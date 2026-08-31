@@ -10,13 +10,15 @@ marcar uma aula, a Nathália escolhe o tema e o material sai pronto, anexado àq
 
 | | |
 |---|---|
-| Temas catalogados | 146 |
-| Temas escritos e conferidos | 6 |
-| Verificações automáticas por tema | 20 a 25 |
-| Séries cobertas até aqui | 2º, 5º, 6º, 7º, 9º e 1º do médio |
+| Temas | 146 de 146, todos conferidos |
+| Séries | do 2º ano do fundamental ao 3º do médio |
+| Exercícios | 2.485 em português, e os mesmos em inglês |
+| Verificações simbólicas | 2.999 |
+| Conferência humana | 73 itens, 2,9% do total |
+| Material explicativo | cerca de 105 mil palavras em cada língua |
 
-Os seis prontos foram escolhidos para provar o formato em pontos bem distantes da escala: contagem
-no 2º ano, porcentagem no 5º, frações no 6º, equação no 7º, geometria no 9º e função no médio.
+O banco está completo. Cada série tem entre 12 e 14 temas, e cada tema traz a explicação, a lista
+em três blocos de dificuldade e o gabarito, nas duas línguas.
 
 O estado de cada tema está no `CATALOGO.md`, e a coluna de situação é preenchida por programa, não
 à mão: um tema só aparece como `pronto` se o arquivo existir **e** passar na conferência.
@@ -102,10 +104,11 @@ O `FORMATO.md` traz a estrutura completa e as regras de conteúdo. O resumo:
 
 ## O que falta
 
-1. **Escrever os 140 temas restantes.** É o grosso do trabalho e vai por etapas.
-2. **Gerar o arquivo consolidado que o aplicativo vai ler.** Os `.md` são a fonte, boa para escrever
-   e revisar. O aplicativo vai consumir um único arquivo gerado a partir deles, para não precisar
-   baixar 146 arquivos no tablet.
-3. **Ligar ao aplicativo**, que é a etapa a ser validada antes de começar: ao criar a aula, escolher
-   o tema e a língua, e sair o material e a lista anexados àquela aula, prontos para o PDF do
-   fechamento ou para ela anotar por cima com a S Pen.
+1. **Ligar ao aplicativo**, que é a etapa a ser validada antes de começar: ao criar a aula, escolher
+   o tema e a língua, montar a lista marcando e desmarcando exercícios, e sair o material anexado
+   àquela aula, pronto para o PDF do fechamento ou para ela anotar por cima com a S Pen.
+2. **Revisar os 73 itens de conferência humana**, que são os exercícios sem conta a verificar por
+   símbolo: nomear figuras, justificar com as próprias palavras, dobrar papel. O verificador os lista
+   ao final de cada execução.
+3. **Traduzir o banco para outras matérias**, se fizer sentido. O formato e o verificador foram
+   escritos para matemática, mas a estrutura serve.

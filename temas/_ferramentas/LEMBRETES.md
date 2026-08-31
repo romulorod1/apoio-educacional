@@ -78,3 +78,38 @@ Prefira conferir em centavos inteiros, com `Rational`, em vez de trabalhar com d
 Só existem estes: x, y, z, a, b, c, d, k, m, n, p, q, r, t, u, v, w, alpha, beta, theta.
 Usar `f` ou `S` como incógnita não dá erro de conta: dá "não pode ser avaliado", que é mais fácil de
 não perceber. Precisando de outro nome, use `Symbol('nome')`.
+
+## Dízima periódica e a regra das reticências
+
+O verificador bloqueia reticências, porque quase sempre são sobra de rascunho. Isso esbarra na
+notação usual de dízima. Use a convenção de parênteses, que é padrão e não conflita:
+
+- Português: 0,(3) para um terço, 1,2(45) para a parte periódica sendo 45.
+- Inglês: 0.(3) e 1.2(45).
+
+Declare a convenção no começo da explicação do tema, para o aluno não estranhar.
+
+Pelo mesmo motivo, ao continuar uma sequência escreva "e assim por diante", nunca reticências.
+
+## Expoente negativo vira float sem avisar
+
+`3**(-2)` em Python puro devolve 0.111..., um float, e a comparação com `Rational(1,9)` falha.
+Escreva `Rational(3)**(-2)` ou `Rational(1, 3**2)`. O mesmo vale para qualquer divisão: `1/3` é
+float, `Rational(1,3)` é a fração exata.
+
+## Símbolos reais e a variável complexa
+
+Os símbolos do ambiente são declarados reais, com uma exceção: `z` fica sem suposição, pela
+convenção de ser a variável complexa.
+
+- Equação com valor absoluto funciona direto: `solve(Eq(Abs(2*x - 6), 4), x)` devolve `[1, 5]`.
+  Antes quebrava, porque o sympy não sabia se o argumento era real.
+- Para raiz complexa, use `z` como incógnita e `I` como unidade imaginária:
+  `set(solve(Eq(z**2 + 25, 0), z)) == set([5*I, -5*I])`. Usar `x` esconderia as raízes, porque
+  `x` é real.
+- Também estão disponíveis `re`, `im`, `arg` e `conjugate`.
+
+## solve não é confiável com a incógnita no expoente
+
+`solve(Eq(3**(2*x - 1), 27), x)` pode não devolver a resposta. Confira igualando os expoentes e
+substituindo: `3**(2*2 - 1) == 27 and solve(Eq(2*x - 1, 3), x) == [2]`.

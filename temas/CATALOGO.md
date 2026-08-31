@@ -104,36 +104,36 @@ ainda não foi escrito.
 | MAT07-01 | Números inteiros e a reta numérica | numeros | pronto |
 | MAT07-02 | Operações com números inteiros | numeros | pronto |
 | MAT07-03 | Números racionais e suas formas | numeros | pronto |
-| MAT07-04 | Operações com racionais | numeros | previsto |
-| MAT07-05 | Razão e proporção | algebra | previsto |
-| MAT07-06 | Regra de três simples | algebra | previsto |
-| MAT07-07 | Porcentagem e juros simples | numeros | previsto |
+| MAT07-04 | Operações com racionais | numeros | pronto |
+| MAT07-05 | Razão e proporção | algebra | pronto |
+| MAT07-06 | Regra de três simples | algebra | pronto |
+| MAT07-07 | Porcentagem e juros simples | numeros | pronto |
 | MAT07-08 | Sequências e regularidades | algebra | pronto |
 | MAT07-09 | Linguagem algébrica e expressões | algebra | pronto |
 | MAT07-10 | Equações do 1º grau | algebra | pronto |
 | MAT07-11 | Ângulos: medir, somar e classificar | geometria | pronto |
 | MAT07-12 | Triângulos e quadriláteros | geometria | pronto |
-| MAT07-13 | Área e perímetro de figuras compostas | grandezas | previsto |
-| MAT07-14 | Média, moda, mediana e probabilidade | estatistica | previsto |
+| MAT07-13 | Área e perímetro de figuras compostas | grandezas | pronto |
+| MAT07-14 | Média, moda, mediana e probabilidade | estatistica | pronto |
 
 ## 8º ano do fundamental
 
 | ID | Tema | Unidade | Situação |
 |---|---|---|---|
 | MAT08-01 | Potenciação e suas propriedades | numeros | pronto |
-| MAT08-02 | Notação científica | numeros | com erro |
+| MAT08-02 | Notação científica | numeros | pronto |
 | MAT08-03 | Radiciação e raízes | numeros | pronto |
 | MAT08-04 | Dízimas periódicas e fração geratriz | numeros | pronto |
 | MAT08-05 | Expressões algébricas e monômios | algebra | pronto |
-| MAT08-06 | Produtos notáveis | algebra | previsto |
-| MAT08-07 | Fatoração de polinômios | algebra | previsto |
+| MAT08-06 | Produtos notáveis | algebra | pronto |
+| MAT08-07 | Fatoração de polinômios | algebra | pronto |
 | MAT08-08 | Frações algébricas | algebra | pronto |
 | MAT08-09 | Equações com duas incógnitas | algebra | pronto |
 | MAT08-10 | Sistemas de equações do 1º grau | algebra | pronto |
-| MAT08-11 | Ângulos em retas paralelas | geometria | previsto |
-| MAT08-12 | Congruência de triângulos | geometria | previsto |
-| MAT08-13 | Círculo: comprimento e área | grandezas | previsto |
-| MAT08-14 | Média ponderada e probabilidade | estatistica | previsto |
+| MAT08-11 | Ângulos em retas paralelas | geometria | pronto |
+| MAT08-12 | Congruência de triângulos | geometria | pronto |
+| MAT08-13 | Círculo: comprimento e área | grandezas | pronto |
+| MAT08-14 | Média ponderada e probabilidade | estatistica | pronto |
 
 ## 9º ano do fundamental
 
@@ -141,18 +141,18 @@ ainda não foi escrito.
 |---|---|---|---|
 | MAT09-01 | Números reais e irracionais | numeros | pronto |
 | MAT09-02 | Potências com expoente negativo e fracionário | numeros | pronto |
-| MAT09-03 | Radicais: operações e racionalização | numeros | previsto |
-| MAT09-04 | Equação do 2º grau: como resolver | algebra | previsto |
-| MAT09-05 | Equação do 2º grau: problemas | algebra | previsto |
-| MAT09-06 | Relações métricas no triângulo retângulo | geometria | previsto |
+| MAT09-03 | Radicais: operações e racionalização | numeros | pronto |
+| MAT09-04 | Equação do 2º grau: como resolver | algebra | pronto |
+| MAT09-05 | Equação do 2º grau: problemas | algebra | pronto |
+| MAT09-06 | Relações métricas no triângulo retângulo | geometria | pronto |
 | MAT09-07 | Teorema de Pitágoras | geometria | pronto |
-| MAT09-08 | Semelhança e Teorema de Tales | geometria | previsto |
+| MAT09-08 | Semelhança e Teorema de Tales | geometria | pronto |
 | MAT09-09 | Seno, cosseno e tangente | geometria | pronto |
 | MAT09-10 | Funções: a ideia e o gráfico | algebra | pronto |
 | MAT09-11 | Circunferência: ângulos e arcos | geometria | pronto |
-| MAT09-12 | Volume de cilindros e outros sólidos | grandezas | previsto |
-| MAT09-13 | Medidas de tendência e de dispersão | estatistica | previsto |
-| MAT09-14 | Probabilidade de eventos sucessivos | estatistica | previsto |
+| MAT09-12 | Volume de cilindros e outros sólidos | grandezas | pronto |
+| MAT09-13 | Medidas de tendência e de dispersão | estatistica | pronto |
+| MAT09-14 | Probabilidade de eventos sucessivos | estatistica | pronto |
 
 ## 1º ano do ensino médio
 
@@ -165,13 +165,13 @@ ainda não foi escrito.
 | MATEM1-05 | Inequações do 1º e do 2º grau | algebra | pronto |
 | MATEM1-06 | Função modular | algebra | pronto |
 | MATEM1-07 | Função exponencial | algebra | pronto |
-| MATEM1-08 | Logaritmos: definição e propriedades | algebra | previsto |
+| MATEM1-08 | Logaritmos: definição e propriedades | algebra | pronto |
 | MATEM1-09 | Função logarítmica | algebra | pronto |
 | MATEM1-10 | Progressão aritmética | algebra | pronto |
 | MATEM1-11 | Progressão geométrica | algebra | pronto |
-| MATEM1-12 | Sequências e recorrência | algebra | previsto |
-| MATEM1-13 | Estatística descritiva | estatistica | previsto |
-| MATEM1-14 | Trigonometria no triângulo retângulo | geometria | previsto |
+| MATEM1-12 | Sequências e recorrência | algebra | pronto |
+| MATEM1-13 | Estatística descritiva | estatistica | pronto |
+| MATEM1-14 | Trigonometria no triângulo retângulo | geometria | pronto |
 
 ## 2º ano do ensino médio
 
@@ -179,37 +179,37 @@ ainda não foi escrito.
 |---|---|---|---|
 | MATEM2-01 | Ciclo trigonométrico | geometria | pronto |
 | MATEM2-02 | Funções trigonométricas | algebra | pronto |
-| MATEM2-03 | Lei dos senos e lei dos cossenos | geometria | previsto |
-| MATEM2-04 | Matrizes e suas operações | algebra | previsto |
-| MATEM2-05 | Determinantes | algebra | previsto |
-| MATEM2-06 | Sistemas lineares | algebra | previsto |
+| MATEM2-03 | Lei dos senos e lei dos cossenos | geometria | pronto |
+| MATEM2-04 | Matrizes e suas operações | algebra | pronto |
+| MATEM2-05 | Determinantes | algebra | pronto |
+| MATEM2-06 | Sistemas lineares | algebra | pronto |
 | MATEM2-07 | Princípio fundamental da contagem | estatistica | pronto |
-| MATEM2-08 | Arranjos, permutações e combinações | estatistica | previsto |
-| MATEM2-09 | Binômio de Newton | algebra | previsto |
-| MATEM2-10 | Probabilidade | estatistica | previsto |
-| MATEM2-11 | Prismas e pirâmides | geometria | previsto |
-| MATEM2-12 | Cilindros, cones e esferas | geometria | previsto |
-| MATEM2-13 | Juros compostos | numeros | previsto |
-| MATEM2-14 | Distribuições e dispersão | estatistica | previsto |
+| MATEM2-08 | Arranjos, permutações e combinações | estatistica | pronto |
+| MATEM2-09 | Binômio de Newton | algebra | pronto |
+| MATEM2-10 | Probabilidade | estatistica | pronto |
+| MATEM2-11 | Prismas e pirâmides | geometria | pronto |
+| MATEM2-12 | Cilindros, cones e esferas | geometria | pronto |
+| MATEM2-13 | Juros compostos | numeros | pronto |
+| MATEM2-14 | Distribuições e dispersão | estatistica | pronto |
 
 ## 3º ano do ensino médio
 
 | ID | Tema | Unidade | Situação |
 |---|---|---|---|
 | MATEM3-01 | Geometria analítica: ponto e distância | geometria | pronto |
-| MATEM3-02 | Geometria analítica: a reta | geometria | previsto |
-| MATEM3-03 | Geometria analítica: a circunferência | geometria | previsto |
-| MATEM3-04 | Cônicas | geometria | previsto |
-| MATEM3-05 | Números complexos: forma algébrica | numeros | previsto |
-| MATEM3-06 | Números complexos: forma trigonométrica | numeros | previsto |
-| MATEM3-07 | Polinômios: operações e divisão | algebra | previsto |
-| MATEM3-08 | Equações polinomiais e raízes | algebra | previsto |
-| MATEM3-09 | Noção de limite e continuidade | algebra | previsto |
-| MATEM3-10 | Revisão: funções e gráficos | algebra | previsto |
-| MATEM3-11 | Revisão: contagem e probabilidade | estatistica | previsto |
-| MATEM3-12 | Revisão: geometria plana e espacial | geometria | previsto |
-| MATEM3-13 | Matemática financeira aplicada | numeros | previsto |
-| MATEM3-14 | Interpretação de dados e gráficos | estatistica | previsto |
+| MATEM3-02 | Geometria analítica: a reta | geometria | pronto |
+| MATEM3-03 | Geometria analítica: a circunferência | geometria | pronto |
+| MATEM3-04 | Cônicas | geometria | pronto |
+| MATEM3-05 | Números complexos: forma algébrica | numeros | pronto |
+| MATEM3-06 | Números complexos: forma trigonométrica | numeros | pronto |
+| MATEM3-07 | Polinômios: operações e divisão | algebra | pronto |
+| MATEM3-08 | Equações polinomiais e raízes | algebra | pronto |
+| MATEM3-09 | Noção de limite e continuidade | algebra | pronto |
+| MATEM3-10 | Revisão: funções e gráficos | algebra | pronto |
+| MATEM3-11 | Revisão: contagem e probabilidade | estatistica | pronto |
+| MATEM3-12 | Revisão: geometria plana e espacial | geometria | pronto |
+| MATEM3-13 | Matemática financeira aplicada | numeros | pronto |
+| MATEM3-14 | Interpretação de dados e gráficos | estatistica | pronto |
 
 ---
 

@@ -31,14 +31,22 @@ from sympy import (symbols, solve, Eq, simplify, expand, factor, Rational, sqrt,
                    Interval, FiniteSet, Union, Intersection, EmptySet, sympify,
                    Rational as R, nsolve, real_roots, cancel, together, apart,
                    trigsimp, radsimp, powsimp, root, cbrt, sign, Min, Max,
-                   solveset, solve_univariate_inequality, Reals, Rational as Fr)
+                   solveset, solve_univariate_inequality, Reals, Rational as Fr,
+                   I, re as parte_real, im as parte_imag, arg, conjugate, Abs as modulo)
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PASTA_MAT = os.path.join(RAIZ, 'mat')
 
 # simbolos disponiveis nas expressoes de verificacao
-x, y, z, a, b, c, d, k, m, n, p, q, r, t, u, v, w = symbols('x y z a b c d k m n p q r t u v w')
-alpha, beta, theta = symbols('alpha beta theta')
+# Declarados reais de proposito: sem isso o sympy recusa resolver equacao com
+# valor absoluto, dizendo que nao sabe se o argumento e real. Como todo tema
+# deste banco trabalha com numeros reais, a suposicao e sempre verdadeira aqui.
+x, y, a, b, c, d, k, m, n, p, q, r, t, u, v, w = symbols(
+    'x y a b c d k m n p q r t u v w', real=True)
+alpha, beta, theta = symbols('alpha beta theta', real=True)
+# z fica sem suposicao, pela convencao de ser a variavel complexa: declarar z
+# como real faria o sympy esconder as raizes complexas de uma equacao.
+z = symbols('z')
 
 AMBIENTE = dict(
     x=x, y=y, z=z, a=a, b=b, c=c, d=d, k=k, m=m, n=n, p=p, q=q, r=r, t=t, u=u, v=v, w=w,
@@ -57,6 +65,7 @@ AMBIENTE = dict(
     len=len, abs=abs, round=round, sum=sum, all=all, any=any, list=list, range=range, int=int,
     max=max, min=min, enumerate=enumerate, zip=zip, divmod=divmod, str=str, float=float,
     solveset=solveset, solve_univariate_inequality=solve_univariate_inequality, Reals=Reals,
+    I=I, re=parte_real, im=parte_imag, arg=arg, conjugate=conjugate,
 )
 
 UNIDADES = {'numeros', 'algebra', 'geometria', 'grandezas', 'estatistica'}

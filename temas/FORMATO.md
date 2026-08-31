@@ -122,6 +122,16 @@ resultar em verdadeiro quando avaliada com o sympy.
 - `E1`, `E2`, ... conferem os exercícios, na ordem do gabarito.
 - `X1`, `X2`, ... conferem os exemplos resolvidos dentro da explicação.
 
+**A verificação precisa provar alguma coisa.** Escrever `12 == 12` para conferir que o cubo tem 12
+arestas passa e não prova nada, o que é pior do que não conferir: dá a impressão de que a conta foi
+checada. O verificador reprova esse padrão. O certo seria `Rational(6*4, 2) == 12`, que é o
+argumento de verdade. Quando o item é fato de convenção, como a semana ter 7 dias, marque como
+conferência humana. Comparação entre números diferentes, como `385 > 358`, prova algo e vale.
+
+**Nenhum exercício pode citar outro pelo número.** A Nathália monta a lista marcando e desmarcando
+questões, então a numeração muda a cada montagem. Um enunciado que diga "compare com o exercício 8"
+quebra assim que o 8 sai da lista. O verificador também reprova isso.
+
 O verificador roda `temas/_ferramentas/verificar.py`. Um tema que falhe em qualquer linha **não entra
 no banco**. Exercício que não é verificável por símbolo (interpretação, desenho, argumentação) é
 marcado com `# manual: motivo` e entra na lista de conferência humana, que o próprio verificador
