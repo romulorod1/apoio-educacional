@@ -51,14 +51,14 @@ const esp = ms => new Promise(r => setTimeout(r, ms));
   console.log('\n=== a janela de novidades aparece ===');
   conf('a janela abriu sozinha', await visivel('#modal-novidades'), true);
   const nov = await pag.$eval('#corpo-modal-novidades', e => e.textContent);
-  conf('diz a versão nova', nov.includes('1.5.0'), true);
+  conf('diz a versão nova', /vers[aã]o [0-9]+\.[0-9]+\.[0-9]+/i.test(nov), true);
   conf('tranquiliza sobre os dados', nov.includes('Nada do que você já tinha foi alterado'), true);
   conf('conta do histórico do aluno', nov.includes('Histórico'), true);
   await pag.$eval('#entendi-novidades', e => e.click());
   await esp(600);
   conf('fecha ao confirmar', await visivel('#modal-novidades'), false);
   let banco = await bd();
-  conf('guarda que ela já viu', banco.ajustes.versaoVista, '1.5.0');
+  conf('guarda que ela já viu', /^[0-9]+\.[0-9]+\.[0-9]+$/.test(banco.ajustes.versaoVista), true);
 
   await pag.reload({ waitUntil: 'networkidle0' });
   await esp(2200);

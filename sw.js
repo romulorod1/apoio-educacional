@@ -3,7 +3,7 @@
  * Os dados das aulas não passam por aqui: ficam no IndexedDB, no aparelho.
  */
 
-var CACHE = 'apoio-educacional-v6';
+var CACHE = 'apoio-educacional-v8';
 
 var ARQUIVOS = [
   './',
@@ -18,7 +18,10 @@ var ARQUIVOS = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
-  './icons/favicon.png'
+  './icons/favicon.png',
+  // o indice dos temas entra no pacote inicial para a lista abrir sem internet.
+  // o conteudo de cada serie e guardado sozinho, na primeira vez que for usado.
+  './banco/indice.json'
 ];
 
 /* Não assume o controle sozinho: fica esperando. Quem manda trocar de versão

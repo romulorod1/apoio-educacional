@@ -25,6 +25,7 @@ import verificar
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SAIDA = os.path.join(RAIZ, 'banco.json')
+PASTA_BANCO = os.path.join(os.path.dirname(RAIZ), 'banco')
 
 TITULOS = {
     'pt': {'explicacao': 'Explicação', 'exercicios': 'Exercícios', 'gabarito': 'Gabarito'},
@@ -118,6 +119,13 @@ def montar_lista(tema, lingua, escolhidos, com_gabarito=True):
 
 
 def gerar():
+    """Gera o que o aplicativo consome.
+
+    Sao dois niveis, de proposito. O indice e leve e carrega sempre, para a
+    lista de temas aparecer na hora. O conteudo de cada serie so e baixado
+    quando ela abre um tema daquela serie: no tablet, puxar dois megabytes toda
+    vez que alguem quer ver um titulo seria desperdicio.
+    """
     temas = []
     reprovados = []
     for caminho in sorted(glob.glob(os.path.join(RAIZ, 'mat', '*', '*.md'))):
@@ -127,14 +135,44 @@ def gerar():
             continue
         temas.append(ler(caminho))
 
+    if not os.path.isdir(PASTA_BANCO):
+        os.makedirs(PASTA_BANCO)
+
+    indice = []
+    for t in temas:
+        indice.append({
+            'id': t['id'], 'serie': t['serie'], 'unidade': t['unidade'],
+            'duracaoMin': t['duracaoMin'], 'dificuldade': t['dificuldade'],
+            'qtd': len(t['pt']['exercicios']),
+            'pt': {'titulo': t['pt']['titulo'], 'resumo': t['pt']['resumo']},
+            'en': {'titulo': t['en']['titulo'], 'resumo': t['en']['resumo']},
+        })
+    caminho_indice = os.path.join(PASTA_BANCO, 'indice.json')
+    io.open(caminho_indice, 'w', encoding='utf-8', newline=chr(10)).write(
+        json.dumps({'formato': 'banco-temas-matematica', 'versao': 1, 'temas': indice},
+                   ensure_ascii=False, separators=(',', ':')))
+
+    por_serie = {}
+    for t in temas:
+        por_serie.setdefault(t['serie'], []).append(t)
+    maior = 0
+    for serie, lista in sorted(por_serie.items()):
+        caminho = os.path.join(PASTA_BANCO, 'serie-%s.json' % serie)
+        io.open(caminho, 'w', encoding='utf-8', newline=chr(10)).write(
+            json.dumps({'serie': serie, 'temas': lista},
+                       ensure_ascii=False, separators=(',', ':')))
+        maior = max(maior, os.path.getsize(caminho) / 1024.0)
+
     banco = {'formato': 'banco-temas-matematica', 'versao': 1, 'temas': temas}
-    io.open(SAIDA, 'w', encoding='utf-8', newline='\n').write(
+    io.open(SAIDA, 'w', encoding='utf-8', newline=chr(10)).write(
         json.dumps(banco, ensure_ascii=False, separators=(',', ':')))
 
-    tamanho = os.path.getsize(SAIDA)
     total_ex = sum(len(t['pt']['exercicios']) for t in temas)
-    print('banco.json gerado: %d tema(s), %d exercicio(s) em portugues, %.1f KB'
-          % (len(temas), total_ex, tamanho / 1024.0))
+    print('%d tema(s), %d exercicio(s) em portugues' % (len(temas), total_ex))
+    print('indice.json: %.0f KB, carrega sempre' % (os.path.getsize(caminho_indice) / 1024.0))
+    print('%d arquivos de serie, o maior com %.0f KB, baixados so quando precisa'
+          % (len(por_serie), maior))
+    print('banco.json inteiro: %.0f KB' % (os.path.getsize(SAIDA) / 1024.0))
     if reprovados:
         print('')
         print('%d tema(s) ficaram de fora por nao passarem na conferencia:' % len(reprovados))

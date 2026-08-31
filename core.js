@@ -633,6 +633,150 @@
 
   /* Retorna o fechamento de um aluno num mes.
    * db = { alunos: [], aulas: [], resumos: [] } */
+  /* Áreas trabalhadas na aula.
+   *
+   * O trabalho dela não é só conteúdo: boa parte do valor está em ensinar a
+   * criança a estudar, a se organizar e a lidar com prova. Isso costuma ficar
+   * invisível no fechamento, que só mostra hora e valor. Aqui a lista é de
+   * clicar, para o registro sair completo sem virar trabalho de digitação.
+   *
+   * A ordem dentro de cada grupo é a de uso provável, não alfabética.
+   */
+  var AREAS = [
+    {
+      grupo: 'Método e organização',
+      itens: [
+        { id: 'autonomia', rotulo: 'Autonomia nos estudos' },
+        { id: 'horarios', rotulo: 'Organização dos horários' },
+        { id: 'cronograma', rotulo: 'Montagem do cronograma' },
+        { id: 'priorizacao', rotulo: 'Priorização do que estudar' },
+        { id: 'disciplina', rotulo: 'Disciplina e constância' },
+        { id: 'metodo', rotulo: 'Método de estudo (resumo, mapa, ficha)' },
+        { id: 'material', rotulo: 'Organização do material e do caderno' },
+        { id: 'tempo', rotulo: 'Uso do tempo e foco' }
+      ]
+    },
+    {
+      grupo: 'Preparação para avaliações',
+      itens: [
+        { id: 'revisao', rotulo: 'Revisão para prova' },
+        { id: 'estrategia-prova', rotulo: 'Estratégia de prova' },
+        { id: 'analise-erros', rotulo: 'Correção de prova e análise de erros' },
+        { id: 'enunciado', rotulo: 'Leitura e interpretação de enunciado' },
+        { id: 'lista-tarefa', rotulo: 'Lista de exercícios e dever de casa' }
+      ]
+    },
+    {
+      grupo: 'Postura e emocional',
+      itens: [
+        { id: 'frustracao', rotulo: 'Lidar com frustrações' },
+        { id: 'ansiedade', rotulo: 'Ansiedade ou medo de prova' },
+        { id: 'confianca', rotulo: 'Confiança e autoestima' },
+        { id: 'persistencia', rotulo: 'Persistir na questão difícil' },
+        { id: 'pedir-ajuda', rotulo: 'Pedir ajuda e tirar dúvida' },
+        { id: 'concentracao', rotulo: 'Concentração' }
+      ]
+    },
+    {
+      grupo: 'Conteúdo e raciocínio',
+      itens: [
+        { id: 'base', rotulo: 'Retomada de base de anos anteriores' },
+        { id: 'raciocinio', rotulo: 'Raciocínio lógico' },
+        { id: 'argumentacao', rotulo: 'Argumentação e justificativa escrita' },
+        { id: 'calculo-mental', rotulo: 'Cálculo mental' },
+        { id: 'linguagem', rotulo: 'Linguagem matemática e notação' }
+      ]
+    }
+  ];
+
+  var ROTULO_AREA = {};
+  AREAS.forEach(function (g) {
+    g.itens.forEach(function (i) { ROTULO_AREA[i.id] = i.rotulo; });
+  });
+
+  function rotuloArea(id) { return ROTULO_AREA[id] || ''; }
+
+  /* Uma aula pode ter mais de um tema: hora e meia dá tempo de fechar um assunto
+   * e começar outro. O campo antigo, de um tema só, continua sendo lido para não
+   * perder registro de quem já usou. */
+  function temasDaAula(au) {
+    if (au.temas && au.temas.length) return au.temas.slice();
+    if (au.tema) return [au.tema];
+    return [];
+  }
+
+  /* Divide uma aula em duas metades no mesmo dia.
+   *
+   * Serve para quando o encontro tratou de dois assuntos diferentes e ela quer
+   * registrar cada um no seu lugar. A soma das duas é sempre igual à duração
+   * original, para o valor cobrado no mês não mudar por causa da divisão.
+   *
+   * O que já estava escrito fica na primeira metade. A segunda nasce vazia:
+   * mover nota e anexo por conta própria seria adivinhar a qual assunto cada
+   * coisa pertence.
+   */
+  function somarMinutosNaHora(hora, minutos) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(String(hora || ''));
+    if (!m) return '';
+    var total = (+m[1]) * 60 + (+m[2]) + minutos;
+    if (total >= 24 * 60) total = 24 * 60 - 1;
+    return pad2(Math.floor(total / 60)) + ':' + pad2(total % 60);
+  }
+
+  function metadesDe(duracaoMin) {
+    var total = duracaoMin || 60;
+    var primeira = Math.round(total / 2);
+    return [primeira, total - primeira];
+  }
+
+  function podeDividir(aula) {
+    return !!aula && (aula.duracaoMin || 60) >= 20;
+  }
+
+  function dividirAula(db, aulaId) {
+    var aula = (db.aulas || []).filter(function (a) { return a.id === aulaId; })[0];
+    if (!podeDividir(aula)) return null;
+    var partes = metadesDe(aula.duracaoMin || 60);
+    var anterior = { duracaoMin: aula.duracaoMin, destacada: !!aula.destacada };
+
+    aula.duracaoMin = partes[0];
+    // A divisão vale só para este encontro, nunca para a repetição inteira.
+    if (aula.serieId) aula.destacada = true;
+
+    var nova = {
+      id: uid(),
+      alunoId: aula.alunoId,
+      serieId: null,
+      destacada: false,
+      data: aula.data,
+      hora: somarMinutosNaHora(aula.hora, partes[0]),
+      duracaoMin: partes[1],
+      status: aula.status || 'realizada',
+      cobravel: aula.cobravel !== undefined ? aula.cobravel : true,
+      notaTexto: '',
+      temNota: false,
+      anexos: [],
+      areas: [],
+      temas: []
+    };
+    db.aulas.push(nova);
+    return { aulaId: aula.id, novaId: nova.id, anterior: anterior, partes: partes };
+  }
+
+  function desfazerDivisao(db, marca) {
+    if (!marca) return false;
+    var aula = (db.aulas || []).filter(function (a) { return a.id === marca.aulaId; })[0];
+    var nova = (db.aulas || []).filter(function (a) { return a.id === marca.novaId; })[0];
+    // Se ela já escreveu algo na segunda metade, desfazer apagaria trabalho.
+    if (nova && temConteudo(nova)) return false;
+    if (aula) {
+      aula.duracaoMin = marca.anterior.duracaoMin;
+      aula.destacada = marca.anterior.destacada;
+    }
+    db.aulas = (db.aulas || []).filter(function (a) { return a.id !== marca.novaId; });
+    return true;
+  }
+
   function calcularFechamento(db, alunoId, mesIso) {
     var aluno = (db.alunos || []).filter(function (a) { return a.id === alunoId; })[0];
     if (!aluno) return null;
@@ -682,13 +826,38 @@
         valorHora: vh,
         valor: valor,
         temNota: !!(au.notaTexto || (au.nota && au.nota.paginas && au.nota.paginas.length) || (au.anexos && au.anexos.length)),
-        notaTexto: au.notaTexto || ''
+        notaTexto: au.notaTexto || '',
+        temas: temasDaAula(au),
+        areas: (au.areas || []).slice()
       });
     }
 
     var resumo = (db.resumos || []).filter(function (r) {
       return r.alunoId === alunoId && r.mes === mesIso;
     })[0] || null;
+
+    /* O que ela trabalhou no mês, além das horas. É isto que transforma o
+     * fechamento em algo que a família lê com atenção, e não só uma conta. */
+    var temasDoMes = [];
+    var vistos = {};
+    var contagemAreas = {};
+    linhas.forEach(function (l) {
+      l.temas.forEach(function (t) {
+        if (vistos[t.titulo]) {
+          if (vistos[t.titulo].datas.indexOf(l.data) < 0) vistos[t.titulo].datas.push(l.data);
+          return;
+        }
+        vistos[t.titulo] = { titulo: t.titulo, datas: [l.data] };
+        temasDoMes.push(vistos[t.titulo]);
+      });
+      l.areas.forEach(function (id) {
+        contagemAreas[id] = (contagemAreas[id] || 0) + 1;
+      });
+    });
+    var areasDoMes = Object.keys(contagemAreas).map(function (id) {
+      return { id: id, rotulo: rotuloArea(id), vezes: contagemAreas[id] };
+    }).filter(function (a) { return a.rotulo; })
+      .sort(function (a, b) { return b.vezes - a.vezes || a.rotulo.localeCompare(b.rotulo); });
 
     var listaFaixas = Object.keys(faixas).map(function (k) { return faixas[k]; })
       .sort(function (a, b) { return a.valorHora - b.valorHora; });
@@ -709,6 +878,8 @@
       precoUnico: listaFaixas.length === 1 ? listaFaixas[0].valorHora : null,
       semPreco: semPreco,
       resumoTexto: resumo ? (resumo.texto || '') : '',
+      temasDoMes: temasDoMes,
+      areasDoMes: areasDoMes,
       qtdEncontros: linhas.filter(function (l) { return l.cobravel || l.status !== 'cancelada'; }).length
     };
   }
@@ -768,6 +939,24 @@
       L.push('');
       L.push('> Atenção: não há valor por hora vigente para ' + f.semPreco.map(ddmm).join(', ') + '.');
     }
+    if (f.temasDoMes && f.temasDoMes.length) {
+      L.push('');
+      L.push('## Temas trabalhados');
+      L.push('');
+      f.temasDoMes.forEach(function (t) {
+        L.push('- ' + t.titulo + ' (' + t.datas.map(ddmm).join(', ') + ')');
+      });
+    }
+
+    if (f.areasDoMes && f.areasDoMes.length) {
+      L.push('');
+      L.push('## Áreas trabalhadas');
+      L.push('');
+      f.areasDoMes.forEach(function (a) {
+        L.push('- ' + a.rotulo + (a.vezes > 1 ? ' (' + a.vezes + ' aulas)' : ''));
+      });
+    }
+
     L.push('');
     L.push('## Resumo do mês');
     L.push('');
@@ -846,6 +1035,9 @@
     repetirParaTras: repetirParaTras, preverRetroativo: preverRetroativo, temConteudo: temConteudo,
     calcularFechamento: calcularFechamento, calcularMesInteiro: calcularMesInteiro,
     markdownFechamento: markdownFechamento, markdownMesInteiro: markdownMesInteiro,
+    AREAS: AREAS, rotuloArea: rotuloArea, temasDaAula: temasDaAula,
+    dividirAula: dividirAula, desfazerDivisao: desfazerDivisao,
+    podeDividir: podeDividir, metadesDe: metadesDe, somarMinutosNaHora: somarMinutosNaHora,
     uid: uid, nomeArquivo: nomeArquivo
   };
 });

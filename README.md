@@ -43,6 +43,26 @@ escolha **PDF**, e depois use **Anexar PDF** aqui dentro da aula. O arquivo fica
 aula e você abre ou compartilha quando quiser. Ele não entra dentro do PDF do fechamento, que leva
 só as folhas escritas no próprio aplicativo.
 
+**Material de aula.** Dentro da aula, ao lado da folha em branco, o botão *Material de aula* abre um
+banco com 146 temas de matemática, do 2º ano do fundamental ao 3º do médio, em português ou em
+inglês. Cada tema traz explicação, lista de exercícios e gabarito, e você escolhe o que entra. A
+lista nasce com todos os exercícios marcados: vá desmarcando o que não quiser, ou desmarque tudo e
+escolha um a um. O material sai em PDF anexado àquela aula, com a mesma marca do fechamento.
+
+O tema é opcional, sempre. A folha em branco continua sendo o começo natural da aula, para você
+planejar do seu jeito, e o material pronto é só um atalho para quando ajudar.
+
+Uma aula pode receber quantos temas você quiser. Uma revisão de prova que passou por três assuntos
+continua sendo um encontro só, e o fechamento do mês lista os três. Se um dia forem mesmo dois
+encontros separados no mesmo dia, existe *Dividir em duas aulas*, que reparte a duração ao meio e
+tem *Desfazer*.
+
+**Áreas trabalhadas na aula.** Dentro da aula há uma lista de clicar, com o que você trabalha além
+do conteúdo: autonomia, organização dos horários, montagem do cronograma, priorização, disciplina,
+método de estudo, estratégia de prova, lidar com frustrações, ansiedade antes da prova, e outras.
+O que for marcado aparece no fechamento do mês, com a contagem de quantas aulas tocaram em cada
+ponto. É o que mostra à família o trabalho que não cabe na conta de horas.
+
 **Repetir para trás.** Quando as aulas já aconteciam antes de você cadastrar o aluno, abra
 qualquer aula dele e toque em *Repetir para trás*. Escolha os dias da semana e até que data voltar:
 o aplicativo cria as datas passadas com o mesmo horário e a mesma duração, pulando os dias que já
@@ -54,7 +74,8 @@ que valia na data dela, então reajuste no meio do mês sai certo sozinho.
 
 **Fechamento.** Uma tela por mês, com a tabela de cada aluno e o total. Escreva o resumo do mês e
 gere o PDF, já com o cabeçalho, o rodapé e a marca d'água. Dá para gerar também o arquivo de texto e
-o PDF com as folhas de aula anexadas.
+o PDF com as folhas de aula anexadas. Além da tabela de datas, o documento traz os temas trabalhados
+com as datas de cada um e as áreas trabalhadas com a contagem, quando houver.
 
 **Ficha do aluno.** Ao tocar num aluno abre a janela de perfil, em três abas. *Dados* traz nome,
 responsável, desde quando ele estuda com você, e dois campos de anotação: observações gerais, para o
@@ -108,6 +129,8 @@ alunos fica em zero e um aviso aparece na tela de alunos.
 | `draw.js` | Editor da folha de aula |
 | `app.js` | Interface e ligação entre as partes |
 | `sw.js` | Modo offline |
+| `banco/` | Banco de temas em JSON, gerado a partir de `temas/`: `indice.json` carrega sempre, cada `serie-XX.json` só quando usada |
+| `temas/` | Fonte dos temas em Markdown, com o verificador simbólico |
 
 `core.js` e `pdf.js` não dependem de navegador, então rodam no Node e são testados direto.
 

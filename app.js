@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.5.0';
+  var VERSAO = '1.6.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -18,6 +18,23 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.6.0',
+      itens: [
+        'Dentro da aula, o botão "Material de aula" abre um banco com 146 temas de matemática, ' +
+        'do 2º ano do fundamental ao 3º do médio, em português ou em inglês.',
+        'Cada tema traz explicação, lista de exercícios e gabarito. Você escolhe o que entra, ' +
+        'e monta a lista marcando e desmarcando questão por questão. O material sai em PDF ' +
+        'anexado àquela aula.',
+        'A folha em branco continua como sempre foi: o tema é um atalho, para quando quiser, ' +
+        'e nunca substitui o seu planejamento.',
+        'Uma mesma aula pode receber vários temas: uma revisão de prova continua sendo um ' +
+        'encontro só, e o fechamento do mês lista os assuntos trabalhados. Se precisar, ' +
+        'ainda dá para dividir uma aula em duas metades no mesmo dia.',
+        'A aula agora tem uma lista de áreas trabalhadas, de organização e método a postura ' +
+        'e emocional, e o que você marcar aparece no fechamento do mês.'
+      ]
+    },
     {
       versao: '1.5.0',
       itens: [
@@ -839,24 +856,42 @@
         el('span', { texto: 'Anotação digitada' }), areaNota
       ]));
 
+      desenharAreas(corpo, aulaEmEdicao);
+
       corpo.appendChild(el('div', { class: 'barra', style: 'margin-bottom:4px' }, [
         el('button', {
           type: 'button', class: 'btn',
           texto: 'Repetir para trás',
           aoClick: function () { abrirRetroativo(aulaEmEdicao.id); }
-        })
-      ]));
-      corpo.appendChild(el('div', {
-        class: 'ajuda',
-        texto: 'Use quando as aulas já aconteciam antes de você cadastrar o aluno. ' +
-          'O aplicativo cria as datas passadas com este mesmo horário e duração.'
-      }));
+        }),
+        Core.podeDividir(aulaEmEdicao) ? el('button', {
+          type: 'button', class: 'btn', id: 'dividir-aula',
+          texto: 'Dividir em duas aulas de ' + rotuloMetades(aulaEmEdicao),
+          aoClick: function () { dividirAulaEmDuas(aulaEmEdicao.id); }
+        }) : null
+      ].filter(Boolean)));
+      corpo.appendChild(el('div', { class: 'ajuda' }, [
+        el('strong', { texto: 'Repetir para trás: ' }),
+        document.createTextNode('use quando as aulas já aconteciam antes de você cadastrar o aluno. ' +
+          'O aplicativo cria as datas passadas com este mesmo horário e duração. '),
+        Core.podeDividir(aulaEmEdicao) ? el('strong', { texto: 'Dividir em duas: ' }) : null,
+        Core.podeDividir(aulaEmEdicao) ? document.createTextNode(
+          'raramente é preciso. Um encontro que passou por vários assuntos continua sendo ' +
+          'uma aula só, e pode receber quantos temas você quiser: assim o fechamento do mês ' +
+          'mostra a lista de temas em vez de se partir em vários blocos curtos. ' +
+          'Divida apenas quando foram mesmo dois encontros separados no dia.') : null
+      ].filter(Boolean)));
 
-      var linhaFolha = el('div', { class: 'barra', style: 'margin-bottom:6px' });
+      var linhaFolha = el('div', { id: 'linha-folha', class: 'barra', style: 'margin-bottom:6px' });
       linhaFolha.appendChild(el('button', {
         type: 'button', class: 'btn destaque',
         texto: aulaEmEdicao.temNota ? 'Abrir folha de aula' : 'Escrever à mão na folha',
         aoClick: function () { abrirEditorNota(aulaEmEdicao.id); }
+      }));
+      linhaFolha.appendChild(el('button', {
+        type: 'button', class: 'btn',
+        texto: 'Material de aula',
+        aoClick: function () { abrirTemas(aulaEmEdicao.id); }
       }));
       linhaFolha.appendChild(el('button', {
         type: 'button', class: 'btn',
@@ -869,13 +904,22 @@
         aoClick: function () { anexarArquivo(aulaEmEdicao.id, 'foto'); }
       }));
       corpo.appendChild(linhaFolha);
-      corpo.appendChild(el('div', { class: 'ajuda' }, [
-        document.createTextNode('A folha aceita escrita com a S Pen, imagem colada e texto digitado. '),
+      corpo.appendChild(el('div', { id: 'ajuda-folha', class: 'ajuda' }, [
+        el('strong', { texto: 'A folha em branco é sempre o começo: ' }),
+        document.createTextNode('ela aceita escrita com a S Pen, imagem colada e texto digitado, ' +
+          'e serve para você planejar a aula do jeito que quiser. '),
+        el('strong', { texto: 'Material de aula ' }),
+        document.createTextNode('é um atalho opcional, para quando quiser puxar explicação e ' +
+          'exercícios prontos de um tema. '),
         el('strong', { texto: 'Para trazer uma aula do Samsung Notes: ' }),
         document.createTextNode('lá dentro toque em Compartilhar, escolha PDF, e depois use "Anexar PDF" aqui. ' +
           'O arquivo fica guardado junto da aula e você abre ou compartilha quando quiser. ' +
           'Ele não entra dentro do PDF do fechamento, que leva só as folhas escritas aqui.')
       ]));
+
+      var listaTemas = el('div', { id: 'lista-temas-aula' });
+      corpo.appendChild(listaTemas);
+      desenharTemasDaAula(listaTemas, aulaEmEdicao);
 
       var listaAnexos = el('div', { id: 'lista-anexos' });
       corpo.appendChild(listaAnexos);
@@ -884,6 +928,130 @@
 
     atualizarPrevisao();
     abrirModal('modal-aula');
+  }
+
+  /* Áreas trabalhadas.
+   *
+   * Fica recolhido por padrão: no meio de uma aula ela não quer rolar por vinte
+   * e quatro caixas para chegar ao anexo. Aberto, é só clicar. */
+  function desenharAreas(corpo, aula) {
+    aula.areas = aula.areas || [];
+
+    var contador = el('span', { class: 'tag', id: 'conta-areas' });
+    var caixa = el('div', { id: 'caixa-areas', style: 'display:none' });
+
+    function atualizarContador() {
+      var n = aula.areas.length;
+      contador.textContent = n ? (n === 1 ? '1 marcada' : n + ' marcadas') : 'nenhuma';
+      contador.className = 'tag' + (n ? ' cheia' : '');
+    }
+
+    var botao = el('button', {
+      type: 'button', class: 'btn pequeno', id: 'abrir-areas', texto: 'Mostrar'
+    });
+    botao.addEventListener('click', function () {
+      var aberto = caixa.style.display !== 'none';
+      caixa.style.display = aberto ? 'none' : '';
+      botao.textContent = aberto ? 'Mostrar' : 'Esconder';
+    });
+
+    corpo.appendChild(el('div', { class: 'barra', style: 'margin:10px 0 4px' }, [
+      el('span', {
+        texto: 'Áreas trabalhadas na aula',
+        style: 'font-size:13px;font-weight:700;color:#1F3A5F'
+      }),
+      contador,
+      el('span', { class: 'cresce' }),
+      botao
+    ]));
+
+    Core.AREAS.forEach(function (grupo) {
+      caixa.appendChild(el('div', { class: 'bloco-exercicios', texto: grupo.grupo }));
+      var grade = el('div', { class: 'grade-areas' });
+      grupo.itens.forEach(function (item) {
+        var chk = el('input', { type: 'checkbox', style: 'width:auto;min-height:auto' });
+        chk.checked = aula.areas.indexOf(item.id) >= 0;
+        chk.addEventListener('change', function () {
+          if (this.checked) {
+            if (aula.areas.indexOf(item.id) < 0) aula.areas.push(item.id);
+          } else {
+            aula.areas = aula.areas.filter(function (x) { return x !== item.id; });
+          }
+          atualizarContador();
+          salvar();
+        });
+        grade.appendChild(el('label', { class: 'item-area', 'data-area': item.id },
+          [chk, el('span', { texto: item.rotulo })]));
+      });
+      caixa.appendChild(grade);
+    });
+    corpo.appendChild(caixa);
+    atualizarContador();
+
+    // Já marcada de outra vez: abre mostrando, para ela ver o que registrou.
+    if (aula.areas.length) { caixa.style.display = ''; botao.textContent = 'Esconder'; }
+  }
+
+  /* Os temas já gerados para esta aula. Cada um veio com o seu PDF, e remover
+   * daqui remove também o anexo correspondente. */
+  function desenharTemasDaAula(caixa, aula) {
+    caixa.innerHTML = '';
+    var lista = Core.temasDaAula(aula);
+    if (!lista.length) return;
+    caixa.appendChild(el('div', {
+      class: 'bloco-exercicios',
+      texto: lista.length === 1 ? 'Tema desta aula' : 'Temas desta aula'
+    }));
+    lista.forEach(function (t) {
+      caixa.appendChild(el('div', { class: 'item-lista' }, [
+        el('div', { class: 'cresce' }, [
+          el('div', { class: 'nome', texto: t.titulo || t.id }),
+          el('div', {
+            class: 'detalhe',
+            texto: (t.lingua === 'en' ? 'em inglês' : 'em português') +
+              (t.exercicios ? ' · ' + t.exercicios + ' exercícios' : '') +
+              (t.partes && t.partes.length ? ' · ' + t.partes.join(', ') : '')
+          })
+        ]),
+        el('button', {
+          type: 'button', class: 'btn pequeno perigo', texto: 'Tirar',
+          aoClick: function () {
+            aula.temas = Core.temasDaAula(aula).filter(function (x) { return x !== t; });
+            delete aula.tema;
+            if (t.anexoId) {
+              aula.anexos = (aula.anexos || []).filter(function (x) { return x.id !== t.anexoId; });
+              Store.apagarAnexo(t.anexoId);
+            }
+            salvar().then(function () {
+              desenharTemasDaAula(caixa, aula);
+              if ($('#lista-anexos')) desenharAnexos($('#lista-anexos'), aula);
+            });
+          }
+        })
+      ]));
+    });
+  }
+
+  function rotuloMetades(aula) {
+    var p = Core.metadesDe(aula.duracaoMin || 60);
+    return p[0] === p[1] ? p[0] + ' minutos' : p[0] + ' e ' + p[1] + ' minutos';
+  }
+
+  function dividirAulaEmDuas(aulaId) {
+    var marca = Core.dividirAula(db, aulaId);
+    if (!marca) { avisar('Esta aula é curta demais para dividir.'); return; }
+    salvar().then(function () {
+      fecharModal('modal-aula');
+      desenharTudo();
+      avisar('Aula dividida em ' + marca.partes[0] + ' e ' + marca.partes[1] + ' minutos.',
+        'Desfazer', function () {
+          if (!Core.desfazerDivisao(db, marca)) {
+            avisar('A segunda aula já tem conteúdo, então ela ficou como está.');
+            return;
+          }
+          salvar().then(function () { desenharTudo(); avisar('Divisão desfeita.'); });
+        });
+    });
   }
 
   function desenharAnexos(caixa, aula) {
@@ -1906,6 +2074,380 @@
           if (arquivo) { e.preventDefault(); adicionarImagemAoEditor(arquivo); return; }
         }
       }
+    });
+  }
+
+  // ================= banco de temas =================
+  //
+  // O tema é sempre opcional. A folha em branco continua sendo o caminho
+  // principal, e existe para ela planejar a aula do jeito que quiser. Isto aqui
+  // é um atalho para quando ela quiser material pronto, e nada mais.
+
+  var SERIES_NOMES = [
+    ['02', '2º ano'], ['03', '3º ano'], ['04', '4º ano'], ['05', '5º ano'],
+    ['06', '6º ano'], ['07', '7º ano'], ['08', '8º ano'], ['09', '9º ano'],
+    ['em1', '1º médio'], ['em2', '2º médio'], ['em3', '3º médio']
+  ];
+  var UNIDADES_NOMES = {
+    numeros: 'Números', algebra: 'Álgebra', geometria: 'Geometria',
+    grandezas: 'Grandezas', estatistica: 'Estatística'
+  };
+
+  var indiceTemas = null;
+  var seriesCarregadas = {};
+  var ultimoAnoEscolar = null;
+
+  function carregarIndice() {
+    if (indiceTemas) return Promise.resolve(indiceTemas);
+    return fetch('banco/indice.json').then(function (r) {
+      if (!r.ok) throw new Error('indice indisponivel');
+      return r.json();
+    }).then(function (d) {
+      indiceTemas = d.temas || [];
+      return indiceTemas;
+    });
+  }
+
+  function carregarSerie(serie) {
+    if (seriesCarregadas[serie]) return Promise.resolve(seriesCarregadas[serie]);
+    return fetch('banco/serie-' + serie + '.json').then(function (r) {
+      if (!r.ok) throw new Error('serie indisponivel');
+      return r.json();
+    }).then(function (d) {
+      seriesCarregadas[serie] = d.temas || [];
+      return seriesCarregadas[serie];
+    });
+  }
+
+  /* O ano escolar não é perguntado em lugar nenhum: ele fica guardado sozinho na
+   * primeira vez que ela escolhe um tema para aquele aluno, e da segunda em
+   * diante a lista já abre no lugar certo. Um campo a menos para preencher. */
+  function anoEscolarDe(aluno) {
+    return (aluno && aluno.anoEscolar) || null;
+  }
+  function lembrarAnoEscolar(aluno, ano) {
+    if (!aluno || aluno.anoEscolar === ano) return;
+    aluno.anoEscolar = ano;
+    salvar();
+  }
+
+  /* Passo 1: escolher o tema. */
+  function abrirTemas(aulaId) {
+    var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
+    if (!aula) return;
+    var aluno = alunoPorId(aula.alunoId);
+    $('#titulo-modal-tema').textContent = 'Material de aula' + (aluno ? ', ' + aluno.nome : '');
+
+    var corpo = $('#corpo-modal-tema');
+    var rodape = $('#rodape-modal-tema');
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    corpo.appendChild(el('div', { class: 'ajuda', style: 'margin-top:0', texto: 'Carregando os temas...' }));
+    abrirModal('modal-tema');
+
+    carregarIndice().then(function (temas) {
+      desenharEscolhaTema(temas, aula, aluno);
+    }).catch(function () {
+      corpo.innerHTML = '';
+      corpo.appendChild(el('div', { class: 'faixa-aviso' }, [
+        el('strong', { texto: 'Não consegui abrir o banco de temas. ' }),
+        document.createTextNode('Se for a primeira vez, abra o aplicativo uma vez com internet. ' +
+          'De qualquer jeito, a folha em branco continua funcionando normalmente.')
+      ]));
+    });
+  }
+
+  function desenharEscolhaTema(temas, aula, aluno) {
+    var corpo = $('#corpo-modal-tema');
+    var rodape = $('#rodape-modal-tema');
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+
+    var serieAtual = anoEscolarDe(aluno) || ultimoAnoEscolar || '06';
+    var busca = '';
+
+    var selSerie = el('select', { style: 'max-width:150px' });
+    SERIES_NOMES.forEach(function (par) {
+      var o = el('option', { value: par[0], texto: par[1] });
+      if (par[0] === serieAtual) o.selected = true;
+      selSerie.appendChild(o);
+    });
+
+    var campoBusca = el('input', {
+      type: 'text', placeholder: 'Procurar por assunto', style: 'flex:1;min-width:160px'
+    });
+
+    corpo.appendChild(el('div', { class: 'barra' }, [selSerie, campoBusca]));
+    var lista = el('div', { id: 'lista-temas' });
+    corpo.appendChild(lista);
+
+    function redesenhar() {
+      lista.innerHTML = '';
+      var termo = busca.trim().toLowerCase();
+      var filtrados = temas.filter(function (t) {
+        if (t.serie !== serieAtual) return false;
+        if (!termo) return true;
+        return (t.pt.titulo + ' ' + t.pt.resumo + ' ' + t.en.titulo).toLowerCase().indexOf(termo) >= 0;
+      });
+      if (!filtrados.length) {
+        lista.appendChild(el('div', { class: 'vazio' }, [
+          el('p', { texto: termo ? 'Nenhum tema encontrado para essa busca.' : 'Nenhum tema nesta série.' })
+        ]));
+        return;
+      }
+      filtrados.forEach(function (t) {
+        lista.appendChild(el('div', { class: 'item-lista item-tema' }, [
+          el('div', { class: 'cresce' }, [
+            el('div', { class: 'nome' }, [
+              document.createTextNode(t.pt.titulo),
+              el('span', { class: 'tag', texto: UNIDADES_NOMES[t.unidade] || t.unidade, style: 'margin-left:8px' })
+            ]),
+            el('div', { class: 'detalhe', texto: t.pt.resumo }),
+            el('div', {
+              class: 'detalhe',
+              texto: t.qtd + ' exercícios · cerca de ' + t.duracaoMin + ' minutos · dificuldade ' +
+                t.dificuldade + ' de 5'
+            })
+          ]),
+          el('button', {
+            type: 'button', class: 'btn pequeno principal', texto: 'Escolher',
+            aoClick: function () { abrirMontagem(t, aula, aluno); }
+          })
+        ]));
+      });
+    }
+
+    selSerie.addEventListener('change', function () {
+      serieAtual = this.value;
+      ultimoAnoEscolar = serieAtual;
+      lembrarAnoEscolar(aluno, serieAtual);
+      redesenhar();
+    });
+    campoBusca.addEventListener('input', function () { busca = this.value; redesenhar(); });
+    redesenhar();
+
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn', texto: 'Cancelar',
+      aoClick: function () { fecharModal('modal-tema'); }
+    }));
+  }
+
+  /* Passo 2: montar o material, escolhendo o que entra e quais exercícios. */
+  function abrirMontagem(resumoTema, aula, aluno) {
+    var corpo = $('#corpo-modal-tema');
+    var rodape = $('#rodape-modal-tema');
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    corpo.appendChild(el('div', { class: 'ajuda', texto: 'Carregando o tema...' }));
+
+    carregarSerie(resumoTema.serie).then(function (temas) {
+      var tema = temas.filter(function (t) { return t.id === resumoTema.id; })[0];
+      if (!tema) throw new Error('tema nao encontrado');
+      desenharMontagem(tema, aula, aluno);
+    }).catch(function () {
+      corpo.innerHTML = '';
+      corpo.appendChild(el('div', { class: 'faixa-aviso' }, [
+        document.createTextNode('Não consegui abrir este tema. Abra o aplicativo uma vez com ' +
+          'internet para ele ficar guardado no tablet.')
+      ]));
+    });
+  }
+
+  function desenharMontagem(tema, aula, aluno) {
+    var corpo = $('#corpo-modal-tema');
+    var rodape = $('#rodape-modal-tema');
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+
+    var lingua = 'pt';
+    var incluir = { material: true, lista: true, gabarito: false };
+    var marcados = {};
+    tema.pt.exercicios.forEach(function (e) { marcados[e.n] = true; });
+
+    corpo.appendChild(el('div', { class: 'barra', style: 'margin-bottom:8px' }, [
+      el('button', {
+        type: 'button', class: 'btn pequeno', texto: '‹ Outro tema',
+        aoClick: function () { desenharEscolhaTema(indiceTemas, aula, aluno); }
+      }),
+      el('h3', { class: 'titulo', style: 'font-size:17px', texto: tema.pt.titulo })
+    ]));
+
+    // idioma
+    var linhaIdioma = el('div', { class: 'barra', style: 'margin-bottom:10px' });
+    [['pt', 'Português'], ['en', 'English']].forEach(function (par) {
+      var b = el('button', {
+        type: 'button', class: 'btn pequeno' + (par[0] === lingua ? ' principal' : ''),
+        texto: par[1], 'data-lingua': par[0]
+      });
+      b.addEventListener('click', function () {
+        lingua = par[0];
+        linhaIdioma.querySelectorAll('[data-lingua]').forEach(function (x) { x.classList.remove('principal'); });
+        b.classList.add('principal');
+        desenharExercicios();
+      });
+      linhaIdioma.appendChild(b);
+    });
+    corpo.appendChild(el('div', { class: 'campo' }, [
+      el('span', { texto: 'Idioma do material', style: 'display:block;font-size:13px;font-weight:700;color:#1F3A5F;margin-bottom:5px' }),
+      linhaIdioma
+    ]));
+
+    // o que entra
+    var caixaPartes = el('div', { style: 'display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px' });
+    [['material', 'Material explicativo'], ['lista', 'Lista de exercícios'], ['gabarito', 'Gabarito']]
+      .forEach(function (par) {
+        var chk = el('input', { type: 'checkbox', style: 'width:auto;min-height:auto' });
+        chk.checked = incluir[par[0]];
+        chk.addEventListener('change', function () {
+          incluir[par[0]] = this.checked;
+          caixaExercicios.style.display = incluir.lista || incluir.gabarito ? '' : 'none';
+          atualizarRodape();
+        });
+        caixaPartes.appendChild(el('label', {
+          style: 'display:flex;align-items:center;gap:7px;font-size:15px;cursor:pointer'
+        }, [chk, el('span', { texto: par[1] })]));
+      });
+    corpo.appendChild(el('div', { class: 'campo' }, [
+      el('span', { texto: 'O que incluir', style: 'display:block;font-size:13px;font-weight:700;color:#1F3A5F;margin-bottom:5px' }),
+      caixaPartes
+    ]));
+    corpo.appendChild(el('div', {
+      class: 'ajuda',
+      texto: 'O gabarito sai numa folha separada, para a lista poder ser entregue sem ele.'
+    }));
+
+    // exercícios
+    var caixaExercicios = el('div');
+    corpo.appendChild(caixaExercicios);
+
+    function contarMarcados() {
+      return Object.keys(marcados).filter(function (k) { return marcados[k]; }).length;
+    }
+
+    function desenharExercicios() {
+      caixaExercicios.innerHTML = '';
+      var dados = tema[lingua];
+      caixaExercicios.appendChild(el('div', { class: 'barra', style: 'margin:14px 0 8px' }, [
+        el('h3', { class: 'subtitulo', style: 'margin:0;border:none', texto: 'Quais exercícios' }),
+        el('span', { class: 'cresce' }),
+        el('button', {
+          type: 'button', class: 'btn pequeno', texto: 'Marcar todos',
+          aoClick: function () {
+            dados.exercicios.forEach(function (e) { marcados[e.n] = true; });
+            desenharExercicios();
+          }
+        }),
+        el('button', {
+          type: 'button', class: 'btn pequeno', texto: 'Desmarcar todos',
+          aoClick: function () {
+            dados.exercicios.forEach(function (e) { marcados[e.n] = false; });
+            desenharExercicios();
+          }
+        })
+      ]));
+
+      var blocoAtual = null;
+      dados.exercicios.forEach(function (ex) {
+        if (ex.bloco && ex.bloco !== blocoAtual) {
+          blocoAtual = ex.bloco;
+          caixaExercicios.appendChild(el('div', { class: 'bloco-exercicios', texto: blocoAtual }));
+        }
+        var chk = el('input', { type: 'checkbox', style: 'width:auto;min-height:auto;margin-top:3px' });
+        chk.checked = !!marcados[ex.n];
+        chk.addEventListener('change', function () {
+          marcados[ex.n] = this.checked;
+          atualizarRodape();
+        });
+        caixaExercicios.appendChild(el('label', { class: 'item-exercicio' }, [
+          chk,
+          el('div', { class: 'cresce' }, [
+            el('div', { class: 'texto-exercicio', texto: ex.enunciado })
+          ])
+        ]));
+      });
+      atualizarRodape();
+    }
+
+    function atualizarRodape() {
+      rodape.innerHTML = '';
+      var quantos = contarMarcados();
+      var precisaExercicio = incluir.lista || incluir.gabarito;
+      var nada = !incluir.material && !precisaExercicio;
+      var semExercicio = precisaExercicio && quantos === 0;
+
+      rodape.appendChild(el('span', {
+        class: 'esquerda ajuda', style: 'margin:0;align-self:center',
+        texto: precisaExercicio
+          ? quantos + ' de ' + tema.pt.exercicios.length + ' exercícios marcados'
+          : 'só o material explicativo'
+      }));
+      rodape.appendChild(el('button', {
+        type: 'button', class: 'btn', texto: 'Cancelar',
+        aoClick: function () { fecharModal('modal-tema'); }
+      }));
+      var botao = el('button', {
+        type: 'button', class: 'btn principal', texto: 'Gerar e anexar à aula',
+        aoClick: function () {
+          gerarMaterialDoTema(tema, lingua, incluir, marcados, aula, aluno);
+        }
+      });
+      if (nada || semExercicio) botao.disabled = true;
+      rodape.appendChild(botao);
+    }
+
+    desenharExercicios();
+  }
+
+  /* Passo 3: gerar o PDF e anexar à aula. */
+  function gerarMaterialDoTema(tema, lingua, incluir, marcados, aula, aluno) {
+    var escolhidos = tema[lingua].exercicios
+      .map(function (e) { return e.n; })
+      .filter(function (n) { return marcados[n]; });
+
+    var partes = [];
+    if (incluir.material) partes.push('material');
+    if (incluir.lista) partes.push('lista');
+    if (incluir.gabarito) partes.push('gabarito');
+
+    var bytes = PDFGen.gerarMaterialTema({
+      tema: tema, lingua: lingua,
+      incluirMaterial: incluir.material,
+      incluirLista: incluir.lista,
+      incluirGabarito: incluir.gabarito,
+      escolhidos: escolhidos,
+      aluno: aluno ? aluno.nome : '',
+      data: Core.ddmmaaaa(aula.data),
+      espacoParaResposta: incluir.lista && !incluir.gabarito ? 24 : 0
+    });
+
+    var nome = Core.nomeArquivo(tema[lingua].titulo) + '_' + tema.id + '.pdf';
+    var blob = new Blob([bytes], { type: 'application/pdf' });
+    var id = Core.uid();
+
+    Store.salvarAnexo(id, { nome: nome, tipo: 'application/pdf', blob: blob }).then(function () {
+      aula.anexos = aula.anexos || [];
+      aula.anexos.push({ id: id, nome: nome, tamanho: blob.size });
+      // Uma aula pode tratar mais de um assunto: os temas se somam.
+      aula.temas = Core.temasDaAula(aula);
+      aula.temas.push({
+        id: tema.id, titulo: tema[lingua].titulo, lingua: lingua,
+        partes: partes, exercicios: escolhidos.length, anexoId: id
+      });
+      delete aula.tema;
+      return salvar();
+    }).then(function () {
+      fecharModal('modal-tema');
+      if ($('#modal-aula').classList.contains('aberto') && aulaEmEdicao &&
+          aulaEmEdicao.id === aula.id) {
+        if ($('#lista-temas-aula')) desenharTemasDaAula($('#lista-temas-aula'), aula);
+        if ($('#lista-anexos')) desenharAnexos($('#lista-anexos'), aula);
+      }
+      desenharAgenda();
+      avisar('Material anexado à aula.', 'Abrir', function () {
+        entregarArquivo(nome, blob, tema[lingua].titulo);
+      });
+    }).catch(function () {
+      avisar('Não foi possível gerar o material.');
     });
   }
 

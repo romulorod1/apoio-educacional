@@ -386,6 +386,60 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
 }
 .fechar:hover { background: var(--soft); }
 
+/* ---------- escolha de tema e montagem da lista ---------- */
+
+.item-tema { align-items: flex-start; }
+.item-tema .detalhe { margin-top: 2px; }
+
+.bloco-exercicios {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--teal);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin: 14px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--fio);
+}
+
+/* Cada exercício é um alvo de toque inteiro, não só a caixinha: no tablet,
+   acertar um quadradinho de 16 pixels com o dedo é ruim. */
+.item-exercicio {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 9px 11px;
+  border: 1px solid var(--fio);
+  border-radius: 9px;
+  background: var(--branco);
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+.item-exercicio:hover { border-color: var(--teal); background: var(--teal-claro); }
+.texto-exercicio { font-size: 14px; line-height: 1.4; }
+
+/* ---------- areas trabalhadas ---------- */
+
+.grade-areas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 5px;
+  margin-bottom: 4px;
+}
+.item-area {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid var(--fio);
+  border-radius: 9px;
+  background: var(--branco);
+  font-size: 14px;
+  cursor: pointer;
+}
+.item-area:hover { border-color: var(--teal); background: var(--teal-claro); }
+.tag.cheia { background: var(--teal); color: var(--branco); border-color: var(--teal); }
+
 /* ---------- abas dentro da ficha do aluno ---------- */
 
 .abas-perfil {

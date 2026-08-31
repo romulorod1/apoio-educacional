@@ -624,6 +624,59 @@
         MARG_E, doc.y, { tam: 9, bold: true, cor: COR.gold });
     }
 
+    /* O que foi trabalhado. Vem antes do resumo escrito porque é o que a
+     * família procura quando abre o documento: o mês em uma olhada. */
+    function tituloDeSecao(texto, larguraFio) {
+      doc.y -= 26;
+      doc.garanteEspaco(44);
+      doc.texto(texto, MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
+      doc.y -= 4;
+      doc.linha(MARG_E, doc.y, MARG_E + (larguraFio || 70), doc.y, COR.teal, 1.2);
+      doc.y -= 4;
+    }
+
+    if (dados.temasDoMes && dados.temasDoMes.length) {
+      tituloDeSecao('Temas trabalhados', 92);
+      for (var t = 0; t < dados.temasDoMes.length; t++) {
+        var tm = dados.temasDoMes[t];
+        doc.garanteEspaco(16);
+        doc.y -= 14;
+        doc.texto('•', MARG_E + 3, doc.y, { tam: 10, cor: COR.teal });
+        doc.texto(tm.titulo, MARG_E + 16, doc.y, { tam: 10, cor: COR.texto });
+        /* As datas ficam à direita. Quando não cabem ao lado de um título
+           longo, viram a contagem: melhor dizer menos do que sobrepor. */
+        var datas = tm.datas.map(ddmmL).join(', ');
+        var sobra = MARG_D - (MARG_E + 16 + medir(tm.titulo, 10, false)) - 14;
+        if (medir(datas, 9, false) > sobra) {
+          datas = tm.datas.length + (tm.datas.length === 1 ? ' aula' : ' aulas');
+        }
+        doc.texto(datas, MARG_D, doc.y, { tam: 9, cor: COR.muted, align: 'direita' });
+      }
+    }
+
+    if (dados.areasDoMes && dados.areasDoMes.length) {
+      tituloDeSecao('Áreas trabalhadas', 92);
+      /* Em duas colunas: a lista costuma ser longa, e uma coluna só empurraria
+         o resumo para a página seguinte sem necessidade. */
+      var meio = Math.ceil(dados.areasDoMes.length / 2);
+      var topo = doc.y;
+      var menor = doc.y;
+      for (var col = 0; col < 2; col++) {
+        doc.y = topo;
+        var px = MARG_E + col * (UTIL / 2);
+        var de = col * meio, ate = Math.min(dados.areasDoMes.length, de + meio);
+        for (var a = de; a < ate; a++) {
+          var ar = dados.areasDoMes[a];
+          doc.y -= 14;
+          doc.texto('•', px + 3, doc.y, { tam: 10, cor: COR.teal });
+          doc.texto(ar.rotulo + (ar.vezes > 1 ? ' (' + ar.vezes + ')' : ''),
+            px + 16, doc.y, { tam: 9.5, cor: COR.texto });
+        }
+        if (doc.y < menor) menor = doc.y;
+      }
+      doc.y = menor;
+    }
+
     // resumo do mes
     var resumo = (dados.resumoTexto || '').trim();
     if (resumo || opcoes.sempreResumo) {
@@ -712,9 +765,280 @@
     return doc.finalizar();
   }
 
+  // ================= material de aula =================
+  //
+  // O texto dos temas vem em Markdown simples. Aqui ele vira PDF com a mesma
+  // moldura do fechamento, para o material que a criança recebe ter a cara da
+  // marca, e não a de uma folha genérica.
+
+  /* Quebra um texto em pedaços conforme o negrito, para a linha poder misturar
+   * as duas fontes. */
+  function partirNegrito(texto) {
+    var partes = [];
+    var resto = String(texto == null ? '' : texto);
+    var re = /\*\*(.+?)\*\*/;
+    var achado = re.exec(resto);
+    while (achado) {
+      if (achado.index > 0) partes.push({ txt: resto.slice(0, achado.index), bold: false });
+      partes.push({ txt: achado[1], bold: true });
+      resto = resto.slice(achado.index + achado[0].length);
+      achado = re.exec(resto);
+    }
+    if (resto) partes.push({ txt: resto, bold: false });
+    return partes.filter(function (p) { return p.txt.length; });
+  }
+
+  /* Quebra os pedaços em linhas que cabem na largura, sem separar o negrito. */
+  function quebrarRico(partes, largura, tam) {
+    var linhas = [], atual = [], usado = 0;
+    partes.forEach(function (parte) {
+      var palavras = parte.txt.split(/(\s+)/);
+      palavras.forEach(function (palavra) {
+        if (!palavra) return;
+        var w = medir(palavra, tam, parte.bold);
+        if (usado + w > largura && usado > 0 && palavra.trim()) {
+          linhas.push(atual); atual = []; usado = 0;
+          if (!palavra.trim()) return;
+        }
+        if (!palavra.trim() && usado === 0) return;
+        atual.push({ txt: palavra, bold: parte.bold });
+        usado += w;
+      });
+    });
+    if (atual.length) linhas.push(atual);
+    return linhas;
+  }
+
+  Doc.prototype.escreverRico = function (texto, opcoes) {
+    opcoes = opcoes || {};
+    var tam = opcoes.tam || 10;
+    var x = opcoes.x || MARG_E;
+    var largura = opcoes.largura || (MARG_D - x);
+    var alturaLinha = opcoes.alturaLinha || (tam * 1.45);
+    var self = this;
+    var linhas = quebrarRico(partirNegrito(texto), largura, tam);
+    linhas.forEach(function (segmentos) {
+      self.garanteEspaco(alturaLinha);
+      self.y -= alturaLinha;
+      var px = x;
+      segmentos.forEach(function (s) {
+        if (s.txt.trim()) {
+          self.texto(s.txt, px, self.y, { tam: tam, bold: s.bold, cor: opcoes.cor || COR.texto });
+        }
+        px += medir(s.txt, tam, s.bold);
+      });
+    });
+    return linhas.length;
+  };
+
+  /* Escreve um bloco em Markdown simples: subtítulos, parágrafos com negrito,
+   * listas e tabelas. É o suficiente para o material dos temas. */
+  Doc.prototype.markdown = function (texto, opcoes) {
+    opcoes = opcoes || {};
+    var tam = opcoes.tam || 10;
+    var linhas = String(texto || '').split('\n');
+    var i = 0;
+    while (i < linhas.length) {
+      var linha = linhas[i];
+      var limpo = linha.trim();
+
+      if (!limpo) { this.y -= tam * 0.5; i++; continue; }
+
+      // subtítulo
+      var titulo = /^#{3,6}\s+(.*)$/.exec(limpo);
+      if (titulo) {
+        this.garanteEspaco(tam * 2.6);
+        this.y -= tam * 1.7;
+        this.texto(titulo[1], MARG_E, this.y, { tam: tam + 1.5, bold: true, cor: COR.navy });
+        this.y -= tam * 0.35;
+        i++; continue;
+      }
+
+      // tabela: junta as linhas seguidas que começam com barra
+      if (limpo.charAt(0) === '|') {
+        var bruto = [];
+        while (i < linhas.length && linhas[i].trim().charAt(0) === '|') {
+          bruto.push(linhas[i].trim());
+          i++;
+        }
+        this.tabelaSimples(bruto, tam);
+        continue;
+      }
+
+      // item de lista
+      var marcador = /^([-*])\s+(.*)$/.exec(limpo);
+      var numerado = /^(\d+)\.\s+(.*)$/.exec(limpo);
+      if (marcador || numerado) {
+        var rotulo = marcador ? '\u2022' : (numerado[1] + '.');
+        var conteudo = marcador ? marcador[2] : numerado[2];
+        // junta as continuações indentadas
+        while (i + 1 < linhas.length && /^\s{2,}\S/.test(linhas[i + 1]) &&
+               !/^\s*([-*]|\d+\.)\s/.test(linhas[i + 1])) {
+          conteudo += ' ' + linhas[i + 1].trim();
+          i++;
+        }
+        this.garanteEspaco(tam * 1.5);
+        this.y -= tam * 1.45;
+        this.texto(rotulo, MARG_E + 4, this.y, { tam: tam, cor: COR.teal, bold: !marcador });
+        var recuo = MARG_E + 22;
+        var segmentos = quebrarRico(partirNegrito(conteudo), MARG_D - recuo, tam);
+        for (var k = 0; k < segmentos.length; k++) {
+          if (k > 0) { this.garanteEspaco(tam * 1.45); this.y -= tam * 1.45; }
+          var px = recuo;
+          for (var j = 0; j < segmentos[k].length; j++) {
+            var s = segmentos[k][j];
+            if (s.txt.trim()) this.texto(s.txt, px, this.y, { tam: tam, bold: s.bold });
+            px += medir(s.txt, tam, s.bold);
+          }
+        }
+        i++; continue;
+      }
+
+      // parágrafo: junta as linhas seguidas até a próxima em branco
+      var paragrafo = limpo;
+      while (i + 1 < linhas.length && linhas[i + 1].trim() &&
+             linhas[i + 1].trim().charAt(0) !== '|' &&
+             !/^#{3,6}\s/.test(linhas[i + 1].trim()) &&
+             !/^\s*([-*]|\d+\.)\s/.test(linhas[i + 1])) {
+        paragrafo += ' ' + linhas[i + 1].trim();
+        i++;
+      }
+      this.y -= tam * 0.35;
+      this.escreverRico(paragrafo, { tam: tam, alturaLinha: tam * 1.45 });
+      i++;
+    }
+  };
+
+  Doc.prototype.tabelaSimples = function (bruto, tam) {
+    var linhas = bruto.filter(function (l) { return !/^\|[\s:\-|]+\|$/.test(l); })
+      .map(function (l) {
+        return l.replace(/^\||\|$/g, '').split('|').map(function (c) { return c.trim(); });
+      });
+    if (!linhas.length) return;
+    var colunas = Math.max.apply(null, linhas.map(function (l) { return l.length; }));
+    var largura = UTIL / colunas;
+    var altura = tam * 1.9;
+    this.y -= tam * 0.6;
+    for (var i = 0; i < linhas.length; i++) {
+      this.garanteEspaco(altura);
+      this.y -= altura;
+      if (i === 0) this.retangulo(MARG_E, this.y, UTIL, altura, COR.navy);
+      else if (i % 2 === 0) this.retangulo(MARG_E, this.y, UTIL, altura, COR.soft);
+      for (var c = 0; c < colunas; c++) {
+        var celula = (linhas[i][c] || '').replace(/\*\*/g, '');
+        if (!celula) continue;
+        this.texto(celula, MARG_E + c * largura + 6, this.y + tam * 0.6, {
+          tam: tam - 0.8, bold: i === 0,
+          cor: i === 0 ? COR.branco : COR.texto
+        });
+      }
+      this.linha(MARG_E, this.y, MARG_D, this.y, COR.fio, 0.4);
+    }
+    this.y -= tam * 0.4;
+  };
+
+  Doc.prototype.cabecalhoDeSecao = function (titulo, subtitulo) {
+    this.garanteEspaco(52);
+    this.y -= 26;
+    this.texto(titulo, PAGINA_L / 2, this.y, { tam: 17, bold: true, cor: COR.navy, align: 'centro' });
+    if (subtitulo) {
+      this.y -= 12;
+      this.texto(subtitulo, PAGINA_L / 2, this.y, { tam: 9.5, cor: COR.teal, align: 'centro', tracking: 0.9 });
+    }
+    this.y -= 8;
+    this.linha(PAGINA_L / 2 - 40, this.y, PAGINA_L / 2 + 40, this.y, COR.teal, 1.2);
+    this.y -= 6;
+  };
+
+  /* Monta o material de um tema. Cada parte é opcional: ela escolhe se quer a
+   * explicação, a lista, o gabarito, ou só um deles. */
+  function gerarMaterialTema(op) {
+    var doc = new Doc();
+    var lingua = op.lingua === 'en' ? 'en' : 'pt';
+    var dados = op.tema[lingua];
+    var rotulos = lingua === 'en'
+      ? { material: 'Study material', lista: 'Exercises', gabarito: 'Answer key', aluno: 'Student' }
+      : { material: 'Material de estudo', lista: 'Exercícios', gabarito: 'Gabarito', aluno: 'Aluno' };
+
+    var primeira = true;
+    function abrirParte(titulo) {
+      if (!primeira) doc.novaPagina();
+      primeira = false;
+      doc.cabecalhoDeSecao(dados.titulo, titulo);
+      if (op.aluno) {
+        doc.y -= 14;
+        doc.texto(rotulos.aluno + ': ' + op.aluno + (op.data ? '   ' + op.data : ''),
+          MARG_E, doc.y, { tam: 9, cor: COR.muted });
+      }
+      doc.y -= 6;
+    }
+
+    doc.novaPagina();
+
+    if (op.incluirMaterial) {
+      abrirParte(rotulos.material);
+      doc.markdown(dados.explicacao, { tam: 10 });
+    }
+
+    var escolhidos = op.escolhidos || dados.exercicios.map(function (e) { return e.n; });
+    var selecionados = dados.exercicios.filter(function (e) { return escolhidos.indexOf(e.n) >= 0; });
+
+    if (op.incluirLista && selecionados.length) {
+      abrirParte(rotulos.lista);
+      var blocoAtual = null;
+      selecionados.forEach(function (ex, i) {
+        if (ex.bloco && ex.bloco !== blocoAtual) {
+          blocoAtual = ex.bloco;
+          doc.garanteEspaco(28);
+          doc.y -= 18;
+          doc.texto(blocoAtual, MARG_E, doc.y, { tam: 11, bold: true, cor: COR.teal });
+          doc.y -= 4;
+        }
+        doc.garanteEspaco(20);
+        doc.y -= 15;
+        doc.texto(String(i + 1) + '.', MARG_E, doc.y, { tam: 10, bold: true, cor: COR.navy });
+        var recuo = MARG_E + 20;
+        var segmentos = quebrarRico(partirNegrito(ex.enunciado), MARG_D - recuo, 10);
+        for (var k = 0; k < segmentos.length; k++) {
+          if (k > 0) { doc.garanteEspaco(15); doc.y -= 15; }
+          var px = recuo;
+          for (var j = 0; j < segmentos[k].length; j++) {
+            var s = segmentos[k][j];
+            if (s.txt.trim()) doc.texto(s.txt, px, doc.y, { tam: 10, bold: s.bold });
+            px += medir(s.txt, 10, s.bold);
+          }
+        }
+        if (op.espacoParaResposta) doc.y -= op.espacoParaResposta;
+      });
+    }
+
+    if (op.incluirGabarito && selecionados.length) {
+      abrirParte(rotulos.gabarito);
+      selecionados.forEach(function (ex, i) {
+        doc.garanteEspaco(18);
+        doc.y -= 14;
+        doc.texto(String(i + 1) + '.', MARG_E, doc.y, { tam: 9.5, bold: true, cor: COR.navy });
+        var recuo = MARG_E + 20;
+        var segmentos = quebrarRico(partirNegrito(ex.resposta), MARG_D - recuo, 9.5);
+        for (var k = 0; k < segmentos.length; k++) {
+          if (k > 0) { doc.garanteEspaco(14); doc.y -= 14; }
+          var px = recuo;
+          for (var j = 0; j < segmentos[k].length; j++) {
+            var s = segmentos[k][j];
+            if (s.txt.trim()) doc.texto(s.txt, px, doc.y, { tam: 9.5, bold: s.bold });
+            px += medir(s.txt, 9.5, s.bold);
+          }
+        }
+      });
+    }
+
+    return doc.finalizar();
+  }
+
   return {
     Doc: Doc, COR: COR, medir: medir, paraWinAnsi: paraWinAnsi,
     gerarFechamento: gerarFechamento, gerarResumoMes: gerarResumoMes,
+    gerarMaterialTema: gerarMaterialTema,
     NOTA_L: NOTA_L, NOTA_A: NOTA_A,
     PAGINA_L: PAGINA_L, PAGINA_A: PAGINA_A, MARG_E: MARG_E, MARG_D: MARG_D, UTIL: UTIL
   };
