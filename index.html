@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+  <title>Apoio Educacional</title>
+  <meta name="description" content="Controle de aulas, folhas de aula e fechamento mensal do Apoio Educacional.">
+  <meta name="theme-color" content="#1F3A5F">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Apoio Educacional">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+  <header class="cabecalho">
+    <div class="marca">
+      <strong>Nathália Wajsenzon</strong>
+      <span>Apoio Educacional</span>
+    </div>
+    <nav class="abas" id="abas">
+      <button class="aba ativa" data-tela="agenda" type="button">Agenda</button>
+      <button class="aba" data-tela="alunos" type="button">Alunos</button>
+      <button class="aba" data-tela="fechamento" type="button">Fechamento</button>
+      <button class="aba" data-tela="ajustes" type="button">Ajustes</button>
+    </nav>
+  </header>
+
+  <main class="conteudo">
+
+    <!-- ---------------- agenda ---------------- -->
+    <section class="tela ativa" id="tela-agenda">
+      <div class="barra">
+        <button class="btn pequeno" id="mes-anterior" type="button">‹ Anterior</button>
+        <h2 class="titulo" id="rotulo-mes">.</h2>
+        <button class="btn pequeno" id="mes-seguinte" type="button">Seguinte ›</button>
+        <span class="cresce"></span>
+        <button class="btn pequeno" id="ir-para-hoje" type="button">Hoje</button>
+        <button class="btn principal" id="nova-aula" type="button">+ Nova aula</button>
+      </div>
+
+      <div class="numeros" id="numeros-mes"></div>
+      <div id="grade-mes"></div>
+    </section>
+
+    <!-- ---------------- alunos ---------------- -->
+    <section class="tela" id="tela-alunos">
+      <div class="barra">
+        <h2 class="titulo">Alunos</h2>
+        <span class="cresce"></span>
+        <button class="btn principal" id="novo-aluno" type="button">+ Novo aluno</button>
+      </div>
+      <div id="lista-alunos"></div>
+    </section>
+
+    <!-- ---------------- fechamento ---------------- -->
+    <section class="tela" id="tela-fechamento">
+      <div class="barra">
+        <h2 class="titulo">Fechamento do mês</h2>
+        <span class="cresce"></span>
+        <select id="mes-fechamento" style="max-width:210px"></select>
+      </div>
+
+      <div class="numeros" id="numeros-fechamento"></div>
+
+      <div class="barra">
+        <button class="btn" id="exportar-md-mes" type="button">Exportar o mês em texto</button>
+        <button class="btn" id="exportar-pdf-mes" type="button">PDF do resumo do mês</button>
+      </div>
+
+      <div id="lista-fechamento"></div>
+    </section>
+
+    <!-- ---------------- ajustes ---------------- -->
+    <section class="tela" id="tela-ajustes">
+      <h2 class="titulo">Ajustes</h2>
+
+      <h3 class="subtitulo">Cópia de segurança</h3>
+      <div class="cartao">
+        <p class="ajuda" style="margin-top:0">
+          Tudo fica guardado apenas neste tablet. Nada é enviado para a internet.
+          Faça uma cópia de vez em quando e guarde no Google Drive.
+        </p>
+        <div class="barra" style="margin-bottom:0">
+          <button class="btn principal" id="baixar-copia" type="button">Salvar cópia de segurança</button>
+          <button class="btn" id="restaurar-copia" type="button">Restaurar de uma cópia</button>
+          <input type="file" id="arquivo-copia" accept="application/json,.json" hidden>
+        </div>
+      </div>
+
+      <h3 class="subtitulo">Desfazer</h3>
+      <div class="cartao">
+        <p class="ajuda" style="margin-top:0">
+          Toda alteração que atinge mais de uma aula fica registrada aqui.
+          Dá para voltar ao estado anterior mesmo depois de fechar o aplicativo.
+        </p>
+        <div id="lista-historico"></div>
+      </div>
+
+      <h3 class="subtitulo">Espaço e manutenção</h3>
+      <div class="cartao">
+        <div id="info-espaco" class="ajuda" style="margin-top:0"></div>
+        <div class="barra" style="margin-bottom:0">
+          <button class="btn" id="limpar-orfaos" type="button">Liberar espaço de folhas descartadas</button>
+        </div>
+      </div>
+
+      <h3 class="subtitulo">Recomeçar</h3>
+      <div class="cartao">
+        <p class="ajuda" style="margin-top:0">
+          O aplicativo já vem com os doze alunos de julho de 2026 cadastrados, e com
+          o mês de junho do Marcelo preenchido. Falta informar o valor da hora-aula
+          de cada um, porque esse dado não estava registrado em lugar nenhum.
+        </p>
+        <div class="barra" style="margin-bottom:0">
+          <button class="btn perigo" id="apagar-exemplo" type="button">Apagar a carga inicial</button>
+          <button class="btn perigo" id="apagar-tudo" type="button">Apagar todos os dados</button>
+        </div>
+      </div>
+
+      <h3 class="subtitulo">Sobre</h3>
+      <div class="cartao">
+        <p class="ajuda" style="margin:0">
+          Apoio Educacional, controle de aulas. Funciona sem internet depois de instalado.
+          Versão <span id="versao-app">.</span>
+        </p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ---------------- modais ---------------- -->
+
+  <div class="fundo-modal" id="modal-aula">
+    <div class="modal">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-aula">Aula</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-aula"></div>
+      <div class="modal-rodape">
+        <button class="btn perigo esquerda" id="excluir-aula" type="button">Excluir</button>
+        <button class="btn" data-fechar type="button">Cancelar</button>
+        <button class="btn principal" id="salvar-aula" type="button">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="fundo-modal" id="modal-aluno">
+    <div class="modal">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-aluno">Aluno</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-aluno"></div>
+      <div class="modal-rodape">
+        <button class="btn perigo esquerda" id="excluir-aluno" type="button">Excluir aluno</button>
+        <button class="btn" data-fechar type="button">Cancelar</button>
+        <button class="btn principal" id="salvar-aluno" type="button">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="fundo-modal" id="modal-escopo">
+    <div class="modal" style="max-width:460px">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-escopo">Esta aula se repete</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-escopo"></div>
+    </div>
+  </div>
+
+  <div class="fundo-modal" id="modal-nota">
+    <div class="modal largo">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-nota">Folha de aula</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+      </div>
+      <div class="modal-corpo sem-espaco">
+        <div class="editor-envolve">
+          <div class="ferramentas" id="ferramentas-nota"></div>
+          <canvas class="tela-desenho" id="tela-desenho"></canvas>
+          <div class="rodape-editor" id="rodape-nota"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fundo-modal" id="modal-resumo">
+    <div class="modal">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-resumo">Resumo do mês</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-resumo"></div>
+      <div class="modal-rodape">
+        <button class="btn" data-fechar type="button">Cancelar</button>
+        <button class="btn principal" id="salvar-resumo" type="button">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="aviso" id="aviso">
+    <span id="aviso-texto"></span>
+    <button id="aviso-acao" type="button">Desfazer</button>
+  </div>
+
+  <input type="file" id="entrada-imagem" accept="image/*" hidden>
+  <input type="file" id="entrada-anexo" hidden>
+
+  <script src="core.js"></script>
+  <script src="pdf.js"></script>
+  <script src="store.js"></script>
+  <script src="draw.js"></script>
+  <script src="app.js"></script>
+</body>
+
+</html>

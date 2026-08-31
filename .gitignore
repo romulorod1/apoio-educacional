@@ -1,0 +1,9 @@
+# dependências e saídas dos testes
+_teste/node_modules/
+_teste/baixados/
+_teste/package-lock.json
+_teste/*.png
+_teste/*.pdf
+_teste/saida_*.md
+_teste/dom.html
+_teste/chrome_err.txt

@@ -1,0 +1,725 @@
+/* core.js
+ * Modelo de dados, calculo de fechamento e geracao de Markdown.
+ * Sem dependencia de DOM: roda no navegador e no Node (para testes).
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.Core = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  var MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  var DIAS_CURTO = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  var DIAS_LONGO = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+
+  var STATUS = {
+    realizada: { rotulo: 'Realizada', cobravelPadrao: true },
+    reposicao: { rotulo: 'Reposição', cobravelPadrao: true },
+    falta: { rotulo: 'Falta sem aviso', cobravelPadrao: true },
+    cancelada: { rotulo: 'Cancelada com aviso', cobravelPadrao: false }
+  };
+
+  // ---------- datas (sempre locais, nunca UTC, para nao deslocar o dia) ----------
+
+  function partesData(iso) {
+    var p = String(iso).split('-');
+    return { a: +p[0], m: +p[1], d: +p[2] };
+  }
+
+  function dataLocal(iso) {
+    var p = partesData(iso);
+    return new Date(p.a, p.m - 1, p.d);
+  }
+
+  function isoDe(dt) {
+    return dt.getFullYear() + '-' + pad2(dt.getMonth() + 1) + '-' + pad2(dt.getDate());
+  }
+
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  function diaSemana(iso) { return dataLocal(iso).getDay(); }
+  function diaSemanaCurto(iso) { return DIAS_CURTO[diaSemana(iso)]; }
+  function diaSemanaLongo(iso) { return DIAS_LONGO[diaSemana(iso)]; }
+
+  function ddmm(iso) { var p = partesData(iso); return pad2(p.d) + '/' + pad2(p.m); }
+  function ddmmaaaa(iso) { var p = partesData(iso); return pad2(p.d) + '/' + pad2(p.m) + '/' + p.a; }
+
+  /* Converte uma data escrita como dd/mm/aaaa para o formato interno.
+   * Devolve null quando o texto não é uma data válida. */
+  function deBR(texto) {
+    var m = String(texto || '').trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+    if (!m) return null;
+    var d = +m[1], mes = +m[2], a = +m[3];
+    if (mes < 1 || mes > 12 || d < 1) return null;
+    var dt = new Date(a, mes - 1, d);
+    if (dt.getFullYear() !== a || dt.getMonth() !== mes - 1 || dt.getDate() !== d) return null;
+    return isoDe(dt);
+  }
+
+  function mesExtenso(mesIso) {
+    var p = String(mesIso).split('-');
+    return MESES[(+p[1]) - 1] + ' de ' + p[0];
+  }
+
+  function mesDe(iso) { return String(iso).slice(0, 7); }
+
+  function diasDoMes(mesIso) {
+    var p = String(mesIso).split('-');
+    return new Date(+p[0], +p[1], 0).getDate();
+  }
+
+  function primeiroDiaSemanaDoMes(mesIso) {
+    var p = String(mesIso).split('-');
+    return new Date(+p[0], +p[1] - 1, 1).getDay();
+  }
+
+  function mesAdjacente(mesIso, delta) {
+    var p = String(mesIso).split('-');
+    var dt = new Date(+p[0], +p[1] - 1 + delta, 1);
+    return dt.getFullYear() + '-' + pad2(dt.getMonth() + 1);
+  }
+
+  function hojeIso() {
+    var d = new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  // ---------- formatacao pt-BR ----------
+
+  function fmtMoeda(v) {
+    var neg = v < 0;
+    var n = Math.abs(Math.round(v * 100)) / 100;
+    var inteiro = Math.floor(n);
+    var cent = Math.round((n - inteiro) * 100);
+    if (cent === 100) { inteiro += 1; cent = 0; }
+    var s = String(inteiro);
+    var out = '';
+    while (s.length > 3) { out = '.' + s.slice(-3) + out; s = s.slice(0, -3); }
+    out = s + out;
+    return (neg ? '-' : '') + 'R$ ' + out + ',' + pad2(cent);
+  }
+
+  function fmtHoras(min) {
+    var h = Math.floor(min / 60);
+    var m = min % 60;
+    return h + ':' + pad2(m);
+  }
+
+  function fmtHorasDecimal(min) {
+    var v = min / 60;
+    var s = (Math.round(v * 100) / 100).toFixed(2).replace('.', ',');
+    return s.replace(/,00$/, '').replace(/(,\d)0$/, '$1');
+  }
+
+  function fmtDuracao(min) {
+    if (min < 60) return min + 'min';
+    if (min % 60 === 0) return (min / 60) + 'h';
+    return Math.floor(min / 60) + 'h' + pad2(min % 60);
+  }
+
+  // ---------- precos vigentes ----------
+
+  /* aluno.precos = [{ id, inicio: 'AAAA-MM-DD', fim: 'AAAA-MM-DD'|null, valorHora: Number }]
+   * Vigencia com fim null vale por prazo indeterminado.
+   * Havendo sobreposicao, vence a de inicio mais recente. */
+  function precoVigente(aluno, dataIso) {
+    var lista = (aluno && aluno.precos) || [];
+    var melhor = null;
+    for (var i = 0; i < lista.length; i++) {
+      var p = lista[i];
+      if (!p || typeof p.valorHora !== 'number') continue;
+      if (p.inicio && dataIso < p.inicio) continue;
+      if (p.fim && dataIso > p.fim) continue;
+      if (!melhor || String(p.inicio || '') > String(melhor.inicio || '')) melhor = p;
+    }
+    return melhor;
+  }
+
+  function validarPrecos(aluno) {
+    var erros = [];
+    var lista = ((aluno && aluno.precos) || []).slice().sort(function (a, b) {
+      return String(a.inicio || '').localeCompare(String(b.inicio || ''));
+    });
+    for (var i = 0; i < lista.length; i++) {
+      var p = lista[i];
+      if (!p.inicio) erros.push('Há uma vigência sem data de início.');
+      if (typeof p.valorHora !== 'number' || !(p.valorHora > 0)) erros.push('Há uma vigência sem valor por hora válido.');
+      if (p.fim && p.inicio && p.fim < p.inicio) erros.push('Vigência iniciada em ' + ddmmaaaa(p.inicio) + ' termina antes de começar.');
+      if (i > 0) {
+        var ant = lista[i - 1];
+        if (!ant.fim) erros.push('A vigência de ' + ddmmaaaa(ant.inicio) + ' não tem fim e se sobrepõe à de ' + ddmmaaaa(p.inicio) + '.');
+        else if (ant.fim >= p.inicio) erros.push('As vigências de ' + ddmmaaaa(ant.inicio) + ' e ' + ddmmaaaa(p.inicio) + ' se sobrepõem.');
+      }
+    }
+    return erros;
+  }
+
+  // ---------- grade padrao ----------
+
+  /* aluno.grade = { dias: [1,3,5], hora: '15:30', duracaoMin: 60 } */
+  function gradeTexto(aluno) {
+    var g = aluno && aluno.grade;
+    if (!g || !g.dias || !g.dias.length) return '';
+    var nomes = g.dias.slice().sort().map(function (d) { return DIAS_LONGO[d]; });
+    var lista;
+    if (nomes.length === 1) lista = nomes[0];
+    else lista = nomes.slice(0, -1).join(', ') + ' e ' + nomes[nomes.length - 1];
+    return lista + (g.hora ? ', ' + g.hora : '');
+  }
+
+  function aulasDaGradeNoMes(aluno, mesIso) {
+    var g = aluno && aluno.grade;
+    if (!g || !g.dias || !g.dias.length) return [];
+    var total = diasDoMes(mesIso);
+    var out = [];
+    for (var d = 1; d <= total; d++) {
+      var iso = mesIso + '-' + pad2(d);
+      if (g.dias.indexOf(diaSemana(iso)) >= 0) {
+        out.push({ data: iso, hora: g.hora || '', duracaoMin: g.duracaoMin || 60 });
+      }
+    }
+    return out;
+  }
+
+  // ---------- feriados ----------
+
+  /* Feriados nacionais, do estado do Rio de Janeiro e do município de Niterói.
+   * Servem apenas de lembrete no calendário: nada é bloqueado, porque
+   * aula em feriado acontece e às vezes é justamente a reposição. */
+
+  /* Domingo de Páscoa pelo algoritmo de Meeus e Butcher. */
+  function domingoDePascoa(ano) {
+    var a = ano % 19;
+    var b = Math.floor(ano / 100);
+    var c = ano % 100;
+    var d = Math.floor(b / 4);
+    var e = b % 4;
+    var f = Math.floor((b + 8) / 25);
+    var g = Math.floor((b - f + 1) / 3);
+    var h = (19 * a + b - d - g + 15) % 30;
+    var i = Math.floor(c / 4);
+    var k = c % 4;
+    var l = (32 + 2 * e + 2 * i - h - k) % 7;
+    var m = Math.floor((a + 11 * h + 22 * l) / 451);
+    var mes = Math.floor((h + l - 7 * m + 114) / 31);
+    var dia = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(ano, mes - 1, dia);
+  }
+
+  function somaDias(dt, dias) {
+    var novo = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    novo.setDate(novo.getDate() + dias);
+    return novo;
+  }
+
+  var cacheFeriados = {};
+
+  /* Devolve { 'AAAA-MM-DD': { nome, ambito, facultativo } } para o ano. */
+  function feriadosDoAno(ano) {
+    if (cacheFeriados[ano]) return cacheFeriados[ano];
+    var mapa = {};
+    function marca(iso, nome, ambito, facultativo) {
+      mapa[iso] = { nome: nome, ambito: ambito, facultativo: !!facultativo };
+    }
+    function fixo(mes, dia, nome, ambito, facultativo) {
+      marca(ano + '-' + pad2(mes) + '-' + pad2(dia), nome, ambito, facultativo);
+    }
+
+    // nacionais de data fixa
+    fixo(1, 1, 'Confraternização Universal', 'nacional');
+    fixo(4, 21, 'Tiradentes', 'nacional');
+    fixo(5, 1, 'Dia do Trabalho', 'nacional');
+    fixo(9, 7, 'Independência do Brasil', 'nacional');
+    fixo(10, 12, 'Nossa Senhora Aparecida', 'nacional');
+    fixo(11, 2, 'Finados', 'nacional');
+    fixo(11, 15, 'Proclamação da República', 'nacional');
+    fixo(11, 20, 'Consciência Negra', 'nacional');
+    fixo(12, 25, 'Natal', 'nacional');
+
+    // nacionais de data móvel, ancorados na Páscoa
+    var pascoa = domingoDePascoa(ano);
+    marca(isoDe(somaDias(pascoa, -48)), 'Carnaval', 'nacional');
+    marca(isoDe(somaDias(pascoa, -47)), 'Carnaval', 'nacional');
+    marca(isoDe(somaDias(pascoa, -46)), 'Quarta-feira de Cinzas', 'nacional', true);
+    marca(isoDe(somaDias(pascoa, -2)), 'Sexta-feira Santa', 'nacional');
+    marca(isoDe(pascoa), 'Páscoa', 'nacional');
+    marca(isoDe(somaDias(pascoa, 60)), 'Corpus Christi', 'nacional', true);
+
+    // estado do Rio de Janeiro
+    fixo(4, 23, 'São Jorge', 'estadual');
+
+    // município de Niterói
+    fixo(11, 22, 'Aniversário de Niterói', 'municipal');
+    fixo(12, 8, 'Nossa Senhora da Conceição, padroeira de Niterói', 'municipal');
+
+    cacheFeriados[ano] = mapa;
+    return mapa;
+  }
+
+  function feriadoEm(iso) {
+    var ano = parseInt(String(iso).slice(0, 4), 10);
+    if (!ano) return null;
+    return feriadosDoAno(ano)[iso] || null;
+  }
+
+  function feriadosDoMes(mesIso) {
+    var ano = parseInt(String(mesIso).slice(0, 4), 10);
+    var todos = feriadosDoAno(ano);
+    var saida = {};
+    Object.keys(todos).forEach(function (iso) {
+      if (mesDe(iso) === mesIso) saida[iso] = todos[iso];
+    });
+    return saida;
+  }
+
+  // ---------- séries recorrentes ----------
+
+  /* serie = { id, alunoId, dias: [1,3,5], hora: '15:30', duracaoMin: 60,
+   *           inicio: 'AAAA-MM-DD', fim: 'AAAA-MM-DD'|null, materializadoAte: 'AAAA-MM' }
+   *
+   * As ocorrências são materializadas como aulas de verdade, com serieId.
+   * Uma aula editada individualmente recebe destacada = true e passa a ser
+   * uma exceção: edições em massa da série não a sobrescrevem mais.
+   * É a mesma semântica do Google Agenda. */
+
+  var HORIZONTE_MESES = 6;
+
+  function datasDaSerieNoMes(serie, mesIso) {
+    var out = [];
+    if (!serie || !serie.dias || !serie.dias.length) return out;
+    var total = diasDoMes(mesIso);
+    for (var d = 1; d <= total; d++) {
+      var iso = mesIso + '-' + pad2(d);
+      if (serie.inicio && iso < serie.inicio) continue;
+      if (serie.fim && iso > serie.fim) continue;
+      if (serie.dias.indexOf(diaSemana(iso)) >= 0) out.push(iso);
+    }
+    return out;
+  }
+
+  function achaAula(db, alunoId, dataIso) {
+    return (db.aulas || []).filter(function (a) {
+      return a.alunoId === alunoId && a.data === dataIso;
+    })[0] || null;
+  }
+
+  /* Cria as ocorrências que faltam da série no mês.
+   * Nunca duplica, e nunca ressuscita uma aula que a Nathália apagou:
+   * as datas apagadas ficam registradas em serie.exclusoes. */
+  function materializarSerieNoMes(db, serie, mesIso) {
+    var criadas = 0;
+    var apagadas = serie.exclusoes || [];
+    datasDaSerieNoMes(serie, mesIso).forEach(function (iso) {
+      if (apagadas.indexOf(iso) >= 0) return;
+      if (achaAula(db, serie.alunoId, iso)) return;
+      db.aulas.push({
+        id: uid(),
+        alunoId: serie.alunoId,
+        serieId: serie.id,
+        destacada: false,
+        data: iso,
+        hora: serie.hora || '',
+        duracaoMin: serie.duracaoMin || 60,
+        status: 'realizada',
+        cobravel: true,
+        notaTexto: '',
+        nota: null,
+        anexos: []
+      });
+      criadas++;
+    });
+    return criadas;
+  }
+
+  /* Garante que todas as séries ativas estejam materializadas até o mês pedido.
+   * Chamado sempre que ela navega no calendário, para a agenda nunca aparecer vazia. */
+  function garantirSeriesAte(db, mesIso) {
+    var criadas = 0;
+    (db.series || []).forEach(function (s) {
+      // vai até o mês pedido, mas nunca além do fim da própria série
+      var limite = mesIso;
+      if (s.fim && mesDe(s.fim) < limite) limite = mesDe(s.fim);
+      var m = mesDe(s.inicio || mesIso);
+      if (s.materializadoAte && s.materializadoAte >= m) m = s.materializadoAte;
+      var guarda = 0;
+      while (m <= limite && guarda++ < 240) {
+        criadas += materializarSerieNoMes(db, s, m);
+        m = mesAdjacente(m, 1);
+      }
+      if (!s.materializadoAte || s.materializadoAte < limite) s.materializadoAte = limite;
+    });
+    return criadas;
+  }
+
+  function criarSerie(db, dados) {
+    var serie = {
+      id: uid(),
+      alunoId: dados.alunoId,
+      dias: (dados.dias || []).slice().sort(),
+      hora: dados.hora || '',
+      duracaoMin: dados.duracaoMin || 60,
+      inicio: dados.inicio,
+      fim: dados.fim || null,
+      exclusoes: [],
+      materializadoAte: null
+    };
+    db.series = db.series || [];
+    db.series.push(serie);
+    var ate = serie.fim ? mesDe(serie.fim) : mesAdjacente(mesDe(serie.inicio), HORIZONTE_MESES);
+    var m = mesDe(serie.inicio), guarda = 0;
+    while (m <= ate && guarda++ < 240) {
+      materializarSerieNoMes(db, serie, m);
+      m = mesAdjacente(m, 1);
+    }
+    serie.materializadoAte = ate;
+    return serie;
+  }
+
+  function aulasDaSerie(db, serieId) {
+    return (db.aulas || []).filter(function (a) { return a.serieId === serieId; });
+  }
+
+  /* Alvos de uma edição em massa, respeitando o escopo escolhido.
+   * escopo: 'esta' | 'seguintes' | 'todas' */
+  function alvosDoEscopo(db, aula, escopo) {
+    if (escopo === 'esta' || !aula.serieId) return [aula];
+    var irmas = aulasDaSerie(db, aula.serieId).filter(function (a) {
+      return a.id === aula.id || !a.destacada;
+    });
+    if (escopo === 'seguintes') {
+      return irmas.filter(function (a) { return a.data >= aula.data; });
+    }
+    return irmas;
+  }
+
+  /* Aplica mudanças de horário, duração, situação ou cobrança.
+   * Devolve quantas aulas foram alteradas. */
+  function aplicarEdicaoAula(db, aulaId, mudancas, escopo) {
+    var aula = (db.aulas || []).filter(function (a) { return a.id === aulaId; })[0];
+    if (!aula) return 0;
+    var alvos = alvosDoEscopo(db, aula, escopo);
+    var campos = ['hora', 'duracaoMin', 'status', 'cobravel'];
+    alvos.forEach(function (a) {
+      campos.forEach(function (c) {
+        if (mudancas[c] !== undefined) a[c] = mudancas[c];
+      });
+      if (escopo === 'esta' && a.serieId) a.destacada = true;
+    });
+    // Notas e anexos são sempre individuais: nunca se propagam pela série.
+    if (mudancas.notaTexto !== undefined) aula.notaTexto = mudancas.notaTexto;
+    if (mudancas.nota !== undefined) aula.nota = mudancas.nota;
+    if (mudancas.anexos !== undefined) aula.anexos = mudancas.anexos;
+    if (mudancas.data !== undefined && mudancas.data !== aula.data) {
+      aula.data = mudancas.data;
+      if (aula.serieId) aula.destacada = true;
+    }
+    return alvos.length;
+  }
+
+  function excluirAulas(db, aulaId, escopo) {
+    var aula = (db.aulas || []).filter(function (a) { return a.id === aulaId; })[0];
+    if (!aula) return 0;
+    var alvos = alvosDoEscopo(db, aula, escopo);
+    var ids = {};
+    alvos.forEach(function (a) { ids[a.id] = true; });
+
+    // Registra as datas apagadas na série, para elas não voltarem sozinhas
+    // quando o calendário for aberto de novo.
+    if (aula.serieId) {
+      var s0 = (db.series || []).filter(function (x) { return x.id === aula.serieId; })[0];
+      if (s0) {
+        s0.exclusoes = s0.exclusoes || [];
+        alvos.forEach(function (a) {
+          if (a.serieId === s0.id && s0.exclusoes.indexOf(a.data) < 0) s0.exclusoes.push(a.data);
+        });
+      }
+    }
+
+    db.aulas = (db.aulas || []).filter(function (a) { return !ids[a.id]; });
+    if (escopo === 'todas' && aula.serieId) {
+      db.series = (db.series || []).filter(function (s) { return s.id !== aula.serieId; });
+    } else if (escopo === 'seguintes' && aula.serieId) {
+      var s = (db.series || []).filter(function (x) { return x.id === aula.serieId; })[0];
+      if (s) {
+        var dt = dataLocal(aula.data); dt.setDate(dt.getDate() - 1);
+        s.fim = isoDe(dt);
+        if (s.fim < s.inicio) db.series = db.series.filter(function (x) { return x.id !== s.id; });
+      }
+    }
+    return alvos.length;
+  }
+
+  /* Muda o padrão da recorrência (dias da semana, horário, duração, fim).
+   * Recria as ocorrências futuras não destacadas a partir de aPartirDe. */
+  function editarSerie(db, serieId, novoPadrao, aPartirDe) {
+    var s = (db.series || []).filter(function (x) { return x.id === serieId; })[0];
+    if (!s) return 0;
+    var corte = aPartirDe || s.inicio;
+
+    // remove as futuras que não são exceções
+    db.aulas = (db.aulas || []).filter(function (a) {
+      return !(a.serieId === serieId && a.data >= corte && !a.destacada);
+    });
+
+    s.exclusoes = (s.exclusoes || []).filter(function (d) { return d < corte; });
+
+    if (novoPadrao.dias !== undefined) s.dias = novoPadrao.dias.slice().sort();
+    if (novoPadrao.hora !== undefined) s.hora = novoPadrao.hora;
+    if (novoPadrao.duracaoMin !== undefined) s.duracaoMin = novoPadrao.duracaoMin;
+    if (novoPadrao.fim !== undefined) s.fim = novoPadrao.fim;
+
+    var serieCorte = {
+      id: s.id, alunoId: s.alunoId, dias: s.dias, hora: s.hora,
+      duracaoMin: s.duracaoMin, inicio: corte > s.inicio ? corte : s.inicio, fim: s.fim,
+      exclusoes: s.exclusoes
+    };
+    var ate = s.fim ? mesDe(s.fim) : mesAdjacente(mesDe(corte), HORIZONTE_MESES);
+    var m = mesDe(serieCorte.inicio), guarda = 0, criadas = 0;
+    while (m <= ate && guarda++ < 240) {
+      criadas += materializarSerieNoMes(db, serieCorte, m);
+      m = mesAdjacente(m, 1);
+    }
+    s.materializadoAte = ate;
+    return criadas;
+  }
+
+  function serieDe(db, aula) {
+    if (!aula || !aula.serieId) return null;
+    return (db.series || []).filter(function (s) { return s.id === aula.serieId; })[0] || null;
+  }
+
+  function descreveSerie(serie) {
+    if (!serie) return '';
+    var nomes = (serie.dias || []).slice().sort().map(function (d) { return DIAS_LONGO[d]; });
+    var lista = nomes.length <= 1 ? (nomes[0] || '') :
+      nomes.slice(0, -1).join(', ') + ' e ' + nomes[nomes.length - 1];
+    var txt = 'Toda ' + lista + (serie.hora ? ', às ' + serie.hora : '');
+    if (serie.fim) txt += ', até ' + ddmmaaaa(serie.fim);
+    return txt;
+  }
+
+  // ---------- fechamento ----------
+
+  function ordenarAulas(a, b) {
+    if (a.data !== b.data) return a.data < b.data ? -1 : 1;
+    return String(a.hora || '').localeCompare(String(b.hora || ''));
+  }
+
+  /* Retorna o fechamento de um aluno num mes.
+   * db = { alunos: [], aulas: [], resumos: [] } */
+  function calcularFechamento(db, alunoId, mesIso) {
+    var aluno = (db.alunos || []).filter(function (a) { return a.id === alunoId; })[0];
+    if (!aluno) return null;
+
+    var aulas = (db.aulas || []).filter(function (x) {
+      return x.alunoId === alunoId && mesDe(x.data) === mesIso;
+    }).sort(ordenarAulas);
+
+    var linhas = [];
+    var totalMin = 0, totalValor = 0, minNaoCobrados = 0;
+    var faixas = {};
+    var semPreco = [];
+
+    for (var i = 0; i < aulas.length; i++) {
+      var au = aulas[i];
+      var st = STATUS[au.status] || STATUS.realizada;
+      var cobravel = (typeof au.cobravel === 'boolean') ? au.cobravel : st.cobravelPadrao;
+      var pv = precoVigente(aluno, au.data);
+      var vh = pv ? pv.valorHora : null;
+      var dur = au.duracaoMin || 0;
+      var valor = (cobravel && vh !== null) ? (dur / 60) * vh : 0;
+
+      if (cobravel && vh === null && dur > 0) semPreco.push(au.data);
+
+      if (cobravel) {
+        totalMin += dur;
+        totalValor += valor;
+        if (vh !== null) {
+          var k = String(vh);
+          if (!faixas[k]) faixas[k] = { valorHora: vh, minutos: 0, valor: 0 };
+          faixas[k].minutos += dur;
+          faixas[k].valor += valor;
+        }
+      } else {
+        minNaoCobrados += dur;
+      }
+
+      linhas.push({
+        id: au.id,
+        data: au.data,
+        dia: diaSemanaCurto(au.data),
+        hora: au.hora || '',
+        duracaoMin: dur,
+        status: au.status || 'realizada',
+        statusRotulo: st.rotulo,
+        cobravel: cobravel,
+        valorHora: vh,
+        valor: valor,
+        temNota: !!(au.notaTexto || (au.nota && au.nota.paginas && au.nota.paginas.length) || (au.anexos && au.anexos.length)),
+        notaTexto: au.notaTexto || ''
+      });
+    }
+
+    var resumo = (db.resumos || []).filter(function (r) {
+      return r.alunoId === alunoId && r.mes === mesIso;
+    })[0] || null;
+
+    var listaFaixas = Object.keys(faixas).map(function (k) { return faixas[k]; })
+      .sort(function (a, b) { return a.valorHora - b.valorHora; });
+
+    return {
+      aluno: aluno,
+      alunoNome: aluno.nome,
+      responsavel: aluno.responsavel || '',
+      mes: mesIso,
+      mesExtenso: mesExtenso(mesIso),
+      grade: gradeTexto(aluno),
+      linhas: linhas,
+      totalMin: totalMin,
+      totalHoras: fmtHoras(totalMin),
+      totalValor: Math.round(totalValor * 100) / 100,
+      minutosNaoCobrados: minNaoCobrados,
+      faixas: listaFaixas,
+      precoUnico: listaFaixas.length === 1 ? listaFaixas[0].valorHora : null,
+      semPreco: semPreco,
+      resumoTexto: resumo ? (resumo.texto || '') : '',
+      qtdEncontros: linhas.filter(function (l) { return l.cobravel || l.status !== 'cancelada'; }).length
+    };
+  }
+
+  function calcularMesInteiro(db, mesIso) {
+    var out = [];
+    (db.alunos || []).forEach(function (a) {
+      var f = calcularFechamento(db, a.id, mesIso);
+      if (f && f.linhas.length) out.push(f);
+    });
+    out.sort(function (x, y) { return y.totalValor - x.totalValor; });
+    return out;
+  }
+
+  // ---------- Markdown ----------
+  // Regra da casa: nunca usar travessao (em-dash ou en-dash) em entregavel.
+
+  function markdownFechamento(f, opcoes) {
+    opcoes = opcoes || {};
+    var L = [];
+    L.push('# Controle de aulas');
+    L.push('');
+    L.push('**Aluno:** ' + f.alunoNome);
+    if (f.responsavel) L.push('**Responsável:** ' + f.responsavel);
+    L.push('**Mês:** ' + f.mesExtenso);
+    if (f.grade) L.push('**Dias e horário:** ' + f.grade);
+    L.push('');
+    L.push('## Datas trabalhadas');
+    L.push('');
+    L.push('| Data | Dia | Horário | Duração | Situação | Cobrada | R$/h | Valor |');
+    L.push('|---|---|---|---|---|---|---:|---:|');
+    f.linhas.forEach(function (l) {
+      L.push('| ' + ddmm(l.data) +
+        ' | ' + l.dia +
+        ' | ' + (l.hora || '') +
+        ' | ' + fmtDuracao(l.duracaoMin) +
+        ' | ' + l.statusRotulo +
+        ' | ' + (l.cobravel ? 'sim' : 'não') +
+        ' | ' + (l.valorHora !== null ? fmtMoeda(l.valorHora) : 'sem preço') +
+        ' | ' + fmtMoeda(l.cobravel ? l.valor : 0) + ' |');
+    });
+    L.push('');
+    L.push('**Total de horas cobradas:** ' + f.totalHoras + ' h (' + fmtHorasDecimal(f.totalMin) + ' horas)');
+    if (f.minutosNaoCobrados > 0) {
+      L.push('**Horas não cobradas:** ' + fmtHoras(f.minutosNaoCobrados) + ' h');
+    }
+    if (f.faixas.length > 1) {
+      L.push('');
+      L.push('Composição por valor vigente:');
+      f.faixas.forEach(function (fx) {
+        L.push('- ' + fmtHoras(fx.minutos) + ' h a ' + fmtMoeda(fx.valorHora) + '/h: ' + fmtMoeda(fx.valor));
+      });
+    }
+    L.push('');
+    L.push('**Total a cobrar:** ' + fmtMoeda(f.totalValor));
+    if (f.semPreco.length) {
+      L.push('');
+      L.push('> Atenção: não há valor por hora vigente para ' + f.semPreco.map(ddmm).join(', ') + '.');
+    }
+    L.push('');
+    L.push('## Resumo do mês');
+    L.push('');
+    L.push(f.resumoTexto ? f.resumoTexto : '(a preencher)');
+
+    if (opcoes.incluirNotas) {
+      var comNota = f.linhas.filter(function (l) { return l.temNota; });
+      if (comNota.length) {
+        L.push('');
+        L.push('## Notas das aulas');
+        comNota.forEach(function (l) {
+          L.push('');
+          L.push('### ' + ddmm(l.data) + ' (' + l.dia + ')');
+          if (l.notaTexto) L.push(l.notaTexto);
+          else L.push('(folha manuscrita registrada no aplicativo)');
+        });
+      }
+    }
+    L.push('');
+    return L.join('\n');
+  }
+
+  function markdownMesInteiro(fechs, mesIso) {
+    var L = [];
+    L.push('# Fechamento do mês: ' + mesExtenso(mesIso));
+    L.push('');
+    L.push('| Aluno | Encontros | Horas cobradas | Valor |');
+    L.push('|---|---:|---:|---:|');
+    var totMin = 0, totVal = 0, totEnc = 0;
+    fechs.forEach(function (f) {
+      totMin += f.totalMin; totVal += f.totalValor; totEnc += f.qtdEncontros;
+      L.push('| ' + f.alunoNome + ' | ' + f.qtdEncontros + ' | ' + f.totalHoras + ' | ' + fmtMoeda(f.totalValor) + ' |');
+    });
+    L.push('| **Total** | **' + totEnc + '** | **' + fmtHoras(totMin) + '** | **' + fmtMoeda(totVal) + '** |');
+    L.push('');
+    L.push('Alunos ativos no mês: ' + fechs.length + '.');
+    L.push('Média por hora no mês: ' + (totMin > 0 ? fmtMoeda(totVal / (totMin / 60)) : fmtMoeda(0)) + '.');
+    L.push('');
+    fechs.forEach(function (f) {
+      L.push('');
+      L.push('---');
+      L.push('');
+      L.push(markdownFechamento(f, { incluirNotas: true }));
+    });
+    return L.join('\n');
+  }
+
+  // ---------- utilidades ----------
+
+  function uid() {
+    return 'x' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  }
+
+  function nomeArquivo(s) {
+    return String(s)
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^A-Za-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+  }
+
+  return {
+    MESES: MESES, DIAS_CURTO: DIAS_CURTO, DIAS_LONGO: DIAS_LONGO, STATUS: STATUS,
+    pad2: pad2, partesData: partesData, dataLocal: dataLocal, isoDe: isoDe, hojeIso: hojeIso,
+    diaSemana: diaSemana, diaSemanaCurto: diaSemanaCurto, diaSemanaLongo: diaSemanaLongo,
+    ddmm: ddmm, ddmmaaaa: ddmmaaaa, mesExtenso: mesExtenso, mesDe: mesDe,
+    diasDoMes: diasDoMes, primeiroDiaSemanaDoMes: primeiroDiaSemanaDoMes, mesAdjacente: mesAdjacente,
+    fmtMoeda: fmtMoeda, fmtHoras: fmtHoras, fmtHorasDecimal: fmtHorasDecimal, fmtDuracao: fmtDuracao,
+    precoVigente: precoVigente, validarPrecos: validarPrecos,
+    gradeTexto: gradeTexto, aulasDaGradeNoMes: aulasDaGradeNoMes,
+    domingoDePascoa: domingoDePascoa, feriadosDoAno: feriadosDoAno,
+    feriadoEm: feriadoEm, feriadosDoMes: feriadosDoMes, deBR: deBR,
+    criarSerie: criarSerie, editarSerie: editarSerie, serieDe: serieDe, descreveSerie: descreveSerie,
+    datasDaSerieNoMes: datasDaSerieNoMes, materializarSerieNoMes: materializarSerieNoMes,
+    garantirSeriesAte: garantirSeriesAte, aulasDaSerie: aulasDaSerie, alvosDoEscopo: alvosDoEscopo,
+    aplicarEdicaoAula: aplicarEdicaoAula, excluirAulas: excluirAulas, achaAula: achaAula,
+    calcularFechamento: calcularFechamento, calcularMesInteiro: calcularMesInteiro,
+    markdownFechamento: markdownFechamento, markdownMesInteiro: markdownMesInteiro,
+    uid: uid, nomeArquivo: nomeArquivo
+  };
+});
