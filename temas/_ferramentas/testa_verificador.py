@@ -166,6 +166,43 @@ def testar_frases():
     return falhas
 
 
+# O ambiente de verificacao tem duas decisoes que precisam ser preservadas.
+# Um agente que escreveu os temas de numeros complexos avisou: se z virar real,
+# os temas de raiz complexa quebram sem que ninguem entenda por que.
+AMBIENTE_ESPERADO = [
+    ("solve(Eq(Abs(2*x - 6), 4), x) == [1, 5]", True,
+     "x precisa ser real, senao equacao com valor absoluto nao resolve"),
+    ("set(solve(Eq(z**2 + 25, 0), z)) == set([5*I, -5*I])", True,
+     "z precisa ficar complexo, senao as raizes complexas somem"),
+    ("expand((1 + I)**2) == 2*I", True,
+     "a unidade imaginaria precisa estar disponivel"),
+    ("Rational(3)**(-2) == Rational(1,9)", True,
+     "expoente negativo precisa dar fracao exata, nao float"),
+    ("solveset(x**2 - 5*x + 6 < 0, x, Reals) == Interval.open(2, 3)", True,
+     "inequacao precisa de solveset sobre os reais"),
+    ("len(real_roots(x**2 + 2*x + 5)) == 0", True,
+     "raiz real precisa ser contada por real_roots, nao por solve"),
+]
+
+
+def testar_ambiente():
+    falhas = 0
+    escopo = dict(verificar.AMBIENTE)
+    escopo['__builtins__'] = {}
+    for expressao, esperado, motivo in AMBIENTE_ESPERADO:
+        try:
+            obtido = bool(eval(expressao, dict(escopo)))
+        except Exception as e:
+            obtido = 'erro: %s' % e
+        if obtido == esperado:
+            print('  OK     ambiente: %s' % motivo)
+        else:
+            print('  FALHA  ambiente: %s' % motivo)
+            print('         %s deu %s' % (expressao[:60], obtido))
+            falhas += 1
+    return falhas
+
+
 def rodar():
     pasta = tempfile.mkdtemp(prefix='verifica_')
     falhas = 0
@@ -200,13 +237,15 @@ def rodar():
         shutil.rmtree(pasta, ignore_errors=True)
 
     falhas += testar_frases()
+    falhas += testar_ambiente()
 
     print('')
     print('=' * 60)
     if falhas:
         print('%d defeito(s) passaram sem ser notados. O verificador nao esta confiavel.' % falhas)
     else:
-        print('O verificador pegou todos os %d defeitos e passou nas %d frases.' % (len(CASOS), len(FRASES)))
+        print('O verificador pegou os %d defeitos, passou nas %d frases e manteve as %d decisoes do ambiente.'
+              % (len(CASOS), len(FRASES), len(AMBIENTE_ESPERADO)))
     print('=' * 60)
     return 1 if falhas else 0
 
