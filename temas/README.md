@@ -110,8 +110,7 @@ gabarito) e quais exercícios ficam, marcando e desmarcando a partir de tudo sel
 sai em PDF anexado àquela aula, com a numeração refeita e o gabarito acompanhando a escolha.
 
 O `indice.json` carrega sempre, e cada `serie-XX.json` só quando aquela série é
-aberta: no tablet,
-puxar o banco inteiro para ver um título seria desperdício.
+aberta: no tablet, puxar o banco inteiro para ver um título seria desperdício.
 
 ## O que falta
 
