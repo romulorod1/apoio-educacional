@@ -102,13 +102,20 @@ O `FORMATO.md` traz a estrutura completa e as regras de conteúdo. O resumo:
 - Gabarito separado, para o material poder ser entregue sem ele.
 - Bloco de verificação com uma linha por conta.
 
+## Já ligado ao aplicativo
+
+Feito na versão 1.6.0. Dentro da aula, o botão **Material de aula** abre a lista de temas por ano
+escolar, com busca. Ao escolher um tema ela decide a língua, o que entra (explicação, lista,
+gabarito) e quais exercícios ficam, marcando e desmarcando a partir de tudo selecionado. O material
+sai em PDF anexado àquela aula, com a numeração refeita e o gabarito acompanhando a escolha.
+
+O  carrega sempre, e cada  só quando aquela série é aberta: no tablet,
+puxar o banco inteiro para ver um título seria desperdício.
+
 ## O que falta
 
-1. **Ligar ao aplicativo**, que é a etapa a ser validada antes de começar: ao criar a aula, escolher
-   o tema e a língua, montar a lista marcando e desmarcando exercícios, e sair o material anexado
-   àquela aula, pronto para o PDF do fechamento ou para ela anotar por cima com a S Pen.
-2. **Revisar os 73 itens de conferência humana**, que são os exercícios sem conta a verificar por
+1. **Revisar os 73 itens de conferência humana**, que são os exercícios sem conta a verificar por
    símbolo: nomear figuras, justificar com as próprias palavras, dobrar papel. O verificador os lista
    ao final de cada execução.
-3. **Traduzir o banco para outras matérias**, se fizer sentido. O formato e o verificador foram
+2. **Traduzir o banco para outras matérias**, se fizer sentido. O formato e o verificador foram
    escritos para matemática, mas a estrutura serve.
