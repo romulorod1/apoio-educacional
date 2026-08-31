@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.2.0';
+  var VERSAO = '1.3.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());

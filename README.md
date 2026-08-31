@@ -155,6 +155,11 @@ O caso de referência é o fechamento de junho do Marcelo, que existe em papel: 
 git add -A && git commit -m "descrição" && git push
 ```
 
-O GitHub Pages atualiza sozinho em um ou dois minutos. Ao mudar qualquer arquivo, suba também a
-versão do cache em `sw.js` (`var CACHE = 'apoio-educacional-v2'`), senão os tablets que já
-instalaram continuam com a versão antiga em cache.
+O GitHub Pages atualiza sozinho em um ou dois minutos. Ao mudar qualquer arquivo, suba a versão do
+cache em `sw.js` e a de `VERSAO` em `app.js`.
+
+O GitHub Pages manda guardar os arquivos por dez minutos (`Cache-Control: max-age=600`). Por isso o
+service worker busca com `cache: no-cache`: ele pergunta ao servidor se o arquivo mudou em vez de
+aceitar o que está guardado, e uma versão nova chega na primeira abertura. Sem isso, uma atualização
+podia demorar dez minutos para aparecer no tablet. `testa_atualizacao_real.js` cobre os dois
+cenários, com os mesmos cabeçalhos do servidor de verdade.

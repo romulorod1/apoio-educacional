@@ -6,6 +6,8 @@ const path = require('path');
 
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const URL_APP = 'http://127.0.0.1:8777/index.html';
+const VERSAO_ESPERADA = (fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8')
+  .match(/var VERSAO = '([^']+)'/) || [])[1];
 
 let falhas = 0, passes = 0;
 const erros = [];
@@ -255,7 +257,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 
   await pag.evaluate(() => Array.from(document.querySelectorAll('#abas .aba')).find(b => b.dataset.tela === 'ajustes').click());
   await espera(500);
-  conf('a versão aparece', await texto('#versao-app'), '1.1.0');
+  conf('a versão aparece', await texto('#versao-app'), VERSAO_ESPERADA);
   conf('existe o botão de procurar atualização', await conta('#procurar-atualizacao'), 1);
   const aviso = await pag.$eval('#tela-ajustes', e => e.textContent);
   conf('explica que atualizar não apaga dados', aviso.includes('Atualizar não apaga nada'), true);

@@ -65,6 +65,8 @@ function prepararVersaoAntiga() {
 }
 
 const COMMIT_V1 = '7250029';
+const VERSAO_NOVA = (fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8')
+  .match(/var VERSAO = '([^']+)'/) || [])[1];
 
 (async () => {
   const versaoAntiga = prepararVersaoAntiga();
@@ -194,7 +196,7 @@ const COMMIT_V1 = '7250029';
   await espera(3000);
 
   const versaoAgora = await pag.$eval('#versao-app', e => e.textContent).catch(() => 'nao achou');
-  conf('a versão nova entrou sozinha', versaoAgora, '1.1.0');
+  conf('a versão nova entrou sozinha', versaoAgora, VERSAO_NOVA);
 
   // aciona a troca do service worker, como o botão faz
   await pag.evaluate(() => navigator.serviceWorker.getRegistration().then(reg => {
