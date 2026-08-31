@@ -225,6 +225,26 @@
 
   // ---------- cópia de segurança ----------
 
+  /* Anexo é guardado como Blob, e Blob não sobrevive a JSON.stringify: viraria
+   * um objeto vazio e o arquivo se perderia calado. Por isso vira texto na
+   * cópia e volta a ser Blob na restauração. */
+  function blobParaTexto(blob) {
+    return new Promise(function (resolve, reject) {
+      var leitor = new FileReader();
+      leitor.onload = function () { resolve(leitor.result); };
+      leitor.onerror = function () { reject(leitor.error); };
+      leitor.readAsDataURL(blob);
+    });
+  }
+
+  function textoParaBlob(texto, tipo) {
+    var partes = String(texto || '').split(',');
+    var bin = atob(partes[1] || '');
+    var arr = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: tipo || 'application/octet-stream' });
+  }
+
   function exportarTudo(db) {
     var pacote = { formato: 'apoio-educacional', versao: 1, quando: new Date().toISOString(), dados: db };
     return todasAsNotas().then(function (notas) {
@@ -244,8 +264,15 @@
       }));
     }).then(function (anexos) {
       pacote.anexos = {};
-      anexos.forEach(function (a) { if (a.valor) pacote.anexos[a.id] = a.valor; });
-      return pacote;
+      return Promise.all(anexos.map(function (a) {
+        if (!a.valor) return null;
+        var registro = { nome: a.valor.nome, tipo: a.valor.tipo };
+        if (!a.valor.blob) { pacote.anexos[a.id] = registro; return null; }
+        return blobParaTexto(a.valor.blob).then(function (texto) {
+          registro.conteudo = texto;
+          pacote.anexos[a.id] = registro;
+        });
+      })).then(function () { return pacote; });
     });
   }
 
@@ -257,7 +284,15 @@
       var passos = [];
       Object.keys(pacote.notas || {}).forEach(function (k) { passos.push(gravar('notas', k, pacote.notas[k])); });
       Object.keys(pacote.midias || {}).forEach(function (k) { passos.push(salvarMidia(k, pacote.midias[k])); });
-      Object.keys(pacote.anexos || {}).forEach(function (k) { passos.push(salvarAnexo(k, pacote.anexos[k])); });
+      Object.keys(pacote.anexos || {}).forEach(function (k) {
+        var reg = pacote.anexos[k];
+        // cópias antigas podiam trazer o anexo já como Blob
+        if (reg && reg.conteudo) {
+          passos.push(salvarAnexo(k, { nome: reg.nome, tipo: reg.tipo, blob: textoParaBlob(reg.conteudo, reg.tipo) }));
+        } else if (reg && reg.blob) {
+          passos.push(salvarAnexo(k, reg));
+        }
+      });
       return Promise.all(passos);
     }).then(function () { return pacote.dados; });
   }

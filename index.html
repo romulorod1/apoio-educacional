@@ -124,12 +124,19 @@
         </div>
       </div>
 
-      <h3 class="subtitulo">Sobre</h3>
+      <h3 class="subtitulo">Versão do aplicativo</h3>
       <div class="cartao">
-        <p class="ajuda" style="margin:0">
-          Apoio Educacional, controle de aulas. Funciona sem internet depois de instalado.
-          Versão <span id="versao-app">.</span>
+        <p class="ajuda" style="margin-top:0">
+          Você está na versão <strong><span id="versao-app">.</span></strong>.
+          Quando sai uma versão nova, ela chega sozinha na próxima vez que você abrir
+          o aplicativo com internet, e aparece um aviso perguntando se quer atualizar.
+          <strong>Atualizar não apaga nada:</strong> alunos, aulas, folhas e anexos continuam
+          no lugar. Nunca é preciso desinstalar e instalar de novo.
         </p>
+        <div id="estado-versao"></div>
+        <div class="barra" style="margin-bottom:0">
+          <button class="btn" id="procurar-atualizacao" type="button">Procurar atualização</button>
+        </div>
       </div>
     </section>
 
@@ -193,6 +200,49 @@
     </div>
   </div>
 
+  <div class="fundo-modal" id="modal-retroativo">
+    <div class="modal" style="max-width:500px">
+      <div class="modal-cabecalho">
+        <h3>Repetir para trás</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-retroativo"></div>
+      <div class="modal-rodape">
+        <button class="btn" data-fechar type="button">Cancelar</button>
+        <button class="btn principal" id="salvar-retroativo" type="button">Criar as aulas</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="fundo-modal" id="modal-texto">
+    <div class="modal" style="max-width:460px">
+      <div class="modal-cabecalho">
+        <h3>Texto na folha</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+      </div>
+      <div class="modal-corpo">
+        <label class="campo">
+          <span>O que escrever</span>
+          <textarea id="campo-texto-folha" style="min-height:110px"
+            placeholder="Pode usar mais de uma linha."></textarea>
+        </label>
+        <label class="campo">
+          <span>Tamanho da letra</span>
+          <select id="campo-texto-tamanho">
+            <option value="22">Pequena</option>
+            <option value="30" selected>Média</option>
+            <option value="42">Grande</option>
+            <option value="58">Título</option>
+          </select>
+        </label>
+      </div>
+      <div class="modal-rodape">
+        <button class="btn" data-fechar type="button">Cancelar</button>
+        <button class="btn principal" id="salvar-texto-folha" type="button">Inserir</button>
+      </div>
+    </div>
+  </div>
+
   <div class="fundo-modal" id="modal-resumo">
     <div class="modal">
       <div class="modal-cabecalho">
@@ -213,7 +263,11 @@
   </div>
 
   <input type="file" id="entrada-imagem" accept="image/*" hidden>
-  <input type="file" id="entrada-anexo" hidden>
+  <!-- Tipos explícitos: sem isso o Android abre só a câmera e a galeria,
+       em vez do seletor de arquivos onde estão os PDFs e o Drive. -->
+  <input type="file" id="entrada-anexo"
+    accept="application/pdf,.pdf,application/msword,.doc,.docx,.txt,.md,.ppt,.pptx,.xls,.xlsx" hidden>
+  <input type="file" id="entrada-anexo-foto" accept="image/*" hidden>
 
   <script src="core.js"></script>
   <script src="pdf.js"></script>

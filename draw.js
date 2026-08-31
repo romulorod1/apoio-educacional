@@ -206,7 +206,11 @@
     this.pagina().itens.push({
       t: 'texto', x: x, y: y, tam: tam || 30, cor: this.cor, txt: txt
     });
+    // Volta para a caneta: escrever à mão é o uso normal, e assim ela nunca
+    // fica presa abrindo o painel de texto a cada toque.
+    this.ferramenta = 'caneta';
     this.cacheValido = false; this.precisaRedesenhar = true;
+    if (this.opcoes.aoTrocarFerramenta) this.opcoes.aoTrocarFerramenta('caneta');
   };
 
   /* A imagem entra centralizada e proporcional, ocupando no máximo 70% da folha. */
@@ -279,27 +283,37 @@
 
   // ---------- eventos ----------
 
+  /* A tela de desenho é sempre o mesmo elemento, reaproveitado a cada folha
+   * que ela abre. Por isso todos os ouvintes ficam presos a um AbortController:
+   * ao fechar a folha eles são removidos de uma vez. Sem isso, o editor da folha
+   * anterior continuaria escutando os toques junto com o novo, e a ferramenta
+   * antiga voltaria a agir sozinha. */
   Editor.prototype._ligarEventos = function () {
     var self = this;
     var c = this.canvas;
     c.style.touchAction = 'none';
 
-    c.addEventListener('pointerdown', function (e) { self._aoDescer(e); });
-    c.addEventListener('pointermove', function (e) { self._aoMover(e); });
-    c.addEventListener('pointerup', function (e) { self._aoSubir(e); });
-    c.addEventListener('pointercancel', function (e) { self._aoSubir(e); });
-    c.addEventListener('pointerleave', function (e) { self._aoSubir(e); });
-    c.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    this._parador = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var sinal = this._parador ? { signal: this._parador.signal } : undefined;
+    var sinalAtivo = this._parador ? { signal: this._parador.signal, passive: false } : { passive: false };
+
+    c.addEventListener('pointerdown', function (e) { self._aoDescer(e); }, sinal);
+    c.addEventListener('pointermove', function (e) { self._aoMover(e); }, sinal);
+    c.addEventListener('pointerup', function (e) { self._aoSubir(e); }, sinal);
+    c.addEventListener('pointercancel', function (e) { self._aoSubir(e); }, sinal);
+    c.addEventListener('pointerleave', function (e) { self._aoSubir(e); }, sinal);
+    c.addEventListener('contextmenu', function (e) { e.preventDefault(); }, sinal);
     c.addEventListener('wheel', function (e) {
       e.preventDefault();
       var p = self.posicaoDoEvento(e);
       self.zoom(e.deltaY < 0 ? 1.12 : 1 / 1.12, p.x, p.y);
-    }, { passive: false });
+    }, sinalAtivo);
   };
 
   Editor.prototype._eDedo = function (e) { return e.pointerType === 'touch'; };
 
   Editor.prototype._aoDescer = function (e) {
+    if (this.destruido) return;
     var pos = this.posicaoDoEvento(e);
     this.ponteiros[e.pointerId] = { x: pos.x, y: pos.y, tipo: e.pointerType };
     var dedos = Object.keys(this.ponteiros).filter(function (k) { return true; });
@@ -311,13 +325,17 @@
       return;
     }
 
-    try { this.canvas.setPointerCapture(e.pointerId); } catch (err) { /* sem captura, segue */ }
     var p = this.paraFolha(pos.x, pos.y);
 
+    // O texto abre um painel próprio: prender o ponteiro aqui deixaria a tela de
+    // desenho recebendo todos os toques seguintes, inclusive os dos botões.
     if (this.ferramenta === 'texto') {
+      delete this.ponteiros[e.pointerId];
       if (this.opcoes.aoPedirTexto) this.opcoes.aoPedirTexto(p);
       return;
     }
+
+    try { this.canvas.setPointerCapture(e.pointerId); } catch (err) { /* sem captura, segue */ }
     if (this.ferramenta === 'borracha') {
       this.marcarPonto();
       this.apagando = true;
@@ -366,6 +384,7 @@
   };
 
   Editor.prototype._aoMover = function (e) {
+    if (this.destruido) return;
     var pos = this.posicaoDoEvento(e);
     var anterior = this.ponteiros[e.pointerId];
     if (!anterior) return;
@@ -423,6 +442,7 @@
   };
 
   Editor.prototype._aoSubir = function (e) {
+    if (this.destruido) return;
     if (this.ponteiros[e.pointerId]) delete this.ponteiros[e.pointerId];
     if (Object.keys(this.ponteiros).length < 2) this.pinca = null;
     try { this.canvas.releasePointerCapture(e.pointerId); } catch (err) { /* nada a fazer */ }
@@ -473,8 +493,17 @@
   };
 
   Editor.prototype.destruir = function () {
-    if (this._raf) cancelAnimationFrame(this._raf);
+    if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
     if (this._observador) { this._observador.disconnect(); this._observador = null; }
+    if (this._parador) { this._parador.abort(); this._parador = null; }
+    this.destruido = true;
+    // solta qualquer ponteiro que tenha ficado preso na tela de desenho
+    var self = this;
+    Object.keys(this.ponteiros).forEach(function (id) {
+      try { self.canvas.releasePointerCapture(+id); } catch (e) { /* já solto */ }
+    });
+    this.ponteiros = {};
+    this.tracoAtual = null;
   };
 
   Editor.prototype.desenhar = function () {

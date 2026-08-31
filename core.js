@@ -411,8 +411,19 @@
     if (mudancas.nota !== undefined) aula.nota = mudancas.nota;
     if (mudancas.anexos !== undefined) aula.anexos = mudancas.anexos;
     if (mudancas.data !== undefined && mudancas.data !== aula.data) {
+      var dataAntiga = aula.data;
       aula.data = mudancas.data;
-      if (aula.serieId) aula.destacada = true;
+      if (aula.serieId) {
+        aula.destacada = true;
+        // A data de onde ela saiu fica registrada como apagada. Sem isso a
+        // série recriaria uma aula ali na próxima vez que o mês fosse aberto,
+        // e a aula pareceria ter se duplicado.
+        var s2 = (db.series || []).filter(function (x) { return x.id === aula.serieId; })[0];
+        if (s2) {
+          s2.exclusoes = s2.exclusoes || [];
+          if (s2.exclusoes.indexOf(dataAntiga) < 0) s2.exclusoes.push(dataAntiga);
+        }
+      }
     }
     return alvos.length;
   }
@@ -452,18 +463,52 @@
 
   /* Muda o padrão da recorrência (dias da semana, horário, duração, fim).
    * Recria as ocorrências futuras não destacadas a partir de aPartirDe. */
+  /* Uma aula com folha escrita, anotação ou anexo carrega trabalho que não pode
+   * ser jogado fora por causa de uma mudança de padrão. */
+  function temConteudo(aula) {
+    return !!(aula && ((aula.notaTexto && aula.notaTexto.trim()) || aula.temNota ||
+      (aula.anexos && aula.anexos.length)));
+  }
+
   function editarSerie(db, serieId, novoPadrao, aPartirDe) {
     var s = (db.series || []).filter(function (x) { return x.id === serieId; })[0];
     if (!s) return 0;
     var corte = aPartirDe || s.inicio;
+    if (novoPadrao.inicio && novoPadrao.inicio < corte) corte = novoPadrao.inicio;
 
-    // remove as futuras que não são exceções
+    // Descobre quais datas o padrão novo produz, para poder aproveitar as aulas
+    // que continuam valendo em vez de apagar e recriar. Manter o mesmo registro
+    // é o que preserva a folha de aula, que fica ligada ao identificador dele.
+    var padraoNovo = {
+      dias: novoPadrao.dias !== undefined ? novoPadrao.dias.slice().sort() : s.dias,
+      inicio: novoPadrao.inicio || (corte > s.inicio ? corte : s.inicio),
+      fim: novoPadrao.fim !== undefined ? novoPadrao.fim : s.fim
+    };
+    var limite = padraoNovo.fim ? mesDe(padraoNovo.fim) : mesAdjacente(mesDe(corte), HORIZONTE_MESES);
+    var datasNovas = {};
+    var m0 = mesDe(padraoNovo.inicio), guarda0 = 0;
+    while (m0 <= limite && guarda0++ < 240) {
+      datasDaSerieNoMes(padraoNovo, m0).forEach(function (d) { if (d >= corte) datasNovas[d] = true; });
+      m0 = mesAdjacente(m0, 1);
+    }
+
+    var preservadas = 0;
     db.aulas = (db.aulas || []).filter(function (a) {
-      return !(a.serieId === serieId && a.data >= corte && !a.destacada);
+      if (a.serieId !== serieId || a.data < corte || a.destacada) return true;
+      if (datasNovas[a.data]) return true;          // a data continua no padrão
+      if (temConteudo(a)) { a.destacada = true; preservadas++; return true; }
+      return false;                                  // vazia e fora do padrão: sai
     });
+    db._preservadasNaEdicao = preservadas;
 
     s.exclusoes = (s.exclusoes || []).filter(function (d) { return d < corte; });
 
+    // Antecipar o início faz a recorrência passar a valer para trás, criando
+    // as datas que ainda não existiam naquele intervalo.
+    if (novoPadrao.inicio !== undefined && novoPadrao.inicio) {
+      s.inicio = novoPadrao.inicio;
+      if (s.inicio < corte) corte = s.inicio;
+    }
     if (novoPadrao.dias !== undefined) s.dias = novoPadrao.dias.slice().sort();
     if (novoPadrao.hora !== undefined) s.hora = novoPadrao.hora;
     if (novoPadrao.duracaoMin !== undefined) s.duracaoMin = novoPadrao.duracaoMin;
@@ -474,6 +519,15 @@
       duracaoMin: s.duracaoMin, inicio: corte > s.inicio ? corte : s.inicio, fim: s.fim,
       exclusoes: s.exclusoes
     };
+    // As aulas que sobreviveram ao corte passam a seguir o horário e a duração
+    // novos, sem trocar de registro: assim a folha de aula continua com a aula.
+    (db.aulas || []).forEach(function (a) {
+      if (a.serieId !== serieId || a.data < corte || a.destacada) return;
+      if (novoPadrao.hora !== undefined) a.hora = s.hora;
+      if (novoPadrao.duracaoMin !== undefined) a.duracaoMin = s.duracaoMin;
+    });
+
+    s.materializadoAte = null;
     var ate = s.fim ? mesDe(s.fim) : mesAdjacente(mesDe(corte), HORIZONTE_MESES);
     var m = mesDe(serieCorte.inicio), guarda = 0, criadas = 0;
     while (m <= ate && guarda++ < 240) {
@@ -482,6 +536,77 @@
     }
     s.materializadoAte = ate;
     return criadas;
+  }
+
+  /* Repete uma aula para trás, recuperando o que já aconteceu antes de o aluno
+   * ser cadastrado. Cria as datas dos dias da semana escolhidos, do dia anterior
+   * ao da aula até a data limite, com o mesmo horário e a mesma duração.
+   *
+   * Nunca mexe em aula que já existe: se o dia já tem aula, aquele dia é pulado.
+   * Se a aula faz parte de uma recorrência, o início dela é puxado para trás,
+   * para o padrão continuar coerente. */
+  function repetirParaTras(db, aulaId, dias, ateData, opcoes) {
+    opcoes = opcoes || {};
+    var aula = (db.aulas || []).filter(function (a) { return a.id === aulaId; })[0];
+    if (!aula || !ateData || ateData >= aula.data) return { criadas: 0, datas: [] };
+    var listaDias = (dias && dias.length) ? dias.slice().sort() : [diaSemana(aula.data)];
+
+    var datas = [];
+    var dt = dataLocal(aula.data);
+    dt.setDate(dt.getDate() - 1);
+    var limite = dataLocal(ateData);
+    var guarda = 0;
+    while (dt >= limite && guarda++ < 4000) {
+      var iso = isoDe(dt);
+      if (listaDias.indexOf(dt.getDay()) >= 0 && !achaAula(db, aula.alunoId, iso)) datas.push(iso);
+      dt.setDate(dt.getDate() - 1);
+    }
+    datas.sort();
+
+    var serie = serieDe(db, aula);
+    datas.forEach(function (iso) {
+      db.aulas.push({
+        id: uid(),
+        alunoId: aula.alunoId,
+        serieId: serie ? serie.id : null,
+        destacada: serie ? (listaDias.indexOf(diaSemana(iso)) < 0) : false,
+        data: iso,
+        hora: aula.hora || '',
+        duracaoMin: aula.duracaoMin || 60,
+        status: opcoes.status || 'realizada',
+        cobravel: opcoes.cobravel !== undefined ? opcoes.cobravel : true,
+        notaTexto: '',
+        temNota: false,
+        anexos: []
+      });
+    });
+
+    if (serie) {
+      // a recorrência passa a valer desde a data mais antiga recuperada
+      if (datas.length && datas[0] < serie.inicio) serie.inicio = datas[0];
+      serie.exclusoes = (serie.exclusoes || []).filter(function (d) { return datas.indexOf(d) < 0; });
+      listaDias.forEach(function (d) { if (serie.dias.indexOf(d) < 0) serie.dias.push(d); });
+      serie.dias.sort();
+    }
+    return { criadas: datas.length, datas: datas };
+  }
+
+  /* Quantas aulas seriam criadas, para mostrar antes de confirmar. */
+  function preverRetroativo(db, aulaId, dias, ateData) {
+    var aula = (db.aulas || []).filter(function (a) { return a.id === aulaId; })[0];
+    if (!aula || !ateData || ateData >= aula.data) return [];
+    var listaDias = (dias && dias.length) ? dias.slice() : [diaSemana(aula.data)];
+    var datas = [];
+    var dt = dataLocal(aula.data);
+    dt.setDate(dt.getDate() - 1);
+    var limite = dataLocal(ateData);
+    var guarda = 0;
+    while (dt >= limite && guarda++ < 4000) {
+      var iso = isoDe(dt);
+      if (listaDias.indexOf(dt.getDay()) >= 0 && !achaAula(db, aula.alunoId, iso)) datas.push(iso);
+      dt.setDate(dt.getDate() - 1);
+    }
+    return datas.sort();
   }
 
   function serieDe(db, aula) {
@@ -718,6 +843,7 @@
     datasDaSerieNoMes: datasDaSerieNoMes, materializarSerieNoMes: materializarSerieNoMes,
     garantirSeriesAte: garantirSeriesAte, aulasDaSerie: aulasDaSerie, alvosDoEscopo: alvosDoEscopo,
     aplicarEdicaoAula: aplicarEdicaoAula, excluirAulas: excluirAulas, achaAula: achaAula,
+    repetirParaTras: repetirParaTras, preverRetroativo: preverRetroativo, temConteudo: temConteudo,
     calcularFechamento: calcularFechamento, calcularMesInteiro: calcularMesInteiro,
     markdownFechamento: markdownFechamento, markdownMesInteiro: markdownMesInteiro,
     uid: uid, nomeArquivo: nomeArquivo

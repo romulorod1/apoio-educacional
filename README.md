@@ -38,8 +38,15 @@ sem pauta, pautado ou pontilhado, cinco cores, três espessuras, marca-texto, bo
 digitado e imagem colada. A caneta escreve e o dedo arrasta a folha, então dá para apoiar a mão sem
 riscar nada. Dois dedos aproximam e afastam.
 
-Se preferir montar a aula no Samsung Notes, como sempre fez, use **Anexar arquivo** e o arquivo fica
-guardado junto da aula.
+Se preferir montar a aula no Samsung Notes, como sempre fez: lá dentro toque em Compartilhar,
+escolha **PDF**, e depois use **Anexar PDF** aqui dentro da aula. O arquivo fica guardado junto da
+aula e você abre ou compartilha quando quiser. Ele não entra dentro do PDF do fechamento, que leva
+só as folhas escritas no próprio aplicativo.
+
+**Repetir para trás.** Quando as aulas já aconteciam antes de você cadastrar o aluno, abra
+qualquer aula dele e toque em *Repetir para trás*. Escolha os dias da semana e até que data voltar:
+o aplicativo cria as datas passadas com o mesmo horário e a mesma duração, pulando os dias que já
+têm aula. Serve para fechar um mês que começou antes do aplicativo existir.
 
 **Valor da hora-aula.** Cada aluno tem valores com período de vigência: de tal data até tal data,
 tanto por hora. Ao reajustar, encerre o valor antigo e crie o novo. Cada aula é cobrada pelo valor
@@ -50,7 +57,13 @@ gere o PDF, já com o cabeçalho, o rodapé e a marca d'água. Dá para gerar ta
 o PDF com as folhas de aula anexadas.
 
 **Cópia de segurança.** Em *Ajustes*, salve a cópia de vez em quando e guarde no Google Drive. Se o
-tablet quebrar ou for trocado, é essa cópia que devolve tudo.
+tablet quebrar ou for trocado, é essa cópia que devolve tudo. Ela leva junto as folhas escritas à
+mão, as imagens coladas e os arquivos anexados.
+
+**Atualização.** Quando sai uma versão nova, ela chega sozinha na próxima vez que você abrir o
+aplicativo com internet, e aparece um aviso perguntando se quer atualizar. **Atualizar não apaga
+nada**: alunos, aulas, folhas e anexos continuam no lugar. Nunca é preciso desinstalar e instalar de
+novo. Em *Ajustes* há também o botão *Procurar atualização*, para verificar na hora.
 
 ### O que já vem preenchido
 
@@ -100,6 +113,18 @@ tem essa fonte instalada e a quebra de linha precisa ser exata mesmo assim.
 **Nada sai do aparelho.** Não há servidor, conta ou sincronização. A cópia de segurança é manual, de
 propósito: são dados de crianças.
 
+**Anexo vira texto na cópia.** Blob não sobrevive a `JSON.stringify`: viraria um objeto vazio e o
+arquivo se perderia calado. Por isso o anexo é convertido para texto na exportação e reconstruído na
+importação.
+
+**Um editor de folha por vez.** A tela de desenho é o mesmo elemento reaproveitado a cada folha, e
+os ouvintes ficam presos a um `AbortController` que é abortado no `destruir()`. Sem isso o editor
+anterior continua escutando os toques junto com o novo, e a ferramenta antiga volta a agir sozinha.
+
+**Mudança de padrão nunca descarta trabalho.** Ao editar uma recorrência, as aulas que continuam
+valendo mantêm o mesmo registro, para a folha seguir ligada a elas. Aula que sai do padrão mas tem
+folha, anotação ou anexo vira exceção em vez de ser apagada.
+
 ### Testes
 
 Sobem um servidor local e rodam contra o Chrome instalado.
@@ -113,7 +138,10 @@ node testa.js            # cálculo do fechamento e geração de PDF
 node testa_series.js     # recorrência e escopos de edição
 node testa_feriados.js   # feriados, incluindo os móveis
 node testa_exclusoes.js  # regressão: aula apagada não pode voltar
+node testa_mover.js      # mover ocorrência e editar o padrão sem perder folha
+node testa_retroativo.js # recuperar aulas passadas
 node e2e.js              # 98 verificações simulando o uso real no tablet
+node e2e_correcoes.js    # 39 verificações das correções e dos recursos novos
 ```
 
 O caso de referência é o fechamento de junho do Marcelo, que existe em papel: dez encontros,

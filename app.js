@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.0.0';
+  var VERSAO = '1.1.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -66,6 +66,15 @@
 
   function confirmar(pergunta) { return window.confirm(pergunta); }
 
+  /* Fecha os painéis e solta o que estava sendo editado. Usado quando o estado
+   * inteiro é trocado, para nada continuar apontando para registro que sumiu. */
+  function fecharTudo() {
+    if (editorAtual) { editorAtual.destruir(); editorAtual = null; }
+    $$('.fundo-modal').forEach(function (m) { m.classList.remove('aberto'); });
+    aulaEmEdicao = null;
+    alunoEmEdicao = null;
+  }
+
   // ================= gravação e desfazer =================
 
   function salvar() { return Store.salvar(db); }
@@ -80,6 +89,9 @@
     }).then(function () {
       avisar(rotulo, 'Desfazer', function () {
         db = antes;
+        // Um painel aberto ainda aponta para o registro antigo, que sai do ar
+        // ao voltar o estado. Fecha tudo e limpa as referências.
+        fecharTudo();
         Store.salvar(db).then(function () {
           desenharTudo();
           avisar('Alteração desfeita.');
@@ -256,10 +268,62 @@
     });
   }
 
+  /* Atualização do aplicativo.
+   *
+   * Os dados ficam no banco do aparelho, que não é tocado pela atualização:
+   * trocar de versão nunca apaga aluno, aula, folha nem anexo. Não existe
+   * desinstalar e instalar de novo. */
+  var registroSW = null;
+
   function registrarServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     if (location.protocol === 'file:') return;
-    navigator.serviceWorker.register('sw.js').catch(function () { /* segue sem modo offline */ });
+    navigator.serviceWorker.register('sw.js').then(function (reg) {
+      registroSW = reg;
+      if (reg.waiting) mostrarAvisoDeVersao();
+      reg.addEventListener('updatefound', function () {
+        var novo = reg.installing;
+        if (!novo) return;
+        novo.addEventListener('statechange', function () {
+          if (novo.state === 'installed' && navigator.serviceWorker.controller) mostrarAvisoDeVersao();
+        });
+      });
+      // procura versão nova de tempos em tempos, quando houver internet
+      setInterval(function () { reg.update().catch(function () { }); }, 60 * 60 * 1000);
+    }).catch(function () { /* segue sem modo offline */ });
+
+    var recarregando = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (recarregando) return;
+      recarregando = true;
+      location.reload();
+    });
+  }
+
+  function mostrarAvisoDeVersao() {
+    avisar('Há uma versão nova do aplicativo.', 'Atualizar', aplicarAtualizacao);
+    desenharAjustes();
+  }
+
+  function aplicarAtualizacao() {
+    if (registroSW && registroSW.waiting) {
+      registroSW.waiting.postMessage({ tipo: 'ativar-agora' });
+    } else {
+      location.reload();
+    }
+  }
+
+  function procurarAtualizacao() {
+    if (!registroSW) { avisar('Atualização automática não disponível aqui.'); return; }
+    avisar('Procurando atualização...');
+    registroSW.update().then(function () {
+      setTimeout(function () {
+        if (registroSW.waiting) mostrarAvisoDeVersao();
+        else avisar('Você já está na versão mais recente.');
+      }, 1400);
+    }).catch(function () {
+      avisar('Não foi possível verificar agora. Confira a internet.');
+    });
   }
 
   function desenharTudo() {
@@ -328,6 +392,7 @@
     $('#salvar-resumo').addEventListener('click', salvarResumo);
 
     $('#versao-app').textContent = VERSAO;
+    $('#procurar-atualizacao').addEventListener('click', procurarAtualizacao);
 
     window.addEventListener('resize', function () {
       if (editorAtual) editorAtual.ajustarTamanho();
@@ -621,6 +686,19 @@
         el('span', { texto: 'Anotação digitada' }), areaNota
       ]));
 
+      corpo.appendChild(el('div', { class: 'barra', style: 'margin-bottom:4px' }, [
+        el('button', {
+          type: 'button', class: 'btn',
+          texto: 'Repetir para trás',
+          aoClick: function () { abrirRetroativo(aulaEmEdicao.id); }
+        })
+      ]));
+      corpo.appendChild(el('div', {
+        class: 'ajuda',
+        texto: 'Use quando as aulas já aconteciam antes de você cadastrar o aluno. ' +
+          'O aplicativo cria as datas passadas com este mesmo horário e duração.'
+      }));
+
       var linhaFolha = el('div', { class: 'barra', style: 'margin-bottom:6px' });
       linhaFolha.appendChild(el('button', {
         type: 'button', class: 'btn destaque',
@@ -629,11 +707,22 @@
       }));
       linhaFolha.appendChild(el('button', {
         type: 'button', class: 'btn',
-        texto: 'Anexar arquivo',
-        aoClick: function () { anexarArquivo(aulaEmEdicao.id); }
+        texto: 'Anexar PDF',
+        aoClick: function () { anexarArquivo(aulaEmEdicao.id, 'documento'); }
+      }));
+      linhaFolha.appendChild(el('button', {
+        type: 'button', class: 'btn',
+        texto: 'Anexar foto',
+        aoClick: function () { anexarArquivo(aulaEmEdicao.id, 'foto'); }
       }));
       corpo.appendChild(linhaFolha);
-      corpo.appendChild(el('div', { class: 'ajuda', texto: 'A folha aceita escrita com a S Pen, imagem colada e texto digitado. Se preferir montar a aula no Samsung Notes, use "Anexar arquivo".' }));
+      corpo.appendChild(el('div', { class: 'ajuda' }, [
+        document.createTextNode('A folha aceita escrita com a S Pen, imagem colada e texto digitado. '),
+        el('strong', { texto: 'Para trazer uma aula do Samsung Notes: ' }),
+        document.createTextNode('lá dentro toque em Compartilhar, escolha PDF, e depois use "Anexar PDF" aqui. ' +
+          'O arquivo fica guardado junto da aula e você abre ou compartilha quando quiser. ' +
+          'Ele não entra dentro do PDF do fechamento, que leva só as folhas escritas aqui.')
+      ]));
 
       var listaAnexos = el('div', { id: 'lista-anexos' });
       corpo.appendChild(listaAnexos);
@@ -672,14 +761,19 @@
     });
   }
 
-  function anexarArquivo(aulaId) {
-    var entrada = $('#entrada-anexo');
+  function anexarArquivo(aulaId, tipo) {
+    var entrada = $(tipo === 'foto' ? '#entrada-anexo-foto' : '#entrada-anexo');
     entrada.value = '';
     entrada.onchange = function () {
       var arquivo = entrada.files && entrada.files[0];
       if (!arquivo) return;
       var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
       if (!aula) return;
+      var LIMITE = 25 * 1024 * 1024;
+      if (arquivo.size > LIMITE) {
+        avisar('Arquivo muito grande (' + Math.round(arquivo.size / 1048576) + ' MB). O limite é 25 MB.');
+        return;
+      }
       var id = Core.uid();
       Store.salvarAnexo(id, { nome: arquivo.name, tipo: arquivo.type, blob: arquivo }).then(function () {
         aula.anexos = aula.anexos || [];
@@ -808,6 +902,96 @@
         desenharTudo();
       });
     }, true);
+  }
+
+  /* Recuperar as aulas que já aconteceram antes do cadastro do aluno. */
+  function abrirRetroativo(aulaId) {
+    var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
+    if (!aula) return;
+    var aluno = alunoPorId(aula.alunoId);
+    var serie = Core.serieDe(db, aula);
+
+    var corpo = $('#corpo-modal-retroativo');
+    corpo.innerHTML = '';
+    corpo.appendChild(el('div', {
+      class: 'ajuda', style: 'margin-top:0',
+      texto: 'Partindo da aula de ' + Core.ddmmaaaa(aula.data) + ', às ' + (aula.hora || 'sem horário') +
+        ', de ' + Core.fmtDuracao(aula.duracaoMin) + ', para ' + (aluno ? aluno.nome : '') + '.'
+    }));
+
+    var escolhidos = serie ? serie.dias.slice() : [Core.diaSemana(aula.data)];
+    var linhaDias = el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px' });
+    Core.DIAS_CURTO.forEach(function (nome, indice) {
+      var marcado = escolhidos.indexOf(indice) >= 0;
+      var b = el('button', {
+        type: 'button', class: 'btn pequeno' + (marcado ? ' principal' : ''),
+        texto: nome, style: 'min-width:52px'
+      });
+      b.dataset.dia = String(indice);
+      b.dataset.marcado = marcado ? '1' : '';
+      b.addEventListener('click', function () {
+        var ativo = b.classList.toggle('principal');
+        b.dataset.marcado = ativo ? '1' : '';
+        atualizarPrevia();
+      });
+      linhaDias.appendChild(b);
+    });
+    corpo.appendChild(el('div', { class: 'campo' }, [
+      el('span', { texto: 'Em quais dias da semana', style: 'display:block;font-size:13px;font-weight:700;color:#1F3A5F;margin-bottom:5px' }),
+      linhaDias
+    ]));
+
+    var padraoAte = Core.mesAdjacente(Core.mesDe(aula.data), -1) + '-01';
+    var campoAte = el('input', { type: 'date', id: 'campo-retroativo-ate', value: padraoAte, max: aula.data });
+    corpo.appendChild(el('label', { class: 'campo' }, [
+      el('span', { texto: 'Voltar até que data' }), campoAte
+    ]));
+
+    var previa = el('div', { class: 'faixa-info' });
+    corpo.appendChild(previa);
+
+    function diasEscolhidos() {
+      return $$('#corpo-modal-retroativo [data-dia]')
+        .filter(function (b) { return b.dataset.marcado; })
+        .map(function (b) { return parseInt(b.dataset.dia, 10); });
+    }
+
+    function atualizarPrevia() {
+      var datas = Core.preverRetroativo(db, aulaId, diasEscolhidos(), campoAte.value);
+      if (!datas.length) {
+        previa.textContent = 'Nenhuma aula nova seria criada com essas escolhas.';
+        return;
+      }
+      previa.innerHTML = '';
+      previa.appendChild(el('strong', {
+        texto: datas.length + ' aula' + (datas.length === 1 ? '' : 's') + ' ' +
+          (datas.length === 1 ? 'seria criada' : 'seriam criadas') + '. '
+      }));
+      previa.appendChild(document.createTextNode(
+        'De ' + Core.ddmmaaaa(datas[0]) + ' a ' + Core.ddmmaaaa(datas[datas.length - 1]) + '. ' +
+        'Dias que já têm aula são pulados.'));
+    }
+    campoAte.addEventListener('change', atualizarPrevia);
+    campoAte.addEventListener('input', atualizarPrevia);
+    atualizarPrevia();
+
+    $('#salvar-retroativo').onclick = function () {
+      var dias = diasEscolhidos();
+      var ate = campoAte.value;
+      if (!ate) { avisar('Informe até que data voltar.'); return; }
+      if (!dias.length) { avisar('Escolha ao menos um dia da semana.'); return; }
+      var quantas = Core.preverRetroativo(db, aulaId, dias, ate).length;
+      if (!quantas) { avisar('Nenhuma aula nova a criar.'); return; }
+      comDesfazer(quantas + ' aula' + (quantas === 1 ? '' : 's') + ' recuperada' + (quantas === 1 ? '' : 's') + '.', function () {
+        Core.repetirParaTras(db, aulaId, dias, ate);
+      }).then(function () {
+        fecharModal('modal-retroativo');
+        fecharModal('modal-aula');
+        desenharTudo();
+      });
+    };
+
+    abrirModal('modal-retroativo');
   }
 
   /* A escolha de escopo do Google Agenda: só esta, esta e as seguintes, ou todas. */
@@ -1143,19 +1327,38 @@
       midias: midiasCarregadas,
       aoMudar: function () { agendarGravacaoNota(aula.id); },
       aoTrocarFerramenta: function () { desenharFerramentas(aula); },
-      aoPedirTexto: function (p) {
-        var txt = window.prompt('Texto a inserir na folha:');
-        if (txt) editorAtual.adicionarTexto(txt, p.x, p.y, 30);
-        desenharFerramentas(aula);
-      }
+      aoPedirTexto: function (p) { pedirTextoDaFolha(p, aula); }
     });
 
-    // o canvas só tem tamanho depois que o modal aparece
+    // A folha precisa saber a que aula pertence antes de qualquer gravação.
+    // Antes isso era definido dentro do desenho da barra de ferramentas, e um
+    // tropeço ali deixava a folha sem dono e sem ser salva.
+    editorAtual._aulaId = aula.id;
+
+    // o canvas só tem tamanho depois que o painel aparece
     setTimeout(function () { if (editorAtual) editorAtual.ajustarTamanho(); }, 30);
 
     desenharFerramentas(aula);
     desenharRodapeNota(aula);
     ligarColagem();
+  }
+
+  /* Painel de texto da folha. Antes isso era a janela do navegador, que no
+   * aplicativo instalado aparece como "romulorod1.github.io diz" e só aceita
+   * uma linha. */
+  function pedirTextoDaFolha(ponto, aula) {
+    var area = $('#campo-texto-folha');
+    area.value = '';
+    $('#campo-texto-tamanho').value = '30';
+    abrirModal('modal-texto');
+    setTimeout(function () { area.focus(); }, 80);
+    $('#salvar-texto-folha').onclick = function () {
+      var txt = area.value.trim();
+      fecharModal('modal-texto');
+      if (!txt || !editorAtual) return;
+      editorAtual.adicionarTexto(txt, ponto.x, ponto.y, parseInt($('#campo-texto-tamanho').value, 10) || 30);
+      desenharFerramentas(aula);
+    };
   }
 
   var gravacaoPendente = null;
@@ -1661,6 +1864,23 @@
         ]));
       });
     });
+
+    var estado = $('#estado-versao');
+    if (estado) {
+      if (registroSW && registroSW.waiting) {
+        estado.innerHTML = '';
+        estado.appendChild(el('div', { class: 'faixa-info' }, [
+          el('strong', { texto: 'Há uma versão nova pronta. ' }),
+          document.createTextNode('Toque em Atualizar agora. Seus dados continuam como estão.')
+        ]));
+        estado.appendChild(el('button', {
+          type: 'button', class: 'btn destaque', texto: 'Atualizar agora',
+          aoClick: aplicarAtualizacao
+        }));
+      } else {
+        estado.textContent = '';
+      }
+    }
 
     Store.estimarEspaco().then(function (e) {
       if (!e) { $('#info-espaco').textContent = ''; return; }

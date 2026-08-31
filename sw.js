@@ -3,7 +3,7 @@
  * Os dados das aulas não passam por aqui: ficam no IndexedDB, no aparelho.
  */
 
-var CACHE = 'apoio-educacional-v1';
+var CACHE = 'apoio-educacional-v2';
 
 var ARQUIVOS = [
   './',
@@ -21,12 +21,15 @@ var ARQUIVOS = [
   './icons/favicon.png'
 ];
 
+/* Não assume o controle sozinho: fica esperando. Quem manda trocar de versão
+ * é ela, pelo aviso que aparece no aplicativo. Assim uma atualização nunca
+ * recarrega a tela no meio de uma aula. */
 self.addEventListener('install', function (e) {
-  e.waitUntil(
-    caches.open(CACHE).then(function (c) {
-      return c.addAll(ARQUIVOS);
-    }).then(function () { return self.skipWaiting(); })
-  );
+  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(ARQUIVOS); }));
+});
+
+self.addEventListener('message', function (e) {
+  if (e.data && e.data.tipo === 'ativar-agora') self.skipWaiting();
 });
 
 self.addEventListener('activate', function (e) {
