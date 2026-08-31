@@ -56,6 +56,11 @@ que valia na data dela, então reajuste no meio do mês sai certo sozinho.
 gere o PDF, já com o cabeçalho, o rodapé e a marca d'água. Dá para gerar também o arquivo de texto e
 o PDF com as folhas de aula anexadas.
 
+**Esconder os valores.** O botão redondo no cabeçalho apaga da tela tudo que é dinheiro: o total a
+receber, o valor por hora de cada aluno e os números do fechamento. As horas continuam à vista. Serve
+para quando o tablet está aberto na casa da família. A escolha fica guardada, e o PDF e o arquivo de
+texto sempre saem com os valores, porque é o que a família precisa receber.
+
 **Cópia de segurança.** Em *Ajustes*, salve a cópia de vez em quando e guarde no Google Drive. O
 aplicativo lembra sozinho: se passarem catorze dias sem cópia, aparece um aviso na Agenda com um
 botão para salvar na hora. Se o

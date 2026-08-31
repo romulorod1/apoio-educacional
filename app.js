@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.3.0';
+  var VERSAO = '1.4.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -65,6 +65,38 @@
   function esconderAviso() { $('#aviso').classList.remove('aberto'); }
 
   function confirmar(pergunta) { return window.confirm(pergunta); }
+
+  /* Valores na tela.
+   *
+   * Ela dá aula na casa das famílias, com o tablet aberto em cima da mesa. A
+   * agenda mostra quanto ela tem a receber no mês, e isso fica à vista de
+   * qualquer pessoa que passe. O botão do olho esconde os valores da interface.
+   *
+   * Só a tela é afetada. O PDF do fechamento e o arquivo de texto sempre saem
+   * com os números, porque é justamente o que a família precisa receber. */
+  var valoresOcultos = false;
+  var MASCARA = 'R$ ' + '•••••';
+
+  function dinheiro(v) {
+    return valoresOcultos ? MASCARA : Core.fmtMoeda(v);
+  }
+
+  function alternarValores() {
+    valoresOcultos = !valoresOcultos;
+    db.ajustes = db.ajustes || {};
+    db.ajustes.valoresOcultos = valoresOcultos;
+    atualizarBotaoOlho();
+    salvar().then(desenharTudo);
+  }
+
+  function atualizarBotaoOlho() {
+    var b = $('#alternar-valores');
+    if (!b) return;
+    b.textContent = valoresOcultos ? '●̸' : '◉';
+    b.setAttribute('title', valoresOcultos ? 'Mostrar os valores' : 'Esconder os valores');
+    b.setAttribute('aria-label', b.getAttribute('title'));
+    b.classList.toggle('ativo', valoresOcultos);
+  }
 
   /* Fecha os painéis e solta o que estava sendo editado. Usado quando o estado
    * inteiro é trocado, para nada continuar apontando para registro que sumiu. */
@@ -259,7 +291,9 @@
         var temHoje = db.aulas.some(function (a) { return Core.mesDe(a.data) === mesAtual; });
         if (!temHoje) mesAtual = Core.mesDe(db.aulas[0].data);
       }
+      valoresOcultos = !!(db.ajustes && db.ajustes.valoresOcultos);
       ligarEventos();
+      atualizarBotaoOlho();
       desenharTudo();
       registrarServiceWorker();
     }).catch(function (e) {
@@ -391,6 +425,7 @@
     $('#apagar-tudo').addEventListener('click', apagarTudo);
     $('#salvar-resumo').addEventListener('click', salvarResumo);
 
+    $('#alternar-valores').addEventListener('click', alternarValores);
     $('#versao-app').textContent = VERSAO;
     $('#procurar-atualizacao').addEventListener('click', procurarAtualizacao);
 
@@ -436,7 +471,7 @@
     numeros.innerHTML = '';
     [['Encontros', String(doMes.length)],
     ['Horas cobradas', Core.fmtHoras(minutos) + ' h'],
-    ['A receber', Core.fmtMoeda(valor)],
+    ['A receber', dinheiro(valor)],
     ['Alunos', String(Object.keys(alunosNoMes).length)]].forEach(function (par) {
       numeros.appendChild(el('div', { class: 'numero' }, [
         el('div', { class: 'rotulo', texto: par[0] }),
@@ -638,8 +673,8 @@
         previsao.innerHTML = '<strong style="color:#B4453C">Sem valor por hora vigente nesta data.</strong> ' +
           'Cadastre o valor na ficha do aluno.';
       } else {
-        previsao.textContent = 'Valor previsto: ' + Core.fmtMoeda((dur / 60) * pv.valorHora) +
-          ' (' + Core.fmtMoeda(pv.valorHora) + ' por hora).';
+        previsao.textContent = 'Valor previsto: ' + dinheiro((dur / 60) * pv.valorHora) +
+          ' (' + dinheiro(pv.valorHora) + ' por hora).';
       }
     }
     selAluno.addEventListener('change', atualizarPrevisao);
@@ -1074,7 +1109,7 @@
           ]),
           el('div', {
             class: 'detalhe',
-            texto: (pv ? Core.fmtMoeda(pv.valorHora) + ' por hora' : 'sem valor cadastrado') +
+            texto: (pv ? dinheiro(pv.valorHora) + ' por hora' : 'sem valor cadastrado') +
               ' · ' + qtd + ' aula' + (qtd === 1 ? '' : 's') +
               (series.length ? ' · ' + Core.descreveSerie(series[0]) : '')
           })
@@ -1633,7 +1668,7 @@
     [['Alunos no mês', String(fechs.length)],
     ['Encontros', String(totalEncontros)],
     ['Horas cobradas', Core.fmtHoras(totalMin) + ' h'],
-    ['Total a receber', Core.fmtMoeda(totalValor)]].forEach(function (par) {
+    ['Total a receber', dinheiro(totalValor)]].forEach(function (par) {
       numeros.appendChild(el('div', { class: 'numero' }, [
         el('div', { class: 'rotulo', texto: par[0] }),
         el('div', { class: 'valor', texto: par[1] })
@@ -1655,7 +1690,7 @@
       cartao.appendChild(el('div', { class: 'barra', style: 'margin-bottom:10px' }, [
         el('h3', { class: 'titulo', style: 'font-size:18px', texto: f.alunoNome }),
         el('span', { class: 'cresce' }),
-        el('strong', { style: 'color:#1F3A5F;font-size:18px', texto: Core.fmtMoeda(f.totalValor) })
+        el('strong', { style: 'color:#1F3A5F;font-size:18px', texto: dinheiro(f.totalValor) })
       ]));
 
       cartao.appendChild(el('div', {
@@ -1687,7 +1722,7 @@
           el('td', { texto: l.dia }),
           el('td', { texto: Core.fmtDuracao(l.duracaoMin) }),
           el('td', { texto: l.statusRotulo + (l.cobravel ? '' : ' (não cobrada)') }),
-          el('td', { texto: Core.fmtMoeda(l.cobravel ? l.valor : 0) })
+          el('td', { texto: dinheiro(l.cobravel ? l.valor : 0) })
         ]));
       });
       var linhaTotal = el('tr', { class: 'total' }, [
@@ -1695,7 +1730,7 @@
         el('td', { texto: '' }),
         el('td', { texto: f.totalHoras + ' h' }),
         el('td', { texto: '' }),
-        el('td', { texto: Core.fmtMoeda(f.totalValor) })
+        el('td', { texto: dinheiro(f.totalValor) })
       ]);
       corpo.appendChild(linhaTotal);
       tabela.appendChild(corpo);

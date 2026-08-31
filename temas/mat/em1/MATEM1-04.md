@@ -152,8 +152,8 @@ primeiro rende tempo.
 16. Mostre, usando a forma canônica, que o valor mínimo de f(x) igual a ax ao quadrado mais bx mais
     c, com a positivo, é atingido em x igual a menos b sobre 2a.
 17. Um terreno retangular será cercado com 60 metros de tela, mas um dos lados é um muro que já
-    existe e não precisa de cerca. Qual é a maior área possível, e quais as dimensões? Compare com o
-    resultado do exercício 8 e explique a diferença.
+    existe e não precisa de cerca. Qual é a maior área possível, e quais as dimensões? Quando a tela
+    cerca os quatro lados, o formato ótimo é o quadrado. Aqui isso muda: explique por quê.
 18. A soma de dois números é 12. Determine os dois números para que o produto deles seja o maior
     possível, e prove que a resposta é sempre a metade da soma, para qualquer soma dada.
 
@@ -178,8 +178,8 @@ primeiro rende tempo.
     quadrado sobre 4a. Como a é positivo, o termo com o quadrado nunca é negativo, e o menor valor
     acontece quando ele é zero, isto é, quando x vale menos b sobre 2a.
 17. Área máxima de 450 metros quadrados, com 30 metros no lado paralelo ao muro e 15 em cada lado
-    perpendicular. A diferença para o exercício 8 é que aqui a tela cobre apenas três lados, então
-    a restrição é 2x mais y igual a 60, e o formato ótimo deixa de ser o quadrado.
+    perpendicular. Com a tela cobrindo apenas três lados, a restrição passa a ser 2x mais y igual a
+    60, e o formato ótimo deixa de ser o quadrado.
 18. Os dois números são 6 e 6, com produto 36. Em geral, se a soma é S, os números são x e S menos
     x, e o produto é uma parábola com concavidade para baixo cujo vértice fica em x igual a S sobre
     2. Logo o produto é máximo quando os dois números são iguais à metade da soma.
@@ -329,8 +329,8 @@ first pays off.
 16. Using vertex form, show that the minimum value of f(x) equals ax squared plus bx plus c, with a
     positive, occurs at x equals minus b over 2a.
 17. A rectangular plot will be fenced with 60 metres of fencing, but one of its sides is an existing
-    wall that needs no fence. What is the largest possible area, and what are the dimensions? Compare
-    it with the result of exercise 8 and explain the difference.
+    wall that needs no fence. What is the largest possible area, and what are the dimensions? When
+    fencing surrounds all four sides, the best shape is a square. Here that changes: explain why.
 18. The sum of two numbers is 12. Find the two numbers that make their product as large as possible,
     and prove that the answer is always half the sum, for any given sum.
 
@@ -355,9 +355,8 @@ first pays off.
     over 4a. Since a is positive, the squared term is never negative, and the smallest value happens
     when it is zero, that is, when x equals minus b over 2a.
 17. Maximum area of 450 square metres, with 30 metres on the side parallel to the wall and 15 on
-    each perpendicular side. The difference from exercise 8 is that here the fencing covers only
-    three sides, so the constraint is 2x plus y equals 60, and the optimal shape is no longer a
-    square.
+    each perpendicular side. With the fencing covering only three sides, the constraint becomes
+    2x plus y equals 60, and the optimal shape is no longer a square.
 18. The two numbers are 6 and 6, with product 36. In general, if the sum is S, the numbers are x and
     S minus x, and the product is a downward parabola whose vertex sits at x equals S over 2. So the
     product is greatest when the two numbers are both half the sum.

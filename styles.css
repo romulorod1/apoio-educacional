@@ -66,6 +66,27 @@ body {
 
 .abas { display: flex; gap: 4px; flex-wrap: wrap; }
 
+/* Botão que esconde os valores da tela. Fica no cabeçalho, ao alcance do
+   polegar, porque às vezes é preciso apagar a renda da vista em um toque. */
+.olho {
+  border: 1px solid var(--fio);
+  background: var(--branco);
+  color: var(--muted);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.olho:hover { background: var(--soft); }
+.olho.ativo { background: var(--navy); border-color: var(--navy); color: var(--branco); }
+
 .aba {
   border: 1px solid transparent;
   background: transparent;
@@ -542,5 +563,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   .aba { flex: 1; padding: 9px 8px; font-size: 14px; }
   .dia { min-height: 62px; }
   .marca span { display: none; }
+  .olho { position: absolute; top: 10px; right: 12px; }
+  .cabecalho { position: relative; }
   .conteudo { padding: 12px; }
 }

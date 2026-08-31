@@ -3,7 +3,7 @@
  * Os dados das aulas não passam por aqui: ficam no IndexedDB, no aparelho.
  */
 
-var CACHE = 'apoio-educacional-v4';
+var CACHE = 'apoio-educacional-v5';
 
 var ARQUIVOS = [
   './',

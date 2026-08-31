@@ -211,6 +211,30 @@ def verificacoes(corpo):
     return linhas, manuais
 
 
+# A Nathalia monta a lista marcando e desmarcando exercicios, entao a numeracao
+# muda a cada montagem. Um enunciado que diz "compare com o exercicio 8" quebra
+# assim que o 8 sai da lista. Todo enunciado precisa se sustentar sozinho.
+REFERENCIA_CRUZADA = [
+    r'exerc[í i]cio\s+\d+',
+    r'exercise\s+\d+',
+    r'quest[ãa]o\s+\d+',
+    r'item\s+\d+',
+]
+
+
+def referencias_cruzadas(corpo):
+    """Acha enunciado que depende de outro pelo numero."""
+    achados = []
+    texto = corpo.split('## VERIFICACAO')[0]
+    for numero, linha in enumerate(texto.split(chr(10)), 1):
+        for padrao in REFERENCIA_CRUZADA:
+            achado = re.search(padrao, linha, re.I)
+            if achado:
+                achados.append((numero, achado.group(0), linha.strip()[:70]))
+                break
+    return achados
+
+
 def conferir(caminho):
     """Devolve (erros, avisos, manuais, cabecalho)."""
     erros, avisos, manuais = [], [], []
@@ -229,6 +253,11 @@ def conferir(caminho):
         erros.append('possivel rascunho na linha %d (%s): %s' % (numero, motivo, trecho))
     for numero, motivo, trecho in marcas_de_rascunho(corpo, RASCUNHO_AVISO):
         avisos.append('linha %d, %s: %s' % (numero, motivo, trecho))
+
+    for numero, citacao, trecho in referencias_cruzadas(corpo):
+        erros.append('linha %d cita "%s": o enunciado precisa se sustentar sozinho, '
+                     'porque a numeracao muda quando ela monta a lista | %s'
+                     % (numero, citacao, trecho))
 
     pt, en = secao(corpo, 'PT'), secao(corpo, 'EN')
     if pt is None:
