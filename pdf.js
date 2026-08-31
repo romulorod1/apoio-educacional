@@ -489,6 +489,7 @@
     return Math.floor(min / 60) + 'h' + (min % 60 < 10 ? '0' : '') + (min % 60);
   }
   function ddmmL(iso) { var p = String(iso).split('-'); return p[2] + '/' + p[1]; }
+  function ddmmaaaaL(iso) { var p = String(iso).split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
 
   var COLUNAS = [
     { chave: 'data', rotulo: 'Data', largura: 52, align: 'esq' },
@@ -555,6 +556,7 @@
     var linhasId = [];
     linhasId.push(['Aluno', dados.alunoNome]);
     if (dados.responsavel) linhasId.push(['Responsável', dados.responsavel]);
+    if (dados.contextoEscolar) linhasId.push(['Escola', dados.contextoEscolar]);
     if (dados.grade) linhasId.push(['Dias e horário', dados.grade]);
     var alturaBloco = 14 + linhasId.length * 15;
     doc.y -= alturaBloco;
@@ -582,7 +584,7 @@
         hora: l.hora || '',
         dur: fmtDur(l.duracaoMin),
         situacao: l.statusRotulo + (l.cobravel ? '' : ' (não cobrada)'),
-        vh: l.valorHora !== null ? fmtMoedaLocal(l.valorHora) : 'sem preço',
+        vh: !l.cobravel ? '' : (l.valorHora !== null ? fmtMoedaLocal(l.valorHora) : 'sem preço'),
         valor: fmtMoedaLocal(l.cobravel ? l.valor : 0)
       }, j, false);
     }
@@ -682,6 +684,15 @@
     if (resumo || opcoes.sempreResumo) {
       doc.y -= 28;
       doc.garanteEspaco(46);
+
+      /* O resumo é a parte que a família de fato lê. Cortá-lo no meio de uma
+         frase, com quatro linhas numa página e o resto na outra, atrapalha a
+         leitura à toa. Se ele cabe inteiro numa folha limpa mas não no espaço
+         que sobrou, começa na página seguinte. */
+      var alturaResumo = 12 + doc.quebrar(resumo || ' ', UTIL, 10.5, false).length * 15.5;
+      var sobra = doc.y - Y_LIMITE;
+      if (alturaResumo > sobra && alturaResumo <= (Y_TOPO - Y_LIMITE)) doc.novaPagina();
+
       doc.texto('Resumo do mês', MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
       doc.y -= 4;
       doc.linha(MARG_E, doc.y, MARG_E + 70, doc.y, COR.teal, 1.2);
@@ -950,6 +961,85 @@
     this.y -= 6;
   };
 
+  /* Ficha de mapeamento do aluno, em uma folha.
+   *
+   * Sai com a mesma moldura do fechamento porque pode ir para a mão da família,
+   * mas quem decide isso é ela: por padrão o documento é de uso interno. */
+  function gerarFichaMapeamento(op) {
+    var doc = new Doc();
+    var m = op.mapeamento || {};
+    doc.novaPagina();
+
+    doc.cabecalhoDeSecao('Mapeamento do aluno', op.aluno.nome);
+    doc.y -= 16;
+    doc.texto('Mapeado em ' + ddmmaaaaL(m.data), PAGINA_L / 2, doc.y,
+      { tam: 9, cor: COR.muted, align: 'centro' });
+    doc.y -= 10;
+
+    var contexto = [];
+    if (op.anoEscolar) contexto.push(op.anoEscolar);
+    if (m.escola) contexto.push(m.escola);
+    if (m.professor) contexto.push('professor: ' + m.professor);
+    if (contexto.length) {
+      doc.y -= 14;
+      doc.texto(contexto.join('  ·  '), MARG_E, doc.y, { tam: 9.5, cor: COR.texto });
+    }
+    if (op.nivel) {
+      doc.y -= 20;
+      doc.retangulo(MARG_E, doc.y - 5, UTIL, 22, COR.soft);
+      doc.texto(op.nivel, MARG_E + 8, doc.y + 2, { tam: 10, bold: true, cor: COR.navy });
+      doc.y -= 8;
+    }
+
+    function secaoTexto(titulo, texto) {
+      var t = (texto || '').trim();
+      if (!t) return;
+      doc.y -= 20;
+      doc.garanteEspaco(40);
+      doc.texto(titulo, MARG_E, doc.y, { tam: 10.5, bold: true, cor: COR.navy });
+      doc.y -= 4;
+      doc.linha(MARG_E, doc.y, MARG_E + 60, doc.y, COR.teal, 1.1);
+      doc.y -= 4;
+      doc.paragrafo(t, { tam: 10, alturaLinha: 14.5 });
+    }
+
+    secaoTexto('Motivo da procura', m.motivo);
+    secaoTexto('Expectativa da família', m.expectativa);
+
+    /* As listas marcadas em duas colunas: sozinhas numa coluna empurrariam o
+       plano para a segunda folha sem necessidade. */
+    (op.grupos || []).forEach(function (g) {
+      var rot = op.rotulos(g.chave, m.marcados && m.marcados[g.chave]);
+      if (!rot.length) return;
+      doc.y -= 20;
+      doc.garanteEspaco(46);
+      doc.texto(g.titulo, MARG_E, doc.y, { tam: 10.5, bold: true, cor: COR.navy });
+      doc.y -= 4;
+      doc.linha(MARG_E, doc.y, MARG_E + 60, doc.y, COR.teal, 1.1);
+      doc.y -= 2;
+
+      var meio = Math.ceil(rot.length / 2);
+      var topo = doc.y, menor = doc.y;
+      for (var col = 0; col < 2; col++) {
+        doc.y = topo;
+        var px = MARG_E + col * (UTIL / 2);
+        var de = col * meio, ate = Math.min(rot.length, de + meio);
+        for (var i = de; i < ate; i++) {
+          doc.y -= 13.5;
+          doc.texto('•', px + 3, doc.y, { tam: 9.5, cor: COR.teal });
+          doc.texto(rot[i], px + 15, doc.y, { tam: 9.5, cor: COR.texto });
+        }
+        if (doc.y < menor) menor = doc.y;
+      }
+      doc.y = menor;
+    });
+
+    secaoTexto('Prioridades', m.prioridades);
+    secaoTexto('Diagnóstico e plano inicial', m.plano);
+
+    return doc.finalizar();
+  }
+
   /* Monta o material de um tema. Cada parte é opcional: ela escolhe se quer a
    * explicação, a lista, o gabarito, ou só um deles. */
   function gerarMaterialTema(op) {
@@ -1038,7 +1128,7 @@
   return {
     Doc: Doc, COR: COR, medir: medir, paraWinAnsi: paraWinAnsi,
     gerarFechamento: gerarFechamento, gerarResumoMes: gerarResumoMes,
-    gerarMaterialTema: gerarMaterialTema,
+    gerarMaterialTema: gerarMaterialTema, gerarFichaMapeamento: gerarFichaMapeamento,
     NOTA_L: NOTA_L, NOTA_A: NOTA_A,
     PAGINA_L: PAGINA_L, PAGINA_A: PAGINA_A, MARG_E: MARG_E, MARG_D: MARG_D, UTIL: UTIL
   };

@@ -63,6 +63,24 @@ método de estudo, estratégia de prova, lidar com frustrações, ansiedade ante
 O que for marcado aparece no fechamento do mês, com a contagem de quantas aulas tocaram em cada
 ponto. É o que mostra à família o trabalho que não cabe na conta de horas.
 
+**Mapeamento do aluno.** Na ficha de cada aluno há a aba *Mapeamento*: pontos fortes, pontos de
+atenção, lacunas de anos anteriores, rotina de estudo e como ele aprende melhor, tudo de clicar,
+mais campos escritos para o contexto escolar, a expectativa da família, as prioridades e o seu
+diagnóstico. Vale para qualquer aluno, e não só para quem chegou agora: nunca é tarde para mapear.
+
+Ao cadastrar um aluno novo, dá para já marcar o **encontro de mapeamento**. Esse encontro aparece
+diferente na agenda e abre com um roteiro sugerido, dividido em conversa com o responsável, conversa
+com o aluno, sondagem escrita, preenchimento da ficha e combinados. Ele conta como aula normal no
+fechamento, porque é trabalho.
+
+Depois de mapeado, toda aula daquele aluno abre com um **lembrete**: as prioridades, as lacunas, os
+pontos de atenção e o jeito dele aprender. Um toque copia o lembrete para a anotação da aula, se
+você quiser partir dali. Cada lacuna marcada leva direto aos temas do banco que tratam do assunto.
+
+O mapeamento pode ser refeito quantas vezes quiser: a revisão nova começa a partir da anterior, e a
+anterior fica guardada com a data, para você comparar os semestres. Também dá para gerar a ficha em
+PDF, que é sua e só vai para a família se você decidir mostrar.
+
 **Repetir para trás.** Quando as aulas já aconteciam antes de você cadastrar o aluno, abra
 qualquer aula dele e toque em *Repetir para trás*. Escolha os dias da semana e até que data voltar:
 o aplicativo cria as datas passadas com o mesmo horário e a mesma duração, pulando os dias que já
@@ -74,14 +92,20 @@ que valia na data dela, então reajuste no meio do mês sai certo sozinho.
 
 **Fechamento.** Uma tela por mês, com a tabela de cada aluno e o total. Escreva o resumo do mês e
 gere o PDF, já com o cabeçalho, o rodapé e a marca d'água. Dá para gerar também o arquivo de texto e
-o PDF com as folhas de aula anexadas. Além da tabela de datas, o documento traz os temas trabalhados
-com as datas de cada um e as áreas trabalhadas com a contagem, quando houver.
+o PDF com as folhas de aula anexadas. Além da tabela de datas, o documento traz o ano escolar e o
+colégio do aluno, os temas trabalhados com as datas de cada um e as áreas trabalhadas com a
+contagem, quando houver.
 
-**Ficha do aluno.** Ao tocar num aluno abre a janela de perfil, em três abas. *Dados* traz nome,
+**Choque de horário.** Se você marcar uma aula que cai em cima de outra já marcada, aparece um
+aviso dizendo qual é. Ele não impede nada: serve para pegar o lançamento repetido e a aula
+desmarcada que ficou para trás.
+
+**Ficha do aluno.** Ao tocar num aluno abre a janela de perfil, em quatro abas. *Dados* traz nome,
 responsável, desde quando ele estuda com você, e dois campos de anotação: observações gerais, para o
 que é prático, e observações pedagógicas, para como aquele aluno aprende. *Valores* traz o valor da
-hora-aula por período e as aulas que se repetem. *Histórico* mostra as últimas aulas daquele aluno,
-com a anotação de cada uma e o sinal de quais têm folha ou anexo, sem precisar caçar no calendário.
+hora-aula por período e as aulas que se repetem. *Mapeamento* traz o diagnóstico do aluno.
+*Histórico* mostra as últimas aulas daquele aluno, com a anotação de cada uma e o sinal de quais
+têm folha ou anexo, sem precisar caçar no calendário.
 De lá dá para abrir qualquer aula direto.
 
 **O que mudou.** Depois de uma atualização, aparece uma janela contando o que chegou de novo, com o

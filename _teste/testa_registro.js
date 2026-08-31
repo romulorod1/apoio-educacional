@@ -177,6 +177,35 @@ conf('e a diferença é de um minuto no máximo',
 conf('hora vazia não inventa horário', Core.somarMinutosNaHora('', 30), '');
 conf('não passa da meia-noite', Core.somarMinutosNaHora('23:50', 30), '23:59');
 
+secao('8. Choque de horário');
+
+db = bancoDeProva();
+const base = db.aulas[0];  // 01/06, 15:30, 90 min
+function nova(campos) {
+  return Object.assign({ id: 'novo', alunoId: 'al1', data: '2026-06-01', hora: '15:30',
+    duracaoMin: 60, status: 'realizada' }, campos);
+}
+conf('mesma hora e mesmo dia é choque',
+  Core.conflitosDe(db, nova({})).map(a => a.id).join(','), 'a1');
+conf('sobreposição parcial também',
+  Core.conflitosDe(db, nova({ hora: '16:30' })).map(a => a.id).join(','), 'a1');
+conf('encostado no fim não é choque',
+  Core.conflitosDe(db, nova({ hora: '17:00' })).length, 0);
+conf('antes de começar não é choque',
+  Core.conflitosDe(db, nova({ hora: '14:00', duracaoMin: 90 })).length, 0);
+conf('outro dia não é choque',
+  Core.conflitosDe(db, nova({ data: '2026-06-02' })).length, 0);
+conf('a aula cancelada não ocupa horário',
+  Core.conflitosDe(db, nova({ status: 'cancelada' })).length, 0);
+conf('e não é apontada como choque de outra',
+  (() => { base.status = 'cancelada'; const r = Core.conflitosDe(db, nova({})).length; base.status = 'realizada'; return r; })(), 0);
+conf('a própria aula não choca consigo mesma',
+  Core.conflitosDe(db, base).map(a => a.id).join(','), '');
+conf('sem horário não dá para saber, então não acusa',
+  Core.conflitosDe(db, nova({ hora: '' })).length, 0);
+conf('aluno diferente no mesmo horário também acusa, porque ela é uma só',
+  Core.conflitosDe(db, nova({ alunoId: 'outro' })).map(a => a.id).join(','), 'a1');
+
 console.log('\n' + '='.repeat(60));
 console.log(passes + ' verificações passaram, ' + falhas + ' falharam.');
 if (falhas) { console.log('\nFALHAS:'); erros.forEach(e => console.log(' - ' + e)); }

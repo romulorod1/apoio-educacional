@@ -418,6 +418,40 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
 .item-exercicio:hover { border-color: var(--teal); background: var(--teal-claro); }
 .texto-exercicio { font-size: 14px; line-height: 1.4; }
 
+.item-lista.clicavel { cursor: pointer; }
+.item-lista.clicavel:hover { border-color: var(--teal); background: var(--teal-claro); }
+
+/* ---------- mapeamento do aluno ---------- */
+
+.pilula.mapeamento { box-shadow: inset 0 0 0 2px var(--gold); }
+
+
+/* O lembrete precisa parecer um bilhete preso na aula, nao mais um bloco de
+   formulario: ela le isso de relance com o aluno na frente. */
+.lembrete {
+  border: 1px solid var(--teal);
+  border-left-width: 4px;
+  background: var(--teal-claro);
+  border-radius: 10px;
+  padding: 11px 13px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.lembrete strong { color: #1F3A5F; }
+
+.passo-roteiro {
+  padding: 9px 12px;
+  border-left: 3px solid var(--teal);
+  background: var(--branco);
+  border-radius: 0 8px 8px 0;
+  margin-bottom: 6px;
+}
+.passo-roteiro .nome { font-size: 14px; font-weight: 700; color: #1F3A5F; }
+.passo-roteiro .detalhe { font-size: 13px; margin-top: 2px; }
+
+.item-area .btn.pequeno { padding: 2px 8px; font-size: 12px; }
+
 /* ---------- areas trabalhadas ---------- */
 
 .grade-areas {

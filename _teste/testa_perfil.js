@@ -53,7 +53,10 @@ const esp = ms => new Promise(r => setTimeout(r, ms));
   const nov = await pag.$eval('#corpo-modal-novidades', e => e.textContent);
   conf('diz a versão nova', /vers[aã]o [0-9]+\.[0-9]+\.[0-9]+/i.test(nov), true);
   conf('tranquiliza sobre os dados', nov.includes('Nada do que você já tinha foi alterado'), true);
-  conf('conta do histórico do aluno', nov.includes('Histórico'), true);
+  // Nao amarrar a um texto de versao: a janela mostra sempre as novidades mais
+  // recentes, e cravar uma frase aqui quebraria o teste a cada publicacao.
+  conf('lista o que mudou',
+    await pag.$$eval('#corpo-modal-novidades li', es => es.length) >= 3, true);
   await pag.$eval('#entendi-novidades', e => e.click());
   await esp(600);
   conf('fecha ao confirmar', await visivel('#modal-novidades'), false);
@@ -67,7 +70,7 @@ const esp = ms => new Promise(r => setTimeout(r, ms));
   console.log('\n=== a ficha do aluno tem abas ===');
   await abrirAluno('Marcelo');
   const nomesAbas = await pag.$$eval('.aba-perfil', es => es.map(e => e.textContent.trim()));
-  conf('três abas', nomesAbas.join(','), 'Dados,Valores,Histórico');
+  conf('quatro abas', nomesAbas.join(','), 'Dados,Valores,Mapeamento,Histórico');
   conf('abre na aba de dados', await pag.$eval('.aba-perfil.ativa', e => e.textContent.trim()), 'Dados');
 
   console.log('\n=== campos novos ===');

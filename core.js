@@ -705,6 +705,254 @@
     return [];
   }
 
+  /* Mapeamento do aluno.
+   *
+   * O primeiro encontro com um aluno novo raramente é aula: é sondagem. E o
+   * que se descobre ali costuma ficar só na cabeça dela. Aqui vira registro,
+   * de clicar, com espaço para o que só se escreve.
+   *
+   * Nunca é tarde: aluno de dois anos de casa pode ser mapeado hoje, e o
+   * mapeamento pode ser refeito quantas vezes ela quiser. Cada revisão fica
+   * guardada com a data, então dá para ver o que mudou de um semestre ao outro.
+   *
+   * Nas lacunas, cada item carrega um termo de busca do banco de temas: marcar
+   * "Frações" e cair na lista de temas de fração é o caminho curto entre
+   * descobrir o buraco e ter material para tapá-lo.
+   */
+  var MAPA = [
+    {
+      chave: 'fortes',
+      titulo: 'Pontos fortes',
+      ajuda: 'O que já funciona e serve de apoio para o resto.',
+      itens: [
+        { id: 'calculo-mental', rotulo: 'Cálculo mental' },
+        { id: 'tabuada-ok', rotulo: 'Tabuada automatizada' },
+        { id: 'enunciado-ok', rotulo: 'Entende bem o enunciado' },
+        { id: 'raciocinio-ok', rotulo: 'Raciocínio lógico' },
+        { id: 'caderno-ok', rotulo: 'Caderno organizado' },
+        { id: 'tarefa-ok', rotulo: 'Faz as tarefas em dia' },
+        { id: 'pergunta', rotulo: 'Pergunta quando não entende' },
+        { id: 'persiste', rotulo: 'Persiste na questão difícil' },
+        { id: 'sozinho', rotulo: 'Trabalha bem sozinho' },
+        { id: 'autocorrige', rotulo: 'Percebe e corrige o próprio erro' },
+        { id: 'gosta', rotulo: 'Gosta de matemática' },
+        { id: 'pega-rapido', rotulo: 'Pega conceito novo com rapidez' }
+      ]
+    },
+    {
+      chave: 'atencao',
+      titulo: 'Pontos de atenção',
+      ajuda: 'Onde ele costuma perder ponto. É o que vira plano de trabalho.',
+      itens: [
+        { id: 'sinal', rotulo: 'Erros de sinal' },
+        { id: 'tabuada-fraca', rotulo: 'Tabuada insegura' },
+        { id: 'fracao-fraca', rotulo: 'Se perde nas operações com frações' },
+        { id: 'decimal-fraca', rotulo: 'Erra na passagem entre decimal, fração e porcentagem' },
+        { id: 'enunciado-fraco', rotulo: 'Lê o enunciado sem entender o que se pede' },
+        { id: 'nao-comeca', rotulo: 'Não sabe por onde começar' },
+        { id: 'branco', rotulo: 'Deixa questão em branco' },
+        { id: 'chuta', rotulo: 'Chuta sem tentar' },
+        { id: 'nao-confere', rotulo: 'Não confere o resultado' },
+        { id: 'nao-revisa', rotulo: 'Não revisa a prova depois de corrigida' },
+        { id: 'vespera', rotulo: 'Estuda só na véspera' },
+        { id: 'caderno-fraco', rotulo: 'Caderno incompleto' },
+        { id: 'dispersa', rotulo: 'Dispersa com facilidade' },
+        { id: 'depende', rotulo: 'Depende de ajuda para começar' },
+        { id: 'fora-do-modelo', rotulo: 'Trava quando a questão foge do modelo' },
+        { id: 'ansiedade-prova', rotulo: 'Fica ansioso perto da prova' }
+      ]
+    },
+    {
+      chave: 'lacunas',
+      titulo: 'Lacunas de anos anteriores',
+      ajuda: 'O que ficou para trás e atrapalha o conteúdo de agora. ' +
+        'Cada lacuna marcada abre os temas correspondentes no banco.',
+      itens: [
+        { id: 'naturais', rotulo: 'Operações com números naturais', busca: 'operações' },
+        { id: 'tabuada', rotulo: 'Tabuada e multiplicação', busca: 'multiplicação' },
+        { id: 'divisao', rotulo: 'Divisão', busca: 'divisão' },
+        { id: 'fracoes', rotulo: 'Frações', busca: 'fração' },
+        { id: 'decimais', rotulo: 'Números decimais', busca: 'decimais' },
+        { id: 'porcentagem', rotulo: 'Porcentagem', busca: 'porcentagem' },
+        { id: 'inteiros', rotulo: 'Números negativos', busca: 'inteiros' },
+        { id: 'potencias', rotulo: 'Potenciação e raiz', busca: 'potência' },
+        { id: 'medidas', rotulo: 'Unidades de medida', busca: 'medida' },
+        { id: 'algebrica', rotulo: 'Expressões algébricas', busca: 'algébric' },
+        { id: 'eq1', rotulo: 'Equação do primeiro grau', busca: 'primeiro grau' },
+        { id: 'sistemas', rotulo: 'Sistemas de equações', busca: 'sistema' },
+        { id: 'fatoracao', rotulo: 'Produtos notáveis e fatoração', busca: 'fatoração' },
+        { id: 'eq2', rotulo: 'Equação do segundo grau', busca: 'segundo grau' },
+        { id: 'proporcao', rotulo: 'Razão, proporção e regra de três', busca: 'proporção' },
+        { id: 'area', rotulo: 'Perímetro, área e volume', busca: 'área' },
+        { id: 'pitagoras', rotulo: 'Teorema de Pitágoras', busca: 'Pitágoras' },
+        { id: 'semelhanca', rotulo: 'Semelhança e escala', busca: 'semelhança' },
+        { id: 'trigonometria', rotulo: 'Trigonometria no triângulo retângulo', busca: 'trigonometria' },
+        { id: 'funcoes', rotulo: 'Funções', busca: 'função' },
+        { id: 'graficos', rotulo: 'Leitura de gráficos e estatística', busca: 'gráfico' },
+        { id: 'probabilidade', rotulo: 'Probabilidade', busca: 'probabilidade' }
+      ]
+    },
+    {
+      chave: 'rotina',
+      titulo: 'Rotina de estudo',
+      ajuda: 'Como o estudo acontece fora da aula. Marque o que for verdade hoje.',
+      itens: [
+        { id: 'horario-fixo', rotulo: 'Tem horário fixo de estudo' },
+        { id: 'lugar-calmo', rotulo: 'Estuda em lugar sem distração' },
+        { id: 'usa-agenda', rotulo: 'Usa agenda ou cronograma' },
+        { id: 'celular-longe', rotulo: 'Deixa o celular longe na hora de estudar' },
+        { id: 'dever-sozinho', rotulo: 'Faz o dever sem precisar ser lembrado' },
+        { id: 'revisa-antes', rotulo: 'Revisa a matéria antes da véspera' },
+        { id: 'anota-duvida', rotulo: 'Anota as dúvidas para perguntar' },
+        { id: 'material-completo', rotulo: 'Tem o material completo' },
+        { id: 'agenda-cheia', rotulo: 'Agenda muito cheia de outras atividades' },
+        { id: 'cansado', rotulo: 'Costuma chegar cansado na aula' }
+      ]
+    },
+    {
+      chave: 'aprende',
+      titulo: 'Como aprende melhor',
+      ajuda: 'O caminho que costuma funcionar com este aluno.',
+      itens: [
+        { id: 'visual', rotulo: 'Vendo o desenho ou o gráfico' },
+        { id: 'fazendo', rotulo: 'Fazendo muitos exercícios' },
+        { id: 'ouvindo', rotulo: 'Ouvindo a explicação passo a passo' },
+        { id: 'explicando', rotulo: 'Explicando para outra pessoa' },
+        { id: 'exemplo-regra', rotulo: 'Do exemplo para a regra' },
+        { id: 'regra-exemplo', rotulo: 'Da regra para o exemplo' },
+        { id: 'aplicado', rotulo: 'Com aplicação prática do dia a dia' },
+        { id: 'devagar', rotulo: 'Com ritmo mais devagar e mais repetição' }
+      ]
+    }
+  ];
+
+  var NIVEIS = [
+    { id: '1', rotulo: 'Precisa retomar a base de anos anteriores' },
+    { id: '2', rotulo: 'Abaixo do que o ano pede' },
+    { id: '3', rotulo: 'Acompanha o ano com apoio' },
+    { id: '4', rotulo: 'Seguro no conteúdo do ano' },
+    { id: '5', rotulo: 'Pronto para aprofundar' }
+  ];
+
+  var ITEM_MAPA = {};
+  MAPA.forEach(function (g) {
+    g.itens.forEach(function (i) { ITEM_MAPA[g.chave + ':' + i.id] = i; });
+  });
+
+  function itemDoMapa(chave, id) { return ITEM_MAPA[chave + ':' + id] || null; }
+
+  function rotulosDoMapa(chave, ids) {
+    return (ids || []).map(function (id) {
+      var it = itemDoMapa(chave, id);
+      return it ? it.rotulo : '';
+    }).filter(Boolean);
+  }
+
+  function rotuloNivel(id) {
+    var n = NIVEIS.filter(function (x) { return x.id === String(id); })[0];
+    return n ? n.rotulo : '';
+  }
+
+  function mapeamentoNovo() {
+    return {
+      id: uid(), data: hojeIso(), aulaId: null,
+      escola: '', anoEscolar: '', professor: '', calendarioProvas: '',
+      indicacao: '', motivo: '', expectativa: '',
+      nivel: '', prioridades: '', plano: '',
+      marcados: { fortes: [], atencao: [], lacunas: [], rotina: [], aprende: [] }
+    };
+  }
+
+  function mapeamentosDe(aluno) {
+    return ((aluno && aluno.mapeamentos) || []).slice()
+      .sort(function (a, b) { return String(a.data).localeCompare(String(b.data)); });
+  }
+
+  /* O mapeamento que vale hoje é o mais recente. */
+  function mapeamentoAtual(aluno) {
+    var lista = mapeamentosDe(aluno);
+    return lista.length ? lista[lista.length - 1] : null;
+  }
+
+  function mapeado(aluno) { return !!mapeamentoAtual(aluno); }
+
+  var ANOS_ESCOLARES = {
+    '02': '2º ano', '03': '3º ano', '04': '4º ano', '05': '5º ano', '06': '6º ano',
+    '07': '7º ano', '08': '8º ano', '09': '9º ano',
+    em1: '1º ano do médio', em2: '2º ano do médio', em3: '3º ano do médio'
+  };
+
+  /* Ano escolar e colégio, para o fechamento situar quem lê. Só aparece quando
+   * a informação existe: nada de linha em branco no documento da família. */
+  function contextoEscolarDe(aluno) {
+    var m = mapeamentoAtual(aluno);
+    var ano = (m && m.anoEscolar) || (aluno && aluno.anoEscolar) || '';
+    var partes = [];
+    if (ANOS_ESCOLARES[ano]) partes.push(ANOS_ESCOLARES[ano]);
+    if (m && m.escola) partes.push(m.escola);
+    return partes.join(', ');
+  }
+
+  /* O lembrete que aparece ao abrir uma aula: curto de propósito, porque ela
+   * está com o aluno na frente e não vai ler meia página. */
+  function lembreteDoMapeamento(aluno, limite) {
+    var m = mapeamentoAtual(aluno);
+    if (!m) return null;
+    var max = limite || 4;
+    return {
+      data: m.data,
+      nivel: rotuloNivel(m.nivel),
+      atencao: rotulosDoMapa('atencao', m.marcados && m.marcados.atencao).slice(0, max),
+      lacunas: rotulosDoMapa('lacunas', m.marcados && m.marcados.lacunas).slice(0, max),
+      aprende: rotulosDoMapa('aprende', m.marcados && m.marcados.aprende).slice(0, 2),
+      prioridades: (m.prioridades || '').trim(),
+      totalAtencao: ((m.marcados && m.marcados.atencao) || []).length,
+      totalLacunas: ((m.marcados && m.marcados.lacunas) || []).length
+    };
+  }
+
+  /* O mesmo lembrete em texto, para ela colar na anotação da aula se quiser. */
+  function textoDoLembrete(aluno) {
+    var l = lembreteDoMapeamento(aluno, 6);
+    if (!l) return '';
+    var L = [];
+    if (l.prioridades) L.push('Prioridades: ' + l.prioridades.replace(/\s*\n\s*/g, '; '));
+    if (l.lacunas.length) L.push('Lacunas: ' + l.lacunas.join(', ') + '.');
+    if (l.atencao.length) L.push('Atenção: ' + l.atencao.join(', ') + '.');
+    if (l.aprende.length) L.push('Aprende melhor: ' + l.aprende.join(' e ') + '.');
+    return L.join(' ');
+  }
+
+  /* Choque de horário.
+   *
+   * Duas aulas no mesmo dia e no mesmo horário quase sempre são engano: ou a
+   * aula foi lançada duas vezes, ou a que foi cancelada não foi apagada. O
+   * aplicativo avisa, mas não impede: dois alunos irmãos na mesma sala existe,
+   * e quem sabe se é engano é ela.
+   *
+   * A aula cancelada não entra: ela não ocupa horário nenhum.
+   */
+  function minutosDaHora(hora) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(String(hora || ''));
+    return m ? (+m[1]) * 60 + (+m[2]) : null;
+  }
+
+  function conflitosDe(db, aula) {
+    if (!aula || !aula.data) return [];
+    var inicio = minutosDaHora(aula.hora);
+    if (inicio === null) return [];
+    var fim = inicio + (aula.duracaoMin || 60);
+    if ((aula.status || 'realizada') === 'cancelada') return [];
+
+    return (db.aulas || []).filter(function (o) {
+      if (o.id === aula.id || o.data !== aula.data) return false;
+      if ((o.status || 'realizada') === 'cancelada') return false;
+      var oi = minutosDaHora(o.hora);
+      if (oi === null) return false;
+      return oi < fim && (oi + (o.duracaoMin || 60)) > inicio;
+    });
+  }
+
   /* Divide uma aula em duas metades no mesmo dia.
    *
    * Serve para quando o encontro tratou de dois assuntos diferentes e ela quer
@@ -878,6 +1126,7 @@
       precoUnico: listaFaixas.length === 1 ? listaFaixas[0].valorHora : null,
       semPreco: semPreco,
       resumoTexto: resumo ? (resumo.texto || '') : '',
+      contextoEscolar: contextoEscolarDe(aluno),
       temasDoMes: temasDoMes,
       areasDoMes: areasDoMes,
       qtdEncontros: linhas.filter(function (l) { return l.cobravel || l.status !== 'cancelada'; }).length
@@ -1036,6 +1285,12 @@
     calcularFechamento: calcularFechamento, calcularMesInteiro: calcularMesInteiro,
     markdownFechamento: markdownFechamento, markdownMesInteiro: markdownMesInteiro,
     AREAS: AREAS, rotuloArea: rotuloArea, temasDaAula: temasDaAula,
+    MAPA: MAPA, NIVEIS: NIVEIS, itemDoMapa: itemDoMapa, rotulosDoMapa: rotulosDoMapa,
+    rotuloNivel: rotuloNivel, mapeamentoNovo: mapeamentoNovo, mapeamentosDe: mapeamentosDe,
+    mapeamentoAtual: mapeamentoAtual, mapeado: mapeado,
+    lembreteDoMapeamento: lembreteDoMapeamento, textoDoLembrete: textoDoLembrete,
+    contextoEscolarDe: contextoEscolarDe, ANOS_ESCOLARES: ANOS_ESCOLARES,
+    conflitosDe: conflitosDe, minutosDaHora: minutosDaHora,
     dividirAula: dividirAula, desfazerDivisao: desfazerDivisao,
     podeDividir: podeDividir, metadesDe: metadesDe, somarMinutosNaHora: somarMinutosNaHora,
     uid: uid, nomeArquivo: nomeArquivo

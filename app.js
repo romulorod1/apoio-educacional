@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.6.0';
+  var VERSAO = '1.7.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -18,6 +18,27 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.7.0',
+      itens: [
+        'A ficha do aluno ganhou a aba Mapeamento: pontos fortes, pontos de atenção, lacunas ' +
+        'de anos anteriores, rotina de estudo e como ele aprende melhor. Vale para qualquer ' +
+        'aluno, não só para os novos: nunca é tarde para mapear.',
+        'Ao cadastrar um aluno novo, dá para já agendar o encontro de mapeamento. Esse encontro ' +
+        'abre com um roteiro sugerido e com a ficha para preencher na hora.',
+        'Aluno mapeado passa a mostrar, ao abrir qualquer aula dele, um lembrete com as ' +
+        'prioridades, as lacunas e os pontos de atenção. Dá para copiar esse lembrete para a ' +
+        'anotação da aula com um toque.',
+        'Cada lacuna marcada leva direto aos temas do banco que tratam daquele assunto.',
+        'O mapeamento pode ser refeito quantas vezes você quiser. O anterior fica guardado com ' +
+        'a data, para você ver o que mudou de um semestre para o outro.',
+        'A aula recém-criada agora abre sozinha, já com a folha, o material de aula e os anexos ' +
+        'à mão.',
+        'Se você marcar duas aulas no mesmo horário, o aplicativo avisa. Não impede: só avisa.',
+        'O fechamento do mês mostra o ano escolar e o colégio do aluno, e a aula não cobrada ' +
+        'deixou de exibir valor por hora, que só confundia.'
+      ]
+    },
     {
       versao: '1.6.0',
       itens: [
@@ -653,11 +674,14 @@
       doDia.forEach(function (a) {
         var aluno = alunoPorId(a.alunoId);
         var nome = aluno ? aluno.nome : 'Aluno removido';
-        var cls = 'pilula' + (a.status === 'cancelada' ? ' cancelada' : '') + (a.temNota ? ' tem-nota' : '');
+        var cls = 'pilula' + (a.status === 'cancelada' ? ' cancelada' : '') +
+          (a.temNota ? ' tem-nota' : '') + (a.tipo === 'mapeamento' ? ' mapeamento' : '');
         var pil = el('div', {
           class: cls,
           style: 'background:' + (aluno ? aluno.cor : '#9AA3AF'),
-          texto: (a.hora ? a.hora + ' ' : '') + nome
+          // O encontro de mapeamento se distingue na agenda: nao e aula comum.
+          texto: (a.hora ? a.hora + ' ' : '') + nome +
+            (a.tipo === 'mapeamento' ? ' · mapeamento' : '')
         });
         pil.addEventListener('click', function (ev) {
           ev.stopPropagation();
@@ -768,6 +792,33 @@
     // lembrete de feriado, sem impedir a marcação
     var avisoFeriado = el('div', { id: 'aviso-feriado' });
     corpo.appendChild(avisoFeriado);
+
+    /* Choque de horário. Duas aulas ao mesmo tempo quase sempre são lançamento
+       repetido, ou a aula desmarcada que ficou para trás. O aviso aparece, mas
+       nada é bloqueado: irmãos na mesma sala existem. */
+    var avisoChoque = el('div', { id: 'aviso-choque' });
+    corpo.appendChild(avisoChoque);
+    function atualizarChoque() {
+      avisoChoque.innerHTML = '';
+      var provisoria = {
+        id: aulaEmEdicao ? aulaEmEdicao.id : null,
+        data: $('#campo-data').value,
+        hora: $('#campo-hora').value,
+        duracaoMin: parseInt($('#campo-duracao').value, 10) || 60,
+        status: $('#campo-status').value
+      };
+      var choques = Core.conflitosDe(db, provisoria);
+      if (!choques.length) return;
+      var nomes = choques.map(function (c) {
+        var al = alunoPorId(c.alunoId);
+        return (al ? al.nome : 'aluno removido') + (c.hora ? ' às ' + c.hora : '');
+      });
+      avisoChoque.appendChild(el('div', { class: 'faixa-aviso' }, [
+        el('strong', { texto: 'Já há aula neste horário: ' }),
+        document.createTextNode(nomes.join(', ') + '. Confira se não é lançamento repetido. ' +
+          'Se for mesmo assim, pode salvar.')
+      ]));
+    }
     function atualizarFeriado() {
       var data = $('#campo-data').value;
       var f = data ? Core.feriadoEm(data) : null;
@@ -784,6 +835,7 @@
     corpo.appendChild(previsao);
     function atualizarPrevisao() {
       atualizarFeriado();
+      atualizarChoque();
       var aluno = alunoPorId($('#campo-aluno').value);
       var data = $('#campo-data').value;
       var dur = parseInt($('#campo-duracao').value, 10) || 0;
@@ -798,8 +850,11 @@
     }
     selAluno.addEventListener('change', atualizarPrevisao);
     selDur.addEventListener('change', atualizarPrevisao);
+    selStatus.addEventListener('change', atualizarPrevisao);
     $('#campo-data').addEventListener('change', atualizarPrevisao);
     $('#campo-data').addEventListener('input', atualizarPrevisao);
+    $('#campo-hora').addEventListener('change', atualizarPrevisao);
+    $('#campo-hora').addEventListener('input', atualizarPrevisao);
 
     // recorrência, só ao criar
     if (novo) {
@@ -843,8 +898,26 @@
       });
     }
 
+    /* A aula nova ainda não existe, então não tem onde guardar folha, material
+     * nem anexo. Em vez de deixar ela procurando por botões que não estão ali,
+     * o aviso diz o que vem depois de salvar. */
+    if (novo) {
+      corpo.appendChild(el('div', {
+        class: 'ajuda', id: 'ajuda-aula-nova',
+        texto: 'Ao salvar, a aula abre de novo já com a folha, o material de aula, os anexos e ' +
+          'as áreas trabalhadas.'
+      }));
+    }
+
     // folha de aula e anexos, só depois que a aula existe
     if (!novo) {
+      var alunoDaAula = alunoPorId(aulaEmEdicao.alunoId);
+      if (aulaEmEdicao.tipo === 'mapeamento' && alunoDaAula) {
+        desenharEncontroDeMapeamento(corpo, alunoDaAula, aulaEmEdicao);
+      } else if (alunoDaAula && Core.mapeado(alunoDaAula)) {
+        desenharLembrete(corpo, alunoDaAula, aulaEmEdicao);
+      }
+
       corpo.appendChild(el('h3', { class: 'subtitulo', texto: 'Conteúdo da aula' }));
 
       var areaNota = el('textarea', {
@@ -855,32 +928,6 @@
       corpo.appendChild(el('label', { class: 'campo' }, [
         el('span', { texto: 'Anotação digitada' }), areaNota
       ]));
-
-      desenharAreas(corpo, aulaEmEdicao);
-
-      corpo.appendChild(el('div', { class: 'barra', style: 'margin-bottom:4px' }, [
-        el('button', {
-          type: 'button', class: 'btn',
-          texto: 'Repetir para trás',
-          aoClick: function () { abrirRetroativo(aulaEmEdicao.id); }
-        }),
-        Core.podeDividir(aulaEmEdicao) ? el('button', {
-          type: 'button', class: 'btn', id: 'dividir-aula',
-          texto: 'Dividir em duas aulas de ' + rotuloMetades(aulaEmEdicao),
-          aoClick: function () { dividirAulaEmDuas(aulaEmEdicao.id); }
-        }) : null
-      ].filter(Boolean)));
-      corpo.appendChild(el('div', { class: 'ajuda' }, [
-        el('strong', { texto: 'Repetir para trás: ' }),
-        document.createTextNode('use quando as aulas já aconteciam antes de você cadastrar o aluno. ' +
-          'O aplicativo cria as datas passadas com este mesmo horário e duração. '),
-        Core.podeDividir(aulaEmEdicao) ? el('strong', { texto: 'Dividir em duas: ' }) : null,
-        Core.podeDividir(aulaEmEdicao) ? document.createTextNode(
-          'raramente é preciso. Um encontro que passou por vários assuntos continua sendo ' +
-          'uma aula só, e pode receber quantos temas você quiser: assim o fechamento do mês ' +
-          'mostra a lista de temas em vez de se partir em vários blocos curtos. ' +
-          'Divida apenas quando foram mesmo dois encontros separados no dia.') : null
-      ].filter(Boolean)));
 
       var linhaFolha = el('div', { id: 'linha-folha', class: 'barra', style: 'margin-bottom:6px' });
       linhaFolha.appendChild(el('button', {
@@ -924,6 +971,32 @@
       var listaAnexos = el('div', { id: 'lista-anexos' });
       corpo.appendChild(listaAnexos);
       desenharAnexos(listaAnexos, aulaEmEdicao);
+
+      desenharAreas(corpo, aulaEmEdicao);
+
+      corpo.appendChild(el('div', { class: 'barra', style: 'margin:14px 0 4px' }, [
+        el('button', {
+          type: 'button', class: 'btn',
+          texto: 'Repetir para trás',
+          aoClick: function () { abrirRetroativo(aulaEmEdicao.id); }
+        }),
+        Core.podeDividir(aulaEmEdicao) ? el('button', {
+          type: 'button', class: 'btn', id: 'dividir-aula',
+          texto: 'Dividir em duas aulas de ' + rotuloMetades(aulaEmEdicao),
+          aoClick: function () { dividirAulaEmDuas(aulaEmEdicao.id); }
+        }) : null
+      ].filter(Boolean)));
+      corpo.appendChild(el('div', { class: 'ajuda' }, [
+        el('strong', { texto: 'Repetir para trás: ' }),
+        document.createTextNode('use quando as aulas já aconteciam antes de você cadastrar o aluno. ' +
+          'O aplicativo cria as datas passadas com este mesmo horário e duração. '),
+        Core.podeDividir(aulaEmEdicao) ? el('strong', { texto: 'Dividir em duas: ' }) : null,
+        Core.podeDividir(aulaEmEdicao) ? document.createTextNode(
+          'raramente é preciso. Um encontro que passou por vários assuntos continua sendo ' +
+          'uma aula só, e pode receber quantos temas você quiser: assim o fechamento do mês ' +
+          'mostra a lista de temas em vez de se partir em vários blocos curtos. ' +
+          'Divida apenas quando foram mesmo dois encontros separados no dia.') : null
+      ].filter(Boolean)));
     }
 
     atualizarPrevisao();
@@ -1148,6 +1221,9 @@
       salvar().then(function () {
         fecharModal('modal-aula');
         desenharTudo();
+        // Reabre para ela já poder escrever na folha ou puxar o material. Numa
+        // repetição não faz sentido: seriam muitas aulas criadas de uma vez.
+        abrirAula(nova.id);
         avisar('Aula criada.');
       });
       return;
@@ -1370,7 +1446,9 @@
       var pv = Core.precoVigente(a, Core.hojeIso());
       var series = (db.series || []).filter(function (s) { return s.alunoId === a.id; });
       var qtd = db.aulas.filter(function (x) { return x.alunoId === a.id; }).length;
-      caixa.appendChild(el('div', { class: 'item-lista' }, [
+      // A linha inteira abre a ficha: mirar no botao pequeno com o dedo, no
+      // tablet, e mais trabalhoso do que tocar no nome do aluno.
+      var linhaAluno = el('div', { class: 'item-lista clicavel', 'data-aluno': a.id }, [
         el('div', { class: 'bolinha', style: 'background:' + a.cor }),
         el('div', { class: 'cresce' }, [
           el('div', { class: 'nome' }, [
@@ -1386,9 +1464,11 @@
         ]),
         el('button', {
           type: 'button', class: 'btn pequeno', texto: 'Abrir',
-          aoClick: function () { abrirAluno(a.id); }
+          aoClick: function (ev) { ev.stopPropagation(); abrirAluno(a.id); }
         })
-      ]));
+      ]);
+      linhaAluno.addEventListener('click', function () { abrirAluno(a.id); });
+      caixa.appendChild(linhaAluno);
     });
   }
 
@@ -1404,10 +1484,13 @@
     var corpo = $('#corpo-modal-aluno');
     corpo.innerHTML = '';
 
-    var painel = { dados: el('div'), valores: el('div'), historico: el('div') };
+    var painel = {
+      dados: el('div'), valores: el('div'),
+      mapeamento: el('div'), historico: el('div')
+    };
     var abas = el('div', { class: 'abas-perfil' });
     var lista = [['dados', 'Dados'], ['valores', 'Valores']];
-    if (!novo) lista.push(['historico', 'Histórico']);
+    if (!novo) lista.push(['mapeamento', 'Mapeamento'], ['historico', 'Histórico']);
 
     lista.forEach(function (par, i) {
       var b = el('button', {
@@ -1500,6 +1583,51 @@
       class: 'ajuda',
       texto: 'Nada daqui aparece no fechamento que a família recebe. É a sua memória sobre o aluno.'
     }));
+
+    /* Aluno novo costuma começar por um encontro de sondagem. Deixar isso a um
+     * clique aqui evita que ela tenha que lembrar de marcar depois. */
+    if (novo) {
+      var marcarEncontro = el('input', { type: 'checkbox', id: 'campo-agendar-mapeamento' });
+      var caixaEncontro = el('div', { id: 'caixa-mapeamento-novo', style: 'display:none' });
+
+      painel.dados.appendChild(el('h3', { class: 'subtitulo', texto: 'Primeiro encontro' }));
+      painel.dados.appendChild(el('label', {
+        style: 'display:flex;align-items:center;gap:9px;cursor:pointer;margin-bottom:6px'
+      }, [marcarEncontro, el('span', { texto: 'Agendar encontro de mapeamento' })]));
+      painel.dados.appendChild(el('div', {
+        class: 'ajuda', style: 'margin-top:0',
+        texto: 'Um primeiro encontro de sondagem, para entender de onde o aluno parte antes de ' +
+          'montar o plano. Abre com roteiro e com a ficha de mapeamento para preencher na hora. ' +
+          'Conta como aula normal no fechamento.'
+      }));
+
+      caixaEncontro.appendChild(el('div', { class: 'linha' }, [
+        el('label', { class: 'campo' }, [
+          el('span', { texto: 'Data' }),
+          el('input', { type: 'date', id: 'campo-mapa-data', value: Core.hojeIso() })
+        ]),
+        el('label', { class: 'campo' }, [
+          el('span', { texto: 'Horário' }),
+          el('input', { type: 'time', id: 'campo-mapa-hora', value: '15:30' })
+        ]),
+        el('label', { class: 'campo' }, [
+          el('span', { texto: 'Duração' }),
+          (function () {
+            var sel = el('select', { id: 'campo-mapa-duracao' });
+            [[60, '1h'], [90, '1h30'], [120, '2h']].forEach(function (par) {
+              var o = el('option', { value: String(par[0]), texto: par[1] });
+              if (par[0] === 90) o.selected = true;
+              sel.appendChild(o);
+            });
+            return sel;
+          })()
+        ])
+      ]));
+      painel.dados.appendChild(caixaEncontro);
+      marcarEncontro.addEventListener('change', function () {
+        caixaEncontro.style.display = this.checked ? '' : 'none';
+      });
+    }
 
     // ---------------- aba: valores ----------------
 
@@ -1617,11 +1745,125 @@
       }
     }
 
+    // ---------------- aba: mapeamento ----------------
+
+    if (!novo) desenharAbaMapeamento(painel.mapeamento, alunoEmEdicao);
+
     // ---------------- aba: histórico ----------------
 
     if (!novo) desenharHistorico(painel.historico, alunoEmEdicao);
 
     abrirModal('modal-aluno');
+  }
+
+  /* Aba Mapeamento na ficha do aluno.
+   *
+   * Existe para todo aluno, não só para os novos. Quem estuda com ela há dois
+   * anos também nunca foi mapeado, e é justamente nesses que o mapa costuma
+   * explicar coisas que ela já sentia sem conseguir nomear. */
+  function desenharAbaMapeamento(caixa, aluno) {
+    caixa.innerHTML = '';
+    var m = Core.mapeamentoAtual(aluno);
+
+    if (!m) {
+      caixa.appendChild(el('div', { class: 'vazio' }, [
+        el('p', { texto: aluno.nome + ' ainda não foi mapeado.' }),
+        el('p', {
+          class: 'ajuda',
+          texto: 'Nunca é tarde: dá para mapear um aluno de anos, não só o que chegou hoje. ' +
+            'São pontos fortes, pontos de atenção, lacunas de anos anteriores, rotina de estudo ' +
+            'e como ele aprende melhor. O que você marcar aparece como lembrete toda vez que ' +
+            'abrir uma aula dele.'
+        }),
+        el('button', {
+          type: 'button', class: 'btn principal', id: 'mapear-aluno',
+          texto: 'Mapear ' + aluno.nome,
+          aoClick: function () {
+            fecharModal('modal-aluno');
+            abrirMapeamento(aluno.id, { novo: true });
+          }
+        })
+      ]));
+      return;
+    }
+
+    var lista = Core.mapeamentosDe(aluno);
+    caixa.appendChild(el('div', { class: 'barra', style: 'margin:6px 0 10px' }, [
+      el('span', {
+        class: 'cresce',
+        texto: 'Mapeado em ' + Core.ddmmaaaa(m.data) +
+          (lista.length > 1 ? ', com ' + (lista.length - 1) + ' revisão anterior' : ''),
+        style: 'font-size:14px'
+      }),
+      el('button', {
+        type: 'button', class: 'btn pequeno', id: 'editar-mapeamento', texto: 'Abrir',
+        aoClick: function () { fecharModal('modal-aluno'); abrirMapeamento(aluno.id); }
+      }),
+      el('button', {
+        type: 'button', class: 'btn pequeno', id: 'refazer-mapeamento', texto: 'Refazer',
+        aoClick: function () { fecharModal('modal-aluno'); abrirMapeamento(aluno.id, { novo: true }); }
+      })
+    ]));
+
+    if (Core.rotuloNivel(m.nivel)) {
+      caixa.appendChild(el('div', { class: 'faixa-info', texto: Core.rotuloNivel(m.nivel) }));
+    }
+
+    var contexto = [];
+    if (m.escola) contexto.push(m.escola);
+    if (m.anoEscolar) {
+      var nome = SERIES_NOMES.filter(function (p) { return p[0] === m.anoEscolar; })[0];
+      if (nome) contexto.push(nome[1]);
+    }
+    if (m.motivo) contexto.push(m.motivo);
+    if (contexto.length) {
+      caixa.appendChild(el('div', { class: 'ajuda', style: 'margin-top:0', texto: contexto.join(' · ') }));
+    }
+
+    Core.MAPA.forEach(function (g) {
+      var rot = Core.rotulosDoMapa(g.chave, m.marcados && m.marcados[g.chave]);
+      if (!rot.length) return;
+      caixa.appendChild(el('div', { class: 'bloco-exercicios', texto: g.titulo }));
+      var grade = el('div', { class: 'grade-areas' });
+      rot.forEach(function (r) {
+        grade.appendChild(el('div', { class: 'item-area', style: 'cursor:default' },
+          [el('span', { texto: r })]));
+      });
+      caixa.appendChild(grade);
+    });
+
+    [['prioridades', 'Prioridades'], ['plano', 'Diagnóstico e plano'],
+    ['expectativa', 'Expectativa da família']].forEach(function (par) {
+      var texto = (m[par[0]] || '').trim();
+      if (!texto) return;
+      caixa.appendChild(el('h3', { class: 'subtitulo', texto: par[1] }));
+      caixa.appendChild(el('div', { style: 'font-size:14px;line-height:1.55;white-space:pre-wrap', texto: texto }));
+    });
+
+    caixa.appendChild(el('div', { class: 'barra', style: 'margin-top:14px' }, [
+      el('button', {
+        type: 'button', class: 'btn', id: 'pdf-mapeamento', texto: 'Gerar ficha em PDF',
+        aoClick: function () { gerarFichaDeMapeamento(aluno, m); }
+      })
+    ]));
+    caixa.appendChild(el('div', {
+      class: 'ajuda',
+      texto: 'A ficha é sua. Se quiser mostrar à família, veja antes se tudo que está escrito ali ' +
+        'é o que você diria para eles.'
+    }));
+  }
+
+  function gerarFichaDeMapeamento(aluno, m) {
+    var bytes = PDFGen.gerarFichaMapeamento({
+      aluno: aluno, mapeamento: m,
+      grupos: Core.MAPA,
+      rotulos: Core.rotulosDoMapa,
+      nivel: Core.rotuloNivel(m.nivel),
+      anoEscolar: (SERIES_NOMES.filter(function (p) { return p[0] === m.anoEscolar; })[0] || ['', ''])[1]
+    });
+    var nome = 'Mapeamento_' + Core.nomeArquivo(aluno.nome) + '_' + m.data + '.pdf';
+    var blob = new Blob([bytes], { type: 'application/pdf' });
+    entregarArquivo(nome, blob, 'Mapeamento de ' + aluno.nome);
   }
 
   /* Últimas aulas do aluno, da mais recente para a mais antiga. */
@@ -1732,6 +1974,7 @@
     var corpo = $('#corpo-modal-aluno');
     var precos = corpo._precos();
 
+    var encontroCriado = null;
     var provisorio = { precos: precos };
     var erros = Core.validarPrecos(provisorio);
     if (erros.length) { avisar(erros[0]); return; }
@@ -1745,18 +1988,44 @@
       alunoEmEdicao.obsPedagogicas = $('#campo-obs-pedagogicas').value.trim();
       alunoEmEdicao.desde = $('#campo-desde').value || null;
     } else {
-      db.alunos.push({
+      var criado = {
         id: Core.uid(), nome: nome,
         responsavel: $('#campo-responsavel').value.trim(),
         cor: corpo._cor(), ativo: true, precos: precos,
         obs: $('#campo-obs').value.trim(),
         obsPedagogicas: $('#campo-obs-pedagogicas').value.trim(),
-        desde: $('#campo-desde').value || null
-      });
+        desde: $('#campo-desde').value || null,
+        mapeamentos: []
+      };
+      db.alunos.push(criado);
+
+      var marcar = $('#campo-agendar-mapeamento');
+      if (marcar && marcar.checked) {
+        var dataEncontro = $('#campo-mapa-data').value;
+        if (!dataEncontro) { avisar('Informe a data do encontro de mapeamento.'); return; }
+        encontroCriado = {
+          id: Core.uid(), alunoId: criado.id, serieId: null, destacada: false,
+          tipo: 'mapeamento',
+          data: dataEncontro,
+          hora: $('#campo-mapa-hora').value || '',
+          duracaoMin: parseInt($('#campo-mapa-duracao').value, 10) || 90,
+          status: 'realizada', cobravel: true,
+          notaTexto: '', temNota: false, anexos: [], areas: [], temas: []
+        };
+        db.aulas.push(encontroCriado);
+        if (!criado.desde) criado.desde = dataEncontro;
+      }
     }
     salvar().then(function () {
       fecharModal('modal-aluno');
       desenharTudo();
+      if (encontroCriado) {
+        irParaMes(Core.mesDe(encontroCriado.data));
+        abrirAula(encontroCriado.id);
+        avisar('Aluno salvo e encontro de mapeamento marcado para ' +
+          Core.ddmmaaaa(encontroCriado.data) + '.');
+        return;
+      }
       avisar('Aluno salvo.');
     });
   }
@@ -2077,6 +2346,405 @@
     });
   }
 
+  // ================= mapeamento do aluno =================
+  //
+  // Nunca é tarde para mapear: a janela é a mesma para o aluno que chegou hoje
+  // e para o que estuda com ela há dois anos. O que muda é só de onde ela abriu.
+
+  var ROTEIRO_MAPEAMENTO = [
+    ['Conversa com o responsável, 10 minutos',
+      'Por que procuraram apoio agora, o que esperam, como é a rotina em casa e ' +
+      'como o colégio avalia.'],
+    ['Conversa com o aluno, 10 minutos',
+      'O que ele acha que sabe e o que acha que não sabe. Vale mais o que ele diz ' +
+      'do que a nota do boletim.'],
+    ['Sondagem escrita, 25 minutos',
+      'Use "Material de aula" e monte uma lista curta com exercícios de anos anteriores. ' +
+      'Não é prova: é para ver onde ele trava e como ele pensa.'],
+    ['Preencher o mapeamento, 10 minutos',
+      'Marque pontos fortes, pontos de atenção e lacunas, e escreva o plano inicial.'],
+    ['Combinados, 5 minutos',
+      'Frequência, dever de casa, remarcação, como e quando você vai dar retorno.']
+  ];
+
+  function abrirMapeamento(alunoId, opcoes) {
+    opcoes = opcoes || {};
+    var aluno = alunoPorId(alunoId);
+    if (!aluno) return;
+    aluno.mapeamentos = aluno.mapeamentos || [];
+
+    var atual = Core.mapeamentoAtual(aluno);
+    var trabalho;
+    if (opcoes.novo || !atual) {
+      // Uma revisão nova começa do último preenchimento: quase nada muda de um
+      // semestre para o outro, e redigitar tudo faria ela não refazer nunca.
+      trabalho = atual ? JSON.parse(JSON.stringify(atual)) : Core.mapeamentoNovo();
+      trabalho.id = Core.uid();
+      trabalho.data = Core.hojeIso();
+      trabalho.aulaId = opcoes.aulaId || null;
+      trabalho._novo = true;
+    } else {
+      trabalho = atual;
+    }
+    trabalho.marcados = trabalho.marcados || {};
+    Core.MAPA.forEach(function (g) {
+      trabalho.marcados[g.chave] = (trabalho.marcados[g.chave] || []).slice();
+    });
+
+    $('#titulo-modal-mapeamento').textContent = 'Mapeamento de ' + aluno.nome;
+    var corpo = $('#corpo-modal-mapeamento');
+    var rodape = $('#rodape-modal-mapeamento');
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+
+    var anteriores = Core.mapeamentosDe(aluno).filter(function (m) { return m.id !== trabalho.id; });
+    if (trabalho._novo && anteriores.length) {
+      corpo.appendChild(el('div', { class: 'faixa-info' }, [
+        el('strong', { texto: 'Revisão do mapeamento. ' }),
+        document.createTextNode('Começa com o que estava marcado em ' +
+          Core.ddmmaaaa(anteriores[anteriores.length - 1].data) +
+          '. Ajuste o que mudou: o mapeamento anterior fica guardado do jeito que estava.')
+      ]));
+    }
+
+    if (opcoes.aulaId) {
+      corpo.appendChild(el('div', {
+        class: 'ajuda', style: 'margin-top:0',
+        texto: 'Este mapeamento fica ligado ao encontro de hoje.'
+      }));
+    }
+
+    // ---- contexto ----
+    corpo.appendChild(el('h3', { class: 'subtitulo', style: 'margin-top:6px', texto: 'Contexto' }));
+
+    var campos = {};
+    function campoTexto(chave, rotulo, dica, largo) {
+      var e = el('input', { type: 'text', placeholder: dica || '' });
+      e.value = trabalho[chave] || '';
+      e.addEventListener('input', function () { trabalho[chave] = this.value; });
+      campos[chave] = e;
+      return el('label', { class: 'campo', 'data-campo': chave }, [el('span', { texto: rotulo }), e]);
+    }
+
+    corpo.appendChild(el('div', { class: 'linha' }, [
+      campoTexto('escola', 'Colégio', 'Onde ele estuda'),
+      (function () {
+        var sel = el('select', { id: 'mapa-ano' });
+        sel.appendChild(el('option', { value: '', texto: 'Não informado' }));
+        SERIES_NOMES.forEach(function (par) {
+          var o = el('option', { value: par[0], texto: par[1] });
+          if (par[0] === (trabalho.anoEscolar || aluno.anoEscolar)) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.addEventListener('change', function () { trabalho.anoEscolar = this.value; });
+        trabalho.anoEscolar = trabalho.anoEscolar || aluno.anoEscolar || '';
+        return el('label', { class: 'campo' }, [el('span', { texto: 'Ano escolar' }), sel]);
+      })()
+    ]));
+
+    corpo.appendChild(el('div', { class: 'linha' }, [
+      campoTexto('professor', 'Professor de matemática', 'Opcional'),
+      campoTexto('calendarioProvas', 'Como o colégio avalia', 'Bimestral, trimestral, peso das provas')
+    ]));
+
+    corpo.appendChild(el('div', { class: 'linha' }, [
+      campoTexto('indicacao', 'Como chegou até você', 'Indicação de quem'),
+      campoTexto('motivo', 'Motivo da procura', 'Nota baixa, recuperação, aprofundamento')
+    ]));
+
+    corpo.appendChild(el('label', { class: 'campo' }, [
+      el('span', { texto: 'Expectativa da família' }),
+      (function () {
+        var t = el('textarea', {
+          style: 'min-height:56px',
+          placeholder: 'O que eles esperam ver mudar, e em quanto tempo.'
+        });
+        t.value = trabalho.expectativa || '';
+        t.addEventListener('input', function () { trabalho.expectativa = this.value; });
+        return t;
+      })()
+    ]));
+
+    // ---- listas de marcar ----
+    Core.MAPA.forEach(function (grupo) {
+      var marcados = trabalho.marcados[grupo.chave];
+      var contador = el('span', { class: 'tag' });
+      function atualizar() {
+        contador.textContent = marcados.length ? marcados.length + ' marcados' : 'nenhum';
+        contador.className = 'tag' + (marcados.length ? ' cheia' : '');
+      }
+
+      var caixa = el('div', { 'data-grupo': grupo.chave });
+      var botao = el('button', { type: 'button', class: 'btn pequeno', texto: 'Esconder' });
+      botao.addEventListener('click', function () {
+        var aberto = caixa.style.display !== 'none';
+        caixa.style.display = aberto ? 'none' : '';
+        botao.textContent = aberto ? 'Mostrar' : 'Esconder';
+      });
+
+      corpo.appendChild(el('div', { class: 'barra', style: 'margin:16px 0 2px' }, [
+        el('h3', { class: 'subtitulo', style: 'margin:0;border:none', texto: grupo.titulo }),
+        contador,
+        el('span', { class: 'cresce' }),
+        botao
+      ]));
+      corpo.appendChild(el('div', { class: 'ajuda', style: 'margin-top:0', texto: grupo.ajuda }));
+
+      var grade = el('div', { class: 'grade-areas' });
+      grupo.itens.forEach(function (item) {
+        var chk = el('input', { type: 'checkbox', style: 'width:auto;min-height:auto' });
+        chk.checked = marcados.indexOf(item.id) >= 0;
+        chk.addEventListener('change', function () {
+          if (this.checked) {
+            if (marcados.indexOf(item.id) < 0) marcados.push(item.id);
+          } else {
+            var i = marcados.indexOf(item.id);
+            if (i >= 0) marcados.splice(i, 1);
+          }
+          atualizar();
+        });
+        var filhos = [chk, el('span', { class: 'cresce', texto: item.rotulo })];
+        // A lacuna leva direto aos temas que a tapam.
+        if (item.busca) {
+          filhos.push(el('button', {
+            type: 'button', class: 'btn pequeno', texto: 'temas', title: 'Ver temas sobre ' + item.rotulo,
+            aoClick: function (ev) {
+              ev.preventDefault();
+              ev.stopPropagation();
+              abrirTemasPorBusca(item.busca, aluno);
+            }
+          }));
+        }
+        grade.appendChild(el('label', {
+          class: 'item-area', 'data-item': grupo.chave + ':' + item.id
+        }, filhos));
+      });
+      caixa.appendChild(grade);
+      corpo.appendChild(caixa);
+      atualizar();
+    });
+
+    // ---- leitura dela ----
+    corpo.appendChild(el('h3', { class: 'subtitulo', texto: 'A sua leitura' }));
+
+    var selNivel = el('select', { id: 'mapa-nivel' });
+    selNivel.appendChild(el('option', { value: '', texto: 'Não avaliado' }));
+    Core.NIVEIS.forEach(function (n) {
+      var o = el('option', { value: n.id, texto: n.rotulo });
+      if (n.id === String(trabalho.nivel || '')) o.selected = true;
+      selNivel.appendChild(o);
+    });
+    selNivel.addEventListener('change', function () { trabalho.nivel = this.value; });
+    corpo.appendChild(el('label', { class: 'campo' }, [
+      el('span', { texto: 'Onde ele está hoje' }), selNivel
+    ]));
+
+    function campoLongo(chave, rotulo, dica, altura) {
+      var t = el('textarea', { style: 'min-height:' + (altura || 72) + 'px', placeholder: dica });
+      t.value = trabalho[chave] || '';
+      t.addEventListener('input', function () { trabalho[chave] = this.value; });
+      campos[chave] = t;
+      return el('label', { class: 'campo', 'data-campo': chave }, [el('span', { texto: rotulo }), t]);
+    }
+
+    corpo.appendChild(campoLongo('prioridades', 'Prioridades para os próximos encontros',
+      'Duas ou três, no máximo. É isto que vai aparecer ao abrir cada aula dele.', 72));
+    corpo.appendChild(campoLongo('plano', 'Diagnóstico e plano inicial',
+      'O que você entendeu do aluno e como pretende trabalhar nos próximos dois meses.', 96));
+
+    if (anteriores.length) {
+      corpo.appendChild(el('h3', { class: 'subtitulo', texto: 'Mapeamentos anteriores' }));
+      anteriores.slice().reverse().forEach(function (m) {
+        corpo.appendChild(el('div', { class: 'item-lista' }, [
+          el('div', { class: 'cresce' }, [
+            el('div', { class: 'nome', texto: Core.ddmmaaaa(m.data) }),
+            el('div', {
+              class: 'detalhe',
+              texto: Core.rotuloNivel(m.nivel) ||
+                ((m.marcados && m.marcados.lacunas ? m.marcados.lacunas.length : 0) + ' lacunas marcadas')
+            })
+          ]),
+          el('button', {
+            type: 'button', class: 'btn pequeno', texto: 'Ver',
+            aoClick: function () { verMapeamentoAntigo(aluno, m); }
+          })
+        ]));
+      });
+    }
+
+    rodape.appendChild(el('span', {
+      class: 'esquerda ajuda', style: 'margin:0;align-self:center',
+      texto: 'Mapeamento de ' + Core.ddmmaaaa(trabalho.data)
+    }));
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn', texto: 'Cancelar',
+      aoClick: function () { fecharModal('modal-mapeamento'); }
+    }));
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn principal', id: 'salvar-mapeamento', texto: 'Salvar mapeamento',
+      aoClick: function () {
+        if (trabalho._novo) {
+          delete trabalho._novo;
+          aluno.mapeamentos.push(trabalho);
+        }
+        if (trabalho.anoEscolar) aluno.anoEscolar = trabalho.anoEscolar;
+        salvar().then(function () {
+          fecharModal('modal-mapeamento');
+          if ($('#modal-aula').classList.contains('aberto') && aulaEmEdicao) {
+            abrirAula(aulaEmEdicao.id);
+          }
+          desenharTudo();
+          avisar('Mapeamento salvo.');
+        });
+      }
+    }));
+
+    abrirModal('modal-mapeamento');
+    corpo.scrollTop = 0;
+  }
+
+  /* Um mapeamento antigo é só leitura: mexer nele reescreveria a história. */
+  function verMapeamentoAntigo(aluno, m) {
+    var corpo = $('#corpo-modal-mapeamento');
+    var rodape = $('#rodape-modal-mapeamento');
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    $('#titulo-modal-mapeamento').textContent =
+      'Mapeamento de ' + aluno.nome + ' em ' + Core.ddmmaaaa(m.data);
+
+    corpo.appendChild(el('div', {
+      class: 'faixa-info',
+      texto: 'Este é um mapeamento antigo, guardado como estava. Para mudar alguma coisa, ' +
+        'refaça o mapeamento: o de hoje nasce a partir deste.'
+    }));
+
+    if (Core.rotuloNivel(m.nivel)) {
+      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Onde estava' }));
+      corpo.appendChild(el('div', { style: 'font-size:14px', texto: Core.rotuloNivel(m.nivel) }));
+    }
+
+    Core.MAPA.forEach(function (g) {
+      var rot = Core.rotulosDoMapa(g.chave, m.marcados && m.marcados[g.chave]);
+      if (!rot.length) return;
+      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: g.titulo }));
+      corpo.appendChild(el('div', { style: 'font-size:14px;line-height:1.55', texto: rot.join(', ') + '.' }));
+    });
+
+    [['prioridades', 'Prioridades'], ['plano', 'Diagnóstico e plano'],
+    ['expectativa', 'Expectativa da família'], ['motivo', 'Motivo da procura']].forEach(function (par) {
+      var texto = (m[par[0]] || '').trim();
+      if (!texto) return;
+      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: par[1] }));
+      corpo.appendChild(el('div', {
+        style: 'font-size:14px;line-height:1.55;white-space:pre-wrap', texto: texto
+      }));
+    });
+
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn', texto: '‹ Voltar',
+      aoClick: function () { abrirMapeamento(aluno.id); }
+    }));
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn principal', texto: 'Fechar',
+      aoClick: function () { fecharModal('modal-mapeamento'); }
+    }));
+    corpo.scrollTop = 0;
+  }
+
+  /* Abre o banco de temas já filtrado por uma lacuna, sem aula nenhuma por
+   * trás: aqui ela está olhando material, não montando uma aula. */
+  function abrirTemasPorBusca(busca, aluno) {
+    abrirTemas(null, { busca: busca, aluno: aluno });
+  }
+
+  /* Caixa de lembrete que aparece ao abrir uma aula de aluno já mapeado. */
+  function desenharLembrete(corpo, aluno, aula) {
+    var l = Core.lembreteDoMapeamento(aluno);
+    if (!l) return;
+
+    var conteudo = [];
+    if (l.prioridades) {
+      conteudo.push(el('div', { style: 'margin-bottom:5px' }, [
+        el('strong', { texto: 'Prioridades: ' }),
+        document.createTextNode(l.prioridades.replace(/\s*\n\s*/g, '; '))
+      ]));
+    }
+    function linha(rotulo, itens, total) {
+      if (!itens.length) return;
+      var extra = total > itens.length ? ' e mais ' + (total - itens.length) : '';
+      conteudo.push(el('div', { style: 'margin-bottom:4px' }, [
+        el('strong', { texto: rotulo + ': ' }),
+        document.createTextNode(itens.join(', ') + extra + '.')
+      ]));
+    }
+    linha('Lacunas', l.lacunas, l.totalLacunas);
+    linha('Atenção', l.atencao, l.totalAtencao);
+    linha('Aprende melhor', l.aprende, l.aprende.length);
+
+    var caixa = el('div', { class: 'lembrete', id: 'lembrete-mapeamento' }, [
+      el('div', { class: 'barra', style: 'margin-bottom:6px' }, [
+        el('span', {
+          texto: 'Do mapeamento de ' + Core.ddmmaaaa(l.data),
+          style: 'font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#2E7D6B'
+        }),
+        el('span', { class: 'cresce' }),
+        el('button', {
+          type: 'button', class: 'btn pequeno', id: 'abrir-mapeamento-da-aula', texto: 'Abrir',
+          aoClick: function () { abrirMapeamento(aluno.id); }
+        })
+      ])
+    ].concat(conteudo));
+
+    if (aula) {
+      caixa.appendChild(el('button', {
+        type: 'button', class: 'btn pequeno', id: 'usar-lembrete',
+        style: 'margin-top:8px',
+        texto: 'Copiar para a anotação',
+        aoClick: function () {
+          var area = $('#campo-nota-texto');
+          if (!area) return;
+          var texto = Core.textoDoLembrete(aluno);
+          area.value = (area.value.trim() ? area.value.trim() + '\n\n' : '') + texto;
+          area.dispatchEvent(new Event('input', { bubbles: true }));
+          avisar('Lembrete copiado para a anotação. Ajuste como quiser.');
+        }
+      }));
+    }
+    corpo.appendChild(caixa);
+  }
+
+  /* Roteiro do encontro de mapeamento, dentro da própria aula. */
+  function desenharEncontroDeMapeamento(corpo, aluno, aula) {
+    corpo.appendChild(el('div', { class: 'faixa-info' }, [
+      el('strong', { texto: 'Encontro de mapeamento. ' }),
+      document.createTextNode('Este primeiro encontro é de sondagem: entender de onde o aluno ' +
+        'parte antes de montar qualquer plano. Ele conta como aula normal no fechamento.')
+    ]));
+
+    var jaTem = Core.mapeado(aluno);
+    corpo.appendChild(el('div', { class: 'barra', style: 'margin-bottom:6px' }, [
+      el('button', {
+        type: 'button', class: 'btn destaque', id: 'abrir-mapeamento',
+        texto: jaTem ? 'Abrir o mapeamento' : 'Preencher o mapeamento',
+        aoClick: function () { abrirMapeamento(aluno.id, { aulaId: aula.id }); }
+      })
+    ]));
+
+    var roteiro = el('div', { id: 'roteiro-mapeamento' });
+    ROTEIRO_MAPEAMENTO.forEach(function (par) {
+      roteiro.appendChild(el('div', { class: 'passo-roteiro' }, [
+        el('div', { class: 'nome', texto: par[0] }),
+        el('div', { class: 'detalhe', texto: par[1] })
+      ]));
+    });
+    corpo.appendChild(el('h3', { class: 'subtitulo', texto: 'Roteiro sugerido' }));
+    corpo.appendChild(roteiro);
+    corpo.appendChild(el('div', {
+      class: 'ajuda',
+      texto: 'É sugestão, não regra. Cada família chega de um jeito.'
+    }));
+  }
+
   // ================= banco de temas =================
   //
   // O tema é sempre opcional. A folha em branco continua sendo o caminho
@@ -2132,11 +2800,15 @@
   }
 
   /* Passo 1: escolher o tema. */
-  function abrirTemas(aulaId) {
-    var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
-    if (!aula) return;
-    var aluno = alunoPorId(aula.alunoId);
-    $('#titulo-modal-tema').textContent = 'Material de aula' + (aluno ? ', ' + aluno.nome : '');
+  function abrirTemas(aulaId, opcoes) {
+    opcoes = opcoes || {};
+    var aula = aulaId ? db.aulas.filter(function (a) { return a.id === aulaId; })[0] : null;
+    if (aulaId && !aula) return;
+    // Sem aula por tras, ela esta so consultando material: o botao final entrega
+    // o arquivo em vez de anexar em lugar nenhum.
+    var aluno = aula ? alunoPorId(aula.alunoId) : (opcoes.aluno || null);
+    $('#titulo-modal-tema').textContent = (aula ? 'Material de aula' : 'Consultar temas') +
+      (aluno ? ', ' + aluno.nome : '');
 
     var corpo = $('#corpo-modal-tema');
     var rodape = $('#rodape-modal-tema');
@@ -2146,7 +2818,7 @@
     abrirModal('modal-tema');
 
     carregarIndice().then(function (temas) {
-      desenharEscolhaTema(temas, aula, aluno);
+      desenharEscolhaTema(temas, aula, aluno, opcoes.busca || '');
     }).catch(function () {
       corpo.innerHTML = '';
       corpo.appendChild(el('div', { class: 'faixa-aviso' }, [
@@ -2157,14 +2829,14 @@
     });
   }
 
-  function desenharEscolhaTema(temas, aula, aluno) {
+  function desenharEscolhaTema(temas, aula, aluno, buscaInicial) {
     var corpo = $('#corpo-modal-tema');
     var rodape = $('#rodape-modal-tema');
     corpo.innerHTML = '';
     rodape.innerHTML = '';
 
     var serieAtual = anoEscolarDe(aluno) || ultimoAnoEscolar || '06';
-    var busca = '';
+    var busca = buscaInicial || '';
 
     var selSerie = el('select', { style: 'max-width:150px' });
     SERIES_NOMES.forEach(function (par) {
@@ -2176,6 +2848,26 @@
     var campoBusca = el('input', {
       type: 'text', placeholder: 'Procurar por assunto', style: 'flex:1;min-width:160px'
     });
+    campoBusca.value = busca;
+
+    /* Vindo de uma lacuna do mapeamento, a busca costuma achar temas espalhados
+       por varios anos. Comecar pelo ano do aluno e nao achar nada seria um beco
+       sem saida, entao abrimos no primeiro ano que tem resposta. */
+    if (busca) {
+      var termo = busca.toLowerCase();
+      var casa = function (t) {
+        return (t.pt.titulo + ' ' + t.pt.resumo + ' ' + t.en.titulo).toLowerCase().indexOf(termo) >= 0;
+      };
+      if (!temas.filter(function (t) { return t.serie === serieAtual && casa(t); }).length) {
+        var achou = temas.filter(casa)[0];
+        if (achou) {
+          serieAtual = achou.serie;
+          for (var iOpc = 0; iOpc < selSerie.options.length; iOpc++) {
+            selSerie.options[iOpc].selected = selSerie.options[iOpc].value === serieAtual;
+          }
+        }
+      }
+    }
 
     corpo.appendChild(el('div', { class: 'barra' }, [selSerie, campoBusca]));
     var lista = el('div', { id: 'lista-temas' });
@@ -2386,7 +3078,8 @@
         aoClick: function () { fecharModal('modal-tema'); }
       }));
       var botao = el('button', {
-        type: 'button', class: 'btn principal', texto: 'Gerar e anexar à aula',
+        type: 'button', class: 'btn principal',
+        texto: aula ? 'Gerar e anexar à aula' : 'Gerar material',
         aoClick: function () {
           gerarMaterialDoTema(tema, lingua, incluir, marcados, aula, aluno);
         }
@@ -2416,13 +3109,20 @@
       incluirGabarito: incluir.gabarito,
       escolhidos: escolhidos,
       aluno: aluno ? aluno.nome : '',
-      data: Core.ddmmaaaa(aula.data),
+      data: aula ? Core.ddmmaaaa(aula.data) : Core.ddmmaaaa(Core.hojeIso()),
       espacoParaResposta: incluir.lista && !incluir.gabarito ? 24 : 0
     });
 
     var nome = Core.nomeArquivo(tema[lingua].titulo) + '_' + tema.id + '.pdf';
     var blob = new Blob([bytes], { type: 'application/pdf' });
     var id = Core.uid();
+
+    // Consultando material, sem aula: entrega o arquivo e pronto.
+    if (!aula) {
+      fecharModal('modal-tema');
+      entregarArquivo(nome, blob, tema[lingua].titulo);
+      return;
+    }
 
     Store.salvarAnexo(id, { nome: nome, tipo: 'application/pdf', blob: blob }).then(function () {
       aula.anexos = aula.anexos || [];
