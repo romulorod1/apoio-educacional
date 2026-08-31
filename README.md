@@ -56,7 +56,9 @@ que valia na data dela, então reajuste no meio do mês sai certo sozinho.
 gere o PDF, já com o cabeçalho, o rodapé e a marca d'água. Dá para gerar também o arquivo de texto e
 o PDF com as folhas de aula anexadas.
 
-**Cópia de segurança.** Em *Ajustes*, salve a cópia de vez em quando e guarde no Google Drive. Se o
+**Cópia de segurança.** Em *Ajustes*, salve a cópia de vez em quando e guarde no Google Drive. O
+aplicativo lembra sozinho: se passarem catorze dias sem cópia, aparece um aviso na Agenda com um
+botão para salvar na hora. Se o
 tablet quebrar ou for trocado, é essa cópia que devolve tudo. Ela leva junto as folhas escritas à
 mão, as imagens coladas e os arquivos anexados.
 

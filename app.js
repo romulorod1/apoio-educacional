@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.1.0';
+  var VERSAO = '1.2.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -443,6 +443,22 @@
         el('div', { class: 'valor', texto: par[1] })
       ]));
     });
+
+    var lembrete = $('#lembrete-copia');
+    lembrete.innerHTML = '';
+    if (precisaLembrarDaCopia()) {
+      var dias = diasDesdeACopia();
+      lembrete.appendChild(el('div', { class: 'faixa-aviso' }, [
+        el('strong', { texto: dias === null ? 'Você ainda não salvou uma cópia de segurança. '
+          : 'Sua última cópia de segurança tem ' + dias + ' dias. ' }),
+        document.createTextNode('Tudo fica só neste tablet. Salve uma cópia e guarde no Drive. '),
+        el('button', {
+          type: 'button', class: 'btn pequeno', style: 'margin-left:8px',
+          texto: 'Salvar cópia agora',
+          aoClick: function () { baixarCopia(); }
+        })
+      ]));
+    }
 
     var grade = $('#grade-mes');
     grade.innerHTML = '';
@@ -1865,6 +1881,22 @@
       });
     });
 
+    var estadoCopia = $('#estado-copia');
+    if (estadoCopia) {
+      var d = diasDesdeACopia();
+      estadoCopia.innerHTML = '';
+      if (d === null) {
+        estadoCopia.appendChild(el('div', { class: 'faixa-aviso', texto: 'Nenhuma cópia foi salva ainda por este aplicativo.' }));
+      } else {
+        estadoCopia.appendChild(el('div', {
+          class: d >= 14 ? 'faixa-aviso' : 'faixa-info',
+          texto: d === 0 ? 'Última cópia salva hoje.'
+            : 'Última cópia salva há ' + d + ' dia' + (d === 1 ? '' : 's') + ', em ' +
+              Core.ddmmaaaa(db.ajustes.ultimaCopia) + '.'
+        }));
+      }
+    }
+
     var estado = $('#estado-versao');
     if (estado) {
       if (registroSW && registroSW.waiting) {
@@ -1896,7 +1928,27 @@
       var hoje = Core.hojeIso();
       entregarArquivo('Copia_Apoio_Educacional_' + hoje + '.json',
         new Blob([texto], { type: 'application/json' }), 'Cópia de segurança');
+      db.ajustes = db.ajustes || {};
+      db.ajustes.ultimaCopia = hoje;
+      return salvar();
+    }).then(function () {
+      desenharAjustes();
+      desenharAgenda();
     });
+  }
+
+  /* Há quantos dias a última cópia foi salva. Devolve null se nunca houve. */
+  function diasDesdeACopia() {
+    var quando = db.ajustes && db.ajustes.ultimaCopia;
+    if (!quando) return null;
+    var ms = Core.dataLocal(Core.hojeIso()) - Core.dataLocal(quando);
+    return Math.max(0, Math.round(ms / 86400000));
+  }
+
+  function precisaLembrarDaCopia() {
+    if (!db.aulas.length) return false;
+    var dias = diasDesdeACopia();
+    return dias === null || dias >= 14;
   }
 
   function restaurarCopia(ev) {
