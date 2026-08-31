@@ -235,6 +235,18 @@ def referencias_cruzadas(corpo):
     return achados
 
 
+def eh_tautologia(expressao):
+    """Diz se a expressao passa sem provar nada, do tipo 12 == 12.
+
+    Uma verificacao que nao prova nada e pior do que nenhuma, porque da a
+    impressao de que a conta foi conferida. Comparacao entre numeros
+    diferentes, como 385 > 358, prova alguma coisa e por isso vale.
+    """
+    limpo = expressao.split('#')[0].strip()
+    achado = re.fullmatch(r'(-?\d+)\s*==\s*(-?\d+)', limpo)
+    return bool(achado) and achado.group(1) == achado.group(2)
+
+
 def conferir(caminho):
     """Devolve (erros, avisos, manuais, cabecalho)."""
     erros, avisos, manuais = [], [], []
@@ -313,6 +325,10 @@ def conferir(caminho):
     for rotulo, expressao in linhas:
         if rotulo.startswith('E'):
             rotulos_exercicio.add(rotulo)
+        if eh_tautologia(expressao):
+            erros.append('%s nao prova nada: %s. Escreva a conta que sustenta a resposta, '
+                         'ou marque como conferencia humana' % (rotulo, expressao[:40]))
+            continue
         try:
             # o ambiente vai como global: dentro de uma compreensao de lista o
             # escopo local nao e enxergado, e os nomes ficariam indefinidos
