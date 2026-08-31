@@ -16,6 +16,11 @@ const PASTA = path.join(__dirname, 'sim_real');
 const RAIZ = path.join(__dirname, '..');
 const PORTA = 8779;
 const COMMIT_V1 = '7250029';
+// a versao esperada sai do proprio codigo, para o teste nao envelhecer a cada release
+const VERSAO_NOVA = (fs.readFileSync(path.join(RAIZ, 'app.js'), 'utf8')
+  .match(/var VERSAO = '([^']+)'/) || [])[1];
+const CACHE_ATUAL = (fs.readFileSync(path.join(RAIZ, 'sw.js'), 'utf8')
+  .match(/var CACHE = '([^']+)'/) || [])[1];
 const BARRA = String.fromCharCode(92);
 
 const TIPOS = {
@@ -103,7 +108,7 @@ const servidor = http.createServer((req, res) => {
   await p.goto('about:blank'); await espera(300);
   await p.goto(url, { waitUntil: 'networkidle0' });
   await espera(3500);
-  conf('passados os dez minutos, a versão nova entra', await versao(p), '1.3.0');
+  conf('passados os dez minutos, a versão nova entra', await versao(p), VERSAO_NOVA);
   conf('e as aulas continuam todas', await aulas(p), guardadas);
   await nav.close();
 
@@ -123,7 +128,7 @@ const servidor = http.createServer((req, res) => {
   await p.goto('about:blank'); await espera(300);
   await p.goto(url, { waitUntil: 'networkidle0' });
   await espera(3500);
-  conf('a versão nova entra já na primeira abertura', await versao(p), '1.3.0');
+  conf('a versão nova entra já na primeira abertura', await versao(p), VERSAO_NOVA);
   conf('sem perder nenhuma aula', await aulas(p), guardadasB);
 
   // =============================================================
@@ -137,9 +142,10 @@ const servidor = http.createServer((req, res) => {
 
   // publica uma versão seguinte, sem limpar cache nenhum
   const appOriginal = fs.readFileSync(path.join(PASTA, 'app.js'), 'utf8');
-  fs.writeFileSync(path.join(PASTA, 'app.js'), appOriginal.replace("var VERSAO = '1.3.0'", "var VERSAO = '9.9.9'"));
+  fs.writeFileSync(path.join(PASTA, 'app.js'),
+    appOriginal.replace("var VERSAO = '" + VERSAO_NOVA + "'", "var VERSAO = '9.9.9'"));
   const swOriginal = fs.readFileSync(path.join(PASTA, 'sw.js'), 'utf8');
-  fs.writeFileSync(path.join(PASTA, 'sw.js'), swOriginal.replace("apoio-educacional-v4", "apoio-educacional-v9"));
+  fs.writeFileSync(path.join(PASTA, 'sw.js'), swOriginal.replace(CACHE_ATUAL, 'apoio-educacional-v99'));
 
   await p.goto('about:blank'); await espera(300);
   await p.goto(url, { waitUntil: 'networkidle0' });

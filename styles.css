@@ -386,6 +386,49 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
 }
 .fechar:hover { background: var(--soft); }
 
+/* ---------- abas dentro da ficha do aluno ---------- */
+
+.abas-perfil {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--fio);
+  margin: -4px 0 16px;
+  position: sticky;
+  top: 0;
+  background: var(--branco);
+  z-index: 2;
+}
+.aba-perfil {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 10px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+}
+.aba-perfil:hover { color: var(--navy); }
+.aba-perfil.ativa { color: var(--navy); border-bottom-color: var(--teal); }
+
+.lista-novidades { margin: 0; padding-left: 20px; }
+.lista-novidades li { margin-bottom: 7px; line-height: 1.45; }
+.lista-novidades li:last-child { margin-bottom: 0; }
+
+.linha-historico { align-items: flex-start; }
+.anotacao-historico {
+  font-size: 13px;
+  color: var(--texto);
+  background: var(--soft);
+  border-left: 3px solid var(--fio);
+  padding: 6px 10px;
+  border-radius: 0 6px 6px 0;
+  margin-top: 6px;
+  white-space: pre-wrap;
+}
+
 /* ---------- escolha de escopo ---------- */
 
 .opcao-escopo {

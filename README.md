@@ -56,6 +56,16 @@ que valia na data dela, então reajuste no meio do mês sai certo sozinho.
 gere o PDF, já com o cabeçalho, o rodapé e a marca d'água. Dá para gerar também o arquivo de texto e
 o PDF com as folhas de aula anexadas.
 
+**Ficha do aluno.** Ao tocar num aluno abre a janela de perfil, em três abas. *Dados* traz nome,
+responsável, desde quando ele estuda com você, e dois campos de anotação: observações gerais, para o
+que é prático, e observações pedagógicas, para como aquele aluno aprende. *Valores* traz o valor da
+hora-aula por período e as aulas que se repetem. *Histórico* mostra as últimas aulas daquele aluno,
+com a anotação de cada uma e o sinal de quais têm folha ou anexo, sem precisar caçar no calendário.
+De lá dá para abrir qualquer aula direto.
+
+**O que mudou.** Depois de uma atualização, aparece uma janela contando o que chegou de novo, com o
+lembrete de que nada do que você já tinha foi alterado.
+
 **Esconder os valores.** O botão redondo no cabeçalho apaga da tela tudo que é dinheiro: o total a
 receber, o valor por hora de cada aluno e os números do fechamento. As horas continuam à vista. Serve
 para quando o tablet está aberto na casa da família. A escolha fica guardada, e o PDF e o arquivo de
