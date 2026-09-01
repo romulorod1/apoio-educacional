@@ -2165,24 +2165,53 @@
     });
   }
 
+  /* Ícones da barra da folha. SVG inline, para acompanhar a cor do botão e não
+   * depender de fonte de emoji, que muda de aparelho para aparelho. */
+  function svg(caminho, extra) {
+    return '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" ' +
+      'fill="none" stroke="currentColor" stroke-width="1.7" ' +
+      'stroke-linecap="round" stroke-linejoin="round">' + caminho + (extra || '') + '</svg>';
+  }
+
+  var ICONES = {
+    // caneta apontando para baixo e à esquerda, com a ponta marcada
+    caneta: svg('<path d="M16.8 3.6a2 2 0 0 1 2.8 2.8L8.4 17.6 4 20l2.4-4.4z"/>' +
+      '<path d="M14.6 5.8l3.6 3.6"/>'),
+    // marca-texto: ponta chanfrada e o rastro largo embaixo
+    marcatexto: svg('<path d="M14.5 3.5l6 6-7.4 7.4H7.1v-6z"/>' +
+      '<path d="M4 21h16" stroke-width="3"/>'),
+    // borracha: o bloco inclinado apoiado na linha, que é como se desenha borracha
+    borracha: svg('<path d="M8.6 19.5H20"/>' +
+      '<path d="M14.2 4.6l5.2 5.2a1.6 1.6 0 0 1 0 2.3l-7.4 7.4H7.6l-3.1-3.1a1.6 1.6 0 0 1 0-2.3z"/>' +
+      '<path d="M10.1 8.7l5.2 5.2"/>'),
+    // texto: o T clássico, mas desenhado
+    texto: svg('<path d="M5 6.5V5h14v1.5"/><path d="M12 5v14"/><path d="M9 19h6"/>'),
+    // mover: as quatro setas
+    selecao: svg('<path d="M12 3v18M3 12h18"/>' +
+      '<path d="M12 3l-2.6 2.6M12 3l2.6 2.6M12 21l-2.6-2.6M12 21l2.6-2.6"/>' +
+      '<path d="M3 12l2.6-2.6M3 12l2.6 2.6M21 12l-2.6-2.6M21 12l2.6 2.6"/>')
+  };
+
   function desenharFerramentas(aula) {
     if (!editorAtual) return;
     editorAtual._aulaId = aula.id;
     var barra = $('#ferramentas-nota');
     barra.innerHTML = '';
 
+    /* Os ícones são desenhados, e não símbolos de teclado. O ⌫ que estava aqui
+     * é o sinal de apagar do teclado, e ninguém lê aquilo como borracha. */
     var ferramentas = [
-      ['caneta', '✎', 'Caneta'],
-      ['marcatexto', '▬', 'Marca-texto'],
-      ['borracha', '⌫', 'Borracha'],
-      ['texto', 'T', 'Texto digitado'],
-      ['selecao', '✥', 'Mover e redimensionar']
+      ['caneta', ICONES.caneta, 'Caneta'],
+      ['marcatexto', ICONES.marcatexto, 'Marca-texto'],
+      ['borracha', ICONES.borracha, 'Borracha'],
+      ['texto', ICONES.texto, 'Texto digitado'],
+      ['selecao', ICONES.selecao, 'Mover e redimensionar']
     ];
     ferramentas.forEach(function (f) {
       var b = el('button', {
-        type: 'button', title: f[2],
+        type: 'button', title: f[2], 'aria-label': f[2],
         class: 'ferr' + (editorAtual.ferramenta === f[0] ? ' ativa' : ''),
-        texto: f[1]
+        html: f[1]
       });
       b.addEventListener('click', function () {
         editorAtual.ferramenta = f[0];
@@ -3471,19 +3500,48 @@
     });
   }
 
+  /* Por que a cópia ia parar sempre nos downloads, e nunca no Drive.
+   *
+   * O Android só deixa abrir a folha de compartilhamento logo depois de um toque.
+   * Montar a cópia demora segundos, porque cada folha escrita e cada anexo viram
+   * texto, e quando terminava a permissão do toque já tinha vencido: o
+   * compartilhamento era recusado em silêncio e o arquivo caía no download.
+   *
+   * A correção é separar em dois tempos. Primeiro o aplicativo monta a cópia e
+   * avisa que ficou pronta. O toque em "Enviar" é um toque novo, e aí a folha de
+   * compartilhamento abre, com Drive, e-mail e o que mais ela tiver. */
+  var copiaPronta = null;
+
   function baixarCopia() {
+    var botao = $('#baixar-copia');
+    var rotuloCopia = botao ? botao.textContent : '';
+    if (botao) { botao.disabled = true; botao.textContent = 'Montando a cópia...'; }
+
     Store.exportarTudo(db).then(function (pacote) {
-      var texto = JSON.stringify(pacote);
       var hoje = Core.hojeIso();
-      entregarArquivo('Copia_Apoio_Educacional_' + hoje + '.json',
-        new Blob([texto], { type: 'application/json' }), 'Cópia de segurança');
+      copiaPronta = {
+        nome: 'Copia_Apoio_Educacional_' + hoje + '.json',
+        blob: new Blob([JSON.stringify(pacote)], { type: 'application/json' })
+      };
       db.ajustes = db.ajustes || {};
       db.ajustes.ultimaCopia = hoje;
       return salvar();
     }).then(function () {
+      if (botao) { botao.disabled = false; botao.textContent = rotuloCopia; }
       desenharAjustes();
       desenharAgenda();
+      avisar('Cópia pronta, ' + Math.round(copiaPronta.blob.size / 1024) + ' KB. Envie para o Drive.',
+        'Enviar', enviarCopiaPronta);
+    }).catch(function () {
+      if (botao) { botao.disabled = false; botao.textContent = rotuloCopia; }
+      avisar('Não consegui montar a cópia. Tente de novo em um minuto.');
     });
+  }
+
+  /* Chamada a partir do toque dela, com a permissão do Android ainda valendo. */
+  function enviarCopiaPronta() {
+    if (!copiaPronta) return;
+    entregarArquivo(copiaPronta.nome, copiaPronta.blob, 'Cópia de segurança');
   }
 
   /* Há quantos dias a última cópia foi salva. Devolve null se nunca houve. */
