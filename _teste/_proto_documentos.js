@@ -265,13 +265,27 @@ function gerarDossieDoCiclo(op) {
     doc.paragrafo(b.texto, { tam: 10.5, alturaLinha: 15.5 });
   });
 
+  /* A caixa do próximo ciclo se mede antes de ser desenhada. Antes a altura era
+   * fixa em 66 pontos, e qualquer texto de mais de duas linhas escapava por
+   * baixo do fundo cinza. */
+  var largura = UTIL - 28;
+  var alturaLinha = 13.5;
+  var linhas = doc.quebrar(op.proximo, largura, 9.5, false);
+  var altura = 22 + 16 + linhas.length * alturaLinha + 12;
+
   doc.y -= 30;
-  doc.garanteEspaco(80);
-  doc.retangulo(MARG_E, doc.y - 56, UTIL, 66, COR.soft);
-  doc.retangulo(MARG_E, doc.y - 56, 3, 66, COR.gold);
-  doc.texto('Próximo ciclo', MARG_E + 14, doc.y - 12, { tam: 10, bold: true, cor: COR.navy });
-  doc.y -= 26;
-  doc.paragrafo(op.proximo, { tam: 9.5, alturaLinha: 13.5, x: MARG_E + 14, largura: UTIL - 28 });
+  doc.garanteEspaco(altura + 12);
+  var topo = doc.y;
+  doc.retangulo(MARG_E, topo - altura, UTIL, altura, COR.soft);
+  doc.retangulo(MARG_E, topo - altura, 3, altura, COR.gold);
+  doc.texto('Próximo ciclo', MARG_E + 14, topo - 22, { tam: 10, bold: true, cor: COR.navy });
+  var ly = topo - 38 - alturaLinha + 4;
+  linhas.forEach(function (l) {
+    ly -= 0;
+    doc.texto(l, MARG_E + 14, ly, { tam: 9.5, cor: COR.texto });
+    ly -= alturaLinha;
+  });
+  doc.y = topo - altura;
 
   return doc.finalizar();
 }
