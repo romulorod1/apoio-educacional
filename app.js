@@ -2883,9 +2883,8 @@
        por varios anos. Comecar pelo ano do aluno e nao achar nada seria um beco
        sem saida, entao abrimos no primeiro ano que tem resposta. */
     if (busca) {
-      var termo = busca.toLowerCase();
       var casa = function (t) {
-        return (t.pt.titulo + ' ' + t.pt.resumo + ' ' + t.en.titulo).toLowerCase().indexOf(termo) >= 0;
+        return Core.casaBusca(t.pt.titulo + ' ' + t.pt.resumo + ' ' + t.en.titulo, busca);
       };
       if (!temas.filter(function (t) { return t.serie === serieAtual && casa(t); }).length) {
         var achou = temas.filter(casa)[0];
@@ -2904,11 +2903,10 @@
 
     function redesenhar() {
       lista.innerHTML = '';
-      var termo = busca.trim().toLowerCase();
+      var termo = busca.trim();
       var filtrados = temas.filter(function (t) {
         if (t.serie !== serieAtual) return false;
-        if (!termo) return true;
-        return (t.pt.titulo + ' ' + t.pt.resumo + ' ' + t.en.titulo).toLowerCase().indexOf(termo) >= 0;
+        return Core.casaBusca(t.pt.titulo + ' ' + t.pt.resumo + ' ' + t.en.titulo, termo);
       });
       if (!filtrados.length) {
         lista.appendChild(el('div', { class: 'vazio' }, [

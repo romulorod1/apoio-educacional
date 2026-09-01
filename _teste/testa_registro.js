@@ -206,6 +206,26 @@ conf('sem horário não dá para saber, então não acusa',
 conf('aluno diferente no mesmo horário também acusa, porque ela é uma só',
   Core.conflitosDe(db, nova({ alunoId: 'outro' })).map(a => a.id).join(','), 'a1');
 
+secao('9. Busca sem acento');
+
+conf('acha com acento', Core.casaBusca('Equação do primeiro grau', 'equação'), true);
+conf('acha sem acento', Core.casaBusca('Equação do primeiro grau', 'equacao'), true);
+conf('acha com maiúscula', Core.casaBusca('Equação do primeiro grau', 'EQUACAO'), true);
+conf('o ç vira c', Core.casaBusca('Frações e decimais', 'fracoes'), true);
+conf('o til some', Core.casaBusca('Revolução Francesa', 'revolucao'), true);
+conf('o circunflexo some', Core.casaBusca('Ângulos internos', 'angulos'), true);
+conf('o acento agudo some', Core.casaBusca('Genética mendeliana', 'genetica'), true);
+conf('termo vazio casa com tudo', Core.casaBusca('qualquer coisa', ''), true);
+conf('só espaço casa com tudo', Core.casaBusca('qualquer coisa', '   '), true);
+conf('o que não é, continua não sendo', Core.casaBusca('Holocausto', 'nazismo'), false);
+conf('texto vazio não casa com termo', Core.casaBusca('', 'nazismo'), false);
+conf('a chave é estável', Core.chaveDeBusca('Ç Á É Í Ó Ú Ã Õ Â Ê Ô À'), 'c a e i o u a o a e o a');
+
+/* Isto é limite conhecido e não defeito: tirar acento não junta singular com
+   plural. Fica registrado para ninguém achar depois que é regressão. */
+conf('singular não acha plural, e isso é esperado',
+  Core.casaBusca('Frações equivalentes', 'fracao'), false);
+
 console.log('\n' + '='.repeat(60));
 console.log(passes + ' verificações passaram, ' + falhas + ' falharam.');
 if (falhas) { console.log('\nFALHAS:'); erros.forEach(e => console.log(' - ' + e)); }

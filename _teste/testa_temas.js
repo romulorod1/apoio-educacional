@@ -122,6 +122,23 @@ const porValor = (sel, valor) => `(() => {
   const filtrados = await pag.$$eval('#lista-temas .item-tema .nome', es => es.map(e => e.textContent));
   conf('a busca filtrou', filtrados.length < quantosTemas && filtrados.length > 0, true);
 
+  /* Ela digita no teclado do tablet, onde o acento custa toques a mais. Antes
+     disto, procurar sem acento devolvia a lista vazia como se o assunto não
+     existisse. */
+  await pag.evaluate(porValor('#corpo-modal-tema input[type=text]', 'divisao'));
+  await espera(400);
+  const semAcento = await pag.$$eval('#lista-temas .item-tema', es => es.length);
+  await pag.evaluate(porValor('#corpo-modal-tema input[type=text]', 'divisão'));
+  await espera(400);
+  const comAcento = await pag.$$eval('#lista-temas .item-tema', es => es.length);
+  conf('procurar sem acento acha', semAcento > 0, true);
+  conf('e acha exatamente o mesmo que com acento', semAcento, comAcento);
+
+  await pag.evaluate(porValor('#corpo-modal-tema input[type=text]', 'ANGULO'));
+  await espera(400);
+  conf('e não se importa com maiúscula',
+    await pag.$$eval('#lista-temas .item-tema', es => es.length) > 0, true);
+
   await pag.evaluate(porValor('#corpo-modal-tema input[type=text]', 'zzzzz'));
   await espera(300);
   conf('busca sem resultado avisa em vez de ficar em branco',
