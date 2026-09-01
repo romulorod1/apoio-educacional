@@ -1,0 +1,444 @@
+{
+ "disciplina": "História",
+ "situacao": "rascunho, nao ligado ao aplicativo, aguardando revisao da Nathalia",
+ "cobertura": "Medido, não estimado. Rodei um script sobre banco/topicos/historia.json: a disciplina tem 379 tópicos. As 40 entradas acima passaram em duas verificações automáticas, com zero problemas: todos os tópicos de \"leva\" existem com a grafia exata do arquivo, e nenhum termo já encontra sozinho o tópico que ele leva, ou seja, toda entrada resolve uma falha real da busca de hoje. Juntas, elas alcançam 173 tópicos distintos, 46 por cento do total da disciplina.\n\nO que fica resolvido: os casos de nome duplo, que são a maior parte da frustração real. Nome popular contra nome do livro (hitler para Nazismo na Alemanha, tiradentes para Inconfidência Mineira, zumbi para Quilombo dos Palmares, lampião para Cangaço, princesa isabel para Lei Áurea, bomba atômica para Hiroshima e Nagasaki, guerra civil americana para Guerra de Secessão). Sigla contra nome por extenso (eua, urss, jk). Palavra de sala de aula contra palavra do índice (escravos, índios, negros, comunismo, ditadura, pré-história, idade média, descobrimento). E o nome do período contra o nome do assunto solto: buscar \"guerra fria\" hoje devolve 2 tópicos, com a entrada devolve 11; \"primeira república\" devolve 1, com a entrada devolve 16.\n\nO que continua falhando, e é preciso dizer com clareza:\n\n1. Metade da disciplina não é coberta. Os 206 tópicos de fora são principalmente 4º e 5º ano (cidadania, patrimônio, município, símbolos nacionais), os blocos de \"Reforço para prova de fora\", e todo tópico cujo nome já é a palavra que ela digitaria. Boa parte desses 206 não precisa de sinônimo: buscar \"quilombo\" ou \"feudalismo\" já funciona hoje. Ainda assim, dentro dos 206 existem tópicos que só apareceriam com um segundo lote de termos.\n\n2. Acento não é resolvido por esta lista. É problema separado e mais grave no dia a dia. \"getulio\" sem acento continua não achando a entrada \"getúlio\", e \"grecia\" sem acento continua não achando \"grécia\". Sem normalizar acento antes de comparar, boa parte das 40 entradas só funciona se ela digitar certinho, o que num teclado de tablet ela não vai fazer. A normalização de acento tem que vir antes, ou junto, e serve para os dois bancos.\n\n3. Erro de digitação e plural não são resolvidos. \"nazizmo\", \"hollocausto\", \"ditaduras\" não caem em nada. Isso exigiria comparação aproximada, que é outro projeto.\n\n4. Termo que não está na lista se comporta exatamente como hoje. Não há generalização: a lista é literal. Se ela digitar \"guilhotina\", \"muçulmano\", \"sumérios\" ou \"apartheid\", nada muda até alguém escrever a entrada.\n\n5. A lista precisa de revisão da Nathália antes de entrar. Eu escolhi os termos pelo que é plausível uma professora digitar, não por observação do uso dela. Ela vai cortar alguns e acrescentar outros que eu não imaginei, e essa correção vale mais do que dobrar o tamanho da lista no escuro.",
+ "entradas": [
+  {
+   "termo": "hitler",
+   "leva": [
+    "Nazismo na Alemanha",
+    "Holocausto",
+    "Segunda Guerra Mundial",
+    "Totalitarismos: fascismo, nazismo e stalinismo",
+    "Segunda Guerra Mundial: frentes e desfecho",
+    "Holocausto e os julgamentos de Nuremberg",
+    "Brasil na Segunda Guerra e a FEB",
+    "Fascismo na Itália"
+   ]
+  },
+  {
+   "termo": "nazismo",
+   "leva": [
+    "Holocausto",
+    "Segunda Guerra Mundial",
+    "Holocausto e os julgamentos de Nuremberg",
+    "Segunda Guerra Mundial: frentes e desfecho",
+    "Tratado de Versalhes"
+   ]
+  },
+  {
+   "termo": "judeus",
+   "leva": [
+    "Holocausto",
+    "Holocausto e os julgamentos de Nuremberg",
+    "Hebreus e o monoteísmo",
+    "Conflito árabe-israelense",
+    "Conflitos no Oriente Médio"
+   ]
+  },
+  {
+   "termo": "guerra fria",
+   "leva": [
+    "Mundo bipolar: OTAN e Pacto de Varsóvia",
+    "Plano Marshall e a divisão da Alemanha",
+    "Guerra da Coreia",
+    "Guerra do Vietnã",
+    "Queda do Muro de Berlim",
+    "Fim da União Soviética",
+    "Revolução Cubana",
+    "Cuba e a esquerda na América Latina",
+    "Criação da ONU"
+   ]
+  },
+  {
+   "termo": "urss",
+   "leva": [
+    "Revolução Russa",
+    "Fim da União Soviética",
+    "Guerra Fria e a corrida armamentista",
+    "Mundo bipolar: OTAN e Pacto de Varsóvia",
+    "Queda do Muro de Berlim"
+   ]
+  },
+  {
+   "termo": "comunismo",
+   "leva": [
+    "Revolução Russa",
+    "Revolução Russa e a construção da URSS",
+    "Revolução Chinesa",
+    "Revolução Chinesa e o maoísmo",
+    "Revolução Cubana",
+    "Socialismo utópico e socialismo científico",
+    "Fim da União Soviética",
+    "Guerra Fria e a corrida armamentista",
+    "Cuba e a esquerda na América Latina"
+   ]
+  },
+  {
+   "termo": "escravos",
+   "leva": [
+    "Africanos escravizados no Brasil",
+    "Tráfico de africanos escravizados",
+    "Vida dos escravizados na colônia",
+    "Escravidão em Roma",
+    "Escravidão indígena",
+    "Tráfico negreiro e o lucro colonial",
+    "Formas de resistência escrava",
+    "Quilombo dos Palmares",
+    "Plantation açucareira",
+    "Lei Áurea",
+    "Escravidão na Antiguidade clássica"
+   ]
+  },
+  {
+   "termo": "abolição",
+   "leva": [
+    "Lei Áurea",
+    "Movimento abolicionista e a resistência negra",
+    "Lei do Ventre Livre e Lei dos Sexagenários",
+    "Fim do tráfico e a Lei Eusébio de Queirós",
+    "Crise do Império e a Proclamação da República"
+   ]
+  },
+  {
+   "termo": "princesa isabel",
+   "leva": [
+    "Lei Áurea",
+    "Movimento abolicionista e a resistência negra",
+    "Crise do Império e a Proclamação da República",
+    "Segundo Reinado e o café"
+   ]
+  },
+  {
+   "termo": "dom pedro",
+   "leva": [
+    "Independência do Brasil",
+    "Abdicação de D. Pedro I",
+    "Constituição de 1824 e o Poder Moderador",
+    "Período Regencial",
+    "Golpe da maioridade",
+    "Segundo Reinado e o café",
+    "Constituição outorgada e o Poder Moderador"
+   ]
+  },
+  {
+   "termo": "getúlio",
+   "leva": [
+    "Revolução de 1930",
+    "Estado Novo",
+    "Leis trabalhistas e a CLT",
+    "Volta de Vargas e o suicídio de 1954",
+    "Fim do Estado Novo",
+    "Estado Novo: propaganda e censura",
+    "Queda de Vargas e a redemocratização de 1945",
+    "Governo Provisório e a centralização do poder",
+    "Trabalhismo e o populismo",
+    "Era Vargas nos vestibulares",
+    "Brasil na Segunda Guerra e a FEB"
+   ]
+  },
+  {
+   "termo": "jk",
+   "leva": [
+    "Juscelino e os anos dourados",
+    "Construção de Brasília",
+    "Plano de Metas e o desenvolvimentismo"
+   ]
+  },
+  {
+   "termo": "ditadura",
+   "leva": [
+    "Golpe de 1964",
+    "AI-5 e o endurecimento do regime",
+    "Milagre econômico",
+    "Censura e repressão",
+    "Abertura política e as Diretas Já",
+    "Atos institucionais e o Congresso fechado",
+    "Anos de chumbo: repressão e tortura",
+    "Luta armada e a resistência cultural",
+    "Milagre econômico e o endividamento externo",
+    "Abertura lenta e a Lei da Anistia",
+    "1964: o papel dos civis no golpe",
+    "Nova República e a eleição de Tancredo"
+   ]
+  },
+  {
+   "termo": "grécia",
+   "leva": [
+    "Pólis: a cidade grega",
+    "Esparta e a educação militar",
+    "Atenas e a democracia",
+    "Mitologia grega",
+    "Teatro grego",
+    "Jogos Olímpicos",
+    "Alexandre e o helenismo",
+    "Cretenses e micênicos",
+    "Formação da pólis grega",
+    "Democracia ateniense e seus limites",
+    "Filosofia e o pensamento grego"
+   ]
+  },
+  {
+   "termo": "egito",
+   "leva": [
+    "Faraó, escribas e camponeses",
+    "Hieróglifos",
+    "Religião egípcia e a mumificação",
+    "Pirâmides e templos"
+   ]
+  },
+  {
+   "termo": "pré-história",
+   "leva": [
+    "Origem do ser humano",
+    "Hominídeos e a saída da África",
+    "Paleolítico: caça e coleta",
+    "Arte rupestre",
+    "Neolítico: agricultura e pastoreio",
+    "Primeiros povoadores da América",
+    "Nômades e sedentários",
+    "Nascimento da agricultura",
+    "Invenção da escrita"
+   ]
+  },
+  {
+   "termo": "homem das cavernas",
+   "leva": [
+    "Paleolítico: caça e coleta",
+    "Arte rupestre",
+    "Origem do ser humano",
+    "Hominídeos e a saída da África",
+    "Nômades e sedentários"
+   ]
+  },
+  {
+   "termo": "idade média",
+   "leva": [
+    "Reinos germânicos",
+    "Império de Carlos Magno",
+    "Feudalismo: senhores e servos",
+    "Vida no feudo",
+    "Igreja no mundo medieval",
+    "Cruzadas",
+    "Renascimento comercial e as cidades",
+    "Peste negra e a crise do século XIV",
+    "Império Bizantino",
+    "Formação do feudalismo",
+    "Servidão e as relações de suserania",
+    "Poder da Igreja e a escolástica",
+    "Império Bizantino e o cisma"
+   ]
+  },
+  {
+   "termo": "islamismo",
+   "leva": [
+    "Nascimento do Islã",
+    "Expansão árabe e a ciência muçulmana",
+    "Mundo islâmico: expansão e cultura",
+    "Comércio do ouro no Saara"
+   ]
+  },
+  {
+   "termo": "lutero",
+   "leva": [
+    "Reforma Protestante",
+    "Contrarreforma e os jesuítas",
+    "Reforma Protestante e a ética do trabalho",
+    "Contrarreforma e a Inquisição"
+   ]
+  },
+  {
+   "termo": "tiradentes",
+   "leva": [
+    "Inconfidência Mineira",
+    "Impostos, quinto e derrama",
+    "Mineração em Minas Gerais",
+    "Conjuração Baiana"
+   ]
+  },
+  {
+   "termo": "ciclo do ouro",
+   "leva": [
+    "Mineração em Minas Gerais",
+    "Vida nas vilas do ouro",
+    "Impostos, quinto e derrama",
+    "Inconfidência Mineira",
+    "Mineração e o novo eixo econômico"
+   ]
+  },
+  {
+   "termo": "descobrimento",
+   "leva": [
+    "Primeiro contato e a carta de Caminha",
+    "Pau-brasil e escambo",
+    "Pioneirismo português nas navegações",
+    "Tratado de Tordesilhas",
+    "Chegada de Colombo à América"
+   ]
+  },
+  {
+   "termo": "cabral",
+   "leva": [
+    "Primeiro contato e a carta de Caminha",
+    "Pau-brasil e escambo",
+    "Pioneirismo português nas navegações",
+    "Tratado de Tordesilhas"
+   ]
+  },
+  {
+   "termo": "índios",
+   "leva": [
+    "Povos indígenas antes dos portugueses",
+    "Aldeia: moradia, roça e caça",
+    "Palavras indígenas no nosso dia a dia",
+    "Encontro entre indígenas e portugueses",
+    "Terras indígenas hoje",
+    "Herança indígena na cultura brasileira",
+    "Escravidão indígena",
+    "Povos indígenas do Brasil: diversidade",
+    "Povos indígenas e a questão da terra",
+    "Primeiros povoadores da América",
+    "Jesuítas e as missões"
+   ]
+  },
+  {
+   "termo": "negros",
+   "leva": [
+    "Africanos escravizados no Brasil",
+    "Quilombos e comunidades quilombolas",
+    "Movimento abolicionista e a resistência negra",
+    "Racismo e preconceito: como enfrentar",
+    "História e cultura afro-brasileira",
+    "Pós-abolição e a exclusão dos libertos",
+    "Quilombo dos Palmares",
+    "Formação do povo brasileiro"
+   ]
+  },
+  {
+   "termo": "zumbi",
+   "leva": [
+    "Quilombo dos Palmares",
+    "Quilombos e comunidades quilombolas",
+    "Formas de resistência escrava"
+   ]
+  },
+  {
+   "termo": "primeira república",
+   "leva": [
+    "República da Espada",
+    "Política do café com leite",
+    "Coronelismo e voto de cabresto",
+    "Guerra de Canudos",
+    "Revolta da Vacina",
+    "Revolta da Chibata",
+    "Cangaço",
+    "Tenentismo",
+    "Coluna Prestes",
+    "Semana de Arte Moderna",
+    "República da Espada e o positivismo",
+    "República oligárquica e a política dos governadores",
+    "Convênio de Taubaté e a defesa do café",
+    "Messianismo: Canudos e Contestado",
+    "Movimento operário e as greves de 1917"
+   ]
+  },
+  {
+   "termo": "lampião",
+   "leva": [
+    "Cangaço"
+   ]
+  },
+  {
+   "termo": "antônio conselheiro",
+   "leva": [
+    "Guerra de Canudos",
+    "Messianismo: Canudos e Contestado"
+   ]
+  },
+  {
+   "termo": "semana de 22",
+   "leva": [
+    "Semana de Arte Moderna",
+    "Modernismo e a crise das oligarquias"
+   ]
+  },
+  {
+   "termo": "marx",
+   "leva": [
+    "Socialismo utópico e socialismo científico",
+    "Formação da classe operária",
+    "Nascimento do movimento operário",
+    "Anarquismo e sindicalismo",
+    "Revolução Industrial e a divisão do trabalho"
+   ]
+  },
+  {
+   "termo": "eua",
+   "leva": [
+    "Independência dos Estados Unidos",
+    "Estados Unidos: marcha para o Oeste",
+    "Guerra de Secessão",
+    "Independência dos Estados Unidos e a Constituição",
+    "Estados Unidos e o Destino Manifesto",
+    "Crise de 1929 e o New Deal",
+    "Plano Marshall e a divisão da Alemanha",
+    "Terrorismo e o 11 de setembro",
+    "Guerra do Vietnã"
+   ]
+  },
+  {
+   "termo": "guerra civil americana",
+   "leva": [
+    "Guerra de Secessão",
+    "Estados Unidos: marcha para o Oeste"
+   ]
+  },
+  {
+   "termo": "china",
+   "leva": [
+    "Revolução Chinesa",
+    "Revolução Chinesa e o maoísmo",
+    "Guerra da Coreia"
+   ]
+  },
+  {
+   "termo": "japão",
+   "leva": [
+    "Hiroshima e Nagasaki",
+    "Segunda Guerra Mundial",
+    "Segunda Guerra Mundial: frentes e desfecho"
+   ]
+  },
+  {
+   "termo": "bomba atômica",
+   "leva": [
+    "Hiroshima e Nagasaki",
+    "Guerra Fria e a corrida armamentista",
+    "Criação da ONU"
+   ]
+  },
+  {
+   "termo": "palestina",
+   "leva": [
+    "Conflito árabe-israelense",
+    "Conflitos no Oriente Médio",
+    "Terrorismo e o 11 de setembro"
+   ]
+  },
+  {
+   "termo": "lenin",
+   "leva": [
+    "Revolução Russa",
+    "Revolução Russa e a construção da URSS"
+   ]
+  },
+  {
+   "termo": "crise de 29",
+   "leva": [
+    "Crise de 1929",
+    "Crise de 1929 e o New Deal",
+    "Revolução de 1930"
+   ]
+  }
+ ]
+}

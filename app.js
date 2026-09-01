@@ -517,6 +517,10 @@
         $$('.tela').forEach(function (t) { t.classList.remove('ativa'); });
         $('#tela-' + b.dataset.tela).classList.add('ativa');
         $('.conteudo').scrollTop = 0;
+        /* Ajustes mostra coisa que muda enquanto ela usa: a data da última
+         * cópia, o estado da versão e as buscas que não acharam nada. Sem
+         * redesenhar ao abrir, ela via o estado de quando o aplicativo subiu. */
+        if (b.dataset.tela === 'ajustes') desenharAjustes();
       });
     });
 
@@ -2790,6 +2794,58 @@
     grandezas: 'Grandezas', estatistica: 'Estatística'
   };
 
+  /* Busca que não achou nada.
+   *
+   * Antes de escrever uma lista de sinônimos adivinhando o que ela digitaria,
+   * vale descobrir o que ela digita de verdade e não encontra. Fica só no
+   * aparelho, não vai para lugar nenhum, e guarda no máximo duzentas entradas.
+   *
+   * Grava depois que ela para de digitar, e não a cada tecla: senão o registro
+   * enche de prefixo de palavra e não serve para nada. */
+  var LIMITE_BUSCAS_VAZIAS = 200;
+  var relogioBuscaVazia = null;
+
+  function anotarBuscaSemResultado(termo, onde) {
+    var t = String(termo || '').trim();
+    if (t.length < 3) return;
+    clearTimeout(relogioBuscaVazia);
+    relogioBuscaVazia = setTimeout(function () {
+      try {
+        var bruto = localStorage.getItem('buscas-vazias');
+        var lista = bruto ? JSON.parse(bruto) : [];
+        if (!Array.isArray(lista)) lista = [];
+        lista.push({ termo: t, onde: onde || '', quando: Core.hojeIso() });
+        if (lista.length > LIMITE_BUSCAS_VAZIAS) {
+          lista = lista.slice(lista.length - LIMITE_BUSCAS_VAZIAS);
+        }
+        localStorage.setItem('buscas-vazias', JSON.stringify(lista));
+      } catch (e) {
+        /* modo anônimo, ou armazenamento cheio. Registro é conveniência,
+           e nunca pode atrapalhar a busca em si. */
+      }
+    }, 1200);
+  }
+
+  /* Lida em Ajustes, para virar pauta de conversa com ela. */
+  function buscasSemResultado() {
+    try {
+      var bruto = localStorage.getItem('buscas-vazias');
+      var lista = bruto ? JSON.parse(bruto) : [];
+      if (!Array.isArray(lista)) return [];
+      var conta = {};
+      lista.forEach(function (r) {
+        var k = Core.chaveDeBusca(r.termo);
+        if (!conta[k]) conta[k] = { termo: r.termo, vezes: 0, ultima: r.quando };
+        conta[k].vezes++;
+        if (r.quando > conta[k].ultima) conta[k].ultima = r.quando;
+      });
+      return Object.keys(conta).map(function (k) { return conta[k]; })
+        .sort(function (a, b) { return b.vezes - a.vezes || b.ultima.localeCompare(a.ultima); });
+    } catch (e) {
+      return [];
+    }
+  }
+
   var indiceTemas = null;
   var seriesCarregadas = {};
   var ultimoAnoEscolar = null;
@@ -2909,6 +2965,7 @@
         return Core.casaBusca(t.pt.titulo + ' ' + t.pt.resumo + ' ' + t.en.titulo, termo);
       });
       if (!filtrados.length) {
+        if (termo) anotarBuscaSemResultado(termo, 'temas de matemática');
         lista.appendChild(el('div', { class: 'vazio' }, [
           el('p', { texto: termo ? 'Nenhum tema encontrado para essa busca.' : 'Nenhum tema nesta série.' })
         ]));
@@ -3469,6 +3526,46 @@
           texto: d === 0 ? 'Última cópia salva hoje.'
             : 'Última cópia salva há ' + d + ' dia' + (d === 1 ? '' : 's') + ', em ' +
               Core.ddmmaaaa(db.ajustes.ultimaCopia) + '.'
+        }));
+      }
+    }
+
+    /* O que ela procurou e não achou. Fica em Ajustes porque é conversa nossa,
+     * não recurso dela: serve para decidir que assunto falta no banco e que
+     * palavra a busca precisa entender. */
+    var caixaBuscas = $('#buscas-vazias');
+    if (caixaBuscas) {
+      var vazias = buscasSemResultado();
+      caixaBuscas.innerHTML = '';
+      if (!vazias.length) {
+        caixaBuscas.appendChild(el('div', {
+          class: 'ajuda', style: 'margin-top:0',
+          texto: 'Nenhuma busca sem resultado registrada ainda.'
+        }));
+      } else {
+        caixaBuscas.appendChild(el('div', {
+          class: 'ajuda', style: 'margin-top:0',
+          texto: 'O que você procurou e não encontrou. Fica só neste tablet. ' +
+            'Serve para a gente descobrir que assunto falta no banco.'
+        }));
+        vazias.slice(0, 12).forEach(function (b) {
+          caixaBuscas.appendChild(el('div', { class: 'item-lista' }, [
+            el('div', { class: 'cresce' }, [
+              el('div', { class: 'nome', texto: b.termo }),
+              el('div', {
+                class: 'detalhe',
+                texto: (b.vezes === 1 ? 'uma vez' : b.vezes + ' vezes') +
+                  ' · a última em ' + Core.ddmmaaaa(b.ultima)
+              })
+            ])
+          ]));
+        });
+        caixaBuscas.appendChild(el('button', {
+          type: 'button', class: 'btn pequeno', texto: 'Limpar esta lista',
+          aoClick: function () {
+            try { localStorage.removeItem('buscas-vazias'); } catch (e) { /* nada a fazer */ }
+            desenharAjustes();
+          }
         }));
       }
     }
