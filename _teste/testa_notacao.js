@@ -159,6 +159,31 @@ secao('7. Subtítulo não fica órfão no pé da página');
 }
 
 // ================================================================
+secao('8. O vão entre o fio do cabeçalho e o título');
+
+/* Esta correção já se perdeu DUAS vezes: um agente reescreveu o
+ * cabecalhoDeSecao e o valor voltou ao antigo, e a minha conferência por grep
+ * deu falso positivo porque procurava uma linha que aparece duas vezes dentro
+ * da própria função. Agora quem confere é a geometria do PDF gerado, não o
+ * texto do fonte. */
+{
+  const doc = new PDFGen.Doc();
+  doc.novaPagina();
+  doc.cabecalhoDeSecao('Termologia', 'Material de estudo');
+  const bruto = Buffer.from(doc.finalizar()).toString('latin1');
+
+  const m = bruto.match(/\/F2 17 Tf[^]{0,80}?([0-9.]+) ([0-9.]+) Td/);
+  conf('achei a linha de base do título no PDF', !!m, true);
+  if (m) {
+    const base = parseFloat(m[2]);
+    const fio = 841.8898 - 58;
+    const vaoMm = (fio - (base + 17 * 0.717)) * 25.4 / 72;
+    console.log('       vão medido: ' + vaoMm.toFixed(1) + ' mm');
+    conf('o vão fica entre 5 e 9 mm', vaoMm > 5 && vaoMm < 9, true);
+  }
+}
+
+// ================================================================
 console.log('\n' + '='.repeat(60));
 console.log(passes + ' verificações passaram, ' + falhas + ' falharam.');
 if (falhas) { console.log('\nFALHAS:'); erros.forEach(e => console.log(' - ' + e)); }
