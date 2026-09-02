@@ -113,7 +113,7 @@ tg(2a) = sen(2a)/cos(2a) = (24/25)/(7/25) = 24/7.
 As duas últimas formas do cosseno do arco duplo, lidas ao contrário, dão o seno e o cosseno da
 metade de um arco. Chamando o arco de x, de modo que 2a = x e a = x/2:
 
-@eq \text{sen}\left(\frac{x}{2}\right) = \pm \sqrt{\frac{1 - \cos(x)}{2}}
+@eq \sen\left(\frac{x}{2}\right) = \pm \sqrt{\frac{1 - \cos(x)}{2}}
 
 @eq \cos\left(\frac{x}{2}\right) = \pm \sqrt{\frac{1 + \cos(x)}{2}}
 
