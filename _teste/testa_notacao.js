@@ -264,6 +264,138 @@ secao('9. Numero abrindo linha no meio de paragrafo nao vira item de lista');
 }
 
 // ================================================================
+secao('10. A equação de bloco @eq');
+
+/* O renderizador de LaTeX mora em figuras/formula.js e é carregado tarde, igual
+ * ao de figuras: sem ele o pdf.js tem que continuar servindo.
+ *
+ * A regra que estes testes existem para travar é uma só, e ela já foi quebrada
+ * antes com o @fig: DIRETIVA NUNCA SAI IMPRESSA COMO TEXTO. Quando o ramo do
+ * markdown não pega a linha, ela cai no parágrafo e a marcação inteira aparece
+ * escrita no meio da folha, em silêncio: o PDF gera, o verificador de caractere
+ * passa (arroba, barra invertida e chave desenham) e o defeito só aparece no
+ * papel. */
+{
+  const temFormula = (function () {
+    try { require('../figuras/formula.js'); return true; } catch (e) { return false; }
+  })();
+  conf('o módulo de fórmula está ao lado', temFormula, true);
+
+  const r = paginaCom(d => d.markdown(
+    'A raiz sai da fórmula:\n\n' +
+    '@eq x = \\frac{-b \\pm \\sqrt{b^{2} - 4ac}}{2a}\n\n' +
+    'E daí em diante.', { tam: 10 }));
+
+  const escritos = [];
+  const rx = /Td \(((?:[^()\\]|\\.)*)\) Tj/g;
+  let m;
+  while ((m = rx.exec(r.texto))) escritos.push(m[1]);
+
+  conf('a diretiva "@eq" não sai impressa',
+    escritos.some(t => t.indexOf('@eq') >= 0), false);
+  conf('o comando "\\frac" não sai impresso',
+    escritos.some(t => t.indexOf('\\\\frac') >= 0 || t.indexOf('frac') >= 0), false);
+  conf('a chave da fórmula não sai impressa',
+    escritos.some(t => /\{|\}/.test(t)), false);
+  conf('o texto em volta continua saindo',
+    escritos.filter(t => /raiz|diante/.test(t)).length >= 2, true);
+  conf('a barra da fração foi desenhada', / re f\b|[0-9.]+ w\b/.test(r.texto), true);
+}
+
+/* A diretiva colada num parágrafo. Sem a parada no laço, a linha vira o fim do
+ * parágrafo anterior e sai escrita por extenso. */
+{
+  const r = paginaCom(d => d.markdown(
+    'Olhe a fórmula abaixo.\n@eq \\frac{1}{2}\nE continue lendo.', { tam: 10 }));
+  const escritos = [];
+  const rx = /Td \(((?:[^()\\]|\\.)*)\) Tj/g;
+  let m;
+  while ((m = rx.exec(r.texto))) escritos.push(m[1]);
+  conf('diretiva colada em parágrafo não sai impressa',
+    escritos.some(t => t.indexOf('@eq') >= 0 || t.indexOf('frac') >= 0), false);
+  conf('e o parágrafo de antes e o de depois continuam lá',
+    escritos.filter(t => /Olhe|continue/.test(t)).length, 2);
+}
+
+/* Comando que não existe. O renderizador desenha um selo visível no ponto do
+ * defeito e avisa; o que ele NÃO pode fazer é imprimir o comando cru como texto
+ * normal, porque aí a aluna lê barra invertida no meio da conta. */
+{
+  const doc = new PDFGen.Doc();
+  doc.novaPagina();
+  doc.markdown('@eq \\naoexiste{x}', { tam: 10 });
+  /* A lista chama-se avisosFigura, e o aviso de fórmula entra NELA de propósito:
+   * duas listas de aviso em dois lugares é uma lista que ninguém lê, e a trava
+   * que já existe (conferirFigura) lê esta. */
+  doc.finalizar();
+  const avisos = doc.avisosFigura || [];
+  conf('comando desconhecido gera aviso', avisos.length > 0, true);
+  conf('e o aviso diz qual comando foi',
+    avisos.some(a => String(a).indexOf('naoexiste') >= 0), true);
+  conf('e o aviso é marcado como de fórmula',
+    avisos.some(a => String(a).indexOf('rmula') >= 0), true);
+}
+
+/* Acrescentar o @eq não pode mexer em nada que já existe. Nenhum dos 146 temas
+ * usa a diretiva, então a folha de um tema tem que sair idêntica com e sem ela.
+ * Aqui vai a versão barata desse contrato: um texto sem @eq nenhum. */
+{
+  const semDiretiva = 'Um parágrafo comum.\n\n1. Primeiro item.\n2. Segundo item.\n\n' +
+    '| a | b |\n| 1 | 2 |\n\nOutro parágrafo com x^{2} e a_{1}.';
+  const a = paginaCom(d => d.markdown(semDiretiva, { tam: 10 }));
+  const b = paginaCom(d => d.markdown(semDiretiva, { tam: 10 }));
+  conf('texto sem @eq sai igual entre duas gerações', a.texto.length, b.texto.length);
+  conf('e nenhum vestígio de fórmula aparece nele',
+    /Formula|@eq/.test(a.texto), false);
+}
+
+// ================================================================
+secao('11. A figura não se separa do parágrafo que a explica');
+
+/* Achado por uma leitora que olhou a folha impressa como a aluna: "viro a folha
+ * e caio numa figura pelada com dois números soltos, não sei se é área, se é
+ * lado, se é o quê". A frase que explicava a figura tinha ficado na página
+ * anterior. Para aluno neurodivergente é pior: o desenho perde o dono.
+ *
+ * A regra: a ÚLTIMA linha do parágrafo e a figura que vem logo depois têm que
+ * caber juntas. Não cabendo, as duas viram a folha juntas.
+ *
+ * A diretiva vem separada do parágrafo por uma linha em branco na fonte dos
+ * temas, então a busca adiante precisa pular o branco. A primeira versão deste
+ * conserto olhava só a linha seguinte, achava a linha vazia e não reservava
+ * nada: o defeito continuou de pé e a medição não mudou. */
+/* O teste varre VÁRIAS alturas de partida em vez de calibrar uma: assim ele não
+ * depende de eu acertar o ponto exato em que a folha estoura, e cobre tanto o
+ * caso em que tudo cabe quanto o caso em que a fórmula empurra a virada. */
+{
+  const fonte = 'Uma frase curta que explica a fórmula abaixo.\n\n' +
+                '@eq \\frac{-b \\pm \\sqrt{b^{2} - 4ac}}{2a}';
+  let virou = 0, sozinha = 0, casos = 0;
+
+  for (let y0 = 200; y0 >= 90; y0 -= 10) {
+    const doc = new PDFGen.Doc();
+    doc.novaPagina();
+    doc.y = y0;
+    const antes = doc.paginas.length;
+    doc.markdown(fonte, { tam: 10 });
+    const bruto = Buffer.from(doc.finalizar()).toString('latin1');
+    const paginas = bruto.split(/Apoio Educacional\) Tj/).slice(0, -1);
+    casos++;
+    if (doc.paginas.length > antes) virou++;
+
+    /* A fórmula sai desenhada (barra da fração), então a página que a contém tem
+     * que conter TAMBÉM alguma palavra do parágrafo. */
+    const comFormula = paginas.filter(p => / re f\b/.test(p) || /[0-9.]+ w\b/.test(p));
+    const ultima = comFormula[comFormula.length - 1] || '';
+    if (ultima && !/Td \((Uma|frase|curta|que|explica|abaixo\.)\) Tj/.test(ultima)) sozinha++;
+  }
+
+  conf('houve caso em que a folha virou, senão o teste não testa nada', virou > 0, true);
+  conf('em nenhuma altura a fórmula ficou sozinha, longe da frase', sozinha, 0);
+  console.log('       ' + casos + ' alturas de partida conferidas, ' + virou + ' viraram a folha');
+}
+
+// ================================================================
 console.log('\n' + '='.repeat(60));
 console.log(passes + ' verificações passaram, ' + falhas + ' falharam.');
 if (falhas) { console.log('\nFALHAS:'); erros.forEach(e => console.log(' - ' + e)); }

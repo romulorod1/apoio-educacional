@@ -1,0 +1,2477 @@
+/* figuras/receitas.js
+ * As receitas que a marcacao @fig chama.
+ *
+ * Tres receitas, e o criterio de quantas ser tres: cada uma cobre uma FAMILIA de
+ * configuracoes do banco, nunca uma figura so.
+ *
+ *   triangulo     tres lados, tres angulos, lado prolongado com angulo externo,
+ *                 marcas de congruencia, cevianas com ponto de encontro e o
+ *                 triangulo que NAO existe (o null da desigualdade triangular
+ *                 desenhado como duas reguas que nao se alcancam).
+ *   quadrilatero  a familia inteira por paralelismo: trapezio, trapezio
+ *                 isosceles, paralelogramo, retangulo, losango, quadrado e o
+ *                 irregular, com a diagonal que decompoe em dois triangulos.
+ *   painel        varias figurinhas lado a lado com o nome de cada uma embaixo.
+ *                 E a figura de CLASSIFICAR, que e o que uma tabela de nomes
+ *                 nunca entrega: os tres triangulos por lados, os tres por
+ *                 angulos e os cinco quadrilateros da familia.
+ *
+ * Duas decisoes deste arquivo, tomadas no piloto do MAT07-12 e validas para o
+ * resto do banco:
+ *
+ *   1. O painel nao e UMA figura com quinze marcas: cada celula e uma figura
+ *      propria, com fundo branco proprio e teto de cinco marcas proprio. O que o
+ *      painel faz e segurar o doc.y entre uma celula e a seguinte para elas
+ *      sairem lado a lado em vez de empilhadas. O teto de cinco vem da memoria
+ *      de trabalho, que se gasta no que o olho abarca de uma vez, e tres celulas
+ *      separadas por espaco em branco sao lidas uma de cada vez.
+ *
+ *   2. Palavra nenhuma nasce aqui dentro. Nome de classe (equilatero, rhombus),
+ *      glosa de hachura e aviso de legenda entram por parametro, vindos do tema,
+ *      porque o banco e bilingue e a verificacao com sympy so confere conta: um
+ *      "altura" escrito dentro da funcao de desenho quebra a folha em ingles em
+ *      silencio. Letra de vertice, numero e o sinal de grau sao neutros e ficam.
+ *
+ *   3. Uma cor, um sentido. O teal e a tinta da camada de resposta e diz uma
+ *      coisa so: ISTO A RESPOSTA ACRESCENTOU. Preto e o que ja estava impresso
+ *      na folha do exercicio. A regra inteira, com os tres casos medidos que a
+ *      obrigaram, esta na secao "codigo de cor do gabarito", mais abaixo.
+ *
+ * Este arquivo tambem e a fachada que o pdf.js enxerga: ele repassa a leitura da
+ * marcacao para o figuras/base.js, para o gerador ter uma dependencia so.
+ *
+ * Roda no navegador por <script> (exporta FigReceitas no global) e no Node.
+ *
+ * Regra da casa: nunca usar travessao.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.FigReceitas = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  /* Ligacao tardia com a fundacao, pelo mesmo motivo do base.js: no navegador o
+   * base.js entra por <script> e vira o global FigBase; no Node a cadeia de
+   * require passa pelo pdf.js e so fecha depois que ele terminou de carregar. */
+  var cacheBase = null;
+  function base() {
+    if (cacheBase) return cacheBase;
+    if (typeof FigBase !== 'undefined' && FigBase && FigBase.figura) cacheBase = FigBase;
+    else if (typeof require === 'function') {
+      try { cacheBase = require('./base.js'); } catch (e) { cacheBase = null; }
+    }
+    return cacheBase;
+  }
+
+  /* As marcas e o desenho entram pela MESMA ligacao tardia, e pelo mesmo motivo:
+   * no navegador eles chegam por <script> e viram FigMarcas e FigDesenho; no
+   * Node a cadeia de require passa pelo pdf.js e so fecha depois que ele
+   * terminou de carregar. Resolvidos no topo do arquivo, os dois sairiam
+   * undefined em silencio e o arco de angulo simplesmente nao apareceria.
+   *
+   * Os dois devolvem null quando nao estao disponiveis, em vez de lancar: a
+   * receita tem caminho de recuo escrito para esse caso, porque uma folha com o
+   * valor do angulo sem arco ainda e melhor do que uma folha sem figura. */
+  var cacheMarcas = null;
+  function marcas() {
+    if (cacheMarcas) return cacheMarcas;
+    if (typeof FigMarcas !== 'undefined' && FigMarcas && FigMarcas.marcaAngulo) cacheMarcas = FigMarcas;
+    else if (typeof require === 'function') {
+      try { cacheMarcas = require('./marcas.js'); } catch (e) { cacheMarcas = null; }
+    }
+    return cacheMarcas;
+  }
+
+  var cacheDesenho = null;
+  function desenho() {
+    if (cacheDesenho) return cacheDesenho;
+    if (typeof FigDesenho !== 'undefined' && FigDesenho && FigDesenho.cota) cacheDesenho = FigDesenho;
+    else if (typeof require === 'function') {
+      try { cacheDesenho = require('./desenho.js'); } catch (e) { cacheDesenho = null; }
+    }
+    return cacheDesenho;
+  }
+
+  /* ============================================================ apoio */
+
+  var TAM_DADO = 8.5;        // corpo do dado que resolve a questao
+  var TAM_NOME = 8.5;        // nome da classe, embaixo da celula do painel
+  var AFAST_VERTICE = 4.5;   // vao entre a letra e o vertice, ate a BORDA da caixa
+
+  function versor(dx, dy) {
+    var n = Math.sqrt(dx * dx + dy * dy);
+    if (n < 1e-9) return { x: 0, y: 1 };
+    return { x: dx / n, y: dy / n };
+  }
+
+  function arredondar(n) {
+    return String(Math.round(n * 100) / 100);
+  }
+
+  /* Grau desenha na base-14 (0xB0), e numero mais simbolo de grau sao neutros nas
+   * duas linguas. Expressao algebrica (2x, 3x+10) sai como veio: escrever 2x
+   * seguido do grau seria correto, mas a diretiva ja e o lugar onde o autor
+   * decide isso. */
+  function rotuloDeAngulo(bruto, B) {
+    return B.ehNumero(bruto) ? bruto + '°' : String(bruto);
+  }
+
+  /* Rotulo de REGIAO, que nao e rotulo de angulo e por isso sai por outra porta.
+   *
+   * O caso medido, a figura do quadrilatero cortado pela diagonal na explicacao.
+   * Ela ja escreveu esse rotulo de duas formas erradas, uma em cada rodada, e as
+   * duas pelo mesmo motivo de fundo: um rotulo de regiao tem que dizer DE QUE
+   * GRANDEZA ele fala, e nenhuma das duas dizia.
+   *
+   *   "180°" no centro de cada metade. Numero com simbolo de grau solto dentro de
+   *   uma area se le como medida de UM angulo, e a figura passava a afirmar que
+   *   existem ali dois angulos rasos, o contrario exato do argumento que ela
+   *   ilustra. Tirar o grau foi certo e continua valendo.
+   *
+   *   "180" pelado, que e o que a rodada seguinte deixou. Duas leitoras
+   *   independentes tropecaram, e uma delas escreveu: "viro a folha e caio numa
+   *   figura pelada com dois numeros soltos, nao sei se e area, se e lado, se e o
+   *   que". Sem o grau o numero parou de mentir e continuou mudo.
+   *
+   * A saida e a PALAVRA, e nao o arco. Marcar os tres angulos de cada
+   * sub-triangulo custaria SEIS arcos na mesma figura, e arco sem valor e a
+   * notacao de CONGRUENCIA neste kit (esta escrito no marcasPorAngulos, mais
+   * abaixo): seis arcos vazios diriam que os seis angulos sao iguais, o que e
+   * falso, e trocariam um rotulo mudo por uma afirmacao errada. Com a palavra na
+   * frente, "soma 180" nao tem como ser lido como area nem como lado, e o grau
+   * continua de fora porque a trava do valor solto do base.js classifica QUALQUER
+   * texto com "°" como valor de angulo e cobra dele o arco que uma soma de regiao
+   * nao tem. Quem escreve a unidade por extenso e o paragrafo ao lado da figura.
+   *
+   * A palavra vem do TEMA, como toda palavra deste arquivo: regioes=soma;180 em
+   * portugues e regioes=sum;180 em ingles. Cada ocorrencia da chave e UMA regiao e
+   * os pedacos dela saem juntos separados por espaco, que e o unico jeito de
+   * escrever mais de uma palavra num valor de diretiva (a sintaxe corta em espaco
+   * e so a legenda= engole a linha). */
+  function rotuloDeRegiao(pedacos, B, doc) {
+    var partes = [];
+    var lista = [].concat(pedacos === null || pedacos === undefined ? [] : pedacos);
+    for (var i = 0; i < lista.length; i++) {
+      var t = String(lista[i] === null || lista[i] === undefined ? '' : lista[i]).trim();
+      if (t) partes.push(t);
+    }
+    var s = partes.join(' ');
+    if (s.indexOf('°') >= 0) {
+      B.avisar(doc, 'quadrilatero: regioes=' + s + ' traz o simbolo de grau, e a glosa de uma ' +
+        'regiao nao e medida de angulo: o valor ali e a soma dos angulos daquele ' +
+        'sub-triangulo, e com o simbolo a figura afirma que existe um angulo raso dentro ' +
+        'da regiao. Escreva a palavra do tema junto do valor (regioes=soma;180), sem o simbolo.');
+      s = s.split('°').join('').trim();
+    }
+    if (s && !/[^0-9\s.+\-]/.test(s)) {
+      B.avisar(doc, 'quadrilatero: regioes=' + s + ' e numero pelado no meio de uma area, e ' +
+        'numero solto dentro de uma regiao nao diz se e area, lado ou soma. Escreva a palavra ' +
+        'junto, vinda do tema nas duas linguas (regioes=soma;' + s + ' e regioes=sum;' + s + ').');
+    }
+    return s;
+  }
+
+  /* Cada ocorrencia de regioes= e UMA regiao, e os pedacos dela chegam separados
+   * por ponto e virgula, como em externo=C;115: regioes=soma;180 regioes=soma;180.
+   *
+   * A forma antiga, "regioes=180;180" numa ocorrencia so, continua sendo lida
+   * como duas regioes de um valor cada. Apagar a glosa de um tema ja escrito
+   * seria trocar um defeito por outro, e o aviso de numero pelado que o
+   * rotuloDeRegiao emite ja diz o que consertar. */
+  function regioesDaDiretiva(B, d) {
+    var brutos = pares(B, d.args, 'regioes');
+    if (brutos.length !== 1 || brutos[0].length < 2) return brutos;
+    for (var i = 0; i < brutos[0].length; i++) {
+      if (!/^-?\d+(\.\d+)?°?$/.test(String(brutos[0][i]).trim())) return brutos;
+    }
+    var saida = [];
+    for (var j = 0; j < brutos[0].length; j++) saida.push([brutos[0][j]]);
+    return saida;
+  }
+
+  /* Rotulo empurrado para fora na direcao dada pela GEOMETRIA, nunca por
+   * deslocamento literal em x e y: deslocamento fixo funciona na primeira figura
+   * e em triangulo obtuso a letra cai dentro do desenho.
+   *
+   * Quem faz o trabalho e o rotulo() do desenho.js, que ja resolve halo medido,
+   * linha de base, fuga de colisao e fio de chamada. O caminho de recuo existe
+   * porque o desenho.js pode faltar no navegador, e uma folha com o valor sem
+   * halo ainda e melhor do que uma folha sem o valor. */
+  function escrever(ctx, texto, ancora, dir, afastamento, op) {
+    op = op || {};
+    var D = desenho();
+    if (D) {
+      return D.rotulo(ctx, texto, ancora, {
+        direcao: dir || null,
+        afastamento: afastamento,
+        tam: op.tam || TAM_DADO, cor: op.cor, bold: !!op.bold
+      });
+    }
+    var B = base(), g = B.gerador();
+    var tam = op.tam || TAM_DADO;
+    var d = dir || { x: 0, y: 0 };
+    var px = ancora.x + d.x * (afastamento + 4);
+    var py = ancora.y + d.y * (afastamento + 4) - tam * 0.35;
+    var largura = g.medir(texto, tam, !!op.bold);
+    var x0 = px - largura / 2;
+    ctx.doc.retangulo(x0 - 1.4, py - tam * 0.26, largura + 2.8, tam * 1.08, g.COR.branco);
+    ctx.doc.texto(texto, px, py, { tam: tam, bold: !!op.bold, cor: op.cor || g.COR.texto, align: 'centro' });
+    return ctx.anota('rotulo', {
+      texto: texto, tam: tam,
+      x: x0 - 1.4, y: py - tam * 0.26, largura: largura + 2.8, altura: tam * 1.08
+    });
+  }
+
+  /* Letra de vertice na BISSETRIZ EXTERNA, que e a unica direcao que se afasta
+   * dos dois lados ao mesmo tempo. A direcao "centro para vertice" so coincide
+   * com ela no poligono regular: em triangulo muito obtuso ela empurra a letra na
+   * direcao do vizinho e as duas letras se encostam. */
+  function letrasDeVertice(ctx, pontos, nomes) {
+    var D = desenho();
+    if (!nomes || !nomes.length) return;
+    for (var i = 0; i < nomes.length && i < pontos.length; i++) {
+      if (!nomes[i]) continue;
+      if (D) {
+        D.rotuloVertice(ctx, nomes[i], pontos, i, { tam: TAM_DADO, afastamento: AFAST_VERTICE });
+      } else {
+        var geo = base().geo;
+        var n = pontos.length;
+        var bi = geo.bissetriz(pontos[i], pontos[(i + 1) % n], pontos[(i + n - 1) % n]);
+        escrever(ctx, nomes[i], pontos[i], { x: -bi.x, y: -bi.y }, AFAST_VERTICE, { tam: TAM_DADO });
+      }
+    }
+  }
+
+  /* Medida de lado no ponto medio e na NORMAL externa, e nao na direcao do centro
+   * para o ponto medio: as duas so coincidem no isosceles, e o desvio medido
+   * chega a 87 graus num triangulo de lados 100, 3 e 98, onde o rotulo saia
+   * empurrado paralelo ao lado e os numeros se empilhavam no meio do desenho. */
+  function medidaDeLado(ctx, texto, A, Bp, pontos, cor) {
+    var D = desenho();
+    if (D) {
+      return D.rotuloLado(ctx, texto, A, Bp, {
+        pontos: pontos, tam: TAM_DADO, afastamento: 5, cor: cor || undefined
+      });
+    }
+    var geo = base().geo;
+    var C = geo.centroide(pontos);
+    var m = { x: (A.x + Bp.x) / 2, y: (A.y + Bp.y) / 2 };
+    var nrm = versor(Bp.y - A.y, -(Bp.x - A.x));
+    if (nrm.x * (m.x - C.x) + nrm.y * (m.y - C.y) < 0) { nrm.x = -nrm.x; nrm.y = -nrm.y; }
+    return escrever(ctx, texto, m, nrm, 5, { tam: TAM_DADO, cor: cor || undefined });
+  }
+
+  /* Valor de angulo com o arco que diz A QUAL angulo ele se refere. Sem o arco a
+   * folha nao tem como ser lida: foi o defeito achado nas primeiras 16 folhas
+   * impressas, com 52, 61, 67, 38, 104 e a incognita x saindo como numero solto
+   * perto do vertice.
+   *
+   * Quem desenha e o marcaAngulo() do marcas.js, e nao um arco escrito aqui, por
+   * tres coisas que ele ja resolve e que uma copia local erraria: o arco sai
+   * SEMPRE pelo lado do angulo menor que 180 (o erro mais silencioso da lista,
+   * porque a figura fica bonita e diz outra coisa), o raio e fracao da menor
+   * distancia do vertice aos vizinhos em vez de fixo, e o valor que nao cabe na
+   * cunha sai para fora ligado por fio fino em vez de deitar em cima do lado.
+   *
+   * Contagem de marcas ativas: o marcaAngulo anota UM item, o valor, e nao dois.
+   * O arco nao e dado a ler, e sim o que diz de qual angulo o dado fala. */
+  function valorDeAngulo(ctx, V, A, Bp, texto, op) {
+    op = op || {};
+    var M = marcas();
+    if (M) {
+      return M.marcaAngulo(ctx.doc, V, A, Bp, {
+        rotulo: texto, tam: op.tam || TAM_DADO, voltas: op.voltas,
+        cor: op.cor, corRotulo: op.corRotulo, ctx: op.semContar ? null : ctx
+      });
+    }
+    var geo = base().geo;
+    var bis = geo.bissetriz(V, A, Bp);
+    escrever(ctx, texto, V, bis, 16, { tam: op.tam || TAM_DADO });
+    return null;
+  }
+
+  /* ============================================================ expressao do primeiro grau
+   *
+   * O valor de um angulo chega como numero (65) ou como expressao numa incognita
+   * (3x+10, 2x+20, x, 180-x). Ler a expressao nao e luxo: quando o sistema que
+   * elas formam e DETERMINADO, a figura tem que ser construida com os valores
+   * achados, senao ela sai INVERTIDA, que e pior do que nao sair.
+   *
+   * O caso medido, exercicio 15 do MAT07-12: paralelogramo com 3x+10 e 2x+20 em
+   * vertices consecutivos. O sistema fecha (3x+10 mais 2x+20 igual a 180 da x
+   * igual a 30), a resposta e 100 no vertice do 3x+10 e 80 no do 2x+20, e o
+   * desenho saia com 62 e 118, o agudo exatamente onde a resposta e obtusa. A
+   * legenda "fora de escala" cobre imprecisao e NAO cobre inversao: a aluna que
+   * resolve certo e olha o desenho conclui que errou, e o gabarito do 15 e so
+   * texto, entao ela nao tem como se reconciliar com a figura.
+   *
+   * Devolve {a, b, letra} para "a vezes letra mais b", com letra null quando e
+   * numero puro, e null quando a expressao nao e do primeiro grau numa incognita
+   * so (x ao quadrado, 2x/3, alfa, duas letras). Ali a figura nao adivinha: cai
+   * no caminho de recuo de sempre, que e o prototipo do tipo. */
+  function lerLinear(bruto) {
+    var s = String(bruto === null || bruto === undefined ? '' : bruto).replace(/\s+/g, '');
+    if (!s) return null;
+    var a = 0, b = 0, letra = null, termos = 0, i = 0;
+    while (i < s.length) {
+      var sinal = 1, ch = s.charAt(i);
+      if (ch === '+' || ch === '-') { sinal = ch === '-' ? -1 : 1; i++; }
+      else if (termos > 0) return null;   // termo colado sem operador: 3x10
+      var num = '';
+      while (i < s.length && /[0-9.]/.test(s.charAt(i))) { num += s.charAt(i); i++; }
+      var lt = null;
+      if (i < s.length && /[a-zA-Z]/.test(s.charAt(i))) { lt = s.charAt(i); i++; }
+      if (num === '' && lt === null) return null;
+      var v = num === '' ? null : parseFloat(num);
+      if (num !== '' && !isFinite(v)) return null;
+      if (lt !== null) {
+        /* Duas letras diferentes na mesma folha nao formam sistema numa
+         * incognita, e chutar uma delas seria inventar dado. */
+        if (letra !== null && letra !== lt) return null;
+        letra = lt;
+        a += sinal * (v === null ? 1 : v);
+      } else {
+        b += sinal * v;
+      }
+      termos++;
+    }
+    return termos ? { a: a, b: b, letra: letra } : null;
+  }
+
+  /* Resolve o sistema "a x menos s t igual a rhs" pelo par de equacoes com maior
+   * determinante, que e o par numericamente mais estavel. Devolve {x, t} com o
+   * que conseguiu achar e null no que ficou indeterminado. */
+  function resolverSistema(eqs) {
+    var x = null, t = null, k, l;
+    /* Uma equacao sem incognita algebrica (angulo numerico escrito num vertice)
+     * ja fixa o t sozinha: e o caso do "angulo=65" num paralelogramo, escrito no
+     * vertice A ou em qualquer outro. */
+    for (k = 0; k < eqs.length; k++) {
+      if (Math.abs(eqs[k].a) < 1e-9 && Math.abs(eqs[k].s) > 1e-9) { t = -eqs[k].rhs / eqs[k].s; break; }
+    }
+    var melhor = null;
+    for (k = 0; k < eqs.length; k++) {
+      for (l = k + 1; l < eqs.length; l++) {
+        var det = -eqs[k].a * eqs[l].s + eqs[k].s * eqs[l].a;
+        if (melhor === null || Math.abs(det) > Math.abs(melhor.det)) {
+          melhor = { det: det, k: eqs[k], l: eqs[l] };
+        }
+      }
+    }
+    if (melhor && Math.abs(melhor.det) > 1e-9) {
+      var e1 = melhor.k, e2 = melhor.l;
+      x = (-e1.rhs * e2.s + e1.s * e2.rhs) / melhor.det;
+      if (t === null) t = (e1.a * e2.rhs - e2.a * e1.rhs) / melhor.det;
+    }
+    /* Tipo de forma fixa (retangulo, quadrado): a equacao nao fala de t, e a
+     * unica coisa que ela determina e a propria incognita. */
+    if (x === null) {
+      for (k = 0; k < eqs.length; k++) {
+        if (Math.abs(eqs[k].a) > 1e-9 && Math.abs(eqs[k].s) < 1e-9) { x = eqs[k].rhs / eqs[k].a; break; }
+      }
+    }
+    return { x: x, t: t };
+  }
+
+  /* ============================================================ escala
+   *
+   * A escala sai automatica da propria diretiva: se algum valor metrico nao e
+   * numero (3x+10, x, alfa), a figura recebe fora de escala sem o autor precisar
+   * lembrar. O foraDeEscala() do base.js olha uma lista de chaves inteiras, e
+   * aqui algumas chaves misturam letra de vertice com numero (externo=C;115), o
+   * que faria o "C" reprovar a escala de uma figura perfeitamente medivel. Estes
+   * valores extras entram um a um. */
+  function escalaFora(B, d, chavesMetricas, extras) {
+    if (d.escala === 'fora') return true;
+    if (d.escala === 'fiel') return false;
+    if (B.foraDeEscala(d, chavesMetricas)) return true;
+    for (var i = 0; i < (extras || []).length; i++) {
+      var v = extras[i];
+      if (v !== null && v !== undefined && v !== '' && !B.ehNumero(v)) return true;
+    }
+    return false;
+  }
+
+  /* ============================================================ leitura de pares
+   *
+   * Varias chaves carregam um par "quem;quanto" no mesmo valor (externo=C;115,
+   * ceviana=bissetriz;B). O ponto e virgula ja e o separador de lista da
+   * sintaxe, entao a leitura e um split proprio e nao o B.lista, que achataria os
+   * pares de todas as ocorrencias numa lista unica e perderia quem vai com quem. */
+  function pares(B, args, chave) {
+    var brutos = B.valores(args, chave), saida = [];
+    for (var i = 0; i < brutos.length; i++) {
+      var partes = String(brutos[i]).split(';');
+      var limpos = [];
+      for (var j = 0; j < partes.length; j++) {
+        var t = partes[j].trim();
+        if (t) limpos.push(t);
+      }
+      if (limpos.length) saida.push(limpos);
+    }
+    return saida;
+  }
+
+  function indiceDeVertice(nomes, alvo, n) {
+    var padrao = ['A', 'B', 'C', 'D', 'E', 'F'];
+    var quero = String(alvo || '').toUpperCase();
+    for (var i = 0; i < n; i++) {
+      var nome = String((nomes && nomes[i]) || padrao[i]).toUpperCase();
+      if (nome === quero) return i;
+    }
+    return -1;
+  }
+
+  function nomeDoVertice(nomes, i) {
+    // sem vertices= a receita ainda entende incognita=C, porque a volta e sempre
+    // A, B, C, D na ordem em que a construcao devolveu os pontos
+    var padrao = ['A', 'B', 'C', 'D', 'E', 'F'];
+    return String((nomes && nomes[i]) || padrao[i]).toUpperCase();
+  }
+
+  /* ============================================================ congruencia
+   *
+   * congruentes=b;c e um GRUPO: os lados b e c recebem a mesma marca. Cada
+   * ocorrencia nova da chave e outro grupo e ganha um tracinho a mais, que e a
+   * notacao do livro: mesma marca significa mesma medida, marcas diferentes
+   * significam medidas diferentes.
+   *
+   * O grupo inteiro anota UMA marca, e nao uma por lado. E a mesma regra de
+   * contagem do arco com valor: o que a aluna le nao sao tres tracinhos, e a
+   * afirmacao "estes tres lados sao iguais". Contando um por lado, um triangulo
+   * equilatero legitimo estourava o teto de cinco sozinho. */
+  function marcarCongruentes(ctx, grupos, lados) {
+    var M = marcas();
+    if (!M || !grupos.length) return 0;
+    var contadas = 0;
+    for (var g = 0; g < grupos.length; g++) {
+      var indices = grupos[g];
+      for (var i = 0; i < indices.length; i++) {
+        var lado = lados[indices[i]];
+        if (!lado) continue;
+        M.marcaLado(ctx.doc, lado[0], lado[1], { n: Math.min(3, g + 1) });
+      }
+      if (indices.length) {
+        ctx.anota('marca', { tipo: 'congruencia', n: Math.min(3, g + 1), lados: indices.length });
+        contadas++;
+      }
+    }
+    return contadas;
+  }
+
+  /* Setas de paralelismo, pelo mesmo criterio de contagem: o par inteiro e uma
+   * afirmacao so ("estes dois lados sao paralelos") e anota uma marca. O glifo de
+   * paralelo sai como interrogacao na base-14, entao a setinha nao e reforco: e o
+   * unico canal que existe para dizer paralelo nesta folha.
+   *
+   * As duas setas de um par apontam para o MESMO lado, e isso da trabalho porque
+   * lados opostos de um poligono sao percorridos em sentidos contrarios na volta:
+   * desenhadas cruas, a de cima do trapezio apontava para a esquerda e a de baixo
+   * para a direita, o que se le como sentido e nao como paralelismo. O sentido de
+   * cada lado e comparado com o do primeiro do par e invertido quando discorda.
+   *
+   * O conjunto inteiro conta como UMA marca, mesmo com dois pares. E a mesma
+   * conta dos quatro quadradinhos do retangulo: o que a aluna le nao sao dois
+   * fatos independentes, e a frase "esta figura tem os lados paralelos", que a
+   * setinha simples e a dupla escrevem juntas. Contando um por par, o gabarito do
+   * paralelogramo com os tres angulos respondidos estourava o teto de cinco
+   * marcas por causa da notacao, e nao por causa da resposta. */
+  function marcarParalelas(ctx, pares2, lados) {
+    var M = marcas();
+    if (!M || !pares2.length) return 0;
+    for (var g = 0; g < pares2.length; g++) {
+      var par = pares2[g];
+      var ref = null;
+      for (var i = 0; i < par.length; i++) {
+        var lado = lados[par[i]];
+        if (!lado) continue;
+        var u = versor(lado[1].x - lado[0].x, lado[1].y - lado[0].y);
+        var de = lado[0], ate = lado[1];
+        if (ref === null) ref = u;
+        else if (u.x * ref.x + u.y * ref.y < 0) { de = lado[1]; ate = lado[0]; }
+        M.marcaLado(ctx.doc, de, ate, { n: Math.min(3, g + 1), tipo: 'seta' });
+      }
+    }
+    ctx.anota('marca', { tipo: 'paralelismo', pares: pares2.length });
+    return 1;
+  }
+
+  /* ============================================================ trava do clone
+   *
+   * Duas figuras com a MESMA forma no mesmo documento, uma na explicacao e outra
+   * num exercicio, entregam a resposta. O caso medido no MAT07-12: a figura do
+   * exercicio 8 e a figura do exemplo resolvido da pagina 3, mesmos 40 e 115
+   * graus, mesmo enquadramento, so sem os rotulos; como o exemplo traz o 75
+   * impresso, a resposta do exercicio 8 esta na folha do proprio material tres
+   * paginas antes.
+   *
+   * Trocar os valores do exercicio e do TEMA e nao do desenhador: uma receita que
+   * inventa numero deixa de desenhar o que o autor escreveu. O que o desenhador
+   * pode fazer, e faz aqui, e se recusar a deixar isso passar em silencio.
+   *
+   * A impressao digital e a FORMA (os angulos internos ordenados, mais os angulos
+   * externos marcados) e nao o texto da diretiva: "angulo=40 angulo=75 angulo=65
+   * externo=C;115" e "angulo=40 externo=C;115 incognita=B" sao escritas
+   * diferentes e constroem o mesmo triangulo. E ela e invariante por giro e por
+   * escala de proposito: girar o exercicio muda o enquadramento e nao muda o fato
+   * de a resposta estar impressa na outra folha.
+   *
+   * Explicacao e exercicio se distinguem pelo id: a figura da explicacao nao tem
+   * id porque nada a chama de volta, e a do exercicio tem, porque a camada de
+   * gabarito a chama por ele. Duas figuras iguais dentro da explicacao, ou dois
+   * exercicios com a mesma forma, nao acusam: ali a repeticao nao entrega
+   * resposta nenhuma. */
+  function impressaoDaForma(geo, receita, pontos, extras) {
+    var n = pontos.length, angs = [];
+    for (var i = 0; i < n; i++) {
+      var m = geo.anguloEm(pontos[i], pontos[(i + 1) % n], pontos[(i + n - 1) % n]);
+      angs.push(Math.round(m * 10) / 10);
+    }
+    angs.sort(function (p, q) { return p - q; });
+    var cauda = [];
+    for (var e = 0; e < (extras || []).length; e++) {
+      if (extras[e] !== null && extras[e] !== undefined && extras[e] !== '') cauda.push(String(extras[e]));
+    }
+    cauda.sort();
+    return receita + ' ' + angs.join('/') + (cauda.length ? ' ext ' + cauda.join('/') : '');
+  }
+
+  function travaDeClone(B, doc, d, chave) {
+    if (!doc || d.fase === 'gabarito') return;
+    var vistas = doc.formasDeFigura || (doc.formasDeFigura = {});
+    var papel = d.id ? 'exercicio' : 'explicacao';
+    var antes = vistas[chave];
+    if (!antes) { vistas[chave] = { papel: papel, id: d.id || null, avisou: false }; return; }
+    if (antes.papel === papel || antes.avisou) return;
+    antes.avisou = true;
+    var qual = papel === 'exercicio' ? d.id : antes.id;
+    B.avisar(doc, 'a figura do exercicio ' + (qual || '(sem id)') + ' repete a forma da figura da ' +
+      'explicacao (' + chave + '): o exemplo resolvido ja traz os valores calculados, entao a ' +
+      'figura do exercicio entrega a resposta. Troque os valores do exercicio no tema, ou tire a ' +
+      'figura do exercicio.');
+  }
+
+  /* ============================================================ codigo de cor do gabarito
+   *
+   * UMA cor, UM sentido, e o sentido e este: TEAL marca o que a RESPOSTA
+   * ACRESCENTA a folha, PRETO marca o que ja estava impresso no enunciado. Lida
+   * assim, a figura do gabarito se le num relance como "a sua folha, mais isto",
+   * e nao como a mesma figura outra vez.
+   *
+   * A folha do piloto tinha o mesmo codigo com DOIS sentidos, que e pior do que
+   * codigo nenhum: quem aprende que teal quer dizer resposta num exercicio le
+   * errado o exercicio seguinte. Os tres casos, medidos no fluxo de conteudo do
+   * _piloto_MAT07-12_gabarito.pdf antes deste conserto:
+   *
+   *   exercicio 10, "@fig id=q10 fase=gabarito", a figura do enunciado rechamada
+   *     pelo id: "65°" em (0.102, 0.110, 0.122) e "115°", "65°" e "115°" em
+   *     (0.180, 0.490, 0.420). Certo, e e este o caso que define a regra: o 65 e o
+   *     dado impresso na folha da aluna, os outros tres sao a resposta.
+   *   exercicio 18, "@fig quadrilatero tipo=losango angulo=60 angulo=120
+   *     fase=gabarito": "60°" e "120°" em preto e outro "60°" e outro "120°" em
+   *     teal, sem significado nenhum. O exercicio 18 nao tem figura no enunciado:
+   *     o losango inteiro e o contraexemplo que a resposta acrescenta, e os quatro
+   *     valores sao resposta. A divisao em duas cores nascia de um detalhe de
+   *     escrita da diretiva, dois valores declarados e dois deduzidos.
+   *   exercicio 11, "@fig triangulo angulo=30 angulo=60 angulo=90 fase=gabarito":
+   *     "30°" e "60°" em preto (e o 90 no quadradinho, tambem preto). Ou seja,
+   *     preto querendo dizer RESPOSTA na mesma folha em que no 10 ele quer dizer
+   *     DADO.
+   *
+   * A regra resolve os tres de uma vez: a figura que NASCE no gabarito nao tem
+   * folha de exercicio nenhuma para repetir, entao tudo nela e acrescimo e sai em
+   * teal; a figura rechamada pelo id repete o enunciado, e ali so o que ela
+   * ACRESCENTA muda de cor.
+   *
+   * Como se sabe qual e qual sem adivinhar: o guardarPorId do base.js guarda a
+   * PRIMEIRA diretiva de cada id, e a fase dela diz onde a figura nasceu. Sem id,
+   * ou com id que ninguem registrou, a figura so existe aqui e tambem nasceu no
+   * gabarito.
+   *
+   * O codigo vale sobre VALOR: numero, expressao, medida de lado, glosa de regiao
+   * e o quadradinho de angulo reto, que neste kit ocupa o lugar do "90°" escrito.
+   * Nao vale sobre o ALFABETO da figura, que e a letra de vertice, o tracinho de
+   * congruencia, a seta de paralelismo, a diagonal, a ceviana e o contorno: essas
+   * dizem a mesma coisa nas duas folhas, e pintar de teal uma delas devolveria a
+   * cor o segundo sentido que este conserto acabou de tirar. Pela mesma razao os
+   * quatro quadradinhos que o TIPO traz de fabrica (retangulo, quadrado) ficam
+   * pretos: eles sao a notacao da classe e nao o valor de um vertice.
+   *
+   * A instrucao de desenho tambem nao entra, e por um motivo medido e nao por
+   * gosto: a cota do desenho.js e feita de tres pecas e a mais leve delas, a linha
+   * de chamada, sai a 0,6 pt; teal a 0,6 pt e exatamente o que a regra R2 do
+   * _prova_desenho_auditor.js proibe, porque teal e a tinta de "olhe aqui" e 0,6 e
+   * o peso de "isto e andaime". */
+  function corDaCamada(doc, d, COR) {
+    if (!d || d.fase !== 'gabarito') return null;
+    var origem = d.id && doc && doc.figurasPorId ? doc.figurasPorId[d.id] : null;
+    return (!origem || origem.fase === 'gabarito') ? COR.teal : null;
+  }
+
+  /* ============================================================ a escala que mente
+   *
+   * "Figura fora de escala" e afirmacao sobre o proprio desenho, e a folha do
+   * piloto trazia essa afirmacao FALSA. Medido no exercicio 15, reconstruindo os
+   * quatro angulos por produto escalar sobre os vertices do contorno impresso:
+   * 100,004 / 80,001 / 99,999 / 79,996 graus, contra a resposta 100 e 80. Erro de
+   * quatro milesimos de grau, e a legenda dizendo "meca com a conta e nao com o
+   * transferidor".
+   *
+   * A frase nasceu quando a figura estava mesmo errada: antes de a receita
+   * resolver o sistema, o exercicio 15 saia com 62 e 118, o agudo exatamente onde
+   * a resposta e obtusa, e a legenda cobria o estrago. Consertado o desenho na
+   * rodada passada, a desculpa ficou para tras.
+   *
+   * Das duas saidas coerentes o tema passou a escrever escala=fiel, e nao o
+   * desenho deliberadamente enganoso. O argumento didatico, para quem for mexer:
+   *
+   *   1. A folha INTEIRA e mensuravel. O exercicio 10 desenha o paralelogramo de
+   *      65 graus em escala e entrega 115 a quem medir; o 12 desenha o trapezio de
+   *      72 e entrega 108. A politica deste kit esta escrita neste arquivo, na
+   *      secao do quadrilatero: "a aluna que conferir com transferidor e
+   *      recompensada". Sob essa politica o 15 nao e diferente em especie do 10
+   *      nem do 12, e seria a UNICA figura da folha que mente. Uma figura que
+   *      mente no meio de vinte e quatro que nao mentem nao custa so a si mesma:
+   *      custa a confianca nas outras vinte e quatro, e o desenho deixa de ser
+   *      ferramenta para virar enfeite.
+   *   2. Ha turma com aluno neurodivergente, e para quem le ao pe da letra um
+   *      desenho que contradiz a propria resposta e armadilha e nao licao: ele
+   *      obriga a segurar "a figura esta errada de proposito" na memoria de
+   *      trabalho ao mesmo tempo em que se resolve a equacao.
+   *   3. O transferidor nao entrega a questao. Os arcos do 15 carregam "3x+10" e
+   *      "2x+20", nao numeros: medir da 100 e 80 e ainda e preciso escrever
+   *      3x+10 = 100 para achar x. O que se perde e um atalho de um passo; o que
+   *      se ganharia com a mentira e uma folha em que o desenho deixa de valer.
+   *   4. Desenhar fora de escala de proposito desliga a unica trava que pegou a
+   *      inversao da rodada passada. O conferirRotulos, a trava do fam.temT e o
+   *      _prova_receitas_auditor.py cobram todos a MESMA coisa, que o rotulo pouse
+   *      num vertice que o mede. Trocada por "a ordem tem que bater", a trava para
+   *      de distinguir 100 e 80 de 118 e 62.
+   *
+   * O que fica no desenhador e a trava que torna esse defeito impossivel de sair
+   * calado outra vez. Quem marca fora de escala aqui e a chave escala= e o
+   * automatico do escalaFora, que liga a marca quando algum valor metrico nao e
+   * numero. O automatico nasceu de uma epoca em que letra na diretiva significava
+   * figura chutada, e desde que a receita RESOLVE o sistema isso deixou de ser
+   * verdade. A marca continua onde esta, porque letra em LADO continua sem
+   * proporcao possivel e porque mexer no automatico calaria a marca tambem na
+   * figura que ainda e chute; o que passa a existir e o aviso: quando cada valor
+   * que a figura imprime sai no vertice que o mede, a receita se recusa a deixar a
+   * folha afirmar o contrario e manda o tema decidir entre escala=fiel e
+   * escala=fora. */
+  function travaDaEscalaQueMente(B, doc, geo, receita, d, pontos, porVertice, valores) {
+    if (!d || d.escala === 'fora' || d.escala === 'fiel') return false;
+    /* Letra em LADO nao tem proporcao possivel: ali a marca automatica e verdade
+     * e nao ha o que avisar. */
+    var lados = B.lista(d.args, 'lado');
+    for (var s = 0; s < lados.length; s++) if (!B.ehNumero(lados[s])) return false;
+    var n = pontos.length, comLetra = 0;
+    for (var v = 0; v < n; v++) {
+      var bruto = porVertice[v];
+      if (bruto === null || bruto === undefined || B.ehNumero(bruto)) continue;
+      comLetra++;
+      var val = valores ? valores[v] : null;
+      if (val === null || val === undefined) return false;   // letra que ninguem resolveu
+      var medido = geo.anguloEm(pontos[v], pontos[(v + 1) % n], pontos[(v + n - 1) % n]);
+      if (Math.abs(medido - val) > 0.5) return false;
+    }
+    if (!comLetra) return false;
+    B.avisar(doc, receita + ': esta figura esta marcada fora de escala so porque a diretiva traz ' +
+      'letra, e o desenho saiu EXATO, cada valor no vertice que o mede. "Fora de escala" e ' +
+      'afirmacao sobre o proprio desenho, e assim ela e falsa. Escreva escala=fiel na diretiva e ' +
+      'tire a legenda de escala do tema, ou escreva escala=fora se o desenho enganoso for mesmo o ' +
+      'que voce quer.');
+    return true;
+  }
+
+  /* ============================================================ triangulo */
+
+  var ALTURA_VAO = 92;
+
+  var triangulo = {
+    chaves: ['angulo', 'lado', 'vertices', 'incognita', 'giro',
+             'congruentes', 'externo', 'ceviana', 'encontro'],
+    metricas: ['angulo', 'lado'],
+
+    /* Quanto o bloco vai ocupar, sem desenhar nada. Quem escreve o exercicio
+     * precisa disto ANTES de escrever o numero: reservado so o espaco da figura,
+     * o enunciado ficava no pe de uma folha e o desenho dele aparecia no topo da
+     * seguinte, acima de nada e antes do numero do exercicio seguinte. */
+    medir: function (d, op) {
+      var B = base(), geo = B.geo;
+      var lados = B.numeros(d.args, 'lado');
+      var ladosBrutos = B.lista(d.args, 'lado');
+      var ehVao = ladosBrutos.length >= 3 && lados.length >= 3 &&
+        lados[0] > 0 && lados[1] > 0 && lados[2] > 0 &&
+        !geo.trianguloPorLados(lados[0], lados[1], lados[2]);
+      return {
+        altura: op.altura != null ? op.altura : (ehVao ? ALTURA_VAO : null),
+        legenda: d.legenda || null,
+        foraDeEscala: escalaFora(B, d, triangulo.metricas, valoresExtras(B, d))
+      };
+    },
+
+    desenhar: function (doc, d, op) {
+      var B = base(), g = B.gerador(), geo = B.geo, COR = g.COR;
+
+      var angulosBrutos = B.lista(d.args, 'angulo');
+      var ladosBrutos = B.lista(d.args, 'lado');
+      var lados = B.numeros(d.args, 'lado');
+      var nomes = B.lista(d.args, 'vertices');
+      var incognitas = B.lista(d.args, 'incognita');
+      var giro = B.numero(d.args, 'giro') || 0;
+      var fora = escalaFora(B, d, triangulo.metricas, valoresExtras(B, d));
+
+      /* Um rotulo por vertice, decidido ANTES de construir. Os valores de angulo
+       * preenchem os vertices na ordem, pulando os da incognita: assim
+       * "angulo=52 angulo=61 incognita=C" poe 52 em A, 61 em B e x em C, e
+       * "angulo=52 angulo=61 incognita=A" poe x em A, 52 em B e 61 em C, sem o
+       * autor precisar contar posicao. */
+      var ehIncognita = [false, false, false];
+      for (var q = 0; q < incognitas.length; q++) {
+        var iq = indiceDeVertice(nomes, incognitas[q], 3);
+        /* Incognita que nao e vertice nenhum some da folha em silencio, e a
+         * questao que pede "o valor de x" sai sem o x em lugar nenhum. */
+        if (iq < 0) {
+          B.avisar(doc, 'triangulo: incognita=' + incognitas[q] + ' nao e um dos vertices (' +
+            [nomeDoVertice(nomes, 0), nomeDoVertice(nomes, 1), nomeDoVertice(nomes, 2)].join(', ') + ')');
+          return null;
+        }
+        ehIncognita[iq] = true;
+      }
+      var nIncognitas = incognitas.length;
+
+      /* Valor escrito na diretiva que nao chega na folha e SEMPRE erro de quem
+       * escreveu o tema. O laco de preenchimento so tem tres posicoes, entao o
+       * quarto angulo, ou o angulo que sobra por causa da incognita, ia para o
+       * lixo em silencio: "angulo=52 angulo=61 angulo=67 angulo=90" desenhava e
+       * jogava o 90 fora sem ninguem ver. */
+      var cabemAngulos = 3 - nIncognitas;
+      if (angulosBrutos.length > cabemAngulos) {
+        B.avisar(doc, 'triangulo: sobraram valores de angulo que nenhum vertice recebe (' +
+          angulosBrutos.join(', ') + ' para ' + cabemAngulos + ' vertice(s) livre(s))');
+        return null;
+      }
+      if (ladosBrutos.length > 3) {
+        B.avisar(doc, 'triangulo: sobraram valores de lado (' + ladosBrutos.join(', ') + ')');
+        return null;
+      }
+
+      /* A trava da soma 180 e conferida sobre os valores ESCRITOS e nao sobre os
+       * slots de porVertice: o slot da incognita guarda a string "x", entao
+       * exigir os tres slots numericos deixava a chave incognita desligar a
+       * trava, e "angulo=52 angulo=61 angulo=70 incognita=C" desenhava 52, 61 e x
+       * tranquilo, com o 70 sumindo da folha. */
+      var angNum = [];
+      for (var an = 0; an < angulosBrutos.length; an++) {
+        if (B.ehNumero(angulosBrutos[an])) angNum.push(parseFloat(angulosBrutos[an]));
+      }
+      var somaEscrita = angNum.reduce(function (s, v) { return s + v; }, 0);
+      if (angNum.length >= 3 && Math.abs(somaEscrita - 180) > 0.5) {
+        B.avisar(doc, 'triangulo: os angulos ' + angulosBrutos.join(', ') + ' somam ' +
+          arredondar(somaEscrita) + ' e nao 180');
+        return null;
+      }
+      if (angNum.length === 2 && somaEscrita >= 180 - 0.5) {
+        B.avisar(doc, 'triangulo: os angulos ' + angulosBrutos.join(', ') + ' somam ' +
+          arredondar(somaEscrita) + ' e nao sobra nada para o terceiro');
+        return null;
+      }
+
+      var porVertice = [null, null, null];
+      for (var iv2 = 0, prox = 0; iv2 < 3; iv2++) {
+        if (ehIncognita[iv2]) { porVertice[iv2] = 'x'; continue; }
+        if (prox < angulosBrutos.length) porVertice[iv2] = angulosBrutos[prox++];
+      }
+
+      /* O angulo externo entra na CONSTRUCAO e nao so no desenho: com
+       * "externo=C;115" o vertice C mede 65 por dentro, e sem isso o triangulo
+       * saia com o C chutado pelo caminho de recuo e o arco de 115 aparecia num
+       * vertice cujo suplementar era outro numero. A figura ficava bonita e
+       * dizia outra coisa, que e o defeito que este arquivo inteiro existe para
+       * impedir. */
+      var externos = [];
+      var pex = pares(B, d.args, 'externo');
+      for (var e = 0; e < pex.length; e++) {
+        var ie = indiceDeVertice(nomes, pex[e][0], 3);
+        if (ie < 0) {
+          B.avisar(doc, 'triangulo: externo=' + pex[e].join(';') + ' nao comeca por um vertice');
+          return null;
+        }
+        externos.push({ i: ie, bruto: pex[e].length > 1 ? pex[e][1] : null });
+      }
+
+      var congruentes = gruposDeLados(B, d, doc, 3);
+      if (congruentes === null) return null;
+
+      var pontos = null, vao = null, deduzido = [false, false, false];
+      /* Os valores que os DADOS determinam em cada vertice, e nao os que o
+       * caminho de recuo chutou. Declarado aqui em cima e nao dentro do ramo
+       * porque a trava da escala que mente, la embaixo, precisa dele para saber
+       * se o desenho saiu exato. */
+      var conhecidos = [null, null, null];
+
+      if (ladosBrutos.length >= 3) {
+        pontos = lados.length >= 3 ? geo.trianguloPorLados(lados[0], lados[1], lados[2]) : null;
+        /* Com os tres lados numericos a construcao consome tudo, entao os tres
+         * angulos da figura sao deducao dos dados e o gabarito pode escrever o
+         * valor medido. */
+        if (pontos) deduzido = [true, true, true];
+        /* O null da desigualdade triangular e resultado didatico; o null de lado
+         * zero ou negativo nao e, e os dois entravam pela mesma porta: "lado=-5
+         * lado=7 lado=12" desenhava a segunda regua VOLTANDO para tras, e
+         * "lado=0" pendurava um rotulo numa regua de comprimento zero, os dois
+         * marcados como escala fiel. */
+        if (!pontos && lados.length >= 3) {
+          if (lados[0] > 0 && lados[1] > 0 && lados[2] > 0 &&
+              isFinite(lados[0]) && isFinite(lados[1]) && isFinite(lados[2])) {
+            vao = lados.slice(0, 3).sort(function (a, b) { return b - a; });
+          } else {
+            B.avisar(doc, 'triangulo: lado que nao e comprimento (' + lados.join(', ') + ')');
+            return null;
+          }
+        }
+      }
+      if (!pontos && !vao) {
+        /* Cada angulo tem que sair no SEU vertice, inclusive quando um deles e
+         * expressao (3x+10, alfa). Se a construcao apenas empurrasse os numeros
+         * na ordem de chegada, o 61 iria parar num vertice de 62 graus e a
+         * figura mentiria justamente no dado que a aluna vai medir. */
+        for (var kc = 0; kc < 3; kc++) {
+          if (porVertice[kc] !== null && B.ehNumero(porVertice[kc])) conhecidos[kc] = parseFloat(porVertice[kc]);
+        }
+        for (var ke = 0; ke < externos.length; ke++) {
+          if (externos[ke].bruto === null || !B.ehNumero(externos[ke].bruto)) continue;
+          var interno = 180 - parseFloat(externos[ke].bruto);
+          var ja = conhecidos[externos[ke].i];
+          if (ja !== null && Math.abs(ja - interno) > 0.5) {
+            B.avisar(doc, 'triangulo: o vertice ' + nomeDoVertice(nomes, externos[ke].i) +
+              ' esta escrito com ' + ja + ' por dentro e ' + externos[ke].bruto +
+              ' por fora, e os dois nao sao suplementares');
+            return null;
+          }
+          conhecidos[externos[ke].i] = interno;
+        }
+        /* A simetria sai dos grupos de congruencia e e lida ANTES de a resolucao
+         * algebrica preencher os slots vazios. Lida depois, o isosceles do
+         * exercicio 9 (angulo=40 com x nos dois angulos da base) deixaria de ser
+         * reconhecido como isosceles na hora de assentar a figura sobre a base, e
+         * sairia deitado de lado, com os numeros certos e sem se ler como
+         * isosceles, que e a unica coisa que ele precisa dizer. */
+        var simetria = simetriaDeCongruentes(congruentes, conhecidos);
+        resolverTriangulo(B, porVertice, conhecidos, simetria);
+        var vals = aberturas(conhecidos, simetria);
+        /* trianguloPorAngulos(100, 95) devolve null pelo mesmo motivo do
+         * trianguloPorLados(4, 7, 12): os dois lados nunca se encontram. Nao ha
+         * receita de vao para angulo, entao a figura nao sai e o aviso fica no
+         * doc. Desenhar um triangulo qualquer no lugar seria desenhar uma
+         * configuracao que nao existe, com aparencia de verdade. */
+        if (vals.impossivel) { B.avisar(doc, 'triangulo: ' + vals.aviso); return null; }
+        pontos = geo.trianguloPorAngulos(vals.a, vals.b, 100);
+        if (!pontos) {
+          B.avisar(doc, 'triangulo: os angulos ' + angulosBrutos.join(' e ') + ' nao fecham');
+          return null;
+        }
+        /* O trianguloPorAngulos deita SEMPRE o lado entre os dois primeiros
+         * vertices na horizontal, entao o vertice de indice 2 e que fica no
+         * apice. Num isosceles com o apice dado em A, isso punha o apice num dos
+         * cantos de baixo e o triangulo saia deitado de lado: a figura estava
+         * certa nos numeros e mesmo assim nao se lia como isosceles, que era a
+         * unica coisa que ela precisava dizer. Com os dois angulos iguais
+         * identificados, a figura e assentada sobre a base deles. */
+        if (vals.simetria) pontos = assentarSobre(geo, pontos, vals.simetria[0], vals.simetria[1]);
+        deduzido = vals.deduzido;
+      }
+
+      var corGab = corDaCamada(doc, d, COR);
+
+      if (vao) return desenharVao(doc, B, g, d, op, vao, ladosBrutos, fora, corGab);
+
+      /* Lado e angulo no mesmo triangulo sao dado redundante: ou concordam, ou um
+       * dos dois esta errado e a folha nao pode escolher em silencio. Sem esta
+       * conferencia, "lado=3 lado=4 lado=5 angulo=50" construia o 3-4-5 de
+       * verdade e imprimia "50 graus" num vertice que mede 36,87, e "lado=6
+       * lado=8 angulo=90" desenhava o lado rotulado 6 com 41 por cento a mais de
+       * comprimento que o rotulado 8, os dois marcados como escala fiel.
+       *
+       * A unica saida e a chave escala=fora escrita a mao, que e o caso do
+       * desenho enganoso de proposito previsto na especificacao: ali o autor
+       * assume a diferenca e a folha ja avisa em legenda. O fora automatico, o
+       * que nasce de um valor nao numerico, NAO abre essa porta: ninguem pediu
+       * desenho enganoso. */
+      var briga = d.escala === 'fora' ? null
+        : conferirRotulos(geo, B, pontos, porVertice, ladosBrutos, externos, congruentes, nomes);
+      if (briga) { B.avisar(doc, 'triangulo: ' + briga); return null; }
+
+      if (giro) pontos = geo.girar(pontos, giro);
+
+      /* As cevianas e o prolongamento do angulo externo saem da figura, entao a
+       * caixa de enquadramento precisa conhecer os pontos deles ANTES do
+       * enquadrar: enquadrada so pelo triangulo, a ponta do prolongamento caia
+       * fora do bloco e por cima do texto seguinte. */
+      var cevianas = lerCevianas(B, doc, d, nomes, pontos);
+      if (cevianas === null) return null;
+      var extremos = pontos.slice();
+      var prolongamentos = [];
+      for (var pe = 0; pe < externos.length; pe++) {
+        var raio = prolongar(pontos, externos[pe].i);
+        prolongamentos.push(raio);
+        extremos.push(raio.ponta);
+      }
+      for (var pc = 0; pc < cevianas.length; pc++) extremos.push(cevianas[pc].pe);
+
+      var cx = geo.caixa(extremos);
+
+      travaDeClone(B, doc, d, impressaoDaForma(geo, 'triangulo', pontos, valoresExtras(B, d)));
+      if (fora) travaDaEscalaQueMente(B, doc, geo, 'triangulo', d, pontos, porVertice, conhecidos);
+
+      return B.figura(doc, {
+        x: op.x, largura: op.largura, altura: op.altura,
+        unidades: cx, legenda: d.legenda, foraDeEscala: fora,
+        fase: d.fase, id: d.id, receita: 'triangulo'
+      }, function (ctx) {
+        var P = ctx.pontos(pontos);
+        var ladosP = [[P[1], P[2]], [P[2], P[0]], [P[0], P[1]]];
+
+        /* Contorno em COR.texto e 1,2 pt: e o nivel grosso da hierarquia de tres
+         * espessuras (1,2 contorno, 0,9 marca, 0,6 auxiliar), e a NBR 8403 pede
+         * que a larga seja no minimo o dobro da estreita justamente para uma
+         * informacao nao ser confundida com outra. */
+        ctx.contorno(function () {
+          contornoDe(ctx, P);
+          /* O prolongamento e do mesmo peso do contorno: ele E um lado do
+           * triangulo continuado, e nao uma construcao acrescentada. A ponta de
+           * seta diz que a semirreta segue, que e o que faz o angulo do lado de
+           * fora existir. */
+          var D = desenho();
+          for (var i = 0; i < prolongamentos.length; i++) {
+            var V = ctx.p(prolongamentos[i].vertice), Q = ctx.p(prolongamentos[i].ponta);
+            if (D) D.seta(ctx, V, Q, { espessura: 1.2, tam: 5 });
+            else ctx.doc.linha(V.x, V.y, Q.x, Q.y, COR.texto, 1.2);
+          }
+        });
+
+        /* O angulo mora na camada de MARCAS e nao na de rotulos, porque o que se
+         * desenha aqui e o arco: o numero e o rotulo DELE e sai junto, na mesma
+         * chamada. Pintado na camada certa, o arco fica por baixo dos halos das
+         * letras de vertice e das medidas de lado, que e a ordem que a
+         * especificacao fixa (fundo, preenchimento, hachura, contorno, marcas,
+         * rotulos). */
+        ctx.marcas(function () {
+          marcarCongruentes(ctx, congruentes, ladosP);
+          desenharCevianas(ctx, cevianas, P, d);
+          desenharAngulos(ctx, geo, B, P, porVertice, ehIncognita, nomes, d, fora, deduzido,
+            { corDeclarada: corGab });
+          for (var i = 0; i < prolongamentos.length; i++) {
+            var v = externos[i].i;
+            if (externos[i].bruto === null) continue;
+            /* Dos quatro angulos que aparecem no vertice depois do
+             * prolongamento, so um deles e "o angulo externo": o que fica entre a
+             * ponta do prolongamento e o OUTRO lado que sai do vertice, o lado
+             * que nao foi prolongado. O prolongar() sempre continua o lado que
+             * chega vindo do vertice anterior na volta, entao o lado nao
+             * prolongado e o que vai para o vertice seguinte. */
+            valorDeAngulo(ctx, P[v], ctx.p(prolongamentos[i].ponta), P[(v + 1) % 3],
+              rotuloDeAngulo(externos[i].bruto, B),
+              { cor: corGab || undefined, corRotulo: corGab || undefined });
+          }
+        });
+
+        ctx.rotulos(function () {
+          letrasDeVertice(ctx, P, nomes);
+          for (var s = 0; s < ladosBrutos.length && s < 3; s++) {
+            /* lado a e o oposto ao vertice A: a = BC, b = CA, c = AB. */
+            medidaDeLado(ctx, String(ladosBrutos[s]), ladosP[s][0], ladosP[s][1], P, corGab);
+          }
+        });
+      });
+    }
+  };
+
+  /* Preenche os angulos que as EXPRESSOES determinam, pela mesma regra do
+   * quadrilatero: sistema determinado vira construcao, e nao prototipo chutado.
+   * No triangulo a relacao e a soma 180, mais a igualdade dos dois angulos da
+   * base quando as marcas de congruencia dizem que ela existe: com "angulo=2x
+   * incognita=B congruentes=b;c" as marcas dao o terceiro valor e o sistema
+   * fecha em 90, 45 e 45.
+   *
+   * Mexe em conhecidos SO onde ele esta null, e so quando os tres valores achados
+   * sao angulos de verdade: qualquer coisa fora do intervalo volta pelo caminho
+   * de recuo, que ja tem os avisos dele escritos. Devolve se resolveu, para o
+   * teste poder cobrar. */
+  function resolverTriangulo(B, porVertice, conhecidos, simetria) {
+    var formas = [null, null, null], letra = null, i;
+    for (i = 0; i < 3; i++) {
+      if (conhecidos[i] !== null) { formas[i] = { a: 0, b: conhecidos[i], letra: null }; continue; }
+      if (porVertice[i] === null || porVertice[i] === undefined) continue;
+      var lin = lerLinear(porVertice[i]);
+      if (!lin) continue;
+      if (lin.letra) {
+        if (letra !== null && letra !== lin.letra) return false;
+        letra = lin.letra;
+      }
+      formas[i] = lin;
+    }
+    if (simetria) {
+      var si = simetria[0], sj = simetria[1];
+      if (formas[si] && !formas[sj]) formas[sj] = formas[si];
+      else if (formas[sj] && !formas[si]) formas[si] = formas[sj];
+    }
+    if (!formas[0] || !formas[1] || !formas[2]) return false;
+    var somaA = 0, somaB = 0;
+    for (i = 0; i < 3; i++) { somaA += formas[i].a; somaB += formas[i].b; }
+    if (Math.abs(somaA) < 1e-9) return false;
+    var x = (180 - somaB) / somaA;
+    var valores = [];
+    for (i = 0; i < 3; i++) {
+      var v = formas[i].a * x + formas[i].b;
+      if (!(v > 0.5) || !(v < 179.5)) return false;
+      if (conhecidos[i] !== null && Math.abs(conhecidos[i] - v) > 0.5) return false;
+      valores.push(v);
+    }
+    var mexeu = false;
+    for (i = 0; i < 3; i++) if (conhecidos[i] === null) { conhecidos[i] = valores[i]; mexeu = true; }
+    return mexeu;
+  }
+
+  /* Os valores que misturam letra e numero num mesmo par, para a decisao de
+   * escala poder olhar so a parte numerica. */
+  function valoresExtras(B, d) {
+    var saida = [], p = pares(B, d.args, 'externo');
+    for (var i = 0; i < p.length; i++) if (p[i].length > 1) saida.push(p[i][1]);
+    return saida;
+  }
+
+  /* congruentes=b;c e um grupo de lados pelo nome (a, b, c no triangulo; a, b, c,
+   * d no quadrilatero, na volta A-B, B-C, C-D, D-A). Devolve null quando um nome
+   * nao existe, porque um grupo silenciosamente vazio apagaria justamente a marca
+   * que carrega a hipotese do exercicio. */
+  function gruposDeLados(B, d, doc, n) {
+    var letras = ['a', 'b', 'c', 'd', 'e', 'f'];
+    var brutos = pares(B, d.args, 'congruentes'), saida = [];
+    for (var g = 0; g < brutos.length; g++) {
+      var grupo = [];
+      for (var i = 0; i < brutos[g].length; i++) {
+        var nome = String(brutos[g][i]).toLowerCase();
+        var idx = -1;
+        for (var k = 0; k < n; k++) if (letras[k] === nome) idx = k;
+        if (idx < 0) {
+          B.avisar(doc, 'congruentes=' + brutos[g].join(';') + ': "' + brutos[g][i] +
+            '" nao e um lado (use ' + letras.slice(0, n).join(', ') + ')');
+          return null;
+        }
+        grupo.push(idx);
+      }
+      if (grupo.length) saida.push(grupo);
+    }
+    return saida;
+  }
+
+  /* No triangulo, o lado a e oposto ao vertice A. Um grupo de congruencia com
+   * exatamente dois lados diz que os dois ANGULOS opostos a eles sao iguais, e e
+   * isso que transforma o chute do caminho de recuo em deducao: com o apice de 40
+   * escrito e os lados b e c marcados iguais, os dois angulos da base medem 70 de
+   * verdade e nao por acaso do desenho. */
+  function simetriaDeCongruentes(grupos, conhecidos) {
+    for (var g = 0; g < (grupos || []).length; g++) {
+      if (grupos[g].length !== 2) continue;
+      var i = grupos[g][0], j = grupos[g][1];
+      if (conhecidos[i] === null && conhecidos[j] === null) return [i, j];
+    }
+    return null;
+  }
+
+  /* Onde termina o prolongamento de um lado alem do vertice V. O lado prolongado
+   * e o que CHEGA em V vindo do vertice anterior na volta, e nao um dos dois a
+   * escolher: fixada a regra, "externo=C" quer dizer sempre a mesma figura, e o
+   * autor do tema nao precisa adivinhar qual dos dois angulos externos ele vai
+   * receber. */
+  function prolongar(pontos, v) {
+    var origem = pontos[(v + 2) % 3];
+    var V = pontos[v];
+    var u = versor(V.x - origem.x, V.y - origem.y);
+    var comprimento = Math.sqrt((V.x - origem.x) * (V.x - origem.x) + (V.y - origem.y) * (V.y - origem.y));
+    var t = Math.max(0.42 * comprimento, 26);
+    return { vertice: V, origem: origem, ponta: { x: V.x + u.x * t, y: V.y + u.y * t } };
+  }
+
+  /* ceviana=bissetriz;B, repetivel, mais encontro=I. Devolve o pe de cada uma e o
+   * ponto onde elas se cruzam, ja em unidades do problema, para o enquadramento
+   * poder incluir tudo antes do primeiro traco. */
+  function lerCevianas(B, doc, d, nomes, pontos) {
+    var geo = B.geo;
+    var brutos = pares(B, d.args, 'ceviana'), saida = [];
+    for (var i = 0; i < brutos.length; i++) {
+      var tipo = String(brutos[i][0]).toLowerCase();
+      if (tipo !== 'altura' && tipo !== 'mediana' && tipo !== 'bissetriz') {
+        B.avisar(doc, 'ceviana=' + brutos[i].join(';') +
+          ': o tipo tem que ser altura, mediana ou bissetriz');
+        return null;
+      }
+      var v = indiceDeVertice(nomes, brutos[i].length > 1 ? brutos[i][1] : '', 3);
+      if (v < 0) {
+        B.avisar(doc, 'ceviana=' + brutos[i].join(';') + ': o vertice nao existe neste triangulo');
+        return null;
+      }
+      var A = pontos[(v + 1) % 3], C = pontos[(v + 2) % 3], V = pontos[v];
+      var pe;
+      if (tipo === 'altura') pe = geo.pe(V, A, C);
+      else if (tipo === 'mediana') pe = geo.pontoNoSegmento(A, C, 0.5);
+      else {
+        /* O pe da bissetriz divide o lado oposto na razao dos lados vizinhos, que
+         * e o teorema da bissetriz interna. Calculado assim, e nao por
+         * intersecao aproximada, o desenho fecha com a conta. */
+        var lA = geo.distancia(V, A), lC = geo.distancia(V, C);
+        pe = geo.pontoNoSegmento(A, C, lA / (lA + lC));
+      }
+      saida.push({ tipo: tipo, v: v, pe: { x: pe.x, y: pe.y } });
+    }
+    var letra = B.primeiro(d.args, 'encontro');
+    if (letra && saida.length >= 2) {
+      var X = cruzar(pontos[saida[0].v], saida[0].pe, pontos[saida[1].v], saida[1].pe);
+      if (!X) B.avisar(doc, 'encontro=' + letra + ': as duas cevianas nao se cruzam');
+      else saida.encontro = { ponto: X, letra: String(letra) };
+    } else if (letra) {
+      B.avisar(doc, 'encontro=' + letra + ' pede pelo menos duas cevianas');
+    }
+    return saida;
+  }
+
+  function cruzar(A, Bp, C, D) {
+    var r = { x: Bp.x - A.x, y: Bp.y - A.y }, s = { x: D.x - C.x, y: D.y - C.y };
+    var den = r.x * s.y - r.y * s.x;
+    if (Math.abs(den) < 1e-9) return null;
+    var t = ((C.x - A.x) * s.y - (C.y - A.y) * s.x) / den;
+    return { x: A.x + t * r.x, y: A.y + t * r.y };
+  }
+
+  /* A ceviana sai na TINTA DO CONTORNO e se separa dele pela ESPESSURA, e nao
+   * pela cor: o triangulo do enunciado tem tres lados e a bissetriz e uma linha
+   * acrescentada por cima dele, o que na folha se diz com peso e nao com pigmento.
+   *
+   * Ela pedia COR.teal tracejada, e isso era o codigo da camada de RESPOSTA
+   * pedido dentro de uma figura de ENUNCIADO: no exercicio 17 as duas bissetrizes
+   * sao dado da questao, e teal ali queria dizer exatamente o contrario do que
+   * quer dizer no gabarito do exercicio 10. Mesmo codigo com dois sentidos na
+   * mesma folha e pior do que codigo nenhum, e a secao "codigo de cor do
+   * gabarito" acima decide a favor do gabarito: teal so na resposta.
+   *
+   * Na pratica a folha ja saia certa, porque a regra OBJETO da hierarquia de
+   * tinta do desenho.js corrigia o pedido em silencio (medido no t17: 0,90 pt,
+   * #1A1C1F, continuo, e nao 0,60 teal tracejado). O pedido e que continuava
+   * mentindo, e um pedido errado que so nao aparece porque alguem o conserta
+   * depois volta a aparecer no dia em que o conserto mudar de lugar. A espessura
+   * continua vindo daqui em 0,6, o piso auxiliar, e quem a sobe para 0,9 e a regra
+   * OBJETO, que e de quem tem a tabela.
+   *
+   * Os arquinhos que dizem "esta ceviana divide o angulo ao meio" NAO entram
+   * aqui. Com duas bissetrizes eles somam quatro arcos que competem com o arco do
+   * dado do enunciado, e a propria especificacao nomeia "cinco arcos na mesma
+   * figura" como o resultado tipico de quem tem primitiva boa e nenhum criterio.
+   * Quem diz que sao bissetrizes e o texto do exercicio, e redundancia entre os
+   * dois canais, texto e desenho, e justamente a que ajuda quem le com
+   * dificuldade. */
+  function desenharCevianas(ctx, cevianas, P, d) {
+    var B = base(), D = desenho(), COR = B.gerador().COR;
+    if (!cevianas || !cevianas.length || !D) return;
+    for (var i = 0; i < cevianas.length; i++) {
+      D.poligono(ctx, [P[cevianas[i].v], ctx.p(cevianas[i].pe)], {
+        fechado: false, cor: COR.texto, espessura: 0.6,
+        papel: 'ceviana ' + cevianas[i].tipo
+      });
+    }
+    if (cevianas.encontro) {
+      var X = ctx.p(cevianas.encontro.ponto);
+      var centro = B.geo.centroide(P);
+      /* O arco do angulo que o cruzamento batiza. Batizar o ponto onde duas
+       * construcoes se encontram so tem um motivo, que e perguntar por um dos
+       * QUATRO angulos que nascem ali, e sem arco nada na figura diz qual deles:
+       * medido no exercicio 17, a figura marcava o 70 do vertice A com arco e
+       * deixava o angulo BIC, que e a pergunta, com um "I" solto ao lado do
+       * cruzamento. Marcava o dado e deixava a incognita sem marca.
+       *
+       * O arco vai entre as semirretas que saem do cruzamento na direcao dos dois
+       * VERTICES de onde as construcoes partiram, que e exatamente o angulo que o
+       * par de letras nomeia: com as bissetrizes de B e de C, o angulo BIC.
+       *
+       * Ele nao anota item proprio, pela mesma regra ja escrita para o arco com
+       * valor: o arco nao e dado a ler, e o que diz de qual angulo o dado fala, e
+       * aqui o dado e a propria letra do cruzamento, que o ponto abaixo ja anota.
+       * Contando os dois, o exercicio 17 passaria de cinco itens (70, A, B, C e I)
+       * para seis e estouraria o teto por causa da notacao, e nao do conteudo.
+       *
+       * Sai antes do ponto de proposito: os dois moram na camada de marcas, e
+       * desenhado depois o arco passaria por cima do halo da letra. */
+      var M = marcas();
+      if (M && cevianas.length >= 2) {
+        M.marcaAngulo(ctx.doc, X, P[cevianas[0].v], P[cevianas[1].v], { tam: TAM_DADO });
+      }
+      D.ponto(ctx, X, {
+        rotulo: cevianas.encontro.letra, tam: TAM_DADO,
+        direcao: versor(X.x - centro.x, X.y - centro.y)
+      });
+    }
+  }
+
+  function contornoDe(ctx, P) {
+    var D = desenho(), COR = base().gerador().COR;
+    if (D) { D.poligono(ctx, P, { cor: COR.texto, espessura: 1.2 }); return; }
+    for (var i = 0; i < P.length; i++) {
+      var A = P[i], Bp = P[(i + 1) % P.length];
+      ctx.doc.linha(A.x, A.y, Bp.x, Bp.y, COR.texto, 1.2);
+      ctx.anota('traco', { x1: A.x, y1: A.y, x2: Bp.x, y2: Bp.y, espessura: 1.2, papel: 'contorno' });
+    }
+  }
+
+  /* ============================================================ arco de angulo */
+
+  function desenharAngulos(ctx, geo, B, P, porVertice, ehIncognita, nomes, d, fora, deduzido, op) {
+    var COR = B.gerador().COR;
+    var n = P.length;
+    op = op || {};
+
+    for (var v = 0; v < n; v++) {
+      var bruto = porVertice[v];
+
+      /* Camada de resposta num vertice que o enunciado deixou EM BRANCO. E o caso
+       * do paralelogramo com um angulo dado: o enunciado marca so o 65, porque
+       * descobrir qual dos outros e o oposto e qual e o consecutivo e a questao
+       * inteira, e a resposta "115, 65 e 115" e ambigua em texto porque nao diz
+       * qual e qual. Aqui ela sai onde e medida, e a figura do gabarito passa a
+       * ser a do enunciado MAIS a resposta, em vez de a mesma figura de novo.
+       *
+       * E ela sai COM ARCO, pela mesma obrigacao da camada de enunciado. Escrito
+       * solto na bissetriz, como estava, o valor nao dizia a qual angulo pertencia:
+       * medido no gabarito do exercicio 10, os tres numeros da resposta ("115",
+       * "65" e "115") sairam a 154,53, 208,69 e 79,24 pt do unico arco da figura,
+       * e no do exercicio 18 o "60" e o "120" da resposta sairam a 73,79 e 69,01
+       * pt. Um numero perto de um vertice pode ser o angulo interno, o externo ou
+       * o do triangulo da diagonal, e o teto de marcas nao muda com a troca: o
+       * marcaAngulo anota UM item, o valor, exatamente como o escrever anotava. */
+      if ((bruto === null || bruto === undefined) && d.fase === 'gabarito' && !fora && deduzido[v]) {
+        var Vg = P[v], G1 = P[(v + 1) % n], G2 = P[(v + n - 1) % n];
+        var med = geo.anguloEm(Vg, G1, G2);
+        var Mg = marcas();
+        /* Angulo reto continua sendo o quadradinho tambem na resposta: "90°"
+         * escrito ao lado de um quadradinho e a redundancia que a especificacao
+         * proibe. Nos tipos que ja marcam os quatro cantos (retangulo, quadrado) a
+         * resposta ja esta desenhada no enunciado, e repetir o quadradinho por
+         * cima seria a mesma marca duas vezes no mesmo canto. */
+        if (Math.abs(med - 90) < 0.5) {
+          if (Mg && !op.retosProntos) {
+            Mg.marcaAnguloReto(ctx.doc, Vg, G1, G2, { cor: COR.teal, ctx: ctx });
+          }
+          continue;
+        }
+        if (Mg) {
+          Mg.marcaAngulo(ctx.doc, Vg, G1, G2, {
+            rotulo: arredondar(med) + '°', tam: TAM_DADO,
+            cor: COR.teal, corRotulo: COR.teal, ctx: ctx
+          });
+          continue;
+        }
+        /* Caminho de recuo, sem o marcas.js: valor sem arco ainda e melhor do que
+         * gabarito sem resposta. */
+        var bisV = geo.bissetriz(Vg, G1, G2);
+        escrever(ctx, arredondar(med) + '°', Vg, bisV, 17,
+          { tam: TAM_DADO, bold: true, cor: COR.teal });
+        continue;
+      }
+      if (bruto === null || bruto === undefined) continue;
+
+      var V = P[v], A1 = P[(v + 1) % n], A2 = P[(v + n - 1) % n];
+      var abertura = geo.anguloEm(V, A1, A2);
+      var texto = rotuloDeAngulo(bruto, B);
+      var res = null;
+      var M = marcas();
+      /* Valor DECLARADO na diretiva numa figura que nasceu no gabarito. Ele
+       * tambem e resposta: nao ha folha de exercicio com essa figura, entao o
+       * valor nao foi lido antes em lugar nenhum. E o caso do exercicio 11 (os
+       * angulos 30, 60 e 90 achados pela aluna) e do 18 (o losango de 60 e 120 que
+       * e o contraexamplo pedido). Ver a secao "codigo de cor do gabarito". O arco
+       * vai junto, porque nessas figuras o arco tambem e acrescimo: no gabarito
+       * rechamado pelo id o arco ja esta impresso no enunciado e continua preto,
+       * com so o valor mudando de cor. */
+      var corDaResposta = op.corDeclarada || null;
+
+      /* Camada de resposta na INCOGNITA. Ela sai colada ao proprio x, no rotulo
+       * do arco que ja marca aquele angulo, e nao como um segundo numero
+       * empurrado mais para fora na mesma direcao, que era como estava. Tres
+       * coisas medidas obrigaram a troca, e as tres vem da mesma causa, o valor
+       * ser um item solto:
+       *
+       *   1. Ele caia FORA do alcance do arco que responde. Medido: 26,51 pt no
+       *      "67°" do gabarito de "angulo=52 angulo=61 incognita=C", 22,34 pt em
+       *      cada um dos dois "70°" do isosceles com duas incognitas e 27,90 pt
+       *      no valor do vertice pedido de um triangulo com angulo externo,
+       *      contra os 12 pt mais meia largura do rotulo que a trava aceita.
+       *      Numero solto perto de um vertice nao diz se e o interno, o externo
+       *      ou o do triangulo da diagonal.
+       *   2. Empurrado para fora, ele chegava mais perto do arco do VIZINHO: no
+       *      gabarito de "angulo=38 angulo=104 incognita=C giro=22" o "38°" da
+       *      resposta ficou a 12,13 pt do arco de 104 graus, e a folha passou a
+       *      afirmar que um arco de 104 mede 38.
+       *   3. Ele dobrava a contagem de itens do vertice. No isosceles com duas
+       *      incognitas o gabarito somava seis itens (40, x, 70, x, 70) e
+       *      estourava o teto de cinco por causa da notacao, e nao do conteudo.
+       *
+       * Escrito "x = 67°" o valor e UM item, esta dentro da cunha do proprio arco
+       * por construcao (quem posiciona e o marcaAngulo) e diz de que x ele e a
+       * resposta. A diferenca entre a folha do enunciado e a do gabarito continua
+       * codificada duas vezes: a cor teal e o proprio texto a mais.
+       *
+       * Medir na figura, e nao numa conta paralela, e o que garante que o
+       * gabarito nunca escreve um valor que o desenho nao mostra. Mas so vale
+       * quando a abertura foi DEDUZIDA dos dados: o caminho de recuo serve para
+       * desenhar o formato e nao pode virar resposta, senao "angulo=52
+       * incognita=C" escreve 64 graus, que veio de (180-52)/2, na folha que a
+       * professora usa para corrigir. */
+      if (ehIncognita[v] && d.fase === 'gabarito' && !fora) {
+        if (deduzido[v]) {
+          texto = texto + ' = ' + arredondar(abertura) + '°';
+          corDaResposta = COR.teal;
+        } else {
+          ctx.anota('aviso', 'o gabarito nao tem resposta para ' +
+            nomeDoVertice(nomes, v) + ': os dados nao determinam esse angulo');
+        }
+      }
+
+      if (M) {
+        /* Angulo reto e o quadradinho, nunca arco e nunca o texto 90 graus,
+         * mesmo quando o valor 90 vem escrito na diretiva: arco com 90 ao lado
+         * faz a aluna ler mais um dado numerico entre os outros e perder a
+         * distincao entre o que a figura DA e o que ela tem que calcular. A
+         * excecao e a incognita: ali o vertice medir 90 e consequencia dos
+         * outros dados e e justamente o que ela tem que descobrir, entao o
+         * quadradinho entregaria a resposta e ainda contradiria o x ao lado. */
+        if (!ehIncognita[v] && B.ehNumero(bruto) &&
+            Math.abs(parseFloat(bruto) - 90) < 0.5 && Math.abs(abertura - 90) < 1.5) {
+          /* O quadradinho ocupa o lugar do "90°" escrito, entao ele carrega o
+           * codigo de cor pelo valor que substitui: no gabarito do exercicio 11 o
+           * angulo reto e parte da resposta tanto quanto o 30 e o 60. */
+          res = M.marcaAnguloReto(ctx.doc, V, A1, A2,
+            { ctx: ctx, cor: op.corDeclarada || undefined });
+        } else {
+          res = M.marcaAngulo(ctx.doc, V, A1, A2, {
+            rotulo: texto, tam: TAM_DADO, ctx: ctx,
+            cor: op.corDeclarada || undefined, corRotulo: corDaResposta
+          });
+        }
+      }
+
+      /* Caminho de recuo, para o valor nunca sumir da folha. Valor escrito na
+       * diretiva que nao chega na folha e SEMPRE erro de quem escreveu o tema, e
+       * o marcaAngulo devolve null em dois casos legitimos: o vertice em que nao
+       * cabe arco nenhum, e o marcas.js ausente no navegador. Nesses o numero
+       * volta a sair sozinho na bissetriz, que e pior que o arco mas nao e
+       * silencio. */
+      if (!res || (res.tipo !== 'anguloReto' && !res.rotulo)) {
+        var bis = geo.bissetriz(V, A1, A2);
+        escrever(ctx, texto, V, bis, 16,
+          { tam: TAM_DADO, cor: corDaResposta || undefined, bold: !!corDaResposta });
+      }
+    }
+  }
+
+  /* O foraDaCaixa(), que pousava a resposta do gabarito logo depois da caixa do x
+   * do enunciado, saiu daqui junto com o segundo rotulo que ele posicionava: a
+   * resposta agora entra no proprio rotulo do arco ("x = 67°") e quem a posiciona
+   * e o marcaAngulo, que ja resolve cunha estreita, fio de chamada e colisao. O
+   * defeito que a funcao carregava esta medido no comentario do desenharAngulos:
+   * empurrado para fora, o valor saia a 22,34, 26,51 e 27,90 pt do arco que
+   * responde, e no caso do 38 girado chegou mais perto do arco de 104 do que do
+   * seu proprio. */
+
+  /* Com que abertura os dois primeiros vertices sao construidos, a partir do que
+   * se sabe. Devolve tambem o aviso de soma: tres angulos numericos que nao somam
+   * 180 sao erro de quem escreveu o tema, e a figura sairia impossivel sem
+   * ninguem ver. */
+  function aberturas(conhecidos, simetria) {
+    var a = conhecidos[0], b = conhecidos[1], c = conhecidos[2];
+    var escritos = [];
+    for (var i = 0; i < 3; i++) if (conhecidos[i] !== null) escritos.push(conhecidos[i]);
+
+    /* Quais vertices tem valor DEDUZIDO dos dados, e nao chutado pelo caminho de
+     * recuo. Com dois angulos conhecidos o terceiro sai de 180 menos os dois; com
+     * um so, a divisao abaixo e chute, salvo quando as marcas de congruencia
+     * dizem que os dois que faltam sao iguais. */
+    var numericos = escritos.length;
+    var deduzido = [
+      a !== null || numericos >= 2 || !!simetria,
+      b !== null || numericos >= 2 || !!simetria,
+      c !== null || numericos >= 2 || !!simetria
+    ];
+
+    /* Tres angulos numericos que nao somam 180 sao erro de quem escreveu o tema.
+     * Desenhar assim mesmo produziria uma figura em que o rotulo diz uma coisa e
+     * o traco diz outra, que e o pior defeito possivel: a aluna que confere com
+     * transferidor conclui que o material esta errado e para de usar figura como
+     * ferramenta nas questoes seguintes. */
+    if (a !== null && b !== null && c !== null && Math.abs(a + b + c - 180) > 0.5) {
+      return {
+        a: a, b: b, impossivel: true, deduzido: deduzido,
+        aviso: 'os angulos ' + escritos.join(', ') + ' somam ' + arredondar(a + b + c) + ' e nao 180'
+      };
+    }
+    if (a === null && b !== null && c !== null) a = 180 - b - c;
+    if (b === null && a !== null && c !== null) b = 180 - a - c;
+    if (c === null && a !== null && b !== null) c = 180 - a - b;
+
+    if (numericos === 1) {
+      /* Um angulo so nao determina o triangulo, e a repartição do que sobra e
+       * escolha do desenhador. Ela NAO pode ser meio a meio por padrao: um
+       * isosceles desenhado onde ninguem pediu isosceles afirma na folha uma
+       * congruencia que o enunciado nao deu, e a aluna que mede com regua conclui
+       * que os dois lados sao iguais. A divisao desigual sai visivelmente
+       * escalena. Meio a meio so quando as marcas de congruencia pedem, que e o
+       * caso do isosceles com o apice dado. */
+      var sobra = 180 - escritos[0];
+      var faltam = [];
+      for (var k = 0; k < 3; k++) if (conhecidos[k] === null) faltam.push(k);
+      var parte = simetria ? [0.5, 0.5] : [0.46, 0.54];
+      var valores = [a, b, c];
+      valores[faltam[0]] = sobra * parte[0];
+      valores[faltam[1]] = sobra * parte[1];
+      a = valores[0]; b = valores[1];
+    }
+    /* Sem numero nenhum a figura e um triangulo generico: ela ainda serve para
+     * mostrar formato, letra de vertice e incognita. */
+    if (a === null && b === null) { a = 58; b = 62; }
+    if (a === null) a = 180 - b - (c === null ? 60 : c);
+    if (b === null) b = 180 - a - (c === null ? 60 : c);
+
+    if (!(a > 0) || !(b > 0) || a + b >= 180) {
+      return {
+        a: a, b: b, impossivel: true, deduzido: deduzido,
+        aviso: 'os angulos ' + escritos.join(', ') + ' nao fecham um triangulo'
+      };
+    }
+    return { a: a, b: b, aviso: null, deduzido: deduzido, simetria: simetria || null };
+  }
+
+  /* Gira a figura ate o segmento P[i]P[j] ficar na horizontal, com o resto da
+   * figura POR CIMA dele. E a posicao prototipica: um poligono apoiado num lado e
+   * nao equilibrado num bico. Gira a lista de pontos antes de desenhar, e nunca
+   * por cm no PDF, senao a espessura das linhas escalaria junto e os rotulos
+   * deitariam com a figura. */
+  function assentarSobre(geo, pontos, i, j) {
+    var A = pontos[i], Bp = pontos[j];
+    var ang = Math.atan2(Bp.y - A.y, Bp.x - A.x) * 180 / Math.PI;
+    var girado = geo.girar(pontos, -ang);
+    var apoio = (girado[i].y + girado[j].y) / 2;
+    var acima = 0;
+    for (var k = 0; k < girado.length; k++) acima += girado[k].y - apoio;
+    if (acima < 0) girado = geo.girar(girado, 180);
+    return girado;
+  }
+
+  /* Cruza o que esta ESCRITO na diretiva com o que a construcao produziu.
+   * Devolve o motivo da briga, ou null quando os dois contam a mesma historia.
+   *
+   * O angulo e absoluto e vai comparado direto, com a mesma tolerancia de 0,5
+   * grau da soma. O lado e comparado por PROPORCAO, porque o enquadramento decide
+   * o tamanho na folha: dois lados rotulados 6 e 8 tem que sair com a mesma razao
+   * no desenho, e um lado sozinho nunca briga com ninguem. */
+  function conferirRotulos(geo, B, pontos, porVertice, ladosBrutos, externos, congruentes, nomes) {
+    var v, n = pontos.length;
+    for (v = 0; v < n; v++) {
+      if (!B.ehNumero(porVertice[v])) continue;
+      var escrito = parseFloat(porVertice[v]);
+      var medido = geo.anguloEm(pontos[v], pontos[(v + 1) % n], pontos[(v + n - 1) % n]);
+      if (Math.abs(medido - escrito) > 0.5) {
+        return 'o angulo escrito ' + porVertice[v] + ' esta num vertice que mede ' +
+          arredondar(medido) + ' no desenho';
+      }
+    }
+    for (var e = 0; e < (externos || []).length; e++) {
+      if (externos[e].bruto === null || !B.ehNumero(externos[e].bruto)) continue;
+      var iv = externos[e].i;
+      var interno = geo.anguloEm(pontos[iv], pontos[(iv + 1) % n], pontos[(iv + n - 1) % n]);
+      if (Math.abs(180 - interno - parseFloat(externos[e].bruto)) > 0.5) {
+        return 'o angulo externo ' + externos[e].bruto + ' esta num vertice cujo suplementar mede ' +
+          arredondar(180 - interno) + ' no desenho';
+      }
+    }
+    var lados = [];
+    for (var s = 0; s < n; s++) lados.push(geo.distancia(pontos[(s + 1) % n], pontos[(s + n - 1) % n]));
+    if (n !== 3) {
+      lados = [];
+      for (var s2 = 0; s2 < n; s2++) lados.push(geo.distancia(pontos[s2], pontos[(s2 + 1) % n]));
+    }
+    /* Marca de congruencia e afirmacao sobre a figura, igual ao numero: marcados
+     * como iguais dois lados que o desenho traz diferentes, a folha mente na
+     * notacao em vez de mentir no numero, e o estrago e o mesmo. */
+    for (var gi = 0; gi < (congruentes || []).length; gi++) {
+      var grupo = congruentes[gi];
+      for (var k = 1; k < grupo.length; k++) {
+        var l0 = lados[grupo[0]], lk = lados[grupo[k]];
+        if (Math.abs(l0 - lk) > 0.01 * Math.max(l0, lk)) {
+          return 'os lados marcados como congruentes saem com comprimentos diferentes no desenho';
+        }
+      }
+    }
+    var ref = null;
+    for (var s3 = 0; s3 < ladosBrutos.length && s3 < n; s3++) {
+      if (!B.ehNumero(ladosBrutos[s3])) continue;
+      var val = parseFloat(ladosBrutos[s3]);
+      if (!(val > 0)) return 'lado que nao e comprimento: ' + ladosBrutos[s3];
+      var comp = lados[s3];
+      if (ref === null) { ref = { val: val, comp: comp }; continue; }
+      var esperado = ref.comp / ref.val * val;
+      if (Math.abs(comp - esperado) > 0.01 * Math.max(comp, esperado)) {
+        return 'os lados ' + ref.val + ' e ' + val + ' nao saem nessa proporcao no desenho' +
+          ' (dois lados soltos nao definem triangulo)';
+      }
+    }
+    return null;
+  }
+
+  /* ============================================================ o triangulo que nao existe
+   *
+   * Os dois lados menores saem deitados em fila sobre o maior, alinhados a
+   * esquerda: e a unica forma em que a desigualdade se ve em vez de se decorar,
+   * porque 4 mais 7 termina antes de 12 e a sobra fica na folha.
+   *
+   * A AMARRACAO ENTRE AS DUAS REGUAS era a linha mais fraca da folha inteira, e
+   * era a linha que carrega a resposta. Medido no fluxo de conteudo do piloto,
+   * material p3 e ingles p3: duas verticais de 0,60 pt em #6B7280, contraste
+   * 4,83:1, padrao tracejado [1 2] e 60,00 pt de comprimento cada. Um [1 2]
+   * deposita um terco da tinta pelo mesmo caminho, entao na segunda geracao de
+   * fotocopia a ligacao entre o vao e a base de 12 some, e a figura para de
+   * explicar exatamente o que ela existe para explicar. O
+   * _prova_desenho_auditor.js ja acusava as tres ocorrencias pela regra R3.
+   *
+   * Elas sairam. Quem amarra agora e a propria LINHA DE CHAMADA da cota, pelo
+   * op.desde do desenho.js: a chamada nasce na aresta de referencia (a base do
+   * lado maior), passa pelo ponto medido e vai ate depois da linha de cota, num
+   * traco so, 0,60 pt continuo na tinta do contorno, 17,08:1. Deixa de ser guia
+   * solta e passa a ser o que ela e no desenho tecnico, a chamada da propria cota,
+   * e a hierarquia da figura fica com os tres niveis na ordem certa: contorno
+   * 1,20, linha de cota 0,90, chamada 0,60.
+   *
+   * No degenerado exato nao ha cota (o vao e zero), e ali a amarracao continua
+   * sendo desenhada aqui, mas com a mesma tinta e o mesmo peso da chamada: 0,60 pt
+   * continuo em COR.texto. Ela e a unica coisa que mostra que as duas reguas de
+   * cima terminam EXATAMENTE onde a de baixo termina, que e a resposta daquele
+   * caso, e nao pode ser o traco mais apagado da figura. */
+  function desenharVao(doc, B, g, d, op, tres, brutos, fora, corGab) {
+    var COR = g.COR, D = desenho();
+    var L = tres[0], m1 = tres[1], m2 = tres[2];
+    /* O degenerado exato (5, 5 e 10; 8, 8 e 16) e didaticamente OUTRO caso. A
+     * figura inteira existe para mostrar que a soma dos menores nao alcanca o
+     * maior, e ali ela mostra que alcanca exatamente: as duas reguas cobrem a de
+     * baixo de ponta a ponta, vao zero, e as duas guias tracejadas caem no mesmo
+     * x. Sem dizer o que aconteceu ali, o desenho confirma o contrario da
+     * resposta, e por isso a glosa e obrigatoria neste caso.
+     *
+     * A glosa vem da DIRETIVA e nao daqui: ela e uma frase, e frase escrita
+     * dentro do desenhador quebra a folha em ingles em silencio. */
+    var exato = Math.abs(m1 + m2 - L) <= 1e-9 * Math.max(L, 1);
+    if (exato && !d.legenda) {
+      B.avisar(doc, 'triangulo: o caso degenerado exato (' + brutos.join(', ') +
+        ') precisa de legenda= na diretiva dizendo que os tres vertices ficam alinhados');
+    }
+    /* A distancia entre as duas reguas e curta de proposito. Na primeira prova
+     * impressa ela era 0,30 do lado maior e as duas barras liam como duas coisas
+     * sem relacao, no meio de meia folha vazia: a comparacao que a questao pede
+     * so acontece quando uma esta logo acima da outra. */
+    var alto = L * 0.14;
+
+    return B.figura(doc, {
+      x: op.x, largura: op.largura, altura: op.altura != null ? op.altura : ALTURA_VAO,
+      unidades: { x0: 0, y0: 0, x1: L, y1: alto },
+      legenda: d.legenda, foraDeEscala: fora,
+      fase: d.fase, id: d.id, receita: 'triangulo'
+    }, function (ctx) {
+      var base0 = ctx.p({ x: 0, y: 0 }), base1 = ctx.p({ x: L, y: 0 });
+      var c0 = ctx.p({ x: 0, y: alto }), c1 = ctx.p({ x: m1, y: alto });
+      var c2 = ctx.p({ x: m1 + m2, y: alto });
+
+      ctx.contorno(function () {
+        doc.linha(base0.x, base0.y, base1.x, base1.y, COR.texto, 1.2);
+        doc.linha(c0.x, c0.y, c1.x, c1.y, COR.texto, 1.2);
+        doc.linha(c1.x, c1.y, c2.x, c2.y, COR.texto, 1.2);
+        ctx.anota('traco', { x1: base0.x, y1: base0.y, x2: base1.x, y2: base1.y, espessura: 1.2, papel: 'contorno' });
+        ctx.anota('traco', { x1: c0.x, y1: c0.y, x2: c1.x, y2: c1.y, espessura: 1.2, papel: 'contorno' });
+        ctx.anota('traco', { x1: c1.x, y1: c1.y, x2: c2.x, y2: c2.y, espessura: 1.2, papel: 'contorno' });
+        /* Tacos de extremo nas duas reguas: sem eles os dois lados menores leem
+         * como um segmento so, e o extremo direito do maior nao se ve. */
+        [c0, c1, c2, base0, base1].forEach(function (p) {
+          doc.linha(p.x, p.y - 3.5, p.x, p.y + 3.5, COR.texto, 0.9);
+        });
+      });
+
+      /* O vao aberto sem cota mostrava que sobra pedaco, mas nao dizia QUANTO, e
+       * o quanto e a resposta da questao (4 mais 7 da 11 contra 12, entao falta
+       * 1). Medida que nao se refere a um lado desenhado vai em cota e nunca
+       * escrita sobre o traco, e este vao nao e lado de ninguem.
+       *
+       * No degenerado exato o vao e zero: cotar zero seria desenhar duas cabecas
+       * de seta em cima do mesmo ponto, e quem diz o que aconteceu e a legenda. */
+      if (!exato && D) {
+        ctx.marcas(function () {
+          var fim = ctx.p({ x: L, y: alto });
+          /* O 'fora' recebe um ponto de DENTRO da figura e a cota sai pelo lado
+           * contrario: assim ela sobe para o vazio acima das reguas sem depender
+           * de a figura estar em pe ou girada. O 'desde' recebe a aresta de
+           * REFERENCIA, a base do lado maior, e e ela que faz a chamada da cota
+           * descer os 60 pt ate a regua de baixo num traco continuo, no lugar das
+           * duas guias tracejadas que sairam daqui. */
+          D.cota(ctx, c2, fim, arredondar(L - m1 - m2), {
+            fora: { x: (base0.x + base1.x) / 2, y: base0.y },
+            desde: base0, afastamento: 11, tam: TAM_DADO
+          });
+        });
+      } else {
+        ctx.marcas(function () {
+          /* Duas situacoes caem aqui, e as duas pedem a mesma vertical.
+           *
+           * O degenerado exato, que nao tem cota porque o vao e zero: as duas
+           * reguas de cima terminam no mesmo x em que a de baixo termina, e sem
+           * esta vertical o encontro dos dois extremos nao se ve, que e a resposta
+           * daquele caso.
+           *
+           * E o caminho de recuo sem o desenho.js, em que nao ha cota nenhuma: ali
+           * a vertical e a unica coisa que ainda liga as duas reguas, e figura com
+           * amarracao fraca ainda e melhor do que figura sem amarracao.
+           *
+           * Nos dois a linha sai com a tinta e o peso da linha de chamada da cota
+           * do outro ramo, 0,60 pt continuo em COR.texto, para os dois casos da
+           * mesma figura nao serem desenhados com dois vocabularios diferentes. */
+          function amarrar(x) {
+            if (D) {
+              D.poligono(ctx, [{ x: x, y: base0.y }, { x: x, y: c2.y + 3.5 }],
+                { fechado: false, cor: COR.texto, espessura: 0.6, papel: 'chamada' });
+            } else {
+              doc.linha(x, base0.y, x, c2.y + 3.5, COR.texto, 0.6);
+            }
+          }
+          amarrar(c2.x);
+          if (!exato) amarrar(base1.x);
+        });
+      }
+
+      ctx.rotulos(function () {
+        var cima = { x: 0, y: 1 }, baixo = { x: 0, y: -1 };
+        var tinta = { tam: TAM_DADO, cor: corGab || undefined };
+        escrever(ctx, String(maiorBruto(brutos)), { x: (base0.x + base1.x) / 2, y: base0.y }, baixo, 5, tinta);
+        escrever(ctx, String(m1), { x: (c0.x + c1.x) / 2, y: c0.y }, cima, 5, tinta);
+        escrever(ctx, String(m2), { x: (c1.x + c2.x) / 2, y: c1.y }, cima, 5, tinta);
+      });
+    });
+  }
+
+  function maiorBruto(brutos) {
+    var maior = null;
+    for (var i = 0; i < brutos.length; i++) {
+      var n = parseFloat(brutos[i]);
+      if (!isFinite(n)) continue;
+      if (maior === null || n > parseFloat(maior)) maior = brutos[i];
+    }
+    return maior === null ? brutos[0] : maior;
+  }
+
+  /* ============================================================ quadrilatero
+   *
+   * A familia inteira numa receita so, porque ela E uma familia: cada figura e a
+   * anterior com uma condicao a mais, e sao as MARCAS que dizem qual condicao.
+   * Por isso a notacao sai automatica do tipo e nao precisa ser escrita a mao:
+   * paralelogramo ganha as duas setas de paralelismo, losango ganha os quatro
+   * tracinhos, retangulo ganha os quadradinhos, quadrado ganha os dois. Escrita a
+   * mao, ela seria esquecida justamente na figura em que a condicao importa.
+   *
+   * A volta e sempre A, B, C, D no sentido anti-horario, com AB na base. Os lados
+   * chamam-se a (AB), b (BC), c (CD) e d (DA), na mesma ordem da volta, e nao
+   * "oposto ao vertice" como no triangulo: num quadrilatero nao ha lado oposto a
+   * vertice, e inventar uma segunda convencao daria dois nomes ao mesmo lado. */
+
+  var PROTOTIPOS = {
+    quadrilatero: function () { return [pt(0, 0), pt(118, 8), pt(96, 76), pt(14, 60)]; },
+    /* O trapezio generico e ESCALENO de proposito, e as duas pernas tem que sair
+     * visivelmente diferentes. Desenhado simetrico, como estava (pernas de 67,2 e
+     * 68,0, angulos da base de 67,2 e 65,7 graus, diferenca de 1,5 grau que
+     * ninguem ve), ele contradiz a definicao escrita ao lado dele, "pelo menos um
+     * par de lados paralelos": a aluna guarda o prototipo simetrico como se a
+     * simetria fizesse parte da definicao, que e o erro classico desta serie, e
+     * depois nao reconhece como trapezio o que nao for isosceles. Pior no painel
+     * da familia, onde o trapezio generico e o trapezio isosceles do exercicio 12
+     * sairiam com o MESMO formato e a diferenca entre os dois viraria so os
+     * tracinhos das pernas.
+     *
+     * Os dois angulos da base saem separados por 24 graus. Nenhum dos dois chega
+     * perto de 90, senao a figura viraria o outro caso particular, o trapezio
+     * retangulo, e o prototipo ensinaria outro preconceito no lugar do primeiro.
+     * A altura sai dos dois angulos, e nao fixa, para o lado de cima nunca
+     * encolher ate sumir: com o recuo das duas pernas limitado a 55 por cento da
+     * base, sobram 45 por cento de lado menor em qualquer inclinacao. */
+    trapezio: function (a) {
+      var L = 126;
+      var angA = (a > 12 && a < 84) ? a : 52;
+      var angB = angA + 24 < 84 ? angA + 24 : angA - 24;
+      var cotA = 1 / Math.tan(angA * Math.PI / 180), cotB = 1 / Math.tan(angB * Math.PI / 180);
+      var h = Math.min(0.50 * L, 0.55 * L / Math.max(cotA + cotB, 1e-6));
+      return [pt(0, 0), pt(L, 0), pt(L - h * cotB, h), pt(h * cotA, h)];
+    },
+    trapezioisosceles: function (a) {
+      /* O angulo da base maior manda no desenho, e a altura sai dele: com 72
+       * graus o trapezio e alto e fechado, com 50 ele e baixo e aberto, e a aluna
+       * que medir com transferidor acha o valor do enunciado. O recuo tem teto,
+       * senao um angulo de 85 graus produziria uma figura tres vezes mais alta do
+       * que larga e o enquadramento a encolheria ate o rotulo nao caber. */
+      var L = 120, ang = (a > 5 && a < 89) ? a : 68;
+      var alturaAlvo = 0.62 * L;
+      var recuo = alturaAlvo / Math.tan(ang * Math.PI / 180);
+      if (recuo > 0.30 * L) { recuo = 0.30 * L; alturaAlvo = recuo * Math.tan(ang * Math.PI / 180); }
+      return [pt(0, 0), pt(L, 0), pt(L - recuo, alturaAlvo), pt(recuo, alturaAlvo)];
+    },
+    paralelogramo: function (a) {
+      var L = 112, lado = 66, ang = (a > 5 && a < 175) ? a : 62;
+      var t = ang * Math.PI / 180;
+      return [pt(0, 0), pt(L, 0), pt(L + lado * Math.cos(t), lado * Math.sin(t)), pt(lado * Math.cos(t), lado * Math.sin(t))];
+    },
+    retangulo: function () { return [pt(0, 0), pt(116, 0), pt(116, 70), pt(0, 70)]; },
+    losango: function (a) {
+      var lado = 82, ang = (a > 5 && a < 175) ? a : 62;
+      var t = ang * Math.PI / 180;
+      return [pt(0, 0), pt(lado, 0), pt(lado + lado * Math.cos(t), lado * Math.sin(t)), pt(lado * Math.cos(t), lado * Math.sin(t))];
+    },
+    quadrado: function () { return [pt(0, 0), pt(84, 0), pt(84, 84), pt(0, 84)]; }
+  };
+
+  /* Que notacao cada tipo carrega. paralelas e uma lista de pares de lados, e
+   * congruentes uma lista de grupos, os dois pelo indice do lado na volta. */
+  var NOTACAO = {
+    quadrilatero: { paralelas: [], congruentes: [], retos: false },
+    trapezio: { paralelas: [[0, 2]], congruentes: [], retos: false },
+    trapezioisosceles: { paralelas: [[0, 2]], congruentes: [[1, 3]], retos: false },
+    paralelogramo: { paralelas: [[0, 2], [1, 3]], congruentes: [], retos: false },
+    retangulo: { paralelas: [], congruentes: [], retos: true },
+    losango: { paralelas: [], congruentes: [[0, 1, 2, 3]], retos: false },
+    quadrado: { paralelas: [], congruentes: [[0, 1, 2, 3]], retos: true }
+  };
+
+  /* Como cada vertice se escreve em funcao do angulo de construcao t, que e o
+   * angulo em A: ang(i) igual a s[i] vezes t mais c[i]. O s null marca o vertice
+   * que o TIPO nao amarra (os dois de cima do trapezio generico, os quatro do
+   * irregular), e sobre esse vertice a receita nao afirma nada.
+   *
+   * Esta tabela e o que permite RESOLVER em vez de chutar: com uma expressao em
+   * cada vertice, cada linha vira uma equacao "a x menos s t igual a c menos b", e
+   * duas equacoes independentes dao a incognita e a forma de uma vez. E o mesmo
+   * intervalo que o prototipo aceita fica escrito aqui, para um t fora dele virar
+   * aviso em vez de virar figura calada com o prototipo padrao no lugar.
+   *
+   * Retangulo e quadrado tem os quatro angulos fixos em 90: ali t nao existe, e a
+   * unica coisa que a expressao pode determinar e a propria incognita. */
+  var FAMILIA = {
+    quadrilatero:      { s: [null, null, null, null], c: [0, 0, 0, 0], temT: false },
+    trapezio:          { s: [1, null, null, -1], c: [0, 0, 0, 180], temT: true, min: 12, max: 84 },
+    trapezioisosceles: { s: [1, 1, -1, -1], c: [0, 0, 180, 180], temT: true, min: 5, max: 89 },
+    paralelogramo:     { s: [1, -1, 1, -1], c: [0, 180, 0, 180], temT: true, min: 5, max: 175 },
+    retangulo:         { s: [0, 0, 0, 0], c: [90, 90, 90, 90], temT: false },
+    losango:           { s: [1, -1, 1, -1], c: [0, 180, 0, 180], temT: true, min: 5, max: 175 },
+    quadrado:          { s: [0, 0, 0, 0], c: [90, 90, 90, 90], temT: false }
+  };
+
+  /* O angulo de construcao e o valor pretendido em cada vertice, a partir do que
+   * a diretiva escreveu. Devolve {t, valores, determinado} com t null quando o
+   * sistema nao fecha, e ali quem constroi e o prototipo de sempre. */
+  function resolverQuadrilatero(tipo, porVertice) {
+    var fam = FAMILIA[tipo] || FAMILIA.quadrilatero;
+    var formas = [null, null, null, null], eqs = [], letra = null, misturou = false, i;
+    for (i = 0; i < 4; i++) {
+      if (porVertice[i] === null || porVertice[i] === undefined) continue;
+      var lin = lerLinear(porVertice[i]);
+      if (!lin) continue;
+      if (lin.letra) {
+        if (letra !== null && letra !== lin.letra) misturou = true;
+        else letra = lin.letra;
+      }
+      formas[i] = lin;
+      if (fam.s[i] !== null) eqs.push({ i: i, a: lin.a, s: fam.s[i], rhs: fam.c[i] - lin.b });
+    }
+    /* Com duas letras diferentes na folha nao ha sistema numa incognita so, e as
+     * equacoes que ainda valem sao as dos vertices com valor numerico. */
+    if (misturou) {
+      var soNumericas = [];
+      for (i = 0; i < eqs.length; i++) if (Math.abs(eqs[i].a) < 1e-9) soNumericas.push(eqs[i]);
+      eqs = soNumericas;
+    }
+    var sol = resolverSistema(eqs);
+    var valores = [null, null, null, null], determinado = false;
+    for (i = 0; i < 4; i++) {
+      if (!formas[i]) continue;
+      if (Math.abs(formas[i].a) < 1e-9) { valores[i] = formas[i].b; continue; }
+      if (sol.x === null || !isFinite(sol.x)) continue;
+      valores[i] = formas[i].a * sol.x + formas[i].b;
+      determinado = true;
+    }
+    var t = sol.t;
+    if (t !== null && (!isFinite(t) || !fam.temT)) t = null;
+    return { t: t, valores: valores, determinado: determinado, fam: fam, x: sol.x };
+  }
+
+  /* A ORDEM, que e a regra para quando o sistema nao fecha: o vertice da
+   * expressao maior tem que ser o vertice desenhado maior. Devolve quantos pares
+   * saem invertidos entre o que a diretiva pretende e o que a construcao produziu.
+   * Pares empatados nao contam: dois vertices com o mesmo valor podem sair em
+   * qualquer ordem sem mentir. */
+  function inversoesDeOrdem(geo, pontos, valores) {
+    var n = pontos.length, medidos = [], i, j, ruins = 0;
+    for (i = 0; i < n; i++) {
+      medidos.push(geo.anguloEm(pontos[i], pontos[(i + 1) % n], pontos[(i + n - 1) % n]));
+    }
+    for (i = 0; i < n; i++) {
+      for (j = i + 1; j < n; j++) {
+        if (valores[i] === null || valores[j] === null) continue;
+        if (Math.abs(valores[i] - valores[j]) <= 0.5) continue;
+        if (Math.abs(medidos[i] - medidos[j]) <= 0.5) { ruins++; continue; }
+        if ((valores[i] - valores[j]) * (medidos[i] - medidos[j]) < 0) ruins++;
+      }
+    }
+    return ruins;
+  }
+
+  /* Das voltas possiveis do prototipo de forma fixa, fica a que inverte menos
+   * pares. Trocar qual canto e o A nao muda a forma nem a notacao, e e a unica
+   * liberdade que sobra quando o tipo nao tem angulo de construcao. O passo 2
+   * existe para o trapezio: com passo 1 o par de lados paralelos deixaria de ser
+   * o par [0, 2] que a notacao marca. Empate mantem a volta original. */
+  function melhorVolta(geo, pontos, valores, passo) {
+    var n = pontos.length;
+    var ruimMelhor = inversoesDeOrdem(geo, pontos, valores);
+    if (!ruimMelhor) return pontos;
+    var melhor = pontos;
+    for (var v = passo; v < n; v += passo) {
+      var cand = [];
+      for (var i = 0; i < n; i++) cand.push(pontos[(i + v) % n]);
+      var ruim = inversoesDeOrdem(geo, cand, valores);
+      if (ruim < ruimMelhor) { ruimMelhor = ruim; melhor = cand; }
+    }
+    return melhor;
+  }
+
+  function pt(x, y) { return { x: x, y: y }; }
+
+  var quadrilatero = {
+    chaves: ['tipo', 'angulo', 'lado', 'vertices', 'incognita', 'giro',
+             'diagonal', 'regioes', 'marcas', 'congruentes'],
+    metricas: ['angulo', 'lado'],
+
+    medir: function (d, op) {
+      var B = base();
+      return {
+        altura: op.altura != null ? op.altura : null,
+        legenda: d.legenda || null,
+        foraDeEscala: escalaFora(B, d, quadrilatero.metricas, [])
+      };
+    },
+
+    desenhar: function (doc, d, op) {
+      var B = base(), g = B.gerador(), geo = B.geo, COR = g.COR;
+      var D = desenho(), M = marcas();
+
+      var tipo = String(B.primeiro(d.args, 'tipo') || 'quadrilatero').toLowerCase();
+      if (!PROTOTIPOS[tipo]) {
+        B.avisar(doc, 'quadrilatero: tipo desconhecido "' + tipo + '" (use ' +
+          Object.keys(PROTOTIPOS).join(', ') + ')');
+        return null;
+      }
+      var angulosBrutos = B.lista(d.args, 'angulo');
+      var ladosBrutos = B.lista(d.args, 'lado');
+      var nomes = B.lista(d.args, 'vertices');
+      var incognitas = B.lista(d.args, 'incognita');
+      var giro = B.numero(d.args, 'giro') || 0;
+      var semMarcas = String(B.primeiro(d.args, 'marcas') || '').toLowerCase() === 'nao';
+      var fora = escalaFora(B, d, quadrilatero.metricas, []);
+
+      var ehIncognita = [false, false, false, false];
+      for (var q = 0; q < incognitas.length; q++) {
+        var iq = indiceDeVertice(nomes, incognitas[q], 4);
+        if (iq < 0) {
+          B.avisar(doc, 'quadrilatero: incognita=' + incognitas[q] + ' nao e um dos vertices');
+          return null;
+        }
+        ehIncognita[iq] = true;
+      }
+      var cabem = 4 - incognitas.length;
+      if (angulosBrutos.length > cabem) {
+        B.avisar(doc, 'quadrilatero: sobraram valores de angulo que nenhum vertice recebe (' +
+          angulosBrutos.join(', ') + ')');
+        return null;
+      }
+
+      var porVertice = [null, null, null, null];
+      for (var iv = 0, prox = 0; iv < 4; iv++) {
+        if (ehIncognita[iv]) { porVertice[iv] = 'x'; continue; }
+        if (prox < angulosBrutos.length) porVertice[iv] = angulosBrutos[prox++];
+      }
+
+      /* O que decide a forma nao e "o primeiro numero escrito", e o SISTEMA que
+       * os valores dos vertices formam com as relacoes do proprio tipo. Nos tipos
+       * cuja forma depende de um angulo (paralelogramo, losango, trapezio) e ele
+       * que decide a inclinacao, e por isso a figura sai fiel ao enunciado: 65
+       * graus na diretiva viram 65 graus na folha e a aluna que conferir com
+       * transferidor e recompensada.
+       *
+       * Com EXPRESSAO no lugar do numero valia a mesma exigencia e ela nao estava
+       * sendo cumprida. O exercicio 15 do MAT07-12 escreve 3x+10 e 2x+20 em
+       * vertices consecutivos de um paralelogramo: o sistema fecha em x igual a
+       * 30, a resposta e 100 no vertice do 3x+10 e 80 no do 2x+20, e a figura
+       * saia com 62 e 118, ou seja, com o agudo exatamente onde a resposta e
+       * obtusa. Resolvido o sistema, a construcao usa os valores achados e a
+       * legenda de fora de escala continua onde estava: ela cobre a imprecisao do
+       * desenho, nunca a inversao. */
+      var fam = FAMILIA[tipo];
+      if (!fam) {
+        /* Tipo novo no PROTOTIPOS e esquecido aqui: sem a linha da familia a
+         * receita nao sabe que angulo cada vertice carrega e resolveria a
+         * expressao contra uma relacao que nao existe. */
+        B.avisar(doc, 'quadrilatero: o tipo "' + tipo + '" nao tem linha na tabela FAMILIA');
+        return null;
+      }
+      var res = resolverQuadrilatero(tipo, porVertice);
+      var pontos;
+      if (res.t !== null) {
+        if (!(res.t > fam.min) || !(res.t < fam.max)) {
+          B.avisar(doc, 'quadrilatero: os valores escritos determinam ' + arredondar(res.t) +
+            ' graus no primeiro vertice, e o ' + tipo + ' so se desenha entre ' +
+            fam.min + ' e ' + fam.max + ' graus');
+          return null;
+        }
+        pontos = PROTOTIPOS[tipo](res.t);
+      } else {
+        /* Sistema indeterminado: fica o prototipo do tipo, e a unica liberdade
+         * que sobra e a ORIENTACAO. Ela vai escolhida pela ordem: o vertice do
+         * valor maior tem que ser o vertice desenhado maior. */
+        pontos = PROTOTIPOS[tipo](null);
+        if (fam.temT) {
+          var t0 = geo.anguloEm(pontos[0], pontos[1], pontos[3]);
+          var alt = 180 - t0;
+          if (inversoesDeOrdem(geo, pontos, res.valores) > 0 && alt > fam.min && alt < fam.max) {
+            var outro = PROTOTIPOS[tipo](alt);
+            if (inversoesDeOrdem(geo, outro, res.valores) < inversoesDeOrdem(geo, pontos, res.valores)) {
+              pontos = outro;
+            }
+          }
+        } else {
+          pontos = melhorVolta(geo, pontos, res.valores, 1);
+        }
+      }
+
+      /* As duas travas contra a figura invertida, na ordem da mais forte para a
+       * mais fraca. A primeira so vale onde o tipo AMARRA o vertice: no
+       * quadrilatero irregular o prototipo nao tem como valer 4 angulos dados, e
+       * cobrar isso dele seria apagar a figura toda vez. */
+      var im;
+      if (fam.temT) {
+        for (im = 0; im < 4; im++) {
+          if (res.valores[im] === null || fam.s[im] === null) continue;
+          var medido = geo.anguloEm(pontos[im], pontos[(im + 1) % 4], pontos[(im + 3) % 4]);
+          if (Math.abs(medido - res.valores[im]) > 0.5) {
+            B.avisar(doc, 'quadrilatero: o vertice de "' + porVertice[im] + '" vale ' +
+              arredondar(res.valores[im]) + ' e saiu desenhado com ' + arredondar(medido));
+            return null;
+          }
+        }
+      }
+      if (inversoesDeOrdem(geo, pontos, res.valores) > 0) {
+        B.avisar(doc, 'quadrilatero: os valores escritos (' + porVertice.join(', ') +
+          ') saem em ordem invertida no desenho, e desenhar invertido e pior do que nao desenhar');
+        return null;
+      }
+
+      var notacao = NOTACAO[tipo];
+      var congruentes = gruposDeLados(B, d, doc, 4);
+      if (congruentes === null) return null;
+      if (!congruentes.length) congruentes = notacao.congruentes;
+
+      /* O que o desenho AFIRMA tem que bater com o que a diretiva ESCREVE, do
+       * mesmo jeito que no triangulo: um "angulo=70" num paralelogramo construido
+       * com 65 imprimiria 70 num vertice que mede 65, e a aluna que medisse
+       * concluiria que o material esta errado. */
+      if (d.escala !== 'fora') {
+        var briga = conferirRotulos(geo, B, pontos, porVertice, ladosBrutos, [], congruentes, nomes);
+        if (briga) { B.avisar(doc, 'quadrilatero: ' + briga); return null; }
+      }
+
+      if (giro) pontos = geo.girar(pontos, giro);
+
+      /* A diagonal e o argumento da soma 360: sem ela nao ha os dois triangulos, e
+       * a demonstracao por decomposicao nao existe. Ela vai CONTINUA e fina, e
+       * nao tracejada, porque liga dois vertices que a figura ja tem e e ela
+       * propria o objeto do exercicio. */
+      var diag = pares(B, d.args, 'diagonal');
+      var regioes = regioesDaDiretiva(B, d);
+      var corGab = corDaCamada(doc, d, COR);
+
+      var cx = geo.caixa(pontos);
+
+      travaDeClone(B, doc, d, impressaoDaForma(geo, 'quadrilatero ' + tipo, pontos, []));
+      if (fora) travaDaEscalaQueMente(B, doc, geo, 'quadrilatero', d, pontos, porVertice, res.valores);
+
+      return B.figura(doc, {
+        x: op.x, largura: op.largura, altura: op.altura,
+        unidades: cx, legenda: d.legenda, foraDeEscala: fora,
+        fase: d.fase, id: d.id, receita: 'quadrilatero'
+      }, function (ctx) {
+        var P = ctx.pontos(pontos);
+        var ladosP = [[P[0], P[1]], [P[1], P[2]], [P[2], P[3]], [P[3], P[0]]];
+
+        ctx.contorno(function () { contornoDe(ctx, P); });
+
+        ctx.marcas(function () {
+          if (diag.length && M) {
+            var quais = [];
+            for (var i = 0; i < diag.length; i++) quais.push(diag[i].join('-'));
+            M.diagonais(ctx.doc, P, { quais: quais, nomes: nomes.length ? nomes : null, ctx: ctx });
+          }
+          if (!semMarcas) {
+            marcarParalelas(ctx, notacao.paralelas, ladosP);
+            marcarCongruentes(ctx, congruentes, ladosP);
+            if (notacao.retos && M) {
+              /* Os quatro quadradinhos sao UMA afirmacao ("os quatro angulos sao
+               * retos") e por isso anotam uma marca so, pela mesma regra do grupo
+               * de tracinhos. Desenhar um so bastaria para a vista, mas nao para
+               * a definicao: o retangulo e o paralelogramo com QUATRO angulos
+               * retos, e e essa a frase que a figura esta escrevendo. */
+              for (var r = 0; r < 4; r++) {
+                M.marcaAnguloReto(ctx.doc, P[r], P[(r + 1) % 4], P[(r + 3) % 4], {});
+              }
+              ctx.anota('marca', { tipo: 'angulosRetos', quantos: 4 });
+            }
+          }
+          desenharAngulos(ctx, geo, B, P, porVertice, ehIncognita, nomes, d, fora,
+            [true, true, true, true],
+            { retosProntos: !!notacao.retos && !semMarcas, corDeclarada: corGab });
+        });
+
+        ctx.rotulos(function () {
+          letrasDeVertice(ctx, P, nomes);
+          for (var s = 0; s < ladosBrutos.length && s < 4; s++) {
+            medidaDeLado(ctx, String(ladosBrutos[s]), ladosP[s][0], ladosP[s][1], P, corGab);
+          }
+          /* A glosa de cada regiao criada pela diagonal, no centro dela. E o que
+           * transforma "some 2 vezes 180" numa coisa que se le no desenho, sem
+           * uma linha de texto a mais. */
+          if (regioes.length && diag.length) {
+            var i0 = indiceDeVertice(nomes, diag[0][0], 4);
+            var i1 = indiceDeVertice(nomes, diag[0].length > 1 ? diag[0][1] : '', 4);
+            if (i0 >= 0 && i1 >= 0) {
+              var partes = partirPelaDiagonal(P, i0, i1);
+              for (var k = 0; k < partes.length && k < regioes.length; k++) {
+                escrever(ctx, rotuloDeRegiao(regioes[k], B, ctx.doc), geo.centroide(partes[k]),
+                  null, 0, { tam: TAM_DADO, cor: corGab || undefined });
+              }
+            }
+          }
+        });
+      });
+    }
+  };
+
+  /* Os dois poligonos em que a diagonal parte o quadrilatero, na volta. */
+  function partirPelaDiagonal(P, i, j) {
+    var n = P.length, um = [], dois = [];
+    var k;
+    for (k = i; ; k = (k + 1) % n) { um.push(P[k]); if (k === j) break; }
+    for (k = j; ; k = (k + 1) % n) { dois.push(P[k]); if (k === i) break; }
+    return [um, dois];
+  }
+
+  /* ============================================================ painel
+   *
+   * Varias figurinhas lado a lado com o nome de cada uma embaixo. E a figura de
+   * CLASSIFICAR, e ela nao tem substituto em texto: a tabela do tema define
+   * equilatero, isosceles e escaleno por escrito e a aluna nunca ve a notacao de
+   * tracinhos, que e como toda prova de colegio marca lado congruente. Sem o
+   * painel ela fica sem o alfabeto da geometria e nao le o enunciado da prova
+   * ainda que saiba a materia.
+   *
+   * Cada celula e uma figura PROPRIA, com o fundo branco dela e o teto de cinco
+   * marcas dela. O painel so segura o doc.y entre uma celula e a seguinte para
+   * elas sairem lado a lado em vez de empilhadas, e reserva o bloco inteiro antes
+   * da primeira, para a segunda linha do painel nao cair na folha seguinte.
+   *
+   * Uma celula e escrita como celula=<que>;<parametros>:
+   *   lados;7;7;7          triangulo pelos tres lados
+   *   angulos;65;70;45     triangulo pelos tres angulos
+   *   paralelogramo        um dos tipos do quadrilatero, no prototipo dele
+   *
+   * O nome embaixo vem de nome=, um por celula, na ordem, e nunca de dentro do
+   * codigo: equilatero e equilateral sao a mesma celula em duas folhas. */
+
+  var CELULA_MIN = 92;     // celula nunca mais baixa do que isto
+  var CELULA_MAX = 140;    // nem mais alta, senao um painel come a folha
+  var VAO_CELULA = 8;      // ar entre duas celulas vizinhas, em pontos
+  var VAO_LINHA = 10;
+  var FOLGA_CELULA = 9;    // anel onde os rotulos que saem da forma cabem
+  var FAIXA_NOME = 19;     // altura reservada ao nome, embaixo, em pontos
+
+  /* A altura da celula sai da forma que vai dentro dela, e nao de uma constante.
+   * Com altura fixa, o painel dos angulos (triangulos quase tao altos quanto
+   * largos) saia com as figuras encolhidas pela metade e os valores dos dois
+   * angulos da base encostados um no outro, enquanto o painel dos quadrilateros
+   * (formas achatadas) desperdicava meia celula em branco. Aqui a celula fica com
+   * a altura que a forma mais alta do painel pede para ocupar a largura toda, com
+   * piso e teto. */
+  function layoutDoPainel(B, d, op) {
+    var g = B.gerador();
+    var celulas = pares(B, d.args, 'celula');
+    var colunas = Math.max(1, Math.min(6, B.numero(d.args, 'colunas') || celulas.length || 1));
+    var linhas = Math.max(1, Math.ceil(celulas.length / colunas));
+    var x = op.x != null ? Number(op.x) : g.MARG_E;
+    var largura = op.largura != null ? Number(op.largura) : (g.MARG_D - x);
+    var passo = largura / colunas;
+    var larguraCelula = passo - VAO_CELULA;
+
+    var maiorAspecto = 0.45;
+    for (var i = 0; i < celulas.length; i++) {
+      var forma = formaDaCelula(B, null, celulas[i]);
+      if (!forma) continue;
+      var u = B.geo.caixa(forma.pontos);
+      if (u.largura > 1e-9) maiorAspecto = Math.max(maiorAspecto, u.altura / u.largura);
+    }
+    var util = Math.max(1, larguraCelula - 2 * FOLGA_CELULA);
+    var alturaCelula = Math.max(CELULA_MIN,
+      Math.min(CELULA_MAX, util * maiorAspecto + FAIXA_NOME + 2 * FOLGA_CELULA));
+
+    return {
+      celulas: celulas, colunas: colunas, linhas: linhas,
+      x: x, largura: largura, passo: passo, larguraCelula: larguraCelula,
+      alturaCelula: alturaCelula,
+      altura: linhas * alturaCelula + (linhas - 1) * VAO_LINHA
+    };
+  }
+
+  var painel = {
+    chaves: ['celula', 'nome', 'colunas'],
+    metricas: [],
+
+    medir: function (d, op) {
+      var B = base();
+      return {
+        altura: op.altura != null ? op.altura : layoutDoPainel(B, d, op).altura,
+        legenda: d.legenda || null,
+        foraDeEscala: d.escala === 'fora'
+      };
+    },
+
+    desenhar: function (doc, d, op) {
+      var B = base();
+      var L = layoutDoPainel(B, d, op);
+      var celulas = L.celulas;
+      var titulos = B.valores(d.args, 'nome');
+      if (!celulas.length) {
+        B.avisar(doc, 'painel sem celula=, nao ha o que desenhar');
+        return null;
+      }
+      if (titulos.length && titulos.length !== celulas.length) {
+        /* Nome a menos deixa uma celula anonima no meio de um painel de
+         * classificacao, que e exatamente a informacao que o painel existe para
+         * dar. Nome a mais e nome que nao chega na folha. */
+        B.avisar(doc, 'painel: ' + celulas.length + ' celula(s) para ' +
+          titulos.length + ' nome(s)');
+      }
+
+      var colunas = L.colunas, linhas = L.linhas;
+      var x = L.x, largura = L.largura, passo = L.passo, larguraCelula = L.larguraCelula;
+      var ALTURA_CELULA = L.alturaCelula;
+
+      var med = B.medidaDoBloco({
+        x: x, largura: largura, altura: L.altura,
+        legenda: d.legenda, foraDeEscala: d.escala === 'fora'
+      });
+      /* A reserva do bloco INTEIRO vem antes da primeira celula. Reservada celula
+       * a celula, um painel de duas linhas no pe da folha punha a primeira linha
+       * numa pagina e a segunda na outra, e um painel de classificacao partido ao
+       * meio deixa de comparar, que e a unica coisa que ele faz. */
+      doc.garanteEspaco(med.total);
+      var yInicial = doc.y;
+      var registros = [];
+
+      for (var i = 0; i < celulas.length; i++) {
+        var linha = Math.floor(i / colunas), coluna = i % colunas;
+        var ultima = i === celulas.length - 1;
+        doc.y = yInicial - linha * (ALTURA_CELULA + VAO_LINHA);
+        /* A celula ocupa o PASSO inteiro e o ar entre uma e a vizinha sai da
+         * folga, e nao de um vao sem dono. A diferenca aparece na folha: o fundo
+         * branco de cada figura cobre so a largura que ela declara, entao com um
+         * vao de oito pontos sem dono a marca d'agua atravessava por ali, entre
+         * uma celula e a seguinte, bem no meio do painel. */
+        registros.push(desenharCelula(doc, B, d, celulas[i], titulos[i] || null, {
+          x: x + coluna * passo, largura: passo, altura: ALTURA_CELULA,
+          /* A legenda do painel e uma so e sai na ultima celula, alinhada a
+           * direita: e a borda direita do bloco, que e onde o figura() ja escreve
+           * legenda. Uma legenda por celula repetiria o aviso de escala tres
+           * vezes na mesma faixa. */
+          legenda: ultima ? d.legenda : null,
+          foraDeEscala: ultima && d.escala === 'fora'
+        }));
+      }
+
+      doc.y = yInicial - linhas * ALTURA_CELULA - (linhas - 1) * VAO_LINHA
+        - med.alturaLegenda - med.antes - med.depois;
+      return registros[registros.length - 1] || null;
+    }
+  };
+
+  /* A geometria de uma celula, sem desenhar nada e sem tocar no doc. Existe
+   * separada porque o layout precisa dela ANTES de a primeira celula ser
+   * desenhada, para saber que altura a linha do painel vai pedir. */
+  function formaDaCelula(B, doc, spec) {
+    var geo = B.geo;
+    var que = String(spec[0]).toLowerCase();
+    var params = spec.slice(1);
+
+    if (que === 'lados') {
+      var nums = [];
+      for (var i = 0; i < 3; i++) nums.push(parseFloat(params[i]));
+      var p = geo.trianguloPorLados(nums[0], nums[1], nums[2]);
+      if (!p) {
+        if (doc) B.avisar(doc, 'painel: celula=lados;' + params.join(';') + ' nao fecha triangulo');
+        return null;
+      }
+      return { que: que, pontos: p, angulos: null, tipoQuad: null };
+    }
+    if (que === 'angulos') {
+      var angulos = [parseFloat(params[0]), parseFloat(params[1]), parseFloat(params[2])];
+      var pa = geo.trianguloPorAngulos(angulos[0], angulos[1], 100);
+      if (!pa) {
+        if (doc) B.avisar(doc, 'painel: celula=angulos;' + params.join(';') + ' nao fecha triangulo');
+        return null;
+      }
+      return { que: que, pontos: pa, angulos: angulos, tipoQuad: null };
+    }
+    if (PROTOTIPOS[que]) {
+      return {
+        que: que, tipoQuad: que, angulos: null,
+        pontos: PROTOTIPOS[que](params.length ? parseFloat(params[0]) : null)
+      };
+    }
+    if (doc) {
+      B.avisar(doc, 'painel: celula=' + spec.join(';') +
+        ' nao e lados, angulos nem um tipo de quadrilatero');
+    }
+    return null;
+  }
+
+  function desenharCelula(doc, B, d, spec, nome, caixa) {
+    var geo = B.geo, M = marcas();
+    var forma = formaDaCelula(B, doc, spec);
+    if (!forma) return null;
+    var que = forma.que, pontos = forma.pontos;
+    var tipoQuad = forma.tipoQuad, angulos = forma.angulos;
+
+    /* O nome mora ABAIXO da figura, dentro da mesma caixa. Para abrir o lugar
+     * dele, a caixa de unidades desce um pedaco por baixo da figura: como o
+     * enquadramento e isotropico e centra o que recebe, a forma sobe para a parte
+     * de cima da celula e a faixa de baixo fica livre.
+     *
+     * O tamanho desse pedaco e medido em PONTOS DA FOLHA e nao em unidades do
+     * problema, e a diferenca nao e detalhe: o primeiro rascunho reservava 18
+     * unidades, o que num triangulo de lados 7, 7 e 7 (seis unidades de altura)
+     * pedia uma faixa TRES vezes mais alta do que a propria figura, e os tres
+     * triangulos do painel sairam do tamanho de uma unha. Como a escala so e
+     * conhecida depois do enquadramento e o enquadramento depende da faixa, o
+     * ponto fixo sai por iteracao, que converge em duas ou tres voltas. */
+    var u = geo.caixa(pontos);
+    var folga = FOLGA_CELULA + VAO_CELULA / 2;
+    var alvoL = Math.max(1, caixa.largura - 2 * folga);
+    var alvoA = Math.max(1, caixa.altura - 2 * folga);
+    var respiro = 0;
+    for (var it = 0; it < 4; it++) {
+      var k = Math.min(u.largura > 1e-9 ? alvoL / u.largura : Infinity,
+        (u.altura + respiro) > 1e-9 ? alvoA / (u.altura + respiro) : Infinity);
+      if (!isFinite(k) || k <= 0) break;
+      respiro = FAIXA_NOME / k;
+    }
+    var unidades = { x0: u.x0, y0: u.y0 - respiro, x1: u.x1, y1: u.y1 };
+
+    return B.figura(doc, {
+      x: caixa.x, largura: caixa.largura, altura: caixa.altura, folga: folga,
+      unidades: unidades, legenda: caixa.legenda, foraDeEscala: caixa.foraDeEscala,
+      fase: d.fase, id: null, receita: 'painel'
+    }, function (ctx) {
+      var P = ctx.pontos(pontos);
+      var n = P.length;
+      var lados = [];
+      for (var s = 0; s < n; s++) lados.push([P[s], P[(s + 1) % n]]);
+
+      ctx.contorno(function () { contornoDe(ctx, P); });
+
+      ctx.marcas(function () {
+        if (que === 'lados') marcasPorLados(ctx, pontos, lados);
+        else if (que === 'angulos') marcasPorAngulos(ctx, B, P, angulos);
+        else if (tipoQuad && M) {
+          var notacao = NOTACAO[tipoQuad];
+          marcarParalelas(ctx, notacao.paralelas, lados);
+          marcarCongruentes(ctx, notacao.congruentes, lados);
+          if (notacao.retos) {
+            for (var r = 0; r < 4; r++) {
+              M.marcaAnguloReto(ctx.doc, P[r], P[(r + 1) % 4], P[(r + 3) % 4], {});
+            }
+            ctx.anota('marca', { tipo: 'angulosRetos', quantos: 4 });
+          }
+        }
+      });
+
+      ctx.rotulos(function () {
+        if (!nome) return;
+        /* Os nomes das celulas ficam todos na MESMA linha de base, medida a
+         * partir do pe da celula e nao da figura que esta dentro dela. Ancorado
+         * na figura, cada nome saia numa altura diferente, porque o
+         * enquadramento centra formas de proporcoes diferentes em pontos
+         * diferentes: os tres nomes do painel dos lados saiam em tres alturas e o
+         * painel deixava de ler como uma linha de coisas comparaveis. */
+        var meio = {
+          x: ctx.caixa.x + ctx.caixa.largura / 2,
+          y: ctx.caixa.y + FAIXA_NOME * 0.42
+        };
+        escrever(ctx, String(nome), meio, null, 0, { tam: TAM_NOME });
+      });
+    });
+  }
+
+  /* Painel dos lados: quem tem a mesma medida recebe a mesma marca.
+   *
+   * Duas regras, e a segunda e a que se esquece. Havendo lados congruentes, so
+   * eles sao marcados: no isosceles de 7, 7 e 10, marcar tambem a base com dois
+   * tracinhos gasta uma marca para dizer o que ja se ve, que a base e outra
+   * coisa. Nao havendo nenhum par congruente, TODOS recebem marcas diferentes,
+   * porque essa e a outra metade da mesma convencao: marcas diferentes
+   * significam medidas diferentes. Sem isso o escaleno seria a unica celula do
+   * painel sem notacao nenhuma e a aluna leria "escaleno" como "o triangulo em
+   * que ninguem marcou nada". */
+  function marcasPorLados(ctx, pontos, lados) {
+    var geo = base().geo;
+    var n = pontos.length;
+    var comp = [];
+    for (var s = 0; s < n; s++) comp.push(geo.distancia(pontos[(s + 1) % n], pontos[(s + 2) % n]));
+    var grupos = [];
+    for (var i = 0; i < n; i++) {
+      var achou = false;
+      for (var gj = 0; gj < grupos.length; gj++) {
+        if (Math.abs(comp[grupos[gj][0]] - comp[i]) <= 1e-6 * Math.max(comp[i], 1)) {
+          grupos[gj].push(i); achou = true; break;
+        }
+      }
+      if (!achou) grupos.push([i]);
+    }
+    var temPar = false;
+    for (var gk = 0; gk < grupos.length; gk++) if (grupos[gk].length > 1) temPar = true;
+    if (temPar) {
+      var soOsPares = [];
+      for (var gm = 0; gm < grupos.length; gm++) if (grupos[gm].length > 1) soOsPares.push(grupos[gm]);
+      grupos = soOsPares;
+    }
+    /* Os lados do triangulo na convencao brasileira: a = BC, b = CA, c = AB, ou
+     * seja o lado de indice s liga os vertices s+1 e s+2. */
+    var segmentos = [];
+    for (var k = 0; k < n; k++) segmentos.push([lados[(k + 1) % n][0], lados[(k + 1) % n][1]]);
+    marcarCongruentes(ctx, grupos, segmentos);
+  }
+
+  /* Painel dos angulos: a celula marca o que DEFINE a classe, e so isso. No
+   * acutangulo os tres valores, porque a classe fala dos tres; no retangulo o
+   * quadradinho sozinho, porque a classe fala de um angulo so; no obtusangulo o
+   * valor do obtuso. Marcar os tres em toda celula encheria o retangulo e o
+   * obtusangulo de numeros que nao dizem nada sobre a classificacao deles.
+   *
+   * Arco vazio esta proibido aqui de proposito: arco sem valor e a notacao de
+   * congruencia, e tres arcos vazios num triangulo de 65, 70 e 45 diriam que os
+   * tres angulos sao iguais. */
+  function marcasPorAngulos(ctx, B, P, angulos) {
+    var M = marcas();
+    if (!M) return;
+    var especial = -1;
+    for (var i = 0; i < 3; i++) if (angulos[i] >= 89.5) especial = i;
+    for (var v = 0; v < 3; v++) {
+      if (especial >= 0 && v !== especial) continue;
+      if (Math.abs(angulos[v] - 90) < 0.5) {
+        M.marcaAnguloReto(ctx.doc, P[v], P[(v + 1) % 3], P[(v + 2) % 3], { ctx: ctx });
+      } else {
+        M.marcaAngulo(ctx.doc, P[v], P[(v + 1) % 3], P[(v + 2) % 3],
+          { rotulo: rotuloDeAngulo(String(angulos[v]), B), tam: TAM_DADO, ctx: ctx });
+      }
+    }
+  }
+
+  /* ============================================================ despacho */
+
+  var receitas = { triangulo: triangulo, quadrilatero: quadrilatero, painel: painel };
+
+  function existe(nome) { return !!(nome && receitas[String(nome).toLowerCase()]); }
+  function nomes() { var s = []; for (var k in receitas) s.push(k); return s.sort(); }
+  function chavesDe(nome) {
+    var r = receitas[String(nome || '').toLowerCase()];
+    if (!r) return null;
+    var B = base(), saida = r.chaves.slice();
+    for (var k in B.RESERVADAS) saida.push(k);
+    return saida;
+  }
+
+  /* Quanto a figura desta diretiva vai gastar de folha, sem desenhar nada e sem
+   * mexer em nada: quem escreve o exercicio precisa somar isto ao texto e ao
+   * espaco de resposta e reservar tudo de uma vez, ANTES do numero do exercicio.
+   *
+   * A resolucao pelo id e feita na mao aqui, e nao pelo resolverPorId, de
+   * proposito: aquele guarda id e empurra aviso, e medir nao pode ter efeito
+   * nenhum, senao o mesmo aviso sai duas vezes e um aviso que conta dois desloca
+   * qualquer limiar do conferirFigura. */
+  function alturaDoBloco(doc, diretiva, op) {
+    var B = base();
+    if (!B || !diretiva) return 0;
+    op = op || {};
+    var d = diretiva;
+    if (!d.receita && d.id && doc && doc.figurasPorId && doc.figurasPorId[d.id]) {
+      d = doc.figurasPorId[d.id];
+    }
+    var receita = d.receita ? receitas[String(d.receita).toLowerCase()] : null;
+    if (!receita) return 0;
+    var m = receita.medir ? receita.medir(d, op) : {};
+    return B.medidaDoBloco({
+      x: op.x, largura: op.largura,
+      altura: m.altura != null ? m.altura : op.altura,
+      legenda: m.legenda, foraDeEscala: m.foraDeEscala
+    }).total;
+  }
+
+  /* Ponto unico de desenho a partir de uma diretiva ja lida. Resolve a camada de
+   * gabarito pelo id, confere a receita e as chaves, e chama a receita. As duas
+   * conferencias existem porque a diretiva nunca sai impressa: sem elas um erro
+   * de digitacao no nome da receita apagaria a figura em silencio. */
+  function desenhar(doc, diretiva, op) {
+    var B = base();
+    if (!B) return null;
+    var d = B.resolverPorId(doc, diretiva);
+    for (var a = 0; a < (d.avisos || []).length; a++) B.avisar(doc, d.avisos[a]);
+
+    var nome = d.receita ? String(d.receita).toLowerCase() : null;
+    var receita = nome ? receitas[nome] : null;
+    if (!receita) {
+      B.avisar(doc, 'receita inexistente: ' + (nome || '(diretiva sem receita e sem id conhecido)'));
+      return null;
+    }
+    for (var chave in d.args) {
+      if (receita.chaves.indexOf(chave) < 0 && !B.RESERVADAS[chave]) {
+        B.avisar(doc, 'chave nao declarada por ' + nome + ': ' + chave);
+      }
+    }
+    return receita.desenhar(doc, d, op || {});
+  }
+
+  /* Fachada da leitura, para o pdf.js ter uma dependencia so. */
+  function partirEnunciado(texto) { var B = base(); return B ? B.partirEnunciado(texto) : []; }
+  function registrarIds(doc, texto) { var B = base(); return B ? B.registrarIds(doc, texto) : 0; }
+  function temDiretiva(texto) { var B = base(); return B ? B.temDiretiva(texto) : false; }
+  function lerDiretiva(linha) { var B = base(); return B ? B.lerDiretiva(linha) : null; }
+
+  return {
+    receitas: receitas, desenhar: desenhar, existe: existe, nomes: nomes, chavesDe: chavesDe,
+    alturaDoBloco: alturaDoBloco,
+    partirEnunciado: partirEnunciado, registrarIds: registrarIds,
+    temDiretiva: temDiretiva, lerDiretiva: lerDiretiva, base: base,
+    PROTOTIPOS: PROTOTIPOS, NOTACAO: NOTACAO
+  };
+});

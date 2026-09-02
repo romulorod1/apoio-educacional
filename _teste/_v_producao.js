@@ -16,8 +16,8 @@ const c = (r, v, e) => { const p = String(v) === String(e); p ? ok++ : mau++;
   await pag.goto(URL, { waitUntil: 'networkidle0' });
   await new Promise(r => setTimeout(r, 3500));
 
-  c('a versao publicada e a 1.8.0',
-    await pag.evaluate(() => (document.body.innerText.match(/1\.8\.0/) || [''])[0]), '1.8.0');
+  c('a versao publicada e a 1.9.0',
+    await pag.evaluate(() => (document.body.innerText.match(/1\.8\.0/) || [''])[0]), '1.9.0');
   c('a tela abriu', await pag.$eval('#abas', e => e.children.length > 0), true);
 
   // o buscador chegou e funciona no ar

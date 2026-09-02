@@ -104,12 +104,51 @@ for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento 
 done
 
 titulo "nada de aluno no commit"
-sujo=$(git status --short | grep -icE "experimento|mateus|_antes|pdf_antes" || true)
+# O primeiro nome do aluno da prova adaptada NAO aparece escrito neste script:
+# senao o portao acusa a si mesmo. Ele e lido de um arquivo fora do repositorio,
+# e as duas conferencias abaixo (por nome de arquivo e por conteudo) usam o
+# mesmo valor.
+nome_lista="$HOME/.claude/projects/C--Users-romul/memory/.aluno-sensivel"
+padrao=""
+[ -f "$nome_lista" ] && padrao=$(cat "$nome_lista")
+# Pelo NOME do arquivo.
+if [ -n "$padrao" ]; then
+  sujo=$(git status --short | grep -icE "experimento|$padrao|_antes|pdf_antes" || true)
+else
+  sujo=$(git status --short | grep -icE "experimento|_antes|pdf_antes" || true)
+fi
 if [ "$sujo" = "0" ]; then
   printf '  ok      nenhum arquivo identificavel entra no commit\n'
 else
   printf '  FALHOU  %s arquivo(s) de aluno apareceriam no commit\n' "$sujo"
   falhou=1
+fi
+# E pelo CONTEUDO. O primeiro nome do aluno da prova adaptada apareceu num
+# comentario do figuras/base.js, num arquivo prestes a ir para o repositorio
+# publico, e a conferencia acima nao viu porque so olha nome de arquivo.
+#
+# A unica ocorrencia permitida e a linha dele na lista ALUNOS_INICIAIS do
+# app.js (alunos-semente so com primeiro nome, aprovados para o repositorio e
+# ja publicados). O nome nao aparece escrito neste script de proposito: senao
+# o portao acusa a si mesmo. Ele e lido de um arquivo fora do repositorio.
+nome_lista="$HOME/.claude/projects/C--Users-romul/memory/.aluno-sensivel"
+if [ -f "$nome_lista" ]; then
+  padrao=$(cat "$nome_lista")
+  dentro=""
+  for f in $(git ls-files -mo --exclude-standard 2>/dev/null | grep -vE "^_teste/node_modules"); do
+    [ -f "$f" ] || continue
+    n=$(grep -i "$padrao" "$f" 2>/dev/null | grep -vc "nome: '[A-Z][a-z]*', horasJulho" || true)
+    [ "$n" != "0" ] && dentro="$dentro $f"
+  done
+  if [ -z "$dentro" ]; then
+    printf '  ok      nenhum arquivo do commit cita o aluno por dentro\n'
+  else
+    printf '  FALHOU  nome do aluno DENTRO de arquivo que entraria no commit:%s\n' "$dentro"
+    falhou=1
+  fi
+else
+  printf '  INSTAVEL conferencia de conteudo pulada: falta %s\n' "$nome_lista"
+  instavel=1
 fi
 
 printf '\n'

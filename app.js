@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.8.0';
+  var VERSAO = '1.9.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -18,6 +18,31 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.9.0',
+      itens: [
+        'As folhas de matemática ganharam figuras. Começou pelo assunto de triângulos e ' +
+          'quadriláteros do 7º ano: o exercício traz o desenho com o ângulo pedido marcado, os ' +
+          'lados iguais com tracinhos e os lados paralelos com setinhas, do jeito que a prova ' +
+          'do colégio escreve. As figuras estão em escala: dá para conferir com transferidor.',
+        'As fórmulas passaram a sair como fórmula de verdade: fração com o traço no meio, ' +
+          'raiz cobrindo o que está dentro, somatório com os limites em cima e embaixo. Antes ' +
+          'só expoente e índice tinham esse cuidado.',
+        'A figura nunca mais fica sozinha no topo de uma página, longe da frase que a ' +
+          'explica: as duas viram a folha juntas.',
+        'As linhas das tabelas ficaram mais escuras e um pouco mais grossas, para não sumirem ' +
+          'na fotocópia.',
+        'A folha em inglês agora numera as páginas em inglês (Page 1 of 3), e nenhuma palavra ' +
+          'em português sobra nela.',
+        'No assunto de triângulos e quadriláteros, seis exercícios que repetiam os exemplos ' +
+          'resolvidos da explicação ganharam números novos, e a legenda do painel de ' +
+          'quadriláteros foi corrigida: ela afirmava justamente o erro que o exercício 18 ' +
+          'cobra.',
+        'Dois consertos de texto no material, valendo para todos os assuntos: um número que ' +
+          'começava a linha no meio de uma frase virava item de lista (26 lugares em 20 ' +
+          'assuntos), e a última palavra de alguns itens caía sozinha na margem (5 assuntos).'
+      ]
+    },
     {
       versao: '1.8.0',
       itens: [
