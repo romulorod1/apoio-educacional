@@ -10,18 +10,76 @@ set -e
 cd "$(dirname "$0")/.."
 
 falhou=0
+instavel=0
 titulo() { printf '\n=== %s ===\n' "$1"; }
+
+# Quantas verificacoes falharam na saida de um teste (vazio = nenhuma).
+quantas_falhas() {
+  printf '%s\n' "$1" | grep -oE "[0-9]+ falharam" | grep -oE "^[0-9]+" | tail -1
+}
+resumo() {
+  printf '%s\n' "$1" | grep -E "passaram|PASSARAM|CONFIRMAD" | tail -1
+}
+
+# Roda um teste. Se falhar, roda UMA segunda vez antes de reprovar.
+#
+# Os testes de navegador esperam por tempo fixo depois de recarregar a pagina
+# (2000, 1500 e 3000 ms). Com a maquina ocupada essas esperas nao bastam e o
+# teste falha sem haver defeito: o testa_atualizacao reprovou com 2 falhas
+# enquanto rodavam outros processos e passou com 32 de 32 sozinho, logo em
+# seguida. Alarme falso no portao de merge e pior do que parece, porque ensina a
+# ignorar alarme, e foi ignorando conferencia que uma regressao de tabela ja
+# subiu para producao.
+#
+# Repetir NAO esconde defeito: quem falha duas vezes reprova igual. O que passa
+# na segunda sai marcado como INSTAVEL, aparece no resumo do fim e continua
+# pedindo olho humano, em vez de sumir como se nada tivesse acontecido.
+# Um teste so passa se ele DISSER que passou. Ausencia de falha nao e aprovacao:
+# um teste que morre no require nao imprime "N falharam" nenhum, e a versao
+# anterior desta funcao marcava isso como ok. Aconteceu de verdade: rodando a
+# suite numa copia do repo sem as dependencias, o testa_temas morria no
+# puppeteer-core e o portao dizia "TUDO PASSOU. Pode seguir para o merge."
+passou_de_verdade() {
+  printf '%s\n' "$1" | grep -qE "passaram|PASSARAM|CONFIRMAD"
+}
 roda() {
   nome="$1"; shift
   saida=$("$@" 2>&1) || true
-  linha=$(printf '%s\n' "$saida" | grep -E "passaram|PASSARAM|CONFIRMAD" | tail -1)
-  ruim=$(printf '%s\n' "$saida" | grep -cE "FALHA|falharam\.$|REPROVADO" || true)
-  n=$(printf '%s\n' "$saida" | grep -oE "[0-9]+ falharam" | grep -oE "^[0-9]+" | tail -1)
-  if [ -n "$n" ] && [ "$n" != "0" ]; then
-    printf '  FALHOU  %-24s %s\n' "$nome" "$linha"
+  n=$(quantas_falhas "$saida")
+  ruim=0
+  [ -n "$n" ] && [ "$n" != "0" ] && ruim=1
+  passou_de_verdade "$saida" || ruim=1
+
+  if [ "$ruim" = "0" ]; then
+    printf '  ok      %-24s %s\n' "$nome" "$(resumo "$saida")"
+    return
+  fi
+
+  # Falhou. Roda UMA segunda vez antes de reprovar, porque os testes de navegador
+  # esperam por tempo fixo depois de recarregar a pagina (2000, 1500 e 3000 ms) e
+  # com a maquina ocupada essas esperas nao bastam: o testa_atualizacao reprovou
+  # com 2 falhas e passou com 32 de 32 sozinho um minuto depois. Alarme falso em
+  # portao de merge ensina a ignorar alarme, e foi ignorando conferencia que uma
+  # regressao de tabela ja subiu para producao aqui.
+  #
+  # Repetir NAO esconde defeito: quem falha duas vezes reprova igual.
+  saida2=$("$@" 2>&1) || true
+  n2=$(quantas_falhas "$saida2")
+  ruim2=0
+  [ -n "$n2" ] && [ "$n2" != "0" ] && ruim2=1
+  passou_de_verdade "$saida2" || ruim2=1
+
+  if [ "$ruim2" = "1" ]; then
+    if passou_de_verdade "$saida2"; then
+      printf '  FALHOU  %-24s %s\n' "$nome" "$(resumo "$saida2")"
+    else
+      printf '  FALHOU  %-24s nao chegou a rodar: %s\n' "$nome" \
+        "$(printf '%s\n' "$saida2" | grep -iE "error|cannot find|not found" | head -1 | cut -c1-90)"
+    fi
     falhou=1
   else
-    printf '  ok      %-24s %s\n' "$nome" "$linha"
+    printf '  INSTAVEL %-23s passou na segunda vez\n' "$nome"
+    instavel=1
   fi
 }
 
@@ -55,9 +113,12 @@ else
 fi
 
 printf '\n'
-if [ "$falhou" = "0" ]; then
-  printf 'TUDO PASSOU. Pode seguir para o merge.\n'
-else
+if [ "$falhou" != "0" ]; then
   printf 'HA FALHA. Nao faca o merge antes de resolver.\n'
+elif [ "$instavel" != "0" ]; then
+  printf 'TUDO PASSOU, mas algum teste so passou na segunda vez (INSTAVEL acima).\n'
+  printf 'Nao e impedimento de merge; e aviso de que aquele teste depende de tempo.\n'
+else
+  printf 'TUDO PASSOU. Pode seguir para o merge.\n'
 fi
 exit "$falhou"
