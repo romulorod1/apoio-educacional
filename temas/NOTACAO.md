@@ -46,7 +46,11 @@ Escreva o caractere de verdade. O gerador troca de fonte sozinho para desenhá-l
 π   √   ≥   ≤   ≠   ∞   Δ   Σ   α   β   θ
 ```
 
-Para quem for implementar o gerador, os códigos na fonte Symbol (base-14, não precisa embutir):
+Quem manda no repertório é o `pdf.js`: a lista `SIMBOLOS` dele é a única fonte, e o
+`verificar.py` pergunta a ele em vez de manter cópia. Para acrescentar um símbolo novo, basta
+mexer no `pdf.js`, com o código na fonte Symbol e a largura do glifo.
+
+Os códigos na fonte Symbol (base-14, não precisa embutir):
 `π` 0x70, `√` 0xD6, `≥` 0xB3, `≤` 0xA3, `≠` 0xB9, `∞` 0xA5, `Δ` 0x44, `Σ` 0x53,
 `α` 0x61, `β` 0x62, `θ` 0x71.
 
