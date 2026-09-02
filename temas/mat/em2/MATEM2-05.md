@@ -30,16 +30,16 @@ o determinante dá zero, o paralelogramo achatou, porque as duas linhas ficaram 
 
 Para uma matriz com um único elemento, o determinante é o próprio elemento.
 
-Para uma matriz de duas linhas e duas colunas com primeira linha a e b e segunda linha c e d, o
+Para uma matriz A de duas linhas e duas colunas com primeira linha a e b e segunda linha c e d, o
 determinante é
 
-a vezes d menos b vezes c
+det(A) = a · d - b · c
 
 Isto é, o produto da diagonal principal menos o produto da outra diagonal.
 
 **Exemplo 1.** Achar o determinante da matriz cuja primeira linha é 2 e 3 e cuja segunda linha é 1 e
 5.
-É 2 vezes 5 menos 3 vezes 1, que dá 10 menos 3, ou seja, 7.
+É 2 × 5 - 3 × 1 = 10 - 3 = 7.
 
 #### Matriz de três linhas: a regra de Sarrus
 
@@ -49,9 +49,8 @@ direita e subtraem-se os três produtos das diagonais que sobem.
 
 **Exemplo 2.** Achar o determinante da matriz cuja primeira linha é 1, 2 e 0, cuja segunda linha é 3,
 1 e 4 e cuja terceira linha é 2, 0 e 1.
-Os produtos que descem dão 1 vezes 1 vezes 1, mais 2 vezes 4 vezes 2, mais 0 vezes 3 vezes 0, ou
-seja, 1 mais 16 mais 0, que é 17. Os produtos que sobem dão 0 vezes 1 vezes 2, mais 1 vezes 4 vezes
-0, mais 2 vezes 3 vezes 1, ou seja, 0 mais 0 mais 6, que é 6. O determinante é 17 menos 6, que dá 11.
+Os produtos que descem dão 1 × 1 × 1 + 2 × 4 × 2 + 0 × 3 × 0 = 1 + 16 + 0 = 17. Os produtos que
+sobem dão 0 × 1 × 2 + 1 × 4 × 0 + 2 × 3 × 1 = 0 + 0 + 6 = 6. O determinante é 17 - 6 = 11.
 
 #### As propriedades que economizam conta
 
@@ -65,15 +64,14 @@ Muita questão de prova se resolve pelas propriedades, sem calcular nada:
 - **Transposta.** O determinante de uma matriz é igual ao da sua transposta.
 - **Troca de linhas.** Trocar duas linhas de lugar troca o sinal do determinante.
 - **Multiplicar uma linha por um número.** O determinante fica multiplicado por esse número. Se toda
-  a matriz de n linhas for multiplicada por um número, o determinante fica multiplicado por esse
-  número elevado a n.
+  a matriz A, de n linhas, for multiplicada por um número k, então det(k · A) = k^{n} · det(A).
 - **Produto.** O determinante de um produto é o produto dos determinantes.
 - **Inversa.** O determinante da inversa é o inverso do determinante.
 
 **Exemplo 3.** Achar o determinante da matriz cuja primeira linha é 2 e 4 e cuja segunda linha é 1 e
 2.
 A primeira linha é o dobro da segunda. Sem calcular nada, o determinante é zero. Conferindo pela
-fórmula: 2 vezes 2 menos 4 vezes 1, que dá zero.
+fórmula: 2 × 2 - 4 × 1 = 0.
 
 #### Determinante com incógnita
 
@@ -83,7 +81,7 @@ inversa e quando um sistema deixa de ter solução única.
 
 **Exemplo 4.** Achar os valores de x que anulam o determinante da matriz cuja primeira linha é x e 3
 e cuja segunda linha é 3 e x.
-O determinante é x ao quadrado menos 9. Ele se anula quando x vale 3 ou menos 3.
+O determinante é x^{2} - 9. Ele se anula quando x = 3 ou x = -3.
 
 #### Erros comuns
 
@@ -132,7 +130,7 @@ que o sinal seja corrigido a cada troca.
 **Bloco C. Aprofundamento**
 
 15. Resolva a equação em que o determinante da matriz cuja primeira linha é x e 2 e cuja segunda
-    linha é 3 e x menos 1 vale zero.
+    linha é 3 e x - 1 vale zero.
 16. Mostre, com uma matriz de duas linhas escrita com letras, que uma matriz com duas linhas iguais
     tem determinante zero.
 17. Calcule o determinante da matriz de três linhas cuja primeira linha é 1, 1 e 1, cuja segunda
@@ -148,25 +146,24 @@ que o sinal seja corrigido a cada troca.
 2. 0. A segunda linha é o dobro da primeira.
 3. 2. A matriz é triangular, e o determinante é o produto dos elementos da diagonal principal.
 4. 3.
-5. x igual a 4.
+5. x = 4.
 6. 0. A terceira linha é o dobro da segunda menos a primeira, e por isso as três linhas não são
    independentes.
 7. Menos 6.
-8. k igual a 2 e k igual a menos 2.
-9. 45. Multiplicar as duas linhas por 3 multiplica o determinante por 3 ao quadrado.
+8. k = 2 e k = -2.
+9. 45. Multiplicar as duas linhas por 3 multiplica o determinante por 3^{2}.
 10. 7. O determinante de uma matriz e o da sua transposta são sempre iguais.
 11. Menos 6.
-12. Não admite. A segunda linha é proporcional à primeira, e a conta confirma: 2 vezes 6 menos 4
-    vezes 3 dá zero.
+12. Não admite. A segunda linha é proporcional à primeira, e a conta confirma: 2 × 6 - 4 × 3 = 0.
 13. 13.
-14. 32. Multiplicar as três linhas por 2 multiplica o determinante por 2 na terceira potência.
-15. x igual a 3 e x igual a menos 2. O determinante vale x ao quadrado menos x menos 6.
-16. Numa matriz cuja primeira linha é a e b e cuja segunda linha também é a e b, o determinante vale
-    a vezes b menos b vezes a, que é zero.
+14. 32. Multiplicar as três linhas por 2 multiplica o determinante por 2^{3}.
+15. x = 3 e x = -2. O determinante vale x^{2} - x - 6.
+16. Numa matriz cuja primeira linha é a e b e cuja segunda linha também é a e b, o determinante é
+    a · b - b · a = 0.
 17. 2.
 18. Nenhum valor de m serve. A terceira linha é o triplo da primeira, então o determinante é zero
     qualquer que seja m, e a inversa nunca existe.
-19. O determinante da inversa vale 1 sobre 5, e o determinante do produto vale 25.
+19. O determinante da inversa vale 1/5, e o determinante do produto vale 25.
 
 ## EN
 
@@ -188,16 +185,16 @@ same direction.
 
 For a matrix with a single entry, the determinant is that entry itself.
 
-For a matrix with two rows and two columns with first row a and b and second row c and d, the
+For a matrix A with two rows and two columns with first row a and b and second row c and d, the
 determinant is
 
-a times d minus b times c
+det(A) = a · d - b · c
 
 That is, the product along the main diagonal minus the product along the other diagonal.
 
 **Example 1.** Find the determinant of the matrix whose first row is 2 and 3 and whose second row is
 1 and 5.
-It is 2 times 5 minus 3 times 1, which gives 10 minus 3, that is, 7.
+It is 2 × 5 - 3 × 1 = 10 - 3 = 7.
 
 #### Three rows: the rule of Sarrus
 
@@ -207,10 +204,8 @@ right, and subtract the three products along the diagonals that go up.
 
 **Example 2.** Find the determinant of the matrix whose first row is 1, 2 and 0, whose second row is
 3, 1 and 4 and whose third row is 2, 0 and 1.
-The products going down give 1 times 1 times 1, plus 2 times 4 times 2, plus 0 times 3 times 0, that
-is, 1 plus 16 plus 0, which is 17. The products going up give 0 times 1 times 2, plus 1 times 4 times
-0, plus 2 times 3 times 1, that is, 0 plus 0 plus 6, which is 6. The determinant is 17 minus 6, which
-gives 11.
+The products going down give 1 × 1 × 1 + 2 × 4 × 2 + 0 × 3 × 0 = 1 + 16 + 0 = 17. The products
+going up give 0 × 1 × 2 + 1 × 4 × 0 + 2 × 3 × 1 = 0 + 0 + 6 = 6. The determinant is 17 - 6 = 11.
 
 #### The properties that save work
 
@@ -224,15 +219,14 @@ Many test questions are solved by the properties, with no calculation at all:
 - **Transpose.** The determinant of a matrix equals the determinant of its transpose.
 - **Swapping rows.** Swapping two rows flips the sign of the determinant.
 - **Multiplying a row by a number.** The determinant gets multiplied by that number. If a whole
-  matrix with n rows is multiplied by a number, the determinant gets multiplied by that number raised
-  to n.
+  matrix A with n rows is multiplied by a number k, then det(k · A) = k^{n} · det(A).
 - **Product.** The determinant of a product is the product of the determinants.
 - **Inverse.** The determinant of the inverse is the reciprocal of the determinant.
 
 **Example 3.** Find the determinant of the matrix whose first row is 2 and 4 and whose second row is
 1 and 2.
 The first row is twice the second. With no calculation, the determinant is zero. Checking with the
-formula: 2 times 2 minus 4 times 1, which gives zero.
+formula: 2 × 2 - 4 × 1 = 0.
 
 #### Determinants with an unknown
 
@@ -242,7 +236,7 @@ having an inverse and when a system stops having a unique solution.
 
 **Example 4.** Find the values of x that make the determinant of the matrix whose first row is x and
 3 and whose second row is 3 and x vanish.
-The determinant is x squared minus 9. It vanishes when x is 3 or minus 3.
+The determinant is x^{2} - 9. It vanishes when x = 3 or x = -3.
 
 #### Common mistakes
 
@@ -292,7 +286,7 @@ allowed, as long as the sign is fixed at every swap.
 **Block C. Going further**
 
 15. Solve the equation in which the determinant of the matrix whose first row is x and 2 and whose
-    second row is 3 and x minus 1 equals zero.
+    second row is 3 and x - 1 equals zero.
 16. Show, using a matrix with two rows written with letters, that a matrix with two equal rows has
     determinant zero.
 17. Find the determinant of the matrix with three rows whose first row is 1, 1 and 1, whose second
@@ -308,25 +302,25 @@ allowed, as long as the sign is fixed at every swap.
 2. 0. The second row is twice the first.
 3. 2. The matrix is triangular, and the determinant is the product of the main diagonal entries.
 4. 3.
-5. x equals 4.
+5. x = 4.
 6. 0. The third row is twice the second minus the first, and so the three rows are not
    independent.
 7. Minus 6.
-8. k equals 2 and k equals minus 2.
-9. 45. Multiplying the two rows by 3 multiplies the determinant by 3 squared.
+8. k = 2 and k = -2.
+9. 45. Multiplying the two rows by 3 multiplies the determinant by 3^{2}.
 10. 7. The determinant of a matrix and that of its transpose are always equal.
 11. Minus 6.
-12. It does not. The second row is proportional to the first, and the calculation confirms it: 2
-    times 6 minus 4 times 3 gives zero.
+12. It does not. The second row is proportional to the first, and the calculation confirms it:
+    2 × 6 - 4 × 3 = 0.
 13. 13.
-14. 32. Multiplying the three rows by 2 multiplies the determinant by 2 to the third power.
-15. x equals 3 and x equals minus 2. The determinant is x squared minus x minus 6.
-16. In a matrix whose first row is a and b and whose second row is also a and b, the determinant is a
-    times b minus b times a, which is zero.
+14. 32. Multiplying the three rows by 2 multiplies the determinant by 2^{3}.
+15. x = 3 and x = -2. The determinant is x^{2} - x - 6.
+16. In a matrix whose first row is a and b and whose second row is also a and b, the determinant is
+    a · b - b · a = 0.
 17. 2.
 18. No value of m works. The third row is three times the first, so the determinant is zero whatever
     m may be, and the inverse never exists.
-19. The determinant of the inverse is 1 over 5, and the determinant of the product is 25.
+19. The determinant of the inverse is 1/5, and the determinant of the product is 25.
 
 ## VERIFICACAO
 

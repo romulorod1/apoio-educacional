@@ -555,6 +555,9 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
 .ferramentas .cresce { flex: 1; }
 
 .ferr {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 42px;
   height: 42px;
   border: 1px solid var(--fio);

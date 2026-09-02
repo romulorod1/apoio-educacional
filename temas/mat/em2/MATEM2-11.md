@@ -28,37 +28,48 @@ exatamente acima do centro da base.
 
 Duas fórmulas concentram quase tudo:
 
-o volume do prisma é a área da base vezes a altura
-o volume da pirâmide é um terço da área da base vezes a altura
+V_{prisma} = A_{b} · h
+
+V_{pirâmide} = (1/3) · A_{b} · h
+
+onde V é o volume, A_{b} a área da base e h a altura.
 
 O terço não é convenção: uma pirâmide com a mesma base e a mesma altura de um prisma cabe três vezes
 dentro dele.
 
 #### Áreas
 
-A **área lateral** é a soma das áreas das faces que não são base. Num prisma reto, ela é o perímetro
-da base vezes a altura, o que evita somar retângulo por retângulo. A **área total** é a área lateral
-mais a área das bases: duas bases no prisma, uma só na pirâmide.
+A **área lateral** é a soma das áreas das faces que não são base. Num prisma reto ela vale
+
+A_{lat} = P · h
+
+onde P é o perímetro da base, o que evita somar retângulo por retângulo. A **área total** é a área
+lateral mais a área das bases: A_{t} = A_{lat} + 2 · A_{b} no prisma e A_{t} = A_{lat} + A_{b} na
+pirâmide.
 
 **Exemplo 1.** Um paralelepípedo reto retângulo tem dimensões 3, 4 e 5. Calcular volume, área total
 e diagonal.
-O volume é 3 vezes 4 vezes 5, que dá 60. A área total é o dobro da soma de 12, 15 e 20, o que dá 94.
-A diagonal do bloco sai da raiz da soma dos quadrados das três dimensões, ou seja, a raiz de 9 mais
-16 mais 25, que é a raiz de 50, isto é, 5 vezes a raiz de 2.
+V = 3 × 4 × 5 = 60. A área total é o dobro da soma de 12, 15 e 20: A_{t} = 2 · (12 + 15 + 20) = 94.
+A diagonal do bloco sai da raiz da soma dos quadrados das três dimensões:
+d = √(9 + 16 + 25) = √50 = 5√2.
 
 A diagonal do bloco merece atenção: ela é o teorema de Pitágoras aplicado duas vezes, primeiro na
 base e depois no triângulo formado pela diagonal da base, a altura e a diagonal do sólido.
 
 #### Bases que exigem uma fórmula própria
 
-Quando a base é um triângulo equilátero de lado L, sua área é L ao quadrado vezes a raiz de 3,
-dividido por 4. Quando a base é um hexágono regular de lado L, ela vale seis vezes essa mesma área,
-porque o hexágono regular se divide em seis triângulos equiláteros.
+Quando a base é um triângulo equilátero de lado L, sua área é
+
+A_{b} = (L^{2} · √3) / 4
+
+Quando a base é um hexágono regular de lado L, ela vale seis vezes essa mesma área, porque o
+hexágono regular se divide em seis triângulos equiláteros:
+
+A_{b} = 6 · (L^{2} · √3) / 4
 
 **Exemplo 2.** Um prisma reto tem base triangular equilátera de lado 6 e altura 10. Calcular o
 volume.
-A área da base é 36 vezes a raiz de 3, dividido por 4, que dá 9 vezes a raiz de 3. Multiplicando
-pela altura 10, o volume é 90 vezes a raiz de 3.
+A_{b} = (36 · √3) / 4 = 9√3. Multiplicando pela altura 10, V = 90√3.
 
 #### Os triângulos escondidos na pirâmide
 
@@ -71,9 +82,8 @@ Numa pirâmide regular de base quadrada, três triângulos retângulos resolvem 
 
 **Exemplo 3.** Uma pirâmide regular tem base quadrada de lado 6 e altura 4. Calcular o volume, o
 apótema da face lateral e a área total.
-O volume é um terço de 36 vezes 4, que dá 48. O apótema da face sai da raiz de 16 mais 9, que é 5.
-Cada face lateral tem área 6 vezes 5 dividido por 2, ou seja, 15, e as quatro somam 60. Com a base
-de 36, a área total é 96.
+V = (1/3) · 36 · 4 = 48. Chamando de m o apótema da face, m = √(16 + 9) = 5. Cada face lateral tem
+área (6 · 5) / 2 = 15, e as quatro somam 60. Com a base de 36, A_{t} = 96.
 
 #### Sólidos compostos
 
@@ -84,7 +94,7 @@ na área da peça montada.
 **Exemplo 4.** Um bloco tem a forma de um cubo de aresta 6 com uma pirâmide de base quadrada e
 altura 4 apoiada sobre a face superior, com a base da pirâmide coincidindo com essa face. Calcular o
 volume.
-O cubo tem volume 216 e a pirâmide tem um terço de 36 vezes 4, que dá 48. O total é 264.
+O cubo tem volume 216 e a pirâmide tem V = (1/3) · 36 · 4 = 48. O total é 264.
 
 #### Erros comuns
 
@@ -120,7 +130,7 @@ conversão. Um decímetro cúbico é um litro.
 10. Um prisma reto tem base hexagonal regular de lado 4 e altura 10. Calcule o volume, deixando a
     resposta em forma de raiz.
 11. Uma pirâmide de base quadrada tem volume 100 e altura 12. Calcule o lado da base.
-12. A diagonal de um cubo mede 6 vezes a raiz de 3. Calcule a aresta e o volume desse cubo.
+12. A diagonal de um cubo mede 6√3. Calcule a aresta e o volume desse cubo.
 13. Um prisma reto tem base retangular de 3 por 8 e altura 5. Calcule a área lateral e a área total.
 
 **Bloco C. Aprofundamento**
@@ -148,23 +158,23 @@ conversão. Um decímetro cúbico é um litro.
 3. 64.
 4. 48.
 5. 13.
-6. 90 vezes a raiz de 3. A área da base é 9 vezes a raiz de 3.
+6. 90√3. A área da base é 9√3.
 7. 8.
 8. 94.
 9. O apótema da face lateral mede 5 e a área total é 96. A área lateral é 60 e a base tem área 36.
-10. 240 vezes a raiz de 3. A área da base é 24 vezes a raiz de 3.
-11. 5. A área da base é o triplo do volume dividido pela altura, o que dá 25.
+10. 240√3. A área da base é 24√3.
+11. 5. A área da base é A_{b} = 3 · V / h, o que dá 25.
 12. A aresta mede 6 e o volume é 216.
 13. A área lateral é 110 e a área total é 158.
 14. 264. O cubo contribui com 216 e a pirâmide com 48.
 15. 192. O furo tem volume 24.
-16. A altura é 7 e o volume é 336. A metade da diagonal da base vale 6 vezes a raiz de 2, cujo
-    quadrado é 72, e 121 menos 72 dá 49.
+16. A altura é 7 e o volume é 336. A metade da diagonal da base vale 6√2, cujo quadrado é 72, e
+    121 - 72 = 49.
 17. O prisma tem volume 360 e a pirâmide tem volume 120, ou seja, o prisma vale o triplo. A razão
     não depende das medidas porque as duas fórmulas usam a mesma área de base e a mesma altura, e a
-    da pirâmide traz o fator um terço qualquer que seja o sólido.
-18. 14,5 centímetros. O volume de água é 4800, o cubo acrescenta 1000, e a soma dividida pela área
-    da base, que é 400, dá a nova altura.
+    da pirâmide traz o fator 1/3 qualquer que seja o sólido.
+18. 14,5 centímetros. O volume de água é 4800 e o cubo acrescenta 1000. A área da base é 400,
+    então h = (4800 + 1000) / 400 = 14,5.
 
 ## EN
 
@@ -183,8 +193,11 @@ sits exactly above the centre of the base.
 
 Two formulas carry almost everything:
 
-the volume of a prism is the area of the base times the height
-the volume of a pyramid is one third of the area of the base times the height
+V_{prism} = A_{b} · h
+
+V_{pyramid} = (1/3) · A_{b} · h
+
+where V is the volume, A_{b} the area of the base and h the height.
 
 The third is not a convention: a pyramid with the same base and the same height as a prism fits
 three times inside it.
@@ -192,16 +205,18 @@ three times inside it.
 #### Areas
 
 The **lateral area** is the sum of the areas of the faces that are not bases. In a right prism it is
-the perimeter of the base times the height, which saves you adding rectangle by rectangle. The
-**total area** is the lateral area plus the area of the bases: two bases in a prism, only one in a
-pyramid.
+
+A_{lat} = P · h
+
+where P is the perimeter of the base, which saves you adding rectangle by rectangle. The **total
+area** is the lateral area plus the area of the bases: A_{t} = A_{lat} + 2 · A_{b} in a prism and
+A_{t} = A_{lat} + A_{b} in a pyramid.
 
 **Example 1.** A rectangular block has dimensions 3, 4 and 5. Find its volume, total area and
 diagonal.
-The volume is 3 times 4 times 5, which gives 60. The total area is twice the sum of 12, 15 and 20,
-which gives 94. The diagonal of the block comes from the square root of the sum of the squares of
-the three dimensions, that is, the square root of 9 plus 16 plus 25, which is the square root of 50,
-that is, 5 times the square root of 2.
+V = 3 × 4 × 5 = 60. The total area is twice the sum of 12, 15 and 20:
+A_{t} = 2 · (12 + 15 + 20) = 94. The diagonal of the block comes from the square root of the sum of
+the squares of the three dimensions: d = √(9 + 16 + 25) = √50 = 5√2.
 
 The diagonal of the block deserves attention: it is the Pythagorean theorem used twice, first on the
 base and then on the triangle formed by the diagonal of the base, the height and the diagonal of the
@@ -209,14 +224,18 @@ solid.
 
 #### Bases that call for a formula of their own
 
-When the base is an equilateral triangle of side L, its area is L squared times the square root of
-3, divided by 4. When the base is a regular hexagon of side L, it is six times that same area,
-because a regular hexagon splits into six equilateral triangles.
+When the base is an equilateral triangle of side L, its area is
+
+A_{b} = (L^{2} · √3) / 4
+
+When the base is a regular hexagon of side L, it is six times that same area, because a regular
+hexagon splits into six equilateral triangles:
+
+A_{b} = 6 · (L^{2} · √3) / 4
 
 **Example 2.** A right prism has an equilateral triangular base of side 6 and height 10. Find the
 volume.
-The area of the base is 36 times the square root of 3, divided by 4, which gives 9 times the square
-root of 3. Multiplying by the height 10, the volume is 90 times the square root of 3.
+A_{b} = (36 · √3) / 4 = 9√3. Multiplying by the height 10, V = 90√3.
 
 #### The triangles hidden in a pyramid
 
@@ -229,9 +248,8 @@ In a regular pyramid with a square base, three right triangles settle everything
 
 **Example 3.** A regular pyramid has a square base of side 6 and height 4. Find the volume, the
 slant height of a lateral face and the total area.
-The volume is one third of 36 times 4, which gives 48. The slant height comes from the square root
-of 16 plus 9, which is 5. Each lateral face has area 6 times 5 divided by 2, that is, 15, and the
-four of them add to 60. With the base of 36, the total area is 96.
+V = (1/3) · 36 · 4 = 48. Calling the slant height m, m = √(16 + 9) = 5. Each lateral face has area
+(6 · 5) / 2 = 15, and the four of them add to 60. With the base of 36, A_{t} = 96.
 
 #### Composite solids
 
@@ -241,8 +259,7 @@ joining do not count in the area of the assembled piece.
 
 **Example 4.** A block has the shape of a cube of edge 6 with a pyramid with a square base and
 height 4 resting on the top face, the base of the pyramid coinciding with that face. Find the volume.
-The cube has volume 216 and the pyramid has one third of 36 times 4, which gives 48. The total
-is 264.
+The cube has volume 216 and the pyramid has V = (1/3) · 36 · 4 = 48. The total is 264.
 
 #### Common mistakes
 
@@ -279,8 +296,7 @@ decimetre is one litre.
 10. A right prism has a regular hexagonal base of side 4 and height 10. Find the volume, leaving
     your answer in surd form.
 11. A pyramid with a square base has volume 100 and height 12. Find the side of the base.
-12. The diagonal of a cube measures 6 times the square root of 3. Find the edge and the volume of
-    that cube.
+12. The diagonal of a cube measures 6√3. Find the edge and the volume of that cube.
 13. A right prism has a rectangular base of 3 by 8 and height 5. Find the lateral area and the total
     area.
 
@@ -309,24 +325,24 @@ decimetre is one litre.
 3. 64.
 4. 48.
 5. 13.
-6. 90 times the square root of 3. The area of the base is 9 times the square root of 3.
+6. 90√3. The area of the base is 9√3.
 7. 8.
 8. 94.
 9. The slant height of a lateral face is 5 and the total area is 96. The lateral area is 60 and the
    base has area 36.
-10. 240 times the square root of 3. The area of the base is 24 times the square root of 3.
-11. 5. The area of the base is three times the volume divided by the height, which gives 25.
+10. 240√3. The area of the base is 24√3.
+11. 5. The area of the base is A_{b} = 3 · V / h, which gives 25.
 12. The edge is 6 and the volume is 216.
 13. The lateral area is 110 and the total area is 158.
 14. 264. The cube contributes 216 and the pyramid contributes 48.
 15. 192. The hole has volume 24.
-16. The height is 7 and the volume is 336. Half the diagonal of the base is 6 times the square root
-    of 2, whose square is 72, and 121 minus 72 gives 49.
+16. The height is 7 and the volume is 336. Half the diagonal of the base is 6√2, whose square
+    is 72, and 121 - 72 = 49.
 17. The prism has volume 360 and the pyramid has volume 120, so the prism is three times as large.
     The ratio does not depend on the measurements because both formulas use the same base area and
-    the same height, and the one for the pyramid carries the factor one third whatever the solid is.
-18. 14.5 centimetres. The volume of water is 4800, the cube adds 1000, and that sum divided by the
-    base area, which is 400, gives the new height.
+    the same height, and the one for the pyramid carries the factor 1/3 whatever the solid is.
+18. 14.5 centimetres. The volume of water is 4800 and the cube adds 1000. The base area is 400,
+    so h = (4800 + 1000) / 400 = 14.5.
 
 ## VERIFICACAO
 

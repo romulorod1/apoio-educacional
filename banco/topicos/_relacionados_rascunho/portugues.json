@@ -1,0 +1,408 @@
+{
+ "disciplina": "Português",
+ "situacao": "rascunho, nao ligado ao aplicativo, aguardando revisao da Nathalia",
+ "cobertura": "As 40 entradas foram validadas por script contra o arquivo real: os 200 tópicos citados existem com o texto exato, e nenhum termo aparece dentro do tópico que ele deveria trazer, nem ignorando acento. Ou seja, as 40 falham hoje de verdade, nenhuma é desperdício.\n\nO que elas resolvem: a classe do assunto com dois nomes. São três famílias. Primeira, o nome guarda-chuva que não existe como tópico: \"figura de linguagem\" traz 17 tópicos que hoje dão zero, \"classes gramaticais\" traz 11, \"ortografia\" traz 14, \"escolas literárias\" traz 13, \"análise sintática\" traz 11. Segunda, a inversão de palavras que quebra o match de pedaço de texto: buscar \"oração subordinada\" dá zero hoje porque os tópicos se chamam \"Subordinada substantiva subjetiva\", \"Subordinada adverbial causal\" e assim por diante. O mesmo com \"oração coordenada\" e \"oração adverbial\", que são exatamente como o professor fala e o livro escreve ao contrário. Terceira, o aluno que chega com o livro na mão e não com o movimento: \"Capitu\" para Dom Casmurro, \"Os Lusíadas\" para Camões, \"Macunaíma\" para Mário de Andrade, \"Ricardo Reis\" para os heterônimos de Pessoa, \"Morte e Vida Severina\" para João Cabral. Essa terceira família é a de maior valor no dia a dia dela, porque a busca de hoje nunca vai acertar: o nome da obra simplesmente não está no banco.\n\nO que continua falhando, e é bom dizer com clareza:\n\n1. O acento pesa mais do que o termo relacionado nesta disciplina. Medi no arquivo: 216 dos 427 tópicos de Português têm acento, 51 por cento. Com a regra de hoje, digitar sem acento devolve zero em quase tudo que ela mais busca: \"redacao\" dá 0 contra 8 de \"redação\", \"cronica\" dá 0 contra 6, \"silaba\" dá 0 contra 6, \"noticia\" dá 0 contra 5, \"concordancia\" dá 0 contra 5, \"coesao\" dá 0 contra 3, \"interpretacao\" dá 0 contra 3, \"fabula\" dá 0 contra 2, \"gramatica\" dá 0 contra 1, \"metafora\" dá 0 contra 1, \"acentuacao\" dá 0 contra 1. Nenhuma tabela de termos relacionados conserta isso. Normalizar acento é a correção maior e é uma linha de código; o dicionário de termos é a correção menor e é trabalho manual. Se for para fazer só uma coisa, é a normalização.\n\n2. Obra que não tem tópico correspondente. Se o aluno chega com \"Auto da Compadecida\" ou \"Memórias de um Sargento de Milícias\", não há para onde apontar sem inventar tópico, e inventar está fora de questão. Deixei essas de fora de propósito.\n\n3. Erro de digitação e forma flexionada. \"cronic\", \"figuras de linguagem\" no plural com preposição diferente, \"predicado e sujeito\" invertido: nada disso é coberto por lista de sinônimos, só por busca tolerante a prefixo e a palavra solta.\n\n4. Busca por contexto de agenda, não por conteúdo: \"prova de sexta\", \"matéria da recuperação\", \"o que caiu no simulado\". Isso não é problema de busca de tema.\n\n5. Ruído de repetição entre anos. \"Crônica\" traz 6 tópicos espalhados do 4º ano ao 9º. Achar não é o problema ali, escolher é. O que resolve é mostrar o ano e o bloco ao lado do resultado, não termo relacionado.\n\nChute honesto de proporção, sem medição de uso real porque não existe log: das buscas que hoje frustram em Português, algo como metade a dois terços é acento puro, e o resto é nome diferente. Dentro dessa fatia de nome diferente, estas 40 entradas pegam a maior parte dos casos previsíveis de gramática e de literatura, e não pegam quase nada dos casos de gênero textual e de produção de texto, onde o vocabulário da professora varia demais para tabular.",
+ "entradas": [
+  {
+   "termo": "figura de linguagem",
+   "leva": [
+    "Metáfora",
+    "Comparação",
+    "Personificação",
+    "Hipérbole",
+    "Ironia",
+    "Metonímia",
+    "Catacrese",
+    "Sinestesia",
+    "Antítese",
+    "Paradoxo",
+    "Eufemismo",
+    "Pleonasmo",
+    "Anáfora",
+    "Elipse e zeugma",
+    "Hipérbato",
+    "Aliteração e assonância",
+    "Gradação"
+   ]
+  },
+  {
+   "termo": "sentido figurado",
+   "leva": [
+    "Denotação e conotação",
+    "Metáfora",
+    "Comparação",
+    "Hipérbole",
+    "Ironia",
+    "Personificação",
+    "Polissemia"
+   ]
+  },
+  {
+   "termo": "análise sintática",
+   "leva": [
+    "Frase, oração e período",
+    "Sujeito e predicado",
+    "Sujeito simples e composto",
+    "Sujeito oculto",
+    "Sujeito indeterminado",
+    "Oração sem sujeito",
+    "Verbo de ligação",
+    "Predicado verbal",
+    "Predicado nominal",
+    "Predicativo do sujeito",
+    "Predicado verbo-nominal"
+   ]
+  },
+  {
+   "termo": "termos da oração",
+   "leva": [
+    "Transitividade verbal",
+    "Objeto direto e objeto indireto",
+    "Complemento nominal",
+    "Adjunto adnominal",
+    "Adjunto adverbial",
+    "Agente da passiva",
+    "Aposto",
+    "Vocativo"
+   ]
+  },
+  {
+   "termo": "oração subordinada",
+   "leva": [
+    "Subordinada substantiva subjetiva",
+    "Subordinada substantiva objetiva direta",
+    "Subordinada substantiva objetiva indireta",
+    "Subordinada substantiva completiva nominal",
+    "Subordinada substantiva predicativa",
+    "Subordinada substantiva apositiva",
+    "Subordinada adjetiva restritiva",
+    "Subordinada adjetiva explicativa",
+    "Orações reduzidas"
+   ]
+  },
+  {
+   "termo": "oração coordenada",
+   "leva": [
+    "Orações sindéticas e assindéticas",
+    "Coordenada aditiva",
+    "Coordenada adversativa",
+    "Coordenada alternativa",
+    "Coordenada conclusiva",
+    "Coordenada explicativa",
+    "Vírgula entre orações coordenadas"
+   ]
+  },
+  {
+   "termo": "oração adverbial",
+   "leva": [
+    "Subordinada adverbial causal",
+    "Subordinada adverbial condicional",
+    "Subordinada adverbial concessiva",
+    "Subordinada adverbial consecutiva",
+    "Subordinada adverbial final",
+    "Subordinada adverbial temporal",
+    "Subordinada adverbial comparativa",
+    "Subordinada adverbial proporcional"
+   ]
+  },
+  {
+   "termo": "colocação pronominal",
+   "leva": [
+    "Próclise, mesóclise e ênclise",
+    "Uso dos pronomes oblíquos átonos",
+    "Pronome do caso reto e oblíquo"
+   ]
+  },
+  {
+   "termo": "vozes verbais",
+   "leva": [
+    "Voz ativa, passiva e reflexiva",
+    "Voz passiva analítica",
+    "Voz passiva sintética",
+    "Transformar ativa em passiva",
+    "Agente da passiva"
+   ]
+  },
+  {
+   "termo": "complemento verbal",
+   "leva": [
+    "Transitividade verbal",
+    "Verbo transitivo direto",
+    "Verbo transitivo indireto",
+    "Objeto direto e objeto indireto",
+    "Objeto direto preposicionado"
+   ]
+  },
+  {
+   "termo": "classes gramaticais",
+   "leva": [
+    "Substantivo: classificação",
+    "Adjetivo e locução adjetiva",
+    "Artigo definido e indefinido",
+    "Numeral",
+    "Pronome pessoal",
+    "Verbo: pessoa, número, tempo e modo",
+    "Advérbio e locução adverbial",
+    "Preposição",
+    "Conjunção coordenativa",
+    "Conjunção subordinativa",
+    "Interjeição"
+   ]
+  },
+  {
+   "termo": "morfologia",
+   "leva": [
+    "Radical e desinência",
+    "Prefixo e sufixo",
+    "Derivação e composição",
+    "Família de palavras"
+   ]
+  },
+  {
+   "termo": "ortografia",
+   "leva": [
+    "Uso do S e do Z",
+    "Uso do G e do J",
+    "Palavras com Ç",
+    "Uso do S, SS, C e Ç",
+    "Uso do X e do CH",
+    "X com som de Z",
+    "Casos difíceis com X e CH",
+    "M antes de P e B",
+    "M e N antes de consoante",
+    "Palavras com R e RR",
+    "Palavras com S e SS",
+    "Palavras com CH, LH e NH",
+    "Palavras com H no começo",
+    "Emprego do hífen"
+   ]
+  },
+  {
+   "termo": "fonologia",
+   "leva": [
+    "Fonema e letra",
+    "Dígrafo",
+    "Divisão silábica: casos difíceis",
+    "Sílabas simples",
+    "Sílabas complexas",
+    "Som nasal com til"
+   ]
+  },
+  {
+   "termo": "encontro vocálico",
+   "leva": [
+    "Ditongo, tritongo e hiato",
+    "Divisão silábica: casos difíceis"
+   ]
+  },
+  {
+   "termo": "pretérito perfeito",
+   "leva": [
+    "Tempos simples do indicativo",
+    "Modo indicativo do verbo",
+    "Verbo: presente, passado e futuro",
+    "Tempos compostos"
+   ]
+  },
+  {
+   "termo": "norma culta",
+   "leva": [
+    "Norma-padrão e variedades",
+    "Norma-padrão na redação",
+    "Deslizes mais comuns na norma-padrão",
+    "Registro formal e informal",
+    "Escolher o registro certo"
+   ]
+  },
+  {
+   "termo": "gíria",
+   "leva": [
+    "Registro formal e informal",
+    "Variação regional",
+    "Norma-padrão e variedades",
+    "Preconceito linguístico"
+   ]
+  },
+  {
+   "termo": "semântica",
+   "leva": [
+    "Denotação e conotação",
+    "Polissemia",
+    "Ambiguidade",
+    "Sinônimo e antônimo",
+    "Homônimos e parônimos",
+    "Sentido da palavra pelo contexto"
+   ]
+  },
+  {
+   "termo": "quadrinhos",
+   "leva": [
+    "Tirinha",
+    "Charge",
+    "Charge e tirinha na prova"
+   ]
+  },
+  {
+   "termo": "conto de terror",
+   "leva": [
+    "Conto de mistério",
+    "Conto fantástico"
+   ]
+  },
+  {
+   "termo": "publicidade",
+   "leva": [
+    "Anúncio publicitário",
+    "Propaganda e persuasão"
+   ]
+  },
+  {
+   "termo": "cantiga de roda",
+   "leva": [
+    "Cantiga",
+    "Parlenda",
+    "Trava-língua"
+   ]
+  },
+  {
+   "termo": "alfabetização",
+   "leva": [
+    "Sílabas simples",
+    "Sílabas complexas",
+    "Leitura de palavras",
+    "Leitura de frases",
+    "Alfabeto e ordem alfabética",
+    "Vogais e consoantes",
+    "Separar as sílabas"
+   ]
+  },
+  {
+   "termo": "dissertativo",
+   "leva": [
+    "Estrutura da dissertação argumentativa",
+    "Tese e argumento",
+    "Parágrafo argumentativo",
+    "Introdução, desenvolvimento e conclusão",
+    "Conectivos argumentativos",
+    "Conclusão com proposta de intervenção"
+   ]
+  },
+  {
+   "termo": "narração",
+   "leva": [
+    "Narrativa curta",
+    "Narrativa com conflito e desfecho",
+    "Narrativa em primeira pessoa",
+    "Conto autoral",
+    "Começo, meio e fim",
+    "Discurso direto e indireto"
+   ]
+  },
+  {
+   "termo": "escolas literárias",
+   "leva": [
+    "Trovadorismo: as cantigas",
+    "Humanismo",
+    "Classicismo e Camões",
+    "Quinhentismo: a carta de Caminha",
+    "Barroco: cultismo e conceptismo",
+    "Arcadismo e a vida simples",
+    "Romantismo: contexto",
+    "Realismo e Machado de Assis",
+    "Naturalismo e Aluísio Azevedo",
+    "Parnasianismo",
+    "Simbolismo e Cruz e Sousa",
+    "Pré-Modernismo",
+    "Semana de 22"
+   ]
+  },
+  {
+   "termo": "semana de arte moderna",
+   "leva": [
+    "Semana de 22",
+    "Primeira geração modernista",
+    "Mário de Andrade",
+    "Oswald de Andrade e a antropofagia"
+   ]
+  },
+  {
+   "termo": "cantiga de amigo",
+   "leva": [
+    "Trovadorismo: as cantigas"
+   ]
+  },
+  {
+   "termo": "os lusíadas",
+   "leva": [
+    "Classicismo e Camões"
+   ]
+  },
+  {
+   "termo": "iracema",
+   "leva": [
+    "Romance indianista de José de Alencar",
+    "Romantismo: contexto"
+   ]
+  },
+  {
+   "termo": "capitu",
+   "leva": [
+    "Dom Casmurro",
+    "Realismo e Machado de Assis"
+   ]
+  },
+  {
+   "termo": "macunaíma",
+   "leva": [
+    "Mário de Andrade",
+    "Primeira geração modernista",
+    "Semana de 22"
+   ]
+  },
+  {
+   "termo": "os sertões",
+   "leva": [
+    "Euclides da Cunha",
+    "Pré-Modernismo"
+   ]
+  },
+  {
+   "termo": "policarpo quaresma",
+   "leva": [
+    "Lima Barreto",
+    "Pré-Modernismo"
+   ]
+  },
+  {
+   "termo": "morte e vida severina",
+   "leva": [
+    "João Cabral de Melo Neto"
+   ]
+  },
+  {
+   "termo": "a hora da estrela",
+   "leva": [
+    "Clarice Lispector"
+   ]
+  },
+  {
+   "termo": "grande sertão veredas",
+   "leva": [
+    "Guimarães Rosa"
+   ]
+  },
+  {
+   "termo": "capitães da areia",
+   "leva": [
+    "Jorge Amado",
+    "Romance de 30"
+   ]
+  },
+  {
+   "termo": "ricardo reis",
+   "leva": [
+    "Fernando Pessoa e os heterônimos"
+   ]
+  }
+ ]
+}

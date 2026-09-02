@@ -256,6 +256,45 @@ def eh_tautologia(expressao):
     return bool(achado) and achado.group(1) == achado.group(2)
 
 
+# ---------------------------------------------------------------- caracteres
+
+# O PDF usa as fontes base-14 com WinAnsiEncoding, que cobrem o portugues
+# inteiro mas nao cobrem grego, raiz nem comparacao. Um caractere fora do
+# repertorio nao quebra nada: vira uma interrogacao silenciosa no meio da
+# formula, e so aparece quando alguem olha o material pronto. Foi assim que
+# 38 letras pi entraram no banco e sairam como "?" no material de circunferencia.
+#
+# O repertorio permitido esta em temas/NOTACAO.md, e e a uniao de dois
+# conjuntos: o que a fonte de texto desenha e o que a fonte de simbolos
+# desenha. Quem quiser um caractere novo mexe aqui e no gerador, nunca so num.
+
+SIMBOLOS_DA_FONTE = u'\u03c0\u221a\u2265\u2264\u2260\u221e\u0394\u03a3\u03b1\u03b2\u03b8'
+TIPOGRAFICOS = u'\u201c\u201d\u2018\u2019\u20ac\u2026\u2030\u2022\u2020\u2021'
+
+
+def _desenhavel(c):
+    n = ord(c)
+    if n < 32:
+        return c in u'\n\r\t'
+    if n < 256:
+        return True          # o latin-1 inteiro cabe no WinAnsi
+    return c in SIMBOLOS_DA_FONTE or c in TIPOGRAFICOS
+
+
+def caracteres_indesenhaveis(texto):
+    """Devolve [(linha, caractere, codigo, trecho)] do que o PDF nao desenha."""
+    achados = []
+    for numero, linha in enumerate(texto.split(u'\n'), 1):
+        for i, c in enumerate(linha):
+            if not _desenhavel(c):
+                # o console do Windows nao imprime o proprio caractere, entao
+                # o trecho sai com ele trocado pelo codigo
+                trecho = linha[max(0, i - 24):i + 24].strip()
+                trecho = trecho.replace(c, u'<%s>' % (u'U+%04X' % ord(c)))
+                achados.append((numero, c, u'U+%04X' % ord(c), trecho))
+    return achados
+
+
 def conferir(caminho):
     """Devolve (erros, avisos, manuais, cabecalho)."""
     erros, avisos, manuais = [], [], []
@@ -269,6 +308,11 @@ def conferir(caminho):
     for numero, linha in enumerate(io.open(caminho, encoding='utf-8').read().split('\n'), 1):
         if '–' in linha or '—' in linha:
             erros.append('travessao na linha %d: %s' % (numero, linha.strip()[:60]))
+
+    for numero, c, codigo, trecho in caracteres_indesenhaveis(
+            io.open(caminho, encoding='utf-8').read()):
+        erros.append('caractere que o PDF nao desenha na linha %d: %s | %s'
+                     % (numero, codigo, trecho))
 
     for numero, motivo, trecho in marcas_de_rascunho(corpo):
         erros.append('possivel rascunho na linha %d (%s): %s' % (numero, motivo, trecho))

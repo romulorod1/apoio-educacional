@@ -23,69 +23,70 @@ Na progressão aritmética você **soma** sempre o mesmo valor. Na progressão g
 2, 6, 18, 54, 162
 
 Aqui a razão é 3, porque cada termo é o anterior vezes 3. Para descobrir a razão, divida um termo
-pelo anterior: 6 dividido por 2 dá 3, e 18 dividido por 6 também dá 3.
+pelo anterior: 6 ÷ 2 = 3, e 18 ÷ 6 = 3 também.
 
 Essa diferença de mecanismo muda tudo. A aritmética cresce em linha reta, e a geométrica cresce cada
 vez mais depressa, o que explica juros compostos, população e meia-vida.
 
 #### O termo geral
 
-a de n igual a a1 vezes q elevado a (n menos 1)
+a_{n} = a_{1} · q^{n-1}
 
-De novo o expoente é n menos 1, e pela mesma razão de antes: do primeiro ao termo n há n menos 1
+onde a_{n} é o termo de ordem n, a_{1} é o primeiro termo e q é a razão.
+
+De novo o expoente é n - 1, e pela mesma razão de antes: do primeiro ao termo n há n - 1
 multiplicações.
 
 **Exemplo 1.** Na sequência 2, 6, 18, 54, qual é o sétimo termo?
-O primeiro termo é 2 e a razão é 3. Então a de 7 é 2 vezes 3 elevado a 6, que dá 2 vezes 729, ou
-seja, 1458.
+O primeiro termo é 2 e a razão é 3. Então a_{7} = 2 · 3^{6} = 2 · 729 = 1458.
 
 #### Quando a razão é menor que 1
 
 Se a razão está entre 0 e 1, a sequência diminui, mas nunca chega a zero.
 
 **Exemplo 2.** Na sequência 80, 40, 20, 10, qual é a razão e qual é o sexto termo?
-A razão é 40 dividido por 80, que dá um meio. O sexto termo é 80 vezes um meio elevado a 5, que dá
-80 dividido por 32, ou seja, 5 sobre 2.
+A razão é 40 ÷ 80 = 1/2. O sexto termo é 80 · (1/2)^{5} = 80 ÷ 32 = 5/2.
 
-Razão negativa também existe, e aí os sinais alternam. Em 3, menos 6, 12, menos 24 a razão é menos
-2.
+Razão negativa também existe, e aí os sinais alternam. Em 3, -6, 12, -24 a razão é -2.
 
 #### A soma dos termos
 
-S de n igual a a1 vezes (q elevado a n menos 1), dividido por (q menos 1)
+S_{n} = a_{1} · (q^{n} - 1) / (q - 1)
 
-Essa fórmula vale quando q é diferente de 1. Se q vale 1, todos os termos são iguais e a soma é
-simplesmente a1 vezes n.
+onde S_{n} é a soma dos n primeiros termos.
+
+Essa fórmula vale quando q ≠ 1. Se q vale 1, todos os termos são iguais e a soma é
+simplesmente a_{1} · n.
 
 **Exemplo 3.** Somar os 6 primeiros termos de 2, 6, 18, 54.
-Aqui a1 vale 2, q vale 3 e n vale 6. Então a soma é 2 vezes (729 menos 1) dividido por 2, que dá 728.
+Aqui a_{1} = 2, q = 3 e n = 6. Então S_{6} = 2 · (729 - 1) / 2 = 728.
 
 #### A soma infinita
 
-Este é o resultado que mais surpreende. Se a razão está entre menos 1 e 1, sem contar o zero, dá
+Este é o resultado que mais surpreende. Se a razão está entre -1 e 1, sem contar o zero, dá
 para somar **infinitos** termos e obter um número finito:
 
-S igual a a1 dividido por (1 menos q)
+S = a_{1} / (1 - q)
+
+onde S é a soma de todos os termos.
 
 Faz sentido porque cada termo é bem menor que o anterior, e o que se acrescenta vai ficando
 desprezível.
 
-**Exemplo 4.** Somar 1 mais um meio mais um quarto mais um oitavo, e assim por diante, para sempre.
-Aqui a1 vale 1 e q vale um meio. A soma é 1 dividido por (1 menos um meio), que dá 1 dividido por um
-meio, ou seja, 2.
+**Exemplo 4.** Somar 1 + 1/2 + 1/4 + 1/8, e assim por diante, para sempre.
+Aqui a_{1} = 1 e q = 1/2. A soma é S = 1 / (1 - 1/2) = 1 ÷ (1/2) = 2.
 
 Por mais termos que se some, o total nunca passa de 2. Ele se aproxima de 2 e nunca ultrapassa.
 
 **Exemplo 5.** Escrever a dízima 0,333 e assim por diante como fração.
-Ela é a soma de 3 décimos mais 3 centésimos mais 3 milésimos, e assim por diante, que é uma
-progressão geométrica de primeiro termo 3 sobre 10 e razão 1 sobre 10.
-A soma é (3 sobre 10) dividido por (1 menos 1 sobre 10), que dá (3 sobre 10) dividido por (9 sobre
-10), ou seja, um terço.
+Ela é a soma 3/10 + 3/100 + 3/1000, e assim por diante, que é uma progressão geométrica de
+primeiro termo a_{1} = 3/10 e razão q = 1/10.
+A soma é S = (3/10) / (1 - 1/10) = (3/10) ÷ (9/10) = 1/3.
 
 #### Três termos em progressão geométrica
 
-O truque aqui é chamar os três de x sobre q, x e x vezes q. O produto dos três dá x elevado ao cubo,
-então o termo do meio é a raiz cúbica do produto.
+O truque aqui é chamar os três de x/q, x e x · q. O produto dos três dá x^{3}, então o termo do
+meio é a raiz cúbica do produto.
 
 #### Erros comuns
 
@@ -93,10 +94,10 @@ então o termo do meio é a raiz cúbica do produto.
 consecutivos e achar valores diferentes, isso não descarta a progressão geométrica: é preciso
 dividir.
 
-**Usar a soma infinita com razão maior que 1.** Só funciona quando o valor absoluto da razão é menor
-que 1. Com razão 2 a soma cresce sem limite.
+**Usar a soma infinita com razão maior que 1.** Só funciona quando |q| < 1. Com razão 2 a soma
+cresce sem limite.
 
-**Errar o expoente.** É n menos 1, não n.
+**Errar o expoente.** É n - 1, não n.
 
 **Confundir crescimento aritmético com geométrico num problema.** Se o enunciado diz "aumenta 10 por
 cento ao ano", a razão é 1,1 e a progressão é geométrica. Se diz "aumenta 10 unidades por ano", é
@@ -110,7 +111,7 @@ aritmética.
 2. Determine a razão de 80, 40, 20, 10 e escreva os dois termos seguintes.
 3. Numa progressão geométrica de primeiro termo 5 e razão 2, calcule o sexto termo.
 4. Verifique se 3, 6, 12, 20 é uma progressão geométrica.
-5. Determine a razão de 3, menos 6, 12, menos 24.
+5. Determine a razão de 3, -6, 12, -24.
 
 **Bloco B. Consolidação**
 
@@ -119,7 +120,7 @@ aritmética.
 8. Some os 6 primeiros termos de 2, 6, 18, 54.
 9. Numa progressão geométrica, o segundo termo vale 12 e o quarto vale 108, com razão positiva.
    Determine o primeiro termo e a razão.
-10. Some 1 mais um meio mais um quarto mais um oitavo, e assim por diante, para sempre.
+10. Some 1 + 1/2 + 1/4 + 1/8, e assim por diante, para sempre.
 11. Escreva a dízima 0,333 e assim por diante como fração, usando soma infinita.
 12. Uma população de bactérias dobra a cada hora e começa com 500 indivíduos. Quantas serão depois
     de 8 horas?
@@ -142,25 +143,25 @@ aritmética.
 ### Gabarito
 
 1. Razão 3. Seguem 162 e 486.
-2. Razão um meio. Seguem 5 e 5 sobre 2.
+2. Razão 1/2. Seguem 5 e 5/2.
 3. 160.
-4. Não é. As razões seriam 2, 2 e 5 sobre 3, que não são iguais.
-5. Razão menos 2.
+4. Não é. As razões seriam 2, 2 e 5/3, que não são iguais.
+5. Razão -2.
 6. 1458.
-7. 5 sobre 2.
+7. 5/2.
 8. 728.
 9. Razão 3 e primeiro termo 4.
 10. A soma é 2.
-11. Um terço.
+11. 1/3.
 12. 128000 bactérias.
 13. 30720 reais.
 14. Os números são 2, 6 e 18.
-15. x igual a 9.
+15. x = 9.
 16. 6 metros. Ela cai 2 metros e depois sobe e desce alturas que somam duas vezes a soma infinita de
-    1 mais um meio mais um quarto, e assim por diante, começando de 1 metro.
-17. Chamando o termo do meio de a e a razão de q, o anterior é a sobre q e o seguinte é a vezes q. O
-    produto entre eles é a ao quadrado, porque os q se cancelam. A raiz quadrada disso é a, já que os
-    termos são positivos.
+    1 + 1/2 + 1/4, e assim por diante, começando de 1 metro.
+17. Chamando o termo do meio de a e a razão de q, o anterior é a/q e o seguinte é a · q. O produto
+    entre eles é a^{2}, porque os q se cancelam. A raiz quadrada disso é a, já que os termos são
+    positivos.
 18. A segunda rendeu mais. A primeira chega a 2000 reais e a segunda a aproximadamente 2158,92
     reais. O crescimento aritmético soma sempre a mesma parcela, enquanto o geométrico rende sobre um
     valor que já cresceu, e por isso acaba passando à frente.
@@ -177,69 +178,70 @@ In an arithmetic progression you always **add** the same value. In a geometric p
 2, 6, 18, 54, 162
 
 Here the ratio is 3, because each term is the previous one times 3. To find the ratio, divide a term
-by the one before: 6 divided by 2 gives 3, and 18 divided by 6 also gives 3.
+by the one before: 6 ÷ 2 = 3, and 18 ÷ 6 = 3 as well.
 
 That difference in mechanism changes everything. Arithmetic grows in a straight line, and geometric
 grows faster and faster, which explains compound interest, populations and half-lives.
 
 #### The general term
 
-a of n equals a1 times q to the power of (n minus 1)
+a_{n} = a_{1} · q^{n-1}
 
-Again the exponent is n minus 1, for the same reason as before: from the first to term n there are
-n minus 1 multiplications.
+where a_{n} is the term of order n, a_{1} is the first term and q is the ratio.
+
+Again the exponent is n - 1, for the same reason as before: from the first to term n there are
+n - 1 multiplications.
 
 **Example 1.** In the sequence 2, 6, 18, 54, what is the seventh term?
-The first term is 2 and the ratio is 3. So a of 7 is 2 times 3 to the power of 6, which gives 2
-times 729, that is, 1458.
+The first term is 2 and the ratio is 3. So a_{7} = 2 · 3^{6} = 2 · 729 = 1458.
 
 #### When the ratio is less than 1
 
 If the ratio is between 0 and 1, the sequence shrinks, but never reaches zero.
 
 **Example 2.** In the sequence 80, 40, 20, 10, what is the ratio and what is the sixth term?
-The ratio is 40 divided by 80, which gives one half. The sixth term is 80 times one half to the
-power of 5, which gives 80 divided by 32, that is, 5 over 2.
+The ratio is 40 ÷ 80 = 1/2. The sixth term is 80 · (1/2)^{5} = 80 ÷ 32 = 5/2.
 
-A negative ratio also exists, and then the signs alternate. In 3, minus 6, 12, minus 24 the ratio is
-minus 2.
+A negative ratio also exists, and then the signs alternate. In 3, -6, 12, -24 the ratio is -2.
 
 #### The sum of the terms
 
-S of n equals a1 times (q to the power of n minus 1), divided by (q minus 1)
+S_{n} = a_{1} · (q^{n} - 1) / (q - 1)
 
-This formula holds when q is different from 1. If q is 1, all terms are equal and the sum is simply
-a1 times n.
+where S_{n} is the sum of the first n terms.
+
+This formula holds when q ≠ 1. If q is 1, all terms are equal and the sum is simply
+a_{1} · n.
 
 **Example 3.** Add the first 6 terms of 2, 6, 18, 54.
-Here a1 is 2, q is 3 and n is 6. So the sum is 2 times (729 minus 1) divided by 2, which gives 728.
+Here a_{1} = 2, q = 3 and n = 6. So S_{6} = 2 · (729 - 1) / 2 = 728.
 
 #### The infinite sum
 
-This is the result that surprises students most. If the ratio is between minus 1 and 1, not counting
+This is the result that surprises students most. If the ratio is between -1 and 1, not counting
 zero, you can add **infinitely** many terms and get a finite number:
 
-S equals a1 divided by (1 minus q)
+S = a_{1} / (1 - q)
+
+where S is the sum of all the terms.
 
 It makes sense because each term is much smaller than the one before, and what gets added becomes
 negligible.
 
-**Example 4.** Add 1 plus one half plus one quarter plus one eighth, and so on, forever.
-Here a1 is 1 and q is one half. The sum is 1 divided by (1 minus one half), which gives 1 divided by
-one half, that is, 2.
+**Example 4.** Add 1 + 1/2 + 1/4 + 1/8, and so on, forever.
+Here a_{1} = 1 and q = 1/2. The sum is S = 1 / (1 - 1/2) = 1 ÷ (1/2) = 2.
 
 However many terms you add, the total never passes 2. It gets closer to 2 and never goes beyond.
 
 **Example 5.** Write the repeating decimal 0.333 and so on as a fraction.
-It is the sum of 3 tenths plus 3 hundredths plus 3 thousandths, and so on, which is a geometric
-progression with first term 3 over 10 and ratio 1 over 10.
-The sum is (3 over 10) divided by (1 minus 1 over 10), which gives (3 over 10) divided by (9 over
-10), that is, one third.
+It is the sum 3/10 + 3/100 + 3/1000, and so on, which is a geometric progression with first term
+a_{1} = 3/10 and ratio q = 1/10.
+The sum is S = (3/10) / (1 - 1/10) = (3/10) ÷ (9/10) = 1/3.
 
 #### Three terms in geometric progression
 
-The trick here is to call the three of them x over q, x and x times q. The product of the three
-gives x cubed, so the middle term is the cube root of the product.
+The trick here is to call the three of them x/q, x and x · q. The product of the three gives
+x^{3}, so the middle term is the cube root of the product.
 
 #### Common mistakes
 
@@ -247,10 +249,10 @@ gives x cubed, so the middle term is the cube root of the product.
 subtract consecutive terms and get different values, that does not rule out a geometric progression:
 you have to divide.
 
-**Using the infinite sum with a ratio greater than 1.** It only works when the absolute value of the
-ratio is less than 1. With ratio 2 the sum grows without limit.
+**Using the infinite sum with a ratio greater than 1.** It only works when |q| < 1. With ratio 2 the
+sum grows without limit.
 
-**Getting the exponent wrong.** It is n minus 1, not n.
+**Getting the exponent wrong.** It is n - 1, not n.
 
 **Mixing up arithmetic and geometric growth in a problem.** If the problem says "goes up by 10 per
 cent a year", the ratio is 1.1 and the progression is geometric. If it says "goes up by 10 units a
@@ -264,7 +266,7 @@ year", it is arithmetic.
 2. Find the ratio of 80, 40, 20, 10 and write the next two terms.
 3. In a geometric progression with first term 5 and ratio 2, find the sixth term.
 4. Check whether 3, 6, 12, 20 is a geometric progression.
-5. Find the ratio of 3, minus 6, 12, minus 24.
+5. Find the ratio of 3, -6, 12, -24.
 
 **Block B. Building up**
 
@@ -273,7 +275,7 @@ year", it is arithmetic.
 8. Add the first 6 terms of 2, 6, 18, 54.
 9. In a geometric progression, the second term is 12 and the fourth is 108, with positive ratio.
    Find the first term and the ratio.
-10. Add 1 plus one half plus one quarter plus one eighth, and so on, forever.
+10. Add 1 + 1/2 + 1/4 + 1/8, and so on, forever.
 11. Write the repeating decimal 0.333 and so on as a fraction, using an infinite sum.
 12. A population of bacteria doubles every hour and starts with 500 individuals. How many will there
     be after 8 hours?
@@ -296,25 +298,25 @@ year", it is arithmetic.
 ### Answer key
 
 1. Ratio 3. Next come 162 and 486.
-2. Ratio one half. Next come 5 and 5 over 2.
+2. Ratio 1/2. Next come 5 and 5/2.
 3. 160.
-4. It is not. The ratios would be 2, 2 and 5 over 3, which are not equal.
-5. Ratio minus 2.
+4. It is not. The ratios would be 2, 2 and 5/3, which are not equal.
+5. Ratio -2.
 6. 1458.
-7. 5 over 2.
+7. 5/2.
 8. 728.
 9. Ratio 3 and first term 4.
 10. The sum is 2.
-11. One third.
+11. 1/3.
 12. 128000 bacteria.
 13. 30720 reais.
 14. The numbers are 2, 6 and 18.
-15. x equals 9.
+15. x = 9.
 16. 6 metres. It falls 2 metres and then rises and falls through heights that add up to twice the
-    infinite sum of 1 plus one half plus one quarter, and so on, starting from 1 metre.
-17. Calling the middle term a and the ratio q, the one before is a over q and the one after is a
-    times q. Their product is a squared, because the q cancels out. Its square root is a, since the
-    terms are positive.
+    infinite sum of 1 + 1/2 + 1/4, and so on, starting from 1 metre.
+17. Calling the middle term a and the ratio q, the one before is a/q and the one after is a · q.
+    Their product is a^{2}, because the q cancels out. Its square root is a, since the terms are
+    positive.
 18. The second earned more. The first reaches 2000 reais and the second reaches about 2158.92 reais.
     Arithmetic growth always adds the same amount, while geometric growth earns on a value that has
     already grown, and so it ends up ahead.

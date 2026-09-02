@@ -24,55 +24,91 @@ fórmulas do plano na ponta da língua resolve o espaço quase de graça.
 
 #### O essencial do plano
 
-**Triângulo.** Área igual a base vezes altura dividido por 2. No triângulo retângulo vale o teorema
-de Pitágoras: o quadrado da hipotenusa é a soma dos quadrados dos catetos. O triângulo equilátero de
-lado L tem área igual a L ao quadrado vezes raiz de 3, dividido por 4.
+**Triângulo.** A área é
 
-**Quadrilátero.** O retângulo tem área base vezes altura, e sua diagonal também sai de Pitágoras. O
-trapézio tem área igual à soma das bases vezes a altura, dividido por 2.
+A = (b · h)/2
+
+onde b é a base e h a altura relativa a ela. No triângulo retângulo vale o teorema de Pitágoras:
+
+a^{2} = b^{2} + c^{2}
+
+onde a é a hipotenusa e b e c são os catetos. O triângulo equilátero de lado L tem área
+
+A = (L^{2} · √3)/4
+
+**Quadrilátero.** O retângulo de base b e altura h tem área
+
+A = b · h
+
+e sua diagonal também sai de Pitágoras: d^{2} = b^{2} + h^{2}. O trapézio de bases B e b e altura h
+tem área
+
+A = ((B + b) · h)/2
 
 **Polígono regular.** O hexágono regular de lado L é formado por seis triângulos equiláteros de lado
 L, e essa decomposição resolve a área sem fórmula decorada.
 
-**Circunferência e círculo.** O comprimento é 2 vezes pi vezes o raio, e a área é pi vezes o raio ao
-quadrado. Um setor de ângulo central alfa é a fração de alfa sobre 360 do círculo inteiro, e a mesma
-fração vale para o arco.
+**Circunferência e círculo.** Com raio r, o comprimento da circunferência e a área do círculo são
+
+C = 2 · π · r
+
+A = π · r^{2}
+
+Um setor de ângulo central α vale a fração α/360 do círculo inteiro, e a mesma fração vale para o
+arco.
 
 **Semelhança.** Quando duas figuras são semelhantes na razão k, os comprimentos ficam multiplicados
-por k, as áreas por k ao quadrado e os volumes por k ao cubo. Esse é o resultado que mais aparece
-disfarçado em prova.
+por k, as áreas por k^{2} e os volumes por k^{3}. Esse é o resultado que mais aparece disfarçado
+em prova.
 
 **Exemplo 1.** Um triângulo retângulo tem catetos 6 e 8. Qual a hipotenusa e qual a área?
-A hipotenusa é a raiz de 36 mais 64, ou seja, 10. A área é 6 vezes 8 dividido por 2, que dá 24.
+a = √(36 + 64) = 10 e A = (6 · 8)/2 = 24.
 
 **Exemplo 2.** Um círculo tem raio 5. Qual a área e qual o comprimento da circunferência?
-A área é pi vezes 25, ou seja, 25 pi. O comprimento é 2 vezes pi vezes 5, ou seja, 10 pi.
+A = π · 5^{2} = 25π e C = 2 · π · 5 = 10π.
 
 #### O essencial do espaço
 
-**Prisma.** Volume igual à área da base vezes a altura. A área lateral é o perímetro da base vezes a
-altura.
+**Prisma.** Com área da base A_{b}, perímetro da base P_{b} e altura h:
 
-**Cilindro.** É um prisma de base circular. Volume igual a pi vezes o raio ao quadrado vezes a
-altura. Área lateral igual a 2 vezes pi vezes o raio vezes a altura.
+V = A_{b} · h
 
-**Pirâmide.** Volume igual a um terço da área da base vezes a altura. A área lateral depende do
-apótema da face, que se acha por Pitágoras com a altura e o apótema da base.
+A_{lat} = P_{b} · h
 
-**Cone.** Volume igual a um terço de pi vezes o raio ao quadrado vezes a altura. A geratriz é a
-hipotenusa do triângulo formado pelo raio e pela altura. A área lateral é pi vezes o raio vezes a
-geratriz.
+**Cilindro.** É um prisma de base circular, de raio r e altura h:
 
-**Esfera.** Volume igual a quatro terços de pi vezes o raio ao cubo. Área da superfície igual a 4
-vezes pi vezes o raio ao quadrado.
+V = π · r^{2} · h
+
+A_{lat} = 2 · π · r · h
+
+**Pirâmide.** Com área da base A_{b} e altura h:
+
+V = (A_{b} · h)/3
+
+A área lateral depende do apótema da face, que se acha por Pitágoras com a altura e o apótema da
+base.
+
+**Cone.** Com raio r, altura h e geratriz g:
+
+V = (π · r^{2} · h)/3
+
+g^{2} = r^{2} + h^{2}
+
+A_{lat} = π · r · g
+
+A geratriz é a hipotenusa do triângulo formado pelo raio e pela altura.
+
+**Esfera.** Com raio r:
+
+V = (4 · π · r^{3})/3
+
+A = 4 · π · r^{2}
 
 **Exemplo 3.** Um cilindro tem raio 3 e altura 10. Qual o volume e qual a área lateral?
-O volume é pi vezes 9 vezes 10, ou seja, 90 pi. A área lateral é 2 vezes pi vezes 3 vezes 10, ou
-seja, 60 pi.
+V = π · 3^{2} · 10 = 90π e A_{lat} = 2 · π · 3 · 10 = 60π.
 
 **Exemplo 4.** Uma esfera tem raio 3. Qual o volume e qual a área da superfície?
-O volume é quatro terços de pi vezes 27, ou seja, 36 pi. A área é 4 vezes pi vezes 9, ou seja,
-também 36 pi.
+V = (4 · π · 3^{3})/3 = 36π e A = 4 · π · 3^{2} = 36π, o mesmo valor.
 
 #### Erros comuns
 
@@ -130,30 +166,29 @@ centímetro no meio da conta é um erro caro.
 ### Gabarito
 
 1. Hipotenusa de 15 centímetros e área de 54 centímetros quadrados.
-2. Área de 36 pi centímetros quadrados e comprimento de 12 pi centímetros.
+2. Área de 36π centímetros quadrados e comprimento de 12π centímetros.
 3. Volume de 125 centímetros cúbicos e área total de 150 centímetros quadrados.
 4. Área de 120 centímetros quadrados e diagonal de 17 centímetros.
-5. Área de 25 raiz de 3 centímetros quadrados.
+5. Área de 25√3 centímetros quadrados.
 6. Área de 50 centímetros quadrados.
-7. Volume de 144 pi centímetros cúbicos e área lateral de 72 pi centímetros quadrados.
+7. Volume de 144π centímetros cúbicos e área lateral de 72π centímetros quadrados.
 8. Volume de 48 centímetros cúbicos. O apótema da base é 3, então o apótema da face é 5. A área
    lateral é 60 e a área total é 96 centímetros quadrados.
-9. Geratriz de 10 centímetros, volume de 96 pi centímetros cúbicos e área total de 96 pi centímetros
+9. Geratriz de 10 centímetros, volume de 96π centímetros cúbicos e área total de 96π centímetros
    quadrados.
-10. Volume de 288 pi centímetros cúbicos e área da superfície de 144 pi centímetros quadrados.
-11. Os outros lados medem 20 e 25 centímetros. A razão de semelhança é 5 sobre 2, e a razão entre as
-    áreas é 25 sobre 4.
-12. Perímetro de 24 centímetros e área de 24 raiz de 3 centímetros quadrados.
-13. Os catetos medem 10 e 10 raiz de 3 centímetros.
-14. O círculo inscrito tem raio 5 e área 25 pi. O círculo circunscrito tem raio 5 raiz de 2 e área 50
-    pi. A região pedida tem área 100 menos 25 pi centímetros quadrados.
-15. Volume de 90 raiz de 3 centímetros cúbicos e área lateral de 180 centímetros quadrados.
-16. Comprimento de arco de 2 pi centímetros e área de setor de 12 pi centímetros quadrados.
-17. O raio da base é 5 centímetros, porque o arco do semicírculo, que mede 10 pi, vira o comprimento
-    da circunferência da base. A altura é 5 raiz de 3 e o volume é 125 raiz de 3 pi sobre 3
-    centímetros cúbicos.
-18. A esfera tem volume 36 pi e o cilindro, de raio 3 e altura 6, tem volume 54 pi centímetros
-    cúbicos. A razão entre os volumes é 2 sobre 3.
+10. Volume de 288π centímetros cúbicos e área da superfície de 144π centímetros quadrados.
+11. Os outros lados medem 20 e 25 centímetros. A razão de semelhança é 5/2, e a razão entre as
+    áreas é 25/4.
+12. Perímetro de 24 centímetros e área de 24√3 centímetros quadrados.
+13. Os catetos medem 10 e 10√3 centímetros.
+14. O círculo inscrito tem raio 5 e área 25π. O círculo circunscrito tem raio 5√2 e área 50π. A
+    região pedida tem área 100 - 25π centímetros quadrados.
+15. Volume de 90√3 centímetros cúbicos e área lateral de 180 centímetros quadrados.
+16. Comprimento de arco de 2π centímetros e área de setor de 12π centímetros quadrados.
+17. O raio da base é 5 centímetros, porque o arco do semicírculo, que mede 10π, vira o comprimento
+    da circunferência da base. A altura é 5√3 e o volume é (125√3 · π)/3 centímetros cúbicos.
+18. A esfera tem volume 36π e o cilindro, de raio 3 e altura 6, tem volume 54π centímetros
+    cúbicos. A razão entre os volumes é 2/3.
 
 ## EN
 
@@ -168,58 +203,92 @@ slant height. Whoever has the plane formulas ready solves solids almost for free
 
 #### The essentials of the plane
 
-**Triangle.** Area equals base times height divided by 2. In a right triangle the Pythagorean theorem
-holds: the square of the hypotenuse is the sum of the squares of the legs. An equilateral triangle of
-side L has area equal to L squared times root of 3, divided by 4.
+**Triangle.** The area is
 
-**Quadrilateral.** A rectangle has area base times height, and its diagonal also comes from
-Pythagoras. A trapezium has area equal to the sum of the parallel sides times the height, divided by
-2.
+A = (b · h)/2
+
+where b is the base and h the height relative to it. In a right triangle the Pythagorean theorem
+holds:
+
+a^{2} = b^{2} + c^{2}
+
+where a is the hypotenuse and b and c are the legs. An equilateral triangle of side L has area
+
+A = (L^{2} · √3)/4
+
+**Quadrilateral.** A rectangle of base b and height h has area
+
+A = b · h
+
+and its diagonal also comes from Pythagoras: d^{2} = b^{2} + h^{2}. A trapezium with parallel sides
+B and b and height h has area
+
+A = ((B + b) · h)/2
 
 **Regular polygon.** A regular hexagon of side L is made of six equilateral triangles of side L, and
 that decomposition settles the area with no memorised formula.
 
-**Circle.** The circumference is 2 times pi times the radius, and the area is pi times the radius
-squared. A sector with central angle alpha is the fraction alpha over 360 of the whole disc, and the
-same fraction gives the arc.
+**Circle.** With radius r, the circumference and the area of the disc are
 
-**Similarity.** When two figures are similar with ratio k, lengths get multiplied by k, areas by k
-squared and volumes by k cubed. This is the result that most often turns up in disguise on a test.
+C = 2 · π · r
+
+A = π · r^{2}
+
+A sector with central angle α is the fraction α/360 of the whole disc, and the same fraction gives
+the arc.
+
+**Similarity.** When two figures are similar with ratio k, lengths get multiplied by k, areas by
+k^{2} and volumes by k^{3}. This is the result that most often turns up in disguise on a test.
 
 **Example 1.** A right triangle has legs 6 and 8. What is the hypotenuse and what is the area?
-The hypotenuse is the root of 36 plus 64, that is, 10. The area is 6 times 8 divided by 2, which
-gives 24.
+a = √(36 + 64) = 10 and A = (6 · 8)/2 = 24.
 
 **Example 2.** A circle has radius 5. What is the area and what is the circumference?
-The area is pi times 25, that is, 25 pi. The circumference is 2 times pi times 5, that is, 10 pi.
+A = π · 5^{2} = 25π and C = 2 · π · 5 = 10π.
 
 #### The essentials of space
 
-**Prism.** Volume equals the area of the base times the height. The lateral area is the perimeter of
-the base times the height.
+**Prism.** With base area A_{b}, base perimeter P_{b} and height h:
 
-**Cylinder.** It is a prism with a circular base. Volume equals pi times the radius squared times the
-height. Lateral area equals 2 times pi times the radius times the height.
+V = A_{b} · h
 
-**Pyramid.** Volume equals one third of the area of the base times the height. The lateral area
-depends on the slant height of a face, found by Pythagoras from the height and the apothem of the
-base.
+A_{lat} = P_{b} · h
 
-**Cone.** Volume equals one third of pi times the radius squared times the height. The slant height
-is the hypotenuse of the triangle formed by the radius and the height. The lateral area is pi times
-the radius times the slant height.
+**Cylinder.** It is a prism with a circular base, of radius r and height h:
 
-**Sphere.** Volume equals four thirds of pi times the radius cubed. Surface area equals 4 times pi
-times the radius squared.
+V = π · r^{2} · h
+
+A_{lat} = 2 · π · r · h
+
+**Pyramid.** With base area A_{b} and height h:
+
+V = (A_{b} · h)/3
+
+The lateral area depends on the slant height of a face, found by Pythagoras from the height and the
+apothem of the base.
+
+**Cone.** With radius r, height h and slant height g:
+
+V = (π · r^{2} · h)/3
+
+g^{2} = r^{2} + h^{2}
+
+A_{lat} = π · r · g
+
+The slant height is the hypotenuse of the triangle formed by the radius and the height.
+
+**Sphere.** With radius r:
+
+V = (4 · π · r^{3})/3
+
+A = 4 · π · r^{2}
 
 **Example 3.** A cylinder has radius 3 and height 10. What is the volume and what is the lateral
 area?
-The volume is pi times 9 times 10, that is, 90 pi. The lateral area is 2 times pi times 3 times 10,
-that is, 60 pi.
+V = π · 3^{2} · 10 = 90π and A_{lat} = 2 · π · 3 · 10 = 60π.
 
 **Example 4.** A sphere has radius 3. What is the volume and what is the surface area?
-The volume is four thirds of pi times 27, that is, 36 pi. The area is 4 times pi times 9, that is,
-also 36 pi.
+V = (4 · π · 3^{3})/3 = 36π and A = 4 · π · 3^{2} = 36π, the same value.
 
 #### Common mistakes
 
@@ -281,30 +350,30 @@ metres to centimetres mid calculation is an expensive mistake.
 ### Answer key
 
 1. Hypotenuse of 15 centimetres and area of 54 square centimetres.
-2. Area of 36 pi square centimetres and circumference of 12 pi centimetres.
+2. Area of 36π square centimetres and circumference of 12π centimetres.
 3. Volume of 125 cubic centimetres and total area of 150 square centimetres.
 4. Area of 120 square centimetres and diagonal of 17 centimetres.
-5. Area of 25 root of 3 square centimetres.
+5. Area of 25√3 square centimetres.
 6. Area of 50 square centimetres.
-7. Volume of 144 pi cubic centimetres and lateral area of 72 pi square centimetres.
+7. Volume of 144π cubic centimetres and lateral area of 72π square centimetres.
 8. Volume of 48 cubic centimetres. The apothem of the base is 3, so the slant height of a face is 5.
    The lateral area is 60 and the total area is 96 square centimetres.
-9. Slant height of 10 centimetres, volume of 96 pi cubic centimetres and total area of 96 pi square
+9. Slant height of 10 centimetres, volume of 96π cubic centimetres and total area of 96π square
    centimetres.
-10. Volume of 288 pi cubic centimetres and surface area of 144 pi square centimetres.
-11. The other sides measure 20 and 25 centimetres. The similarity ratio is 5 over 2, and the ratio
-    between the areas is 25 over 4.
-12. Perimeter of 24 centimetres and area of 24 root of 3 square centimetres.
-13. The legs measure 10 and 10 root of 3 centimetres.
-14. The inscribed circle has radius 5 and area 25 pi. The circumscribed circle has radius 5 root of 2
-    and area 50 pi. The region asked for has area 100 minus 25 pi square centimetres.
-15. Volume of 90 root of 3 cubic centimetres and lateral area of 180 square centimetres.
-16. Arc length of 2 pi centimetres and sector area of 12 pi square centimetres.
-17. The base radius is 5 centimetres, because the arc of the half disc, which measures 10 pi, becomes
-    the circumference of the base. The height is 5 root of 3 and the volume is 125 root of 3 pi over
-    3 cubic centimetres.
-18. The sphere has volume 36 pi and the cylinder, of radius 3 and height 6, has volume 54 pi cubic
-    centimetres. The ratio between the volumes is 2 over 3.
+10. Volume of 288π cubic centimetres and surface area of 144π square centimetres.
+11. The other sides measure 20 and 25 centimetres. The similarity ratio is 5/2, and the ratio
+    between the areas is 25/4.
+12. Perimeter of 24 centimetres and area of 24√3 square centimetres.
+13. The legs measure 10 and 10√3 centimetres.
+14. The inscribed circle has radius 5 and area 25π. The circumscribed circle has radius 5√2 and
+    area 50π. The region asked for has area 100 - 25π square centimetres.
+15. Volume of 90√3 cubic centimetres and lateral area of 180 square centimetres.
+16. Arc length of 2π centimetres and sector area of 12π square centimetres.
+17. The base radius is 5 centimetres, because the arc of the half disc, which measures 10π, becomes
+    the circumference of the base. The height is 5√3 and the volume is (125√3 · π)/3 cubic
+    centimetres.
+18. The sphere has volume 36π and the cylinder, of radius 3 and height 6, has volume 54π cubic
+    centimetres. The ratio between the volumes is 2/3.
 
 ## VERIFICACAO
 

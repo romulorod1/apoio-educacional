@@ -571,10 +571,20 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   await aba('ajustes');
   await espera(300);
   await clicar('#baixar-copia');
-  await espera(1800);
+  await espera(2200);
+
+  /* A cópia agora sai em dois tempos, de propósito: montar demora, e o Android só
+     abre a folha de compartilhamento logo depois de um toque. O segundo toque é
+     o que manda para o Drive. */
+  conf('avisa que a cópia ficou pronta',
+    await pag.$eval('#aviso-texto', e => /C[óo]pia pronta/.test(e.textContent)), true);
+  conf('e oferece enviar', await pag.$eval('#aviso-acao', e => e.textContent.trim()), 'Enviar');
+  await clicar('#aviso-acao');
+  await espera(1400);
+
   const novosArquivos = await coletarGerados();
   const copia = novosArquivos.find(f => f.startsWith('Copia_Apoio_Educacional'));
-  conf('a cópia foi gerada', !!copia, true);
+  conf('a cópia foi entregue', !!copia, true);
 
   const pacote = JSON.parse(fs.readFileSync(path.join(PASTA_DOWNLOAD, copia), 'utf8'));
   conf('a cópia tem o formato certo', pacote.formato, 'apoio-educacional');

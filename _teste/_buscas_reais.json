@@ -1,0 +1,495 @@
+{
+ "buscas": [
+  {
+   "q": "equacao do primeiro grau",
+   "esperado": "Equações do 1º grau (7º ano)",
+   "porque": "É o nome falado do assunto, por extenso e no singular, contra um título que traz 1º e plural. Hoje essa busca devolve zero resultados, que é justamente o caso que motivou a mudança."
+  },
+  {
+   "q": "equação do 2 grau problemas",
+   "esperado": "Equação do 2º grau: problemas (9º ano)",
+   "porque": "Ela sabe que existem os dois temas de segundo grau e quer o de problemas, então digita tudo. No tablet o teclado não oferece o º com facilidade, e ela deixa só o 2."
+  },
+  {
+   "q": "equacao de segundo grau",
+   "esperado": "Equação do 2º grau: como resolver e Equação do 2º grau: problemas",
+   "porque": "Na fala corrida sai equação de segundo grau, com de no lugar de do. A preposição trocada não pode custar o resultado."
+  },
+  {
+   "q": "funcao do primeiro grau",
+   "esperado": "Função afim (1ª série do médio)",
+   "porque": "O caso mais duro: o aluno chega dizendo que a prova é de função do primeiro grau, e o banco registrou o tema como Função afim. Nenhuma palavra do título casa, o texto do tema é que precisa resolver."
+  },
+  {
+   "q": "função do segundo grau",
+   "esperado": "Função quadrática (1ª série do médio)",
+   "porque": "Mesma situação da função afim, e mais comum ainda, porque parábola e função do segundo grau é como o colégio nomeia a matéria na prova bimestral."
+  },
+  {
+   "q": "bhaskara",
+   "esperado": "Equação do 2º grau: como resolver (9º ano)",
+   "porque": "Uma palavra só, digitada enquanto o aluno senta. O nome da fórmula não está em nenhum título do banco, só no miolo da explicação e dos exercícios."
+  },
+  {
+   "q": "analise combinatoria",
+   "esperado": "Arranjos, permutações e combinações e Princípio fundamental da contagem (2ª série do médio)",
+   "porque": "Análise combinatória é o nome do capítulo no colégio. O banco quebrou o assunto em dois temas e nenhum dos dois usa essa expressão no título."
+  },
+  {
+   "q": "PA e PG",
+   "esperado": "Progressão aritmética e Progressão geométrica (2ª série do médio)",
+   "porque": "É como está escrito no caderno e no enunciado da lista que o aluno traz. Ela copia a sigla sem pensar duas vezes."
+  },
+  {
+   "q": "regra de 3",
+   "esperado": "Regra de três simples (7º ano)",
+   "porque": "Ninguém escreve três por extenso com pressa. O algarismo tem que valer pela palavra."
+  },
+  {
+   "q": "regra de tres simples",
+   "esperado": "Regra de três simples (7º ano)",
+   "porque": "A versão por extenso e sem acento, que é o padrão de digitação no tablet. Serve de contraprova da busca com o algarismo."
+  },
+  {
+   "q": "razao e proporcao",
+   "esperado": "Razão e proporção (7º ano)",
+   "porque": "Título que ela acerta em cheio, só que sem nenhum acento. Se a normalização falhar, o acerto mais fácil do banco vira zero resultado."
+  },
+  {
+   "q": "produto notavel",
+   "esperado": "Produtos notáveis (8º ano)",
+   "porque": "O aluno errou um produto notável no exercício, no singular, e é assim que ela digita. O título está no plural nas duas palavras."
+  },
+  {
+   "q": "fatorar polinomio",
+   "esperado": "Fatoração de polinômios (8º ano)",
+   "porque": "Ela digita a ação que vai ensinar, o verbo, e o título traz o substantivo Fatoração mais o plural polinômios. É o caso clássico de radical comum com terminação diferente."
+  },
+  {
+   "q": "sistema de equação",
+   "esperado": "Sistemas de equações do 1º grau (8º ano)",
+   "porque": "Duplo singular contra duplo plural no título, e ela ainda corta o do 1º grau porque considera óbvio."
+  },
+  {
+   "q": "lei do seno",
+   "esperado": "Lei dos senos e lei dos cossenos (2ª série do médio)",
+   "porque": "Metade do título, no singular, e sem a parte dos cossenos. É a metade que o aluno precisa naquela questão."
+  },
+  {
+   "q": "seno cosseno tangente",
+   "esperado": "Seno, cosseno e tangente (9º ano)",
+   "porque": "Ela digita os três nomes emendados, sem vírgula e sem o e. A pontuação do título não pode atrapalhar."
+  },
+  {
+   "q": "trigonometria triangulo retangulo",
+   "esperado": "Trigonometria no triângulo retângulo (2ª série do médio) e Relações métricas no triângulo retângulo (9º ano)",
+   "porque": "Três palavras cheias, sem a preposição no e sem acento nenhum. É digitação de quem quer chegar rápido, e é razoável que os dois temas apareçam."
+  },
+  {
+   "q": "pitagoras",
+   "esperado": "Teorema de Pitágoras (9º ano)",
+   "porque": "Uma palavra, sem acento e sem o Teorema de. É a busca mais provável do banco inteiro."
+  },
+  {
+   "q": "inequacao do 1 grau",
+   "esperado": "Inequações do 1º e do 2º grau (1ª série do médio)",
+   "porque": "Singular contra plural, número sem o º, e ela pede só o primeiro grau enquanto o título cobre os dois de uma vez."
+  },
+  {
+   "q": "area de figuras planas",
+   "esperado": "Perímetro e área de figuras planas (6º ano) e Área e perímetro de figuras compostas (7º ano)",
+   "porque": "Ela lembra a metade do título que interessa e deixa o perímetro de fora. A ordem das palavras também é outra em um dos temas."
+  },
+  {
+   "q": "volume de sólidos",
+   "esperado": "Volume de cilindros e outros sólidos (9º ano) e Perímetro, área e volume (5º ano)",
+   "porque": "Nome genérico do assunto contra título específico. Volume de sólidos é como ela anota no plano de aula, e nenhum título do banco é exatamente isso."
+  },
+  {
+   "q": "média moda e mediana",
+   "esperado": "Média, moda, mediana e probabilidade (7º ano)",
+   "porque": "A trinca é dita sempre nessa ordem e sem a probabilidade, que está no título por acréscimo. Palavras dela dentro de um título maior."
+  },
+  {
+   "q": "equacao da reta",
+   "esperado": "Geometria analítica: a reta (3ª série do médio)",
+   "porque": "O colégio chama de equação da reta, o banco arquivou como Geometria analítica: a reta. Só a palavra reta é comum aos dois."
+  },
+  {
+   "q": "conta de dividir",
+   "esperado": "Divisão: repartir em partes iguais (3º ano) e Divisão com resto (4º ano)",
+   "porque": "Com aluno pequeno o assunto se chama conta de dividir, nunca divisão euclidiana. É a mãe que descreve a dificuldade assim no WhatsApp e ela repete a palavra na busca."
+  },
+  {
+   "q": "tabuada",
+   "esperado": "Multiplicação: a ideia e a tabuada (3º ano)",
+   "porque": "Uma palavra que está no fim do título, depois dos dois pontos. Aula de reforço de tabuada é pedido semanal."
+  },
+  {
+   "q": "equa",
+   "esperado": "Todos os temas de equação, com Equações do 1o grau (7o ano) no topo",
+   "porque": "Ela começa a digitar e já olha a lista antes de terminar a palavra. Quatro letras é o que dá tempo de digitar enquanto a criança abre o caderno."
+  },
+  {
+   "q": "eq 2 grau",
+   "esperado": "Equação do 2o grau: como resolver",
+   "porque": "Abreviação de professora com pressa. Ela sabe que é do segundo grau e corta a palavra equação para duas letras."
+  },
+  {
+   "q": "equacao do primeiro grau",
+   "esperado": "Equações do 1o grau (7o ano)",
+   "porque": "É o nome que a aluna usa em voz alta, escrito por extenso e sem acento nenhum, do jeito que sai no teclado do tablet."
+  },
+  {
+   "q": "equacao 2 grau problema",
+   "esperado": "Equação do 2o grau: problemas",
+   "porque": "Ela quer a folha de problemas, não a de resolver a fórmula, então acrescenta a última palavra para separar os dois temas."
+  },
+  {
+   "q": "pitag",
+   "esperado": "Teorema de Pitágoras",
+   "porque": "Palavra longa e com acento. Ela para no meio porque sabe que só existe um tema com esse começo."
+  },
+  {
+   "q": "teorena de pitagoras",
+   "esperado": "Teorema de Pitágoras",
+   "porque": "O m virou n, que é a tecla vizinha no teclado do tablet. Ela nem percebe que errou e espera o resultado aparecer igual."
+  },
+  {
+   "q": "tri ret",
+   "esperado": "Trigonometria no triângulo retângulo e Relações métricas no triângulo retângulo",
+   "porque": "As duas palavras são compridas e cheias de acento, então ela digita só o começo de cada uma e deixa a lista decidir."
+  },
+  {
+   "q": "sen cos tan",
+   "esperado": "Seno, cosseno e tangente",
+   "porque": "É como está escrito na calculadora e no caderno do aluno. Ela repete as três abreviações porque é assim que pensa no assunto."
+  },
+  {
+   "q": "lei dos coss",
+   "esperado": "Lei dos senos e lei dos cossenos",
+   "porque": "Ela lembra do nome inteiro mas para de digitar assim que tem certeza de que não vai confundir com outra coisa."
+  },
+  {
+   "q": "regra de 3",
+   "esperado": "Regra de três simples",
+   "porque": "Ninguém escreve três por extenso com pressa. O número no teclado é mais rápido do que a palavra com acento circunflexo."
+  },
+  {
+   "q": "regra d tres",
+   "esperado": "Regra de três simples",
+   "porque": "O e do de ficou para trás na pressa. É o erro clássico de digitar rápido em tela de vidro, uma letra que não registra."
+  },
+  {
+   "q": "porcent",
+   "esperado": "Porcentagem no dia a dia",
+   "porque": "Palavra longa, tema único. Sete letras já bastam e ela sabe disso por experiência."
+  },
+  {
+   "q": "prod not",
+   "esperado": "Produtos notáveis",
+   "porque": "É como ela anota no planejamento da semana. Duas palavras cortadas pela metade, do jeito que abrevia à mão."
+  },
+  {
+   "q": "fatora poli",
+   "esperado": "Fatoração de polinômios",
+   "porque": "Ela não quer parar para pensar se é fatoração ou fatorar, então digita o pedaço que vale para as duas formas e completa com o começo da segunda palavra."
+  },
+  {
+   "q": "  area figuras  ",
+   "esperado": "Área de figuras planas",
+   "porque": "Espaço a mais no começo e no fim, porque o polegar bate na barra de espaço antes e depois de digitar. Acontece toda vez no tablet."
+  },
+  {
+   "q": "Volume solidos",
+   "esperado": "Volume de sólidos",
+   "porque": "Maiúscula automática do teclado do tablet na primeira palavra, e ela pula o de porque não muda nada."
+  },
+  {
+   "q": "media moda",
+   "esperado": "Média, moda e mediana",
+   "porque": "Duas das três palavras do título, sem acento, porque escrever a terceira não acrescenta nada e custa tempo."
+  },
+  {
+   "q": "probabil",
+   "esperado": "Probabilidade",
+   "porque": "Palavra de treze letras. Ela para na metade porque já sabe que nenhum outro tema começa assim."
+  },
+  {
+   "q": "func 1 grau",
+   "esperado": "Função do 1o grau",
+   "porque": "Função com cedilha e til é chato de digitar rápido, então ela corta antes do ç e vai direto para o número."
+  },
+  {
+   "q": "funçao do 2 grau",
+   "esperado": "Função do 2o grau",
+   "porque": "Ela colocou a cedilha mas esqueceu o til, que é o meio termo mais comum de quem digita com pressa e acento no tablet."
+  },
+  {
+   "q": "sistema de equacoes",
+   "esperado": "Sistemas de equações do 1o grau (8o ano)",
+   "porque": "Ela digita no singular porque está pensando em um sistema só, o da lista de exercícios que está na mão dela."
+  },
+  {
+   "q": "inequa",
+   "esperado": "Inequações do 1o e do 2o grau (1a série do médio)",
+   "porque": "Seis letras que já separam inequação de equação. É exatamente onde ela para de digitar para não arriscar cair no tema errado."
+  },
+  {
+   "q": "Razao e prop",
+   "esperado": "Razão e proporção",
+   "porque": "Maiúscula do corretor no começo, sem acento no meio, e a segunda palavra cortada porque proporção é longa demais para o momento."
+  },
+  {
+   "q": "trigonimetria",
+   "esperado": "Trigonometria no triângulo retângulo",
+   "porque": "O o virou i no meio da palavra, erro que ela comete direto porque digita sem olhar para a tela enquanto explica alguma coisa para o aluno."
+  },
+  {
+   "q": "bhaskara",
+   "esperado": "Equação do 2º grau: como resolver, com Função quadrática e Equações polinomiais e raízes logo abaixo",
+   "porque": "É o nome que toda aluna brasileira usa para a fórmula, e nenhum tema se chama assim. Verifiquei: a palavra bhaskara não aparece em nenhum dos 146 temas, nem no título, nem na explicação, nem nos exercícios. Hoje essa busca devolve zero para o assunto mais pedido do 9º ano."
+  },
+  {
+   "q": "hipotenusa",
+   "esperado": "Teorema de Pitágoras no topo, e junto o conjunto: Relações métricas no triângulo retângulo, Seno, cosseno e tangente, Trigonometria no triângulo retângulo, Prismas e pirâmides",
+   "porque": "Ela quer um exercício qualquer que use hipotenusa, não a aula de Pitágoras. A palavra aparece em 11 temas do banco, do 7º ano ao ensino médio, e em nenhum título. É o caso exemplar da frente."
+  },
+  {
+   "q": "cateto oposto sobre hipotenusa",
+   "esperado": "Seno, cosseno e tangente, e Trigonometria no triângulo retângulo",
+   "porque": "Ela digita a definição inteira porque é assim que ela fala em aula, e não lembra se o tema se chama seno ou trigonometria. Cinco palavras, todas dentro da explicação, nenhuma no título."
+  },
+  {
+   "q": "delta negativo",
+   "esperado": "Equação do 2º grau: como resolver, e Função quadrática",
+   "porque": "Cena típica: a aluna errou uma questão em que o delta deu negativo e a Nathália quer o pedaço da explicação que trata disso. O termo aparece em exatamente dois temas, dentro da explicação, e é o recorte certo."
+  },
+  {
+   "q": "soma e produto das raízes",
+   "esperado": "Equação do 2º grau: como resolver, Equações polinomiais e raízes, Função quadrática e Fatoração de polinômios",
+   "porque": "É o nome do método, não de um tema. Aparece em seis temas do banco e ela quer justamente ver o conceito repetido em séries diferentes, para escolher a versão do nível do aluno."
+  },
+  {
+   "q": "briot ruffini",
+   "esperado": "Polinômios: operações e divisão",
+   "porque": "Nome de dispositivo prático que só existe dentro da explicação de um tema. Ela digita porque o aluno chegou com esse nome na prova, e não faz ideia de qual aula do banco cobre isso."
+  },
+  {
+   "q": "coeficiente angular",
+   "esperado": "Função afim e Geometria analítica: a reta",
+   "porque": "Termo que atravessa 1ª e 3ª série do médio sem ser título de nenhum tema. É exatamente a busca de quem quer ligar dois assuntos que o aluno viu em anos diferentes."
+  },
+  {
+   "q": "fatorial",
+   "esperado": "Arranjos, permutações e combinações, e Revisão: contagem e probabilidade",
+   "porque": "Ela quer relembrar onde o banco explica o símbolo de fatorial antes de dar análise combinatória. Uma palavra, dentro da explicação, invisível para busca por título."
+  },
+  {
+   "q": "árvore de possibilidades",
+   "esperado": "Princípio fundamental da contagem e Probabilidade de eventos sucessivos",
+   "porque": "É o desenho que ela faz no quadro, não o nome de nenhum tema. Quer achar o tema que traz esse recurso pronto para copiar."
+  },
+  {
+   "q": "desvio padrao",
+   "esperado": "Medidas de tendência e de dispersão, Estatística descritiva e Distribuições e dispersão",
+   "porque": "O banco chama de dispersão, ela chama de desvio padrão. Três temas em três séries diferentes, nenhum com esse nome no título, e ela precisa escolher o do nível certo."
+  },
+  {
+   "q": "média ponderada",
+   "esperado": "Média ponderada e probabilidade, e também Medidas de tendência e de dispersão, Estatística descritiva e Interpretação de dados e gráficos",
+   "porque": "Cena real de fim de bimestre, calcular nota. Um tema tem no título, mas o conceito reaparece em quatro outros e ela quer ver todos para pegar exercício extra."
+  },
+  {
+   "q": "grafico de pizza",
+   "esperado": "os temas de estatística que trazem gráfico de setores: Média, tabelas e gráficos, Estatística descritiva e Interpretação de dados e gráficos",
+   "porque": "Ela fala pizza, o banco escreve setores. É a busca em que o vocabulário dela não bate com o vocabulário do texto, e o resultado precisa aparecer mesmo assim."
+  },
+  {
+   "q": "mmc para somar fração",
+   "esperado": "Operações com frações, e Múltiplos, divisores, MMC e MDC",
+   "porque": "O aluno travou na soma de frações com denominadores diferentes. Ela quer o pedaço em que o MMC é usado como ferramenta, não a aula de MMC pelo MMC."
+  },
+  {
+   "q": "regra de sinais",
+   "esperado": "Operações com números inteiros, e Operações com racionais",
+   "porque": "Dúvida clássica de 7º ano, menos com menos dá mais. Não é título de nada, mora dentro de dois temas, e é o tipo de coisa que ela busca com o aluno já sentado ao lado."
+  },
+  {
+   "q": "prova real da divisão",
+   "esperado": "Divisão com resto, e As quatro operações com naturais",
+   "porque": "Ela quer mostrar ao aluno como conferir a conta. O termo aparece dentro da explicação de dois temas do fundamental 1 e não é o nome de nenhum."
+  },
+  {
+   "q": "propriedade distributiva",
+   "esperado": "Produtos notáveis, Expressões algébricas e monômios, e Linguagem algébrica e expressões",
+   "porque": "É a ferramenta que ela precisa revisar antes de entrar em produtos notáveis. Aparece em seis temas, do 6º ano ao 3º médio, sempre dentro do texto."
+  },
+  {
+   "q": "escala de mapa",
+   "esperado": "Razão e proporção, e Semelhança e Teorema de Tales",
+   "porque": "O aluno trouxe um exercício de escala de geografia. Ela quer o tema de matemática que dá o suporte, e não sabe se o banco guarda isso em razão ou em semelhança."
+  },
+  {
+   "q": "juros",
+   "esperado": "Juros compostos, Porcentagem e juros simples, Matemática financeira aplicada, e ainda Função exponencial e Progressão geométrica",
+   "porque": "Uma palavra só, com pressa. O conceito aparece em seis temas espalhados do 6º ano ao 3º médio, e ver todos juntos é justamente o que ajuda ela a escolher o nível."
+  },
+  {
+   "q": "parabola",
+   "esperado": "Função quadrática, Cônicas, Funções: a ideia e o gráfico, e Inequações do 1º e do 2º grau",
+   "porque": "Ela pensa pelo desenho da curva, não pelo nome da função. Cinco temas usam a palavra, nenhum a tem no título."
+  },
+  {
+   "q": "diagonal do quadrado",
+   "esperado": "Teorema de Pitágoras, e junto Números reais e irracionais e Radicais: operações e racionalização",
+   "porque": "É o exemplo que faz a raiz de 2 aparecer. Ela quer justamente a ponte entre geometria e número irracional, que nenhum título anuncia."
+  },
+  {
+   "q": "exercicio de area com fracao",
+   "esperado": "os exercícios de área e perímetro cujas medidas caem em fração: Perímetro e área de figuras planas, Área e perímetro de figuras compostas, Operações com frações",
+   "porque": "Cena literal de aula: precisa de um problema de geometria que force o aluno a operar com fração. Cinco palavras, e o casamento tem que acontecer no enunciado do exercício, não no título."
+  },
+  {
+   "q": "angulos notaveis 30 45 60",
+   "esperado": "Seno, cosseno e tangente, e Trigonometria no triângulo retângulo",
+   "porque": "Ela digita os três ângulos porque é assim que a tabela aparece na cabeça dela. Cinco palavras, e os números só existem dentro da explicação e dos exercícios."
+  },
+  {
+   "q": "número pi",
+   "esperado": "Círculo: comprimento e área, e Conjuntos numéricos",
+   "porque": "O aluno perguntou de onde sai o pi. Ela quer tanto a aula de circunferência quanto o lugar em que o banco explica que o pi é irracional, e são dois temas de séries bem distantes."
+  },
+  {
+   "q": "semelhança de triângulos",
+   "esperado": "Semelhança e Teorema de Tales, e junto Congruência de triângulos e Relações métricas no triângulo retângulo",
+   "porque": "Ela quer o conjunto, porque semelhança é pré-requisito das relações métricas e ela vai precisar dos dois na mesma aula. O conceito aparece em cinco temas e só um o traz no título."
+  },
+  {
+   "q": "torneira que enche o tanque",
+   "esperado": "Equações do 1o grau (7o ano), na parte de problemas de enunciado",
+   "porque": "A aluna chega com a lista do colégio e a única coisa que ela sabe dizer é o cenário do enunciado. A Nathália digita o cenário porque é o que está na folha na frente dela. Palavras como torneira e tanque só existem no enunciado de exercício, nunca no título nem no resumo."
+  },
+  {
+   "q": "escada na parede",
+   "esperado": "Teorema de Pitágoras",
+   "porque": "É o problema clássico da escada apoiada. A criança não fala Pitágoras, fala escada. Quando a Nathália repete a fala da aluna no campo de busca, é isso que sai."
+  },
+  {
+   "q": "sombra do prédio",
+   "esperado": "Trigonometria no triângulo retângulo, e também Relações métricas no triângulo retângulo",
+   "porque": "Outro enunciado de repetição garantida. Ela nem tem certeza se é semelhança ou tangente, e é justamente por isso que busca pelo cenário e não pelo conteúdo."
+  },
+  {
+   "q": "ângulo de elevação",
+   "esperado": "Seno, cosseno e tangente",
+   "porque": "Esse é o vocabulário do enunciado da prova, não do índice do livro. A professora do colégio escreve ângulo de elevação, e a Nathália repete o que está escrito na questão."
+  },
+  {
+   "q": "delta negativo",
+   "esperado": "Equação do 2o grau: como resolver",
+   "porque": "É o erro concreto que a aluna traz: fez a conta, deu delta negativo, travou. Ela busca pelo sintoma. É provável que delta apareça só na explicação e não no título, então esse resultado depende do peso da explicação."
+  },
+  {
+   "q": "x dos dois lados",
+   "esperado": "Equações do 1o grau (7o ano)",
+   "porque": "É a dificuldade descrita do jeito que a criança descreve. Ninguém de 12 anos diz incógnita nos dois membros. Cinco palavras curtas, digitadas rápido entre uma aula e outra."
+  },
+  {
+   "q": "passar pro outro lado trocando o sinal",
+   "esperado": "Equações do 1o grau (7o ano)",
+   "porque": "É a frase que a professora do colégio usou e que a aluna decorou errado. A Nathália quer achar a explicação para desmontar essa regrinha. Note que pro, outro e lado não aparecem em lugar nenhum de tema nenhum."
+  },
+  {
+   "q": "desconto na loja",
+   "esperado": "Porcentagem no dia a dia",
+   "porque": "Busca curtinha e completamente realista antes de uma aula de sexto ou sétimo ano. Desconto é a palavra do enunciado; porcentagem é a palavra do índice."
+  },
+  {
+   "q": "juros do cartão",
+   "esperado": "Porcentagem no dia a dia",
+   "porque": "Aparece nas listas de nono ano e do médio, e é o tipo de contexto que a aluna traz de casa. Ela digita com acento aqui porque cartão é uma palavra que o teclado do tablet corrige sozinho."
+  },
+  {
+   "q": "gráfico de barras",
+   "esperado": "Os temas de estatística: leitura de gráficos e Média, moda e mediana",
+   "porque": "A questão da prova mostra um gráfico e pede a média. Ela busca pelo que está desenhado na folha. Nenhum título do banco tem a palavra gráfico, então isso só funciona se resumo e exercícios contarem."
+  },
+  {
+   "q": "media pra passar de ano",
+   "esperado": "Média, moda e mediana",
+   "porque": "Novembro, aluna desesperada, quanto eu preciso tirar. É a busca mais humana da lista. Digitada sem acento em media, que é exatamente como sai no teclado quando se está com pressa."
+  },
+  {
+   "q": "chance de sair",
+   "esperado": "Probabilidade",
+   "porque": "A palavra da criança é chance, não probabilidade. Curta, três palavras, e o tema inteiro depende de a palavra chance existir no resumo ou nos exercícios."
+  },
+  {
+   "q": "sorteio",
+   "esperado": "Probabilidade",
+   "porque": "Uma palavra só, digitada no meio da aula enquanto a aluna lê a questão em voz alta. É o teste mais duro para o peso de exercício, porque sorteio quase certamente só aparece em enunciado."
+  },
+  {
+   "q": "quanto de tinta pra pintar a parede",
+   "esperado": "Área de figuras planas",
+   "porque": "Enunciado de aplicação que aparece do sexto ano ao médio. Cinco palavras úteis mais duas de ligação. Se o algoritmo exigir todas as palavras, pra e quanto derrubam o resultado inteiro para zero."
+  },
+  {
+   "q": "quantos litros cabem na caixa",
+   "esperado": "Volume de sólidos",
+   "porque": "Litro é a palavra do enunciado, volume é a do índice. A aluna nunca liga uma coisa à outra sozinha, e a Nathália precisa achar o tema rápido para mostrar a conversão."
+  },
+  {
+   "q": "receita de bolo pra 6 pessoas",
+   "esperado": "Regra de três simples, e também Razão e proporção",
+   "porque": "É o contexto padrão de proporcionalidade nas listas de sétimo ano. Ela busca o contexto porque não sabe se a professora do colégio quer regra de três ou proporção, e quer ver os dois."
+  },
+  {
+   "q": "escala do mapa",
+   "esperado": "Razão e proporção",
+   "porque": "Vem colado com geografia e cai muito em prova integrada. Três palavras, contexto puro, nenhuma delas no título do tema."
+  },
+  {
+   "q": "professora mandou fatorar",
+   "esperado": "Fatoração de polinômios",
+   "porque": "Essa é literalmente a informação que a aluna dá: a professora mandou fatorar e ela não sabe o que é. A Nathália digita a frase inteira sem editar, porque está com o tablet numa mão e o caderno na outra."
+  },
+  {
+   "q": "quadrado da soma",
+   "esperado": "Produtos notáveis",
+   "porque": "A aluna sabe o nome do caso mas não o nome da família. Ela busca o caso. Produtos notáveis é o título, quadrado da soma está no resumo e nos exercícios."
+  },
+  {
+   "q": "triangulo sem angulo reto",
+   "esperado": "Lei dos senos e lei dos cossenos",
+   "porque": "É a dificuldade descrita pela negativa: a aluna aprendeu seno e cosseno no retângulo e agora caiu um triângulo qualquer. Sem acento em triangulo e angulo, que é o padrão de digitação apressada."
+  },
+  {
+   "q": "duas equacoes juntas",
+   "esperado": "Sistemas de equações do 1o grau (8o ano)",
+   "porque": "É o que a aluna vê na folha: duas linhas com uma chave na frente. Ela não sabe que se chama sistema. Repare que equacoes no plural e sem acento precisa cair no mesmo lugar que equação."
+  },
+  {
+   "q": "parábola pra cima ou pra baixo",
+   "esperado": "Função do 2o grau",
+   "porque": "A dúvida concreta de concavidade, do jeito que a aluna pergunta. Cinco palavras, com acento em parábola e com o pra do português falado no meio."
+  },
+  {
+   "q": "sinal de maior ou igual",
+   "esperado": "Inequações do 1o e do 2o grau (1a série do médio)",
+   "porque": "A aluna não sabe o nome inequação, sabe que o sinal é diferente do igual. Ela descreve o símbolo. Nenhuma dessas cinco palavras está no título do tema."
+  },
+  {
+   "q": "numero que eu pensei",
+   "esperado": "Equações do 1o grau (7o ano), problemas de tradução de enunciado",
+   "porque": "Pensei em um número, dobrei, somei três. É a abertura padrão do enunciado de sétimo ano e é o que a aluna lê em voz alta. Digitado sem acento em numero."
+  },
+  {
+   "q": "grafico de reta",
+   "esperado": "Função do 1o grau",
+   "porque": "Ela viu a reta no papel quadriculado e quer a explicação de coeficiente angular. É o mesmo padrão do gráfico de barras: a busca parte do desenho, e o título do tema não tem nem gráfico nem reta."
+  }
+ ],
+ "ataques": null
+}

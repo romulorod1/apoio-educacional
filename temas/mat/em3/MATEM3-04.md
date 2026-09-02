@@ -33,66 +33,61 @@ Os pontos fixos são os focos, e a reta fixa da parábola é a diretriz.
 
 Com centro na origem e focos sobre o eixo horizontal, a equação reduzida é
 
-x ao quadrado sobre a ao quadrado mais y ao quadrado sobre b ao quadrado igual a 1
+x^{2}/a^{2} + y^{2}/b^{2} = 1
 
 Aqui a é o semieixo maior, b é o semieixo menor e c é a distância do centro a cada foco. A relação
 entre eles é a relação fundamental da elipse:
 
-a ao quadrado igual a b ao quadrado mais c ao quadrado
+a^{2} = b^{2} + c^{2}
 
 O maior dos dois denominadores está sempre embaixo da variável cujo eixo contém os focos. Se o
-denominador maior estiver embaixo de y ao quadrado, a elipse é vertical.
+denominador maior estiver embaixo de y^{2}, a elipse é vertical.
 
-A excentricidade é c dividido por a, e mede o quanto a elipse é achatada. Perto de zero ela é quase
+A excentricidade é dada por e = c/a, e mede o quanto a elipse é achatada. Perto de zero ela é quase
 uma circunferência, e perto de 1 ela é bem alongada.
 
-**Exemplo 1.** Analisar a elipse x ao quadrado sobre 25 mais y ao quadrado sobre 9 igual a 1.
-Como 25 é maior, o eixo maior é horizontal, com a igual a 5 e b igual a 3. Então c ao quadrado é 25
-menos 9, ou seja, 16, e c vale 4. Os focos são o ponto de coordenadas 4 e 0 e o ponto de coordenadas
-menos 4 e 0. A excentricidade é 4 sobre 5.
+**Exemplo 1.** Analisar a elipse x^{2}/25 + y^{2}/9 = 1.
+Como 25 é maior, o eixo maior é horizontal, com a = 5 e b = 3. Então c^{2} = 25 - 9 = 16, e c = 4.
+Os focos são (4, 0) e (-4, 0). A excentricidade é e = 4/5.
 
 #### A hipérbole
 
 Com centro na origem e focos sobre o eixo horizontal:
 
-x ao quadrado sobre a ao quadrado menos y ao quadrado sobre b ao quadrado igual a 1
+x^{2}/a^{2} - y^{2}/b^{2} = 1
 
 Repare no sinal de menos, que é o que distingue a hipérbole da elipse à primeira vista. Aqui a
 relação fundamental muda de lugar:
 
-c ao quadrado igual a a ao quadrado mais b ao quadrado
+c^{2} = a^{2} + b^{2}
 
 Agora c é o maior dos três, o que faz sentido, porque os focos ficam além dos vértices. Não importa
 qual denominador é maior: quem manda é o sinal, e o termo positivo indica o eixo que contém os
 focos.
 
-As assíntotas são as retas que a hipérbole se aproxima sem tocar, e valem y igual a mais ou menos b
-sobre a vezes x.
+As assíntotas são as retas que a hipérbole se aproxima sem tocar, e valem y = ± (b/a) · x.
 
-**Exemplo 2.** Analisar a hipérbole x ao quadrado sobre 9 menos y ao quadrado sobre 16 igual a 1.
-Temos a igual a 3 e b igual a 4, então c ao quadrado é 9 mais 16, que dá 25, e c vale 5. Os focos são
-o ponto de coordenadas 5 e 0 e o ponto de coordenadas menos 5 e 0. As assíntotas são y igual a 4x
-sobre 3 e y igual a menos 4x sobre 3, e a excentricidade é 5 sobre 3.
+**Exemplo 2.** Analisar a hipérbole x^{2}/9 - y^{2}/16 = 1.
+Temos a = 3 e b = 4, então c^{2} = 9 + 16 = 25, e c = 5. Os focos são (5, 0) e (-5, 0). As
+assíntotas são y = 4x/3 e y = -4x/3, e a excentricidade é e = 5/3.
 
 #### A parábola
 
 Com vértice na origem e eixo de simetria horizontal:
 
-y ao quadrado igual a 4px
+y^{2} = 4px
 
-onde p é a distância do vértice ao foco. O foco fica no ponto de coordenadas p e 0, e a diretriz é a
-reta x igual a menos p. Se o eixo de simetria for vertical, a equação vira x ao quadrado igual a
-4py, com foco no ponto de coordenadas 0 e p.
+onde p é a distância do vértice ao foco. O foco fica no ponto (p, 0), e a diretriz é a reta
+x = -p. Se o eixo de simetria for vertical, a equação vira x^{2} = 4py, com foco no ponto (0, p).
 
 Quando o coeficiente é negativo, a parábola abre para o lado oposto, e o foco fica do lado negativo.
 
-**Exemplo 3.** Analisar a parábola y ao quadrado igual a 12x.
-Como 4p vale 12, p vale 3. O foco é o ponto de coordenadas 3 e 0 e a diretriz é a reta x igual a
-menos 3. A parábola abre para a direita.
+**Exemplo 3.** Analisar a parábola y^{2} = 12x.
+Como 4p = 12, p = 3. O foco é (3, 0) e a diretriz é a reta x = -3. A parábola abre para a direita.
 
 Uma consequência prática da definição: a distância de um ponto da parábola ao foco é igual à
-distância dele à diretriz. Para a parábola y ao quadrado igual a 12x, essa distância vale a abscissa
-do ponto mais 3.
+distância dele à diretriz. Para a parábola y^{2} = 12x, essa distância vale x + 3, sendo x a
+abscissa do ponto.
 
 #### Identificar a cônica completando quadrados
 
@@ -101,16 +96,13 @@ quadrados em x e em y até chegar à forma reduzida. O sinal entre os dois quadr
 mesmo sinal indica elipse, sinais opostos indicam hipérbole, e a falta de um dos quadrados indica
 parábola.
 
-**Exemplo 4.** Identificar 4x ao quadrado mais 9y ao quadrado menos 8x mais 36y mais 4 igual a zero.
-Agrupando: 4 vezes (x ao quadrado menos 2x) mais 9 vezes (y ao quadrado mais 4y) mais 4 igual a
-zero. Completando: 4 vezes (x menos 1) ao quadrado menos 4 mais 9 vezes (y mais 2) ao quadrado menos
-36 mais 4 igual a zero, ou seja, 4 vezes (x menos 1) ao quadrado mais 9 vezes (y mais 2) ao quadrado
-igual a 36. Dividindo por 36:
+**Exemplo 4.** Identificar 4x^{2} + 9y^{2} - 8x + 36y + 4 = 0.
+Agrupando: 4 · (x^{2} - 2x) + 9 · (y^{2} + 4y) + 4 = 0. Completando: 4 · (x - 1)^{2} - 4 +
+9 · (y + 2)^{2} - 36 + 4 = 0, ou seja, 4 · (x - 1)^{2} + 9 · (y + 2)^{2} = 36. Dividindo por 36:
 
-(x menos 1) ao quadrado sobre 9 mais (y mais 2) ao quadrado sobre 4 igual a 1
+(x - 1)^{2}/9 + (y + 2)^{2}/4 = 1
 
-É uma elipse de centro no ponto de coordenadas 1 e menos 2, com a igual a 3, b igual a 2 e c igual à
-raiz de 5.
+É uma elipse de centro (1, -2), com a = 3, b = 2 e c = √5.
 
 #### Erros comuns
 
@@ -120,92 +112,79 @@ Trocar as duas relações é o erro que mais aparece.
 **Supor que o denominador maior é sempre o de x.** Na elipse, o eixo maior fica onde está o
 denominador maior, e ele pode estar embaixo de y.
 
-**Confundir p com 4p na parábola.** Se a equação é y ao quadrado igual a 8x, então 4p vale 8 e p
-vale 2. O foco fica a 2 do vértice, não a 8.
+**Confundir p com 4p na parábola.** Se a equação é y^{2} = 8x, então 4p = 8 e p = 2. O foco fica a
+2 do vértice, não a 8.
 
-**Esquecer que o fator multiplica o que foi somado.** Ao completar quadrados em 4 vezes (x ao
-quadrado menos 2x), somar 1 dentro do parêntese equivale a somar 4 fora dele.
+**Esquecer que o fator multiplica o que foi somado.** Ao completar quadrados em 4 · (x^{2} - 2x),
+somar 1 dentro do parêntese equivale a somar 4 fora dele.
 
 ### Exercícios
 
 **Bloco A. Fundamentos**
 
-1. Na elipse x ao quadrado sobre 25 mais y ao quadrado sobre 16 igual a 1, determine a, b e c.
-2. Na hipérbole x ao quadrado sobre 16 menos y ao quadrado sobre 9 igual a 1, determine a, b e c.
-3. Determine o foco e a diretriz da parábola y ao quadrado igual a 8x.
-4. Calcule a excentricidade da elipse x ao quadrado sobre 100 mais y ao quadrado sobre 64 igual a 1.
-5. Na elipse x ao quadrado sobre 4 mais y ao quadrado sobre 9 igual a 1, diga sobre qual eixo está o
-   eixo maior e determine a, b e c.
+1. Na elipse x^{2}/25 + y^{2}/16 = 1, determine a, b e c.
+2. Na hipérbole x^{2}/16 - y^{2}/9 = 1, determine a, b e c.
+3. Determine o foco e a diretriz da parábola y^{2} = 8x.
+4. Calcule a excentricidade da elipse x^{2}/100 + y^{2}/64 = 1.
+5. Na elipse x^{2}/4 + y^{2}/9 = 1, diga sobre qual eixo está o eixo maior e determine a, b e c.
 
 **Bloco B. Consolidação**
 
-6. Escreva a equação reduzida da elipse de centro na origem, com focos no ponto de coordenadas 3 e 0
-   e no ponto de coordenadas menos 3 e 0, e semieixo maior igual a 5.
+6. Escreva a equação reduzida da elipse de centro na origem, com focos (3, 0) e (-3, 0), e semieixo
+   maior igual a 5.
 7. Escreva a equação reduzida da elipse de centro na origem cujo eixo maior está sobre o eixo
    horizontal e mede 10, e cujo eixo menor mede 6.
-8. Determine as assíntotas e a excentricidade da hipérbole x ao quadrado sobre 9 menos y ao quadrado
-   sobre 16 igual a 1.
-9. Escreva a equação reduzida da hipérbole de centro na origem com focos no ponto de coordenadas 5 e
-   0 e no ponto de coordenadas menos 5 e 0, e vértices no ponto de coordenadas 4 e 0 e no ponto de
-   coordenadas menos 4 e 0.
-10. Escreva a equação reduzida da parábola de foco no ponto de coordenadas 0 e 4 e diretriz a reta y
-    igual a menos 4.
-11. Determine o foco e a diretriz da parábola y ao quadrado igual a menos 20x.
-12. Determine os valores de y para os quais o ponto de coordenadas 4 e y pertence à elipse x ao
-    quadrado sobre 25 mais y ao quadrado sobre 9 igual a 1.
-13. Identifique a cônica de equação 4x ao quadrado mais 9y ao quadrado igual a 36 e determine a, b e
-    c.
-14. Identifique a cônica de equação 16x ao quadrado menos 25y ao quadrado igual a 400 e determine a,
-    b e c.
+8. Determine as assíntotas e a excentricidade da hipérbole x^{2}/9 - y^{2}/16 = 1.
+9. Escreva a equação reduzida da hipérbole de centro na origem com focos (5, 0) e (-5, 0), e
+   vértices (4, 0) e (-4, 0).
+10. Escreva a equação reduzida da parábola de foco (0, 4) e diretriz a reta y = -4.
+11. Determine o foco e a diretriz da parábola y^{2} = -20x.
+12. Determine os valores de y para os quais o ponto (4, y) pertence à elipse x^{2}/25 + y^{2}/9 = 1.
+13. Identifique a cônica de equação 4x^{2} + 9y^{2} = 36 e determine a, b e c.
+14. Identifique a cônica de equação 16x^{2} - 25y^{2} = 400 e determine a, b e c.
 
 **Bloco C. Aprofundamento**
 
-15. Identifique a cônica de equação 9x ao quadrado mais 4y ao quadrado menos 36x mais 8y mais 4
-    igual a zero, completando quadrados, e determine o centro, a, b e c.
-16. Identifique a cônica de equação x ao quadrado menos 4y ao quadrado menos 2x menos 16y menos 19
-    igual a zero, completando quadrados, e determine o centro, a, b e c.
-17. Identifique a cônica de equação y ao quadrado menos 8x menos 6y mais 25 igual a zero,
-    completando quadrados, e determine o vértice, o foco e a diretriz.
-18. Um ponto pertence à elipse x ao quadrado sobre 25 mais y ao quadrado sobre 16 igual a 1 e dista
-    7 de um dos focos. Determine a distância desse ponto ao outro foco, justificando pela definição
-    da elipse.
+15. Identifique a cônica de equação 9x^{2} + 4y^{2} - 36x + 8y + 4 = 0, completando quadrados, e
+    determine o centro, a, b e c.
+16. Identifique a cônica de equação x^{2} - 4y^{2} - 2x - 16y - 19 = 0, completando quadrados, e
+    determine o centro, a, b e c.
+17. Identifique a cônica de equação y^{2} - 8x - 6y + 25 = 0, completando quadrados, e determine o
+    vértice, o foco e a diretriz.
+18. Um ponto pertence à elipse x^{2}/25 + y^{2}/16 = 1 e dista 7 de um dos focos. Determine a
+    distância desse ponto ao outro foco, justificando pela definição da elipse.
 19. Um arco tem a forma de metade de uma elipse, apoiado no chão numa abertura de 20 metros e com
     altura de 6 metros no ponto central. Calcule a altura do arco num ponto do chão que fica a 8
     metros do centro da abertura.
-20. Um ponto da parábola y ao quadrado igual a 12x dista 8 do foco. Determine as coordenadas desse
-    ponto, usando a igualdade entre a distância ao foco e a distância à diretriz.
+20. Um ponto da parábola y^{2} = 12x dista 8 do foco. Determine as coordenadas desse ponto, usando a
+    igualdade entre a distância ao foco e a distância à diretriz.
 
 ### Gabarito
 
-1. a vale 5, b vale 4 e c vale 3.
-2. a vale 4, b vale 3 e c vale 5.
-3. Foco no ponto de coordenadas 2 e 0, e diretriz a reta x igual a menos 2.
-4. 3 sobre 5. Aqui c vale 6 e a vale 10.
-5. O eixo maior está sobre o eixo vertical. a vale 3, b vale 2 e c vale a raiz de 5.
-6. x ao quadrado sobre 25 mais y ao quadrado sobre 16 igual a 1.
-7. x ao quadrado sobre 25 mais y ao quadrado sobre 9 igual a 1.
-8. Assíntotas y igual a 4x sobre 3 e y igual a menos 4x sobre 3. Excentricidade 5 sobre 3.
-9. x ao quadrado sobre 16 menos y ao quadrado sobre 9 igual a 1.
-10. x ao quadrado igual a 16y.
-11. Foco no ponto de coordenadas menos 5 e 0, e diretriz a reta x igual a 5.
-12. y igual a 9 sobre 5 ou y igual a menos 9 sobre 5.
-13. Elipse de equação x ao quadrado sobre 9 mais y ao quadrado sobre 4 igual a 1, com a igual a 3, b
-    igual a 2 e c igual à raiz de 5.
-14. Hipérbole de equação x ao quadrado sobre 25 menos y ao quadrado sobre 16 igual a 1, com a igual
-    a 5, b igual a 4 e c igual à raiz de 41.
-15. Elipse de equação (x menos 2) ao quadrado sobre 4 mais (y mais 1) ao quadrado sobre 9 igual a 1.
-    Centro no ponto de coordenadas 2 e menos 1, com a igual a 3, b igual a 2 e c igual à raiz de 5.
-    O eixo maior é vertical.
-16. Hipérbole de equação (x menos 1) ao quadrado sobre 4 menos (y mais 2) ao quadrado igual a 1.
-    Centro no ponto de coordenadas 1 e menos 2, com a igual a 2, b igual a 1 e c igual à raiz de 5.
-17. Parábola de equação (y menos 3) ao quadrado igual a 8 vezes (x menos 2). Vértice no ponto de
-    coordenadas 2 e 3, foco no ponto de coordenadas 4 e 3, e diretriz a reta x igual a zero.
+1. a = 5, b = 4 e c = 3.
+2. a = 4, b = 3 e c = 5.
+3. Foco (2, 0), e diretriz a reta x = -2.
+4. e = 3/5. Aqui c = 6 e a = 10.
+5. O eixo maior está sobre o eixo vertical. a = 3, b = 2 e c = √5.
+6. x^{2}/25 + y^{2}/16 = 1.
+7. x^{2}/25 + y^{2}/9 = 1.
+8. Assíntotas y = 4x/3 e y = -4x/3. Excentricidade e = 5/3.
+9. x^{2}/16 - y^{2}/9 = 1.
+10. x^{2} = 16y.
+11. Foco (-5, 0), e diretriz a reta x = 5.
+12. y = 9/5 ou y = -9/5.
+13. Elipse de equação x^{2}/9 + y^{2}/4 = 1, com a = 3, b = 2 e c = √5.
+14. Hipérbole de equação x^{2}/25 - y^{2}/16 = 1, com a = 5, b = 4 e c = √41.
+15. Elipse de equação (x - 2)^{2}/4 + (y + 1)^{2}/9 = 1. Centro (2, -1), com a = 3, b = 2 e
+    c = √5. O eixo maior é vertical.
+16. Hipérbole de equação (x - 1)^{2}/4 - (y + 2)^{2} = 1. Centro (1, -2), com a = 2, b = 1 e
+    c = √5.
+17. Parábola de equação (y - 3)^{2} = 8 · (x - 2). Vértice (2, 3), foco (4, 3), e diretriz a reta
+    x = 0.
 18. 3. A soma das distâncias aos dois focos é constante e vale o eixo maior, ou seja, 10. Como uma
     delas vale 7, a outra vale 3.
-19. 3,6 metros. Com a elipse x ao quadrado sobre 100 mais y ao quadrado sobre 36 igual a 1, para x
-    igual a 8 o valor de y ao quadrado é 1296 sobre 100.
-20. O ponto de coordenadas 5 e 2 raízes de 15 e o ponto de coordenadas 5 e menos 2 raízes de 15. A
-    distância ao foco vale a abscissa mais 3, então a abscissa é 5 e y ao quadrado vale 60.
+19. 3,6 metros. Com a elipse x^{2}/100 + y^{2}/36 = 1, para x = 8 o valor de y^{2} é 1296/100.
+20. Os pontos (5, 2√15) e (5, -2√15). A distância ao foco vale x + 3, então x = 5 e y^{2} = 60.
 
 ## EN
 
@@ -231,67 +210,64 @@ The fixed points are the foci, and the fixed line of the parabola is the directr
 
 With centre at the origin and foci on the horizontal axis, the standard equation is
 
-x squared over a squared plus y squared over b squared equals 1
+x^{2}/a^{2} + y^{2}/b^{2} = 1
 
 Here a is the semi major axis, b is the semi minor axis and c is the distance from the centre to each
 focus. The relation between them is the fundamental relation of the ellipse:
 
-a squared equals b squared plus c squared
+a^{2} = b^{2} + c^{2}
 
 The larger of the two denominators always sits under the variable whose axis contains the foci. If
-the larger denominator sits under y squared, the ellipse is vertical.
+the larger denominator sits under y^{2}, the ellipse is vertical.
 
-The eccentricity is c divided by a, and it measures how flattened the ellipse is. Near zero it is
+The eccentricity is given by e = c/a, and it measures how flattened the ellipse is. Near zero it is
 almost a circle, and near 1 it is very elongated.
 
-**Example 1.** Analyse the ellipse x squared over 25 plus y squared over 9 equals 1.
-Since 25 is larger, the major axis is horizontal, with a equal to 5 and b equal to 3. So c squared is
-25 minus 9, that is, 16, and c is 4. The foci are the point with coordinates 4 and 0 and the point
-with coordinates minus 4 and 0. The eccentricity is 4 over 5.
+**Example 1.** Analyse the ellipse x^{2}/25 + y^{2}/9 = 1.
+Since 25 is larger, the major axis is horizontal, with a = 5 and b = 3. So c^{2} = 25 - 9 = 16, and
+c = 4. The foci are (4, 0) and (-4, 0). The eccentricity is e = 4/5.
 
 #### The hyperbola
 
 With centre at the origin and foci on the horizontal axis:
 
-x squared over a squared minus y squared over b squared equals 1
+x^{2}/a^{2} - y^{2}/b^{2} = 1
 
 Notice the minus sign, which is what tells a hyperbola from an ellipse at first glance. Here the
 fundamental relation changes places:
 
-c squared equals a squared plus b squared
+c^{2} = a^{2} + b^{2}
 
 Now c is the largest of the three, which makes sense, because the foci lie beyond the vertices. It
 does not matter which denominator is larger: the sign is in charge, and the positive term marks the
 axis that contains the foci.
 
-The asymptotes are the lines the hyperbola approaches without touching, and they are y equals plus or
-minus b over a times x.
+The asymptotes are the lines the hyperbola approaches without touching, and they are y = ± (b/a) · x.
 
-**Example 2.** Analyse the hyperbola x squared over 9 minus y squared over 16 equals 1.
-We have a equal to 3 and b equal to 4, so c squared is 9 plus 16, which gives 25, and c is 5. The foci
-are the point with coordinates 5 and 0 and the point with coordinates minus 5 and 0. The asymptotes
-are y equals 4x over 3 and y equals minus 4x over 3, and the eccentricity is 5 over 3.
+**Example 2.** Analyse the hyperbola x^{2}/9 - y^{2}/16 = 1.
+We have a = 3 and b = 4, so c^{2} = 9 + 16 = 25, and c = 5. The foci are (5, 0) and (-5, 0). The
+asymptotes are y = 4x/3 and y = -4x/3, and the eccentricity is e = 5/3.
 
 #### The parabola
 
 With vertex at the origin and horizontal axis of symmetry:
 
-y squared equals 4px
+y^{2} = 4px
 
-where p is the distance from the vertex to the focus. The focus sits at the point with coordinates p
-and 0, and the directrix is the line x equals minus p. If the axis of symmetry is vertical, the
-equation becomes x squared equals 4py, with the focus at the point with coordinates 0 and p.
+where p is the distance from the vertex to the focus. The focus sits at the point (p, 0), and the
+directrix is the line x = -p. If the axis of symmetry is vertical, the equation becomes x^{2} = 4py,
+with the focus at the point (0, p).
 
 When the coefficient is negative, the parabola opens the other way and the focus sits on the negative
 side.
 
-**Example 3.** Analyse the parabola y squared equals 12x.
-Since 4p is 12, p is 3. The focus is the point with coordinates 3 and 0 and the directrix is the line
-x equals minus 3. The parabola opens to the right.
+**Example 3.** Analyse the parabola y^{2} = 12x.
+Since 4p = 12, p = 3. The focus is (3, 0) and the directrix is the line x = -3. The parabola opens
+to the right.
 
 One practical consequence of the definition: the distance from a point of the parabola to the focus
-equals its distance to the directrix. For the parabola y squared equals 12x, that distance is the x
-coordinate of the point plus 3.
+equals its distance to the directrix. For the parabola y^{2} = 12x, that distance is x + 3, where x
+is the abscissa of the point.
 
 #### Identifying the conic by completing the square
 
@@ -300,16 +276,13 @@ complete the square in x and in y until the standard form appears. The sign betw
 decides: the same sign means an ellipse, opposite signs mean a hyperbola, and a missing square means
 a parabola.
 
-**Example 4.** Identify 4x squared plus 9y squared minus 8x plus 36y plus 4 equals zero.
-Grouping: 4 times (x squared minus 2x) plus 9 times (y squared plus 4y) plus 4 equals zero.
-Completing: 4 times (x minus 1) squared minus 4 plus 9 times (y plus 2) squared minus 36 plus 4
-equals zero, that is, 4 times (x minus 1) squared plus 9 times (y plus 2) squared equals 36. Dividing
-by 36:
+**Example 4.** Identify 4x^{2} + 9y^{2} - 8x + 36y + 4 = 0.
+Grouping: 4 · (x^{2} - 2x) + 9 · (y^{2} + 4y) + 4 = 0. Completing: 4 · (x - 1)^{2} - 4 +
+9 · (y + 2)^{2} - 36 + 4 = 0, that is, 4 · (x - 1)^{2} + 9 · (y + 2)^{2} = 36. Dividing by 36:
 
-(x minus 1) squared over 9 plus (y plus 2) squared over 4 equals 1
+(x - 1)^{2}/9 + (y + 2)^{2}/4 = 1
 
-It is an ellipse with centre at the point with coordinates 1 and minus 2, with a equal to 3, b equal
-to 2 and c equal to the square root of 5.
+It is an ellipse with centre (1, -2), with a = 3, b = 2 and c = √5.
 
 #### Common mistakes
 
@@ -319,95 +292,81 @@ hyperbola the largest is c. Swapping the two relations is the most common error.
 **Assuming the larger denominator always belongs to x.** In the ellipse, the major axis lies where
 the larger denominator is, and it may be under y.
 
-**Confusing p with 4p in the parabola.** If the equation is y squared equals 8x, then 4p is 8 and p
-is 2. The focus is 2 away from the vertex, not 8.
+**Confusing p with 4p in the parabola.** If the equation is y^{2} = 8x, then 4p = 8 and p = 2. The
+focus is 2 away from the vertex, not 8.
 
-**Forgetting that the factor multiplies what was added.** When completing the square in 4 times (x
-squared minus 2x), adding 1 inside the bracket amounts to adding 4 outside it.
+**Forgetting that the factor multiplies what was added.** When completing the square in
+4 · (x^{2} - 2x), adding 1 inside the bracket amounts to adding 4 outside it.
 
 ### Exercises
 
 **Block A. Fundamentals**
 
-1. In the ellipse x squared over 25 plus y squared over 16 equals 1, find a, b and c.
-2. In the hyperbola x squared over 16 minus y squared over 9 equals 1, find a, b and c.
-3. Find the focus and the directrix of the parabola y squared equals 8x.
-4. Find the eccentricity of the ellipse x squared over 100 plus y squared over 64 equals 1.
-5. In the ellipse x squared over 4 plus y squared over 9 equals 1, say which axis carries the major
-   axis and find a, b and c.
+1. In the ellipse x^{2}/25 + y^{2}/16 = 1, find a, b and c.
+2. In the hyperbola x^{2}/16 - y^{2}/9 = 1, find a, b and c.
+3. Find the focus and the directrix of the parabola y^{2} = 8x.
+4. Find the eccentricity of the ellipse x^{2}/100 + y^{2}/64 = 1.
+5. In the ellipse x^{2}/4 + y^{2}/9 = 1, say which axis carries the major axis and find a, b and c.
 
 **Block B. Building up**
 
-6. Write the standard equation of the ellipse with centre at the origin, with foci at the point with
-   coordinates 3 and 0 and at the point with coordinates minus 3 and 0, and semi major axis equal to
-   5.
+6. Write the standard equation of the ellipse with centre at the origin, with foci (3, 0) and
+   (-3, 0), and semi major axis equal to 5.
 7. Write the standard equation of the ellipse with centre at the origin whose major axis lies on the
    horizontal axis and measures 10, and whose minor axis measures 6.
-8. Find the asymptotes and the eccentricity of the hyperbola x squared over 9 minus y squared over 16
-   equals 1.
-9. Write the standard equation of the hyperbola with centre at the origin with foci at the point with
-   coordinates 5 and 0 and at the point with coordinates minus 5 and 0, and vertices at the point
-   with coordinates 4 and 0 and at the point with coordinates minus 4 and 0.
-10. Write the standard equation of the parabola with focus at the point with coordinates 0 and 4 and
-    directrix the line y equals minus 4.
-11. Find the focus and the directrix of the parabola y squared equals minus 20x.
-12. Find the values of y for which the point with coordinates 4 and y lies on the ellipse x squared
-    over 25 plus y squared over 9 equals 1.
-13. Identify the conic with equation 4x squared plus 9y squared equals 36 and find a, b and c.
-14. Identify the conic with equation 16x squared minus 25y squared equals 400 and find a, b and c.
+8. Find the asymptotes and the eccentricity of the hyperbola x^{2}/9 - y^{2}/16 = 1.
+9. Write the standard equation of the hyperbola with centre at the origin with foci (5, 0) and
+   (-5, 0), and vertices (4, 0) and (-4, 0).
+10. Write the standard equation of the parabola with focus (0, 4) and directrix the line y = -4.
+11. Find the focus and the directrix of the parabola y^{2} = -20x.
+12. Find the values of y for which the point (4, y) lies on the ellipse x^{2}/25 + y^{2}/9 = 1.
+13. Identify the conic with equation 4x^{2} + 9y^{2} = 36 and find a, b and c.
+14. Identify the conic with equation 16x^{2} - 25y^{2} = 400 and find a, b and c.
 
 **Block C. Going further**
 
-15. Identify the conic with equation 9x squared plus 4y squared minus 36x plus 8y plus 4 equals zero
-    by completing the square, and find the centre, a, b and c.
-16. Identify the conic with equation x squared minus 4y squared minus 2x minus 16y minus 19 equals
-    zero by completing the square, and find the centre, a, b and c.
-17. Identify the conic with equation y squared minus 8x minus 6y plus 25 equals zero by completing
-    the square, and find the vertex, the focus and the directrix.
-18. A point lies on the ellipse x squared over 25 plus y squared over 16 equals 1 and is at distance
-    7 from one of the foci. Find the distance from that point to the other focus, justifying your
-    answer by the definition of the ellipse.
+15. Identify the conic with equation 9x^{2} + 4y^{2} - 36x + 8y + 4 = 0 by completing the square,
+    and find the centre, a, b and c.
+16. Identify the conic with equation x^{2} - 4y^{2} - 2x - 16y - 19 = 0 by completing the square,
+    and find the centre, a, b and c.
+17. Identify the conic with equation y^{2} - 8x - 6y + 25 = 0 by completing the square, and find the
+    vertex, the focus and the directrix.
+18. A point lies on the ellipse x^{2}/25 + y^{2}/16 = 1 and is at distance 7 from one of the foci.
+    Find the distance from that point to the other focus, justifying your answer by the definition
+    of the ellipse.
 19. An arch has the shape of half an ellipse, resting on the ground across an opening of 20 metres
     and reaching a height of 6 metres at the central point. Find the height of the arch at a point of
     the ground that is 8 metres from the centre of the opening.
-20. A point of the parabola y squared equals 12x is at distance 8 from the focus. Find the
-    coordinates of that point, using the equality between the distance to the focus and the distance
-    to the directrix.
+20. A point of the parabola y^{2} = 12x is at distance 8 from the focus. Find the coordinates of that
+    point, using the equality between the distance to the focus and the distance to the directrix.
 
 ### Answer key
 
-1. a is 5, b is 4 and c is 3.
-2. a is 4, b is 3 and c is 5.
-3. Focus at the point with coordinates 2 and 0, and directrix the line x equals minus 2.
-4. 3 over 5. Here c is 6 and a is 10.
-5. The major axis lies on the vertical axis. a is 3, b is 2 and c is the square root of 5.
-6. x squared over 25 plus y squared over 16 equals 1.
-7. x squared over 25 plus y squared over 9 equals 1.
-8. Asymptotes y equals 4x over 3 and y equals minus 4x over 3. Eccentricity 5 over 3.
-9. x squared over 16 minus y squared over 9 equals 1.
-10. x squared equals 16y.
-11. Focus at the point with coordinates minus 5 and 0, and directrix the line x equals 5.
-12. y equals 9 over 5 or y equals minus 9 over 5.
-13. An ellipse with equation x squared over 9 plus y squared over 4 equals 1, with a equal to 3, b
-    equal to 2 and c equal to the square root of 5.
-14. A hyperbola with equation x squared over 25 minus y squared over 16 equals 1, with a equal to 5,
-    b equal to 4 and c equal to the square root of 41.
-15. An ellipse with equation (x minus 2) squared over 4 plus (y plus 1) squared over 9 equals 1.
-    Centre at the point with coordinates 2 and minus 1, with a equal to 3, b equal to 2 and c equal
-    to the square root of 5. The major axis is vertical.
-16. A hyperbola with equation (x minus 1) squared over 4 minus (y plus 2) squared equals 1. Centre at
-    the point with coordinates 1 and minus 2, with a equal to 2, b equal to 1 and c equal to the
-    square root of 5.
-17. A parabola with equation (y minus 3) squared equals 8 times (x minus 2). Vertex at the point with
-    coordinates 2 and 3, focus at the point with coordinates 4 and 3, and directrix the line x equals
-    zero.
+1. a = 5, b = 4 and c = 3.
+2. a = 4, b = 3 and c = 5.
+3. Focus (2, 0), and directrix the line x = -2.
+4. e = 3/5. Here c = 6 and a = 10.
+5. The major axis lies on the vertical axis. a = 3, b = 2 and c = √5.
+6. x^{2}/25 + y^{2}/16 = 1.
+7. x^{2}/25 + y^{2}/9 = 1.
+8. Asymptotes y = 4x/3 and y = -4x/3. Eccentricity e = 5/3.
+9. x^{2}/16 - y^{2}/9 = 1.
+10. x^{2} = 16y.
+11. Focus (-5, 0), and directrix the line x = 5.
+12. y = 9/5 or y = -9/5.
+13. An ellipse with equation x^{2}/9 + y^{2}/4 = 1, with a = 3, b = 2 and c = √5.
+14. A hyperbola with equation x^{2}/25 - y^{2}/16 = 1, with a = 5, b = 4 and c = √41.
+15. An ellipse with equation (x - 2)^{2}/4 + (y + 1)^{2}/9 = 1. Centre (2, -1), with a = 3, b = 2
+    and c = √5. The major axis is vertical.
+16. A hyperbola with equation (x - 1)^{2}/4 - (y + 2)^{2} = 1. Centre (1, -2), with a = 2, b = 1
+    and c = √5.
+17. A parabola with equation (y - 3)^{2} = 8 · (x - 2). Vertex (2, 3), focus (4, 3), and directrix
+    the line x = 0.
 18. 3. The sum of the distances to the two foci is constant and equals the major axis, that is, 10.
     Since one of them is 7, the other is 3.
-19. 3.6 metres. With the ellipse x squared over 100 plus y squared over 36 equals 1, for x equal to 8
-    the value of y squared is 1296 over 100.
-20. The point with coordinates 5 and 2 square roots of 15 and the point with coordinates 5 and minus
-    2 square roots of 15. The distance to the focus is the x coordinate plus 3, so the x coordinate
-    is 5 and y squared is 60.
+19. 3.6 metres. With the ellipse x^{2}/100 + y^{2}/36 = 1, for x = 8 the value of y^{2} is 1296/100.
+20. The points (5, 2√15) and (5, -2√15). The distance to the focus is x + 3, so x = 5 and
+    y^{2} = 60.
 
 ## VERIFICACAO
 

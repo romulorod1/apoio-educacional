@@ -17,19 +17,18 @@ dificuldade: 4
 
 #### O que é um polinômio
 
-Um polinômio na variável x é uma soma de parcelas do tipo coeficiente vezes potência de x, com
-expoentes naturais. O maior expoente que aparece com coeficiente não nulo é o **grau**, e o
-coeficiente que acompanha essa maior potência é o **coeficiente dominante**.
+Um polinômio na variável x é uma soma de parcelas do tipo a·x^{n}, com expoentes naturais. O maior
+expoente que aparece com coeficiente não nulo é o **grau**, e o coeficiente que acompanha essa maior
+potência é o **coeficiente dominante**.
 
-Em 5x elevado a 4 menos 3x ao quadrado mais 7, o grau é 4 e o coeficiente dominante é 5. Repare que
-o expoente precisa ser natural: uma expressão com x no denominador ou dentro de raiz não é
-polinômio.
+Em 5x^{4} - 3x^{2} + 7, o grau é 4 e o coeficiente dominante é 5. Repare que o expoente precisa ser
+natural: uma expressão com x no denominador ou dentro de raiz não é polinômio.
 
 Calcular o **valor numérico** é apenas substituir. O valor de P em a se escreve P(a), e é ele que vai
 carregar quase toda a teoria adiante.
 
-**Exemplo 1.** Sendo P(x) igual a x ao cubo menos 4x ao quadrado mais 2x mais 5, calcular P(3).
-Substituindo: 27 menos 36 mais 6 mais 5, que dá 2.
+**Exemplo 1.** Sendo P(x) = x^{3} - 4x^{2} + 2x + 5, calcular P(3).
+Substituindo: P(3) = 27 - 36 + 6 + 5 = 2.
 
 #### Somar, subtrair e multiplicar
 
@@ -44,36 +43,33 @@ apareceu grau 3, algo se perdeu.
 
 Dividir P por D produz um quociente Q e um resto R, tais que
 
-P igual a D vezes Q mais R, com o grau de R menor que o grau de D
+P = D · Q + R, com o grau de R menor que o grau de D
 
 O procedimento é o mesmo da divisão de números: divida o termo de maior grau do que sobrou pelo
 termo de maior grau do divisor, multiplique, subtraia, repita. Pare quando o que sobrou tiver grau
 menor que o do divisor. Se faltar alguma potência intermediária, escreva-a com coeficiente zero
 antes de começar, porque a coluna precisa existir.
 
-**Exemplo 2.** Dividir 3x ao cubo menos x ao quadrado mais 2 por x ao quadrado menos 2.
-Primeiro passo: 3x ao cubo dividido por x ao quadrado dá 3x. Multiplicando e subtraindo, sobra menos
-x ao quadrado mais 6x mais 2.
-Segundo passo: menos x ao quadrado dividido por x ao quadrado dá menos 1. Multiplicando e
-subtraindo, sobra 6x.
-O quociente é 3x menos 1 e o resto é 6x. Conferindo: (x ao quadrado menos 2) vezes (3x menos 1) mais
-6x devolve o polinômio original.
+**Exemplo 2.** Dividir 3x^{3} - x^{2} + 2 por x^{2} - 2.
+Primeiro passo: 3x^{3} ÷ x^{2} = 3x. Multiplicando e subtraindo, sobra -x^{2} + 6x + 2.
+Segundo passo: -x^{2} ÷ x^{2} = -1. Multiplicando e subtraindo, sobra 6x.
+O quociente é Q = 3x - 1 e o resto é R = 6x. Conferindo: (x^{2} - 2) · (3x - 1) + 6x devolve o
+polinômio original.
 
 #### Teorema do resto
 
-Este teorema economiza tempo como poucos: **o resto da divisão de P por x menos a é exatamente
-P(a)**. Não é preciso dividir para saber o resto, basta substituir.
+Este teorema economiza tempo como poucos: **o resto da divisão de P por x - a é exatamente P(a)**.
+Não é preciso dividir para saber o resto, basta substituir.
 
-**Exemplo 3.** Determinar o resto da divisão de x elevado a 5 mais 2x menos 1 por x mais 1.
-O divisor x mais 1 é x menos menos 1, então a vale menos 1. Substituindo: menos 1 menos 2 menos 1,
-que dá menos 4. Esse é o resto.
+**Exemplo 3.** Determinar o resto da divisão de x^{5} + 2x - 1 por x + 1.
+O divisor x + 1 é x - (-1), então a = -1. Substituindo: P(-1) = -1 - 2 - 1 = -4. Esse é o resto.
 
-A consequência mais útil é o teorema do fator: **x menos a divide P exatamente quando P(a) vale
-zero**, isto é, quando a é raiz de P. É assim que se testa um candidato a raiz em um segundo.
+A consequência mais útil é o teorema do fator: **x - a divide P exatamente quando P(a) = 0**, isto é,
+quando a é raiz de P. É assim que se testa um candidato a raiz em um segundo.
 
 #### Dispositivo de Briot e Ruffini
 
-Quando o divisor é do tipo x menos a, existe um esquema muito mais rápido do que a chave. Escreva a
+Quando o divisor é do tipo x - a, existe um esquema muito mais rápido do que a chave. Escreva a
 à esquerda e os coeficientes de P em ordem decrescente de grau, sem pular nenhuma potência. Baixe o
 primeiro coeficiente. Depois, repita: multiplique o último número obtido por a e some ao próximo
 coeficiente.
@@ -81,22 +77,21 @@ coeficiente.
 Os números obtidos, exceto o último, são os coeficientes do quociente, que tem um grau a menos. O
 último número é o resto.
 
-**Exemplo 4.** Dividir x ao cubo menos 2x ao quadrado menos 5x mais 6 por x menos 1.
-Com a igual a 1 e coeficientes 1, menos 2, menos 5 e 6:
-baixa o 1; depois 1 vezes 1 mais menos 2 dá menos 1; depois menos 1 vezes 1 mais menos 5 dá menos 6;
-por fim menos 6 vezes 1 mais 6 dá zero.
-O quociente é x ao quadrado menos x menos 6 e o resto é zero, logo 1 é raiz do polinômio.
+**Exemplo 4.** Dividir x^{3} - 2x^{2} - 5x + 6 por x - 1.
+Com a = 1 e coeficientes 1, -2, -5 e 6:
+baixa o 1; depois 1 · 1 + (-2) = -1; depois -1 · 1 + (-5) = -6; por fim -6 · 1 + 6 = 0.
+O quociente é x^{2} - x - 6 e o resto é zero, logo 1 é raiz do polinômio.
 
 Encadeando o dispositivo com raízes sucessivas, chega-se à fatoração completa de um polinômio de
 grau alto sem nunca resolver uma equação difícil.
 
 #### Erros comuns
 
-**Esquecer o coeficiente zero das potências que faltam.** Em x ao cubo mais 1 os coeficientes são 1,
-0, 0 e 1. Quem escreve só 1 e 1 desalinha a conta inteira.
+**Esquecer o coeficiente zero das potências que faltam.** Em x^{3} + 1 os coeficientes são 1, 0, 0 e
+1. Quem escreve só 1 e 1 desalinha a conta inteira.
 
-**Trocar o sinal de a no divisor.** Para dividir por x mais 3, o valor de a é menos 3, porque x mais
-3 é x menos menos 3.
+**Trocar o sinal de a no divisor.** Para dividir por x + 3, o valor de a é -3, porque x + 3 é
+x - (-3).
 
 **Parar a divisão cedo ou tarde demais.** Continue enquanto o que sobrou tiver grau maior ou igual
 ao do divisor, e pare no instante em que ficar menor.
@@ -108,70 +103,60 @@ máximo o maior dos dois.
 
 **Bloco A. Fundamentos**
 
-1. Determine o grau e o coeficiente dominante do polinômio 5x elevado a 4 menos 3x ao quadrado mais
-   7.
-2. Sendo P(x) igual a 2x ao cubo menos 5x ao quadrado mais x menos 3, calcule P(2).
-3. Calcule a soma dos polinômios 3x ao quadrado mais 2x menos 1 e x ao quadrado menos 4x mais 6.
-4. Sendo P(x) igual a x ao cubo menos 2x mais 4, calcule P de menos 1.
-5. Calcule o produto de x mais 3 por x menos 5.
+1. Determine o grau e o coeficiente dominante do polinômio 5x^{4} - 3x^{2} + 7.
+2. Sendo P(x) = 2x^{3} - 5x^{2} + x - 3, calcule P(2).
+3. Calcule a soma dos polinômios 3x^{2} + 2x - 1 e x^{2} - 4x + 6.
+4. Sendo P(x) = x^{3} - 2x + 4, calcule P(-1).
+5. Calcule o produto (x + 3) · (x - 5).
 
 **Bloco B. Consolidação**
 
-6. Calcule o produto de 2x menos 1 por x ao quadrado mais 3x menos 4.
-7. Divida x ao cubo menos 6x ao quadrado mais 11x menos 6 por x menos 1, indicando o quociente e o
-   resto.
-8. Divida 2x ao cubo mais 3x ao quadrado menos x mais 5 por x ao quadrado mais x menos 1, indicando
-   o quociente e o resto.
-9. Determine o resto da divisão de x elevado a 4 menos 3x ao quadrado mais 2 por x menos 2, usando o
-   teorema do resto.
-10. Determine o resto da divisão de 2x ao cubo menos x ao quadrado mais 3x menos 5 por x mais 1,
-    usando o teorema do resto.
-11. Use o dispositivo de Briot e Ruffini para dividir x ao cubo mais 2x ao quadrado menos 5x menos 6
-    por x menos 2, indicando o quociente e o resto.
-12. Verifique se x menos 3 é fator do polinômio x ao cubo menos 4x ao quadrado mais x mais 6.
-13. Determine k para que a divisão de x ao cubo mais kx ao quadrado menos 4x mais 3 por x menos 1
-    deixe resto 5.
-14. Calcule a diferença entre 4x ao cubo menos x mais 2 e x ao cubo mais 2x ao quadrado menos 3x
-    mais 7.
+6. Calcule o produto (2x - 1) · (x^{2} + 3x - 4).
+7. Divida x^{3} - 6x^{2} + 11x - 6 por x - 1, indicando o quociente e o resto.
+8. Divida 2x^{3} + 3x^{2} - x + 5 por x^{2} + x - 1, indicando o quociente e o resto.
+9. Determine o resto da divisão de x^{4} - 3x^{2} + 2 por x - 2, usando o teorema do resto.
+10. Determine o resto da divisão de 2x^{3} - x^{2} + 3x - 5 por x + 1, usando o teorema do resto.
+11. Use o dispositivo de Briot e Ruffini para dividir x^{3} + 2x^{2} - 5x - 6 por x - 2, indicando o
+    quociente e o resto.
+12. Verifique se x - 3 é fator do polinômio x^{3} - 4x^{2} + x + 6.
+13. Determine k para que a divisão de x^{3} + kx^{2} - 4x + 3 por x - 1 deixe resto 5.
+14. Calcule a diferença (4x^{3} - x + 2) - (x^{3} + 2x^{2} - 3x + 7).
 
 **Bloco C. Aprofundamento**
 
-15. Fatore completamente o polinômio x ao cubo menos 6x ao quadrado mais 11x menos 6, começando por
-    testar 1 como raiz e usando o dispositivo de Briot e Ruffini.
-16. Um polinômio dividido por x menos 1 deixa resto 3, e dividido por x menos 2 deixa resto 5.
-    Determine o resto da divisão desse polinômio pelo produto de x menos 1 por x menos 2.
-17. Determine a e b para que o polinômio x elevado a 4 mais ax ao quadrado mais b seja divisível por
-    x ao quadrado menos 3x mais 2.
-18. Determine m para que x menos 3 seja fator do polinômio x ao cubo menos 3x ao quadrado mais mx
-    menos 6.
-19. Divida x elevado a 4 menos 1 por x menos 1 usando o dispositivo de Briot e Ruffini e escreva a
-    fatoração completa de x elevado a 4 menos 1 em fatores de coeficientes reais.
+15. Fatore completamente o polinômio x^{3} - 6x^{2} + 11x - 6, começando por testar 1 como raiz e
+    usando o dispositivo de Briot e Ruffini.
+16. Um polinômio dividido por x - 1 deixa resto 3, e dividido por x - 2 deixa resto 5. Determine o
+    resto da divisão desse polinômio por (x - 1) · (x - 2).
+17. Determine a e b para que o polinômio x^{4} + ax^{2} + b seja divisível por x^{2} - 3x + 2.
+18. Determine m para que x - 3 seja fator do polinômio x^{3} - 3x^{2} + mx - 6.
+19. Divida x^{4} - 1 por x - 1 usando o dispositivo de Briot e Ruffini e escreva a fatoração
+    completa de x^{4} - 1 em fatores de coeficientes reais.
 
 ### Gabarito
 
 1. Grau 4 e coeficiente dominante 5.
-2. menos 5.
-3. 4x ao quadrado menos 2x mais 5.
+2. -5.
+3. 4x^{2} - 2x + 5.
 4. 5.
-5. x ao quadrado menos 2x menos 15.
-6. 2x ao cubo mais 5x ao quadrado menos 11x mais 4.
-7. Quociente x ao quadrado menos 5x mais 6, resto zero.
-8. Quociente 2x mais 1, resto 6.
-9. 6. Basta calcular o valor do polinômio em 2.
-10. menos 11. Basta calcular o valor do polinômio em menos 1.
-11. Quociente x ao quadrado mais 4x mais 3, resto zero.
-12. É fator, porque o valor do polinômio em 3 é zero.
-13. k igual a 5.
-14. 3x ao cubo menos 2x ao quadrado mais 2x menos 5.
-15. O produto de x menos 1 por x menos 2 por x menos 3. O dispositivo com a raiz 1 dá quociente x ao
-    quadrado menos 5x mais 6, que se fatora direto.
-16. O resto é 2x mais 1. Como o divisor tem grau 2, o resto tem a forma ax mais b, e as condições
-    dadas produzem o sistema a mais b igual a 3 e 2a mais b igual a 5.
-17. a igual a menos 5 e b igual a 4. As raízes do divisor são 1 e 2, e ambas precisam anular o
-    polinômio.
-18. m igual a 2.
-19. Quociente x ao cubo mais x ao quadrado mais x mais 1, com resto zero. A fatoração completa é o
-    produto de x menos 1 por x mais 1 por x ao quadrado mais 1.
+5. x^{2} - 2x - 15.
+6. 2x^{3} + 5x^{2} - 11x + 4.
+7. Quociente x^{2} - 5x + 6, resto zero.
+8. Quociente 2x + 1, resto 6.
+9. 6. Basta calcular P(2).
+10. -11. Basta calcular P(-1).
+11. Quociente x^{2} + 4x + 3, resto zero.
+12. É fator, porque P(3) = 0.
+13. k = 5.
+14. 3x^{3} - 2x^{2} + 2x - 5.
+15. (x - 1) · (x - 2) · (x - 3). O dispositivo com a raiz 1 dá quociente x^{2} - 5x + 6, que se
+    fatora direto.
+16. O resto é 2x + 1. Como o divisor tem grau 2, o resto tem a forma ax + b, e as condições dadas
+    produzem o sistema a + b = 3 e 2a + b = 5.
+17. a = -5 e b = 4. As raízes do divisor são 1 e 2, e ambas precisam anular o polinômio.
+18. m = 2.
+19. Quociente x^{3} + x^{2} + x + 1, com resto zero. A fatoração completa é
+    (x - 1) · (x + 1) · (x^{2} + 1).
 
 ## EN
 
@@ -179,19 +164,19 @@ máximo o maior dos dois.
 
 #### What a polynomial is
 
-A polynomial in the variable x is a sum of terms of the type coefficient times a power of x, with
-natural number exponents. The largest exponent appearing with a non zero coefficient is the
-**degree**, and the coefficient attached to that highest power is the **leading coefficient**.
+A polynomial in the variable x is a sum of terms of the type a·x^{n}, with natural number exponents.
+The largest exponent appearing with a non zero coefficient is the **degree**, and the coefficient
+attached to that highest power is the **leading coefficient**.
 
-In 5x to the power 4 minus 3x squared plus 7, the degree is 4 and the leading coefficient is 5.
-Notice that the exponent has to be a natural number: an expression with x in the denominator or
-inside a radical is not a polynomial.
+In 5x^{4} - 3x^{2} + 7, the degree is 4 and the leading coefficient is 5. Notice that the exponent
+has to be a natural number: an expression with x in the denominator or inside a radical is not a
+polynomial.
 
 Computing the **value** is simply substituting. The value of P at a is written P(a), and it is what
 carries almost all the theory ahead.
 
-**Example 1.** With P(x) equal to x cubed minus 4x squared plus 2x plus 5, compute P(3).
-Substituting: 27 minus 36 plus 6 plus 5, which gives 2.
+**Example 1.** With P(x) = x^{3} - 4x^{2} + 2x + 5, compute P(3).
+Substituting: P(3) = 27 - 36 + 6 + 5 = 2.
 
 #### Adding, subtracting and multiplying
 
@@ -206,36 +191,34 @@ degree 1 by one of degree 2 and no degree 3 appeared, something got lost.
 
 Dividing P by D produces a quotient Q and a remainder R, such that
 
-P equals D times Q plus R, with the degree of R less than the degree of D
+P = D · Q + R, with the degree of R less than the degree of D
 
 The procedure is the same as for numbers: divide the highest degree term of what is left by the
 highest degree term of the divisor, multiply, subtract, repeat. Stop when what is left has degree
 lower than the divisor. If an intermediate power is missing, write it with coefficient zero before
 starting, because the column has to exist.
 
-**Example 2.** Divide 3x cubed minus x squared plus 2 by x squared minus 2.
-First step: 3x cubed divided by x squared gives 3x. Multiplying and subtracting leaves minus x
-squared plus 6x plus 2.
-Second step: minus x squared divided by x squared gives minus 1. Multiplying and subtracting leaves
-6x.
-The quotient is 3x minus 1 and the remainder is 6x. Checking: (x squared minus 2) times (3x minus 1)
-plus 6x gives back the original polynomial.
+**Example 2.** Divide 3x^{3} - x^{2} + 2 by x^{2} - 2.
+First step: 3x^{3} ÷ x^{2} = 3x. Multiplying and subtracting leaves -x^{2} + 6x + 2.
+Second step: -x^{2} ÷ x^{2} = -1. Multiplying and subtracting leaves 6x.
+The quotient is Q = 3x - 1 and the remainder is R = 6x. Checking: (x^{2} - 2) · (3x - 1) + 6x gives
+back the original polynomial.
 
 #### The remainder theorem
 
-This theorem saves time like few others: **the remainder of the division of P by x minus a is exactly
+This theorem saves time like few others: **the remainder of the division of P by x - a is exactly
 P(a)**. There is no need to divide in order to know the remainder, substituting is enough.
 
-**Example 3.** Find the remainder of the division of x to the power 5 plus 2x minus 1 by x plus 1.
-The divisor x plus 1 is x minus minus 1, so a is minus 1. Substituting: minus 1 minus 2 minus 1,
-which gives minus 4. That is the remainder.
+**Example 3.** Find the remainder of the division of x^{5} + 2x - 1 by x + 1.
+The divisor x + 1 is x - (-1), so a = -1. Substituting: P(-1) = -1 - 2 - 1 = -4. That is the
+remainder.
 
-The most useful consequence is the factor theorem: **x minus a divides P exactly when P(a) is zero**,
-that is, when a is a root of P. That is how a candidate root gets tested in one second.
+The most useful consequence is the factor theorem: **x - a divides P exactly when P(a) = 0**, that
+is, when a is a root of P. That is how a candidate root gets tested in one second.
 
 #### Synthetic division
 
-When the divisor has the form x minus a, there is a scheme far faster than long division. Write a on
+When the divisor has the form x - a, there is a scheme far faster than long division. Write a on
 the left and the coefficients of P in decreasing order of degree, skipping no power. Bring down the
 first coefficient. Then repeat: multiply the last number obtained by a and add it to the next
 coefficient.
@@ -243,22 +226,21 @@ coefficient.
 The numbers obtained, except the last one, are the coefficients of the quotient, which has one degree
 less. The last number is the remainder.
 
-**Example 4.** Divide x cubed minus 2x squared minus 5x plus 6 by x minus 1.
-With a equal to 1 and coefficients 1, minus 2, minus 5 and 6:
-bring down the 1; then 1 times 1 plus minus 2 gives minus 1; then minus 1 times 1 plus minus 5 gives
-minus 6; finally minus 6 times 1 plus 6 gives zero.
-The quotient is x squared minus x minus 6 and the remainder is zero, so 1 is a root of the polynomial.
+**Example 4.** Divide x^{3} - 2x^{2} - 5x + 6 by x - 1.
+With a = 1 and coefficients 1, -2, -5 and 6:
+bring down the 1; then 1 · 1 + (-2) = -1; then -1 · 1 + (-5) = -6; finally -6 · 1 + 6 = 0.
+The quotient is x^{2} - x - 6 and the remainder is zero, so 1 is a root of the polynomial.
 
 Chaining the scheme with successive roots leads to the complete factorisation of a high degree
 polynomial without ever solving a hard equation.
 
 #### Common mistakes
 
-**Forgetting the zero coefficient of missing powers.** In x cubed plus 1 the coefficients are 1, 0, 0
-and 1. Writing only 1 and 1 throws the whole calculation out of line.
+**Forgetting the zero coefficient of missing powers.** In x^{3} + 1 the coefficients are 1, 0, 0 and
+1. Writing only 1 and 1 throws the whole calculation out of line.
 
-**Flipping the sign of a in the divisor.** To divide by x plus 3, the value of a is minus 3, because
-x plus 3 is x minus minus 3.
+**Flipping the sign of a in the divisor.** To divide by x + 3, the value of a is -3, because x + 3 is
+x - (-3).
 
 **Stopping the division too early or too late.** Carry on while what is left has degree greater than
 or equal to the divisor, and stop the moment it becomes smaller.
@@ -270,69 +252,61 @@ is at most the larger of the two.
 
 **Block A. Fundamentals**
 
-1. Find the degree and the leading coefficient of the polynomial 5x to the power 4 minus 3x squared
-   plus 7.
-2. With P(x) equal to 2x cubed minus 5x squared plus x minus 3, compute P(2).
-3. Find the sum of the polynomials 3x squared plus 2x minus 1 and x squared minus 4x plus 6.
-4. With P(x) equal to x cubed minus 2x plus 4, compute P at minus 1.
-5. Find the product of x plus 3 and x minus 5.
+1. Find the degree and the leading coefficient of the polynomial 5x^{4} - 3x^{2} + 7.
+2. With P(x) = 2x^{3} - 5x^{2} + x - 3, compute P(2).
+3. Find the sum of the polynomials 3x^{2} + 2x - 1 and x^{2} - 4x + 6.
+4. With P(x) = x^{3} - 2x + 4, compute P(-1).
+5. Find the product (x + 3) · (x - 5).
 
 **Block B. Building up**
 
-6. Find the product of 2x minus 1 and x squared plus 3x minus 4.
-7. Divide x cubed minus 6x squared plus 11x minus 6 by x minus 1, giving the quotient and the
-   remainder.
-8. Divide 2x cubed plus 3x squared minus x plus 5 by x squared plus x minus 1, giving the quotient
-   and the remainder.
-9. Find the remainder of the division of x to the power 4 minus 3x squared plus 2 by x minus 2, using
-   the remainder theorem.
-10. Find the remainder of the division of 2x cubed minus x squared plus 3x minus 5 by x plus 1, using
-    the remainder theorem.
-11. Use synthetic division to divide x cubed plus 2x squared minus 5x minus 6 by x minus 2, giving
-    the quotient and the remainder.
-12. Check whether x minus 3 is a factor of the polynomial x cubed minus 4x squared plus x plus 6.
-13. Find k so that the division of x cubed plus kx squared minus 4x plus 3 by x minus 1 leaves
-    remainder 5.
-14. Find the difference between 4x cubed minus x plus 2 and x cubed plus 2x squared minus 3x plus 7.
+6. Find the product (2x - 1) · (x^{2} + 3x - 4).
+7. Divide x^{3} - 6x^{2} + 11x - 6 by x - 1, giving the quotient and the remainder.
+8. Divide 2x^{3} + 3x^{2} - x + 5 by x^{2} + x - 1, giving the quotient and the remainder.
+9. Find the remainder of the division of x^{4} - 3x^{2} + 2 by x - 2, using the remainder theorem.
+10. Find the remainder of the division of 2x^{3} - x^{2} + 3x - 5 by x + 1, using the remainder
+    theorem.
+11. Use synthetic division to divide x^{3} + 2x^{2} - 5x - 6 by x - 2, giving the quotient and the
+    remainder.
+12. Check whether x - 3 is a factor of the polynomial x^{3} - 4x^{2} + x + 6.
+13. Find k so that the division of x^{3} + kx^{2} - 4x + 3 by x - 1 leaves remainder 5.
+14. Find the difference (4x^{3} - x + 2) - (x^{3} + 2x^{2} - 3x + 7).
 
 **Block C. Going further**
 
-15. Factorise completely the polynomial x cubed minus 6x squared plus 11x minus 6, starting by
-    testing 1 as a root and using synthetic division.
-16. A polynomial divided by x minus 1 leaves remainder 3, and divided by x minus 2 leaves remainder
-    5. Find the remainder of the division of that polynomial by the product of x minus 1 and x minus
-    2.
-17. Find a and b so that the polynomial x to the power 4 plus ax squared plus b is divisible by x
-    squared minus 3x plus 2.
-18. Find m so that x minus 3 is a factor of the polynomial x cubed minus 3x squared plus mx minus 6.
-19. Divide x to the power 4 minus 1 by x minus 1 using synthetic division and write the complete
-    factorisation of x to the power 4 minus 1 into factors with real coefficients.
+15. Factorise completely the polynomial x^{3} - 6x^{2} + 11x - 6, starting by testing 1 as a root
+    and using synthetic division.
+16. A polynomial divided by x - 1 leaves remainder 3, and divided by x - 2 leaves remainder 5. Find
+    the remainder of the division of that polynomial by (x - 1) · (x - 2).
+17. Find a and b so that the polynomial x^{4} + ax^{2} + b is divisible by x^{2} - 3x + 2.
+18. Find m so that x - 3 is a factor of the polynomial x^{3} - 3x^{2} + mx - 6.
+19. Divide x^{4} - 1 by x - 1 using synthetic division and write the complete factorisation of
+    x^{4} - 1 into factors with real coefficients.
 
 ### Answer key
 
 1. Degree 4 and leading coefficient 5.
-2. minus 5.
-3. 4x squared minus 2x plus 5.
+2. -5.
+3. 4x^{2} - 2x + 5.
 4. 5.
-5. x squared minus 2x minus 15.
-6. 2x cubed plus 5x squared minus 11x plus 4.
-7. Quotient x squared minus 5x plus 6, remainder zero.
-8. Quotient 2x plus 1, remainder 6.
-9. 6. It is enough to compute the value of the polynomial at 2.
-10. minus 11. It is enough to compute the value of the polynomial at minus 1.
-11. Quotient x squared plus 4x plus 3, remainder zero.
-12. It is a factor, because the value of the polynomial at 3 is zero.
-13. k equals 5.
-14. 3x cubed minus 2x squared plus 2x minus 5.
-15. The product of x minus 1 by x minus 2 by x minus 3. The scheme with the root 1 gives quotient x
-    squared minus 5x plus 6, which factorises straight away.
-16. The remainder is 2x plus 1. Since the divisor has degree 2, the remainder has the form ax plus b,
-    and the given conditions produce the system a plus b equals 3 and 2a plus b equals 5.
-17. a equals minus 5 and b equals 4. The roots of the divisor are 1 and 2, and both must make the
-    polynomial zero.
-18. m equals 2.
-19. Quotient x cubed plus x squared plus x plus 1, with remainder zero. The complete factorisation is
-    the product of x minus 1 by x plus 1 by x squared plus 1.
+5. x^{2} - 2x - 15.
+6. 2x^{3} + 5x^{2} - 11x + 4.
+7. Quotient x^{2} - 5x + 6, remainder zero.
+8. Quotient 2x + 1, remainder 6.
+9. 6. It is enough to compute P(2).
+10. -11. It is enough to compute P(-1).
+11. Quotient x^{2} + 4x + 3, remainder zero.
+12. It is a factor, because P(3) = 0.
+13. k = 5.
+14. 3x^{3} - 2x^{2} + 2x - 5.
+15. (x - 1) · (x - 2) · (x - 3). The scheme with the root 1 gives quotient x^{2} - 5x + 6, which
+    factorises straight away.
+16. The remainder is 2x + 1. Since the divisor has degree 2, the remainder has the form ax + b, and
+    the given conditions produce the system a + b = 3 and 2a + b = 5.
+17. a = -5 and b = 4. The roots of the divisor are 1 and 2, and both must make the polynomial zero.
+18. m = 2.
+19. Quotient x^{3} + x^{2} + x + 1, with remainder zero. The complete factorisation is
+    (x - 1) · (x + 1) · (x^{2} + 1).
 
 ## VERIFICACAO
 

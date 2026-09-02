@@ -1259,6 +1259,28 @@
     return 'x' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
   }
 
+  /* Chave de busca: sem acento e sem maiúscula.
+   *
+   * Ela digita num teclado de tablet, onde o acento custa toques a mais. Antes
+   * disto, procurar "fracao" não achava nada e "equacao" não achava nada, e a
+   * lista aparecia vazia como se o assunto não existisse no banco.
+   *
+   * Normalizar em NFD separa a letra do acento, e a faixa 0300 a 036F é a dos
+   * acentos combinantes. O ç também vira c, que é o que ela espera. */
+  function chaveDeBusca(s) {
+    return String(s == null ? '' : s)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '');
+  }
+
+  /* Casa um termo digitado com um texto qualquer, ignorando acento e caixa. */
+  function casaBusca(texto, termo) {
+    var t = chaveDeBusca(termo).trim();
+    if (!t) return true;
+    return chaveDeBusca(texto).indexOf(t) >= 0;
+  }
+
   function nomeArquivo(s) {
     return String(s)
       .normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -1293,6 +1315,7 @@
     conflitosDe: conflitosDe, minutosDaHora: minutosDaHora,
     dividirAula: dividirAula, desfazerDivisao: desfazerDivisao,
     podeDividir: podeDividir, metadesDe: metadesDe, somarMinutosNaHora: somarMinutosNaHora,
-    uid: uid, nomeArquivo: nomeArquivo
+    uid: uid, nomeArquivo: nomeArquivo,
+    chaveDeBusca: chaveDeBusca, casaBusca: casaBusca
   };
 });

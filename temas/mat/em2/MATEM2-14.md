@@ -25,54 +25,80 @@ que dizem o quanto eles se afastam desse centro.
 
 #### Medidas de tendência central
 
-A **média aritmética** é a soma dos valores dividida pela quantidade de valores. Ela usa todos os
-dados, o que é uma virtude, e por isso mesmo é sensível a valores extremos.
+A **média aritmética** é a soma dos valores dividida pela quantidade de valores:
+
+M = S / n
+
+onde M é a média, S a soma de todos os valores e n a quantidade de valores. Ela usa todos os dados,
+o que é uma virtude, e por isso mesmo é sensível a valores extremos.
 
 A **mediana** é o valor que fica no meio quando os dados são colocados em ordem. Com uma quantidade
-par de dados, é a média dos dois centrais. Ela ignora o tamanho dos extremos e olha só a posição,
-por isso resiste bem a um valor muito fora da faixa.
+par de dados, é a média dos dois centrais:
+
+Md = (c_{1} + c_{2}) / 2
+
+onde Md é a mediana e c_{1} e c_{2} são os dois valores centrais. Ela ignora o tamanho dos extremos
+e olha só a posição, por isso resiste bem a um valor muito fora da faixa.
 
 A **moda** é o valor que mais se repete. Um conjunto pode ter mais de uma moda, ou não ter moda
 alguma.
 
 **Exemplo 1.** Calcular média, mediana e moda de 2, 4, 4, 5, 6, 6, 6 e 7.
-A soma dá 40 e são 8 valores, então a média é 5. Em ordem, os dois valores centrais são 5 e 6, e a
-mediana é 5,5. O valor que mais se repete é o 6, que aparece três vezes, então a moda é 6.
+A soma é S = 40 e são n = 8 valores, então M = 40 / 8 = 5. Em ordem, os dois valores centrais são 5
+e 6, e Md = (5 + 6) / 2 = 5,5. O valor que mais se repete é o 6, que aparece três vezes, então a
+moda é 6.
 
 #### Distribuição de frequências
 
 Quando muitos dados se repetem, a lista vira tabela: cada valor com a quantidade de vezes em que
 aparece, chamada de frequência. A média sai multiplicando cada valor pela sua frequência, somando
-tudo e dividindo pela soma das frequências. É a mesma conta da média ponderada, com as frequências
-no papel dos pesos.
+tudo e dividindo pela soma das frequências:
+
+M = Σ(x · f) / Σf
+
+onde M é a média, x cada valor, f a frequência desse valor e Σ a soma sobre todos os valores. É a
+mesma conta da média ponderada, com as frequências no papel dos pesos.
 
 **Exemplo 2.** Numa prova, a nota 5 apareceu 2 vezes, a nota 6 apareceu 3 vezes, a nota 7 apareceu 4
 vezes e a nota 8 apareceu uma vez. Calcular a média.
-A soma dos produtos é 10 mais 18 mais 28 mais 8, o que dá 64. Foram 10 alunos, então a média é 6,4.
+A soma dos produtos é 10 + 18 + 28 + 8 = 64. Foram n = 10 alunos, então M = 64 / 10 = 6,4.
 
 #### Medidas de dispersão
 
-A **amplitude** é a diferença entre o maior e o menor valor. É rápida de calcular e usa apenas dois
-dados, o que a torna frágil.
+A **amplitude** é a diferença entre o maior e o menor valor:
 
-A ideia mais fina é olhar o quanto cada valor se afasta da média. Somar os desvios não funciona:
-essa soma dá sempre zero, porque os afastamentos para cima cancelam os afastamentos para baixo. Por
-isso se elevam os desvios ao quadrado antes de somar.
+A = x_{máx} - x_{mín}
 
-A **variância** é a média dos quadrados dos desvios em relação à média. O **desvio padrão** é a raiz
-quadrada da variância, e tem a vantagem de voltar à unidade original dos dados.
+onde A é a amplitude, x_{máx} o maior valor do conjunto e x_{mín} o menor. É rápida de calcular e
+usa apenas dois dados, o que a torna frágil.
+
+A ideia mais fina é olhar o quanto cada valor se afasta da média, ou seja, o desvio x - M. Somar os
+desvios não funciona: Σ(x - M) dá sempre zero, porque os afastamentos para cima cancelam os
+afastamentos para baixo. Por isso se elevam os desvios ao quadrado antes de somar.
+
+A **variância** é a média dos quadrados dos desvios em relação à média:
+
+V = Σ(x - M)^{2} / n
+
+onde V é a variância, x cada valor do conjunto, M a média, n a quantidade de valores e Σ a soma
+sobre todos os valores. O **desvio padrão** é a raiz quadrada da variância:
+
+DP = √V
+
+onde DP é o desvio padrão e V a variância. Ele tem a vantagem de voltar à unidade original dos
+dados.
 
 **Exemplo 3.** Calcular a variância e o desvio padrão de 2, 4, 5, 6 e 8.
-A média é 5. Os desvios são menos 3, menos 1, 0, 1 e 3, e seus quadrados são 9, 1, 0, 1 e 9, que
-somam 20. A variância é 20 dividido por 5, ou seja, 4, e o desvio padrão é 2.
+M = 5. Os desvios x - 5 são -3, -1, 0, 1 e 3, e seus quadrados (x - 5)^{2} são 9, 1, 0, 1 e 9, que
+somam 20. Então V = 20 / 5 = 4 e DP = √4 = 2.
 
 #### Mesma média, dispersões diferentes
 
 É aqui que a dispersão mostra serventia.
 
 **Exemplo 4.** Comparar os conjuntos 2, 4, 5, 6 e 8 com 3, 4, 5, 6 e 7.
-Os dois têm média 5. No primeiro, a soma dos quadrados dos desvios é 20 e a variância é 4. No
-segundo, essa soma é 10 e a variância é 2. Os dois conjuntos se organizam em torno do mesmo centro,
+Os dois têm M = 5. No primeiro, a soma dos quadrados dos desvios é 20 e V = 20 / 5 = 4. No segundo,
+essa soma é 10 e V = 10 / 5 = 2. Os dois conjuntos se organizam em torno do mesmo centro,
 mas o primeiro se espalha mais, e é isso que a variância mede.
 
 Uma consequência útil: somar uma constante a todos os valores desloca a média por essa constante e
@@ -171,56 +197,79 @@ tell those two cases apart, and that is why statistics works with two kinds of m
 
 #### Measures of central tendency
 
-The **mean** is the sum of the values divided by how many values there are. It uses every piece of
-data, which is a virtue, and for that very reason it is sensitive to extreme values.
+The **mean** is the sum of the values divided by how many values there are:
+
+M = S / n
+
+where M is the mean, S the sum of all the values and n how many values there are. It uses every
+piece of data, which is a virtue, and for that very reason it is sensitive to extreme values.
 
 The **median** is the value sitting in the middle once the data are put in order. With an even number
-of values, it is the mean of the two central ones. It ignores how big the extremes are and looks
-only at position, so it stands up well to a value far outside the range.
+of values, it is the mean of the two central ones:
+
+Md = (c_{1} + c_{2}) / 2
+
+where Md is the median and c_{1} and c_{2} are the two central values. It ignores how big the
+extremes are and looks only at position, so it stands up well to a value far outside the range.
 
 The **mode** is the value that repeats most often. A set may have more than one mode, or none at all.
 
 **Example 1.** Find the mean, the median and the mode of 2, 4, 4, 5, 6, 6, 6 and 7.
-The sum is 40 and there are 8 values, so the mean is 5. In order, the two central values are 5 and
-6, so the median is 5.5. The value repeating most often is 6, which appears three times, so the mode
-is 6.
+The sum is S = 40 and there are n = 8 values, so M = 40 / 8 = 5. In order, the two central values
+are 5 and 6, so Md = (5 + 6) / 2 = 5.5. The value repeating most often is 6, which appears three
+times, so the mode is 6.
 
 #### Frequency distribution
 
 When many data repeat, the list becomes a table: each value with the number of times it appears,
 called its frequency. The mean comes from multiplying each value by its frequency, adding everything
-up and dividing by the sum of the frequencies. It is the same calculation as a weighted mean, with
-the frequencies playing the part of the weights.
+up and dividing by the sum of the frequencies:
+
+M = Σ(x · f) / Σf
+
+where M is the mean, x each value, f the frequency of that value and Σ the sum over every value. It
+is the same calculation as a weighted mean, with the frequencies playing the part of the weights.
 
 **Example 2.** In a test, the mark 5 appeared 2 times, the mark 6 appeared 3 times, the mark 7
 appeared 4 times and the mark 8 appeared once. Find the mean.
-The sum of the products is 10 plus 18 plus 28 plus 8, which gives 64. There were 10 students, so the
-mean is 6.4.
+The sum of the products is 10 + 18 + 28 + 8 = 64. There were n = 10 students, so M = 64 / 10 = 6.4.
 
 #### Measures of dispersion
 
-The **range** is the difference between the largest and the smallest value. It is quick to work out
-and uses only two pieces of data, which makes it fragile.
+The **range** is the difference between the largest and the smallest value:
 
-The finer idea is to look at how far each value sits from the mean. Adding the deviations does not
-work: that sum is always zero, because the departures above cancel the departures below. So the
-deviations are squared before being added.
+R = x_{max} - x_{min}
 
-The **variance** is the mean of the squared deviations from the mean. The **standard deviation** is
-the square root of the variance, and it has the advantage of returning to the original unit of the
-data.
+where R is the range, x_{max} the largest value in the set and x_{min} the smallest. It is quick to
+work out and uses only two pieces of data, which makes it fragile.
+
+The finer idea is to look at how far each value sits from the mean, that is, at the deviation x - M.
+Adding the deviations does not work: Σ(x - M) is always zero, because the departures above cancel
+the departures below. So the deviations are squared before being added.
+
+The **variance** is the mean of the squared deviations from the mean:
+
+V = Σ(x - M)^{2} / n
+
+where V is the variance, x each value in the set, M the mean, n how many values there are and Σ the
+sum over every value. The **standard deviation** is the square root of the variance:
+
+SD = √V
+
+where SD is the standard deviation and V the variance. It has the advantage of returning to the
+original unit of the data.
 
 **Example 3.** Find the variance and the standard deviation of 2, 4, 5, 6 and 8.
-The mean is 5. The deviations are minus 3, minus 1, 0, 1 and 3, and their squares are 9, 1, 0, 1
-and 9, adding to 20. The variance is 20 divided by 5, that is, 4, and the standard deviation is 2.
+M = 5. The deviations x - 5 are -3, -1, 0, 1 and 3, and their squares (x - 5)^{2} are 9, 1, 0, 1
+and 9, adding to 20. So V = 20 / 5 = 4 and SD = √4 = 2.
 
 #### Same mean, different dispersions
 
 This is where dispersion earns its keep.
 
 **Example 4.** Compare the sets 2, 4, 5, 6 and 8 with 3, 4, 5, 6 and 7.
-Both have mean 5. In the first, the sum of the squared deviations is 20 and the variance is 4. In
-the second, that sum is 10 and the variance is 2. The two sets organise themselves around the same
+Both have M = 5. In the first, the sum of the squared deviations is 20 and V = 20 / 5 = 4. In the
+second, that sum is 10 and V = 10 / 5 = 2. The two sets organise themselves around the same
 centre, but the first spreads out more, and that is what the variance measures.
 
 One useful consequence: adding a constant to every value shifts the mean by that constant and does

@@ -3,13 +3,14 @@
  * Os dados das aulas não passam por aqui: ficam no IndexedDB, no aparelho.
  */
 
-var CACHE = 'apoio-educacional-v9';
+var CACHE = 'apoio-educacional-v10';
 
 var ARQUIVOS = [
   './',
   './index.html',
   './styles.css',
   './core.js',
+  './busca.js',
   './pdf.js',
   './store.js',
   './draw.js',
@@ -21,7 +22,10 @@ var ARQUIVOS = [
   './icons/favicon.png',
   // o indice dos temas entra no pacote inicial para a lista abrir sem internet.
   // o conteudo de cada serie e guardado sozinho, na primeira vez que for usado.
-  './banco/indice.json'
+  './banco/indice.json',
+  // o indice de busca acompanha o de temas: e ele que faz o campo de assunto
+  // achar por conteudo, e nao so por titulo.
+  './banco/busca.json'
 ];
 
 /* Não assume o controle sozinho: fica esperando. Quem manda trocar de versão

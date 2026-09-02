@@ -21,33 +21,63 @@ Interpretar dados é responder a duas perguntas: **onde está o centro** e **qua
 espalham**. Um número sozinho quase nunca conta a história inteira, e o exercício de prova costuma
 morar exatamente no ponto em que o resumo esconde algo.
 
-**Média.** Soma dos valores dividida pela quantidade. É sensível a valores extremos: um único salário
-muito alto puxa a média para cima sem que a maioria das pessoas ganhe mais.
+**Média.** Soma dos valores dividida pela quantidade:
+
+M = S / n
+
+onde M é a média, S a soma de todos os valores e n a quantidade de valores. É sensível a valores
+extremos: um único salário muito alto puxa a média para cima sem que a maioria das pessoas ganhe
+mais.
 
 **Mediana.** O valor do meio, com os dados em ordem. Com quantidade par de dados, é a média dos dois
-centrais. Resiste a extremos, e por isso é a medida preferida para renda e para preço de imóvel.
+centrais:
+
+Md = (c_{1} + c_{2}) / 2
+
+onde Md é a mediana e c_{1} e c_{2} são os dois valores centrais. Resiste a extremos, e por isso é a
+medida preferida para renda e para preço de imóvel.
 
 **Moda.** O valor que mais aparece. É a única medida que faz sentido para dados que não são números,
 como cor preferida.
 
-**Amplitude.** Diferença entre o maior e o menor valor. É a medida de dispersão mais simples.
+**Amplitude.** Diferença entre o maior e o menor valor:
 
-**Desvio padrão.** Mede o afastamento típico em relação à média. Calcula-se a média dos quadrados dos
-desvios, que é a variância, e extrai-se a raiz quadrada. Dois conjuntos com a mesma média podem ter
-dispersões completamente diferentes, e é o desvio padrão que separa os dois casos.
+A = x_{máx} - x_{mín}
+
+onde A é a amplitude, x_{máx} o maior valor do conjunto e x_{mín} o menor. É a medida de dispersão
+mais simples.
+
+**Desvio padrão.** Mede o afastamento típico em relação à média. A média dos quadrados dos desvios é
+a variância:
+
+V = Σ(x - M)^{2} / n
+
+e o desvio padrão é a raiz quadrada dela:
+
+DP = √V
+
+onde V é a variância, x cada valor do conjunto, M a média, n a quantidade de valores, Σ a soma sobre
+todos os valores e DP o desvio padrão. Dois conjuntos com a mesma média podem ter dispersões
+completamente diferentes, e é o desvio padrão que separa os dois casos.
 
 **Exemplo 1.** Calcular a média e a mediana de 4, 7, 8, 10 e 11.
-A soma é 40 e há cinco valores, então a média é 8. Colocando em ordem, o valor central também é 8.
+A soma é S = 40 e são n = 5 valores, então M = 40 / 5 = 8. Colocando em ordem, o valor central
+também é 8.
 Quando média e mediana coincidem, é sinal de que os dados são razoavelmente simétricos.
 
 #### Média ponderada
 
 Quando cada valor tem um peso, multiplica-se cada valor pelo seu peso, soma-se tudo e divide-se pela
-soma dos pesos.
+soma dos pesos:
+
+M_{p} = (v_{1} · p_{1} + v_{2} · p_{2} + v_{3} · p_{3}) / (p_{1} + p_{2} + p_{3})
+
+onde M_{p} é a média ponderada, v_{1}, v_{2} e v_{3} são os valores e p_{1}, p_{2} e p_{3} os pesos
+correspondentes.
 
 **Exemplo 2.** Uma nota final combina três avaliações: 7 com peso 1, 8 com peso 2 e 9 com peso 2.
 Qual a nota final?
-O numerador é 7 mais 16 mais 18, que dá 41. A soma dos pesos é 5. A nota final é 8,2.
+O numerador é 7 + 16 + 18 = 41. A soma dos pesos é 5. Então M_{p} = 41 / 5 = 8,2.
 
 #### Ler um gráfico descrito em palavras
 
@@ -57,8 +87,8 @@ vertical, e onde o eixo vertical começa.
 
 **Exemplo 3.** As vendas de uma loja foram 300 em janeiro, 450 em fevereiro e 360 em março. Qual a
 média e quais as variações mensais?
-A média é 1110 dividido por 3, ou seja, 370. De janeiro para fevereiro houve alta de 50%, porque 150
-sobre 300 é meio. De fevereiro para março houve queda de 20%, porque 90 sobre 450 é um quinto.
+A média é M = 1110 / 3 = 370. De janeiro para fevereiro houve alta de 50%, porque 150 / 300 é meio.
+De fevereiro para março houve queda de 20%, porque 90 / 450 é um quinto.
 
 #### Conclusões que os dados não sustentam
 
@@ -74,8 +104,8 @@ Esta é a parte mais cobrada, e a mais útil fora da escola. Alguns padrões se 
 **Exemplo 4.** Um gráfico mostra um índice de satisfação de 96, 97 e 98 pontos em três anos, com o
 eixo vertical começando em 95. As barras aparecem com alturas 1, 2 e 3. Qual é o crescimento real de
 96 para 98?
-O crescimento é 2 dividido por 96, que dá cerca de 2,08%. A barra mais alta tem o triplo da altura da
-primeira, mas o índice não triplicou. O corte do eixo é o responsável pela impressão errada.
+O crescimento é 2 / 96, que dá cerca de 2,08%. A barra mais alta tem o triplo da altura da primeira,
+mas o índice não triplicou. O corte do eixo é o responsável pela impressão errada.
 
 #### Erros comuns
 
@@ -160,8 +190,8 @@ inicial.
     sustenta porque de fevereiro para março as vendas caíram de 260 para 240 unidades.
 16. Não usam nenhum dos dois 70 pessoas. Usam apenas o aplicativo A 180 pessoas, o que corresponde a
     36% do total.
-17. A média é 7,6, pois é a soma de 280 com 480, dividida por 100. Ela não vale 7,5 porque as duas
-    escolas têm quantidades diferentes de alunos, e a média simples das médias ignoraria esse peso.
+17. A média é M = (280 + 480) / 100 = 7,6. Ela não vale 7,5 porque as duas escolas têm quantidades
+    diferentes de alunos, e a média simples das médias ignoraria esse peso.
 18. O valor final é 150 reais e a variação acumulada é de menos 25%. A afirmação não se sustenta,
     porque a alta incidiu sobre uma base menor do que a base da queda.
 
@@ -175,36 +205,62 @@ Reading data means answering two questions: **where is the centre** and **how sp
 values**. A single number almost never tells the whole story, and the hard exam question usually
 lives exactly where the summary hides something.
 
-**Mean.** The sum of the values divided by how many there are. It is sensitive to extreme values: one
-very high salary pulls the mean up without most people earning more.
+**Mean.** The sum of the values divided by how many there are:
+
+M = S / n
+
+where M is the mean, S the sum of all the values and n how many values there are. It is sensitive to
+extreme values: one very high salary pulls the mean up without most people earning more.
 
 **Median.** The middle value, with the data in order. With an even number of values, it is the mean
-of the two central ones. It resists extremes, which is why it is the preferred measure for income and
-for house prices.
+of the two central ones:
+
+Md = (c_{1} + c_{2}) / 2
+
+where Md is the median and c_{1} and c_{2} are the two central values. It resists extremes, which is
+why it is the preferred measure for income and for house prices.
 
 **Mode.** The value that appears most often. It is the only measure that makes sense for data that
 are not numbers, such as favourite colour.
 
-**Range.** The difference between the largest and the smallest value. It is the simplest measure of
-spread.
+**Range.** The difference between the largest and the smallest value:
 
-**Standard deviation.** It measures the typical distance from the mean. You take the mean of the
-squared deviations, which is the variance, and then the square root. Two sets with the same mean may
-have completely different spreads, and it is the standard deviation that tells the two cases apart.
+R = x_{max} - x_{min}
+
+where R is the range, x_{max} the largest value in the set and x_{min} the smallest. It is the
+simplest measure of spread.
+
+**Standard deviation.** It measures the typical distance from the mean. The mean of the squared
+deviations is the variance:
+
+V = Σ(x - M)^{2} / n
+
+and the standard deviation is its square root:
+
+SD = √V
+
+where V is the variance, x each value in the set, M the mean, n how many values there are, Σ the sum
+over every value and SD the standard deviation. Two sets with the same mean may have completely
+different spreads, and it is the standard deviation that tells the two cases apart.
 
 **Example 1.** Work out the mean and the median of 4, 7, 8, 10 and 11.
-The sum is 40 and there are five values, so the mean is 8. Put in order, the central value is also 8.
+The sum is S = 40 and there are n = 5 values, so M = 40 / 5 = 8. Put in order, the central value is
+also 8.
 When mean and median agree, it is a sign that the data are reasonably symmetric.
 
 #### Weighted mean
 
 When each value carries a weight, you multiply each value by its weight, add everything and divide by
-the sum of the weights.
+the sum of the weights:
+
+M_{w} = (v_{1} · p_{1} + v_{2} · p_{2} + v_{3} · p_{3}) / (p_{1} + p_{2} + p_{3})
+
+where M_{w} is the weighted mean, v_{1}, v_{2} and v_{3} are the values and p_{1}, p_{2} and p_{3}
+the matching weights.
 
 **Example 2.** A final grade combines three assessments: 7 with weight 1, 8 with weight 2 and 9 with
 weight 2. What is the final grade?
-The numerator is 7 plus 16 plus 18, which gives 41. The sum of the weights is 5. The final grade is
-8.2.
+The numerator is 7 + 16 + 18 = 41. The sum of the weights is 5. So M_{w} = 41 / 5 = 8.2.
 
 #### Reading a graph described in words
 
@@ -214,9 +270,8 @@ vertical axis, and where the vertical axis starts.
 
 **Example 3.** A shop sold 300 in January, 450 in February and 360 in March. What is the mean and
 what are the monthly changes?
-The mean is 1110 divided by 3, that is, 370. From January to February there was a rise of 50%,
-because 150 over 300 is one half. From February to March there was a fall of 20%, because 90 over 450
-is one fifth.
+The mean is M = 1110 / 3 = 370. From January to February there was a rise of 50%, because 150 / 300
+is one half. From February to March there was a fall of 20%, because 90 / 450 is one fifth.
 
 #### Conclusions the data do not support
 
@@ -232,8 +287,8 @@ This is the most examined part, and the most useful outside school. A few patter
 **Example 4.** A graph shows a satisfaction index of 96, 97 and 98 points across three years, with
 the vertical axis starting at 95. The bars appear with heights 1, 2 and 3. What is the real growth
 from 96 to 98?
-The growth is 2 divided by 96, which gives about 2.08%. The tallest bar is three times as tall as the
-first one, yet the index did not triple. The truncated axis is what creates the wrong impression.
+The growth is 2 / 96, which gives about 2.08%. The tallest bar is three times as tall as the first
+one, yet the index did not triple. The truncated axis is what creates the wrong impression.
 
 #### Common mistakes
 
@@ -316,9 +371,8 @@ back the starting value.
     hold because from February to March sales fell from 260 to 240 units.
 16. Neither of them is used by 70 people. Only app A is used by 180 people, which corresponds to 36%
     of the total.
-17. The mean is 7.6, since it is the sum of 280 and 480, divided by 100. It is not 7.5 because the
-    two schools have different numbers of students, and a plain mean of the means would ignore that
-    weight.
+17. The mean is M = (280 + 480) / 100 = 7.6. It is not 7.5 because the two schools have different
+    numbers of students, and a plain mean of the means would ignore that weight.
 18. The final value is 150 reais and the accumulated change is minus 25%. The claim does not hold,
     because the rise applied to a smaller base than the base of the fall.
 

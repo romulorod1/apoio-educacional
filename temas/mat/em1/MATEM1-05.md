@@ -27,25 +27,23 @@ regra nova é a que mais derruba gente em prova:
 
 **Multiplicar ou dividir os dois lados por um número negativo inverte o sentido da desigualdade.**
 
-Dá para conferir com números concretos. É verdade que 2 é menor que 5. Multiplicando os dois lados
-por menos 1, fica menos 2 e menos 5, e agora menos 2 é **maior** que menos 5. O sentido virou.
+Dá para conferir com números concretos. É verdade que 2 < 5. Multiplicando os dois lados por -1,
+ficam -2 e -5, e agora vale **-2 > -5**. O sentido virou.
 
 #### Inequação do primeiro grau
 
 O caminho é o mesmo da equação: isolar o x, com atenção redobrada ao sinal na hora de dividir.
 
-**Exemplo 1.** Resolver 3x menos 7 maior que 5.
-Somando 7 dos dois lados: 3x maior que 12. Dividindo por 3, que é positivo, o sentido se mantém:
-x maior que 4. O conjunto solução são os valores maiores que 4, sem incluir o 4.
+**Exemplo 1.** Resolver 3x - 7 > 5.
+Somando 7 dos dois lados: 3x > 12. Dividindo por 3, que é positivo, o sentido se mantém: x > 4.
+O conjunto solução é x > 4: o próprio 4 fica de fora.
 
-**Exemplo 2.** Resolver menos 2x mais 1 maior ou igual a 9.
-Subtraindo 1: menos 2x maior ou igual a 8. Agora divido por menos 2, que é negativo, então o sentido
-inverte: x menor ou igual a menos 4. O conjunto solução são os valores menores que menos 4,
-incluindo o menos 4.
+**Exemplo 2.** Resolver -2x + 1 ≥ 9.
+Subtraindo 1: -2x ≥ 8. Agora divido por -2, que é negativo, então o sentido inverte: x ≤ -4.
+O conjunto solução é x ≤ -4, e desta vez o próprio -4 entra.
 
-Quem esquece de virar o sinal encontra x maior ou igual a menos 4, que é exatamente o complementar
-da resposta certa. Vale sempre testar um valor: com x igual a menos 10, menos 2 vezes menos 10 mais
-1 dá 21, que de fato é maior ou igual a 9. Confirma.
+Quem esquece de virar o sinal encontra x ≥ -4, que é exatamente o complementar da resposta certa.
+Vale sempre testar um valor: com x = -10, temos -2 · (-10) + 1 = 21, e 21 ≥ 9 é verdade. Confirma.
 
 #### Inequação do segundo grau: o estudo do sinal
 
@@ -54,26 +52,25 @@ inequação quadrática:
 
 1. Passar tudo para um lado, deixando zero do outro.
 2. Achar as raízes da expressão quadrática.
-3. Decidir a concavidade pelo sinal do coeficiente que acompanha x ao quadrado.
+3. Decidir a concavidade pelo sinal do coeficiente que acompanha x^{2}.
 4. Ler no desenho mental da parábola onde ela fica acima ou abaixo do eixo horizontal.
 
 A regra que resume o passo 4: **entre as raízes o sinal é o contrário do sinal do coeficiente
 principal, e fora das raízes o sinal é o mesmo**.
 
-**Exemplo 3.** Resolver x ao quadrado menos 5x mais 6 menor que zero.
+**Exemplo 3.** Resolver x^{2} - 5x + 6 < 0.
 As raízes são 2 e 3, porque somam 5 e multiplicam 6. O coeficiente principal é 1, positivo, então a
-parábola abre para cima e fica **abaixo** do eixo apenas entre as raízes. O conjunto solução são os
-valores entre 2 e 3, sem incluir os extremos.
+parábola abre para cima e fica **abaixo** do eixo apenas entre as raízes. O conjunto solução é
+2 < x < 3.
 
-**Exemplo 4.** Resolver menos x ao quadrado mais 4x menor ou igual a zero.
-Fatorando, fica x vezes (menos x mais 4), com raízes 0 e 4. O coeficiente principal é menos 1, então
-a parábola abre para baixo e é negativa fora das raízes. Como a desigualdade aceita o zero, as
-raízes entram. O conjunto solução são os valores menores ou iguais a 0 reunidos com os valores
-maiores ou iguais a 4.
+**Exemplo 4.** Resolver -x^{2} + 4x ≤ 0.
+Fatorando, fica x · (-x + 4), com raízes 0 e 4. O coeficiente principal é -1, então a parábola abre
+para baixo e é negativa fora das raízes. Como a desigualdade aceita o zero, as raízes entram.
+O conjunto solução é x ≤ 0 ou x ≥ 4.
 
 Quando o discriminante é negativo, a parábola nunca toca o eixo, e o sinal é o mesmo em toda a reta.
-Isso resolve casos que parecem difíceis num piscar de olhos: x ao quadrado mais x mais 1 é sempre
-positivo, porque o discriminante vale menos 3 e a concavidade é para cima.
+Isso resolve casos que parecem difíceis num piscar de olhos: x^{2} + x + 1 é sempre positivo,
+porque o discriminante vale -3 e a concavidade é para cima.
 
 #### Inequação produto
 
@@ -81,18 +78,15 @@ Quando a inequação é um produto de fatores, cada fator recebe seu próprio es
 os sinais são multiplicados linha a linha. O quadro de sinais é a organização desse trabalho: uma
 linha por fator, uma coluna por região da reta, e uma última linha com o produto.
 
-**Exemplo 5.** Resolver (x menos 1) vezes (x mais 3) maior que zero.
-O primeiro fator zera em 1 e é positivo à direita de 1. O segundo zera em menos 3 e é positivo à
-direita de menos 3. Nas regiões da reta:
+**Exemplo 5.** Resolver (x - 1) · (x + 3) > 0.
+O primeiro fator zera em 1 e é positivo à direita de 1. O segundo zera em -3 e é positivo à direita
+de -3. Nas regiões da reta:
 
-- valores menores que menos 3: o primeiro fator é negativo e o segundo é negativo, então o produto é
-  positivo.
-- valores entre menos 3 e 1: o primeiro é negativo e o segundo é positivo, então o produto é
-  negativo.
-- valores maiores que 1: os dois são positivos, então o produto é positivo.
+- para x < -3: o primeiro fator é negativo e o segundo é negativo, então o produto é positivo.
+- para -3 < x < 1: o primeiro é negativo e o segundo é positivo, então o produto é negativo.
+- para x > 1: os dois são positivos, então o produto é positivo.
 
-O conjunto solução são os valores menores que menos 3 reunidos com os valores maiores que 1, sem
-incluir os extremos.
+O conjunto solução é x < -3 ou x > 1.
 
 #### Inequação quociente
 
@@ -100,25 +94,23 @@ O quadro de sinais é o mesmo, porque o sinal de uma divisão segue a mesma regr
 diferença é a condição de existência: **o denominador nunca pode ser zero**, mesmo quando a
 desigualdade aceita a igualdade. Essa é a armadilha clássica de prova.
 
-**Exemplo 6.** Resolver (x menos 2) dividido por (x mais 1) maior ou igual a zero.
-O numerador zera em 2 e o denominador zera em menos 1. Nas regiões:
+**Exemplo 6.** Resolver (x - 2)/(x + 1) ≥ 0.
+O numerador zera em 2 e o denominador zera em -1. Nas regiões:
 
-- valores menores que menos 1: numerador negativo e denominador negativo, quociente positivo.
-- valores entre menos 1 e 2: numerador negativo e denominador positivo, quociente negativo.
-- valores maiores que 2: os dois positivos, quociente positivo.
+- para x < -1: numerador negativo e denominador negativo, quociente positivo.
+- para -1 < x < 2: numerador negativo e denominador positivo, quociente negativo.
+- para x > 2: os dois positivos, quociente positivo.
 
-O valor 2 entra, porque anula o numerador e a desigualdade aceita o zero. O valor menos 1 fica de
-fora, porque anula o denominador. O conjunto solução são os valores menores que menos 1 reunidos com
-os valores maiores ou iguais a 2.
+O valor 2 entra, porque anula o numerador e a desigualdade aceita o zero. O valor -1 fica de fora,
+porque anula o denominador. O conjunto solução é x < -1 ou x ≥ 2.
 
 #### Sistema de inequações
 
 Num sistema, cada inequação é resolvida sozinha e no fim se toma a **interseção** dos conjuntos:
 serve o que satisfaz todas ao mesmo tempo.
 
-**Exemplo 7.** Resolver o sistema formado por 2x mais 1 maior que 5 e por x menos 4 menor que 0.
-A primeira dá x maior que 2. A segunda dá x menor que 4. A interseção são os valores entre 2 e 4,
-sem incluir os extremos.
+**Exemplo 7.** Resolver o sistema formado por 2x + 1 > 5 e por x - 4 < 0.
+A primeira dá x > 2. A segunda dá x < 4. A interseção é 2 < x < 4.
 
 #### Erros comuns
 
@@ -143,69 +135,61 @@ raízes pede reunião.
 
 **Bloco A. Fundamentos**
 
-1. Resolva 3x menos 7 maior que 5.
-2. Resolva menos 2x mais 1 maior ou igual a 9.
-3. Resolva 5x mais 2 menor que 3x mais 10.
-4. Resolva x ao quadrado menos 5x mais 6 menor que zero.
-5. Resolva x ao quadrado menos 9 maior ou igual a zero.
+1. Resolva 3x - 7 > 5.
+2. Resolva -2x + 1 ≥ 9.
+3. Resolva 5x + 2 < 3x + 10.
+4. Resolva x^{2} - 5x + 6 < 0.
+5. Resolva x^{2} - 9 ≥ 0.
 
 **Bloco B. Consolidação**
 
-6. Resolva menos x ao quadrado mais 4x menor ou igual a zero.
-7. Resolva x ao quadrado mais 6x mais 9 maior que zero.
-8. Resolva x ao quadrado mais x mais 1 maior que zero.
-9. Resolva (x menos 1) vezes (x mais 3) maior que zero.
-10. Resolva (x menos 2) dividido por (x mais 1) maior ou igual a zero.
-11. Resolva o sistema formado por 2x mais 1 maior que 5 e por x menos 4 menor que 0.
-12. Determine para quais valores de x o gráfico de f(x) igual a x ao quadrado menos 4 fica acima do
-    gráfico de g(x) igual a 3x.
-13. Uma fábrica tem lucro dado por L(x) igual a menos x ao quadrado mais 10x menos 16, onde x é a
-    quantidade produzida em milhares de peças. Para quais quantidades o lucro é positivo?
+6. Resolva -x^{2} + 4x ≤ 0.
+7. Resolva x^{2} + 6x + 9 > 0.
+8. Resolva x^{2} + x + 1 > 0.
+9. Resolva (x - 1) · (x + 3) > 0.
+10. Resolva (x - 2)/(x + 1) ≥ 0.
+11. Resolva o sistema formado por 2x + 1 > 5 e por x - 4 < 0.
+12. Determine para quais valores de x o gráfico de f(x) = x^{2} - 4 fica acima do gráfico de
+    g(x) = 3x.
+13. Uma fábrica tem lucro dado por L(x) = -x^{2} + 10x - 16, onde x é a quantidade produzida em
+    milhares de peças. Para quais quantidades o lucro é positivo?
 
 **Bloco C. Aprofundamento**
 
-14. Resolva a inequação produto (x menos 1) vezes (x mais 2) vezes (x menos 4) menor que zero,
-    montando o quadro de sinais completo.
-15. Resolva (x ao quadrado menos 4) dividido por (x menos 3) menor ou igual a zero, indicando a
-    condição de existência.
-16. Determine os valores de m para que a inequação x ao quadrado mais mx mais 4 maior que zero seja
-    verdadeira para todo x real.
-17. Determine o domínio da função f(x) igual à raiz quadrada de (x ao quadrado menos 5x mais 4).
-18. Resolva 1 dividido por x menor que 3, tomando cuidado com o sinal de x, e explique por que
-    multiplicar os dois lados por x não é um caminho válido aqui.
+14. Resolva a inequação produto (x - 1) · (x + 2) · (x - 4) < 0, montando o quadro de sinais
+    completo.
+15. Resolva (x^{2} - 4)/(x - 3) ≤ 0, indicando a condição de existência.
+16. Determine os valores de m para que a inequação x^{2} + mx + 4 > 0 seja verdadeira para todo
+    x real.
+17. Determine o domínio da função f(x) = √(x^{2} - 5x + 4).
+18. Resolva 1/x < 3, tomando cuidado com o sinal de x, e explique por que multiplicar os dois lados
+    por x não é um caminho válido aqui.
 
 ### Gabarito
 
-1. Os valores maiores que 4, sem incluir o 4.
-2. Os valores menores que menos 4, incluindo o menos 4. O sentido inverte porque se divide por menos
-   2.
-3. Os valores menores que 4, sem incluir o 4.
-4. Os valores entre 2 e 3, sem incluir os extremos.
-5. Os valores menores ou iguais a menos 3 reunidos com os valores maiores ou iguais a 3.
-6. Os valores menores ou iguais a 0 reunidos com os valores maiores ou iguais a 4.
-7. Todos os reais, com a única exceção de menos 3. A expressão é o quadrado de (x mais 3), que só
-   deixa de ser positiva quando x vale menos 3.
-8. Todos os reais. O discriminante vale menos 3 e a concavidade é para cima, então a parábola nunca
-   toca o eixo.
-9. Os valores menores que menos 3 reunidos com os valores maiores que 1, sem incluir os extremos.
-10. Os valores menores que menos 1 reunidos com os valores maiores ou iguais a 2. O menos 1 fica de
-    fora porque anula o denominador.
-11. Os valores entre 2 e 4, sem incluir os extremos.
-12. Os valores menores que menos 1 reunidos com os valores maiores que 4, sem incluir os extremos.
-    A condição é x ao quadrado menos 4 maior que 3x.
-13. As quantidades entre 2 e 8, sem incluir os extremos, ou seja, entre 2 mil e 8 mil peças.
-14. Os valores menores que menos 2 reunidos com os valores entre 1 e 4, sem incluir os extremos. As
-    raízes são menos 2, 1 e 4, e o produto é negativo nas duas regiões indicadas.
-15. Os valores menores ou iguais a menos 2 reunidos com os valores entre 2 e 3, incluindo o 2 e sem
-    incluir o 3. A condição de existência é x diferente de 3.
-16. Os valores entre menos 4 e 4, sem incluir os extremos. É preciso que o discriminante, que vale m
-    ao quadrado menos 16, seja negativo.
-17. Os valores menores ou iguais a 1 reunidos com os valores maiores ou iguais a 4, porque o radicando
-    precisa ser maior ou igual a zero.
-18. Os valores menores que 0 reunidos com os valores maiores que um terço, sem incluir os extremos.
-    Multiplicar os dois lados por x não vale porque o sinal de x é desconhecido, e multiplicar por
-    valor negativo inverteria o sentido da desigualdade. O caminho correto é passar tudo para um lado
-    e estudar o sinal de (1 menos 3x) dividido por x.
+1. x > 4.
+2. x ≤ -4. O sentido inverte porque se divide por -2.
+3. x < 4.
+4. 2 < x < 3.
+5. x ≤ -3 ou x ≥ 3.
+6. x ≤ 0 ou x ≥ 4.
+7. Todos os reais, com a única exceção de -3. A expressão é (x + 3)^{2}, que só deixa de ser
+   positiva quando x = -3.
+8. Todos os reais. O discriminante vale -3 e a concavidade é para cima, então a parábola nunca toca
+   o eixo.
+9. x < -3 ou x > 1.
+10. x < -1 ou x ≥ 2. O valor -1 fica de fora porque anula o denominador.
+11. 2 < x < 4.
+12. x < -1 ou x > 4. A condição é x^{2} - 4 > 3x.
+13. 2 < x < 8, ou seja, entre 2 mil e 8 mil peças.
+14. x < -2 ou 1 < x < 4. As raízes são -2, 1 e 4, e o produto é negativo nas duas regiões
+    indicadas.
+15. x ≤ -2 ou 2 ≤ x < 3. A condição de existência é x ≠ 3.
+16. -4 < m < 4. É preciso que o discriminante, que vale m^{2} - 16, seja negativo.
+17. x ≤ 1 ou x ≥ 4, porque é preciso ter x^{2} - 5x + 4 ≥ 0 dentro da raiz.
+18. x < 0 ou x > 1/3. Multiplicar os dois lados por x não vale porque o sinal de x é desconhecido, e
+    multiplicar por valor negativo inverteria o sentido da desigualdade. O caminho correto é passar
+    tudo para um lado e estudar o sinal de (1 - 3x)/x.
 
 ## EN
 
@@ -223,25 +207,24 @@ is the one that trips most students up in tests:
 
 **Multiplying or dividing both sides by a negative number reverses the direction of the inequality.**
 
-You can check this with concrete numbers. It is true that 2 is less than 5. Multiplying both sides by
-minus 1 gives minus 2 and minus 5, and now minus 2 is **greater** than minus 5. The direction flipped.
+You can check this with concrete numbers. It is true that 2 < 5. Multiplying both sides by -1 gives -2
+and -5, and now **-2 > -5** holds. The direction flipped.
 
 #### First degree inequalities
 
 The route is the same as for equations: isolate x, with extra care about the sign when you divide.
 
-**Example 1.** Solve 3x minus 7 greater than 5.
-Adding 7 to both sides: 3x greater than 12. Dividing by 3, which is positive, keeps the direction:
-x greater than 4. The solution set is the values greater than 4, not including 4.
+**Example 1.** Solve 3x - 7 > 5.
+Adding 7 to both sides: 3x > 12. Dividing by 3, which is positive, keeps the direction: x > 4.
+The solution set is x > 4: 4 itself is left out.
 
-**Example 2.** Solve minus 2x plus 1 greater than or equal to 9.
-Subtracting 1: minus 2x greater than or equal to 8. Now I divide by minus 2, which is negative, so the
-direction reverses: x less than or equal to minus 4. The solution set is the values less than minus 4,
-including minus 4.
+**Example 2.** Solve -2x + 1 ≥ 9.
+Subtracting 1: -2x ≥ 8. Now I divide by -2, which is negative, so the direction reverses: x ≤ -4.
+The solution set is x ≤ -4, and this time -4 itself is included.
 
-Anyone who forgets to flip the sign gets x greater than or equal to minus 4, which is exactly the
-complement of the right answer. It is always worth testing a value: with x equal to minus 10, minus 2
-times minus 10 plus 1 gives 21, which is indeed greater than or equal to 9. That confirms it.
+Anyone who forgets to flip the sign gets x ≥ -4, which is exactly the complement of the right answer.
+It is always worth testing a value: with x = -10, we get -2 · (-10) + 1 = 21, and 21 ≥ 9 is true.
+That confirms it.
 
 #### Second degree inequalities: sign analysis
 
@@ -250,26 +233,25 @@ same for every quadratic inequality:
 
 1. Move everything to one side, leaving zero on the other.
 2. Find the roots of the quadratic expression.
-3. Decide the concavity from the sign of the coefficient of x squared.
+3. Decide the concavity from the sign of the coefficient of x^{2}.
 4. Read off the mental picture of the parabola where it sits above or below the horizontal axis.
 
 The rule that sums up step 4: **between the roots the sign is the opposite of the sign of the leading
 coefficient, and outside the roots the sign is the same**.
 
-**Example 3.** Solve x squared minus 5x plus 6 less than zero.
+**Example 3.** Solve x^{2} - 5x + 6 < 0.
 The roots are 2 and 3, because they add to 5 and multiply to 6. The leading coefficient is 1, which is
 positive, so the parabola opens upwards and sits **below** the axis only between the roots. The
-solution set is the values between 2 and 3, not including the endpoints.
+solution set is 2 < x < 3.
 
-**Example 4.** Solve minus x squared plus 4x less than or equal to zero.
-Factoring gives x times (minus x plus 4), with roots 0 and 4. The leading coefficient is minus 1, so
-the parabola opens downwards and is negative outside the roots. Since the inequality accepts zero, the
-roots are included. The solution set is the values less than or equal to 0 together with the values
-greater than or equal to 4.
+**Example 4.** Solve -x^{2} + 4x ≤ 0.
+Factoring gives x · (-x + 4), with roots 0 and 4. The leading coefficient is -1, so the parabola opens
+downwards and is negative outside the roots. Since the inequality accepts zero, the roots are
+included. The solution set is x ≤ 0 or x ≥ 4.
 
 When the discriminant is negative the parabola never touches the axis, and the sign is the same all
-along the line. That settles cases that look hard in a blink: x squared plus x plus 1 is always
-positive, because the discriminant is minus 3 and the concavity is upwards.
+along the line. That settles cases that look hard in a blink: x^{2} + x + 1 is always
+positive, because the discriminant is -3 and the concavity is upwards.
 
 #### Product inequalities
 
@@ -277,18 +259,15 @@ When the inequality is a product of factors, each factor gets its own sign analy
 are multiplied row by row. The sign chart organises that work: one row per factor, one column per
 region of the line, and a final row with the product.
 
-**Example 5.** Solve (x minus 1) times (x plus 3) greater than zero.
-The first factor is zero at 1 and positive to the right of 1. The second is zero at minus 3 and
-positive to the right of minus 3. In the regions of the line:
+**Example 5.** Solve (x - 1) · (x + 3) > 0.
+The first factor is zero at 1 and positive to the right of 1. The second is zero at -3 and positive to
+the right of -3. In the regions of the line:
 
-- values less than minus 3: the first factor is negative and the second is negative, so the product is
-  positive.
-- values between minus 3 and 1: the first is negative and the second is positive, so the product is
-  negative.
-- values greater than 1: both are positive, so the product is positive.
+- for x < -3: the first factor is negative and the second is negative, so the product is positive.
+- for -3 < x < 1: the first is negative and the second is positive, so the product is negative.
+- for x > 1: both are positive, so the product is positive.
 
-The solution set is the values less than minus 3 together with the values greater than 1, not
-including the endpoints.
+The solution set is x < -3 or x > 1.
 
 #### Quotient inequalities
 
@@ -296,25 +275,23 @@ The sign chart is the same, because the sign of a division follows the same rule
 difference is the existence condition: **the denominator can never be zero**, even when the inequality
 accepts equality. This is the classic test trap.
 
-**Example 6.** Solve (x minus 2) divided by (x plus 1) greater than or equal to zero.
-The numerator is zero at 2 and the denominator is zero at minus 1. In the regions:
+**Example 6.** Solve (x - 2)/(x + 1) ≥ 0.
+The numerator is zero at 2 and the denominator is zero at -1. In the regions:
 
-- values less than minus 1: negative numerator and negative denominator, positive quotient.
-- values between minus 1 and 2: negative numerator and positive denominator, negative quotient.
-- values greater than 2: both positive, positive quotient.
+- for x < -1: negative numerator and negative denominator, positive quotient.
+- for -1 < x < 2: negative numerator and positive denominator, negative quotient.
+- for x > 2: both positive, positive quotient.
 
 The value 2 is included, because it makes the numerator zero and the inequality accepts zero. The
-value minus 1 is left out, because it makes the denominator zero. The solution set is the values less
-than minus 1 together with the values greater than or equal to 2.
+value -1 is left out, because it makes the denominator zero. The solution set is x < -1 or x ≥ 2.
 
 #### Systems of inequalities
 
 In a system, each inequality is solved on its own and at the end you take the **intersection** of the
 sets: what works is what satisfies all of them at the same time.
 
-**Example 7.** Solve the system made of 2x plus 1 greater than 5 and x minus 4 less than 0.
-The first gives x greater than 2. The second gives x less than 4. The intersection is the values
-between 2 and 4, not including the endpoints.
+**Example 7.** Solve the system made of 2x + 1 > 5 and x - 4 < 0.
+The first gives x > 2. The second gives x < 4. The intersection is 2 < x < 4.
 
 #### Common mistakes
 
@@ -339,70 +316,61 @@ lies outside the roots calls for union.
 
 **Block A. Fundamentals**
 
-1. Solve 3x minus 7 greater than 5.
-2. Solve minus 2x plus 1 greater than or equal to 9.
-3. Solve 5x plus 2 less than 3x plus 10.
-4. Solve x squared minus 5x plus 6 less than zero.
-5. Solve x squared minus 9 greater than or equal to zero.
+1. Solve 3x - 7 > 5.
+2. Solve -2x + 1 ≥ 9.
+3. Solve 5x + 2 < 3x + 10.
+4. Solve x^{2} - 5x + 6 < 0.
+5. Solve x^{2} - 9 ≥ 0.
 
 **Block B. Building up**
 
-6. Solve minus x squared plus 4x less than or equal to zero.
-7. Solve x squared plus 6x plus 9 greater than zero.
-8. Solve x squared plus x plus 1 greater than zero.
-9. Solve (x minus 1) times (x plus 3) greater than zero.
-10. Solve (x minus 2) divided by (x plus 1) greater than or equal to zero.
-11. Solve the system made of 2x plus 1 greater than 5 and x minus 4 less than 0.
-12. Find for which values of x the graph of f(x) equals x squared minus 4 lies above the graph of
-    g(x) equals 3x.
-13. A factory has profit given by L(x) equals minus x squared plus 10x minus 16, where x is the
-    quantity produced in thousands of parts. For which quantities is the profit positive?
+6. Solve -x^{2} + 4x ≤ 0.
+7. Solve x^{2} + 6x + 9 > 0.
+8. Solve x^{2} + x + 1 > 0.
+9. Solve (x - 1) · (x + 3) > 0.
+10. Solve (x - 2)/(x + 1) ≥ 0.
+11. Solve the system made of 2x + 1 > 5 and x - 4 < 0.
+12. Find for which values of x the graph of f(x) = x^{2} - 4 lies above the graph of
+    g(x) = 3x.
+13. A factory has profit given by L(x) = -x^{2} + 10x - 16, where x is the quantity produced in
+    thousands of parts. For which quantities is the profit positive?
 
 **Block C. Going further**
 
-14. Solve the product inequality (x minus 1) times (x plus 2) times (x minus 4) less than zero,
-    building the complete sign chart.
-15. Solve (x squared minus 4) divided by (x minus 3) less than or equal to zero, stating the existence
-    condition.
-16. Find the values of m for which the inequality x squared plus mx plus 4 greater than zero holds for
-    every real x.
-17. Find the domain of the function f(x) equal to the square root of (x squared minus 5x plus 4).
-18. Solve 1 divided by x less than 3, being careful with the sign of x, and explain why multiplying
-    both sides by x is not a valid route here.
+14. Solve the product inequality (x - 1) · (x + 2) · (x - 4) < 0, building the complete sign
+    chart.
+15. Solve (x^{2} - 4)/(x - 3) ≤ 0, stating the existence condition.
+16. Find the values of m for which the inequality x^{2} + mx + 4 > 0 holds for every
+    real x.
+17. Find the domain of the function f(x) = √(x^{2} - 5x + 4).
+18. Solve 1/x < 3, being careful with the sign of x, and explain why multiplying both sides
+    by x is not a valid route here.
 
 ### Answer key
 
-1. The values greater than 4, not including 4.
-2. The values less than minus 4, including minus 4. The direction reverses because you divide by minus
-   2.
-3. The values less than 4, not including 4.
-4. The values between 2 and 3, not including the endpoints.
-5. The values less than or equal to minus 3 together with the values greater than or equal to 3.
-6. The values less than or equal to 0 together with the values greater than or equal to 4.
-7. All real numbers, with the single exception of minus 3. The expression is the square of (x plus 3),
-   which stops being positive only when x is minus 3.
-8. All real numbers. The discriminant is minus 3 and the concavity is upwards, so the parabola never
+1. x > 4.
+2. x ≤ -4. The direction reverses because you divide by -2.
+3. x < 4.
+4. 2 < x < 3.
+5. x ≤ -3 or x ≥ 3.
+6. x ≤ 0 or x ≥ 4.
+7. All real numbers, with the single exception of -3. The expression is (x + 3)^{2}, which stops
+   being positive only when x = -3.
+8. All real numbers. The discriminant is -3 and the concavity is upwards, so the parabola never
    touches the axis.
-9. The values less than minus 3 together with the values greater than 1, not including the endpoints.
-10. The values less than minus 1 together with the values greater than or equal to 2. Minus 1 is left
-    out because it makes the denominator zero.
-11. The values between 2 and 4, not including the endpoints.
-12. The values less than minus 1 together with the values greater than 4, not including the endpoints.
-    The condition is x squared minus 4 greater than 3x.
-13. The quantities between 2 and 8, not including the endpoints, that is, between 2 thousand and 8
-    thousand parts.
-14. The values less than minus 2 together with the values between 1 and 4, not including the endpoints.
-    The roots are minus 2, 1 and 4, and the product is negative in the two regions indicated.
-15. The values less than or equal to minus 2 together with the values between 2 and 3, including 2 and
-    not including 3. The existence condition is x different from 3.
-16. The values between minus 4 and 4, not including the endpoints. The discriminant, which is m squared
-    minus 16, has to be negative.
-17. The values less than or equal to 1 together with the values greater than or equal to 4, because the
-    expression under the root has to be greater than or equal to zero.
-18. The values less than 0 together with the values greater than one third, not including the endpoints.
-    Multiplying both sides by x is not allowed because the sign of x is unknown, and multiplying by a
-    negative value would reverse the direction of the inequality. The correct route is to move
-    everything to one side and study the sign of (1 minus 3x) divided by x.
+9. x < -3 or x > 1.
+10. x < -1 or x ≥ 2. The value -1 is left out because it makes the denominator zero.
+11. 2 < x < 4.
+12. x < -1 or x > 4. The condition is x^{2} - 4 > 3x.
+13. 2 < x < 8, that is, between 2 thousand and 8 thousand parts.
+14. x < -2 or 1 < x < 4. The roots are -2, 1 and 4, and the product is negative in the two regions
+    indicated.
+15. x ≤ -2 or 2 ≤ x < 3. The existence condition is x ≠ 3.
+16. -4 < m < 4. The discriminant, which is m^{2} - 16, has to be negative.
+17. x ≤ 1 or x ≥ 4, because we need x^{2} - 5x + 4 ≥ 0 under the root.
+18. x < 0 or x > 1/3. Multiplying both sides by x is not allowed because the sign of x is unknown, and
+    multiplying by a negative value would reverse the direction of the inequality. The correct route
+    is to move everything to one side and study the sign of (1 - 3x)/x.
 
 ## VERIFICACAO
 

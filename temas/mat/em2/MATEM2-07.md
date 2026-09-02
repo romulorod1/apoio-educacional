@@ -28,7 +28,7 @@ decisão, de quantos modos ela pode ser tomada.
 #### O princípio multiplicativo
 
 Se uma decisão pode ser tomada de m modos e, para cada um deles, uma segunda decisão pode ser tomada
-de n modos, então o par de decisões pode ser tomado de m vezes n modos.
+de n modos, então o par de decisões pode ser tomado de m · n modos.
 
 O princípio vale para quantas etapas forem necessárias: multiplicam-se as possibilidades de cada
 etapa. Há uma condição escondida que precisa ser respeitada: **o número de possibilidades de uma
@@ -37,8 +37,8 @@ previsível, como acontece quando não se pode repetir, mas não pode depender d
 escolhido antes.
 
 **Exemplo 1.** Com 4 camisas e 3 calças, quantos conjuntos diferentes se pode montar?
-São duas etapas: escolher a camisa, de 4 modos, e escolher a calça, de 3 modos. O total é 4 vezes 3,
-que dá 12.
+São duas etapas: escolher a camisa, de 4 modos, e escolher a calça, de 3 modos. O total é
+4 × 3 = 12.
 
 #### Quando as escolhas interferem umas nas outras
 
@@ -47,7 +47,7 @@ que a redução seja a mesma qualquer que tenha sido a escolha anterior.
 
 **Exemplo 2.** Quantas senhas de 3 algarismos distintos existem?
 Para o primeiro algarismo há 10 opções. Escolhido ele, sobram 9 para o segundo e 8 para o terceiro.
-O total é 10 vezes 9 vezes 8, que dá 720.
+O total é 10 × 9 × 8 = 720.
 
 #### Comece pela etapa mais restrita
 
@@ -58,7 +58,7 @@ escolhido antes.
 **Exemplo 3.** Quantos números de 4 algarismos distintos existem?
 A posição do milhar é a restrita, porque não aceita o zero: são 9 opções. Para a segunda posição
 voltam a valer os dez algarismos, menos o que já foi usado, o que dá 9. Depois sobram 8 e 7. O total
-é 9 vezes 9 vezes 8 vezes 7, que dá 4536.
+é 9 × 9 × 8 × 7 = 4536.
 
 #### O princípio aditivo
 
@@ -75,7 +75,7 @@ sem restrição e subtrai-se o que não interessa.
 **Exemplo 4.** Quantos números de 3 algarismos têm ao menos um algarismo igual a 5?
 Números de 3 algarismos existem 900, de 100 a 999. Os que não têm nenhum 5 são contados assim: 8
 opções para a centena, que exclui o zero e o cinco, e 9 para cada uma das outras duas posições, o
-que dá 8 vezes 9 vezes 9, ou seja, 648. Logo, com ao menos um 5 existem 900 menos 648, que dá 252.
+que dá 8 × 9 × 9 = 648. Logo, com ao menos um 5 existem 900 - 648 = 252.
 
 #### Erros comuns
 
@@ -132,9 +132,9 @@ só depois se contam as demais com o que sobrou.
     em cadeiras vizinhas. De quantos modos as seis podem se sentar?
 17. Usando os algarismos 0, 1, 2, 3, 4, 5 e 6, quantos números ímpares de 5 algarismos distintos
     podem ser formados?
-18. Para contar quantos números de 3 algarismos distintos existem, um estudante calculou 10 vezes 9
-    vezes 8 e obteve 720. Explique o erro, faça a contagem correta e diga quantas das configurações
-    contadas por ele não são números de 3 algarismos.
+18. Para contar quantos números de 3 algarismos distintos existem, um estudante calculou
+    10 × 9 × 8 e obteve 720. Explique o erro, faça a contagem correta e diga quantas das
+    configurações contadas por ele não são números de 3 algarismos.
 
 ### Gabarito
 
@@ -159,8 +159,8 @@ só depois se contam as demais com o que sobrou.
     internas.
 17. 900. O algarismo final tem 3 opções ímpares, o primeiro tem 5 opções, porque perde o zero e o
     algarismo já usado, e as três posições do meio ficam com 5, 4 e 3 opções.
-18. A conta 10 vezes 9 vezes 8 permite que o zero ocupe a primeira posição. A contagem correta é 9
-    vezes 9 vezes 8, que dá 648. Entre as 720 configurações contadas, 72 começam por zero e não são
+18. A conta 10 × 9 × 8 permite que o zero ocupe a primeira posição. A contagem correta é
+    9 × 9 × 8 = 648. Entre as 720 configurações contadas, 72 começam por zero e não são
     números de 3 algarismos.
 
 ## EN
@@ -180,7 +180,7 @@ decision, in how many ways it can be made.
 #### The multiplication principle
 
 If one decision can be made in m ways and, for each of them, a second decision can be made in n
-ways, then the pair of decisions can be made in m times n ways.
+ways, then the pair of decisions can be made in m · n ways.
 
 The principle works for as many stages as needed: you multiply the possibilities at each stage.
 There is a hidden condition that must be respected: **the number of possibilities at one stage
@@ -191,7 +191,7 @@ before.
 **Example 1.** With 4 shirts and 3 pairs of trousers, how many different outfits can you put
 together?
 There are two stages: choosing the shirt, in 4 ways, and choosing the trousers, in 3 ways. The total
-is 4 times 3, which gives 12.
+is 4 × 3 = 12.
 
 #### When the choices interfere with one another
 
@@ -200,7 +200,7 @@ reduction is the same whatever the previous choice was.
 
 **Example 2.** How many passwords with 3 distinct digits are there?
 For the first digit there are 10 options. Once it is chosen, 9 are left for the second and 8 for the
-third. The total is 10 times 9 times 8, which gives 720.
+third. The total is 10 × 9 × 8 = 720.
 
 #### Start with the most restricted stage
 
@@ -211,7 +211,7 @@ chosen earlier.
 **Example 3.** How many 4-digit numbers with distinct digits are there?
 The thousands position is the restricted one, since it does not accept zero: there are 9 options.
 For the second position all ten digits are back in play, minus the one already used, which gives 9.
-Then 8 and 7 are left. The total is 9 times 9 times 8 times 7, which gives 4536.
+Then 8 and 7 are left. The total is 9 × 9 × 8 × 7 = 4536.
 
 #### The addition principle
 
@@ -228,8 +228,7 @@ total with no restriction and subtract what does not interest you.
 **Example 4.** How many 3-digit numbers have at least one digit equal to 5?
 There are 900 three-digit numbers, from 100 to 999. Those with no 5 are counted like this: 8 options
 for the hundreds digit, which rules out zero and five, and 9 for each of the other two positions,
-which gives 8 times 9 times 9, that is, 648. So numbers with at least one 5 are 900 minus 648, which
-gives 252.
+which gives 8 × 9 × 9 = 648. So numbers with at least one 5 are 900 - 648 = 252.
 
 #### Common mistakes
 
@@ -286,9 +285,9 @@ settled, and only then are the others counted with what is left.
     chairs. In how many ways can the six of them be seated?
 17. Using the digits 0, 1, 2, 3, 4, 5 and 6, how many odd 5-digit numbers with distinct digits can
     be formed?
-18. To count how many 3-digit numbers with distinct digits there are, a student worked out 10 times
-    9 times 8 and got 720. Explain the mistake, carry out the correct count, and say how many of the
-    configurations counted that way are not 3-digit numbers.
+18. To count how many 3-digit numbers with distinct digits there are, a student worked out
+    10 × 9 × 8 and got 720. Explain the mistake, carry out the correct count, and say how many of
+    the configurations counted that way are not 3-digit numbers.
 
 ### Answer key
 
@@ -315,8 +314,8 @@ settled, and only then are the others counted with what is left.
     internal orders.
 17. 900. The final digit has 3 odd options, the first has 5 options, since it loses zero and the
     digit already used, and the three middle positions are left with 5, 4 and 3 options.
-18. The calculation 10 times 9 times 8 lets zero take the first position. The correct count is 9
-    times 9 times 8, which gives 648. Among the 720 configurations counted that way, 72 start with
+18. The calculation 10 × 9 × 8 lets zero take the first position. The correct count is
+    9 × 9 × 8 = 648. Among the 720 configurations counted that way, 72 start with
     zero and are not 3-digit numbers.
 
 ## VERIFICACAO

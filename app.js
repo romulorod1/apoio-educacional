@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.7.0';
+  var VERSAO = '1.8.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -18,6 +18,33 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.8.0',
+      itens: [
+        'A busca do material de aula ficou muito melhor. Antes, procurar por "equação do ' +
+        'primeiro grau" não achava nada, porque no banco o assunto está escrito como ' +
+        '"Equações do 1º grau". Agora acha, e digitar mais palavras não atrapalha mais.',
+        'Acento e maiúscula deixaram de importar: "fracao" acha o mesmo que "fração".',
+        'A busca também procura dentro dos exercícios e da explicação, e não só no nome do ' +
+        'assunto. Procurar por "pitágoras" traz o Teorema de Pitágoras e mais quatro assuntos ' +
+        'que usam Pitágoras nos exercícios, com uma etiqueta dizendo de onde cada um veio.',
+        'Ela entende o nome que o aluno usa. "Bhaskara" acha equação do 2º grau, mesmo essa ' +
+        'palavra não estando escrita em lugar nenhum. Vale também para PA, PG, MMC e ' +
+        'análise combinatória.',
+        'Dá para escrever o ano junto do assunto: "fração 7 ano" deixa só o 7º ano na lista.',
+        'Erro de digitação de uma letra é corrigido sozinho, e o aplicativo avisa que corrigiu.',
+        'A busca agora atravessa os anos escolares, porque o assunto que trava o aluno costuma ' +
+        'ser de um ano atrás. Cada resultado de outro ano vem com o ano marcado.',
+        'Quando você procura um assunto que ainda não existe no banco, em vez da tela vazia ' +
+        'aparece o que há de mais perto, e o que você digitou fica anotado em Ajustes.',
+        'As contas do material passaram a ser escritas com símbolos, e não por extenso. Onde ' +
+        'estava "o montante é C vezes (1 mais i) elevado a t" agora está a fórmula de verdade, ' +
+        'com o expoente no lugar certo.',
+        'Três consertos no PDF: a tabela não escreve mais uma coluna por cima da outra, o ' +
+        'subtítulo não fica mais sozinho no pé da página longe do seu conteúdo, e a folga ' +
+        'entre o cabeçalho e o título diminuiu.'
+      ]
+    },
     {
       versao: '1.7.0',
       itens: [
@@ -180,6 +207,25 @@
       e.appendChild(typeof f === 'string' ? document.createTextNode(f) : f);
     });
     return e;
+  }
+
+  /* Os enunciados do banco escrevem expoente e indice como x^{2} e a_{1}, que
+   * e a marcacao que o gerador de PDF entende. Na tela isso apareceria cru, e
+   * ela leria "Calcule 2^{5}" em vez de "Calcule 2 elevado a 5". Aqui a mesma
+   * marcacao vira sobrescrito e subscrito de verdade, que o navegador desenha
+   * melhor do que o PDF. */
+  function comNotacao(texto) {
+    var partes = [];
+    var resto = String(texto == null ? '' : texto);
+    var re = /([\^_])\{([^}]*)\}/;
+    var m;
+    while ((m = re.exec(resto))) {
+      if (m.index) partes.push(document.createTextNode(resto.slice(0, m.index)));
+      partes.push(el(m[1] === '^' ? 'sup' : 'sub', { texto: m[2] }));
+      resto = resto.slice(m.index + m[0].length);
+    }
+    if (resto) partes.push(document.createTextNode(resto));
+    return partes;
   }
 
   function abrirModal(id) { $('#' + id).classList.add('aberto'); }
@@ -517,6 +563,10 @@
         $$('.tela').forEach(function (t) { t.classList.remove('ativa'); });
         $('#tela-' + b.dataset.tela).classList.add('ativa');
         $('.conteudo').scrollTop = 0;
+        /* Ajustes mostra coisa que muda enquanto ela usa: a data da última
+         * cópia, o estado da versão e as buscas que não acharam nada. Sem
+         * redesenhar ao abrir, ela via o estado de quando o aplicativo subiu. */
+        if (b.dataset.tela === 'ajustes') desenharAjustes();
       });
     });
 
@@ -2165,24 +2215,53 @@
     });
   }
 
+  /* Ícones da barra da folha. SVG inline, para acompanhar a cor do botão e não
+   * depender de fonte de emoji, que muda de aparelho para aparelho. */
+  function svg(caminho, extra) {
+    return '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" ' +
+      'fill="none" stroke="currentColor" stroke-width="1.7" ' +
+      'stroke-linecap="round" stroke-linejoin="round">' + caminho + (extra || '') + '</svg>';
+  }
+
+  var ICONES = {
+    // caneta apontando para baixo e à esquerda, com a ponta marcada
+    caneta: svg('<path d="M16.8 3.6a2 2 0 0 1 2.8 2.8L8.4 17.6 4 20l2.4-4.4z"/>' +
+      '<path d="M14.6 5.8l3.6 3.6"/>'),
+    // marca-texto: ponta chanfrada e o rastro largo embaixo
+    marcatexto: svg('<path d="M14.5 3.5l6 6-7.4 7.4H7.1v-6z"/>' +
+      '<path d="M4 21h16" stroke-width="3"/>'),
+    // borracha: o bloco inclinado apoiado na linha, que é como se desenha borracha
+    borracha: svg('<path d="M8.6 19.5H20"/>' +
+      '<path d="M14.2 4.6l5.2 5.2a1.6 1.6 0 0 1 0 2.3l-7.4 7.4H7.6l-3.1-3.1a1.6 1.6 0 0 1 0-2.3z"/>' +
+      '<path d="M10.1 8.7l5.2 5.2"/>'),
+    // texto: o T clássico, mas desenhado
+    texto: svg('<path d="M5 6.5V5h14v1.5"/><path d="M12 5v14"/><path d="M9 19h6"/>'),
+    // mover: as quatro setas
+    selecao: svg('<path d="M12 3v18M3 12h18"/>' +
+      '<path d="M12 3l-2.6 2.6M12 3l2.6 2.6M12 21l-2.6-2.6M12 21l2.6-2.6"/>' +
+      '<path d="M3 12l2.6-2.6M3 12l2.6 2.6M21 12l-2.6-2.6M21 12l2.6 2.6"/>')
+  };
+
   function desenharFerramentas(aula) {
     if (!editorAtual) return;
     editorAtual._aulaId = aula.id;
     var barra = $('#ferramentas-nota');
     barra.innerHTML = '';
 
+    /* Os ícones são desenhados, e não símbolos de teclado. O ⌫ que estava aqui
+     * é o sinal de apagar do teclado, e ninguém lê aquilo como borracha. */
     var ferramentas = [
-      ['caneta', '✎', 'Caneta'],
-      ['marcatexto', '▬', 'Marca-texto'],
-      ['borracha', '⌫', 'Borracha'],
-      ['texto', 'T', 'Texto digitado'],
-      ['selecao', '✥', 'Mover e redimensionar']
+      ['caneta', ICONES.caneta, 'Caneta'],
+      ['marcatexto', ICONES.marcatexto, 'Marca-texto'],
+      ['borracha', ICONES.borracha, 'Borracha'],
+      ['texto', ICONES.texto, 'Texto digitado'],
+      ['selecao', ICONES.selecao, 'Mover e redimensionar']
     ];
     ferramentas.forEach(function (f) {
       var b = el('button', {
-        type: 'button', title: f[2],
+        type: 'button', title: f[2], 'aria-label': f[2],
         class: 'ferr' + (editorAtual.ferramenta === f[0] ? ' ativa' : ''),
-        texto: f[1]
+        html: f[1]
       });
       b.addEventListener('click', function () {
         editorAtual.ferramenta = f[0];
@@ -2761,9 +2840,72 @@
     grandezas: 'Grandezas', estatistica: 'Estatística'
   };
 
+  /* Busca que não achou nada.
+   *
+   * Antes de escrever uma lista de sinônimos adivinhando o que ela digitaria,
+   * vale descobrir o que ela digita de verdade e não encontra. Fica só no
+   * aparelho, não vai para lugar nenhum, e guarda no máximo duzentas entradas.
+   *
+   * Grava depois que ela para de digitar, e não a cada tecla: senão o registro
+   * enche de prefixo de palavra e não serve para nada. */
+  var LIMITE_BUSCAS_VAZIAS = 200;
+  var relogioBuscaVazia = null;
+
+  function anotarBuscaSemResultado(termo, onde) {
+    var t = String(termo || '').trim();
+    if (t.length < 3) return;
+    clearTimeout(relogioBuscaVazia);
+    relogioBuscaVazia = setTimeout(function () {
+      try {
+        var bruto = localStorage.getItem('buscas-vazias');
+        var lista = bruto ? JSON.parse(bruto) : [];
+        if (!Array.isArray(lista)) lista = [];
+        lista.push({ termo: t, onde: onde || '', quando: Core.hojeIso() });
+        if (lista.length > LIMITE_BUSCAS_VAZIAS) {
+          lista = lista.slice(lista.length - LIMITE_BUSCAS_VAZIAS);
+        }
+        localStorage.setItem('buscas-vazias', JSON.stringify(lista));
+      } catch (e) {
+        /* modo anônimo, ou armazenamento cheio. Registro é conveniência,
+           e nunca pode atrapalhar a busca em si. */
+      }
+    }, 1200);
+  }
+
+  /* Lida em Ajustes, para virar pauta de conversa com ela. */
+  function buscasSemResultado() {
+    try {
+      var bruto = localStorage.getItem('buscas-vazias');
+      var lista = bruto ? JSON.parse(bruto) : [];
+      if (!Array.isArray(lista)) return [];
+      var conta = {};
+      lista.forEach(function (r) {
+        var k = Core.chaveDeBusca(r.termo);
+        if (!conta[k]) conta[k] = { termo: r.termo, vezes: 0, ultima: r.quando };
+        conta[k].vezes++;
+        if (r.quando > conta[k].ultima) conta[k].ultima = r.quando;
+      });
+      return Object.keys(conta).map(function (k) { return conta[k]; })
+        .sort(function (a, b) { return b.vezes - a.vezes || b.ultima.localeCompare(a.ultima); });
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function nomeDoAno(serie) {
+    for (var i = 0; i < SERIES_NOMES.length; i++) {
+      if (SERIES_NOMES[i][0] === serie) return SERIES_NOMES[i][1];
+    }
+    return serie;
+  }
+
   var indiceTemas = null;
   var seriesCarregadas = {};
   var ultimoAnoEscolar = null;
+
+  /* O índice de busca vem separado, e a falta dele não impede nada: sem ele a
+   * busca volta a comparar título e resumo, que é o comportamento antigo. */
+  var indiceDeBusca = null;
 
   function carregarIndice() {
     if (indiceTemas) return Promise.resolve(indiceTemas);
@@ -2772,7 +2914,22 @@
       return r.json();
     }).then(function (d) {
       indiceTemas = d.temas || [];
+      carregarIndiceDeBusca();
       return indiceTemas;
+    });
+  }
+
+  function carregarIndiceDeBusca() {
+    if (indiceDeBusca) return Promise.resolve(indiceDeBusca);
+    return fetch('banco/busca.json').then(function (r) {
+      if (!r.ok) throw new Error('sem indice de busca');
+      return r.json();
+    }).then(function (d) {
+      indiceDeBusca = d.temas || [];
+      return indiceDeBusca;
+    }).catch(function () {
+      indiceDeBusca = null;
+      return null;
     });
   }
 
@@ -2854,9 +3011,8 @@
        por varios anos. Comecar pelo ano do aluno e nao achar nada seria um beco
        sem saida, entao abrimos no primeiro ano que tem resposta. */
     if (busca) {
-      var termo = busca.toLowerCase();
       var casa = function (t) {
-        return (t.pt.titulo + ' ' + t.pt.resumo + ' ' + t.en.titulo).toLowerCase().indexOf(termo) >= 0;
+        return Core.casaBusca(t.pt.titulo + ' ' + t.pt.resumo + ' ' + t.en.titulo, busca);
       };
       if (!temas.filter(function (t) { return t.serie === serieAtual && casa(t); }).length) {
         var achou = temas.filter(casa)[0];
@@ -2873,27 +3029,85 @@
     var lista = el('div', { id: 'lista-temas' });
     corpo.appendChild(lista);
 
+    /* Sem busca, a lista é a do ano escolhido, como sempre foi. Com busca, ela
+     * atravessa os anos, porque o assunto que ela procura muitas vezes está no
+     * ano anterior, e é justamente disso que a aula de reforço trata. */
+    function procurarTemas(termo) {
+      if (!termo) {
+        return {
+          achados: temas.filter(function (t) { return t.serie === serieAtual; })
+            .map(function (t) { return { tema: t, onde: 'titulo', completa: true }; }),
+          atravessaAnos: false
+        };
+      }
+      if (indiceDeBusca && typeof Busca !== 'undefined') {
+        var porId = {};
+        temas.forEach(function (t) { porId[t.id] = t; });
+        var r = Busca.procurar(indiceDeBusca, termo) || { itens: [] };
+        var achados = r.itens
+          .map(function (x) {
+            return { tema: porId[x.id], onde: x.onde, completa: x.completa };
+          })
+          .filter(function (x) { return x.tema; });
+        return {
+          achados: achados, atravessaAnos: true, total: r.total,
+          completa: r.completa, corrigida: r.corrigida, foraDoAno: r.foraDoAno
+        };
+      }
+      /* Sem o índice de busca, volta a procurar só no título e no resumo. */
+      return {
+        achados: temas.filter(function (t) {
+          return Core.casaBusca(t.pt.titulo + ' ' + t.pt.resumo + ' ' + t.en.titulo, termo);
+        }).map(function (t) { return { tema: t, onde: 'titulo', completa: true }; }),
+        atravessaAnos: true
+      };
+    }
+
     function redesenhar() {
       lista.innerHTML = '';
-      var termo = busca.trim().toLowerCase();
-      var filtrados = temas.filter(function (t) {
-        if (t.serie !== serieAtual) return false;
-        if (!termo) return true;
-        return (t.pt.titulo + ' ' + t.pt.resumo + ' ' + t.en.titulo).toLowerCase().indexOf(termo) >= 0;
-      });
+      var termo = busca.trim();
+      var achado = procurarTemas(termo);
+      var filtrados = achado.achados;
+
+      /* O que ela procurou e o banco não tem fica anotado, tanto quando a
+       * lista vem vazia quanto quando vem só por aproximação: nos dois casos
+       * ela procurou um assunto que não existe aqui. */
+      if (termo && (!filtrados.length || achado.completa === false)) {
+        anotarBuscaSemResultado(termo, 'temas de matemática');
+      }
       if (!filtrados.length) {
         lista.appendChild(el('div', { class: 'vazio' }, [
           el('p', { texto: termo ? 'Nenhum tema encontrado para essa busca.' : 'Nenhum tema nesta série.' })
         ]));
         return;
       }
-      filtrados.forEach(function (t) {
+
+      if (termo && achado.atravessaAnos) {
+        var deOutroAno = filtrados.filter(function (x) { return x.tema.serie !== serieAtual; }).length;
+        var recado = filtrados.length + (filtrados.length === 1 ? ' tema' : ' temas') +
+          (deOutroAno ? ', sendo ' + deOutroAno + ' de outros anos' : ', neste ano') + '.';
+        var extra = '';
+        if (achado.corrigida) extra = ' Corrigi o que parecia erro de digitação.';
+        else if (achado.completa === false) extra = ' Não achei tudo o que você escreveu, então mostro o mais próximo.';
+        lista.appendChild(el('div', { class: 'ajuda', style: 'margin-top:0' }, [
+          document.createTextNode(recado),
+          extra ? el('strong', { texto: extra }) : null
+        ].filter(Boolean)));
+      }
+
+      filtrados.forEach(function (x) {
+        var t = x.tema;
+        var rotulo = typeof Busca !== 'undefined' && Busca.ROTULO ? Busca.ROTULO[x.onde] : '';
         lista.appendChild(el('div', { class: 'item-lista item-tema' }, [
           el('div', { class: 'cresce' }, [
             el('div', { class: 'nome' }, [
               document.createTextNode(t.pt.titulo),
-              el('span', { class: 'tag', texto: UNIDADES_NOMES[t.unidade] || t.unidade, style: 'margin-left:8px' })
-            ]),
+              el('span', { class: 'tag', texto: UNIDADES_NOMES[t.unidade] || t.unidade, style: 'margin-left:8px' }),
+              termo && t.serie !== serieAtual
+                ? el('span', { class: 'tag serie', texto: nomeDoAno(t.serie), style: 'margin-left:6px' })
+                : null,
+              rotulo ? el('span', { class: 'tag', texto: rotulo, style: 'margin-left:6px' }) : null
+            ].filter(Boolean)),
             el('div', { class: 'detalhe', texto: t.pt.resumo }),
             el('div', {
               class: 'detalhe',
@@ -3053,7 +3267,7 @@
         caixaExercicios.appendChild(el('label', { class: 'item-exercicio' }, [
           chk,
           el('div', { class: 'cresce' }, [
-            el('div', { class: 'texto-exercicio', texto: ex.enunciado })
+            el('div', { class: 'texto-exercicio' }, comNotacao(ex.enunciado))
           ])
         ]));
       });
@@ -3446,6 +3660,46 @@
       }
     }
 
+    /* O que ela procurou e não achou. Fica em Ajustes porque é conversa nossa,
+     * não recurso dela: serve para decidir que assunto falta no banco e que
+     * palavra a busca precisa entender. */
+    var caixaBuscas = $('#buscas-vazias');
+    if (caixaBuscas) {
+      var vazias = buscasSemResultado();
+      caixaBuscas.innerHTML = '';
+      if (!vazias.length) {
+        caixaBuscas.appendChild(el('div', {
+          class: 'ajuda', style: 'margin-top:0',
+          texto: 'Nenhuma busca sem resultado registrada ainda.'
+        }));
+      } else {
+        caixaBuscas.appendChild(el('div', {
+          class: 'ajuda', style: 'margin-top:0',
+          texto: 'O que você procurou e não encontrou. Fica só neste tablet. ' +
+            'Serve para a gente descobrir que assunto falta no banco.'
+        }));
+        vazias.slice(0, 12).forEach(function (b) {
+          caixaBuscas.appendChild(el('div', { class: 'item-lista' }, [
+            el('div', { class: 'cresce' }, [
+              el('div', { class: 'nome', texto: b.termo }),
+              el('div', {
+                class: 'detalhe',
+                texto: (b.vezes === 1 ? 'uma vez' : b.vezes + ' vezes') +
+                  ' · a última em ' + Core.ddmmaaaa(b.ultima)
+              })
+            ])
+          ]));
+        });
+        caixaBuscas.appendChild(el('button', {
+          type: 'button', class: 'btn pequeno', texto: 'Limpar esta lista',
+          aoClick: function () {
+            try { localStorage.removeItem('buscas-vazias'); } catch (e) { /* nada a fazer */ }
+            desenharAjustes();
+          }
+        }));
+      }
+    }
+
     var estado = $('#estado-versao');
     if (estado) {
       if (registroSW && registroSW.waiting) {
@@ -3471,19 +3725,48 @@
     });
   }
 
+  /* Por que a cópia ia parar sempre nos downloads, e nunca no Drive.
+   *
+   * O Android só deixa abrir a folha de compartilhamento logo depois de um toque.
+   * Montar a cópia demora segundos, porque cada folha escrita e cada anexo viram
+   * texto, e quando terminava a permissão do toque já tinha vencido: o
+   * compartilhamento era recusado em silêncio e o arquivo caía no download.
+   *
+   * A correção é separar em dois tempos. Primeiro o aplicativo monta a cópia e
+   * avisa que ficou pronta. O toque em "Enviar" é um toque novo, e aí a folha de
+   * compartilhamento abre, com Drive, e-mail e o que mais ela tiver. */
+  var copiaPronta = null;
+
   function baixarCopia() {
+    var botao = $('#baixar-copia');
+    var rotuloCopia = botao ? botao.textContent : '';
+    if (botao) { botao.disabled = true; botao.textContent = 'Montando a cópia...'; }
+
     Store.exportarTudo(db).then(function (pacote) {
-      var texto = JSON.stringify(pacote);
       var hoje = Core.hojeIso();
-      entregarArquivo('Copia_Apoio_Educacional_' + hoje + '.json',
-        new Blob([texto], { type: 'application/json' }), 'Cópia de segurança');
+      copiaPronta = {
+        nome: 'Copia_Apoio_Educacional_' + hoje + '.json',
+        blob: new Blob([JSON.stringify(pacote)], { type: 'application/json' })
+      };
       db.ajustes = db.ajustes || {};
       db.ajustes.ultimaCopia = hoje;
       return salvar();
     }).then(function () {
+      if (botao) { botao.disabled = false; botao.textContent = rotuloCopia; }
       desenharAjustes();
       desenharAgenda();
+      avisar('Cópia pronta, ' + Math.round(copiaPronta.blob.size / 1024) + ' KB. Envie para o Drive.',
+        'Enviar', enviarCopiaPronta);
+    }).catch(function () {
+      if (botao) { botao.disabled = false; botao.textContent = rotuloCopia; }
+      avisar('Não consegui montar a cópia. Tente de novo em um minuto.');
     });
+  }
+
+  /* Chamada a partir do toque dela, com a permissão do Android ainda valendo. */
+  function enviarCopiaPronta() {
+    if (!copiaPronta) return;
+    entregarArquivo(copiaPronta.nome, copiaPronta.blob, 'Cópia de segurança');
   }
 
   /* Há quantos dias a última cópia foi salva. Devolve null se nunca houve. */

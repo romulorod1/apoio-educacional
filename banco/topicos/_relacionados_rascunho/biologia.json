@@ -1,0 +1,363 @@
+{
+ "disciplina": "Biologia",
+ "situacao": "rascunho, nao ligado ao aplicativo, aguardando revisao da Nathalia",
+ "cobertura": "Escrevi 39 entradas, validadas por script contra banco/topicos/biologia.json: todo topico listado existe com a grafia exata, e nenhum termo e encontrado hoje pela busca por pedaco de texto, com duas excecoes que declaro abaixo. As 39 entradas tocam 127 dos 194 topicos de Biologia.\n\nO que fica resolvido, e o grosso da dor: a busca pelo nome do capitulo do colegio. Em Biologia o banco esta organizado por bloco descritivo (A celula por dentro, Tecidos do corpo, Do zigoto ao embriao, Virus e reinos), mas a professora pensa e digita pelo nome tradicional. Hoje \"citologia\", \"histologia\", \"embriologia\", \"zoologia\", \"botanica\", \"microbiologia\" e \"bioquimica\" devolvem ZERO resultados, e sozinhas essas sete entradas cobrem 60 topicos. Resolve tambem o nome popular contra o nome do livro (lixo, minhoca, estrela do mar, inseto, camisinha, gordura, verme, pressao alta), a sigla (hiv, dst), a doenca que aparece embaixo do nome do agente (dengue, malaria, daltonismo, hemofilia, sindrome de down) e o orgao escrito no plural, que e um caso real e invisivel: \"pulmao\" nao acha \"Vias respiratorias e pulmoes\" e \"rim\" nao acha \"Rins e formacao da urina\".\n\nDuas ressalvas honestas dentro da propria amostra:\n1. \"genetica\" ja devolve hoje 1 resultado (Probabilidade em genetica), de 16 que deveria devolver. Mantive a entrada porque 15 de 16 falham.\n2. \"rim\" hoje devolve 1 resultado, e errado: \"Experimentos classicos em questoes\", porque a palavra rim esta dentro de Experimentos. Nenhum topico de rim aparece. E o melhor exemplo de que o problema nao e so acento.\n\nO que continua falhando, mesmo com estas 39 entradas:\n- Doenca especifica que nao virou entrada. Biologia tem cauda longa: chikungunya, zika, covid, gripe, tuberculose, hanseniase, leishmaniose, esquistossomose, amarelao, toxoplasmose, anemia falciforme, fenilcetonuria. Cada uma exigiria a sua entrada. Uma amostra de 39 nao cobre um dicionario de doencas.\n- Erro de digitacao e forma flexionada: \"mitocondrea\", \"fisiologia\" escrito errado, singular contra plural. Isso nao e tag, e normalizacao mais tolerancia, decisao separada.\n- Termo que hoje ja acha um resultado e por isso parece funcionar, mas devolve pouco: \"ecologia\" acha so \"Graficos e tabelas de ecologia\" e deixa de fora as 12 entradas de ecologia basica e ciclos. Nao coloquei na amostra por respeitar a regra de nao incluir termo que aparece no nome do topico, mas ele falha na pratica.\n- Ordenacao. Tag faz aparecer, nao faz ranquear. \"citologia\" passa a devolver 14 topicos numa lista sem prioridade, e ela ainda vai rolar a tela.\n- Confusao entre disciplinas. Celula e digestao existem em Biologia do 9o ano e tambem no banco de Ciencias. Tag dentro de biologia.json nao resolve ela procurar no lugar errado.\n- Manutencao. Topico novo adicionado depois nasce sem tag e volta a sumir da busca.\n\nEstimativa de proporcao, sem fingir precisao: as buscas frustradas de Biologia se dividem grosso modo entre acento e digitacao (que se resolve com normalizacao, sem tag nenhuma), nome de capitulo e nome popular (que e o que estas 39 entradas atacam) e cauda longa de doenca e organismo (que fica de fora). As 39 entradas resolvem a maior parte da fatia do meio, e essa fatia e a que a normalizacao sozinha nao alcanca.",
+ "entradas": [
+  {
+   "termo": "citologia",
+   "leva": [
+    "Célula, unidade da vida",
+    "O que se vê no microscópio",
+    "Membrana, citoplasma e núcleo",
+    "Organelas e suas funções",
+    "Célula procarionte e eucarionte",
+    "Estrutura da membrana plasmática",
+    "Difusão e osmose",
+    "Transporte ativo",
+    "Retículo endoplasmático e ribossomos",
+    "Complexo golgiense",
+    "Lisossomos e digestão celular",
+    "Vacúolos e peroxissomos",
+    "Mitocôndrias e cloroplastos",
+    "Núcleo, cromatina e cromossomos"
+   ]
+  },
+  {
+   "termo": "histologia",
+   "leva": [
+    "Dos tecidos aos sistemas",
+    "Tecido epitelial de revestimento",
+    "Tecido conjuntivo e seus tipos",
+    "Cartilagem e tecido ósseo",
+    "Tecido muscular, os três tipos",
+    "Tecido nervoso"
+   ]
+  },
+  {
+   "termo": "embriologia",
+   "leva": [
+    "Gametogênese",
+    "Tipos de ovo",
+    "Segmentação, mórula e blástula",
+    "Gástrula e folhetos embrionários",
+    "Nêurula e formação dos órgãos",
+    "Anexos embrionários",
+    "Fecundação e gravidez"
+   ]
+  },
+  {
+   "termo": "zoologia",
+   "leva": [
+    "Poríferos e cnidários",
+    "Platelmintos e nematelmintos",
+    "Anelídeos",
+    "Moluscos",
+    "Artrópodes e seus grupos",
+    "Equinodermos",
+    "Cordados, características gerais",
+    "Peixes",
+    "Anfíbios",
+    "Répteis",
+    "Aves",
+    "Mamíferos"
+   ]
+  },
+  {
+   "termo": "botanica",
+   "leva": [
+    "Briófitas e pteridófitas",
+    "Gimnospermas e angiospermas",
+    "Raiz, caule e folha",
+    "Condução de seiva",
+    "Transpiração e estômatos",
+    "Flor, fruto e semente",
+    "Polinização e dispersão",
+    "Hormônios vegetais e tropismos"
+   ]
+  },
+  {
+   "termo": "microbiologia",
+   "leva": [
+    "Vírus e doenças virais",
+    "Bactérias e sua importância",
+    "Doenças bacterianas",
+    "Protozoários e protozooses",
+    "Algas e ambiente",
+    "Fungos e micoses",
+    "Classificação dos seres vivos"
+   ]
+  },
+  {
+   "termo": "bioquimica",
+   "leva": [
+    "Água e sais minerais na célula",
+    "Carboidratos",
+    "Lipídios",
+    "Proteínas e aminoácidos",
+    "Enzimas e como agem",
+    "Ácidos nucleicos, DNA e RNA"
+   ]
+  },
+  {
+   "termo": "genetica",
+   "leva": [
+    "Gene, alelo e cromossomo",
+    "Homozigoto e heterozigoto",
+    "Genótipo e fenótipo",
+    "1ª lei de Mendel",
+    "Quadro de Punnett",
+    "Probabilidade em genética",
+    "Heredogramas",
+    "2ª lei de Mendel",
+    "Dominância incompleta e codominância",
+    "Interação gênica e epistasia",
+    "Alelos múltiplos",
+    "Grupos sanguíneos ABO",
+    "Ligação gênica e permuta",
+    "Herança ligada ao sexo",
+    "Cariótipo e síndromes",
+    "Mutações e agentes mutagênicos"
+   ]
+  },
+  {
+   "termo": "hereditariedade",
+   "leva": [
+    "1ª lei de Mendel",
+    "2ª lei de Mendel",
+    "Gene, alelo e cromossomo",
+    "Genótipo e fenótipo",
+    "Heredogramas",
+    "Herança ligada ao sexo"
+   ]
+  },
+  {
+   "termo": "arvore genealogica",
+   "leva": [
+    "Heredogramas",
+    "Heredogramas de vestibular"
+   ]
+  },
+  {
+   "termo": "sindrome de down",
+   "leva": [
+    "Cariótipo e síndromes",
+    "Mutações e agentes mutagênicos"
+   ]
+  },
+  {
+   "termo": "daltonismo",
+   "leva": [
+    "Herança ligada ao sexo",
+    "Heredogramas"
+   ]
+  },
+  {
+   "termo": "hemofilia",
+   "leva": [
+    "Herança ligada ao sexo",
+    "Coagulação do sangue"
+   ]
+  },
+  {
+   "termo": "doacao de sangue",
+   "leva": [
+    "Tipos sanguíneos e transfusão",
+    "Grupos sanguíneos ABO",
+    "Fator Rh e eritroblastose"
+   ]
+  },
+  {
+   "termo": "divisao celular",
+   "leva": [
+    "Ciclo celular e interfase",
+    "Mitose, fase por fase",
+    "Meiose, fase por fase",
+    "Alterações na divisão e câncer"
+   ]
+  },
+  {
+   "termo": "tumor",
+   "leva": [
+    "Alterações na divisão e câncer",
+    "Mutações e agentes mutagênicos"
+   ]
+  },
+  {
+   "termo": "glicose",
+   "leva": [
+    "Carboidratos",
+    "Glicólise",
+    "Fermentação",
+    "Insulina e taxa de açúcar",
+    "Diabetes e distúrbios da tireoide"
+   ]
+  },
+  {
+   "termo": "clorofila",
+   "leva": [
+    "Fotossíntese e suas etapas",
+    "Mitocôndrias e cloroplastos"
+   ]
+  },
+  {
+   "termo": "gordura",
+   "leva": [
+    "Lipídios",
+    "Nutrientes dos alimentos",
+    "Alimentação e doenças crônicas"
+   ]
+  },
+  {
+   "termo": "pulmao",
+   "leva": [
+    "Vias respiratórias e pulmões",
+    "Trocas gasosas",
+    "Respiração branquial, traqueal e pulmonar",
+    "Transporte de oxigênio e gás carbônico"
+   ]
+  },
+  {
+   "termo": "rim",
+   "leva": [
+    "Rins e formação da urina",
+    "Néfron e filtração do sangue",
+    "Equilíbrio de água e sais",
+    "Excreção nos animais e ambiente"
+   ]
+  },
+  {
+   "termo": "cerebro",
+   "leva": [
+    "Sistema nervoso central e periférico",
+    "Neurônio e impulso nervoso",
+    "Tecido nervoso",
+    "Sinapses e neurotransmissores"
+   ]
+  },
+  {
+   "termo": "estomago",
+   "leva": [
+    "Caminho do alimento no corpo",
+    "Enzimas da digestão",
+    "Fígado e pâncreas",
+    "Digestão nos animais"
+   ]
+  },
+  {
+   "termo": "pressao alta",
+   "leva": [
+    "Ciclo cardíaco e pressão arterial",
+    "Coração e vasos sanguíneos"
+   ]
+  },
+  {
+   "termo": "hemoglobina",
+   "leva": [
+    "Transporte de oxigênio e gás carbônico",
+    "Sangue e seus componentes"
+   ]
+  },
+  {
+   "termo": "dengue",
+   "leva": [
+    "Doenças transmitidas por mosquitos",
+    "Vírus e doenças virais"
+   ]
+  },
+  {
+   "termo": "hiv",
+   "leva": [
+    "Infecções sexualmente transmissíveis",
+    "Vírus e doenças virais",
+    "Resposta imune e anticorpos"
+   ]
+  },
+  {
+   "termo": "dst",
+   "leva": [
+    "Infecções sexualmente transmissíveis",
+    "Métodos contraceptivos"
+   ]
+  },
+  {
+   "termo": "camisinha",
+   "leva": [
+    "Métodos contraceptivos",
+    "Infecções sexualmente transmissíveis"
+   ]
+  },
+  {
+   "termo": "menstruacao",
+   "leva": [
+    "Ciclo menstrual",
+    "Puberdade e hormônios",
+    "Regulação hormonal da reprodução"
+   ]
+  },
+  {
+   "termo": "verme",
+   "leva": [
+    "Verminoses e higiene",
+    "Platelmintos e nematelmintos",
+    "Ciclos de verminoses no ENEM"
+   ]
+  },
+  {
+   "termo": "malaria",
+   "leva": [
+    "Protozoários e protozooses",
+    "Doenças transmitidas por mosquitos"
+   ]
+  },
+  {
+   "termo": "minhoca",
+   "leva": [
+    "Anelídeos"
+   ]
+  },
+  {
+   "termo": "estrela do mar",
+   "leva": [
+    "Equinodermos"
+   ]
+  },
+  {
+   "termo": "inseto",
+   "leva": [
+    "Artrópodes e seus grupos"
+   ]
+  },
+  {
+   "termo": "lixo",
+   "leva": [
+    "Resíduos sólidos e reciclagem"
+   ]
+  },
+  {
+   "termo": "meio ambiente",
+   "leva": [
+    "Biomas brasileiros",
+    "Desmatamento e biodiversidade",
+    "Poluição da água e eutrofização",
+    "Resíduos sólidos e reciclagem",
+    "Sustentabilidade em textos do ENEM",
+    "Efeito estufa e aquecimento global"
+   ]
+  },
+  {
+   "termo": "parasita",
+   "leva": [
+    "Relações desarmônicas",
+    "Verminoses e higiene",
+    "Platelmintos e nematelmintos"
+   ]
+  },
+  {
+   "termo": "fossil",
+   "leva": [
+    "Evidências da evolução",
+    "Origem da vida, hipóteses"
+   ]
+  }
+ ]
+}
