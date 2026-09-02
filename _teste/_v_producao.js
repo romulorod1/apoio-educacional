@@ -40,7 +40,10 @@ const c = (r, v, e) => { const p = String(v) === String(e); p ? ok++ : mau++;
     const j = await r.json();
     return { temas: j.temas.length, tem: typeof Busca === 'object' };
   });
-  c('o indice de busca baixou', busca.temas, 146);
+  /* O total vem do banco.json LOCAL, nao de um numero cravado: o 146 cravado ia
+   * reprovar o primeiro deploy com 148 temas. */
+  const totalLocal = JSON.parse(require('fs').readFileSync(path.join(__dirname, '..', 'temas', 'banco.json'), 'utf8')).temas.length;
+  c('o indice de busca baixou (' + totalLocal + ' temas)', busca.temas, totalLocal);
   c('o busca.js carregou', busca.tem, true);
 
   const achou = await pag.evaluate(() => {

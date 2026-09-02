@@ -157,6 +157,11 @@
     ['pa', [['progressao'], ['aritmetica']]],
     ['pg', [['progressao'], ['geometrica']]],
     ['tg', [['tangente']]],
+    /* O normalizador descarta letra solta e pontuacao: "f(g(x))" vira consulta
+     * vazia e "fog" e palavra desconhecida; "sen" nao e token de tema nenhum,
+     * entao "sen(a+b)" nao chegava ao tema de identidades. */
+    ['fog', [['composta']]],
+    ['sen', [['seno']]],
     ['mmc', [['minimo'], ['multiplo']]],
     ['mdc', [['maximo'], ['divisor']]],
 

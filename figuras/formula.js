@@ -1580,7 +1580,14 @@
       case 'nivel': return montarNivel(no, ctx, tam);
       case 'opGrande': return montarOpGrande(no, ctx, tam);
       case 'opNome':
-        return { caixa: caixaTexto(no.txt, tam, ctx.bold, ctx.cor, ctx.reg), classe: 'op' };
+        /* A tabela guarda o nome em portugues (sen, tg) e a troca de lingua
+         * acontece AQUI, na montagem, onde o ctx e o do contexto() e traz a
+         * lingua que o pdf.js passou. No analisador nao ha lingua: um 	an na
+         * secao EN saia impresso como tg e o autor do tema teve que contornar
+         * com 	ext{tan}. */
+        var nomeFn = no.txt;
+        if (ctx.lingua === 'en') nomeFn = ({ 'sen': 'sin', 'tg': 'tan' })[nomeFn] || nomeFn;
+        return { caixa: caixaTexto(nomeFn, tam, ctx.bold, ctx.cor, ctx.reg), classe: 'op' };
       case 'cerca': return montarCerca(no, ctx, tam);
       case 'matriz': return montarMatriz(no, ctx, tam);
     }
@@ -2069,6 +2076,7 @@
       frac: 0,
       cor: opcoes.cor || cor('texto'),
       bold: !!opcoes.bold,
+      lingua: opcoes.lingua === 'en' ? 'en' : 'pt',
       reg: reg
     };
   }
