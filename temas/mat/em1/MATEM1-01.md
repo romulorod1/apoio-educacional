@@ -27,14 +27,14 @@ multiplicação sempre funcionam. A subtração não: 3 - 5 não existe entre os
 **Inteiros.** Acrescentam os negativos: -3, -2, -1, 0, 1, 2, 3 e assim por diante. Agora toda
 subtração funciona. A divisão ainda não: 3/5 não é inteiro.
 
-**Racionais.** São os números que podem ser escritos na forma a/b, com a e b inteiros e b ≠ 0. Todo
-inteiro é racional, porque 7 = 7/1. A marca dos racionais na forma decimal é clara: ou a
-representação termina, como em 0,25, ou ela repete um bloco para sempre, como em 0,333 e assim por
-diante.
+**Racionais.** São os números que podem ser escritos na forma a/b, com a e b inteiros e b ≠ 0, isto
+é, com o denominador diferente de zero. Todo inteiro é racional, porque 7 = 7/1. A marca dos
+racionais na forma decimal é clara: ou a representação termina, como em 0,25, ou ela repete um bloco
+para sempre, como em 0,333 e assim por diante.
 
 **Irracionais.** São os números cuja representação decimal é infinita e nunca passa a repetir um
-bloco. √2 e π são os exemplos clássicos. Um irracional não pode ser escrito como fração de inteiros,
-e é exatamente isso que o define.
+bloco. √2, que se lê "raiz de 2", e π, o número pi, são os exemplos clássicos. Um irracional não
+pode ser escrito como fração de inteiros, e é exatamente isso que o define.
 
 **Reais.** Reunindo racionais e irracionais chega-se aos reais, que preenchem a reta sem deixar
 buracos. Cada ponto da reta é um real, e cada real é um ponto da reta.
@@ -80,7 +80,8 @@ quer dizer que o extremo entra, parêntese quer dizer que ele fica de fora.
 Alguns livros escrevem o intervalo aberto com o colchete virado para fora: ]2, 5[ é o mesmo que
 (2, 5).
 
-O extremo entra quando a desigualdade é do tipo ≥ ou ≤, e não entra quando é do tipo > ou <.
+O extremo entra quando a desigualdade é do tipo ≥ ou ≤, que se leem "maior ou igual" e
+"menor ou igual", e não entra quando é do tipo > ou <, estritamente maior ou estritamente menor.
 Infinito nunca entra, porque não é um número: do lado do ∞ o parêntese é obrigatório.
 
 #### União, intersecção e diferença
@@ -193,12 +194,14 @@ multiplication always work. Subtraction does not: 3 - 5 does not exist among the
 works. Division still does not: 3/5 is not an integer.
 
 **Rationals.** These are the numbers that can be written in the form a/b, with a and b integers and
-b ≠ 0. Every integer is rational, because 7 = 7/1. The decimal signature of a rational is clear:
-either the representation ends, as in 0.25, or it repeats a block forever, as in 0.333 and so on.
+b ≠ 0, that is, with a denominator different from zero. Every integer is rational, because 7 = 7/1.
+The decimal signature of a rational is clear: either the representation ends, as in 0.25, or it
+repeats a block forever, as in 0.333 and so on.
 
 **Irrationals.** These are the numbers whose decimal representation is infinite and never settles
-into a repeating block. √2 and π are the classic examples. An irrational cannot be written as a
-fraction of integers, and that is exactly what defines it.
+into a repeating block. √2, read "the square root of 2", and π, the number pi, are the classic
+examples. An irrational cannot be written as a fraction of integers, and that is exactly what
+defines it.
 
 **Reals.** Putting rationals and irrationals together gives the reals, which fill the line leaving no
 gaps. Every point of the line is a real number, and every real number is a point of the line.
@@ -244,7 +247,8 @@ endpoint is in. A square bracket means the endpoint is in, a round bracket means
 
 Some books write the open interval with the brackets turned outwards: ]2, 5[ is the same as (2, 5).
 
-An endpoint is in when the inequality is of the ≥ or ≤ kind, and out when it is of the > or < kind.
+An endpoint is in when the inequality is of the ≥ or ≤ kind, read "greater than or equal" and
+"less than or equal", and out when it is of the > or < kind, strictly greater or strictly less.
 Infinity is never in, because it is not a number: on the ∞ side the round bracket is compulsory.
 
 #### Union, intersection and difference

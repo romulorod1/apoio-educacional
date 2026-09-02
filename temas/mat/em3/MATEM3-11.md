@@ -43,7 +43,8 @@ Permutar é ordenar todos os elementos. Com n elementos distintos, o número de 
 
 P_{n} = n!
 
-onde n! é o produto de todos os naturais de 1 até n.
+onde n! é o fatorial de n, o produto de todos os naturais de 1 até n. Escrevemos n! e lemos
+"n fatorial".
 
 **Exemplo 1.** Quantos anagramas tem a palavra LIVRO?
 São cinco letras distintas, então o total é 5! = 120.
@@ -53,6 +54,9 @@ elementos, dos quais um se repete p vezes e outro se repete q vezes, o total é:
 
 P = n! / (p! · q!)
 
+onde P é o número de ordens distintas, n o total de elementos, e p e q as quantidades de cada
+elemento que se repete.
+
 #### Combinação
 
 Combinar é escolher um subconjunto sem se importar com a ordem. O número de modos de escolher k
@@ -60,7 +64,7 @@ elementos entre n é:
 
 C_{n,k} = n! / (k! · (n - k)!)
 
-onde C_{n,k} é a combinação de n elementos tomados k a k.
+onde C_{n,k} é a combinação de n elementos tomados k a k, também chamada binomial de n sobre k.
 
 **Exemplo 2.** De quantos modos se forma uma comissão de 3 pessoas em um grupo de 10?
 Como a comissão não tem cargos, a ordem não importa. O total é C_{10,3} = 120.
@@ -82,7 +86,7 @@ probabilidade é 6/36 = 1/6.
 Quando o enunciado diz **pelo menos um**, quase sempre compensa calcular a probabilidade de nenhum e
 subtrair de 1:
 
-P(ao menos um) = 1 - P(nenhum)
+P(pelo menos um) = 1 - P(nenhum)
 
 Contar diretamente todos os casos com um, dois ou três acertos dá muito mais trabalho.
 
@@ -208,7 +212,8 @@ orders is:
 
 P_{n} = n!
 
-where n! is the product of all natural numbers from 1 up to n.
+where n! is the factorial of n, the product of all natural numbers from 1 up to n. We write n! and
+read it "n factorial".
 
 **Example 1.** How many anagrams does the word LIVRO have?
 There are five distinct letters, so the total is 5! = 120.
@@ -218,6 +223,9 @@ n elements, one of which repeats p times and another q times, the total is:
 
 P = n! / (p! · q!)
 
+where P is the number of distinct orders, n the total number of elements, and p and q the amounts
+of each repeated element.
+
 #### Combinations
 
 To combine is to choose a subset without caring about order. The number of ways of choosing k
@@ -225,7 +233,8 @@ elements among n is:
 
 C_{n,k} = n! / (k! · (n - k)!)
 
-where C_{n,k} is the combination of n elements taken k at a time.
+where C_{n,k} is the combination of n elements taken k at a time, also called the binomial of n
+over k.
 
 **Example 2.** In how many ways can a committee of 3 people be formed from a group of 10?
 Since the committee has no ranks, order does not matter. The total is C_{10,3} = 120.

@@ -17,9 +17,9 @@ dificuldade: 4
 
 #### O que é um polinômio
 
-Um polinômio na variável x é uma soma de parcelas do tipo a·x^{n}, com expoentes naturais. O maior
-expoente que aparece com coeficiente não nulo é o **grau**, e o coeficiente que acompanha essa maior
-potência é o **coeficiente dominante**.
+Um polinômio na variável x é uma soma de parcelas do tipo coeficiente vezes potência de x, com
+expoentes naturais. O maior expoente que aparece com coeficiente não nulo é o **grau**, e o
+coeficiente que acompanha essa maior potência é o **coeficiente dominante**.
 
 Em 5x^{4} - 3x^{2} + 7, o grau é 4 e o coeficiente dominante é 5. Repare que o expoente precisa ser
 natural: uma expressão com x no denominador ou dentro de raiz não é polinômio.
@@ -164,9 +164,9 @@ máximo o maior dos dois.
 
 #### What a polynomial is
 
-A polynomial in the variable x is a sum of terms of the type a·x^{n}, with natural number exponents.
-The largest exponent appearing with a non zero coefficient is the **degree**, and the coefficient
-attached to that highest power is the **leading coefficient**.
+A polynomial in the variable x is a sum of terms of the type coefficient times a power of x, with
+natural number exponents. The largest exponent appearing with a non zero coefficient is the
+**degree**, and the coefficient attached to that highest power is the **leading coefficient**.
 
 In 5x^{4} - 3x^{2} + 7, the degree is 4 and the leading coefficient is 5. Notice that the exponent
 has to be a natural number: an expression with x in the denominator or inside a radical is not a

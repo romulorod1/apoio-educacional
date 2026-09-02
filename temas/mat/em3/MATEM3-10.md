@@ -26,7 +26,7 @@ isto é, quanto y muda quando x aumenta uma unidade. O b é onde a reta corta o 
 característica: dados dois pontos, qual é a lei?
 
 **Função quadrática.** Lei do tipo f(x) = ax^{2} + bx + c. O gráfico é uma parábola. As raízes vêm
-da fórmula resolutiva ou de soma e produto, e o vértice, de abscissa x_{V} = -b/(2a), resolve todo
+da fórmula resolutiva ou de soma e produto, e o vértice, de abscissa x_{v} = -b/(2a), resolve todo
 problema de máximo e mínimo. Pergunta característica: onde está o ponto ótimo?
 
 **Função exponencial.** Lei do tipo f(x) = a^{x}. O gráfico cresce cada vez mais rápido quando a base
@@ -49,7 +49,7 @@ coeficiente que não acompanha o x. A reta corta o eixo horizontal em 3 e o eixo
 
 **Exemplo 2.** Determinar raízes e vértice de f(x) = x^{2} - 8x + 15.
 Procurando dois números que somem 8 e multipliquem 15, achamos 3 e 5, que são as raízes. A abscissa
-do vértice é a média das raízes: x_{V} = 4. Substituindo, f(4) = 16 - 32 + 15 = -1.
+do vértice é a média das raízes: x_{v} = 4. Substituindo, f(4) = 16 - 32 + 15 = -1.
 O vértice é o ponto (4, -1), e é ponto de mínimo porque a é positivo.
 
 #### Exponencial: igualar as bases
@@ -99,7 +99,7 @@ ser conferida no enunciado original.
 7. Sendo f(x) = 2x - 3 e g(x) = x^{2} + 1, calcule f(g(2)) e depois g(f(2)).
 8. Determine a função inversa de f(x) = (3x - 1)/2.
 9. Resolva a equação 3^{2x - 1} = 27.
-10. Resolva a equação log_{2}(x - 1) + log_{2}(x + 1) = 3.
+10. Resolva a equação log_{2} (x - 1) + log_{2} (x + 1) = 3.
 11. Uma substância radioativa de 800 gramas perde metade da massa a cada 5 anos. Qual é a massa
     restante depois de 20 anos?
 12. Resolva a equação |2x - 6| = 4.
@@ -158,7 +158,7 @@ crosses the vertical axis. Characteristic question: given two points, what is th
 
 **Quadratic function.** A rule of the type f(x) = ax^{2} + bx + c. The graph is a parabola. The roots
 come from the quadratic formula or from sum and product, and the vertex, whose first coordinate is
-x_{V} = -b/(2a), settles every maximum and minimum problem. Characteristic question: where is the
+x_{v} = -b/(2a), settles every maximum and minimum problem. Characteristic question: where is the
 optimal point?
 
 **Exponential function.** A rule of the type f(x) = a^{x}. The graph grows faster and faster when the
@@ -183,7 +183,7 @@ vertical axis at -6.
 
 **Example 2.** Find the roots and the vertex of f(x) = x^{2} - 8x + 15.
 Looking for two numbers adding to 8 and multiplying to 15, we find 3 and 5, which are the roots. The
-first coordinate of the vertex is the average of the roots: x_{V} = 4. Substituting,
+first coordinate of the vertex is the average of the roots: x_{v} = 4. Substituting,
 f(4) = 16 - 32 + 15 = -1. The vertex is the point (4, -1), and it is a minimum point because a is
 positive.
 
@@ -234,7 +234,7 @@ one must be checked against the original statement.
 7. With f(x) = 2x - 3 and g(x) = x^{2} + 1, work out f(g(2)) and then g(f(2)).
 8. Find the inverse function of f(x) = (3x - 1)/2.
 9. Solve the equation 3^{2x - 1} = 27.
-10. Solve the equation log_{2}(x - 1) + log_{2}(x + 1) = 3.
+10. Solve the equation log_{2} (x - 1) + log_{2} (x + 1) = 3.
 11. A radioactive substance of 800 grams loses half its mass every 5 years. What mass is left after
     20 years?
 12. Solve the equation |2x - 6| = 4.

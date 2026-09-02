@@ -83,7 +83,7 @@ Numa pirâmide regular de base quadrada, três triângulos retângulos resolvem 
 **Exemplo 3.** Uma pirâmide regular tem base quadrada de lado 6 e altura 4. Calcular o volume, o
 apótema da face lateral e a área total.
 V = (1/3) · 36 · 4 = 48. Chamando de m o apótema da face, m = √(16 + 9) = 5. Cada face lateral tem
-área (6 · 5) / 2 = 15, e as quatro somam 60. Com a base de 36, A_{t} = 96.
+área (6 × 5) / 2 = 15, e as quatro somam 60. Com a base de 36, A_{t} = 96.
 
 #### Sólidos compostos
 
@@ -163,7 +163,7 @@ conversão. Um decímetro cúbico é um litro.
 8. 94.
 9. O apótema da face lateral mede 5 e a área total é 96. A área lateral é 60 e a base tem área 36.
 10. 240√3. A área da base é 24√3.
-11. 5. A área da base é A_{b} = 3 · V / h, o que dá 25.
+11. 5. A área da base vem de A_{b} = 3 · V / h, o que dá 25.
 12. A aresta mede 6 e o volume é 216.
 13. A área lateral é 110 e a área total é 158.
 14. 264. O cubo contribui com 216 e a pirâmide com 48.
@@ -249,7 +249,7 @@ In a regular pyramid with a square base, three right triangles settle everything
 **Example 3.** A regular pyramid has a square base of side 6 and height 4. Find the volume, the
 slant height of a lateral face and the total area.
 V = (1/3) · 36 · 4 = 48. Calling the slant height m, m = √(16 + 9) = 5. Each lateral face has area
-(6 · 5) / 2 = 15, and the four of them add to 60. With the base of 36, A_{t} = 96.
+(6 × 5) / 2 = 15, and the four of them add to 60. With the base of 36, A_{t} = 96.
 
 #### Composite solids
 
@@ -331,7 +331,7 @@ decimetre is one litre.
 9. The slant height of a lateral face is 5 and the total area is 96. The lateral area is 60 and the
    base has area 36.
 10. 240√3. The area of the base is 24√3.
-11. 5. The area of the base is A_{b} = 3 · V / h, which gives 25.
+11. 5. The area of the base comes from A_{b} = 3 · V / h, which gives 25.
 12. The edge is 6 and the volume is 216.
 13. The lateral area is 110 and the total area is 158.
 14. 264. The cube contributes 216 and the pyramid contributes 48.

@@ -28,7 +28,11 @@ decisão, de quantos modos ela pode ser tomada.
 #### O princípio multiplicativo
 
 Se uma decisão pode ser tomada de m modos e, para cada um deles, uma segunda decisão pode ser tomada
-de n modos, então o par de decisões pode ser tomado de m · n modos.
+de n modos, então o par de decisões pode ser tomado de T modos:
+
+T = m · n
+
+onde T é o número de pares de decisões possíveis.
 
 O princípio vale para quantas etapas forem necessárias: multiplicam-se as possibilidades de cada
 etapa. Há uma condição escondida que precisa ser respeitada: **o número de possibilidades de uma
@@ -180,7 +184,11 @@ decision, in how many ways it can be made.
 #### The multiplication principle
 
 If one decision can be made in m ways and, for each of them, a second decision can be made in n
-ways, then the pair of decisions can be made in m · n ways.
+ways, then the pair of decisions can be made in T ways:
+
+T = m · n
+
+where T is the number of possible pairs of decisions.
 
 The principle works for as many stages as needed: you multiply the possibilities at each stage.
 There is a hidden condition that must be respected: **the number of possibilities at one stage

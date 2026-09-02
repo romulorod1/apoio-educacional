@@ -295,6 +295,24 @@ def caracteres_indesenhaveis(texto):
     return achados
 
 
+def marcacao_quebrada(texto):
+    """Chave de expoente ou indice mal fechada, ou aninhada.
+
+    Estes dois passam por todas as outras travas e chegam calados no material:
+    "x^{2" sem fechar imprime a chave na folha, e "2^{3^{2}}" aninhado desenha
+    um pedaco literal no meio da formula. O caractere e ASCII e o PDF desenha,
+    entao a trava de caractere nao ve. Quem tem que ver e esta.
+    """
+    achados = []
+    bem_formado = re.compile(r'[\^_]\{[^{}]*\}')
+    for numero, linha in enumerate(texto.split(chr(10)), 1):
+        # tira o que esta certo e olha o que sobrou
+        resto = bem_formado.sub('', linha)
+        if '^{' in resto or '_{' in resto:
+            achados.append((numero, linha.strip()[:70]))
+    return achados
+
+
 def conferir(caminho):
     """Devolve (erros, avisos, manuais, cabecalho)."""
     erros, avisos, manuais = [], [], []
@@ -308,6 +326,11 @@ def conferir(caminho):
     for numero, linha in enumerate(io.open(caminho, encoding='utf-8').read().split('\n'), 1):
         if '–' in linha or '—' in linha:
             erros.append('travessao na linha %d: %s' % (numero, linha.strip()[:60]))
+
+    for numero, trecho in marcacao_quebrada(bruto if 'bruto' in dir() else
+                                            io.open(caminho, encoding='utf-8').read()):
+        erros.append('marcacao de expoente ou indice mal fechada na linha %d: %s'
+                     % (numero, trecho))
 
     for numero, c, codigo, trecho in caracteres_indesenhaveis(
             io.open(caminho, encoding='utf-8').read()):

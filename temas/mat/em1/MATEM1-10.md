@@ -172,8 +172,7 @@ Here the common difference is 4, because each term is the previous one plus 4. T
 sequence is an arithmetic progression, subtract each term from the next: if you always get the same,
 it is.
 
-The common difference can be negative, and then the sequence decreases. In 20, 17, 14, 11 it
-is -3.
+The common difference can be negative, and then the sequence decreases. In 20, 17, 14, 11 it is -3.
 
 #### The general term
 

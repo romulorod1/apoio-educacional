@@ -127,7 +127,8 @@ Procura-se n com 2^{n} > 1000. Como 2^{10} = 1024, bastam 10 períodos.
 **Esquecer a condição de existência.** É o erro campeão. Resolver a equação e entregar todas as
 raízes, sem testar, custa a questão inteira.
 
-**Achar que log de zero vale zero.** Não existe logaritmo de zero. O que vale zero é log_{a} 1 = 0.
+**Achar que log de zero vale zero.** Não existe logaritmo de zero. O que vale zero é o logaritmo
+de 1: log_{a} 1 = 0.
 
 **Distribuir o logaritmo sobre uma soma.** log_{a} (x + y) ≠ log_{a} x + log_{a} y. A propriedade da
 soma vale para o logaritmo de um **produto**.
@@ -313,8 +314,8 @@ We look for n with 2^{n} > 1000. Since 2^{10} = 1024, 10 periods are enough.
 **Forgetting the existence condition.** This is the champion mistake. Solving the equation and
 handing in every root, without testing, costs the whole question.
 
-**Thinking that the log of zero is zero.** There is no logarithm of zero. What equals zero is
-log_{a} 1 = 0.
+**Thinking that log of zero is zero.** There is no logarithm of zero. What equals zero is the
+logarithm of 1: log_{a} 1 = 0.
 
 **Spreading the logarithm over a sum.** log_{a} (x + y) ≠ log_{a} x + log_{a} y. The sum property
 holds for the logarithm of a **product**.

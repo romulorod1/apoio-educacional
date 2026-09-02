@@ -68,7 +68,7 @@ Na prática, o coeficiente da perpendicular é o inverso do outro com o sinal tr
 
 **Exemplo 2.** Reta perpendicular a y = 2x - 1 que passa por (4, 3).
 O coeficiente angular da reta dada é 2, logo o da perpendicular é -1/2. A equação é
-y - 3 = -1/2 · (x - 4), que arrumada fica x + 2y - 10 = 0. Conferindo o ponto: 4 + 6 - 10 = 0.
+y - 3 = (-1/2) · (x - 4), que arrumada fica x + 2y - 10 = 0. Conferindo o ponto: 4 + 6 - 10 = 0.
 
 #### Distância de um ponto a uma reta
 
@@ -93,7 +93,7 @@ duas contas curtas: o ponto médio e o coeficiente angular perpendicular.
 
 **Exemplo 4.** Mediatriz do segmento de extremos (2, 1) e (6, 7).
 O ponto médio é (4, 4). O coeficiente angular do segmento é 6/4 = 3/2, então o coeficiente da
-mediatriz é -2/3. A equação é y - 4 = -2/3 · (x - 4), que arrumada fica 2x + 3y - 20 = 0.
+mediatriz é -2/3. A equação é y - 4 = (-2/3) · (x - 4), que arrumada fica 2x + 3y - 20 = 0.
 
 #### Erros comuns
 
@@ -225,7 +225,7 @@ In practice, the slope of the perpendicular is the reciprocal of the other one w
 
 **Example 2.** Line perpendicular to y = 2x - 1 passing through (4, 3).
 The slope of the given line is 2, so the slope of the perpendicular is -1/2. The equation is
-y - 3 = -1/2 · (x - 4), which tidies up to x + 2y - 10 = 0. Checking the point: 4 + 6 - 10 = 0.
+y - 3 = (-1/2) · (x - 4), which tidies up to x + 2y - 10 = 0. Checking the point: 4 + 6 - 10 = 0.
 
 #### Distance from a point to a line
 
@@ -250,7 +250,7 @@ calculations: the midpoint and the perpendicular slope.
 
 **Example 4.** Perpendicular bisector of the segment whose endpoints are (2, 1) and (6, 7).
 The midpoint is (4, 4). The slope of the segment is 6/4 = 3/2, so the slope of the bisector is -2/3.
-The equation is y - 4 = -2/3 · (x - 4), which tidies up to 2x + 3y - 20 = 0.
+The equation is y - 4 = (-2/3) · (x - 4), which tidies up to 2x + 3y - 20 = 0.
 
 #### Common mistakes
 

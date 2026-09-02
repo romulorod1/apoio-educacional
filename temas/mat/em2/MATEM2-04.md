@@ -25,7 +25,8 @@ O tamanho de uma matriz é dado pelo número de linhas e pelo número de colunas
 matriz de duas linhas e três colunas tem seis números dentro.
 
 Cada número dentro da matriz é um **elemento**, e ele é localizado por dois índices: o primeiro diz a
-linha e o segundo diz a coluna. O elemento da linha i e da coluna j costuma ser escrito a_{ij}.
+linha e o segundo diz a coluna. O elemento da linha i e da coluna j costuma ser escrito a_{ij}, que
+se lê a com os índices i e j.
 
 Como não há desenho aqui, cada matriz vai descrita por linhas. Por exemplo, a matriz de duas linhas e
 duas colunas cuja primeira linha é 1 e 2 e cuja segunda linha é 3 e 4 tem o elemento 3 na segunda
@@ -84,8 +85,9 @@ primeira linha 1 e 0 e segunda linha 1 e 1, e depois na ordem contrária.
 Na primeira ordem, o resultado tem primeira linha 2 e 1 e segunda linha 1 e 1. Na ordem contrária, o
 resultado tem primeira linha 1 e 1 e segunda linha 1 e 2. São matrizes diferentes.
 
-A identidade é a exceção agradável: A · I = I · A = A, ou seja, multiplicar por ela não muda nada.
-Ela faz na multiplicação de matrizes o mesmo papel que o número 1 faz na multiplicação de números.
+A identidade é a exceção agradável: para qualquer matriz quadrada A, A · I = I · A = A, ou seja,
+multiplicar por ela não muda nada. Ela faz na multiplicação de matrizes o mesmo papel que o número 1
+faz na multiplicação de números.
 
 #### Matriz inversa
 
@@ -201,7 +203,8 @@ The size of a matrix is given by its number of rows and its number of columns, i
 matrix with two rows and three columns holds six numbers.
 
 Each number inside the matrix is an **entry**, and it is located by two indices: the first gives the
-row and the second gives the column. The entry in row i and column j is usually written a_{ij}.
+row and the second gives the column. The entry in row i and column j is usually written a_{ij}, read
+as a with indices i and j.
 
 Since there are no pictures here, every matrix is described row by row. For instance, the matrix with
 two rows and two columns whose first row is 1 and 2 and whose second row is 3 and 4 has the entry 3
@@ -259,8 +262,9 @@ first row 1 and 0 and second row 1 and 1, and then in the opposite order.
 In the first order, the result has first row 2 and 1 and second row 1 and 1. In the opposite order,
 the result has first row 1 and 1 and second row 1 and 2. They are different matrices.
 
-The identity is the pleasant exception: A · I = I · A = A, that is, multiplying by it changes
-nothing. It plays the same role in matrix multiplication that the number 1 plays for numbers.
+The identity is the pleasant exception: for any square matrix A, A · I = I · A = A, that is,
+multiplying by it changes nothing. It plays the same role in matrix multiplication that the number 1
+plays for numbers.
 
 #### Inverse matrix
 

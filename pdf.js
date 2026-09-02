@@ -40,13 +40,24 @@
     0xF1: 'n', 0xF2: 'o', 0xF3: 'o', 0xF4: 'o', 0xF5: 'o', 0xF6: 'o',
     0xF9: 'u', 0xFA: 'u', 0xFB: 'u', 0xFC: 'u', 0xFD: 'y', 0xFF: 'y'
   };
+  /* Larguras do AFM da Helvetica e da Helvetica-Bold para os bytes fora do ASCII.
+   * A seção 1 do temas/NOTACAO.md certifica ± ² ³ ½ ¼ ¾ µ × ÷ como escrevíveis
+   * direto, e nenhum deles tinha entrada aqui: todos caíam no fallback da largura
+   * do '?' (556). ½ ¼ ¾ medem 834 de verdade, ou seja 278 milésimos a mais,
+   * exatamente a largura de um espaço, e a linha saía com o texto seguinte colado
+   * na fração. Conferido desenhando cada caractere isolado e medindo o avanço real
+   * na folha, os dois pesos. */
   var W_EXTRA = {
-    0xA0: 278, 0xA7: 556, 0xAA: 370, 0xAB: 556, 0xB0: 400, 0xB7: 278, 0xBA: 365, 0xBB: 556,
+    0xA0: 278, 0xA7: 556, 0xAA: 370, 0xAB: 556, 0xB0: 400, 0xB1: 584, 0xB2: 333, 0xB3: 333,
+    0xB5: 556, 0xB7: 278, 0xBA: 365, 0xBB: 556, 0xBC: 834, 0xBD: 834, 0xBE: 834,
+    0xD7: 584, 0xF7: 584,
     0x80: 556, 0x85: 1000, 0x91: 222, 0x92: 222, 0x93: 333, 0x94: 333, 0x95: 350,
     0x96: 556, 0x97: 1000, 0x99: 1000
   };
   var W_EXTRA_BOLD = {
-    0xA0: 278, 0xA7: 556, 0xAA: 370, 0xAB: 556, 0xB0: 400, 0xB7: 278, 0xBA: 365, 0xBB: 556,
+    0xA0: 278, 0xA7: 556, 0xAA: 370, 0xAB: 556, 0xB0: 400, 0xB1: 584, 0xB2: 333, 0xB3: 333,
+    0xB5: 611, 0xB7: 278, 0xBA: 365, 0xBB: 556, 0xBC: 834, 0xBD: 834, 0xBE: 834,
+    0xD7: 584, 0xF7: 584,
     0x80: 556, 0x85: 1000, 0x91: 278, 0x92: 278, 0x93: 500, 0x94: 500, 0x95: 350,
     0x96: 556, 0x97: 1000, 0x99: 1000
   };
@@ -80,10 +91,17 @@
     'Δ': 612, 'Σ': 592, 'α': 631, 'β': 549, 'θ': 521
   };
   var RE_SIMBOLO = new RegExp('[' + Object.keys(SIMBOLOS).join('') + ']');
+  /* Limitação conhecida: a base-14 não tem Symbol em negrito. Dentro de ** o
+   * glifo de símbolo continua indo para /F3 com o traço fino, enquanto a
+   * Helvetica ao lado vai para /F2, então "**Δ ≥ 0**" sai com peso misturado na
+   * folha. Resolver isso exigiria embutir uma fonte matemática, o que muda o
+   * tamanho do arquivo. Enquanto não houver, título, subtítulo e trecho em
+   * negrito não devem carregar π √ Δ Σ α β θ ≥ ≤ ≠ ∞. */
 
   // Expoente e índice. A chave é obrigatória mesmo com um caractere só, porque
   // sem ela não dá para saber onde o expoente termina.
   var RE_NIVEL = /([\^_])\{([^{}]*)\}/;
+  var RE_NIVEL_G = /([\^_])\{([^{}]*)\}/g;
   var CORPO_NIVEL = 0.62;   // corpo do expoente e do índice, fração do corpo da linha
   var SOBE_NIVEL = 0.42;    // quanto o expoente sobe da linha de base
   var DESCE_NIVEL = 0.16;   // quanto o índice desce
@@ -173,7 +191,7 @@
    * marcação ^{} e _{} não conta, porque ela nunca chega até a fonte. */
   function caracteresQueNaoDesenha(texto) {
     var limpo = String(texto == null ? '' : texto)
-      .replace(/([\^_])\{([^{}]*)\}/g, '$2').replace(/\*\*/g, '');
+      .replace(RE_NIVEL_G, '$2').replace(/\*\*/g, '');
     var fora = [], visto = {};
     for (var i = 0; i < limpo.length; i++) {
       var ch = limpo.charAt(i);
@@ -183,6 +201,20 @@
       fora.push(ch);
     }
     return fora;
+  }
+
+  /* Marcação de expoente ou de índice que não fecha a chave, ou que aninha uma
+   * dentro da outra. A trava de caractere acima não pega isto: '^', '_' e '{' são
+   * ASCII que a Helvetica desenha bem, então "x^{2 sem fechar" e "2^{3^{2}}"
+   * chegariam à folha da aluna com a chave e o circunflexo impressos, e em
+   * silêncio. Devolve o trecho ofensor, já com a marcação bem formada expandida,
+   * ou null quando não sobrou nada. O aninhamento é proibido de propósito: o
+   * partirNivel só reconhece chave sem chave dentro. */
+  function marcacaoQueSobrou(texto) {
+    var limpo = String(texto == null ? '' : texto).replace(RE_NIVEL_G, '$2');
+    var achado = /[\^_]\{|[{}]/.exec(limpo);
+    if (!achado) return null;
+    return limpo.slice(Math.max(0, achado.index - 12), achado.index + 20);
   }
 
   function escapar(wa) {
@@ -980,6 +1012,28 @@
     return itens;
   }
 
+  /* Parte uma palavra que sozinha não cabe na largura, segmento a segmento e,
+   * dentro do segmento, caractere a caractere, medindo cada pedaço no corpo do
+   * nível dele. Devolve linhas de segmentos; a última fica aberta para receber o
+   * que vier depois. */
+  function partirPorCaractere(segs, largura, tam) {
+    var linhas = [], atual = [], usado = 0;
+    for (var i = 0; i < segs.length; i++) {
+      var s = segs[i], corrente = '';
+      for (var c = 0; c < s.txt.length; c++) {
+        var ch = s.txt.charAt(c);
+        var w = medirSeg({ txt: ch, bold: s.bold, nivel: s.nivel }, tam);
+        if (usado > 0 && usado + w > largura) {
+          if (corrente) { atual.push({ txt: corrente, bold: s.bold, nivel: s.nivel }); corrente = ''; }
+          linhas.push(atual); atual = []; usado = 0;
+        }
+        corrente += ch; usado += w;
+      }
+      if (corrente) atual.push({ txt: corrente, bold: s.bold, nivel: s.nivel });
+    }
+    return { linhas: linhas, aberta: atual, usado: usado };
+  }
+
   /* Quebra os pedaços em linhas que cabem na largura, sem separar o negrito nem
    * a potência da base. */
   function quebrarRico(partes, largura, tam) {
@@ -992,6 +1046,16 @@
         linhas.push(atual); atual = []; usado = 0;
       }
       if (itens[i].espaco && usado === 0) continue;
+      /* Palavra sozinha mais larga que a coluna. Sem este ramo a linha atravessa
+       * a margem e o fim é cortado no papel: uma fórmula colada conta como uma
+       * palavra só, e o Doc.prototype.quebrar, o caminho antigo, já se defendia
+       * disso. */
+      if (!itens[i].espaco && usado === 0 && w > largura) {
+        var quebra = partirPorCaractere(segs, largura, tam);
+        for (var q = 0; q < quebra.linhas.length; q++) linhas.push(quebra.linhas[q]);
+        atual = quebra.aberta; usado = quebra.usado;
+        continue;
+      }
       for (var k = 0; k < segs.length; k++) atual.push(segs[k]);
       usado += w;
     }
@@ -1016,6 +1080,25 @@
       px += medir(s.txt, corpo, bold);
     }
     return px - x;
+  };
+
+  /* O texto() cru desenha a marcação como se fosse letra: um título "Potências de
+   * 10^{3}" sairia com a chave e o circunflexo na folha, e ainda por cima
+   * centralizado errado, porque a medida contaria esses caracteres. Este é o
+   * texto() da tubulação rica: mede com medirRico para resolver o alinhamento e
+   * desenha com escreverSegmentos. Uma linha só, sem quebra, para os pontos em que
+   * o texto do autor é curto por natureza: título, subtítulo e nome de bloco. */
+  Doc.prototype.textoRico = function (txt, x, y, opcoes) {
+    opcoes = opcoes || {};
+    var tam = opcoes.tam || 10;
+    var bold = !!opcoes.bold;
+    txt = String(txt == null ? '' : txt);
+    var largura = medirRico(txt, tam, bold);
+    var px = x;
+    if (opcoes.align === 'centro') px = x - largura / 2;
+    else if (opcoes.align === 'direita') px = x - largura;
+    this.escreverSegmentos(partirRico(txt), px, y, { tam: tam, bold: bold, cor: opcoes.cor });
+    return largura;
   };
 
   Doc.prototype.escreverRico = function (texto, opcoes) {
@@ -1050,23 +1133,19 @@
       // subtítulo
       var titulo = /^#{3,6}\s+(.*)$/.exec(limpo);
       if (titulo) {
-        /* Um subtitulo sozinho no pe da pagina e pior do que uma pagina mais
+        /* Um subtítulo sozinho no pé da página é pior do que uma página mais
          * curta: quem vira a folha encontra uma tabela ou uma lista sem saber
-         * do que ela trata. Entao a reserva olha o que vem depois dele, ate
-         * tres linhas de conteudo, e leva tudo junto para a proxima pagina se
-         * nao couber. */
+         * do que ela trata. A reserva olha o que vem depois dele e leva junto. */
         var adiante = 0, j = i + 1;
         while (j < linhas.length && adiante < 3) {
           if (linhas[j].trim()) adiante++;
           else if (adiante) break;
           j++;
         }
-        /* Reserva pelo menos tres linhas de conteudo junto com o subtitulo.
-         * Com uma linha so o titulo ficava sozinho no pe da pagina e a tabela
-         * dele comecava na seguinte, que e o caso que motivou isto. */
         this.garanteEspaco(tam * 2.6 + Math.max(adiante, 3) * tam * 1.7);
         this.y -= tam * 1.7;
-        this.texto(titulo[1], MARG_E, this.y, { tam: tam + 1.5, bold: true, cor: COR.navy });
+        // O subtítulo é texto do autor do tema, então passa pela tubulação rica.
+        this.textoRico(titulo[1], MARG_E, this.y, { tam: tam + 1.5, bold: true, cor: COR.navy });
         this.y -= tam * 0.35;
         i++; continue;
       }
@@ -1122,7 +1201,6 @@
   };
 
   Doc.prototype.tabelaSimples = function (bruto, tam) {
-    var self = this;
     var linhas = bruto.filter(function (l) { return !/^\|[\s:\-|]+\|$/.test(l); })
       .map(function (l) {
         return l.replace(/^\||\|$/g, '').split('|').map(function (c) { return c.trim(); });
@@ -1130,33 +1208,35 @@
     if (!linhas.length) return;
     var colunas = Math.max.apply(null, linhas.map(function (l) { return l.length; }));
     var largura = UTIL / colunas;
-    var util = largura - 12;
     var corpo = tam - 0.8;
     var salto = corpo * 1.35;
-
-    /* A celula quebra na largura da coluna. Sem isto o texto comprido passava
-     * por cima da coluna vizinha, e a linha ficava ilegivel. Como a celula
-     * agora pode ter mais de uma linha, a altura da faixa vem da celula mais
-     * alta da fila, e nao de um valor fixo. */
     this.y -= tam * 0.6;
     for (var i = 0; i < linhas.length; i++) {
-      var partido = [];
-      var maior = 1;
-      for (var c = 0; c < colunas; c++) {
-        var celula = (linhas[i][c] || '').replace(/\*\*/g, '');
-        var quebrado = celula ? self.quebrar(celula, util, corpo, i === 0) : [];
-        partido.push(quebrado);
-        if (quebrado.length > maior) maior = quebrado.length;
+      /* A célula quebra na largura da coluna. Sem isto o texto comprido passava
+       * por cima da coluna vizinha: no material de termologia saía
+       * "A temperatura muda e o estado continua calorsensível", ilegível. Como
+       * a célula pode ter mais de uma linha, a altura da faixa vem da célula
+       * mais alta da fila, e não de um valor fixo. */
+      var partido = [], maior = 1;
+      for (var q = 0; q < colunas; q++) {
+        var bruta = (linhas[i][q] || '').replace(/\*\*/g, '');
+        var quebrada = bruta ? quebrarRico(partirRico(bruta), largura - 12, corpo) : [];
+        partido.push(quebrada);
+        if (quebrada.length > maior) maior = quebrada.length;
       }
       var altura = maior * salto + corpo * 0.9;
       this.garanteEspaco(altura);
       this.y -= altura;
       if (i === 0) this.retangulo(MARG_E, this.y, UTIL, altura, COR.navy);
       else if (i % 2 === 0) this.retangulo(MARG_E, this.y, UTIL, altura, COR.soft);
-      for (c = 0; c < colunas; c++) {
+      for (var c = 0; c < colunas; c++) {
+        /* O ** some e a fila inteira do cabeçalho vai em negrito, que é a regra
+         * antiga. O que muda é o resto: a célula passa pela tubulação rica, senão
+         * "a^{2} + b^{2}" e "A = l · l = l^{2}", que já estão no banco, saíam com a
+         * chave e o circunflexo impressos na folha. */
         var linhasDaCelula = partido[c];
         for (var k = 0; k < linhasDaCelula.length; k++) {
-          this.texto(linhasDaCelula[k], MARG_E + c * largura + 6,
+          this.escreverSegmentos(linhasDaCelula[k], MARG_E + c * largura + 6,
             this.y + altura - corpo * 1.15 - k * salto, {
               tam: corpo, bold: i === 0,
               cor: i === 0 ? COR.branco : COR.texto
@@ -1170,11 +1250,11 @@
 
   Doc.prototype.cabecalhoDeSecao = function (titulo, subtitulo) {
     this.garanteEspaco(52);
-    /* O Y_TOPO ja comeca 30pt abaixo do fio do cabecalho. Descer mais 26 aqui
-     * abria quase um centimetro e meio de papel em branco entre o fio e o
-     * titulo, em toda folha que o aplicativo gera. */
-    this.y -= 12;
-    this.texto(titulo, PAGINA_L / 2, this.y, { tam: 17, bold: true, cor: COR.navy, align: 'centro' });
+    this.y -= 26;
+    /* O título é o nome do tema, escrito pelo autor, então passa pela tubulação
+     * rica: com texto() cru um título "Potências de 10^{3}" sairia com a chave na
+     * folha e ainda centralizado errado, porque a medida contaria a marcação. */
+    this.textoRico(titulo, PAGINA_L / 2, this.y, { tam: 17, bold: true, cor: COR.navy, align: 'centro' });
     if (subtitulo) {
       this.y -= 12;
       this.texto(subtitulo, PAGINA_L / 2, this.y, { tam: 9.5, cor: COR.teal, align: 'centro', tracking: 0.9 });
@@ -1304,7 +1384,8 @@
           blocoAtual = ex.bloco;
           doc.garanteEspaco(28);
           doc.y -= 18;
-          doc.texto(blocoAtual, MARG_E, doc.y, { tam: 11, bold: true, cor: COR.teal });
+          // Nome de bloco também é texto do autor do tema.
+          doc.textoRico(blocoAtual, MARG_E, doc.y, { tam: 11, bold: true, cor: COR.teal });
           doc.y -= 4;
         }
         doc.garanteEspaco(20);
@@ -1341,6 +1422,7 @@
   return {
     Doc: Doc, COR: COR, medir: medir, medirRico: medirRico, paraWinAnsi: paraWinAnsi,
     SIMBOLOS: SIMBOLOS, caracteresQueNaoDesenha: caracteresQueNaoDesenha,
+    marcacaoQueSobrou: marcacaoQueSobrou,
     gerarFechamento: gerarFechamento, gerarResumoMes: gerarResumoMes,
     gerarMaterialTema: gerarMaterialTema, gerarFichaMapeamento: gerarFichaMapeamento,
     NOTA_L: NOTA_L, NOTA_A: NOTA_A,

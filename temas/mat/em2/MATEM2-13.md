@@ -54,7 +54,7 @@ duas casas.
 
 **Exemplo 2.** Comparar, para 2000 reais a 5 por cento ao mês durante 4 meses, o montante em juros
 simples e em juros compostos.
-Em juros simples, o fator é 1 + 0,05 · 4 = 1,2, e o montante é 2400 reais. Em juros compostos, o
+Em juros simples, o fator é 1 + 0,05 × 4 = 1,2, e o montante é 2400 reais. Em juros compostos, o
 fator é 1,05^{4} = 1,21550625, e o montante é 2431,01 reais.
 
 Repare em duas coisas. Primeiro, os dois montantes coincidem ao fim do primeiro período, porque nele
@@ -224,7 +224,7 @@ decimal places.
 
 **Example 2.** For 2000 reais at 5 per cent a month for 4 months, compare the amount under simple
 interest and under compound interest.
-Under simple interest the factor is 1 + 0.05 · 4 = 1.2, and the amount is 2400 reais. Under compound
+Under simple interest the factor is 1 + 0.05 × 4 = 1.2, and the amount is 2400 reais. Under compound
 interest the factor is 1.05^{4} = 1.21550625, and the amount is 2431.01 reais.
 
 Notice two things. First, the two amounts agree at the end of the first period, because there is not

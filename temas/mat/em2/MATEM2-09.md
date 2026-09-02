@@ -142,7 +142,7 @@ se soma ao outro expoente, não se subtrai duas vezes.
 4. x^{4} - 4x^{3} + 6x^{2} - 4x + 1.
 5. 32. Basta substituir x por 1, o que dá 2^{5}.
 6. 16x^{4} - 96x^{3} + 216x^{2} - 216x + 81.
-7. 960. O valor de k é 3, e o termo é C_{10, 3} · 2^{3}.
+7. 960. O valor de k é 3, e o termo tem o coeficiente binomial C_{10, 3} multiplicado por 2^{3}.
 8. 20.
 9. 13.
 10. 160x^{3}. O termo central corresponde a k = 3.
@@ -285,7 +285,8 @@ and it is added to the other exponent, not subtracted twice.
 4. x^{4} - 4x^{3} + 6x^{2} - 4x + 1.
 5. 32. Just replace x with 1, which gives 2^{5}.
 6. 16x^{4} - 96x^{3} + 216x^{2} - 216x + 81.
-7. 960. The value of k is 3, and the term is C_{10, 3} · 2^{3}.
+7. 960. The value of k is 3, and the term has the binomial coefficient C_{10, 3} multiplied by
+   2^{3}.
 8. 20.
 9. 13.
 10. 160x^{3}. The middle term corresponds to k = 3.

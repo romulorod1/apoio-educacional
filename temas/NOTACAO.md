@@ -33,6 +33,11 @@ O PDF não tem esses glifos na fonte de texto. Escreva com a marcação abaixo, 
 A chave é obrigatória mesmo com um caractere só: `x^{2}`, e não `x^2`. Sem a chave o gerador não
 sabe onde o expoente termina.
 
+**Não existe marcação dentro de marcação.** `2^{3^{2}}` não funciona: o gerador desenha um pedaço
+literal no meio da fórmula, sem avisar. Potência de potência precisa ser escrita de outro jeito, em
+prosa ou em duas etapas. O `verificar.py` reprova chave mal fechada e chave aninhada, porque os dois
+passavam por todas as outras travas e chegavam calados na folha.
+
 ## 3. O que vem da fonte de símbolos
 
 Escreva o caractere de verdade. O gerador troca de fonte sozinho para desenhá-lo.
