@@ -1495,11 +1495,11 @@
   }
   function comNivel(ctx) {
     return { base: ctx.base, nivel: Math.min(ctx.nivel + 1, 2), frac: ctx.frac,
-      cor: ctx.cor, bold: ctx.bold, reg: ctx.reg };
+      cor: ctx.cor, bold: ctx.bold, reg: ctx.reg, lingua: ctx.lingua };
   }
   function comFracao(ctx) {
     return { base: ctx.base, nivel: ctx.nivel, frac: ctx.frac + 1,
-      cor: ctx.cor, bold: ctx.bold, reg: ctx.reg };
+      cor: ctx.cor, bold: ctx.bold, reg: ctx.reg, lingua: ctx.lingua };
   }
 
   function montarLista(lista, ctx) {
@@ -1684,7 +1684,7 @@
     var indice = null, largIndice = 0;
     if (no.indice) {
       var ctxI = { base: ctx.base, nivel: 2, frac: ctx.frac, cor: ctx.cor,
-        bold: ctx.bold, reg: ctx.reg };
+        bold: ctx.bold, reg: ctx.reg, lingua: ctx.lingua };
       indice = montarLista(no.indice, ctxI).caixa;
       largIndice = indice.largura + tam * 0.06;
     }

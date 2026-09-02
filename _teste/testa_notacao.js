@@ -447,6 +447,27 @@ secao('13. O nome de função na fórmula segue a língua da folha');
   conf('folha em inglês escreve sin e tan', tem(en, 'sin\\(') && tem(en, 'tan\\('), true);
   conf('e não escreve sen nem tg', tem(en, 'sen\\(') || tem(en, 'tg\\('), false);
   conf('cos é igual nas duas', tem(pt, 'cos\\(') && tem(en, 'cos\\('), true);
+
+  /* O caso que passou por engano: dentro de FRAÇÃO (e raiz, expoente, cerca) o
+   * renderizador deriva um contexto novo copiando campos, e a língua não ia
+   * junto. A folha inglesa do MATEM2-15 saiu com nove "tg(a)" e "tg(b)", todos
+   * de dentro da tangente da soma. A prova de cima não pegava porque só olhava
+   * uma função solta no nível de cima. */
+  const aninhada = (lingua) => {
+    const d = new PDFGen.Doc();
+    d.lingua = lingua;
+    d.novaPagina();
+    d.markdown('@eq \\frac{\\tan(a) + \\tan(b)}{1 - \\tan(a) \\tan(b)} + \\sqrt{\\sin(x)} + 2^{\\cos(x)}', { tam: 10 });
+    const b = Buffer.from(d.finalizar()).toString('latin1');
+    const rx = /Td \(((?:[^()\\]|\\.)*)\) Tj/g;
+    let m, o = [];
+    while ((m = rx.exec(b))) o.push(m[1]);
+    return o;
+  };
+  const enA = aninhada('en'), ptA = aninhada('pt');
+  conf('dentro de fração, raiz e expoente a folha inglesa escreve tan e sin',
+    tem(enA, 'tan\\(') && tem(enA, 'sin\\(') && !tem(enA, 'tg\\(') && !tem(enA, 'sen\\('), true);
+  conf('e a portuguesa escreve tg e sen', tem(ptA, 'tg\\(') && tem(ptA, 'sen\\('), true);
 }
 
 // ================================================================
