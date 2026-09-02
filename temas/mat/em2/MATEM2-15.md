@@ -66,9 +66,9 @@ arco é o seno do seu complementar.
 Dividindo sen(a + b) por cos(a + b) e depois dividindo numerador e denominador por cos(a) · cos(b),
 chega-se a
 
-@eq \text{tg}(a + b) = \frac{\text{tg}(a) + \text{tg}(b)}{1 - \text{tg}(a) \cdot \text{tg}(b)}
+@eq \tg(a + b) = \frac{\tg(a) + \tg(b)}{1 - \tg(a) \cdot \tg(b)}
 
-@eq \text{tg}(a - b) = \frac{\text{tg}(a) - \text{tg}(b)}{1 + \text{tg}(a) \cdot \text{tg}(b)}
+@eq \tg(a - b) = \frac{\tg(a) - \tg(b)}{1 + \tg(a) \cdot \tg(b)}
 
 As fórmulas só valem quando as tangentes envolvidas existem e o denominador não é zero. Quando
 tg(a) · tg(b) = 1, o arco a + b tem cosseno zero, e a tangente dele não existe.
@@ -87,7 +87,7 @@ sen(2a) = 2 · sen(a) · cos(a)
 
 cos(2a) = cos^{2}(a) - sen^{2}(a)
 
-@eq \text{tg}(2a) = \frac{2 \cdot \text{tg}(a)}{1 - \text{tg}^{2}(a)}
+@eq \tg(2a) = \frac{2 \cdot \tg(a)}{1 - \tg^{2}(a)}
 
 O cosseno do arco duplo tem mais duas formas, que saem da relação fundamental
 sen^{2}(a) + cos^{2}(a) = 1. Trocando cos^{2}(a) por 1 - sen^{2}(a), ou sen^{2}(a) por
