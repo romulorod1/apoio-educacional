@@ -21,6 +21,8 @@ import os
 import re
 import sys
 import glob
+
+AQUI = os.path.dirname(os.path.abspath(__file__))
 import traceback
 
 from sympy import (symbols, solve, Eq, simplify, expand, factor, Rational, sqrt,
@@ -258,35 +260,68 @@ def eh_tautologia(expressao):
 
 # ---------------------------------------------------------------- caracteres
 
-# O PDF usa as fontes base-14 com WinAnsiEncoding, que cobrem o portugues
-# inteiro mas nao cobrem grego, raiz nem comparacao. Um caractere fora do
-# repertorio nao quebra nada: vira uma interrogacao silenciosa no meio da
-# formula, e so aparece quando alguem olha o material pronto. Foi assim que
-# 38 letras pi entraram no banco e sairam como "?" no material de circunferencia.
+# O PDF usa as fontes base-14, que cobrem o portugues inteiro mas nao cobrem
+# grego, raiz nem comparacao, e uma fonte de simbolos para os poucos casos que
+# faltam. Um caractere fora do repertorio nao quebra nada: vira uma
+# interrogacao silenciosa no meio da formula, e so aparece quando alguem olha o
+# material pronto. Foi assim que 38 letras pi entraram no banco e sairam como
+# "?" no material de circunferencia.
 #
-# O repertorio permitido esta em temas/NOTACAO.md, e e a uniao de dois
-# conjuntos: o que a fonte de texto desenha e o que a fonte de simbolos
-# desenha. Quem quiser um caractere novo mexe aqui e no gerador, nunca so num.
+# Quem desenha e o pdf.js, entao a autoridade sobre o repertorio e ele. Este
+# arquivo NAO mantem lista propria: ele pergunta. E o mesmo padrao que o
+# gerar_banco.py usa com o busca.js, e existe pelo mesmo motivo: lista repetida
+# em dois lugares diverge no dia em que alguem mexe em um so, e a trava para de
+# travar sem ninguem perceber.
 
-SIMBOLOS_DA_FONTE = u'\u03c0\u221a\u2265\u2264\u2260\u221e\u0394\u03a3\u03b1\u03b2\u03b8'
-TIPOGRAFICOS = u'\u201c\u201d\u2018\u2019\u20ac\u2026\u2030\u2022\u2020\u2021'
+_PERGUNTA = (
+    "const P=require(process.argv[1]);"
+    "const cs=JSON.parse(process.argv[2]);"
+    "process.stdout.write(JSON.stringify("
+    "cs.filter(function(c){return P.caracteresQueNaoDesenha(c).length>0;})));"
+)
+
+_veredito = {}          # caractere -> True quando o PDF NAO desenha
 
 
-def _desenhavel(c):
-    n = ord(c)
-    if n < 32:
-        return c in u'\n\r\t'
-    if n < 256:
-        return True          # o latin-1 inteiro cabe no WinAnsi
-    return c in SIMBOLOS_DA_FONTE or c in TIPOGRAFICOS
+def _perguntar_ao_gerador(caracteres):
+    """Pergunta ao pdf.js quais destes ele nao sabe desenhar.
+
+    Uma chamada por lote, e o resultado fica guardado para o resto da
+    execucao: o banco inteiro usa umas poucas centenas de caracteres
+    distintos, entao na pratica sao uma ou duas chamadas por rodada.
+    """
+    import json
+    import subprocess
+    pdf = os.path.join(os.path.dirname(RAIZ), 'pdf.js')
+    saida = subprocess.run(
+        ['node', '-e', _PERGUNTA, pdf, json.dumps(caracteres)],
+        capture_output=True, text=True, encoding='utf-8')
+    if saida.returncode != 0:
+        raise Problema('nao consegui perguntar ao pdf.js quais caracteres ele '
+                       'desenha: %s' % saida.stderr[:300])
+    return set(json.loads(saida.stdout or '[]'))
+
+
+# Alem do que o PDF desenha, ha coisa que simplesmente nao deve estar num
+# arquivo de tema, mesmo sendo desenhavel. Controle e uma delas: o gerador
+# transforma em espaco e segue, mas no fonte e sempre erro de edicao.
+def _proibido_no_fonte(c):
+    return ord(c) < 32 and c not in u'\n\r\t'
 
 
 def caracteres_indesenhaveis(texto):
     """Devolve [(linha, caractere, codigo, trecho)] do que o PDF nao desenha."""
+    novos = sorted(set(ch for ch in texto if ch not in _veredito
+                       and not _proibido_no_fonte(ch)))
+    if novos:
+        ruins = _perguntar_ao_gerador(novos)
+        for ch in novos:
+            _veredito[ch] = ch in ruins
+
     achados = []
     for numero, linha in enumerate(texto.split(u'\n'), 1):
         for i, c in enumerate(linha):
-            if not _desenhavel(c):
+            if _proibido_no_fonte(c) or _veredito.get(c):
                 # o console do Windows nao imprime o proprio caractere, entao
                 # o trecho sai com ele trocado pelo codigo
                 trecho = linha[max(0, i - 24):i + 24].strip()
