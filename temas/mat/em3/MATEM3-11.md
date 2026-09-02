@@ -57,6 +57,25 @@ P = n! / (p! · q!)
 onde P é o número de ordens distintas, n o total de elementos, e p e q as quantidades de cada
 elemento que se repete.
 
+#### Permutação circular
+
+Quando os elementos ficam dispostos em círculo, girar a roda inteira não produz uma disposição nova:
+cada um continua com os mesmos vizinhos dos dois lados. Para não contar a mesma roda uma vez por
+rotação, fixa-se um elemento em um lugar qualquer e ordenam-se apenas os outros. Com n elementos
+distintos em círculo, o número de disposições é:
+
+P_{c} = (n - 1)!
+
+onde P_{c} é o número de disposições circulares distintas e n o total de elementos. É a permutação
+comum dividida por n, justamente porque cada roda aparece n vezes na contagem em fila, uma para cada
+rotação.
+
+**Exemplo 2.** De quantos modos 4 amigos podem se sentar em torno de uma mesa redonda, contando como
+iguais as disposições que diferem apenas por uma rotação?
+Fixando um dos amigos em um lugar, sobram 3 lugares para os outros 3, o que dá 3! = 6 modos. Pela
+fórmula, (4 - 1)! = 6, o mesmo resultado. A conta em fila daria 4! = 24, quatro vezes mais, e cada
+roda teria sido contada uma vez para cada uma das 4 rotações.
+
 #### Combinação
 
 Combinar é escolher um subconjunto sem se importar com a ordem. O número de modos de escolher k
@@ -66,7 +85,7 @@ C_{n,k} = n! / (k! · (n - k)!)
 
 onde C_{n,k} é a combinação de n elementos tomados k a k, também chamada binomial de n sobre k.
 
-**Exemplo 2.** De quantos modos se forma uma comissão de 3 pessoas em um grupo de 10?
+**Exemplo 3.** De quantos modos se forma uma comissão de 3 pessoas em um grupo de 10?
 Como a comissão não tem cargos, a ordem não importa. O total é C_{10,3} = 120.
 
 #### Probabilidade em espaço equiprovável
@@ -77,7 +96,7 @@ P(A) = casos favoráveis / casos possíveis
 
 A parte difícil quase nunca é a divisão: é contar direito os dois números.
 
-**Exemplo 3.** Jogando dois dados comuns, qual a probabilidade de a soma dar 7?
+**Exemplo 4.** Jogando dois dados comuns, qual a probabilidade de a soma dar 7?
 Os casos possíveis são 36. Os favoráveis são os pares em que a soma dá 7, e há 6 deles. A
 probabilidade é 6/36 = 1/6.
 
@@ -90,7 +109,7 @@ P(pelo menos um) = 1 - P(nenhum)
 
 Contar diretamente todos os casos com um, dois ou três acertos dá muito mais trabalho.
 
-**Exemplo 4.** Jogando três dados, qual a probabilidade de sair ao menos um 6?
+**Exemplo 5.** Jogando três dados, qual a probabilidade de sair ao menos um 6?
 A probabilidade de um dado não dar 6 é 5/6. Para os três, é (5/6)^{3} = 125/216. Logo a resposta é
 1 - 125/216 = 91/216.
 
@@ -117,6 +136,9 @@ contado duas vezes.
 
 **Tratar extração sem reposição como se fosse com reposição.** Depois da primeira retirada, o total
 diminui, e o número de favoráveis também.
+
+**Contar a mesa redonda como se fosse uma fila.** Em círculo, deslocar todo mundo um lugar não muda
+quem senta ao lado de quem, então o total é (n - 1)!, e não n!.
 
 ### Exercícios
 
@@ -226,6 +248,25 @@ P = n! / (p! · q!)
 where P is the number of distinct orders, n the total number of elements, and p and q the amounts
 of each repeated element.
 
+#### Circular permutations
+
+When the elements are placed in a circle, turning the whole ring produces no new arrangement: each
+one still has the same neighbours on both sides. So that the same ring is not counted once per
+rotation, one element is held in any fixed place and only the others are put in order. With n
+distinct elements in a circle, the number of arrangements is:
+
+P_{c} = (n - 1)!
+
+where P_{c} is the number of distinct circular arrangements and n the total number of elements. It
+is the ordinary permutation divided by n, precisely because each ring turns up n times in the count
+made along a line, once for every rotation.
+
+**Example 2.** In how many ways can 4 friends sit around a round table, counting as equal the
+arrangements that differ only by a rotation?
+Holding one of the friends in one place, 3 places are left for the other 3, which gives 3! = 6 ways.
+By the formula, (4 - 1)! = 6, the same result. The count along a line would give 4! = 24, four times
+as many, and each ring would have been counted once for each of the 4 rotations.
+
 #### Combinations
 
 To combine is to choose a subset without caring about order. The number of ways of choosing k
@@ -236,7 +277,7 @@ C_{n,k} = n! / (k! · (n - k)!)
 where C_{n,k} is the combination of n elements taken k at a time, also called the binomial of n
 over k.
 
-**Example 2.** In how many ways can a committee of 3 people be formed from a group of 10?
+**Example 3.** In how many ways can a committee of 3 people be formed from a group of 10?
 Since the committee has no ranks, order does not matter. The total is C_{10,3} = 120.
 
 #### Probability in an equally likely space
@@ -247,7 +288,7 @@ P(A) = favourable cases / possible cases
 
 The hard part is almost never the division: it is counting both numbers properly.
 
-**Example 3.** Rolling two ordinary dice, what is the probability that the sum is 7?
+**Example 4.** Rolling two ordinary dice, what is the probability that the sum is 7?
 The possible cases are 36. The favourable ones are the pairs whose sum is 7, and there are 6 of them.
 The probability is 6/36 = 1/6.
 
@@ -260,7 +301,7 @@ P(at least one) = 1 - P(none)
 
 Counting directly all the cases with one, two or three hits is far more work.
 
-**Example 4.** Rolling three dice, what is the probability of getting at least one 6?
+**Example 5.** Rolling three dice, what is the probability of getting at least one 6?
 The probability that one die does not show 6 is 5/6. For all three it is (5/6)^{3} = 125/216. So
 the answer is 1 - 125/216 = 91/216.
 
@@ -286,6 +327,9 @@ uses both has been counted twice.
 
 **Treating drawing without replacement as if it were with replacement.** After the first draw the
 total goes down, and so does the number of favourable cases.
+
+**Counting a round table as if it were a queue.** In a circle, moving everybody one place along does
+not change who sits next to whom, so the total is (n - 1)!, and not n!.
 
 ### Exercises
 
@@ -353,9 +397,10 @@ total goes down, and so does the number of favourable cases.
 
 ```python
 X1: factorial(5) == 120
-X2: binomial(10, 3) == 120
-X3: Rational(6, 36) == Rational(1, 6)
-X4: 1 - Rational(5, 6)**3 == Rational(91, 216) and Rational(5, 6)**3 == Rational(125, 216)
+X2: factorial(4)/4 == 6 and factorial(3) == 6 and factorial(4) == 24
+X3: binomial(10, 3) == 120
+X4: Rational(6, 36) == Rational(1, 6)
+X5: 1 - Rational(5, 6)**3 == Rational(91, 216) and Rational(5, 6)**3 == Rational(125, 216)
 E1: factorial(5) == 120
 E2: binomial(8, 3) == 56
 E3: Rational(6, 36) == Rational(1, 6)

@@ -127,8 +127,8 @@ soluções, e o enunciado quase sempre pede todas.
 16. Resolva a equação sen^{2}(x) = sen(x), com 0 ≤ x < 2π.
 17. Uma função da forma f(x) = b · cos(c · x), com b positivo e c positivo, tem imagem [-3, 3] e
     período π. Determine b e c.
-18. Mostre que a função f(x) = sen(x) · cos(x) tem período π e valor máximo 1/2. Use a identidade
-    que escreve o produto como metade do seno do arco dobrado.
+18. Mostre que a função f(x) = |sen(x)| tem período π e imagem [0, 1]. Justifique também por que
+    nenhum valor positivo menor que π pode ser período dessa função.
 19. A temperatura em graus de uma cidade, t horas após a meia-noite, é modelada por
     T(t) = 20 + 6 · sen(πt/12). Determine a temperatura máxima, o instante em que ela
     ocorre e todos os instantes, com 0 ≤ t < 24, em que a temperatura vale 23.
@@ -154,9 +154,10 @@ soluções, e o enunciado quase sempre pede todas.
 16. x = 0, x = π/2 e x = π. Passando tudo para um lado, sen(x) aparece em evidência, e o produto é
     zero quando o seno vale zero ou vale 1.
 17. b = 3 e c = 2. A imagem dá a amplitude e o período dá o fator que multiplica x.
-18. O produto do seno pelo cosseno é metade do seno do arco dobrado. Como o seno do arco dobrado tem
-    período π na variável x, a função também tem. E como o seno chega a 1, o produto chega a 1/2,
-    valor atingido em π/4.
+18. Somar π ao arco troca o sinal do seno, e o módulo desfaz essa troca: |sen(x + π)| = |sen(x)|,
+    logo π é período. Nenhum valor positivo menor serve, porque f(0) = 0 e, numa volta, o seno só se
+    anula em 0 e em π. A imagem é [0, 1], já que o seno percorre [-1, 1] e o módulo dobra a parte
+    negativa para cima.
 19. Temperatura máxima de 26 graus, atingida em t = 6. A temperatura vale 23 graus em t = 2 e em
     t = 10.
 
@@ -279,8 +280,8 @@ solutions, and the problem nearly always asks for all of them.
 16. Solve the equation sin^{2}(x) = sin(x), with 0 ≤ x < 2π.
 17. A function of the form f(x) = b · cos(c · x), with b positive and c positive, has range [-3, 3]
     and period π. Find b and c.
-18. Show that the function f(x) = sin(x) · cos(x) has period π and maximum value 1/2. Use the
-    identity that writes the product as half the sine of the doubled arc.
+18. Show that the function f(x) = |sin(x)| has period π and range [0, 1]. Justify as well why no
+    positive value smaller than π can be a period of this function.
 19. The temperature in degrees of a town, t hours after midnight, is modelled by
     T(t) = 20 + 6 · sin(πt/12). Find the maximum temperature, the moment it happens
     and every moment, with 0 ≤ t < 24, when the temperature is 23.
@@ -308,9 +309,10 @@ solutions, and the problem nearly always asks for all of them.
 16. x = 0, x = π/2 and x = π. Moving everything to one side puts sin(x) in evidence, and the product
     is zero when the sine is zero or equals 1.
 17. b = 3 and c = 2. The range gives the amplitude and the period gives the factor multiplying x.
-18. The product of sine and cosine is half the sine of the doubled arc. Since the sine of the
-    doubled arc has period π in the variable x, the function has it too. And since the sine reaches
-    1, the product reaches 1/2, a value attained at π/4.
+18. Adding π to the arc flips the sign of the sine, and the modulus undoes that flip:
+    |sin(x + π)| = |sin(x)|, so π is a period. No smaller positive value works, because f(0) = 0
+    and, over one turn, the sine vanishes only at 0 and at π. The range is [0, 1], since the sine
+    sweeps [-1, 1] and the modulus folds the negative part upwards.
 19. Maximum temperature of 26 degrees, reached at t = 6. The temperature is 23 degrees at t = 2 and
     at t = 10.
 
@@ -338,6 +340,6 @@ E14: solveset(Eq(cos(2*x), Rational(1,2)), x, Interval.Ropen(0, 2*pi)) == Finite
 E15: solve([Eq(a + b, 9), Eq(a - b, 1)], [a, b]) == {a: 5, b: 4}
 E16: solveset(Eq(sin(x)**2, sin(x)), x, Interval.Ropen(0, 2*pi)) == FiniteSet(0, pi/2, pi)
 E17: solve(Eq(2*pi/c, pi), c) == [2] and 3*1 == 3
-E18: simplify(sin(x)*cos(x) - sin(2*x)/2) == 0 and simplify(sin(x + pi)*cos(x + pi) - sin(x)*cos(x)) == 0 and sin(pi/4)*cos(pi/4) == Rational(1,2)
+E18: simplify(Abs(sin(x + pi)) - Abs(sin(x))) == 0 and solveset(Eq(Abs(sin(x)), 0), x, Interval.Ropen(0, 2*pi)) == FiniteSet(0, pi) and Abs(sin(pi/2)) == 1 and Abs(sin(0)) == 0
 E19: 20 + 6 == 26 and solve(Eq(pi*t/12, pi/2), t) == [6] and solveset(Eq(20 + 6*sin(pi*t/12), 23), t, Interval.Ropen(0, 24)) == FiniteSet(2, 10)
 ```
