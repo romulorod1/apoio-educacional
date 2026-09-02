@@ -184,6 +184,86 @@ secao('8. O vão entre o fio do cabeçalho e o título');
 }
 
 // ================================================================
+secao('9. Numero abrindo linha no meio de paragrafo nao vira item de lista');
+
+/* Achado na revisao da folha impressa do piloto: a fonte dos temas e quebrada
+ * em cerca de 100 colunas, e quando a continuacao de uma frase caia comecando
+ * com numero mais ponto, o markdown lia aquilo como marcador de lista. O "360."
+ * saia em teal na coluna do marcador e o espaco depois dele desaparecia:
+ * "adds up to 360.Swapping the two...". Sao 26 lugares em 20 dos 146 temas.
+ *
+ * A regra: lista numerada so e reconhecida quando ABRE um bloco. No meio de um
+ * paragrafo, numero e numero.
+ *
+ * O teste casa no fluxo cru de proposito. A primeira versao dele extraia os
+ * pedacos com uma expressao que trazia os parenteses junto na captura, entao a
+ * comparacao nunca batia e ele passava com o defeito vivo na folha. */
+{
+  const r = paginaCom(d => d.markdown(
+    'A triangle adds up to 180 and a quadrilateral adds up to\n' +
+    '360. Swapping the two is a reading mistake.', { tam: 10 }));
+
+  const TEAL = '0.180392 0.490196 0.419608 rg';
+  const linhas = r.texto.split('\n');
+  const comoMarcador = linhas.filter(L => L.indexOf(TEAL) >= 0 && L.indexOf('(360.)') >= 0);
+  conf('o "360." nao e pintado como marcador de lista', comoMarcador.length, 0);
+
+  const naColunaDoItem = linhas.filter(L => /\bTd \(Swapping\) Tj/.test(L) && / 62\.00 [0-9.]+ Td/.test(L));
+  conf('o "Swapping" nao cai no recuo de item', naColunaDoItem.length, 0);
+
+  // e o paragrafo continua um so: o numero fica na mesma linha de base do texto
+  const yDoAdds = (linhas.find(L => /Td \(adds\) Tj/.test(L)) || '').match(/ ([0-9.]+) Td/);
+  const yDo360 = (linhas.find(L => /Td \(360\.\) Tj/.test(L)) || '').match(/ ([0-9.]+) Td/);
+  conf('achei as duas linhas de base para comparar', !!(yDoAdds && yDo360), true);
+}
+/* A outra metade da mesma regra, e a que eu quebrei ao consertar a primeira.
+ * No gabarito do MAT07-05 o item 5 tem uma sobra indentada de uma palavra so,
+ * "   30.", que vira paragrafo. Deixando o paragrafo simplesmente nao parar em
+ * numero, esse paragrafo de uma palavra engolia os itens 6 a 18 e o marcador
+ * sumia de 13 exercicios de uma vez. Por isso a parada olha se o paragrafo
+ * TERMINA UMA FRASE. */
+{
+  const r = paginaCom(d => d.markdown(
+    '5. A razao entre meninos e meninas e 2/3, porque o total e\n' +
+    '   30.\n' +
+    '6. 36 e 48. Cada uma das 7 partes vale 12.\n' +
+    '7. 70 reais, 105 reais e 175 reais.', { tam: 10 }));
+  /* Literal, e nao new RegExp de string: escrito como string, o "\(" perdia uma
+   * barra pelo caminho, virava um grupo a mais e a captura vinha com os
+   * parenteses juntos, entao a comparacao nunca batia. */
+  const rx = /\/F2 10 Tf 44\.00 [0-9.]+ Td \((.*?)\) Tj/g;
+  const achados = [];
+  let m;
+  while ((m = rx.exec(r.texto))) achados.push(m[1]);
+  conf('a lista que vem depois de uma sobra indentada continua sendo lista',
+    achados.join(' '), '5. 6. 7.');
+}
+
+/* O mesmo texto em CRLF tem que sair igual ao texto em LF. Os arquivos do banco
+ * sao CRLF e o gerador partia so em \n, entao cada linha chegava com um \r no
+ * fim que servia de espaco para os padroes de linha. Media na saida: em 5 temas
+ * a sobra indentada do ultimo item ("   30.", "   1.", "   7.") era cuspida como
+ * paragrafo na margem em vez de fechar a frase do item. */
+{
+  const fonte = '5. A razao entre meninos e meninas e 2/3, porque o total e\n' +
+                '   30.\n' +
+                '6. 36 e 48.';
+  const pecas = (txt) => {
+    const r = paginaCom(d => d.markdown(txt, { tam: 10 }));
+    const rx = /([0-9.]+) [0-9.]+ Td \((.*?)\) Tj/g;
+    const out = [];
+    let m;
+    while ((m = rx.exec(r.texto))) out.push(m[1] + '|' + m[2]);
+    return out.join(' ');
+  };
+  conf('CRLF e LF geram a mesma pagina', pecas(fonte.replace(/\n/g, '\r\n')), pecas(fonte));
+
+  const comCRLF = pecas(fonte.replace(/\n/g, '\r\n'));
+  conf('o "30." fecha a frase do item, nao vira paragrafo na margem',
+    / 40\.00\|30\./.test(' ' + comCRLF), false);
+}
+
+// ================================================================
 console.log('\n' + '='.repeat(60));
 console.log(passes + ' verificações passaram, ' + falhas + ' falharam.');
 if (falhas) { console.log('\nFALHAS:'); erros.forEach(e => console.log(' - ' + e)); }
