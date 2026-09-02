@@ -23,3 +23,6 @@ _teste/_pdf_antes.js
 # cache do Python
 __pycache__/
 *.pyc
+
+# retratos de seguranca dos arquivos criticos, so locais
+.retratos/

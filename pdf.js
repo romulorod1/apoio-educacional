@@ -1122,7 +1122,15 @@
   Doc.prototype.markdown = function (texto, opcoes) {
     opcoes = opcoes || {};
     var tam = opcoes.tam || 10;
-    var linhas = String(texto || '').split('\n');
+    /* Parte em \r?\n e não só em \n. Os arquivos de tema são CRLF, então com
+     * split('\n') toda linha chegava aqui com um \r pendurado no fim, e todo
+     * teste de linha via esse \r como espaço. Efeito medido: a sobra indentada
+     * "   30." do item 5 do gabarito do MAT07-05 casava com o padrão de item de
+     * lista, porque o \r servia de espaço depois do ponto; o laço de continuação
+     * parava ali e a sobra virava parágrafo solto na margem, fora do recuo do
+     * item. O mesmo arquivo em LF saía certo, que é um jeito ruim de um gerador
+     * se comportar. */
+    var linhas = String(texto || '').split(/\r?\n/);
     var i = 0;
     while (i < linhas.length) {
       var linha = linhas[i];
@@ -1190,7 +1198,31 @@
       while (i + 1 < linhas.length && linhas[i + 1].trim() &&
              linhas[i + 1].trim().charAt(0) !== '|' &&
              !/^#{3,6}\s/.test(linhas[i + 1].trim()) &&
-             !/^\s*([-*]|\d+\.)\s/.test(linhas[i + 1])) {
+             /* Para em marcador de topico sempre. Em numero mais ponto, so para
+              * quando o que ja esta no paragrafo TERMINA UMA FRASE.
+              *
+              * A fonte dos temas e quebrada em cerca de 100 colunas e a continuacao
+              * de uma frase cai comecando por numero com frequencia: "...and a
+              * quadrilateral adds up to" / "360. Swapping the two...". Parando ali,
+              * o 360 virava marcador de lista, ia para a coluna do marcador em teal,
+              * o resto do periodo ganhava recuo de item e o espaco depois do ponto
+              * sumia na folha impressa. Sao 26 lugares em 20 dos 146 temas, em
+              * portugues e em ingles.
+              *
+              * Nao basta deixar de parar em numero: a lista do gabarito do MAT07-05
+              * vem depois da linha "   30.", que e a sobra indentada do item 5 e vira
+              * um paragrafo de uma palavra so. Sem o teste de fim de frase, esse
+              * paragrafo engolia os itens 6 a 18 inteiros, e o marcador sumia de 13
+              * exercicios. Foi medido: 58 marcadores perdidos no banco contra os 26
+              * esperados.
+              *
+              * O fim de frase separa os dois casos sem ambiguidade no banco todo. As
+              * 26 continuacoes falsas terminam em palavra solta ou em virgula ("adds
+              * up to", "1, 3, 6, 10,"); toda lista de verdade nasce depois de linha em
+              * branco, de titulo, ou de linha terminada em ponto. Virgula NAO conta
+              * como fim de frase, de proposito: uma das 26 termina em virgula. */
+             (!/^\s*\d+\.\s/.test(linhas[i + 1]) || !/[.?!:]$/.test(paragrafo.trim())) &&
+             !/^\s*[-*]\s/.test(linhas[i + 1])) {
         paragrafo += ' ' + linhas[i + 1].trim();
         i++;
       }
