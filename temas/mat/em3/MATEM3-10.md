@@ -96,7 +96,8 @@ ser conferida no enunciado original.
 **Bloco B. Consolidação**
 
 6. Uma função afim passa pelos pontos (1, 5) e (3, 11). Determine sua lei.
-7. Sendo f(x) = 2x - 3 e g(x) = x^{2} + 1, calcule f(g(2)) e depois g(f(2)).
+7. Sendo f(x) = 2x - 3 e g(x) = x^{2} + 1, calcule f(g(2)), aplicando g ao número 2 e depois f ao
+   resultado, e em seguida calcule g(f(2)).
 8. Determine a função inversa de f(x) = (3x - 1)/2.
 9. Resolva a equação 3^{2x - 1} = 27.
 10. Resolva a equação log_{2} (x - 1) + log_{2} (x + 1) = 3.
@@ -112,8 +113,8 @@ ser conferida no enunciado original.
     cruzam.
 15. A receita de uma empresa, em reais, é dada por R(p) = p · (200 - 4p), em que p é o preço unitário
     em reais. Determine o preço que dá receita máxima e o valor dessa receita.
-16. Mostre que a função dada por f(x) = (x + 2)/(x - 1) é igual à sua própria inversa, verificando
-    que f(f(x)) devolve x.
+16. Determine a função inversa de f(x) = 2^{x - 3} + 1 e calcule o valor que essa inversa assume
+    em 9.
 17. Determine o valor de k para que a reta de equação y = x + k toque a parábola de equação
     y = x^{2} em um único ponto.
 18. Uma cultura começa com 500 bactérias e dobra a cada 3 horas. Depois de quantas horas a população
@@ -137,8 +138,8 @@ ser conferida no enunciado original.
 13. O maior valor é 4, atingido em x = 3. O conjunto imagem são os reais y ≤ 4.
 14. Os gráficos se cruzam em x = 1 e em x = 4, pois a igualdade leva a x^{2} - 5x + 4 = 0.
 15. O preço é 25 reais e a receita máxima é 2500 reais.
-16. Substituindo, f(f(x)) tem numerador 3x/(x - 1) e denominador 3/(x - 1). O quociente é x, para
-    todo x ≠ 1.
+16. A inversa é f^{-1}(x) = 3 + log_{2} (x - 1), definida para x > 1. Em 9 ela vale 6, porque
+    log_{2} 8 = 3. Conferindo no sentido contrário, f(6) = 2^{3} + 1 = 9.
 17. k = -1/4. A igualdade leva a x^{2} - x - k = 0, e o discriminante Δ = 1 + 4k precisa ser nulo.
 18. Depois de 18 horas. A população é P(t) = 500 · 2^{t/3}, e 32000/500 = 64 = 2^{6}.
 
@@ -231,7 +232,8 @@ one must be checked against the original statement.
 **Block B. Building up**
 
 6. An affine function passes through the points (1, 5) and (3, 11). Find its rule.
-7. With f(x) = 2x - 3 and g(x) = x^{2} + 1, work out f(g(2)) and then g(f(2)).
+7. With f(x) = 2x - 3 and g(x) = x^{2} + 1, work out f(g(2)), applying g to the number 2 and then f
+   to the result, and after that work out g(f(2)).
 8. Find the inverse function of f(x) = (3x - 1)/2.
 9. Solve the equation 3^{2x - 1} = 27.
 10. Solve the equation log_{2} (x - 1) + log_{2} (x + 1) = 3.
@@ -247,8 +249,8 @@ one must be checked against the original statement.
     cross.
 15. The revenue of a company, in reais, is given by R(p) = p · (200 - 4p), where p is the unit price
     in reais. Find the price giving maximum revenue and the value of that revenue.
-16. Show that the function given by f(x) = (x + 2)/(x - 1) equals its own inverse, by checking
-    that f(f(x)) gives back x.
+16. Find the inverse function of f(x) = 2^{x - 3} + 1 and work out the value that this inverse
+    takes at 9.
 17. Find the value of k for which the line with equation y = x + k touches the parabola with equation
     y = x^{2} at a single point.
 18. A culture starts with 500 bacteria and doubles every 3 hours. After how many hours does the
@@ -272,8 +274,8 @@ one must be checked against the original statement.
 13. The greatest value is 4, reached at x = 3. The range is the set of reals y ≤ 4.
 14. The graphs cross at x = 1 and at x = 4, since the equality leads to x^{2} - 5x + 4 = 0.
 15. The price is 25 reais and the maximum revenue is 2500 reais.
-16. Substituting, f(f(x)) has numerator 3x/(x - 1) and denominator 3/(x - 1). The quotient is x, for
-    every x ≠ 1.
+16. The inverse is f^{-1}(x) = 3 + log_{2} (x - 1), defined for x > 1. At 9 the inverse equals 6,
+    because log_{2} 8 = 3. Checking the other way round, f(6) = 2^{3} + 1 = 9.
 17. k = -1/4. The equality leads to x^{2} - x - k = 0, and the discriminant Δ = 1 + 4k must be zero.
 18. After 18 hours. The population is P(t) = 500 · 2^{t/3}, and 32000/500 = 64 = 2^{6}.
 
@@ -299,7 +301,7 @@ E12: Abs(2*5 - 6) == 4 and Abs(2*1 - 6) == 4 and solve(Eq(2*x - 6, 4), x) == [5]
 E13: -6/(2*(-1)) == 3 and (-(3**2) + 6*3 - 5) == 4
 E14: sorted(solve(Eq(x**2 - 4*x + 3, x - 1), x)) == [1, 4]
 E15: solve(Eq(diff(p*(200 - 4*p), p), 0), p) == [25] and 25*(200 - 4*25) == 2500
-E16: simplify(((x + 2)/(x - 1) + 2)/((x + 2)/(x - 1) - 1) - x) == 0
+E16: simplify(solve(Eq(2**(y - 3) + 1, x), y)[0] - (3 + log(x - 1)/log(2))) == 0 and simplify(log(8)/log(2)) == 3 and 2**(6 - 3) + 1 == 9
 E17: solve(Eq(1 + 4*k, 0), k) == [Rational(-1, 4)]
 E18: solve(Eq(500*2**(t/3), 32000), t) == [18] and 500*2**6 == 32000
 ```
