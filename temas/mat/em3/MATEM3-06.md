@@ -31,7 +31,7 @@ z = r · (cos θ + i · sen θ)
 
 onde r é o módulo e θ o argumento.
 
-Escrevendo z = a + b·i, a parte real é a = r · cos θ e a parte imaginária é b = r · sen θ, e o
+Escrevendo z = a + b · i, a parte real é a = r · cos θ e a parte imaginária é b = r · sen θ, e o
 módulo sai de r = √(a^{2} + b^{2}). Por isso, para achar o argumento, o caminho seguro é olhar o
 sinal das duas partes, que dizem o quadrante, e só então usar a tangente ou reconhecer um ângulo
 notável.
@@ -54,8 +54,8 @@ e somar os argumentos**. Dividir significa **dividir os módulos e subtrair os a
 Geometricamente, multiplicar por um complexo de módulo r e argumento α é esticar por r e girar
 α. Essa leitura explica de uma vez por que multiplicar por i equivale a girar um quarto de volta.
 
-**Exemplo 3.** Calcular o produto de 2 · (cos 45° + i · sen 45°) por 3 · (cos 45°
-+ i · sen 45°).
+**Exemplo 3.** Calcular o produto de 2 · (cos 45° + i · sen 45°) por
+3 · (cos 45° + i · sen 45°).
 Os módulos multiplicam: 2 × 3 dá 6. Os argumentos somam: 45 + 45 dá 90. O produto é
 6 · (cos 90° + i · sen 90°), que na forma algébrica é 6i.
 
@@ -70,8 +70,8 @@ tire voltas inteiras, porque o ângulo é o mesmo.
 
 **Exemplo 4.** Calcular (1 + i)^{6}.
 O módulo de 1 + i é √2 e o argumento é 45°. Então o módulo da potência é (√2)^{6},
-que dá 8, e o argumento é 6 × 45, ou seja, 270°. O resultado é 8 · (cos 270°
-+ i · sen 270°), que vale -8i.
+que dá 8, e o argumento é 6 × 45, ou seja, 270°. O resultado é
+8 · (cos 270° + i · sen 270°), que vale -8i.
 
 Sem essa fórmula, o mesmo cálculo exigiria seis multiplicações encadeadas, com chance de erro em
 cada uma.
@@ -114,10 +114,10 @@ não apenas a mais óbvia.
 
 6. Escreva na forma trigonométrica o número -1 + √3 · i.
 7. Escreva na forma trigonométrica o número 3 - 3i.
-8. Calcule o produto de 2 · (cos 30° + i · sen 30°) por 3 · (cos 45° + i ·
-   sen 45°), deixando a resposta na forma trigonométrica.
-9. Calcule o quociente de 10 · (cos 100° + i · sen 100°) por 5 · (cos 40°
-   + i · sen 40°), e escreva o resultado também na forma algébrica.
+8. Calcule o produto de 2 · (cos 30° + i · sen 30°) por
+   3 · (cos 45° + i · sen 45°), deixando a resposta na forma trigonométrica.
+9. Calcule o quociente de 10 · (cos 100° + i · sen 100°) por
+   5 · (cos 40° + i · sen 40°), e escreva o resultado também na forma algébrica.
 10. Calcule (cos 30° + i · sen 30°)^{6}.
 11. Calcule (1 + i)^{8}, passando antes para a forma trigonométrica.
 12. Calcule (√3 + i)^{6}, passando antes para a forma trigonométrica.
@@ -183,7 +183,7 @@ z = r · (cos θ + i · sin θ)
 
 where r is the modulus and θ the argument.
 
-Writing z = a + b·i, the real part is a = r · cos θ and the imaginary part is b = r · sin θ, and the
+Writing z = a + b · i, the real part is a = r · cos θ and the imaginary part is b = r · sin θ, and the
 modulus comes from r = √(a^{2} + b^{2}). That is why, to find the argument, the safe route is to
 look at the signs of the two parts, which give the quadrant, and only then use the tangent or
 recognise a special angle.
@@ -207,8 +207,8 @@ arguments**.
 Geometrically, multiplying by a complex number of modulus r and argument α is stretching by r and
 turning by α. That reading explains at once why multiplying by i amounts to a quarter turn.
 
-**Example 3.** Find the product of 2 · (cos 45° + i · sin 45°) and 3 · (cos 45°
-+ i · sin 45°).
+**Example 3.** Find the product of 2 · (cos 45° + i · sin 45°) and
+3 · (cos 45° + i · sin 45°).
 The moduli multiply: 2 × 3 gives 6. The arguments add: 45 + 45 gives 90. The product is
 6 · (cos 90° + i · sin 90°), which in algebraic form is 6i.
 
@@ -268,10 +268,10 @@ solutions, not just the most obvious one.
 
 6. Write in trigonometric form the number -1 + √3 · i.
 7. Write in trigonometric form the number 3 - 3i.
-8. Find the product of 2 · (cos 30° + i · sin 30°) and 3 · (cos 45° + i ·
-   sin 45°), leaving the answer in trigonometric form.
-9. Find the quotient of 10 · (cos 100° + i · sin 100°) by 5 · (cos 40°
-   + i · sin 40°), and write the result in algebraic form as well.
+8. Find the product of 2 · (cos 30° + i · sin 30°) and
+   3 · (cos 45° + i · sin 45°), leaving the answer in trigonometric form.
+9. Find the quotient of 10 · (cos 100° + i · sin 100°) by
+   5 · (cos 40° + i · sin 40°), and write the result in algebraic form as well.
 10. Compute (cos 30° + i · sin 30°)^{6}.
 11. Compute (1 + i)^{8}, moving to trigonometric form first.
 12. Compute (√3 + i)^{6}, moving to trigonometric form first.

@@ -61,8 +61,6 @@ máximo e mínimo. Suas coordenadas são
 
 x_{v} = -b/(2a), e y_{v} = -Δ/(4a)
 
-onde x_{v} e y_{v} são as coordenadas do vértice.
-
 Na prática, calcule primeiro o x do vértice e depois substitua na função para achar o y. Costuma
 ser menos trabalhoso do que usar a fórmula do y.
 
@@ -235,8 +233,6 @@ The vertex is the highest or lowest point of the parabola, and it is what solves
 minimum problem. Its coordinates are
 
 x_{v} = -b/(2a), and y_{v} = -Δ/(4a)
-
-where x_{v} and y_{v} are the coordinates of the vertex.
 
 In practice, work out the x of the vertex first and then substitute it into the function to get the
 y. That is usually less work than using the formula for y.

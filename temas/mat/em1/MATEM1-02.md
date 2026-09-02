@@ -160,8 +160,8 @@ calcula a saída quando a entrada é 5. São perguntas opostas.
 17. A função nunca vale 2. Isolando x na igualdade obtém-se x = (y + 3)/(y - 2), expressão que só
     não existe quando y = 2.
 18. A primeira é função porque cada real tem exatamente um quadrado. A segunda não é, porque o 4
-    ficaria associado ao mesmo tempo a 2 e a -2, e uma função exige um único valor de saída
-    para cada entrada.
+    ficaria associado ao mesmo tempo a 2 e a -2, e uma função exige um único valor de saída para
+    cada entrada.
 
 ## EN
 
@@ -311,8 +311,8 @@ second works out the output when the input is 5. They are opposite questions.
 17. The function never takes the value 2. Isolating x in the equality gives x = (y + 3)/(y - 2), an
     expression that fails to exist only when y = 2.
 18. The first is a function because every real has exactly one square. The second is not, because 4
-    would be matched at the same time with 2 and with -2, and a function requires a single
-    output value for each input.
+    would be matched at the same time with 2 and with -2, and a function requires a single output
+    value for each input.
 
 ## VERIFICACAO
 

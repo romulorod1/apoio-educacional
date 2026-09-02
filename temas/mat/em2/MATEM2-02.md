@@ -17,9 +17,9 @@ dificuldade: 4
 
 #### A ideia: função que se repete
 
-Muita coisa no mundo volta ao mesmo estado depois de um tempo fixo. A maré sobe e desce, a cadeirinha
-da roda-gigante volta ao ponto de embarque, a temperatura média do dia repete o padrão a cada 24
-horas. Uma função que faz isso se chama **periódica**, e o menor intervalo que se repete é o
+Muita coisa no mundo volta ao mesmo estado depois de um tempo fixo. A maré sobe e desce, a
+cadeirinha da roda-gigante volta ao ponto de embarque, a temperatura média do dia repete o padrão a
+cada 24 horas. Uma função que faz isso se chama **periódica**, e o menor intervalo que se repete é o
 **período**.
 
 As funções trigonométricas são o modelo básico desse comportamento. Elas nascem do ciclo: enquanto o
@@ -63,23 +63,22 @@ A imagem é [2, 6].
 
 #### Máximo e mínimo sem cálculo
 
-Como o seno e o cosseno atingem de fato o valor 1 e o valor -1, o máximo e o mínimo saem
-direto. Para f(x) = a + b · sen(c · x + d), com b positivo, o máximo é a + b
-e o mínimo é a - b. Se b for negativo, os dois trocam de lugar.
+Como o seno e o cosseno atingem de fato o valor 1 e o valor -1, o máximo e o mínimo saem direto.
+Para f(x) = a + b · sen(c · x + d), com b positivo, o máximo é a + b e o mínimo é a - b. Se b for
+negativo, os dois trocam de lugar.
 
 #### Equações com essas funções
 
 Resolver uma equação como 2 · sen(x) = √3 é isolar o seno e voltar ao ciclo.
 
 **Exemplo 3.** Resolver 2 · sen(x) = √3, com 0 ≤ x < 2π.
-Isolando, sen(x) = √3/2. No ciclo, isso acontece em π/3 e no simétrico em
-relação ao eixo vertical, que é 2π/3.
+Isolando, sen(x) = √3/2. No ciclo, isso acontece em π/3 e no simétrico em relação ao eixo vertical,
+que é 2π/3.
 
 #### Um modelo completo
 
 **Exemplo 4.** A altura em metros de uma cadeirinha de roda-gigante, t minutos após o embarque, é
-h(t) = 10 + 8 · sen(πt/6). Achar a altura máxima, a mínima e a duração de
-uma volta.
+h(t) = 10 + 8 · sen(πt/6). Achar a altura máxima, a mínima e a duração de uma volta.
 A amplitude é 8 e o deslocamento vertical é 10, então a altura vai de 2 a 18 metros. O período é
 2π/(π/6) = 12. Uma volta leva 12 minutos.
 
@@ -117,23 +116,22 @@ soluções, e o enunciado quase sempre pede todas.
 11. Determine o período da função tangente e diga para quais arcos ela não está definida.
 12. Resolva a equação 2 · sen(x) - 1 = 0, com 0 ≤ x < 2π.
 13. A altura em metros de uma cadeirinha de roda-gigante, t minutos após o embarque, é dada por
-    h(t) = 6 + 5 · sen(πt/4). Determine a altura máxima, a altura mínima e a
-    duração de uma volta completa.
+    h(t) = 6 + 5 · sen(πt/4). Determine a altura máxima, a altura mínima e a duração de uma volta
+    completa.
 14. Determine todos os valores de x, com 0 ≤ x < 2π, tais que cos(2x) = 1/2.
 
 **Bloco C. Aprofundamento**
 
-15. Uma função da forma f(x) = a + b · sen(x), com b positivo, tem valor máximo 9 e
-    valor mínimo 1. Determine a e b.
+15. Uma função da forma f(x) = a + b · sen(x), com b positivo, tem valor máximo 9 e valor mínimo 1.
+    Determine a e b.
 16. Resolva a equação sen^{2}(x) = sen(x), com 0 ≤ x < 2π.
-17. Uma função da forma f(x) = b · cos(c · x), com b positivo e c positivo, tem imagem
-    [-3, 3] e período π. Determine b e c.
-18. Mostre que a função f(x) = sen(x) · cos(x) tem período π e valor máximo 1/2.
-    Use a identidade que escreve o produto como metade do seno do arco dobrado.
+17. Uma função da forma f(x) = b · cos(c · x), com b positivo e c positivo, tem imagem [-3, 3] e
+    período π. Determine b e c.
+18. Mostre que a função f(x) = sen(x) · cos(x) tem período π e valor máximo 1/2. Use a identidade
+    que escreve o produto como metade do seno do arco dobrado.
 19. A temperatura em graus de uma cidade, t horas após a meia-noite, é modelada por
     T(t) = 20 + 6 · sen(πt/12). Determine a temperatura máxima, o instante em que ela
-    ocorre e todos os instantes, com 0 ≤ t < 24, em que a temperatura vale
-    23.
+    ocorre e todos os instantes, com 0 ≤ t < 24, em que a temperatura vale 23.
 
 ### Gabarito
 
@@ -146,17 +144,15 @@ soluções, e o enunciado quase sempre pede todas.
 7. Período 4π.
 8. Período 2π/3 e imagem [-4, 4].
 9. 5.
-10. Máximo 7 e mínimo 3. O cosseno vale -1 no máximo e 1 no mínimo, porque ele aparece
-    subtraído.
+10. Máximo 7 e mínimo 3. O cosseno vale -1 no máximo e 1 no mínimo, porque ele aparece subtraído.
 11. Período π. Ela não está definida quando o cosseno é zero, ou seja, em x = π/2 + k · π, com k
     inteiro.
 12. x = π/6 e x = 5π/6.
 13. Altura máxima de 11 metros, altura mínima de 1 metro e volta completa em 8 minutos.
 14. x = π/6, x = 5π/6, x = 7π/6 e x = 11π/6.
-15. a = 5 e b = 4. O máximo é a + b e o mínimo é a - b, o que dá um sistema de
-    duas equações.
-16. x = 0, x = π/2 e x = π. Passando tudo para um lado, sen(x) aparece
-    em evidência, e o produto é zero quando o seno vale zero ou vale 1.
+15. a = 5 e b = 4. O máximo é a + b e o mínimo é a - b, o que dá um sistema de duas equações.
+16. x = 0, x = π/2 e x = π. Passando tudo para um lado, sen(x) aparece em evidência, e o produto é
+    zero quando o seno vale zero ou vale 1.
 17. b = 3 e c = 2. A imagem dá a amplitude e o período dá o fator que multiplica x.
 18. O produto do seno pelo cosseno é metade do seno do arco dobrado. Como o seno do arco dobrado tem
     período π na variável x, a função também tem. E como o seno chega a 1, o produto chega a 1/2,
@@ -204,38 +200,37 @@ Each letter does one job, and it is worth understanding them one at a time.
 - **The parameter b controls the amplitude.** The wave now swings between -|b| and |b|, before any
   shift.
 - **The parameter a shifts the wave vertically.** The range now is [a - |b|, a + |b|].
-- **The parameter c changes the period.** The period becomes 2π/|c|.
-  The larger c is, the faster the wave repeats.
+- **The parameter c changes the period.** The period becomes 2π/|c|. The larger c is, the faster the
+  wave repeats.
 - **The parameter d shifts the wave horizontally.**
 
 **Example 1.** Find the period of f(x) = sin(3x).
-The period is 2π/3. The wave completes three oscillations in the
-space where the plain sine completes one.
+The period is 2π/3. The wave completes three oscillations in the space where the plain sine
+completes one.
 
 **Example 2.** Find the range of f(x) = 4 + 2 · cos(x).
-The cosine varies from -1 to 1. Multiplied by 2, it varies from -2 to 2. Adding 4, it
-varies from 2 to 6. The range is [2, 6].
+The cosine varies from -1 to 1. Multiplied by 2, it varies from -2 to 2. Adding 4, it varies from 2
+to 6. The range is [2, 6].
 
 #### Maximum and minimum without calculus
 
 Since the sine and the cosine really do reach the value 1 and the value -1, the maximum and the
-minimum come out directly. For f(x) = a + b · sin(c · x + d), with b positive, the
-maximum is a + b and the minimum is a - b. If b is negative, the two swap places.
+minimum come out directly. For f(x) = a + b · sin(c · x + d), with b positive, the maximum is a + b
+and the minimum is a - b. If b is negative, the two swap places.
 
 #### Equations with these functions
 
-Solving an equation such as 2 · sin(x) = √3 means isolating the sine
-and going back to the circle.
+Solving an equation such as 2 · sin(x) = √3 means isolating the sine and going back to the circle.
 
 **Example 3.** Solve 2 · sin(x) = √3, with 0 ≤ x < 2π.
-Isolating, sin(x) = √3/2. On the circle this happens at π/3 and at
-its mirror image across the vertical axis, which is 2π/3.
+Isolating, sin(x) = √3/2. On the circle this happens at π/3 and at its mirror image across the
+vertical axis, which is 2π/3.
 
 #### A complete model
 
 **Example 4.** The height in metres of a ferris wheel car, t minutes after boarding, is
-h(t) = 10 + 8 · sin(πt/6). Find the maximum height, the minimum height and how long
-one turn takes.
+h(t) = 10 + 8 · sin(πt/6). Find the maximum height, the minimum height and how long one
+turn takes.
 The amplitude is 8 and the vertical shift is 10, so the height runs from 2 to 18 metres. The period
 is 2π/(π/6) = 12. One turn takes 12 minutes.
 
@@ -244,12 +239,11 @@ is 2π/(π/6) = 12. One turn takes 12 minutes.
 **Thinking that multiplying by a number changes the period.** What changes the period is the number
 multiplying x inside the function, not the one multiplying the whole function.
 
-**Giving the period of the tangent as 2π.** The period of the tangent is π, because adding π to
-the arc flips the sign of the sine and of the cosine at the same time, and the quotient does not
-change.
+**Giving the period of the tangent as 2π.** The period of the tangent is π, because adding π to the
+arc flips the sign of the sine and of the cosine at the same time, and the quotient does not change.
 
-**Forgetting the vertical shift when stating the range.** The amplitude alone does not answer it: the
-value of a raises or lowers the whole wave.
+**Forgetting the vertical shift when stating the range.** The amplitude alone does not answer it:
+the value of a raises or lowers the whole wave.
 
 **Solving an equation and stopping at the first solution.** Over a full turn there are usually two
 solutions, and the problem nearly always asks for all of them.
@@ -280,17 +274,16 @@ solutions, and the problem nearly always asks for all of them.
 
 **Block C. Going further**
 
-15. A function of the form f(x) = a + b · sin(x), with b positive, has maximum
-    value 9 and minimum value 1. Find a and b.
+15. A function of the form f(x) = a + b · sin(x), with b positive, has maximum value 9 and minimum
+    value 1. Find a and b.
 16. Solve the equation sin^{2}(x) = sin(x), with 0 ≤ x < 2π.
-17. A function of the form f(x) = b · cos(c · x), with b positive and c positive, has
-    range [-3, 3] and period π. Find b and c.
-18. Show that the function f(x) = sin(x) · cos(x) has period π and maximum
-    value 1/2. Use the identity that writes the product as half the sine of the doubled arc.
+17. A function of the form f(x) = b · cos(c · x), with b positive and c positive, has range [-3, 3]
+    and period π. Find b and c.
+18. Show that the function f(x) = sin(x) · cos(x) has period π and maximum value 1/2. Use the
+    identity that writes the product as half the sine of the doubled arc.
 19. The temperature in degrees of a town, t hours after midnight, is modelled by
-    T(t) = 20 + 6 · sin(πt/12). Find the maximum temperature, the moment it happens and every
-    moment, with 0 ≤ t < 24, when the temperature is
-    23.
+    T(t) = 20 + 6 · sin(πt/12). Find the maximum temperature, the moment it happens
+    and every moment, with 0 ≤ t < 24, when the temperature is 23.
 
 ### Answer key
 
@@ -310,15 +303,14 @@ solutions, and the problem nearly always asks for all of them.
 12. x = π/6 and x = 5π/6.
 13. Maximum height of 11 metres, minimum height of 1 metre, and one full turn in 8 minutes.
 14. x = π/6, x = 5π/6, x = 7π/6 and x = 11π/6.
-15. a = 5 and b = 4. The maximum is a + b and the minimum is a - b, which gives a
-    system of two equations.
-16. x = 0, x = π/2 and x = π. Moving everything to one side puts sin(x)
-    in evidence, and the product is zero when the sine is zero or equals 1.
-17. b = 3 and c = 2. The range gives the amplitude and the period gives the factor
-    multiplying x.
-18. The product of sine and cosine is half the sine of the doubled arc. Since the sine of the doubled
-    arc has period π in the variable x, the function has it too. And since the sine reaches 1, the
-    product reaches 1/2, a value attained at π/4.
+15. a = 5 and b = 4. The maximum is a + b and the minimum is a - b, which gives a system of two
+    equations.
+16. x = 0, x = π/2 and x = π. Moving everything to one side puts sin(x) in evidence, and the product
+    is zero when the sine is zero or equals 1.
+17. b = 3 and c = 2. The range gives the amplitude and the period gives the factor multiplying x.
+18. The product of sine and cosine is half the sine of the doubled arc. Since the sine of the
+    doubled arc has period π in the variable x, the function has it too. And since the sine reaches
+    1, the product reaches 1/2, a value attained at π/4.
 19. Maximum temperature of 26 degrees, reached at t = 6. The temperature is 23 degrees at t = 2 and
     at t = 10.
 

@@ -109,10 +109,10 @@ sen(θ)^{2} + cos(θ)^{2} = (a^{2} + b^{2}) / c^{2}
 
 e, pelo Teorema de Pitágoras, a^{2} + b^{2} = c^{2}, de modo que a fração inteira vale 1.
 
-**Exemplo 4.** Num ângulo agudo θ vale sen(θ) = 3/5. Calcular o cosseno e a tangente.
-Pela relação fundamental, cos(θ)^{2} = 1 - 9/25 = 16/25. Como o ângulo é agudo, o cosseno é positivo
-e vale cos(θ) = 4/5.
-A tangente é tg(θ) = sen(θ) / cos(θ) = (3/5) / (4/5) = 3/4.
+**Exemplo 4.** Para um ângulo agudo θ vale sen(θ) = 3/5. Calcular o cosseno e a tangente.
+Pela relação fundamental, cos(θ)^{2} = 1 - 9/25 = 16/25. Como o ângulo é agudo, o cosseno é positivo:
+cos(θ) = 4/5.
+A tangente é o seno dividido pelo cosseno: tg(θ) = sen(θ) / cos(θ) = (3/5) / (4/5) = 3/4.
 
 #### Ângulos complementares
 
@@ -332,10 +332,10 @@ sin(θ)^{2} + cos(θ)^{2} = (a^{2} + b^{2}) / c^{2}
 
 and, by the Pythagorean Theorem, a^{2} + b^{2} = c^{2}, so the whole fraction is 1.
 
-**Example 4.** In an acute angle θ we have sin(θ) = 3/5. Find the cosine and the tangent.
+**Example 4.** For an acute angle θ, sin(θ) = 3/5. Find the cosine and the tangent.
 By the fundamental relation, cos(θ)^{2} = 1 - 9/25 = 16/25. Since the angle is acute, the cosine is
-positive and equals cos(θ) = 4/5.
-The tangent is tan(θ) = sin(θ) / cos(θ) = (3/5) / (4/5) = 3/4.
+positive: cos(θ) = 4/5.
+The tangent is the sine divided by the cosine: tan(θ) = sin(θ) / cos(θ) = (3/5) / (4/5) = 3/4.
 
 #### Complementary angles
 

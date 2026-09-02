@@ -54,7 +54,7 @@ Quando a conta não cai em quadrado perfeito, a resposta fica em forma de raiz s
 
 O ponto médio de um segmento tem coordenadas iguais às médias das coordenadas dos extremos.
 
-x_{M} = (x_{A} + x_{B}) / 2   e   y_{M} = (y_{A} + y_{B}) / 2
+x_{M} = (x_{A} + x_{B}) / 2 e y_{M} = (y_{A} + y_{B}) / 2
 
 onde M(x_{M}, y_{M}) é o ponto médio do segmento de extremos A e B.
 
@@ -64,14 +64,14 @@ x_{M} = (-3 + 7) / 2 = 2 e y_{M} = (5 + 1) / 2 = 3. O ponto médio é M(2, 3).
 Essa fórmula lida bem com o problema inverso. Se você conhece um extremo e o ponto médio, o outro
 extremo sai isolando:
 
-x_{B} = 2 · x_{M} - x_{A}   e   y_{B} = 2 · y_{M} - y_{A}
+x_{B} = 2 · x_{M} - x_{A} e y_{B} = 2 · y_{M} - y_{A}
 
 #### Baricentro do triângulo
 
 O baricentro é o ponto de encontro das medianas, e em coordenadas ele é a média simples dos três
 vértices:
 
-x_{G} = (x_{A} + x_{B} + x_{C}) / 3   e   y_{G} = (y_{A} + y_{B} + y_{C}) / 3
+x_{G} = (x_{A} + x_{B} + x_{C}) / 3 e y_{G} = (y_{A} + y_{B} + y_{C}) / 3
 
 É uma das fórmulas mais fáceis de lembrar e das mais cobradas.
 
@@ -222,7 +222,7 @@ Writing √61 is a better answer than an approximate decimal, because it is exac
 
 The midpoint of a segment has coordinates equal to the averages of the coordinates of the endpoints.
 
-x_{M} = (x_{A} + x_{B}) / 2   and   y_{M} = (y_{A} + y_{B}) / 2
+x_{M} = (x_{A} + x_{B}) / 2 and y_{M} = (y_{A} + y_{B}) / 2
 
 where M(x_{M}, y_{M}) is the midpoint of the segment with endpoints A and B.
 
@@ -232,14 +232,14 @@ x_{M} = (-3 + 7) / 2 = 2 and y_{M} = (5 + 1) / 2 = 3. The midpoint is M(2, 3).
 This formula handles the reverse problem well. If you know one endpoint and the midpoint, the other
 endpoint comes out by isolating:
 
-x_{B} = 2 · x_{M} - x_{A}   and   y_{B} = 2 · y_{M} - y_{A}
+x_{B} = 2 · x_{M} - x_{A} and y_{B} = 2 · y_{M} - y_{A}
 
 #### Centroid of a triangle
 
 The centroid is the meeting point of the medians, and in coordinates it is the plain average of the
 three vertices:
 
-x_{G} = (x_{A} + x_{B} + x_{C}) / 3   and   y_{G} = (y_{A} + y_{B} + y_{C}) / 3
+x_{G} = (x_{A} + x_{B} + x_{C}) / 3 and y_{G} = (y_{A} + y_{B} + y_{C}) / 3
 
 It is one of the easiest formulas to remember and one of the most frequently asked.
 

@@ -73,8 +73,8 @@ onde A é a amplitude, x_{máx} o maior valor do conjunto e x_{mín} o menor. É
 usa apenas dois dados, o que a torna frágil.
 
 A ideia mais fina é olhar o quanto cada valor se afasta da média, ou seja, o desvio x - M. Somar os
-desvios não funciona: Σ(x - M) dá sempre zero, porque os afastamentos para cima cancelam os
-afastamentos para baixo. Por isso se elevam os desvios ao quadrado antes de somar.
+desvios não funciona: Σ(x - M) = 0 para qualquer conjunto, porque os afastamentos para cima
+cancelam os afastamentos para baixo. Por isso se elevam os desvios ao quadrado antes de somar.
 
 A **variância** é a média dos quadrados dos desvios em relação à média:
 
@@ -244,8 +244,8 @@ where R is the range, x_{max} the largest value in the set and x_{min} the small
 work out and uses only two pieces of data, which makes it fragile.
 
 The finer idea is to look at how far each value sits from the mean, that is, at the deviation x - M.
-Adding the deviations does not work: Σ(x - M) is always zero, because the departures above cancel
-the departures below. So the deviations are squared before being added.
+Adding the deviations does not work: Σ(x - M) = 0 for any set, because the departures above
+cancel the departures below. So the deviations are squared before being added.
 
 The **variance** is the mean of the squared deviations from the mean:
 

@@ -26,8 +26,9 @@ símbolos:
 
 log_{2} 32 = 5, porque 2^{5} = 32
 
-Essa linha inteira é a definição. Sempre que travar numa questão de logaritmo, volte a ela e leia em
-voz alta: o logaritmo é o expoente.
+Lemos "log na base 2 de 32 é igual a 5, porque 2 elevado a 5 é igual a 32". Essa linha inteira
+é a definição. Sempre que travar numa questão de logaritmo, volte a ela e leia em voz alta: o
+logaritmo é o expoente.
 
 #### A definição em geral
 
@@ -79,7 +80,7 @@ multiplicando na frente. É ela que permite resolver equações em que a incógn
 **Exemplo 3.** Sabendo que log_{10} 2 vale aproximadamente 0,30 e que log_{10} 3 vale
 aproximadamente 0,48, calcular log_{10} 12.
 Como 12 = 4 × 3 e 4 = 2^{2}, o logaritmo vira 2 · log_{10} 2 + log_{10} 3. Isso dá
-2 · 0,30 + 0,48 = 1,08.
+2 × 0,30 + 0,48 = 1,08.
 
 Atenção a um par de igualdades que não existem: log_{a} (m + n) não é log_{a} m + log_{a} n, e
 log_{a} (m / n) não é (log_{a} m) / (log_{a} n).
@@ -171,7 +172,7 @@ do logaritmando, não o da base.
 3. 1/2.
 4. x = 32.
 5. 3.
-6. 0,90. Como 8 = 2^{3}, o logaritmo vale 3 · 0,30.
+6. 0,90. Como 8 = 2^{3}, o logaritmo vale 3 × 0,30.
 7. 0,78. Como 6 = 2 × 3, basta somar os dois logaritmos.
 8. 2 · log_{10} x + log_{10} y.
 9. x = 5.
@@ -185,7 +186,7 @@ do logaritmando, não o da base.
 16. x = 4. O valor -4 é descartado porque a base precisa ser positiva.
 17. Pela mudança de base, log_{a} b = (log b) / (log a) e log_{b} a = (log a) / (log b). O produto
     dos dois é 1, porque os fatores se cancelam.
-18. 31 algarismos. O logaritmo decimal de 2^{100} vale 100 · 0,30 = 30, então o número está entre
+18. 31 algarismos. O logaritmo decimal de 2^{100} vale 100 × 0,30 = 30, então o número está entre
     10^{30} e 10^{31}.
 19. x = 8 e y = 4.
 
@@ -204,8 +205,9 @@ symbols:
 
 log_{2} 32 = 5, because 2^{5} = 32
 
-That whole line is the definition. Whenever you get stuck on a logarithm question, go back to it and
-read it aloud: the logarithm is the exponent.
+We read it as "log to base 2 of 32 equals 5, because 2 to the power of 5 equals 32". That whole
+line is the definition. Whenever you get stuck on a logarithm question, go back to it and read it
+aloud: the logarithm is the exponent.
 
 #### The definition in general
 
@@ -260,7 +262,7 @@ exponent.
 **Example 3.** Given that log_{10} 2 is approximately 0.30 and that log_{10} 3 is approximately
 0.48, find log_{10} 12.
 Since 12 = 4 × 3 and 4 = 2^{2}, the logarithm becomes 2 · log_{10} 2 + log_{10} 3. That gives
-2 · 0.30 + 0.48 = 1.08.
+2 × 0.30 + 0.48 = 1.08.
 
 Watch out for a pair of equalities that do not exist: log_{a} (m + n) is not log_{a} m + log_{a} n,
 and log_{a} (m / n) is not (log_{a} m) / (log_{a} n).
@@ -351,7 +353,7 @@ one on the argument, not the one on the base.
 3. 1/2.
 4. x = 32.
 5. 3.
-6. 0.90. Since 8 = 2^{3}, the logarithm is 3 · 0.30.
+6. 0.90. Since 8 = 2^{3}, the logarithm is 3 × 0.30.
 7. 0.78. Since 6 = 2 × 3, it is enough to add the two logarithms.
 8. 2 · log_{10} x + log_{10} y.
 9. x = 5.
@@ -365,7 +367,7 @@ one on the argument, not the one on the base.
 16. x = 4. The value -4 is discarded because the base has to be positive.
 17. By the change of base, log_{a} b = (log b) / (log a) and log_{b} a = (log a) / (log b). The
     product of the two is 1, because the factors cancel out.
-18. 31 digits. The decimal logarithm of 2^{100} is 100 · 0.30 = 30, so the number lies between
+18. 31 digits. The decimal logarithm of 2^{100} is 100 × 0.30 = 30, so the number lies between
     10^{30} and 10^{31}.
 19. x = 8 and y = 4.
 
