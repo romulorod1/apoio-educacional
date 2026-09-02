@@ -6,7 +6,7 @@ titulo_pt: Revisão: funções e gráficos
 titulo_en: Review: functions and graphs
 resumo_pt: Retomar as famílias de funções do ensino médio, reconhecer cada uma pelo gráfico e escolher a ferramenta certa em cada problema.
 resumo_en: Revisiting the families of functions from secondary school, recognising each one by its graph and picking the right tool for each problem.
-prerequisitos: [MATEM3-09]
+prerequisitos: [MATEM3-09, MATEM1-15]
 duracao_min: 90
 dificuldade: 5
 ---

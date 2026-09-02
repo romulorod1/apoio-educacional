@@ -396,6 +396,81 @@ secao('11. A figura não se separa do parágrafo que a explica');
 }
 
 // ================================================================
+secao('12. Comentário HTML nunca sai impresso');
+
+/* Um autor de tema deixou "<!-- figura: ... -->" no corpo para anotar o que
+ * uma figura mostraria, e a folha saiu com "<!--", "figura:" e "-->" escritos:
+ * nenhum ramo do markdown reconhecia a linha e ela caía no parágrafo. Vale
+ * para o comentário de uma linha, para o de várias, e para o que vem colado
+ * logo abaixo de um parágrafo (onde o laço de junção o engoliria). */
+{
+  const fonte = 'Um parágrafo antes.\n' +
+                '<!-- figura: um triângulo com a altura marcada -->\n' +
+                'Um parágrafo depois.\n\n' +
+                '<!-- comentário de\n' +
+                'várias linhas -->\n\n' +
+                'O último parágrafo.';
+  const r = paginaCom(d => d.markdown(fonte, { tam: 10 }));
+  const escritos = [];
+  const rx = /Td \(((?:[^()\\]|\\.)*)\) Tj/g;
+  let m;
+  while ((m = rx.exec(r.texto))) escritos.push(m[1]);
+  const vazou = escritos.filter(t => /<!--|-->|figura:|comentário|várias/.test(t));
+  conf('nada do comentário sai impresso', vazou.length ? JSON.stringify(vazou) : 0, 0);
+  conf('os três parágrafos de verdade continuam lá',
+    escritos.filter(t => /antes\.|depois\.|último/.test(t)).length, 3);
+}
+
+// ================================================================
+secao('13. O nome de função na fórmula segue a língua da folha');
+
+/* A tabela de nomes do renderizador guarda "sen" e "tg" (o que a escola
+ * brasileira escreve). Na folha em inglês tem que sair "sin" e "tan". Um
+ * \tan na seção EN saía impresso como "tg", e o autor de tema teve que
+ * contornar com \text{tan}. A língua vem do doc, como a numeração de página.
+ * No fluxo do PDF o parêntese sai escapado, então a peça é "sen\(x\)". */
+{
+  const pecas = (lingua) => {
+    const d = new PDFGen.Doc();
+    d.lingua = lingua;
+    d.novaPagina();
+    d.markdown('@eq \\sin(x) + \\tan(x) + \\cos(x)', { tam: 10 });
+    const b = Buffer.from(d.finalizar()).toString('latin1');
+    const rx = /Td \(((?:[^()\\]|\\.)*)\) Tj/g;
+    let m, o = [];
+    while ((m = rx.exec(b))) o.push(m[1]);
+    return o;
+  };
+  const tem = (lista, s) => lista.some(t => t.indexOf(s) >= 0);
+  const pt = pecas('pt'), en = pecas('en');
+  conf('folha em português escreve sen e tg', tem(pt, 'sen\\(') && tem(pt, 'tg\\('), true);
+  conf('folha em inglês escreve sin e tan', tem(en, 'sin\\(') && tem(en, 'tan\\('), true);
+  conf('e não escreve sen nem tg', tem(en, 'sen\\(') || tem(en, 'tg\\('), false);
+  conf('cos é igual nas duas', tem(pt, 'cos\\(') && tem(en, 'cos\\('), true);
+
+  /* O caso que passou por engano: dentro de FRAÇÃO (e raiz, expoente, cerca) o
+   * renderizador deriva um contexto novo copiando campos, e a língua não ia
+   * junto. A folha inglesa do MATEM2-15 saiu com nove "tg(a)" e "tg(b)", todos
+   * de dentro da tangente da soma. A prova de cima não pegava porque só olhava
+   * uma função solta no nível de cima. */
+  const aninhada = (lingua) => {
+    const d = new PDFGen.Doc();
+    d.lingua = lingua;
+    d.novaPagina();
+    d.markdown('@eq \\frac{\\tan(a) + \\tan(b)}{1 - \\tan(a) \\tan(b)} + \\sqrt{\\sin(x)} + 2^{\\cos(x)}', { tam: 10 });
+    const b = Buffer.from(d.finalizar()).toString('latin1');
+    const rx = /Td \(((?:[^()\\]|\\.)*)\) Tj/g;
+    let m, o = [];
+    while ((m = rx.exec(b))) o.push(m[1]);
+    return o;
+  };
+  const enA = aninhada('en'), ptA = aninhada('pt');
+  conf('dentro de fração, raiz e expoente a folha inglesa escreve tan e sin',
+    tem(enA, 'tan\\(') && tem(enA, 'sin\\(') && !tem(enA, 'tg\\(') && !tem(enA, 'sen\\('), true);
+  conf('e a portuguesa escreve tg e sen', tem(ptA, 'tg\\(') && tem(ptA, 'sen\\('), true);
+}
+
+// ================================================================
 console.log('\n' + '='.repeat(60));
 console.log(passes + ' verificações passaram, ' + falhas + ' falharam.');
 if (falhas) { console.log('\nFALHAS:'); erros.forEach(e => console.log(' - ' + e)); }

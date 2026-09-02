@@ -6,7 +6,7 @@ titulo_pt: Função logarítmica
 titulo_en: Logarithmic function
 resumo_pt: Entender a função que desfaz a exponencial, ler seu domínio e seu crescimento pela base, e resolver equações e inequações sem esquecer a condição de existência.
 resumo_en: Understanding the function that undoes the exponential, reading its domain and growth from the base, and solving equations and inequalities without forgetting the existence condition.
-prerequisitos: [MATEM1-08]
+prerequisitos: [MATEM1-08, MATEM1-15]
 duracao_min: 90
 dificuldade: 4
 ---

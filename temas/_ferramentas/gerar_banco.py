@@ -3,7 +3,7 @@
 Gera o arquivo unico que o aplicativo vai ler, a partir dos temas em Markdown.
 
 Os .md sao a fonte, boas de escrever e de revisar. O aplicativo consome um JSON
-so, para nao ter que baixar 146 arquivos no tablet.
+so, para nao ter que baixar um arquivo por tema no tablet.
 
 Cada exercicio sai separado, com o bloco a que pertence e a resposta pareada.
 E isso que permite a Nathalia montar a lista marcando e desmarcando questoes:

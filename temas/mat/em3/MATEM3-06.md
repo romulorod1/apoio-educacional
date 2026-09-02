@@ -6,7 +6,7 @@ titulo_pt: Números complexos: forma trigonométrica
 titulo_en: Complex numbers: trigonometric form
 resumo_pt: Escrever um complexo pelo módulo e pelo argumento, multiplicar e dividir somando e subtraindo ângulos, e usar a fórmula de De Moivre para potências e raízes.
 resumo_en: Writing a complex number from its modulus and argument, multiplying and dividing by adding and subtracting angles, and using De Moivre's formula for powers and roots.
-prerequisitos: [MATEM3-05]
+prerequisitos: [MATEM3-05, MATEM2-15]
 duracao_min: 90
 dificuldade: 5
 ---

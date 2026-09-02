@@ -1245,7 +1245,7 @@
     }
     var m;
     try {
-      m = mod.medir(latex, tam, {});
+      m = mod.medir(latex, tam, { lingua: this.lingua });
     } catch (e) {
       this.avisoDeFigura('não deu para medir a fórmula: ' + (e && e.message ? e.message : e));
       return null;
@@ -1255,7 +1255,7 @@
     this.y -= FOLGA_EQ + (m.altura || 0);
     var r = null;
     try {
-      r = mod.desenhar(this, latex, MARG_E + UTIL / 2, this.y, tam, { align: 'centro' });
+      r = mod.desenhar(this, latex, MARG_E + UTIL / 2, this.y, tam, { align: 'centro', lingua: this.lingua });
     } catch (e) {
       this.avisoDeFigura('não deu para desenhar a fórmula: ' + (e && e.message ? e.message : e));
     }
@@ -1281,7 +1281,7 @@
     var mod = moduloFormula();
     if (!mod) return 0;
     try {
-      var m = mod.medir(latex, (opcoes && opcoes.tam) || 11, {});
+      var m = mod.medir(latex, (opcoes && opcoes.tam) || 11, { lingua: this.lingua });
       return (m.altura || 0) + (m.profundidade || 0) + FOLGA_EQ * 2;
     } catch (e) { return 0; }
   };
@@ -1444,6 +1444,16 @@
 
       if (!limpo) { this.y -= tam * 0.5; i++; continue; }
 
+      /* Comentário HTML nunca sai impresso. Um autor de tema deixou
+       * "<!-- figura: ... -->" no corpo para anotar o que uma figura mostraria, e
+       * a folha saiu com "<!--", "figura:" e "-->" escritos, porque nenhum ramo
+       * reconhecia a linha e ela caía no parágrafo. Vale para o comentário de uma
+       * linha e para o que se estende por várias: pula até o "-->". */
+      if (/^<!--/.test(limpo)) {
+        while (i < linhas.length && linhas[i].indexOf('-->') < 0) i++;
+        i++; continue;
+      }
+
       /* figura: a diretiva ocupa a linha inteira e NUNCA sai impressa como
        * texto. O ramo vem antes do de parágrafo de propósito: nenhum outro ramo
        * do markdown começa por arroba, então sem este a linha cairia no
@@ -1538,6 +1548,7 @@
         // impressa por extenso na folha, em silêncio
         while (i + 1 < linhas.length && /^\s{2,}\S/.test(linhas[i + 1]) &&
                !/^@(fig|eq)(\s|$)/.test(linhas[i + 1].trim()) &&
+             !/^<!--/.test(linhas[i + 1].trim()) &&
                !/^\s*([-*]|\d+\.)\s/.test(linhas[i + 1])) {
           conteudo += ' ' + linhas[i + 1].trim();
           i++;
@@ -1580,6 +1591,7 @@
       while (i + 1 < linhas.length && linhas[i + 1].trim() &&
              linhas[i + 1].trim().charAt(0) !== '|' &&
              !/^@(fig|eq)(\s|$)/.test(linhas[i + 1].trim()) &&
+             !/^<!--/.test(linhas[i + 1].trim()) &&
              !/^#{3,6}\s/.test(linhas[i + 1].trim()) &&
              /* Para em marcador de topico sempre. Em numero mais ponto, so para
               * quando o que ja esta no paragrafo TERMINA UMA FRASE.
