@@ -112,6 +112,53 @@ if (typeof PDFGen.caracteresQueNaoDesenha === 'function') {
 }
 
 // ================================================================
+secao('6. A célula da tabela respeita a largura da coluna');
+
+/* Isto já foi corrigido uma vez e voltou: um agente reescreveu o tabelaSimples
+ * e a quebra por coluna se perdeu, sem nenhum teste acusar. A tabela saiu
+ * impressa com "continua o mesmo" por cima de "calor sensível", e a suíte
+ * inteira passou verde. */
+{
+  const comprida = [
+    '| O que está acontecendo | Nome | Fórmula |',
+    '| A temperatura muda e o estado continua o mesmo | calor sensível | Q = m · c · (Tf - Ti) |',
+    '| O estado muda e a temperatura fica parada | calor latente | Q = m · L |'
+  ];
+  const curta = ['| a | b | c |', '| 1 | 2 | 3 |', '| 4 | 5 | 6 |'];
+
+  const alturaDe = (linhas) => {
+    const d = new PDFGen.Doc();
+    d.novaPagina();
+    const y0 = d.y;
+    d.tabelaSimples(linhas, 10);
+    return y0 - d.y;
+  };
+
+  conf('a tabela de célula comprida fica mais alta que a de célula curta',
+    alturaDe(comprida) > alturaDe(curta), true);
+
+  // a coluna do meio começa a UTIL/3 da margem: nada da primeira pode passar dali
+  const largura = PDFGen.UTIL / 3;
+  const cabe = PDFGen.medirRico
+    ? PDFGen.medirRico('A temperatura muda e o estado', 9.2) < largura - 12
+    : false;
+  conf('a linha quebrada cabe dentro da coluna', cabe, true);
+}
+
+// ================================================================
+secao('7. Subtítulo não fica órfão no pé da página');
+
+{
+  const d = new PDFGen.Doc();
+  d.novaPagina();
+  d.y = 150;                     // quase no rodapé
+  const antes = d.paginas.length;
+  d.markdown('### Um subtítulo\n\nUma linha.\n\nOutra linha.\n\nMais uma linha.', { tam: 10 });
+  conf('o subtítulo leva o conteúdo junto para a página seguinte',
+    d.paginas.length > antes, true);
+}
+
+// ================================================================
 console.log('\n' + '='.repeat(60));
 console.log(passes + ' verificações passaram, ' + falhas + ' falharam.');
 if (falhas) { console.log('\nFALHAS:'); erros.forEach(e => console.log(' - ' + e)); }

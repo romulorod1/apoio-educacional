@@ -1133,7 +1133,16 @@
       // subtítulo
       var titulo = /^#{3,6}\s+(.*)$/.exec(limpo);
       if (titulo) {
-        this.garanteEspaco(tam * 2.6);
+        /* Um subtítulo sozinho no pé da página é pior do que uma página mais
+         * curta: quem vira a folha encontra uma tabela ou uma lista sem saber
+         * do que ela trata. A reserva olha o que vem depois dele e leva junto. */
+        var adiante = 0, j = i + 1;
+        while (j < linhas.length && adiante < 3) {
+          if (linhas[j].trim()) adiante++;
+          else if (adiante) break;
+          j++;
+        }
+        this.garanteEspaco(tam * 2.6 + Math.max(adiante, 3) * tam * 1.7);
         this.y -= tam * 1.7;
         // O subtítulo é texto do autor do tema, então passa pela tubulação rica.
         this.textoRico(titulo[1], MARG_E, this.y, { tam: tam + 1.5, bold: true, cor: COR.navy });
@@ -1199,9 +1208,23 @@
     if (!linhas.length) return;
     var colunas = Math.max.apply(null, linhas.map(function (l) { return l.length; }));
     var largura = UTIL / colunas;
-    var altura = tam * 1.9;
+    var corpo = tam - 0.8;
+    var salto = corpo * 1.35;
     this.y -= tam * 0.6;
     for (var i = 0; i < linhas.length; i++) {
+      /* A célula quebra na largura da coluna. Sem isto o texto comprido passava
+       * por cima da coluna vizinha: no material de termologia saía
+       * "A temperatura muda e o estado continua calorsensível", ilegível. Como
+       * a célula pode ter mais de uma linha, a altura da faixa vem da célula
+       * mais alta da fila, e não de um valor fixo. */
+      var partido = [], maior = 1;
+      for (var q = 0; q < colunas; q++) {
+        var bruta = (linhas[i][q] || '').replace(/\*\*/g, '');
+        var quebrada = bruta ? quebrarRico(partirRico(bruta), largura - 12, corpo) : [];
+        partido.push(quebrada);
+        if (quebrada.length > maior) maior = quebrada.length;
+      }
+      var altura = maior * salto + corpo * 0.9;
       this.garanteEspaco(altura);
       this.y -= altura;
       if (i === 0) this.retangulo(MARG_E, this.y, UTIL, altura, COR.navy);
@@ -1211,12 +1234,14 @@
          * antiga. O que muda é o resto: a célula passa pela tubulação rica, senão
          * "a^{2} + b^{2}" e "A = l · l = l^{2}", que já estão no banco, saíam com a
          * chave e o circunflexo impressos na folha. */
-        var celula = (linhas[i][c] || '').replace(/\*\*/g, '');
-        if (!celula) continue;
-        this.escreverSegmentos(partirRico(celula), MARG_E + c * largura + 6, this.y + tam * 0.6, {
-          tam: tam - 0.8, bold: i === 0,
-          cor: i === 0 ? COR.branco : COR.texto
-        });
+        var linhasDaCelula = partido[c];
+        for (var k = 0; k < linhasDaCelula.length; k++) {
+          this.escreverSegmentos(linhasDaCelula[k], MARG_E + c * largura + 6,
+            this.y + altura - corpo * 1.15 - k * salto, {
+              tam: corpo, bold: i === 0,
+              cor: i === 0 ? COR.branco : COR.texto
+            });
+        }
       }
       this.linha(MARG_E, this.y, MARG_D, this.y, COR.fio, 0.4);
     }
