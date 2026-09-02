@@ -276,8 +276,10 @@ def eh_tautologia(expressao):
 _PERGUNTA = (
     "const P=require(process.argv[1]);"
     "const cs=JSON.parse(process.argv[2]);"
-    "process.stdout.write(JSON.stringify("
-    "cs.filter(function(c){return P.caracteresQueNaoDesenha(c).length>0;})));"
+    "process.stdout.write(JSON.stringify({"
+    "ruins: cs.filter(function(c){return P.caracteresQueNaoDesenha(c).length>0;}),"
+    "simbolos: Object.keys(P.SIMBOLOS || {})"
+    "}));"
 )
 
 _veredito = {}          # caractere -> True quando o PDF NAO desenha
@@ -293,13 +295,19 @@ def _perguntar_ao_gerador(caracteres):
     import json
     import subprocess
     pdf = os.path.join(os.path.dirname(RAIZ), 'pdf.js')
-    saida = subprocess.run(
-        ['node', '-e', _PERGUNTA, pdf, json.dumps(caracteres)],
-        capture_output=True, text=True, encoding='utf-8')
+    try:
+        saida = subprocess.run(
+            ['node', '-e', _PERGUNTA, pdf, json.dumps(caracteres)],
+            capture_output=True, text=True, encoding='utf-8')
+    except OSError:
+        raise Problema('o node nao esta instalado ou nao esta no PATH. Ele e '
+                       'necessario para conferir quais caracteres o PDF desenha, '
+                       'e o gerar_banco.py ja dependia dele.')
     if saida.returncode != 0:
         raise Problema('nao consegui perguntar ao pdf.js quais caracteres ele '
                        'desenha: %s' % saida.stderr[:300])
-    return set(json.loads(saida.stdout or '[]'))
+    resposta = json.loads(saida.stdout or '{}')
+    return set(resposta.get('ruins', [])), resposta.get('simbolos', [])
 
 
 # Alem do que o PDF desenha, ha coisa que simplesmente nao deve estar num
@@ -309,12 +317,32 @@ def _proibido_no_fonte(c):
     return ord(c) < 32 and c not in u'\n\r\t'
 
 
+def _preparar():
+    """Pergunta de uma vez pelo alfabeto inteiro que um tema pode usar.
+
+    Sem isto cada arquivo que estreava um caractere novo disparava a sua
+    propria chamada: medido no banco, 30 chamadas. O lote inicial cobre o
+    Latin-1 e os simbolos que o proprio gerador declara, e derruba para uma.
+    A lista de simbolos vem do pdf.js na mesma pergunta, para nao recriar aqui
+    a copia que este trabalho existe para eliminar.
+    """
+    base = [chr(n) for n in range(32, 127)] + [chr(n) for n in range(160, 256)]
+    ruins, simbolos = _perguntar_ao_gerador(base)
+    for ch in base:
+        _veredito[ch] = ch in ruins
+    for ch in simbolos:
+        _veredito[ch] = False        # se o gerador declara, ele desenha
+
+
 def caracteres_indesenhaveis(texto):
     """Devolve [(linha, caractere, codigo, trecho)] do que o PDF nao desenha."""
+    if not _veredito:
+        _preparar()
+
     novos = sorted(set(ch for ch in texto if ch not in _veredito
                        and not _proibido_no_fonte(ch)))
     if novos:
-        ruins = _perguntar_ao_gerador(novos)
+        ruins, _ = _perguntar_ao_gerador(novos)
         for ch in novos:
             _veredito[ch] = ch in ruins
 
