@@ -1250,7 +1250,16 @@
 
   Doc.prototype.cabecalhoDeSecao = function (titulo, subtitulo) {
     this.garanteEspaco(52);
-    this.y -= 26;
+    /* O titulo se posiciona pelo FIO do cabecalho, e nao pelo cursor.
+     *
+     * O Y_TOPO ja comeca 30pt abaixo do fio, que e a margem certa para o corpo
+     * do texto, e o titulo descia mais 26 a partir dali: sobravam 15,4 mm de
+     * papel em branco entre o fio e o topo das letras, em toda folha que o
+     * aplicativo gera. Medindo pelo fio, o vao fica em 7 mm, que e o de um
+     * documento normal. Se o cabecalho for chamado no meio da pagina, e nao no
+     * alto, vale o comportamento antigo: desce a partir de onde esta. */
+    var alvoDoTitulo = Y_FIO_CAB - 32;
+    this.y = this.y > alvoDoTitulo ? alvoDoTitulo : this.y - 26;
     /* O título é o nome do tema, escrito pelo autor, então passa pela tubulação
      * rica: com texto() cru um título "Potências de 10^{3}" sairia com a chave na
      * folha e ainda centralizado errado, porque a medida contaria a marcação. */
