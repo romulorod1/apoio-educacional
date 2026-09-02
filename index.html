@@ -315,6 +315,18 @@
   <script src="core.js"></script>
   <script src="busca.js"></script>
   <script src="pdf.js"></script>
+  <!-- As figuras da folha. Sao CINCO arquivos, e faltando um a figura degrada em
+       silencio: no navegador o receitas.js procura os globais FigMarcas e
+       FigDesenho, e sem eles a figura sai sem marca nenhuma, sem erro e sem
+       aviso. Estavam declarados so o base e o receitas; conferido rodando os
+       arquivos num contexto sem require, como o navegador faz.
+       A ordem entre eles nao importa, porque a ligacao e tardia: o que importa e
+       que os cinco existam antes do primeiro desenho. -->
+  <script src="figuras/base.js"></script>
+  <script src="figuras/desenho.js"></script>
+  <script src="figuras/marcas.js"></script>
+  <script src="figuras/receitas.js"></script>
+  <script src="figuras/formula.js"></script>
   <script src="store.js"></script>
   <script src="draw.js"></script>
   <script src="app.js"></script>

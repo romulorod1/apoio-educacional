@@ -26,3 +26,7 @@ __pycache__/
 
 # retratos de seguranca dos arquivos criticos, so locais
 .retratos/
+
+# evidencia gerada pelas provas do kit de figuras: pesada, regeravel, e nao e codigo
+figuras/*.pdf
+figuras/*.png

@@ -3,7 +3,7 @@
  * Os dados das aulas não passam por aqui: ficam no IndexedDB, no aparelho.
  */
 
-var CACHE = 'apoio-educacional-v10';
+var CACHE = 'apoio-educacional-v11';
 
 var ARQUIVOS = [
   './',
@@ -12,6 +12,14 @@ var ARQUIVOS = [
   './core.js',
   './busca.js',
   './pdf.js',
+  /* Os CINCO arquivos do kit de figuras. Faltando um, a figura sai sem marca
+   * nenhuma e sem erro, e ela da aula na casa das familias, muitas vezes sem
+   * sinal: o que nao estiver aqui nao existe quando falta rede. */
+  './figuras/base.js',
+  './figuras/desenho.js',
+  './figuras/marcas.js',
+  './figuras/receitas.js',
+  './figuras/formula.js',
   './store.js',
   './draw.js',
   './app.js',
