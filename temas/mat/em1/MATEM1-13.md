@@ -44,7 +44,11 @@ Confundir os tipos leva a erro grosseiro: calcular a média da cor dos olhos nã
 
 A tabela de frequências conta quantas vezes cada valor aparece. A **frequência absoluta** é a
 contagem pura, e a **frequência relativa** é essa contagem dividida pelo total, quase sempre escrita
-em porcentagem.
+em porcentagem:
+
+f_{r} = f_{a} / N
+
+onde f_{r} é a frequência relativa, f_{a} a frequência absoluta e N o total de observações.
 
 **Exemplo 1.** Numa turma de 20 alunos perguntou-se quantos irmãos cada um tem. Cinco responderam
 que não têm irmãos, oito responderam um, quatro responderam dois e três responderam três.
@@ -53,32 +57,39 @@ A tabela fica assim: o valor 0 tem frequência 5, o valor 1 tem frequência 8, o
 frequência 4 e o valor 3 tem frequência 3. As frequências somam 20, o que confirma que ninguém ficou
 de fora.
 
-As frequências relativas são 5 dividido por 20, que dá 25 por cento; 8 dividido por 20, que dá 40
-por cento; 4 dividido por 20, que dá 20 por cento; e 3 dividido por 20, que dá 15 por cento. As
-porcentagens somam 100 por cento, e essa soma é a primeira conferência a fazer.
+As frequências relativas são 5 / 20, que dá 25%; 8 / 20, que dá 40%; 4 / 20, que dá 20%; e
+3 / 20, que dá 15%. As porcentagens somam 100%, e essa soma é a primeira conferência a fazer.
 
 #### As três medidas de centro
 
-A **média aritmética** é a soma dos valores dividida pela quantidade deles. É a medida que usa todos
+A **média aritmética** é a soma dos valores dividida pela quantidade deles:
+
+M = S / n
+
+onde M é a média, S a soma de todos os valores e n a quantidade de valores. É a medida que usa todos
 os dados, e por isso é a mais sensível a valores extremos.
 
 A **mediana** é o valor que fica no meio depois de ordenar os dados. Com quantidade ímpar de valores
-ela é o valor central; com quantidade par, é a média dos dois centrais. Ordenar antes é obrigatório,
-e é aí que mais se erra.
+ela é o valor central; com quantidade par, é a média dos dois centrais:
+
+Md = (c_{1} + c_{2}) / 2
+
+onde Md é a mediana e c_{1} e c_{2} são os dois valores centrais. Ordenar antes é obrigatório, e é
+aí que mais se erra.
 
 A **moda** é o valor que mais se repete. Um conjunto pode ter uma moda, mais de uma, ou nenhuma.
 
 **Exemplo 2.** Calcular as três medidas do conjunto 3, 5, 7, 7, 8, 9, 10.
-A soma é 49 e há 7 valores, então a média é 7. O conjunto já está ordenado, e com 7 valores o
-central é o quarto, que vale 7. O único valor repetido é o 7, que é a moda.
+A soma é S = 49 e há n = 7 valores, então M = 49 / 7 = 7. O conjunto já está ordenado, e com 7
+valores o central é o quarto, que vale 7. O único valor repetido é o 7, que é a moda.
 
 Nesse conjunto as três medidas coincidem, o que acontece quando os dados são bem distribuídos em
 torno do centro.
 
 **Exemplo 3.** Calcular a média, a mediana e a moda a partir da tabela do exemplo anterior, com 5
 alunos sem irmãos, 8 com um irmão, 4 com dois e 3 com três.
-Para a média, multiplica-se cada valor pela sua frequência e divide-se pelo total: 0 vezes 5 mais 1
-vezes 8 mais 2 vezes 4 mais 3 vezes 3 dá 25, e 25 dividido por 20 dá 1,25.
+Para a média, multiplica-se cada valor pela sua frequência e divide-se pelo total:
+0 × 5 + 1 × 8 + 2 × 4 + 3 × 3 = 25, e M = 25 / 20 = 1,25.
 Para a mediana, com 20 valores os centrais são o décimo e o décimo primeiro. Os cinco primeiros
 valem 0 e do sexto ao décimo terceiro valem 1, então os dois centrais valem 1, e a mediana é 1.
 A moda é 1, que é o valor de maior frequência.
@@ -89,12 +100,16 @@ não é erro: a média é um resumo, não um retrato de alguém.
 #### Média ponderada
 
 Quando os valores têm importâncias diferentes, cada um entra com um **peso**. A média ponderada é a
-soma dos produtos valor vezes peso, dividida pela soma dos pesos.
+soma de cada valor multiplicado pelo seu peso, dividida pela soma dos pesos:
+
+M_{p} = (v_{1} · p_{1} + v_{2} · p_{2} + v_{3} · p_{3}) / (p_{1} + p_{2} + p_{3})
+
+onde M_{p} é a média ponderada, v_{1}, v_{2} e v_{3} são os valores e p_{1}, p_{2} e p_{3} os pesos
+correspondentes.
 
 **Exemplo 4.** A nota final de um curso vem de três avaliações: 6 com peso 2, 7 com peso 3 e 9 com
 peso 5.
-O numerador é 12 mais 21 mais 45, que dá 78. A soma dos pesos é 10. Então a nota final é 78 dividido
-por 10, ou seja, 7,8.
+O numerador é 12 + 21 + 45 = 78. A soma dos pesos é 10. Então M_{p} = 78 / 10 = 7,8.
 
 Repare que a média simples das três notas daria um valor menor, porque a nota alta é justamente a de
 maior peso. Dividir pela quantidade de notas em vez de dividir pela soma dos pesos é o erro clássico
@@ -104,7 +119,7 @@ aqui.
 
 **Exemplo 5.** Uma empresa tem cinco funcionários, com salários mensais de 1500, 2000, 2000, 2500 e
 22000 reais.
-A soma é 30000, então a média é 6000 reais. Ordenando, o valor central é 2000, e essa é a mediana.
+A soma é S = 30000, então M = 6000 reais. Ordenando, o valor central é 2000, e essa é a mediana.
 
 Quatro dos cinco funcionários ganham menos do que a média. Dizer que o salário médio da empresa é
 6000 reais é verdade aritmética e mentira descritiva. A mediana de 2000 reais descreve muito melhor
@@ -115,20 +130,33 @@ mediana é a medida mais honesta.
 
 Saber o centro não basta. As medidas de dispersão contam o quanto os dados se afastam dele.
 
-A **amplitude** é a diferença entre o maior e o menor valor. É rápida de calcular e depende apenas
-de dois dados, o que a torna frágil.
+A **amplitude** é a diferença entre o maior e o menor valor:
 
-A **variância** é a média dos quadrados dos desvios em relação à média. Eleva-se ao quadrado para
-que desvios para cima e para baixo não se cancelem.
+A = x_{máx} - x_{mín}
 
-O **desvio padrão** é a raiz quadrada da variância. Ele volta para a unidade original dos dados, e
-por isso é o que se usa para comunicar o resultado.
+onde A é a amplitude, x_{máx} o maior valor do conjunto e x_{mín} o menor. É rápida de calcular e
+depende apenas de dois dados, o que a torna frágil.
+
+A **variância** é a média dos quadrados dos desvios em relação à média:
+
+V = Σ(x - M)^{2} / n
+
+onde V é a variância, x cada valor do conjunto, M a média, n a quantidade de valores e Σ a soma
+sobre todos os valores. Eleva-se ao quadrado para que desvios para cima e para baixo não se
+cancelem.
+
+O **desvio padrão** é a raiz quadrada da variância:
+
+DP = √V
+
+onde DP é o desvio padrão e V a variância. Ele volta para a unidade original dos dados, e por isso é
+o que se usa para comunicar o resultado.
 
 **Exemplo 6.** Calcular a média, a variância e o desvio padrão do conjunto 2, 4, 4, 4, 5, 5, 7, 9.
-A soma é 40 e há 8 valores, então a média é 5.
-Os desvios em relação a 5 são menos 3, menos 1, menos 1, menos 1, 0, 0, 2 e 4. Elevando ao quadrado:
+A soma é S = 40 e há n = 8 valores, então M = 5.
+Os desvios x - 5 são -3, -1, -1, -1, 0, 0, 2 e 4. Elevando ao quadrado, (x - 5)^{2} dá
 9, 1, 1, 1, 0, 0, 4 e 16, que somam 32.
-A variância é 32 dividido por 8, que dá 4. O desvio padrão é a raiz quadrada de 4, ou seja, 2.
+Então V = 32 / 8 = 4 e DP = √4 = 2.
 
 Um desvio padrão de 2 num conjunto de média 5 indica que os valores costumam ficar a cerca de duas
 unidades do centro.
@@ -217,15 +245,14 @@ moda.
 9. 10. A soma das quatro notas precisa ser 28 e as três primeiras somam 18.
 10. 6,6.
 11. 7,5. Em ordem o conjunto é 3, 5, 7, 8, 10, 12, e a mediana é a média entre 7 e 8.
-12. x igual a 12.
-13. Variância 8 e desvio padrão igual à raiz quadrada de 8, que vale 2 vezes a raiz quadrada de 2.
-14. Os dois conjuntos têm média 10. O primeiro tem variância 2 e desvio padrão igual à raiz quadrada
-    de 2. O segundo tem variância 18 e desvio padrão igual a 3 vezes a raiz quadrada de 2. A média
-    sozinha não distingue os dois conjuntos, e o desvio padrão mostra que o segundo tem valores bem
-    mais espalhados.
+12. x = 12.
+13. Variância 8 e desvio padrão DP = √8 = 2·√2.
+14. Os dois conjuntos têm média 10. O primeiro tem variância 2 e desvio padrão DP = √2. O segundo
+    tem variância 18 e desvio padrão DP = 3·√2. A média sozinha não distingue os dois conjuntos, e o
+    desvio padrão mostra que o segundo tem valores bem mais espalhados.
 15. 6,2. A soma das notas passa de 150 para 155.
-16. A nova média é 30, porque 90 dividido por 9 dá 10 de acréscimo. A mediana continua 20, porque o
-    valor central não mudou.
+16. A nova média é 30, porque 90 / 9 = 10 de acréscimo. A mediana continua 20, porque o valor
+    central não mudou.
 17. 6. A soma de todas as notas é 260 e o grupo de estudo soma 80, restando 180 para 30 alunos.
 18. Os números são 4, 4, 6, 7 e 9. A soma precisa ser 30, o valor central é 6 e o 4 precisa aparecer
     duas vezes sem que nenhum outro se repita.
@@ -263,7 +290,12 @@ Mixing up the types leads to a crude mistake: the mean of eye colour means nothi
 
 A frequency table counts how many times each value appears. The **absolute frequency** is the plain
 count, and the **relative frequency** is that count divided by the total, almost always written as a
-percentage.
+percentage:
+
+f_{r} = f_{a} / N
+
+where f_{r} is the relative frequency, f_{a} the absolute frequency and N the total number of
+observations.
 
 **Example 1.** In a class of 20 students each one was asked how many siblings they have. Five
 answered that they have none, eight answered one, four answered two and three answered three.
@@ -272,32 +304,41 @@ The table looks like this: the value 0 has frequency 5, the value 1 has frequenc
 frequency 4 and the value 3 has frequency 3. The frequencies add up to 20, which confirms that
 nobody was left out.
 
-The relative frequencies are 5 divided by 20, which gives 25 per cent; 8 divided by 20, which gives
-40 per cent; 4 divided by 20, which gives 20 per cent; and 3 divided by 20, which gives 15 per cent.
-The percentages add up to 100 per cent, and that sum is the first check to make.
+The relative frequencies are 5 / 20, which gives 25%; 8 / 20, which gives 40%; 4 / 20, which gives
+20%; and 3 / 20, which gives 15%. The percentages add up to 100%, and that sum is the first check to
+make.
 
 #### The three measures of centre
 
-The **arithmetic mean** is the sum of the values divided by how many there are. It is the measure
+The **arithmetic mean** is the sum of the values divided by how many there are:
+
+M = S / n
+
+where M is the mean, S the sum of all the values and n how many values there are. It is the measure
 that uses every piece of data, and for that reason it is the most sensitive to extreme values.
 
 The **median** is the value that sits in the middle once the data is ordered. With an odd number of
-values it is the central value; with an even number, it is the mean of the two central ones.
-Ordering first is compulsory, and that is where most mistakes happen.
+values it is the central value; with an even number, it is the mean of the two central ones:
+
+Md = (c_{1} + c_{2}) / 2
+
+where Md is the median and c_{1} and c_{2} are the two central values. Ordering first is compulsory,
+and that is where most mistakes happen.
 
 The **mode** is the value that repeats most often. A set can have one mode, more than one, or none.
 
 **Example 2.** Find the three measures of the set 3, 5, 7, 7, 8, 9, 10.
-The sum is 49 and there are 7 values, so the mean is 7. The set is already ordered, and with 7
-values the central one is the fourth, which is 7. The only repeated value is 7, which is the mode.
+The sum is S = 49 and there are n = 7 values, so M = 49 / 7 = 7. The set is already ordered, and
+with 7 values the central one is the fourth, which is 7. The only repeated value is 7, which is the
+mode.
 
 In this set the three measures coincide, which happens when the data is evenly spread around the
 centre.
 
 **Example 3.** Find the mean, the median and the mode from the table above, with 5 students with no
 siblings, 8 with one sibling, 4 with two and 3 with three.
-For the mean, multiply each value by its frequency and divide by the total: 0 times 5 plus 1 times 8
-plus 2 times 4 plus 3 times 3 gives 25, and 25 divided by 20 gives 1.25.
+For the mean, multiply each value by its frequency and divide by the total:
+0 × 5 + 1 × 8 + 2 × 4 + 3 × 3 = 25, and M = 25 / 20 = 1.25.
 For the median, with 20 values the central ones are the tenth and the eleventh. The first five are
 0 and from the sixth to the thirteenth they are 1, so both central values are 1, and the median is 1.
 The mode is 1, the value with the highest frequency.
@@ -308,12 +349,16 @@ normal and is not a mistake: the mean is a summary, not a portrait of anyone.
 #### Weighted mean
 
 When the values carry different importance, each one enters with a **weight**. The weighted mean is
-the sum of the products value times weight, divided by the sum of the weights.
+the sum of each value multiplied by its weight, divided by the sum of the weights:
+
+M_{w} = (v_{1} · p_{1} + v_{2} · p_{2} + v_{3} · p_{3}) / (p_{1} + p_{2} + p_{3})
+
+where M_{w} is the weighted mean, v_{1}, v_{2} and v_{3} are the values and p_{1}, p_{2} and p_{3}
+the matching weights.
 
 **Example 4.** The final grade of a course comes from three assessments: 6 with weight 2, 7 with
 weight 3 and 9 with weight 5.
-The numerator is 12 plus 21 plus 45, which gives 78. The sum of the weights is 10. So the final
-grade is 78 divided by 10, that is, 7.8.
+The numerator is 12 + 21 + 45 = 78. The sum of the weights is 10. So M_{w} = 78 / 10 = 7.8.
 
 Notice that the simple mean of the three grades would give a smaller value, because the high grade
 is precisely the one with the largest weight. Dividing by the number of grades instead of dividing
@@ -323,7 +368,7 @@ by the sum of the weights is the classic slip here.
 
 **Example 5.** A company has five employees, with monthly salaries of 1500, 2000, 2000, 2500 and
 22000 reais.
-The sum is 30000, so the mean is 6000 reais. In order, the central value is 2000, and that is the
+The sum is S = 30000, so M = 6000 reais. In order, the central value is 2000, and that is the
 median.
 
 Four of the five employees earn less than the mean. Saying that the average salary in the company is
@@ -335,22 +380,34 @@ median is the more honest measure.
 
 Knowing the centre is not enough. Measures of spread tell you how far the data sits from it.
 
-The **range** is the difference between the largest and the smallest value. It is quick to work out
-and depends on only two pieces of data, which makes it fragile.
+The **range** is the difference between the largest and the smallest value:
 
-The **variance** is the mean of the squared deviations from the mean. You square them so that
-deviations above and below do not cancel each other out.
+R = x_{max} - x_{min}
 
-The **standard deviation** is the square root of the variance. It returns to the original unit of
-the data, and that is why it is the one used to report the result.
+where R is the range, x_{max} the largest value in the set and x_{min} the smallest. It is quick to
+work out and depends on only two pieces of data, which makes it fragile.
+
+The **variance** is the mean of the squared deviations from the mean:
+
+V = Σ(x - M)^{2} / n
+
+where V is the variance, x each value in the set, M the mean, n how many values there are and Σ the
+sum over every value. You square the deviations so that those above and below do not cancel each
+other out.
+
+The **standard deviation** is the square root of the variance:
+
+SD = √V
+
+where SD is the standard deviation and V the variance. It returns to the original unit of the data,
+and that is why it is the one used to report the result.
 
 **Example 6.** Find the mean, the variance and the standard deviation of the set 2, 4, 4, 4, 5, 5,
 7, 9.
-The sum is 40 and there are 8 values, so the mean is 5.
-The deviations from 5 are minus 3, minus 1, minus 1, minus 1, 0, 0, 2 and 4. Squaring them: 9, 1, 1,
-1, 0, 0, 4 and 16, which add up to 32.
-The variance is 32 divided by 8, which gives 4. The standard deviation is the square root of 4, that
-is, 2.
+The sum is S = 40 and there are n = 8 values, so M = 5.
+The deviations x - 5 are -3, -1, -1, -1, 0, 0, 2 and 4. Squaring them, (x - 5)^{2} gives
+9, 1, 1, 1, 0, 0, 4 and 16, which add up to 32.
+So V = 32 / 8 = 4 and SD = √4 = 2.
 
 A standard deviation of 2 in a set with mean 5 tells you that the values usually sit about two units
 from the centre.
@@ -438,16 +495,15 @@ reais squared, and only the standard deviation returns to reais.
 9. 10. The sum of the four scores has to be 28 and the first three add up to 18.
 10. 6.6.
 11. 7.5. In order the set is 3, 5, 7, 8, 10, 12, and the median is the mean of 7 and 8.
-12. x equals 12.
-13. Variance 8 and standard deviation equal to the square root of 8, which is 2 times the square
-    root of 2.
-14. The two sets have mean 10. The first has variance 2 and standard deviation equal to the square
-    root of 2. The second has variance 18 and standard deviation equal to 3 times the square root of
-    2. The mean alone does not tell the two sets apart, and the standard deviation shows that the
-    second one has values that are far more spread out.
+12. x = 12.
+13. Variance 8 and standard deviation SD = √8 = 2·√2.
+14. The two sets have mean 10. The first has variance 2 and standard deviation SD = √2. The second
+    has variance 18 and standard deviation SD = 3·√2. The mean alone does not tell the two sets
+    apart, and the standard deviation shows that the second one has values that are far more spread
+    out.
 15. 6.2. The sum of the scores goes from 150 to 155.
-16. The new mean is 30, because 90 divided by 9 gives an increase of 10. The median stays 20,
-    because the middle value did not change.
+16. The new mean is 30, because 90 / 9 = 10 is the increase. The median stays 20, because the
+    middle value did not change.
 17. 6. The sum of all the scores is 260 and the study group adds up to 80, leaving 180 for 30
     students.
 18. The numbers are 4, 4, 6, 7 and 9. The sum has to be 30, the middle value is 6 and the 4 has to

@@ -21,15 +21,15 @@ Geometria analítica é geometria feita com números. Em vez de olhar para uma f
 sobre ela, você dá um endereço a cada ponto e passa a resolver o problema por conta. A vantagem é
 enorme: o que era intuição vira álgebra, e álgebra a gente confere.
 
-O endereço de um ponto é o par de coordenadas. Escrevendo o ponto de coordenadas 3 e menos 2,
-queremos dizer que ele está três unidades à direita da origem e duas unidades abaixo dela. O
-primeiro número é a abscissa, o segundo é a ordenada.
+O endereço de um ponto é o par de coordenadas. Escrevendo P(3, -2), queremos dizer que o ponto está
+três unidades à direita da origem e duas unidades abaixo dela. O primeiro número é a abscissa, o
+segundo é a ordenada.
 
 Vale fixar o vocabulário, porque ele aparece o tempo todo em prova:
 
-- Ponto com ordenada zero está sobre o eixo horizontal.
-- Ponto com abscissa zero está sobre o eixo vertical.
-- Ponto com as duas coordenadas iguais está sobre a bissetriz dos quadrantes ímpares.
+- Ponto da forma (x, 0) está sobre o eixo horizontal.
+- Ponto da forma (0, y) está sobre o eixo vertical.
+- Ponto da forma (a, a) está sobre a bissetriz dos quadrantes ímpares.
 
 #### Distância entre dois pontos
 
@@ -37,38 +37,43 @@ Esta é a fórmula que sustenta o resto do capítulo, e ela não é uma fórmula
 Pitágoras vestido de coordenadas. Dois pontos determinam um triângulo retângulo cujos catetos são a
 diferença das abscissas e a diferença das ordenadas.
 
-d igual à raiz quadrada de (diferença das abscissas ao quadrado mais diferença das ordenadas ao
-quadrado)
+d = √((x_{B} - x_{A})^{2} + (y_{B} - y_{A})^{2})
+
+onde d é a distância entre os pontos A(x_{A}, y_{A}) e B(x_{B}, y_{B}).
 
 Como as diferenças aparecem ao quadrado, a ordem em que você as subtrai não importa.
 
-**Exemplo 1.** Distância entre o ponto de coordenadas 1 e 2 e o ponto de coordenadas 4 e 6.
-A diferença das abscissas é 3 e a das ordenadas é 4. Então d é a raiz de 9 mais 16, ou seja, raiz de
-25, que dá 5.
+**Exemplo 1.** Distância entre A(1, 2) e B(4, 6).
+A diferença das abscissas é 4 - 1 = 3 e a das ordenadas é 6 - 2 = 4. Então
+d = √(3^{2} + 4^{2}) = √(9 + 16) = √25 = 5.
 
 Quando a conta não cai em quadrado perfeito, a resposta fica em forma de raiz simplificada. Escrever
-raiz de 61 é uma resposta melhor do que um decimal aproximado, porque é exata.
+√61 é uma resposta melhor do que um decimal aproximado, porque é exata.
 
 #### Ponto médio
 
 O ponto médio de um segmento tem coordenadas iguais às médias das coordenadas dos extremos.
 
-x do ponto médio igual à média das abscissas, e y do ponto médio igual à média das ordenadas
+x_{M} = (x_{A} + x_{B}) / 2   e   y_{M} = (y_{A} + y_{B}) / 2
 
-**Exemplo 2.** Ponto médio do segmento de extremos o ponto de coordenadas menos 3 e 5 e o ponto de
-coordenadas 7 e 1.
-A média das abscissas é menos 3 mais 7 dividido por 2, que dá 2. A média das ordenadas é 5 mais 1
-dividido por 2, que dá 3. O ponto médio é o ponto de coordenadas 2 e 3.
+onde M(x_{M}, y_{M}) é o ponto médio do segmento de extremos A e B.
+
+**Exemplo 2.** Ponto médio do segmento de extremos A(-3, 5) e B(7, 1).
+x_{M} = (-3 + 7) / 2 = 2 e y_{M} = (5 + 1) / 2 = 3. O ponto médio é M(2, 3).
 
 Essa fórmula lida bem com o problema inverso. Se você conhece um extremo e o ponto médio, o outro
-extremo sai isolando: a abscissa do extremo que falta é o dobro da abscissa do ponto médio menos a
-abscissa do extremo conhecido.
+extremo sai isolando:
+
+x_{B} = 2 · x_{M} - x_{A}   e   y_{B} = 2 · y_{M} - y_{A}
 
 #### Baricentro do triângulo
 
 O baricentro é o ponto de encontro das medianas, e em coordenadas ele é a média simples dos três
-vértices: soma as abscissas e divide por 3, soma as ordenadas e divide por 3. É uma das fórmulas
-mais fáceis de lembrar e das mais cobradas.
+vértices:
+
+x_{G} = (x_{A} + x_{B} + x_{C}) / 3   e   y_{G} = (y_{A} + y_{B} + y_{C}) / 3
+
+É uma das fórmulas mais fáceis de lembrar e das mais cobradas.
 
 #### Alinhamento de três pontos
 
@@ -78,22 +83,25 @@ determinante der zero, os pontos estão alinhados.
 
 Desenvolvido, o determinante vale
 
-x1 vezes (y2 menos y3) mais x2 vezes (y3 menos y1) mais x3 vezes (y1 menos y2)
+D = x_{1} · (y_{2} - y_{3}) + x_{2} · (y_{3} - y_{1}) + x_{3} · (y_{1} - y_{2})
 
-**Exemplo 3.** Verificar se o ponto de coordenadas 1 e 2, o ponto de coordenadas 3 e 6 e o ponto de
-coordenadas 5 e 10 estão alinhados.
-O determinante vale 1 vezes (6 menos 10) mais 3 vezes (10 menos 2) mais 5 vezes (2 menos 6), ou
-seja, menos 4 mais 24 menos 20, que dá zero. Logo os três pontos estão alinhados.
+e a condição de alinhamento é D = 0.
+
+**Exemplo 3.** Verificar se A(1, 2), B(3, 6) e C(5, 10) estão alinhados.
+D = 1 · (6 - 10) + 3 · (10 - 2) + 5 · (2 - 6) = -4 + 24 - 20 = 0. Logo os três pontos estão
+alinhados.
 
 #### Área de um triângulo
 
-Quando o determinante não dá zero, o seu valor absoluto é o dobro da área do triângulo. Então a área
-é a metade do módulo do determinante.
+Quando o determinante não dá zero, o seu valor absoluto é o dobro da área do triângulo:
 
-**Exemplo 4.** Área do triângulo de vértices o ponto de coordenadas 2 e 1, o ponto de coordenadas 6
-e 3 e o ponto de coordenadas 4 e 7.
-O determinante vale 2 vezes (3 menos 7) mais 6 vezes (7 menos 1) mais 4 vezes (1 menos 3), isto é,
-menos 8 mais 36 menos 8, que dá 20. A área é a metade de 20, ou seja, 10.
+S = |D| / 2
+
+onde S é a área do triângulo cujos vértices formaram o determinante D.
+
+**Exemplo 4.** Área do triângulo de vértices A(2, 1), B(6, 3) e C(4, 7).
+D = 2 · (3 - 7) + 6 · (7 - 1) + 4 · (1 - 3) = -8 + 36 - 8 = 20, e a área é
+S = |20| / 2 = 10.
 
 Para polígonos com mais lados existe a mesma ideia, conhecida como fórmula do cadarço: percorra os
 vértices numa volta só, some os produtos de cada abscissa pela ordenada do vértice seguinte, subtraia
@@ -110,79 +118,64 @@ escreve os vértices. Área negativa não existe.
 **Trocar as coordenadas de lugar.** Abscissa primeiro, ordenada depois, sempre. Inverter é o erro
 que mais custa ponto em prova de geometria analítica.
 
-**Aproximar a raiz cedo demais.** Se a resposta é raiz de 29, deixe raiz de 29. Arredondar no meio
-da conta contamina tudo o que vem depois.
+**Aproximar a raiz cedo demais.** Se a resposta é √29, deixe √29. Arredondar no meio da conta
+contamina tudo o que vem depois.
 
 ### Exercícios
 
 **Bloco A. Fundamentos**
 
-1. Calcule a distância entre o ponto de coordenadas 2 e 3 e o ponto de coordenadas 6 e 6.
-2. Calcule a distância entre o ponto de coordenadas menos 1 e 4 e o ponto de coordenadas 2 e 0.
-3. Determine o ponto médio do segmento de extremos o ponto de coordenadas menos 2 e 7 e o ponto de
-   coordenadas 6 e 1.
-4. Calcule a distância da origem ao ponto de coordenadas 5 e 12.
-5. Determine o ponto médio do segmento de extremos o ponto de coordenadas 3 e menos 5 e o ponto de
-   coordenadas menos 1 e 9.
+1. Calcule a distância entre A(2, 3) e B(6, 6).
+2. Calcule a distância entre A(-1, 4) e B(2, 0).
+3. Determine o ponto médio do segmento de extremos A(-2, 7) e B(6, 1).
+4. Calcule a distância da origem a P(5, 12).
+5. Determine o ponto médio do segmento de extremos A(3, -5) e B(-1, 9).
 
 **Bloco B. Consolidação**
 
-6. Calcule a distância entre o ponto de coordenadas menos 3 e 2 e o ponto de coordenadas 2 e menos
-   4, deixando a resposta em forma de raiz.
-7. O ponto de coordenadas 4 e 5 é o ponto médio de um segmento cujo primeiro extremo é o ponto de
-   coordenadas 1 e 2. Determine o outro extremo.
-8. Verifique se o ponto de coordenadas 2 e 1, o ponto de coordenadas 4 e 5 e o ponto de coordenadas
-   7 e 11 estão alinhados.
-9. Um triângulo tem vértices no ponto de coordenadas 0 e 0, no ponto de coordenadas 6 e 0 e no ponto
-   de coordenadas 3 e 4. Calcule o perímetro e classifique o triângulo quanto aos lados.
-10. Determine o ponto do eixo horizontal que fica à mesma distância do ponto de coordenadas 1 e 2 e
-    do ponto de coordenadas 7 e 4.
-11. Calcule o baricentro do triângulo de vértices o ponto de coordenadas 1 e 2, o ponto de
-    coordenadas 5 e 4 e o ponto de coordenadas 3 e 9.
-12. Calcule a área do triângulo de vértices o ponto de coordenadas 1 e 1, o ponto de coordenadas 5 e
-    2 e o ponto de coordenadas 3 e 6.
-13. Calcule a distância da origem ao ponto de coordenadas 2 e 5, deixando a resposta em forma de
-    raiz.
-14. Determine os valores de m para que o ponto de coordenadas m e 3 fique a uma distância 5 do ponto
-    de coordenadas 1 e menos 1.
+6. Calcule a distância entre A(-3, 2) e B(2, -4), deixando a resposta em forma de raiz.
+7. O ponto M(4, 5) é o ponto médio de um segmento cujo primeiro extremo é A(1, 2). Determine o outro
+   extremo.
+8. Verifique se A(2, 1), B(4, 5) e C(7, 11) estão alinhados.
+9. Um triângulo tem vértices A(0, 0), B(6, 0) e C(3, 4). Calcule o perímetro e classifique o
+   triângulo quanto aos lados.
+10. Determine o ponto do eixo horizontal que fica à mesma distância de A(1, 2) e de B(7, 4).
+11. Calcule o baricentro do triângulo de vértices A(1, 2), B(5, 4) e C(3, 9).
+12. Calcule a área do triângulo de vértices A(1, 1), B(5, 2) e C(3, 6).
+13. Calcule a distância da origem a P(2, 5), deixando a resposta em forma de raiz.
+14. Determine os valores de m para que P(m, 3) fique a uma distância 5 de Q(1, -1).
 
 **Bloco C. Aprofundamento**
 
-15. Um triângulo tem vértices no ponto de coordenadas 1 e 1, no ponto de coordenadas 4 e 5 e no
-    ponto de coordenadas 8 e 2. Calcule os quadrados dos três lados, mostre que o triângulo é
-    retângulo e isósceles, e calcule sua área.
-16. Determine o ponto do eixo vertical que fica à mesma distância do ponto de coordenadas 3 e 1 e do
-    ponto de coordenadas menos 1 e 5.
-17. Determine k para que o ponto de coordenadas 1 e 3, o ponto de coordenadas 3 e 7 e o ponto de
-    coordenadas k e 15 estejam alinhados.
-18. Um triângulo tem vértices no ponto de coordenadas 0 e 0, no ponto de coordenadas 8 e 0 e no
-    ponto de coordenadas 0 e 6. Calcule o comprimento da mediana que sai do vértice do ângulo reto e
-    compare com o comprimento da hipotenusa.
-19. Calcule a área do quadrilátero de vértices, nesta ordem, o ponto de coordenadas 0 e 0, o ponto
-    de coordenadas 6 e 0, o ponto de coordenadas 8 e 5 e o ponto de coordenadas 0 e 4.
+15. Um triângulo tem vértices A(1, 1), B(4, 5) e C(8, 2). Calcule os quadrados dos três lados,
+    mostre que o triângulo é retângulo e isósceles, e calcule sua área.
+16. Determine o ponto do eixo vertical que fica à mesma distância de A(3, 1) e de B(-1, 5).
+17. Determine k para que A(1, 3), B(3, 7) e C(k, 15) estejam alinhados.
+18. Um triângulo tem vértices A(0, 0), B(8, 0) e C(0, 6). Calcule o comprimento da mediana que sai
+    do vértice do ângulo reto e compare com o comprimento da hipotenusa.
+19. Calcule a área do quadrilátero de vértices, nesta ordem, A(0, 0), B(6, 0), C(8, 5) e D(0, 4).
 
 ### Gabarito
 
 1. 5. Os catetos medem 4 e 3.
 2. 5. Os catetos medem 3 e 4.
-3. O ponto de coordenadas 2 e 4.
+3. M(2, 4).
 4. 13.
-5. O ponto de coordenadas 1 e 2.
-6. Raiz de 61. Os catetos medem 5 e 6.
-7. O ponto de coordenadas 7 e 8. Cada coordenada do extremo que falta é o dobro da do ponto médio
-   menos a do extremo conhecido.
-8. Estão alinhados. O determinante vale zero.
+5. M(1, 2).
+6. √61. Os catetos medem 5 e 6.
+7. B(7, 8), porque x_{B} = 2 · x_{M} - x_{A} e y_{B} = 2 · y_{M} - y_{A}.
+8. Estão alinhados, porque D = 0.
 9. Perímetro 16. Os lados medem 6, 5 e 5, então o triângulo é isósceles.
-10. O ponto de coordenadas 5 e 0.
-11. O ponto de coordenadas 3 e 5.
-12. 9. O determinante vale 18 e a área é a metade do seu módulo.
-13. Raiz de 29.
-14. m igual a 4 ou m igual a menos 2.
-15. Os quadrados dos lados valem 25, 25 e 50. Como 25 mais 25 dá 50, o triângulo é retângulo pelo
+10. O ponto (5, 0).
+11. G(3, 5).
+12. 9. D = 18 e a área é S = |D| / 2.
+13. √29.
+14. m = 4 ou m = -2.
+15. Os quadrados dos lados valem 25, 25 e 50. Como 25 + 25 = 50, o triângulo é retângulo pelo
     recíproco do teorema de Pitágoras, e como dois lados têm o mesmo quadrado ele também é
     isósceles. A área vale 12,5.
-16. O ponto de coordenadas 0 e 2.
-17. k igual a 7.
+16. O ponto (0, 2).
+17. k = 7.
 18. A mediana mede 5 e a hipotenusa mede 10. A mediana relativa à hipotenusa é a metade dela.
 19. 31. Pela fórmula do cadarço, a soma dos produtos cruzados vale 62.
 
@@ -196,15 +189,15 @@ Analytic geometry is geometry done with numbers. Instead of looking at a figure 
 it, you give every point an address and solve the problem by calculation. The gain is huge: what was
 intuition becomes algebra, and algebra can be checked.
 
-The address of a point is its pair of coordinates. Writing the point with coordinates 3 and minus 2,
-we mean it sits three units to the right of the origin and two units below it. The first number is
-the x coordinate, the second is the y coordinate.
+The address of a point is its pair of coordinates. Writing P(3, -2), we mean the point sits three
+units to the right of the origin and two units below it. The first number is the x coordinate, the
+second is the y coordinate.
 
 It is worth fixing the vocabulary, because it shows up constantly in tests:
 
-- A point whose y coordinate is zero lies on the horizontal axis.
-- A point whose x coordinate is zero lies on the vertical axis.
-- A point whose two coordinates are equal lies on the bisector of the odd quadrants.
+- A point of the form (x, 0) lies on the horizontal axis.
+- A point of the form (0, y) lies on the vertical axis.
+- A point of the form (a, a) lies on the bisector of the odd quadrants.
 
 #### Distance between two points
 
@@ -212,41 +205,43 @@ This is the formula the whole chapter rests on, and it is not a new formula: it 
 theorem dressed in coordinates. Two points determine a right triangle whose legs are the difference
 of the x coordinates and the difference of the y coordinates.
 
-d equals the square root of (difference of the x coordinates squared plus difference of the y
-coordinates squared)
+d = √((x_{B} - x_{A})^{2} + (y_{B} - y_{A})^{2})
+
+where d is the distance between the points A(x_{A}, y_{A}) and B(x_{B}, y_{B}).
 
 Since the differences appear squared, the order in which you subtract them does not matter.
 
-**Example 1.** Distance between the point with coordinates 1 and 2 and the point with coordinates 4
-and 6.
-The difference of the x coordinates is 3 and of the y coordinates is 4. So d is the square root of 9
-plus 16, that is, the square root of 25, which gives 5.
+**Example 1.** Distance between A(1, 2) and B(4, 6).
+The difference of the x coordinates is 4 - 1 = 3 and of the y coordinates is 6 - 2 = 4. So
+d = √(3^{2} + 4^{2}) = √(9 + 16) = √25 = 5.
 
 When the calculation does not land on a perfect square, the answer stays in simplified radical form.
-Writing the square root of 61 is a better answer than an approximate decimal, because it is exact.
+Writing √61 is a better answer than an approximate decimal, because it is exact.
 
 #### Midpoint
 
 The midpoint of a segment has coordinates equal to the averages of the coordinates of the endpoints.
 
-x of the midpoint equals the average of the x coordinates, and y of the midpoint equals the average
-of the y coordinates
+x_{M} = (x_{A} + x_{B}) / 2   and   y_{M} = (y_{A} + y_{B}) / 2
 
-**Example 2.** Midpoint of the segment whose endpoints are the point with coordinates minus 3 and 5
-and the point with coordinates 7 and 1.
-The average of the x coordinates is minus 3 plus 7 divided by 2, which gives 2. The average of the y
-coordinates is 5 plus 1 divided by 2, which gives 3. The midpoint is the point with coordinates 2
-and 3.
+where M(x_{M}, y_{M}) is the midpoint of the segment with endpoints A and B.
+
+**Example 2.** Midpoint of the segment with endpoints A(-3, 5) and B(7, 1).
+x_{M} = (-3 + 7) / 2 = 2 and y_{M} = (5 + 1) / 2 = 3. The midpoint is M(2, 3).
 
 This formula handles the reverse problem well. If you know one endpoint and the midpoint, the other
-endpoint comes out by isolating: the x coordinate of the missing endpoint is twice the x coordinate
-of the midpoint minus the x coordinate of the known endpoint.
+endpoint comes out by isolating:
+
+x_{B} = 2 · x_{M} - x_{A}   and   y_{B} = 2 · y_{M} - y_{A}
 
 #### Centroid of a triangle
 
 The centroid is the meeting point of the medians, and in coordinates it is the plain average of the
-three vertices: add the x coordinates and divide by 3, add the y coordinates and divide by 3. It is
-one of the easiest formulas to remember and one of the most frequently asked.
+three vertices:
+
+x_{G} = (x_{A} + x_{B} + x_{C}) / 3   and   y_{G} = (y_{A} + y_{B} + y_{C}) / 3
+
+It is one of the easiest formulas to remember and one of the most frequently asked.
 
 #### Collinearity of three points
 
@@ -256,22 +251,25 @@ points. If the determinant is zero, the points are collinear.
 
 Expanded, the determinant equals
 
-x1 times (y2 minus y3) plus x2 times (y3 minus y1) plus x3 times (y1 minus y2)
+D = x_{1} · (y_{2} - y_{3}) + x_{2} · (y_{3} - y_{1}) + x_{3} · (y_{1} - y_{2})
 
-**Example 3.** Check whether the point with coordinates 1 and 2, the point with coordinates 3 and 6
-and the point with coordinates 5 and 10 are collinear.
-The determinant equals 1 times (6 minus 10) plus 3 times (10 minus 2) plus 5 times (2 minus 6), that
-is, minus 4 plus 24 minus 20, which gives zero. So the three points are collinear.
+and the collinearity condition is D = 0.
+
+**Example 3.** Check whether A(1, 2), B(3, 6) and C(5, 10) are collinear.
+D = 1 · (6 - 10) + 3 · (10 - 2) + 5 · (2 - 6) = -4 + 24 - 20 = 0. So the three points are
+collinear.
 
 #### Area of a triangle
 
-When the determinant is not zero, its absolute value is twice the area of the triangle. So the area
-is half the absolute value of the determinant.
+When the determinant is not zero, its absolute value is twice the area of the triangle:
 
-**Example 4.** Area of the triangle with vertices at the point with coordinates 2 and 1, the point
-with coordinates 6 and 3 and the point with coordinates 4 and 7.
-The determinant equals 2 times (3 minus 7) plus 6 times (7 minus 1) plus 4 times (1 minus 3), that
-is, minus 8 plus 36 minus 8, which gives 20. The area is half of 20, that is, 10.
+S = |D| / 2
+
+where S is the area of the triangle whose vertices formed the determinant D.
+
+**Example 4.** Area of the triangle with vertices A(2, 1), B(6, 3) and C(4, 7).
+D = 2 · (3 - 7) + 6 · (7 - 1) + 4 · (1 - 3) = -8 + 36 - 8 = 20, and the area is
+S = |20| / 2 = 10.
 
 For polygons with more sides there is the same idea, known as the shoelace formula: walk around the
 vertices in a single loop, add the products of each x coordinate by the y coordinate of the next
@@ -289,83 +287,67 @@ the order in which you write the vertices. A negative area does not exist.
 **Swapping the coordinates.** The x coordinate comes first, the y coordinate second, always.
 Reversing them is the mistake that costs the most marks in analytic geometry.
 
-**Rounding the radical too early.** If the answer is the square root of 29, leave it as the square
-root of 29. Rounding mid calculation contaminates everything that follows.
+**Rounding the radical too early.** If the answer is √29, leave it as √29. Rounding mid calculation
+contaminates everything that follows.
 
 ### Exercises
 
 **Block A. Fundamentals**
 
-1. Find the distance between the point with coordinates 2 and 3 and the point with coordinates 6 and
-   6.
-2. Find the distance between the point with coordinates minus 1 and 4 and the point with coordinates
-   2 and 0.
-3. Find the midpoint of the segment whose endpoints are the point with coordinates minus 2 and 7 and
-   the point with coordinates 6 and 1.
-4. Find the distance from the origin to the point with coordinates 5 and 12.
-5. Find the midpoint of the segment whose endpoints are the point with coordinates 3 and minus 5 and
-   the point with coordinates minus 1 and 9.
+1. Find the distance between A(2, 3) and B(6, 6).
+2. Find the distance between A(-1, 4) and B(2, 0).
+3. Find the midpoint of the segment with endpoints A(-2, 7) and B(6, 1).
+4. Find the distance from the origin to P(5, 12).
+5. Find the midpoint of the segment with endpoints A(3, -5) and B(-1, 9).
 
 **Block B. Building up**
 
-6. Find the distance between the point with coordinates minus 3 and 2 and the point with coordinates
-   2 and minus 4, leaving the answer in radical form.
-7. The point with coordinates 4 and 5 is the midpoint of a segment whose first endpoint is the point
-   with coordinates 1 and 2. Find the other endpoint.
-8. Check whether the point with coordinates 2 and 1, the point with coordinates 4 and 5 and the
-   point with coordinates 7 and 11 are collinear.
-9. A triangle has vertices at the point with coordinates 0 and 0, the point with coordinates 6 and 0
-   and the point with coordinates 3 and 4. Find the perimeter and classify the triangle by its sides.
-10. Find the point on the horizontal axis that is the same distance from the point with coordinates
-    1 and 2 and from the point with coordinates 7 and 4.
-11. Find the centroid of the triangle with vertices at the point with coordinates 1 and 2, the point
-    with coordinates 5 and 4 and the point with coordinates 3 and 9.
-12. Find the area of the triangle with vertices at the point with coordinates 1 and 1, the point
-    with coordinates 5 and 2 and the point with coordinates 3 and 6.
-13. Find the distance from the origin to the point with coordinates 2 and 5, leaving the answer in
-    radical form.
-14. Find the values of m for which the point with coordinates m and 3 is at a distance 5 from the
-    point with coordinates 1 and minus 1.
+6. Find the distance between A(-3, 2) and B(2, -4), leaving the answer in radical form.
+7. The point M(4, 5) is the midpoint of a segment whose first endpoint is A(1, 2). Find the other
+   endpoint.
+8. Check whether A(2, 1), B(4, 5) and C(7, 11) are collinear.
+9. A triangle has vertices A(0, 0), B(6, 0) and C(3, 4). Find the perimeter and classify the
+   triangle by its sides.
+10. Find the point on the horizontal axis that is the same distance from A(1, 2) and from B(7, 4).
+11. Find the centroid of the triangle with vertices A(1, 2), B(5, 4) and C(3, 9).
+12. Find the area of the triangle with vertices A(1, 1), B(5, 2) and C(3, 6).
+13. Find the distance from the origin to P(2, 5), leaving the answer in radical form.
+14. Find the values of m for which P(m, 3) is at a distance 5 from Q(1, -1).
 
 **Block C. Going further**
 
-15. A triangle has vertices at the point with coordinates 1 and 1, the point with coordinates 4 and
-    5 and the point with coordinates 8 and 2. Find the squares of the three sides, show that the
-    triangle is right angled and isosceles, and find its area.
-16. Find the point on the vertical axis that is the same distance from the point with coordinates 3
-    and 1 and from the point with coordinates minus 1 and 5.
-17. Find k so that the point with coordinates 1 and 3, the point with coordinates 3 and 7 and the
-    point with coordinates k and 15 are collinear.
-18. A triangle has vertices at the point with coordinates 0 and 0, the point with coordinates 8 and
-    0 and the point with coordinates 0 and 6. Find the length of the median drawn from the vertex of
-    the right angle and compare it with the length of the hypotenuse.
-19. Find the area of the quadrilateral whose vertices are, in this order, the point with coordinates
-    0 and 0, the point with coordinates 6 and 0, the point with coordinates 8 and 5 and the point
-    with coordinates 0 and 4.
+15. A triangle has vertices A(1, 1), B(4, 5) and C(8, 2). Find the squares of the three sides, show
+    that the triangle is right angled and isosceles, and find its area.
+16. Find the point on the vertical axis that is the same distance from A(3, 1) and from B(-1, 5).
+17. Find k so that A(1, 3), B(3, 7) and C(k, 15) are collinear.
+18. A triangle has vertices A(0, 0), B(8, 0) and C(0, 6). Find the length of the median drawn from
+    the vertex of the right angle and compare it with the length of the hypotenuse.
+19. Find the area of the quadrilateral whose vertices are, in this order, A(0, 0), B(6, 0), C(8, 5)
+    and D(0, 4).
 
 ### Answer key
 
 1. 5. The legs measure 4 and 3.
 2. 5. The legs measure 3 and 4.
-3. The point with coordinates 2 and 4.
+3. M(2, 4).
 4. 13.
-5. The point with coordinates 1 and 2.
-6. The square root of 61. The legs measure 5 and 6.
-7. The point with coordinates 7 and 8. Each coordinate of the missing endpoint is twice the one of
-   the midpoint minus the one of the known endpoint.
-8. They are collinear. The determinant is zero.
+5. M(1, 2).
+6. √61. The legs measure 5 and 6.
+7. B(7, 8), because x_{B} = 2 · x_{M} - x_{A} and y_{B} = 2 · y_{M} - y_{A}.
+8. They are collinear, because D = 0.
 9. Perimeter 16. The sides measure 6, 5 and 5, so the triangle is isosceles.
-10. The point with coordinates 5 and 0.
-11. The point with coordinates 3 and 5.
-12. 9. The determinant is 18 and the area is half its absolute value.
-13. The square root of 29.
-14. m equals 4 or m equals minus 2.
-15. The squares of the sides are 25, 25 and 50. Since 25 plus 25 gives 50, the triangle is right
-    angled by the converse of the Pythagorean theorem, and since two sides have the same square it
-    is also isosceles. The area is 12.5.
-16. The point with coordinates 0 and 2.
-17. k equals 7.
-18. The median measures 5 and the hypotenuse measures 10. The median to the hypotenuse is half of it.
+10. The point (5, 0).
+11. G(3, 5).
+12. 9. D = 18 and the area is S = |D| / 2.
+13. √29.
+14. m = 4 or m = -2.
+15. The squares of the sides are 25, 25 and 50. Since 25 + 25 = 50, the triangle is right angled by
+    the converse of the Pythagorean theorem, and since two sides have the same square it is also
+    isosceles. The area is 12.5.
+16. The point (0, 2).
+17. k = 7.
+18. The median measures 5 and the hypotenuse measures 10. The median to the hypotenuse is half of
+    it.
 19. 31. By the shoelace formula, the sum of the cross products is 62.
 
 ## VERIFICACAO

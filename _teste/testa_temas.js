@@ -120,7 +120,15 @@ const porValor = (sel, valor) => `(() => {
   await pag.evaluate(porValor('#corpo-modal-tema input[type=text]', 'fra'));
   await espera(400);
   const filtrados = await pag.$$eval('#lista-temas .item-tema .nome', es => es.map(e => e.textContent));
-  conf('a busca filtrou', filtrados.length < quantosTemas && filtrados.length > 0, true);
+  /* A busca agora atravessa os anos escolares: o assunto que ela procura
+   * muitas vezes está no ano anterior, e é disso que a aula de reforço trata.
+   * Então o que se confere não é a lista ter encolhido, e sim tudo que voltou
+   * ser mesmo sobre o que ela digitou. */
+  conf('a busca devolveu alguma coisa', filtrados.length > 0, true);
+  conf('e tudo que voltou é sobre frações',
+    filtrados.slice(0, 5).every(t => /[Ff]ra[çc]/.test(t)), true);
+  conf('a busca sai do ano aberto quando o assunto está em outro',
+    filtrados.length > quantosTemas, true);
 
   /* Ela digita no teclado do tablet, onde o acento custa toques a mais. Antes
      disto, procurar sem acento devolvia a lista vazia como se o assunto não
@@ -196,6 +204,14 @@ const porValor = (sel, valor) => `(() => {
 
   // ================================================================
   secao('4. Trocar de idioma');
+
+  /* A marcacao de expoente do banco (x^{2}) e para o PDF. Na tela ela tem que
+   * virar sobrescrito de verdade, senao a professora le "Calcule 2^{5}". */
+  const cru = await pag.$$eval('.item-exercicio .texto-exercicio',
+    es => es.map(e => e.textContent).join(' '));
+  conf('nenhum enunciado mostra a marcacao crua', /\^\{|_\{/.test(cru), false);
+  conf('e o expoente virou sobrescrito de verdade',
+    await pag.$$eval('.item-exercicio .texto-exercicio sup', es => es.length) > 0, true);
 
   const primeiroPT = await pag.$eval('.item-exercicio .texto-exercicio', e => e.textContent);
   await clicarTexto('#corpo-modal-tema button', 'English');

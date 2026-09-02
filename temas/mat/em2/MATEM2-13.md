@@ -32,28 +32,30 @@ Essa é a diferença inteira, e ela é a razão de o dinheiro no mundo real func
 
 #### As fórmulas
 
-Para juros simples, com capital C, taxa i por período e t períodos:
+Para juros simples:
 
-o montante é C vezes (1 mais i vezes t)
+M = C · (1 + i · t)
 
-Para juros compostos, com os mesmos símbolos:
+Para juros compostos:
 
-o montante é C vezes (1 mais i) elevado a t
+M = C · (1 + i)^{t}
+
+onde M é o montante, C o capital, i a taxa por período e t o número de períodos.
 
 A taxa entra sempre em forma decimal: 10 por cento vira 0,1, e 5 por cento vira 0,05. E a taxa
 precisa estar na mesma unidade de tempo do prazo. Taxa mensal pede prazo em meses.
 
 **Exemplo 1.** Achar o montante de 5000 reais aplicados a 2 por cento ao mês, durante 4 meses, em
 juros compostos.
-O montante é 5000 vezes 1,02 elevado a 4. O fator vale 1,08243216, e o montante fica 5412,16 reais,
-arredondando para duas casas.
+M = 5000 · 1,02^{4}. O fator vale 1,08243216, e o montante fica 5412,16 reais, arredondando para
+duas casas.
 
 #### A comparação que interessa
 
 **Exemplo 2.** Comparar, para 2000 reais a 5 por cento ao mês durante 4 meses, o montante em juros
 simples e em juros compostos.
-Em juros simples, o fator é 1 mais 0,05 vezes 4, que dá 1,2, e o montante é 2400 reais. Em juros
-compostos, o fator é 1,05 elevado a 4, que dá 1,21550625, e o montante é 2431,01 reais.
+Em juros simples, o fator é 1 + 0,05 · 4 = 1,2, e o montante é 2400 reais. Em juros compostos, o
+fator é 1,05^{4} = 1,21550625, e o montante é 2431,01 reais.
 
 Repare em duas coisas. Primeiro, os dois montantes coincidem ao fim do primeiro período, porque nele
 ainda não há juros acumulados sobre os quais render. Segundo, a partir do segundo período o composto
@@ -74,8 +76,7 @@ números redondos, testar potências resolve.
 
 **Exemplo 3.** Em quantos períodos um capital de 1000 reais vira 1728 reais a 20 por cento por
 período?
-O fator total é 1728 dividido por 1000, que dá 1,728. Testando: 1,2 ao quadrado dá 1,44, e 1,2 ao
-cubo dá 1,728. São 3 períodos.
+O fator total é 1728 / 1000 = 1,728. Testando: 1,2^{2} = 1,44, e 1,2^{3} = 1,728. São 3 períodos.
 
 #### Taxas equivalentes
 
@@ -84,13 +85,13 @@ prazo. Para achar a taxa de um período maior a partir da taxa de um período me
 ao número de períodos menores que cabem no maior.
 
 **Exemplo 4.** Achar a taxa bimestral equivalente a 10 por cento ao mês.
-O fator bimestral é 1,1 ao quadrado, que dá 1,21. Tirando o 1, a taxa bimestral é 21 por cento.
+O fator bimestral é 1,1^{2} = 1,21. Tirando o 1, a taxa bimestral é 21 por cento.
 Repare que não são 20 por cento: os juros do primeiro mês rendem no segundo.
 
 #### Erros comuns
 
 **Somar taxas de períodos seguidos.** Um aumento de 10 por cento seguido de outro de 20 por cento não
-dá 30 por cento. Os fatores se multiplicam, e 1,1 vezes 1,2 dá 1,32, ou seja, 32 por cento.
+dá 30 por cento. Os fatores se multiplicam, e 1,1 × 1,2 = 1,32, ou seja, 32 por cento.
 
 **Misturar unidade de taxa e de prazo.** Taxa ao ano com prazo em meses dá resultado sem sentido.
 
@@ -156,8 +157,7 @@ gera diferença visível. Arredonde apenas no fim.
 2. 2315,25 reais.
 3. Juro de 200 reais e montante de 1200 reais.
 4. 720 reais.
-5. 10 por cento por período. O fator de dois períodos é 968 dividido por 800, que dá 1,21, e a raiz
-   quadrada de 1,21 é 1,1.
+5. 10 por cento por período. O fator de dois períodos é 968 / 800 = 1,21, e √(1,21) = 1,1.
 6. Montante de 1331 reais e juro total de 331 reais.
 7. 11261,62 reais.
 8. Montante de 6800 reais em juros simples, montante de 7024,64 reais em juros compostos, e diferença
@@ -165,16 +165,16 @@ gera diferença visível. Arredonde apenas no fim.
 9. 3 meses.
 10. 1000 reais.
 11. 2680,19 reais.
-12. 33,1 por cento ao trimestre. O fator é 1,1 ao cubo, que dá 1,331.
+12. 33,1 por cento ao trimestre. O fator é 1,1^{3} = 1,331.
 13. 6250 reais.
-14. Preço final de 264 reais e taxa acumulada de 32 por cento. Os fatores se multiplicam: 1,1 vezes
-    1,2 dá 1,32.
+14. Preço final de 264 reais e taxa acumulada de 32 por cento. Os fatores se multiplicam:
+    1,1 × 1,2 = 1,32.
 15. Em juros simples, os montantes são 1100, 1200 e 1300 reais. Em juros compostos, são 1100, 1210 e
     1331 reais. Os dois coincidem ao fim do primeiro mês, e a partir do segundo mês o composto passa
     à frente.
-16. 8 meses. O fator 1,1 elevado a 7 vale cerca de 1,9487, e ainda não chega ao dobro, enquanto 1,1
-    elevado a 8 vale cerca de 2,1436.
-17. A taxa é raiz de 3 menos 1, o que dá aproximadamente 73,21 por cento por período.
+16. 8 meses. O fator 1,1^{7} vale cerca de 1,9487, e ainda não chega ao dobro, enquanto 1,1^{8}
+    vale cerca de 2,1436.
+17. A taxa é √3 - 1, o que dá aproximadamente 73,21 por cento por período.
 18. Rende mais a aplicação em juros simples. Ela chega a 13600 reais, enquanto a de juros compostos
     chega a 12682,42 reais, com diferença de 917,58 reais. A taxa maior compensa, nesse prazo, o
     efeito do acúmulo.
@@ -202,29 +202,30 @@ That is the whole difference, and it is why money in the real world works the se
 
 #### The formulas
 
-For simple interest, with principal C, rate i per period and t periods:
+For simple interest:
 
-the amount is C times (1 plus i times t)
+M = C · (1 + i · t)
 
-For compound interest, with the same symbols:
+For compound interest:
 
-the amount is C times (1 plus i) raised to t
+M = C · (1 + i)^{t}
+
+where M is the amount, C the principal, i the rate per period and t the number of periods.
 
 The rate always goes in as a decimal: 10 per cent becomes 0.1, and 5 per cent becomes 0.05. And the
 rate has to be in the same time unit as the term. A monthly rate calls for a term in months.
 
 **Example 1.** Find the amount of 5000 reais invested at 2 per cent a month for 4 months, under
 compound interest.
-The amount is 5000 times 1.02 raised to 4. The factor is 1.08243216, and the amount comes to 5412.16
-reais, rounded to two decimal places.
+M = 5000 · 1.02^{4}. The factor is 1.08243216, and the amount comes to 5412.16 reais, rounded to two
+decimal places.
 
 #### The comparison that matters
 
 **Example 2.** For 2000 reais at 5 per cent a month for 4 months, compare the amount under simple
 interest and under compound interest.
-Under simple interest the factor is 1 plus 0.05 times 4, which gives 1.2, and the amount is 2400
-reais. Under compound interest the factor is 1.05 raised to 4, which gives 1.21550625, and the amount
-is 2431.01 reais.
+Under simple interest the factor is 1 + 0.05 · 4 = 1.2, and the amount is 2400 reais. Under compound
+interest the factor is 1.05^{4} = 1.21550625, and the amount is 2431.01 reais.
 
 Notice two things. First, the two amounts agree at the end of the first period, because there is not
 yet any accumulated interest to earn on. Second, from the second period on, the compound one moves
@@ -245,8 +246,8 @@ factor. With round numbers, testing powers settles it.
 
 **Example 3.** In how many periods does a principal of 1000 reais become 1728 reais at 20 per cent
 per period?
-The total factor is 1728 divided by 1000, which gives 1.728. Testing: 1.2 squared gives 1.44, and 1.2
-cubed gives 1.728. It takes 3 periods.
+The total factor is 1728 / 1000 = 1.728. Testing: 1.2^{2} = 1.44, and 1.2^{3} = 1.728. It takes 3
+periods.
 
 #### Equivalent rates
 
@@ -255,13 +256,13 @@ term. To get the rate of a longer period from the rate of a shorter one, raise t
 number of shorter periods that fit inside the longer one.
 
 **Example 4.** Find the two month rate equivalent to 10 per cent a month.
-The two month factor is 1.1 squared, which gives 1.21. Taking away the 1, the two month rate is 21
-per cent. Notice that it is not 20 per cent: the first month interest earns during the second.
+The two month factor is 1.1^{2} = 1.21. Taking away the 1, the two month rate is 21 per cent.
+Notice that it is not 20 per cent: the first month interest earns during the second.
 
 #### Common mistakes
 
 **Adding the rates of consecutive periods.** A rise of 10 per cent followed by another of 20 per cent
-does not give 30 per cent. The factors multiply, and 1.1 times 1.2 gives 1.32, that is, 32 per cent.
+does not give 30 per cent. The factors multiply, and 1.1 × 1.2 = 1.32, that is, 32 per cent.
 
 **Mixing the unit of the rate with the unit of the term.** A yearly rate with a term in months gives
 a meaningless result.
@@ -327,8 +328,7 @@ multiplying by the principal creates a visible difference. Round only at the end
 2. 2315.25 reais.
 3. Interest of 200 reais and amount of 1200 reais.
 4. 720 reais.
-5. 10 per cent per period. The two period factor is 968 divided by 800, which gives 1.21, and the
-   square root of 1.21 is 1.1.
+5. 10 per cent per period. The two period factor is 968 / 800 = 1.21, and √(1.21) = 1.1.
 6. Amount of 1331 reais and total interest of 331 reais.
 7. 11261.62 reais.
 8. Amount of 6800 reais under simple interest, amount of 7024.64 reais under compound interest, and a
@@ -336,16 +336,16 @@ multiplying by the principal creates a visible difference. Round only at the end
 9. 3 months.
 10. 1000 reais.
 11. 2680.19 reais.
-12. 33.1 per cent per quarter. The factor is 1.1 cubed, which gives 1.331.
+12. 33.1 per cent per quarter. The factor is 1.1^{3} = 1.331.
 13. 6250 reais.
-14. Final price of 264 reais and accumulated rate of 32 per cent. The factors multiply: 1.1 times 1.2
-    gives 1.32.
+14. Final price of 264 reais and accumulated rate of 32 per cent. The factors multiply:
+    1.1 × 1.2 = 1.32.
 15. Under simple interest the amounts are 1100, 1200 and 1300 reais. Under compound interest they are
     1100, 1210 and 1331 reais. The two agree at the end of the first month, and from the second month
     on the compound one moves ahead.
-16. 8 months. The factor 1.1 raised to 7 is about 1.9487, which still falls short of double, while
-    1.1 raised to 8 is about 2.1436.
-17. The rate is square root of 3 minus 1, which comes to about 73.21 per cent per period.
+16. 8 months. The factor 1.1^{7} is about 1.9487, which still falls short of double, while 1.1^{8}
+    is about 2.1436.
+17. The rate is √3 - 1, which comes to about 73.21 per cent per period.
 18. The simple interest investment earns more. It reaches 13600 reais, while the compound one reaches
     12682.42 reais, a difference of 917.58 reais. Over this term the higher rate outweighs the effect
     of compounding.

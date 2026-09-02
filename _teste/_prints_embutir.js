@@ -22,7 +22,7 @@ const DIR = path.join(__dirname, 'prints');
       const img = new Image();
       img.src = 'data:image/png;base64,' + dados;
       await img.decode();
-      const escala = Math.min(1, 1500 / img.width);
+      const escala = Math.min(1, 1280 / img.width);
       const c = document.createElement('canvas');
       c.width = Math.round(img.width * escala);
       c.height = Math.round(img.height * escala);
@@ -36,14 +36,14 @@ const DIR = path.join(__dirname, 'prints');
       y.fillStyle = '#FBF9F5'; y.fillRect(0, 0, c.width, c.height);
       y.drawImage(c, 0, 0);
       return {
-        url: comFundo.toDataURL('image/jpeg', 0.9),
+        url: comFundo.toDataURL('image/jpeg', 0.85),
         w: c.width, h: c.height
       };
     }, b64);
     saida[f.replace('.png', '')] = r;
     const kb = r.url.length / 1024;
     total += kb;
-    console.log('  %-28s %5.0f KB  %dx%d', f, kb, r.w, r.h);
+    console.log('  ' + f.padEnd(30) + ' ' + kb.toFixed(0).padStart(5) + ' KB  ' + r.w + 'x' + r.h);
   }
 
   fs.writeFileSync(path.join(DIR, 'imagens.json'), JSON.stringify(saida));

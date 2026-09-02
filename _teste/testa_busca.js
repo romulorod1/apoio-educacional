@@ -99,7 +99,11 @@ function secao(t) { console.log('\n=== ' + t + ' ==='); }
 
   await digitar('trigonometria hiperbolica');
   await espera(1600);
-  conf('a lista fica vazia', await quantos(), 0);
+  // nao devolve tela vazia: mostra o que existe de trigonometria, e mesmo
+  // assim anota que ela procurou um assunto que o banco nao tem
+  conf('mostra o que existe de mais perto', await quantos() > 0, true);
+  conf('e avisa que nao achou tudo',
+    await pag.$eval('#lista-temas', e => /Não achei tudo/.test(e.textContent)), true);
 
   let registro = await pag.evaluate(() => {
     try { return JSON.parse(localStorage.getItem('buscas-vazias') || '[]'); } catch (e) { return null; }

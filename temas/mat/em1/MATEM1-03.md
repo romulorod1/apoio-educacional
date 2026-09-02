@@ -19,12 +19,12 @@ dificuldade: 3
 
 Uma função afim é toda função que pode ser escrita como
 
-f(x) igual a ax mais b
+f(x) = ax + b
 
 onde a e b são números fixos. O gráfico é sempre uma **reta**, e é por isso que ela aparece em toda
 situação em que uma grandeza cresce ou diminui sempre no mesmo ritmo.
 
-Quando b vale zero, a função vira f(x) igual a ax, e a reta passa pela origem. Esse caso especial é
+Quando b = 0, a função vira f(x) = ax, e a reta passa pela origem. Esse caso especial é
 chamado de função linear, e é o único em que dobrar o x dobra o f(x).
 
 #### Os dois coeficientes contam coisas diferentes
@@ -32,41 +32,38 @@ chamado de função linear, e é o único em que dobrar o x dobra o f(x).
 **O coeficiente a é a taxa de variação, também chamada de coeficiente angular.** Ele diz quanto o
 f(x) muda quando o x aumenta uma unidade. É a inclinação da reta:
 
-- a positivo: a reta sobe, e a função é crescente.
-- a negativo: a reta desce, e a função é decrescente.
-- a igual a zero: a reta fica horizontal, e a função é constante.
+- a > 0: a reta sobe, e a função é crescente.
+- a < 0: a reta desce, e a função é decrescente.
+- a = 0: a reta fica horizontal, e a função é constante.
 
 **O coeficiente b é o valor inicial, também chamado de coeficiente linear.** Ele é o f(0), ou seja,
 o ponto onde a reta corta o eixo vertical.
 
-**Exemplo 1.** Numa função f(x) igual a 3x mais 5, o que dizem os coeficientes?
-O a vale 3: a cada unidade que o x avança, o f(x) sobe 3. O b vale 5: quando x é zero, f vale 5, e a
+**Exemplo 1.** Numa função f(x) = 3x + 5, o que dizem os coeficientes?
+O a vale 3: a cada unidade que o x avança, o f(x) sobe 3. O b vale 5: quando x = 0, f vale 5, e a
 reta corta o eixo vertical em 5.
 
 #### A raiz
 
 A raiz é o valor de x que faz f(x) valer zero, ou seja, onde a reta cruza o eixo horizontal. Para
-achar, resolva ax mais b igual a zero, o que dá
+achar, resolva ax + b = 0, o que dá
 
-x igual a menos b sobre a
+x = -b/a
 
-**Exemplo 2.** Achar a raiz de f(x) igual a 2x menos 8.
-Fazendo 2x menos 8 igual a zero, temos 2x igual a 8, então x igual a 4. A reta cruza o eixo
-horizontal no 4.
+**Exemplo 2.** Achar a raiz de f(x) = 2x - 8.
+Fazendo 2x - 8 = 0, temos 2x = 8, então x = 4. A reta cruza o eixo horizontal no 4.
 
 #### Montando a lei a partir de dois pontos
 
 Duas informações bastam para determinar uma reta. Se você conhece dois pontos, o coeficiente angular
 sai da divisão entre a variação do f e a variação do x:
 
-a igual a (variação de f) dividida por (variação de x)
+a = (variação de f) / (variação de x)
 
-**Exemplo 3.** Uma função afim passa pelos pontos de coordenadas 1 e 7, e 4 e 16. Qual é a lei?
-A variação de f é 16 menos 7, que dá 9. A variação de x é 4 menos 1, que dá 3. Então a vale 9
-dividido por 3, ou seja, 3.
-Agora use um dos pontos para achar b: com x igual a 1, temos 3 vezes 1 mais b igual a 7, o que dá b
-igual a 4.
-A lei é f(x) igual a 3x mais 4. Conferindo no outro ponto: 3 vezes 4 mais 4 dá 16. Certo.
+**Exemplo 3.** Uma função afim passa pelos pontos (1, 7) e (4, 16). Qual é a lei?
+A variação de f é 16 - 7 = 9. A variação de x é 4 - 1 = 3. Então a = 9/3 = 3.
+Agora use um dos pontos para achar b: com x = 1, temos 3 × 1 + b = 7, o que dá b = 4.
+A lei é f(x) = 3x + 4. Conferindo no outro ponto: 3 × 4 + 4 = 16. Certo.
 
 #### Onde ela aparece de verdade
 
@@ -79,7 +76,7 @@ escondida:
 
 **Exemplo 4.** Um táxi cobra 5 reais de bandeirada mais 2 reais por quilômetro. Qual é a lei do
 preço, e quanto custa uma corrida de 12 quilômetros?
-A lei é P(x) igual a 2x mais 5. Para 12 quilômetros: 2 vezes 12 mais 5, que dá 29 reais.
+A lei é P(x) = 2x + 5. Para 12 quilômetros: 2 × 12 + 5 = 29 reais.
 
 #### Comparando duas funções afins
 
@@ -89,7 +86,7 @@ planos.
 
 **Exemplo 5.** O plano A custa 40 reais fixos mais 1 real por minuto. O plano B custa 10 reais fixos
 mais 4 reais por minuto. A partir de quantos minutos o plano A compensa?
-Igualando: 40 mais x igual a 10 mais 4x. Resolvendo: 30 igual a 3x, então x igual a 10.
+Igualando: 40 + x = 10 + 4x. Resolvendo: 30 = 3x, então x = 10.
 Nos 10 minutos os dois custam o mesmo, que é 50 reais. Acima disso, o A fica mais barato, porque
 cresce mais devagar.
 
@@ -111,32 +108,32 @@ matemática aceita, mas o problema não.
 
 **Bloco A. Fundamentos**
 
-1. Na função f(x) igual a 3x mais 5, diga quanto valem a e b, e se ela é crescente ou decrescente.
-2. Calcule f(2) e f(0) para f(x) igual a 4x menos 7.
-3. Determine a raiz de f(x) igual a 2x menos 8.
-4. Determine a raiz de f(x) igual a menos 3x mais 12.
-5. Classifique como crescente ou decrescente: f(x) igual a menos 2x mais 9.
+1. Na função f(x) = 3x + 5, diga quanto valem a e b, e se ela é crescente ou decrescente.
+2. Calcule f(2) e f(0) para f(x) = 4x - 7.
+3. Determine a raiz de f(x) = 2x - 8.
+4. Determine a raiz de f(x) = -3x + 12.
+5. Classifique como crescente ou decrescente: f(x) = -2x + 9.
 
 **Bloco B. Consolidação**
 
-6. Uma função afim passa pelos pontos de coordenadas 1 e 7, e 4 e 16. Determine a lei.
-7. Uma função afim passa pelos pontos de coordenadas 0 e 5, e 3 e menos 1. Determine a lei.
+6. Uma função afim passa pelos pontos (1, 7) e (4, 16). Determine a lei.
+7. Uma função afim passa pelos pontos (0, 5) e (3, -1). Determine a lei.
 8. Um táxi cobra 5 reais de bandeirada mais 2 reais por quilômetro. Escreva a lei do preço e calcule
    quanto custa uma corrida de 12 quilômetros.
-9. Numa função afim, f(1) vale 10 e f(5) vale 22. Quanto vale f(9)?
-10. Determine o ponto onde as retas f(x) igual a 2x mais 1 e g(x) igual a menos x mais 7 se cruzam.
-11. Uma reta corta o eixo vertical em 6 e tem taxa de variação menos 2. Escreva a lei e determine a
+9. Numa função afim, f(1) = 10 e f(5) = 22. Quanto vale f(9)?
+10. Determine o ponto onde as retas f(x) = 2x + 1 e g(x) = -x + 7 se cruzam.
+11. Uma reta corta o eixo vertical em 6 e tem taxa de variação -2. Escreva a lei e determine a
     raiz.
 12. O plano A custa 40 reais fixos mais 1 real por minuto e o plano B custa 10 reais fixos mais 4
     reais por minuto. A partir de quantos minutos o plano A fica mais barato?
-13. Resolva a inequação 3x menos 6 maior que zero e diga o que ela significa em termos do gráfico de
-    f(x) igual a 3x menos 6.
+13. Resolva a inequação 3x - 6 > 0 e diga o que ela significa em termos do gráfico de
+    f(x) = 3x - 6.
 
 **Bloco C. Aprofundamento**
 
-14. Determine m para que a função f(x) igual a (m menos 2)x mais 5 seja decrescente.
-15. Uma função afim tem f(3) igual a 0 e corta o eixo vertical em menos 9. Determine a lei.
-16. Mostre que, numa função afim, a diferença f(x mais 1) menos f(x) é sempre igual a a, qualquer
+14. Determine m para que a função f(x) = (m - 2)x + 5 seja decrescente.
+15. Uma função afim tem f(3) = 0 e corta o eixo vertical em -9. Determine a lei.
+16. Mostre que, numa função afim, a diferença f(x + 1) - f(x) é sempre igual a a, qualquer
     que seja o x. Faça com letras.
 17. Um reservatório tem 500 litros e perde 8 litros por hora. Escreva a lei do volume em função do
     tempo, diga em quanto tempo ele esvazia, e explique por que a função só faz sentido até esse
@@ -146,26 +143,24 @@ matemática aceita, mas o problema não.
 
 ### Gabarito
 
-1. a vale 3 e b vale 5. É crescente, porque a é positivo.
-2. f(2) vale 1 e f(0) vale menos 7.
-3. x igual a 4.
-4. x igual a 4.
-5. Decrescente, porque a vale menos 2.
-6. f(x) igual a 3x mais 4.
-7. f(x) igual a menos 2x mais 5.
-8. A lei é P(x) igual a 2x mais 5, e a corrida de 12 quilômetros custa 29 reais.
+1. a = 3 e b = 5. É crescente, porque a > 0.
+2. f(2) = 1 e f(0) = -7.
+3. x = 4.
+4. x = 4.
+5. Decrescente, porque a = -2.
+6. f(x) = 3x + 4.
+7. f(x) = -2x + 5.
+8. A lei é P(x) = 2x + 5, e a corrida de 12 quilômetros custa 29 reais.
 9. 34. A taxa de variação é 3, porque de f(1) a f(5) o valor sobe 12 em 4 unidades de x.
-10. No ponto de coordenadas 2 e 5.
-11. A lei é f(x) igual a menos 2x mais 6, e a raiz é x igual a 3.
+10. No ponto (2, 5).
+11. A lei é f(x) = -2x + 6, e a raiz é x = 3.
 12. A partir de 10 minutos os dois custam igual, e acima de 10 minutos o plano A fica mais barato.
-13. A solução é x maior que 2. Isso significa que o gráfico fica acima do eixo horizontal para x
-    maior que 2.
-14. m menor que 2.
-15. f(x) igual a 3x menos 9.
-16. Substituindo, f(x mais 1) é a vezes (x mais 1) mais b, que dá ax mais a mais b. Tirando f(x),
-    que é ax mais b, sobra apenas a. Isso mostra que o passo é sempre o mesmo, e é por isso que o
-    gráfico é uma reta.
-17. A lei é V(t) igual a 500 menos 8t. Ele esvazia quando V vale zero, ou seja, em 62,5 horas. Depois
+13. A solução é x > 2. Isso significa que o gráfico fica acima do eixo horizontal para x > 2.
+14. m < 2.
+15. f(x) = 3x - 9.
+16. Substituindo, f(x + 1) = a · (x + 1) + b = ax + a + b. Tirando f(x) = ax + b, sobra apenas a.
+    Isso mostra que o passo é sempre o mesmo, e é por isso que o gráfico é uma reta.
+17. A lei é V(t) = 500 - 8t. Ele esvazia quando V = 0, ou seja, em 62,5 horas. Depois
     disso a fórmula daria volume negativo, que não existe num reservatório, então o domínio do
     problema vai de 0 até 62,5.
 18. Não podem. Se os coeficientes angulares são iguais, as retas são paralelas, e ao igualar as duas
@@ -179,12 +174,12 @@ matemática aceita, mas o problema não.
 
 A linear function is any function that can be written as
 
-f(x) equals ax plus b
+f(x) = ax + b
 
 where a and b are fixed numbers. Its graph is always a **straight line**, and that is why it shows
 up in every situation where a quantity grows or shrinks at a steady rate.
 
-When b is zero, the function becomes f(x) equals ax, and the line goes through the origin. That
+When b = 0, the function becomes f(x) = ax, and the line goes through the origin. That
 special case is called a proportional function, and it is the only one where doubling x doubles
 f(x).
 
@@ -193,43 +188,38 @@ f(x).
 **The coefficient a is the rate of change, also called the slope.** It says how much f(x) changes
 when x goes up by one unit. It is the steepness of the line:
 
-- a positive: the line rises, and the function is increasing.
-- a negative: the line falls, and the function is decreasing.
-- a equal to zero: the line is horizontal, and the function is constant.
+- a > 0: the line rises, and the function is increasing.
+- a < 0: the line falls, and the function is decreasing.
+- a = 0: the line is horizontal, and the function is constant.
 
 **The coefficient b is the starting value, also called the intercept.** It is f(0), that is, the
 point where the line crosses the vertical axis.
 
-**Example 1.** In the function f(x) equals 3x plus 5, what do the coefficients say?
-a is 3: for every unit x moves forward, f(x) rises by 3. b is 5: when x is zero, f is 5, and the
+**Example 1.** In the function f(x) = 3x + 5, what do the coefficients say?
+a is 3: for every unit x moves forward, f(x) rises by 3. b is 5: when x = 0, f is 5, and the
 line crosses the vertical axis at 5.
 
 #### The root
 
 The root is the value of x that makes f(x) zero, that is, where the line crosses the horizontal
-axis. To find it, solve ax plus b equals zero, which gives
+axis. To find it, solve ax + b = 0, which gives
 
-x equals minus b over a
+x = -b/a
 
-**Example 2.** Find the root of f(x) equals 2x minus 8.
-Setting 2x minus 8 equal to zero gives 2x equals 8, so x equals 4. The line crosses the horizontal
-axis at 4.
+**Example 2.** Find the root of f(x) = 2x - 8.
+Setting 2x - 8 = 0 gives 2x = 8, so x = 4. The line crosses the horizontal axis at 4.
 
 #### Building the rule from two points
 
 Two pieces of information are enough to pin down a line. If you know two points, the slope comes
 from dividing the change in f by the change in x:
 
-a equals (change in f) divided by (change in x)
+a = (change in f) / (change in x)
 
-**Example 3.** A linear function passes through the points with coordinates 1 and 7, and 4 and 16.
-What is its rule?
-The change in f is 16 minus 7, which gives 9. The change in x is 4 minus 1, which gives 3. So a is
-9 divided by 3, that is, 3.
-Now use one of the points to find b: with x equal to 1, we get 3 times 1 plus b equals 7, which
-gives b equal to 4.
-The rule is f(x) equals 3x plus 4. Checking with the other point: 3 times 4 plus 4 gives 16.
-Correct.
+**Example 3.** A linear function passes through the points (1, 7) and (4, 16). What is its rule?
+The change in f is 16 - 7 = 9. The change in x is 4 - 1 = 3. So a = 9/3 = 3.
+Now use one of the points to find b: with x = 1, we get 3 × 1 + b = 7, which gives b = 4.
+The rule is f(x) = 3x + 4. Checking with the other point: 3 × 4 + 4 = 16. Correct.
 
 #### Where it really shows up
 
@@ -242,7 +232,7 @@ hiding:
 
 **Example 4.** A taxi charges 5 reais as a flat fee plus 2 reais per kilometre. What is the price
 rule, and how much does a 12 kilometre ride cost?
-The rule is P(x) equals 2x plus 5. For 12 kilometres: 2 times 12 plus 5, which gives 29 reais.
+The rule is P(x) = 2x + 5. For 12 kilometres: 2 × 12 + 5 = 29 reais.
 
 #### Comparing two linear functions
 
@@ -252,7 +242,7 @@ plans.
 
 **Example 5.** Plan A costs 40 reais fixed plus 1 real per minute. Plan B costs 10 reais fixed plus
 4 reais per minute. From how many minutes on is plan A worth it?
-Setting them equal: 40 plus x equals 10 plus 4x. Solving: 30 equals 3x, so x equals 10.
+Setting them equal: 40 + x = 10 + 4x. Solving: 30 = 3x, so x = 10.
 At 10 minutes both cost the same, which is 50 reais. Above that, A is cheaper, because it grows more
 slowly.
 
@@ -273,35 +263,33 @@ mathematical function accepts it, the problem does not.
 
 **Block A. Fundamentals**
 
-1. In the function f(x) equals 3x plus 5, say what a and b are, and whether it is increasing or
+1. In the function f(x) = 3x + 5, say what a and b are, and whether it is increasing or
    decreasing.
-2. Work out f(2) and f(0) for f(x) equals 4x minus 7.
-3. Find the root of f(x) equals 2x minus 8.
-4. Find the root of f(x) equals minus 3x plus 12.
-5. Classify as increasing or decreasing: f(x) equals minus 2x plus 9.
+2. Work out f(2) and f(0) for f(x) = 4x - 7.
+3. Find the root of f(x) = 2x - 8.
+4. Find the root of f(x) = -3x + 12.
+5. Classify as increasing or decreasing: f(x) = -2x + 9.
 
 **Block B. Building up**
 
-6. A linear function passes through the points with coordinates 1 and 7, and 4 and 16. Find the
-   rule.
-7. A linear function passes through the points with coordinates 0 and 5, and 3 and minus 1. Find the
-   rule.
+6. A linear function passes through the points (1, 7) and (4, 16). Find the rule.
+7. A linear function passes through the points (0, 5) and (3, -1). Find the rule.
 8. A taxi charges 5 reais as a flat fee plus 2 reais per kilometre. Write the price rule and work
    out how much a 12 kilometre ride costs.
-9. In a linear function, f(1) is 10 and f(5) is 22. What is f(9)?
-10. Find the point where the lines f(x) equals 2x plus 1 and g(x) equals minus x plus 7 cross.
-11. A line crosses the vertical axis at 6 and has rate of change minus 2. Write the rule and find the
+9. In a linear function, f(1) = 10 and f(5) = 22. What is f(9)?
+10. Find the point where the lines f(x) = 2x + 1 and g(x) = -x + 7 cross.
+11. A line crosses the vertical axis at 6 and has rate of change -2. Write the rule and find the
     root.
 12. Plan A costs 40 reais fixed plus 1 real per minute and plan B costs 10 reais fixed plus 4 reais
     per minute. From how many minutes on is plan A cheaper?
-13. Solve the inequality 3x minus 6 greater than zero and say what it means for the graph of f(x)
-    equals 3x minus 6.
+13. Solve the inequality 3x - 6 > 0 and say what it means for the graph of
+    f(x) = 3x - 6.
 
 **Block C. Going further**
 
-14. Find m so that the function f(x) equals (m minus 2)x plus 5 is decreasing.
-15. A linear function has f(3) equal to 0 and crosses the vertical axis at minus 9. Find the rule.
-16. Show that in a linear function the difference f(x plus 1) minus f(x) always equals a, whatever x
+14. Find m so that the function f(x) = (m - 2)x + 5 is decreasing.
+15. A linear function has f(3) = 0 and crosses the vertical axis at -9. Find the rule.
+16. Show that in a linear function the difference f(x + 1) - f(x) always equals a, whatever x
     is. Do it with letters.
 17. A tank holds 500 litres and loses 8 litres per hour. Write the rule for the volume as a function
     of time, say how long it takes to empty, and explain why the function only makes sense up to that
@@ -311,26 +299,24 @@ mathematical function accepts it, the problem does not.
 
 ### Answer key
 
-1. a is 3 and b is 5. It is increasing, because a is positive.
-2. f(2) is 1 and f(0) is minus 7.
-3. x equals 4.
-4. x equals 4.
-5. Decreasing, because a is minus 2.
-6. f(x) equals 3x plus 4.
-7. f(x) equals minus 2x plus 5.
-8. The rule is P(x) equals 2x plus 5, and the 12 kilometre ride costs 29 reais.
+1. a = 3 and b = 5. It is increasing, because a > 0.
+2. f(2) = 1 and f(0) = -7.
+3. x = 4.
+4. x = 4.
+5. Decreasing, because a = -2.
+6. f(x) = 3x + 4.
+7. f(x) = -2x + 5.
+8. The rule is P(x) = 2x + 5, and the 12 kilometre ride costs 29 reais.
 9. 34. The rate of change is 3, because from f(1) to f(5) the value rises 12 over 4 units of x.
-10. At the point with coordinates 2 and 5.
-11. The rule is f(x) equals minus 2x plus 6, and the root is x equals 3.
+10. At the point (2, 5).
+11. The rule is f(x) = -2x + 6, and the root is x = 3.
 12. At 10 minutes both cost the same, and above 10 minutes plan A is cheaper.
-13. The solution is x greater than 2. That means the graph sits above the horizontal axis for x
-    greater than 2.
-14. m less than 2.
-15. f(x) equals 3x minus 9.
-16. Substituting, f(x plus 1) is a times (x plus 1) plus b, which gives ax plus a plus b. Taking away
-    f(x), which is ax plus b, only a is left. That shows the step is always the same, and that is why
-    the graph is a straight line.
-17. The rule is V(t) equals 500 minus 8t. It empties when V is zero, that is, at 62.5 hours. After
+13. The solution is x > 2. That means the graph sits above the horizontal axis for x > 2.
+14. m < 2.
+15. f(x) = 3x - 9.
+16. Substituting, f(x + 1) = a · (x + 1) + b = ax + a + b. Taking away f(x) = ax + b, only a is
+    left. That shows the step is always the same, and that is why the graph is a straight line.
+17. The rule is V(t) = 500 - 8t. It empties when V = 0, that is, at 62.5 hours. After
     that the formula would give a negative volume, which does not exist in a tank, so the domain of
     the problem runs from 0 to 62.5.
 18. They cannot. If the slopes are equal, the lines are parallel, and setting the two rules equal

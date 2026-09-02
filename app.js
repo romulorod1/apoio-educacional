@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.7.0';
+  var VERSAO = '1.8.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -18,6 +18,33 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.8.0',
+      itens: [
+        'A busca do material de aula ficou muito melhor. Antes, procurar por "equação do ' +
+        'primeiro grau" não achava nada, porque no banco o assunto está escrito como ' +
+        '"Equações do 1º grau". Agora acha, e digitar mais palavras não atrapalha mais.',
+        'Acento e maiúscula deixaram de importar: "fracao" acha o mesmo que "fração".',
+        'A busca também procura dentro dos exercícios e da explicação, e não só no nome do ' +
+        'assunto. Procurar por "pitágoras" traz o Teorema de Pitágoras e mais quatro assuntos ' +
+        'que usam Pitágoras nos exercícios, com uma etiqueta dizendo de onde cada um veio.',
+        'Ela entende o nome que o aluno usa. "Bhaskara" acha equação do 2º grau, mesmo essa ' +
+        'palavra não estando escrita em lugar nenhum. Vale também para PA, PG, MMC e ' +
+        'análise combinatória.',
+        'Dá para escrever o ano junto do assunto: "fração 7 ano" deixa só o 7º ano na lista.',
+        'Erro de digitação de uma letra é corrigido sozinho, e o aplicativo avisa que corrigiu.',
+        'A busca agora atravessa os anos escolares, porque o assunto que trava o aluno costuma ' +
+        'ser de um ano atrás. Cada resultado de outro ano vem com o ano marcado.',
+        'Quando você procura um assunto que ainda não existe no banco, em vez da tela vazia ' +
+        'aparece o que há de mais perto, e o que você digitou fica anotado em Ajustes.',
+        'As contas do material passaram a ser escritas com símbolos, e não por extenso. Onde ' +
+        'estava "o montante é C vezes (1 mais i) elevado a t" agora está a fórmula de verdade, ' +
+        'com o expoente no lugar certo.',
+        'Três consertos no PDF: a tabela não escreve mais uma coluna por cima da outra, o ' +
+        'subtítulo não fica mais sozinho no pé da página longe do seu conteúdo, e a folga ' +
+        'entre o cabeçalho e o título diminuiu.'
+      ]
+    },
     {
       versao: '1.7.0',
       itens: [
@@ -180,6 +207,25 @@
       e.appendChild(typeof f === 'string' ? document.createTextNode(f) : f);
     });
     return e;
+  }
+
+  /* Os enunciados do banco escrevem expoente e indice como x^{2} e a_{1}, que
+   * e a marcacao que o gerador de PDF entende. Na tela isso apareceria cru, e
+   * ela leria "Calcule 2^{5}" em vez de "Calcule 2 elevado a 5". Aqui a mesma
+   * marcacao vira sobrescrito e subscrito de verdade, que o navegador desenha
+   * melhor do que o PDF. */
+  function comNotacao(texto) {
+    var partes = [];
+    var resto = String(texto == null ? '' : texto);
+    var re = /([\^_])\{([^}]*)\}/;
+    var m;
+    while ((m = re.exec(resto))) {
+      if (m.index) partes.push(document.createTextNode(resto.slice(0, m.index)));
+      partes.push(el(m[1] === '^' ? 'sup' : 'sub', { texto: m[2] }));
+      resto = resto.slice(m.index + m[0].length);
+    }
+    if (resto) partes.push(document.createTextNode(resto));
+    return partes;
   }
 
   function abrirModal(id) { $('#' + id).classList.add('aberto'); }
@@ -2846,9 +2892,20 @@
     }
   }
 
+  function nomeDoAno(serie) {
+    for (var i = 0; i < SERIES_NOMES.length; i++) {
+      if (SERIES_NOMES[i][0] === serie) return SERIES_NOMES[i][1];
+    }
+    return serie;
+  }
+
   var indiceTemas = null;
   var seriesCarregadas = {};
   var ultimoAnoEscolar = null;
+
+  /* O índice de busca vem separado, e a falta dele não impede nada: sem ele a
+   * busca volta a comparar título e resumo, que é o comportamento antigo. */
+  var indiceDeBusca = null;
 
   function carregarIndice() {
     if (indiceTemas) return Promise.resolve(indiceTemas);
@@ -2857,7 +2914,22 @@
       return r.json();
     }).then(function (d) {
       indiceTemas = d.temas || [];
+      carregarIndiceDeBusca();
       return indiceTemas;
+    });
+  }
+
+  function carregarIndiceDeBusca() {
+    if (indiceDeBusca) return Promise.resolve(indiceDeBusca);
+    return fetch('banco/busca.json').then(function (r) {
+      if (!r.ok) throw new Error('sem indice de busca');
+      return r.json();
+    }).then(function (d) {
+      indiceDeBusca = d.temas || [];
+      return indiceDeBusca;
+    }).catch(function () {
+      indiceDeBusca = null;
+      return null;
     });
   }
 
@@ -2957,27 +3029,85 @@
     var lista = el('div', { id: 'lista-temas' });
     corpo.appendChild(lista);
 
+    /* Sem busca, a lista é a do ano escolhido, como sempre foi. Com busca, ela
+     * atravessa os anos, porque o assunto que ela procura muitas vezes está no
+     * ano anterior, e é justamente disso que a aula de reforço trata. */
+    function procurarTemas(termo) {
+      if (!termo) {
+        return {
+          achados: temas.filter(function (t) { return t.serie === serieAtual; })
+            .map(function (t) { return { tema: t, onde: 'titulo', completa: true }; }),
+          atravessaAnos: false
+        };
+      }
+      if (indiceDeBusca && typeof Busca !== 'undefined') {
+        var porId = {};
+        temas.forEach(function (t) { porId[t.id] = t; });
+        var r = Busca.procurar(indiceDeBusca, termo) || { itens: [] };
+        var achados = r.itens
+          .map(function (x) {
+            return { tema: porId[x.id], onde: x.onde, completa: x.completa };
+          })
+          .filter(function (x) { return x.tema; });
+        return {
+          achados: achados, atravessaAnos: true, total: r.total,
+          completa: r.completa, corrigida: r.corrigida, foraDoAno: r.foraDoAno
+        };
+      }
+      /* Sem o índice de busca, volta a procurar só no título e no resumo. */
+      return {
+        achados: temas.filter(function (t) {
+          return Core.casaBusca(t.pt.titulo + ' ' + t.pt.resumo + ' ' + t.en.titulo, termo);
+        }).map(function (t) { return { tema: t, onde: 'titulo', completa: true }; }),
+        atravessaAnos: true
+      };
+    }
+
     function redesenhar() {
       lista.innerHTML = '';
       var termo = busca.trim();
-      var filtrados = temas.filter(function (t) {
-        if (t.serie !== serieAtual) return false;
-        return Core.casaBusca(t.pt.titulo + ' ' + t.pt.resumo + ' ' + t.en.titulo, termo);
-      });
+      var achado = procurarTemas(termo);
+      var filtrados = achado.achados;
+
+      /* O que ela procurou e o banco não tem fica anotado, tanto quando a
+       * lista vem vazia quanto quando vem só por aproximação: nos dois casos
+       * ela procurou um assunto que não existe aqui. */
+      if (termo && (!filtrados.length || achado.completa === false)) {
+        anotarBuscaSemResultado(termo, 'temas de matemática');
+      }
       if (!filtrados.length) {
-        if (termo) anotarBuscaSemResultado(termo, 'temas de matemática');
         lista.appendChild(el('div', { class: 'vazio' }, [
           el('p', { texto: termo ? 'Nenhum tema encontrado para essa busca.' : 'Nenhum tema nesta série.' })
         ]));
         return;
       }
-      filtrados.forEach(function (t) {
+
+      if (termo && achado.atravessaAnos) {
+        var deOutroAno = filtrados.filter(function (x) { return x.tema.serie !== serieAtual; }).length;
+        var recado = filtrados.length + (filtrados.length === 1 ? ' tema' : ' temas') +
+          (deOutroAno ? ', sendo ' + deOutroAno + ' de outros anos' : ', neste ano') + '.';
+        var extra = '';
+        if (achado.corrigida) extra = ' Corrigi o que parecia erro de digitação.';
+        else if (achado.completa === false) extra = ' Não achei tudo o que você escreveu, então mostro o mais próximo.';
+        lista.appendChild(el('div', { class: 'ajuda', style: 'margin-top:0' }, [
+          document.createTextNode(recado),
+          extra ? el('strong', { texto: extra }) : null
+        ].filter(Boolean)));
+      }
+
+      filtrados.forEach(function (x) {
+        var t = x.tema;
+        var rotulo = typeof Busca !== 'undefined' && Busca.ROTULO ? Busca.ROTULO[x.onde] : '';
         lista.appendChild(el('div', { class: 'item-lista item-tema' }, [
           el('div', { class: 'cresce' }, [
             el('div', { class: 'nome' }, [
               document.createTextNode(t.pt.titulo),
-              el('span', { class: 'tag', texto: UNIDADES_NOMES[t.unidade] || t.unidade, style: 'margin-left:8px' })
-            ]),
+              el('span', { class: 'tag', texto: UNIDADES_NOMES[t.unidade] || t.unidade, style: 'margin-left:8px' }),
+              termo && t.serie !== serieAtual
+                ? el('span', { class: 'tag serie', texto: nomeDoAno(t.serie), style: 'margin-left:6px' })
+                : null,
+              rotulo ? el('span', { class: 'tag', texto: rotulo, style: 'margin-left:6px' }) : null
+            ].filter(Boolean)),
             el('div', { class: 'detalhe', texto: t.pt.resumo }),
             el('div', {
               class: 'detalhe',
@@ -3137,7 +3267,7 @@
         caixaExercicios.appendChild(el('label', { class: 'item-exercicio' }, [
           chk,
           el('div', { class: 'cresce' }, [
-            el('div', { class: 'texto-exercicio', texto: ex.enunciado })
+            el('div', { class: 'texto-exercicio' }, comNotacao(ex.enunciado))
           ])
         ]));
       });

@@ -60,6 +60,38 @@
     0x0153: 0x9C, 0x017E: 0x9E, 0x0178: 0x9F
   };
 
+  // ================= notação matemática =================
+  //
+  // O banco de temas escreve fórmula de verdade: "M = C · (1 + i)^{t}" e
+  // "A = π · r^{2}". Nada disso sai da Helvetica sozinho: pi e raiz não existem
+  // no WinAnsi, e expoente não é caractere, é posicionamento. O contrato de quem
+  // escreve o tema está em temas/NOTACAO.md.
+
+  /* Código de cada símbolo na base-14 /Symbol. A chave é o caractere de verdade
+   * porque quem escreve o tema digita "π", e não um código. */
+  var SIMBOLOS = {
+    'π': 0x70, '√': 0xD6, '≥': 0xB3, '≤': 0xA3, '≠': 0xB9, '∞': 0xA5,
+    'Δ': 0x44, 'Σ': 0x53, 'α': 0x61, 'β': 0x62, 'θ': 0x71
+  };
+  /* Largura (1/1000 em) dos mesmos glifos na Symbol. Sem isto a linha com pi
+   * mediria pela largura do '?', e a quebra sairia torta. */
+  var W_SIM = {
+    'π': 549, '√': 549, '≥': 549, '≤': 549, '≠': 549, '∞': 713,
+    'Δ': 612, 'Σ': 592, 'α': 631, 'β': 549, 'θ': 521
+  };
+  var RE_SIMBOLO = new RegExp('[' + Object.keys(SIMBOLOS).join('') + ']');
+
+  // Expoente e índice. A chave é obrigatória mesmo com um caractere só, porque
+  // sem ela não dá para saber onde o expoente termina.
+  var RE_NIVEL = /([\^_])\{([^{}]*)\}/;
+  var CORPO_NIVEL = 0.62;   // corpo do expoente e do índice, fração do corpo da linha
+  var SOBE_NIVEL = 0.42;    // quanto o expoente sobe da linha de base
+  var DESCE_NIVEL = 0.16;   // quanto o índice desce
+
+  // Bytes que o WinAnsiEncoding deixa vazios: chegam até a fonte e não desenham
+  // nada, então contam como caractere que o PDF não sabe desenhar.
+  var WINANSI_VAZIO = { 0x81: 1, 0x8D: 1, 0x8F: 1, 0x90: 1, 0x9D: 1 };
+
   function paraWinAnsi(str) {
     var out = '';
     str = String(str == null ? '' : str);
@@ -94,7 +126,63 @@
   }
 
   function medir(texto, tamanho, bold, tracking) {
-    return medirWA(paraWinAnsi(texto), tamanho, bold, tracking);
+    texto = String(texto == null ? '' : texto);
+    if (!RE_SIMBOLO.test(texto)) return medirWA(paraWinAnsi(texto), tamanho, bold, tracking);
+    // Com símbolo a conta é caractere a caractere, porque cada um puxa a largura
+    // da sua própria fonte.
+    var soma = 0, n = 0;
+    for (var i = 0; i < texto.length; i++) {
+      var ch = texto.charAt(i);
+      if (W_SIM[ch] !== undefined) { soma += W_SIM[ch]; n++; continue; }
+      var pedaco = ch;
+      if (texto.codePointAt(i) > 0xFFFF) { pedaco = texto.substr(i, 2); i++; }
+      var wa = paraWinAnsi(pedaco);
+      for (var j = 0; j < wa.length; j++) { soma += larguraByte(wa.charCodeAt(j), bold); n++; }
+    }
+    var w = soma * tamanho / 1000;
+    if (tracking) w += tracking * n;
+    return w;
+  }
+
+  /* Parte o texto nos trechos que vão para a fonte de símbolo e nos que ficam na
+   * fonte de texto. O trecho de símbolo já sai com o byte da Symbol. */
+  function partirSimbolo(txt) {
+    var trechos = [], atual = '', simAtual = false;
+    for (var i = 0; i < txt.length; i++) {
+      var ch = txt.charAt(i);
+      var eh = SIMBOLOS[ch] !== undefined;
+      if (atual && eh !== simAtual) { trechos.push({ txt: atual, sim: simAtual }); atual = ''; }
+      simAtual = eh;
+      atual += eh ? String.fromCharCode(SIMBOLOS[ch]) : ch;
+    }
+    if (atual) trechos.push({ txt: atual, sim: simAtual });
+    return trechos;
+  }
+
+  /* Um caractere que o PDF sabe desenhar, seja pela fonte de texto ou pela de
+   * símbolo. */
+  function desenhavel(ch) {
+    if (SIMBOLOS[ch] !== undefined) return true;
+    var wa = paraWinAnsi(ch);
+    if (wa === '?' && ch !== '?') return false;
+    return !WINANSI_VAZIO[wa.charCodeAt(0)];
+  }
+
+  /* Lista, sem repetir, os caracteres que sairiam como interrogação. É a trava de
+   * quem escreve o tema: melhor descobrir aqui do que na folha impressa. A
+   * marcação ^{} e _{} não conta, porque ela nunca chega até a fonte. */
+  function caracteresQueNaoDesenha(texto) {
+    var limpo = String(texto == null ? '' : texto)
+      .replace(/([\^_])\{([^{}]*)\}/g, '$2').replace(/\*\*/g, '');
+    var fora = [], visto = {};
+    for (var i = 0; i < limpo.length; i++) {
+      var ch = limpo.charAt(i);
+      if (limpo.codePointAt(i) > 0xFFFF) { ch = limpo.substr(i, 2); i++; }
+      if (visto[ch] || desenhavel(ch)) continue;
+      visto[ch] = 1;
+      fora.push(ch);
+    }
+    return fora;
   }
 
   function escapar(wa) {
@@ -184,12 +272,13 @@
     this.imagens = {};       // ref -> {obj, w, h}
     this.fonteRegular = 0;
     this.fonteBold = 0;
+    this.fonteSimbolo = 0;
     this.pag = null;
   }
 
   Doc.prototype.novaPagina = function (opcoes) {
     opcoes = opcoes || {};
-    this.pag = { ops: [], usaImg: {}, semMoldura: !!opcoes.semMoldura };
+    this.pag = { ops: [], usaImg: {}, usaSim: false, semMoldura: !!opcoes.semMoldura };
     this.paginas.push(this.pag);
     this.y = Y_TOPO;
     if (!opcoes.semMarca) this.marcaDagua();
@@ -204,15 +293,33 @@
     var bold = !!opcoes.bold;
     var c = opcoes.cor || COR.texto;
     var tr = opcoes.tracking || 0;
-    var wa = paraWinAnsi(txt);
-    if (!wa.length) return;
-    var largura = medirWA(wa, tam, bold, tr);
+    txt = String(txt == null ? '' : txt);
+    var largura = medir(txt, tam, bold, tr);
     var px = x;
     if (opcoes.align === 'centro') px = x - largura / 2;
     else if (opcoes.align === 'direita') px = x - largura;
-    this.op('BT ' + cor3(c) + ' rg /' + (bold ? 'F2' : 'F1') + ' ' + tam + ' Tf ' +
-      (tr ? tr.toFixed(3) + ' Tc ' : '') +
-      px.toFixed(2) + ' ' + y.toFixed(2) + ' Td (' + escapar(wa) + ') Tj ' +
+    if (!RE_SIMBOLO.test(txt)) {
+      var wa = paraWinAnsi(txt);
+      if (!wa.length) return;
+      this.op('BT ' + cor3(c) + ' rg /' + (bold ? 'F2' : 'F1') + ' ' + tam + ' Tf ' +
+        (tr ? tr.toFixed(3) + ' Tc ' : '') +
+        px.toFixed(2) + ' ' + y.toFixed(2) + ' Td (' + escapar(wa) + ') Tj ' +
+        (tr ? '0 Tc ' : '') + 'ET');
+      return largura;
+    }
+    // Dentro do mesmo BT cada Tj continua de onde o anterior parou, então para
+    // sair "π · r" basta trocar a fonte entre os Tj, sem recalcular o x.
+    var trechos = partirSimbolo(txt), ops = [];
+    for (var i = 0; i < trechos.length; i++) {
+      var bytes = trechos[i].sim ? trechos[i].txt : paraWinAnsi(trechos[i].txt);
+      if (!bytes.length) continue;
+      ops.push('/' + (trechos[i].sim ? 'F3' : (bold ? 'F2' : 'F1')) + ' ' + tam + ' Tf (' +
+        escapar(bytes) + ') Tj');
+    }
+    if (!ops.length) return;
+    if (this.pag) this.pag.usaSim = true;
+    this.op('BT ' + cor3(c) + ' rg ' + (tr ? tr.toFixed(3) + ' Tc ' : '') +
+      px.toFixed(2) + ' ' + y.toFixed(2) + ' Td ' + ops.join(' ') + ' ' +
       (tr ? '0 Tc ' : '') + 'ET');
     return largura;
   };
@@ -344,6 +451,13 @@
     var w = this.w;
     this.fonteRegular = w.add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
     this.fonteBold = w.add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+    // A Symbol só entra no arquivo se alguma página precisou dela: fechamento de
+    // mês não tem fórmula e não deve carregar fonte de fórmula. Ela vai sem
+    // /Encoding de propósito, porque usa a codificação embutida na própria fonte.
+    var precisaSimbolo = false;
+    for (var s = 0; s < this.paginas.length; s++) if (this.paginas[s].usaSim) precisaSimbolo = true;
+    this.fonteSimbolo = precisaSimbolo ?
+      w.add('<< /Type /Font /Subtype /Type1 /BaseFont /Symbol >>') : 0;
     var numPaginas = w.alloc();
     var refs = [];
     for (var j = 0; j < this.paginas.length; j++) {
@@ -353,7 +467,8 @@
       for (var ref in pg.usaImg) {
         if (this.imagens[ref]) xo.push('/' + this.imagens[ref].nome + ' ' + this.imagens[ref].obj + ' 0 R');
       }
-      var recursos = '/Font << /F1 ' + this.fonteRegular + ' 0 R /F2 ' + this.fonteBold + ' 0 R >>' +
+      var recursos = '/Font << /F1 ' + this.fonteRegular + ' 0 R /F2 ' + this.fonteBold + ' 0 R' +
+        (pg.usaSim ? ' /F3 ' + this.fonteSimbolo + ' 0 R' : '') + ' >>' +
         (xo.length ? ' /XObject << ' + xo.join(' ') + ' >>' : '');
       var pgNum = w.add('<< /Type /Page /Parent ' + numPaginas + ' 0 R /MediaBox [0 0 ' +
         PAGINA_L.toFixed(4) + ' ' + PAGINA_A.toFixed(4) + '] /Resources << ' + recursos +
@@ -799,26 +914,109 @@
     return partes.filter(function (p) { return p.txt.length; });
   }
 
-  /* Quebra os pedaços em linhas que cabem na largura, sem separar o negrito. */
-  function quebrarRico(partes, largura, tam) {
-    var linhas = [], atual = [], usado = 0;
-    partes.forEach(function (parte) {
-      var palavras = parte.txt.split(/(\s+)/);
-      palavras.forEach(function (palavra) {
-        if (!palavra) return;
-        var w = medir(palavra, tam, parte.bold);
-        if (usado + w > largura && usado > 0 && palavra.trim()) {
-          linhas.push(atual); atual = []; usado = 0;
-          if (!palavra.trim()) return;
+  /* Expande a marcação de expoente e de índice. Cada pedaço ganha um nível: 0 na
+   * linha de base, 1 em cima, -1 embaixo. Não é fonte nova, é o mesmo glifo em
+   * corpo menor com a linha de base deslocada. */
+  function partirNivel(partes) {
+    var saida = [];
+    for (var i = 0; i < partes.length; i++) {
+      var resto = partes[i].txt, bold = partes[i].bold;
+      var achado = RE_NIVEL.exec(resto);
+      while (achado) {
+        if (achado.index > 0) saida.push({ txt: resto.slice(0, achado.index), bold: bold, nivel: 0 });
+        if (achado[2].length) {
+          saida.push({ txt: achado[2], bold: bold, nivel: achado[1] === '^' ? 1 : -1 });
         }
-        if (!palavra.trim() && usado === 0) return;
-        atual.push({ txt: palavra, bold: parte.bold });
-        usado += w;
+        resto = resto.slice(achado.index + achado[0].length);
+        achado = RE_NIVEL.exec(resto);
+      }
+      if (resto) saida.push({ txt: resto, bold: bold, nivel: 0 });
+    }
+    return saida;
+  }
+
+  /* A entrada da tubulação de texto rico: negrito primeiro, nível depois. */
+  function partirRico(texto) {
+    return partirNivel(partirNegrito(texto));
+  }
+
+  function corpoNivel(tam) { return Math.round(tam * CORPO_NIVEL * 100) / 100; }
+
+  /* Largura de um pedaço já no corpo do nível dele. */
+  function medirSeg(s, tam, bold) {
+    return medir(s.txt, s.nivel ? corpoNivel(tam) : tam, bold || s.bold);
+  }
+
+  /* Largura em pontos de um texto com marcação: expoente, índice e símbolo.
+   * Quem quebra linha precisa desta medida, senão o parágrafo com expoente
+   * mede a chave e o acento circunflexo como se fossem letras, e estoura a
+   * margem. */
+  function medirRico(texto, tam, bold) {
+    var partes = partirRico(texto), soma = 0;
+    for (var i = 0; i < partes.length; i++) soma += medirSeg(partes[i], tam, bold);
+    return soma;
+  }
+
+  /* Junta os pedaços em palavras. Uma palavra pode misturar corpo e nível, e não
+   * pode ser partida: em "(1 + i)^{t}" a quebra de linha não pode cair entre o
+   * parêntese e o t. O espaço vira um item sozinho, para poder ser descartado
+   * quando cai no começo da linha. */
+  function palavrasRicas(partes) {
+    var itens = [], palavra = null;
+    partes.forEach(function (parte) {
+      parte.txt.split(/(\s+)/).forEach(function (tok) {
+        if (!tok) return;
+        var seg = { txt: tok, bold: parte.bold, nivel: parte.nivel || 0 };
+        if (!tok.trim()) {
+          if (palavra) { itens.push({ segs: palavra, espaco: false }); palavra = null; }
+          itens.push({ segs: [seg], espaco: true });
+          return;
+        }
+        if (!palavra) palavra = [];
+        palavra.push(seg);
       });
     });
+    if (palavra) itens.push({ segs: palavra, espaco: false });
+    return itens;
+  }
+
+  /* Quebra os pedaços em linhas que cabem na largura, sem separar o negrito nem
+   * a potência da base. */
+  function quebrarRico(partes, largura, tam) {
+    var itens = palavrasRicas(partes);
+    var linhas = [], atual = [], usado = 0;
+    for (var i = 0; i < itens.length; i++) {
+      var segs = itens[i].segs, w = 0;
+      for (var j = 0; j < segs.length; j++) w += medirSeg(segs[j], tam);
+      if (!itens[i].espaco && usado + w > largura && usado > 0) {
+        linhas.push(atual); atual = []; usado = 0;
+      }
+      if (itens[i].espaco && usado === 0) continue;
+      for (var k = 0; k < segs.length; k++) atual.push(segs[k]);
+      usado += w;
+    }
     if (atual.length) linhas.push(atual);
     return linhas;
   }
+
+  /* Desenha uma linha já quebrada. O expoente e o índice saem daqui: mesmo
+   * glifo, corpo menor, linha de base deslocada. */
+  Doc.prototype.escreverSegmentos = function (segmentos, x, y, opcoes) {
+    opcoes = opcoes || {};
+    var tam = opcoes.tam || 10;
+    var px = x;
+    for (var i = 0; i < segmentos.length; i++) {
+      var s = segmentos[i];
+      var bold = s.bold || !!opcoes.bold;
+      var corpo = s.nivel ? corpoNivel(tam) : tam;
+      var desloca = s.nivel > 0 ? tam * SOBE_NIVEL : (s.nivel < 0 ? -tam * DESCE_NIVEL : 0);
+      if (s.txt.trim()) {
+        this.texto(s.txt, px, y + desloca, { tam: corpo, bold: bold, cor: opcoes.cor });
+      }
+      px += medir(s.txt, corpo, bold);
+    }
+    return px - x;
+  };
 
   Doc.prototype.escreverRico = function (texto, opcoes) {
     opcoes = opcoes || {};
@@ -827,17 +1025,11 @@
     var largura = opcoes.largura || (MARG_D - x);
     var alturaLinha = opcoes.alturaLinha || (tam * 1.45);
     var self = this;
-    var linhas = quebrarRico(partirNegrito(texto), largura, tam);
+    var linhas = quebrarRico(partirRico(texto), largura, tam);
     linhas.forEach(function (segmentos) {
       self.garanteEspaco(alturaLinha);
       self.y -= alturaLinha;
-      var px = x;
-      segmentos.forEach(function (s) {
-        if (s.txt.trim()) {
-          self.texto(s.txt, px, self.y, { tam: tam, bold: s.bold, cor: opcoes.cor || COR.texto });
-        }
-        px += medir(s.txt, tam, s.bold);
-      });
+      self.escreverSegmentos(segmentos, x, self.y, { tam: tam, cor: opcoes.cor });
     });
     return linhas.length;
   };
@@ -858,7 +1050,21 @@
       // subtítulo
       var titulo = /^#{3,6}\s+(.*)$/.exec(limpo);
       if (titulo) {
-        this.garanteEspaco(tam * 2.6);
+        /* Um subtitulo sozinho no pe da pagina e pior do que uma pagina mais
+         * curta: quem vira a folha encontra uma tabela ou uma lista sem saber
+         * do que ela trata. Entao a reserva olha o que vem depois dele, ate
+         * tres linhas de conteudo, e leva tudo junto para a proxima pagina se
+         * nao couber. */
+        var adiante = 0, j = i + 1;
+        while (j < linhas.length && adiante < 3) {
+          if (linhas[j].trim()) adiante++;
+          else if (adiante) break;
+          j++;
+        }
+        /* Reserva pelo menos tres linhas de conteudo junto com o subtitulo.
+         * Com uma linha so o titulo ficava sozinho no pe da pagina e a tabela
+         * dele comecava na seguinte, que e o caso que motivou isto. */
+        this.garanteEspaco(tam * 2.6 + Math.max(adiante, 3) * tam * 1.7);
         this.y -= tam * 1.7;
         this.texto(titulo[1], MARG_E, this.y, { tam: tam + 1.5, bold: true, cor: COR.navy });
         this.y -= tam * 0.35;
@@ -892,15 +1098,10 @@
         this.y -= tam * 1.45;
         this.texto(rotulo, MARG_E + 4, this.y, { tam: tam, cor: COR.teal, bold: !marcador });
         var recuo = MARG_E + 22;
-        var segmentos = quebrarRico(partirNegrito(conteudo), MARG_D - recuo, tam);
+        var segmentos = quebrarRico(partirRico(conteudo), MARG_D - recuo, tam);
         for (var k = 0; k < segmentos.length; k++) {
           if (k > 0) { this.garanteEspaco(tam * 1.45); this.y -= tam * 1.45; }
-          var px = recuo;
-          for (var j = 0; j < segmentos[k].length; j++) {
-            var s = segmentos[k][j];
-            if (s.txt.trim()) this.texto(s.txt, px, this.y, { tam: tam, bold: s.bold });
-            px += medir(s.txt, tam, s.bold);
-          }
+          this.escreverSegmentos(segmentos[k], recuo, this.y, { tam: tam });
         }
         i++; continue;
       }
@@ -921,6 +1122,7 @@
   };
 
   Doc.prototype.tabelaSimples = function (bruto, tam) {
+    var self = this;
     var linhas = bruto.filter(function (l) { return !/^\|[\s:\-|]+\|$/.test(l); })
       .map(function (l) {
         return l.replace(/^\||\|$/g, '').split('|').map(function (c) { return c.trim(); });
@@ -928,20 +1130,38 @@
     if (!linhas.length) return;
     var colunas = Math.max.apply(null, linhas.map(function (l) { return l.length; }));
     var largura = UTIL / colunas;
-    var altura = tam * 1.9;
+    var util = largura - 12;
+    var corpo = tam - 0.8;
+    var salto = corpo * 1.35;
+
+    /* A celula quebra na largura da coluna. Sem isto o texto comprido passava
+     * por cima da coluna vizinha, e a linha ficava ilegivel. Como a celula
+     * agora pode ter mais de uma linha, a altura da faixa vem da celula mais
+     * alta da fila, e nao de um valor fixo. */
     this.y -= tam * 0.6;
     for (var i = 0; i < linhas.length; i++) {
+      var partido = [];
+      var maior = 1;
+      for (var c = 0; c < colunas; c++) {
+        var celula = (linhas[i][c] || '').replace(/\*\*/g, '');
+        var quebrado = celula ? self.quebrar(celula, util, corpo, i === 0) : [];
+        partido.push(quebrado);
+        if (quebrado.length > maior) maior = quebrado.length;
+      }
+      var altura = maior * salto + corpo * 0.9;
       this.garanteEspaco(altura);
       this.y -= altura;
       if (i === 0) this.retangulo(MARG_E, this.y, UTIL, altura, COR.navy);
       else if (i % 2 === 0) this.retangulo(MARG_E, this.y, UTIL, altura, COR.soft);
-      for (var c = 0; c < colunas; c++) {
-        var celula = (linhas[i][c] || '').replace(/\*\*/g, '');
-        if (!celula) continue;
-        this.texto(celula, MARG_E + c * largura + 6, this.y + tam * 0.6, {
-          tam: tam - 0.8, bold: i === 0,
-          cor: i === 0 ? COR.branco : COR.texto
-        });
+      for (c = 0; c < colunas; c++) {
+        var linhasDaCelula = partido[c];
+        for (var k = 0; k < linhasDaCelula.length; k++) {
+          this.texto(linhasDaCelula[k], MARG_E + c * largura + 6,
+            this.y + altura - corpo * 1.15 - k * salto, {
+              tam: corpo, bold: i === 0,
+              cor: i === 0 ? COR.branco : COR.texto
+            });
+        }
       }
       this.linha(MARG_E, this.y, MARG_D, this.y, COR.fio, 0.4);
     }
@@ -950,7 +1170,10 @@
 
   Doc.prototype.cabecalhoDeSecao = function (titulo, subtitulo) {
     this.garanteEspaco(52);
-    this.y -= 26;
+    /* O Y_TOPO ja comeca 30pt abaixo do fio do cabecalho. Descer mais 26 aqui
+     * abria quase um centimetro e meio de papel em branco entre o fio e o
+     * titulo, em toda folha que o aplicativo gera. */
+    this.y -= 12;
     this.texto(titulo, PAGINA_L / 2, this.y, { tam: 17, bold: true, cor: COR.navy, align: 'centro' });
     if (subtitulo) {
       this.y -= 12;
@@ -1088,15 +1311,10 @@
         doc.y -= 15;
         doc.texto(String(i + 1) + '.', MARG_E, doc.y, { tam: 10, bold: true, cor: COR.navy });
         var recuo = MARG_E + 20;
-        var segmentos = quebrarRico(partirNegrito(ex.enunciado), MARG_D - recuo, 10);
+        var segmentos = quebrarRico(partirRico(ex.enunciado), MARG_D - recuo, 10);
         for (var k = 0; k < segmentos.length; k++) {
           if (k > 0) { doc.garanteEspaco(15); doc.y -= 15; }
-          var px = recuo;
-          for (var j = 0; j < segmentos[k].length; j++) {
-            var s = segmentos[k][j];
-            if (s.txt.trim()) doc.texto(s.txt, px, doc.y, { tam: 10, bold: s.bold });
-            px += medir(s.txt, 10, s.bold);
-          }
+          doc.escreverSegmentos(segmentos[k], recuo, doc.y, { tam: 10 });
         }
         if (op.espacoParaResposta) doc.y -= op.espacoParaResposta;
       });
@@ -1109,15 +1327,10 @@
         doc.y -= 14;
         doc.texto(String(i + 1) + '.', MARG_E, doc.y, { tam: 9.5, bold: true, cor: COR.navy });
         var recuo = MARG_E + 20;
-        var segmentos = quebrarRico(partirNegrito(ex.resposta), MARG_D - recuo, 9.5);
+        var segmentos = quebrarRico(partirRico(ex.resposta), MARG_D - recuo, 9.5);
         for (var k = 0; k < segmentos.length; k++) {
           if (k > 0) { doc.garanteEspaco(14); doc.y -= 14; }
-          var px = recuo;
-          for (var j = 0; j < segmentos[k].length; j++) {
-            var s = segmentos[k][j];
-            if (s.txt.trim()) doc.texto(s.txt, px, doc.y, { tam: 9.5, bold: s.bold });
-            px += medir(s.txt, 9.5, s.bold);
-          }
+          doc.escreverSegmentos(segmentos[k], recuo, doc.y, { tam: 9.5 });
         }
       });
     }
@@ -1126,7 +1339,8 @@
   }
 
   return {
-    Doc: Doc, COR: COR, medir: medir, paraWinAnsi: paraWinAnsi,
+    Doc: Doc, COR: COR, medir: medir, medirRico: medirRico, paraWinAnsi: paraWinAnsi,
+    SIMBOLOS: SIMBOLOS, caracteresQueNaoDesenha: caracteresQueNaoDesenha,
     gerarFechamento: gerarFechamento, gerarResumoMes: gerarResumoMes,
     gerarMaterialTema: gerarMaterialTema, gerarFichaMapeamento: gerarFichaMapeamento,
     NOTA_L: NOTA_L, NOTA_A: NOTA_A,

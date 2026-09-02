@@ -118,6 +118,50 @@ def montar_lista(tema, lingua, escolhidos, com_gabarito=True):
     return saida
 
 
+def gerar_indice_de_busca(temas):
+    """Chama o busca.js para montar o indice, e grava banco/busca.json.
+
+    Quem normaliza palavra e o busca.js, e nao este script. Se a regra morasse
+    nos dois lugares, um dia elas divergiriam e a busca passaria a nao achar o
+    que o indice guardou.
+    """
+    import subprocess
+    import tempfile
+
+    entrada = [
+        {
+            'id': t['id'], 'serie': t['serie'],
+            'titulo': t['pt']['titulo'], 'resumo': t['pt']['resumo'],
+            'explicacao': t['pt']['explicacao'],
+            'enunciados': ' '.join(e['enunciado'] for e in t['pt']['exercicios']),
+        }
+        for t in temas
+    ]
+    raiz_proj = os.path.dirname(RAIZ)
+    with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False, encoding='utf-8') as f:
+        json.dump(entrada, f, ensure_ascii=False)
+        caminho_entrada = f.name
+
+    script = (
+        "const fs=require('fs');"
+        "const B=require(process.argv[1]);"
+        "const t=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));"
+        "process.stdout.write(JSON.stringify({formato:'indice-de-busca',versao:1,"
+        "temas:B.montarIndice(t)}));"
+    )
+    saida = subprocess.run(
+        ['node', '-e', script, os.path.join(raiz_proj, 'busca.js'), caminho_entrada],
+        capture_output=True, text=True, encoding='utf-8')
+    os.unlink(caminho_entrada)
+    if saida.returncode != 0:
+        raise SystemExit('nao consegui montar o indice de busca: %s' % saida.stderr[:400])
+
+    caminho = os.path.join(PASTA_BANCO, 'busca.json')
+    io.open(caminho, 'w', encoding='utf-8', newline=chr(10)).write(saida.stdout)
+    print('busca.json: %.0f KB, carrega junto com o indice'
+          % (os.path.getsize(caminho) / 1024.0))
+
+
 def gerar():
     """Gera o que o aplicativo consome.
 
@@ -162,6 +206,10 @@ def gerar():
             json.dumps({'serie': serie, 'temas': lista},
                        ensure_ascii=False, separators=(',', ':')))
         maior = max(maior, os.path.getsize(caminho) / 1024.0)
+
+    # indice de busca, montado pelo proprio busca.js para nao existirem duas
+    # regras de normalizacao que possam divergir com o tempo
+    gerar_indice_de_busca(temas)
 
     banco = {'formato': 'banco-temas-matematica', 'versao': 1, 'temas': temas}
     io.open(SAIDA, 'w', encoding='utf-8', newline=chr(10)).write(

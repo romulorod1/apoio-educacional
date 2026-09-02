@@ -10,3 +10,16 @@ _teste/chrome_err.txt
 _teste/sim_v1/
 _teste/prints/
 _teste/_modelo.html
+
+# material de aluno identificavel: nome, colegio, prova. O repositorio e
+# publico, entao nada disso pode entrar aqui. O material chega a professora
+# por e-mail ou Drive, e ela anexa na aula pelo proprio aplicativo.
+_experimento/
+
+# retrato do banco antes da reescrita da notacao, para poder comparar e voltar
+temas/_antes/
+_teste/_pdf_antes.js
+
+# cache do Python
+__pycache__/
+*.pyc

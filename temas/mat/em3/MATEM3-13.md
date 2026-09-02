@@ -21,19 +21,21 @@ Aumentar um valor em 20% é multiplicá-lo por 1,20. Dar um desconto de 20% é m
 Trocar a palavra por um fator é o passo que transforma matemática financeira em multiplicação
 simples, e é ele que resolve as pegadinhas mais comuns.
 
-Aumentos e descontos sucessivos se **multiplicam**, nunca se somam. Dois aumentos de 20% dão 1,20
-vezes 1,20, que é 1,44, ou seja, um aumento acumulado de 44% e não de 40%. E um aumento de 25%
-seguido de um desconto de 20% devolve o valor original, porque 1,25 vezes 0,80 dá exatamente 1.
+Aumentos e descontos sucessivos se **multiplicam**, nunca se somam. Dois aumentos de 20% dão
+1,20 × 1,20 = 1,44, ou seja, um aumento acumulado de 44% e não de 40%. E um aumento de 25% seguido
+de um desconto de 20% devolve o valor original, porque 1,25 × 0,80 dá exatamente 1.
 
 #### Juros simples
 
 Nos juros simples, só o capital inicial rende. O montante depois de n períodos é
 
-M igual a C vezes (1 mais i vezes n)
+M = C · (1 + i · n)
+
+onde M é o montante, C o capital, i a taxa por período e n o número de períodos.
 
 **Exemplo 1.** Qual o montante de 1000 reais aplicados a 2% ao mês, em juros simples, durante 6
 meses?
-Os juros são 1000 vezes 0,02 vezes 6, ou seja, 120 reais. O montante é 1120 reais.
+Os juros são 1000 × 0,02 × 6 = 120 reais. O montante é 1120 reais.
 
 Juros simples aparecem pouco no mercado. Servem, na prática, como termo de comparação.
 
@@ -42,11 +44,11 @@ Juros simples aparecem pouco no mercado. Servem, na prática, como termo de comp
 Nos juros compostos, os juros de cada período passam a render também. O montante depois de n períodos
 é
 
-M igual a C vezes (1 mais i) elevado a n
+M = C · (1 + i)^{n}
 
 **Exemplo 2.** Qual o montante de 1000 reais aplicados a 2% ao mês, em juros compostos, durante 6
 meses?
-O montante é 1000 vezes 1,02 elevado a 6, o que dá 1126,16 reais quando arredondado para duas casas.
+O montante é 1000 × 1,02^{6}, o que dá 1126,16 reais quando arredondado para duas casas.
 A diferença para o regime simples parece pequena em 6 meses, mas cresce muito com o tempo, porque a
 função é exponencial e não linear.
 
@@ -54,12 +56,16 @@ função é exponencial e não linear.
 
 Comparar 100 reais hoje com 100 reais daqui a um ano é comparar coisas diferentes. Para comparar
 propostas de pagamento, leva-se tudo para a mesma data. Trazer um valor futuro F, de n períodos à
-frente, para hoje, é dividir por (1 mais i) elevado a n.
+frente, para hoje, é dividir por (1 + i)^{n}:
+
+VP = F/(1 + i)^{n}
+
+onde VP é o valor presente de F.
 
 Esse é o raciocínio que decide entre pagar à vista com desconto e pagar parcelado.
 
 **Exemplo 3.** Um preço sofre dois aumentos seguidos de 20%. Qual o aumento acumulado?
-O fator é 1,20 vezes 1,20, que dá 1,44. O aumento acumulado é de 44%.
+O fator é 1,20 × 1,20 = 1,44. O aumento acumulado é de 44%.
 
 **Exemplo 4.** Um produto custa 1200 reais à vista ou 3 parcelas mensais de 440 reais. Quanto se paga
 a mais no total, em termos percentuais?
@@ -69,13 +75,13 @@ compara apenas totais, e não datas, então serve como primeira leitura, não co
 #### Ganho real
 
 Quando os preços sobem, um aumento nominal de salário pode significar perda. O ganho real é o fator
-do salário dividido pelo fator dos preços. Se o salário sobe 8% e os preços sobem 20%, o fator é 1,08
-dividido por 1,20, que dá 0,90: uma perda real de 10%.
+do salário dividido pelo fator dos preços. Se o salário sobe 8% e os preços sobem 20%, o fator é
+1,08/1,20 = 0,90: uma perda real de 10%.
 
 #### Erros comuns
 
 **Somar taxas de períodos diferentes.** 1% ao mês não é 12% ao ano em juros compostos. O fator anual
-é 1,01 elevado a 12.
+é 1,01^{12}.
 
 **Somar aumentos e descontos sucessivos.** Aumento de 30% seguido de desconto de 30% não volta ao
 início, e sim a 91% do valor original.
@@ -138,23 +144,21 @@ sentido.
 4. O preço passa a ser 170 reais, pois o fator de desconto é 0,85.
 5. O montante é 1210 reais.
 6. O montante é 5306,04 reais.
-7. O preço final é 360 reais. O fator acumulado é 0,9 vezes 0,8, que dá 0,72, logo o desconto único
+7. O preço final é 360 reais. O fator acumulado é 0,9 × 0,8 = 0,72, logo o desconto único
    equivalente é de 28%.
 8. Em juros simples o montante é 4400 reais. Em juros compostos é 4410 reais.
-9. Não há variação acumulada, pois 1,25 vezes 0,80 dá 1. A variação é de 0%.
+9. Não há variação acumulada, pois 1,25 × 0,80 = 1. A variação é de 0%.
 10. O total parcelado é 1650 reais, que supera o preço à vista em 10%.
-11. A taxa é de 10% ao ano, pois 9680 dividido por 8000 dá 1,21, que é 1,1 ao quadrado.
-12. Houve perda real de 10%, pois 1,08 dividido por 1,20 dá 0,90.
+11. A taxa é de 10% ao ano, pois 9680/8000 = 1,21, que é 1,1^{2}.
+12. Houve perda real de 10%, pois 1,08/1,20 = 0,90.
 13. É preciso aplicar 4622,78 reais.
 14. Pagar à vista é melhor. Os 2400 reais aplicados por 2 meses virariam 2595,84 reais, valor menor
     que os 2600 reais devidos. A diferença é de 4,16 reais a favor do pagamento à vista.
-15. O desconto é de 23,08%, pois ele vale 30 dividido por 130, ou seja, 3 sobre 13.
+15. O desconto é de 23,08%, pois ele vale 30/130 = 3/13.
 16. O montante é 14347,42 reais.
-17. A segunda rende mais. Sua taxa anual equivalente é de 12,68%, pois o fator anual é 1,01 elevado
-    a 12.
+17. A segunda rende mais. Sua taxa anual equivalente é de 12,68%, pois o fator anual é 1,01^{12}.
 18. Cada parcela vale 5226,11 reais e o total pago é 10452,22 reais. A soma dos valores presentes das
-    duas parcelas precisa ser 10000, o que leva à parcela igual a 10000 vezes 1,0609 dividido por
-    2,03.
+    duas parcelas precisa ser 10000, o que leva à parcela P = 10000 × 1,0609/2,03.
 
 ## EN
 
@@ -166,19 +170,21 @@ Increasing a value by 20% means multiplying it by 1.20. Giving a 20% discount me
 0.80. Turning the word into a factor is the step that makes financial mathematics into plain
 multiplication, and it is what settles the most common traps.
 
-Successive increases and discounts **multiply**, they never add. Two increases of 20% give 1.20 times
-1.20, which is 1.44, that is, an accumulated increase of 44% and not of 40%. And an increase of 25%
-followed by a discount of 20% gives back the original value, because 1.25 times 0.80 is exactly 1.
+Successive increases and discounts **multiply**, they never add. Two increases of 20% give
+1.20 × 1.20 = 1.44, that is, an accumulated increase of 44% and not of 40%. And an increase of 25%
+followed by a discount of 20% gives back the original value, because 1.25 × 0.80 gives exactly 1.
 
 #### Simple interest
 
 Under simple interest, only the initial capital earns. The amount after n periods is
 
-M equals C times (1 plus i times n)
+M = C · (1 + i · n)
+
+where M is the amount, C the capital, i the rate per period and n the number of periods.
 
 **Example 1.** What is the amount of 1000 reais invested at 2% a month, at simple interest, for 6
 months?
-The interest is 1000 times 0.02 times 6, that is, 120 reais. The amount is 1120 reais.
+The interest is 1000 × 0.02 × 6 = 120 reais. The amount is 1120 reais.
 
 Simple interest rarely shows up in the market. In practice it serves as a benchmark for comparison.
 
@@ -187,24 +193,28 @@ Simple interest rarely shows up in the market. In practice it serves as a benchm
 Under compound interest, the interest of each period starts earning too. The amount after n periods
 is
 
-M equals C times (1 plus i) to the power n
+M = C · (1 + i)^{n}
 
 **Example 2.** What is the amount of 1000 reais invested at 2% a month, at compound interest, for 6
 months?
-The amount is 1000 times 1.02 to the power 6, which gives 1126.16 reais when rounded to two decimal
-places. The gap over the simple regime looks small across 6 months, but it grows a lot with time,
-because the function is exponential and not linear.
+The amount is 1000 × 1.02^{6}, which gives 1126.16 reais when rounded to two decimal places. The gap
+over the simple regime looks small across 6 months, but it grows a lot with time, because the
+function is exponential and not linear.
 
 #### Present value: bringing everything to the same date
 
 Comparing 100 reais today with 100 reais a year from now is comparing different things. To compare
 payment offers, you bring everything to the same date. Bringing a future value F, n periods ahead,
-back to today means dividing by (1 plus i) to the power n.
+back to today means dividing by (1 + i)^{n}:
+
+PV = F/(1 + i)^{n}
+
+where PV is the present value of F.
 
 That is the reasoning that decides between paying cash with a discount and paying in installments.
 
 **Example 3.** A price takes two successive increases of 20%. What is the accumulated increase?
-The factor is 1.20 times 1.20, which gives 1.44. The accumulated increase is 44%.
+The factor is 1.20 × 1.20 = 1.44. The accumulated increase is 44%.
 
 **Example 4.** A product costs 1200 reais cash or 3 monthly installments of 440 reais. How much more
 is paid in total, in percentage terms?
@@ -214,13 +224,13 @@ calculation compares totals only, not dates, so it works as a first reading, not
 #### Real gain
 
 When prices go up, a nominal salary increase may mean a loss. The real gain is the salary factor
-divided by the price factor. If the salary goes up 8% and prices go up 20%, the factor is 1.08
-divided by 1.20, which gives 0.90: a real loss of 10%.
+divided by the price factor. If the salary goes up 8% and prices go up 20%, the factor is
+1.08/1.20 = 0.90: a real loss of 10%.
 
 #### Common mistakes
 
 **Adding rates from different periods.** 1% a month is not 12% a year under compound interest. The
-yearly factor is 1.01 to the power 12.
+yearly factor is 1.01^{12}.
 
 **Adding successive increases and discounts.** An increase of 30% followed by a discount of 30% does
 not return to the start, it returns to 91% of the original value.
@@ -283,23 +293,23 @@ means nothing.
 4. The price becomes 170 reais, since the discount factor is 0.85.
 5. The amount is 1210 reais.
 6. The amount is 5306.04 reais.
-7. The final price is 360 reais. The accumulated factor is 0.9 times 0.8, which gives 0.72, so the
-   equivalent single discount is 28%.
+7. The final price is 360 reais. The accumulated factor is 0.9 × 0.8 = 0.72, so the equivalent
+   single discount is 28%.
 8. Under simple interest the amount is 4400 reais. Under compound interest it is 4410 reais.
-9. There is no accumulated change, since 1.25 times 0.80 gives 1. The change is 0%.
+9. There is no accumulated change, since 1.25 × 0.80 = 1. The change is 0%.
 10. The installment total is 1650 reais, which exceeds the cash price by 10%.
-11. The rate is 10% a year, since 9680 divided by 8000 gives 1.21, which is 1.1 squared.
-12. There was a real loss of 10%, since 1.08 divided by 1.20 gives 0.90.
+11. The rate is 10% a year, since 9680/8000 = 1.21, which is 1.1^{2}.
+12. There was a real loss of 10%, since 1.08/1.20 = 0.90.
 13. It is necessary to invest 4622.78 reais.
 14. Paying cash is better. The 2400 reais invested for 2 months would become 2595.84 reais, less than
     the 2600 reais owed. The difference is 4.16 reais in favour of paying cash.
-15. The discount is 23.08%, since it equals 30 divided by 130, that is, 3 over 13.
+15. The discount is 23.08%, since it equals 30/130 = 3/13.
 16. The amount is 14347.42 reais.
-17. The second one pays more. Its equivalent yearly rate is 12.68%, since the yearly factor is 1.01
-    to the power 12.
+17. The second one pays more. Its equivalent yearly rate is 12.68%, since the yearly factor
+    is 1.01^{12}.
 18. Each installment is 5226.11 reais and the total paid is 10452.22 reais. The sum of the present
-    values of the two installments must be 10000, which leads to an installment equal to 10000 times
-    1.0609 divided by 2.03.
+    values of the two installments must be 10000, which leads to an installment
+    P = 10000 × 1.0609/2.03.
 
 ## VERIFICACAO
 
