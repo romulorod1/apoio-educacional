@@ -1,4 +1,5 @@
 /* Confere o aplicativo publicado, e nao o local. E a unica prova que vale. */
+const path = require('path');
 const puppeteer = require('puppeteer-core');
 const URL = 'https://romulorod1.github.io/apoio-educacional/';
 let ok = 0, mau = 0;
@@ -16,8 +17,21 @@ const c = (r, v, e) => { const p = String(v) === String(e); p ? ok++ : mau++;
   await pag.goto(URL, { waitUntil: 'networkidle0' });
   await new Promise(r => setTimeout(r, 3500));
 
-  c('a versao publicada e a 1.9.0',
-    await pag.evaluate(() => (document.body.innerText.match(/1\.8\.0/) || [''])[0]), '1.9.0');
+  /* A versao esperada vem do app.js LOCAL e a lida e a PRIMEIRA que aparece na tela
+
+   * (o painel de novidades lista as anteriores logo abaixo). Antes o numero estava
+
+   * cravado aqui em dois lugares e numa regex com barras, e uma troca de versao
+
+   * deixou a regex para tras: a conferencia acusava producao saudavel. */
+
+  const esperada = (require('fs').readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8')
+
+    .match(/VERSAO = '([0-9.]+)'/) || [])[1];
+
+  c('a versao publicada e a do app.js local (' + esperada + ')',
+
+    await pag.evaluate(() => (document.body.innerText.match(/\d+\.\d+\.\d+/) || [''])[0]), esperada);
   c('a tela abriu', await pag.$eval('#abas', e => e.children.length > 0), true);
 
   // o buscador chegou e funciona no ar
