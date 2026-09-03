@@ -506,6 +506,26 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   conf('o fechamento do aluno abriu para exportar', achouCartao, true);
   await espera(900);
 
+  /* As duas listas só saem quando ela marca a caixa. O teste marca antes de
+   * exportar, porque o que ele quer conferir é o conteúdo delas. O padrão, que
+   * é não sair, é conferido logo em seguida. */
+  await pag.evaluate(() => {
+    const cx = Array.from(document.querySelectorAll('#lista-fechamento input[type=checkbox]'))
+      .filter(c => /Exibir os temas/.test((c.closest('label') || {}).textContent || ''))[0];
+    if (cx && !cx.checked) cx.click();
+  });
+  await espera(800);
+  await pag.evaluate((nome) => {
+    const cartoes = Array.from(document.querySelectorAll('#lista-fechamento .cartao'));
+    const c = cartoes.filter(x => x.textContent.indexOf(nome) >= 0)[0];
+    if (!c) return false;
+    const b = Array.from(c.querySelectorAll('button'))
+      .filter(x => x.textContent.trim() === 'Texto')[0];
+    if (b) b.click();
+    return !!b;
+  }, marcelo.nome);
+  await espera(900);
+
   const md = await pag.evaluate(() => (window.__ultimoBlob ? window.__ultimoBlob.text() : null));
   conf('o fechamento saiu em texto', !!md, true);
   conf('ele tem a seção dos temas trabalhados',

@@ -952,7 +952,11 @@
       doc.y -= 4;
     }
 
-    if (dados.temasDoMes && dados.temasDoMes.length) {
+    /* As duas listas abaixo só saem quando ela manda exibir. O motivo está
+       escrito no core.js, em exibeListas: o documento que a família lê não
+       muda porque ela experimentou uma funcionalidade nova. */
+    var exibirListas = !!opcoes.exibirTemasEAreas;
+    if (exibirListas && dados.temasDoMes && dados.temasDoMes.length) {
       tituloDeSecao('Temas trabalhados', 92);
       for (var t = 0; t < dados.temasDoMes.length; t++) {
         var tm = dados.temasDoMes[t];
@@ -971,7 +975,7 @@
       }
     }
 
-    if (dados.areasDoMes && dados.areasDoMes.length) {
+    if (exibirListas && dados.areasDoMes && dados.areasDoMes.length) {
       tituloDeSecao('Áreas trabalhadas', 92);
       /* Em duas colunas: a lista costuma ser longa, e uma coluna só empurraria
          o resumo para a página seguinte sem necessidade. */

@@ -1163,6 +1163,20 @@
   // ---------- Markdown ----------
   // Regra da casa: nunca usar travessao (em-dash ou en-dash) em entregavel.
 
+  /* As duas listas do fechamento, temas e áreas, só saem no documento quando
+   * ela mandar exibir.
+   *
+   * Foi decisão dela. Hoje o que ela usa é a agenda, o valor a receber e o texto
+   * que escreve no fechamento; registrar assunto e marcar áreas são coisas que
+   * está começando a explorar, e uma exploração não pode mudar sozinha o
+   * documento que vai para a família. A caixa nasce desmarcada e fica lembrada:
+   * quando ela decidir que o registro está do jeito que quer, marca uma vez.
+   *
+   * A tela dela continua mostrando tudo. O filtro é só do documento que sai. */
+  function exibeListas(opcoes) {
+    return !!(opcoes && opcoes.exibirTemasEAreas);
+  }
+
   function markdownFechamento(f, opcoes) {
     opcoes = opcoes || {};
     var L = [];
@@ -1205,7 +1219,7 @@
       L.push('');
       L.push('> Atenção: não há valor por hora vigente para ' + f.semPreco.map(ddmm).join(', ') + '.');
     }
-    if (f.temasDoMes && f.temasDoMes.length) {
+    if (exibeListas(opcoes) && f.temasDoMes && f.temasDoMes.length) {
       L.push('');
       L.push('## Temas trabalhados');
       L.push('');
@@ -1214,7 +1228,7 @@
       });
     }
 
-    if (f.areasDoMes && f.areasDoMes.length) {
+    if (exibeListas(opcoes) && f.areasDoMes && f.areasDoMes.length) {
       L.push('');
       L.push('## Áreas trabalhadas');
       L.push('');
@@ -1333,6 +1347,7 @@
     dividirAula: dividirAula, desfazerDivisao: desfazerDivisao,
     podeDividir: podeDividir, metadesDe: metadesDe, somarMinutosNaHora: somarMinutosNaHora,
     uid: uid, nomeArquivo: nomeArquivo,
-    chaveDeBusca: chaveDeBusca, casaBusca: casaBusca
+    chaveDeBusca: chaveDeBusca, casaBusca: casaBusca,
+    exibeListas: exibeListas
   };
 });
