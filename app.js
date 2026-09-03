@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.10.2';
+  var VERSAO = '1.11.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -18,6 +18,24 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.11.0',
+      itens: [
+        'O assunto da aula aparece agora assim que você abre a aula, logo abaixo de ' +
+          'Conteúdo da aula. Antes ele ficava guardado dentro do botão de material e só ' +
+          'existia quando saía um PDF. Agora é ao contrário: primeiro você registra o que ' +
+          'foi trabalhado, e é isso que entra no fechamento que a família lê.',
+        'Registrar o assunto não obriga mais a gerar material. Você escolhe, ele fica ' +
+          'gravado na hora, sem passar pelo Salvar, e a folha pronta continua a um toque: ' +
+          'quando o assunto tem material no banco, aparece um botão na linha dele.',
+        'As outras doze matérias entraram, com 2.513 assuntos ao todo: português, redação, ' +
+          'inglês, ciências, história, geografia, física, química, biologia, literatura, ' +
+          'filosofia e sociologia e método de estudo. Dá para procurar em todas de uma vez ' +
+          'no campo de cima, ou abrir matéria por matéria. E escrever o assunto com as suas ' +
+          'palavras continua sendo a primeira linha da tela, para o dia em que o banco não ' +
+          'tiver o que você deu.'
+      ]
+    },
     {
       versao: '1.10.2',
       itens: [
@@ -1046,6 +1064,8 @@
 
       corpo.appendChild(el('h3', { class: 'subtitulo', texto: 'Conteúdo da aula' }));
 
+      desenharAssuntos(corpo, aulaEmEdicao, alunoDaAula);
+
       var areaNota = el('textarea', {
         id: 'campo-nota-texto',
         placeholder: 'O que foi trabalhado nesta aula. Este texto entra no fechamento quando você pedir.'
@@ -1087,12 +1107,11 @@
         el('strong', { texto: 'Para trazer uma aula do Samsung Notes: ' }),
         document.createTextNode('lá dentro toque em Compartilhar, escolha PDF, e depois use "Anexar PDF" aqui. ' +
           'O arquivo fica guardado junto da aula e você abre ou compartilha quando quiser. ' +
-          'Ele não entra dentro do PDF do fechamento, que leva só as folhas escritas aqui.')
+          'Ele não entra dentro do PDF do fechamento, que leva só as folhas escritas aqui.'),
+        el('strong', { texto: ' O assunto da aula ' }),
+        document.createTextNode('fica logo acima e vale sozinho: registrar o assunto não obriga ' +
+          'a gerar material nenhum.')
       ]));
-
-      var listaTemas = el('div', { id: 'lista-temas-aula' });
-      corpo.appendChild(listaTemas);
-      desenharTemasDaAula(listaTemas, aulaEmEdicao);
 
       var listaAnexos = el('div', { id: 'lista-anexos' });
       corpo.appendChild(listaAnexos);
@@ -1191,30 +1210,187 @@
     if (aula.areas.length) { caixa.style.display = ''; botao.textContent = 'Esconder'; }
   }
 
-  /* Os temas já gerados para esta aula. Cada um veio com o seu PDF, e remover
-   * daqui remove também o anexo correspondente. */
-  function desenharTemasDaAula(caixa, aula) {
+  /* O assunto da aula.
+   *
+   * Fica logo abaixo do título do conteúdo, antes de tudo, porque é o registro
+   * do que foi trabalhado: é ele que entra no fechamento que a família lê.
+   * Antes o assunto só existia quando ela gerava um PDF, e ficava escondido
+   * dentro do botão "Material de aula". Agora é ao contrário: primeiro o
+   * assunto, e o material é um atalho que sai de dentro dele quando ela quiser.
+   *
+   * Muta a aula e grava na hora, sem depender do botão Salvar, do mesmo jeito
+   * que as áreas trabalhadas já fazem aqui embaixo. */
+  var blocoAssuntoAtivo = null;
+
+  function desenharAssuntos(corpo, aula, aluno) {
+    var bloco = el('div', { id: 'bloco-assunto', style: 'margin-bottom:14px' });
+    corpo.appendChild(bloco);
+
+    function desenhar() {
+      bloco.innerHTML = '';
+
+      /* O id continua sendo lista-temas-aula porque é por ele que a geração de
+       * material redesenha a lista depois de anexar o PDF. */
+      var lista = el('div', { id: 'lista-temas-aula' });
+      bloco.appendChild(lista);
+      desenharTemasDaAula(lista, aula, aluno);
+
+      var quantos = Core.temasDaAula(aula).length;
+      bloco.appendChild(el('div', { class: 'barra', style: 'margin:0' }, [
+        el('button', {
+          type: 'button', id: 'escolher-assunto',
+          class: quantos ? 'btn pequeno' : 'btn destaque',
+          style: quantos ? '' : 'flex:1',
+          texto: quantos ? 'Mais um assunto' : 'Escolher o assunto da aula',
+          aoClick: function () { abrirAssunto(aula.id); }
+        })
+      ]));
+      if (!quantos) {
+        bloco.appendChild(el('div', {
+          class: 'ajuda', style: 'margin-top:4px',
+          texto: 'O assunto entra no fechamento do mês. Se quiser material pronto, ' +
+            'ele sai daqui mesmo.'
+        }));
+      }
+    }
+
+    blocoAssuntoAtivo = { aulaId: aula.id, desenhar: desenhar };
+    desenhar();
+  }
+
+  /* Redesenha o bloco de assunto da aula que está aberta, quando é ela mesma.
+   * Tirar um assunto ou registrar um novo muda também o rótulo do botão, e
+   * redesenhar só a lista deixaria a tela mentindo. */
+  function atualizarBlocoAssunto(aulaId) {
+    if (!blocoAssuntoAtivo || blocoAssuntoAtivo.aulaId !== aulaId) return false;
+    if (!$('#bloco-assunto')) return false;
+    blocoAssuntoAtivo.desenhar();
+    return true;
+  }
+
+  /* Um assunto sem disciplina é de matemática: é o que todos os registros
+   * anteriores são, porque antes só virava registro o que gerava material. */
+  function disciplinaDoAssunto(t) { return t.disciplina || 'matematica'; }
+
+  /* MAT06-04 é do 6º ano, MATEM1-14 é da 1ª série do médio. O ano já está
+   * dentro do id, então não precisa de campo novo para ser lido. */
+  function anoDoTemaMat(id) {
+    var m = /^MAT(EM[123]|\d{2})/i.exec(String(id || ''));
+    return m ? m[1].toLowerCase() : '';
+  }
+
+  function resumoMatDe(id) {
+    if (!indiceTemas || !id) return null;
+    return indiceTemas.filter(function (t) { return t.id === id; })[0] || null;
+  }
+
+  /* Os assuntos registrados nesta aula.
+   *
+   * Alguns vieram com material em PDF, e tirar daqui tira também o anexo; a
+   * maioria é só o registro do que foi trabalhado, e é assim que ela pediu. */
+  function desenharTemasDaAula(caixa, aula, aluno) {
     caixa.innerHTML = '';
     var lista = Core.temasDaAula(aula);
     if (!lista.length) return;
+
+    if (!aluno) aluno = alunoPorId(aula.alunoId);
+
     caixa.appendChild(el('div', {
       class: 'bloco-exercicios',
-      texto: lista.length === 1 ? 'Tema desta aula' : 'Temas desta aula'
+      texto: lista.length === 1 ? 'Assunto da aula' : 'Assuntos desta aula'
     }));
+
+    /* A etiqueta da matéria e o botão Material dependem de dois índices
+     * pequenos. Eles só são buscados quando há assunto sem material para
+     * mostrar: registro antigo, que sempre tem PDF, não pede nada. */
+    var faltaIndice = false, faltaTopicos = false;
     lista.forEach(function (t) {
-      caixa.appendChild(el('div', { class: 'item-lista' }, [
+      if (t.anexoId) return;
+      if (disciplinaDoAssunto(t) === 'matematica') {
+        if (!indiceTemas && !indiceTemasFalhou) faltaIndice = true;
+      } else if (!indiceTopicos && !indiceTopicosFalhou) {
+        faltaTopicos = true;
+      }
+    });
+    if (faltaIndice || faltaTopicos) {
+      /* Sem sinal os dois podem não vir. A falha fica anotada para a lista não
+       * ficar buscando de novo a cada redesenho: sem material a linha aparece
+       * do mesmo jeito, só sem a etiqueta do ano ou da matéria. */
+      var espera = faltaIndice
+        ? carregarIndice().catch(function () { indiceTemasFalhou = true; })
+        : Promise.resolve();
+      espera.then(function () {
+        if (!faltaTopicos) return null;
+        return carregarIndiceTopicos().catch(function () { indiceTopicosFalhou = true; });
+      }).then(function () {
+        if (caixa.parentNode) desenharTemasDaAula(caixa, aula, aluno);
+      });
+    }
+
+    lista.forEach(function (t) {
+      var comMaterial = !!t.anexoId;
+      var disciplina = disciplinaDoAssunto(t);
+      var detalhe = '';
+      if (comMaterial) {
+        detalhe = (t.lingua === 'en' ? 'em inglês' : 'em português') +
+          (t.exercicios ? ' · ' + t.exercicios + ' exercícios' : '') +
+          (t.partes && t.partes.length ? ' · ' + t.partes.join(', ') : '');
+      } else if (t.fonte === 'livre') {
+        detalhe = 'assunto escrito por você';
+      } else if (disciplina !== 'matematica') {
+        var nomeGrupo = rotuloGrupoDeTopico(disciplina, t.grupo);
+        detalhe = rotuloDisciplina(disciplina) + (nomeGrupo ? ', ' + nomeGrupo : '');
+      } else {
+        var ano = anoDoTemaMat(t.id);
+        detalhe = ano ? nomeDoAno(ano) : '';
+      }
+
+      var podeMaterial = !comMaterial && disciplina === 'matematica' && !!resumoMatDe(t.id);
+
+      caixa.appendChild(el('div', { class: 'item-lista item-assunto-aula' }, [
         el('div', { class: 'cresce' }, [
-          el('div', { class: 'nome', texto: t.titulo || t.id }),
-          el('div', {
-            class: 'detalhe',
-            texto: (t.lingua === 'en' ? 'em inglês' : 'em português') +
-              (t.exercicios ? ' · ' + t.exercicios + ' exercícios' : '') +
-              (t.partes && t.partes.length ? ' · ' + t.partes.join(', ') : '')
-          })
-        ]),
+          el('div', { class: 'nome' }, [
+            document.createTextNode(t.titulo || t.id),
+            comMaterial
+              ? el('span', { class: 'tag', texto: 'com material pronto', style: 'margin-left:8px' })
+              : null
+          ].filter(Boolean)),
+          detalhe ? el('div', { class: 'detalhe', texto: detalhe }) : null
+        ].filter(Boolean)),
+        podeMaterial ? el('button', {
+          type: 'button', class: 'btn pequeno', texto: 'Material',
+          aoClick: function () {
+            $('#titulo-modal-tema').textContent = 'Material de aula' +
+              (aluno ? ', ' + aluno.nome : '');
+            abrirModal('modal-tema');
+            abrirMontagem(resumoMatDe(t.id), aula, aluno, {
+              itemExistente: t,
+              rotuloVoltar: '‹ Voltar para a aula',
+              voltar: function () { fecharModal('modal-tema'); }
+            });
+          }
+        }) : null,
+        /* A folga sai dos 12 px da linha para 32: Tirar apaga, Material não, e
+         * os dois ficavam a um dedo de distância um do outro numa tela que ela
+         * usa em pé, na casa da família, muitas vezes com o aluno do lado. */
         el('button', {
           type: 'button', class: 'btn pequeno perigo', texto: 'Tirar',
+          style: 'margin-left:20px',
           aoClick: function () {
+            /* Tirar um assunto que tem PDF leva o arquivo junto, e arquivo
+             * apagado não volta: aí ela é perguntada antes. Sem PDF não há o
+             * que perder para sempre, então em vez de perguntar o item fica
+             * guardado e a barra oferece Desfazer, do mesmo jeito que dividir
+             * a aula em duas já faz. Perguntar sempre viraria hábito de dizer
+             * sim sem ler, que é o contrário de proteger. */
+            var comPdf = !!t.anexoId;
+            if (comPdf && !confirmar('Tirar "' + (t.titulo || t.id) +
+                '" apaga também o material em PDF que está anexado, e o arquivo não volta. ' +
+                'Tirar mesmo assim?')) {
+              return;
+            }
+            var guardado = t;
+            var posicao = Core.temasDaAula(aula).indexOf(t);
             aula.temas = Core.temasDaAula(aula).filter(function (x) { return x !== t; });
             delete aula.tema;
             if (t.anexoId) {
@@ -1222,12 +1398,26 @@
               Store.apagarAnexo(t.anexoId);
             }
             salvar().then(function () {
-              desenharTemasDaAula(caixa, aula);
+              if (!atualizarBlocoAssunto(aula.id)) desenharTemasDaAula(caixa, aula, aluno);
               if ($('#lista-anexos')) desenharAnexos($('#lista-anexos'), aula);
+              desenharAgenda();
+              if (comPdf) { avisar('Assunto e material tirados da aula.'); return; }
+              avisar('Assunto tirado da aula.', 'Desfazer', function () {
+                var lista = Core.temasDaAula(aula);
+                lista.splice(posicao < 0 ? lista.length : Math.min(posicao, lista.length),
+                  0, guardado);
+                aula.temas = lista;
+                delete aula.tema;
+                salvar().then(function () {
+                  if (!atualizarBlocoAssunto(aula.id)) desenharTemasDaAula(caixa, aula, aluno);
+                  desenharAgenda();
+                  avisar('Assunto de volta na aula.');
+                });
+              });
             });
           }
         })
-      ]));
+      ].filter(Boolean)));
     });
   }
 
@@ -1274,7 +1464,27 @@
           aoClick: function () {
             aula.anexos = (aula.anexos || []).filter(function (x) { return x.id !== an.id; });
             Store.apagarAnexo(an.id);
-            salvar().then(function () { desenharAnexos(caixa, aula); });
+            /* O assunto que carregava este PDF volta a ser só registro.
+             *
+             * Sem isto o item continuava com o anexoId de um arquivo que já não
+             * existe: a linha da aula dizia "com material pronto" apontando para
+             * o nada, e o botão Material não voltava, porque ele só aparece
+             * quando não há material. Os campos que descrevem o PDF (a língua,
+             * as partes e a contagem de exercícios) saem junto, senão a linha
+             * continuaria contando um material que se foi. */
+            Core.temasDaAula(aula).forEach(function (t) {
+              if (t.anexoId !== an.id) return;
+              delete t.anexoId;
+              delete t.lingua;
+              delete t.partes;
+              delete t.exercicios;
+            });
+            salvar().then(function () {
+              desenharAnexos(caixa, aula);
+              if (!atualizarBlocoAssunto(aula.id) && $('#lista-temas-aula')) {
+                desenharTemasDaAula($('#lista-temas-aula'), aula, alunoPorId(aula.alunoId));
+              }
+            });
           }
         })
       ]));
@@ -2978,6 +3188,7 @@
   var indiceTemas = null;
   var seriesCarregadas = {};
   var ultimoAnoEscolar = null;
+  var indiceTemasFalhou = false;
 
   /* O índice de busca vem separado, e a falta dele não impede nada: sem ele a
    * busca volta a comparar título e resumo, que é o comportamento antigo. */
@@ -3020,6 +3231,95 @@
     });
   }
 
+  /* ---------- os assuntos das outras matérias ----------
+   *
+   * banco/topicos/ tem um índice que descreve as doze disciplinas e um arquivo
+   * por disciplina. Cada disciplina tem grupos (por ano escolar em português,
+   * ciências, história, geografia, física, química, biologia e literatura; por
+   * nível em inglês; transversais em redação, filosofia e sociologia e método
+   * de estudo), cada grupo tem blocos com título, e cada bloco tem os tópicos.
+   *
+   * Os tópicos são cadeias de texto puras, sem id nenhum: o título é o que ela
+   * lê e é o que fica guardado na aula. Por isso o item de assunto guarda
+   * titulo, disciplina e grupo, e não um identificador que não existe. */
+  var indiceTopicos = null;
+  var topicosPorDisciplina = null;
+  var topicosPlanos = null;
+  var indiceTopicosFalhou = false;
+  /* Guarda a última lista montada, completa ou não, para a tela saber a
+   * diferença entre 'ainda não pedi' e 'pedi e não veio'. */
+  var topicosParciais = null;
+
+  function carregarIndiceTopicos() {
+    if (indiceTopicos) return Promise.resolve(indiceTopicos);
+    return fetch('banco/topicos/indice.json').then(function (r) {
+      if (!r.ok) throw new Error('indice de topicos indisponivel');
+      return r.json();
+    }).then(function (d) {
+      indiceTopicos = d.disciplinas || [];
+      return indiceTopicos;
+    });
+  }
+
+  /* Os treze arquivos de uma vez. Somam 99 KB, menos que o índice de busca que
+   * já vem no pacote, e a lista precisa deles inteiros para a busca atravessar
+   * as matérias sem ela ter que escolher uma antes. */
+  function carregarTopicos() {
+    if (topicosPlanos) return Promise.resolve(topicosPlanos);
+    return carregarIndiceTopicos().then(function (disciplinas) {
+      return Promise.all(disciplinas.map(function (d) {
+        return fetch('banco/topicos/' + d.chave + '.json').then(function (r) {
+          return r.ok ? r.json() : null;
+        }).catch(function () { return null; });
+      }));
+    }).then(function (arquivos) {
+      topicosPorDisciplina = {};
+      var planos = [];
+      arquivos.forEach(function (arquivo, i) {
+        var d = indiceTopicos[i];
+        if (!arquivo || !d) return;
+        topicosPorDisciplina[d.chave] = arquivo;
+        (arquivo.grupos || []).forEach(function (g) {
+          (g.blocos || []).forEach(function (b) {
+            (b.topicos || []).forEach(function (titulo) {
+              planos.push({
+                disciplina: d.chave, disciplinaNome: d.nome,
+                grupo: g.chave, grupoRotulo: g.rotulo,
+                bloco: b.titulo, titulo: titulo,
+                chave: Core.chaveDeBusca(titulo + ' ' + b.titulo + ' ' + d.nome)
+              });
+            });
+          });
+        });
+      });
+      /* Só memoriza quando veio tudo.
+       *
+       * O índice tem 4 KB e os doze arquivos de disciplina somam 95 KB, então
+       * quem costuma falhar são eles. Guardando lista incompleta, a sessão
+       * inteira ficava sem as outras matérias mesmo depois de o sinal voltar,
+       * porque a primeira linha desta função devolve o que está guardado.
+       * Lista parcial é devolvida para a tela, mas não vira memória. */
+      var faltaram = arquivos.filter(function (a) { return !a; }).length;
+      topicosParciais = planos;
+      if (!faltaram) topicosPlanos = planos;
+      return planos;
+    });
+  }
+
+  function rotuloDisciplina(chave) {
+    if (chave === 'matematica') return 'Matemática';
+    var d = (indiceTopicos || []).filter(function (x) { return x.chave === chave; })[0];
+    return d ? d.nome : '';
+  }
+
+  function rotuloGrupoDeTopico(chaveDisciplina, chaveGrupo) {
+    if (!chaveGrupo) return '';
+    var d = (indiceTopicos || []).filter(function (x) { return x.chave === chaveDisciplina; })[0];
+    if (!d) return '';
+    var g = (d.grupos || []).filter(function (x) { return x.chave === chaveGrupo; })[0];
+    return g ? g.rotulo : '';
+  }
+
   /* O ano escolar não é perguntado em lugar nenhum: ele fica guardado sozinho na
    * primeira vez que ela escolhe um tema para aquele aluno, e da segunda em
    * diante a lista já abre no lugar certo. Um campo a menos para preencher. */
@@ -3030,6 +3330,414 @@
     if (!aluno || aluno.anoEscolar === ano) return;
     aluno.anoEscolar = ano;
     salvar();
+  }
+
+  /* ================= o assunto da aula =================
+   *
+   * Reusa a janela do material, e não abre tela nova: tela nova é mais uma
+   * coisa para ela decorar, e o caminho já é o mesmo que ela conhece.
+   *
+   * Três faixas, de cima para baixo. Escrever com as próprias palavras vem
+   * primeiro, porque é o que o material dela fixou e é o que resolve o dia em
+   * que o banco não tem o assunto. Depois as sugestões, que valem um toque só.
+   * Por último a navegação por matéria, para quando ela quiser procurar.
+   *
+   * O campo não recebe foco automático de propósito: em tablet isso abre o
+   * teclado por cima da lista toda vez que a janela abre. */
+  function abrirAssunto(aulaId) {
+    var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
+    if (!aula) return;
+    var aluno = alunoPorId(aula.alunoId);
+
+    $('#titulo-modal-tema').textContent = 'Assunto da aula' + (aluno ? ', ' + aluno.nome : '');
+    var corpo = $('#corpo-modal-tema');
+    var rodape = $('#rodape-modal-tema');
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    corpo.appendChild(el('div', {
+      class: 'ajuda', style: 'margin-top:0', texto: 'Carregando os assuntos...'
+    }));
+    abrirModal('modal-tema');
+
+    /* Os dois bancos em paralelo, e nenhum deles é obrigatório: faltando um, a
+     * tela abre com o que veio, e escrever o assunto à mão sempre funciona. */
+    Promise.all([
+      carregarIndice().catch(function () { indiceTemasFalhou = true; return null; }),
+      carregarTopicos().catch(function () { indiceTopicosFalhou = true; return null; })
+    ]).then(function () {
+      desenharEscolhaAssunto(aula, aluno);
+    });
+  }
+
+  /* Grava o assunto na aula e fecha. É um item de aula.temas sem anexoId, que é
+   * o que faz o fechamento, o PDF e a lista da aula continuarem funcionando sem
+   * precisarem saber que alguma coisa mudou. */
+  var MAX_TITULO_ASSUNTO = 70;
+
+  function registrarAssunto(aula, item) {
+    /* O corte mora aqui e não só no campo, porque o texto livre chega por dois
+     * caminhos: o campo Escrever e a linha 'Usar o que você digitou assim
+     * mesmo', que copia o termo da busca e não passa pelo maxlength. */
+    if (item && item.titulo && item.titulo.length > MAX_TITULO_ASSUNTO) {
+      item.titulo = item.titulo.slice(0, MAX_TITULO_ASSUNTO).replace(/\s+\S*$/, '');
+    }
+    var repetido = Core.temasDaAula(aula).filter(function (t) {
+      return Core.chaveDeBusca(t.titulo || '') === Core.chaveDeBusca(item.titulo || '');
+    })[0];
+    if (repetido) {
+      fecharModal('modal-tema');
+      avisar('Este assunto já está registrado nesta aula.');
+      return;
+    }
+    aula.temas = Core.temasDaAula(aula);
+    aula.temas.push(item);
+    delete aula.tema;
+    salvar().then(function () {
+      fecharModal('modal-tema');
+      if ($('#modal-aula').classList.contains('aberto') && aulaEmEdicao &&
+          aulaEmEdicao.id === aula.id) {
+        if (!atualizarBlocoAssunto(aula.id) && $('#lista-temas-aula')) {
+          desenharTemasDaAula($('#lista-temas-aula'), aula, alunoPorId(aula.alunoId));
+        }
+        if ($('#lista-anexos')) desenharAnexos($('#lista-anexos'), aula);
+      }
+      desenharAgenda();
+      avisar('Assunto registrado: ' + item.titulo + '.');
+    }).catch(function () {
+      /* A gravação falhou, então a memória tem que voltar a espelhar o disco.
+       *
+       * Sem desfazer, o assunto ficava só na memória e a guarda de duplicata
+       * logo acima passava a recusar a segunda tentativa, dizendo que ele já
+       * estava registrado quando não estava em lugar nenhum. Acontece de
+       * verdade com o armazenamento cheio, e o aplicativo aceita anexo de até
+       * 25 MB. */
+      aula.temas = Core.temasDaAula(aula).filter(function (x) { return x !== item; });
+      atualizarBlocoAssunto(aula.id);
+      avisar('Não foi possível registrar o assunto. Tente de novo.');
+    });
+  }
+
+  /* O que oferecer sem ela digitar nada: primeiro os cinco últimos assuntos
+   * dados a este aluno, que é o que mais se repete de uma semana para a outra,
+   * e depois os temas de matemática do ano escolar dele.
+   *
+   * O total é curto de propósito. Cada ano tem catorze temas de matemática, e
+   * a lista inteira empurrava "Por matéria" para fora da tela: quem quiser o
+   * ano completo toca em Matemática ali embaixo. */
+  var MAX_SUGESTOES = 8;
+
+  function sugestoesDeAssunto(aula, aluno) {
+    var fora = {};
+    Core.temasDaAula(aula).forEach(function (t) {
+      fora[Core.chaveDeBusca(t.titulo || '')] = true;
+    });
+
+    var saida = [];
+    function juntar(item, detalhe) {
+      var chave = Core.chaveDeBusca(item.titulo || '');
+      if (!chave || fora[chave]) return;
+      fora[chave] = true;
+      saida.push({ item: item, detalhe: detalhe });
+    }
+
+    db.aulas.filter(function (a) {
+      return a.alunoId === aula.alunoId && a.id !== aula.id;
+    }).sort(function (a, b) { return b.data.localeCompare(a.data); })
+      .forEach(function (a) {
+        if (saida.length >= 5) return;
+        Core.temasDaAula(a).forEach(function (t) {
+          if (saida.length >= 5) return;
+          juntar({
+            id: t.id, titulo: t.titulo, fonte: t.fonte, disciplina: t.disciplina, grupo: t.grupo
+          }, 'já dado em ' + Core.ddmm(a.data));
+        });
+      });
+
+    var ano = anoEscolarDe(aluno) || ultimoAnoEscolar || '06';
+    (indiceTemas || []).filter(function (t) { return t.serie === ano; })
+      .forEach(function (t) {
+        if (saida.length >= MAX_SUGESTOES) return;
+        juntar(
+          { id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: 'matematica' },
+          'Matemática, ' + nomeDoAno(t.serie)
+        );
+      });
+
+    return saida;
+  }
+
+  /* Casa o que ela digitou com um tópico, palavra por palavra: procurar
+   * "verbo ser" tem que achar o tópico que escreve as duas separadas. */
+  function casaTopico(chaveDoTopico, palavras) {
+    for (var i = 0; i < palavras.length; i++) {
+      if (chaveDoTopico.indexOf(palavras[i]) < 0) return false;
+    }
+    return true;
+  }
+
+  function desenharEscolhaAssunto(aula, aluno) {
+    var corpo = $('#corpo-modal-tema');
+    var rodape = $('#rodape-modal-tema');
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+
+    var busca = '';
+    var nivel = { tipo: 'raiz' };
+
+    var campoBusca = el('input', {
+      type: 'text', id: 'busca-assunto',
+      placeholder: 'Procurar assunto em qualquer matéria',
+      style: 'flex:1;min-width:160px'
+    });
+    campoBusca.addEventListener('input', function () {
+      busca = this.value;
+      nivel = { tipo: 'raiz' };
+      desenhar();
+    });
+    corpo.appendChild(el('div', { class: 'barra' }, [campoBusca]));
+
+    var lista = el('div', { id: 'lista-assuntos' });
+    corpo.appendChild(lista);
+
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn', texto: 'Cancelar',
+      aoClick: function () { fecharModal('modal-tema'); }
+    }));
+
+    function irPara(novo) {
+      nivel = novo;
+      busca = '';
+      campoBusca.value = '';
+      desenhar();
+    }
+
+    /* Linha inteira clicável: em tablet, alvo grande vale mais que botão. */
+    function linha(titulo, detalhe, aoTocar, comSeta) {
+      var dentro = [el('div', { class: 'nome', texto: titulo })];
+      if (detalhe) dentro.push(el('div', { class: 'detalhe', texto: detalhe }));
+      var item = el('div', { class: 'item-lista clicavel item-assunto' }, [
+        el('div', { class: 'cresce' }, dentro),
+        comSeta ? el('span', { class: 'tag', texto: 'abrir' }) : null
+      ].filter(Boolean));
+      item.addEventListener('click', aoTocar);
+      return item;
+    }
+
+    function voltarPara(rotulo, titulo, aoTocar) {
+      return el('div', { class: 'barra', style: 'margin-bottom:8px' }, [
+        el('button', { type: 'button', class: 'btn pequeno', texto: '‹ Voltar', aoClick: aoTocar }),
+        el('h3', { class: 'titulo', style: 'font-size:17px', texto: titulo })
+      ]);
+    }
+
+    function desenhar() {
+      lista.innerHTML = '';
+      var termo = busca.trim();
+      if (termo) { desenharBusca(termo); return; }
+      if (nivel.tipo === 'disciplina') { desenharDisciplina(nivel.d); return; }
+      if (nivel.tipo === 'grupo') { desenharGrupo(nivel.d, nivel.g); return; }
+      desenharRaiz();
+    }
+
+    function desenharRaiz() {
+      // 1. Escrever com as próprias palavras, sempre primeiro.
+      lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Escrever o assunto' }));
+      /* Setenta caracteres é o limite, e ele existe porque até agora todo
+       * título vinha do banco: o mais longo da matemática tem 57 e o mais longo
+       * das outras matérias tem 63. Texto maior que isso não cabe na linha da
+       * aula nem na tabela do fechamento que a família lê, e sai cortado no
+       * meio de uma palavra. Cortar na entrada é melhor do que cortar na
+       * impressão, porque ela vê o que vai sair. */
+      var campoOutro = el('input', {
+        type: 'text', id: 'assunto-outro', maxlength: '70',
+        placeholder: 'Com as suas palavras', style: 'flex:1;min-width:160px'
+      });
+      var usar = el('button', {
+        type: 'button', class: 'btn principal', id: 'usar-assunto-outro', texto: 'Usar',
+        aoClick: function () {
+          var texto = campoOutro.value.trim();
+          if (!texto) { avisar('Escreva o assunto antes de tocar em Usar.'); return; }
+          registrarAssunto(aula, { titulo: texto, fonte: 'livre' });
+        }
+      });
+      campoOutro.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') { ev.preventDefault(); usar.click(); }
+      });
+      lista.appendChild(el('div', { class: 'barra', style: 'margin-bottom:12px' }, [campoOutro, usar]));
+
+      // 2. Sugestões, sem digitar nada.
+      var sugestoes = sugestoesDeAssunto(aula, aluno);
+      if (sugestoes.length) {
+        lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Sugestões para este aluno' }));
+        sugestoes.forEach(function (s) {
+          lista.appendChild(linha(s.item.titulo, s.detalhe, function () {
+            registrarAssunto(aula, s.item);
+          }));
+        });
+      }
+
+      // 3. Por matéria, com a matemática na frente.
+      lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Por matéria' }));
+      lista.appendChild(linha('Matemática',
+        indiceTemas ? indiceTemas.length + ' temas, com material pronto' : 'temas com material pronto',
+        function () { abrirMatematicaComoAssunto(aula, aluno); }, true));
+      (indiceTopicos || []).forEach(function (d) {
+        lista.appendChild(linha(d.nome, d.topicos + ' assuntos', function () {
+          irPara({ tipo: 'disciplina', d: d });
+        }, true));
+      });
+      /* A faixa vale para os dois jeitos de faltar: o índice não abriu, ou ele
+       * abriu e os arquivos das disciplinas não vieram. O segundo é o mais
+       * provável, porque o índice tem 4 KB e os doze somam 95 KB, e era
+       * justamente o que passava calado: ela via as doze matérias com a
+       * contagem, entrava numa e encontrava o vazio sem explicação. */
+      var semTopicos = !indiceTopicos ||
+        (topicosParciais !== null && !topicosParciais.length);
+      if (semTopicos) {
+        lista.appendChild(el('div', { class: 'faixa-aviso' }, [
+          el('strong', { texto: 'As outras matérias não abriram agora. ' }),
+          document.createTextNode('Abra o aplicativo uma vez com internet para elas ficarem ' +
+            'guardadas no tablet. Escrever o assunto acima continua funcionando sem sinal.')
+        ]));
+      }
+    }
+
+    function desenharDisciplina(d) {
+      lista.appendChild(voltarPara('‹ Voltar', d.nome, function () { irPara({ tipo: 'raiz' }); }));
+      var arquivo = topicosPorDisciplina ? topicosPorDisciplina[d.chave] : null;
+      var grupos = (arquivo && arquivo.grupos) || [];
+      if (!grupos.length) {
+        lista.appendChild(el('div', { class: 'vazio' }, [
+          el('p', { texto: 'Os assuntos desta matéria não estão guardados no tablet.' })
+        ]));
+        return;
+      }
+      grupos.forEach(function (g) {
+        var quantos = 0;
+        (g.blocos || []).forEach(function (b) { quantos += (b.topicos || []).length; });
+        lista.appendChild(linha(g.rotulo, quantos + ' assuntos', function () {
+          irPara({ tipo: 'grupo', d: d, g: g });
+        }, true));
+      });
+    }
+
+    /* Os blocos viram título e os tópicos ficam logo abaixo, na mesma tela.
+     * Um nível a menos para tocar, e ela vê o grupo inteiro de uma vez. */
+    function desenharGrupo(d, g) {
+      lista.appendChild(voltarPara('‹ Voltar', d.nome + ', ' + g.rotulo, function () {
+        irPara({ tipo: 'disciplina', d: d });
+      }));
+      (g.blocos || []).forEach(function (b) {
+        lista.appendChild(el('div', { class: 'bloco-exercicios', texto: b.titulo }));
+        (b.topicos || []).forEach(function (titulo) {
+          lista.appendChild(linha(titulo, '', function () {
+            registrarAssunto(aula, {
+              titulo: titulo, fonte: 'topico', disciplina: d.chave, grupo: g.chave
+            });
+          }));
+        });
+      });
+    }
+
+    function desenharBusca(termo) {
+      var achados = [];
+      var exatos = 0;
+
+      if (indiceTemas) {
+        var porId = {};
+        indiceTemas.forEach(function (t) { porId[t.id] = t; });
+        var itens, completa = true;
+        if (indiceDeBusca && typeof Busca !== 'undefined') {
+          var r = Busca.procurar(indiceDeBusca, termo) || { itens: [] };
+          itens = r.itens || [];
+          /* A busca de matemática responde por aproximação quando não acha tudo
+           * o que ela escreveu. Aproximação é resposta útil, mas não é achado:
+           * conta como zero para decidir onde fica a linha do texto livre. */
+          completa = r.completa !== false;
+        } else {
+          itens = indiceTemas.filter(function (t) {
+            return Core.casaBusca(t.pt.titulo + ' ' + t.pt.resumo, termo);
+          }).map(function (t) { return { id: t.id }; });
+        }
+        itens.forEach(function (x) {
+          var t = porId[x.id];
+          if (!t) return;
+          if (completa) exatos++;
+          achados.push({
+            titulo: t.pt.titulo, detalhe: 'Matemática, ' + nomeDoAno(t.serie),
+            item: { id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: 'matematica' }
+          });
+        });
+      }
+
+      var palavras = Core.chaveDeBusca(termo).split(/\s+/).filter(Boolean);
+      (topicosPlanos || []).forEach(function (p) {
+        if (!casaTopico(p.chave, palavras)) return;
+        exatos++;
+        achados.push({
+          titulo: p.titulo,
+          detalhe: p.disciplinaNome + ', ' + p.grupoRotulo + ' · ' + p.bloco,
+          item: {
+            titulo: p.titulo, fonte: 'topico', disciplina: p.disciplina, grupo: p.grupo
+          }
+        });
+      });
+
+      var livre = linha('Usar "' + termo + '" assim mesmo',
+        'grava exatamente o que você escreveu', function () {
+          registrarAssunto(aula, { titulo: termo, fonte: 'livre' });
+        });
+
+      /* Ela procura assunto que o banco não tem, e é por isso que a anotação
+       * existe. Aqui a saída fica na primeira linha, e não num beco. */
+      if (!exatos) {
+        anotarBuscaSemResultado(termo, 'assunto da aula');
+        lista.appendChild(livre);
+        lista.appendChild(el('div', {
+          class: 'ajuda',
+          texto: achados.length
+            ? 'Nenhum assunto do banco casou com tudo o que você escreveu. ' +
+              'A linha de cima grava exatamente o que está escrito; abaixo, o mais próximo.'
+            : 'Nenhum assunto do banco casou com o que você escreveu.'
+        }));
+      }
+
+      var LIMITE = 120;
+      if (!achados.length) return;
+
+      if (exatos) {
+        lista.appendChild(el('div', { class: 'ajuda', style: 'margin-top:0' }, [
+          document.createTextNode(achados.length +
+            (achados.length === 1 ? ' assunto encontrado' : ' assuntos encontrados') +
+            (achados.length > LIMITE ? ', mostrando os ' + LIMITE + ' primeiros.' : '.'))
+        ]));
+      }
+      achados.slice(0, LIMITE).forEach(function (a) {
+        lista.appendChild(linha(a.titulo, a.detalhe, function () {
+          registrarAssunto(aula, a.item);
+        }));
+      });
+      if (exatos) lista.appendChild(livre);
+    }
+
+    desenhar();
+  }
+
+  /* A matemática do assunto reusa a lista do material, com o mesmo filtro por
+   * ano e a mesma busca. O que muda é só o que acontece ao escolher: aqui vira
+   * registro da aula, e não montagem de PDF. */
+  function abrirMatematicaComoAssunto(aula, aluno) {
+    if (!indiceTemas) { avisar('O banco de matemática não abriu agora.'); return; }
+    desenharEscolhaTema(indiceTemas, aula, aluno, '', {
+      rotuloEscolher: 'Usar',
+      rotuloVoltar: '‹ Voltar',
+      voltar: function () { desenharEscolhaAssunto(aula, aluno); },
+      aoEscolher: function (t) {
+        registrarAssunto(aula, {
+          id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: 'matematica'
+        });
+      }
+    });
   }
 
   /* Passo 1: escolher o tema. */
@@ -3062,11 +3770,26 @@
     });
   }
 
-  function desenharEscolhaTema(temas, aula, aluno, buscaInicial) {
+  /* opcoes existe para esta mesma lista servir a dois caminhos sem virar duas
+   * funções: pelo botão "Material de aula" ela leva à montagem do PDF, que é o
+   * padrão e não muda em nada; pelo assunto da aula ela só registra o tema.
+   * O que vier aqui viaja junto até o botão "‹ Outro tema" da montagem, senão
+   * voltar de lá cairia no caminho errado. */
+  function desenharEscolhaTema(temas, aula, aluno, buscaInicial, opcoes) {
+    opcoes = opcoes || {};
     var corpo = $('#corpo-modal-tema');
     var rodape = $('#rodape-modal-tema');
     corpo.innerHTML = '';
     rodape.innerHTML = '';
+
+    if (opcoes.voltar) {
+      corpo.appendChild(el('div', { class: 'barra', style: 'margin-bottom:8px' }, [
+        el('button', {
+          type: 'button', class: 'btn pequeno',
+          texto: opcoes.rotuloVoltar || '‹ Voltar', aoClick: opcoes.voltar
+        })
+      ]));
+    }
 
     var serieAtual = anoEscolarDe(aluno) || ultimoAnoEscolar || '06';
     var busca = buscaInicial || '';
@@ -3192,8 +3915,12 @@
             })
           ]),
           el('button', {
-            type: 'button', class: 'btn pequeno principal', texto: 'Escolher',
-            aoClick: function () { abrirMontagem(t, aula, aluno); }
+            type: 'button', class: 'btn pequeno principal',
+            texto: opcoes.rotuloEscolher || 'Escolher',
+            aoClick: function () {
+              if (opcoes.aoEscolher) opcoes.aoEscolher(t);
+              else abrirMontagem(t, aula, aluno, opcoes);
+            }
           })
         ]));
       });
@@ -3215,7 +3942,7 @@
   }
 
   /* Passo 2: montar o material, escolhendo o que entra e quais exercícios. */
-  function abrirMontagem(resumoTema, aula, aluno) {
+  function abrirMontagem(resumoTema, aula, aluno, opcoes) {
     var corpo = $('#corpo-modal-tema');
     var rodape = $('#rodape-modal-tema');
     corpo.innerHTML = '';
@@ -3225,7 +3952,7 @@
     carregarSerie(resumoTema.serie).then(function (temas) {
       var tema = temas.filter(function (t) { return t.id === resumoTema.id; })[0];
       if (!tema) throw new Error('tema nao encontrado');
-      desenharMontagem(tema, aula, aluno);
+      desenharMontagem(tema, aula, aluno, opcoes);
     }).catch(function () {
       corpo.innerHTML = '';
       corpo.appendChild(el('div', { class: 'faixa-aviso' }, [
@@ -3235,7 +3962,8 @@
     });
   }
 
-  function desenharMontagem(tema, aula, aluno) {
+  function desenharMontagem(tema, aula, aluno, opcoes) {
+    opcoes = opcoes || {};
     var corpo = $('#corpo-modal-tema');
     var rodape = $('#rodape-modal-tema');
     corpo.innerHTML = '';
@@ -3248,8 +3976,12 @@
 
     corpo.appendChild(el('div', { class: 'barra', style: 'margin-bottom:8px' }, [
       el('button', {
-        type: 'button', class: 'btn pequeno', texto: '‹ Outro tema',
-        aoClick: function () { desenharEscolhaTema(indiceTemas, aula, aluno); }
+        type: 'button', class: 'btn pequeno',
+        texto: opcoes.rotuloVoltar || '‹ Outro tema',
+        aoClick: function () {
+          if (opcoes.voltar) opcoes.voltar();
+          else desenharEscolhaTema(indiceTemas, aula, aluno, '', opcoes);
+        }
       }),
       el('h3', { class: 'titulo', style: 'font-size:17px', texto: tema.pt.titulo })
     ]));
@@ -3371,7 +4103,7 @@
         type: 'button', class: 'btn principal',
         texto: aula ? 'Gerar e anexar à aula' : 'Gerar material',
         aoClick: function () {
-          gerarMaterialDoTema(tema, lingua, incluir, marcados, aula, aluno);
+          gerarMaterialDoTema(tema, lingua, incluir, marcados, aula, aluno, opcoes.itemExistente);
         }
       });
       if (nada || semExercicio) botao.disabled = true;
@@ -3381,8 +4113,13 @@
     desenharExercicios();
   }
 
-  /* Passo 3: gerar o PDF e anexar à aula. */
-  function gerarMaterialDoTema(tema, lingua, incluir, marcados, aula, aluno) {
+  /* Passo 3: gerar o PDF e anexar à aula.
+   *
+   * itemExistente vem quando o material foi pedido a partir de um assunto que
+   * já está registrado na aula. Aí o PDF entra naquele item, e não num segundo:
+   * sem isso, tocar em "Material" numa linha de assunto criaria uma linha
+   * repetida do mesmo assunto no fechamento do mês. */
+  function gerarMaterialDoTema(tema, lingua, incluir, marcados, aula, aluno, itemExistente) {
     var escolhidos = tema[lingua].exercicios
       .map(function (e) { return e.n; })
       .filter(function (n) { return marcados[n]; });
@@ -3419,17 +4156,29 @@
       aula.anexos.push({ id: id, nome: nome, tamanho: blob.size });
       // Uma aula pode tratar mais de um assunto: os temas se somam.
       aula.temas = Core.temasDaAula(aula);
-      aula.temas.push({
-        id: tema.id, titulo: tema[lingua].titulo, lingua: lingua,
-        partes: partes, exercicios: escolhidos.length, anexoId: id
-      });
+      var jaEsta = itemExistente ? aula.temas.indexOf(itemExistente) : -1;
+      if (jaEsta >= 0) {
+        itemExistente.id = tema.id;
+        itemExistente.titulo = itemExistente.titulo || tema[lingua].titulo;
+        itemExistente.lingua = lingua;
+        itemExistente.partes = partes;
+        itemExistente.exercicios = escolhidos.length;
+        itemExistente.anexoId = id;
+      } else {
+        aula.temas.push({
+          id: tema.id, titulo: tema[lingua].titulo, lingua: lingua,
+          partes: partes, exercicios: escolhidos.length, anexoId: id
+        });
+      }
       delete aula.tema;
       return salvar();
     }).then(function () {
       fecharModal('modal-tema');
       if ($('#modal-aula').classList.contains('aberto') && aulaEmEdicao &&
           aulaEmEdicao.id === aula.id) {
-        if ($('#lista-temas-aula')) desenharTemasDaAula($('#lista-temas-aula'), aula);
+        if (!atualizarBlocoAssunto(aula.id) && $('#lista-temas-aula')) {
+          desenharTemasDaAula($('#lista-temas-aula'), aula, aluno);
+        }
         if ($('#lista-anexos')) desenharAnexos($('#lista-anexos'), aula);
       }
       desenharAgenda();

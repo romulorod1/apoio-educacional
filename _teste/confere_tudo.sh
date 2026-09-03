@@ -139,7 +139,8 @@ fi
 titulo "com navegador"
 for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento \
          testa_perfil testa_olho testa_atualizacao testa_atualizacao_real \
-         testa_exclusoes testa_feriados testa_mover testa_retroativo testa_series; do
+         testa_exclusoes testa_feriados testa_mover testa_retroativo testa_series \
+         testa_assunto; do
   roda "$t" node "_teste/$t.js"
 done
 
