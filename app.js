@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.11.1';
+  var VERSAO = '1.12.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -18,6 +18,38 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.12.0',
+      itens: [
+        'A lacuna virou trilha. No mapeamento do aluno, o botãozinho ao lado de cada lacuna de ' +
+          'ano anterior deixou de ser "temas" e passou a ser "trilha": ele monta a sequência de ' +
+          'assuntos que precisa vir antes daquele em que o aluno travou, na ordem, e diz quantos ' +
+          'encontros deve levar. Antes o botão abria dezoito temas em ordem de relevância, ' +
+          'começando pelo 8º ano e pulando para o 4º, e a ordem ficava por sua conta.',
+        'Antes de montar, você confirma onde ele precisa chegar: a tela mostra os fins possíveis ' +
+          'daquela lacuna, cada um com o ano, já com o mais provável sugerido. É um toque por ' +
+          'trilha, e não por aula. Sem ele, uma lacuna de Funções num aluno do 2º ano do médio ' +
+          'podia virar uma trilha de matrizes.',
+        'A proposta é sua para mexer: cada passo tem seta para subir, seta para descer e Tirar, ' +
+          'e no pé tem Acrescentar passo. Nada de arrastar, que é o gesto que falha na tela ' +
+          'grande. O assunto que você já deu para esse aluno nasce riscado, com a data, e volta ' +
+          'para a fila com um toque.',
+        'Quando a trilha começa mais perto do objetivo do que você gostaria, a tela diz isso com ' +
+          'todas as letras e oferece Puxar mais de trás, um assunto por vez. E quando o assunto ' +
+          'não depende de nenhum outro, ela também diz: não há escada, dá para atacar direto.',
+        'Na aula, o próximo passo aparece em cima do assunto, num botão grande. Um toque registra ' +
+          'o assunto da aula e marca o passo como dado, com a data daquela aula: é o mesmo toque ' +
+          'que você já dava, e a trilha anda sozinha. Nenhuma pergunta nova no fim da aula. Se ' +
+          'depois você mudar a aula para cancelada ou falta, o passo volta para a fila.',
+        'Na ficha do aluno, na aba Mapeamento, ficam as trilhas: as ativas com os passos em ' +
+          'ordem e a data de cada um, com caixa de marcar para consertar à mão, e as encerradas ' +
+          'com as datas. Dá para encerrar antes do fim, com um motivo se quiser, e criar uma ' +
+          'trilha do zero escolhendo o assunto direto no banco. Trilha encerrada não some: é a ' +
+          'prova do trabalho.',
+        'O caminho antigo continua onde estava: dentro da trilha há "Ver os temas soltos", que ' +
+          'abre exatamente a mesma lista de temas de antes.'
+      ]
+    },
     {
       versao: '1.11.1',
       itens: [
@@ -332,8 +364,35 @@
     return partes;
   }
 
-  function abrirModal(id) { $('#' + id).classList.add('aberto'); }
-  function fecharModal(id) { $('#' + id).classList.remove('aberto'); }
+  /* Janela sobre janela.
+   *
+   * Todos os fundos nascem no mesmo nível no styles.css, então quem pinta por
+   * cima é o último do documento, e não o último a abrir. Isso já deixava o
+   * seletor de temas atrás do mapeamento, e ia piorar com a trilha, que abre o
+   * seletor de dentro dela. Aqui cada abertura sobe um degrau e cada fechamento
+   * devolve o degrau, então a de cima é sempre a última que ela abriu. */
+  var degrauModal = 50;
+
+  function abrirModal(id) {
+    var e = $('#' + id);
+    if (!e.classList.contains('aberto')) {
+      degrauModal += 2;
+      e.style.zIndex = String(degrauModal);
+    }
+    e.classList.add('aberto');
+  }
+
+  function fecharModal(id) {
+    var e = $('#' + id);
+    e.classList.remove('aberto');
+    e.style.zIndex = '';
+    /* Fechar o mapeamento é DESISTIR dele, venha o toque do Cancelar, do × ou
+     * do fundo da janela. A memória volta a ser o que está no disco, senão a
+     * ficha continuaria mostrando a lacuna que ela acabou de cancelar. Quem
+     * salva de verdade limpa a marca antes de fechar, e aí não há o que voltar. */
+    if (id === 'modal-mapeamento') descartarMapeamentoEmEdicao();
+    if (!$$('.fundo-modal.aberto').length) degrauModal = 50;
+  }
 
   function avisar(texto, rotuloAcao, aoAgir) {
     var caixa = $('#aviso');
@@ -391,27 +450,85 @@
    * inteiro é trocado, para nada continuar apontando para registro que sumiu. */
   function fecharTudo() {
     if (editorAtual) { editorAtual.destruir(); editorAtual = null; }
-    $$('.fundo-modal').forEach(function (m) { m.classList.remove('aberto'); });
+    $$('.fundo-modal').forEach(function (m) { fecharModal(m.id); });
     aulaEmEdicao = null;
     alunoEmEdicao = null;
+    /* O painel de trilhas guarda o aluno e a função que o redesenha. Deixá-lo
+     * aqui fazia atualizarPainelTrilhas() mandar desenhar num nó que já saiu do
+     * documento, apontando para um registro que o estado novo não tem. */
+    painelTrilhasAtivo = null;
   }
 
   // ================= gravação e desfazer =================
 
-  function salvar() { return Store.salvar(db); }
+  /* O que vai para o disco.
+   *
+   * O mapeamento aberto para editar é o PRÓPRIO registro guardado no aluno: o
+   * objeto de trabalho e o que está no db são o mesmo, de propósito, para que
+   * "Ver" um mapeamento antigo e voltar não perca o que ela digitou. O preço
+   * disso é que qualquer gravação feita enquanto a janela está aberta levaria
+   * junto o que ela ainda não confirmou.
+   *
+   * Isso deixou de ser teórico quando a lacuna passou a montar trilha: guardar
+   * a trilha grava, e ela guardava a trilha DE DENTRO do mapeamento aberto.
+   * Medido: marcar a lacuna Pitágoras, montar a trilha de Frações, guardar e
+   * depois tocar em Cancelar deixava "fracoes,pitagoras" no disco; e desmarcar
+   * Frações e cancelar apagava "fracoes" do disco. O Cancelar mentia nos dois
+   * sentidos.
+   *
+   * A saída escolhida é a primeira das duas: gravar sobre uma cópia do aluno
+   * que NÃO carrega o mapeamento em edição, em vez de salvar o mapeamento junto
+   * e avisar. Salvar junto tornaria permanente, por efeito colateral, uma
+   * marcação que ela ainda estava pensando; aqui Cancelar volta a ser verdade,
+   * e "Salvar mapeamento" continua sendo o único caminho que grava mapeamento.
+   *
+   * A cópia é rasa e serve só para esta gravação: o IndexedDB clona o valor por
+   * conta própria, então trocar uma referência já basta e nada da memória viva
+   * é mexido. Fora do mapeamento aberto, devolve o db como sempre. */
+  function dbParaGravar() {
+    if (!mapeamentoEmEdicao) return db;
+    var i = -1, j = -1;
+    (db.alunos || []).forEach(function (a, k) { if (a.id === mapeamentoEmEdicao.alunoId) i = k; });
+    if (i < 0) return db;
+    var lista = db.alunos[i].mapeamentos || [];
+    lista.forEach(function (m, k) { if (m.id === mapeamentoEmEdicao.id) j = k; });
+    if (j < 0) return db;
+
+    var mapeamentos = lista.slice();
+    mapeamentos[j] = mapeamentoEmEdicao.disco;
+    var alunos = db.alunos.slice();
+    var copia = {};
+    Object.keys(db.alunos[i]).forEach(function (k) { copia[k] = db.alunos[i][k]; });
+    copia.mapeamentos = mapeamentos;
+    alunos[i] = copia;
+
+    var saida = {};
+    Object.keys(db).forEach(function (k) { saida[k] = db[k]; });
+    saida.alunos = alunos;
+    return saida;
+  }
+
+  function salvar() { return Store.salvar(dbParaGravar()); }
 
   /* Grava um ponto de retorno antes de mexer em várias aulas de uma vez,
-   * e depois oferece o desfazer na barra flutuante. */
+   * e depois oferece o desfazer na barra flutuante.
+   *
+   * O rótulo aceita uma função porque quem chama nem sempre sabe o texto antes
+   * de a ação rodar: quantos passos da trilha voltaram para a fila só se sabe
+   * depois de mexer nas aulas, e esse número precisa aparecer no MESMO aviso
+   * que oferece o Desfazer. */
   function comDesfazer(rotulo, acao) {
-    var antes = JSON.parse(JSON.stringify(db));
+    var antes = JSON.parse(JSON.stringify(dbParaGravar()));
     var resultado = acao();
-    return Store.registrarHistorico(rotulo, antes).then(function () {
+    var texto = (typeof rotulo === 'function') ? rotulo() : rotulo;
+    return Store.registrarHistorico(texto, antes).then(function () {
       return salvar();
     }).then(function () {
-      avisar(rotulo, 'Desfazer', function () {
+      avisar(texto, 'Desfazer', function () {
         db = antes;
         // Um painel aberto ainda aponta para o registro antigo, que sai do ar
         // ao voltar o estado. Fecha tudo e limpa as referências.
+        mapeamentoEmEdicao = null;
         fecharTudo();
         Store.salvar(db).then(function () {
           desenharTudo();
@@ -679,7 +796,7 @@
         var m = b.closest('.fundo-modal');
         if (m) {
           if (m.id === 'modal-nota') fecharEditorNota();
-          else m.classList.remove('aberto');
+          else fecharModal(m.id);
         }
       });
     });
@@ -688,7 +805,7 @@
       m.addEventListener('click', function (e) {
         if (e.target !== m) return;
         if (m.id === 'modal-nota') fecharEditorNota();
-        else m.classList.remove('aberto');
+        else fecharModal(m.id);
       });
     });
 
@@ -875,6 +992,17 @@
 
     var corpo = $('#corpo-modal-aula');
     corpo.innerHTML = '';
+
+    /* O próximo passo da trilha é a PRIMEIRA coisa da janela da aula.
+     *
+     * Ele nascia dentro do bloco de assunto, depois do aluno, da data, do
+     * horário, da duração, da situação, do cobrar, do valor previsto e do
+     * lembrete do mapeamento: em paisagem (1280 por 800) o botão nascia abaixo
+     * da dobra e ela precisava rolar para ver o caminho de um toque que a
+     * trilha inteira promete. Aqui em cima ele aparece inteiro nas duas
+     * orientações, e os campos da aula continuam logo abaixo, na ordem de
+     * sempre. Quem o preenche é o desenharAssuntos, que sabe quando redesenhar. */
+    if (!novo) corpo.appendChild(el('div', { id: 'cartao-trilha' }));
 
     if (serie) {
       corpo.appendChild(el('div', { class: 'faixa-info' }, [
@@ -1239,19 +1367,37 @@
     function desenhar() {
       bloco.innerHTML = '';
 
+      /* O próximo passo da trilha entra ANTES de tudo, porque é a primeira
+       * pergunta da aula: o que vem hoje. Ele não mora mais dentro deste bloco,
+       * e sim no TOPO da janela da aula, num #cartao-trilha que o abrirAula já
+       * deixou pronto: aqui embaixo ele nascia depois de oito campos da aula e
+       * ficava abaixo da dobra em paisagem (1280 por 800), faltando rolagem
+       * para aparecer inteiro. O caminho de um toque que a trilha inteira
+       * promete não pode depender de ela rolar para achá-lo.
+       *
+       * Continua sendo desenhado por esta função porque é ela que sabe quando
+       * redesenhar: registrar ou tirar um assunto muda o cartão e o botão. */
+      var cartao = $('#cartao-trilha');
+      var passoAOferecer = cartao ? desenharCartaoDaTrilha(cartao, aula, aluno) : false;
+
       /* O id continua sendo lista-temas-aula porque é por ele que a geração de
        * material redesenha a lista depois de anexar o PDF. */
       var lista = el('div', { id: 'lista-temas-aula' });
       bloco.appendChild(lista);
       desenharTemasDaAula(lista, aula, aluno);
 
+      /* Com o próximo passo em cima, este botão desce de tom: dois botões
+       * grandes e do mesmo verde, um em cima do outro, brigam pelo olho e o
+       * caminho de um toque some no meio. Sem trilha, ele continua sendo o
+       * botão principal do bloco, como sempre foi. */
       var quantos = Core.temasDaAula(aula).length;
       bloco.appendChild(el('div', { class: 'barra', style: 'margin:0' }, [
         el('button', {
           type: 'button', id: 'escolher-assunto',
-          class: quantos ? 'btn pequeno' : 'btn destaque',
+          class: quantos ? 'btn pequeno' : (passoAOferecer ? 'btn' : 'btn destaque'),
           style: quantos ? '' : 'flex:1',
-          texto: quantos ? 'Mais um assunto' : 'Escolher o assunto da aula',
+          texto: quantos ? 'Mais um assunto' : (passoAOferecer
+            ? 'Escolher outro assunto' : 'Escolher o assunto da aula'),
           aoClick: function () { abrirAssunto(aula.id); }
         })
       ]));
@@ -1276,6 +1422,93 @@
     if (!$('#bloco-assunto')) return false;
     blocoAssuntoAtivo.desenhar();
     return true;
+  }
+
+  /* O próximo passo da trilha, no topo do bloco de assunto.
+   *
+   * Um toque registra o assunto E marca o passo, e é o MESMO toque que ela já
+   * daria para escolher o assunto: não é gesto novo, é gesto poupado. Nada de
+   * perguntar no fim da aula se o passo terminou, que é o tipo de pergunta que
+   * não sobrevive duas semanas. */
+  function desenharCartaoDaTrilha(caixa, aula, aluno) {
+    caixa.innerHTML = '';
+    if (!aluno) return false;
+
+    var achado = null;
+    var outras = [];
+    Core.trilhasAtivas(aluno).forEach(function (t) {
+      var p = Core.proximoPasso(t);
+      if (!p) return;
+      if (achado) { outras.push(t); return; }
+      achado = { trilha: t, passo: p };
+    });
+    if (!achado) return false;
+
+    var trilha = achado.trilha;
+    var passo = achado.passo;
+    var total = (trilha.passos || []).length;
+    var numero = (trilha.passos || []).indexOf(passo) + 1;
+    var jaNaAula = Core.temasDaAula(aula).filter(function (t) {
+      return t.id === passo.temaId;
+    }).length > 0;
+
+    var st = aula.status || 'realizada';
+    var contaAgora = st === 'realizada' || st === 'reposicao';
+
+    var dentro = [
+      el('div', { class: 'barra', style: 'margin:0 0 6px' }, [
+        el('span', {
+          class: 'cresce', style: 'font-size:13px;color:#1F5A4C',
+          texto: 'Trilha até ' + trilha.titulo + ' · passo ' + numero + ' de ' + total
+        })
+      ])
+    ];
+
+    if (jaNaAula) {
+      dentro.push(el('div', {
+        style: 'font-size:14px;font-weight:700;color:#1F3A5F',
+        texto: 'Próximo passo já registrado nesta aula: ' + passo.titulo
+      }));
+    } else {
+      dentro.push(el('button', {
+        type: 'button', class: 'btn destaque', id: 'usar-proximo-passo',
+        style: 'width:100%;text-align:left;padding:14px 16px;font-size:15px;white-space:normal',
+        texto: 'Próximo passo: ' + passo.titulo,
+        aoClick: function () {
+          registrarAssunto(aula, {
+            id: passo.temaId, titulo: passo.titulo, fonte: 'banco', disciplina: 'matematica'
+          });
+        }
+      }));
+      dentro.push(el('div', {
+        class: 'ajuda', style: 'margin:6px 0 0',
+        texto: contaAgora
+          ? 'Um toque registra o assunto da aula e marca o passo como dado, com a data desta aula.'
+          : 'Um toque registra o assunto. O passo só é marcado em aula realizada ou reposição, e ' +
+            'esta está como ' + (Core.STATUS[st] ? Core.STATUS[st].rotulo.toLowerCase() : st) + '.'
+      }));
+    }
+
+    /* O cartão mostra o próximo passo de UMA trilha, e não dizia que havia
+     * outra: ela escolhia entre duas sem saber que estava escolhendo. Dizer
+     * qual é a outra basta, e é o que cabe aqui sem virar uma segunda tela. */
+    if (outras.length) {
+      dentro.push(el('div', {
+        class: 'ajuda', id: 'outras-trilhas-ativas', style: 'margin:6px 0 0',
+        texto: outras.length === 1
+          ? 'Este aluno tem outra trilha em andamento, até ' + outras[0].titulo +
+            '. Para dar um passo dela, escolha o assunto por baixo; a ficha do aluno mostra as duas.'
+          : 'Este aluno tem outras ' + outras.length + ' trilhas em andamento (até ' +
+            outras.map(function (t) { return t.titulo; }).join('; ') +
+            '). Para dar um passo delas, escolha o assunto por baixo.'
+      }));
+    }
+
+    caixa.appendChild(el('div', { class: 'lembrete', id: 'cartao-proximo-passo' }, dentro));
+    /* Devolve se o cartão está mesmo OFERECENDO o passo: quando ele já foi
+     * registrado nesta aula não há botão nenhum, e aí o bloco de assunto volta
+     * a ser o botão principal. */
+    return !jaNaAula;
   }
 
   /* Um assunto sem disciplina é de matemática: é o que todos os registros
@@ -1407,21 +1640,33 @@
               aula.anexos = (aula.anexos || []).filter(function (x) { return x.id !== t.anexoId; });
               Store.apagarAnexo(t.anexoId);
             }
+            /* Tirar o assunto desfaz também a marcação do passo que aquele
+             * assunto fechou. Sem isto o passo continuava contando como dado,
+             * amarrado a uma aula que não registra mais aquele assunto: a
+             * trilha andava com uma prova que ela mesma acabou de apagar. */
+            var mexeu = revisarTrilhasDoAluno(aula.alunoId);
             salvar().then(function () {
               if (!atualizarBlocoAssunto(aula.id)) desenharTemasDaAula(caixa, aula, aluno);
               if ($('#lista-anexos')) desenharAnexos($('#lista-anexos'), aula);
+              atualizarPainelTrilhas(aula.alunoId);
               desenharAgenda();
-              if (comPdf) { avisar('Assunto e material tirados da aula.'); return; }
-              avisar('Assunto tirado da aula.', 'Desfazer', function () {
+              if (comPdf) {
+                avisar('Assunto e material tirados da aula.' + textoDeTrilha(mexeu));
+                return;
+              }
+              avisar('Assunto tirado da aula.' + textoDeTrilha(mexeu), 'Desfazer', function () {
                 var lista = Core.temasDaAula(aula);
                 lista.splice(posicao < 0 ? lista.length : Math.min(posicao, lista.length),
                   0, guardado);
                 aula.temas = lista;
                 delete aula.tema;
+                /* Devolver o assunto devolve o passo, com a data da aula. */
+                var voltou = revisarTrilhasDoAluno(aula.alunoId);
                 salvar().then(function () {
                   if (!atualizarBlocoAssunto(aula.id)) desenharTemasDaAula(caixa, aula, aluno);
+                  atualizarPainelTrilhas(aula.alunoId);
                   desenharAgenda();
-                  avisar('Assunto de volta na aula.');
+                  avisar('Assunto de volta na aula.' + textoDeTrilha(voltou));
                 });
               });
             });
@@ -1527,6 +1772,118 @@
     entrada.click();
   }
 
+  /* Põe as trilhas do aluno de acordo com as aulas que existem HOJE.
+   *
+   * Chamada depois de qualquer mexida em aula: mudança de situação, exclusão,
+   * assunto tirado ou devolvido. São quatro coisas, nesta ordem, e a ordem
+   * importa:
+   *
+   *   1. aula que deixou de acontecer solta os passos que ela tinha fechado.
+   *      Sem isto a trilha contaria como andado o que não foi dado, que é o
+   *      pior tipo de erro: o que fica calado.
+   *   2. passo sem lastro também solta. São dois casos, e nenhum dos dois era
+   *      tratado: a aula não existe mais no banco, porque excluir aula não
+   *      revisava trilha nenhuma (vale nos dois ramos, com e sem repetição); e
+   *      a aula existe mas não registra mais aquele assunto, porque tirar o
+   *      assunto não desfazia a marcação do passo que aquele assunto fechou.
+   *   3. o jaEra sai de todo passo que ficou sem data. Ele diz "isto é anterior
+   *      à trilha", e sobrevivendo à desmarcação fazia o passo ser lido como
+   *      anterior à trilha para sempre.
+   *   4. e a volta, que faltava: varre as aulas realizadas e de reposição em
+   *      ordem de data e remarca pelo assunto. A desmarcação era de mão única,
+   *      então cancelar uma aula devolvia o passo para a fila e voltar a aula
+   *      para realizada NÃO devolvia o passo, mesmo com o assunto ainda
+   *      registrado ali. Aqui ele volta com a data e a aula daquele encontro.
+   *
+   * Duas coisas a varredura do 4 NÃO faz, de propósito:
+   *
+   *   - não toca em passo que ELA soltou à mão. "Trazer de volta" e desmarcar a
+   *     caixa querem dizer "aquela aula não fechou isto de verdade", e a
+   *     varredura remarcaria na primeira aula salva depois, apagando a decisão
+   *     dela sem avisar. O passo solto à mão fica solto até ela marcar de novo.
+   *   - não escreve em trilha encerrada. Registro fechado não ganha passo novo
+   *     por efeito colateral de uma aula editada hoje.
+   *
+   * Devolve quantos passos ficaram mesmo para trás, já descontando os que a
+   * varredura devolveu, e quantos voltaram a contar. */
+  function revisarTrilhasDoAluno(alunoId) {
+    var aluno = alunoPorId(alunoId);
+    if (!aluno || !Core.trilhasDe(aluno).length) return { soltos: 0, remarcados: 0 };
+
+    var todos = [];
+    Core.trilhasDe(aluno).forEach(function (tr) {
+      (tr.passos || []).forEach(function (p) { todos.push(p); });
+    });
+    var tinha = todos.map(function (p) { return !!p.feitoEm; });
+
+    var minhasAulas = db.aulas.filter(function (a) { return a.alunoId === alunoId; });
+    minhasAulas.forEach(function (a) { Core.revisarPassosDaAula(aluno, a); });
+
+    // 2. o lastro de cada marca: a aula existe e ainda registra aquele assunto?
+    var registra = {};
+    db.aulas.forEach(function (a) {
+      var mapa = {};
+      Core.temasDaAula(a).forEach(function (t) { if (t && t.id) mapa[t.id] = true; });
+      registra[a.id] = mapa;
+    });
+    todos.forEach(function (p) {
+      if (p.aulaId && (!registra[p.aulaId] || (p.temaId && !registra[p.aulaId][p.temaId]))) {
+        p.feitoEm = null;
+        p.aulaId = null;
+      }
+      if (!p.feitoEm) delete p.jaEra;   // 3.
+    });
+
+    // 4. a volta, pelas aulas que contam, da mais antiga para a mais nova
+    minhasAulas.slice()
+      .sort(function (a, b) { return String(a.data).localeCompare(String(b.data)); })
+      .forEach(function (a) {
+        var st = a.status || 'realizada';
+        if (st !== 'realizada' && st !== 'reposicao') return;
+        Core.temasDaAula(a).forEach(function (t) {
+          if (!t || !t.id) return;
+          var achou = false;
+          Core.trilhasAtivas(aluno).forEach(function (tr) {
+            if (achou) return;
+            (tr.passos || []).forEach(function (p) {
+              if (achou || p.feitoEm || p.soltoAMao || p.temaId !== t.id) return;
+              p.feitoEm = a.data;
+              p.aulaId = a.id;
+              delete p.jaEra;
+              delete p.marcaAnterior;
+              t.passoDe = tr.id;
+              achou = true;
+            });
+          });
+        });
+      });
+
+    var soltos = 0, remarcados = 0;
+    todos.forEach(function (p, i) {
+      if (tinha[i] && !p.feitoEm) soltos++;
+      if (!tinha[i] && p.feitoEm) remarcados++;
+    });
+    return { soltos: soltos, remarcados: remarcados };
+  }
+
+  /* Desmarcar em silêncio seria o pior dos dois mundos: ela mudaria o status e
+   * a trilha andaria para trás sem ninguém contar. O contrário também vale: se
+   * o passo voltou a contar, ela precisa saber, senão a trilha anda sozinha e
+   * ela descobre por acaso. */
+  function textoDeTrilha(r) {
+    if (!r) return '';
+    var texto = '';
+    if (r.soltos) {
+      texto += ' A aula não conta mais, então ' + r.soltos +
+        (r.soltos === 1 ? ' passo voltou' : ' passos voltaram') + ' para a fila da trilha.';
+    }
+    if (r.remarcados) {
+      texto += ' ' + r.remarcados + (r.remarcados === 1
+        ? ' passo voltou a contar como dado.' : ' passos voltaram a contar como dados.');
+    }
+    return texto;
+  }
+
   function salvarAula() {
     var alunoId = $('#campo-aluno').value;
     var data = $('#campo-data').value;
@@ -1591,40 +1948,57 @@
           seguintes: 'Aulas alteradas desta data em diante.',
           todas: 'Todas as aulas da repetição foram alteradas.'
         };
-        var acao = function () { Core.aplicarEdicaoAula(db, aulaEmEdicao.id, mudancas, escopo); };
+        var alunoId = aulaEmEdicao.alunoId;
+        var mexeu = null;
+        var acao = function () {
+          Core.aplicarEdicaoAula(db, aulaEmEdicao.id, mudancas, escopo);
+          mexeu = revisarTrilhasDoAluno(alunoId);
+        };
         if (escopo === 'esta') {
           acao();
           salvar().then(function () {
             fecharModal('modal-aula');
             desenharTudo();
-            avisar(rotulos[escopo]);
+            avisar(rotulos[escopo] + textoDeTrilha(mexeu));
           });
         } else {
-          comDesfazer(rotulos[escopo], acao).then(function () {
-            fecharModal('modal-aula');
-            desenharTudo();
-          });
+          /* O rótulo é uma função porque só depois da ação se sabe quantos
+           * passos se mexeram. Nos escopos "seguintes" e "todas", que são
+           * justamente os que desmarcam vários de uma vez, a trilha andava para
+           * trás em silêncio: o aviso saía sem contar nada. */
+          comDesfazer(function () { return rotulos[escopo] + textoDeTrilha(mexeu); }, acao)
+            .then(function () {
+              fecharModal('modal-aula');
+              desenharTudo();
+            });
         }
       });
       return;
     }
 
     Core.aplicarEdicaoAula(db, aulaEmEdicao.id, mudancas, 'esta');
+    var mexeuAqui = revisarTrilhasDoAluno(aulaEmEdicao.alunoId);
     salvar().then(function () {
       fecharModal('modal-aula');
       desenharTudo();
-      avisar('Aula salva.');
+      avisar('Aula salva.' + textoDeTrilha(mexeuAqui));
     });
   }
 
   function excluirAulaAtual() {
     if (!aulaEmEdicao) return;
     var serie = Core.serieDe(db, aulaEmEdicao);
+    /* Excluir a aula não revisava as trilhas: o passo continuava marcado
+     * apontando para uma aula que não existe mais no banco, e a ficha dizia
+     * "dado em 10/08" sem ter onde mostrar aquele dia. Vale nos dois ramos. */
     if (!serie) {
       if (!confirmar('Excluir esta aula?')) return;
       var alvo = aulaEmEdicao.id;
-      comDesfazer('Aula excluída.', function () {
+      var quem = aulaEmEdicao.alunoId;
+      var mexeu = null;
+      comDesfazer(function () { return 'Aula excluída.' + textoDeTrilha(mexeu); }, function () {
         Core.excluirAulas(db, alvo, 'esta');
+        mexeu = revisarTrilhasDoAluno(quem);
       }).then(function () {
         fecharModal('modal-aula');
         desenharTudo();
@@ -1638,8 +2012,11 @@
         todas: 'Todas as aulas da repetição foram excluídas.'
       };
       var alvo = aulaEmEdicao.id;
-      comDesfazer(rotulos[escopo], function () {
+      var quem = aulaEmEdicao.alunoId;
+      var mexeu = null;
+      comDesfazer(function () { return rotulos[escopo] + textoDeTrilha(mexeu); }, function () {
         Core.excluirAulas(db, alvo, escopo);
+        mexeu = revisarTrilhasDoAluno(quem);
       }).then(function () {
         fecharModal('modal-aula');
         desenharTudo();
@@ -2130,6 +2507,9 @@
           }
         })
       ]));
+      /* O painel entra mesmo sem mapeamento: uma trilha do zero não depende de
+       * lacuna nenhuma, e trilha encerrada nunca pode sumir da vista. */
+      desenharPainelTrilhas(caixa, aluno);
       return;
     }
 
@@ -2165,6 +2545,13 @@
     if (contexto.length) {
       caixa.appendChild(el('div', { class: 'ajuda', style: 'margin-top:0', texto: contexto.join(' · ') }));
     }
+
+    /* As trilhas vêm ANTES do resto do mapeamento. Elas eram a última coisa da
+     * aba e, em paisagem, nasciam fora da tela: o botão Montar trilha ficava
+     * 40 px abaixo da dobra e ela só o encontrava rolando. O mapeamento
+     * marcado é consulta, e continua logo abaixo; a trilha é o que ela vem
+     * fazer aqui. */
+    desenharPainelTrilhas(caixa, aluno);
 
     Core.MAPA.forEach(function (g) {
       var rot = Core.rotulosDoMapa(g.chave, m.marcados && m.marcados[g.chave]);
@@ -2742,6 +3129,28 @@
       'Frequência, dever de casa, remarcação, como e quando você vai dar retorno.']
   ];
 
+  /* O mapeamento que está aberto para editar em cima do registro guardado.
+   *
+   * Guarda como o registro estava NO DISCO quando a janela abriu. Serve a duas
+   * coisas: dbParaGravar() usa a foto para que nenhuma gravação feita enquanto
+   * a janela está aberta leve o que ela ainda não confirmou, e fechar sem
+   * salvar devolve a foto à memória. Vale só para a edição EM CIMA do registro
+   * guardado; uma revisão nova já nasce num objeto separado. */
+  var mapeamentoEmEdicao = null;
+
+  function descartarMapeamentoEmEdicao() {
+    var m = mapeamentoEmEdicao;
+    mapeamentoEmEdicao = null;
+    if (!m) return false;
+    var aluno = alunoPorId(m.alunoId);
+    var lista = aluno && aluno.mapeamentos;
+    if (!lista) return false;
+    for (var i = 0; i < lista.length; i++) {
+      if (lista[i].id === m.id) { lista[i] = m.disco; return true; }
+    }
+    return false;
+  }
+
   function abrirMapeamento(alunoId, opcoes) {
     opcoes = opcoes || {};
     var aluno = alunoPorId(alunoId);
@@ -2753,6 +3162,7 @@
     if (opcoes.novo || !atual) {
       // Uma revisão nova começa do último preenchimento: quase nada muda de um
       // semestre para o outro, e redigitar tudo faria ela não refazer nunca.
+      descartarMapeamentoEmEdicao();
       trabalho = atual ? JSON.parse(JSON.stringify(atual)) : Core.mapeamentoNovo();
       trabalho.id = Core.uid();
       trabalho.data = Core.hojeIso();
@@ -2760,6 +3170,17 @@
       trabalho._novo = true;
     } else {
       trabalho = atual;
+      /* A foto é tirada UMA vez por sessão de edição. Voltar de "Ver" um
+       * mapeamento antigo passa por aqui de novo, e refotografar ali gravaria
+       * como se fosse disco o que ela digitou nesta mesma janela. */
+      if (!mapeamentoEmEdicao || mapeamentoEmEdicao.id !== trabalho.id ||
+          mapeamentoEmEdicao.alunoId !== aluno.id) {
+        descartarMapeamentoEmEdicao();
+        mapeamentoEmEdicao = {
+          alunoId: aluno.id, id: trabalho.id,
+          disco: JSON.parse(JSON.stringify(trabalho))
+        };
+      }
     }
     trabalho.marcados = trabalho.marcados || {};
     Core.MAPA.forEach(function (g) {
@@ -2879,14 +3300,18 @@
           atualizar();
         });
         var filhos = [chk, el('span', { class: 'cresce', texto: item.rotulo })];
-        // A lacuna leva direto aos temas que a tapam.
-        if (item.busca) {
+        /* A lacuna monta a trilha: a sequência de assuntos que precisa vir
+         * antes daquele em que o aluno travou, na ordem. Continua sendo UM
+         * botão por lacuna, e o caminho antigo não some: dentro da trilha há
+         * "Ver os temas soltos", que abre a mesma lista de sempre. */
+        if (item.busca || (item.alvos && item.alvos.length)) {
           filhos.push(el('button', {
-            type: 'button', class: 'btn pequeno', texto: 'temas', title: 'Ver temas sobre ' + item.rotulo,
+            type: 'button', class: 'btn pequeno', texto: 'trilha',
+            title: 'Montar a trilha até ' + item.rotulo,
             aoClick: function (ev) {
               ev.preventDefault();
               ev.stopPropagation();
-              abrirTemasPorBusca(item.busca, aluno);
+              abrirTrilhaDaLacuna(aluno, item);
             }
           }));
         }
@@ -2963,6 +3388,10 @@
           aluno.mapeamentos.push(trabalho);
         }
         if (trabalho.anoEscolar) aluno.anoEscolar = trabalho.anoEscolar;
+        /* Este é o toque que autoriza a gravação: a foto do disco deixa de
+         * valer AQUI, antes do salvar(), senão dbParaGravar() devolveria o
+         * registro antigo e o botão não gravaria nada. */
+        mapeamentoEmEdicao = null;
         salvar().then(function () {
           fecharModal('modal-mapeamento');
           if ($('#modal-aula').classList.contains('aberto') && aulaEmEdicao) {
@@ -3030,6 +3459,1016 @@
    * trás: aqui ela está olhando material, não montando uma aula. */
   function abrirTemasPorBusca(busca, aluno) {
     abrirTemas(null, { busca: busca, aluno: aluno });
+  }
+
+  /* ===================== a trilha da lacuna =====================
+   *
+   * Marcar "Frações" no mapeamento levava a uma busca que devolve dezoito temas
+   * em ordem de relevância, começando pelo 8º ano e pulando para o 4º: uma
+   * lista sem ordem, em que ela decidia de cabeça por onde começar. A trilha
+   * monta a sequência que precisa vir ANTES do assunto em que o aluno travou,
+   * na ordem, e diz quantos encontros deve levar.
+   *
+   * O motor é todo do core.js e é função pura. Aqui é só o que ela vê e toca.
+   * Três coisas mandam neste desenho, e as três vêm do tablet dela:
+   *   - alvo de toque grande, porque ela usa isto em pé, na casa da família;
+   *   - SETAS para reordenar, nunca arrasto, que é o gesto que falha dentro de
+   *     uma janela que rola, tanto com o dedo quanto com a S Pen;
+   *   - nenhum gesto novo por aula: a trilha anda pelo registro do assunto, que
+   *     ela já faz hoje. */
+
+  /* A proposta só existe entre montar e guardar; a lista dos cortados viaja
+   * junto porque é ela que alimenta o "Puxar mais de trás". */
+  var propostaDeTrilha = null;
+
+  /* "1 hora" lê melhor do que "1h" numa frase corrida, e é ela que lê. */
+  function duracaoPorExtenso(min) {
+    if (min === 60) return '1 hora';
+    if (min % 60 === 0) return (min / 60) + ' horas';
+    if (min < 60) return min + ' minutos';
+    return Core.fmtDuracao(min);
+  }
+
+  /* Nunca uma data de término: o calendário dela tem cancelamento, prova e
+   * feriado, e data errada é pior do que data nenhuma. */
+  function resumoDaTrilha(trilha, aluno) {
+    /* Trilha encerrada não tem futuro para prometer: contar quantos encontros
+     * "faltam" numa trilha que acabou é oferecer trabalho que não existe. */
+    if (trilha.encerradaEm) return resumoDeTrilhaEncerrada(trilha);
+    var passos = trilha.passos || [];
+    if (!passos.length) return 'Nenhum passo. Acrescente ao menos um.';
+    var feitos = Core.passosFeitos(trilha);
+    var faltam = passos.filter(function (p) { return !p.feitoEm; });
+    var dur = Core.duracaoHabitual(db, aluno ? aluno.id : trilha.alunoId);
+    var texto = passos.length + (passos.length === 1 ? ' passo' : ' passos');
+    if (feitos) texto += ', ' + feitos + ' já dado' + (feitos === 1 ? '' : 's');
+    if (!faltam.length) return texto + '. Trilha inteira percorrida.';
+    var enc = Core.encontrosPrevistos(faltam, dur);
+    return texto + (feitos ? '. Faltam cerca de ' : ', cerca de ') + enc +
+      (enc === 1 ? ' encontro' : ' encontros') + ' de ' + duracaoPorExtenso(dur) + '.';
+  }
+
+  /* O que uma trilha encerrada tem para dizer é o que foi feito, e até quando.
+   * É registro histórico: é isto que uma conversa com a família vai olhar. */
+  function resumoDeTrilhaEncerrada(trilha) {
+    var passos = trilha.passos || [];
+    var feitos = Core.passosFeitos(trilha);
+    var texto = feitos + ' de ' + passos.length +
+      (passos.length === 1 ? ' passo dado' : ' passos dados');
+    texto += ', de ' + Core.ddmmaaaa(trilha.criadaEm) + ' a ' + Core.ddmmaaaa(trilha.encerradaEm);
+    if (feitos === passos.length && passos.length) texto += '. Trilha inteira percorrida';
+    return texto + (trilha.motivo ? '. Motivo: ' + trilha.motivo + '.' : '.');
+  }
+
+  /* Desmarcar e remarcar um passo à mão.
+   *
+   * Desmarcar apagava a data e a aula para sempre: remarcar carimbava HOJE e
+   * perdia o vínculo com a aula em que o assunto foi dado, e um toque acidental
+   * já bastava. A marca antiga fica guardada no próprio passo, num campo
+   * opcional que registro nenhum é obrigado a ter, e remarcar devolve o que
+   * estava lá. Só quando não há nada guardado é que a data de hoje entra.
+   *
+   * O jaEra também sai na desmarcação. Ele diz "este assunto é anterior a esta
+   * trilha", e sobrevivendo a uma desmarcação fazia o passo ser lido como
+   * anterior à trilha para sempre, mesmo depois de dado numa aula de verdade. */
+  function desmarcarPasso(p) {
+    if (!p) return;
+    if (p.feitoEm || p.aulaId) {
+      p.marcaAnterior = { feitoEm: p.feitoEm || null, aulaId: p.aulaId || null, jaEra: !!p.jaEra };
+    }
+    p.feitoEm = null;
+    p.aulaId = null;
+    delete p.jaEra;
+    /* Quem soltou foi ELA, e não a revisão automática. A varredura que remarca
+     * pelo assunto respeita esta marca: sem ela, soltar um passo cujo assunto
+     * está registrado numa aula duraria só até a próxima aula salva. */
+    p.soltoAMao = true;
+  }
+
+  function remarcarPasso(p, marca) {
+    if (!p) return;
+    var m = marca || p.marcaAnterior;
+    delete p.marcaAnterior;
+    delete p.soltoAMao;
+    if (m && m.feitoEm) {
+      p.feitoEm = m.feitoEm;
+      p.aulaId = m.aulaId || null;
+      if (m.jaEra) p.jaEra = true; else delete p.jaEra;
+      return;
+    }
+    p.feitoEm = Core.hojeIso();
+    p.aulaId = null;
+    delete p.jaEra;
+  }
+
+  /* O caminho de hoje, guardado inteiro um nível abaixo da trilha. Para trilha
+   * criada do zero não existe lacuna, e aí a busca é o próprio título do alvo. */
+  function buscaSoltaDaTrilha(trilha) {
+    var item = trilha.lacunaId ? Core.itemDaLacuna(trilha.lacunaId) : null;
+    return (item && item.busca) || trilha.titulo || '';
+  }
+
+  function botaoTemasSoltos(trilha, aluno) {
+    return el('button', {
+      type: 'button', class: 'btn', id: 'trilha-temas-soltos', texto: 'Ver os temas soltos',
+      title: 'Abre a lista de temas de sempre, sem ordem nenhuma',
+      style: 'min-height:44px',
+      aoClick: function () { abrirTemasPorBusca(buscaSoltaDaTrilha(trilha), aluno); }
+    });
+  }
+
+  /* ---------- passo 1: onde ele precisa chegar ---------- */
+
+  function abrirTrilhaDaLacuna(aluno, item) {
+    propostaDeTrilha = null;
+    $('#titulo-modal-trilha').textContent = 'Trilha para fechar: ' + item.rotulo;
+    var corpo = $('#corpo-modal-trilha');
+    var rodape = $('#rodape-modal-trilha');
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    corpo.appendChild(el('div', {
+      class: 'ajuda', style: 'margin-top:0', texto: 'Abrindo o banco de temas...'
+    }));
+    abrirModal('modal-trilha');
+
+    carregarIndice().then(function (temas) {
+      var r = Core.alvosDaLacuna(temas, item.id, Core.anoEscolarDe(aluno));
+      /* Lacuna sem alvo curado cai no comportamento de sempre, em vez de abrir
+       * uma tela vazia. Hoje as vinte e duas têm alvo, mas o dado pode mudar
+       * sem que este arquivo mude junto. */
+      if (!r.candidatos.length) {
+        fecharModal('modal-trilha');
+        abrirTemasPorBusca(item.busca, aluno);
+        return;
+      }
+      desenharEscolhaDoAlvo(aluno, item, r, temas);
+    }).catch(function () {
+      corpo.innerHTML = '';
+      corpo.appendChild(el('div', { class: 'faixa-aviso' }, [
+        el('strong', { texto: 'Não consegui abrir o banco de temas agora. ' }),
+        document.createTextNode('Se for a primeira vez, abra o aplicativo uma vez com internet. ' +
+          'A folha em branco e o resto da aula continuam funcionando sem sinal.')
+      ]));
+      rodape.innerHTML = '';
+      rodape.appendChild(el('button', {
+        type: 'button', class: 'btn principal', texto: 'Fechar',
+        aoClick: function () { fecharModal('modal-trilha'); }
+      }));
+    });
+  }
+
+  /* Quem decide o fim da trilha é ela, com um toque, e não a tabela sozinha.
+   *
+   * Medido: a lacuna "Funções" num aluno do 2º ano do médio pode cair numa
+   * trilha de matrizes e determinantes se a escolha for automática. Um toque
+   * por TRILHA, nunca por aula, então não é gesto novo no dia a dia. */
+  function desenharEscolhaDoAlvo(aluno, item, r, temas) {
+    var corpo = $('#corpo-modal-trilha');
+    var rodape = $('#rodape-modal-trilha');
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    $('#titulo-modal-trilha').textContent = 'Trilha para fechar: ' + item.rotulo;
+
+    var ano = Core.anoEscolarDe(aluno);
+    corpo.appendChild(el('div', { class: 'bloco-exercicios', id: 'trilha-onde-chegar', texto: 'Onde ele precisa chegar' }));
+    corpo.appendChild(el('div', { class: 'ajuda', style: 'margin-top:0' }, [
+      document.createTextNode(ano
+        ? 'Toque no assunto que fecha a lacuna. A sugestão é o mais alto que não passa do ' +
+          nomeDoAno(ano) + ', que é o ano de ' + aluno.nome + '. '
+        : 'Toque no assunto que fecha a lacuna. ' + aluno.nome + ' está sem ano escolar ' +
+          'registrado, então a sugestão é a mais baixa, que é o lado seguro de errar. '),
+      el('strong', { texto: 'A trilha é montada até o que você escolher aqui.' })
+    ]));
+
+    r.candidatos.slice(0, 5).forEach(function (c) {
+      var ehSugerido = c.id === r.sugerido;
+      var linha = el('div', {
+        class: 'item-lista clicavel item-alvo-trilha', 'data-alvo': c.id,
+        style: ehSugerido ? 'border-color:#2E8B76;border-width:2px' : ''
+      }, [
+        el('div', { class: 'cresce' }, [
+          el('div', { class: 'nome' }, [
+            document.createTextNode(c.titulo),
+            ehSugerido
+              ? el('span', { class: 'tag cheia', texto: 'sugerido', style: 'margin-left:8px' })
+              : null
+          ].filter(Boolean)),
+          el('div', { class: 'detalhe', texto: 'Matemática, ' + nomeDoAno(c.serie) })
+        ]),
+        el('button', {
+          type: 'button', class: 'btn pequeno principal', texto: 'Montar',
+          style: 'min-height:44px;box-sizing:border-box;padding:11px 18px;font-size:14px'
+        })
+      ]);
+      /* O clique do botão sobe até aqui: a linha inteira é o alvo de toque, e
+       * o botão existe para ela ver onde tocar. */
+      linha.addEventListener('click', function () {
+        montarPropostaDeTrilha(aluno, item, c, temas);
+      });
+      corpo.appendChild(linha);
+    });
+
+    corpo.appendChild(el('div', {
+      class: 'ajuda',
+      texto: 'Depois de montada, a trilha ainda é sua: dá para tirar passo, mudar a ordem e ' +
+        'acrescentar o que faltar antes de guardar.'
+    }));
+
+    /* Mesmo id da versão que fica dentro da trilha montada: as duas telas nunca
+     * existem ao mesmo tempo, e assim o caminho antigo tem um só endereço. */
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn esquerda', id: 'trilha-temas-soltos',
+      texto: 'Ver os temas soltos', style: 'min-height:44px',
+      aoClick: function () { abrirTemasPorBusca(item.busca, aluno); }
+    }));
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn', texto: 'Cancelar', style: 'min-height:44px',
+      aoClick: function () { fecharModal('modal-trilha'); }
+    }));
+    corpo.scrollTop = 0;
+  }
+
+  /* ---------- passo 2: a proposta, editável ---------- */
+
+  function montarPropostaDeTrilha(aluno, item, alvo, temas) {
+    var d = Core.trilhaDerivada(temas, alvo.id, { maximo: 6 });
+    /* O passo que o aluno já viu nasce marcado, com a data daquela aula: é aqui
+     * que o registro de assunto e a trilha se encostam. Ela traz de volta com
+     * um toque, se aquela aula não tiver fechado o assunto de verdade. */
+    Core.marcarOQueJaFoiDado(db, aluno.id, d.passos);
+    var trilha = Core.criarTrilha({
+      alunoId: aluno.id,
+      lacunaId: item ? item.id : null,
+      titulo: alvo.titulo,
+      alvoId: alvo.id,
+      passos: d.passos
+    });
+    propostaDeTrilha = { trilha: trilha, cortados: d.cortados, aluno: aluno, item: item };
+    desenharTrilha(trilha, aluno, { proposta: true });
+  }
+
+  /* Uma função desenha os três casos: a proposta que ainda não foi guardada, a
+   * trilha ativa que já mora no aluno e a trilha encerrada. O que muda é o
+   * rodapé, a gravação e, na encerrada, o fato de não haver o que tocar.
+   *
+   * A encerrada é SÓ LEITURA. Ela abria igual a uma ativa, com título "Trilha
+   * para fechar", resumo dizendo quantos encontros faltavam e os botões de
+   * marcar, subir, descer, tirar e acrescentar, todos gravando no disco: um
+   * toque em Tirar apagava um passo de um registro histórico, que é o que uma
+   * conversa com a família vai olhar. */
+  function desenharTrilha(trilha, aluno, opcoes) {
+    opcoes = opcoes || {};
+    var proposta = !!opcoes.proposta;
+    var encerrada = !proposta && !!trilha.encerradaEm;
+    var corpo = $('#corpo-modal-trilha');
+    var rodape = $('#rodape-modal-trilha');
+    var alturaAntes = corpo.scrollTop;
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+
+    var item = trilha.lacunaId ? Core.itemDaLacuna(trilha.lacunaId) : null;
+    $('#titulo-modal-trilha').textContent = encerrada
+      ? 'Trilha encerrada: ' + (item ? item.rotulo : trilha.titulo)
+      : (item ? 'Trilha para fechar: ' + item.rotulo : 'Trilha até ' + trilha.titulo);
+
+    /* Uma trilha antiga pode ter chegado aqui sem a lista de passos. Sem esta
+     * linha a variável local viraria um array solto, as escritas não chegariam
+     * ao disco e o aviso confirmaria assim mesmo: ela acrescentava um passo,
+     * lia "Passo acrescentado" e nada tinha sido guardado. */
+    if (!trilha.passos) trilha.passos = [];
+    var passos = trilha.passos;
+
+    /* Gravar só quando a trilha já existe no aluno. Na proposta nada vai para o
+     * disco antes de ela tocar em Guardar. */
+    function mudar(acao, aviso) {
+      acao();
+      if (proposta) { desenharTrilha(trilha, aluno, opcoes); return; }
+      salvar().then(function () {
+        desenharTrilha(trilha, aluno, opcoes);
+        atualizarPainelTrilhas(aluno.id);
+        if (aulaEmEdicao) atualizarBlocoAssunto(aulaEmEdicao.id);
+        desenharAgenda();
+        if (aviso) avisar(aviso);
+      });
+    }
+
+    /* O mesmo, para o que APAGA. Tirar um passo e desmarcar um passo gravavam
+     * direto, e o aviso saía sem o botão Desfazer, que é o padrão do resto do
+     * aplicativo. Na proposta nada foi ao disco ainda, então o desfazer é em
+     * memória; na trilha guardada é o comDesfazer de sempre, com ponto de
+     * retorno no histórico. */
+    function mudarComDesfazer(rotulo, acao, refazer) {
+      if (proposta) {
+        acao();
+        desenharTrilha(trilha, aluno, opcoes);
+        avisar(rotulo, 'Desfazer', function () {
+          refazer();
+          desenharTrilha(trilha, aluno, opcoes);
+          avisar('Alteração desfeita.');
+        });
+        return;
+      }
+      comDesfazer(rotulo, acao).then(function () {
+        desenharTrilha(trilha, aluno, opcoes);
+        atualizarPainelTrilhas(aluno.id);
+        if (aulaEmEdicao) atualizarBlocoAssunto(aulaEmEdicao.id);
+        desenharAgenda();
+      });
+    }
+
+    // ---- o que a trilha fecha ----
+    corpo.appendChild(el('div', {
+      class: 'faixa-info', id: 'resumo-trilha'
+    }, [
+      el('strong', { texto: (encerrada ? 'Era até ' : 'Até ') + trilha.titulo + '. ' }),
+      document.createTextNode(resumoDaTrilha(trilha, aluno))
+    ]));
+
+    if (encerrada) {
+      corpo.appendChild(el('div', { class: 'faixa-info', id: 'trilha-so-leitura' }, [
+        el('strong', { texto: 'Esta trilha está encerrada, e aqui é só leitura. ' }),
+        document.createTextNode('Ela fica guardada do jeito que estava: é a prova do trabalho ' +
+          'feito. Para retomar o assunto, monte uma trilha nova.')
+      ]));
+    }
+
+    /* Guardar a trilha não guarda o mapeamento, e a tela diz isso antes: sem
+     * esta linha ela fecharia a trilha achando que já tinha confirmado tudo. */
+    if (mapeamentoEmEdicao && aluno && mapeamentoEmEdicao.alunoId === aluno.id) {
+      corpo.appendChild(el('div', { class: 'ajuda', id: 'trilha-mapeamento-aberto', style: 'margin-top:0' }, [
+        el('strong', { texto: 'O mapeamento continua aberto atrás desta janela. ' }),
+        document.createTextNode('O que você marcar lá só é gravado por "Salvar mapeamento": ' +
+          'guardar a trilha aqui não salva o mapeamento junto.')
+      ]));
+    }
+
+    /* Na encerrada as datas e o motivo já estão no resumo, e repeti-los aqui
+     * embaixo faria a mesma frase aparecer duas vezes na mesma tela. */
+    if (!proposta && !encerrada) {
+      corpo.appendChild(el('div', {
+        class: 'ajuda', style: 'margin-top:0',
+        texto: 'Criada em ' + Core.ddmmaaaa(trilha.criadaEm)
+      }));
+    }
+
+    // ---- a saída honesta: não há escada ----
+    if (passos.length === 1 && !encerrada) {
+      corpo.appendChild(el('div', { class: 'faixa-aviso', id: 'trilha-sem-escada' }, [
+        el('strong', { texto: 'Este assunto não depende de nenhum outro no banco. ' }),
+        document.createTextNode('Não há escada para montar até ele, e inventar uma seria pior ' +
+          'do que não oferecer nenhuma. Dá para atacar direto: guardando assim mesmo, ele ' +
+          'aparece como próximo passo ao abrir a aula. Se preferir escolher à mão, veja os ' +
+          'temas soltos aqui embaixo.')
+      ]));
+    }
+
+    // ---- o corte, que dispara na maioria das lacunas ----
+    var cortados = (proposta && propostaDeTrilha) ? propostaDeTrilha.cortados : [];
+    if (cortados && cortados.length) {
+      corpo.appendChild(el('div', { class: 'faixa-aviso', id: 'trilha-cortada' }, [
+        el('strong', { texto: 'Comecei do que está mais perto do objetivo. ' }),
+        document.createTextNode('Se ele não tiver base nem para isso, puxe mais de trás: ' +
+          'ainda há ' + cortados.length + (cortados.length === 1
+            ? ' assunto anterior guardado.' : ' assuntos anteriores guardados.')),
+        el('div', { class: 'barra', style: 'margin:8px 0 0' }, [
+          el('button', {
+            type: 'button', class: 'btn', id: 'puxar-mais-de-tras', texto: 'Puxar mais de trás',
+            style: 'min-height:44px;padding:11px 16px',
+            aoClick: function () {
+              mudar(function () {
+                var novo = propostaDeTrilha.cortados.pop();
+                if (!novo) return;
+                Core.marcarOQueJaFoiDado(db, aluno.id, [novo]);
+                passos.unshift(novo);
+              });
+            }
+          })
+        ])
+      ]));
+    }
+
+    // ---- os passos, numerados ----
+    corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'A ordem dos assuntos' }));
+    /* A ordem não é arbitrária nem cronológica: sai do pré-requisito que cada
+     * tema declara no banco. A tela nunca dizia isso, e sem saber de onde vem a
+     * ordem ela não tinha como decidir quando mudá-la. */
+    corpo.appendChild(el('div', {
+      class: 'ajuda', id: 'trilha-de-onde-vem-a-ordem', style: 'margin-top:0',
+      texto: encerrada
+        ? 'A ordem veio dos pré-requisitos do banco: cada assunto entrou depois daquele que ele exige.'
+        : 'A ordem vem dos pré-requisitos do banco: cada assunto vem depois daquele que ele exige. ' +
+          'Se para este aluno fizer mais sentido de outro jeito, use as setas.'
+    }));
+
+    if (!passos.length) {
+      corpo.appendChild(el('div', { class: 'vazio' }, [
+        el('p', { texto: 'A trilha ficou sem nenhum passo.' }),
+        el('p', {
+          class: 'ajuda',
+          texto: encerrada ? 'Ela foi encerrada assim.' : 'Acrescente um assunto aqui embaixo, ou cancele.'
+        })
+      ]));
+    }
+
+    var listaPassos = el('div', { id: 'passos-trilha' });
+    corpo.appendChild(listaPassos);
+
+    passos.forEach(function (p, i) {
+      var feito = !!p.feitoEm;
+      /* "1 hora" e não "60 minutos": o resumo lá em cima já fala assim, e duas
+       * palavras diferentes para a mesma duração na mesma tela fazem parecer
+       * que são coisas diferentes. */
+      var detalhe = nomeDoAno(p.serie) + ' · cerca de ' + duracaoPorExtenso(p.duracaoMin || 60);
+      if (feito) {
+        detalhe = (p.jaEra ? 'já trabalhado em ' : (p.aulaId ? 'dado em ' : 'marcado por você em ')) +
+          Core.ddmm(p.feitoEm) + ' · ' + detalhe;
+      }
+
+      /* Alvo de toque de 44 px, que é o que a mão dela pede em pé, na casa da
+       * família. O que estava aqui tinha 37 px de altura. */
+      var ALVO = 'min-height:44px;min-width:44px;box-sizing:border-box;';
+      var botoes = [];
+      if (encerrada) {
+        /* Nenhum botão: trilha encerrada é registro, e registro não se mexe. */
+      } else if (feito) {
+        botoes.push(el('button', {
+          type: 'button', class: 'btn pequeno trazer-passo', texto: 'Trazer de volta',
+          title: 'Volta a contar como passo a dar',
+          style: ALVO + 'padding:11px 14px;font-size:13px',
+          aoClick: function () {
+            var marca = { feitoEm: p.feitoEm, aulaId: p.aulaId, jaEra: p.jaEra };
+            mudarComDesfazer('Passo de volta na fila.', function () {
+              desmarcarPasso(p);
+            }, function () { remarcarPasso(p, marca); });
+          }
+        }));
+      } else {
+        if (!proposta) {
+          botoes.push(el('button', {
+            type: 'button', class: 'btn pequeno marcar-passo', texto: 'Já dei este',
+            style: ALVO + 'padding:11px 14px;font-size:13px',
+            aoClick: function () {
+              mudar(function () { remarcarPasso(p, null); }, 'Passo marcado.');
+            }
+          }));
+        }
+        /* Setas, nunca arrasto: arrasto dentro de uma janela que rola, com o
+         * dedo e com a S Pen, é o gesto que falha.
+         *
+         * A folga entre elas era de 6 px, e elas fazem coisas opostas: errar a
+         * seta desce o passo que ela queria subir, e ela só descobre relendo a
+         * lista. Agora há 16 px entre uma e outra. */
+        botoes.push(el('button', {
+          type: 'button', class: 'btn pequeno subir-passo', texto: '↑', title: 'Subir este passo',
+          style: ALVO + 'padding:11px 15px;font-size:16px;margin-right:16px' +
+            (i === 0 ? ';visibility:hidden' : ''),
+          aoClick: function () {
+            if (i === 0) return;
+            mudar(function () { Core.moverPasso(trilha, i, i - 1); });
+          }
+        }));
+        botoes.push(el('button', {
+          type: 'button', class: 'btn pequeno descer-passo', texto: '↓', title: 'Descer este passo',
+          style: ALVO + 'padding:11px 15px;font-size:16px' +
+            (i === passos.length - 1 ? ';visibility:hidden' : ''),
+          aoClick: function () {
+            if (i === passos.length - 1) return;
+            mudar(function () { Core.moverPasso(trilha, i, i + 1); });
+          }
+        }));
+      }
+      if (!encerrada) {
+        botoes.push(el('button', {
+          type: 'button', class: 'btn pequeno perigo tirar-passo', texto: 'Tirar',
+          /* A folga existe pelo mesmo motivo da lista de assuntos: Tirar apaga,
+           * e ficava a 21 px da seta de descer numa tela usada em pé. */
+          style: ALVO + 'margin-left:28px;padding:11px 14px;font-size:13px',
+          aoClick: function () {
+            var guardado = p, posicao = i;
+            mudarComDesfazer('Passo tirado da trilha.', function () {
+              Core.removerPasso(trilha, posicao);
+            }, function () {
+              trilha.passos.splice(Math.min(posicao, trilha.passos.length), 0, guardado);
+            });
+          }
+        }));
+      }
+
+      listaPassos.appendChild(el('div', {
+        class: 'passo-roteiro item-passo-trilha', 'data-passo': p.temaId,
+        style: 'display:flex;align-items:center;gap:10px;flex-wrap:wrap' +
+          (feito ? ';opacity:.65' : '')
+      }, [
+        el('div', { class: 'cresce', style: 'flex:1;min-width:200px' }, [
+          el('div', {
+            class: 'nome',
+            style: feito ? 'text-decoration:line-through' : '',
+            texto: (i + 1) + '. ' + p.titulo
+          }),
+          el('div', { class: 'detalhe', texto: detalhe })
+        ]),
+        el('div', { style: 'display:flex;align-items:center;gap:6px;flex-wrap:wrap' }, botoes)
+      ]));
+    });
+
+    // ---- acrescentar, e o caminho antigo ----
+    var barraDoFim = [];
+    if (!encerrada) {
+      barraDoFim.push(el('button', {
+        type: 'button', class: 'btn', id: 'acrescentar-passo', texto: '+ Acrescentar passo',
+        style: 'min-height:44px;padding:11px 16px',
+        aoClick: function () {
+          escolherTemaDeMatematica(aluno, 'Acrescentar passo à trilha', function (t) {
+            var jaTem = passos.filter(function (x) { return x.temaId === t.id; }).length;
+            if (jaTem) { avisar('Este assunto já é um passo desta trilha.'); return; }
+            mudar(function () {
+              var novo = {
+                temaId: t.id, titulo: t.pt.titulo, serie: t.serie,
+                duracaoMin: t.duracaoMin || 60, feitoEm: null, aulaId: null
+              };
+              Core.marcarOQueJaFoiDado(db, aluno.id, [novo]);
+              passos.push(novo);
+            }, 'Passo acrescentado.');
+          }, true);
+        }
+      }));
+    }
+    barraDoFim.push(botaoTemasSoltos(trilha, aluno));
+    corpo.appendChild(el('div', { class: 'barra', style: 'margin:12px 0 4px' }, barraDoFim));
+    corpo.appendChild(el('div', {
+      class: 'ajuda',
+      texto: encerrada
+        ? 'Ver os temas soltos abre a lista de sempre, para quando você quiser rever o material ' +
+          'que esta trilha usou.'
+        : 'Acrescentar passo abre o banco de matemática. Ver os temas soltos abre a mesma ' +
+          'lista de sempre, sem ordem nenhuma, para quando você quiser só olhar o material.'
+    }));
+
+    // ---- rodapé ----
+    if (proposta) {
+      rodape.appendChild(el('button', {
+        type: 'button', class: 'btn', texto: 'Cancelar',
+        style: 'min-height:44px',
+        aoClick: function () { propostaDeTrilha = null; fecharModal('modal-trilha'); }
+      }));
+      rodape.appendChild(el('button', {
+        type: 'button', class: 'btn principal', id: 'guardar-trilha',
+        texto: passos.length === 1 ? 'Guardar assim mesmo' : 'Guardar trilha',
+        style: 'min-height:44px',
+        aoClick: function (ev) {
+          /* Trava do segundo toque, aqui e dentro do guardarProposta: no tablet
+           * o toque duplica com facilidade, e dois toques empurravam a MESMA
+           * trilha duas vezes, com o mesmo id. */
+          if (ev && ev.currentTarget) ev.currentTarget.disabled = true;
+          guardarProposta(trilha, aluno);
+        }
+      }));
+    } else {
+      if (!encerrada) {
+        rodape.appendChild(el('button', {
+          type: 'button', class: 'btn esquerda', id: 'encerrar-trilha', texto: 'Encerrar trilha',
+          style: 'min-height:44px',
+          aoClick: function () {
+            abrirEncerramento(trilha, aluno, function () {
+              desenharTrilha(trilha, aluno, opcoes);
+            }, function () { desenharTrilha(trilha, aluno, opcoes); });
+          }
+        }));
+      }
+      rodape.appendChild(el('button', {
+        type: 'button', class: 'btn principal', id: 'fechar-trilha', texto: 'Fechar',
+        style: 'min-height:44px',
+        aoClick: function () { fecharModal('modal-trilha'); }
+      }));
+    }
+
+    corpo.scrollTop = alturaAntes;
+  }
+
+  /* A trilha está sendo empurrada para o aluno agora? Dois toques seguidos em
+   * Guardar chegavam aqui duas vezes antes de a primeira gravação terminar, e
+   * a mesma trilha ia para a lista duas vezes, com o mesmo id. */
+  var guardandoTrilha = false;
+
+  function guardarProposta(trilha, aluno) {
+    if (guardandoTrilha) return;
+    if (!(trilha.passos || []).length) {
+      avisar('A trilha está sem passos. Acrescente um antes de guardar.');
+      return;
+    }
+    aluno.trilhas = aluno.trilhas || [];
+    /* Cinto e suspensório: se por algum caminho ela chegar aqui com a trilha
+     * já guardada, não duplica. */
+    if (aluno.trilhas.indexOf(trilha) >= 0) return;
+    guardandoTrilha = true;
+    aluno.trilhas.push(trilha);
+    salvar().then(function () {
+      guardandoTrilha = false;
+      propostaDeTrilha = null;
+      fecharModal('modal-trilha');
+      atualizarPainelTrilhas(aluno.id);
+      if (aulaEmEdicao) atualizarBlocoAssunto(aulaEmEdicao.id);
+      desenharAgenda();
+      avisar('Trilha guardada: ' + resumoDaTrilha(trilha, aluno));
+    }).catch(function () {
+      guardandoTrilha = false;
+      /* A gravação falhou, então a memória volta a espelhar o disco: senão a
+       * trilha ficaria só na tela e ela acharia que está guardada. */
+      aluno.trilhas = (aluno.trilhas || []).filter(function (t) { return t !== trilha; });
+      avisar('Não consegui guardar a trilha. Tente de novo.');
+    });
+  }
+
+  /* Encerrar antes do fim é o normal, e não a exceção: o aluno destrava e a
+   * trilha deixou de fazer sentido. Sem interrogatório, o motivo é opcional.
+   *
+   * Era um window.prompt. No tablet ele abre a caixa do sistema, que ganha foco
+   * sozinha e faz o teclado subir por cima da tela, contra a regra de nenhum
+   * campo com foco automático; e um OK sem digitar nada já encerrava a trilha,
+   * porque texto vazio não é a mesma coisa que cancelar. Aqui é tela do próprio
+   * aplicativo: nada tem foco ao abrir, e encerrar exige um toque no botão que
+   * diz Encerrar. */
+  function abrirEncerramento(trilha, aluno, depois, voltar) {
+    var corpo = $('#corpo-modal-trilha');
+    var rodape = $('#rodape-modal-trilha');
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    $('#titulo-modal-trilha').textContent = 'Encerrar a trilha até ' + trilha.titulo;
+
+    var feitos = Core.passosFeitos(trilha);
+    var total = (trilha.passos || []).length;
+
+    corpo.appendChild(el('div', { class: 'faixa-info' }, [
+      el('strong', { texto: 'Encerrar não apaga nada. ' }),
+      document.createTextNode('A trilha sai da lista das ativas e continua guardada com as ' +
+        'datas, como prova do trabalho: ' + feitos + ' de ' + total +
+        (total === 1 ? ' passo dado' : ' passos dados') + ' desde ' +
+        Core.ddmmaaaa(trilha.criadaEm) + '.')
+    ]));
+
+    var campo = el('textarea', {
+      id: 'motivo-encerramento', style: 'min-height:72px',
+      placeholder: 'Ele destravou, mudou a prioridade, a família pediu outra coisa...'
+    });
+    corpo.appendChild(el('label', { class: 'campo' }, [
+      el('span', { texto: 'Por que está encerrando (opcional)' }), campo
+    ]));
+    corpo.appendChild(el('div', {
+      class: 'ajuda', style: 'margin-top:0',
+      texto: 'Pode deixar em branco. O motivo aparece junto da trilha encerrada na ficha do aluno.'
+    }));
+
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn', id: 'cancelar-encerramento', texto: '‹ Voltar',
+      style: 'min-height:44px',
+      aoClick: function () {
+        if (voltar) voltar(); else fecharModal('modal-trilha');
+      }
+    }));
+    rodape.appendChild(el('button', {
+      /* Sem a classe perigo junto da principal: as duas mandam na cor e a
+       * segunda vence, deixando texto vermelho sobre fundo azul-escuro. E
+       * encerrar não apaga nada mesmo, então vermelho contaria outra história. */
+      type: 'button', class: 'btn principal', id: 'confirmar-encerramento',
+      texto: 'Encerrar trilha', style: 'min-height:44px',
+      aoClick: function (ev) {
+        if (ev && ev.currentTarget) ev.currentTarget.disabled = true;
+        var motivo = String(campo.value || '').trim();
+        /* Encerrar é destrutivo do ponto de vista dela: some da lista das
+         * ativas e o próximo passo deixa de aparecer na aula. Vai com Desfazer,
+         * como o resto do aplicativo. */
+        comDesfazer('Trilha encerrada. Ela continua guardada, com as datas.', function () {
+          Core.encerrarTrilha(trilha, Core.hojeIso(), motivo);
+        }).then(function () {
+          atualizarPainelTrilhas(aluno.id);
+          if (aulaEmEdicao) atualizarBlocoAssunto(aulaEmEdicao.id);
+          desenharAgenda();
+          if (depois) depois();
+        });
+      }
+    }));
+    /* Nada de campo.focus() aqui: é justamente o teclado subindo sozinho que
+     * tirava metade da tela dela no tablet. */
+    corpo.scrollTop = 0;
+  }
+
+  /* O seletor de temas de matemática servindo à trilha: mesma lista de sempre,
+   * o que muda é o que acontece ao escolher. Ele abre POR CIMA da trilha, e ao
+   * fechar a trilha continua atrás, do jeito que ela deixou. */
+  function escolherTemaDeMatematica(aluno, titulo, aoEscolher, temTrilhaAtras) {
+    $('#titulo-modal-tema').textContent = titulo;
+    var corpo = $('#corpo-modal-tema');
+    var rodape = $('#rodape-modal-tema');
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    corpo.appendChild(el('div', {
+      class: 'ajuda', style: 'margin-top:0', texto: 'Carregando os temas...'
+    }));
+    abrirModal('modal-tema');
+    carregarIndice().then(function (temas) {
+      desenharEscolhaTema(temas, null, aluno, '', {
+        rotuloEscolher: 'Usar',
+        /* O botão de voltar só existe quando há mesmo uma trilha atrás. Vindo da
+         * ficha do aluno, a trilha ainda não foi montada, e "Voltar para a
+         * trilha" prometeria uma tela que não existe. */
+        rotuloVoltar: temTrilhaAtras ? '‹ Voltar para a trilha' : null,
+        voltar: temTrilhaAtras ? function () { fecharModal('modal-tema'); } : null,
+        aoEscolher: function (t) {
+          fecharModal('modal-tema');
+          aoEscolher(t);
+        }
+      });
+    }).catch(function () {
+      corpo.innerHTML = '';
+      corpo.appendChild(el('div', { class: 'faixa-aviso' }, [
+        el('strong', { texto: 'Não consegui abrir o banco de temas agora. ' }),
+        document.createTextNode('Abra o aplicativo uma vez com internet para ele ficar guardado.')
+      ]));
+    });
+  }
+
+  function abrirTrilhaGuardada(aluno, trilha) {
+    propostaDeTrilha = null;
+    abrirModal('modal-trilha');
+    desenharTrilha(trilha, aluno, { proposta: false });
+    $('#corpo-modal-trilha').scrollTop = 0;
+  }
+
+  /* ---------- montar a partir da ficha, com alvo grande ----------
+   *
+   * O botão da lacuna dentro do mapeamento tem 12 px de altura. Aqui, na ficha,
+   * a mesma coisa começa por um botão largo que lista as lacunas marcadas. */
+  function abrirEscolhaDaLacuna(aluno) {
+    propostaDeTrilha = null;
+    $('#titulo-modal-trilha').textContent = 'Montar trilha para ' + aluno.nome;
+    var corpo = $('#corpo-modal-trilha');
+    var rodape = $('#rodape-modal-trilha');
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+
+    var m = Core.mapeamentoAtual(aluno);
+    var marcadas = (m && m.marcados && m.marcados.lacunas) || [];
+    var itens = marcadas.map(Core.itemDaLacuna).filter(Boolean);
+
+    if (itens.length) {
+      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Lacunas marcadas no mapeamento' }));
+      corpo.appendChild(el('div', {
+        class: 'ajuda', style: 'margin-top:0',
+        texto: 'Toque na lacuna que você quer fechar. Na tela seguinte você confirma onde ele ' +
+          'precisa chegar, e só depois a trilha é montada.'
+      }));
+      itens.forEach(function (item) {
+        var linha = el('div', {
+          class: 'item-lista clicavel item-lacuna-trilha', 'data-lacuna': item.id
+        }, [
+          el('div', { class: 'cresce' }, [
+            el('div', { class: 'nome', texto: item.rotulo })
+          ]),
+          el('button', {
+            type: 'button', class: 'btn pequeno principal', texto: 'Montar',
+            style: 'min-height:44px;box-sizing:border-box;padding:11px 18px;font-size:14px'
+          })
+        ]);
+        linha.addEventListener('click', function () { abrirTrilhaDaLacuna(aluno, item); });
+        corpo.appendChild(linha);
+      });
+    } else {
+      corpo.appendChild(el('div', { class: 'vazio' }, [
+        el('p', { texto: 'Nenhuma lacuna de ano anterior está marcada no mapeamento de ' + aluno.nome + '.' }),
+        el('p', {
+          class: 'ajuda',
+          texto: 'A trilha nasce de uma lacuna marcada. Abra o mapeamento e marque o que ficou ' +
+            'para trás, ou monte uma trilha do zero escolhendo o assunto direto no banco.'
+        })
+      ]));
+    }
+
+    corpo.appendChild(el('div', { class: 'barra', style: 'margin-top:12px' }, [
+      el('button', {
+        type: 'button', class: 'btn', id: 'trilha-do-zero-na-escolha', texto: 'Trilha do zero',
+        style: 'min-height:44px;padding:11px 16px',
+        aoClick: function () { novaTrilhaDoZero(aluno); }
+      })
+    ]));
+
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn principal', texto: 'Fechar', style: 'min-height:44px',
+      aoClick: function () { fecharModal('modal-trilha'); }
+    }));
+    abrirModal('modal-trilha');
+    corpo.scrollTop = 0;
+  }
+
+  /* Do zero: sem lacuna por trás, ela mesma escolhe onde a trilha termina. */
+  function novaTrilhaDoZero(aluno) {
+    var daTrilha = $('#modal-trilha').classList.contains('aberto');
+    escolherTemaDeMatematica(aluno, 'Onde a trilha precisa chegar', function (t) {
+      carregarIndice().then(function (temas) {
+        abrirModal('modal-trilha');
+        montarPropostaDeTrilha(aluno, null,
+          { id: t.id, titulo: t.pt.titulo, serie: t.serie }, temas);
+      });
+    }, daTrilha);
+  }
+
+  /* ---------- onde ela governa: painel na ficha do aluno ---------- */
+
+  var painelTrilhasAtivo = null;
+
+  function atualizarPainelTrilhas(alunoId) {
+    if (!painelTrilhasAtivo || painelTrilhasAtivo.alunoId !== alunoId) return false;
+    if (!document.getElementById('painel-trilhas')) return false;
+    painelTrilhasAtivo.desenhar();
+    return true;
+  }
+
+  function desenharPainelTrilhas(caixa, aluno) {
+    var painel = el('div', { id: 'painel-trilhas' });
+    caixa.appendChild(painel);
+
+    function desenhar() {
+      painel.innerHTML = '';
+      var todas = Core.trilhasDe(aluno);
+      var ativas = Core.trilhasAtivas(aluno);
+      var encerradas = todas.filter(function (t) { return t.encerradaEm; });
+
+      painel.appendChild(el('h3', { class: 'subtitulo', texto: 'Trilhas' }));
+      painel.appendChild(el('div', {
+        class: 'ajuda', style: 'margin-top:0',
+        texto: 'A trilha é a sequência de assuntos que precisa vir antes daquele em que ele ' +
+          'travou, na ordem. Ela anda sozinha: quando você registra o assunto da aula, o passo ' +
+          'daquele assunto fica marcado com a data da aula.'
+      }));
+
+      painel.appendChild(el('div', { class: 'barra', style: 'margin:10px 0' }, [
+        el('button', {
+          type: 'button', class: 'btn principal', id: 'montar-trilha',
+          texto: 'Montar trilha', style: 'flex:1;min-height:44px;padding:12px 16px',
+          aoClick: function () { abrirEscolhaDaLacuna(aluno); }
+        }),
+        el('button', {
+          type: 'button', class: 'btn', id: 'nova-trilha-do-zero', texto: 'Trilha do zero',
+          style: 'min-height:44px;padding:12px 16px',
+          aoClick: function () { novaTrilhaDoZero(aluno); }
+        })
+      ]));
+
+      if (!todas.length) {
+        painel.appendChild(el('div', {
+          class: 'ajuda', style: 'margin-top:0',
+          texto: 'Nenhuma trilha ainda. Montar trilha parte das lacunas marcadas no ' +
+            'mapeamento; Trilha do zero parte de um assunto escolhido por você.'
+        }));
+        return;
+      }
+
+      ativas.forEach(function (trilha) { painel.appendChild(cartaoDeTrilha(trilha, aluno, desenhar)); });
+
+      if (encerradas.length) {
+        painel.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Trilhas encerradas' }));
+        painel.appendChild(el('div', {
+          class: 'ajuda', style: 'margin-top:0',
+          texto: 'Trilha encerrada não some: é a prova do trabalho, e é o que uma conversa com ' +
+            'a família vai querer ver.'
+        }));
+        encerradas.forEach(function (trilha) {
+          painel.appendChild(el('div', { class: 'item-lista item-trilha-encerrada' }, [
+            el('div', { class: 'cresce' }, [
+              el('div', { class: 'nome', texto: trilha.titulo }),
+              el('div', {
+                class: 'detalhe',
+                texto: Core.passosFeitos(trilha) + ' de ' + (trilha.passos || []).length +
+                  ' passos dados · de ' + Core.ddmmaaaa(trilha.criadaEm) + ' a ' +
+                  Core.ddmmaaaa(trilha.encerradaEm) + (trilha.motivo ? ' · ' + trilha.motivo : '')
+              })
+            ]),
+            el('button', {
+              type: 'button', class: 'btn pequeno abrir-trilha', texto: 'Abrir',
+              style: 'min-height:44px;min-width:44px;box-sizing:border-box;padding:11px 16px;font-size:13px',
+              /* Sem fechar a ficha: ver a trilha e voltar tem que custar um
+               * toque, como já custa em Montar trilha, que empilha. */
+              aoClick: function () { abrirTrilhaGuardada(aluno, trilha); }
+            })
+          ]));
+        });
+      }
+    }
+
+    painelTrilhasAtivo = { alunoId: aluno.id, desenhar: desenhar };
+    desenhar();
+  }
+
+  /* Uma trilha ativa por inteiro: os passos em ordem, a data de cada um que já
+   * foi dado, e a caixa de marcar para consertar à mão o que o automático
+   * errou. Desmarcar apaga a data e a aula, e por isso passa pelo Desfazer.
+   *
+   * O alvo de toque aqui era o rótulo INTEIRO, 470 por 38 px, e ele alternava o
+   * feito: rolar a lista com o dedo e encostar num rótulo apagava a data e a
+   * aula de um passo, sem pergunta e sem volta. Agora o alvo é só a caixa de
+   * marcar, que passou de 13 para 44 px. */
+  function cartaoDeTrilha(trilha, aluno, redesenhar) {
+    var caixa = el('div', {
+      class: 'cartao item-trilha-ativa', 'data-trilha': trilha.id,
+      style: 'margin-bottom:12px'
+    });
+    var ALVO = 'min-height:44px;min-width:44px;box-sizing:border-box;';
+
+    caixa.appendChild(el('div', { class: 'barra', style: 'margin-bottom:6px;gap:10px' }, [
+      el('div', { class: 'cresce' }, [
+        el('div', { class: 'nome', style: 'font-weight:700;color:#1F3A5F', texto: trilha.titulo }),
+        el('div', { class: 'detalhe', style: 'font-size:13px', texto: resumoDaTrilha(trilha, aluno) })
+      ]),
+      el('button', {
+        type: 'button', class: 'btn pequeno abrir-trilha', texto: 'Abrir',
+        style: ALVO + 'padding:11px 16px;font-size:13px',
+        /* Abrir empilha em cima da ficha, do mesmo jeito que Montar trilha:
+         * fechar a ficha aqui fazia o caminho de volta custar seis toques. */
+        aoClick: function () { abrirTrilhaGuardada(aluno, trilha); }
+      }),
+      el('button', {
+        type: 'button', class: 'btn pequeno encerrar-trilha', texto: 'Encerrar',
+        /* Encerrar ficava a 10 px de Abrir, e uma some da lista e a outra não. */
+        style: ALVO + 'margin-left:22px;padding:11px 16px;font-size:13px',
+        aoClick: function () { encerrarPeloPainel(trilha, aluno, redesenhar); }
+      })
+    ]));
+
+    (trilha.passos || []).forEach(function (p, i) {
+      var feito = !!p.feitoEm;
+      /* A caixa tinha 13 por 13 px e o alvo real era o rótulo inteiro. Agora a
+       * caixa É o alvo, e por isso ela mesma tem 44 por 44: nada de zona
+       * invisível maior do que o desenho, que é o tipo de alvo que ela erra
+       * justamente por não ver onde acaba. */
+      var chk = el('input', {
+        type: 'checkbox', class: 'marca-passo',
+        style: 'width:44px;height:44px;min-height:44px;flex:none;margin:0;cursor:pointer'
+      });
+      chk.checked = feito;
+      chk.addEventListener('change', function () {
+        /* Desmarcar apaga a data e a aula, então vai com Desfazer, que é o
+         * padrão do resto do aplicativo. Marcar não destrói nada e continua
+         * gravando direto: pedir desfazer para tudo ensina a ignorar o aviso.
+         *
+         * Marcar recupera a marca anterior, se houver: desmarcar sem querer e
+         * marcar de novo devolvia a data de HOJE e perdia a aula em que o
+         * assunto foi dado. */
+        if (this.checked) {
+          remarcarPasso(p, null);
+          salvar().then(function () {
+            redesenhar();
+            if (aulaEmEdicao) atualizarBlocoAssunto(aulaEmEdicao.id);
+            desenharAgenda();
+          });
+          return;
+        }
+        comDesfazer('Passo de volta na fila.', function () {
+          desmarcarPasso(p);
+        }).then(function () {
+          redesenhar();
+          if (aulaEmEdicao) atualizarBlocoAssunto(aulaEmEdicao.id);
+          desenharAgenda();
+        });
+      });
+
+      var quando = '';
+      if (feito) {
+        quando = (p.jaEra ? 'já trabalhado em ' : (p.aulaId ? 'dado em ' : 'marcado por você em ')) +
+          Core.ddmm(p.feitoEm);
+      }
+
+      /* Um <div>, e não um <label>: o rótulo do <label> repassava o toque para
+       * a caixa, e era a linha inteira que virava alvo. A caixa ganhou 10 px de
+       * folga em volta para chegar aos 44, sem crescer o desenho. */
+      caixa.appendChild(el('div', {
+        class: 'item-area passo-da-trilha', 'data-passo': p.temaId,
+        style: 'margin-bottom:5px;cursor:default;padding:4px 10px' + (feito ? ';opacity:.65' : '')
+      }, [
+        chk,
+        el('span', { class: 'cresce' }, [
+          el('span', {
+            style: feito ? 'text-decoration:line-through' : '',
+            texto: (i + 1) + '. ' + p.titulo
+          }),
+          quando ? el('span', { class: 'detalhe', style: 'display:block;font-size:12px', texto: quando }) : null
+        ].filter(Boolean))
+      ]));
+    });
+
+    return caixa;
+  }
+
+  /* Encerrar a partir do painel da ficha usa a MESMA tela de encerramento da
+   * trilha aberta, empilhada em cima da ficha. Voltar devolve a ficha do jeito
+   * que estava, sem redesenhar nada. */
+  function encerrarPeloPainel(trilha, aluno, redesenhar) {
+    abrirModal('modal-trilha');
+    abrirEncerramento(trilha, aluno, function () {
+      fecharModal('modal-trilha');
+      if (redesenhar) redesenhar();
+    }, function () {
+      fecharModal('modal-trilha');
+    });
+    $('#corpo-modal-trilha').scrollTop = 0;
   }
 
   /* Caixa de lembrete que aparece ao abrir uma aula de aluno já mapeado. */
@@ -3402,6 +4841,23 @@
     aula.temas = Core.temasDaAula(aula);
     aula.temas.push(item);
     delete aula.tema;
+
+    /* A trilha anda de graça: o mesmo toque que registra o assunto marca o
+     * passo daquele assunto, com a data DA AULA e não a de hoje, porque ela
+     * lança aula atrasada e usa Repetir para trás. Só marca o passo que ainda
+     * não foi dado, e nunca os anteriores: pular etapa é decisão dela. */
+    var alunoDaAula = alunoPorId(aula.alunoId);
+    var andou = alunoDaAula ? Core.marcarPassoPorAssunto(alunoDaAula, aula, item) : null;
+    /* Este passo foi dado NESTA aula, então não é anterior à trilha. Um jaEra
+     * que tivesse sobrado de uma desmarcação faria a ficha dizer "já trabalhado
+     * em", como se a aula de hoje não contasse. E a marca de solto à mão sai
+     * junto: ela acabou de dizer o contrário, registrando o assunto. */
+    if (andou) {
+      delete andou.passo.jaEra;
+      delete andou.passo.marcaAnterior;
+      delete andou.passo.soltoAMao;
+    }
+
     salvar().then(function () {
       fecharModal('modal-tema');
       if ($('#modal-aula').classList.contains('aberto') && aulaEmEdicao &&
@@ -3411,9 +4867,23 @@
         }
         if ($('#lista-anexos')) desenharAnexos($('#lista-anexos'), aula);
       }
+      if (andou) atualizarPainelTrilhas(aula.alunoId);
       desenharAgenda();
+      if (andou) {
+        var feitos = Core.passosFeitos(andou.trilha);
+        var total = (andou.trilha.passos || []).length;
+        avisar('Assunto registrado, e a trilha andou: ' + feitos + ' de ' + total + ' passos.');
+        return;
+      }
       avisar('Assunto registrado: ' + item.titulo + '.');
     }).catch(function () {
+      /* O passo também volta atrás: trilha que anda sem a aula ter sido gravada
+       * contaria como dado o que não ficou registrado em lugar nenhum. */
+      if (andou) {
+        andou.passo.feitoEm = null;
+        andou.passo.aulaId = null;
+        delete item.passoDe;
+      }
       /* A gravação falhou, então a memória tem que voltar a espelhar o disco.
        *
        * Sem desfazer, o assunto ficava só na memória e a guarda de duplicata
@@ -3450,13 +4920,26 @@
       saida.push({ item: item, detalhe: detalhe });
     }
 
+    /* O próximo passo da trilha vem na frente de tudo, porque é a resposta mais
+     * provável para "o que a gente vê hoje". O cartão lá em cima é o caminho de
+     * um toque; aqui é o mesmo assunto, para quando ela já entrou no seletor. */
+    Core.trilhasAtivas(aluno || {}).forEach(function (tr) {
+      var p = Core.proximoPasso(tr);
+      if (!p) return;
+      juntar(
+        { id: p.temaId, titulo: p.titulo, fonte: 'banco', disciplina: 'matematica' },
+        'próximo passo da trilha até ' + tr.titulo
+      );
+    });
+    var daTrilha = saida.length;
+
     db.aulas.filter(function (a) {
       return a.alunoId === aula.alunoId && a.id !== aula.id;
     }).sort(function (a, b) { return b.data.localeCompare(a.data); })
       .forEach(function (a) {
-        if (saida.length >= 5) return;
+        if (saida.length >= daTrilha + 5) return;
         Core.temasDaAula(a).forEach(function (t) {
-          if (saida.length >= 5) return;
+          if (saida.length >= daTrilha + 5) return;
           juntar({
             id: t.id, titulo: t.titulo, fonte: t.fonte, disciplina: t.disciplina, grupo: t.grupo
           }, 'já dado em ' + Core.ddmm(a.data));
@@ -3466,7 +4949,7 @@
     var ano = anoEscolarDe(aluno) || ultimoAnoEscolar || '06';
     (indiceTemas || []).filter(function (t) { return t.serie === ano; })
       .forEach(function (t) {
-        if (saida.length >= MAX_SUGESTOES) return;
+        if (saida.length >= daTrilha + MAX_SUGESTOES) return;
         juntar(
           { id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: 'matematica' },
           'Matemática, ' + nomeDoAno(t.serie)

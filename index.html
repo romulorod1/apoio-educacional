@@ -230,6 +230,22 @@
     </div>
   </div>
 
+  <!-- A trilha tem janela própria, e não reaproveita a do material, porque de
+       dentro dela ela abre o seletor de assunto para acrescentar um passo, e o
+       seletor é justamente #modal-tema. Uma janela só se apagaria no meio do
+       caminho. Quem fica por cima de quem é resolvido no app.js, na ordem em
+       que as janelas abrem. -->
+  <div class="fundo-modal" id="modal-trilha">
+    <div class="modal largo">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-trilha">Trilha</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-trilha"></div>
+      <div class="modal-rodape" id="rodape-modal-trilha"></div>
+    </div>
+  </div>
+
   <div class="fundo-modal" id="modal-novidades">
     <div class="modal" style="max-width:520px">
       <div class="modal-cabecalho">
