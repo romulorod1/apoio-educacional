@@ -775,30 +775,43 @@
       chave: 'lacunas',
       titulo: 'Lacunas de anos anteriores',
       ajuda: 'O que ficou para trás e atrapalha o conteúdo de agora. ' +
-        'Cada lacuna marcada abre os temas correspondentes no banco.',
+        'Cada lacuna marcada monta a trilha dos assuntos que precisam vir antes, ' +
+        'na ordem.',
+      /* Cada item tem `busca`, que continua abrindo a lista de temas, e `alvos`,
+       * que são os fins de trilha possíveis daquela lacuna, do ano mais baixo
+       * para o mais alto.
+       *
+       * Os alvos são escritos à mão de propósito. Medido no banco de hoje: a
+       * busca por "função" devolve sete temas do 1º ano do médio, todos
+       * plausíveis, e escolher pelo ano do aluno pode pegar o errado; a busca por
+       * "operações" devolve dez temas espalhados do 5º ano ao 3º do médio,
+       * incluindo matrizes e polinômios; e "primeiro grau" e "segundo grau" não
+       * casam com título nenhum, ou seja as duas lacunas de equação não tinham
+       * alvo nenhum. Quem confirma o alvo é ela, com um toque, ao montar a
+       * trilha: um toque por trilha, nunca por aula. */
       itens: [
-        { id: 'naturais', rotulo: 'Operações com números naturais', busca: 'operações' },
-        { id: 'tabuada', rotulo: 'Tabuada e multiplicação', busca: 'multiplicação' },
-        { id: 'divisao', rotulo: 'Divisão', busca: 'divisão' },
-        { id: 'fracoes', rotulo: 'Frações', busca: 'fração' },
-        { id: 'decimais', rotulo: 'Números decimais', busca: 'decimais' },
-        { id: 'porcentagem', rotulo: 'Porcentagem', busca: 'porcentagem' },
-        { id: 'inteiros', rotulo: 'Números negativos', busca: 'inteiros' },
-        { id: 'potencias', rotulo: 'Potenciação e raiz', busca: 'potência' },
-        { id: 'medidas', rotulo: 'Unidades de medida', busca: 'medida' },
-        { id: 'algebrica', rotulo: 'Expressões algébricas', busca: 'algébric' },
-        { id: 'eq1', rotulo: 'Equação do primeiro grau', busca: 'primeiro grau' },
-        { id: 'sistemas', rotulo: 'Sistemas de equações', busca: 'sistema' },
-        { id: 'fatoracao', rotulo: 'Produtos notáveis e fatoração', busca: 'fatoração' },
-        { id: 'eq2', rotulo: 'Equação do segundo grau', busca: 'segundo grau' },
-        { id: 'proporcao', rotulo: 'Razão, proporção e regra de três', busca: 'proporção' },
-        { id: 'area', rotulo: 'Perímetro, área e volume', busca: 'área' },
-        { id: 'pitagoras', rotulo: 'Teorema de Pitágoras', busca: 'Pitágoras' },
-        { id: 'semelhanca', rotulo: 'Semelhança e escala', busca: 'semelhança' },
-        { id: 'trigonometria', rotulo: 'Trigonometria no triângulo retângulo', busca: 'trigonometria' },
-        { id: 'funcoes', rotulo: 'Funções', busca: 'função' },
-        { id: 'graficos', rotulo: 'Leitura de gráficos e estatística', busca: 'gráfico' },
-        { id: 'probabilidade', rotulo: 'Probabilidade', busca: 'probabilidade' }
+        { id: 'naturais', rotulo: 'Operações com números naturais', busca: 'operações', alvos: ['MAT04-02', 'MAT05-02', 'MAT06-02'] },
+        { id: 'tabuada', rotulo: 'Tabuada e multiplicação', busca: 'multiplicação', alvos: ['MAT03-04', 'MAT04-03'] },
+        { id: 'divisao', rotulo: 'Divisão', busca: 'divisão', alvos: ['MAT03-05', 'MAT04-04'] },
+        { id: 'fracoes', rotulo: 'Frações', busca: 'fração', alvos: ['MAT04-05', 'MAT05-03', 'MAT06-05', 'MAT06-06'] },
+        { id: 'decimais', rotulo: 'Números decimais', busca: 'decimais', alvos: ['MAT04-06', 'MAT05-05', 'MAT06-07'] },
+        { id: 'porcentagem', rotulo: 'Porcentagem', busca: 'porcentagem', alvos: ['MAT05-06', 'MAT06-08', 'MAT07-07'] },
+        { id: 'inteiros', rotulo: 'Números negativos', busca: 'inteiros', alvos: ['MAT07-01', 'MAT07-02'] },
+        { id: 'potencias', rotulo: 'Potenciação e raiz', busca: 'potência', alvos: ['MAT08-01', 'MAT09-02'] },
+        { id: 'medidas', rotulo: 'Unidades de medida', busca: 'medida', alvos: ['MAT04-10', 'MAT05-10', 'MAT06-12'] },
+        { id: 'algebrica', rotulo: 'Expressões algébricas', busca: 'algébric', alvos: ['MAT07-09', 'MAT08-05'] },
+        { id: 'eq1', rotulo: 'Equação do primeiro grau', busca: 'primeiro grau', alvos: ['MAT07-10'] },
+        { id: 'sistemas', rotulo: 'Sistemas de equações', busca: 'sistema', alvos: ['MAT08-10', 'MATEM2-06'] },
+        { id: 'fatoracao', rotulo: 'Produtos notáveis e fatoração', busca: 'fatoração', alvos: ['MAT08-06', 'MAT08-07'] },
+        { id: 'eq2', rotulo: 'Equação do segundo grau', busca: 'segundo grau', alvos: ['MAT09-04', 'MAT09-05'] },
+        { id: 'proporcao', rotulo: 'Razão, proporção e regra de três', busca: 'proporção', alvos: ['MAT07-05', 'MAT07-06'] },
+        { id: 'area', rotulo: 'Perímetro, área e volume', busca: 'área', alvos: ['MAT04-09', 'MAT05-09', 'MAT06-11', 'MAT07-13'] },
+        { id: 'pitagoras', rotulo: 'Teorema de Pitágoras', busca: 'Pitágoras', alvos: ['MAT09-07'] },
+        { id: 'semelhanca', rotulo: 'Semelhança e escala', busca: 'semelhança', alvos: ['MAT09-08'] },
+        { id: 'trigonometria', rotulo: 'Trigonometria no triângulo retângulo', busca: 'trigonometria', alvos: ['MAT09-09', 'MATEM1-14'] },
+        { id: 'funcoes', rotulo: 'Funções', busca: 'função', alvos: ['MAT09-10', 'MATEM1-03'] },
+        { id: 'graficos', rotulo: 'Leitura de gráficos e estatística', busca: 'gráfico', alvos: ['MAT04-12', 'MAT05-12', 'MAT06-14', 'MATEM3-14'] },
+        { id: 'probabilidade', rotulo: 'Probabilidade', busca: 'probabilidade', alvos: ['MAT07-14', 'MAT08-14', 'MAT09-14', 'MATEM2-10'] }
       ]
     },
     {
@@ -1127,6 +1140,8 @@
     var listaFaixas = Object.keys(faixas).map(function (k) { return faixas[k]; })
       .sort(function (a, b) { return a.valorHora - b.valorHora; });
 
+
+
     return {
       aluno: aluno,
       alunoNome: aluno.nome,
@@ -1319,6 +1334,318 @@
       .replace(/^_+|_+$/g, '');
   }
 
+  // ---------- trilhas para fechar uma lacuna ----------
+
+  /* A trilha é a sequência de assuntos que precisam vir antes daquele em que o
+   * aluno travou, em ordem, derivada do pré-requisito que cada tema já declara.
+   *
+   * Ela existe porque marcar "Frações" no mapeamento levava a uma busca que
+   * devolve dezoito temas em ordem de relevância, começando pelo 8º ano e
+   * pulando para o 4º: uma lista sem ordem, em que ela decidia de cabeça por
+   * onde começar. Aqui a ordem sai do grafo, e não da relevância.
+   *
+   * Tudo abaixo é função pura e recebe a lista de temas por argumento: assim
+   * roda em node, no teste, sem navegador e sem rede. */
+
+  var ORDEM_SERIE = ['01', '02', '03', '04', '05', '06', '07', '08', '09', 'em1', 'em2', 'em3'];
+
+  function posDaSerie(s) {
+    var i = ORDEM_SERIE.indexOf(String(s || ''));
+    return i < 0 ? 99 : i;
+  }
+
+  /* O ano do aluno, com a mesma precedência que o contextoEscolarDe usa: o
+   * mapeamento mais recente manda, e o cadastro do aluno é o recurso. */
+  function anoEscolarDe(aluno) {
+    var m = mapeamentoAtual(aluno);
+    return (m && m.anoEscolar) || (aluno && aluno.anoEscolar) || '';
+  }
+
+  function itemDaLacuna(lacunaId) {
+    var achado = null;
+    (MAPA || []).forEach(function (g) {
+      if (g.chave !== 'lacunas') return;
+      (g.itens || []).forEach(function (it) { if (it.id === lacunaId) achado = it; });
+    });
+    return achado;
+  }
+
+  /* Os fins de trilha possíveis de uma lacuna, e qual deles propor.
+   *
+   * O proposto é o mais alto que não passa do ano do aluno: dar conteúdo de 6º
+   * ano para tapar buraco de aluno do 5º é adiantar, não recuperar. Aluno sem
+   * ano registrado recebe o mais baixo, que é o lado seguro de errar, e a tela
+   * diz de onde veio. Quem confirma é ela. */
+  function alvosDaLacuna(temas, lacunaId, anoEscolar) {
+    var item = itemDaLacuna(lacunaId);
+    if (!item || !item.alvos || !item.alvos.length) return { candidatos: [], sugerido: '' };
+    var porId = {};
+    (temas || []).forEach(function (t) { porId[t.id] = t; });
+    var candidatos = item.alvos.map(function (id) {
+      var t = porId[id];
+      return t ? { id: id, titulo: tituloDoTema(t), serie: t.serie } : null;
+    }).filter(Boolean);
+    if (!candidatos.length) return { candidatos: [], sugerido: '' };
+
+    var sugerido = candidatos[0].id;
+    if (anoEscolar) {
+      var teto = posDaSerie(anoEscolar);
+      candidatos.forEach(function (c) {
+        if (posDaSerie(c.serie) <= teto) sugerido = c.id;
+      });
+    }
+    return { candidatos: candidatos, sugerido: sugerido, rotulo: item.rotulo };
+  }
+
+  /* O título do tema, seja ele do formato do banco (pt.titulo) ou do índice
+   * enxuto que o aplicativo baixa. */
+  function tituloDoTema(t) {
+    if (!t) return '';
+    if (t.pt && t.pt.titulo) return t.pt.titulo;
+    return t.titulo || t.id;
+  }
+
+  /* A escada até o alvo.
+   *
+   * Fecho transitivo para trás sobre os pré-requisitos, depois ordenação
+   * topológica de Kahn com desempate por (ano, número do id).
+   *
+   * A topológica é necessária, e não enfeite: ordenar direto por ano e número
+   * erra em dois pares do banco de hoje, MAT09-06 que depende de MAT09-07 e
+   * MATEM1-09 que depende de MATEM1-15, e ordenar por dificuldade erra em cinco,
+   * sendo o mais visível MAT06-03 (múltiplos e MMC), que é pré-requisito de
+   * frações e tem dificuldade maior: a trilha de fração começaria por fração.
+   *
+   * O corte guarda os passos MAIS PRÓXIMOS do alvo, e dispara na maioria das
+   * lacunas: porcentagem no 7º ano dá dez passos, potenciação no 8º dá nove,
+   * probabilidade dá nove. Por isso os cortados voltam na resposta: a tela
+   * oferece puxar mais de trás, um por vez. */
+  function trilhaDerivada(temas, alvoId, opcoes) {
+    opcoes = opcoes || {};
+    var maximo = opcoes.maximo || 6;
+    var porId = {};
+    (temas || []).forEach(function (t) { porId[t.id] = t; });
+    if (!porId[alvoId]) return { passos: [], cortados: [], alvo: null };
+
+    // 1. fecho para trás, em largura, à prova de ciclo e de aresta quebrada
+    var dentro = {};
+    var fila = [alvoId];
+    dentro[alvoId] = true;
+    while (fila.length) {
+      var id = fila.shift();
+      var pres = (porId[id] && porId[id].prerequisitos) || [];
+      for (var i = 0; i < pres.length; i++) {
+        var p = pres[i];
+        if (!porId[p] || dentro[p]) continue;
+        dentro[p] = true;
+        fila.push(p);
+      }
+    }
+
+    // 2. ordenação topológica de Kahn, desempatando por ano e número
+    var ids = Object.keys(dentro);
+    var grau = {}, saiDe = {};
+    ids.forEach(function (id) { grau[id] = 0; saiDe[id] = []; });
+    ids.forEach(function (id) {
+      ((porId[id].prerequisitos) || []).forEach(function (p) {
+        if (!dentro[p]) return;
+        grau[id]++;
+        saiDe[p].push(id);
+      });
+    });
+    var numeroDoId = function (id) {
+      var m = String(id).match(/(\d+)$/);
+      return m ? +m[1] : 0;
+    };
+    var antes = function (a, b) {
+      var d = posDaSerie(porId[a].serie) - posDaSerie(porId[b].serie);
+      if (d) return d;
+      d = numeroDoId(a) - numeroDoId(b);
+      if (d) return d;
+      return a < b ? -1 : (a > b ? 1 : 0);
+    };
+    var prontos = ids.filter(function (id) { return !grau[id]; }).sort(antes);
+    var ordem = [];
+    while (prontos.length) {
+      var atual = prontos.shift();
+      ordem.push(atual);
+      saiDe[atual].forEach(function (v) {
+        grau[v]--;
+        if (!grau[v]) prontos.push(v);
+      });
+      prontos.sort(antes);
+    }
+
+    var passos = ordem.map(function (id) {
+      return {
+        temaId: id, titulo: tituloDoTema(porId[id]),
+        serie: porId[id].serie, duracaoMin: porId[id].duracaoMin || 60,
+        feitoEm: null, aulaId: null
+      };
+    });
+
+    /* O corte tira do começo, que é o mais distante do alvo. Sem o alvo a
+     * trilha não faz sentido, então ele nunca sai. */
+    var cortados = [];
+    if (passos.length > maximo) {
+      cortados = passos.slice(0, passos.length - maximo);
+      passos = passos.slice(passos.length - maximo);
+    }
+    return { passos: passos, cortados: cortados, alvo: porId[alvoId] };
+  }
+
+  /* Quanto tempo cada encontro costuma durar com aquele aluno: a duração mais
+   * frequente nas aulas dele, com 60 minutos de recurso. Nunca uma data de
+   * término: o calendário dela tem cancelamento, prova e feriado, e data errada
+   * é pior do que data nenhuma. */
+  function duracaoHabitual(db, alunoId) {
+    var contagem = {};
+    ((db && db.aulas) || []).forEach(function (a) {
+      if (a.alunoId !== alunoId) return;
+      var d = a.duracao || 0;
+      if (d > 0) contagem[d] = (contagem[d] || 0) + 1;
+    });
+    var melhor = 0, vezes = -1;
+    Object.keys(contagem).forEach(function (d) {
+      if (contagem[d] > vezes || (contagem[d] === vezes && +d > melhor)) {
+        melhor = +d; vezes = contagem[d];
+      }
+    });
+    return melhor || 60;
+  }
+
+  function encontrosPrevistos(passos, duracaoMin) {
+    var soma = 0;
+    (passos || []).forEach(function (p) { soma += p.duracaoMin || 60; });
+    var d = duracaoMin || 60;
+    return Math.max(1, Math.ceil(soma / d));
+  }
+
+  // ---------- as trilhas guardadas no aluno ----------
+
+  function trilhasDe(aluno) {
+    return (aluno && aluno.trilhas) || [];
+  }
+
+  function trilhasAtivas(aluno) {
+    return trilhasDe(aluno).filter(function (t) { return !t.encerradaEm; });
+  }
+
+  function proximoPasso(trilha) {
+    var ps = (trilha && trilha.passos) || [];
+    for (var i = 0; i < ps.length; i++) if (!ps[i].feitoEm) return ps[i];
+    return null;
+  }
+
+  function passosFeitos(trilha) {
+    return ((trilha && trilha.passos) || []).filter(function (p) { return p.feitoEm; }).length;
+  }
+
+  /* Passo que o aluno já viu em alguma aula anterior nasce marcado, com a data
+   * daquela aula. É aqui que as duas frentes se encostam: o registro de assunto
+   * alimenta a trilha antes mesmo de ela existir. */
+  function marcarOQueJaFoiDado(db, alunoId, passos) {
+    var quando = {};
+    ((db && db.aulas) || []).forEach(function (a) {
+      if (a.alunoId !== alunoId) return;
+      if (a.status && a.status !== 'realizada' && a.status !== 'reposicao') return;
+      temasDaAula(a).forEach(function (t) {
+        if (!t.id) return;
+        if (!quando[t.id] || a.data > quando[t.id].data) quando[t.id] = { data: a.data, id: a.id };
+      });
+    });
+    (passos || []).forEach(function (p) {
+      var q = quando[p.temaId];
+      if (!q) return;
+      p.feitoEm = q.data;
+      p.aulaId = q.id;
+      p.jaEra = true;
+    });
+    return passos;
+  }
+
+  function criarTrilha(dados) {
+    return {
+      id: uid(),
+      alunoId: dados.alunoId,
+      lacunaId: dados.lacunaId || null,
+      titulo: dados.titulo || '',
+      alvoId: dados.alvoId,
+      criadaEm: dados.criadaEm || hojeIso(),
+      origem: dados.lacunaId ? 'lacuna' : 'manual',
+      passos: dados.passos || [],
+      encerradaEm: null,
+      motivo: ''
+    };
+  }
+
+  function moverPasso(trilha, de, para) {
+    var ps = (trilha && trilha.passos) || [];
+    if (de < 0 || de >= ps.length || para < 0 || para >= ps.length) return false;
+    var x = ps.splice(de, 1)[0];
+    ps.splice(para, 0, x);
+    return true;
+  }
+
+  function removerPasso(trilha, indice) {
+    var ps = (trilha && trilha.passos) || [];
+    if (indice < 0 || indice >= ps.length) return false;
+    ps.splice(indice, 1);
+    return true;
+  }
+
+  function encerrarTrilha(trilha, data, motivo) {
+    if (!trilha) return false;
+    trilha.encerradaEm = data || hojeIso();
+    trilha.motivo = motivo || '';
+    return true;
+  }
+
+  /* O assunto registrado numa aula faz a trilha andar sozinha.
+   *
+   * Marca só o passo cujo tema é aquele, nunca os anteriores: pular etapa é
+   * decisão dela, não do aplicativo. E carimba a data DA AULA, não a de hoje,
+   * porque ela lança aula atrasada e usa repetir para trás.
+   *
+   * Só conta em aula realizada ou reposição. Falta sem aviso é aula que não
+   * aconteceu, e cancelada também. */
+  function marcarPassoPorAssunto(aluno, aula, item) {
+    if (!aluno || !aula || !item || !item.id) return null;
+    var st = aula.status || 'realizada';
+    if (st !== 'realizada' && st !== 'reposicao') return null;
+    var marcado = null;
+    trilhasAtivas(aluno).forEach(function (tr) {
+      if (marcado) return;
+      (tr.passos || []).forEach(function (p) {
+        if (marcado || p.feitoEm || p.temaId !== item.id) return;
+        p.feitoEm = aula.data;
+        p.aulaId = aula.id;
+        marcado = { trilha: tr, passo: p };
+      });
+    });
+    if (marcado) item.passoDe = marcado.trilha.id;
+    return marcado;
+  }
+
+  /* Aula que deixou de acontecer desmarca os passos que ela tinha fechado. Sem
+   * isto a trilha contaria como andado o que não foi dado, que é o pior tipo de
+   * erro: o que fica calado. */
+  function revisarPassosDaAula(aluno, aula) {
+    if (!aluno || !aula) return 0;
+    var st = aula.status || 'realizada';
+    if (st === 'realizada' || st === 'reposicao') return 0;
+    var n = 0;
+    trilhasDe(aluno).forEach(function (tr) {
+      (tr.passos || []).forEach(function (p) {
+        if (p.aulaId !== aula.id) return;
+        p.feitoEm = null;
+        p.aulaId = null;
+        n++;
+      });
+    });
+    return n;
+  }
+
   return {
     MESES: MESES, DIAS_CURTO: DIAS_CURTO, DIAS_LONGO: DIAS_LONGO, STATUS: STATUS,
     pad2: pad2, partesData: partesData, dataLocal: dataLocal, isoDe: isoDe, hojeIso: hojeIso,
@@ -1348,6 +1675,14 @@
     podeDividir: podeDividir, metadesDe: metadesDe, somarMinutosNaHora: somarMinutosNaHora,
     uid: uid, nomeArquivo: nomeArquivo,
     chaveDeBusca: chaveDeBusca, casaBusca: casaBusca,
+    alvosDaLacuna: alvosDaLacuna, trilhaDerivada: trilhaDerivada,
+    duracaoHabitual: duracaoHabitual, encontrosPrevistos: encontrosPrevistos,
+    trilhasDe: trilhasDe, trilhasAtivas: trilhasAtivas, proximoPasso: proximoPasso,
+    passosFeitos: passosFeitos, marcarOQueJaFoiDado: marcarOQueJaFoiDado,
+    criarTrilha: criarTrilha, moverPasso: moverPasso, removerPasso: removerPasso,
+    encerrarTrilha: encerrarTrilha, marcarPassoPorAssunto: marcarPassoPorAssunto,
+    revisarPassosDaAula: revisarPassosDaAula, anoEscolarDe: anoEscolarDe,
+    itemDaLacuna: itemDaLacuna,
     exibeListas: exibeListas
   };
 });

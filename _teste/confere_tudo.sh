@@ -96,6 +96,7 @@ roda "notacao"        node _teste/testa_notacao.js
 roda "busca (regras)" node _teste/testa_busca_regras.js
 roda "material (PDF)" node _teste/testa_material.js
 roda "trilha (dados)" node _teste/testa_trilha_dados.js
+roda "trilha (motor)" node _teste/testa_trilha.js
 
 # As provas do kit de figuras nao rodavam aqui. Duas delas estavam falhando
 # desde o commit que as criou, algumas horas antes (_base_prova_travas, 34 de
