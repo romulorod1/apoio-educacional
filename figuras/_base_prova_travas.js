@@ -127,17 +127,14 @@ function parDeCasos(nome, trecho, comDefeito, semDefeito, op) {
 
 /* ------------------------------------------------ (e) texto nascido no desenho */
 const FRASE = 'Figura fora de escala.';
-parDeCasos('(e) texto nascido no desenhador', 'nao veio do tema',
-  function (ctx) {
-    ctx.contorno(function () { D.poligono(ctx, triangulo(ctx), { fechado: true }); });
-    ctx.rotulos(function () { D.rotulo(ctx, FRASE, centro(ctx), { tam: 8.5 }); });
-  },
-  function (ctx) {
-    ctx.contorno(function () { D.poligono(ctx, triangulo(ctx), { fechado: true }); });
-    ctx.rotulos(function () { D.rotulo(ctx, FRASE, centro(ctx), { tam: 8.5 }); });
-  },
-  null
-);
+/* So o lado com defeito: o lado limpo e o vindaDoTema logo abaixo, porque a
+ * frase e a mesma e o que muda e de onde ela veio (legenda= na diretiva). */
+const nascidaNoDesenhador = cartao('(e) texto nascido no desenhador: com o defeito', function (ctx) {
+  ctx.contorno(function () { D.poligono(ctx, triangulo(ctx), { fechado: true }); });
+  ctx.rotulos(function () { D.rotulo(ctx, FRASE, centro(ctx), { tam: 8.5 }); });
+});
+conf('(e) texto nascido no desenhador: acusa com o defeito',
+  contem(nascidaNoDesenhador.conferencia, 'nao veio do tema'), true);
 /* O par acima usa a MESMA frase nos dois lados de proposito: o que muda nao e a
  * frase, e de onde ela veio. Como o cartao nao aceita opcoes diferentes por
  * lado, o lado limpo e refeito aqui com a frase declarada pelo tema. */
@@ -262,14 +259,16 @@ function doisArcos(ctx, r1, r2) {
   const c = ctx.caixa;
   const V = { x: c.x + 12, y: c.y + 12 };
   const A = { x: c.x + c.largura - 10, y: c.y + 12 };
-  const meio = { x: V.x + 70, y: V.y + 70 };
   const alto = { x: V.x, y: c.y + c.altura - 10 };
   ctx.contorno(function () {
     D.poligono(ctx, [A, V, alto], { fechado: false });
   });
+  /* Por D.arco e nao por marcaAngulo: o marcaAngulo afasta o segundo arco
+   * sozinho (SEPARA_ARCO) e o defeito nunca chegava a trava. Dois angulos
+   * DIFERENTES (45 e 90 graus) no mesmo vertice, raios r1 e r2. */
   ctx.marcas(function () {
-    M.marcaAngulo(ctx.doc, V, A, meio, { raio: r1, ctx: ctx });
-    M.marcaAngulo(ctx.doc, V, A, alto, { raio: r2, ctx: ctx });
+    D.arco(ctx, V, r1, r1, 0, 45, { espessura: 0.9 });
+    D.arco(ctx, V, r2, r2, 0, 90, { espessura: 0.9 });
   });
 }
 function paralelogramo(ctx, invertido) {

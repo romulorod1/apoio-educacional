@@ -96,12 +96,71 @@ roda "notacao"        node _teste/testa_notacao.js
 roda "busca (regras)" node _teste/testa_busca_regras.js
 roda "material (PDF)" node _teste/testa_material.js
 
+# As provas do kit de figuras nao rodavam aqui. Duas delas estavam falhando
+# havia dias (_base_prova_travas, 34 de 36) e ninguem viu, porque so o
+# verificar.py e as suites de _teste entravam no portao. Regressao no kit
+# passaria pelo merge. Cada prova imprime "N passaram, M falharam"; a
+# _prova_desenho imprime so "avisos: N", e e conferida por esse token.
+titulo "kit de figuras"
+roda "fundacao"         node figuras/_prova_fundacao.js
+roda "marcas"           node figuras/_prova_marcas.js
+roda "receitas"         node figuras/_prova_receitas.js
+roda "receitas circ."   node figuras/_prova_receitas_circulo.js
+roda "curvas"           node figuras/_prova_desenho_curvas.js
+roda "solidos"          node figuras/_prova_solidos.js
+roda "travas do base"   node figuras/_base_prova_travas.js
+roda "travas de hoje"   node figuras/_prova_base_travas_hoje.js
+roda "formula"          node figuras/testa_formula.js
+roda "piloto MAT07-12"  node figuras/_piloto_MAT07-12.js
+roda "receitas sol."    node figuras/_prova_receitas_solidos.js
+roda "piloto MAT08-13"  node figuras/_piloto_MAT08-13.js
+roda "piloto MATEM3-04" node figuras/_piloto_MATEM3-04.js
+saida=$(node figuras/_prova_desenho.js 2>&1) || true
+if printf '%s\n' "$saida" | grep -qE "^avisos: 0$" && printf '%s\n' "$saida" | grep -qE "^vazamentos de estado: 0$"; then
+  printf '  ok      %-24s %s\n' "desenho" "$(printf '%s\n' "$saida" | grep -E '^figuras:' | head -1)"
+else
+  printf '  FALHOU  %-24s %s\n' "desenho" "$(printf '%s\n' "$saida" | grep -E 'avisos|vazamentos' | tr '\n' ' ')"
+  falhou=1
+fi
+
 titulo "com navegador"
 for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento \
          testa_perfil testa_olho testa_atualizacao testa_exclusoes testa_feriados \
          testa_mover testa_retroativo testa_series; do
   roda "$t" node "_teste/$t.js"
 done
+
+# O nome do cache do sw.js tem que mudar quando a lista de ARQUIVOS muda. Nos
+# dez commits que mexeram no sw.js a constante CACHE foi promovida toda vez (v1
+# ate v11); nesta rodada a lista ganhou o figuras/solidos.js e o nome ficou
+# parado em v11, e ninguem viu. Sem nome novo o install abre caches.open(CACHE)
+# no MESMO cache de onde a versao ATIVA esta servindo e da put() em cada
+# arquivo, entao o codigo novo entra la antes de ela mandar atualizar; e como o
+# .catch() por arquivo deixa a instalacao dar certo quando a conexao cai no
+# meio, o cache vivo fica parte novo e parte velho justamente para quem da aula
+# na casa das familias sem sinal. Com nome novo o cache anterior fica inteiro
+# ate o activate.
+#
+# A comparacao e com o sw.js do HEAD: ela pega a mudanca que ainda nao foi
+# comitada, que e onde o esquecimento acontece. Numa copia do repo sem
+# historico a conferencia sai INSTAVEL, nunca ok silencioso.
+titulo "cache do aplicativo"
+sw_antes=$(git show HEAD:sw.js 2>/dev/null | tr -d '\r' || true)
+sw_agora=$(tr -d '\r' < sw.js 2>/dev/null || true)
+lista_sw() { printf '%s\n' "$1" | sed -n '/^var ARQUIVOS = \[/,/^\];/p'; }
+nome_sw()  { printf '%s\n' "$1" | sed -n "s/^var CACHE = '\(.*\)';.*/\1/p" | head -1; }
+if [ -z "$sw_antes" ] || [ -z "$sw_agora" ]; then
+  printf '  INSTAVEL %-23s sem sw.js no HEAD para comparar\n' "nome do cache"
+  instavel=1
+elif [ "$(lista_sw "$sw_agora")" = "$(lista_sw "$sw_antes")" ]; then
+  printf '  ok      %-24s a lista de arquivos nao mudou\n' "nome do cache"
+elif [ "$(nome_sw "$sw_agora")" != "$(nome_sw "$sw_antes")" ]; then
+  printf '  ok      %-24s lista nova, cache %s\n' "nome do cache" "$(nome_sw "$sw_agora")"
+else
+  printf '  FALHOU  %-24s a lista de ARQUIVOS mudou e o cache continua %s\n' \
+    "nome do cache" "$(nome_sw "$sw_agora")"
+  falhou=1
+fi
 
 titulo "nada de aluno no commit"
 # O primeiro nome do aluno da prova adaptada NAO aparece escrito neste script:

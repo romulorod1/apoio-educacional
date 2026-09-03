@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.9.0';
+  var VERSAO = '1.10.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -18,6 +18,25 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.10.0',
+      itens: [
+        'Mais dois assuntos ganharam figura: o círculo do 8º ano e as cônicas do 3º ano do ' +
+          'ensino médio. No círculo, a primeira figura mostra a circunferência desenrolada em ' +
+          'cima de uma régua, que é de onde o π aparece: cabem três diâmetros e sobra um ' +
+          'pedaço. Nas cônicas, a elipse, a hipérbole e a parábola aparecem com os focos ' +
+          'marcados e com os segmentos que a definição de cada uma compara.',
+        'Sete exercícios do círculo repetiam os números dos exemplos já resolvidos duas ' +
+          'páginas antes, e dava para responder folheando para trás. Ganharam números novos, ' +
+          'com a conta refeita no gabarito.',
+        'Um exercício de cônicas perguntava no singular e o gabarito respondia com dois ' +
+          'pontos, porque a parábola tem mesmo dois pontos àquela distância do foco. O ' +
+          'enunciado passou para o plural.',
+        'A hachura, que é o risquinho que marca a região que o exercício pede, ficou mais ' +
+          'grossa. Na espessura antiga ela sumia na fotocópia, e em seis figuras do círculo é ' +
+          'ela que diz qual pedaço está sendo cobrado.'
+      ]
+    },
     {
       versao: '1.9.0',
       itens: [

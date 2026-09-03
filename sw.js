@@ -3,7 +3,16 @@
  * Os dados das aulas não passam por aqui: ficam no IndexedDB, no aparelho.
  */
 
-var CACHE = 'apoio-educacional-v11';
+/* O nome do cache muda toda vez que a lista de ARQUIVOS muda, e nao e etiqueta:
+ * o install abre caches.open(CACHE) e da put() em cada arquivo, entao com o nome
+ * repetido ele escreve dentro do MESMO cache de onde a versao ativa esta
+ * servindo, e o arquivo novo entra antes de ela mandar atualizar. Pior, o
+ * .catch() por arquivo deixa a instalacao dar certo quando a conexao cai no
+ * meio: o cache vivo fica rasgado, parte novo e parte velho, justamente para
+ * quem da aula na casa das familias sem sinal. Com nome novo o cache anterior
+ * fica inteiro ate o activate. Foi assim de v1 a v11, um por mudanca; este v12
+ * e a entrada de './figuras/solidos.js' na lista abaixo. */
+var CACHE = 'apoio-educacional-v12';
 
 var ARQUIVOS = [
   './',
@@ -20,6 +29,7 @@ var ARQUIVOS = [
   './figuras/marcas.js',
   './figuras/receitas.js',
   './figuras/formula.js',
+  './figuras/solidos.js',
   './store.js',
   './draw.js',
   './app.js',

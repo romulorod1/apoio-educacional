@@ -777,8 +777,44 @@ console.log('        COR.soft: ' + contraste(COR.soft, COR.branco).toFixed(2) +
   const quad = [{ x: 40, y: 400 }, { x: 140, y: 400 }, { x: 140, y: 500 }, { x: 40, y: 500 }];
   const h = M.hachurar(t, quad, { angulo: 0, espacamento: 1, espessura: 3 });
   conf('espacamento sobe para o piso de 4 pt', h.espacamento >= M.ESPACAMENTO_MIN, true);
-  conf('espessura cai para o teto de 0,5 pt', h.espessura, M.HACHURA_MAX);
+  conf('espessura cai para o teto de 0,6 pt', h.espessura, M.HACHURA_MAX);
   conf('e a inclinacao 0, paralela ao lado de baixo, e trocada', h.angulo !== 0, true);
+}
+
+/* A hachura tem PISO e nao so teto, e este bloco reprovava antes de o piso
+ * existir: a hachura saia a 0,500 pt, meio decimo abaixo dos 0,6 pt que o
+ * conferirFigura cobra de todo traco que carrega significado.
+ *
+ * A medida esta escrita por extenso no HACHURA_MAX do marcas.js. O resumo: a
+ * 150 dpi, que e a resolucao tipica de fotocopiadora, 0,5 pt vale 1,04 pixel e
+ * o traco cai entre a grade. Nas seis regioes hachuradas do tema do circulo,
+ * 4150 travessias medidas, o pixel mais escuro do traco ficava em 133 de 255
+ * (3,69 de contraste) e 21,37 por cento dos tracos nem chegavam aos 3:1 da
+ * WCAG, um em cada tres na coroa e no anel interno do alvo. Com 0,6 pt: 123 de
+ * 255, 4,23 de contraste, e 4,08 por cento abaixo de 3:1.
+ *
+ * As quatro primeiras conferencias sao o mesmo numero visto de quatro lados, e
+ * e por isso que elas fecham a faixa em vez de so cobrar um valor: 0,6 e o piso
+ * do projeto, e a metade exata do contorno de 1,2 pt (o dobro que a NBR 8403
+ * exige entre linha larga e estreita) e e o maior teto que ainda cabe na regra
+ * de seis por um contra o piso de espacamento de 4 pt. Subir para 0,7 quebra as
+ * duas ultimas de uma vez, e por isso a prova reprova tanto quem desce quanto
+ * quem sobe. */
+{
+  const t = new PDFGen.Doc(); t.novaPagina();
+  const quad = [{ x: 40, y: 400 }, { x: 140, y: 400 }, { x: 140, y: 500 }, { x: 40, y: 500 }];
+  const h = M.hachurar(t, quad, { angulo: 45, espacamento: 5 });
+  const piso = FigBase.TRAVAS.minEspessura;
+  conf('a hachura padrao sai no piso de espessura do projeto (' + piso + ' pt)',
+    h.espessura >= piso - 1e-9, true);
+  conf('e o teto da hachura tambem nao fica abaixo desse piso',
+    M.HACHURA_MAX >= piso - 1e-9, true);
+  conf('o teto para na metade do contorno de 1,2 pt, para nao competir com ele',
+    M.HACHURA_MAX <= 1.2 / 2 + 1e-9, true);
+  conf('e o piso de espacamento continua mandando na regra de seis por um',
+    M.ESPACAMENTO_MIN >= 6 * M.HACHURA_MAX - 1e-9, true);
+  conf('entao a hachura padrao cobre 12 por cento da regiao, longe de encher',
+    Math.round(h.espessura / h.espacamento * 100), 12);
 }
 
 /* Diagonais: a contagem tem que fechar com n vezes n menos 3 sobre 2. */

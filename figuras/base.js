@@ -960,6 +960,43 @@
     return out;
   }
 
+  /* O texto que a folha IMPRIME, e nao o byte que o fluxo carrega.
+   *
+   * O pdf.js manda pi, alfa, beta e teta para a base-14 /Symbol, onde eles
+   * viajam como os BYTES 0x70, 0x61, 0x62 e 0x71, ou seja como "p", "a", "b" e
+   * "q" em ASCII (pdf.js, mapa SIMBOLOS, e o partirSimbolo que ja entrega o
+   * trecho com o byte da Symbol). Lido cru, o rotulo "α" chega ate aqui como
+   * "a": a trava do valor de angulo sem arco, que exclui a letra de comprimento
+   * sozinha (r, d, a, b, c, p, h), ficava CEGA para as tres gregas, e alfa e
+   * teta sao a notacao corrente dos temas (MAT08-13 escreve o angulo central
+   * como alfa, MAT09-09 escreve o agudo como teta). Uma figura de setor com a
+   * incognita solta, sem arco, passava calada pelo portao.
+   *
+   * A traducao acontece aqui porque este e o unico lugar que sabe QUAL fonte
+   * estava acesa no Tj. Depois dela a trava compara contra o caractere de
+   * verdade, e nao contra o byte, e o mapa continua morando num lugar so, no
+   * SIMBOLOS do pdf.js, em vez de virar copia que diverge. De quebra a largura
+   * medida no ET passa a ser a da Symbol (alfa mede 631 e nao os 556 do "a"). */
+  var cacheSimbolos = null;
+  function deSimbolo(txt) {
+    if (!cacheSimbolos) {
+      var g = gerador();
+      if (!g || !g.SIMBOLOS) return txt;   // sem o gerador, o byte cru e o que ha
+      cacheSimbolos = {};
+      for (var k in g.SIMBOLOS) {
+        if (Object.prototype.hasOwnProperty.call(g.SIMBOLOS, k)) {
+          cacheSimbolos[String.fromCharCode(g.SIMBOLOS[k])] = k;
+        }
+      }
+    }
+    var out = '';
+    for (var i = 0; i < txt.length; i++) {
+      var c = txt.charAt(i);
+      out += (cacheSimbolos[c] !== undefined ? cacheSimbolos[c] : c);
+    }
+    return out;
+  }
+
   function lum(c) {
     function f(v) { return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
     return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
@@ -1186,7 +1223,13 @@
         case 'Tj':
           if (bt) {
             var lit = pilha[pilha.length - 1];
-            if (lit && lit.t === 'str') { bt.txt += textoDoLiteral(lit.v); bt.cor = gs.preench.slice(); }
+            if (lit && lit.t === 'str') {
+              /* O bt.simbolo vale para ESTE Tj: o Tf vem antes de cada trecho,
+               * entao "π · r" traduz so o pedaco que saiu na /F3. */
+              var cru = textoDoLiteral(lit.v);
+              bt.txt += bt.simbolo ? deSimbolo(cru) : cru;
+              bt.cor = gs.preench.slice();
+            }
           }
           break;
         case 'ET':
@@ -1286,6 +1329,12 @@
      * letras A, B e C de todo triangulo da folha e virava ruido em um dia. */
     var s = String(txt).replace(/\s/g, '');
     if (!s || /°/.test(s)) return null;
+    /* Letra SOZINHA so e angulo no alfabeto de angulo (x e as gregas). O
+     * circulo e as conicas escrevem r, d, a, b, c, p e h como comprimento e
+     * parametro, e a regra antiga (qualquer minuscula) acusava as oito de
+     * "valor de angulo solto sem arco": um eixo chamado x reprovava o tema.
+     * Expressao com digito (3x+10) continua valendo com qualquer letra. */
+    if (/^[a-zαβθ]$/.test(s) && !/^[xαβθ]$/.test(s)) return null;
     if (!/^[-+]?[\d.]*[a-zαβθ](?:[-+][\d.]+)?$|^[-+]?[\d.]+[-+][\d.]*[a-zαβθ]$/.test(s)) return null;
     var a = 0, b = 0, inc = null, ok = true;
     var termos = s.replace(/([-+])/g, ' $1').trim().split(/\s+/);
@@ -1330,10 +1379,32 @@
     return dist2(p, { x: seg.x1 + t * vx, y: seg.y1 + t * vy });
   }
 
+  /* Distancia de um ponto ao ARCO, analitica: pelo centro, raio, inicio e
+   * varrido. A versao anterior media ate as ancoras de Bezier registradas, e
+   * nao ate o arco: onde a ancora caia decidia o veredito (um arco comecando
+   * a 85 graus, com a ancora da circunferencia a 90, media 3,21 pt e
+   * reprovava; o mesmo arco comecando a 80 media 6,42 e passava). */
+  function pontoDoArco(arco, grausAbs) {
+    var t = grausAbs * Math.PI / 180;
+    return { x: arco.cx + arco.raio * Math.cos(t), y: arco.cy + arco.raio * Math.sin(t) };
+  }
   function distAoArco(arco, p) {
-    var menor = Infinity;
-    for (var i = 0; i < arco.pontos.length; i++) menor = Math.min(menor, dist2(arco.pontos[i], p));
-    return menor;
+    var dx = p.x - arco.cx, dy = p.y - arco.cy;
+    var d = Math.sqrt(dx * dx + dy * dy);
+    if (arco.abertura >= 359.9) return Math.abs(d - arco.raio);
+    var ang = Math.atan2(dy, dx) * 180 / Math.PI;
+    var s = arco.varre >= 0 ? 1 : -1;
+    var rel = (((ang - arco.de) * s) % 360 + 360) % 360;   // 0..360 no sentido do varrido
+    if (rel <= arco.abertura) return Math.abs(d - arco.raio);
+    var e1 = pontoDoArco(arco, arco.de), e2 = pontoDoArco(arco, arco.de + arco.varre);
+    return Math.min(dist2(e1, p), dist2(e2, p));
+  }
+  /* Amostra o arco de 6 em 6 graus (o passo que o desenhador usa para o
+   * halo), para a trava de arcos vizinhos medir o arco e nao a ancora. */
+  function amostraArco(arco, passo) {
+    var out = [], n = Math.max(2, Math.ceil(arco.abertura / (passo || 6)));
+    for (var i = 0; i <= n; i++) out.push(pontoDoArco(arco, arco.de + arco.varre * i / n));
+    return out;
   }
 
   /* As marcas de lado reconstruidas a partir do que foi impresso, sem depender de
@@ -1557,6 +1628,27 @@
       for (var x2 = x1 + 1; x2 < med.arcos.length; x2++) {
         var A1 = med.arcos[x1], A2 = med.arcos[x2];
         if (dist2({ x: A1.cx, y: A1.cy }, { x: A2.cx, y: A2.cy }) > 2) continue;
+        /* Mesmo centro E mesmo raio e o arco destacado SOBRE a circunferencia (a
+         * convencao da especificacao para setor, arco e angulo central), e nao
+         * dois angulos disputando um vertice: a distancia entre eles e zero por
+         * construcao e nao diz nada.
+         *
+         * O pulo e por OU EXCLUSIVO, e nao por OU: a convencao e um arco INTEIRO
+         * mais um arco PARCIAL. Escrito com OU, o par de duas circunferencias
+         * INTEIRAS de raio quase igual tambem entrava no pulo e a distancia entre
+         * concentricas deixava de ser medida. O caso medido, pelo caminho de
+         * verdade: @fig circulo raio=10 coroa=9.93 sai com as duas circunferencias
+         * em raio 54,39 e 54,01, ou seja a 0,38 pt uma da outra; elas imprimem
+         * como uma linha unica um pouco mais grossa, a hachura da coroa some entre
+         * elas e o exercicio pede a area de um anel que nao existe no papel. A
+         * receita nao tem outra defesa: o coroa so exige 0 < coroaR < raio e o
+         * aneis nao tem trava de espacamento nenhuma. */
+        if (Math.abs(A1.raio - A2.raio) < 0.5 &&
+            (A1.abertura >= 359.9) !== (A2.abertura >= 359.9)) continue;
+        /* Dois arcos PARCIAIS de mesmo raio no mesmo vertice continuam medidos: e
+         * exatamente o caso de emendarem num semicirculo, que a trava existe para
+         * pegar. Uma primeira versao pulava qualquer par de mesmo raio e a prova
+         * _base_prova_travas acusou. */
         /* Mesmo vertice. Dois arcos que varrem a MESMA abertura sao as voltas da
          * notacao de congruencia; varrendo aberturas diferentes, sao angulos
          * diferentes, e ai eles precisam de folga de verdade para nao se
@@ -1584,7 +1676,8 @@
           Math.abs(((A1.de - A2.de) % 360 + 540) % 360 - 180) < 2;
         var pisoArco = mesmoAngulo ? op.folgaEntreVoltas : op.folgaEntreArcos;
         var vao = Infinity;
-        for (var q = 0; q < A1.pontos.length; q++) vao = Math.min(vao, distAoArco(A2, A1.pontos[q]));
+        var amostra = amostraArco(A1, 6);
+        for (var q = 0; q < amostra.length; q++) vao = Math.min(vao, distAoArco(A2, amostra[q]));
         if (vao < pisoArco - 1e-6) {
           falhar('dois arcos no mesmo vertice a ' + n2(vao) + ' pt um do outro (' +
             n2(A1.abertura) + ' e ' + n2(A2.abertura) + ' graus), abaixo do piso de ' +
@@ -1598,10 +1691,15 @@
      * A figura marca o dado e deixa o pedido sem marca, que e o contrario do que
      * deveria: o aluno olha o desenho e nao sabe por onde comecar. */
     var comArco = [];
+    var declarouIncognita = /\bincognita=/.test(doTema);
     for (var t2 = 0; t2 < med.textos.length; t2++) {
       var tx = med.textos[t2];
       var val = valorDeAngulo(tx.txt);
       if (!val) continue;
+      /* Um x sozinho so e incognita de angulo se a diretiva declarou
+       * incognita=. Sem isso ele e nome de eixo ou de variavel, e o eixo x
+       * de toda conica reprovava o tema. */
+      if (val.expressao && /^\s*[xαβθ]\s*$/.test(String(tx.txt)) && !declarouIncognita) continue;
       var ancora = { x: tx.cx != null ? tx.cx : tx.x, y: tx.cy != null ? tx.cy : tx.y };
       var melhor = null, perto = Infinity;
       for (var y2 = 0; y2 < med.arcos.length; y2++) {
@@ -1704,14 +1802,51 @@
     for (var e3 = 0; e3 < registro.pontos.length; e3++) {
       var pn = registro.pontos[e3];
       if (!pn || !pn.rotulo || pn.x == null) continue;
-      var cruza = 0;
+      /* Cruzar e ter tinta dos DOIS lados do ponto, em duas direcoes distintas.
+       * Quem decide e a geometria da folha, e nao o jeito de emitir o traco.
+       *
+       * A versao anterior contava traco que PASSA pelo ponto, exigindo que ele
+       * nao terminasse ali. Isso lia a emissao e nao o desenho: o D.poligono
+       * anota um traco por aresta, entao a mesma reta desenhada como polilinha
+       * com o ponto nomeado no meio (A ate I ate C) vira dois tracos que
+       * TERMINAM em I, e o mesmo X no papel recebia dois vereditos opostos.
+       * Medido: o X emitido como dois segmentos era acusado, o X emitido como
+       * duas polilinhas ficava calado.
+       *
+       * Agora cada traco vizinho declara de que LADO do ponto ele tem tinta,
+       * pela direcao do proprio segmento (que nao depende de onde o ponto caiu),
+       * os lados se somam por eixo e so conta como reta o eixo servido dos dois
+       * lados. Com isso o raio focal continua liberado: F1 ate P e F2 ate P dao
+       * um lado cada, em eixos diferentes, e nenhuma reta atravessa P. */
+      var eixos = [];
       for (var e4 = 0; e4 < registro.tracos.length; e4++) {
         var tr = registro.tracos[e4];
         if (!tr || tr.x1 == null) continue;
         if (String(tr.papel || '').indexOf('contorno') === 0) continue;
-        if (distDoSegmento(pn, tr) < 1.2) cruza++;
+        if (distDoSegmento(pn, tr) >= 1.2) continue;
+        var pA = { x: tr.x1, y: tr.y1 }, pB = { x: tr.x2, y: tr.y2 };
+        var dir = versorEntre(pA, pB);
+        if (!isFinite(dir.x) || (dir.x === 0 && dir.y === 0)) continue;
+        /* Ponta a menos de 2 pt do ponto nao e tinta de um lado: e o traco
+         * terminando ali, que era a distincao certa da versao anterior e que
+         * continua valendo aqui, agora por lado e nao por traco inteiro. */
+        var lados = 0;
+        if (dist2(pn, pA) > 2) lados |= ((pA.x - pn.x) * dir.x + (pA.y - pn.y) * dir.y) > 0 ? 1 : 2;
+        if (dist2(pn, pB) > 2) lados |= ((pB.x - pn.x) * dir.x + (pB.y - pn.y) * dir.y) > 0 ? 1 : 2;
+        if (!lados) continue;
+        var caiu = false;
+        for (var e6 = 0; e6 < eixos.length; e6++) {
+          var pr = dir.x * eixos[e6].u.x + dir.y * eixos[e6].u.y;
+          if (Math.abs(pr) < 0.99) continue;    // ate 8 graus e o mesmo eixo
+          /* Eixo guardado ao contrario: os lados trocam de nome junto. */
+          eixos[e6].lados |= (pr > 0 ? lados : ((lados & 1) ? 2 : 0) | ((lados & 2) ? 1 : 0));
+          caiu = true; break;
+        }
+        if (!caiu) eixos.push({ u: dir, lados: lados });
       }
-      if (cruza >= 2) cruzamentos.push({ x: pn.x, y: pn.y });
+      var retas = 0;
+      for (var e7 = 0; e7 < eixos.length; e7++) if (eixos[e7].lados === 3) retas++;
+      if (retas >= 2) cruzamentos.push({ x: pn.x, y: pn.y });
     }
     for (var e5 = 0; e5 < cruzamentos.length; e5++) {
       var achou = false;

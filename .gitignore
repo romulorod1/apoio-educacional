@@ -30,3 +30,7 @@ __pycache__/
 # evidencia gerada pelas provas do kit de figuras: pesada, regeravel, e nao e codigo
 figuras/*.pdf
 figuras/*.png
+figuras/*_clips.json
+figuras/_tema_*.json
+# PDF de prova gerado na raiz pelo testa_formula
+/_prova_formula.pdf

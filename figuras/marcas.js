@@ -106,8 +106,16 @@
    * seja no minimo o dobro da estreita justamente para uma informacao nao ser
    * confundida com outra, e 1,2 contra 0,6 e exatamente dois. A marca fica em
    * 0,9 porque ela e parte do enunciado e nao construcao: precisa pesar quase
-   * como o contorno. */
-  var ESPESSURA = { contorno: 1.2, marca: 0.9, auxiliar: 0.6, hachura: 0.5 };
+   * como o contorno.
+   *
+   * A hachura mora no MESMO 0,6 do auxiliar, e nao num quarto nivel abaixo
+   * dele. Ela ja esteve em 0,5, meio decimo abaixo do piso do projeto, e o
+   * auditor da fotocopia mediu o estrago: os numeros estao no HACHURA_MAX,
+   * umas linhas adiante. O que faz a hachura recuar para segundo plano e a
+   * DENSIDADE (uma linha a cada 5 pt, ou seja 12 por cento de tinta na
+   * regiao) mais o tom (COR.muted contra o navy do contorno), nunca o traco
+   * ser mais fino que o piso. */
+  var ESPESSURA = { contorno: 1.2, marca: 0.9, auxiliar: 0.6, hachura: 0.6 };
 
   /* Constantes em PONTOS, nunca em unidades do problema. Ver a primeira regra do
    * cabecalho: marca escalada com a figura vira quadradinho do tamanho do
@@ -266,7 +274,58 @@
   var FOLGA_ALCANCE = 1.5;
 
   var ESPACAMENTO_MIN = 4;  // piso de espacamento da hachura
-  var HACHURA_MAX = 0.5;    // teto de espessura da hachura
+
+  /* O teto de espessura da hachura, que hoje e tambem o PISO de espessura do
+   * projeto: os dois valem 0,6 pt e a hachura sai exatamente ali.
+   *
+   * Ele valia 0,5, e o numero vinha da tela e nao da folha. A 150 dpi, que e a
+   * resolucao tipica de fotocopiadora, 0,5 pt vale 1,04 pixel: o traco nao
+   * cobre um pixel inteiro, cai entre a grade e sai cinza claro em vez de sair
+   * fino. Medido na folha rasterizada em tons de cinza sobre as seis regioes
+   * hachuradas do tema do circulo (setor de 60 graus, coroa, fatia da pizza,
+   * cantos do quadrado inscrito e os dois aneis do alvo), 4150 travessias de
+   * traco antes contra 4119 depois:
+   *
+   *                                   0,5 pt      0,6 pt
+   *     cobertura por traco          2,000 px    2,500 px
+   *     tinta por traco              0,582 px    0,696 px   (pixel preto cheio)
+   *     tom do traco, mediana          133         123      de 255
+   *     contraste do traco             3,69        4,23     contra o branco
+   *     tom do traco no p90            157         142
+   *     contraste no p90               2,71        3,28
+   *     tracos abaixo de 3:1          21,37 %      4,08 %
+   *     tinta media da regiao          5,65 %      6,75 %
+   *
+   * A linha que decide e a penultima. A hachura e objeto grafico portador de
+   * significado, e o proprio conferirFigura cobra dela os 3:1 da WCAG 1.4.11
+   * no minContraste. A 0,5 pt, um traco em cada cinco nao chegava la, e nas
+   * duas regioes de 60 graus, a coroa e o anel interno do alvo, era um em cada
+   * tres (30,04 e 29,19 por cento). Em seis das dez figuras do tema do circulo
+   * a hachura e o UNICO canal que diz qual e a regiao pedida: onde ela some, o
+   * exercicio deixa de dizer o que pede.
+   *
+   * Por que 0,6 e nao mais. Tres travas se cruzam exatamente neste numero:
+   *
+   *   - e o piso de espessura do projeto, o minEspessura do conferirFigura;
+   *   - e a METADE do contorno de 1,2 pt, ou seja o maior valor que preserva o
+   *     dobro que a NBR 8403 exige entre linha larga e linha estreita. Acima
+   *     dele a hachura passa a competir com o contorno da propria regiao;
+   *   - cabe na regra de seis por um contra o ESPACAMENTO_MIN de 4 pt, porque
+   *     seis vezes 0,6 da 3,6.
+   *
+   * Em 0,7 as duas ultimas caem juntas: 1,2 sobre 0,7 da 1,71, abaixo do dobro,
+   * e seis vezes 0,7 da 4,2, acima do piso de espacamento, entao a hachura
+   * passaria a empurrar o proprio vao em toda figura hachurada do banco.
+   * Medido, 0,7 zeraria os 4,08 por cento que sobram, mas ao preco de virar uma
+   * segunda linha de contorno; os 4,08 restantes estao todos nas duas regioes
+   * de 60 graus e ja passam dos 3:1 no p90, com 3,28.
+   *
+   * A 600 dpi o traco sai solido nos dois casos, com o tom cheio do COR.muted
+   * (113 de 255, contraste 4,88), e a hachura mede 5,00 px contra 10,00 px do
+   * contorno: a razao de dois para um continua exata e a regiao fica com 6,7
+   * por cento de tinta, ou seja 93 por cento de papel branco. Nao pesou e nao
+   * encheu. */
+  var HACHURA_MAX = 0.6;    // teto de espessura, igual ao piso do projeto
   var TOL_PARALELA = 7;     // graus: abaixo disto a hachura desaparece contra o lado
 
   /* ============================================================ ferramentas locais
@@ -1257,10 +1316,14 @@
       espacamento = ESPACAMENTO_MIN;
     }
     /* Com as constantes de hoje esta trava nunca dispara, e isso e de proposito:
-     * espessura no teto de 0,5 pede espacamento de 3, e o piso de 4 ja passa
-     * disso. Ela fica escrita porque a razao de seis para um e o que impede a
-     * hachura fechar e virar area cheia, e quem um dia mexer no HACHURA_MAX ou no
-     * ESPACAMENTO_MIN precisa esbarrar nela em vez de descobrir na folha. */
+     * espessura no teto de 0,6 pede espacamento de 3,6, e o piso de 4 ainda passa
+     * disso. A folga que sobra encolheu de 1,0 para 0,4 pt quando o teto subiu de
+     * 0,5 para 0,6, e isso e parte da conta: em 0,7 a folga acabaria (seis vezes
+     * 0,7 da 4,2) e esta trava passaria a mandar no vao de toda figura hachurada
+     * do banco, o que e razao para o teto parar em 0,6 e nao subir mais. Ela fica
+     * escrita porque a razao de seis para um e o que impede a hachura fechar e
+     * virar area cheia, e quem um dia mexer no HACHURA_MAX ou no ESPACAMENTO_MIN
+     * precisa esbarrar nela em vez de descobrir na folha. */
     if (espacamento < 6 * espessura) {
       avisar(doc, 'hachurar: espacamento menor que seis vezes a espessura, subido para ' +
         (6 * espessura).toFixed(1));

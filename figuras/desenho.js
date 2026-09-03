@@ -1404,8 +1404,39 @@
        * coordenadas em legenda obriga a aluna a casar duas listas. O afastamento
        * conta a partir da borda da bolinha, senao a letra encosta nela. */
       var dir = op.direcao ? versor(op.direcao) : pt(0.7071, 0.7071);
+      var afastR = op.afastamento != null ? Number(op.afastamento) : 2.5;
+      /* Ponto sobre uma CURVA nao tem uma direcao certa e uma errada: o foco de
+       * uma elipse, o vertice de uma parabola e o centro de uma circunferencia
+       * tem varias direcoes igualmente legitimas, e o que decide entre elas e o
+       * que ja esta desenhado em volta. Com op.direcoes quem chama oferece a
+       * lista em ordem de preferencia e o direcaoLivre escolhe, com a mesma
+       * maquinaria de halo que o rotulo() usa depois: nao ha regra nova nem
+       * segunda copia dela. Sem op.direcoes nada muda, e e por isso que a
+       * folha que ja existe sai igual.
+       *
+       * A pergunta vai com a ancora no PROPRIO ponto e o raio da bolinha somado
+       * ao afastamento, que e o mesmo idioma do nomearPonto do receitas.js. A
+       * ancora deslocada de dir*raio nao servia: ela e montada uma vez so, a
+       * partir do dir de PARTIDA, e fica parada enquanto a direcao candidata
+       * varia, entao a caixa testada nao era a caixa desenhada. Pior, a bolinha
+       * deste ponto ja foi anotada duas linhas acima e vira obstaculo: para a
+       * candidata oposta a de partida o centro testado caia a 2,5 + suporte
+       * menos o raio do proprio ponto, ou seja em cima dele, e a candidata era
+       * dada como bloqueada sempre. Medido no _prova_desenho_curvas.js: dos oito
+       * pares opostos, onde a alternativa esta comprovadamente livre, tres saiam
+       * na direcao BLOQUEADA, e na rosa inteira a direcao impressa divergia em
+       * 17 dos 56 pares da que o direcaoLivre responde para a caixa desenhada.
+       * Quem salvava era a fuga de halo do rotulo(), que empurra e as vezes liga
+       * o fio de chamada. Com a ancora certa a caixa testada e exatamente a que
+       * vai ser desenhada. */
+      if (op.direcoes && op.direcoes.length) {
+        var esc = direcaoLivre(alvo, op.rotulo, p, op.direcoes, {
+          tam: op.tam || TAM_PADRAO, bold: op.bold, afastamento: afastR + raio
+        });
+        if (esc) dir = esc;
+      }
       reg.rotulo = rotulo(alvo, op.rotulo, pt(p.x + dir.x * raio, p.y + dir.y * raio), {
-        direcao: dir, afastamento: op.afastamento != null ? Number(op.afastamento) : 2.5,
+        direcao: dir, afastamento: afastR,
         tam: op.tam || TAM_PADRAO, cor: op.corRotulo || COR.texto, bold: op.bold
       });
     }
@@ -1722,6 +1753,947 @@
     return caminho;
   }
 
+  /* ================================================== circunferencia e elipse
+   *
+   *   circunferencia(doc, centro, raio, op)
+   *   elipse(doc, centro, a, b, op)
+   *
+   * As duas sao o arco() com a volta inteira, e sao funcao propria por um motivo
+   * so: o nome. Quem escreve a receita do circulo procura "circunferencia" e
+   * acha o doc.circulo do pdf.js, que e o caminho errado por tres razoes ja
+   * medidas (espessura cravada em 1.6 quando nao preenche, so a volta inteira e
+   * so raio igual nos dois sentidos). Com o nome certo apontando para o motor
+   * certo, o caminho errado deixa de ser o mais curto.
+   *
+   * A volta inteira cai no trechosDeArco com total de 360 graus, ou seja n igual
+   * a 4 e passo de 90: k = 4/3 * tg(22,5 graus) = 0,55228, que e a constante
+   * classica do quarto de circunferencia por Bezier. Nao ha conta nova aqui, e e
+   * de proposito: uma segunda emissao de arco neste arquivo divergiria da
+   * primeira no dia em que alguem corrigisse uma so.
+   *
+   * O registro tambem sai do arco(): tipo 'arco', de 0 ate 360. E o que o
+   * conferirFigura precisa para enxergar a circunferencia como curva e nao como
+   * um punhado de retas, e e o que o obstaculosDoRotulo usa para o halo de um
+   * rotulo nao morder o contorno. */
+  function circunferencia(alvo, centro, raio, op) {
+    op = op || {};
+    var r = Number(raio);
+    if (!isFinite(r) || r <= 0) {
+      avisar(alvoDe(alvo).doc, 'circunferencia com raio invalido, nao desenha');
+      return null;
+    }
+    /* Sem espessura declarada ela sai no nivel de CONTORNO, 1,2 pt: a
+     * circunferencia e o que a figura E. Quem quiser a construcao auxiliar passa
+     * 0,6 e quem quiser destacar um arco por cima passa papel 'marca'. A
+     * hierarquia inteira mora no arco(), e nao aqui. */
+    return arco(alvo, centro, r, r, 0, 360, op);
+  }
+
+  /* Semieixos no sistema LOCAL da elipse: a ao longo do eixo do giro, b na
+   * normal dele. Devolve a geometria que as conicas pedem (c, focos, vertices)
+   * junto com o registro do traco, porque quem desenha a elipse quase sempre
+   * precisa marcar um foco logo em seguida e refazer a raiz do lado de fora e o
+   * jeito mais barato de os dois numeros divergirem. */
+  function elipse(alvo, centro, a, b, op) {
+    op = op || {};
+    var A = alvoDe(alvo);
+    var C = norm(centro);
+    var ra = Number(a), rb = Number(b);
+    if (!isFinite(ra) || !isFinite(rb) || ra <= 0 || rb <= 0) {
+      avisar(A.doc, 'elipse com semieixo invalido, nao desenha');
+      return null;
+    }
+    var giro = Number(op.giro) || 0;
+    var de = op.de != null ? Number(op.de) : 0;
+    var ate = op.ate != null ? Number(op.ate) : 360;
+    var reg = arco(alvo, C, ra, rb, de, ate, op);
+
+    /* O eixo MAIOR e o que manda nos focos, e ele nao e sempre o x local: uma
+     * elipse alta tem a menor que b e os focos no eixo vertical. Decidir por
+     * comparacao, e nao por convencao, e o que faz elipse(C, 40, 90) sair com os
+     * focos no lugar certo em vez de sair com a raiz de um numero negativo. */
+    var eixoA = versorDeGiro(giro), eixoB = perp(eixoA);
+    var uMaior = ra >= rb ? eixoA : eixoB;
+    var maior = Math.max(ra, rb), menor = Math.min(ra, rb);
+    var c = Math.sqrt(Math.max(0, maior * maior - menor * menor));
+    return {
+      tipo: 'elipse', centro: C, a: ra, b: rb, giro: giro,
+      c: c, excentricidade: maior > 0 ? c / maior : 0,
+      eixoMaior: uMaior, eixoMenor: perp(uMaior),
+      focos: [
+        pt(C.x + uMaior.x * c, C.y + uMaior.y * c),
+        pt(C.x - uMaior.x * c, C.y - uMaior.y * c)
+      ],
+      vertices: [
+        pt(C.x + eixoA.x * ra, C.y + eixoA.y * ra),
+        pt(C.x - eixoA.x * ra, C.y - eixoA.y * ra),
+        pt(C.x + eixoB.x * rb, C.y + eixoB.y * rb),
+        pt(C.x - eixoB.x * rb, C.y - eixoB.y * rb)
+      ],
+      arco: reg
+    };
+  }
+
+  function versorDeGiro(g) {
+    return pt(Math.cos(rad(g)), Math.sin(rad(g)));
+  }
+
+  /* ====================================================== caminho amostrado
+   *
+   *   curvaSuave(doc, pontos, {cor, espessura, tracejado, recorte, fechado,
+   *                            papel})
+   *
+   * Parabola e hiperbole nao sao arcos e nao saem do arco(): elas sao amostradas
+   * e ligadas. Ligadas por RETA, a folha impressa mostra o vinco em cada
+   * amostra, e a fotocopia de segunda geracao engrossa justamente o canto; para
+   * o vinco sumir por poligonal seriam necessarias centenas de amostras, e o
+   * arquivo cresce e a leitura do fluxo fica mais cara. Ligadas por Catmull-Rom
+   * convertida em Bezier cubica, a curva sai com tangente continua em cada
+   * amostra (C1) e duas dezenas de amostras ja bastam: nao ha vinco nenhum para
+   * a fotocopia achar, porque nao ha vinco.
+   *
+   * A conversao e a classica: o controle de cada trecho e um sexto da corda
+   * entre os dois vizinhos do ponto. Nas pontas o vizinho que falta e o proprio
+   * extremo, o que da tangente pela corda e nao um bico.
+   *
+   * A curva entra no registro trecho a trecho, pelo mesmo motivo escrito no
+   * poligono(): o conferirFigura testa rotulo cruzando TRACO, e para isso ele
+   * precisa dos segmentos. E entra sempre como 'traco', nunca como 'marca':
+   * marca ativa e o que se le um a um e o teto e cinco, entao uma curva de
+   * quarenta amostras anotada como marca estouraria o teto sozinha. Curva e
+   * contorno; quem quer destaca-la sobe a espessura. */
+  function curvaSuave(alvo, pontos, op) {
+    op = op || {};
+    var A = alvoDe(alvo), doc = A.doc;
+    var B = base(), g = gerador(), COR = g.COR;
+    var pts = normLista(pontos);
+    if (pts.length < 2) {
+      avisar(doc, 'curvaSuave com menos de dois pontos, nao desenha');
+      return null;
+    }
+    if (op.papel === 'marca') {
+      avisar(doc, 'curvaSuave: papel marca numa curva amostrada contaria uma marca ' +
+        'ativa por trecho e estouraria o teto de cinco, saiu como traco');
+    }
+    var espessura = op.espessura != null ? Number(op.espessura) : ESPESSURA.contorno;
+    var cor = op.cor || COR.texto;
+    var tracejado = op.tracejado || null;
+    var papel = op.papel === 'marca' ? 'contorno' : (op.papel || 'contorno');
+    var tinta = tintaDePapel(A, op, papel, cor, espessura, tracejado);
+    cor = tinta.cor; espessura = tinta.espessura; tracejado = tinta.tracejado;
+    conferirCor(doc, cor, 'curvaSuave');
+    conferirEspessura(doc, espessura, 'curvaSuave', op.abaixoDoPiso);
+
+    var fechado = op.fechado === true;
+    B.comEstado(doc, {
+      tracejado: tracejado,
+      recorte: op.recorte || null,
+      cor: cor,
+      espessura: espessura
+    }, function () {
+      doc.op('1 J 1 j');
+      doc.op(caminhoSuave(pts) + (fechado ? 'h ' : '') + 'S');
+    });
+
+    var ate = fechado ? pts.length : pts.length - 1;
+    for (var i = 0; i < ate; i++) {
+      var P = pts[i], Q = pts[(i + 1) % pts.length];
+      A.anota('traco', {
+        x1: P.x, y1: P.y, x2: Q.x, y2: Q.y, espessura: espessura, papel: papel
+      });
+    }
+    return {
+      tipo: 'curva', pontos: pts, fechado: fechado,
+      espessura: espessura, papel: papel, caixa: B.geo.caixa(pts)
+    };
+  }
+
+  function caminhoSuave(pts) {
+    var n = pts.length;
+    if (n < 2) return '';
+    if (n === 2) {
+      return n2(pts[0].x) + ' ' + n2(pts[0].y) + ' m ' +
+             n2(pts[1].x) + ' ' + n2(pts[1].y) + ' l ';
+    }
+    var s = n2(pts[0].x) + ' ' + n2(pts[0].y) + ' m ';
+    for (var i = 0; i + 1 < n; i++) {
+      var p0 = pts[i > 0 ? i - 1 : 0];
+      var p1 = pts[i], p2 = pts[i + 1];
+      var p3 = pts[i + 2 < n ? i + 2 : n - 1];
+      s += n2(p1.x + (p2.x - p0.x) / 6) + ' ' + n2(p1.y + (p2.y - p0.y) / 6) + ' ' +
+           n2(p2.x - (p3.x - p1.x) / 6) + ' ' + n2(p2.y - (p3.y - p1.y) / 6) + ' ' +
+           n2(p2.x) + ' ' + n2(p2.y) + ' c ';
+    }
+    return s;
+  }
+
+  /* Curva ilimitada precisa de recorte, e o recorte certo e o BLOCO da figura: a
+   * parabola cresce quadraticamente e a hiperbole vai ao infinito, entao sem
+   * recorte o traco sai do retangulo branco e cruza a marca d'agua, o texto do
+   * exercicio e a figura seguinte. O bloco ja e conhecido pelo ctx do figura(),
+   * entao a receita nao precisa dizer nada; quem quiser outra regiao passa
+   * recorte, e quem quiser nenhuma passa recorte falso e responde por isso. */
+  function recorteDoBloco(A, op) {
+    if (op.recorte === false) return null;
+    if (op.recorte) return op.recorte;
+    return A.limites || null;
+  }
+
+  /* ============================================================ parabola
+   *
+   *   parabola(doc, vertice, p, {giro, de, ate, amostras, cor, espessura,
+   *                              tracejado, recorte})
+   *
+   * Na forma do livro brasileiro, y ao quadrado igual a 2px: o foco fica a p/2
+   * do vertice sobre o eixo e a diretriz fica a p/2 do outro lado, ou seja p e a
+   * distancia do foco a diretriz. O parametro chega em PONTOS da pagina, como
+   * todo o resto deste arquivo; quem trabalha em unidades do problema converte
+   * com o ctx.k antes de chamar.
+   *
+   * O giro gira o EIXO: 0 abre para a direita, 90 abre para cima, 180 para a
+   * esquerda. E o mesmo op.giro do arco(), de proposito, para nao existirem duas
+   * convencoes de orientacao no mesmo arquivo.
+   *
+   * A funcao desenha a curva e DEVOLVE o foco e a diretriz, sem desenhar os
+   * dois. E a mesma divisao de trabalho da ceviana, que devolve o pe e deixa a
+   * marca para quem chamou: foco e diretriz sao marcas ativas e o teto e cinco,
+   * entao quem decide quantas cabem e a receita, que sabe o que a questao pede.
+   * A primitiva que decidisse sozinha poria tres marcas em toda parabola da
+   * folha, inclusive nas que so precisam da curva. */
+  function parabola(alvo, vertice, p, op) {
+    op = op || {};
+    var A = alvoDe(alvo), doc = A.doc;
+    var V = norm(vertice), pp = Number(p);
+    if (!isFinite(pp) || Math.abs(pp) < 1e-9) {
+      avisar(doc, 'parabola com parametro p invalido (p e a distancia do foco a diretriz), nao desenha');
+      return null;
+    }
+    var giro = Number(op.giro) || 0;
+    var u = versorDeGiro(giro), nrm = perp(u);
+    /* O alcance e dado na NORMAL do eixo, que e a metade da abertura da curva, e
+     * nao ao longo do eixo: e assim que quem chama controla a largura do desenho
+     * sem precisar inverter a parabola de cabeca. */
+    var ate = op.ate != null ? Math.abs(Number(op.ate)) : Math.abs(3 * pp);
+    var de = op.de != null ? Number(op.de) : -ate;
+    var n = Math.max(8, Math.round(Number(op.amostras) || 48));
+    var pts = [];
+    for (var i = 0; i <= n; i++) {
+      var t = de + (ate - de) * i / n;
+      var s = t * t / (2 * pp);
+      pts.push(pt(V.x + u.x * s + nrm.x * t, V.y + u.y * s + nrm.y * t));
+    }
+    var o = copiar(op);
+    o.recorte = recorteDoBloco(A, op);
+    o.fechado = false;
+    var reg = curvaSuave(alvo, pts, o);
+
+    var meia = Math.max(Math.abs(de), Math.abs(ate));
+    var pe = pt(V.x - u.x * pp / 2, V.y - u.y * pp / 2);
+    return {
+      tipo: 'parabola', vertice: V, p: pp, giro: giro,
+      eixo: u, normal: nrm,
+      foco: pt(V.x + u.x * pp / 2, V.y + u.y * pp / 2),
+      peDaDiretriz: pe,
+      diretriz: [
+        pt(pe.x - nrm.x * meia, pe.y - nrm.y * meia),
+        pt(pe.x + nrm.x * meia, pe.y + nrm.y * meia)
+      ],
+      pontos: pts, traco: reg
+    };
+  }
+
+  /* ============================================================ hiperbole
+   *
+   *   hiperbole(doc, centro, a, b, {giro, ate, amostras, ramos, cor, espessura,
+   *                                 tracejado, recorte})
+   *
+   * x ao quadrado sobre a ao quadrado menos y ao quadrado sobre b ao quadrado
+   * igual a um, no sistema local do giro. Os dois ramos saem da parametrizacao
+   * por cosseno e seno hiperbolicos, que percorre cada ramo uma vez so e sem
+   * assintota vertical no meio do caminho: a parametrizacao por x, com y igual a
+   * b vezes a raiz de x ao quadrado sobre a ao quadrado menos um, tem derivada
+   * infinita no vertice e a amostragem uniforme produz um bico ali, exatamente
+   * no ponto que o exercicio manda olhar.
+   *
+   * Devolve focos, vertices, o retangulo fundamental e as duas assintotas ja
+   * como pares de pontos, e nao os desenha, pela mesma razao escrita na
+   * parabola: quantas marcas cabem quem sabe e a receita. */
+  function hiperbole(alvo, centro, a, b, op) {
+    op = op || {};
+    var A = alvoDe(alvo), doc = A.doc;
+    var C = norm(centro), ra = Number(a), rb = Number(b);
+    if (!isFinite(ra) || !isFinite(rb) || ra <= 0 || rb <= 0) {
+      avisar(doc, 'hiperbole com semieixo invalido, nao desenha');
+      return null;
+    }
+    var giro = Number(op.giro) || 0;
+    var u = versorDeGiro(giro), nrm = perp(u);
+    var yMax = op.ate != null ? Math.abs(Number(op.ate)) : 2.2 * rb;
+    if (yMax < 1e-6) yMax = 2.2 * rb;
+    var T = arcoSenoH(yMax / rb);
+    var n = Math.max(8, Math.round(Number(op.amostras) || 40));
+
+    var quais = op.ramos === 'direito' ? [1]
+      : (op.ramos === 'esquerdo' ? [-1] : [1, -1]);
+    var ramos = [], tracos = [];
+    for (var r = 0; r < quais.length; r++) {
+      var sinal = quais[r], pts = [];
+      for (var i = 0; i <= n; i++) {
+        var t = -T + 2 * T * i / n;
+        var h = hiperbolicas(t);
+        var x = sinal * ra * h.c, y = rb * h.s;
+        pts.push(pt(C.x + u.x * x + nrm.x * y, C.y + u.y * x + nrm.y * y));
+      }
+      var o = copiar(op);
+      o.recorte = recorteDoBloco(A, op);
+      o.fechado = false;
+      tracos.push(curvaSuave(alvo, pts, o));
+      ramos.push(pts);
+    }
+
+    var c = Math.sqrt(ra * ra + rb * rb);
+    var xMax = ra * hiperbolicas(T).c;
+    /* A assintota e devolvida ATRAVESSANDO o alcance da curva desenhada, e nao
+     * como um par de vetores: reta que para nos dois pontos dados vira segmento,
+     * e a assintota que para antes do ramo dela nao diz que a curva se aproxima
+     * dela para sempre. Quem desenhar por cima ainda ganha o recorte do bloco. */
+    /* Ordem declarada: a primeira e a que SOBE no sistema local, direcao (a, b),
+     * e a segunda e a que desce, direcao (a, menos b). Sem ordem declarada, quem
+     * for rotular a assintota ou medir a distancia do ramo a ela acerta metade
+     * das vezes e a outra metade sai apontando para a assintota do outro ramo. */
+    var L = Math.sqrt(xMax * xMax + yMax * yMax) * 1.05;
+    var assintotas = [];
+    for (var s2 = 1; s2 >= -1; s2 -= 2) {
+      var dx = ra, dy = s2 * rb, dn = Math.sqrt(dx * dx + dy * dy);
+      var vx = (u.x * dx + nrm.x * dy) / dn, vy = (u.y * dx + nrm.y * dy) / dn;
+      assintotas.push([
+        pt(C.x - vx * L, C.y - vy * L),
+        pt(C.x + vx * L, C.y + vy * L)
+      ]);
+    }
+    return {
+      tipo: 'hiperbole', centro: C, a: ra, b: rb, giro: giro,
+      c: c, excentricidade: c / ra, eixo: u, normal: nrm,
+      focos: [pt(C.x + u.x * c, C.y + u.y * c), pt(C.x - u.x * c, C.y - u.y * c)],
+      vertices: [pt(C.x + u.x * ra, C.y + u.y * ra), pt(C.x - u.x * ra, C.y - u.y * ra)],
+      retangulo: [
+        pt(C.x + u.x * ra + nrm.x * rb, C.y + u.y * ra + nrm.y * rb),
+        pt(C.x - u.x * ra + nrm.x * rb, C.y - u.y * ra + nrm.y * rb),
+        pt(C.x - u.x * ra - nrm.x * rb, C.y - u.y * ra - nrm.y * rb),
+        pt(C.x + u.x * ra - nrm.x * rb, C.y + u.y * ra - nrm.y * rb)
+      ],
+      assintotas: assintotas, ramos: ramos, tracos: tracos
+    };
+  }
+
+  /* Cosseno e seno hiperbolicos escritos com Math.exp, e nao com Math.cosh e
+   * Math.sinh: os dois sao do ES6 e este arquivo tambem entra por <script> num
+   * navegador qualquer, onde a falta deles seria um NaN silencioso que o n2
+   * transforma em zero e a hiperbole sairia colapsada na origem. */
+  function hiperbolicas(t) {
+    var e = Math.exp(t), f = 1 / e;
+    return { c: (e + f) / 2, s: (e - f) / 2 };
+  }
+  function arcoSenoH(v) {
+    return Math.log(v + Math.sqrt(v * v + 1));
+  }
+
+  /* ============================================================ eixos
+   *
+   *   eixos(doc, origem, escala, {xMin, xMax, yMin, yMax, passo, malha,
+   *                               rotulos, formatar, nomeX, nomeY, zero, tam,
+   *                               cor, espessura, tique})
+   *     -> {p, px, py, inverso, u, origem, caixa}
+   *
+   * A escala e UM numero, pontos por unidade, e vale para os dois eixos. Nao ha
+   * como pedir escala diferente em x e em y por esta porta, e e de proposito: e
+   * o defeito herdado do graficos.js, que constroi px e py com fatores
+   * independentes, e num plano onde ele aparece a circunferencia sai ovo, o
+   * angulo reto deixa de medir 90 graus na folha e o quadradinho passa a mentir.
+   *
+   * TIQUE e nao malha. O tique e um risquinho de 2,5 pt para cada lado do eixo,
+   * na unidade; ele diz onde esta o 1 sem acrescentar uma linha que atravessa a
+   * figura inteira. A malha e opcional e sai ATRAS de tudo, em COR.fio e 0,3 pt,
+   * que e o unico traco autorizado abaixo do piso de 0,6 e so porque a figura
+   * por cima e quatro vezes mais grossa. Ela sai como uma varredura unica (um S
+   * com todos os sub-caminhos), que e a assinatura que o lerFluxo do base.js
+   * usa para separar textura de linha que carrega informacao: sem isso, cada
+   * linha de malha seria acusada de traco abaixo do piso e de contraste abaixo
+   * de 3:1, uma vez por figura.
+   *
+   * ------------------------------------------------ a escala conta UMA marca
+   *
+   * Um plano com dez tiques numerados tem dez numeros na folha, e o teto de
+   * marcas ativas e cinco. Os dois nao se contradizem: marca ativa e o que a
+   * aluna le UM A UM, e a escala de um eixo se le de uma vez, como a regua se le
+   * de uma vez. E a mesma decisao que este arquivo ja tomou duas vezes: o anel
+   * da bolinha vazada sai pelo doc e nao pelo ctx, "quem entra no registro e o
+   * ponto, uma vez so", e as setas da cota tambem, porque "a cota inteira ja
+   * entrou no registro como um traco so, e o que a aluna le nela e o numero".
+   *
+   * Entao os numeros saem pelo rotulo() com o DOC, e no fim cada eixo anota UMA
+   * entrada de rotulo, com a caixa que envolve toda a faixa de numeros daquele
+   * eixo. Um plano completo custa duas marcas das cinco e sobram tres para a
+   * pergunta.
+   *
+   * Isso nao deixa o conferirFigura cego para os numeros, e vale dizer por que:
+   * a auditoria de texto do base.js le o FLUXO (med.textos), e nao o registro,
+   * entao o piso de corpo, a palavra nascida dentro do desenhador e o vao entre
+   * caixas continuam medidos numero a numero. O registro so responde por
+   * QUANTAS marcas a figura tem. O canal mais forte continua ligado.
+   *
+   * Como os numeros nao passam pelo ctx, eles tambem nao ganham a fuga do halo.
+   * Nao precisam: eles sao postos a uma folga do eixo medida ate a BORDA da
+   * caixa, entao o halo nunca alcanca o eixo, e o que ele pode cobrir por baixo
+   * e malha e tique, que sao apoio e podem ser cobertos, exatamente como a
+   * convencao escrita pede ("rotulo sobre o eixo empurra para o lado de dentro
+   * ou apaga o numero do tique"). O que eles ganham e o op.limites do bloco, sem
+   * o qual um numero de dois digitos na ponta do eixo sai do retangulo branco.
+   *
+   * Nenhuma palavra portuguesa entra aqui: o que se escreve sao numeros e os
+   * nomes dos eixos, que chegam por parametro e cujo padrao, x e y, e simbolo de
+   * matematica e nao palavra de lingua nenhuma. O separador decimal e decisao de
+   * LINGUA (a folha em portugues quer virgula e a em ingles quer ponto), entao
+   * passo que nao seja inteiro exige op.formatar vindo do tema, e a falta dele e
+   * avisada em vez de resolvida no chute. */
+  function eixos(alvo, origem, escala, op) {
+    op = op || {};
+    var A = alvoDe(alvo), doc = A.doc;
+    var B = base(), g = gerador(), COR = g.COR;
+    var O = norm(origem);
+    var u = Number(escala);
+    if (!isFinite(u) || u <= 0) { avisar(doc, 'eixos com escala invalida, nao desenha'); return null; }
+
+    var xMin = op.xMin != null ? Number(op.xMin) : -1;
+    var xMax = op.xMax != null ? Number(op.xMax) : 5;
+    var yMin = op.yMin != null ? Number(op.yMin) : -1;
+    var yMax = op.yMax != null ? Number(op.yMax) : 5;
+    if (!(xMax > xMin) || !(yMax > yMin)) {
+      avisar(doc, 'eixos com intervalo vazio, nao desenha');
+      return null;
+    }
+    var passo = Math.abs(Number(op.passo)) || 1;
+    var tam = Number(op.tam) || PISO_CORPO;
+    var tq = op.tique != null ? Number(op.tique) : 2.5;
+    var corEixo = op.cor || COR.texto;
+    var espEixo = op.espessura != null ? Number(op.espessura) : ESPESSURA.marca;
+
+    function px(v) { return O.x + Number(v) * u; }
+    function py(v) { return O.y + Number(v) * u; }
+    function P(q) { var w = norm(q); return pt(px(w.x), py(w.y)); }
+    var caixa = { x0: px(xMin), y0: py(yMin), x1: px(xMax), y1: py(yMax) };
+    var limites = op.limites !== undefined ? op.limites : A.limites;
+
+    /* Primeiro tique de cada eixo: o primeiro multiplo do passo dentro do
+     * intervalo, e nao o proprio minimo, senao um intervalo que comeca em -1,5
+     * poria numero em -1,5, -0,5, 0,5 e o zero nao cairia em tique nenhum. */
+    function tiques(v0, v1) {
+      var saida = [], k = Math.ceil(v0 / passo - 1e-9);
+      for (var v = k * passo; v <= v1 + 1e-9; v += passo) saida.push(Math.abs(v) < 1e-9 ? 0 : v);
+      return saida;
+    }
+    var tx = tiques(xMin, xMax), ty = tiques(yMin, yMax);
+
+    /* -------------------------------------------------------------- a malha */
+    if (op.malha) {
+      B.comEstado(doc, { cor: COR.fio, espessura: ESPESSURA.malha }, function () {
+        var s = n2(ESPESSURA.malha) + ' w ';
+        for (var i = 0; i < tx.length; i++) {
+          s += n2(px(tx[i])) + ' ' + n2(caixa.y0) + ' m ' + n2(px(tx[i])) + ' ' + n2(caixa.y1) + ' l ';
+        }
+        for (var j = 0; j < ty.length; j++) {
+          s += n2(caixa.x0) + ' ' + n2(py(ty[j])) + ' m ' + n2(caixa.x1) + ' ' + n2(py(ty[j])) + ' l ';
+        }
+        doc.op(s + 'S');
+      });
+      for (var mi = 0; mi < tx.length; mi++) {
+        A.anota('traco', { x1: px(tx[mi]), y1: caixa.y0, x2: px(tx[mi]), y2: caixa.y1,
+          espessura: ESPESSURA.malha, papel: 'malha' });
+      }
+      for (var mj = 0; mj < ty.length; mj++) {
+        A.anota('traco', { x1: caixa.x0, y1: py(ty[mj]), x2: caixa.x1, y2: py(ty[mj]),
+          espessura: ESPESSURA.malha, papel: 'malha' });
+      }
+    }
+
+    /* --------------------------------------------------------- os dois eixos
+     * Seta so na ponta positiva: a seta diz PARA ONDE cresce, e ponta nos dois
+     * sentidos do mesmo eixo e o erro classico da lista. O seta() ja poe uma
+     * cabeca so quando dupla nao e pedido. */
+    var eixoX = seta(alvo, pt(caixa.x0, py(0)), pt(caixa.x1, py(0)),
+      { cor: corEixo, espessura: espEixo, papel: 'eixo' });
+    var eixoY = seta(alvo, pt(px(0), caixa.y0), pt(px(0), caixa.y1),
+      { cor: corEixo, espessura: espEixo, papel: 'eixo' });
+
+    /* ------------------------------------------------------------- os tiques
+     * Um caminho so com todos eles e um S no fim: alem de nao reemitir cor e
+     * espessura por risquinho, e isso que faz o lerFluxo le-los como varredura,
+     * ou seja como escala e nao como um punhado de tracinhos de congruencia
+     * soltos pela figura. Papel 'guia' com carrega falso porque o tique e apoio
+     * de leitura: o numero e que carrega, e o halo dele pode comer o risquinho. */
+    if (tq > 0) {
+      B.comEstado(doc, { cor: corEixo, espessura: ESPESSURA.auxiliar }, function () {
+        var s = n2(ESPESSURA.auxiliar) + ' w ';
+        for (var i = 0; i < tx.length; i++) {
+          if (tx[i] === 0) continue;
+          s += n2(px(tx[i])) + ' ' + n2(py(0) - tq) + ' m ' + n2(px(tx[i])) + ' ' + n2(py(0) + tq) + ' l ';
+        }
+        for (var j = 0; j < ty.length; j++) {
+          if (ty[j] === 0) continue;
+          s += n2(px(0) - tq) + ' ' + n2(py(ty[j])) + ' m ' + n2(px(0) + tq) + ' ' + n2(py(ty[j])) + ' l ';
+        }
+        doc.op(s + 'S');
+      });
+      for (var ti = 0; ti < tx.length; ti++) {
+        if (tx[ti] === 0) continue;
+        A.anota('traco', { x1: px(tx[ti]), y1: py(0) - tq, x2: px(tx[ti]), y2: py(0) + tq,
+          espessura: ESPESSURA.auxiliar, papel: 'guia', carrega: false });
+      }
+      for (var tj = 0; tj < ty.length; tj++) {
+        if (ty[tj] === 0) continue;
+        A.anota('traco', { x1: px(0) - tq, y1: py(ty[tj]), x2: px(0) + tq, y2: py(ty[tj]),
+          espessura: ESPESSURA.auxiliar, papel: 'guia', carrega: false });
+      }
+    }
+
+    /* ------------------------------------------------------------- a escala */
+    var quero = escolhaDeRotulos(op.rotulos);
+    var faixaX = null, faixaY = null;
+    var avisouDecimal = { feito: false };
+    var afast = tq + 2;
+
+    /* ------------------------------------------ a escala cabe na unidade?
+     *
+     * Tres contas, e as tres vem de medir(), nunca de olhar a folha depois.
+     *
+     * AO LONGO DO EIXO X: dois numeros vizinhos ficam a um passo um do outro, e
+     * a caixa impressa de cada um tem a largura do texto mais o halo. Se a caixa
+     * for mais larga do que o passo, a escala sai com os numeros encavalados.
+     *
+     * AO LONGO DO EIXO Y: os numeros se empilham na vertical, e ali quem manda
+     * nao e a largura e sim a ALTURA da caixa impressa, que vale duas meias
+     * alturas, ou 1,16 do corpo. Com o corpo padrao de 7,5 pt isso da 8,70 pt, e
+     * enquanto so a largura era conferida havia uma faixa cega inteira: de 7,37
+     * pt por passo (abaixo disso o numero de um digito ja e mais largo do que o
+     * passo e a conta do x acusa) ate 8,70 pt por passo, a escala do y saia com
+     * os digitos colados uns nos outros, com o conferirFigura limpo e sem uma
+     * palavra de aviso. Medido: com passo 1 e unidade de 8 pt os numeros do y
+     * ficam a 8,00 pt de centro a centro com caixa de 8,70 pt, ou seja 0,70 pt
+     * de sobreposicao.
+     *
+     * NO CANTO: o numero menos um do eixo x mora ABAIXO do eixo x e o numero
+     * menos um do eixo y mora A ESQUERDA do eixo y, e os dois caem no mesmo
+     * pedaco do terceiro quadrante. A caixa do de baixo ocupa da folga ate a
+     * folga mais duas meias alturas; a do da esquerda esta centrada a uma
+     * unidade do zero. Para nao se tocarem, uma unidade precisa valer pelo menos
+     * a folga mais TRES meias alturas. Com corpo de 7,5 pt e folga de 4,5 pt,
+     * isso da 17,6 pt por unidade, e foi exatamente o que a medicao desta folha
+     * pegou: a 11,5 pt por unidade os dois "menos um" saiam sobrepostos, com vao
+     * zero, e a escala imprimia um borrao no canto sem nada acusar.
+     *
+     * Essa terceira conta continua condicionada aos dois minimos negativos, e de
+     * proposito: o canto do terceiro quadrante so existe quando ha numero abaixo
+     * do eixo x E numero a esquerda do eixo y. Cobrar os 17,55 pt de um plano de
+     * primeiro quadrante seria reprovar folha correta por uma colisao que nao
+     * pode acontecer ali. O que faltava ao primeiro quadrante era a rede do
+     * empilhamento vertical, que agora e a conta do eixo y logo acima e cobra o
+     * numero certo, 8,70 pt, e nao 17,55.
+     *
+     * Nao ha conserto automatico aqui de proposito. Empurrar o numero para longe
+     * do tique dele resolve a colisao e cria outra coisa pior, que e um numero
+     * que nomeia o tique errado; e escolher sozinho um passo maior mudaria a
+     * escala que a questao pediu. Quem decide e quem chama, por escala, passo,
+     * corpo ou rotulos=, e o aviso diz qual dos quatro. */
+    if (op.rotulos !== false && op.rotulos !== 'nenhum') {
+      var meiaAltura = MEIA_ALTURA * tam;
+      var precisaCanto = afast + 3 * meiaAltura;
+      var temNegX = xMin < -1e-9, temNegY = yMin < -1e-9;
+      if (temNegX && temNegY && passo * u < precisaCanto - 1e-6) {
+        avisar(doc, 'eixos: a unidade vale ' + (passo * u).toFixed(2) +
+          ' pt por passo e o numero de ' + tam + ' pt precisa de ' + precisaCanto.toFixed(2) +
+          ' pt no canto do terceiro quadrante: o numero do eixo x e o do eixo y se ' +
+          'sobrepoem ali. Aumente a escala ou o passo, diminua o corpo, ou passe ' +
+          'rotulos= com os valores que a questao usa');
+      }
+      var maisLargo = 0;
+      for (var w = 0; w < tx.length; w++) {
+        if (tx[w] === 0 || !quero(tx[w])) continue;
+        var cw = caixaDoRotulo(textoDoValor(null, tx[w], op.formatar, null), { tam: tam });
+        if (cw.largura > maisLargo) maisLargo = cw.largura;
+      }
+      if (maisLargo > passo * u + 1e-6) {
+        avisar(doc, 'eixos: o numero mais largo da escala de x mede ' + maisLargo.toFixed(2) +
+          ' pt e o passo vale ' + (passo * u).toFixed(2) + ' pt: os numeros vizinhos se ' +
+          'encavalam. Aumente a escala ou o passo, ou passe rotulos= com os valores ' +
+          'que a questao usa');
+      }
+      /* No y todas as caixas tem a mesma altura, entao nao ha "o mais alto" a
+       * procurar: basta contar quantos numeros vao ser escritos ali, porque
+       * empilhar exige DOIS. O tique zero fica de fora porque o zero e escrito
+       * uma vez so, no cruzamento, e ele ja foge pela maquinaria do halo. */
+      var numerosY = 0;
+      for (var wy = 0; wy < ty.length; wy++) {
+        if (ty[wy] !== 0 && quero(ty[wy])) numerosY++;
+      }
+      var alturaCaixa = 2 * meiaAltura;
+      if (numerosY >= 2 && alturaCaixa > passo * u + 1e-6) {
+        avisar(doc, 'eixos: o numero da escala de y tem ' + alturaCaixa.toFixed(2) +
+          ' pt de altura impressa e o passo vale ' + (passo * u).toFixed(2) +
+          ' pt: os numeros vizinhos se empilham um sobre o outro. Aumente a escala ' +
+          'ou o passo, diminua o corpo, ou passe rotulos= com os valores que a ' +
+          'questao usa');
+      }
+    }
+
+    function escrever(txt, ancora, dir) {
+      return rotulo(doc, txt, ancora, {
+        tam: tam, cor: op.corTexto || COR.texto, direcao: dir,
+        afastamento: afast, halo: true, limites: limites, chamada: false
+      });
+    }
+    function faixa(caixas) {
+      var q = null;
+      for (var i = 0; i < caixas.length; i++) {
+        var c = caixas[i];
+        if (!c) continue;
+        if (!q) q = { x0: c.x, y0: c.y, x1: c.x + c.largura, y1: c.y + c.altura };
+        else {
+          q.x0 = Math.min(q.x0, c.x); q.y0 = Math.min(q.y0, c.y);
+          q.x1 = Math.max(q.x1, c.x + c.largura); q.y1 = Math.max(q.y1, c.y + c.altura);
+        }
+      }
+      return q;
+    }
+
+    var caixasX = [], caixasY = [], textosX = [], textosY = [];
+    for (var i2 = 0; i2 < tx.length; i2++) {
+      if (tx[i2] === 0 || !quero(tx[i2])) continue;
+      var t1 = textoDoValor(doc, tx[i2], op.formatar, avisouDecimal);
+      caixasX.push(escrever(t1, pt(px(tx[i2]), py(0)), pt(0, -1)));
+      textosX.push(t1);
+    }
+    for (var j2 = 0; j2 < ty.length; j2++) {
+      if (ty[j2] === 0 || !quero(ty[j2])) continue;
+      var t2 = textoDoValor(doc, ty[j2], op.formatar, avisouDecimal);
+      caixasY.push(escrever(t2, pt(px(0), py(ty[j2])), pt(-1, 0)));
+      textosY.push(t2);
+    }
+    /* O zero uma vez so, no cruzamento. Ele e o unico numero da escala que
+     * disputa lugar com dois vizinhos ao mesmo tempo: cai na diagonal do
+     * terceiro quadrante, e na diagonal moram o menos um do eixo x e o menos um
+     * do eixo y. Medido nesta folha, com passo 1 e unidade de 11,5 pt, o halo do
+     * zero apagava o "-1" do eixo x por inteiro, e o defeito e justamente o que
+     * a convencao escrita manda evitar ("rotulo sobre o eixo empurra para o lado
+     * de dentro ou apaga o numero do tique", e o que se apaga e o TIQUE, nunca
+     * outro numero).
+     *
+     * Em vez de escolher um deslocamento no olho, o zero foge pela MESMA
+     * maquinaria do rotulo: as caixas dos numeros ja escritos viram obstaculo e
+     * o fugirDoHalo acha o menor desvio que libera, testando primeiro a
+     * diagonal, que e onde o zero deveria estar. */
+    if (op.zero !== false && xMin <= 0 && xMax >= 0 && yMin <= 0 && yMax >= 0) {
+      var txt0 = textoDoValor(doc, 0, op.formatar, avisouDecimal);
+      var cz = caixaDoRotulo(txt0, { tam: tam });
+      var hw0 = cz.largura / 2, hh0 = cz.altura / 2;
+      var ex0 = pt(1, 0), ey0 = pt(0, 1);
+      var d0 = pt(-0.7071, -0.7071);
+      var sup0 = suporteCaixa(d0, ex0, ey0, hw0, hh0);
+      var c0 = pt(px(0) + d0.x * (afast + sup0), py(0) + d0.y * (afast + sup0));
+      var obst0 = obstaculosDeCaixas(caixasX.concat(caixasY), c0);
+      if (obst0.length && !haloLivre(obst0, 0, 0, hw0, hh0)) {
+        var fuga0 = fugirDoHalo(obst0, [d0, pt(-1, 0), pt(0, -1)], hw0, hh0, ex0, ey0, null);
+        if (fuga0) c0 = pt(c0.x + fuga0.x, c0.y + fuga0.y);
+      }
+      caixasX.push(rotulo(doc, txt0, c0, {
+        tam: tam, cor: op.corTexto || COR.texto, halo: true, limites: limites, chamada: false
+      }));
+    }
+    /* O nome do eixo depois da ponta da seta. Ele e neutro por padrao (x e y sao
+     * simbolo de matematica), e quem precisar de outro nome passa. */
+    var nomeX = op.nomeX !== undefined ? op.nomeX : 'x';
+    var nomeY = op.nomeY !== undefined ? op.nomeY : 'y';
+    if (nomeX) caixasX.push(escrever(String(nomeX), pt(caixa.x1, py(0)), pt(1, 0)));
+    if (nomeY) caixasY.push(escrever(String(nomeY), pt(px(0), caixa.y1), pt(0, 1)));
+
+    faixaX = faixa(caixasX);
+    faixaY = faixa(caixasY);
+    /* UMA entrada por eixo, com a caixa da faixa inteira. O texto guardado e a
+     * lista dos numeros, para quem audita saber o que a faixa contem sem ter que
+     * voltar ao fluxo. */
+    if (faixaX) {
+      A.anota('rotulo', {
+        texto: textosX.join(' '), tam: tam, giro: 0, papel: 'escala',
+        x: faixaX.x0, y: faixaX.y0, largura: faixaX.x1 - faixaX.x0, altura: faixaX.y1 - faixaX.y0,
+        cx: (faixaX.x0 + faixaX.x1) / 2, cy: (faixaX.y0 + faixaX.y1) / 2,
+        desviou: 0, tarja: false, eixo: 'x'
+      });
+    }
+    if (faixaY) {
+      A.anota('rotulo', {
+        texto: textosY.join(' '), tam: tam, giro: 0, papel: 'escala',
+        x: faixaY.x0, y: faixaY.y0, largura: faixaY.x1 - faixaY.x0, altura: faixaY.y1 - faixaY.y0,
+        cx: (faixaY.x0 + faixaY.x1) / 2, cy: (faixaY.y0 + faixaY.y1) / 2,
+        desviou: 0, tarja: false, eixo: 'y'
+      });
+    }
+
+    return {
+      p: P, px: px, py: py,
+      inverso: function (q) { var w = norm(q); return pt((w.x - O.x) / u, (w.y - O.y) / u); },
+      u: u, origem: O, caixa: caixa, passo: passo,
+      tiquesX: tx, tiquesY: ty, eixoX: eixoX, eixoY: eixoY
+    };
+  }
+
+  /* Caixas de rotulo viradas em obstaculo, no formato que o haloLivre e o
+   * fugirDoHalo esperam: quatro lados mais as duas diagonais. As diagonais nao
+   * sao enfeite, sao o caso do CONTIDO: o segmentoCruzaCaixa responde falso para
+   * os quatro lados de uma caixa que envolve a outra por inteiro, e sem elas uma
+   * caixa pequena escondida dentro de uma grande passaria por livre. As
+   * coordenadas ja saem relativas ao centro do rotulo que esta fugindo, que e o
+   * sistema em que aquelas duas funcoes trabalham; aqui nao ha giro, entao a
+   * projecao e a propria diferenca. */
+  function obstaculosDeCaixas(caixas, centro) {
+    var saida = [];
+    for (var i = 0; i < caixas.length; i++) {
+      var c = caixas[i];
+      if (!c || c.largura == null) continue;
+      var x0 = c.x - centro.x, y0 = c.y - centro.y;
+      var x1 = x0 + c.largura, y1 = y0 + c.altura;
+      saida.push({ ax: x0, ay: y0, bx: x1, by: y0 });
+      saida.push({ ax: x1, ay: y0, bx: x1, by: y1 });
+      saida.push({ ax: x1, ay: y1, bx: x0, by: y1 });
+      saida.push({ ax: x0, ay: y1, bx: x0, by: y0 });
+      saida.push({ ax: x0, ay: y0, bx: x1, by: y1 });
+      saida.push({ ax: x0, ay: y1, bx: x1, by: y0 });
+    }
+    return saida;
+  }
+
+  /* Quais valores ganham numero. Padrao: todos os tiques. Uma lista escolhe os
+   * que a questao usa, e falso deixa a escala muda, que e o caso do plano que
+   * serve so para dizer onde e a origem. */
+  function escolhaDeRotulos(quais) {
+    if (quais === false || quais === 'nenhum') return function () { return false; };
+    if (quais && quais.length !== undefined && typeof quais !== 'string') {
+      var lista = [];
+      for (var i = 0; i < quais.length; i++) lista.push(Number(quais[i]));
+      return function (v) {
+        for (var j = 0; j < lista.length; j++) if (Math.abs(lista[j] - v) < 1e-9) return true;
+        return false;
+      };
+    }
+    return function () { return true; };
+  }
+
+  /* Numero para texto. Inteiro sai inteiro, que e o caso de quase todo tique e o
+   * unico que nao tem lingua. Fracionario tem separador decimal, e separador
+   * decimal E lingua: a folha portuguesa quer virgula e a inglesa quer ponto.
+   * Aqui ele sai com ponto e o aviso sai junto, uma vez por figura, para o tema
+   * passar op.formatar em vez de a folha em portugues sair com 2.5. */
+  function textoDoValor(doc, v, formatar, avisou) {
+    if (typeof formatar === 'function') return String(formatar(v));
+    var n = Number(v);
+    if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
+    if (avisou && !avisou.feito) {
+      avisou.feito = true;
+      avisar(doc, 'eixos: tique fracionario sem op.formatar, saiu com ponto decimal. ' +
+        'O separador decimal e decisao de lingua e tem que vir do tema');
+    }
+    return String(Math.round(n * 1000) / 1000);
+  }
+
+  /* ====================================================== poligono regular
+   *
+   *   poligonoRegular(doc, centro, n, raio, {giro, ...opcoes do poligono})
+   *     -> {pontos, centro, raio, n, giro, apotema, lado, pes, reg}
+   *
+   * A matematica e a do geo.poligonoRegular do base.js e continua sendo, para
+   * nao existirem dois lugares que decidem onde fica o vertice de um hexagono.
+   * O que esta aqui e o desenho mais os tres numeros que a decomposicao pede: a
+   * apotema, o lado e os pes (os pontos medios dos lados, que e onde a apotema
+   * encosta). O hexagono decomposto em seis triangulos e o trapezio cotado, que
+   * sao as duas figuras de alta prioridade do MATEM3-12, saem dai sem nenhuma
+   * conta na receita.
+   *
+   * Com desenhar falso ela so CALCULA. Existe porque a ordem de pintura do
+   * figura() e fixa e as camadas rodam depois de a receita empilhar todas: quem
+   * precisa preencher um dos triangulos da decomposicao precisa dos vertices na
+   * camada de preenchimento, que roda ANTES da de contorno. Sem esta porta, a
+   * saida seria pedir contorno falso e preenche falso, e ai o poligono() avisa
+   * com razao que nada seria desenhado, e um aviso legitimo vira ruido.
+   *
+   * CUIDADO com a ordem dos argumentos: aqui e (centro, n, raio) e no
+   * geo.poligonoRegular e (centro, raio, n). A ordem daqui e a que a
+   * especificacao pede na assinatura desta primitiva, e a troca esta escrita
+   * neste comentario porque ela e silenciosa: um pentagono de raio 5 chamado com
+   * a ordem trocada sai como um poligono de 5 lados de raio 5 tambem, e um
+   * hexagono de raio 40 vira um poligono de 40 lados de raio 6, que na folha e
+   * uma circunferencia. */
+  function poligonoRegular(alvo, centro, n, raio, op) {
+    op = op || {};
+    var A = alvoDe(alvo), doc = A.doc;
+    var geo = base().geo;
+    var lados = Math.round(Number(n));
+    var r = Number(raio);
+    if (!(lados >= 3)) {
+      avisar(doc, 'poligonoRegular com ' + n + ' lados, o minimo e tres, nao desenha');
+      return null;
+    }
+    if (!isFinite(r) || r <= 0) {
+      avisar(doc, 'poligonoRegular com raio invalido, nao desenha');
+      return null;
+    }
+    var giro = Number(op.giro) || 0;
+    var C = norm(centro);
+    var pts = normLista(geo.poligonoRegular(C, r, lados, giro));
+    var reg = op.desenhar === false ? null : poligono(alvo, pts, op);
+    var pes = [];
+    for (var i = 0; i < lados; i++) {
+      var P = pts[i], Q = pts[(i + 1) % lados];
+      pes.push(pt((P.x + Q.x) / 2, (P.y + Q.y) / 2));
+    }
+    return {
+      tipo: 'poligonoRegular', pontos: pts, centro: C, raio: r, n: lados, giro: giro,
+      apotema: r * Math.cos(Math.PI / lados),
+      lado: 2 * r * Math.sin(Math.PI / lados),
+      anguloCentral: 360 / lados,
+      pes: pes, reg: reg
+    };
+  }
+
+  /* ============================================================ cota radial
+   *
+   *   cotaRadial(doc, centro, raio, texto, {tipo, angulo, estilo, lado, em,
+   *                                         tam, cor, espessura, afastamento})
+   *
+   * Escrever o r e o d de um circulo e um caso proprio porque o contorno do
+   * circulo esta em TODA direcao: a normal de qualquer lugar cruza a
+   * circunferencia, e um rotulo empurrado para fora do raio cai em cima dela.
+   * Foi o defeito medido na coroa circular deste projeto, onde o R apagava um
+   * pedaco da circunferencia interna.
+   *
+   * Dois modos, e nenhum dos dois e primitiva nova:
+   *
+   *   estilo 'linha' (padrao)  o raio (ou o diametro) e desenhado como objeto e
+   *                            o texto vai pelo rotuloLado(), na normal do ponto
+   *                            medio. Como o raio nasce no centro e morre na
+   *                            circunferencia, o ponto medio esta a meio raio de
+   *                            distancia dos dois, e o texto tem o vao inteiro
+   *                            para ele. O fuga= ao longo do raio faz o numero
+   *                            deslizar SOBRE a propria linha que ele mede
+   *                            quando ainda assim faltar espaco, em vez de
+   *                            sair dela, que e a mesma saida da cota().
+   *   estilo 'cota'            a cota() de sempre, para quando o raio nao pode
+   *                            ser desenhado por dentro (alvo, coroa, disco
+   *                            preenchido) e a medida tem que sair por fora.
+   *
+   * O raio sai com papel 'objeto': ele e a linha que a pergunta manda olhar, e a
+   * hierarquia de tinta ja garante que ela nunca fica mais fraca do que 0,9 pt
+   * nem sai vestida com o codigo do gabarito. */
+  function cotaRadial(alvo, centro, raio, texto, op) {
+    op = op || {};
+    var A = alvoDe(alvo), doc = A.doc;
+    var COR = gerador().COR;
+    var C = norm(centro), r = Number(raio);
+    if (!isFinite(r) || r <= 0) {
+      avisar(doc, 'cotaRadial com raio invalido, nao desenha');
+      return null;
+    }
+    var ehDiametro = op.tipo === 'diametro';
+    var ang = op.angulo != null ? Number(op.angulo) : 30;
+    var u = versorDeGiro(ang);
+    var P = ehDiametro ? pt(C.x - u.x * r, C.y - u.y * r) : pt(C.x, C.y);
+    var Q = pt(C.x + u.x * r, C.y + u.y * r);
+    var tam = Number(op.tam) || TAM_PADRAO;
+
+    if (op.estilo === 'cota') {
+      var reg = cota(alvo, P, Q, texto, {
+        afastamento: op.afastamento != null ? Number(op.afastamento) : 0,
+        cor: op.cor, corTexto: op.corTexto, tam: tam,
+        lado: op.lado, estilo: 'seta',
+        espessura: op.espessura != null ? Number(op.espessura) : undefined
+      });
+      return { tipo: 'cotaRadial', modo: ehDiametro ? 'diametro' : 'raio',
+        centro: C, raio: r, A: P, B: Q, angulo: ang, cota: reg, rotulo: reg ? reg.rotulo : null };
+    }
+
+    var linha = poligono(alvo, [P, Q], {
+      fechado: false,
+      cor: op.cor || COR.texto,
+      espessura: op.espessura != null ? Number(op.espessura) : ESPESSURA.marca,
+      papel: op.papel || 'objeto'
+    });
+    var rot = null;
+    if (texto != null && String(texto).trim()) {
+      /* No diametro o ponto medio E o centro, que quase sempre ja tem a bolinha
+       * do O em cima: o texto sai a tres quartos do vao, ainda sobre a linha que
+       * ele mede e longe das duas coisas. */
+      rot = rotuloLado(alvo, texto, P, Q, {
+        em: op.em != null ? Number(op.em) : (ehDiametro ? 0.72 : 0.5),
+        lado: op.lado != null ? Number(op.lado) : 1,
+        tam: tam, bold: op.bold, cor: op.corTexto,
+        afastamento: op.afastamento != null ? Number(op.afastamento) : AFAST_PADRAO,
+        fuga: u
+      });
+    }
+    return {
+      tipo: 'cotaRadial', modo: ehDiametro ? 'diametro' : 'raio',
+      centro: C, raio: r, A: P, B: Q, angulo: ang, linha: linha, rotulo: rot
+    };
+  }
+
+  /* ====================================================== direcao livre
+   *
+   *   direcaoLivre(doc, texto, ancora, [dirs], {tam, bold, giro, afastamento,
+   *                                             exceto})
+   *
+   * Qual dos sentidos oferecidos poe o rotulo em papel limpo. E a MESMA
+   * maquinaria do halo que o rotulo() ja usa, perguntada antes em vez de depois:
+   * obstaculosDoRotulo levanta o que ja foi desenhado, suporteCaixa mede a
+   * caixa na direcao pedida e haloLivre responde. Nao ha uma segunda copia da
+   * regra aqui, e por isso ela nao pode divergir da que desenha.
+   *
+   * A diferenca entre isto e a fuga de dentro do rotulo() e o que se move: a
+   * fuga empurra o rotulo para LONGE da ancora, a poucos pontos por vez, e acima
+   * de um corpo de desvio ela liga o fio de chamada porque o rotulo ja nao esta
+   * onde a geometria pediu. Aqui nada e empurrado: escolhe-se entre direcoes que
+   * a geometria considera todas legitimas, e o rotulo continua colado no ponto.
+   * E o caso do ponto sobre uma curva, onde para dentro e para fora sao as duas
+   * igualmente certas e so uma delas esta livre.
+   *
+   * Sem ctx nao ha registro e nao ha o que consultar: devolve o primeiro
+   * sentido, que e o que quem chamou preferia. */
+  function direcaoLivre(alvo, texto, ancora, dirs, op) {
+    op = op || {};
+    var A = alvoDe(alvo);
+    var lista = [];
+    for (var i = 0; i < (dirs || []).length; i++) {
+      var v = versor(dirs[i]);
+      if (v) lista.push(v);
+    }
+    if (!lista.length) return null;
+    if (!A.ctx) return lista[0];
+
+    var tam = Number(op.tam) || TAM_PADRAO;
+    var cx0 = caixaDoRotulo(texto, { tam: tam, bold: op.bold });
+    var hw = cx0.largura / 2, hh = cx0.altura / 2;
+    var giro = normalizarGiro(op.giro);
+    var e1 = pt(Math.cos(rad(giro)), Math.sin(rad(giro)));
+    var e2 = pt(-e1.y, e1.x);
+    var anc = norm(ancora);
+    var afast = op.afastamento != null ? Number(op.afastamento) : AFAST_PADRAO;
+
+    for (var d = 0; d < lista.length; d++) {
+      var dir = lista[d];
+      var sup = suporteCaixa(dir, e1, e2, hw, hh);
+      var cx = anc.x + dir.x * (afast + sup), cy = anc.y + dir.y * (afast + sup);
+      var obst = obstaculosDoRotulo(A.ctx, cx, cy, e1, e2, op.exceto);
+      if (!obst.length || haloLivre(obst, 0, 0, hw, hh)) return dir;
+    }
+    return lista[0];
+  }
+
   /* A mesma decisao de tinta, oferecida a quem desenha por fora deste arquivo. E
    * o caso da diagonal e da ceviana do marcas.js, que emitem o proprio caminho e
    * nao passam pelo poligono daqui: em vez de a regra ser copiada e envelhecer
@@ -1739,13 +2711,18 @@
   }
 
   return {
-    poligono: poligono,
+    poligono: poligono, poligonoRegular: poligonoRegular,
     arco: arco, arcoPontos: arcoPontos, trechosDeArco: trechosDeArco,
+    circunferencia: circunferencia, elipse: elipse,
+    curvaSuave: curvaSuave, caminhoSuave: caminhoSuave,
+    parabola: parabola, hiperbole: hiperbole,
+    eixos: eixos,
     varreDoAngulo: varreDoAngulo,
     rotulo: rotulo, caixaDoRotulo: caixaDoRotulo,
     rotuloVertice: rotuloVertice, rotularVertices: rotularVertices,
     rotuloLado: rotuloLado, rotuloAngulo: rotuloAngulo,
-    ponto: ponto, seta: seta, cota: cota,
+    direcaoLivre: direcaoLivre,
+    ponto: ponto, seta: seta, cota: cota, cotaRadial: cotaRadial,
     versor: versor, perp: perp, contraste: contraste,
     tintaDe: tintaDe, PAPEL_OBJETO: PAPEL_OBJETO, GUIA_LEITURA: GUIA_LEITURA,
     ESPESSURA: ESPESSURA, PISO_ESPESSURA: PISO_ESPESSURA, PISO_CORPO: PISO_CORPO,

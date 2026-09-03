@@ -134,7 +134,7 @@ console.log('\n=== o navegador recebe o kit de figuras inteiro ===');
  * O sw.js precisa da mesma lista: ela dá aula na casa das famílias, muitas vezes
  * sem sinal, e o que não está no cache não existe quando falta rede. */
 {
-  const KIT = ['base.js', 'desenho.js', 'marcas.js', 'receitas.js', 'formula.js'];
+  const KIT = ['base.js', 'desenho.js', 'marcas.js', 'receitas.js', 'formula.js', 'solidos.js'];
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   const sw = fs.readFileSync(path.join(__dirname, '..', 'sw.js'), 'utf8');
 
