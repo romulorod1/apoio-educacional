@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.11.0';
+  var VERSAO = '1.11.1';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -18,6 +18,16 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.11.1',
+      itens: [
+        'O documento que a família recebe voltou a ser o que era: a tabela de aulas, o total ' +
+          'e o seu feedback. As listas de temas e de áreas trabalhadas ficam de fora até você ' +
+          'marcar a caixa Exibir os temas e as áreas trabalhadas, que fica logo acima dos ' +
+          'botões de exportar. Marque quando o registro estiver do jeito que você quer; o ' +
+          'aplicativo lembra.'
+      ]
+    },
     {
       versao: '1.11.0',
       itens: [
@@ -4290,6 +4300,34 @@
       cartao.appendChild(el('div', { class: 'rolagem' }, [tabela]));
 
       var temResumo = !!(f.resumoTexto || '').trim();
+
+      /* A caixa fica ACIMA dos botões de exportar, e não dentro da fileira: ela
+       * muda o que vai sair, então precisa ser lida antes de tocar em PDF. */
+      var chkListas = el('input', {
+        type: 'checkbox', style: 'width:auto;min-height:auto'
+      });
+      chkListas.checked = exibirTemasEAreas();
+      chkListas.addEventListener('change', function () {
+        db.ajustes = db.ajustes || {};
+        db.ajustes.exibirTemasEAreas = chkListas.checked;
+        salvar().then(function () { desenharFechamento(); });
+      });
+      cartao.appendChild(el('label', {
+        class: 'campo', style: 'display:flex;align-items:center;gap:10px;margin:12px 0 0'
+      }, [
+        chkListas,
+        el('span', {
+          texto: 'Exibir os temas e as áreas trabalhadas no documento', style: 'margin:0'
+        })
+      ]));
+      cartao.appendChild(el('div', {
+        class: 'ajuda', style: 'margin:2px 0 0',
+        texto: exibirTemasEAreas()
+          ? 'A família vai ver a lista de assuntos e a de áreas, com as datas de cada um.'
+          : 'Por enquanto o documento leva a tabela de aulas, o total e o seu feedback. '
+            + 'Marque quando quiser que a lista de assuntos e a de áreas entrem também.'
+      }));
+
       cartao.appendChild(el('div', { class: 'barra', style: 'margin:12px 0 0' }, [
         el('button', {
           type: 'button', class: 'btn' + (temResumo ? '' : ' destaque'),
@@ -4365,8 +4403,28 @@
     return 'Fechamento_' + Core.nomeArquivo(f.alunoNome) + '_' + f.mes;
   }
 
+  /* Exibir ou não as listas de temas e de áreas no documento que a família lê.
+   *
+   * Nasce desmarcada, por decisão dela: hoje o que ela usa é a agenda, o valor a
+   * receber e o texto do fechamento. Registrar assunto e marcar áreas são coisas
+   * que está começando a explorar, e explorar não pode mudar sozinho o que sai
+   * para a família. Quando o registro estiver do jeito que ela quer, marca uma
+   * vez e fica marcado.
+   *
+   * Mora em db.ajustes, junto das outras preferências, e não por aluno: é uma
+   * decisão sobre o formato do documento, não sobre uma família específica. */
+  function exibirTemasEAreas() {
+    return !!(db.ajustes && db.ajustes.exibirTemasEAreas);
+  }
+
+  function opcoesDoDocumento(extra) {
+    var o = extra || {};
+    o.exibirTemasEAreas = exibirTemasEAreas();
+    return o;
+  }
+
   function exportarAlunoEmTexto(f) {
-    var md = Core.markdownFechamento(f, { incluirNotas: true });
+    var md = Core.markdownFechamento(f, opcoesDoDocumento({ incluirNotas: true }));
     entregarArquivo(nomeBase(f) + '.md', new Blob([md], { type: 'text/markdown;charset=utf-8' }),
       'Fechamento de ' + f.alunoNome);
   }
@@ -4418,12 +4476,12 @@
     }
 
     passo.then(function (extra) {
-      var bytes = PDFGen.gerarFechamento(f, {
+      var bytes = PDFGen.gerarFechamento(f, opcoesDoDocumento({
         incluirNotas: comFolhas,
         notas: extra.notas,
         imagens: extra.imagens,
         sempreResumo: true
-      });
+      }));
       entregarArquivo(nomeBase(f) + (comFolhas ? '_com_folhas' : '') + '.pdf',
         new Blob([bytes], { type: 'application/pdf' }),
         'Fechamento de ' + f.alunoNome);

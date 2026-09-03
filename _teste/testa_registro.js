@@ -102,7 +102,12 @@ conf('área desconhecida é ignorada', f.areasDoMes.length, 3);
 // ================================================================
 secao('4. O fechamento em Markdown');
 
-const md = Core.markdownFechamento(f, { incluirNotas: false });
+/* As duas listas, temas e áreas, só saem quando ela manda exibir. Foi decisão
+ * dela: hoje o que usa é a agenda, o valor a receber e o texto do fechamento, e
+ * o registro de assunto está começando a ser explorado. Aqui o teste pede as
+ * listas de propósito, para conferir o conteúdo delas; o padrão está logo
+ * abaixo, na seção 4b. */
+const md = Core.markdownFechamento(f, { incluirNotas: false, exibirTemasEAreas: true });
 conf('tem a seção de temas', md.indexOf('## Temas trabalhados') >= 0, true);
 conf('com o tema e as datas', md.indexOf('- Equações do primeiro grau (01/06, 03/06)') >= 0, true);
 conf('tem a seção de áreas', md.indexOf('## Áreas trabalhadas') >= 0, true);
@@ -119,6 +124,21 @@ const mdVazio = Core.markdownFechamento(Core.calcularFechamento(dbVazio, 'al1', 
 conf('sem temas, a seção não aparece', mdVazio.indexOf('## Temas trabalhados') >= 0, false);
 conf('sem áreas, a seção não aparece', mdVazio.indexOf('## Áreas trabalhadas') >= 0, false);
 conf('e o fechamento continua completo', mdVazio.indexOf('## Feedback') >= 0, true);
+
+// ================================================================
+secao('4b. Por padrão o documento não leva as duas listas');
+
+/* O documento que a família recebe só ganha a lista de assuntos e a de áreas
+ * quando ela marca a caixa no cartão do fechamento. Enquanto não marcar, ele
+ * leva a tabela de aulas, o total e o feedback dela, que é o que ele já levava
+ * antes de o registro de assunto existir. */
+const mdPadrao = Core.markdownFechamento(f, { incluirNotas: false });
+conf('sem pedir, a seção de temas não sai', mdPadrao.indexOf('## Temas trabalhados') >= 0, false);
+conf('sem pedir, a seção de áreas não sai', mdPadrao.indexOf('## Áreas trabalhadas') >= 0, false);
+conf('mas o feedback continua saindo', mdPadrao.indexOf('## Feedback') >= 0, true);
+conf('e a tabela de aulas também', mdPadrao.indexOf('**Aluno:**') >= 0, true);
+conf('pedindo, as duas voltam',
+  md.indexOf('## Temas trabalhados') >= 0 && md.indexOf('## Áreas trabalhadas') >= 0, true);
 
 // ================================================================
 secao('5. Dividir a aula em duas');
