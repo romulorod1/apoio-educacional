@@ -109,8 +109,8 @@ conf('tem a seção de áreas', md.indexOf('## Áreas trabalhadas') >= 0, true);
 conf('marca quantas aulas quando repete', md.indexOf('(2 aulas)') >= 0, true);
 conf('e não marca quando foi uma só', md.indexOf('Ansiedade ou medo de prova\n') >= 0 ||
   md.indexOf('- Ansiedade ou medo de prova') >= 0, true);
-conf('o resumo continua depois disso',
-  md.indexOf('## Áreas trabalhadas') < md.indexOf('## Resumo do mês'), true);
+conf('o feedback continua depois disso',
+  md.indexOf('## Áreas trabalhadas') < md.indexOf('## Feedback'), true);
 conf('nenhum travessão no fechamento', /[–—]/.test(md), false);
 
 const dbVazio = bancoDeProva();
@@ -118,7 +118,7 @@ dbVazio.aulas.forEach(a => { delete a.temas; delete a.areas; });
 const mdVazio = Core.markdownFechamento(Core.calcularFechamento(dbVazio, 'al1', '2026-06'), {});
 conf('sem temas, a seção não aparece', mdVazio.indexOf('## Temas trabalhados') >= 0, false);
 conf('sem áreas, a seção não aparece', mdVazio.indexOf('## Áreas trabalhadas') >= 0, false);
-conf('e o fechamento continua completo', mdVazio.indexOf('## Resumo do mês') >= 0, true);
+conf('e o fechamento continua completo', mdVazio.indexOf('## Feedback') >= 0, true);
 
 // ================================================================
 secao('5. Dividir a aula em duas');

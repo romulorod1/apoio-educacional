@@ -472,11 +472,11 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   conf('a agenda mostra o sinal de folha', await conta('.pilula.tem-nota'), 1);
 
   // ================================================================
-  secao('11. Escrever o resumo do mês e gerar o fechamento');
+  secao('11. Escrever o feedback e gerar o fechamento');
 
   await aba('fechamento');
   await espera(400);
-  await clicarTexto('#lista-fechamento button', 'Editar resumo do mês');
+  await clicarTexto('#lista-fechamento button', 'Editar o feedback');
   await espera(900);
   const resumoExistente = await pag.$eval('#campo-resumo', e => e.value);
   conf('o resumo do exemplo já vem escrito', resumoExistente.includes('homenzinho'), true);
