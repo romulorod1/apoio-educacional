@@ -184,13 +184,27 @@ def gerar():
 
     indice = []
     for t in temas:
-        indice.append({
+        registro = {
             'id': t['id'], 'serie': t['serie'], 'unidade': t['unidade'],
             'duracaoMin': t['duracaoMin'], 'dificuldade': t['dificuldade'],
             'qtd': len(t['pt']['exercicios']),
             'pt': {'titulo': t['pt']['titulo'], 'resumo': t['pt']['resumo']},
             'en': {'titulo': t['en']['titulo'], 'resumo': t['en']['resumo']},
-        })
+        }
+        # O pre-requisito viaja no indice, e nao so no arquivo da serie.
+        #
+        # A trilha que fecha uma lacuna atravessa anos: fracoes no 6 ano puxa
+        # multiplos e divisores do 6, operacoes com naturais do 4 e o sistema
+        # decimal do 3. Montada a partir dos arquivos de serie, ela custaria ate
+        # onze downloads e 2,4 MB, na casa da familia e muitas vezes sem sinal.
+        # No indice custa 3,7 KB sobre 69 KB, e o indice ja e baixado na
+        # primeira abertura e ja fica no cache do service worker.
+        #
+        # So sai quando existe: 22 dos 148 temas nao dependem de nenhum outro,
+        # e campo vazio em 22 registros e peso sem informacao.
+        if t.get('prerequisitos'):
+            registro['prerequisitos'] = t['prerequisitos']
+        indice.append(registro)
     caminho_indice = os.path.join(PASTA_BANCO, 'indice.json')
     io.open(caminho_indice, 'w', encoding='utf-8', newline=chr(10)).write(
         json.dumps({'formato': 'banco-temas-matematica', 'versao': 1, 'temas': indice},
