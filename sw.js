@@ -18,9 +18,9 @@
  * O nome novo a cada mudança da lista não é etiqueta: com o nome repetido o
  * install escreveria dentro do MESMO cache de onde a versão ativa está servindo,
  * e o arquivo novo entraria antes de ela mandar atualizar. Foi assim de v1 a
- * v11, um por mudança; este v12 é a entrada de './figuras/solidos.js' na lista
- * abaixo. */
-var CACHE = 'apoio-educacional-v12';
+ * v11, um por mudança; o v12 foi a entrada de './figuras/solidos.js', e este
+ * v13 é a entrada dos treze arquivos de './banco/topicos/' na lista abaixo. */
+var CACHE = 'apoio-educacional-v13';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -52,7 +52,32 @@ var ARQUIVOS = [
   './banco/indice.json',
   // o índice de busca acompanha o de temas: é ele que faz o campo de assunto
   // achar por conteúdo, e não só por título.
-  './banco/busca.json'
+  './banco/busca.json',
+  /* Os TREZE arquivos dos assuntos das outras matérias. O assunto da aula é
+   * registro, e não atalho para material: ela precisa poder escolher o assunto
+   * na casa da família, sem sinal, do mesmo jeito que abre a lista de temas.
+   * Somam 99 KB, menos que os 240 KB do banco/busca.json que já está aqui.
+   *
+   * Ficam no CACHE, e não no BAIXADOS: BAIXADOS é para os banco/serie-*.json,
+   * que pesam de 130 a 280 KB cada e só entram quando a série é aberta.
+   *
+   * São treze chances novas de a instalação falhar numa conexão ruim, porque a
+   * instalação falha inteira de propósito quando um arquivo não baixa (veja o
+   * install abaixo). É o preço de o assunto abrir sem internet, e a falha deixa
+   * ela na versão anterior inteira, nunca numa versão pela metade. */
+  './banco/topicos/indice.json',
+  './banco/topicos/biologia.json',
+  './banco/topicos/ciencias.json',
+  './banco/topicos/estudo.json',
+  './banco/topicos/filosofia-sociologia.json',
+  './banco/topicos/fisica.json',
+  './banco/topicos/geografia.json',
+  './banco/topicos/historia.json',
+  './banco/topicos/ingles.json',
+  './banco/topicos/literatura.json',
+  './banco/topicos/portugues.json',
+  './banco/topicos/quimica.json',
+  './banco/topicos/redacao.json'
 ];
 
 /* Os mesmos ARQUIVOS em endereço absoluto, que é a forma como eles aparecem
