@@ -29,14 +29,20 @@
     333, 556, 611, 556, 611, 556, 333, 611, 611, 278, 278, 556, 278, 889, 611, 611,
     611, 611, 389, 556, 333, 611, 556, 778, 556, 556, 500, 389, 280, 389, 584
   ];
-  // Acentuados das fontes base-14 tem a largura do caractere base.
+  /* Acentuados das fontes base-14 têm a largura do caractere base. Vale para
+   * quase todos, mas NÃO para o i minúsculo acentuado: o 'i' mede 222 na
+   * Helvetica e o 'í' mede 278, porque o acento é mais largo que a haste. Por
+   * isso i com agudo, grave, circunflexo e trema saiu daqui e foi para o
+   * W_EXTRA. As MAIÚSCULAS acentuadas continuam aqui: Í e I medem 278 os dois.
+   * A tabela inteira é conferida caractere a caractere contra a largura real da
+   * Helvetica na seção 14 do _teste/testa_notacao.js. */
   var BASE_ACENTO = {
     0xC0: 'A', 0xC1: 'A', 0xC2: 'A', 0xC3: 'A', 0xC4: 'A', 0xC5: 'A', 0xC7: 'C',
     0xC8: 'E', 0xC9: 'E', 0xCA: 'E', 0xCB: 'E', 0xCC: 'I', 0xCD: 'I', 0xCE: 'I', 0xCF: 'I',
     0xD1: 'N', 0xD2: 'O', 0xD3: 'O', 0xD4: 'O', 0xD5: 'O', 0xD6: 'O',
     0xD9: 'U', 0xDA: 'U', 0xDB: 'U', 0xDC: 'U', 0xDD: 'Y',
     0xE0: 'a', 0xE1: 'a', 0xE2: 'a', 0xE3: 'a', 0xE4: 'a', 0xE5: 'a', 0xE7: 'c',
-    0xE8: 'e', 0xE9: 'e', 0xEA: 'e', 0xEB: 'e', 0xEC: 'i', 0xED: 'i', 0xEE: 'i', 0xEF: 'i',
+    0xE8: 'e', 0xE9: 'e', 0xEA: 'e', 0xEB: 'e',
     0xF1: 'n', 0xF2: 'o', 0xF3: 'o', 0xF4: 'o', 0xF5: 'o', 0xF6: 'o',
     0xF9: 'u', 0xFA: 'u', 0xFB: 'u', 0xFC: 'u', 0xFD: 'y', 0xFF: 'y'
   };
@@ -46,20 +52,48 @@
    * do '?' (556). ½ ¼ ¾ medem 834 de verdade, ou seja 278 milésimos a mais,
    * exatamente a largura de um espaço, e a linha saía com o texto seguinte colado
    * na fração. Conferido desenhando cada caractere isolado e medindo o avanço real
-   * na folha, os dois pesos. */
+   * na folha, os dois pesos.
+   *
+   * O resto do WinAnsi entrou depois, quando a conferência caractere a caractere
+   * contra a Helvetica de verdade mostrou 46 bytes medindo errado: os quatro i
+   * acentuados (222 em vez de 278, que é o defeito de transbordo da legenda) e
+   * mais 42 que não tinham entrada nenhuma e caíam no 556 do '?'. Erravam por
+   * até 444 milésimos (o Æ mede 1000 e media 556). Agora a tabela cobre TODO
+   * byte do WinAnsi que desenha alguma coisa, e o teste da seção 14 do
+   * _teste/testa_notacao.js compara os 218 com a largura real dos dois pesos:
+   * caractere sem largura certa é linha que quebra no lugar errado. */
   var W_EXTRA = {
     0xA0: 278, 0xA7: 556, 0xAA: 370, 0xAB: 556, 0xB0: 400, 0xB1: 584, 0xB2: 333, 0xB3: 333,
     0xB5: 556, 0xB7: 278, 0xBA: 365, 0xBB: 556, 0xBC: 834, 0xBD: 834, 0xBE: 834,
     0xD7: 584, 0xF7: 584,
     0x80: 556, 0x85: 1000, 0x91: 222, 0x92: 222, 0x93: 333, 0x94: 333, 0x95: 350,
-    0x96: 556, 0x97: 1000, 0x99: 1000
+    0x96: 556, 0x97: 1000, 0x99: 1000,
+    // i minusculo acentuado: 278, e nao os 222 do 'i' sem acento
+    0xEC: 278, 0xED: 278, 0xEE: 278, 0xEF: 278,
+    0x82: 222, 0x83: 556, 0x84: 333, 0x86: 556, 0x87: 556, 0x88: 333, 0x89: 1000,
+    0x8A: 667, 0x8B: 333, 0x8C: 1000, 0x8E: 611, 0x98: 333, 0x9A: 500, 0x9B: 333,
+    0x9C: 944, 0x9E: 500, 0x9F: 667,
+    0xA1: 333, 0xA2: 556, 0xA3: 556, 0xA4: 556, 0xA5: 556, 0xA6: 260, 0xA8: 333,
+    0xA9: 737, 0xAC: 584, 0xAD: 333, 0xAE: 737, 0xAF: 333, 0xB4: 333, 0xB6: 537,
+    0xB8: 333, 0xB9: 333, 0xBF: 611,
+    0xC6: 1000, 0xD0: 722, 0xD8: 778, 0xDE: 667, 0xDF: 611, 0xE6: 889, 0xF8: 611
   };
   var W_EXTRA_BOLD = {
     0xA0: 278, 0xA7: 556, 0xAA: 370, 0xAB: 556, 0xB0: 400, 0xB1: 584, 0xB2: 333, 0xB3: 333,
     0xB5: 611, 0xB7: 278, 0xBA: 365, 0xBB: 556, 0xBC: 834, 0xBD: 834, 0xBE: 834,
     0xD7: 584, 0xF7: 584,
     0x80: 556, 0x85: 1000, 0x91: 278, 0x92: 278, 0x93: 500, 0x94: 500, 0x95: 350,
-    0x96: 556, 0x97: 1000, 0x99: 1000
+    0x96: 556, 0x97: 1000, 0x99: 1000,
+    // no negrito o 'i' ja mede 278, entao o acentuado bate: a entrada existe
+    // para o negrito nao voltar a cair no 611 do '?' agora que saiu do BASE_ACENTO
+    0xEC: 278, 0xED: 278, 0xEE: 278, 0xEF: 278,
+    0x82: 278, 0x83: 556, 0x84: 500, 0x86: 556, 0x87: 556, 0x88: 333, 0x89: 1000,
+    0x8A: 667, 0x8B: 333, 0x8C: 1000, 0x8E: 611, 0x98: 333, 0x9A: 556, 0x9B: 333,
+    0x9C: 944, 0x9E: 500, 0x9F: 667,
+    0xA1: 333, 0xA2: 556, 0xA3: 556, 0xA4: 556, 0xA5: 556, 0xA6: 280, 0xA8: 333,
+    0xA9: 737, 0xAC: 584, 0xAD: 333, 0xAE: 737, 0xAF: 333, 0xB4: 333, 0xB6: 556,
+    0xB8: 333, 0xB9: 333, 0xBF: 611,
+    0xC6: 1000, 0xD0: 722, 0xD8: 778, 0xDE: 667, 0xDF: 611, 0xE6: 889, 0xF8: 611
   };
 
   // Unicode que nao esta em latin1 mas existe no cp1252 (WinAnsi).
@@ -379,6 +413,16 @@
   };
 
   Doc.prototype.retangulo = function (x, y, largura, altura, c) {
+    /* Placa BRANCA fica anotada na página. É ela que decide, no finalizar(), se
+     * alguma palavra da marca d'água sairia cortada aqui: só o branco corta a
+     * marca de forma visível, porque COR.soft e COR.softEsc são quase a mesma
+     * tinta que COR.marca (0,937 contra 0,925) e o navy cobre a marca inteira. */
+    if (this.pag && c && c[0] >= 0.999 && c[1] >= 0.999 && c[2] >= 0.999) {
+      (this.pag.brancos = this.pag.brancos || []).push([
+        Math.min(x, x + largura), Math.min(y, y + altura),
+        Math.max(x, x + largura), Math.max(y, y + altura)
+      ]);
+    }
     this.op(cor3(c) + ' rg ' + x.toFixed(2) + ' ' + y.toFixed(2) + ' ' +
       largura.toFixed(2) + ' ' + altura.toFixed(2) + ' re f');
   };
@@ -394,12 +438,86 @@
       (preenche ? 'f' : 'S'));
   };
 
+  /* Altura da caixa de maiúsculas da Helvetica, em fração do corpo. As duas
+   * palavras da marca são só maiúsculas, então é ela que dá o topo da tinta. */
+  var CAIXA_ALTA = 0.718;
+
+  /* Caixa de tinta de um texto centrado em cx, com a base em y. */
+  function caixaDeTexto(txt, cx, y, tam, bold, tracking) {
+    var w = medir(txt, tam, bold, tracking);
+    return { x0: cx - w / 2, y0: y, x1: cx + w / 2, y1: y + CAIXA_ALTA * tam };
+  }
+
+  /* A marca d'água mora no FUNDO da folha, embaixo de todo o resto, e é escrita
+   * no finalizar(). Não pode subir para cima do conteúdo: COR.marca é tinta
+   * opaca e não transparência, então a marca por cima APAGA o que cruza. Medido
+   * numa folha com um triângulo: o NW de 82 pt corta os dois lados do triângulo
+   * em três pedaços e come letras do enunciado. O kit de figuras já tinha medido
+   * o mesmo por outro caminho (figuras/base.js e _experimento/graficos.js): é
+   * por isso que cada figura pinta uma placa branca atrás do desenho, para tirar
+   * a marca de dentro da caixa onde moram os fios de construção, que estão em
+   * COR.fio, quase a mesma tinta da marca.
+   *
+   * O preço de ficar no fundo é essa mesma placa: ela cobre um pedaço da marca e
+   * corta a palavra num corte horizontal reto, deixando meia letra boiando
+   * embaixo da figura. Medido nas folhas do MAT07-12, do MAT08-13 e do
+   * MATEM3-04: em 23 das 66 páginas o NW saía fatiado assim.
+   *
+   * Por isso cada PALAVRA da marca é tudo ou nada: se alguma placa branca corta
+   * a caixa de tinta dela sem cobri-la inteira, a palavra não é desenhada nessa
+   * página. O anel continua sempre, porque um traço de 1,6 pt cortado por uma
+   * reta lê como traço que termina, e não como letra quebrada; e porque o anel é
+   * cruzado por placa em 44 das mesmas 66 páginas, ou seja, aplicar a regra a
+   * ele apagaria a marca de dois terços das folhas. */
   Doc.prototype.marcaDagua = function () {
-    var cx = PAGINA_L / 2, cy = PAGINA_A / 2;
-    this.circulo(cx, cy, 96, COR.marca, false);
-    this.texto('NW', cx, cy - 26, { tam: 82, bold: true, cor: COR.marca, align: 'centro' });
-    this.texto('APOIO EDUCACIONAL', cx, cy - 62, { tam: 10, cor: COR.marca, align: 'centro', tracking: 2.4 });
+    var pag = this.pag;
+    if (!pag) return;
+    var cx = PAGINA_L / 2, cy = PAGINA_A / 2, doc = this;
+    var lista = pag.marca = pag.marca || [];
+    /* Desenha o elemento num fluxo à parte, para ele poder ser descartado
+     * inteiro depois sem sobrar meia operação no meio da folha. */
+    function elemento(caixa, desenha) {
+      var guardadas = pag.ops;
+      pag.ops = [];
+      desenha();
+      var ops = pag.ops;
+      pag.ops = guardadas;
+      if (ops.length) lista.push({ caixa: caixa, ops: ops });
+    }
+    elemento(null, function () { doc.circulo(cx, cy, 96, COR.marca, false); });
+    elemento(caixaDeTexto('NW', cx, cy - 26, 82, true, 0), function () {
+      doc.texto('NW', cx, cy - 26, { tam: 82, bold: true, cor: COR.marca, align: 'centro' });
+    });
+    elemento(caixaDeTexto('APOIO EDUCACIONAL', cx, cy - 62, 10, false, 2.4), function () {
+      doc.texto('APOIO EDUCACIONAL', cx, cy - 62,
+        { tam: 10, cor: COR.marca, align: 'centro', tracking: 2.4 });
+    });
   };
+
+  /* Uma placa branca FATIA a caixa quando encosta nela sem cobri-la inteira: é
+   * aí que sobra pedaço de letra do lado de fora do corte. Placa que cobre a
+   * caixa inteira não fatia nada, e a palavra some por baixo dela de qualquer
+   * jeito. */
+  function fatiada(c, brancos) {
+    var encosta = false;
+    for (var i = 0; i < brancos.length; i++) {
+      var r = brancos[i];
+      if (r[2] <= c.x0 || r[0] >= c.x1 || r[3] <= c.y0 || r[1] >= c.y1) continue;
+      if (r[0] <= c.x0 && r[1] <= c.y0 && r[2] >= c.x1 && r[3] >= c.y1) return false;
+      encosta = true;
+    }
+    return encosta;
+  }
+
+  /* As operações da marca que sobrevivem nesta página, na ordem de desenho. */
+  function opsDaMarca(pag) {
+    var lista = pag.marca || [], brancos = pag.brancos || [], saida = [];
+    for (var i = 0; i < lista.length; i++) {
+      if (lista[i].caixa && fatiada(lista[i].caixa, brancos)) continue;
+      saida = saida.concat(lista[i].ops);
+    }
+    return saida;
+  }
 
   Doc.prototype.moldura = function (numero, total) {
     // Cabecalho identico ao samsung_template_branco.
@@ -499,11 +617,13 @@
 
   Doc.prototype.finalizar = function () {
     var total = this.paginas.length;
-    // moldura por pagina, inserida no inicio do fluxo de cada uma
+    // moldura por pagina, inserida no fim do fluxo de cada uma, e marca d'agua
+    // no comeco, que e onde ela fica embaixo de tudo.
     for (var i = 0; i < total; i++) {
       this.pag = this.paginas[i];
-      if (this.pag.semMoldura) continue;
-      var antes = this.pag.ops;
+      var antes = opsDaMarca(this.pag).concat(this.pag.ops);
+      this.pag.marca = null;   // finalizar duas vezes nao empilha a marca
+      if (this.pag.semMoldura) { this.pag.ops = antes; continue; }
       this.pag.ops = [];
       this.moldura(i + 1, total);
       this.pag.ops = antes.concat(this.pag.ops);

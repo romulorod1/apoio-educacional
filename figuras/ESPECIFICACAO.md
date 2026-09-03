@@ -92,6 +92,68 @@ Rotulo com palavra, que muda de lingua e por isso e escrito na diretiva de cada 
 
 As duas passam no numeros_de com o mesmo conjunto (10 e 6) e na trava de paridade de receita, e nenhuma palavra portuguesa fica presa dentro do desenhador.
 
+### A equacao de bloco: @eq
+
+Uma linha propria, separada do paragrafo por linha em branco, com o resto da linha em
+LaTeX: `@eq x = \frac{-b \pm \sqrt{b^{2} - 4ac}}{2a}`. O renderizador (figuras/formula.js)
+cobre fracao, raiz com indice, expoente e indice, delimitadores que crescem, somatorio,
+produtorio, integral e limite com limites em cima e embaixo, matrizes, `\text{}` e o
+espacamento por classe do TeX. Comando malformado vira selo visivel na folha e aviso no
+registro, nunca LaTeX cru como texto. O delimitador e `@eq` e nao `$...$` porque o banco
+tem 135 cifroes e todos sao `R$`. O nome de funcao segue a lingua da folha: `\sin` sai
+"sen" em portugues e "sin" em ingles, inclusive dentro de fracao, raiz e expoente.
+
+### As receitas de circulo, conicas e poligono regular
+
+Chegaram em 02/09/2026, com um caso por chave em `_prova_receitas_circulo.js` e um
+auditor independente em MuPDF (`_audita_receitas_curvas.py`):
+
+- `circulo`: raio, diametro, corda, centro, arco, setor, coroa, inscrito, circunscrito,
+  fatias, aneis, incognita, giro. Medida com rotulo no formato `valor;rotulo` (`raio=5;r`
+  constroi com 5 e escreve r). Ex.: `@fig circulo id=c8 fatias=8 diametro=40 incognita=x`.
+- `conica`: tipo (elipse, hiperbole, parabola), a, b, p, c, focos, vertices, diretriz,
+  assintotas, retangulo, ponto (`ponto=P;7` poe P a 7 do primeiro foco), eixos, centro.
+  Ex.: `@fig conica tipo=hiperbole a=3 b=2 focos=F1;F2 vertices=A1;A2 retangulo=c assintotas=sim`.
+- `poligonoregular`: lados, lado, raio, apotema, decomposto, centro, incognita.
+  Ex.: `@fig poligonoRegular lados=6 lado=L decomposto=sim centro=O apotema=a`.
+- `pidesenrolado` (`diametro=d sobra=0.14·d`), `pista` (`comprimento=84 largura=60`) e
+  `rodando` (`raio=r comprimento=C`), as tres compostas do tema do circulo.
+
+O que ainda NAO existe: painel de excentricidade (tres elipses lado a lado), a chave
+`cheio` (circunferencia contra circulo), a semielipse apoiada e a demonstracao da area por
+doze setores.
+
+### As receitas de espaco: solido e painelsolidos
+
+Chegaram em 02/09/2026, com 122 conferencias em `_prova_receitas_solidos.js` e um render
+de auditoria em MuPDF (`_prova_receitas_solidos_render.py`). As duas sao a ponte entre a
+diretiva e o `figuras/solidos.js`, e nenhum solido e desenhado dentro delas. Medida com
+rotulo no mesmo formato do `circulo`, `valor;rotulo`: o primeiro valor CONSTROI e a letra
+so rotula (`raio=5 altura=12 geratriz=g` desenha o cone de 5 por 12 e escreve g na
+geratriz). Palavra nenhuma nasce no desenhador: `altura=h` escreve h e `altura=height`
+escreve height. O que a diretiva deixou em letra a conta fecha, e a camada de gabarito
+escreve o valor resolvido em teal; numero dado que contradiz a conta recusa a figura com
+aviso, em vez de desenhar uma que mente.
+
+- `solido`: tipo, aresta, lado, profundidade, altura, raio, geratriz, apotema,
+  apotemabase, triangulo, esfera, planificacao, angulo, setor, arco, centro. O `tipo`
+  aceita prisma, cilindro, piramide, cone, esfera e prismatriangular; `lado` e sinonimo de
+  `aresta`; sem `profundidade` a base do prisma e quadrada. Chave que so faz sentido num
+  tipo avisa nos outros e e ignorada, em vez de trocar o tipo por baixo do pano:
+  `geratriz` so no cone, `apotema` e `apotemabase` so na piramide com `triangulo=sim`,
+  `setor` e `arco` so com `planificacao=sim`. As tres composicoes sao `triangulo=sim` (o
+  triangulo retangulo interno do cone e da piramide), `esfera=inscrita` (a esfera que toca
+  as duas bases do cilindro) e `planificacao=sim` (o setor plano do cone, com `angulo` em
+  graus, 180 por padrao). `centro` e a letra do centro e so tem onde sair na esfera, no
+  cilindro com esfera e no cone ou piramide com triangulo. Nao ha chave de giro: a fuga e
+  uma constante da folha inteira.
+  Ex.: `@fig solido id=s8 tipo=cone triangulo=sim raio=5 altura=12 geratriz=g`.
+- `painelsolidos`: nome, ordem, aresta, lado, raio, altura. Os cinco solidos lado a lado,
+  cada celula com fundo branco e teto de cinco marcas proprios. `nome` traz o nome de cada
+  celula pelo tema, nas duas linguas, e `ordem` escolhe quais celulas e em que sequencia,
+  entre prisma, cilindro, piramide, cone e esfera.
+  Ex.: `@fig painelsolidos id=p1 nome=prisma;cilindro;pirâmide;cone;esfera aresta=a raio=r altura=h`.
+
 ### Dentro do exercicio
 
 Dentro do enunciado a diretiva nao e vista pelo gerador como texto. O itens_numerados do verificador cola a linha no fim da string do item, e o ex.enunciado que chega ao gerarMaterialTema fica com a diretiva pendurada no fim. Antes de escrever qualquer coisa, o gerador parte esse enunciado em pedacos de texto e diretivas de figura, e monta o exercicio nesta ordem fixa: numero, enunciado completo, figura centrada na faixa de MARG_E + 20 ate MARG_D, legenda opcional em 7,5 pt COR.muted, espaco de resposta.
@@ -415,6 +477,25 @@ Destrava 1007 figuras.
 - Nada abaixo do piso de corpo e de espessura
 - Impede que 29 temas ganhem figura e tres saiam com rotulo em cima da linha sem ninguem ver antes da impressao
 
+Tres travas mudaram em 02/09/2026, cada uma com prova nos dois sentidos em
+`_prova_base_travas_hoje.js`:
+
+- **Letra sozinha so e valor de angulo no alfabeto de angulo** (x, alfa, beta, theta).
+  r, d, a, b, c, p e h sao comprimento e parametro; a regra antiga (qualquer minuscula)
+  acusava as oito de "valor solto sem arco" e um eixo chamado x reprovava o tema. O x
+  sozinho so conta quando a diretiva declarou `incognita=`; sem isso e nome de eixo.
+- **A distancia entre arcos e analitica** (centro, raio, inicio e varrido), nao entre as
+  ancoras de Bezier registradas: onde a ancora caia decidia o veredito (arco de 60 graus a
+  partir de 85, com a ancora da circunferencia a 90, media 3,21 pt e reprovava; a partir
+  de 80 media 6,42 e passava). Arco destacado SOBRE a circunferencia (mesmo centro, mesmo
+  raio, um deles inteiro) e a convencao de setor e angulo central, nao "dois arcos no mesmo
+  vertice"; dois arcos PARCIAIS de mesmo raio continuam medidos, porque emendar num
+  semicirculo e exatamente o defeito.
+- **Cruzamento nomeado e traco que PASSA pelo ponto, nao que TERMINA nele.** As
+  bissetrizes passam pelo incentro e as diagonais pelo centro; o raio focal termina em P e
+  o semieixo em F1, e um ponto em que dois tracos so terminam nao tem quatro angulos
+  nascendo. O traco conta quando o ponto esta a mais de 2 pt de cada extremidade.
+
 ## O que NAO fazer
 
 - Nao escrever COR.vermelho. Ele nao existe: a tabela COR tem navy, teal, gold, muted, fio, soft, softEsc, branco, texto e marca. Testei o comportamento e ele e pior do que um erro: o doc.linha faz c || COR.fio, entao a linha sai desenhada em COR.fio, que mede 1,53 de contraste contra o branco. O traco do gabarito nao quebra nada, apenas desaparece na folha impressa. Varias das convencoes levantadas e o proprio briefing supoem que COR.vermelho existe. O destaque e COR.teal, e a camada de resposta vem sempre em teal MAIS tracejado.
@@ -605,7 +686,12 @@ Destrava 1007 figuras.
 
 - **Aresta escondida e desenhada, nunca omitida, e vai em tracejado curto e fino na cor auxiliar (COR.muted, 0.7 pt, padrao '2 2'). Aresta visivel vai cheia em COR.navy, 1.1 pt.** A aresta oculta e o que informa que o solido e fechado e tem volume. Apagar as tres arestas do vertice de tras transforma o cubo num hexagono riscado, e a criança com dificuldade de leitura perde justamente a informacao de profundidade. Deixa-las cheias produz ambiguidade de qual face esta na frente. Exemplo: Na caixa desenhada com profundidade subindo para a direita, o vertice escondido e o de tras, embaixo e a esquerda: as tres arestas que morrem nele (E-F, E-H e A-E) saem tracejadas, as outras nove saem cheias.
 
-- **Circunferencia vista em perspectiva vira elipse com um unico achatamento em toda a folha (ry = 0.34 * rx), e a metade de tras da base vai tracejada enquanto a da frente vai cheia. Isso vale para cilindro, cone e para o equador da esfera.** Achatamento diferente entre duas figuras da mesma folha faz um cilindro parecer visto de cima e o outro visto de lado, e o aluno acha que sao solidos diferentes. A metade de tras tracejada e o que separa 'vejo um solido' de 'vejo dois riscos'; sem ela o cilindro vira um retangulo com dois cantos redondos. Exemplo: cilindro(doc, 100, 450, 30, 80): tampa de cima como elipse inteira cheia, base com arco de 180 a 360 cheio e arco de 0 a 180 tracejado em muted. A constante ACHATA = 0.34 mora num lugar so.
+- **Circunferencia vista em perspectiva vira elipse com um unico achatamento em toda a folha (ry = 0.40 * rx), e a metade de tras da base vai tracejada enquanto a da frente vai cheia. Isso vale para cilindro, cone e para o equador da esfera.** Achatamento diferente entre duas figuras da mesma folha faz um cilindro parecer visto de cima e o outro visto de lado, e o aluno acha que sao solidos diferentes. A metade de tras tracejada e o que separa 'vejo um solido' de 'vejo dois riscos'; sem ela o cilindro vira um retangulo com dois cantos redondos. Exemplo: cilindro(doc, 100, 450, 30, 80): tampa de cima como elipse inteira cheia, base com arco de 180 a 360 cheio e arco de 0 a 180 tracejado em muted. A constante ACHATAMENTO = 0.40 mora num lugar so (figuras/solidos.js).
+  Era 0,34 e passou a 0,40 em 02/09/2026, medido no painel dos cinco solidos: a projecao
+  exata da base circular e uma elipse inclinada 7,0 graus (1,068 r por 0,331 r) e, alinhada
+  aos eixos, daria 0,354; a 0,40 os dois arcos da menor base do painel ficam a 11,2 pt no
+  eixo e 6,9 pt a 3 pt do vertice, contra 9,9 e 6,1 a 0,34. E uma constante so
+  (ACHATAMENTO no solidos.js); quem preferir 0,34 muda um numero.
 
 - **Planificacao NAO tem perspectiva: nela circunferencia e circunferencia, quadrado e quadrado. Linha de dobra vai tracejada e fina; contorno de corte vai cheio. As pecas encostam umas nas outras exatamente onde o molde dobra.** O molde esta deitado na mesa, entao desenhar a base do cilindro como elipse e uma contradicao dentro da propria figura e desmonta a ideia que a planificacao existe para ensinar, que e 'isto aqui e o mesmo objeto aberto'. Peca solta no espaco nao mostra onde dobra, e sem a diferenca entre dobra e corte o molde vira um amontoado de retangulos. Exemplo: planificacaoCilindro(doc, x, y, r, h): retangulo de largura 2*pi*r com as duas circunferencias de raio r tangentes ao lado de cima e ao de baixo, tocando no ponto medio. Foi exatamente o erro que o primeiro render cometeu, e corrigi-lo mudou a leitura da figura.
 

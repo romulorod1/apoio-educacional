@@ -16,6 +16,32 @@
  *                 nunca entrega: os tres triangulos por lados, os tres por
  *                 angulos e os cinco quadrilateros da familia.
  *
+ * Mais as receitas de curva, escritas em cima das primitivas circunferencia,
+ * elipse, parabola, hiperbole, eixos, poligonoRegular e cotaRadial do
+ * desenho.js (secao "receitas de curva", mais abaixo):
+ *
+ *   circulo          raio, diametro e corda cotados, setor e arco com o angulo
+ *                    central, coroa, quadrado inscrito e circunscrito, pizza em
+ *                    fatias e o alvo de aneis concentricos (MAT08-13, MATEM3-12).
+ *   conica           elipse, hiperbole e parabola com focos, vertices, diretriz,
+ *                    assintotas, retangulo fundamental, um ponto sobre a curva
+ *                    com os raios focais e o plano cartesiano atras (MATEM3-04).
+ *   poligonoregular  o poligono de n lados com lado, raio e apotema cotados e a
+ *                    decomposicao em n triangulos pelo centro (MATEM3-12).
+ *   pidesenrolado    a circunferencia de diametro d desenrolada num segmento com
+ *                    tres copias de d e a sobra cotada: o pi como "3 e um pouco".
+ *   pista            o retangulo com um semicirculo em cada lado menor.
+ *   rodando          a roda em tres posicoes sobre a reta, uma volta cotada.
+ *
+ * Mais as duas receitas de espaco, que sao a ponte entre a diretiva e o
+ * figuras/solidos.js (secao "solido", mais abaixo):
+ *
+ *   solido           prisma, cilindro, piramide, cone, esfera e prisma
+ *                    triangular em cavaleira, com as composicoes do MATEM3-12:
+ *                    o triangulo retangulo interno do cone e da piramide, a
+ *                    esfera inscrita no cilindro e o setor que vira cone.
+ *   painelsolidos    os cinco solidos lado a lado, nome por parametro.
+ *
  * Duas decisoes deste arquivo, tomadas no piloto do MAT07-12 e validas para o
  * resto do banco:
  *
@@ -92,11 +118,55 @@
     return cacheDesenho;
   }
 
+  /* Os solidos em cavaleira, pela mesma ligacao tardia: FigSolidos no navegador,
+   * require no Node. Null quando nao carregou, e a receita solido avisa em vez
+   * de lancar, como as receitas de curva fazem com o desenho.js. */
+  var cacheSolidos = null;
+  function solidos() {
+    if (cacheSolidos) return cacheSolidos;
+    if (typeof FigSolidos !== 'undefined' && FigSolidos && FigSolidos.cone) cacheSolidos = FigSolidos;
+    else if (typeof require === 'function') {
+      try { cacheSolidos = require('./solidos.js'); } catch (e) { cacheSolidos = null; }
+    }
+    return cacheSolidos;
+  }
+
   /* ============================================================ apoio */
 
   var TAM_DADO = 8.5;        // corpo do dado que resolve a questao
+  /* O corpo da RESPOSTA na camada de gabarito. O teal do gabarito da 4,93:1
+   * contra o 17,08:1 da tinta do texto, e em tons de cinza (fotocopia) o
+   * mesmo corpo nas duas tintas faz a resposta imprimir mais fraca do que o
+   * dado: medido a 150 dpi, 1.176 de tinta por ponto de largura contra 1.928
+   * do dado, 39 por cento a menos. A cor e do pdf.js e e o codigo de todo o
+   * gabarito; o que a receita pode dar e peso e corpo. */
+  var TAM_RESPOSTA = 9.5;
   var TAM_NOME = 8.5;        // nome da classe, embaixo da celula do painel
   var AFAST_VERTICE = 4.5;   // vao entre a letra e o vertice, ate a BORDA da caixa
+
+  /* Traco e ponto, o padrao de EIXO e de linha de centro da NBR 8403, escrito
+   * cru como o GUIA_LEITURA do desenho.js e pelo mesmo motivo: os nomes do
+   * base.js ja estao ocupados ('auxiliar' e [3 2], o codigo da construcao do
+   * gabarito; 'oculta' e [2 2], aresta escondida de solido; 'guia' e [1 2], que
+   * some na fotocopia). Ele existe aqui para UMA coisa: a assintota da
+   * hiperbole, que e reta de referencia e nao lado de figura.
+   *
+   * Por que ele nasceu. Depois do conserto de contraste, o retangulo
+   * fundamental passou a sair na tinta do contorno (COR.texto) para sobreviver
+   * a fotocopia, e as assintotas ja saiam na mesma tinta, na mesma espessura de
+   * 0,6 pt e no mesmo [2 2]: medido no fluxo da hiperbole a=4 b=3, os quatro
+   * lados do retangulo e as duas assintotas davam SEIS segmentos com a mesma
+   * assinatura "0,60 pt | #1A1C1F | [2 2] 0". Na folha isso e uma trelica
+   * unica, e o texto manda ler duas coisas diferentes ali ("o retangulo tem
+   * lados 2a e 2b" e "as assintotas sao as diagonais dele prolongadas"). Com o
+   * traco e ponto a diferenca volta a estar codificada duas vezes, cor e
+   * padrao, como a ESPECIFICACAO.md pede na linha 529, e sem devolver a
+   * assintota ao muted, que era o que sumia na fotocopia.
+   *
+   * O periodo de 11 pt (6 de traco, 2 de vao, 1 de ponto, 2 de vao) e o que
+   * cabe: a assintota mais curta da folha mede 176 pt, ou seja 16 periodos
+   * inteiros, e o ponto de 1 pt a 0,6 pt de espessura ainda imprime. */
+  var TRACO_E_PONTO = '[6 2 1 2] 0';
 
   function versor(dx, dy) {
     var n = Math.sqrt(dx * dx + dy * dy);
@@ -106,6 +176,37 @@
 
   function arredondar(n) {
     return String(Math.round(n * 100) / 100);
+  }
+
+  /* O separador decimal da FOLHA.
+   *
+   * A diretiva escreve o decimal sempre com ponto, nas duas linguas, porque a
+   * virgula esta proibida no valor (ela e o separador de lista do @fig). A
+   * ESPECIFICACAO.md linha 43 diz quem fecha o outro lado: "a diretiva sempre
+   * escreve ponto e quem imprime a folha decide a virgula". Quem imprime a
+   * folha e este arquivo, e ate aqui ninguem decidia nada: o rotulo saia
+   * identico nas duas linguas.
+   *
+   * O caso medido, MAT08-13 pagina 1: a figura do pi desenrolado imprimia
+   * "0.14·d" na folha PORTUGUESA, na mesma pagina em que o corpo do texto
+   * escreve 3,14 e 31,4 e o gabarito escreve 113,04. Era a unica quebra de
+   * notacao numerica da folha inteira, e a aluna de 13 anos ou le o rotulo como
+   * numero de outro sistema ou registra que na aula de matematica as vezes se
+   * escreve com ponto.
+   *
+   * Troca so o ponto ENTRE DIGITOS: "0.14·d" vira "0,14·d" e um ponto final de
+   * frase, um ponto de multiplicar ou um nome com ponto ficam onde estao. O
+   * valor impresso continua o mesmo, muda so o separador. Em ingles nada muda,
+   * que ja e a notacao de la.
+   *
+   * Toda receita que imprime um numero VINDO DO TEMA passa por aqui. Hoje o
+   * banco inteiro (148 temas) tem um unico rotulo de figura com casa decimal, o
+   * "0.14·d" do MAT08-13, mas a porta fica aberta e nomeada para o proximo. */
+  function numeroNaFolha(doc, texto) {
+    if (texto === null || texto === undefined) return texto;
+    var s = String(texto);
+    if (doc && doc.lingua === 'en') return s;
+    return s.replace(/(\d)\.(?=\d)/g, '$1,');
   }
 
   /* Grau desenha na base-14 (0xB0), e numero mais simbolo de grau sao neutros nas
@@ -2397,9 +2498,2401 @@
     }
   }
 
+  /* ============================================================ receitas de curva
+   *
+   * Tudo daqui para baixo e escrito em cima das primitivas de curva do
+   * desenho.js (circunferencia, elipse, parabola, hiperbole, eixos,
+   * poligonoRegular, cotaRadial) e das marcas do marcas.js (marcaAngulo,
+   * marcaAnguloReto, marcaLado, hachurar). Nenhuma conta de Bezier mora aqui.
+   *
+   * Tres decisoes que valem para as seis receitas:
+   *
+   *   1. A primitiva devolve a geometria e a RECEITA compoe. A parabola do
+   *      desenho.js nao desenha foco nem diretriz e a hiperbole nao desenha
+   *      assintota nem retangulo: quem sabe quantas marcas cabem e a receita,
+   *      porque e ela que sabe o que a questao pede. Cada uma dessas coisas so
+   *      entra quando a diretiva a pede por chave.
+   *
+   *   2. A regiao marcada (hachura ou cinza chapado) sai pelo marcas.js com o
+   *      DOC e nao com o ctx, entao ela NAO conta como marca ativa. A definicao
+   *      escrita na especificacao e "todo elemento que o aluno precisa ler:
+   *      numero, letra de vertice, arco, quadradinho, tracinho, seta de
+   *      paralelismo, rotulo de regiao"; a textura de uma area nao se le um a um,
+   *      e quem diz o que ela significa e a legenda, que tambem nao conta. Sem
+   *      isso o alvo de tres aneis (tres raios cotados mais tres regioes) passava
+   *      de cinco so pela notacao. A hachura continua obrigada a glosa: ela vem
+   *      pela legenda= do tema, como o hachurar() do marcas.js ja cobra.
+   *
+   *   3. Rotulo de medida vem da diretiva e nunca daqui (ver lerMedida): a letra
+   *      r, d, L ou a e neutra, mas quem decide entre a letra e o numero e o
+   *      tema, e "r" numa folha que pede "raio" em ingles nao e da conta deste
+   *      arquivo. */
+
+  /* ------------------------------------------------------ medida com rotulo
+   *
+   * Uma medida tem duas metades, o numero que CONSTROI e o texto que a folha
+   * IMPRIME, e as duas chegam pela mesma chave:
+   *
+   *   raio=5        constroi com 5 e imprime 5
+   *   raio=r        imprime r; nao e numero, entao o tamanho e o padrao
+   *   raio=5;r      constroi com 5 e imprime r
+   *
+   * Devolve {valor, rotulo, letra, explicito}: letra e verdadeiro quando o que
+   * veio nao e numero, explicito quando o rotulo foi escrito depois do ponto e
+   * virgula. As conicas usam o explicito para decidir se a, b e p aparecem na
+   * folha: "a=5" so da a forma, "a=a" ou "a=5;5" tambem escreve. */
+  function medidaDe(B, bruto) {
+    var partes = String(bruto === null || bruto === undefined ? '' : bruto).split(';');
+    var v = partes[0].trim();
+    var r = partes.length > 1 ? partes[1].trim() : '';
+    var valor = B.ehNumero(v) ? parseFloat(v) : null;
+    return { bruto: v, valor: valor, rotulo: r || v, letra: valor === null, explicito: !!r };
+  }
+  function lerMedida(B, args, chave) {
+    var brutos = B.valores(args, chave);
+    return brutos.length ? medidaDe(B, brutos[0]) : null;
+  }
+  function lerMedidas(B, args, chave) {
+    var brutos = B.valores(args, chave), saida = [];
+    for (var i = 0; i < brutos.length; i++) saida.push(medidaDe(B, brutos[i]));
+    return saida;
+  }
+
+  /* "sim" nunca sai impresso, entao pode viver aqui: e o valor de uma chave que
+   * so liga alguma coisa (diretriz=sim, eixos=sim, decomposto=sim). Aceita
+   * tambem yes e true para o tema em ingles nao precisar de portugues. */
+  function ehSim(v) {
+    return /^(sim|yes|true)$/i.test(String(v === null || v === undefined ? '' : v).trim());
+  }
+
+  /* Fora de escala nestas receitas so quando a figura tem NUMERO e ao mesmo
+   * tempo alguma medida saiu CHUTADA: "raio=10 coroa=r" desenha a coroa com um
+   * raio interno de 0,6 R que ninguem pediu, e a folha tem que dizer isso. Uma
+   * figura toda em letras (raio=r diametro=d) e o prototipo generico e nao esta
+   * fora de escala de nada; toda em numeros e fiel por construcao; e uma letra
+   * numa medida que se DEDUZ das outras (inscrito=10 raio=r, ou o segundo
+   * raio=5√2 do circunscrito) tambem nao e chute. A regra do base.js (qualquer
+   * letra liga a marca) nasceu do triangulo, onde letra em lado e chute; aqui a
+   * letra e o rotulo normal da explicacao. Quem sabe o que foi chutado e a
+   * geometria de cada receita, e e ela que responde. escala=fora e escala=fiel
+   * continuam mandando por cima. */
+  function escalaDe(d, numerico, chute) {
+    if (d.escala === 'fora') return true;
+    if (d.escala === 'fiel') return false;
+    return !!numerico && !!chute;
+  }
+
+  /* A altura do bloco sai da PROPORCAO da caixa de unidades, com piso e teto:
+   * um circulo quer ser tao alto quanto largo e ganharia a folha inteira sem o
+   * teto; a pista de atletismo e achatada e desperdicaria meia folha em branco
+   * sem o piso. A mesma conta vale antes de desenhar (medir) e no desenho. */
+  function alturaParaCaixa(B, op, unid, minimo, maximo, folga) {
+    var g = B.gerador();
+    var x = op.x != null ? Number(op.x) : g.MARG_E;
+    var largura = op.largura != null ? Number(op.largura) : (g.MARG_D - x);
+    /* A folga e a do figura() salvo quando a receita pede outra: o solido leva
+     * o anel maior das composicoes, e a conta tem que ser feita com o mesmo. */
+    var anel = folga != null ? Number(folga) : B.FOLGA_PADRAO;
+    var util = Math.max(1, largura - 2 * anel);
+    var lu = unid.x1 - unid.x0, au = unid.y1 - unid.y0;
+    if (!(lu > 1e-9) || !(au > 1e-9)) return minimo;
+    var alt = au * (util / lu) + 2 * anel;
+    return Math.max(minimo, Math.min(maximo, Math.round(alt)));
+  }
+
+  function polar(C, r, graus) {
+    var t = graus * Math.PI / 180;
+    return pt(C.x + r * Math.cos(t), C.y + r * Math.sin(t));
+  }
+
+  /* Bolinha com letra, na direcao livre entre as oferecidas.
+   *
+   * Com op.separado a letra sai pelo rotulo() e nao pelo rotulo do proprio
+   * ponto(). A trava do "cruzamento nomeado" do base.js le dois tracos que nao
+   * sao contorno passando por um ponto com nome como o encontro de duas
+   * cevianas, e cobra dele um arco de angulo. Ela foi escrita para o incentro
+   * do exercicio 17 e acerta la; numa conica ela dispara em TODO ponto com nome,
+   * porque nenhum deles e encontro de construcao e todos estao, por definicao,
+   * onde dois segmentos se tocam. Medido na primeira tirada desta receita:
+   *
+   *   P    os dois raios focais PF1 e PF2 terminam nele: 0,00 e 0,00 pt
+   *   F1   o raio focal PF1 termina nele e o semieixo a passa por ele (o foco
+   *        esta sobre o eixo maior): 0,00 e 0,00 pt
+   *   F    com o plano atras, o eixo x passa pelo foco (3, 0) e o tique de x
+   *        igual a 3 tambem: 0,00 e 0,00 pt (o cartao "eixos parabola" da
+   *        _prova_desenho_curvas e acusado por isto, com o F em (0, 1))
+   *   O    no hexagono decomposto as seis diagonais nascem no centro
+   *
+   * Nenhum desses pontos tem angulo pedido, e um arco neles seria a marca a
+   * mais que a especificacao proibe. O ponto continua anotado e a letra
+   * continua contando UMA marca; o que muda e que a letra nao fica pendurada no
+   * registro do ponto, que e o unico lugar onde aquela trava procura. A trava
+   * fica ligada onde ela acerta, no triangulo e no quadrilatero. */
+  function nomearPonto(ctx, P, nome, direcoes, op) {
+    op = op || {};
+    var D = desenho();
+    var dirs = direcoes && direcoes.length ? direcoes : [{ x: 0.7071, y: 0.7071 }];
+    if (!D) {
+      if (nome) escrever(ctx, nome, P, dirs[0], 3, { tam: TAM_DADO, cor: op.cor });
+      return null;
+    }
+    if (!nome) return D.ponto(ctx, P, { cor: op.corPonto });
+    if (!op.separado) {
+      return D.ponto(ctx, P, {
+        rotulo: nome, direcoes: dirs, tam: TAM_DADO, cor: op.corPonto, corRotulo: op.cor
+      });
+    }
+    var reg = D.ponto(ctx, P, { cor: op.corPonto });
+    var raio = reg && reg.raio != null ? reg.raio : 2.2;
+    var dir = D.direcaoLivre(ctx, nome, P, dirs, { tam: TAM_DADO, afastamento: 2.5 + raio }) || dirs[0];
+    D.rotulo(ctx, nome, { x: P.x + dir.x * raio, y: P.y + dir.y * raio }, {
+      direcao: dir, afastamento: 2.5, tam: TAM_DADO, cor: op.cor
+    });
+    return reg;
+  }
+
+  /* Regiao hachurada ou chapada pelo marcas.js, com o DOC (ver a decisao 2 no
+   * cabecalho desta secao). O angulo pedido e conferido pelo proprio hachurar
+   * contra os lados retos da regiao e trocado quando fica paralelo. */
+  function hachurarRegiao(ctx, partes, angulo) {
+    var M = marcas();
+    if (!M) return null;
+    return M.hachurar(ctx.doc, partes, { angulo: angulo });
+  }
+  function chaparRegiao(ctx, partes, cor) {
+    var M = marcas();
+    if (!M) return null;
+    return M.hachurar(ctx.doc, partes, { estilo: 'chapado', cor: cor || undefined });
+  }
+
+  /* Segmento de construcao que CARREGA leitura (diretriz, assintota, linha de
+   * centro): 0,6 pt continuo ou no padrao [2 2] da guia de leitura, na tinta do
+   * contorno. Nunca [3 2] nem teal, que sao o codigo do gabarito. */
+  function guia(ctx, A, Bp, tracejada, cor) {
+    var D = desenho(), COR = base().gerador().COR;
+    if (!D) return null;
+    return D.poligono(ctx, [A, Bp], {
+      fechado: false, espessura: 0.6, papel: 'guia',
+      tracejado: tracejada ? D.GUIA_LEITURA : null, cor: cor || COR.texto
+    });
+  }
+
+  /* O angulo central com o valor, pelo marcaAngulo do marcas.js: raio entre 12 e
+   * 20 pt, rotulo na bissetriz por fora do arco, fuga de colisao. O marcaAngulo
+   * se recusa acima de 179,5 graus, e o semicirculo e uma figura legitima do
+   * tema (a pista, a meia pizza): ali o arco sai pelo arco() do desenho.js e o
+   * valor pela direcao media, a mesma folga de 6 pt da borda do arco. Nos dois
+   * caminhos o valor conta UMA marca e o arco nao conta, que e a regra do
+   * valorDeAngulo la em cima. */
+  function anguloCentral(ctx, C, PA, PB, de, ate, texto, op) {
+    op = op || {};
+    var M = marcas(), D = desenho();
+    var abertura = Math.abs(ate - de);
+    if (abertura < 179.5 && M) {
+      var res = M.marcaAngulo(ctx.doc, C, PA, PB, {
+        rotulo: texto, tam: TAM_DADO, ctx: ctx,
+        cor: op.cor || undefined, corRotulo: op.corRotulo || undefined
+      });
+      if (res && (res.rotulo || res.tipo === 'anguloReto')) return res;
+    }
+    if (!D) { escrever(ctx, texto, C, polar({ x: 0, y: 0 }, 1, (de + ate) / 2), 16, { tam: TAM_DADO, cor: op.corRotulo }); return null; }
+    /* Raio 16 e o valor a 8 pt da borda do arco: medido na primeira tirada, com
+     * 14 e 6 o "180°" caia a 6,82 pt da letra O do centro e a trava do rotulo
+     * grudado acusava. Assim o vao ate o O passa de um corpo e o valor continua
+     * a 13 pt do arco dele, dentro do alcance de 12 pt mais meia largura. */
+    var raio = 16;
+    D.arco(ctx.doc, C, raio, raio, de, ate, { espessura: 0.9, papel: 'marca', cor: op.cor || undefined });
+    var meio = polar({ x: 0, y: 0 }, 1, (de + ate) / 2);
+    escrever(ctx, texto, C, meio, raio + 8, { tam: TAM_DADO, cor: op.corRotulo });
+    return null;
+  }
+
+  /* ============================================================ circulo
+   *
+   * A familia do MAT08-13 e do MATEM3-12 numa receita so: a circunferencia com
+   * o que se cota nela (raio, diametro, corda), o setor e o arco com o angulo
+   * central, a coroa, o quadrado inscrito e o circunscrito, a pizza em fatias
+   * iguais e o alvo de aneis concentricos.
+   *
+   * Tudo e construido em unidades do problema numa caixa quadrada em volta do
+   * centro, e o enquadramento isotropico do figura() e o que faz o circulo sair
+   * REDONDO: a caixa envolvente da circunferencia no fluxo mede 2r por 2r (a
+   * _prova_receitas_circulo.js mede, com desvio abaixo de 0,5 pt).
+   *
+   * Chaves:
+   *   raio=V[;R]         raio cotado do centro ate a circunferencia (cotaRadial)
+   *   diametro=V[;R]     diametro atravessando, com a medida em cota por FORA
+   *                      da circunferencia (o rotulo na propria linha pousa no
+   *                      meio de MEIA corda e le como raio; ver a decisao no
+   *                      geometriaDoCirculo)
+   *   corda=V[;R]        corda de comprimento V (numero) ou generica, rotulada R
+   *   centro=O           a letra do centro
+   *   arco=G             arco de G graus destacado sobre a circunferencia, com os
+   *                      dois raios e o angulo central marcado
+   *   setor=G            o mesmo, com a regiao do setor hachurada
+   *   coroa=V[;R]        segunda circunferencia concentrica de raio V por dentro,
+   *                      a coroa hachurada, os dois raios cotados (raio= e coroa=)
+   *   inscrito=L         quadrado de lado L com o circulo tocando os quatro lados
+   *                      (r = L/2), os cantos hachurados, o lado rotulado L
+   *   circunscrito=L     quadrado de lado L com o circulo pelos quatro vertices
+   *                      (r = L raiz de 2 sobre 2); com inscrito=, o segundo raio=
+   *                      cota o raio do circunscrito
+   *   fatias=n           n fatias iguais pelos raios, uma hachurada, o angulo
+   *                      central de uma fatia marcado (360/n)
+   *   aneis=r1;r2;r3     circunferencias concentricas, o disco central chapado e
+   *                      as coroas hachuradas em inclinacoes opostas, cada raio
+   *                      cotado dentro do seu anel
+   *   incognita=x        a letra do angulo central pedido (setor, arco, fatias)
+   *   giro=G             gira a figura inteira
+   *
+   * O primeiro valor numerico CONSTROI: raio=5 da r igual a 5, inscrito=10 da r
+   * igual a 5 tambem, e os dois juntos so passam se concordarem. */
+
+  var circulo = {
+    chaves: ['raio', 'diametro', 'corda', 'centro', 'arco', 'setor', 'coroa', 'inscrito',
+             'circunscrito', 'fatias', 'aneis', 'incognita', 'giro'],
+    metricas: ['raio', 'diametro', 'corda', 'coroa', 'inscrito', 'circunscrito'],
+
+    medir: function (d, op) {
+      var B = base();
+      var G = geometriaDoCirculo(B, null, d);
+      return {
+        altura: op.altura != null ? op.altura
+          : (G ? alturaParaCaixa(B, op, G.unidades, 120, G.alturaMax) : null),
+        legenda: d.legenda || null,
+        foraDeEscala: G ? G.fora : d.escala === 'fora'
+      };
+    },
+
+    desenhar: function (doc, d, op) {
+      var B = base(), g = B.gerador(), COR = g.COR, D = desenho(), M = marcas();
+      var G = geometriaDoCirculo(B, doc, d);
+      if (!G) return null;
+      if (!D) {
+        B.avisar(doc, 'circulo: o figuras/desenho.js nao carregou, e sem ele nao ha circunferencia');
+        return null;
+      }
+      var fora = G.fora;
+      var corGab = corDaCamada(doc, d, COR);
+      var corValor = corGab || undefined;
+
+      return B.figura(doc, {
+        x: op.x, largura: op.largura,
+        altura: op.altura != null ? op.altura : alturaParaCaixa(B, op, G.unidades, 120, G.alturaMax),
+        unidades: G.unidades, legenda: d.legenda, foraDeEscala: fora,
+        fase: d.fase, id: d.id, receita: 'circulo'
+      }, function (ctx) {
+        var k = ctx.k;
+        var C = ctx.p(pt(0, 0));
+        var rp = G.r * k;
+        function pp(rr, graus) { return polar(C, rr * k, graus); }
+        var i;
+
+        /* ---------------------------------------------------- regioes */
+        if (G.aneis) {
+          ctx.preenchimento(function () { chaparRegiao(ctx, { centro: C, raio: G.aneis[0] * k }); });
+        }
+        ctx.hachura(function () {
+          if (G.hachuraSetor) {
+            hachurarRegiao(ctx, { centro: C, raio: rp, de: G.a0, ate: G.a1, setor: true }, 45);
+          }
+          if (G.coroa !== null) {
+            hachurarRegiao(ctx, [{ centro: C, raio: rp }, { centro: C, raio: G.coroa * k }], 60);
+          }
+          if (G.rIn !== null) {
+            hachurarRegiao(ctx, [ctx.pontos(G.quadrado), { centro: C, raio: G.rIn * k }], 45);
+          }
+          if (G.aneis) {
+            for (i = 1; i < G.aneis.length; i++) {
+              hachurarRegiao(ctx, [{ centro: C, raio: G.aneis[i] * k }, { centro: C, raio: G.aneis[i - 1] * k }],
+                i % 2 === 1 ? 45 : 135);
+            }
+          }
+        });
+
+        /* ---------------------------------------------------- contorno */
+        ctx.contorno(function () {
+          if (G.quadrado) D.poligono(ctx, ctx.pontos(G.quadrado), { cor: COR.texto, espessura: 1.2 });
+          for (i = 0; i < G.circunferencias.length; i++) D.circunferencia(ctx, C, G.circunferencias[i] * k, {});
+          /* Os raios do setor e das fatias sao OBJETO (0,9 pt, continuos): sao
+           * as linhas que a pergunta manda olhar. O raio que leva o rotulo e
+           * desenhado pelo cotaRadial, na camada de marcas, para nao sair duas
+           * vezes por cima de si mesmo. */
+          if (G.temAngulo) {
+            if (!G.raioNoSetor) D.poligono(ctx, [pp(G.r, G.a0), C], { fechado: false, espessura: 0.9, papel: 'objeto' });
+            D.poligono(ctx, [C, pp(G.r, G.a1)], { fechado: false, espessura: 0.9, papel: 'objeto' });
+          }
+          if (G.fatias) {
+            for (i = 2; i < G.fatias; i++) {
+              D.poligono(ctx, [C, pp(G.r, G.a0 + i * 360 / G.fatias)], { fechado: false, espessura: 0.9, papel: 'objeto' });
+            }
+          }
+          if (G.corda) {
+            D.poligono(ctx, [pp(G.r, G.corda.de), pp(G.r, G.corda.ate)], { fechado: false, espessura: 0.9, papel: 'objeto' });
+          }
+          /* O diametro em pessoa. Ele e OBJETO, e por isso e desenhado aqui e
+           * nao pelo cotaRadial: a medida dele sai por fora, em cota (ver a
+           * decisao no geometriaDoCirculo), e o cotaRadial em estilo 'cota' nao
+           * desenha a linha. Na pizza ele nao entra por aqui porque os proprios
+           * cortes ja o desenham, e um segundo traco por cima do mesmo lugar
+           * viraria um corte que nao divide fatia nenhuma. */
+          if (G.diametroAngulo !== null) {
+            D.poligono(ctx, [pp(G.r, G.diametroAngulo + 180), pp(G.r, G.diametroAngulo)],
+              { fechado: false, espessura: 0.9, papel: 'objeto' });
+          }
+        });
+
+        /* ---------------------------------------------------- marcas */
+        ctx.marcas(function () {
+          /* O arco destacado sobre a propria circunferencia, em 2,0 pt: e o que
+           * amarra o angulo central ao arco que ele enxerga (convencao escrita
+           * na especificacao para setor, arco e angulo central). Mesmo centro e
+           * mesmo raio da circunferencia, que e o caso que o conferirFigura
+           * deixou de contar como dois arcos no mesmo vertice. Sai como OBJETO,
+           * nao como marca: o que se le e o valor do angulo, uma vez. */
+          if (G.temAngulo) {
+            D.arco(ctx, C, rp, rp, G.a0, G.a1, { espessura: 2.0, papel: 'objeto', cor: corValor });
+          }
+          for (i = 0; i < G.cotas.length; i++) {
+            var ct = G.cotas[i];
+            D.cotaRadial(ctx, C, ct.raio * k, ct.rotulo, {
+              tipo: ct.tipo, angulo: ct.angulo, lado: ct.lado, em: ct.em,
+              estilo: ct.fora ? 'cota' : undefined,
+              afastamento: ct.fora ? rp + 10 : ct.afastamento,
+              tam: TAM_DADO, corTexto: corValor
+            });
+          }
+          if (G.temAngulo) {
+            var texto = G.anguloTexto;
+            var corResposta = undefined;
+            if (d.fase === 'gabarito' && G.anguloLetra && G.ang !== null) {
+              texto = G.anguloLetra + ' = ' + arredondar(G.ang) + '°';
+              corResposta = COR.teal;
+            }
+            anguloCentral(ctx, C, pp(G.r, G.a0), pp(G.r, G.a1), G.a0, G.a1, texto,
+              { cor: corValor, corRotulo: corResposta || corValor });
+          }
+          /* O quadradinho no ponto de tangencia: e o que diz que o raio chega
+           * perpendicular ao lado, ou seja, que r e metade de L. So sai quando o
+           * raio foi desenhado ate la. */
+          if (G.tangencia && M) {
+            var T = ctx.p(G.tangencia.ponto);
+            M.marcaAnguloReto(ctx.doc, T, C, ctx.p(G.tangencia.aoLongo), { ctx: ctx });
+          }
+        });
+
+        /* ---------------------------------------------------- rotulos */
+        ctx.rotulos(function () {
+          if (G.centro) {
+            nomearPonto(ctx, C, G.centro, [
+              { x: -0.7071, y: -0.7071 }, { x: 0.7071, y: -0.7071 },
+              { x: -0.7071, y: 0.7071 }, { x: 0.7071, y: 0.7071 }
+            ], {});
+          }
+          if (G.corda) {
+            D.rotuloLado(ctx, G.corda.rotulo, pp(G.r, G.corda.de), pp(G.r, G.corda.ate),
+              { centro: C, tam: TAM_DADO, afastamento: 5, cor: corValor });
+          }
+          if (G.quadrado && G.ladoRotulo) {
+            var Q = ctx.pontos(G.quadrado);
+            D.rotuloLado(ctx, G.ladoRotulo, Q[0], Q[1], { centro: C, tam: TAM_DADO, afastamento: 5, cor: corValor });
+          }
+        });
+      });
+    }
+  };
+
+  /* Toda a geometria do circulo em unidades do problema, sem desenhar nada. E
+   * chamada duas vezes, para medir e para desenhar, e por isso os avisos so
+   * saem quando ha doc. Devolve null quando a diretiva se contradiz. */
+  function geometriaDoCirculo(B, doc, d) {
+    function recusarCirculo(t) { if (doc) B.avisar(doc, 'circulo: ' + t); return null; }
+    var raios = lerMedidas(B, d.args, 'raio');
+    var raio = raios.length ? raios[0] : null;
+    var diam = lerMedida(B, d.args, 'diametro');
+    var corda = lerMedida(B, d.args, 'corda');
+    var coroa = lerMedida(B, d.args, 'coroa');
+    var insc = lerMedida(B, d.args, 'inscrito');
+    var circ = lerMedida(B, d.args, 'circunscrito');
+    var setor = lerMedida(B, d.args, 'setor');
+    var arco = lerMedida(B, d.args, 'arco');
+    var fatiasBruto = B.primeiro(d.args, 'fatias');
+    var aneisBrutos = B.lista(d.args, 'aneis');
+    var centro = B.primeiro(d.args, 'centro');
+    var incognita = B.primeiro(d.args, 'incognita');
+    var giro = B.numero(d.args, 'giro') || 0;
+
+    /* ---------------------------------------------- o raio, uma vez so */
+    var r = null, origem = null;
+    function fixarRaioDoCirculo(v, de) {
+      if (v === null || v === undefined) return true;
+      if (!(v > 0)) { recusarCirculo(de + ' tem que ser positivo'); return false; }
+      if (r === null) { r = v; origem = de; return true; }
+      if (Math.abs(r - v) > 0.005 * Math.max(r, v)) {
+        recusarCirculo(de + ' da raio ' + arredondar(v) + ' e ' + origem + ' da raio ' + arredondar(r) +
+          ': os dois nao contam a mesma historia');
+        return false;
+      }
+      return true;
+    }
+    var aneis = null;
+    if (aneisBrutos.length) {
+      aneis = [];
+      for (var an = 0; an < aneisBrutos.length; an++) {
+        if (!B.ehNumero(aneisBrutos[an])) return recusarCirculo('aneis=' + aneisBrutos.join(';') + ' pede so numeros');
+        aneis.push(parseFloat(aneisBrutos[an]));
+      }
+      aneis.sort(function (p, q) { return p - q; });
+      if (aneis.length < 2) return recusarCirculo('aneis= pede pelo menos dois raios');
+      if (!(aneis[0] > 0)) return recusarCirculo('aneis= com raio nao positivo');
+    }
+    var L = null;
+    if (insc && insc.valor !== null) L = insc.valor;
+    if (circ && circ.valor !== null) {
+      if (L !== null && Math.abs(L - circ.valor) > 1e-9) return recusarCirculo('inscrito e circunscrito com lados diferentes');
+      L = circ.valor;
+    }
+    var rIn = null, rOut = null;
+    /* O circulo PRINCIPAL e o inscrito quando ha quadrado inscrito: e ele que
+     * o raio= cota e e nele que setor, corda e diametro se apoiam. */
+    if (insc) {
+      if (L !== null) rIn = L / 2;
+      else if (raio && raio.valor !== null) { rIn = raio.valor; L = 2 * rIn; }
+      else if (diam && diam.valor !== null) { rIn = diam.valor / 2; L = 2 * rIn; }
+      if (rIn !== null && !fixarRaioDoCirculo(rIn, 'inscrito')) return null;
+    }
+    if (circ) {
+      if (L !== null) rOut = L * Math.SQRT1_2;
+      else if (!insc && raio && raio.valor !== null) { rOut = raio.valor; L = rOut * Math.SQRT2; }
+      if (!insc && rOut !== null && !fixarRaioDoCirculo(rOut, 'circunscrito')) return null;
+    }
+    if (!fixarRaioDoCirculo(raio && raio.valor !== null ? raio.valor : null, 'raio')) return null;
+    if (!fixarRaioDoCirculo(diam && diam.valor !== null ? diam.valor / 2 : null, 'diametro')) return null;
+    if (aneis && !fixarRaioDoCirculo(aneis[aneis.length - 1], 'aneis')) return null;
+    var rChutado = r === null;
+    if (r === null) r = 5;
+    if (insc && rIn === null) { rIn = r; L = 2 * r; }
+    if (circ && rOut === null) { rOut = insc ? r * Math.SQRT2 : r; if (L === null) L = rOut * Math.SQRT2; }
+    /* Um raio so para dois circulos: o rotulo vai no inscrito, e o do
+     * circunscrito fica sem cota. Nao e erro, e o teto de marcas que decide. */
+
+    /* ---------------------------------------------- o angulo central */
+    var ang = null, angLetra = null, temAngulo = false, hachuraSetor = false, fatias = null;
+    function anguloDe(m, nome) {
+      if (!m) return true;
+      temAngulo = true;
+      if (m.valor !== null) {
+        if (!(m.valor > 0) || m.valor >= 360) { recusarCirculo(nome + '=' + m.bruto + ' nao e angulo central'); return false; }
+        if (ang !== null && Math.abs(ang - m.valor) > 1e-9) { recusarCirculo('arco e setor com angulos diferentes'); return false; }
+        ang = m.valor;
+      } else {
+        angLetra = m.rotulo;
+      }
+      return true;
+    }
+    if (!anguloDe(setor, 'setor')) return null;
+    if (!anguloDe(arco, 'arco')) return null;
+    if (setor) hachuraSetor = true;
+    if (fatiasBruto !== null) {
+      if (!B.ehNumero(fatiasBruto) || Math.round(parseFloat(fatiasBruto)) < 2) {
+        return recusarCirculo('fatias=' + fatiasBruto + ' pede um numero inteiro de fatias, de 2 para cima');
+      }
+      fatias = Math.round(parseFloat(fatiasBruto));
+      if (temAngulo) return recusarCirculo('fatias nao combina com setor nem com arco na mesma figura');
+      temAngulo = true; hachuraSetor = true;
+      ang = 360 / fatias;
+    }
+    if (incognita) {
+      if (!temAngulo) return recusarCirculo('incognita=' + incognita + ' sem angulo central para marcar (use setor, arco ou fatias)');
+      angLetra = String(incognita);
+    }
+    var a0 = giro, a1 = giro + (ang !== null ? ang : 60);
+    var anguloTexto = angLetra ? angLetra : (ang !== null ? arredondar(ang) + '°' : null);
+
+    /* ---------------------------------------------- a coroa e a corda */
+    var coroaR = null;
+    if (coroa) {
+      coroaR = coroa.valor !== null ? coroa.valor : 0.6 * r;
+      if (!(coroaR > 0) || coroaR >= r) return recusarCirculo('coroa=' + coroa.bruto + ' tem que ser menor do que o raio ' + arredondar(r));
+    }
+    var cordaG = null;
+    if (corda) {
+      var meia = 50;
+      if (corda.valor !== null) {
+        if (!(corda.valor > 0) || corda.valor > 2 * r + 1e-9) return recusarCirculo('corda=' + corda.bruto + ' nao cabe num circulo de raio ' + arredondar(r));
+        meia = Math.asin(Math.min(1, corda.valor / (2 * r))) * 180 / Math.PI;
+      }
+      cordaG = { de: 270 + giro - meia, ate: 270 + giro + meia, rotulo: corda.rotulo };
+    }
+
+    /* ---------------------------------------------- as cotas radiais */
+    var cotas = [], raioNoSetor = false, cotaForaDoDiametro = false, diametroAngulo = null;
+    if (raio) {
+      var rr = insc ? rIn : (circ ? rOut : r);
+      if (temAngulo) {
+        /* Sobre o primeiro raio do setor, com o texto por FORA da cunha. */
+        cotas.push({ raio: rr, rotulo: raio.rotulo, tipo: 'raio', angulo: a0, lado: -1 });
+        raioNoSetor = true;
+      } else if (insc) {
+        cotas.push({ raio: rr, rotulo: raio.rotulo, tipo: 'raio', angulo: 90 + giro, lado: 1 });
+      } else if (circ) {
+        cotas.push({ raio: rr, rotulo: raio.rotulo, tipo: 'raio', angulo: 45 + giro, lado: 1 });
+      } else if (coroa) {
+        /* O R da coroa pousa DENTRO da coroa, no meio do anel que ele mede:
+         * no meio do raio ele caia dentro do disco branco de r, e um 10
+         * escrito dentro do circulo de 6 le como medida do circulo errado. */
+        cotas.push({ raio: rr, rotulo: raio.rotulo, tipo: 'raio', angulo: 118 + giro, lado: 1,
+          em: (coroaR + rr) / (2 * rr) });
+      } else {
+        cotas.push({ raio: rr, rotulo: raio.rotulo, tipo: 'raio', angulo: 55 + giro, lado: 1 });
+      }
+    }
+    if (insc && circ && raios.length >= 2) {
+      /* O raio do circunscrito vai ao canto de baixo a direita, longe do raio
+       * do inscrito (que sobe ate a tangencia de cima) e do seu quadradinho, e
+       * o rotulo fica do lado de fora da diagonal, na parte branca entre o
+       * circulo inscrito e o canto. */
+      cotas.push({ raio: rOut, rotulo: raios[1].rotulo, tipo: 'raio', angulo: -45 + giro, lado: 1, em: 0.6 });
+    }
+    if (diam) {
+      /* Perpendicular a bissetriz do setor, para cruzar a regiao so no centro;
+       * na pizza, SOBRE um dos cortes (o primeiro raio mais 90), senao o
+       * diametro vira um nono corte que nao divide fatia nenhuma. */
+      var angD = fatias ? a0 + 90 : (temAngulo ? (a0 + a1) / 2 + 90 : 160 + giro);
+      /* O rotulo do diametro NAO pode ficar na linha, e isso vale em toda
+       * figura e nao so na pizza. O diametro passa pelo centro, entao cada
+       * metade dele e do tamanho de um raio, e o texto na linha pousa no meio
+       * de UMA das metades (o em padrao do cotaRadial e 0,72, que e quase o
+       * meio da segunda metade, 0,75).
+       *
+       * Medido nas duas figuras onde isso doi:
+       *
+       *   pizza (fatias=8 diametro=40)   o "40" ficava a 9,68 pt de um raio de
+       *     54,39 pt e a 10,32 pt do diametro de 108,78 pt que ele nomeia
+       *   circulo r d O (MAT08-13 p2)    a figura existe justamente para
+       *     separar raio de diametro, e o "d" pousava a 25,92 pt do centro,
+       *     sobre a metade esquerda da corda de 108,77 pt, do mesmo jeito e
+       *     quase a mesma distancia que o "r" (28,90 pt do centro). Tres linhas
+       *     acima o texto diz d = 2r, e a figura mostrava dois rotulos iguais
+       *     grudados em dois pedacos do mesmo tamanho.
+       *
+       * Quem le assim monta a area com o raio errado e erra por fator 4, que e
+       * o erro mais comum do assunto. Entao o diametro sai sempre como cota por
+       * FORA, com a chamada nos dois extremos: a medida passa a ter comeco e
+       * fim visiveis, e o rotulo mora no meio do vao inteiro. Levar o texto
+       * para o meio da corda inteira nao resolve: la esta o centro, que quase
+       * sempre ja tem a bolinha e a letra O. */
+      cotaForaDoDiametro = true;
+      /* Fora da pizza a linha do diametro passa a ser desenhada pela receita,
+       * porque o cotaRadial em estilo 'cota' so desenha a medida. */
+      diametroAngulo = fatias ? null : angD;
+      /* Com quadrado a cota vai para o outro lado do diametro. O rotulo do LADO
+       * do quadrado mora sempre embaixo (aresta Q0 Q1, lado -1), e a cota do
+       * diametro no lado padrao cai ali tambem: medido em inscrito=10 raio=5
+       * diametro=10, os dois "10" ficavam a 6,41 pt um do outro, contra 40,10
+       * pt antes desta rodada. Do outro lado eles voltam a 40 pt de folga. */
+      cotas.push({ raio: r, rotulo: diam.rotulo, tipo: 'diametro', angulo: angD,
+        lado: (insc || circ) ? -1 : 1, fora: true });
+    }
+    if (coroa) cotas.push({ raio: coroaR, rotulo: coroa.rotulo, tipo: 'raio', angulo: 215 + giro, lado: 1 });
+    if (aneis) {
+      /* Cada raio do alvo e cotado DENTRO do proprio anel: o rotulo do raio de
+       * 4 fica entre 2 e 4, onde ele mede alguma coisa, e nao em cima do disco
+       * de 2. O em e a fracao do raio em que o texto pousa.
+       *
+       * O leque e a ordem sao o resto da mesma decisao, e nasceram medidos. Com
+       * passo de 38 graus e todos os rotulos empurrados para o mesmo lado
+       * (lado: 1, ou seja para a normal a mais 90), cada rotulo era empurrado
+       * NA DIRECAO do raio seguinte: o "2" ficava a 1,48 pt da linha do 6 e a
+       * 10,40 pt da propria linha, sete vezes mais longe do que ele nomeia, e
+       * o "4" ficava a 8,92 pt da sua e a 9,76 pt da do 6, empate pratico.
+       * Agora o passo e de 62 graus e cada rotulo foge do leque: o de dentro
+       * para a normal de menos 90, os de fora para a de mais 90.
+       *
+       * A ordem e de FORA para dentro pelo mesmo motivo que a pilha de camadas
+       * do base.js existe: o cotaRadial poe o raio e o rotulo juntos na camada
+       * de marcas, entao os tres pares se intercalam e um raio desenhado
+       * DEPOIS risca o rotulo pintado antes. Foi o "2" saindo cortado por uma
+       * barra de 0,9 pt do raio de 6. Do maior para o menor isso nao acontece:
+       * o raio que ainda falta desenhar e sempre mais curto do que a distancia
+       * do rotulo ja pintado ao centro. */
+      var rotulosAneis = B.lista(d.args, 'aneis');
+      for (var ai = aneis.length - 1; ai >= 0; ai--) {
+        var interno = ai === 0 ? 0 : aneis[ai - 1];
+        cotas.push({
+          raio: aneis[ai], rotulo: String(aneis[ai]), tipo: 'raio',
+          angulo: 40 + giro + ai * 62, lado: ai === 0 ? -1 : 1,
+          /* O anel de DENTRO e o unico cuja regiao encosta no ponto em que os
+           * tres raios se encontram, e ali a distancia do rotulo as outras duas
+           * linhas nao passa da distancia dele ao centro. Por isso ele ganha os
+           * dois ajustes que os outros nao precisam: pousa mais longe do centro
+           * (o piso do em) e cola na propria linha (afastamento curto, que o
+           * halo do rotulo resolve). Medido no alvo de 2, 4 e 6: o "2" passou a
+           * ficar a 7,75 pt da sua linha contra 12,17 pt das outras duas, e
+           * continua a 1,34 unidades do centro, ou seja dentro do disco de 2
+           * que ele mede. */
+          afastamento: ai === 0 ? 1.5 : undefined,
+          em: Math.max((interno + aneis[ai]) / 2 / aneis[ai], 0.68)
+        });
+      }
+      if (rotulosAneis.length !== aneis.length) return recusarCirculo('aneis= com valor repetido');
+    }
+
+    /* ---------------------------------------------- o quadrado e a caixa */
+    var quadrado = null, tangencia = null, ladoRotulo = null;
+    if (L !== null && (insc || circ)) {
+      var h = L / 2;
+      quadrado = B.geo.girar([pt(-h, -h), pt(h, -h), pt(h, h), pt(-h, h)], giro, pt(0, 0));
+      ladoRotulo = insc ? insc.rotulo : circ.rotulo;
+      if (insc && raio && !temAngulo) {
+        /* O quadradinho no ponto de tangencia T, entre o raio (T ate o centro)
+         * e o lado (T ate o canto). O segundo ponto e o CANTO do quadrado, e
+         * nao um passo qualquer ao longo do lado: o marcaAnguloReto limita o
+         * lado do quadradinho a um terco da menor semirreta, e um passo de uma
+         * unidade (8 pt na folha) dava um quadradinho de 2,7 pt, que ele
+         * recusa. */
+        var T = polar(pt(0, 0), rIn, 90 + giro);
+        tangencia = { ponto: T, aoLongo: polar(T, h, giro) };
+      }
+    }
+    /* O que foi CHUTADO, para a decisao de escala (ver escalaDe). */
+    var numerico = !rChutado || (coroa && coroa.valor !== null) || (corda && corda.valor !== null) || !!aneis;
+    var chute = (coroa && coroa.letra) || (corda && corda.letra) ||
+      (rChutado && !!(raio || diam || insc || circ));
+    var circunferencias = [];
+    if (insc) circunferencias.push(rIn); else if (!aneis) circunferencias.push(r);
+    if (circ) circunferencias.push(rOut);
+    if (coroaR !== null) circunferencias.push(coroaR);
+    if (aneis) for (var ac = 0; ac < aneis.length; ac++) circunferencias.push(aneis[ac]);
+
+    var R = Math.max(r, rOut !== null ? rOut : 0, quadrado ? L * Math.SQRT1_2 : 0);
+    /* A cota por fora do diametro sai a um raio e um pouco do centro, e o numero
+     * mora nela: sem folga o desenho encostaria na borda do bloco. */
+    var margem = cotaForaDoDiametro ? 0.40 * R : (quadrado ? 0.30 * R : 0.14 * R);
+    var unidades = { x0: -R - margem, y0: -R - margem, x1: R + margem, y1: R + margem };
+
+    return {
+      r: r, rIn: rIn, rOut: rOut, L: L, giro: giro,
+      ang: ang, anguloLetra: angLetra, anguloTexto: anguloTexto, temAngulo: temAngulo,
+      a0: a0, a1: a1, hachuraSetor: hachuraSetor, fatias: fatias,
+      coroa: coroaR, corda: cordaG, aneis: aneis, centro: centro ? String(centro) : null,
+      cotas: cotas, raioNoSetor: raioNoSetor, diametroAngulo: diametroAngulo,
+      quadrado: quadrado, tangencia: tangencia,
+      ladoRotulo: ladoRotulo, circunferencias: circunferencias,
+      unidades: unidades, alturaMax: quadrado ? 176 : 156,
+      fora: escalaDe(d, numerico, chute)
+    };
+  }
+
+  /* ============================================================ conica
+   *
+   * Elipse, hiperbole e parabola do MATEM3-04, na forma do livro brasileiro:
+   * x2/a2 + y2/b2 = 1, x2/a2 - y2/b2 = 1 e y2 = 2px (a parabola abre para a
+   * direita, com o foco a p/2 do vertice e a diretriz a p/2 do outro lado).
+   *
+   * As primitivas devolvem focos, vertices, diretriz, assintotas e retangulo
+   * fundamental SEM desenhar nada disso, e cada um so entra quando a chave pede,
+   * porque o teto e cinco marcas e uma parabola com foco, diretriz e vertice
+   * marcados ja gastou tres.
+   *
+   * Chaves:
+   *   tipo=elipse|hiperbole|parabola
+   *   a=V[;R] b=V[;R]    semieixos; p=V[;R] o parametro da parabola. O numero
+   *                      constroi; o texto so e ESCRITO quando e letra (a=a) ou
+   *                      quando vem depois do ponto e virgula (a=5;5), porque a
+   *                      e b definem a forma de toda elipse e nem toda elipse
+   *                      quer os dois cotados
+   *   focos=F1;F2        os focos com nome (focos=sim: bolinhas sem nome)
+   *   c=c                a distancia focal, do centro ao primeiro foco, cotada
+   *                      com a letra; com b e c escritos e P na ponta do eixo
+   *                      menor sai o triangulo da relacao fundamental, com o
+   *                      quadradinho no centro (b e c catetos, a hipotenusa
+   *                      pela incognita=a sobre PF1)
+   *   vertices=A1;A2;B1;B2   os vertices com nome (vertices=sim: so bolinhas);
+   *                      na hiperbole dois, na parabola um
+   *   diretriz=sim|d     a diretriz da parabola, com rotulo quando for letra
+   *   assintotas=sim     as duas assintotas da hiperbole
+   *   retangulo=sim|c    o retangulo fundamental 2a por 2b tracejado; com letra,
+   *                      a meia diagonal (que mede c) sai cotada com ela
+   *   ponto=P[;r]        um ponto P sobre a curva com os raios focais; r e a
+   *                      distancia de P ao primeiro foco, em unidades, e escolhe
+   *                      ONDE P fica (ponto=P;7 na elipse de a=5 e c=3 poe P a 7
+   *                      de F1 e a 3 de F2). Na parabola sai tambem a
+   *                      perpendicular ate a diretriz, com os tracinhos de
+   *                      congruencia e o quadradinho no pe. No gabarito os raios
+   *                      focais ganham o valor, em teal
+   *   eixos=sim          o plano cartesiano atras, na escala da figura
+   *   centro=h;k[;C]     a conica transladada para (h, k), com as linhas de
+   *                      centro tracejadas ate os eixos e as distancias cotadas
+   *   incognita=d        a letra do raio focal PF1 pedido (precisa de ponto=)
+   *
+   * O primeiro foco e o do lado positivo do eixo maior: F1 = (c, 0). */
+
+  var conica = {
+    chaves: ['tipo', 'a', 'b', 'p', 'c', 'focos', 'vertices', 'diretriz', 'assintotas', 'retangulo',
+             'ponto', 'eixos', 'centro', 'incognita'],
+    metricas: ['a', 'b', 'p'],
+
+    medir: function (d, op) {
+      var B = base();
+      var G = geometriaDaConica(B, null, d);
+      return {
+        altura: op.altura != null ? op.altura
+          : (G ? alturaParaCaixa(B, op, G.unidades, 130, 190) : null),
+        legenda: d.legenda || null,
+        foraDeEscala: G ? G.fora : d.escala === 'fora'
+      };
+    },
+
+    desenhar: function (doc, d, op) {
+      var B = base(), g = B.gerador(), COR = g.COR, D = desenho(), M = marcas();
+      var G = geometriaDaConica(B, doc, d);
+      if (!G) return null;
+      if (!D) {
+        B.avisar(doc, 'conica: o figuras/desenho.js nao carregou, e sem ele nao ha curva');
+        return null;
+      }
+      var fora = G.fora;
+      var corGab = corDaCamada(doc, d, COR);
+      var corValor = corGab || undefined;
+
+      return B.figura(doc, {
+        x: op.x, largura: op.largura,
+        altura: op.altura != null ? op.altura : alturaParaCaixa(B, op, G.unidades, 130, 190),
+        unidades: G.unidades, legenda: d.legenda, foraDeEscala: fora,
+        fase: d.fase, id: d.id, receita: 'conica'
+      }, function (ctx) {
+        var k = ctx.k;
+        var C = ctx.p(G.C);
+        var bloco = ctx.blocoInteiro
+          ? { x0: ctx.blocoInteiro.x, y0: ctx.blocoInteiro.y,
+              x1: ctx.blocoInteiro.x + ctx.blocoInteiro.largura,
+              y1: ctx.blocoInteiro.y + ctx.blocoInteiro.altura }
+          : null;
+        var saida = {};
+        var i;
+
+        /* -------------------------------------------------- o plano atras */
+        if (G.eixos) {
+          ctx.fundo(function () {
+            /* Um passo inteiro que caiba no canto do terceiro quadrante, onde o
+             * eixos() mede que os dois "menos um" precisam de 17,55 pt: o passo
+             * sobe ate a unidade caber, em vez de o tema receber o aviso. */
+            var passo = 1;
+            while (passo * k < 17.6 && passo < 50) passo += 1;
+            D.eixos(ctx, ctx.p(pt(0, 0)), k, {
+              xMin: G.unidades.x0 + 0.05, xMax: G.unidades.x1 - 0.05,
+              yMin: G.unidades.y0 + 0.05, yMax: G.unidades.y1 - 0.05,
+              passo: passo
+            });
+          });
+        }
+
+        /* -------------------------------------------------- a curva */
+        ctx.contorno(function () {
+          if (G.tipo === 'elipse') saida.E = D.elipse(ctx, C, G.a * k, G.b * k, {});
+          else if (G.tipo === 'hiperbole') saida.H = D.hiperbole(ctx, C, G.a * k, G.b * k, { ate: G.alcanceY * k });
+          else saida.P = D.parabola(ctx, C, G.p * k, { giro: 0, ate: G.alcanceY * k });
+        });
+
+        /* -------------------------------------------------- construcoes */
+        ctx.marcas(function () {
+          var F1 = ctx.p(G.F1), F2 = G.F2 ? ctx.p(G.F2) : null;
+          if (G.retangulo && saida.H) {
+            /* O retangulo fundamental CARREGA leitura: o texto manda ler que
+             * ele tem lados 2a e 2b e que a meia diagonal mede c. Por isso ele
+             * sai na tinta do contorno, e nao em muted, seguindo a regra que o
+             * proprio desenho.js ja escreveu para a guia de leitura ("[2 2] na
+             * tinta do contorno e nos mesmos 0,6 pt"): em muted, medido a 150
+             * dpi em tons de cinza, 27 por cento da tinta do lado de cima e 34
+             * por cento da do lado de baixo caiam ABAIXO do piso de 3:1, com
+             * percentil 90 em 1,40:1 e 1,18:1, e na fotocopia o retangulo ficava
+             * com tres lados. O tracejado continua sendo o que o separa da
+             * conica. */
+            D.poligono(ctx, saida.H.retangulo, {
+              espessura: 0.6, tracejado: D.GUIA_LEITURA, cor: COR.texto, papel: 'apoio'
+            });
+            if (G.retanguloRotulo) {
+              var canto = saida.H.retangulo[0];
+              if (G.assintotas) {
+                /* Com as assintotas na folha a meia diagonal E um pedaco de
+                 * assintota: o segmento solido de 0,9 pt cobria os 48,46 pt
+                 * inteiros da meia diagonal superior direita, ou seja 22,8 por
+                 * cento daquela assintota, e a folha saia com tres meias
+                 * diagonais pontilhadas e uma continua, como se a assintota
+                 * comecasse no canto do retangulo. A cota diz a mesma coisa sem
+                 * cobrir nada: ela sai ao lado, com a chamada nos dois extremos,
+                 * e ainda delimita onde o c comeca e acaba. */
+                D.cota(ctx, C, canto, G.retanguloRotulo, {
+                  afastamento: 11, lado: 1, tam: TAM_DADO, corTexto: corValor
+                });
+              } else {
+                D.poligono(ctx, [C, canto], { fechado: false, espessura: 0.9, papel: 'objeto' });
+                D.rotuloLado(ctx, G.retanguloRotulo, C, canto, { lado: 1, tam: TAM_DADO, afastamento: 4, cor: corValor });
+              }
+            }
+          }
+          if (G.assintotas && saida.H) {
+            for (i = 0; i < saida.H.assintotas.length; i++) {
+              /* Traco e ponto, e nao o [2 2] do retangulo: ver o TRACO_E_PONTO
+               * la em cima. Os dois estao na mesma tinta e na mesma espessura
+               * por causa da fotocopia, entao o que sobra para separar a caixa
+               * do X e o padrao. */
+              D.poligono(ctx, saida.H.assintotas[i], {
+                fechado: false, espessura: 0.6, tracejado: TRACO_E_PONTO, cor: COR.texto,
+                papel: 'guia', recorte: bloco
+              });
+            }
+          }
+          if (G.diretriz) {
+            var d0 = ctx.p(pt(G.diretrizX, G.unidades.y0 + 0.08 * (G.unidades.y1 - G.unidades.y0)));
+            var d1 = ctx.p(pt(G.diretrizX, G.unidades.y1 - 0.08 * (G.unidades.y1 - G.unidades.y0)));
+            guia(ctx, d0, d1, false);
+            if (G.diretrizRotulo) {
+              D.rotuloLado(ctx, G.diretrizRotulo, d0, d1, { em: 0.9, lado: 1, tam: TAM_DADO, afastamento: 4 });
+            }
+          }
+          /* Semieixos escritos: a do centro ao vertice, b do centro ao co-vertice. */
+          if (G.mostraA) {
+            var Va = ctx.p(pt(G.C.x + G.a, G.C.y));
+            D.poligono(ctx, [C, Va], { fechado: false, espessura: 0.9, papel: 'objeto' });
+            D.rotuloLado(ctx, G.ma.rotulo, C, Va, { lado: -1, tam: TAM_DADO, afastamento: 4, cor: corValor });
+          }
+          if (G.mostraB) {
+            var Vb = ctx.p(pt(G.C.x, G.C.y + G.b));
+            D.poligono(ctx, [C, Vb], { fechado: false, espessura: 0.9, papel: 'objeto' });
+            D.rotuloLado(ctx, G.mb.rotulo, C, Vb, { lado: 1, tam: TAM_DADO, afastamento: 4, cor: corValor });
+          }
+          if (G.mostraC && G.tipo !== 'parabola') {
+            D.poligono(ctx, [C, F1], { fechado: false, espessura: 0.9, papel: 'objeto' });
+            D.rotuloLado(ctx, G.mc.rotulo, C, F1, { lado: -1, tam: TAM_DADO, afastamento: 4, cor: corValor });
+            /* A relacao fundamental: com b e c escritos e P na ponta do eixo
+             * menor, o triangulo CPF1 e retangulo em C, e o quadradinho e o que
+             * diz que a hipotenusa e a (e nao c, que e o erro comum numero um
+             * do tema, o de trocar a relacao da elipse pela da hiperbole). */
+            if (G.mostraB && G.P && Math.abs(G.P.x - G.C.x) < 1e-6 && M) {
+              M.marcaAnguloReto(ctx.doc, C, ctx.p(G.P), F1, { ctx: ctx });
+            }
+          }
+          if (G.mostraP && G.tipo === 'parabola') {
+            /* p e a distancia do foco a diretriz, medida sobre o eixo. */
+            var pe0 = ctx.p(pt(G.diretrizX, G.C.y)), pe1 = F1;
+            D.poligono(ctx, [pe0, pe1], { fechado: false, espessura: 0.9, papel: 'objeto' });
+            D.rotuloLado(ctx, G.mp.rotulo, pe0, pe1, { lado: -1, tam: TAM_DADO, afastamento: 4, cor: corValor });
+          }
+          /* As linhas de centro da conica transladada, com as distancias. */
+          if (G.linhasDeCentro) {
+            var Cx = ctx.p(pt(G.C.x, 0)), Cy = ctx.p(pt(0, G.C.y)), O = ctx.p(pt(0, 0));
+            if (Math.abs(G.C.y) > 1e-9) {
+              guia(ctx, C, Cx, true);
+              D.cota(ctx, C, Cx, arredondar(Math.abs(G.C.y)), { fora: O, afastamento: 9, tam: TAM_DADO, corTexto: corValor });
+            }
+            if (Math.abs(G.C.x) > 1e-9) {
+              guia(ctx, C, Cy, true);
+              D.cota(ctx, C, Cy, arredondar(Math.abs(G.C.x)), { fora: O, afastamento: 9, tam: TAM_DADO, corTexto: corValor });
+            }
+          }
+          /* Os raios focais do ponto P. */
+          if (G.P) {
+            var Pp = ctx.p(G.P);
+            var gab = d.fase === 'gabarito';
+            var t1 = G.incognita ? String(G.incognita) : null;
+            var t2 = null;
+            if (gab) {
+              t1 = (G.incognita ? G.incognita + ' = ' : '') + arredondar(G.r1);
+              t2 = arredondar(G.r2);
+            }
+            var corResp = gab ? COR.teal : corValor;
+            /* No gabarito o raio focal E a resposta, e a folha e fotocopiada. O
+             * teal do gabarito da 4,93:1 contra o 17,08:1 da tinta do texto, ou
+             * seja em tons de cinza a resposta imprime mais CLARA do que o dado
+             * que ela responde (medido a 150 dpi: cinza 112 contra 27), com os
+             * dois no mesmo corpo de 8,5 pt. Isso inverte a hierarquia que o
+             * proprio projeto escreve: o que carrega a resposta nunca e a marca
+             * mais fraca da figura. A paleta e do pdf.js e o teal e o codigo de
+             * cor de todo o gabarito; o que a receita pode dar e PESO, e e o
+             * mesmo bold que o caminho de recuo do valor de angulo ja usa
+             * quando ha cor de resposta. */
+            var negritoResp = gab === true, tamResp = gab ? TAM_RESPOSTA : TAM_DADO;
+            D.poligono(ctx, [Pp, F1], { fechado: false, espessura: 0.9, papel: 'objeto' });
+            if (t1) D.rotuloLado(ctx, t1, Pp, F1, { centro: C, tam: tamResp, afastamento: 4, cor: corResp, bold: negritoResp });
+            if (G.tipo === 'parabola') {
+              var Dp = ctx.p(G.peDiretriz);
+              D.poligono(ctx, [Pp, Dp], { fechado: false, espessura: 0.9, papel: 'objeto' });
+              if (t2) D.rotuloLado(ctx, t2, Pp, Dp, { lado: 1, tam: tamResp, afastamento: 4, cor: corResp, bold: negritoResp });
+              if (M) {
+                /* A definicao da parabola e UMA afirmacao, "P esta a mesma
+                 * distancia do foco e da diretriz", e ela se escreve com tres
+                 * pecas: o tracinho num segmento, o tracinho no outro e o
+                 * quadradinho no pe (sem ele "distancia a diretriz" nao e a
+                 * perpendicular). As tres anotam uma marca so, pela mesma regra
+                 * do grupo de tracinhos do marcarCongruentes; contadas uma a
+                 * uma, a figura da definicao (V, F, d, P) estourava o teto so
+                 * pela notacao. O pe do quadradinho aponta para a PONTA da
+                 * diretriz e nao para um passo de uma unidade, senao no plano
+                 * cartesiano o lado do quadradinho cai abaixo dos 3 pt e o
+                 * marcaAnguloReto recusa. */
+                M.marcaLado(ctx.doc, Pp, F1, { n: 1 });
+                M.marcaLado(ctx.doc, Pp, Dp, { n: 1 });
+                var pontaD = ctx.p(pt(G.diretrizX, G.P.y >= G.C.y ? G.unidades.y0 + 0.08 * (G.unidades.y1 - G.unidades.y0)
+                  : G.unidades.y1 - 0.08 * (G.unidades.y1 - G.unidades.y0)));
+                M.marcaAnguloReto(ctx.doc, Dp, Pp, pontaD, {});
+                ctx.anota('marca', { tipo: 'definicaoDaParabola', congruentes: 2, anguloReto: 1 });
+              }
+            } else if (F2) {
+              D.poligono(ctx, [Pp, F2], { fechado: false, espessura: 0.9, papel: 'objeto' });
+              if (t2) D.rotuloLado(ctx, t2, Pp, F2, { centro: C, tam: tamResp, afastamento: 4, cor: corResp, bold: negritoResp });
+            }
+          }
+        });
+
+        /* -------------------------------------------------- os nomes
+         * Todos separados (ver o nomearPonto): numa conica todo ponto com nome
+         * esta onde dois segmentos se tocam, e nenhum deles tem angulo pedido. */
+        ctx.rotulos(function () {
+          var sep = true;
+          var F1 = ctx.p(G.F1), F2 = G.F2 ? ctx.p(G.F2) : null;
+          /* Com o plano atras, os numeros da escala moram ABAIXO do eixo x e a
+           * ESQUERDA do eixo y (o eixos() nao os registra como obstaculo), entao
+           * o nome do foco sobe: embaixo ele cobria o "3" do tique de x igual a
+           * 3, que e justamente a abscissa do foco. */
+          var baixo = G.eixos ? [{ x: 0, y: 1 }, { x: 0, y: -1 }] : [{ x: 0, y: -1 }, { x: 0, y: 1 }];
+          var lateral = G.tipo === 'elipse' && !G.horizontal ? [{ x: 1, y: 0 }, { x: -1, y: 0 }] : baixo;
+          if (G.focos) {
+            nomearPonto(ctx, F1, G.focos[0], direcoesDoFoco(G, lateral, 1), { separado: sep });
+            if (F2) nomearPonto(ctx, F2, G.focos[1], direcoesDoFoco(G, lateral, -1), { separado: sep });
+          }
+          if (G.vertices) {
+            for (i = 0; i < G.verticesPontos.length; i++) {
+              var V = G.verticesPontos[i];
+              var ux = V.x - G.C.x, uy = V.y - G.C.y, n = Math.sqrt(ux * ux + uy * uy) || 1;
+              var fora2 = { x: ux / n, y: uy / n };
+              var dirs;
+              if (G.tipo === 'parabola') {
+                dirs = G.eixos
+                  ? [{ x: -0.7071, y: 0.7071 }, { x: -0.7071, y: -0.7071 }, { x: -1, y: 0 }]
+                  : [{ x: -1, y: 0 }, { x: -0.7071, y: -0.7071 }, { x: -0.7071, y: 0.7071 }];
+              } else if (G.tipo === 'hiperbole') {
+                /* Para DENTRO, entre os dois ramos: por fora o vertice esta
+                 * espremido entre o ramo, que sobe quase vertical dali, e o
+                 * lado do retangulo fundamental, que passa exatamente por ele.
+                 * Medido na primeira tirada: A1 e A2 sairam em tarja estreita
+                 * por nao haver posicao livre em 26 pt de busca. */
+                dirs = [{ x: -fora2.x, y: -fora2.y },
+                        { x: -fora2.x * 0.7071 + fora2.y * 0.7071, y: -fora2.x * 0.7071 - fora2.y * 0.7071 },
+                        { x: -fora2.x * 0.7071 - fora2.y * 0.7071, y: fora2.x * 0.7071 - fora2.y * 0.7071 }];
+              } else {
+                dirs = [{ x: fora2.x * 0.7071 - fora2.y * 0.7071, y: fora2.x * 0.7071 + fora2.y * 0.7071 },
+                        { x: fora2.x * 0.7071 + fora2.y * 0.7071, y: -fora2.x * 0.7071 + fora2.y * 0.7071 },
+                        fora2];
+              }
+              nomearPonto(ctx, ctx.p(V), G.verticesNomes[i], dirs, { separado: sep });
+            }
+          }
+          if (G.P) {
+            var ux2 = G.P.x - G.C.x, uy2 = G.P.y - G.C.y, n2 = Math.sqrt(ux2 * ux2 + uy2 * uy2) || 1;
+            var foraP = G.tipo === 'hiperbole' ? { x: -0.5, y: 0.866 } : { x: ux2 / n2, y: uy2 / n2 };
+            if (G.tipo === 'parabola') foraP = { x: -0.45, y: 0.89 };
+            nomearPonto(ctx, ctx.p(G.P), G.pontoNome, [foraP, { x: 0, y: 1 }, { x: 1, y: 0 }, { x: -1, y: 0 }], { separado: sep });
+          }
+          if (G.centroNome) {
+            /* O nome do centro foge das DUAS linhas de cota da translacao, e
+             * elas nao estao em lugar qualquer: as duas saem com fora= na
+             * origem, ou seja sao empurradas para o lado de LA da origem. A do
+             * valor de k (a vertical) fica do lado do sinal de h, e a do valor
+             * de h (a horizontal) fica do lado do sinal de k. Entao a diagonal
+             * que aponta de volta PARA a origem e a unica que nao encosta em
+             * nenhuma das duas, e ela vai na frente da fila.
+             *
+             * Medido na elipse transladada do MATEM3-04 (centro em (2, 3), o
+             * material p4): o "C" saia a 0,80 pt da linha de cota vertical do
+             * valor 3 e a 11,25 pt da bolinha que ele nomeia, quatorze vezes
+             * mais perto da cota do que do ponto. De cima para baixo lia-se
+             * seta, C, traco, 3, seta, e nao dava para saber se o C nomeava o
+             * ponto ou a medida. */
+            var dirCentro = [
+              { x: 0.7071, y: -0.7071 }, { x: -0.7071, y: -0.7071 },
+              { x: 0.7071, y: 0.7071 }, { x: -0.7071, y: 0.7071 }
+            ];
+            if (G.linhasDeCentro) {
+              var sx = G.C.x > 1e-9 ? -0.7071 : (G.C.x < -1e-9 ? 0.7071 : 0.7071);
+              var sy = G.C.y > 1e-9 ? -0.7071 : (G.C.y < -1e-9 ? 0.7071 : -0.7071);
+              /* Na folha o y cresce para cima e o ctx.p ja fez a conversao, mas
+               * o sinal do lado vem das unidades do problema: a diagonal para a
+               * origem em unidades e a mesma diagonal na folha. */
+              dirCentro = [{ x: sx, y: sy }].concat(dirCentro);
+            }
+            nomearPonto(ctx, C, G.centroNome, dirCentro, { separado: sep });
+          }
+        });
+      });
+    }
+  };
+
+  /* Para que lado sai o NOME do foco.
+   *
+   * Na elipse e na parabola o foco fica dentro da curva e qualquer lado e um
+   * lado de dentro: vale a fila comum (embaixo, ou lateral quando a elipse esta
+   * em pe). Na hiperbole nao: o foco fica ALEM do vertice, do lado de fora do
+   * ramo, e o lado livre e justamente o de fora, onde entre a letra e a bolinha
+   * nao passa curva nenhuma.
+   *
+   * O caso medido, hiperbole a=4 b=3 com focos=F1;F2 (a figura da definicao do
+   * MATEM3-04, material p.2 e p.3 nas duas linguas, quatro rotulos por folha).
+   * Com a fila comum o rotulo nao achava lugar livre na vertical, fugia 25,00
+   * pt e ganhava fio de chamada: o F1 saia a 32,43 pt da bolinha que ele
+   * nomeia, e o fio cruzava o ramo da hiperbole a 13,75 pt do rotulo. Quem le
+   * de baixo para cima sobe pelo fio e a primeira tinta que ele toca e a curva,
+   * a 2,4 vezes mais perto do que a bolinha: a leitura que sobra e "o foco esta
+   * SOBRE a hiperbole", o oposto das duas frases do texto ("os focos ficam alem
+   * dos vertices", "os focos F1 e F2 ficam fora dele").
+   *
+   * Mandando o nome para fora nao ha fuga, nao ha fio e nao ha nada entre a
+   * letra e o ponto. As diagonais de fora entram como recuo, e a fila comum
+   * continua no fim dela para o caso de a figura ser tao apertada que nem por
+   * fora sobre lugar (com eixos=sim, por exemplo, onde os numeros da escala
+   * ocupam a faixa de baixo). */
+  function direcoesDoFoco(G, padrao, sinal) {
+    if (G.tipo !== 'hiperbole') return padrao;
+    var s = sinal >= 0 ? 1 : -1;
+    return [{ x: s, y: 0 },
+            { x: s * 0.7071, y: 0.7071 },
+            { x: s * 0.7071, y: -0.7071 }].concat(padrao);
+  }
+
+  /* A geometria da conica em unidades do problema, sem desenhar. Centro em
+   * (h, k), eixo maior no x. Devolve null quando a diretiva nao fecha. */
+  function geometriaDaConica(B, doc, d) {
+    function recusarConica(t) { if (doc) B.avisar(doc, 'conica: ' + t); return null; }
+    var tipo = String(B.primeiro(d.args, 'tipo') || 'elipse').toLowerCase();
+    if (tipo !== 'elipse' && tipo !== 'hiperbole' && tipo !== 'parabola') {
+      return recusarConica('tipo=' + tipo + ' nao e elipse, hiperbole nem parabola');
+    }
+    var ma = lerMedida(B, d.args, 'a'), mb = lerMedida(B, d.args, 'b'), mp = lerMedida(B, d.args, 'p');
+    var mc = lerMedida(B, d.args, 'c');
+    if (mc && mc.valor !== null) return recusarConica('c=' + mc.bruto + ': a distancia focal se deduz de a e b (ou de p), escreva so a letra');
+    var a = ma && ma.valor !== null ? ma.valor : (tipo === 'hiperbole' ? 3 : 5);
+    var b = mb && mb.valor !== null ? mb.valor : (tipo === 'hiperbole' ? 2 : 3.5);
+    var p = mp && mp.valor !== null ? mp.valor : 4;
+    if (!(a > 0) || !(b > 0)) return recusarConica('a e b tem que ser positivos');
+    if (!(p > 0)) return recusarConica('p tem que ser positivo (e a distancia do foco a diretriz)');
+
+    var cen = B.lista(d.args, 'centro');
+    var h = 0, kk = 0, centroNome = null;
+    if (cen.length) {
+      if (cen.length < 2 || !B.ehNumero(cen[0]) || !B.ehNumero(cen[1])) {
+        return recusarConica('centro=' + cen.join(';') + ' pede h;k numericos e, opcionalmente, o nome');
+      }
+      h = parseFloat(cen[0]); kk = parseFloat(cen[1]);
+      if (cen.length > 2) centroNome = String(cen[2]);
+    }
+    var C = pt(h, kk);
+    var eixos = ehSim(B.primeiro(d.args, 'eixos'));
+    var medidasDoTipo = tipo === 'parabola' ? [mp] : [ma, mb];
+    var numerico = false, chute = false;
+    for (var md = 0; md < medidasDoTipo.length; md++) {
+      if (medidasDoTipo[md] && medidasDoTipo[md].valor !== null) numerico = true;
+      if (medidasDoTipo[md] && medidasDoTipo[md].letra) chute = true;
+    }
+    var G = {
+      tipo: tipo, a: a, b: b, p: p, C: C, ma: ma, mb: mb, mp: mp, eixos: eixos,
+      fora: escalaDe(d, numerico, chute),
+      centroNome: centroNome, linhasDeCentro: eixos && (Math.abs(h) > 1e-9 || Math.abs(kk) > 1e-9),
+      mostraA: !!ma && (ma.letra || ma.explicito) && tipo !== 'parabola',
+      mostraB: !!mb && (mb.letra || mb.explicito) && tipo !== 'parabola',
+      mostraC: !!mc && tipo !== 'parabola', mc: mc,
+      mostraP: !!mp && (mp.letra || mp.explicito) && tipo === 'parabola'
+    };
+
+    /* ---------------------------------------------- focos, vertices, caixa */
+    var caixa;
+    if (tipo === 'elipse') {
+      G.horizontal = a >= b;
+      G.maior = Math.max(a, b); G.menor = Math.min(a, b);
+      G.c = Math.sqrt(G.maior * G.maior - G.menor * G.menor);
+      G.e = G.c / G.maior;
+      G.F1 = G.horizontal ? pt(h + G.c, kk) : pt(h, kk + G.c);
+      G.F2 = G.horizontal ? pt(h - G.c, kk) : pt(h, kk - G.c);
+      G.verticesPontos = [pt(h + a, kk), pt(h - a, kk), pt(h, kk + b), pt(h, kk - b)];
+      caixa = { x0: h - a, y0: kk - b, x1: h + a, y1: kk + b };
+    } else if (tipo === 'hiperbole') {
+      G.c = Math.sqrt(a * a + b * b);
+      G.e = G.c / a;
+      G.F1 = pt(h + G.c, kk); G.F2 = pt(h - G.c, kk);
+      G.verticesPontos = [pt(h + a, kk), pt(h - a, kk)];
+      G.alcanceY = 2.0 * b;
+      var xMax = a * Math.sqrt(1 + (G.alcanceY / b) * (G.alcanceY / b));
+      caixa = { x0: h - xMax, y0: kk - G.alcanceY, x1: h + xMax, y1: kk + G.alcanceY };
+    } else {
+      G.c = p / 2;
+      G.F1 = pt(h + p / 2, kk); G.F2 = null;
+      G.diretrizX = h - p / 2;
+      G.verticesPontos = [pt(h, kk)];
+      G.alcanceY = 1.6 * p;
+      caixa = { x0: h - p / 2, y0: kk - G.alcanceY, x1: h + G.alcanceY * G.alcanceY / (2 * p), y1: kk + G.alcanceY };
+    }
+
+    /* ---------------------------------------------- o que a diretiva nomeia */
+    var focos = B.lista(d.args, 'focos');
+    if (focos.length) {
+      G.focos = ehSim(focos[0]) ? [null, null] : [focos[0], focos.length > 1 ? focos[1] : null];
+      if (!ehSim(focos[0]) && tipo !== 'parabola' && focos.length < 2) {
+        return recusarConica('focos=' + focos.join(';') + ': a ' + tipo + ' tem dois focos, de nome aos dois');
+      }
+    }
+    var vert = B.lista(d.args, 'vertices');
+    if (vert.length) {
+      G.vertices = true;
+      G.verticesNomes = [];
+      for (var vi = 0; vi < G.verticesPontos.length; vi++) {
+        G.verticesNomes.push(ehSim(vert[0]) ? null : (vert[vi] || null));
+      }
+    }
+    var dir = B.primeiro(d.args, 'diretriz');
+    if (dir !== null) {
+      if (tipo !== 'parabola') return recusarConica('diretriz so na parabola');
+      G.diretriz = true;
+      G.diretrizRotulo = ehSim(dir) ? null : String(dir);
+    }
+    if (B.primeiro(d.args, 'assintotas') !== null) {
+      if (tipo !== 'hiperbole') return recusarConica('assintotas so na hiperbole');
+      G.assintotas = true;
+    }
+    var ret = B.primeiro(d.args, 'retangulo');
+    if (ret !== null) {
+      if (tipo !== 'hiperbole') return recusarConica('retangulo fundamental so na hiperbole');
+      G.retangulo = true;
+      G.retanguloRotulo = ehSim(ret) ? null : String(ret);
+    }
+    G.incognita = B.primeiro(d.args, 'incognita');
+    if (G.incognita !== null && /^[xαβθ]$/.test(String(G.incognita))) {
+      return recusarConica('incognita=' + G.incognita + ': a trava do base.js le x, alfa, beta e teta sozinhos como ' +
+        'valor de ANGULO e cobra um arco que um raio focal nao tem; use outra letra (d, r, m)');
+    }
+
+    /* ---------------------------------------------- o ponto sobre a curva */
+    var pv = pares(B, d.args, 'ponto');
+    if (pv.length) {
+      var nome = pv[0][0];
+      var rf = pv[0].length > 1 ? pv[0][1] : null;
+      if (rf !== null && !B.ehNumero(rf)) return recusarConica('ponto=' + pv[0].join(';') + ': o segundo valor e a distancia de P ao primeiro foco, numerica');
+      var P = null;
+      if (tipo === 'elipse') {
+        if (rf !== null) {
+          var r1 = parseFloat(rf);
+          if (G.e < 1e-9) return recusarConica('ponto=' + pv[0].join(';') + ': com a igual a b a distancia ao foco nao escolhe ponto nenhum');
+          if (r1 < G.maior - G.c - 1e-9 || r1 > G.maior + G.c + 1e-9) {
+            return recusarConica('ponto=' + pv[0].join(';') + ': o raio focal tem que ficar entre ' +
+              arredondar(G.maior - G.c) + ' e ' + arredondar(G.maior + G.c));
+          }
+          var s = (G.maior - r1) / G.e;
+          var outro = G.menor * Math.sqrt(Math.max(0, 1 - s * s / (G.maior * G.maior)));
+          P = G.horizontal ? pt(h + s, kk + outro) : pt(h + outro, kk + s);
+        } else {
+          var t = 55 * Math.PI / 180;
+          P = pt(h + a * Math.cos(t), kk + b * Math.sin(t));
+        }
+      } else if (tipo === 'hiperbole') {
+        var xh;
+        if (rf !== null) {
+          xh = (parseFloat(rf) + a) / G.e;
+          if (xh < a - 1e-9) return recusarConica('ponto=' + pv[0].join(';') + ': o raio focal tem que ser pelo menos ' + arredondar(G.c - a));
+        } else xh = 1.5 * a;
+        if (xh > caixa.x1 - h) G.alcanceY = b * Math.sqrt(xh * xh / (a * a) - 1) * 1.15;
+        P = pt(h + xh, kk + b * Math.sqrt(Math.max(0, xh * xh / (a * a) - 1)));
+        var xM = a * Math.sqrt(1 + (G.alcanceY / b) * (G.alcanceY / b));
+        caixa = { x0: h - xM, y0: kk - G.alcanceY, x1: h + xM, y1: kk + G.alcanceY };
+      } else {
+        var xp;
+        if (rf !== null) {
+          xp = parseFloat(rf) - p / 2;
+          if (xp < -1e-9) return recusarConica('ponto=' + pv[0].join(';') + ': a distancia ao foco e no minimo p/2 = ' + arredondar(p / 2));
+        } else xp = 0.8 * p;
+        P = pt(h + xp, kk + Math.sqrt(2 * p * Math.max(0, xp)));
+        if (P.y - kk > G.alcanceY * 0.9) {
+          G.alcanceY = (P.y - kk) * 1.15;
+          caixa = { x0: h - p / 2, y0: kk - G.alcanceY, x1: h + G.alcanceY * G.alcanceY / (2 * p), y1: kk + G.alcanceY };
+        }
+        G.peDiretriz = pt(G.diretrizX, P.y);
+        G.diretriz = true;
+        if (!G.diretrizRotulo) G.diretrizRotulo = G.diretrizRotulo || null;
+      }
+      G.P = P;
+      G.pontoNome = nome;
+      G.r1 = B.geo.distancia(P, G.F1);
+      G.r2 = tipo === 'parabola' ? Math.abs(P.x - G.diretrizX) : B.geo.distancia(P, G.F2);
+    } else if (G.incognita !== null) {
+      return recusarConica('incognita=' + G.incognita + ' pede ponto= para haver raio focal a marcar');
+    }
+
+    /* ---------------------------------------------- a caixa de unidades */
+    var lu = caixa.x1 - caixa.x0, au = caixa.y1 - caixa.y0;
+    var m = 0.14 * Math.max(lu, au);
+    var u = { x0: caixa.x0 - m, y0: caixa.y0 - m, x1: caixa.x1 + m, y1: caixa.y1 + m };
+    if (G.diretriz) u.x0 = Math.min(u.x0, G.diretrizX - 0.6 * m);
+    if (eixos) {
+      /* A origem fica dentro, com folga para os numeros da escala e para a
+       * ponta da seta. */
+      u.x0 = Math.min(u.x0, -0.8 * m); u.y0 = Math.min(u.y0, -0.8 * m);
+      u.x1 = Math.max(u.x1, 0.8 * m); u.y1 = Math.max(u.y1, 0.8 * m);
+    }
+    G.unidades = u;
+    return G;
+  }
+
+  /* ============================================================ poligono regular
+   *
+   * O hexagono decomposto em seis triangulos equilateros do MATEM3-12, e o resto
+   * da familia pela mesma porta: n lados, lado ou raio cotado, a apotema com o
+   * quadradinho no pe, as diagonais pelo centro com um triangulo preenchido.
+   *
+   * Chaves:
+   *   lados=n            o numero de lados (padrao 6)
+   *   lado=V[;R]         o lado, cotado no lado de baixo; raio=V[;R] o raio do
+   *                      circulo circunscrito, cotado ate um vertice
+   *   apotema=V[;R]      a apotema ate o meio de um lado, com o quadradinho
+   *   decomposto=sim     as n diagonais pelo centro e o triangulo de baixo chapado
+   *   centro=O           a letra do centro
+   *   incognita=x        o angulo central de um triangulo (com decomposto) ou o
+   *                      angulo interno de um vertice
+   *
+   * O poligono nasce apoiado num lado, que e a posicao prototipica (o
+   * geo.poligonoRegular do base.js ja faz isso para n par e impar). */
+
+  var poligonoregular = {
+    chaves: ['lados', 'lado', 'raio', 'apotema', 'decomposto', 'centro', 'incognita'],
+    metricas: ['lado', 'raio', 'apotema'],
+
+    medir: function (d, op) {
+      var B = base();
+      var G = geometriaDoRegular(B, null, d);
+      return {
+        altura: op.altura != null ? op.altura
+          : (G ? alturaParaCaixa(B, op, G.unidades, 120, 156) : null),
+        legenda: d.legenda || null,
+        /* Todas as medidas do regular se deduzem de uma so (lado, raio e
+         * apotema estao amarrados por n), entao letra nunca e chute aqui. */
+        foraDeEscala: d.escala === 'fora'
+      };
+    },
+
+    desenhar: function (doc, d, op) {
+      var B = base(), g = B.gerador(), COR = g.COR, D = desenho(), M = marcas();
+      var G = geometriaDoRegular(B, doc, d);
+      if (!G) return null;
+      if (!D) {
+        B.avisar(doc, 'poligonoregular: o figuras/desenho.js nao carregou');
+        return null;
+      }
+      var fora = d.escala === 'fora';
+      var corGab = corDaCamada(doc, d, COR);
+      var corValor = corGab || undefined;
+
+      return B.figura(doc, {
+        x: op.x, largura: op.largura,
+        altura: op.altura != null ? op.altura : alturaParaCaixa(B, op, G.unidades, 120, 156),
+        unidades: G.unidades, legenda: d.legenda, foraDeEscala: fora,
+        fase: d.fase, id: d.id, receita: 'poligonoregular'
+      }, function (ctx) {
+        var k = ctx.k, n = G.n;
+        var C = ctx.p(pt(0, 0));
+        var H = D.poligonoRegular(ctx, C, n, G.r * k, { desenhar: false });
+        var V = H.pontos;
+        var i;
+
+        if (G.decomposto) {
+          ctx.preenchimento(function () {
+            chaparRegiao(ctx, [C, V[G.iBase], V[(G.iBase + 1) % n]]);
+          });
+        }
+        ctx.contorno(function () { D.poligonoRegular(ctx, C, n, G.r * k, {}); });
+
+        ctx.marcas(function () {
+          if (G.decomposto) {
+            for (i = 0; i < n; i++) D.poligono(ctx, [C, V[i]], { fechado: false, espessura: 0.6, papel: 'diagonal' });
+          }
+          if (G.raio) {
+            var iv = G.decomposto ? (G.iBase + 2) % n : (G.iBase + 1) % n;
+            if (!G.decomposto) D.poligono(ctx, [C, V[iv]], { fechado: false, espessura: 0.9, papel: 'objeto' });
+            D.rotuloLado(ctx, G.raio.rotulo, C, V[iv], { lado: -1, tam: TAM_DADO, afastamento: 4, cor: corValor });
+          }
+          if (G.apotema) {
+            var pe = H.pes[G.iApotema];
+            D.poligono(ctx, [C, pe], { fechado: false, espessura: 0.9, papel: 'objeto' });
+            D.rotuloLado(ctx, G.apotema.rotulo, C, pe, { lado: 1, tam: TAM_DADO, afastamento: 4, cor: corValor });
+            if (M) M.marcaAnguloReto(ctx.doc, pe, C, V[G.iApotema], { ctx: ctx });
+          }
+          if (G.incognita) {
+            var texto = G.incognita, corResp = corValor;
+            if (d.fase === 'gabarito') {
+              texto = G.incognita + ' = ' + arredondar(G.decomposto ? 360 / n : 180 - 360 / n) + '°';
+              corResp = COR.teal;
+            }
+            if (M) {
+              if (G.decomposto) {
+                M.marcaAngulo(ctx.doc, C, V[G.iBase], V[(G.iBase + 1) % n],
+                  { rotulo: texto, tam: TAM_DADO, ctx: ctx, cor: corValor, corRotulo: corResp });
+              } else {
+                var iv2 = (G.iBase + 1) % n;
+                M.marcaAngulo(ctx.doc, V[iv2], V[(iv2 + 1) % n], V[(iv2 + n - 1) % n],
+                  { rotulo: texto, tam: TAM_DADO, ctx: ctx, cor: corValor, corRotulo: corResp });
+              }
+            }
+          }
+        });
+
+        ctx.rotulos(function () {
+          if (G.lado) {
+            D.rotuloLado(ctx, G.lado.rotulo, V[G.iBase], V[(G.iBase + 1) % n],
+              { centro: C, tam: TAM_DADO, afastamento: 5, cor: corValor });
+          }
+          if (G.centro) {
+            /* Separado (ver o nomearPonto): as diagonais, o raio e a apotema
+             * nascem todos no centro, e nenhum angulo e pedido ali salvo pela
+             * incognita, que ja traz o arco dela. */
+            nomearPonto(ctx, C, G.centro, [
+              { x: 0.7071, y: 0.7071 }, { x: -0.7071, y: 0.7071 },
+              { x: 0.7071, y: -0.7071 }, { x: -0.7071, y: -0.7071 }
+            ], { separado: true });
+          }
+        });
+      });
+    }
+  };
+
+  function geometriaDoRegular(B, doc, d) {
+    function recusarRegular(t) { if (doc) B.avisar(doc, 'poligonoregular: ' + t); return null; }
+    var nBruto = B.primeiro(d.args, 'lados');
+    var n = nBruto === null ? 6 : Math.round(parseFloat(nBruto));
+    if (!B.ehNumero(nBruto === null ? 6 : nBruto) || n < 3 || n > 24) return recusarRegular('lados=' + nBruto + ' pede um inteiro de 3 a 24');
+    var lado = lerMedida(B, d.args, 'lado'), raio = lerMedida(B, d.args, 'raio');
+    var apotema = lerMedida(B, d.args, 'apotema');
+    var seno = Math.sin(Math.PI / n), cosseno = Math.cos(Math.PI / n);
+    var r = null, origem = null;
+    function fixarRaioDoRegular(v, de) {
+      if (v === null) return true;
+      if (!(v > 0)) { recusarRegular(de + ' tem que ser positivo'); return false; }
+      if (r === null) { r = v; origem = de; return true; }
+      if (Math.abs(r - v) > 0.005 * Math.max(r, v)) {
+        recusarRegular(de + ' da raio ' + arredondar(v) + ' e ' + origem + ' da raio ' + arredondar(r));
+        return false;
+      }
+      return true;
+    }
+    if (!fixarRaioDoRegular(raio && raio.valor !== null ? raio.valor : null, 'raio')) return null;
+    if (!fixarRaioDoRegular(lado && lado.valor !== null ? lado.valor / (2 * seno) : null, 'lado')) return null;
+    if (!fixarRaioDoRegular(apotema && apotema.valor !== null ? apotema.valor / cosseno : null, 'apotema')) return null;
+    if (r === null) r = 5;
+    /* O lado de baixo e o de indice (n - 1) / 2 arredondado para baixo na volta
+     * do geo.poligonoRegular; a apotema vai para o lado oposto a ele, para nao
+     * cruzar o triangulo chapado nem o rotulo do lado. */
+    var iBase = Math.floor((n - 1) / 2);
+    var iApotema = (iBase + Math.floor(n / 2)) % n;
+    if (n % 2 === 1) iApotema = (iBase + Math.floor(n / 2) + 1) % n;
+    var margem = 0.32 * r;
+    return {
+      n: n, r: r, lado: lado, raio: raio, apotema: apotema,
+      decomposto: ehSim(B.primeiro(d.args, 'decomposto')),
+      centro: B.primeiro(d.args, 'centro') ? String(B.primeiro(d.args, 'centro')) : null,
+      incognita: B.primeiro(d.args, 'incognita') ? String(B.primeiro(d.args, 'incognita')) : null,
+      iBase: iBase, iApotema: iApotema,
+      unidades: { x0: -r - margem, y0: -r - margem, x1: r + margem, y1: r + margem }
+    };
+  }
+
+  /* ============================================================ pi desenrolado
+   *
+   * A figura mais didatica do MAT08-13: a circunferencia de diametro d, e
+   * abaixo dela o barbante esticado, com tres copias de d enfileiradas e a
+   * sobra cotada. E a unica forma de VER por que pi e "3 e um pouco".
+   *
+   * Chaves:
+   *   diametro=d[;R]     o rotulo do diametro (e das tres copias)
+   *   sobra=R            o rotulo da sobra; vem do tema. Escreva 0.14·d (com o
+   *                      ponto de multiplicar) e nao 0.14d: numero colado em
+   *                      letra e a forma de "2x", e a trava do valor solto do
+   *                      base.js le isso como valor de angulo sem arco
+   *
+   * O segmento mede pi vezes d por construcao, em unidades, e a
+   * _prova_receitas_circulo.js confere no fluxo que tres d mais a sobra dao pi
+   * vezes d com erro abaixo de 0,5 pt. Cinco marcas, e sao as cinco: o d do
+   * diametro, os tres d das copias e a sobra. Nao ha cota do comprimento
+   * inteiro porque ela seria a sexta; o nome do comprimento (C, pi vezes d)
+   * mora no paragrafo ao lado, que e onde o tema o define.
+   *
+   * A conta foi REFEITA nesta rodada, com o pedido em maos de cotar o segmento
+   * inteiro como C: com a cota a figura sai com seis marcas ativas contra o
+   * teto de cinco, e o conferirFigura reprova o tema com "marcas ativas: 6, o
+   * teto e 5" (medido). Nao ha marca sobrando para trocar, porque as tres
+   * copias do d e a sobra sao o que a figura existe para mostrar. Cotar o C
+   * aqui e decisao de teto e de tema, nao de receita: pede uma chave nova na
+   * diretiva (comprimento=, como a da receita rodando, para o nome vir do tema
+   * e nao nascer no desenhador) e alguem que abra mao de uma das cinco. O que
+   * ESTA consertado aqui e a seta, que era a metade do problema que ensinava
+   * errado. */
+
+  var pidesenrolado = {
+    chaves: ['diametro', 'sobra'],
+    metricas: [],
+
+    medir: function (d, op) {
+      var B = base();
+      return {
+        altura: op.altura != null ? op.altura : alturaParaCaixa(B, op, caixaDoPi(), 150, 210),
+        legenda: d.legenda || null,
+        foraDeEscala: d.escala === 'fora'
+      };
+    },
+
+    desenhar: function (doc, d, op) {
+      var B = base(), g = B.gerador(), COR = g.COR, D = desenho(), M = marcas();
+      if (!D) { B.avisar(doc, 'pidesenrolado: o figuras/desenho.js nao carregou'); return null; }
+      var diam = lerMedida(B, d.args, 'diametro');
+      /* O ponto decimal do tema vira a virgula da folha portuguesa aqui, na
+       * porta de entrada dos dois rotulos desta figura. Ver o numeroNaFolha: o
+       * "0.14·d" era a unica quebra de notacao numerica do MAT08-13. */
+      var rotuloD = numeroNaFolha(doc, diam ? diam.rotulo : 'd');
+      var sobra = B.primeiro(d.args, 'sobra');
+      if (sobra !== null) sobra = numeroNaFolha(doc, sobra);
+      if (sobra === null) {
+        B.avisar(doc, 'pidesenrolado: a sobra e o que a figura existe para mostrar e o rotulo dela vem do tema: escreva sobra=0.14d (ou o texto da sua lingua)');
+      }
+      var corGab = corDaCamada(doc, d, COR);
+      var corValor = corGab || undefined;
+      var U = caixaDoPi();
+
+      return B.figura(doc, {
+        x: op.x, largura: op.largura,
+        altura: op.altura != null ? op.altura : alturaParaCaixa(B, op, U, 150, 210),
+        unidades: U, legenda: d.legenda, foraDeEscala: d.escala === 'fora',
+        fase: d.fase, id: d.id, receita: 'pidesenrolado'
+      }, function (ctx) {
+        var k = ctx.k;
+        var C = ctx.p(pt(0.5, 0.85));
+        var y0 = 0;
+        var marcos = [0, 1, 2, 3, Math.PI];
+        var Pm = [];
+        for (var i = 0; i < marcos.length; i++) Pm.push(ctx.p(pt(marcos[i], y0)));
+
+        ctx.contorno(function () {
+          D.circunferencia(ctx, C, 0.5 * k, {});
+          D.poligono(ctx, [Pm[0], Pm[4]], { fechado: false, cor: COR.texto, espessura: 1.2 });
+          /* Tacos de extremo em cada marco: sem eles as tres copias leem como um
+           * segmento so, e a sobra some. Sao contorno da regua, nao marca a ler
+           * (anotados como marca eles sozinhos passavam do teto). */
+          for (var t = 0; t < Pm.length; t++) {
+            D.poligono(ctx, [pt(Pm[t].x, Pm[t].y - 3.5), pt(Pm[t].x, Pm[t].y + 3.5)],
+              { fechado: false, espessura: 0.9 });
+          }
+        });
+
+        ctx.marcas(function () {
+          D.cotaRadial(ctx, C, 0.5 * k, rotuloD, { tipo: 'diametro', angulo: 0, lado: 1, em: 0.72, tam: TAM_DADO, corTexto: corValor });
+          /* Do circulo para o barbante: a seta diz que e o mesmo comprimento
+           * desenrolado, e ela aponta para a marca de INICIO da regua.
+           *
+           * Ela apontava para baixo, reta, e pousava em x = 200,89 pt: o meio
+           * exato do primeiro intervalo d (que vai de 155,71 a 246,06). Medido
+           * assim, a seta ficava a 0,00 pt do meio do primeiro d e a 45,18 pt
+           * da marca zero, ou seja dizia "esta circunferencia e este pedaco
+           * aqui", que e justamente a leitura errada: a circunferencia e o
+           * segmento INTEIRO, e o primeiro pedaco e um diametro. Apontando para
+           * a marca zero ela passa a dizer onde o desenrolar comeca. */
+          D.seta(ctx, ctx.p(pt(0.5, 0.35)), ctx.p(pt(0, 0.09)), { espessura: 0.6, tam: 5 });
+          if (sobra !== null) {
+            D.cota(ctx, Pm[3], Pm[4], String(sobra), { lado: 1, afastamento: 12, tam: TAM_DADO, corTexto: corValor });
+          }
+        });
+
+        ctx.rotulos(function () {
+          for (var s = 0; s < 3; s++) {
+            D.rotuloLado(ctx, rotuloD, Pm[s], Pm[s + 1], { lado: -1, tam: TAM_DADO, afastamento: 5, cor: corValor });
+          }
+        });
+      });
+    }
+  };
+
+  function caixaDoPi() {
+    return { x0: -0.12, y0: -0.5, x1: Math.PI + 0.12, y1: 1.47 };
+  }
+
+  /* ============================================================ pista
+   *
+   * O retangulo com um semicirculo colado em cada lado menor (exercicio 16 do
+   * MAT08-13). O perimetro sai em 1,2 pt; os dois lados menores, que NAO entram
+   * no perimetro, saem em guia [2 2] de 0,6 pt por dentro, e e essa diferenca
+   * de traco que mostra a armadilha da questao.
+   *
+   * O interior e REGIAO PEDIDA e nao apoio, ao contrario do que este comentario
+   * dizia: o enunciado 16 pede "o perimetro da pista e a area da regiao que ela
+   * delimita". Ele saia em COR.soft, que da 1,12:1 contra o branco e era o
+   * unico preenchimento de regiao da folha inteira abaixo do piso de 3:1 (o
+   * setor, a coroa, a fatia, os cantos do quadrado e as coroas do alvo usam
+   * hachura cinza a 4,80:1 e o disco central do alvo usa o cinza de area a
+   * 5,62:1). Numa impressora de casa ou numa fotocopia os 7 por cento de tinta
+   * somem e sobra so o contorno, ou seja a resposta a "qual e a regiao cuja
+   * area eu tenho que calcular" desaparecia justamente onde a folha e usada.
+   * Agora ele cai no cinza de area do marcas.js, o mesmo do disco do alvo, que
+   * foi medido em 3,07:1 e escrito para isto.
+   *
+   * Chaves: comprimento=V[;R] e largura=V[;R], cotados nos dois lados. */
+
+  var pista = {
+    chaves: ['comprimento', 'largura'],
+    metricas: ['comprimento', 'largura'],
+
+    medir: function (d, op) {
+      var B = base();
+      var G = geometriaDaPista(B, null, d);
+      return {
+        altura: op.altura != null ? op.altura : (G ? alturaParaCaixa(B, op, G.unidades, 100, 150) : null),
+        legenda: d.legenda || null,
+        foraDeEscala: G ? G.fora : d.escala === 'fora'
+      };
+    },
+
+    desenhar: function (doc, d, op) {
+      var B = base(), g = B.gerador(), COR = g.COR, D = desenho();
+      var G = geometriaDaPista(B, doc, d);
+      if (!G) return null;
+      if (!D) { B.avisar(doc, 'pista: o figuras/desenho.js nao carregou'); return null; }
+      var fora = G.fora;
+      var corGab = corDaCamada(doc, d, COR);
+      var corValor = corGab || undefined;
+
+      return B.figura(doc, {
+        x: op.x, largura: op.largura,
+        altura: op.altura != null ? op.altura : alturaParaCaixa(B, op, G.unidades, 100, 150),
+        unidades: G.unidades, legenda: d.legenda, foraDeEscala: fora,
+        fase: d.fase, id: d.id, receita: 'pista'
+      }, function (ctx) {
+        var k = ctx.k, L = G.L, W = G.W;
+        var A = ctx.p(pt(0, 0)), Bq = ctx.p(pt(L, 0)), Cq = ctx.p(pt(L, W)), Dq = ctx.p(pt(0, W));
+        var CE = ctx.p(pt(0, W / 2)), CD = ctx.p(pt(L, W / 2));
+
+        ctx.preenchimento(function () {
+          /* Sem cor: cai no cinza de area do marcas.js (3,07:1), que e a tinta
+           * de regiao pedida da casa. Ver o cabecalho da receita. */
+          chaparRegiao(ctx, [
+            [A, Bq, Cq, Dq],
+            { centro: CE, raio: W / 2 * k, de: 90, ate: 270, setor: false },
+            { centro: CD, raio: W / 2 * k, de: -90, ate: 90, setor: false }
+          ]);
+        });
+        ctx.contorno(function () {
+          D.poligono(ctx, [A, Bq], { fechado: false, cor: COR.texto, espessura: 1.2 });
+          D.poligono(ctx, [Dq, Cq], { fechado: false, cor: COR.texto, espessura: 1.2 });
+          D.arco(ctx, CE, W / 2 * k, W / 2 * k, 90, 270, { espessura: 1.2 });
+          D.arco(ctx, CD, W / 2 * k, W / 2 * k, -90, 90, { espessura: 1.2 });
+          guia(ctx, A, Dq, true);
+          guia(ctx, Bq, Cq, true);
+        });
+        ctx.marcas(function () {
+          /* O comprimento e a armadilha da questao, e por isso ele sai em COTA
+           * e nao em rotulo de lado. Medido na folha do MAT08-13 (exercicio
+           * 16): o "84" era um numero solto 9,84 pt abaixo da aresta de baixo,
+           * centrado num x que e ao mesmo tempo o meio do retangulo (297,64 pt)
+           * e o meio da silhueta inteira (297,64 pt tambem, porque os dois
+           * semicirculos sao iguais). Nada dizia onde a medida comeca e onde
+           * ela acaba, e a aluna lia 84 como a pista toda, o que faz o
+           * retangulo virar 84 menos 60 e derruba a questao inteira.
+           *
+           * Com a cota, as duas linhas de chamada descem das PONTAS do
+           * retangulo, que e exatamente onde os semicirculos comecam: o vao
+           * medido tem inicio e fim visiveis. E o mesmo tratamento que o C do
+           * exercicio 17 (a receita rodando) ja tinha. */
+          D.cota(ctx, A, Bq, numeroNaFolha(doc, G.mL.rotulo),
+            { lado: -1, afastamento: 12, tam: TAM_DADO, corTexto: corValor });
+          /* E a largura ganha o MESMO tratamento, pelo mesmo motivo levado ate
+           * o fim. Ela saia como numero solto de 12,65 por 9,86 pt encostado a
+           * 5,00 pt da linha TRACEJADA, que e justamente a linha que NAO faz
+           * parte do perimetro (o gabarito e 168 mais 60π, e os dois lados de
+           * 60 nao entram): o unico numero que a figura punha ao lado dessa
+           * linha nao dizia onde ela comeca nem onde ela acaba, enquanto o 84,
+           * que entra duas vezes na conta, era o unico com seta. E o halo
+           * branco dele abria um retangulo dentro da propria regiao pintada.
+           *
+           * A cota sai do lado de FORA, a esquerda, e as duas linhas de chamada
+           * nascem nos dois cantos do lado esquerdo do retangulo, que sao
+           * exatamente as duas pontas do semicirculo: horizontais a partir dali
+           * elas tangenciam o arco e nao cruzam tinta nenhuma. O afastamento
+           * conta o raio do semicirculo em PONTOS (W/2 vezes k) mais 12, senao
+           * a linha de cota cairia dentro do arco. */
+          D.cota(ctx, A, Dq, numeroNaFolha(doc, G.mW.rotulo), {
+            fora: ctx.p(pt(L / 2, W / 2)), afastamento: W / 2 * k + 12,
+            tam: TAM_DADO, corTexto: corValor
+          });
+        });
+      });
+    }
+  };
+
+  function geometriaDaPista(B, doc, d) {
+    var mL = lerMedida(B, d.args, 'comprimento') || medidaDe(B, '84');
+    var mW = lerMedida(B, d.args, 'largura') || medidaDe(B, '60');
+    var L = mL.valor !== null ? mL.valor : 84;
+    var W = mW.valor !== null ? mW.valor : 60;
+    if (!(L > 0) || !(W > 0)) { if (doc) B.avisar(doc, 'pista: comprimento e largura tem que ser positivos'); return null; }
+    var m = 0.16 * W;
+    return {
+      L: L, W: W, mL: mL, mW: mW,
+      fora: escalaDe(d, mL.valor !== null || mW.valor !== null, mL.letra || mW.letra),
+      unidades: { x0: -W / 2 - m, y0: -m, x1: L + W / 2 + m, y1: W + m }
+    };
+  }
+
+  /* ============================================================ rodando
+   *
+   * A roda rolando: a circunferencia em tres posicoes sobre a reta (no inicio,
+   * depois de meia volta e depois de uma volta inteira), a marca no aro
+   * acompanhando o giro (embaixo, em cima, embaixo) e o trecho da reta entre a
+   * primeira e a ultima posicao cotado: uma volta e um comprimento.
+   *
+   * Chaves: raio=V[;R] ou diametro=V[;R] (cotado na primeira roda) e
+   * comprimento=R, o rotulo da cota de uma volta, que vem do tema. */
+
+  var rodando = {
+    chaves: ['raio', 'diametro', 'comprimento'],
+    metricas: ['raio', 'diametro'],
+
+    medir: function (d, op) {
+      var B = base();
+      var G = geometriaDaRoda(B, null, d);
+      return {
+        altura: op.altura != null ? op.altura : (G ? alturaParaCaixa(B, op, G.unidades, 100, 150) : null),
+        legenda: d.legenda || null,
+        /* Uma medida so (o raio ou o diametro), entao nada e chute aqui. */
+        foraDeEscala: d.escala === 'fora'
+      };
+    },
+
+    desenhar: function (doc, d, op) {
+      var B = base(), g = B.gerador(), COR = g.COR, D = desenho();
+      var G = geometriaDaRoda(B, doc, d);
+      if (!G) return null;
+      if (!D) { B.avisar(doc, 'rodando: o figuras/desenho.js nao carregou'); return null; }
+      var fora = d.escala === 'fora';
+      var corGab = corDaCamada(doc, d, COR);
+      var corValor = corGab || undefined;
+
+      return B.figura(doc, {
+        x: op.x, largura: op.largura,
+        altura: op.altura != null ? op.altura : alturaParaCaixa(B, op, G.unidades, 100, 150),
+        unidades: G.unidades, legenda: d.legenda, foraDeEscala: fora,
+        fase: d.fase, id: d.id, receita: 'rodando'
+      }, function (ctx) {
+        var k = ctx.k, r = G.r;
+        var volta = 2 * Math.PI * r;
+        var centros = [ctx.p(pt(0, r)), ctx.p(pt(volta / 2, r)), ctx.p(pt(volta, r))];
+        var chao0 = ctx.p(pt(-1.4 * r, 0)), chao1 = ctx.p(pt(volta + 1.4 * r, 0));
+        var marcas3 = [ctx.p(pt(0, 0)), ctx.p(pt(volta / 2, 2 * r)), ctx.p(pt(volta, 0))];
+
+        ctx.contorno(function () {
+          D.poligono(ctx, [chao0, chao1], { fechado: false, cor: COR.texto, espessura: 1.2 });
+          for (var i = 0; i < 3; i++) D.circunferencia(ctx, centros[i], r * k, {});
+        });
+        ctx.marcas(function () {
+          if (G.medida) {
+            D.cotaRadial(ctx, centros[0], r * k, G.medida.rotulo, {
+              tipo: G.medida.tipo, angulo: G.medida.tipo === 'diametro' ? 0 : 60, lado: 1,
+              em: G.medida.tipo === 'diametro' ? 0.72 : 0.5, tam: TAM_DADO, corTexto: corValor
+            });
+          }
+          if (G.comprimento !== null) {
+            D.cota(ctx, marcas3[0], marcas3[2], G.comprimento, { lado: -1, afastamento: 12, tam: TAM_DADO, corTexto: corValor });
+          }
+        });
+        ctx.rotulos(function () {
+          for (var i = 0; i < 3; i++) D.ponto(ctx, marcas3[i], {});
+        });
+      });
+    }
+  };
+
+  function geometriaDaRoda(B, doc, d) {
+    var raio = lerMedida(B, d.args, 'raio'), diam = lerMedida(B, d.args, 'diametro');
+    var r = 1;
+    if (raio && raio.valor !== null) r = raio.valor;
+    else if (diam && diam.valor !== null) r = diam.valor / 2;
+    if (!(r > 0)) { if (doc) B.avisar(doc, 'rodando: o raio tem que ser positivo'); return null; }
+    var comprimento = B.primeiro(d.args, 'comprimento');
+    if (comprimento === null && doc) {
+      B.avisar(doc, 'rodando: a cota de uma volta e o que a figura mostra e o rotulo dela vem do tema: escreva comprimento=C (ou o texto da sua lingua)');
+    }
+    var medida = raio ? { rotulo: raio.rotulo, tipo: 'raio' } : (diam ? { rotulo: diam.rotulo, tipo: 'diametro' } : null);
+    var volta = 2 * Math.PI * r;
+    return {
+      r: r, medida: medida, comprimento: comprimento === null ? null : String(comprimento),
+      unidades: { x0: -1.5 * r, y0: -0.75 * r, x1: volta + 1.5 * r, y1: 2.3 * r }
+    };
+  }
+
+  /* ============================================================ solido
+   *
+   * A ponte entre a diretiva @fig e o figuras/solidos.js. Nenhum solido e
+   * desenhado aqui: cada tipo vira UMA chamada a funcao de solido (prisma,
+   * cilindro, piramide, cone, esfera) ou a composicao (coneComTriangulo,
+   * piramideComTriangulo, cilindroComEsfera, prismaTriangular,
+   * planificacaoDoCone) do solidos.js, e o que mora nesta receita e regra de
+   * receita: ler as chaves, resolver o que a diretiva deixou em letra, decidir
+   * a escala, escolher a tinta da camada de gabarito, medir o bloco e passar
+   * id, fase, legenda e receita para o figura() registrar. O solido simples e
+   * rotulado com o que o solidos.js exporta para isso (rotuloColado,
+   * linhaInterna e as posicoes EM_*), nas mesmas posicoes da celula do painel
+   * dele, porque as funcoes de solido devolvem os pontos-chave justamente
+   * "para a receita cotar em cima".
+   *
+   * Chaves:
+   *   tipo=T             prisma, cilindro, piramide, cone, esfera, prismatriangular
+   *   aresta=V[;R]       a aresta da base (prisma, piramide); lado= e a mesma chave
+   *   profundidade=V[;R] a aresta de fuga do prisma; sem ela a base e quadrada,
+   *                      que e o padrao do proprio solidos.js
+   *   altura=V[;R]       a altura
+   *   raio=V[;R]         o raio (cilindro, cone, esfera)
+   *   geratriz=V[;R]     a geratriz do cone, na silhueta da direita
+   *   apotema=V[;R]      piramide com triangulo: o apotema da face (a hipotenusa)
+   *   apotemabase=V[;R]  piramide com triangulo: do centro ao meio do lado
+   *   triangulo=sim      cone ou piramide: o triangulo retangulo interno,
+   *                      preenchido, com o quadradinho no pe da altura
+   *   esfera=inscrita    cilindro: a esfera que toca as duas bases e a lateral;
+   *                      a altura E o diametro dela e sai cotada por fora
+   *   planificacao=sim   cone: o setor plano a esquerda, a seta e o cone montado
+   *                      a direita; angulo=G e o angulo do setor (180 por
+   *                      padrao), setor=V[;R] rotula o raio do setor e arco=R
+   *                      rotula o arco (10π), que e o que vira a circunferencia
+   *                      da base
+   *   centro=O           a letra do centro (esfera; cilindro com esfera; cone e
+   *                      piramide com triangulo)
+   *
+   * O primeiro valor numerico CONSTROI e a letra so rotula: raio=5 altura=12
+   * geratriz=g desenha o cone de 5 por 12 e escreve g na geratriz. Nenhuma
+   * palavra nasce aqui: altura=h escreve h, altura=height escreve height, e
+   * sem a chave a medida nao e rotulada.
+   *
+   * Deduzido nao e chute. A geratriz de raio=5 altura=12, a altura 2r do
+   * cilindro com esfera, o raio do cone que o setor monta e o apotema da base
+   * (metade da aresta) saem da conta e a figura continua fiel; a altura de um
+   * cone que so trouxe o raio nao sai de nada, e chutada na proporcao do
+   * prototipo do painel e a figura sai fora de escala, com a legenda que o
+   * tema escreve. Numero dado que contradiz a conta (geratriz=12 com raio=5 e
+   * altura=12) recusa a figura com aviso, em vez de desenhar uma que mente.
+   *
+   * Camada de gabarito. Pela regra do codigo de cor deste arquivo, teal marca
+   * o que a resposta ACRESCENTA: na figura rechamada pelo id, a letra que a
+   * conta resolve sai como "g = 13" em teal e o que ja estava impresso fica
+   * preto; na figura que nasce no gabarito todo valor sai em teal. Isso vale
+   * inteiro nos tipos que esta receita rotula com as primitivas (os cinco
+   * solidos simples): la o valor resolvido vai com halo, e foge com fio de
+   * chamada quando nao cabe onde a letra cabia. Nas cinco COMPOSICOES valem
+   * duas restricoes, as duas do lado do solidos.js: o texto resolvido sai na
+   * tinta do contorno, porque elas recebem os rotulos como texto e nao tem
+   * porta para a cor de cada um (a receita manda a cor em op.cores, com as
+   * mesmas chaves de op.rotulos, para o dia em que o solidos.js ler esse
+   * campo); e so os rotulos que elas poem com halo recebem o valor resolvido,
+   * porque a letra colada nao tem lugar para "a = 5" (ver
+   * COLADOS_DA_COMPOSICAO). A folha do gabarito de uma composicao fica sem
+   * teal e com a letra colada como veio, e nao fica errada.
+   *
+   * Sem giro: a fuga e uma constante da folha inteira, por decisao escrita no
+   * cabecalho do solidos.js, e um solido girado teria a altura fora da vertical
+   * e o quadradinho do triangulo interno virando losango. */
+
+  var FOLGA_SOLIDO = 22;          // o anel das composicoes com letra colada
+  var FOLGA_SOLIDO_COTADO = 28;   // o anel das composicoes com cota de seta por fora
+  var ALTURA_SOLIDO_MIN = 120;
+  var ALTURA_SOLIDO_MAX = 160;
+  var ALTURA_PLANIFICACAO = 170;  // a mesma da composicao, que e larga e baixa
+  var TIPOS_DE_SOLIDO = ['prisma', 'cilindro', 'piramide', 'cone', 'esfera', 'prismatriangular'];
+  var DIMS_POR_TIPO = {
+    prisma: ['aresta', 'profundidade', 'altura'], cilindro: ['raio', 'altura'],
+    piramide: ['aresta', 'altura'], cone: ['raio', 'altura'], esfera: ['raio'],
+    prismatriangular: ['lado', 'altura']
+  };
+  /* Qual rotulo de cada composicao vem de qual medida da diretiva. */
+  var ROTULOS_DA_COMPOSICAO = {
+    coneComTriangulo: { raio: 'raio', altura: 'altura', geratriz: 'geratriz' },
+    piramideComTriangulo: { altura: 'altura', apotemaBase: 'apotemabase', apotema: 'apotema' },
+    cilindroComEsfera: { raio: 'raio', altura: 'altura' },
+    prismaTriangular: { lado: 'aresta', altura: 'altura' },
+    planificacaoDoCone: { raioSetor: 'setor', raio: 'raio', altura: 'altura', geratriz: 'geratriz' }
+  };
+
+  /* A proporcao do prototipo de cada solido, que e a do painel do solidos.js,
+   * mais as medidas que se deduzem dela, para a diretiva que so trouxe a
+   * geratriz ou o apotema ainda chutar as outras na mesma proporcao. */
+  function prototipoDoSolido(S, tipo) {
+    var d = S.DIMS_PAINEL;
+    if (tipo === 'prisma') return { aresta: d.prisma.aresta, profundidade: d.prisma.profundidade, altura: d.prisma.altura };
+    if (tipo === 'prismatriangular') return { lado: d.prisma.aresta, altura: d.prisma.altura };
+    if (tipo === 'cilindro') return { raio: d.cilindro.raio, altura: d.cilindro.altura };
+    if (tipo === 'piramide') {
+      return {
+        aresta: d.piramide.aresta, altura: d.piramide.altura, apotemabase: d.piramide.aresta / 2,
+        apotema: Math.sqrt(d.piramide.altura * d.piramide.altura + d.piramide.aresta * d.piramide.aresta / 4)
+      };
+    }
+    if (tipo === 'cone') {
+      return { raio: d.cone.raio, altura: d.cone.altura, geratriz: Math.sqrt(d.cone.raio * d.cone.raio + d.cone.altura * d.cone.altura) };
+    }
+    return { raio: d.esfera.raio };
+  }
+
+  /* Uma medida com sinonimo (aresta e lado): qualquer um dos dois serve, e os
+   * dois juntos e numericos tem que concordar. Devolve false na discordancia. */
+  function lerMedidaDupla(B, args, a, b, recusar) {
+    var ma = lerMedida(B, args, a), mb = lerMedida(B, args, b);
+    if (ma && mb && ma.valor !== null && mb.valor !== null && Math.abs(ma.valor - mb.valor) > 1e-9) {
+      recusar(a + '=' + ma.bruto + ' e ' + b + '=' + mb.bruto + ' nao concordam');
+      return false;
+    }
+    return ma || mb;
+  }
+
+  /* O numero de uma medida: o dado, ou o deduzido pela conta. */
+  function numeroDaMedida(m) {
+    if (!m) return null;
+    if (m.valor !== null) return m.valor;
+    return m.deduzido != null ? m.deduzido : null;
+  }
+
+  /* Fecha uma medida pela conta: med[k] e a entrada, que pode nem existir.
+   *
+   * A medida nao e so rotulo, e tambem a dimensao que constroi o desenho: uma
+   * chave que o tema nao escreveu ainda assim CONTA, porque apotemabase=3
+   * altura=4 apotema=m tem a aresta 6 escondida na conta e sem ela a figura
+   * desenha 1,54 onde imprime 3. Por isso a chave ausente ganha aqui a entrada
+   * MUDA (a mesma forma da profundidade calada do prisma): dimensao correta,
+   * rotulo nenhum. As mudas saem da lista no fim do geometriaDoSolido, antes
+   * de virar rotulo.
+   *
+   * Numero dado tem que bater com a conta (meio por cento), senao a figura e
+   * recusada; letra ganha o valor deduzido, que e o que a camada de gabarito
+   * escreve. */
+  function deduzir(med, k, valor, recusar) {
+    if (!(valor > 0) || !isFinite(valor)) return true;
+    var m = med[k];
+    if (!m) {
+      med[k] = { bruto: '', valor: null, rotulo: '', letra: true, explicito: false, deduzido: valor, calada: true };
+      return true;
+    }
+    if (m.valor !== null) {
+      if (Math.abs(m.valor - valor) > 0.005 * Math.max(m.valor, valor)) {
+        recusar(k + '=' + m.bruto + ' nao bate com o que as outras medidas dao, ' + arredondar(valor));
+        return false;
+      }
+      return true;
+    }
+    m.deduzido = valor;
+    return true;
+  }
+
+  /* As entradas mudas levantaram a dimensao e nao tem rotulo para imprimir:
+   * saem da lista antes de o desenhar montar os rotulos. */
+  function calarMudas(med) {
+    for (var k in med) {
+      if (Object.prototype.hasOwnProperty.call(med, k) && med[k] && med[k].calada) med[k] = null;
+    }
+  }
+
+  /* As dimensoes que o solidos.js vai desenhar: o numero dado, o deduzido, ou
+   * o prototipo na escala do primeiro numero que a diretiva trouxe. So o
+   * terceiro caso e chute, e so ele poe a figura fora de escala.
+   *
+   * refPadrao e a referencia de escala de FORA, que so o painel passa: o
+   * solido que nao tem numero nenhum seu desenha o prototipo no fator do
+   * painel, e nao no fator 1, senao ele sai na ordem de grandeza 1 contra 6 a
+   * 10 dos vizinhos e vira um pingo na escala comum. */
+  function dimensoesDoSolido(proto, med, chaves, refPadrao) {
+    var ref = null, k, i;
+    for (k in med) {
+      if (!Object.prototype.hasOwnProperty.call(med, k)) continue;
+      if (med[k] && med[k].valor !== null && proto[k]) { ref = med[k].valor / proto[k]; break; }
+    }
+    if (ref === null && refPadrao != null && isFinite(refPadrao) && refPadrao > 0) ref = refPadrao;
+    var dims = {}, chute = false;
+    for (i = 0; i < chaves.length; i++) {
+      k = chaves[i];
+      var v = numeroDaMedida(med[k]);
+      if (v !== null) dims[k] = v;
+      else { dims[k] = proto[k] * (ref !== null ? ref : 1); if (ref !== null) chute = true; }
+    }
+    return { dims: dims, chute: chute, numerico: ref !== null };
+  }
+
+  /* Toda a leitura e a conta do solido, sem desenhar nada. E chamada para medir
+   * e para desenhar, e por isso os avisos so saem quando ha doc. Devolve null
+   * quando a diretiva se contradiz. */
+  function geometriaDoSolido(B, S, doc, d) {
+    function recusarSolido(t) { if (doc) B.avisar(doc, 'solido: ' + t); return null; }
+    function avisarSolido(t) { if (doc) B.avisar(doc, 'solido: ' + t); }
+    var tipo = String(B.primeiro(d.args, 'tipo') || '').toLowerCase();
+    if (tipo === 'painel') return recusarSolido('o painel dos cinco e a receita painelsolidos');
+    if (TIPOS_DE_SOLIDO.indexOf(tipo) < 0) {
+      return recusarSolido('tipo=' + (tipo || '(vazio)') + ' nao e um de ' + TIPOS_DE_SOLIDO.join(', '));
+    }
+
+    var aresta = lerMedidaDupla(B, d.args, 'aresta', 'lado', recusarSolido);
+    if (aresta === false) return null;
+    var med = {
+      aresta: aresta, profundidade: lerMedida(B, d.args, 'profundidade'),
+      altura: lerMedida(B, d.args, 'altura'), raio: lerMedida(B, d.args, 'raio'),
+      geratriz: lerMedida(B, d.args, 'geratriz'), apotema: lerMedida(B, d.args, 'apotema'),
+      apotemabase: lerMedida(B, d.args, 'apotemabase'), setor: lerMedida(B, d.args, 'setor')
+    };
+    var k;
+    for (k in med) {
+      if (med[k] && med[k].valor !== null && !(med[k].valor > 0)) return recusarSolido(k + '=' + med[k].bruto + ' tem que ser positivo');
+    }
+    var centro = B.primeiro(d.args, 'centro');
+    centro = centro === null ? null : String(centro);
+    var arco = B.primeiro(d.args, 'arco');
+    arco = arco === null ? null : String(arco);
+    var triangulo = ehSim(B.primeiro(d.args, 'triangulo'));
+    var esferaBruto = B.primeiro(d.args, 'esfera');
+    var esfera = esferaBruto !== null && (ehSim(esferaBruto) || /^(inscrita|inscribed)$/i.test(String(esferaBruto).trim()));
+    var planif = ehSim(B.primeiro(d.args, 'planificacao'));
+    var anguloBruto = B.primeiro(d.args, 'angulo');
+    var angulo = anguloBruto === null ? 180 : (B.ehNumero(anguloBruto) ? parseFloat(anguloBruto) : NaN);
+
+    /* Chave que so faz sentido num tipo avisa nos outros e e ignorada, em vez
+     * de trocar o tipo por baixo do pano. */
+    if (triangulo && tipo !== 'cone' && tipo !== 'piramide') { avisarSolido('triangulo=sim so vale para cone e piramide, ignorado em ' + tipo); triangulo = false; }
+    if (esfera && tipo !== 'cilindro') { avisarSolido('esfera=inscrita so vale para cilindro, ignorada em ' + tipo); esfera = false; }
+    if (planif && tipo !== 'cone') { avisarSolido('planificacao=sim so vale para cone, ignorada em ' + tipo); planif = false; }
+    if ((med.apotema || med.apotemabase) && !(tipo === 'piramide' && triangulo)) avisarSolido('apotema= e apotemabase= so saem na piramide com triangulo=sim, ignorados');
+    if (med.geratriz && tipo !== 'cone') avisarSolido('geratriz= so vale para cone, ignorada em ' + tipo);
+    if (med.setor && !planif) avisarSolido('setor= so vale com planificacao=sim, ignorado');
+    if (arco && !planif) avisarSolido('arco= so vale com planificacao=sim, ignorado');
+    var temCentro = tipo === 'esfera' || (tipo === 'cilindro' && esfera) || ((tipo === 'cone' || tipo === 'piramide') && triangulo);
+    if (centro && !temCentro) avisarSolido('centro= nao tem onde sair em ' + tipo + ' sem composicao, ignorado');
+
+    var proto = prototipoDoSolido(S, tipo);
+    var comp = null, dims = null, dimsComp = null, unidades = null;
+    var folga = FOLGA_SOLIDO, numerico = false, chute = false, res;
+    var va, vh, vm, vr, vg;
+
+    if (tipo === 'cone' && planif) {
+      /* O setor monta o cone: R e o raio do setor e a geratriz, r = R vezes o
+       * angulo sobre 360 e h fecha por Pitagoras. R vem do primeiro numero que
+       * o diga (geratriz, setor, raio ou altura) e os outros tem que bater. */
+      comp = 'planificacaoDoCone';
+      if (!(angulo > 0 && angulo < 360)) return recusarSolido('angulo=' + anguloBruto + ' pede um numero entre 0 e 360');
+      var fr = angulo / 360, R = null, origemR = null;
+      var candidatos = [
+        ['geratriz', med.geratriz && med.geratriz.valor !== null ? med.geratriz.valor : null],
+        ['setor', med.setor && med.setor.valor !== null ? med.setor.valor : null],
+        ['raio', med.raio && med.raio.valor !== null ? med.raio.valor / fr : null],
+        ['altura', med.altura && med.altura.valor !== null ? med.altura.valor / Math.sqrt(1 - fr * fr) : null]
+      ];
+      for (k = 0; k < candidatos.length; k++) {
+        var cv = candidatos[k][1];
+        if (cv === null) continue;
+        if (R === null) { R = cv; origemR = candidatos[k][0]; continue; }
+        if (Math.abs(R - cv) > 0.005 * Math.max(R, cv)) {
+          return recusarSolido(candidatos[k][0] + ' da raio do setor ' + arredondar(cv) + ' e ' + origemR + ' da ' + arredondar(R));
+        }
+      }
+      numerico = R !== null;
+      if (R === null) R = 1;
+      var rc = R * fr, hc = Math.sqrt(R * R - rc * rc);
+      if (numerico) {
+        if (!deduzir(med, 'geratriz', R, recusarSolido)) return null;
+        if (!deduzir(med, 'setor', R, recusarSolido)) return null;
+        if (!deduzir(med, 'raio', rc, recusarSolido)) return null;
+        if (!deduzir(med, 'altura', hc, recusarSolido)) return null;
+      }
+      dims = { raio: rc, altura: hc };
+      dimsComp = { raio: R, angulo: angulo };
+    } else if (tipo === 'cone') {
+      /* g ao quadrado igual a r ao quadrado mais h ao quadrado: duas medidas
+       * numericas fecham a terceira. */
+      vr = med.raio ? med.raio.valor : null; vh = med.altura ? med.altura.valor : null; vg = med.geratriz ? med.geratriz.valor : null;
+      if (vr !== null && vh !== null) { if (!deduzir(med, 'geratriz', Math.sqrt(vr * vr + vh * vh), recusarSolido)) return null; }
+      else if (vr !== null && vg !== null) {
+        if (vg <= vr) return recusarSolido('geratriz=' + med.geratriz.bruto + ' nao pode ser menor ou igual ao raio ' + med.raio.bruto);
+        if (!deduzir(med, 'altura', Math.sqrt(vg * vg - vr * vr), recusarSolido)) return null;
+      } else if (vh !== null && vg !== null) {
+        if (vg <= vh) return recusarSolido('geratriz=' + med.geratriz.bruto + ' nao pode ser menor ou igual a altura ' + med.altura.bruto);
+        if (!deduzir(med, 'raio', Math.sqrt(vg * vg - vh * vh), recusarSolido)) return null;
+      }
+      res = dimensoesDoSolido(proto, med, DIMS_POR_TIPO.cone);
+      dims = res.dims; numerico = res.numerico; chute = res.chute;
+      if (triangulo) { comp = 'coneComTriangulo'; dimsComp = dims; }
+    } else if (tipo === 'piramide') {
+      /* O apotema da base e metade da aresta; o apotema da face fecha com a
+       * altura por Pitagoras.
+       *
+       * A altura e o apotema da face fecham o apotema da BASE direto, sem
+       * passar pela aresta: assim apotemabase= numerico e conferido mesmo
+       * quando a diretiva nao escreve aresta=, e as tres combinacoes de duas
+       * medidas fecham as outras duas, como o cone ja faz. Antes disso
+       * altura=4 apotema=5 apotemabase=99 saia DESENHADO, com 99 impresso em
+       * cima de uma medida que valia 1,54 e cujo valor certo e 3. */
+      vh = med.altura ? med.altura.valor : null; vm = med.apotema ? med.apotema.valor : null;
+      if (vh !== null && vm !== null && vm > vh) {
+        if (!deduzir(med, 'apotemabase', Math.sqrt(vm * vm - vh * vh), recusarSolido)) return null;
+      }
+      va = med.aresta ? med.aresta.valor : null;
+      if (va === null && numeroDaMedida(med.apotemabase) !== null) {
+        if (!deduzir(med, 'aresta', 2 * numeroDaMedida(med.apotemabase), recusarSolido)) return null;
+        va = numeroDaMedida(med.aresta);
+      }
+      if (va !== null && vh !== null) { if (!deduzir(med, 'apotema', Math.sqrt(vh * vh + va * va / 4), recusarSolido)) return null; }
+      else if (va !== null && vm !== null) {
+        if (vm <= va / 2) return recusarSolido('apotema=' + med.apotema.bruto + ' nao pode ser menor ou igual a metade da aresta ' + arredondar(va));
+        if (!deduzir(med, 'altura', Math.sqrt(vm * vm - va * va / 4), recusarSolido)) return null;
+      } else if (vh !== null && vm !== null) {
+        if (vm <= vh) return recusarSolido('apotema=' + med.apotema.bruto + ' nao pode ser menor ou igual a altura ' + med.altura.bruto);
+        if (!deduzir(med, 'aresta', 2 * Math.sqrt(vm * vm - vh * vh), recusarSolido)) return null;
+      }
+      if (numeroDaMedida(med.aresta) !== null) {
+        if (!deduzir(med, 'apotemabase', numeroDaMedida(med.aresta) / 2, recusarSolido)) return null;
+      }
+      res = dimensoesDoSolido(proto, med, DIMS_POR_TIPO.piramide);
+      dims = res.dims; numerico = res.numerico; chute = res.chute;
+      if (triangulo) { comp = 'piramideComTriangulo'; dimsComp = dims; }
+    } else if (tipo === 'cilindro' && esfera) {
+      /* A altura E o diametro da esfera inscrita. */
+      vr = med.raio ? med.raio.valor : null; vh = med.altura ? med.altura.valor : null;
+      if (vr !== null) { if (!deduzir(med, 'altura', 2 * vr, recusarSolido)) return null; }
+      else if (vh !== null) { if (!deduzir(med, 'raio', vh / 2, recusarSolido)) return null; }
+      res = dimensoesDoSolido(proto, med, ['raio']);
+      dims = { raio: res.dims.raio, altura: 2 * res.dims.raio };
+      numerico = res.numerico; chute = res.chute;
+      comp = 'cilindroComEsfera'; dimsComp = { raio: dims.raio }; folga = FOLGA_SOLIDO_COTADO;
+    } else if (tipo === 'prismatriangular') {
+      /* O lado da base equilatera entra como aresta na leitura e como lado na
+       * composicao. */
+      res = dimensoesDoSolido(proto, { lado: med.aresta, altura: med.altura }, DIMS_POR_TIPO.prismatriangular);
+      dims = res.dims; numerico = res.numerico; chute = res.chute;
+      comp = 'prismaTriangular'; dimsComp = dims; folga = FOLGA_SOLIDO_COTADO;
+    } else {
+      /* prisma, cilindro e esfera simples: nada a deduzir. No prisma sem
+       * profundidade= a base e QUADRADA, que e o padrao do solidos.js escrito
+       * no cabecalho desta receita e nao um chute: a diretiva que quer outra
+       * profundidade a escreve. Vale com numero e com letra, e por isso a
+       * profundidade fica fora da conta de dimensoesDoSolido e sai da aresta
+       * ja resolvida: pelo prototipo ela sairia em 0,8 da aresta, que e o 0,8
+       * do PAINEL, decidido para o painel de letras nao parecer um cubo, e o
+       * prisma simples em letras saia com base retangular se dizendo fiel. */
+      var quadrada = tipo === 'prisma' && !med.profundidade;
+      res = dimensoesDoSolido(proto, med, quadrada ? ['aresta', 'altura'] : DIMS_POR_TIPO[tipo]);
+      dims = res.dims; numerico = res.numerico; chute = res.chute;
+      if (quadrada) dims.profundidade = dims.aresta;
+    }
+
+    calarMudas(med);
+
+    if (comp === 'prismaTriangular') unidades = S.caixaDoSolido('prisma', { base: 'triangular', aresta: dims.lado, altura: dims.altura });
+    else if (comp !== 'planificacaoDoCone') unidades = S.caixaDoSolido(tipo, dims);
+    if (comp !== 'planificacaoDoCone' && !unidades) return recusarSolido('dimensoes invalidas para ' + tipo);
+
+    return {
+      tipo: tipo, comp: comp, dims: dims, dimsComp: dimsComp, med: med,
+      centro: centro, arco: arco, angulo: angulo, unidades: unidades, folga: folga,
+      fora: escalaDe(d, numerico, chute)
+    };
+  }
+
+  function alturaDoSolido(B, op, G) {
+    if (op.altura != null) return op.altura;
+    if (G.comp === 'planificacaoDoCone' || !G.unidades) return ALTURA_PLANIFICACAO;
+    return alturaParaCaixa(B, op, G.unidades, ALTURA_SOLIDO_MIN, ALTURA_SOLIDO_MAX, G.folga);
+  }
+
+  /* O texto que a folha imprime para uma medida, e a tinta dele. No enunciado
+   * e o rotulo como veio (o numero ou a letra). No gabarito a letra que a conta
+   * resolveu vira "g = 13" e sai em teal; o que ja estava impresso fica preto;
+   * e na figura que NASCE no gabarito (corGab) todo valor e acrescimo. */
+  function rotuloDaMedida(m, d, COR, corGab) {
+    if (!m) return null;
+    var texto = m.rotulo, cor = corGab || undefined, resolvido = false;
+    if (d.fase === 'gabarito' && m.letra && m.deduzido != null) {
+      texto = m.rotulo + ' = ' + arredondar(m.deduzido);
+      cor = COR.teal;
+      resolvido = true;
+    }
+    return { texto: texto, letra: m.rotulo, cor: cor, resolvido: resolvido };
+  }
+
+  /* Os rotulos que cada composicao poe COLADOS na linha (sem halo, a 3 pt,
+   * dentro do solido). Ali cabe uma letra e nao cabe um valor resolvido:
+   * medido na primeira tirada do gabarito, "a = 5" (19,1 pt de largura) caiu
+   * sobre o quadradinho do apotema da base da piramide e "h = 8.66" (33 pt)
+   * atravessou a silhueta esquerda do cone montado. Nessas posicoes a receita
+   * manda a letra como veio; o valor resolvido so vai para os rotulos que a
+   * composicao poe com halo e fuga (geratriz, apotema, as cotas, o raio do
+   * setor), e a resposta em texto fica com o resto. */
+  var COLADOS_DA_COMPOSICAO = {
+    coneComTriangulo: { altura: 1, raio: 1 },
+    piramideComTriangulo: { altura: 1, apotemaBase: 1 },
+    planificacaoDoCone: { altura: 1, raio: 1 }
+  };
+
+  /* O solido simples dentro do figura() da receita: a funcao do solidos.js
+   * desenha o solido e devolve os pontos-chave; a receita poe a linha interna
+   * e a letra onde a celula do painel dele as poe, com as posicoes EM_* que o
+   * proprio solidos.js exporta, e com a tinta da camada. */
+  function desenharSolidoSimples(ctx, S, D, G, R) {
+    var tipo = G.tipo, O = ctx.p(pt(0, 0));
+    var dk = S.emPontos(G.dims, ctx.k);
+    var Sd = null;
+    ctx.contorno(function () { Sd = S[tipo](ctx, O, dk, {}); ctx.registro.solido = Sd; });
+
+    ctx.marcas(function () {
+      if (!Sd) return;
+      if (tipo === 'cilindro' && R.raio) {
+        D.poligono(ctx, [Sd.centroTopo, Sd.topoDir], { fechado: false, espessura: 0.9, papel: 'objeto' });
+      }
+      if (tipo === 'piramide' && R.altura) S.linhaInterna(ctx, Sd.vertice, Sd.O);
+      if (tipo === 'cone') {
+        if (R.altura) S.linhaInterna(ctx, Sd.vertice, Sd.O);
+        if (R.raio) S.linhaInterna(ctx, Sd.O, Sd.baseDir);
+      }
+      if (tipo === 'esfera') {
+        if (R.raio) D.cotaRadial(ctx, Sd.centro, Sd.raio, R.raio.texto, { angulo: 50, tam: TAM_DADO, corTexto: R.raio.cor });
+        D.ponto(ctx, Sd.centro, {
+          raio: 1.6, rotulo: G.centro || null,
+          direcoes: [pt(-0.7071, -0.7071), pt(-1, 0), pt(0.7071, -0.7071)]
+        });
+      }
+    });
+
+    ctx.rotulos(function () {
+      if (!Sd) return;
+      function lado(m, A, Bq, op) {
+        if (!m) return;
+        op.tam = TAM_DADO; op.cor = m.cor;
+        D.rotuloLado(ctx, m.texto, A, Bq, op);
+      }
+      /* A letra vai colada, como na celula do painel do solidos.js; o valor
+       * resolvido do gabarito ("g = 13") e largo demais para a posicao colada
+       * e vai com halo, que e o que o faz fugir com fio de chamada em vez de
+       * atravessar a silhueta. */
+      function colado(m, P, Q, dir, candidatos, afast) {
+        if (!m) return;
+        S.rotuloColado(ctx, m.texto, P, Q, dir, {
+          candidatos: candidatos, afastamento: afast, tam: TAM_DADO, cor: m.cor, halo: m.resolvido === true
+        });
+      }
+      if (tipo === 'prisma') {
+        lado(R.aresta, Sd.arestaFrente[0], Sd.arestaFrente[1], { centro: Sd.centroBase });
+        lado(R.altura, Sd.arestaAlturaDireita[0], Sd.arestaAlturaDireita[1], { direcao: pt(1, 0) });
+        lado(R.profundidade, Sd.vertices.B, Sd.vertices.C, { centro: Sd.centroBase });
+      } else if (tipo === 'cilindro') {
+        colado(R.raio, Sd.centroTopo, Sd.topoDir, pt(0, 1), S.EM_RAIO_TAMPA, S.AFAST_RAIO);
+        lado(R.altura, Sd.baseDir, Sd.topoDir, { direcao: pt(1, 0) });
+      } else if (tipo === 'piramide') {
+        lado(R.aresta, Sd.vertices.A, Sd.vertices.B, { centro: Sd.centroBase });
+        colado(R.altura, Sd.vertice, Sd.O, pt(-1, 0), S.EM_ALTURA_PIRAMIDE, undefined);
+      } else if (tipo === 'cone') {
+        colado(R.altura, Sd.vertice, Sd.O, pt(-1, 0), S.EM_ALTURA_CONE, undefined);
+        colado(R.raio, Sd.O, Sd.baseDir, pt(0, 1), S.EM_RAIO_CONE, S.AFAST_RAIO);
+        lado(R.geratriz, Sd.vertice, Sd.baseDir, { centro: Sd.O });
+      }
+    });
+  }
+
+  /* A composicao do solidos.js abre o proprio figura(); a receita so traduz os
+   * rotulos e passa o bloco, a fase, o id, a legenda e o nome da receita. */
+  function chamarComposicao(doc, S, G, d, op, R, altura) {
+    var mapa = ROTULOS_DA_COMPOSICAO[G.comp], colados = COLADOS_DA_COMPOSICAO[G.comp] || {};
+    var rot = {}, cores = {}, k;
+    for (k in mapa) {
+      if (!Object.prototype.hasOwnProperty.call(mapa, k)) continue;
+      var m = R[mapa[k]];
+      if (!m) continue;
+      rot[k] = colados[k] ? m.letra : m.texto;
+      if (m.cor && !(colados[k] && m.resolvido)) cores[k] = m.cor;
+    }
+    if (G.comp === 'planificacaoDoCone' && G.arco) rot.arco = G.arco;
+    if (G.centro && G.comp !== 'prismaTriangular' && G.comp !== 'planificacaoDoCone') rot.centro = G.centro;
+    return S[G.comp](doc, {
+      dims: G.dimsComp, rotulos: rot, cores: cores,
+      bloco: { x: op.x, largura: op.largura, altura: altura, folga: G.folga },
+      legenda: d.legenda, foraDeEscala: G.fora, fase: d.fase, id: d.id, receita: 'solido'
+    });
+  }
+
+  var solido = {
+    chaves: ['tipo', 'aresta', 'lado', 'profundidade', 'altura', 'raio', 'geratriz', 'apotema', 'apotemabase',
+             'triangulo', 'esfera', 'planificacao', 'angulo', 'setor', 'arco', 'centro'],
+    metricas: ['aresta', 'lado', 'profundidade', 'altura', 'raio', 'geratriz', 'apotema', 'apotemabase', 'setor'],
+
+    medir: function (d, op) {
+      var B = base(), S = solidos();
+      var G = S ? geometriaDoSolido(B, S, null, d) : null;
+      return {
+        altura: G ? alturaDoSolido(B, op, G) : (op.altura != null ? op.altura : null),
+        legenda: d.legenda || null,
+        foraDeEscala: G ? G.fora : d.escala === 'fora'
+      };
+    },
+
+    desenhar: function (doc, d, op) {
+      var B = base(), g = B.gerador(), COR = g.COR, D = desenho(), S = solidos();
+      if (!S) { B.avisar(doc, 'solido: o figuras/solidos.js nao carregou, e sem ele nao ha solido'); return null; }
+      if (!D) { B.avisar(doc, 'solido: o figuras/desenho.js nao carregou'); return null; }
+      var G = geometriaDoSolido(B, S, doc, d);
+      if (!G) return null;
+      var corGab = corDaCamada(doc, d, COR);
+      var R = {}, k;
+      for (k in G.med) if (Object.prototype.hasOwnProperty.call(G.med, k)) R[k] = rotuloDaMedida(G.med[k], d, COR, corGab);
+      var altura = alturaDoSolido(B, op, G);
+      if (G.comp) return chamarComposicao(doc, S, G, d, op, R, altura);
+      return B.figura(doc, {
+        x: op.x, largura: op.largura, altura: altura, folga: G.folga,
+        unidades: G.unidades, legenda: d.legenda, foraDeEscala: G.fora,
+        fase: d.fase, id: d.id, receita: 'solido'
+      }, function (ctx) { desenharSolidoSimples(ctx, S, D, G, R); });
+    }
+  };
+
+  /* ============================================================ painelsolidos
+   *
+   * Os cinco solidos lado a lado, na mesma escala, com o nome de cada um
+   * embaixo, pelo painelDeSolidos do solidos.js. E a figura de RECONHECER o
+   * solido pelo nome, e o nome vem do tema, nas duas linguas: nome=prisma;
+   * cilindro;pirâmide;cone;esfera numa folha e nome=prism;cylinder;pyramid;
+   * cone;sphere na outra. Sem nome= o painel sai mudo e o painelDeSolidos
+   * avisa.
+   *
+   * Chaves:
+   *   nome=N1;N2;...     um nome por solido, na ordem
+   *   ordem=T1;T2;...    quais solidos e em que ordem (os cinco por padrao)
+   *   aresta=V[;R] raio=V[;R] altura=V[;R]
+   *                      a cota de cada dimensao, em todo solido que a tem:
+   *                      altura=h escreve h no prisma, no cilindro, na piramide
+   *                      e no cone; o numero, quando vem, da a dimensao a todos
+   *                      eles (raio=3 altura=10 aresta=6), e a que faltar e
+   *                      chutada na proporcao do prototipo, com a figura fora
+   *                      de escala
+   *
+   * A altura da celula e a mesma conta do painelDeSolidos (escala comum, faixa
+   * do nome, piso e teto da celula), feita aqui ANTES de desenhar para o bloco
+   * poder ser medido; o desenhar confere que as duas contas dao o mesmo. */
+
+  var SOLIDOS_DO_PAINEL = ['prisma', 'cilindro', 'piramide', 'cone', 'esfera'];
+
+  /* UMA referencia de escala para o painel inteiro: o primeiro solido da ordem
+   * que tem numero proprio na diretiva da o fator, dividindo o numero pelo
+   * prototipo da medida a que ele pertence. Quem nao tem numero nenhum seu
+   * desenha o prototipo NESSE fator.
+   *
+   * Sem isso a referencia era por solido e o solido sem chave sua saia no
+   * prototipo cru, ordem de grandeza 1, contra a ordem de 6 a 10 dos vizinhos:
+   * "altura=10" nos cinco desenhava a esfera com 7,30 pt de altura contra
+   * 66,32 pt dos outros quatro, 9,1 vezes menor, e o painel existe justamente
+   * para o aluno reconhecer o solido pelo nome. Painel todo em letras nao tem
+   * numero nenhum, devolve null e continua no prototipo cru, como sempre. */
+  function referenciaDoPainel(S, ordem, med) {
+    for (var i = 0; i < ordem.length; i++) {
+      var proto = prototipoDoSolido(S, ordem[i]), chaves = DIMS_POR_TIPO[ordem[i]] || [];
+      for (var j = 0; j < chaves.length; j++) {
+        var m = med[chaves[j]];
+        if (m && m.valor !== null && proto[chaves[j]]) return m.valor / proto[chaves[j]];
+      }
+    }
+    return null;
+  }
+
+  function layoutDoPainelDeSolidos(B, S, doc, d, op) {
+    function recusarPainel(t) { if (doc) B.avisar(doc, 'painelsolidos: ' + t); return null; }
+    var g = B.gerador(), i, k;
+    var ordem = B.lista(d.args, 'ordem');
+    if (!ordem.length) ordem = S.ORDEM_PAINEL.slice();
+    for (i = 0; i < ordem.length; i++) {
+      ordem[i] = String(ordem[i]).toLowerCase();
+      if (SOLIDOS_DO_PAINEL.indexOf(ordem[i]) < 0) return recusarPainel('ordem= aceita ' + SOLIDOS_DO_PAINEL.join(', ') + ', e nao ' + ordem[i]);
+    }
+    var aresta = lerMedidaDupla(B, d.args, 'aresta', 'lado', recusarPainel);
+    if (aresta === false) return null;
+    var med = { aresta: aresta, raio: lerMedida(B, d.args, 'raio'), altura: lerMedida(B, d.args, 'altura') };
+    for (k in med) {
+      if (med[k] && med[k].valor !== null && !(med[k].valor > 0)) return recusarPainel(k + '=' + med[k].bruto + ' tem que ser positivo');
+    }
+
+    var dims = {}, cotas = {}, numerico = false, chute = false;
+    var x = op.x != null ? Number(op.x) : g.MARG_E;
+    var largura = op.largura != null ? Number(op.largura) : (g.MARG_D - x);
+    var passo = largura / ordem.length;
+    var folga = FOLGA_CELULA + VAO_CELULA / 2;
+    var utilL = Math.max(1, passo - 2 * folga);
+    var escala = Infinity, maior = 0, refPainel = referenciaDoPainel(S, ordem, med);
+    for (i = 0; i < ordem.length; i++) {
+      var tipo = ordem[i], chaves = DIMS_POR_TIPO[tipo];
+      var medTipo = {};
+      for (k = 0; k < chaves.length; k++) medTipo[chaves[k]] = med[chaves[k]] || null;
+      var res = dimensoesDoSolido(prototipoDoSolido(S, tipo), medTipo, chaves, refPainel);
+      /* No prisma com aresta numerica a base e quadrada (o padrao do
+       * solidos.js), e nao o 0,8 do prototipo, que so existe para o painel de
+       * letras nao parecer um cubo. */
+      if (tipo === 'prisma' && med.aresta && med.aresta.valor !== null) {
+        res.dims.profundidade = res.dims.aresta;
+        res.chute = !(med.altura && med.altura.valor !== null);
+      }
+      dims[tipo] = res.dims;
+      numerico = numerico || res.numerico;
+      chute = chute || res.chute;
+      cotas[tipo] = {};
+      for (k = 0; k < chaves.length; k++) if (med[chaves[k]]) cotas[tipo][chaves[k]] = med[chaves[k]].rotulo;
+      var cx = S.caixaDoSolido(tipo, res.dims);
+      if (!cx) return recusarPainel('dimensoes invalidas para ' + tipo);
+      escala = Math.min(escala, utilL / cx.largura);
+      maior = Math.max(maior, cx.altura);
+    }
+    var alturaCelula = Math.max(CELULA_MIN, Math.min(CELULA_MAX, maior * escala + S.FAIXA_NOME + 2 * folga));
+    return {
+      ordem: ordem, nomes: B.lista(d.args, 'nome'), dims: dims, cotas: cotas,
+      alturaCelula: alturaCelula, fora: escalaDe(d, numerico, chute)
+    };
+  }
+
+  var painelsolidos = {
+    chaves: ['nome', 'ordem', 'aresta', 'lado', 'raio', 'altura'],
+    metricas: ['aresta', 'lado', 'raio', 'altura'],
+
+    medir: function (d, op) {
+      var B = base(), S = solidos();
+      var L = S ? layoutDoPainelDeSolidos(B, S, null, d, op) : null;
+      return {
+        altura: L ? L.alturaCelula : null,
+        legenda: d.legenda || null,
+        foraDeEscala: L ? L.fora : d.escala === 'fora'
+      };
+    },
+
+    desenhar: function (doc, d, op) {
+      var B = base(), S = solidos();
+      if (!S) { B.avisar(doc, 'painelsolidos: o figuras/solidos.js nao carregou, e sem ele nao ha painel'); return null; }
+      var L = layoutDoPainelDeSolidos(B, S, doc, d, op);
+      if (!L) return null;
+      var P = S.painelDeSolidos(doc, {
+        nomes: L.nomes, cotas: L.cotas, dims: L.dims, ordem: L.ordem,
+        x: op.x, largura: op.largura, legenda: d.legenda, foraDeEscala: L.fora,
+        fase: d.fase, receita: 'painelsolidos'
+      });
+      if (!P) return null;
+      /* A medida feita antes de desenhar e a celula desenhada tem que ser a
+       * mesma conta: divergindo, o bloco reservado pelo exercicio nao e o que
+       * saiu na folha, e isso tem que gritar. */
+      if (Math.abs(P.alturaCelula - L.alturaCelula) > 0.5) {
+        B.avisar(doc, 'painelsolidos: a medida do bloco deu ' + arredondar(L.alturaCelula) +
+          ' pt e a celula desenhada tem ' + arredondar(P.alturaCelula) + ' pt');
+      }
+      return P.registros[P.registros.length - 1] || null;
+    }
+  };
+
   /* ============================================================ despacho */
 
-  var receitas = { triangulo: triangulo, quadrilatero: quadrilatero, painel: painel };
+  var receitas = {
+    triangulo: triangulo, quadrilatero: quadrilatero, painel: painel,
+    circulo: circulo, conica: conica, poligonoregular: poligonoregular,
+    pidesenrolado: pidesenrolado, pista: pista, rodando: rodando,
+    solido: solido, painelsolidos: painelsolidos
+  };
 
   function existe(nome) { return !!(nome && receitas[String(nome).toLowerCase()]); }
   function nomes() { var s = []; for (var k in receitas) s.push(k); return s.sort(); }

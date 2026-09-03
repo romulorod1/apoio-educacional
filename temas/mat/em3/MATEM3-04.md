@@ -35,10 +35,22 @@ Com centro na origem e focos sobre o eixo horizontal, a equação reduzida é
 
 x^{2}/a^{2} + y^{2}/b^{2} = 1
 
-Aqui a é o semieixo maior, b é o semieixo menor e c é a distância do centro a cada foco. A relação
-entre eles é a relação fundamental da elipse:
+Aqui a é o semieixo maior, b é o semieixo menor e c é a distância do centro a cada foco. Na figura,
+F_{1} e F_{2} são os focos e P é um ponto qualquer da elipse: a soma PF_{1} + PF_{2} é a mesma para
+todo ponto P da curva, e vale 2a, que é a distância entre as duas pontas do eixo maior, marcadas na
+figura.
+
+@fig conica tipo=elipse focos=F1;F2 vertices=sim ponto=P
+
+A relação entre a, b e c é a relação fundamental da elipse:
 
 a^{2} = b^{2} + c^{2}
+
+Ela é o teorema de Pitágoras no triângulo da figura: quando P está na extremidade do eixo menor, os
+dois raios focais são iguais e cada um vale a, porque a soma deles é 2a. Os catetos medem b e c, e a
+hipotenusa mede a.
+
+@fig conica tipo=elipse a=5 b=3;b c=c focos=sim ponto=P;5 incognita=a
 
 O maior dos dois denominadores está sempre embaixo da variável cujo eixo contém os focos. Se o
 denominador maior estiver embaixo de y^{2}, a elipse é vertical.
@@ -56,8 +68,14 @@ Com centro na origem e focos sobre o eixo horizontal:
 
 x^{2}/a^{2} - y^{2}/b^{2} = 1
 
-Repare no sinal de menos, que é o que distingue a hipérbole da elipse à primeira vista. Aqui a
-relação fundamental muda de lugar:
+Repare no sinal de menos, que é o que distingue a hipérbole da elipse à primeira vista. Na
+figura, F_{1} e F_{2} são os focos e P é um ponto qualquer da hipérbole: a diferença entre
+PF_{2} e PF_{1}, em módulo, é a mesma para todo ponto P da curva, e vale 2a, que é a distância entre
+os dois vértices, marcados com A_{1} e A_{2} na figura seguinte.
+
+@fig conica tipo=hiperbole a=4 b=3 focos=F1;F2 ponto=P
+
+Aqui a relação fundamental muda de lugar:
 
 c^{2} = a^{2} + b^{2}
 
@@ -65,7 +83,13 @@ Agora c é o maior dos três, o que faz sentido, porque os focos ficam além dos
 qual denominador é maior: quem manda é o sinal, e o termo positivo indica o eixo que contém os
 focos.
 
-As assíntotas são as retas que a hipérbole se aproxima sem tocar, e valem y = ± (b/a) · x.
+As assíntotas são as retas que a hipérbole se aproxima sem tocar, e valem y = ± (b/a) · x. Na
+figura, o retângulo tracejado tem lados 2a e 2b e está centrado na origem: as assíntotas são as suas
+diagonais prolongadas, e a meia diagonal mede c, o que é outra forma de ver a relação
+c^{2} = a^{2} + b^{2}. Os vértices A_{1} e A_{2} ficam sobre o retângulo, e os focos F_{1} e F_{2}
+ficam fora dele.
+
+@fig conica tipo=hiperbole a=4 b=3 focos=F1;F2 vertices=A1;A2 retangulo=c assintotas=sim
 
 **Exemplo 2.** Analisar a hipérbole x^{2}/9 - y^{2}/16 = 1.
 Temos a = 3 e b = 4, então c^{2} = 9 + 16 = 25, e c = 5. Os focos são (5, 0) e (-5, 0). As
@@ -87,7 +111,11 @@ Como 4p = 12, p = 3. O foco é (3, 0) e a diretriz é a reta x = -3. A parábola
 
 Uma consequência prática da definição: a distância de um ponto da parábola ao foco é igual à
 distância dele à diretriz. Para a parábola y^{2} = 12x, essa distância vale x + 3, sendo x a
-abscissa do ponto.
+abscissa do ponto. Na figura, os dois segmentos que saem de P, um até o foco F e outro perpendicular
+até a diretriz r, têm o mesmo comprimento, e o vértice V fica no meio do caminho entre F e r. A reta
+se chama r aqui, e não d, porque nos exercícios o d é sempre uma distância.
+
+@fig conica tipo=parabola p=6 focos=F vertices=V diretriz=r ponto=P;5
 
 #### Identificar a cônica completando quadrados
 
@@ -96,13 +124,15 @@ quadrados em x e em y até chegar à forma reduzida. O sinal entre os dois quadr
 mesmo sinal indica elipse, sinais opostos indicam hipérbole, e a falta de um dos quadrados indica
 parábola.
 
-**Exemplo 4.** Identificar 4x^{2} + 9y^{2} - 8x + 36y + 4 = 0.
-Agrupando: 4 · (x^{2} - 2x) + 9 · (y^{2} + 4y) + 4 = 0. Completando: 4 · (x - 1)^{2} - 4 +
-9 · (y + 2)^{2} - 36 + 4 = 0, ou seja, 4 · (x - 1)^{2} + 9 · (y + 2)^{2} = 36. Dividindo por 36:
+**Exemplo 4.** Identificar 4x^{2} + 9y^{2} - 16x - 54y + 61 = 0.
+Agrupando: 4 · (x^{2} - 4x) + 9 · (y^{2} - 6y) + 61 = 0. Completando: 4 · (x - 2)^{2} - 16 +
+9 · (y - 3)^{2} - 81 + 61 = 0, ou seja, 4 · (x - 2)^{2} + 9 · (y - 3)^{2} = 36. Dividindo por 36:
 
-(x - 1)^{2}/9 + (y + 2)^{2}/4 = 1
+(x - 2)^{2}/9 + (y - 3)^{2}/4 = 1
 
-É uma elipse de centro (1, -2), com a = 3, b = 2 e c = √5.
+É uma elipse de centro (2, 3), com a = 3, b = 2 e c = √5. Ela é a elipse x^{2}/9 + y^{2}/4 = 1
+deslocada 2 unidades para a direita e 3 para cima: completar quadrados só encontra o centro, e a
+curva é a mesma, só desenhada em outro lugar.
 
 #### Erros comuns
 
@@ -115,8 +145,8 @@ denominador maior, e ele pode estar embaixo de y.
 **Confundir p com 4p na parábola.** Se a equação é y^{2} = 8x, então 4p = 8 e p = 2. O foco fica a
 2 do vértice, não a 8.
 
-**Esquecer que o fator multiplica o que foi somado.** Ao completar quadrados em 4 · (x^{2} - 2x),
-somar 1 dentro do parêntese equivale a somar 4 fora dele.
+**Esquecer que o fator multiplica o que foi somado.** Ao completar quadrados em 4 · (x^{2} - 4x),
+somar 4 dentro do parêntese equivale a somar 16 fora dele.
 
 ### Exercícios
 
@@ -134,7 +164,7 @@ somar 1 dentro do parêntese equivale a somar 4 fora dele.
    maior igual a 5.
 7. Escreva a equação reduzida da elipse de centro na origem cujo eixo maior está sobre o eixo
    horizontal e mede 10, e cujo eixo menor mede 6.
-8. Determine as assíntotas e a excentricidade da hipérbole x^{2}/9 - y^{2}/16 = 1.
+8. Determine as assíntotas e a excentricidade da hipérbole x^{2}/25 - y^{2}/144 = 1.
 9. Escreva a equação reduzida da hipérbole de centro na origem com focos (5, 0) e (-5, 0), e
    vértices (4, 0) e (-4, 0).
 10. Escreva a equação reduzida da parábola de foco (0, 4) e diretriz a reta y = -4.
@@ -151,12 +181,12 @@ somar 1 dentro do parêntese equivale a somar 4 fora dele.
     determine o centro, a, b e c.
 17. Identifique a cônica de equação y^{2} - 8x - 6y + 25 = 0, completando quadrados, e determine o
     vértice, o foco e a diretriz.
-18. Um ponto pertence à elipse x^{2}/25 + y^{2}/16 = 1 e dista 7 de um dos focos. Determine a
-    distância desse ponto ao outro foco, justificando pela definição da elipse.
+18. Um ponto P da elipse x^{2}/25 + y^{2}/16 = 1 dista 7 do foco F_{2}. Determine a distância d de P
+    ao foco F_{1}, justificando pela definição da elipse.
 19. Um arco tem a forma de metade de uma elipse, apoiado no chão numa abertura de 20 metros e com
     altura de 6 metros no ponto central. Calcule a altura do arco num ponto do chão que fica a 8
     metros do centro da abertura.
-20. Um ponto da parábola y^{2} = 12x dista 8 do foco. Determine as coordenadas desse ponto, usando a
+20. Determine as coordenadas dos pontos da parábola y^{2} = 12x que distam 8 do foco, usando a
     igualdade entre a distância ao foco e a distância à diretriz.
 
 ### Gabarito
@@ -168,7 +198,7 @@ somar 1 dentro do parêntese equivale a somar 4 fora dele.
 5. O eixo maior está sobre o eixo vertical. a = 3, b = 2 e c = √5.
 6. x^{2}/25 + y^{2}/16 = 1.
 7. x^{2}/25 + y^{2}/9 = 1.
-8. Assíntotas y = 4x/3 e y = -4x/3. Excentricidade e = 5/3.
+8. Assíntotas y = 12x/5 e y = -12x/5. Excentricidade e = 13/5.
 9. x^{2}/16 - y^{2}/9 = 1.
 10. x^{2} = 16y.
 11. Foco (-5, 0), e diretriz a reta x = 5.
@@ -181,10 +211,12 @@ somar 1 dentro do parêntese equivale a somar 4 fora dele.
     c = √5.
 17. Parábola de equação (y - 3)^{2} = 8 · (x - 2). Vértice (2, 3), foco (4, 3), e diretriz a reta
     x = 0.
-18. 3. A soma das distâncias aos dois focos é constante e vale o eixo maior, ou seja, 10. Como uma
-    delas vale 7, a outra vale 3.
+18. d = 3. A soma das distâncias aos dois focos é constante e vale o eixo maior, ou seja, 10. Como
+    PF_{2} vale 7, PF_{1} vale 3.
+    @fig conica id=k18 tipo=elipse a=5 b=4 focos=F1;F2 ponto=P;3 incognita=d fase=gabarito
 19. 3,6 metros. Com a elipse x^{2}/100 + y^{2}/36 = 1, para x = 8 o valor de y^{2} é 1296/100.
-20. Os pontos (5, 2√15) e (5, -2√15). A distância ao foco vale x + 3, então x = 5 e y^{2} = 60.
+20. Os pontos (5, 2√15) e (5, -2√15). A distância ao foco vale x + 3, então x = 5 e y^{2} = 60. Cada
+    um dos dois fica a 8 do foco e a 8 da diretriz, e um é o simétrico do outro em relação ao eixo.
 
 ## EN
 
@@ -213,9 +245,21 @@ With centre at the origin and foci on the horizontal axis, the standard equation
 x^{2}/a^{2} + y^{2}/b^{2} = 1
 
 Here a is the semi major axis, b is the semi minor axis and c is the distance from the centre to each
-focus. The relation between them is the fundamental relation of the ellipse:
+focus. In the figure, F_{1} and F_{2} are the foci and P is any point of the ellipse: the sum
+PF_{1} + PF_{2} is the same for every point P of the curve, and it equals 2a, the distance between
+the two ends of the major axis, marked in the figure.
+
+@fig conica tipo=elipse focos=F1;F2 vertices=sim ponto=P
+
+The relation between a, b and c is the fundamental relation of the ellipse:
 
 a^{2} = b^{2} + c^{2}
+
+It is Pythagoras' theorem in the triangle of the figure: when P sits at the end of the minor axis, the
+two focal radii are equal and each one is a, because their sum is 2a. The legs measure b and c, and
+the hypotenuse measures a.
+
+@fig conica tipo=elipse a=5 b=3;b c=c focos=sim ponto=P;5 incognita=a
 
 The larger of the two denominators always sits under the variable whose axis contains the foci. If
 the larger denominator sits under y^{2}, the ellipse is vertical.
@@ -233,8 +277,14 @@ With centre at the origin and foci on the horizontal axis:
 
 x^{2}/a^{2} - y^{2}/b^{2} = 1
 
-Notice the minus sign, which is what tells a hyperbola from an ellipse at first glance. Here the
-fundamental relation changes places:
+Notice the minus sign, which is what tells a hyperbola from an ellipse at first glance. In the
+figure, F_{1} and F_{2} are the foci and P is any point of the hyperbola: the difference between
+PF_{2} and PF_{1}, in absolute value, is the same for every point P of the curve, and it equals
+2a, the distance between the two vertices, marked A_{1} and A_{2} in the next figure.
+
+@fig conica tipo=hiperbole a=4 b=3 focos=F1;F2 ponto=P
+
+Here the fundamental relation changes places:
 
 c^{2} = a^{2} + b^{2}
 
@@ -243,6 +293,12 @@ does not matter which denominator is larger: the sign is in charge, and the posi
 axis that contains the foci.
 
 The asymptotes are the lines the hyperbola approaches without touching, and they are y = ± (b/a) · x.
+In the figure, the dashed rectangle has sides 2a and 2b and is centred at the origin: the asymptotes
+are its diagonals extended, and half a diagonal measures c, which is another way of seeing the
+relation c^{2} = a^{2} + b^{2}. The vertices A_{1} and A_{2} sit on the rectangle, and the foci F_{1}
+and F_{2} sit outside it.
+
+@fig conica tipo=hiperbole a=4 b=3 focos=F1;F2 vertices=A1;A2 retangulo=c assintotas=sim
 
 **Example 2.** Analyse the hyperbola x^{2}/9 - y^{2}/16 = 1.
 We have a = 3 and b = 4, so c^{2} = 9 + 16 = 25, and c = 5. The foci are (5, 0) and (-5, 0). The
@@ -267,7 +323,11 @@ to the right.
 
 One practical consequence of the definition: the distance from a point of the parabola to the focus
 equals its distance to the directrix. For the parabola y^{2} = 12x, that distance is x + 3, where x
-is the abscissa of the point.
+is the abscissa of the point. In the figure, the two segments leaving P, one to the focus F and the
+other perpendicular to the directrix r, have the same length, and the vertex V sits halfway between F
+and r. The line is called r here, and not d, because in the exercises d is always a distance.
+
+@fig conica tipo=parabola p=6 focos=F vertices=V diretriz=r ponto=P;5
 
 #### Identifying the conic by completing the square
 
@@ -276,13 +336,15 @@ complete the square in x and in y until the standard form appears. The sign betw
 decides: the same sign means an ellipse, opposite signs mean a hyperbola, and a missing square means
 a parabola.
 
-**Example 4.** Identify 4x^{2} + 9y^{2} - 8x + 36y + 4 = 0.
-Grouping: 4 · (x^{2} - 2x) + 9 · (y^{2} + 4y) + 4 = 0. Completing: 4 · (x - 1)^{2} - 4 +
-9 · (y + 2)^{2} - 36 + 4 = 0, that is, 4 · (x - 1)^{2} + 9 · (y + 2)^{2} = 36. Dividing by 36:
+**Example 4.** Identify 4x^{2} + 9y^{2} - 16x - 54y + 61 = 0.
+Grouping: 4 · (x^{2} - 4x) + 9 · (y^{2} - 6y) + 61 = 0. Completing: 4 · (x - 2)^{2} - 16 +
+9 · (y - 3)^{2} - 81 + 61 = 0, that is, 4 · (x - 2)^{2} + 9 · (y - 3)^{2} = 36. Dividing by 36:
 
-(x - 1)^{2}/9 + (y + 2)^{2}/4 = 1
+(x - 2)^{2}/9 + (y - 3)^{2}/4 = 1
 
-It is an ellipse with centre (1, -2), with a = 3, b = 2 and c = √5.
+It is an ellipse with centre (2, 3), with a = 3, b = 2 and c = √5. It is the ellipse
+x^{2}/9 + y^{2}/4 = 1 shifted 2 units to the right and 3 units up: completing the square only finds
+the centre, and the curve is the same, just drawn somewhere else.
 
 #### Common mistakes
 
@@ -296,7 +358,7 @@ the larger denominator is, and it may be under y.
 focus is 2 away from the vertex, not 8.
 
 **Forgetting that the factor multiplies what was added.** When completing the square in
-4 · (x^{2} - 2x), adding 1 inside the bracket amounts to adding 4 outside it.
+4 · (x^{2} - 4x), adding 4 inside the bracket amounts to adding 16 outside it.
 
 ### Exercises
 
@@ -314,7 +376,7 @@ focus is 2 away from the vertex, not 8.
    (-3, 0), and semi major axis equal to 5.
 7. Write the standard equation of the ellipse with centre at the origin whose major axis lies on the
    horizontal axis and measures 10, and whose minor axis measures 6.
-8. Find the asymptotes and the eccentricity of the hyperbola x^{2}/9 - y^{2}/16 = 1.
+8. Find the asymptotes and the eccentricity of the hyperbola x^{2}/25 - y^{2}/144 = 1.
 9. Write the standard equation of the hyperbola with centre at the origin with foci (5, 0) and
    (-5, 0), and vertices (4, 0) and (-4, 0).
 10. Write the standard equation of the parabola with focus (0, 4) and directrix the line y = -4.
@@ -331,14 +393,13 @@ focus is 2 away from the vertex, not 8.
     and find the centre, a, b and c.
 17. Identify the conic with equation y^{2} - 8x - 6y + 25 = 0 by completing the square, and find the
     vertex, the focus and the directrix.
-18. A point lies on the ellipse x^{2}/25 + y^{2}/16 = 1 and is at distance 7 from one of the foci.
-    Find the distance from that point to the other focus, justifying your answer by the definition
-    of the ellipse.
+18. A point P of the ellipse x^{2}/25 + y^{2}/16 = 1 is at distance 7 from the focus F_{2}. Find the
+    distance d from P to the focus F_{1}, justifying your answer by the definition of the ellipse.
 19. An arch has the shape of half an ellipse, resting on the ground across an opening of 20 metres
     and reaching a height of 6 metres at the central point. Find the height of the arch at a point of
     the ground that is 8 metres from the centre of the opening.
-20. A point of the parabola y^{2} = 12x is at distance 8 from the focus. Find the coordinates of that
-    point, using the equality between the distance to the focus and the distance to the directrix.
+20. Find the coordinates of the points of the parabola y^{2} = 12x that are at distance 8 from the
+    focus, using the equality between the distance to the focus and the distance to the directrix.
 
 ### Answer key
 
@@ -349,7 +410,7 @@ focus is 2 away from the vertex, not 8.
 5. The major axis lies on the vertical axis. a = 3, b = 2 and c = √5.
 6. x^{2}/25 + y^{2}/16 = 1.
 7. x^{2}/25 + y^{2}/9 = 1.
-8. Asymptotes y = 4x/3 and y = -4x/3. Eccentricity e = 5/3.
+8. Asymptotes y = 12x/5 and y = -12x/5. Eccentricity e = 13/5.
 9. x^{2}/16 - y^{2}/9 = 1.
 10. x^{2} = 16y.
 11. Focus (-5, 0), and directrix the line x = 5.
@@ -362,11 +423,13 @@ focus is 2 away from the vertex, not 8.
     and c = √5.
 17. A parabola with equation (y - 3)^{2} = 8 · (x - 2). Vertex (2, 3), focus (4, 3), and directrix
     the line x = 0.
-18. 3. The sum of the distances to the two foci is constant and equals the major axis, that is, 10.
-    Since one of them is 7, the other is 3.
+18. d = 3. The sum of the distances to the two foci is constant and equals the major axis, that is,
+    10. Since PF_{2} is 7, PF_{1} is 3.
+    @fig conica id=k18 tipo=elipse a=5 b=4 focos=F1;F2 ponto=P;3 incognita=d fase=gabarito
 19. 3.6 metres. With the ellipse x^{2}/100 + y^{2}/36 = 1, for x = 8 the value of y^{2} is 1296/100.
 20. The points (5, 2√15) and (5, -2√15). The distance to the focus is x + 3, so x = 5 and
-    y^{2} = 60.
+    y^{2} = 60. Each of the two is 8 from the focus and 8 from the directrix, and one is the mirror
+    image of the other across the axis.
 
 ## VERIFICACAO
 
@@ -374,7 +437,7 @@ focus is 2 away from the vertex, not 8.
 X1: 25 - 9 == 16 and sqrt(16) == 4 and Rational(4,5) == Rational(4,5)
 X2: 9 + 16 == 25 and sqrt(25) == 5 and simplify(x**2/9 - (4*x/3)**2/16) == 0
 X3: Rational(12,4) == 3
-X4: expand(4*(x-1)**2 + 9*(y+2)**2 - 36) == 4*x**2 + 9*y**2 - 8*x + 36*y + 4 and 9 - 4 == 5
+X4: expand(4*(x-2)**2 + 9*(y-3)**2 - 36) == 4*x**2 + 9*y**2 - 16*x - 54*y + 61 and 9 - 4 == 5
 E1: 25 - 16 == 9 and sqrt(25) == 5 and sqrt(16) == 4 and sqrt(9) == 3
 E2: 16 + 9 == 25 and sqrt(16) == 4 and sqrt(9) == 3 and sqrt(25) == 5
 E3: Rational(8,4) == 2
@@ -382,7 +445,7 @@ E4: 100 - 64 == 36 and sqrt(36) == 6 and Rational(6,10) == Rational(3,5)
 E5: 9 - 4 == 5 and sqrt(9) == 3 and sqrt(4) == 2 and simplify(sqrt(5)) == sqrt(5)
 E6: 5**2 - 3**2 == 16 and 5**2 == 25
 E7: Rational(10,2) == 5 and Rational(6,2) == 3 and 5**2 == 25 and 3**2 == 9
-E8: simplify(x**2/9 - (4*x/3)**2/16) == 0 and sqrt(9 + 16) == 5 and Rational(5,3) == Rational(5,3)
+E8: simplify(x**2/25 - (12*x/5)**2/144) == 0 and sqrt(25 + 144) == 13 and Rational(sqrt(25 + 144), 5) == Rational(13, 5)
 E9: 5**2 - 4**2 == 9 and 4**2 == 16
 E10: expand((y+4)**2 - (y-4)**2) == 16*y
 E11: Rational(-20,4) == -5

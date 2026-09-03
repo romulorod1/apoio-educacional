@@ -3,7 +3,25 @@
  * Os dados das aulas não passam por aqui: ficam no IndexedDB, no aparelho.
  */
 
-var CACHE = 'apoio-educacional-v11';
+/* São dois caches, e é essa divisão que faz a atualização sair barata:
+ * CACHE guarda os ARQUIVOS do aplicativo e muda de nome a cada mudança da lista;
+ * BAIXADOS guarda o que só entra durante o uso, que hoje são as séries de temas
+ * (banco/serie-*.json, uma por vez, na primeira vez que a série é aberta), tem
+ * nome fixo, e o activate nunca o apaga.
+ *
+ * Antes havia um cache só e o activate apagava todo cache cujo nome não fosse o
+ * novo. As séries moram ali e não estão em ARQUIVOS de propósito, então o
+ * install não as recria: medido no Chrome, as três séries que abriam sem sinal
+ * antes de atualizar voltavam 503 depois, e no dia seguinte, na casa da família
+ * sem sinal, nenhum tema abria. Valia para todo release.
+ *
+ * O nome novo a cada mudança da lista não é etiqueta: com o nome repetido o
+ * install escreveria dentro do MESMO cache de onde a versão ativa está servindo,
+ * e o arquivo novo entraria antes de ela mandar atualizar. Foi assim de v1 a
+ * v11, um por mudança; este v12 é a entrada de './figuras/solidos.js' na lista
+ * abaixo. */
+var CACHE = 'apoio-educacional-v12';
+var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
   './',
@@ -12,14 +30,15 @@ var ARQUIVOS = [
   './core.js',
   './busca.js',
   './pdf.js',
-  /* Os CINCO arquivos do kit de figuras. Faltando um, a figura sai sem marca
-   * nenhuma e sem erro, e ela da aula na casa das familias, muitas vezes sem
-   * sinal: o que nao estiver aqui nao existe quando falta rede. */
+  /* Os SEIS arquivos do kit de figuras. Faltando um, a figura sai sem marca
+   * nenhuma e sem erro, e ela dá aula na casa das famílias, muitas vezes sem
+   * sinal: o que não estiver aqui não existe quando falta rede. */
   './figuras/base.js',
   './figuras/desenho.js',
   './figuras/marcas.js',
   './figuras/receitas.js',
   './figuras/formula.js',
+  './figuras/solidos.js',
   './store.js',
   './draw.js',
   './app.js',
@@ -28,23 +47,38 @@ var ARQUIVOS = [
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
   './icons/favicon.png',
-  // o indice dos temas entra no pacote inicial para a lista abrir sem internet.
-  // o conteudo de cada serie e guardado sozinho, na primeira vez que for usado.
+  // o índice dos temas entra no pacote inicial para a lista abrir sem internet.
+  // o conteúdo de cada série é guardado sozinho, na primeira vez que for usado.
   './banco/indice.json',
-  // o indice de busca acompanha o de temas: e ele que faz o campo de assunto
-  // achar por conteudo, e nao so por titulo.
+  // o índice de busca acompanha o de temas: é ele que faz o campo de assunto
+  // achar por conteúdo, e não só por título.
   './banco/busca.json'
 ];
 
+/* Os mesmos ARQUIVOS em endereço absoluto, que é a forma como eles aparecem
+ * como chave de cache. É o que separa o pacote do aplicativo daquilo que ela
+ * baixou durante o uso. */
+var ENDERECOS = ARQUIVOS.map(function (u) { return new URL(u, self.location.href).href; });
+function doPacote(endereco) { return ENDERECOS.indexOf(endereco) !== -1; }
+
 /* Não assume o controle sozinho: fica esperando. Quem manda trocar de versão
  * é ela, pelo aviso que aparece no aplicativo. Assim uma atualização nunca
- * recarrega a tela no meio de uma aula. */
+ * recarrega a tela no meio de uma aula.
+ *
+ * Faltando um arquivo, a instalação inteira falha, de propósito. Antes a falha
+ * de cada arquivo era engolida: com a conexão caindo no meio, uma instalação
+ * rasgada chegava a installed, o aplicativo anunciava versão nova, e o toque
+ * dela promovia o cache incompleto por cima do completo (medido: FigSolidos
+ * indefinido sem sinal, e a figura do sólido saindo muda na folha). Falhando
+ * aqui ela continua com a versão anterior inteira, e o navegador tenta de novo
+ * na abertura seguinte. */
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) {
     return Promise.all(ARQUIVOS.map(function (u) {
       return fetch(new Request(u, { cache: 'reload' })).then(function (r) {
-        if (r && r.ok) return c.put(u, r);
-      }).catch(function () { /* um arquivo a menos não impede a instalação */ });
+        if (!r || !r.ok) throw new Error('não baixou ' + u);
+        return c.put(u, r);
+      });
     }));
   }));
 });
@@ -53,12 +87,38 @@ self.addEventListener('message', function (e) {
   if (e.data && e.data.tipo === 'ativar-agora') self.skipWaiting();
 });
 
+/* Apaga os caches das versões anteriores, e nunca o BAIXADOS. Antes de apagar
+ * cada um, resgata dele para o BAIXADOS as chaves que não são do pacote: são as
+ * séries que ela já baixou e que o install não recria. Sem esse resgate, quem
+ * está numa versão anterior a esta perderia a biblioteca uma última vez. */
+function resgatarEApagar(baixados, nome) {
+  return caches.open(nome).then(function (velho) {
+    return velho.keys().then(function (chaves) {
+      return Promise.all(chaves.map(function (pedido) {
+        if (doPacote(pedido.url)) return null;
+        return velho.match(pedido).then(function (r) {
+          return r ? baixados.put(pedido, r) : null;
+        });
+      }));
+    });
+  }).then(function () {
+    return caches.delete(nome);
+  }, function () {
+    /* Se o resgate falhar, o cache antigo fica de pé: melhor guardar duas
+     * vezes do que apagar o que ela baixou. Na ativação seguinte tenta de
+     * novo, e o clients.claim() abaixo acontece de todo jeito. */
+    return null;
+  });
+}
+
 self.addEventListener('activate', function (e) {
   e.waitUntil(
-    caches.keys().then(function (nomes) {
-      return Promise.all(nomes.map(function (n) {
-        if (n !== CACHE) return caches.delete(n);
-      }));
+    caches.open(BAIXADOS).then(function (baixados) {
+      return caches.keys().then(function (nomes) {
+        return Promise.all(nomes
+          .filter(function (n) { return n !== CACHE && n !== BAIXADOS; })
+          .map(function (n) { return resgatarEApagar(baixados, n); }));
+      });
     }).then(function () { return self.clients.claim(); })
   );
 });
@@ -74,15 +134,25 @@ self.addEventListener('fetch', function (e) {
    * guardado no cache do navegador. O GitHub Pages manda guardar por dez
    * minutos, e sem isso uma versão nova podia demorar a chegar no tablet.
    * A resposta continua barata: quando nada mudou o servidor devolve
-   * apenas "sem alteração". */
+   * apenas "sem alteração".
+   *
+   * Vale para o que chega até aqui, e não é tudo: medido numa recarga da mesma
+   * aba logo depois de um deploy, nenhum dos 13 scripts e estilos do index.html
+   * passou por este handler, porque o navegador os serviu do cache dele. Quem
+   * entrega o conjunto inteiro e coerente é o botão de atualizar, que troca de
+   * service worker e recarrega. */
   e.respondWith(
     fetch(e.request, { cache: 'no-cache' }).then(function (resposta) {
       if (resposta && resposta.status === 200 && resposta.type === 'basic') {
         var copia = resposta.clone();
-        caches.open(CACHE).then(function (c) { c.put(e.request, copia); });
+        // cada um no seu cache: o pacote no CACHE, o baixado durante o uso no BAIXADOS.
+        caches.open(doPacote(e.request.url) ? CACHE : BAIXADOS).then(function (c) {
+          c.put(e.request, copia);
+        });
       }
       return resposta;
     }).catch(function () {
+      // caches.match sem nome procura nos dois, então a série baixada aparece aqui.
       return caches.match(e.request).then(function (achado) {
         if (achado) return achado;
         if (e.request.mode === 'navigate') return caches.match('./index.html');
