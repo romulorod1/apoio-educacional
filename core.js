@@ -1207,7 +1207,7 @@
     }
 
     L.push('');
-    L.push('## Resumo do mês');
+    L.push('## Feedback');
     L.push('');
     L.push(f.resumoTexto ? f.resumoTexto : '(a preencher)');
 

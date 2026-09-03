@@ -988,7 +988,7 @@
       var sobra = doc.y - Y_LIMITE;
       if (alturaResumo > sobra && alturaResumo <= (Y_TOPO - Y_LIMITE)) doc.novaPagina();
 
-      doc.texto('Resumo do mês', MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
+      doc.texto('Feedback', MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
       doc.y -= 4;
       doc.linha(MARG_E, doc.y, MARG_E + 70, doc.y, COR.teal, 1.2);
       doc.y -= 8;

@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.10.0';
+  var VERSAO = '1.10.1';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -18,6 +18,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.10.1',
+      itens: [
+        'A segunda seção do fechamento deixou de se chamar Resumo do mês e passou a se chamar ' +
+          'Feedback, como você pediu. É o mesmo campo, no mesmo lugar, e o que você já escreveu ' +
+          'continua lá.'
+      ]
+    },
     {
       versao: '1.10.0',
       itens: [
@@ -3512,7 +3520,7 @@
       cartao.appendChild(el('div', { class: 'barra', style: 'margin:12px 0 0' }, [
         el('button', {
           type: 'button', class: 'btn' + (temResumo ? '' : ' destaque'),
-          texto: temResumo ? 'Editar resumo do mês' : 'Escrever o resumo do mês',
+          texto: temResumo ? 'Editar o feedback' : 'Escrever o feedback',
           aoClick: function () { abrirResumo(f.aluno.id, mesAtual); }
         }),
         el('span', { class: 'cresce' }),
@@ -3533,7 +3541,7 @@
       if (!temResumo) {
         cartao.appendChild(el('div', {
           class: 'ajuda', style: 'margin:8px 0 0',
-          texto: 'O resumo do mês ainda não foi escrito. Ele entra no PDF logo abaixo da tabela.'
+          texto: 'O feedback ainda não foi escrito. Ele entra no PDF logo abaixo da tabela.'
         }));
       }
 
@@ -3544,7 +3552,7 @@
   function abrirResumo(alunoId, mes) {
     var aluno = alunoPorId(alunoId);
     var registro = db.resumos.filter(function (r) { return r.alunoId === alunoId && r.mes === mes; })[0];
-    $('#titulo-modal-resumo').textContent = 'Resumo de ' + aluno.nome + ', ' + Core.mesExtenso(mes);
+    $('#titulo-modal-resumo').textContent = 'Feedback de ' + aluno.nome + ', ' + Core.mesExtenso(mes);
     var corpo = $('#corpo-modal-resumo');
     corpo.innerHTML = '';
     corpo.appendChild(el('div', {
