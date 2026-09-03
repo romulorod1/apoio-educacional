@@ -37,9 +37,10 @@ x^{2}/a^{2} + y^{2}/b^{2} = 1
 
 Aqui a é o semieixo maior, b é o semieixo menor e c é a distância do centro a cada foco. Na figura,
 F_{1} e F_{2} são os focos e P é um ponto qualquer da elipse: a soma PF_{1} + PF_{2} é a mesma para
-todo ponto P da curva, e vale 2a.
+todo ponto P da curva, e vale 2a, que é a distância entre as duas pontas do eixo maior, marcadas na
+figura.
 
-@fig conica tipo=elipse b=b focos=F1;F2 vertices=sim ponto=P
+@fig conica tipo=elipse focos=F1;F2 vertices=sim ponto=P
 
 A relação entre a, b e c é a relação fundamental da elipse:
 
@@ -69,7 +70,8 @@ x^{2}/a^{2} - y^{2}/b^{2} = 1
 
 Repare no sinal de menos, que é o que distingue a hipérbole da elipse à primeira vista. Na
 figura, F_{1} e F_{2} são os focos e P é um ponto qualquer da hipérbole: a diferença entre
-PF_{2} e PF_{1}, em módulo, é a mesma para todo ponto P da curva, e vale 2a.
+PF_{2} e PF_{1}, em módulo, é a mesma para todo ponto P da curva, e vale 2a, que é a distância entre
+os dois vértices, marcados com A_{1} e A_{2} na figura seguinte.
 
 @fig conica tipo=hiperbole a=4 b=3 focos=F1;F2 ponto=P
 
@@ -110,9 +112,10 @@ Como 4p = 12, p = 3. O foco é (3, 0) e a diretriz é a reta x = -3. A parábola
 Uma consequência prática da definição: a distância de um ponto da parábola ao foco é igual à
 distância dele à diretriz. Para a parábola y^{2} = 12x, essa distância vale x + 3, sendo x a
 abscissa do ponto. Na figura, os dois segmentos que saem de P, um até o foco F e outro perpendicular
-até a diretriz d, têm o mesmo comprimento, e o vértice V fica no meio do caminho entre F e d.
+até a diretriz r, têm o mesmo comprimento, e o vértice V fica no meio do caminho entre F e r. A reta
+se chama r aqui, e não d, porque nos exercícios o d é sempre uma distância.
 
-@fig conica tipo=parabola p=6 focos=F vertices=V diretriz=d ponto=P
+@fig conica tipo=parabola p=6 focos=F vertices=V diretriz=r ponto=P;5
 
 #### Identificar a cônica completando quadrados
 
@@ -127,11 +130,9 @@ Agrupando: 4 · (x^{2} - 4x) + 9 · (y^{2} - 6y) + 61 = 0. Completando: 4 · (x 
 
 (x - 2)^{2}/9 + (y - 3)^{2}/4 = 1
 
-É uma elipse de centro (2, 3), com a = 3, b = 2 e c = √5. Na figura, ela é a elipse
-x^{2}/9 + y^{2}/4 = 1 deslocada 2 unidades para a direita e 3 para cima: completar quadrados só
-encontra o centro, e a curva é a mesma.
-
-@fig conica tipo=elipse a=3 b=2 eixos=sim centro=2;3;C
+É uma elipse de centro (2, 3), com a = 3, b = 2 e c = √5. Ela é a elipse x^{2}/9 + y^{2}/4 = 1
+deslocada 2 unidades para a direita e 3 para cima: completar quadrados só encontra o centro, e a
+curva é a mesma, só desenhada em outro lugar.
 
 #### Erros comuns
 
@@ -180,9 +181,8 @@ somar 4 dentro do parêntese equivale a somar 16 fora dele.
     determine o centro, a, b e c.
 17. Identifique a cônica de equação y^{2} - 8x - 6y + 25 = 0, completando quadrados, e determine o
     vértice, o foco e a diretriz.
-18. O ponto P da figura pertence à elipse x^{2}/25 + y^{2}/16 = 1 e dista 7 do foco F_{2}. Determine
-    a distância d de P ao foco F_{1}, justificando pela definição da elipse.
-    @fig conica id=k18 tipo=elipse a=5 b=4 focos=F1;F2 ponto=P;3 incognita=d
+18. Um ponto P da elipse x^{2}/25 + y^{2}/16 = 1 dista 7 do foco F_{2}. Determine a distância d de P
+    ao foco F_{1}, justificando pela definição da elipse.
 19. Um arco tem a forma de metade de uma elipse, apoiado no chão numa abertura de 20 metros e com
     altura de 6 metros no ponto central. Calcule a altura do arco num ponto do chão que fica a 8
     metros do centro da abertura.
@@ -213,10 +213,10 @@ somar 4 dentro do parêntese equivale a somar 16 fora dele.
     x = 0.
 18. d = 3. A soma das distâncias aos dois focos é constante e vale o eixo maior, ou seja, 10. Como
     PF_{2} vale 7, PF_{1} vale 3.
-    @fig id=k18 fase=gabarito
+    @fig conica id=k18 tipo=elipse a=5 b=4 focos=F1;F2 ponto=P;3 incognita=d fase=gabarito
 19. 3,6 metros. Com a elipse x^{2}/100 + y^{2}/36 = 1, para x = 8 o valor de y^{2} é 1296/100.
-20. Os pontos (5, 2√15) e (5, -2√15). A distância ao foco vale x + 3, então x = 5 e y^{2} = 60.
-    @fig conica id=k20 tipo=parabola p=6 focos=F ponto=P;8 fase=gabarito legenda=P fica a 8 do foco e a 8 da diretriz. O outro ponto é o simétrico de P em relação ao eixo.
+20. Os pontos (5, 2√15) e (5, -2√15). A distância ao foco vale x + 3, então x = 5 e y^{2} = 60. Cada
+    um dos dois fica a 8 do foco e a 8 da diretriz, e um é o simétrico do outro em relação ao eixo.
 
 ## EN
 
@@ -246,9 +246,10 @@ x^{2}/a^{2} + y^{2}/b^{2} = 1
 
 Here a is the semi major axis, b is the semi minor axis and c is the distance from the centre to each
 focus. In the figure, F_{1} and F_{2} are the foci and P is any point of the ellipse: the sum
-PF_{1} + PF_{2} is the same for every point P of the curve, and it equals 2a.
+PF_{1} + PF_{2} is the same for every point P of the curve, and it equals 2a, the distance between
+the two ends of the major axis, marked in the figure.
 
-@fig conica tipo=elipse b=b focos=F1;F2 vertices=sim ponto=P
+@fig conica tipo=elipse focos=F1;F2 vertices=sim ponto=P
 
 The relation between a, b and c is the fundamental relation of the ellipse:
 
@@ -279,7 +280,7 @@ x^{2}/a^{2} - y^{2}/b^{2} = 1
 Notice the minus sign, which is what tells a hyperbola from an ellipse at first glance. In the
 figure, F_{1} and F_{2} are the foci and P is any point of the hyperbola: the difference between
 PF_{2} and PF_{1}, in absolute value, is the same for every point P of the curve, and it equals
-2a.
+2a, the distance between the two vertices, marked A_{1} and A_{2} in the next figure.
 
 @fig conica tipo=hiperbole a=4 b=3 focos=F1;F2 ponto=P
 
@@ -323,10 +324,10 @@ to the right.
 One practical consequence of the definition: the distance from a point of the parabola to the focus
 equals its distance to the directrix. For the parabola y^{2} = 12x, that distance is x + 3, where x
 is the abscissa of the point. In the figure, the two segments leaving P, one to the focus F and the
-other perpendicular to the directrix d, have the same length, and the vertex V sits halfway between F
-and d.
+other perpendicular to the directrix r, have the same length, and the vertex V sits halfway between F
+and r. The line is called r here, and not d, because in the exercises d is always a distance.
 
-@fig conica tipo=parabola p=6 focos=F vertices=V diretriz=d ponto=P
+@fig conica tipo=parabola p=6 focos=F vertices=V diretriz=r ponto=P;5
 
 #### Identifying the conic by completing the square
 
@@ -341,11 +342,9 @@ Grouping: 4 · (x^{2} - 4x) + 9 · (y^{2} - 6y) + 61 = 0. Completing: 4 · (x - 
 
 (x - 2)^{2}/9 + (y - 3)^{2}/4 = 1
 
-It is an ellipse with centre (2, 3), with a = 3, b = 2 and c = √5. In the figure, it is the ellipse
+It is an ellipse with centre (2, 3), with a = 3, b = 2 and c = √5. It is the ellipse
 x^{2}/9 + y^{2}/4 = 1 shifted 2 units to the right and 3 units up: completing the square only finds
-the centre, and the curve is the same.
-
-@fig conica tipo=elipse a=3 b=2 eixos=sim centro=2;3;C
+the centre, and the curve is the same, just drawn somewhere else.
 
 #### Common mistakes
 
@@ -394,10 +393,8 @@ focus is 2 away from the vertex, not 8.
     and find the centre, a, b and c.
 17. Identify the conic with equation y^{2} - 8x - 6y + 25 = 0 by completing the square, and find the
     vertex, the focus and the directrix.
-18. The point P in the figure lies on the ellipse x^{2}/25 + y^{2}/16 = 1 and is at distance 7 from
-    the focus F_{2}. Find the distance d from P to the focus F_{1}, justifying your answer by the
-    definition of the ellipse.
-    @fig conica id=k18 tipo=elipse a=5 b=4 focos=F1;F2 ponto=P;3 incognita=d
+18. A point P of the ellipse x^{2}/25 + y^{2}/16 = 1 is at distance 7 from the focus F_{2}. Find the
+    distance d from P to the focus F_{1}, justifying your answer by the definition of the ellipse.
 19. An arch has the shape of half an ellipse, resting on the ground across an opening of 20 metres
     and reaching a height of 6 metres at the central point. Find the height of the arch at a point of
     the ground that is 8 metres from the centre of the opening.
@@ -428,11 +425,11 @@ focus is 2 away from the vertex, not 8.
     the line x = 0.
 18. d = 3. The sum of the distances to the two foci is constant and equals the major axis, that is,
     10. Since PF_{2} is 7, PF_{1} is 3.
-    @fig id=k18 fase=gabarito
+    @fig conica id=k18 tipo=elipse a=5 b=4 focos=F1;F2 ponto=P;3 incognita=d fase=gabarito
 19. 3.6 metres. With the ellipse x^{2}/100 + y^{2}/36 = 1, for x = 8 the value of y^{2} is 1296/100.
 20. The points (5, 2√15) and (5, -2√15). The distance to the focus is x + 3, so x = 5 and
-    y^{2} = 60.
-    @fig conica id=k20 tipo=parabola p=6 focos=F ponto=P;8 fase=gabarito legenda=P is 8 from the focus and 8 from the directrix. The other point is the mirror image of P across the axis.
+    y^{2} = 60. Each of the two is 8 from the focus and 8 from the directrix, and one is the mirror
+    image of the other across the axis.
 
 ## VERIFICACAO
 

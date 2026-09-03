@@ -97,10 +97,15 @@ roda "busca (regras)" node _teste/testa_busca_regras.js
 roda "material (PDF)" node _teste/testa_material.js
 
 # As provas do kit de figuras nao rodavam aqui. Duas delas estavam falhando
-# havia dias (_base_prova_travas, 34 de 36) e ninguem viu, porque so o
-# verificar.py e as suites de _teste entravam no portao. Regressao no kit
-# passaria pelo merge. Cada prova imprime "N passaram, M falharam"; a
-# _prova_desenho imprime so "avisos: N", e e conferida por esse token.
+# desde o commit que as criou, algumas horas antes (_base_prova_travas, 34 de
+# 36: ce5d842 as 17:56 e o conserto as 01:42 do dia seguinte, 7h46), e ninguem
+# viu, porque so o verificar.py e as suites de _teste entravam no portao.
+# Regressao no kit passaria pelo merge. Cada prova imprime "N passaram, M
+# falharam"; a _prova_desenho imprime so "avisos: N", e e conferida por esse
+# token. Nem todas as provas de figuras/ entram: as que dizem "nenhuma reprova"
+# ou "todos os resultados como esperado" o `roda` nao sabe ler, e o
+# _audita_receitas_gab reprova hoje (dois arcos rotulados com angulo diferente
+# do que varrem, na main tambem). Entram as que imprimem contagem.
 titulo "kit de figuras"
 roda "fundacao"         node figuras/_prova_fundacao.js
 roda "marcas"           node figuras/_prova_marcas.js
@@ -115,6 +120,7 @@ roda "piloto MAT07-12"  node figuras/_piloto_MAT07-12.js
 roda "receitas sol."    node figuras/_prova_receitas_solidos.js
 roda "piloto MAT08-13"  node figuras/_piloto_MAT08-13.js
 roda "piloto MATEM3-04" node figuras/_piloto_MATEM3-04.js
+roda "tinta"            node figuras/_prova_desenho_tinta.js
 saida=$(node figuras/_prova_desenho.js 2>&1) || true
 if printf '%s\n' "$saida" | grep -qE "^avisos: 0$" && printf '%s\n' "$saida" | grep -qE "^vazamentos de estado: 0$"; then
   printf '  ok      %-24s %s\n' "desenho" "$(printf '%s\n' "$saida" | grep -E '^figuras:' | head -1)"
@@ -123,41 +129,90 @@ else
   falhou=1
 fi
 
+# O testa_atualizacao_real entra aqui porque e o UNICO que percorre uma transicao
+# de versao de verdade, com os cabecalhos reais do GitHub Pages (max-age=600 e
+# ETag) e o cache do navegador quente e vencido. Ele ficou de fora justamente da
+# rodada cujo tema era o nome do cache do service worker. Ele nao imprime
+# "N falharam": diz "ATUALIZACAO CONFIRMADA..." quando passa, e o `roda` aceita
+# pelo CONFIRMAD; quando falha imprime "N FALHA(S)", sem CONFIRMAD, e reprova.
 titulo "com navegador"
 for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento \
-         testa_perfil testa_olho testa_atualizacao testa_exclusoes testa_feriados \
-         testa_mover testa_retroativo testa_series; do
+         testa_perfil testa_olho testa_atualizacao testa_atualizacao_real \
+         testa_exclusoes testa_feriados testa_mover testa_retroativo testa_series; do
   roda "$t" node "_teste/$t.js"
 done
 
-# O nome do cache do sw.js tem que mudar quando a lista de ARQUIVOS muda. Nos
-# dez commits que mexeram no sw.js a constante CACHE foi promovida toda vez (v1
-# ate v11); nesta rodada a lista ganhou o figuras/solidos.js e o nome ficou
-# parado em v11, e ninguem viu. Sem nome novo o install abre caches.open(CACHE)
-# no MESMO cache de onde a versao ATIVA esta servindo e da put() em cada
-# arquivo, entao o codigo novo entra la antes de ela mandar atualizar; e como o
-# .catch() por arquivo deixa a instalacao dar certo quando a conexao cai no
-# meio, o cache vivo fica parte novo e parte velho justamente para quem da aula
-# na casa das familias sem sinal. Com nome novo o cache anterior fica inteiro
-# ate o activate.
+# Duas conferencias aqui, e a primeira e a que pega o defeito de verdade.
 #
-# A comparacao e com o sw.js do HEAD: ela pega a mudanca que ainda nao foi
-# comitada, que e onde o esquecimento acontece. Numa copia do repo sem
-# historico a conferencia sai INSTAVEL, nunca ok silencioso.
+# 1) O pacote offline tem DUAS listas que precisam bater: os <script src=
+# "figuras/*.js"> do index.html e a lista ARQUIVOS do sw.js. Ela da aula na casa
+# das familias, muitas vezes sem sinal: arquivo que o index.html carrega e o
+# cache nao guarda vira 503 quando falta rede, e some calado, porque cada modulo
+# de figuras procura o global do vizinho e, nao achando, desiste sem erro. A
+# figura sai sem marca nenhuma e so se descobre na folha impressa. Por isso a
+# conferencia sai dos DOIS arquivos de HOJE. A versao anterior comparava o sw.js
+# com o sw.js e nunca olhou o index.html: nao veria isso nunca.
+#
+# 2) O nome do cache tem que mudar quando a lista muda. Nos dez commits que
+# mexeram no sw.js a constante CACHE foi promovida toda vez (v1 ate v11); depois
+# a lista ganhou o figuras/solidos.js e o nome quase ficou parado. Sem nome novo
+# o install abre caches.open(CACHE) no MESMO cache de onde a versao ATIVA esta
+# servindo e da put() em cada arquivo, entao o codigo novo entra la antes de ela
+# mandar atualizar; e como o .catch() por arquivo deixa a instalacao dar certo
+# quando a conexao cai no meio, o cache vivo fica parte novo e parte velho.
+# Com nome novo o cache anterior fica inteiro ate o activate.
+#
+# A comparacao e com a BASE DO MERGE, e nao com o HEAD. Numa branch ja comitada,
+# que e o unico estado em que este portao roda de verdade, o HEAD e igual a
+# arvore por construcao: a versao anterior comparava o arquivo consigo mesmo e
+# imprimia ok sem ter afirmado nada. Sem base (copia do repo sem historico) sai
+# INSTAVEL, nunca ok silencioso.
 titulo "cache do aplicativo"
-sw_antes=$(git show HEAD:sw.js 2>/dev/null | tr -d '\r' || true)
-sw_agora=$(tr -d '\r' < sw.js 2>/dev/null || true)
 lista_sw() { printf '%s\n' "$1" | sed -n '/^var ARQUIVOS = \[/,/^\];/p'; }
 nome_sw()  { printf '%s\n' "$1" | sed -n "s/^var CACHE = '\(.*\)';.*/\1/p" | head -1; }
-if [ -z "$sw_antes" ] || [ -z "$sw_agora" ]; then
-  printf '  INSTAVEL %-23s sem sw.js no HEAD para comparar\n' "nome do cache"
-  instavel=1
-elif [ "$(lista_sw "$sw_agora")" = "$(lista_sw "$sw_antes")" ]; then
-  printf '  ok      %-24s a lista de arquivos nao mudou\n' "nome do cache"
-elif [ "$(nome_sw "$sw_agora")" != "$(nome_sw "$sw_antes")" ]; then
-  printf '  ok      %-24s lista nova, cache %s\n' "nome do cache" "$(nome_sw "$sw_agora")"
+# So as ENTRADAS da lista: linha que e um caminho entre aspas, e nada de
+# comentario. Procurar o nome no arquivo inteiro nao serve: um comentario do
+# proprio sw.js que cite './figuras/solidos.js' satisfaria a trava sozinho.
+entradas_sw() { printf '%s\n' "$1" | sed -n "s|^ *'\(\./\)\{0,1\}\([^']*\)' *,\{0,1\} *\$|\2|p"; }
+
+sw_agora=$(tr -d '\r' < sw.js 2>/dev/null || true)
+lista_agora=$(entradas_sw "$(lista_sw "$sw_agora")")
+figs_html=$(grep -oE 'src="figuras/[A-Za-z0-9_.-]+\.js"' index.html 2>/dev/null \
+  | sed 's|.*figuras/||; s|"$||' | sort -u)
+if [ -z "$lista_agora" ] || [ -z "$figs_html" ]; then
+  printf '  FALHOU  %-24s nao achei a lista ARQUIVOS no sw.js ou os scripts de figuras no index.html\n' \
+    "kit no cache"
+  falhou=1
 else
-  printf '  FALHOU  %-24s a lista de ARQUIVOS mudou e o cache continua %s\n' \
+  fora=""
+  for f in $figs_html; do
+    printf '%s\n' "$lista_agora" | grep -Fqx "figuras/$f" || fora="$fora $f"
+  done
+  if [ -z "$fora" ]; then
+    printf '  ok      %-24s os %s arquivos de figuras do index.html estao na lista do sw.js\n' \
+      "kit no cache" "$(printf '%s\n' "$figs_html" | wc -l | tr -d ' ')"
+  else
+    printf '  FALHOU  %-24s o index.html carrega e o sw.js nao guarda:%s\n' "kit no cache" "$fora"
+    falhou=1
+  fi
+fi
+
+base=$(git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD main 2>/dev/null || true)
+[ -n "$base" ] || base=$(git rev-parse --verify -q origin/main 2>/dev/null || true)
+[ -n "$base" ] || base=$(git rev-parse --verify -q main 2>/dev/null || true)
+sw_antes=""
+if [ -n "$base" ]; then
+  sw_antes=$(git show "$base:sw.js" 2>/dev/null | tr -d '\r' || true)
+fi
+if [ -z "$sw_antes" ] || [ -z "$sw_agora" ]; then
+  printf '  INSTAVEL %-23s sem base de merge com sw.js para comparar\n' "nome do cache"
+  instavel=1
+elif [ "$lista_agora" = "$(entradas_sw "$(lista_sw "$sw_antes")")" ]; then
+  printf '  ok      %-24s a lista nao mudou desde a base do merge\n' "nome do cache"
+elif [ "$(nome_sw "$sw_agora")" != "$(nome_sw "$sw_antes")" ]; then
+  printf '  ok      %-24s lista nova desde a base, cache %s\n' "nome do cache" "$(nome_sw "$sw_agora")"
+else
+  printf '  FALHOU  %-24s a lista de ARQUIVOS mudou desde a base do merge e o cache continua %s\n' \
     "nome do cache" "$(nome_sw "$sw_agora")"
   falhou=1
 fi

@@ -39,10 +39,13 @@
  * envolvente, um rotulo deitado sobre um lado obliquo era empurrado quase 30 pt
  * para fora do lado que ele nomeia.
  *
- * E o halo do rotulo, que e branco chapado e sai por ultimo, nao pode comer a
- * figura: antes de pintar, o retangulo dele e testado contra o que ja foi
- * desenhado e o rotulo anda o minimo que baste para ficar livre. Ver a secao "o
- * halo contra o contorno".
+ * E o halo do rotulo, que e chapado e sai por ultimo, nao pode comer a figura:
+ * antes de pintar, o retangulo dele e testado contra o que ja foi desenhado e o
+ * rotulo anda o minimo que baste para ficar livre. Ver a secao "o halo contra o
+ * contorno". A tinta dele e branca sobre papel branco e a cor da REGIAO quando
+ * ele cai dentro de uma area pintada, senao ele abre um buraco de canto vivo
+ * justamente na regiao que a pergunta esta apontando. Ver a secao "o fundo por
+ * baixo do halo".
  *
  * Roda no navegador por <script> (exporta FigDesenho no global) e no Node.
  *
@@ -496,6 +499,11 @@
       doc.op(caminho + fim);
     });
 
+    /* O que foi PINTADO fica anotado no doc, para o halo de um rotulo pousado
+     * aqui dentro sair na tinta da regiao em vez de abrir um buraco branco nela.
+     * Ver a secao "o fundo por baixo do halo". */
+    if (preenche) registrarArea(doc, [pts].concat(furos), preenche);
+
     var reg = {
       tipo: 'poligono', pontos: pts, furos: furos, fechado: fechado,
       espessura: contorna ? espessura : 0, papel: papel,
@@ -637,6 +645,14 @@
       setor: setor, corda: corda, espessura: contorna ? espessura : 0,
       papel: papel, inicio: inicio, fim: fim
     };
+    /* Idem ao poligono: o disco, o setor e o segmento circular pintados entram
+     * na lista de areas do doc, poligonizados de 6 em 6 graus, que e a mesma
+     * aproximacao que o obstaculosDoRotulo ja usa (flecha de 0,0014 do raio). */
+    if (preenche) {
+      var anel = arcoPontos(C, rx, ry, g0, g0 + varre, { passo: 6, giro: giro });
+      if (setor) anel = [C].concat(anel);
+      registrarArea(doc, [anel], preenche);
+    }
     A.anota(reg.papel === 'marca' ? 'marca' : 'traco', reg);
     return reg;
   }
@@ -1016,7 +1032,16 @@
 
     var precisaChamada = op.chamada === true || (puxou && op.chamada !== false);
 
-    B.comEstado(doc, { cor: cor, preenchimento: COR.branco }, function () {
+    /* A tinta do halo, decidida depois de o rotulo ja ter parado onde vai ficar:
+     * a cor da regiao pintada por baixo dele, quando ele cai inteiro dentro de
+     * uma e o texto continua legivel ali; branco no resto, que e o caso comum. */
+    var tintaHalo = COR.branco;
+    if (op.halo !== false) {
+      var fundo = corSobAcaixa(doc, cantosDaCaixa(cx, cy, haloW, haloH, giro));
+      if (fundo && contrasteEntre(cor, fundo) >= CONTRASTE_TEXTO) tintaHalo = fundo;
+    }
+
+    B.comEstado(doc, { cor: cor, preenchimento: tintaHalo }, function () {
       if (precisaChamada) {
         /* O fio para na BORDA da caixa e nao no centro dela, senao ele passa por
          * baixo do halo e reaparece do outro lado do numero.
@@ -1037,7 +1062,7 @@
           }
         }
       }
-      if (op.halo !== false) desenharHalo(doc, COR, cx, cy, haloW, haloH, giro);
+      if (op.halo !== false) desenharHalo(doc, tintaHalo, cx, cy, haloW, haloH, giro);
       if (giro) escreverGirado(doc, g, txt, cx, cy, tam, cor, !!op.bold, giro);
       else doc.texto(txt, cx, cy - CENTRO_OPTICO * tam, {
         tam: tam, bold: !!op.bold, cor: cor, align: 'centro'
@@ -1062,25 +1087,130 @@
     return reg;
   }
 
-  /* Halo branco por baixo, dimensionado por medir(). Sem ele o rotulo cruza a
+  /* Halo por baixo, dimensionado por medir(). Sem ele o rotulo cruza a
    * hachura, a malha e o proprio lado do poligono, e o que sobra e um borrao que
    * nao se le em fotocopia. Girado, o halo tem que girar junto: um retangulo
    * alinhado aos eixos por baixo de um texto a 40 graus apaga um pedaco da
-   * figura que ninguem pediu para apagar. */
-  function desenharHalo(doc, COR, cx, cy, hw, hh, giro) {
+   * figura que ninguem pediu para apagar.
+   *
+   * A tinta e branca por padrao e NAO por definicao: sobre regiao preenchida ela
+   * e a cor da propria regiao. Ver a secao "o fundo por baixo do halo". */
+  function desenharHalo(doc, tinta, cx, cy, hw, hh, giro) {
     if (!giro) {
-      doc.op(base().cor3(COR.branco) + ' rg ' +
+      doc.op(base().cor3(tinta) + ' rg ' +
         n2(cx - hw) + ' ' + n2(cy - hh) + ' ' + n2(2 * hw) + ' ' + n2(2 * hh) + ' re f');
       return;
     }
-    var co = Math.cos(rad(giro)), se = Math.sin(rad(giro));
-    var cantos = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]], s = '';
+    var s = '', cantos = cantosDaCaixa(cx, cy, hw, hh, giro);
     for (var i = 0; i < 4; i++) {
-      var x = cx + cantos[i][0] * co - cantos[i][1] * se;
-      var y = cy + cantos[i][0] * se + cantos[i][1] * co;
-      s += n2(x) + ' ' + n2(y) + (i === 0 ? ' m ' : ' l ');
+      s += n2(cantos[i].x) + ' ' + n2(cantos[i].y) + (i === 0 ? ' m ' : ' l ');
     }
-    doc.op(base().cor3(COR.branco) + ' rg ' + s + 'h f');
+    doc.op(base().cor3(tinta) + ' rg ' + s + 'h f');
+  }
+
+  function cantosDaCaixa(cx, cy, hw, hh, giro) {
+    var co = Math.cos(rad(giro || 0)), se = Math.sin(rad(giro || 0));
+    var c = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]], saida = [];
+    for (var i = 0; i < 4; i++) {
+      saida.push(pt(cx + c[i][0] * co - c[i][1] * se, cy + c[i][0] * se + c[i][1] * co));
+    }
+    return saida;
+  }
+
+  /* ================================================ o fundo por baixo do halo
+   *
+   * O halo era branco chapado SEMPRE, e branco chapado dentro de uma regiao
+   * pintada e um buraco. Medido no alvo do MAT08-13 (exercicio 20, material p7 e
+   * lista p4): o rotulo "2" abre uma caixa de 7,93 por 9,86 pt de branco dentro
+   * do disco central, que sai em #8B94A1 cheio, e o canto direito dessa caixa
+   * para a 1,25 pt do eixo da circunferencia de raio 2, ou seja a 0,65 pt da
+   * borda interna do traco de 1,2 pt. Ampliado a 1400 dpi o disco aparece com um
+   * pedaco quadrado mordido na borda: na folha impressa e um adesivo branco
+   * colado no alvo, e o disco central e uma das TRES regioes que o exercicio
+   * manda identificar e calcular. O mesmo acontecia com o "60" da pista do
+   * exercicio 16, que abre um retangulo branco dentro da regiao tingida.
+   *
+   * O conserto nao e tirar o halo (sem ele a hachura corta a letra) nem
+   * arredondar o canto (o buraco continua, so que com o canto redondo): e pintar
+   * o halo na cor do que esta EMBAIXO. Sobre papel branco isso e o branco de
+   * hoje, byte por byte; sobre regiao pintada e a tinta da regiao, e ai o halo
+   * some de vista e continua fazendo o trabalho dele, que e nao deixar a hachura
+   * cortar o numero.
+   *
+   * Para isso o preenchimento precisa ficar anotado em algum lugar, e o lugar
+   * NAO pode ser o registro da figura: o preenchimento de regiao do banco sai
+   * pelo hachurar() do marcas.js chamado com o ctx.doc, e nao com o ctx, entao
+   * ele nunca chega ao registro (medido: as duas areas chapadas do MAT08-13 nao
+   * aparecem em registro.marcas). A anotacao vai no proprio doc, marcada com a
+   * pagina em que foi pintada, que e o que impede uma area da pagina 1 responder
+   * por um rotulo da pagina 5 nas mesmas coordenadas.
+   *
+   * A troca so acontece se o texto continuar legivel sobre aquela tinta: 4,5:1,
+   * que e o criterio da WCAG para texto e nao os 3:1 de objeto grafico, porque
+   * aqui o que esta em jogo E texto. Abaixo disso o halo volta a ser branco, que
+   * e o comportamento de hoje, com o buraco e tudo: entre um buraco e um numero
+   * que nao se le, o buraco perde menos. */
+  var CONTRASTE_TEXTO = 4.5;
+
+  function registrarArea(doc, contornos, cor) {
+    if (!doc || !cor || !contornos || !contornos.length) return null;
+    var limpos = [];
+    for (var i = 0; i < contornos.length; i++) {
+      if (contornos[i] && contornos[i].length >= 3) limpos.push(contornos[i]);
+    }
+    if (!limpos.length) return null;
+    var area = { pag: doc.pag || null, contornos: limpos, cor: cor };
+    (doc.areasPintadas = doc.areasPintadas || []).push(area);
+    return area;
+  }
+
+  /* Regra par e impar, que e a mesma do f* com que a coroa, o furo e a pista sao
+   * pintados: um ponto no furo conta como fora, e e por isso que um rotulo em
+   * cima do furo nao ganha halo colorido. */
+  function dentroDosContornos(contornos, x, y) {
+    var dentro = false;
+    for (var c = 0; c < contornos.length; c++) {
+      var p = contornos[c];
+      for (var i = 0, j = p.length - 1; i < p.length; j = i++) {
+        if (((p[i].y > y) !== (p[j].y > y)) &&
+            (x < (p[j].x - p[i].x) * (y - p[i].y) / (p[j].y - p[i].y) + p[i].x)) dentro = !dentro;
+      }
+    }
+    return dentro;
+  }
+
+  /* A caixa esta INTEIRA dentro da area? Nove pontos e nao quatro: os quatro
+   * cantos, os quatro meios de lado e o centro. Com so os cantos, uma caixa que
+   * atravessasse o furo de uma coroa de lado a lado passaria por dentro, e o
+   * halo colorido taparia o furo. */
+  function caixaNaArea(area, cantos) {
+    var teste = cantos.slice();
+    for (var i = 0; i < 4; i++) {
+      teste.push(pt((cantos[i].x + cantos[(i + 1) % 4].x) / 2,
+                    (cantos[i].y + cantos[(i + 1) % 4].y) / 2));
+    }
+    teste.push(pt((cantos[0].x + cantos[2].x) / 2, (cantos[0].y + cantos[2].y) / 2));
+    for (var t = 0; t < teste.length; t++) {
+      if (!dentroDosContornos(area.contornos, teste[t].x, teste[t].y)) return false;
+    }
+    return true;
+  }
+
+  /* Da ULTIMA area pintada para a primeira, porque a de cima e a que se ve. */
+  function corSobAcaixa(doc, cantos) {
+    var lista = doc && doc.areasPintadas;
+    if (!lista || !lista.length) return null;
+    for (var i = lista.length - 1; i >= 0; i--) {
+      var a = lista[i];
+      if (a.pag && doc.pag && a.pag !== doc.pag) continue;
+      if (caixaNaArea(a, cantos)) return a.cor;
+    }
+    return null;
+  }
+
+  function contrasteEntre(a, b) {
+    var la = luminancia(a), lb = luminancia(b);
+    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
   }
 
   /* Texto girado sai por matriz Tm, e nao por cm: o cm escalaria a espessura de
@@ -1672,11 +1802,13 @@
       /* Vao curto demais para caber as duas cabecas mais o numero: as pontas
        * viram para fora e apontam para dentro, que e a saida do desenho tecnico
        * e a unica que nao sobrepoe as duas cabecas uma na outra. */
-      var precisa = g.medir(String(texto == null ? '' : texto), tam, false) + 2 * CABECA + 6;
+      var txtCota = String(texto == null ? '' : texto);
+      var precisa = g.medir(txtCota, tam, false) + 2 * CABECA + 6;
+      var curto = txtCota.trim() && comprimento < precisa;
       /* As setas vao pelo doc e nao pelo ctx pelo mesmo motivo do anel do ponto:
        * a cota inteira ja entrou no registro como um traco so, e o que a aluna le
        * nela e o numero. */
-      if (comprimento >= precisa || !String(texto == null ? '' : texto).trim()) {
+      if (!curto) {
         seta(doc, a0, a1, { cor: cor, espessura: espCota, dupla: true, tam: CABECA, papel: 'traco' });
       } else {
         var f = CABECA + 3;
@@ -1689,7 +1821,41 @@
         seta(doc, e1, a1, { cor: cor, espessura: espCota, tam: CABECA, papel: 'traco' });
       }
       meio = pt((a0.x + a1.x) / 2, (a0.y + a1.y) / 2);
-      tipRot = { direcao: null, afastamento: 0 };
+
+      /* --------------------------------------- o numero cabe SOBRE a linha?
+       *
+       * Interromper a linha de cota por baixo do numero e a convencao, e o halo
+       * branco e o que a executa. Ele so pode fazer isso enquanto for MENOR do
+       * que o vao que a cota mede: passando disso ele deixa de interromper a
+       * linha e passa a apagar a cota inteira, inclusive as pontas de seta, que
+       * saem pelo doc e por isso nem aparecem na lista de obstaculos do halo.
+       *
+       * Medido no MAT08-13, primeira figura do material (o pi desenrolado, a que
+       * explica de onde vem o pi): a cota do resto mede 12,79 pt entre as pontas
+       * e o halo do rotulo "0.14·d" tem 26,83 pt, mais que o DOBRO do vao. O
+       * halo cobria 100 por cento das duas cabecas e o miolo da linha, e sobrava
+       * na folha um "- 0.14·d -" solto no ar entre dois toquinhos de 3,52 pt,
+       * sem seta e sem ligacao com nada, que a aluna le como "menos 0,14·d" na
+       * pagina que ensina que o contorno e MAIOR que tres diametros.
+       *
+       * Entao a pergunta e feita ANTES de pousar o rotulo, e nao depois: o vao
+       * livre e o que sobra entre as duas cabecas (com as pontas para dentro, o
+       * proprio vao medido; com elas para fora, o vao menos as duas cabecas), e
+       * o numero so pousa sobre a linha se o halo couber ali com 1 pt de folga
+       * de cada lado. Quando nao cabe, ele sobe para FORA da linha, na normal da
+       * cota, que e o mesmo lugar para onde o estilo 'chave' ja manda o texto.
+       *
+       * O afastamento de 3,5 pt e medido e nao escolhido: as linhas de chamada
+       * ultrapassam a linha de cota em sobra = 2,5 pt, entao 3,5 deixa 1 pt de
+       * papel entre a borda do halo e a ponta da chamada. Menos do que isso e o
+       * halo volta a comer o andaime que ele saiu de cima. */
+      var haloCota = g.medir(txtCota, tam, !!op.bold) + 2 * PAD_HALO;
+      var vaoLivre = curto ? comprimento : comprimento - 2 * CABECA;
+      if (txtCota.trim() && haloCota + 2 > vaoLivre) {
+        tipRot = { direcao: nrm, afastamento: sobra + 1 };
+      } else {
+        tipRot = { direcao: null, afastamento: 0 };
+      }
     }
 
     var reg = {
@@ -2723,7 +2889,11 @@
     rotuloLado: rotuloLado, rotuloAngulo: rotuloAngulo,
     direcaoLivre: direcaoLivre,
     ponto: ponto, seta: seta, cota: cota, cotaRadial: cotaRadial,
-    versor: versor, perp: perp, contraste: contraste,
+    versor: versor, perp: perp, contraste: contraste, contrasteEntre: contrasteEntre,
+    /* Oferecido a quem pinta area por fora deste arquivo, que hoje e o hachurar
+     * do marcas.js: a lista de areas do doc precisa ser UMA, senao o halo passa
+     * a ver metade do que foi pintado. Ver "o fundo por baixo do halo". */
+    registrarArea: registrarArea, corSobAcaixa: corSobAcaixa,
     tintaDe: tintaDe, PAPEL_OBJETO: PAPEL_OBJETO, GUIA_LEITURA: GUIA_LEITURA,
     ESPESSURA: ESPESSURA, PISO_ESPESSURA: PISO_ESPESSURA, PISO_CORPO: PISO_CORPO,
     TAM_PADRAO: TAM_PADRAO, CINZA_AREA: CINZA_AREA, CABECA: CABECA

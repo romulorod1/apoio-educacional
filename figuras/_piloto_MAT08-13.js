@@ -195,6 +195,7 @@ function secoesDoMd() {
     o[marca.toLowerCase()] = {
       explicacao: blocos[0] || '',
       exercicios: itensNumerados(blocos[1] || ''),
+      exerciciosBruto: blocos[1] || '',
       gabarito: itensNumerados(blocos[2] || '')
     };
   });
@@ -247,6 +248,88 @@ let clonados = [], conferidos = 0;
 conf('o .md deu 20 exercicios com gabarito em cada lingua para a trava editorial', conferidos, 40);
 conf('nenhum exercicio repete os dados e o resultado de um passo ja resolvido',
   clonados.join(' ') || 'nenhum', 'nenhum');
+
+/* Vazamento PARCIAL no primeiro bloco, que a trava acima nao pega.
+ *
+ * A trava anterior so acusa o clone inteiro: dados E resultado do exercicio
+ * dentro do mesmo passo ja resolvido. O exercicio 4 escapava por pouco, com o
+ * raio 6 dos Exemplos 3 e 4, que imprimem "A area total e 36pi" duas paginas
+ * antes: o gabarito do 4 pedia "36 x 3,14 = 113,04" e a unica coisa que o
+ * exercicio queria cobrar, elevar o raio ao quadrado, ja estava na folha. A
+ * aluna que folheia para tras achava 36pi pronto e so multiplicava.
+ *
+ * A regra vale para o PRIMEIRO bloco, que e onde a formula crua e treinada: um
+ * exercicio de Fundamentos nao pode usar um dado v cujo quadrado o gabarito
+ * dele cita E que algum passo ja resolvido imprime AO LADO do proprio v. Nos
+ * blocos B e C o exercicio pede uma composicao (coroa, regiao entre figuras,
+ * volta da roda) e reaproveitar um quadrado ja visto e economia de leitura, nao
+ * gabarito adiantado, entao a regra nao se aplica la: o exercicio 12 usa 25pi
+ * do Exemplo 2 e continua tendo que achar 144pi e subtrair.
+ *
+ * O 3,14 e o 360 saem da conta de dados: sao as duas constantes que o proprio
+ * enunciado entrega, e nao dado do problema. Sem tirar, o Exemplo 1 (que cita
+ * 3,14) casaria com quase todo enunciado que manda usar a aproximacao. */
+const CONSTANTES_ENTREGUES = ['3.14', '360'];
+function numerosDoPrimeiroBloco(bruto) {
+  /* O corpo entre o primeiro cabecalho de bloco e o segundo. */
+  const partes = String(bruto || '')
+    .split(/^\*\*(?:Bloco|Block)\s+[A-C][.．]?[^\n]*\*\*\s*$/m);
+  const corpo = partes.length > 1 ? partes[1] : '';
+  const ns = [];
+  corpo.split('\n').forEach(function (linha) {
+    const abre = linha.match(/^(\d+)\.\s+/);
+    if (abre) ns.push(abre[1]);
+  });
+  return ns;
+}
+let adiantados = [], noPrimeiroBloco = 0;
+['pt', 'en'].forEach(function (lingua) {
+  const secao = fonte[lingua];
+  const passos = passosResolvidos(secao.explicacao);
+  numerosDoPrimeiroBloco(secao.exerciciosBruto).forEach(function (n) {
+    noPrimeiroBloco++;
+    const dados = numerosDe(secao.exercicios[n]).filter(function (v) {
+      return CONSTANTES_ENTREGUES.indexOf(v) < 0;
+    });
+    const resp = numerosDe(secao.gabarito[n]);
+    dados.forEach(function (v) {
+      const q = String(Number(v) * Number(v));
+      if (resp.indexOf(q) < 0) return;
+      passos.forEach(function (p) {
+        if (p.indexOf(v) >= 0 && p.indexOf(q) >= 0) {
+          const marca = lingua + ':' + n + ' (' + v + ' ja elevado a ' + q + ')';
+          if (adiantados.indexOf(marca) < 0) adiantados.push(marca);
+        }
+      });
+    });
+  });
+});
+conf('o primeiro bloco de cada lingua tem 5 exercicios para esta trava', noPrimeiroBloco, 10);
+conf('nenhum exercicio do primeiro bloco usa um dado que a explicacao ja elevou ao quadrado',
+  adiantados.join(' ') || 'nenhum', 'nenhum');
+
+/* A figura da roda mostra a MESMA roda em tres instantes de uma volta, e nao
+ * tres rodas enfileiradas. Quem ja sabe a materia le certo; quem esta
+ * aprendendo conta tres rodas e a conta deixa de fazer sentido, porque a cota C
+ * vai do chao da primeira ao chao da terceira. A receita rodando so aceita
+ * raio/diametro e comprimento, e a ESPECIFICACAO restringe legenda de figura ao
+ * aviso de escala e a glosa da hachura, entao a chave de leitura tem que estar
+ * no ENUNCIADO, que e onde a especificacao manda o aviso de figura morar e o
+ * lugar que a aluna le ANTES de olhar o desenho. */
+const CHAVE_DA_RODA = { pt: /a mesma roda/i, en: /the same wheel/i };
+let semChave = [], comRodando = 0;
+['pt', 'en'].forEach(function (lingua) {
+  const secao = fonte[lingua];
+  Object.keys(secao.exercicios).forEach(function (n) {
+    const texto = secao.exercicios[n];
+    if (!/@fig\s+rodando\b/.test(texto)) return;
+    comRodando++;
+    if (!CHAVE_DA_RODA[lingua].test(texto)) semChave.push(lingua + ':' + n);
+  });
+});
+conf('a receita rodando aparece em um enunciado de cada lingua', comRodando, 2);
+conf('todo enunciado com a roda diz que as tres sao a mesma roda',
+  semChave.join(' ') || 'nenhum', 'nenhum');
 
 let pareado = true;
 tema.pt.exercicios.forEach(function (ex, i) {

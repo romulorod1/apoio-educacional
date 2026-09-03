@@ -69,6 +69,22 @@
   }
   function avisar(doc, texto) { base().avisar(doc, texto); }
 
+  /* Ligacao tardia com o desenho.js, pelo mesmo motivo e do mesmo jeito que o
+   * receitas.js faz: FigDesenho no navegador, require no Node, null quando nao
+   * carregou. Este modulo nao depende dele para desenhar nada; ele so precisa
+   * entregar la a lista de areas pintadas, para o halo de um rotulo pousado
+   * dentro de uma regiao sair na tinta dela. Null aqui volta ao halo branco de
+   * antes, que e degradacao e nao quebra. */
+  var cacheDesenho = null;
+  function desenho() {
+    if (cacheDesenho) return cacheDesenho;
+    if (typeof FigDesenho !== 'undefined' && FigDesenho && FigDesenho.registrarArea) cacheDesenho = FigDesenho;
+    else if (typeof require === 'function') {
+      try { cacheDesenho = require('./desenho.js'); } catch (e) { cacheDesenho = null; }
+    }
+    return cacheDesenho;
+  }
+
   /* ============================================================ a paleta que faltava
    *
    * O cinza de area, criado aqui porque a paleta do pdf.js nao tem nenhum.
@@ -326,7 +342,28 @@
    * por cento de tinta, ou seja 93 por cento de papel branco. Nao pesou e nao
    * encheu. */
   var HACHURA_MAX = 0.6;    // teto de espessura, igual ao piso do projeto
-  var TOL_PARALELA = 7;     // graus: abaixo disto a hachura desaparece contra o lado
+
+  /* Folga minima entre a hachura e uma fronteira RETA da propria regiao.
+   *
+   * Era 7 graus, e 7 nao basta. Medido na fatia da pizza do MAT08-13
+   * (exercicio 7, material p5 e lista p1): a hachura saia a 45 graus e o corte
+   * que limita a fatia tambem esta a 45 graus, cruzamento de 0,0 grau, com uma
+   * linha de hachura COLINEAR com o corte (deslocamento perpendicular 0,00 pt)
+   * e as outras correndo paralelas a ele de 5 em 5 pt. A trava de paralelismo
+   * existia e nao pegou por outro motivo, medido junto: o ladosDe so olhava
+   * lado de POLIGONO, e a fatia e um setor, cujas duas fronteiras retas sao os
+   * raios. Com os raios na conta, o setor de 60 graus da p3 sai a 15 graus do
+   * proprio raio, que passava folgado nos 7 antigos e ainda assim fecha uma
+   * fresta branca que afina ate sumir junto ao arco.
+   *
+   * Hachura paralela a fronteira da propria regiao e erro de desenho tecnico:
+   * a listra mais externa passa a poder ser lida como o limite da regiao e o
+   * limite como mais uma listra. Vinte graus e o menor angulo em que as duas
+   * familias de reta ainda se distinguem a olho na folha impressa, e e o valor
+   * que a revisao pediu. Medido no banco inteiro (148 temas, 14 hachuras, 6
+   * delas com fronteira reta), a subida de 7 para 20 muda 4 hachuras, todas do
+   * MAT08-13, e nenhuma outra. */
+  var TOL_PARALELA = 20;    // graus: abaixo disto a hachura compete com a fronteira
 
   /* ============================================================ ferramentas locais
    *
@@ -1267,10 +1304,12 @@
    *     'chapado' mora aqui dentro, no mesmo lugar: quem quer marcar uma regiao
    *     encontra as duas opcoes juntas e a certa e a que esta por perto.
    *
-   *   - Hachura paralela a um lado desaparece contra o contorno. A inclinacao
-   *     pedida e conferida contra todos os lados retos da regiao e trocada
-   *     sozinha quando colide, na ordem que a convencao manda (45, depois 30 ou
-   *     60).
+   *   - Hachura paralela a uma fronteira da propria regiao desaparece contra o
+   *     contorno e duplica a borda. A inclinacao pedida e conferida contra
+   *     TODAS as fronteiras retas da regiao (lado de poligono, os dois raios de
+   *     um setor, a corda de um arco parcial) e trocada sozinha quando fica a
+   *     menos de TOL_PARALELA graus de alguma, na ordem que a convencao manda
+   *     (45, depois 30 ou 60, depois os espelhos).
    *
    *   - A GLOSA nunca entra dentro da area. Ver o glosaDaHachura logo abaixo. */
   function hachurar(doc, caminhos, op) {
@@ -1297,6 +1336,14 @@
       Bs.comEstado(doc, { preenchimento: tinta }, function () {
         doc.op(caminho + 'f*');
       });
+      /* O que foi pintado fica anotado no DOC, e nao so no registro da figura:
+       * as receitas chamam esta funcao com o ctx.doc e nao com o ctx (a decisao
+       * esta escrita no hachurarRegiao do receitas.js), entao o registro nao ve
+       * a area. Quem precisa dela e o halo do rotulo: sem esta lista o "2" do
+       * alvo e o "60" da pista abrem um retangulo branco dentro da regiao
+       * tingida. Ver "o fundo por baixo do halo" no desenho.js. */
+      var D = desenho();
+      if (D && D.registrarArea) D.registrarArea(doc, contornosDasPartes(partes), tinta);
       return anotar(op, 'marca', {
         tipo: 'areaChapada', x: cx.cx, y: cx.cy, caixa: cx, cor: tinta, glosa: glosa
       });
@@ -1492,22 +1539,72 @@
     return base().geo.caixa(pts);
   }
 
-  /* Todos os lados retos da regiao, em graus no intervalo de 0 a 180: a
-   * inclinacao da hachura e comparada com eles. */
+  /* Todas as fronteiras RETAS da regiao, em graus no intervalo de 0 a 180: a
+   * inclinacao da hachura e comparada com elas.
+   *
+   * Lado de poligono era a unica coisa que esta funcao enxergava, e por isso a
+   * trava de paralelismo nao existia para metade das regioes do banco. Um setor
+   * tem duas fronteiras retas, os raios, e sao elas que a fatia da pizza mostra
+   * na folha: o corte a 45 graus com a hachura tambem a 45. Um arco parcial sem
+   * setor fecha pela CORDA, que e reta pelo mesmo motivo. As duas entram aqui,
+   * no mesmo lugar em que o lado de poligono ja entrava, para nao existir uma
+   * segunda regra de paralelismo que diverge desta.
+   *
+   * O angulo do raio nao e o angulo parametrico: numa elipse o ponto de
+   * parametro t esta em (rx cos t, ry sen t), entao o raio desenhado sai em
+   * atan2(ry sen t, rx cos t). Com rx igual a ry os dois coincidem, que e o
+   * caso do setor circular. */
   function ladosDe(partes) {
     var angs = [];
+    function guardar(ax, ay, bx, by) {
+      if (Math.abs(bx - ax) < 1e-9 && Math.abs(by - ay) < 1e-9) return;
+      angs.push(((grausDe(Math.atan2(by - ay, bx - ax)) % 180) + 180) % 180);
+    }
     for (var i = 0; i < partes.length; i++) {
-      if (partes[i].tipo !== 'poligono') continue;
-      var pts = partes[i].pontos;
-      for (var j = 0; j < pts.length; j++) {
-        var A = pts[j], B = pts[(j + 1) % pts.length];
-        if (dist(A, B) < 2) continue;
-        var a = grausDe(Math.atan2(B.y - A.y, B.x - A.x));
-        a = ((a % 180) + 180) % 180;
-        angs.push(a);
+      var p = partes[i];
+      if (p.tipo === 'poligono') {
+        var pts = p.pontos;
+        for (var j = 0; j < pts.length; j++) {
+          var A = pts[j], B = pts[(j + 1) % pts.length];
+          if (dist(A, B) < 2) continue;
+          guardar(A.x, A.y, B.x, B.y);
+        }
+        continue;
+      }
+      /* Volta inteira nao tem fronteira reta nenhuma: e o circulo e a coroa. */
+      if (Math.abs(p.ate - p.de) >= 359.9) continue;
+      var d0 = pontoDoArco(p, p.de), d1 = pontoDoArco(p, p.ate);
+      if (p.setor) {
+        guardar(p.centro.x, p.centro.y, d0.x, d0.y);
+        guardar(p.centro.x, p.centro.y, d1.x, d1.y);
+      } else if (dist(d0, d1) >= 2) {
+        guardar(d0.x, d0.y, d1.x, d1.y);
       }
     }
     return angs;
+  }
+  function pontoDoArco(p, grau) {
+    var t = rad(grau);
+    return pt(p.centro.x + p.rx * Math.cos(t), p.centro.y + p.ry * Math.sin(t));
+  }
+
+  /* As partes viradas em aneis de pontos, que e o formato em que o desenho.js
+   * guarda area pintada. Poligonizar de 6 em 6 graus e a mesma aproximacao que o
+   * obstaculosDoRotulo ja usa: a flecha fica em 0,0014 do raio, muito abaixo da
+   * espessura de qualquer traco. */
+  function contornosDasPartes(partes) {
+    var saida = [];
+    for (var i = 0; i < partes.length; i++) {
+      var p = partes[i];
+      if (p.tipo === 'poligono') { saida.push(p.pontos); continue; }
+      var total = p.ate - p.de;
+      var n = Math.max(3, Math.ceil(Math.abs(total) / 6));
+      var anel = [];
+      if (p.setor && Math.abs(total) < 359.9) anel.push(pt(p.centro.x, p.centro.y));
+      for (var k = 0; k <= n; k++) anel.push(pontoDoArco(p, p.de + total * k / n));
+      saida.push(anel);
+    }
+    return saida;
   }
 
   function distanciaAngular(a, b) {
@@ -1515,28 +1612,70 @@
     return Math.min(d, 180 - d);
   }
 
+  /* A inclinacao e escolhida POR REGIAO, e nao cravada: a mesma hachura de 45
+   * graus que fica perfeita num quadrado deitado fica colinear com o corte de
+   * uma fatia de 45 graus.
+   *
+   * A ordem das candidatas e a da convencao, e nessa ordem de proposito: 45 e a
+   * hachura generica do desenho tecnico, e a especificacao manda cair em 30 ou
+   * 60 quando ela colide com um lado. So depois disso entram o 135 (o espelho
+   * do 45, que resolve o setor estreito onde 30 e 60 tambem colidem), os dois
+   * espelhos de 30 e 60, e por ultimo a vertical e a horizontal, que leem bem
+   * mas se confundem com eixo e com malha.
+   *
+   * Quando nenhuma candidata da lista escapa, a saida NAO e a menos ruim delas:
+   * e a bissetriz do maior vao entre duas fronteiras vizinhas, que por
+   * construcao e o angulo de folga MAXIMA possivel naquela regiao. Com n
+   * fronteiras retas o maior vao mede pelo menos 180/n graus, entao a folga
+   * nunca fica abaixo de 90/n: com os dois raios de um setor ela e de no minimo
+   * 45 graus. E o "perpendicular a bissetriz do setor" que a revisao propos,
+   * escrito de um jeito que vale tambem para poligono e para regiao mista.
+   *
+   * Trocar dentro da lista da convencao e SILENCIOSO, e isso e decisao e nao
+   * descuido. O contrato desta funcao, escrito no cabecalho do hachurar e
+   * repetido no hachurarRegiao do receitas.js, e que a receita pede 45 e a
+   * regiao decide: cair em 30 num setor de 60 graus e o contrato sendo
+   * cumprido, nao violado. Avisar ali encheria toda folha com hachura de aviso
+   * e reprovaria o tema por a maquina ter funcionado. O que continua avisando e
+   * o caso em que a convencao inteira falha e a regiao empurra a hachura para
+   * um angulo que nao esta na lista: ali houve um pedido que a figura nao
+   * comporta e alguem precisa olhar. O angulo escolhido volta no registro, e e
+   * por ele que a auditoria confere, e nao pelo aviso. */
   function escolherInclinacao(doc, partes, pedida) {
     var lados = ladosDe(partes);
-    var candidatas = [pedida, 30, 60, 15, 75, 45, 0, 90];
-    var melhor = null, folgaMelhor = -1;
+    var candidatas = [pedida, 45, 30, 60, 135, 120, 150, 90, 0];
     for (var i = 0; i < candidatas.length; i++) {
       var a = ((candidatas[i] % 180) + 180) % 180;
-      var pior = 180;
-      for (var j = 0; j < lados.length; j++) {
-        var d = distanciaAngular(a, lados[j]);
-        if (d < pior) pior = d;
-      }
-      if (pior > folgaMelhor) { folgaMelhor = pior; melhor = a; }
-      if (pior >= TOL_PARALELA) {
-        if (i > 0) {
-          avisar(doc, 'hachurar: ' + pedida + ' graus fica paralela a um lado, trocada para ' + a);
-        }
-        return a;
-      }
+      if (folgaAteOsLados(a, lados) >= TOL_PARALELA) return a;
     }
-    avisar(doc, 'hachurar: nenhuma inclinacao escapa dos lados da regiao, ' +
-      'a melhor fica a ' + folgaMelhor.toFixed(1) + ' graus de um deles');
-    return melhor;
+    var a2 = bissetrizDoMaiorVao(lados);
+    avisar(doc, 'hachurar: nenhuma inclinacao da convencao escapa das fronteiras da regiao, ' +
+      'saiu na folga maxima de ' + folgaAteOsLados(a2, lados).toFixed(1) + ' graus, a ' +
+      a2.toFixed(1) + ' graus');
+    return a2;
+  }
+
+  function folgaAteOsLados(a, lados) {
+    var pior = 180;
+    for (var j = 0; j < lados.length; j++) {
+      var d = distanciaAngular(a, lados[j]);
+      if (d < pior) pior = d;
+    }
+    return pior;
+  }
+
+  /* O meio do maior vao entre duas fronteiras vizinhas, no circulo de 180 graus
+   * em que inclinacao de reta vive. Sem fronteira nenhuma qualquer angulo serve
+   * e vale o 45 da convencao. */
+  function bissetrizDoMaiorVao(lados) {
+    if (!lados.length) return 45;
+    var ord = lados.slice().sort(function (x, y) { return x - y; });
+    var melhor = ord[0], vao = -1;
+    for (var i = 0; i < ord.length; i++) {
+      var b = i + 1 < ord.length ? ord[i + 1] : ord[0] + 180;
+      if (b - ord[i] > vao) { vao = b - ord[i]; melhor = (ord[i] + b) / 2; }
+    }
+    return ((melhor % 180) + 180) % 180;
   }
 
   /* ============================================================ ceviana

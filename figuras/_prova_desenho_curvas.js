@@ -982,6 +982,125 @@ function avisou(lista, trecho) {
     'e com op.formatar vindo do tema ela fica quieta');
 }
 
+/* ============================================================ o halo branco
+ *
+ * Duas medicoes no fluxo, as duas vindas da folha impressa do MAT08-13.
+ *
+ * A primeira e a cota do resto no pi desenrolado (material p1 e ingles p1). O
+ * halo do rotulo "0.14·d" tem 26,83 pt de largura para cotar um vao de 12,79 pt
+ * entre as pontas de seta, e como ele e branco chapado e sai por ULTIMO, ele
+ * apagava as duas cabecas e o miolo da linha. Sobrava na folha um "- 0.14·d -"
+ * solto no ar entre dois toquinhos de 3,52 pt, sem seta e sem ligacao com nada,
+ * na pagina que ensina que o contorno e um pouco MAIOR que tres diametros.
+ *
+ * A segunda e o rotulo "2" do alvo (material p7 e lista p4). O halo abria uma
+ * caixa branca de 7,93 por 9,86 pt dentro do disco central, que sai em #8B94A1
+ * cheio, com o canto a 1,25 pt do eixo da circunferencia de raio 2.
+ *
+ * As duas sao medidas no que vai sair impresso, e nao no que a funcao disse que
+ * ia desenhar: o retangulo do halo e lido do proprio fluxo de conteudo, com a
+ * tinta que estava ligada na hora de pinta-lo. */
+console.log('');
+console.log('o halo branco: contra as pontas da cota e dentro de regiao pintada');
+
+/* Todo retangulo cheio do fluxo, com a tinta com que foi pintado. O halo sai num
+ * op so ("r g b rg x y w h re f"), entao a tinta e lida da mesma linha. */
+function retangulosCheios(pagina) {
+  const saida = [];
+  pagina.ops.forEach(function (linha) {
+    const s = String(linha);
+    const m = s.match(/(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+rg\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+re\s+f/);
+    if (!m) return;
+    saida.push({
+      cor: [+m[1], +m[2], +m[3]],
+      x0: +m[4], y0: +m[5], x1: +m[4] + +m[6], y1: +m[5] + +m[7]
+    });
+  });
+  return saida;
+}
+/* Segmento contra retangulo reto, por corte de faixas. */
+function cruza(ax, ay, bx, by, r) {
+  let t0 = 0, t1 = 1;
+  const p = [-(bx - ax), bx - ax, -(by - ay), by - ay];
+  const q = [ax - r.x0, r.x1 - ax, ay - r.y0, r.y1 - ay];
+  for (let i = 0; i < 4; i++) {
+    if (Math.abs(p[i]) < 1e-9) { if (q[i] < 0) return false; continue; }
+    const s = q[i] / p[i];
+    if (p[i] < 0) { if (s > t1) return false; if (s > t0) t0 = s; }
+    else { if (s < t0) return false; if (s < t1) t1 = s; }
+  }
+  return true;
+}
+
+{
+  const t = new PDFGen.Doc(); t.novaPagina();
+  const TXT = '0.14·d', TAM = 8.5, VAO = 12.79, AFAST = 14;
+  const P = { x: 200, y: 400 }, Q = { x: 200 + VAO, y: 400 };
+  D.cota(t, P, Q, TXT, { afastamento: AFAST, lado: 1, tam: TAM });
+
+  /* A linha de cota e o vao que ela mede: as duas pontas de seta ficam nos
+   * extremos deste segmento, apontando para dentro. */
+  const a0 = { x: P.x, y: P.y + AFAST }, a1 = { x: Q.x, y: Q.y + AFAST };
+  const larguraHalo = PDFGen.medir(TXT, TAM, false) + 2 * 1.6;
+  const halos = retangulosCheios(t.paginas[0])
+    .filter(function (r) { return Math.abs((r.x1 - r.x0) - larguraHalo) < 0.6; });
+
+  ok(halos.length === 1, 'a cota curta pinta um halo so, de ' + larguraHalo.toFixed(2) + ' pt',
+    'achados: ' + halos.length);
+  const h = halos[0];
+  medido('vao entre as pontas: ' + VAO.toFixed(2) + ' pt   halo: ' + larguraHalo.toFixed(2) + ' pt');
+  if (h) {
+    medido('halo em x de ' + h.x0.toFixed(2) + ' a ' + h.x1.toFixed(2) +
+      ', y de ' + h.y0.toFixed(2) + ' a ' + h.y1.toFixed(2) +
+      '   linha de cota em y = ' + a0.y.toFixed(2));
+    ok(!cruza(a0.x, a0.y, a1.x, a1.y, h),
+      'o halo do numero nao toca a linha de cota nem as duas pontas de seta',
+      'folga do halo ate a linha: ' + (h.y0 - a0.y).toFixed(2) + ' pt');
+    /* As linhas de chamada passam 2,5 pt da linha de cota: o halo tem que ficar
+     * acima disso tambem, senao ele come o andaime de que acabou de sair. */
+    ok(h.y0 > a0.y + 2.5,
+      'e fica acima das pontas das duas linhas de chamada, que sobram 2,5 pt',
+      'borda de baixo do halo a ' + (h.y0 - a0.y).toFixed(2) + ' pt da linha');
+  }
+}
+
+{
+  const t = new PDFGen.Doc(); t.novaPagina();
+  const C = { x: 300, y: 400 }, R = 26;
+  const TINTA = [0.545098, 0.580392, 0.631373];      // #8B94A1, o cinza de area
+  D.arco(t, C, R, R, 0, 360, { preenche: TINTA, espessura: 1.2 });
+  D.rotulo(t, '2', C, { tam: 8.5 });
+
+  const cheios = retangulosCheios(t.paginas[0]);
+  const halo = cheios[cheios.length - 1];
+  ok(!!halo, 'o rotulo dentro do disco pintado desenha o halo dele');
+  if (halo) {
+    const dist = Math.min(
+      Math.hypot(halo.x0 - C.x, halo.y0 - C.y), Math.hypot(halo.x1 - C.x, halo.y0 - C.y),
+      Math.hypot(halo.x0 - C.x, halo.y1 - C.y), Math.hypot(halo.x1 - C.x, halo.y1 - C.y));
+    medido('halo de ' + (halo.x1 - halo.x0).toFixed(2) + ' por ' + (halo.y1 - halo.y0).toFixed(2) +
+      ' pt, canto mais longe a ' + (R - dist).toFixed(2) + ' pt do contorno de raio ' + R);
+    const branco = halo.cor[0] > 0.99 && halo.cor[1] > 0.99 && halo.cor[2] > 0.99;
+    ok(!branco, 'o halo dentro da regiao pintada NAO sai branco, que abriria um buraco nela',
+      'tinta do halo: ' + halo.cor.join(' '));
+    ok(Math.abs(halo.cor[0] - TINTA[0]) < 1e-4 && Math.abs(halo.cor[1] - TINTA[1]) < 1e-4 &&
+       Math.abs(halo.cor[2] - TINTA[2]) < 1e-4,
+      'ele sai na tinta da propria regiao, entao some de vista e continua protegendo o numero',
+      'tinta do halo: ' + halo.cor.join(' '));
+    ok(D.contrasteEntre(PDFGen.COR.texto, TINTA) >= 4.5,
+      'e o numero continua legivel sobre essa tinta, pelos 4,5:1 da WCAG para texto',
+      D.contrasteEntre(PDFGen.COR.texto, TINTA).toFixed(2) + ':1');
+  }
+
+  /* Fora de regiao pintada nada muda: o halo continua branco, byte por byte. */
+  const t2 = new PDFGen.Doc(); t2.novaPagina();
+  D.rotulo(t2, '2', { x: 300, y: 400 }, { tam: 8.5 });
+  const soltos = retangulosCheios(t2.paginas[0]);
+  ok(soltos.length === 1 && soltos[0].cor[0] === 1 && soltos[0].cor[1] === 1 && soltos[0].cor[2] === 1,
+    'sobre papel branco o halo continua branco, sem regra nova nenhuma',
+    soltos.length ? 'tinta: ' + soltos[0].cor.join(' ') : 'nenhum halo');
+}
+
 console.log('');
 console.log('achados que NAO sao deste arquivo (o conferirFigura mora no base.js)');
 {

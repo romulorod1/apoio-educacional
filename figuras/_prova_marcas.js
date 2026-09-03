@@ -425,8 +425,11 @@ pagina('hachurar', 'recorte mais varredura: regiao com furo sem nenhuma conta de
       });
       ctx.contorno(function () { contorno(ctx.doc, P); });
     },
-    unidades: geo.caixa(geo.girar(geo.poligonoRegular({ x: 0, y: 0 }, 45, 4, 0), 45)),
-    esperaAviso: 'paralela a um lado'
+    /* Nao espera aviso: trocar dentro da lista da convencao e o contrato do
+     * hachurar sendo cumprido, e nao anomalia. Quem confere o resultado e o
+     * bloco de conferencias sobre a inclinacao, la embaixo, que mede a folga em
+     * graus contra as fronteiras da propria regiao. */
+    unidades: geo.caixa(geo.girar(geo.poligonoRegular({ x: 0, y: 0 }, 45, 4, 0), 45))
   },
   {
     titulo: 'dificil: poligono nao convexo, com espacamento abaixo do piso',
@@ -779,6 +782,76 @@ console.log('        COR.soft: ' + contraste(COR.soft, COR.branco).toFixed(2) +
   conf('espacamento sobe para o piso de 4 pt', h.espacamento >= M.ESPACAMENTO_MIN, true);
   conf('espessura cai para o teto de 0,6 pt', h.espessura, M.HACHURA_MAX);
   conf('e a inclinacao 0, paralela ao lado de baixo, e trocada', h.angulo !== 0, true);
+}
+
+/* ---------------------------------------------- a inclinacao escolhida por regiao
+ *
+ * Hachura paralela a uma fronteira da propria regiao e erro de desenho tecnico:
+ * a listra mais externa passa a poder ser lida como o limite da regiao e o
+ * limite como mais uma listra. A revisao mediu isso na fatia da pizza do
+ * MAT08-13 (exercicio 7): hachura a 45 graus dentro de um setor de 0 a 45, ou
+ * seja uma linha de hachura COLINEAR com o corte que limita a fatia, folga de
+ * 0,0 grau. E no setor de 60 graus da p3, folga de 15,0 graus, com a primeira
+ * linha convergindo para o raio e fechando uma fresta que afina ate sumir.
+ *
+ * Os dois passavam porque o ladosDe so enxergava lado de POLIGONO: setor nao
+ * tem lado, tem raio, e arco parcial fecha pela corda. Este bloco cobra a folga
+ * em graus, que e a medida do defeito, e nao a lista de fronteiras, que e a
+ * implementacao. */
+{
+  const t = new PDFGen.Doc(); t.novaPagina();
+  const C = { x: 300, y: 400 };
+  function folga(angulo, fronteiras) {
+    let pior = 180;
+    fronteiras.forEach(function (f) {
+      const d = Math.abs(((angulo - f) % 180 + 180) % 180);
+      pior = Math.min(pior, Math.min(d, 180 - d));
+    });
+    return pior;
+  }
+  const PISO = 20;
+
+  const fatia = M.hachurar(t, { centro: C, raio: 60, de: 0, ate: 45, setor: true }, { angulo: 45 });
+  conf('fatia de 0 a 45 com 45 pedidos: a hachura sai longe dos dois raios (' +
+    folga(fatia.angulo, [0, 45]).toFixed(1) + ' graus)',
+    folga(fatia.angulo, [0, 45]) >= PISO, true);
+  conf('e nenhuma linha da fatia fica colinear com o corte', fatia.angulo !== 45, true);
+
+  const setor60 = M.hachurar(t, { centro: C, raio: 60, de: 0, ate: 60, setor: true }, { angulo: 45 });
+  conf('setor de 60 graus com 45 pedidos: folga de ' +
+    folga(setor60.angulo, [0, 60]).toFixed(1) + ' graus contra os raios',
+    folga(setor60.angulo, [0, 60]) >= PISO, true);
+
+  /* Arco parcial SEM setor fecha pela corda, que e reta igual: de 0 a 90 num
+   * circulo a corda sai a 135 graus. */
+  const seg = M.hachurar(t, { centro: C, raio: 60, de: 0, ate: 90, setor: false }, { angulo: 135 });
+  conf('segmento circular: a hachura nao sai paralela a corda (' +
+    folga(seg.angulo, [135]).toFixed(1) + ' graus)',
+    folga(seg.angulo, [135]) >= PISO, true);
+
+  const losango = M.hachurar(t, geo.girar(geo.poligonoRegular(C, 45, 4, 0), 45), { angulo: 45 });
+  conf('quadrado girado 45: a hachura escapa dos dois pares de lados (' +
+    folga(losango.angulo, [45, 135]).toFixed(1) + ' graus)',
+    folga(losango.angulo, [45, 135]) >= PISO, true);
+
+  /* Regiao que a convencao inteira nao resolve: o dodecagono regular tem seis
+   * direcoes de lado distintas, de 30 em 30 graus, entao 45, 30, 60, 135, 120,
+   * 150, 90 e 0 caem todos a 15 graus ou menos de alguma. Aqui o fallback entra
+   * e AVISA, que e o unico caso em que avisar ainda faz sentido: houve um pedido
+   * que a figura nao comporta. A folga maxima possivel e metade do vao de 30
+   * entre direcoes vizinhas, ou seja 15 graus, e e nela que ele sai. */
+  const antes = (t.avisosFigura || []).length;
+  const p12 = geo.poligonoRegular(C, 45, 12, 0);
+  const lados12 = p12.map(function (A, i) {
+    const B = p12[(i + 1) % p12.length];
+    return ((Math.atan2(B.y - A.y, B.x - A.x) * 180 / Math.PI) % 180 + 180) % 180;
+  });
+  const doze = M.hachurar(t, p12, { angulo: 45 });
+  conf('dodecagono: sai na folga maxima possivel, ' + folga(doze.angulo, lados12).toFixed(1) +
+    ' graus, que e metade do vao de 30 entre direcoes vizinhas de lado',
+    Math.abs(folga(doze.angulo, lados12) - 15) < 0.51, true);
+  conf('e esse caso, que a convencao nao resolve, avisa',
+    (t.avisosFigura || []).slice(antes).some(function (a) { return /nenhuma inclinacao/.test(a); }), true);
 }
 
 /* A hachura tem PISO e nao so teto, e este bloco reprovava antes de o piso

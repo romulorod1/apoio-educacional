@@ -134,16 +134,43 @@ console.log('\n=== o navegador recebe o kit de figuras inteiro ===');
  * O sw.js precisa da mesma lista: ela dá aula na casa das famílias, muitas vezes
  * sem sinal, e o que não está no cache não existe quando falta rede. */
 {
-  const KIT = ['base.js', 'desenho.js', 'marcas.js', 'receitas.js', 'formula.js', 'solidos.js'];
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   const sw = fs.readFileSync(path.join(__dirname, '..', 'sw.js'), 'utf8');
+
+  /* O kit sai do index.html de HOJE, e não de uma lista escrita à mão aqui.
+   * Lista literal só confere o que alguém lembrou de escrever nela: um sexto
+   * arquivo de figuras entrando em produção fora do cache passava batido, e a
+   * lista ainda precisou ser editada à mão na última vez que o kit cresceu. */
+  const KIT = [...new Set((html.match(/src="figuras\/[\w.-]+\.js"/g) || [])
+    .map(function (s) { return s.replace(/.*figuras\//, '').replace(/"$/, ''); }))].sort();
+
+  /* E o index.html tem que carregar TODO módulo de figuras/ que existe no disco
+   * (os arquivos sem prefixo "_" e sem "testa_", que são as provas). Sem esta
+   * linha a conferência abaixo ficaria vazia quando o index.html perdesse os
+   * <script>: laço sobre lista vazia passa sempre, calado. */
+  const modulos = fs.readdirSync(path.join(__dirname, '..', 'figuras'))
+    .filter(function (f) {
+      return f.endsWith('.js') && !f.startsWith('_') && !f.startsWith('testa_');
+    }).sort();
+  conf('o index.html carrega todo módulo de figuras/ que existe no disco',
+    modulos.filter(function (m) { return KIT.indexOf(m) < 0; }).join(', ') || 0, 0);
+
+  /* A lista do sw.js é RECORTADA antes da busca, e sem os comentários dela. A
+   * versão anterior procurava o nome no arquivo inteiro com indexOf, e um
+   * comentário do próprio sw.js que cita './figuras/solidos.js' passou a
+   * satisfazer a trava sozinho: dava para apagar a linha da lista ARQUIVOS que
+   * esta suíte passava inteira, com o arquivo fora do pacote offline. */
+  const bloco = (sw.match(/var ARQUIVOS = \[[\s\S]*?\n\];/) || [''])[0]
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/[^\n]*$/gm, '');
+  const noCache = new Set((bloco.match(/'[^']*'/g) || [])
+    .map(function (s) { return s.slice(1, -1).replace(/^\.\//, ''); }));
+  conf('o sw.js tem uma lista ARQUIVOS com entradas', noCache.size > 0, true);
 
   KIT.forEach(function (arq) {
     const existe = fs.existsSync(path.join(__dirname, '..', 'figuras', arq));
     conf('figuras/' + arq + ' existe', existe, true);
     if (!existe) return;
-    conf('  o index.html carrega ' + arq, html.indexOf('figuras/' + arq) >= 0, true);
-    conf('  o sw.js guarda ' + arq, sw.indexOf('figuras/' + arq) >= 0, true);
+    conf('  o sw.js guarda ' + arq + ' na lista ARQUIVOS', noCache.has('figuras/' + arq), true);
   });
 
   /* E o pdf.js tem que continuar servindo SEM o kit ao lado: quem gera um

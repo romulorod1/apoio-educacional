@@ -144,6 +144,30 @@
   var TAM_NOME = 8.5;        // nome da classe, embaixo da celula do painel
   var AFAST_VERTICE = 4.5;   // vao entre a letra e o vertice, ate a BORDA da caixa
 
+  /* Traco e ponto, o padrao de EIXO e de linha de centro da NBR 8403, escrito
+   * cru como o GUIA_LEITURA do desenho.js e pelo mesmo motivo: os nomes do
+   * base.js ja estao ocupados ('auxiliar' e [3 2], o codigo da construcao do
+   * gabarito; 'oculta' e [2 2], aresta escondida de solido; 'guia' e [1 2], que
+   * some na fotocopia). Ele existe aqui para UMA coisa: a assintota da
+   * hiperbole, que e reta de referencia e nao lado de figura.
+   *
+   * Por que ele nasceu. Depois do conserto de contraste, o retangulo
+   * fundamental passou a sair na tinta do contorno (COR.texto) para sobreviver
+   * a fotocopia, e as assintotas ja saiam na mesma tinta, na mesma espessura de
+   * 0,6 pt e no mesmo [2 2]: medido no fluxo da hiperbole a=4 b=3, os quatro
+   * lados do retangulo e as duas assintotas davam SEIS segmentos com a mesma
+   * assinatura "0,60 pt | #1A1C1F | [2 2] 0". Na folha isso e uma trelica
+   * unica, e o texto manda ler duas coisas diferentes ali ("o retangulo tem
+   * lados 2a e 2b" e "as assintotas sao as diagonais dele prolongadas"). Com o
+   * traco e ponto a diferenca volta a estar codificada duas vezes, cor e
+   * padrao, como a ESPECIFICACAO.md pede na linha 529, e sem devolver a
+   * assintota ao muted, que era o que sumia na fotocopia.
+   *
+   * O periodo de 11 pt (6 de traco, 2 de vao, 1 de ponto, 2 de vao) e o que
+   * cabe: a assintota mais curta da folha mede 176 pt, ou seja 16 periodos
+   * inteiros, e o ponto de 1 pt a 0,6 pt de espessura ainda imprime. */
+  var TRACO_E_PONTO = '[6 2 1 2] 0';
+
   function versor(dx, dy) {
     var n = Math.sqrt(dx * dx + dy * dy);
     if (n < 1e-9) return { x: 0, y: 1 };
@@ -152,6 +176,37 @@
 
   function arredondar(n) {
     return String(Math.round(n * 100) / 100);
+  }
+
+  /* O separador decimal da FOLHA.
+   *
+   * A diretiva escreve o decimal sempre com ponto, nas duas linguas, porque a
+   * virgula esta proibida no valor (ela e o separador de lista do @fig). A
+   * ESPECIFICACAO.md linha 43 diz quem fecha o outro lado: "a diretiva sempre
+   * escreve ponto e quem imprime a folha decide a virgula". Quem imprime a
+   * folha e este arquivo, e ate aqui ninguem decidia nada: o rotulo saia
+   * identico nas duas linguas.
+   *
+   * O caso medido, MAT08-13 pagina 1: a figura do pi desenrolado imprimia
+   * "0.14·d" na folha PORTUGUESA, na mesma pagina em que o corpo do texto
+   * escreve 3,14 e 31,4 e o gabarito escreve 113,04. Era a unica quebra de
+   * notacao numerica da folha inteira, e a aluna de 13 anos ou le o rotulo como
+   * numero de outro sistema ou registra que na aula de matematica as vezes se
+   * escreve com ponto.
+   *
+   * Troca so o ponto ENTRE DIGITOS: "0.14·d" vira "0,14·d" e um ponto final de
+   * frase, um ponto de multiplicar ou um nome com ponto ficam onde estao. O
+   * valor impresso continua o mesmo, muda so o separador. Em ingles nada muda,
+   * que ja e a notacao de la.
+   *
+   * Toda receita que imprime um numero VINDO DO TEMA passa por aqui. Hoje o
+   * banco inteiro (148 temas) tem um unico rotulo de figura com casa decimal, o
+   * "0.14·d" do MAT08-13, mas a porta fica aberta e nomeada para o proximo. */
+  function numeroNaFolha(doc, texto) {
+    if (texto === null || texto === undefined) return texto;
+    var s = String(texto);
+    if (doc && doc.lingua === 'en') return s;
+    return s.replace(/(\d)\.(?=\d)/g, '$1,');
   }
 
   /* Grau desenha na base-14 (0xB0), e numero mais simbolo de grau sao neutros nas
@@ -3279,8 +3334,12 @@
           }
           if (G.assintotas && saida.H) {
             for (i = 0; i < saida.H.assintotas.length; i++) {
+              /* Traco e ponto, e nao o [2 2] do retangulo: ver o TRACO_E_PONTO
+               * la em cima. Os dois estao na mesma tinta e na mesma espessura
+               * por causa da fotocopia, entao o que sobra para separar a caixa
+               * do X e o padrao. */
               D.poligono(ctx, saida.H.assintotas[i], {
-                fechado: false, espessura: 0.6, tracejado: D.GUIA_LEITURA, cor: COR.texto,
+                fechado: false, espessura: 0.6, tracejado: TRACO_E_PONTO, cor: COR.texto,
                 papel: 'guia', recorte: bloco
               });
             }
@@ -3400,8 +3459,8 @@
           var baixo = G.eixos ? [{ x: 0, y: 1 }, { x: 0, y: -1 }] : [{ x: 0, y: -1 }, { x: 0, y: 1 }];
           var lateral = G.tipo === 'elipse' && !G.horizontal ? [{ x: 1, y: 0 }, { x: -1, y: 0 }] : baixo;
           if (G.focos) {
-            nomearPonto(ctx, F1, G.focos[0], lateral, { separado: sep });
-            if (F2) nomearPonto(ctx, F2, G.focos[1], lateral, { separado: sep });
+            nomearPonto(ctx, F1, G.focos[0], direcoesDoFoco(G, lateral, 1), { separado: sep });
+            if (F2) nomearPonto(ctx, F2, G.focos[1], direcoesDoFoco(G, lateral, -1), { separado: sep });
           }
           if (G.vertices) {
             for (i = 0; i < G.verticesPontos.length; i++) {
@@ -3469,6 +3528,37 @@
       });
     }
   };
+
+  /* Para que lado sai o NOME do foco.
+   *
+   * Na elipse e na parabola o foco fica dentro da curva e qualquer lado e um
+   * lado de dentro: vale a fila comum (embaixo, ou lateral quando a elipse esta
+   * em pe). Na hiperbole nao: o foco fica ALEM do vertice, do lado de fora do
+   * ramo, e o lado livre e justamente o de fora, onde entre a letra e a bolinha
+   * nao passa curva nenhuma.
+   *
+   * O caso medido, hiperbole a=4 b=3 com focos=F1;F2 (a figura da definicao do
+   * MATEM3-04, material p.2 e p.3 nas duas linguas, quatro rotulos por folha).
+   * Com a fila comum o rotulo nao achava lugar livre na vertical, fugia 25,00
+   * pt e ganhava fio de chamada: o F1 saia a 32,43 pt da bolinha que ele
+   * nomeia, e o fio cruzava o ramo da hiperbole a 13,75 pt do rotulo. Quem le
+   * de baixo para cima sobe pelo fio e a primeira tinta que ele toca e a curva,
+   * a 2,4 vezes mais perto do que a bolinha: a leitura que sobra e "o foco esta
+   * SOBRE a hiperbole", o oposto das duas frases do texto ("os focos ficam alem
+   * dos vertices", "os focos F1 e F2 ficam fora dele").
+   *
+   * Mandando o nome para fora nao ha fuga, nao ha fio e nao ha nada entre a
+   * letra e o ponto. As diagonais de fora entram como recuo, e a fila comum
+   * continua no fim dela para o caso de a figura ser tao apertada que nem por
+   * fora sobre lugar (com eixos=sim, por exemplo, onde os numeros da escala
+   * ocupam a faixa de baixo). */
+  function direcoesDoFoco(G, padrao, sinal) {
+    if (G.tipo !== 'hiperbole') return padrao;
+    var s = sinal >= 0 ? 1 : -1;
+    return [{ x: s, y: 0 },
+            { x: s * 0.7071, y: 0.7071 },
+            { x: s * 0.7071, y: -0.7071 }].concat(padrao);
+  }
 
   /* A geometria da conica em unidades do problema, sem desenhar. Centro em
    * (h, k), eixo maior no x. Devolve null quando a diretiva nao fecha. */
@@ -3858,8 +3948,12 @@
       var B = base(), g = B.gerador(), COR = g.COR, D = desenho(), M = marcas();
       if (!D) { B.avisar(doc, 'pidesenrolado: o figuras/desenho.js nao carregou'); return null; }
       var diam = lerMedida(B, d.args, 'diametro');
-      var rotuloD = diam ? diam.rotulo : 'd';
+      /* O ponto decimal do tema vira a virgula da folha portuguesa aqui, na
+       * porta de entrada dos dois rotulos desta figura. Ver o numeroNaFolha: o
+       * "0.14·d" era a unica quebra de notacao numerica do MAT08-13. */
+      var rotuloD = numeroNaFolha(doc, diam ? diam.rotulo : 'd');
       var sobra = B.primeiro(d.args, 'sobra');
+      if (sobra !== null) sobra = numeroNaFolha(doc, sobra);
       if (sobra === null) {
         B.avisar(doc, 'pidesenrolado: a sobra e o que a figura existe para mostrar e o rotulo dela vem do tema: escreva sobra=0.14d (ou o texto da sua lingua)');
       }
@@ -3928,8 +4022,19 @@
    * O retangulo com um semicirculo colado em cada lado menor (exercicio 16 do
    * MAT08-13). O perimetro sai em 1,2 pt; os dois lados menores, que NAO entram
    * no perimetro, saem em guia [2 2] de 0,6 pt por dentro, e e essa diferenca
-   * de traco que mostra a armadilha da questao. O interior vai em COR.soft, que
-   * e apoio e nao regiao pedida.
+   * de traco que mostra a armadilha da questao.
+   *
+   * O interior e REGIAO PEDIDA e nao apoio, ao contrario do que este comentario
+   * dizia: o enunciado 16 pede "o perimetro da pista e a area da regiao que ela
+   * delimita". Ele saia em COR.soft, que da 1,12:1 contra o branco e era o
+   * unico preenchimento de regiao da folha inteira abaixo do piso de 3:1 (o
+   * setor, a coroa, a fatia, os cantos do quadrado e as coroas do alvo usam
+   * hachura cinza a 4,80:1 e o disco central do alvo usa o cinza de area a
+   * 5,62:1). Numa impressora de casa ou numa fotocopia os 7 por cento de tinta
+   * somem e sobra so o contorno, ou seja a resposta a "qual e a regiao cuja
+   * area eu tenho que calcular" desaparecia justamente onde a folha e usada.
+   * Agora ele cai no cinza de area do marcas.js, o mesmo do disco do alvo, que
+   * foi medido em 3,07:1 e escrito para isto.
    *
    * Chaves: comprimento=V[;R] e largura=V[;R], cotados nos dois lados. */
 
@@ -3967,11 +4072,13 @@
         var CE = ctx.p(pt(0, W / 2)), CD = ctx.p(pt(L, W / 2));
 
         ctx.preenchimento(function () {
+          /* Sem cor: cai no cinza de area do marcas.js (3,07:1), que e a tinta
+           * de regiao pedida da casa. Ver o cabecalho da receita. */
           chaparRegiao(ctx, [
             [A, Bq, Cq, Dq],
             { centro: CE, raio: W / 2 * k, de: 90, ate: 270, setor: false },
             { centro: CD, raio: W / 2 * k, de: -90, ate: 90, setor: false }
-          ], COR.soft);
+          ]);
         });
         ctx.contorno(function () {
           D.poligono(ctx, [A, Bq], { fechado: false, cor: COR.texto, espessura: 1.2 });
@@ -3995,10 +4102,27 @@
            * retangulo, que e exatamente onde os semicirculos comecam: o vao
            * medido tem inicio e fim visiveis. E o mesmo tratamento que o C do
            * exercicio 17 (a receita rodando) ja tinha. */
-          D.cota(ctx, A, Bq, G.mL.rotulo, { lado: -1, afastamento: 12, tam: TAM_DADO, corTexto: corValor });
-        });
-        ctx.rotulos(function () {
-          D.rotuloLado(ctx, G.mW.rotulo, A, Dq, { lado: -1, tam: TAM_DADO, afastamento: 5, cor: corValor });
+          D.cota(ctx, A, Bq, numeroNaFolha(doc, G.mL.rotulo),
+            { lado: -1, afastamento: 12, tam: TAM_DADO, corTexto: corValor });
+          /* E a largura ganha o MESMO tratamento, pelo mesmo motivo levado ate
+           * o fim. Ela saia como numero solto de 12,65 por 9,86 pt encostado a
+           * 5,00 pt da linha TRACEJADA, que e justamente a linha que NAO faz
+           * parte do perimetro (o gabarito e 168 mais 60π, e os dois lados de
+           * 60 nao entram): o unico numero que a figura punha ao lado dessa
+           * linha nao dizia onde ela comeca nem onde ela acaba, enquanto o 84,
+           * que entra duas vezes na conta, era o unico com seta. E o halo
+           * branco dele abria um retangulo dentro da propria regiao pintada.
+           *
+           * A cota sai do lado de FORA, a esquerda, e as duas linhas de chamada
+           * nascem nos dois cantos do lado esquerdo do retangulo, que sao
+           * exatamente as duas pontas do semicirculo: horizontais a partir dali
+           * elas tangenciam o arco e nao cruzam tinta nenhuma. O afastamento
+           * conta o raio do semicirculo em PONTOS (W/2 vezes k) mais 12, senao
+           * a linha de cota cairia dentro do arco. */
+          D.cota(ctx, A, Dq, numeroNaFolha(doc, G.mW.rotulo), {
+            fora: ctx.p(pt(L / 2, W / 2)), afastamento: W / 2 * k + 12,
+            tam: TAM_DADO, corTexto: corValor
+          });
         });
       });
     }

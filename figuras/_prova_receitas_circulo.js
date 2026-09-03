@@ -86,6 +86,13 @@ const CASOS = [
     fig: '@fig conica id=e6 tipo=elipse a=3 b=2 eixos=sim centro=2;3;C', mede: 'elipse' },
   { nome: 'hiperbole', titulo: 'conica: hiperbole 3 por 2 com focos, vertices, retangulo fundamental e assintotas',
     fig: '@fig conica id=h1 tipo=hiperbole a=3 b=2 focos=F1;F2 vertices=A1;A2 retangulo=c assintotas=sim', mede: 'hiperbole' },
+  /* A figura da DEFINICAO do MATEM3-04 (material p.2 nas duas linguas), que e
+   * onde o nome do foco saia a 32,43 pt do ponto com um fio de chamada
+   * atravessando o ramo. Ela nao estava na folha de prova: o unico caso de
+   * hiperbole que havia era o do retangulo, e la o mesmo defeito acontecia sem
+   * ninguem medir. */
+  { nome: 'hiperbole definicao', titulo: 'conica: hiperbole 4 por 3 com os dois focos nomeados e P com os raios focais',
+    fig: '@fig conica id=h4 tipo=hiperbole a=4 b=3 focos=F1;F2 ponto=P', mede: 'hiperbole' },
   { nome: 'parabola definicao', titulo: 'conica: parabola com V, F, diretriz d e P com os dois segmentos iguais',
     fig: '@fig conica id=p1 tipo=parabola p=4 focos=F vertices=V diretriz=d ponto=P', mede: 'parabola' },
   { nome: 'parabola gab 20', titulo: 'conica: gabarito do 20, y2 = 12x, P a 8 do foco e a 8 da diretriz',
@@ -459,6 +466,56 @@ console.log('\nhiperbole: focos a c = raiz(a2 + b2)');
   conf('sem tarja nem falha', (m.reg.conferencia || []).length === 0 && (m.reg.rotulos || []).every((r) => !r.tarja));
 }
 
+/* O nome do foco da hiperbole, nas DUAS figuras que a folha tem.
+ *
+ * O defeito medido no MATEM3-04 (material p.2 e p.3, nas duas linguas, quatro
+ * rotulos por folha): o nome do foco procurava lugar em cima e embaixo, nao
+ * achava, fugia 25,00 pt e ganhava fio de chamada. Na folha de prova o F1 saia
+ * a 32,43 pt da bolinha que ele nomeia, e o fio cruzava o ramo da hiperbole a
+ * 13,75 pt do rotulo, ou seja 2,4 vezes mais perto do que o ponto. Quem le de
+ * baixo para cima sobe pelo fio, o olho fecha no primeiro traco e a leitura
+ * que sobra e "o foco esta SOBRE a curva", que e o contrario do que o texto
+ * diz duas vezes ("os focos ficam alem dos vertices", "os focos ficam fora
+ * dele").
+ *
+ * Na hiperbole o lado livre e o de FORA, alem do foco: entre a letra e a
+ * bolinha nao passa curva nenhuma. A conferencia mede as duas coisas que
+ * importam, e as duas falham na receita de antes: nao ha fio de chamada, e o
+ * segmento reto que liga o rotulo ao ponto nao cruza contorno nenhum. */
+console.log('\no nome do foco da hiperbole sai para fora, sem fio que atravesse o ramo');
+function cruzamento(p1, p2, p3, p4) {
+  const d = (p2.x - p1.x) * (p4.y - p3.y) - (p2.y - p1.y) * (p4.x - p3.x);
+  if (Math.abs(d) < 1e-9) return null;
+  const t = ((p3.x - p1.x) * (p4.y - p3.y) - (p3.y - p1.y) * (p4.x - p3.x)) / d;
+  const u = ((p3.x - p1.x) * (p2.y - p1.y) - (p3.y - p1.y) * (p2.x - p1.x)) / d;
+  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+  return { x: p1.x + t * (p2.x - p1.x), y: p1.y + t * (p2.y - p1.y) };
+}
+for (const nome of ['hiperbole', 'hiperbole definicao']) {
+  const m = achar(nome), reg = m.reg;
+  const contorno = (reg.medido.segmentos || []).filter((s) => Math.abs(s.w - 1.2) < 0.01);
+  const nomes = (reg.rotulos || []).filter((r) => r.texto === 'F1' || r.texto === 'F2');
+  let piorDist = 0, comFio = 0, atravessa = 0, piorRazao = Infinity;
+  for (const r of nomes) {
+    const alvo = { x: r.cx, y: r.cy }, anc = r.ancora;
+    piorDist = Math.max(piorDist, dist(alvo, anc));
+    if (r.chamada) comFio++;
+    let perto = null;
+    for (const s of contorno) {
+      const p = cruzamento(anc, alvo, { x: s.x1, y: s.y1 }, { x: s.x2, y: s.y2 });
+      if (p && (!perto || dist(p, alvo) < dist(perto, alvo))) perto = p;
+    }
+    if (perto) { atravessa++; piorRazao = Math.min(piorRazao, dist(anc, alvo) / Math.max(0.01, dist(perto, alvo))); }
+  }
+  medido(nome + ': ' + nomes.length + ' nome(s) de foco, o mais distante a ' + n2c(piorDist) +
+    ' pt da sua bolinha (era 32,43 pt), ' + comFio + ' com fio de chamada, ' + atravessa + ' com contorno no caminho' +
+    (atravessa ? ' (o mais proximo a ' + n2c(piorRazao) + ' vezes a distancia do ponto)' : ''));
+  conf('os dois focos ganham nome em ' + nome, nomes.length === 2);
+  conf('nenhum nome de foco precisa de fio de chamada em ' + nome, comFio === 0, comFio + ' com fio');
+  conf('e entre a letra e a bolinha nao passa contorno nenhum em ' + nome, atravessa === 0, atravessa + ' atravessado(s)');
+  conf('o nome do foco fica a menos de um corpo e meio da bolinha em ' + nome, piorDist < 13, n2c(piorDist) + ' pt');
+}
+
 console.log('\nparabola: foco a p/2 do vertice, diretriz a p/2 do outro lado');
 function parabolaDe(m) {
   const k = m.reg.escala;
@@ -562,7 +619,33 @@ console.log('\npi desenrolado: tres d mais a sobra dao pi vezes d');
   const volta = voltasInteiras(subs, 20)[0];
   const c = caixaDe(pontosDoSub(volta, 24));
   conf('a circunferencia de cima tem diametro d', Math.abs(c.largura - d) < 0.5 && Math.abs(c.altura - d) < 0.5, 'caixa ' + c.largura.toFixed(3) + ' por ' + c.altura.toFixed(3));
-  conf('quatro d e a sobra impressos: cinco marcas', tem(m, 'd') === 4 && tem(m, '0.14·d') === 1 && m.reg.marcasAtivas === 5, m.reg.marcasAtivas + ' marcas');
+  conf('quatro d e a sobra impressos: cinco marcas', tem(m, 'd') === 4 && tem(m, '0,14·d') === 1 && m.reg.marcasAtivas === 5, m.reg.marcasAtivas + ' marcas');
+
+  /* O separador decimal do rotulo segue a LINGUA da folha.
+   *
+   * Medido no MAT08-13 pagina 1: a diretiva escreve sobra=0.14·d nas duas
+   * linguas (a virgula esta proibida no valor, porque ela e o separador de
+   * lista do @fig), e a figura imprimia "0.14·d" tambem em portugues, na mesma
+   * pagina em que o corpo do texto escreve 3,14 e 31,4 e o gabarito escreve
+   * 113,04. Era a unica quebra de notacao numerica da folha inteira. A
+   * ESPECIFICACAO.md linha 43 ja dizia de quem e a decisao: "a diretiva sempre
+   * escreve ponto e quem imprime a folha decide a virgula". */
+  const naLingua = (lg) => {
+    const d2 = new PDFGen.Doc();
+    d2.lingua = lg;
+    d2.novaPagina();
+    const antes = (d2.figurasDesenhadas || []).length;
+    d2.partesDeFigura('@fig pidesenrolado id=kL diametro=d sobra=0.14·d').forEach(function (p) {
+      if (p.tipo === 'figura') d2.figura(p.diretiva, { x: MARG_E + 20, largura: LARGURA });
+    });
+    const r = (d2.figurasDesenhadas || [])[antes];
+    return ((r && r.medido && r.medido.textos) || []).map((t) => t.txt);
+  };
+  const emPt = naLingua('pt'), emEn = naLingua('en');
+  medido('o rotulo da sobra sai "' + emPt.filter((t) => /\d/.test(t)).join(' ') + '" em portugues e "' +
+    emEn.filter((t) => /\d/.test(t)).join(' ') + '" em ingles (saia com ponto nas duas)');
+  conf('em portugues o rotulo da sobra sai com virgula', emPt.indexOf('0,14·d') >= 0 && emPt.indexOf('0.14·d') < 0);
+  conf('e em ingles continua com ponto', emEn.indexOf('0.14·d') >= 0 && emEn.indexOf('0,14·d') < 0);
 
   /* A seta que liga a circunferencia ao barbante. Ela apontava reta para baixo
    * e pousava em x = 200,89 pt, o meio EXATO do primeiro intervalo d (que vai
@@ -603,7 +686,9 @@ console.log('\npista e roda');
    * em x = 297,64 pt, que e ao mesmo tempo o meio do retangulo e o meio da
    * silhueta inteira: nada na folha dizia qual dos dois vaos ele mede, e ler
    * 84 como a pista toda faz o retangulo virar 84 menos 60. */
-  const cotas84 = (m.reg.tracos || []).filter((t) => t && t.tipo === 'cota');
+  const cotas = (m.reg.tracos || []).filter((t) => t && t.tipo === 'cota');
+  const cotas84 = cotas.filter((t) => Math.abs(t.y1 - t.y2) < 0.05);
+  const cotas60 = cotas.filter((t) => Math.abs(t.x1 - t.x2) < 0.05);
   const chamadas = (m.reg.medido.segmentos || []).filter((s) => Math.abs(s.w - 0.6) < 0.01 &&
     Math.abs(s.x1 - s.x2) < 0.05 && s.tracejado.indexOf('[]') === 0);
   const t84 = textos(m).filter((t) => t.txt === '84')[0];
@@ -619,6 +704,55 @@ console.log('\npista e roda');
     Math.abs(vaoCotado / k - 84) < 0.05 && Math.abs(silhueta / k - 144) < 0.5);
   conf('com um tracinho de extensao descendo de cada ponta do retangulo', chamadas.length === 2 &&
     chamadas.every((s) => longos.some((L) => Math.abs(s.x1 - L.x1) < 0.05 || Math.abs(s.x1 - L.x2) < 0.05)));
+
+  /* O 60 ganha o MESMO tratamento, pelo mesmo motivo levado ate o fim.
+   *
+   * Medido na folha do MAT08-13 (material p.6 e lista p.3): o 84 tinha cota
+   * completa (chamadas, linha de 0,9 pt e duas setas) e o 60 era um numero nu
+   * de 12,65 por 9,86 pt encostado a 5,00 pt da linha TRACEJADA, que e
+   * justamente a linha que NAO entra no perimetro (gabarito 168 mais 60π). O
+   * unico numero ao lado dessa linha nao dizia onde ela comeca nem onde ela
+   * acaba, e o halo branco dele ainda abria um retangulo dentro da regiao
+   * pintada. Agora ele sai do lado de FORA, a esquerda, com as chamadas
+   * saindo dos dois cantos do lado esquerdo do retangulo. */
+  const t60 = textos(m).filter((t) => t.txt === '60')[0];
+  const vaoCotado60 = cotas60.length ? Math.abs(cotas60[0].y2 - cotas60[0].y1) : 0;
+  const chamadas60 = (m.reg.medido.segmentos || []).filter((s) => Math.abs(s.w - 0.6) < 0.01 &&
+    Math.abs(s.y1 - s.y2) < 0.05 && s.tracejado.indexOf('[]') === 0);
+  const esqRet = longos.length === 2 ? Math.min(longos[0].x1, longos[0].x2) : NaN;
+  const arcoEsq = (m.reg.medido.arcos || []).reduce((a, x) => Math.min(a, x.cx - x.raio), Infinity);
+  const foraDoArco = t60 ? arcoEsq - (t60.x + t60.largura) : NaN;
+  const daGuia = t60 ? Math.min.apply(null, curtos.map((s) => Math.abs(s.x1 - (t60.x + t60.largura)))) : NaN;
+  medido('60: vao cotado ' + n2c(vaoCotado60) + ' pt (' + n2c(vaoCotado60 / k) + ' unidades); ' + chamadas60.length +
+    ' chamada(s) horizontal(is); o texto acaba a ' + n2c(foraDoArco) + ' pt do ponto mais a esquerda do semicirculo e a ' +
+    n2c(daGuia) + ' pt da linha tracejada (era 5,00 pt, encostado nela)');
+  conf('o 60 tambem sai em cota, e nao como numero nu ao lado da linha tracejada', cotas60.length === 1);
+  conf('a cota do 60 mede a largura do retangulo', Math.abs(vaoCotado60 / k - 60) < 0.05);
+  conf('com uma linha de chamada saindo de cada canto do lado esquerdo', chamadas60.length === 2 &&
+    chamadas60.every((s) => Math.abs(Math.max(s.x1, s.x2) - esqRet) < 2.5));
+  conf('e o numero fica FORA da silhueta, longe da linha que nao entra no perimetro',
+    t60 && foraDoArco > 3 && daGuia > 40, n2c(foraDoArco) + ' pt do arco, ' + n2c(daGuia) + ' pt da tracejada');
+
+  /* A tinta da regiao. O enunciado 16 pede "o perimetro da pista e a area da
+   * regiao que ela delimita", entao o preenchimento E a regiao pedida e nao
+   * apoio. Ele saia em COR.soft, 1,12:1 contra o branco, o unico preenchimento
+   * de regiao da folha abaixo do piso de 3:1: numa impressora de casa os 7 por
+   * cento de tinta somem e a resposta a "qual e a regiao" desaparece. */
+  const areas = (m.reg.medido.areas || []).map((a) => a.cor).filter((c) => c && contrasteNoBranco(c) < 15 && contrasteNoBranco(c) > 1.001);
+  const pior = areas.length ? Math.min.apply(null, areas.map(contrasteNoBranco)) : Infinity;
+  medido('a regiao da pista sai em ' + (areas.length ? nomeHex(areas[0]) : '(nada)') + ', ' + n2c(pior) +
+    ':1 contra o branco (era #EFF3F7, 1,12:1)');
+  conf('a regiao pedida passa o piso de 3:1 da WCAG para objeto grafico', areas.length >= 1 && pior >= 3);
+}
+/* Contraste contra o papel branco, pela formula da WCAG. Mora aqui porque as
+ * duas secoes que medem tinta de area (a pista e o alvo) ficam antes das
+ * utilidades do fim do arquivo. */
+function contrasteNoBranco(c) {
+  const f = c.map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+  return 1.05 / (0.2126 * f[0] + 0.7152 * f[1] + 0.0722 * f[2] + 0.05);
+}
+function nomeHex(c) {
+  return '#' + c.map((v) => ('0' + Math.round(v * 255).toString(16)).slice(-2).toUpperCase()).join('');
 }
 {
   const m = achar('rodando');
@@ -873,9 +1007,13 @@ function ondeAoLongo(P, s) {
 {
   const m = achar('hiperbole'), reg = m.reg;
   const segs = reg.medido.segmentos || [];
-  const assintotas = segs.filter((s) => s.tracejado.indexOf('[2 2]') === 0 && comprimento(s) > 150);
+  /* As assintotas sao escolhidas pela GEOMETRIA (0,6 pt e mais de 150 pt de
+   * comprimento, que so elas tem nesta figura) e nao pelo padrao de traco:
+   * escolhidas pelo padrao, uma trava sobre o padrao se confirmaria sozinha. */
+  const assintotas = segs.filter((s) => Math.abs(s.w - 0.6) < 0.01 && comprimento(s) > 150);
   const linhaC = segs.filter((s) => Math.abs(s.w - 0.9) < 0.01 && comprimento(s) > 20);
-  conf('as duas assintotas saem inteiras e tracejadas', assintotas.length === 2, assintotas.length + ' assintota(s)');
+  conf('as duas assintotas saem inteiras e tracejadas', assintotas.length === 2 &&
+    assintotas.every((s) => s.tracejado.indexOf('[]') !== 0), assintotas.length + ' assintota(s)');
   let menor = Infinity;
   for (const s of linhaC) {
     const meio = { x: (s.x1 + s.x2) / 2, y: (s.y1 + s.y2) / 2 };
@@ -887,6 +1025,28 @@ function ondeAoLongo(P, s) {
   const emMuted = lados.filter((s) => s.cor && Math.abs(s.cor[0] - COR.muted[0]) < 0.02 && Math.abs(s.cor[1] - COR.muted[1]) < 0.02);
   conf('o retangulo fundamental sai na tinta do contorno, e nao em muted', lados.length === 4 && emMuted.length === 0,
     lados.length + ' lados, ' + emMuted.length + ' em muted');
+
+  /* A DIFERENCA entre a caixa e o X, codificada duas vezes.
+   *
+   * O conserto de contraste trouxe o retangulo para a tinta do contorno, que e
+   * o certo para a fotocopia, mas as assintotas ja estavam la: os quatro lados
+   * e as duas retas sairam com a assinatura identica "0,60 pt | #1A1C1F |
+   * [2 2] 0", seis tracos iguais, e na folha isso e uma trelica unica. O texto
+   * manda ler duas coisas diferentes na mesma imagem ("o retangulo tem lados
+   * 2a e 2b" e "as assintotas sao as diagonais dele prolongadas"), e separar
+   * uma da outra virava trabalho da aluna. A trava conta as assinaturas:
+   * enquanto o retangulo e a assintota partilharem cor, espessura E padrao,
+   * ela reprova. */
+  const assinatura = (s) => n2c(s.w) + '|' + (s.cor || []).map((v) => n2c(v)).join(',') + '|' + s.tracejado;
+  const doRetangulo = new Set(lados.map(assinatura));
+  const daAssintota = new Set(assintotas.map(assinatura));
+  const partilhadas = [...daAssintota].filter((a) => doRetangulo.has(a));
+  medido('assinatura (espessura, tinta, tracejado) do retangulo: ' + [...doRetangulo].join(' ; ') +
+    ' / da assintota: ' + [...daAssintota].join(' ; '));
+  conf('o retangulo e a assintota nao sao o mesmo traco na folha', partilhadas.length === 0,
+    partilhadas.length + ' assinatura(s) em comum');
+  conf('e a assintota continua na tinta do contorno, que e a que sobrevive a fotocopia',
+    assintotas.every((s) => s.cor && Math.abs(s.cor[0] - COR.texto[0]) < 0.02));
 }
 
 {

@@ -21,7 +21,9 @@ const PDFGen = require('../pdf.js');
 
 const ID = 'MATEM3-04';
 const RAIZ = path.join(__dirname, '..');
-const BANCO = process.argv[2] || path.join(RAIZ, 'temas', 'banco.json');
+const PADRAO = path.join(RAIZ, 'temas', 'banco.json');
+const BANCO = process.argv[2] || PADRAO;
+const FONTE = path.join(RAIZ, 'temas', 'mat', 'em3', ID + '.md');
 const banco = JSON.parse(fs.readFileSync(BANCO, 'utf8'));
 const tema = banco.temas.find(function (t) { return t.id === ID; });
 if (!tema) throw new Error(ID + ' nao esta em ' + BANCO + ': rode gerar_banco.py antes');
@@ -64,6 +66,30 @@ function conf(rotulo, obtido, esperado) {
 function medido(t) { console.log('        ' + t); }
 
 console.log('\nconferencias');
+
+/* 0. O banco tem que ser o do .md de hoje.
+ * O piloto le o banco.json, e nao o .md, de proposito: e o arquivo que o tablet
+ * consome, entao e nele que a folha da aluna nasce. Mas quando o .md muda e o
+ * gerar_banco.py ainda nao rodou, TODAS as contagens abaixo comparam a escolha
+ * editorial de hoje com o texto de ontem, e o piloto reprova em sete
+ * conferencias sem dizer a causa. Ja aconteceu nesta rodada. Esta conferencia
+ * diz a causa numa linha so, e o conserto e regerar o banco, nunca desfazer o
+ * tema. Conta as diretivas dos dois lados: no .md as linhas @fig das duas
+ * linguas, no banco as que sobreviveram em explicacao, enunciado e resposta.
+ * So vale para o banco padrao: quem passa outro banco na linha de comando, para
+ * comparar com a main por exemplo, esta comparando de proposito. */
+if (BANCO === PADRAO && fs.existsSync(FONTE)) {
+  const noMd = (fs.readFileSync(FONTE, 'utf8').match(/(^|\s)@fig\s/g) || []).length;
+  let noBanco = 0;
+  ['pt', 'en'].forEach(function (lingua) {
+    const d = tema[lingua] || {};
+    const textos = [d.explicacao || ''];
+    (d.exercicios || []).forEach(function (e) { textos.push(e.enunciado || '', e.resposta || ''); });
+    textos.forEach(function (s) { noBanco += (s.match(/(^|\s)@fig\s/g) || []).length; });
+  });
+  conf('o banco.json foi gerado do MATEM3-04.md de hoje (' + noMd + ' diretivas no .md)',
+    noBanco === noMd ? 'sim' : 'NAO: o banco tem ' + noBanco + ' diretivas, rode temas/_ferramentas/gerar_banco.py', 'sim');
+}
 
 [['material', material], ['lista', lista], ['gabarito', gabarito], ['ingles', ingles]]
   .forEach(function (par) {
@@ -120,19 +146,35 @@ function receitasDe(texto) {
   return nomes.join(' ');
 }
 
-/* Escolha editorial escrita: 6 na explicacao, 1 em 20 enunciados, 2 no gabarito.
- * Sao seis e nao cinco porque as tres conicas se definem por distancia e as
- * tres precisam da definicao DESENHADA: a elipse tem a soma dos raios focais na
- * primeira figura e a parabola tem os dois segmentos iguais com tracinho, e a
- * hiperbole nao tinha nada, so o retangulo e as assintotas. A folha pedia para
- * a aluna aceitar de fe justamente a conica em que trocar a relacao e o erro
- * que mais aparece. */
+/* Escolha editorial escrita: 5 na explicacao, nenhuma nos 20 enunciados, 1 no
+ * gabarito. As tres conicas se definem por distancia e as tres precisam da
+ * definicao DESENHADA: a elipse tem a soma dos raios focais na primeira figura,
+ * a hiperbole tem a diferenca na dela, a parabola tem os dois segmentos iguais
+ * com tracinho. As outras duas sao as que o texto percorre elemento a elemento,
+ * o triangulo de Pitagoras e o retangulo fundamental com as assintotas.
+ *
+ * Duas sairam desta lista, e o motivo e medido em papel. Cada figura de conica
+ * reserva 190 pt, um quarto da faixa util da folha, porque a caixa e mais larga
+ * do que alta e o alturaParaCaixa do receitas.js entrega o teto de 190 para
+ * todas elas. Com nove figuras o material saia com 9 paginas em cada lingua e
+ * tres delas quase em branco: PT p.5 com 616 pt de papel branco (89 por cento
+ * da faixa util), EN p.7 com 631 pt (91 por cento) e p.9 com 487 pt nas duas.
+ * Com seis figuras sao 6 paginas e a mais vazia tem 148 pt, 21 por cento.
+ *
+ * A que saiu da explicacao e a elipse transladada do Exemplo 4: das seis, e a
+ * unica cujo paragrafo continua inteiro sem ela, porque o que o exemplo ensina
+ * e a conta de completar quadrados, e a conclusao ('a curva e a mesma, so
+ * desenhada em outro lugar') cabe na frase. A do enunciado do 18 desceu para o gabarito e
+ * ganhou com a mudanca: ela estava em escala exata, e com regua na folha a
+ * aluna media PF1 e PF2, fazia 7 vezes a razao e chegava ao 3 sem usar a
+ * definicao uma vez, que e justamente o que aquele enunciado manda usar. No
+ * gabarito a mesma figura vira conferencia, e nao atalho. */
 const diretivasExplic = receitasDe(tema.pt.explicacao).split(' ').filter(function (s) { return s; }).length;
-conf('a explicacao tem 6 figuras', diretivasExplic, 6);
-conf('e as 6 foram desenhadas', (docPT.figurasDesenhadas || []).length - 1, 6);
-conf('mais a 1 figura de enunciado (18)',
-  tema.pt.exercicios.filter(function (e) { return receitasDe(e.enunciado); }).map(function (e) { return e.n; }).join(' '), '18');
-conf('e as 2 do gabarito (18 pelo id e 20)', (docGab.figurasDesenhadas || []).length, 2);
+conf('a explicacao tem 5 figuras', diretivasExplic, 5);
+conf('e as 5 foram desenhadas', (docPT.figurasDesenhadas || []).length, 5);
+conf('nenhum dos 20 enunciados carrega figura',
+  tema.pt.exercicios.filter(function (e) { return receitasDe(e.enunciado); }).map(function (e) { return e.n; }).join(' ') || 'nenhum', 'nenhum');
+conf('e o gabarito tem 1 (a do 18, com o d = 3 escrito)', (docGab.figurasDesenhadas || []).length, 1);
 conf('nenhuma figura falhou', figs.filter(function (f) { return f.erro; }).length, 0);
 conf('nenhum aviso de figura no material', (docPT.avisosFigura || []).length, 0);
 conf('nenhum aviso de figura no gabarito', (docGab.avisosFigura || []).length, 0);
@@ -299,7 +341,9 @@ let elipses = 0, elipsesOk = 0, parabolas = 0, parabolasOk = 0, hiperboles = 0, 
 conf('elipses com focos impressos: ' + elipses + ', todas com os focos a c do centro', elipsesOk, elipses);
 conf('parabolas com foco impresso: ' + parabolas + ', todas com o foco a p/2 do vertice', parabolasOk, parabolas);
 conf('hiperboles: ' + hiperboles + ', com |PF1 - PF2| = 2a em todo ponto impresso', hiperbolesOk, hiperboles);
-conf('houve o que medir (4 elipses, 2 parabolas, 2 hiperboles)', elipses + ' ' + parabolas + ' ' + hiperboles, '4 2 2');
+/* Tres elipses (a da definicao, a de Pitagoras e a do 18 no gabarito), uma
+ * parabola e duas hiperboles: e a conta das seis figuras que sobraram. */
+conf('houve o que medir (3 elipses, 1 parabola, 2 hiperboles)', elipses + ' ' + parabolas + ' ' + hiperboles, '3 1 2');
 
 /* ================================================================ leitura da folha
  * As quatro coisas que a revisao de folha impressa mediu e que o TEMA resolve,
@@ -349,7 +393,25 @@ conf('nenhum par de rotulos na mesma linha de base fica a menos de ' + FOLGA_MIN
  * vertice que ele nomeia e a 11,65 pt do cruzamento das assintotas, ou seja
  * equidistante, e a folha nao dizia qual bolinha era qual. Quem decide isso e
  * o tema, pela escala: a mesma caixa de altura desenha 2a maior quando a razao
- * a por b cresce. */
+ * a por b cresce.
+ *
+ * A primeira versao desta trava so comparava com o cruzamento das assintotas, e
+ * essa era a comparacao errada. O concorrente real do A1 na folha e a OUTRA
+ * bolinha da mesma reta horizontal, a do foco: com a excentricidade honesta de
+ * 1,25 desta figura o vertice e o foco ficam a 9,29 pt um do outro, e o A1 mede
+ * 11,50 pt ate o seu vertice contra 20,78 ate o foco, razao 1,81. A trava
+ * antiga informava 2,23, que e a razao contra o cruzamento, entao qualquer
+ * mudanca que aproximasse o A1 do foco passava no teste e saia errada na folha.
+ * Agora ela mede contra a bolinha mais proxima que NAO e a dele, seja o foco,
+ * seja o outro vertice, e tambem contra o cruzamento, e cobra o menor dos dois.
+ *
+ * O piso desce de 2 para 1,7 porque a medida mudou de objeto, e nao porque a
+ * folha piorou: 1,81 e o que a figura entrega hoje, com o A1 do lado de dentro
+ * do seu vertice e o foco do lado de fora, e a leitura sai inequivoca no papel
+ * (conferido a 200 dpi). E o piso pega o que a medida velha deixava passar:
+ * trocada a figura por a=4 b=2, que puxa o foco para perto do vertice, a razao
+ * nova cai para 1,50 e a conferencia acusa, enquanto a razao velha SOBE para
+ * 3,22, porque afastar b afasta o cruzamento das assintotas. */
 /* Bolinha e area pequena, escura e REDONDA. Sem o teste de redondeza as duas
  * pontas de seta da cota do c entram na conta (5,77 por 6,60 pt, escuras), e
  * uma delas vira "o vertice mais proximo" do A1: a primeira tirada desta
@@ -391,18 +453,29 @@ todasAsFiguras.forEach(function (f) {
     const V = meus[0];
     const aoVertice = Math.hypot(px - V.x, py - V.y);
     const aoCentro = Math.hypot(px - cx, py - cy);
-    if (aoCentro / aoVertice < piorVertice.razao) {
+    /* A bolinha mais proxima que nao e a dele. */
+    let outra = { d: Infinity, quem: 'nenhuma outra bolinha' };
+    dots.forEach(function (d) {
+      if (d === V) return;
+      const dd = Math.hypot(px - d.x, py - d.y);
+      if (dd < outra.d) outra = { d: dd, quem: 'da bolinha vizinha' };
+    });
+    const concorrente = Math.min(outra.d, aoCentro);
+    const comoChama = outra.d <= aoCentro ? outra.quem : 'do cruzamento das assintotas';
+    if (concorrente / aoVertice < piorVertice.razao) {
       piorVertice = {
-        razao: aoCentro / aoVertice,
+        razao: concorrente / aoVertice,
         onde: nomeDaFigura(f) + ' "' + t.txt + '" a ' + aoVertice.toFixed(2) +
-          ' pt do seu vertice e a ' + aoCentro.toFixed(2) + ' pt do cruzamento das assintotas'
+          ' pt do seu vertice e a ' + concorrente.toFixed(2) + ' pt ' + comoChama
       };
     }
   });
 });
+const PISO_DO_VERTICE = 1.7;
 medido(piorVertice.onde + ' (razao ' + piorVertice.razao.toFixed(2) + ')');
-conf('o rotulo do vertice fica ao menos duas vezes mais perto do seu vertice do que do centro',
-  piorVertice.razao >= 2, true);
+conf('o rotulo do vertice fica ao menos ' + PISO_DO_VERTICE +
+  ' vezes mais perto do seu vertice do que do concorrente mais proximo',
+  piorVertice.razao >= PISO_DO_VERTICE, true);
 
 /* 3. Enunciado no singular com gabarito no plural.
  * O 20 pedia "as coordenadas desse ponto" e o gabarito entregava "os pontos
@@ -445,6 +518,113 @@ let jaRespondidos = [];
 });
 conf('nenhum exercicio repete a equacao de um exemplo com a resposta ja impressa',
   jaRespondidos.join('; ') || 'nenhum', 'nenhum');
+
+/* 5. A letra de cota tem que repousar no traco que ela cota.
+ * Em desenho a letra pertence a linha em que a base dela repousa, e as travas 1
+ * e 2 acima so comparam texto contra texto e texto contra bolinha: nenhuma
+ * olhava texto contra TRACO. Dois casos medidos na tirada anterior, os dois na
+ * explicacao:
+ *
+ *   b   na elipse que abre o tema: 1,92 pt ate a corda PF2, que e obliqua, e
+ *       5,60 pt ate o semieixo menor, que e vertical e e o que ele nomeia. A
+ *       aluna saia da primeira figura com b = raio focal, no paragrafo que
+ *       acabou de dizer que PF1 + PF2 = 2a, e trocar quem e quem nessa relacao
+ *       e o erro que o proprio tema lista como o numero um.
+ *   d   na parabola: 5,60 pt ate a diretriz, que ele nomeia, e 5,76 pt ate o
+ *       segmento horizontal que sai de P, ou seja empate de 3 por cento, e o
+ *       segmento errado e o mais grosso dos dois (0,9 contra 0,6 pt).
+ *
+ * A conferencia le da DIRETIVA que traco cada letra cota, porque isso e escolha
+ * do tema: b cota o semieixo menor, que e vertical; a, c e p cotam medidas
+ * sobre o eixo horizontal; diretriz=<letra> nomeia a reta vertical. Duas cotam
+ * obliquas e para elas so vale a margem: retangulo=<letra>, que e a meia
+ * diagonal, e incognita=<letra>, que e o raio focal. Fora a direcao, todas tem
+ * que ganhar do segundo traco mais proximo por 1,6 vezes; hoje a pior margem e
+ * 2,29. So le letra escrita sozinha: no gabarito a incognita sai como "d = 3",
+ * puxada por fio de chamada, que e outra mecanica e tem trava propria. */
+const DIRECAO_DA_COTA = { a: 0, b: 90, c: 0, p: 0, diretriz: 90, retangulo: null, incognita: null };
+const MARGEM_DA_COTA = 1.6;
+const TOLERANCIA_DE_ANGULO = 4;
+
+function paresDaDiretiva(bruto) {
+  const pares = {};
+  const rx = /([a-z]+)=([^\s]+)/g;
+  let m;
+  while ((m = rx.exec(String(bruto || '')))) if (!(m[1] in pares)) pares[m[1]] = m[2];
+  return pares;
+}
+function letraDaCota(valor) {
+  const partes = String(valor).split(';');
+  const fim = partes[partes.length - 1];
+  return /^[A-Za-z]$/.test(fim) ? fim : null;
+}
+function anguloDoSegmento(s) {
+  let a = Math.atan2(s.y2 - s.y1, s.x2 - s.x1) * 180 / Math.PI;
+  while (a < 0) a += 180;
+  return a % 180;
+}
+function difDeAngulo(u, v) { const d = Math.abs(u - v) % 180; return Math.min(d, 180 - d); }
+function distanciaAteSegmento(caixa, s) {
+  function doPonto(px, py) {
+    const dx = s.x2 - s.x1, dy = s.y2 - s.y1, L = dx * dx + dy * dy;
+    let t = L ? ((px - s.x1) * dx + (py - s.y1) * dy) / L : 0;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (s.x1 + t * dx), py - (s.y1 + t * dy));
+  }
+  let d = Infinity;
+  for (let i = 0; i <= 16; i++) {
+    const fx = caixa.x0 + (caixa.x1 - caixa.x0) * i / 16;
+    const fy = caixa.y0 + (caixa.y1 - caixa.y0) * i / 16;
+    d = Math.min(d, doPonto(fx, caixa.y0), doPonto(fx, caixa.y1), doPonto(caixa.x0, fy), doPonto(caixa.x1, fy));
+  }
+  return d;
+}
+let cotasLidas = 0;
+let cotaErrada = [];
+let piorCota = { razao: Infinity, onde: 'nenhuma letra de cota' };
+todasAsFiguras.forEach(function (f) {
+  const pares = paresDaDiretiva(f.diretiva);
+  const med = f.medido || {};
+  const tracos = (med.segmentos || []).filter(function (s) { return !s.varredura; });
+  if (!tracos.length) return;
+  Object.keys(DIRECAO_DA_COTA).forEach(function (chave) {
+    if (!(chave in pares)) return;
+    const letra = letraDaCota(pares[chave]);
+    if (!letra) return;
+    const rot = (med.textos || []).filter(function (t) { return String(t.txt).trim() === letra; });
+    if (!rot.length) return;
+    rot.forEach(function (t) {
+      cotasLidas++;
+      const caixa = { x0: t.x, y0: t.y, x1: t.x + t.largura, y1: t.y + t.tam * 0.72 };
+      const ordenados = tracos.map(function (s) {
+        return { d: distanciaAteSegmento(caixa, s), ang: anguloDoSegmento(s), s: s };
+      }).sort(function (u, v) { return u.d - v.d; });
+      const perto = ordenados[0];
+      const outro = ordenados.find(function (o) { return difDeAngulo(o.ang, perto.ang) > TOLERANCIA_DE_ANGULO; });
+      const esperada = DIRECAO_DA_COTA[chave];
+      const onde = nomeDaFigura(f) + ' "' + letra + '" (' + chave + '=' + pares[chave] + ')';
+      if (esperada !== null && difDeAngulo(perto.ang, esperada) > TOLERANCIA_DE_ANGULO) {
+        cotaErrada.push(onde + ': o traco mais proximo esta a ' + perto.d.toFixed(2) +
+          ' pt e sai a ' + perto.ang.toFixed(0) + ' graus, e nao a ' + esperada);
+        return;
+      }
+      const razao = outro ? outro.d / Math.max(perto.d, 1e-6) : Infinity;
+      if (razao < piorCota.razao) {
+        piorCota = {
+          razao: razao,
+          onde: onde + ' a ' + perto.d.toFixed(2) + ' pt do traco que ela cota e a ' +
+            (outro ? outro.d.toFixed(2) : 'nenhum') + ' pt do traco seguinte'
+        };
+      }
+    });
+  });
+});
+medido('letras de cota lidas: ' + cotasLidas + '; a de menor margem e ' + piorCota.onde +
+  ' (razao ' + piorCota.razao.toFixed(2) + ')');
+conf('toda letra de cota repousa no traco que ela cota',
+  cotaErrada.join('; ') || 'nenhuma fora do lugar', 'nenhuma fora do lugar');
+conf('e ganha do traco seguinte por ao menos ' + MARGEM_DA_COTA + ' vezes',
+  piorCota.razao >= MARGEM_DA_COTA, true);
 
 console.log('\n' + ok + ' conferencias passaram, ' + mau + ' falharam.');
 [['pt', docPT], ['gb', docGab], ['en', docEN], ['en gb', docGabEN]].forEach(function (par) {

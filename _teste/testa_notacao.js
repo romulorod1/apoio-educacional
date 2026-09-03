@@ -471,6 +471,182 @@ secao('13. O nome de função na fórmula segue a língua da folha');
 }
 
 // ================================================================
+secao('14. A largura de cada caractere bate com a Helvetica de verdade');
+
+/* Quem mede errado quebra a linha no lugar errado, e quem alinha à direita
+ * transborda a margem. O defeito medido: a tabela BASE_ACENTO mandava í, ì, î e
+ * ï para o 'i' simples, que mede 222 milésimos de em; na Helvetica os quatro
+ * medem 278. A legenda alinhada à direita do gabarito 18 do MAT08-13, com dois
+ * "círculo", terminava em x = 556,11 contra a margem em 555,28: passava 0,83 pt,
+ * que é exatamente 2 × 56/1000 × 7,5 pt. E "centímetro", "círculo", "perímetro"
+ * e "semicírculo" aparecem em quase toda linha de um tema de circunferência.
+ *
+ * Conferir só os quatro deixaria o resto escondido, então a prova varre os 218
+ * bytes do WinAnsi que desenham alguma coisa, nos dois pesos. As larguras de
+ * referência abaixo saíram da própria fonte, com
+ * pymupdf.Font('helv').glyph_advance(cp) * 1000 e o mesmo para 'hebo', e batem
+ * com o AFM da Adobe. Ficam escritas aqui, e não medidas na hora, para o teste
+ * rodar sem Python no portão de merge.
+ *
+ * Os índices vão do byte 32 ao 255. Zero marca byte que o WinAnsi deixa sem
+ * glifo (0x7F, 0x81, 0x8D, 0x8F, 0x90, 0x9D): esses não são conferidos, porque
+ * não têm largura para conferir. */
+const REAL_REG = [
+   278,  278,  355,  556,  556,  889,  667,  191,  333,  333,  389,  584,  278,  333,  278,  278,
+   556,  556,  556,  556,  556,  556,  556,  556,  556,  556,  278,  278,  584,  584,  584,  556,
+  1015,  667,  667,  722,  722,  667,  611,  778,  722,  278,  500,  667,  556,  833,  722,  778,
+   667,  778,  722,  667,  611,  722,  667,  944,  667,  667,  611,  278,  278,  278,  469,  556,
+   333,  556,  556,  500,  556,  556,  278,  556,  556,  222,  222,  500,  222,  833,  556,  556,
+   556,  556,  333,  500,  278,  556,  500,  722,  500,  500,  500,  334,  260,  334,  584,    0,
+   556,    0,  222,  556,  333, 1000,  556,  556,  333, 1000,  667,  333, 1000,    0,  611,    0,
+     0,  222,  222,  333,  333,  350,  556, 1000,  333, 1000,  500,  333,  944,    0,  500,  667,
+   278,  333,  556,  556,  556,  556,  260,  556,  333,  737,  370,  556,  584,  333,  737,  333,
+   400,  584,  333,  333,  333,  556,  537,  278,  333,  333,  365,  556,  834,  834,  834,  611,
+   667,  667,  667,  667,  667,  667, 1000,  722,  667,  667,  667,  667,  278,  278,  278,  278,
+   722,  722,  778,  778,  778,  778,  778,  584,  778,  722,  722,  722,  722,  667,  667,  611,
+   556,  556,  556,  556,  556,  556,  889,  500,  556,  556,  556,  556,  278,  278,  278,  278,
+   556,  556,  556,  556,  556,  556,  556,  584,  611,  556,  556,  556,  556,  500,  556,  500
+];
+const REAL_BOLD = [
+   278,  333,  474,  556,  556,  889,  722,  238,  333,  333,  389,  584,  278,  333,  278,  278,
+   556,  556,  556,  556,  556,  556,  556,  556,  556,  556,  333,  333,  584,  584,  584,  611,
+   975,  722,  722,  722,  722,  667,  611,  778,  722,  278,  556,  722,  611,  833,  722,  778,
+   667,  778,  722,  667,  611,  722,  667,  944,  667,  667,  611,  333,  278,  333,  584,  556,
+   333,  556,  611,  556,  611,  556,  333,  611,  611,  278,  278,  556,  278,  889,  611,  611,
+   611,  611,  389,  556,  333,  611,  556,  778,  556,  556,  500,  389,  280,  389,  584,    0,
+   556,    0,  278,  556,  500, 1000,  556,  556,  333, 1000,  667,  333, 1000,    0,  611,    0,
+     0,  278,  278,  500,  500,  350,  556, 1000,  333, 1000,  556,  333,  944,    0,  500,  667,
+   278,  333,  556,  556,  556,  556,  280,  556,  333,  737,  370,  556,  584,  333,  737,  333,
+   400,  584,  333,  333,  333,  611,  556,  278,  333,  333,  365,  556,  834,  834,  834,  611,
+   722,  722,  722,  722,  722,  722, 1000,  722,  667,  667,  667,  667,  278,  278,  278,  278,
+   722,  722,  778,  778,  778,  778,  778,  584,  778,  722,  722,  722,  722,  667,  667,  611,
+   556,  556,  556,  556,  556,  556,  889,  556,  556,  556,  556,  556,  278,  278,  278,  278,
+   611,  611,  611,  611,  611,  611,  611,  584,  611,  611,  611,  611,  611,  556,  611,  556
+];
+/* Byte do WinAnsi que não é latin1: 0x80 a 0x9F vêm do cp1252. Para pedir a
+ * medida ao gerador é preciso o caractere Unicode de verdade, porque é assim
+ * que o autor do tema digita. */
+const UNI_DO_BYTE = {
+  0x80: 0x20AC, 0x82: 0x201A, 0x83: 0x0192, 0x84: 0x201E, 0x85: 0x2026, 0x86: 0x2020,
+  0x87: 0x2021, 0x88: 0x02C6, 0x89: 0x2030, 0x8A: 0x0160, 0x8B: 0x2039, 0x8C: 0x0152,
+  0x8E: 0x017D, 0x91: 0x2018, 0x92: 0x2019, 0x93: 0x201C, 0x94: 0x201D, 0x95: 0x2022,
+  0x96: 0x2013, 0x97: 0x2014, 0x98: 0x02DC, 0x99: 0x2122, 0x9A: 0x0161, 0x9B: 0x203A,
+  0x9C: 0x0153, 0x9E: 0x017E, 0x9F: 0x0178
+};
+const charDoByte = b => String.fromCharCode(UNI_DO_BYTE[b] || b);
+/* Largura de verdade de uma frase, pela tabela da fonte. É contra ela que a
+ * medida do gerador tem que bater: a diferença entre as duas é exatamente o
+ * tanto que a linha transborda. */
+function larguraReal(txt, tam, bold) {
+  const wa = PDFGen.paraWinAnsi(txt);
+  let soma = 0;
+  for (let i = 0; i < wa.length; i++) soma += (bold ? REAL_BOLD : REAL_REG)[wa.charCodeAt(i) - 32];
+  return soma * tam / 1000;
+}
+
+[false, true].forEach(bold => {
+  const ruins = [];
+  let conferidos = 0;
+  for (let b = 32; b < 256; b++) {
+    const real = (bold ? REAL_BOLD : REAL_REG)[b - 32];
+    if (!real) continue;                       // byte sem glifo no WinAnsi
+    conferidos++;
+    const ch = charDoByte(b);
+    const medido = PDFGen.medir(ch, 1000, bold);
+    if (medido !== real) {
+      ruins.push('0x' + b.toString(16).toUpperCase() + ' "' + ch + '" mede ' + medido +
+        ' e a fonte tem ' + real);
+    }
+  }
+  conf('os ' + conferidos + ' bytes do WinAnsi medem certo ' + (bold ? 'no negrito' : 'no regular'),
+    ruins.length ? ruins.length + ' erradas: ' + ruins.join('; ') : 0, 0);
+});
+
+['í', 'ì', 'î', 'ï'].forEach(c => {
+  conf('"' + c + '" mede 278, e não os 222 do "i"', PDFGen.medir(c, 1000), 278);
+  conf('"' + c.toUpperCase() + '" continua medindo 278, como o "I"', PDFGen.medir(c.toUpperCase(), 1000), 278);
+});
+conf('o "i" sem acento continua 222', PDFGen.medir('i', 1000), 222);
+conf('e o "i" do negrito continua 278', PDFGen.medir('i', 1000, true), 278);
+
+/* A legenda que transbordava, medida no fluxo do PDF: o texto alinhado à
+ * direita na margem tem que TERMINAR na margem, e não 0,83 pt depois dela. */
+{
+  const legenda = 'o círculo de raio 2·r vale quatro vezes o de raio r.';
+  const doc = new PDFGen.Doc();
+  doc.novaPagina();
+  doc.texto(legenda, PDFGen.MARG_D, 400, { tam: 7.5, align: 'direita' });
+  const bytes = Buffer.from(doc.finalizar()).toString('latin1');
+  const alvo = PDFGen.paraWinAnsi(legenda);
+  const achado = new RegExp('([\\d.]+) ([\\d.]+) Td \\(' +
+    alvo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\) Tj').exec(bytes);
+  conf('a legenda foi escrita na folha', !!achado, true);
+  const x = achado ? Number(achado[1]) : 0;
+  const fim = x + larguraReal(legenda, 7.5, false);
+  conf('e termina dentro da margem de ' + PDFGen.MARG_D.toFixed(2),
+    fim <= PDFGen.MARG_D + 0.01 ? 'sim' : 'nao, termina em ' + fim.toFixed(2), 'sim');
+  conf('a medida do gerador e a da fonte batem na legenda inteira',
+    PDFGen.medir(legenda, 7.5).toFixed(4), larguraReal(legenda, 7.5, false).toFixed(4));
+}
+
+// ================================================================
+secao('15. A marca d\'água não sai cortada no meio da palavra');
+
+/* A marca fica embaixo de tudo, e a placa branca que o kit de figuras pinta
+ * atrás de cada desenho cobria um pedaço dela: o corte saía numa reta
+ * horizontal e sobrava meia letra do NW boiando embaixo da figura. Medido na
+ * página 6 do material do MAT07-12, com a placa de 60,403.9 495.3x132.
+ *
+ * A regra é tudo ou nada por palavra: placa que corta a palavra sem cobri-la
+ * inteira tira a palavra da página. E a marca continua EMBAIXO do conteúdo, que
+ * é a outra metade do contrato: por cima ela apagaria o traço da figura e a
+ * letra do enunciado, porque COR.marca é tinta opaca. */
+{
+  const folha = (desenhar) => {
+    const d = new PDFGen.Doc();
+    d.novaPagina();
+    if (desenhar) desenhar(d);
+    d.texto('Texto do enunciado.', PDFGen.MARG_E, 300, { tam: 10 });
+    return Buffer.from(d.finalizar()).toString('latin1');
+  };
+  /* Casa a marca pela linha de base dela, e não só pelo texto: "APOIO
+   * EDUCACIONAL" também é escrito no cabeçalho de toda folha, em 8 pt, e um
+   * teste que olhasse só a palavra passaria sempre, por causa do cabeçalho. */
+  const temNW = t => /394\.94 Td \(NW\) Tj/.test(t);
+  const temLegenda = t => /358\.94 Td \(APOIO EDUCACIONAL\) Tj/.test(t);
+
+  conf('sem placa nenhuma a marca sai inteira', temNW(folha(null)) && temLegenda(folha(null)), true);
+
+  // a placa medida na folha do MAT07-12: corta o NW pela base, em y=403,89
+  const fatia = folha(d => d.retangulo(60, 403.9, 495.3, 132, PDFGen.COR.branco));
+  conf('placa que corta o NW no meio da letra tira o NW da página', temNW(fatia), false);
+  conf('e a legenda da marca, que a placa não encosta, continua', temLegenda(fatia), true);
+
+  // placa que cobre a palavra inteira nao fatia nada: a palavra some por baixo
+  // dela de qualquer jeito, entao continua sendo escrita
+  conf('placa que cobre o NW inteiro não muda nada',
+    temNW(folha(d => d.retangulo(60, 380, 495.3, 140, PDFGen.COR.branco))), true);
+  conf('placa longe da marca não muda nada',
+    temNW(folha(d => d.retangulo(60, 700, 495.3, 60, PDFGen.COR.branco))), true);
+
+  // a placa branca de uma legenda pequena, que corta so a linha de baixo
+  conf('placa pequena que corta a legenda tira a legenda',
+    temLegenda(folha(d => d.retangulo(359.6, 365.8, 26.2, 9.2, PDFGen.COR.branco))), false);
+
+  /* A marca embaixo de tudo: o NW tem que ser escrito ANTES do enunciado no
+   * fluxo da página, senão ele passa por cima do texto e da figura. */
+  const limpa = folha(null);
+  conf('a marca é escrita antes do conteúdo, e não por cima dele',
+    limpa.indexOf('(NW) Tj') < limpa.indexOf('(Texto do enunciado.) Tj'), true);
+
+  /* Só o BRANCO tira a marca. COR.soft é quase a mesma tinta da marca (0,937
+   * contra 0,925): fatia de faixa de tabela não é corte visível, e apagar a
+   * marca por causa dela seria perder a marca em folha de tabela à toa. */
+  conf('faixa clara de tabela não tira a marca',
+    temNW(folha(d => d.retangulo(40, 403.9, 515, 132, PDFGen.COR.soft))), true);
+}
+
+// ================================================================
 console.log('\n' + '='.repeat(60));
 console.log(passes + ' verificações passaram, ' + falhas + ' falharam.');
 if (falhas) { console.log('\nFALHAS:'); erros.forEach(e => console.log(' - ' + e)); }
