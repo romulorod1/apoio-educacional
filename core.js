@@ -464,10 +464,19 @@
   /* Muda o padrão da recorrência (dias da semana, horário, duração, fim).
    * Recria as ocorrências futuras não destacadas a partir de aPartirDe. */
   /* Uma aula com folha escrita, anotação ou anexo carrega trabalho que não pode
-   * ser jogado fora por causa de uma mudança de padrão. */
+   * ser jogado fora por causa de uma mudança de padrão.
+   *
+   * O assunto e as áreas contam pelo mesmo motivo, e não contavam. Quem manda
+   * aqui é o editarSerie logo abaixo: ao mudar o padrão de uma repetição, ele
+   * recria as ocorrências futuras e descarta as que considera vazias. Uma aula
+   * cujo único registro fosse o assunto seria apagada sem aviso, levando junto
+   * o passo de trilha que ela fechou. Preservar demais é o lado seguro do
+   * erro: no máximo sobra uma aula que ela apaga com um toque. */
   function temConteudo(aula) {
     return !!(aula && ((aula.notaTexto && aula.notaTexto.trim()) || aula.temNota ||
-      (aula.anexos && aula.anexos.length)));
+      (aula.anexos && aula.anexos.length) ||
+      temasDaAula(aula).length ||
+      (aula.areas && aula.areas.length)));
   }
 
   function editarSerie(db, serieId, novoPadrao, aPartirDe) {
@@ -1087,16 +1096,24 @@
     /* O que ela trabalhou no mês, além das horas. É isto que transforma o
      * fechamento em algo que a família lê com atenção, e não só uma conta. */
     var temasDoMes = [];
-    var vistos = {};
+    /* Agrupa por chave sem acento e sem caixa, e não pelo título cru.
+     *
+     * O assunto passou a poder ser digitado por ela no campo Outro, e aí
+     * 'frações' numa aula e 'Frações' na seguinte virariam duas linhas no
+     * documento que a família lê. O primeiro título visto é o que aparece.
+     * O objeto é sem protótipo porque a chave agora vem de texto livre, e um
+     * assunto chamado 'constructor' não pode derrubar a conta. */
+    var vistos = Object.create(null);
     var contagemAreas = {};
     linhas.forEach(function (l) {
       l.temas.forEach(function (t) {
-        if (vistos[t.titulo]) {
-          if (vistos[t.titulo].datas.indexOf(l.data) < 0) vistos[t.titulo].datas.push(l.data);
+        var chave = chaveDeBusca(t.titulo || '');
+        if (vistos[chave]) {
+          if (vistos[chave].datas.indexOf(l.data) < 0) vistos[chave].datas.push(l.data);
           return;
         }
-        vistos[t.titulo] = { titulo: t.titulo, datas: [l.data] };
-        temasDoMes.push(vistos[t.titulo]);
+        vistos[chave] = { titulo: t.titulo, datas: [l.data] };
+        temasDoMes.push(vistos[chave]);
       });
       l.areas.forEach(function (id) {
         contagemAreas[id] = (contagemAreas[id] || 0) + 1;
