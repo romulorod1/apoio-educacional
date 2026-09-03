@@ -315,6 +315,26 @@
   var Y_TOPO = Y_FIO_CAB - 30;                // inicio do conteudo
   var Y_LIMITE = Y_FIO_ROD + 18;              // fim do conteudo
 
+  /* O vao que fica entre o fio do cabecalho e o TOPO das letras do titulo,
+   * em milimetros. Vale para todo documento que o aplicativo gera.
+   *
+   * O Y_TOPO comeca 30 pt abaixo do fio, que e a margem certa para o corpo do
+   * texto. Quando o titulo tambem descia a partir dali, sobravam 14,9 mm de
+   * papel em branco antes da primeira palavra, e a professora notou que o
+   * fechamento do mes parecia comecar longe demais do alto. Medido pelo fio, o
+   * vao fica em 7 mm nos quatro documentos, que e o de um documento normal.
+   *
+   * A conta mora numa funcao so de proposito: quando ela estava repetida em
+   * cada gerador, a correcao se perdeu duas vezes em reescritas. */
+  var VAO_TITULO = 7 * 72 / 25.4;             // 19.84 pt
+  var ALTURA_MAIUSCULA = 0.717;               // da Helvetica, em fracao do corpo
+
+  /* A linha de base que poe o topo das letras a VAO_TITULO do fio, para um
+   * titulo do corpo dado. */
+  function baseDoTitulo(corpo) {
+    return Y_FIO_CAB - VAO_TITULO - corpo * ALTURA_MAIUSCULA;
+  }
+
   var COR = {
     navy: [0.121569, 0.227451, 0.372549],   // #1F3A5F
     teal: [0.180392, 0.490196, 0.419608],   // #2E7D6B
@@ -840,8 +860,8 @@
     var doc = new Doc();
     doc.novaPagina();
 
-    // titulo
-    doc.y -= 26;
+    // titulo, medido pelo fio do cabecalho e nao pelo cursor
+    doc.y = baseDoTitulo(19);
     doc.texto('Controle de aulas', PAGINA_L / 2, doc.y, { tam: 19, bold: true, cor: COR.navy, align: 'centro' });
     doc.y -= 12;
     doc.texto(dados.mesExtenso, PAGINA_L / 2, doc.y, { tam: 10, cor: COR.teal, align: 'centro', tracking: 1.1 });
@@ -1018,7 +1038,7 @@
   function gerarResumoMes(fechs, mesExtenso) {
     var doc = new Doc();
     doc.novaPagina();
-    doc.y -= 26;
+    doc.y = baseDoTitulo(19);
     doc.texto('Fechamento do mês', PAGINA_L / 2, doc.y, { tam: 19, bold: true, cor: COR.navy, align: 'centro' });
     doc.y -= 12;
     doc.texto(mesExtenso, PAGINA_L / 2, doc.y, { tam: 10, cor: COR.teal, align: 'centro', tracking: 1.1 });
@@ -1865,7 +1885,7 @@
      * aplicativo gera. Medindo pelo fio, o vao fica em 7 mm, que e o de um
      * documento normal. Se o cabecalho for chamado no meio da pagina, e nao no
      * alto, vale o comportamento antigo: desce a partir de onde esta. */
-    var alvoDoTitulo = Y_FIO_CAB - 32;
+    var alvoDoTitulo = baseDoTitulo(17);
     this.y = this.y > alvoDoTitulo ? alvoDoTitulo : this.y - 26;
     /* O título é o nome do tema, escrito pelo autor, então passa pela tubulação
      * rica: com texto() cru um título "Potências de 10^{3}" sairia com a chave na

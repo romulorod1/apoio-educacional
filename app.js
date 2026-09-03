@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.10.1';
+  var VERSAO = '1.10.2';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -18,6 +18,15 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.10.2',
+      itens: [
+        'O vão entre o fio do cabeçalho e o título encolheu pela metade em todos os ' +
+          'documentos. Você tinha notado no fechamento do mês: eram quase 15 milímetros de ' +
+          'papel em branco antes da primeira palavra, contra 7 do material de aula. Agora os ' +
+          'quatro documentos têm o mesmo espaço.'
+      ]
+    },
     {
       versao: '1.10.1',
       itens: [

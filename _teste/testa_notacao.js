@@ -165,22 +165,70 @@ secao('8. O vão entre o fio do cabeçalho e o título');
  * cabecalhoDeSecao e o valor voltou ao antigo, e a minha conferência por grep
  * deu falso positivo porque procurava uma linha que aparece duas vezes dentro
  * da própria função. Agora quem confere é a geometria do PDF gerado, não o
- * texto do fonte. */
+ * texto do fonte.
+ *
+ * E passou a conferir os QUATRO documentos, não só o material de estudo. O
+ * fechamento do mês e o resumo do mês posicionavam o título pelo cursor e
+ * ficavam com 14,9 mm, mais que o dobro do material, e ninguém via porque o
+ * teste olhava um documento só. Quem notou foi a professora, na folha impressa.
+ */
 {
-  const doc = new PDFGen.Doc();
-  doc.novaPagina();
-  doc.cabecalhoDeSecao('Termologia', 'Material de estudo');
-  const bruto = Buffer.from(doc.finalizar()).toString('latin1');
+  const FIO = 841.8898 - 58;
+  const ASC = 0.717;
 
-  const m = bruto.match(/\/F2 17 Tf[^]{0,80}?([0-9.]+) ([0-9.]+) Td/);
-  conf('achei a linha de base do título no PDF', !!m, true);
-  if (m) {
-    const base = parseFloat(m[2]);
-    const fio = 841.8898 - 58;
-    const vaoMm = (fio - (base + 17 * 0.717)) * 25.4 / 72;
-    console.log('       vão medido: ' + vaoMm.toFixed(1) + ' mm');
-    conf('o vão fica entre 5 e 9 mm', vaoMm > 5 && vaoMm < 9, true);
+  /* Mede o vão do PRIMEIRO título de um documento, pela geometria do PDF: o Td
+   * traz a linha de base, e o topo das letras fica uma altura de maiúscula
+   * acima dela. */
+  const vaoDoTitulo = (bytes, corpo) => {
+    const bruto = Buffer.from(bytes).toString('latin1');
+    const re = new RegExp('/F[123] ' + corpo + ' Tf[^]{0,120}?([0-9.]+) ([0-9.]+) Td');
+    const m = bruto.match(re);
+    if (!m) return null;
+    return (FIO - (parseFloat(m[2]) + corpo * ASC)) * 25.4 / 72;
+  };
+
+  const docs = [];
+
+  {
+    const doc = new PDFGen.Doc();
+    doc.novaPagina();
+    doc.cabecalhoDeSecao('Termologia', 'Material de estudo');
+    docs.push(['material de estudo', doc.finalizar(), 17]);
   }
+
+  {
+    const Core = require('../core.js');
+    const db = {
+      alunos: [{ id: 'a1', nome: 'Aluna Exemplo', serie: '8', valorHora: 100 }],
+      aulas: [{
+        id: 'l1', alunoId: 'a1', data: '2026-06-03', inicio: '14:00', duracao: 60,
+        status: 'realizada', temas: ['Frações'], areas: []
+      }],
+      resumos: [{ alunoId: 'a1', mes: '2026-06', texto: 'Foi bem.' }],
+      mapeamentos: [], ajustes: {}
+    };
+    const f = Core.calcularFechamento(db, 'a1', '2026-06');
+    docs.push(['fechamento do mês', PDFGen.gerarFechamento(f, { incluirNotas: false }), 19]);
+    docs.push(['resumo do mês', PDFGen.gerarResumoMes([f], 'junho de 2026'), 19]);
+    docs.push(['ficha de mapeamento', PDFGen.gerarFichaMapeamento({
+      aluno: db.alunos[0], mapeamento: { data: '2026-06-01', marcados: {} }
+    }), 17]);
+  }
+
+  for (const [nome, bytes, corpo] of docs) {
+    const vao = vaoDoTitulo(bytes, corpo);
+    conf('achei a linha de base do título: ' + nome, vao !== null, true);
+    if (vao !== null) {
+      console.log('       ' + nome.padEnd(22) + vao.toFixed(1) + ' mm');
+      conf('o vão fica entre 5 e 9 mm: ' + nome, vao > 5 && vao < 9, true);
+    }
+  }
+
+  /* E os quatro têm que concordar entre si: um documento com o dobro do vão do
+   * outro é justamente o que a professora viu na mesa. */
+  const medidos = docs.map(d => vaoDoTitulo(d[1], d[2])).filter(v => v !== null);
+  const espalha = Math.max(...medidos) - Math.min(...medidos);
+  conf('os documentos concordam entre si (menos de 1 mm de diferença)', espalha < 1, true);
 }
 
 // ================================================================
