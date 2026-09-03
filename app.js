@@ -206,9 +206,24 @@
     if (vista === VERSAO) return;
 
     var primeiraVez = !vista && !db.aulas.length;
-    var novas = vista
-      ? NOVIDADES.filter(function (n) { return compararVersao(n.versao, vista) > 0; })
-      : NOVIDADES.slice(0, 2);
+    var novas;
+    if (vista) {
+      novas = NOVIDADES.filter(function (n) { return compararVersao(n.versao, vista) > 0; });
+    } else {
+      /* Quem nunca viu a janela nao tem versao de referencia, entao o recorte e por
+       * quantidade. Era "as duas ultimas versoes", e isso encolheu junto com o
+       * ritmo: duas correcoes seguidas de um item cada abriam a janela com dois
+       * marcadores, que nao paga o incomodo de interromper quem abriu o aplicativo
+       * para dar aula. Agora junta versoes ate somar tres itens, e para em quatro
+       * versoes para nao virar historico. */
+      novas = [];
+      var itens = 0;
+      for (var i = 0; i < NOVIDADES.length && novas.length < 4; i++) {
+        novas.push(NOVIDADES[i]);
+        itens += (NOVIDADES[i].itens || []).length;
+        if (itens >= 3) break;
+      }
+    }
 
     if (primeiraVez || !novas.length) {
       db.ajustes.versaoVista = VERSAO;
