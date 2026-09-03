@@ -369,7 +369,15 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
     marcelo2.mapeamentos[1].marcados.atencao.length, 0);
 
   // ================================================================
-  secao('7. A lacuna leva aos temas, e a ficha vira PDF');
+  secao('7. A lacuna leva à trilha, os temas continuam a um toque, e a ficha vira PDF');
+
+  /* O botão da lacuna mudou de destino de propósito: antes abria a busca de
+   * temas, que devolve dezoito resultados em ordem de relevância, começando pelo
+   * 8º ano e pulando para o 4º. Agora monta a trilha, que é a mesma lista em
+   * ordem de pré-requisito.
+   *
+   * O caminho antigo NÃO sumiu, e é isso que as asserções de baixo continuam
+   * conferindo: ele está dentro da trilha, em "Ver os temas soltos". */
 
   await abrirFichaDoMarcelo();
   await espera(700);
@@ -379,13 +387,30 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 
   await pag.$eval('[data-item="lacunas:fracoes"] button', e => e.click());
   await espera(2200);
-  conf('a janela de temas abriu pela lacuna', await visivel('#modal-tema'), true);
+  conf('a trilha abriu pela lacuna', await visivel('#modal-trilha'), true);
+  const tituloTrilha = await pag.$eval('#titulo-modal-trilha', e => e.textContent.trim());
+  conf('e o título diz o que ela fecha', /Fraç/i.test(tituloTrilha), true);
+
+  /* Daqui em diante é o caminho de hoje, um nível abaixo. */
+  await clicarTexto('#modal-trilha button', 'Ver os temas soltos');
+  await espera(2000);
+  conf('a janela de temas continua a um toque, de dentro da trilha',
+    await visivel('#modal-tema'), true);
   conf('com a busca já preenchida',
     await pag.$eval('#corpo-modal-tema input[type=text]', e => e.value), 'fração');
   const achados = await pag.$$eval('#lista-temas .item-tema', es => es.map(e => e.textContent));
   conf('e achou temas de fração', achados.length > 0, true);
-  // A busca olha titulo e resumo, entao o titulo sozinho pode nao ter a palavra.
-  conf('todos falando de fração', achados.every(t => /fra[cç]/i.test(t)), true);
+  /* Todo resultado precisa dizer POR QUE esta ali. A busca olha titulo, resumo,
+   * explicacao e exercicios, entao um tema pode entrar sem a palavra aparecer no
+   * que se le: nesses casos a etiqueta cinza no fim da linha diz onde bateu.
+   *
+   * Medido: por este caminho a lista traz 18 temas, cinco deles achados so pelos
+   * exercicios. Pelo caminho antigo vinham 9, porque a lista abria antes de o
+   * indice de busca terminar de carregar e caia no casamento por titulo e resumo.
+   * A busca por conteudo e a funcionalidade que ela mais elogiou, entao passar a
+   * ter os cinco aqui e ganho, desde que a etiqueta explique cada um. */
+  conf('todo resultado fala de fração ou diz onde bateu',
+    achados.every(t => /fra[cç]/i.test(t) || /tratado n/i.test(t)), true);
   conf('o botão final não fala em anexar, porque não há aula aqui',
     await pag.$eval('#rodape-modal-tema button', e => e.textContent.trim()), 'Cancelar');
 
