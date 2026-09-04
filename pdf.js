@@ -964,7 +964,9 @@
           MARG_E + 12, doc.y, { tam: 9, cor: COR.texto });
       }
     }
-    if (dados.minutosNaoCobrados > 0) {
+    /* Mesma regra do markdown: sai enquanto ela deixar. O motivo está escrito
+       no core.js, em markdownFechamento. */
+    if (dados.minutosNaoCobrados > 0 && opcoes.mostrarNaoCobradas !== false) {
       doc.y -= 15;
       var hn = Math.floor(dados.minutosNaoCobrados / 60) + ':' +
         (dados.minutosNaoCobrados % 60 < 10 ? '0' : '') + (dados.minutosNaoCobrados % 60);

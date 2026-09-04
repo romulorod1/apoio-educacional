@@ -7358,9 +7358,21 @@
     return !!(db.ajustes && db.ajustes.exibirTemasEAreas);
   }
 
+  /* Mostrar ou não, no documento da família, a conta das horas que ela deu e não
+   * cobrou. Nasce ligada, porque é assim que o fechamento sempre foi.
+   *
+   * A chave existe porque há um argumento dos dois lados, e o lado que perde é
+   * sempre o dela: mostrar dá valor ao que ela deu de graça, e mostrar também
+   * transforma gentileza em dívida na cabeça de quem lê. Quem decide é ela, em
+   * Ajustes, e não este arquivo. */
+  function mostrarNaoCobradas() {
+    return !(db.ajustes && db.ajustes.esconderNaoCobradas);
+  }
+
   function opcoesDoDocumento(extra) {
     var o = extra || {};
     o.exibirTemasEAreas = exibirTemasEAreas();
+    o.mostrarNaoCobradas = mostrarNaoCobradas();
     return o;
   }
 
@@ -7541,6 +7553,7 @@
       }
     }
 
+    desenharAjustesDoFechamento();
     desenharAjustesDeReajuste();
 
     Store.estimarEspaco().then(function (e) {
@@ -7618,6 +7631,52 @@
       desenharFechamento();
       desenharAjustes();
     }).catch(function () { /* sem sinal hoje: continua valendo o que já estava */ });
+  }
+
+  /* A área em Ajustes. Fica ao lado da sugestão de reajuste, que é o outro
+   * assunto de Ajustes que fala de dinheiro. */
+  function desenharAjustesDoFechamento() {
+    var tela = $('#tela-ajustes');
+    if (!tela) return;
+    var caixa = $('#ajustes-fechamento');
+    if (!caixa) {
+      caixa = el('div', { id: 'ajustes-fechamento' });
+      var reajuste = $('#ajustes-reajuste');
+      if (reajuste && reajuste.parentNode === tela) tela.insertBefore(caixa, reajuste);
+      else tela.appendChild(caixa);
+    }
+    caixa.innerHTML = '';
+
+    caixa.appendChild(el('h3', { class: 'subtitulo', texto: 'O documento da família' }));
+    var cartao = el('div', { class: 'cartao' });
+
+    var chk = el('input', { type: 'checkbox', style: 'width:auto;min-height:auto' });
+    chk.checked = mostrarNaoCobradas();
+    chk.addEventListener('change', function () {
+      db.ajustes = db.ajustes || {};
+      db.ajustes.esconderNaoCobradas = !chk.checked;
+      salvar().then(function () { desenharAjustesDoFechamento(); });
+    });
+    cartao.appendChild(el('label', {
+      class: 'campo', style: 'display:flex;align-items:center;gap:10px;margin:0'
+    }, [
+      chk,
+      el('span', {
+        texto: 'Mostrar as horas que você deu e não cobrou', style: 'margin:0'
+      })
+    ]));
+
+    cartao.appendChild(el('p', {
+      class: 'ajuda', style: 'margin:8px 0 0',
+      texto: mostrarNaoCobradas()
+        ? 'O fechamento leva uma linha com o total de horas que você deu sem cobrar no mês. '
+          + 'Ela dá valor ao que você fez de graça, e é isso que costuma passar despercebido. '
+          + 'Se achar que soa como cobrança, desmarque: a conta continua na sua tela.'
+        : 'A linha não vai mais no documento que a família recebe. A conta continua aparecendo '
+          + 'para você na tela do fechamento, que é onde ela sempre foi útil.'
+    }));
+
+    caixa.appendChild(cartao);
   }
 
   function desenharAjustesDeReajuste() {
