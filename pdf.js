@@ -816,14 +816,21 @@
     { chave: 'valor', rotulo: 'Valor', largura: 92.2756, align: 'dir' }
   ];
 
-  function cabecalhoTabela(doc) {
+  /* A tabela desenha as colunas que receber, e cai nas do fechamento quando
+   * ninguém disser outra coisa. Assim o fechamento continua chamando
+   * exatamente como chamava, sem uma linha mexida, e a proposta passa as
+   * dela. A alternativa seria uma segunda tabela desenhada em outro lugar do
+   * arquivo, e duas tabelas divergem na primeira mexida: a tabela é
+   * justamente a parte do documento em que a família confere número. */
+  function cabecalhoTabela(doc, colunas) {
+    colunas = colunas || COLUNAS;
     var alturaCab = 20;
     doc.garanteEspaco(alturaCab + 16);
     doc.y -= alturaCab;
     doc.retangulo(MARG_E, doc.y, UTIL, alturaCab, COR.navy);
     var x = MARG_E;
-    for (var i = 0; i < COLUNAS.length; i++) {
-      var col = COLUNAS[i];
+    for (var i = 0; i < colunas.length; i++) {
+      var col = colunas[i];
       if (col.align === 'dir') {
         doc.texto(col.rotulo, x + col.largura - 7, doc.y + 6.5, { tam: 8.5, bold: true, cor: COR.branco, align: 'direita' });
       } else {
@@ -833,15 +840,16 @@
     }
   }
 
-  function linhaTabela(doc, valores, indice, destaque) {
+  function linhaTabela(doc, valores, indice, destaque, colunas) {
+    colunas = colunas || COLUNAS;
     var alturaLinha = 18;
-    if (doc.y - alturaLinha < Y_LIMITE) { doc.novaPagina(); cabecalhoTabela(doc); }
+    if (doc.y - alturaLinha < Y_LIMITE) { doc.novaPagina(); cabecalhoTabela(doc, colunas); }
     doc.y -= alturaLinha;
     if (destaque) doc.retangulo(MARG_E, doc.y, UTIL, alturaLinha, COR.softEsc);
     else if (indice % 2 === 1) doc.retangulo(MARG_E, doc.y, UTIL, alturaLinha, COR.soft);
     var x = MARG_E;
-    for (var i = 0; i < COLUNAS.length; i++) {
-      var col = COLUNAS[i];
+    for (var i = 0; i < colunas.length; i++) {
+      var col = colunas[i];
       var v = valores[col.chave];
       if (v !== undefined && v !== null && v !== '') {
         var op = { tam: 9, bold: !!destaque, cor: destaque ? COR.navy : COR.texto };
@@ -2124,6 +2132,367 @@
     return doc.finalizar();
   }
 
+  /* Proposta de acompanhamento.
+   *
+   * O documento que ela manda para a família de um aluno NOVO, antes de
+   * começar. Vizinha da ficha de mapeamento de propósito: mesma Doc, mesma
+   * moldura, mesma paleta, mesmas medidas. A folha tem que parecer da mesma
+   * casa que o material e o fechamento, porque é isso que dá credibilidade a
+   * ela: a família recebe as três coisas do mesmo lugar.
+   *
+   * Não tem linha de assinatura nem campo de aceite. A resposta que ela quer é
+   * um sim no WhatsApp, e campo de assinatura muda o tom de proposta para
+   * contrato, que é exatamente o que faz a família virar consumidora e ela
+   * virar fornecedora sendo fiscalizada.
+   *
+   * op sai de Core.dadosDaProposta, do mesmo jeito que gerarFechamento recebe
+   * o resultado de Core.calcularFechamento: aqui dentro tudo já é rótulo em
+   * português pronto para imprimir, e este arquivo continua sem conhecer o
+   * Core. */
+  var MESES_MINUSCULO = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+  function dataExtensoL(iso) {
+    var p = String(iso || '').split('-');
+    if (p.length !== 3 || !MESES_MINUSCULO[(+p[1]) - 1]) return '';
+    return (+p[2]) + ' de ' + MESES_MINUSCULO[(+p[1]) - 1] + ' de ' + p[0];
+  }
+
+  /* As colunas da tabela de planos. Mesmo desenho da tabela do fechamento,
+   * mesmas somas de largura, outros rótulos: por isso cabecalhoTabela e
+   * linhaTabela recebem as colunas em vez de cada documento ter a sua tabela.
+   * Duas tabelas desenhadas em dois lugares divergem na primeira mexida. */
+  var COLUNAS_PLANO = [
+    { chave: 'plano', rotulo: 'Plano', largura: 110, align: 'esq' },
+    { chave: 'compromisso', rotulo: 'Compromisso', largura: 175, align: 'esq' },
+    { chave: 'hora', rotulo: 'Por hora-aula', largura: 105, align: 'dir' },
+    { chave: 'total', rotulo: 'Total do período', largura: 125.2756, align: 'dir' }
+  ];
+
+  var VEZES_POR_SEMANA = ['', 'uma vez por semana', 'duas vezes por semana',
+    'três vezes por semana', 'quatro vezes por semana', 'cinco vezes por semana'];
+
+  var PERIODO_DO_PLANO = { mensal: 'o mês', trimestral: 'o trimestre', semestral: 'o semestre' };
+
+  /* Um item de lista com o rótulo em negrito e o resto na mesma linha.
+   *
+   * A primeira linha começa depois do rótulo e as seguintes voltam à margem do
+   * texto. Escrever o rótulo e o texto como dois parágrafos deixaria um degrau
+   * no meio da frase, e escrever tudo em negrito apagaria a diferença entre o
+   * que é o assunto do item e o que é o combinado em si. */
+  function itemComRotulo(doc, rotulo, texto, opcoes) {
+    opcoes = opcoes || {};
+    var tam = opcoes.tam || 10;
+    var passo = opcoes.passo || 14;
+    var x = opcoes.x || MARG_E;
+    var largura = opcoes.largura || UTIL;
+    var xTexto = x + 16;
+    var larguraTexto = largura - 16;
+    var lab = rotulo ? String(rotulo) + ': ' : '';
+    var wLab = lab ? medir(lab, tam, true) : 0;
+    var palavras = String(texto == null ? '' : texto).split(/\s+/).filter(function (s) { return s.length; });
+    var linhas = [], atual = '', primeira = true;
+    for (var i = 0; i < palavras.length; i++) {
+      var t = atual ? atual + ' ' + palavras[i] : palavras[i];
+      var limite = larguraTexto - (primeira ? wLab : 0);
+      if (!atual || medir(t, tam, false) <= limite) { atual = t; continue; }
+      linhas.push(atual);
+      atual = palavras[i];
+      primeira = false;
+    }
+    if (atual) linhas.push(atual);
+    if (!linhas.length) linhas.push('');
+    /* O item inteiro é reservado antes da primeira linha. Sem isso o
+     * combinado das folgas do semestre podia começar no pé de uma folha e
+     * terminar no alto da outra, com o rótulo em negrito sozinho embaixo: é
+     * justamente o item que precisa ser lido de uma vez. */
+    doc.garanteEspaco(linhas.length * passo);
+    for (var k = 0; k < linhas.length; k++) {
+      doc.garanteEspaco(passo);
+      doc.y -= passo;
+      if (k === 0) {
+        doc.texto('•', x + 3, doc.y, { tam: tam, cor: COR.teal });
+        if (lab) doc.texto(lab, xTexto, doc.y, { tam: tam, bold: true, cor: COR.navy });
+        if (linhas[0]) doc.texto(linhas[0], xTexto + wLab, doc.y, { tam: tam, cor: COR.texto });
+      } else if (linhas[k]) {
+        doc.texto(linhas[k], xTexto, doc.y, { tam: tam, cor: COR.texto });
+      }
+    }
+    return linhas.length;
+  }
+
+  function gerarProposta(op) {
+    op = op || {};
+    var doc = new Doc();
+    /* Quem chama passa o nome; aceitar o objeto do aluno também é barato e
+     * evita uma folha sem nome no dia em que a tela mudar de mão. */
+    var nomeAluno = typeof op.aluno === 'string' ? op.aluno : ((op.aluno && op.aluno.nome) || '');
+    var primeiroNome = (nomeAluno.split(/\s+/)[0] || '').trim();
+    var cob = op.cobranca || {};
+    var enc = op.encontro || {};
+    var duracao = fmtDur(enc.duracaoMin || 90);
+    var vezes = VEZES_POR_SEMANA[enc.porSemana] || (enc.porSemana + ' vezes por semana');
+
+    doc.novaPagina();
+    doc.cabecalhoDeSecao('Proposta de acompanhamento', nomeAluno);
+
+    // ---- a linha de data, igual à da ficha de mapeamento
+    doc.y -= 16;
+    var linhaData = (op.cidade || '') + (op.cidade ? ', ' : '') + dataExtensoL(op.data);
+    if (op.validaAte) linhaData += ', válida até ' + dataExtensoL(op.validaAte);
+    doc.texto(linhaData, PAGINA_L / 2, doc.y, { tam: 9, cor: COR.muted, align: 'centro' });
+    doc.y -= 10;
+
+    // ---- bloco de identificação, o mesmo do fechamento
+    var materias = (op.materias || []).filter(Boolean);
+    var linhasId = [['Aluno', nomeAluno]];
+    if (op.responsavel) linhasId.push(['Responsável', op.responsavel]);
+    if (op.contextoEscolar) linhasId.push(['Escola', op.contextoEscolar]);
+    if (materias.length) {
+      linhasId.push([materias.length > 1 ? 'Matérias' : 'Matéria', listaEmPortugues(materias)]);
+    }
+    doc.y -= 22;
+    var alturaBloco = 14 + linhasId.length * 15;
+    doc.y -= alturaBloco;
+    doc.retangulo(MARG_E, doc.y, UTIL, alturaBloco, COR.soft);
+    doc.retangulo(MARG_E, doc.y, 3, alturaBloco, COR.teal);
+    var yy = doc.y + alturaBloco - 15;
+    for (var i = 0; i < linhasId.length; i++) {
+      doc.texto(linhasId[i][0] + ':', MARG_E + 14, yy, { tam: 9.5, bold: true, cor: COR.navy });
+      doc.texto(linhasId[i][1], MARG_E + 96, yy, { tam: 9.5, cor: COR.texto });
+      yy -= 15;
+    }
+
+    function tituloDeSecao(texto, larguraFio) {
+      doc.y -= 26;
+      doc.garanteEspaco(44);
+      doc.texto(texto, MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
+      doc.y -= 4;
+      doc.linha(MARG_E, doc.y, MARG_E + (larguraFio || 70), doc.y, COR.teal, 1.2);
+      doc.y -= 4;
+    }
+
+    /* As listas em duas colunas, iguais às da ficha de mapeamento. Duas colunas
+     * aqui não é economia de papel: é o que evita empurrar o preço para a
+     * terceira folha. */
+    function blocoDeMarcados(titulo, rot) {
+      if (!rot || !rot.length) return;
+      doc.y -= 20;
+      doc.garanteEspaco(46);
+      doc.texto(titulo, MARG_E, doc.y, { tam: 10.5, bold: true, cor: COR.navy });
+      doc.y -= 4;
+      doc.linha(MARG_E, doc.y, MARG_E + 60, doc.y, COR.teal, 1.1);
+      doc.y -= 2;
+      var meio = Math.ceil(rot.length / 2);
+      var topo = doc.y, menor = doc.y;
+      for (var col = 0; col < 2; col++) {
+        doc.y = topo;
+        var px = MARG_E + col * (UTIL / 2);
+        var de = col * meio, ate = Math.min(rot.length, de + meio);
+        for (var k = de; k < ate; k++) {
+          doc.y -= 13.5;
+          doc.texto('•', px + 3, doc.y, { tam: 9.5, cor: COR.teal });
+          doc.texto(rot[k], px + 15, doc.y, { tam: 9.5, cor: COR.texto });
+        }
+        if (doc.y < menor) menor = doc.y;
+      }
+      doc.y = menor;
+    }
+
+    function faixa(texto) {
+      doc.y -= 24;
+      doc.garanteEspaco(60);
+      doc.retangulo(MARG_E, doc.y - 5, UTIL, 22, COR.soft);
+      doc.texto(texto, MARG_E + 8, doc.y + 2, { tam: 10, bold: true, cor: COR.navy });
+      doc.y -= 8;
+    }
+
+    /* O ponto de partida só existe quando ela tem o que contar: nível,
+     * objetivo ou o parágrafo escrito por ela. Sozinha, a linha de origem
+     * diria à família uma coisa que a família já sabe, que foi ela mesma quem
+     * conversou, e abriria uma seção de uma linha só na primeira folha. */
+    var objetivo = op.objetivo || {};
+    if (op.nivel || op.texto || objetivo.rotulo) {
+      tituloDeSecao('Ponto de partida', 70);
+      if (op.origem) {
+        doc.y -= 15;
+        doc.texto(op.origem, MARG_E, doc.y, { tam: 10, cor: COR.texto });
+      }
+      if (objetivo.rotulo) {
+        doc.y -= 14;
+        var alvo = objetivo.rotulo + (objetivo.dataProva ? ', em ' + ddmmaaaaL(objetivo.dataProva) : '');
+        doc.texto('Objetivo: ', MARG_E, doc.y, { tam: 10, bold: true, cor: COR.navy });
+        doc.texto(alvo, MARG_E + medir('Objetivo: ', 10, true), doc.y, { tam: 10, cor: COR.texto });
+      }
+      if (op.nivel) faixa(op.nivel);
+      if (op.texto) {
+        doc.y -= 10;
+        doc.garanteEspaco(40);
+        doc.paragrafo(op.texto, { tam: 10, alturaLinha: 14.5 });
+      }
+    }
+
+    /* Pelo menos um ponto forte é obrigatório, e a regra mora aqui e não só na
+     * tela: sem nenhum forte a lista de atenção não é impressa.
+     *
+     * A ficha de mapeamento é interna e pode ser dura. Esta folha é a primeira
+     * coisa que a família lê sobre o próprio filho, e uma proposta que abre
+     * listando defeito assusta e perde a família, que é o oposto do que o
+     * documento existe para fazer. O teto de seis é da mesma família de motivo:
+     * seis itens ela diria na frente dos pais, dezenove é um laudo. */
+    var fortes = op.fortes || [];
+    var atencao = (op.atencao || []).slice(0, 6);
+    var lacunas = op.lacunas || [];
+    if (fortes.length || lacunas.length) {
+      tituloDeSecao('O que eu observei', 82);
+      blocoDeMarcados('Pontos fortes', fortes);
+      if (fortes.length) blocoDeMarcados('Pontos de atenção', atencao);
+      blocoDeMarcados('O que ficou para trás e atrapalha agora', lacunas);
+    }
+
+    /* O que proponho trabalhar sai em prosa, e não em lista de marcar.
+     *
+     * Cada um dos quatro grupos de área costuma trazer dois itens, e um
+     * bloco de duas colunas com título e filete para duas linhas gastava meia
+     * folha para dizer oito coisas: o fecho da proposta era empurrado para uma
+     * terceira página que continha só ele. Aqui o grupo vira o rótulo em
+     * negrito e os itens viram a frase, que é como ela diria em voz alta:
+     * "Método e organização: montagem do cronograma, disciplina e constância."
+     * A lista das matérias não se repete aqui, porque ela já está no bloco de
+     * identificação, no alto da folha. */
+    var areas = op.areas || [];
+    if (areas.length) {
+      tituloDeSecao('O que eu proponho trabalhar', 110);
+      doc.y -= 6;
+      areas.forEach(function (g) {
+        itemComRotulo(doc, g.grupo, (g.itens || []).map(emMinuscula).join(', ') + '.');
+      });
+    }
+
+    // ---- como funcionam os encontros
+    tituloDeSecao('Como funcionam os encontros', 128);
+    doc.y -= 6;
+    itemComRotulo(doc, 'Encontros', duracao + ', ' + vezes +
+      (enc.local ? ', ' + String(enc.local).charAt(0).toLowerCase() + String(enc.local).slice(1) : '') + '.');
+    (op.combinados || []).forEach(function (c) {
+      itemComRotulo(doc, c.rotulo, c.texto);
+    });
+
+    // ---- investimento
+    var planos = op.planos;
+    var emPlanos = cob.modo === 'planos' && planos && planos.planos && planos.planos.length;
+    var porque = '';
+    if (emPlanos) {
+      porque = 'O desconto não é do preço da aula: é do compromisso. Quem fecha ' +
+        (PERIODO_DO_PLANO[cob.recomendado] || 'o período') +
+        (op.reservadoAte ? ' tem o horário reservado na minha agenda até ' + op.reservadoAte + ', e eu' : ' tem o horário reservado na minha agenda, e eu') +
+        ' consigo planejar a sequência dos assuntos com antecedência, montar o material de cada semana e não recomeçar o plano a cada mês. É essa previsibilidade que o plano compra, dos dois lados.';
+    }
+
+    /* A seção do preço nunca começa no pé da folha. Mede o bloco inteiro, e se
+     * ele cabe numa folha limpa mas não no que sobrou, vira a página antes: o
+     * preço cortado ao meio é o pior lugar possível para uma quebra. É a mesma
+     * proteção que o Feedback do fechamento usa. */
+    var alturaInvest = 26 + 18;
+    if (emPlanos) {
+      alturaInvest += 20 + (planos.planos.length + 1) * 18 + 16 +
+        doc.quebrar(porque, UTIL, 9.5, false).length * 13;
+    } else {
+      alturaInvest += 20 + 3 * 14;
+    }
+    var sobra = doc.y - Y_LIMITE;
+    if (alturaInvest > sobra && alturaInvest <= (Y_TOPO - Y_LIMITE)) doc.novaPagina();
+
+    tituloDeSecao('Investimento', 70);
+    if (emPlanos) {
+      doc.y -= 6;
+      cabecalhoTabela(doc, COLUNAS_PLANO);
+      linhaTabela(doc, {
+        plano: 'Aula avulsa',
+        compromisso: '1 encontro, sem horário fixo',
+        hora: fmtMoedaLocal(planos.avulsa.valorHora),
+        total: fmtMoedaLocal(planos.avulsa.valorEncontro)
+      }, 0, false, COLUNAS_PLANO);
+      planos.planos.forEach(function (pl, k) {
+        linhaTabela(doc, {
+          plano: pl.rotulo,
+          compromisso: pl.encontros + ' encontros de ' + duracao,
+          hora: fmtMoedaLocal(pl.valorHora),
+          total: fmtMoedaLocal(pl.total)
+        }, k + 1, pl.id === cob.recomendado, COLUNAS_PLANO);
+      });
+      doc.y -= 14;
+      doc.garanteEspaco(30);
+      doc.paragrafo(porque, { tam: 9.5, cor: COR.muted, alturaLinha: 13 });
+    } else {
+      doc.y -= 18;
+      doc.texto(fmtMoedaLocal(cob.valorHora || 0) + ' por hora-aula', MARG_E, doc.y,
+        { tam: 11, bold: true, cor: COR.navy });
+      doc.y -= 4;
+      doc.paragrafo('Cada encontro de ' + duracao + ' sai por ' +
+        fmtMoedaLocal((cob.valorHora || 0) * (enc.duracaoMin || 90) / 60) +
+        '. A cobrança é mensal, pelas aulas que aconteceram, e no fim de cada mês vai o fechamento com as datas, os assuntos e o meu retorno sobre a evolução.',
+        { tam: 10, alturaLinha: 14 });
+    }
+
+    /* O que vem junto e o fecho são medidos JUNTOS e viram a folha juntos.
+     *
+     * São o fim do documento, e o fim é curto: medidos separado, sobrava
+     * espaço para dois itens no pé de uma folha e a outra nascia com dois
+     * itens soltos e o "fico à disposição". Uma folha final com o bloco
+     * inteiro parece decidida; duas linhas órfãs parecem sobra de impressão,
+     * e esta é a folha em que a família decide. */
+    var vantagens = (op.vantagens || []).filter(Boolean);
+    var textoFecho = 'Fico à disposição para conversar sobre qualquer ponto. Se fizer sentido ' +
+      'para vocês, combino a primeira data e já começo a montar o plano de trabalho' +
+      (primeiroNome ? ' para ' + primeiroNome : '') + '.';
+    var alturaFim = 24 + doc.quebrar(textoFecho, UTIL, 10.5, false).length * 15 +
+      (op.validaAte ? 25 : 0);
+    if (vantagens.length) {
+      var linhasVantagens = 0;
+      vantagens.forEach(function (v) {
+        linhasVantagens += doc.quebrar(v, UTIL - 16, 10, false).length;
+      });
+      alturaFim += 46 + linhasVantagens * 14;
+    }
+    var sobraFim = doc.y - Y_LIMITE;
+    if (alturaFim > sobraFim && alturaFim <= (Y_TOPO - Y_LIMITE)) doc.novaPagina();
+
+    if (vantagens.length) {
+      tituloDeSecao('O que vem junto', 76);
+      doc.y -= 6;
+      vantagens.forEach(function (v) { itemComRotulo(doc, '', v); });
+    }
+
+    // ---- fecho
+    doc.y -= 24;
+    doc.garanteEspaco(50);
+    doc.paragrafo(textoFecho, { tam: 10.5, alturaLinha: 15 });
+    if (op.validaAte) {
+      doc.y -= 16;
+      doc.texto('Proposta válida até ' + ddmmaaaaL(op.validaAte), MARG_E, doc.y,
+        { tam: 9, cor: COR.muted });
+    }
+
+    return doc.finalizar();
+  }
+
+  /* O rótulo do MAPA e o das AREAS são escritos com inicial maiúscula, porque
+   * nasceram para virar item de uma lista de marcar. Dentro de uma frase eles
+   * voltam para a minúscula. */
+  function emMinuscula(s) {
+    s = String(s || '');
+    return s.charAt(0).toLowerCase() + s.slice(1);
+  }
+
+  /* "Matemática e Física", e não "Matemática, Física": é uma carta, não uma
+   * lista de sistema. */
+  function listaEmPortugues(itens) {
+    var L = (itens || []).filter(Boolean);
+    if (L.length <= 1) return L[0] || '';
+    return L.slice(0, -1).join(', ') + ' e ' + L[L.length - 1];
+  }
+
   /* Monta o material de um tema. Cada parte é opcional: ela escolhe se quer a
    * explicação, a lista, o gabarito, ou só um deles. */
   function gerarMaterialTema(op) {
@@ -2265,6 +2634,7 @@
     marcacaoQueSobrou: marcacaoQueSobrou,
     gerarFechamento: gerarFechamento, gerarResumoMes: gerarResumoMes,
     gerarMaterialTema: gerarMaterialTema, gerarFichaMapeamento: gerarFichaMapeamento,
+    gerarProposta: gerarProposta,
     NOTA_L: NOTA_L, NOTA_A: NOTA_A,
     PAGINA_L: PAGINA_L, PAGINA_A: PAGINA_A, MARG_E: MARG_E, MARG_D: MARG_D, UTIL: UTIL,
     /* O figuras/base.js precisa saber onde o conteúdo começa e onde acaba, para

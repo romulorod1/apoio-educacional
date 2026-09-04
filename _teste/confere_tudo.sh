@@ -99,6 +99,7 @@ roda "trilha (dados)" node _teste/testa_trilha_dados.js
 roda "trilha (motor)" node _teste/testa_trilha.js
 roda "dinheiro"      node _teste/testa_dinheiro.js
 roda "cartao do mes" node _teste/testa_cartao.js
+roda "proposta"      node _teste/testa_proposta.js
 
 # As provas do kit de figuras nao rodavam aqui. Duas delas estavam falhando
 # desde o commit que as criou, algumas horas antes (_base_prova_travas, 34 de
@@ -143,7 +144,7 @@ titulo "com navegador"
 for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento \
          testa_perfil testa_olho testa_atualizacao testa_atualizacao_real \
          testa_exclusoes testa_feriados testa_mover testa_retroativo testa_series \
-         testa_assunto testa_aluno testa_familia; do
+         testa_assunto testa_aluno testa_familia testa_proposta_tela; do
   roda "$t" node "_teste/$t.js"
 done
 
