@@ -170,6 +170,11 @@
       <div class="barra">
         <h2 class="titulo">Alunos</h2>
         <span class="cresce"></span>
+        <!-- A proposta fica na barra dos Alunos porque o caso principal e o
+             aluno que ainda NAO existe: ela manda a proposta antes de comecar,
+             e so cadastra quem fecha. O botao principal continua sendo o de
+             cadastrar, que e o gesto mais comum desta tela. -->
+        <button class="btn" id="proposta-nova" type="button">Proposta</button>
         <button class="btn principal" id="novo-aluno" type="button">+ Novo aluno</button>
       </div>
       <div id="lista-alunos"></div>
@@ -294,10 +299,37 @@
         <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
       </div>
       <div class="modal-corpo" id="corpo-modal-aluno"></div>
+      <!-- O rodape segue a aba aberta. Na aba Proposta o que ela precisa e
+           gerar, nao salvar: quem grava a proposta e o proprio gerar. Medido
+           antes: na aba Proposta o unico botao azul era o Salvar e o
+           "Gerar proposta em PDF" ficava 608 pixels abaixo da dobra, entao ela
+           tocava no Salvar, a janela fechava e nenhum PDF saia. -->
       <div class="modal-rodape">
         <button class="btn perigo esquerda" id="excluir-aluno" type="button">Excluir aluno</button>
         <button class="btn" data-fechar type="button">Cancelar</button>
         <button class="btn principal" id="salvar-aluno" type="button">Salvar</button>
+        <button class="btn principal" id="gerar-proposta-aluno" type="button" style="display:none">Gerar proposta em PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- A proposta de acompanhamento tem janela propria, e nao uma aba dentro da
+       ficha do aluno, porque a familia principal nao tem ficha nenhuma: ela
+       manda a proposta antes de cadastrar. A aba da ficha existe tambem, para
+       quem ja esta cadastrado, e as duas desenham o MESMO editor. -->
+  <div class="fundo-modal" id="modal-proposta">
+    <!-- Alta como as janelas largas, para a rolagem nao pular de tamanho a cada
+         bloco que abre, e estreita o bastante para a linha de texto continuar
+         legivel: e um documento sendo escrito, e nao uma tabela. -->
+    <div class="modal largo" style="max-width:820px">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-proposta">Proposta de acompanhamento</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-proposta"></div>
+      <div class="modal-rodape">
+        <button class="btn" data-fechar type="button">Fechar</button>
+        <button class="btn principal" id="gerar-proposta" type="button">Gerar proposta em PDF</button>
       </div>
     </div>
   </div>

@@ -303,7 +303,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 
   const nomesAbas = await pag.$$eval('.aba-perfil', es => es.map(e => e.textContent.trim()));
   conf('a ficha do aluno ganhou a aba de mapeamento', nomesAbas.join(','),
-    'Dados,Valores,Mapeamento,Histórico');
+    'Dados,Valores,Mapeamento,Histórico,Proposta');
   conf('e a opção de agendar encontro não aparece para aluno já existente',
     await pag.$('#campo-agendar-mapeamento') === null, true);
 

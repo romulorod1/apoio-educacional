@@ -70,7 +70,9 @@ const esp = ms => new Promise(r => setTimeout(r, ms));
   console.log('\n=== a ficha do aluno tem abas ===');
   await abrirAluno('Marcelo');
   const nomesAbas = await pag.$$eval('.aba-perfil', es => es.map(e => e.textContent.trim()));
-  conf('quatro abas', nomesAbas.join(','), 'Dados,Valores,Mapeamento,Histórico');
+  /* Cinco desde a proposta de acompanhamento: a quinta aba é o mesmo editor da
+   * janela Proposta, para quem já está cadastrado. */
+  conf('cinco abas', nomesAbas.join(','), 'Dados,Valores,Mapeamento,Histórico,Proposta');
   conf('abre na aba de dados', await pag.$eval('.aba-perfil.ativa', e => e.textContent.trim()), 'Dados');
 
   console.log('\n=== campos novos ===');

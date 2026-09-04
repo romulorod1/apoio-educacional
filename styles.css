@@ -476,13 +476,23 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
 
 /* ---------- abas dentro da ficha do aluno ---------- */
 
+/* A fileira de abas fica presa no alto enquanto ela rola a ficha, e os 18 px de
+   folga do corpo da janela entram como padding DA PROPRIA fileira, com o top
+   negativo do mesmo tamanho.
+
+   Sem isso o texto rolava por dentro daqueles 18 px e aparecia ACIMA das abas,
+   meia linha solta pairando sobre elas: o `top: 0` prende a fileira na borda do
+   conteudo, e nao na da janela, entao sobrava uma faixa descoberta. Medido em
+   1280 por 800: a fileira parava em 115 e o corpo comecava em 97. So se ve nas
+   abas compridas, e a aba Proposta e a mais comprida de todas. */
 .abas-perfil {
   display: flex;
   gap: 4px;
   border-bottom: 1px solid var(--fio);
-  margin: -4px 0 16px;
+  margin: -18px 0 16px;
+  padding-top: 18px;
   position: sticky;
-  top: 0;
+  top: -18px;
   background: var(--branco);
   z-index: 2;
 }
@@ -622,7 +632,19 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
      Só o botão de desfazer recebe toque. */
   pointer-events: none;
 }
-.aviso.aberto { transform: translateX(-50%) translateY(0); }
+/* Com janela aberta o aviso sobe acima do rodape dela, e quem mede quanto e o
+   app.js, em posicionarAviso: um valor fixo aqui nao serve, porque a janela e
+   centrada e a baixa termina bem mais acima do que a alta. Medido em pe, num
+   tablet de 800 por 1280: 4vh mais 92 pixels limpava a janela da proposta e
+   ainda cobria 10 por cento do Cancelar da ficha do aluno, e 100 por cento do
+   rodape da janela de aula deitado.
+
+   A subida entra no TRANSFORM, e nao no bottom. Mexendo no bottom, o aviso
+   FECHADO deixava de caber no proprio recuo de 140 por cento e ficava
+   espiando na beirada de baixo da tela, com o botao Desfazer a vista, o tempo
+   todo, sem aviso nenhum no ar. Visto no print. No transform, o estado fechado
+   continua o de sempre e a animacao continua sendo uma so. */
+.aviso.aberto { transform: translateX(-50%) translateY(calc(var(--sobe, 0px) * -1)); }
 .aviso button {
   pointer-events: auto;
   background: transparent;
@@ -886,6 +908,108 @@ body.modo-familia .bloco-mes .data-dia { font-size: 19px; }
 body.modo-familia .texto-rendeu { font-size: 16px; }
 body.modo-familia .assunto-mes { font-size: 16px; padding: 6px 14px; }
 body.modo-familia .modal-cabecalho h3 { font-size: 20px; }
+
+/* ---------- o editor da proposta ---------- */
+
+/* Cada bloco abre FECHADO, mostrando so um resumo de uma linha do que esta
+   dentro. Sao sete blocos, e isso nao e enfeite: sete blocos abertos numa tela
+   de tablet viram tres telas de rolagem e ela para de usar isto na terceira
+   proposta. So Quem e Investimento nascem abertos. */
+.bloco-proposta {
+  border: 1px solid var(--fio);
+  border-radius: var(--raio);
+  background: var(--branco);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.cabeca-bloco {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 58px;
+  padding: 11px 14px;
+  border: none;
+  background: var(--soft);
+  font-family: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+.cabeca-bloco:hover { background: var(--soft-2); }
+.cabeca-bloco .cresce { flex: 1; min-width: 0; }
+.titulo-bloco {
+  display: block;
+  font-weight: 700;
+  color: var(--navy);
+  font-size: 15px;
+}
+.resumo-bloco {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.35;
+  margin-top: 2px;
+}
+/* O que falta preencher fica em vermelho no resumo: e a unica coisa que ela
+   precisa enxergar com o bloco fechado. */
+.resumo-bloco.falta { color: var(--vermelho); font-weight: 600; }
+.seta-bloco { color: var(--navy); font-size: 19px; flex-shrink: 0; width: 20px; text-align: center; }
+.corpo-bloco { padding: 14px; }
+.corpo-bloco > .subtitulo:first-child { margin-top: 4px; }
+/* Alvo de toque de dedo, dentro do editor. A lista de marcar do mapeamento
+   continua como esta: aqui a folha inteira e preenchida de pe, na sala da
+   familia, e errar o alvo custa mais. */
+.corpo-bloco .item-area { min-height: 44px; }
+.corpo-bloco .cartao.compacto { background: var(--ivory); }
+
+/* Escolha de poucas opcoes, em botoes grandes lado a lado. Nada de arrastar:
+   com a mao apoiada na mesa da familia, arrasto erra. */
+.segmentado { display: flex; gap: 8px; flex-wrap: wrap; }
+.opcao-seg {
+  flex: 1;
+  min-width: 108px;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--fio);
+  border-radius: 10px;
+  background: var(--branco);
+  color: var(--texto);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.opcao-seg:hover { border-color: var(--teal); background: var(--teal-claro); }
+.opcao-seg.ativa { background: var(--navy); border-color: var(--navy); color: var(--branco); }
+
+/* A conta dos planos, do jeito que ela confere de cabeca: o valor por hora e o
+   total do periodo lado a lado, e a linha que ela recomenda em destaque. */
+.tabela-planos { border: 1px solid var(--fio); border-radius: 10px; overflow: hidden; }
+.linha-plano {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--fio);
+  background: var(--branco);
+}
+.linha-plano:last-child { border-bottom: none; }
+.linha-plano .cresce { flex: 1; min-width: 0; }
+.linha-plano .nome { font-weight: 700; color: var(--navy); font-size: 14px; }
+.linha-plano .detalhe { font-size: 13px; color: var(--muted); }
+.linha-plano .valores { text-align: right; flex-shrink: 0; }
+.linha-plano .por-hora { font-size: 13px; color: var(--muted); }
+.linha-plano .total { font-weight: 700; color: var(--navy); font-size: 15px; }
+.linha-plano.recomendado { background: var(--teal-claro); }
+.linha-plano.recomendado .nome::after {
+  content: " recomendado";
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--teal);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
 
 /* ---------- telas estreitas ---------- */
 

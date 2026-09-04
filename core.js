@@ -1297,6 +1297,796 @@
     return partes.join(', ');
   }
 
+  // ---------- a proposta de acompanhamento ----------
+
+  /* A proposta é o documento que ela manda para a família de um aluno NOVO,
+   * antes de começar: quem é o aluno, o que ela observou, o que propõe
+   * trabalhar, como funcionam os encontros e quanto custa.
+   *
+   * Mora ao lado do mapeamento e é irmã dele de propósito. Quase tudo o que a
+   * proposta diz já foi respondido na aula de nivelamento ou na primeira
+   * conversa com os pais, e ela não deveria responder duas vezes: propostaNova,
+   * propostasDe e propostaAtual são as gêmeas de mapeamentoNovo, mapeamentosDe
+   * e mapeamentoAtual, e preencherProposta traz o resto já preenchido.
+   *
+   * Guardar a proposta, e não regerá-la, é o que importa: quando a família
+   * liga em dezembro perguntando "mas você não tinha falado R$ 109?", ela abre
+   * a proposta que mandou.
+   *
+   * NADA aqui inventa taxonomia. As matérias vêm de MATERIAS, os pontos fortes
+   * e de atenção do MAPA, as áreas de AREAS, o nível de NIVEIS e o ano escolar
+   * de ANOS_ESCOLARES. O registro guarda só os identificadores, como o
+   * mapeamento faz, para que corrigir um rótulo aqui conserte também as
+   * propostas antigas. */
+
+  /* Onde o encontro acontece. Ela atende dentro da casa das famílias, então é
+   * esse o padrão. */
+  var LOCAIS_ENCONTRO = [
+    { id: 'casa', rotulo: 'Na casa de vocês' },
+    { id: 'online', rotulo: 'Online' },
+    { id: 'combinar', rotulo: 'A combinar' }
+  ];
+
+  function rotuloLocal(id) {
+    var l = LOCAIS_ENCONTRO.filter(function (x) { return x.id === String(id || ''); })[0];
+    return l ? l.rotulo : LOCAIS_ENCONTRO[0].rotulo;
+  }
+
+  /* O plano é PACOTE DE HORAS, e não mensalidade fixa.
+   *
+   * Esta é a decisão que sustenta todo o resto. Mensalidade fixa quebraria o
+   * motor: calcularFechamento cobra aula por aula, e um mês com cinco terças
+   * não pode custar o mesmo que um com quatro sem reescrever o fechamento.
+   * Pacote de horas custa ZERO mudança, porque aluno.precos já é exatamente
+   * isso: uma vigência com início, fim e valor por hora. O plano que a família
+   * aceitar vira UMA linha ali, com início hoje e fim no fim do período, e o
+   * fechamento dos meses seguintes sai certo sozinho. Aula cancelada com aviso
+   * continua não cobrável, que é o que o combinado de remarcação promete.
+   *
+   * As semanas são 4, 12 e 24, e não 4,3: é o número que a família confere no
+   * calendário e que ela consegue explicar em voz alta.
+   *
+   * E o plano é medido em SEMANAS também na hora de virar vigência, nunca em
+   * meses de calendário. Três meses de calendário não contêm doze aulas
+   * semanais: contêm treze. Medido com aula toda sexta a partir de 04/09 e
+   * hora a R$ 123,50: a folha prometia doze encontros por R$ 2.223,00 e o
+   * fechamento, que cobra aula por aula dentro da vigência, somava treze aulas
+   * e R$ 2.407,75. Os dois documentos chegam à mesma família no mesmo mês. Por
+   * isso não existe campo de meses aqui: quem precisar do fim da vigência
+   * conta semanas. */
+  var PLANOS = [
+    { id: 'mensal', rotulo: 'Mensal', semanas: 4 },
+    { id: 'trimestral', rotulo: 'Trimestral', semanas: 12 },
+    { id: 'semestral', rotulo: 'Semestral', semanas: 24 }
+  ];
+
+  function planoPorId(id) {
+    return PLANOS.filter(function (p) { return p.id === String(id || ''); })[0] || null;
+  }
+
+  function numeroOu(v, padrao) {
+    var n = typeof v === 'string' ? Number(String(v).replace(',', '.')) : v;
+    return (typeof n === 'number' && isFinite(n)) ? n : padrao;
+  }
+
+  /* Número por extenso no feminino, só até onde a frase precisa. Ela escreve
+   * "duas folgas", e não "2 folgas": é uma carta para a família. */
+  function porExtensoFem(n) {
+    var nomes = ['nenhuma', 'uma', 'duas', 'três', 'quatro', 'cinco', 'seis'];
+    return nomes[n] || String(n);
+  }
+
+  function comInicialMaiuscula(s) {
+    s = String(s || '');
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  function somaDiasIso(iso, dias) {
+    return isoDe(somaDias(dataLocal(iso), dias));
+  }
+
+  /* Soma meses sem estourar o mês curto: 31 de janeiro mais um mês é o último
+   * dia de fevereiro, e não 3 de março. */
+  function somaMesesIso(iso, meses) {
+    var p = partesData(iso);
+    var d = new Date(p.a, p.m - 1 + meses, p.d);
+    if (d.getDate() !== p.d) d = new Date(d.getFullYear(), d.getMonth(), 0);
+    return isoDe(d);
+  }
+
+  /* Arredonda para baixo em degraus de R$ 0,50.
+   *
+   * Para baixo de propósito: arredondar para cima entregaria menos desconto do
+   * que o percentual anunciado logo ao lado, e é a família que faz essa conta.
+   * A passagem por centavos inteiros antes do degrau existe para o 0,95 de
+   * ponto flutuante não derrubar o valor meio real inteiro. */
+  function arredondaMeioReal(v) {
+    var centavos = Math.round(numeroOu(v, 0) * 100);
+    if (centavos <= 0) return 0;
+    return Math.floor(centavos / 50) * 50 / 100;
+  }
+
+  function arredondaCentavos(v) {
+    return Math.round(numeroOu(v, 0) * 100) / 100;
+  }
+
+  /* A âncora sugerida: o valor de hoje mais 15 por cento, para cima em múltiplo
+   * de cinco.
+   *
+   * Ancorar num valor mais alto funciona, mas só sob uma condição, e a condição
+   * é a diferença entre ferramenta e truque: a âncora tem que ser um preço que
+   * ela REALMENTE cobraria. A aula avulsa custa mais caro de verdade, porque
+   * sem compromisso ela não planeja a sequência dos assuntos nem prepara o
+   * material com antecedência. Se ela não pegaria um aluno avulso por esse
+   * valor, então o número é de vitrine, a família descobre na primeira conversa
+   * com a vizinha, e o documento inteiro perde credibilidade junto.
+   *
+   * A âncora é o preço da linha AVULSA, e só dela. Os planos descem do preço
+   * que ela cobra hoje, em calcularPlanos. Foi assim que o mensal voltou a
+   * cair no preço dela: enquanto os planos desciam da âncora, os 15 por cento
+   * de marcação ficavam por baixo de todo desconto e os três planos saíam
+   * acima do que ela cobra. */
+  function ancoraSugerida(valorHora) {
+    var v = numeroOu(valorHora, 0);
+    if (!(v > 0)) return 0;
+    return Math.ceil(v * 1.15 / 5) * 5;
+  }
+
+  /* Os padrões dela, escritos uma vez e usados em toda proposta.
+   *
+   * Moram em db.ajustes.propostaPadrao, no mesmo lugar de exibirTemasEAreas e
+   * valoresOcultos. Uma âncora só para todo mundo: Niterói é pequeno e as
+   * famílias se falam, e duas propostas do mesmo mês com âncoras diferentes
+   * custam as duas famílias de uma vez.
+   *
+   * Os três descontos são POR BAIXO DO PREÇO DELA, e é o que os torna legíveis:
+   * zero no mensal quer dizer "o mensal é o meu preço de hoje", cinco no
+   * trimestral quer dizer "cinco por cento abaixo dele". A escada de 0, 5 e 10
+   * fica dentro da faixa de 5 a 15 por cento que a pesquisa achou em tutoria,
+   * música e aula particular no Brasil. */
+  var PROPOSTA_PADRAO = {
+    cidade: 'Niterói',
+    diasDeValidade: 30,
+    valorHora: 0,
+    ancora: 0,
+    descontos: { mensal: 0, trimestral: 5, semestral: 10 },
+    recomendado: 'trimestral',
+    horasDeAviso: 24,
+    folgasPorSemestre: 2,
+    duracaoMin: 90,
+    porSemana: 1,
+    local: 'casa'
+  };
+
+  /* Acima disto o desconto deixa de ser desconto e vira o produto: atrai quem
+   * decide por preço, corrói a margem e ainda desvaloriza a aula avulsa. */
+  var LIMITE_DESCONTO = 25;
+
+  /* O combinado de remarcação, na voz dela, como PADRÃO EDITÁVEL e nunca como
+   * texto fixo: ela tem que poder mudar cada palavra antes de mandar.
+   *
+   * A ordem não é decorativa. Abre pelo trabalho pedagógico, que é o argumento
+   * que só ela tem e que é verificável pela família, que recebe os PDFs. A
+   * analogia do horário que não se revende é verdadeira e soa comercial vinda
+   * de quem entra na casa da família toda semana, então ela não lidera.
+   *
+   * O item das folgas é o que faz o resto funcionar: tira dela o papel de
+   * julgar se o motivo era bom o bastante, que é o que envenena a relação, e
+   * tira da família a necessidade de inventar desculpa. Depois que a franquia
+   * acaba, a regra fica fácil de aplicar exatamente porque deixou de ser
+   * pessoal.
+   *
+   * O item de quando quem desmarca é ela não é gentileza: regra que pega um
+   * lado só é cobrança, e a mesma regra dos dois lados é combinado. É o teste
+   * que a família faz mentalmente, e é rápido de fazer.
+   *
+   * Os textos nascem com o número de horas e o de folgas já escritos por
+   * extenso, montados a partir dos campos. Depois que ela edita uma frase, a
+   * frase dela vence: por isso a montagem acontece na criação, e não na hora de
+   * imprimir. */
+  function combinadosPadrao(padrao) {
+    var pd = padrao || PROPOSTA_PADRAO;
+    var h = numeroOu(pd.horasDeAviso, 24);
+    var f = numeroOu(pd.folgasPorSemestre, 2);
+    return [
+      { id: 'preparo', ligado: true, rotulo: 'Como a aula é montada',
+        texto: 'Cada encontro é preparado antes: eu escolho o assunto olhando o que ficou errado na semana anterior e monto a explicação, a lista de exercícios e o gabarito daquela semana.' },
+      { id: 'aviso', ligado: true, rotulo: 'Se precisarem desmarcar',
+        texto: 'Me avisem por mensagem escrita no WhatsApp até ' + h + ' horas antes do início da aula. Com esse aviso eu remanejo a minha semana, a aula não é cobrada e a gente reagenda dentro do mesmo mês.' },
+      { id: 'folgas', ligado: true, rotulo: comInicialMaiuscula(porExtensoFem(f)) + ' folgas por semestre',
+        texto: 'Vida acontece. Cada família tem ' + porExtensoFem(f) + ' desmarcações em cima da hora por semestre que não são cobradas e sobre as quais vocês não precisam me dar explicação nenhuma. Usem quando precisarem, sem ficar sem graça comigo.' },
+      /* A folha promete o que o motor faz, e o motor tem cobrável sim ou não.
+       *
+       * Este item dizia "entra no fechamento do mês como meia aula". O
+       * fechamento cobra a aula cancelada que ela marca como cobrável pelo
+       * valor inteiro: medido numa aula de 1h30 a R$ 133,00, a folha prometia
+       * R$ 99,75 e o fechamento cobrava R$ 199,50, e as duas contas chegam à
+       * mesma família no mesmo mês. Meia cobrança seria mudança de motor, e a
+       * pesquisa até prefere os 50 por cento; enquanto ela não existir, o
+       * texto padrão diz o valor da aula. A franquia de folgas acima é o que
+       * mantém isso justo: ninguém paga na primeira vez. */
+      { id: 'vespera', ligado: true, rotulo: 'Depois dessas ' + porExtensoFem(f),
+        texto: 'A desmarcação com menos de ' + h + ' horas entra no fechamento do mês pelo valor da aula, porque o horário ficou reservado e o material daquela semana já estava preparado. Se der para encaixar uma reposição na mesma semana, eu ofereço.' },
+      /* Falta sem aviso é a única linha que o motor já cobra sozinho, por
+       * padrão, e era a única que a folha não contava. Separar falta de
+       * desmarcação é unanimidade na pesquisa e é justo: uma coisa é um aviso
+       * tardio, outra é ela ter atravessado a cidade. */
+      { id: 'falta', ligado: true, rotulo: 'Falta sem aviso',
+        texto: 'Aula sem aviso nenhum, comigo já na porta de vocês, conta como aula dada e não tem reposição: é diferente de desmarcar, e por isso o tratamento é outro. Se o atraso passar de trinta minutos sem notícia, eu considero falta e sigo o meu dia.' },
+      { id: 'eu-desmarco', ligado: true, rotulo: 'Se quem desmarcar for eu',
+        texto: 'Vale a mesma régua para mim: eu aviso o quanto antes e reponho a aula sem cobrar nada.' },
+      { id: 'reposicao', ligado: true, rotulo: 'Como funciona a reposição',
+        texto: 'Uma por mês e dentro do próprio mês. Assim não junta aula atrasada para novembro, quando não sobra horário para ninguém.' },
+      /* A promessa de devolver o que foi pago e não usado supunha pacote pago
+       * adiantado, e não é o que o aplicativo faz: a cobrança é mensal, pelas
+       * aulas que aconteceram. Prometer devolução de um valor que nunca foi
+       * recebido é promessa que a conta do mês desmente. */
+      { id: 'parar', ligado: true, rotulo: 'Se quiserem parar',
+        texto: 'É só me falar, de preferência com uma semana de antecedência para eu reorganizar a agenda. Não fica nada preso: como a cobrança é mensal, vocês pagam só as aulas que aconteceram até ali.' }
+    ];
+  }
+
+  /* O que vem junto com a aula.
+   *
+   * As duas primeiras ela já faz e quase ninguém faz, e hoje isso é invisível
+   * exatamente no momento em que a família está decidindo o preço. */
+  function vantagensPadrao() {
+    return [
+      /* Sem pronome. Dizia "para o que ele precisa naquela semana", e metade
+       * das crianças é menina: a família lê a primeira folha sobre a filha e
+       * encontra um "ele". Tirar o pronome resolve inteiro e é mais barato,
+       * mais curto e mais seguro do que criar campo de gênero, que seria uma
+       * pergunta a mais na tela para consertar uma palavra. */
+      { id: 'material', ligado: true,
+        texto: 'Material próprio: explicação, lista de exercícios e gabarito em PDF, preparados para o que estiver faltando naquela semana.' },
+      { id: 'fechamento', ligado: true,
+        texto: 'Fechamento mensal por escrito: as datas, os assuntos trabalhados e o meu retorno sobre a evolução.' },
+      { id: 'provas', ligado: true,
+        texto: 'Acompanhamento do calendário de provas do colégio.' },
+      { id: 'duvida', ligado: true,
+        texto: 'Retorno por mensagem entre as aulas, para dúvida pontual.' }
+    ];
+  }
+
+  function copiaItens(lista, molde) {
+    var fonte = (lista && lista.length) ? lista : molde;
+    return (fonte || []).map(function (i) {
+      return {
+        id: i.id || uid(),
+        ligado: i.ligado !== false,
+        rotulo: String(i.rotulo || ''),
+        texto: String(i.texto || '')
+      };
+    });
+  }
+
+  /* Os itens guardados por ela POR CIMA do molde da casa, casando pelo id.
+   *
+   * Antes disto, a lista guardada substituía o molde inteiro, e a lista é
+   * guardada na primeira proposta que ela gera, tenha editado alguma coisa ou
+   * não. O efeito: um combinado corrigido aqui nunca mais chegava nela. Foi
+   * exatamente o caso da desmarcação de véspera, que prometia meia aula, e do
+   * combinado de falta sem aviso, que não existia: as duas correções morreriam
+   * na primeira proposta já gerada.
+   *
+   * A regra é a mesma de sempre, só que item a item: o texto dela vence o da
+   * casa, e o que ela nunca tocou acompanha a casa. Item novo entra na posição
+   * que a casa deu; item que só ela tem fica no fim. */
+  function mesclaItens(salvos, molde) {
+    var dela = {};
+    (salvos || []).forEach(function (i) { if (i && i.id) dela[i.id] = i; });
+    var usados = {};
+    var out = (molde || []).map(function (padrao) {
+      var s = dela[padrao.id];
+      if (s) usados[padrao.id] = true;
+      return {
+        id: padrao.id,
+        ligado: s ? s.ligado !== false : padrao.ligado !== false,
+        rotulo: String((s && s.rotulo) || padrao.rotulo || ''),
+        texto: String((s && s.texto) || padrao.texto || '')
+      };
+    });
+    (salvos || []).forEach(function (i) {
+      if (!i || !i.id || usados[i.id]) return;
+      out.push({
+        id: i.id,
+        ligado: i.ligado !== false,
+        rotulo: String(i.rotulo || ''),
+        texto: String(i.texto || '')
+      });
+    });
+    return out;
+  }
+
+  /* Os padrões dela por cima dos padrões da casa. Campo que ela nunca mexeu
+   * cai no embutido, e campo guardado torto não derruba a proposta. */
+  function propostaPadraoDe(db) {
+    var g = (db && db.ajustes && db.ajustes.propostaPadrao) || {};
+    var out = {
+      cidade: String(g.cidade || PROPOSTA_PADRAO.cidade),
+      diasDeValidade: numeroOu(g.diasDeValidade, PROPOSTA_PADRAO.diasDeValidade),
+      valorHora: numeroOu(g.valorHora, PROPOSTA_PADRAO.valorHora),
+      ancora: numeroOu(g.ancora, PROPOSTA_PADRAO.ancora),
+      descontos: {
+        mensal: numeroOu(g.descontos && g.descontos.mensal, PROPOSTA_PADRAO.descontos.mensal),
+        trimestral: numeroOu(g.descontos && g.descontos.trimestral, PROPOSTA_PADRAO.descontos.trimestral),
+        semestral: numeroOu(g.descontos && g.descontos.semestral, PROPOSTA_PADRAO.descontos.semestral)
+      },
+      recomendado: planoPorId(g.recomendado) ? g.recomendado : PROPOSTA_PADRAO.recomendado,
+      horasDeAviso: numeroOu(g.horasDeAviso, PROPOSTA_PADRAO.horasDeAviso),
+      folgasPorSemestre: numeroOu(g.folgasPorSemestre, PROPOSTA_PADRAO.folgasPorSemestre),
+      duracaoMin: numeroOu(g.duracaoMin, PROPOSTA_PADRAO.duracaoMin),
+      porSemana: numeroOu(g.porSemana, PROPOSTA_PADRAO.porSemana),
+      local: LOCAIS_ENCONTRO.filter(function (l) { return l.id === g.local; }).length
+        ? g.local : PROPOSTA_PADRAO.local,
+      modo: g.modo === 'planos' ? 'planos' : 'hora'
+    };
+    out.combinados = mesclaItens(g.combinados, combinadosPadrao(out));
+    out.vantagens = mesclaItens(g.vantagens, vantagensPadrao());
+    return out;
+  }
+
+  /* Gêmea de mapeamentoNovo. Nasce com os padrões dela e sem nenhum campo
+   * obrigatório preenchido: quem preenche é preencherProposta ou ela. */
+  function propostaNova(padrao) {
+    var pd = padrao || propostaPadraoDe(null);
+    var data = hojeIso();
+    return {
+      id: uid(),
+      data: data,
+      validaAte: somaDiasIso(data, pd.diasDeValidade),
+      cidade: pd.cidade,
+      aluno: '',
+      responsavel: '',
+      /* O nome que ela escreve quando acrescenta uma disciplina em "Outra".
+       * Sem ele a folha diria "Outra" para a família, que é o tipo de palavra
+       * que só faz sentido para quem programou a lista. */
+      materiaOutra: '',
+      colegio: '',
+      anoEscolar: '',
+      anoEscolarOutro: '',
+      origem: 'conversa',
+      aulaId: null,
+      dataOrigem: '',
+      materias: [],
+      fortes: [],
+      atencao: [],
+      lacunas: [],
+      nivel: '',
+      objetivo: { tipo: '', descricao: '', dataProva: '' },
+      texto: '',
+      areas: [],
+      encontro: { duracaoMin: pd.duracaoMin, porSemana: pd.porSemana, local: pd.local },
+      combinados: { horas: pd.horasDeAviso, folgas: pd.folgasPorSemestre, itens: copiaItens(pd.combinados) },
+      cobranca: {
+        modo: pd.modo === 'planos' ? 'planos' : 'hora',
+        valorHora: pd.valorHora,
+        ancora: pd.ancora,
+        descontos: {
+          mensal: pd.descontos.mensal,
+          trimestral: pd.descontos.trimestral,
+          semestral: pd.descontos.semestral
+        },
+        recomendado: pd.recomendado
+      },
+      vantagens: copiaItens(pd.vantagens)
+    };
+  }
+
+  function propostasDe(aluno) {
+    return ((aluno && aluno.propostas) || []).slice()
+      .sort(function (a, b) { return String(a.data).localeCompare(String(b.data)); });
+  }
+
+  /* A proposta que vale hoje é a mais recente. */
+  function propostaAtual(aluno) {
+    var lista = propostasDe(aluno);
+    return lista.length ? lista[lista.length - 1] : null;
+  }
+
+  /* De cada ponto de atenção do mapeamento sai a área que trata dele.
+   *
+   * É uma tabelinha curta e proposital: ela confere e muda. O que a tabela
+   * garante é que a seção "o que proponho trabalhar" não nasça vazia numa folha
+   * que a família lê antes de decidir. */
+  var AREA_DA_ATENCAO = {
+    vespera: ['cronograma', 'disciplina'],
+    branco: ['estrategia-prova'],
+    chuta: ['estrategia-prova'],
+    'nao-confere': ['estrategia-prova'],
+    'enunciado-fraco': ['enunciado'],
+    'nao-comeca': ['autonomia'],
+    depende: ['autonomia'],
+    dispersa: ['concentracao'],
+    'ansiedade-prova': ['ansiedade'],
+    'nao-revisa': ['analise-erros'],
+    'caderno-fraco': ['material'],
+    'conteudo-atrasado': ['revisao'],
+    'fora-do-modelo': ['raciocinio'],
+    'nao-retem': ['metodo'],
+    sinal: ['base'],
+    'tabuada-fraca': ['base'],
+    'fracao-fraca': ['base'],
+    'decimal-fraca': ['base']
+  };
+
+  function areasSugeridas(idsDeAtencao) {
+    var out = [];
+    (idsDeAtencao || []).forEach(function (id) {
+      (AREA_DA_ATENCAO[id] || []).forEach(function (a) {
+        if (out.indexOf(a) < 0) out.push(a);
+      });
+    });
+    return out;
+  }
+
+  /* Uma proposta nova já preenchida com tudo o que o aplicativo sabe.
+   *
+   * O aluno pode ser nulo, que é o caso principal: a proposta é para aluno
+   * NOVO, e ela gera antes de cadastrar.
+   *
+   * Os pontos de atenção nascem DESMARCADOS mesmo quando estão marcados no
+   * mapeamento, e isto é a decisão mais importante desta função. A ficha de
+   * mapeamento é interna e pode ser dura. A proposta é a primeira coisa que a
+   * família lê sobre o próprio filho, e itens verdadeiros como "Chuta sem
+   * tentar" e "Estuda só na véspera" viram acusação da criança na primeira
+   * folha que os pais abrem. Os pontos fortes nascem marcados pelo mesmo
+   * motivo, ao contrário.
+   *
+   * E as áreas de trabalho seguem os pontos de atenção MARCADOS, não os do
+   * mapeamento. Elas nascem da mesma lista, então derivá-las da verdade
+   * inteira escondia o defeito numa seção e o devolvia quatro centímetros
+   * abaixo com outro rótulo: medido no mapeamento de dez pontos de atenção, a
+   * proposta saía com zero pontos de atenção impressos e oito áreas marcadas,
+   * entre elas "Concentração", que é "Dispersa com facilidade", e "Ansiedade
+   * ou medo de prova", que é "Fica ansioso perto da prova". A área só nasce
+   * marcada quando o ponto de atenção que a gerou está marcado, e como os
+   * pontos de atenção nascem desmarcados, as áreas nascem vazias e ela marca
+   * as duas coisas juntas, vendo o que a família vai ler. */
+  function preencherProposta(db, aluno) {
+    var p = propostaNova(propostaPadraoDe(db));
+    if (aluno) {
+      p.aluno = aluno.nome || '';
+      p.responsavel = aluno.responsavel || '';
+    }
+    var m = mapeamentoAtual(aluno);
+    if (m) {
+      p.colegio = m.escola || '';
+      p.anoEscolar = m.anoEscolar || '';
+      p.anoEscolarOutro = m.anoEscolarOutro || '';
+      p.origem = m.aulaId ? 'nivelamento' : 'conversa';
+      p.aulaId = m.aulaId || null;
+      p.dataOrigem = m.data || '';
+      p.materias = materiasDoMapeamento(m);
+      p.nivel = m.nivel || '';
+      if (m.objetivo) {
+        p.objetivo = {
+          tipo: m.objetivo.tipo || '',
+          descricao: m.objetivo.descricao || '',
+          dataProva: m.objetivo.dataProva || ''
+        };
+      }
+      var principal = p.materias[0] || MATERIA_PADRAO;
+      var doAluno = marcadosDoAluno(m);
+      var daMateria = marcadosDaMateria(m, principal);
+      p.fortes = doAluno.fortes.concat(daMateria.fortes.filter(function (x) {
+        return doAluno.fortes.indexOf(x) < 0;
+      }));
+      p.atencao = [];
+      p.lacunas = temLacunaDeAnoAnterior(principal) ? daMateria.lacunas.slice() : [];
+      p.areas = areasSugeridas(p.atencao);
+    }
+    /* Proposta sem matéria nenhuma sairia com o bloco de identificação pela
+     * metade. Cai em matemática, que é a mesma saída que materiasDoMapeamento
+     * já usa quando não há marcação nenhuma. */
+    if (!p.materias.length) p.materias = [MATERIA_PADRAO];
+    if (aluno && aluno.id) {
+      /* A duração habitual só vale quando existe hábito. Sem aula nenhuma
+       * lançada, ela devolve os 60 minutos de recurso, e a proposta sairia
+       * propondo uma hora para quem ela combina hora e meia: o encontro de
+       * mapeamento dela é de 90. */
+      var temAula = ((db && db.aulas) || []).some(function (a) { return a.alunoId === aluno.id; });
+      if (temAula) p.encontro.duracaoMin = duracaoHabitual(db, aluno.id);
+      var g = aluno.grade;
+      if (g && g.dias && g.dias.length) p.encontro.porSemana = g.dias.length;
+    }
+    var pv = precoVigente(aluno, p.data);
+    if (pv) p.cobranca.valorHora = pv.valorHora;
+    if (!(p.cobranca.valorHora > 0)) p.cobranca.valorHora = 100;
+    if (!(p.cobranca.ancora > 0)) p.cobranca.ancora = ancoraSugerida(p.cobranca.valorHora);
+    return p;
+  }
+
+  /* A conta dos planos, pura e sem banco nenhum.
+   *
+   * op = { valorHora, ancora, descontos: { mensal, trimestral, semestral },
+   *        porSemana, duracaoMin }
+   *
+   * DOIS PREÇOS ENTRAM, e a diferença entre eles é o desenho inteiro:
+   *   valorHora é o que ela cobra HOJE, e é a base dos três planos.
+   *   ancora é o preço da aula avulsa, mais alto, e só serve à linha da avulsa.
+   *
+   * Três contas, e é de propósito que sejam as três que ela confere de cabeça:
+   *   valor por hora do plano = preço de hoje vezes (1 menos o desconto)
+   *   horas do período        = vezes por semana x duração x 4, 12 ou 24 semanas
+   *   total do período        = valor por hora x horas do período
+   *
+   * Por que a base é o preço dela e não a âncora: descontando da âncora, o
+   * desconto tem que primeiro desfazer os 15 por cento de marcação antes de
+   * virar desconto de verdade, e os padrões de 0, 5 e 10 deixavam os TRÊS
+   * planos acima do preço dela. Medido com a aluna de R$ 130,00 a hora: a
+   * âncora nascia em R$ 150,00 e a folha oferecia mensal R$ 150,00, trimestral
+   * R$ 142,50 e semestral R$ 135,00. Ela mandaria para a família uma tabela
+   * inteira acima do próprio preço sem perceber. Descontando do preço dela, os
+   * mesmos 0, 5 e 10 dão mensal R$ 130,00, trimestral R$ 123,50 e semestral
+   * R$ 117,00: o mensal cai exatamente no que ela já cobra, os outros dois
+   * caem abaixo, e o número que ela digita quer dizer o que está escrito ao
+   * lado dele. A marcação continua existindo, onde ela é verdade: na avulsa.
+   *
+   * Enquanto o desconto for zero ou mais, nenhum plano passa do preço dela.
+   * Isso é por construção, e não por sorte de arredondamento.
+   *
+   * A distância que a família calcula é outra: ela compara o plano com a
+   * avulsa impressa ao lado. É essa a que acende o aviso, quando passa de 25
+   * por cento. A escada de 0, 5 e 10 é criticável; a de 0, 15 e 30 lê como
+   * desespero e ainda destrói a receita de quem teria pago cheio. */
+  function calcularPlanos(op) {
+    op = op || {};
+    var ancora = Math.max(0, numeroOu(op.ancora, 0));
+    /* A base é o preço de hoje. Sem ele a conta cai na âncora, que é o
+     * comportamento antigo: torto, mas nunca NaN nem zero. */
+    var base = Math.max(0, numeroOu(op.valorHora, 0));
+    if (!(base > 0)) base = ancora;
+    if (!(ancora > 0)) ancora = base;
+    var porSemana = Math.max(1, Math.round(numeroOu(op.porSemana, 1)));
+    var duracaoMin = Math.max(1, Math.round(numeroOu(op.duracaoMin, 60)));
+    var horasPorEncontro = duracaoMin / 60;
+    var descontos = op.descontos || {};
+    var maior = 0;
+    var linhas = PLANOS.map(function (pl) {
+      var pedido = Math.max(0, Math.min(100, numeroOu(descontos[pl.id], 0)));
+      var valorHora = arredondaMeioReal(base * (1 - pedido / 100));
+      var encontros = porSemana * pl.semanas;
+      var horas = Math.round(encontros * horasPorEncontro * 100) / 100;
+      var real = base > 0 ? (base - valorHora) / base * 100 : 0;
+      var daAvulsa = ancora > 0 ? (ancora - valorHora) / ancora * 100 : 0;
+      if (daAvulsa > maior) maior = daAvulsa;
+      var contra = arredondaCentavos(valorHora - base);
+      return {
+        id: pl.id, rotulo: pl.rotulo, semanas: pl.semanas,
+        desconto: pedido,
+        descontoReal: Math.round(real * 100) / 100,
+        descontoDaAvulsa: Math.round(daAvulsa * 100) / 100,
+        valorHora: valorHora,
+        encontros: encontros,
+        horas: horas,
+        total: arredondaCentavos(valorHora * horas),
+        economia: arredondaCentavos((ancora - valorHora) * horas),
+        /* O que a linha significa contra o preço que ela cobra hoje, já em
+         * português: é a única leitura que responde "eu estou dando desconto
+         * ou aumentando o preço de alguém?", e é a pergunta que ela faz. */
+        contraAtual: contra,
+        comparada: contra === 0
+          ? 'no seu preço de hoje'
+          : (contra < 0
+            ? fmtMoeda(-contra) + ' abaixo do seu preço de hoje'
+            : fmtMoeda(contra) + ' ACIMA do seu preço de hoje')
+      };
+    });
+    var avisos = [];
+    if (maior > LIMITE_DESCONTO) {
+      avisos.push('Desconto acima de ' + LIMITE_DESCONTO +
+        ' por cento costuma soar como preço inventado.');
+    }
+    /* Âncora abaixo do preço dela imprimiria uma tabela em que a aula sem
+     * compromisso sai mais barata do que o plano, e a família vê isso na
+     * mesma folha. */
+    if (base > 0 && ancora < base) {
+      avisos.push('A aula avulsa está mais barata do que o seu preço de hoje: ' +
+        'na folha, o plano ficaria mais caro do que não ter plano nenhum.');
+    }
+    return {
+      ancora: ancora,
+      /* O preço de hoje volta na conta para a tela poder escrever a
+       * comparação sem ter que ir buscá-lo noutro canto do registro. */
+      precoAtual: base,
+      porSemana: porSemana,
+      duracaoMin: duracaoMin,
+      horasPorEncontro: horasPorEncontro,
+      avulsa: {
+        valorHora: ancora,
+        valorEncontro: arredondaCentavos(ancora * horasPorEncontro),
+        contraAtual: arredondaCentavos(ancora - base)
+      },
+      planos: linhas,
+      maiorDesconto: Math.round(maior * 100) / 100,
+      avisos: avisos,
+      aviso: avisos[0] || ''
+    };
+  }
+
+  /* A conta de uma proposta inteira. Tela e folha entram por aqui, e é o que
+   * garante que as duas mostrem os mesmos quatro números: chamar calcularPlanos
+   * direto obriga quem chama a lembrar de passar o preço de hoje, e quem
+   * esquecer vê a tabela descer da âncora outra vez. */
+  function contaDaProposta(proposta) {
+    var c = (proposta && proposta.cobranca) || {};
+    var e = (proposta && proposta.encontro) || {};
+    return calcularPlanos({
+      valorHora: c.valorHora,
+      ancora: c.ancora,
+      descontos: c.descontos,
+      porSemana: e.porSemana,
+      duracaoMin: e.duracaoMin
+    });
+  }
+
+  function planoDaProposta(proposta, planoId) {
+    var conta = contaDaProposta(proposta);
+    return conta.planos.filter(function (p) { return p.id === String(planoId || ''); })[0] || null;
+  }
+
+  /* O elo com a cobrança, que é a parte que evita conta errada lá na frente.
+   *
+   * Se ela fecha o trimestral a R$ 109 no PDF e esquece de criar a vigência em
+   * aluno.precos, calcularFechamento cobra o valor antigo e a família recebe em
+   * outubro uma conta que não bate com a proposta que aceitou. Aqui sai a linha
+   * pronta para entrar em aluno.precos: um toque, e o fechamento dos meses
+   * seguintes já sai certo. Quem confere sobreposição continua sendo
+   * validarPrecos.
+   *
+   * A janela fecha por SEMANAS, e é o que faz as duas contas baterem. A folha
+   * promete 4, 12 ou 24 encontros; o fechamento cobra aula por aula dentro da
+   * vigência. Fechando por mês de calendário, o trimestral abria uma janela de
+   * 04/09 a 03/12, que tem treze sextas-feiras, e a família recebia em outubro
+   * uma conta maior do que a proposta que aceitou. Fechando por semanas a
+   * janela vai de 04/09 a 26/11, com doze sextas exatas.
+   *
+   * O menos um dia é para a vigência seguinte poder começar no dia certo sem
+   * sobreposição. */
+  function vigenciaDoPlano(proposta, planoId) {
+    var pl = planoPorId(planoId);
+    if (!pl) return null;
+    var linha = planoDaProposta(proposta, planoId);
+    if (!linha || !(linha.valorHora > 0)) return null;
+    var inicio = (proposta && proposta.data) || hojeIso();
+    return {
+      id: uid(),
+      inicio: inicio,
+      fim: somaDiasIso(inicio, pl.semanas * 7 - 1),
+      valorHora: linha.valorHora
+    };
+  }
+
+  function rotuloObjetivoDaProposta(o) {
+    if (!o) return '';
+    var base = objetivoPorId(o.tipo);
+    var livre = (o.descricao || '').trim();
+    return base ? (base.livre ? (livre || base.rotulo) : base.rotulo) : livre;
+  }
+
+  /* Ano escolar e colégio da proposta, no formato do fechamento. Lê do próprio
+   * registro, e não do aluno, porque a proposta principal é a de quem ainda não
+   * está cadastrado. */
+  function contextoEscolarDaProposta(p) {
+    var partes = [];
+    var ano = (p && p.anoEscolar) || '';
+    if (anoEscolarLivre(ano)) {
+      var livre = ((p && p.anoEscolarOutro) || '').trim();
+      if (livre) partes.push(livre);
+    } else if (ANOS_ESCOLARES[ano]) {
+      partes.push(ANOS_ESCOLARES[ano]);
+    }
+    if (p && p.colegio) partes.push(p.colegio);
+    return partes.join(', ');
+  }
+
+  /* O que a folha diz sobre a criança, além do nome dela.
+   *
+   * É o nível, o objetivo, os pontos fortes, as lacunas e as áreas de
+   * trabalho: cada um deles abre uma seção. Sem nenhum, as três primeiras
+   * seções somem e sobram o nome, a matéria, o combinado e o preço. */
+  function falaDaCrianca(p) {
+    var o = (p && p.objetivo) || {};
+    return !!((p && p.nivel) || o.tipo || (o.descricao || '').trim() ||
+      ((p && p.fortes) || []).length || ((p && p.lacunas) || []).length ||
+      ((p && p.areas) || []).length);
+  }
+
+  /* O que falta para a proposta poder sair, em ordem de quem lê a folha.
+   *
+   * A terceira regra é a que a medição pediu. Para o aluno que ainda não
+   * existe, que é o caso principal, não há mapeamento nenhum: medido na folha
+   * mínima, das 444 palavras impressas 232 eram o combinado de desmarcação e
+   * NENHUMA era sobre a criança. A família recebe um documento sobre regras e
+   * preço, com o nome do filho no alto. Quando não há mapeamento, o parágrafo
+   * escrito por ela deixa de ser opcional: é o único lugar da folha em que
+   * alguém fala da criança.
+   *
+   * Devolve frases prontas para avisar, e não códigos: quem chama mostra a
+   * primeira e para. */
+  function pendenciasDaProposta(p) {
+    var out = [];
+    if (!((p && p.aluno) || '').trim()) {
+      out.push('Informe o nome do aluno. A proposta é escrita sobre ele.');
+    }
+    if (!((p && p.responsavel) || '').trim()) {
+      out.push('Informe o responsável. A proposta tem destinatário: é para quem decide.');
+    }
+    if (!falaDaCrianca(p) && !((p && p.texto) || '').trim()) {
+      out.push('Escreva duas ou três linhas sobre a criança. Sem o mapeamento, ' +
+        'este parágrafo é a única parte da folha que fala dela: sem ele a ' +
+        'família recebe uma página de combinados e preço.');
+    }
+    return out;
+  }
+
+  /* Traduz o registro para a folha, do mesmo jeito que calcularFechamento
+   * traduz o mês: o pdf.js não conhece o Core e não deve conhecer, então tudo
+   * o que sai daqui já são rótulos em português prontos para imprimir. */
+  function dadosDaProposta(aluno, proposta) {
+    var p = proposta || propostaNova();
+    var c = p.cobranca || {};
+    var enc = p.encontro || {};
+    var principal = (p.materias && p.materias[0]) || MATERIA_PADRAO;
+    var comb = (p.combinados && p.combinados.itens) || [];
+    var planos = c.modo === 'planos' ? contaDaProposta(p) : null;
+    var recomendada = c.modo === 'planos' ? vigenciaDoPlano(p, c.recomendado) : null;
+
+    var areasPorGrupo = [];
+    AREAS.forEach(function (g) {
+      var itens = g.itens
+        .filter(function (i) { return (p.areas || []).indexOf(i.id) >= 0; })
+        .map(function (i) { return i.rotulo; });
+      if (itens.length) areasPorGrupo.push({ grupo: g.grupo, itens: itens });
+    });
+
+    var origem = p.origem === 'nivelamento'
+      ? ('Aula de nivelamento' + (p.dataOrigem ? ' em ' + ddmm(p.dataOrigem) : ''))
+      : 'Primeira conversa com vocês';
+
+    return {
+      aluno: p.aluno || (aluno && aluno.nome) || '',
+      responsavel: p.responsavel || (aluno && aluno.responsavel) || '',
+      contextoEscolar: contextoEscolarDaProposta(p),
+      materias: (p.materias || []).map(function (id) {
+        var mat = materiaPorId(id);
+        if (mat && mat.livre) return String(p.materiaOutra || '').trim() || mat.rotulo;
+        return mat ? mat.rotulo : '';
+      }).filter(Boolean),
+      cidade: p.cidade || PROPOSTA_PADRAO.cidade,
+      data: p.data,
+      validaAte: p.validaAte,
+      origem: origem,
+      nivel: rotuloNivel(p.nivel),
+      objetivo: {
+        rotulo: rotuloObjetivoDaProposta(p.objetivo),
+        dataProva: (p.objetivo && p.objetivo.dataProva) || ''
+      },
+      texto: (p.texto || '').trim(),
+      fortes: rotulosDoMapa('fortes', p.fortes),
+      atencao: rotulosDoMapa('atencao', p.atencao),
+      lacunas: temLacunaDeAnoAnterior(principal) ? rotulosDoMapa('lacunas', p.lacunas) : [],
+      areas: areasPorGrupo,
+      encontro: {
+        duracaoMin: numeroOu(enc.duracaoMin, 90),
+        porSemana: numeroOu(enc.porSemana, 1),
+        local: rotuloLocal(enc.local)
+      },
+      combinados: comb.filter(function (i) { return i.ligado !== false; })
+        .map(function (i) { return { rotulo: i.rotulo, texto: i.texto }; }),
+      vantagens: (p.vantagens || []).filter(function (i) { return i.ligado !== false; })
+        .map(function (i) { return i.texto; }),
+      cobranca: {
+        modo: c.modo === 'planos' ? 'planos' : 'hora',
+        valorHora: numeroOu(c.valorHora, 0),
+        recomendado: c.recomendado || ''
+      },
+      planos: planos,
+      reservadoAte: recomendada ? ddmmaaaa(recomendada.fim) : ''
+    };
+  }
+
   // ---------- em que etapa o aluno está ----------
 
   /* As quatro etapas que ela já usa, marcadas em três frentes, cada uma com a
@@ -2447,7 +3237,13 @@
     var contagem = {};
     ((db && db.aulas) || []).forEach(function (a) {
       if (a.alunoId !== alunoId) return;
-      var d = a.duracao || 0;
+      /* O campo é duracaoMin: é assim que a aula é gravada, em aulaNova e na
+       * materialização da série. Enquanto isto lia a.duracao, que não existe
+       * em aula nenhuma, a contagem ficava sempre vazia e a função devolvia os
+       * 60 minutos de recurso para todo mundo. Media-se assim: uma aluna com
+       * três aulas de 90 minutos lançadas recebia proposta oferecendo 1h, e a
+       * tabela inteira de planos saía calculada sobre a duração errada. */
+      var d = a.duracaoMin || 0;
       if (d > 0) contagem[d] = (contagem[d] || 0) + 1;
     });
     var melhor = 0, vezes = -1;
@@ -2628,6 +3424,18 @@
     cobrancaDaMateria: cobrancaDaMateria, definirCobranca: definirCobranca,
     materiasDoMapeamento: materiasDoMapeamento,
     OBJETIVOS: OBJETIVOS, objetivoPorId: objetivoPorId, objetivoDe: objetivoDe,
+    LOCAIS_ENCONTRO: LOCAIS_ENCONTRO, rotuloLocal: rotuloLocal,
+    PLANOS: PLANOS, planoPorId: planoPorId, PROPOSTA_PADRAO: PROPOSTA_PADRAO,
+    LIMITE_DESCONTO: LIMITE_DESCONTO, propostaPadraoDe: propostaPadraoDe,
+    combinadosPadrao: combinadosPadrao, vantagensPadrao: vantagensPadrao,
+    propostaNova: propostaNova, propostasDe: propostasDe, propostaAtual: propostaAtual,
+    preencherProposta: preencherProposta, areasSugeridas: areasSugeridas,
+    calcularPlanos: calcularPlanos, ancoraSugerida: ancoraSugerida,
+    contaDaProposta: contaDaProposta,
+    planoDaProposta: planoDaProposta, vigenciaDoPlano: vigenciaDoPlano,
+    pendenciasDaProposta: pendenciasDaProposta, falaDaCrianca: falaDaCrianca,
+    dadosDaProposta: dadosDaProposta, arredondaMeioReal: arredondaMeioReal,
+    somaDiasIso: somaDiasIso, somaMesesIso: somaMesesIso,
     semanasAteAProva: semanasAteAProva,
     ETAPAS: ETAPAS, FRENTES_ETAPA: FRENTES_ETAPA, etapaPorId: etapaPorId,
     rotuloEtapa: rotuloEtapa, etapasDe: etapasDe, registrosDaFrente: registrosDaFrente,
