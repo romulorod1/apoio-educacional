@@ -632,7 +632,19 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
      Só o botão de desfazer recebe toque. */
   pointer-events: none;
 }
-.aviso.aberto { transform: translateX(-50%) translateY(0); }
+/* Com janela aberta o aviso sobe acima do rodape dela, e quem mede quanto e o
+   app.js, em posicionarAviso: um valor fixo aqui nao serve, porque a janela e
+   centrada e a baixa termina bem mais acima do que a alta. Medido em pe, num
+   tablet de 800 por 1280: 4vh mais 92 pixels limpava a janela da proposta e
+   ainda cobria 10 por cento do Cancelar da ficha do aluno, e 100 por cento do
+   rodape da janela de aula deitado.
+
+   A subida entra no TRANSFORM, e nao no bottom. Mexendo no bottom, o aviso
+   FECHADO deixava de caber no proprio recuo de 140 por cento e ficava
+   espiando na beirada de baixo da tela, com o botao Desfazer a vista, o tempo
+   todo, sem aviso nenhum no ar. Visto no print. No transform, o estado fechado
+   continua o de sempre e a animacao continua sendo uma so. */
+.aviso.aberto { transform: translateX(-50%) translateY(calc(var(--sobe, 0px) * -1)); }
 .aviso button {
   pointer-events: auto;
   background: transparent;

@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.13.0';
+  var VERSAO = '1.14.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -22,6 +22,26 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.14.0',
+      itens: [
+        'A proposta de acompanhamento. Dentro de Alunos, um botão novo monta em PDF a ' +
+          'proposta que você manda para uma família antes de começar: quem é o aluno, o que ' +
+          'você observou na aula de nivelamento ou na primeira conversa, o que propõe ' +
+          'trabalhar, como funcionam os encontros e quanto custa. Sai pelo mesmo caminho de ' +
+          'sempre, então vai direto para o WhatsApp ou para o S Notes.',
+        'Você escolhe entre cobrar por hora-aula ou mostrar planos mensal, trimestral e ' +
+          'semestral. A aula avulsa fica mais cara, porque não reserva horário, e os planos ' +
+          'descem a partir do valor que você cobra hoje. A tela mostra, linha por linha, quanto ' +
+          'cada plano fica acima ou abaixo do seu preço atual, para nenhuma proposta sair sem ' +
+          'você ver isso.',
+        'Junto vai o combinado de remarcação, editável palavra por palavra. Ele começa ' +
+          'explicando que cada aula é preparada antes, olhando o que ficou errado na semana ' +
+          'anterior, e só então fala das 24 horas de antecedência. Cada família tem duas folgas ' +
+          'por semestre, sem precisar dar explicação nenhuma, e a mesma régua vale para você ' +
+          'quando é você quem precisa desmarcar.'
+      ]
+    },
     {
       versao: '1.13.0',
       itens: [
@@ -424,7 +444,45 @@
       e.style.zIndex = String(degrauModal);
     }
     e.classList.add('aberto');
+    posicionarAviso();
   }
+
+  /* O aviso flutuante e o rodapé das janelas moram no mesmo canto da tela.
+   *
+   * Medido em pé, num tablet de 800 por 1280: o aviso cobria 96 por cento do
+   * botão Fechar da janela da proposta. Ela lia o aviso, e para sair da janela
+   * tinha que esperar o aviso ir embora sozinho. Pior: é no aviso que vem a
+   * oferta de cadastrar o aluno, então o convite tapava a própria saída.
+   *
+   * A altura é MEDIDA, e não uma constante: as janelas são centradas, e a
+   * janela baixa termina muito mais acima do que a alta. Um recuo fixo que
+   * limpava o rodapé da proposta ainda cobria 10 por cento do Cancelar da
+   * ficha do aluno e 100 por cento do rodapé da janela de aula. Aqui o aviso
+   * para 12 pixels acima do rodapé mais alto que estiver aberto, com teto de
+   * 55 por cento da tela para ele nunca subir demais. */
+  function posicionarAviso() {
+    var caixa = $('#aviso');
+    if (!caixa) return;
+    var limite = null;
+    $$('.fundo-modal.aberto').forEach(function (m) {
+      var rodape = m.querySelector('.modal-rodape');
+      if (!rodape) return;
+      var r = rodape.getBoundingClientRect();
+      if (r.height <= 0) return;
+      if (limite === null || r.top < limite) limite = r.top;
+    });
+    if (limite === null) { caixa.style.removeProperty('--sobe'); return; }
+    /* O aviso mora a 24 pixels do fim da tela: subir o bastante para a base
+     * dele parar 12 pixels acima do rodapé. Teto de 55 por cento da tela, para
+     * ele nunca sair voando para o alto numa janela pequena. */
+    var subir = Math.max(0, window.innerHeight - limite - 12);
+    caixa.style.setProperty('--sobe', Math.min(subir, Math.round(window.innerHeight * 0.55)) + 'px');
+  }
+
+  /* Ela vira o tablet no colo o tempo todo. Girando a tela, a janela muda de
+   * altura e a medida de antes fica velha: um aviso que estava livre volta a
+   * cair em cima do rodapé. Medir de novo custa duas leituras de geometria. */
+  window.addEventListener('resize', posicionarAviso);
 
   function fecharModal(id) {
     var e = $('#' + id);
@@ -445,6 +503,7 @@
      * querer seria perder tudo o que ela digitou, e não há para onde voltar. */
     if (id === 'modal-proposta') guardarRascunhoDeProposta();
     if (!$$('.fundo-modal.aberto').length) degrauModal = 50;
+    posicionarAviso();
   }
 
   function avisar(texto, rotuloAcao, aoAgir) {
@@ -459,6 +518,9 @@
       botao.style.display = 'none';
       botao.onclick = null;
     }
+    /* Medido no momento de mostrar: a janela pode ter mudado de altura depois
+     * de aberta, e é agora que o aviso precisa caber. */
+    posicionarAviso();
     caixa.classList.add('aberto');
     clearTimeout(tempoAviso);
     tempoAviso = setTimeout(esconderAviso, aoAgir ? 9000 : 3600);
@@ -879,6 +941,12 @@
     $('#proposta-nova').addEventListener('click', abrirPropostaAvulsa);
     $('#gerar-proposta').addEventListener('click', function () {
       gerarPropostaEmPdf(propostaEmEdicao);
+    });
+    /* O rodapé da ficha muda com a aba: na aba Proposta o que ela precisa é
+     * gerar, e não salvar. Quem sabe gerar é a aba, que guarda a proposta de
+     * trabalho na própria closure, então ela deixa aqui a função. */
+    $('#gerar-proposta-aluno').addEventListener('click', function () {
+      if (gerarDaAbaProposta) gerarDaAbaProposta();
     });
 
     $('#salvar-aula').addEventListener('click', salvarAula);
@@ -2329,11 +2397,46 @@
   function desenharAlunos() {
     var caixa = $('#lista-alunos');
     caixa.innerHTML = '';
-    var semValor = db.alunos.filter(function (a) { return !Core.precoVigente(a, Core.hojeIso()); });
+    var hojeDaLista = Core.hojeIso();
+    var semValor = db.alunos.filter(function (a) { return !Core.precoVigente(a, hojeDaLista); });
     if (semValor.length) {
       caixa.appendChild(el('div', { class: 'faixa-aviso' }, [
         el('strong', { texto: semValor.length + ' aluno' + (semValor.length === 1 ? '' : 's') + ' sem valor por hora. ' }),
         document.createTextNode('Abra cada ficha e informe quanto custa a hora-aula. Enquanto isso, o fechamento desses alunos fica em zero.')
+      ]));
+    }
+
+    /* O valor que vai acabar, com a data.
+     *
+     * A vigência de um plano nasce com fim: o trimestral que a família aceitou
+     * em setembro termina em dezembro. Passado esse dia o aluno fica sem preço
+     * nenhum, o fechamento do mês seguinte sai em zero e a família recebe uma
+     * conta que não bate com a proposta. Nada dizia isso antes desta faixa: a
+     * outra faixa só acende DEPOIS que o valor já acabou, quando o mês torto já
+     * está correndo. Esta acende no dia em que a vigência é criada e fica.
+     *
+     * Não inventa preço nenhum sozinha, de propósito: qual valor passa a valer
+     * quando o plano acaba é decisão dela, e emendar por conta própria o preço
+     * anterior mandaria para a família, em janeiro, uma conta com um número que
+     * ninguém combinou. */
+    var acabando = db.alunos.filter(function (a) {
+      var atual = Core.precoVigente(a, hojeDaLista);
+      if (!atual || !atual.fim) return false;
+      return !Core.precoVigente(a, Core.somaDiasIso(atual.fim, 1));
+    });
+    if (acabando.length) {
+      caixa.appendChild(el('div', { class: 'faixa-aviso', 'data-faixa': 'valor-termina' }, [
+        el('strong', {
+          texto: acabando.length === 1
+            ? 'O valor combinado de ' + acabando[0].nome + ' termina em ' +
+              Core.ddmmaaaa(Core.precoVigente(acabando[0], hojeDaLista).fim) + '. '
+            : acabando.length + ' alunos com o valor combinado terminando. '
+        }),
+        document.createTextNode(acabando.length === 1
+          ? 'Depois dessa data o fechamento dele volta a zero. Abra a ficha e diga quanto passa a custar.'
+          : 'São eles: ' + acabando.map(function (a) {
+            return a.nome + ' até ' + Core.ddmmaaaa(Core.precoVigente(a, hojeDaLista).fim);
+          }).join('; ') + '. Depois dessas datas o fechamento deles volta a zero.')
       ]));
     }
     if (!db.alunos.length) {
@@ -2380,7 +2483,24 @@
     alunoEmEdicao = alunoId ? alunoPorId(alunoId) : null;
     var novo = !alunoEmEdicao;
     $('#titulo-modal-aluno').textContent = novo ? 'Novo aluno' : alunoEmEdicao.nome;
-    $('#excluir-aluno').style.display = novo ? 'none' : '';
+
+    /* O rodapé segue a aba.
+     *
+     * Medido: na aba Proposta o rodapé mostrava Excluir aluno, Cancelar e
+     * Salvar, o único botão azul era o Salvar, e "Gerar proposta em PDF"
+     * ficava 608 pixels abaixo da dobra. Ela mudava o valor, tocava no botão
+     * azul que estava à mão, a janela fechava e nenhum PDF saía. Aqui a aba
+     * Proposta não tem o que salvar: quem grava a proposta é o gerar. */
+    function rodapeDaFicha(chave) {
+      var naProposta = chave === 'proposta';
+      $('#excluir-aluno').style.display = (novo || naProposta) ? 'none' : '';
+      $('#salvar-aluno').style.display = naProposta ? 'none' : '';
+      $('#gerar-proposta-aluno').style.display = naProposta ? '' : 'none';
+    }
+    rodapeDaFicha('dados');
+    /* Aluno novo não tem aba Proposta: solta a função da ficha anterior, para
+     * o botão do rodapé nunca poder gerar a proposta de outro aluno. */
+    if (novo) gerarDaAbaProposta = null;
 
     var corpo = $('#corpo-modal-aluno');
     corpo.innerHTML = '';
@@ -2404,6 +2524,7 @@
         b.classList.add('ativa');
         Object.keys(painel).forEach(function (k) { painel[k].style.display = 'none'; });
         painel[par[0]].style.display = '';
+        rodapeDaFicha(par[0]);
         corpo.scrollTop = 0;
       });
       abas.appendChild(b);
@@ -2881,6 +3002,16 @@
    * da janela, para virar rascunho. */
   var propostaEmEdicao = null;
 
+  /* O que a aba Proposta da ficha sabe gerar, para o botão do rodapé alcançar.
+   * A aba guarda a proposta de trabalho na própria closure, e o rodapé mora
+   * fora dela. */
+  var gerarDaAbaProposta = null;
+
+  /* Redesenha o alto da janela da proposta: a faixa do que foi gerado, o bloco
+   * fixo que oferece cadastrar e o botão de começar outra. Fica aqui em cima
+   * porque o gerar precisa chamá-lo depois que o PDF sai. */
+  var redesenharTopoDaProposta = null;
+
   /* Campo novo nasce opcional e a leitura tolera a falta: uma proposta gravada
    * por uma versão anterior não pode derrubar a tela. Tudo o que estiver
    * faltando vem do molde de hoje, com os padrões dela por cima. */
@@ -2929,12 +3060,65 @@
     if (!propostaEmEdicao) return;
     var p = propostaEmEdicao.proposta;
     propostaEmEdicao = null;
+    redesenharTopoDaProposta = null;
+    clearTimeout(rascunhoPendente);
+    rascunhoPendente = null;
     db.ajustes = db.ajustes || {};
     db.ajustes.propostaRascunho = p;
     salvar();
   }
 
+  /* O rascunho vai para o disco enquanto ela escreve, e não só ao fechar.
+   *
+   * Medido: quatro campos preenchidos, a página recarregada sem fechar a
+   * janela, e não havia rascunho nenhum no disco. Basta o tablet recarregar o
+   * aplicativo, o navegador matar a aba por memória ou a atualização entrar,
+   * e ela perde a proposta inteira de uma família que ainda não existe no
+   * aplicativo, sem ter para onde voltar. É o mesmo cuidado que a folha de
+   * aula já tem, e pelo mesmo motivo. */
+  var rascunhoPendente = null;
+
+  function gravarRascunhoAgora() {
+    if (!propostaEmEdicao || !propostaEmEdicao.avulsa) return;
+    clearTimeout(rascunhoPendente);
+    rascunhoPendente = null;
+    db.ajustes = db.ajustes || {};
+    db.ajustes.propostaRascunho = propostaEmEdicao.proposta;
+    salvar();
+  }
+
+  function agendarRascunho() {
+    if (!propostaEmEdicao || !propostaEmEdicao.avulsa) return;
+    clearTimeout(rascunhoPendente);
+    rascunhoPendente = setTimeout(gravarRascunhoAgora, 1500);
+  }
+
   // ---------------- porta 1: a janela própria, na tela Alunos ----------------
+
+  /* Há alguma coisa escrita nesta proposta para descartar?
+   *
+   * O botão de recomeçar existe para não obrigar ela a apagar campo por campo
+   * antes da segunda família da tarde. Antes ele só era desenhado quando havia
+   * NOME, e o nome não é a única coisa que ela escreve: medido, depois de
+   * gerar a proposta da primeira família o botão continuava não existindo, e o
+   * caminho que sobrava era apagar tudo à mão, com o risco de deixar para trás
+   * a frase que ela escreveu sobre a outra criança.
+   *
+   * A regra passa a ser "tem o que descartar", e não "tem nome". Numa proposta
+   * de verdade em branco o botão continua fora, porque ali ele não mudaria
+   * nada e um toque que não faz nada é pior do que um botão a menos. */
+  function propostaTemAlgoEscrito(p) {
+    if (!p) return false;
+    if (p.geradoEm) return true;
+    var textos = [p.aluno, p.responsavel, p.colegio, p.anoEscolar, p.anoEscolarOutro,
+      p.texto, p.materiaOutra, p.nivel, p.dataOrigem];
+    if (textos.some(function (t) { return String(t || '').trim(); })) return true;
+    if (['fortes', 'atencao', 'lacunas', 'areas'].some(function (k) {
+      return (p[k] || []).length;
+    })) return true;
+    var o = p.objetivo || {};
+    return !!(o.tipo || o.dataProva || String(o.descricao || '').trim());
+  }
 
   function abrirPropostaAvulsa() {
     var p = rascunhoDeProposta();
@@ -2943,29 +3127,71 @@
     var corpo = $('#corpo-modal-proposta');
     corpo.innerHTML = '';
 
-    if (p.geradoEm && (p.aluno || '').trim()) {
-      corpo.appendChild(el('div', { class: 'faixa-info' }, [
-        el('strong', { texto: 'Proposta de ' + p.aluno.trim() + ', gerada em ' + Core.ddmmaaaa(p.geradoEm) + '. ' }),
-        document.createTextNode('Está tudo aqui do jeito que você mandou, para corrigir e gerar de novo. ' +
-          'Para a família seguinte, toque em Começar outra.')
-      ]));
+    var topo = el('div');
+    corpo.appendChild(topo);
+
+    /* O alto da janela é redesenhado depois de gerar, sem refazer o editor
+     * inteiro: é ali que nascem o convite de cadastrar e o botão de começar
+     * outra, e os dois só fazem sentido DEPOIS que o PDF saiu. */
+    function desenharTopo() {
+      topo.innerHTML = '';
+      var nome = (p.aluno || '').trim();
+
+      if (p.geradoEm && nome) {
+        topo.appendChild(el('div', { class: 'faixa-info' }, [
+          el('strong', { texto: 'Proposta de ' + nome + ', gerada em ' + Core.ddmmaaaa(p.geradoEm) + '. ' }),
+          document.createTextNode('Está tudo aqui do jeito que você mandou, para corrigir e gerar de novo. ' +
+            'Para a família seguinte, toque em Começar outra.')
+        ]));
+      }
+
+      /* O convite de cadastrar mora AQUI, e não só no aviso flutuante.
+       *
+       * Medido: o aviso vive nove segundos. Depois de gerar, a folha de
+       * compartilhamento do Android sobe por cima e fica aberta enquanto ela
+       * escolhe o WhatsApp, procura a conversa e escreve alguma coisa. Ela
+       * volta quarenta segundos depois e a oferta já foi embora, sem deixar
+       * rastro. Este bloco não some sozinho: fica esperando. */
+      if (p.geradoEm && nome && !p.ofertaDispensada) {
+        topo.appendChild(el('div', { class: 'faixa-info', 'data-oferta': 'cadastrar' }, [
+          el('div', { texto: 'A proposta de ' + nome + ' já saiu. Se a família fechar, ' +
+            nome + ' entra na lista de alunos com esta proposta guardada na ficha, ' +
+            'e o valor combinado vem junto.' }),
+          el('div', { class: 'barra', style: 'margin:10px 0 0' }, [
+            el('button', {
+              type: 'button', class: 'btn principal', 'data-acao': 'cadastrar-do-rascunho',
+              texto: 'Cadastrar ' + nome.split(' ')[0],
+              aoClick: function () { cadastrarDoRascunho(p); }
+            }),
+            el('button', {
+              type: 'button', class: 'btn', 'data-acao': 'oferta-depois', texto: 'Ainda não',
+              aoClick: function () {
+                p.ofertaDispensada = true;
+                gravarRascunhoAgora();
+                desenharTopo();
+              }
+            }),
+            el('span', { class: 'cresce' })
+          ])
+        ]));
+      }
+
+      if (propostaTemAlgoEscrito(p)) {
+        topo.appendChild(el('div', { class: 'barra', style: 'margin:0 0 12px' }, [
+          el('span', { class: 'cresce' }),
+          el('button', {
+            type: 'button', class: 'btn', 'data-acao': 'comecar-outra', texto: 'Começar outra',
+            aoClick: function () {
+              if (!confirmar('Começar uma proposta em branco? A que está aqui não fica guardada.')) return;
+              db.ajustes.propostaRascunho = Core.preencherProposta(db, null);
+              abrirPropostaAvulsa();
+            }
+          })
+        ]));
+      }
     }
-    /* O botão de recomeçar só aparece quando há uma proposta com nome para
-     * descartar. Numa proposta em branco ele seria um botão que não faz nada,
-     * ocupando a primeira linha da janela. */
-    if ((p.aluno || '').trim()) {
-      corpo.appendChild(el('div', { class: 'barra', style: 'margin:0 0 12px' }, [
-        el('span', { class: 'cresce' }),
-        el('button', {
-          type: 'button', class: 'btn', 'data-acao': 'comecar-outra', texto: 'Começar outra',
-          aoClick: function () {
-            if (!confirmar('Começar uma proposta em branco? A que está aqui não fica guardada.')) return;
-            db.ajustes.propostaRascunho = Core.preencherProposta(db, null);
-            abrirPropostaAvulsa();
-          }
-        })
-      ]));
-    }
+    desenharTopo();
+    redesenharTopoDaProposta = desenharTopo;
 
     desenharEditorProposta(corpo, propostaEmEdicao);
     abrirModal('modal-proposta');
@@ -3015,16 +3241,55 @@
       ]));
     }
 
+    /* O elo com a cobrança, num bloco que não some sozinho.
+     *
+     * O aviso flutuante vive nove segundos, e depois de gerar é a folha de
+     * compartilhamento do Android que está na frente da tela. Se essa oferta
+     * viver só no aviso, o preço combinado fica no PDF e o fechamento do mês
+     * seguinte cobra o valor antigo: a família recebe uma conta que não bate
+     * com a proposta que aceitou. Este bloco fica aqui até ela criar o valor,
+     * e some sozinho no momento em que a vigência existe. */
+    if (ultima && ultima.geradoEm) {
+      var pendente = vigenciaOferecida(aluno, ultima);
+      if (pendente) {
+        caixa.appendChild(el('div', { class: 'faixa-aviso', 'data-oferta': 'vigencia' }, [
+          el('div', {
+            texto: 'A proposta de ' + Core.ddmmaaaa(ultima.data) + ' promete ' +
+              dinheiro(pendente.valorHora) + ' por hora' +
+              (pendente.fim ? ', de ' + Core.ddmmaaaa(pendente.inicio) + ' a ' + Core.ddmmaaaa(pendente.fim)
+                : ', a partir de ' + Core.ddmmaaaa(pendente.inicio)) +
+              '. Enquanto esse valor não estiver na ficha, o fechamento do mês continua ' +
+              'cobrando o valor antigo.'
+          }),
+          el('div', { class: 'barra', style: 'margin:10px 0 0' }, [
+            el('button', {
+              type: 'button', class: 'btn principal', 'data-acao': 'criar-vigencia',
+              texto: 'Criar o valor na ficha',
+              aoClick: function () {
+                criarVigenciaDoPlano(aluno, pendente, function () {
+                  desenharAbaProposta(caixa, aluno, escolhida);
+                });
+              }
+            }),
+            el('span', { class: 'cresce' })
+          ])
+        ]));
+      }
+    }
+
     var ctx = { proposta: trabalho, aluno: aluno, avulsa: false };
     desenharEditorProposta(caixa, ctx);
 
+    /* O botão do rodapé é o principal, e este é o mesmo caminho no fim do
+     * documento, para quem já rolou até aqui. Um azul só na tela. */
+    gerarDaAbaProposta = function () {
+      gerarPropostaEmPdf(ctx, function () { desenharAbaProposta(caixa, aluno, null); });
+    };
     caixa.appendChild(el('div', { class: 'barra', style: 'margin-top:14px' }, [
       el('button', {
-        type: 'button', class: 'btn principal', 'data-acao': 'gerar-proposta',
+        type: 'button', class: 'btn', 'data-acao': 'gerar-proposta',
         texto: 'Gerar proposta em PDF',
-        aoClick: function () {
-          gerarPropostaEmPdf(ctx, function () { desenharAbaProposta(caixa, aluno, null); });
-        }
+        aoClick: function () { gerarDaAbaProposta(); }
       })
     ]));
     caixa.appendChild(el('div', {
@@ -3040,6 +3305,15 @@
     var p = completarProposta(ctx.proposta);
     var padroes = Core.propostaPadraoDe(db);
     var valorTocado = false;
+
+    /* Qualquer toque ou tecla dentro do editor agenda a gravação do rascunho.
+     * Um ouvinte só na raiz, e não um por campo: campo novo passa a ser
+     * gravado sem ninguém precisar lembrar de ligá-lo aqui. Na aba da ficha
+     * isso não faz nada, porque lá o trabalho é uma cópia e quem grava é o
+     * gerar. */
+    caixa.addEventListener('input', agendarRascunho);
+    caixa.addEventListener('change', agendarRascunho);
+    caixa.addEventListener('click', agendarRascunho);
 
     var atualizadores = [];
     function atualizarResumos() { atualizadores.forEach(function (f) { f(); }); }
@@ -3161,6 +3435,47 @@
       return g;
     }
     function contar(n, um, muitos) { return n + ' ' + (n === 1 ? um : muitos); }
+
+    /* O que ela escreve para UMA família não vira o texto da casa sozinho.
+     *
+     * Antes, toda geração copiava os sete textos do combinado e os quatro do
+     * "o que vem junto" para os padrões dela. Medido e lido na tela: duas
+     * frases escritas para uma família apareceram inteiras na proposta da
+     * família seguinte, sem ela digitar nada além dos dois nomes. Numa dessas
+     * frases estava o nome da outra criança. Em Niterói, com as famílias se
+     * falando, isso é conversa particular vazando de uma casa para outra.
+     *
+     * Agora o texto da casa só muda por um toque explícito, aqui. O que
+     * continua viajando sozinho são os NÚMEROS (horas de aviso, folgas,
+     * descontos, âncora), que não têm nome de criança dentro e são mesmo
+     * regra da casa: com eles guardados, os textos padrão da próxima proposta
+     * já nascem escritos com os números dela. */
+    function botaoDeGuardarPadrao(chave, itens, nomeDoBloco) {
+      var b = el('button', {
+        type: 'button', class: 'btn', 'data-acao': 'guardar-padrao-' + chave,
+        texto: 'Guardar estes textos como o meu padrão',
+        aoClick: function () {
+          if (!confirmar('Guardar estes textos como o seu padrão de ' + nomeDoBloco + '? ' +
+            'Eles passam a nascer assim em TODA proposta, para toda família. ' +
+            'Confira antes se não sobrou nada escrito para uma família só.')) return;
+          db.ajustes = db.ajustes || {};
+          var g = db.ajustes.propostaPadrao || {};
+          g[chave] = JSON.parse(JSON.stringify(itens() || []));
+          db.ajustes.propostaPadrao = g;
+          salvar().then(function () {
+            avisar('Pronto: estes textos passam a nascer em toda proposta nova.');
+          });
+        }
+      });
+      return el('div', {}, [
+        el('div', { class: 'barra', style: 'margin:12px 0 0' }, [el('span', { class: 'cresce' }), b]),
+        el('div', {
+          class: 'ajuda', style: 'margin-top:6px',
+          texto: 'O que você escreve aqui vale só para esta família. Este botão é o único ' +
+            'caminho para virar o texto de todas.'
+        })
+      ]);
+    }
 
     // ---- bloco 1: quem (nasce aberto)
 
@@ -3528,6 +3843,9 @@
         'O botão existe para quando você quiser o contrário.'
     }));
     b5.appendChild(caixaCombinados);
+    b5.appendChild(botaoDeGuardarPadrao('combinados', function () {
+      return p.combinados.itens;
+    }, 'o combinado'));
     desenharCombinados();
     atualizadores.push(function () {
       faixaFolgas.style.display = folgasLigadas() ? 'none' : '';
@@ -3539,7 +3857,7 @@
     var caixaPlanos = el('div');
     var caixaConta = el('div');
     var faixaValorPadrao = el('div', {
-      class: 'faixa-aviso',
+      class: 'faixa-aviso', 'data-faixa': 'valor-padrao',
       texto: 'Este valor por hora é o padrão do aplicativo, e não o seu. ' +
         'Confira antes de gerar: é o número que a família vai guardar.'
     });
@@ -3554,13 +3872,25 @@
 
     function desenharConta() {
       caixaConta.innerHTML = '';
-      var conta = Core.calcularPlanos({
-        ancora: p.cobranca.ancora, descontos: p.cobranca.descontos,
-        porSemana: p.encontro.porSemana, duracaoMin: p.encontro.duracaoMin
+      /* A conta sai por contaDaProposta, que é a mesma porta pela qual a folha
+       * passa. Não é preciosismo: chamando calcularPlanos direto, sem o preço
+       * de hoje, a base cai na âncora e a tela desce a tabela da âncora
+       * enquanto o PDF desce do preço dela.
+       *
+       * Medido, com o preço de hoje em R$ 120,00 e âncora de R$ 140,00: a tela
+       * mostrava mensal R$ 140,00, trimestral R$ 133,00 e semestral R$ 126,00,
+       * e a folha que a família recebeu dizia R$ 120,00, R$ 114,00 e
+       * R$ 108,00. Ela conferia três números e mandava outros três. */
+      var conta = Core.contaDaProposta(p);
+      /* Cada aviso etiquetado pelo que ele é, e não pela ordem em que saiu:
+       * são dois de naturezas diferentes, e o da escada de desconto tem que
+       * continuar reconhecível sozinho. */
+      (conta.avisos || []).forEach(function (texto) {
+        caixaConta.appendChild(el('div', {
+          class: 'faixa-aviso', texto: texto,
+          'data-aviso': texto.indexOf('Desconto acima') === 0 ? 'desconto' : 'ancora'
+        }));
       });
-      if (conta.aviso) {
-        caixaConta.appendChild(el('div', { class: 'faixa-aviso', 'data-aviso': 'desconto', texto: conta.aviso }));
-      }
       var tabela = el('div', { class: 'tabela-planos' });
       function linhaConta(rotulo, compromisso, hora, total, forte) {
         return el('div', { class: 'linha-plano' + (forte ? ' recomendado' : ''), 'data-plano': rotulo }, [
@@ -3589,11 +3919,37 @@
       }));
     }
 
+    /* Montando ainda, ou já na mão dela? Enquanto o editor está sendo
+     * desenhado nada de aviso flutuante: ela não pediu nada ainda. */
+    var montando = true;
+
+    /* A âncora acompanha o valor por hora.
+     *
+     * Medido: ela digitou 150 no modo hora-aula, trocou para Planos, e a
+     * tabela ofereceu mensal a R$ 115,00, porque a âncora guardada ainda era a
+     * do preço anterior. Âncora abaixo do preço de hoje imprime uma folha em
+     * que a aula sem compromisso sai mais barata do que o plano, e a família
+     * lê as duas linhas juntas. Quando isso acontece, a âncora sobe para a
+     * sugestão e ela fica sabendo, com o número. */
+    function conferirAncora() {
+      if (!(p.cobranca.valorHora > 0)) return;
+      if (p.cobranca.ancora >= p.cobranca.valorHora) return;
+      var antes = p.cobranca.ancora;
+      p.cobranca.ancora = Core.ancoraSugerida(p.cobranca.valorHora);
+      var alvo = caixaPlanos.querySelector('[data-campo="ancora"]');
+      if (alvo) alvo.value = String(p.cobranca.ancora);
+      if (!montando) {
+        avisar('A âncora subiu de ' + Core.fmtMoeda(antes) + ' para ' +
+          Core.fmtMoeda(p.cobranca.ancora) + ': ela estava abaixo do seu valor de hoje, ' +
+          'e a aula avulsa sairia na folha mais barata do que o plano.');
+      }
+    }
+
     function trocarModo(modo) {
       p.cobranca.modo = modo === 'planos' ? 'planos' : 'hora';
       caixaHora.style.display = p.cobranca.modo === 'hora' ? '' : 'none';
       caixaPlanos.style.display = p.cobranca.modo === 'planos' ? '' : 'none';
-      if (p.cobranca.modo === 'planos') desenharConta();
+      if (p.cobranca.modo === 'planos') { conferirAncora(); desenharConta(); }
     }
 
     var b6 = bloco('Investimento', true, function () {
@@ -3608,12 +3964,16 @@
       return { texto: dinheiro(p.cobranca.valorHora) + ' por hora-aula' };
     });
 
+    /* A faixa do valor não pertence ao modo hora-aula: ela vale nos dois.
+     * Dentro do caixaHora ela sumia justamente no modo Planos, onde o R$ 100
+     * do aplicativo é a base de que descem os três planos e ainda a origem da
+     * âncora, e onde ela não tem o campo à vista para desconfiar do número. */
+    b6.appendChild(faixaValorPadrao);
     b6.appendChild(grupo('Como você vai cobrar', segmentado(
       [['hora', 'Hora-aula'], ['planos', 'Planos com desconto']], p.cobranca.modo,
       trocarModo, 'modo-cobranca')));
 
     // modo hora-aula
-    caixaHora.appendChild(faixaValorPadrao);
     caixaHora.appendChild(campo('Valor por hora-aula', (function () {
       var e = entradaNumero(p.cobranca.valorHora, function (v) {
         p.cobranca.valorHora = v;
@@ -3679,6 +4039,7 @@
     caixaPlanos.appendChild(caixaConta);
     b6.appendChild(caixaPlanos);
     trocarModo(p.cobranca.modo);
+    montando = false;
 
     // ---- bloco 7: o que vem junto
 
@@ -3710,6 +4071,9 @@
         ])
       ]));
     });
+    b7.appendChild(botaoDeGuardarPadrao('vantagens', function () {
+      return p.vantagens;
+    }, 'o que vem junto'));
 
     atualizarResumos();
     return { atualizar: atualizarResumos };
@@ -3741,11 +4105,20 @@
     g.modo = p.cobranca.modo;
     g.horasDeAviso = p.combinados.horas;
     g.folgasPorSemestre = p.combinados.folgas;
-    g.duracaoMin = p.encontro.duracaoMin;
-    g.porSemana = p.encontro.porSemana;
     g.local = p.encontro.local;
-    g.combinados = JSON.parse(JSON.stringify(p.combinados.itens || []));
-    g.vantagens = JSON.parse(JSON.stringify(p.vantagens || []));
+    /* NÃO entram aqui, e cada um por um motivo medido:
+     *
+     * duracaoMin e porSemana não são da casa: vêm da grade daquele aluno. O
+     * aluno de três vezes por semana gravava porSemana 3 como padrão e a
+     * proposta da família seguinte nascia oferecendo três encontros semanais
+     * que ninguém combinou. Sem eles guardados, a proposta de um aluno já
+     * cadastrado continua vindo da grade dele (preencherProposta), e a de
+     * família nova volta ao 1x de 90 minutos da casa.
+     *
+     * combinados e vantagens são TEXTO, escrito para uma família, muitas vezes
+     * com o nome da criança dentro. Copiar isso daqui foi o vazamento medido:
+     * duas frases de uma família na proposta da seguinte. Quem promove texto
+     * para padrão é o botão do próprio bloco, com pergunta. */
     db.ajustes.propostaPadrao = g;
   }
 
@@ -3784,7 +4157,7 @@
       'Criar o valor', function () { criarVigenciaDoPlano(aluno, vig); });
   }
 
-  function criarVigenciaDoPlano(aluno, vig) {
+  function criarVigenciaDoPlano(aluno, vig, aoTerminar) {
     var precos = JSON.parse(JSON.stringify(aluno.precos || []));
     /* A vigência anterior sem fim tem que terminar na véspera, senão
      * validarPrecos recusa a sobreposição e ela fica sem entender por quê. */
@@ -3794,8 +4167,21 @@
     precos.push(vig);
     var erros = Core.validarPrecos({ precos: precos });
     if (erros.length) { avisar(erros[0]); return; }
-    comDesfazer('Valor de ' + Core.fmtMoeda(vig.valorHora) + ' por hora criado para ' + aluno.nome + '.',
-      function () { aluno.precos = precos; }).then(function () { desenharTudo(); });
+    /* A data do fim entra no texto do próprio aviso.
+     *
+     * A vigência de um plano acaba, e depois dela o aluno fica sem preço: o
+     * fechamento do mês seguinte sairia em zero. Isto aqui diz a data em voz
+     * alta no momento em que a vigência nasce, e a faixa da tela Alunos volta
+     * a dizer, com o nome do aluno, todo dia até ela resolver. Nada emenda um
+     * preço sozinho: qual valor passa a valer quando o plano acaba é decisão
+     * dela, e inventar um mandaria para a família uma conta que ninguém
+     * combinou. */
+    var rotulo = 'Valor de ' + Core.fmtMoeda(vig.valorHora) + ' por hora criado para ' + aluno.nome +
+      (vig.fim ? ', até ' + Core.ddmmaaaa(vig.fim) + '.' : '.');
+    comDesfazer(rotulo, function () { aluno.precos = precos; }).then(function () {
+      desenharTudo();
+      if (aoTerminar) aoTerminar();
+    });
   }
 
   /* O mapeamento inicial do aluno que nasce da proposta.
@@ -3838,6 +4224,7 @@
     /* Solta a janela ANTES de mexer no banco: o fecharModal grava o rascunho, e
      * gravar o rascunho depois de limpá-lo o traria de volta. */
     propostaEmEdicao = null;
+    redesenharTopoDaProposta = null;
     fecharModal('modal-proposta');
 
     var aluno = {
@@ -3872,6 +4259,36 @@
       return;
     }
 
+    /* O valor por hora nasce em R$ 100, que é o que sobrou de não haver preço
+     * nenhum, e não um número dela.
+     *
+     * Medido: com dois campos digitados a proposta saía dizendo R$ 100,00 por
+     * hora-aula, sem nada segurar o gerar, e no modo Planos esses R$ 100 são
+     * ainda a base dos três planos e a origem da âncora. A faixa amarela
+     * avisava e podia passar despercebida na rolagem. Aqui a pergunta é feita
+     * UMA vez, e some para sempre depois que ela responder: confirmado, o
+     * número passa a ser dela e vale para as próximas propostas.
+     *
+     * Sem dinheiro() de propósito: com os valores escondidos na tela, a
+     * pergunta sairia com o número mascarado, e é justamente o número que ela
+     * precisa ler para responder. */
+    var padroesDeHoje = Core.propostaPadraoDe(db);
+    var precoConfirmado = p.cobranca.valorConfirmado === true ||
+      padroesDeHoje.valorHora > 0 ||
+      !!(ctx.aluno && Core.precoVigente(ctx.aluno, p.data));
+    if (!precoConfirmado) {
+      if (!confirmar('O valor de ' + Core.fmtMoeda(p.cobranca.valorHora) + ' por hora é o padrão ' +
+        'do aplicativo, e não um número seu. É esse mesmo que vai na proposta de ' + nome + '?')) {
+        avisar('Nada foi gerado. Abra Investimento e escreva quanto custa a sua hora-aula.');
+        return;
+      }
+      p.cobranca.valorConfirmado = true;
+      /* Respondida a pergunta, a faixa que pedia para conferir não tem mais o
+       * que dizer, e deixá-la no ar faria ela conferir duas vezes a mesma
+       * coisa. */
+      $$('[data-faixa="valor-padrao"]').forEach(function (f) { f.style.display = 'none'; });
+    }
+
     var hoje = Core.hojeIso();
 
     /* Regerar no mesmo dia é corrigir a mesma proposta. Regerar noutro dia é
@@ -3900,6 +4317,15 @@
     if (ctx.avulsa) {
       db.ajustes = db.ajustes || {};
       db.ajustes.propostaRascunho = p;
+      /* Uma proposta gerada é outra proposta: se ela tinha dispensado o convite
+       * da anterior, este volta a aparecer. */
+      p.ofertaDispensada = false;
+      /* O alto da janela é redesenhado agora, e é o que faz o convite de
+       * cadastrar e o botão de começar outra existirem sem ela precisar fechar
+       * e reabrir. Antes, gerada a proposta, a mesma janela continuava sem os
+       * dois: o caminho que sobrava para a segunda família da tarde era apagar
+       * campo por campo. */
+      if (redesenharTopoDaProposta) redesenharTopoDaProposta();
       salvar().then(function () {
         avisar('Proposta de ' + nome + ' gerada. Cadastrar como aluno?', 'Cadastrar',
           function () { cadastrarDoRascunho(p); });
@@ -4185,16 +4611,22 @@
   /* Se o tablet for bloqueado ou o aplicativo for para segundo plano no meio da
    * escrita, grava na hora. Nenhum traço pode se perder por causa disso. */
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'hidden' && editorAtual && editorAtual._aulaId) {
+    if (document.visibilityState !== 'hidden') return;
+    if (editorAtual && editorAtual._aulaId) {
       clearTimeout(gravacaoPendente);
       gravarNota(editorAtual._aulaId);
     }
+    /* A folha de compartilhamento do Android esconde o aplicativo: é
+     * exatamente aqui que a proposta que ela acabou de escrever precisa estar
+     * no disco. */
+    gravarRascunhoAgora();
   });
   window.addEventListener('pagehide', function () {
     if (editorAtual && editorAtual._aulaId) {
       clearTimeout(gravacaoPendente);
       gravarNota(editorAtual._aulaId);
     }
+    gravarRascunhoAgora();
   });
 
   function gravarNota(aulaId) {

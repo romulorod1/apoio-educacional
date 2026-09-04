@@ -62,32 +62,86 @@ function fixarDatas(p) {
 // ================================================================
 secao('1. A conta dos planos, número a número');
 
-/* A tabela do documento de desenho: âncora de R$ 115, escada de 0, 5 e 10 por
- * cento, um encontro de 1h30 por semana. */
+/* A aluna medida na revisão: ela cobra R$ 130,00 a hora, a âncora da avulsa
+ * nasce em R$ 150,00, a escada é de 0, 5 e 10 por cento POR BAIXO DO PREÇO
+ * DELA, e o encontro é de 1h30 uma vez por semana.
+ *
+ * Descontando da âncora, como era antes, os três planos saíam acima do preço
+ * dela: mensal R$ 150,00, trimestral R$ 142,50 e semestral R$ 135,00. Ela
+ * mandaria para a família uma tabela inteira acima do próprio preço. */
 const conta = Core.calcularPlanos({
-  ancora: 115, descontos: { mensal: 0, trimestral: 5, semestral: 10 },
+  valorHora: 130, ancora: 150,
+  descontos: { mensal: 0, trimestral: 5, semestral: 10 },
   porSemana: 1, duracaoMin: 90
 });
 const porId = {};
 conta.planos.forEach(p => { porId[p.id] = p; });
 
-conf('a aula avulsa fica na âncora', Core.fmtMoeda(conta.avulsa.valorHora), 'R$ 115,00');
-conf('e um encontro avulso de 1h30 custa uma hora e meia', Core.fmtMoeda(conta.avulsa.valorEncontro), 'R$ 172,50');
+conf('a aula avulsa fica na âncora', Core.fmtMoeda(conta.avulsa.valorHora), 'R$ 150,00');
+conf('e um encontro avulso de 1h30 custa uma hora e meia', Core.fmtMoeda(conta.avulsa.valorEncontro), 'R$ 225,00');
+conf('a conta devolve o preço de hoje, para a tela poder comparar',
+  Core.fmtMoeda(conta.precoAtual), 'R$ 130,00');
 
 conf('mensal: 4 encontros', porId.mensal.encontros, 4);
 conf('mensal: 6 horas', porId.mensal.horas, 6);
-conf('mensal: sem desconto, a hora é a âncora', Core.fmtMoeda(porId.mensal.valorHora), 'R$ 115,00');
-conf('mensal: total do período', Core.fmtMoeda(porId.mensal.total), 'R$ 690,00');
+conf('mensal: sem desconto, a hora é o preço que ela cobra hoje',
+  Core.fmtMoeda(porId.mensal.valorHora), 'R$ 130,00');
+conf('mensal: total do período', Core.fmtMoeda(porId.mensal.total), 'R$ 780,00');
 
 conf('trimestral: 12 encontros', porId.trimestral.encontros, 12);
 conf('trimestral: 18 horas', porId.trimestral.horas, 18);
-conf('trimestral: a hora com 5 por cento', Core.fmtMoeda(porId.trimestral.valorHora), 'R$ 109,00');
-conf('trimestral: total do período', Core.fmtMoeda(porId.trimestral.total), 'R$ 1.962,00');
+conf('trimestral: a hora com 5 por cento abaixo do preço dela',
+  Core.fmtMoeda(porId.trimestral.valorHora), 'R$ 123,50');
+conf('trimestral: total do período', Core.fmtMoeda(porId.trimestral.total), 'R$ 2.223,00');
 
 conf('semestral: 24 encontros', porId.semestral.encontros, 24);
 conf('semestral: 36 horas', porId.semestral.horas, 36);
-conf('semestral: a hora com 10 por cento', Core.fmtMoeda(porId.semestral.valorHora), 'R$ 103,50');
-conf('semestral: total do período', Core.fmtMoeda(porId.semestral.total), 'R$ 3.726,00');
+conf('semestral: a hora com 10 por cento abaixo do preço dela',
+  Core.fmtMoeda(porId.semestral.valorHora), 'R$ 117,00');
+conf('semestral: total do período', Core.fmtMoeda(porId.semestral.total), 'R$ 4.212,00');
+
+/* A trava que a revisão pediu: nenhum plano pode sair acima do que ela cobra
+ * hoje. Com desconto zero ou mais isso vale por construção, e a prova varre
+ * preços e escadas em vez de confiar num caso. */
+secao('1b. Nenhum plano acima do preço dela');
+
+let acima = 0, fora = '';
+[87.5, 100, 110, 120, 130, 133.33, 175, 240].forEach(function (preco) {
+  [[0, 5, 10], [0, 0, 0], [5, 10, 15], [2, 7, 12]].forEach(function (esc) {
+    const c = Core.calcularPlanos({
+      valorHora: preco, ancora: Core.ancoraSugerida(preco),
+      descontos: { mensal: esc[0], trimestral: esc[1], semestral: esc[2] },
+      porSemana: 1, duracaoMin: 90
+    });
+    c.planos.forEach(function (pl) {
+      if (pl.valorHora > preco) { acima++; fora = preco + '/' + esc.join('-') + '/' + pl.id; }
+    });
+  });
+});
+conf('nenhum plano passa do preço dela em 8 preços x 4 escadas', acima + (fora ? ' (' + fora + ')' : ''), 0);
+conf('o mensal sem desconto cai exatamente no preço dela',
+  Core.calcularPlanos({ valorHora: 133.5, ancora: 155, descontos: { mensal: 0 }, porSemana: 1, duracaoMin: 60 })
+    .planos[0].valorHora, 133.5);
+conf('e a linha diz o que significa contra o preço de hoje',
+  porId.trimestral.comparada, 'R$ 6,50 abaixo do seu preço de hoje');
+conf('o mensal diz que está no preço dela', porId.mensal.comparada, 'no seu preço de hoje');
+conf('e a diferença sai em número, para a tela',
+  porId.semestral.contraAtual, -13);
+
+/* Âncora abaixo do preço dela imprimiria a aula sem compromisso mais barata do
+ * que o plano, na mesma folha. */
+const ancoraBaixa = Core.calcularPlanos({
+  valorHora: 130, ancora: 110, descontos: { mensal: 0, trimestral: 5, semestral: 10 },
+  porSemana: 1, duracaoMin: 90
+});
+conf('âncora abaixo do preço dela acende aviso',
+  ancoraBaixa.avisos.some(a => a.indexOf('mais barata') > 0), true);
+const descontoNegativo = Core.calcularPlanos({
+  valorHora: 130, ancora: 150, descontos: { mensal: -20, trimestral: 5, semestral: 10 },
+  porSemana: 1, duracaoMin: 90
+});
+conf('desconto negativo não vira aumento de preço',
+  descontoNegativo.planos[0].valorHora, 130);
 
 /* O arredondamento é PARA BAIXO em degraus de meio real. Para cima, 115 menos
  * 5 por cento viraria R$ 109,50, que é menos desconto do que os 5 por cento
@@ -107,22 +161,27 @@ conf('valor negativo não vira preço', Core.arredondaMeioReal(-10), 0);
 secao('3. Desconto zero, âncora zero e escada exagerada');
 
 const semDesconto = Core.calcularPlanos({
-  ancora: 100, descontos: { mensal: 0, trimestral: 0, semestral: 0 },
+  valorHora: 100, ancora: 100, descontos: { mensal: 0, trimestral: 0, semestral: 0 },
   porSemana: 1, duracaoMin: 60
 });
-conf('sem desconto nenhum, os três planos ficam na âncora',
+conf('sem desconto nenhum, os três planos ficam no preço dela',
   semDesconto.planos.map(p => p.valorHora).join('/'), '100/100/100');
-conf('e o semestral é só a âncora vezes as horas',
+conf('e o semestral é só o preço dela vezes as horas',
   Core.fmtMoeda(semDesconto.planos[2].total), 'R$ 2.400,00');
-conf('sem desconto não sai aviso', semDesconto.aviso, '');
+conf('sem desconto e sem marcação não sai aviso', semDesconto.aviso, '');
 conf('e o maior desconto é zero', semDesconto.maiorDesconto, 0);
 
 const semAncora = Core.calcularPlanos({ ancora: 0, descontos: {}, porSemana: 1, duracaoMin: 90 });
 conf('âncora zero não estoura a conta', semAncora.planos.length, 3);
 conf('e devolve zero em vez de NaN', semAncora.planos[1].total, 0);
 
+/* Sem o preço de hoje a conta cai na âncora: torto, mas nunca NaN. É o que
+ * segura quem chamar calcularPlanos sem passar o valorHora. */
+const semBase = Core.calcularPlanos({ ancora: 150, descontos: { mensal: 0 }, porSemana: 1, duracaoMin: 60 });
+conf('sem o preço de hoje, a conta cai na âncora', semBase.planos[0].valorHora, 150);
+
 const exagerada = Core.calcularPlanos({
-  ancora: 120, descontos: { mensal: 0, trimestral: 15, semestral: 30 },
+  valorHora: 120, ancora: 140, descontos: { mensal: 0, trimestral: 15, semestral: 30 },
   porSemana: 1, duracaoMin: 90
 });
 conf('escada de 30 por cento acende o aviso', exagerada.aviso.length > 0, true);
@@ -132,13 +191,13 @@ conf('a escada de 0, 5 e 10 não acende nada', conta.aviso, '');
 secao('4. Frequência e duração mudam as horas, não o valor da hora');
 
 const doisPorSemana = Core.calcularPlanos({
-  ancora: 115, descontos: { mensal: 0, trimestral: 5, semestral: 10 },
+  valorHora: 130, ancora: 150, descontos: { mensal: 0, trimestral: 5, semestral: 10 },
   porSemana: 2, duracaoMin: 60
 });
 conf('duas vezes por semana dá 8 encontros no mês', doisPorSemana.planos[0].encontros, 8);
 conf('de uma hora cada, 8 horas', doisPorSemana.planos[0].horas, 8);
-conf('o valor da hora é o mesmo', Core.fmtMoeda(doisPorSemana.planos[1].valorHora), 'R$ 109,00');
-conf('o total acompanha as horas', Core.fmtMoeda(doisPorSemana.planos[1].total), 'R$ 2.616,00');
+conf('o valor da hora é o mesmo', Core.fmtMoeda(doisPorSemana.planos[1].valorHora), 'R$ 123,50');
+conf('o total acompanha as horas', Core.fmtMoeda(doisPorSemana.planos[1].total), 'R$ 2.964,00');
 
 secao('5. A âncora sugerida');
 
@@ -163,8 +222,8 @@ conf('o encontro nasce em 90 minutos, como o do mapeamento', nova.encontro.durac
 conf('e uma vez por semana, na casa da família', nova.encontro.porSemana + '/' + nova.encontro.local, '1/casa');
 conf('o aviso de remarcação nasce em 24 horas', nova.combinados.horas, 24);
 conf('e a franquia em duas folgas por semestre', nova.combinados.folgas, 2);
-conf('os sete combinados nascem ligados',
-  nova.combinados.itens.filter(i => i.ligado).length, 7);
+conf('os oito combinados nascem ligados',
+  nova.combinados.itens.filter(i => i.ligado).length, 8);
 conf('as quatro vantagens também', nova.vantagens.filter(i => i.ligado).length, 4);
 conf('nenhum campo obrigatório vem inventado', nova.aluno + '|' + nova.responsavel, '|');
 conf('e nada nasce marcado no mapa', nova.fortes.length + nova.atencao.length + nova.lacunas.length, 0);
@@ -183,6 +242,58 @@ conf('a mesma régua vale quando quem desmarca é ela',
   combinado.indexOf('eu-desmarco') >= 0, true);
 conf('a reposição tem prazo', combinado.indexOf('reposicao') >= 0, true);
 
+/* A folha não pode prometer o que o motor não faz.
+ *
+ * O motor tem cobrável sim ou não, e mais nada: a aula cancelada que ela marca
+ * como cobrável entra pelo valor inteiro. Enquanto isto dizia "meia aula",
+ * numa aula de 1h30 a R$ 133,00 a folha prometia R$ 99,75 e o fechamento
+ * cobrava R$ 199,50, e os dois documentos chegam à mesma família no mesmo mês.
+ * A prova mede o fechamento de verdade, e não só a palavra. */
+secao('7b. O combinado promete só o que o motor faz');
+
+const textoCombinado = nova.combinados.itens.map(i => i.texto).join(' ');
+conf('nenhum combinado promete meia aula', /meia aula|metade da aula/i.test(textoCombinado), false);
+conf('a desmarcação de véspera entra pelo valor da aula',
+  nova.combinados.itens[3].texto.indexOf('pelo valor da aula') > 0, true);
+
+const alunoCancelada = {
+  id: 'ac', nome: 'Helena Prado',
+  precos: [{ id: 'v1', inicio: '2026-01-01', fim: null, valorHora: 133 }]
+};
+const dbCancelada = {
+  alunos: [alunoCancelada],
+  aulas: [{ id: 'c1', alunoId: 'ac', data: '2026-09-11', duracaoMin: 90, status: 'cancelada', cobravel: true }],
+  resumos: [], ajustes: {}
+};
+const fCancelada = Core.calcularFechamento(dbCancelada, 'ac', '2026-09', '2026-09-30');
+conf('o motor cobra a desmarcação cobrável pelo valor cheio de 1h30',
+  Core.fmtMoeda(fCancelada.linhas[0].valor), 'R$ 199,50');
+conf('e é isso que o combinado promete, e não metade',
+  Core.fmtMoeda(133 * 1.5), 'R$ 199,50');
+
+/* Falta sem aviso é a única linha que o motor já cobra sozinho, e era a única
+ * que a folha não contava. */
+conf('existe o combinado de falta sem aviso', combinado.indexOf('falta') >= 0, true);
+conf('a falta conta como aula dada e não tem reposição',
+  /conta como aula dada e não tem reposição/.test(textoCombinado), true);
+conf('o motor cobra a falta por padrão, sem ela marcar nada',
+  Core.STATUS.falta.cobravelPadrao, true);
+conf('e a desmarcação com aviso não é cobrada por padrão',
+  Core.STATUS.cancelada.cobravelPadrao, false);
+
+/* A promessa de devolver o que foi pago e não usado supunha pacote adiantado,
+ * e o motor cobra aula por aula, todo mês. */
+conf('a saída não promete devolução de pacote',
+  /devolvo|devolução/i.test(textoCombinado), false);
+
+secao('7c. Nada de pronome fixo: metade das crianças é menina');
+
+const textoTudo = textoCombinado + ' ' + nova.vantagens.map(v => v.texto).join(' ');
+conf('nenhum padrão trata a criança por "ele"', /\b(ele|dele|nele)\b/i.test(textoTudo), false);
+conf('nem por "a aluna" ou "o aluno"', /\bo aluno\b|\ba aluna\b/i.test(textoTudo), false);
+conf('o material continua sendo o da semana',
+  nova.vantagens[0].texto.indexOf('naquela semana') > 0, true);
+
 /* Se ela mudar o número de horas ANTES de gerar, o texto do padrão acompanha.
  * Depois que ela edita a frase, a frase dela é que vai para o registro. */
 const dbDela = { alunos: [], aulas: [], resumos: [], ajustes: { propostaPadrao: { horasDeAviso: 48, folgasPorSemestre: 3, cidade: 'Niterói', descontos: { trimestral: 8 } } } };
@@ -194,11 +305,51 @@ conf('e a franquia sai por extenso no rótulo',
 conf('o desconto que ela guardou vale', comPadraoDela.cobranca.descontos.trimestral, 8);
 conf('e o que ela não mexeu cai no padrão da casa', comPadraoDela.cobranca.descontos.semestral, 10);
 
+/* O texto dela vence o da casa, item a item, e o que ela nunca tocou acompanha
+ * a casa. A lista é guardada na PRIMEIRA proposta que ela gera, tenha editado
+ * alguma coisa ou não: substituir o molde inteiro pela lista guardada fazia com
+ * que combinado corrigido aqui nunca mais chegasse nela, e as duas correções
+ * desta rodada (a meia aula e a falta sem aviso) morreriam ali. */
 const editada = Core.propostaPadraoDe({
-  ajustes: { propostaPadrao: { combinados: [{ id: 'meu', rotulo: 'Do meu jeito', texto: 'Escrevi eu.' }] } }
+  ajustes: {
+    propostaPadrao: {
+      combinados: [
+        { id: 'aviso', rotulo: 'Se precisarem desmarcar', texto: 'Me avisem no grupo da família, com um dia de antecedência.' },
+        { id: 'meu', rotulo: 'Do meu jeito', texto: 'Escrevi eu.' }
+      ]
+    }
+  }
 });
-conf('o texto que ela escreveu vence o da casa', editada.combinados.length, 1);
-conf('e sai inteiro', editada.combinados[0].texto, 'Escrevi eu.');
+const porIdComb = {};
+editada.combinados.forEach(i => { porIdComb[i.id] = i; });
+conf('o texto que ela escreveu vence o da casa',
+  porIdComb.aviso.texto, 'Me avisem no grupo da família, com um dia de antecedência.');
+conf('e o combinado que só ela tem continua na lista', porIdComb.meu.texto, 'Escrevi eu.');
+conf('o que ela nunca tocou acompanha a casa',
+  porIdComb.vespera.texto.indexOf('pelo valor da aula') > 0, true);
+conf('e o combinado novo chega em quem já tinha lista guardada',
+  !!porIdComb.falta, true);
+conf('a ordem da casa é preservada, e o item só dela fica no fim',
+  editada.combinados.map(i => i.id).join(','),
+  'preparo,aviso,folgas,vespera,falta,eu-desmarco,reposicao,parar,meu');
+
+/* Uma lista guardada ANTES desta rodada, com a promessa de meia aula, é o caso
+ * real: ela já gerou proposta nesta branch e a lista dela ficou congelada. */
+const congelada = Core.propostaPadraoDe({
+  ajustes: {
+    propostaPadrao: {
+      combinados: [
+        { id: 'vespera', rotulo: 'Depois dessas duas', texto: 'A desmarcação com menos de 24 horas entra no fechamento do mês como meia aula.' }
+      ]
+    }
+  }
+});
+conf('a lista congelada volta a ter os oito combinados', congelada.combinados.length, 8);
+conf('mas o texto que ela escreveu não é sobrescrito por trás dela',
+  congelada.combinados[3].texto.indexOf('meia aula') > 0, true);
+conf('e o desligado continua desligado',
+  Core.propostaPadraoDe({ ajustes: { propostaPadrao: { vantagens: [{ id: 'duvida', ligado: false, texto: 'x' }] } } })
+    .vantagens.filter(v => v.id === 'duvida')[0].ligado, false);
 
 secao('8. As gêmeas das funções de mapeamento');
 
@@ -236,20 +387,43 @@ const comPreco = {
   precos: [{ id: 'v1', inicio: '2026-01-01', fim: null, valorHora: 120 }],
   grade: { dias: [2, 4], hora: '15:00', duracaoMin: 90 }
 };
+/* As aulas são gravadas com duracaoMin, e é esse o campo que a duração
+ * habitual tem que ler. Enquanto ela lia a.duracao, que não existe em aula
+ * nenhuma, a contagem ficava vazia e devolvia os 60 minutos de recurso para
+ * todo mundo: uma aluna com aulas de 1h30 lançadas recebia proposta oferecendo
+ * 1h, e a tabela inteira de planos saía calculada sobre a duração errada. */
 const dbComPreco = {
   alunos: [comPreco],
   aulas: [
-    { id: 'l1', alunoId: 'a2', data: '2026-08-04', duracao: 90, status: 'realizada' },
-    { id: 'l2', alunoId: 'a2', data: '2026-08-06', duracao: 90, status: 'realizada' },
-    { id: 'l3', alunoId: 'a2', data: '2026-08-11', duracao: 60, status: 'realizada' }
+    { id: 'l1', alunoId: 'a2', data: '2026-08-04', duracaoMin: 90, status: 'realizada' },
+    { id: 'l2', alunoId: 'a2', data: '2026-08-06', duracaoMin: 90, status: 'realizada' },
+    { id: 'l3', alunoId: 'a2', data: '2026-08-11', duracaoMin: 60, status: 'realizada' }
   ],
   resumos: [], ajustes: {}
 };
 const pComPreco = Core.preencherProposta(dbComPreco, comPreco);
 conf('o preço vigente vira o valor da proposta', pComPreco.cobranca.valorHora, 120);
 conf('a âncora é 15 por cento acima, em múltiplo de cinco', pComPreco.cobranca.ancora, 140);
+conf('a duração habitual lê duracaoMin, que é como a aula é gravada',
+  Core.duracaoHabitual(dbComPreco, 'a2'), 90);
 conf('a duração vem da duração habitual das aulas', pComPreco.encontro.duracaoMin, 90);
 conf('e a frequência vem da grade', pComPreco.encontro.porSemana, 2);
+conf('aula gravada no campo antigo não conta como hábito',
+  Core.duracaoHabitual({ aulas: [{ alunoId: 'a2', duracao: 120 }] }, 'a2'), 60);
+
+/* O número que a duração decide vai inteiro para a família: o total do
+ * semestral com 1h30 é a metade a mais do total com 1h. */
+const contaUmaHora = Core.calcularPlanos({
+  valorHora: 120, ancora: 140, descontos: { mensal: 0, trimestral: 5, semestral: 10 },
+  porSemana: 1, duracaoMin: 60
+});
+const contaHoraEMeia = Core.calcularPlanos({
+  valorHora: 120, ancora: 140, descontos: { mensal: 0, trimestral: 5, semestral: 10 },
+  porSemana: 1, duracaoMin: 90
+});
+conf('o semestral de 1h e o de 1h30 não são o mesmo documento',
+  Core.fmtMoeda(contaUmaHora.planos[2].total) + ' x ' + Core.fmtMoeda(contaHoraEMeia.planos[2].total),
+  'R$ 2.592,00 x R$ 3.888,00');
 
 // ================================================================
 secao('10. Os pontos de atenção nascem desmarcados');
@@ -283,31 +457,84 @@ conf('sem aula de nivelamento, a origem é a conversa com os pais',
 conf('o nível vem do mapeamento', pMapa.nivel, '2');
 conf('o colégio também', pMapa.colegio, 'Colégio Nossa Senhora');
 
-/* As áreas de trabalho, essas sim, saem da verdade inteira do mapeamento: o
- * plano é feito com o que ela viu, mesmo quando a folha não lista defeito. */
-conf('as áreas de trabalho saem dos pontos de atenção do mapeamento',
-  pMapa.areas.length > 0, true);
-conf('estudar só na véspera vira cronograma', pMapa.areas.indexOf('cronograma') >= 0, true);
-conf('e disciplina', pMapa.areas.indexOf('disciplina') >= 0, true);
+/* A área segue o ponto de atenção MARCADO, e não o do mapeamento.
+ *
+ * As duas listas nascem do mesmo conjunto. Derivando as áreas da verdade
+ * inteira, a folha escondia o defeito numa seção e o devolvia quatro
+ * centímetros abaixo com outro rótulo: dos dez pontos de atenção do
+ * mapeamento saíam zero pontos de atenção impressos e OITO áreas marcadas,
+ * entre elas "Concentração", que é "Dispersa com facilidade", e "Ansiedade ou
+ * medo de prova", que é "Fica ansioso perto da prova". */
+conf('nenhuma área nasce marcada, porque nenhum ponto de atenção nasceu marcado',
+  pMapa.areas.length, 0);
+conf('e a folha não devolve o defeito com outro rótulo',
+  pMapa.areas.indexOf('concentracao') >= 0 || pMapa.areas.indexOf('ansiedade') >= 0, false);
+
+/* Quando ela marca o ponto de atenção, a área vem junto: é a mesma tabelinha
+ * de sempre, e é o que a tela chama a cada marcação. */
+const sugeridas = Core.areasSugeridas(['vespera', 'branco', 'chuta', 'enunciado-fraco']);
+conf('estudar só na véspera vira cronograma', sugeridas.indexOf('cronograma') >= 0, true);
+conf('e disciplina', sugeridas.indexOf('disciplina') >= 0, true);
 conf('deixar em branco e chutar viram estratégia de prova',
-  pMapa.areas.indexOf('estrategia-prova') >= 0, true);
-conf('ler o enunciado sem entender vira enunciado', pMapa.areas.indexOf('enunciado') >= 0, true);
+  sugeridas.indexOf('estrategia-prova') >= 0, true);
+conf('ler o enunciado sem entender vira enunciado', sugeridas.indexOf('enunciado') >= 0, true);
 conf('a área sugerida existe mesmo na lista de AREAS',
-  pMapa.areas.every(a => Core.rotuloArea(a).length > 0), true);
+  sugeridas.every(a => Core.rotuloArea(a).length > 0), true);
 conf('sem ponto de atenção nenhum não sai área nenhuma', Core.areasSugeridas([]).length, 0);
 
 secao('11. A vigência que nasce do plano aceito');
 
+/* A vigência fecha por SEMANAS, e é o que faz a folha e o fechamento darem o
+ * mesmo número. Fechando por mês de calendário, o trimestral abria uma janela
+ * de 04/09 a 03/12, que tem treze sextas-feiras: a folha prometia doze
+ * encontros e o fechamento cobrava treze aulas, na mesma família e no mesmo
+ * mês. */
 const pPlano = fixarDatas(Core.preencherProposta(dbMapa, comMapa));
 pPlano.cobranca.modo = 'planos';
+pPlano.cobranca.valorHora = 120;
 pPlano.cobranca.ancora = 140;
 pPlano.cobranca.descontos = { mensal: 0, trimestral: 5, semestral: 10 };
+pPlano.encontro.duracaoMin = 90;
+pPlano.encontro.porSemana = 1;
 const vig = Core.vigenciaDoPlano(pPlano, 'trimestral');
 conf('a vigência começa no dia da proposta', vig.inicio, '2026-09-04');
-conf('e termina três meses depois, menos um dia', vig.fim, '2026-12-03');
-conf('com o valor por hora do plano', Core.fmtMoeda(vig.valorHora), 'R$ 133,00');
-conf('o semestral vai até seis meses', Core.vigenciaDoPlano(pPlano, 'semestral').fim, '2027-03-03');
+conf('e termina doze semanas depois, menos um dia', vig.fim, '2026-11-26');
+conf('com o valor por hora do plano', Core.fmtMoeda(vig.valorHora), 'R$ 114,00');
+conf('o mensal fecha em quatro semanas', Core.vigenciaDoPlano(pPlano, 'mensal').fim, '2026-10-01');
+conf('o semestral, em vinte e quatro', Core.vigenciaDoPlano(pPlano, 'semestral').fim, '2027-02-18');
 conf('plano que não existe não vira vigência', Core.vigenciaDoPlano(pPlano, 'anual'), null);
+
+/* A prova de verdade: montar as aulas semanais dentro da janela e passar o
+ * mês inteiro pelo motor de fechamento, que é o que a família recebe depois. */
+function cobradoNaVigencia(proposta, planoId) {
+  const v = Core.vigenciaDoPlano(proposta, planoId);
+  const aulas = [];
+  let d = v.inicio, guarda = 0;
+  while (d <= v.fim && guarda++ < 400) {
+    aulas.push({ id: 'w' + guarda, alunoId: 'aw', data: d, duracaoMin: 90, status: 'realizada' });
+    d = Core.somaDiasIso(d, 7);
+  }
+  const aluno = { id: 'aw', nome: 'Helena Prado', precos: [v] };
+  const dbW = { alunos: [aluno], aulas: aulas, resumos: [], ajustes: {} };
+  const meses = {};
+  aulas.forEach(a => { meses[a.data.slice(0, 7)] = 1; });
+  let valor = 0, n = 0;
+  Object.keys(meses).sort().forEach(function (mes) {
+    Core.calcularFechamento(dbW, 'aw', mes, '2027-12-31').linhas.forEach(function (l) {
+      if (l.data >= v.inicio && l.data <= v.fim) { valor += l.valor; n++; }
+    });
+  });
+  return { aulas: n, valor: Math.round(valor * 100) / 100 };
+}
+
+Core.PLANOS.forEach(function (pl) {
+  const folha = Core.planoDaProposta(pPlano, pl.id);
+  const conta = cobradoNaVigencia(pPlano, pl.id);
+  conf(pl.id + ': o fechamento conta os encontros que a folha promete',
+    conta.aulas, folha.encontros);
+  conf(pl.id + ': e cobra exatamente o total impresso na folha',
+    Core.fmtMoeda(conta.valor), Core.fmtMoeda(folha.total));
+});
 
 /* A vigência tem que passar pela mesma validação que a tela usa, senão ela
  * cria uma linha que se sobrepõe à antiga e o fechamento fica ambíguo. */
@@ -385,12 +612,29 @@ const rPlanos = folha('proposta_planos.pdf', opPlanos, 3);
 conf('a tabela sai com os rótulos da proposta, e não com os do fechamento',
   rPlanos.texto.indexOf('Total do período') >= 0 && rPlanos.texto.indexOf('Situação') < 0, true);
 conf('a aula avulsa aparece como âncora', rPlanos.texto.indexOf('Aula avulsa') >= 0, true);
-conf('o trimestral sai com o valor calculado', rPlanos.texto.indexOf('R$ 133,00') >= 0, true);
-conf('e o total do trimestre', rPlanos.texto.indexOf('R$ 2.394,00') >= 0, true);
+conf('o trimestral sai com o valor calculado', rPlanos.texto.indexOf('R$ 114,00') >= 0, true);
+conf('e o total do trimestre', rPlanos.texto.indexOf('R$ 2.052,00') >= 0, true);
+conf('nenhuma linha da tabela sai acima do que ela cobra hoje',
+  opPlanos.planos.planos.filter(pl => pl.valorHora > 120).length, 0);
 conf('o parágrafo que explica o desconto vem junto',
   rPlanos.texto.indexOf('não é do preço da aula') > 0, true);
-conf('e diz até quando o horário fica reservado',
-  rPlanos.texto.indexOf('03/12/2026') > 0, true);
+conf('e diz até quando o horário fica reservado, doze semanas depois',
+  rPlanos.texto.indexOf('26/11/2026') > 0, true);
+
+/* A mãe lê "Semestral, 24 encontros, R$ 4.104,00" e precisa saber se está
+ * sendo convidada a pagar tudo de uma vez. No modo hora-aula essa frase sempre
+ * existiu; no modo planos não havia nenhuma. */
+conf('a folha diz COMO se paga', rPlanos.texto.indexOf('pagamento continua mensal') > 0, true);
+conf('e que não tem pacote adiantado',
+  rPlanos.texto.indexOf('Não tem pacote para pagar adiantado') > 0, true);
+
+/* O que a folha promete tem que ser o que o fechamento cobra. */
+conf('a folha não promete meia aula', /meia aula|metade da aula/i.test(rPlanos.texto), false);
+conf('a folha traz o combinado de falta sem aviso',
+  rPlanos.texto.indexOf('Falta sem aviso') > 0, true);
+conf('e não promete devolver pacote que ninguém pagou',
+  /devolvo|devolução/i.test(rPlanos.texto), false);
+conf('nem trata a criança por "ele"', /\b(ele|dele)\b/i.test(rPlanos.texto), false);
 conf('as duas folgas por semestre estão na folha',
   rPlanos.texto.indexOf('folgas por semestre') > 0, true);
 conf('o material preparado antes está na folha',
@@ -417,23 +661,65 @@ conf('sem tabela de planos', rHora.texto.indexOf('Total do período') >= 0, fals
 conf('e sem falar de desconto', rHora.texto.indexOf('desconto') >= 0, false);
 
 /* Caso 3: a proposta mínima, que é o caminho principal. Aluno que ainda não
- * existe, dois campos digitados, e todo o resto no padrão. */
+ * existe, e por isso sem mapeamento nenhum.
+ *
+ * Sem mapeamento somem as três primeiras seções e sobram o nome, a matéria, o
+ * combinado e o preço: medido na folha mínima anterior, das 444 palavras
+ * impressas 232 eram o combinado de desmarcação e NENHUMA era sobre a criança.
+ * Por isso o parágrafo escrito por ela deixa de ser opcional aqui, e é o
+ * pendenciasDaProposta que segura. */
 const pMinima = fixarDatas(Core.preencherProposta({ ajustes: {} }, null));
 pMinima.aluno = 'Helena Prado';
 pMinima.responsavel = 'Sandra Prado';
+pMinima.texto = 'A Helena está no oitavo ano e chegou por indicação da escola: ela ' +
+  'acompanha bem a aula, mas trava na hora de estudar sozinha e chega na prova sem ' +
+  'ter revisado. A ideia das primeiras semanas é montar com ela uma rotina curta de ' +
+  'estudo e usar a lista do colégio como termômetro do que já está firme.';
 const rMinima = folha('proposta_minima.pdf', Core.dadosDaProposta(null, pMinima), 3);
 conf('o responsável entra no bloco de identificação',
   rMinima.texto.indexOf('Sandra Prado') > 0, true);
 conf('sem mapeamento, não sai seção de observação',
   rMinima.texto.indexOf('O que eu observei') >= 0, false);
-conf('nem seção de ponto de partida com uma linha só',
-  rMinima.texto.indexOf('Ponto de partida') >= 0, false);
 conf('e nem seção de áreas vazia',
   rMinima.texto.indexOf('O que eu proponho trabalhar') >= 0, false);
+conf('mas o parágrafo dela sai, e é a parte que fala da criança',
+  rMinima.texto.indexOf('travar') >= 0 || rMinima.texto.indexOf('rotina curta de estudo') > 0, true);
+conf('no ponto de partida', rMinima.texto.indexOf('Ponto de partida') > 0, true);
 conf('mas o combinado dos encontros sai sempre',
   rMinima.texto.indexOf('Como funcionam os encontros') > 0, true);
 conf('e o investimento também', rMinima.texto.indexOf('Investimento') > 0, true);
 conf('a proposta diz até quando vale', rMinima.texto.indexOf('Proposta válida até') > 0, true);
+
+/* O peso do combinado na folha mínima, medido: enquanto ele for mais da
+ * metade das palavras, a folha é um regulamento com um nome no alto. Com o
+ * parágrafo dela obrigatório, a criança volta a ter espaço. */
+const palavrasMinima = rMinima.texto.split(/\s+/).filter(Boolean).length;
+const palavrasDela = pMinima.texto.split(/\s+/).filter(Boolean).length;
+console.log('  folha mínima: ' + palavrasMinima + ' palavras, ' + palavrasDela + ' escritas por ela');
+conf('a folha mínima fala da criança em pelo menos 40 palavras', palavrasDela >= 40, true);
+
+secao('12b. Sem mapeamento, o parágrafo dela deixa de ser opcional');
+
+const semNada = Core.preencherProposta({ ajustes: {} }, null);
+conf('proposta sem nome nenhum pede o nome',
+  Core.pendenciasDaProposta(semNada)[0], 'Informe o nome do aluno. A proposta é escrita sobre ele.');
+semNada.aluno = 'Helena Prado';
+conf('depois pede o responsável',
+  Core.pendenciasDaProposta(semNada)[0].indexOf('Informe o responsável') === 0, true);
+semNada.responsavel = 'Sandra Prado';
+conf('e aí pede o parágrafo, porque a folha não diria nada da criança',
+  Core.pendenciasDaProposta(semNada)[0].indexOf('Escreva duas ou três linhas') === 0, true);
+semNada.texto = 'A Helena está no oitavo ano e chegou por indicação da escola.';
+conf('com o parágrafo escrito, nada mais falta', Core.pendenciasDaProposta(semNada).length, 0);
+
+/* Quem tem mapeamento já tem o que contar: o nível, os pontos fortes e as
+ * lacunas abrem seções próprias, e o parágrafo volta a ser opcional. */
+const comMapeamento = fixarDatas(Core.preencherProposta(dbMapa, comMapa));
+conf('a folha do mapeamento fala da criança sem o parágrafo',
+  Core.falaDaCrianca(comMapeamento), true);
+conf('e por isso o parágrafo continua opcional lá',
+  Core.pendenciasDaProposta(comMapeamento).length, 0);
+conf('proposta em branco não fala da criança', Core.falaDaCrianca(Core.propostaNova()), false);
 
 secao('13. A trava que protege a família: ponto de atenção nunca vem sozinho');
 

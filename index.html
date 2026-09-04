@@ -299,10 +299,16 @@
         <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
       </div>
       <div class="modal-corpo" id="corpo-modal-aluno"></div>
+      <!-- O rodape segue a aba aberta. Na aba Proposta o que ela precisa e
+           gerar, nao salvar: quem grava a proposta e o proprio gerar. Medido
+           antes: na aba Proposta o unico botao azul era o Salvar e o
+           "Gerar proposta em PDF" ficava 608 pixels abaixo da dobra, entao ela
+           tocava no Salvar, a janela fechava e nenhum PDF saia. -->
       <div class="modal-rodape">
         <button class="btn perigo esquerda" id="excluir-aluno" type="button">Excluir aluno</button>
         <button class="btn" data-fechar type="button">Cancelar</button>
         <button class="btn principal" id="salvar-aluno" type="button">Salvar</button>
+        <button class="btn principal" id="gerar-proposta-aluno" type="button" style="display:none">Gerar proposta em PDF</button>
       </div>
     </div>
   </div>

@@ -2382,7 +2382,22 @@
     var planos = op.planos;
     var emPlanos = cob.modo === 'planos' && planos && planos.planos && planos.planos.length;
     var porque = '';
+    /* COMO se paga, e não só quanto.
+     *
+     * No modo hora-aula esta frase sempre existiu. No modo planos não havia
+     * nenhuma, e a mãe lia "Semestral, 24 encontros, R$ 4.212,00" sem saber se
+     * estava sendo convidada a pagar quatro mil reais de uma vez. É a primeira
+     * pergunta que ela faz, e ficava sem resposta na folha.
+     *
+     * A frase diz o que o aplicativo faz de verdade: o plano vira uma vigência
+     * de preço por hora, e calcularFechamento cobra aula por aula, todo mês.
+     * Não existe pacote pago adiantado em lugar nenhum do motor, e prometer um
+     * seria promessa que o fechamento desmente trinta dias depois. */
+    var comoSePaga = '';
     if (emPlanos) {
+      comoSePaga = 'O pagamento continua mensal, pelas aulas que aconteceram no mês, ' +
+        'com o valor por hora do plano escolhido. Não tem pacote para pagar adiantado: ' +
+        'a coluna do total mostra quanto o período inteiro custa, para vocês compararem os planos.';
       porque = 'O desconto não é do preço da aula: é do compromisso. Quem fecha ' +
         (PERIODO_DO_PLANO[cob.recomendado] || 'o período') +
         (op.reservadoAte ? ' tem o horário reservado na minha agenda até ' + op.reservadoAte + ', e eu' : ' tem o horário reservado na minha agenda, e eu') +
@@ -2396,6 +2411,7 @@
     var alturaInvest = 26 + 18;
     if (emPlanos) {
       alturaInvest += 20 + (planos.planos.length + 1) * 18 + 16 +
+        doc.quebrar(comoSePaga, UTIL, 10, false).length * 14 + 12 +
         doc.quebrar(porque, UTIL, 9.5, false).length * 13;
     } else {
       alturaInvest += 20 + 3 * 14;
@@ -2422,6 +2438,9 @@
         }, k + 1, pl.id === cob.recomendado, COLUNAS_PLANO);
       });
       doc.y -= 14;
+      doc.garanteEspaco(30);
+      doc.paragrafo(comoSePaga, { tam: 10, alturaLinha: 14 });
+      doc.y -= 10;
       doc.garanteEspaco(30);
       doc.paragrafo(porque, { tam: 9.5, cor: COR.muted, alturaLinha: 13 });
     } else {

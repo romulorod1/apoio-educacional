@@ -452,8 +452,15 @@ function textoDoPdf(bytes) {
 
   banco = await bd();
   const rasc = banco.ajustes.propostaRascunho;
+  /* As MESMAS entradas que a tela usa. O valorHora entrou porque a conta dos
+   * planos passou a descer do preco que ela cobra hoje, e nao da ancora: sem
+   * ele o teste compararia a tela com uma conta que ninguem faz.
+   *
+   * A ancora ficou sendo so a linha da aula avulsa, que e o preco de quem nao
+   * reserva horario. Antes os tres planos saiam ACIMA do que ela cobra. */
   const contaEsperada = Core.calcularPlanos({
-    ancora: rasc.cobranca.ancora, descontos: rasc.cobranca.descontos,
+    ancora: rasc.cobranca.ancora, valorHora: rasc.cobranca.valorHora,
+    descontos: rasc.cobranca.descontos,
     porSemana: rasc.encontro.porSemana, duracaoMin: rasc.encontro.duracaoMin
   });
   conf('a âncora da tela é a que o Core calcula',
@@ -498,7 +505,9 @@ function textoDoPdf(bytes) {
       editavel: !c.querySelector('textarea').readOnly && !c.querySelector('textarea').disabled
     }));
   });
-  conf('são sete partes no combinado', comb.length, 7);
+  /* Oito desde que entrou a falta sem aviso, que e o unico caso que o motor
+ * cobra inteiro por padrao e que o combinado nao mencionava. */
+  conf('são oito partes no combinado', comb.length, 8);
   conf('todas nascem ligadas', comb.every(c => c.ligado), true);
   conf('e todas são editáveis, nunca texto fixo', comb.every(c => c.editavel), true);
   conf('a primeira é o material preparado antes, que é o argumento dela',

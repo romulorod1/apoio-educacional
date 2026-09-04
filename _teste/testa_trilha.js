@@ -134,13 +134,24 @@ secao('5. Quantos encontros, pela duração habitual do aluno');
 
 const dbDur = {
   aulas: [
-    { alunoId: 'a1', duracao: 60 }, { alunoId: 'a1', duracao: 60 },
-    { alunoId: 'a1', duracao: 90 }, { alunoId: 'a2', duracao: 90 }
+    /* O campo e duracaoMin, que e o que a aula grava de verdade. Este teste
+     * usava `duracao`, que nao existe em aula nenhuma, e passava porque a
+     * funcao lia o mesmo campo errado: os dois se enganavam juntos, e a
+     * proposta saia oferecendo uma hora para quem ela atende hora e meia. */
+    { alunoId: 'a1', duracaoMin: 60 }, { alunoId: 'a1', duracaoMin: 60 },
+    { alunoId: 'a1', duracaoMin: 90 }, { alunoId: 'a2', duracaoMin: 90 },
+    /* Aula com o campo curto, que NAO existe em aula nenhuma do aplicativo:
+     * fica aqui para provar que ela nao conta, e nao para pedir uma reserva.
+     * Inventar reserva para um campo que nunca existiu esconderia o defeito
+     * que acabou de ser consertado, que era exatamente ler o campo errado. */
+    { alunoId: 'a4', duracao: 120 }
   ]
 };
 conf('a duração habitual é a mais frequente', Core.duracaoHabitual(dbDur, 'a1'), 60);
 conf('e de outro aluno é a dele', Core.duracaoHabitual(dbDur, 'a2'), 90);
 conf('aluno sem aula cai em 60', Core.duracaoHabitual(dbDur, 'a3'), 60);
+conf('aula com o campo curto nao conta, e cai no recurso',
+  Core.duracaoHabitual(dbDur, 'a4'), 60);
 
 const fr = Core.trilhaDerivada(temas, 'MAT06-06').passos;
 const minutos = fr.reduce((s, p) => s + p.duracaoMin, 0);
