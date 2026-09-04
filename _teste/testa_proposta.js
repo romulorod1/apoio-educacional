@@ -642,8 +642,17 @@ conf('o material preparado antes está na folha',
 conf('os pontos fortes aparecem', rPlanos.texto.indexOf('Pontos fortes') > 0, true);
 conf('os pontos de atenção, só os três que ela marcou',
   rPlanos.texto.indexOf('Pontos de atenção') > 0, true);
-conf('a folha não repete o nome dela no corpo',
-  (rPlanos.texto.match(/Nathália Wajsenzon/g) || []).length, rPlanos.paginas * 2);
+/* O nome dela aparece UMA vez no corpo, na assinatura, e a moldura assina as
+ * demais. A assinatura foi pedida depois que esta trava nasceu: uma proposta
+ * que termina sem despedida lê como formulário, e o documento existe
+ * justamente para não ler como formulário. A trava continua servindo, agora
+ * contando: mais de uma vez no corpo é repetição. */
+const nomesNoCorpo = (rPlanos.texto.match(/Nathália Wajsenzon/g) || []).length;
+/* A moldura escreve o nome dela DUAS vezes por pagina: no cabecalho e no rodape. */
+const nomesNaMoldura = rPlanos.paginas * 2;
+conf('o nome dela aparece uma vez no corpo, na assinatura',
+  nomesNoCorpo - nomesNaMoldura, 1);
+conf('e a despedida está lá', rPlanos.texto.indexOf('Com carinho,') > 0, true);
 
 /* Caso 2: hora-aula, sem tabela nenhuma. */
 const opHora = Core.dadosDaProposta(comPreco, (function () {
