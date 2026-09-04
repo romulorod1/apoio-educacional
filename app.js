@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.14.0';
+  var VERSAO = '1.14.1';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -22,6 +22,19 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.14.1',
+      itens: [
+        'Quatro acertos na proposta. O destaque cinza passou a carregar o objetivo do aluno, ' +
+          'e não o quanto ele está atrás: o que a família procura na folha é para onde a ' +
+          'criança vai. A folha termina com Com carinho e o seu nome. Os combinados ganharam um ' +
+          'respiro entre um e outro, para não lerem como um parágrafo só.',
+        'A janela deixou de fechar sozinha no meio da digitação. Acontecia no computador, com ' +
+          'o mouse: apertar dentro da janela, arrastar para fora e soltar, que é o que se faz ' +
+          'ao selecionar um texto e passar da borda, fazia o navegador entender que o clique ' +
+          'tinha sido fora. No tablet isso não acontece, porque o dedo rola em vez de arrastar.'
+      ]
+    },
     {
       versao: '1.14.0',
       itens: [
@@ -925,8 +938,22 @@
     });
 
     $$('.fundo-modal').forEach(function (m) {
+      /* Fechar clicando fora só vale quando o gesto COMEÇOU fora.
+       *
+       * Com o dedo isso nunca foi problema. Com o mouse é: apertar dentro da
+       * janela, arrastar para fora e soltar, que é o que acontece ao selecionar
+       * um texto e passar da borda do campo, faz o navegador disparar o clique
+       * no ancestral comum dos dois pontos, que é o fundo. O alvo vira o fundo
+       * e a janela fechava no meio da digitação. Reproduzido arrastando de
+       * dentro para fora pela direita.
+       *
+       * Guardar onde o gesto começou resolve sem tirar o fechar clicando fora,
+       * que é gesto que ela já usa. */
+      var comecouNoFundo = false;
+      m.addEventListener('pointerdown', function (e) { comecouNoFundo = (e.target === m); });
       m.addEventListener('click', function (e) {
-        if (e.target !== m) return;
+        if (e.target !== m || !comecouNoFundo) return;
+        comecouNoFundo = false;
         if (presaNoModoFamilia(m.id)) return;
         if (m.id === 'modal-nota') fecharEditorNota();
         else fecharModal(m.id);

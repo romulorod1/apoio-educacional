@@ -2184,6 +2184,10 @@
     opcoes = opcoes || {};
     var tam = opcoes.tam || 10;
     var passo = opcoes.passo || 14;
+    /* Folga acima do item, para um item nao encostar no anterior. Nasce em
+       zero: quem nao pedir continua exatamente como estava. Ela NAO entra
+       entre as linhas do mesmo item, que continuam no passo. */
+    var folgaAntes = opcoes.folgaAntes || 0;
     var x = opcoes.x || MARG_E;
     var largura = opcoes.largura || UTIL;
     var xTexto = x + 16;
@@ -2206,7 +2210,10 @@
      * combinado das folgas do semestre podia começar no pé de uma folha e
      * terminar no alto da outra, com o rótulo em negrito sozinho embaixo: é
      * justamente o item que precisa ser lido de uma vez. */
-    doc.garanteEspaco(linhas.length * passo);
+    doc.garanteEspaco(folgaAntes + linhas.length * passo);
+    /* Depois do garanteEspaco: numa virada de pagina a folga nao deve empurrar
+       o primeiro item para baixo do alto da folha nova. */
+    if (folgaAntes && doc.y < Y_TOPO) doc.y -= folgaAntes;
     for (var k = 0; k < linhas.length; k++) {
       doc.garanteEspaco(passo);
       doc.y -= passo;
@@ -2318,13 +2325,24 @@
         doc.y -= 15;
         doc.texto(op.origem, MARG_E, doc.y, { tam: 10, cor: COR.texto });
       }
-      if (objetivo.rotulo) {
+      /* O destaque vai no OBJETIVO, e não no nível.
+       *
+       * A faixa cinza puxa o olho antes de qualquer outra linha da seção, e o
+       * que a família procura é para onde a criança vai. Enquanto o nível estava
+       * na faixa, o pai lia primeiro "Precisa retomar a base de anos anteriores",
+       * que é o diagnóstico, e o objetivo, que é o alvo dele, saía como linha
+       * comum logo acima. O diagnóstico continua na folha, em texto, porque ele
+       * explica o plano; ele só deixa de ser a primeira coisa que salta. */
+      if (op.nivel) {
         doc.y -= 14;
-        var alvo = objetivo.rotulo + (objetivo.dataProva ? ', em ' + ddmmaaaaL(objetivo.dataProva) : '');
-        doc.texto('Objetivo: ', MARG_E, doc.y, { tam: 10, bold: true, cor: COR.navy });
-        doc.texto(alvo, MARG_E + medir('Objetivo: ', 10, true), doc.y, { tam: 10, cor: COR.texto });
+        doc.texto('Como está hoje: ', MARG_E, doc.y, { tam: 10, bold: true, cor: COR.navy });
+        doc.texto(op.nivel, MARG_E + medir('Como está hoje: ', 10, true), doc.y,
+          { tam: 10, cor: COR.texto });
       }
-      if (op.nivel) faixa(op.nivel);
+      if (objetivo.rotulo) {
+        faixa('Objetivo: ' + objetivo.rotulo +
+          (objetivo.dataProva ? ', em ' + ddmmaaaaL(objetivo.dataProva) : ''));
+      }
       if (op.texto) {
         doc.y -= 10;
         doc.garanteEspaco(40);
@@ -2374,8 +2392,11 @@
     doc.y -= 6;
     itemComRotulo(doc, 'Encontros', duracao + ', ' + vezes +
       (enc.local ? ', ' + String(enc.local).charAt(0).toLowerCase() + String(enc.local).slice(1) : '') + '.');
+    /* Dois pontos de folga entre um combinado e o seguinte. Sao oito acordos
+       diferentes, e sem respiro eles leem como um paragrafo so. O vao de dentro
+       de cada um continua nos 14 pt, que e o que segura a leitura da frase. */
     (op.combinados || []).forEach(function (c) {
-      itemComRotulo(doc, c.rotulo, c.texto);
+      itemComRotulo(doc, c.rotulo, c.texto, { folgaAntes: 1.5 });
     });
 
     // ---- investimento
@@ -2465,8 +2486,11 @@
     var textoFecho = 'Fico à disposição para conversar sobre qualquer ponto. Se fizer sentido ' +
       'para vocês, combino a primeira data e já começo a montar o plano de trabalho' +
       (primeiroNome ? ' para ' + primeiroNome : '') + '.';
+    /* 38 pt da assinatura: as duas linhas mais o respiro acima delas. Sem
+       contar aqui, o fecho cabia e a assinatura ia sozinha para a folha
+       seguinte, que e o pior lugar possivel para ela. */
     var alturaFim = 24 + doc.quebrar(textoFecho, UTIL, 10.5, false).length * 15 +
-      (op.validaAte ? 25 : 0);
+      32 + (op.validaAte ? 25 : 0);
     if (vantagens.length) {
       var linhasVantagens = 0;
       vantagens.forEach(function (v) {
@@ -2487,8 +2511,17 @@
     doc.y -= 24;
     doc.garanteEspaco(50);
     doc.paragrafo(textoFecho, { tam: 10.5, alturaLinha: 15 });
+    /* A assinatura. Duas linhas, e a segunda é o nome dela: é o único lugar do
+       corpo em que o nome aparece, porque a moldura já o assina em toda página.
+       Fica antes da validade, que é nota de rodapé e não despedida. */
+    doc.y -= 18;
+    doc.garanteEspaco(30);
+    doc.texto('Com carinho,', MARG_E, doc.y, { tam: 10.5, cor: COR.texto });
+    doc.y -= 16;
+    doc.texto('Nathália Wajsenzon', MARG_E, doc.y, { tam: 10.5, bold: true, cor: COR.navy });
+
     if (op.validaAte) {
-      doc.y -= 16;
+      doc.y -= 18;
       doc.texto('Proposta válida até ' + ddmmaaaaL(op.validaAte), MARG_E, doc.y,
         { tam: 9, cor: COR.muted });
     }
