@@ -2121,7 +2121,14 @@
       L.push('');
     }
     L.push('**Total de horas cobradas' + ate + ':** ' + horasCobradas + ' h (' + fmtHorasDecimal(minCobrados) + ' horas)');
-    if (f.minutosNaoCobrados > 0) {
+    /* A conta do que ela deu e não cobrou só sai no documento da família
+     * enquanto ela deixar. Nasce ligada, porque é assim que o fechamento sempre
+     * foi, e ela desliga em Ajustes se achar que a comunicação ficou agressiva.
+     *
+     * Há um argumento dos dois lados, e por isso a escolha é dela: mostrar dá
+     * valor ao que ela deu de graça, e mostrar também transforma gentileza em
+     * dívida na cabeça de quem lê. */
+    if (f.minutosNaoCobrados > 0 && (!opcoes || opcoes.mostrarNaoCobradas !== false)) {
       L.push('**Horas não cobradas:** ' + fmtHoras(f.minutosNaoCobrados) + ' h');
     }
     if (faixasACobrar.length > 1) {
