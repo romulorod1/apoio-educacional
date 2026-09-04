@@ -324,6 +324,7 @@
         status: 'realizada',
         cobravel: true,
         notaTexto: '',
+        notaPrivada: '',
         nota: null,
         anexos: []
       });
@@ -408,6 +409,9 @@
     });
     // Notas e anexos são sempre individuais: nunca se propagam pela série.
     if (mudancas.notaTexto !== undefined) aula.notaTexto = mudancas.notaTexto;
+    /* A anotação só dela segue a mesma regra da outra: é daquele encontro, e
+     * nunca escorre para as irmãs da repetição. */
+    if (mudancas.notaPrivada !== undefined) aula.notaPrivada = mudancas.notaPrivada;
     if (mudancas.nota !== undefined) aula.nota = mudancas.nota;
     if (mudancas.anexos !== undefined) aula.anexos = mudancas.anexos;
     if (mudancas.data !== undefined && mudancas.data !== aula.data) {
@@ -473,7 +477,8 @@
    * o passo de trilha que ela fechou. Preservar demais é o lado seguro do
    * erro: no máximo sobra uma aula que ela apaga com um toque. */
   function temConteudo(aula) {
-    return !!(aula && ((aula.notaTexto && aula.notaTexto.trim()) || aula.temNota ||
+    return !!(aula && ((aula.notaTexto && aula.notaTexto.trim()) ||
+      (aula.notaPrivada && aula.notaPrivada.trim()) || aula.temNota ||
       (aula.anexos && aula.anexos.length) ||
       temasDaAula(aula).length ||
       (aula.areas && aula.areas.length)));
@@ -585,6 +590,7 @@
         status: opcoes.status || 'realizada',
         cobravel: opcoes.cobravel !== undefined ? opcoes.cobravel : true,
         notaTexto: '',
+        notaPrivada: '',
         temNota: false,
         anexos: []
       });
@@ -714,6 +720,62 @@
     return [];
   }
 
+  /* O último encontro com aquele aluno.
+   *
+   * Para lembrar onde os dois pararam, ela precisava fechar a janela da aula,
+   * procurar a aula anterior no calendário e abri-la. Isto aqui devolve o mesmo
+   * conteúdo pronto para caber no alto da aula de hoje.
+   *
+   * Só entra encontro que ACONTECEU: aula cancelada e falta não são um lugar
+   * onde alguém parou. E só o que já passou, nunca uma aula marcada à frente,
+   * mesmo que ela tenha adiantado alguma anotação.
+   *
+   * Devolve null quando não há nada de útil para mostrar, e a janela da aula
+   * simplesmente não desenha o bloco: primeira aula de um aluno novo não pode
+   * abrir com uma caixa vazia dizendo que não há nada.
+   */
+  function ultimoEncontro(db, alunoId, aulaAtual) {
+    /* "Antes" é por data E horário, e não só por data: quando ela divide um
+     * encontro em dois, as duas metades ficam no mesmo dia, e a primeira é
+     * mesmo o encontro anterior da segunda. */
+    var referencia = aulaAtual && aulaAtual.data
+      ? aulaAtual
+      : { data: hojeIso(), hora: '23:59' };
+    var idAtual = aulaAtual && aulaAtual.id;
+    var candidatas = ((db && db.aulas) || []).filter(function (a) {
+      if (a.alunoId !== alunoId) return false;
+      if (idAtual && a.id === idAtual) return false;
+      if (!a.data || ordenarAulas(a, referencia) >= 0) return false;
+      if (a.status === 'cancelada' || a.status === 'falta') return false;
+      return true;
+    }).sort(ordenarAulas);
+
+    for (var i = candidatas.length - 1; i >= 0; i--) {
+      var au = candidatas[i];
+      var assuntos = temasDaAula(au).map(function (t) {
+        return t.titulo || t.id || '';
+      }).filter(Boolean);
+      var areas = (au.areas || []).map(rotuloArea).filter(Boolean);
+      var rendeu = (au.notaTexto || '').trim();
+      var soMinha = (au.notaPrivada || '').trim();
+      var folha = !!au.temNota;
+      var anexos = (au.anexos || []).length;
+      if (!assuntos.length && !areas.length && !rendeu && !soMinha && !folha && !anexos) continue;
+      return {
+        aulaId: au.id,
+        data: au.data,
+        diaSemana: diaSemanaLongo(au.data),
+        assuntos: assuntos,
+        areas: areas,
+        oQueRendeu: rendeu,
+        soMinha: soMinha,
+        temFolha: folha,
+        qtdAnexos: anexos
+      };
+    }
+    return null;
+  }
+
   /* Mapeamento do aluno.
    *
    * O primeiro encontro com um aluno novo raramente é aula: é sondagem. E o
@@ -727,6 +789,18 @@
    * Nas lacunas, cada item carrega um termo de busca do banco de temas: marcar
    * "Frações" e cair na lista de temas de fração é o caminho curto entre
    * descobrir o buraco e ter material para tapá-lo.
+   *
+   * Metade disto é sobre o ALUNO e metade é sobre a MATÉRIA.
+   *
+   * A rotina de estudo, o jeito de aprender, deixar questão em branco, chutar,
+   * estudar só na véspera, ficar ansioso perto da prova: isso é o mesmo aluno
+   * em matemática e em história, e ela não deveria responder de novo a cada
+   * matéria. Já em que ponto ele está, o que ele erra e o que ficou para trás
+   * muda de uma matéria para outra e se repete por matéria.
+   *
+   * Por isso cada item diz `sobre: 'aluno'` ou `sobre: 'materia'`. E o item que
+   * só existe em matemática carrega `so: 'matematica'`: cálculo mental, tabuada
+   * e fração não são pergunta para quem dá aula de história.
    */
   var MAPA = [
     {
@@ -734,18 +808,23 @@
       titulo: 'Pontos fortes',
       ajuda: 'O que já funciona e serve de apoio para o resto.',
       itens: [
-        { id: 'calculo-mental', rotulo: 'Cálculo mental' },
-        { id: 'tabuada-ok', rotulo: 'Tabuada automatizada' },
-        { id: 'enunciado-ok', rotulo: 'Entende bem o enunciado' },
-        { id: 'raciocinio-ok', rotulo: 'Raciocínio lógico' },
-        { id: 'caderno-ok', rotulo: 'Caderno organizado' },
-        { id: 'tarefa-ok', rotulo: 'Faz as tarefas em dia' },
-        { id: 'pergunta', rotulo: 'Pergunta quando não entende' },
-        { id: 'persiste', rotulo: 'Persiste na questão difícil' },
-        { id: 'sozinho', rotulo: 'Trabalha bem sozinho' },
-        { id: 'autocorrige', rotulo: 'Percebe e corrige o próprio erro' },
-        { id: 'gosta', rotulo: 'Gosta de matemática' },
-        { id: 'pega-rapido', rotulo: 'Pega conceito novo com rapidez' }
+        { id: 'calculo-mental', rotulo: 'Cálculo mental', sobre: 'materia', so: 'matematica' },
+        { id: 'tabuada-ok', rotulo: 'Tabuada automatizada', sobre: 'materia', so: 'matematica' },
+        { id: 'enunciado-ok', rotulo: 'Entende bem o enunciado', sobre: 'aluno' },
+        { id: 'raciocinio-ok', rotulo: 'Raciocínio lógico', sobre: 'aluno' },
+        { id: 'caderno-ok', rotulo: 'Caderno organizado', sobre: 'aluno' },
+        { id: 'tarefa-ok', rotulo: 'Faz as tarefas em dia', sobre: 'aluno' },
+        { id: 'pergunta', rotulo: 'Pergunta quando não entende', sobre: 'aluno' },
+        { id: 'persiste', rotulo: 'Persiste na questão difícil', sobre: 'aluno' },
+        { id: 'sozinho', rotulo: 'Trabalha bem sozinho', sobre: 'aluno' },
+        { id: 'autocorrige', rotulo: 'Percebe e corrige o próprio erro', sobre: 'aluno' },
+        /* Era "Gosta de matemática". O rótulo passou a dizer a matéria em vez de
+         * dizer matemática, porque agora ele aparece dentro da matéria escolhida.
+         * O identificador é o mesmo, então o que ela já marcou continua marcado. */
+        { id: 'gosta', rotulo: 'Gosta da matéria', sobre: 'materia' },
+        { id: 'pega-rapido', rotulo: 'Pega conceito novo com rapidez', sobre: 'aluno' },
+        { id: 'conteudo-em-dia', rotulo: 'Está em dia com o conteúdo do ano', sobre: 'materia' },
+        { id: 'base-solida', rotulo: 'Tem base sólida do que veio antes', sobre: 'materia' }
       ]
     },
     {
@@ -753,27 +832,42 @@
       titulo: 'Pontos de atenção',
       ajuda: 'Onde ele costuma perder ponto. É o que vira plano de trabalho.',
       itens: [
-        { id: 'sinal', rotulo: 'Erros de sinal' },
-        { id: 'tabuada-fraca', rotulo: 'Tabuada insegura' },
-        { id: 'fracao-fraca', rotulo: 'Se perde nas operações com frações' },
-        { id: 'decimal-fraca', rotulo: 'Erra na passagem entre decimal, fração e porcentagem' },
-        { id: 'enunciado-fraco', rotulo: 'Lê o enunciado sem entender o que se pede' },
-        { id: 'nao-comeca', rotulo: 'Não sabe por onde começar' },
-        { id: 'branco', rotulo: 'Deixa questão em branco' },
-        { id: 'chuta', rotulo: 'Chuta sem tentar' },
-        { id: 'nao-confere', rotulo: 'Não confere o resultado' },
-        { id: 'nao-revisa', rotulo: 'Não revisa a prova depois de corrigida' },
-        { id: 'vespera', rotulo: 'Estuda só na véspera' },
-        { id: 'caderno-fraco', rotulo: 'Caderno incompleto' },
-        { id: 'dispersa', rotulo: 'Dispersa com facilidade' },
-        { id: 'depende', rotulo: 'Depende de ajuda para começar' },
-        { id: 'fora-do-modelo', rotulo: 'Trava quando a questão foge do modelo' },
-        { id: 'ansiedade-prova', rotulo: 'Fica ansioso perto da prova' }
+        { id: 'sinal', rotulo: 'Erros de sinal', sobre: 'materia', so: 'matematica' },
+        { id: 'tabuada-fraca', rotulo: 'Tabuada insegura', sobre: 'materia', so: 'matematica' },
+        { id: 'fracao-fraca', rotulo: 'Se perde nas operações com frações', sobre: 'materia', so: 'matematica' },
+        { id: 'decimal-fraca', rotulo: 'Erra na passagem entre decimal, fração e porcentagem', sobre: 'materia', so: 'matematica' },
+        { id: 'enunciado-fraco', rotulo: 'Lê o enunciado sem entender o que se pede', sobre: 'aluno' },
+        { id: 'nao-comeca', rotulo: 'Não sabe por onde começar', sobre: 'aluno' },
+        { id: 'branco', rotulo: 'Deixa questão em branco', sobre: 'aluno' },
+        { id: 'chuta', rotulo: 'Chuta sem tentar', sobre: 'aluno' },
+        { id: 'nao-confere', rotulo: 'Não confere o resultado', sobre: 'aluno' },
+        { id: 'nao-revisa', rotulo: 'Não revisa a prova depois de corrigida', sobre: 'aluno' },
+        { id: 'vespera', rotulo: 'Estuda só na véspera', sobre: 'aluno' },
+        { id: 'caderno-fraco', rotulo: 'Caderno incompleto', sobre: 'aluno' },
+        { id: 'dispersa', rotulo: 'Dispersa com facilidade', sobre: 'aluno' },
+        { id: 'depende', rotulo: 'Depende de ajuda para começar', sobre: 'aluno' },
+        { id: 'fora-do-modelo', rotulo: 'Trava quando a questão foge do modelo', sobre: 'materia' },
+        { id: 'ansiedade-prova', rotulo: 'Fica ansioso perto da prova', sobre: 'aluno' },
+        { id: 'conteudo-atrasado', rotulo: 'Está atrás do conteúdo que a turma está vendo', sobre: 'materia' },
+        { id: 'confunde-conceitos', rotulo: 'Confunde conceitos parecidos da matéria', sobre: 'materia' },
+        { id: 'nao-retem', rotulo: 'Não lembra do que foi visto no encontro anterior', sobre: 'materia' }
       ]
     },
     {
       chave: 'lacunas',
       titulo: 'Lacunas de anos anteriores',
+      /* A lista de lacunas só aparece onde ela é verdade.
+       *
+       * Matemática é escada: não dá para fazer equação do segundo grau sem
+       * fração. História não é escada. Não saber Revolução Francesa não impede
+       * aprender Primeira Guerra, e quem vai mal em história costuma ir mal em
+       * ler e escrever, que é português, e não está faltando um assunto do ano
+       * passado. Copiar esta lista nas outras onze matérias daria onze listas
+       * que nunca receberiam uma marcação sequer. */
+      soEmEscada: true,
+      /* O grupo inteiro é sobre a matéria: cada item aqui herda isso, e não
+       * precisa repetir `sobre` vinte e duas vezes. */
+      sobre: 'materia',
       ajuda: 'O que ficou para trás e atrapalha o conteúdo de agora. ' +
         'Cada lacuna marcada monta a trilha dos assuntos que precisam vir antes, ' +
         'na ordem.',
@@ -817,6 +911,9 @@
     {
       chave: 'rotina',
       titulo: 'Rotina de estudo',
+      /* Rotina e jeito de aprender são o mesmo aluno em qualquer matéria:
+       * respondidos uma vez, valem para todas. */
+      sobre: 'aluno',
       ajuda: 'Como o estudo acontece fora da aula. Marque o que for verdade hoje.',
       itens: [
         { id: 'horario-fixo', rotulo: 'Tem horário fixo de estudo' },
@@ -834,6 +931,7 @@
     {
       chave: 'aprende',
       titulo: 'Como aprende melhor',
+      sobre: 'aluno',
       ajuda: 'O caminho que costuma funcionar com este aluno.',
       itens: [
         { id: 'visual', rotulo: 'Vendo o desenho ou o gráfico' },
@@ -875,13 +973,265 @@
     return n ? n.rotulo : '';
   }
 
+  // ---------- as matérias do mapeamento ----------
+
+  /* As matérias que ela dá. `escada` marca a matéria em que o conteúdo de um
+   * ano depende mesmo do ano anterior: hoje só matemática, e é por isso que só
+   * ali existe lista de lacunas.
+   *
+   * `apoiaEmMatematica` marca física e química. Quando um aluno trava nelas,
+   * quase sempre o que falta é proporção, isolar a variável, potência de dez ou
+   * trigonometria, que já existem no banco de temas e a busca já sabe achar:
+   * não é preciso escrever uma lista de lacunas de física para isso funcionar.
+   *
+   * A última é "Outra", com o nome em branco, porque nenhuma lista prevê tudo. */
+  var MATERIAS = [
+    { id: 'matematica', rotulo: 'Matemática', escada: true },
+    { id: 'portugues', rotulo: 'Português' },
+    { id: 'redacao', rotulo: 'Redação' },
+    { id: 'ingles', rotulo: 'Inglês' },
+    { id: 'ciencias', rotulo: 'Ciências' },
+    { id: 'fisica', rotulo: 'Física', apoiaEmMatematica: true },
+    { id: 'quimica', rotulo: 'Química', apoiaEmMatematica: true },
+    { id: 'biologia', rotulo: 'Biologia' },
+    { id: 'historia', rotulo: 'História' },
+    { id: 'geografia', rotulo: 'Geografia' },
+    { id: 'filosofia', rotulo: 'Filosofia' },
+    { id: 'sociologia', rotulo: 'Sociologia' },
+    { id: 'outra', rotulo: 'Outra', livre: true }
+  ];
+
+  var MATERIA_PADRAO = 'matematica';
+
+  function materiaPorId(id) {
+    return MATERIAS.filter(function (m) { return m.id === String(id || ''); })[0] || null;
+  }
+
+  function rotuloMateria(m, id) {
+    var mat = materiaPorId(id);
+    if (!mat) return '';
+    if (mat.livre) {
+      var nome = ((dadosDaMateria(m, id) || {}).nome || '').trim();
+      return nome || mat.rotulo;
+    }
+    return mat.rotulo;
+  }
+
+  /* A matéria tem lista de lacunas de ano anterior? Só onde a matéria é escada. */
+  function temLacunaDeAnoAnterior(materiaId) {
+    var mat = materiaPorId(materiaId);
+    return !!(mat && mat.escada);
+  }
+
+  function sobreDoItem(grupo, item) {
+    return item.sobre || grupo.sobre || 'materia';
+  }
+
+  /* Os itens de um grupo que são sobre o aluno: valem em qualquer matéria e
+   * ficam respondidos uma vez só. */
+  function itensDoAluno(chave) {
+    var g = MAPA.filter(function (x) { return x.chave === chave; })[0];
+    if (!g) return [];
+    return g.itens.filter(function (i) { return sobreDoItem(g, i) === 'aluno'; });
+  }
+
+  /* Os itens de um grupo que são sobre a matéria escolhida. O item marcado com
+   * `so` só aparece na matéria dele: tabuada não é pergunta de história. */
+  function itensDaMateria(chave, materiaId) {
+    var g = MAPA.filter(function (x) { return x.chave === chave; })[0];
+    if (!g) return [];
+    var alvo = String(materiaId || MATERIA_PADRAO);
+    if (g.soEmEscada && !temLacunaDeAnoAnterior(alvo)) return [];
+    return g.itens.filter(function (i) {
+      if (sobreDoItem(g, i) !== 'materia') return false;
+      return !i.so || i.so === alvo;
+    });
+  }
+
+  /* Os grupos que aparecem para uma matéria, na ordem. */
+  function gruposDaMateria(materiaId) {
+    return MAPA.filter(function (g) {
+      return itensDaMateria(g.chave, materiaId).length > 0;
+    });
+  }
+
+  /* Os grupos que aparecem no bloco do aluno, na ordem. */
+  function gruposDoAluno() {
+    return MAPA.filter(function (g) { return itensDoAluno(g.chave).length > 0; });
+  }
+
+  /* Onde moram as marcações de cada matéria.
+   *
+   * Matemática continua em m.marcados, exatamente onde sempre esteve. Tudo o
+   * que ela já marcou foi marcado sobre matemática, e é de lá que leem o
+   * lembrete da aula, a ficha em PDF e a trilha. Mover isso para outro lugar
+   * reescreveria o que ela já respondeu.
+   *
+   * As outras matérias nascem hoje e moram em m.porMateria[id], que nasce
+   * vazio. O bloco do aluno mora sempre em m.marcados, para qualquer matéria:
+   * é respondido uma vez.
+   *
+   * Por isso, em matemática, m.marcados.atencao guarda os itens do aluno e os
+   * da matéria na mesma lista, que é o que ele sempre guardou. */
+  function dadosDaMateria(m, materiaId) {
+    if (!m) return null;
+    var id = String(materiaId || MATERIA_PADRAO);
+    return (m.porMateria && m.porMateria[id]) || null;
+  }
+
+  function garantirMateria(m, materiaId) {
+    var id = String(materiaId || MATERIA_PADRAO);
+    m.porMateria = m.porMateria || {};
+    if (!m.porMateria[id]) m.porMateria[id] = { fortes: [], atencao: [], nome: '', cobranca: '' };
+    var d = m.porMateria[id];
+    ['fortes', 'atencao'].forEach(function (c) { d[c] = (d[c] || []).slice(); });
+    if (typeof d.cobranca !== 'string') d.cobranca = '';
+    if (typeof d.nome !== 'string') d.nome = '';
+    return d;
+  }
+
+  /* O que está marcado na matéria escolhida, só os itens de matéria. */
+  function marcadosDaMateria(m, materiaId) {
+    var id = String(materiaId || MATERIA_PADRAO);
+    var out = {};
+    MAPA.forEach(function (g) {
+      var permitidos = {};
+      itensDaMateria(g.chave, id).forEach(function (i) { permitidos[i.id] = true; });
+      var fonte = id === MATERIA_PADRAO
+        ? ((m && m.marcados && m.marcados[g.chave]) || [])
+        : (((dadosDaMateria(m, id) || {})[g.chave]) || []);
+      out[g.chave] = fonte.filter(function (x) { return permitidos[x]; });
+    });
+    return out;
+  }
+
+  /* O que está marcado sobre o aluno, que vale em qualquer matéria. */
+  function marcadosDoAluno(m) {
+    var out = {};
+    MAPA.forEach(function (g) {
+      var permitidos = {};
+      itensDoAluno(g.chave).forEach(function (i) { permitidos[i.id] = true; });
+      out[g.chave] = ((m && m.marcados && m.marcados[g.chave]) || [])
+        .filter(function (x) { return permitidos[x]; });
+    });
+    return out;
+  }
+
+  /* Marca ou desmarca um item de matéria. Devolve true se algo mudou. */
+  function marcarNaMateria(m, materiaId, chave, itemId, ligado) {
+    if (!m) return false;
+    var id = String(materiaId || MATERIA_PADRAO);
+    var lista;
+    if (id === MATERIA_PADRAO) {
+      m.marcados = m.marcados || {};
+      m.marcados[chave] = m.marcados[chave] || [];
+      lista = m.marcados[chave];
+    } else {
+      var d = garantirMateria(m, id);
+      d[chave] = d[chave] || [];
+      lista = d[chave];
+    }
+    var i = lista.indexOf(itemId);
+    if (ligado && i < 0) { lista.push(itemId); return true; }
+    if (!ligado && i >= 0) { lista.splice(i, 1); return true; }
+    return false;
+  }
+
+  /* O que o colégio vai cobrar no bimestre naquela matéria, tirado da lista que
+   * o aluno já manda. É o que entra no lugar das lacunas onde elas não existem. */
+  function cobrancaDaMateria(m, materiaId) {
+    return ((dadosDaMateria(m, materiaId) || {}).cobranca || '').trim();
+  }
+
+  function definirCobranca(m, materiaId, texto) {
+    garantirMateria(m, materiaId).cobranca = String(texto || '');
+  }
+
+  /* As matérias que esse mapeamento já tem alguma coisa dentro. Matemática
+   * entra sempre que houver marcação antiga, porque foi ali que ela nasceu. */
+  function materiasDoMapeamento(m) {
+    var out = [];
+    MATERIAS.forEach(function (mat) {
+      var marc = marcadosDaMateria(m, mat.id);
+      var algum = Object.keys(marc).some(function (k) { return marc[k].length > 0; });
+      if (algum || cobrancaDaMateria(m, mat.id)) out.push(mat.id);
+    });
+    if (!out.length) out.push(MATERIA_PADRAO);
+    return out;
+  }
+
+  // ---------- para onde o aluno está indo ----------
+
+  /* "Outro" fica em primeiro, com campo em branco, porque nenhuma lista prevê
+   * tudo: uma criança pode estar estudando para uma prova de bolsa, para uma
+   * banca, ou para nada além de parar de sofrer na aula de terça. */
+  var OBJETIVOS = [
+    { id: 'outro', rotulo: 'Outro', livre: true },
+    { id: 'media', rotulo: 'Recuperar a média na escola' },
+    { id: 'selecao-colegio', rotulo: 'Processo seletivo de colégio' },
+    { id: 'vestibular', rotulo: 'Vestibular ou ENEM' },
+    { id: 'fora', rotulo: 'Universidade fora do país' }
+  ];
+
+  function objetivoPorId(id) {
+    return OBJETIVOS.filter(function (o) { return o.id === String(id || ''); })[0] || null;
+  }
+
+  /* O objetivo do mapeamento que vale hoje, já em português pronto para a tela.
+   * Devolve null quando ela não registrou nenhum: o bloco simplesmente não
+   * aparece, em vez de aparecer vazio. */
+  function objetivoDe(aluno) {
+    var m = mapeamentoAtual(aluno);
+    if (!m || !m.objetivo) return null;
+    var o = m.objetivo;
+    var base = objetivoPorId(o.tipo);
+    var livre = (o.descricao || '').trim();
+    var rotulo = base ? (base.livre ? (livre || base.rotulo) : base.rotulo) : livre;
+    if (!rotulo && !o.dataProva) return null;
+    return {
+      tipo: o.tipo || '',
+      rotulo: rotulo,
+      descricao: livre,
+      dataProva: o.dataProva || ''
+    };
+  }
+
+  /* Quantas semanas faltam para a prova.
+   *
+   * Devolve null sem data. `passou` diz que a data já ficou para trás, e aí
+   * `semanas` é quantas se passaram: a aula não pode mentir que ainda falta
+   * tempo. Abaixo de uma semana ela mostra os dias, que é o que importa ali. */
+  function semanasAteAProva(dataIso, hojeRef) {
+    if (!dataIso) return null;
+    var hoje = hojeRef || hojeIso();
+    var a = dataLocal(hoje), b = dataLocal(dataIso);
+    if (!isFinite(a.getTime()) || !isFinite(b.getTime())) return null;
+    var dias = Math.round((b - a) / 86400000);
+    var passou = dias < 0;
+    var absoluto = Math.abs(dias);
+    return {
+      data: dataIso,
+      dias: dias,
+      passou: passou,
+      semanas: Math.floor(absoluto / 7),
+      texto: passou
+        ? (absoluto === 0 ? 'é hoje' : 'já passou')
+        : (dias === 0 ? 'é hoje'
+          : dias < 7 ? (dias === 1 ? 'falta 1 dia' : 'faltam ' + dias + ' dias')
+            : (Math.floor(dias / 7) === 1 ? 'falta 1 semana'
+              : 'faltam ' + Math.floor(dias / 7) + ' semanas'))
+    };
+  }
+
   function mapeamentoNovo() {
     return {
       id: uid(), data: hojeIso(), aulaId: null,
-      escola: '', anoEscolar: '', professor: '', calendarioProvas: '',
+      escola: '', anoEscolar: '', anoEscolarOutro: '', professor: '', calendarioProvas: '',
       indicacao: '', motivo: '', expectativa: '',
       nivel: '', prioridades: '', plano: '',
-      marcados: { fortes: [], atencao: [], lacunas: [], rotina: [], aprende: [] }
+      objetivo: { tipo: '', descricao: '', dataProva: '' },
+      marcados: { fortes: [], atencao: [], lacunas: [], rotina: [], aprende: [] },
+      porMateria: {}
     };
   }
 
@@ -898,11 +1248,38 @@
 
   function mapeado(aluno) { return !!mapeamentoAtual(aluno); }
 
+  /* O ano escolar deixou de ser só a série do colégio.
+   *
+   * Não havia como registrar aluno em cursinho, aluno que saiu da escola, nem
+   * aluno em sistema de fora: a lista ia do 2º ano ao 3º do médio e acabava.
+   * Os três de baixo entram por isso, e "Outro" traz campo em branco, do mesmo
+   * jeito que o objetivo. */
   var ANOS_ESCOLARES = {
     '02': '2º ano', '03': '3º ano', '04': '4º ano', '05': '5º ano', '06': '6º ano',
     '07': '7º ano', '08': '8º ano', '09': '9º ano',
-    em1: '1º ano do médio', em2: '2º ano do médio', em3: '3º ano do médio'
+    em1: '1º ano do médio', em2: '2º ano do médio', em3: '3º ano do médio',
+    cursinho: 'Cursinho', fora: 'Fora da escola', outro: 'Outro'
   };
+
+  /* A ordem em que a lista aparece na tela: as séries primeiro, na ordem da
+   * escada, e os três casos de fora depois. */
+  var ANOS_ESCOLARES_ORDEM = ['02', '03', '04', '05', '06', '07', '08', '09',
+    'em1', 'em2', 'em3', 'cursinho', 'fora', 'outro'];
+
+  function anoEscolarLivre(ano) { return String(ano || '') === 'outro'; }
+
+  /* A série que o banco de temas entende, a partir do que ela registrou.
+   *
+   * O banco vai do 1º ano ao 3º do médio e não conhece cursinho. Cursinho lê
+   * como 3º do médio, que é o conteúdo que ele revisa. "Fora da escola" e
+   * "Outro" não viram série nenhuma: sem série o aplicativo propõe o começo
+   * mais baixo da trilha, que é o lado seguro de errar. */
+  function serieParaTemas(ano) {
+    var a = String(ano || '');
+    if (a === 'cursinho') return 'em3';
+    if (ANOS_ESCOLARES[a] && a !== 'fora' && a !== 'outro') return a;
+    return '';
+  }
 
   /* Ano escolar e colégio, para o fechamento situar quem lê. Só aparece quando
    * a informação existe: nada de linha em branco no documento da família. */
@@ -910,9 +1287,109 @@
     var m = mapeamentoAtual(aluno);
     var ano = (m && m.anoEscolar) || (aluno && aluno.anoEscolar) || '';
     var partes = [];
-    if (ANOS_ESCOLARES[ano]) partes.push(ANOS_ESCOLARES[ano]);
+    if (anoEscolarLivre(ano)) {
+      var livre = ((m && m.anoEscolarOutro) || (aluno && aluno.anoEscolarOutro) || '').trim();
+      if (livre) partes.push(livre);
+    } else if (ANOS_ESCOLARES[ano]) {
+      partes.push(ANOS_ESCOLARES[ano]);
+    }
     if (m && m.escola) partes.push(m.escola);
     return partes.join(', ');
+  }
+
+  // ---------- em que etapa o aluno está ----------
+
+  /* As quatro etapas que ela já usa, marcadas em três frentes, cada uma com a
+   * data em que mudou. É o que mostra que a criança andou, e não só que ela
+   * teve aula.
+   *
+   * A etapa mora na ficha do aluno, e não na janela da aula. Fica lá parada,
+   * mostrando o ponto, e não pede nada: quando ela perceber a mudança, e isso
+   * leva semanas ou meses, toca uma vez no botão. Se o aplicativo perguntasse a
+   * cada aula seriam quase cinquenta respostas por mês, ela responderia no
+   * automático e o dado deixaria de valer.
+   *
+   * Não existe aqui nenhuma função que escolha a etapa sozinha, e isso é de
+   * propósito: seria inventar uma avaliação que ela não fez. */
+  var ETAPAS = [
+    { id: 'apoio-total', rotulo: 'Apoio total', ajuda: 'Precisa de você ao lado o tempo todo.' },
+    { id: 'apoio-parcial', rotulo: 'Apoio parcial', ajuda: 'Começa sozinho e trava no meio.' },
+    { id: 'supervisao', rotulo: 'Supervisão', ajuda: 'Faz sozinho, e você confere depois.' },
+    { id: 'autonomia', rotulo: 'Autonomia', ajuda: 'Faz e confere sozinho.' }
+  ];
+
+  var FRENTES_ETAPA = [
+    { id: 'conteudo', rotulo: 'Conteúdo', ajuda: 'Dar conta da matéria em si.' },
+    { id: 'autonomia', rotulo: 'Autonomia', ajuda: 'Estudar e se organizar sem alguém junto.' },
+    { id: 'confianca', rotulo: 'Confiança', ajuda: 'Acreditar que consegue, na aula e na prova.' }
+  ];
+
+  function etapaPorId(id) {
+    return ETAPAS.filter(function (e) { return e.id === String(id || ''); })[0] || null;
+  }
+
+  function frenteDeEtapaPorId(id) {
+    return FRENTES_ETAPA.filter(function (f) { return f.id === String(id || ''); })[0] || null;
+  }
+
+  function rotuloEtapa(id) {
+    var e = etapaPorId(id);
+    return e ? e.rotulo : '';
+  }
+
+  /* Aluno de hoje não tem o campo, e isso tem que continuar funcionando. */
+  function etapasDe(aluno) {
+    return (((aluno && aluno.etapas) || []).filter(function (r) {
+      return r && frenteDeEtapaPorId(r.frente) && etapaPorId(r.etapa) && r.desde;
+    })).slice().sort(function (a, b) { return String(a.desde).localeCompare(String(b.desde)); });
+  }
+
+  function registrosDaFrente(aluno, frente) {
+    return etapasDe(aluno).filter(function (r) { return r.frente === frente; });
+  }
+
+  /* Onde o aluno está naquela frente hoje, e desde quando. Null quando ela
+   * ainda não marcou nada: a linha aparece igual, dizendo que não foi marcada. */
+  function etapaAtual(aluno, frente) {
+    var lista = registrosDaFrente(aluno, frente);
+    if (!lista.length) return null;
+    var r = lista[lista.length - 1];
+    var anterior = lista.length > 1 ? lista[lista.length - 2] : null;
+    return {
+      etapa: r.etapa,
+      rotulo: rotuloEtapa(r.etapa),
+      desde: r.desde,
+      indice: ETAPAS.map(function (e) { return e.id; }).indexOf(r.etapa),
+      anterior: anterior ? { etapa: anterior.etapa, rotulo: rotuloEtapa(anterior.etapa), desde: anterior.desde } : null
+    };
+  }
+
+  /* As três linhas, sempre as três, na ordem. */
+  function quadroDeEtapas(aluno) {
+    return FRENTES_ETAPA.map(function (f) {
+      return { frente: f.id, rotulo: f.rotulo, ajuda: f.ajuda, atual: etapaAtual(aluno, f.id) };
+    });
+  }
+
+  /* O toque de "mudou de etapa". Devolve o registro criado, ou null quando não
+   * há nada a registrar.
+   *
+   * Marcar de novo a etapa em que ele já está não vira registro: encheria o
+   * histórico de linhas iguais e apagaria a data em que a mudança aconteceu de
+   * verdade. Trocar de etapa no mesmo dia substitui o registro do dia, porque a
+   * segunda escolha é conserto do toque errado, e não um aluno que andou duas
+   * etapas numa tarde. */
+  function registrarEtapa(aluno, frente, etapaId, dataIso) {
+    if (!aluno || !frenteDeEtapaPorId(frente) || !etapaPorId(etapaId)) return null;
+    var quando = dataIso || hojeIso();
+    var atual = etapaAtual(aluno, frente);
+    if (atual && atual.etapa === etapaId) return null;
+    aluno.etapas = (aluno.etapas || []).filter(function (r) {
+      return !(r && r.frente === frente && r.desde === quando);
+    });
+    var registro = { id: uid(), frente: frente, etapa: etapaId, desde: quando };
+    aluno.etapas.push(registro);
+    return registro;
   }
 
   /* O lembrete que aparece ao abrir uma aula: curto de propósito, porque ela
@@ -1024,6 +1501,7 @@
       status: aula.status || 'realizada',
       cobravel: aula.cobravel !== undefined ? aula.cobravel : true,
       notaTexto: '',
+      notaPrivada: '',
       temNota: false,
       anexos: [],
       areas: [],
@@ -1047,9 +1525,28 @@
     return true;
   }
 
-  function calcularFechamento(db, alunoId, mesIso) {
+  /* O mês olhando para o calendário: o que já aconteceu e o que ainda vai.
+   *
+   * A aula nasce marcada como realizada, inclusive a que está lá na frente no
+   * calendário. Por isso, no dia primeiro, a tela já mostrava o valor do mês
+   * inteiro como se todas as aulas tivessem acontecido. O conserto não dá
+   * trabalho a ela: ninguém confirma aula por aula. Quem manda é a data. O que
+   * já passou conta como dado, a aula de HOJE conta como dada, e o que está
+   * marcado à frente vai para uma soma separada, de previsto.
+   *
+   * Os campos antigos continuam querendo dizer exatamente o que sempre
+   * quiseram, o mês inteiro: totalMin, totalValor, totalHoras, faixas,
+   * qtdEncontros e minutosNaoCobrados. O documento que a família recebe e o PDF
+   * são feitos com eles, e são fechados com o mês já vencido, quando previsto e
+   * realizado são a mesma coisa. O que é novo entra em campo novo, e quem não
+   * conhece o campo novo continua lendo o que sempre leu.
+   *
+   * hojeRef existe para o teste poder fixar o dia. Sem ele, é o dia de hoje. */
+  function calcularFechamento(db, alunoId, mesIso, hojeRef) {
     var aluno = (db.alunos || []).filter(function (a) { return a.id === alunoId; })[0];
     if (!aluno) return null;
+
+    var hoje = hojeRef || hojeIso();
 
     var aulas = (db.aulas || []).filter(function (x) {
       return x.alunoId === alunoId && mesDe(x.data) === mesIso;
@@ -1057,7 +1554,14 @@
 
     var linhas = [];
     var totalMin = 0, totalValor = 0, minNaoCobrados = 0;
-    var faixas = {};
+    var minFeitos = 0, valorFeito = 0;
+    var minPrevistos = 0;
+    var minDadosSemCobrar = 0, minDesmarcados = 0;
+    /* Duas contagens por faixa de preço: a do mês inteiro, que é a de sempre, e
+     * a do que já aconteceu. A segunda existe porque o documento da família
+     * passou a cobrar só o que já aconteceu, e a composição por valor vigente
+     * embaixo dele tem que somar exatamente o mesmo. */
+    var faixas = {}, faixasFeitas = {};
     var semPreco = [];
 
     for (var i = 0; i < aulas.length; i++) {
@@ -1068,20 +1572,40 @@
       var vh = pv ? pv.valorHora : null;
       var dur = au.duracaoMin || 0;
       var valor = (cobravel && vh !== null) ? (dur / 60) * vh : 0;
+      /* A aula de hoje conta como dada. Só o que está depois de hoje é previsto. */
+      var futura = au.data > hoje;
+      var aconteceu = au.status !== 'cancelada' && au.status !== 'falta';
 
       if (cobravel && vh === null && dur > 0) semPreco.push(au.data);
 
       if (cobravel) {
         totalMin += dur;
         totalValor += valor;
+        if (futura) minPrevistos += dur;
+        else { minFeitos += dur; valorFeito += valor; }
         if (vh !== null) {
           var k = String(vh);
           if (!faixas[k]) faixas[k] = { valorHora: vh, minutos: 0, valor: 0 };
           faixas[k].minutos += dur;
           faixas[k].valor += valor;
+          if (!futura) {
+            if (!faixasFeitas[k]) faixasFeitas[k] = { valorHora: vh, minutos: 0, valor: 0 };
+            faixasFeitas[k].minutos += dur;
+            faixasFeitas[k].valor += valor;
+          }
         }
       } else {
         minNaoCobrados += dur;
+        /* As duas contas do item "o que você deu e não cobrou". A aula extra na
+         * véspera da prova e o horário esticado entram em minutosDadosSemCobrar,
+         * e só depois de terem acontecido: não dá para ter dado de graça uma
+         * aula que ainda não chegou. O horário que ficou reservado e não virou
+         * aula entra em minutosDesmarcados, tenha sido desmarcado com aviso ou
+         * perdido por falta, porque para ela é a mesma coisa: guardou o horário
+         * e não cobrou por ele. Somados, os dois nunca passam de
+         * minutosNaoCobrados, que continua sendo o total de sempre. */
+        if (!aconteceu) minDesmarcados += dur;
+        else if (!futura) minDadosSemCobrar += dur;
       }
 
       linhas.push({
@@ -1090,8 +1614,19 @@
         dia: diaSemanaCurto(au.data),
         hora: au.hora || '',
         duracaoMin: dur,
+        futura: futura,
         status: au.status || 'realizada',
         statusRotulo: st.rotulo,
+        /* O mesmo rótulo, escrito para um documento.
+         *
+         * A aula nasce como realizada, inclusive a que está lá na frente no
+         * calendário, e chamar de "Realizada" uma aula do dia 23 num documento
+         * impresso no dia 3 é dizer à família que ela aconteceu. Na tela dela o
+         * rótulo continua o de sempre: lá o dia da aula está à vista, e quem lê
+         * é quem marcou. */
+        statusNaFolha: (futura && (st === STATUS.realizada || st === STATUS.reposicao))
+          ? (st === STATUS.reposicao ? 'Reposição marcada' : 'Marcada')
+          : st.rotulo,
         cobravel: cobravel,
         valorHora: vh,
         valor: valor,
@@ -1118,29 +1653,63 @@
      * assunto chamado 'constructor' não pode derrubar a conta. */
     var vistos = Object.create(null);
     var contagemAreas = {};
+    /* A mesma lista, restrita ao que já aconteceu.
+     *
+     * Ela às vezes adianta o assunto da aula que ainda vai acontecer, e o
+     * documento da família dizia "Frações (18/09)" em Temas TRABALHADOS no dia
+     * 3. Quem lê entende que já foi dado. As duas listas existem para a tela
+     * dela continuar mostrando o mês inteiro e o documento mostrar o que
+     * aconteceu. */
+    var temasFeitos = [];
+    var vistosFeitos = Object.create(null);
+    var contagemFeitas = {};
+    function guardaTema(mapa, lista, titulo, data) {
+      var chave = chaveDeBusca(titulo || '');
+      if (mapa[chave]) {
+        if (mapa[chave].datas.indexOf(data) < 0) mapa[chave].datas.push(data);
+        return;
+      }
+      mapa[chave] = { titulo: titulo, datas: [data] };
+      lista.push(mapa[chave]);
+    }
     linhas.forEach(function (l) {
       l.temas.forEach(function (t) {
-        var chave = chaveDeBusca(t.titulo || '');
-        if (vistos[chave]) {
-          if (vistos[chave].datas.indexOf(l.data) < 0) vistos[chave].datas.push(l.data);
-          return;
-        }
-        vistos[chave] = { titulo: t.titulo, datas: [l.data] };
-        temasDoMes.push(vistos[chave]);
+        guardaTema(vistos, temasDoMes, t.titulo, l.data);
+        if (!l.futura) guardaTema(vistosFeitos, temasFeitos, t.titulo, l.data);
       });
       l.areas.forEach(function (id) {
         contagemAreas[id] = (contagemAreas[id] || 0) + 1;
+        if (!l.futura) contagemFeitas[id] = (contagemFeitas[id] || 0) + 1;
       });
     });
-    var areasDoMes = Object.keys(contagemAreas).map(function (id) {
-      return { id: id, rotulo: rotuloArea(id), vezes: contagemAreas[id] };
-    }).filter(function (a) { return a.rotulo; })
-      .sort(function (a, b) { return b.vezes - a.vezes || a.rotulo.localeCompare(b.rotulo); });
+    function listaDeAreas(cont) {
+      return Object.keys(cont).map(function (id) {
+        return { id: id, rotulo: rotuloArea(id), vezes: cont[id] };
+      }).filter(function (a) { return a.rotulo; })
+        .sort(function (a, b) { return b.vezes - a.vezes || a.rotulo.localeCompare(b.rotulo); });
+    }
+    var areasDoMes = listaDeAreas(contagemAreas);
+    var areasFeitas = listaDeAreas(contagemFeitas);
 
-    var listaFaixas = Object.keys(faixas).map(function (k) { return faixas[k]; })
-      .sort(function (a, b) { return a.valorHora - b.valorHora; });
+    function listaDeFaixas(mapa) {
+      return Object.keys(mapa).map(function (k) { return mapa[k]; })
+        .sort(function (a, b) { return a.valorHora - b.valorHora; });
+    }
+    var listaFaixas = listaDeFaixas(faixas);
+    var listaFaixasFeitas = listaDeFaixas(faixasFeitas);
 
 
+
+    var contaEncontro = function (l) { return l.cobravel || l.status !== 'cancelada'; };
+
+    /* O previsto sai por diferença, e não de uma soma própria, para que o que
+     * aconteceu mais o previsto dê SEMPRE o total do mês na tela. Arredondar as
+     * duas somas em separado deixaria um centavo sobrando quando a hora não
+     * divide redondo, e um centavo que não fecha na tela do dinheiro dela vira
+     * desconfiança do aplicativo inteiro. */
+    var vTotal = Math.round(totalValor * 100) / 100;
+    var vFeito = Math.round(valorFeito * 100) / 100;
+    var vPrevisto = Math.round((vTotal - vFeito) * 100) / 100;
 
     return {
       aluno: aluno,
@@ -1152,27 +1721,324 @@
       linhas: linhas,
       totalMin: totalMin,
       totalHoras: fmtHoras(totalMin),
-      totalValor: Math.round(totalValor * 100) / 100,
+      totalValor: vTotal,
       minutosNaoCobrados: minNaoCobrados,
+      /* Só para ela, nunca para a família. Ver item "o que você deu e não
+       * cobrou": mostrar essa conta a quem paga transforma gentileza em dívida. */
+      minutosDadosSemCobrar: minDadosSemCobrar,
+      minutosDesmarcados: minDesmarcados,
+      /* O dia de referência que separou o que aconteceu do que vai acontecer. */
+      hoje: hoje,
+      minFeitos: minFeitos,
+      horasFeitas: fmtHoras(minFeitos),
+      valorFeito: vFeito,
+      minPrevistos: minPrevistos,
+      horasPrevistas: fmtHoras(minPrevistos),
+      valorPrevisto: vPrevisto,
       faixas: listaFaixas,
       precoUnico: listaFaixas.length === 1 ? listaFaixas[0].valorHora : null,
+      /* Os três campos abaixo são a versão "só o que já aconteceu" de faixas,
+       * temasDoMes e areasDoMes. Quem não conhecer os campos novos continua
+       * lendo os de sempre, que continuam sendo o mês inteiro. */
+      faixasFeitas: listaFaixasFeitas,
+      precoUnicoFeito: listaFaixasFeitas.length === 1 ? listaFaixasFeitas[0].valorHora : null,
       semPreco: semPreco,
       resumoTexto: resumo ? (resumo.texto || '') : '',
       contextoEscolar: contextoEscolarDe(aluno),
       temasDoMes: temasDoMes,
       areasDoMes: areasDoMes,
-      qtdEncontros: linhas.filter(function (l) { return l.cobravel || l.status !== 'cancelada'; }).length
+      temasFeitos: temasFeitos,
+      areasFeitas: areasFeitas,
+      qtdEncontros: linhas.filter(contaEncontro).length,
+      qtdEncontrosFeitos: linhas.filter(function (l) { return contaEncontro(l) && !l.futura; }).length,
+      qtdEncontrosPrevistos: linhas.filter(function (l) { return contaEncontro(l) && l.futura; }).length
     };
   }
 
-  function calcularMesInteiro(db, mesIso) {
+  function calcularMesInteiro(db, mesIso, hojeRef) {
     var out = [];
     (db.alunos || []).forEach(function (a) {
-      var f = calcularFechamento(db, a.id, mesIso);
+      var f = calcularFechamento(db, a.id, mesIso, hojeRef);
       if (f && f.linhas.length) out.push(f);
     });
     out.sort(function (x, y) { return y.totalValor - x.totalValor; });
     return out;
+  }
+
+  /* Os totais do mês somados de todos os alunos, já separando o que aconteceu
+   * do que ainda vai acontecer. É o que a tela do fechamento mostra em cima:
+   * o número grande é o realizado, e o previsto fica embaixo, menor. */
+  function totaisDoMes(fechs) {
+    var t = {
+      alunos: 0, encontros: 0, encontrosFeitos: 0, encontrosPrevistos: 0,
+      minutos: 0, valor: 0,
+      minFeitos: 0, valorFeito: 0,
+      minPrevistos: 0, valorPrevisto: 0,
+      minutosDadosSemCobrar: 0, minutosDesmarcados: 0
+    };
+    (fechs || []).forEach(function (f) {
+      if (!f) return;
+      t.alunos += 1;
+      t.encontros += f.qtdEncontros || 0;
+      t.encontrosFeitos += f.qtdEncontrosFeitos || 0;
+      t.encontrosPrevistos += f.qtdEncontrosPrevistos || 0;
+      t.minutos += f.totalMin || 0;
+      t.valor += f.totalValor || 0;
+      t.minFeitos += f.minFeitos || 0;
+      t.valorFeito += f.valorFeito || 0;
+      t.minPrevistos += f.minPrevistos || 0;
+      t.minutosDadosSemCobrar += f.minutosDadosSemCobrar || 0;
+      t.minutosDesmarcados += f.minutosDesmarcados || 0;
+    });
+    t.valor = Math.round(t.valor * 100) / 100;
+    t.valorFeito = Math.round(t.valorFeito * 100) / 100;
+    /* Pela mesma razão de sempre: feito mais previsto tem que dar o total. */
+    t.valorPrevisto = Math.round((t.valor - t.valorFeito) * 100) / 100;
+    return t;
+  }
+
+  // ---------- cada aluno, desde quando e por quanto ----------
+
+  /* Esta parte é só dela. Não entra em documento nenhum que a família receba.
+   *
+   * Uma linha por aluno, com desde quando ele estuda, quanto paga, há quantos
+   * meses está nesse valor e quanto ele pesa no mês. Ao lado, uma sugestão de
+   * reajuste, que é sugestão e nada mais: quem conhece cada família é ela. */
+
+  /* Os dois números do IBGE que entram na sugestão.
+   *
+   * A referência é quanto as ESCOLAS subiram, e não a inflação geral: subitem
+   * 8101003, Ensino fundamental, do IPCA. Em doze meses fechados em julho de
+   * 2026 ele deu 8,81 por cento, contra 4,44 da inflação geral. As escolas
+   * sobem quase o dobro, e isso se repete há cinco anos.
+   *
+   * Este par fica escrito aqui, com a data do mês a que se refere, porque ela
+   * dá aula na casa das famílias e muitas vezes está sem sinal. Sem internet o
+   * aplicativo usa este par e diz de quando ele é, para ela nunca olhar um
+   * número sem saber se está velho. Com internet, baixa o par novo do IBGE e
+   * guarda em db.ajustes.ibge. A busca nunca segura a tela. */
+  var IBGE_ESCRITO = {
+    escolas12m: 8.81,
+    inflacao12m: 4.44,
+    referencia: '2026-07'
+  };
+
+  /* Um pedido só traz os dois números, do mesmo lugar, e eles se atualizam
+   * juntos: agregado 7060 do IPCA, variação acumulada em doze meses (variável
+   * 2265), categoria 7169 para o índice geral e 107671 para o ensino
+   * fundamental. */
+  var IBGE_CAT_GERAL = '7169';
+  var IBGE_CAT_ESCOLAS = '107671';
+  var IBGE_URL = 'https://servicodados.ibge.gov.br/api/v3/agregados/7060/periodos/-1' +
+    '/variaveis/2265?localidades=N1[1]&classificacao=315[' +
+    IBGE_CAT_GERAL + ',' + IBGE_CAT_ESCOLAS + ']';
+
+  function mesDoPeriodoIbge(p) {
+    var s = String(p || '');
+    if (!/^\d{6}$/.test(s)) return '';
+    return s.slice(0, 4) + '-' + s.slice(4);
+  }
+
+  /* Lê a resposta do IBGE. Devolve null se faltar qualquer um dos dois números,
+   * porque meio índice não serve para sugerir reajuste nenhum: nesse caso o
+   * aplicativo continua com o que já tinha. */
+  function lerIndicesDoIbge(dados) {
+    if (!dados || !dados.length) return null;
+    var out = { escolas12m: null, inflacao12m: null, referencia: '' };
+    for (var i = 0; i < dados.length; i++) {
+      var res = (dados[i] && dados[i].resultados) || [];
+      for (var j = 0; j < res.length; j++) {
+        var cls = (res[j].classificacoes || [])[0];
+        var cat = (cls && cls.categoria) || {};
+        var chave = Object.keys(cat)[0];
+        if (chave !== IBGE_CAT_GERAL && chave !== IBGE_CAT_ESCOLAS) continue;
+        var series = res[j].series || [];
+        for (var k = 0; k < series.length; k++) {
+          var serie = (series[k] && series[k].serie) || {};
+          var periodos = Object.keys(serie).sort();
+          if (!periodos.length) continue;
+          var p = periodos[periodos.length - 1];
+          var v = parseFloat(String(serie[p]).replace(',', '.'));
+          if (!isFinite(v) || v < -50 || v > 100) continue;
+          if (chave === IBGE_CAT_ESCOLAS) out.escolas12m = v;
+          else out.inflacao12m = v;
+          var m = mesDoPeriodoIbge(p);
+          if (m > out.referencia) out.referencia = m;
+        }
+      }
+    }
+    if (out.escolas12m === null || out.inflacao12m === null || !out.referencia) return null;
+    return out;
+  }
+
+  /* O par que vale agora: o baixado, se houver, e senão o escrito no código.
+   * Sempre acompanhado de quando ele é, para ela saber a idade do número. */
+  function indicesDeReajuste(db) {
+    var g = db && db.ajustes && db.ajustes.ibge;
+    if (g && typeof g.escolas12m === 'number' && typeof g.inflacao12m === 'number' && g.referencia) {
+      return {
+        escolas12m: g.escolas12m,
+        inflacao12m: g.inflacao12m,
+        referencia: g.referencia,
+        baixadoEm: g.baixadoEm || '',
+        baixado: true
+      };
+    }
+    return {
+      escolas12m: IBGE_ESCRITO.escolas12m,
+      inflacao12m: IBGE_ESCRITO.inflacao12m,
+      referencia: IBGE_ESCRITO.referencia,
+      baixadoEm: '',
+      baixado: false
+    };
+  }
+
+  /* Quanto ela quer subir acima da inflação, em pontos percentuais, somado à
+   * alta das escolas na hora de sugerir. Nasce em zero e é dela. */
+  function margemDeReajuste(db) {
+    var m = db && db.ajustes && db.ajustes.reajusteAcimaDaInflacao;
+    if (typeof m !== 'number' || !isFinite(m)) return 0;
+    if (m < 0) return 0;
+    if (m > 20) return 20;
+    return Math.round(m * 10) / 10;
+  }
+
+  /* Meses inteiros entre duas datas. Devolve null quando falta alguma. */
+  function mesesEntre(deIso, ateIso) {
+    if (!deIso || !ateIso) return null;
+    var a = partesData(deIso), b = partesData(ateIso);
+    if (!isFinite(a.a) || !isFinite(b.a)) return null;
+    var n = (b.a - a.a) * 12 + (b.m - a.m);
+    if (isFinite(a.d) && isFinite(b.d) && b.d < a.d) n -= 1;
+    return n < 0 ? 0 : n;
+  }
+
+  function pctBR(v) {
+    var s = (Math.round(v * 100) / 100).toFixed(2).replace('.', ',');
+    return s.replace(/,00$/, '').replace(/(,\d)0$/, '$1') + '%';
+  }
+
+  /* A sugestão: o valor novo, quanto isso daria no ano e o motivo em português.
+   * Sem preço cadastrado não há o que sugerir, e aí devolve null. */
+  function sugestaoDeReajuste(valorHora, indices, margem, minutosDoMes, mesesNoValor) {
+    if (typeof valorHora !== 'number' || !(valorHora > 0)) return null;
+    var m = margem || 0;
+    var pct = (indices.escolas12m || 0) + m;
+    if (!(pct > 0)) return null;
+    var novo = Math.round(valorHora * (1 + pct / 100) * 100) / 100;
+    var porHora = Math.round((novo - valorHora) * 100) / 100;
+    var horasDoMes = (minutosDoMes || 0) / 60;
+    var noAno = Math.round(porHora * horasDoMes * 12 * 100) / 100;
+
+    var motivo = 'As escolas subiram ' + pctBR(indices.escolas12m) +
+      ' em doze meses, medido pelo IBGE até ' + mesExtenso(indices.referencia).toLowerCase() +
+      '. A inflação geral no mesmo período foi ' + pctBR(indices.inflacao12m) + '.';
+    if (m > 0) motivo += ' Somei os ' + pctBR(m) + ' acima que você escolheu.';
+    if (typeof mesesNoValor === 'number') {
+      if (mesesNoValor <= 0) motivo += ' Este valor começou a valer neste mês.';
+      else if (mesesNoValor === 1) motivo += ' Você está com este valor há um mês.';
+      else motivo += ' Você está com este valor há ' + mesesNoValor + ' meses.';
+    }
+
+    return {
+      percentual: Math.round(pct * 100) / 100,
+      valorAtual: valorHora,
+      valorNovo: novo,
+      porHora: porHora,
+      noAno: noAno,
+      motivo: motivo
+    };
+  }
+
+  /* Desde quando o aluno estuda com ela.
+   *
+   * Três fontes, nesta ordem, e a primeira que existir manda:
+   *   1. o campo "Aluno desde" da ficha, que foi ela quem escreveu;
+   *   2. a data da primeira aula registrada;
+   *   3. o começo da primeira vigência de preço.
+   *
+   * A ordem é o conserto de duas respostas para a mesma pergunta. Antes, isto
+   * pegava a MAIS ANTIGA entre a primeira aula e a primeira vigência, e ignorava
+   * o campo da ficha: com "Aluno desde" preenchido como 01/06/2026 e um preço
+   * valendo desde 01/01/2026, a aba Histórico dizia 01/06/2026 e o painel de
+   * valores dizia 01/01/2026. Ela decide reajuste olhando isso e repete o
+   * número para a família.
+   *
+   * O começo da vigência fica por último porque é data de administração: um
+   * preço pode ter sido cadastrado com data retroativa, ou antes da primeira
+   * aula, sem que o aluno estudasse ali. Só vale quando não há nada melhor. */
+  function desdeQuandoEstuda(db, aluno) {
+    var escrito = String((aluno && aluno.desde) || '').trim();
+    if (escrito) return escrito;
+
+    var primeiraAula = '';
+    ((db && db.aulas) || []).forEach(function (a) {
+      if (!aluno || a.alunoId !== aluno.id || !a.data) return;
+      if (!primeiraAula || a.data < primeiraAula) primeiraAula = a.data;
+    });
+    if (primeiraAula) return primeiraAula;
+
+    var primeiraVigencia = '';
+    ((aluno && aluno.precos) || []).forEach(function (p) {
+      if (!p || !p.inicio) return;
+      if (!primeiraVigencia || p.inicio < primeiraVigencia) primeiraVigencia = p.inicio;
+    });
+    return primeiraVigencia || '';
+  }
+
+  /* A lista inteira: uma linha por aluno com aula ou preço, ordenada por quanto
+   * pesa no mês. Sem alerta e sem cobrança, só o que já está guardado. */
+  function panoramaDeValores(db, mesIso, hojeRef) {
+    var hoje = hojeRef || hojeIso();
+    var indices = indicesDeReajuste(db);
+    var margem = margemDeReajuste(db);
+    var fechs = calcularMesInteiro(db, mesIso, hoje);
+    var porAluno = {};
+    fechs.forEach(function (f) { porAluno[f.aluno.id] = f; });
+
+    var totalDoMes = 0;
+    fechs.forEach(function (f) { totalDoMes += f.totalValor; });
+
+    var linhas = [];
+    (db.alunos || []).forEach(function (aluno) {
+      var f = porAluno[aluno.id] || null;
+      var temPreco = ((aluno.precos || []).length > 0);
+      if (!f && !temPreco) return;
+
+      var pv = precoVigente(aluno, hoje);
+      var valorHora = pv ? pv.valorHora : null;
+      var desde = desdeQuandoEstuda(db, aluno);
+      var valorNoMes = f ? f.totalValor : 0;
+      var minutosNoMes = f ? f.totalMin : 0;
+      var mesesNoValor = pv && pv.inicio ? mesesEntre(pv.inicio, hoje) : null;
+
+      linhas.push({
+        alunoId: aluno.id,
+        nome: aluno.nome,
+        desde: desde,
+        mesesEstudando: desde ? mesesEntre(desde, hoje) : null,
+        valorHora: valorHora,
+        desdeNesseValor: pv ? (pv.inicio || '') : '',
+        mesesNoValor: mesesNoValor,
+        minutosNoMes: minutosNoMes,
+        valorNoMes: valorNoMes,
+        fatiaDoMes: totalDoMes > 0 ? valorNoMes / totalDoMes : 0,
+        sugestao: sugestaoDeReajuste(valorHora, indices, margem, minutosNoMes, mesesNoValor)
+      });
+    });
+
+    linhas.sort(function (a, b) {
+      return b.valorNoMes - a.valorNoMes || a.nome.localeCompare(b.nome);
+    });
+
+    return {
+      mes: mesIso,
+      hoje: hoje,
+      indices: indices,
+      margem: margem,
+      totalDoMes: Math.round(totalDoMes * 100) / 100,
+      linhas: linhas
+    };
   }
 
   // ---------- Markdown ----------
@@ -1201,53 +2067,109 @@
     if (f.responsavel) L.push('**Responsável:** ' + f.responsavel);
     L.push('**Mês:** ' + f.mesExtenso);
     if (f.grade) L.push('**Dias e horário:** ' + f.grade);
-    L.push('');
-    L.push('## Datas trabalhadas');
-    L.push('');
-    L.push('| Data | Dia | Horário | Duração | Situação | Cobrada | R$/h | Valor |');
-    L.push('|---|---|---|---|---|---|---:|---:|');
-    f.linhas.forEach(function (l) {
-      L.push('| ' + ddmm(l.data) +
+    /* O documento que a família recebe nunca conta como dada uma aula que ainda
+     * não aconteceu.
+     *
+     * A aula nasce marcada como realizada, inclusive a que está lá na frente no
+     * calendário. Enquanto este documento somava o mês inteiro, mandá-lo no dia
+     * 3 dizia à família que onze encontros tinham acontecido quando três
+     * tinham. O item 02 desta rodada separou as duas somas no motor; aqui a
+     * tabela se separa junto: em cima o que aconteceu até hoje, embaixo o que
+     * está marcado à frente, com o total do mês fechado por escrito para
+     * ninguém precisar somar.
+     *
+     * Com o mês vencido não há nada à frente, e aí sai exatamente o documento
+     * de sempre, palavra por palavra: é assim que o fechamento fechado não
+     * mudou de forma. */
+    var previstas = (f.linhas || []).filter(function (l) { return l.futura; });
+    var feitas = previstas.length
+      ? f.linhas.filter(function (l) { return !l.futura; })
+      : (f.linhas || []);
+    var ate = previstas.length ? ' até ' + ddmm(f.hoje) : '';
+    var minCobrados = previstas.length ? f.minFeitos : f.totalMin;
+    var horasCobradas = previstas.length ? f.horasFeitas : f.totalHoras;
+    var valorACobrar = previstas.length ? f.valorFeito : f.totalValor;
+    var faixasACobrar = (previstas.length ? f.faixasFeitas : f.faixas) || f.faixas || [];
+    var temasNoTexto = (previstas.length ? f.temasFeitos : f.temasDoMes) || f.temasDoMes || [];
+    var areasNoTexto = (previstas.length ? f.areasFeitas : f.areasDoMes) || f.areasDoMes || [];
+
+    var CABECALHO = ['| Data | Dia | Horário | Duração | Situação | Cobrada | R$/h | Valor |',
+      '|---|---|---|---|---|---|---:|---:|'];
+    function linhaDaTabela(l) {
+      return '| ' + ddmm(l.data) +
         ' | ' + l.dia +
         ' | ' + (l.hora || '') +
         ' | ' + fmtDuracao(l.duracaoMin) +
-        ' | ' + l.statusRotulo +
+        ' | ' + (l.statusNaFolha || l.statusRotulo) +
         ' | ' + (l.cobravel ? 'sim' : 'não') +
         ' | ' + (l.valorHora !== null ? fmtMoeda(l.valorHora) : 'sem preço') +
-        ' | ' + fmtMoeda(l.cobravel ? l.valor : 0) + ' |');
-    });
+        ' | ' + fmtMoeda(l.cobravel ? l.valor : 0) + ' |';
+    }
+
     L.push('');
-    L.push('**Total de horas cobradas:** ' + f.totalHoras + ' h (' + fmtHorasDecimal(f.totalMin) + ' horas)');
+    L.push('## Datas trabalhadas');
+    L.push('');
+    if (feitas.length || !previstas.length) {
+      /* Sem nada marcado à frente, a tabela sai como sempre saiu, inclusive
+       * vazia no mês sem aula nenhuma. */
+      L.push(CABECALHO[0]);
+      L.push(CABECALHO[1]);
+      feitas.forEach(function (l) { L.push(linhaDaTabela(l)); });
+      L.push('');
+    } else {
+      L.push('Nenhuma aula aconteceu até ' + ddmmaaaa(f.hoje) + '.');
+      L.push('');
+    }
+    L.push('**Total de horas cobradas' + ate + ':** ' + horasCobradas + ' h (' + fmtHorasDecimal(minCobrados) + ' horas)');
     if (f.minutosNaoCobrados > 0) {
       L.push('**Horas não cobradas:** ' + fmtHoras(f.minutosNaoCobrados) + ' h');
     }
-    if (f.faixas.length > 1) {
+    if (faixasACobrar.length > 1) {
       L.push('');
       L.push('Composição por valor vigente:');
-      f.faixas.forEach(function (fx) {
+      faixasACobrar.forEach(function (fx) {
         L.push('- ' + fmtHoras(fx.minutos) + ' h a ' + fmtMoeda(fx.valorHora) + '/h: ' + fmtMoeda(fx.valor));
       });
     }
     L.push('');
-    L.push('**Total a cobrar:** ' + fmtMoeda(f.totalValor));
+    L.push('**Total a cobrar' + ate + ':** ' + fmtMoeda(valorACobrar));
     if (f.semPreco.length) {
       L.push('');
       L.push('> Atenção: não há valor por hora vigente para ' + f.semPreco.map(ddmm).join(', ') + '.');
     }
-    if (exibeListas(opcoes) && f.temasDoMes && f.temasDoMes.length) {
+
+    if (previstas.length) {
+      L.push('');
+      L.push('## Ainda marcadas neste mês');
+      L.push('');
+      L.push(CABECALHO[0]);
+      L.push(CABECALHO[1]);
+      previstas.forEach(function (l) { L.push(linhaDaTabela(l)); });
+      L.push('');
+      L.push('**Encontros ainda marcados:** ' + f.qtdEncontrosPrevistos);
+      L.push('**Horas ainda por dar:** ' + f.horasPrevistas + ' h');
+      L.push('**Valor destas datas:** ' + fmtMoeda(f.valorPrevisto));
+      L.push('');
+      L.push('> Estas datas ainda não aconteceram e não entram no total acima. ' +
+        'Se todas acontecerem, o mês fecha em ' + f.qtdEncontros + ' encontro' +
+        (f.qtdEncontros === 1 ? '' : 's') + ', ' + f.totalHoras + ' h e ' +
+        fmtMoeda(f.totalValor) + '.');
+    }
+
+    if (exibeListas(opcoes) && temasNoTexto.length) {
       L.push('');
       L.push('## Temas trabalhados');
       L.push('');
-      f.temasDoMes.forEach(function (t) {
+      temasNoTexto.forEach(function (t) {
         L.push('- ' + t.titulo + ' (' + t.datas.map(ddmm).join(', ') + ')');
       });
     }
 
-    if (exibeListas(opcoes) && f.areasDoMes && f.areasDoMes.length) {
+    if (exibeListas(opcoes) && areasNoTexto.length) {
       L.push('');
       L.push('## Áreas trabalhadas');
       L.push('');
-      f.areasDoMes.forEach(function (a) {
+      areasNoTexto.forEach(function (a) {
         L.push('- ' + a.rotulo + (a.vezes > 1 ? ' (' + a.vezes + ' aulas)' : ''));
       });
     }
@@ -1289,6 +2211,19 @@
     L.push('');
     L.push('Alunos ativos no mês: ' + fechs.length + '.');
     L.push('Média por hora no mês: ' + (totMin > 0 ? fmtMoeda(totVal / (totMin / 60)) : fmtMoeda(0)) + '.');
+    /* Este documento é dela, e a tabela de cima continua sendo o mês inteiro:
+     * é com ela que se planeja o mês. Mas o fechamento de cada aluno, logo
+     * abaixo, passou a cobrar só o que já aconteceu, e uma linha dizendo 11
+     * encontros em cima de um total de 3 encontros embaixo faria ela desconfiar
+     * da conta. Esta linha diz qual é qual, e só aparece com o mês correndo. */
+    var comFuturo = (fechs || []).filter(function (f) {
+      return f && ((f.qtdEncontrosPrevistos || 0) > 0 || (f.minPrevistos || 0) > 0);
+    });
+    if (comFuturo.length && comFuturo[0].hoje) {
+      L.push('');
+      L.push('> A tabela acima é do mês inteiro. O fechamento de cada aluno, abaixo, ' +
+        'traz o total do que já aconteceu até ' + ddmmaaaa(comFuturo[0].hoje) + '.');
+    }
     L.push('');
     fechs.forEach(function (f) {
       L.push('');
@@ -1355,10 +2290,13 @@
   }
 
   /* O ano do aluno, com a mesma precedência que o contextoEscolarDe usa: o
-   * mapeamento mais recente manda, e o cadastro do aluno é o recurso. */
+   * mapeamento mais recente manda, e o cadastro do aluno é o recurso.
+   *
+   * Sai já traduzido para o que o banco de temas entende. Quem quiser o que ela
+   * escolheu de verdade, para mostrar na tela, usa o contextoEscolarDe. */
   function anoEscolarDe(aluno) {
     var m = mapeamentoAtual(aluno);
-    return (m && m.anoEscolar) || (aluno && aluno.anoEscolar) || '';
+    return serieParaTemas((m && m.anoEscolar) || (aluno && aluno.anoEscolar) || '');
   }
 
   function itemDaLacuna(lacunaId) {
@@ -1663,13 +2601,34 @@
     aplicarEdicaoAula: aplicarEdicaoAula, excluirAulas: excluirAulas, achaAula: achaAula,
     repetirParaTras: repetirParaTras, preverRetroativo: preverRetroativo, temConteudo: temConteudo,
     calcularFechamento: calcularFechamento, calcularMesInteiro: calcularMesInteiro,
+    totaisDoMes: totaisDoMes, panoramaDeValores: panoramaDeValores,
+    indicesDeReajuste: indicesDeReajuste, margemDeReajuste: margemDeReajuste,
+    sugestaoDeReajuste: sugestaoDeReajuste, lerIndicesDoIbge: lerIndicesDoIbge,
+    desdeQuandoEstuda: desdeQuandoEstuda, mesesEntre: mesesEntre, pctBR: pctBR,
+    IBGE_URL: IBGE_URL, IBGE_ESCRITO: IBGE_ESCRITO,
     markdownFechamento: markdownFechamento, markdownMesInteiro: markdownMesInteiro,
     AREAS: AREAS, rotuloArea: rotuloArea, temasDaAula: temasDaAula,
+    ultimoEncontro: ultimoEncontro,
     MAPA: MAPA, NIVEIS: NIVEIS, itemDoMapa: itemDoMapa, rotulosDoMapa: rotulosDoMapa,
     rotuloNivel: rotuloNivel, mapeamentoNovo: mapeamentoNovo, mapeamentosDe: mapeamentosDe,
     mapeamentoAtual: mapeamentoAtual, mapeado: mapeado,
+    MATERIAS: MATERIAS, MATERIA_PADRAO: MATERIA_PADRAO, materiaPorId: materiaPorId,
+    rotuloMateria: rotuloMateria, temLacunaDeAnoAnterior: temLacunaDeAnoAnterior,
+    itensDoAluno: itensDoAluno, itensDaMateria: itensDaMateria,
+    gruposDoAluno: gruposDoAluno, gruposDaMateria: gruposDaMateria,
+    marcadosDoAluno: marcadosDoAluno, marcadosDaMateria: marcadosDaMateria,
+    marcarNaMateria: marcarNaMateria, garantirMateria: garantirMateria,
+    cobrancaDaMateria: cobrancaDaMateria, definirCobranca: definirCobranca,
+    materiasDoMapeamento: materiasDoMapeamento,
+    OBJETIVOS: OBJETIVOS, objetivoPorId: objetivoPorId, objetivoDe: objetivoDe,
+    semanasAteAProva: semanasAteAProva,
+    ETAPAS: ETAPAS, FRENTES_ETAPA: FRENTES_ETAPA, etapaPorId: etapaPorId,
+    rotuloEtapa: rotuloEtapa, etapasDe: etapasDe, registrosDaFrente: registrosDaFrente,
+    etapaAtual: etapaAtual, quadroDeEtapas: quadroDeEtapas, registrarEtapa: registrarEtapa,
     lembreteDoMapeamento: lembreteDoMapeamento, textoDoLembrete: textoDoLembrete,
     contextoEscolarDe: contextoEscolarDe, ANOS_ESCOLARES: ANOS_ESCOLARES,
+    ANOS_ESCOLARES_ORDEM: ANOS_ESCOLARES_ORDEM, anoEscolarLivre: anoEscolarLivre,
+    serieParaTemas: serieParaTemas,
     conflitosDe: conflitosDe, minutosDaHora: minutosDaHora,
     dividirAula: dividirAula, desfazerDivisao: desfazerDivisao,
     podeDividir: podeDividir, metadesDe: metadesDe, somarMinutosNaHora: somarMinutosNaHora,

@@ -689,6 +689,204 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   flex-shrink: 0;
 }
 
+/* ---------- o cartão do mês ---------- */
+
+/* Cada frase do feedback dela é um alvo de toque inteiro, e não um rádio com
+   um texto ao lado: ela escolhe com o dedo, de pé, na casa da família. */
+.opcao-frase {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--fio);
+  background: var(--branco);
+  color: var(--texto);
+  border-radius: 10px;
+  padding: 12px 14px;
+  min-height: 48px;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.opcao-frase:hover { border-color: var(--teal); background: var(--teal-claro); }
+.opcao-frase.escolhida {
+  border-color: var(--teal);
+  background: var(--teal-claro);
+  box-shadow: inset 0 0 0 1px var(--teal);
+  font-weight: 600;
+}
+.opcao-frase.sem-frase { color: var(--muted); font-style: italic; }
+
+/* A prévia fica presa no alto da janela enquanto ela rola a lista de frases:
+   com oito frases num tablet, a imagem caía abaixo da dobra e ela mandaria sem
+   ter visto o cartão. O fundo é opaco de propósito, para as frases passarem por
+   baixo em vez de aparecerem através dela. */
+.previa-presa {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--branco);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--fio);
+}
+
+/* O canvas tem 1080 por 1080 de verdade; aqui é só o tamanho na tela.
+
+   Ele saía com 300 por 300 nas duas orientações, e o documento promete que ela
+   vê exatamente a imagem que a família recebe: a 300 a frase do feedback dela
+   fica ilegível e não dá para conferir nada antes de enviar. O tamanho agora
+   acompanha a altura da tela, porque a prévia fica presa no alto enquanto ela
+   rola a lista de frases: deitado, 48vh de 800 dá 384; em pé, o teto de 460
+   impede que a imagem coma a tela inteira e empurre as frases para fora. */
+.previa-cartao {
+  display: block;
+  width: clamp(300px, 48vh, 460px);
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border: 1px solid var(--fio);
+  border-radius: 12px;
+  background: var(--ivory);
+}
+
+/* ---------- o mês numa tela ---------- */
+
+.bloco-mes {
+  border: 1px solid var(--fio);
+  border-radius: 12px;
+  background: var(--branco);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+/* A aula que ainda não chegou não pode ser desenhada igual à que já aconteceu.
+   No modo da família ela saía com a mesma borda e a mesma letra das outras, sem
+   marca nenhuma: quem lê do outro lado da mesa via o mês inteiro como entregue.
+   O tracejado e a letra mais clara dizem, sem palavra nenhuma, que aquele dia
+   ainda está por vir; o rótulo "ainda vai acontecer" diz com palavra. */
+.bloco-mes.futura {
+  border-style: dashed;
+  background: var(--soft);
+}
+.bloco-mes.futura .data-dia { color: var(--muted); }
+
+.bloco-mes .cabeca-dia { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.bloco-mes .data-dia { font-size: 16px; font-weight: 700; color: var(--navy); }
+.bloco-mes .detalhe-dia { font-size: 13px; color: var(--muted); }
+.bloco-mes .valor-dia { margin-left: auto; font-weight: 700; color: var(--navy); }
+.tags-assunto { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+
+/* O assunto não usa a etiqueta .tag de propósito: aquela é maiúscula de 11 px,
+   que serve para rótulo curto e ilegível de perto. Aqui o texto é conteúdo, e é
+   a coisa que a família mais lê nesta tela. */
+.assunto-mes {
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+  background: var(--teal-claro);
+  border-radius: 999px;
+  padding: 4px 12px;
+  line-height: 1.35;
+}
+.assunto-mes.area { background: #FBF3E3; color: #8A6D2F; }
+.texto-rendeu { margin-top: 8px; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
+
+/* O bloco cinza com a barra é a anotação particular dela. Só existe no modo
+   dela: no modo da família ele nem chega a ser criado. */
+.so-minha {
+  margin-top: 8px;
+  background: var(--soft);
+  border-left: 4px solid var(--muted);
+  border-radius: 8px;
+  padding: 8px 11px;
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+.so-minha .rotulo-so-minha {
+  display: block;
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+
+.selo-familia {
+  margin-left: auto;
+  background: var(--teal-claro);
+  color: var(--teal);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+
+/* O passo do meio: entre "mostrar" e mostrar de verdade existe uma leitura. */
+.confirma-familia {
+  flex: 1 0 100%;
+  background: var(--branco);
+  border: 1px solid var(--fio);
+  border-left: 4px solid var(--teal);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 4px;
+}
+.confirma-familia strong { display: block; color: var(--navy); margin-bottom: 3px; }
+.confirma-familia span { font-size: 13px; color: var(--muted); line-height: 1.45; }
+
+/* Sair do modo da família é segurar, não tocar: um toque perdido no meio de uma
+   conversa não pode devolver a tela com os valores. A barra enche enquanto ela
+   segura, para o gesto não ser adivinhação. */
+.btn.segurar {
+  position: relative;
+  overflow: hidden;
+  min-height: 52px;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+.btn.segurar .enchendo {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 0;
+  background: rgba(46, 125, 107, .22);
+  pointer-events: none;
+}
+.btn.segurar.segurando .enchendo { width: 100%; transition: width 1.2s linear; }
+.btn.segurar .rotulo-segurar { position: relative; }
+.dica-segurar { font-size: 13px; color: var(--muted); flex: 1 0 100%; margin-top: 6px; }
+
+/* ---------- o modo da família ---------- */
+
+/* Tudo o que não é esta tela sai do ar enquanto o tablet está na mão da
+   família: o cabeçalho, as quatro abas, o fechamento com todos os alunos, o
+   aviso flutuante e qualquer outra janela aberta. Não é só uma questão de
+   parecer limpo: é o que garante que nenhum valor e nenhum outro nome de aluno
+   exista no texto da tela, nem atrás, nem por baixo de uma rolagem. */
+body.modo-familia > .cabecalho,
+body.modo-familia > .conteudo,
+body.modo-familia > .aviso,
+body.modo-familia > .fundo-modal:not(#modal-mes) { display: none !important; }
+
+body.modo-familia #modal-mes { padding: 0; background: var(--ivory); }
+body.modo-familia #modal-mes .modal {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+}
+body.modo-familia #fechar-modal-mes { display: none; }
+body.modo-familia .bloco-mes { padding: 15px 17px; }
+body.modo-familia .bloco-mes .data-dia { font-size: 19px; }
+body.modo-familia .texto-rendeu { font-size: 16px; }
+body.modo-familia .assunto-mes { font-size: 16px; padding: 6px 14px; }
+body.modo-familia .modal-cabecalho h3 { font-size: 20px; }
+
 /* ---------- telas estreitas ---------- */
 
 @media (max-width: 720px) {

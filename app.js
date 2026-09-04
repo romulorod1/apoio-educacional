@@ -4,13 +4,17 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.12.0';
+  var VERSAO = '1.13.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
   var editorAtual = null;
   var aulaEmEdicao = null;
   var alunoEmEdicao = null;
+  /* Redesenha o resumo de etapas do alto da aba Dados. Quem marca a etapa é o
+   * quadro da aba Mapeamento, e ele avisa aqui para as duas abas nunca
+   * mostrarem etapas diferentes do mesmo aluno. */
+  var resumoEtapas = null;
   var midiasCarregadas = {};
   var tempoAviso = null;
 
@@ -18,6 +22,46 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.13.0',
+      itens: [
+        'O dinheiro do mês passou a mostrar o que já aconteceu. Antes, no dia primeiro, a ' +
+          'tela já somava o mês inteiro como se todas as aulas tivessem sido dadas. Agora o ' +
+          'número grande é o que foi feito até hoje, e o que está marcado à frente aparece ' +
+          'embaixo, menor. Você não precisa confirmar aula por aula: o aplicativo olha a data ' +
+          'sozinho.',
+        'O cartão do mês. No fechamento, um botão novo transforma o mesmo mês numa imagem ' +
+          'quadrada, que aparece dentro da conversa do WhatsApp em vez de virar um arquivo para ' +
+          'baixar. Você escolhe a frase, que sai do feedback que já escreveu, e vê exatamente a ' +
+          'imagem antes de mandar. Não vai valor nenhum no cartão.',
+        'A tela para abrir na frente da família. O mês inteiro de um aluno numa tela só, em ' +
+          'dois modos: um com tudo, para você escrever o fechamento sem abrir aula por aula, e ' +
+          'outro sem valores, sem as suas anotações e sem nenhum outro aluno, para virar o ' +
+          'tablet e mostrar.',
+        'A janela da aula mudou de ordem. A primeira coisa que você vê é o que aconteceu no ' +
+          'último encontro com aquele aluno, para não precisar procurar no calendário. E a ' +
+          'anotação virou duas: o que rendeu hoje, que entra no fechamento, e só minha, que não ' +
+          'sai em lugar nenhum. O que você já tinha escrito continua sendo a primeira.',
+        'O mapeamento agora sabe que nem toda matéria é matemática. A parte que é sobre o ' +
+          'aluno, como a rotina de estudo e o jeito de aprender, você responde uma vez só. A ' +
+          'parte que é sobre a matéria se repete por matéria. E a lista de lacunas de anos ' +
+          'anteriores só aparece em matemática, que é onde ela é verdade.',
+        'Em que etapa o aluno está. As quatro que você já usa, apoio total, apoio parcial, ' +
+          'supervisão e autonomia, marcadas em três frentes: conteúdo, autonomia e confiança, ' +
+          'cada uma com a data em que mudou. Ela fica parada na ficha, não pergunta nada em ' +
+          'aula nenhuma, e você toca em mudou de etapa quando perceber.',
+        'Para onde o aluno está indo. Um bloco de objetivo no mapeamento, com a data da prova ' +
+          'quando houver, e a aula passa a mostrar quantas semanas faltam. O ano escolar também ' +
+          'deixou de ser uma lista fechada: agora aceita cursinho e aluno fora da escola.',
+        'Cada aluno, desde quando e por quanto. Uma lista só sua, com desde quando cada um ' +
+          'estuda com você, quanto paga, há quanto tempo está nesse valor e quanto representa ' +
+          'do seu mês, com uma sugestão de reajuste ao lado. O número é sugestão e o campo é ' +
+          'seu.',
+        'O que você deu e não cobrou. Duas linhas discretas somando as horas que você deu de ' +
+          'graça no mês e as que ficaram reservadas e foram desmarcadas. É número para você, e ' +
+          'não vai para a família.'
+      ]
+    },
     {
       versao: '1.12.0',
       itens: [
@@ -391,6 +435,10 @@
      * ficha continuaria mostrando a lacuna que ela acabou de cancelar. Quem
      * salva de verdade limpa a marca antes de fechar, e aí não há o que voltar. */
     if (id === 'modal-mapeamento') descartarMapeamentoEmEdicao();
+    /* A tela do mês fechando por qualquer caminho, inclusive o fecharTudo() do
+     * desfazer, tem que devolver o aplicativo inteiro: sem isto o corpo ficaria
+     * com a marca do modo da família e a agenda continuaria escondida. */
+    if (id === 'modal-mes') encerrarMesNumaTela();
     if (!$$('.fundo-modal.aberto').length) degrauModal = 50;
   }
 
@@ -788,6 +836,13 @@
          * cópia, o estado da versão e as buscas que não acharam nada. Sem
          * redesenhar ao abrir, ela via o estado de quando o aplicativo subiu. */
         if (b.dataset.tela === 'ajustes') desenharAjustes();
+        /* Os números do IBGE se atualizam sozinhos quando ela abre uma tela que
+         * os usa, e nunca na abertura do aplicativo: a hora em que ela abre o
+         * aplicativo, na casa de uma família, é a pior hora para disputar a
+         * rede. A busca é um extra e não segura tela nenhuma. */
+        if (b.dataset.tela === 'fechamento' || b.dataset.tela === 'ajustes') {
+          setTimeout(talvezAtualizarIndices, 900);
+        }
       });
     });
 
@@ -795,6 +850,7 @@
       b.addEventListener('click', function () {
         var m = b.closest('.fundo-modal');
         if (m) {
+          if (presaNoModoFamilia(m.id)) return;
           if (m.id === 'modal-nota') fecharEditorNota();
           else fecharModal(m.id);
         }
@@ -804,6 +860,7 @@
     $$('.fundo-modal').forEach(function (m) {
       m.addEventListener('click', function (e) {
         if (e.target !== m) return;
+        if (presaNoModoFamilia(m.id)) return;
         if (m.id === 'modal-nota') fecharEditorNota();
         else fecharModal(m.id);
       });
@@ -835,6 +892,7 @@
     $('#apagar-exemplo').addEventListener('click', apagarExemplo);
     $('#apagar-tudo').addEventListener('click', apagarTudo);
     $('#salvar-resumo').addEventListener('click', salvarResumo);
+    $('#enviar-cartao').addEventListener('click', enviarCartaoDoMes);
 
     $('#alternar-valores').addEventListener('click', alternarValores);
     $('#versao-app').textContent = VERSAO;
@@ -861,34 +919,82 @@
     return db.alunos.filter(function (a) { return a.id === id; })[0] || null;
   }
 
+  /* Um número da faixa de cima, com linhas menores embaixo quando há o que
+   * dizer.
+   *
+   * O número grande é o que JÁ ACONTECEU. O previsto fica embaixo, menor.
+   * Antes disso, no dia primeiro do mês a tela mostrava o valor do mês inteiro
+   * como se todas as aulas já tivessem sido dadas, porque a aula nasce marcada
+   * como realizada mesmo quando está lá na frente no calendário. Ela lia aquilo
+   * como dinheiro que já existe. Agora quem separa é a data, sozinha: ela não
+   * confirma aula nenhuma.
+   *
+   * O rodapé não leva a classe valor de propósito: quem lê a tela por fora
+   * procura o número principal por essa classe. */
+  function numeroComRodape(rotulo, valor, rodapes) {
+    var filhos = [
+      el('div', { class: 'rotulo', texto: rotulo }),
+      el('div', { class: 'valor', texto: valor })
+    ];
+    (rodapes || []).forEach(function (t) {
+      if (!t) return;
+      filhos.push(el('div', {
+        style: 'font-size:12px;color:var(--muted);margin-top:3px;line-height:1.35',
+        texto: t
+      }));
+    });
+    return el('div', { class: 'numero' }, filhos);
+  }
+
+  function plural(n, um, muitos) { return n === 1 ? um : muitos; }
+
   function desenharAgenda() {
     $('#rotulo-mes').textContent = Core.mesExtenso(mesAtual);
 
+    var hoje = Core.hojeIso();
     var doMes = db.aulas.filter(function (a) { return Core.mesDe(a.data) === mesAtual; });
     var minutos = 0, valor = 0;
+    var minFeitos = 0, valorFeito = 0, minPrevistos = 0, valorPrevisto = 0;
+    var encontrosFeitos = 0, encontrosPrevistos = 0;
     doMes.forEach(function (a) {
+      /* A aula de hoje conta como dada: só o que vem depois de hoje é previsto. */
+      var futura = a.data > hoje;
+      if (futura) encontrosPrevistos++; else encontrosFeitos++;
       var st = Core.STATUS[a.status] || Core.STATUS.realizada;
       var cobravel = (typeof a.cobravel === 'boolean') ? a.cobravel : st.cobravelPadrao;
       if (!cobravel) return;
-      minutos += a.duracaoMin || 0;
+      var dur = a.duracaoMin || 0;
       var aluno = alunoPorId(a.alunoId);
       var pv = aluno ? Core.precoVigente(aluno, a.data) : null;
-      if (pv) valor += (a.duracaoMin / 60) * pv.valorHora;
+      var v = pv ? (dur / 60) * pv.valorHora : 0;
+      minutos += dur;
+      valor += v;
+      if (futura) minPrevistos += dur;
+      else { minFeitos += dur; valorFeito += v; }
     });
+    /* O previsto sai por diferença para que os dois números da caixa somem
+     * sempre o total do mês na tela, mesmo quando a hora não divide redondo. */
+    valor = Math.round(valor * 100) / 100;
+    valorFeito = Math.round(valorFeito * 100) / 100;
+    valorPrevisto = Math.round((valor - valorFeito) * 100) / 100;
+
     var alunosNoMes = {};
     doMes.forEach(function (a) { alunosNoMes[a.alunoId] = true; });
 
     var numeros = $('#numeros-mes');
     numeros.innerHTML = '';
-    [['Encontros', String(doMes.length)],
-    ['Horas cobradas', Core.fmtHoras(minutos) + ' h'],
-    ['A receber', dinheiro(valor)],
-    ['Alunos', String(Object.keys(alunosNoMes).length)]].forEach(function (par) {
-      numeros.appendChild(el('div', { class: 'numero' }, [
-        el('div', { class: 'rotulo', texto: par[0] }),
-        el('div', { class: 'valor', texto: par[1] })
-      ]));
-    });
+    numeros.appendChild(numeroComRodape('Encontros', String(encontrosFeitos), [
+      encontrosPrevistos ? 'mais ' + encontrosPrevistos + ' ' +
+        plural(encontrosPrevistos, 'marcado à frente', 'marcados à frente') : ''
+    ]));
+    numeros.appendChild(numeroComRodape('Horas cobradas', Core.fmtHoras(minFeitos) + ' h', [
+      minPrevistos ? 'mais ' + Core.fmtHoras(minPrevistos) + ' h à frente' : ''
+    ]));
+    numeros.appendChild(numeroComRodape('A receber', dinheiro(valorFeito), [
+      valorPrevisto ? 'previsto à frente: ' + dinheiro(valorPrevisto) : '',
+      valorPrevisto ? 'mês inteiro: ' + dinheiro(valor) : ''
+    ]));
+    numeros.appendChild(numeroComRodape('Alunos', String(Object.keys(alunosNoMes).length), []));
 
     var lembrete = $('#lembrete-copia');
     lembrete.innerHTML = '';
@@ -993,16 +1099,23 @@
     var corpo = $('#corpo-modal-aula');
     corpo.innerHTML = '';
 
-    /* O próximo passo da trilha é a PRIMEIRA coisa da janela da aula.
+    /* Onde os dois pararam vem antes de tudo.
      *
-     * Ele nascia dentro do bloco de assunto, depois do aluno, da data, do
-     * horário, da duração, da situação, do cobrar, do valor previsto e do
-     * lembrete do mapeamento: em paisagem (1280 por 800) o botão nascia abaixo
-     * da dobra e ela precisava rolar para ver o caminho de um toque que a
-     * trilha inteira promete. Aqui em cima ele aparece inteiro nas duas
-     * orientações, e os campos da aula continuam logo abaixo, na ordem de
-     * sempre. Quem o preenche é o desenharAssuntos, que sabe quando redesenhar. */
-    if (!novo) corpo.appendChild(el('div', { id: 'cartao-trilha' }));
+     * Para lembrar do último encontro ela precisava fechar esta janela, achar a
+     * aula anterior no calendário e abrir. Agora o assunto, as áreas, o que
+     * rendeu e o que ela anotou só para ela abrem a janela, num bloco de altura
+     * fixa e curta, que não empurra nada para fora da tela.
+     *
+     * Ele fica ACIMA do cartão da trilha de propósito: memória primeiro, ação
+     * logo em seguida. O que a rodada da trilha exigia continua valendo, e é o
+     * que os prints das duas orientações conferem: o cartão da trilha aparece
+     * inteiro sem rolagem, e não depois de oito campos da aula. */
+    if (!novo) {
+      desenharUltimoEncontro(corpo, aulaEmEdicao);
+      /* O próximo passo da trilha. Quem o preenche é o desenharAssuntos, que
+       * sabe quando redesenhar. */
+      corpo.appendChild(el('div', { id: 'cartao-trilha' }));
+    }
 
     if (serie) {
       corpo.appendChild(el('div', { class: 'faixa-info' }, [
@@ -1014,19 +1127,29 @@
       ]));
     }
 
+    /* Quando a aula é, quanto dura, como terminou e se é cobrada.
+     *
+     * Numa aula que já existe isto tudo já está preenchido e quase nunca muda:
+     * é o bloco que ela olha e passa. Fica num contêiner só porque, com a aula
+     * aberta, ele é MOVIDO para depois dos dois campos de anotação. Ver o
+     * comentário do move, mais abaixo. Numa aula nova ele continua no alto,
+     * onde tem que estar: aula nova é exatamente escolher dia e horário. */
+    var blocoQuando = el('div', { id: 'bloco-quando' });
+    corpo.appendChild(blocoQuando);
+
     var selAluno = el('select', { id: 'campo-aluno' });
     db.alunos.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome); }).forEach(function (a) {
       var o = el('option', { value: a.id, texto: a.nome });
       if (aulaEmEdicao ? a.id === aulaEmEdicao.alunoId : false) o.selected = true;
       selAluno.appendChild(o);
     });
-    corpo.appendChild(el('label', { class: 'campo' }, [el('span', { texto: 'Aluno' }), selAluno]));
+    blocoQuando.appendChild(el('label', { class: 'campo' }, [el('span', { texto: 'Aluno' }), selAluno]));
     if (!novo) selAluno.disabled = true;
 
     var dataVal = aulaEmEdicao ? aulaEmEdicao.data : (dataSugerida || Core.hojeIso());
     var horaVal = aulaEmEdicao ? (aulaEmEdicao.hora || '') : '15:30';
 
-    corpo.appendChild(el('div', { class: 'linha' }, [
+    blocoQuando.appendChild(el('div', { class: 'linha' }, [
       el('label', { class: 'campo' }, [
         el('span', { texto: 'Data' }),
         el('input', { type: 'date', id: 'campo-data', value: dataVal })
@@ -1054,7 +1177,7 @@
       selStatus.appendChild(o);
     });
 
-    corpo.appendChild(el('div', { class: 'linha' }, [
+    blocoQuando.appendChild(el('div', { class: 'linha' }, [
       el('label', { class: 'campo' }, [el('span', { texto: 'Duração' }), selDur]),
       el('label', { class: 'campo' }, [el('span', { texto: 'Situação' }), selStatus])
     ]));
@@ -1064,7 +1187,7 @@
       ? aulaEmEdicao.cobravel : stAtual.cobravelPadrao;
     var chkCobrar = el('input', { type: 'checkbox', id: 'campo-cobrar', style: 'width:auto;min-height:auto' });
     chkCobrar.checked = cobravelVal;
-    corpo.appendChild(el('label', { class: 'campo', style: 'display:flex;align-items:center;gap:10px' }, [
+    blocoQuando.appendChild(el('label', { class: 'campo', style: 'display:flex;align-items:center;gap:10px' }, [
       chkCobrar, el('span', { texto: 'Cobrar esta aula', style: 'margin:0' })
     ]));
     selStatus.addEventListener('change', function () {
@@ -1073,13 +1196,13 @@
 
     // lembrete de feriado, sem impedir a marcação
     var avisoFeriado = el('div', { id: 'aviso-feriado' });
-    corpo.appendChild(avisoFeriado);
+    blocoQuando.appendChild(avisoFeriado);
 
     /* Choque de horário. Duas aulas ao mesmo tempo quase sempre são lançamento
        repetido, ou a aula desmarcada que ficou para trás. O aviso aparece, mas
        nada é bloqueado: irmãos na mesma sala existem. */
     var avisoChoque = el('div', { id: 'aviso-choque' });
-    corpo.appendChild(avisoChoque);
+    blocoQuando.appendChild(avisoChoque);
     function atualizarChoque() {
       avisoChoque.innerHTML = '';
       var provisoria = {
@@ -1114,7 +1237,7 @@
 
     // valor previsto
     var previsao = el('div', { class: 'ajuda', id: 'previsao-valor' });
-    corpo.appendChild(previsao);
+    blocoQuando.appendChild(previsao);
     function atualizarPrevisao() {
       atualizarFeriado();
       atualizarChoque();
@@ -1204,14 +1327,58 @@
 
       desenharAssuntos(corpo, aulaEmEdicao, alunoDaAula);
 
+      /* A anotação virou duas.
+       *
+       * Existia uma só, e o que ela escrevesse ali podia acabar saindo no
+       * arquivo que a família recebe: o fechamento com notas leva o notaTexto
+       * inteiro. Então ela escrevia pensando em quem lê, e o que era só dela
+       * não tinha onde morar.
+       *
+       * O campo de sempre continua sendo o de sempre, com o mesmo texto dentro
+       * e o mesmo destino: é ele que vai para o fechamento. O que muda é o nome,
+       * que agora diz para onde vai. O campo novo nasce vazio e não sai em lugar
+       * nenhum: nem no Markdown, nem no PDF, nem no documento do mês. */
       var areaNota = el('textarea', {
         id: 'campo-nota-texto',
         placeholder: 'O que foi trabalhado nesta aula. Este texto entra no fechamento quando você pedir.'
       });
       areaNota.value = aulaEmEdicao.notaTexto || '';
       corpo.appendChild(el('label', { class: 'campo' }, [
-        el('span', { texto: 'Anotação digitada' }), areaNota
+        el('span', { texto: 'O que rendeu hoje' }), areaNota
       ]));
+      corpo.appendChild(el('div', {
+        class: 'ajuda', style: 'margin-top:-6px',
+        texto: 'Este é o texto que pode sair no arquivo que a família recebe.'
+      }));
+
+      var areaPrivada = el('textarea', {
+        id: 'campo-nota-privada', style: 'min-height:64px',
+        placeholder: 'O que você não diria à família. Fica só aqui.'
+      });
+      areaPrivada.value = aulaEmEdicao.notaPrivada || '';
+      corpo.appendChild(el('label', { class: 'campo' }, [
+        el('span', { texto: 'Só minha' }), areaPrivada
+      ]));
+      corpo.appendChild(el('div', {
+        class: 'ajuda', style: 'margin-top:-6px',
+        texto: 'Não entra no fechamento, no PDF nem em nenhum documento que sai daqui. ' +
+          'Aparece para você no alto da próxima aula deste aluno.'
+      }));
+
+      /* Aqui o bloco de data, horário, duração e situação desce.
+       *
+       * Ele estava acima do conteúdo, e com isso o que ela abre a aula para
+       * escrever caía abaixo da dobra em paisagem: medindo em 1280 por 800, o
+       * título "Conteúdo da aula" ficava em 552 e o campo "O que rendeu hoje"
+       * em 752, num corpo de 600. Ela precisava rolar para achar o campo em que
+       * escreve toda aula, e não precisava rolar nenhum pixel para achar a data,
+       * que já está certa e ela não vai mexer.
+       *
+       * appendChild MOVE o bloco, que já está no documento desde o começo desta
+       * função: os campos precisam existir antes, porque os avisos de feriado e
+       * de choque de horário e a previsão de valor são ligados por $('#campo-...')
+       * logo depois de criados. */
+      corpo.appendChild(blocoQuando);
 
       var linhaFolha = el('div', { id: 'linha-folha', class: 'barra', style: 'margin-bottom:6px' });
       linhaFolha.appendChild(el('button', {
@@ -1918,7 +2085,7 @@
       var nova = {
         id: Core.uid(), alunoId: alunoId, serieId: null, destacada: false,
         data: data, hora: hora, duracaoMin: duracao, status: status, cobravel: cobrar,
-        notaTexto: '', temNota: false, anexos: []
+        notaTexto: '', notaPrivada: '', temNota: false, anexos: []
       };
       db.aulas.push(nova);
       salvar().then(function () {
@@ -1935,7 +2102,9 @@
     // edição
     var mudancas = {
       data: data, hora: hora, duracaoMin: duracao, status: status, cobravel: cobrar,
-      notaTexto: $('#campo-nota-texto') ? $('#campo-nota-texto').value : aulaEmEdicao.notaTexto
+      notaTexto: $('#campo-nota-texto') ? $('#campo-nota-texto').value : aulaEmEdicao.notaTexto,
+      notaPrivada: $('#campo-nota-privada')
+        ? $('#campo-nota-privada').value : aulaEmEdicao.notaPrivada
     };
     var mudouPadrao = (aulaEmEdicao.hora !== hora) || (aulaEmEdicao.duracaoMin !== duracao) ||
       (aulaEmEdicao.status !== status) || (aulaEmEdicao.cobravel !== cobrar);
@@ -2212,6 +2381,7 @@
       mapeamento: el('div'), historico: el('div')
     };
     var abas = el('div', { class: 'abas-perfil' });
+    var botaoDaAba = {};
     var lista = [['dados', 'Dados'], ['valores', 'Valores']];
     if (!novo) lista.push(['mapeamento', 'Mapeamento'], ['historico', 'Histórico']);
 
@@ -2219,6 +2389,7 @@
       var b = el('button', {
         type: 'button', class: 'aba-perfil' + (i === 0 ? ' ativa' : ''), texto: par[1]
       });
+      botaoDaAba[par[0]] = b;
       b.addEventListener('click', function () {
         abas.querySelectorAll('.aba-perfil').forEach(function (x) { x.classList.remove('ativa'); });
         b.classList.add('ativa');
@@ -2233,6 +2404,19 @@
     Object.keys(painel).forEach(function (k) { corpo.appendChild(painel[k]); });
 
     // ---------------- aba: dados ----------------
+
+    /* A etapa também aqui, no alto da primeira aba.
+     *
+     * Ela mora na aba Mapeamento, e a ficha abre na aba Dados: para ver em que
+     * etapa o aluno está era preciso saber que existe uma terceira aba e tocar
+     * nela. O valor do item inteiro é o quadro ficar parado à vista, e ele
+     * estava atrás de um toque que ninguém dá sem já saber o que vai achar.
+     *
+     * Aqui é só leitura, em três linhas. Quem muda continua sendo o quadro da
+     * aba Mapeamento, um lugar só, e o botão leva direto para lá. */
+    resumoEtapas = novo ? null : desenharResumoDeEtapas(painel.dados, alunoEmEdicao, function () {
+      if (botaoDaAba.mapeamento) botaoDaAba.mapeamento.click();
+    });
 
     painel.dados.appendChild(el('label', { class: 'campo' }, [
       el('span', { texto: 'Nome do aluno' }),
@@ -2488,6 +2672,10 @@
     caixa.innerHTML = '';
     var m = Core.mapeamentoAtual(aluno);
 
+    /* A etapa entra em cima, e vale mapeado ou não: ela é sobre o aluno ter
+     * andado, e isso independe de existir ficha de mapeamento. */
+    desenharEtapas(caixa, aluno);
+
     if (!m) {
       caixa.appendChild(el('div', { class: 'vazio' }, [
         el('p', { texto: aluno.nome + ' ainda não foi mapeado.' }),
@@ -2538,12 +2726,25 @@
     var contexto = [];
     if (m.escola) contexto.push(m.escola);
     if (m.anoEscolar) {
-      var nome = SERIES_NOMES.filter(function (p) { return p[0] === m.anoEscolar; })[0];
-      if (nome) contexto.push(nome[1]);
+      var nome = Core.anoEscolarLivre(m.anoEscolar)
+        ? (m.anoEscolarOutro || '').trim()
+        : Core.ANOS_ESCOLARES[m.anoEscolar];
+      if (nome) contexto.push(nome);
     }
     if (m.motivo) contexto.push(m.motivo);
     if (contexto.length) {
       caixa.appendChild(el('div', { class: 'ajuda', style: 'margin-top:0', texto: contexto.join(' · ') }));
+    }
+
+    /* Para onde ele está indo, com o prazo em semanas quando há data de prova. */
+    var objetivo = Core.objetivoDe(aluno);
+    if (objetivo) {
+      var prazo = Core.semanasAteAProva(objetivo.dataProva);
+      caixa.appendChild(el('div', { class: 'faixa-info', id: 'objetivo-do-aluno' }, [
+        el('strong', { texto: 'Objetivo: ' }),
+        document.createTextNode(objetivo.rotulo +
+          (prazo ? '. Prova em ' + Core.ddmmaaaa(prazo.data) + ', ' + prazo.texto : '') + '.')
+      ]));
     }
 
     /* As trilhas vêm ANTES do resto do mapeamento. Elas eram a última coisa da
@@ -2553,16 +2754,40 @@
      * fazer aqui. */
     desenharPainelTrilhas(caixa, aluno);
 
-    Core.MAPA.forEach(function (g) {
-      var rot = Core.rotulosDoMapa(g.chave, m.marcados && m.marcados[g.chave]);
-      if (!rot.length) return;
-      caixa.appendChild(el('div', { class: 'bloco-exercicios', texto: g.titulo }));
+    /* Consulta: primeiro cada matéria que ela preencheu, depois o aluno, que
+     * vale para todas. É a mesma divisão da tela de preencher. */
+    function listar(titulo, rotulos) {
+      if (!rotulos.length) return;
+      caixa.appendChild(el('div', { class: 'bloco-exercicios', texto: titulo }));
       var grade = el('div', { class: 'grade-areas' });
-      rot.forEach(function (r) {
+      rotulos.forEach(function (r) {
         grade.appendChild(el('div', { class: 'item-area', style: 'cursor:default' },
           [el('span', { texto: r })]));
       });
       caixa.appendChild(grade);
+    }
+
+    Core.materiasDoMapeamento(m).forEach(function (materiaId) {
+      var marc = Core.marcadosDaMateria(m, materiaId);
+      var nomeMateria = Core.rotuloMateria(m, materiaId);
+      Core.MAPA.forEach(function (g) {
+        listar(nomeMateria + ': ' + g.titulo.toLowerCase(),
+          Core.rotulosDoMapa(g.chave, marc[g.chave]));
+      });
+      var cobranca = Core.cobrancaDaMateria(m, materiaId);
+      if (cobranca) {
+        caixa.appendChild(el('div', {
+          class: 'bloco-exercicios', texto: nomeMateria + ': o que o colégio cobra no bimestre'
+        }));
+        caixa.appendChild(el('div', {
+          style: 'font-size:14px;line-height:1.55;white-space:pre-wrap', texto: cobranca
+        }));
+      }
+    });
+
+    var doAluno = Core.marcadosDoAluno(m);
+    Core.MAPA.forEach(function (g) {
+      listar('O aluno: ' + g.titulo.toLowerCase(), Core.rotulosDoMapa(g.chave, doAluno[g.chave]));
     });
 
     [['prioridades', 'Prioridades'], ['plano', 'Diagnóstico e plano'],
@@ -2592,7 +2817,9 @@
       grupos: Core.MAPA,
       rotulos: Core.rotulosDoMapa,
       nivel: Core.rotuloNivel(m.nivel),
-      anoEscolar: (SERIES_NOMES.filter(function (p) { return p[0] === m.anoEscolar; })[0] || ['', ''])[1]
+      anoEscolar: Core.anoEscolarLivre(m.anoEscolar)
+        ? (m.anoEscolarOutro || '').trim()
+        : (Core.ANOS_ESCOLARES[m.anoEscolar] || '')
     });
     var nome = 'Mapeamento_' + Core.nomeArquivo(aluno.nome) + '_' + m.data + '.pdf';
     var blob = new Blob([bytes], { type: 'application/pdf' });
@@ -3186,6 +3413,10 @@
     Core.MAPA.forEach(function (g) {
       trabalho.marcados[g.chave] = (trabalho.marcados[g.chave] || []).slice();
     });
+    /* As matérias que não são matemática moram aqui, e o campo nasce ausente em
+     * todo mapeamento que já existe: por isso ele é criado na entrada, e não
+     * exigido de quem gravou antes. */
+    trabalho.porMateria = trabalho.porMateria || {};
 
     $('#titulo-modal-mapeamento').textContent = 'Mapeamento de ' + aluno.nome;
     var corpo = $('#corpo-modal-mapeamento');
@@ -3222,21 +3453,45 @@
       return el('label', { class: 'campo', 'data-campo': chave }, [el('span', { texto: rotulo }), e]);
     }
 
+    /* O ano escolar deixou de ser uma lista fechada.
+     *
+     * A lista ia do 2º ano ao 3º do médio e acabava: não havia como registrar
+     * aluno em cursinho, aluno que saiu da escola ou aluno em sistema de fora, e
+     * ela era obrigada a escolher um ano que não era verdade ou a deixar em
+     * branco. Agora os três casos entram na lista, e "Outro" abre um campo em
+     * branco logo abaixo. O banco de temas continua entendendo só as séries: o
+     * cursinho lê como 3º ano do médio, e os outros dois não viram série
+     * nenhuma, o que faz a trilha propor o começo mais baixo. */
+    var campoAnoLivre = el('input', {
+      type: 'text', id: 'mapa-ano-outro',
+      placeholder: 'Escreva qual, por exemplo: 1º período de engenharia'
+    });
+    campoAnoLivre.value = trabalho.anoEscolarOutro || aluno.anoEscolarOutro || '';
+    campoAnoLivre.addEventListener('input', function () { trabalho.anoEscolarOutro = this.value; });
+    var caixaAnoLivre = el('label', {
+      class: 'campo', id: 'caixa-ano-outro', style: 'display:none'
+    }, [el('span', { texto: 'Qual' }), campoAnoLivre]);
+
     corpo.appendChild(el('div', { class: 'linha' }, [
       campoTexto('escola', 'Colégio', 'Onde ele estuda'),
       (function () {
         var sel = el('select', { id: 'mapa-ano' });
         sel.appendChild(el('option', { value: '', texto: 'Não informado' }));
-        SERIES_NOMES.forEach(function (par) {
-          var o = el('option', { value: par[0], texto: par[1] });
-          if (par[0] === (trabalho.anoEscolar || aluno.anoEscolar)) o.selected = true;
+        Core.ANOS_ESCOLARES_ORDEM.forEach(function (id) {
+          var o = el('option', { value: id, texto: Core.ANOS_ESCOLARES[id] });
+          if (id === (trabalho.anoEscolar || aluno.anoEscolar)) o.selected = true;
           sel.appendChild(o);
         });
-        sel.addEventListener('change', function () { trabalho.anoEscolar = this.value; });
+        sel.addEventListener('change', function () {
+          trabalho.anoEscolar = this.value;
+          caixaAnoLivre.style.display = Core.anoEscolarLivre(this.value) ? '' : 'none';
+        });
         trabalho.anoEscolar = trabalho.anoEscolar || aluno.anoEscolar || '';
         return el('label', { class: 'campo' }, [el('span', { texto: 'Ano escolar' }), sel]);
       })()
     ]));
+    caixaAnoLivre.style.display = Core.anoEscolarLivre(trabalho.anoEscolar) ? '' : 'none';
+    corpo.appendChild(caixaAnoLivre);
 
     corpo.appendChild(el('div', { class: 'linha' }, [
       campoTexto('professor', 'Professor de matemática', 'Opcional'),
@@ -3261,44 +3516,29 @@
       })()
     ]));
 
-    // ---- listas de marcar ----
-    Core.MAPA.forEach(function (grupo) {
-      var marcados = trabalho.marcados[grupo.chave];
-      var contador = el('span', { class: 'tag' });
-      function atualizar() {
-        contador.textContent = marcados.length ? marcados.length + ' marcados' : 'nenhum';
-        contador.className = 'tag' + (marcados.length ? ' cheia' : '');
-      }
+    // ---- para onde o aluno está indo ----
+    desenharObjetivo(corpo, trabalho);
 
-      var caixa = el('div', { 'data-grupo': grupo.chave });
-      var botao = el('button', { type: 'button', class: 'btn pequeno', texto: 'Esconder' });
-      botao.addEventListener('click', function () {
-        var aberto = caixa.style.display !== 'none';
-        caixa.style.display = aberto ? 'none' : '';
-        botao.textContent = aberto ? 'Mostrar' : 'Esconder';
-      });
+    // ---- listas de marcar, divididas entre a matéria e o aluno ----
+    //
+    // Metade do mapeamento é sobre a matéria e metade é sobre o aluno. Marcar
+    // "estuda só na véspera" ou "fica ansioso perto da prova" é o mesmo aluno
+    // em matemática e em história, e ela não deveria responder de novo a cada
+    // matéria; já em que ponto ele está, o que erra e o que ficou para trás
+    // muda de uma matéria para a outra.
+    //
+    // A ordem na tela é: primeiro a matéria escolhida, depois o aluno. É a
+    // matéria que ela vem revisitar, uma por vez; o bloco do aluno fica
+    // respondido de uma vez e quase não muda. É também a única ordem possível
+    // sem separar em dois os grupos de Pontos fortes e Pontos de atenção, que
+    // têm itens dos dois lados.
 
-      corpo.appendChild(el('div', { class: 'barra', style: 'margin:16px 0 2px' }, [
-        el('h3', { class: 'subtitulo', style: 'margin:0;border:none', texto: grupo.titulo }),
-        contador,
-        el('span', { class: 'cresce' }),
-        botao
-      ]));
-      corpo.appendChild(el('div', { class: 'ajuda', style: 'margin-top:0', texto: grupo.ajuda }));
-
-      var grade = el('div', { class: 'grade-areas' });
-      grupo.itens.forEach(function (item) {
+    function grade(itens, marcados, aoMudar) {
+      var g = el('div', { class: 'grade-areas' });
+      itens.forEach(function (item) {
         var chk = el('input', { type: 'checkbox', style: 'width:auto;min-height:auto' });
         chk.checked = marcados.indexOf(item.id) >= 0;
-        chk.addEventListener('change', function () {
-          if (this.checked) {
-            if (marcados.indexOf(item.id) < 0) marcados.push(item.id);
-          } else {
-            var i = marcados.indexOf(item.id);
-            if (i >= 0) marcados.splice(i, 1);
-          }
-          atualizar();
-        });
+        chk.addEventListener('change', function () { aoMudar(item, this.checked); });
         var filhos = [chk, el('span', { class: 'cresce', texto: item.rotulo })];
         /* A lacuna monta a trilha: a sequência de assuntos que precisa vir
          * antes daquele em que o aluno travou, na ordem. Continua sendo UM
@@ -3315,13 +3555,164 @@
             }
           }));
         }
-        grade.appendChild(el('label', {
-          class: 'item-area', 'data-item': grupo.chave + ':' + item.id
+        g.appendChild(el('label', {
+          class: 'item-area', 'data-item': item.chaveDoGrupo + ':' + item.id
         }, filhos));
       });
-      caixa.appendChild(grade);
+      return g;
+    }
+
+    function cabecalhoDeGrupo(destino, titulo, ajuda, quantos, caixa) {
+      var contador = el('span', { class: 'tag' });
+      function atualizar(n) {
+        contador.textContent = n ? n + ' marcados' : 'nenhum';
+        contador.className = 'tag' + (n ? ' cheia' : '');
+      }
+      atualizar(quantos);
+      var botao = el('button', { type: 'button', class: 'btn pequeno', texto: 'Esconder' });
+      botao.addEventListener('click', function () {
+        var aberto = caixa.style.display !== 'none';
+        caixa.style.display = aberto ? 'none' : '';
+        botao.textContent = aberto ? 'Mostrar' : 'Esconder';
+      });
+      destino.appendChild(el('div', { class: 'barra', style: 'margin:16px 0 2px' }, [
+        el('h3', { class: 'subtitulo', style: 'margin:0;border:none', texto: titulo }),
+        contador,
+        el('span', { class: 'cresce' }),
+        botao
+      ]));
+      destino.appendChild(el('div', { class: 'ajuda', style: 'margin-top:0', texto: ajuda }));
+      return atualizar;
+    }
+
+    var materiaAberta = Core.MATERIA_PADRAO;
+    var caixaMateria = el('div', { id: 'bloco-materia' });
+
+    function desenharMateria() {
+      caixaMateria.innerHTML = '';
+      var mat = Core.materiaPorId(materiaAberta) || Core.materiaPorId(Core.MATERIA_PADRAO);
+
+      if (mat.livre) {
+        var nomeLivre = el('input', {
+          type: 'text', id: 'mapa-materia-nome', placeholder: 'Escreva qual, por exemplo: Espanhol'
+        });
+        nomeLivre.value = (Core.garantirMateria(trabalho, mat.id).nome || '');
+        nomeLivre.addEventListener('input', function () {
+          Core.garantirMateria(trabalho, mat.id).nome = this.value;
+        });
+        caixaMateria.appendChild(el('label', { class: 'campo' }, [
+          el('span', { texto: 'Qual matéria' }), nomeLivre
+        ]));
+      }
+
+      /* Física e química vêm junto, sem trabalho nenhum. Quando um aluno trava
+       * nelas, quase sempre o que falta é matemática: proporção, isolar a
+       * variável, potência de dez, trigonometria. Esses assuntos já estão no
+       * banco de temas e a busca já sabe achar, então em vez de uma lista de
+       * lacunas de física, que ninguém preencheria, fica dito onde procurar. */
+      if (mat.apoiaEmMatematica) {
+        caixaMateria.appendChild(el('div', { class: 'faixa-info', id: 'apoio-matematica' }, [
+          el('strong', { texto: 'Quando ele trava aqui, costuma faltar matemática. ' }),
+          document.createTextNode('Proporção, isolar a variável, potência de dez e trigonometria ' +
+            'já existem no banco de temas. Marque a lacuna em Matemática: a trilha e a busca ' +
+            'levam aos mesmos assuntos.')
+        ]));
+      }
+
+      Core.gruposDaMateria(mat.id).forEach(function (grupo) {
+        var itens = Core.itensDaMateria(grupo.chave, mat.id).map(function (i) {
+          var copia = {};
+          Object.keys(i).forEach(function (k) { copia[k] = i[k]; });
+          copia.chaveDoGrupo = grupo.chave;
+          return copia;
+        });
+        var marcados = Core.marcadosDaMateria(trabalho, mat.id)[grupo.chave];
+        var caixa = el('div', { 'data-grupo': grupo.chave });
+        var atualizar = cabecalhoDeGrupo(caixaMateria, grupo.titulo, grupo.ajuda,
+          marcados.length, caixa);
+        caixa.appendChild(grade(itens, marcados, function (item, ligado) {
+          Core.marcarNaMateria(trabalho, mat.id, grupo.chave, item.id, ligado);
+          atualizar(Core.marcadosDaMateria(trabalho, mat.id)[grupo.chave].length);
+        }));
+        caixaMateria.appendChild(caixa);
+      });
+
+      /* O que o colégio vai cobrar no bimestre, tirado da lista que o aluno já
+       * manda. Em história é o que entra no lugar da lista de lacunas, que ali
+       * não existe; em matemática soma-se às lacunas, porque a lista do colégio
+       * é útil de qualquer jeito. */
+      var cob = el('textarea', {
+        id: 'mapa-cobranca', style: 'min-height:72px',
+        placeholder: 'Os assuntos que o colégio vai cobrar neste bimestre nesta matéria.'
+      });
+      cob.value = Core.cobrancaDaMateria(trabalho, mat.id);
+      cob.addEventListener('input', function () {
+        Core.definirCobranca(trabalho, mat.id, this.value);
+      });
+      caixaMateria.appendChild(el('label', { class: 'campo', style: 'margin-top:14px' }, [
+        el('span', { texto: 'O que o colégio vai cobrar no bimestre' }), cob
+      ]));
+    }
+
+    corpo.appendChild(el('h3', { class: 'subtitulo', texto: 'A matéria' }));
+    corpo.appendChild(el('div', {
+      class: 'ajuda', style: 'margin-top:0',
+      texto: 'Esta parte se repete por matéria que você dá para este aluno. ' +
+        'Trocar a matéria aqui em cima troca só o que está abaixo.'
+    }));
+    var selMateria = el('select', { id: 'mapa-materia' });
+    var jaPreenchidas = Core.materiasDoMapeamento(trabalho);
+    Core.MATERIAS.forEach(function (mat) {
+      var jaTem = jaPreenchidas.indexOf(mat.id) >= 0;
+      var o = el('option', {
+        value: mat.id,
+        texto: Core.rotuloMateria(trabalho, mat.id) + (jaTem && mat.id !== Core.MATERIA_PADRAO ? ' (preenchida)' : '')
+      });
+      if (mat.id === materiaAberta) o.selected = true;
+      selMateria.appendChild(o);
+    });
+    selMateria.addEventListener('change', function () {
+      materiaAberta = this.value;
+      desenharMateria();
+    });
+    corpo.appendChild(el('label', { class: 'campo' }, [
+      el('span', { texto: 'Matéria' }), selMateria
+    ]));
+    corpo.appendChild(caixaMateria);
+    desenharMateria();
+
+    corpo.appendChild(el('h3', { class: 'subtitulo', style: 'margin-top:22px', texto: 'O aluno' }));
+    corpo.appendChild(el('div', {
+      class: 'ajuda', style: 'margin-top:0',
+      texto: 'Isto vale em qualquer matéria e fica respondido uma vez só. ' +
+        'Não é preciso repetir quando você abrir outra matéria.'
+    }));
+
+    Core.gruposDoAluno().forEach(function (grupo) {
+      var itens = Core.itensDoAluno(grupo.chave).map(function (i) {
+        var copia = {};
+        Object.keys(i).forEach(function (k) { copia[k] = i[k]; });
+        copia.chaveDoGrupo = grupo.chave;
+        return copia;
+      });
+      var marcados = trabalho.marcados[grupo.chave];
+      /* Os grupos que são inteiros sobre o aluno mantêm o data-grupo, e por isso
+       * rotina e aprende continuam aparecendo aqui, na ordem de sempre. Pontos
+       * fortes e Pontos de atenção têm itens dos dois lados: a metade da matéria
+       * ficou no bloco de cima, e esta metade não repete o data-grupo para não
+       * haver dois elementos dizendo ser o mesmo grupo. */
+      var caixa = el('div',
+        grupo.sobre === 'aluno' ? { 'data-grupo': grupo.chave } : { 'data-grupo-aluno': grupo.chave });
+      var titulo = grupo.sobre === 'aluno' ? grupo.titulo : grupo.titulo + ' do aluno';
+      var atualizar = cabecalhoDeGrupo(corpo, titulo, grupo.ajuda,
+        Core.marcadosDoAluno(trabalho)[grupo.chave].length, caixa);
+      caixa.appendChild(grade(itens, marcados, function (item, ligado) {
+        var i = marcados.indexOf(item.id);
+        if (ligado && i < 0) marcados.push(item.id);
+        if (!ligado && i >= 0) marcados.splice(i, 1);
+        atualizar(Core.marcadosDoAluno(trabalho)[grupo.chave].length);
+      }));
       corpo.appendChild(caixa);
-      atualizar();
     });
 
     // ---- leitura dela ----
@@ -3388,6 +3779,9 @@
           aluno.mapeamentos.push(trabalho);
         }
         if (trabalho.anoEscolar) aluno.anoEscolar = trabalho.anoEscolar;
+        if (Core.anoEscolarLivre(trabalho.anoEscolar)) {
+          aluno.anoEscolarOutro = trabalho.anoEscolarOutro || '';
+        }
         /* Este é o toque que autoriza a gravação: a foto do disco deixa de
          * valer AQUI, antes do salvar(), senão dbParaGravar() devolveria o
          * registro antigo e o botão não gravaria nada. */
@@ -3405,6 +3799,183 @@
 
     abrirModal('modal-mapeamento');
     corpo.scrollTop = 0;
+  }
+
+  /* Para onde o aluno está indo.
+   *
+   * "Outro" fica em primeiro e traz campo em branco, porque nenhuma lista prevê
+   * tudo. Com a data da prova preenchida, a janela da aula passa a mostrar
+   * quantas semanas faltam, que é o número que muda a conversa.
+   *
+   * Nada aqui é obrigatório: sem objetivo registrado o bloco fica em branco e
+   * a aula não mostra linha nenhuma. */
+  function desenharObjetivo(corpo, trabalho) {
+    trabalho.objetivo = trabalho.objetivo || { tipo: '', descricao: '', dataProva: '' };
+    var obj = trabalho.objetivo;
+
+    corpo.appendChild(el('h3', { class: 'subtitulo', texto: 'Para onde ele está indo' }));
+
+    var campoLivre = el('input', {
+      type: 'text', id: 'mapa-objetivo-outro',
+      placeholder: 'Escreva qual, com as suas palavras'
+    });
+    campoLivre.value = obj.descricao || '';
+    campoLivre.addEventListener('input', function () { obj.descricao = this.value; });
+    var caixaLivre = el('label', { class: 'campo', id: 'caixa-objetivo-outro' },
+      [el('span', { texto: 'Qual' }), campoLivre]);
+
+    var sel = el('select', { id: 'mapa-objetivo' });
+    sel.appendChild(el('option', { value: '', texto: 'Não registrado' }));
+    Core.OBJETIVOS.forEach(function (o) {
+      var op = el('option', { value: o.id, texto: o.rotulo });
+      if (o.id === (obj.tipo || '')) op.selected = true;
+      sel.appendChild(op);
+    });
+    function mostrarLivre() {
+      var o = Core.objetivoPorId(obj.tipo);
+      caixaLivre.style.display = (o && o.livre) ? '' : 'none';
+    }
+    sel.addEventListener('change', function () {
+      obj.tipo = this.value;
+      mostrarLivre();
+    });
+
+    var dataProva = el('input', { type: 'date', id: 'mapa-data-prova' });
+    dataProva.value = obj.dataProva || '';
+    dataProva.addEventListener('change', function () { obj.dataProva = this.value; });
+
+    corpo.appendChild(el('div', { class: 'linha' }, [
+      el('label', { class: 'campo' }, [el('span', { texto: 'Objetivo' }), sel]),
+      el('label', { class: 'campo' }, [
+        el('span', { texto: 'Data da prova, quando houver' }), dataProva
+      ])
+    ]));
+    corpo.appendChild(caixaLivre);
+    mostrarLivre();
+    corpo.appendChild(el('div', {
+      class: 'ajuda', style: 'margin-top:0',
+      texto: 'Com a data preenchida, a janela de cada aula deste aluno passa a dizer ' +
+        'quantas semanas faltam.'
+    }));
+  }
+
+  /* Em que etapa o aluno está.
+   *
+   * Fica na ficha do aluno e não pede nada: nenhuma pergunta em toda aula.
+   * Quando ela perceber que o aluno mudou, e isso leva semanas ou meses, toca
+   * em "Mudou de etapa" naquela linha e escolhe uma das quatro. São dois
+   * toques, e nada mais.
+   *
+   * O aplicativo nunca escolhe a etapa sozinho: seria inventar uma avaliação
+   * que ela não fez. */
+  /* As mesmas três linhas, só para ler, no alto da aba Dados.
+   *
+   * Devolve a função que redesenha, para o quadro da aba Mapeamento chamar
+   * depois de registrar uma mudança: sem isso ela mudaria a etapa numa aba e
+   * voltaria para a outra encontrando o valor velho. */
+  function desenharResumoDeEtapas(caixa, aluno, irParaOQuadro) {
+    var bloco = el('div', { class: 'resumo-etapas', id: 'resumo-etapas' });
+    caixa.appendChild(bloco);
+
+    function desenhar() {
+      bloco.innerHTML = '';
+      bloco.appendChild(el('div', { class: 'barra', style: 'margin-bottom:6px' }, [
+        el('span', { class: 'rotulo-resumo-etapas', texto: 'Em que etapa ele está' }),
+        el('span', { class: 'cresce' }),
+        el('button', {
+          type: 'button', class: 'btn pequeno', id: 'ir-para-etapas', texto: 'Marcar',
+          aoClick: function () { if (irParaOQuadro) irParaOQuadro(); }
+        })
+      ]));
+      Core.quadroDeEtapas(aluno).forEach(function (linha) {
+        bloco.appendChild(el('div', { class: 'linha-resumo-etapa' }, [
+          el('span', { class: 'frente-etapa', texto: linha.rotulo }),
+          el('span', {
+            class: 'valor-etapa' + (linha.atual ? '' : ' vazia'),
+            texto: linha.atual
+              ? linha.atual.rotulo + ', desde ' + Core.ddmmaaaa(linha.atual.desde)
+              : 'ainda não marcada'
+          })
+        ]));
+      });
+    }
+
+    desenhar();
+    return desenhar;
+  }
+
+  function desenharEtapas(caixa, aluno) {
+    var bloco = el('div', { class: 'quadro-etapas', id: 'quadro-etapas' });
+    caixa.appendChild(bloco);
+
+    function desenhar() {
+      bloco.innerHTML = '';
+      bloco.appendChild(el('div', { class: 'barra', style: 'margin-bottom:4px' }, [
+        el('h3', { class: 'subtitulo', style: 'margin:0;border:none', texto: 'Em que etapa ele está' })
+      ]));
+      bloco.appendChild(el('div', {
+        class: 'ajuda', style: 'margin-top:0',
+        texto: 'Fica parado aqui mostrando o ponto. Toque em Mudou de etapa só quando ' +
+          'perceber que ele andou, o que costuma levar semanas ou meses.'
+      }));
+
+      Core.quadroDeEtapas(aluno).forEach(function (linha) {
+        var escolha = el('div', { class: 'escolha-etapa', style: 'display:none' });
+        var corpoLinha = el('div', { class: 'cresce' }, [
+          el('div', { class: 'nome', texto: linha.rotulo }),
+          el('div', {
+            class: 'detalhe',
+            texto: linha.atual
+              ? linha.atual.rotulo + ', desde ' + Core.ddmmaaaa(linha.atual.desde) +
+                (linha.atual.anterior
+                  ? '. Antes: ' + linha.atual.anterior.rotulo + ', desde ' +
+                    Core.ddmmaaaa(linha.atual.anterior.desde) + '.'
+                  : '')
+              : 'Ainda não marcada. ' + linha.ajuda
+          })
+        ]);
+
+        var botao = el('button', {
+          type: 'button', class: 'btn pequeno',
+          'data-etapa-frente': linha.frente,
+          texto: linha.atual ? 'Mudou de etapa' : 'Marcar a etapa'
+        });
+        botao.addEventListener('click', function () {
+          var aberto = escolha.style.display !== 'none';
+          escolha.style.display = aberto ? 'none' : '';
+        });
+
+        Core.ETAPAS.forEach(function (etapa) {
+          var atual = linha.atual && linha.atual.etapa === etapa.id;
+          var b = el('button', {
+            type: 'button',
+            class: 'btn' + (atual ? ' principal' : ''),
+            'data-etapa': linha.frente + ':' + etapa.id,
+            title: etapa.ajuda,
+            texto: etapa.rotulo
+          });
+          b.addEventListener('click', function () {
+            if (atual) { escolha.style.display = 'none'; return; }
+            var registro = null;
+            comDesfazer('Etapa de ' + linha.rotulo.toLowerCase() + ' agora é ' +
+              etapa.rotulo.toLowerCase() + '.', function () {
+                registro = Core.registrarEtapa(aluno, linha.frente, etapa.id);
+              }).then(function () {
+                if (!registro) return;
+                desenhar();
+                if (resumoEtapas) resumoEtapas();
+                desenharTudo();
+              });
+          });
+          escolha.appendChild(b);
+        });
+
+        bloco.appendChild(el('div', { class: 'item-lista linha-etapa' }, [corpoLinha, botao]));
+        bloco.appendChild(escolha);
+      });
+    }
+
+    desenhar();
   }
 
   /* Um mapeamento antigo é só leitura: mexer nele reescreveria a história. */
@@ -3427,11 +3998,34 @@
       corpo.appendChild(el('div', { style: 'font-size:14px', texto: Core.rotuloNivel(m.nivel) }));
     }
 
+    function bloco(titulo, rotulos) {
+      if (!rotulos.length) return;
+      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: titulo }));
+      corpo.appendChild(el('div', {
+        style: 'font-size:14px;line-height:1.55', texto: rotulos.join(', ') + '.'
+      }));
+    }
+    Core.materiasDoMapeamento(m).forEach(function (materiaId) {
+      var marc = Core.marcadosDaMateria(m, materiaId);
+      var nomeMateria = Core.rotuloMateria(m, materiaId);
+      Core.MAPA.forEach(function (g) {
+        bloco(nomeMateria + ': ' + g.titulo.toLowerCase(),
+          Core.rotulosDoMapa(g.chave, marc[g.chave]));
+      });
+      var cobranca = Core.cobrancaDaMateria(m, materiaId);
+      if (cobranca) {
+        corpo.appendChild(el('div', {
+          class: 'bloco-exercicios', texto: nomeMateria + ': o que o colégio cobrava no bimestre'
+        }));
+        corpo.appendChild(el('div', {
+          style: 'font-size:14px;line-height:1.55;white-space:pre-wrap', texto: cobranca
+        }));
+      }
+    });
+    var doAlunoAntigo = Core.marcadosDoAluno(m);
     Core.MAPA.forEach(function (g) {
-      var rot = Core.rotulosDoMapa(g.chave, m.marcados && m.marcados[g.chave]);
-      if (!rot.length) return;
-      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: g.titulo }));
-      corpo.appendChild(el('div', { style: 'font-size:14px;line-height:1.55', texto: rot.join(', ') + '.' }));
+      bloco('O aluno: ' + g.titulo.toLowerCase(),
+        Core.rotulosDoMapa(g.chave, doAlunoAntigo[g.chave]));
     });
 
     [['prioridades', 'Prioridades'], ['plano', 'Diagnóstico e plano'],
@@ -4472,11 +5066,232 @@
   }
 
   /* Caixa de lembrete que aparece ao abrir uma aula de aluno já mapeado. */
+  /* Onde os dois pararam, no alto da aula de hoje.
+   *
+   * Mostra o encontro anterior daquele aluno: assunto, áreas, o que rendeu e o
+   * que ela anotou só para ela. Nada aqui pede resposta, e nada aqui pode ser
+   * editado: é memória, e a memória é a aula que já foi. O botão Abrir leva
+   * para a aula de verdade, que é onde se corrige.
+   *
+   * Não aparece quando não há encontro anterior com conteúdo nenhum: a primeira
+   * aula de um aluno novo não pode abrir com uma caixa vazia. */
+  function desenharUltimoEncontro(corpo, aula) {
+    if (!aula || !aula.alunoId) return;
+    var u = Core.ultimoEncontro(db, aula.alunoId, aula);
+    if (!u) return;
+
+    var linhas = [];
+    function linha(rotulo, texto) {
+      if (!texto) return;
+      linhas.push(el('div', { class: 'linha-ultimo' }, [
+        el('strong', { texto: rotulo + ': ' }),
+        document.createTextNode(texto)
+      ]));
+    }
+    linha('Assunto', u.assuntos.join('; '));
+    var areas = u.areas.slice(0, 4).join(', ') +
+      (u.areas.length > 4 ? ' e mais ' + (u.areas.length - 4) : '');
+    linha('Áreas', u.areas.length ? areas : '');
+    linha('O que rendeu', u.oQueRendeu);
+
+    var sinais = [];
+    if (u.temFolha) sinais.push('folha escrita');
+    if (u.qtdAnexos) sinais.push(u.qtdAnexos === 1 ? '1 anexo' : u.qtdAnexos + ' anexos');
+    if (sinais.length) {
+      linhas.push(el('div', { class: 'linha-ultimo ajuda', style: 'margin:2px 0 0',
+        texto: 'Esse encontro tem ' + sinais.join(' e ') + '.' }));
+    }
+
+    /* A anotação particular do encontro anterior sai por último e fechada.
+     *
+     * Ela abria escrita, no alto da janela da aula, e o tablet fica na mesa
+     * durante a aula inteira, com a mãe passando ao lado. É o único texto do
+     * aplicativo escrito para não ser lido por ninguém além dela, e era o
+     * primeiro que aparecia. Agora precisa de um toque, num botão de dedo, e
+     * fica no fim do bloco: quem abre a aula vê o assunto e o que rendeu, que é
+     * o que serve para começar, e a anotação só aparece quando ela quiser. */
+    if (u.soMinha) {
+      var texto = el('div', {
+        class: 'linha-ultimo so-minha-anterior', id: 'so-minha-anterior', style: 'display:none'
+      }, [
+        el('strong', { texto: 'Só minha: ' }),
+        document.createTextNode(u.soMinha)
+      ]);
+      var botao = el('button', {
+        type: 'button', class: 'btn pequeno mostrar-so-minha', id: 'mostrar-so-minha',
+        texto: 'Ver a sua anotação'
+      });
+      botao.addEventListener('click', function () {
+        var escondida = texto.style.display === 'none';
+        texto.style.display = escondida ? '' : 'none';
+        botao.textContent = escondida ? 'Esconder a sua anotação' : 'Ver a sua anotação';
+        /* O bloco tem teto de altura e rola por dentro: sem isto, deitado, o
+         * texto aparecia abaixo da borda e o botão parecia não ter feito nada. */
+        var caixa = texto.parentNode;
+        if (escondida && caixa && caixa.scrollHeight > caixa.clientHeight) {
+          caixa.scrollTop = caixa.scrollHeight;
+        }
+      });
+      linhas.push(el('div', { style: 'margin-top:6px' }, [botao]));
+      linhas.push(texto);
+    }
+
+    corpo.appendChild(el('div', { class: 'ultimo-encontro', id: 'ultimo-encontro' }, [
+      el('div', { class: 'barra', style: 'margin-bottom:6px' }, [
+        el('span', {
+          class: 'rotulo-ultimo',
+          texto: 'No último encontro, ' + Core.ddmmaaaa(u.data) + ', ' + u.diaSemana
+        }),
+        el('span', { class: 'cresce' }),
+        el('button', {
+          type: 'button', class: 'btn pequeno', id: 'abrir-ultimo-encontro', texto: 'Abrir',
+          aoClick: function () { irParaOutraAula(u.aulaId); }
+        })
+      ])
+    ].concat(linhas)));
+  }
+
+  /* Sair desta aula para outra sem jogar fora o que ela acabou de escrever.
+   *
+   * O botão Abrir fechava a janela e chamava a aula anterior direto: o que
+   * estivesse nos dois campos de anotação sumia, sem gravar e sem perguntar.
+   * O caminho é justamente o de quem estava escrevendo: ela digita o que
+   * rendeu, rola até o alto para conferir onde os dois pararam, toca em Abrir.
+   *
+   * As duas anotações são gravadas antes de navegar, e é seguro fazer isso
+   * calado: nota nunca escorre pela repetição e nunca muda dinheiro nenhum. O
+   * que mexe no fechamento (data, horário, duração, situação e cobrança) NÃO é
+   * gravado por tabela, porque numa aula que se repete isso abriria a pergunta
+   * de escopo no meio da navegação. Se ela mexeu ali, a janela pergunta antes
+   * de sair, e o padrão é ficar. */
+  function irParaOutraAula(aulaId) {
+    var seguir = function () {
+      fecharModal('modal-aula');
+      setTimeout(function () { abrirAula(aulaId, null); }, 120);
+    };
+    if (!aulaEmEdicao) { seguir(); return; }
+
+    var valor = function (sel) { var e = $(sel); return e ? e.value : null; };
+    var marcado = function (sel) { var e = $(sel); return e ? e.checked : null; };
+    var stAtual = Core.STATUS[aulaEmEdicao.status] || Core.STATUS.realizada;
+    var cobravelAtual = typeof aulaEmEdicao.cobravel === 'boolean'
+      ? aulaEmEdicao.cobravel : stAtual.cobravelPadrao;
+    var mexeuNoResto =
+      (valor('#campo-data') !== null && valor('#campo-data') !== aulaEmEdicao.data) ||
+      (valor('#campo-hora') !== null && valor('#campo-hora') !== (aulaEmEdicao.hora || '')) ||
+      (valor('#campo-duracao') !== null &&
+        parseInt(valor('#campo-duracao'), 10) !== aulaEmEdicao.duracaoMin) ||
+      (valor('#campo-status') !== null &&
+        valor('#campo-status') !== (aulaEmEdicao.status || 'realizada')) ||
+      (marcado('#campo-cobrar') !== null && marcado('#campo-cobrar') !== cobravelAtual);
+
+    if (mexeuNoResto && !confirmar(
+      'Você mudou a data, o horário, a duração, a situação ou a cobrança desta aula ' +
+      'e ainda não salvou. Abrir o outro encontro agora perde essa mudança. Abrir mesmo assim?'
+    )) return;
+
+    var campoNota = $('#campo-nota-texto');
+    var campoPriv = $('#campo-nota-privada');
+    var mudouNota = campoNota && campoNota.value !== (aulaEmEdicao.notaTexto || '');
+    var mudouPriv = campoPriv && campoPriv.value !== (aulaEmEdicao.notaPrivada || '');
+    if (!mudouNota && !mudouPriv) { seguir(); return; }
+
+    if (campoNota) aulaEmEdicao.notaTexto = campoNota.value;
+    if (campoPriv) aulaEmEdicao.notaPrivada = campoPriv.value;
+    salvar().then(function () {
+      fecharModal('modal-aula');
+      desenharTudo();
+      avisar('Sua anotação foi salva antes de abrir o outro encontro.');
+      setTimeout(function () { abrirAula(aulaId, null); }, 120);
+    });
+  }
+
+  /* O que ela marcou no mapeamento, de TODAS as matérias, numa lista só.
+   *
+   * O lembrete lia m.marcados, que é onde matemática sempre morou e continua
+   * morando. As outras matérias nasceram em m.porMateria, e o que ela marcasse
+   * em história, inglês ou redação não aparecia em canto nenhum na hora da
+   * aula: ela mapeava o aluno com cuidado e abria a aula dele com uma caixa de
+   * lembrete vazia, como se o mapeamento não existisse.
+   *
+   * As duas fontes viram uma aqui. O bloco do aluno vale em qualquer matéria e
+   * entra uma vez só; o bloco de cada matéria entra por marcadosDaMateria, para
+   * cada matéria que ela usou. Nada conta duas vezes: em matemática as duas
+   * fontes saem da mesma lista, e o mesmo id não entra de novo. */
+  function marcasDoMapeamento(aluno) {
+    var m = Core.mapeamentoAtual(aluno);
+    if (!m) return null;
+    var out = {};
+    function junta(fonte) {
+      Object.keys(fonte || {}).forEach(function (chave) {
+        out[chave] = out[chave] || [];
+        (fonte[chave] || []).forEach(function (id) {
+          if (out[chave].indexOf(id) < 0) out[chave].push(id);
+        });
+      });
+    }
+    junta(Core.marcadosDoAluno(m));
+    Core.materiasDoMapeamento(m).forEach(function (id) {
+      junta(Core.marcadosDaMateria(m, id));
+    });
+    return out;
+  }
+
+  /* O mesmo lembrete em texto, para o botão Copiar. Sai da MESMA união que a
+   * caixa mostra: senão a tela diria uma coisa e o texto colado diria outra. */
+  function textoDoLembreteCompleto(aluno) {
+    var m = Core.mapeamentoAtual(aluno);
+    var todas = marcasDoMapeamento(aluno);
+    if (!m || !todas) return Core.textoDoLembrete(aluno);
+    var L = [];
+    var pri = (m.prioridades || '').trim();
+    if (pri) L.push('Prioridades: ' + pri.replace(/\s*\n\s*/g, '; '));
+    var lac = Core.rotulosDoMapa('lacunas', todas.lacunas).slice(0, 6);
+    var ate = Core.rotulosDoMapa('atencao', todas.atencao).slice(0, 6);
+    var apr = Core.rotulosDoMapa('aprende', todas.aprende).slice(0, 2);
+    if (lac.length) L.push('Lacunas: ' + lac.join(', ') + '.');
+    if (ate.length) L.push('Atenção: ' + ate.join(', ') + '.');
+    if (apr.length) L.push('Aprende melhor: ' + apr.join(' e ') + '.');
+    return L.join(' ');
+  }
+
   function desenharLembrete(corpo, aluno, aula) {
     var l = Core.lembreteDoMapeamento(aluno);
     if (!l) return;
 
+    /* O Core continua devolvendo o lembrete de matemática, que é o que ele
+     * sempre devolveu e o que o PDF e a trilha leem. O que é da tela da aula, e
+     * só dela, é enxergar as outras matérias junto. */
+    var todas = marcasDoMapeamento(aluno);
+    if (todas) {
+      l.lacunas = Core.rotulosDoMapa('lacunas', todas.lacunas).slice(0, 4);
+      l.totalLacunas = (todas.lacunas || []).length;
+      l.atencao = Core.rotulosDoMapa('atencao', todas.atencao).slice(0, 4);
+      l.totalAtencao = (todas.atencao || []).length;
+      l.aprende = Core.rotulosDoMapa('aprende', todas.aprende).slice(0, 2);
+    }
+
     var conteudo = [];
+
+    /* Para onde o aluno está indo, e quanto tempo falta.
+     *
+     * Com a data da prova registrada no mapeamento, a aula passa a dizer
+     * quantas semanas faltam. É o número que muda a conversa de "vamos ver
+     * frações" para "faltam seis semanas". */
+    var obj = Core.objetivoDe(aluno);
+    if (obj) {
+      var prazo = Core.semanasAteAProva(obj.dataProva);
+      var texto = obj.rotulo;
+      if (prazo) {
+        texto += (texto ? '. ' : '') + 'Prova em ' + Core.ddmmaaaa(prazo.data) +
+          ', ' + prazo.texto;
+      }
+      conteudo.push(el('div', { id: 'objetivo-da-aula', style: 'margin-bottom:5px' }, [
+        el('strong', { texto: 'Objetivo: ' }),
+        document.createTextNode(texto + '.')
+      ]));
+    }
+
     if (l.prioridades) {
       conteudo.push(el('div', { style: 'margin-bottom:5px' }, [
         el('strong', { texto: 'Prioridades: ' }),
@@ -4517,7 +5332,7 @@
         aoClick: function () {
           var area = $('#campo-nota-texto');
           if (!area) return;
-          var texto = Core.textoDoLembrete(aluno);
+          var texto = textoDoLembreteCompleto(aluno);
           area.value = (area.value.trim() ? area.value.trim() + '\n\n' : '') + texto;
           area.dispatchEvent(new Event('input', { bubbles: true }));
           avisar('Lembrete copiado para a anotação. Ajuste como quiser.');
@@ -4771,12 +5586,27 @@
 
   /* O ano escolar não é perguntado em lugar nenhum: ele fica guardado sozinho na
    * primeira vez que ela escolhe um tema para aquele aluno, e da segunda em
-   * diante a lista já abre no lugar certo. Um campo a menos para preencher. */
+   * diante a lista já abre no lugar certo. Um campo a menos para preencher.
+   *
+   * O valor guardado deixou de ser sempre uma série. O mapeamento passou a
+   * aceitar cursinho, fora da escola e outro, e grava a escolha aqui: um aluno
+   * que já tinha 9º ano aprendido virava "cursinho" e o seletor de tema, que só
+   * conhece as séries, não achava a opção e caía na primeira da lista, o 2º
+   * ano. Core.serieParaTemas é quem sabe traduzir: cursinho lê como 3º do
+   * médio, e fora da escola e outro não viram série nenhuma, e aí o seletor cai
+   * no último ano que ela usou, como já caía para aluno sem ano registrado. */
   function anoEscolarDe(aluno) {
-    return (aluno && aluno.anoEscolar) || null;
+    return Core.serieParaTemas((aluno && aluno.anoEscolar) || '') || null;
   }
+  /* Aprender por uso não pode apagar o que ela respondeu no mapeamento. Um
+   * aluno de cursinho abre a lista no 3º do médio, que é onde o cursinho lê; se
+   * ela navegar dali para outro ano, o que fica guardado continua sendo
+   * cursinho, e não o ano que ela foi olhar. O mesmo vale para fora da escola e
+   * para outro. Ano de série continua sendo aprendido como sempre foi. */
   function lembrarAnoEscolar(aluno, ano) {
     if (!aluno || aluno.anoEscolar === ano) return;
+    var guardado = aluno.anoEscolar || '';
+    if (guardado && Core.serieParaTemas(guardado) !== guardado) return;
     aluno.anoEscolar = ano;
     salvar();
   }
@@ -5704,22 +6534,24 @@
     });
 
     var fechs = Core.calcularMesInteiro(db, mesAtual);
-    var totalMin = 0, totalValor = 0, totalEncontros = 0;
-    fechs.forEach(function (f) {
-      totalMin += f.totalMin; totalValor += f.totalValor; totalEncontros += f.qtdEncontros;
-    });
+    var t = Core.totaisDoMes(fechs);
 
     var numeros = $('#numeros-fechamento');
     numeros.innerHTML = '';
-    [['Alunos no mês', String(fechs.length)],
-    ['Encontros', String(totalEncontros)],
-    ['Horas cobradas', Core.fmtHoras(totalMin) + ' h'],
-    ['Total a receber', dinheiro(totalValor)]].forEach(function (par) {
-      numeros.appendChild(el('div', { class: 'numero' }, [
-        el('div', { class: 'rotulo', texto: par[0] }),
-        el('div', { class: 'valor', texto: par[1] })
-      ]));
-    });
+    numeros.appendChild(numeroComRodape('Alunos no mês', String(t.alunos), []));
+    numeros.appendChild(numeroComRodape('Encontros', String(t.encontrosFeitos), [
+      t.encontrosPrevistos ? 'mais ' + t.encontrosPrevistos + ' ' +
+        plural(t.encontrosPrevistos, 'marcado à frente', 'marcados à frente') : ''
+    ]));
+    numeros.appendChild(numeroComRodape('Horas cobradas', Core.fmtHoras(t.minFeitos) + ' h', [
+      t.minPrevistos ? 'mais ' + Core.fmtHoras(t.minPrevistos) + ' h à frente' : ''
+    ]));
+    numeros.appendChild(numeroComRodape('Total a receber', dinheiro(t.valorFeito), [
+      t.valorPrevisto ? 'previsto à frente: ' + dinheiro(t.valorPrevisto) : '',
+      t.valorPrevisto ? 'mês inteiro: ' + dinheiro(t.valor) : ''
+    ]));
+
+    desenharGentilezas(numeros, t);
 
     var lista = $('#lista-fechamento');
     lista.innerHTML = '';
@@ -5727,6 +6559,7 @@
       lista.appendChild(el('div', { class: 'vazio' }, [
         el('p', { texto: 'Nenhuma aula registrada em ' + Core.mesExtenso(mesAtual) + '.' })
       ]));
+      desenharPanoramaDeValores();
       return;
     }
 
@@ -5736,16 +6569,37 @@
       cartao.appendChild(el('div', { class: 'barra', style: 'margin-bottom:10px' }, [
         el('h3', { class: 'titulo', style: 'font-size:18px', texto: f.alunoNome }),
         el('span', { class: 'cresce' }),
-        el('strong', { style: 'color:#1F3A5F;font-size:18px', texto: dinheiro(f.totalValor) })
+        el('strong', { style: 'color:#1F3A5F;font-size:18px', texto: dinheiro(f.valorFeito) })
       ]));
 
       cartao.appendChild(el('div', {
         class: 'ajuda', style: 'margin-top:0',
-        texto: f.qtdEncontros + ' encontro' + (f.qtdEncontros === 1 ? '' : 's') +
-          ' · ' + f.totalHoras + ' h cobradas' +
-          (f.faixas.length > 1 ? ' · houve reajuste no mês' : '') +
-          (f.minutosNaoCobrados ? ' · ' + Core.fmtHoras(f.minutosNaoCobrados) + ' h não cobradas' : '')
+        /* Num mês já vencido nada está à frente, e a frase fica igual à de
+         * sempre. O "até aqui" só aparece quando existe algo depois de hoje. */
+        texto: f.qtdEncontrosFeitos + ' encontro' + (f.qtdEncontrosFeitos === 1 ? '' : 's') +
+          (f.qtdEncontrosPrevistos ? ' até aqui' : '') +
+          ' · ' + f.horasFeitas + ' h cobradas' +
+          (f.qtdEncontrosPrevistos
+            ? ' · mais ' + f.qtdEncontrosPrevistos + ' ' +
+              plural(f.qtdEncontrosPrevistos, 'marcado à frente', 'marcados à frente') +
+              ', ' + dinheiro(f.valorPrevisto)
+            : '') +
+          (f.faixas.length > 1 ? ' · houve reajuste no mês' : '')
       }));
+
+      /* As duas contas do "o que você deu e não cobrou", por aluno. Sem cor de
+       * aviso e sem sugestão, só o número, e só na tela dela. */
+      if (f.minutosDadosSemCobrar || f.minutosDesmarcados) {
+        cartao.appendChild(el('div', {
+          class: 'ajuda', style: 'margin-top:-6px',
+          texto: [
+            f.minutosDadosSemCobrar
+              ? 'Dadas sem cobrar: ' + Core.fmtHoras(f.minutosDadosSemCobrar) + ' h' : '',
+            f.minutosDesmarcados
+              ? 'Reservadas e desmarcadas: ' + Core.fmtHoras(f.minutosDesmarcados) + ' h' : ''
+          ].filter(Boolean).join(' · ')
+        }));
+      }
 
       if (f.semPreco.length) {
         cartao.appendChild(el('div', {
@@ -5767,7 +6621,10 @@
           el('td', { texto: Core.ddmm(l.data) }),
           el('td', { texto: l.dia }),
           el('td', { texto: Core.fmtDuracao(l.duracaoMin) }),
-          el('td', { texto: l.statusRotulo + (l.cobravel ? '' : ' (não cobrada)') }),
+          el('td', {
+            texto: l.statusRotulo + (l.cobravel ? '' : ' (não cobrada)') +
+              (l.futura ? ' · ainda vai acontecer' : '')
+          }),
           el('td', { texto: dinheiro(l.cobravel ? l.valor : 0) })
         ]));
       });
@@ -5781,6 +6638,17 @@
       corpo.appendChild(linhaTotal);
       tabela.appendChild(corpo);
       cartao.appendChild(el('div', { class: 'rolagem' }, [tabela]));
+
+      /* A tabela lista o mês inteiro, e o total dela é o do mês inteiro. Quem
+       * lê o número grande lá em cima vê só o que já aconteceu, então aqui fica
+       * dito, uma vez, de onde vem a diferença. */
+      if (f.valorPrevisto) {
+        cartao.appendChild(el('div', {
+          class: 'ajuda', style: 'margin-top:6px',
+          texto: 'Desse total, ' + dinheiro(f.valorFeito) + ' já aconteceu e ' +
+            dinheiro(f.valorPrevisto) + ' está marcado para os próximos dias.'
+        }));
+      }
 
       var temResumo = !!(f.resumoTexto || '').trim();
 
@@ -5817,6 +6685,10 @@
           texto: temResumo ? 'Editar o feedback' : 'Escrever o feedback',
           aoClick: function () { abrirResumo(f.aluno.id, mesAtual); }
         }),
+        el('button', {
+          type: 'button', class: 'btn', texto: 'O mês numa tela',
+          aoClick: function () { abrirMesNumaTela(f.aluno.id, mesAtual); }
+        }),
         el('span', { class: 'cresce' }),
         el('button', {
           type: 'button', class: 'btn', texto: 'Texto',
@@ -5825,6 +6697,10 @@
         el('button', {
           type: 'button', class: 'btn principal', texto: 'PDF do fechamento',
           aoClick: function () { exportarAlunoEmPdf(f, false); }
+        }),
+        el('button', {
+          type: 'button', class: 'btn', texto: 'Cartão do mês',
+          aoClick: function () { abrirCartaoDoMes(f.aluno.id, mesAtual); }
         }),
         el('button', {
           type: 'button', class: 'btn', texto: 'PDF com as folhas',
@@ -5841,6 +6717,131 @@
 
       lista.appendChild(cartao);
     });
+
+    desenharPanoramaDeValores();
+  }
+
+  /* O que ela deu e não cobrou no mês.
+   *
+   * Duas linhas discretas, sem cor de aviso e sem sugestão, só o número. A aula
+   * extra na véspera da prova, a reposição sem cobrar e o horário esticado são
+   * gentilezas, e o total nunca tinha sido somado. Isto NÃO entra no fechamento
+   * que a família recebe, e não é para entrar: mostrar essa conta a quem paga
+   * transforma gentileza em dívida. Por isso mora aqui, na tela, e não em
+   * markdownFechamento nem no PDF. */
+  function desenharGentilezas(depoisDe, t) {
+    var caixa = $('#gentilezas-do-mes');
+    if (!caixa) {
+      caixa = el('div', { id: 'gentilezas-do-mes' });
+      if (depoisDe && depoisDe.parentNode) {
+        depoisDe.parentNode.insertBefore(caixa, depoisDe.nextSibling);
+      } else return;
+    }
+    caixa.innerHTML = '';
+    if (!t.minutosDadosSemCobrar && !t.minutosDesmarcados) return;
+    caixa.appendChild(el('div', {
+      class: 'ajuda', style: 'margin:-8px 0 4px',
+      texto: 'Horas dadas sem cobrar no mês: ' + Core.fmtHoras(t.minutosDadosSemCobrar) + ' h'
+    }));
+    caixa.appendChild(el('div', {
+      class: 'ajuda', style: 'margin:0 0 4px',
+      texto: 'Horas reservadas e desmarcadas: ' + Core.fmtHoras(t.minutosDesmarcados) + ' h'
+    }));
+    caixa.appendChild(el('div', {
+      class: 'ajuda', style: 'margin:0 0 14px;font-size:12px',
+      texto: 'Só para você. Não entra no documento que a família recebe.'
+    }));
+  }
+
+  // ================= cada aluno, desde quando e por quanto =================
+
+  /* Uma linha por aluno, só para ela: desde quando estuda, quanto paga, há
+   * quantos meses está nesse valor e quanto pesa no mês. Ao lado, uma sugestão
+   * de reajuste. Sem alerta e sem cobrança: só o que já está guardado. */
+
+  function textoDaIdadeDoIndice(ind) {
+    var quando = 'referentes a ' + Core.mesExtenso(ind.referencia).toLowerCase();
+    if (ind.baixado) {
+      return 'Números do IBGE ' + quando +
+        (ind.baixadoEm ? ', baixados em ' + Core.ddmmaaaa(ind.baixadoEm) : '') + '.';
+    }
+    return 'Números do IBGE ' + quando + ', os que vieram escritos no aplicativo. ' +
+      'Quando houver internet, ele busca os mais novos sozinho.';
+  }
+
+  function linhaDoPanorama(l) {
+    var partes = [];
+    if (l.desde) {
+      partes.push('estuda com você desde ' + Core.ddmmaaaa(l.desde) +
+        (typeof l.mesesEstudando === 'number'
+          ? ' (' + (l.mesesEstudando < 1 ? 'menos de um mês'
+            : l.mesesEstudando + ' ' + plural(l.mesesEstudando, 'mês', 'meses')) + ')'
+          : ''));
+    }
+    if (l.valorHora !== null && typeof l.mesesNoValor === 'number') {
+      partes.push('neste valor há ' + (l.mesesNoValor < 1 ? 'menos de um mês'
+        : l.mesesNoValor + ' ' + plural(l.mesesNoValor, 'mês', 'meses')));
+    }
+    if (l.valorNoMes > 0) {
+      partes.push(dinheiro(l.valorNoMes) + ' no mês, ' +
+        Math.round(l.fatiaDoMes * 100) + '% do total');
+    }
+
+    var caixa = el('div', { class: 'item-lista', style: 'display:block' });
+    caixa.appendChild(el('div', { class: 'barra', style: 'margin-bottom:2px' }, [
+      el('div', { class: 'nome', texto: l.nome }),
+      el('span', { class: 'cresce' }),
+      el('strong', {
+        style: 'color:#1F3A5F',
+        texto: l.valorHora === null ? 'sem valor por hora' : dinheiro(l.valorHora) + ' por hora'
+      })
+    ]));
+    if (partes.length) {
+      caixa.appendChild(el('div', { class: 'detalhe', texto: partes.join(' · ') }));
+    }
+    if (!l.sugestao) {
+      caixa.appendChild(el('div', {
+        class: 'detalhe', style: 'margin-top:4px',
+        texto: 'Sem valor por hora cadastrado, então não há o que sugerir.'
+      }));
+      return caixa;
+    }
+    caixa.appendChild(el('div', {
+      class: 'detalhe', style: 'margin-top:6px;color:#1F3A5F',
+      texto: 'Sugestão: ' + dinheiro(l.sugestao.valorNovo) + ' por hora, ' +
+        Core.pctBR(l.sugestao.percentual) + ' a mais' +
+        (l.sugestao.noAno > 0 ? '. No ano, ' + dinheiro(l.sugestao.noAno) + ' a mais' : '') + '.'
+    }));
+    caixa.appendChild(el('div', { class: 'detalhe', style: 'margin-top:2px', texto: l.sugestao.motivo }));
+    return caixa;
+  }
+
+  function desenharPanoramaDeValores() {
+    var tela = $('#tela-fechamento');
+    if (!tela) return;
+    var caixa = $('#painel-valores');
+    if (!caixa) {
+      caixa = el('div', { id: 'painel-valores' });
+      tela.appendChild(caixa);
+    }
+    caixa.innerHTML = '';
+
+    var pan = Core.panoramaDeValores(db, mesAtual);
+    if (!pan.linhas.length) return;
+
+    caixa.appendChild(el('h3', { class: 'subtitulo', texto: 'Cada aluno, desde quando e por quanto' }));
+    var cartao = el('div', { class: 'cartao' });
+    cartao.appendChild(el('div', {
+      class: 'ajuda', style: 'margin-top:0',
+      texto: 'Só para você. Nada daqui entra no documento que a família recebe. ' +
+        textoDaIdadeDoIndice(pan.indices) +
+        (pan.margem > 0 ? ' A sugestão já soma os ' + Core.pctBR(pan.margem) +
+          ' acima que você escolheu em Ajustes.' : '')
+    }));
+    pan.linhas.forEach(function (l) { cartao.appendChild(linhaDoPanorama(l)); });
+    caixa.appendChild(cartao);
+
+    if (tela.classList.contains('ativa')) setTimeout(talvezAtualizarIndices, 1200);
   }
 
   function abrirResumo(alunoId, mes) {
@@ -5876,8 +6877,465 @@
     salvar().then(function () {
       fecharModal('modal-resumo');
       desenharFechamento();
+      /* A tela do mês pode estar aberta por baixo, e é de lá que ela costuma
+       * escrever o feedback: sem isto o texto novo só apareceria ao reabrir. */
+      atualizarMesNumaTela();
       avisar('Resumo salvo.');
     });
+  }
+
+  // ================= o cartão do mês =================
+
+  /* O mesmo fechamento que ela já escreve, saindo também como uma imagem
+   * quadrada que aparece DENTRO da conversa em vez de virar um retângulo cinza
+   * para baixar. O desenho inteiro mora no cartao.js; aqui só existem as três
+   * coisas que o documento promete: ela escolhe a frase, ela vê antes de mandar
+   * e é essa mesma imagem que sai.
+   *
+   * A prévia e o arquivo são o MESMO canvas, de propósito. Redesenhar por fora
+   * na hora de enviar abriria a porta para a família receber uma imagem que ela
+   * nunca viu, e o documento diz "vê antes de mandar, sempre".
+   *
+   * Não há campo novo e não há gravação: o cartão é leitura do que o
+   * Core.calcularFechamento já devolve. Fechar sem enviar não deixa rastro. */
+  var cartaoAberto = null;
+
+  function abrirCartaoDoMes(alunoId, mes) {
+    var f = Core.calcularFechamento(db, alunoId, mes);
+    if (!f) { avisar('Não há o que mostrar neste mês.'); return; }
+    /* O desenho do cartão vive num arquivo próprio. Enquanto ele não estiver na
+     * lista do sw.js, uma abertura sem sinal pode não tê-lo: melhor dizer isso
+     * do que quebrar a tela de fechamento inteira em cima de um toque. */
+    if (typeof Cartao === 'undefined' || !Cartao) {
+      avisar('O cartão do mês não abriu agora. Tente de novo com internet.');
+      return;
+    }
+    var frases = Cartao.frasesDoResumo(f.resumoTexto);
+    cartaoAberto = { alunoId: alunoId, mes: mes, nome: f.alunoNome, frase: frases[0] || '' };
+    $('#titulo-modal-cartao').textContent = 'Cartão do mês, ' + f.alunoNome;
+    abrirModal('modal-cartao');
+    desenharEscolhaDoCartao(f, frases);
+  }
+
+  function desenharEscolhaDoCartao(f, frases) {
+    var corpo = $('#corpo-modal-cartao');
+    corpo.innerHTML = '';
+
+    var tela = el('canvas', { class: 'previa-cartao', id: 'previa-cartao' });
+    var botoes = [];
+
+    function repintar() {
+      /* rotuloDisciplina depende do índice das outras matérias, que pode não ter
+       * vindo ainda. O cartao.js tem a própria lista de reserva, então o nome da
+       * matéria sai certo dos dois jeitos. */
+      Cartao.desenhar(tela, f, {
+        frase: cartaoAberto.frase,
+        rotuloDisciplina: rotuloDisciplina
+      });
+      botoes.forEach(function (b) {
+        b.classList.toggle('escolhida', b._frase === cartaoAberto.frase);
+      });
+    }
+
+    function opcao(texto, valor, extra) {
+      var b = el('button', {
+        type: 'button', class: 'opcao-frase' + (extra || ''), texto: texto,
+        aoClick: function () { cartaoAberto.frase = valor; repintar(); }
+      });
+      b._frase = valor;
+      botoes.push(b);
+      return b;
+    }
+
+    /* A imagem vem PRIMEIRO e fica presa no alto enquanto ela rola as frases.
+     * O documento promete "vê antes de mandar, sempre", e com oito frases numa
+     * tela de tablet a prévia caía abaixo da dobra: ela escolheria uma frase e
+     * mandaria sem ter visto o cartão. Presa, cada toque numa frase muda uma
+     * imagem que está debaixo do olho dela. */
+    corpo.appendChild(el('div', { class: 'previa-presa' }, [
+      tela,
+      el('div', {
+        class: 'ajuda', style: 'margin:8px 0 0;text-align:center',
+        texto: 'É exatamente esta imagem que a família recebe.'
+      })
+    ]));
+
+    if (frases.length) {
+      corpo.appendChild(el('div', {
+        class: 'ajuda', style: 'margin:14px 0 8px',
+        texto: 'A frase sai do feedback que você já escreveu. Toque numa e ela vai para o cartão.'
+      }));
+      frases.forEach(function (fr) { corpo.appendChild(opcao(fr, fr)); });
+      corpo.appendChild(opcao('Sem frase nenhuma', '', ' sem-frase'));
+    } else {
+      corpo.appendChild(el('div', {
+        class: 'ajuda', style: 'margin:14px 0 8px',
+        texto: 'O feedback deste mês ainda não foi escrito, então o cartão sai sem frase. ' +
+          'Escreva o feedback e volte aqui para escolher uma.'
+      }));
+    }
+
+    corpo.appendChild(el('div', {
+      class: 'ajuda', style: 'margin:10px 0 0',
+      texto: 'O cartão não leva valor nenhum. A conta continua no PDF do fechamento, ' +
+        'e a lista completa de assuntos também.'
+    }));
+
+    repintar();
+  }
+
+  function enviarCartaoDoMes() {
+    var tela = $('#previa-cartao');
+    if (!tela || !cartaoAberto) return;
+    var alvo = cartaoAberto;
+    tela.toBlob(function (bl) {
+      if (!bl) { avisar('Não consegui gerar o cartão.'); return; }
+      entregarArquivo('Cartao_' + Core.nomeArquivo(alvo.nome) + '_' + alvo.mes + '.png',
+        bl, 'Cartão do mês');
+      fecharModal('modal-cartao');
+    }, 'image/png');
+  }
+
+  // ================= o mês numa tela, nos dois modos =================
+
+  /* O mês inteiro de um aluno numa tela só, em dois modos: um com tudo, para ela
+   * escrever o fechamento sem abrir aula por aula, e outro sem valores, sem a
+   * anotação particular dela e sem nenhum outro aluno, para abrir com o tablet
+   * na mão na frente da família.
+   *
+   * O modo da família não esconde o que é dela atrás de uma máscara: ele NÃO
+   * CRIA o nó. Máscara é o que o botão do olho faz, e máscara ainda escreve
+   * "R$" na tela; aqui o valor não chega a existir no documento. E o resto do
+   * aplicativo sai do ar por CSS (body.modo-familia no styles.css), porque a
+   * agenda e o fechamento atrás desta janela têm todos os outros alunos e todo
+   * o dinheiro do mês, e uma rolagem ou uma janela mal fechada bastaria.
+   *
+   * Nenhum arquivo é gerado daqui, nos dois modos. Não há PDF, não há imagem e
+   * não há compartilhamento: o que sai para a família continua saindo pelos
+   * botões da tela de fechamento, onde ela escolhe o que manda. Assim não
+   * existe caminho por onde esta tela vaze num arquivo.
+   *
+   * Nada aqui grava: é leitura do que o Core.calcularFechamento devolve, mais o
+   * notaPrivada lido direto da aula, que de propósito não viaja no fechamento. */
+  var mesNaTela = null;
+  var modoFamilia = false;
+  var perguntandoFamilia = false;
+  var MS_SEGURAR = 1200;
+
+  /* No modo da família a tela não fecha por engano: nem no ×, nem tocando fora,
+   * nem no Cancelar. Sair de lá é segurar o botão do rodapé. */
+  function presaNoModoFamilia(id) { return id === 'modal-mes' && modoFamilia; }
+
+  function abrirMesNumaTela(alunoId, mes) {
+    mesNaTela = { alunoId: alunoId, mes: mes };
+    modoFamilia = false;
+    perguntandoFamilia = false;
+    abrirModal('modal-mes');
+    desenharMesNumaTela();
+  }
+
+  function encerrarMesNumaTela() {
+    mesNaTela = null;
+    modoFamilia = false;
+    perguntandoFamilia = false;
+    document.body.classList.remove('modo-familia');
+  }
+
+  function atualizarMesNumaTela() {
+    if (mesNaTela && $('#modal-mes').classList.contains('aberto')) desenharMesNumaTela();
+  }
+
+  function entrarNoModoFamilia() {
+    perguntandoFamilia = false;
+    modoFamilia = true;
+    /* Nenhuma outra janela pode ficar aberta atrás desta. O CSS já as esconde,
+     * mas fechar de verdade é o que garante que ela não volte de lá com uma
+     * janela pendurada que ninguém sabia estar aberta. */
+    $$('.fundo-modal.aberto').forEach(function (m) {
+      if (m.id !== 'modal-mes') fecharModal(m.id);
+    });
+    desenharMesNumaTela();
+    $('#corpo-modal-mes').scrollTop = 0;
+  }
+
+  function sairDoModoFamilia() {
+    modoFamilia = false;
+    perguntandoFamilia = false;
+    desenharMesNumaTela();
+  }
+
+  /* As duas caixas do alto saem da MESMA lista de blocos que vem logo abaixo.
+   *
+   * Contavam de conjuntos diferentes. "Encontros" somava tudo que não fosse
+   * cancelada, então a aula dada de graça e a falta entravam; "Horas" usava o
+   * total cobrado, onde nenhuma das duas entra. Um mês com uma aula de duas
+   * horas dada sem cobrar e uma falta de uma hora mostrava dez encontros e oito
+   * horas sobre os mesmos onze blocos, e nenhum dos dois números explicava o
+   * outro para quem lia.
+   *
+   * Agora as duas contam a mesma linha: o encontro que houve. A falta e a aula
+   * cancelada com aviso continuam na lista, com o rótulo delas, e ficam fora da
+   * conta, porque ninguém deu aula naquele dia. A aula dada sem cobrar entra
+   * nas duas, porque ela aconteceu, e a família não descobre por aqui que ela
+   * não foi cobrada: no modo da família não há uma palavra sobre cobrança.
+   *
+   * E só entra no número grande o que já aconteceu. Isto aqui é a mesma
+   * separação que o Core faz com hoje, lida da linha (l.futura): a aula marcada
+   * para daqui a três semanas vai para o rodapé, "mais N marcados à frente", e
+   * nunca para o número que a família lê em letra grande.
+   *
+   * Não uso o par qtdEncontrosFeitos e minFeitos direto porque eles são o par
+   * do dinheiro: qtdEncontrosFeitos conta a falta, e minFeitos só soma minuto
+   * cobrado. Os dois juntos recriariam aqui a mesma divergência de conjunto. */
+  function houveEncontro(l) {
+    return l.status !== 'cancelada' && l.status !== 'falta';
+  }
+
+  function contaDeEncontros(linhas) {
+    var c = { feitos: 0, minFeitos: 0, previstos: 0, minPrevistos: 0 };
+    (linhas || []).forEach(function (l) {
+      if (!houveEncontro(l)) return;
+      if (l.futura) { c.previstos += 1; c.minPrevistos += l.duracaoMin || 0; }
+      else { c.feitos += 1; c.minFeitos += l.duracaoMin || 0; }
+    });
+    return c;
+  }
+
+  function blocoDaAula(l) {
+    var bloco = el('div', { class: 'bloco-mes' + (l.futura ? ' futura' : '') });
+    var cabeca = el('div', { class: 'cabeca-dia' });
+    cabeca.appendChild(el('span', {
+      class: 'data-dia', texto: Core.ddmm(l.data) + ' · ' + l.dia
+    }));
+
+    var detalhe = [Core.fmtDuracao(l.duracaoMin)];
+    if (modoFamilia) {
+      /* "Realizada" em toda linha é ruído; o que foge do comum é o que informa.
+       * O rótulo é o mesmo do PDF que a família recebe, para a tela e o
+       * documento nunca contarem histórias diferentes. */
+      if (l.status !== 'realizada') detalhe.push(l.statusRotulo);
+      /* A aula que ainda não chegou saía desenhada igual à que já aconteceu:
+       * mesma borda, mesma letra, nenhuma marca. Quem está lendo do outro lado
+       * da mesa não tem como saber que aquele dia é o mês que vem. */
+      if (l.futura) detalhe.push('ainda vai acontecer');
+    } else {
+      if (l.hora) detalhe.push(l.hora);
+      detalhe.push(l.statusRotulo + (l.cobravel ? '' : ' (não cobrada)'));
+      if (l.futura) detalhe.push('ainda vai acontecer');
+    }
+    cabeca.appendChild(el('span', { class: 'detalhe-dia', texto: detalhe.join(' · ') }));
+
+    if (!modoFamilia) {
+      cabeca.appendChild(el('span', {
+        class: 'valor-dia', texto: dinheiro(l.cobravel ? l.valor : 0)
+      }));
+    }
+    bloco.appendChild(cabeca);
+
+    var titulos = (l.temas || []).map(function (t) {
+      return String((t && t.titulo) || '').trim();
+    }).filter(Boolean);
+    if (titulos.length) {
+      var tags = el('div', { class: 'tags-assunto' });
+      titulos.forEach(function (t) { tags.appendChild(el('span', { class: 'assunto-mes', texto: t })); });
+      bloco.appendChild(tags);
+    }
+
+    var rendeu = (l.notaTexto || '').trim();
+    if (rendeu) bloco.appendChild(el('div', { class: 'texto-rendeu', texto: rendeu }));
+
+    /* O bloco cinza com a barra. Só no modo dela, e lido direto da aula: o
+     * notaPrivada não viaja no fechamento justamente para não vazar por
+     * descuido em quem consome o fechamento. */
+    if (!modoFamilia) {
+      var au = (db.aulas || []).filter(function (a) { return a.id === l.id; })[0];
+      var so = au ? (au.notaPrivada || '').trim() : '';
+      if (so) {
+        bloco.appendChild(el('div', { class: 'so-minha' }, [
+          el('span', { class: 'rotulo-so-minha', texto: 'Só minha' }),
+          document.createTextNode(so)
+        ]));
+      }
+    }
+
+    return bloco;
+  }
+
+  function desenharMesNumaTela() {
+    if (!mesNaTela) return;
+    var f = Core.calcularFechamento(db, mesNaTela.alunoId, mesNaTela.mes);
+    if (!f) { fecharModal('modal-mes'); return; }
+
+    document.body.classList.toggle('modo-familia', modoFamilia);
+
+    /* O título da janela também é tela. No modo da família ele leva o primeiro
+     * nome deste aluno e o mês, e mais nada. */
+    $('#titulo-modal-mes').textContent = f.alunoNome + ', ' + f.mesExtenso;
+    var selo = $('#selo-modal-mes');
+    selo.textContent = modoFamilia ? 'Mostrando para a família' : '';
+    selo.className = modoFamilia ? 'selo-familia' : '';
+
+    var corpo = $('#corpo-modal-mes');
+    corpo.innerHTML = '';
+
+    var c = contaDeEncontros(f.linhas);
+    var numeros = el('div', { class: 'numeros' });
+    numeros.appendChild(numeroComRodape('Encontros', String(c.feitos), [
+      c.previstos ? 'mais ' + c.previstos + ' ' +
+        plural(c.previstos, 'marcado à frente', 'marcados à frente') : ''
+    ]));
+    numeros.appendChild(numeroComRodape('Horas', Core.fmtHoras(c.minFeitos) + ' h', [
+      c.minPrevistos ? 'mais ' + Core.fmtHoras(c.minPrevistos) + ' h à frente' : ''
+    ]));
+    if (!modoFamilia) {
+      /* O rótulo muda junto com o número. Num mês já vencido nada está à frente
+       * e ele é o total do mês, como sempre foi; enquanto o mês corre, o número
+       * é só o que já aconteceu, e dizer "total do mês" ali seria a mesma
+       * mentira de antes, agora do lado do dinheiro. */
+      numeros.appendChild(numeroComRodape(
+        c.previstos ? 'Total até aqui' : 'Total do mês', dinheiro(f.valorFeito), [
+          f.faixas.length > 1 ? 'houve reajuste no mês' : '',
+          f.valorPrevisto ? 'previsto à frente: ' + dinheiro(f.valorPrevisto) : '',
+          f.valorPrevisto ? 'mês inteiro: ' + dinheiro(f.totalValor) : ''
+        ]));
+    }
+    corpo.appendChild(numeros);
+
+    if (!modoFamilia && (f.minutosDadosSemCobrar || f.minutosDesmarcados)) {
+      corpo.appendChild(el('div', {
+        class: 'ajuda', style: 'margin-top:-6px',
+        texto: [
+          f.minutosDadosSemCobrar
+            ? 'Dadas sem cobrar: ' + Core.fmtHoras(f.minutosDadosSemCobrar) + ' h' : '',
+          f.minutosDesmarcados
+            ? 'Reservadas e desmarcadas: ' + Core.fmtHoras(f.minutosDesmarcados) + ' h' : ''
+        ].filter(Boolean).join(' · ') + '. Só para você.'
+      }));
+    }
+
+    if (!f.linhas.length) {
+      corpo.appendChild(el('div', { class: 'vazio' }, [
+        el('p', { texto: 'Nenhum encontro registrado neste mês.' })
+      ]));
+    } else {
+      f.linhas.forEach(function (l) { corpo.appendChild(blocoDaAula(l)); });
+    }
+
+    if (f.areasDoMes.length) {
+      corpo.appendChild(el('h3', { class: 'subtitulo', texto: 'Além do conteúdo' }));
+      var areas = el('div', { class: 'tags-assunto' });
+      f.areasDoMes.forEach(function (a) {
+        areas.appendChild(el('span', { class: 'assunto-mes area', texto: a.rotulo }));
+      });
+      corpo.appendChild(areas);
+    }
+
+    var texto = (f.resumoTexto || '').trim();
+    if (texto || !modoFamilia) {
+      corpo.appendChild(el('h3', { class: 'subtitulo', texto: 'Feedback do mês' }));
+      corpo.appendChild(texto
+        ? el('div', { class: 'texto-rendeu', style: 'margin-top:0', texto: texto })
+        : el('div', {
+          class: 'ajuda', style: 'margin-top:0',
+          texto: 'Ainda não escrito. É esta tela que serve para escrever, sem abrir aula por aula.'
+        }));
+    }
+
+    desenharRodapeDoMes(f);
+  }
+
+  function desenharRodapeDoMes(f) {
+    var rodape = $('#rodape-modal-mes');
+    rodape.innerHTML = '';
+
+    if (modoFamilia) {
+      rodape.appendChild(botaoDeSegurarParaSair());
+      return;
+    }
+
+    if (perguntandoFamilia) {
+      rodape.appendChild(el('div', { class: 'confirma-familia' }, [
+        el('strong', { texto: 'Vou virar o tablet para a família' }),
+        el('span', {
+          texto: 'Somem os valores, a sua anotação particular e todos os outros alunos. ' +
+            'Fica só ' + f.alunoNome + ' em ' + f.mesExtenso + '. ' +
+            'Para voltar, você segura o botão de sair.'
+        })
+      ]));
+      rodape.appendChild(el('button', {
+        type: 'button', class: 'btn esquerda', texto: 'Agora não',
+        aoClick: function () { perguntandoFamilia = false; desenharMesNumaTela(); }
+      }));
+      rodape.appendChild(el('button', {
+        type: 'button', class: 'btn destaque', id: 'confirmar-familia', texto: 'Sim, mostrar',
+        aoClick: entrarNoModoFamilia
+      }));
+      return;
+    }
+
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn esquerda', texto: 'Fechar',
+      aoClick: function () { fecharModal('modal-mes'); }
+    }));
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn',
+      texto: (f.resumoTexto || '').trim() ? 'Editar o feedback' : 'Escrever o feedback',
+      aoClick: function () { abrirResumo(f.aluno.id, f.mes); }
+    }));
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn principal', id: 'mostrar-para-familia',
+      texto: 'Mostrar para a família',
+      aoClick: function () { perguntandoFamilia = true; desenharMesNumaTela(); }
+    }));
+  }
+
+  /* Segurar, e não tocar.
+   *
+   * Um toque perdido no meio de uma conversa não pode devolver a tela com os
+   * valores e os outros alunos na frente de quem paga. Segurar por um instante
+   * é gesto de adulto decidido, e a barra que enche diz o que está acontecendo
+   * enquanto acontece. Quem só toca não sai, e lê por que não saiu.
+   *
+   * Isto não é gesto novo por aula: esta tela é do fim do mês, e nada no dia a
+   * dia dela depende de saber segurar botão. */
+  function botaoDeSegurarParaSair() {
+    var caixa = document.createDocumentFragment();
+    var dica = el('div', { class: 'dica-segurar', id: 'dica-segurar', texto: '' });
+    var botao = el('button', {
+      type: 'button', class: 'btn segurar', id: 'sair-modo-familia'
+    }, [
+      el('span', { class: 'enchendo' }),
+      el('span', { class: 'rotulo-segurar', texto: 'Segure para sair' })
+    ]);
+
+    var conta = null;
+    function comeca(ev) {
+      if (ev && ev.cancelable) ev.preventDefault();
+      if (conta) return;
+      dica.textContent = '';
+      botao.classList.add('segurando');
+      conta = setTimeout(function () {
+        conta = null;
+        botao.classList.remove('segurando');
+        sairDoModoFamilia();
+      }, MS_SEGURAR);
+    }
+    function solta() {
+      if (!conta) return;
+      clearTimeout(conta);
+      conta = null;
+      botao.classList.remove('segurando');
+      dica.textContent = 'Segure o botão por um instante para sair.';
+    }
+
+    botao.addEventListener('pointerdown', comeca);
+    botao.addEventListener('pointerup', solta);
+    botao.addEventListener('pointerleave', solta);
+    botao.addEventListener('pointercancel', solta);
+
+    caixa.appendChild(botao);
+    caixa.appendChild(dica);
+    return caixa;
   }
 
   // ================= exportação =================
@@ -6083,12 +7541,173 @@
       }
     }
 
+    desenharAjustesDeReajuste();
+
     Store.estimarEspaco().then(function (e) {
       if (!e) { $('#info-espaco').textContent = ''; return; }
       var usado = (e.usage || 0) / (1024 * 1024);
       $('#info-espaco').textContent = 'Espaço usado pelo aplicativo: ' +
         (usado < 1 ? (Math.round(usado * 1000) / 1000).toString().replace('.', ',') : (Math.round(usado * 10) / 10).toString().replace('.', ',')) + ' MB.';
     });
+  }
+
+  // ================= os números do IBGE =================
+
+  /* A sugestão de reajuste usa dois números do IBGE: quanto as escolas subiram
+   * em doze meses e a inflação geral no mesmo período. Os dois vêm do mesmo
+   * pedido e se atualizam juntos.
+   *
+   * Ela dá aula na casa das famílias e muitas vezes está sem sinal. Por isso a
+   * busca NUNCA segura a tela e nunca reclama sozinha quando falha: o par que
+   * veio escrito no aplicativo continua valendo, com a data dele à vista, para
+   * ela nunca olhar um número sem saber de quando é. Em Ajustes ficam essa data
+   * e um botão para procurar na hora, se ela quiser. */
+
+  var buscandoIbge = false;
+
+  function buscarIndicesDoIbge() {
+    if (buscandoIbge) return Promise.reject(new Error('já está procurando'));
+    if (typeof fetch !== 'function') return Promise.reject(new Error('sem fetch aqui'));
+    buscandoIbge = true;
+
+    var parar = null;
+    var opcoes = { cache: 'no-store' };
+    if (typeof AbortController === 'function') {
+      var ctrl = new AbortController();
+      opcoes.signal = ctrl.signal;
+      parar = setTimeout(function () { try { ctrl.abort(); } catch (e) { /* já foi */ } }, 15000);
+    }
+    var solta = function () { if (parar) clearTimeout(parar); buscandoIbge = false; };
+
+    return fetch(Core.IBGE_URL, opcoes).then(function (r) {
+      if (!r.ok) throw new Error('resposta ' + r.status);
+      return r.json();
+    }).then(function (dados) {
+      var lido = Core.lerIndicesDoIbge(dados);
+      if (!lido) throw new Error('a resposta não trouxe os dois números');
+      db.ajustes = db.ajustes || {};
+      db.ajustes.ibge = {
+        escolas12m: lido.escolas12m,
+        inflacao12m: lido.inflacao12m,
+        referencia: lido.referencia,
+        baixadoEm: Core.hojeIso()
+      };
+      return salvar().then(function () { solta(); return lido; });
+    }).catch(function (e) { solta(); throw e; });
+  }
+
+  /* Sozinho, sem ela pedir, quando abre a tela que usa o número e há internet.
+   *
+   * Uma vez por sessão e no máximo uma por semana: o IPCA sai uma vez por mês, o
+   * plano de dados do tablet não é para gastar à toa e a hora em que ela abre o
+   * aplicativo, na casa de uma família, é a pior hora para disputar a rede.
+   * Falhou, fica quieto: continua valendo o número que já estava, com a data
+   * dele à vista. */
+  var jaTenteiIbge = false;
+
+  function talvezAtualizarIndices() {
+    if (jaTenteiIbge) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    var g = db.ajustes && db.ajustes.ibge;
+    if (g && g.baixadoEm) {
+      var dias = (Core.dataLocal(Core.hojeIso()) - Core.dataLocal(g.baixadoEm)) / 86400000;
+      if (dias >= 0 && dias < 7) return;
+    }
+    jaTenteiIbge = true;
+    buscarIndicesDoIbge().then(function () {
+      desenharFechamento();
+      desenharAjustes();
+    }).catch(function () { /* sem sinal hoje: continua valendo o que já estava */ });
+  }
+
+  function desenharAjustesDeReajuste() {
+    var tela = $('#tela-ajustes');
+    if (!tela) return;
+    var caixa = $('#ajustes-reajuste');
+    if (!caixa) {
+      caixa = el('div', { id: 'ajustes-reajuste' });
+      /* Antes de Recomeçar, que é onde ficam os botões de apagar. */
+      var apagar = $('#apagar-exemplo');
+      var cartaoRecomecar = (apagar && apagar.closest) ? apagar.closest('.cartao') : null;
+      var tituloRecomecar = cartaoRecomecar ? cartaoRecomecar.previousElementSibling : null;
+      if (tituloRecomecar && tituloRecomecar.parentNode === tela) tela.insertBefore(caixa, tituloRecomecar);
+      else tela.appendChild(caixa);
+    }
+    caixa.innerHTML = '';
+
+    var ind = Core.indicesDeReajuste(db);
+    var margem = Core.margemDeReajuste(db);
+
+    caixa.appendChild(el('h3', { class: 'subtitulo', texto: 'Sugestão de reajuste' }));
+    var cartao = el('div', { class: 'cartao' });
+
+    cartao.appendChild(el('p', {
+      class: 'ajuda', style: 'margin-top:0',
+      texto: 'A sugestão que aparece no fechamento usa dois números do IBGE: quanto as escolas ' +
+        'subiram em doze meses e a inflação geral no mesmo período. Os dois vêm do mesmo lugar e ' +
+        'se atualizam juntos, sozinhos, sempre que o tablet estiver com internet.'
+    }));
+
+    cartao.appendChild(el('div', {
+      class: 'faixa-info',
+      texto: 'Escolas: ' + Core.pctBR(ind.escolas12m) + ' em doze meses. Inflação geral: ' +
+        Core.pctBR(ind.inflacao12m) + '. ' + textoDaIdadeDoIndice(ind)
+    }));
+
+    cartao.appendChild(el('div', { class: 'barra' }, [
+      el('button', {
+        type: 'button', class: 'btn', id: 'procurar-ibge',
+        texto: 'Procurar os números agora',
+        aoClick: function () {
+          var b = $('#procurar-ibge');
+          if (b) { b.disabled = true; b.textContent = 'Procurando...'; }
+          buscarIndicesDoIbge().then(function (lido) {
+            avisar('Números atualizados: escolas ' + Core.pctBR(lido.escolas12m) +
+              ' e inflação ' + Core.pctBR(lido.inflacao12m) + '.');
+            desenharAjustes();
+            desenharFechamento();
+          }).catch(function () {
+            if (b) { b.disabled = false; b.textContent = 'Procurar os números agora'; }
+            avisar('Não consegui buscar agora. Continua valendo o número de ' +
+              Core.mesExtenso(ind.referencia).toLowerCase() + '.');
+          });
+        }
+      })
+    ]));
+
+    cartao.appendChild(el('p', {
+      class: 'ajuda', style: 'margin:16px 0 8px',
+      texto: 'Quanto você quer subir acima da inflação. Entra na sugestão, somado à alta das escolas.'
+    }));
+
+    var mostra = el('strong', {
+      style: 'font-size:20px;min-width:78px;text-align:center;color:#1F3A5F',
+      texto: Core.pctBR(margem)
+    });
+    var mudar = function (passo) {
+      db.ajustes = db.ajustes || {};
+      var novo = Core.margemDeReajuste(db) + passo;
+      if (novo < 0) novo = 0;
+      if (novo > 20) novo = 20;
+      db.ajustes.reajusteAcimaDaInflacao = novo;
+      salvar().then(function () {
+        mostra.textContent = Core.pctBR(Core.margemDeReajuste(db));
+        desenharFechamento();
+      });
+    };
+    cartao.appendChild(el('div', { class: 'barra', style: 'margin-bottom:0' }, [
+      el('button', {
+        type: 'button', class: 'btn', style: 'min-width:64px', texto: '-1%',
+        'aria-label': 'Diminuir um ponto', aoClick: function () { mudar(-1); }
+      }),
+      mostra,
+      el('button', {
+        type: 'button', class: 'btn', style: 'min-width:64px', texto: '+1%',
+        'aria-label': 'Aumentar um ponto', aoClick: function () { mudar(1); }
+      })
+    ]));
+
+    caixa.appendChild(cartao);
   }
 
   /* Por que a cópia ia parar sempre nos downloads, e nunca no Drive.
