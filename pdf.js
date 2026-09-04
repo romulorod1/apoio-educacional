@@ -884,45 +884,80 @@
       yy -= 15;
     }
 
+    /* A folha que vai para a família nunca conta como dada uma aula que ainda
+       não aconteceu.
+
+       A aula nasce marcada como realizada, inclusive a que está lá na frente no
+       calendário. Enquanto esta tabela era uma só, com o total do mês inteiro,
+       imprimir o fechamento no dia 3 dizia à família que onze encontros tinham
+       acontecido quando três tinham. O item 02 desta rodada separou as somas no
+       motor (qtdEncontrosFeitos, valorFeito, minFeitos); aqui a tabela se separa
+       junto: em cima o que aconteceu até hoje, embaixo o que está marcado à
+       frente, com o total do mês fechado por escrito.
+
+       Mês vencido não tem nada à frente, e nesse caso sai exatamente a folha de
+       sempre: a tabela de baixo não existe e a de cima tem o mês inteiro. */
+    var todas = dados.linhas || [];
+    var previstas = todas.filter(function (l) { return l.futura; });
+    var feitas = previstas.length ? todas.filter(function (l) { return !l.futura; }) : todas;
+    var ate = previstas.length ? ' até ' + ddmmL(dados.hoje) : '';
+    var horasDaTabela = previstas.length ? dados.horasFeitas : dados.totalHoras;
+    var valorDaTabela = previstas.length ? dados.valorFeito : dados.totalValor;
+    var encontrosDaTabela = previstas.length ? dados.qtdEncontrosFeitos : dados.qtdEncontros;
+    var faixasDaTabela = (previstas.length ? dados.faixasFeitas : dados.faixas) || dados.faixas || [];
+    var precoDaTabela = previstas.length
+      ? (dados.precoUnicoFeito !== undefined ? dados.precoUnicoFeito : dados.precoUnico)
+      : dados.precoUnico;
+
+    function corpoDaTabela(lista) {
+      for (var j = 0; j < lista.length; j++) {
+        var l = lista[j];
+        linhaTabela(doc, {
+          data: ddmmL(l.data),
+          dia: l.dia,
+          hora: l.hora || '',
+          dur: fmtDur(l.duracaoMin),
+          situacao: (l.statusNaFolha || l.statusRotulo) + (l.cobravel ? '' : ' (não cobrada)'),
+          vh: !l.cobravel ? '' : (l.valorHora !== null ? fmtMoedaLocal(l.valorHora) : 'sem preço'),
+          valor: fmtMoedaLocal(l.cobravel ? l.valor : 0)
+        }, j, false);
+      }
+    }
+
     // tabela
     doc.y -= 24;
     doc.texto('Datas trabalhadas', MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
     doc.y -= 6;
     cabecalhoTabela(doc);
 
-    var linhas = dados.linhas || [];
-    for (var j = 0; j < linhas.length; j++) {
-      var l = linhas[j];
-      linhaTabela(doc, {
-        data: ddmmL(l.data),
-        dia: l.dia,
-        hora: l.hora || '',
-        dur: fmtDur(l.duracaoMin),
-        situacao: l.statusRotulo + (l.cobravel ? '' : ' (não cobrada)'),
-        vh: !l.cobravel ? '' : (l.valorHora !== null ? fmtMoedaLocal(l.valorHora) : 'sem preço'),
-        valor: fmtMoedaLocal(l.cobravel ? l.valor : 0)
-      }, j, false);
-    }
-    if (!linhas.length) {
+    corpoDaTabela(feitas);
+    if (!todas.length) {
       doc.y -= 18;
       doc.texto('Nenhuma aula registrada neste mês.', MARG_E + 7, doc.y + 5.5, { tam: 9, cor: COR.muted });
+    } else if (!feitas.length) {
+      doc.y -= 18;
+      doc.texto('Nenhuma aula aconteceu até ' + ddmmaaaaL(dados.hoje) + '.',
+        MARG_E + 7, doc.y + 5.5, { tam: 9, cor: COR.muted });
     }
 
     // total
     linhaTabela(doc, {
       data: 'Total',
-      dur: dados.totalHoras + ' h',
-      situacao: dados.qtdEncontros + ' encontro' + (dados.qtdEncontros === 1 ? '' : 's'),
-      vh: dados.precoUnico !== null ? fmtMoedaLocal(dados.precoUnico) : 'vários',
-      valor: fmtMoedaLocal(dados.totalValor)
+      dur: horasDaTabela + ' h',
+      situacao: encontrosDaTabela + ' encontro' + (encontrosDaTabela === 1 ? '' : 's') + ate,
+      /* Tabela sem uma linha sequer não tem "vários" preço nenhum: fica em
+         branco. O mês inteiro vazio continua como sempre foi. */
+      vh: precoDaTabela !== null ? fmtMoedaLocal(precoDaTabela)
+        : ((previstas.length && !feitas.length) ? '' : 'vários'),
+      valor: fmtMoedaLocal(valorDaTabela)
     }, 0, true);
 
     // composicao por faixa, quando houve reajuste no mes
-    if (dados.faixas && dados.faixas.length > 1) {
+    if (faixasDaTabela.length > 1) {
       doc.y -= 16;
       doc.texto('Composição por valor vigente:', MARG_E, doc.y, { tam: 9, bold: true, cor: COR.navy });
-      for (var k = 0; k < dados.faixas.length; k++) {
-        var fx = dados.faixas[k];
+      for (var k = 0; k < faixasDaTabela.length; k++) {
+        var fx = faixasDaTabela[k];
         doc.y -= 13;
         var h = Math.floor(fx.minutos / 60) + ':' + (fx.minutos % 60 < 10 ? '0' : '') + (fx.minutos % 60);
         doc.texto(h + ' h a ' + fmtMoedaLocal(fx.valorHora) + ' por hora: ' + fmtMoedaLocal(fx.valor),
@@ -941,6 +976,33 @@
         MARG_E, doc.y, { tam: 9, bold: true, cor: COR.gold });
     }
 
+    /* O que está marcado à frente, em tabela própria, para que a soma da coluna
+       de valor bata com o total de cada tabela e nada precise ser conferido de
+       cabeça. */
+    if (previstas.length) {
+      doc.y -= 26;
+      doc.garanteEspaco(74);
+      doc.texto('Ainda marcadas neste mês', MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
+      doc.y -= 6;
+      cabecalhoTabela(doc);
+      corpoDaTabela(previstas);
+      linhaTabela(doc, {
+        data: 'Total',
+        dur: dados.horasPrevistas + ' h',
+        situacao: dados.qtdEncontrosPrevistos +
+          (dados.qtdEncontrosPrevistos === 1 ? ' encontro marcado' : ' encontros marcados'),
+        vh: '',
+        valor: fmtMoedaLocal(dados.valorPrevisto)
+      }, 0, true);
+      doc.y -= 16;
+      doc.garanteEspaco(30);
+      doc.paragrafo('Estas datas ainda não aconteceram e não entram no total acima. ' +
+        'Se todas acontecerem, o mês fecha em ' + dados.qtdEncontros + ' encontro' +
+        (dados.qtdEncontros === 1 ? '' : 's') + ', ' + dados.totalHoras + ' h e ' +
+        fmtMoedaLocal(dados.totalValor) + '.',
+        { tam: 9, cor: COR.muted, alturaLinha: 12.5 });
+    }
+
     /* O que foi trabalhado. Vem antes do resumo escrito porque é o que a
      * família procura quando abre o documento: o mês em uma olhada. */
     function tituloDeSecao(texto, larguraFio) {
@@ -956,10 +1018,15 @@
        escrito no core.js, em exibeListas: o documento que a família lê não
        muda porque ela experimentou uma funcionalidade nova. */
     var exibirListas = !!opcoes.exibirTemasEAreas;
-    if (exibirListas && dados.temasDoMes && dados.temasDoMes.length) {
+    /* Pelo mesmo motivo da tabela: assunto e área de uma aula que ainda não
+       aconteceu não entram em "trabalhados". Ela às vezes adianta o assunto do
+       encontro seguinte, e a folha dizia "Frações (18/09)" no dia 3. */
+    var temasDaFolha = (previstas.length ? dados.temasFeitos : dados.temasDoMes) || dados.temasDoMes || [];
+    var areasDaFolha = (previstas.length ? dados.areasFeitas : dados.areasDoMes) || dados.areasDoMes || [];
+    if (exibirListas && temasDaFolha.length) {
       tituloDeSecao('Temas trabalhados', 92);
-      for (var t = 0; t < dados.temasDoMes.length; t++) {
-        var tm = dados.temasDoMes[t];
+      for (var t = 0; t < temasDaFolha.length; t++) {
+        var tm = temasDaFolha[t];
         doc.garanteEspaco(16);
         doc.y -= 14;
         doc.texto('•', MARG_E + 3, doc.y, { tam: 10, cor: COR.teal });
@@ -975,19 +1042,19 @@
       }
     }
 
-    if (exibirListas && dados.areasDoMes && dados.areasDoMes.length) {
+    if (exibirListas && areasDaFolha.length) {
       tituloDeSecao('Áreas trabalhadas', 92);
       /* Em duas colunas: a lista costuma ser longa, e uma coluna só empurraria
          o resumo para a página seguinte sem necessidade. */
-      var meio = Math.ceil(dados.areasDoMes.length / 2);
+      var meio = Math.ceil(areasDaFolha.length / 2);
       var topo = doc.y;
       var menor = doc.y;
       for (var col = 0; col < 2; col++) {
         doc.y = topo;
         var px = MARG_E + col * (UTIL / 2);
-        var de = col * meio, ate = Math.min(dados.areasDoMes.length, de + meio);
-        for (var a = de; a < ate; a++) {
-          var ar = dados.areasDoMes[a];
+        var de = col * meio, ateCol = Math.min(areasDaFolha.length, de + meio);
+        for (var a = de; a < ateCol; a++) {
+          var ar = areasDaFolha[a];
           doc.y -= 14;
           doc.texto('•', px + 3, doc.y, { tam: 10, cor: COR.teal });
           doc.texto(ar.rotulo + (ar.vezes > 1 ? ' (' + ar.vezes + ')' : ''),
@@ -1904,6 +1971,29 @@
     this.y -= 6;
   };
 
+  /* Os nomes das matérias do mapeamento, na ordem em que aparecem na tela dela.
+   *
+   * Copiados do core.js e não lidos de lá, pelo mesmo motivo do cartao.js: este
+   * gerador não conhece o Core, roda no Node nos testes e desenha offline. Quem
+   * chamar pode passar op.rotuloMateria e ganhar o rótulo de qualquer outra;
+   * matéria sem rótulo conhecido sai com o nome que ela escreveu, e, na falta
+   * dele, com o próprio identificador, em vez de sumir da folha. */
+  var MATERIAS_ROTULO = {
+    matematica: 'Matemática',
+    portugues: 'Português',
+    redacao: 'Redação',
+    ingles: 'Inglês',
+    ciencias: 'Ciências',
+    fisica: 'Física',
+    quimica: 'Química',
+    biologia: 'Biologia',
+    historia: 'História',
+    geografia: 'Geografia',
+    filosofia: 'Filosofia',
+    sociologia: 'Sociologia',
+    outra: 'Outra'
+  };
+
   /* Ficha de mapeamento do aluno, em uma folha.
    *
    * Sai com a mesma moldura do fechamento porque pode ir para a mão da família,
@@ -1951,12 +2041,11 @@
 
     /* As listas marcadas em duas colunas: sozinhas numa coluna empurrariam o
        plano para a segunda folha sem necessidade. */
-    (op.grupos || []).forEach(function (g) {
-      var rot = op.rotulos(g.chave, m.marcados && m.marcados[g.chave]);
+    function blocoDeMarcados(titulo, rot) {
       if (!rot.length) return;
       doc.y -= 20;
       doc.garanteEspaco(46);
-      doc.texto(g.titulo, MARG_E, doc.y, { tam: 10.5, bold: true, cor: COR.navy });
+      doc.texto(titulo, MARG_E, doc.y, { tam: 10.5, bold: true, cor: COR.navy });
       doc.y -= 4;
       doc.linha(MARG_E, doc.y, MARG_E + 60, doc.y, COR.teal, 1.1);
       doc.y -= 2;
@@ -1975,6 +2064,56 @@
         if (doc.y < menor) menor = doc.y;
       }
       doc.y = menor;
+    }
+
+    (op.grupos || []).forEach(function (g) {
+      blocoDeMarcados(g.titulo, op.rotulos(g.chave, m.marcados && m.marcados[g.chave]));
+    });
+
+    /* O que ela marcou nas OUTRAS matérias.
+     *
+     * Matemática e tudo o que é sobre o aluno moram em m.marcados, que é o que
+     * a ficha sempre imprimiu. As outras matérias nasceram no item 12 e moram em
+     * m.porMateria, e a ficha não olhava para lá: aluno mapeado em história ou
+     * português saía com a folha pela metade, e a folha é justamente o que ela
+     * leva para a conversa com a família.
+     *
+     * Cada matéria com alguma marcação ganha uma faixa com o nome dela e, por
+     * baixo, os mesmos blocos de sempre. Matéria sem marcação nenhuma não
+     * aparece: campo em branco em documento é ruído. */
+    var porMateria = m.porMateria || {};
+    var ordem = Object.keys(MATERIAS_ROTULO).filter(function (id) { return porMateria[id]; });
+    Object.keys(porMateria).forEach(function (id) {
+      if (ordem.indexOf(id) < 0) ordem.push(id);
+    });
+
+    /* Item que é sobre o ALUNO vale em qualquer matéria e já saiu acima. Aqui só
+       entra o que é sobre a matéria, mesmo que algo tenha sido guardado fora do
+       lugar: a folha não repete a mesma marcação duas vezes. */
+    function idsDaMateria(g, lista) {
+      var deMateria = {};
+      (g.itens || []).forEach(function (i) {
+        if ((i.sobre || g.sobre || 'materia') === 'materia') deMateria[i.id] = true;
+      });
+      return (lista || []).filter(function (x) { return deMateria[x]; });
+    }
+
+    ordem.forEach(function (id) {
+      var dados = porMateria[id] || {};
+      var blocos = (op.grupos || []).map(function (g) {
+        return { titulo: g.titulo, rot: op.rotulos(g.chave, idsDaMateria(g, dados[g.chave])) };
+      }).filter(function (b) { return b.rot.length; });
+      if (!blocos.length) return;
+
+      var nome = (op.rotuloMateria && op.rotuloMateria(id)) ||
+        String(dados.nome || '').trim() || MATERIAS_ROTULO[id] || id;
+      doc.y -= 24;
+      doc.garanteEspaco(70);
+      doc.retangulo(MARG_E, doc.y - 5, UTIL, 22, COR.soft);
+      doc.texto(nome, MARG_E + 8, doc.y + 2, { tam: 10, bold: true, cor: COR.navy });
+      doc.y -= 8;
+
+      blocos.forEach(function (b) { blocoDeMarcados(b.titulo, b.rot); });
     });
 
     secaoTexto('Prioridades', m.prioridades);

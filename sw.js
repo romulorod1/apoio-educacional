@@ -20,7 +20,7 @@
  * e o arquivo novo entraria antes de ela mandar atualizar. Foi assim de v1 a
  * v11, um por mudança; o v12 foi a entrada de './figuras/solidos.js', e este
  * v13 é a entrada dos treze arquivos de './banco/topicos/' na lista abaixo. */
-var CACHE = 'apoio-educacional-v15';
+var CACHE = 'apoio-educacional-v16';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -41,6 +41,10 @@ var ARQUIVOS = [
   './figuras/solidos.js',
   './store.js',
   './draw.js',
+  /* O cartao do mes: ela toca uma vez no fechamento e manda a imagem por
+   * WhatsApp. Se ficasse de fora da lista, o app.js novo rodaria contra o
+   * cartao.js velho servido do cache de sobra, depois de uma atualizacao. */
+  './cartao.js',
   './app.js',
   './manifest.webmanifest',
   './icons/icon-192.png',

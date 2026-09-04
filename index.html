@@ -15,6 +15,120 @@
   <link rel="icon" href="icons/favicon.png" type="image/png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
+  <style>
+    /* O último encontro, no alto da janela da aula.
+       Bloco de leitura, sem nada para tocar além do botão Abrir: por isso o
+       fundo é claro e o traço lateral é discreto, para não competir com o
+       cartão da trilha, que fica logo abaixo e é onde ela age. */
+    .ultimo-encontro {
+      border: 1px solid #D9E2EC;
+      border-left: 4px solid #1F3A5F;
+      background: #F7F9FC;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      /* Teto de altura, porque o bloco cresce com o que ela escreveu na aula
+         passada. Deitado, num corpo de 600 pixels, ele já tomou 374 e empurrou
+         o campo de escrever para fora da tela. Passando disso, ele rola por
+         dentro e o resto da janela fica onde está. */
+      max-height: 32vh;
+      overflow-y: auto;
+    }
+
+    /* A anotação particular do encontro anterior nasce fechada e sai por
+       último: o tablet fica na mesa durante a aula e a mãe passa ao lado. */
+    .ultimo-encontro .btn.mostrar-so-minha {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    .ultimo-encontro .so-minha-anterior {
+      margin-top: 6px;
+      border-left: 3px solid #829AB1;
+      background: #EEF2F7;
+      border-radius: 0 8px 8px 0;
+      padding: 7px 10px;
+    }
+
+    .ultimo-encontro .rotulo-ultimo {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: #1F3A5F;
+    }
+
+    .ultimo-encontro .linha-ultimo {
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 4px;
+      white-space: pre-wrap;
+    }
+
+    /* As três frentes da etapa, na ficha do aluno. Os quatro botões de escolha
+       ficam em grade de dois por dois, com alvo de toque folgado: é um toque por
+       mês, no máximo, e ela está com a criança do lado.
+
+       Em linha com quebra, os quatro caíam em três mais um, e o quarto ficava a
+       12 pixels do título da frente seguinte: um toque de dedo ali marcava a
+       etapa na frente errada, e essa é uma marca que fica com data. Dois por
+       dois cabe deitado e em pé, nunca sobra um botão solto embaixo, e o espaço
+       até a linha de baixo passou a ser folgado. */
+    .quadro-etapas { margin-bottom: 14px; }
+
+    .quadro-etapas .linha-etapa { align-items: center; }
+
+    .quadro-etapas .escolha-etapa {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin: 8px 0 20px;
+    }
+
+    .quadro-etapas .escolha-etapa .btn {
+      width: 100%;
+      min-height: 46px;
+    }
+
+    /* As mesmas três linhas, só para ler, no alto da aba Dados. A etapa mora na
+       aba Mapeamento e a ficha abre na aba Dados: ficava atrás de um toque que
+       ninguém dá sem já saber o que vai achar. */
+    .resumo-etapas {
+      border: 1px solid #D9E2EC;
+      border-left: 4px solid #C99A2E;
+      background: #FDFBF5;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 16px;
+    }
+
+    .resumo-etapas .rotulo-resumo-etapas {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: #1F3A5F;
+    }
+
+    .resumo-etapas .btn.pequeno { min-height: 44px; min-width: 44px; }
+
+    .resumo-etapas .linha-resumo-etapa {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 10px;
+      font-size: 14px;
+      line-height: 1.5;
+      padding: 3px 0;
+    }
+
+    .resumo-etapas .frente-etapa {
+      font-weight: 700;
+      color: #1F3A5F;
+      min-width: 132px;
+    }
+
+    .resumo-etapas .valor-etapa.vazia { color: #627D98; font-style: italic; }
+  </style>
 </head>
 
 <body>
@@ -75,6 +189,12 @@
         <button class="btn" id="exportar-md-mes" type="button">Exportar o mês em texto</button>
         <button class="btn" id="exportar-pdf-mes" type="button">PDF do resumo do mês</button>
       </div>
+
+      <!-- Cada aluno, desde quando e por quanto. Fica ANTES da lista de
+           cartões: ele nascia depois dela, e num mês de sete alunos começava
+           cinco telas abaixo do topo, num painel que existe para ser lido de
+           relance. O app.js reaproveita esta caixa quando ela já existe. -->
+      <div id="painel-valores"></div>
 
       <div id="lista-fechamento"></div>
     </section>
@@ -316,6 +436,41 @@
     </div>
   </div>
 
+  <!-- O cartão do mês.
+       Ela escolhe a frase, vê a imagem e só então envia. A prévia e o arquivo
+       são o MESMO desenho, num canvas de 1080 por 1080: o documento promete
+       "vê antes de mandar, sempre", e prévia diferente do arquivo quebraria a
+       promessa sem ela ter como perceber. -->
+  <div class="fundo-modal" id="modal-cartao">
+    <div class="modal">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-cartao">Cartão do mês</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-cartao"></div>
+      <div class="modal-rodape">
+        <button class="btn" data-fechar type="button">Cancelar</button>
+        <button class="btn principal" id="enviar-cartao" type="button">Enviar o cartão</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- O mês inteiro de um aluno numa tela só, nos dois modos.
+       O rodapé é montado no app.js porque muda com o modo, e o × do cabeçalho
+       sai de cena no modo da família: de lá só se sai segurando o botão, para
+       ninguém cair fora por engano no meio de uma conversa. -->
+  <div class="fundo-modal" id="modal-mes">
+    <div class="modal largo">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-mes">O mês numa tela</h3>
+        <span id="selo-modal-mes"></span>
+        <button class="fechar" id="fechar-modal-mes" data-fechar type="button" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-mes"></div>
+      <div class="modal-rodape" id="rodape-modal-mes"></div>
+    </div>
+  </div>
+
   <div class="aviso" id="aviso">
     <span id="aviso-texto"></span>
     <button id="aviso-acao" type="button">Desfazer</button>
@@ -346,6 +501,11 @@
   <script src="figuras/formula.js"></script>
   <script src="store.js"></script>
   <script src="draw.js"></script>
+  <!-- O cartão do mês, desenhado em canvas. Entra ANTES do app.js, que procura
+       o global Cartao para montar a prévia. Precisa estar também na lista
+       ARQUIVOS do sw.js: ela dá aula na casa das famílias, muitas vezes sem
+       sinal, e arquivo que o index carrega e o cache não guarda vira 503. -->
+  <script src="cartao.js"></script>
   <script src="app.js"></script>
 </body>
 
