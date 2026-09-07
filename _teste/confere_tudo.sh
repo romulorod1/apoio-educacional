@@ -126,6 +126,12 @@ roda "proposta"      node _teste/testa_proposta.js
 # o Python. Foi a divergencia entre quatro vocabularios de materia que deixou
 # "matematica" escrita a mao em oito pontos do app.js.
 roda "materias"      node _teste/testa_materias.js
+# Os 2.513 titulos do catalogo de topicos tem identificador estavel gravado
+# como lista paralela 'ids', com registro congelado em banco/topicos/_ids.json.
+# O risco real e o desalinhamento: um titulo inserido sem id deslocaria todos
+# os seguintes em silencio, e o item gravado no tablet passaria a apontar para
+# outro topico. Este teste casa titulo por titulo com o registro.
+roda "ids de topicos" node _teste/testa_topicos_ids.js
 
 # As provas do kit de figuras nao rodavam aqui. Duas delas estavam falhando
 # desde o commit que as criou, algumas horas antes (_base_prova_travas, 34 de

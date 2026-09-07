@@ -50,7 +50,9 @@ marcado como conferência humana e listado no fim do relatório.
 
 Um verificador que nunca reprova nada não prova nada. `testa_verificador.py` injeta onze defeitos de
 propósito, um de cada tipo, e falha se algum passar. Também mantém catorze frases de calibragem,
-metade que precisa ser pega e metade que precisa passar.
+metade que precisa ser pega e metade que precisa passar, e vinte e quatro pares por matéria: para
+cada regra que depende da matéria (inglês, unidade, tópicos, citação, prefixo, pasta), o caso que
+tem que reprovar e o saudável ao lado que tem que passar.
 
 Essa parte não é enfeite. Numa versão anterior, três regras de detecção ficaram inertes por um
 escape trocado e ninguém notou, porque o teste só exercitava as outras. Em outra, a marca `TODO`
@@ -92,7 +94,8 @@ Um tema reprovado não entra no banco. A regra é essa e não tem exceção.
 
 O `FORMATO.md` traz a estrutura completa e as regras de conteúdo. O resumo:
 
-- Um arquivo por tema, com as duas línguas dentro, em `mat/<serie>/<ID>.md`.
+- Um arquivo por tema em `<pasta da matéria>/<serie>/<ID>.md`: `mat/` para matemática, `por/` para
+  português, `lit/` para literatura. A matéria vem da pasta. Em matemática, as duas línguas dentro.
 - Explicação de duas a três folhas, com exemplos resolvidos e uma seção de erros comuns.
 - De quinze a vinte exercícios em três blocos: fundamentos, consolidação e aprofundamento. Nos anos
   iniciais, de dez a doze.
@@ -117,5 +120,9 @@ aberta: no tablet, puxar o banco inteiro para ver um título seria desperdício.
 1. **Revisar os 73 itens de conferência humana**, que são os exercícios sem conta a verificar por
    símbolo: nomear figuras, justificar com as próprias palavras, dobrar papel. O verificador os lista
    ao final de cada execução.
-2. **Traduzir o banco para outras matérias**, se fizer sentido. O formato e o verificador foram
-   escritos para matemática, mas a estrutura serve.
+2. **Escrever os temas de português e de literatura.** A estrutura já aceita: as duas matérias estão
+   declaradas na tabela única (`Core.MATERIAS`, no `core.js`), o verificador lê a matéria pela pasta
+   e exige o que a tabela diz (só português, unidades próprias, `topicos:` do catálogo, citação de
+   autor com travessão dentro de bloco `> `), e o gerador escreve em `banco/<id>/`. Os arquivos da
+   matemática em `banco/` não mudam um byte com isso. O `FORMATO.md` diz o que muda de uma matéria
+   para outra.
