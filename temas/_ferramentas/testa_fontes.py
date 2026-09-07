@@ -233,7 +233,7 @@ PARES = [
      'machado-de-assis_missa-do-galo', _sem_linha(BASE, 'genero:'),
      2026, 'falta o campo "genero"'),
     ('F11 genero fora da lista reprova',
-     'machado-de-assis_missa-do-galo', _troca(BASE, 'genero: conto', 'genero: romance'),
+     'machado-de-assis_missa-do-galo', _troca(BASE, 'genero: conto', 'genero: novela'),
      2026, 'genero invalido'),
     ('F11 dominio fora da lista reprova',
      'machado-de-assis_missa-do-galo', _troca(BASE, 'dominio: publico', 'dominio: outro'),

@@ -665,8 +665,9 @@ def marcacao_quebrada(texto):
 # livre no ano A quando morte + 71 <= A) e recusa o arquivo que nao a satisfaz.
 # O ano entra por parametro de proposito: a conta so afrouxa com o tempo, e um
 # par envenenado escrito com o relogio explodiria sozinho na virada do ano.
-GENEROS_DE_FONTE = ['conto', 'poema', 'cronica', 'fabula', 'noticia', 'verbete',
-                    'bilhete', 'carta', 'teatro', 'ensaio', 'cantiga', 'parlenda', 'outro']
+GENEROS_DE_FONTE = ['conto', 'poema', 'cronica', 'fabula', 'noticia', 'reportagem', 'artigo',
+                    'entrevista', 'propaganda', 'verbete', 'bilhete', 'carta', 'teatro', 'romance',
+                    'ensaio', 'cantiga', 'parlenda', 'outro']
 DOMINIOS_DE_FONTE = ['publico', 'autoral', 'cc', 'tradicional']
 CAMPOS_DE_FONTE = ['id', 'titulo', 'autor', 'ano', 'genero', 'dominio',
                    'licenca', 'procedencia', 'integral']
