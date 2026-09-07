@@ -41,3 +41,5 @@ figuras/*_clips.json
 figuras/_tema_*.json
 # PDF de prova gerado na raiz pelo testa_formula
 /_prova_formula.pdf
+# textos brutos baixados do Wikisource pelos autores (a fonte curada vai para fontes/)
+temas/_ferramentas/_wikisource/

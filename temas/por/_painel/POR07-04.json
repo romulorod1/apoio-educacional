@@ -1,0 +1,270 @@
+{
+  "tema": "POR07-04",
+  "assinatura": "66626935d54f43f896a965c5a6548c36385a17a9133c143b00ad091f29e3c3c9",
+  "data": "2026-09-07",
+  "modelos": {
+    "leitores": "sonnet",
+    "juiz": "sonnet",
+    "lente": "fable"
+  },
+  "questoes": [
+    {
+      "n": 2,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O quê: a Biblioteca do Jardim Alto reabriu ao público. Quem: a Biblioteca Municipal do Jardim Alto, com a Secretaria de Cultura da cidade. Quando: na manhã de segunda-feira, 14 de setembro. Onde: em Vila Serrana, no bairro Jardim Alto. Por quê: porque ela ficou fechada oito meses para reforma do telhado, depois que uma chuva forte derrubou o forro.",
+          "veredito": "espera_se",
+          "motivo": "Responde as cinco perguntas do lide com o conteudo central esperado, incluindo o por que ligado a reforma do telhado apos oito meses."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O que: a biblioteca reabriu. Quem: a Biblioteca Municipal do Jardim Alto. Quando: segunda-feira, 14 de setembro. Onde: em Vila Serrana. Por que: porque tinha ficado fechada oito meses para reforma do telhado.",
+          "veredito": "espera_se",
+          "motivo": "Cobre as cinco perguntas com as respostas do lide, batendo com o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O quê: a Biblioteca Municipal do Jardim Alto reabriu ao público depois da reforma do telhado. Quem: a Secretaria de Cultura fez a reabertura, com moradores e alunos presentes. Quando: na manhã de segunda feira, 14 de setembro, e onde: em Vila Serrana, no prédio da própria biblioteca (linhas 4 a 7). Por quê: porque ela tinha ficado fechada oito meses depois de uma chuva forte danificar o telhado.",
+          "veredito": "espera_se",
+          "motivo": "As cinco respostas batem com o espera_se, com por que ligado a oito meses fechada, nao a chuva isolada."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 4,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O parágrafo que poderia sair é o terceiro, que fala da sala infantil, do novo horário de sábado e do total do acervo. Ele traz detalhes extras, mas as informações essenciais sobre a reabertura já estão no lide, no primeiro parágrafo.",
+          "veredito": "espera_se",
+          "motivo": "Aponta o terceiro paragrafo (sala infantil e horario) e justifica que o essencial ja esta no lide, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Acho que o ultimo paragrafo poderia sair, porque ele so da detalhes de horario e emprestimo, e o essencial da reabertura ja foi dito antes.",
+          "veredito": "aceita_se",
+          "motivo": "Chama de ultimo paragrafo em vez de terceiro, mas com a ideia de que o essencial ja foi dito, batendo com a entrada de aceita_se sobre o ultimo paragrafo."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Acho que o segundo parágrafo, sobre o prédio de 1962 e os livros molhados (linhas 8 a 10), poderia sair sem prejudicar o essencial, porque o lide já explica que a biblioteca fechou para reforma do telhado. Esses detalhes sobre a chuva e os livros são interessantes, mas não são a informação mais importante da notícia. O terceiro parágrafo, com os horários novos, é mais útil para quem quer usar a biblioteca.",
+          "veredito": "aceita_se",
+          "motivo": "Aponta o segundo paragrafo, nao o terceiro, mas justifica que o essencial esta no lide, o que a entrada de aceita_se sobre o segundo paragrafo prevê."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 6,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A reportagem escolhe abrir com dona Marlene porque ela é uma moradora comum que usa a biblioteca há muito tempo, e isso dá um lado mais humano e emocionante à história. Essa escolha mostra que a reportagem quer contar o fato pelo olhar de quem vive o bairro, e não pelo olhar oficial da prefeitura.",
+          "veredito": "espera_se",
+          "motivo": "Explica que a reportagem privilegia o olhar dos moradores e nao o oficial, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A reportagem abre com dona Marlene porque quer mostrar o fato pelo lado dos moradores, das pessoas que usam a biblioteca, e nao pelo lado do governo.",
+          "veredito": "espera_se",
+          "motivo": "Diz que o fato e mostrado pelo lado dos moradores, nao do governo, batendo com o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A reportagem escolhe abrir com dona Marlene porque ela representa os moradores que mais sentiram falta da biblioteca, e não a autoridade que fez a reforma. Isso mostra que a reportagem enxerga o fato pelo lado das pessoas comuns, contando a experiência de quem usa o lugar no dia a dia. A fala dela, \"Eu vinha aqui buscar livro para os meus filhos. Agora venho para os netos\" (linhas 8 e 9), dá um sentimento pessoal à história.",
+          "veredito": "espera_se",
+          "motivo": "Liga a escolha a mostrar o fato pelas pessoas comuns em vez da autoridade, conforme o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 8,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Duas informações que só estão na reportagem são o abaixo-assinado com 2.300 assinaturas organizado pelos moradores e o fato de os próprios vizinhos e alunos terem secado os livros molhados com ventiladores. A notícia não conta nada disso.",
+          "veredito": "espera_se",
+          "motivo": "Cita abaixo-assinado e ventiladores, duas informacoes exclusivas da reportagem previstas no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A reportagem conta que os moradores secaram os livros com ventilador e que fizeram um abaixo-assinado com 2.300 assinaturas. Essas informacoes nao estao na noticia.",
+          "veredito": "espera_se",
+          "motivo": "Cita as mesmas duas informacoes exclusivas (ventilador e abaixo-assinado) do espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Uma informação que só está na reportagem é que os moradores e alunos ajudaram a secar os livros molhados com ventiladores, como conta o trecho \"ficaram uma semana separando páginas com papel toalha e secando volumes na frente de ventiladores emprestados\" (linhas 19 e 20). Outra informação é sobre o abaixo assinado, que reuniu \"2.300 assinaturas em três semanas\" e foi entregue na Câmara Municipal (linhas 24 e 25). Nenhuma dessas duas coisas aparece na notícia curta.",
+          "veredito": "espera_se",
+          "motivo": "Cita ventilador e abaixo-assinado com detalhes corretos, batendo com o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 10,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Os livros no ventilador conta como os moradores salvaram os livros molhados logo depois da chuva. O abaixo-assinado conta como a comunidade pressionou a prefeitura para a reforma começar. O que mudou conta as novidades depois da reforma pronta. A ordem faz sentido porque segue a ordem em que as coisas aconteceram, do problema até a solução.",
+          "veredito": "espera_se",
+          "motivo": "Descreve as tres partes corretamente e explica a ordem cronologica do problema a solucao, como o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Os livros no ventilador conta como os moradores salvaram os livros molhados. O abaixo-assinado conta como eles pressionaram a prefeitura. O que mudou conta as novidades da reforma. A ordem faz sentido porque segue a ordem em que as coisas aconteceram.",
+          "veredito": "espera_se",
+          "motivo": "Mesma descricao das tres partes e da ordem cronologica prevista no espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "\"Os livros no ventilador\" conta como os moradores salvaram os livros molhados logo depois da chuva. \"O abaixo assinado\" conta como a comunidade pressionou para a reforma começar de verdade. \"O que mudou\" conta as novidades depois da reabertura. A ordem faz sentido porque segue a ordem dos acontecimentos no tempo, do problema até a solução final.",
+          "veredito": "espera_se",
+          "motivo": "Descreve as tres partes e a ordem cronologica do problema a solucao, batendo com o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 12,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O título da notícia destaca só o fato de a biblioteca ter reaberto depois de oito meses fechada, de um jeito neutro. Já o título da reportagem destaca o papel dos moradores, que lutaram para ela não fechar, e esse já é um título com ponto de vista, porque interpreta o fato em vez de só informar.",
+          "veredito": "espera_se",
+          "motivo": "Diz que o titulo da noticia e neutro e o da reportagem toma partido pelos moradores, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O titulo da noticia destaca que a biblioteca reabriu depois de ficar fechada. O titulo da reportagem destaca que o bairro lutou para isso acontecer. O da reportagem ja mostra um ponto de vista, porque da credito aos moradores.",
+          "veredito": "espera_se",
+          "motivo": "Identifica que o titulo da reportagem ja mostra ponto de vista ao dar credito aos moradores, batendo com o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O título da notícia, \"Biblioteca do Jardim Alto reabre depois de oito meses fechada\", destaca o fato em si, a reabertura depois do tempo fechado. O título da reportagem, \"A biblioteca que o bairro não deixou fechar\", já destaca a força dos moradores dentro da história. O título da reportagem já mostra um ponto de vista, porque dá o mérito ao bairro, e não só conta o acontecimento.",
+          "veredito": "espera_se",
+          "motivo": "Explica que o titulo da reportagem da o merito ao bairro e ja mostra ponto de vista, conforme o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 13,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A reportagem termina com o menino do livro de dinossauros porque isso mostra de um jeito emocionante que a biblioteca voltou a cumprir sua função, que é servir aos leitores. Terminar assim é mais bonito e humano do que terminar só com números da reforma.",
+          "veredito": "espera_se",
+          "motivo": "Liga o final ao sentido de a biblioteca voltar a servir as pessoas e ao contraste com numeros frios, nucleo do espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Terminar assim mostra de um jeito simples e bonito para que serve a biblioteca, que e para as pessoas usarem os livros. Isso emociona mais do que so falar numeros da reforma.",
+          "veredito": "espera_se",
+          "motivo": "Mostra que o final revela para que serve a biblioteca e emociona mais que numeros, batendo com o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Terminar com o menino e o livro sobre dinossauros dá um final mais emocionante e humano para a reportagem, mostrando que a biblioteca já está sendo usada de verdade por quem mais precisa dela, uma criança curiosa. Terminar com números da reforma seria mais frio e menos ligado às pessoas que a reportagem quis mostrar o tempo todo. Esse final combina com o jeito da reportagem de contar a história pelo lado dos moradores.",
+          "veredito": "espera_se",
+          "motivo": "Explica que o menino mostra a biblioteca sendo usada de verdade, em contraste com numeros frios, como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 14,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Um fato que aparece igual nos dois textos é que 600 livros ficaram molhados e 480 foram recuperados. Um fato que só a reportagem conta é o abaixo-assinado com 2.300 assinaturas feito pelos moradores. É importante que os dados em comum batam porque isso mostra que as duas informações são confiáveis e contam a mesma verdade, só que com profundidades diferentes.",
+          "veredito": "espera_se",
+          "motivo": "Aponta um fato comum (600/480 livros) e um exclusivo (abaixo-assinado) com a explicacao sobre confianca, batendo com o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Os dois textos dizem que a biblioteca reabriu em 14 de setembro depois de oito meses fechada. So a reportagem conta a historia de dona Marlene. E importante que os fatos batam para o leitor confiar que a informacao e verdadeira.",
+          "veredito": "espera_se",
+          "motivo": "Aponta a reabertura em 14 de setembro como fato comum e a historia de dona Marlene como exclusiva, com explicacao sobre confianca."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Um fato que aparece nos dois textos com os mesmos dados é que a biblioteca ficou fechada oito meses e reabriu em 14 de setembro. Um fato que só a reportagem conta é a história do abaixo assinado com 2.300 assinaturas entregue na Câmara Municipal. É importante que os fatos em comum batam porque isso mostra que os dois textos são confiáveis e estão contando a verdade sobre o mesmo acontecimento, só com focos diferentes.",
+          "veredito": "espera_se",
+          "motivo": "Aponta fato comum e exclusivo corretos com a explicacao sobre confianca no mesmo acontecimento, como o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 16,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A notícia serve para informar rápido o fato principal para quem só quer saber o que aconteceu. A reportagem serve para aprofundar a história, mostrando as pessoas envolvidas, os detalhes e o contexto. Um não substitui o outro porque atendem a leitores com necessidades diferentes, um mais rápido e outro mais completo.",
+          "veredito": "espera_se",
+          "motivo": "Explica as funcoes diferentes de noticia e reportagem e por que uma nao substitui a outra, batendo com o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A noticia serve para o leitor saber rapido o que aconteceu. A reportagem serve para entender a historia completa, com mais detalhes e pessoas. Um nao substitui o outro porque cada um da um tipo de informacao diferente.",
+          "veredito": "espera_se",
+          "motivo": "Contrapoe saber rapido versus entender a historia completa, nucleo do espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A notícia serve para o leitor saber rápido o que aconteceu, com as informações mais importantes logo no começo. A reportagem serve para o leitor entender melhor a história por trás do fato, com mais detalhes e falas de pessoas envolvidas. Um texto não substitui o outro porque quem quer só a informação rápida lê a notícia, e quem quer entender o contexto completo lê a reportagem.",
+          "veredito": "espera_se",
+          "motivo": "Explica as funcoes de cada texto e para que tipo de leitor cada um serve, como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    }
+  ],
+  "resultado": {
+    "aprovadas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      13,
+      14,
+      16
+    ],
+    "ambiguas": [],
+    "estreitas": []
+  }
+}

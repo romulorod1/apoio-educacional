@@ -1,0 +1,298 @@
+{
+  "tema": "POR07-05",
+  "assinatura": "a28fa23749ec101be99ad51bde93afa2333ecd4fd913bf1e79cd34745617672d",
+  "data": "2026-09-07",
+  "modelos": {
+    "leitores": "sonnet",
+    "juiz": "sonnet",
+    "lente": "fable"
+  },
+  "questoes": [
+    {
+      "n": 2,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O esquema de rima da segunda estrofe é A B C B: o primeiro verso, que termina em estrelas, e o terceiro, que termina em vida, não rimam com nada, e o segundo verso, que termina em flores, rima com o quarto, que termina em amores.",
+          "veredito": "espera_se",
+          "motivo": "Da o esquema ABCB e identifica corretamente que so flores e amores rimam, como o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O esquema e ABCB. O verso 6 (flores) rima com o verso 8 (amores), e os versos 5 (estrelas) e 7 (vida) nao rimam com nenhum outro dessa estrofe.",
+          "veredito": "espera_se",
+          "motivo": "Mesmo esquema ABCB com versos 6 e 8 rimando e 5 e 7 sem rima, batendo com o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O esquema de rima da segunda estrofe é ABCB. O verso 5 (\"estrelas\") e o verso 7 (\"vida\") não rimam com nada dentro da estrofe, mas o verso 6 (\"flores\") rima com o verso 8 (\"amores\"), porque os dois terminam com o mesmo som \"ores\". Então só os versos pares dessa estrofe rimam entre si.",
+          "veredito": "espera_se",
+          "motivo": "Esquema ABCB correto com a rima flores/amores identificada, conforme o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 4,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Lá indica a terra natal do poeta, o lugar de onde ele está longe e de onde sente saudade. Cá indica o lugar onde ele está agora, longe de casa, enquanto escreve o poema.",
+          "veredito": "espera_se",
+          "motivo": "La como terra natal e ca como lugar atual do poeta, exatamente o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "La indica a terra natal do poeta, o Brasil, de que ele sente saudade. Ca indica o lugar onde ele esta agora, longe de casa.",
+          "veredito": "espera_se",
+          "motivo": "La como Brasil/terra natal e ca como onde esta agora, batendo com o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "\"Lá\" indica a terra natal do poeta, o lugar de onde ele está longe e para onde quer voltar, como em \"Não gorjeiam como lá\" (linha 4). \"Cá\" indica o lugar onde ele está agora, longe de casa, como em \"Que tais não encontro eu cá\" (linha 14). As duas palavras marcam a distância entre onde o poeta está e onde ele gostaria de estar.",
+          "veredito": "espera_se",
+          "motivo": "Distingue la como terra natal e ca como lugar atual, com versos de apoio, como o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 6,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Contando as sílabas poéticas, Mais-pra-zer-en-con-tro-eu-lá dá sete sílabas, porque tro e eu se juntam numa fala só. Essa junção é necessária porque o verso precisa ter sete sílabas, como todos os outros versos do poema.",
+          "veredito": "espera_se",
+          "motivo": "Chega a sete silabas explicando a juncao de tro e eu e liga a necessidade a regularidade do poema, como o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Contando, fica Mais-pra-zer-en-con-troeu-la, que da sete silabas poeticas. A juncao e necessaria porque senao o verso ficaria com uma silaba a mais e quebraria o ritmo igual aos outros versos.",
+          "veredito": "espera_se",
+          "motivo": "Mostra troeu junto somando sete silabas e explica que sem a juncao quebraria o ritmo dos outros versos, batendo com o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "No verso \"Mais prazer encontro eu lá\", as palavras \"encontro\" e \"eu\" se juntam numa sílaba só na hora de contar, ficando algo como Mais, pra, zer, en, con, tro eu, lá, o que dá sete sílabas poéticas. Essa junção é necessária para o verso manter o mesmo número de sílabas dos outros versos do poema, que também têm sete sílabas, mantendo o ritmo igual em toda a canção.",
+          "veredito": "espera_se",
+          "motivo": "Junta tro eu numa silaba, chega a sete e liga a necessidade a manter a metrica dos outros versos, conforme o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 7,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Essa repetição reforça a saudade do poeta pela terra natal e mostra que essa lembrança está sempre voltando em sua cabeça. Isso deixa o sentimento de saudade mais forte para o leitor, como se fosse uma coisa que o poeta não consegue parar de pensar.",
+          "veredito": "espera_se",
+          "motivo": "Diz que a repeticao fixa a imagem da terra e mostra insistencia ligada a saudade, quase literal ao espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Essa repeticao faz o leitor sentir a saudade do poeta, como se ele nao conseguisse parar de pensar na terra dele. Isso combina com o sentimento de exilio do poema.",
+          "veredito": "espera_se",
+          "motivo": "Liga a repeticao a nao conseguir parar de pensar na terra e ao sentimento de exilio, batendo com o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A repetição do refrão \"Minha terra tem palmeiras, Onde canta o Sabiá\" reforça a ideia fixa que o poeta tem da sua terra, como se ele não conseguisse parar de pensar nela. Esse efeito de repetição combina com o sentimento de saudade do poema, porque mostra que o pensamento da terra natal sempre volta, do mesmo jeito que o refrão sempre volta ao longo do texto. É como se a saudade fosse um pensamento que não sai da cabeça dele.",
+          "veredito": "espera_se",
+          "motivo": "Explica que a repeticao reforca a ideia fixa da terra e o efeito de saudade constante, como o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 8,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A expressão que se repete é Sem, e esse recurso se chama anáfora. Ela reforça, de um jeito insistente, o pedido do poeta para não morrer antes de voltar para sua terra e rever tudo o que sente falta.",
+          "veredito": "espera_se",
+          "motivo": "Nomeia anafora e explica o efeito de insistencia do pedido, embora copie so Sem em vez de Sem que; o conteudo central bate com o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A expressao repetida e Sem que. O nome desse recurso e anafora. O efeito e reforcar o pedido do poeta, mostrando tudo que ele quer fazer antes de morrer.",
+          "veredito": "espera_se",
+          "motivo": "Copia Sem que, nomeia anafora e explica o efeito de reforcar o pedido, batendo com o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A expressão que se repete é \"Sem que\", presente em três dos quatro versos (linhas 20, 21 e 23). O nome desse recurso é anáfora. O efeito dela nessa estrofe é reforçar o medo do poeta de morrer sem realizar essas coisas, como se ele fosse contando, uma por uma, tudo que ainda não fez antes de voltar para a terra dele.",
+          "veredito": "espera_se",
+          "motivo": "Copia Sem que, nomeia anafora e explica o efeito de insistencia listando desejos antes de morrer, como o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 11,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Com a repetição de mais, o poeta compara sua terra com o lugar onde está agora, dizendo que lá tudo é maior e melhor: tem mais estrelas, mais flores, mais vida e mais amores. Ele está comparando o Brasil com o lugar do seu exílio.",
+          "veredito": "espera_se",
+          "motivo": "Explica a comparacao em que a terra do poeta vence em tudo (estrelas, flores, vida, amores), como o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Com essa repeticao o poeta esta exagerando para mostrar que tudo na terra dele e melhor. Ele esta comparando a terra dele com outros lugares, principalmente com o lugar onde esta agora.",
+          "veredito": "espera_se",
+          "motivo": "Diz que a repeticao exagera para mostrar que a terra dele e melhor que o lugar atual, batendo com o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O poeta repete a palavra \"mais\" em todos os versos da segunda estrofe para comparar sua terra com outros lugares, dizendo que lá tem mais estrelas, mais flores, mais vida e mais amores. Ele exagera as qualidades da sua terra para mostrar o quanto sente saudade dela. A terra dele está sendo comparada, de modo geral, com o lugar onde ele está agora, fora do Brasil.",
+          "veredito": "espera_se",
+          "motivo": "Repete os quatro itens comparados e liga a saudade e ao exilio, conforme o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 12,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Antes de morrer, o poeta quer voltar para sua terra, aproveitar as belezas que só existem lá e ainda ver as palmeiras onde canta o Sabiá.",
+          "veredito": "espera_se",
+          "motivo": "Cita os tres desejos (voltar, aproveitar belezas, ver palmeiras/sabia), como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Ele quer voltar para a terra dele, aproveitar os primores de la e ver de novo as palmeiras onde canta o sabia.",
+          "veredito": "espera_se",
+          "motivo": "Mesmos tres desejos citados, batendo com o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Antes de morrer, o poeta quer voltar para sua terra, como diz \"Sem que eu volte para lá\" (linha 20), e quer aproveitar os primores dela, que ele \"não encontro por cá\" (linhas 21 e 22). Ele também quer ver de novo as palmeiras onde canta o Sabiá, como no verso \"Sem qu'inda aviste as palmeiras\" (linha 23). Ou seja, ele pede a Deus para não morrer antes de voltar e sentir tudo isso de novo.",
+          "veredito": "espera_se",
+          "motivo": "Cita os tres desejos com versos de apoio, conforme o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 13,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A última linha mostra que o poema foi escrito em Coimbra, em Portugal, longe do Brasil. Isso explica o título Canção do exílio, porque mostra que o poeta estava mesmo distante de sua terra quando escreveu esses versos de saudade.",
+          "veredito": "espera_se",
+          "motivo": "Liga Coimbra e a distancia do Brasil ao sentido do titulo Cancao do exilio, como o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Isso mostra que o poeta escreveu o poema em Coimbra, longe do Brasil, sentindo saudade. Isso se liga com o titulo porque exilio quer dizer estar longe da propria terra.",
+          "veredito": "espera_se",
+          "motivo": "Mesma ligacao entre Coimbra, distancia da terra e o significado de exilio, batendo com o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A última linha, \"Coimbra, Julho 1843\" (linha 25), mostra que o poeta escreveu o poema estando em Portugal, longe do Brasil. Isso ajuda a entender por que ele sente tanta saudade da terra dele durante o poema inteiro. Essa informação se liga ao título \"Canção do exílio\" porque exílio quer dizer estar afastado da própria terra, exatamente a situação do poeta em Coimbra.",
+          "veredito": "espera_se",
+          "motivo": "Cita Coimbra, Portugal e 1843 e liga ao titulo, cobrindo todo o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 15,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O poeta escreveu qu'inda em vez de que ainda para o verso não ficar com uma sílaba poética a mais. Assim ele mantém a contagem de sete sílabas, igual aos outros versos do poema.",
+          "veredito": "espera_se",
+          "motivo": "Explica que qu'inda mantem sete silabas como os outros versos, batendo com o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Ele juntou as palavras para o verso nao ficar com silaba a mais, mantendo a metrica igual aos outros versos do poema.",
+          "veredito": "aceita_se",
+          "motivo": "Diz apenas que a juncao evita uma silaba a mais e mantem a metrica, sem mostrar a contagem de silabas pedida, o que cai na entrada de aceita_se sobre caber no ritmo."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O poeta escreveu \"qu'inda\" no lugar de \"que ainda\" para economizar uma sílaba poética, já que \"que ainda\" tem duas sílabas separadas e \"qu'inda\" junta as duas em uma só. Isso é necessário porque o verso \"Sem qu'inda aviste as palmeiras\" precisa ter o mesmo número de sílabas dos outros versos do poema, que é sete. Se ele tivesse escrito \"que ainda\" completo, o verso ficaria com uma sílaba a mais e quebraria o ritmo.",
+          "veredito": "espera_se",
+          "motivo": "Mostra que que ainda daria oito silabas e qu'inda mantem sete como os demais versos, exatamente o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 16,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O leitor descobre que a terra é o Brasil pelas palmeiras e pelo canto do Sabiá, elementos bem conhecidos daqui, e também porque o poema foi escrito em Coimbra, fora do país. Não nomear o Brasil deixa o poema com um tom mais poético e faz o sentimento de saudade parecer ainda maior.",
+          "veredito": "aceita_se",
+          "motivo": "Explica o reconhecimento pelas palmeiras, pelo sabiá e por Coimbra e liga a não nomeação a um efeito mais poético e de saudade maior, o que cai em aceita_se: não nomear deixa o poema mais poético ou a saudade maior, se explicar como o leitor reconhece a terra."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O leitor descobre que e o Brasil pelas palmeiras e pelo sabia, que sao coisas bem brasileiras. Nao nomear deixa o poema mais bonito e faz parecer que qualquer pessoa longe de casa pode sentir aquilo.",
+          "veredito": "aceita_se",
+          "motivo": "Explica o reconhecimento pelas palmeiras e pelo sabiá e liga a não nomeação à ideia de que qualquer pessoa longe de casa pode se identificar, o que cai em aceita_se: qualquer leitor que vive longe de casa pode se reconhecer no poema."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O leitor descobre que o poeta fala do Brasil por causa dos elementos citados, como as palmeiras e o Sabiá, que são símbolos bem conhecidos do país, além da informação de que ele escreveu de Coimbra, em Portugal, estando longe de casa. O efeito de não nomear o país é deixar o poema mais universal, como se qualquer pessoa que sinta saudade da própria terra pudesse se identificar com os sentimentos do poema.",
+          "veredito": "aceita_se",
+          "motivo": "Explica o reconhecimento pelos mesmos sinais e conclui que o poema fica mais universal, o que cai em aceita_se: o poema fica mais íntimo ou mais universal por não dar o nome."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    }
+  ],
+  "resultado": {
+    "aprovadas": [
+      2,
+      4,
+      6,
+      7,
+      8,
+      11,
+      12,
+      13,
+      15,
+      16
+    ],
+    "ambiguas": [],
+    "estreitas": []
+  }
+}

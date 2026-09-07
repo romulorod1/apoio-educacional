@@ -1,0 +1,270 @@
+{
+  "tema": "POR07-06",
+  "assinatura": "715408a9aed690edf27fe63488f7dd26fad85d9efb10505f15d6368e360b5701",
+  "data": "2026-09-07",
+  "modelos": {
+    "leitores": "sonnet",
+    "juiz": "sonnet",
+    "lente": "fable"
+  },
+  "questoes": [
+    {
+      "n": 2,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Sampaio pede que o juiz mande Tomás devolver o leitão para ele. Isso aconteceu porque o leitão de Sampaio furou a cerca e comeu da horta de Tomás, e agora Tomás não quer mais devolver o bichinho, dizendo que ele é dele.",
+          "veredito": "espera_se",
+          "motivo": "Da o pedido (devolver o leitao) e o motivo (leitao furou a cerca e comeu da horta), como o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Sampaio pede que o juiz mande Tomas devolver o leitao dele. Isso aconteceu porque o leitao fugiu, entrou na horta de Tomas, e Tomas ficou com o bicho.",
+          "veredito": "espera_se",
+          "motivo": "Mesmo pedido e motivo, com a horta invadida e Tomas ficando com o bicho, batendo com o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "No requerimento, Sampaio pede que o juiz mande Tomás entregar de volta o leitão que era dele, dizendo \"peço a V.S.ª que mande entregar me o leitão\" (linhas 10 e 11). Isso aconteceu porque o leitão de Sampaio furou a cerca de Tomás e comeu plantas da horta dele, e por isso Tomás resolveu ficar com o animal. Sampaio acha isso injusto porque a culpa foi do porco, não dele.",
+          "veredito": "espera_se",
+          "motivo": "Da o pedido e o motivo com citacao do requerimento, cobrindo o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 4,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Tomás é o dono da horta que o leitão de Sampaio invadiu e estragou comendo nabos. Ele acha que o leitão agora é dele só porque o bicho comeu da horta, mesmo sem tê-lo comprado nem recebido de presente.",
+          "veredito": "espera_se",
+          "motivo": "Identifica Tomas como dono da horta e explica que ele se apropria do leitao sem compra nem doacao, como o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Tomas e o dono da horta onde o leitao de Sampaio entrou e comeu uns nabos. Ele acha que o leitao e dele porque ficou com o bicho depois disso.",
+          "veredito": "aceita_se",
+          "motivo": "Identifica Tomas como dono da horta mas so diz que ele acha o leitao dele por ter ficado com o bicho, sem dar a razao da compensacao, batendo com a entrada de aceita_se sobre afirmar sem dar razao."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Tomás é o vizinho cuja horta foi invadida pelo leitão de Sampaio. Ele acha que o leitão agora é dele porque o animal comeu plantas da sua horta, e por isso decidiu ficar com o bicho como se isso desse a ele algum direito sobre o leitão. Ele mesmo diz \"É verdade que o leitão era dele, porém agora é meu\" (linha 13), mostrando que a razão dele não é muito lógica.",
+          "veredito": "espera_se",
+          "motivo": "Explica que Tomas se acha no direito ao leitao por ele ter comido da horta, mesmo sem razao logica, como o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 6,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O juiz propõe que os dois desistam da briga dando o leitão de presente para outra pessoa, mas ele mesmo acaba insinuando que quer ganhar o bicho. No final, ele ganha o leitão gordo para si mesmo, sem gastar nada.",
+          "veredito": "espera_se",
+          "motivo": "Mostra o juiz propondo o presente e acabando com o leitao para si, batendo com o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O juiz propoe que os dois deem o leitao de presente para alguem, e ele mesmo acaba ficando com o leitao de presente. Ele ganha o porco sem gastar nada.",
+          "veredito": "espera_se",
+          "motivo": "Mesma ideia do juiz propor o presente e ficar com o porco sem gastar nada, conforme o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O juiz propõe que os dois deem o leitão de presente para alguma pessoa, dizendo \"só vejo um modo de conciliar esta contenda, que é darem os senhores este leitão de presente a alguma pessoa\" (linhas 22 e 23). Ele mesmo acaba aceitando o presente, já que logo depois comenta que gosta de \"porco com ervilha\" (linha 31). Assim, o juiz ganha o leitão para si, usando o cargo para resolver a briga a seu próprio favor.",
+          "veredito": "espera_se",
+          "motivo": "Cobre a proposta do presente, a aceitacao do juiz e a mencao a ervilha, exatamente o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 8,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Sampaio conta a história da cadela Tróia para tentar provar que os animais podem pensar, mas nem todos do mesmo jeito, e por isso o leitão não teria culpa de invadir a horta. Essa história não ajuda muito no argumento, porque é confusa e não prova de verdade que o leitão é inocente.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que a história tenta justificar a falta de culpa do leitão mas é confusa e não prova nada, ideia próxima de aceita_se: a história atrapalha o argumento, porque foge do assunto."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Sampaio conta a historia para provar que os animais nao pensam como gente e por isso o leitao nao teve culpa de entrar na horta. Acho que a historia nao ajuda muito, porque nao tem muito a ver com o caso do leitao.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que a história não tem muito a ver com o caso do leitão, o que cai quase literalmente em aceita_se: a história atrapalha o argumento, porque foge do assunto."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Sampaio conta a história da cadela Tróia para tentar provar que os animais podem mudar de comportamento depois de um castigo, sugerindo que o leitão também poderia ter feito besteira sem ter culpa de verdade, já que não pensa como gente. A história não ajuda muito no argumento, porque fala de uma cadela que aprendeu a se comportar depois de apanhar, e isso não explica por que o leitão invadiu a horta. É um argumento meio confuso que não resolve a questão de quem é o dono do leitão.",
+          "veredito": "espera_se",
+          "motivo": "Reproduz o mecanismo completo do espera_se: o cão aprende com o castigo e o porco não pensa assim, logo o leitão não tem culpa, e a história não ajuda porque não explica a invasão nem resolve de quem é o leitão."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 9,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Tomás revela que o juiz, em outra ocasião, pediu votos a algumas pessoas prometendo muitas coisas em troca. Isso mostra que o juiz é hipócrita e usa o cargo para conseguir vantagens políticas, chamando de insignificância só o que não interessa a ele.",
+          "veredito": "espera_se",
+          "motivo": "Revela que o juiz pediu votos prometendo favores e chama isso de hipocrisia, como o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Tomas revela que o juiz pediu votos para uns politicos e prometeu ajudar em troca, mostrando que o juiz tambem usa o cargo dele para conseguir favores.",
+          "veredito": "espera_se",
+          "motivo": "Diz que o juiz pediu votos e prometeu ajudar em troca, usando o cargo para favores, batendo com o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Essa fala revela que o juiz é interesseiro e usa o cargo para conseguir favores, porque ele mesmo pediu votos a Tomás prometendo \"mundos e fundos\" (linha 45) em troca. Isso mostra que o juiz trata assuntos políticos como importantes quando lhe interessam, mas chama de \"insignificância\" o pedido de Sampaio sobre os cercados. Ou seja, o juiz age de acordo com o que é bom para ele, não com o que é justo para todos.",
+          "veredito": "espera_se",
+          "motivo": "Explica a troca de votos por promessas e o duplo padrao do juiz, conforme o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 11,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Um momento engraçado é quando o juiz, fingindo resolver a briga com justiça, começa a elogiar o quanto o leitão está gordo e já pensa em comê-lo com ervilha. O humor vem do contraste entre o juiz fingir ser justo e na verdade só estar interessado em ganhar o porco para ele.",
+          "veredito": "espera_se",
+          "motivo": "Aponta o elogio ao toucinho logo apos fingir desinteresse e explica o humor pelo contraste, exatamente o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "E engracado quando o juiz finge nao querer o leitao mas ja esta de olho no toucinho dele. O humor vem porque ele fala como se nao quisesse, mas na verdade esta querendo pegar o presente para ele.",
+          "veredito": "espera_se",
+          "motivo": "Aponta o juiz de olho no toucinho enquanto finge nao querer, explicando o humor pelo contraste, como o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Um momento engraçado é quando o juiz, depois de dizer que não estava pedindo o leitão para si, aceita o presente de Tomás e já começa a elogiar o tamanho do animal, dizendo \"está gordo, tem toucinho de quatro dedos\" (linhas 29 e 30). O humor vem da contradição entre o que o juiz diz, que não quer o bicho, e o que ele realmente queria o tempo todo. Essa educação fingida é o que causa graça na cena.",
+          "veredito": "espera_se",
+          "motivo": "Usa a mesma cena e a mesma citacao ancora para explicar o humor por contradicao, batendo com o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 13,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O texto mostra o juiz aceitando o leitão gordo para si mesmo, mesmo tendo dito que a solução era dar o bicho de presente a outra pessoa. Também mostra, pela fala de Tomás, que o juiz já tinha pedido votos prometendo favores, e essas duas ações levam o público a desconfiar da honestidade dele sem que ninguém precise dizer isso.",
+          "veredito": "espera_se",
+          "motivo": "Aponta a aceitacao do leitao e a fala de Tomas sobre os votos como duas acoes que levam a desconfianca, como o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O juiz sugere que deem o leitao de presente e depois aceita ficar com ele mesmo, que e uma acao desonesta. Outra acao e ele pedir votos para os amigos e prometer ajudar em troca.",
+          "veredito": "espera_se",
+          "motivo": "Cita a aceitacao do presente e o pedido de votos como duas acoes do juiz, batendo com o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O texto nunca diz que o juiz é desonesto, mas mostra isso pelas ações dele, como quando finge não querer o leitão dizendo \"Não digo com isso que mo deem\" (linhas 23 e 24) e depois aceita o presente sem hesitar. Outra ação reveladora é quando Tomás lembra que o juiz pediu votos prometendo \"mundos e fundos\" (linha 45), mostrando que ele usa o cargo para conseguir apoio político. São essas ações, e não uma fala explicando o caráter dele, que levam o público a perceber que o juiz é interesseiro.",
+          "veredito": "espera_se",
+          "motivo": "Cita a falsa recusa seguida de aceitacao e o pedido de votos, com citacoes, conforme o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 14,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Sampaio fala de um jeito mais simples e cheio de erros, com expressões como vou a respeito de dizer, o que mostra que ele é uma pessoa do interior, sem muito estudo. O juiz fala de um jeito mais formal e educado, mas essa educação esconde que ele está mais interessado em levar vantagem do que em fazer justiça.",
+          "veredito": "espera_se",
+          "motivo": "Liga a fala simples de Sampaio a pouco estudo e a educacao do juiz a esconder interesse proprio, exatamente o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Sampaio fala de um jeito mais simples e errado na gramatica, como matuto da roca. O juiz fala mais educado e formal. Isso mostra que Sampaio e uma pessoa simples e o juiz e uma pessoa com mais estudo, mas nem por isso mais honesta.",
+          "veredito": "aceita_se",
+          "motivo": "Marca a diferenca entre fala simples e fala educada mas so diz que o juiz nao e mais honesto por isso, sem dizer que a fala dele serve para conseguir o que quer, batendo com a entrada de aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A fala de Sampaio é mais informal e cheia de repetições, como \"Vou a respeito de dizer\" (linha 4), usada várias vezes, mostrando que ele é um homem simples, do povo. A fala do juiz é mais formal e educada, cheia de expressões como \"Muito obrigado\" e \"Faz me muito favor\" (linhas 26 e 29), mostrando que ele tem mais instrução e um cargo importante. Essa diferença de linguagem marca a diferença social entre os dois personagens.",
+          "veredito": "aceita_se",
+          "motivo": "Aponta marcas linguisticas corretas de cada personagem, mas liga isso so a diferenca social, sem dizer que a fala do juiz encobre proveito proprio, batendo com a entrada de aceita_se sobre relacionar so uma marca a cada um."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 16,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Na minha opinião, essa situação ainda faz sentido hoje, porque existem autoridades que usam o cargo para conseguir vantagens pessoais escondidas atrás de boas maneiras. Um exemplo da cena é o juiz aceitando o leitão para si mesmo enquanto finge só estar resolvendo a briga com justiça.",
+          "veredito": "espera_se",
+          "motivo": "Da uma opiniao justificada com o elemento do juiz ficando com o leitao, como o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Acho que sim, ainda faz sentido, porque hoje tambem tem gente com poder que usa o cargo para ganhar coisas, como quando o juiz fica com o leitao de presente.",
+          "veredito": "espera_se",
+          "motivo": "Opiniao de que ainda faz sentido, justificada com o exemplo do leitao de presente, batendo com o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Na minha opinião, essa situação ainda faz sentido hoje, porque existem casos de autoridades que usam o cargo para conseguir vantagens pessoais, mesmo agindo com boas maneiras. Um elemento da cena que mostra isso é quando o juiz aceita o leitão de presente logo depois de dizer educadamente que não estava pedindo nada, nas linhas 23 e 24. Esse jeito educado escondendo interesse próprio ainda acontece hoje em dia, então acho que a crítica da peça continua atual.",
+          "veredito": "espera_se",
+          "motivo": "Opiniao justificada com o elemento da aceitacao educada do presente, conforme o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    }
+  ],
+  "resultado": {
+    "aprovadas": [
+      2,
+      4,
+      6,
+      8,
+      9,
+      11,
+      13,
+      14,
+      16
+    ],
+    "ambiguas": [],
+    "estreitas": []
+  }
+}
