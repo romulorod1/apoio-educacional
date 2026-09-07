@@ -102,6 +102,16 @@ printf '  %s     verificar.py             %s temas ok, %s reprovados\n' \
   "$([ "$rep" = "0" ] && echo 'ok    ' || echo 'FALHOU')" "$ok" "$rep"
 [ "$rep" = "0" ] || falhou=1
 
+# QUEM CONFERE O CONFERENTE.
+#
+# O verificar.py acima diz que os 148 temas estao bons. Ele so vale se ele
+# souber reprovar: um verificador que aprova tudo tambem imprime "0 reprovados".
+# O testa_verificador.py estraga um tema saudavel de 11 formas diferentes e
+# exige que cada defeito seja pego, mais 14 frases e 6 decisoes do ambiente
+# simbolico. Ele existia desde o comeco e o portao nunca o rodou, entao a linha
+# acima vinha sendo uma afirmacao sobre um instrumento que ninguem aferia.
+roda "provas do verificador" python temas/_ferramentas/testa_verificador.py
+
 titulo "sem navegador"
 roda "notacao"        node _teste/testa_notacao.js
 roda "busca (regras)" node _teste/testa_busca_regras.js
@@ -157,6 +167,46 @@ fi
 # imprime "N verificacoes passaram, M falharam", que e o dialeto de todos os
 # irmaos, e a frase da confirmacao segue na linha seguinte, que e o nome pelo
 # qual ele aparece no resumo quando passa.
+# O PORTAO LEVANTA O PROPRIO SERVIDOR.
+#
+# Os dez testes de navegador apontam para http://127.0.0.1:8777/index.html e
+# NENHUM deles levanta servidor: eles dependiam de alguem ter deixado um
+# `python -m http.server 8777` rodando a mao. Numa maquina recem-ligada, num
+# clone novo, ou depois que alguem limpa processos parados, todos falhavam por
+# conexao recusada, e o portao acusava dez defeitos que nao existiam. Aconteceu
+# de verdade em 07/09/2026: um servidor esquecido foi derrubado como lixo de
+# sessao antiga e derrubou a bateria inteira junto.
+#
+# So sobe se a porta estiver muda, e so derruba o que ELE subiu: quem ja tem um
+# servidor proprio ali continua com o dele.
+servidor_pid=""
+porta_responde() { curl -s -o /dev/null -m 2 "http://127.0.0.1:8777/index.html" 2>/dev/null; }
+if porta_responde; then
+  printf '\n  (servidor ja estava no ar em 127.0.0.1:8777)\n'
+else
+  python -m http.server 8777 --bind 127.0.0.1 >/dev/null 2>&1 &
+  servidor_pid=$!
+  espera=0
+  while [ "$espera" -lt 40 ] && ! porta_responde; do
+    sleep 0.25
+    espera=$((espera + 1))
+  done
+  if porta_responde; then
+    printf '\n  (portao levantou o servidor em 127.0.0.1:8777, pid %s)\n' "$servidor_pid"
+  else
+    printf '\n  FALHOU  nao subiu servidor em 127.0.0.1:8777; os testes de navegador nao rodam\n'
+    falhou=1
+  fi
+fi
+# Derruba no fim, aconteca o que acontecer, inclusive se o portao for
+# interrompido no meio: comando de fundo morto pelo terminal deixa filho vivo,
+# e servidor orfao na porta e pior que nenhum, porque o proximo processo que
+# tentar subir ali no Windows sobe junto e as conexoes vao para o antigo.
+limpa_servidor() {
+  [ -n "$servidor_pid" ] && kill "$servidor_pid" 2>/dev/null || true
+}
+trap limpa_servidor EXIT INT TERM
+
 titulo "com navegador"
 for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento \
          testa_perfil testa_olho testa_atualizacao testa_atualizacao_real \
@@ -240,51 +290,30 @@ else
   falhou=1
 fi
 
+# A PROVA VEM ANTES DA CONFERENCIA que ela prova.
+#
+# As duas travas de privacidade passaram meses imprimindo ok sem olhar arquivo
+# nenhum, porque liam a arvore suja e o portao roda com a branch ja comitada.
+# A prova monta os casos que TEM que reprovar (nome dentro de arquivo novo, nome
+# no nome do arquivo, lista de nomes ausente) e confere que cada um reprova
+# mesmo. Se a prova cair, a conferencia abaixo nao vale nada, e e por isso que
+# ela roda primeiro.
+roda "prova da privacidade" sh _teste/prova_privacidade.sh
+
 titulo "nada de aluno no commit"
-# O primeiro nome do aluno da prova adaptada NAO aparece escrito neste script:
-# senao o portao acusa a si mesmo. Ele e lido de um arquivo fora do repositorio,
-# e as duas conferencias abaixo (por nome de arquivo e por conteudo) usam o
-# mesmo valor.
-nome_lista="$HOME/.claude/projects/C--Users-romul/memory/.aluno-sensivel"
-padrao=""
-[ -f "$nome_lista" ] && padrao=$(cat "$nome_lista")
-# Pelo NOME do arquivo.
-if [ -n "$padrao" ]; then
-  sujo=$(git status --short | grep -icE "experimento|$padrao|_antes|pdf_antes" || true)
-else
-  sujo=$(git status --short | grep -icE "experimento|_antes|pdf_antes" || true)
-fi
-if [ "$sujo" = "0" ]; then
-  printf '  ok      nenhum arquivo identificavel entra no commit\n'
-else
-  printf '  FALHOU  %s arquivo(s) de aluno apareceriam no commit\n' "$sujo"
+# A conferencia vive em _teste/confere_privacidade.sh para poder ser rodada
+# sozinha, em um segundo, em vez de so no fim dos quinze minutos da bateria.
+# Saida: 0 passou, 1 reprovou, 2 instavel.
+saida=$(sh _teste/confere_privacidade.sh 2>&1) && codigo=0 || codigo=$?
+printf '%s\n' "$saida"
+# Ifs explicitos, e nao `[ ... ] && var=1`: sob `set -e`, uma lista com && cujo
+# teste falha devolve codigo diferente de zero e derruba o portao inteiro ali,
+# calado, antes de imprimir o resumo. Custa duas linhas a mais e nao tem
+# armadilha.
+if [ "$codigo" = "1" ]; then
   falhou=1
 fi
-# E pelo CONTEUDO. O primeiro nome do aluno da prova adaptada apareceu num
-# comentario do figuras/base.js, num arquivo prestes a ir para o repositorio
-# publico, e a conferencia acima nao viu porque so olha nome de arquivo.
-#
-# A unica ocorrencia permitida e a linha dele na lista ALUNOS_INICIAIS do
-# app.js (alunos-semente so com primeiro nome, aprovados para o repositorio e
-# ja publicados). O nome nao aparece escrito neste script de proposito: senao
-# o portao acusa a si mesmo. Ele e lido de um arquivo fora do repositorio.
-nome_lista="$HOME/.claude/projects/C--Users-romul/memory/.aluno-sensivel"
-if [ -f "$nome_lista" ]; then
-  padrao=$(cat "$nome_lista")
-  dentro=""
-  for f in $(git ls-files -mo --exclude-standard 2>/dev/null | grep -vE "^_teste/node_modules"); do
-    [ -f "$f" ] || continue
-    n=$(grep -i "$padrao" "$f" 2>/dev/null | grep -vc "nome: '[A-Z][a-z]*', horasJulho" || true)
-    [ "$n" != "0" ] && dentro="$dentro $f"
-  done
-  if [ -z "$dentro" ]; then
-    printf '  ok      nenhum arquivo do commit cita o aluno por dentro\n'
-  else
-    printf '  FALHOU  nome do aluno DENTRO de arquivo que entraria no commit:%s\n' "$dentro"
-    falhou=1
-  fi
-else
-  printf '  INSTAVEL conferencia de conteudo pulada: falta %s\n' "$nome_lista"
+if [ "$codigo" = "2" ]; then
   instavel=1
 fi
 
