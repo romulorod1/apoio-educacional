@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.15.0';
+  var VERSAO = '1.16.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -22,6 +22,23 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.16.0',
+      itens: [
+        'Duas folhas do 3º médio ganharam as figuras que faltavam: a revisão de geometria plana e ' +
+          'espacial (os cinco sólidos lado a lado, o triângulo dentro do cone e da pirâmide, o ' +
+          'hexágono em seis triângulos, o semicírculo virando cone) e a circunferência na geometria ' +
+          'analítica (plano cartesiano, reta, tangente, os três casos de posição). Antes saíam sem ' +
+          'nenhuma. As outras folhas de geometria vêm nas próximas versões.',
+        'Literatura entrou na lista de matérias do mapeamento e da proposta, separada de Português.',
+        'Por dentro, o aplicativo deixou de tratar matemática como a única matéria possível. Nada ' +
+          'muda na tela agora; é o que permite o material de língua portuguesa e literatura entrar ' +
+          'nas próximas versões sem mexer no que já existe. Os assuntos das outras disciplinas ' +
+          'ganharam um identificador fixo, para o material poder se ligar a eles.',
+        'Quando sair uma versão nova, ela entra na segunda vez que você abrir o aplicativo: na ' +
+          'primeira ele instala por baixo e ainda mostra a anterior.'
+      ]
+    },
     {
       versao: '1.15.0',
       itens: [
