@@ -116,7 +116,46 @@ const CASOS = [
   { nome: 'pista', titulo: 'pista: retangulo 84 por 60 com um semicirculo em cada lado de 60',
     fig: '@fig pista id=k2 comprimento=84 largura=60', mede: 'pista' },
   { nome: 'rodando', titulo: 'rodando: a roda de raio r em tres posicoes, uma volta cotada C',
-    fig: '@fig rodando id=k3 raio=r comprimento=C', mede: 'rodando' }
+    fig: '@fig rodando id=k3 raio=r comprimento=C', mede: 'rodando' },
+
+  /* ---------------------------------------------------------- circulo no plano
+   * As portas do MATEM3-03: o plano atras, o centro em (h, k), a reta pela
+   * equacao geral com a perpendicular cotada, os pontos livres, a segunda
+   * circunferencia e o painel de tres casos. */
+  { nome: 'plano origem', titulo: 'circulo no plano: x2 + y2 = 25 com o centro O na origem (o raio numerico fica calado)',
+    fig: '@fig circulo id=a1 eixos=sim raio=5 centro=O', mede: 'plano' },
+  { nome: 'plano centro cotado', titulo: 'circulo no plano: centro (1, 2) com as linhas de centro e as duas coordenadas cotadas',
+    fig: '@fig circulo id=a2 eixos=sim raio=5 centro=1;2;C coordenadas=sim', mede: 'plano' },
+  { nome: 'reta secante', titulo: 'circulo no plano: centro (1, 2), raio 5, a reta 3x + 4y - 30 = 0 e a distancia d com o quadradinho',
+    fig: '@fig circulo id=a3 eixos=sim raio=5 centro=1;2;C reta=3;4;-30 distancia=d', mede: 'plano' },
+  { nome: 'reta secante gab', titulo: 'a mesma figura no gabarito: d = 3,8 em teal',
+    fig: '@fig id=a3 fase=gabarito', mede: 'plano', gabaritoDe: '@fig circulo id=a3 eixos=sim raio=5 centro=1;2;C reta=3;4;-30 distancia=d' },
+  { nome: 'reta tangente', titulo: 'circulo no plano: x2 + y2 = 25 e a tangente 3x + 4y - 25 = 0, com o ponto de contato (3, 4)',
+    fig: '@fig circulo id=a4 eixos=sim raio=5 reta=3;4;-25;t distancia=d', mede: 'plano' },
+  { nome: 'ponto exterior', titulo: 'circulo no plano: centro (2, -1), raio 4, o ponto P(6, 2) e a distancia d ate o centro',
+    fig: '@fig circulo id=a5 eixos=sim raio=4 centro=2;-1;C ponto=6;2;P cota=d', mede: 'plano' },
+  { nome: 'ponto exterior gab', titulo: 'o ponto exterior no gabarito: d = 5 em teal',
+    fig: '@fig id=a5 fase=gabarito', mede: 'plano', gabaritoDe: '@fig circulo id=a5 eixos=sim raio=4 centro=2;-1;C ponto=6;2;P cota=d' },
+  { nome: 'duas circunferencias', titulo: 'circulo no plano: x2 + y2 = 9 e (x - 8)2 + y2 = 25, tangentes exteriormente em T(3, 0)',
+    fig: '@fig circulo id=a6 eixos=sim raio=3 centro=O outra=8;0;5;B ponto=3;0;T', mede: 'plano' },
+  { nome: 'tres pontos', titulo: 'circulo no plano: a circunferencia por (0, 0), (6, 0) e (0, 8), centro C(3, 4)',
+    fig: '@fig circulo id=a7 eixos=sim raio=5 centro=3;4;C ponto=6;0;A ponto=0;8;B', mede: 'plano' },
+  { nome: 'reta generica', titulo: 'circulo: a reta generica s a distancia 7 de um raio 5, d e r em letra, sem plano',
+    fig: '@fig circulo id=a8 raio=5;r reta=s distancia=7;d centro=O', mede: 'circulo' },
+  { nome: 'trio retas', titulo: 'circulo: o painel de tres casos da posicao de uma reta, d igual a 7, 5 e 3 num raio 5',
+    fig: '@fig circulo raio=5;r reta=s distancia=d centro=O casos=7;5;3', mede: 'trio' },
+  { nome: 'trio pontos', titulo: 'circulo: o painel de tres casos da posicao de um ponto, d igual a 3, 5 e 7 num raio 5',
+    fig: '@fig circulo raio=5;r centro=O ponto=P cota=d casos=3;5;7', mede: 'trio' },
+  { nome: 'definicao generica', titulo: 'circulo no plano mudo: o centro (a, b), o ponto (x, y) e o raio r da definicao',
+    fig: '@fig circulo id=a9 eixos=sim centro=a;b raio=r ponto=x;y', mede: 'plano' },
+  /* Os dois pontos comuns de x2 + y2 = 25 com y = x + 1 (o g13 do tema): o
+   * nome de cada um nao pode sair por um fio colado a reta. */
+  { nome: 'dois pontos na reta', titulo: 'circulo no plano: x2 + y2 = 25 e a reta s (y = x + 1), com os pontos comuns (3, 4) e (-4, -3)',
+    fig: '@fig circulo id=a10 eixos=sim raio=5 ponto=3;4 ponto=-4;-3 reta=1;-1;1;s', mede: 'plano' },
+  /* Uma circunferencia inteira no primeiro quadrante, longe das duas faixas de
+   * numeros: nenhum numero da escala pode ser calado por ela. */
+  { nome: 'longe das faixas', titulo: 'circulo no plano: centro (5, 5) e raio 3, sem tocar a faixa de numeros de eixo nenhum',
+    fig: '@fig circulo id=a11 eixos=sim raio=3 centro=5;5;C', mede: 'plano' }
 ];
 
 /* ================================================================ a folha */
@@ -142,7 +181,9 @@ CASOS.forEach(function (caso) {
     if (p.tipo === 'figura') doc.figura(p.diretiva, { x: MARG_E + 20, largura: LARGURA });
   });
   const reg = (doc.figurasDesenhadas || [])[antes] || null;
-  medidas.push({ caso: caso, reg: reg, ops: pag.ops.slice(de) });
+  /* regs: todos os registros que a diretiva gerou. Uma figura comum gera um; o
+   * painel de tres casos (casos=) gera um por celula. */
+  medidas.push({ caso: caso, reg: reg, ops: pag.ops.slice(de), regs: (doc.figurasDesenhadas || []).slice(antes) });
 });
 
 fs.writeFileSync(path.join(__dirname, '_prova_receitas_circulo.pdf'), doc.finalizar());
@@ -1064,9 +1105,403 @@ function ondeAoLongo(P, s) {
   conf('o dado continua sem negrito, para a diferenca ser visivel', dado.length === 3 && dado.every((t) => !t.bold));
 }
 
+/* ================================================================ circulo no plano
+ * Medido no fluxo, com o plano lido da propria folha: a origem e o cruzamento
+ * do eixo x (o segmento horizontal mais longo de 0,9 pt) com o eixo y (o
+ * vertical mais longo), e a unidade e a escala do registro. Tudo o que a
+ * equacao afirma e conferido em coordenadas lidas do papel: o centro esta em
+ * (h, k), a reta impressa passa pelos pontos que a equacao diz, a perpendicular
+ * mede d e chega perpendicular, o ponto de contato esta onde a conta manda. */
+console.log('\ncirculo no plano: o que a equacao diz, lido no papel');
+function segmentosRetos(subs, w) {
+  return subs.filter((s) => s.pintado === 'traco' && s.trechos.length === 1 && s.trechos[0].reta &&
+    (w == null || Math.abs(s.w - w) < 0.01)).map((s) => ({ a: s.pts[0], b: s.pts[1], L: dist(s.pts[0], s.pts[1]) }));
+}
+function planoDe(m) {
+  const subs = lerCaminhos(m.ops);
+  const segs = segmentosRetos(subs, 0.9);
+  const horizontais = segs.filter((s) => Math.abs(s.a.y - s.b.y) < 0.05).sort((u, v) => v.L - u.L);
+  const verticais = segs.filter((s) => Math.abs(s.a.x - s.b.x) < 0.05).sort((u, v) => v.L - u.L);
+  if (!horizontais.length || !verticais.length) return null;
+  const O = { x: verticais[0].a.x, y: horizontais[0].a.y };
+  const k = m.reg.escala;
+  const voltas = voltasInteiras(subs, 20).map((v) => caixaDe(pontosDoSub(v, 24)));
+  return {
+    subs, segs, O, k,
+    voltas,
+    /* do papel para o problema */
+    xy: (p) => ({ x: (p.x - O.x) / k, y: (p.y - O.y) / k }),
+    bolinhas: bolinhas(subs).map((b) => ({ x: b.cx, y: b.cy }))
+  };
+}
+/* Os numeros da escala, por eixo: numero puro que mora na faixa logo abaixo
+ * do eixo x ou logo a esquerda do eixo y (a mesma leitura do
+ * _piloto_MATEM3-03.js). O zero da origem fica de fora das duas. */
+const NUMERO_PURO = /^-?\d+([.,]\d+)?$/;
+function escalaDe(m, P) {
+  const nums = textos(m).filter((t) => NUMERO_PURO.test(String(t.txt).trim()) && t.txt !== '0');
+  return {
+    x: nums.filter((t) => t.y < P.O.y && t.y > P.O.y - 16),
+    y: nums.filter((t) => t.x + t.largura < P.O.x && t.x + t.largura > P.O.x - 16)
+  };
+}
+{
+  const m = achar('plano origem');
+  const P = planoDe(m);
+  conf('plano origem: o plano foi desenhado (eixo x e eixo y em 0,9 pt)', !!P);
+  if (P) {
+    const c = P.voltas[0];
+    const centro = P.xy({ x: c.cx, y: c.cy });
+    medido('centro impresso em (' + n2c(centro.x) + ', ' + n2c(centro.y) + '), raio ' + n2c(c.largura / 2 / P.k) + ' unidades');
+    conf('o centro da circunferencia impressa e a origem do plano', Math.abs(centro.x) < 0.03 && Math.abs(centro.y) < 0.03);
+    conf('e o raio impresso e 5', Math.abs(c.largura / 2 / P.k - 5) < 0.03);
+  }
+  conf('a escala dos eixos conta duas marcas e o O uma: tres', m.reg.marcasAtivas === 3, m.reg.marcasAtivas + ' marcas');
+  conf('o raio numerico fica calado no plano (nenhum "5" impresso)', tem(m, '5') === 0, 'textos: ' + textos(m).map((t) => t.txt).join(' '));
+  /* O nome do centro na origem e o zero da escala moram os dois na diagonal
+   * de baixo a esquerda, e o rotulo so desvia de traco: o "O" saia impresso em
+   * cima do "0" (caixas cruzadas em 4,17 por 6,47 pt, medido no g19). */
+  const tO = textos(m).filter((t) => t.txt === 'O')[0], tZero = textos(m).filter((t) => t.txt === '0')[0];
+  const vaoO0 = tO && tZero ? vaoEntreCaixas(caixaDoTexto(tO), caixaDoTexto(tZero)) : -1;
+  medido('plano origem: o "O" do centro e o "0" da escala ficam a ' + n2c(vaoO0) + ' pt um do outro');
+  conf('o nome do centro na origem nao e impresso em cima do zero da escala (vao de ao menos 2 pt)', vaoO0 >= 2);
+  conf('e sai por cima do eixo x, onde nao ha numero', !!P && !!tO && tO.y > P.O.y);
+  conf('sem falha de conferencia', (m.reg.conferencia || []).length === 0, (m.reg.conferencia || []).join(' | '));
+}
+{
+  const m = achar('plano centro cotado');
+  const P = planoDe(m);
+  const c = P.voltas[0];
+  const centro = P.xy({ x: c.cx, y: c.cy });
+  medido('centro impresso em (' + n2c(centro.x) + ', ' + n2c(centro.y) + ')');
+  conf('plano centro cotado: o centro impresso esta em (1, 2)', Math.abs(centro.x - 1) < 0.03 && Math.abs(centro.y - 2) < 0.03);
+  const cotas = (m.reg.tracos || []).filter((t) => t && t.tipo === 'cota');
+  conf('as duas coordenadas saem em cota', cotas.length === 2, cotas.length + ' cota(s)');
+  const guias = (m.reg.medido.segmentos || []).filter((s) => s.tracejado.indexOf('[2 2]') === 0 && s.w < 0.7);
+  conf('com as duas linhas de centro tracejadas ate os eixos', guias.length === 2, guias.length + ' guia(s)');
+  conf('e cabe no teto: eixos 2, cotas 2, C 1', m.reg.marcasAtivas === 5, m.reg.marcasAtivas + ' marcas');
+  conf('sem falha de conferencia', (m.reg.conferencia || []).length === 0, (m.reg.conferencia || []).join(' | '));
+}
+/* A reta impressa passa pelos pontos que a equacao diz: os dois extremos do
+ * segmento mais longo de 0,9 pt satisfazem Ax + By + C = 0 nas coordenadas
+ * lidas do papel. A perpendicular e o segmento de 0,9 pt que parte do centro. */
+function retaEPerpendicular(m, A, B, C) {
+  const P = planoDe(m);
+  const c = P.voltas[0];
+  const centro = { x: c.cx, y: c.cy };
+  const obliquos = P.segs.filter((s) => Math.abs(s.a.y - s.b.y) > 0.05 && Math.abs(s.a.x - s.b.x) > 0.05).sort((u, v) => v.L - u.L);
+  const reta = obliquos[0];
+  const residuo = (p) => { const q = P.xy(p); return A * q.x + B * q.y + C; };
+  const perp = P.segs.filter((s) => (dist(s.a, centro) < 0.6 || dist(s.b, centro) < 0.6) && s !== reta)
+    .sort((u, v) => v.L - u.L)[0] || null;
+  let pe = null, angulo = null;
+  if (perp) {
+    pe = dist(perp.a, centro) < 0.6 ? perp.b : perp.a;
+    const u = { x: reta.b.x - reta.a.x, y: reta.b.y - reta.a.y }, v = { x: pe.x - centro.x, y: pe.y - centro.y };
+    angulo = Math.acos(Math.abs(u.x * v.x + u.y * v.y) / (Math.hypot(u.x, u.y) * Math.hypot(v.x, v.y))) * 180 / Math.PI;
+  }
+  return { P, centro, reta, residuos: reta ? [residuo(reta.a), residuo(reta.b)] : null, perp, pe, angulo,
+    d: perp ? perp.L / P.k : null, peXY: pe ? P.xy(pe) : null };
+}
+{
+  const m = achar('reta secante');
+  const R = retaEPerpendicular(m, 3, 4, -30);
+  medido('reta secante: residuo de 3x + 4y - 30 nos extremos impressos: ' + (R.residuos || []).map(n2c).join(' e ') +
+    '; perpendicular ' + n2c(R.d) + ' unidades (19/5 = 3,8), a ' + n2c(R.angulo) + ' graus da reta; pe em (' +
+    (R.peXY ? n2c(R.peXY.x) + ', ' + n2c(R.peXY.y) : '?') + ')');
+  conf('a reta impressa passa pelos pontos que 3x + 4y - 30 = 0 diz', !!R.residuos && R.residuos.every((v) => Math.abs(v) < 0.05));
+  conf('a perpendicular impressa mede 19/5', R.d !== null && Math.abs(R.d - 3.8) < 0.02);
+  conf('e chega perpendicular a reta (90 graus)', R.angulo !== null && Math.abs(R.angulo - 90) < 0.5);
+  conf('o pe esta em (3,28, 5,04), que e a conta', !!R.peXY && Math.abs(R.peXY.x - 3.28) < 0.02 && Math.abs(R.peXY.y - 5.04) < 0.02);
+  conf('o quadradinho no pe esta anotado', (m.reg.marcas || []).filter((x) => x.tipo === 'anguloReto').length === 1);
+  conf('d e C impressos, e a figura cabe no teto (eixos 2, d, quadradinho, C)', tem(m, 'd') === 1 && tem(m, 'C') === 1 && m.reg.marcasAtivas === 5, m.reg.marcasAtivas + ' marcas');
+  conf('sem falha de conferencia', (m.reg.conferencia || []).length === 0, (m.reg.conferencia || []).join(' | '));
+  const g = achar('reta secante gab');
+  conf('no gabarito sai d = 3,8, em teal e negrito', tem(g, 'd = 3,8') === 1 && corDe(g, 'd = 3,8') === 'teal' &&
+    textos(g).filter((t) => t.txt === 'd = 3,8').every((t) => t.bold === true));
+  conf('e o C continua preto, porque ja estava no enunciado', corDe(g, 'C') === 'preto');
+  conf('sem falha de conferencia no gabarito', (g.reg.conferencia || []).length === 0, (g.reg.conferencia || []).join(' | '));
+}
+{
+  const m = achar('reta tangente');
+  const R = retaEPerpendicular(m, 3, 4, -25);
+  medido('reta tangente: residuos ' + (R.residuos || []).map(n2c).join(' e ') + '; perpendicular ' + n2c(R.d) +
+    ' unidades; pe em (' + (R.peXY ? n2c(R.peXY.x) + ', ' + n2c(R.peXY.y) : '?') + ')');
+  conf('a tangente impressa passa pelos pontos que 3x + 4y - 25 = 0 diz', !!R.residuos && R.residuos.every((v) => Math.abs(v) < 0.05));
+  conf('a perpendicular mede exatamente o raio, 5', R.d !== null && Math.abs(R.d - 5) < 0.02);
+  const contato = R.P.bolinhas.map((b) => R.P.xy(b)).filter((q) => Math.abs(q.x - 3) < 0.05 && Math.abs(q.y - 4) < 0.05);
+  conf('e o ponto de contato (3, 4) ganha a bolinha', contato.length === 1, R.P.bolinhas.length + ' bolinha(s)');
+  conf('d e t impressos, quadradinho anotado, teto respeitado', tem(m, 'd') === 1 && tem(m, 't') === 1 &&
+    (m.reg.marcas || []).filter((x) => x.tipo === 'anguloReto').length === 1 && m.reg.marcasAtivas === 5, m.reg.marcasAtivas + ' marcas');
+  conf('sem falha de conferencia', (m.reg.conferencia || []).length === 0, (m.reg.conferencia || []).join(' | '));
+}
+{
+  const m = achar('ponto exterior');
+  const P = planoDe(m);
+  const c = P.voltas[0];
+  const centro = P.xy({ x: c.cx, y: c.cy });
+  const ps = P.bolinhas.map((b) => P.xy(b));
+  const emP = ps.filter((q) => Math.abs(q.x - 6) < 0.05 && Math.abs(q.y - 2) < 0.05);
+  const seg = P.segs.filter((s) => (dist(s.a, { x: c.cx, y: c.cy }) < 0.6 || dist(s.b, { x: c.cx, y: c.cy }) < 0.6)).sort((u, v) => v.L - u.L)[0];
+  medido('ponto exterior: centro em (' + n2c(centro.x) + ', ' + n2c(centro.y) + '), bolinhas em ' +
+    ps.map((q) => '(' + n2c(q.x) + ', ' + n2c(q.y) + ')').join(' ') + '; segmento do centro mede ' + (seg ? n2c(seg.L / P.k) : '?') + ' unidades');
+  conf('o centro impresso esta em (2, -1) e P em (6, 2)', Math.abs(centro.x - 2) < 0.03 && Math.abs(centro.y + 1) < 0.03 && emP.length === 1);
+  conf('o segmento do centro a P mede 5, que e a distancia da conta', !!seg && Math.abs(seg.L / P.k - 5) < 0.02);
+  conf('d, C e P impressos; teto respeitado', tem(m, 'd') === 1 && tem(m, 'C') === 1 && tem(m, 'P') === 1 && m.reg.marcasAtivas === 5, m.reg.marcasAtivas + ' marcas');
+  /* O tique de x igual a 2 e calado: a linha de centro sobe do centro (abaixo
+   * do eixo) ate ele atravessando a faixa dos numeros, e o numero sairia
+   * riscado. */
+  const doisNoEixoX = textos(m).filter((t) => t.txt === '2' && Math.abs(t.y - (P.O.y - 12)) < 6);
+  conf('o numero do tique onde a linha de centro chega (x = 2) e calado', doisNoEixoX.length === 0, doisNoEixoX.length + ' "2" na faixa do eixo x');
+  /* A propria circunferencia tambem risca: com centro (2, -1) e raio 4 ela
+   * passa na vertical por x = -2 e x = 6, dentro da faixa de numeros do eixo x,
+   * e na horizontal por y = 2 e y = -4, dentro da faixa do eixo y. Medido no
+   * g11 do MATEM3-03 antes do conserto (ver_tiques.py do verificador): os
+   * quatro numeros saiam riscados pelo traco de 1,2 pt. Esses quatro sao
+   * calados; o 4 do eixo x, por onde a circunferencia nao passa, e o zero da
+   * origem continuam. */
+  const faixaX = escalaDe(m, P).x.map((t) => t.txt), faixaY = escalaDe(m, P).y.map((t) => t.txt);
+  medido('ponto exterior: escala do eixo x ' + faixaX.join(' ') + '; do eixo y ' + faixaY.join(' '));
+  conf('o -2 e o 6 do eixo x, por onde a circunferencia passa, sao calados', faixaX.indexOf('-2') < 0 && faixaX.indexOf('6') < 0,
+    'faixa do eixo x: ' + faixaX.join(' '));
+  conf('o 2 e o -4 do eixo y tambem', faixaY.indexOf('2') < 0 && faixaY.indexOf('-4') < 0, 'faixa do eixo y: ' + faixaY.join(' '));
+  conf('e o 4 do eixo x e o zero da origem continuam', faixaX.indexOf('4') >= 0 && tem(m, '0') === 1);
+  conf('sem falha de conferencia', (m.reg.conferencia || []).length === 0, (m.reg.conferencia || []).join(' | '));
+  const g = achar('ponto exterior gab');
+  conf('no gabarito sai d = 5 em teal', tem(g, 'd = 5') === 1 && corDe(g, 'd = 5') === 'teal');
+}
+{
+  const m = achar('duas circunferencias');
+  const P = planoDe(m);
+  const vs = P.voltas.slice().sort((a, b) => a.largura - b.largura);
+  const c1 = P.xy({ x: vs[0].cx, y: vs[0].cy }), c2 = P.xy({ x: vs[1].cx, y: vs[1].cy });
+  medido('duas circunferencias: raios ' + vs.map((v) => n2c(v.largura / 2 / P.k)).join(' e ') + ' unidades, centros em (' +
+    n2c(c1.x) + ', ' + n2c(c1.y) + ') e (' + n2c(c2.x) + ', ' + n2c(c2.y) + '), a ' + n2c(Math.hypot(c2.x - c1.x, c2.y - c1.y)) + ' um do outro');
+  conf('as duas circunferencias impressas tem raios 3 e 5', vs.length === 2 && Math.abs(vs[0].largura / 2 / P.k - 3) < 0.03 && Math.abs(vs[1].largura / 2 / P.k - 5) < 0.03);
+  conf('com os centros na origem e em (8, 0): a 8 um do outro, a soma dos raios', Math.abs(c1.x) < 0.03 && Math.abs(c1.y) < 0.03 && Math.abs(c2.x - 8) < 0.03 && Math.abs(c2.y) < 0.03);
+  const T = P.bolinhas.map((b) => P.xy(b)).filter((q) => Math.abs(q.x - 3) < 0.05 && Math.abs(q.y) < 0.05);
+  conf('e T(3, 0), o ponto de contato, ganha a bolinha', T.length === 1);
+  conf('O, B e T impressos; teto respeitado', tem(m, 'O') === 1 && tem(m, 'B') === 1 && tem(m, 'T') === 1 && m.reg.marcasAtivas === 5, m.reg.marcasAtivas + ' marcas');
+  conf('sem falha de conferencia', (m.reg.conferencia || []).length === 0, (m.reg.conferencia || []).join(' | '));
+}
+{
+  const m = achar('tres pontos');
+  const P = planoDe(m);
+  const c = P.voltas[0];
+  const ps = P.bolinhas.map((b) => P.xy(b));
+  const acha = (x, y) => ps.filter((q) => Math.abs(q.x - x) < 0.05 && Math.abs(q.y - y) < 0.05).length === 1;
+  medido('tres pontos: bolinhas em ' + ps.map((q) => '(' + n2c(q.x) + ', ' + n2c(q.y) + ')').join(' '));
+  conf('as bolinhas estao em (3, 4), (6, 0) e (0, 8)', acha(3, 4) && acha(6, 0) && acha(0, 8));
+  conf('e a circunferencia impressa passa por (6, 0) e (0, 8): raio 5 a partir de (3, 4)', Math.abs(c.largura / 2 / P.k - 5) < 0.03);
+  /* O nome de um ponto sobre um eixo sai do lado sem numeros: A acima do eixo
+   * x, B a direita do eixo y. */
+  const tA = textos(m).filter((t) => t.txt === 'A')[0], tB = textos(m).filter((t) => t.txt === 'B')[0];
+  conf('A, sobre o eixo x, e escrito ACIMA do eixo, onde nao ha numero', !!tA && tA.y > P.O.y);
+  conf('B, sobre o eixo y, e escrito A DIREITA do eixo, onde nao ha numero', !!tB && tB.x > P.O.x);
+  conf('teto respeitado (eixos 2, C, A, B)', m.reg.marcasAtivas === 5, m.reg.marcasAtivas + ' marcas');
+  conf('sem falha de conferencia', (m.reg.conferencia || []).length === 0, (m.reg.conferencia || []).join(' | '));
+}
+{
+  const m = achar('reta generica');
+  const k = m.reg.escala;
+  const subs = lerCaminhos(m.ops);
+  const c = caixaDe(pontosDoSub(voltasInteiras(subs, 20)[0], 24));
+  const centro = { x: c.cx, y: c.cy };
+  const segs = segmentosRetos(subs, 0.9);
+  const doCentro = segs.filter((s) => dist(s.a, centro) < 0.6 || dist(s.b, centro) < 0.6).map((s) => s.L / k).sort((a, b) => a - b);
+  medido('reta generica: segmentos que partem do centro medem ' + doCentro.map(n2c).join(' e ') + ' unidades (raio 5 e distancia 7)');
+  conf('a perpendicular impressa mede 7 e o raio cotado mede 5', doCentro.length === 2 && Math.abs(doCentro[0] - 5) < 0.02 && Math.abs(doCentro[1] - 7) < 0.02);
+  conf('r, d, s e O impressos: cinco marcas com o quadradinho', tem(m, 'r') === 1 && tem(m, 'd') === 1 && tem(m, 's') === 1 && tem(m, 'O') === 1 && m.reg.marcasAtivas === 5, m.reg.marcasAtivas + ' marcas');
+  conf('sem falha de conferencia', (m.reg.conferencia || []).length === 0, (m.reg.conferencia || []).join(' | '));
+}
+/* O painel de tres casos: tres figuras proprias na mesma pagina, cada uma com
+ * a sua circunferencia, e o segmento que parte do centro mede o caso dela. */
+function celulasDoTrio(m) {
+  const subs = lerCaminhos(m.ops);
+  const voltas = voltasInteiras(subs, 20).map((v) => caixaDe(pontosDoSub(v, 24))).sort((a, b) => a.cx - b.cx);
+  const segs = segmentosRetos(subs, 0.9);
+  const dots = bolinhas(subs).map((b) => ({ x: b.cx, y: b.cy }));
+  return voltas.map((c) => {
+    const k = c.largura / 10;
+    const centro = { x: c.cx, y: c.cy };
+    const doCentro = segs.filter((s) => dist(s.a, centro) < 0.6 || dist(s.b, centro) < 0.6).map((s) => s.L / k).sort((a, b) => a - b);
+    const pontos = dots.filter((p) => dist(p, centro) > 1).map((p) => dist(p, centro) / k);
+    return { k, doCentro, pontos };
+  });
+}
+{
+  const m = achar('trio retas');
+  const cel = celulasDoTrio(m);
+  medido('trio retas: ' + cel.length + ' celulas; segmentos do centro ' + cel.map((c) => c.doCentro.map(n2c).join('/')).join('  '));
+  conf('o painel tem tres celulas, cada uma com a sua circunferencia de raio 5', cel.length === 3);
+  conf('e as perpendiculares medem 7, 5 e 3, na ordem do texto (exterior, tangente, secante)', cel.length === 3 &&
+    [7, 5, 3].every((d, i) => cel[i].doCentro.some((L) => Math.abs(L - d) < 0.02)));
+  conf('a tangente do meio ganha a bolinha do ponto de contato, a 5 do centro', cel.length === 3 && cel[1].pontos.some((L) => Math.abs(L - 5) < 0.02));
+  const regs = m.regs || [];
+  conf('as tres celulas passam pelo conferirFigura sem falha', regs.length === 3 && regs.every((r) => (r.conferencia || []).length === 0 && r.marcasAtivas <= 5),
+    regs.map((r) => r.marcasAtivas + ' marcas' + ((r.conferencia || []).length ? ' ' + r.conferencia.join(' | ') : '')).join('; '));
+}
+{
+  const m = achar('trio pontos');
+  const cel = celulasDoTrio(m);
+  medido('trio pontos: bolinhas a ' + cel.map((c) => c.pontos.map(n2c).join('/')).join('  ') + ' do centro');
+  conf('o painel dos pontos tem tres celulas com P a 3, 5 e 7 do centro (interior, sobre, exterior)', cel.length === 3 &&
+    [3, 5, 7].every((d, i) => cel[i].pontos.some((L) => Math.abs(L - d) < 0.02)));
+  conf('e em cada uma o segmento OP mede o caso dela', cel.length === 3 && [3, 5, 7].every((d, i) => cel[i].doCentro.some((L) => Math.abs(L - d) < 0.02)));
+}
+{
+  const m = achar('definicao generica');
+  const ts = textos(m).map((t) => t.txt);
+  medido('definicao generica: textos impressos: ' + ts.join(' | '));
+  conf('o plano mudo nao imprime numero nenhum', ts.every((t) => !/\d/.test(t)));
+  conf('o par (a, b) e o par (x, y) saem escritos junto dos pontos, e o r no raio', tem(m, '(a, b)') === 1 && tem(m, '(x, y)') === 1 && tem(m, 'r') === 1);
+  conf('cinco marcas: eixos 2, (a, b), (x, y), r', m.reg.marcasAtivas === 5, m.reg.marcasAtivas + ' marcas');
+  conf('sem falha de conferencia', (m.reg.conferencia || []).length === 0, (m.reg.conferencia || []).join(' | '));
+}
+
+/* ================================================================ numero riscado pela circunferencia
+ * A leitura do ver_tiques.py do verificador do MATEM3-03, refeita no fluxo:
+ * todo caminho curvo com traco de 1,1 a 1,3 pt (a circunferencia, 1,2 pt) e
+ * amostrado, e um numero de escala esta riscado quando a caixa dele, encolhida
+ * em 1 pt de cada lado para o roce nao contar, contem um ponto amostrado.
+ * Medido antes do conserto: 11 numeros por lingua nos PDFs do tema (o -2 e o 6
+ * do eixo x e o 2 e o -4 do eixo y so no g11, que e o caso "ponto exterior"
+ * desta folha). A caixa aqui e a do glifo lido no fluxo (linha de base, altura
+ * de digito), e nao a caixa de palavra do MuPDF, mas as duas encolhidas
+ * partilham o miolo do numero. */
+console.log('\ncirculo no plano: nenhum numero de escala riscado pela circunferencia');
+function numerosRiscados(m) {
+  const subs = lerCaminhos(m.ops);
+  const curvas = subs.filter((s) => s.pintado === 'traco' && s.w >= 1.1 && s.w <= 1.3 && s.trechos.some((t) => !t.reta));
+  const pontos = [];
+  for (const s of curvas) for (const tr of s.trechos) if (!tr.reta) for (let i = 0; i <= 24; i++) pontos.push(emBezier(tr, i / 24));
+  const riscados = [];
+  for (const t of textos(m)) {
+    if (!NUMERO_PURO.test(String(t.txt).trim()) || t.tam >= 12) continue;
+    const q = { x0: t.x + 1, x1: t.x + t.largura - 1, y0: t.y - 0.2 * t.tam + 1, y1: t.y + 0.75 * t.tam - 1 };
+    if (q.x1 <= q.x0 || q.y1 <= q.y0) continue;
+    if (pontos.some((p) => p.x >= q.x0 && p.x <= q.x1 && p.y >= q.y0 && p.y <= q.y1)) riscados.push(t.txt + ' em (' + n2c(t.x) + ', ' + n2c(t.y) + ')');
+  }
+  return riscados;
+}
+{
+  let total = 0, onde = [];
+  for (const m of medidas) {
+    if (m.caso.mede !== 'plano') continue;
+    const r = numerosRiscados(m);
+    total += r.length;
+    if (r.length) onde.push(m.caso.nome + ': ' + r.join('; '));
+  }
+  medido('numeros de escala riscados por traco curvo de 1,1 a 1,3 pt nas figuras com plano: ' + total + (onde.length ? ' (' + onde.join(' | ') + ')' : ''));
+  conf('nenhum numero de escala e riscado pela circunferencia em figura nenhuma com plano (eram 4 so no ponto exterior)', total === 0, onde.join(' | '));
+}
+{
+  /* O lado saudavel: a circunferencia de centro (5, 5) e raio 3 nao chega a
+   * faixa de numero nenhum, entao a escala sai inteira. A escala desta janela
+   * anda de 2 em 2, e o 2, o 4, o 6 e o 8, que cobrem a projecao da
+   * circunferencia nos dois eixos, tem que estar la: uma regra que calasse
+   * pelo cruzamento com o EIXO, ou pela projecao, em vez de pela caixa do
+   * numero, apagaria alguns deles. */
+  const m = achar('longe das faixas');
+  const P = planoDe(m);
+  const e = escalaDe(m, P);
+  const fx = e.x.map((t) => t.txt), fy = e.y.map((t) => t.txt);
+  medido('longe das faixas: escala do eixo x ' + fx.join(' ') + '; do eixo y ' + fy.join(' '));
+  const todos = ['2', '4', '6', '8'];
+  conf('a circunferencia que nao toca faixa nenhuma nao cala numero nenhum: 2, 4, 6 e 8 nos dois eixos',
+    todos.every((v) => fx.indexOf(v) >= 0) && todos.every((v) => fy.indexOf(v) >= 0));
+  conf('e a circunferencia impressa e a de raio 3 em (5, 5)', Math.abs(P.voltas[0].largura / 2 / P.k - 3) < 0.03 &&
+    Math.abs(P.xy({ x: P.voltas[0].cx, y: P.voltas[0].cy }).x - 5) < 0.03 && Math.abs(P.xy({ x: P.voltas[0].cx, y: P.voltas[0].cy }).y - 5) < 0.03);
+  conf('sem falha de conferencia', (m.reg.conferencia || []).length === 0, (m.reg.conferencia || []).join(' | '));
+}
+
+/* ================================================================ o fio de chamada e a reta
+ * No g13 do tema (x2 + y2 = 25 com y = x + 1) os nomes "(3, 4)" e "(-4, -3)"
+ * saiam por um fio na direcao do versor do ponto, (0,6; 0,8), a 8 graus da
+ * reta s, (0,707; 0,707), e correndo colado a ela: na folha a reta parecia
+ * bifurcar nos dois pontos comuns. O angulo entre o fio (da ancora ao centro
+ * do rotulo) e a reta tem que ficar acima de 20 graus. */
+console.log('\ncirculo no plano: o fio de chamada de um ponto sobre a reta nao corre colado a ela');
+{
+  const m = achar('dois pontos na reta');
+  const P = planoDe(m);
+  const R = retaEPerpendicular(m, 1, -1, 1);
+  conf('dois pontos na reta: a reta impressa passa pelos pontos que x - y + 1 = 0 diz', !!R.residuos && R.residuos.every((v) => Math.abs(v) < 0.05));
+  const emCima = P.bolinhas.map((b) => P.xy(b)).filter((q) => (Math.abs(q.x - 3) < 0.05 && Math.abs(q.y - 4) < 0.05) || (Math.abs(q.x + 4) < 0.05 && Math.abs(q.y + 3) < 0.05));
+  conf('as bolinhas estao em (3, 4) e (-4, -3)', emCima.length === 2, P.bolinhas.length + ' bolinha(s)');
+  const u = { x: Math.SQRT1_2, y: Math.SQRT1_2 };
+  let piorAngulo = Infinity, lidos = 0, relato = [];
+  for (const texto of ['(3, 4)', '(-4, -3)']) {
+    const rot = (m.reg.rotulos || []).filter((r) => r.texto === texto)[0];
+    if (!rot || !rot.ancora) { relato.push(texto + ' sem registro de rotulo'); continue; }
+    lidos++;
+    const fio = { x: rot.cx - rot.ancora.x, y: rot.cy - rot.ancora.y };
+    const L = Math.hypot(fio.x, fio.y) || 1e-9;
+    const ang = Math.acos(Math.min(1, Math.abs(fio.x * u.x + fio.y * u.y) / L)) * 180 / Math.PI;
+    piorAngulo = Math.min(piorAngulo, ang);
+    relato.push(texto + ' a ' + n2c(ang) + ' graus da reta, fio de ' + n2c(L) + ' pt');
+  }
+  medido('dois pontos na reta: ' + relato.join('; ') + ' (eram 8 graus nos dois)');
+  conf('os dois nomes saem escritos', lidos === 2, relato.join('; '));
+  conf('e nenhum fio de chamada fica a menos de 20 graus da reta', lidos === 2 && piorAngulo >= 20, 'pior ' + n2c(piorAngulo) + ' graus');
+  /* O nome da reta mora do lado de fora, perto de uma ponta, e o rotulo so
+   * desvia de traco, nunca de outro rotulo: a primeira tentativa do conserto
+   * mandava o "(3, 4)" para a normal de fora e ele saiu impresso por baixo do
+   * "s" ("(3 s 4)" na folha). As caixas dos tres rotulos nao podem se cruzar. */
+  const rot = textos(m).filter((t) => ['(3, 4)', '(-4, -3)', 's'].indexOf(t.txt) >= 0);
+  let cruzados = [];
+  for (let i = 0; i < rot.length; i++) {
+    for (let j = i + 1; j < rot.length; j++) {
+      if (vaoEntreCaixas(caixaDoTexto(rot[i]), caixaDoTexto(rot[j])) < 2) cruzados.push('"' + rot[i].txt + '" e "' + rot[j].txt + '"');
+    }
+  }
+  conf('e o "s" da reta nao e impresso em cima de nenhum dos dois pares (vao de ao menos 2 pt)', rot.length === 3 && cruzados.length === 0, cruzados.join('; ') || rot.length + ' rotulos');
+  conf('s impresso, teto respeitado (eixos 2, dois pares, s)', tem(m, 's') === 1 && m.reg.marcasAtivas === 5, m.reg.marcasAtivas + ' marcas');
+  conf('sem falha de conferencia', (m.reg.conferencia || []).length === 0, (m.reg.conferencia || []).join(' | '));
+}
+
+console.log('\ncirculo no plano: as recusas, cada uma com o par que passa');
+conf('centro=1;2 sem eixos e recusado', comAviso('@fig circulo raio=5 centro=1;2', 'pede eixos=sim') === 1);
+conf('e com eixos=sim passa', comAviso('@fig circulo eixos=sim raio=5 centro=1;2', 'circulo:') === 0);
+conf('reta=1;2 (dois coeficientes) e recusada', comAviso('@fig circulo eixos=sim raio=5 reta=1;2', 'pede A;B;C') === 1);
+conf('reta=0;0;5 nao e reta', comAviso('@fig circulo eixos=sim raio=5 reta=0;0;5', 'nao e reta') === 1);
+conf('reta=1;0;-40 passa longe e nao cruza a janela: avisada', comAviso('@fig circulo eixos=sim raio=5 reta=1;0;-40', 'nao cruza a janela') === 1);
+conf('e reta=1;0;-12, a dois raios e meio, ainda cruza e passa', comAviso('@fig circulo eixos=sim raio=5 reta=1;0;-12', 'circulo:') === 0);
+conf('distancia=d sem reta= e recusada', comAviso('@fig circulo eixos=sim raio=5 distancia=d', 'sem reta=') === 1);
+conf('distancia=9 que nao bate com a conta (3,8) e recusada', comAviso('@fig circulo eixos=sim raio=5 centro=1;2 reta=3;4;-30 distancia=9', 'nao bate com a conta') === 1);
+conf('e distancia=3.8, que bate, passa', comAviso('@fig circulo eixos=sim raio=5 centro=1;2 reta=3;4;-30 distancia=3.8', 'circulo:') === 0);
+conf('ponto=6;2 sem eixos e recusado', comAviso('@fig circulo raio=5 ponto=6;2', 'pede eixos=sim') === 1);
+conf('outra=1;2 (sem raio) e recusada', comAviso('@fig circulo eixos=sim raio=5 outra=1;2', 'pede h;k;r') === 1);
+conf('reta generica sem distancia= nao tem onde ficar', comAviso('@fig circulo raio=5 reta=s', 'precisa de distancia=') === 1);
+conf('casos=a;b e recusado', comAviso('@fig circulo eixos=sim raio=5 reta=3;4;-30 casos=a;b', 'pede so numeros') === 1);
+conf('casos= sem reta nem ponto generico nao tem o que variar', comAviso('@fig circulo raio=5;r casos=7;5;3', 'nao tem nenhum dos dois') === 1);
+/* Os eixos custam duas marcas: com as coordenadas cotadas e o C a figura esta
+ * no teto (5), e um ponto a mais estoura. */
+conf('eixos 2 + cotas 2 + C 1 = 5 passa no teto', comAviso('@fig circulo eixos=sim raio=5 centro=1;2;C coordenadas=sim', 'marcas ativas') === 0);
+conf('e mais um ponto nomeado estoura: os eixos contam duas', comAviso('@fig circulo eixos=sim raio=5 centro=1;2;C coordenadas=sim ponto=6;2;P', 'marcas ativas: 6') === 1);
+/* O raio numerico so fica calado no plano; fora dele continua cotado, e a
+ * letra continua saindo nos dois. */
+{
+  const imprime = (fig) => {
+    const d2 = new PDFGen.Doc();
+    d2.novaPagina();
+    const antes = (d2.figurasDesenhadas || []).length;
+    d2.partesDeFigura(fig).forEach(function (p) { if (p.tipo === 'figura') d2.figura(p.diretiva, { x: MARG_E + 20, largura: LARGURA }); });
+    const r = (d2.figurasDesenhadas || [])[antes];
+    return ((r && r.medido && r.medido.textos) || []).map((t) => t.txt);
+  };
+  conf('raio=5 no plano nao imprime o 5', imprime('@fig circulo eixos=sim raio=5').indexOf('5') < 0);
+  conf('raio=5;r no plano imprime o r', imprime('@fig circulo eixos=sim raio=5;r').indexOf('r') >= 0);
+  conf('e raio=5 sem plano continua imprimindo o 5', imprime('@fig circulo raio=5').indexOf('5') >= 0);
+}
+
 console.log('\na folha inteira');
 const avisos = doc.avisosFigura || [];
-conf('todas as ' + CASOS.length + ' figuras foram desenhadas', (doc.figurasDesenhadas || []).length === CASOS.length, (doc.figurasDesenhadas || []).length + ' figuras');
+/* Cada painel de tres casos (casos=) e uma diretiva que gera TRES registros, um
+ * por celula, como o painel: contam dois a mais cada. */
+const esperadas = CASOS.length + 2 * CASOS.filter((c) => /\bcasos=/.test(c.fig)).length;
+conf('todas as ' + CASOS.length + ' diretivas foram desenhadas (' + esperadas + ' figuras, com as celulas dos dois paineis)',
+  (doc.figurasDesenhadas || []).length === esperadas, (doc.figurasDesenhadas || []).length + ' figuras');
 conf('nenhuma passa do teto de cinco marcas', (doc.figurasDesenhadas || []).every((r) => r.marcasAtivas <= 5),
   'marcas por figura: ' + (doc.figurasDesenhadas || []).map((r) => r.marcasAtivas).join(' '));
 conf('nenhum aviso de figura na folha inteira', avisos.length === 0);

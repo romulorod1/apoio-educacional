@@ -27,7 +27,10 @@ chega-se à **equação reduzida**:
 
 (x - a)^{2} + (y - b)^{2} = r^{2}
 
-onde a e b são as coordenadas do centro e r é o raio.
+onde a e b são as coordenadas do centro e r é o raio. A figura mostra o centro (a, b), um ponto
+(x, y) da circunferência e o raio r, que é a distância entre os dois.
+
+@fig circulo eixos=sim centro=a;b raio=r ponto=x;y
 
 Quando o centro é a origem, a equação fica simplesmente x^{2} + y^{2} = r^{2}.
 
@@ -58,7 +61,10 @@ quadrado é 9. Somando 25 e 9 nos dois lados:
 
 (x - 5)^{2} + (y + 3)^{2} = -9 + 25 + 9
 
-O lado direito dá 25. Logo o centro é (5, -3), e o raio vale 5.
+O lado direito dá 25. Logo o centro é (5, -3), e o raio vale 5. Na figura, as linhas tracejadas
+levam o centro até os eixos e mostram as duas coordenadas.
+
+@fig circulo eixos=sim raio=5 centro=5;-3;C coordenadas=sim
 
 Se ao final o lado direito der zero, a equação descreve apenas um ponto. Se der negativo, não
 descreve nenhum ponto real. Vale conferir esse sinal antes de anunciar um raio.
@@ -71,6 +77,10 @@ quadrado da distância com o quadrado do raio. Chamando de d a distância do pon
 - d < r: ponto interior.
 - d = r: ponto sobre a circunferência.
 - d > r: ponto exterior.
+
+A figura mostra os três casos, na ordem da lista, com a distância d do ponto ao centro.
+
+@fig circulo raio=5;r centro=O ponto=P cota=d casos=3;5;7
 
 **Exemplo 3.** Posição do ponto (5, 1) em relação a (x - 1)^{2} + (y + 2)^{2} = 25.
 Substituindo: (5 - 1)^{2} + (1 + 2)^{2} = 16 + 9 = 25. Como o resultado é igual ao quadrado do raio,
@@ -85,9 +95,17 @@ distância do centro à reta:
 - d = r: a reta é tangente e há exatamente um ponto comum.
 - d < r: a reta é secante e há dois pontos comuns.
 
+A figura mostra os três casos, na ordem da lista, com a distância d do centro à reta medida na
+perpendicular.
+
+@fig circulo raio=5;r reta=s distancia=d centro=O casos=7;5;3
+
 **Exemplo 4.** Posição da reta x + y - 8 = 0 em relação à circunferência de centro (2, 1) e raio 3.
 Substituindo o centro: 2 + 1 - 8 = -5, e o módulo é 5. O denominador é √(1 + 1) = √2. Então
-d = (5·√2)/2, que é maior que 3. A reta é exterior.
+d = (5·√2)/2, que é maior que 3. A reta é exterior. Na figura, d é a perpendicular do centro à
+reta, e a reta não toca a circunferência.
+
+@fig circulo eixos=sim raio=3 centro=2;1;C reta=1;1;-8 distancia=d
 
 O caminho alternativo é substituir a reta na circunferência e olhar o discriminante da equação do
 segundo grau que aparece. Os dois caminhos dão a mesma resposta, e o da distância costuma ser mais
@@ -97,7 +115,9 @@ curto.
 
 Uma reta tangente é perpendicular ao raio no ponto de contato. Isso dá um método rápido: para achar
 a tangente num ponto da circunferência, calcule o coeficiente angular do raio e tome o inverso com o
-sinal trocado.
+sinal trocado. Na figura, o raio OT chega à reta t formando ângulo reto.
+
+@fig circulo reta=t distancia=5;r centro=O ponto=T
 
 #### Erros comuns
 
@@ -160,19 +180,28 @@ igualado a zero.
 7. Centro (3, -2) e raio 5.
 8. Centro (-4, 5) e raio 5.
 9. (x - 1)^{2} + (y - 2)^{2} = 25. O raio é a distância entre os dois pontos dados, que vale 5.
-10. (x - 2)^{2} + (y - 7)^{2} = 25. O centro é o ponto médio do diâmetro e o raio é a metade do
-    comprimento dele, que vale 10.
+10. (x - 2)^{2} + (y - 7)^{2} = 25. O centro M é o ponto médio do diâmetro AB e o raio é a metade
+    do comprimento dele, que vale 10.
+    @fig circulo id=g10 eixos=sim raio=5 centro=2;7;M ponto=-1;3;A ponto=5;11;B fase=gabarito
 11. Exterior. O quadrado da distância ao centro vale 25, maior que 16.
+    @fig circulo id=g11 eixos=sim raio=4 centro=2;-1;C ponto=6;2;P cota=d fase=gabarito
 12. Secante. A distância do centro à reta vale 19/5, que é menor que o raio 5, então a reta corta a
     circunferência em dois pontos.
+    @fig circulo id=g12 eixos=sim raio=5 centro=1;2;C reta=3;4;-30 distancia=d fase=gabarito
 13. Os pontos (3, 4) e (-4, -3).
+    @fig circulo id=g13 eixos=sim raio=5 ponto=3;4 ponto=-4;-3 reta=1;-1;1;s fase=gabarito
 14. k = -11.
 15. Tangente. A distância do centro à reta vale 25/5 = 5, exatamente o raio. O único ponto comum é
     (3, 4).
+    @fig circulo id=g15 eixos=sim raio=5 reta=3;4;-25 distancia=d ponto=3;4 fase=gabarito
 16. (x - 5)^{2} + (y - 1)^{2} = 361/25. O raio é a distância do centro à reta, que vale 19/5.
+    @fig circulo id=g16 eixos=sim raio=3.8 centro=5;1;C reta=3;-4;8 distancia=d fase=gabarito
 17. x^{2} + y^{2} - 6x - 8y = 0. O centro é (3, 4) e o raio vale 5.
+    @fig circulo id=g17 eixos=sim raio=5 centro=3;4;C ponto=6;0 ponto=0;8 fase=gabarito
 18. 5x + 12y - 169 = 0. A tangente é perpendicular ao raio no ponto de contato.
-19. Tangentes exteriormente. A distância entre os centros vale 8, que é a soma dos raios 3 e 5.
+    @fig circulo id=g18 eixos=sim raio=13 reta=5;12;-169 distancia=r ponto=5;12 fase=gabarito
+19. Tangentes exteriormente. A distância entre os centros O e C vale 8, que é a soma dos raios 3 e 5.
+    @fig circulo id=g19 eixos=sim raio=3 centro=O outra=8;0;5;C ponto=3;0;T fase=gabarito
 
 ## EN
 
@@ -190,7 +219,10 @@ gives the **standard equation**:
 
 (x - a)^{2} + (y - b)^{2} = r^{2}
 
-where a and b are the coordinates of the centre and r is the radius.
+where a and b are the coordinates of the centre and r is the radius. The figure shows the centre
+(a, b), a point (x, y) of the circle and the radius r, which is the distance between the two.
+
+@fig circulo eixos=sim centro=a;b raio=r ponto=x;y
 
 When the centre is the origin, the equation is simply x^{2} + y^{2} = r^{2}.
 
@@ -221,7 +253,10 @@ square is 9. Adding 25 and 9 to both sides:
 
 (x - 5)^{2} + (y + 3)^{2} = -9 + 25 + 9
 
-The right hand side gives 25. So the centre is (5, -3), and the radius is 5.
+The right hand side gives 25. So the centre is (5, -3), and the radius is 5. In the figure, the
+dashed lines take the centre to the axes and show the two coordinates.
+
+@fig circulo eixos=sim raio=5 centro=5;-3;C coordenadas=sim
 
 If the right hand side ends up as zero, the equation describes a single point. If it ends up
 negative, it describes no real point at all. It is worth checking that sign before announcing a
@@ -237,6 +272,11 @@ distance from the point to the centre:
 - d = r: the point is on the circle.
 - d > r: the point is outside.
 
+The figure shows the three cases, in the order of the list, with the distance d from the point to
+the centre.
+
+@fig circulo raio=5;r centro=O ponto=P cota=d casos=3;5;7
+
 **Example 3.** Position of the point (5, 1) relative to (x - 1)^{2} + (y + 2)^{2} = 25.
 Substituting: (5 - 1)^{2} + (1 + 2)^{2} = 16 + 9 = 25. Since the result equals the square of the
 radius, the point lies on the circle.
@@ -250,10 +290,18 @@ the distance from the centre to the line:
 - d = r: the line is tangent and there is exactly one common point.
 - d < r: the line is a secant and there are two common points.
 
+The figure shows the three cases, in the order of the list, with the distance d from the centre to
+the line measured along the perpendicular.
+
+@fig circulo raio=5;r reta=s distancia=d centro=O casos=7;5;3
+
 **Example 4.** Position of the line x + y - 8 = 0 relative to the circle with centre (2, 1) and
 radius 3.
 Substituting the centre: 2 + 1 - 8 = -5, and its absolute value is 5. The denominator is
-√(1 + 1) = √2. So d = (5·√2)/2, which is greater than 3. The line is external.
+√(1 + 1) = √2. So d = (5·√2)/2, which is greater than 3. The line is external. In the figure, d is
+the perpendicular from the centre to the line, and the line does not touch the circle.
+
+@fig circulo eixos=sim raio=3 centro=2;1;C reta=1;1;-8 distancia=d
 
 The alternative route is to substitute the line into the circle and look at the discriminant of the
 quadratic equation that appears. Both routes give the same answer, and the distance one is usually
@@ -263,7 +311,9 @@ shorter.
 
 A tangent line is perpendicular to the radius at the point of contact. That gives a quick method: to
 find the tangent at a point of the circle, compute the slope of the radius and take the reciprocal
-with the sign flipped.
+with the sign flipped. In the figure, the radius OT meets the line t at a right angle.
+
+@fig circulo reta=t distancia=5;r centro=O ponto=T
 
 #### Common mistakes
 
@@ -329,20 +379,30 @@ with everything set equal to zero.
 8. Centre (-4, 5) and radius 5.
 9. (x - 1)^{2} + (y - 2)^{2} = 25. The radius is the distance between the two given points, which
    is 5.
-10. (x - 2)^{2} + (y - 7)^{2} = 25. The centre is the midpoint of the diameter and the radius is
-    half its length, which is 10.
+10. (x - 2)^{2} + (y - 7)^{2} = 25. The centre M is the midpoint of the diameter AB and the radius
+    is half its length, which is 10.
+    @fig circulo id=g10 eixos=sim raio=5 centro=2;7;M ponto=-1;3;A ponto=5;11;B fase=gabarito
 11. Outside. The square of the distance to the centre is 25, greater than 16.
+    @fig circulo id=g11 eixos=sim raio=4 centro=2;-1;C ponto=6;2;P cota=d fase=gabarito
 12. A secant. The distance from the centre to the line is 19/5, which is less than the radius 5, so
     the line cuts the circle at two points.
+    @fig circulo id=g12 eixos=sim raio=5 centro=1;2;C reta=3;4;-30 distancia=d fase=gabarito
 13. The points (3, 4) and (-4, -3).
+    @fig circulo id=g13 eixos=sim raio=5 ponto=3;4 ponto=-4;-3 reta=1;-1;1;s fase=gabarito
 14. k = -11.
 15. Tangent. The distance from the centre to the line is 25/5 = 5, exactly the radius. The only
     common point is (3, 4).
+    @fig circulo id=g15 eixos=sim raio=5 reta=3;4;-25 distancia=d ponto=3;4 fase=gabarito
 16. (x - 5)^{2} + (y - 1)^{2} = 361/25. The radius is the distance from the centre to the line,
     which is 19/5.
+    @fig circulo id=g16 eixos=sim raio=3.8 centro=5;1;C reta=3;-4;8 distancia=d fase=gabarito
 17. x^{2} + y^{2} - 6x - 8y = 0. The centre is (3, 4) and the radius is 5.
+    @fig circulo id=g17 eixos=sim raio=5 centro=3;4;C ponto=6;0 ponto=0;8 fase=gabarito
 18. 5x + 12y - 169 = 0. The tangent is perpendicular to the radius at the point of contact.
-19. Externally tangent. The distance between the centres is 8, which is the sum of the radii 3 and 5.
+    @fig circulo id=g18 eixos=sim raio=13 reta=5;12;-169 distancia=r ponto=5;12 fase=gabarito
+19. Externally tangent. The distance between the centres O and C is 8, which is the sum of the
+    radii 3 and 5.
+    @fig circulo id=g19 eixos=sim raio=3 centro=O outra=8;0;5;C ponto=3;0;T fase=gabarito
 
 ## VERIFICACAO
 

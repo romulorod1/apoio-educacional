@@ -111,6 +111,44 @@ auditor independente em MuPDF (`_audita_receitas_curvas.py`):
 - `circulo`: raio, diametro, corda, centro, arco, setor, coroa, inscrito, circunscrito,
   fatias, aneis, incognita, giro. Medida com rotulo no formato `valor;rotulo` (`raio=5;r`
   constroi com 5 e escreve r). Ex.: `@fig circulo id=c8 fatias=8 diametro=40 incognita=x`.
+- `circulo` no plano cartesiano (chegou em 07/09/2026 para o MATEM3-03, com os casos em
+  `_prova_receitas_circulo.js` a partir de "circulo no plano"). O plano fica atras e a
+  escala dele custa duas marcas; sobram tres para a pergunta. Com `eixos=sim`, `raio=5`
+  constroi e fica calado (o raio se le da escala); o numero so sai escrito como `raio=5;r`.
+  O numero da escala que uma linha de centro, a reta ou a propria circunferencia
+  atravessaria sai calado, e o tique fica.
+  - `eixos=sim`: o plano graduado atras da circunferencia.
+    Ex.: `@fig circulo eixos=sim raio=5 centro=O`.
+  - `centro=h;k[;C]` numerico: o centro em (h, k), com as linhas de centro tracejadas
+    ate os eixos quando ele tem nome; pede `eixos=sim`. `centro=a;b` em letras poe o
+    plano MUDO (sem numero, sem tique) e escreve o par "(a, b)" junto do ponto.
+    Ex.: `@fig circulo eixos=sim raio=5 centro=1;2;C` e `@fig circulo eixos=sim centro=a;b raio=r`.
+  - `coordenadas=sim`: cota h e k ate os eixos (uma marca cada), como a conica transladada.
+    Ex.: `@fig circulo eixos=sim raio=5 centro=5;-3;C coordenadas=sim`.
+  - `reta=A;B;C[;nome]`: a reta Ax + By + C = 0 atravessando a janela; pede `eixos=sim`,
+    e uma reta a mais de dois raios e meio do centro e recusada. `reta=s` e a reta
+    generica, sem plano, posta pela `distancia=`.
+    Ex.: `@fig circulo eixos=sim raio=5 centro=1;2;C reta=3;4;-30 distancia=d`.
+  - `distancia=V[;R]`: a perpendicular do centro a reta, cotada, com o quadradinho no pe.
+    Com a reta analitica o valor e CONFERIDO na conta (e recusado se nao bate); com a
+    generica ele CONSTROI. Distancia igual ao raio ganha a bolinha do contato. No gabarito
+    a letra vira "d = 3,8" em teal.
+    Ex.: `@fig circulo raio=5;r reta=s distancia=7;d centro=O`.
+  - `ponto=x;y[;P]`: ponto livre por coordenadas (dentro, sobre ou fora); sem nome sai o
+    par "(x, y)". `ponto=P` generico vai para a circunferencia (na ponta do raio cotado,
+    ou no pe da tangente); `ponto=P;7` fica a 7 do centro; `ponto=x;y` em letras e o
+    ponto da definicao, no plano mudo. Sobre um eixo o nome sai do lado sem numeros, e o
+    fio de chamada nunca corre a menos de 20 graus da reta que passa pelo ponto.
+    Ex.: `@fig circulo eixos=sim raio=5 ponto=3;4 ponto=-4;-3 reta=1;-1;1;s`.
+  - `cota=d`: a distancia do centro ao ponto, um `cota=` por `ponto=`, na ordem; o valor
+    numerico e conferido na conta. No gabarito sai "d = 5" em teal.
+    Ex.: `@fig circulo eixos=sim raio=4 centro=2;-1;C ponto=6;2;P cota=d`.
+  - `outra=h;k;r[;B]`: a segunda circunferencia, com centro (h, k), raio r e o nome do
+    centro. Ex.: `@fig circulo eixos=sim raio=3 centro=O outra=8;0;5;C ponto=3;0;T`.
+  - `casos=7;5;3`: painel de tres celulas com a mesma figura variando a distancia da reta
+    generica (ou do ponto generico), na ordem escrita; cada celula e figura propria, com
+    teto proprio, e a legenda sai uma vez.
+    Ex.: `@fig circulo raio=5;r reta=s distancia=d centro=O casos=7;5;3`.
 - `conica`: tipo (elipse, hiperbole, parabola), a, b, p, c, focos, vertices, diretriz,
   assintotas, retangulo, ponto (`ponto=P;7` poe P a 7 do primeiro foco), eixos, centro.
   Ex.: `@fig conica tipo=hiperbole a=3 b=2 focos=F1;F2 vertices=A1;A2 retangulo=c assintotas=sim`.
