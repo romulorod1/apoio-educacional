@@ -25,13 +25,13 @@ Uso:
         materia>/ na saida. E como se prova o caminho de uma materia nova sem
         deixar tema falso dentro do repositorio.
     python gerar_banco.py --fontes DIR           outra raiz para a colecao de textos
+    python gerar_banco.py --painel DIR           outra raiz para os registros do painel cego
 """
 import io
 import os
 import re
 import sys
 import json
-import glob
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import verificar
@@ -414,7 +414,7 @@ def gerar_materia(materia, temas, pasta_banco, raiz_temas):
     return banco
 
 
-def gerar(raiz_temas=None, raiz_saida=None, so=None, raiz_fontes=None):
+def gerar(raiz_temas=None, raiz_saida=None, so=None, raiz_fontes=None, raiz_painel=None):
     """Gera o que o aplicativo consome, para cada materia que tem tema escrito.
 
     Materia declarada na tabela mas ainda sem tema nao gera nada: escrever um
@@ -437,7 +437,10 @@ def gerar(raiz_temas=None, raiz_saida=None, so=None, raiz_fontes=None):
         if so and materia['id'] != so:
             continue
         pasta = materia['temas']['pasta']
-        arquivos = sorted(glob.glob(os.path.join(raiz_temas, pasta, '*', '*.md')))
+        # A lista de arquivos e a do verificador, e nao um curinga proprio: a
+        # pasta _painel/ mora ao lado das series e nao pode virar serie aqui
+        # depois de ter deixado de ser serie la.
+        arquivos = verificar.arquivos_da_materia(materia, raiz_temas)
         if not arquivos:
             print('%s: nenhum tema escrito ainda em %s/, nada gerado' % (materia['id'], pasta))
             continue
@@ -445,7 +448,12 @@ def gerar(raiz_temas=None, raiz_saida=None, so=None, raiz_fontes=None):
         temas = []
         reprovados = []
         for caminho in arquivos:
-            erros, avisos, manuais, cab = verificar.conferir(caminho, raiz_fontes)
+            # sem_painel=False escrito de proposito: quem escreve tema pode
+            # desligar a conferencia do painel cego na linha de comando do
+            # verificador, para ver o resto passar antes de rodar os leitores. O
+            # gerador nunca desliga, porque e ele que grava o que o tablet baixa.
+            erros, avisos, manuais, cab = verificar.conferir(
+                caminho, raiz_fontes, raiz_painel, sem_painel=False)
             if erros:
                 reprovados.append((os.path.basename(caminho), erros[0]))
                 continue
@@ -534,6 +542,6 @@ def _argumento(nome):
 
 if __name__ == '__main__':
     bancos = gerar(_argumento('--temas'), _argumento('--saida'),
-                   _argumento('--so'), _argumento('--fontes'))
+                   _argumento('--so'), _argumento('--fontes'), _argumento('--painel'))
     if '--provar' in sys.argv and MATERIA_LEGADA in bancos:
         provar(bancos[MATERIA_LEGADA])
