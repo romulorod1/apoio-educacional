@@ -280,6 +280,67 @@ console.log('\ntrava 2: o rotulo do vertice e atribuivel');
     P.verticeAtribuivel([trocado]).razao >= P.PISO_DO_VERTICE, false);
 }
 
+/* ================================================================ a remissao, frase a frase
+ *
+ * A expressao de remissao e o coracao das travas 3 e 8, e ela nao entra sem par
+ * envenenado de FRASE. Cada linha aqui e uma decisao editorial escrita: o que
+ * conta como "o texto manda olhar o papel" e o que e a palavra "figura" em
+ * outro sentido. Ampliar a expressao sem acrescentar linha aqui e como se
+ * chegou a versao que acusava 62 temas dos 148.
+ *
+ * As oito primeiras existem por um defeito medido: o apagador do
+ * SENTIDO_DE_FORMA come "area da figura" inteiro, e a remissao mais explicita
+ * que existe vinha logo DEPOIS do trecho comido. Rodando o apagador antes de
+ * procurar, "Calcule a area da figura ao lado." dava NAO. */
+console.log('\na remissao, frase a frase');
+{
+  function deveRemeter(lingua, frase) {
+    conf('REMETE  ' + lingua + '  "' + frase + '"', P.remeteAFigura(frase, lingua), true);
+  }
+  function naoDeveRemeter(lingua, frase) {
+    conf('nao      ' + lingua + '  "' + frase + '"', P.remeteAFigura(frase, lingua), false);
+  }
+  /* Forma forte atras de uma medida: o caso que o apagador matava. */
+  deveRemeter('pt', 'Calcule a área da figura ao lado.');
+  deveRemeter('pt', 'Calcule o perímetro da figura acima.');
+  deveRemeter('pt', 'Meça o contorno da figura mostrada.');
+  deveRemeter('pt', 'Qual é a área da figura a seguir?');
+  deveRemeter('pt', 'O lado da figura abaixo mede 4 cm.');
+  deveRemeter('pt', 'dentro da figura ao lado');
+  deveRemeter('en', 'Find the area of the figure below.');
+  deveRemeter('en', 'Find the perimeter of the figure alongside.');
+  /* Forma forte sozinha. */
+  deveRemeter('pt', 'Observe a figura e escreva as medidas.');
+  deveRemeter('pt', 'A figura mostra o centro e o raio.');
+  deveRemeter('en', 'The figure shows the centre and the radius.');
+  /* Forma nua: a forma da casa, com o objeto desenhado como sujeito. */
+  deveRemeter('pt', 'A pirâmide reta da figura tem base quadrada de aresta 6 centímetros.');
+  deveRemeter('pt', 'A pista de atletismo da figura é formada por um retângulo.');
+  deveRemeter('pt', 'Escreva as medidas dos oito ângulos formados na figura.');
+  deveRemeter('en', 'Write the measures of the eight angles in the figure.');
+  /* A palavra em outro sentido: nenhuma destas pode remeter. */
+  naoDeveRemeter('pt', 'Qual figura não tem nenhum canto?');
+  naoDeveRemeter('pt', 'Num pictograma, cada figura vale 10 alunos.');
+  naoDeveRemeter('pt', 'Qual é a área da figura que sobrou?');
+  naoDeveRemeter('pt', 'Compare o perímetro da figura que sobrou com o do retângulo original.');
+  naoDeveRemeter('pt', 'Na figura composta, esquecer de retirar o pedaço é o erro comum.');
+  naoDeveRemeter('pt', 'Uma figura plana é a que cabe no papel.');
+  naoDeveRemeter('pt', 'k é a razão entre um lado da figura original e o correspondente.');
+  naoDeveRemeter('pt', 'Marque a seta no desenho.');
+  naoDeveRemeter('pt', 'Ler no desenho mental da parábola.');
+  naoDeveRemeter('en', 'in the drawing it is always the one facing the right angle');
+  /* E o apagador tem que apagar mesmo depois de vogal acentuada, que e onde o
+   * \b do JavaScript nao vale. */
+  conf('o apagador funciona depois de vogal acentuada',
+    P.textoDeRemissao('a área da figura é grande', 'pt').replace(/\s+/g, ' ').trim(), 'a é grande');
+  /* A ordem: forma forte no texto CRU, forma nua no texto apagado. Se alguem
+   * inverter, esta conferencia cai junto com as oito de cima. */
+  conf('a forma forte e achada no texto cru, antes de qualquer apagamento',
+    P.formaForte('Calcule a área da figura ao lado.', 'pt'), true);
+  conf('e a mesma frase, depois de apagada, ja nao tem a forma nua',
+    P.REMETE_NUA.pt.test(P.textoDeRemissao('Calcule a área da figura ao lado.', 'pt')), false);
+}
+
 /* ================================================================ trava 3 */
 console.log('\ntrava 3: enunciado com figura remete a ela, e sem figura nao fala dela');
 {
