@@ -880,6 +880,78 @@ def testar_parser(pasta):
     return falhas, len(casos)
 
 
+def testar_gerador(pasta):
+    """G2: o gerador de uma materia com catalogo produz o JSON da secao 3.
+
+    Roda em pasta temporaria, com --temas e --saida, como o gerador ja sabe
+    fazer: o tema de prova nao entra no repositorio.
+    """
+    import gerar_banco
+    # Raiz propria: os pares deixaram temas de teste na outra, e a prova do
+    # gerador precisa de uma lista de temas com um tema so.
+    raiz = tempfile.mkdtemp(prefix='gera_')
+    try:
+        escrever(raiz, 'por/07/POR07-99.md', BASE_POR7)
+        saida = os.path.join(raiz, 'saida')
+        bancos = gerar_banco.gerar(raiz, saida, so='portugues',
+                                   raiz_fontes=os.path.join(pasta, 'fontes'))
+    finally:
+        shutil.rmtree(raiz, ignore_errors=True)
+    tema = bancos['portugues']['temas'][0]
+    ex = tema['pt']['exercicios']
+    fechada = [e for e in ex if e['tipo'] == 'fechada'][0]
+    conto = tema['fontes'].get('machado-de-assis_missa-do-galo', {})
+    bilhete = tema['fontes'].get('escrito_bilhete-da-geladeira', {})
+
+    casos = [
+        ('as chaves do tema saem na ordem do desenho', list(tema.keys()),
+         ['id', 'materia', 'serie', 'unidade', 'duracaoMin', 'dificuldade', 'prerequisitos',
+          'topicos', 'bncc', 'vestibular', 'fontes', 'pt']),
+        ('as chaves da lingua saem na ordem do desenho', list(tema['pt'].keys()),
+         ['titulo', 'resumo', 'explicacao', 'textos', 'exercicios']),
+        ('os dois textos de apoio viajam', len(tema['pt']['textos']), 2),
+        ('o primeiro texto traz o par de linhas da fonte',
+         tema['pt']['textos'][0]['linhas'], [1, 5]),
+        ('a linha em branco do texto viaja como cadeia vazia',
+         tema['pt']['textos'][0]['conteudo'][2], ''),
+        ('o primeiro exercicio aponta o texto de indice 0', ex[0]['texto'], 0),
+        ('o primeiro exercicio e aberto', ex[0]['tipo'], 'aberta'),
+        ('a resposta da aberta e o espera_se', ex[0]['resposta'], ex[0]['gabarito']['espera_se']),
+        ('as chaves da questao aberta saem na ordem do desenho', list(ex[0].keys()),
+         ['n', 'bloco', 'texto', 'tipo', 'enunciado', 'resposta', 'gabarito']),
+        ('as chaves da questao fechada saem na ordem do desenho', list(fechada.keys()),
+         ['n', 'bloco', 'texto', 'tipo', 'enunciado', 'alternativas', 'resposta', 'gabarito']),
+        ('a fechada traz quatro alternativas', len(fechada['alternativas']), 4),
+        ('a resposta da fechada e a letra', fechada['resposta'], 'b'),
+        ('o bloco do primeiro exercicio vem do cabecalho da lista',
+         ex[0]['bloco'], 'Fundamentos'),
+        ('a questao 7 aponta o segundo texto', ex[6]['texto'], 1),
+        ('a questao 8 leva o trecho proprio', ex[7]['trecho']['linhas'], [6, 8]),
+        ('o credito do conto sai montado',
+         conto.get('credito'),
+         'Machado de Assis. *Missa do galo*. In: *Páginas recolhidas*, 1899.'),
+        ('o credito do texto autoral diz que ele foi escrito para o exercicio',
+         bilhete.get('credito'), 'Texto escrito para este exercício.'),
+        ('as chaves da fonte saem na ordem do desenho', list(conto.keys()),
+         ['titulo', 'autor', 'obra', 'ano', 'dominio', 'credito']),
+        ('a fonte sem obra sai sem a chave obra', 'obra' in bilhete, False),
+        ('so as fontes citadas viajam', sorted(tema['fontes'].keys()),
+         ['escrito_bilhete-da-geladeira', 'machado-de-assis_missa-do-galo']),
+        ('a cobertura declarada viaja', tema['bncc'], ['EF67LP28', 'EF69LP47']),
+        ('o indice de busca so leva os enunciados',
+         'Nunca pude entender' in ' '.join(e['enunciado'] for e in ex), False),
+    ]
+    falhas = 0
+    for nome, obtido, esperado in casos:
+        if obtido == esperado:
+            print('  OK     gerador: %s' % nome)
+        else:
+            print('  FALHA  gerador: %s' % nome)
+            print('         esperava %r, obteve %r' % (esperado, obtido))
+            falhas += 1
+    return falhas, len(casos)
+
+
 def rodar():
     pasta = tempfile.mkdtemp(prefix='verifica_')
     raiz_antiga = verificar.RAIZ_FONTES
@@ -957,6 +1029,9 @@ def rodar():
         falhas += parciais
         total += quantos
 
+        parciais, quantos = testar_gerador(pasta)
+        falhas += parciais
+        total += quantos
     finally:
         verificar.RAIZ_FONTES = raiz_antiga
         shutil.rmtree(pasta, ignore_errors=True)
@@ -971,7 +1046,7 @@ def rodar():
         print('%d defeito(s) passaram sem ser notados. O verificador nao esta confiavel.' % falhas)
     else:
         print('O verificador pegou os %d defeitos, resolveu os %d pares por materia, passou nas %d '
-              'frases, manteve as %d decisoes do ambiente e provou o parser.'
+              'frases, manteve as %d decisoes do ambiente e provou o parser e o gerador.'
               % (len(CASOS), len(PARES), len(FRASES), len(AMBIENTE_ESPERADO)))
     # O PLACAR SAI NO DIALETO DOS IRMAOS: "N passaram, M falharam."
     #
