@@ -1,0 +1,270 @@
+{
+  "tema": "POR06-05",
+  "assinatura": "e241ec18574c77b8d2e3aeaa4226f9cb3cfcd992794ffc3dd3378695678500a8",
+  "data": "2026-09-07",
+  "modelos": {
+    "leitores": "sonnet",
+    "juiz": "sonnet",
+    "lente": "fable"
+  },
+  "questoes": [
+    {
+      "n": 2,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Os ratos estavam a ponto de morrer de fome porque o gato Faro-Fino tinha feito tal destroço na rataria que os sobreviventes não tinham ânimo de sair das tocas.",
+          "veredito": "espera_se",
+          "motivo": "Explica que o estrago do gato tirava o animo de sair das tocas, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Porque um gato chamado Faro-Fino tinha matado muitos ratos, e os que sobraram tinham medo de sair das tocas pra comer.",
+          "veredito": "espera_se",
+          "motivo": "Explica que o medo do gato os prendia nas tocas sem comer, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Os ratos estavam a ponto de morrer de fome porque o gato Faro-Fino fez tal destroço na rataria que os sobreviventes ficaram sem ânimo de sair das tocas, como diz a linha 1 e 2.",
+          "veredito": "espera_se",
+          "motivo": "Cita o trecho sobre a falta de animo de sair das tocas, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 4,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A frase final é: \"Dizer é fácil; fazer é que são elas!\" Isso ensina que é fácil ter ideias e falar o que deveria ser feito, mas é bem mais difícil ter coragem de realmente fazer.",
+          "veredito": "espera_se",
+          "motivo": "Copia a frase final e explica que falar e mais facil que fazer, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A frase é: Dizer é fácil, fazer é que são elas. Isso ensina que é fácil falar uma ideia, mas é bem mais difícil colocar ela em prática de verdade.",
+          "veredito": "espera_se",
+          "motivo": "Copia a frase final e explica que falar e mais facil que fazer, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A frase final é: \"Dizer é fácil; fazer é que são elas!\" Ela ensina que propor uma ideia é muito mais fácil do que ter coragem de colocar essa ideia em prática de verdade.",
+          "veredito": "espera_se",
+          "motivo": "Copia a frase final e explica quase nos mesmos termos de espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 6,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Um rato perguntou quem iria amarrar o guizo no pescoço do gato, e ninguém teve coragem de se oferecer, uns porque não sabiam dar nó e outros porque tinham medo. Foi por isso que a boa ideia não pôde ser realizada.",
+          "veredito": "espera_se",
+          "motivo": "Explica que a pergunta sobre quem amarraria o guizo revelou a falta de voluntarios, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Ninguém quis amarrar o guizo no pescoço do gato, cada um deu uma desculpa diferente, e por isso a alegria virou tristeza.",
+          "veredito": "espera_se",
+          "motivo": "Explica que ninguem quis amarrar o guizo e por isso a alegria virou tristeza, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Entre os dois momentos, o rato casmurro pergunta quem vai amarrar o guizo no pescoço do gato (linha 11), e ninguém tem coragem nem sabe como fazer isso. Foi essa pergunta que fez a alegria virar desânimo.",
+          "veredito": "espera_se",
+          "motivo": "Explica que a pergunta do rato casmurro fez a alegria virar desanimo, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 8,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A fábula quer que o leitor pense antes de propor coisas que não sabe se pode cumprir, e que tenha coragem de agir, não só de falar. Isso aparece na frase final: \"Dizer é fácil; fazer é que são elas!\"",
+          "veredito": "espera_se",
+          "motivo": "Diz que a fabula quer que o leitor pense antes de prometer e cita a frase final, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Quer que o leitor pense antes de propor uma coisa se ele mesmo topa fazer. Isso aparece na frase final, dizer é fácil, fazer é que são elas.",
+          "veredito": "espera_se",
+          "motivo": "Diz que a fabula quer que o leitor pense antes de propor e cita a frase final, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A fábula quer que o leitor pense antes de só falar bonito, e que se preocupe em como executar de verdade uma ideia antes de comemorar. O trecho que sustenta isso é a frase final: \"Dizer é fácil; fazer é que são elas!\"",
+          "veredito": "espera_se",
+          "motivo": "Diz que a fabula quer que o leitor pense antes de falar bonito e cita a frase final, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 9,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O anúncio se dirige a estudantes que carregam mochila todo dia. Isso aparece na linha: \"Você carrega livro, caderno, estojo, garrafa e ainda o casaco que a professora mandou trazer.\"",
+          "veredito": "espera_se",
+          "motivo": "Aponta que o anuncio fala com estudantes citando a lista de material, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O anúncio se dirige pra quem carrega mochila, tipo o aluno. Isso aparece na parte que diz: no fim do dia, o ombro dói.",
+          "veredito": "aceita_se",
+          "motivo": "Aponta o aluno citando a frase sobre o ombro doer, conforme o segundo item de aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O anúncio se dirige a estudantes que carregam mochila para a escola. Isso aparece na linha 3: \"Você carrega livro, caderno, estojo, garrafa e ainda o casaco que a professora mandou trazer.\"",
+          "veredito": "espera_se",
+          "motivo": "Aponta que o anuncio fala com estudantes citando a lista de material, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 11,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O problema é que a mochila fica pesada e no fim do dia o ombro dói. Começar pelo problema ajuda a vender porque faz o leitor se identificar e sentir que precisa da solução que o anúncio oferece.",
+          "veredito": "espera_se",
+          "motivo": "Explica que o problema do ombro dolorido aproxima o leitor antes da oferta, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O problema é a dor no ombro de carregar peso o dia todo. Começar falando disso ajuda a vender, porque a pessoa se identifica com o problema e quer resolver comprando o produto.",
+          "veredito": "espera_se",
+          "motivo": "Explica que a identificacao com a dor no ombro leva a compra, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O problema é a dor no ombro causada pelo peso da mochila no fim do dia (linha 3 e 4). Começar por esse problema ajuda a vender porque faz o leitor se identificar com a dor e sentir que precisa do produto para resolver aquilo.",
+          "veredito": "espera_se",
+          "motivo": "Explica que a identificacao com a dor no ombro prepara a venda, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 13,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A fábula quer ensinar uma lição sobre dizer e fazer. O anúncio quer convencer o leitor a comprar a mochila Passo Leve.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que a fabula ensina uma licao e o anuncio vende a mochila, conforme o primeiro item de aceita_se, sem a formulacao especifica de espera_se sobre prometer menos."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A fábula quer que a pessoa pense antes de prometer uma coisa que não vai cumprir. O anúncio quer que a pessoa compre a mochila.",
+          "veredito": "espera_se",
+          "motivo": "Diz que a fabula quer que a pessoa pense antes de prometer o que nao vai cumprir, o nucleo de espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A fábula quer que o leitor reflita e aprenda uma lição sobre coragem e ação. Já o anúncio quer que o leitor compre a mochila Passo Leve.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que a fabula ensina uma licao sobre coragem e acao e o anuncio quer a venda, conforme o primeiro item de aceita_se, sem a formulacao especifica de espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 15,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A fábula promete, de certa forma, uma lição de vida sobre coragem e ação. O anúncio promete que a mochila resolve a dor no ombro e tem cinco anos de garantia. A promessa que pode ser conferida por alguém de fora é a garantia do anúncio, porque é uma coisa concreta.",
+          "veredito": "espera_se",
+          "motivo": "Aponta a garantia do anuncio como a promessa verificavel, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A fábula ensina que quem fala fácil nem sempre faz. O anúncio promete que a mochila acaba com a dor no ombro. A promessa do anúncio dá pra conferir de fora, testando a mochila.",
+          "veredito": "aceita_se",
+          "motivo": "Aponta uma promessa de cada texto e diz que a do anuncio e a verificavel, conforme o item de aceita_se, ainda que trate a fala da fabula mais como licao do que como promessa."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O anúncio promete que a mochila alivia a dor no ombro e traz cinco anos de garantia. A fábula promete, através da moral, que fazer é mais difícil que falar. A promessa que pode ser conferida por alguém de fora é a do anúncio, porque dá para comprar a mochila e testar se ela realmente funciona.",
+          "veredito": "espera_se",
+          "motivo": "Aponta a garantia do anuncio como a promessa verificavel, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 17,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O prazo faz o leitor sentir que precisa comprar logo, com medo de perder o desconto. Eu acho que não é totalmente honesto, porque o anúncio não explica por que o preço vai subir depois, e isso parece só um jeito de apressar quem está lendo.",
+          "veredito": "espera_se",
+          "motivo": "Identifica o efeito de urgencia e argumenta pela desonestidade com base no texto, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O prazo faz a pessoa ter pressa de comprar logo. Eu acho meio desonesto, porque parece que o desconto vai acabar mesmo, quando talvez não acabe.",
+          "veredito": "espera_se",
+          "motivo": "Identifica o efeito de urgencia e argumenta pela desonestidade com base no desconto, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O prazo faz o leitor sentir urgência e medo de perder o desconto, então ele decide comprar mais rápido sem pensar com calma. Eu acho que não é totalmente honesto usar esse recurso, porque a linha 11 mostra um prazo apertado só para apressar a decisão de quem lê.",
+          "veredito": "espera_se",
+          "motivo": "Identifica o efeito de urgencia e cita a linha 11 para argumentar, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    }
+  ],
+  "resultado": {
+    "aprovadas": [
+      2,
+      4,
+      6,
+      8,
+      9,
+      11,
+      13,
+      15,
+      17
+    ],
+    "ambiguas": [],
+    "estreitas": []
+  }
+}

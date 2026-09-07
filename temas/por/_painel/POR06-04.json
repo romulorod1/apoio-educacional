@@ -1,0 +1,242 @@
+{
+  "tema": "POR06-04",
+  "assinatura": "87ca9de54f3d4e89dc61a74e8ce3a470f98452e35319829a10e75b561956dccd",
+  "data": "2026-09-07",
+  "modelos": {
+    "leitores": "sonnet",
+    "juiz": "sonnet",
+    "lente": "fable"
+  },
+  "questoes": [
+    {
+      "n": 2,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "As duas últimas linhas são: \"Há estrelas no céu. Na terra há pirilampos. E o boi, para dormir, regressa ao seu curral...\" Elas contam que a noite chegou e o boi, depois de trabalhar o dia inteiro, volta para casa para descansar.",
+          "veredito": "espera_se",
+          "motivo": "Copia as duas ultimas linhas certas e explica que o boi volta para descansar apos o dia de trabalho, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "As últimas linhas são: Há estrelas no céu. Na terra há pirilampos. E o boi, para dormir, regressa ao seu curral. Elas contam que o dia acabou e o boi volta pra casa dele descansar.",
+          "veredito": "espera_se",
+          "motivo": "Copia as duas ultimas linhas certas e explica que o dia acabou e o boi volta para casa, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "As duas últimas linhas são: \"Há estrelas no céu. Na terra há pirilampos. E o boi, para dormir, regressa ao seu curral...\" Elas contam que a noite já chegou, com estrelas e pirilampos, e que o boi termina o dia de trabalho voltando para casa descansar.",
+          "veredito": "espera_se",
+          "motivo": "Copia as duas ultimas linhas certas e explica o fim do dia de trabalho, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 4,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Um verso curto é: \"Caminha sem parar:\". Um verso comprido é: \"Já o encontra, robusto e manso, a trabalhar.\"",
+          "veredito": "espera_se",
+          "motivo": "Copia um verso curto e um comprido, ambos citados como exemplo em espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Verso curto: Caminha sem parar. Verso comprido: Já o encontra, robusto e manso, a trabalhar.",
+          "veredito": "espera_se",
+          "motivo": "Copia um verso curto e um comprido, ambos citados como exemplo em espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Um verso curto é \"O boi, para o trabalho.\" (linha 4). Um verso comprido é \"Já o encontra, robusto e manso, a trabalhar.\" (linha 8).",
+          "veredito": "espera_se",
+          "motivo": "Copia dois versos, curto e comprido, ambos citados como exemplo em espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 6,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O esquema é ABAB: a linha 5 rima com a linha 7 (obedece, aparece) e a linha 6 rima com a linha 8 (parar, trabalhar).",
+          "veredito": "espera_se",
+          "motivo": "Da o esquema ABAB e identifica as rimas certas, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O esquema é A B A B. As linhas 5 e 7 rimam entre si, obedece e aparece, e as linhas 6 e 8 rimam entre si, parar e trabalhar.",
+          "veredito": "espera_se",
+          "motivo": "Da o esquema ABAB e identifica as rimas certas, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "As linhas 5 a 8 têm o esquema ABAB: obedece (linha 5) rima com aparece (linha 7), e parar (linha 6) rima com trabalhar (linha 8). Então os versos 5 e 7 rimam entre si, e os versos 6 e 8 rimam entre si.",
+          "veredito": "espera_se",
+          "motivo": "Da o esquema ABAB e identifica as rimas certas, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 8,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O lavrador crava a ponta da aguilhada no boi para instigá-lo, sem pena. O boi não se revolta e aceita isso com calma.",
+          "veredito": "espera_se",
+          "motivo": "Descreve a aguilhada cravada no boi e a ausencia de revolta, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O lavrador crava a ponta da aguilhada nele pra fazer ele andar mais rápido, e o boi não se revolta com isso.",
+          "veredito": "espera_se",
+          "motivo": "Descreve a aguilhada cravada no boi e a ausencia de revolta, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O lavrador crava a ponta da aguilhada nele para instigar, ou seja, fazer o boi andar mais depressa (linha 11 e 12). O boi reage sem se revoltar, aceitando tudo com calma, como diz a própria linha 11.",
+          "veredito": "espera_se",
+          "motivo": "Descreve a aguilhada cravada no boi e a ausencia de revolta, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 10,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Essas duas linhas constroem a imagem de um boi muito resistente e paciente, que sofre incômodos e dores, mas continua trabalhando sem reclamar.",
+          "veredito": "espera_se",
+          "motivo": "Constroi a imagem de resistencia e paciencia do boi, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Mostram o boi como um animal muito forte e paciente, que aguenta tudo sem reclamar.",
+          "veredito": "espera_se",
+          "motivo": "Constroi a imagem de forca e paciencia do boi que aguenta sem reclamar, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Essas duas linhas juntas constroem a imagem de um animal forte, paciente e resignado, que aguenta as dores e o cansaço sem reclamar nem se importar, seguindo em frente mesmo picado pelas moscas.",
+          "veredito": "espera_se",
+          "motivo": "Constroi a imagem de resistencia e resignacao do boi, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 12,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Três marcas de tempo são: \"Quando ainda no céu não se percebe a aurora\" (linha 1), \"E o sol, quando aparece\" (linha 7) e \"Desce a noite\" (linha 21).",
+          "veredito": "espera_se",
+          "motivo": "Aponta as tres marcas de tempo na ordem certa, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A aurora no começo do dia, o sol quando aparece, e a noite que desce no final.",
+          "veredito": "espera_se",
+          "motivo": "Aponta as tres marcas de tempo na ordem certa, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Três marcas de tempo na ordem são: \"Quando ainda no céu não se percebe a aurora\" (linha 1, de madrugada), \"E o sol, quando aparece\" (linha 7, de manhã) e \"Desce a noite\" (linha 21, à noite).",
+          "veredito": "espera_se",
+          "motivo": "Aponta as tres marcas de tempo na ordem certa, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 13,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Ele é forte porque puxa o arado e trabalha o dia inteiro sem cansar, e é meigo porque tem uma expressão serena e não se revolta mesmo quando o lavrador o fere com a aguilhada.",
+          "veredito": "espera_se",
+          "motivo": "Separa a forca do corpo da mansidao do comportamento, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Ele é forte porque trabalha o dia inteiro puxando o arado pesado, e é meigo porque nem se revolta quando o lavrador é ruim com ele.",
+          "veredito": "espera_se",
+          "motivo": "Separa a forca do trabalho da mansidao ao nao se revoltar, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Ele é forte porque puxa o arado o dia inteiro sem parar (linhas 19 e 20), mas é meigo porque tem a \"doce expressão da face resignada\" e nem se revolta quando maltratado (linhas 9 a 11). Então as duas qualidades cabem juntas porque uma é sobre o corpo dele e a outra é sobre o jeito calmo de ser.",
+          "veredito": "espera_se",
+          "motivo": "Separa explicitamente forca de corpo e mansidao de comportamento, citando versos, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 16,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Dá para descobrir pela rima e pelo sentido de cada trecho, que forma uma ideia completa a cada quatro versos. Como o poema tem vinte e quatro versos, ele se divide em seis grupos de quatro.",
+          "veredito": "espera_se",
+          "motivo": "Explica que a rima marca cada grupo e da o numero seis, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Dá pra descobrir pela rima, porque ela muda de padrão a cada quatro versos. O poema se divide em seis grupos de quatro versos.",
+          "veredito": "espera_se",
+          "motivo": "Explica que a rima marca cada grupo e da o numero seis, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Dá para descobrir onde termina cada grupo pela rima e pelo sentido de cada quatro versos, que formam uma ideia completa antes de começar outra. O poema tem 24 linhas, então ele se divide em seis grupos de quatro versos.",
+          "veredito": "espera_se",
+          "motivo": "Explica que a rima e o sentido marcam cada grupo e da o numero seis, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    }
+  ],
+  "resultado": {
+    "aprovadas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      13,
+      16
+    ],
+    "ambiguas": [],
+    "estreitas": []
+  }
+}

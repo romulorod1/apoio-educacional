@@ -1,0 +1,242 @@
+{
+  "tema": "POR06-09",
+  "assinatura": "a3fadc6ec27c9c081ff73ad6ff534fd319fc27035da06fc4eb8a6268a0ccd789",
+  "data": "2026-09-07",
+  "modelos": {
+    "leitores": "sonnet",
+    "juiz": "sonnet",
+    "lente": "fable"
+  },
+  "questoes": [
+    {
+      "n": 2,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Marina trabalha há nove anos como guarda-parque. Ela fez um curso técnico de meio ambiente, de dois anos, depois de não passar na faculdade de biologia.",
+          "veredito": "espera_se",
+          "motivo": "Nove anos e curso técnico após não passar em biologia, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Marina trabalha no parque há nove anos. Ela fez um curso técnico de meio ambiente de dois anos.",
+          "veredito": "aceita_se",
+          "motivo": "Dá os nove anos e o curso técnico, mas omite que foi depois de não passar na faculdade de biologia."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Marina trabalha no parque há nove anos (linha 2). Ela fez um curso técnico de meio ambiente, de dois anos, depois de não passar na faculdade de biologia (linhas 12 e 13).",
+          "veredito": "espera_se",
+          "motivo": "Mesma resposta completa do espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 4,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A primeira coisa que ela faz é a ronda, andando os três primeiros quilômetros da trilha para procurar galho caído, placa virada, lixo e pegada de animal. Ela faz isso antes de abrir o portão para garantir que a trilha está segura.",
+          "veredito": "espera_se",
+          "motivo": "Descreve a ronda com os itens procurados e o motivo, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A primeira coisa que ela faz é a ronda, ela anda os três primeiros quilômetros olhando o chão e pra cima. Ela faz isso antes de abrir o portão pra ver se tem algum perigo antes dos visitantes entrarem.",
+          "veredito": "aceita_se",
+          "motivo": "Diz a ronda e explica o motivo de segurança, sem citar os itens específicos, cumprindo o aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A primeira coisa que ela faz é a ronda, andando os três primeiros quilômetros olhando o chão e para cima, procurando galho caído, placa virada, lixo e pegada de animal (linhas 8 a 10). Ela faz isso antes de abrir o portão para garantir que a trilha está segura para os visitantes.",
+          "veredito": "espera_se",
+          "motivo": "Mesma resposta completa com os itens do espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 5,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A apresentação informa que Marina tem 34 anos e é guarda-parque há nove anos no Parque Municipal da Pedra Furada, e explica que guarda-parque é quem cuida de uma área protegida, percorrendo trilhas, orientando visitantes, socorrendo quem se perde e registrando o que vê.",
+          "veredito": "espera_se",
+          "motivo": "Traz idade, tempo de ofício e local, mais a explicação do ofício, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "As informações são a idade dela, trinta e quatro anos, e há quanto tempo ela trabalha, nove anos. A explicação é o que é guarda-parque, que cuida da área, percorre as trilhas e socorre quem se perde.",
+          "veredito": "aceita_se",
+          "motivo": "Da duas informacoes da apresentacao (idade e tempo de oficio) mais a explicacao do que e guarda-parque, atendendo ao primeiro item de aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A apresentação informa que Marina tem 34 anos e é guarda-parque há nove anos no Parque Municipal da Pedra Furada (linha 2 e 3). Ela também explica o que é o ofício: guarda-parque é quem cuida de área protegida, percorre trilhas, orienta visitantes, socorre quem se perde e registra o que vê (linhas 4 e 5).",
+          "veredito": "espera_se",
+          "motivo": "Mesma resposta completa do espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 7,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "As duas diferenças são pisar em muda de planta que levou anos para nascer, e tirar a pessoa do único caminho que os guardas conhecem para percorrer no escuro. Elas se ligam porque mostram que sair da trilha causa dano à natureza e também põe a pessoa em perigo.",
+          "veredito": "aceita_se",
+          "motivo": "Dá as duas consequências e liga uma a dano à mata e outra a risco para a pessoa, como no aceita_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "As duas diferenças são pisar em muda de planta que levou anos pra nascer, e tirar a pessoa do único caminho que dá pra voltar no escuro. Uma se liga à outra porque, se a pessoa sai da trilha, ela pode se perder de verdade.",
+          "veredito": "espera_se",
+          "motivo": "Liga as duas consequências à ideia de se perder de verdade, como no espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "As duas diferenças são: pisar em muda de planta que levou anos para nascer, e tirar a pessoa do único caminho que os guardas sabem percorrer no escuro (linhas 22 e 23). Elas se ligam porque as duas mostram que um pouquinho fora da trilha causa uma consequência bem maior do que parece, tanto para a natureza quanto para a segurança de quem se perde.",
+          "veredito": "aceita_se",
+          "motivo": "Dá as duas consequências e liga a dano à natureza e risco à segurança, como no aceita_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 9,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A cobra-cipó assusta porque é diferente e fica pendurada no galho, mas Marina diz que ela não é agressiva e quase não faz mal. Já a abelha não assusta ninguém, mas é ela quem mais manda gente para o posto de saúde, ou seja, é a mais perigosa de verdade. Isso mostra que o medo das pessoas nasce da aparência do bicho, e não do perigo real que ele oferece.",
+          "veredito": "espera_se",
+          "motivo": "Reproduz os dados especificos de ambos os bichos (pendurada no galho, nao agressiva, abelha manda gente ao posto de saude) e conclui que o medo segue a aparencia e nao o perigo real, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A cobra cipó não faz mal e mesmo assim todo mundo corre dela, e a abelha é a que mais machuca e ninguém tem medo. Isso mostra que o medo das pessoas não combina com o perigo de verdade.",
+          "veredito": "aceita_se",
+          "motivo": "Compara os dois bichos com os dados dela de forma generica, sem os detalhes especificos do espera_se, o que atende ao segundo item de aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Marina conta que a cobra-cipó é verde, fina, fica pendurada no galho e não é agressiva, mas mesmo assim toda semana alguém corre dela. Já a abelha, que segundo ela é a que mais manda gente para o posto de saúde, ninguém teme. Isso mostra que o medo das pessoas segue a aparência do bicho, e não o perigo de verdade, porque quem mais machuca é a abelha e é justamente dela que ninguém foge. Acho curioso como a gente confia mais na cara de perigoso do que no que realmente faz mal.",
+          "veredito": "espera_se",
+          "motivo": "Traz os dados exatos do texto sobre a cobra-cipo e a abelha e conclui explicitamente que o medo segue a aparencia e nao o perigo real, cumprindo o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 11,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Primeiro ela diz que uma pessoa só levar uma pedra não faz diferença nenhuma. Depois ela explica que o problema é que não é só uma pessoa, e se cada visitante levar uma pedra, em um ano some a beira inteira do riacho.",
+          "veredito": "aceita_se",
+          "motivo": "Reproduz o raciocínio de uma pessoa não fazer diferença até a soma de todos, sem o passo final de que a regra vale também para ela, do espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Uma pessoa só levando uma pedra não faz diferença nenhuma. Mas se todo mundo fizer isso, em um ano some a beira inteira do riacho, por isso a regra vale pra todos.",
+          "veredito": "aceita_se",
+          "motivo": "Mesmo raciocínio resumido, sem o passo final sobre a regra valer para ela mesma."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Primeiro ela diz que uma pessoa levando uma pedra não é nada. Depois explica que o problema é que não é só uma pessoa, são muitos visitantes. Por fim conclui que, se cada um levar uma pedra, em um ano some a beira inteira do riacho, e por isso a regra vale para todo mundo, inclusive para ela mesma (linhas 31 a 33).",
+          "veredito": "espera_se",
+          "motivo": "Reproduz os três passos completos, incluindo que a regra vale também para ela, como no espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 13,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A primeira pergunta é sobre o trabalho comum de Marina no dia a dia, e a última é um conselho para uma criança que quer seguir a mesma profissão. Essa ordem funciona porque começa mostrando o que ela faz e termina incentivando quem lê a se interessar pelo assunto.",
+          "veredito": "espera_se",
+          "motivo": "Compara a pergunta do trabalho com a do conselho e explica a ordem, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A primeira pergunta fala do trabalho dela no dia a dia, e a última fala sobre uma criança que quer ser guarda-parque no futuro. Funciona porque começa explicando o trabalho e termina inspirando quem lê.",
+          "veredito": "espera_se",
+          "motivo": "Mesma comparação e explicação da ordem."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A primeira pergunta é sobre o trabalho dela no dia a dia, uma rotina prática. A última pergunta é sobre o que ela diria a uma criança que quer ser guarda-parque, olhando para o futuro. Essa ordem funciona porque começa mostrando o que ela faz e termina abrindo espaço para quem lê imaginar seguir esse caminho também.",
+          "veredito": "espera_se",
+          "motivo": "Mesma comparação e explicação da ordem."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 15,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Isso produz o efeito de fazer o leitor sentir a situação de verdade, como se estivesse vendo a cena, em vez de só ler uma explicação seca sobre o trabalho dela.",
+          "veredito": "espera_se",
+          "motivo": "Diz que o caso faz o leitor sentir a cena em vez de uma explicação seca, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Isso faz a resposta ficar mais interessante e fácil de entender, porque contando uma história a gente sente o que aconteceu, em vez de só ler uma explicação seca.",
+          "veredito": "espera_se",
+          "motivo": "Mesma ideia de sentir a história em vez de explicação seca."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Contar um caso, em vez de dar uma definição, torna a resposta mais emocionante e real, porque o leitor consegue imaginar a cena da família, do pai caindo e do silêncio da mata. Isso ajuda o leitor a sentir de verdade a importância do trabalho dela, em vez de só ler uma explicação seca.",
+          "veredito": "espera_se",
+          "motivo": "Cita os elementos da cena, família, pai caindo e silêncio da mata, como no espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    }
+  ],
+  "resultado": {
+    "aprovadas": [
+      2,
+      4,
+      5,
+      7,
+      9,
+      11,
+      13,
+      15
+    ],
+    "ambiguas": [],
+    "estreitas": []
+  }
+}

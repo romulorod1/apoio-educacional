@@ -1,0 +1,242 @@
+{
+  "tema": "POR06-07",
+  "assinatura": "0ab77566b2453c65cc8e60c45fd0e8b468dab591b6b3870f4dd439ea6c4612ce",
+  "data": "2026-09-07",
+  "modelos": {
+    "leitores": "sonnet",
+    "juiz": "sonnet",
+    "lente": "fable"
+  },
+  "questoes": [
+    {
+      "n": 2,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O quê: a inauguração de uma horta de 220 metros quadrados. Quem: a Escola Municipal Alto da Pedreira. Quando: na manhã de quarta-feira, 2 de setembro. Onde: no bairro de Santa Cruz do Vento. Por quê: para levar verdura fresca à merenda dos 430 estudantes.",
+          "veredito": "espera_se",
+          "motivo": "Responde às cinco perguntas do lide com os dados corretos do espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O quê: a inauguração de uma horta. Quem: a Escola Municipal Alto da Pedreira. Quando: quarta-feira, 2 de setembro, às 10h. Onde: no bairro de Santa Cruz do Vento. Por quê: pra levar verdura fresca pra merenda dos alunos.",
+          "veredito": "espera_se",
+          "motivo": "Responde às cinco perguntas do lide de forma mais resumida, mas correta."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O quê: a inauguração de uma horta de 220 metros quadrados cuidada pelos alunos. Quem: a Escola Municipal Alto da Pedreira. Quando: na manhã de quarta-feira, 2 de setembro, às 10h. Onde: no bairro de Santa Cruz do Vento. Por quê: para levar verdura fresca à merenda dos 430 estudantes.",
+          "veredito": "espera_se",
+          "motivo": "Responde às cinco perguntas do lide com todos os detalhes do espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 4,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A horta tem doze canteiros, e cada uma das doze turmas da escola, do 4º ao 9º ano, ficou responsável por um canteiro.",
+          "veredito": "espera_se",
+          "motivo": "Doze canteiros e divisão por turma, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A horta tem doze canteiros, e cada uma das doze turmas, do 4º ao 9º ano, ficou responsável por um canteiro.",
+          "veredito": "espera_se",
+          "motivo": "Mesma resposta do espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A horta tem doze canteiros (linha 12), e cada uma das doze turmas do 4º ao 9º ano ficou responsável por um canteiro.",
+          "veredito": "espera_se",
+          "motivo": "Mesma resposta do espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 6,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A obra durou três semanas e custou 9.400 reais. O dinheiro saiu da verba de manutenção do prédio.",
+          "veredito": "espera_se",
+          "motivo": "Os dois números certos e a origem do dinheiro, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A obra custou 9.400 reais e durou três semanas. O dinheiro saiu da verba de manutenção do prédio.",
+          "veredito": "espera_se",
+          "motivo": "Mesmos dados em ordem diferente, batendo com o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A obra durou três semanas e custou 9.400 reais (linha 9). O dinheiro saiu da verba de manutenção do prédio (linha 10).",
+          "veredito": "espera_se",
+          "motivo": "Mesmos dados com linhas citadas."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 8,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A pirâmide invertida é quando a notícia coloca as informações mais importantes logo no começo e os detalhes menos importantes depois. Isso aparece porque o primeiro parágrafo já conta o essencial da inauguração, e só depois vêm detalhes como o custo da obra e as plantas.",
+          "veredito": "aceita_se",
+          "motivo": "Define a pirâmide invertida e aponta lide, custo e plantas em ordem, sem cobrir o último parágrafo do espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "É quando a notícia coloca as informações mais importantes no começo e os detalhes menores depois. Isso aparece porque o lide já conta o principal, e coisas como a data da colheita vêm só depois.",
+          "veredito": "aceita_se",
+          "motivo": "Define e aponta lide e data da colheita em ordem, cumprindo o mínimo do aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A pirâmide invertida é quando a notícia começa pelas informações mais importantes, e vai deixando os detalhes menos essenciais para o final. Nesta notícia isso aparece porque o lide já traz o quê, quem, quando, onde e por quê logo no primeiro parágrafo, e só depois vêm detalhes como o histórico do terreno e o cronograma da horta.",
+          "veredito": "aceita_se",
+          "motivo": "Define e aponta lide, histórico do terreno e cronograma, sem chegar ao último parágrafo do espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 10,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Porque essa informação é um detalhe a mais, menos importante do que o fato principal da inauguração, então ela fica guardada para depois, seguindo a ordem da pirâmide invertida.",
+          "veredito": "espera_se",
+          "motivo": "Explica que é informação secundária, guardada para depois, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Porque é um detalhe menos importante do que as informações do lide, então ele fica pra depois.",
+          "veredito": "espera_se",
+          "motivo": "Mesma ideia de menor importância guardada para depois."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Essa informação aparece só no terceiro parágrafo porque é um detalhe futuro, menos urgente do que o fato principal, que é a inauguração da horta. Seguindo a pirâmide invertida, o que é mais importante vem primeiro, e essa previsão fica para depois.",
+          "veredito": "espera_se",
+          "motivo": "Combina detalhe futuro e menos urgente, batendo com o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 12,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Esses números servem para dar mais precisão e credibilidade à notícia, mostrando o tamanho real da escola e do projeto.",
+          "veredito": "espera_se",
+          "motivo": "Diz que os números dão precisão e credibilidade e mostram o tamanho, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Servem pra mostrar que a notícia é baseada em fatos reais e dar mais detalhes sobre o tamanho da escola.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que os números mostram que a notícia é baseada em fatos reais, próximo do aceita_se sobre credibilidade."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Esses números servem para dar precisão à notícia e mostrar o tamanho real do impacto da horta, provando que ela atende muita gente e envolve todas as turmas da escola.",
+          "veredito": "espera_se",
+          "motivo": "Mesma ideia de precisão e tamanho real do impacto."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 14,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Porque a notícia deve só informar os fatos, sem dar opinião, para que o leitor forme sua própria ideia sobre o assunto.",
+          "veredito": "espera_se",
+          "motivo": "Diz que a notícia só informa fatos para o leitor formar a própria ideia, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Porque a notícia tem que só contar os fatos, sem dar a opinião de quem escreveu.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que a notícia só conta fatos sem opinião, batendo com o aceita_se sobre imparcialidade."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A notícia evita elogiar porque o papel dela é informar os fatos de forma neutra, sem opinião, deixando o leitor formar sua própria ideia sobre se a horta é uma boa iniciativa.",
+          "veredito": "espera_se",
+          "motivo": "Mesma ideia de neutralidade deixando a avaliação para o leitor."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 15,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A manchete informa que a escola inaugurou uma horta cuidada pelos alunos. A linha fina informa onde fica o terreno e para onde vai a colheita. Sem a linha fina, o leitor perderia a informação de que a horta fica no lugar de um depósito desativado e que a produção vai para a merenda dos estudantes.",
+          "veredito": "espera_se",
+          "motivo": "Compara manchete e linha fina e diz exatamente o que se perderia, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A manchete conta o fato principal, que a escola abriu a horta. A linha fina dá mais detalhes, tipo onde é o terreno e pra onde vai a colheita. Se tirasse a linha fina, o leitor perderia esses detalhes.",
+          "veredito": "espera_se",
+          "motivo": "Mesma comparação com os mesmos detalhes."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A manchete conta que a escola inaugurou a horta cuidada pelos alunos. A linha fina acrescenta onde fica o terreno, um depósito desativado, e para onde vai a colheita, a merenda dos 430 estudantes. Se a linha fina fosse cortada, o leitor perderia logo de cara essas informações extras.",
+          "veredito": "espera_se",
+          "motivo": "Mesma comparação com os mesmos detalhes específicos."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    }
+  ],
+  "resultado": {
+    "aprovadas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      14,
+      15
+    ],
+    "ambiguas": [],
+    "estreitas": []
+  }
+}

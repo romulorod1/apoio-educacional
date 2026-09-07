@@ -1,0 +1,270 @@
+{
+  "tema": "POR06-02",
+  "assinatura": "f0455650a5161ffb155ac5d80520c69ffb80d2017e5986b95a5c6e6967a4a7f0",
+  "data": "2026-09-07",
+  "modelos": {
+    "leitores": "sonnet",
+    "juiz": "sonnet",
+    "lente": "fable"
+  },
+  "questoes": [
+    {
+      "n": 2,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A cobra comeu os olhos dos animais mortos: das capivaras, das antas, das corujas, dos jacarés, dos peixes e dos veados.",
+          "veredito": "espera_se",
+          "motivo": "Lista os olhos dos seis animais citados no texto, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Ela comeu os olhos dos bichos, das capivaras, das antas, das corujas, dos jacarés, dos peixes e dos veados.",
+          "veredito": "espera_se",
+          "motivo": "Lista os olhos dos seis animais citados no texto, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Quando acordou com fome, a cobra comeu os olhos dos bichos mortos pela enchente. O texto diz que ela comeu \"os olhos das capivaras e das antas, os olhos das corujas e dos jacarés, os olhos dos peixes e dos veados\" (linhas 12 a 14).",
+          "veredito": "espera_se",
+          "motivo": "Cita o trecho com os seis animais cujos olhos foram comidos, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 4,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A história explica de onde vem a luz que às vezes corre rente ao chão nas noites do campo, e explica por que não se deve pôr fogo no mato por brincadeira.",
+          "veredito": "espera_se",
+          "motivo": "Enuncia as duas explicacoes, luz do campo e aviso contra fogo no mato, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Explica de onde vem a luz que corre no campo à noite e por que não se deve pôr fogo no mato à toa.",
+          "veredito": "espera_se",
+          "motivo": "Enuncia as duas explicacoes nos mesmos termos de espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "As duas coisas que a história explica estão nas linhas 31 a 33: \"de onde vem aquela luz que às vezes corre rente ao chão nas noites do campo, e por que não se deve pôr fogo no mato por brincadeira.\"",
+          "veredito": "espera_se",
+          "motivo": "Cita o trecho com as duas explicacoes, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 5,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A cobra sobreviveu porque era uma cobra enorme que morava no fundo dos rios e passava o inverno enterrada no barro, por isso resistiu à enchente enquanto os outros bichos se cansaram nadando ou voando.",
+          "veredito": "espera_se",
+          "motivo": "Explica que ela vivia enterrada no fundo dos rios e por isso resistiu a enchente, o nucleo de espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Porque ela sabia nadar e vivia enterrada no barro no fundo dos rios, então aguentou a enchente que matou os outros bichos.",
+          "veredito": "aceita_se",
+          "motivo": "Aponta que a cobra vivia enterrada no barro no fundo dos rios e por isso resistiu a enchente, o que satisfaz o primeiro item de aceita_se, mesmo citando tambem que ela sabia nadar."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A cobra foi a única sobrevivente porque ela era uma cobra enorme que morava no fundo dos rios e atravessava o inverno enterrada no barro, como diz a linha 9 e 10. Por isso ela ficou protegida enquanto os outros bichos se afogaram tentando nadar ou voar.",
+          "veredito": "espera_se",
+          "motivo": "Explica que ela vivia no fundo dos rios enterrada no barro e por isso nao morreu na enchente, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 7,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Ela ficou tão clara que não podia mais viver no escuro do barro, e ficou tão quente que não podia mais entrar na água.",
+          "veredito": "espera_se",
+          "motivo": "Explica os dois motivos, luz demais para o barro e calor demais para a agua, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Ela não pode mais viver no barro porque ficou clara demais, e não pode entrar na água porque ficou quente demais.",
+          "veredito": "espera_se",
+          "motivo": "Explica os dois motivos nos mesmos termos de espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O texto explica nas linhas 20 e 21 que ela ficou \"tão clara que não podia mais viver no escuro do barro, e tão quente que não podia mais entrar na água\". Ou seja, a luz que ela ganhou é incompatível com o escuro do barro, e o calor dela é incompatível com a água fria.",
+          "veredito": "espera_se",
+          "motivo": "Cita o trecho e explica os dois motivos, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 9,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Essas expressões mostram que a história não tem um autor certo, ela foi passada de boca em boca pelas pessoas ao longo do tempo, então ninguém garante que seja verdade.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que a historia nao tem autor certo e passa de boca em boca, mas acrescenta que ninguem garante que seja verdade, o que a desvia um pouco do nucleo de espera_se para o registro mais cauteloso de aceita_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Mostram que ninguém sabe direito quem inventou a história, ela foi passada de boca em boca pelas pessoas mais velhas.",
+          "veredito": "espera_se",
+          "motivo": "Diz que ninguem sabe quem inventou e que passa de boca em boca pelos mais velhos, o nucleo de espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Essas expressões mostram ao leitor que essa é uma lenda contada de boca em boca, sem um autor certo. Não é uma história escrita por alguém que viu tudo acontecer, é uma crença antiga passada entre as pessoas do campo, geração após geração.",
+          "veredito": "espera_se",
+          "motivo": "Explica que e uma crenca antiga sem autor, passada de geracao em geracao, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 11,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A luz do Boitatá é feita dos pedacinhos de luz guardados nos olhos dos animais que ele comeu. Por isso as pessoas acreditam que quem olha muito tempo para ele fica cego, já que a luz vem justamente de olhos.",
+          "veredito": "espera_se",
+          "motivo": "Liga a luz feita de olhos a crenca de ficar cego, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A luz dele é feita dos pedacinhos de luz que estavam guardados nos olhos dos bichos que ele comeu. Por isso quem olha muito tempo pra ele fica cego, porque está olhando pra um monte de olhos.",
+          "veredito": "espera_se",
+          "motivo": "Liga a luz feita de olhos a crenca de ficar cego, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A luz do Boitatá é feita dos pedacinhos de luz guardados nos olhos dos bichos que ele comeu, como conta a linha 15 e 16. Por isso faz sentido a crença de que olhar muito tempo para ele deixa cego: como a luz vem de olhos, é como se essa luz tomasse a visão de quem fica olhando fixo demais.",
+          "veredito": "espera_se",
+          "motivo": "Liga a luz feita de olhos a crenca de ficar cego, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 13,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A história explica a luz que corre pelo campo à noite. Uma explicação assim podia convencer porque antigamente as pessoas não sabiam a causa real desse fenômeno, então a história dava um sentido para algo que ninguém conseguia explicar de outro jeito.",
+          "veredito": "espera_se",
+          "motivo": "Identifica a luz do campo e explica que a falta de outra explicacao dava sentido ao fenomeno, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Explica a luz que corre no campo à noite. Convencia porque as pessoas antigas não tinham outra explicação pra esse fenômeno.",
+          "veredito": "aceita_se",
+          "motivo": "Identifica a luz do campo e diz que convencia por falta de explicacao melhor, batendo com o primeiro item de aceita_se de forma mais sucinta que espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A história explica a luz que às vezes corre pelo campo à noite, mencionada na linha 31. Uma explicação assim podia convencer porque, sem ciência para explicar o fenômeno, uma história cheia de causa e efeito, com um motivo e um castigo, dava um sentido para algo misterioso que ninguém sabia explicar de outro jeito.",
+          "veredito": "espera_se",
+          "motivo": "Identifica a luz do campo e explica que a historia organizava o misterio sem outra explicacao disponivel, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 15,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Isso mostra que o mito não fica igual para sempre, ele muda um pouco cada vez que é contado, porque nunca foi escrito por um dono e cada lugar conta a história do seu jeito.",
+          "veredito": "espera_se",
+          "motivo": "Diz que o mito muda a cada boca porque nunca foi escrito por um dono, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Mostra que o mito muda de nome e de jeito de contar dependendo do lugar, porque ele passa de boca em boca e cada um conta de um jeito.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que o mito muda de nome e de jeito por lugar por ser transmitido de boca em boca, batendo com o primeiro item de aceita_se sem explicitar a ideia de conservacao de espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Isso mostra que o mito não tem uma versão única e fixa: ele muda de nome e de detalhes conforme passa de boca em boca, como diz a linha 36, \"a história muda um pouco de boca para boca\". Um mito se conserva assim, sendo recontado sempre um pouco diferente, e não guardado igual como num livro.",
+          "veredito": "espera_se",
+          "motivo": "Diz explicitamente que o mito se conserva sendo recontado sempre um pouco diferente, o nucleo de espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 16,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Sim, eu concordo, porque o texto diz que o Boitatá persegue quem toca fogo no mato à toa, então a história serve para as pessoas terem medo e não colocarem fogo no mato por brincadeira.",
+          "veredito": "espera_se",
+          "motivo": "Concorda citando que o Boitata persegue quem toca fogo no mato, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Eu concordo, porque o texto diz que ele persegue quem toca fogo no mato à toa, isso é um aviso.",
+          "veredito": "espera_se",
+          "motivo": "Concorda citando a mesma perseguicao a quem toca fogo, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Eu concordo, porque o texto diz na linha 29 que ele \"persegue quem toca fogo no mato à toa\". Isso funciona como um aviso, quase um susto para as pessoas não colocarem fogo no mato por brincadeira, senão o Boitatá vem atrás delas.",
+          "veredito": "espera_se",
+          "motivo": "Concorda citando a perseguicao a quem toca fogo no mato, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    }
+  ],
+  "resultado": {
+    "aprovadas": [
+      2,
+      4,
+      5,
+      7,
+      9,
+      11,
+      13,
+      15,
+      16
+    ],
+    "ambiguas": [],
+    "estreitas": []
+  }
+}

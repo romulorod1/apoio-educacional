@@ -1,0 +1,270 @@
+{
+  "tema": "POR06-06",
+  "assinatura": "c33ab2609a3bdd89560de881e06aa1dd4a633ab9dc10cba4dd5327f9b44bdd72",
+  "data": "2026-09-07",
+  "modelos": {
+    "leitores": "sonnet",
+    "juiz": "sonnet",
+    "lente": "fable"
+  },
+  "questoes": [
+    {
+      "n": 2,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A viagem aconteceu em julho, nas férias, e o menino ia com o avô Ariosto para a casa da tia Ondina, em Vila Guaíra.",
+          "veredito": "espera_se",
+          "motivo": "Diz época (julho, férias) e destino (casa da tia Ondina, em Vila Guaíra) como pede o espera_se, só sem repetir ano passado."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A viagem aconteceu em julho, nas férias, e eles iam pra casa da tia Ondina, em Vila Guaíra.",
+          "veredito": "espera_se",
+          "motivo": "Mesma resposta completa de época e destino do espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A viagem aconteceu em julho do ano passado, nas férias (linha 7). Eles iam para a casa da tia Ondina, em Vila Guaíra (linhas 5 e 6).",
+          "veredito": "espera_se",
+          "motivo": "Reproduz época e destino com fidelidade total ao espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 4,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "\"arrumei a mochila três vezes: tirei o caderno de desenho, botei o caderno de novo, tirei o casaco, botei o casaco.\" e \"Chegamos cedo demais, e mesmo assim eu tinha medo de o trem ir embora sem a gente.\"",
+          "veredito": "espera_se",
+          "motivo": "As duas frases copiadas batem com itens da lista do espera_se, incluindo o medo do trem ir embora."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Ele escreve: eu perguntei duas vezes se ele estava falando sério. E também: arrumei a mochila três vezes, tirei o caderno de desenho, botei o caderno de novo, tirei o casaco, botei o casaco.",
+          "veredito": "aceita_se",
+          "motivo": "Combina uma frase do espera_se ('arrumei a mochila tres vezes...') com outra listada em aceita_se ('perguntei duas vezes se ele estava falando serio'), ambas mostrando ansiedade."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Uma frase é: \"arrumei a mochila três vezes: tirei o caderno de desenho, botei o caderno de novo, tirei o casaco, botei o casaco\" (linhas 8 e 9). Outra é: \"Na plataforma, eu não conseguia ficar parado\" (linha 17).",
+          "veredito": "espera_se",
+          "motivo": "As duas frases, mochila e não conseguir ficar parado, constam do espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 5,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Ele entendeu que não era o poste que estava se mexendo, mas sim o próprio trem, com ele dentro, que estava se afastando da plataforma.",
+          "veredito": "aceita_se",
+          "motivo": "Identifica que o movimento era do trem e não do poste, como no aceita_se, mas não menciona ser a primeira vez que sentiu a partida por dentro."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Ele entendeu que não era o poste que estava andando, era ele que estava se movendo dentro do trem.",
+          "veredito": "aceita_se",
+          "motivo": "Mesma explicação do movimento, sem a nuance de primeira vez do espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Ele entendeu que não era o poste que se mexia, mas sim ele mesmo, dentro do trem que já estava andando. Foi a primeira vez que ele percebeu de verdade a sensação de estar em movimento dentro de um trem.",
+          "veredito": "espera_se",
+          "motivo": "Acrescenta explicitamente que foi a primeira vez que sentiu de verdade o movimento, batendo com o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 7,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "\"Acordamos às cinco e meia\" situa a hora em que acordaram. \"O trem chegou às sete e doze\" situa a hora de chegada do trem. \"Chegamos em Vila Guaíra às dez e vinte\" situa a hora de chegada ao destino.",
+          "veredito": "espera_se",
+          "motivo": "Três marcas de hora corretas com o que cada uma situa, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Cinco e meia, hora que ele acordou. Sete e doze, hora que o trem chegou. Dez e vinte, hora que eles chegaram em Vila Guaíra.",
+          "veredito": "espera_se",
+          "motivo": "Mesmas três marcas e situações do espera_se, de forma mais telegráfica."
+        },
+        {
+          "leitor": "C",
+          "resposta": "\"Acordamos às cinco e meia\" (linha 12) situa a hora de acordar. \"O trem chegou às sete e doze\" (linha 20) situa a hora da chegada do trem. \"Chegamos em Vila Guaíra às dez e vinte\" (linha 35) situa a hora da chegada ao destino.",
+          "veredito": "espera_se",
+          "motivo": "Três marcas com linha citada e explicação correta, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 9,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A fala \"Ele não vem mais rápido só porque você olha\" mostra que o avô é calmo e um pouco brincalhão com a ansiedade do neto. A fala \"Trem atrasa, mas chega\" mostra que ele é paciente e confia que as coisas vão dar certo.",
+          "veredito": "espera_se",
+          "motivo": "Descreve a primeira fala como brincadeira com a ansiedade e a segunda como conforto calmo, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A primeira mostra que ele é brincalhão e observador, percebe que o neto está ansioso à toa. A segunda mostra que ele é calmo e confia que tudo vai dar certo mesmo com o atraso.",
+          "veredito": "espera_se",
+          "motivo": "Mesma leitura das duas falas do avô do espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A primeira fala, \"Ele não vem mais rápido só porque você olha\" (linha 18), mostra que o avô é calmo e um pouco brincalhão com o neto ansioso. A segunda, \"Trem atrasa, mas chega\" (linha 34), mostra que ele é uma pessoa experiente e tranquila, que confia que tudo vai dar certo mesmo com atraso.",
+          "veredito": "espera_se",
+          "motivo": "Mesma leitura das duas falas, com avô calmo e brincalhão, batendo com o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 11,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Ele descobriu que, olhando pela janela do trem, a gente vê os fundos das casas e a rotina real das pessoas, sem ninguém arrumar aquilo antes para os passageiros verem.",
+          "veredito": "espera_se",
+          "motivo": "Explica que do trem se vê os fundos e a rotina real que ninguém arruma, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Ele descobriu que do trem dá pra ver as coisas que as pessoas não arrumam pra mostrar, tipo os fundos das casas e roupa no varal.",
+          "veredito": "espera_se",
+          "motivo": "Cita fundos das casas e roupa no varal, elementos do espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Ele descobriu que, pela janela do trem, dá para ver os fundos das casas, os quintais e a rotina real das pessoas, coisas que ninguém arruma bonitinho para os outros verem, diferente da parte da frente das casas.",
+          "veredito": "espera_se",
+          "motivo": "Reproduz a mesma ideia de ver os fundos e a rotina real não arrumada."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 13,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Essa diferença mostra que o menino está contando a história um tempo depois de ter vivido ela, já mais crescido, olhando para trás com saudade daquele primeiro dia.",
+          "veredito": "aceita_se",
+          "motivo": "Liga a distância de um ano a contar com saudade depois de crescer, próximo do aceita_se sobre contar com calma porque já passou tempo, sem detalhar a comparação com outras viagens do espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Faz diferença porque com onze anos a viagem já não é mais novidade pra ele, então ele conta com saudade do jeito que sentiu da primeira vez, com dez anos.",
+          "veredito": "aceita_se",
+          "motivo": "Mesma ideia de contar com saudade por já não ser mais novidade, sem explicitar a comparação do espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Com um ano de distância, ele já sabe o que vai acontecer na viagem, o barulho, o tranco, o poste, então ele consegue contar essa primeira vez com carinho e um pouco de saudade, comparando o que sentia então com o que sabe agora.",
+          "veredito": "espera_se",
+          "motivo": "Explicita a comparação entre o que sentia então e o que sabe agora, como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 14,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Um trecho de fato é: \"O trem chegou às sete e doze.\" Um trecho de sentimento é: \"eu tinha medo de o trem ir embora sem a gente.\" Eu separei os dois porque o primeiro só dá uma informação que pode ser conferida, e o segundo conta o que o menino sentia por dentro.",
+          "veredito": "espera_se",
+          "motivo": "Trecho de fato e de sentimento corretos com o critério de separação explicado como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Fato: o trem chegou às sete e doze. Sentimento: eu tinha medo de o trem ir embora sem a gente. Separei porque um só conta uma informação e o outro fala o que ele estava sentindo.",
+          "veredito": "espera_se",
+          "motivo": "Mesma estrutura de fato e sentimento do espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Um trecho só fato é \"O trem chegou às sete e doze\" (linha 20), que só informa a hora, sem emoção. Um trecho com sentimento é \"eu tinha medo de o trem ir embora sem a gente\" (linhas 15 e 16), que mostra o que ele sentia por dentro. Eu separei os dois porque um só descreve o acontecimento e o outro conta como o menino se sentia.",
+          "veredito": "espera_se",
+          "motivo": "Mesma estrutura de fato e sentimento, com o critério de separação do espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 17,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Eu escolheria o título \"O cheiro do vagão de manhã\", porque no fim do texto o menino diz que essa é a lembrança mais forte que guardou daquele dia.",
+          "veredito": "espera_se",
+          "motivo": "Propõe título ligado a um elemento real do relato, o cheiro do vagão, com justificativa, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Eu escolheria o título O cheiro do trem, porque no final ele conta que guardou o cheiro do vagão como a lembrança mais forte daquele dia.",
+          "veredito": "espera_se",
+          "motivo": "Mesmo tipo de título ligado ao cheiro do vagão, com justificativa."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Eu proporia o título \"O dia em que o poste não andava\", porque esse é o momento em que o menino entende de verdade o que é viajar de trem, quando percebe nas linhas 25 e 26 que \"não era o poste que andava. Era eu.\"",
+          "veredito": "espera_se",
+          "motivo": "Propõe título ligado à descoberta do movimento, elemento citado como exemplo no espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    }
+  ],
+  "resultado": {
+    "aprovadas": [
+      2,
+      4,
+      5,
+      7,
+      9,
+      11,
+      13,
+      14,
+      17
+    ],
+    "ambiguas": [],
+    "estreitas": []
+  }
+}
