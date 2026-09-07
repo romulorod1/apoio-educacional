@@ -45,6 +45,19 @@
   function ddmm(iso) { var p = partesData(iso); return pad2(p.d) + '/' + pad2(p.m); }
   function ddmmaaaa(iso) { var p = partesData(iso); return pad2(p.d) + '/' + pad2(p.m) + '/' + p.a; }
 
+  /* "2 de setembro", para data escrita dentro de uma frase.
+   *
+   * O ddmm existe para tabela e para etiqueta, onde a coluna é estreita e a
+   * barra é o que economiza espaço. Numa linha em prosa a barra é o que faz a
+   * frase parecer campo de formulário, e pior quando o cabeçalho da mesma
+   * folha, duas linhas acima, já escreveu a data por extenso. Sem o ano de
+   * propósito: quem chama já o imprimiu ali perto. */
+  function diaEMes(iso) {
+    var p = partesData(iso);
+    if (!p || !MESES[p.m - 1]) return '';
+    return p.d + ' de ' + MESES[p.m - 1].toLowerCase();
+  }
+
   /* Converte uma data escrita como dd/mm/aaaa para o formato interno.
    * Devolve null quando o texto não é uma data válida. */
   function deBR(texto) {
@@ -793,7 +806,7 @@
    * Metade disto é sobre o ALUNO e metade é sobre a MATÉRIA.
    *
    * A rotina de estudo, o jeito de aprender, deixar questão em branco, chutar,
-   * estudar só na véspera, ficar ansioso perto da prova: isso é o mesmo aluno
+   * estudar só na véspera, ter ansiedade perto da prova: isso é o mesmo aluno
    * em matemática e em história, e ela não deveria responder de novo a cada
    * matéria. Já em que ponto ele está, o que ele erra e o que ficou para trás
    * muda de uma matéria para outra e se repete por matéria.
@@ -816,7 +829,9 @@
         { id: 'tarefa-ok', rotulo: 'Faz as tarefas em dia', sobre: 'aluno' },
         { id: 'pergunta', rotulo: 'Pergunta quando não entende', sobre: 'aluno' },
         { id: 'persiste', rotulo: 'Persiste na questão difícil', sobre: 'aluno' },
-        { id: 'sozinho', rotulo: 'Trabalha bem sozinho', sobre: 'aluno' },
+        /* "Sem ajuda", e não "sozinho". Ver a nota de gênero no grupo de
+         * atenção, logo abaixo: vale para todo rótulo desta lista. */
+        { id: 'sozinho', rotulo: 'Trabalha bem sem ajuda', sobre: 'aluno' },
         { id: 'autocorrige', rotulo: 'Percebe e corrige o próprio erro', sobre: 'aluno' },
         /* Era "Gosta de matemática". O rótulo passou a dizer a matéria em vez de
          * dizer matemática, porque agora ele aparece dentro da matéria escolhida.
@@ -830,7 +845,19 @@
     {
       chave: 'atencao',
       titulo: 'Pontos de atenção',
-      ajuda: 'Onde ele costuma perder ponto. É o que vira plano de trabalho.',
+      /* NENHUM RÓTULO DESTA LISTA FLEXIONA GÊNERO, e a ajuda também não.
+       *
+       * Os rótulos de fortes, de atenção e de lacunas são os três grupos que
+       * chegam impressos na proposta, que é a primeira folha que a família lê
+       * sobre a própria filha. "Fica ansioso perto da prova" saía no masculino
+       * sobre uma menina, e "Onde ele costuma perder ponto" tratava a criança
+       * por "ele" na tela de quem marca. Metade das crianças é menina, e o
+       * aplicativo não pergunta o gênero de propósito: perguntar seria uma
+       * pergunta a mais na tela para consertar uma palavra, e adivinhar pela
+       * terminação do nome erra em Alex, Ariel e Sasha. Escrever sem flexão
+       * nunca erra e não custa campo nenhum. O identificador de cada item
+       * continua o mesmo, então o que ela já marcou continua marcado. */
+      ajuda: 'Onde o ponto se perde. É o que vira plano de trabalho.',
       itens: [
         { id: 'sinal', rotulo: 'Erros de sinal', sobre: 'materia', so: 'matematica' },
         { id: 'tabuada-fraca', rotulo: 'Tabuada insegura', sobre: 'materia', so: 'matematica' },
@@ -847,7 +874,7 @@
         { id: 'dispersa', rotulo: 'Dispersa com facilidade', sobre: 'aluno' },
         { id: 'depende', rotulo: 'Depende de ajuda para começar', sobre: 'aluno' },
         { id: 'fora-do-modelo', rotulo: 'Trava quando a questão foge do modelo', sobre: 'materia' },
-        { id: 'ansiedade-prova', rotulo: 'Fica ansioso perto da prova', sobre: 'aluno' },
+        { id: 'ansiedade-prova', rotulo: 'Ansiedade perto da prova', sobre: 'aluno' },
         { id: 'conteudo-atrasado', rotulo: 'Está atrás do conteúdo que a turma está vendo', sobre: 'materia' },
         { id: 'confunde-conceitos', rotulo: 'Confunde conceitos parecidos da matéria', sobre: 'materia' },
         { id: 'nao-retem', rotulo: 'Não lembra do que foi visto no encontro anterior', sobre: 'materia' }
@@ -920,12 +947,14 @@
         { id: 'lugar-calmo', rotulo: 'Estuda em lugar sem distração' },
         { id: 'usa-agenda', rotulo: 'Usa agenda ou cronograma' },
         { id: 'celular-longe', rotulo: 'Deixa o celular longe na hora de estudar' },
-        { id: 'dever-sozinho', rotulo: 'Faz o dever sem precisar ser lembrado' },
+        { id: 'dever-sozinho', rotulo: 'Faz o dever sem precisar de lembrete' },
         { id: 'revisa-antes', rotulo: 'Revisa a matéria antes da véspera' },
         { id: 'anota-duvida', rotulo: 'Anota as dúvidas para perguntar' },
         { id: 'material-completo', rotulo: 'Tem o material completo' },
         { id: 'agenda-cheia', rotulo: 'Agenda muito cheia de outras atividades' },
-        { id: 'cansado', rotulo: 'Costuma chegar cansado na aula' }
+        /* "Cansaço", e não "chega cansado": mesma regra de gênero dos rótulos
+         * de atenção, comentada lá em cima. O id continua 'cansado'. */
+        { id: 'cansado', rotulo: 'Cansaço na hora da aula' }
       ]
     },
     {
@@ -1483,7 +1512,38 @@
    * Os textos nascem com o número de horas e o de folgas já escritos por
    * extenso, montados a partir dos campos. Depois que ela edita uma frase, a
    * frase dela vence: por isso a montagem acontece na criação, e não na hora de
-   * imprimir. */
+   * imprimir.
+   *
+   * Cada item EXPLICA a regra em vez de enunciá-la, e é isso que separa esta
+   * folha de um regulamento. Regra enunciada só pode ser obedecida; regra
+   * explicada pode ser entendida, e uma família que entende por que a
+   * desmarcação de véspera custa não precisa inventar desculpa para desmarcar.
+   * A explicação também é o que mantém a régua legível: o motivo é sempre
+   * verificável (o horário ficou reservado, o material já estava pronto, ela já
+   * atravessou a cidade), nunca um julgamento do motivo da família.
+   *
+   * O que NÃO pode acontecer aqui é a gentileza comer a clareza. A frase de
+   * remarcação continua dizendo, com estas palavras, que a aula entra no
+   * fechamento do mês PELO VALOR DA AULA. Calor e clareza não competem; quem
+   * come os dois é a ambiguidade.
+   *
+   * NEM TODO ITEM GANHOU O PORQUÊ, e o motivo é medido. A folha tem orçamento
+   * de duas páginas: o bloco do fim (o que vem junto mais o fecho) é reservado
+   * inteiro e vira a página junto, então uma linha a mais aqui em cima custa o
+   * fecho inteiro numa terceira folha sozinha. Medido na proposta cheia, com
+   * mapeamento, duas matérias e tabela de planos: cada linha nova aqui come
+   * 14 pt, e a folga que existia era de 8. Ganharam a explicação os itens em
+   * que a família precisa dela para não se sentir julgada (as folgas, a falta
+   * sem aviso, a régua que também vale para mim) e os que couberam sem virar
+   * linha nova. Ficaram sem os que já se explicam sozinhos: o preparo do
+   * material, que o próprio texto descreve, e o parar, que já diz que a
+   * cobrança é mensal.
+   *
+   * O combinado saiu desta rodada com UMA LINHA IMPRESSA A MENOS do que tinha,
+   * e mais caloroso. Quem pagou a conta foi a gordura do aviso de remarcação:
+   * "horas antes do início da aula" virou "horas antes da aula" e "remanejo a
+   * minha semana" virou "remanejo a semana", sem perder nada do combinado. A
+   * folga do fim da folha passou de 8 pt para 37. */
   function combinadosPadrao(padrao) {
     var pd = padrao || PROPOSTA_PADRAO;
     var h = numeroOu(pd.horasDeAviso, 24);
@@ -1492,9 +1552,9 @@
       { id: 'preparo', ligado: true, rotulo: 'Como a aula é montada',
         texto: 'Cada encontro é preparado antes: eu escolho o assunto olhando o que ficou errado na semana anterior e monto a explicação, a lista de exercícios e o gabarito daquela semana.' },
       { id: 'aviso', ligado: true, rotulo: 'Se precisarem desmarcar',
-        texto: 'Me avisem por mensagem escrita no WhatsApp até ' + h + ' horas antes do início da aula. Com esse aviso eu remanejo a minha semana, a aula não é cobrada e a gente reagenda dentro do mesmo mês.' },
+        texto: 'Me avisem por mensagem escrita no WhatsApp até ' + h + ' horas antes da aula. Com esse aviso eu remanejo a semana, a aula não é cobrada e a gente reagenda dentro do mesmo mês.' },
       { id: 'folgas', ligado: true, rotulo: comInicialMaiuscula(porExtensoFem(f)) + ' folgas por semestre',
-        texto: 'Vida acontece. Cada família tem ' + porExtensoFem(f) + ' desmarcações em cima da hora por semestre que não são cobradas e sobre as quais vocês não precisam me dar explicação nenhuma. Usem quando precisarem, sem ficar sem graça comigo.' },
+        texto: 'Criança fica doente, a semana desanda, e ninguém tem culpa. Cada família tem ' + porExtensoFem(f) + ' desmarcações em cima da hora por semestre que não são cobradas e sobre as quais vocês não precisam me dar explicação nenhuma. Usem quando precisarem, sem ficar sem graça comigo.' },
       /* A folha promete o que o motor faz, e o motor tem cobrável sim ou não.
        *
        * Este item dizia "entra no fechamento do mês como meia aula". O
@@ -1505,18 +1565,42 @@
        * pesquisa até prefere os 50 por cento; enquanto ela não existir, o
        * texto padrão diz o valor da aula. A franquia de folgas acima é o que
        * mantém isso justo: ninguém paga na primeira vez. */
-      { id: 'vespera', ligado: true, rotulo: 'Depois dessas ' + porExtensoFem(f),
-        texto: 'A desmarcação com menos de ' + h + ' horas entra no fechamento do mês pelo valor da aula, porque o horário ficou reservado e o material daquela semana já estava preparado. Se der para encaixar uma reposição na mesma semana, eu ofereço.' },
+      /* O RÓTULO SE SUSTENTA SOZINHO, e o texto usa a palavra da mãe.
+       *
+       * Este item chamava "Depois dessas duas", que só funciona olhando para
+       * trás, e o antecedente é o item das folgas, logo acima. Medido nas três
+       * variantes da folha, o item caía como PRIMEIRA linha de corpo da página
+       * 2 (y=91 pt) enquanto "Duas folgas por semestre" ficava na página 1
+       * (y=724): a mãe virava a folha e lia "Depois dessas duas" sem ter
+       * "essas duas" na frente.
+       *
+       * Pior do que a ordem era o vocabulário. A expressão "em cima da hora",
+       * que é como a família fala, aparecia UMA vez na folha inteira, colada
+       * em "que não são cobradas"; o item que COBRA dizia "com menos de 24
+       * horas", que é outra frase. Contadas, a folha tinha quatro passagens
+       * dizendo que não cobra contra duas dizendo que cobra. A família assina
+       * achando que desmarcar em cima da hora não custa, e a briga acontece no
+       * fechamento do segundo mês.
+       *
+       * Agora o rótulo nomeia o assunto inteiro sem depender da linha de cima,
+       * e o texto abre repetindo a expressão da mãe antes de dar o prazo em
+       * horas. A frase que o motor executa continua inteira lá dentro: quem
+       * reescrever isto tem que manter "entra no fechamento do mês pelo valor
+       * da aula" e o prazo em horas, e há trava no teste conferindo o texto
+       * impresso. O par folgas mais este item é reservado junto no pdf.js,
+       * para nunca mais serem separados por quebra de página. */
+      { id: 'vespera', ligado: true, rotulo: 'Desmarcação em cima da hora, passadas as folgas',
+        texto: 'Passadas essas ' + porExtensoFem(f) + ', a desmarcação em cima da hora, com menos de ' + h + ' horas, entra no fechamento do mês pelo valor da aula, porque o horário ficou reservado e o material daquela semana já estava preparado. Se der para encaixar uma reposição na mesma semana, eu ofereço.' },
       /* Falta sem aviso é a única linha que o motor já cobra sozinho, por
        * padrão, e era a única que a folha não contava. Separar falta de
        * desmarcação é unanimidade na pesquisa e é justo: uma coisa é um aviso
        * tardio, outra é ela ter atravessado a cidade. */
       { id: 'falta', ligado: true, rotulo: 'Falta sem aviso',
-        texto: 'Aula sem aviso nenhum, comigo já na porta de vocês, conta como aula dada e não tem reposição: é diferente de desmarcar, e por isso o tratamento é outro. Se o atraso passar de trinta minutos sem notícia, eu considero falta e sigo o meu dia.' },
+        texto: 'Aula sem aviso nenhum conta como aula dada e não tem reposição: é diferente de desmarcar porque eu já atravessei a cidade e cheguei na porta de vocês. Se o atraso passar de trinta minutos sem notícia, eu considero falta e sigo o meu dia.' },
       { id: 'eu-desmarco', ligado: true, rotulo: 'Se quem desmarcar for eu',
-        texto: 'Vale a mesma régua para mim: eu aviso o quanto antes e reponho a aula sem cobrar nada.' },
+        texto: 'Vale a mesma régua para mim: régua que pega um lado só não é combinado. Eu aviso o quanto antes e reponho a aula sem cobrar nada.' },
       { id: 'reposicao', ligado: true, rotulo: 'Como funciona a reposição',
-        texto: 'Uma por mês e dentro do próprio mês. Assim não junta aula atrasada para novembro, quando não sobra horário para ninguém.' },
+        texto: 'Uma por mês, e dentro do próprio mês. Assim não junta aula atrasada para novembro, quando as provas apertam e não sobra horário para ninguém.' },
       /* A promessa de devolver o que foi pago e não usado supunha pacote pago
        * adiantado, e não é o que o aplicativo faz: a cobrança é mensal, pelas
        * aulas que aconteceram. Prometer devolução de um valor que nunca foi
@@ -1529,7 +1613,19 @@
   /* O que vem junto com a aula.
    *
    * As duas primeiras ela já faz e quase ninguém faz, e hoje isso é invisível
-   * exatamente no momento em que a família está decidindo o preço. */
+   * exatamente no momento em que a família está decidindo o preço.
+   *
+   * Cada linha termina dizendo PARA QUE aquilo serve. Sem isso a lista lia como
+   * catálogo de recurso, e catálogo é a parte mais fria de qualquer folha: a
+   * família não estava comprando um PDF, estava comprando não precisar
+   * perguntar como a criança está indo.
+   *
+   * O fechamento mensal é o único sem "para que", e é falta de espaço, não de
+   * motivo: medido na folha do plano, a explicação dele era a única que
+   * empurrava o item para uma segunda linha, e a segunda linha custava o bloco
+   * inteiro do fecho, que ia sozinho para uma terceira folha. Ele também é o
+   * item que menos precisa: quem lê "fechamento mensal por escrito" já sabe
+   * para que serve. */
   function vantagensPadrao() {
     return [
       /* Sem pronome. Dizia "para o que ele precisa naquela semana", e metade
@@ -1538,13 +1634,13 @@
        * mais curto e mais seguro do que criar campo de gênero, que seria uma
        * pergunta a mais na tela para consertar uma palavra. */
       { id: 'material', ligado: true,
-        texto: 'Material próprio: explicação, lista de exercícios e gabarito em PDF, preparados para o que estiver faltando naquela semana.' },
+        texto: 'Material próprio: explicação, lista de exercícios e gabarito em PDF, preparados para o que estiver faltando naquela semana. Fica com vocês para refazer depois.' },
       { id: 'fechamento', ligado: true,
         texto: 'Fechamento mensal por escrito: as datas, os assuntos trabalhados e o meu retorno sobre a evolução.' },
       { id: 'provas', ligado: true,
-        texto: 'Acompanhamento do calendário de provas do colégio.' },
+        texto: 'Acompanhamento do calendário de provas do colégio, para a revisão começar antes da véspera.' },
       { id: 'duvida', ligado: true,
-        texto: 'Retorno por mensagem entre as aulas, para dúvida pontual.' }
+        texto: 'Retorno por mensagem entre as aulas: dúvida de dever de casa não precisa esperar a semana virar.' }
     ];
   }
 
@@ -1739,7 +1835,7 @@
    * abaixo com outro rótulo: medido no mapeamento de dez pontos de atenção, a
    * proposta saía com zero pontos de atenção impressos e oito áreas marcadas,
    * entre elas "Concentração", que é "Dispersa com facilidade", e "Ansiedade
-   * ou medo de prova", que é "Fica ansioso perto da prova". A área só nasce
+   * ou medo de prova", que é "Ansiedade perto da prova". A área só nasce
    * marcada quando o ponto de atenção que a gerou está marcado, e como os
    * pontos de atenção nascem desmarcados, as áreas nascem vazias e ela marca
    * as duas coisas juntas, vendo o que a família vai ler. */
@@ -2014,7 +2110,12 @@
       out.push('Informe o responsável. A proposta tem destinatário: é para quem decide.');
     }
     if (!falaDaCrianca(p) && !((p && p.texto) || '').trim()) {
-      out.push('Escreva duas ou três linhas sobre a criança. Sem o mapeamento, ' +
+      /* O aviso diz COMO escrever, e não só que falta escrever. Duas ou três
+       * linhas genéricas caberiam em qualquer criança e a família percebe: o
+       * que aquece a folha é uma frase que só caberia naquela, e o começo pelo
+       * que ela viu de bom é o que faz o resto ser lido sem defesa. */
+      out.push('Escreva duas ou três linhas sobre a criança, começando pelo que ' +
+        'você viu de bom e com uma frase que só caberia nela. Sem o mapeamento, ' +
         'este parágrafo é a única parte da folha que fala dela: sem ele a ' +
         'família recebe uma página de combinados e preço.');
     }
@@ -2041,9 +2142,67 @@
       if (itens.length) areasPorGrupo.push({ grupo: g.grupo, itens: itens });
     });
 
+    /* A frase de origem diz DE ONDE veio o que está escrito abaixo dela, e não
+     * o nome do procedimento que a produziu. "Aula de nivelamento em 02/09" é
+     * uma etiqueta de arquivo: informa a família de uma coisa que a família já
+     * sabe, porque foi ela quem esteve lá, e abre a folha com o vocabulário de
+     * quem cumpre protocolo. Dizendo de onde veio, a mesma linha credita quem
+     * contou: no caminho principal, que é o do aluno que ainda não existe,
+     * quem contou foi a própria família. */
+    /* A data por extenso, e não 02/09. O cabeçalho, duas linhas acima, escreve
+     * "4 de setembro de 2026", e a linha de origem escrevia "02/09": duas
+     * datas em dois formatos coladas uma na outra é o que faz a abertura da
+     * folha parecer ficha de atendimento. Sem o ano, que já está no cabeçalho
+     * e não precisa aparecer duas vezes na mesma dobra da página. */
     var origem = p.origem === 'nivelamento'
-      ? ('Aula de nivelamento' + (p.dataOrigem ? ' em ' + ddmm(p.dataOrigem) : ''))
-      : 'Primeira conversa com vocês';
+      ? ('Do que eu vi na aula de nivelamento' + (p.dataOrigem ? ', em ' + diaEMes(p.dataOrigem) : ''))
+      : 'Do que vocês me contaram na nossa primeira conversa';
+
+    /* De onde veio o veredito de nível, em três palavras, para a etiqueta
+     * herdar a fonte que a linha de origem já imprimiu.
+     *
+     * A etiqueta dizia "Como Helena está hoje: Abaixo do que o ano pede" com a
+     * mesma certeza viesse ela de uma aula de nivelamento ou de um telefonema.
+     * Na origem "conversa" a professora nunca deu aula para a criança, e a
+     * folha imprimia o veredito 15 pt abaixo da própria frase que diz que quem
+     * contou foi a família: lê-se como laudo. Dizer a fonte na etiqueta não
+     * tira força nenhuma do diagnóstico, só devolve a ele o crédito certo. */
+    var origemFonte = p.origem === 'nivelamento'
+      ? 'pelo que eu vi na aula'
+      : 'pelo que vocês me contaram';
+
+    /* O TÍTULO DA SEÇÃO DO DIAGNÓSTICO TAMBÉM SEGUE A ORIGEM.
+     *
+     * O título era "O que eu vi em Helena" em toda folha, e na origem
+     * "conversa" ele desmentia, 50 pt abaixo, as duas linhas que acabaram de
+     * creditar a família: "Do que vocês me contaram na nossa primeira
+     * conversa" e "Como Helena está hoje, pelo que vocês me contaram". Medido
+     * na folha de conversa, as três linhas entram no mesmo golpe de vista, e a
+     * do meio afirma que ela viu uma criança que ainda não viu.
+     *
+     * "O que eu já sei sobre Helena" resolve sem inventar dono: não diz que
+     * viu, e também não devolve o diagnóstico para a família, que seria o erro
+     * espelhado, porque a leitura do que os pais contaram é dela. Sem nome, o
+     * título perde só o nome. */
+    var primeiroNomeDaFolha = String(p.aluno || (aluno && aluno.nome) || '')
+      .trim().split(/\s+/)[0] || '';
+    var tituloObservacao = p.origem === 'nivelamento'
+      ? (primeiroNomeDaFolha ? 'O que eu vi em ' + primeiroNomeDaFolha : 'O que eu vi na aula')
+      : (primeiroNomeDaFolha ? 'O que eu já sei sobre ' + primeiroNomeDaFolha
+        : 'O que eu já sei até aqui');
+
+    /* O ano escolar sozinho, para caber dentro de uma frase.
+     *
+     * O contextoEscolar acima junta ano e colégio ("8º ano, Colégio São
+     * Vicente"), que é o que o bloco de identificação imprime. A frase do que
+     * ela propõe trabalhar precisa só do ano. Cursinho, "Fora da escola" e
+     * "Outro" não viram série nenhuma e ficam de fora: "o conteúdo do Fora da
+     * escola" não é frase, e quem não tem série na folha recebe a frase sem
+     * essa parte. */
+    var anoDaFrase = ANOS_ESCOLARES[(p && p.anoEscolar) || ''];
+    if (p && (p.anoEscolar === 'cursinho' || p.anoEscolar === 'fora' || anoEscolarLivre(p.anoEscolar))) {
+      anoDaFrase = '';
+    }
 
     return {
       aluno: p.aluno || (aluno && aluno.nome) || '',
@@ -2058,6 +2217,9 @@
       data: p.data,
       validaAte: p.validaAte,
       origem: origem,
+      origemFonte: origemFonte,
+      tituloObservacao: tituloObservacao,
+      anoEscolar: anoDaFrase || '',
       nivel: rotuloNivel(p.nivel),
       objetivo: {
         rotulo: rotuloObjetivoDaProposta(p.objetivo),
@@ -2073,8 +2235,15 @@
         porSemana: numeroOu(enc.porSemana, 1),
         local: rotuloLocal(enc.local)
       },
+      /* O id acompanha o combinado até a folha, e não é enfeite: o pdf.js
+       * precisa dele para saber onde parte a seção (o preparo da aula fica com
+       * "Como funcionam os encontros", o resto abre "Os nossos combinados") e
+       * para reservar o par folgas mais desmarcação na mesma página. Sem o id
+       * a única alternativa seria contar pela posição, e ela reordena a
+       * lista. Combinado escrito por ela nasce com id próprio, gerado no uid,
+       * e cai na parte dos combinados, que é onde ele pertence. */
       combinados: comb.filter(function (i) { return i.ligado !== false; })
-        .map(function (i) { return { rotulo: i.rotulo, texto: i.texto }; }),
+        .map(function (i) { return { id: i.id, rotulo: i.rotulo, texto: i.texto }; }),
       vantagens: (p.vantagens || []).filter(function (i) { return i.ligado !== false; })
         .map(function (i) { return i.texto; }),
       cobranca: {
@@ -2103,9 +2272,11 @@
    * propósito: seria inventar uma avaliação que ela não fez. */
   var ETAPAS = [
     { id: 'apoio-total', rotulo: 'Apoio total', ajuda: 'Precisa de você ao lado o tempo todo.' },
-    { id: 'apoio-parcial', rotulo: 'Apoio parcial', ajuda: 'Começa sozinho e trava no meio.' },
-    { id: 'supervisao', rotulo: 'Supervisão', ajuda: 'Faz sozinho, e você confere depois.' },
-    { id: 'autonomia', rotulo: 'Autonomia', ajuda: 'Faz e confere sozinho.' }
+    /* "Sem ajuda", e não "sozinho", pelo mesmo motivo de gênero comentado nos
+     * rótulos do mapa: a ajuda descreve a criança, e metade delas é menina. */
+    { id: 'apoio-parcial', rotulo: 'Apoio parcial', ajuda: 'Começa sem ajuda e trava no meio.' },
+    { id: 'supervisao', rotulo: 'Supervisão', ajuda: 'Faz sem ajuda, e você confere depois.' },
+    { id: 'autonomia', rotulo: 'Autonomia', ajuda: 'Faz e confere sem ajuda.' }
   ];
 
   var FRENTES_ETAPA = [
@@ -3391,7 +3562,7 @@
     MESES: MESES, DIAS_CURTO: DIAS_CURTO, DIAS_LONGO: DIAS_LONGO, STATUS: STATUS,
     pad2: pad2, partesData: partesData, dataLocal: dataLocal, isoDe: isoDe, hojeIso: hojeIso,
     diaSemana: diaSemana, diaSemanaCurto: diaSemanaCurto, diaSemanaLongo: diaSemanaLongo,
-    ddmm: ddmm, ddmmaaaa: ddmmaaaa, mesExtenso: mesExtenso, mesDe: mesDe,
+    ddmm: ddmm, ddmmaaaa: ddmmaaaa, diaEMes: diaEMes, mesExtenso: mesExtenso, mesDe: mesDe,
     diasDoMes: diasDoMes, primeiroDiaSemanaDoMes: primeiroDiaSemanaDoMes, mesAdjacente: mesAdjacente,
     fmtMoeda: fmtMoeda, fmtHoras: fmtHoras, fmtHorasDecimal: fmtHorasDecimal, fmtDuracao: fmtDuracao,
     precoVigente: precoVigente, validarPrecos: validarPrecos,

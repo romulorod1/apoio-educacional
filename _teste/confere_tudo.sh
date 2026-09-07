@@ -73,8 +73,19 @@ roda() {
     if passou_de_verdade "$saida2"; then
       printf '  FALHOU  %-24s %s\n' "$nome" "$(resumo "$saida2")"
     else
-      printf '  FALHOU  %-24s nao chegou a rodar: %s\n' "$nome" \
-        "$(printf '%s\n' "$saida2" | grep -iE "error|cannot find|not found" | head -1 | cut -c1-90)"
+      # Sem placar nenhum na saida. Sao dois casos, e o texto vale para os dois:
+      # o teste morreu antes de comecar, ou ele rodou e falou um dialeto que
+      # este portao nao le. Dizer "nao chegou a rodar" para o segundo manda quem
+      # le procurar defeito no lugar errado.
+      #
+      # E o motivo nunca sai vazio. Saia: quando nao havia linha de erro para
+      # citar, o portao imprimia "nao chegou a rodar: " e nada depois, e quem
+      # lia ficava sem nada para chasear. Na falta de linha de erro, a ultima
+      # linha nao vazia da saida e o que o teste deixou dito.
+      motivo=$(printf '%s\n' "$saida2" | grep -iE "error|cannot find|not found" | head -1 | cut -c1-90)
+      [ -n "$motivo" ] || motivo=$(printf '%s\n' "$saida2" | grep -v '^[[:space:]]*$' | tail -1 | cut -c1-90)
+      [ -n "$motivo" ] || motivo="nao imprimiu nada"
+      printf '  FALHOU  %-24s nao disse que passou: %s\n' "$nome" "$motivo"
     fi
     falhou=1
   else
@@ -137,9 +148,15 @@ fi
 # O testa_atualizacao_real entra aqui porque e o UNICO que percorre uma transicao
 # de versao de verdade, com os cabecalhos reais do GitHub Pages (max-age=600 e
 # ETag) e o cache do navegador quente e vencido. Ele ficou de fora justamente da
-# rodada cujo tema era o nome do cache do service worker. Ele nao imprime
-# "N falharam": diz "ATUALIZACAO CONFIRMADA..." quando passa, e o `roda` aceita
-# pelo CONFIRMAD; quando falha imprime "N FALHA(S)", sem CONFIRMAD, e reprova.
+# rodada cujo tema era o nome do cache do service worker.
+#
+# Ele falava sozinho: "ATUALIZACAO CONFIRMADA" quando passava e "N FALHA(S)"
+# quando falhava. O segundo nao casa com "N falharam" nem com "passaram", entao
+# uma falha de asercao REAL saia daqui como "nao chegou a rodar: " e nada
+# depois, tendo o teste rodado inteiro e impresso 14 OK mais uma FALHA. Hoje ele
+# imprime "N verificacoes passaram, M falharam", que e o dialeto de todos os
+# irmaos, e a frase da confirmacao segue na linha seguinte, que e o nome pelo
+# qual ele aparece no resumo quando passa.
 titulo "com navegador"
 for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento \
          testa_perfil testa_olho testa_atualizacao testa_atualizacao_real \

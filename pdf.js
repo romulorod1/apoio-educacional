@@ -2180,17 +2180,17 @@
    * texto. Escrever o rótulo e o texto como dois parágrafos deixaria um degrau
    * no meio da frase, e escrever tudo em negrito apagaria a diferença entre o
    * que é o assunto do item e o que é o combinado em si. */
-  function itemComRotulo(doc, rotulo, texto, opcoes) {
+  /* A quebra do item em linhas, SEM desenhar nada.
+   *
+   * Existe separada porque quem precisa reservar uma folha inteira para um par
+   * de itens tem que saber a altura dos dois ANTES de escrever o primeiro. Se
+   * a conta da altura vivesse copiada em dois lugares, o dia em que alguém
+   * mexer na largura do recuo aqui a reserva lá passa a mentir, e o defeito
+   * volta calado: um item no pé de uma folha e o par dele no alto da outra. */
+  function linhasDoItem(rotulo, texto, opcoes) {
     opcoes = opcoes || {};
     var tam = opcoes.tam || 10;
-    var passo = opcoes.passo || 14;
-    /* Folga acima do item, para um item nao encostar no anterior. Nasce em
-       zero: quem nao pedir continua exatamente como estava. Ela NAO entra
-       entre as linhas do mesmo item, que continuam no passo. */
-    var folgaAntes = opcoes.folgaAntes || 0;
-    var x = opcoes.x || MARG_E;
     var largura = opcoes.largura || UTIL;
-    var xTexto = x + 16;
     var larguraTexto = largura - 16;
     var lab = rotulo ? String(rotulo) + ': ' : '';
     var wLab = lab ? medir(lab, tam, true) : 0;
@@ -2206,6 +2206,29 @@
     }
     if (atual) linhas.push(atual);
     if (!linhas.length) linhas.push('');
+    return { linhas: linhas, lab: lab, wLab: wLab };
+  }
+
+  /* A altura que o item vai ocupar, na mesma conta que o desenho usa. */
+  function alturaDoItem(rotulo, texto, opcoes) {
+    opcoes = opcoes || {};
+    var passo = opcoes.passo || 14;
+    return (opcoes.folgaAntes || 0) +
+      linhasDoItem(rotulo, texto, opcoes).linhas.length * passo;
+  }
+
+  function itemComRotulo(doc, rotulo, texto, opcoes) {
+    opcoes = opcoes || {};
+    var tam = opcoes.tam || 10;
+    var passo = opcoes.passo || 14;
+    /* Folga acima do item, para um item nao encostar no anterior. Nasce em
+       zero: quem nao pedir continua exatamente como estava. Ela NAO entra
+       entre as linhas do mesmo item, que continuam no passo. */
+    var folgaAntes = opcoes.folgaAntes || 0;
+    var x = opcoes.x || MARG_E;
+    var med = linhasDoItem(rotulo, texto, opcoes);
+    var linhas = med.linhas, lab = med.lab, wLab = med.wLab;
+    var xTexto = x + 16;
     /* O item inteiro é reservado antes da primeira linha. Sem isso o
      * combinado das folgas do semestre podia começar no pé de uma folha e
      * terminar no alto da outra, com o rótulo em negrito sozinho embaixo: é
@@ -2243,12 +2266,16 @@
     doc.novaPagina();
     doc.cabecalhoDeSecao('Proposta de acompanhamento', nomeAluno);
 
-    // ---- a linha de data, igual à da ficha de mapeamento
-    doc.y -= 16;
+    /* ---- a linha de data, igual a da ficha de mapeamento. Os vaos deste
+       cabecalho encolheram 2 pt cada um, pela mesma conta anotada no vao dos
+       titulos: e espaco vazio, e ele paga o conteudo novo da folha sem custar
+       palavra nenhuma. Aqui nao ha risco de encostar em nada, porque a linha
+       de data e centrada e o bloco de identificacao tem fundo proprio. */
+    doc.y -= 14;
     var linhaData = (op.cidade || '') + (op.cidade ? ', ' : '') + dataExtensoL(op.data);
     if (op.validaAte) linhaData += ', válida até ' + dataExtensoL(op.validaAte);
     doc.texto(linhaData, PAGINA_L / 2, doc.y, { tam: 9, cor: COR.muted, align: 'centro' });
-    doc.y -= 10;
+    doc.y -= 8;
 
     // ---- bloco de identificação, o mesmo do fechamento
     var materias = (op.materias || []).filter(Boolean);
@@ -2258,7 +2285,11 @@
     if (materias.length) {
       linhasId.push([materias.length > 1 ? 'Matérias' : 'Matéria', listaEmPortugues(materias)]);
     }
-    doc.y -= 22;
+    /* 16, e nao 22. Ver a nota do vao dos titulos: a folha ganhou conteudo
+       nesta rodada e o espaco vazio e o que paga a conta antes de qualquer
+       palavra. Dezesseis pontos abaixo da linha de data continuam separando o
+       cabecalho do bloco de identificacao a olho nu. */
+    doc.y -= 16;
     var alturaBloco = 14 + linhasId.length * 15;
     doc.y -= alturaBloco;
     doc.retangulo(MARG_E, doc.y, UTIL, alturaBloco, COR.soft);
@@ -2270,12 +2301,35 @@
       yy -= 15;
     }
 
+    /* O fio embaixo do título tem a largura escrita à mão em cada seção, e as
+     * medidas que já existiam ficam como estão. Quem não passar número nenhum
+     * ganha o fio proporcional ao próprio título: os títulos que carregam o
+     * nome da criança mudam de largura de uma família para outra, e um número
+     * fixo sublinharia meia palavra numa e passaria do texto na seguinte. Os 74
+     * por cento são a proporção que as medidas escritas à mão já usavam. */
+    /* O VÃO ACIMA DO TÍTULO PAGA A CONTA DA SEÇÃO NOVA, e vale a pena medido.
+     *
+     * A folha ganhou nesta rodada um título ("Os nossos combinados"), a linha
+     * que diz por onde ela começa a trabalhar e a oração que diz o que
+     * acontece se a família parar no meio do período. Somados, 104 pt na folha
+     * do plano, contra 49 pt de folga que existiam: a terceira página nascia
+     * com o fecho sozinho dentro dela.
+     *
+     * O vão caiu de 26 para 20 pt nos títulos de seção, e de 20 para 16 nos
+     * sub-blocos de marcados. Medido na folha do plano, isso devolve 36 pt na
+     * página 1, e 36 pt é justamente o que faltava para o título novo e o
+     * primeiro combinado caberem lá em vez de abrirem a página 2: a página 1
+     * desperdiçava 42 pt em branco no pé, e agora não desperdiça. Nenhuma
+     * palavra foi cortada para isso. Vinte pontos acima de um título com fio
+     * continuam separando seção de seção a olho nu, e é o espaço, não a cor
+     * nem o corpo da letra, que carrega a hierarquia desta folha. */
     function tituloDeSecao(texto, larguraFio) {
-      doc.y -= 26;
+      doc.y -= 20;
       doc.garanteEspaco(44);
       doc.texto(texto, MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
       doc.y -= 4;
-      doc.linha(MARG_E, doc.y, MARG_E + (larguraFio || 70), doc.y, COR.teal, 1.2);
+      var fio = larguraFio || Math.round(medir(String(texto), 11.5, true) * 0.74);
+      doc.linha(MARG_E, doc.y, MARG_E + fio, doc.y, COR.teal, 1.2);
       doc.y -= 4;
     }
 
@@ -2284,7 +2338,8 @@
      * terceira folha. */
     function blocoDeMarcados(titulo, rot) {
       if (!rot || !rot.length) return;
-      doc.y -= 20;
+      /* 16, e não 20: ver a nota do vão dos títulos, logo acima. */
+      doc.y -= 16;
       doc.garanteEspaco(46);
       doc.texto(titulo, MARG_E, doc.y, { tam: 10.5, bold: true, cor: COR.navy });
       doc.y -= 4;
@@ -2307,6 +2362,11 @@
     }
 
     function faixa(texto) {
+      /* 24, E NAO MENOS. A faixa desenha um retangulo que sobe 17 pt acima do
+         doc.y, entao o topo dela fica a 7 pt da linha de cima: e a folga que
+         as descidas do g, do q e do p precisam. Medido a 300 dpi com 18 pt de
+         vao, o "q" de "que o ano pede" cortava a borda da faixa. Este numero
+         nao acompanha o encolhimento dos vaos de titulo por isso. */
       doc.y -= 24;
       doc.garanteEspaco(60);
       doc.retangulo(MARG_E, doc.y - 5, UTIL, 22, COR.soft);
@@ -2321,8 +2381,31 @@
     var objetivo = op.objetivo || {};
     if (op.nivel || op.texto || objetivo.rotulo) {
       tituloDeSecao('Ponto de partida', 70);
+      /* A VOZ DELA ABRE A SEÇÃO, e as etiquetas vêm depois.
+       *
+       * A ordem era origem, nível, faixa do objetivo e só então o parágrafo em
+       * prosa. As duas primeiras linhas não têm verbo finito nem ponto final
+       * ("Do que eu vi na aula de nivelamento, em 2 de setembro" e "Como
+       * Helena está hoje: ..."), e abrir com duas etiquetas é o que fazia o
+       * trecho parecer ficha de atendimento justamente onde a conversa deveria
+       * começar. O parágrafo é a única parte da seção escrita por ela, em
+       * frases inteiras, e é ele que a família precisa ler primeiro.
+       *
+       * As etiquetas continuam na folha, logo abaixo, porque creditam de onde
+       * veio o que ela escreveu; a faixa do objetivo fecha a seção apontando
+       * para a frente, que é onde a família quer chegar. */
+      if (op.texto) {
+        doc.y -= 8;
+        doc.garanteEspaco(40);
+        doc.paragrafo(op.texto, { tam: 10, alturaLinha: 14.5 });
+      }
       if (op.origem) {
-        doc.y -= 15;
+        /* 22 pt, e não 15: a entrelinha do próprio parágrafo é 14,5, então a
+         * 15 pt a linha de origem se lia como a quarta linha do parágrafo, e
+         * não como a linha que credita de onde veio o que está escrito acima.
+         * Medido a 300 dpi. Os 7 pt saíram do vão do bloco seguinte, para a
+         * página não mudar de conta. */
+        doc.y -= 22;
         doc.texto(op.origem, MARG_E, doc.y, { tam: 10, cor: COR.texto });
       }
       /* O destaque vai no OBJETIVO, e não no nível.
@@ -2333,20 +2416,57 @@
        * que é o diagnóstico, e o objetivo, que é o alvo dele, saía como linha
        * comum logo acima. O diagnóstico continua na folha, em texto, porque ele
        * explica o plano; ele só deixa de ser a primeira coisa que salta. */
+      /* O nome da criança entra na etiqueta do nível. "Como está hoje" não tem
+       * sujeito, e uma frase sem sujeito ao lado de um diagnóstico soa como
+       * ficha de atendimento. "Como a Helena está hoje" é a mesma informação
+       * dita por quem conhece a criança pelo nome, e é como ela diria em voz
+       * alta na sala da família. Sem nome, a etiqueta antiga continua valendo:
+       * a folha nunca imprime uma lacuna.
+       *
+       * SEM ARTIGO antes do nome, e isto não é descuido. "A Helena" e "o
+       * Rafael" é como se fala em Niterói, mas escolher entre "a" e "o" pede
+       * saber o gênero da criança, e o único jeito de saber seria adivinhar
+       * pela terminação do nome ou criar um campo de gênero na tela. Adivinhar
+       * erra em Alex, Ariel e Sasha, e erra logo na primeira folha que a
+       * família lê sobre a própria filha. O campo foi recusado antes, pelo
+       * mesmo motivo que tirou o "ele" das vantagens: uma pergunta a mais na
+       * tela para consertar uma palavra. Sem artigo a frase nunca erra. */
+      /* A ETIQUETA DO NÍVEL HERDA A FONTE, e não sai como veredito fechado.
+       *
+       * Ela imprimia "Como Helena está hoje: Abaixo do que o ano pede" com a
+       * mesma certeza viesse o nível de uma aula de nivelamento ou de uma
+       * conversa por telefone. Na origem "conversa" a professora nunca deu
+       * aula para a criança, e a folha punha esse veredito 15 pt abaixo da
+       * própria linha que diz que quem contou foi a família: a mãe lê um
+       * laudo sobre a filha assinado por quem ainda não a viu estudando.
+       *
+       * A fonte já está impressa uma linha acima, então repeti-la aqui custa
+       * três palavras e devolve ao diagnóstico o crédito certo. Sem origem,
+       * a etiqueta continua exatamente como era: a folha nunca imprime uma
+       * lacuna nem uma vírgula sobrando. */
       if (op.nivel) {
+        var rotuloNivel = primeiroNome ? 'Como ' + primeiroNome + ' está hoje'
+          : 'Como está hoje';
+        rotuloNivel += (op.origemFonte ? ', ' + op.origemFonte : '') + ': ';
+        var wNivel = medir(rotuloNivel, 10, true);
         doc.y -= 14;
-        doc.texto('Como está hoje: ', MARG_E, doc.y, { tam: 10, bold: true, cor: COR.navy });
-        doc.texto(op.nivel, MARG_E + medir('Como está hoje: ', 10, true), doc.y,
-          { tam: 10, cor: COR.texto });
+        doc.texto(rotuloNivel, MARG_E, doc.y, { tam: 10, bold: true, cor: COR.navy });
+        /* A etiqueta cresceu ao ganhar a fonte, e as duas partes juntas podem
+         * passar da margem: medido, o pior caso é o nome comprido com "Precisa
+         * retomar a base de anos anteriores", que chega perto dos 499 pt úteis.
+         * Esta linha é escrita sem quebra automática, então o que não coubesse
+         * sairia por cima do fio da direita. Quando não cabe, o nível desce uma
+         * linha em vez de vazar. */
+        if (wNivel + medir(op.nivel, 10, false) <= UTIL) {
+          doc.texto(op.nivel, MARG_E + wNivel, doc.y, { tam: 10, cor: COR.texto });
+        } else {
+          doc.y -= 13;
+          doc.texto(op.nivel, MARG_E, doc.y, { tam: 10, cor: COR.texto });
+        }
       }
       if (objetivo.rotulo) {
         faixa('Objetivo: ' + objetivo.rotulo +
           (objetivo.dataProva ? ', em ' + ddmmaaaaL(objetivo.dataProva) : ''));
-      }
-      if (op.texto) {
-        doc.y -= 10;
-        doc.garanteEspaco(40);
-        doc.paragrafo(op.texto, { tam: 10, alturaLinha: 14.5 });
       }
     }
 
@@ -2361,11 +2481,60 @@
     var fortes = op.fortes || [];
     var atencao = (op.atencao || []).slice(0, 6);
     var lacunas = op.lacunas || [];
+    /* O título nomeia a criança quando há nome. "O que eu observei" é verdade e
+     * é frio: descreve o ato de quem examina, e a família lê o filho virar
+     * objeto de exame na primeira folha. "O que eu vi em Helena" diz a mesma
+     * coisa a respeito de uma pessoa que ela conhece pelo nome. O fio embaixo
+     * do título passa a ser medido, porque o título deixou de ter largura
+     * fixa.
+     *
+     * Qual das duas formas sai é decidido no Core, junto com a linha de origem
+     * e a etiqueta do nível: as três falam da mesma coisa e precisam concordar
+     * entre si, e quem sabe se ela viu a criança ou só conversou com a família
+     * é o registro, não o desenho. */
+    var areas = op.areas || [];
+    var lacunasDaFrase = (op.lacunas || []).filter(Boolean).map(emMinuscula);
+
+    /* A ÚNICA FRASE QUE DIZ O QUE SERÁ FEITO COM A LACUNA, e ela precisa sair
+     * mesmo quando não há área marcada.
+     *
+     * Montada SÓ com o que já está impresso acima: as lacunas marcadas e o ano
+     * escolar do bloco de identificação. Sem lacuna nenhuma não sai, porque não
+     * haveria o que dizer. A ordem é promessa que o aplicativo cumpre: cada
+     * lacuna carrega os alvos da trilha, e a trilha nasce do ano mais baixo
+     * para o mais alto. Sem ano escolar registrado termina em "o conteúdo do
+     * ano", que é verdade em qualquer série. */
+    function escreveOQueVouFazer() {
+      /* 8 mais os 14 do proprio paragrafo dao 22 pt de respiro acima da
+         linha: ela fecha a secao, nao abre outra. */
+      doc.y -= 8;
+      doc.garanteEspaco(32);
+      doc.paragrafo('Começo pelo que ficou para trás e está atrapalhando agora, ' +
+        listaEmPortugues(lacunasDaFrase) + ', na ordem que a matéria pede, ' +
+        'sem parar o conteúdo do ' + (op.anoEscolar || 'ano') + '.',
+        { tam: 10, alturaLinha: 14 });
+    }
+
     if (fortes.length || lacunas.length) {
-      tituloDeSecao('O que eu observei', 82);
+      tituloDeSecao(op.tituloObservacao ||
+        (primeiroNome ? 'O que eu vi em ' + primeiroNome : 'O que eu observei'));
       blocoDeMarcados('Pontos fortes', fortes);
       if (fortes.length) blocoDeMarcados('Pontos de atenção', atencao);
       blocoDeMarcados('O que ficou para trás e atrapalha agora', lacunas);
+      /* SEM ÁREA MARCADA, a frase fecha ESTA seção em vez de abrir a de baixo.
+       *
+       * As áreas nascem desmarcadas de propósito (a decisão está escrita em
+       * preencherProposta, no core), então a folha que sai do mapeamento tem
+       * lacuna preenchida e área vazia: é o caso comum, e não a beirada. Sem
+       * isto a mãe lia "O que ficou para trás e atrapalha agora: Frações,
+       * Porcentagem" e a folha nunca dizia o que seria feito com aquilo.
+       *
+       * Aqui custa 28 pt, as duas linhas. Abrir a seção "O que eu proponho
+       * trabalhar" só para carregá-la custaria 74 pt, medidos, numa página 1
+       * que tem 54 livres, e levaria a folha de planos para três páginas com o
+       * fecho sozinho na última. A frase responde a pergunta no mesmo lugar em
+       * que ela nasce, colada na lista que acabou de ser lida. */
+      if (!areas.length && lacunasDaFrase.length) escreveOQueVouFazer();
     }
 
     /* O que proponho trabalhar sai em prosa, e não em lista de marcar.
@@ -2378,16 +2547,49 @@
      * "Método e organização: montagem do cronograma, disciplina e constância."
      * A lista das matérias não se repete aqui, porque ela já está no bloco de
      * identificação, no alto da folha. */
-    var areas = op.areas || [];
     if (areas.length) {
       tituloDeSecao('O que eu proponho trabalhar', 110);
       doc.y -= 6;
       areas.forEach(function (g) {
         itemComRotulo(doc, g.grupo, (g.itens || []).map(emMinuscula).join(', ') + '.');
       });
+      /* A ÚNICA SEÇÃO QUE RESPONDE O QUE A FAMÍLIA ESTÁ COMPRANDO PRECISA CITAR
+       * AS LACUNAS QUE A FOLHA ACABOU DE NOMEAR.
+       *
+       * Medido: a folha listava "Frações" e "Porcentagem" em "O que ficou para
+       * trás e atrapalha agora" e, quatro centímetros abaixo, a seção do plano
+       * gastava 29 palavras falando só de método de estudo e de prova, sem
+       * citar nenhuma das duas. O dado existia e não era impresso, e é
+       * exatamente o dado pelo qual a família decide.
+       *
+       * Havendo área marcada, a frase fecha ESTA seção, que é onde a família
+       * procura o plano. Sem área nenhuma ela já saiu lá em cima, colada na
+       * lista de lacunas, e por isso nunca sai duas vezes. */
+      if (lacunasDaFrase.length) escreveOQueVouFazer();
     }
 
-    // ---- como funcionam os encontros
+    /* ---- como funcionam os encontros, e os combinados: DUAS SEÇÕES.
+     *
+     * Eram uma só, e a conta explica por que isso não podia continuar: das 318
+     * palavras em 9 itens, os dois primeiros (45 palavras) falavam da aula e os
+     * sete seguintes (273 palavras) eram desmarcação, falta, reposição e saída.
+     * Oitenta e seis por cento de uma seção chamada "Como funcionam os
+     * encontros" era contrato, sem aviso nenhum de que o assunto tinha mudado.
+     *
+     * Sem título próprio, o contrato também podia ser partido em qualquer
+     * ponto pela quebra de página, que é o que produzia o defeito grave: o
+     * item que cobra a desmarcação nascia no alto da folha 2 e o item das
+     * folgas, que é o antecedente dele, ficava no pé da folha 1.
+     *
+     * A partilha é pelo id, e não pela posição: ela reordena a lista na tela.
+     * O preparo da aula fica com os encontros, porque descreve a aula; todo o
+     * resto, inclusive combinado escrito por ela, abre a seção dos combinados,
+     * que é onde a família espera achá-lo. */
+    var COMBINADOS_DA_AULA = { preparo: true };
+    var combinados = (op.combinados || []);
+    var daAula = combinados.filter(function (c) { return COMBINADOS_DA_AULA[c.id]; });
+    var doContrato = combinados.filter(function (c) { return !COMBINADOS_DA_AULA[c.id]; });
+
     tituloDeSecao('Como funcionam os encontros', 128);
     doc.y -= 6;
     itemComRotulo(doc, 'Encontros', duracao + ', ' + vezes +
@@ -2395,9 +2597,39 @@
     /* Dois pontos de folga entre um combinado e o seguinte. Sao oito acordos
        diferentes, e sem respiro eles leem como um paragrafo so. O vao de dentro
        de cada um continua nos 14 pt, que e o que segura a leitura da frase. */
-    (op.combinados || []).forEach(function (c) {
+    daAula.forEach(function (c) {
       itemComRotulo(doc, c.rotulo, c.texto, { folgaAntes: 1.5 });
     });
+
+    if (doContrato.length) {
+      tituloDeSecao('Os nossos combinados', 108);
+      doc.y -= 6;
+      /* O PAR FOLGAS MAIS DESMARCAÇÃO É RESERVADO JUNTO.
+       *
+       * São o item que diz que as duas primeiras desmarcações não são cobradas
+       * e o item que diz que a terceira é. Lidos separados, cada um deles é
+       * meia verdade, e a metade que ficava sozinha no alto da folha 2 era a
+       * que cobra. Aqui os dois são medidos antes de o primeiro ser escrito e
+       * viram a página juntos. O teto é uma folha inteira: se o par crescer
+       * além disso, é melhor ele quebrar do que abrir uma folha em branco. */
+      /* Menos um, e não zero: a folga pode ser o primeiro item da lista no dia
+         em que ela apagar o aviso de remarcação, e zero seria falso aqui. */
+      var reservaDoPar = -1;
+      for (var ic = 0; ic < doContrato.length - 1; ic++) {
+        if (doContrato[ic].id === 'folgas' && doContrato[ic + 1].id === 'vespera') {
+          reservaDoPar = ic;
+        }
+      }
+      doContrato.forEach(function (c, i) {
+        var op1 = { folgaAntes: 1.5 };
+        if (i === reservaDoPar) {
+          var par = alturaDoItem(c.rotulo, c.texto, op1) +
+            alturaDoItem(doContrato[i + 1].rotulo, doContrato[i + 1].texto, op1);
+          doc.garanteEspaco(Math.min(par, Y_TOPO - Y_LIMITE));
+        }
+        itemComRotulo(doc, c.rotulo, c.texto, op1);
+      });
+    }
 
     // ---- investimento
     var planos = op.planos;
@@ -2418,11 +2650,39 @@
     if (emPlanos) {
       comoSePaga = 'O pagamento continua mensal, pelas aulas que aconteceram no mês, ' +
         'com o valor por hora do plano escolhido. Não tem pacote para pagar adiantado: ' +
-        'a coluna do total mostra quanto o período inteiro custa, para vocês compararem os planos.';
+        'a coluna do total mostra quanto o período inteiro custa.';
+      /* O QUE ACONTECE SE A FAMÍLIA PARAR NO SEGUNDO MÊS.
+       *
+       * A tabela pedia compromisso de 12 encontros e mostrava R$ 2.151,00, e a
+       * folha nunca dizia o que acontece com quem para no meio. Silêncio nesse
+       * ponto a família lê como multa, porque é o que ela conhece de contrato
+       * de academia, e ninguém assina o que não entendeu.
+       *
+       * Conferido no motor antes de escrever: calcularFechamento percorre as
+       * aulas do mês, cobra cada uma pelo precoVigente do dia e não conhece
+       * multa nem período mínimo. Quem para deve as aulas que aconteceram,
+       * ponto. A frase diz isso, e não uma gentileza parecida: é o que o
+       * fechamento do mês seguinte vai mostrar. */
       porque = 'O desconto não é do preço da aula: é do compromisso. Quem fecha ' +
         (PERIODO_DO_PLANO[cob.recomendado] || 'o período') +
         (op.reservadoAte ? ' tem o horário reservado na minha agenda até ' + op.reservadoAte + ', e eu' : ' tem o horário reservado na minha agenda, e eu') +
-        ' consigo planejar a sequência dos assuntos com antecedência, montar o material de cada semana e não recomeçar o plano a cada mês. É essa previsibilidade que o plano compra, dos dois lados.';
+        ' consigo planejar a sequência dos assuntos com antecedência e não recomeçar o plano a cada mês. ' +
+        'Se pararem antes do fim do período, vale a mesma regra de sempre: vocês pagam só as aulas que aconteceram, pelo valor do plano que escolheram.';
+    }
+
+    /* O parágrafo do hora-aula sai daqui de cima, e não de dentro do desenho,
+     * porque a reserva de espaço abaixo precisa MEDIR o que vai ser escrito. O
+     * modo planos já media os dois parágrafos dele; o hora-aula tinha três
+     * linhas escritas à mão na conta, e o texto passou a ter quatro. Número
+     * fixo de linhas envelhece calado: quem reescreve a frase não vai lembrar
+     * de somar um. */
+    var porHora = '';
+    if (!emPlanos) {
+      porHora = 'Cada encontro de ' + duracao + ' sai por ' +
+        fmtMoedaLocal((cob.valorHora || 0) * (enc.duracaoMin || 90) / 60) +
+        '. A cobrança é mensal e conta aula por aula, pelo que aconteceu no mês. ' +
+        'No fim de cada mês vai o fechamento por escrito, com as datas, os assuntos ' +
+        'e o meu retorno sobre a evolução: vocês conferem linha por linha antes de pagar.';
     }
 
     /* A seção do preço nunca começa no pé da folha. Mede o bloco inteiro, e se
@@ -2432,15 +2692,30 @@
     var alturaInvest = 26 + 18;
     if (emPlanos) {
       alturaInvest += 20 + (planos.planos.length + 1) * 18 + 16 +
-        doc.quebrar(comoSePaga, UTIL, 10, false).length * 14 + 12 +
-        doc.quebrar(porque, UTIL, 9.5, false).length * 13;
+        doc.quebrar(comoSePaga, UTIL, 10, false).length * 14 + 20 +
+        doc.quebrar(porque, UTIL, 10, false).length * 14;
     } else {
-      alturaInvest += 20 + 3 * 14;
+      alturaInvest += 22 + doc.quebrar(porHora, UTIL, 10, false).length * 14;
     }
     var sobra = doc.y - Y_LIMITE;
     if (alturaInvest > sobra && alturaInvest <= (Y_TOPO - Y_LIMITE)) doc.novaPagina();
 
-    tituloDeSecao('Investimento', 70);
+    /* "Quanto custa", e não "Investimento".
+     *
+     * "Investimento" é a palavra mais fria da folha justamente por ser a mais
+     * simpática: ela pede que a família chame o preço por outro nome, e o nome
+     * que oferece promete retorno financeiro sobre uma criança, que é
+     * exatamente o que esta folha não promete em lugar nenhum. E é a palavra
+     * mais batida de material de venda no Brasil: curso, academia e mentoria
+     * abrem a página de preço com ela, então quem lê reconhece o roteiro antes
+     * de ler o número, e o documento inteiro passa a soar ensaiado.
+     *
+     * O resto da folha é escrito com as palavras que ela diria na sala da
+     * família. Na sala, ninguém pergunta qual é o investimento: pergunta quanto
+     * custa. Ser direto sobre preço é forma de respeito, e é mais caloroso do
+     * que o eufemismo, porque não pede à família que finja estar fazendo outra
+     * coisa. */
+    tituloDeSecao('Quanto custa');
     if (emPlanos) {
       doc.y -= 6;
       cabecalhoTabela(doc, COLUNAS_PLANO);
@@ -2461,18 +2736,26 @@
       doc.y -= 14;
       doc.garanteEspaco(30);
       doc.paragrafo(comoSePaga, { tam: 10, alturaLinha: 14 });
-      doc.y -= 10;
+      /* MESMA COR E MESMO CORPO DO PARÁGRAFO DE CIMA.
+       *
+       * Este parágrafo saía em #6b7280 a 9,5 pt colado num de #1a1c1f a 10 pt,
+       * e mais claro e menor que o vizinho é o formato da letra miúda. É o
+       * único parágrafo da folha que fala em compromisso e em data de reserva,
+       * e agora também é onde está escrito o que acontece se a família parar
+       * no meio: numa folha cujo argumento é que nada está escondido, é o
+       * parágrafo errado para desbotar.
+       *
+       * A hierarquia que ele tinha vem agora do espaço acima, que dobrou de 10
+       * para 20 pt: separar sem apagar. */
+      doc.y -= 20;
       doc.garanteEspaco(30);
-      doc.paragrafo(porque, { tam: 9.5, cor: COR.muted, alturaLinha: 13 });
+      doc.paragrafo(porque, { tam: 10, alturaLinha: 14 });
     } else {
       doc.y -= 18;
       doc.texto(fmtMoedaLocal(cob.valorHora || 0) + ' por hora-aula', MARG_E, doc.y,
         { tam: 11, bold: true, cor: COR.navy });
       doc.y -= 4;
-      doc.paragrafo('Cada encontro de ' + duracao + ' sai por ' +
-        fmtMoedaLocal((cob.valorHora || 0) * (enc.duracaoMin || 90) / 60) +
-        '. A cobrança é mensal, pelas aulas que aconteceram, e no fim de cada mês vai o fechamento com as datas, os assuntos e o meu retorno sobre a evolução.',
-        { tam: 10, alturaLinha: 14 });
+      doc.paragrafo(porHora, { tam: 10, alturaLinha: 14 });
     }
 
     /* O que vem junto e o fecho são medidos JUNTOS e viram a folha juntos.
@@ -2482,21 +2765,48 @@
      * itens soltos e o "fico à disposição". Uma folha final com o bloco
      * inteiro parece decidida; duas linhas órfãs parecem sobra de impressão,
      * e esta é a folha em que a família decide. */
+    /* O fecho termina como quem quer trabalhar com aquela família, e não como
+     * quem espera aprovação.
+     *
+     * "Fico à disposição" é a fórmula de quem já disse o que tinha a dizer e
+     * agora aguarda, e "se fizer sentido para vocês" entrega a decisão inteira
+     * e sai de cena. As duas juntas fechavam a folha em posição de espera, que
+     * é o oposto do que uma proposta existe para fazer.
+     *
+     * Aqui a última frase abre a conversa em vez de encerrá-la (dizendo que o
+     * preço e o horário são conversáveis, que é o que a família quer saber e
+     * não pergunta), e a seguinte já pede a única coisa que falta para começar,
+     * oferecendo trabalho adiantado em troca. Continua sem prometer resultado:
+     * o que ela promete é chegar com o plano pronto, que é coisa que depende
+     * só dela. */
     var vantagens = (op.vantagens || []).filter(Boolean);
-    var textoFecho = 'Fico à disposição para conversar sobre qualquer ponto. Se fizer sentido ' +
-      'para vocês, combino a primeira data e já começo a montar o plano de trabalho' +
-      (primeiroNome ? ' para ' + primeiroNome : '') + '.';
-    /* 38 pt da assinatura: as duas linhas mais o respiro acima delas. Sem
+    var textoFecho = 'Qualquer ponto daqui pode ser conversado, o valor e o horário ' +
+      'inclusive: prefiro acertar agora do que deixar vocês com uma dúvida guardada. ' +
+      'Me digam o dia da semana que funciona aí em casa e eu chego na primeira aula ' +
+      'com o plano' + (primeiroNome ? ' de ' + primeiroNome : ' de trabalho') + ' já montado.';
+    /* 34 pt da assinatura: as duas linhas mais o respiro acima delas. Sem
        contar aqui, o fecho cabia e a assinatura ia sozinha para a folha
-       seguinte, que e o pior lugar possivel para ela. */
-    var alturaFim = 24 + doc.quebrar(textoFecho, UTIL, 10.5, false).length * 15 +
-      32 + (op.validaAte ? 25 : 0);
+       seguinte, que e o pior lugar possivel para ela.
+       A reserva encolheu junto com o fim da folha: a validade saiu daqui de
+       baixo, e com ela os 25 pt que ela pedia. Reservar espaco para uma linha
+       que nao e mais escrita empurraria a assinatura de pagina de gracao. */
+    /* 38 pt da assinatura: 18 de respiro acima do "Com carinho", 16 ate o
+       nome dela e 4 de sobra para a descida das letras. O numero tem que
+       casar com o garanteEspaco de la embaixo, senao a reserva diz que o
+       bloco cabe, o desenho comeca, e a assinatura vira pagina sozinha no
+       ultimo passo: foi exatamente o que aconteceu quando a reserva contava
+       34 e o garanteEspaco pedia 30. */
+    var alturaFim = 18 + doc.quebrar(textoFecho, UTIL, 10.5, false).length * 15 + 38;
     if (vantagens.length) {
       var linhasVantagens = 0;
       vantagens.forEach(function (v) {
         linhasVantagens += doc.quebrar(v, UTIL - 16, 10, false).length;
       });
-      alturaFim += 46 + linhasVantagens * 14;
+      /* 34, e não 46: é o que o título custa de verdade, medido no desenho
+         (20 de vão, 4 até o fio, 4 depois dele e 6 antes do primeiro item).
+         Reserva que não acompanha o desenho vira página virada à toa, e a
+         página virada à toa aqui custa uma folha inteira só com o fecho. */
+      alturaFim += 34 + linhasVantagens * 14;
     }
     var sobraFim = doc.y - Y_LIMITE;
     if (alturaFim > sobraFim && alturaFim <= (Y_TOPO - Y_LIMITE)) doc.novaPagina();
@@ -2507,24 +2817,30 @@
       vantagens.forEach(function (v) { itemComRotulo(doc, '', v); });
     }
 
-    // ---- fecho
-    doc.y -= 24;
+    /* ---- fecho. 18 de vao, e nao 24: com o respiro proprio do paragrafo
+       (15 pt) dao 33 pt entre o ultimo item do que vem junto e a despedida,
+       que continua sendo o maior vao do corpo da folha. Os 6 pt de diferenca
+       entram na reserva do bloco final, e la eles valem uma pagina. */
+    doc.y -= 18;
     doc.garanteEspaco(50);
     doc.paragrafo(textoFecho, { tam: 10.5, alturaLinha: 15 });
     /* A assinatura. Duas linhas, e a segunda é o nome dela: é o único lugar do
        corpo em que o nome aparece, porque a moldura já o assina em toda página.
-       Fica antes da validade, que é nota de rodapé e não despedida. */
+       E É A ÚLTIMA COISA DA FOLHA.
+       A validade saía repetida aqui embaixo, em cinza, colada no "Com carinho":
+       num documento de duas páginas o prazo aparecia duas vezes, e a segunda
+       encostava um prazo comercial na despedida. Era a única passagem da folha
+       que soava ensaiada. A tarja do alto da página 1 continua dizendo até
+       quando a proposta vale, que é onde a família procura, e a folha termina
+       na assinatura. */
     doc.y -= 18;
-    doc.garanteEspaco(30);
+    /* 20, e nao 30: e o que a assinatura realmente ocupa abaixo desta linha,
+       16 ate o nome mais 4 de descida. Pedir mais do que se usa aqui e o que
+       empurrava a assinatura para uma folha so dela. */
+    doc.garanteEspaco(20);
     doc.texto('Com carinho,', MARG_E, doc.y, { tam: 10.5, cor: COR.texto });
     doc.y -= 16;
     doc.texto('Nathália Wajsenzon', MARG_E, doc.y, { tam: 10.5, bold: true, cor: COR.navy });
-
-    if (op.validaAte) {
-      doc.y -= 18;
-      doc.texto('Proposta válida até ' + ddmmaaaaL(op.validaAte), MARG_E, doc.y,
-        { tam: 9, cor: COR.muted });
-    }
 
     return doc.finalizar();
   }

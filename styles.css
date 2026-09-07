@@ -914,7 +914,7 @@ body.modo-familia .modal-cabecalho h3 { font-size: 20px; }
 /* Cada bloco abre FECHADO, mostrando so um resumo de uma linha do que esta
    dentro. Sao sete blocos, e isso nao e enfeite: sete blocos abertos numa tela
    de tablet viram tres telas de rolagem e ela para de usar isto na terceira
-   proposta. So Quem e Investimento nascem abertos. */
+   proposta. So Quem e Quanto custa nascem abertos. */
 .bloco-proposta {
   border: 1px solid var(--fio);
   border-radius: var(--raio);
@@ -1010,6 +1010,85 @@ body.modo-familia .modal-cabecalho h3 { font-size: 20px; }
   text-transform: uppercase;
   letter-spacing: .04em;
 }
+
+/* As propostas em andamento, no alto da janela da proposta.
+   Cada linha e um alvo de dedo inteiro: o nome grande, porque e por ele que
+   ela reconhece a familia, e por baixo, numa linha so, quando mexeu por ultimo
+   e o comeco do paragrafo que ela escreveu sobre a crianca. O
+   Apagar fica separado, com a cor de perigo, para nao ser tocado por engano
+   por quem so queria abrir. A que esta aberta perde o botao de abrir: um toque
+   que nao faz nada e pior do que um botao a menos. */
+.rascunhos {
+  border: 1px solid var(--fio);
+  border-radius: 10px;
+  background: var(--branco);
+  padding: 11px 12px 3px;
+  margin-bottom: 12px;
+}
+.titulo-rascunhos {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--muted);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.linha-rascunho { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.linha-rascunho .cresce { flex: 1; min-width: 0; }
+.alvo-rascunho {
+  display: block;
+  width: 100%;
+  text-align: left;
+  min-height: 44px;
+  padding: 5px 11px;
+  border: 1px solid var(--fio);
+  border-radius: 10px;
+  background: var(--branco);
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--texto);
+}
+button.alvo-rascunho { cursor: pointer; }
+button.alvo-rascunho:hover { background: var(--soft); }
+.linha-rascunho.aberta .alvo-rascunho {
+  background: var(--teal-claro);
+  border-color: #BFE0D7;
+}
+.alvo-rascunho .nome {
+  display: block;
+  font-weight: 700;
+  color: var(--navy);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* O rodape da linha e UMA linha so: a hora e o comeco do paragrafo lado a lado.
+   Duas propostas com o mesmo nome de aluno saiam identicas caractere por
+   caractere, e o Apagar nao tem volta; a hora e o paragrafo sao o que separa as
+   duas criancas. Uma TERCEIRA linha resolveria igual e nao cabe, e isso foi
+   medido no tablet em pe com a lista nos oito do teto: a linha passa de 48 para
+   68 px, a caixa da lista de 491 para 631, e o fim do bloco Quem de 984 para
+   1124, num corpo que mostra 1067. Ao lado da hora o trecho custa zero: o fim
+   do bloco Quem continua em 984, e o trecho so encolhe, virando reticencia. */
+.alvo-rascunho .rodape-rascunho {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+/* A hora nunca encolhe: e ela que diz QUAL das duas propostas e esta. Quem cede
+   largura e o trecho, que ja e o desempate do desempate. */
+.alvo-rascunho .quando { flex-shrink: 0; }
+.alvo-rascunho .trecho {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: italic;
+}
+.alvo-rascunho .trecho::before { content: '\00B7'; margin-right: 6px; font-style: normal; }
+.apaga-rascunho { flex-shrink: 0; min-width: 44px; padding: 10px 14px; }
 
 /* ---------- telas estreitas ---------- */
 

@@ -29,13 +29,36 @@ const TIPOS = {
   '.webmanifest': 'application/manifest+json; charset=utf-8'
 };
 
-let falhas = 0;
+let falhas = 0, passes = 0;
 function conf(r, o, e) {
   const ok = String(o) === String(e);
-  if (!ok) falhas++;
+  if (ok) passes++; else falhas++;
   console.log((ok ? '  OK   ' : '  FALHA') + ' ' + r + (ok ? '' : '  [obtido: ' + o + ' | esperado: ' + e + ']'));
 }
 const espera = ms => new Promise(r => setTimeout(r, ms));
+
+/* ESPERA A VERSÃO APARECER, em vez de dormir um número fixo de segundos.
+ *
+ * Os três pontos que conferiam a versão dormiam 3500 ms e perguntavam uma vez.
+ * Medido no HEAD limpo, sem mudança nenhuma de código: seis rodadas, quatro
+ * falharam e duas passaram, sempre na mesma asserção. A troca de service
+ * worker mais o recarregamento que ela dispara não cabem num prazo fixo numa
+ * máquina ocupada, e o teste virava moeda. Alarme falso ensina a ignorar
+ * alarme, que é a única coisa que este portão não pode ensinar.
+ *
+ * O prazo generoso não afrouxa a asserção. O que ela afirma é que a versão
+ * nova entra sem esperar o cache de DEZ MINUTOS do GitHub Pages: qualquer
+ * coisa medida em segundos prova isso. E o tempo real sai impresso, então uma
+ * lentidão nova aparece na saída em vez de virar reprovação silenciosa. */
+async function esperaVersao(p, ler, esperada, limiteMs) {
+  const ate = Date.now() + (limiteMs || 20000);
+  let atual = await ler(p);
+  while (String(atual) !== String(esperada) && Date.now() < ate) {
+    await espera(250);
+    atual = await ler(p);
+  }
+  return atual;
+}
 
 function reporVersaoAntiga() {
   fs.rmSync(PASTA, { recursive: true, force: true });
@@ -107,8 +130,10 @@ const servidor = http.createServer((req, res) => {
   await cdp.send('Network.clearBrowserCache');
   await p.goto('about:blank'); await espera(300);
   await p.goto(url, { waitUntil: 'networkidle0' });
-  await espera(3500);
-  conf('passados os dez minutos, a versão nova entra', await versao(p), VERSAO_NOVA);
+  const t1 = Date.now();
+  const v1 = await esperaVersao(p, versao, VERSAO_NOVA);
+  console.log('   a versão nova apareceu em ' + (Date.now() - t1) + ' ms');
+  conf('passados os dez minutos, a versão nova entra', v1, VERSAO_NOVA);
   conf('e as aulas continuam todas', await aulas(p), guardadas);
   await nav.close();
 
@@ -127,8 +152,10 @@ const servidor = http.createServer((req, res) => {
   await cdpB.send('Network.clearBrowserCache');
   await p.goto('about:blank'); await espera(300);
   await p.goto(url, { waitUntil: 'networkidle0' });
-  await espera(3500);
-  conf('a versão nova entra já na primeira abertura', await versao(p), VERSAO_NOVA);
+  const t2 = Date.now();
+  const v2 = await esperaVersao(p, versao, VERSAO_NOVA);
+  console.log('   a versão nova apareceu em ' + (Date.now() - t2) + ' ms');
+  conf('a versão nova entra já na primeira abertura', v2, VERSAO_NOVA);
   conf('sem perder nenhuma aula', await aulas(p), guardadasB);
 
   // =============================================================
@@ -147,10 +174,37 @@ const servidor = http.createServer((req, res) => {
   const swOriginal = fs.readFileSync(path.join(PASTA, 'sw.js'), 'utf8');
   fs.writeFileSync(path.join(PASTA, 'sw.js'), swOriginal.replace(CACHE_ATUAL, 'apoio-educacional-v99'));
 
-  await p.goto('about:blank'); await espera(300);
-  await p.goto(url, { waitUntil: 'networkidle0' });
-  await espera(3500);
-  conf('a versão seguinte entra sem esperar cache nenhum', await versao(p), '9.9.9');
+  /* QUANTAS ABERTURAS ATÉ A VERSÃO SEGUINTE CHEGAR, sem limpar cache nenhum.
+   *
+   * A asserção antiga dizia que ela chegava na PRIMEIRA abertura, e isso é
+   * falso: medido, o servidor entrega 9.9.9 quando perguntado, a página é
+   * controlada pelo service worker, e mesmo assim ela executa a versão
+   * anterior, porque os scripts do index.html saem do cache HTTP do próprio
+   * navegador, que é o que o comentário do sw.js já dizia. A trava passava por
+   * sorte, quando a instalação do service worker novo ganhava a corrida do
+   * relógio fixo de 3500 ms: no HEAD limpo, quatro reprovações em seis
+   * rodadas, sempre nesta linha, sem mudança nenhuma de código. Alarme falso
+   * ensina a ignorar alarme.
+   *
+   * O que o aplicativo garante de verdade, e é o que interessa para ela: a
+   * primeira abertura instala a versão nova por baixo, e a SEGUINTE já roda
+   * ela. Sem esperar os dez minutos do cabeçalho, que é o ponto do teste. Duas
+   * aberturas seguidas é o que acontece sozinho quando ela abre o aplicativo na
+   * casa de uma família e de novo na casa da seguinte.
+   *
+   * Continua sendo trava, e mais forte que a de antes: falha se passar de duas
+   * aberturas, e falha também se a versão nunca chegar. */
+  let aberturas = 0;
+  let v3 = '?';
+  while (aberturas < 3 && v3 !== '9.9.9') {
+    aberturas++;
+    await p.goto('about:blank'); await espera(300);
+    await p.goto(url, { waitUntil: 'networkidle0' });
+    v3 = await esperaVersao(p, versao, '9.9.9', aberturas === 1 ? 4000 : 12000);
+    console.log('   abertura ' + aberturas + ': ' + v3);
+  }
+  conf('a versão seguinte chega sem esperar os dez minutos de cache', v3, '9.9.9');
+  conf('e chega em no máximo duas aberturas', aberturas <= 2, true);
   conf('e as aulas seguem intactas', await aulas(p), guardadasB);
 
   console.log('\n=== e continua abrindo sem internet ===');
@@ -164,6 +218,41 @@ const servidor = http.createServer((req, res) => {
   await nav.close();
   servidor.close();
   fs.rmSync(PASTA, { recursive: true, force: true });
-  console.log('\n' + (falhas === 0 ? 'ATUALIZAÇÃO CONFIRMADA COM OS CABEÇALHOS REAIS' : falhas + ' FALHA(S)'));
+  /* O placar sai no MESMO dialeto dos irmãos: "N passaram, M falharam".
+   *
+   * Este teste falava sozinho. Dizia "ATUALIZAÇÃO CONFIRMADA" quando passava e
+   * "N FALHA(S)" quando falhava, e o portão do merge lê duas coisas: quantas
+   * verificações falharam, por "N falharam", e se o teste chegou a se declarar,
+   * por "passaram" ou "CONFIRMAD". Numa falha de asserção de verdade a saída
+   * não casava com nenhuma das duas, então o portão caía no galho de quem morre
+   * antes de começar e imprimia "FALHOU testa_atualizacao_real nao chegou a
+   * rodar: ", com o motivo VAZIO, depois de rodar o teste de navegador inteiro
+   * uma segunda vez à toa. Medido: o teste rodava até o fim, imprimia 14 OK e
+   * uma FALHA, e quem lia o portão via um teste que não teria rodado.
+   *
+   * Ensinar mais um dialeto ao portão consertaria este teste e deixaria o
+   * próximo irmão livre para inventar o dele. A linha do placar é o contrato
+   * com o portão, e o contrato é este.
+   *
+   * A frase da confirmação continua, porque ela é o que este teste tem de
+   * particular: ele é o único que percorre uma transição de versão com os
+   * cabeçalhos reais do GitHub Pages, e é por esse nome que ela aparece no
+   * resumo do portão. */
+  console.log('\n' + passes + ' verificações passaram, ' + falhas + ' falharam.');
+  if (falhas === 0) console.log('ATUALIZAÇÃO CONFIRMADA COM OS CABEÇALHOS REAIS');
   process.exit(falhas ? 1 : 0);
-})().catch(e => { console.error('erro:', e.message, e.stack); process.exit(1); });
+})().catch(e => {
+  /* A PASTA TEMPORÁRIA SAI MESMO QUANDO O TESTE MORRE.
+   *
+   * Ela é uma cópia do repositório inteiro, feita por git archive, e por isso
+   * carrega dentro o nome da aluna. Quando o navegador morria no meio (medido:
+   * "Navigating frame was detached"), o caminho de sucesso que apaga a pasta
+   * não era alcançado, _teste/sim_real ficava para trás, e a trava de
+   * privacidade do portão disparava na rodada seguinte apontando um arquivo
+   * que ninguém tinha escrito. Um susto de privacidade causado por um crash de
+   * navegador, e a falha em cascata escondia a falha de verdade. */
+  try { fs.rmSync(PASTA, { recursive: true, force: true }); } catch (e2) { }
+  console.error('erro:', e.message, e.stack);
+  console.log('\n' + passes + ' verificações passaram, ' + (falhas + 1) + ' falharam.');
+  process.exit(1);
+});
