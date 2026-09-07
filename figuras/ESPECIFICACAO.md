@@ -412,14 +412,23 @@ responder no gabarito.
   camada de gabarito a letra vira o valor medido na figura, em teal e no corpo de resposta, e
   so quando a forma foi DEDUZIDA dos dados. **Uma marca por ocorrencia.**
   Ex.: `@fig retas id=r3 reta=r reta=s paralelas=r;s transversal=t angulo=110;3 incognita=x;6`.
+  Cuidado com a letra: `incognita=x` E a expressao x, entao `angulo=3x+10;1 incognita=x;3` diz
+  3x + 10 = x, que fecha em x = -5 e e recusado.
 - `congruentes=P;Q[;R...]`: grupo de posicoes que recebem o mesmo numero de arcos, repetivel
-  (a segunda ocorrencia ganha dois arcos, a terceira tres). Vale sobre posicao SEM valor
-  escrito: onde ja ha numero, o numero ja disse que os dois sao iguais, e o arco a mais fecha
-  um no em volta do cruzamento. **Uma marca por grupo que acrescenta arco; nenhuma sobre
-  posicao que ja carrega valor.** Ex.: `@fig retas reta=r reta=s congruentes=1;3 congruentes=2;4`.
+  (a segunda ocorrencia ganha dois arcos, a terceira tres). O numero de voltas vale para TODOS
+  os membros do grupo, com valor escrito ou sem: aplicado so a quem nao tem valor, o segundo
+  grupo saia com dois arcos num membro e um no outro, e pela convencao do livro marcas
+  diferentes significam medidas diferentes, ou seja a figura afirmava que os dois membros do
+  grupo sao diferentes. Duas recusas: **paridade misturada** (uma posicao impar com uma par
+  sao SUPLEMENTARES e nao congruentes, e marcadas igual a figura contradiz o proprio
+  paralelismo que a setinha declara) e **grupo em que todos os membros ja carregam valor** (os
+  numeros ja disseram quais sao iguais, e o que o grupo acrescenta e arco: num cruzamento com
+  os quatro angulos rotulados os arcos a mais fecham um no em volta do ponto). **Uma marca por
+  grupo.** Ex.: `@fig retas reta=r reta=s congruentes=1;3 congruentes=2;4`.
 - `oposto=sim`: acucar para o grupo de congruencia dos dois opostos pelo vertice do primeiro
-  angulo marcado, para o tema nao precisar calcular o numero da posicao oposta. **Conta como o
-  grupo que ele cria.** Ex.: `@fig retas reta=r reta=s angulo=3x+10;1 incognita=x;3 oposto=sim`.
+  angulo marcado, para o tema nao precisar calcular o numero da posicao oposta. Opostos tem
+  sempre a mesma paridade, entao ele nunca cai na recusa de paridade. **Conta como o grupo que
+  ele cria.** Ex.: `@fig retas reta=r reta=s congruentes=1;3` num cruzamento sem valor escrito.
 - `reto=sim`: o cruzamento e perpendicular e leva o quadradinho, um por cruzamento e nunca
   quatro. Nao convive com `angulo=` nem com `incognita=` (o valor nao chegaria na folha) nem
   com `ponto=`. **Uma marca.** Ex.: `@fig retas reta=r reta=s reto=sim nomeiaretas=sim`.
@@ -445,6 +454,16 @@ responder no gabarito.
 - `giro=G`: gira a configuracao inteira, para o exercicio nao repetir a posicao prototipica da
   explicacao. **Nenhuma marca.** Ex.: `@fig retas ... angulo=118;1 giro=20`.
 
+**A escala nao e automatica nesta receita, e nao precisa ser.** No modo cruzamento a figura e
+sempre exata por construcao: o primeiro valor numerico fixa a inclinacao, o sistema das
+expressoes a fixa quando nao ha numero, e a conferencia ja recusou tudo que nao fecha com o
+desenho. Nao sobra caso em que um rotulo diga um numero e o arco varra outro, que e a unica
+coisa que "fora de escala" pode significar aqui. O automatico do `escalaFora`, que liga a marca
+so por haver letra junto de numero, e falso neste contexto: `angulo=35;1 angulo=x+30;2` saia
+exigindo legenda com o desenho exato (x = 115), que e a escala que mente ao contrario.
+`escala=fora` escrito a mao continua mandando. No feixe a escala e decidida pela razao entre as
+duas transversais, acima.
+
 **Reta atravessa a moldura inteira**, cortada nos quatro lados do quadro, e nunca para nos
 pontos que a determinam: reta que para vira segmento e ensina que a solucao so pode estar
 entre eles. E ela sai **sem ponta de seta nas extremidades**, ao contrario da convencao geral
@@ -465,10 +484,17 @@ valor caber dentro dela sem fio de chamada.
 - transversal declarada com a inclinacao do grupo (nao corta, nao nasce angulo). Campo minimo:
   nenhum; a trava olha o angulo ja resolvido, e o padrao de 55 graus nunca produz uma
   transversal paralela.
-- dois valores que nao cabem na mesma figura. Campo minimo: **UM** valor numerico, e nao dois:
-  um valor ja fixa a figura inteira e os outros sete angulos sao deducao, entao cada valor a
-  mais e conferido contra a configuracao que o primeiro determinou. Sem posicao escrita a
-  conferencia continua rodando, porque as posicoes livres sao preenchidas na volta.
+- valor que nao cabe na figura. Campo minimo: **nenhum**. A conferencia roda com a inclinacao
+  JA RESOLVIDA, venha ela de um numero, do sistema das expressoes, da inclinacao declarada, do
+  `reto=sim` ou do padrao, e ela olha TODA entrada: numero e conferido contra o valor da
+  posicao, e expressao e conferida por letra, porque cada letra e uma incognita propria. Rodava
+  so sobre numeros, e ai `angulo=110;3 angulo=2x+30;5 angulo=x+10;1` passava limpa pedindo
+  x = 40 e x = 100 ao mesmo tempo. Sem posicao escrita ela continua rodando, porque as posicoes
+  livres sao preenchidas na volta.
+- sistema de expressoes que fecha FORA do intervalo de um angulo de cruzamento. Caia calado no
+  padrao de 55 graus, e ai a figura era chute com aparencia de deducao.
+- reta declarada que nao tem papel na figura, e inclinacao escrita na segunda reta de um grupo
+  de paralelas: as duas sao valor escrito que nao chega na folha.
 - cruzamento que da 90 graus sem `reto=sim`, e `reto=sim` com valor escrito.
 - `paralelas=` citando reta que ninguem declarou, e `paralelas=` com uma reta so; e chave de
   angulo num grupo de paralelas SEM transversal, onde nao nasce angulo nenhum.
@@ -478,9 +504,18 @@ valor caber dentro dela sem fio de chamada.
   dois na outra a razao e conferida, com um numero e uma letra a letra e deduzida, e sem
   numero em transversal nenhuma os vaos saem iguais e a receita AVISA, porque vao igual e uma
   afirmacao (a de que os segmentos sao congruentes) e nao a ausencia de uma.
+- a ESCALA ENTRE as duas transversais do feixe. Tales garante a razao DENTRO de cada uma; entre
+  elas o segmento recortado do mesmo vao vale `g/sen(inclinacao)`, entao inclinacoes diferentes
+  recortam comprimentos diferentes, e com "6 e 10" nas duas o 6 de uma saia com o dobro do 6 da
+  outra. Campo minimo: um indice em que as DUAS tragam numero. Havendo, ou a receita ESCOLHE a
+  inclinacao da segunda para cumprir a razao (quando o autor nao a escreveu), ou marca a figura
+  fora de escala, que passa a exigir a legenda (quando ele a escreveu). O que ela nao faz e
+  deixar as duas coisas se contradizerem caladas.
 - `ponto=` num cruzamento sem angulo marcado. A trava equivalente do `conferirFigura` nao
   alcanca esta receita, porque la o laco pula todo traco de papel `contorno`, que e o papel das
-  retas daqui.
+  retas daqui. E `ponto=` dentro do feixe, onde nao ha angulo nenhum a pedir.
+- `nomeiaretas=` pedindo o nome de uma paralela que o `feixe=` nao nomeou. Palavra nenhuma nasce
+  no desenhador: o que a diretiva nao nomeou, a folha nao escreve.
 - figura acima do teto de cinco marcas, pelo `conferirFigura`.
 
 **O exercicio 8 do MAT08-11, os oito angulos, dentro do teto de cinco.** Sao duas figuras
