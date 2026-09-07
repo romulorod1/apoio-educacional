@@ -30,7 +30,14 @@
           'para baixo, e você tinha que rolar a tela para chegar neles. O título continua no ' +
           'mesmo lugar, com a quantidade de alunos ao lado e um botão Mostrar: toque nele para ' +
           'abrir a lista, e em Esconder para fechar de novo. O aplicativo lembra a sua escolha ' +
-          'e abre do mesmo jeito na próxima vez.'
+          'e abre do mesmo jeito na próxima vez.',
+        'No fechamento de um mês que ainda tem aulas marcadas, o total do mês inteiro agora ' +
+          'sai como total, logo abaixo da tabela das datas que ainda vão acontecer, tanto no ' +
+          'texto quanto no PDF. Antes esse número saía só numa nota pequena, que ainda começava ' +
+          'dizendo que aquelas datas não entravam no total, e isso atrapalhava na hora de mandar ' +
+          'o fechamento para uma família que paga adiantado: justamente o número que ela precisa ' +
+          'ver ficava escondido. O fechamento de um mês que já terminou continua exatamente como ' +
+          'sempre foi.'
       ]
     },
     {
@@ -9200,8 +9207,15 @@
    * cabeçalho, com o título, a contagem de alunos e o botão que abre. O cartão
    * com as linhas é o que aparece e some.
    *
-   * Mês sem aula nenhuma continua sem desenhar nada aqui, nem cabeçalho nem
-   * botão: o return acima acontece antes de qualquer coisa ir para a tela. */
+   * O painel só não sai quando NENHUM aluno tem aula no mês nem preço
+   * cadastrado. A lista do Core.panoramaDeValores é de alunos, e não de aulas:
+   * entra nela todo aluno com preço cadastrado, mesmo que ele não tenha tido
+   * aula neste mês. Então num mês sem aula nenhuma, com aluno precificado na
+   * ficha, o cabeçalho e o botão saem normalmente, e o cartão, quando ela abre,
+   * traz a linha daquele aluno com o mês zerado. Sem aula e sem preço a lista
+   * volta vazia, e aí o return de !pan.linhas.length acontece com a caixa já
+   * esvaziada: não entra nada nela, e some inclusive o painel que tivesse
+   * ficado do mês anterior. */
   function desenharPanoramaDeValores() {
     var tela = $('#tela-fechamento');
     if (!tela) return;

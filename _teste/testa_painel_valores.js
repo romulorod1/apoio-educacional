@@ -329,11 +329,19 @@ async function abrirFechamento(pag) {
   pag.on('pageerror', e => errosDePagina.push(e.message));
   pag.on('dialog', async d => { try { await d.accept(); } catch (e) { /* ok */ } });
 
-  /* A busca do índice do IBGE é cortada aqui dentro. Ela sai do aplicativo de
-   * verdade quando a tela do Fechamento abre, e esta trava é sobre recolher
-   * painel, não sobre a rede do IBGE: deixar a busca real acontecer amarraria
-   * a rodada ao sinal desta máquina e ao servidor de terceiro. O contador
-   * existe só para a saída dizer quantas vezes o aplicativo tentou. */
+  /* A busca do índice do IBGE é cortada aqui dentro, e o contador é CONFERIDO
+   * mais abaixo, não só impresso.
+   *
+   * Com o painel recolhido, abrir a aba do Fechamento não agenda busca nenhuma.
+   * Quem agenda é o toque em Mostrar e, quando o painel já nasce aberto pela
+   * escolha dela, o desenho do painel e a própria abertura da aba. Este arquivo
+   * ficava com o contador impresso no fim e nunca comparado com nada, e
+   * imprimir não reprova: uma regressão que repusesse o agendamento
+   * incondicional na aba passava no portão inteiro com o número à vista.
+   *
+   * Deixar a busca real acontecer amarraria a rodada ao sinal desta máquina e a
+   * um servidor de terceiro, então o fetch do IBGE é recusado aqui e o que fica
+   * guardado é quantas vezes o aplicativo tentou. */
   await pag.evaluateOnNewDocument(() => {
     window.__tentativasIbge = 0;
     const original = window.fetch;
@@ -377,6 +385,31 @@ async function abrirFechamento(pag) {
     conf('e o botão diz que está recolhido', painel.expandido, 'false');
     conf('o cartão com as linhas dos alunos NÃO está visível',
       painel.cartaoVisivel ? 'visível' : 'recolhido', 'recolhido');
+  }
+
+  /* A economia de sinal, conferida e não só impressa. Ela dá aula na casa das
+   * famílias, no plano de dados do tablet, e o painel é o único lugar desta
+   * tela que usa o índice do IBGE. */
+  const lerTentativasIbge = () => pag.evaluate(() => window.__tentativasIbge || 0);
+  if (VENENO_ABERTO) {
+    /* Nascendo aberto, o painel manda buscar sozinho e a abertura da aba manda
+     * junto: aqui a PRIMEIRA leitura já tem que ser maior que zero. O veneno que
+     * já existia prova também a economia de sinal, sem veneno novo. */
+    const semPedir = await esperar('a busca do IBGE saindo sem ela ter tocado em nada',
+      lerTentativasIbge, v => v > 0, 15000);
+    console.log('   tentativas até aqui: ' + semPedir.valor);
+    conf('envenenado-aberto: o painel nasceu aberto e o tablet já gastou sinal com o IBGE (defeito detectado)',
+      semPedir.valor > 0 ? 'gastou' : 'não gastou (0 tentativas)', 'gastou');
+  } else {
+    /* A espera de 3 s é de propósito, e não é folga: com o painel aberto, quem
+     * agenda na abertura da aba agenda em 900 ms, e o clique em Mostrar agenda
+     * em 1200 ms. Ler o contador na hora daria zero mesmo com o agendamento
+     * incondicional de volta, e a trava não pegaria a regressão que ela existe
+     * para pegar. */
+    const antesDoToque = await esperar('esperando 3 s para ver se alguma busca do IBGE sai sozinha',
+      lerTentativasIbge, v => v > 0, 3000);
+    conf('com o painel recolhido, o tablet não vai ao IBGE antes de ela tocar em Mostrar',
+      antesDoToque.valor, 0);
   }
 
   // ================================================================
@@ -429,6 +462,17 @@ async function abrirFechamento(pag) {
   conf('com uma linha por aluno', painel.linhasDeAluno, 1);
   conf('e a linha do aluno traz o texto do painel',
     painel.textoDoCartao.indexOf('Só para você') === 0, true);
+
+  /* O outro lado da economia de sinal: recolhido não pode virar "nunca busca".
+   * Com o painel aberto o índice está na tela, e é aí que ele precisa ser
+   * atualizado. No modo envenenado-aberto esta prova não cabe: lá o toque da
+   * seção 2 fechou o painel em vez de abrir, e a busca já saiu antes. */
+  if (!VENENO_ABERTO) {
+    const depoisDoToque = await esperar('a busca do IBGE saindo depois de ela abrir o painel',
+      lerTentativasIbge, v => v > 0, 15000);
+    conf('abrir o painel é o que manda o aplicativo buscar o índice',
+      depoisDoToque.valor > 0 ? 'buscou' : 'não buscou (0 tentativas)', 'buscou');
+  }
 
   // ================================================================
   secao('4. Abrir e fechar não mexe na rolagem');

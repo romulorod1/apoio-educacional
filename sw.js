@@ -24,9 +24,11 @@
  * atualizar, e app.js, core.js e banco mudados juntos chegariam aos pedaços
  * pelo cache do navegador. O v20 (08/09/2026) é isso: o aplicativo passou a
  * ler a tabela de matérias, os treze JSON de tópicos ganharam identificadores,
- * e a lista não mudou um item. O v21 é do mesmo tipo: o painel "Cada aluno,
- * desde quando e por quanto" passou a nascer recolhido no Fechamento, mudança
- * de app.js e index.html, e a lista continua igual. */
+ * e a lista não mudou um item. O v21 é do mesmo tipo, e leva quatro arquivos
+ * mudados juntos: o painel "Cada aluno, desde quando e por quanto" passou a
+ * nascer recolhido no Fechamento (app.js e index.html) e o fechamento que vai
+ * para a família ganhou a linha do total do mês, no texto e no PDF (core.js e
+ * pdf.js). Os quatro já estão na lista abaixo, que continua igual. */
 var CACHE = 'apoio-educacional-v21';
 var BAIXADOS = 'apoio-educacional-baixados';
 

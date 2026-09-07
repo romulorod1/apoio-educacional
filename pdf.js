@@ -1017,17 +1017,19 @@
     linhaTabela(doc, {
       data: 'Total',
       dur: horasDaTabela + ' h',
-      /* Mesmo motivo escrito no core.js, em markdownFechamento: com datas à
-         frente esta linha é o PARCIAL, e o número parcial não pode ser
-         apresentado com a força de um total de mês enquanto existe um total
-         maior embaixo dele. No texto o rótulo dizia "Total a cobrar até 03/10"
-         em cima de R$ 0,00; aqui a linha dizia só "0 encontros até 03/10", sem
-         dizer o que aqueles encontros eram. Os dois documentos apontavam para
-         números diferentes com a mesma força. Agora sai "3 encontros dados até
-         15/09", com o mesmo "dados" do texto. Mês vencido sai "N encontros",
-         palavra por palavra como sempre saiu. */
-      situacao: encontrosDaTabela + ' encontro' + (encontrosDaTabela === 1 ? '' : 's') +
-        (previstas.length ? (encontrosDaTabela === 1 ? ' dado' : ' dados') + ate : ''),
+      /* Sem sufixo nenhum, como sempre foi: "3 encontros até 15/09" com datas à
+         frente, "1 encontro" no mês vencido. A linha diz quantos encontros a
+         tabela DE CIMA soma, e o ate diz até quando; nada além disso.
+
+         Uma versão intermediária escreveu " dados" aqui, para casar com um
+         "Total das aulas dadas" que o texto chegou a ter. Os dois saíram pelo
+         mesmo motivo, escrito por extenso no core.js, em markdownFechamento:
+         falta sem aviso é cobrável por padrão, entra no valor desta tabela e
+         conta como encontro, então chamar de "dados" os encontros desta linha
+         contradiz a tabela logo acima, onde a mesma falta aparece com o valor
+         cobrado na coluna Valor. O que motivou mexer aqui era a palavra
+         "cobrar", e ela nunca esteve neste campo. */
+      situacao: encontrosDaTabela + ' encontro' + (encontrosDaTabela === 1 ? '' : 's') + ate,
       /* Tabela sem uma linha sequer não tem "vários" preço nenhum: fica em
          branco. O mês inteiro vazio continua como sempre foi. */
       vh: precoDaTabela !== null ? fmtMoedaLocal(precoDaTabela)
@@ -1105,10 +1107,7 @@
          fique órfã é a reserva das três peças feita logo acima, antes da linha
          de Total, que traz a linha de Total junto quando a página vira. Uma
          reserva neste ponto era o próprio defeito, porque virava a página com a
-         faixa já separada da tabela. O teste do 'if (doc.y < Y_TOPO)' que
-         acompanhava essa reserva também saiu: ele só existia para o caso de a
-         virada acontecer aqui, e a partir da linha de Total a faixa nunca cai no
-         alto de uma folha limpa. */
+         faixa já separada da tabela. */
       doc.y -= 14;
       linhaTabela(doc, {
         rotulo: 'Total do mês, já contando as datas ainda marcadas: ' +
