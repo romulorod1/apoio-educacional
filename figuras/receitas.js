@@ -507,20 +507,68 @@
    * das letras de vertice (externo=C;115, diagonal=A;C;13;d) nao entra por aqui:
    * ela entra pelos extras, um a um, ja lida por quem sabe a gramatica dela.
    *
+   * A saida do meio tem uma condicao a mais, e ela nasceu de uma REGRESSAO que
+   * este arquivo introduziu e que quase saiu na folha. "So letra" nao basta:
+   * medido, "triangulo lado=x lado=2x lado=2x" desenhava 100, 97,92 e 101,96, ou
+   * seja o lado rotulado x saia do mesmo tamanho dos rotulados 2x, com escala
+   * fiel e sem legenda; idem "lado=a lado=a lado=b", "lado=a lado=a lado=a" e
+   * "retangulo base=a altura=a", que saia 116 por 70. Nesses casos o PROTOTIPO
+   * contradiz os proprios rotulos, e a figura passou a mentir exatamente onde
+   * antes ela avisava.
+   *
+   * A condicao e sobre COMPRIMENTO e nao sobre angulo, e a diferenca e de fundo:
+   * o angulo escrito em letra e RESOLVIDO (o resolverTriangulo e o
+   * resolverQuadrilatero fecham o sistema e a construcao usa o valor achado),
+   * enquanto o comprimento em letra nao e resolvido por ninguem e sai do
+   * prototipo. Entao letra em angulo continua fiel como estava, e letra em
+   * comprimento so e fiel quando os simbolos sao DISTINTOS e SEM coeficiente:
+   * "base=b altura=h" e "lado=a lado=b lado=c" nao afirmam proporcao nenhuma e
+   * qualquer desenho os satisfaz; "lado=a lado=a" afirma que dois lados sao
+   * iguais, e ai o desenho tem que cumprir.
+   *
+   * A receita que SABE cumprir passa honrado=true e a figura volta a ser fiel: o
+   * triangulo constroi o isosceles do "lado=a lado=a lado=b" e a proporcao 1 para
+   * 2 do "lado=x lado=2x lado=2x", e ali o desenho deixa de ser chute.
+   *
    * escala=fiel e escala=fora escritos na diretiva continuam mandando por cima. */
-  function escalaFora(B, d, chavesMetricas, extras) {
+  function escalaFora(B, d, op) {
     if (d.escala === 'fora') return true;
     if (d.escala === 'fiel') return false;
-    var vistos = valoresMetricos(B, d, chavesMetricas);
-    for (var i = 0; i < (extras || []).length; i++) {
-      var v = extras[i];
-      if (v !== null && v !== undefined && v !== '') vistos.push(String(v));
-    }
-    var temNumero = false, temLetra = false;
-    for (var k = 0; k < vistos.length; k++) {
+    op = op || {};
+    var vistos = valoresMetricos(B, d, op.metricas).concat(limparValores(op.extras));
+    var temNumero = false, temLetra = false, k;
+    for (k = 0; k < vistos.length; k++) {
       if (B.ehNumero(vistos[k])) temNumero = true; else temLetra = true;
     }
-    return temLetra && temNumero;
+    if (!temLetra) return false;
+    if (temNumero) return true;
+    if (op.honrado) return false;
+    var comps = valoresMetricos(B, d, op.comprimentos).concat(limparValores(op.extrasComprimento));
+    return !simbolosDistintos(B, comps);
+  }
+
+  function limparValores(lista) {
+    var saida = [];
+    for (var i = 0; i < (lista || []).length; i++) {
+      var v = lista[i];
+      if (v !== null && v !== undefined && v !== '') saida.push(String(v));
+    }
+    return saida;
+  }
+
+  /* Todo comprimento em letra e um simbolo simples, e nenhum se repete. Simbolo
+   * simples e so letra: "2x", "a+1" e "3L" trazem coeficiente ou conta, e ai o
+   * rotulo afirma uma proporcao que o prototipo nao tem como cumprir por acaso. */
+  function simbolosDistintos(B, comps) {
+    var vistos = {};
+    for (var i = 0; i < comps.length; i++) {
+      var v = String(comps[i]).trim();
+      if (B.ehNumero(v)) continue;
+      if (!/^[A-Za-z]+$/.test(v)) return false;
+      if (vistos[v]) return false;
+      vistos[v] = 1;
+    }
+    return true;
   }
 
   /* O valor de construcao de cada ocorrencia de cada chave metrica: o primeiro
@@ -1070,10 +1118,17 @@
    * numero que a diretiva deu, para a figura nao sair achatada quando o unico
    * numero e a altura. Devolve null quando nao ha numero nenhum, e ali fica o
    * prototipo de sempre, que e exato por construcao. */
-  function dimensoesBaseAltura(proto, bases, alturas) {
+  function dimensoesBaseAltura(proto, bases, alturas, deduzidas) {
     var b0 = bases.length > 0 ? bases[0].valor : null;
     var b1 = bases.length > 1 ? bases[1].valor : null;
     var h = alturas.length ? alturas[0].valor : null;
+    /* O que Pitagoras deduziu entra onde a diretiva deixou letra ou silencio, e
+     * nunca por cima de um numero escrito: numero escrito que a construcao ignora
+     * e o defeito que este arquivo inteiro existe para impedir. */
+    if (deduzidas) {
+      if (b0 === null) b0 = deduzidas.base;
+      if (h === null) h = deduzidas.altura;
+    }
     if (b0 === null && b1 === null && h === null) return null;
     var k = b0 !== null ? b0 / proto.base
       : (h !== null ? h / proto.altura : b1 / proto.base2);
@@ -1085,15 +1140,90 @@
     };
   }
 
-  function trianguloPorBaseAltura(dim) {
-    return [pt(0, 0), pt(dim.base, 0), pt(APICE_BH * dim.base, dim.altura)];
+  /* O apice fica em 0,38 da base quando nada o amarra (ver o APICE_BH), e no x
+   * que o angulo escrito manda quando ha um. */
+  function trianguloPorBaseAltura(dim, apiceX) {
+    var x = (apiceX === null || apiceX === undefined || !isFinite(apiceX))
+      ? APICE_BH * dim.base : apiceX;
+    return [pt(0, 0), pt(dim.base, 0), pt(x, dim.altura)];
+  }
+
+  /* Os comprimentos que os SIMBOLOS dos tres lados pedem, quando nenhum deles e
+   * numero. Devolve a lista de tres comprimentos proporcionais, ou null quando
+   * nao ha nada a honrar e fica o prototipo de sempre.
+   *
+   * Duas leituras, nesta ordem:
+   *
+   *   coeficiente   os tres sao multiplos da MESMA letra, sem termo constante
+   *                 (x, 2x, 2x): os coeficientes sao a proporcao, e a figura sai
+   *                 com um lado da metade dos outros dois, que e o que a diretiva
+   *                 esta dizendo.
+   *   repeticao     simbolos iguais pedem lados iguais (a, a, b): o par ganha o
+   *                 lado maior e o avulso sai visivelmente menor, para o
+   *                 isosceles se ler como isosceles.
+   *
+   * Sem isso o prototipo saia com os tres lados quase iguais e os rotulos x, 2x e
+   * 2x por cima, ou seja a figura contradizia o proprio rotulo. */
+  /* Se a construcao do triangulo vai HONRAR os simbolos dos tres lados. Sai da
+   * diretiva sozinha, sem construir nada, porque o medir() precisa da mesma
+   * resposta antes de existir figura. Repete a leitura de base= do desenhar por
+   * um motivo so: aqui nao ha doc, e um aviso emitido duas vezes conta dois. */
+  function honraOsLados(B, d) {
+    var brutos = B.lista(d.args, 'lado').slice(0, 3);
+    var base0 = B.valores(d.args, 'base');
+    if (base0.length === 1) brutos[2] = String(base0[0]).split(';')[0].trim();
+    if (brutos.length < 3) return false;
+    return comprimentosPorSimbolo(B, brutos) !== null;
+  }
+
+  function comprimentosPorSimbolo(B, brutos) {
+    var i, s = [];
+    for (i = 0; i < 3; i++) {
+      var v = brutos[i];
+      if (v === null || v === undefined || String(v) === '' || B.ehNumero(v)) return null;
+      s.push(String(v).trim());
+    }
+    var lins = [], letra = null, coefOk = true;
+    for (i = 0; i < 3; i++) {
+      var lin = lerLinear(s[i]);
+      if (!lin || !lin.letra || Math.abs(lin.b) > 1e-9 || !(lin.a > 0)) { coefOk = false; break; }
+      if (letra === null) letra = lin.letra;
+      else if (letra !== lin.letra) { coefOk = false; break; }
+      lins.push(lin);
+    }
+    var comps = null;
+    if (coefOk && lins.length === 3) {
+      comps = [lins[0].a, lins[1].a, lins[2].a];
+    } else {
+      var iguais = (s[0] === s[1]) + (s[1] === s[2]) + (s[0] === s[2]);
+      if (!iguais) return null;                       // tres simbolos distintos: nada a honrar
+      if (s[0] === s[1] && s[1] === s[2]) comps = [100, 100, 100];
+      else if (s[0] === s[1]) comps = [100, 100, 76];
+      else if (s[1] === s[2]) comps = [76, 100, 100];
+      else comps = [100, 76, 100];
+    }
+    /* Simbolos que nao fecham triangulo (x, x, 5x) nao viram o caso didatico do
+     * vao: ali o vao mostraria uma sobra em unidades que a diretiva nao deu.
+     * Volta o null, o prototipo desenha o formato e a marca de fora de escala
+     * continua ligada, que e o que a regra de escala ja resolve. */
+    var geo = base().geo;
+    return geo.trianguloPorLados(comps[0], comps[1], comps[2]) ? comps : null;
   }
 
   /* A volta continua sendo A, B, C, D no anti-horario com AB na base, porque e
    * ela que a tabela NOTACAO usa para saber quais lados sao paralelos e quais
    * levam tracinho. Construir aqui em outra ordem apagaria a notacao da classe. */
-  function quadrilateroPorBaseAltura(B, doc, tipo, dim, bases, alturas) {
+  function quadrilateroPorBaseAltura(B, doc, tipo, dim, bases, alturas, ang) {
     var b = dim.base, h = dim.altura, topo = dim.base2;
+    /* O angulo escrito e a base e a altura NAO se contradizem: no paralelogramo,
+     * no losango e no trapezio o angulo fixa a INCLINACAO das pernas e deixa a
+     * razao dos lados livre, entao a base e a altura entram medindo o que ele
+     * deixou em aberto. Medido antes deste conserto, "paralelogramo angulo=120
+     * base=10 altura=6" era recusado como contradicao com a razao 5,1, e 5,1 era
+     * a razao do PROTOTIPO e nao uma deducao: o paralelogramo de 120 graus com
+     * base 10 e altura 6 existe, a perna mede 6,93, e ele e o enunciado padrao de
+     * area com angulo. */
+    var cot = ang === null || ang === undefined ? null : 1 / Math.tan(ang * Math.PI / 180);
     if (tipo === 'retangulo') return [pt(0, 0), pt(b, 0), pt(b, h), pt(0, h)];
     if (tipo === 'quadrado') {
       /* No quadrado base e altura sao o MESMO lado, entao dois numeros diferentes
@@ -1111,7 +1241,13 @@
     if (tipo === 'losango') {
       /* No losango a base e o LADO, e a altura e a distancia entre os dois lados
        * paralelos: ela nunca passa do lado, porque o lado e a hipotenusa do
-       * triangulo que a altura forma com o recuo. */
+       * triangulo que a altura forma com o recuo. Com o angulo escrito, a altura
+       * sai dele (h igual a lado vezes o seno) e o que o autor tenha escrito em
+       * altura= e conferido depois. */
+      if (cot !== null) {
+        h = b * Math.sin(ang * Math.PI / 180);
+        return [pt(0, 0), pt(b, 0), pt(b + h * cot, h), pt(h * cot, h)];
+      }
       if (h > b + 1e-9) {
         B.avisar(doc, 'quadrilatero: a altura ' + arredondar(h) + ' nao cabe num losango de lado ' +
           arredondar(b) + ': a altura e um cateto e o lado e a hipotenusa');
@@ -1121,11 +1257,26 @@
       return [pt(0, 0), pt(b, 0), pt(b + r, h), pt(r, h)];
     }
     if (tipo === 'paralelogramo') {
-      var rp = h / Math.tan(62 * Math.PI / 180);
+      var rp = h * (cot !== null ? cot : 1 / Math.tan(62 * Math.PI / 180));
       return [pt(0, 0), pt(b, 0), pt(b + rp, h), pt(rp, h)];
     }
     if (tipo === 'trapezio' || tipo === 'trapezioisosceles') {
-      var t = topo === null ? 0.55 * b : topo;
+      /* Com o angulo escrito, o recuo da perna ESQUERDA sai dele. No isosceles as
+       * duas pernas recuam igual, entao a base menor fica determinada e nao
+       * precisa ser escrita; no escaleno a perna direita continua livre e sai da
+       * base menor ou da proporcao do prototipo. */
+      var x1, t;
+      if (cot !== null && tipo === 'trapezioisosceles') {
+        x1 = h * cot;
+        t = b - 2 * x1;
+        if (!(t > 0)) {
+          B.avisar(doc, 'quadrilatero: o angulo ' + arredondar(ang) + ' com base ' + arredondar(b) +
+            ' e altura ' + arredondar(h) + ' fecha o trapezio isosceles antes da base menor');
+          return null;
+        }
+        return [pt(0, 0), pt(b, 0), pt(x1 + t, h), pt(x1, h)];
+      }
+      t = topo === null ? 0.55 * b : topo;
       if (!(t < b)) {
         B.avisar(doc, 'quadrilatero: as bases ' + arredondar(b) + ' e ' + arredondar(t) +
           ' nao formam trapezio, a segunda tem que ser menor');
@@ -1134,7 +1285,14 @@
       /* O trapezio generico e ESCALENO de proposito, pelo mesmo motivo escrito no
        * PROTOTIPOS: desenhado simetrico ele contradiz a definicao ao lado e a
        * aluna guarda a simetria como parte dela. */
-      var x1 = tipo === 'trapezioisosceles' ? (b - t) / 2 : 0.30 * (b - t);
+      x1 = cot !== null ? h * cot
+        : (tipo === 'trapezioisosceles' ? (b - t) / 2 : 0.30 * (b - t));
+      if (!(x1 + t < b + 1e-9)) {
+        B.avisar(doc, 'quadrilatero: o angulo ' + arredondar(ang) + ' recua a perna esquerda ' +
+          arredondar(x1) + ', e com a base menor ' + arredondar(t) + ' a figura passa da base maior ' +
+          arredondar(b));
+        return null;
+      }
       return [pt(0, 0), pt(b, 0), pt(x1 + t, h), pt(x1, h)];
     }
     return null;
@@ -1183,16 +1341,34 @@
       fechado: false, espessura: 0.6, cor: COR.texto,
       tracejado: D.GUIA_LEITURA, papel: 'guia altura'
     });
-    /* O segundo lado do quadradinho aponta para DENTRO do lado, e nao para uma
-     * das pontas fixas: no pe externo do obtusangulo a ponta mais perto esta do
-     * lado errado e o quadradinho sairia encavalado no prolongamento. */
+    /* Para que lado do pe o quadradinho abre. Ele abria sempre para a metade mais
+     * LONGA do lado, e essa metade e justamente a que passa pelo PONTO MEDIO, que
+     * e onde moram o tracinho de congruencia e a seta de paralelismo. Medido na
+     * folha do losango de lado 6 e altura 5, recorte a 500 dpi: o tracinho no
+     * ponto medio de AB e o quadradinho de 14 pt no pe ficavam a 0,32 unidade um
+     * do outro e liam como um simbolo so, e o conferirFigura nao ve marca sobre
+     * marca.
+     *
+     * A regra passa a ser a contraria: o quadradinho abre para a metade CURTA,
+     * que e a que se AFASTA do ponto medio. Quando nao ha espaco desse lado (pe
+     * quase em cima de um vertice), ele volta para o lado longo e o proprio
+     * quadradinho encolhe para parar antes da marca do meio. */
     if (M) {
       var A = ctx.p(G.A), Bp = ctx.p(G.B);
-      var alvo = G.t < 0.5 ? Bp : A;
-      var u = versor(alvo.x - pe.x, alvo.y - pe.y);
+      var dA = Bs.geo.distancia(pe, A), dB = Bs.geo.distancia(pe, Bp);
       var passo = Math.min(14, Math.max(6, 0.35 * Bs.geo.distancia(V, pe)));
-      M.marcaAnguloReto(ctx.doc, pe, V, { x: pe.x + u.x * passo, y: pe.y + u.y * passo },
-        { ctx: ctx, cor: corGab || undefined });
+      var perto = dA <= dB ? A : Bp, longe = dA <= dB ? Bp : A;
+      var alvo = Math.min(dA, dB) >= passo + 2 ? perto : longe;
+      var u = versor(alvo.x - pe.x, alvo.y - pe.y);
+      var op = { ctx: ctx, cor: corGab || undefined };
+      if (G.marcaNoMeio) {
+        /* Quanto anda ate a marca do meio, na direcao escolhida. Negativo quer
+         * dizer que ela ficou para tras e nao ha o que evitar. */
+        var meio = { x: (A.x + Bp.x) / 2, y: (A.y + Bp.y) / 2 };
+        var ate = (meio.x - pe.x) * u.x + (meio.y - pe.y) * u.y;
+        if (ate > 0) op.lado = Math.max(3, Math.min(7, ate - 4));
+      }
+      M.marcaAnguloReto(ctx.doc, pe, V, { x: pe.x + u.x * passo, y: pe.y + u.y * passo }, op);
     }
     return { V: V, pe: pe };
   }
@@ -1247,19 +1423,69 @@
     return false;
   }
 
-  /* O que a diretiva ESCREVE contra o que a construcao PRODUZIU, na mesma moeda
-   * do conferirRotulos: proporcao, porque o enquadramento decide o tamanho na
-   * folha. Vale quando a forma veio dos ANGULOS e a base e a altura chegaram as
-   * duas com numero: ali os dois dados sao redundantes, e ou concordam ou um
-   * deles esta errado. */
-  function conferirBaseAltura(bases, alturas, baseDesenho, alturaDesenho) {
-    if (!bases.length || !alturas.length) return null;
-    var b = bases[0].valor, h = alturas[0].valor;
-    if (b === null || h === null || !(baseDesenho > 1e-9)) return null;
-    var esperado = baseDesenho / b * h;
-    if (Math.abs(alturaDesenho - esperado) <= 0.01 * Math.max(alturaDesenho, esperado)) return null;
-    return 'a base ' + b + ' e a altura ' + h + ' nao saem nessa proporcao no desenho (para a base ' +
-      b + ' a altura desenhada vale ' + arredondar(alturaDesenho / baseDesenho * b) + ')';
+  /* ------------------------------------------------------------ a escala do problema
+   *
+   * Quantas unidades do PROBLEMA vale uma unidade da CONSTRUCAO. Sai da primeira
+   * medida de comprimento numerica que a diretiva escreveu, na ordem dos lados e
+   * depois da altura, e e ela que permite conferir TODA outra medida numerica
+   * contra o desenho: fixada a escala por um comprimento, os outros deixam de ser
+   * livres.
+   *
+   * Ela nasceu de um buraco medido, e o buraco era largo. A conferencia anterior
+   * so rodava quando base= E altura= chegavam as duas com numero, e bastava
+   * OMITIR uma delas para o numero da outra sair impresso sobre um segmento que
+   * mede outra coisa, com escala fiel e sem aviso nenhum:
+   *
+   *   quadrado base=6 diagonal=A;C;9      desenhava 8,49 e imprimia 9. E o quadrado
+   *                                       NUNCA conferia, porque altura= e recusada nele
+   *   retangulo base=4 diagonal=A;C;5     desenhava 4,67 e imprimia 5 (a altura vinha
+   *                                       do prototipo), enquanto base=4 altura=3
+   *                                       diagonal=A;C;12 era corretamente recusado
+   *   triangulo lado=4 lado=6 lado=9      desenhava 2,12 e imprimia 8, num tracejado
+   *   altura=8                            visivelmente mais curto que o lado 4
+   *
+   * Com a escala do problema, quem confere e uma regra so, e ela nao pergunta por
+   * quais chaves a diretiva usou.
+   *
+   * A regra geral, que vale para toda conferencia deste arquivo: A AUSENCIA DE UM
+   * CAMPO TEM QUE SER UM CASO DA TRAVA, E NAO A SAIDA DELA. Toda funcao escrita
+   * como "se faltar tal chave, devolvo null" se desliga exatamente na diretiva
+   * incompleta, e nao rodar e indistinguivel de aprovar. Por isso cada
+   * conferencia daqui para baixo declara, no comentario, qual e o CAMPO MINIMO
+   * para ela rodar, e a prova tem um caso com esse campo ausente.
+   *
+   * CAMPO MINIMO desta: um comprimento numerico em qualquer chave (lado=, base=
+   * ou altura=). Sem nenhum ela devolve null, e ali nao ha o que conferir: a
+   * figura so imprime simbolos e nenhum numero pode contradizer nada. */
+  function escalaDoProblema(B, geo, pontos, ladosEfetivos, alturas, alturaDesenhada) {
+    var n = pontos.length, i, comp;
+    for (i = 0; i < n; i++) {
+      if (!B.ehNumero(ladosEfetivos[i])) continue;
+      comp = n === 3
+        ? geo.distancia(pontos[(i + 1) % n], pontos[(i + 2) % n])
+        : geo.distancia(pontos[i], pontos[(i + 1) % n]);
+      if (comp > 1e-9) return parseFloat(ladosEfetivos[i]) / comp;
+    }
+    if (alturas.length && alturas[0].valor !== null && alturaDesenhada > 1e-9) {
+      return alturas[0].valor / alturaDesenhada;
+    }
+    return null;
+  }
+
+  /* Uma medida ESCRITA contra o que a construcao PRODUZIU, na mesma moeda do
+   * conferirRotulos: proporcao, porque o enquadramento decide o tamanho na folha.
+   *
+   * CAMPO MINIMO: a medida com NUMERO mais uma escala do problema. Sem numero nao
+   * ha o que conferir (o rotulo em letra nao afirma valor nenhum); sem escala, a
+   * propria medida e o unico comprimento da figura e e ela que fixa a escala,
+   * entao ela tambem nao pode contradizer ninguem. Os dois casos estao na prova
+   * com o campo ausente. */
+  function conferirMedida(nome, escrito, desenhado, k) {
+    if (escrito === null || escrito === undefined || k === null || !(desenhado > 1e-9)) return null;
+    var vale = desenhado * k;
+    if (Math.abs(vale - escrito) <= 0.01 * Math.max(vale, escrito)) return null;
+    return 'a ' + nome + ' escrita ' + escrito + ' nao sai nessa proporcao no desenho: medida na ' +
+      'figura, ela vale ' + arredondar(vale);
   }
 
   /* A diagonal numerica contra a conta, que num retangulo E o teorema de
@@ -1267,22 +1493,57 @@
    * que figura nenhuma: ela e a folha do proprio material contradizendo o
    * teorema que a pagina ao lado esta ensinando.
    *
-   * A conta e feita por PROPORCAO contra a base e nao em unidades cruas, porque a
-   * construcao pode ter vindo dos angulos e estar nas unidades do prototipo. */
-  function conferirDiagonal(geo, pontos, dg, bases, alturas, retos) {
-    if (dg.valor === null || !bases.length || !alturas.length) return null;
-    var b = bases[0].valor, h = alturas[0].valor;
-    if (b === null || h === null) return null;
-    var baseDesenho = geo.distancia(pontos[0], pontos[1]);
-    if (!(baseDesenho > 1e-9)) return null;
-    var d = geo.distancia(pontos[dg.i0], pontos[dg.i1]) / (baseDesenho / b);
+   * CAMPO MINIMO: a diagonal com NUMERO mais uma escala do problema. O terceiro
+   * caso, forma nao determinada, NAO passa por aqui: quem o trata e a recusa
+   * escrita no laco que chama esta funcao, porque comparar com um segmento
+   * chutado nao e conferir. */
+  function conferirDiagonal(geo, pontos, dg, k, retos) {
+    if (dg.valor === null || k === null) return null;
+    var d = geo.distancia(pontos[dg.i0], pontos[dg.i1]) * k;
+    if (!(d > 1e-9)) return null;
     if (Math.abs(d - dg.valor) <= 0.01 * Math.max(d, dg.valor)) return null;
-    if (retos) {
-      return 'a diagonal ' + dg.nome + ' de um retangulo de base ' + b + ' e altura ' + h +
-        ' mede ' + arredondar(d) + ' e nao ' + dg.valor +
-        ' (d ao quadrado igual a b ao quadrado mais h ao quadrado)';
+    return 'a diagonal ' + dg.nome + ' mede ' + arredondar(d) + ' no desenho e nao ' + dg.valor +
+      (retos ? ' (d ao quadrado igual a b ao quadrado mais h ao quadrado)' : '');
+  }
+
+  /* No retangulo e no quadrado a diagonal FECHA a figura junto com uma dimensao
+   * so, por Pitagoras. Quando a diretiva traz a diagonal numerica e so uma das
+   * duas dimensoes, a outra sai da CONTA em vez de sair do prototipo, e a figura
+   * passa a ser medivel: "retangulo de base 4 cuja diagonal mede 5" e o enunciado
+   * do 9o ano, e ate aqui ele desenhava 4,67 e imprimia 5.
+   *
+   * Devolve as dimensoes deduzidas, ou null quando nao ha o que deduzir (a
+   * diagonal sem numero, as duas dimensoes ja dadas, ou um tipo em que base e
+   * altura nao fecham a diagonal). Quando a conta nao existe, avisa e devolve
+   * false, que e recusa.
+   *
+   * Isto nao e conferencia e sim DEDUCAO, e por isso o null dela nao desliga
+   * trava nenhuma: quem confere depois e o conferirDiagonal, sobre a figura que
+   * saiu daqui. CAMPO MINIMO para deduzir: tipo retangulo ou quadrado, diagonal
+   * com numero, e exatamente uma das duas dimensoes (no quadrado, nenhuma). */
+  function completarPorPitagoras(B, doc, tipo, bases, alturas, diagonais) {
+    if (tipo !== 'retangulo' && tipo !== 'quadrado') return null;
+    var dg = null, i;
+    for (i = 0; i < diagonais.length; i++) if (diagonais[i].valor !== null) { dg = diagonais[i]; break; }
+    if (!dg) return null;
+    var b = bases.length && bases[0].valor !== null ? bases[0].valor : null;
+    var h = alturas.length && alturas[0].valor !== null ? alturas[0].valor : null;
+    if (tipo === 'quadrado') {
+      /* No quadrado a altura e o proprio lado, entao a base sozinha ja fecha e
+       * quem confere e o conferirDiagonal. So ha o que deduzir quando nem base
+       * nem altura vieram. */
+      if (b !== null || h !== null) return null;
+      return { base: dg.valor / Math.SQRT2, altura: dg.valor / Math.SQRT2 };
     }
-    return 'a diagonal ' + dg.nome + ' sai com ' + arredondar(d) + ' no desenho e nao com ' + dg.valor;
+    if ((b !== null) === (h !== null)) return null;   // as duas, ou nenhuma
+    var conhecido = b !== null ? b : h;
+    if (!(dg.valor > conhecido)) {
+      B.avisar(doc, 'quadrilatero: a diagonal ' + dg.valor + ' nao e maior que ' + conhecido +
+        ', e num retangulo a diagonal e a hipotenusa dos dois lados');
+      return false;
+    }
+    var outro = Math.sqrt(dg.valor * dg.valor - conhecido * conhecido);
+    return b !== null ? { base: b, altura: outro } : { base: outro, altura: h };
   }
 
   /* ============================================================ triangulo */
@@ -1296,6 +1557,11 @@
      * PT/EN as enxergarem: sem isso, "base=b altura=h" seria lido como figura sem
      * medida nenhuma e a mistura "base=10 altura=h" sairia declarada fiel. */
     metricas: ['angulo', 'lado', 'base', 'altura'],
+    /* Quais das metricas sao COMPRIMENTO. O angulo em letra e resolvido pelo
+     * sistema e a construcao usa o valor achado; o comprimento em letra nao e
+     * resolvido por ninguem e sai do prototipo, entao so ele responde pela
+     * condicao de simbolos distintos da secao "escala". */
+    comprimentos: ['lado', 'base', 'altura'],
 
     /* Quanto o bloco vai ocupar, sem desenhar nada. Quem escreve o exercicio
      * precisa disto ANTES de escrever o numero: reservado so o espaco da figura,
@@ -1311,7 +1577,10 @@
       return {
         altura: op.altura != null ? op.altura : (ehVao ? ALTURA_VAO : null),
         legenda: d.legenda || null,
-        foraDeEscala: escalaFora(B, d, triangulo.metricas, valoresExtras(B, d))
+        foraDeEscala: escalaFora(B, d, {
+          metricas: triangulo.metricas, comprimentos: triangulo.comprimentos,
+          extras: valoresExtras(B, d), honrado: honraOsLados(B, d)
+        })
       };
     },
 
@@ -1324,7 +1593,10 @@
       var nomes = B.lista(d.args, 'vertices');
       var incognitas = B.lista(d.args, 'incognita');
       var giro = B.numero(d.args, 'giro') || 0;
-      var fora = escalaFora(B, d, triangulo.metricas, valoresExtras(B, d));
+      var fora = escalaFora(B, d, {
+          metricas: triangulo.metricas, comprimentos: triangulo.comprimentos,
+          extras: valoresExtras(B, d), honrado: honraOsLados(B, d)
+        });
 
       /* Um rotulo por vertice, decidido ANTES de construir. Os valores de angulo
        * preenchem os vertices na ordem, pulando os da incognita: assim
@@ -1428,6 +1700,20 @@
         }
         ladosEfetivos[2] = bases[0].bruto;
       }
+      /* E ela e o terceiro lado tambem para a CONSTRUCAO, e nao so para a
+       * conferencia. Lida so pelo ladosBrutos, "base=10 lado=7.21 lado=8.49" (que
+       * fecha um triangulo de verdade, 4 mais 6 igual a 10) caia no caminho de
+       * recuo e saia recusado com "dois lados soltos nao definem triangulo", que
+       * e uma frase FALSA: os lados sao tres. Aviso errado e pior do que aviso
+       * nenhum, porque manda o autor consertar o que nao esta quebrado. */
+      var ladosNum = [];
+      var temTresLados = true;
+      for (var kl = 0; kl < 3; kl++) {
+        var bruto = ladosEfetivos[kl];
+        if (bruto === null || bruto === undefined || String(bruto) === '') temTresLados = false;
+        ladosNum.push(B.ehNumero(bruto) ? parseFloat(bruto) : null);
+      }
+      var ladosTodosNum = ladosNum[0] !== null && ladosNum[1] !== null && ladosNum[2] !== null;
 
       var pontos = null, vao = null, deduzido = [false, false, false];
       /* Os valores que os DADOS determinam em cada vertice, e nao os que o
@@ -1436,23 +1722,57 @@
        * se o desenho saiu exato. */
       var conhecidos = [null, null, null];
 
-      if (ladosBrutos.length >= 3) {
-        pontos = lados.length >= 3 ? geo.trianguloPorLados(lados[0], lados[1], lados[2]) : null;
-        /* Com os tres lados numericos a construcao consome tudo, entao os tres
+      if (temTresLados) {
+        /* Tres lados em SIMBOLO tambem constroem, quando os simbolos dizem
+         * alguma coisa sobre os comprimentos: "lado=a lado=a lado=b" sai
+         * isosceles de verdade e "lado=x lado=2x lado=2x" sai com um lado da
+         * metade dos outros dois. Sem isso o prototipo saia com os tres lados
+         * quase iguais e os rotulos por cima, contradizendo-os. */
+        var simb = ladosTodosNum ? null : comprimentosPorSimbolo(B, ladosEfetivos);
+        if (simb) ladosNum = simb;
+        pontos = (ladosTodosNum || simb)
+          ? geo.trianguloPorLados(ladosNum[0], ladosNum[1], ladosNum[2]) : null;
+        /* Com os tres lados NUMERICOS a construcao consome tudo, entao os tres
          * angulos da figura sao deducao dos dados e o gabarito pode escrever o
-         * valor medido. */
-        if (pontos) deduzido = [true, true, true];
+         * valor medido. Com simbolos nao: "lado=a lado=a lado=b" fixa a FORMA de
+         * isosceles e nao a abertura, e um valor de angulo escrito ali seria o
+         * chute da proporcao 100 para 76 saindo como resposta. */
+        if (pontos && ladosTodosNum) deduzido = [true, true, true];
+        /* O triangulo retangulo dado pelos tres lados sai SEM o quadradinho, e a
+         * especificacao e explicita: "no triangulo retangulo do Teorema de
+         * Pitagoras o quadradinho e a unica marca no vertice reto". Ele nao pode
+         * ser desenhado aqui de oficio: com tres medidas de lado a figura ja tem
+         * tres marcas, e a quarta somada a uma altura estoura o teto de cinco.
+         * Entao a receita AVISA, e quem escreve o tema decide o que tirar.
+         *
+         * O aviso e sobre a figura e nao sobre a conta: se algum vertice ja traz
+         * 90 escrito, o desenharAngulos ja poe o quadradinho e nao ha o que dizer. */
+        if (pontos && ladosTodosNum) {
+          var ord = ladosNum.slice().sort(function (p, q) { return p - q; });
+          var fechaPit = Math.abs(ord[0] * ord[0] + ord[1] * ord[1] - ord[2] * ord[2]) <
+            1e-4 * ord[2] * ord[2];
+          var jaTemReto = false;
+          for (var kr = 0; kr < 3; kr++) {
+            if (B.ehNumero(porVertice[kr]) && Math.abs(parseFloat(porVertice[kr]) - 90) < 0.5) jaTemReto = true;
+          }
+          if (fechaPit && !jaTemReto) {
+            B.avisar(doc, 'triangulo: os lados ' + ladosNum.join(', ') + ' fecham Pitagoras e ' +
+              'nenhum vertice esta marcado como reto. No triangulo retangulo o quadradinho e a ' +
+              'unica marca do vertice reto, e sem ele a aluna nao tem como saber qual lado e a ' +
+              'hipotenusa. Escreva angulo=90 no vertice reto, ou tire um dos lados para caber a marca');
+          }
+        }
         /* O null da desigualdade triangular e resultado didatico; o null de lado
          * zero ou negativo nao e, e os dois entravam pela mesma porta: "lado=-5
          * lado=7 lado=12" desenhava a segunda regua VOLTANDO para tras, e
          * "lado=0" pendurava um rotulo numa regua de comprimento zero, os dois
          * marcados como escala fiel. */
-        if (!pontos && lados.length >= 3) {
-          if (lados[0] > 0 && lados[1] > 0 && lados[2] > 0 &&
-              isFinite(lados[0]) && isFinite(lados[1]) && isFinite(lados[2])) {
-            vao = lados.slice(0, 3).sort(function (a, b) { return b - a; });
+        if (!pontos && ladosTodosNum) {
+          if (ladosNum[0] > 0 && ladosNum[1] > 0 && ladosNum[2] > 0 &&
+              isFinite(ladosNum[0]) && isFinite(ladosNum[1]) && isFinite(ladosNum[2])) {
+            vao = ladosNum.slice(0, 3).sort(function (a, b) { return b - a; });
           } else {
-            B.avisar(doc, 'triangulo: lado que nao e comprimento (' + lados.join(', ') + ')');
+            B.avisar(doc, 'triangulo: lado que nao e comprimento (' + ladosNum.join(', ') + ')');
             return null;
           }
         }
@@ -1492,14 +1812,39 @@
          * doc. Desenhar um triangulo qualquer no lugar seria desenhar uma
          * configuracao que nao existe, com aparencia de verdade. */
         if (vals.impossivel) { B.avisar(doc, 'triangulo: ' + vals.aviso); return null; }
-        /* base= e altura= constroem no lugar do triangulo generico de 58 e 62, e
-         * so ali: quando algum angulo e conhecido, quem manda continua sendo o
-         * angulo, porque ele e o dado mais forte da diretiva. Nesse caso a base e
-         * a altura viram rotulo, e a conferencia logo abaixo cobra que os dois
-         * numeros concordem com o que a construcao produziu. */
-        var semAngulo = conhecidos[0] === null && conhecidos[1] === null && conhecidos[2] === null;
-        var dimT = semAngulo ? dimensoesBaseAltura(PROTO_BH.triangulo, bases, alturas) : null;
-        pontos = dimT ? trianguloPorBaseAltura(dimT) : geo.trianguloPorAngulos(vals.a, vals.b, 100);
+        /* base= e altura= constroem no lugar do triangulo chutado, e a pergunta
+         * nao e "ha angulo escrito" e sim "o que esta escrito ja determina a
+         * forma".
+         *
+         *   nenhum angulo   o caminho de recuo desenharia o generico de 58 e 62;
+         *                   a base e a altura desenham o que a diretiva pede.
+         *   UM angulo, em A ou em B   o angulo fixa a inclinacao de um dos lados
+         *                   e a altura fixa a distancia do apice ate a base: o
+         *                   apice fica em h/tan(A), ou em b menos h/tan(B), e o
+         *                   triangulo esta determinado. Sem isso o aberturas()
+         *                   repartia o que sobra em 0,46 e 0,54, ou seja CHUTAVA a
+         *                   forma, e a conferencia logo abaixo comparava a altura
+         *                   escrita contra esse chute: "angulo=90 base=4 altura=3"
+         *                   era recusado, e o triangulo retangulo de base 4 e
+         *                   altura 3 e a figura de area do 7o ano.
+         *   dois ou mais    o angulo ja determina tudo e quem manda e ele; a base
+         *                   e a altura viram rotulo, conferido logo abaixo.
+         */
+        var quantosAngulos = 0, unico = -1;
+        for (var ka = 0; ka < 3; ka++) {
+          if (conhecidos[ka] !== null) { quantosAngulos++; unico = ka; }
+        }
+        var dimT = null, apiceX = null;
+        if (quantosAngulos === 0 || (quantosAngulos === 1 && unico < 2)) {
+          dimT = dimensoesBaseAltura(PROTO_BH.triangulo, bases, alturas);
+          if (dimT && quantosAngulos === 1) {
+            var cotA = 1 / Math.tan(conhecidos[unico] * Math.PI / 180);
+            apiceX = unico === 0 ? dimT.altura * cotA : dimT.base - dimT.altura * cotA;
+          }
+        }
+        pontos = dimT
+          ? trianguloPorBaseAltura(dimT, apiceX)
+          : geo.trianguloPorAngulos(vals.a, vals.b, 100);
         if (!pontos) {
           B.avisar(doc, 'triangulo: os angulos ' + angulosBrutos.join(' e ') + ' nao fecham');
           return null;
@@ -1517,7 +1862,7 @@
 
       var corGab = corDaCamada(doc, d, COR);
 
-      if (vao) return desenharVao(doc, B, g, d, op, vao, ladosBrutos, fora, corGab);
+      if (vao) return desenharVao(doc, B, g, d, op, vao, ladosEfetivos, fora, corGab);
 
       /* Lado e angulo no mesmo triangulo sao dado redundante: ou concordam, ou um
        * dos dois esta errado e a folha nao pode escolher em silencio. Sem esta
@@ -1545,28 +1890,80 @@
       if (alturas.length) {
         var va = alturas[0].v >= 0 ? alturas[0].v : 2;
         alturaG = geometriaDaAltura(geo, pontos[va], pontos[(va + 1) % 3], pontos[(va + 2) % 3]);
-        /* So vale quando a altura e relativa a BASE. Com altura=6;h;B a altura
-         * cai sobre o lado CA e o base= nomeia AB: sao dois pares diferentes, e
-         * cobrar proporcao entre eles seria inventar uma relacao. */
-        var brigaBH = (d.escala === 'fora' || va !== 2) ? null
-          : conferirBaseAltura(bases, alturas, geo.distancia(pontos[0], pontos[1]), alturaG.comprimento);
+        /* O lado em que o pe cai e o OPOSTO ao vertice da altura, e o indice do
+         * lado oposto ao vertice v e o proprio v. Se ele leva tracinho, a marca
+         * mora no ponto medio e o quadradinho tem que desviar dela. */
+        alturaG.marcaNoMeio = ladoOcupado(va, congruentes, null);
+      }
+
+      /* A escala do problema, e a conferencia da altura contra ela. NAO importa
+       * de qual vertice a altura parte nem por qual chave o comprimento veio: uma
+       * vez que um comprimento numerico fixou a escala, todo outro numero da
+       * diretiva esta determinado.
+       *
+       * A conferencia anterior so olhava o par base mais altura, e por isso
+       * "lado=4 lado=6 lado=9 altura=8" saia desenhando 2,12 e imprimindo 8, num
+       * tracejado visivelmente mais curto do que o lado rotulado 4. Com rotulo
+       * (altura=8;h;A) o 8 era ignorado em silencio, que e a mesma falta pelo
+       * outro lado: numero escrito na diretiva que nao chega a lugar nenhum. */
+      var kBH = escalaDoProblema(B, geo, pontos, ladosEfetivos, alturas,
+        alturaG ? alturaG.comprimento : 0);
+      /* A altura que a CONSTRUCAO por base e altura sabe honrar e a relativa a
+       * base, e so ela. Com "base=10 altura=6;h;B" o 6 mede a altura relativa ao
+       * lado CA e o 10 mede AB: uma equacao para dois graus de liberdade, e a
+       * figura nao esta determinada. Deixado passar, o 6 saia impresso num
+       * tracejado que mede 8,45. */
+      if (dimT && alturas.length && alturas[0].valor !== null && alturas[0].v >= 0 &&
+          alturas[0].v !== 2 && d.escala !== 'fora') {
+        B.avisar(doc, 'triangulo: altura=' + alturas[0].bruto + ' parte de ' +
+          nomeDoVertice(nomes, alturas[0].v) + ', entao ela e relativa ao lado oposto a ' +
+          nomeDoVertice(nomes, alturas[0].v) + ', e a base= mede AB: os dois juntos nao ' +
+          'determinam o triangulo. Escreva os tres lado=, ou os angulos, ou tire o vertice ' +
+          'da altura para ela ser a relativa a base');
+        return null;
+      }
+      if (alturas.length && alturaG && d.escala !== 'fora') {
+        var brigaBH = conferirMedida('altura', alturas[0].valor, alturaG.comprimento, kBH);
         if (brigaBH) { B.avisar(doc, 'triangulo: ' + brigaBH); return null; }
       }
 
-      /* Quantas unidades do problema vale uma unidade da construcao. E o que
-       * permite a camada de gabarito escrever "h = 6" MEDINDO na figura, e nao
-       * numa conta paralela: sem ancora numerica nenhuma o k fica null e o
-       * gabarito escreve a letra como veio, que e melhor do que escrever um
-       * numero de outra escala. */
-      var kBH = null, kb, comp;
-      for (kb = 0; kb < 3 && kBH === null; kb++) {
-        if (!B.ehNumero(ladosEfetivos[kb])) continue;
-        comp = geo.distancia(pontos[(kb + 1) % 3], pontos[(kb + 2) % 3]);
-        if (comp > 1e-9) kBH = parseFloat(ladosEfetivos[kb]) / comp;
-      }
-      if (kBH === null && alturas.length && alturas[0].valor !== null &&
-          alturaG && alturaG.comprimento > 1e-9) {
-        kBH = alturas[0].valor / alturaG.comprimento;
+      /* A altura que COINCIDE com um lado. No triangulo retangulo apoiado num
+       * cateto o pe cai no proprio vertice do angulo reto, e ali a altura E o
+       * outro cateto: desenhada pelo caminho normal ela saia tracejada POR CIMA
+       * do lado e com um segundo quadradinho aninhado no canto que ja tinha o
+       * seu. "Triangulo retangulo de base 4 e altura h" e a frase de area do 7o
+       * ano, entao este caso nao e exotico.
+       *
+       * A saida e a mesma ja escrita para o retangulo, e pelo mesmo motivo: onde
+       * a altura e um lado, ela sai como MEDIDA do lado, custa uma marca so e a
+       * perpendicularidade continua dita por um quadradinho unico. */
+      var alturaNoLado = null;
+      if (alturaG && (Math.abs(alturaG.t) < 0.02 || Math.abs(alturaG.t - 1) < 0.02)) {
+        var vAlt = alturas[0].v >= 0 ? alturas[0].v : 2;
+        var vPe = Math.abs(alturaG.t) < 0.02 ? (vAlt + 1) % 3 : (vAlt + 2) % 3;
+        /* Os tres indices somam 3, e o lado de indice s e o OPOSTO ao vertice s:
+         * entao o terceiro vertice e o lado entre vAlt e vPe tem o mesmo indice. */
+        var terceiro = 3 - vAlt - vPe;
+        alturaNoLado = {
+          lado: terceiro, v: vAlt, pe: vPe, outro: terceiro,
+          comprimento: alturaG.comprimento,
+          /* Quadradinho so quando ninguem ja marcou aquele canto: com angulo=90
+           * escrito no vertice, o desenharAngulos ja poe o dele. */
+          jaMarcado: B.ehNumero(porVertice[vPe]) &&
+            Math.abs(parseFloat(porVertice[vPe]) - 90) < 0.5
+        };
+        alturaG = null;
+        /* E se aquele lado JA leva medida, os dois nomeiam o mesmo segmento. A
+         * especificacao chama isso pelo nome: "cada dado aparece em UM lugar so".
+         * Deixado passar, o lado saia com "4" e "h" empilhados, dizendo que 4 e h
+         * sao coisas diferentes quando sao a mesma. */
+        var jaMedido = ladosEfetivos[alturaNoLado.lado];
+        if (jaMedido !== null && jaMedido !== undefined && String(jaMedido) !== '') {
+          B.avisar(doc, 'triangulo: a altura cai sobre o vertice ' + nomeDoVertice(nomes, vPe) +
+            ', entao ela E o lado que ja leva a medida ' + jaMedido + ': os dois nomeiam o mesmo ' +
+            'segmento. Tire um dos dois');
+          return null;
+        }
       }
       /* Medir na figura so vira RESPOSTA quando a forma foi deduzida dos dados. E
        * a mesma regra ja escrita para o valor do angulo na incognita: o caminho de
@@ -1635,6 +2032,10 @@
           marcarCongruentes(ctx, congruentes, ladosP);
           desenharCevianas(ctx, cevianas, P, d);
           if (alturaG) desenharAltura(ctx, alturaG, corGab);
+          if (alturaNoLado && !alturaNoLado.jaMarcado && marcas()) {
+            marcas().marcaAnguloReto(ctx.doc, P[alturaNoLado.pe], P[alturaNoLado.v],
+              P[alturaNoLado.outro], { ctx: ctx, cor: corGab || undefined });
+          }
           desenharAngulos(ctx, geo, B, P, porVertice, ehIncognita, nomes, d, fora, deduzido,
             { corDeclarada: corGab });
           for (var i = 0; i < prolongamentos.length; i++) {
@@ -1655,7 +2056,11 @@
         ctx.rotulos(function () {
           letrasDeVertice(ctx, P, nomes);
           for (var s = 0; s < ladosBrutos.length && s < 3; s++) {
-            /* lado a e o oposto ao vertice A: a = BC, b = CA, c = AB. */
+            /* lado a e o oposto ao vertice A: a = BC, b = CA, c = AB. O slot da
+             * base sai logo abaixo, pelo medidaDaBase, que sabe fugir para cota:
+             * desenhado nos dois lugares, o mesmo numero saia duas vezes sobre a
+             * mesma aresta quando a diretiva escrevia os tres lado= mais a base. */
+            if (bases.length && s === 2) continue;
             medidaDeLado(ctx, String(ladosBrutos[s]), ladosP[s][0], ladosP[s][1], P, corGab);
           }
           if (bases.length) {
@@ -1678,6 +2083,14 @@
               escrever(ctx, ra.texto, { x: (Va.x + pea.x) / 2, y: (Va.y + pea.y) / 2 },
                 dirA, 5, { tam: ra.tam, cor: ra.cor, bold: ra.bold });
             }
+          }
+          /* A altura que coincide com um lado sai como medida DELE, no mesmo
+           * canal do base=, que ja sabe fugir para cota quando o lado esta
+           * ocupado por tracinho. */
+          if (alturaNoLado) {
+            var rl = rotuloDaCamada(alturas[0], d, alturaNoLado.comprimento, kBH, corGab);
+            medidaDaBase(ctx, rl, ladosP[alturaNoLado.lado][0], ladosP[alturaNoLado.lado][1], P,
+              ladoOcupado(alturaNoLado.lado, congruentes, null));
           }
         });
       });
@@ -2211,6 +2624,19 @@
    * grau da soma. O lado e comparado por PROPORCAO, porque o enquadramento decide
    * o tamanho na folha: dois lados rotulados 6 e 8 tem que sair com a mesma razao
    * no desenho, e um lado sozinho nunca briga com ninguem. */
+  /* CAMPO MINIMO, por laco, porque esta funcao e quatro conferencias numa so
+   * (ver a regra geral escrita na secao "a escala do problema"):
+   *
+   *   angulo         um valor de vertice NUMERICO. Vertice em letra nao afirma
+   *                  medida e nao tem o que conferir.
+   *   angulo externo um externo= com valor numerico.
+   *   congruencia    um grupo com dois lados ou mais; o grupo de um lado so nao
+   *                  afirma igualdade nenhuma.
+   *   proporcao      DOIS lados numericos. Com um so nao ha proporcao a comparar,
+   *                  e ali a ausencia e mesmo um caso: o lado sozinho e que FIXA
+   *                  a escala da figura. A altura e a diagonal, que ate esta
+   *                  familia ficavam de fora, sao conferidas contra essa mesma
+   *                  escala pelo conferirMedida e pelo conferirDiagonal. */
   function conferirRotulos(geo, B, pontos, porVertice, ladosBrutos, externos, congruentes, nomes) {
     var v, n = pontos.length;
     for (v = 0; v < n; v++) {
@@ -2596,13 +3022,17 @@
     chaves: ['tipo', 'angulo', 'lado', 'base', 'altura', 'vertices', 'incognita', 'giro',
              'diagonal', 'regioes', 'marcas', 'congruentes'],
     metricas: ['angulo', 'lado', 'base', 'altura'],
+    comprimentos: ['lado', 'base', 'altura'],
 
     medir: function (d, op) {
       var B = base();
       return {
         altura: op.altura != null ? op.altura : null,
         legenda: d.legenda || null,
-        foraDeEscala: escalaFora(B, d, quadrilatero.metricas, valoresDaDiagonal(B, d))
+        foraDeEscala: escalaFora(B, d, {
+          metricas: quadrilatero.metricas, comprimentos: quadrilatero.comprimentos,
+          extras: valoresDaDiagonal(B, d)
+        })
       };
     },
 
@@ -2622,7 +3052,10 @@
       var incognitas = B.lista(d.args, 'incognita');
       var giro = B.numero(d.args, 'giro') || 0;
       var semMarcas = String(B.primeiro(d.args, 'marcas') || '').toLowerCase() === 'nao';
-      var fora = escalaFora(B, d, quadrilatero.metricas, valoresDaDiagonal(B, d));
+      var fora = escalaFora(B, d, {
+        metricas: quadrilatero.metricas, comprimentos: quadrilatero.comprimentos,
+        extras: valoresDaDiagonal(B, d)
+      });
       var ehTrapezio = tipo === 'trapezio' || tipo === 'trapezioisosceles';
 
       /* base=, altura= e as diagonais, lidas antes de construir: as duas
@@ -2696,9 +3129,16 @@
        * ordem entre as duas nao e gosto: um trapezio de bases 10 e 6 com um
        * angulo de 72 na base e um dado a mais do que a figura comporta, e o
        * angulo e o que o enunciado deste kit escreve com mais frequencia. */
-      var dimQ = res.t !== null ? null
-        : dimensoesBaseAltura(PROTO_BH[tipo] || PROTO_BH.retangulo, bases, alturas);
-      var formaBH = dimQ ? quadrilateroPorBaseAltura(B, doc, tipo, dimQ, bases, alturas) : null;
+      var deduzidas = completarPorPitagoras(B, doc, tipo, bases, alturas, diagonais);
+      if (deduzidas === false) return null;
+      if (res.t !== null && (!(res.t > fam.min) || !(res.t < fam.max))) {
+        B.avisar(doc, 'quadrilatero: os valores escritos determinam ' + arredondar(res.t) +
+          ' graus no primeiro vertice, e o ' + tipo + ' so se desenha entre ' +
+          fam.min + ' e ' + fam.max + ' graus');
+        return null;
+      }
+      var dimQ = dimensoesBaseAltura(PROTO_BH[tipo] || PROTO_BH.retangulo, bases, alturas, deduzidas);
+      var formaBH = dimQ ? quadrilateroPorBaseAltura(B, doc, tipo, dimQ, bases, alturas, res.t) : null;
       if (dimQ && !formaBH) return null;
       var pontos;
       if (formaBH) {
@@ -2708,12 +3148,9 @@
          * sairia sobre a outra. */
         pontos = formaBH;
       } else if (res.t !== null) {
-        if (!(res.t > fam.min) || !(res.t < fam.max)) {
-          B.avisar(doc, 'quadrilatero: os valores escritos determinam ' + arredondar(res.t) +
-            ' graus no primeiro vertice, e o ' + tipo + ' so se desenha entre ' +
-            fam.min + ' e ' + fam.max + ' graus');
-          return null;
-        }
+        /* O intervalo do tipo ja foi conferido la em cima, antes de a base e a
+         * altura construirem: quem escreve um angulo fora dele tem que ser
+         * avisado disso e nao do que a construcao fez depois. */
         pontos = PROTOTIPOS[tipo](res.t);
       } else {
         /* Sistema indeterminado: fica o prototipo do tipo, e a unica liberdade
@@ -2801,63 +3238,108 @@
       var alturaG = null, alturaNoLado = notacao.retos;
       if (alturas.length && !alturaNoLado) {
         alturaG = geometriaDaAltura(geo, pontos[3], pontos[0], pontos[1]);
+        /* O pe cai na base AB, que e o lado 0: se ele leva tracinho ou seta de
+         * paralelismo, a marca mora no ponto medio e o quadradinho desvia dela. */
+        alturaG.marcaNoMeio = !semMarcas && ladoOcupado(0, congruentes, notacao.paralelas);
       }
+      /* A escala do problema, e as conferencias que so ela permite. Ela sai ANTES
+       * de qualquer aviso porque e a moeda de todos eles: o que a diretiva
+       * escreve e conferido contra o que a construcao produziu, e nao contra
+       * outra chave especifica. */
+      var alturaMedida = alturaG ? alturaG.comprimento : geo.distancia(pontos[3], pontos[0]);
+      var kMedida = escalaDoProblema(B, geo, pontos, ladosEfetivos, alturas, alturaMedida);
       if (alturas.length && d.escala !== 'fora') {
-        var alturaMedida = alturaG ? alturaG.comprimento : geo.distancia(pontos[3], pontos[0]);
-        var brigaBH = conferirBaseAltura(bases, alturas, geo.distancia(pontos[0], pontos[1]), alturaMedida);
+        var brigaBH = conferirMedida('altura', alturas[0].valor, alturaMedida, kMedida);
         if (brigaBH) { B.avisar(doc, 'quadrilatero: ' + brigaBH); return null; }
       }
 
-      /* A diagonal e o argumento da soma 360: sem ela nao ha os dois triangulos, e
-       * a demonstracao por decomposicao nao existe. Ela vai CONTINUA e fina, e
-       * nao tracejada, porque liga dois vertices que a figura ja tem e e ela
-       * propria o objeto do exercicio. */
-      for (var idg = 0; idg < diagonais.length; idg++) {
-        var brigaD = d.escala === 'fora' ? null
-          : conferirDiagonal(geo, pontos, diagonais[idg], bases, alturas, notacao.retos);
-        if (brigaD) { B.avisar(doc, 'quadrilatero: ' + brigaD); return null; }
-      }
-
-      /* Quantas unidades do problema vale uma unidade da construcao, para a
-       * camada de gabarito escrever "h = 3" medindo na figura. Ver o
-       * rotuloDaCamada, no fim da secao do triangulo. */
-      var kBH = null, kb, comp;
-      for (kb = 0; kb < 4 && kBH === null; kb++) {
-        if (!B.ehNumero(ladosEfetivos[kb])) continue;
-        comp = geo.distancia(pontos[kb], pontos[(kb + 1) % 4]);
-        if (comp > 1e-9) kBH = parseFloat(ladosEfetivos[kb]) / comp;
-      }
-      if (kBH === null && alturas.length && alturas[0].valor !== null) {
-        var refAlt = alturaG ? alturaG.comprimento : geo.distancia(pontos[3], pontos[0]);
-        if (refAlt > 1e-9) kBH = alturas[0].valor / refAlt;
-      }
-      /* Medir na figura so vira RESPOSTA quando a forma foi deduzida dos dados. E
-       * a mesma regra ja escrita para o valor do angulo na incognita: o caminho de
-       * recuo serve para desenhar o formato e nao pode virar resposta, senao
-       * "base=10 altura=h" escreveria no gabarito da professora um h que veio da
-       * proporcao do prototipo e nao da conta.
+      /* Medir na figura so vira RESPOSTA, e so vira CONFERENCIA, quando a forma
+       * foi deduzida dos dados. E a mesma regra ja escrita para o valor do angulo
+       * na incognita: o caminho de recuo serve para desenhar o formato e nao pode
+       * virar resposta, senao "base=10 altura=h" escreveria no gabarito da
+       * professora um h que veio da proporcao do prototipo e nao da conta.
        *
        * Quais dimensoes determinam a forma NAO e a mesma pergunta em todo tipo, e
        * a diferenca aparece justamente na diagonal. Base e altura fecham o
        * retangulo e o losango; o quadrado se fecha com uma dimensao so; o trapezio
        * isosceles precisa das duas bases mais a altura. O paralelogramo e o
-       * trapezio ESCALENO nao se fecham com base e altura de jeito nenhum: a
-       * inclinacao das pernas fica livre e sai do prototipo, e com ela sai a
-       * diagonal. Ali medir a diagonal na figura seria medir o chute. */
+       * trapezio ESCALENO nao se fecham com base e altura de jeito nenhum, e ali
+       * quem fecha e o angulo escrito. */
+      /* A mesma escala serve a camada de gabarito, para ela escrever "h = 3"
+       * medindo na figura. Ver o rotuloDaCamada, no fim da secao do triangulo. */
+      var kBH = kMedida;
       var temB0 = bases.length > 0 && bases[0].valor !== null;
       var temB1 = bases.length > 1 && bases[1].valor !== null;
       var temH = alturas.length > 0 && alturas[0].valor !== null;
+      var comAngulo = res.t !== null;
       var formaFiel;
-      if (!formaBH) formaFiel = res.t !== null;
-      else if (tipo === 'retangulo' || tipo === 'losango') formaFiel = temB0 && temH;
-      else if (tipo === 'quadrado') formaFiel = temB0 || temH;
-      else if (tipo === 'trapezioisosceles') formaFiel = temB0 && temB1 && temH;
-      else formaFiel = false;
+      if (!formaBH) formaFiel = comAngulo;
+      /* A diagonal numerica que fechou a figura por Pitagoras determina tanto
+       * quanto a dimensao que faltava: ali a segunda dimensao veio da conta e nao
+       * do prototipo. O angulo escrito faz o mesmo pelo outro lado: ele fixa a
+       * inclinacao das pernas, e ai UMA medida ja fecha o paralelogramo e o
+       * losango, e duas fecham o trapezio isosceles. */
+      else if (tipo === 'retangulo') formaFiel = (temB0 && temH) || !!deduzidas;
+      else if (tipo === 'losango') formaFiel = (temB0 && temH) || (comAngulo && (temB0 || temH));
+      else if (tipo === 'quadrado') formaFiel = temB0 || temH || !!deduzidas;
+      else if (tipo === 'paralelogramo') formaFiel = comAngulo && (temB0 || temH);
+      else if (tipo === 'trapezioisosceles') {
+        formaFiel = (temB0 && temB1 && temH) || (comAngulo && temB0 && temH);
+      } else formaFiel = comAngulo && temB0 && temB1 && temH;
+
+      /* A diagonal e o argumento da soma 360: sem ela nao ha os dois triangulos, e
+       * a demonstracao por decomposicao nao existe. Ela vai CONTINUA e fina, e
+       * nao tracejada, porque liga dois vertices que a figura ja tem e e ela
+       * propria o objeto do exercicio.
+       *
+       * Campo minimo para a conferencia rodar: a diagonal com NUMERO mais uma
+       * escala do problema. Sem numero nao ha o que conferir; sem escala, a
+       * propria diagonal e o unico comprimento da figura e e ela que fixa a
+       * escala, entao ela tambem nao pode contradizer ninguem.
+       *
+       * O terceiro caso e o que nao pode sair calado: numero na diagonal, escala
+       * existindo, e a FORMA nao determinada. Ali o segmento desenhado e chute (a
+       * inclinacao das pernas do trapezio escaleno saiu do prototipo), e comparar
+       * com ele seria conferir contra um chute; deixar passar seria imprimir o
+       * numero sobre um segmento que mede outra coisa, que e o defeito que esta
+       * secao inteira acabou de fechar. Entao a receita recusa e diz o que falta. */
+      for (var idg = 0; idg < diagonais.length; idg++) {
+        if (diagonais[idg].valor === null || kMedida === null || d.escala === 'fora') continue;
+        if (!formaFiel) {
+          B.avisar(doc, 'quadrilatero: a diagonal ' + diagonais[idg].valor + ' nao tem como ser ' +
+            'conferida, porque a forma do ' + tipo + ' ainda nao esta determinada: o que falta ' +
+            'sai do prototipo e a diagonal sairia medindo o chute. Escreva as duas bases e a ' +
+            'altura, ou o angulo, ou tire o numero da diagonal e deixe so o rotulo');
+          return null;
+        }
+        var brigaD = conferirDiagonal(geo, pontos, diagonais[idg], kMedida, notacao.retos);
+        if (brigaD) { B.avisar(doc, 'quadrilatero: ' + brigaD); return null; }
+        /* A diagonal que FECHA com as duas dimensoes ja escritas nao acrescenta
+         * dado: ela e deducao. IMPRESSA como numero, a folha mostra quatro
+         * numeros de que so tres sao dado, e a regra do INEP e explicita, o
+         * enunciado apresenta os dados "sem omitir e sem excesso". Nao e recusa,
+         * porque a figura nao mente: e o autor que provavelmente queria a
+         * pergunta e escreveu a resposta.
+         *
+         * So vale quando ela IMPRIME o numero, ou seja quando ninguem escreveu
+         * rotulo: em "diagonal=A;C;5;d" o 5 fica na diretiva construindo e
+         * conferindo, e a folha imprime d, que e a pergunta. */
+        if (temB0 && temH && notacao.retos &&
+            String(diagonais[idg].rotulo) === String(diagonais[idg].valor)) {
+          B.avisar(doc, 'quadrilatero: a diagonal ' + diagonais[idg].valor + ' e dedutivel da base ' +
+            bases[0].valor + ' e da altura ' + alturas[0].valor + ', entao a folha imprime quatro ' +
+            'numeros de que so tres sao dado. Se ela e a pergunta, escreva diagonal=' +
+            nomeDoVertice(nomes, diagonais[idg].i0) + ';' + nomeDoVertice(nomes, diagonais[idg].i1) +
+            ';' + diagonais[idg].valor + ';d, que constroi com o numero e imprime a letra');
+        }
+      }
       if (!formaFiel) kBH = null;
 
       if (giro) pontos = geo.girar(pontos, giro);
       if (alturaG) {
+        var marcaAntes = alturaG.marcaNoMeio;
         alturaG = geometriaDaAltura(geo, pontos[3], pontos[0], pontos[1]);
+        alturaG.marcaNoMeio = marcaAntes;
       }
 
       var regioes = regioesDaDiretiva(B, d);
@@ -2870,7 +3352,7 @@
       travaDeClone(B, doc, d, impressaoDaForma(geo, 'quadrilatero ' + tipo, pontos, []));
       if (fora) travaDaEscalaQueMente(B, doc, geo, 'quadrilatero', d, pontos, porVertice, res.valores);
 
-      return B.figura(doc, {
+      return explicarTetoNoGabarito(B, doc, d, notacao, B.figura(doc, {
         x: op.x, largura: op.largura, altura: op.altura,
         unidades: cx, legenda: d.legenda, foraDeEscala: fora,
         fase: d.fase, id: d.id, receita: 'quadrilatero'
@@ -2961,9 +3443,32 @@
             }
           }
         });
-      });
+      }));
     }
   };
+
+  /* Por que o teto estourou no GABARITO, quando ele nao estourava no enunciado.
+   *
+   * A camada de resposta acrescenta os quatro valores de angulo que os dados
+   * determinam, e no losango, no paralelogramo e nos dois trapezios isso soma
+   * quatro marcas de uma vez: uma figura de enunciado com quatro marcas passa e a
+   * mesma figura com fase=gabarito chega a oito. So o retangulo e o quadrado
+   * escapam, porque neles os quatro angulos sao retos e ja estao ditos pelos
+   * quadradinhos da classe, entao a resposta nao repete nada.
+   *
+   * O aviso do conferirFigura diz o numero e nao diz a causa, e quem escreve
+   * fase=gabarito bate nisso sem entender. Este acrescenta a causa, uma vez so,
+   * sem mexer na trava. */
+  function explicarTetoNoGabarito(B, doc, d, notacao, registro) {
+    if (!registro || d.fase !== 'gabarito' || notacao.retos) return registro;
+    if (!(registro.marcasAtivas > MAX_MARCAS_FIGURA)) return registro;
+    B.avisar(doc, 'quadrilatero: o teto estourou na camada de GABARITO, e nao no enunciado: ' +
+      'ali a resposta acrescenta os quatro valores de angulo que os dados determinam, quatro ' +
+      'marcas de uma vez. Tire uma medida da diretiva, ou parta a figura em duas');
+    return registro;
+  }
+
+  var MAX_MARCAS_FIGURA = 5;
 
   /* Os dois poligonos em que a diagonal parte o quadrilatero, na volta. */
   function partirPelaDiagonal(P, i, j) {

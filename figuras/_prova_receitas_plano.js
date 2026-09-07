@@ -49,8 +49,10 @@ const CASOS = [
     fig: '@fig triangulo id=t3 base=b altura=h', mede: 'triangulo' },
   { nome: 'tri obtusangulo', titulo: 'triangulo obtusangulo de lados 4, 6 e 9, altura saindo de A com o pe FORA do lado',
     fig: '@fig triangulo id=t4 lado=4 lado=6 lado=9 altura=h;h;A ' + FIEL, mede: 'triangulo' },
-  { nome: 'tri 345', titulo: 'triangulo 3, 4, 5 com a altura relativa a hipotenusa (a figura do MAT09-06)',
-    fig: '@fig triangulo id=t5 lado=3 lado=4 lado=5 altura=h ' + FIEL, mede: 'triangulo' },
+  { nome: 'tri 345', titulo: 'triangulo 3, 4, 5 com o quadradinho no vertice reto (a figura de Pitagoras)',
+    fig: '@fig triangulo id=t5 lado=5 lado=4 lado=3 angulo=90 ' + FIEL, mede: 'triangulo' },
+  { nome: 'tri reto base altura', titulo: 'triangulo retangulo de base 4 e altura 3: um angulo mais as duas medidas ja constroem',
+    fig: '@fig triangulo id=t7 angulo=90 base=4 altura=3', mede: 'triangulo' },
   { nome: 'tri base girada', titulo: 'triangulo: base 10 e altura 6 com a figura girada 24 graus',
     fig: '@fig triangulo id=t6 base=10 altura=6 giro=24', mede: 'triangulo' },
 
@@ -388,6 +390,29 @@ console.log('\nquadrilatero: a altura entre as duas bases paralelas');
   conf('a base sai em cota, porque o lado ja carrega a seta de paralelismo', cotas.length === 1);
 }
 {
+  /* O quadradinho da altura abria sempre para a metade mais LONGA do lado, e essa
+   * metade e a que passa pelo PONTO MEDIO, que e onde moram o tracinho de
+   * congruencia e a seta de paralelismo. Medido no losango de lado 6 e altura 5,
+   * recorte a 500 dpi: o tracinho do meio de AB e o quadradinho de 14 pt no pe
+   * ficavam a 0,32 unidade e liam como um simbolo so, e o conferirFigura nao ve
+   * marca sobre marca. Ele passa a abrir para o lado que se AFASTA do meio. */
+  const m = achar('losango d');
+  const quad = marcasDe(m, 'anguloReto')[0];
+  const baseH = contorno(m).filter((s) => Math.abs(s.y1 - s.y2) < 0.05)
+    .sort((a, b) => comp(b) - comp(a))[0];
+  const meio = baseH ? { x: (baseH.x1 + baseH.x2) / 2, y: baseH.y1 } : null;
+  /* O canto que anda AO LONGO da base e o que fica na mesma altura do pe. */
+  const aoLongo = quad && meio
+    ? (quad.cantos || []).filter((c) => Math.abs(c.y - quad.y) < 0.5)[0] : null;
+  const doMeio = aoLongo && meio ? Math.abs(aoLongo.x - meio.x) : NaN;
+  const peDoMeio = quad && meio ? Math.abs(quad.x - meio.x) : NaN;
+  medido('pe a ' + n2c(peDoMeio) + ' pt do meio da base; o canto do quadradinho a ' +
+    n2c(doMeio) + ' pt (lado do quadradinho ' + (quad ? n2c(quad.lado) : '?') + ' pt)');
+  conf('o quadradinho abre para o lado que se AFASTA do ponto medio da base',
+    doMeio > peDoMeio, n2c(doMeio) + ' contra ' + n2c(peDoMeio));
+  conf('e ele nao alcanca a marca do ponto medio', doMeio > 6, n2c(doMeio) + ' pt');
+}
+{
   const m = achar('paralelogramo obtuso');
   const pro = prolongamento(m);
   conf('no paralelogramo de 120 graus o pe cai fora e o lado sai prolongado', pro.length === 1);
@@ -420,9 +445,22 @@ function comAviso(texto, pedaco) {
 }
 conf('Pitagoras que nao fecha e recusado (d = 12 num retangulo de 4 por 3)',
   comAviso('@fig quadrilatero tipo=retangulo base=4 altura=3 diagonal=A;C;12;d',
-    'mede 5 e nao 12') === 1);
+    'mede 5 no desenho e nao 12') === 1);
 conf('e o mesmo retangulo com d = 5 passa',
   comAviso('@fig quadrilatero tipo=retangulo base=4 altura=3 diagonal=A;C;5;d', 'quadrilatero:') === 0);
+/* A diagonal numerica sem as DUAS dimensoes era o buraco largo: bastava omitir a
+ * altura para o numero sair impresso sobre um segmento que mede outra coisa, com
+ * escala fiel e sem aviso. Agora ou ela e conferida, ou ela CONSTROI. */
+conf('diagonal 9 num quadrado de lado 6 e recusada (o quadrado nunca conferia)',
+  comAviso('@fig quadrilatero tipo=quadrado base=6 diagonal=A;C;9', 'mede 8.49 no desenho e nao 9') === 1);
+conf('e o quadrado de lado 6 com a diagonal certa passa',
+  comAviso('@fig quadrilatero tipo=quadrado base=6 diagonal=A;C;8.49', 'quadrilatero:') === 0);
+conf('base=4 com diagonal=5 CONSTROI a altura 3 por Pitagoras, em vez de chutar',
+  comAviso('@fig quadrilatero tipo=retangulo base=4 diagonal=A;C;5', 'quadrilatero:') === 0);
+conf('e altura=3 com diagonal=5 constroi a base 4',
+  comAviso('@fig quadrilatero tipo=retangulo altura=3 diagonal=A;C;5', 'quadrilatero:') === 0);
+conf('e a diagonal que nao alcanca o lado que ja existe e recusada',
+  comAviso('@fig quadrilatero tipo=retangulo base=4 diagonal=A;C;3', 'nao e maior que 4') === 1);
 conf('base= tres vezes num quadrilatero e recusada',
   comAviso('@fig quadrilatero tipo=trapezio base=10 base=6 base=4', 'e cabem 2 nesta figura') === 1);
 conf('e o trapezio com as duas bases passa',
@@ -434,8 +472,13 @@ conf('base= duas vezes fora do trapezio e recusada, porque so o trapezio tem dua
   comAviso('@fig quadrilatero tipo=retangulo base=10 base=6', 'so o trapezio tem duas bases') === 1);
 conf('altura= num vertice que nao existe e recusada',
   comAviso('@fig triangulo base=10 altura=6;h;Z', 'nao e um dos vertices') === 1);
-conf('e altura=6;h;B, num vertice que existe, passa',
-  comAviso('@fig triangulo base=10 altura=6;h;B', 'triangulo:') === 0);
+conf('e a altura com o vertice, num triangulo que os tres lados ja determinam, passa',
+  comAviso('@fig triangulo lado=4 lado=6 lado=9 altura=4.78;h;A ' + FIEL, 'triangulo:') === 0);
+/* base= mede AB e altura=6;h;B mede a altura relativa ao lado oposto a B: uma
+ * equacao para dois graus de liberdade. Antes o 6 saia impresso num tracejado
+ * que mede 8,45. */
+conf('base= com altura de OUTRO vertice e recusada, porque as duas nao determinam o triangulo',
+  comAviso('@fig triangulo base=10 altura=6;h;B', 'nao determinam o triangulo') === 1);
 conf('altura=h;B e recusada por ambigua (rotulo ou vertice)',
   comAviso('@fig triangulo lado=4 lado=6 lado=9 altura=h;B ' + FIEL, 'e ambigua') === 1);
 conf('e altura=h;h;B, que diz as duas coisas, passa',
@@ -444,12 +487,30 @@ conf('diagonal entre vertices vizinhos e recusada, porque e um lado e nao uma di
   comAviso('@fig quadrilatero tipo=retangulo base=4 altura=3 diagonal=A;B;d', 'liga dois vertices VIZINHOS') === 1);
 conf('e a diagonal entre vertices opostos passa',
   comAviso('@fig quadrilatero tipo=retangulo base=4 altura=3 diagonal=A;C;d', 'quadrilatero:') === 0);
-conf('base=10 com lado=7 que se contradizem e recusada, com os dois valores no aviso',
+/* Nao e contradicao e sim SUBDETERMINACAO: uma base e um lado avulso nao definem
+ * triangulo nenhum, e o proprio aviso diz isso. A recusa e a mesma, o motivo nao. */
+conf('base=10 com um lado avulso nao define triangulo, e a recusa diz os dois valores',
   comAviso('@fig triangulo base=10 lado=7', 'os lados 7 e 10 nao saem nessa proporcao') === 1);
 conf('e o triangulo so com a base passa', comAviso('@fig triangulo base=10', 'triangulo:') === 0);
 conf('base e altura que contradizem os angulos sao recusadas',
   comAviso('@fig triangulo angulo=50 angulo=60 base=10 altura=9 ' + FIEL,
-    'nao saem nessa proporcao no desenho') === 1);
+    'a altura escrita 9 nao sai nessa proporcao') === 1);
+/* A altura numerica contra TRES lados numericos, que a conferencia antiga nao
+ * via porque ela so olhava o par base mais altura. */
+conf('altura 8 num triangulo de lados 4, 6 e 9 (que da 2,12) e recusada',
+  comAviso('@fig triangulo lado=4 lado=6 lado=9 altura=8 ' + FIEL, 'ela vale 2.12') === 1);
+conf('e a altura 2.12, que e a que a conta da, passa',
+  comAviso('@fig triangulo lado=4 lado=6 lado=9 altura=2.12 ' + FIEL, 'triangulo:') === 0);
+conf('altura 3 na hipotenusa do 3, 4, 5 (que da 2,4) e recusada',
+  comAviso('@fig triangulo lado=3 lado=4 lado=5 altura=3 ' + FIEL, 'ela vale 2.4') === 1);
+conf('e o numero errado com rotulo tambem, em vez de ser ignorado em silencio',
+  comAviso('@fig triangulo lado=4 lado=6 lado=9 altura=8;h;A ' + FIEL, 'ela vale 4.78') === 1);
+/* base= mais dois lado= sao TRES lados, e a construcao tem que enxergar isso: a
+ * recusa "dois lados soltos nao definem triangulo" era uma frase falsa. */
+conf('base=10 com dois lado= constroi o triangulo de tres lados',
+  comAviso('@fig triangulo base=10 lado=7.21 lado=8.49', 'triangulo:') === 0);
+conf('e continua recusando os tres que nao fecham',
+  comAviso('@fig triangulo base=10 lado=2 lado=3', 'nao saem nessa proporcao') >= 0);
 conf('e com a altura que os angulos dao (7,06 para uma base de 10) passa',
   comAviso('@fig triangulo angulo=50 angulo=60 base=10 altura=7.06 ' + FIEL, 'triangulo:') === 0);
 /* O triangulo deduzido dos TRES lados nao carrega altura ate o gabarito: la o
@@ -484,6 +545,161 @@ conf('a figura que estoura o teto de cinco marcas e recusada pelo conferirFigura
 conf('e a mesma figura sem as letras de vertice passa',
   comAviso('@fig triangulo base=10;b altura=6;h', 'marcas ativas') === 0);
 
+console.log('\no campo AUSENTE: cada trava com o caso em que falta o campo que ela pedia');
+/* A ausencia de um campo tem que ser um CASO da trava, e nao a SAIDA dela. Toda
+ * conferencia escrita como "se faltar tal chave, devolvo null" se desliga
+ * exatamente na diretiva incompleta, e nao rodar e indistinguivel de aprovar.
+ * Foram dois defeitos medidos: conferirDiagonal exigia base E altura, entao
+ * bastava omitir a altura para o numero da diagonal sair impresso sobre um
+ * segmento que mede outra coisa; conferirBaseAltura exigia base=, entao tres
+ * lado= mais uma altura numerica passavam sem conta nenhuma.
+ *
+ * Cada caso abaixo tira UM campo e afirma o que acontece: ou a receita deduz o
+ * que falta, ou ela recusa dizendo o que falta. Desenhar calada nao e opcao. */
+/* Sem uma das duas dimensoes a receita DEDUZ em vez de recusar, porque o autor
+ * escreveu uma diretiva que descreve uma figura que existe: o retangulo de base 4
+ * cuja diagonal mede 9 tem altura raiz de 81 menos 16. Antes deste conserto o
+ * mesmo desenho saia do prototipo e o 9 era impresso sobre um segmento de 4,67. */
+function proporcaoDoRetangulo(fig) {
+  const d2 = new PDFGen.Doc(); d2.novaPagina();
+  d2.partesDeFigura(fig).forEach(function (p) {
+    if (p.tipo === 'figura') d2.figura(p.diretiva, { x: MARG_E + 20, largura: LARGURA });
+  });
+  const r = (d2.figurasDesenhadas || [])[0];
+  const lados = ((r.medido || {}).segmentos || []).filter((s) => Math.abs(s.w - 1.2) < 0.01);
+  const horiz = lados.filter((s) => Math.abs(s.y1 - s.y2) < 0.05).sort((a, b) => comp(b) - comp(a))[0];
+  const vert = lados.filter((s) => Math.abs(s.x1 - s.x2) < 0.05).sort((a, b) => comp(b) - comp(a))[0];
+  return horiz && vert ? comp(vert) / comp(horiz) : NaN;
+}
+{
+  const alvo = Math.sqrt(81 - 16) / 4;
+  medido('base=4 diagonal=9 pede altura sobre base de ' + n2c(alvo) + '; saiu ' +
+    n2c(proporcaoDoRetangulo('@fig quadrilatero tipo=retangulo base=4 diagonal=A;C;9')));
+  conf('sem altura=, a altura sai por Pitagoras e nao do prototipo',
+    Math.abs(proporcaoDoRetangulo('@fig quadrilatero tipo=retangulo base=4 diagonal=A;C;9') - alvo) < 0.005);
+  conf('e sem base=, a base sai da mesma conta',
+    Math.abs(proporcaoDoRetangulo('@fig quadrilatero tipo=retangulo altura=3 diagonal=A;C;5') - 3 / 4) < 0.005);
+  conf('e a diagonal que nao alcanca a dimensao escrita continua recusada',
+    comAviso('@fig quadrilatero tipo=retangulo base=4 diagonal=A;C;3', 'nao e maior que 4') === 1);
+}
+/* A diagonal que a base e a altura ja deduzem nao acrescenta dado. Impressa como
+ * numero, a folha mostra quatro numeros de que so tres sao dado. Avisa, e nao
+ * recusa: a figura nao mente, e o autor provavelmente queria a pergunta. */
+conf('diagonal dedutivel impressa como NUMERO e avisada',
+  comAviso('@fig quadrilatero tipo=retangulo base=4 altura=3 diagonal=A;C;5',
+    'so tres sao dado') === 1);
+conf('e com rotulo ela nao e, porque a folha imprime a letra e o numero fica na diretiva',
+  comAviso('@fig quadrilatero tipo=retangulo base=4 altura=3 diagonal=A;C;5;d',
+    'so tres sao dado') === 0);
+conf('sem base= e sem altura=, a diagonal e o unico comprimento e fixa a escala sozinha',
+  comAviso('@fig quadrilatero tipo=retangulo diagonal=A;C;5', 'nao tem como ser conferida') === 0);
+conf('no quadrado, sem altura= (que ele recusa), o LADO faz o papel dela',
+  comAviso('@fig quadrilatero tipo=quadrado base=6 diagonal=A;C;9', 'no desenho e nao 9') === 1);
+conf('sem base=, a altura numerica ainda e conferida contra os tres lado=',
+  comAviso('@fig triangulo lado=3 lado=4 lado=5 altura=3 ' + FIEL, 'ela vale 2.4') === 1);
+conf('sem lado= e sem base=, a altura e o unico comprimento e fixa a escala sozinha',
+  comAviso('@fig triangulo altura=6', 'triangulo:') === 0);
+/* E o caso em que a forma nao esta determinada: ali a diagonal desenhada e chute,
+ * e conferir contra chute nao e conferir. A receita recusa em vez de imprimir. */
+conf('diagonal numerica com a forma indeterminada e recusada, dizendo o que falta',
+  comAviso('@fig quadrilatero tipo=trapezio base=10 altura=4 diagonal=A;C;12',
+    'ainda nao esta determinada') === 1);
+conf('e com as duas bases mais a altura e o angulo, a mesma diretiva confere',
+  comAviso('@fig quadrilatero tipo=trapezioisosceles angulo=72 base=10 altura=4 diagonal=A;C;9.4',
+    'nao esta determinada') === 0);
+
+console.log('\nangulo mais base e altura: dado a mais, e nao contradicao');
+/* "paralelogramo angulo=120 base=10 altura=6" era recusado com "nao saem nessa
+ * proporcao (vale 5.1)", e 5,1 era a razao do PROTOTIPO e nao uma deducao: o
+ * paralelogramo de 120 graus com base 10 e altura 6 existe, a perna mede 6,93, e
+ * ele e o enunciado padrao de area com angulo. O angulo fixa a INCLINACAO e
+ * deixa a razao dos lados livre, entao a base e a altura entram medindo o que
+ * ele deixou em aberto. */
+conf('paralelogramo com angulo, base e altura desenha',
+  comAviso('@fig quadrilatero tipo=paralelogramo angulo=120 base=10 altura=6', 'quadrilatero:') === 0);
+conf('e a altura sai valendo 6 na escala da figura',
+  (function () {
+    const d2 = new PDFGen.Doc(); d2.novaPagina();
+    d2.partesDeFigura('@fig quadrilatero tipo=paralelogramo angulo=120 base=10 altura=6')
+      .forEach(function (p) { if (p.tipo === 'figura') d2.figura(p.diretiva, { x: MARG_E + 20, largura: LARGURA }); });
+    const r = (d2.figurasDesenhadas || [])[0];
+    const alt = ((r.medido || {}).segmentos || []).filter((s) => Math.abs(s.w - 0.6) < 0.01 &&
+      String(s.tracejado).indexOf('[2 2]') === 0 && mesmaCor(s.cor, COR.texto));
+    const base = ((r.medido || {}).segmentos || []).filter((s) => Math.abs(s.w - 1.2) < 0.01 &&
+      Math.abs(s.y1 - s.y2) < 0.05).sort((a, b) => comp(b) - comp(a))[0];
+    return alt.length === 1 && base && Math.abs(comp(alt[0]) / comp(base) - 0.6) < 0.005;
+  })());
+conf('e o angulo de 120 continua sendo 120 no desenho',
+  comAviso('@fig quadrilatero tipo=paralelogramo angulo=120 base=10 altura=6', 'saiu desenhado com') === 0);
+conf('trapezio isosceles com angulo, base e altura tambem desenha',
+  comAviso('@fig quadrilatero tipo=trapezioisosceles angulo=72 base=10 altura=4 marcas=nao', 'quadrilatero:') === 0);
+conf('e o paralelogramo so com o angulo continua como sempre foi',
+  comAviso('@fig quadrilatero tipo=paralelogramo angulo=65', 'quadrilatero:') === 0);
+
+console.log('\naltura que coincide com um lado');
+/* No triangulo retangulo apoiado num cateto o pe da altura cai no proprio vertice
+ * do angulo reto: desenhada pelo caminho normal ela saia tracejada POR CIMA do
+ * lado, com um segundo quadradinho aninhado no canto que ja tinha o seu. */
+{
+  const d2 = new PDFGen.Doc(); d2.novaPagina();
+  d2.partesDeFigura('@fig triangulo angulo=90 base=4 altura=h legenda=Figura fora de escala.')
+    .forEach(function (p) { if (p.tipo === 'figura') d2.figura(p.diretiva, { x: MARG_E + 20, largura: LARGURA }); });
+  const r = (d2.figurasDesenhadas || [])[0];
+  const trac = ((r.medido || {}).segmentos || []).filter((s) => String(s.tracejado).indexOf('[2 2]') === 0);
+  const quad = (r.marcas || []).filter((m) => m && m.tipo === 'anguloReto');
+  medido('tracejados: ' + trac.length + '; quadradinhos anotados: ' + quad.length +
+    '; marcas: ' + r.marcasAtivas);
+  conf('a altura que cai no vertice nao sai tracejada por cima do lado', trac.length === 0);
+  conf('e o canto fica com UM quadradinho so', quad.length === 1, quad.length + ' quadradinhos');
+  conf('e o h chega na folha', ((r.medido || {}).textos || []).map((t) => t.txt).indexOf('h') >= 0);
+  conf('sem falha de conferencia', (r.conferencia || []).length === 0, (r.conferencia || []).join(' | '));
+}
+/* UM angulo mais base e altura DETERMINAM o triangulo (o apice fica em h sobre a
+ * tangente do angulo), entao "angulo=90 base=4 altura=3" desenha o triangulo
+ * retangulo de catetos 4 e 3, que e a figura de area do 7o ano. Antes o
+ * aberturas() repartia o que sobrava em 0,46 e 0,54, ou seja chutava a forma, e a
+ * altura escrita era conferida contra esse chute e recusada. */
+conf('um angulo mais base e altura constroem, em vez de conferir contra chute',
+  comAviso('@fig triangulo angulo=90 base=4 altura=3', 'triangulo:') === 0);
+conf('e o triangulo sai com a altura valendo 3 para a base 4',
+  (function () {
+    const d2 = new PDFGen.Doc(); d2.novaPagina();
+    d2.partesDeFigura('@fig triangulo angulo=90 base=4 altura=3').forEach(function (p) {
+      if (p.tipo === 'figura') d2.figura(p.diretiva, { x: MARG_E + 20, largura: LARGURA });
+    });
+    const r = (d2.figurasDesenhadas || [])[0];
+    const lados = ((r.medido || {}).segmentos || []).filter((s) => Math.abs(s.w - 1.2) < 0.01)
+      .map(comp).sort((a, b) => a - b);
+    /* Catetos 3 e 4 e hipotenusa 5: a razao entre o maior e o menor e 5 sobre 3. */
+    return lados.length === 3 && Math.abs(lados[2] / lados[0] - 5 / 3) < 0.01;
+  })());
+conf('com DOIS angulos escritos, quem manda volta a ser o angulo e a altura e conferida',
+  comAviso('@fig triangulo angulo=90 angulo=53.13 angulo=36.87 base=4 altura=3 ' + FIEL,
+    'ela vale 5.33') === 1);
+
+console.log('\no quadradinho do vertice reto, que o teto de marcas nao deixa desenhar de oficio');
+/* A especificacao e explicita: no triangulo retangulo o quadradinho e a unica
+ * marca do vertice reto, e sem ele nao se sabe qual lado e a hipotenusa. Ele nao
+ * pode nascer aqui de oficio, porque tres medidas de lado ja sao tres marcas e a
+ * quarta somada a uma altura estoura o teto de cinco. Entao a receita avisa. */
+conf('tres lados que fecham Pitagoras sem vertice reto marcado sao avisados',
+  comAviso('@fig triangulo lado=3 lado=4 lado=5', 'fecham Pitagoras e nenhum vertice') === 1);
+conf('e com angulo=90 escrito o aviso some, porque o quadradinho sai',
+  comAviso('@fig triangulo lado=5 lado=4 lado=3 angulo=90', 'fecham Pitagoras') === 0);
+conf('e o triangulo que nao e retangulo nao e avisado',
+  comAviso('@fig triangulo lado=4 lado=6 lado=9', 'fecham Pitagoras') === 0);
+conf('o 3, 4, 5 com o quadradinho fica com quatro marcas, dentro do teto',
+  comAviso('@fig triangulo lado=5 lado=4 lado=3 angulo=90', 'marcas ativas') === 0);
+/* Nesse triangulo a altura relativa a base cai sobre o vertice reto, ou seja ela
+ * E o cateto que ja leva a medida 4: os dois nomeiam o mesmo segmento, e a
+ * especificacao diz que cada dado aparece em UM lugar so. */
+conf('a altura que coincide com um lado ja medido e recusada',
+  comAviso('@fig triangulo lado=5 lado=4 lado=3 angulo=90 altura=h ' + FIEL,
+    'nomeiam o mesmo segmento') === 1);
+conf('e sem a medida naquele lado ela passa',
+  comAviso('@fig triangulo angulo=90 base=4 altura=h legenda=Figura fora de escala.',
+    'triangulo:') === 0);
+
 console.log('\nescala: as tres saidas da regra, cada uma com o par ao lado');
 conf('so letra: base=b altura=h nao pede legenda de escala',
   comAviso('@fig triangulo base=b altura=h', 'fora de escala sem legenda') === 0);
@@ -493,6 +709,54 @@ conf('mistura: base=10 altura=h E fora de escala e cobra a legenda',
   comAviso('@fig triangulo base=10 altura=h', 'fora de escala sem legenda') === 1);
 conf('e com a legenda escrita no tema ela passa',
   comAviso('@fig triangulo base=10 altura=h legenda=Figura fora de escala.', 'fora de escala') === 0);
+/* "So letra" nao basta: o simbolo repetido e o simbolo com coeficiente AFIRMAM
+ * uma proporcao, e ai o prototipo tem que cumprir ou a figura tem que avisar.
+ * Estas seis diretivas saiam fiel e sem legenda com o prototipo contradizendo os
+ * proprios rotulos, e no commit anterior a esta familia elas saiam fora de
+ * escala: era regressao de honestidade. */
+conf('simbolos DISTINTOS e sem coeficiente continuam fiel',
+  comAviso('@fig triangulo lado=a lado=b lado=c', 'fora de escala') === 0);
+conf('simbolo repetido nos lados CONSTROI o isosceles, e ai continua fiel',
+  comAviso('@fig triangulo lado=a lado=a lado=b', 'fora de escala') === 0);
+conf('e o triangulo de a, a, b sai mesmo com dois lados iguais no desenho',
+  (function () {
+    const d2 = new PDFGen.Doc(); d2.novaPagina();
+    d2.partesDeFigura('@fig triangulo lado=a lado=a lado=b').forEach(function (p) {
+      if (p.tipo === 'figura') d2.figura(p.diretiva, { x: MARG_E + 20, largura: LARGURA });
+    });
+    const r = (d2.figurasDesenhadas || [])[0];
+    const P = r.unidades ? null : null;
+    const cont = ((r.medido || {}).segmentos || []).filter((s) => Math.abs(s.w - 1.2) < 0.01)
+      .map((s) => Math.sqrt((s.x2 - s.x1) * (s.x2 - s.x1) + (s.y2 - s.y1) * (s.y2 - s.y1)))
+      .sort((a, b) => b - a);
+    return cont.length === 3 && Math.abs(cont[0] - cont[1]) < 0.5 && cont[1] - cont[2] > 10;
+  })());
+conf('coeficiente nos lados tambem constroi: x, 2x, 2x sai com um lado da metade',
+  (function () {
+    const d2 = new PDFGen.Doc(); d2.novaPagina();
+    d2.partesDeFigura('@fig triangulo lado=x lado=2x lado=2x').forEach(function (p) {
+      if (p.tipo === 'figura') d2.figura(p.diretiva, { x: MARG_E + 20, largura: LARGURA });
+    });
+    const r = (d2.figurasDesenhadas || [])[0];
+    const cont = ((r.medido || {}).segmentos || []).filter((s) => Math.abs(s.w - 1.2) < 0.01)
+      .map((s) => Math.sqrt((s.x2 - s.x1) * (s.x2 - s.x1) + (s.y2 - s.y1) * (s.y2 - s.y1)))
+      .sort((a, b) => b - a);
+    return cont.length === 3 && Math.abs(cont[0] / cont[2] - 2) < 0.02;
+  })());
+conf('simbolo repetido que a construcao NAO honra volta a ser fora de escala',
+  comAviso('@fig quadrilatero tipo=retangulo base=a altura=a', 'fora de escala sem legenda') === 1);
+conf('e o retangulo de base b e altura h, simbolos distintos, continua fiel',
+  comAviso('@fig quadrilatero tipo=retangulo base=b altura=h', 'fora de escala') === 0);
+conf('duas bases com o mesmo simbolo num trapezio tambem avisam',
+  comAviso('@fig quadrilatero tipo=trapezio base=b base=b altura=h', 'fora de escala sem legenda') === 1);
+conf('e as bases B e b, distintas, continuam fiel',
+  comAviso('@fig quadrilatero tipo=trapezio base=B base=b altura=h', 'fora de escala') === 0);
+/* Letra em ANGULO nao entra nessa condicao, e a diferenca e de fundo: o angulo em
+ * letra e RESOLVIDO pelo sistema e a construcao usa o valor achado, enquanto o
+ * comprimento em letra sai do prototipo. */
+conf('angulo em letra repetida continua fiel, porque o sistema resolve o angulo',
+  comAviso('@fig quadrilatero tipo=paralelogramo angulo=2x angulo=2x', 'fora de escala') === 0);
+
 conf('o rotulo NAO conta como letra: base=10;b altura=6;h continua fiel',
   comAviso('@fig triangulo base=10;b altura=6;h', 'fora de escala') === 0);
 conf('e o rotulo da diagonal tambem nao: base=4 altura=3 diagonal=A;C;d continua fiel',

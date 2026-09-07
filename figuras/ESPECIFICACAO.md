@@ -193,11 +193,22 @@ e a figura ja sai marcada fora de escala pela regra de escala abaixo.
   Ex.: `@fig triangulo lado=4 lado=6 lado=9 altura=h;h;A escala=fiel`.
 - `diagonal=A;C[;V][;R]`: continua sendo o corte que parte o quadrilatero em dois triangulos,
   agora com medida e letra. `diagonal=A;C` e a forma antiga e sai identica; `diagonal=A;C;d`
-  rotula; `diagonal=A;C;13;d` constroi conferindo o 13 e escreve d. Linha CONTINUA e fina,
-  nunca tracejada: ela existe de verdade dentro da figura. Par de vertices VIZINHOS e
-  recusado, porque ali a diagonal e um lado. **Sem rotulo nao custa marca nenhuma (o traco
-  nao e dado a ler); com rotulo, uma.**
+  rotula; `diagonal=A;C;13;d` constroi conferindo o 13 e escreve d. Linha CONTINUA em
+  **0,9 pt**, nunca tracejada: ela existe de verdade dentro da figura. Par de vertices
+  VIZINHOS e recusado, porque ali a diagonal e um lado. **Sem rotulo nao custa marca nenhuma
+  (o traco nao e dado a ler); com rotulo, uma.**
   Ex.: `@fig quadrilatero tipo=retangulo base=4 altura=3 diagonal=A;C;5;d`.
+
+  A secao "Convencoes de desenho do livro didatico", mais abaixo, ainda diz 0,6 pt para a
+  diagonal, e ela e que esta desatualizada: **o valor certo e 0,9 pt**, e a mudanca esta
+  datada no cabecalho do `diagonais()` do `figuras/marcas.js`. O motivo e o argumento da
+  propria convencao levado ate o fim: se a diagonal e CONTINUA porque ela e objeto do
+  exercicio (ao contrario da altura e do prolongamento, que sao construcao), entao ela
+  pertence ao nivel da marca e nao ao do auxiliar. Medido na pagina 4 do piloto, a diagonal
+  que sustenta o argumento inteiro da secao saia em 0,60 pt na tinta mais clara da figura,
+  ou seja era a linha MENOS legivel de uma figura que ela propria explica. As diagonais
+  recuadas (as que nao levam o destaque) continuam em 0,6 pt, e ai a diferenca entre elas
+  esta dita duas vezes, por peso e por tinta.
 
 Quando `base=`, `altura=` e `diagonal=` chegam as tres com numero, a diagonal e CONFERIDA
 contra a conta, que num retangulo e o teorema de Pitagoras, e a figura e recusada com aviso
@@ -223,6 +234,64 @@ que o desenho nao garante, e ai a figura E fora de escala e a legenda continua o
 valor metrico e o primeiro campo de cada ocorrencia, entao o rotulo de `altura=6;h` e o de
 `diagonal=A;C;d` nao contam como letra. `escala=fiel` e `escala=fora` escritos na diretiva
 continuam mandando por cima.
+
+A saida do meio tem uma condicao, e ela e sobre COMPRIMENTO e nao sobre angulo. O angulo em
+letra e RESOLVIDO (o sistema fecha e a construcao usa o valor achado); o comprimento em letra
+nao e resolvido por ninguem e sai do prototipo. Entao letra em angulo e sempre fiel, e letra
+em comprimento so e fiel quando os simbolos sao **distintos e sem coeficiente**: `lado=a
+lado=b lado=c` e `base=b altura=h` nao afirmam proporcao nenhuma e qualquer desenho os
+satisfaz, mas `lado=a lado=a` afirma que dois lados sao iguais e o desenho tem que cumprir.
+Onde a receita SABE cumprir, ela constroi e a figura volta a ser fiel: o `triangulo` monta o
+isosceles de `lado=a lado=a lado=b`, o equilatero de `lado=a lado=a lado=a` e a proporcao 1
+para 2 de `lado=x lado=2x lado=2x`. Onde ela nao sabe (`retangulo base=a altura=a`,
+`trapezio base=b base=b altura=h`), a figura sai fora de escala e cobra a legenda, que e o
+que ela ja fazia antes desta familia existir.
+
+**Limitacao conhecida, e nao e da receita.** Rotulo de lado com COEFICIENTE (`lado=2x`) desenha
+certo, na proporcao certa, e mesmo assim sai com o aviso "o valor de angulo 2x saiu solto na
+figura, sem arco". A trava do `base.js` (`expressaoLinear`, linha 1324, usada em :1711)
+classifica valor de angulo pelo TEXTO, e "2x" e expressao linear com digito, que ela aceita com
+qualquer letra de proposito, para pegar o `3x+10` de angulo. Ela nao tem como saber que aquele
+texto foi posto por `rotuloLado` e nao por `rotuloAngulo`, porque o registro de texto do
+`medido` nao carrega o papel (campos: txt, x, y, tam, bold, cor, largura, cx, cy). E
+PRE-EXISTENTE e independente desta familia: `@fig triangulo angulo=52 angulo=61 lado=2x`, que
+nao passa por nenhuma linha nova, da o mesmo aviso. O conserto e acrescentar `papel` ao registro
+de texto no `desenho.js` e o `base.js` pular o que veio de lado; ficou de fora por ser dois
+arquivos de nucleo para um caso que nenhum tema usa hoje. **Enquanto isso, quem escrever tema
+com `lado=2x` vai ver o piloto reprovar por aviso de figura**, e a saida e usar simbolos
+distintos (`lado=a lado=b`) ou marcar a proporcao no texto do enunciado.
+
+**O que a receita DEDUZ em vez de recusar.** Diretiva incompleta que descreve uma figura que
+existe e desenhada, e nao recusada:
+
+- `retangulo base=4 diagonal=A;C;5` da altura 3 por Pitagoras, e `altura=3 diagonal=A;C;5` da
+  base 4. `quadrado diagonal=A;C;8.49` da lado 6.
+- `triangulo angulo=90 base=4 altura=3` desenha o retangulo de catetos 4 e 3: UM angulo mais
+  a base e a altura ja determinam o triangulo (o apice fica em h sobre a tangente do angulo).
+- `quadrilatero tipo=paralelogramo angulo=120 base=10 altura=6` desenha: o angulo fixa a
+  inclinacao das pernas e deixa a razao dos lados livre, entao a base e a altura entram
+  medindo o que ele deixou em aberto. Vale igual no losango e nos dois trapezios.
+
+**Toda medida numerica e conferida contra o desenho, e a ausencia de uma chave nao desliga a
+conferencia.** Quem confere e a ESCALA DO PROBLEMA: o primeiro comprimento numerico da
+diretiva (qualquer `lado=`, `base=` ou `altura=`) fixa quantas unidades do problema vale uma
+unidade da construcao, e dali em diante todo outro numero esta determinado e e comparado com
+o que a figura produziu. `lado=4 lado=6 lado=9 altura=8` e recusado porque a altura desses
+lados vale 2,12; `retangulo base=4 diagonal=A;C;12` nao e recusado, porque com uma dimensao e
+a diagonal a outra sai da conta. Quando a forma NAO esta determinada (o trapezio escaleno sem
+as duas bases, por exemplo), uma diagonal numerica e recusada dizendo o que falta, em vez de
+ser comparada com um segmento que o prototipo chutou.
+
+Tres recusas que valem escrever, porque sao as que o autor de tema encontra primeiro:
+`altura=h;B` sozinha e ambigua (o segundo campo e o rotulo, entao a altura que parte de B se
+escreve `altura=h;h;B`); `base=10 altura=6;h;B` nao determina o triangulo, porque a base mede
+AB e a altura mede a relativa ao lado oposto a B; e a altura que cai sobre um vertice E o
+lado que sai dali, entao ela nao pode ser escrita junto com a medida daquele lado.
+
+O `triangulo` tambem AVISA (sem recusar) quando os tres lados numericos fecham Pitagoras e
+nenhum vertice esta marcado como reto: o quadradinho e a unica marca do vertice reto, e sem
+ele nao se sabe qual lado e a hipotenusa. Ele nao pode nascer de oficio porque tres medidas
+de lado ja sao tres marcas, e a quarta somada a uma altura estoura o teto de cinco.
 
 O que ainda NAO existe: `mediana=` e `bissetriz=` com medida (a `ceviana=` traca as tres e
 mede nenhuma), a altura relativa a um lado que nao seja a base no quadrilatero, e duas alturas
