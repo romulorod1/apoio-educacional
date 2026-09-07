@@ -208,7 +208,24 @@ console.log('\ntrava E: escala coerente');
     'triangulo marcada fora de escala e sem legenda');
   conf('trava E: a figura marcada fora de escala que saiu EXATA e acusada',
     P.escalaIncoerente([figForaMasExata]).join('; '),
-    'triangulo marcada fora de escala e saiu exata: todo valor da diretiva e numero');
+    'triangulo marcada fora de escala e saiu exata: lado=3 lado=4 lado=5, todo valor e numero');
+  /* O par LIMPO da segunda metade, que faltava: fora de escala, COM legenda e
+   * com valor em letra. Esta a trava tem que APROVAR, porque a afirmacao e
+   * verdadeira. Sem ele, trocar o `every` por `some` no detector deixava a
+   * prova verde: bastava um valor numerico no meio dos de letra para a figura
+   * honesta ser acusada e ninguem ver. */
+  const figForaHonesta = P.rascunho('@fig triangulo angulo=3x+10 angulo=61 angulo=52 legenda=Figura fora de escala.').figs[0];
+  conf('trava E: a figura fora de escala COM legenda e com valor em letra e aprovada',
+    P.escalaIncoerente([figForaHonesta]).join('; ') || 'nenhuma', 'nenhuma');
+  const figForaMista = P.rascunho('@fig triangulo lado=3 lado=4 lado=x escala=fora legenda=Figura fora de escala.').figs[0];
+  conf('trava E: e a que mistura numero com letra tambem, porque ela nao saiu exata',
+    P.escalaIncoerente([figForaMista]).join('; ') || 'nenhuma', 'nenhuma');
+  /* E a lista de chaves metricas vem da receita, nao deste arquivo. */
+  conf('trava E: as chaves metricas do triangulo sao as que o receitas.js declara',
+    JSON.stringify(P.valoresMetricos('@fig triangulo lado=3 lado=4 lado=5 cor=teal', 'triangulo').map(function (v) { return v.chave; })),
+    JSON.stringify(['lado', 'lado', 'lado']));
+  conf('trava E: e receita desconhecida nao afirma nada',
+    P.valoresMetricos('@fig inventada lado=3', 'inventada'), null);
 }
 
 /* ================================================================ trava F */
@@ -309,6 +326,17 @@ console.log('\ntrava 5: toda hachura tem glosa');
   const comPlano = P.rascunho('@fig circulo eixos=sim raio=5 centro=2;1;C coordenadas=sim').figs[0];
   conf('trava 5: e o plano com tiques e eixos nao passa por hachurado',
     P.ehHachurada(comPlano), false);
+  /* Os aneis alternam 45 e 135 de proposito, para cada anel se distinguir do
+   * vizinho. A primeira versao do detector chamava esse par de malha e devolvia
+   * vazio: 56 segmentos de varredura e nenhuma hachura vista. */
+  const comAneis = P.rascunho('@fig circulo raio=6 aneis=2;4;6 centro=O legenda=A região hachurada é o anel.').figs[0];
+  conf('trava 5: a figura de aneis, hachurada a 45 e 135, e lida como hachurada',
+    P.ehHachurada(comAneis), true);
+  conf('trava 5: e as duas inclinacoes dela sao vistas, nao uma so',
+    P.inclinacoesDeHachura(comAneis).sort(function (a, b) { return a - b; }).join(' '), '45 135');
+  const semLegendaAneis = P.rascunho('@fig circulo id=v2 raio=6 aneis=2;4;6 centro=O').figs[0];
+  conf('trava 5: e a mesma figura de aneis sem legenda e acusada',
+    P.hachuraSemGlosa(limpo, 'pt', [semLegendaAneis]).join('; '), 'pt v2 hachurada sem legenda');
 }
 
 /* ================================================================ trava 6 */
