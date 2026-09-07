@@ -862,6 +862,18 @@
     { chave: 'valor', rotulo: 'Valor', largura: 92.2756, align: 'dir' }
   ];
 
+  /* A faixa do total do mês, desenhada pela mesma linhaTabela das tabelas para
+     ter o mesmo peso de total que elas: uma coluna larga para a frase e a
+     coluna de valor exatamente onde está a coluna Valor das duas tabelas, para
+     o número do mês cair alinhado com os outros dois totais em vez de flutuar
+     no meio da folha. A largura vem da própria COLUNAS: se a tabela mudar de
+     medida, a faixa acompanha sozinha. */
+  var LARG_VALOR = COLUNAS[COLUNAS.length - 1].largura;
+  var COLUNAS_TOTAL_MES = [
+    { chave: 'rotulo', rotulo: '', largura: UTIL - LARG_VALOR, align: 'esq' },
+    { chave: 'valor', rotulo: '', largura: LARG_VALOR, align: 'dir' }
+  ];
+
   /* A tabela desenha as colunas que receber, e cai nas do fechamento quando
    * ninguém disser outra coisa. Assim o fechamento continua chamando
    * exatamente como chamava, sem uma linha mexida, e a proposta passa as
@@ -947,7 +959,14 @@
        acontecido quando três tinham. O item 02 desta rodada separou as somas no
        motor (qtdEncontrosFeitos, valorFeito, minFeitos); aqui a tabela se separa
        junto: em cima o que aconteceu até hoje, embaixo o que está marcado à
-       frente, com o total do mês fechado por escrito.
+       frente, e o total do mês fechado abaixo das duas, com peso de total.
+
+       Esse total do mês já foi impresso aqui como parágrafo apagado, em corpo
+       de nota, e isso quebrou uma família: a mãe paga adiantado e recebe o
+       fechamento antes de as aulas acontecerem, então o número que ela precisa
+       ler é justamente o total do mês, e ele estava escondido numa frase que
+       ainda começava dizendo que aquilo não entrava no total. Separar as duas
+       somas continua certo; esconder a soma que a família vai pagar, não.
 
        Mês vencido não tem nada à frente, e nesse caso sai exatamente a folha de
        sempre: a tabela de baixo não existe e a de cima tem o mês inteiro. */
@@ -998,6 +1017,18 @@
     linhaTabela(doc, {
       data: 'Total',
       dur: horasDaTabela + ' h',
+      /* Sem sufixo nenhum, como sempre foi: "3 encontros até 15/09" com datas à
+         frente, "1 encontro" no mês vencido. A linha diz quantos encontros a
+         tabela DE CIMA soma, e o ate diz até quando; nada além disso.
+
+         Uma versão intermediária escreveu " dados" aqui, para casar com um
+         "Total das aulas dadas" que o texto chegou a ter. Os dois saíram pelo
+         mesmo motivo, escrito por extenso no core.js, em markdownFechamento:
+         falta sem aviso é cobrável por padrão, entra no valor desta tabela e
+         conta como encontro, então chamar de "dados" os encontros desta linha
+         contradiz a tabela logo acima, onde a mesma falta aparece com o valor
+         cobrado na coluna Valor. O que motivou mexer aqui era a palavra
+         "cobrar", e ela nunca esteve neste campo. */
       situacao: encontrosDaTabela + ' encontro' + (encontrosDaTabela === 1 ? '' : 's') + ate,
       /* Tabela sem uma linha sequer não tem "vários" preço nenhum: fica em
          branco. O mês inteiro vazio continua como sempre foi. */
@@ -1042,6 +1073,21 @@
       doc.y -= 6;
       cabecalhoTabela(doc);
       corpoDaTabela(previstas);
+      /* A reserva das TRÊS peças que não podem se separar: a linha de Total
+         desta tabela, a folga de 14 e a faixa do total do mês. Ela é feita aqui,
+         ANTES da linha de Total, e não antes da faixa.
+
+         Feita antes da faixa não adiantava nada: quando o espaço acabava, o
+         garanteEspaco de lá virava a página e a faixa nascia SOZINHA no alto da
+         folha nova, sem uma linha de tabela e sem o título "Ainda marcadas neste
+         mês". Reproduzido com 38 datas à frente, que davam uma folha só com a
+         faixa e o Feedback, e com 1 aula passada e 25 à frente, que punha a
+         faixa sozinha na página 2.
+
+         Virando a página aqui, a linha de Total e a faixa viajam juntas, e o
+         cabeçalho é redesenhado na folha nova: é o mesmo que a própria
+         linhaTabela já faz quando uma linha solta vira a página. */
+      if (doc.garanteEspaco(18 + 14 + 18)) cabecalhoTabela(doc);
       linhaTabela(doc, {
         data: 'Total',
         dur: dados.horasPrevistas + ' h',
@@ -1050,13 +1096,25 @@
         vh: '',
         valor: fmtMoedaLocal(dados.valorPrevisto)
       }, 0, true);
-      doc.y -= 16;
-      doc.garanteEspaco(30);
-      doc.paragrafo('Estas datas ainda não aconteceram e não entram no total acima. ' +
-        'Se todas acontecerem, o mês fecha em ' + dados.qtdEncontros + ' encontro' +
-        (dados.qtdEncontros === 1 ? '' : 's') + ', ' + dados.totalHoras + ' h e ' +
-        fmtMoedaLocal(dados.totalValor) + '.',
-        { tam: 9, cor: COR.muted, alturaLinha: 12.5 });
+      /* O total do mês, com o mesmo peso dos outros dois totais, porque é o
+         número que a família que paga adiantado procura na folha.
+
+         A folga de 14 pt antes da faixa é o que impede que ela seja lida como
+         mais uma linha da tabela de cima, cuja coluna soma outro número: o
+         rótulo diz de qual soma se trata e o valor cai na mesma coluna Valor.
+
+         Aqui não há reserva nenhuma, e é de propósito: quem impede que a faixa
+         fique órfã é a reserva das três peças feita logo acima, antes da linha
+         de Total, que traz a linha de Total junto quando a página vira. Uma
+         reserva neste ponto era o próprio defeito, porque virava a página com a
+         faixa já separada da tabela. */
+      doc.y -= 14;
+      linhaTabela(doc, {
+        rotulo: 'Total do mês, já contando as datas ainda marcadas: ' +
+          dados.qtdEncontros + ' encontro' + (dados.qtdEncontros === 1 ? '' : 's') +
+          ', ' + dados.totalHoras + ' h',
+        valor: fmtMoedaLocal(dados.totalValor)
+      }, 0, true, COLUNAS_TOTAL_MES);
     }
 
     /* O que foi trabalhado. Vem antes do resumo escrito porque é o que a

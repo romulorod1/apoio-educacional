@@ -3150,8 +3150,15 @@
      * 3 dizia à família que onze encontros tinham acontecido quando três
      * tinham. O item 02 desta rodada separou as duas somas no motor; aqui a
      * tabela se separa junto: em cima o que aconteceu até hoje, embaixo o que
-     * está marcado à frente, com o total do mês fechado por escrito para
-     * ninguém precisar somar.
+     * está marcado à frente, e o total do mês fechado logo abaixo, como linha
+     * de total, no mesmo peso da linha de total de cima.
+     *
+     * Esse total do mês já saiu daqui como nota de rodapé, em letra de aviso, e
+     * isso quebrou uma família: a mãe paga adiantado e recebe o fechamento
+     * antes de as aulas acontecerem, então o número que ela precisa ler é
+     * justamente o total do mês, e ele estava escondido dentro de uma frase que
+     * ainda começava dizendo que aquilo não entrava no total. Separar as duas
+     * somas continua certo; esconder a soma que a família vai pagar, não.
      *
      * Com o mês vencido não há nada à frente, e aí sai exatamente o documento
      * de sempre, palavra por palavra: é assim que o fechamento fechado não
@@ -3214,7 +3221,39 @@
       });
     }
     L.push('');
-    L.push('**Total a cobrar' + ate + ':** ' + fmtMoeda(valorACobrar));
+    /* Com datas à frente, nenhuma linha de dinheiro desta folha carrega verbo de
+     * pagamento, e isso é de propósito.
+     *
+     * Esta linha saía como "**Total a cobrar até 03/10:** R$ 0,00", e o mês
+     * fechado, maior, vinha só depois da tabela das datas ainda marcadas. A mãe
+     * que paga adiantado recebe o fechamento no dia 3, procura no documento a
+     * palavra "cobrar" para saber quanto depositar, e lia zero: é o erro de
+     * pagar A MENOS, e é a família que motivou esta mudança inteira.
+     *
+     * O documento não sabe se aquela família paga adiantado ou no fim do mês,
+     * então qualquer verbo de pagar seria verdade para metade delas e mentira
+     * para a outra metade. Por isso cada linha diz só DE QUAL SOMA se trata:
+     * esta espelha o "**Valor destas datas:**" da tabela de baixo e fecha a
+     * tabela "Datas trabalhadas" a que se refere. Quem separa os dois números é
+     * a posição: o total do mês é a última linha em negrito da folha, e nunca é
+     * menor do que este.
+     *
+     * O rótulo também não diz "dadas", e dizer já foi tentado: falta sem aviso é
+     * cobrável por padrão, entra nesta soma e conta como encontro. Chamar de
+     * "aulas dadas" uma soma que inclui falta contradiz a tabela logo acima, que
+     * mostra a mesma falta com "sim" na coluna Cobrada, e contradiz na cara da
+     * família que tem mais motivo para conferir linha a linha.
+     *
+     * A linha de horas logo acima foi lida junto e ficou como estava, pelo mesmo
+     * critério: ali "cobradas" não diz quanto pagar, diz QUAIS horas entraram na
+     * soma, e faz par com "Horas não cobradas" logo abaixo.
+     *
+     * Mês vencido não tem nada à frente nem total embaixo, e por isso não muda
+     * uma letra: sai o "**Total a cobrar:**" de sempre, palavra por palavra, que
+     * é o documento de todas as famílias já mandadas. */
+    L.push(previstas.length
+      ? '**Total destas datas' + ate + ':** ' + fmtMoeda(valorACobrar)
+      : '**Total a cobrar:** ' + fmtMoeda(valorACobrar));
     if (f.semPreco.length) {
       L.push('');
       L.push('> Atenção: não há valor por hora vigente para ' + f.semPreco.map(ddmm).join(', ') + '.');
@@ -3232,10 +3271,12 @@
       L.push('**Horas ainda por dar:** ' + f.horasPrevistas + ' h');
       L.push('**Valor destas datas:** ' + fmtMoeda(f.valorPrevisto));
       L.push('');
-      L.push('> Estas datas ainda não aconteceram e não entram no total acima. ' +
-        'Se todas acontecerem, o mês fecha em ' + f.qtdEncontros + ' encontro' +
-        (f.qtdEncontros === 1 ? '' : 's') + ', ' + f.totalHoras + ' h e ' +
-        fmtMoeda(f.totalValor) + '.');
+      /* O fechamento do mês inteiro sai como linha de total, e não como
+       * rodapé: a mãe que paga adiantado lê este número. O motivo está inteiro
+       * no comentário das duas tabelas, no alto desta função. */
+      L.push('**Total do mês, já contando as datas ainda marcadas:** ' +
+        fmtMoeda(f.totalValor) + ' (' + f.qtdEncontros + ' encontro' +
+        (f.qtdEncontros === 1 ? '' : 's') + ', ' + f.totalHoras + ' h)');
     }
 
     if (exibeListas(opcoes) && temasNoTexto.length) {
@@ -3295,16 +3336,26 @@
     L.push('Média por hora no mês: ' + (totMin > 0 ? fmtMoeda(totVal / (totMin / 60)) : fmtMoeda(0)) + '.');
     /* Este documento é dela, e a tabela de cima continua sendo o mês inteiro:
      * é com ela que se planeja o mês. Mas o fechamento de cada aluno, logo
-     * abaixo, passou a cobrar só o que já aconteceu, e uma linha dizendo 11
-     * encontros em cima de um total de 3 encontros embaixo faria ela desconfiar
-     * da conta. Esta linha diz qual é qual, e só aparece com o mês correndo. */
+     * abaixo, separa o que já aconteceu do que ainda está marcado, e uma linha
+     * dizendo 11 encontros em cima de um total de 3 encontros embaixo faria ela
+     * desconfiar da conta. Esta linha diz qual é qual, e só aparece com o mês
+     * correndo.
+     *
+     * A frase explicava metade. O número desta tabela está lá embaixo, aluno
+     * por aluno: em quem tem data à frente, na linha do total do mês que o
+     * fechamento passou a trazer; em quem não tem, no "Total a cobrar" de
+     * sempre, que já era o mês inteiro. Dizer só "o total do que já aconteceu"
+     * mandava ela procurar embaixo uma diferença que embaixo já está
+     * resolvida. */
     var comFuturo = (fechs || []).filter(function (f) {
       return f && ((f.qtdEncontrosPrevistos || 0) > 0 || (f.minPrevistos || 0) > 0);
     });
     if (comFuturo.length && comFuturo[0].hoje) {
       L.push('');
       L.push('> A tabela acima é do mês inteiro. O fechamento de cada aluno, abaixo, ' +
-        'traz o total do que já aconteceu até ' + ddmmaaaa(comFuturo[0].hoje) + '.');
+        'traz o total do que já aconteceu até ' + ddmmaaaa(comFuturo[0].hoje) +
+        ' e também o total do mês inteiro daquele aluno, que é o valor da linha ' +
+        'dele nesta tabela.');
     }
     L.push('');
     fechs.forEach(function (f) {
