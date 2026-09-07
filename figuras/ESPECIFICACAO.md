@@ -302,9 +302,22 @@ existe e desenhada, e nao recusada:
   `angulo=90` no lugar era um beco: no 3, 4, 5 o angulo reto cai em C, a chave `angulo=`
   preenche na ordem A, B, C, e chegar la custava duas incognitas.
   A figura do MAT09-06 (triangulo retangulo com a altura relativa a hipotenusa) NAO cabe com
-  os tres lados rotulados: sao seis marcas. A grafia que cabe constroi pelos angulos e rotula
-  so a hipotenusa: `@fig triangulo angulo=36.87 angulo=53.13 base=5 altura=h`, cinco marcas,
-  fiel, com a altura conferida em 2,4.
+  os tres lados rotulados: sao seis marcas. A grafia que cabe e
+
+      @fig triangulo angulo=90 altura=h;h;A escala=fiel
+
+  com **tres marcas**: o quadradinho em A, a altura ate a hipotenusa e o quadradinho do pe
+  dela. E literalmente a figura que a convencao descreve para esse tema, com o 3, o 4 e o 5
+  morando no TEXTO, que e onde a regra "cada dado aparece em um lugar so" os quer. Ela precisa
+  do `escala=fiel` escrito porque `angulo=90` mais `altura=h` e mistura sem nenhum comprimento
+  na figura: nao ha numero que fixe a escala, entao o refinamento nao tem como declarar a
+  altura determinada.
+- `losango` pelas DUAS diagonais, ou por uma diagonal e o lado. As diagonais do losango sao
+  perpendiculares e se cortam ao meio, entao elas o determinam inteiro e o lado sai de
+  Pitagoras das metades. `@fig quadrilatero tipo=losango diagonal=A;C;8 diagonal=B;D;6 lado=L`
+  desenha os quatro lados medindo 5 na folha, que e O exercicio de losango do 8o e do 9o ano.
+  Nos tipos em que duas diagonais nao fecham a forma (o irregular, o trapezio, o
+  paralelogramo) a diagonal numerica continua recusada, com o aviso dizendo o que falta.
 
 **Toda medida numerica e conferida contra o desenho, e a ausencia de uma chave nao desliga a
 conferencia.** Quem confere e a ESCALA DO PROBLEMA: o primeiro comprimento numerico da
@@ -326,6 +339,18 @@ O `triangulo` tambem AVISA (sem recusar) quando os tres lados numericos fecham P
 nenhum vertice esta marcado como reto: o quadradinho e a unica marca do vertice reto, e sem
 ele nao se sabe qual lado e a hipotenusa. Ele nao pode nascer de oficio porque tres medidas
 de lado ja sao tres marcas, e a quarta somada a uma altura estoura o teto de cinco.
+
+Dois LIMITES CONHECIDOS, medidos e nao consertados, para quem for mexer nao os redescobrir:
+
+- **Legenda de escala numa figura que o refinamento tornou fiel imprime sem aviso.** O
+  desenhador nunca inventa a frase da legenda (ela vem do tema), e tambem nao a apaga: se o
+  tema escreveu `legenda=Figura fora de escala.` numa diretiva que hoje sai fiel, a folha
+  imprime a frase sobre um desenho exato. Nenhum tema do banco esta nesse caso. O conserto e
+  um aviso "legenda de escala numa figura fiel", que ainda nao existe.
+- **`angulo=90 altura=h;h;A vertices=A;B;C` da seis marcas.** As tres letras de vertice mais o
+  quadradinho, a altura e o quadradinho do pe passam do teto, ou seja "triangulo ABC retangulo
+  em A com altura AH" nao cabe COM as letras de vertice. Ou o texto nomeia os vertices e a
+  figura fica sem letras, ou a figura se parte em duas.
 
 O que ainda NAO existe: `mediana=` e `bissetriz=` com medida (a `ceviana=` traca as tres e
 mede nenhuma), a altura relativa a um lado que nao seja a base no quadrilatero, e duas alturas

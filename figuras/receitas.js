@@ -1247,6 +1247,59 @@
     return geo.trianguloPorLados(comps[0], comps[1], comps[2]) ? comps : null;
   }
 
+  /* O losango pelas DUAS diagonais, ou por uma diagonal e o lado.
+   *
+   * As diagonais do losango sao perpendiculares e se cortam ao meio, entao elas o
+   * determinam inteiro e o lado sai de Pitagoras das metades. "As diagonais de um
+   * losango medem 8 e 6, quanto mede o lado" e O exercicio de losango do 8o e do
+   * 9o ano, e ate aqui ele saia recusado com uma frase falsa: a receita conferia
+   * a segunda diagonal contra o PROTOTIPO e dizia "a diagonal BD mede 4.81 no
+   * desenho e nao 6", quando o losango de diagonais 8 e 6 existe e tem lado 5.
+   *
+   * Na volta A, B, C, D a diagonal AC vai de (0, 0) a (L + r, h) e a BD vai de
+   * (L, 0) a (r, h), com r ao quadrado mais h ao quadrado igual a L ao quadrado.
+   * Dai AC ao quadrado igual a 2L2 mais 2Lr e BD ao quadrado igual a 2L2 menos
+   * 2Lr, que dao L igual a raiz de (p2 mais q2) sobre 2, e r igual a (p2 menos
+   * q2) sobre 4L. O r NEGATIVO e legitimo: e ele que inclina o losango para o
+   * outro lado quando a diagonal BD e a maior. */
+  function losangoPorDiagonais(B, doc, basesConstrucao, diagonais) {
+    var p = null, q = null, i;
+    for (i = 0; i < diagonais.length; i++) {
+      if (diagonais[i].valor === null) continue;
+      var ehAC = (diagonais[i].i0 + diagonais[i].i1) === 2;   // A com C
+      if (ehAC) { if (p === null) p = diagonais[i].valor; }
+      else if (q === null) q = diagonais[i].valor;
+    }
+    if (p === null && q === null) return null;
+    var L = basesConstrucao.length && basesConstrucao[0].valor !== null
+      ? basesConstrucao[0].valor : null;
+    if (p !== null && q !== null) {
+      L = Math.sqrt(p * p + q * q) / 2;
+    } else if (L !== null) {
+      /* Uma diagonal mais o lado: a outra sai da mesma relacao. */
+      var so = p !== null ? p : q;
+      var outro2 = 4 * L * L - so * so;
+      if (!(outro2 > 0)) {
+        B.avisar(doc, 'quadrilatero: a diagonal ' + so + ' nao cabe num losango de lado ' +
+          arredondar(L) + ': as duas diagonais somam quatro vezes o lado ao quadrado');
+        return false;
+      }
+      if (p === null) { q = so; p = Math.sqrt(outro2); }
+      else q = Math.sqrt(outro2);
+    } else {
+      return null;   // uma diagonal so, sem lado: a escala fica livre e nao ha o que fechar
+    }
+    var r = (p * p - q * q) / (4 * L);
+    var h2 = L * L - r * r;
+    if (!(h2 > 0)) {
+      B.avisar(doc, 'quadrilatero: as diagonais ' + arredondar(p) + ' e ' + arredondar(q) +
+        ' nao formam losango');
+      return false;
+    }
+    var h = Math.sqrt(h2);
+    return [pt(0, 0), pt(L, 0), pt(L + r, h), pt(r, h)];
+  }
+
   /* A volta continua sendo A, B, C, D no anti-horario com AB na base, porque e
    * ela que a tabela NOTACAO usa para saber quais lados sao paralelos e quais
    * levam tracinho. Construir aqui em outra ordem apagaria a notacao da classe. */
@@ -3253,10 +3306,16 @@
           fam.min + ' e ' + fam.max + ' graus');
         return null;
       }
-      var dimQ = dimensoesBaseAltura(PROTO_BH[tipo] || PROTO_BH.retangulo,
-        basesConstrucao, alturas, deduzidas);
-      var formaBH = dimQ
-        ? quadrilateroPorBaseAltura(B, doc, tipo, dimQ, basesConstrucao, alturas, res.t) : null;
+      /* As diagonais fecham o losango sozinhas, e antes da base e da altura: ali
+       * elas sao o dado do enunciado, e nao um rotulo por cima do prototipo. */
+      var formaDiagonal = tipo === 'losango' && res.t === null
+        ? losangoPorDiagonais(B, doc, basesConstrucao, diagonais) : null;
+      if (formaDiagonal === false) return null;
+      var dimQ = formaDiagonal ? null
+        : dimensoesBaseAltura(PROTO_BH[tipo] || PROTO_BH.retangulo,
+          basesConstrucao, alturas, deduzidas);
+      var formaBH = formaDiagonal ||
+        (dimQ ? quadrilateroPorBaseAltura(B, doc, tipo, dimQ, basesConstrucao, alturas, res.t) : null);
       if (dimQ && !formaBH) return null;
       var pontos;
       if (formaBH) {
@@ -3411,7 +3470,11 @@
        * inclinacao das pernas, e ai UMA medida ja fecha o paralelogramo e o
        * losango, e duas fecham o trapezio isosceles. */
       else if (tipo === 'retangulo') formaFiel = (temB0 && temH) || !!deduzidas;
-      else if (tipo === 'losango') formaFiel = (temB0 && temH) || (comAngulo && (temB0 || temH));
+      /* As duas diagonais fecham o losango sozinhas, e uma diagonal mais o lado
+       * tambem: ali a forma nao tem nada de prototipo. */
+      else if (tipo === 'losango') {
+        formaFiel = !!formaDiagonal || (temB0 && temH) || (comAngulo && (temB0 || temH));
+      }
       else if (tipo === 'quadrado') formaFiel = temB0 || temH || !!deduzidas;
       /* O paralelogramo precisa das DUAS medidas, e nao de uma. O angulo fixa a
        * inclinacao das pernas e a base fixa um lado, mas a perna continua livre:
@@ -3431,7 +3494,15 @@
        * determinada e a escala fixada, toda letra da diretiva nomeia um valor
        * exato, e a marca de fora de escala seria falsa. Ver a nota "a letra que e
        * pergunta", na secao da escala. */
-      if (fora && formaFiel && kMedida !== null && d.escala !== 'fora') fora = false;
+      if (fora && formaFiel && (kMedida !== null || kDiagonal !== null) && d.escala !== 'fora') {
+        fora = false;
+      }
+
+      /* Quantas diagonais trazem NUMERO, que e o que decide se ha algo a amarrar.
+       * Uma sozinha fixa a escala e nao pode contradizer ninguem; a partir da
+       * segunda, elas se amarram entre si. */
+      var diagNumericas = 0;
+      for (var dn = 0; dn < diagonais.length; dn++) if (diagonais[dn].valor !== null) diagNumericas++;
 
       /* A diagonal e o argumento da soma 360: sem ela nao ha os dois triangulos, e
        * a demonstracao por decomposicao nao existe. Ela vai CONTINUA e fina, e
@@ -3451,27 +3522,31 @@
        * secao inteira acabou de fechar. Entao a receita recusa e diz o que falta. */
       for (var idg = 0; idg < diagonais.length; idg++) {
         if (diagonais[idg].valor === null || d.escala === 'fora') continue;
-        /* Sem escala de comprimento, a PRIMEIRA diagonal numerica fixa a escala e
-         * as seguintes sao conferidas contra ela. Com uma so nao ha o que
-         * conferir, e nem o que recusar: ela e o unico numero da figura. */
-        if (kMedida === null) {
-          var brigaD2 = kDiagonal === null ? null
-            : conferirDiagonal(geo, pontos, diagonais[idg], kDiagonal, notacao.retos);
-          if (brigaD2) { B.avisar(doc, 'quadrilatero: ' + brigaD2); return null; }
-          continue;
-        }
-        if (!formaFiel) {
+        /* Ha o que amarrar quando existe escala de comprimento, ou quando ha mais
+         * de uma diagonal numerica: uma sozinha e o unico numero da figura, fixa a
+         * escala e pronto. */
+        var haQueAmarrar = kMedida !== null || diagNumericas > 1;
+        if (!haQueAmarrar) continue;
+        /* No retangulo e no quadrado a CLASSE ja garante que as duas diagonais sao
+         * iguais, entao a segunda e conferivel mesmo sem base nem altura. Fora
+         * disso a forma tem que estar determinada: o ramo da diagonal nao pode
+         * conferir contra o prototipo, que e exatamente o que ele existe para
+         * impedir. Medido: "losango diagonal=A;C;8 diagonal=B;D;6 lado=L" era
+         * recusado com "a diagonal BD mede 4.81 e nao 6", e o losango de diagonais
+         * 8 e 6 existe, tem lado 5 e e O exercicio de losango do 8o ano. */
+        if (!formaFiel && !notacao.retos) {
           /* O que falta nao e o mesmo em todo tipo, e mandar escrever a chave
            * errada custa outra rodada de tentativa. */
           var falta = tipo === 'paralelogramo' || tipo === 'losango' ? 'a altura'
             : (tipo === 'trapezioisosceles' ? 'a base menor e a altura' : 'as duas bases e a altura');
           B.avisar(doc, 'quadrilatero: a diagonal ' + diagonais[idg].valor + ' nao tem como ser ' +
-            'conferida, porque a forma do ' + tipo + ' ainda nao esta determinada: falta ' + falta +
-            ', o que falta sai do prototipo e a diagonal sairia medindo o chute. Escreva o que ' +
-            'falta, ou tire o numero da diagonal e deixe so o rotulo');
+            'conferida, porque a forma do ' + tipo + ' ainda nao esta determinada: o que falta e ' +
+            falta + ', e o que falta sai do prototipo, entao a diagonal sairia medindo o chute. ' +
+            'Escreva o que falta, ou tire o numero da diagonal e deixe so o rotulo');
           return null;
         }
-        var brigaD = conferirDiagonal(geo, pontos, diagonais[idg], kMedida, notacao.retos);
+        var brigaD = conferirDiagonal(geo, pontos, diagonais[idg],
+          kMedida !== null ? kMedida : kDiagonal, notacao.retos);
         if (brigaD) { B.avisar(doc, 'quadrilatero: ' + brigaD); return null; }
         /* A diagonal que FECHA com as duas dimensoes ja escritas nao acrescenta
          * dado: ela e deducao. IMPRESSA como numero, a folha mostra quatro
