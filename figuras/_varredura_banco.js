@@ -247,6 +247,11 @@ comFigura.forEach(function (t) {
 });
 console.log('        trava 3 rodada nos ' + comFigura.length + ' temas que ja tem figura: ' +
   (trava3.length ? trava3.join(' | ') : 'nenhum item fora do lugar'));
+/* Esta afirmacao passa vazia quando comFigura fica vazio, e um banco sem nenhuma
+ * diretiva a deixaria verde sem olhar nada. Nao vale cravar o numero cinco, que
+ * sobe a cada lote da varredura e viraria manutencao; vale exigir que haja o que
+ * olhar. */
+conf('ha tema com figura para a trava 3 olhar', comFigura.length > 0, true);
 conf('nos temas que ja tem figura, todo enunciado com figura remete a ela e nenhum sem figura fala dela',
   trava3.join(' | ') || 'nenhum', 'nenhum');
 /* Os isentos continuam classificados como outro sentido da palavra. */

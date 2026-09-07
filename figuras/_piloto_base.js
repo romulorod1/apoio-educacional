@@ -374,12 +374,16 @@ const REMETE_NUA = {
   pt: /\b(?:n[ao]|d[ao])\s+figura\b/i,
   en: /\bin the (?:figure|diagram|picture)\b/i
 };
-/* A uniao das duas, exportada para quem quiser a lista inteira num objeto so.
- * Quem CONFERE usa remeteAFigura, que respeita a ordem. */
-const REMETE = {
-  pt: new RegExp(FORMA_FORTE.pt.source + '|' + REMETE_NUA.pt.source, 'i'),
-  en: new RegExp(FORMA_FORTE.en.source + '|' + REMETE_NUA.en.source, 'i')
-};
+/* NAO existe aqui uma expressao unica que junte as duas, e a ausencia e
+ * deliberada. Havia uma, chamada REMETE, exportada "para quem quiser a lista
+ * inteira num objeto so", sem nenhum usuario. Ela era uma arma carregada: quem
+ * escrevesse REMETE.test(textoDeRemissao(s)) reinstalaria em uma linha o defeito
+ * que custou uma rodada inteira, porque procuraria a forma FORTE no texto ja
+ * apagado, e "Calcule a area da figura ao lado" voltaria a nao contar. O ponto
+ * desta trava nao e QUAIS formas se procura, e sim EM QUAL TEXTO cada uma e
+ * procurada, e um objeto que junta as duas apaga exatamente essa distincao.
+ * Quem confere usa remeteAFigura; quem quer listar usa ocorrenciasDeRemissao,
+ * que marca cada ocorrencia com forte ou nua. */
 const SENTIDO_DE_FORMA = {
   /* Sem \b antes de "area": em JavaScript \b e ASCII, e entre um espaco e o
    * "a" acentuado nao ha fronteira de palavra nenhuma. Com o \b, "a area da
@@ -1247,7 +1251,7 @@ module.exports = {
   nomeDaFigura: nomeDaFigura, bolinhasDe: bolinhasDe, segmentos09: segmentos09,
   planoDaFigura: planoDaFigura, pecasDeTexto: pecasDeTexto,
   semDiretiva: semDiretiva, diretivasDe: diretivasDe, clonar: clonar,
-  REMETE: REMETE, FORMA_FORTE: FORMA_FORTE, REMETE_NUA: REMETE_NUA,
+  FORMA_FORTE: FORMA_FORTE, REMETE_NUA: REMETE_NUA,
   SENTIDO_DE_FORMA: SENTIDO_DE_FORMA,
   textoDeRemissao: textoDeRemissao, remeteAFigura: remeteAFigura, formaForte: formaForte,
   ocorrenciasDeRemissao: ocorrenciasDeRemissao,
