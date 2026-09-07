@@ -709,7 +709,7 @@ def marcacao_quebrada(texto):
 # par envenenado escrito com o relogio explodiria sozinho na virada do ano.
 GENEROS_DE_FONTE = ['conto', 'poema', 'cronica', 'fabula', 'noticia', 'reportagem', 'artigo',
                     'entrevista', 'propaganda', 'verbete', 'bilhete', 'carta', 'teatro', 'romance',
-                    'ensaio', 'cantiga', 'parlenda', 'outro']
+                    'ensaio', 'cantiga', 'parlenda', 'relato', 'instrucao', 'outro']
 DOMINIOS_DE_FONTE = ['publico', 'autoral', 'cc', 'tradicional']
 CAMPOS_DE_FONTE = ['id', 'titulo', 'autor', 'ano', 'genero', 'dominio',
                    'licenca', 'procedencia', 'integral']
