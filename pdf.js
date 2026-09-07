@@ -3128,6 +3128,10 @@
    * explicação, a lista, o gabarito, ou só um deles. */
   function gerarMaterialTema(op) {
     var doc = new Doc();
+    /* Os metadados das fontes citadas pelo tema, montados pelo gerador de banco.
+     * Vêm antes de qualquer desenho porque a explicação já pode trazer bloco de
+     * citação, e o crédito sai de doc.fontes. */
+    doc.fontes = op.tema.fontes || {};
     var lingua = op.lingua === 'en' ? 'en' : 'pt';
     doc.lingua = lingua;          // a moldura lê daqui, no finalizar()
     var dados = op.tema[lingua];
@@ -3189,19 +3193,82 @@
      * com o desenho dele aparecendo no topo da seguinte, acima de nada e antes do
      * número do exercício seguinte. Medido numa lista de 8 exercícios iguais: 30
      * de 41 valores de espaçoParaResposta reproduziam. */
-    function medirItem(bruto, tam, recuo, alturaLinha) {
-      var partes = doc.partesDeFigura(bruto);
-      var corrido = [], figuras = [];
-      partes.forEach(function (p) {
-        if (p.tipo === 'figura') figuras.push(p.diretiva); else corrido.push(p.valor);
+    /* O que fazer com cada pedaço do item é decidido pelo TIPO, num lugar só. O
+     * partesDeFigura entrega hoje 'texto' e 'figura'; um tipo novo (a equação de
+     * bloco dentro do exercício) entra acrescentando um caso nesta tabela e uma
+     * linha em cada metade, sem mexer no resto do item.
+     *
+     * Pedaço de tipo desconhecido vira aviso e NÃO sai impresso: marcação
+     * impressa por extenso na folha da aluna é o defeito silencioso que toda
+     * esta separação existe para impedir. */
+    var PEDACO_DO_ITEM = {
+      texto: function (saida, p) { saida.texto.push(p.valor); },
+      figura: function (saida, p) { saida.figura.push(p.diretiva); }
+    };
+    function separarPorTipo(bruto) {
+      var saida = { texto: [], figura: [] };
+      doc.partesDeFigura(bruto).forEach(function (p) {
+        var caso = PEDACO_DO_ITEM[p.tipo];
+        if (!caso) { doc.avisoDeFigura('pedaço de tipo desconhecido no item: ' + p.tipo); return; }
+        caso(saida, p);
       });
-      var segmentos = quebrarRico(partirRico(corrido.join(' ')), MARG_D - recuo, tam);
+      return saida;
+    }
+
+    /* Alternativa: uma linha por letra, o rótulo em COR.teal no recuo do item e o
+     * texto 16 pt à frente, pela tubulação rica e com quebra na largura. */
+    var ALT_TAM = 10, ALT_ENTRE = 14.5, ALT_RECUO = 16;
+
+    function medirAlternativas(ex, recuo) {
+      var lista = (ex && ex.alternativas) || [];
+      return lista.map(function (alt) {
+        return {
+          letra: String(alt.letra == null ? '' : alt.letra) + ')',
+          linhas: quebrarRico(partirRico(alt.texto), MARG_D - recuo - ALT_RECUO, ALT_TAM)
+        };
+      });
+    }
+
+    function alturaDeAlternativas(medidas) {
+      var alto = 0;
+      for (var i = 0; i < medidas.length; i++) alto += medidas[i].linhas.length * ALT_ENTRE;
+      return alto;
+    }
+
+    function escreverAlternativas(medidas, recuo) {
+      for (var i = 0; i < (medidas || []).length; i++) {
+        for (var k = 0; k < medidas[i].linhas.length; k++) {
+          doc.garanteEspaco(ALT_ENTRE);
+          doc.y -= ALT_ENTRE;
+          if (k === 0) doc.texto(medidas[i].letra, recuo, doc.y, { tam: ALT_TAM, cor: COR.teal });
+          doc.escreverSegmentos(medidas[i].linhas[k], recuo + ALT_RECUO, doc.y, { tam: ALT_TAM });
+        }
+      }
+    }
+
+    /* extras: { ex, creditoDoTrecho }, e só o item de português tem. O trecho
+     * próprio e as alternativas entram na MESMA altura do enunciado, para o
+     * número, o enunciado, o trecho e as alternativas ficarem na mesma página
+     * quando cabem; o teto de uma folha continua no reservarBloco. */
+    function medirItem(bruto, tam, recuo, alturaLinha, extras) {
+      var pedacos = separarPorTipo(bruto);
+      var figuras = pedacos.figura;
+      var segmentos = quebrarRico(partirRico(pedacos.texto.join(' ')), MARG_D - recuo, tam);
       // a primeira linha divide a linha do número, então só as seguintes descem
       var altura = Math.max(0, segmentos.length - 1) * alturaLinha;
       figuras.forEach(function (d) {
         altura += doc.alturaDeFigura(d, { x: recuo, largura: MARG_D - recuo });
       });
-      return { segmentos: segmentos, figuras: figuras, altura: altura };
+      var ex = extras && extras.ex;
+      var trecho = (ex && ex.trecho && ex.trecho.conteudo) ? ex.trecho : null;
+      var creditoDoTrecho = !!(extras && extras.creditoDoTrecho);
+      var alternativas = medirAlternativas(ex, recuo);
+      if (trecho) altura += doc.alturaDeCitacao(trecho, { tam: 10, credito: creditoDoTrecho });
+      altura += alturaDeAlternativas(alternativas);
+      return {
+        segmentos: segmentos, figuras: figuras, altura: altura,
+        trecho: trecho, creditoDoTrecho: creditoDoTrecho, alternativas: alternativas
+      };
     }
 
     function escreverItem(med, tam, recuo, alturaLinha) {
@@ -3212,7 +3279,102 @@
       med.figuras.forEach(function (d) {
         doc.figura(d, { x: recuo, largura: MARG_D - recuo });
       });
+      /* O trecho próprio do item (G6) sai LOGO DEPOIS do enunciado e antes das
+       * alternativas, com número e fio. O crédito só quando a fonte dele é
+       * diferente da do texto de apoio do item: repetido embaixo do texto de
+       * apoio e de novo embaixo do trecho, ele viraria ruído. */
+      if (med.trecho) {
+        doc.citacao(med.trecho, { tam: 10, credito: med.creditoDoTrecho });
+      }
+      escreverAlternativas(med.alternativas, recuo);
       return med.figuras.length;
+    }
+
+    /* Rótulos do gabarito aberto. Ficam em português porque matéria com catálogo
+     * (português e literatura) não tem versão em inglês; a folha de matemática
+     * nunca chega aqui, porque não tem gabarito estruturado. */
+    var ROTULO_GABARITO = {
+      espera_se: 'Espera-se', aceita_se: 'Aceita-se',
+      nao_aceita: 'Não se aceita', ancora: 'No texto'
+    };
+    var GAB_TAM = 9.5, GAB_ENTRE = 13.5, GAB_RECUO_MARCADOR = 12;
+
+    /* O gabarito estruturado, medido inteiro antes de escrever, pela mesma
+     * metade que mede o enunciado: sem a medida não dá para reservar o bloco, e o
+     * critério da resposta aberta partiria no meio na virada da folha, que é
+     * justamente onde a professora precisa dele inteiro.
+     *
+     * A âncora é a única parte que é TEXTO e não julgamento, então sai como
+     * mini-citação: recuo, fio e itálico, sem número e sem crédito. */
+    function medirGabarito(ex, recuo) {
+      var gab = ex.gabarito || {};
+      var pecas = [], alto = 0;
+
+      function corrido(txt, opcoes) {
+        opcoes = opcoes || {};
+        var deslocamento = opcoes.recuo || 0;
+        var linhas = quebrarRico(partirRico(String(txt == null ? '' : txt)),
+          MARG_D - recuo - deslocamento, GAB_TAM);
+        pecas.push({ tipo: 'corrido', linhas: linhas, recuo: deslocamento,
+          bold: !!opcoes.bold, marcador: opcoes.marcador || '' });
+        alto += linhas.length * GAB_ENTRE;
+      }
+      function rotulo(chave) {
+        pecas.push({ tipo: 'rotulo', txt: ROTULO_GABARITO[chave] });
+        alto += GAB_ENTRE;
+      }
+      function ancora(txt) {
+        var bloco = { fonte: null, linhas: [0, 0], conteudo: [String(txt)] };
+        pecas.push({ tipo: 'ancora', bloco: bloco });
+        alto += doc.alturaDeCitacao(bloco, { tam: GAB_TAM, credito: false });
+      }
+      function listaMarcada(itens) {
+        (itens || []).forEach(function (it) {
+          corrido(it, { recuo: GAB_RECUO_MARCADOR, marcador: '\u2022' });
+        });
+      }
+
+      if (gab.letra) {
+        corrido(gab.letra, { bold: true });
+        if (gab.porque) corrido(gab.porque, {});
+        if (gab.ancora) ancora(gab.ancora);
+      } else if (gab.espera_se) {
+        rotulo('espera_se'); corrido(gab.espera_se, {});
+        rotulo('aceita_se'); listaMarcada(gab.aceita_se);
+        rotulo('nao_aceita'); listaMarcada(gab.nao_aceita);
+        if (gab.ancora) { rotulo('ancora'); ancora(gab.ancora); }
+      }
+      // a primeira linha divide a linha do número, como no item da lista
+      return { pecas: pecas, altura: Math.max(0, alto - GAB_ENTRE) };
+    }
+
+    function escreverGabarito(med, recuo) {
+      var naLinhaDoNumero = true;
+      function descer() {
+        if (naLinhaDoNumero) { naLinhaDoNumero = false; return; }
+        doc.garanteEspaco(GAB_ENTRE);
+        doc.y -= GAB_ENTRE;
+      }
+      med.pecas.forEach(function (p) {
+        if (p.tipo === 'rotulo') {
+          descer();
+          doc.texto(p.txt, recuo, doc.y, { tam: GAB_TAM, bold: true, cor: COR.teal });
+          return;
+        }
+        if (p.tipo === 'ancora') {
+          naLinhaDoNumero = false;
+          doc.citacao(p.bloco, { tam: GAB_TAM, italic: true, credito: false });
+          return;
+        }
+        for (var k = 0; k < p.linhas.length; k++) {
+          descer();
+          if (k === 0 && p.marcador) {
+            doc.texto(p.marcador, recuo, doc.y, { tam: GAB_TAM, cor: COR.teal });
+          }
+          doc.escreverSegmentos(p.linhas[k], recuo + p.recuo, doc.y,
+            { tam: GAB_TAM, bold: p.bold });
+        }
+      });
     }
 
     /* Reserva de bloco: nunca mais do que uma folha inteira, senão um item
@@ -3224,6 +3386,11 @@
     if (op.incluirLista && selecionados.length) {
       abrirParte(rotulos.lista);
       var blocoAtual = null;
+      /* Cada texto de apoio sai UMA vez por folha, na primeira questão
+       * SELECIONADA que o usa: ela desmarca questões, e o texto tem que
+       * acompanhar a que ficou. O gabarito não repete o texto: a âncora basta. */
+      var textos = dados.textos || [];
+      var textoJaSaiu = {};
       selecionados.forEach(function (ex, i) {
         if (ex.bloco && ex.bloco !== blocoAtual) {
           blocoAtual = ex.bloco;
@@ -3233,7 +3400,25 @@
           doc.textoRico(blocoAtual, MARG_E, doc.y, { tam: 11, bold: true, cor: COR.teal });
           doc.y -= 4;
         }
-        var medEx = medirItem(ex.enunciado, 10, MARG_E + 20, 15);
+        var apoio = (typeof ex.texto === 'number') ? textos[ex.texto] : null;
+        if (apoio && !textoJaSaiu[ex.texto]) {
+          textoJaSaiu[ex.texto] = true;
+          /* O subtítulo leva junto as três primeiras linhas do bloco: título de
+           * texto sozinho no pé da folha manda a aluna virar a página para achar
+           * o texto de que ele fala. */
+          var metaApoio = doc.metadadosDaFonte(apoio.fonte);
+          reservarBloco(18 + 3 * 14.5 + 6);
+          doc.y -= 18;
+          doc.textoRico(metaApoio.titulo || apoio.fonte, MARG_E, doc.y,
+            { tam: 11, bold: true, cor: COR.navy });
+          doc.y -= 2;
+          doc.citacao(apoio, { tam: 10 });
+        }
+        var medEx = medirItem(ex.enunciado, 10, MARG_E + 20, 15, {
+          ex: ex,
+          creditoDoTrecho: !!(ex.trecho && ex.trecho.fonte &&
+            ex.trecho.fonte !== (apoio ? apoio.fonte : null))
+        });
         reservarBloco(15 + medEx.altura + (op.espacoParaResposta || 0));
         doc.y -= 15;
         doc.texto(String(i + 1) + '.', MARG_E, doc.y, { tam: 10, bold: true, cor: COR.navy });
@@ -3245,6 +3430,18 @@
     if (op.incluirGabarito && selecionados.length) {
       abrirParte(rotulos.gabarito);
       selecionados.forEach(function (ex, i) {
+        /* Gabarito estruturado: letra da fechada, ou o critério da aberta em
+         * quatro partes. Item sem nenhum dos dois segue pelo caminho de sempre,
+         * que é o da resposta corrida da matemática. */
+        var gab = ex.gabarito;
+        if (gab && (gab.letra || gab.espera_se)) {
+          var medGab = medirGabarito(ex, MARG_E + 20);
+          reservarBloco(14 + medGab.altura);
+          doc.y -= 14;
+          doc.texto(String(i + 1) + '.', MARG_E, doc.y, { tam: 9.5, bold: true, cor: COR.navy });
+          escreverGabarito(medGab, MARG_E + 20);
+          return;
+        }
         /* A resposta passa pelo mesmo caminho: quando ela traz
          * "@fig id=t7 fase=gabarito", a diretiva vira figura em vez de sair
          * impressa como texto, e o bloco inteiro é reservado antes do número. */
