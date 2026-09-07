@@ -1715,6 +1715,156 @@
     return { texto: corrido.join(' '), figuras: figuras.length };
   };
 
+  // ================= bloco de citação =================
+  //
+  // O texto de português e literatura é citado, nunca reescrito: a folha traz o
+  // trecho com o número da linha ao lado, para o enunciado poder dizer "linha 12"
+  // e a aluna achar a linha sem contar do começo.
+
+  /* UMA definição de linha de citação (M7), e o verificador tem a gêmea: até três
+   * espaços iniciais e depois ">" seguido de espaço ou de fim de linha. Lá ela
+   * também reprova a linha cujo texto sem espaços começa por ">" e não casa com
+   * esta, que é o "sinal de citação indentado demais"; aqui ela só reconhece. */
+  var RE_CITACAO = /^ {0,3}>( |$)/;
+  /* A diretiva que abre o bloco ocupa a linha inteira: "@fonte <id> linhas=<a>-<b>".
+   * O par de linhas é obrigatório e conta as linhas NÃO VAZIAS da fonte. */
+  var RE_FONTE = /^@fonte\s+(\S+)\s+linhas=(\d+)-(\d+)\s*$/;
+  /* O sinal e o espaço que vem depois dele, que não fazem parte do texto citado. */
+  var RE_MARCA_CITACAO = /^ {0,3}> ?/;
+
+  var CIT_X_NUM = MARG_E + 18;        // número da linha, alinhado à direita aqui
+  var CIT_X_FIO = MARG_E + 26;        // fio vertical do bloco
+  var CIT_X_TXT = MARG_E + 36;        // texto citado (LARGURA_CITACAO sai deste x)
+  var CIT_RECUO_CONT = 12;            // continuação de linha que não coube
+  var CIT_RESPIRO = 6;                // folga acima e abaixo do bloco
+  var CIT_TAM_NUM = 7.5;
+  var CIT_TAM_CREDITO = 8.5;
+
+  /* Tira o fim de linha e os espaços à direita, sem tocar nos da esquerda: a
+   * regra de citação conta os até três espaços iniciais, então trim() cru
+   * apagaria justamente o que ela mede. */
+  function semFimDeLinha(s) {
+    return String(s == null ? '' : s).replace(/\s+$/, '');
+  }
+
+  /* Os metadados de uma fonte citada, ou um erro que diz o id.
+   *
+   * Sem eles a folha imprimiria "[machado-de-assis_missa-do-galo]" no lugar do
+   * crédito e seguiria em frente: um defeito de dado viraria uma folha entregue
+   * à aluna com colchete no rodapé do trecho. Erro alto e cedo, na geração. */
+  Doc.prototype.metadadosDaFonte = function (id) {
+    var f = this.fontes && this.fontes[id];
+    if (!f) throw new Error('fonte sem metadados no tema: ' + id);
+    return f;
+  };
+
+  /* Desenha o bloco de citação: número de linha, fio vertical e o trecho.
+   *
+   * bloco: { fonte, linhas: [a, b], conteudo: [linha, ...] }, com "" na linha em
+   * branco da fonte. O número impresso é a + (índice da linha NÃO VAZIA): a
+   * primeira linha não vazia é a linha "a" da fonte, e as vazias não contam, que
+   * é a mesma conta que o verificador faz para conferir a cópia. Sai na primeira
+   * linha do trecho e em toda linha múltipla de 5.
+   *
+   * O fio fecha na página que acaba e reabre na seguinte: um fio só, desenhado do
+   * topo do bloco até o pé dele, viraria uma reta que atravessa a moldura quando
+   * o trecho vira a página.
+   *
+   * bloco sem fonte: sem número e sem crédito. É defesa, e não caminho: em
+   * matéria com catálogo o verificador já reprovou o bloco sem @fonte. */
+  Doc.prototype.citacao = function (bloco, opcoes) {
+    bloco = bloco || {};
+    opcoes = opcoes || {};
+    var tam = opcoes.tam || 10;
+    var entre = tam * 1.45;
+    var conteudo = bloco.conteudo || [];
+    var primeira = (bloco.linhas && Number(bloco.linhas[0])) || 0;
+    var euMesmo = this;
+
+    this.garanteEspaco(entre * 3);
+    this.y -= CIT_RESPIRO;
+    var pagDoFio = this.pag, topoDoFio = this.y, algoNaPagina = false;
+
+    /* O fio é desenhado na página que ele fecha, e não na página corrente: quando
+     * o bloco vira a folha, a operação precisa entrar no fluxo da página que
+     * ficou para trás. Daí a troca temporária de this.pag. */
+    function fecharFio(ate) {
+      if (!algoNaPagina) return;
+      var corrente = euMesmo.pag;
+      euMesmo.pag = pagDoFio;
+      euMesmo.linha(CIT_X_FIO, topoDoFio, CIT_X_FIO, ate, COR.fioForte, 0.8);
+      euMesmo.pag = corrente;
+    }
+    function virarPagina() {
+      fecharFio(euMesmo.y - 2);
+      euMesmo.novaPagina();
+      pagDoFio = euMesmo.pag;
+      topoDoFio = euMesmo.y;
+      algoNaPagina = false;
+    }
+
+    var naoVazias = 0;
+    for (var i = 0; i < conteudo.length; i++) {
+      var linha = String(conteudo[i] == null ? '' : conteudo[i]);
+      if (!linha.trim()) {
+        // linha em branco da fonte: meia entrelinha, sem número
+        if (this.y - entre / 2 < Y_LIMITE) virarPagina();
+        this.y -= entre / 2;
+        continue;
+      }
+      naoVazias++;
+      var numero = primeira ? primeira + naoVazias - 1 : 0;
+      var segmentos = quebrarRico(partirRico(linha), LARGURA_CITACAO, tam);
+      for (var k = 0; k < segmentos.length; k++) {
+        if (this.y - entre < Y_LIMITE) virarPagina();
+        this.y -= entre;
+        algoNaPagina = true;
+        /* Linha da fonte que mesmo assim não coube na largura: a continuação
+         * recua mais 12 pt e não repete o número, para o número continuar
+         * apontando uma linha da fonte e não uma linha da folha. O verificador
+         * impede isso medindo cada linha de fontes/ por LARGURA_CITACAO; aqui é
+         * defesa. */
+        this.escreverSegmentos(segmentos[k], k ? CIT_X_TXT + CIT_RECUO_CONT : CIT_X_TXT,
+          this.y, { tam: tam, italic: !!opcoes.italic });
+        if (k === 0 && numero && (naoVazias === 1 || numero % 5 === 0)) {
+          this.texto(String(numero), CIT_X_NUM, this.y,
+            { tam: CIT_TAM_NUM, cor: COR.muted, align: 'direita' });
+        }
+      }
+    }
+    fecharFio(this.y - 2);
+    this.y -= CIT_RESPIRO;
+
+    if (bloco.fonte && opcoes.credito !== false) {
+      /* O crédito vem montado pelo gerador de banco, com o título da obra em
+       * itálico, para a folha não ter que saber regra de citação. */
+      var meta = this.metadadosDaFonte(bloco.fonte);
+      this.garanteEspaco(CIT_TAM_CREDITO * 2);
+      this.y -= CIT_TAM_CREDITO * 1.35;
+      this.textoRico(meta.credito || meta.titulo || bloco.fonte, MARG_D, this.y,
+        { tam: CIT_TAM_CREDITO, cor: COR.muted, align: 'direita' });
+      this.y -= 2;
+    }
+  };
+
+  /* Quanto de folha o bloco vai gastar, sem desenhar nada. Serve à reserva de
+   * quem precisa manter o bloco junto do que vem antes dele: o subtítulo do
+   * texto de apoio, o enunciado do item com trecho próprio e o gabarito. */
+  Doc.prototype.alturaDeCitacao = function (bloco, opcoes) {
+    opcoes = opcoes || {};
+    var tam = opcoes.tam || 10;
+    var entre = tam * 1.45;
+    var conteudo = (bloco && bloco.conteudo) || [];
+    var alto = CIT_RESPIRO * 2;
+    for (var i = 0; i < conteudo.length; i++) {
+      var linha = String(conteudo[i] == null ? '' : conteudo[i]);
+      if (!linha.trim()) { alto += entre / 2; continue; }
+      alto += quebrarRico(partirRico(linha), LARGURA_CITACAO, tam).length * entre;
+    }
+    if (bloco && bloco.fonte && opcoes.credito !== false) alto += CIT_TAM_CREDITO * 1.35 + 2;
+    return alto;
+  };
+
   /* Escreve um bloco em Markdown simples: subtítulos, parágrafos com negrito,
    * listas e tabelas. É o suficiente para o material dos temas. */
   Doc.prototype.markdown = function (texto, opcoes) {
@@ -1778,6 +1928,38 @@
         i++; continue;
       }
 
+      /* bloco de citação: a diretiva "@fonte <id> linhas=<a>-<b>" e as linhas de
+       * citação que vêm logo depois dela.
+       *
+       * Vem antes do ramo de parágrafo pelo mesmo motivo do @fig: nenhum outro
+       * ramo do markdown reconhece essas linhas, então sem este a diretiva sairia
+       * escrita por extenso no meio da folha, em silêncio.
+       *
+       * Linha de citação sem @fonte antes: o bloco é desenhado sem número e sem
+       * crédito. Em matéria com catálogo o verificador já reprovou isso na fonte
+       * do tema; aqui é defesa. */
+      var diretivaDeFonte = RE_FONTE.exec(limpo);
+      if (diretivaDeFonte || RE_CITACAO.test(semFimDeLinha(linha))) {
+        var idDaFonte = null, deLinha = 0, ateLinha = 0;
+        if (diretivaDeFonte) {
+          idDaFonte = diretivaDeFonte[1];
+          deLinha = Number(diretivaDeFonte[2]);
+          ateLinha = Number(diretivaDeFonte[3]);
+          i++;
+        }
+        var conteudoCitado = [];
+        while (i < linhas.length && RE_CITACAO.test(semFimDeLinha(linhas[i]))) {
+          // ">" sozinho e "> " são a linha em branco da fonte, e viram ""
+          conteudoCitado.push(semFimDeLinha(linhas[i]).replace(RE_MARCA_CITACAO, ''));
+          i++;
+        }
+        if (conteudoCitado.length) {
+          this.citacao({ fonte: idDaFonte, linhas: [deLinha, ateLinha], conteudo: conteudoCitado },
+            { tam: tam });
+        }
+        continue;
+      }
+
       // subtítulo
       var titulo = /^#{3,6}\s+(.*)$/.exec(limpo);
       if (titulo) {
@@ -1839,7 +2021,8 @@
         // motivo do laço de parágrafo: diretiva colada em item de lista sairia
         // impressa por extenso na folha, em silêncio
         while (i + 1 < linhas.length && /^\s{2,}\S/.test(linhas[i + 1]) &&
-               !/^@(fig|eq)(\s|$)/.test(linhas[i + 1].trim()) &&
+               !/^@(fig|eq|fonte)(\s|$)/.test(linhas[i + 1].trim()) &&
+               !RE_CITACAO.test(semFimDeLinha(linhas[i + 1])) &&
              !/^<!--/.test(linhas[i + 1].trim()) &&
                !/^\s*([-*]|\d+\.)\s/.test(linhas[i + 1])) {
           conteudo += ' ' + linhas[i + 1].trim();
@@ -1882,7 +2065,11 @@
       var paragrafo = limpo;
       while (i + 1 < linhas.length && linhas[i + 1].trim() &&
              linhas[i + 1].trim().charAt(0) !== '|' &&
-             !/^@(fig|eq)(\s|$)/.test(linhas[i + 1].trim()) &&
+             /* Para na diretiva e na linha de citação pelo mesmo motivo de sempre:
+              * coladas no fim do parágrafo, elas nunca chegariam ao ramo que sabe
+              * desenhá-las e sairiam impressas com sinal e tudo. */
+             !/^@(fig|eq|fonte)(\s|$)/.test(linhas[i + 1].trim()) &&
+             !RE_CITACAO.test(semFimDeLinha(linhas[i + 1])) &&
              !/^<!--/.test(linhas[i + 1].trim()) &&
              !/^#{3,6}\s/.test(linhas[i + 1].trim()) &&
              /* Para em marcador de topico sempre. Em numero mais ponto, so para
