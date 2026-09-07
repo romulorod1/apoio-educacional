@@ -1614,7 +1614,14 @@
       botao
     ]));
 
-    Core.AREAS.forEach(function (grupo) {
+    /* As áreas só de uma matéria (cálculo mental, linguagem matemática) não
+     * aparecem para quem não tem aquela matéria no mapeamento. O que já está
+     * marcado nesta aula fica visível de qualquer jeito: esconder caixa
+     * marcada seria deixá-la sem como desmarcar. Sem mapeamento, todas. */
+    var alunoDasAreas = alunoPorId(aula.alunoId);
+    var mapaDasAreas = alunoDasAreas ? Core.mapeamentoAtual(alunoDasAreas) : null;
+    var materiasDasAreas = mapaDasAreas ? Core.materiasDoMapeamento(mapaDasAreas) : null;
+    Core.areasPara(materiasDasAreas, aula.areas).forEach(function (grupo) {
       caixa.appendChild(el('div', { class: 'bloco-exercicios', texto: grupo.grupo }));
       var grade = el('div', { class: 'grade-areas' });
       grupo.itens.forEach(function (item) {
@@ -1769,7 +1776,8 @@
         texto: 'Próximo passo: ' + passo.titulo,
         aoClick: function () {
           registrarAssunto(aula, {
-            id: passo.temaId, titulo: passo.titulo, fonte: 'banco', disciplina: 'matematica'
+            id: passo.temaId, titulo: passo.titulo, fonte: 'banco',
+            disciplina: materiaDoTemaId(passo.temaId)
           });
         }
       }));
@@ -1804,20 +1812,47 @@
     return !jaNaAula;
   }
 
-  /* Um assunto sem disciplina é de matemática: é o que todos os registros
-   * anteriores são, porque antes só virava registro o que gerava material. */
-  function disciplinaDoAssunto(t) { return t.disciplina || 'matematica'; }
-
-  /* MAT06-04 é do 6º ano, MATEM1-14 é da 1ª série do médio. O ano já está
-   * dentro do id, então não precisa de campo novo para ser lido. */
-  function anoDoTemaMat(id) {
-    var m = /^MAT(EM[123]|\d{2})/i.exec(String(id || ''));
-    return m ? m[1].toLowerCase() : '';
+  /* A matéria de um assunto registrado.
+   *
+   * Quem manda é o REGISTRO do índice: um item cujo id resolve num tema
+   * conhecido é da matéria dona daquele tema, seja o que for que ficou gravado
+   * em `disciplina`. Isso cura o item gravado na janela do deploy, entre a
+   * versão que só conhecia matemática e esta, que pode ter escrito a matéria
+   * padrão num tema de outra matéria. Sem registro vale o que está gravado; e
+   * sem disciplina nenhuma é a matéria padrão, porque é o que todos os
+   * registros anteriores são: antes só virava registro o que gerava material,
+   * e material só existia em matemática. */
+  function disciplinaDoAssunto(t) {
+    var registro = resumoDe(t.id);
+    if (registro) {
+      var dona = Core.materiaDoTema(registro.id);
+      if (dona) return dona.id;
+    }
+    return t.disciplina || Core.MATERIA_PADRAO;
   }
 
-  function resumoMatDe(id) {
-    if (!indiceTemas || !id) return null;
-    return indiceTemas.filter(function (t) { return t.id === id; })[0] || null;
+  /* A matéria dona de um id de tema, pela tabela; a padrão quando o id não é
+   * de tema nenhum. É o que vai gravado em `disciplina` no item de aula, e é
+   * por isso que ninguém escreve o nome da matéria à mão neste arquivo. */
+  function materiaDoTemaId(id) {
+    var mat = Core.materiaDoTema(id);
+    return mat ? mat.id : Core.MATERIA_PADRAO;
+  }
+
+  /* O registro de um tema em qualquer índice carregado. Percorre os índices de
+   * todas as matérias com banco (indicesPorMateria); com um só índice
+   * carregado o resultado é o mesmo de quando só havia o de matemática. O ano
+   * do tema sai daqui (registro.serie), e não mais de dentro do id: a leitura
+   * antiga tirava o ano com uma expressão que só sabia o prefixo MAT, e um
+   * tema POR07-01 sairia sem ano nenhum. */
+  function resumoDe(id) {
+    if (!id || !indicesPorMateria) return null;
+    var chaves = Object.keys(indicesPorMateria);
+    for (var i = 0; i < chaves.length; i++) {
+      var achado = indicesPorMateria[chaves[i]].filter(function (t) { return t.id === id; })[0];
+      if (achado) return achado;
+    }
+    return null;
   }
 
   /* Os assuntos registrados nesta aula.
@@ -1842,9 +1877,15 @@
     var faltaIndice = false, faltaTopicos = false;
     lista.forEach(function (t) {
       if (t.anexoId) return;
-      if (disciplinaDoAssunto(t) === 'matematica') {
-        if (!indiceTemas && !indiceTemasFalhou) faltaIndice = true;
-      } else if (!indiceTopicos && !indiceTopicosFalhou) {
+      /* O índice serve a qualquer item com id de tema (o ano e o botão
+       * Material saem do registro) e ao item sem disciplina, que é a matéria
+       * padrão por legado; o índice de tópicos serve ao item das outras
+       * matérias, de onde saem o nome da matéria e do grupo. */
+      if (!t.disciplina || t.disciplina === Core.MATERIA_PADRAO || Core.materiaDoTema(t.id)) {
+        if (!indicesPorMateria && !indiceTemasFalhou) faltaIndice = true;
+      }
+      if (t.disciplina && t.disciplina !== Core.MATERIA_PADRAO &&
+          !indiceTopicos && !indiceTopicosFalhou) {
         faltaTopicos = true;
       }
     });
@@ -1865,6 +1906,7 @@
 
     lista.forEach(function (t) {
       var comMaterial = !!t.anexoId;
+      var registro = resumoDe(t.id);
       var disciplina = disciplinaDoAssunto(t);
       var detalhe = '';
       if (comMaterial) {
@@ -1873,15 +1915,21 @@
           (t.partes && t.partes.length ? ' · ' + t.partes.join(', ') : '');
       } else if (t.fonte === 'livre') {
         detalhe = 'assunto escrito por você';
-      } else if (disciplina !== 'matematica') {
+      } else if (registro) {
+        /* Tema com registro no índice: matéria e ano vêm do REGISTRO, não do
+         * item gravado. A matéria padrão continua sem nome na etiqueta, como
+         * sempre foi ("6º ano"); as outras dizem qual são, porque esta linha
+         * já não é só de matemática. */
+        detalhe = (disciplina === Core.MATERIA_PADRAO ? '' : rotuloDisciplina(disciplina) + ', ') +
+          nomeDoAno(registro.serie);
+      } else if (disciplina !== Core.MATERIA_PADRAO) {
         var nomeGrupo = rotuloGrupoDeTopico(disciplina, t.grupo);
         detalhe = rotuloDisciplina(disciplina) + (nomeGrupo ? ', ' + nomeGrupo : '');
-      } else {
-        var ano = anoDoTemaMat(t.id);
-        detalhe = ano ? nomeDoAno(ano) : '';
       }
 
-      var podeMaterial = !comMaterial && disciplina === 'matematica' && !!resumoMatDe(t.id);
+      /* Material existe para qualquer tema que o índice da matéria conhece, e
+       * só para ele: oferecer para os outros seria prometer o que não há. */
+      var podeMaterial = !comMaterial && !!registro;
 
       caixa.appendChild(el('div', { class: 'item-lista item-assunto-aula' }, [
         el('div', { class: 'cresce' }, [
@@ -1899,7 +1947,7 @@
             $('#titulo-modal-tema').textContent = 'Material de aula' +
               (aluno ? ', ' + aluno.nome : '');
             abrirModal('modal-tema');
-            abrirMontagem(resumoMatDe(t.id), aula, aluno, {
+            abrirMontagem(registro, aula, aluno, {
               itemExistente: t,
               rotuloVoltar: '‹ Voltar para a aula',
               voltar: function () { fecharModal('modal-tema'); }
@@ -4179,7 +4227,9 @@
       class: 'ajuda', style: 'margin-top:0',
       texto: 'Já vem marcado o que sai dos pontos de atenção do mapeamento. Confira e mude.'
     }));
-    Core.AREAS.forEach(function (g) {
+    /* A proposta declara as matérias (p.materias), então a grade só oferece as
+     * áreas que existem nelas; o que já estiver marcado continua na grade. */
+    Core.areasPara(p.materias, p.areas).forEach(function (g) {
       b3.appendChild(el('h3', { class: 'subtitulo', texto: g.grupo }));
       b3.appendChild(gradeDeMarcar(g.itens, p.areas, 0, null));
     });
@@ -6324,7 +6374,7 @@
               ? el('span', { class: 'tag cheia', texto: 'sugerido', style: 'margin-left:8px' })
               : null
           ].filter(Boolean)),
-          el('div', { class: 'detalhe', texto: 'Matemática, ' + nomeDoAno(c.serie) })
+          el('div', { class: 'detalhe', texto: rotuloDisciplina(materiaDoTemaId(c.id)) + ', ' + nomeDoAno(c.serie) })
         ]),
         el('button', {
           type: 'button', class: 'btn pequeno principal', texto: 'Montar',
@@ -6372,6 +6422,10 @@
       lacunaId: item ? item.id : null,
       titulo: alvo.titulo,
       alvoId: alvo.id,
+      /* A matéria da trilha é a do tema alvo, pela tabela. Hoje é sempre a
+       * padrão, porque só ela tem escada; fica gravado para a trilha de outra
+       * matéria nascer sabendo de quem é, em vez de todo mundo assumir. */
+      materia: materiaDoTemaId(alvo.id),
       passos: d.passos
     });
     propostaDeTrilha = { trilha: trilha, cortados: d.cortados, aluno: aluno, item: item };
@@ -7462,10 +7516,15 @@
     ['06', '6º ano'], ['07', '7º ano'], ['08', '8º ano'], ['09', '9º ano'],
     ['em1', '1º médio'], ['em2', '2º médio'], ['em3', '3º médio']
   ];
-  var UNIDADES_NOMES = {
-    numeros: 'Números', algebra: 'Álgebra', geometria: 'Geometria',
-    grandezas: 'Grandezas', estatistica: 'Estatística'
-  };
+  /* A etiqueta da unidade sai da tabela da matéria dona do tema
+   * (Core.MATERIAS, temas.unidades). Era uma cópia à mão só da matemática
+   * (UNIDADES_NOMES), e cópia é o que diverge; a matéria nova traz as dela na
+   * tabela. Sem rótulo conhecido, mostra a própria chave, como antes. */
+  function rotuloUnidade(t) {
+    var mat = Core.materiaDoTema(t.id);
+    var rotulos = mat && mat.temas ? mat.temas.unidades : null;
+    return (rotulos && rotulos[t.unidade]) || t.unidade;
+  }
 
   /* Busca que não achou nada.
    *
@@ -7526,7 +7585,20 @@
     return serie;
   }
 
+  /* O texto em que a busca simples procura. O bloco `en` só existe nas
+   * matérias cuja tabela declara inglês (matemática); ler t.en.titulo num tema
+   * de português quebraria a lista inteira. */
+  function textoDeBusca(t) {
+    return t.pt.titulo + ' ' + t.pt.resumo + (t.en ? ' ' + t.en.titulo : '');
+  }
+
+  /* indiceTemas é o índice da MATÉRIA PADRÃO (matemática), na forma de sempre:
+   * é o que a lista de material, a trilha e o mapeamento recebem, e nada disso
+   * mudou de forma. indicesPorMateria guarda esse e os das outras matérias com
+   * banco, pela chave da matéria, para resumoDe e para a busca "em qualquer
+   * matéria" atravessarem todos. */
   var indiceTemas = null;
+  var indicesPorMateria = null;
   var seriesCarregadas = {};
   var ultimoAnoEscolar = null;
   var indiceTemasFalhou = false;
@@ -7537,14 +7609,54 @@
 
   function carregarIndice() {
     if (indiceTemas) return Promise.resolve(indiceTemas);
-    return fetch('banco/indice.json').then(function (r) {
+    var padrao = Core.materiaPorId(Core.MATERIA_PADRAO);
+    return fetch(padrao.temas.raiz + 'indice.json').then(function (r) {
       if (!r.ok) throw new Error('indice indisponivel');
       return r.json();
     }).then(function (d) {
-      indiceTemas = d.temas || [];
-      carregarIndiceDeBusca();
-      return indiceTemas;
+      var temas = d.temas || [];
+      return carregarOutrosIndices(padrao).then(function (outros) {
+        indicesPorMateria = {};
+        indicesPorMateria[padrao.id] = temas;
+        outros.forEach(function (o) { if (o) indicesPorMateria[o.id] = o.temas; });
+        indiceTemas = temas;
+        carregarIndiceDeBusca();
+        return indiceTemas;
+      });
     });
+  }
+
+  /* Os índices das outras matérias com banco (Core.materiasComTemas), cada um
+   * em <raiz>indice.json, SE existir. Hoje nenhum existe: português e
+   * literatura estão declaradas na tabela para o banco delas nascer sem tocar
+   * em código, e o arquivo ainda não foi publicado.
+   *
+   * "Se existir" é decidido pelo PACOTE, e não por um pedido à rede. Medido em
+   * 07/09/2026: um fetch de banco/portugues/indice.json que volta 404 aparece
+   * no console do navegador como erro ("Failed to load resource: 404") a cada
+   * sessão, sem o aplicativo ter escrito nada, e os testes de navegador contam
+   * essa linha como erro. O pacote é a lista ARQUIVOS do sw.js, que ganha
+   * banco/<id>/indice.json quando o banco existe; então o índice de uma
+   * matéria está no cache exatamente quando ela tem banco neste aparelho. Sem
+   * a API de caches (sem service worker) cai no fetch, e aí 404 é "não
+   * existe", em silêncio: nunca é erro nem aviso na tela.
+   *
+   * Custo medido na abertura da tela de temas: zero pedidos de rede a mais,
+   * duas consultas ao cache (português e literatura), uma vez por sessão. */
+  function carregarOutrosIndices(padrao) {
+    var outras = Core.materiasComTemas().filter(function (m) {
+      return m.id !== padrao.id && m.temas.raiz !== padrao.temas.raiz;
+    });
+    return Promise.all(outras.map(function (m) {
+      var url = m.temas.raiz + 'indice.json';
+      var achar = (typeof caches !== 'undefined' && caches && caches.match)
+        ? caches.match(url).then(function (r) { return r || null; })
+        : fetch(url).then(function (r) { return r.ok ? r : null; });
+      return achar.then(function (r) {
+        if (!r) return null;
+        return r.json().then(function (d) { return { id: m.id, temas: d.temas || [] }; });
+      }).catch(function () { return null; });
+    }));
   }
 
   function carregarIndiceDeBusca() {
@@ -7561,14 +7673,32 @@
     });
   }
 
-  function carregarSerie(serie) {
-    if (seriesCarregadas[serie]) return Promise.resolve(seriesCarregadas[serie]);
-    return fetch('banco/serie-' + serie + '.json').then(function (r) {
+  /* Recebe o REGISTRO do índice (nunca o item da aula): o id diz de que
+   * matéria o tema é, e a série diz o arquivo. A URL é a raiz da matéria, na
+   * tabela, mais 'serie-' + serie + '.json'.
+   *
+   * A da matéria padrão fica escrita POR EXTENSO, 'banco/serie-', de propósito
+   * e para sempre: é a chave no cache BAIXADOS dos tablets, guardada na
+   * primeira vez que cada série foi aberta, e não há código que renomeie
+   * chave. Trocar este literal faz sumir, sem sinal, toda série que ela já
+   * baixou (o incidente narrado em sw.js:12-16). Duas travas seguram a linha:
+   * a estática do portão (confere_tudo.sh, bloco 'cache do aplicativo') e o
+   * modo --envenenado do testa_biblioteca_offline, que troca o literal e tem
+   * que enxergar a perda. Matéria ausente ou desconhecida também cai aqui,
+   * porque 'banco/' é o único caminho que já existe nos tablets. */
+  function carregarSerie(registro) {
+    var serie = registro.serie;
+    var padrao = Core.materiaPorId(Core.MATERIA_PADRAO).temas.raiz;
+    var mat = Core.materiaDoTema(registro.id);
+    var raiz = mat ? mat.temas.raiz : padrao;
+    var url = raiz === padrao ? 'banco/serie-' + serie + '.json' : raiz + 'serie-' + serie + '.json';
+    if (seriesCarregadas[url]) return Promise.resolve(seriesCarregadas[url]);
+    return fetch(url).then(function (r) {
       if (!r.ok) throw new Error('serie indisponivel');
       return r.json();
     }).then(function (d) {
-      seriesCarregadas[serie] = d.temas || [];
-      return seriesCarregadas[serie];
+      seriesCarregadas[url] = d.temas || [];
+      return seriesCarregadas[url];
     });
   }
 
@@ -7580,9 +7710,11 @@
    * nível em inglês; transversais em redação, filosofia e sociologia e método
    * de estudo), cada grupo tem blocos com título, e cada bloco tem os tópicos.
    *
-   * Os tópicos são cadeias de texto puras, sem id nenhum: o título é o que ela
-   * lê e é o que fica guardado na aula. Por isso o item de assunto guarda
-   * titulo, disciplina e grupo, e não um identificador que não existe. */
+   * Os tópicos continuam cadeias de texto (o título é o que ela lê e o que
+   * fica guardado na aula), e cada bloco traz uma lista `ids` PARALELA a
+   * `topicos`: ids[i] é o identificador estável de topicos[i], no molde
+   * POR07-T12 (banco/topicos/LEIA-ME.md). O item de assunto grava titulo,
+   * disciplina, grupo e, quando o bloco tem, o id. */
   var indiceTopicos = null;
   var topicosPorDisciplina = null;
   var topicosPlanos = null;
@@ -7622,8 +7754,9 @@
         topicosPorDisciplina[d.chave] = arquivo;
         (arquivo.grupos || []).forEach(function (g) {
           (g.blocos || []).forEach(function (b) {
-            (b.topicos || []).forEach(function (titulo) {
+            (b.topicos || []).forEach(function (titulo, i) {
               planos.push({
+                id: (b.ids || [])[i] || null,
                 disciplina: d.chave, disciplinaNome: d.nome,
                 grupo: g.chave, grupoRotulo: g.rotulo,
                 bloco: b.titulo, titulo: titulo,
@@ -7647,8 +7780,84 @@
     });
   }
 
+  /* O item de aula de um tópico: título, disciplina e grupo, como sempre, mais
+   * o id quando o bloco tem (a lista `ids` é paralela a `topicos`). Bloco sem
+   * id não grava id nenhum, nem nulo: o item fica como os antigos, e a
+   * migração abaixo cuida dele quando o id existir. */
+  function itemDeTopico(p) {
+    var item = { titulo: p.titulo, fonte: 'topico', disciplina: p.disciplina, grupo: p.grupo };
+    if (p.id) item.id = p.id;
+    return item;
+  }
+
+  /* ---------- migração preguiçosa: o id dos tópicos já registrados ----------
+   *
+   * Até esta versão o item de tópico ia para a aula sem id (só título,
+   * disciplina e grupo). Agora o bloco traz `ids`, e o item novo grava o seu.
+   * Os antigos ganham o id aqui, sem ela fazer nada, sob três regras:
+   *
+   *   ADITIVA: só escreve `id` em item de tópico que não tem; nunca mexe em
+   *   título, disciplina, grupo nem em mais nada. E nunca grava "não casou":
+   *   item que não casa fica exatamente como estava, continua aparecendo pelo
+   *   título, e na próxima abertura tenta de novo.
+   *   IDEMPOTENTE: rodar de novo não muda nada, e só grava no disco quando
+   *   algum item mudou.
+   *   SÓ COM A LISTA COMPLETA: com lista parcial (uma disciplina que não veio)
+   *   um título poderia parecer único sem ser. Por isso lê topicosPlanos, que
+   *   só existe quando os doze arquivos vieram, e nunca topicosParciais.
+   *
+   * Casa por (disciplina, grupo, título), com o título EXATO, porque foi assim
+   * que ele foi gravado. Se não casar, por (disciplina, título), e só se o
+   * título for único na disciplina. Título sozinho nunca: medido no catálogo
+   * em 07/09/2026, 56 títulos se repetem entre disciplinas e 8 são idênticos
+   * entre português e literatura ("Soneto", "Cecília Meireles"); dentro de uma
+   * mesma disciplina nenhum título se repete hoje, e o mapa por disciplina
+   * marca com false o dia em que isso mudar, para não casar no escuro.
+   *
+   * Roda depois de desenhar a janela do assunto, porque é ali que a lista
+   * completa acabou de chegar, e o desenho não espera por ela. */
+  var chavesDeTopico = null;
+
+  function chavesDoCatalogo() {
+    if (chavesDeTopico) return chavesDeTopico;
+    var porGrupo = {}, porDisciplina = {};
+    topicosPlanos.forEach(function (p) {
+      if (!p.id) return;
+      porGrupo[p.disciplina + '|' + p.grupo + '|' + p.titulo] = p.id;
+      var k = p.disciplina + '|' + p.titulo;
+      // título repetido dentro da disciplina vira false: sem grupo, não casa
+      porDisciplina[k] = Object.prototype.hasOwnProperty.call(porDisciplina, k) ? false : p.id;
+    });
+    chavesDeTopico = { porGrupo: porGrupo, porDisciplina: porDisciplina };
+    return chavesDeTopico;
+  }
+
+  function migrarIdsDosTopicos() {
+    if (!topicosPlanos) return 0;
+    var chaves = chavesDoCatalogo();
+    var mudou = 0;
+    ((db && db.aulas) || []).forEach(function (a) {
+      Core.temasDaAula(a).forEach(function (t) {
+        if (t.id || t.fonte !== 'topico' || !t.disciplina || !t.titulo) return;
+        var id = t.grupo ? chaves.porGrupo[t.disciplina + '|' + t.grupo + '|' + t.titulo] : null;
+        if (!id) id = chaves.porDisciplina[t.disciplina + '|' + t.titulo] || null;
+        if (!id) return;
+        t.id = id;
+        mudou++;
+      });
+    });
+    // gravação que falhar fica para a próxima abertura: o disco continua como estava
+    if (mudou) salvar().catch(function () { /* tenta de novo na próxima */ });
+    return mudou;
+  }
+
+  /* O nome da matéria vem da tabela (Core.MATERIAS). O índice de tópicos é a
+   * reserva para a chave que só o catálogo tem (filosofia-sociologia é um
+   * arquivo só lá). A matéria livre não entra: o nome dela é o que ela
+   * escreveu no mapeamento, e isso é rotuloMateria do core. */
   function rotuloDisciplina(chave) {
-    if (chave === 'matematica') return 'Matemática';
+    var mat = Core.materiaPorId(chave);
+    if (mat && !mat.livre) return mat.rotulo;
     var d = (indiceTopicos || []).filter(function (x) { return x.chave === chave; })[0];
     return d ? d.nome : '';
   }
@@ -7722,6 +7931,7 @@
       carregarTopicos().catch(function () { indiceTopicosFalhou = true; return null; })
     ]).then(function () {
       desenharEscolhaAssunto(aula, aluno);
+      migrarIdsDosTopicos();
     });
   }
 
@@ -7737,8 +7947,19 @@
     if (item && item.titulo && item.titulo.length > MAX_TITULO_ASSUNTO) {
       item.titulo = item.titulo.slice(0, MAX_TITULO_ASSUNTO).replace(/\s+\S*$/, '');
     }
+    /* Repetido é: o mesmo id, quando os dois têm; senão o mesmo título na
+     * mesma disciplina; e título sozinho só quando algum dos lados não tem
+     * disciplina (item livre, ou registro antigo de material). Comparar só
+     * pelo título recusava assunto legítimo: medido no catálogo em 07/09/2026,
+     * 56 títulos se repetem entre disciplinas e 8 são idênticos entre
+     * português e literatura (7 deles no médio), como "Cecília Meireles":
+     * registrar a aula de literatura depois da de português era recusado. */
+    var chaveNova = Core.chaveDeBusca(item.titulo || '');
     var repetido = Core.temasDaAula(aula).filter(function (t) {
-      return Core.chaveDeBusca(t.titulo || '') === Core.chaveDeBusca(item.titulo || '');
+      if (t.id && item.id) return t.id === item.id;
+      if (Core.chaveDeBusca(t.titulo || '') !== chaveNova) return false;
+      if (!t.disciplina || !item.disciplina) return true;
+      return t.disciplina === item.disciplina;
     })[0];
     if (repetido) {
       fecharModal('modal-tema');
@@ -7834,7 +8055,7 @@
       var p = Core.proximoPasso(tr);
       if (!p) return;
       juntar(
-        { id: p.temaId, titulo: p.titulo, fonte: 'banco', disciplina: 'matematica' },
+        { id: p.temaId, titulo: p.titulo, fonte: 'banco', disciplina: materiaDoTemaId(p.temaId) },
         'próximo passo da trilha até ' + tr.titulo
       );
     });
@@ -7858,8 +8079,8 @@
       .forEach(function (t) {
         if (saida.length >= daTrilha + MAX_SUGESTOES) return;
         juntar(
-          { id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: 'matematica' },
-          'Matemática, ' + nomeDoAno(t.serie)
+          { id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: materiaDoTemaId(t.id) },
+          rotuloDisciplina(materiaDoTemaId(t.id)) + ', ' + nomeDoAno(t.serie)
         );
       });
 
@@ -7930,6 +8151,18 @@
       ]);
     }
 
+    /* O assunto escrito por ela. Leva a disciplina só quando o seletor está
+     * dentro de uma disciplina ou de um grupo, e só se essa chave existir na
+     * tabela (Core.MATERIAS): a chave que só o catálogo de tópicos tem
+     * (filosofia-sociologia) não vira disciplina de item. Item sem disciplina
+     * continua sendo lido como a matéria padrão, por legado. */
+    function itemLivre(titulo) {
+      var item = { titulo: titulo, fonte: 'livre' };
+      var d = (nivel.tipo === 'disciplina' || nivel.tipo === 'grupo') ? nivel.d : null;
+      if (d && Core.materiaPorId(d.chave)) item.disciplina = d.chave;
+      return item;
+    }
+
     function desenhar() {
       lista.innerHTML = '';
       var termo = busca.trim();
@@ -7957,7 +8190,7 @@
         aoClick: function () {
           var texto = campoOutro.value.trim();
           if (!texto) { avisar('Escreva o assunto antes de tocar em Usar.'); return; }
-          registrarAssunto(aula, { titulo: texto, fonte: 'livre' });
+          registrarAssunto(aula, itemLivre(texto));
         }
       });
       campoOutro.addEventListener('keydown', function (ev) {
@@ -7978,7 +8211,7 @@
 
       // 3. Por matéria, com a matemática na frente.
       lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Por matéria' }));
-      lista.appendChild(linha('Matemática',
+      lista.appendChild(linha(rotuloDisciplina(Core.MATERIA_PADRAO),
         indiceTemas ? indiceTemas.length + ' temas, com material pronto' : 'temas com material pronto',
         function () { abrirMatematicaComoAssunto(aula, aluno); }, true));
       (indiceTopicos || []).forEach(function (d) {
@@ -8029,11 +8262,11 @@
       }));
       (g.blocos || []).forEach(function (b) {
         lista.appendChild(el('div', { class: 'bloco-exercicios', texto: b.titulo }));
-        (b.topicos || []).forEach(function (titulo) {
+        (b.topicos || []).forEach(function (titulo, i) {
           lista.appendChild(linha(titulo, '', function () {
-            registrarAssunto(aula, {
-              titulo: titulo, fonte: 'topico', disciplina: d.chave, grupo: g.chave
-            });
+            registrarAssunto(aula, itemDeTopico({
+              id: (b.ids || [])[i], titulo: titulo, disciplina: d.chave, grupo: g.chave
+            }));
           }));
         });
       });
@@ -8043,11 +8276,18 @@
       var achados = [];
       var exatos = 0;
 
-      if (indiceTemas) {
+      /* "Em qualquer matéria" percorre um índice por matéria com banco. Cada
+       * achado sai com a matéria do índice de onde veio, e a contagem
+       * "N assuntos encontrados" soma todas. */
+      Object.keys(indicesPorMateria || {}).forEach(function (materiaId) {
+        var temasDaMateria = indicesPorMateria[materiaId];
         var porId = {};
-        indiceTemas.forEach(function (t) { porId[t.id] = t; });
+        temasDaMateria.forEach(function (t) { porId[t.id] = t; });
         var itens, completa = true;
-        if (indiceDeBusca && typeof Busca !== 'undefined') {
+        /* O índice de busca (banco/busca.json) é só da matéria padrão. As
+         * outras procuram em título e resumo, como a matemática fazia antes de
+         * ter índice. */
+        if (materiaId === Core.MATERIA_PADRAO && indiceDeBusca && typeof Busca !== 'undefined') {
           var r = Busca.procurar(indiceDeBusca, termo) || { itens: [] };
           itens = r.itens || [];
           /* A busca de matemática responde por aproximação quando não acha tudo
@@ -8055,20 +8295,21 @@
            * conta como zero para decidir onde fica a linha do texto livre. */
           completa = r.completa !== false;
         } else {
-          itens = indiceTemas.filter(function (t) {
+          itens = temasDaMateria.filter(function (t) {
             return Core.casaBusca(t.pt.titulo + ' ' + t.pt.resumo, termo);
           }).map(function (t) { return { id: t.id }; });
         }
+        var nomeDaMateria = rotuloDisciplina(materiaId);
         itens.forEach(function (x) {
           var t = porId[x.id];
           if (!t) return;
           if (completa) exatos++;
           achados.push({
-            titulo: t.pt.titulo, detalhe: 'Matemática, ' + nomeDoAno(t.serie),
-            item: { id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: 'matematica' }
+            titulo: t.pt.titulo, detalhe: nomeDaMateria + ', ' + nomeDoAno(t.serie),
+            item: { id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: materiaId }
           });
         });
-      }
+      });
 
       var palavras = Core.chaveDeBusca(termo).split(/\s+/).filter(Boolean);
       (topicosPlanos || []).forEach(function (p) {
@@ -8077,15 +8318,13 @@
         achados.push({
           titulo: p.titulo,
           detalhe: p.disciplinaNome + ', ' + p.grupoRotulo + ' · ' + p.bloco,
-          item: {
-            titulo: p.titulo, fonte: 'topico', disciplina: p.disciplina, grupo: p.grupo
-          }
+          item: itemDeTopico(p)
         });
       });
 
       var livre = linha('Usar "' + termo + '" assim mesmo',
         'grava exatamente o que você escreveu', function () {
-          registrarAssunto(aula, { titulo: termo, fonte: 'livre' });
+          registrarAssunto(aula, itemLivre(termo));
         });
 
       /* Ela procura assunto que o banco não tem, e é por isso que a anotação
@@ -8134,7 +8373,7 @@
       voltar: function () { desenharEscolhaAssunto(aula, aluno); },
       aoEscolher: function (t) {
         registrarAssunto(aula, {
-          id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: 'matematica'
+          id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: materiaDoTemaId(t.id)
         });
       }
     });
@@ -8210,9 +8449,7 @@
        por varios anos. Comecar pelo ano do aluno e nao achar nada seria um beco
        sem saida, entao abrimos no primeiro ano que tem resposta. */
     if (busca) {
-      var casa = function (t) {
-        return Core.casaBusca(t.pt.titulo + ' ' + t.pt.resumo + ' ' + t.en.titulo, busca);
-      };
+      var casa = function (t) { return Core.casaBusca(textoDeBusca(t), busca); };
       if (!temas.filter(function (t) { return t.serie === serieAtual && casa(t); }).length) {
         var achou = temas.filter(casa)[0];
         if (achou) {
@@ -8256,7 +8493,7 @@
       /* Sem o índice de busca, volta a procurar só no título e no resumo. */
       return {
         achados: temas.filter(function (t) {
-          return Core.casaBusca(t.pt.titulo + ' ' + t.pt.resumo + ' ' + t.en.titulo, termo);
+          return Core.casaBusca(textoDeBusca(t), termo);
         }).map(function (t) { return { tema: t, onde: 'titulo', completa: true }; }),
         atravessaAnos: true
       };
@@ -8301,7 +8538,7 @@
           el('div', { class: 'cresce' }, [
             el('div', { class: 'nome' }, [
               document.createTextNode(t.pt.titulo),
-              el('span', { class: 'tag', texto: UNIDADES_NOMES[t.unidade] || t.unidade, style: 'margin-left:8px' }),
+              el('span', { class: 'tag', texto: rotuloUnidade(t), style: 'margin-left:8px' }),
               termo && t.serie !== serieAtual
                 ? el('span', { class: 'tag serie', texto: nomeDoAno(t.serie), style: 'margin-left:6px' })
                 : null,
@@ -8349,7 +8586,14 @@
     rodape.innerHTML = '';
     corpo.appendChild(el('div', { class: 'ajuda', texto: 'Carregando o tema...' }));
 
-    carregarSerie(resumoTema.serie).then(function (temas) {
+    /* O REGISTRO inteiro vai para carregarSerie, e não só a série: é pelo id
+     * que ela descobre de que matéria é o tema e em que raiz a série mora.
+     * Passar só a série já aconteceu, na primeira rodada desta mudança, e o
+     * pedido saía para banco/serie-undefined.json: a faixa "Não consegui abrir
+     * este tema" aparecia até com internet (testa_biblioteca_offline, 5
+     * asserções). Quem chama aqui passa sempre um registro do índice: a lista
+     * de temas (o próprio t) e a linha do assunto na aula (resumoDe(t.id)). */
+    carregarSerie(resumoTema).then(function (temas) {
       var tema = temas.filter(function (t) { return t.id === resumoTema.id; })[0];
       if (!tema) throw new Error('tema nao encontrado');
       desenharMontagem(tema, aula, aluno, opcoes);
@@ -8386,25 +8630,31 @@
       el('h3', { class: 'titulo', style: 'font-size:17px', texto: tema.pt.titulo })
     ]));
 
-    // idioma
-    var linhaIdioma = el('div', { class: 'barra', style: 'margin-bottom:10px' });
-    [['pt', 'Português'], ['en', 'English']].forEach(function (par) {
-      var b = el('button', {
-        type: 'button', class: 'btn pequeno' + (par[0] === lingua ? ' principal' : ''),
-        texto: par[1], 'data-lingua': par[0]
+    /* Idioma. O botão só existe quando a matéria do tema declara inglês na
+     * tabela (linguas inclui 'en') e o tema traz o bloco: oferecer English num
+     * tema só em português geraria material vazio. */
+    var materiaDoTema = Core.materiaDoTema(tema.id);
+    var linguasDoTema = materiaDoTema ? materiaDoTema.temas.linguas : ['pt'];
+    if (linguasDoTema.indexOf('en') !== -1 && tema.en) {
+      var linhaIdioma = el('div', { class: 'barra', style: 'margin-bottom:10px' });
+      [['pt', 'Português'], ['en', 'English']].forEach(function (par) {
+        var b = el('button', {
+          type: 'button', class: 'btn pequeno' + (par[0] === lingua ? ' principal' : ''),
+          texto: par[1], 'data-lingua': par[0]
+        });
+        b.addEventListener('click', function () {
+          lingua = par[0];
+          linhaIdioma.querySelectorAll('[data-lingua]').forEach(function (x) { x.classList.remove('principal'); });
+          b.classList.add('principal');
+          desenharExercicios();
+        });
+        linhaIdioma.appendChild(b);
       });
-      b.addEventListener('click', function () {
-        lingua = par[0];
-        linhaIdioma.querySelectorAll('[data-lingua]').forEach(function (x) { x.classList.remove('principal'); });
-        b.classList.add('principal');
-        desenharExercicios();
-      });
-      linhaIdioma.appendChild(b);
-    });
-    corpo.appendChild(el('div', { class: 'campo' }, [
-      el('span', { texto: 'Idioma do material', style: 'display:block;font-size:13px;font-weight:700;color:#1F3A5F;margin-bottom:5px' }),
-      linhaIdioma
-    ]));
+      corpo.appendChild(el('div', { class: 'campo' }, [
+        el('span', { texto: 'Idioma do material', style: 'display:block;font-size:13px;font-weight:700;color:#1F3A5F;margin-bottom:5px' }),
+        linhaIdioma
+      ]));
+    }
 
     // o que entra
     var caixaPartes = el('div', { style: 'display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px' });

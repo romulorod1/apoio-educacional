@@ -223,7 +223,8 @@ for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento 
          testa_perfil testa_olho testa_atualizacao testa_atualizacao_real \
          testa_biblioteca_offline \
          testa_exclusoes testa_feriados testa_mover testa_retroativo testa_series \
-         testa_assunto testa_aluno testa_familia testa_proposta_tela; do
+         testa_assunto testa_aluno testa_familia testa_proposta_tela \
+         testa_tabela_no_app; do
   roda "$t" node "_teste/$t.js"
 done
 # O mesmo teste duas vezes de proposito. Sem argumento ele prova que a serie
@@ -313,6 +314,52 @@ else
   printf '  FALHOU  %-24s a lista de ARQUIVOS mudou desde a base do merge e o cache continua %s\n' \
     "nome do cache" "$(nome_sw "$sw_agora")"
   falhou=1
+fi
+
+# A LINHA DE carregarSerie QUE MONTA O CAMINHO DAS SERIES DA MATEMATICA.
+#
+# O app.js le a tabela de materias (Core.MATERIAS) para saber de que raiz vem
+# cada serie, e a raiz da matematica e 'banco/' por legado: a chave no cache
+# BAIXADOS dos tablets e a URL que o app pediu no dia em que a serie foi
+# baixada, e nao ha codigo que renomeie chave. Se a linha de codigo de
+# carregarSerie deixar de produzir o literal 'banco/serie-', toda serie que ela
+# ja baixou some sem sinal, na casa da familia (o incidente de sw.js:12-16). O
+# testa_biblioteca_offline prova isso no navegador, em tres minutos; esta e a
+# versao de um segundo, sem Chrome e sem servidor.
+#
+# Casa a LINHA de codigo dentro da funcao, e nao o arquivo inteiro: o proprio
+# comentario de carregarSerie cita o literal, e um grep no arquivo passaria com
+# a linha de codigo trocada. E a prova vem antes da conferencia: dois venenos
+# tem que dar zero. O primeiro e o mesmo do testa_biblioteca_offline (o literal
+# trocado por 'banco/matematica/serie-'); o segundo tira o literal da linha de
+# codigo e o deixa so no comentario, que e o buraco de casar o arquivo.
+linhas_serie_mat() {
+  printf '%s\n' "$1" | sed -n '/^  function carregarSerie(/,/^  }$/p' \
+    | grep -vE '^[[:space:]]*(/\*|\*|//)' | grep -cE "'banco/serie-'[[:space:]]*\+" || true
+}
+app_agora=$(tr -d '\r' < app.js 2>/dev/null || true)
+veneno_troca=$(printf '%s\n' "$app_agora" | sed "s|'banco/serie-'|'banco/matematica/serie-'|g")
+veneno_some=$(printf '%s\n' "$app_agora" \
+  | sed "/^  function carregarSerie(/,/^  }$/{ /^[[:space:]]*var url = /s|'banco/serie-'[[:space:]]*+[[:space:]]*serie|raiz + 'serie-' + serie|; }")
+n_agora=$(linhas_serie_mat "$app_agora"); [ -n "$n_agora" ] || n_agora=0
+n_troca=$(linhas_serie_mat "$veneno_troca"); [ -n "$n_troca" ] || n_troca=0
+n_some=$(linhas_serie_mat "$veneno_some"); [ -n "$n_some" ] || n_some=0
+if [ -z "$app_agora" ]; then
+  printf '  FALHOU  %-24s nao consegui ler o app.js\n' "serie da matematica"
+  falhou=1
+elif [ "$veneno_troca" = "$app_agora" ] || [ "$veneno_some" = "$app_agora" ]; then
+  printf '  FALHOU  %-24s um dos venenos nao mudou o app.js: a prova da trava nao prova nada\n' "serie da matematica"
+  falhou=1
+elif [ "$n_troca" != "0" ] || [ "$n_some" != "0" ]; then
+  printf '  FALHOU  %-24s a trava nao enxerga o veneno (literal trocado: %s linha, literal so no comentario: %s linha)\n' \
+    "serie da matematica" "$n_troca" "$n_some"
+  falhou=1
+elif [ "$n_agora" = "0" ]; then
+  printf '  FALHOU  %-24s a linha de carregarSerie nao produz mais o literal banco/serie- para a matematica\n' "serie da matematica"
+  falhou=1
+else
+  printf '  ok      %-24s carregarSerie produz banco/serie- para a matematica (%s linha), e a trava pega os dois venenos\n' \
+    "serie da matematica" "$n_agora"
 fi
 
 # A PROVA VEM ANTES DA CONFERENCIA que ela prova.

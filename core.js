@@ -711,8 +711,11 @@
         { id: 'base', rotulo: 'Retomada de base de anos anteriores' },
         { id: 'raciocinio', rotulo: 'Raciocínio lógico' },
         { id: 'argumentacao', rotulo: 'Argumentação e justificativa escrita' },
-        { id: 'calculo-mental', rotulo: 'Cálculo mental' },
-        { id: 'linguagem', rotulo: 'Linguagem matemática e notação' }
+        /* `so` copia o padrão do MAPA: a área que só existe numa matéria diz
+         * qual. Os ids não mudam, então o que ela já marcou nas aulas continua
+         * valendo; só a oferta é filtrada, por areasPara. */
+        { id: 'calculo-mental', rotulo: 'Cálculo mental', so: ['matematica'] },
+        { id: 'linguagem', rotulo: 'Linguagem matemática e notação', so: ['matematica'] }
       ]
     }
   ];
@@ -723,6 +726,30 @@
   });
 
   function rotuloArea(id) { return ROTULO_AREA[id] || ''; }
+
+  /* As áreas que fazem sentido oferecer para um conjunto de matérias.
+   *
+   * Item sem `so` vale para qualquer matéria. Item com `so` só entra se alguma
+   * das matérias pedidas estiver nele. Sem matérias (lista vazia ou nula) não
+   * há o que filtrar e sai tudo, que é o comportamento de antes: nenhuma tela
+   * antiga perde caixa por não saber a matéria. `manter` são ids já marcados,
+   * que ficam visíveis mesmo filtrados, porque caixa marcada e escondida não
+   * tem como ser desmarcada. Grupo que ficar vazio some. Devolve grupos novos
+   * e nunca mexe em AREAS. */
+  function areasPara(materias, manter) {
+    var pedidas = (materias || []).map(String);
+    var fixos = manter || [];
+    return AREAS.map(function (g) {
+      return {
+        grupo: g.grupo,
+        itens: g.itens.filter(function (i) {
+          if (!i.so || !pedidas.length || fixos.indexOf(i.id) !== -1) return true;
+          var so = Array.isArray(i.so) ? i.so : [i.so];
+          return so.some(function (m) { return pedidas.indexOf(m) !== -1; });
+        })
+      };
+    }).filter(function (g) { return g.itens.length > 0; });
+  }
 
   /* Uma aula pode ter mais de um tema: hora e meia dá tempo de fechar um assunto
    * e começar outro. O campo antigo, de um tema só, continua sendo lido para não
@@ -3570,6 +3597,9 @@
       lacunaId: dados.lacunaId || null,
       titulo: dados.titulo || '',
       alvoId: dados.alvoId,
+      /* A matéria da trilha, pela tabela; a padrão quando quem cria não diz,
+       * que é o caso de toda trilha gravada antes deste campo existir. */
+      materia: dados.materia || MATERIA_PADRAO,
       criadaEm: dados.criadaEm || hojeIso(),
       origem: dados.lacunaId ? 'lacuna' : 'manual',
       passos: dados.passos || [],
@@ -3668,7 +3698,7 @@
     desdeQuandoEstuda: desdeQuandoEstuda, mesesEntre: mesesEntre, pctBR: pctBR,
     IBGE_URL: IBGE_URL, IBGE_ESCRITO: IBGE_ESCRITO,
     markdownFechamento: markdownFechamento, markdownMesInteiro: markdownMesInteiro,
-    AREAS: AREAS, rotuloArea: rotuloArea, temasDaAula: temasDaAula,
+    AREAS: AREAS, rotuloArea: rotuloArea, areasPara: areasPara, temasDaAula: temasDaAula,
     ultimoEncontro: ultimoEncontro,
     MAPA: MAPA, NIVEIS: NIVEIS, itemDoMapa: itemDoMapa, rotulosDoMapa: rotulosDoMapa,
     rotuloNivel: rotuloNivel, mapeamentoNovo: mapeamentoNovo, mapeamentosDe: mapeamentosDe,
