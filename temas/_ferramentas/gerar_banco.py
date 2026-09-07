@@ -26,6 +26,7 @@ Uso:
         deixar tema falso dentro do repositorio.
     python gerar_banco.py --fontes DIR           outra raiz para a colecao de textos
     python gerar_banco.py --painel DIR           outra raiz para os registros do painel cego
+    python gerar_banco.py --ano 2027             faz a conta do dominio publico em outro ano
 """
 import io
 import os
@@ -414,7 +415,8 @@ def gerar_materia(materia, temas, pasta_banco, raiz_temas):
     return banco
 
 
-def gerar(raiz_temas=None, raiz_saida=None, so=None, raiz_fontes=None, raiz_painel=None):
+def gerar(raiz_temas=None, raiz_saida=None, so=None, raiz_fontes=None, raiz_painel=None,
+          ano=None):
     """Gera o que o aplicativo consome, para cada materia que tem tema escrito.
 
     Materia declarada na tabela mas ainda sem tema nao gera nada: escrever um
@@ -453,7 +455,7 @@ def gerar(raiz_temas=None, raiz_saida=None, so=None, raiz_fontes=None, raiz_pain
             # verificador, para ver o resto passar antes de rodar os leitores. O
             # gerador nunca desliga, porque e ele que grava o que o tablet baixa.
             erros, avisos, manuais, cab = verificar.conferir(
-                caminho, raiz_fontes, raiz_painel, sem_painel=False)
+                caminho, raiz_fontes, raiz_painel, sem_painel=False, ano=ano)
             if erros:
                 reprovados.append((os.path.basename(caminho), erros[0]))
                 continue
@@ -541,7 +543,12 @@ def _argumento(nome):
 
 
 if __name__ == '__main__':
+    # O ano da conta do dominio publico. Sem a opcao vale o relogio, porque a
+    # conta so afrouxa com o tempo; ela existe para a bateria do portao fixar o
+    # ano e nao virar alarme falso numa passagem de ano.
+    _ano = _argumento('--ano')
     bancos = gerar(_argumento('--temas'), _argumento('--saida'),
-                   _argumento('--so'), _argumento('--fontes'), _argumento('--painel'))
+                   _argumento('--so'), _argumento('--fontes'), _argumento('--painel'),
+                   int(_ano) if _ano else None)
     if '--provar' in sys.argv and MATERIA_LEGADA in bancos:
         provar(bancos[MATERIA_LEGADA])
