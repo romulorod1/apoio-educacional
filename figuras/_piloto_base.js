@@ -339,25 +339,74 @@ function clonar(t) { return JSON.parse(JSON.stringify(t)); }
  * verdade nas duas linguas. E ela enxerga os controles que TEM figura e
  * remetem: 12 remissoes no MATEM3-03, 14 no MAT08-13, 15 no MATEM3-12. Quem
  * mexer aqui roda o figuras/_varredura_banco.js antes e depois. */
+/* A REMISSAO TEM DUAS FORMAS, E A ORDEM EM QUE SE PROCURA CADA UMA IMPORTA.
+ *
+ * FORMA FORTE: o texto aponta para o papel, e nao ha ambiguidade nenhuma. Sao
+ * os deiticos ("figura a seguir", "figura abaixo", "figura ao lado", "figura
+ * mostrada", "figura dada", "figura indicada"), os imperativos ("observe a
+ * figura", "veja a figura", "conforme a figura") e "a figura mostra".
+ *
+ * FORMA NUA: "na figura", "da figura", "in the figure". E a forma da casa
+ * ("A piramide reta DA FIGURA tem base quadrada", MATEM3-12) e tambem o jeito
+ * de dizer forma geometrica ("a area DA FIGURA que sobrou", MAT04-09). So esta
+ * precisa do apagador do SENTIDO_DE_FORMA.
+ *
+ * POR QUE A ORDEM IMPORTA, e este comentario existe porque alguem vai reordenar
+ * isto sem perceber. O apagador come um trecho INTEIRO ("area da figura",
+ * "perimetro da figura"), e a forma forte costuma vir logo DEPOIS do trecho
+ * comido. Se o apagador rodar primeiro sobre tudo, "Calcule a area da figura ao
+ * lado." vira "Calcule a   ao lado." e a remissao mais explicita que existe
+ * some. Isso mata nos dois sentidos, e o segundo e o pior: no varredura, um
+ * tema sem figura que diga "Calcule o perimetro da figura abaixo" nao entra na
+ * lista (a), e o criterio de pronto da frente fica verde com o defeito na
+ * folha; no piloto, o dia em que o MAT07-13 ("Area e perimetro de figuras
+ * compostas") ganhar figura, a trava 3 acusa "tem figura e nao remete" e
+ * acrescentar "abaixo" ao enunciado nao resolve, porque o apagador come a frase
+ * inteira. A saida facil seria afrouxar a trava, e ai se perdem as duas.
+ *
+ * Entao: FORMA FORTE no texto CRU, primeiro. Forma nua no texto apagado,
+ * depois. Nunca o contrario. */
+const FORMA_FORTE = {
+  pt: /\b(?:[ao]s?\s+)?(?:figura|desenho|esquema|diagrama)s?\s+(?:a seguir|abaixo|acima|ao lado|mostrad[ao]s?|dad[ao]s?|indicad[ao]s?)\b|\b(?:observe|veja|conforme)\s+[ao]s?\s+(?:figura|desenho|esquema|diagrama)s?\b|\b[ao]s?\s+(?:figura|desenho|esquema|diagrama)s?\s+mostram?\b/i,
+  en: /\b(?:figure|diagram|picture|drawing)s?\s+(?:below|above|alongside|opposite|shown)\b|\bthe (?:figure|diagram|picture|drawing)s?\s+shows?\b|\bas shown\b/i
+};
+const REMETE_NUA = {
+  pt: /\b(?:n[ao]|d[ao])\s+figura\b/i,
+  en: /\bin the (?:figure|diagram|picture)\b/i
+};
+/* A uniao das duas, exportada para quem quiser a lista inteira num objeto so.
+ * Quem CONFERE usa remeteAFigura, que respeita a ordem. */
+const REMETE = {
+  pt: new RegExp(FORMA_FORTE.pt.source + '|' + REMETE_NUA.pt.source, 'i'),
+  en: new RegExp(FORMA_FORTE.en.source + '|' + REMETE_NUA.en.source, 'i')
+};
 const SENTIDO_DE_FORMA = {
   /* Sem \b antes de "area": em JavaScript \b e ASCII, e entre um espaco e o
    * "a" acentuado nao ha fronteira de palavra nenhuma. Com o \b, "a area da
-   * figura" escapava do apagador e o tema vinha para a lista. */
+   * figura" escapava do apagador e o tema vinha para a lista. Pela mesma razao
+   * o fim da segunda linha usa (?=\s|$|[,.;:]) e nao \b: depois de vogal
+   * acentuada nao ha fronteira nenhuma.
+   *
+   * O VERBO depois de "da figura" NAO entra na lista de qualificadores, e isso
+   * foi medido: "e" e "sao" estiveram nela e apagavam a forma da casa. O
+   * MAT08-13 diz "A pista de atletismo DA FIGURA E formada por um retangulo" e
+   * "O alvo DA FIGURA E formado por tres circunferencias", que sao remissoes
+   * legitimas em exercicios que TEM figura, e os dois passaram a ser acusados
+   * de "tem figura e nao remete a ela". Quem carrega o sentido de forma e o
+   * substantivo de medida ANTES ("area da", "perimetro da"), nao o verbo
+   * depois. O caso que motivou o "e" na lista, "A area da figura e 58 cm
+   * quadrados" do MAT05-09, ja e apagado pela primeira linha. */
   pt: [
     /(?:[áa]rea|per[íi]metro|contorno|volta|lado|lados|dentro|redor|interior|total|metade)\s+(?:d[ao]|n[ao])\s+figura\b/gi,
-    /\b(?:d[ao]|n[ao])\s+figura\s+(?:composta|original|plana|planas|geom[ée]trica|toda|que|[ée]|s[ãa]o)\b/gi
+    /\b(?:d[ao]|n[ao])\s+figura\s+(?:composta|original|plana|planas|geom[ée]trica|toda|que)(?=\s|$|[,.;:])/gi
   ],
   en: [
     /\b(?:area|perimeter|outline|inside|around)\s+of the figure\b/gi,
     /\b(?:in|of) the figure\s+(?:that|which)\b/gi
   ]
 };
-const REMETE = {
-  pt: /\b(?:n[ao]|d[ao])\s+figura\b|\b(?:conforme|observe|veja)\s+[ao]\s+figura\b|\b[ao]s?\s+(?:figura|desenho|esquema|diagrama)s?\s+(?:a seguir|abaixo|acima|ao lado)\b|\b[ao]\s+(?:figura|desenho|esquema|diagrama)\s+mostra\b/i,
-  en: /\bin the (?:figure|diagram|picture)\b|\b(?:figure|diagram|picture|drawing)s?\s+(?:below|above|alongside)\b|\bthe (?:figure|diagram|picture|drawing) shows\b|\bas shown\b/i
-};
-/* O texto sem as diretivas e sem os usos de "figura" que sao forma medida. E
- * sobre ELE que a remissao se procura. */
+/* O texto sem as diretivas e sem os usos de "figura" que sao forma medida. So a
+ * forma NUA se procura aqui: a forte ja foi procurada no texto cru. */
 function textoDeRemissao(s, lingua) {
   let t = semDiretiva(s);
   SENTIDO_DE_FORMA[lingua].forEach(function (rx) {
@@ -365,21 +414,34 @@ function textoDeRemissao(s, lingua) {
   });
   return t;
 }
-function remeteAFigura(s, lingua) { return REMETE[lingua].test(textoDeRemissao(s, lingua)); }
+function formaForte(s, lingua) { return FORMA_FORTE[lingua].test(semDiretiva(s)); }
+function remeteAFigura(s, lingua) {
+  return formaForte(s, lingua) || REMETE_NUA[lingua].test(textoDeRemissao(s, lingua));
+}
 /* Todas as ocorrencias, com a frase inteira, para o verificador poder mostrar
  * ao leitor o que casou em vez de so um id de tema. Uma lista de ids nao e
  * auditavel: foi abrindo o arquivo que se descobriu o falso positivo do
  * MAT02-06. */
 function ocorrenciasDeRemissao(s, lingua) {
-  const t = textoDeRemissao(s, lingua), saida = [];
-  const rx = new RegExp(REMETE[lingua].source, 'gi');
-  let m;
-  while ((m = rx.exec(t))) {
-    let a = m.index, b = m.index;
-    while (a > 0 && '.!?\n'.indexOf(t[a - 1]) < 0) a--;
-    while (b < t.length && '.!?\n'.indexOf(t[b]) < 0) b++;
-    saida.push({ casou: m[0], frase: t.slice(a, b + 1).replace(/\s+/g, ' ').trim() });
+  const saida = [];
+  function varrer(texto, rx, forte) {
+    const r = new RegExp(rx.source, 'gi');
+    let m;
+    while ((m = r.exec(texto))) {
+      let a = m.index, b = m.index;
+      while (a > 0 && '.!?\n'.indexOf(texto[a - 1]) < 0) a--;
+      while (b < texto.length && '.!?\n'.indexOf(texto[b]) < 0) b++;
+      const frase = texto.slice(a, b + 1).replace(/\s+/g, ' ').trim();
+      /* A mesma frase pode casar as duas formas ("a area da figura ao lado"
+       * casa a forte no cru e nao casa a nua no apagado; "da figura abaixo"
+       * casa as duas). Vale a forte, que e a mais informativa. */
+      if (saida.some(function (x) { return x.frase === frase; })) return;
+      saida.push({ casou: m[0], frase: frase, forte: forte });
+    }
   }
+  /* A ordem e a mesma do remeteAFigura, e pela mesma razao. */
+  varrer(semDiretiva(s), FORMA_FORTE[lingua], true);
+  varrer(textoDeRemissao(s, lingua), REMETE_NUA[lingua], false);
   return saida;
 }
 /* A glosa da hachura: a palavra que diz o que a textura quer dizer. */
@@ -1031,6 +1093,16 @@ function travasGenericas(ctx, op) {
    * nao passa a opcao. */
   conf('nenhuma figura afirma escala falsa: fora de escala pede legenda, e desenho exato nao se marca',
     escalaIncoerente(ctx.todasAsFiguras).join('; ') || 'nenhuma', 'nenhuma');
+  /* Receita que nao declara `metricas` deixa a segunda metade da trava E muda
+   * naquela figura, e mudez tem que aparecer na folha: e o aviso para o dia em
+   * que uma receita nova esquecer a lista. */
+  const semMetricas = [...new Set(ctx.todasAsFiguras
+    .filter(function (f) { return f.receita && valoresMetricos(f.diretiva, f.receita) === null; })
+    .map(function (f) { return f.receita; }))];
+  if (semMetricas.length) {
+    medido('trava E muda em ' + semMetricas.length + ' receita(s) sem lista `metricas` declarada: ' +
+      semMetricas.join(', ') + '. A segunda metade dela nao roda nessas figuras');
+  }
   const aFora = alvo(op.figurasForaDeEscala, 'as figuras marcadas fora de escala sao as esperadas');
   if (aFora) {
     conf(aFora.rotulo,
@@ -1175,8 +1247,9 @@ module.exports = {
   nomeDaFigura: nomeDaFigura, bolinhasDe: bolinhasDe, segmentos09: segmentos09,
   planoDaFigura: planoDaFigura, pecasDeTexto: pecasDeTexto,
   semDiretiva: semDiretiva, diretivasDe: diretivasDe, clonar: clonar,
-  REMETE: REMETE, SENTIDO_DE_FORMA: SENTIDO_DE_FORMA,
-  textoDeRemissao: textoDeRemissao, remeteAFigura: remeteAFigura,
+  REMETE: REMETE, FORMA_FORTE: FORMA_FORTE, REMETE_NUA: REMETE_NUA,
+  SENTIDO_DE_FORMA: SENTIDO_DE_FORMA,
+  textoDeRemissao: textoDeRemissao, remeteAFigura: remeteAFigura, formaForte: formaForte,
   ocorrenciasDeRemissao: ocorrenciasDeRemissao,
   GLOSA: GLOSA, NAO_TRADUZ: NAO_TRADUZ, MARCA_PT_NUCLEO: MARCA_PT_NUCLEO,
   NUMERO_PURO: NUMERO_PURO, ehNumeroDeEscala: ehNumeroDeEscala,

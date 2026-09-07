@@ -92,8 +92,25 @@ const ISENTOS = {
 const REMISSAO_QUEBRADA_DE_HOJE = ['MAT08-11'];
 
 /* Controles: temas que TEM figura e remetem a ela. Obrigatorios, ver o
- * cabecalho. */
-const CONTROLES = ['MATEM3-03', 'MAT08-13'];
+ * cabecalho, e conferidos POR LINGUA e por FORMA.
+ *
+ * Por lingua porque o total esconde cegueira de meia lingua: com a conferencia
+ * sobre a soma, trocar a REMETE.pt por uma que nao casa nada deixaria os
+ * controles com o numero das inglesas, o MAT08-11 na lista (a) pela inglesa, e
+ * o placar sairia verde com a varredura cega em portugues.
+ *
+ * Por forma porque o numero sozinho tambem esconde: o MAT08-13 e o controle que
+ * cobre as duas familias de uma vez, a forte ("a figura abaixo", "a figura
+ * mostra", "figure below", "the figure shows") e a nua ("da figura", "in the
+ * figure"). Se uma das duas familias parar de casar, o numero cai mas a lista
+ * de formas diz QUAL parou.
+ *
+ * Numeros medidos em 07/09/2026. Uma frase que case as duas formas conta uma
+ * vez so, e vale a forte. */
+const CONTROLES = [
+  { id: 'MATEM3-03', pt: 6, en: 6, formas: { pt: ['a figura mostra', 'na figura'], en: ['in the figure', 'the figure shows'] } },
+  { id: 'MAT08-13', pt: 7, en: 7, formas: { pt: ['a figura abaixo', 'a figura mostra', 'da figura'], en: ['figure below', 'in the figure', 'the figure shows'] } }
+];
 
 /* ================================================================ a varredura */
 
@@ -110,21 +127,29 @@ const lido = JSON.parse(fs.readFileSync(BANCO, 'utf8'));
 const temas = Array.isArray(lido.temas) ? lido.temas : [lido];
 
 /* Toda ocorrencia de remissao de um tema, com lingua, item e a frase inteira.
- * O campo `daLista` separa as duas listas: remissao dentro de exercicio manda
- * olhar ESTA folha; remissao na explicacao pode ser roteiro generico. */
+ *
+ * O campo `daLista` separa as duas listas, e a regra e por FORMA antes de ser
+ * por lugar. Remissao dentro de exercicio ou de resposta manda olhar ESTA
+ * folha, sempre. Na explicacao depende da forma: forma FORTE ("Observe a figura
+ * a seguir") e promessa quebrada mesmo na explicacao; forma NUA ("os dois
+ * triangulos que aparecem na figura", MAT08-12) pode ser roteiro generico, que
+ * fala da figura do problema que se estiver resolvendo, e ai e so indicio. */
 function ocorrenciasDoTema(t) {
   const saida = [];
   ['pt', 'en'].forEach(function (lingua) {
     const d = t[lingua];
     if (!d) return;
-    const olhar = [['explicacao', d.explicacao, 'b']];
+    const olhar = [['explicacao', d.explicacao, false]];
     (d.exercicios || []).forEach(function (e) {
-      olhar.push(['ex ' + e.n, e.enunciado, 'a']);
-      olhar.push(['resp ' + e.n, e.resposta, 'a']);
+      olhar.push(['ex ' + e.n, e.enunciado, true]);
+      olhar.push(['resp ' + e.n, e.resposta, true]);
     });
     olhar.forEach(function (par) {
       P.ocorrenciasDeRemissao(par[1], lingua).forEach(function (o) {
-        saida.push({ lingua: lingua, onde: par[0], daLista: par[2], casou: o.casou, frase: o.frase });
+        saida.push({
+          lingua: lingua, onde: par[0], casou: o.casou, frase: o.frase, forte: o.forte,
+          daLista: (par[2] || o.forte) ? 'a' : 'b'
+        });
       });
     });
   });
@@ -174,28 +199,56 @@ Object.keys(ISENTOS).forEach(function (id) {
   console.log('  ' + alinhar(id, 11) + ' ' + ISENTOS[id]);
 });
 
-console.log('\ncontroles: temas que TEM figura e remetem a ela (obrigatorios)');
-CONTROLES.forEach(function (id) {
-  const t = temas.find(function (x) { return x && x.id === id; });
-  if (!t) { console.log('  ' + alinhar(id, 11) + ' fora deste banco'); return; }
+function porLingua(o, lingua) { return o.filter(function (x) { return x.lingua === lingua; }); }
+function formasDe(o) {
+  return [...new Set(o.map(function (x) { return String(x.casou).toLowerCase(); }))].sort();
+}
+
+console.log('\ncontroles: temas que TEM figura e remetem a ela (obrigatorios, por lingua e por forma)');
+CONTROLES.forEach(function (c) {
+  const t = temas.find(function (x) { return x && x.id === c.id; });
+  if (!t) { console.log('  ' + alinhar(c.id, 11) + ' fora deste banco'); return; }
   const o = ocorrenciasDoTema(t);
-  console.log('  ' + alinhar(id, 11) + ' ' + P.contarDiretivas(t) + ' diretivas, ' + o.length + ' remissoes vistas');
-  o.slice(0, 2).forEach(function (x) {
-    console.log('          ' + x.lingua + ' ' + x.onde + ' [' + x.casou + ']  "' + x.frase.slice(0, 96) + '"');
+  console.log('  ' + alinhar(c.id, 11) + ' ' + P.contarDiretivas(t) + ' diretivas');
+  ['pt', 'en'].forEach(function (lg) {
+    const dela = porLingua(o, lg);
+    console.log('          ' + lg + '  ' + dela.length + ' remissoes  formas: ' + formasDe(dela).join(', '));
   });
 });
 
 console.log('\nconferencias');
-/* O detector enxerga. Sem isto, uma lista curta de acusados nao significaria
- * nada: zero acusados parece boa noticia e pode ser cegueira. */
-CONTROLES.forEach(function (id) {
-  const t = temas.find(function (x) { return x && x.id === id; });
-  if (!t) { conf('o controle ' + id + ' esta no banco', 'ausente', 'presente'); return; }
-  conf('o controle ' + id + ' tem figura e o detector ve a remissao dele',
-    P.contarDiretivas(t) > 0 && ocorrenciasDoTema(t).length > 0, true);
-  conf('e por isso o ' + id + ' nao entra em lista nenhuma de acusados',
+/* O detector enxerga, e enxerga NAS DUAS LINGUAS. Sem isto, uma lista curta de
+ * acusados nao significaria nada: zero acusados parece boa noticia e pode ser
+ * cegueira, e cegueira de meia lingua nao aparece num total. */
+CONTROLES.forEach(function (c) {
+  const t = temas.find(function (x) { return x && x.id === c.id; });
+  if (!t) { conf('o controle ' + c.id + ' esta no banco', 'ausente', 'presente'); return; }
+  const o = ocorrenciasDoTema(t);
+  conf('o controle ' + c.id + ' tem figura', P.contarDiretivas(t) > 0, true);
+  ['pt', 'en'].forEach(function (lg) {
+    const dela = porLingua(o, lg);
+    conf('o detector ve ' + c[lg] + ' remissoes do ' + c.id + ' em ' + lg, dela.length, c[lg]);
+    conf('e as formas do ' + c.id + ' em ' + lg + ' sao as conhecidas',
+      formasDe(dela).join(', '), c.formas[lg].join(', '));
+  });
+  conf('e por isso o ' + c.id + ' nao entra em lista nenhuma de acusados',
     P.figuraPrometidaEAusente(t).length, 0);
 });
+
+/* A trava 3 rodada aqui tambem, sobre os temas que JA TEM figura. Dentro do
+ * piloto ela so roda se o tema tiver piloto, e hoje sao dois de cinco. Aqui
+ * fecha a brecha sem custo: enunciado com figura que nao remete a ela, e
+ * enunciado sem figura que fala dela, nos cinco temas marcados. */
+const comFigura = temas.filter(function (t) { return t && t.pt && t.en && P.contarDiretivas(t) > 0; });
+const trava3 = [];
+comFigura.forEach(function (t) {
+  const a = P.semRemissao(t);
+  if (a.length) trava3.push(t.id + ': ' + a.join('; '));
+});
+console.log('        trava 3 rodada nos ' + comFigura.length + ' temas que ja tem figura: ' +
+  (trava3.length ? trava3.join(' | ') : 'nenhum item fora do lugar'));
+conf('nos temas que ja tem figura, todo enunciado com figura remete a ela e nenhum sem figura fala dela',
+  trava3.join(' | ') || 'nenhum', 'nenhum');
 /* Os isentos continuam classificados como outro sentido da palavra. */
 const todosAcusados = quebradas.concat(indicios).map(function (a) { return a.id; });
 conf('nenhum tema isento voltou a ser acusado: a expressao de remissao nao afrouxou',
