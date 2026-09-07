@@ -235,17 +235,37 @@ valor metrico e o primeiro campo de cada ocorrencia, entao o rotulo de `altura=6
 `diagonal=A;C;d` nao contam como letra. `escala=fiel` e `escala=fora` escritos na diretiva
 continuam mandando por cima.
 
-A saida do meio tem uma condicao, e ela e sobre COMPRIMENTO e nao sobre angulo. O angulo em
-letra e RESOLVIDO (o sistema fecha e a construcao usa o valor achado); o comprimento em letra
-nao e resolvido por ninguem e sai do prototipo. Entao letra em angulo e sempre fiel, e letra
-em comprimento so e fiel quando os simbolos sao **distintos e sem coeficiente**: `lado=a
-lado=b lado=c` e `base=b altura=h` nao afirmam proporcao nenhuma e qualquer desenho os
-satisfaz, mas `lado=a lado=a` afirma que dois lados sao iguais e o desenho tem que cumprir.
-Onde a receita SABE cumprir, ela constroi e a figura volta a ser fiel: o `triangulo` monta o
-isosceles de `lado=a lado=a lado=b`, o equilatero de `lado=a lado=a lado=a` e a proporcao 1
-para 2 de `lado=x lado=2x lado=2x`. Onde ela nao sabe (`retangulo base=a altura=a`,
-`trapezio base=b base=b altura=h`), a figura sai fora de escala e cobra a legenda, que e o
-que ela ja fazia antes desta familia existir.
+A saida do meio tem duas condicoes.
+
+A primeira e sobre COMPRIMENTO e nao sobre angulo. O angulo em letra e RESOLVIDO (o sistema
+fecha e a construcao usa o valor achado); o comprimento em letra nao e resolvido por ninguem
+e sai do prototipo. Entao letra em angulo e sempre fiel, e letra em comprimento so e fiel
+quando os simbolos sao **distintos e sem coeficiente**: `lado=a lado=b lado=c` e `base=b
+altura=h` nao afirmam proporcao nenhuma e qualquer desenho os satisfaz, mas `lado=a lado=a`
+afirma que dois lados sao iguais e o desenho tem que cumprir. Onde a receita SABE cumprir,
+ela constroi e a figura volta a ser fiel: o `triangulo` monta o isosceles de `lado=a lado=a
+lado=b`, o equilatero de `lado=a lado=a lado=a` e a proporcao 1 para 2 de `lado=x lado=2x
+lado=2x`. Onde ela nao sabe (`retangulo base=a altura=a`, `trapezio base=b base=b altura=h`,
+`lado=a+1 lado=a lado=a`), a figura sai fora de escala e cobra a legenda.
+
+A segunda vale sobre a MISTURA, e e a que fecha a familia:
+
+> Letra em chave metrica e uma de duas coisas, e so uma delas e fora de escala. Se a
+> CONSTRUCAO determinou aquele valor, a letra e a PERGUNTA e o desenho e exato: **fiel**. Se
+> o valor saiu do prototipo, a letra e parametro livre e o desenho e arbitrario: **fora de
+> escala**.
+
+`lado=3 lado=4 lado=5 altura=h` desenha a altura de 2,4 de verdade e o `h` e o nome da
+resposta: fiel, sem legenda. `base=10 altura=h` desenha uma altura de 6,2 que ninguem pediu:
+fora de escala, com legenda. A pergunta e a mesma que a camada de gabarito ja fazia para
+decidir se podia escrever o valor resolvido, e agora as duas tem uma resposta so: se o
+gabarito pode medir a figura para responder, a figura nao esta fora de escala de nada.
+
+Sao determinadas, no `triangulo`: tres lados numericos; base e altura numericas (com ou sem
+um angulo); e dois angulos mais um comprimento numerico. No `quadrilatero`: a forma fechada
+(ver a lista de deducoes abaixo) mais um comprimento numerico. `escala=fora` escrito na
+diretiva continua mandando por cima, porque o desenho enganoso de proposito e escolha do
+autor e nenhuma deducao a desfaz.
 
 **Limitacao conhecida, e nao e da receita.** Rotulo de lado com COEFICIENTE (`lado=2x`) desenha
 certo, na proporcao certa, e mesmo assim sai com o aviso "o valor de angulo 2x saiu solto na
@@ -270,7 +290,21 @@ existe e desenhada, e nao recusada:
   a base e a altura ja determinam o triangulo (o apice fica em h sobre a tangente do angulo).
 - `quadrilatero tipo=paralelogramo angulo=120 base=10 altura=6` desenha: o angulo fixa a
   inclinacao das pernas e deixa a razao dos lados livre, entao a base e a altura entram
-  medindo o que ele deixou em aberto. Vale igual no losango e nos dois trapezios.
+  medindo o que ele deixou em aberto. Vale igual no losango e nos dois trapezios. O
+  paralelogramo pede as DUAS medidas para a forma fechar: com o angulo e so a base, a perna
+  continua livre e uma diagonal numerica ali e recusada dizendo que falta a altura.
+- `lado=` faz o papel de `base=` na construcao quando `base=` nao foi escrita: na volta A, B,
+  C, D o lado a E o lado AB, que e a base. `tipo=losango lado=6 altura=5` e `tipo=retangulo
+  lado=4 altura=3` desenham, e "losango de lado 6" continua sendo a frase do enunciado.
+- No `triangulo`, tres lados numericos que fecham Pitagoras ganham o **quadradinho do vertice
+  reto de oficio**, como notacao da CLASSE, custando UMA marca, pela mesma conta dos quatro
+  quadradinhos do `tipo=retangulo`. Sem ele nao se sabe qual lado e a hipotenusa, e pedir
+  `angulo=90` no lugar era um beco: no 3, 4, 5 o angulo reto cai em C, a chave `angulo=`
+  preenche na ordem A, B, C, e chegar la custava duas incognitas.
+  A figura do MAT09-06 (triangulo retangulo com a altura relativa a hipotenusa) NAO cabe com
+  os tres lados rotulados: sao seis marcas. A grafia que cabe constroi pelos angulos e rotula
+  so a hipotenusa: `@fig triangulo angulo=36.87 angulo=53.13 base=5 altura=h`, cinco marcas,
+  fiel, com a altura conferida em 2,4.
 
 **Toda medida numerica e conferida contra o desenho, e a ausencia de uma chave nao desliga a
 conferencia.** Quem confere e a ESCALA DO PROBLEMA: o primeiro comprimento numerico da
