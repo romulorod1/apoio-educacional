@@ -158,6 +158,17 @@ roda "receitas sol."    node figuras/_prova_receitas_solidos.js
 roda "piloto MAT08-13"  node figuras/_piloto_MAT08-13.js
 roda "piloto MATEM3-04" node figuras/_piloto_MATEM3-04.js
 roda "tinta"            node figuras/_prova_desenho_tinta.js
+# Frente 3 (figuras), 07/09/2026. Os dois pilotos novos rodam SEM argumento, ou
+# seja, contra o temas/banco.json, que e como os outros tres ja rodam aqui: o
+# retrato figuras/_tema_<ID>.json e gitignored e serve so a autoria. O
+# _varredura_banco nao prova receita nenhuma, prova o BANCO: e o verificador do
+# criterio de pronto desta frente (nenhum exercicio manda olhar uma figura que a
+# folha nao tem), e por isso ele fica aqui e nao no piloto de um tema.
+roda "prova do piloto"  node figuras/_prova_piloto_base.js
+roda "receitas plano"   node figuras/_prova_receitas_plano.js
+roda "piloto MATEM3-12" node figuras/_piloto_MATEM3-12.js
+roda "piloto MATEM3-03" node figuras/_piloto_MATEM3-03.js
+roda "varredura banco"  node figuras/_varredura_banco.js
 saida=$(node figuras/_prova_desenho.js 2>&1) || true
 if printf '%s\n' "$saida" | grep -qE "^avisos: 0$" && printf '%s\n' "$saida" | grep -qE "^vazamentos de estado: 0$"; then
   printf '  ok      %-24s %s\n' "desenho" "$(printf '%s\n' "$saida" | grep -E '^figuras:' | head -1)"
