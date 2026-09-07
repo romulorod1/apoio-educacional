@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.14.1';
+  var VERSAO = '1.15.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -22,6 +22,26 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.15.0',
+      itens: [
+        'As propostas em andamento ficam guardadas. Antes existia uma só: começar outra ' +
+          'descartava a anterior. Agora a janela da proposta abre com a lista das últimas, ' +
+          'pelo nome do aluno e por quando você mexeu, e você volta para qualquer uma com um ' +
+          'toque. Cada linha tem Apagar, e o Apagar pergunta antes dizendo de quem é.',
+        'A proposta ficou mais parecida com você falando. Ela chama a criança pelo nome, diz ' +
+          'de onde veio o que você escreveu (da aula de nivelamento ou da conversa com a ' +
+          'família), e explica o motivo de cada combinado em vez de só enunciar a regra. ' +
+          'A seção de preço passou a se chamar Quanto custa, na folha e na tela.',
+        'A parte que diz que a aula desmarcada em cima da hora é cobrada ficou impossível de ' +
+          'passar batido. Ela usa as mesmas palavras da folga que não é cobrada, tem título ' +
+          'que se entende sozinho, e agora sai sempre na mesma página da folga, colada nela. ' +
+          'A folha também diz o que acontece se a família parar no meio de um plano.',
+        'No modo Planos, o seu preço por hora ficou visível e editável na mesma tela: era ele ' +
+          'que mandava na conta e sumia justamente ali. Os três descontos agora dizem, no ' +
+          'título, que descem do seu preço de hoje.'
+      ]
+    },
     {
       versao: '1.14.1',
       itens: [
@@ -965,7 +985,9 @@
     $('#ir-para-hoje').addEventListener('click', function () { irParaMes(Core.mesDe(Core.hojeIso())); });
     $('#nova-aula').addEventListener('click', function () { abrirAula(null, Core.hojeIso()); });
     $('#novo-aluno').addEventListener('click', function () { abrirAluno(null); });
-    $('#proposta-nova').addEventListener('click', abrirPropostaAvulsa);
+    /* Sem passar o evento adiante: abrirPropostaAvulsa recebe o id do rascunho
+     * a abrir, e um objeto de evento no lugar dele não seria id nenhum. */
+    $('#proposta-nova').addEventListener('click', function () { abrirPropostaAvulsa(); });
     $('#gerar-proposta').addEventListener('click', function () {
       gerarPropostaEmPdf(propostaEmEdicao);
     });
@@ -3016,7 +3038,7 @@
    * A REGRA DE OURO DO EDITOR: cada bloco abre FECHADO, mostrando só um resumo
    * de uma linha do que está dentro. São sete blocos, e isso não é enfeite: é a
    * condição para ela ainda usar isto na terceira proposta. Sete blocos abertos
-   * numa tela de tablet viram três telas de rolagem. Só Quem e Investimento
+   * numa tela de tablet viram três telas de rolagem. Só Quem e Quanto custa
    * nascem abertos, que são os dois que ela sempre olha.
    *
    * O PDF sai primeiro, sempre, e nada é criado sozinho: depois de gerar, o
@@ -3069,30 +3091,233 @@
     return p;
   }
 
-  /* O rascunho do aluno que ainda não existe.
+  /* As propostas em andamento do aluno que ainda não existe.
    *
-   * UM só, e não uma lista, porque rascunho sem aluno não aparece na tela
-   * Alunos e uma pilha invisível viraria lixo. O próximo sobrescreve. Ele mora
-   * nos ajustes e vai para o disco pelo Store de sempre, então sobrevive a
-   * fechar o aplicativo no meio. */
-  function rascunhoDeProposta() {
+   * Era UM rascunho só, e o argumento de então era que rascunho sem aluno não
+   * aparece na tela Alunos e uma pilha invisível viraria lixo. O argumento
+   * estava certo sobre a pilha e errado sobre o caso: a proposta é escrita
+   * JUSTAMENTE para quem ainda não existe no aplicativo, então o rascunho é a
+   * única cópia que existe daquele trabalho. Quem já está cadastrado tem a
+   * proposta guardada na ficha; quem não está tinha só este campo, e o
+   * "Começar outra" da segunda família da tarde apagava a primeira.
+   *
+   * Agora é uma LISTA, em db.ajustes.propostaRascunhos, identificada pelo nome
+   * do aluno e pela data em que ela mexeu por último, mais recente primeiro. O
+   * campo antigo continua sendo lido uma vez, para migrar quem já tinha um
+   * rascunho gravado, e depois é zerado. Campo novo nasce opcional: o esquema
+   * do banco não mudou, isto mora dentro de ajustes como tudo o mais.
+   *
+   * A pilha invisível continua sendo o risco, e são duas travas contra ela:
+   * o teto de TETO_RASCUNHOS e a poda dos rascunhos sem nome. */
+  var TETO_RASCUNHOS = 8;
+
+  /* Por que oito.
+   *
+   * O teto não é de armazenamento: oitocentos rascunhos caberiam no IndexedDB
+   * sem esforço. Ele é de TELA, e a medida é esta, tirada no tablet em pé, 800
+   * por 1280, com a lista cheia:
+   *
+   *   cada linha ocupa 59 px (51 de alvo de dedo mais 8 de respiro);
+   *   o corpo da janela mostra 1067 px;
+   *   o primeiro bloco do editor é o Quem, que nasce aberto e é onde ela vai
+   *   digitar, e ele termina a 984 px com oito linhas, a 1043 com nove e a
+   *   1102 com dez.
+   *
+   * Ou seja: com dez a janela da proposta abre com o primeiro campo já cortado
+   * pelo rodapé, parecendo uma lista de arquivos e não uma proposta. Nove é a
+   * última que cabe, e cabe raspando, com 24 px de sobra. Oito deixa 83, que é
+   * o que absorve um nome comprido virando duas linhas.
+   *
+   * Oito também cobre o uso real com sobra: a proposta vale trinta dias e uma
+   * tarde boa são três famílias. O que passa de oito não é proposta em
+   * andamento, é proposta esquecida.
+   *
+   * Quando o teto estoura, sai a mais antiga e ela fica sabendo POR QUAL NOME.
+   * Sumiço calado é justamente o que transforma lista em lixo. */
+
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  /* A hora local, e não toISOString(): às 22h de Niterói o UTC já é o dia
+   * seguinte, e a lista mostraria "mexida em 05/09" para o que ela mexeu na
+   * noite do dia 4. Ordena como texto porque o formato é fixo. */
+  function agoraIso() {
+    var d = new Date();
+    return Core.hojeIso() + 'T' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) +
+      ':' + pad2(d.getSeconds());
+  }
+
+  function mexidoEm(r) {
+    return String((r && (r.mexidoEm || r.geradoEm || r.data)) || '');
+  }
+
+  /* Quando ela mexeu pela última vez, do jeito que se fala. Hoje e ontem por
+   * extenso porque é a distância em que ela realmente reconhece a proposta;
+   * mais longe do que isso, a data cheia.
+   *
+   * A HORA entra em hoje e em ontem, e isso não é enfeite.
+   *
+   * Medido: três propostas em andamento, duas com o mesmo nome de aluno, e as
+   * duas linhas saíam "Helena Prado / mexida hoje / Apagar", iguais caractere
+   * por caractere, e as duas perguntas do Apagar também. O caso é alcançável em
+   * três toques: abrir a proposta da família, tocar em Começar outra e digitar
+   * o mesmo nome de novo, que é o que acontece quando a mesma família volta ou
+   * quando ela recomeça a proposta do zero. Dali em diante o Apagar tinha
+   * metade de chance de destruir a proposta errada, e o Apagar não tem volta,
+   * numa lista cuja razão de existir é não perder proposta.
+   *
+   * O carimbo já guardava hora, minuto e segundo: era esta função que jogava a
+   * hora fora justamente nos dois dias em que as propostas se acumulam.
+   *
+   * Na data cheia a hora fica de fora: ali o dia já separa as linhas, e o que
+   * se lê de relance é a data. */
+  function quandoMexeu(r) {
+    var carimbo = mexidoEm(r);
+    var dia = carimbo.slice(0, 10);
+    if (!dia) return 'ainda sem data';
+    /* Rascunho antigo, e o que veio do campo único da versão anterior, guardava
+     * só o dia. Sem hora gravada não há hora para mostrar, e inventar uma seria
+     * pior do que não ter nenhuma. */
+    var hora = /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(carimbo)
+      ? ' às ' + carimbo.slice(11, 16) : '';
+    if (dia === Core.hojeIso()) return 'mexida hoje' + hora;
+    if (dia === Core.somaDiasIso(Core.hojeIso(), -1)) return 'mexida ontem' + hora;
+    return 'mexida em ' + Core.ddmmaaaa(dia);
+  }
+
+  /* O começo do parágrafo que ela escreveu sobre a criança.
+   *
+   * É o desempate do desempate: nome e hora já separam quase todo par de
+   * linhas, mas duas propostas com o mesmo nome mexidas no mesmo minuto
+   * continuariam idênticas, e o parágrafo é a única coisa que de fato distingue
+   * as duas crianças, porque é ali que ela escreve com as palavras dela.
+   *
+   * Cortado no tamanho, e não só pelo CSS: é o que impede um parágrafo inteiro
+   * de virar nó de texto gigante numa linha que mostra três palavras. O corte
+   * fino, o da largura que sobrou, continua sendo do CSS. */
+  function trechoDoRascunho(r) {
+    var t = String((r && r.texto) || '').replace(/\s+/g, ' ').trim();
+    if (t.length <= 90) return t;
+    /* Corta em palavra inteira, e não no caractere 90: este mesmo texto entra
+     * na pergunta do Apagar, e ali ele é lido inteiro, não encolhido pelo CSS.
+     * Palavra partida no meio se lê como defeito e desvia a atenção justamente
+     * no segundo em que ela está decidindo se apaga ou não. */
+    var curto = t.slice(0, 90);
+    var ultimoEspaco = curto.lastIndexOf(' ');
+    return (ultimoEspaco > 40 ? curto.slice(0, ultimoEspaco) : curto) + '…';
+  }
+
+  function ordenarRascunhos(lista) {
+    lista.sort(function (a, b) {
+      var x = mexidoEm(a), y = mexidoEm(b);
+      return x < y ? 1 : (x > y ? -1 : 0);
+    });
+    return lista;
+  }
+
+  /* A lista, já migrada. Chamar isto é a única forma de alcançá-la: a migração
+   * do campo antigo mora aqui dentro para não haver caminho que leia a lista
+   * sem passar por ela e conclua que não há rascunho nenhum. */
+  function listaDeRascunhos() {
     db.ajustes = db.ajustes || {};
-    var r = db.ajustes.propostaRascunho;
-    if (!r || typeof r !== 'object' || !r.id) r = Core.preencherProposta(db, null);
-    db.ajustes.propostaRascunho = completarProposta(r);
-    return db.ajustes.propostaRascunho;
+    if (!Array.isArray(db.ajustes.propostaRascunhos)) db.ajustes.propostaRascunhos = [];
+    var lista = db.ajustes.propostaRascunhos;
+    var velho = db.ajustes.propostaRascunho;
+    if (velho && typeof velho === 'object' && !Array.isArray(velho) && velho.id) {
+      var jaEsta = lista.some(function (r) { return r && r.id === velho.id; });
+      if (!jaEsta) lista.push(velho);
+    }
+    /* Zerado sempre, e não só quando migrou: enquanto ele existir, uma versão
+     * futura que o lesse por engano ressuscitaria um rascunho que ela já
+     * apagou da lista. */
+    db.ajustes.propostaRascunho = null;
+    return lista;
+  }
+
+  /* Guarda o rascunho aberto no alto da lista e poda o resto.
+   *
+   * Duas podas, cada uma com o seu motivo:
+   *
+   *   1. Rascunho SEM NOME que não é o aberto sai. É o nome que identifica a
+   *      linha, então sem nome ele não teria como aparecer na lista, e o que
+   *      não aparece na lista ela não tem como abrir nem apagar: seria lixo
+   *      permanente, exatamente o que o rascunho único evitava. O aberto é a
+   *      exceção porque ele está na tela, e ela ainda vai digitar o nome.
+   *
+   *   2. Passando do teto, sai o mais antigo. Quem chama recebe de volta o que
+   *      saiu, para poder dizer o nome em voz alta.
+   *
+   * Devolve os rascunhos podados pelo teto. */
+  function porRascunhoNaLista(p) {
+    if (!p) return [];
+    var lista = listaDeRascunhos();
+    p.mexidoEm = agoraIso();
+    var resto = ordenarRascunhos(lista.filter(function (r) {
+      if (!r || r.id === p.id) return false;
+      return !!String(r.aluno || '').trim();
+    }));
+    lista.length = 0;
+    lista.push(p);
+    resto.forEach(function (r) { lista.push(r); });
+    var sobra = [];
+    while (lista.length > TETO_RASCUNHOS) sobra.push(lista.pop());
+    return sobra;
+  }
+
+  /* O que o teto derrubou, dito em voz alta e por nome. */
+  function avisarPoda(sobra) {
+    if (!sobra || !sobra.length) return;
+    var nomes = sobra.map(function (r) { return String(r.aluno || '').trim(); })
+      .filter(Boolean).join(', ');
+    if (!nomes) return;
+    avisar('A lista guarda ' + TETO_RASCUNHOS + ' propostas em andamento, as mais recentes. ' +
+      (sobra.length === 1 ? 'A de ' + nomes + ' saiu' : 'As de ' + nomes + ' saíram') +
+      ' para caber esta.');
+  }
+
+  function tirarRascunhoDaLista(id) {
+    var lista = listaDeRascunhos();
+    for (var i = lista.length - 1; i >= 0; i--) {
+      if (lista[i] && lista[i].id === id) lista.splice(i, 1);
+    }
   }
 
   function guardarRascunhoDeProposta() {
     if (!propostaEmEdicao) return;
+    var avulsa = !!propostaEmEdicao.avulsa;
     var p = propostaEmEdicao.proposta;
     propostaEmEdicao = null;
     redesenharTopoDaProposta = null;
     clearTimeout(rascunhoPendente);
     rascunhoPendente = null;
-    db.ajustes = db.ajustes || {};
-    db.ajustes.propostaRascunho = p;
+    /* A lista de propostas em andamento é SÓ do aluno que ainda não existe no
+     * aplicativo: é para ele que ela foi feita, porque quem já está cadastrado
+     * tem a proposta guardada na ficha. As duas irmãs que gravam nesta mesma
+     * lista, gravarRascunhoAgora e agendarRascunho, já conferiam o avulsa;
+     * aqui faltava. Hoje não falha porque só existe um lugar que atribui
+     * propostaEmEdicao, e sempre com avulsa. Mas o fecharModal chama isto para
+     * TODA saída de modal-proposta: no dia em que a aba da ficha usar a mesma
+     * variável, a cópia de trabalho de um aluno já cadastrado entraria na
+     * lista e queimaria uma das oito vagas de quem ainda não existe.
+     *
+     * A limpeza acima acontece nos dois casos, e é por isso que a guarda mora
+     * aqui e não na primeira linha: sair antes de limpar deixaria a janela
+     * fechada com a proposta ainda em edição. */
+    if (!avulsa) return;
+    porRascunhoNaLista(p);
     salvar();
+  }
+
+  /* Sair de um rascunho sem nome é abandoná-lo, e ela precisa saber disso
+   * ANTES de tocar.
+   *
+   * Sem nome ele não entra na lista, então trocar de proposta é a última vez
+   * que ela o vê. Só pergunta quando há o que perder: numa proposta em branco
+   * a pergunta seria um toque a mais para não decidir nada. */
+  function podeLargarRascunhoSemNome(p, oQueVem) {
+    if (!p || String(p.aluno || '').trim()) return true;
+    if (!propostaTemAlgoEscrito(p)) return true;
+    return confirmar('A proposta aberta ainda não tem nome de aluno. Sem nome ela não ' +
+      'entra na lista de propostas em andamento e não fica guardada. ' + oQueVem + ' assim mesmo?');
   }
 
   /* O rascunho vai para o disco enquanto ela escreve, e não só ao fechar.
@@ -3109,9 +3334,32 @@
     if (!propostaEmEdicao || !propostaEmEdicao.avulsa) return;
     clearTimeout(rascunhoPendente);
     rascunhoPendente = null;
-    db.ajustes = db.ajustes || {};
-    db.ajustes.propostaRascunho = propostaEmEdicao.proposta;
+    porRascunhoNaLista(propostaEmEdicao.proposta);
+    /* O alto da janela acompanha o que acabou de ir para o disco: é aqui que a
+     * linha dela entra na lista assim que o nome está escrito. O desenho tem
+     * assinatura própria e não refaz nada quando nada mudou. */
+    if (redesenharTopoDaProposta) redesenharTopoDaProposta();
     salvar();
+  }
+
+  /* Qual proposta a janela abre: a pedida, e sem pedido a mais recente.
+   *
+   * Abrir direto a mais recente é o que mantém o caminho principal em três
+   * toques, medidos: quem só tem uma proposta em andamento não paga toque
+   * nenhum pela lista existir. Quem tem mais de uma escolhe na lista, no alto
+   * da janela, e paga um toque só quando a escolha é dela. */
+  function rascunhoDeProposta(id) {
+    var lista = ordenarRascunhos(listaDeRascunhos());
+    var r = null;
+    if (typeof id === 'string' && id) {
+      r = lista.filter(function (x) { return x && x.id === id; })[0] || null;
+    }
+    if (!r) r = lista[0] || null;
+    if (!r || typeof r !== 'object' || !r.id) {
+      r = Core.preencherProposta(db, null);
+      lista.unshift(r);
+    }
+    return completarProposta(r);
   }
 
   function agendarRascunho() {
@@ -3147,8 +3395,64 @@
     return !!(o.tipo || o.dataProva || String(o.descricao || '').trim());
   }
 
-  function abrirPropostaAvulsa() {
-    var p = rascunhoDeProposta();
+  /* Trocar de proposta em andamento sem perder a que está aberta: guarda a
+   * atual na lista e reabre a janela na outra. */
+  function abrirRascunho(id) {
+    if (propostaEmEdicao && propostaEmEdicao.avulsa) {
+      if (!podeLargarRascunhoSemNome(propostaEmEdicao.proposta, 'Abrir a outra')) return;
+      guardarRascunhoDeProposta();
+    }
+    abrirPropostaAvulsa(id);
+  }
+
+  /* Apagar um rascunho, com confirmação, porque lista que só cresce vira lixo.
+   *
+   * Apagar o que está ABERTO é o caso delicado: a janela ficaria mostrando uma
+   * proposta que não existe mais. Ela é reaberta na próxima da lista, ou numa
+   * em branco quando não sobra nenhuma. */
+  function apagarRascunho(id) {
+    var lista = listaDeRascunhos();
+    var alvo = lista.filter(function (r) { return r && r.id === id; })[0];
+    if (!alvo) return;
+    var nome = String(alvo.aluno || '').trim();
+    /* A pergunta diz a MESMA hora e o MESMO trecho que a linha, e não só o
+     * nome. É aqui que o engano vira definitivo: com duas propostas do mesmo
+     * nome na lista, uma pergunta que só dissesse "Apagar a proposta de Helena
+     * Prado?" seria idêntica nas duas linhas, e confirmar não teria como ser
+     * uma decisão. Quem já leu a linha reconhece a pergunta como sendo a dela;
+     * quem tocou na linha errada vê aqui que não é essa. */
+    var trecho = trechoDoRascunho(alvo);
+    if (!confirmar('Apagar a proposta de ' + (nome || 'sem nome') + ', ' + quandoMexeu(alvo) + '?' +
+      (trecho ? '\n\nComeça assim: "' + trecho + '"' : '') +
+      '\n\nEla não fica guardada em lugar nenhum e não dá para trazer de volta.')) return;
+
+    var eraAberta = !!(propostaEmEdicao && propostaEmEdicao.proposta &&
+      propostaEmEdicao.proposta.id === id);
+    if (eraAberta) {
+      propostaEmEdicao = null;
+      redesenharTopoDaProposta = null;
+      clearTimeout(rascunhoPendente);
+      rascunhoPendente = null;
+    }
+    tirarRascunhoDaLista(id);
+    if (eraAberta) abrirPropostaAvulsa();
+    else if (redesenharTopoDaProposta) redesenharTopoDaProposta();
+    salvar().then(function () {
+      avisar('A proposta de ' + (nome || 'sem nome') + ' foi apagada.');
+    });
+  }
+
+  function abrirPropostaAvulsa(id) {
+    var p = rascunhoDeProposta(id);
+    /* A lista é podada e gravada JÁ NA ABERTURA, e não só quando ela mexer.
+     *
+     * Sem isto o teto valia só no disco: abrindo a janela com onze rascunhos
+     * na memória, onze linhas apareciam na tela e o primeiro campo do editor
+     * nascia cortado pelo rodapé. Medido, com o campo antigo migrando para uma
+     * lista que já estava cheia. É também aqui que a migração de quem tinha um
+     * rascunho no campo antigo chega ao disco. */
+    avisarPoda(porRascunhoNaLista(p));
+    salvar();
     propostaEmEdicao = { proposta: p, aluno: null, avulsa: true };
     $('#titulo-modal-proposta').textContent = 'Proposta de acompanhamento';
     var corpo = $('#corpo-modal-proposta');
@@ -3159,10 +3463,37 @@
 
     /* O alto da janela é redesenhado depois de gerar, sem refazer o editor
      * inteiro: é ali que nascem o convite de cadastrar e o botão de começar
-     * outra, e os dois só fazem sentido DEPOIS que o PDF saiu. */
+     * outra, e os dois só fazem sentido DEPOIS que o PDF saiu. Desde a lista de
+     * propostas em andamento ele também é redesenhado a cada gravação do
+     * rascunho, que é 1,5 segundo depois do último toque: é assim que a linha
+     * dela aparece na lista no momento em que ela digita o nome, sem esperar
+     * que a janela seja fechada e reaberta.
+     *
+     * Só que redesenhar de verdade a cada gravação seria trocar o DOM inteiro
+     * do alto da janela enquanto ela lê, e a lista pular na tela sem nada ter
+     * mudado é pior do que ela chegar meio segundo atrasada. Por isso a
+     * assinatura: nada é refeito enquanto o que sairia for igual ao que já
+     * está no ar. */
+    var assinaturaTopo = null;
     function desenharTopo() {
-      topo.innerHTML = '';
       var nome = (p.aluno || '').trim();
+      var emAndamento = ordenarRascunhos(listaDeRascunhos()).filter(function (r) {
+        return r && String(r.aluno || '').trim();
+      });
+      var assinatura = [
+        nome, p.geradoEm || '', p.ofertaDispensada ? 'dispensada' : '',
+        propostaTemAlgoEscrito(p) ? 'escrita' : '',
+        emAndamento.map(function (r) {
+          /* O trecho do parágrafo entra na assinatura das FECHADAS: sem ele,
+           * duas propostas mexidas no mesmo minuto teriam assinatura igual e a
+           * linha ficaria mostrando o parágrafo de antes da troca. */
+          return r.id + ':' + String(r.aluno || '').trim() + ':' +
+            (r.id === p.id ? 'aberta' : quandoMexeu(r) + ':' + trechoDoRascunho(r));
+        }).join('|')
+      ].join('#');
+      if (assinatura === assinaturaTopo) return;
+      assinaturaTopo = assinatura;
+      topo.innerHTML = '';
 
       if (p.geradoEm && nome) {
         topo.appendChild(el('div', { class: 'faixa-info' }, [
@@ -3203,15 +3534,105 @@
         ]));
       }
 
+      /* A lista das propostas em andamento.
+       *
+       * Só entram as que têm NOME: é o nome que identifica a linha, e uma
+       * linha sem nome não diria a ela qual proposta é. A aberta aparece
+       * marcada, e não como botão, porque abrir o que já está aberto é um
+       * toque que não faz nada.
+       *
+       * A lista aparece a partir da PRIMEIRA proposta com nome, e não da
+       * segunda. Escondê-la enquanto houvesse uma só parecia economia de tela
+       * e abria dois buracos. Um: a única proposta guardada ficava sem o
+       * Apagar, e o caminho para se livrar dela era começar outra, dar um nome
+       * a essa outra para a lista aparecer, e só então apagar a primeira. Dois,
+       * e pior: logo depois do Começar outra a aberta é uma proposta em branco,
+       * sem nome, e a lista contava uma só, então a proposta que ela acabou de
+       * guardar sumia da tela até ela digitar um nome novo. Uma linha de 59 px
+       * é barata perto disso, e a lista fica sendo um lugar fixo em vez de uma
+       * coisa que aparece e some. */
+      if (emAndamento.length) {
+        var caixaLista = el('div', { class: 'rascunhos', 'data-lista': 'rascunhos' }, [
+          el('div', { class: 'titulo-rascunhos',
+            texto: emAndamento.length === 1
+              ? '1 proposta em andamento'
+              : emAndamento.length + ' propostas em andamento' })
+        ]);
+        emAndamento.forEach(function (r) {
+          var dele = String(r.aluno || '').trim();
+          var aberta = r.id === p.id;
+          /* O rodapé da linha é UMA linha só, com a hora e o começo do
+           * parágrafo lado a lado, e não duas.
+           *
+           * Medido no tablet em pé, com a lista nos oito do teto: a linha tem
+           * 51 px de alvo mais 8 de respiro, o corpo da janela mostra 1067 px e
+           * o bloco Quem termina a 984, que é o mesmo número de antes do trecho
+           * existir. Ao lado da hora ele custa zero.
+           *
+           * Uma TERCEIRA linha foi medida, e não estimada: a linha passa de 48
+           * para 68 px, a caixa da lista de 491 para 631, e o fim do bloco Quem
+           * de 984 para 1124, num corpo de 1067. A janela abriria com o
+           * primeiro campo já cortado pelo rodapé, que é exatamente o que o
+           * teto de oito existe para evitar.
+           *
+           * O trecho fica de fora da que está ABERTA: o parágrafo dela está
+           * logo abaixo, no editor, e a linha aberta já se distingue sozinha
+           * pela marca de aberta. */
+          var rodape = function (quando, trecho) {
+            return el('span', { class: 'rodape-rascunho' }, [
+              el('span', { class: 'quando', texto: quando }),
+              trecho ? el('span', { class: 'trecho', texto: trecho }) : null
+            ]);
+          };
+          caixaLista.appendChild(el('div', {
+            class: 'linha-rascunho' + (aberta ? ' aberta' : ''), 'data-rascunho': r.id
+          }, [
+            aberta
+              ? el('div', { class: 'cresce alvo-rascunho' }, [
+                el('span', { class: 'nome', texto: dele }),
+                rodape('aberta agora', '')
+              ])
+              : el('button', {
+                type: 'button', class: 'cresce alvo-rascunho', 'data-acao': 'abrir-rascunho',
+                aoClick: function () { abrirRascunho(r.id); }
+              }, [
+                el('span', { class: 'nome', texto: dele }),
+                rodape(quandoMexeu(r), trechoDoRascunho(r))
+              ]),
+            el('button', {
+              type: 'button', class: 'btn perigo apaga-rascunho',
+              'data-acao': 'apagar-rascunho', texto: 'Apagar',
+              aoClick: function () { apagarRascunho(r.id); }
+            })
+          ]));
+        });
+        topo.appendChild(caixaLista);
+      }
+
       if (propostaTemAlgoEscrito(p)) {
         topo.appendChild(el('div', { class: 'barra', style: 'margin:0 0 12px' }, [
           el('span', { class: 'cresce' }),
           el('button', {
             type: 'button', class: 'btn', 'data-acao': 'comecar-outra', texto: 'Começar outra',
+            /* Guarda a atual e abre uma em branco. Antes este botão avisava
+             * que a atual NÃO ficava guardada e a descartava, e era o único
+             * caminho para a segunda família da tarde: quem mandava proposta
+             * para três famílias numa tarde perdia as duas primeiras. Sem
+             * perda não há o que confirmar, e a pergunta some. */
             aoClick: function () {
-              if (!confirmar('Começar uma proposta em branco? A que está aqui não fica guardada.')) return;
-              db.ajustes.propostaRascunho = Core.preencherProposta(db, null);
-              abrirPropostaAvulsa();
+              if (!podeLargarRascunhoSemNome(p, 'Começar outra')) return;
+              var guardada = (p.aluno || '').trim();
+              guardarRascunhoDeProposta();
+              var nova = Core.preencherProposta(db, null);
+              var sobra = porRascunhoNaLista(nova);
+              abrirPropostaAvulsa(nova.id);
+              /* O aviso da poda vence o de "ficou guardada": perder uma
+               * proposta de vista é notícia maior do que guardar outra. */
+              if (sobra.length) avisarPoda(sobra);
+              else if (guardada) {
+                avisar('A proposta de ' + guardada + ' ficou guardada na lista, ' +
+                  'aqui no alto, para você voltar quando quiser.');
+              }
             }
           })
         ]));
@@ -3547,7 +3968,7 @@
     caixaAnoLivre.style.display = Core.anoEscolarLivre(p.anoEscolar) ? '' : 'none';
 
     b1.appendChild(el('div', { class: 'linha' }, [
-      campo('Colégio', entradaTexto(p.colegio, 'Onde ele estuda',
+      campo('Colégio', entradaTexto(p.colegio, 'Onde estuda',
         function (v) { p.colegio = v; }, 'colegio')),
       campo('Ano escolar', (function () {
         var sel = el('select', { 'data-campo': 'ano' });
@@ -3827,7 +4248,12 @@
       });
     }
 
-    var b5 = bloco('O combinado', false, function () {
+    /* "Os nossos combinados", e não "O combinado": é o nome que a seção tem na
+     * folha que a família lê. Os outros seis blocos do editor já batiam palavra
+     * por palavra com o título da seção correspondente, e este passou a não
+     * bater quando a seção foi partida em duas. Quando a mãe ligar citando o
+     * que leu, ela procura na tela o mesmo nome. */
+    var b5 = bloco('Os nossos combinados', false, function () {
       var n = combinadosLigados();
       var total = (p.combinados.itens || []).length;
       return {
@@ -3878,7 +4304,7 @@
       faixaFolgas.style.display = folgasLigadas() ? 'none' : '';
     });
 
-    // ---- bloco 6: investimento (nasce aberto)
+    // ---- bloco 6: quanto custa (nasce aberto)
 
     var caixaHora = el('div');
     var caixaPlanos = el('div');
@@ -3939,10 +4365,17 @@
           dinheiro(pl.valorHora), dinheiro(pl.total), pl.id === p.cobranca.recomendado));
       });
       caixaConta.appendChild(tabela);
+      /* Este texto também dizia "âncora vezes o desconto", e era a mesma
+       * mentira do rótulo dos campos, escrita por extenso e logo abaixo da
+       * tabela: quem desconfiasse do rótulo e descesse os olhos encontrava a
+       * confirmação do erro. A conta é, e sempre foi, o preço de hoje vezes o
+       * desconto; a âncora só produz a primeira linha. */
       caixaConta.appendChild(el('div', {
-        class: 'ajuda',
-        texto: 'A conta é âncora vezes o desconto, arredondada para baixo em degraus de R$ 0,50, ' +
-          'vezes as horas do período. Semanas de 4, 12 e 24: é o número que a família confere no calendário.'
+        class: 'ajuda', 'data-ajuda': 'conta-dos-planos',
+        texto: 'A conta é o seu preço de hoje, ' + dinheiro(conta.precoAtual) +
+          ', vezes o desconto, arredondada para baixo em degraus de R$ 0,50, vezes as horas ' +
+          'do período. A âncora não entra: ela produz a linha da aula avulsa, e só ela. ' +
+          'Semanas de 4, 12 e 24: é o número que a família confere no calendário.'
       }));
     }
 
@@ -3979,7 +4412,17 @@
       if (p.cobranca.modo === 'planos') { conferirAncora(); desenharConta(); }
     }
 
-    var b6 = bloco('Investimento', true, function () {
+    /* "Quanto custa", o mesmo nome que a seção do preço tem na folha que a
+     * família lê.
+     *
+     * O argumento que trocou o nome na folha é o de escrever com as palavras
+     * que ela diria na sala da família, onde ninguém pergunta qual é o
+     * investimento: pergunta quanto custa. Esse argumento vale igual no editor
+     * dela. Com dois nomes para a mesma coisa, a mãe ligava citando "Quanto
+     * custa", que é o que está escrito na folha, e a professora procurava esse
+     * nome na tela e não achava, porque na tela o bloco se chamava outra
+     * coisa. Um nome só, nos dois lados. */
+    var b6 = bloco('Quanto custa', true, function () {
       if (p.cobranca.modo === 'planos') {
         var linha = Core.planoDaProposta(p, p.cobranca.recomendado);
         var pl = Core.planoPorId(p.cobranca.recomendado);
@@ -4000,16 +4443,31 @@
       [['hora', 'Hora-aula'], ['planos', 'Planos com desconto']], p.cobranca.modo,
       trocarModo, 'modo-cobranca')));
 
-    // modo hora-aula
-    caixaHora.appendChild(campo('Valor por hora-aula', (function () {
+    /* O preço que ela cobra hoje fica à vista NOS DOIS MODOS, e não só no
+     * hora-aula.
+     *
+     * Ele é o número que manda na conta dos dois: no hora-aula é o preço
+     * impresso, e no Planos é a base de que os três descontos descem. Estava
+     * dentro do caixaHora, que some no modo Planos, e o resultado era um bloco
+     * inteiro de cobrança em que o único preço visível era a âncora. Foi assim
+     * que a tabela virou uma charada: com âncora de R$ 115,00 e preço de hoje
+     * de R$ 100,00, ela lia "Desconto no mensal (%)" logo abaixo da âncora,
+     * escrevia 5 esperando R$ 109,25, e a folha saía com R$ 95,00. A conta
+     * estava certa desde sempre; o que faltava na tela era a base. */
+    b6.appendChild(campo('Quanto você cobra por hora hoje', (function () {
       var e = entradaNumero(p.cobranca.valorHora, function (v) {
         p.cobranca.valorHora = v;
         valorTocado = true;
         p.cobranca.valorConfirmado = true;
         faixaValorPadrao.style.display = (temValorDela || valorTocado) ? 'none' : '';
+        /* No modo Planos este campo é a base dos três: a tabela abaixo dele
+         * tem que mudar no mesmo toque, senão ela confere números velhos. */
+        if (p.cobranca.modo === 'planos') { conferirAncora(); desenharConta(); }
       }, '0.5', 'valor-hora');
       return e;
     })()));
+
+    // modo hora-aula
     caixaHora.appendChild(el('div', {
       class: 'ajuda', style: 'margin-top:0',
       texto: 'Na folha sai uma linha só: quanto custa a hora, quanto sai o encontro, ' +
@@ -4037,7 +4495,10 @@
 
     // modo planos
     caixaPlanos.appendChild(el('div', { class: 'linha' }, [
-      campo('Âncora: a hora avulsa', entradaNumero(p.cobranca.ancora, function (v) {
+      /* "Âncora: a hora avulsa" dizia o que a âncora É e calava o que ela NÃO
+       * é. Lida logo acima de três campos de desconto, virava a base deles.
+       * O rótulo agora fecha o escopo na própria linha. */
+      campo('Âncora: só a linha da aula avulsa', entradaNumero(p.cobranca.ancora, function (v) {
         p.cobranca.ancora = v;
         desenharConta();
       }, '0.5', 'ancora')),
@@ -4047,18 +4508,47 @@
       class: 'ajuda', style: 'margin-top:0',
       texto: 'A âncora tem que ser um preço que você cobraria de verdade de quem vem sem compromisso. ' +
         'Se não for, a família descobre na primeira conversa com a vizinha e a folha inteira perde valor. ' +
-        'A sugestão é o seu valor de hoje mais 15 por cento, o que faz o mensal cair no que você já cobra.'
+        'A sugestão é o seu valor de hoje mais 15 por cento, o que faz o mensal cair no que você já cobra. ' +
+        'Ela não entra na conta dos planos: os três descem do seu preço de hoje.'
     }));
-    caixaPlanos.appendChild(el('div', { class: 'linha' }, [
-      campo('Desconto no mensal (%)', entradaNumero(p.cobranca.descontos.mensal, function (v) {
-        p.cobranca.descontos.mensal = v; desenharConta();
-      }, '1', 'desconto-mensal')),
-      campo('No trimestral (%)', entradaNumero(p.cobranca.descontos.trimestral, function (v) {
-        p.cobranca.descontos.trimestral = v; desenharConta();
-      }, '1', 'desconto-trimestral')),
-      campo('No semestral (%)', entradaNumero(p.cobranca.descontos.semestral, function (v) {
-        p.cobranca.descontos.semestral = v; desenharConta();
-      }, '1', 'desconto-semestral'))
+
+    /* Os rótulos dos três descontos diziam de quanto e calavam de que.
+     *
+     * Eram "Desconto no mensal (%)", "No trimestral (%)" e "No semestral (%)",
+     * um palmo abaixo de "Âncora: a hora avulsa", e quem lê os quatro na ordem
+     * conclui que o desconto sai da âncora. Não sai: sai do preço que ela
+     * cobra hoje, como está escrito em calcularPlanos e como a folha imprime.
+     * O Rômulo leu a tela assim e perguntou se a conta estava errada; a conta
+     * estava certa e o rótulo estava errado.
+     *
+     * A base agora aparece uma vez, em negrito, imediatamente acima dos três,
+     * COM O NÚMERO, e os rótulos ficam curtos por baixo dela. O número
+     * acompanha o campo do preço de hoje a cada toque: um cabeçalho que
+     * dissesse R$ 100,00 enquanto o campo já diz 130 seria a mesma mentira
+     * noutro lugar. */
+    var rotuloDescontos = el('span', {
+      style: 'display:block;font-size:13px;font-weight:700;color:#1F3A5F;margin-bottom:5px',
+      'data-rotulo': 'base-desconto'
+    });
+    function escreverBaseDosDescontos() {
+      rotuloDescontos.textContent = 'Quanto cada plano desce do seu preço de hoje, ' +
+        dinheiro(p.cobranca.valorHora) + ' por hora';
+    }
+    escreverBaseDosDescontos();
+    atualizadores.push(escreverBaseDosDescontos);
+    caixaPlanos.appendChild(el('div', { class: 'campo' }, [
+      rotuloDescontos,
+      el('div', { class: 'linha' }, [
+        campo('Mensal (%)', entradaNumero(p.cobranca.descontos.mensal, function (v) {
+          p.cobranca.descontos.mensal = v; desenharConta();
+        }, '1', 'desconto-mensal')),
+        campo('Trimestral (%)', entradaNumero(p.cobranca.descontos.trimestral, function (v) {
+          p.cobranca.descontos.trimestral = v; desenharConta();
+        }, '1', 'desconto-trimestral')),
+        campo('Semestral (%)', entradaNumero(p.cobranca.descontos.semestral, function (v) {
+          p.cobranca.descontos.semestral = v; desenharConta();
+        }, '1', 'desconto-semestral'))
+      ])
     ]));
     caixaPlanos.appendChild(grupo('Qual você recomenda', segmentado(
       Core.PLANOS.map(function (pl) { return [pl.id, pl.rotulo]; }), p.cobranca.recomendado,
@@ -4266,7 +4756,10 @@
     var m = mapeamentoDaProposta(p);
     if (m) aluno.mapeamentos.push(m);
     db.alunos.push(aluno);
-    db.ajustes.propostaRascunho = null;
+    /* Virou aluno, sai da lista de propostas em andamento: a partir de agora a
+     * proposta mora na ficha dele, e deixá-la nos dois lugares faria a lista
+     * oferecer a ela um rascunho que já tem dono. */
+    tirarRascunhoDaLista(p.id);
 
     salvar().then(function () {
       desenharTudo();
@@ -4280,10 +4773,32 @@
     if (!ctx || !ctx.proposta) return;
     var p = ctx.proposta;
     var nome = (p.aluno || '').trim();
-    if (!nome) { avisar('Informe o nome do aluno. A proposta é escrita sobre ele.'); return; }
-    if (!(p.responsavel || '').trim()) {
-      avisar('Informe o responsável. A proposta tem destinatário: é para quem decide.');
-      return;
+
+    /* AS PENDÊNCIAS SAEM DO CORE, e não daqui.
+     *
+     * As duas primeiras estavam escritas à mão nesta função, com as mesmas
+     * palavras que o Core já usava, e a terceira, que é a que a medição pediu,
+     * simplesmente não existia aqui: pendenciasDaProposta e falaDaCrianca eram
+     * chamadas só pelo core e pelo teste, por nenhum dos dois botões de gerar.
+     * Medido na folha mínima: 634 palavras impressas, nenhuma sobre a criança.
+     * Com o nome e o responsável digitados, a família recebia uma página de
+     * combinados e preço com o nome do filho no alto, e nada segurava.
+     *
+     * As duas primeiras continuam barrando, porque sem elas a folha não tem
+     * sobre quem nem para quem. A terceira PERGUNTA em vez de barrar: existe a
+     * família que já a conhece e só quer as regras e o preço, e transformar
+     * isso em parede seria decidir por ela. É o mesmo tratamento que o valor
+     * padrão recebe três linhas abaixo. */
+    var pendencias = Core.pendenciasDaProposta(p);
+    var falta = pendencias[0] || '';
+    if (falta && falta.indexOf('Informe ') === 0) { avisar(falta); return; }
+    if (falta) {
+      if (!confirmar('Esta proposta não tem uma palavra sobre ' + nome +
+        '. Sai uma folha de combinados e preço, com esse nome no alto e nada mais. ' +
+        'Gerar assim mesmo?')) {
+        avisar(falta);
+        return;
+      }
     }
 
     /* O valor por hora nasce em R$ 100, que é o que sobrou de não haver preço
@@ -4306,7 +4821,10 @@
     if (!precoConfirmado) {
       if (!confirmar('O valor de ' + Core.fmtMoeda(p.cobranca.valorHora) + ' por hora é o padrão ' +
         'do aplicativo, e não um número seu. É esse mesmo que vai na proposta de ' + nome + '?')) {
-        avisar('Nada foi gerado. Abra Investimento e escreva quanto custa a sua hora-aula.');
+        /* O aviso manda ela para o bloco pelo NOME que o bloco tem na tela:
+         * mandar abrir um bloco que não existe com esse nome é pior do que não
+         * dizer onde ele fica. */
+        avisar('Nada foi gerado. Abra Quanto custa e escreva quanto custa a sua hora-aula.');
         return;
       }
       p.cobranca.valorConfirmado = true;
@@ -4342,11 +4860,10 @@
     guardarPadroesDaProposta(p);
 
     if (ctx.avulsa) {
-      db.ajustes = db.ajustes || {};
-      db.ajustes.propostaRascunho = p;
       /* Uma proposta gerada é outra proposta: se ela tinha dispensado o convite
        * da anterior, este volta a aparecer. */
       p.ofertaDispensada = false;
+      porRascunhoNaLista(p);
       /* O alto da janela é redesenhado agora, e é o que faz o convite de
        * cadastrar e o botão de começar outra existirem sem ela precisar fechar
        * e reabrir. Antes, gerada a proposta, a mesma janela continuava sem os
@@ -5027,7 +5544,7 @@
     }, [el('span', { texto: 'Qual' }), campoAnoLivre]);
 
     corpo.appendChild(el('div', { class: 'linha' }, [
-      campoTexto('escola', 'Colégio', 'Onde ele estuda'),
+      campoTexto('escola', 'Colégio', 'Onde estuda'),
       (function () {
         var sel = el('select', { id: 'mapa-ano' });
         sel.appendChild(el('option', { value: '', texto: 'Não informado' }));

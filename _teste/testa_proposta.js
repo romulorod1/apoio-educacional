@@ -53,6 +53,61 @@ function textoDoPdf(bytes) {
   return partes.join(' ');
 }
 
+/* O texto impresso, PÁGINA POR PÁGINA.
+ *
+ * Nasceu para uma pergunta que o texto corrido não responde: dois combinados
+ * que só fazem sentido lidos juntos estão na mesma folha? A moldura escreve
+ * "Página N de M" como última coisa de cada página, então o corte é ali.
+ * Devolve um vetor, uma posição por página, na ordem impressa. */
+function textoPorPagina(bytes) {
+  const bruto = Buffer.from(bytes).toString('latin1');
+  const rx = /\(((?:\\.|[^\\()])*)\)\s*Tj/g;
+  const paginas = [];
+  let atual = [];
+  let m;
+  while ((m = rx.exec(bruto))) {
+    const t = m[1].replace(/\\([\\()])/g, '$1');
+    atual.push(t);
+    if (/^Página \d+ de \d+$/.test(t)) { paginas.push(atual.join(' ')); atual = []; }
+  }
+  if (atual.length) paginas.push(atual.join(' '));
+  return paginas;
+}
+
+/* Em que página está um trecho impresso. Zero quando ele não está na folha. */
+function paginaDoTrecho(paginas, trecho) {
+  for (let i = 0; i < paginas.length; i++) {
+    if (paginas[i].indexOf(trecho) >= 0) return i + 1;
+  }
+  return 0;
+}
+
+/* A COR e o CORPO com que um trecho foi impresso, lidos do próprio arquivo.
+ *
+ * Existe porque "mais claro e menor que o vizinho" é o formato da letra miúda,
+ * e nenhuma trava de texto enxerga isso: a folha pode dizer tudo certo e
+ * desbotar justamente o parágrafo que fala em compromisso e em prazo. Cada
+ * doc.texto sai como um BT próprio, com a cor e a fonte na frente do Tj, então
+ * dá para ler os dois do operador. */
+function estiloDoTrecho(bytes, trecho) {
+  const bruto = Buffer.from(bytes).toString('latin1');
+  const rx = /BT\s+([\d.]+) ([\d.]+) ([\d.]+) rg \/(F\d) ([\d.]+) Tf [^()]*\(((?:\\.|[^\\()])*)\)\s*Tj/g;
+  let m;
+  while ((m = rx.exec(bruto))) {
+    const txt = m[6].replace(/\\([\\()])/g, '$1');
+    if (txt.indexOf(trecho) >= 0) {
+      const oito = v => Math.round(parseFloat(v) * 255);
+      const hex = n => (n < 16 ? '0' : '') + n.toString(16);
+      return {
+        cor: '#' + hex(oito(m[1])) + hex(oito(m[2])) + hex(oito(m[3])),
+        tam: parseFloat(m[5]),
+        bold: m[4] === 'F2'
+      };
+    }
+  }
+  return null;
+}
+
 function fixarDatas(p) {
   p.data = HOJE;
   p.validaAte = Core.somaDiasIso(HOJE, 30);
@@ -696,8 +751,48 @@ conf('mas o parágrafo dela sai, e é a parte que fala da criança',
 conf('no ponto de partida', rMinima.texto.indexOf('Ponto de partida') > 0, true);
 conf('mas o combinado dos encontros sai sempre',
   rMinima.texto.indexOf('Como funcionam os encontros') > 0, true);
-conf('e o investimento também', rMinima.texto.indexOf('Investimento') > 0, true);
-conf('a proposta diz até quando vale', rMinima.texto.indexOf('Proposta válida até') > 0, true);
+/* MUDOU DE PROPÓSITO: a seção do preço chamava "Investimento" e passou a
+ * chamar "Quanto custa".
+ *
+ * "Investimento" pede que a família chame o preço por outro nome, e o nome que
+ * oferece promete retorno financeiro sobre uma criança, que é o que esta folha
+ * não promete em lugar nenhum. É também a palavra mais batida de material de
+ * venda no Brasil, então quem lê reconhece o roteiro antes de ler o número. A
+ * folha inteira é escrita com as palavras que ela diria na sala da família, e
+ * na sala ninguém pergunta qual é o investimento: pergunta quanto custa. A
+ * trava passa a conferir as duas metades, senão a palavra antiga volta calada
+ * numa reescrita futura. */
+conf('e a seção do preço, que agora pergunta quanto custa',
+  rMinima.texto.indexOf('Quanto custa') > 0, true);
+conf('e não usa a palavra de material de venda',
+  rMinima.texto.indexOf('Investimento') >= 0, false);
+/* MUDOU DE PROPÓSITO: a validade saiu do pé da folha e ficou só na tarja do
+ * alto.
+ *
+ * A trava antiga era "a folha contém 'Proposta válida até'", e ela passava
+ * justamente porque a validade estava escrita DUAS vezes num documento de duas
+ * páginas: na tarja do cabeçalho e como última linha, em cinza, colada no
+ * "Com carinho, Nathália Wajsenzon". Prazo encostado em despedida era a única
+ * passagem da folha que soava ensaiada.
+ *
+ * A trava nova é mais forte do que a que ela substitui: em vez de conferir que
+ * a validade aparece, confere QUANTAS vezes e ONDE. Uma vez só, no alto da
+ * página 1, antes de qualquer seção. Assim nem a repetição volta calada nem a
+ * data some da folha por descuido numa reescrita. */
+const vezesValida = (rMinima.texto.match(/válida até/g) || []).length;
+conf('a validade aparece uma vez só na folha', vezesValida, 1);
+conf('e ela está na tarja do alto, antes da primeira seção',
+  rMinima.texto.indexOf('válida até') < rMinima.texto.indexOf('Ponto de partida'), true);
+conf('a validade não sai mais em cinza no pé da folha',
+  rMinima.texto.indexOf('Proposta válida até') >= 0, false);
+
+/* E a folha termina na assinatura: depois do nome dela não vem mais nada de
+ * corpo, só a moldura, que é a mesma em toda página e é escrita por último. */
+const paginasMinima = textoPorPagina(rMinima.bytes);
+const ultimaMinima = paginasMinima[paginasMinima.length - 1];
+conf('a última coisa escrita no corpo é a assinatura',
+  /Com carinho, Nathália Wajsenzon Nathália Wajsenzon APOIO EDUCACIONAL Nathália Wajsenzon · Apoio Educacional Página \d+ de \d+$/
+    .test(ultimaMinima.trim()), true);
 
 /* O peso do combinado na folha mínima, medido: enquanto ele for mais da
  * metade das palavras, a folha é um regulamento com um nome no alto. Com o
@@ -706,6 +801,366 @@ const palavrasMinima = rMinima.texto.split(/\s+/).filter(Boolean).length;
 const palavrasDela = pMinima.texto.split(/\s+/).filter(Boolean).length;
 console.log('  folha mínima: ' + palavrasMinima + ' palavras, ' + palavrasDela + ' escritas por ela');
 conf('a folha mínima fala da criança em pelo menos 40 palavras', palavrasDela >= 40, true);
+
+/* ================================================================
+ * O TOM DA FOLHA: calorosa sem ficar ambígua.
+ *
+ * A folha estava correta e fria: lia como quem cumpre protocolo. Aquecer um
+ * documento é fácil de fazer errado, e as duas maneiras de errar são opostas.
+ *
+ * A primeira é confundir calor com açúcar: diminutivo, exclamação, adjetivo
+ * empilhado e promessa de resultado. Nada disso aproxima ninguém, e promessa de
+ * resultado é a única que também é desonesta.
+ *
+ * A segunda, mais cara, é deixar a gentileza comer a clareza. Se a frase de
+ * remarcação ficar tão delicada que a família não entende que aquela aula será
+ * cobrada, o documento piorou, e a conta do mês seguinte é que vai contar a
+ * verdade. Calor e clareza não competem; quem come os dois é a ambiguidade.
+ *
+ * Por isso esta seção mede as duas coisas juntas: que a criança apareça pelo
+ * nome, e que o combinado continue dizendo exatamente o que o motor faz.
+ */
+secao('12c. A folha fala da criança pelo nome, e continua clara');
+
+/* Rafael Torres é o aluno das folhas de plano e de hora-aula. O primeiro nome
+ * entra em três lugares onde antes havia sujeito nenhum. */
+conf('o título da observação nomeia a criança, e não o ato de examinar',
+  rPlanos.texto.indexOf('O que eu vi em Rafael') > 0, true);
+conf('e não sobrou o título antigo, que descrevia quem examina',
+  rPlanos.texto.indexOf('O que eu observei') >= 0, false);
+conf('a etiqueta do nível também tem sujeito',
+  rPlanos.texto.indexOf('Como Rafael está hoje') > 0, true);
+conf('o fecho chega com o plano da criança, pelo nome',
+  rPlanos.texto.indexOf('com o plano de Rafael já montado') > 0, true);
+
+/* SEM ARTIGO antes do nome. "A Helena" e "o Rafael" é como se fala em Niterói,
+ * mas escolher o artigo pede saber o gênero da criança, e adivinhar pela
+ * terminação erra em Alex, Ariel e Sasha: erraria na primeira folha que a
+ * família lê sobre a própria filha. É a mesma decisão que tirou o "ele" das
+ * vantagens, em vez de criar um campo de gênero na tela. */
+conf('e nenhum artigo adivinhado antes do nome',
+  /\b[ao] Rafael\b/.test(rPlanos.texto), false);
+
+/* A linha de origem dizia o nome do procedimento. Agora diz de onde veio o que
+ * está escrito abaixo dela, e no caminho principal credita quem contou. */
+conf('a origem diz de onde veio, e não o nome do procedimento',
+  rPlanos.texto.indexOf('Do que eu vi na aula de nivelamento') > 0, true);
+conf('e sem mapeamento é a família quem contou',
+  Core.dadosDaProposta(null, pMinima).origem,
+  'Do que vocês me contaram na nossa primeira conversa');
+
+/* O fecho terminava em posição de espera. Agora abre a conversa e pede a única
+ * coisa que falta para começar, oferecendo trabalho adiantado em troca. */
+conf('o fecho não fica mais à disposição esperando aprovação',
+  /Fico à disposição|Se fizer sentido para vocês/.test(rPlanos.texto), false);
+conf('ele diz que o preço e o horário são conversáveis',
+  rPlanos.texto.indexOf('o valor e o horário inclusive') > 0, true);
+conf('e pede o dia da semana, em vez de esperar um sim',
+  rPlanos.texto.indexOf('Me digam o dia da semana') > 0, true);
+
+/* AS TRAVAS DE CLAREZA. Aquecer o combinado não pode ter apagado o que ele
+ * promete: a folha e o motor dizem a mesma coisa, palavra por palavra. */
+conf('a remarcação de véspera continua dizendo que a aula é cobrada',
+  /entra no fechamento do mês pelo valor da aula/.test(rPlanos.texto), true);
+conf('e continua dizendo o prazo em horas',
+  /com menos de 24 horas/.test(rPlanos.texto), true);
+conf('a falta sem aviso continua contando como aula dada',
+  /conta como aula dada e não tem reposição/.test(rPlanos.texto), true);
+conf('e a franquia continua dizendo quantas são e que não são cobradas',
+  /duas desmarcações em cima da hora por semestre que não são cobradas/.test(rPlanos.texto), true);
+conf('o combinado ainda diz que a mesma régua vale para ela',
+  /Vale a mesma régua para mim/.test(rPlanos.texto), true);
+
+/* Calor não é exclamação, e a folha inteira não tem uma. */
+conf('nenhuma exclamação na folha de planos', rPlanos.texto.indexOf('!') >= 0, false);
+conf('nem na folha mínima', rMinima.texto.indexOf('!') >= 0, false);
+
+/* O combinado explica cada regra em vez de enunciá-la, e o custo disso é
+ * espaço. Na folha mínima ele já era mais da metade das palavras impressas: se
+ * a explicação crescer sem limite, a folha volta a ser um regulamento com um
+ * nome no alto, que é exatamente o defeito que o parágrafo dela veio consertar.
+ * A trava é a proporção, não o número absoluto. */
+const palavrasCombinado = Core.propostaNova().combinados.itens
+  .map(i => i.rotulo + ' ' + i.texto).join(' ').split(/\s+/).filter(Boolean).length;
+const palavrasFolhaMinima = rMinima.texto.split(/\s+/).filter(Boolean).length;
+console.log('  combinado: ' + palavrasCombinado + ' palavras, ' +
+  Math.round(palavrasCombinado / palavrasFolhaMinima * 100) + ' por cento da folha mínima');
+conf('o combinado não passa de 60 por cento da folha mínima',
+  palavrasCombinado / palavrasFolhaMinima < 0.6, true);
+
+/* ================================================================
+ * 12d. O QUE A MÃE ENTENDE DA FOLHA.
+ *
+ * A leitura que gerou esta seção foi feita com os olhos de uma mãe de aluno de
+ * 13 anos, folha por folha, e o que ela achou não aparecia em trava nenhuma
+ * das que já existiam: a folha estava correta em cada frase e mentia no
+ * conjunto. Cada trava daqui guarda um defeito medido, e não uma opinião.
+ */
+secao('12d. O que a mãe entende da folha');
+
+const pgPlanos = textoPorPagina(rPlanos.bytes);
+const pgHora = textoPorPagina(rHora.bytes);
+const pgMinima = textoPorPagina(rMinima.bytes);
+
+/* DEFEITO 1, o grave: a única frase que diz que a desmarcação em cima da hora
+ * É COBRADA não chegava na mãe.
+ *
+ * Medido nas três folhas: "em cima da hora", que é como a família fala,
+ * aparecia UMA vez em toda a folha, colada em "que não são cobradas". O item
+ * que cobra usava outro vocabulário, "com menos de 24 horas", e o rótulo dele
+ * era "Depois dessas duas", que só funciona olhando para trás. Em 3 de 3
+ * variantes esse item era a PRIMEIRA linha de corpo da página 2 e o
+ * antecedente ficava na página 1: a mãe virava a folha e lia "Depois dessas
+ * duas" sem ter "essas duas" na frente. Ela assina achando que desmarcar em
+ * cima da hora não custa, e a briga acontece no fechamento do segundo mês. */
+const itemVespera = Core.propostaNova().combinados.itens.filter(i => i.id === 'vespera')[0];
+conf('o rótulo do item que cobra não depende da linha de cima',
+  /dessas|acima|essas duas/i.test(itemVespera.rotulo), false);
+conf('e ele nomeia o assunto com a palavra da família',
+  itemVespera.rotulo.indexOf('em cima da hora') > 0, true);
+conf('o texto que cobra também usa a palavra da família',
+  itemVespera.texto.indexOf('em cima da hora') > 0, true);
+conf('a expressão da família aparece dos dois lados, no que não cobra e no que cobra',
+  (rPlanos.texto.match(/em cima da hora/g) || []).length >= 2, true);
+
+/* E os dois itens são lidos juntos, na mesma folha, nas três variantes. */
+[['planos', pgPlanos], ['hora', pgHora], ['mínima', pgMinima]].forEach(function (par) {
+  const pgFolgas = paginaDoTrecho(par[1], 'folgas por semestre');
+  const pgCobra = paginaDoTrecho(par[1], 'Desmarcação em cima da hora');
+  conf(par[0] + ': a franquia e a cobrança ficam na mesma página',
+    pgFolgas > 0 && pgFolgas === pgCobra, true);
+});
+
+/* DEFEITO 7: 86 por cento da seção "Como funcionam os encontros" era contrato,
+ * sem aviso de mudança de assunto, e sem título próprio o contrato podia ser
+ * partido em qualquer ponto pela quebra de página. Agora são duas seções. */
+conf('a seção da aula existe', rPlanos.texto.indexOf('Como funcionam os encontros') > 0, true);
+conf('e o contrato ganhou título próprio', rPlanos.texto.indexOf('Os nossos combinados') > 0, true);
+conf('a aula fica com o preparo do material',
+  rPlanos.texto.indexOf('Como a aula é montada') <
+  rPlanos.texto.indexOf('Os nossos combinados'), true);
+conf('e a desmarcação fica do lado dos combinados',
+  rPlanos.texto.indexOf('Os nossos combinados') <
+  rPlanos.texto.indexOf('Se precisarem desmarcar'), true);
+/* Título de seção sozinho no pé de uma folha é pior do que não ter título. */
+conf('o título novo nunca fica órfão no pé da página',
+  paginaDoTrecho(pgPlanos, 'Os nossos combinados'),
+  paginaDoTrecho(pgPlanos, 'Se precisarem desmarcar'));
+
+/* A conta que fez o defeito aparecer: 318 palavras em 9 itens numa seção
+ * chamada "Como funcionam os encontros", das quais 273 (86 por cento) eram
+ * contrato. A trava mede a divisão em vez de cravar quais itens vão para onde:
+ * o que importa é que a seção da aula continue falando da aula. */
+const itensDaCasa = Core.propostaNova().combinados.itens;
+const palavrasDe = l => l.map(i => i.rotulo + ' ' + i.texto).join(' ')
+  .split(/\s+/).filter(Boolean).length;
+const daAula = itensDaCasa.filter(i => i.id === 'preparo');
+const doContrato = itensDaCasa.filter(i => i.id !== 'preparo');
+console.log('  seção da aula: ' + palavrasDe(daAula) + ' palavras em ' + daAula.length +
+  ' item; combinados: ' + palavrasDe(doContrato) + ' palavras em ' + doContrato.length + ' itens');
+conf('o contrato ficou com a maior parte das palavras, e agora tem título dele',
+  palavrasDe(doContrato) > palavrasDe(daAula) * 3, true);
+conf('e a seção da aula não carrega nenhum combinado de cobrança',
+  /cobrad|cobrança|fechamento do mês|reposição|falta/i.test(daAula.map(i => i.texto).join(' ')),
+  false);
+
+/* DEFEITO 2: a etiqueta do nível saía como veredito fechado com a mesma
+ * certeza viesse ele de uma aula de nivelamento ou de um telefonema. Na origem
+ * "conversa" a professora nunca deu aula para a criança, e a folha punha o
+ * veredito 15 pt abaixo da linha que credita a família. Lia-se como laudo. */
+conf('vindo da aula, a etiqueta diz que veio da aula',
+  rPlanos.texto.indexOf('Como Rafael está hoje, pelo que eu vi na aula:') > 0, true);
+const pConversa = fixarDatas(Core.preencherProposta(dbMapa, comMapa));
+pConversa.origem = 'conversa';
+const opConversa = Core.dadosDaProposta(comMapa, pConversa);
+const tConversa = textoDoPdf(PDFGen.gerarProposta(opConversa));
+conf('vindo da conversa, a etiqueta diz que quem contou foi a família',
+  tConversa.indexOf('Como Rafael está hoje, pelo que vocês me contaram:') > 0, true);
+conf('e a folha da conversa não afirma nada como se tivesse visto',
+  tConversa.indexOf('pelo que eu vi na aula') >= 0, false);
+/* Sem origem nenhuma a etiqueta continua a de sempre: a folha nunca imprime
+ * uma vírgula pendurada. */
+const semOrigem = Object.assign({}, opConversa, { origem: '', origemFonte: '' });
+conf('sem origem, a etiqueta volta a ser a de antes',
+  textoDoPdf(PDFGen.gerarProposta(semOrigem)).indexOf('Como Rafael está hoje:') > 0, true);
+
+/* E O TÍTULO DA SEÇÃO SEGUE A MESMA ORIGEM DAS DUAS LINHAS ACIMA DELE.
+ *
+ * A etiqueta e a linha de origem foram consertadas e o título ficou para trás,
+ * dizendo "O que eu vi em Rafael" em toda folha. Medido a 300 dpi na folha de
+ * conversa: as três linhas caem em 50 pt, no mesmo golpe de vista, e a do meio
+ * afirmava que ela viu uma criança que ainda não tinha visto. As três precisam
+ * concordar entre si, e por isso a trava confere as três juntas. */
+conf('vindo da aula, o título da seção diz que ela viu',
+  rPlanos.texto.indexOf('O que eu vi em Rafael') > 0, true);
+conf('vindo da conversa, o título não afirma que ela viu',
+  tConversa.indexOf('O que eu vi em') >= 0, false);
+conf('e diz o que é verdade: ela já sabe, sem dizer que viu',
+  tConversa.indexOf('O que eu já sei sobre Rafael') > 0, true);
+conf('a folha da conversa não devolve o diagnóstico para a família',
+  tConversa.indexOf('O que vocês me contaram sobre') >= 0, false);
+
+/* DEFEITO 3: "Fica ansioso perto da prova" saía no masculino sobre uma menina,
+ * na página 1 da folha que a família lê sobre a própria filha. A varredura vale
+ * para os três grupos que chegam impressos, e o identificador de cada item
+ * continua o mesmo para não perder o que ela já marcou. */
+/* A lista é escrita à mão, e não uma regra de terminação, porque terminação
+ * pega o que não é sobre a criança: "Caderno organizado" fala do caderno,
+ * "enunciado" e "resultado" são substantivos, e nenhum dos três muda com o
+ * gênero de quem está sendo descrito. O que precisa ser proibido são os
+ * adjetivos e particípios que descrevem a PESSOA, e esses cabem numa lista.
+ *
+ * A lista é só do MASCULINO, e isso também é medido: no feminino essas
+ * palavras só aparecem concordando com um substantivo feminino do assunto,
+ * como em "Tabuada insegura", onde a insegura é a tabuada. O defeito que existe
+ * é o masculino cravado sobre uma criança que pode ser menina. */
+const FLEXAO = /\b(ansiosos?|cansados?|sozinhos?|lembrados?|nervosos?|preocupados?|distraídos?|inseguros?|tímidos?|desatentos?|apressados?|calados?|quietos?)\b/i;
+['fortes', 'atencao', 'lacunas', 'rotina', 'aprende'].forEach(function (chave) {
+  const grupo = Core.MAPA.filter(g => g.chave === chave)[0];
+  const comFlexao = grupo.itens.filter(i => FLEXAO.test(i.rotulo)).map(i => i.rotulo);
+  conf('nenhum rótulo de ' + chave + ' flexiona gênero', comFlexao.join(' | '), '');
+});
+/* A ajuda do grupo também é lida por ela na tela, e dizia "Onde ele costuma
+ * perder ponto" sobre uma criança que pode ser menina. */
+conf('e nenhuma ajuda do mapa trata a criança por "ele"',
+  Core.MAPA.filter(g => /\b(ele|dele)\b/i.test(g.ajuda || '')).map(g => g.chave).join(','), '');
+conf('e o item da ansiedade manteve o identificador',
+  Core.MAPA.filter(g => g.chave === 'atencao')[0].itens
+    .filter(i => i.id === 'ansiedade-prova')[0].rotulo, 'Ansiedade perto da prova');
+conf('e o do cansaço também',
+  Core.MAPA.filter(g => g.chave === 'rotina')[0].itens
+    .filter(i => i.id === 'cansado')[0].rotulo, 'Cansaço na hora da aula');
+/* E a metade da folha que fala da criança, que é tudo o que vem antes dos
+ * combinados, não tem uma palavra flexionada no masculino sobre ela. */
+conf('a folha não trata a criança no masculino em lugar nenhum',
+  FLEXAO.test(rPlanos.texto.slice(0, rPlanos.texto.indexOf('Como funcionam os encontros'))),
+  false);
+
+/* DEFEITO 4: a folha nomeava as lacunas da criança e a seção seguinte, a única
+ * que responde o que a família está comprando, tinha 29 palavras e não citava
+ * nenhuma delas. O dado existia e não era impresso. */
+/* As áreas nascem desmarcadas e ela as marca na tela, junto com os pontos de
+ * atenção, vendo o que a família vai ler. A folha com áreas marcadas é a que o
+ * defeito descreve: lacunas nomeadas em cima, plano sem citar nenhuma delas
+ * embaixo. */
+const comAreas = fixarDatas(Core.preencherProposta(dbMapa, comMapa));
+comAreas.areas = ['metodo', 'revisao'];
+comAreas.anoEscolar = '08';
+const tComAreas = textoDoPdf(PDFGen.gerarProposta(Core.dadosDaProposta(comMapa, comAreas)));
+const iProponho = tComAreas.indexOf('O que eu proponho trabalhar');
+const iEncontros = tComAreas.indexOf('Como funcionam os encontros');
+conf('a seção do plano existe quando ela marcou as áreas', iProponho > 0, true);
+const secaoPlano = tComAreas.slice(iProponho, iEncontros);
+conf('o que ela propõe trabalhar cita as lacunas pelo nome',
+  secaoPlano.indexOf('frações') > 0 && secaoPlano.indexOf('números negativos') > 0, true);
+conf('e cita todas as que a folha listou em cima',
+  secaoPlano.indexOf('números decimais') > 0 &&
+  secaoPlano.indexOf('equação do primeiro grau') > 0, true);
+conf('e diz que o conteúdo do ano não para',
+  secaoPlano.indexOf('sem parar o conteúdo do 8º ano') > 0, true);
+/* Sem ano escolar registrado a frase não inventa série nenhuma. */
+const semAno = fixarDatas(Core.preencherProposta(dbMapa, comMapa));
+semAno.areas = ['metodo'];
+semAno.anoEscolar = '';
+conf('sem ano registrado, a frase fala do ano sem dizer qual',
+  textoDoPdf(PDFGen.gerarProposta(Core.dadosDaProposta(comMapa, semAno)))
+    .indexOf('sem parar o conteúdo do ano.') > 0, true);
+/* Sem lacuna nenhuma a linha não sai: ela é montada só com o que a folha já
+ * imprimiu acima, e sem lacuna não haveria o que dizer. */
+const semLacuna = fixarDatas(Core.preencherProposta(dbMapa, comMapa));
+semLacuna.areas = ['metodo'];
+semLacuna.lacunas = [];
+const tSemLacuna = textoDoPdf(PDFGen.gerarProposta(Core.dadosDaProposta(comMapa, semLacuna)));
+conf('sem lacuna marcada, a linha não é inventada',
+  tSemLacuna.indexOf('Começo pelo que ficou para trás') >= 0, false);
+conf('e a seção do plano continua saindo pelas áreas',
+  tSemLacuna.indexOf('O que eu proponho trabalhar') > 0, true);
+
+/* E A FRASE SAI TAMBÉM QUANDO NÃO HÁ ÁREA NENHUMA MARCADA, que é o caso comum.
+ *
+ * preencherProposta zera os pontos de atenção de propósito, e as áreas nascem
+ * deles: a proposta montada a partir do mapeamento nasce SEMPRE com lacuna
+ * preenchida e área vazia. Enquanto a frase morava só dentro da seção das
+ * áreas, a folha que sai do caminho principal listava "Frações, Números
+ * decimais, Números negativos, Equação do primeiro grau" e nunca dizia o que
+ * seria feito com aquilo. Aqui ela fecha a seção do diagnóstico. */
+const semArea = fixarDatas(Core.preencherProposta(dbMapa, comMapa));
+conf('o caminho principal nasce mesmo sem área marcada', (semArea.areas || []).length, 0);
+conf('e com lacuna marcada', (semArea.lacunas || []).length > 0, true);
+const tSemArea = textoDoPdf(PDFGen.gerarProposta(Core.dadosDaProposta(comMapa, semArea)));
+conf('sem área marcada, a folha continua dizendo o que será feito com a lacuna',
+  tSemArea.indexOf('Começo pelo que ficou para trás e está atrapalhando agora') > 0, true);
+conf('e a frase cita as lacunas que a folha acabou de listar',
+  tSemArea.indexOf('frações') > 0, true);
+conf('sem área marcada, a seção do plano não é aberta só para carregar a frase',
+  tSemArea.indexOf('O que eu proponho trabalhar') >= 0, false);
+/* Nunca duas vezes: com área marcada ela sai uma vez só, na seção do plano. */
+conf('com área marcada, a frase sai uma vez só',
+  tComAreas.split('Começo pelo que ficou para trás').length - 1, 1);
+conf('sem área marcada, também uma vez só',
+  tSemArea.split('Começo pelo que ficou para trás').length - 1, 1);
+
+/* DEFEITO 5: a tabela pedia compromisso de 12 encontros e a folha nunca dizia
+ * o que acontece se a família parar no segundo mês. Silêncio nesse ponto a
+ * família lê como multa. A folha passou a dizer, e o que ela diz é o que o
+ * motor faz: conferido aqui contra calcularFechamento, e não contra a memória
+ * de quem escreveu a frase. */
+conf('a folha diz o que acontece se a família parar no meio',
+  rPlanos.texto.indexOf('Se pararem antes do fim do período') > 0, true);
+conf('e o que ela promete é pagar só as aulas que aconteceram',
+  rPlanos.texto.indexOf('vocês pagam só as aulas que aconteceram, pelo valor do plano que escolheram') > 0, true);
+
+const vTri = Core.vigenciaDoPlano(pPlano, 'trimestral');
+const paradas = [
+  { id: 'p1', alunoId: 'ap', data: vTri.inicio, duracaoMin: 90, status: 'realizada' },
+  { id: 'p2', alunoId: 'ap', data: Core.somaDiasIso(vTri.inicio, 7), duracaoMin: 90, status: 'realizada' }
+];
+const dbParou = {
+  alunos: [{ id: 'ap', nome: 'Quem Parou', precos: [vTri] }],
+  aulas: paradas, resumos: [], ajustes: {}
+};
+const fechParou = Core.calcularFechamento(dbParou, 'ap', vTri.inicio.slice(0, 7), '2027-12-31');
+conf('o motor cobra só as duas aulas que aconteceram, pelo valor do plano',
+  Core.fmtMoeda(fechParou.totalValor), Core.fmtMoeda(2 * 1.5 * vTri.valorHora));
+conf('e não cobra os doze encontros que a tabela prometia',
+  fechParou.linhas.length, 2);
+conf('e não existe linha nenhuma de multa no fechamento de quem parou',
+  /multa|rescis|penalidade/i.test(JSON.stringify(fechParou)), false);
+
+/* DEFEITO 6: o único parágrafo da folha que fala em compromisso e em data de
+ * reserva saía em #6b7280 a 9,5 pt colado num de #1a1c1f a 10 pt. Mais claro e
+ * menor que o vizinho é o formato da letra miúda, e numa folha cujo argumento
+ * é que nada está escondido esse é o parágrafo errado para desbotar. A trava
+ * compara os dois, em vez de cravar a cor: assim ela continua valendo no dia
+ * em que a folha inteira mudar de paleta. */
+const estiloDeCima = estiloDoTrecho(rPlanos.bytes, 'O pagamento continua mensal');
+const estiloCompromisso = estiloDoTrecho(rPlanos.bytes, 'O desconto não é do preço da aula');
+conf('o parágrafo do compromisso foi encontrado na folha', !!estiloCompromisso, true);
+conf('ele sai na mesma cor do parágrafo colado acima',
+  estiloCompromisso.cor, estiloDeCima.cor);
+conf('e no mesmo corpo', estiloCompromisso.tam, estiloDeCima.tam);
+conf('e a cor não é a do texto apagado', estiloCompromisso.cor === '#6b7280', false);
+
+/* DEFEITO 9: a seção do ponto de partida abria com duas linhas sem verbo
+ * finito e sem ponto, e o parágrafo em prosa, que é a voz dela, vinha por
+ * último. Era o trecho que mais parecia ficha de atendimento, justamente onde
+ * a conversa deveria começar. E a data saía em 02/09 enquanto o cabeçalho,
+ * duas linhas acima, trazia 4 de setembro de 2026. */
+const iPonto = rPlanos.texto.indexOf('Ponto de partida');
+const iProsa = rPlanos.texto.indexOf('O Rafael entende rápido');
+const iOrigem = rPlanos.texto.indexOf('Do que eu vi na aula de nivelamento');
+const iNivel = rPlanos.texto.indexOf('Como Rafael está hoje');
+conf('a voz dela abre a seção, logo abaixo do título',
+  iPonto < iProsa && iProsa < iOrigem && iOrigem < iNivel, true);
+/* O cabeçalho traz "4 de setembro de 2026" e a linha de origem trazia "02/09",
+ * duas datas em dois formatos coladas uma na outra. Sem o ano na segunda: ele
+ * está impresso duas linhas acima e não precisa aparecer de novo. */
+conf('a data da origem sai por extenso, como a do cabeçalho',
+  rPlanos.texto.indexOf('aula de nivelamento, em 2 de setembro') > 0, true);
+conf('e não sobrou data em barra na linha de origem',
+  /nivelamento, em \d\d?\//.test(rPlanos.texto), false);
+conf('o cabeçalho continua com a data por extenso e com o ano',
+  rPlanos.texto.indexOf('4 de setembro de 2026') > 0, true);
 
 secao('12b. Sem mapeamento, o parágrafo dela deixa de ser opcional');
 
@@ -718,6 +1173,32 @@ conf('depois pede o responsável',
 semNada.responsavel = 'Sandra Prado';
 conf('e aí pede o parágrafo, porque a folha não diria nada da criança',
   Core.pendenciasDaProposta(semNada)[0].indexOf('Escreva duas ou três linhas') === 0, true);
+/* E O ANO E O COLÉGIO NÃO SUBSTITUEM O PARÁGRAFO.
+ *
+ * A folha mínima é a que sai mais cedo na relação com a família, e ela não tem
+ * uma palavra sobre a criança: medido, 589 palavras impressas, nenhuma delas
+ * sobre quem a folha é. A tentação é preencher esse silêncio com o que existe,
+ * que é nome, ano e colégio. Não dá: os três já estão impressos no bloco de
+ * identificação, sessenta pontos acima, e repeti-los em prosa seria o mesmo
+ * dado vestido de observação. Qualquer coisa além deles seria invenção sobre a
+ * criança na primeira folha que a família lê sobre a própria filha, e inventar
+ * é pior do que a folha ser curta.
+ *
+ * Quem resolve isso não é o gerador da folha, é a tela: a pendência continua
+ * de pé mesmo com ano e colégio preenchidos, então essa folha não chega em
+ * família nenhuma sem que ela escreva as duas ou três linhas. */
+const soEscola = Core.preencherProposta({ ajustes: {} }, null);
+soEscola.aluno = 'Helena Prado';
+soEscola.responsavel = 'Sandra Prado';
+soEscola.anoEscolar = '08';
+soEscola.colegio = 'Colégio São Vicente';
+soEscola.materias = ['matematica'];
+conf('ano e colégio preenchidos não dispensam o parágrafo dela',
+  Core.pendenciasDaProposta(soEscola)[0].indexOf('Escreva duas ou três linhas') === 0, true);
+conf('e a folha crua não inventa nada sobre a criança',
+  textoDoPdf(PDFGen.gerarProposta(Core.dadosDaProposta(null, fixarDatas(soEscola))))
+    .indexOf('Ponto de partida') >= 0, false);
+
 semNada.texto = 'A Helena está no oitavo ano e chegou por indicação da escola.';
 conf('com o parágrafo escrito, nada mais falta', Core.pendenciasDaProposta(semNada).length, 0);
 

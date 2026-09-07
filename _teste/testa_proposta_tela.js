@@ -17,7 +17,7 @@
  *   2. A REGRA DE OURO: os sete blocos abrem FECHADOS, com um resumo de uma
  *      linha cada. Sete blocos abertos numa tela de tablet viram três telas de
  *      rolagem e ela para de usar isto na terceira proposta. Só Quem e
- *      Investimento nascem abertos.
+ *      Quanto custa nascem abertos.
  *
  *   3. O ALUNO QUE AINDA NÃO EXISTE, que é o caso do pedido: ela gera antes de
  *      cadastrar, o rascunho sobrevive a fechar a janela, o PDF sai PRIMEIRO e
@@ -284,14 +284,30 @@ function textoDoPdf(bytes) {
   // ================================================================
   secao('2. A regra de ouro: sete blocos, fechados, com resumo de uma linha');
 
+  /* MUDOU DE PROPÓSITO, e as travas mudaram junto: o bloco do preço chamava
+   * "Investimento" na tela e passou a se chamar "Quanto custa", que é o nome
+   * que a seção do preço já tem na folha que a família lê.
+   *
+   * A mesma coisa tinha dois nomes. Quando a mãe ligasse citando "Quanto
+   * custa", que é o que está escrito na folha, a professora procuraria esse
+   * nome na tela e não acharia. O argumento que trocou o nome na folha, o de
+   * escrever com as palavras que ela diria na sala da família, onde ninguém
+   * pergunta qual é o investimento, vale igual no editor dela.
+   *
+   * Nenhuma trava foi afrouxada para isto: o nome trocou nos dois lados, e as
+   * catorze buscas por bloco deste arquivo continuam exigindo o nome exato. */
   const b0 = await blocos('#modal-proposta');
   conf('são sete blocos', b0.length, 7);
   conf('na ordem do documento', b0.map(b => b.titulo).join(' | '),
     'Quem | Ponto de partida | O que eu proponho trabalhar | Como funcionam os encontros | ' +
-    'O combinado | Investimento | O que vem junto');
+    'Os nossos combinados | Quanto custa | O que vem junto');
   conf('só dois nascem abertos', b0.filter(b => b.aberto).length, 2);
-  conf('e são Quem e Investimento',
-    b0.filter(b => b.aberto).map(b => b.titulo).join(', '), 'Quem, Investimento');
+  conf('e são Quem e Quanto custa',
+    b0.filter(b => b.aberto).map(b => b.titulo).join(', '), 'Quem, Quanto custa');
+  /* O bloco do preço tem UM nome só, e é o mesmo da folha: nome de tela e nome
+   * de folha separados é o defeito que esta trava impede de voltar. */
+  conf('e o bloco do preço não voltou a se chamar de outro jeito',
+    b0.filter(b => b.titulo === 'Investimento').length, 0);
   conf('todo bloco tem resumo de uma linha', b0.every(b => b.resumo.length > 0), true);
   conf('nenhum resumo passa de uma linha de tablet', b0.every(b => b.resumo.length <= 90), true);
   conf('toda cabeça de bloco é alvo grande de tocar', b0.every(b => b.altura >= 44), true);
@@ -308,7 +324,7 @@ function textoDoPdf(bytes) {
   /* Cem reais é o padrão do aplicativo, e não um número dela: é o que sobrou de
    * não haver preço nenhum. Enquanto for esse número, a faixa avisa. */
   const faixaValor = () => pag.evaluate(() => {
-    const b = window.__bloco('#modal-proposta', 'Investimento');
+    const b = window.__bloco('#modal-proposta', 'Quanto custa');
     const f = Array.from(b.querySelectorAll('.faixa-aviso'))
       .filter(x => getComputedStyle(x).display !== 'none')[0];
     return f ? f.textContent.replace(/\s+/g, ' ').trim() : '';
@@ -376,10 +392,22 @@ function textoDoPdf(bytes) {
   conf('a janela fechou', await visivel('#modal-proposta'), false);
   await espera(500);
   let banco = await bd();
-  conf('o rascunho foi para o disco', !!(banco.ajustes && banco.ajustes.propostaRascunho), true);
-  conf('com o nome que ela digitou', banco.ajustes.propostaRascunho.aluno, ALUNA);
-  conf('e é UM rascunho só, e não uma lista',
-    Array.isArray(banco.ajustes.propostaRascunho), false);
+  /* O rascunho deixou de ser UM e passou a ser uma LISTA, de propósito, nesta
+   * mesma rodada. Era db.ajustes.propostaRascunho, um objeto só, e a segunda
+   * família da tarde apagava a primeira: "Começar outra" avisava que a atual
+   * não ficava guardada e a descartava. Quem já é aluno tem a proposta na
+   * ficha; quem não é tinha só aquele campo, e a proposta é escrita
+   * JUSTAMENTE para quem ainda não é. Agora é db.ajustes.propostaRascunhos,
+   * lista, mais recente primeiro, e o campo antigo fica null depois de migrar. */
+  conf('o rascunho foi para o disco',
+    !!(banco.ajustes && (banco.ajustes.propostaRascunhos || []).length), true);
+  conf('com o nome que ela digitou', banco.ajustes.propostaRascunhos[0].aluno, ALUNA);
+  conf('e agora é uma LISTA de propostas em andamento, e não uma só',
+    Array.isArray(banco.ajustes.propostaRascunhos), true);
+  conf('com a data em que ela mexeu por último, para a lista poder se ordenar',
+    /^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d$/.test(banco.ajustes.propostaRascunhos[0].mexidoEm || ''), true);
+  conf('e o campo antigo de um rascunho só ficou vazio',
+    banco.ajustes.propostaRascunho, 'null');
 
   await tocar('#proposta-nova', false);
   conf('com nome digitado, o botão de recomeçar aparece',
@@ -414,7 +442,7 @@ function textoDoPdf(bytes) {
   conf('NADA foi cadastrado sozinho',
     banco.alunos.filter(a => a.nome === ALUNA).length, 0);
   conf('o rascunho ficou marcado como gerado',
-    banco.ajustes.propostaRascunho.geradoEm, Core.hojeIso());
+    banco.ajustes.propostaRascunhos[0].geradoEm, Core.hojeIso());
 
   const TOQUES_AVULSO = toques;
   conf('do aplicativo aberto ao PDF gerado, três toques dentro do aplicativo', TOQUES_AVULSO, 3);
@@ -429,11 +457,11 @@ function textoDoPdf(bytes) {
   // ================================================================
   secao('5. A troca entre hora-aula e planos, com a conta conferida');
 
-  await abrirBloco('#modal-proposta', 'Investimento');
-  await tocarNoBloco('#modal-proposta', 'Investimento', '[data-campo="modo-cobranca"] [data-valor="planos"]');
+  await abrirBloco('#modal-proposta', 'Quanto custa');
+  await tocarNoBloco('#modal-proposta', 'Quanto custa', '[data-campo="modo-cobranca"] [data-valor="planos"]');
 
   const tabela = await pag.evaluate(() => {
-    const b = window.__bloco('#modal-proposta', 'Investimento');
+    const b = window.__bloco('#modal-proposta', 'Quanto custa');
     return Array.from(b.querySelectorAll('.linha-plano')).map(l => ({
       nome: l.querySelector('.nome').textContent.trim(),
       detalhe: l.querySelector('.detalhe').textContent.trim(),
@@ -451,7 +479,7 @@ function textoDoPdf(bytes) {
     tabela.filter(l => l.recomendado)[0].nome, 'Trimestral');
 
   banco = await bd();
-  const rasc = banco.ajustes.propostaRascunho;
+  const rasc = banco.ajustes.propostaRascunhos[0];
   /* As MESMAS entradas que a tela usa. O valorHora entrou porque a conta dos
    * planos passou a descer do preco que ela cobra hoje, e nao da ancora: sem
    * ele o teste compararia a tela com uma conta que ninguem faz.
@@ -476,12 +504,12 @@ function textoDoPdf(bytes) {
   /* A escada exagerada avisa. Zero, cinco e dez é criticável; zero, quinze e
    * trinta lê como desespero e ainda destrói a receita de quem pagaria cheio. */
   const semAviso = await pag.evaluate(() =>
-    !window.__bloco('#modal-proposta', 'Investimento').querySelector('[data-aviso="desconto"]'));
+    !window.__bloco('#modal-proposta', 'Quanto custa').querySelector('[data-aviso="desconto"]'));
   conf('com a escada dela não há aviso de desconto', semAviso, true);
   await digitar('#modal-proposta', 'desconto-semestral', '40');
   await espera(300);
   const comAviso = await pag.evaluate(() => {
-    const e = window.__bloco('#modal-proposta', 'Investimento').querySelector('[data-aviso="desconto"]');
+    const e = window.__bloco('#modal-proposta', 'Quanto custa').querySelector('[data-aviso="desconto"]');
     return e ? e.textContent.replace(/\s+/g, ' ').trim() : '';
   });
   conf('a escada de 40 por cento avisa',
@@ -489,14 +517,97 @@ function textoDoPdf(bytes) {
   await digitar('#modal-proposta', 'desconto-semestral', '10');
   await espera(300);
   conf('voltando para dez, o aviso some', await pag.evaluate(() =>
-    !window.__bloco('#modal-proposta', 'Investimento').querySelector('[data-aviso="desconto"]')), true);
+    !window.__bloco('#modal-proposta', 'Quanto custa').querySelector('[data-aviso="desconto"]')), true);
+
+  /* Os rótulos do desconto diziam de quanto e calavam de que.
+   *
+   * Eram "Desconto no mensal (%)", "No trimestral (%)" e "No semestral (%)",
+   * um palmo abaixo de "Âncora: a hora avulsa". Quem lê os quatro na ordem
+   * conclui que o desconto sai da âncora, e não sai: sai do preço que ela
+   * cobra hoje. O Rômulo leu a tela assim e perguntou se a conta estava
+   * errada; a conta estava certa e o rótulo estava errado.
+   *
+   * Este teste não confere o texto exato, que pode ser reescrito melhor: ele
+   * confere as três coisas que não podem voltar a faltar. Primeira, a base
+   * está escrita ali, com o número. Segunda, o número é O DA CONTA, e não
+   * outro: um rótulo que dissesse a base certa com o valor errado seria a
+   * mesma mentira noutro lugar. Terceira, o valor que manda na conta aparece
+   * no bloco, em campo à vista, no modo Planos: antes ele morava dentro do
+   * caixaHora, que some justamente aí. */
+  const cobranca = await pag.evaluate(() => {
+    const b = window.__bloco('#modal-proposta', 'Quanto custa');
+    const campo = document.querySelector('#modal-proposta [data-campo="valor-hora"]');
+    return {
+      base: b.querySelector('[data-rotulo="base-desconto"]').textContent.replace(/\s+/g, ' ').trim(),
+      ajudaDaConta: b.querySelector('[data-ajuda="conta-dos-planos"]').textContent.replace(/\s+/g, ' ').trim(),
+      ancora: Array.from(b.querySelectorAll('label.campo > span'))
+        .filter(s => /Âncora/.test(s.textContent))[0].textContent.trim(),
+      rotulos: Array.from(b.querySelectorAll('label.campo > span')).map(s => s.textContent.trim()),
+      valorHoraNaTela: !!(campo && campo.getClientRects().length),
+      valorHoraNoBloco: !!(campo && b.contains(campo))
+    };
+  });
+  const precoDeHoje = Core.fmtMoeda(rasc.cobranca.valorHora);
+  conf('o valor que manda na conta aparece no bloco de cobrança',
+    cobranca.valorHoraNoBloco && cobranca.valorHoraNaTela, true);
+  conf('e continua à vista no modo Planos, que é onde ele é a base',
+    cobranca.valorHoraNaTela, true);
+  conf('o rótulo dos descontos diz de que base eles descem',
+    /preço de hoje/.test(cobranca.base), true);
+  conf('e diz com o número, que é ' + precoDeHoje,
+    cobranca.base.indexOf(precoDeHoje) >= 0, true);
+  conf('nenhum rótulo de desconto manda ler a âncora',
+    cobranca.rotulos.filter(r => /\(%\)/.test(r) && /ncora/.test(r)).length, 0);
+  conf('os três rótulos curtos continuam nomeando os três planos',
+    cobranca.rotulos.filter(r => /^(Mensal|Trimestral|Semestral) \(%\)$/.test(r)).length, 3);
+  conf('o rótulo da âncora fecha o escopo dela na própria linha',
+    /avulsa/.test(cobranca.ancora) && /só/.test(cobranca.ancora), true);
+  conf('a ajuda embaixo da tabela também desce do preço de hoje, e não da âncora',
+    /A conta é o seu preço de hoje/.test(cobranca.ajudaDaConta), true);
+  conf('e diz em voz alta que a âncora não entra na conta',
+    /A âncora não entra/.test(cobranca.ajudaDaConta), true);
+  conf('nenhum lugar do bloco ainda diz que a conta é âncora vezes o desconto',
+    /âncora vezes o desconto/.test(cobranca.ajudaDaConta), false);
+
+  /* Trocar o preço de hoje no modo Planos redesenha a tabela no mesmo toque.
+   * Enquanto o campo vivia dentro do caixaHora isto não podia acontecer, e ela
+   * conferia números velhos. */
+  await digitar('#modal-proposta', 'valor-hora', '130');
+  await espera(400);
+  const depoisDeTrocar = await pag.evaluate(() => {
+    const b = window.__bloco('#modal-proposta', 'Quanto custa');
+    return {
+      base: b.querySelector('[data-rotulo="base-desconto"]').textContent.replace(/\s+/g, ' ').trim(),
+      mensal: Array.from(b.querySelectorAll('.linha-plano'))
+        .filter(l => l.querySelector('.nome').textContent.trim() === 'Mensal')[0]
+        .querySelector('.por-hora').textContent.trim()
+    };
+  });
+  conf('trocado o preço de hoje, o rótulo da base acompanha',
+    depoisDeTrocar.base.indexOf('R$ 130,00') >= 0, true);
+  conf('e a linha do mensal, que é o preço dela sem desconto, vira R$ 130,00',
+    depoisDeTrocar.mensal, 'R$ 130,00 por hora');
+  /* Devolve o bloco ao estado em que as seções seguintes o encontram. A âncora
+   * volta à mão porque o conferirAncora só a faz SUBIR: trocando o preço para
+   * 130 ela subiu para 150 e não desceria sozinha. */
+  await digitar('#modal-proposta', 'valor-hora', String(rasc.cobranca.valorHora));
+  await espera(300);
+  await digitar('#modal-proposta', 'ancora', String(rasc.cobranca.ancora));
+  await espera(400);
+  conf('o bloco voltou ao preço e à âncora de antes da conferência',
+    await pag.evaluate(() => {
+      const b = window.__bloco('#modal-proposta', 'Quanto custa');
+      return document.querySelector('#modal-proposta [data-campo="valor-hora"]').value + '/' +
+        b.querySelector('[data-campo="ancora"]').value;
+    }),
+    rasc.cobranca.valorHora + '/' + rasc.cobranca.ancora);
 
   // ================================================================
-  secao('6. O combinado: padrão editável, e as duas folgas do semestre');
+  secao('6. Os nossos combinados: padrão editável, e as duas folgas do semestre');
 
-  await abrirBloco('#modal-proposta', 'O combinado');
+  await abrirBloco('#modal-proposta', 'Os nossos combinados');
   const comb = await pag.evaluate(() => {
-    const b = window.__bloco('#modal-proposta', 'O combinado');
+    const b = window.__bloco('#modal-proposta', 'Os nossos combinados');
     return Array.from(b.querySelectorAll('.item-combinado')).map(c => ({
       id: c.getAttribute('data-item'),
       ligado: c.querySelector('input[type=checkbox]').checked,
@@ -525,20 +636,20 @@ function textoDoPdf(bytes) {
   /* Desligar as folgas não é proibido, porque o documento é dela. Mas é o
    * pedaço que não pode faltar, e o editor tem que dizer isso de um jeito que
    * ela veja com o bloco fechado. */
-  await marcarNoBloco('#modal-proposta', 'O combinado', 'folgas');
+  await marcarNoBloco('#modal-proposta', 'Os nossos combinados', 'folgas');
   const semFolgas = await blocos('#modal-proposta');
   conf('desligar as folgas acende o alerta no resumo do bloco',
     /sem as folgas/.test(semFolgas[4].resumo), true);
   conf('e o resumo aparece marcado como falta', semFolgas[4].falta, true);
   const faixaFolgas = await pag.evaluate(() => {
-    const b = window.__bloco('#modal-proposta', 'O combinado');
+    const b = window.__bloco('#modal-proposta', 'Os nossos combinados');
     const f = Array.from(b.querySelectorAll('.faixa-aviso'))
       .filter(x => getComputedStyle(x).display !== 'none')[0];
     return f ? f.textContent.replace(/\s+/g, ' ').trim() : '';
   });
   conf('e a faixa explica por que elas existem',
     /julgar se o motivo era bom o bastante/.test(faixaFolgas), true);
-  await marcarNoBloco('#modal-proposta', 'O combinado', 'folgas');
+  await marcarNoBloco('#modal-proposta', 'Os nossos combinados', 'folgas');
   const comFolgas = await blocos('#modal-proposta');
   conf('religando, o alerta some', /sem as folgas/.test(comFolgas[4].resumo), false);
 
@@ -632,8 +743,10 @@ function textoDoPdf(bytes) {
     (mapa.marcados.fortes || []).indexOf('pergunta') >= 0, true);
   conf('e a lacuna de anos anteriores',
     (mapa.marcados.lacunas || []).indexOf('fracoes') >= 0, true);
-  conf('o rascunho foi embora depois de virar aluno',
-    banco.ajustes.propostaRascunho, 'null');
+  /* Virou aluno, sai da lista: a proposta passa a morar na ficha dele, e
+   * deixá-la nos dois lugares faria a lista oferecer um rascunho com dono. */
+  conf('o rascunho saiu da lista depois de virar aluno',
+    (banco.ajustes.propostaRascunhos || []).filter(r => r.aluno === ALUNA).length, 0);
   conf('a janela da proposta fechou junto', await visivel('#modal-proposta'), false);
 
   const av3 = await aviso();
@@ -661,6 +774,524 @@ function textoDoPdf(bytes) {
     (banco.ajustes.propostaPadrao || {}).modo, 'planos');
   conf('e a âncora ficou guardada',
     (banco.ajustes.propostaPadrao || {}).ancora, comPreco.propostas[0].cobranca.ancora);
+
+  // ================================================================
+  secao('9b. As propostas em andamento: duas famílias na mesma tarde');
+
+  /* O buraco que esta lista fecha é o da tarde de três famílias.
+   *
+   * Antes havia UM rascunho só, e o "Começar outra" avisava que a proposta
+   * aberta não ficava guardada e a descartava. Quem já é aluno tem a proposta
+   * na ficha; quem ainda não é tinha só aquele campo, e é para quem ainda não
+   * é que a proposta existe. A segunda família apagava a primeira.
+   *
+   * Este teste percorre a tarde inteira: escreve a primeira, começa a segunda,
+   * volta para a primeira, apaga a segunda e recarrega a página. Recarregar é
+   * a parte que ninguém lembra de olhar e é a que ela vive: o tablet atualiza
+   * o aplicativo sozinho no meio da aula. */
+
+  const ALUNA2 = 'Bento Alves';
+  const RESP2 = 'Paula Alves';
+
+  /* A linha inteira, e não só o nome: é o conjunto do que sai escrito nela que
+   * decide se ela consegue distinguir uma proposta da outra antes de tocar no
+   * Apagar, que não tem volta. O "texto" é a linha do jeito que o olho dela vê,
+   * e é por ele que a trava das duas Helenas compara caractere por caractere. */
+  const listaNaTela = () => pag.evaluate(() => Array.from(
+    document.querySelectorAll('#modal-proposta .linha-rascunho')).map(l => ({
+      id: l.getAttribute('data-rascunho'),
+      nome: l.querySelector('.nome').textContent.trim(),
+      quando: l.querySelector('.quando').textContent.trim(),
+      trecho: (l.querySelector('.trecho') || { textContent: '' }).textContent.trim(),
+      texto: l.textContent.replace(/\s+/g, ' ').trim(),
+      altura: Math.round(l.getBoundingClientRect().height),
+      aberta: l.classList.contains('aberta'),
+      temAbrir: !!l.querySelector('[data-acao="abrir-rascunho"]'),
+      temApagar: !!l.querySelector('[data-acao="apagar-rascunho"]')
+    })));
+
+  /* Primeiro a metade honesta da regra: quem identifica a linha é o NOME, e
+   * sem nome não há linha. Uma proposta escrita sem nome nenhum não fica
+   * guardada, e ela precisa saber disso ANTES de tocar, e não depois. */
+  await tocar('[data-tela="alunos"]', false);
+  await tocar('#proposta-nova', false);
+  await digitar('#modal-proposta', 'colegio', 'Colégio São Vicente');
+  await espera(1900);
+  const perguntasSemNome = [];
+  const anotarSemNome = d => perguntasSemNome.push(d.message());
+  pag.on('dialog', anotarSemNome);
+  await tocar('#modal-proposta [data-acao="comecar-outra"]', false);
+  await espera(700);
+  pag.off('dialog', anotarSemNome);
+  conf('sem nome, Começar outra avisa que a aberta não fica guardada',
+    perguntasSemNome.some(t => /não tem nome de aluno/.test(t) &&
+      /não fica guardada/.test(t)), true);
+  banco = await bd();
+  conf('e rascunho sem nome nenhum não ganha linha na lista',
+    (banco.ajustes.propostaRascunhos || []).filter(r => String(r.aluno || '').trim()).length, 0);
+
+  /* A janela continua aberta, agora na proposta em branco que o Começar outra
+   * abriu: é aqui que a tarde de duas famílias começa de verdade. */
+  conf('e a janela seguiu numa proposta em branco',
+    await pag.evaluate(() => document.querySelector('#modal-proposta [data-campo="colegio"]').value), '');
+  await digitar('#modal-proposta', 'aluno', ALUNA);
+  await digitar('#modal-proposta', 'responsavel', RESPONSAVEL);
+  await espera(1900);
+  /* A lista aparece já na PRIMEIRA proposta com nome. Enquanto ela só aparecia
+   * da segunda em diante, a única proposta guardada ficava sem o Apagar, e
+   * logo depois do Começar outra, com a aberta ainda em branco, a que ela
+   * acabara de guardar sumia da tela até um nome novo ser digitado. */
+  let naTela = await listaNaTela();
+  conf('a lista existe já na primeira proposta com nome', naTela.length, 1);
+  conf('e ela é a que está aberta', naTela[0].aberta, true);
+  conf('e tem como ser apagada', naTela[0].temApagar, true);
+
+  await tocar('#modal-proposta [data-acao="comecar-outra"]', false);
+  conf('Começar outra abre uma proposta em branco',
+    await pag.evaluate(() => document.querySelector('#modal-proposta [data-campo="aluno"]').value), '');
+  banco = await bd();
+  /* O ponto do pedido: a anterior NÃO foi descartada. */
+  conf('e a anterior ficou guardada, em vez de ser descartada',
+    (banco.ajustes.propostaRascunhos || []).filter(r => r.aluno === ALUNA).length, 1);
+  naTela = await listaNaTela();
+  conf('e continua alcançável na lista, com a nova ainda em branco',
+    naTela.length === 1 && naTela[0].nome === ALUNA && naTela[0].temAbrir, true);
+
+  await digitar('#modal-proposta', 'aluno', ALUNA2);
+  await digitar('#modal-proposta', 'responsavel', RESP2);
+  await espera(1900);
+
+  naTela = await listaNaTela();
+  conf('agora são duas propostas em andamento', naTela.length, 2);
+  conf('a mais recente primeiro, que é a que ela está escrevendo', naTela[0].nome, ALUNA2);
+  conf('e ela aparece marcada como aberta', naTela[0].aberta, true);
+  conf('a aberta não tem botão de abrir, que seria um toque sem efeito',
+    naTela[0].temAbrir, false);
+  conf('a outra é identificada pelo nome do aluno', naTela[1].nome, ALUNA);
+  /* A HORA vai junto, e não só o dia. Sem ela, duas propostas mexidas hoje
+   * saíam com a mesma frase, e a lista existe para não perder proposta. */
+  conf('e pela hora em que ela mexeu por último',
+    /^mexida hoje às \d\d:\d\d$/.test(naTela[1].quando), true);
+  conf('as duas podem ser apagadas',
+    naTela.filter(l => l.temApagar).length, 2);
+
+  /* A lista fotografada nas duas orientações. Ela vira o tablet no colo o tempo
+   * todo, e é no alto da janela que a lista disputa espaço com o primeiro campo
+   * do editor. */
+  await pag.evaluate(() => { document.querySelector('#corpo-modal-proposta').scrollTop = 0; });
+  await espera(200);
+  await pag.screenshot({ path: path.join(__dirname, 'v_rascunhos_deitado.png') });
+  await pag.setViewport({ width: 800, height: 1280, hasTouch: true });
+  await espera(600);
+  await pag.evaluate(() => { document.querySelector('#corpo-modal-proposta').scrollTop = 0; });
+  await espera(200);
+  await pag.screenshot({ path: path.join(__dirname, 'v_rascunhos_em_pe.png') });
+  const alvosDaLista = await pag.evaluate(() => Array.from(
+    document.querySelectorAll('#modal-proposta .linha-rascunho button'))
+    .filter(b => b.getClientRects().length)
+    .map(b => ({ t: b.textContent.replace(/\s+/g, ' ').trim().slice(0, 24),
+      a: Math.round(b.getBoundingClientRect().height),
+      l: Math.round(b.getBoundingClientRect().width) })));
+  conf('em pé, todo botão da lista continua sendo alvo de 44 por 44',
+    alvosDaLista.filter(b => b.a < 44 || b.l < 44).length, 0);
+  await pag.setViewport({ width: 1280, height: 800, hasTouch: true });
+  await espera(500);
+
+  /* Alternar: abrir a outra retoma de onde parou, com o que ela digitou. */
+  await pag.evaluate((nome) => {
+    Array.from(document.querySelectorAll('#modal-proposta .linha-rascunho'))
+      .filter(l => l.querySelector('.nome').textContent.trim() === nome)[0]
+      .querySelector('[data-acao="abrir-rascunho"]').click();
+  }, ALUNA);
+  await espera(700);
+  const retomada = await pag.evaluate(() => ({
+    aluno: document.querySelector('#modal-proposta [data-campo="aluno"]').value,
+    responsavel: document.querySelector('#modal-proposta [data-campo="responsavel"]').value
+  }));
+  conf('abrir a outra retoma de onde ela parou', retomada.aluno, ALUNA);
+  conf('com o responsável junto', retomada.responsavel, RESPONSAVEL);
+  naTela = await listaNaTela();
+  conf('e a marca de aberta trocou de linha',
+    naTela.filter(l => l.aberta)[0].nome, ALUNA);
+  conf('a que ficou para trás continua na lista, e não sumiu',
+    naTela.filter(l => l.nome === ALUNA2).length, 1);
+
+  /* Apagar, com confirmação. Lista que só cresce vira lixo. */
+  const perguntas = [];
+  const anotar = d => perguntas.push(d.message());
+  pag.on('dialog', anotar);
+  await pag.evaluate((nome) => {
+    Array.from(document.querySelectorAll('#modal-proposta .linha-rascunho'))
+      .filter(l => l.querySelector('.nome').textContent.trim() === nome)[0]
+      .querySelector('[data-acao="apagar-rascunho"]').click();
+  }, ALUNA2);
+  await espera(900);
+  pag.off('dialog', anotar);
+  conf('apagar pergunta antes, com o nome do aluno na pergunta',
+    perguntas.some(t => t.indexOf('Apagar a proposta de ' + ALUNA2) === 0), true);
+  /* E a pergunta diz a MESMA hora que a linha. É na pergunta que o engano vira
+   * definitivo: com dois alunos de mesmo nome na lista, uma pergunta que só
+   * dissesse o nome seria idêntica nas duas linhas e confirmar não seria uma
+   * decisão. */
+  conf('e com a hora em que ela mexeu, que é o que separa duas de mesmo nome',
+    perguntas.some(t => /Apagar a proposta de .+, mexida (hoje|ontem) às \d\d:\d\d\?/.test(t)), true);
+  banco = await bd();
+  conf('apagada, ela sai do disco também',
+    (banco.ajustes.propostaRascunhos || []).filter(r => r.aluno === ALUNA2).length, 0);
+  conf('e a que sobrou continua inteira',
+    (banco.ajustes.propostaRascunhos || []).filter(r => r.aluno === ALUNA).length, 1);
+  naTela = await listaNaTela();
+  conf('sobrou uma linha na lista, a da que ficou', naTela.length, 1);
+  conf('e é a proposta certa', naTela[0].nome, ALUNA);
+
+  /* Recarregar a página, que é o que o tablet faz sozinho quando a atualização
+   * entra. Nada pode se perder aí. */
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await espera(2000);
+  await fecharNovidades();
+  await tocar('[data-tela="alunos"]', false);
+  await tocar('#proposta-nova', false);
+  conf('recarregada a página, a proposta em andamento volta inteira',
+    await pag.evaluate(() => document.querySelector('#modal-proposta [data-campo="aluno"]').value),
+    ALUNA);
+  conf('e o responsável volta com ela',
+    await pag.evaluate(() => document.querySelector('#modal-proposta [data-campo="responsavel"]').value),
+    RESPONSAVEL);
+
+  // ================================================================
+  secao('9c. Duas propostas com o MESMO NOME, e o Apagar que não tem volta');
+
+  /* O defeito que este bloco fecha: duas propostas com o mesmo nome de aluno
+   * saíam na lista iguais caractere por caractere, "Helena Prado / mexida hoje
+   * / Apagar", e as duas perguntas do Apagar também. Dali em diante o Apagar
+   * tinha metade de chance de destruir a proposta errada, e ele não tem volta:
+   * apagarRascunho grava direto, sem passar pelo desfazer, numa lista cuja
+   * razão de existir é não perder proposta.
+   *
+   * E é alcançável em três toques: abrir a proposta da família, tocar em
+   * Começar outra e digitar o mesmo nome de novo, que é o que acontece quando a
+   * mesma família volta ou quando ela recomeça a proposta do zero. Nome
+   * repetido também não é caso de laboratório: duas crianças de mesmo nome numa
+   * turma é comum, e nesse caso o parágrafo é a única coisa que de fato
+   * distingue as duas.
+   *
+   * O relógio das propostas semeadas é RELATIVO ao relógio de verdade, de
+   * propósito: um horário fixo escrito à mão poderia coincidir com o minuto em
+   * que o teste roda, e aí duas linhas voltariam a sair iguais por acaso,
+   * escondendo justamente o que este bloco persegue. */
+  const doisDig = n => String(n).padStart(2, '0');
+  const carimboAtras = (minutos) => {
+    const d = new Date(Date.now() - minutos * 60000);
+    return d.getFullYear() + '-' + doisDig(d.getMonth() + 1) + '-' + doisDig(d.getDate()) +
+      'T' + doisDig(d.getHours()) + ':' + doisDig(d.getMinutes()) + ':' + doisDig(d.getSeconds());
+  };
+  const semear = (rascunhos) => pag.evaluate((lista) => new Promise((resolve) => {
+    const req = indexedDB.open('apoio-educacional');
+    req.onsuccess = () => {
+      const b = req.result;
+      const st = b.transaction('dados', 'readwrite').objectStore('dados');
+      const g = st.get('principal');
+      g.onsuccess = () => {
+        const d = g.result;
+        d.ajustes = d.ajustes || {};
+        d.ajustes.propostaRascunhos = lista;
+        d.ajustes.propostaRascunho = null;
+        st.put(d, 'principal').onsuccess = () => resolve(true);
+      };
+    };
+  }), rascunhos);
+
+  const HELENA = 'Helena Prado';
+  const PARAGRAFO_A = 'A Helena chegou no 7º ano com a tabuada firme e trava na divisão com vírgula.';
+  const PARAGRAFO_B = 'A Helena do 3º ano lê tudo sozinha e ainda soma contando nos dedos.';
+  const semeados = [
+    { id: 'igual-b', aluno: HELENA, responsavel: 'Cláudia Prado', texto: PARAGRAFO_B, atras: 95 },
+    { id: 'igual-a', aluno: HELENA, responsavel: 'Marina Prado', texto: PARAGRAFO_A, atras: 240 },
+    { id: 'outro-1', aluno: 'Bianca Toledo', responsavel: 'Ana Toledo', atras: 300,
+      texto: 'Bianca quer inglês para a viagem de intercâmbio de julho.' },
+    { id: 'outro-2', aluno: 'Otávio Lins', responsavel: 'Sérgio Lins', atras: 400,
+      texto: 'Otávio precisa recuperar física antes da prova final.' },
+    /* Este é o parágrafo COMPRIDO de propósito: é ele que prova que o corte do
+     * trecho cai em palavra inteira, e não no meio de uma. */
+    { id: 'outro-3', aluno: 'Rafael Muniz', responsavel: 'Denise Muniz', atras: 1500,
+      texto: 'Rafael veio de uma escola que não deu geometria nenhuma e chegou aqui achando ' +
+        'que não sabe nada de matemática, o que não é verdade.' },
+    { id: 'outro-4', aluno: 'Sofia Andrade', responsavel: 'Paulo Andrade', atras: 1600,
+      texto: 'Sofia se perde em interpretação de texto longo.' }
+  ];
+
+  await tocar('#modal-proposta [data-fechar]', false);
+  await espera(500);
+  await semear(semeados.map(r => ({
+    id: r.id, aluno: r.aluno, responsavel: r.responsavel, texto: r.texto,
+    data: carimboAtras(r.atras).slice(0, 10), mexidoEm: carimboAtras(r.atras),
+    cobranca: { modo: 'hora', valorHora: 120, ancora: 140,
+      descontos: { mensal: 0, trimestral: 5, semestral: 10 }, recomendado: 'trimestral' }
+  })));
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await espera(2000);
+  await fecharNovidades();
+  await tocar('[data-tela="alunos"]', false);
+  await tocar('#proposta-nova', false);
+  await espera(500);
+
+  /* Começar outra guarda a que a janela abriu sozinha e deixa as seis todas
+   * FECHADAS: é esse o estado em que a lista é lida de relance, e é nele que as
+   * duas linhas iguais apareciam. */
+  await tocar('#modal-proposta [data-acao="comecar-outra"]', false);
+  await espera(900);
+  naTela = await listaNaTela();
+  conf('as seis propostas em andamento estão na lista', naTela.length, 6);
+  conf('e nenhuma está aberta, que é como ela lê a lista de relance',
+    naTela.filter(l => l.aberta).length, 0);
+  const helenas = naTela.filter(l => l.nome === HELENA);
+  conf('duas delas têm o mesmo nome de aluno', helenas.length, 2);
+  conf('e as duas linhas NÃO saem iguais caractere por caractere',
+    helenas[0].texto === helenas[1].texto, false);
+  conf('nenhuma linha da lista repete outra',
+    new Set(naTela.map(l => l.texto)).size, 6);
+  conf('a hora em que ela mexeu aparece escrita, e não só o dia',
+    helenas.every(l => /^mexida (hoje|ontem) às \d\d:\d\d$/.test(l.quando)), true);
+  conf('e as duas horas são diferentes', helenas[0].quando === helenas[1].quando, false);
+  /* O parágrafo é o desempate do desempate: duas propostas de mesmo nome
+   * mexidas no MESMO minuto ainda assim se separam, porque é ali que ela
+   * escreve com as palavras dela sobre cada criança. */
+  conf('o começo do parágrafo de uma aparece na linha dela',
+    naTela.filter(l => l.id === 'igual-a')[0].trecho, PARAGRAFO_A);
+  conf('e o da outra na linha da outra',
+    naTela.filter(l => l.id === 'igual-b')[0].trecho, PARAGRAFO_B);
+  /* Parágrafo comprido: o corte cai em palavra inteira. O mesmo texto entra na
+   * pergunta do Apagar, onde é lido inteiro e não encolhido pelo CSS, e palavra
+   * partida no meio se lê como defeito no segundo em que ela decide. */
+  const compridoNaTela = naTela.filter(l => l.id === 'outro-3')[0].trecho;
+  const compridoInteiro = semeados.filter(r => r.id === 'outro-3')[0].texto;
+  console.log('       (parágrafo comprido, ' + compridoInteiro.length +
+    ' caracteres, sai na linha como: ' + compridoNaTela + ')');
+  conf('parágrafo comprido é cortado', compridoNaTela.length < compridoInteiro.length, true);
+  conf('e o corte avisa que continua', compridoNaTela.slice(-1), '…');
+  conf('e cai em palavra inteira, e não no meio de uma',
+    compridoInteiro.indexOf(compridoNaTela.slice(0, -1) + ' ') , 0);
+
+  /* O trecho entrou SEM custar altura: ele divide a linha da hora em vez de
+   * criar uma terceira. Medido no tablet em pé com a lista nos oito do teto: a
+   * linha tem 51 px de alvo mais 8 de respiro, e o fim do bloco Quem continua
+   * em 984 px num corpo de 1067, o mesmo número de antes do trecho existir. Em
+   * três linhas a mesma medida dava 1124, com o primeiro campo do editor já
+   * cortado pelo rodapé. */
+  console.log('       (altura das linhas da lista, deitado: ' +
+    naTela.map(l => l.altura).join(', ') + ' px)');
+  conf('e a linha da lista não engordou: 51 px de alvo, 59 com o respiro',
+    naTela.every(l => l.altura <= 51), true);
+
+  /* O print da lista cheia, nas duas orientações, com as duas Helenas dentro:
+   * é nele que se vê que as duas linhas deixaram de ser a mesma linha. */
+  await pag.evaluate(() => { document.querySelector('#corpo-modal-proposta').scrollTop = 0; });
+  await espera(200);
+  await pag.screenshot({ path: path.join(__dirname, 'v_rascunhos_iguais_deitado.png') });
+  await pag.setViewport({ width: 800, height: 1280, hasTouch: true });
+  await espera(600);
+  await pag.evaluate(() => { document.querySelector('#corpo-modal-proposta').scrollTop = 0; });
+  await espera(200);
+  await pag.screenshot({ path: path.join(__dirname, 'v_rascunhos_iguais_em_pe.png') });
+  const emPeIguais = await listaNaTela();
+  const textosEmPe = emPeIguais.filter(l => l.nome === HELENA).map(l => l.texto);
+  conf('em pé, as duas de mesmo nome continuam se distinguindo',
+    textosEmPe[0] === textosEmPe[1], false);
+  console.log('       (altura das linhas da lista, em pé: ' +
+    emPeIguais.map(l => l.altura).join(', ') + ' px)');
+  conf('e em pé a linha continua nos 51 px de alvo',
+    emPeIguais.every(l => l.altura <= 51), true);
+  conf('em pé, todo botão da lista continua sendo alvo de 44 por 44',
+    await pag.evaluate(() => Array.from(
+      document.querySelectorAll('#modal-proposta .linha-rascunho button'))
+      .filter(b => b.getClientRects().length)
+      .filter(b => b.getBoundingClientRect().height < 44 ||
+        b.getBoundingClientRect().width < 44).length), 0);
+  await pag.setViewport({ width: 1280, height: 800, hasTouch: true });
+  await espera(500);
+
+  /* As duas perguntas do Apagar também saíam byte a byte iguais, e é na
+   * pergunta que o engano vira definitivo. */
+  const perguntasIguais = [];
+  const anotarIguais = d => perguntasIguais.push(d.message());
+  pag.on('dialog', anotarIguais);
+  await pag.evaluate(() => document.querySelector(
+    '#modal-proposta [data-rascunho="igual-a"] [data-acao="apagar-rascunho"]').click());
+  await espera(900);
+  await pag.evaluate(() => document.querySelector(
+    '#modal-proposta [data-rascunho="igual-b"] [data-acao="apagar-rascunho"]').click());
+  await espera(900);
+  pag.off('dialog', anotarIguais);
+  /* As duas perguntas saem escritas no relatório: é o texto que ela lê no
+   * segundo em que decide, e ele precisa ser conferido por olho humano também,
+   * e não só por asserção. */
+  perguntasIguais.forEach(t => console.log('       (pergunta: ' +
+    t.replace(/\s+/g, ' ').trim() + ')'));
+  conf('o Apagar perguntou nas duas vezes', perguntasIguais.length, 2);
+  conf('e as duas perguntas não saem iguais',
+    perguntasIguais[0] === perguntasIguais[1], false);
+  conf('a pergunta de uma cita o parágrafo dela',
+    perguntasIguais[0].indexOf(PARAGRAFO_A) >= 0, true);
+  conf('e a da outra cita o da outra',
+    perguntasIguais[1].indexOf(PARAGRAFO_B) >= 0, true);
+  banco = await bd();
+  conf('as duas de mesmo nome saíram do disco',
+    (banco.ajustes.propostaRascunhos || []).filter(r => r.aluno === HELENA).length, 0);
+
+  // ================================================================
+  secao('9d. Apagar a proposta que está ABERTA, que é o caso delicado');
+
+  /* Este caminho não tinha teste nenhum, e o comentário do próprio código diz
+   * que é o delicado: são quatro efeitos em sequência, e nada travava se um
+   * sumisse. A janela ficaria mostrando uma proposta que não existe mais, ou
+   * fecharia na cara dela no meio da tarde. O teste de tela apagava justamente
+   * a linha que NÃO estava aberta. */
+  await pag.evaluate(() => document.querySelector(
+    '#modal-proposta [data-rascunho="outro-1"] [data-acao="abrir-rascunho"]').click());
+  await espera(800);
+  const antesDeApagar = await listaNaTela();
+  conf('a proposta que ela abriu é a que está marcada como aberta',
+    antesDeApagar[0].id + '/' + antesDeApagar[0].aberta, 'outro-1/true');
+  conf('e há uma seguinte na lista para a janela cair', antesDeApagar.length >= 2, true);
+  const seguinte = antesDeApagar[1];
+
+  const perguntaAberta = [];
+  const anotarAberta = d => perguntaAberta.push(d.message());
+  pag.on('dialog', anotarAberta);
+  await pag.evaluate(() => document.querySelector(
+    '#modal-proposta [data-rascunho="outro-1"] [data-acao="apagar-rascunho"]').click());
+  await espera(1200);
+  pag.off('dialog', anotarAberta);
+  conf('apagar a aberta também pergunta antes, e diz de quem é',
+    perguntaAberta.some(t => t.indexOf('Apagar a proposta de ' + antesDeApagar[0].nome) === 0), true);
+  conf('a janela continua aberta, e não fecha na cara dela',
+    await visivel('#modal-proposta'), true);
+  conf('e o campo do nome passou a mostrar a proposta seguinte da lista',
+    await pag.evaluate(() => document.querySelector('#modal-proposta [data-campo="aluno"]').value),
+    seguinte.nome);
+  naTela = await listaNaTela();
+  conf('a apagada sumiu da lista', naTela.filter(l => l.id === 'outro-1').length, 0);
+  conf('e a seguinte é a que está aberta agora',
+    naTela.filter(l => l.aberta).map(l => l.id).join(','), seguinte.id);
+  banco = await bd();
+  conf('a apagada sumiu do disco também',
+    (banco.ajustes.propostaRascunhos || []).filter(r => r.id === 'outro-1').length, 0);
+
+  /* Recarregar é a parte que ninguém lembra de olhar e é a que ela vive: o
+   * tablet atualiza o aplicativo sozinho no meio da aula. Apagada é para não
+   * voltar, e o que sobrou é para voltar inteiro. */
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await espera(2000);
+  await fecharNovidades();
+  await tocar('[data-tela="alunos"]', false);
+  await tocar('#proposta-nova', false);
+  await espera(500);
+  naTela = await listaNaTela();
+  conf('e recarregar não a traz de volta', naTela.filter(l => l.id === 'outro-1').length, 0);
+  conf('as outras voltam todas, e nenhuma foi junto',
+    naTela.map(l => l.id).sort().join(','), 'outro-2,outro-3,outro-4');
+
+  /* Sobra da migração: quem tinha um rascunho no campo antigo tem que
+   * encontrá-lo na lista. Gravado direto no banco, como uma versão anterior o
+   * teria deixado, e a janela é reaberta. */
+  await tocar('#modal-proposta [data-fechar]', false);
+  await espera(500);
+  await pag.evaluate(() => new Promise((resolve) => {
+    const req = indexedDB.open('apoio-educacional');
+    req.onsuccess = () => {
+      const b = req.result;
+      const st = b.transaction('dados', 'readwrite').objectStore('dados');
+      const g = st.get('principal');
+      g.onsuccess = () => {
+        const d = g.result;
+        d.ajustes = d.ajustes || {};
+        d.ajustes.propostaRascunhos = [];
+        d.ajustes.propostaRascunho = {
+          id: 'rascunho-da-versao-antiga', aluno: 'Zoé do Campo Antigo',
+          responsavel: 'Mãe da Zoé', data: '2026-01-15',
+          cobranca: { modo: 'hora', valorHora: 120, ancora: 140,
+            descontos: { mensal: 0, trimestral: 5, semestral: 10 }, recomendado: 'trimestral' }
+        };
+        st.put(d, 'principal').onsuccess = () => resolve(true);
+      };
+    };
+  }));
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await espera(2000);
+  await fecharNovidades();
+  await tocar('[data-tela="alunos"]', false);
+  await tocar('#proposta-nova', false);
+  conf('quem tinha rascunho no campo antigo o encontra, e não o perde',
+    await pag.evaluate(() => document.querySelector('#modal-proposta [data-campo="aluno"]').value),
+    'Zoé do Campo Antigo');
+  banco = await bd();
+  conf('ele passou a morar na lista', (banco.ajustes.propostaRascunhos || []).length, 1);
+  conf('e o campo antigo ficou vazio, para não ressuscitar o que ela apagar',
+    banco.ajustes.propostaRascunho, 'null');
+
+  /* O teto. Sem ele a lista acumula para sempre, e onze linhas no tablet em pé
+   * empurram o primeiro campo do editor para fora da tela (medido: o bloco Quem
+   * termina a 984 px com oito linhas e a 1102 com dez, num corpo de 1067). */
+  await tocar('#modal-proposta [data-fechar]', false);
+  await espera(500);
+  await pag.evaluate(() => new Promise((resolve) => {
+    const req = indexedDB.open('apoio-educacional');
+    req.onsuccess = () => {
+      const b = req.result;
+      const st = b.transaction('dados', 'readwrite').objectStore('dados');
+      const g = st.get('principal');
+      g.onsuccess = () => {
+        const d = g.result;
+        const nomes = ['Alice Prado', 'Caio Serra', 'Duda Lima', 'Eva Rocha', 'Fábio Nunes',
+          'Gael Pinto', 'Hugo Reis', 'Íris Melo', 'Joana Tavares', 'Lia Barros'];
+        d.ajustes.propostaRascunhos = nomes.map((n, i) => ({
+          id: 'teto' + i, aluno: n, responsavel: 'Responsável de ' + n.split(' ')[0],
+          data: '2026-08-' + String(10 + i).padStart(2, '0'),
+          mexidoEm: '2026-08-' + String(10 + i).padStart(2, '0') + 'T09:00:00',
+          cobranca: { modo: 'hora', valorHora: 120, ancora: 140,
+            descontos: { mensal: 0, trimestral: 5, semestral: 10 }, recomendado: 'trimestral' }
+        }));
+        d.ajustes.propostaRascunho = null;
+        st.put(d, 'principal').onsuccess = () => resolve(true);
+      };
+    };
+  }));
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await espera(2000);
+  await fecharNovidades();
+  await tocar('[data-tela="alunos"]', false);
+  await tocar('#proposta-nova', false);
+  await espera(500);
+  naTela = await listaNaTela();
+  conf('a lista tem teto, e ele vale na tela', naTela.length, 8);
+  conf('o teto guarda as mais recentes, e não as primeiras que chegaram',
+    naTela.map(l => l.nome).join(', '),
+    'Lia Barros, Joana Tavares, Íris Melo, Hugo Reis, Gael Pinto, Fábio Nunes, Eva Rocha, Duda Lima');
+  banco = await bd();
+  conf('e vale no disco também, senão a poda seria só de fachada',
+    (banco.ajustes.propostaRascunhos || []).length, 8);
+  const avTeto = await aviso();
+  conf('o que o teto derrubou é dito por nome, e não some calado',
+    /Alice Prado/.test(avTeto.texto) && /Caio Serra/.test(avTeto.texto), true);
+
+  /* E a tela volta ao estado que as próximas seções esperam. */
+  await pag.evaluate(() => new Promise((resolve) => {
+    const req = indexedDB.open('apoio-educacional');
+    req.onsuccess = () => {
+      const b = req.result;
+      const st = b.transaction('dados', 'readwrite').objectStore('dados');
+      const g = st.get('principal');
+      g.onsuccess = () => {
+        const d = g.result;
+        d.ajustes.propostaRascunhos = [];
+        d.ajustes.propostaRascunho = null;
+        st.put(d, 'principal').onsuccess = () => resolve(true);
+      };
+    };
+  }));
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await espera(2000);
+  await fecharNovidades();
 
   // ================================================================
   secao('10. Porta 2: a aba Proposta na ficha de quem já está cadastrado');
@@ -779,7 +1410,7 @@ function textoDoPdf(bytes) {
   conf('reabrir a janela volta ao alto do documento',
     await pag.evaluate(() => document.querySelector('#corpo-modal-proposta').scrollTop), 0);
   conf('e o modo de cobrança já vem no estado da última vez',
-    await pag.evaluate(() => window.__bloco('#modal-proposta', 'Investimento')
+    await pag.evaluate(() => window.__bloco('#modal-proposta', 'Quanto custa')
       .querySelector('[data-campo="modo-cobranca"] .opcao-seg.ativa').getAttribute('data-valor')),
     'planos');
   await pag.screenshot({ path: path.join(__dirname, 'v_proposta_deitado.png') });
