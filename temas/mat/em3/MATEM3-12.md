@@ -46,7 +46,9 @@ tem área
 A = ((B + b) · h)/2
 
 **Polígono regular.** O hexágono regular de lado L é formado por seis triângulos equiláteros de lado
-L, e essa decomposição resolve a área sem fórmula decorada.
+L, como mostra a figura, e essa decomposição resolve a área sem fórmula decorada.
+
+@fig poligonoregular lados=6 lado=L raio=L decomposto=sim
 
 **Circunferência e círculo.** Com raio r, o comprimento da circunferência e a área do círculo são
 
@@ -56,6 +58,8 @@ A = π · r^{2}
 
 Um setor de ângulo central α vale a fração α/360 do círculo inteiro, e a mesma fração vale para o
 arco.
+
+@fig circulo raio=r setor=α centro=O legenda=A região hachurada é o setor de ângulo central α.
 
 **Semelhança.** Quando duas figuras são semelhantes na razão k, os comprimentos ficam multiplicados
 por k, as áreas por k^{2} e os volumes por k^{3}. Esse é o resultado que mais aparece disfarçado
@@ -68,6 +72,10 @@ a = √(36 + 64) = 10 e A = (6 · 8)/2 = 24.
 A = π · 5^{2} = 25π e C = 2 · π · 5 = 10π.
 
 #### O essencial do espaço
+
+Os cinco sólidos desta revisão, com o raio r e a altura h que aparecem nas fórmulas:
+
+@fig painelsolidos nome=prisma;cilindro;pirâmide;cone;esfera raio=r altura=h
 
 **Prisma.** Com área da base A_{b}, perímetro da base P_{b} e altura h:
 
@@ -85,8 +93,12 @@ A_{lat} = 2 · π · r · h
 
 V = (A_{b} · h)/3
 
-A área lateral depende do apótema da face, que se acha por Pitágoras com a altura e o apótema da
-base.
+A área lateral depende do apótema da face, m, que se acha por Pitágoras com a altura h e o apótema
+da base, a, que vai do centro da base ao meio de um lado:
+
+m^{2} = h^{2} + a^{2}
+
+@fig solido tipo=piramide triangulo=sim altura=h apotema=m apotemabase=a
 
 **Cone.** Com raio r, altura h e geratriz g:
 
@@ -96,7 +108,9 @@ g^{2} = r^{2} + h^{2}
 
 A_{lat} = π · r · g
 
-A geratriz é a hipotenusa do triângulo formado pelo raio e pela altura.
+A geratriz é a hipotenusa do triângulo retângulo formado pelo raio e pela altura.
+
+@fig solido tipo=cone triangulo=sim raio=r altura=h geratriz=g
 
 **Esfera.** Com raio r:
 
@@ -138,10 +152,12 @@ centímetro no meio da conta é um erro caro.
 
 6. Um trapézio tem bases de 12 e 8 centímetros e altura 5 centímetros. Calcule sua área.
 7. Um cilindro reto tem raio 4 centímetros e altura 9 centímetros. Calcule o volume e a área lateral.
-8. Uma pirâmide reta de base quadrada tem aresta da base 6 centímetros e altura 4 centímetros.
-   Calcule o volume, o apótema da face, a área lateral e a área total.
-9. Um cone reto tem raio 6 centímetros e altura 8 centímetros. Calcule a geratriz, o volume e a área
-   total.
+8. A pirâmide reta da figura tem base quadrada de aresta 6 centímetros e altura 4 centímetros.
+   Calcule o volume, o apótema m da face, a área lateral e a área total.
+   @fig solido id=s8 tipo=piramide triangulo=sim aresta=6 altura=4 apotema=m apotemabase=a
+9. O cone reto da figura tem raio 6 centímetros e altura 8 centímetros. Calcule a geratriz g, o
+   volume e a área total.
+   @fig solido id=s9 tipo=cone triangulo=sim raio=6 altura=8 geratriz=g
 10. Uma esfera tem raio 6 centímetros. Calcule o volume e a área da superfície.
 11. Um triângulo tem lados 6, 8 e 10 centímetros. Outro triângulo, semelhante a ele, tem menor lado
     igual a 15 centímetros. Calcule os outros dois lados e a razão entre as áreas dos dois
@@ -152,16 +168,22 @@ centímetro no meio da conta é um erro caro.
 
 **Bloco C. Aprofundamento**
 
-14. Um quadrado tem lado 10 centímetros. Calcule a área do círculo inscrito, a área do círculo
-    circunscrito e a área da região interna ao quadrado e externa ao círculo inscrito.
-15. Um prisma reto tem base triangular equilátera de lado 6 centímetros e altura 10 centímetros.
-    Calcule o volume e a área lateral.
-16. Em um círculo de raio 12 centímetros, um setor tem ângulo central de 30 graus. Calcule o
-    comprimento do arco e a área do setor.
-17. Um semicírculo de raio 10 centímetros é enrolado até formar a superfície lateral de um cone.
-    Determine o raio da base, a altura e o volume desse cone.
-18. Uma esfera de raio 3 centímetros está inscrita em um cilindro, tocando as duas bases e a
-    superfície lateral. Calcule o volume da esfera, o volume do cilindro e a razão entre eles.
+14. O quadrado da figura tem lado 10 centímetros, um círculo inscrito de raio r e um círculo
+    circunscrito de raio R. Calcule a área de cada um dos dois círculos e a área da região
+    hachurada, interna ao quadrado e externa ao círculo inscrito.
+    @fig circulo id=q14 inscrito=10 circunscrito=10 raio=r raio=R legenda=A região hachurada é a região pedida.
+15. O prisma reto da figura tem base triangular equilátera de lado 6 centímetros e altura 10
+    centímetros. Calcule o volume e a área lateral.
+    @fig solido id=s15 tipo=prismatriangular aresta=6 altura=10
+16. No círculo da figura, de raio 12 centímetros, o setor hachurado tem ângulo central de 30 graus.
+    Calcule o comprimento do arco e a área do setor.
+    @fig circulo id=c16 raio=12 setor=30 centro=O legenda=A região hachurada é o setor.
+17. O semicírculo da figura, de raio 10 centímetros, é enrolado até formar a superfície lateral de
+    um cone. Determine o raio r da base, a altura h e o volume desse cone.
+    @fig solido id=s17 tipo=cone planificacao=sim setor=10 raio=r altura=h geratriz=g
+18. A esfera da figura, de raio 3 centímetros, está inscrita em um cilindro, tocando as duas bases e
+    a superfície lateral. Calcule o volume da esfera, o volume do cilindro e a razão entre eles.
+    @fig solido id=s18 tipo=cilindro esfera=inscrita raio=3 altura=h centro=O
 
 ### Gabarito
 
@@ -172,8 +194,9 @@ centímetro no meio da conta é um erro caro.
 5. Área de 25√3 centímetros quadrados.
 6. Área de 50 centímetros quadrados.
 7. Volume de 144π centímetros cúbicos e área lateral de 72π centímetros quadrados.
-8. Volume de 48 centímetros cúbicos. O apótema da base é 3, então o apótema da face é 5. A área
-   lateral é 60 e a área total é 96 centímetros quadrados.
+8. Volume de 48 centímetros cúbicos. O apótema da base a mede 3, metade da aresta, então o apótema
+   da face m mede 5. A área lateral é 60 e a área total é 96 centímetros quadrados.
+   @fig id=s8 fase=gabarito
 9. Geratriz de 10 centímetros, volume de 96π centímetros cúbicos e área total de 96π centímetros
    quadrados.
 10. Volume de 288π centímetros cúbicos e área da superfície de 144π centímetros quadrados.
@@ -185,10 +208,13 @@ centímetro no meio da conta é um erro caro.
     região pedida tem área 100 - 25π centímetros quadrados.
 15. Volume de 90√3 centímetros cúbicos e área lateral de 180 centímetros quadrados.
 16. Comprimento de arco de 2π centímetros e área de setor de 12π centímetros quadrados.
-17. O raio da base é 5 centímetros, porque o arco do semicírculo, que mede 10π, vira o comprimento
-    da circunferência da base. A altura é 5√3 e o volume é (125√3 · π)/3 centímetros cúbicos.
-18. A esfera tem volume 36π e o cilindro, de raio 3 e altura 6, tem volume 54π centímetros
+17. A geratriz é o raio do semicírculo, g = 10. O raio da base é r = 5 centímetros, porque o arco do
+    semicírculo, que mede 10π, vira o comprimento da circunferência da base. A altura é h = 5√3 e o
+    volume é (125√3 · π)/3 centímetros cúbicos.
+    @fig id=s17 fase=gabarito
+18. A esfera tem volume 36π e o cilindro, de raio 3 e altura h = 6, tem volume 54π centímetros
     cúbicos. A razão entre os volumes é 2/3.
+    @fig id=s18 fase=gabarito
 
 ## EN
 
@@ -225,8 +251,10 @@ B and b and height h has area
 
 A = ((B + b) · h)/2
 
-**Regular polygon.** A regular hexagon of side L is made of six equilateral triangles of side L, and
-that decomposition settles the area with no memorised formula.
+**Regular polygon.** A regular hexagon of side L is made of six equilateral triangles of side L, as
+the figure shows, and that decomposition settles the area with no memorised formula.
+
+@fig poligonoregular lados=6 lado=L raio=L decomposto=sim
 
 **Circle.** With radius r, the circumference and the area of the disc are
 
@@ -236,6 +264,8 @@ A = π · r^{2}
 
 A sector with central angle α is the fraction α/360 of the whole disc, and the same fraction gives
 the arc.
+
+@fig circulo raio=r setor=α centro=O legenda=The hatched region is the sector with central angle α.
 
 **Similarity.** When two figures are similar with ratio k, lengths get multiplied by k, areas by
 k^{2} and volumes by k^{3}. This is the result that most often turns up in disguise on a test.
@@ -247,6 +277,10 @@ a = √(36 + 64) = 10 and A = (6 · 8)/2 = 24.
 A = π · 5^{2} = 25π and C = 2 · π · 5 = 10π.
 
 #### The essentials of space
+
+The five solids of this review, with the radius r and the height h that appear in the formulas:
+
+@fig painelsolidos nome=prism;cylinder;pyramid;cone;sphere raio=r altura=h
 
 **Prism.** With base area A_{b}, base perimeter P_{b} and height h:
 
@@ -264,8 +298,12 @@ A_{lat} = 2 · π · r · h
 
 V = (A_{b} · h)/3
 
-The lateral area depends on the slant height of a face, found by Pythagoras from the height and the
-apothem of the base.
+The lateral area depends on the slant height of a face, m, found by Pythagoras from the height h and
+the apothem of the base, a, which goes from the centre of the base to the midpoint of a side:
+
+m^{2} = h^{2} + a^{2}
+
+@fig solido tipo=piramide triangulo=sim altura=h apotema=m apotemabase=a
 
 **Cone.** With radius r, height h and slant height g:
 
@@ -275,7 +313,9 @@ g^{2} = r^{2} + h^{2}
 
 A_{lat} = π · r · g
 
-The slant height is the hypotenuse of the triangle formed by the radius and the height.
+The slant height is the hypotenuse of the right triangle formed by the radius and the height.
+
+@fig solido tipo=cone triangulo=sim raio=r altura=h geratriz=g
 
 **Sphere.** With radius r:
 
@@ -320,10 +360,12 @@ metres to centimetres mid calculation is an expensive mistake.
    area.
 7. A right cylinder has radius 4 centimetres and height 9 centimetres. Work out the volume and the
    lateral area.
-8. A right pyramid with a square base has base edge 6 centimetres and height 4 centimetres. Work out
-   the volume, the slant height of a face, the lateral area and the total area.
-9. A right cone has radius 6 centimetres and height 8 centimetres. Work out the slant height, the
-   volume and the total area.
+8. The right pyramid in the figure has a square base of edge 6 centimetres and height 4 centimetres.
+   Work out the volume, the slant height m of a face, the lateral area and the total area.
+   @fig solido id=s8 tipo=piramide triangulo=sim aresta=6 altura=4 apotema=m apotemabase=a
+9. The right cone in the figure has radius 6 centimetres and height 8 centimetres. Work out the slant
+   height g, the volume and the total area.
+   @fig solido id=s9 tipo=cone triangulo=sim raio=6 altura=8 geratriz=g
 10. A sphere has radius 6 centimetres. Work out the volume and the surface area.
 11. A triangle has sides 6, 8 and 10 centimetres. Another triangle, similar to it, has shortest side
     equal to 15 centimetres. Work out the other two sides and the ratio between the areas of the two
@@ -334,18 +376,23 @@ metres to centimetres mid calculation is an expensive mistake.
 
 **Block C. Going further**
 
-14. A square has side 10 centimetres. Work out the area of the inscribed circle, the area of the
-    circumscribed circle and the area of the region inside the square and outside the inscribed
-    circle.
-15. A right prism has an equilateral triangular base of side 6 centimetres and height 10 centimetres.
-    Work out the volume and the lateral area.
-16. In a circle of radius 12 centimetres, a sector has central angle 30 degrees. Work out the arc
-    length and the area of the sector.
-17. A half disc of radius 10 centimetres is rolled up to form the lateral surface of a cone. Find the
-    base radius, the height and the volume of that cone.
-18. A sphere of radius 3 centimetres is inscribed in a cylinder, touching both bases and the lateral
-    surface. Work out the volume of the sphere, the volume of the cylinder and the ratio between
-    them.
+14. The square in the figure has side 10 centimetres, an inscribed circle of radius r and a
+    circumscribed circle of radius R. Work out the area of each of the two circles and the area of
+    the hatched region, inside the square and outside the inscribed circle.
+    @fig circulo id=q14 inscrito=10 circunscrito=10 raio=r raio=R legenda=The hatched region is the region asked for.
+15. The right prism in the figure has an equilateral triangular base of side 6 centimetres and height
+    10 centimetres. Work out the volume and the lateral area.
+    @fig solido id=s15 tipo=prismatriangular aresta=6 altura=10
+16. In the circle in the figure, of radius 12 centimetres, the hatched sector has central angle 30
+    degrees. Work out the arc length and the area of the sector.
+    @fig circulo id=c16 raio=12 setor=30 centro=O legenda=The hatched region is the sector.
+17. The half disc in the figure, of radius 10 centimetres, is rolled up to form the lateral surface of
+    a cone. Find the base radius r, the height h and the volume of that cone.
+    @fig solido id=s17 tipo=cone planificacao=sim setor=10 raio=r altura=h geratriz=g
+18. The sphere in the figure, of radius 3 centimetres, is inscribed in a cylinder, touching both bases
+    and the lateral surface. Work out the volume of the sphere, the volume of the cylinder and the
+    ratio between them.
+    @fig solido id=s18 tipo=cilindro esfera=inscrita raio=3 altura=h centro=O
 
 ### Answer key
 
@@ -356,8 +403,9 @@ metres to centimetres mid calculation is an expensive mistake.
 5. Area of 25√3 square centimetres.
 6. Area of 50 square centimetres.
 7. Volume of 144π cubic centimetres and lateral area of 72π square centimetres.
-8. Volume of 48 cubic centimetres. The apothem of the base is 3, so the slant height of a face is 5.
-   The lateral area is 60 and the total area is 96 square centimetres.
+8. Volume of 48 cubic centimetres. The apothem of the base a measures 3, half the edge, so the slant
+   height of a face m measures 5. The lateral area is 60 and the total area is 96 square centimetres.
+   @fig id=s8 fase=gabarito
 9. Slant height of 10 centimetres, volume of 96π cubic centimetres and total area of 96π square
    centimetres.
 10. Volume of 288π cubic centimetres and surface area of 144π square centimetres.
@@ -369,11 +417,13 @@ metres to centimetres mid calculation is an expensive mistake.
     area 50π. The region asked for has area 100 - 25π square centimetres.
 15. Volume of 90√3 cubic centimetres and lateral area of 180 square centimetres.
 16. Arc length of 2π centimetres and sector area of 12π square centimetres.
-17. The base radius is 5 centimetres, because the arc of the half disc, which measures 10π, becomes
-    the circumference of the base. The height is 5√3 and the volume is (125√3 · π)/3 cubic
-    centimetres.
-18. The sphere has volume 36π and the cylinder, of radius 3 and height 6, has volume 54π cubic
+17. The slant height is the radius of the half disc, g = 10. The base radius is r = 5 centimetres,
+    because the arc of the half disc, which measures 10π, becomes the circumference of the base. The
+    height is h = 5√3 and the volume is (125√3 · π)/3 cubic centimetres.
+    @fig id=s17 fase=gabarito
+18. The sphere has volume 36π and the cylinder, of radius 3 and height h = 6, has volume 54π cubic
     centimetres. The ratio between the volumes is 2/3.
+    @fig id=s18 fase=gabarito
 
 ## VERIFICACAO
 

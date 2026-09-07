@@ -2424,6 +2424,13 @@
 
     /* ------------------------------------------------------------- a escala */
     var quero = escolhaDeRotulos(op.rotulos);
+    /* Por eixo, quando quem chama precisa calar UM numero de UM eixo: a linha
+     * de centro tracejada de um ponto abaixo do eixo x sobe ate o eixo
+     * atravessando a faixa dos numeros, e o numero do tique onde ela chega
+     * sairia riscado. "Rotulo sobre o eixo apaga o numero do tique" e a
+     * convencao escrita; aqui e a receita que decide qual, pela geometria. */
+    var queroX = op.rotulosX !== undefined ? escolhaDeRotulos(op.rotulosX) : quero;
+    var queroY = op.rotulosY !== undefined ? escolhaDeRotulos(op.rotulosY) : quero;
     var faixaX = null, faixaY = null;
     var avisouDecimal = { feito: false };
     var afast = tq + 2;
@@ -2483,7 +2490,7 @@
       }
       var maisLargo = 0;
       for (var w = 0; w < tx.length; w++) {
-        if (tx[w] === 0 || !quero(tx[w])) continue;
+        if (tx[w] === 0 || !queroX(tx[w])) continue;
         var cw = caixaDoRotulo(textoDoValor(null, tx[w], op.formatar, null), { tam: tam });
         if (cw.largura > maisLargo) maisLargo = cw.largura;
       }
@@ -2499,7 +2506,7 @@
        * uma vez so, no cruzamento, e ele ja foge pela maquinaria do halo. */
       var numerosY = 0;
       for (var wy = 0; wy < ty.length; wy++) {
-        if (ty[wy] !== 0 && quero(ty[wy])) numerosY++;
+        if (ty[wy] !== 0 && queroY(ty[wy])) numerosY++;
       }
       var alturaCaixa = 2 * meiaAltura;
       if (numerosY >= 2 && alturaCaixa > passo * u + 1e-6) {
@@ -2533,13 +2540,13 @@
 
     var caixasX = [], caixasY = [], textosX = [], textosY = [];
     for (var i2 = 0; i2 < tx.length; i2++) {
-      if (tx[i2] === 0 || !quero(tx[i2])) continue;
+      if (tx[i2] === 0 || !queroX(tx[i2])) continue;
       var t1 = textoDoValor(doc, tx[i2], op.formatar, avisouDecimal);
       caixasX.push(escrever(t1, pt(px(tx[i2]), py(0)), pt(0, -1)));
       textosX.push(t1);
     }
     for (var j2 = 0; j2 < ty.length; j2++) {
-      if (ty[j2] === 0 || !quero(ty[j2])) continue;
+      if (ty[j2] === 0 || !queroY(ty[j2])) continue;
       var t2 = textoDoValor(doc, ty[j2], op.formatar, avisouDecimal);
       caixasY.push(escrever(t2, pt(px(0), py(ty[j2])), pt(-1, 0)));
       textosY.push(t2);
@@ -2641,6 +2648,9 @@
    * serve so para dizer onde e a origem. */
   function escolhaDeRotulos(quais) {
     if (quais === false || quais === 'nenhum') return function () { return false; };
+    /* Uma funcao e a forma de dizer "todos menos este": a lista so sabe dizer
+     * quais entram, e quem quer calar um tique nao conhece os outros. */
+    if (typeof quais === 'function') return quais;
     if (quais && quais.length !== undefined && typeof quais !== 'string') {
       var lista = [];
       for (var i = 0; i < quais.length; i++) lista.push(Number(quais[i]));

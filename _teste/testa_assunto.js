@@ -395,8 +395,18 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   conf('com a disciplina certa', doTopico.disciplina, TOPICOS.chave);
   conf('e com o grupo certo', doTopico.grupo, GRUPO.chave);
   conf('sem PDF', !!doTopico.anexoId, false);
-  conf('e sem id de tema de matemática, porque tópico não tem',
-    doTopico.id === undefined || doTopico.id === null || doTopico.id === '', true);
+  /* Trava trocada em 09/2026. Até a versão anterior o tópico ia para a aula
+   * sem id nenhum, e esta linha conferia exatamente isso. Agora cada bloco de
+   * banco/topicos traz a lista `ids`, paralela a `topicos` (POR07-T12), e o
+   * item grava o seu: é por ele que um tema de português vai apontar para o
+   * tópico. O esperado sai do próprio arquivo, e não escrito à mão. Continua
+   * não sendo id de tema de matemática: tem '-T', e Core.materiaDoTema devolve
+   * null para ele, que é a guarda que a trilha usa para não confundir os dois. */
+  const blocoDoTopico = GRUPO.blocos.filter(b => b.titulo === BLOCO)[0];
+  const idEsperado = (blocoDoTopico.ids || [])[blocoDoTopico.topicos.indexOf(TOPICO)];
+  conf('o bloco do catálogo tem id para este tópico', !!idEsperado, true);
+  conf('e o item gravou esse id, tirado da lista ids do bloco', doTopico.id, idEsperado);
+  conf('que não é id de tema de matemática: tem -T', /-T\d+$/.test(doTopico.id || ''), true);
 
   // ================================================================
   secao('4. Registrar assunto livre, digitado no campo Outro');

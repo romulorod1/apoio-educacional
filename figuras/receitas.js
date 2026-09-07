@@ -2746,15 +2746,69 @@
    *   giro=G             gira a figura inteira
    *
    * O primeiro valor numerico CONSTROI: raio=5 da r igual a 5, inscrito=10 da r
-   * igual a 5 tambem, e os dois juntos so passam se concordarem. */
+   * igual a 5 tambem, e os dois juntos so passam se concordarem.
+   *
+   * Geometria analitica (MATEM3-03), a circunferencia no plano. O centro da
+   * circunferencia principal continua na origem LOCAL, que e o sistema em que o
+   * resto desta receita ja trabalha; o que se desloca e o plano, cuja origem
+   * verdadeira fica em (-h, -k). Assim as cotas radiais, o setor e o quadrado
+   * nao precisam saber que existe um plano.
+   *   eixos=sim          o plano cartesiano atras, na escala da figura. A escala
+   *                      de cada eixo conta UMA marca (decisao do eixos() do
+   *                      desenho.js): o plano custa duas e sobram tres
+   *   centro=h;k[;C]     o centro em (h, k), com o nome opcional. Com numeros
+   *                      pede eixos=sim e ganha as linhas de centro tracejadas
+   *                      ate os eixos, que nao custam marca porque o valor se le
+   *                      na escala. Sem nome, o par sai escrito junto do ponto,
+   *                      "(1, 2)". Com letras (centro=a;b) o plano sai MUDO, sem
+   *                      numeros nem tiques, e o par e escrito junto do ponto,
+   *                      "(a, b)" ou "C(a, b)": a escala nao tem como mostrar
+   *                      uma letra
+   *   coordenadas=sim    as distancias do centro aos eixos cotadas com h e k (o
+   *                      padrao da conica transladada); custam uma marca cada
+   *   reta=A;B;C[;r]     a reta Ax + By + C = 0 atravessando a janela inteira,
+   *                      com o nome opcional; pede eixos=sim e recusa a reta que
+   *                      passa a mais de dois raios e meio do centro (nao cruza
+   *                      a janela). reta=s, so o nome, e a reta GENERICA, sem
+   *                      equacao, posta pela distancia=
+   *   distancia=V[;R]    a perpendicular do centro a reta, cotada, com o
+   *                      quadradinho no pe. Na reta analitica V numerico e
+   *                      CONFERIDO contra a conta e recusado se nao bater; na
+   *                      generica ele CONSTROI (distancia=7;d poe a reta a 7 e
+   *                      escreve d). Quando d = r o pe ganha a bolinha do ponto
+   *                      de contato. No gabarito a letra vira "d = valor" em
+   *                      teal, como o raio focal da conica
+   *   ponto=x;y[;P]      um ponto livre por coordenadas (dentro, sobre ou fora
+   *                      da circunferencia), com o nome; sem nome sai o par
+   *                      "(x, y)". ponto=P e o ponto generico SOBRE a
+   *                      circunferencia (na ponta do raio cotado, ou no pe da
+   *                      tangente quando ha uma), ponto=P;7 o generico a 7 do
+   *                      centro, e ponto=x;y em letras o par generico do texto
+   *                      da definicao
+   *   cota=d             a distancia do centro ao ponto, cotada sobre o
+   *                      segmento (um cota= por ponto=, na ordem); no gabarito
+   *                      a letra vira "d = valor" em teal
+   *   outra=h;k;r[;B]    a segunda circunferencia, de centro (h, k) e raio r,
+   *                      com o nome do centro: tangentes, secantes, exteriores
+   *   casos=7;5;3        o mesmo desenho repetido lado a lado, uma celula por
+   *                      valor, variando a distancia da reta (ou do ponto
+   *                      generico ponto=P). E o painel de tres casos do livro,
+   *                      d maior, igual e menor que r; cada celula e uma figura
+   *                      propria, com fundo e teto de marcas proprios */
 
   var circulo = {
     chaves: ['raio', 'diametro', 'corda', 'centro', 'arco', 'setor', 'coroa', 'inscrito',
-             'circunscrito', 'fatias', 'aneis', 'incognita', 'giro'],
-    metricas: ['raio', 'diametro', 'corda', 'coroa', 'inscrito', 'circunscrito'],
+             'circunscrito', 'fatias', 'aneis', 'incognita', 'giro',
+             'eixos', 'coordenadas', 'reta', 'distancia', 'ponto', 'cota', 'outra', 'casos'],
+    metricas: ['raio', 'diametro', 'corda', 'coroa', 'inscrito', 'circunscrito', 'distancia'],
 
     medir: function (d, op) {
       var B = base();
+      var casos = casosDoCirculo(B, d);
+      if (casos) {
+        var L = layoutDoTrio(B, d, op, casos);
+        return { altura: L.altura, legenda: d.legenda || null, foraDeEscala: L.fora };
+      }
       var G = geometriaDoCirculo(B, null, d);
       return {
         altura: op.altura != null ? op.altura
@@ -2766,6 +2820,8 @@
 
     desenhar: function (doc, d, op) {
       var B = base(), g = B.gerador(), COR = g.COR, D = desenho(), M = marcas();
+      var casos = casosDoCirculo(B, d);
+      if (casos) return desenharTrio(doc, d, op, casos);
       var G = geometriaDoCirculo(B, doc, d);
       if (!G) return null;
       if (!D) {
@@ -2775,6 +2831,7 @@
       var fora = G.fora;
       var corGab = corDaCamada(doc, d, COR);
       var corValor = corGab || undefined;
+      var PL = G.plano;
 
       return B.figura(doc, {
         x: op.x, largura: op.largura,
@@ -2787,6 +2844,42 @@
         var rp = G.r * k;
         function pp(rr, graus) { return polar(C, rr * k, graus); }
         var i;
+
+        /* ---------------------------------------------------- o plano atras
+         * O mesmo padrao da conica: um passo inteiro que caiba no canto do
+         * terceiro quadrante, onde o eixos() mede que os dois "menos um"
+         * precisam de 17,55 pt. Com letras nas coordenadas o plano sai mudo:
+         * sem numero, sem tique e sem o zero, so os dois eixos com x e y. */
+        if (PL.eixos) {
+          ctx.fundo(function () {
+            var passo = 1;
+            while (passo * k < 17.6 && passo < 50) passo += 1;
+            var opEixos = {
+              xMin: G.unidades.x0 + PL.h + 0.05, xMax: G.unidades.x1 + PL.h - 0.05,
+              yMin: G.unidades.y0 + PL.k + 0.05, yMax: G.unidades.y1 + PL.k - 0.05,
+              passo: passo
+            };
+            if (PL.mudo) { opEixos.rotulos = false; opEixos.tique = 0; opEixos.zero = false; }
+            /* Um numero e calado quando o tique dele esta a menos de meia
+             * unidade do ponto em que a linha (de centro ou a reta) cruza a
+             * faixa de numeros daquele eixo, ou quando uma circunferencia
+             * atravessa a caixa dele (PL.numeroRiscado, que precisa do k e por
+             * isso so e perguntado aqui). No plano mudo nao ha numero a calar,
+             * e passar rotulosX/Y ali religaria a escala que rotulos=false
+             * desligou. */
+            function longeDe(lista, eixo) {
+              return function (v) {
+                for (var q = 0; q < lista.length; q++) if (Math.abs(v - lista[q]) < 0.5) return false;
+                return !PL.numeroRiscado(eixo, v, k);
+              };
+            }
+            if (!PL.mudo) {
+              opEixos.rotulosX = longeDe(PL.calarX, 'x');
+              opEixos.rotulosY = longeDe(PL.calarY, 'y');
+            }
+            D.eixos(ctx, ctx.p(PL.origem), k, opEixos);
+          });
+        }
 
         /* ---------------------------------------------------- regioes */
         if (G.aneis) {
@@ -2840,6 +2933,17 @@
             D.poligono(ctx, [pp(G.r, G.diametroAngulo + 180), pp(G.r, G.diametroAngulo)],
               { fechado: false, espessura: 0.9, papel: 'objeto' });
           }
+          /* A segunda circunferencia e a reta. A reta e OBJETO em 0,9 pt, um
+           * degrau abaixo da circunferencia: a circunferencia e o que a figura
+           * E, a reta e o que se compara com ela. Ela atravessa a janela
+           * inteira, resolvida nos lados do quadro, e nunca para nos pontos
+           * comuns, senao vira segmento e a leitura fica "a solucao esta entre
+           * eles" (convencao escrita na especificacao para a curva). */
+          if (PL.outra) D.circunferencia(ctx, ctx.p(PL.outra.C), PL.outra.r * k, {});
+          if (PL.reta) {
+            D.poligono(ctx, [ctx.p(PL.reta.P0), ctx.p(PL.reta.P1)],
+              { fechado: false, espessura: 0.9, papel: 'objeto' });
+          }
         });
 
         /* ---------------------------------------------------- marcas */
@@ -2879,15 +2983,97 @@
             var T = ctx.p(G.tangencia.ponto);
             M.marcaAnguloReto(ctx.doc, T, C, ctx.p(G.tangencia.aoLongo), { ctx: ctx });
           }
+
+          /* ------------------------------------------ a parte analitica
+           * As linhas de centro tracejadas ate os eixos (guia de leitura, na
+           * tinta do contorno) e, com coordenadas=sim, as cotas, no mesmo
+           * padrao da conica transladada: a cota sai para o lado de LA da
+           * origem (fora=). */
+          if (PL.guias) {
+            guia(ctx, C, ctx.p(pt(0, -PL.k)), true);
+            guia(ctx, C, ctx.p(pt(-PL.h, 0)), true);
+          }
+          for (i = 0; i < PL.cotas.length; i++) {
+            var cc = PL.cotas[i];
+            D.cota(ctx, C, ctx.p(cc.ate), cc.letra ? cc.texto : numeroNaFolha(doc, arredondar(cc.valor)),
+              { fora: ctx.p(PL.origem), afastamento: 9, tam: TAM_DADO, corTexto: corValor });
+          }
+          /* A perpendicular do centro a reta, cotada, com o quadradinho no pe.
+           * O quadradinho e o que diz que o segmento e A DISTANCIA (a menor),
+           * e nao um segmento qualquer ate a reta. O segundo lado do
+           * quadradinho aponta para um ponto da reta a d do pe, e nao para um
+           * passo de uma unidade, senao no plano apertado o lado cai abaixo
+           * dos 3 pt e o marcaAnguloReto recusa. No gabarito a letra vira
+           * "d = valor" em teal, negrito e corpo de resposta, pela mesma regra
+           * de hierarquia do raio focal da conica. */
+          if (PL.reta && PL.distancia) {
+            var Fp = ctx.p(PL.reta.F);
+            D.poligono(ctx, [C, Fp], { fechado: false, espessura: 0.9, papel: 'objeto' });
+            var txtD = PL.distancia.rotulo, corD = corValor, tamD = TAM_DADO, boldD = false;
+            if (d.fase === 'gabarito' && PL.distancia.letra) {
+              txtD = PL.distancia.rotulo + ' = ' + numeroNaFolha(doc, arredondar(PL.reta.dCalc));
+              corD = COR.teal; tamD = TAM_RESPOSTA; boldD = true;
+            }
+            D.rotuloLado(ctx, txtD, C, Fp, { lado: PL.distancia.lado, em: PL.distancia.em, tam: tamD, afastamento: 4, cor: corD, bold: boldD });
+            if (M) {
+              var Qp = ctx.p(pt(PL.reta.F.x + PL.reta.dir.x * PL.reta.dCalc, PL.reta.F.y + PL.reta.dir.y * PL.reta.dCalc));
+              M.marcaAnguloReto(ctx.doc, Fp, C, Qp, { ctx: ctx });
+            }
+            if (PL.reta.tangente && !PL.reta.pontoNoPe) D.ponto(ctx, Fp, {});
+          }
+          /* Os segmentos do centro aos pontos: cotado quando ha cota=, guia
+           * tracejada quando o ponto generico so quer mostrar a que distancia
+           * esta (a figura da posicao de um ponto). */
+          for (i = 0; i < PL.pontos.length; i++) {
+            var pn = PL.pontos[i], Pp = ctx.p(pn.P);
+            if (pn.segmento === 'cota') {
+              D.poligono(ctx, [C, Pp], { fechado: false, espessura: 0.9, papel: 'objeto' });
+              var txtP = pn.cota.rotulo, corP = corValor, tamP = TAM_DADO, boldP = false;
+              if (d.fase === 'gabarito' && pn.cota.letra) {
+                txtP = pn.cota.rotulo + ' = ' + numeroNaFolha(doc, arredondar(pn.dist));
+                corP = COR.teal; tamP = TAM_RESPOSTA; boldP = true;
+              }
+              D.rotuloLado(ctx, txtP, C, Pp, { lado: pn.lado, em: pn.em, tam: tamP, afastamento: 4, cor: corP, bold: boldP });
+            } else if (pn.segmento === 'guia') {
+              guia(ctx, C, Pp, true);
+            }
+          }
         });
 
         /* ---------------------------------------------------- rotulos */
         ctx.rotulos(function () {
-          if (G.centro) {
-            nomearPonto(ctx, C, G.centro, [
+          /* Com plano, reta ou ponto livre o nome do centro sai SEPARADO da
+           * bolinha (ver o nomearPonto): os dois eixos passam pelo centro na
+           * origem, a perpendicular e os segmentos ate os pontos terminam nele,
+           * e a trava do cruzamento nomeado cobraria um arco de angulo que a
+           * figura nao tem. */
+          var textoCentro = G.centro;
+          if (PL.centroPar) textoCentro = (G.centro || '') + parDeCoordenadas(doc, PL.centroPar[0], PL.centroPar[1]);
+          if (textoCentro) {
+            nomearPonto(ctx, C, textoCentro, PL.dirCentro || [
               { x: -0.7071, y: -0.7071 }, { x: 0.7071, y: -0.7071 },
               { x: -0.7071, y: 0.7071 }, { x: 0.7071, y: 0.7071 }
-            ], {});
+            ], { separado: PL.ativo });
+          } else if (PL.ativo) {
+            /* Sem nome a bolinha continua: e dela que a perpendicular e o
+             * segmento ate o ponto partem, e no plano e o que diz onde o
+             * centro esta. A bolinha nao conta marca. */
+            D.ponto(ctx, C, {});
+          }
+          for (i = 0; i < PL.pontos.length; i++) {
+            var pl = PL.pontos[i];
+            var texto = pl.texto || '';
+            if (pl.par) texto = texto + parDeCoordenadas(doc, pl.par[0], pl.par[1]);
+            nomearPonto(ctx, ctx.p(pl.P), texto || null, pl.dirs, { separado: true });
+          }
+          if (PL.outra) {
+            nomearPonto(ctx, ctx.p(PL.outra.C), PL.outra.nome, PL.outra.dirs, { separado: true });
+          }
+          if (PL.reta && PL.reta.nome) {
+            /* O nome da reta perto de uma ponta, do lado contrario ao centro
+             * da circunferencia, como a diretriz da parabola. */
+            D.rotuloLado(ctx, PL.reta.nome, ctx.p(PL.reta.P0), ctx.p(PL.reta.P1),
+              { em: PL.reta.emNome, centro: C, tam: TAM_DADO, afastamento: 4 });
           }
           if (G.corda) {
             D.rotuloLado(ctx, G.corda.rotulo, pp(G.r, G.corda.de), pp(G.r, G.corda.ate),
@@ -2918,9 +3104,33 @@
     var arco = lerMedida(B, d.args, 'arco');
     var fatiasBruto = B.primeiro(d.args, 'fatias');
     var aneisBrutos = B.lista(d.args, 'aneis');
-    var centro = B.primeiro(d.args, 'centro');
     var incognita = B.primeiro(d.args, 'incognita');
     var giro = B.numero(d.args, 'giro') || 0;
+
+    /* centro=O e o nome; centro=h;k[;O] traz as coordenadas antes do nome. A
+     * leitura das coordenadas fica com o analiticaDoCirculo, mais abaixo. */
+    var centroLista = B.lista(d.args, 'centro');
+    var centro = null, centroXY = null;
+    if (centroLista.length >= 2) {
+      centroXY = [centroLista[0], centroLista[1]];
+      centro = centroLista.length > 2 ? centroLista[2] : null;
+    } else if (centroLista.length === 1) {
+      centro = centroLista[0];
+    }
+
+    /* casos= so chega aqui malformado: bem formado, o medir e o desenhar
+     * viram trio antes de medir a geometria, e cada celula vem sem a chave. */
+    var casosBrutos = B.lista(d.args, 'casos');
+    if (casosBrutos.length) {
+      for (var cb = 0; cb < casosBrutos.length; cb++) {
+        if (!B.ehNumero(casosBrutos[cb])) return recusarCirculo('casos=' + casosBrutos.join(';') + ' pede so numeros, um por celula');
+      }
+      if (casosBrutos.length < 2) return recusarCirculo('casos=' + casosBrutos.join(';') + ' pede dois ou mais valores, um por celula');
+      var pontoGen = pares(B, d.args, 'ponto');
+      if (!B.lista(d.args, 'reta').length && !(pontoGen.length && pontoGen[0].length === 1 && !B.ehNumero(pontoGen[0][0]))) {
+        return recusarCirculo('casos= varia a distancia da reta (reta=) ou de um ponto generico (ponto=P), e a diretiva nao tem nenhum dos dois');
+      }
+    }
 
     /* ---------------------------------------------- o raio, uma vez so */
     var r = null, origem = null;
@@ -3027,24 +3237,39 @@
 
     /* ---------------------------------------------- as cotas radiais */
     var cotas = [], raioNoSetor = false, cotaForaDoDiametro = false, diametroAngulo = null;
-    if (raio) {
+    /* O angulo em que o raio cotado sai: e para la que vai o ponto generico
+     * sobre a circunferencia (ponto=P), para o raio da figura SER o segmento
+     * CP, como na figura da definicao. */
+    var anguloRaio = null;
+    /* No plano cartesiano o raio numerico CONSTROI e fica calado, como o a e o b
+     * da conica: raio=5 desenha a circunferencia de raio 5 sem cotar nada, e o
+     * raio so e escrito quando e letra (raio=r) ou quando o texto vem depois do
+     * ponto e virgula (raio=5;r, raio=5;5). A equacao do enunciado ja diz o
+     * raio, e a cota gastaria uma das tres marcas que sobram depois do plano. */
+    var raioCalado = raio && ehSim(B.primeiro(d.args, 'eixos')) && !raio.letra && !raio.explicito;
+    if (raio && !raioCalado) {
       var rr = insc ? rIn : (circ ? rOut : r);
       if (temAngulo) {
         /* Sobre o primeiro raio do setor, com o texto por FORA da cunha. */
         cotas.push({ raio: rr, rotulo: raio.rotulo, tipo: 'raio', angulo: a0, lado: -1 });
         raioNoSetor = true;
+        anguloRaio = a0;
       } else if (insc) {
         cotas.push({ raio: rr, rotulo: raio.rotulo, tipo: 'raio', angulo: 90 + giro, lado: 1 });
+        anguloRaio = 90 + giro;
       } else if (circ) {
         cotas.push({ raio: rr, rotulo: raio.rotulo, tipo: 'raio', angulo: 45 + giro, lado: 1 });
+        anguloRaio = 45 + giro;
       } else if (coroa) {
         /* O R da coroa pousa DENTRO da coroa, no meio do anel que ele mede:
          * no meio do raio ele caia dentro do disco branco de r, e um 10
          * escrito dentro do circulo de 6 le como medida do circulo errado. */
         cotas.push({ raio: rr, rotulo: raio.rotulo, tipo: 'raio', angulo: 118 + giro, lado: 1,
           em: (coroaR + rr) / (2 * rr) });
+        anguloRaio = 118 + giro;
       } else {
         cotas.push({ raio: rr, rotulo: raio.rotulo, tipo: 'raio', angulo: 55 + giro, lado: 1 });
+        anguloRaio = 55 + giro;
       }
     }
     if (insc && circ && raios.length >= 2) {
@@ -3171,6 +3396,16 @@
     var margem = cotaForaDoDiametro ? 0.40 * R : (quadrado ? 0.30 * R : 0.14 * R);
     var unidades = { x0: -R - margem, y0: -R - margem, x1: R + margem, y1: R + margem };
 
+    /* ---------------------------------------------- o plano, a reta, os pontos
+     * Estende a caixa de unidades para caber a origem, a segunda
+     * circunferencia, os pontos e o pe da perpendicular. */
+    var plano = analiticaDoCirculo(B, doc, d, {
+      r: r, R: R, unidades: unidades, centro: centro ? String(centro) : null,
+      centroXY: centroXY, anguloRaio: anguloRaio
+    });
+    if (!plano) return null;
+    numerico = numerico || plano.numerico;
+
     return {
       r: r, rIn: rIn, rOut: rOut, L: L, giro: giro,
       ang: ang, anguloLetra: angLetra, anguloTexto: anguloTexto, temAngulo: temAngulo,
@@ -3179,9 +3414,565 @@
       cotas: cotas, raioNoSetor: raioNoSetor, diametroAngulo: diametroAngulo,
       quadrado: quadrado, tangencia: tangencia,
       ladoRotulo: ladoRotulo, circunferencias: circunferencias,
-      unidades: unidades, alturaMax: quadrado ? 176 : 156,
+      plano: plano,
+      unidades: unidades, alturaMax: plano.eixos ? 190 : (quadrado ? 176 : 156),
       fora: escalaDe(d, numerico, chute)
     };
+  }
+
+  /* ============================================================ circulo no plano
+   *
+   * A parte analitica do circulo: o plano, o centro em (h, k), a reta e a
+   * perpendicular ate ela, os pontos livres e a segunda circunferencia. Tudo em
+   * unidades do problema, com o centro da circunferencia principal na origem
+   * LOCAL, que e o sistema em que o resto do geometriaDoCirculo trabalha: a
+   * origem verdadeira do plano fica em (-h, -k), um ponto (x, y) do enunciado
+   * fica em (x - h, y - k) e a reta Ax + By + C = 0 vira Au + Bv + (C + Ah + Bk)
+   * = 0. Devolve null quando a diretiva se contradiz (o aviso ja saiu) e um
+   * objeto com ativo false quando nao ha nada analitico na diretiva.
+   *
+   * Teto de marcas, planejado figura a figura no tema: o plano custa duas, o
+   * nome de cada ponto uma, a letra da distancia uma e o quadradinho uma. As
+   * linhas de centro tracejadas e as bolinhas nao custam nada, e e por isso
+   * que o centro numerico NAO cota as coordenadas por padrao: com a escala
+   * numerada atras, a linha tracejada ate o tique ja diz onde o centro esta, e
+   * as duas cotas (coordenadas=sim) so entram quando a figura tem folga para
+   * elas. */
+  var ANGULO_PE_GENERICO = 330;
+  var ANGULOS_PONTO_GENERICO = [320, 150, 230, 40];
+  var DIAGONAIS = [
+    { x: -0.7071, y: -0.7071 }, { x: 0.7071, y: -0.7071 },
+    { x: -0.7071, y: 0.7071 }, { x: 0.7071, y: 0.7071 }
+  ];
+
+  function girarVersor(u, graus) {
+    var t = graus * Math.PI / 180, c = Math.cos(t), s = Math.sin(t);
+    return pt(u.x * c - u.y * s, u.x * s + u.y * c);
+  }
+
+  /* O par "(x, y)" escrito junto do ponto. O separador decimal segue a lingua
+   * da folha (numeroNaFolha), e quando ele vira virgula o par troca a virgula
+   * pelo ponto e virgula, senao "(1,5, 2)" nao se le. */
+  function parDeCoordenadas(doc, x, y) {
+    var sx = numeroNaFolha(doc, String(x)), sy = numeroNaFolha(doc, String(y));
+    var sep = (/\d,\d/.test(sx) || /\d,\d/.test(sy)) ? '; ' : ', ';
+    return '(' + sx + sep + sy + ')';
+  }
+
+  /* Onde a reta que passa por F com versor u corta a caixa: os dois pontos, ou
+   * null quando ela passa por fora (Liang e Barsky). */
+  function retaNaJanela(F, u, cx) {
+    var t0 = -Infinity, t1 = Infinity;
+    var p = [-u.x, u.x, -u.y, u.y];
+    var q = [F.x - cx.x0, cx.x1 - F.x, F.y - cx.y0, cx.y1 - F.y];
+    for (var i = 0; i < 4; i++) {
+      if (Math.abs(p[i]) < 1e-12) { if (q[i] < 0) return null; continue; }
+      var t = q[i] / p[i];
+      if (p[i] < 0) { if (t > t0) t0 = t; } else if (t < t1) t1 = t;
+    }
+    if (t0 > t1) return null;
+    return [pt(F.x + u.x * t0, F.y + u.y * t0), pt(F.x + u.x * t1, F.y + u.y * t1)];
+  }
+
+  function analiticaDoCirculo(B, doc, d, G0) {
+    function recusar(t) { if (doc) B.avisar(doc, 'circulo: ' + t); return null; }
+    var r = G0.r, R = G0.R, unidades = G0.unidades;
+    var eixos = ehSim(B.primeiro(d.args, 'eixos'));
+    var coordenadas = ehSim(B.primeiro(d.args, 'coordenadas'));
+    var A = {
+      ativo: eixos, eixos: eixos, mudo: false, h: 0, k: 0, origem: pt(0, 0),
+      centroPar: null, guias: false, cotas: [], dirCentro: null,
+      reta: null, distancia: null, pontos: [], outra: null, numerico: false
+    };
+
+    /* ---------------------------------------------- o centro em (h, k) */
+    var cXY = G0.centroXY;
+    if (cXY) {
+      A.ativo = true;
+      if (!eixos) return recusar('centro=' + cXY.join(';') + ' pede eixos=sim: sem o plano nao ha onde ler a coordenada');
+      var nx = B.ehNumero(cXY[0]), ny = B.ehNumero(cXY[1]);
+      if (nx && ny) {
+        A.h = parseFloat(cXY[0]); A.k = parseFloat(cXY[1]);
+        A.numerico = true;
+        /* Linha de centro so quando o centro esta fora dos DOIS eixos: sobre
+         * um eixo, a linha ate o outro deitaria em cima do proprio eixo. */
+        A.guias = !!G0.centro && Math.abs(A.h) > 1e-9 && Math.abs(A.k) > 1e-9;
+        if (!G0.centro) A.centroPar = [cXY[0], cXY[1]];
+        if (coordenadas) {
+          if (Math.abs(A.k) > 1e-9) A.cotas.push({ ate: pt(0, -A.k), valor: Math.abs(A.k), letra: false });
+          if (Math.abs(A.h) > 1e-9) A.cotas.push({ ate: pt(-A.h, 0), valor: Math.abs(A.h), letra: false });
+        }
+      } else if (!nx && !ny) {
+        /* Letras: posicao generica no primeiro quadrante e plano mudo. Com
+         * coordenadas=sim as letras saem cotadas ate os eixos, com as linhas
+         * de centro; sem, o par vai escrito junto do ponto. */
+        A.mudo = true;
+        A.h = 1.3 * r; A.k = 1.25 * r;
+        if (coordenadas) {
+          A.guias = true;
+          A.cotas.push({ ate: pt(0, -A.k), texto: cXY[1], letra: true });
+          A.cotas.push({ ate: pt(-A.h, 0), texto: cXY[0], letra: true });
+        } else {
+          A.centroPar = [cXY[0], cXY[1]];
+        }
+      } else {
+        return recusar('centro=' + cXY.join(';') + ' mistura numero e letra: ou h;k numericos ou a;b em letras');
+      }
+    } else if (coordenadas) {
+      return recusar('coordenadas=sim pede centro=h;k com as coordenadas');
+    }
+    A.origem = pt(-A.h, -A.k);
+    /* Linha de centro que sobe ate o eixo x a partir de um centro ABAIXO dele
+     * atravessa a faixa dos numeros da escala e chega justamente no tique de
+     * abscissa h: esse numero e calado (rotulosX do eixos), e o mesmo vale para
+     * o tique k do eixo y quando o centro esta a esquerda dele. Medido em
+     * centro=2;-1;C: o "2" do eixo x saia riscado pela linha tracejada. */
+    A.calarX = []; A.calarY = [];
+    if ((A.guias || A.cotas.length) && !A.mudo) {
+      if (A.k < -1e-9 && Math.abs(A.h) > 1e-9) A.calarX.push(A.h);
+      if (A.h < -1e-9 && Math.abs(A.k) > 1e-9) A.calarY.push(A.k);
+    }
+    if (A.cotas.length) {
+      /* O nome do centro foge das duas linhas de cota, que saem para o lado de
+       * LA da origem: a diagonal que aponta de volta para a origem e a unica
+       * que nao encosta em nenhuma das duas (medido na conica transladada). */
+      var sx = A.h > 1e-9 ? -0.7071 : 0.7071;
+      var sy = A.k > 1e-9 ? -0.7071 : (A.k < -1e-9 ? 0.7071 : -0.7071);
+      A.dirCentro = [pt(sx, sy)].concat(DIAGONAIS);
+    } else if (eixos && !A.mudo && Math.abs(A.h) < 1e-9 && Math.abs(A.k) < 1e-9) {
+      /* Centro NA ORIGEM de um plano graduado: o zero da escala mora na
+       * diagonal de baixo a esquerda, que e a primeira das DIAGONAIS, e o
+       * rotulo so desvia de traco, nunca de outro rotulo. Medido no g19
+       * (centro=O outra=8;0;5;C): o "O" saia impresso em cima do "0", com as
+       * caixas cruzadas em 4,17 por 6,47 pt. As duas diagonais de cima vem
+       * primeiro (o primeiro quadrante nao tem numero nenhum), e a de baixo a
+       * esquerda por ultimo. */
+      A.dirCentro = [pt(0.7071, 0.7071), pt(-0.7071, 0.7071), pt(0.7071, -0.7071), pt(-0.7071, -0.7071)];
+    }
+
+    /* ---------------------------------------------- a segunda circunferencia */
+    var ol = B.lista(d.args, 'outra');
+    if (ol.length) {
+      A.ativo = true;
+      if (ol.length < 3 || !B.ehNumero(ol[0]) || !B.ehNumero(ol[1]) || !B.ehNumero(ol[2])) {
+        return recusar('outra=' + ol.join(';') + ' pede h;k;r numericos e, opcionalmente, o nome do centro');
+      }
+      var r2 = parseFloat(ol[2]);
+      if (!(r2 > 0)) return recusar('outra=' + ol.join(';') + ' com raio nao positivo');
+      var C2 = pt(parseFloat(ol[0]) - A.h, parseFloat(ol[1]) - A.k);
+      var u2 = versor(C2.x, C2.y);
+      A.outra = {
+        C: C2, r: r2, nome: ol.length > 3 ? ol[3] : null,
+        /* O nome do segundo centro foge do primeiro e, sobre o eixo x, sobe,
+         * porque os numeros da escala moram embaixo. */
+        dirs: (eixos && Math.abs(parseFloat(ol[1])) < 1e-9)
+          ? [pt(u2.x >= 0 ? 0.7071 : -0.7071, 0.7071), pt(0, 1)].concat(DIAGONAIS)
+          : [girarVersor(u2, 45), girarVersor(u2, -45)].concat(DIAGONAIS)
+      };
+      A.numerico = true;
+    }
+
+    /* ---------------------------------------------- a reta e a distancia */
+    var rl = B.lista(d.args, 'reta');
+    var distM = lerMedida(B, d.args, 'distancia');
+    if (rl.length) {
+      A.ativo = true;
+      var analitica = rl.length >= 3 && B.ehNumero(rl[0]) && B.ehNumero(rl[1]) && B.ehNumero(rl[2]);
+      if (!analitica && !(rl.length === 1 && !B.ehNumero(rl[0]))) {
+        return recusar('reta=' + rl.join(';') + ' pede A;B;C (os coeficientes de Ax + By + C = 0) ou so o nome da reta generica');
+      }
+      var reta = { nome: null, generica: !analitica, dCalc: 0, F: null, dir: null,
+                   tangente: false, pontoNoPe: false, P0: null, P1: null, emNome: 0.9 };
+      if (analitica) {
+        if (!eixos) return recusar('reta=' + rl.join(';') + ' pede eixos=sim: sem o plano a equacao nao tem onde ficar');
+        var ca = parseFloat(rl[0]), cb = parseFloat(rl[1]), cc = parseFloat(rl[2]);
+        if (Math.abs(ca) < 1e-12 && Math.abs(cb) < 1e-12) return recusar('reta=' + rl.join(';') + ' nao e reta: A e B nao podem ser os dois zero');
+        reta.nome = rl.length > 3 ? rl[3] : null;
+        var c1 = cc + ca * A.h + cb * A.k, n2 = ca * ca + cb * cb;
+        reta.dCalc = Math.abs(c1) / Math.sqrt(n2);
+        reta.F = pt(-c1 * ca / n2, -c1 * cb / n2);
+        reta.dir = versor(-cb, ca);
+        A.numerico = true;
+        /* A reta atravessa a faixa de numeros ao cruzar cada eixo, e o numero
+         * do tique que ela cruza sai riscado: fica calado, como o da linha de
+         * centro. Medido no 16 (3x - 4y + 8 = 0 corta o eixo y em (0, 2)): a
+         * reta passava por cima do "2" da escala. */
+        if (Math.abs(ca) > 1e-12) A.calarX.push(-cc / ca);
+        if (Math.abs(cb) > 1e-12) A.calarY.push(-cc / cb);
+        if (reta.dCalc > 2.5 * r) {
+          return recusar('reta=' + rl.slice(0, 3).join(';') + ' nao cruza a janela da figura: passa a ' +
+            arredondar(reta.dCalc) + ' do centro e a janela vai ate dois raios e meio (' + arredondar(2.5 * r) + ')');
+        }
+      } else {
+        reta.nome = rl[0];
+        if (!distM || distM.valor === null) {
+          return recusar('reta=' + rl[0] + ' e generica e precisa de distancia= com valor (distancia=7;d) para saber onde ficar');
+        }
+        reta.dCalc = distM.valor;
+        reta.F = polar(pt(0, 0), reta.dCalc, ANGULO_PE_GENERICO);
+        var uF = versor(reta.F.x, reta.F.y);
+        reta.dir = pt(-uF.y, uF.x);
+      }
+      reta.tangente = Math.abs(reta.dCalc - r) < 1e-6 * Math.max(1, r);
+      A.reta = reta;
+    }
+    if (distM) {
+      if (!A.reta) return recusar('distancia=' + distM.bruto + ' sem reta= nao tem o que medir: a distancia e do centro a reta');
+      if (A.reta.dCalc < 1e-9) return recusar('a reta passa pelo centro: nao ha distancia a cotar');
+      if (!A.reta.generica && distM.valor !== null &&
+          Math.abs(distM.valor - A.reta.dCalc) > 0.005 * Math.max(distM.valor, A.reta.dCalc)) {
+        return recusar('distancia=' + distM.bruto + ' nao bate com a conta: do centro a reta ' +
+          rl.slice(0, 3).join(';') + ' a distancia e ' + arredondar(A.reta.dCalc));
+      }
+      if (distM.valor !== null) A.numerico = true;
+      A.distancia = { rotulo: distM.rotulo, letra: distM.letra, lado: 1 };
+    }
+
+    /* ---------------------------------------------- a circunferencia risca numero
+     * A propria circunferencia (1,2 pt) e a outra= tambem atravessam a faixa de
+     * numeros dos eixos, e o numero cujo tique fica onde elas passam sai
+     * riscado, como o da linha de centro e o da reta acima. Medido nos PDFs do
+     * MATEM3-03 antes deste conserto, pelo ver_tiques.py do verificador: 11
+     * numeros por lingua (o 3 e o -1 do eixo y no Exemplo 4; o -2 e o 6 do eixo
+     * x e o 2 e o -4 do eixo y no g11; o 2 e o 4 do eixo x no g17; o -12 e o 12
+     * nos dois eixos do g18).
+     *
+     * A conta nao e o cruzamento com o EIXO, e sim com a CAIXA do numero: o
+     * numero mora numa faixa que comeca a tique + 2 pt do eixo (o afastamento
+     * do eixos()) e tem a altura da caixa do rotulo, embaixo do eixo x e a
+     * esquerda do eixo y. Uma circunferencia que cruza o eixo x em cima de um
+     * tique, como x2 + y2 = 25 em (5, 0), risca o numero pelo trecho quase
+     * vertical que percorre de 4,5 a 13 pt abaixo do eixo. Como a faixa e medida em
+     * pontos e a circunferencia em unidades, a decisao so pode ser tomada na
+     * hora de desenhar, quando a escala k e conhecida: por isso isto e uma
+     * funcao, chamada pelo desenhar para cada tique. O numero v e calado quando
+     * alguma circunferencia atravessa o retangulo dele (a largura do texto
+     * centrada no tique, dentro da faixa), alargado em 1 pt para o roce nao
+     * passar por passagem limpa. Uma circunferencia atravessa um retangulo
+     * quando o ponto do retangulo mais perto do centro esta a menos de r e o
+     * mais longe esta a mais de r. */
+    A.curvas = [{ C: pt(0, 0), r: r }];
+    if (A.outra) A.curvas.push({ C: A.outra.C, r: A.outra.r });
+    A.numeroRiscado = function (eixo, v, k) {
+      var D = desenho();
+      if (!D) return false;
+      var TIQUE = 2.5, AFAST = TIQUE + 2, FOLGA = 1;   // pt: tique e afastamento padrao do eixos()
+      var cx = D.caixaDoRotulo(String(v), { tam: D.PISO_CORPO });
+      var q;   // a caixa do numero em pt, a partir da origem do plano, y para cima
+      if (eixo === 'x') {
+        q = { x0: v * k - cx.largura / 2 - FOLGA, x1: v * k + cx.largura / 2 + FOLGA,
+              y0: -AFAST - cx.altura - FOLGA, y1: -AFAST + FOLGA };
+      } else {
+        q = { x0: -AFAST - cx.largura - FOLGA, x1: -AFAST + FOLGA,
+              y0: v * k - cx.altura / 2 - FOLGA, y1: v * k + cx.altura / 2 + FOLGA };
+      }
+      for (var ci = 0; ci < A.curvas.length; ci++) {
+        var cv = A.curvas[ci];
+        /* O centro em pt a partir da origem do plano: no sistema local o centro
+         * principal esta na origem e a origem do plano em A.origem. */
+        var ox = (cv.C.x - A.origem.x) * k, oy = (cv.C.y - A.origem.y) * k, R2 = cv.r * k;
+        var dx = Math.max(q.x0 - ox, 0, ox - q.x1), dy = Math.max(q.y0 - oy, 0, oy - q.y1);
+        var dMin = Math.sqrt(dx * dx + dy * dy);
+        var fx = Math.max(Math.abs(q.x0 - ox), Math.abs(q.x1 - ox));
+        var fy = Math.max(Math.abs(q.y0 - oy), Math.abs(q.y1 - oy));
+        var dMax = Math.sqrt(fx * fx + fy * fy);
+        if (dMin <= R2 && dMax >= R2) return true;
+      }
+      return false;
+    };
+
+    /* ---------------------------------------------- os pontos */
+    var pv = pares(B, d.args, 'ponto');
+    var cotasP = B.valores(d.args, 'cota');
+    if (cotasP.length > pv.length) return recusar('cota= a mais: ' + cotasP.length + ' cota(s) para ' + pv.length + ' ponto(s)');
+    var angulos = A.reta && A.reta.generica ? [150, 230, 40, 320] : ANGULOS_PONTO_GENERICO;
+    var nGen = 0;
+    for (var pi = 0; pi < pv.length; pi++) {
+      var it = pv[pi];
+      var P = { P: null, texto: null, par: null, dist: null, generico: false, naCircunferencia: false,
+                segmento: null, cota: null, dirs: null, noPe: false, eixoX: false, eixoY: false, lado: 1 };
+      var n0 = B.ehNumero(it[0]), n1 = it.length > 1 && B.ehNumero(it[1]);
+      if (it.length >= 2 && n0 && n1) {
+        if (!eixos) return recusar('ponto=' + it.join(';') + ' pede eixos=sim: sem o plano nao ha onde ler a coordenada');
+        var x = parseFloat(it[0]), y = parseFloat(it[1]);
+        P.P = pt(x - A.h, y - A.k);
+        P.texto = it.length > 2 ? it[2] : null;
+        if (!P.texto) P.par = [it[0], it[1]];
+        P.eixoX = Math.abs(y) < 1e-9; P.eixoY = Math.abs(x) < 1e-9;
+        A.numerico = true;
+      } else if (it.length >= 2 && !n0 && n1) {
+        P.generico = true; P.dist = parseFloat(it[1]); P.texto = it[0];
+        if (!(P.dist >= 0)) return recusar('ponto=' + it.join(';') + ' com distancia negativa');
+        P.angulo = angulos[nGen % angulos.length]; nGen++;
+        P.P = polar(pt(0, 0), P.dist, P.angulo);
+        A.numerico = true;
+      } else if (it.length === 1 && !n0) {
+        P.generico = true; P.naCircunferencia = true; P.dist = r; P.texto = it[0];
+      } else if (it.length >= 2 && !n0 && !n1) {
+        if (!eixos) return recusar('ponto=' + it.join(';') + ' em letras pede eixos=sim: o par e lido contra o plano');
+        P.generico = true; P.naCircunferencia = true; P.dist = r; A.mudo = true;
+        P.texto = it.length > 2 ? it[2] : null;
+        P.par = [it[0], it[1]];
+      } else {
+        return recusar('ponto=' + it.join(';') + ' nao e x;y[;nome], nome[;distancia] nem x;y em letras');
+      }
+      if (pi < cotasP.length) {
+        var cm = medidaDe(B, cotasP[pi]);
+        P.cota = { rotulo: cm.rotulo, letra: cm.letra, valor: cm.valor };
+        P.segmento = 'cota';
+      } else if (P.generico && !P.naCircunferencia) {
+        P.segmento = 'guia';
+      }
+      if (P.naCircunferencia) {
+        /* Sobre a circunferencia o ponto generico vai para o pe da tangente,
+         * quando ha uma (e o ponto de contato), ou para a ponta do raio
+         * cotado, para o raio da figura SER o segmento CP. Com cota= propria
+         * ele sai do raio, senao r e d cotariam o mesmo segmento. */
+        var ang = G0.anguloRaio !== null ? G0.anguloRaio : 40;
+        if (A.reta && A.reta.tangente) ang = Math.atan2(A.reta.F.y, A.reta.F.x) * 180 / Math.PI;
+        else if (P.cota && G0.anguloRaio !== null) { ang = angulos[nGen % angulos.length]; nGen++; }
+        P.angulo = ang;
+        P.P = polar(pt(0, 0), r, ang);
+      }
+      if (P.cota && P.cota.valor !== null) {
+        var dReal = Math.sqrt(P.P.x * P.P.x + P.P.y * P.P.y);
+        if (Math.abs(P.cota.valor - dReal) > 0.005 * Math.max(P.cota.valor, dReal)) {
+          return recusar('cota=' + cotasP[pi] + ' nao bate com a conta: do centro ao ponto ' + it.join(';') + ' a distancia e ' + arredondar(dReal));
+        }
+      }
+      P.dist = Math.sqrt(P.P.x * P.P.x + P.P.y * P.P.y);
+      if (A.reta && B.geo.distancia(P.P, A.reta.F) < 1e-6 * Math.max(1, r)) { A.reta.pontoNoPe = true; P.noPe = true; }
+      A.pontos.push(P);
+      A.ativo = true;
+    }
+
+    /* ---------------------------------------------- a janela */
+    var pad = 0.16 * R;
+    function incluir(x, y, p) {
+      unidades.x0 = Math.min(unidades.x0, x - p); unidades.y0 = Math.min(unidades.y0, y - p);
+      unidades.x1 = Math.max(unidades.x1, x + p); unidades.y1 = Math.max(unidades.y1, y + p);
+    }
+    if (A.outra) incluir(A.outra.C.x, A.outra.C.y, A.outra.r + pad);
+    for (var q = 0; q < A.pontos.length; q++) incluir(A.pontos[q].P.x, A.pontos[q].P.y, pad);
+    /* A reta precisa aparecer dos DOIS lados do pe, com sobra: a janela inclui
+     * um trecho de 0,8 raio para cada lado a partir do pe. Medido em
+     * centro=2;1;C reta=1;1;-8 (a reta exterior do Exemplo 4): com folga so em
+     * volta do pe, a reta saia como um toquinho de 3,25 unidades no canto da
+     * janela, mais curto do que a propria perpendicular de 3,54. */
+    if (A.reta) {
+      var braco = Math.max(0.8 * r, 1.5 * pad);
+      incluir(A.reta.F.x, A.reta.F.y, pad);
+      incluir(A.reta.F.x + A.reta.dir.x * braco, A.reta.F.y + A.reta.dir.y * braco, 0.5 * pad);
+      incluir(A.reta.F.x - A.reta.dir.x * braco, A.reta.F.y - A.reta.dir.y * braco, 0.5 * pad);
+    }
+    if (eixos) {
+      /* A origem fica dentro, com folga para os numeros da escala e para a
+       * ponta da seta, como na conica. */
+      var m = 0.14 * Math.max(unidades.x1 - unidades.x0, unidades.y1 - unidades.y0);
+      incluir(A.origem.x, A.origem.y, 0.8 * m);
+    }
+    if (A.reta) {
+      var lu = unidades.x1 - unidades.x0, au = unidades.y1 - unidades.y0;
+      var janela = { x0: unidades.x0 + 0.03 * lu, x1: unidades.x1 - 0.03 * lu,
+                     y0: unidades.y0 + 0.03 * au, y1: unidades.y1 - 0.03 * au };
+      var corte = retaNaJanela(A.reta.F, A.reta.dir, janela);
+      if (!corte) return recusar('reta=' + rl.join(';') + ' nao cruza a janela da figura');
+      A.reta.P0 = corte[0]; A.reta.P1 = corte[1];
+      /* O nome perto da ponta que fica mais longe da origem do plano, para nao
+       * cair sobre os numeros da escala. */
+      if (eixos) {
+        var d0 = B.geo.distancia(corte[0], A.origem), d1 = B.geo.distancia(corte[1], A.origem);
+        A.reta.emNome = d0 > d1 ? 0.1 : 0.9;
+      }
+    }
+
+    /* ---------------------------------------------- onde pousa cada letra
+     * A letra de um segmento que sai do centro (a distancia ate a reta, a
+     * distancia ate um ponto) escolhe lado e posicao ao longo do segmento entre
+     * dez candidatos: fica o que cai mais longe do que atrapalha, que sao os
+     * dois eixos com a faixa de numeros deles (embaixo do eixo x, a esquerda do
+     * eixo y), a propria circunferencia e o rotulo do raio cotado. Medido antes
+     * disto: em centro=2;-1;C ponto=6;2;P cota=d o "d" pousava no meio da
+     * escala do eixo x, entre o 4 e o 6, e no gabarito de centro=1;2;C o
+     * "d = 3,8" saia atravessado pelo eixo y. O rotuloLado com lado positivo
+     * poe o texto na normal (-u.y, u.x). */
+    var FAIXA_DE_NUMEROS = 0.9;   // unidades, o que a escala ocupa embaixo e a esquerda
+    function pousoDoRotulo(alvo) {
+      var u = versor(alvo.x, alvo.y), n = pt(-u.y, u.x);
+      var off = 0.12 * R;
+      var ems = [0.5, 0.38, 0.62, 0.27, 0.73], lados = [1, -1];
+      var melhor = null;
+      for (var e = 0; e < ems.length; e++) {
+        for (var l = 0; l < lados.length; l++) {
+          var p = pt(alvo.x * ems[e] + n.x * lados[l] * off, alvo.y * ems[e] + n.y * lados[l] * off);
+          var nota = Infinity;
+          if (eixos) {
+            var xT = p.x + A.h, yT = p.y + A.k;
+            nota = Math.min(nota, xT < 0 ? Math.max(0, -xT - FAIXA_DE_NUMEROS) : xT);
+            nota = Math.min(nota, yT < 0 ? Math.max(0, -yT - FAIXA_DE_NUMEROS) : yT);
+          }
+          nota = Math.min(nota, Math.abs(Math.sqrt(p.x * p.x + p.y * p.y) - r));
+          if (G0.anguloRaio !== null) nota = Math.min(nota, B.geo.distancia(p, polar(pt(0, 0), 0.5 * r, G0.anguloRaio)));
+          nota -= 0.02 * Math.abs(ems[e] - 0.5);
+          if (!melhor || nota > melhor.nota + 1e-9) melhor = { nota: nota, em: ems[e], lado: lados[l] };
+        }
+      }
+      return melhor;
+    }
+    if (A.distancia) {
+      var pd = pousoDoRotulo(A.reta.F);
+      A.distancia.lado = pd.lado; A.distancia.em = pd.em;
+    }
+    for (var w = 0; w < A.pontos.length; w++) {
+      var pw = A.pontos[w];
+      if (pw.segmento === 'cota' && pw.dist > 1e-9) {
+        var pp2 = pousoDoRotulo(pw.P);
+        pw.lado = pp2.lado; pw.em = pp2.em;
+      }
+      var uP = pw.dist > 1e-9 ? versor(pw.P.x, pw.P.y) : pt(0.7071, 0.7071);
+      if (pw.noPe && A.reta) {
+        /* No pe da tangente o lado livre e o de FORA, alem da reta. */
+        pw.dirs = [uP, girarVersor(uP, 35), girarVersor(uP, -35)].concat(DIAGONAIS);
+      } else if (pw.eixoX) {
+        /* Sobre o eixo x o nome sobe: os numeros da escala moram embaixo. */
+        pw.dirs = [pt(uP.x >= 0 ? 0.7071 : -0.7071, 0.7071), pt(0, 1), pt(uP.x >= 0 ? -0.7071 : 0.7071, 0.7071)];
+      } else if (pw.eixoY) {
+        /* Sobre o eixo y o nome vai para a direita: os numeros moram a esquerda. */
+        pw.dirs = [pt(0.7071, uP.y >= 0 ? 0.7071 : -0.7071), pt(1, 0), pt(0.7071, uP.y >= 0 ? -0.7071 : 0.7071)];
+      } else {
+        pw.dirs = [uP, girarVersor(uP, 45), girarVersor(uP, -45), girarVersor(uP, 90), girarVersor(uP, -90)];
+      }
+      /* O fio de chamada nao pode correr colado a uma linha que PASSA pelo
+       * ponto: a reta, quando o ponto esta sobre ela, e a tangente a
+       * circunferencia, quando ele esta sobre ela. Medido no g13 (x2 + y2 = 25
+       * com y = x + 1): os fios de "(3, 4)" e "(-4, -3)" saiam na direcao do
+       * versor do ponto, (0,6; 0,8), a 8 graus da reta s, (0,707; 0,707), e a
+       * reta parecia bifurcar nos dois pontos comuns. Direcao a menos de 20
+       * graus de uma dessas linhas e descartada. O segmento que parte do
+       * centro (raio, cota) TERMINA no ponto: a direcao que o prolonga nao
+       * corre ao lado de traco nenhum e continua valendo, que e o caso do pe
+       * da tangente, onde o nome do ponto de contato segue na direcao do raio.
+       *
+       * Com o ponto sobre a reta, a primeira candidata fica do lado do CENTRO
+       * da reta, e nao do lado de fora: o nome da reta sai pelo lado de fora
+       * (rotuloLado com centro=), perto de uma ponta, e o obstaculo que o
+       * rotulo desvia e traco, nunca outro rotulo. Medido na primeira
+       * tentativa deste conserto, que preferia a normal de fora: no g13 o
+       * "(3, 4)" subia para cima do "s" e os dois saiam impressos um sobre o
+       * outro. Com o ponto tambem sobre a circunferencia, a direcao livre do
+       * lado do centro e a bissetriz da cunha entre a reta e a tangente, fora
+       * do disco (82 graus de abertura no g13); a bissetriz da cunha de fora
+       * vem em segundo. */
+      var linhasNoPonto = [];
+      var naReta = !!A.reta && Math.abs((pw.P.x - A.reta.F.x) * A.reta.dir.y - (pw.P.y - A.reta.F.y) * A.reta.dir.x) < 1e-6 * Math.max(1, r);
+      var naCircunferencia = Math.abs(pw.dist - r) < 1e-6 * Math.max(1, r);
+      if (naReta) linhasNoPonto.push(A.reta.dir);
+      if (naCircunferencia) linhasNoPonto.push(pt(-uP.y, uP.x));
+      if (linhasNoPonto.length) {
+        var candidatas = pw.dirs;
+        if (naReta && !pw.noPe) {
+          var tR = A.reta.dir;
+          var nCentro = pt(-tR.y, tR.x);
+          if (nCentro.x * uP.x + nCentro.y * uP.y > 0) nCentro = pt(-nCentro.x, -nCentro.y);
+          var nFora = pt(-nCentro.x, -nCentro.y);
+          if (naCircunferencia) {
+            var tFora = (tR.x * uP.x + tR.y * uP.y >= 0) ? tR : pt(-tR.x, -tR.y);
+            var tg = pt(-uP.y, uP.x);
+            var tgCentro = (tg.x * nCentro.x + tg.y * nCentro.y >= 0) ? tg : pt(-tg.x, -tg.y);
+            candidatas = [versor(tFora.x + tgCentro.x, tFora.y + tgCentro.y),
+                          versor(tFora.x - tgCentro.x, tFora.y - tgCentro.y)].concat(candidatas);
+          } else {
+            candidatas = [nCentro, nFora].concat(candidatas);
+          }
+        }
+        var livres = [];
+        for (var cd = 0; cd < candidatas.length; cd++) {
+          var longe = true;
+          for (var ln = 0; ln < linhasNoPonto.length; ln++) {
+            var cosseno = Math.abs(candidatas[cd].x * linhasNoPonto[ln].x + candidatas[cd].y * linhasNoPonto[ln].y);
+            if (Math.acos(Math.min(1, cosseno)) * 180 / Math.PI < 20) { longe = false; break; }
+          }
+          if (longe) livres.push(candidatas[cd]);
+        }
+        if (livres.length) pw.dirs = livres;
+      }
+    }
+    return A;
+  }
+
+  /* ---------------------------------------------- casos=: o painel de tres
+   * O mesmo desenho lado a lado, uma celula por valor de casos=, variando a
+   * distancia da reta (ou a do ponto generico). Cada celula e uma figura
+   * propria, desenhada pela propria receita circulo com uma diretiva derivada:
+   * a mesma mecanica do painel, que segura o doc.y entre uma celula e a
+   * seguinte. A legenda sai uma vez, na ultima celula, e as anteriores saem
+   * marcadas fieis quando o conjunto esta fora de escala, para o aviso de
+   * escala nao se repetir tres vezes na mesma faixa (a decisao do painel). */
+  var TRIO_VAO = 8;
+
+  function casosDoCirculo(B, d) {
+    var brutos = B.lista(d.args, 'casos');
+    if (brutos.length < 2) return null;
+    var saida = [];
+    for (var i = 0; i < brutos.length; i++) {
+      if (!B.ehNumero(brutos[i])) return null;
+      saida.push(parseFloat(brutos[i]));
+    }
+    var pontos = pares(B, d.args, 'ponto');
+    if (!B.lista(d.args, 'reta').length && !(pontos.length && pontos[0].length === 1 && !B.ehNumero(pontos[0][0]))) return null;
+    return saida;
+  }
+
+  function diretivaDoCaso(B, d, valor, i, n, foraTrio) {
+    var args = {};
+    for (var ch in d.args) {
+      if (Object.prototype.hasOwnProperty.call(d.args, ch) && ch !== 'casos') args[ch] = d.args[ch].slice();
+    }
+    if (args.reta) {
+      var m = args.distancia ? medidaDe(B, args.distancia[0]) : null;
+      args.distancia = [String(valor) + (m && (m.explicito || m.letra) ? ';' + m.rotulo : '')];
+    } else if (args.ponto) {
+      var partes = String(args.ponto[0]).split(';');
+      args.ponto[0] = partes[0] + ';' + valor;
+    }
+    var ultimo = i === n - 1;
+    return {
+      bruto: d.bruto, receita: d.receita, args: args, id: null, fase: d.fase,
+      escala: (!ultimo && foraTrio) ? 'fiel' : d.escala,
+      legenda: ultimo ? d.legenda : null, avisos: []
+    };
+  }
+
+  function layoutDoTrio(B, d, op, casos) {
+    var g = B.gerador();
+    var x = op.x != null ? Number(op.x) : g.MARG_E;
+    var largura = op.largura != null ? Number(op.largura) : (g.MARG_D - x);
+    var n = casos.length, passo = largura / n;
+    var Gu = geometriaDoCirculo(B, null, diretivaDoCaso(B, d, casos[n - 1], n - 1, n, false));
+    var fora = Gu ? Gu.fora : d.escala === 'fora';
+    var altura = 0;
+    for (var i = 0; i < n; i++) {
+      var G = geometriaDoCirculo(B, null, diretivaDoCaso(B, d, casos[i], i, n, fora));
+      if (G) altura = Math.max(altura, alturaParaCaixa(B, { x: x + i * passo, largura: passo }, G.unidades, 120, G.alturaMax));
+    }
+    return { x: x, largura: largura, n: n, passo: passo, altura: altura || 120, fora: fora };
+  }
+
+  function desenharTrio(doc, d, op, casos) {
+    var B = base();
+    var L = layoutDoTrio(B, d, op, casos);
+    var med = B.medidaDoBloco({ x: L.x, largura: L.largura, altura: L.altura, legenda: d.legenda, foraDeEscala: L.fora });
+    doc.garanteEspaco(med.total);
+    var yInicial = doc.y, yFinal = doc.y, ultimo = null;
+    for (var i = 0; i < L.n; i++) {
+      doc.y = yInicial;
+      var reg = circulo.desenhar(doc, diretivaDoCaso(B, d, casos[i], i, L.n, L.fora),
+        { x: L.x + i * L.passo, largura: L.passo, altura: L.altura });
+      if (reg) ultimo = reg;
+      if (doc.y < yFinal) yFinal = doc.y;
+    }
+    doc.y = yFinal;
+    return ultimo;
   }
 
   /* ============================================================ conica

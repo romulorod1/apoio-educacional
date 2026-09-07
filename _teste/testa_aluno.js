@@ -169,8 +169,16 @@ conf('as matérias existem, com matemática em primeiro',
   Core.MATERIAS[0].id, 'matematica');
 conf('e a última é a livre, porque nenhuma lista prevê tudo',
   Core.MATERIAS[Core.MATERIAS.length - 1].livre, true);
-conf('há onze matérias além de matemática e da livre',
-  Core.MATERIAS.length - 2, 11);
+/* Eram onze. Em 08/09/2026 a tabela virou a fonte única de matérias e ganhou
+ * as duas disciplinas do catálogo de tópicos que faltavam nela: literatura
+ * (que vai ter banco de material) e método de estudo (que não é matéria de
+ * mapear nem de propor, e por isso carrega mapa: false). A conta é mantida de
+ * propósito, para uma matéria não entrar nem sair sem alguém escrever aqui o
+ * motivo. */
+conf('há treze matérias além de matemática e da livre',
+  Core.MATERIAS.length - 2, 13);
+conf('e só método de estudo fica fora do mapeamento e da proposta',
+  Core.MATERIAS.filter(m => m.mapa === false).map(m => m.id), ['estudo']);
 conf('nenhum identificador de matéria repetido',
   new Set(Core.MATERIAS.map(m => m.id)).size, Core.MATERIAS.length);
 conf('nenhum travessão na lista de matérias',

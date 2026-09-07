@@ -1,17 +1,28 @@
 # -*- coding: utf-8 -*-
 """
-Gera o arquivo unico que o aplicativo vai ler, a partir dos temas em Markdown.
+Gera o que o aplicativo le, a partir dos temas em Markdown, materia por materia.
 
-Os .md sao a fonte, boas de escrever e de revisar. O aplicativo consome um JSON
-so, para nao ter que baixar um arquivo por tema no tablet.
+Os .md sao a fonte, boas de escrever e de revisar. O aplicativo consome JSON,
+para nao ter que baixar um arquivo por tema no tablet.
 
 Cada exercicio sai separado, com o bloco a que pertence e a resposta pareada.
 E isso que permite a Nathalia montar a lista marcando e desmarcando questoes:
 a numeracao e refeita na hora da montagem, e o gabarito acompanha.
 
+A saida de cada materia vai para a raiz declarada na tabela (Core.MATERIAS no
+core.js, exportada para materias.json): matematica em banco/, que e o caminho
+legado e nao pode mudar nunca, porque e a chave do cache BAIXADOS nos tablets;
+materia nova em banco/<id>/. Os arquivos da matematica saem BYTE A BYTE iguais
+aos de antes desta ferramenta aprender outras materias: a ausencia do campo
+`materia` significa matematica, por decisao, e o app vai ler assim.
+
 Uso:
-    python gerar_banco.py            gera banco.json
-    python gerar_banco.py --provar   monta uma lista de exemplo e mostra o resultado
+    python gerar_banco.py                        gera para toda materia com temas
+    python gerar_banco.py --provar               monta uma lista de exemplo e mostra
+    python gerar_banco.py --temas DIR --saida DIR
+        raizes alternativas: DIR/<pasta>/<serie>/*.md na entrada e DIR/<raiz da
+        materia>/ na saida. E como se prova o caminho de uma materia nova sem
+        deixar tema falso dentro do repositorio.
 """
 import io
 import os
@@ -24,13 +35,20 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import verificar
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SAIDA = os.path.join(RAIZ, 'banco.json')
-PASTA_BANCO = os.path.join(os.path.dirname(RAIZ), 'banco')
+RAIZ_PROJETO = os.path.dirname(RAIZ)
 
-TITULOS = {
-    'pt': {'explicacao': 'Explicação', 'exercicios': 'Exercícios', 'gabarito': 'Gabarito'},
-    'en': {'explicacao': 'Explanation', 'exercicios': 'Exercises', 'gabarito': 'Answer key'},
-}
+# A materia legada. Os tres pontos em que ela e diferente das outras existem
+# para os arquivos que o tablet ja baixou continuarem identicos: sem campo
+# `materia` nos temas, formato 'banco-temas-matematica' versao 1, e o banco
+# inteiro em temas/banco.json (os pilotos de figuras/ leem de la). E o mesmo
+# MATERIA_PADRAO do core.js, escrito aqui porque o materias.json nao o exporta.
+MATERIA_LEGADA = 'matematica'
+FORMATO_LEGADO = ('banco-temas-matematica', 1)
+FORMATO_NOVO = ('banco-temas', 2)
+
+# Os titulos das subsecoes por lingua sao os do verificador, que e quem os
+# exige. Mantido com este nome porque e o que se le no resto do arquivo.
+TITULOS = verificar.SECOES
 
 
 def blocos_e_itens(texto):
@@ -61,21 +79,30 @@ def blocos_e_itens(texto):
     return itens
 
 
-def ler(caminho):
+def ler(caminho, materia=None):
+    """Le um tema para o dicionario que vai no JSON.
+
+    A ordem das chaves importa: e ela que sai no arquivo, e o da matematica
+    tem que continuar igual. Por isso `materia` entra logo depois do id so
+    nas materias novas, e a lingua so entra quando a materia a declara: tema
+    sem ingles sai sem a chave en, e nao com en vazio.
+    """
+    materia = materia or verificar.materia_do_caminho(caminho)
     cab, corpo = verificar.ler_tema(caminho)
-    tema = {
-        'id': cab['id'],
-        'serie': cab['serie'],
-        'unidade': cab['unidade'],
-        'duracaoMin': int(cab.get('duracao_min') or 60),
-        'dificuldade': int(cab.get('dificuldade') or 3),
-        'prerequisitos': [p.strip() for p in
-                          (cab.get('prerequisitos') or '').strip('[]').split(',') if p.strip()],
-        'pt': {}, 'en': {},
-    }
-    for lingua, secao_nome in (('pt', 'PT'), ('en', 'EN')):
-        parte = verificar.secao(corpo, secao_nome)
+    legada = materia['id'] == MATERIA_LEGADA
+    tema = {'id': cab['id']}
+    if not legada:
+        tema['materia'] = materia['id']
+    tema['serie'] = cab['serie']
+    tema['unidade'] = cab['unidade']
+    tema['duracaoMin'] = int(cab.get('duracao_min') or 60)
+    tema['dificuldade'] = int(cab.get('dificuldade') or 3)
+    tema['prerequisitos'] = verificar.lista_do_cabecalho(cab.get('prerequisitos'))
+    if not legada and 'topicos' in cab:
+        tema['topicos'] = verificar.lista_do_cabecalho(cab['topicos'])
+    for lingua in materia['temas']['linguas']:
         t = TITULOS[lingua]
+        parte = verificar.secao(corpo, t['secao'])
         exercicios = blocos_e_itens(verificar.subsecao(parte, t['exercicios']))
         respostas = verificar.itens_numerados(verificar.subsecao(parte, t['gabarito']))
         tema[lingua] = {
@@ -118,8 +145,8 @@ def montar_lista(tema, lingua, escolhidos, com_gabarito=True):
     return saida
 
 
-def gerar_indice_de_busca(temas):
-    """Chama o busca.js para montar o indice, e grava banco/busca.json.
+def gerar_indice_de_busca(temas, pasta_banco):
+    """Chama o busca.js para montar o indice, e grava busca.json na pasta da materia.
 
     Quem normaliza palavra e o busca.js, e nao este script. Se a regra morasse
     nos dois lugares, um dia elas divergiriam e a busca passaria a nao achar o
@@ -137,7 +164,6 @@ def gerar_indice_de_busca(temas):
         }
         for t in temas
     ]
-    raiz_proj = os.path.dirname(RAIZ)
     with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False, encoding='utf-8') as f:
         json.dump(entrada, f, ensure_ascii=False)
         caminho_entrada = f.name
@@ -150,47 +176,63 @@ def gerar_indice_de_busca(temas):
         "temas:B.montarIndice(t)}));"
     )
     saida = subprocess.run(
-        ['node', '-e', script, os.path.join(raiz_proj, 'busca.js'), caminho_entrada],
+        ['node', '-e', script, os.path.join(RAIZ_PROJETO, 'busca.js'), caminho_entrada],
         capture_output=True, text=True, encoding='utf-8')
     os.unlink(caminho_entrada)
     if saida.returncode != 0:
         raise SystemExit('nao consegui montar o indice de busca: %s' % saida.stderr[:400])
 
-    caminho = os.path.join(PASTA_BANCO, 'busca.json')
+    caminho = os.path.join(pasta_banco, 'busca.json')
     io.open(caminho, 'w', encoding='utf-8', newline=chr(10)).write(saida.stdout)
-    print('busca.json: %.0f KB, carrega junto com o indice'
+    print('  busca.json: %.0f KB, carrega junto com o indice'
           % (os.path.getsize(caminho) / 1024.0))
 
 
-def gerar():
-    """Gera o que o aplicativo consome.
+def _gravar(caminho, dados):
+    io.open(caminho, 'w', encoding='utf-8', newline=chr(10)).write(
+        json.dumps(dados, ensure_ascii=False, separators=(',', ':')))
+
+
+def _envelope(materia, corpo):
+    """O cabecalho do JSON: legado para a matematica, novo para as outras.
+
+    No novo vai a materia tambem no envelope, e nao so em cada tema, para um
+    arquivo baixado ser reconhecivel sozinho.
+    """
+    if materia['id'] == MATERIA_LEGADA:
+        formato, versao = FORMATO_LEGADO
+        envelope = {'formato': formato, 'versao': versao}
+    else:
+        formato, versao = FORMATO_NOVO
+        envelope = {'formato': formato, 'versao': versao, 'materia': materia['id']}
+    envelope.update(corpo)
+    return envelope
+
+
+def gerar_materia(materia, temas, pasta_banco, raiz_temas):
+    """Grava o indice, um arquivo por serie, o indice de busca e o banco inteiro.
 
     Sao dois niveis, de proposito. O indice e leve e carrega sempre, para a
     lista de temas aparecer na hora. O conteudo de cada serie so e baixado
     quando ela abre um tema daquela serie: no tablet, puxar dois megabytes toda
     vez que alguem quer ver um titulo seria desperdicio.
     """
-    temas = []
-    reprovados = []
-    for caminho in sorted(glob.glob(os.path.join(RAIZ, 'mat', '*', '*.md'))):
-        erros, avisos, manuais, cab = verificar.conferir(caminho)
-        if erros:
-            reprovados.append((os.path.basename(caminho), erros[0]))
-            continue
-        temas.append(ler(caminho))
-
-    if not os.path.isdir(PASTA_BANCO):
-        os.makedirs(PASTA_BANCO)
+    if not os.path.isdir(pasta_banco):
+        os.makedirs(pasta_banco)
+    legada = materia['id'] == MATERIA_LEGADA
 
     indice = []
     for t in temas:
-        registro = {
-            'id': t['id'], 'serie': t['serie'], 'unidade': t['unidade'],
+        registro = {'id': t['id']}
+        if not legada:
+            registro['materia'] = materia['id']
+        registro.update({
+            'serie': t['serie'], 'unidade': t['unidade'],
             'duracaoMin': t['duracaoMin'], 'dificuldade': t['dificuldade'],
             'qtd': len(t['pt']['exercicios']),
-            'pt': {'titulo': t['pt']['titulo'], 'resumo': t['pt']['resumo']},
-            'en': {'titulo': t['en']['titulo'], 'resumo': t['en']['resumo']},
-        }
+        })
+        for lingua in materia['temas']['linguas']:
+            registro[lingua] = {'titulo': t[lingua]['titulo'], 'resumo': t[lingua]['resumo']}
         # O pre-requisito viaja no indice, e nao so no arquivo da serie.
         #
         # A trilha que fecha uma lacuna atravessa anos: fracoes no 6 ano puxa
@@ -204,43 +246,86 @@ def gerar():
         # e campo vazio em 22 registros e peso sem informacao.
         if t.get('prerequisitos'):
             registro['prerequisitos'] = t['prerequisitos']
+        # Os topicos tambem viajam no indice, pelo mesmo motivo: e por eles que
+        # o aplicativo vai achar material a partir do assunto marcado na aula,
+        # e isso precisa funcionar antes de qualquer serie ser baixada.
+        if t.get('topicos'):
+            registro['topicos'] = t['topicos']
         indice.append(registro)
-    caminho_indice = os.path.join(PASTA_BANCO, 'indice.json')
-    io.open(caminho_indice, 'w', encoding='utf-8', newline=chr(10)).write(
-        json.dumps({'formato': 'banco-temas-matematica', 'versao': 1, 'temas': indice},
-                   ensure_ascii=False, separators=(',', ':')))
+    caminho_indice = os.path.join(pasta_banco, 'indice.json')
+    _gravar(caminho_indice, _envelope(materia, {'temas': indice}))
 
     por_serie = {}
     for t in temas:
         por_serie.setdefault(t['serie'], []).append(t)
     maior = 0
     for serie, lista in sorted(por_serie.items()):
-        caminho = os.path.join(PASTA_BANCO, 'serie-%s.json' % serie)
-        io.open(caminho, 'w', encoding='utf-8', newline=chr(10)).write(
-            json.dumps({'serie': serie, 'temas': lista},
-                       ensure_ascii=False, separators=(',', ':')))
+        caminho = os.path.join(pasta_banco, 'serie-%s.json' % serie)
+        corpo = {'serie': serie, 'temas': lista}
+        if not legada:
+            corpo = {'materia': materia['id'], 'serie': serie, 'temas': lista}
+        _gravar(caminho, corpo)
         maior = max(maior, os.path.getsize(caminho) / 1024.0)
 
     # indice de busca, montado pelo proprio busca.js para nao existirem duas
     # regras de normalizacao que possam divergir com o tempo
-    gerar_indice_de_busca(temas)
+    gerar_indice_de_busca(temas, pasta_banco)
 
-    banco = {'formato': 'banco-temas-matematica', 'versao': 1, 'temas': temas}
-    io.open(SAIDA, 'w', encoding='utf-8', newline=chr(10)).write(
-        json.dumps(banco, ensure_ascii=False, separators=(',', ':')))
+    # O banco inteiro num arquivo so, para ferramenta que quer um tema sem
+    # juntar serie: temas/banco.json e o nome legado, lido pelos pilotos de
+    # figuras/; materia nova ganha temas/banco-<id>.json ao lado.
+    nome_banco = 'banco.json' if legada else 'banco-%s.json' % materia['id']
+    caminho_banco = os.path.join(raiz_temas, nome_banco)
+    banco = _envelope(materia, {'temas': temas})
+    _gravar(caminho_banco, banco)
 
     total_ex = sum(len(t['pt']['exercicios']) for t in temas)
-    print('%d tema(s), %d exercicio(s) em portugues' % (len(temas), total_ex))
-    print('indice.json: %.0f KB, carrega sempre' % (os.path.getsize(caminho_indice) / 1024.0))
-    print('%d arquivos de serie, o maior com %.0f KB, baixados so quando precisa'
+    print('  %d tema(s), %d exercicio(s) em portugues' % (len(temas), total_ex))
+    print('  indice.json: %.0f KB, carrega sempre' % (os.path.getsize(caminho_indice) / 1024.0))
+    print('  %d arquivos de serie, o maior com %.0f KB, baixados so quando precisa'
           % (len(por_serie), maior))
-    print('banco.json inteiro: %.0f KB' % (os.path.getsize(SAIDA) / 1024.0))
-    if reprovados:
-        print('')
-        print('%d tema(s) ficaram de fora por nao passarem na conferencia:' % len(reprovados))
-        for nome, erro in reprovados:
-            print('  %s: %s' % (nome, erro[:90]))
+    print('  %s inteiro: %.0f KB' % (nome_banco, os.path.getsize(caminho_banco) / 1024.0))
     return banco
+
+
+def gerar(raiz_temas=None, raiz_saida=None):
+    """Gera o que o aplicativo consome, para cada materia que tem tema escrito.
+
+    Materia declarada na tabela mas ainda sem tema nao gera nada: escrever um
+    indice vazio em banco/portugues/ criaria arquivo no repositorio antes de
+    existir conteudo, e o aplicativo trataria a pasta como banco disponivel.
+    Devolve {id da materia: banco inteiro}.
+    """
+    raiz_temas = os.path.abspath(raiz_temas or RAIZ)
+    raiz_saida = os.path.abspath(raiz_saida or RAIZ_PROJETO)
+    bancos = {}
+    for materia in verificar.materias():
+        pasta = materia['temas']['pasta']
+        arquivos = sorted(glob.glob(os.path.join(raiz_temas, pasta, '*', '*.md')))
+        if not arquivos:
+            print('%s: nenhum tema escrito ainda em %s/, nada gerado' % (materia['id'], pasta))
+            continue
+        print('%s (%s/ -> %s):' % (materia['id'], pasta, materia['temas']['raiz']))
+        temas = []
+        reprovados = []
+        for caminho in arquivos:
+            erros, avisos, manuais, cab = verificar.conferir(caminho)
+            if erros:
+                reprovados.append((os.path.basename(caminho), erros[0]))
+                continue
+            temas.append(ler(caminho, materia))
+
+        # a raiz da tabela e relativa ao projeto e termina em barra: banco/ ou
+        # banco/<id>/
+        partes = [p for p in materia['temas']['raiz'].split('/') if p]
+        pasta_banco = os.path.join(raiz_saida, *partes)
+        bancos[materia['id']] = gerar_materia(materia, temas, pasta_banco, raiz_temas)
+        if reprovados:
+            print('')
+            print('  %d tema(s) ficaram de fora por nao passarem na conferencia:' % len(reprovados))
+            for nome, erro in reprovados:
+                print('    %s: %s' % (nome, erro[:90]))
+    return bancos
 
 
 def provar(banco):
@@ -302,7 +387,16 @@ def provar(banco):
     print('=' * 68)
 
 
+def _argumento(nome):
+    """O valor que segue --nome na linha de comando, ou None."""
+    if nome in sys.argv:
+        i = sys.argv.index(nome)
+        if i + 1 < len(sys.argv):
+            return sys.argv[i + 1]
+    return None
+
+
 if __name__ == '__main__':
-    banco = gerar()
-    if '--provar' in sys.argv:
-        provar(banco)
+    bancos = gerar(_argumento('--temas'), _argumento('--saida'))
+    if '--provar' in sys.argv and MATERIA_LEGADA in bancos:
+        provar(bancos[MATERIA_LEGADA])

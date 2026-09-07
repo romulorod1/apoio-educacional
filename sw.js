@@ -18,9 +18,14 @@
  * O nome novo a cada mudança da lista não é etiqueta: com o nome repetido o
  * install escreveria dentro do MESMO cache de onde a versão ativa está servindo,
  * e o arquivo novo entraria antes de ela mandar atualizar. Foi assim de v1 a
- * v11, um por mudança; o v12 foi a entrada de './figuras/solidos.js', e este
- * v13 é a entrada dos treze arquivos de './banco/topicos/' na lista abaixo. */
-var CACHE = 'apoio-educacional-v19';
+ * v11, um por mudança; o v12 foi a entrada de './figuras/solidos.js'; o v13, a
+ * dos treze arquivos de './banco/topicos/'. Dali em diante o nome sobe a cada
+ * release, mesmo com a lista igual: sem sw.js novo não aparece o aviso de
+ * atualizar, e app.js, core.js e banco mudados juntos chegariam aos pedaços
+ * pelo cache do navegador. O v20 (08/09/2026) é isso: o aplicativo passou a
+ * ler a tabela de matérias, os treze JSON de tópicos ganharam identificadores,
+ * e a lista não mudou um item. */
+var CACHE = 'apoio-educacional-v20';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
