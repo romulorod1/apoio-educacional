@@ -26,7 +26,7 @@ Mesmo molde `chave: valor` dos temas, entre dois `---`.
 | `autor_morte` | só em `publico` | ano de morte; com mais de um autor, os anos separados por vírgula, e a conta usa o maior |
 | `obra` | não | livro ou coletânea em que o texto saiu; sem ela o crédito usa só o título |
 | `ano` | sim | ano de publicação (ou do texto escrito) |
-| `genero` | sim | `conto`, `poema`, `cronica`, `fabula`, `noticia`, `reportagem`, `artigo`, `entrevista`, `propaganda`, `verbete`, `bilhete`, `carta`, `teatro`, `romance`, `ensaio`, `cantiga`, `parlenda`, `outro` |
+| `genero` | sim | `conto`, `poema`, `cronica`, `fabula`, `noticia`, `reportagem`, `artigo`, `entrevista`, `propaganda`, `verbete`, `bilhete`, `carta`, `teatro`, `romance`, `ensaio`, `cantiga`, `parlenda`, `relato`, `instrucao`, `outro` |
 | `dominio` | sim | `publico`, `autoral`, `cc` ou `tradicional` |
 | `licenca` | sim | `publico`: `domínio público, Lei 9.610/98 art. 41`; `autoral`: `escrito para este banco, uso livre`; `cc`: o nome exato da licença, começando por `CC `; `tradicional`: `domínio público, obra tradicional` |
 | `procedencia` | sim | de onde o texto foi copiado, com endereço e data; ou `escrito pela frente 2 em 08/09/2026 para o tema POR07-01`; no tradicional, a coletânea |
