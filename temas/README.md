@@ -10,9 +10,9 @@ marcar uma aula, a Nathália escolhe o tema e o material sai pronto, anexado àq
 
 | | |
 |---|---|
-| Temas | 146 de 146, todos conferidos |
+| Temas | 148 de 148, todos conferidos |
 | Séries | do 2º ano do fundamental ao 3º do médio |
-| Exercícios | 2.485 em português, e os mesmos em inglês |
+| Exercícios | 2.521 em português, e os mesmos em inglês |
 | Verificações simbólicas | 2.999 |
 | Conferência humana | 73 itens, 2,9% do total |
 | Material explicativo | cerca de 105 mil palavras em cada língua |
