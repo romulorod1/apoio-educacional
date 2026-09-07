@@ -210,10 +210,24 @@ trap limpa_servidor EXIT INT TERM
 titulo "com navegador"
 for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento \
          testa_perfil testa_olho testa_atualizacao testa_atualizacao_real \
+         testa_biblioteca_offline \
          testa_exclusoes testa_feriados testa_mover testa_retroativo testa_series \
          testa_assunto testa_aluno testa_familia testa_proposta_tela; do
   roda "$t" node "_teste/$t.js"
 done
+# O mesmo teste duas vezes de proposito. Sem argumento ele prova que a serie
+# de temas baixada sobrevive a uma atualizacao feita sem sinal; com
+# --envenenado a versao publicada troca o caminho das series no app.js e ele
+# tem que ENXERGAR a perda. Se o segundo passar sem o defeito aparecer, o
+# primeiro nao esta provando nada. Fica fora do laco porque o laco nao passa
+# argumento.
+roda "testa_biblioteca_offline --envenenado" node "_teste/testa_biblioteca_offline.js" --envenenado
+# E uma terceira vez, com o veneno do incidente real de sw.js:12-16: o activate
+# publicado deixa de poupar o BAIXADOS e apaga a biblioteca. O primeiro veneno
+# nunca faz as duas asserções de cache falharem; este faz. Sem ele, um activate
+# que apagasse o BAIXADOS passaria pelas duas sem ninguem ter provado que elas
+# sabem reprovar.
+roda "testa_biblioteca_offline --envenenado-activate" node "_teste/testa_biblioteca_offline.js" --envenenado-activate
 
 # Duas conferencias aqui, e a primeira e a que pega o defeito de verdade.
 #

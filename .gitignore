@@ -8,6 +8,13 @@ _teste/saida_*.md
 _teste/dom.html
 _teste/chrome_err.txt
 _teste/sim_v1/
+# copias do repositorio que os testes de atualizacao servem por HTTP. Carregam
+# o nome do aluno de exemplo: se um teste for derrubado por fora (no Windows o
+# handler de exit nao roda em TerminateProcess), a pasta sobra, e sem esta
+# linha a trava de privacidade do portao acusaria um arquivo que ninguem
+# escreveu. Medido em 08/09/2026 com SIGKILL e SIGTERM: 38 arquivos sobrando.
+_teste/sim_real/
+_teste/sim_biblioteca/
 _teste/prints/
 _teste/_modelo.html
 
