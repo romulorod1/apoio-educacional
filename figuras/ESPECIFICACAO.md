@@ -87,10 +87,12 @@ A glosa da hachura, que e uma das duas unicas legendas permitidas:
 
 Rotulo com palavra, que muda de lingua e por isso e escrito na diretiva de cada secao:
 
-  PT:  @fig triangulo id=t9 base=10 altura=6 rotuloaltura=altura
-  EN:  @fig triangulo id=t9 base=10 altura=6 rotuloaltura=height
+  PT:  @fig triangulo id=t9 base=10 altura=6;altura
+  EN:  @fig triangulo id=t9 base=10 altura=6;height
 
 As duas passam no numeros_de com o mesmo conjunto (10 e 6) e na trava de paridade de receita, e nenhuma palavra portuguesa fica presa dentro do desenhador.
+
+A chave `rotuloaltura`, que este exemplo trazia antes de a `altura=` existir, nao chegou a nascer e nao vai nascer: o rotulo ja entra pelo segundo campo da propria medida, na gramatica `valor[;rotulo]` que o `circulo` e o `solido` usam desde 02/09/2026. Duas portas para a mesma coisa custam duas travas, duas linhas de documentacao e um dia em que uma delas e esquecida; e a segunda porta nao acrescentaria nada, porque o rotulo ali ja e texto vindo do tema e o desenhador continua sem inventar palavra. Escrita hoje, `rotuloaltura=` e recusada como chave nao declarada.
 
 ### A equacao de bloco: @eq
 
@@ -160,6 +162,199 @@ auditor independente em MuPDF (`_audita_receitas_curvas.py`):
 O que ainda NAO existe: painel de excentricidade (tres elipses lado a lado), a chave
 `cheio` (circunferencia contra circulo), a semielipse apoiada e a demonstracao da area por
 doze setores.
+
+### As receitas de plano: triangulo e quadrilatero
+
+As duas receitas mais antigas do kit ganharam em 07/09/2026 as chaves de MEDIDA que faltavam,
+com um caso por chave e por combinacao em `_prova_receitas_plano.js`. Ate aqui o `triangulo`
+aceitava `angulo` e `lado` e o `quadrilatero` aceitava `tipo`, `angulo`, `lado` e uma
+`diagonal` sem medida e sem letra: nao havia como dizer "este retangulo tem base b e altura
+h" nem "esta e a diagonal d", que sao as tres frases do `MATEM3-12` e a falta que bloqueia
+todo tema de area e de Pitagoras do 6o ao 9o ano.
+
+A gramatica e a mesma do `circulo` e do `solido`, `valor[;rotulo]`: o primeiro valor CONSTROI
+e a letra so rotula. Onde a diretiva deixou letra, a dimensao sai da proporcao do prototipo,
+e a figura ja sai marcada fora de escala pela regra de escala abaixo.
+
+- `base=V[;R]`: o lado de baixo, cotado. No triangulo e o lado c (entre A e B) escrito por
+  outro nome, e uma so; no quadrilatero e o lado a (AB), e o trapezio aceita DUAS, a maior
+  primeiro. Quando o lado ja carrega tracinho de congruencia ou seta de paralelismo, a medida
+  sai em COTA por fora, e nao empilhada sobre a aresta. **Uma marca.**
+  Ex.: `@fig triangulo base=10 altura=6` e `@fig quadrilatero tipo=trapezio base=10;B base=6;b altura=4;h`.
+- `altura=V[;R[;X]]`: o segmento tracejado do vertice ate o pe, na espessura auxiliar, com o
+  quadradinho de angulo reto no pe; quando o pe cai fora do lado (triangulo obtusangulo,
+  paralelogramo muito inclinado) o lado sai prolongado em tracejado mais claro ate ele. Uma
+  so por figura. No triangulo o terceiro campo e o vertice de partida, e sem ele a altura e a
+  relativa a base; no quadrilatero ela e sempre a distancia entre as duas bases paralelas, e
+  no retangulo e no quadrado ela E o lado DA, entao sai como medida dele. `altura=` num
+  quadrilatero irregular e recusada, porque ali nao ha par de lados paralelos.
+  **Duas marcas: o rotulo conta uma e o quadradinho conta outra.** Um triangulo com base,
+  altura e as tres letras de vertice ja soma seis e e recusado pelo `conferirFigura`.
+  Ex.: `@fig triangulo lado=4 lado=6 lado=9 altura=h;h;A escala=fiel`.
+- `diagonal=A;C[;V][;R]`: continua sendo o corte que parte o quadrilatero em dois triangulos,
+  agora com medida e letra. `diagonal=A;C` e a forma antiga e sai identica; `diagonal=A;C;d`
+  rotula; `diagonal=A;C;13;d` constroi conferindo o 13 e escreve d. Linha CONTINUA em
+  **0,9 pt**, nunca tracejada: ela existe de verdade dentro da figura. Par de vertices
+  VIZINHOS e recusado, porque ali a diagonal e um lado. **Sem rotulo nao custa marca nenhuma
+  (o traco nao e dado a ler); com rotulo, uma.**
+  Ex.: `@fig quadrilatero tipo=retangulo base=4 altura=3 diagonal=A;C;5;d`.
+
+  A secao "Convencoes de desenho do livro didatico", mais abaixo, ainda diz 0,6 pt para a
+  diagonal, e ela e que esta desatualizada: **o valor certo e 0,9 pt**, e a mudanca esta
+  datada no cabecalho do `diagonais()` do `figuras/marcas.js`. O motivo e o argumento da
+  propria convencao levado ate o fim: se a diagonal e CONTINUA porque ela e objeto do
+  exercicio (ao contrario da altura e do prolongamento, que sao construcao), entao ela
+  pertence ao nivel da marca e nao ao do auxiliar. Medido na pagina 4 do piloto, a diagonal
+  que sustenta o argumento inteiro da secao saia em 0,60 pt na tinta mais clara da figura,
+  ou seja era a linha MENOS legivel de uma figura que ela propria explica. As diagonais
+  recuadas (as que nao levam o destaque) continuam em 0,6 pt, e ai a diferenca entre elas
+  esta dita duas vezes, por peso e por tinta.
+
+Quando `base=`, `altura=` e `diagonal=` chegam as tres com numero, a diagonal e CONFERIDA
+contra a conta, que num retangulo e o teorema de Pitagoras, e a figura e recusada com aviso
+se nao fechar: uma figura que diz d igual a 12 num retangulo de 3 por 4 e a folha do proprio
+material contradizendo o teorema da pagina ao lado. Pela mesma regra, `base=` que contradiz
+um `lado=`, e base com altura que contradizem os angulos escritos, saem recusadas com os dois
+valores no aviso.
+
+Na camada de gabarito a letra vira o valor medido na propria figura, em teal, corpo de
+resposta e negrito, como o raio focal da conica: `diagonal=A;C;d` num retangulo de 4 por 3
+sai "d = 5". So quando a forma foi DEDUZIDA dos dados: no paralelogramo e no trapezio
+escaleno a inclinacao das pernas sai do prototipo, e ali a letra fica como veio, porque medir
+seria medir o chute. E so o retangulo e o quadrado levam base, altura e diagonal ate o
+gabarito por baixo do teto de cinco marcas: nos outros tipos a camada de resposta acrescenta
+os quatro valores de angulo e a figura passa de cinco.
+
+**A escala automatica passou a ter tres saidas e nao duas.** So numero: a figura e construida
+com os valores escritos e sai FIEL, como sempre foi. So letra: nenhum valor metrico e numero,
+a figura sai do PROTOTIPO, que e exato por construcao (o retangulo do prototipo tem quatro
+angulos retos de verdade), e ela NAO esta fora de escala de nada, nao pede legenda e nao
+precisa mais de `escala=fiel` escrito a mao. Mistura: `base=10 altura=h` afirma uma proporcao
+que o desenho nao garante, e ai a figura E fora de escala e a legenda continua obrigatoria. O
+valor metrico e o primeiro campo de cada ocorrencia, entao o rotulo de `altura=6;h` e o de
+`diagonal=A;C;d` nao contam como letra. `escala=fiel` e `escala=fora` escritos na diretiva
+continuam mandando por cima.
+
+A saida do meio tem duas condicoes.
+
+A primeira e sobre COMPRIMENTO e nao sobre angulo. O angulo em letra e RESOLVIDO (o sistema
+fecha e a construcao usa o valor achado); o comprimento em letra nao e resolvido por ninguem
+e sai do prototipo. Entao letra em angulo e sempre fiel, e letra em comprimento so e fiel
+quando os simbolos sao **distintos e sem coeficiente**: `lado=a lado=b lado=c` e `base=b
+altura=h` nao afirmam proporcao nenhuma e qualquer desenho os satisfaz, mas `lado=a lado=a`
+afirma que dois lados sao iguais e o desenho tem que cumprir. Onde a receita SABE cumprir,
+ela constroi e a figura volta a ser fiel: o `triangulo` monta o isosceles de `lado=a lado=a
+lado=b`, o equilatero de `lado=a lado=a lado=a` e a proporcao 1 para 2 de `lado=x lado=2x
+lado=2x`. Onde ela nao sabe (`retangulo base=a altura=a`, `trapezio base=b base=b altura=h`,
+`lado=a+1 lado=a lado=a`), a figura sai fora de escala e cobra a legenda.
+
+A segunda vale sobre a MISTURA, e e a que fecha a familia:
+
+> Letra em chave metrica e uma de duas coisas, e so uma delas e fora de escala. Se a
+> CONSTRUCAO determinou aquele valor, a letra e a PERGUNTA e o desenho e exato: **fiel**. Se
+> o valor saiu do prototipo, a letra e parametro livre e o desenho e arbitrario: **fora de
+> escala**.
+
+`lado=3 lado=4 lado=5 altura=h` desenha a altura de 2,4 de verdade e o `h` e o nome da
+resposta: fiel, sem legenda. `base=10 altura=h` desenha uma altura de 6,2 que ninguem pediu:
+fora de escala, com legenda. A pergunta e a mesma que a camada de gabarito ja fazia para
+decidir se podia escrever o valor resolvido, e agora as duas tem uma resposta so: se o
+gabarito pode medir a figura para responder, a figura nao esta fora de escala de nada.
+
+Sao determinadas, no `triangulo`: tres lados numericos; base e altura numericas (com ou sem
+um angulo); e dois angulos mais um comprimento numerico. No `quadrilatero`: a forma fechada
+(ver a lista de deducoes abaixo) mais um comprimento numerico. `escala=fora` escrito na
+diretiva continua mandando por cima, porque o desenho enganoso de proposito e escolha do
+autor e nenhuma deducao a desfaz.
+
+**Limitacao conhecida, e nao e da receita.** Rotulo de lado com COEFICIENTE (`lado=2x`) desenha
+certo, na proporcao certa, e mesmo assim sai com o aviso "o valor de angulo 2x saiu solto na
+figura, sem arco". A trava do `base.js` (`expressaoLinear`, linha 1324, usada em :1711)
+classifica valor de angulo pelo TEXTO, e "2x" e expressao linear com digito, que ela aceita com
+qualquer letra de proposito, para pegar o `3x+10` de angulo. Ela nao tem como saber que aquele
+texto foi posto por `rotuloLado` e nao por `rotuloAngulo`, porque o registro de texto do
+`medido` nao carrega o papel (campos: txt, x, y, tam, bold, cor, largura, cx, cy). E
+PRE-EXISTENTE e independente desta familia: `@fig triangulo angulo=52 angulo=61 lado=2x`, que
+nao passa por nenhuma linha nova, da o mesmo aviso. O conserto e acrescentar `papel` ao registro
+de texto no `desenho.js` e o `base.js` pular o que veio de lado; ficou de fora por ser dois
+arquivos de nucleo para um caso que nenhum tema usa hoje. **Enquanto isso, quem escrever tema
+com `lado=2x` vai ver o piloto reprovar por aviso de figura**, e a saida e usar simbolos
+distintos (`lado=a lado=b`) ou marcar a proporcao no texto do enunciado.
+
+**O que a receita DEDUZ em vez de recusar.** Diretiva incompleta que descreve uma figura que
+existe e desenhada, e nao recusada:
+
+- `retangulo base=4 diagonal=A;C;5` da altura 3 por Pitagoras, e `altura=3 diagonal=A;C;5` da
+  base 4. `quadrado diagonal=A;C;8.49` da lado 6.
+- `triangulo angulo=90 base=4 altura=3` desenha o retangulo de catetos 4 e 3: UM angulo mais
+  a base e a altura ja determinam o triangulo (o apice fica em h sobre a tangente do angulo).
+- `quadrilatero tipo=paralelogramo angulo=120 base=10 altura=6` desenha: o angulo fixa a
+  inclinacao das pernas e deixa a razao dos lados livre, entao a base e a altura entram
+  medindo o que ele deixou em aberto. Vale igual no losango e nos dois trapezios. O
+  paralelogramo pede as DUAS medidas para a forma fechar: com o angulo e so a base, a perna
+  continua livre e uma diagonal numerica ali e recusada dizendo que falta a altura.
+- `lado=` faz o papel de `base=` na construcao quando `base=` nao foi escrita: na volta A, B,
+  C, D o lado a E o lado AB, que e a base. `tipo=losango lado=6 altura=5` e `tipo=retangulo
+  lado=4 altura=3` desenham, e "losango de lado 6" continua sendo a frase do enunciado.
+- No `triangulo`, tres lados numericos que fecham Pitagoras ganham o **quadradinho do vertice
+  reto de oficio**, como notacao da CLASSE, custando UMA marca, pela mesma conta dos quatro
+  quadradinhos do `tipo=retangulo`. Sem ele nao se sabe qual lado e a hipotenusa, e pedir
+  `angulo=90` no lugar era um beco: no 3, 4, 5 o angulo reto cai em C, a chave `angulo=`
+  preenche na ordem A, B, C, e chegar la custava duas incognitas.
+  A figura do MAT09-06 (triangulo retangulo com a altura relativa a hipotenusa) NAO cabe com
+  os tres lados rotulados: sao seis marcas. A grafia que cabe e
+
+      @fig triangulo angulo=90 altura=h;h;A escala=fiel
+
+  com **tres marcas**: o quadradinho em A, a altura ate a hipotenusa e o quadradinho do pe
+  dela. E literalmente a figura que a convencao descreve para esse tema, com o 3, o 4 e o 5
+  morando no TEXTO, que e onde a regra "cada dado aparece em um lugar so" os quer. Ela precisa
+  do `escala=fiel` escrito porque `angulo=90` mais `altura=h` e mistura sem nenhum comprimento
+  na figura: nao ha numero que fixe a escala, entao o refinamento nao tem como declarar a
+  altura determinada.
+- `losango` pelas DUAS diagonais, ou por uma diagonal e o lado. As diagonais do losango sao
+  perpendiculares e se cortam ao meio, entao elas o determinam inteiro e o lado sai de
+  Pitagoras das metades. `@fig quadrilatero tipo=losango diagonal=A;C;8 diagonal=B;D;6 lado=L`
+  desenha os quatro lados medindo 5 na folha, que e O exercicio de losango do 8o e do 9o ano.
+  Nos tipos em que duas diagonais nao fecham a forma (o irregular, o trapezio, o
+  paralelogramo) a diagonal numerica continua recusada, com o aviso dizendo o que falta.
+
+**Toda medida numerica e conferida contra o desenho, e a ausencia de uma chave nao desliga a
+conferencia.** Quem confere e a ESCALA DO PROBLEMA: o primeiro comprimento numerico da
+diretiva (qualquer `lado=`, `base=` ou `altura=`) fixa quantas unidades do problema vale uma
+unidade da construcao, e dali em diante todo outro numero esta determinado e e comparado com
+o que a figura produziu. `lado=4 lado=6 lado=9 altura=8` e recusado porque a altura desses
+lados vale 2,12; `retangulo base=4 diagonal=A;C;12` nao e recusado, porque com uma dimensao e
+a diagonal a outra sai da conta. Quando a forma NAO esta determinada (o trapezio escaleno sem
+as duas bases, por exemplo), uma diagonal numerica e recusada dizendo o que falta, em vez de
+ser comparada com um segmento que o prototipo chutou.
+
+Tres recusas que valem escrever, porque sao as que o autor de tema encontra primeiro:
+`altura=h;B` sozinha e ambigua (o segundo campo e o rotulo, entao a altura que parte de B se
+escreve `altura=h;h;B`); `base=10 altura=6;h;B` nao determina o triangulo, porque a base mede
+AB e a altura mede a relativa ao lado oposto a B; e a altura que cai sobre um vertice E o
+lado que sai dali, entao ela nao pode ser escrita junto com a medida daquele lado.
+
+O `triangulo` tambem AVISA (sem recusar) quando os tres lados numericos fecham Pitagoras e
+nenhum vertice esta marcado como reto: o quadradinho e a unica marca do vertice reto, e sem
+ele nao se sabe qual lado e a hipotenusa. Ele nao pode nascer de oficio porque tres medidas
+de lado ja sao tres marcas, e a quarta somada a uma altura estoura o teto de cinco.
+
+Dois LIMITES CONHECIDOS, medidos e nao consertados, para quem for mexer nao os redescobrir:
+
+- **Legenda de escala numa figura que o refinamento tornou fiel imprime sem aviso.** O
+  desenhador nunca inventa a frase da legenda (ela vem do tema), e tambem nao a apaga: se o
+  tema escreveu `legenda=Figura fora de escala.` numa diretiva que hoje sai fiel, a folha
+  imprime a frase sobre um desenho exato. Nenhum tema do banco esta nesse caso. O conserto e
+  um aviso "legenda de escala numa figura fiel", que ainda nao existe.
+- **`angulo=90 altura=h;h;A vertices=A;B;C` da seis marcas.** As tres letras de vertice mais o
+  quadradinho, a altura e o quadradinho do pe passam do teto, ou seja "triangulo ABC retangulo
+  em A com altura AH" nao cabe COM as letras de vertice. Ou o texto nomeia os vertices e a
+  figura fica sem letras, ou a figura se parte em duas.
+
+O que ainda NAO existe: `mediana=` e `bissetriz=` com medida (a `ceviana=` traca as tres e
+mede nenhuma), a altura relativa a um lado que nao seja a base no quadrilatero, e duas alturas
+na mesma figura, que a regra de uma ideia por figura desaconselha.
 
 ### As receitas de espaco: solido e painelsolidos
 
@@ -533,6 +728,42 @@ Tres travas mudaram em 02/09/2026, cada uma com prova nos dois sentidos em
   bissetrizes passam pelo incentro e as diagonais pelo centro; o raio focal termina em P e
   o semieixo em F1, e um ponto em que dois tracos so terminam nao tem quatro angulos
   nascendo. O traco conta quando o ponto esta a mais de 2 pt de cada extremidade.
+
+## O piloto de tema
+
+Cada tema com figura tem um piloto, `figuras/_piloto_<ID>.js`, que gera as quatro folhas pelo caminho de verdade (o `gerarMaterialTema` do `pdf.js`, lendo o tema do banco) e confere o que saiu. O que e generico mora no `figuras/_piloto_base.js`, e nao e copiado por tema: `abrir({id, caminhoDoMd})` resolve o banco (o `argv[2]` ou o `temas/banco.json`), gera `_exemplo_<ID>_material.pdf`, `_lista.pdf`, `_gabarito.pdf` e `_en.pdf`, monta os quatro documentos medidos e devolve o contexto; `conf`, `medido` e `placar` mantem o placar da casa ("N passaram, M falharam."); e os leitores de folha (`lerCaminhos`, `emBezier`, `caixaDe`, `voltasInteiras`, `textos`, `tem`, `quadradinhos`, `triangulos`, `bolinhasDe`, `planoDaFigura`, `ehHachurada`) leem o que vai sair impresso, nunca o que a receita disse que ia desenhar.
+
+`travasGenericas(ctx, op)` roda as travas numeradas:
+
+- **0** o banco lido e o do `.md` de hoje (vale para o `temas/banco.json` e para o retrato `figuras/_tema_<ID>.json`)
+- **A** nenhuma palavra portuguesa na folha em ingles, e o mesmo padrao acha portugues na folha em portugues
+- **B** paridade PT x EN: as mesmas receitas, na mesma ordem, item a item e na explicacao
+- **C** sanidade: nenhuma diretiva impressa, nenhuma figura com erro, nenhum aviso nas quatro folhas, nenhuma reprovada pelo `conferirFigura`, todo `q` com o seu `Q` e nenhum tracejado fora de envelope
+- **D** teto de cinco marcas ativas
+- **E** escala coerente: fora de escala pede legenda, e desenho exato nao se marca fora de escala
+- **F** ao menos um terco dos exercicios sem figura nenhuma
+- **1** dois rotulos na mesma linha de base a menos de 14 pt viram um rotulo so
+- **2** o rotulo de vertice fica mais perto do vertice dele do que do concorrente
+- **3** enunciado com figura remete a ela, e enunciado sem figura nao fala dela
+- **4** nenhum dado numerico existe so no desenho
+- **5** toda hachura tem glosa, na legenda e, dentro de exercicio, tambem no enunciado
+- **6** nenhum numero de escala e riscado por arco de 1,1 a 1,3 pt
+- **7** nenhum rotulo e impresso em cima de outro, em direcao nenhuma
+- **8** o tema nao promete figura em texto nenhum sem ter uma diretiva `@fig` em lugar nenhum
+
+A trava 8 e **vazia por construcao dentro do piloto**, e o piloto escreve isso na folha: ela devolve vazio assim que o tema tem uma diretiva, e um piloto de tema so existe para tema que tem figura. Quem a roda de verdade e o `figuras/_varredura_banco.js`, sobre os 148 temas do banco, que sao majoritariamente temas sem piloto. Esse script imprime a frase que casou, com tema, lingua e item, e separa dois defeitos diferentes: **(a) remissao quebrada**, exercicio que manda olhar uma figura que a folha nao tem, que e o criterio de pronto e reprova; e **(b) indicio de tema escrito supondo figura**, explicacao que ensina a olhar sem que o tema desenhe, que pode ser roteiro generico e por isso nao reprova, so aponta. Ele mantem tambem uma lista de temas isentos com o motivo escrito ao lado de cada um (a palavra "figura" tambem quer dizer forma, icone de pictograma e termo de sequencia) e dois controles positivos obrigatorios, de temas que tem figura e remetem a ela: um verificador cujo resultado esperado e um tema so fica cego sem ninguem ver, porque zero acusados parece boa noticia.
+
+O piloto do tema traz so tres coisas: o ID, os numeros editoriais daquele tema (`diretivasNaExplicacao`, `enunciadosComFigura`, `registrosNoMaterial`, `figurasNoGabarito`, `idsDoGabarito`, `hachurasMinimas`, `figurasForaDeEscala`, `palavrasPt`, `naoTraduz`, cada um com o rotulo editorial dele) e a medicao no fluxo da familia de receitas dele. Opcao que nao vem desliga a trava correspondente, e a base escreve na folha que desligou, com o motivo verdadeiro: nao existe trava silenciosamente ausente num tema que passou.
+
+O piloto tambem imprime, a cada rodada, o sha-256 das quatro folhas que gerou, e **nao o confere contra nada**. Duas rodadas com o mesmo sha provam que uma mudanca de codigo nao encostou no desenho; cravar o sha numa conferencia faria a trava ficar vermelha a cada melhoria legitima de receita, e trava que se atualiza para ficar verde ensina a ignorar trava.
+
+Roda-se assim, um comando por tema, mais a prova da base e a varredura do banco:
+
+    node figuras/_prova_piloto_base.js
+    node figuras/_piloto_MATEM3-12.js figuras/_tema_MATEM3-12.json
+    node figuras/_varredura_banco.js
+
+A prova da base tem par envenenado para cada trava: um tema (ou uma figura) limpo que ela tem que aprovar e um com exatamente o defeito que ela caca, que ela tem que reprovar nomeando o item. Trava nova entra na base com o par, nunca so num piloto de tema.
 
 ## O que NAO fazer
 

@@ -184,6 +184,17 @@ function comAviso(texto, pedaco) {
   return (d.avisosFigura || []).filter(function (a) { return a.indexOf(pedaco) >= 0; }).length;
 }
 
+/* Pergunta a propria receita se ela considera a figura fora de escala, pelo mesmo
+ * caminho que o gerador usa (o medir, antes de desenhar). Existe porque desde que
+ * a escala=fiel passou a sair sozinha em prototipo exato, "nao ha aviso" deixou de
+ * distinguir dois casos que precisam ser distinguidos: a figura que nao e fora de
+ * escala, e a figura que e fora de escala e ninguem reclamou. */
+function foraDeEscalaDe(texto) {
+  const d = FigBase.lerDiretiva(texto);
+  const r = FigReceitas.receitas[d.receita];
+  return r.medir(d, {}).foraDeEscala;
+}
+
 console.log('\nfiguras que tem que ser RECUSADAS');
 /* Sistema sobredeterminado e contraditorio, e todo ele em EXPRESSAO: 2x, 2x e 3x
  * em tres vertices de um paralelogramo pedem dois valores diferentes do mesmo
@@ -216,8 +227,26 @@ console.log('\na escala que mente');
  * figura saia com 62 e 118, e a rodada passada consertou o desenho sem tirar a
  * desculpa. Agora a receita acusa em vez de deixar a folha afirmar o contrario do
  * que ela desenha. */
-conf('figura exata marcada fora de escala pela letra e acusada',
+/* Esta conferencia mudou de lado em 07/09/2026, junto com a chegada de base= e
+ * altura=. Antes ela cobrava que a figura so em letra fosse ACUSADA: ela nascia
+ * marcada fora de escala pelo automatico, o desenho saia exato, e o aviso mandava
+ * o autor escrever escala=fiel a mao. Agora a regra e outra e o aviso ficou sem
+ * assunto: quando NENHUM valor metrico e numero, a figura sai do prototipo, o
+ * prototipo e exato por construcao, e ela nao e fora de escala nenhuma. O que se
+ * cobra passa a ser o silencio, e o par envenenado desce uma linha, para a
+ * mistura, que e onde a marca automatica continua nascendo. */
+conf('figura so em letra sai fiel sozinha, sem o autor escrever escala=fiel',
+  foraDeEscalaDe('@fig quadrilatero tipo=paralelogramo angulo=3x+10 angulo=2x+20'), false);
+conf('e por isso ela nao e mais acusada',
   comAviso('@fig quadrilatero tipo=paralelogramo angulo=3x+10 angulo=2x+20 ' + LEGENDA,
+    'marcada fora de escala so porque a diretiva traz letra'), 0);
+/* O veneno: numero e letra na mesma diretiva. A letra afirma uma proporcao que o
+ * desenho nao garante, entao a marca automatica continua nascendo; e quando ainda
+ * assim o desenho sai exato, a trava acusa, que e o caso que ela existe para pegar. */
+conf('mas a mistura de numero e letra continua fora de escala',
+  foraDeEscalaDe('@fig quadrilatero tipo=paralelogramo angulo=40 angulo=2x'), true);
+conf('e continua acusada quando o desenho sai exato',
+  comAviso('@fig quadrilatero tipo=paralelogramo angulo=40 angulo=2x ' + LEGENDA,
     'marcada fora de escala so porque a diretiva traz letra') >= 1, true);
 conf('e a mesma figura com escala=fiel escrita no tema passa calada',
   comAviso('@fig quadrilatero tipo=paralelogramo angulo=3x+10 angulo=2x+20 escala=fiel',

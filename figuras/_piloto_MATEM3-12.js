@@ -1,11 +1,14 @@
 /* figuras/_piloto_MATEM3-12.js
  * Gera os documentos do MATEM3-12, "Revisao: geometria plana e espacial", pelo
  * caminho de verdade: o gerarMaterialTema do pdf.js, lendo o tema do
- * temas/banco.json, que e o mesmo arquivo que o tablet consome. Copia a forma
- * do _piloto_MATEM3-04.js e troca tres blocos: os numeros editoriais deste
- * tema, a medicao no fluxo que solidos e circulos pedem (os modelos sao a
- * _prova_receitas_solidos.js e a _prova_receitas_circulo.js) e as travas de
- * leitura da folha reescritas para o texto deste tema.
+ * temas/banco.json, que e o mesmo arquivo que o tablet consome.
+ *
+ * Tudo o que e generico (a abertura do tema, o placar, os leitores de folha e
+ * as travas 0 a 8) mora no _piloto_base.js. Aqui ficam so tres coisas: o ID, os
+ * numeros editoriais deste tema e a medicao no fluxo que solidos e circulos
+ * pedem (os modelos sao a _prova_receitas_solidos.js e a
+ * _prova_receitas_circulo.js), mais os pares envenenados com o texto deste
+ * tema.
  *
  * Uso: node _piloto_MATEM3-12.js [caminho de outro banco.json ou do retrato]
  *   O segundo argumento aceita o banco inteiro ({"temas": [...]}) ou o objeto
@@ -21,139 +24,21 @@
  *
  * Regra da casa: nunca usar travessao.
  */
-const fs = require('fs');
-const path = require('path');
-const PDFGen = require('../pdf.js');
+const P = require('./_piloto_base.js');
+const PDFGen = P.PDFGen;
 
 const ID = 'MATEM3-12';
-const RAIZ = path.join(__dirname, '..');
-const PADRAO = path.join(RAIZ, 'temas', 'banco.json');
-const BANCO = process.argv[2] || PADRAO;
-const FONTE = path.join(RAIZ, 'temas', 'mat', 'em3', ID + '.md');
-const lido = JSON.parse(fs.readFileSync(BANCO, 'utf8'));
-const tema = Array.isArray(lido.temas)
-  ? lido.temas.find(function (t) { return t.id === ID; })
-  : (lido && lido.id === ID ? lido : null);
-if (!tema) throw new Error(ID + ' nao esta em ' + BANCO + ': rode gerar_banco.py antes');
+const ctx = P.abrir({ id: ID, caminhoDoMd: 'temas/mat/em3/' + ID + '.md' });
 
-console.log('tema: ' + tema.pt.titulo + '  |  ' + tema.pt.exercicios.length + ' exercicios  |  banco: ' + BANCO);
+const conf = P.conf, medido = P.medido;
+const textos = P.textos, tem = P.tem, triangulos = P.triangulos, quadradinhos = P.quadradinhos;
+const dist = P.dist, n2 = P.n2, n4 = P.n4;
+const porId = ctx.porId, gabPorId = ctx.gabPorId, explic = ctx.explic;
+const docPT = ctx.docPT, docGab = ctx.docGab, docEN = ctx.docEN;
 
-/* ================================================================ os documentos */
-
-function gerar(nome, op) {
-  const bytes = PDFGen.gerarMaterialTema(Object.assign({ tema: tema }, op));
-  const saida = path.join(__dirname, nome);
-  fs.writeFileSync(saida, bytes);
-  console.log('  ' + nome + ': ' + Math.round(bytes.length / 1024) + ' KB');
-  return bytes;
-}
-
-const material = gerar('_exemplo_' + ID + '_material.pdf', {
-  lingua: 'pt', incluirMaterial: true, incluirLista: true, incluirGabarito: true,
-  aluno: 'Nathália', data: '07/09/2026'
-});
-const lista = gerar('_exemplo_' + ID + '_lista.pdf', {
-  lingua: 'pt', incluirLista: true, aluno: 'Nathália', espacoParaResposta: 26
-});
-const gabarito = gerar('_exemplo_' + ID + '_gabarito.pdf', {
-  lingua: 'pt', incluirGabarito: true
-});
-const ingles = gerar('_exemplo_' + ID + '_en.pdf', {
-  lingua: 'en', incluirMaterial: true, incluirLista: true, incluirGabarito: true
-});
-
-/* ================================================================ conferencias */
-
-let ok = 0, mau = 0;
-function conf(rotulo, obtido, esperado) {
-  const bom = String(obtido) === String(esperado);
-  if (bom) ok++; else mau++;
-  console.log((bom ? '  OK    ' : '  FALHA ') + rotulo +
-    (bom ? '' : '  [obtido: ' + obtido + ' | esperado: ' + esperado + ']'));
-}
-function medido(t) { console.log('        ' + t); }
-const n2 = (v) => (Math.round(v * 100) / 100).toFixed(2);
-const n4 = (v) => (Math.round(v * 10000) / 10000).toFixed(4);
-const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-
-console.log('\nconferencias');
-
-/* 0. O banco tem que ser o do .md de hoje.
- * Vale para o banco padrao e para o retrato deste tema, que nasce do mesmo .md:
- * quem passa OUTRO banco (a main, por exemplo) esta comparando de proposito. */
-const ehRetratoDesteTema = new RegExp('_tema_' + ID + '\\.json$').test(BANCO);
-if (fs.existsSync(FONTE) && (BANCO === PADRAO || ehRetratoDesteTema)) {
-  const noMd = (fs.readFileSync(FONTE, 'utf8').match(/(^|\s)@fig\s/g) || []).length;
-  let noBanco = 0;
-  ['pt', 'en'].forEach(function (lingua) {
-    const d = tema[lingua] || {};
-    const textos = [d.explicacao || ''];
-    (d.exercicios || []).forEach(function (e) { textos.push(e.enunciado || '', e.resposta || ''); });
-    textos.forEach(function (s) { noBanco += (s.match(/(^|\s)@fig\s/g) || []).length; });
-  });
-  conf('o banco lido foi gerado do ' + ID + '.md de hoje (' + noMd + ' diretivas no .md)',
-    noBanco === noMd ? 'sim' : 'NAO: o banco tem ' + noBanco + ' diretivas, regere o retrato ou rode gerar_banco.py', 'sim');
-}
-
-[['material', material], ['lista', lista], ['gabarito', gabarito], ['ingles', ingles]]
-  .forEach(function (par) {
-    const cru = Buffer.from(par[1]).toString('latin1');
-    conf('nenhuma diretiva saiu impressa no ' + par[0], /@fig/.test(cru), false);
-  });
-
-const NAO_TRADUZ = ['Nathália Wajsenzon', 'APOIO EDUCACIONAL',
-  'Nathália Wajsenzon · Apoio Educacional', 'NW'];
-/* As palavras deste tema que so existem em portugues, inclusive as que a
- * figura imprime pelo parametro (os nomes do painel e a glosa da hachura). */
-const MARCA_PT = /ção|ções|ângul|Página|Aluno|Gabarito|Exercícios|\bprisma\b|cilindro|pirâmide|esfera|geratriz|apótema|hachurad|região|setor |graus|ê|õ|ç|ã/;
-
-function pecasDeTexto(bytes) {
-  const cru = Buffer.from(bytes).toString('latin1');
-  const rx = /Td \(((?:[^()\\]|\\.)*)\) Tj/g;
-  let m, o = [];
-  while ((m = rx.exec(cru))) o.push(m[1]);
-  return o;
-}
-const vazou = pecasDeTexto(ingles)
-  .filter(function (t) { return NAO_TRADUZ.indexOf(t) < 0 && MARCA_PT.test(t); });
-conf('nenhuma palavra portuguesa na folha em ingles',
-  [...new Set(vazou)].join(', ') || 'nenhuma', 'nenhuma');
-const achouNoPt = pecasDeTexto(material)
-  .filter(function (t) { return NAO_TRADUZ.indexOf(t) < 0 && MARCA_PT.test(t); });
-conf('e o mesmo padrao acha portugues na folha em portugues', achouNoPt.length >= 10, true);
-
-function comDoc(lingua, op) {
-  const doc = new PDFGen.Doc();
-  doc.lingua = lingua;
-  const dados = tema[lingua];
-  doc.novaPagina();
-  doc.registrarFiguras(dados.explicacao);
-  dados.exercicios.forEach(function (ex) { doc.registrarFiguras(ex.enunciado); });
-  if (op.material) doc.markdown(dados.explicacao, { tam: 10 });
-  dados.exercicios.forEach(function (ex) {
-    const partes = doc.partesDeFigura(op.gabarito ? ex.resposta : ex.enunciado);
-    partes.forEach(function (p) {
-      if (p.tipo === 'figura') doc.figura(p.diretiva, { x: PDFGen.MARG_E + 20, largura: PDFGen.MARG_D - PDFGen.MARG_E - 20 });
-    });
-  });
-  return doc;
-}
-
-const docPT = comDoc('pt', { material: true });
-const docGab = comDoc('pt', { gabarito: true });
-const docEN = comDoc('en', { material: true });
-const docGabEN = comDoc('en', { gabarito: true });
-const figs = (docPT.figurasDesenhadas || []).concat(docGab.figurasDesenhadas || []);
-
-function receitasDe(texto) {
-  const nomes = [];
-  new PDFGen.Doc().partesDeFigura(texto).forEach(function (p) {
-    if (p.tipo === 'figura') nomes.push(p.diretiva.receita || ('id:' + p.diretiva.id));
-  });
-  return nomes.join(' ');
-}
-
-/* Escolha editorial escrita: 5 na explicacao, 7 nos 18 enunciados, 3 no
+/* ================================================================ travas genericas
+ *
+ * Escolha editorial escrita: 5 na explicacao, 7 nos 18 enunciados, 3 no
  * gabarito. O tema chegou sem UMA figura, num assunto em que o livro didatico
  * desenha em toda pagina, e a regua e essa: o que um bom livro do 3o ano traria
  * naquele ponto.
@@ -185,72 +70,30 @@ function receitasDe(texto) {
  * que e o raio do semicirculo, que o texto de antes nao dizia) e 18 (h = 6,
  * a altura que e o diametro da esfera). O 9 e conta pura sobre o triangulo
  * que o enunciado ja mostra, e fica em texto. */
-const diretivasExplic = receitasDe(tema.pt.explicacao).split(' ').filter(function (s) { return s; }).length;
-conf('a explicacao tem 5 figuras', diretivasExplic, 5);
-const COM_FIGURA = '8 9 14 15 16 17 18';
-conf('os enunciados 8, 9, 14, 15, 16, 17 e 18 carregam figura, e so eles',
-  tema.pt.exercicios.filter(function (e) { return receitasDe(e.enunciado); }).map(function (e) { return e.n; }).join(' '), COM_FIGURA);
-conf('o material desenha 16 registros: 4 figuras mais as 5 celulas do painel na explicacao, e 7 nos enunciados',
-  (docPT.figurasDesenhadas || []).length, 16);
-conf('e o gabarito tem 3 (8, 17 e 18)', (docGab.figurasDesenhadas || []).length, 3);
-conf('as tres do gabarito sao as dos ids s8, s17 e s18',
-  (docGab.figurasDesenhadas || []).map(function (f) { return f.id; }).join(' '), 's8 s17 s18');
-conf('nenhuma figura falhou', figs.filter(function (f) { return f.erro; }).length, 0);
-conf('nenhum aviso de figura no material', (docPT.avisosFigura || []).length, 0);
-conf('nenhum aviso de figura no gabarito', (docGab.avisosFigura || []).length, 0);
-conf('nenhum aviso de figura na folha em ingles', (docEN.avisosFigura || []).length + (docGabEN.avisosFigura || []).length, 0);
-conf('nenhuma figura com falha de conferencia',
-  figs.filter(function (f) { return (f.conferencia || []).length; }).map(function (f) { return (f.id || f.receita) + ': ' + f.conferencia.join(' ; '); }).join(' | ') || 'nenhuma', 'nenhuma');
-
-let acimaDoTeto = [];
-figs.forEach(function (f) {
-  if (f.marcasAtivas > 5) acimaDoTeto.push((f.id || f.receita || '?') + ':' + f.marcasAtivas);
+P.travasGenericas(ctx, {
+  /* As palavras deste tema que so existem em portugues, inclusive as que a
+   * figura imprime pelo parametro (os nomes do painel e a glosa da hachura). */
+  palavrasPt: ['\\bprisma\\b', 'cilindro', 'pirâmide', 'esfera', 'geratriz',
+    'apótema', 'hachurad', 'região', 'setor ', 'graus'],
+  diretivasNaExplicacao: { n: 5, rotulo: 'a explicacao tem 5 figuras' },
+  enunciadosComFigura: {
+    n: '8 9 14 15 16 17 18',
+    rotulo: 'os enunciados 8, 9, 14, 15, 16, 17 e 18 carregam figura, e so eles'
+  },
+  registrosNoMaterial: {
+    n: 16,
+    rotulo: 'o material desenha 16 registros: 4 figuras mais as 5 celulas do painel na explicacao, e 7 nos enunciados'
+  },
+  figurasNoGabarito: { n: 3, rotulo: 'e o gabarito tem 3 (8, 17 e 18)' },
+  /* Nenhuma figura deste tema e chute: as numericas saem fieis por construcao e
+   * as de letra sao prototipos ou se deduzem (inscrito=10 raio=r). Entao
+   * nenhuma pode sair MARCADA fora de escala, que e a afirmacao falsa sobre um
+   * desenho exato. E afirmacao editorial deste tema, e nao regra da casa: um
+   * tema com prototipo em letra nao passa esta opcao. */
+  figurasForaDeEscala: { n: 'nenhuma', rotulo: 'nenhuma figura marcada fora de escala: todas saem exatas' },
+  idsDoGabarito: { n: 's8 s17 s18', rotulo: 'as tres do gabarito sao as dos ids s8, s17 e s18' },
+  hachurasMinimas: { n: 6, rotulo: 'ha hachura para glosar (o setor de alfa, o 14 e o 16, em cada lingua)' }
 });
-conf('nenhuma figura passa do teto de cinco marcas ativas', acimaDoTeto.join(', ') || 'nenhuma', 'nenhuma');
-console.log('  marcas ativas por figura: ' +
-  figs.map(function (f) { return (f.id || f.receita) + ':' + f.marcasAtivas; }).join(' '));
-
-/* Nenhuma figura deste tema e chute: as numericas saem fieis por construcao e
- * as de letra sao prototipos ou se deduzem (inscrito=10 raio=r). Entao nenhuma
- * pode sair MARCADA fora de escala, que e a afirmacao falsa sobre um desenho
- * exato; e a falta do aviso numa figura chutada ja sairia como aviso acima. */
-conf('nenhuma figura marcada fora de escala: todas saem exatas',
-  figs.filter(function (f) { return f.foraDeEscala; }).map(function (f) { return f.id || f.receita; }).join(', ') || 'nenhuma', 'nenhuma');
-
-let pareado = true;
-tema.pt.exercicios.forEach(function (ex, i) {
-  const en = tema.en.exercicios[i];
-  if (receitasDe(ex.enunciado) !== receitasDe(en.enunciado)) pareado = false;
-  if (receitasDe(ex.resposta) !== receitasDe(en.resposta)) pareado = false;
-});
-conf('as duas linguas usam as mesmas receitas na mesma ordem, item a item', pareado, true);
-conf('a explicacao tambem', receitasDe(tema.pt.explicacao), receitasDe(tema.en.explicacao));
-
-[['material', docPT], ['gabarito', docGab], ['ingles', docEN]].forEach(function (par) {
-  let desbalanceada = 0, tracejadoAberto = 0;
-  (par[1].paginas || []).forEach(function (pag) {
-    let nivel = 0, tracejado = false;
-    (pag.ops || []).forEach(function (o) {
-      const s = String(o);
-      if (/(^|\s)q(\s|$)/.test(s)) nivel++;
-      if (/(^|\s)Q(\s|$)/.test(s)) { nivel--; if (nivel === 0) { tracejado = false; } }
-      if (/\[[\d\s.]+\]\s+\d+(\.\d+)?\s+d/.test(s)) tracejado = true;
-      if (nivel === 0 && tracejado) tracejadoAberto++;
-    });
-    if (nivel !== 0) desbalanceada++;
-  });
-  conf('todo q tem o seu Q no ' + par[0], desbalanceada, 0);
-  conf('nenhum tracejado ligado fora de envelope no ' + par[0], tracejadoAberto, 0);
-});
-
-const comFigura = tema.pt.exercicios.filter(function (e) { return receitasDe(e.enunciado); }).length;
-const semNada = tema.pt.exercicios.filter(function (e) {
-  return !receitasDe(e.enunciado) && !receitasDe(e.resposta);
-}).length;
-console.log('\neditorial: ' + comFigura + ' de ' + tema.pt.exercicios.length +
-  ' enunciados com figura, ' + semNada + ' exercicios sem figura nenhuma');
-conf('pelo menos um terco dos exercicios sem figura nenhuma',
-  semNada >= Math.ceil(tema.pt.exercicios.length / 3), true);
 
 /* ================================================================ medicao no fluxo
  * O que a folha AFIRMA com o desenho, medido no que vai sair impresso, e nao no
@@ -258,80 +101,20 @@ conf('pelo menos um terco dos exercicios sem figura nenhuma',
  * prova: o de caminhos da _prova_receitas_circulo.js (toda circunferencia sai
  * redonda) e os pontos-chave que o solidos.js devolve "para a receita cotar em
  * cima" (_prova_receitas_solidos.js). */
-function lerCaminhos(ops) {
-  const toks = [];
-  for (const s of ops) {
-    if (String(s).indexOf('BT ') === 0) continue;
-    for (const t of String(s).split(/\s+/)) if (t) toks.push(t);
-  }
-  const subs = [];
-  let atual = null, pilha = [], w = 1;
-  const num = (k) => { const v = pilha[pilha.length - k]; return v === undefined ? 0 : v; };
-  for (const t of toks) {
-    const v = parseFloat(t);
-    if (!isNaN(v) && /^[-+]?[\d.]+$/.test(t)) { pilha.push(v); continue; }
-    switch (t) {
-      case 'w': w = num(1); break;
-      case 'm': atual = { pts: [{ x: num(2), y: num(1) }], trechos: [], w: w, fechado: false }; subs.push(atual); break;
-      case 'l': if (atual) { const a = atual.pts[atual.pts.length - 1], b = { x: num(2), y: num(1) }; atual.trechos.push({ p0: a, c1: a, c2: b, p3: b, reta: true }); atual.pts.push(b); } break;
-      case 'c': if (atual) { const a = atual.pts[atual.pts.length - 1]; const p3 = { x: num(2), y: num(1) }; atual.trechos.push({ p0: a, c1: { x: num(6), y: num(5) }, c2: { x: num(4), y: num(3) }, p3: p3, reta: false }); atual.pts.push(p3); } break;
-      case 'h': if (atual) atual.fechado = true; break;
-      case 'S': case 'B': case 'B*': if (atual) { atual.pintado = 'traco'; atual.w = w; } atual = null; break;
-      case 'f': case 'f*': if (atual) atual.pintado = 'area'; atual = null; break;
-      case 'n': if (atual) atual.pintado = 'recorte'; atual = null; break;
-      default: break;
-    }
-    pilha = [];
-  }
-  return subs;
-}
-function emBezier(tr, t) {
-  const s = 1 - t, a = s * s * s, b = 3 * s * s * t, c = 3 * s * t * t, d = t * t * t;
-  return { x: a * tr.p0.x + b * tr.c1.x + c * tr.c2.x + d * tr.p3.x, y: a * tr.p0.y + b * tr.c1.y + c * tr.c2.y + d * tr.p3.y };
-}
-function pontosDoSub(sub, n) { const o = []; for (const tr of sub.trechos) for (let i = 0; i <= n; i++) o.push(emBezier(tr, i / n)); return o; }
-function caixaDe(pts) {
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const p of pts) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
-  return { x0, y0, x1, y1, largura: x1 - x0, altura: y1 - y0, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
-}
-function voltasInteiras(subs) {
-  return subs.filter((s) => s.pintado === 'traco' && s.trechos.length === 4 && s.trechos.every((t) => !t.reta) &&
-    caixaDe(pontosDoSub(s, 8)).largura >= 20);
-}
-function textos(f) { return ((f && f.medido && f.medido.textos) || []).map((t) => t.txt); }
-function tem(f, txt) { return textos(f).filter((t) => t === txt).length; }
-function quadradinhos(f) { return (f.marcas || []).filter((k) => k && k.tipo === 'anguloReto'); }
-function triangulos(f) { return ((f.medido || {}).areas || []).filter((a) => a.pts.length === 3); }
+
 /* Do triangulo interno preenchido: o cateto horizontal (raio ou apotema da
  * base) sobre o vertical (altura), lidos nos pontos da area impressa. */
 function catetosDoTriangulo(f) {
   const t = triangulos(f)[0];
   if (!t) return null;
-  const P = t.pts;
+  const Q = t.pts;
   let horizontal = 0, vertical = 0;
   for (let i = 0; i < 3; i++) {
-    const a = P[i], b = P[(i + 1) % 3];
+    const a = Q[i], b = Q[(i + 1) % 3];
     if (Math.abs(a.y - b.y) < 0.05) horizontal = Math.abs(a.x - b.x);
     if (Math.abs(a.x - b.x) < 0.05) vertical = Math.abs(a.y - b.y);
   }
   return { horizontal: horizontal, vertical: vertical };
-}
-function rascunho(fig, registra) {
-  const d = new PDFGen.Doc(); d.novaPagina();
-  if (registra) d.registrarFiguras(registra);
-  d.partesDeFigura(fig).forEach(function (p) {
-    if (p.tipo === 'figura') d.figura(p.diretiva, { x: PDFGen.MARG_E + 20, largura: PDFGen.MARG_D - PDFGen.MARG_E - 20 });
-  });
-  return { figs: d.figurasDesenhadas || [], avisos: d.avisosFigura || [] };
-}
-
-const porId = {}, gabPorId = {};
-(docPT.figurasDesenhadas || []).forEach(function (f) { if (f.id) porId[f.id] = f; });
-(docGab.figurasDesenhadas || []).forEach(function (f) { if (f.id) gabPorId[f.id] = f; });
-const daExplicacao = (docPT.figurasDesenhadas || []).filter(function (f) { return !f.id; });
-function explic(receita, trecho) {
-  return daExplicacao.filter(function (f) { return f.receita === receita && (!trecho || String(f.diretiva).indexOf(trecho) >= 0); });
 }
 
 console.log('\nmedicao no fluxo');
@@ -341,8 +124,8 @@ console.log('\ntoda circunferencia sai redonda');
   let piorAniso = 0, piorRadial = 0, quantas = 0;
   [docPT, docGab].forEach(function (d) {
     (d.paginas || []).forEach(function (pag) {
-      voltasInteiras(lerCaminhos(pag.ops || [])).forEach(function (v) {
-        const pts = pontosDoSub(v, 24), c = caixaDe(pts);
+      P.voltasInteiras(P.lerCaminhos(pag.ops || [])).forEach(function (v) {
+        const pts = P.pontosDoSub(v, 24), c = P.caixaDe(pts);
         const r = (c.largura + c.altura) / 4;
         let radial = 0;
         for (const p of pts) radial = Math.max(radial, Math.abs(dist(p, { x: c.cx, y: c.cy }) - r));
@@ -376,7 +159,7 @@ console.log('\nexplicacao: o hexagono e o setor');
   conf('L impresso duas vezes (no lado e no raio) e um triangulo chapado', tem(h, 'L') === 2 && triangulos(h).length === 1, true);
   /* Par envenenado da medida: no pentagono o lado NAO mede o raio, e a mesma
    * conta tem que dizer isso. */
-  const p5 = rascunho('@fig poligonoregular lados=5 lado=L raio=L decomposto=sim').figs[0];
+  const p5 = P.rascunho('@fig poligonoregular lados=5 lado=L raio=L decomposto=sim').figs[0];
   const l5 = ((p5 && p5.medido && p5.medido.segmentos) || []).filter((s) => !s.varredura && Math.abs(s.w - 1.2) < 0.01);
   let c5x = 0, c5y = 0;
   l5.forEach((s) => { c5x += s.x1 + s.x2; c5y += s.y1 + s.y2; });
@@ -391,7 +174,7 @@ console.log('\nexplicacao: o hexagono e o setor');
   medido('setor de alfa: aberturas no fluxo ' + arcos.map((a) => a.toFixed(1)).join(', ') + '; textos ' + textos(s).join(' '));
   conf('o setor de alfa imprime alfa, r e O, e nada mais', textos(s).sort().join(' '), 'O r α');
   conf('e tem os dois arcos do angulo central (o destacado e o da marca)', arcos.filter((a) => a > 10 && a < 350).length >= 2, true);
-  conf('o setor esta hachurado', ((s.medido || {}).varreduras || 0) > 0, true);
+  conf('o setor esta hachurado', P.ehHachurada(s), true);
 }
 
 console.log('\nexplicacao: o painel e os dois triangulos internos');
@@ -427,7 +210,7 @@ console.log('\nexercicio 9: o cone de 6 por 8');
   conf('6 e 8 impressos, g em letra', tem(f, '6') === 1 && tem(f, '8') === 1 && tem(f, 'g') === 1, true);
   conf('quadradinho no pe da altura, reto na folha', !!q && dist(q, f.saida.O) < 0.01 && Math.abs(q.abertura - 90) < 0.01, true);
   /* Par envenenado da medida: o cone de 6 por 9 nao pode passar por 6 por 8. */
-  const outro = catetosDoTriangulo(rascunho('@fig solido tipo=cone triangulo=sim raio=6 altura=9 geratriz=g').figs[0]);
+  const outro = catetosDoTriangulo(P.rascunho('@fig solido tipo=cone triangulo=sim raio=6 altura=9 geratriz=g').figs[0]);
   medido('par envenenado, cone 6 por 9: razao ' + n4(outro.horizontal / outro.vertical));
   conf('a mesma medida distingue o cone de 6 por 9', Math.abs(outro.horizontal / outro.vertical - 0.75) > 0.05, true);
 }
@@ -457,13 +240,13 @@ console.log('\nexercicio 14: o quadrado com os dois circulos');
   conf('o quadrado tem quatro lados de 10 unidades', lados.length === 4 && comp.every((L) => Math.abs(L - 10 * k) < 0.05), true);
   conf('e a inscrita toca os lados: o raio dela e metade do lado', voltas.length === 2 && Math.abs(voltas[0].raio - 5 * k) < 0.05, true);
   conf('10 impresso, r e R em letra, quadradinho na tangencia', tem(f, '10') === 1 && tem(f, 'r') === 1 && tem(f, 'R') === 1 && quadradinhos(f).length === 1, true);
-  conf('a regiao entre o quadrado e a inscrita esta hachurada', ((f.medido || {}).varreduras || 0) > 0, true);
+  conf('a regiao entre o quadrado e a inscrita esta hachurada', P.ehHachurada(f), true);
 }
 
 console.log('\nexercicio 15: o prisma triangular de 6 por 10');
 {
-  const f = porId.s15, P = f.saida.prisma;
-  const lado = dist(P.vertices.A, P.vertices.B), alt = dist(P.vertices.A, P.vertices.D);
+  const f = porId.s15, Q = f.saida.prisma;
+  const lado = dist(Q.vertices.A, Q.vertices.B), alt = dist(Q.vertices.A, Q.vertices.D);
   medido('lado ' + n2(lado) + ' pt, altura ' + n2(alt) + ' pt, razao ' + n4(lado / alt) + ' (pedido 0,6000)');
   conf('lado por altura na folha e 6/10', Math.abs(lado / alt - 0.6) < 1e-6, true);
   conf('duas cotas de seta, 6 e 10, e duas marcas', f.tracos.filter((t) => t.tipo === 'cota').length === 2 && tem(f, '6') === 1 && tem(f, '10') === 1 && f.marcasAtivas === 2, true);
@@ -476,7 +259,7 @@ console.log('\nexercicio 16: o setor de 30 graus');
   medido('aberturas no fluxo: ' + arcos.map((a) => a.toFixed(2)).join(', ') + '; textos ' + textos(f).join(' '));
   conf('dois arcos de 30 graus (o destacado na circunferencia e o da marca)', arcos.filter((a) => Math.abs(a - 30) < 1).length >= 2, true);
   conf('12, 30 graus e O impressos', tem(f, '12') === 1 && tem(f, '30°') === 1 && tem(f, 'O') === 1, true);
-  conf('o setor esta hachurado', ((f.medido || {}).varreduras || 0) > 0, true);
+  conf('o setor esta hachurado', P.ehHachurada(f), true);
 }
 
 console.log('\nexercicio 17: o semicirculo que vira cone, e o seu gabarito');
@@ -514,216 +297,41 @@ console.log('\nexercicio 18: a esfera inscrita, e o seu gabarito');
   conf('gabarito: mesma escala e mesma caixa do enunciado', Math.abs(g.escala - f.escala) < 1e-9 && g.caixa.altura === f.caixa.altura, true);
 }
 
-/* ================================================================ leitura da folha
- * O que a revisao de folha impressa mede e que o TEMA resolve, na diretiva ou
- * no texto, e nao a receita. As duas primeiras vieram do piloto do MATEM3-04 e
- * ficam como estao (leem o fluxo do PDF pelo registro.medido do base.js). As
- * tres seguintes sao deste tema, leem o texto e o registro, e cada uma vem
- * com o par envenenado: a mesma funcao rodada num tema ou numa figura com o
- * defeito plantado tem que acusar. */
-console.log('\nleitura da folha');
-
-const todasAsFiguras = [docPT, docGab, docEN, docGabEN].reduce(function (o, d) {
-  return o.concat(d.figurasDesenhadas || []);
-}, []);
-function nomeDaFigura(f) { return f.id || f.receita || '?'; }
-
-/* 1. Dois rotulos na mesma linha de base viram um rotulo so.
- * Medido no MATEM3-04: na elipse da p.1 o "a" acabava em x = 340,31 e o "F1"
- * comecava em x = 350,25, os dois na linha de base 640, e a folha lia "a  F1"
- * em sequencia. O piso de 14 pt sao 4,9 mm no papel. */
-const FOLGA_MINIMA = 14;
-let piorFolga = { pt: Infinity, onde: 'nenhum par na mesma linha de base' };
-todasAsFiguras.forEach(function (f) {
-  const ts = ((f.medido || {}).textos || []).filter(function (t) { return String(t.txt).trim(); });
-  for (let i = 0; i < ts.length; i++) {
-    for (let j = i + 1; j < ts.length; j++) {
-      if (Math.abs(ts[i].y - ts[j].y) > 1.0) continue;
-      const esq = ts[i].x <= ts[j].x ? ts[i] : ts[j];
-      const dir = ts[i].x <= ts[j].x ? ts[j] : ts[i];
-      const folga = dir.x - (esq.x + esq.largura);
-      if (folga < piorFolga.pt) {
-        piorFolga = { pt: folga, onde: nomeDaFigura(f) + ' "' + esq.txt + '" e "' + dir.txt + '"' };
-      }
-    }
-  }
-});
-medido('menor folga entre dois rotulos na mesma linha de base: ' +
-  piorFolga.pt.toFixed(2) + ' pt, em ' + piorFolga.onde);
-conf('nenhum par de rotulos na mesma linha de base fica a menos de ' + FOLGA_MINIMA + ' pt',
-  piorFolga.pt >= FOLGA_MINIMA, true);
-
-/* 2. O rotulo do vertice da hiperbole tem que ser atribuivel.
- * Trava do piloto do MATEM3-04, mantida como esta. Neste tema nao ha A1 nem
- * A2 e ela passa vazia; fica porque a leitura da folha e a mesma em todos os
- * pilotos e o dia em que uma conica entrar aqui ela ja esta armada. */
-function bolinhasDe(f) {
-  return ((f.medido || {}).areas || []).map(function (a) {
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    a.pts.forEach(function (p) {
-      x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y);
-      x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y);
-    });
-    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-    let rmin = Infinity, rmax = 0;
-    a.pts.forEach(function (p) {
-      const r = Math.hypot(p.x - cx, p.y - cy);
-      rmin = Math.min(rmin, r); rmax = Math.max(rmax, r);
-    });
-    return { x: cx, y: cy, l: x1 - x0, h: y1 - y0, redondeza: rmax / (rmin || 1e-9), cor: a.cor || [0, 0, 0] };
-  }).filter(function (c) {
-    return c.l > 1 && c.l < 8 && c.h > 1 && c.h < 8 && c.redondeza < 1.15 &&
-      (c.cor[0] + c.cor[1] + c.cor[2]) < 1.5;
-  });
-}
-let piorVertice = { razao: Infinity, onde: 'nenhuma figura com A1 e A2' };
-todasAsFiguras.forEach(function (f) {
-  const rot = ((f.medido || {}).textos || [])
-    .filter(function (t) { return /^A[12]$/.test(String(t.txt).trim()); });
-  if (rot.length !== 2) return;
-  const dots = bolinhasDe(f);
-  if (dots.length < 4) return;
-  const cx = dots.reduce(function (s, d) { return s + d.x; }, 0) / dots.length;
-  const cy = dots.reduce(function (s, d) { return s + d.y; }, 0) / dots.length;
-  rot.forEach(function (t) {
-    const px = t.x + t.largura / 2, py = t.y + t.tam * 0.35;
-    const lado = String(t.txt).trim() === 'A1' ? 1 : -1;
-    const meus = dots.filter(function (d) { return (d.x - cx) * lado > 0; })
-      .sort(function (u, v) { return Math.abs(u.x - cx) - Math.abs(v.x - cx); });
-    if (!meus.length) return;
-    const V = meus[0];
-    const aoVertice = Math.hypot(px - V.x, py - V.y);
-    const aoCentro = Math.hypot(px - cx, py - cy);
-    let outra = { d: Infinity, quem: 'nenhuma outra bolinha' };
-    dots.forEach(function (d) {
-      if (d === V) return;
-      const dd = Math.hypot(px - d.x, py - d.y);
-      if (dd < outra.d) outra = { d: dd, quem: 'da bolinha vizinha' };
-    });
-    const concorrente = Math.min(outra.d, aoCentro);
-    const comoChama = outra.d <= aoCentro ? outra.quem : 'do cruzamento das assintotas';
-    if (concorrente / aoVertice < piorVertice.razao) {
-      piorVertice = {
-        razao: concorrente / aoVertice,
-        onde: nomeDaFigura(f) + ' "' + t.txt + '" a ' + aoVertice.toFixed(2) +
-          ' pt do seu vertice e a ' + concorrente.toFixed(2) + ' pt ' + comoChama
-      };
-    }
-  });
-});
-const PISO_DO_VERTICE = 1.7;
-medido(piorVertice.onde + ' (razao ' + piorVertice.razao.toFixed(2) + ')');
-conf('o rotulo do vertice fica ao menos ' + PISO_DO_VERTICE +
-  ' vezes mais perto do seu vertice do que do concorrente mais proximo',
-  piorVertice.razao >= PISO_DO_VERTICE, true);
-
-/* Os utilitarios das tres travas do tema. */
-function semDiretiva(s) { return String(s || '').replace(/(^|\s)@fig\s[^\n]*/g, ' '); }
-function diretivasDe(s) { return String(s || '').match(/(^|\s)@fig\s[^\n]*/g) || []; }
-function clonar(t) { return JSON.parse(JSON.stringify(t)); }
-const REMETE = { pt: /\bfigura\b/i, en: /\bfigure\b/i };
-const GLOSA = { pt: /hachurad/i, en: /hatched/i };
-
-/* 3. Enunciado com figura remete a ela; enunciado sem figura nao fala dela.
- * O texto de antes DESCREVIA a figura em palavras (14, 17 e 18 eram os piores:
- * "interna ao quadrado e externa ao circulo inscrito", "enrolado ate formar",
- * "tocando as duas bases e a superficie lateral"). Com a figura na folha, o
- * enunciado tem que mandar olhar ("da figura", "in the figure"), porque a
- * figura vem DEPOIS do texto e quem le com dificuldade nao volta sozinho; e o
- * contrario e o defeito silencioso da lista montada pela professora: um
- * enunciado que diz "da figura" e cuja diretiva foi apagada. */
-function semRemissao(t) {
-  const acusa = [];
-  ['pt', 'en'].forEach(function (lingua) {
-    t[lingua].exercicios.forEach(function (ex) {
-      const temFig = diretivasDe(ex.enunciado).length > 0;
-      const remete = REMETE[lingua].test(semDiretiva(ex.enunciado));
-      if (temFig && !remete) acusa.push(lingua + ' ' + ex.n + ' tem figura e nao remete a ela');
-      if (!temFig && remete) acusa.push(lingua + ' ' + ex.n + ' fala da figura e nao tem nenhuma');
-    });
-  });
-  return acusa;
-}
-conf('todo enunciado com figura remete a ela, e nenhum sem figura fala dela',
-  semRemissao(tema).join('; ') || 'nenhum', 'nenhum');
+/* ================================================================ pares envenenados
+ * As travas 3, 4 e 5 rodam na base, com os venenos sinteticos do
+ * _prova_piloto_base.js. Aqui elas rodam mais uma vez com o TEXTO DESTE TEMA
+ * envenenado: o detector generico tem que acusar a frase real que a revisao
+ * escreveu, e nao so o tema de laboratorio. Foi assim que os tres defeitos
+ * apareceram na primeira folha, e e o que impede a lista deste tema de perder a
+ * remissao, o numero ou a glosa numa edicao futura sem ninguem ver. */
+console.log('\npares envenenados com o texto deste tema');
 {
-  const veneno = clonar(tema);
+  const veneno = P.clonar(ctx.tema);
   const ex9 = veneno.pt.exercicios.find((e) => e.n === 9);
   ex9.enunciado = ex9.enunciado.replace('da figura', 'reto');
   const ex1 = veneno.en.exercicios.find((e) => e.n === 1);
   ex1.enunciado = 'The right triangle in the figure has legs 9 and 12 centimetres.';
   conf('par envenenado: o 9 sem "da figura" e o 1 falando de figura sem ter sao acusados',
-    semRemissao(veneno).join('; '), 'pt 9 tem figura e nao remete a ela; en 1 fala da figura e nao tem nenhuma');
+    P.semRemissao(veneno).join('; '), 'pt 9 tem figura e nao remete a ela; en 1 fala da figura e nao tem nenhuma');
 }
-
-/* 4. Nenhum dado numerico existe so no desenho.
- * A regra da especificacao para o banco bilingue: o numero que a figura
- * imprime tem que estar tambem no texto do enunciado, senao quem le em voz
- * alta ou pelo leitor de tela perde o exercicio. Le os textos IMPRESSOS de cada
- * figura de enunciado (pelo registro, nao pela diretiva) e procura cada numero
- * no texto do item, sem a diretiva. O "30°" da marca de angulo conta como 30. */
-function numeroSoNoDesenho(t, lingua, registros) {
-  const acusa = [];
-  registros.forEach(function (f) {
-    if (!f.id || f.fase === 'gabarito') return;
-    const ex = t[lingua].exercicios.find((e) => diretivasDe(e.enunciado).some((d) => d.indexOf('id=' + f.id + ' ') >= 0 || / id=.*$/.test(d) && d.indexOf('id=' + f.id) >= 0));
-    if (!ex) { acusa.push(lingua + ' ' + f.id + ' sem exercicio'); return; }
-    const noTexto = semDiretiva(ex.enunciado).match(/\d+(?:[.,]\d+)?/g) || [];
-    textos(f).forEach(function (tx) {
-      const m = String(tx).match(/^(\d+(?:[.,]\d+)?)°?$/);
-      if (!m) return;
-      if (noTexto.indexOf(m[1]) < 0) acusa.push(lingua + ' ' + ex.n + ': a figura imprime ' + tx + ' e o texto nao traz');
-    });
-  });
-  return acusa;
-}
-const soNoDesenho = numeroSoNoDesenho(tema, 'pt', docPT.figurasDesenhadas || [])
-  .concat(numeroSoNoDesenho(tema, 'en', docEN.figurasDesenhadas || []));
-conf('todo numero impresso numa figura de enunciado esta no texto do item, nas duas linguas',
-  soNoDesenho.join('; ') || 'nenhum', 'nenhum');
 {
-  const veneno = clonar(tema);
+  const veneno = P.clonar(ctx.tema);
   const ex16 = veneno.pt.exercicios.find((e) => e.n === 16);
   ex16.enunciado = ex16.enunciado.replace('raio 12 centímetros', 'raio dado');
   conf('par envenenado: tirado o 12 do texto do 16, a figura que imprime 12 e acusada',
-    numeroSoNoDesenho(veneno, 'pt', docPT.figurasDesenhadas || []).join('; '), 'pt 16: a figura imprime 12 e o texto nao traz');
+    P.numeroSoNoDesenho(veneno, 'pt', docPT.figurasDesenhadas || []).join('; '),
+    'pt 16: a figura imprime 12 e o texto nao traz');
 }
-
-/* 5. Toda hachura tem glosa: na legenda da figura e, no exercicio, tambem no
- * enunciado. Hachura sem palavra e textura que o olho tenta ler como conteudo,
- * e a folha pode sair em cinza. A hachura e lida no fluxo (as varreduras que o
- * base.js conta), nao na diretiva. */
-function hachuraSemGlosa(t, lingua, registros) {
-  const acusa = [];
-  registros.forEach(function (f) {
-    if (!((f.medido || {}).varreduras > 0)) return;
-    const nome = lingua + ' ' + nomeDaFigura(f);
-    if (!f.legenda) { acusa.push(nome + ' hachurada sem legenda'); return; }
-    if (!GLOSA[lingua].test(f.legenda)) acusa.push(nome + ' com legenda que nao glosa a hachura');
-    if (f.id && f.fase !== 'gabarito') {
-      const ex = t[lingua].exercicios.find((e) => diretivasDe(e.enunciado).some((d) => d.indexOf('id=' + f.id) >= 0));
-      if (ex && !GLOSA[lingua].test(semDiretiva(ex.enunciado))) acusa.push(nome + ': o enunciado nao diz que ha regiao hachurada');
-    }
-  });
-  return acusa;
-}
-const hachuradas = todasAsFiguras.filter((f) => (f.medido || {}).varreduras > 0).length;
-medido(hachuradas + ' figuras hachuradas nas quatro folhas');
-conf('ha hachura para glosar (o setor de alfa, o 14 e o 16, em cada lingua)', hachuradas >= 6, true);
-conf('toda figura hachurada tem legenda de glosa e o enunciado nomeia a regiao, nas duas linguas',
-  hachuraSemGlosa(tema, 'pt', docPT.figurasDesenhadas || []).concat(hachuraSemGlosa(tema, 'en', docEN.figurasDesenhadas || [])).join('; ') || 'nenhuma', 'nenhuma');
 {
-  const semLegenda = rascunho('@fig circulo id=v1 raio=6 setor=60 centro=O').figs;
-  const veneno = clonar(tema);
+  const semLegenda = P.rascunho('@fig circulo id=v1 raio=6 setor=60 centro=O').figs;
+  const veneno = P.clonar(ctx.tema);
   const ex14 = veneno.pt.exercicios.find((e) => e.n === 14);
   ex14.enunciado = ex14.enunciado.replace('região hachurada', 'região');
   conf('par envenenado: o setor sem legenda e o 14 sem "hachurada" no texto sao acusados',
-    hachuraSemGlosa(veneno, 'pt', semLegenda.concat([porId.q14])).join('; '),
+    P.hachuraSemGlosa(veneno, 'pt', semLegenda.concat([porId.q14])).join('; '),
     'pt v1 hachurada sem legenda; pt q14: o enunciado nao diz que ha regiao hachurada');
 }
 
-console.log('\n' + ok + ' conferencias passaram, ' + mau + ' falharam.');
-[['pt', docPT], ['gb', docGab], ['en', docEN], ['en gb', docGabEN]].forEach(function (par) {
-  (par[1].avisosFigura || []).forEach(function (a) { console.log('  ' + par[0] + ' . ' + a); });
-});
-process.exit(mau ? 1 : 0);
+const saida = P.placar();
+P.avisos(ctx);
+process.exit(saida);
