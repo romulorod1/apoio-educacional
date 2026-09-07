@@ -250,6 +250,23 @@ roda "testa_biblioteca_offline --envenenado" node "_teste/testa_biblioteca_offli
 # sabem reprovar.
 roda "testa_biblioteca_offline --envenenado-activate" node "_teste/testa_biblioteca_offline.js" --envenenado-activate
 
+# O painel "Cada aluno, desde quando e por quanto" nasce recolhido no
+# Fechamento. Esta trava guarda quatro coisas: ele nasce fechado, o botao
+# Mostrar abre, a escolha dela fica lembrada e abrir ou fechar nao mexe na
+# rolagem. O Fechamento e a tela que ela abre todo fim de mes com a familia
+# esperando, e o painel aberto empurrava os botoes de PDF para fora da tela.
+#
+# Os venenos sao DOIS porque as perdas sao de naturezas diferentes e nenhum
+# pega a do outro. Com --envenenado-aberto o painel nasce aberto mesmo sem a
+# preferencia gravada: e a perda visivel, aparece na primeira tela. Com
+# --envenenado-esquece o painel abre e fecha certinho e nunca grava a escolha:
+# e a perda silenciosa, na tela tudo funciona e so a visita seguinte mostra o
+# defeito. Um veneno que so cobre a primeira nao prova nada sobre a segunda.
+# Ficam fora do laco porque o laco nao passa argumento.
+roda "painel de valores"                        node "_teste/testa_painel_valores.js"
+roda "painel de valores --envenenado-aberto"    node "_teste/testa_painel_valores.js" --envenenado-aberto
+roda "painel de valores --envenenado-esquece"   node "_teste/testa_painel_valores.js" --envenenado-esquece
+
 # Duas conferencias aqui, e a primeira e a que pega o defeito de verdade.
 #
 # 1) O pacote offline tem DUAS listas que precisam bater: os <script src=

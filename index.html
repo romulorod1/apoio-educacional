@@ -198,7 +198,15 @@
       <!-- Cada aluno, desde quando e por quanto. Fica ANTES da lista de
            cartões: ele nascia depois dela, e num mês de sete alunos começava
            cinco telas abaixo do topo, num painel que existe para ser lido de
-           relance. O app.js reaproveita esta caixa quando ela já existe. -->
+           relance. O app.js reaproveita esta caixa quando ela já existe.
+
+           E agora nasce RECOLHIDO: aqui dentro fica sempre visível só o
+           cabeçalho, com o título, a contagem de alunos e o botão Mostrar. O
+           cartão com as linhas dos alunos aparece quando ela pede, e a escolha
+           fica lembrada. Estar antes da lista e estar aberto eram duas coisas
+           diferentes: aberto ele empurrava as tabelas de cada aluno e os
+           botões de PDF do fechamento para fora da tela. Quem monta tudo isso
+           é o desenharPanoramaDeValores, no app.js. -->
       <div id="painel-valores"></div>
 
       <div id="lista-fechamento"></div>

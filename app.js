@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.16.0';
+  var VERSAO = '1.17.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -22,6 +22,17 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.17.0',
+      itens: [
+        'No Fechamento, a lista "Cada aluno, desde quando e por quanto" agora começa fechada. ' +
+          'Ficava aberta o tempo todo e empurrava as tabelas de cada aluno e os botões de PDF ' +
+          'para baixo, e você tinha que rolar a tela para chegar neles. O título continua no ' +
+          'mesmo lugar, com a quantidade de alunos ao lado e um botão Mostrar: toque nele para ' +
+          'abrir a lista, e em Esconder para fechar de novo. O aplicativo lembra a sua escolha ' +
+          'e abre do mesmo jeito na próxima vez.'
+      ]
+    },
     {
       versao: '1.16.0',
       itens: [
@@ -957,7 +968,14 @@
          * os usa, e nunca na abertura do aplicativo: a hora em que ela abre o
          * aplicativo, na casa de uma família, é a pior hora para disputar a
          * rede. A busca é um extra e não segura tela nenhuma. */
-        if (b.dataset.tela === 'fechamento' || b.dataset.tela === 'ajustes') {
+        /* O Fechamento só busca com o painel de valores ABERTO. Ele é o único
+         * lugar daquela tela que usa o número, e enquanto está recolhido a
+         * busca seria sinal gasto atrás de um dado que ninguém vai ler. Ela dá
+         * aula na casa das famílias, no plano de dados do tablet. Ajustes
+         * continua buscando sempre, porque a sugestão de reajuste de lá mostra
+         * o índice na própria tela. */
+        if (b.dataset.tela === 'ajustes' ||
+            (b.dataset.tela === 'fechamento' && painelDeValoresAberto())) {
           setTimeout(talvezAtualizarIndices, 900);
         }
       });
@@ -9160,6 +9178,30 @@
     return caixa;
   }
 
+  /* A escolha dela sobre o painel de valores, guardada junto das outras
+   * preferências em db.ajustes. Ausente ou falso é recolhido, que é como o
+   * painel nasce para quem nunca tocou nele. */
+  function painelDeValoresAberto() {
+    return !!(db.ajustes && db.ajustes.painelValoresAberto);
+  }
+
+  /* Cada aluno, desde quando e por quanto: nasce RECOLHIDO.
+   *
+   * É um painel de consulta, para ela olhar de relance de vez em quando, e
+   * estava cobrando pedágio em toda visita ao Fechamento, que é a tela que ela
+   * abre todo fim de mês com a família esperando do lado. Medido nesta janela
+   * de 1000 pixels de altura, com 1 aluno no painel: o painel ocupava 248
+   * pixels e o primeiro botão "PDF do fechamento" começava a 1209 pixels do
+   * topo, ou seja, uma rolagem inteira antes de chegar ao que ela veio fazer.
+   * Num mês de sete alunos o botão desce muito mais.
+   *
+   * Recolher, e não mover: o painel continua ANTES da lista de cartões, pelo
+   * motivo escrito no comentário do index.html. O que fica sempre visível é o
+   * cabeçalho, com o título, a contagem de alunos e o botão que abre. O cartão
+   * com as linhas é o que aparece e some.
+   *
+   * Mês sem aula nenhuma continua sem desenhar nada aqui, nem cabeçalho nem
+   * botão: o return acima acontece antes de qualquer coisa ir para a tela. */
   function desenharPanoramaDeValores() {
     var tela = $('#tela-fechamento');
     if (!tela) return;
@@ -9173,8 +9215,10 @@
     var pan = Core.panoramaDeValores(db, mesAtual);
     if (!pan.linhas.length) return;
 
-    caixa.appendChild(el('h3', { class: 'subtitulo', texto: 'Cada aluno, desde quando e por quanto' }));
-    var cartao = el('div', { class: 'cartao' });
+    var aberto = painelDeValoresAberto();
+    var quantos = pan.linhas.length;
+
+    var cartao = el('div', { class: 'cartao', style: aberto ? '' : 'display:none' });
     cartao.appendChild(el('div', {
       class: 'ajuda', style: 'margin-top:0',
       texto: 'Só para você. Nada daqui entra no documento que a família recebe. ' +
@@ -9183,9 +9227,68 @@
           ' acima que você escolheu em Ajustes.' : '')
     }));
     pan.linhas.forEach(function (l) { cartao.appendChild(linhaDoPanorama(l)); });
+
+    var botao = el('button', {
+      type: 'button', class: 'btn pequeno', id: 'abrir-painel-valores',
+      texto: aberto ? 'Esconder' : 'Mostrar',
+      'aria-expanded': aberto ? 'true' : 'false'
+    });
+    botao.addEventListener('click', function () {
+      var vaiAbrir = cartao.style.display === 'none';
+      /* Alterna o display NO LUGAR, e de propósito NÃO chama desenharFechamento().
+       * Ela está tocando neste botão justamente para controlar a rolagem, e
+       * redesenhar a tela inteira jogaria a rolagem dela de volta para o topo:
+       * seria o aplicativo desfazendo, no mesmo toque, o que o botão veio
+       * resolver. */
+      cartao.style.display = vaiAbrir ? '' : 'none';
+      botao.textContent = vaiAbrir ? 'Esconder' : 'Mostrar';
+      botao.setAttribute('aria-expanded', vaiAbrir ? 'true' : 'false');
+      /* Grava a preferência e não redesenha nada. Gravação que falhe não pode
+       * engolir o toque: o painel abre igual, e o pior que acontece é a escolha
+       * não ser lembrada na próxima abertura. */
+      try {
+        db.ajustes = db.ajustes || {};
+        db.ajustes.painelValoresAberto = vaiAbrir;
+        var gravou = salvar();
+        if (gravou && gravou.catch) gravou.catch(function () { /* fica só na tela desta vez */ });
+      } catch (e) { /* idem */ }
+      if (vaiAbrir) setTimeout(talvezAtualizarIndices, 1200);
+    });
+
+    /* O h3 de sempre, agora dentro da barra: o traço embaixo e o respiro em
+     * cima passam para a barra inteira, senão a linha do título terminaria
+     * antes da tag e do botão. */
+    caixa.appendChild(el('div', {
+      class: 'barra',
+      style: 'margin:22px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--fio)'
+    }, [
+      el('h3', {
+        class: 'subtitulo', style: 'margin:0;padding-bottom:0;border-bottom:none',
+        texto: 'Cada aluno, desde quando e por quanto'
+      }),
+      el('span', {
+        class: 'tag cheia',
+        texto: quantos === 1 ? '1 aluno' : quantos + ' alunos'
+      }),
+      el('span', { class: 'cresce' }),
+      botao
+    ]));
     caixa.appendChild(cartao);
 
-    if (tela.classList.contains('ativa')) setTimeout(talvezAtualizarIndices, 1200);
+    /* O índice do IBGE só é buscado com o painel ABERTO, porque este painel é o
+     * único lugar da tela que usa o número. Ela dá aula na casa das famílias,
+     * com o plano de dados do tablet: não se gasta o sinal dela atrás de índice
+     * para um painel que ninguém abriu. Quando ela abre, o clique agenda.
+     *
+     * São três os lugares que agendam, e os três respeitam o painel recolhido:
+     * aqui, o clique em Mostrar, e a abertura da aba Fechamento em ligarEventos.
+     * Agendar em três lugares não faz três buscas, porque talvezAtualizarIndices
+     * se protege sozinho com o jaTenteiIbge. A primeira versão desta mudança
+     * fechou só este ponto e deixou a aba agendando como antes: o comentário
+     * prometia economia de sinal e o tablet ia ao IBGE do mesmo jeito, o que é
+     * pior do que não ter mexido, porque manda quem for depurar consumo de
+     * dados procurar no lugar errado. */
+    if (aberto && tela.classList.contains('ativa')) setTimeout(talvezAtualizarIndices, 1200);
   }
 
   function abrirResumo(alunoId, mes) {
@@ -9972,7 +10075,15 @@
     }
     jaTenteiIbge = true;
     buscarIndicesDoIbge().then(function () {
-      desenharFechamento();
+      /* Redesenha SÓ o que usa o número, e não a tela inteira.
+       *
+       * Isto chegava como desenharFechamento(), que refaz o seletor de mês, os
+       * quatro números e a lista de cartões de todos os alunos. Nada disso lê o
+       * índice: quem lê é o painel de valores, e a área de Ajustes. E a busca
+       * volta um ou dois segundos DEPOIS do toque dela, então a tela inteira
+       * era trocada debaixo dos dedos de quem já tinha começado a ler. Era o
+       * mesmo redesenho que o clique do painel evita de propósito. */
+      desenharPanoramaDeValores();
       desenharAjustes();
     }).catch(function () { /* sem sinal hoje: continua valendo o que já estava */ });
   }
