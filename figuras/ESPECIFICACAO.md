@@ -556,12 +556,17 @@ Cada tema com figura tem um piloto, `figuras/_piloto_<ID>.js`, que gera as quatr
 - **7** nenhum rotulo e impresso em cima de outro, em direcao nenhuma
 - **8** o tema nao promete figura em texto nenhum sem ter uma diretiva `@fig` em lugar nenhum
 
-O piloto do tema traz so tres coisas: o ID, os numeros editoriais daquele tema (`diretivasNaExplicacao`, `enunciadosComFigura`, `registrosNoMaterial`, `figurasNoGabarito`, `idsDoGabarito`, `hachurasMinimas`, `palavrasPt`, cada um com o rotulo editorial dele) e a medicao no fluxo da familia de receitas dele. Opcao que nao vem desliga a trava correspondente, e a base escreve na folha que desligou: nao existe trava silenciosamente ausente num tema que passou.
+A trava 8 e **vazia por construcao dentro do piloto**, e o piloto escreve isso na folha: ela devolve vazio assim que o tema tem uma diretiva, e um piloto de tema so existe para tema que tem figura. Quem a roda de verdade e o `figuras/_varredura_banco.js`, sobre os 148 temas do banco, que sao majoritariamente temas sem piloto. Esse script imprime a frase que casou, com tema, lingua e item, e separa dois defeitos diferentes: **(a) remissao quebrada**, exercicio que manda olhar uma figura que a folha nao tem, que e o criterio de pronto e reprova; e **(b) indicio de tema escrito supondo figura**, explicacao que ensina a olhar sem que o tema desenhe, que pode ser roteiro generico e por isso nao reprova, so aponta. Ele mantem tambem uma lista de temas isentos com o motivo escrito ao lado de cada um (a palavra "figura" tambem quer dizer forma, icone de pictograma e termo de sequencia) e dois controles positivos obrigatorios, de temas que tem figura e remetem a ela: um verificador cujo resultado esperado e um tema so fica cego sem ninguem ver, porque zero acusados parece boa noticia.
 
-Roda-se assim, um comando por tema, mais a prova da base:
+O piloto do tema traz so tres coisas: o ID, os numeros editoriais daquele tema (`diretivasNaExplicacao`, `enunciadosComFigura`, `registrosNoMaterial`, `figurasNoGabarito`, `idsDoGabarito`, `hachurasMinimas`, `figurasForaDeEscala`, `palavrasPt`, `naoTraduz`, cada um com o rotulo editorial dele) e a medicao no fluxo da familia de receitas dele. Opcao que nao vem desliga a trava correspondente, e a base escreve na folha que desligou, com o motivo verdadeiro: nao existe trava silenciosamente ausente num tema que passou.
+
+O piloto tambem imprime, a cada rodada, o sha-256 das quatro folhas que gerou, e **nao o confere contra nada**. Duas rodadas com o mesmo sha provam que uma mudanca de codigo nao encostou no desenho; cravar o sha numa conferencia faria a trava ficar vermelha a cada melhoria legitima de receita, e trava que se atualiza para ficar verde ensina a ignorar trava.
+
+Roda-se assim, um comando por tema, mais a prova da base e a varredura do banco:
 
     node figuras/_prova_piloto_base.js
     node figuras/_piloto_MATEM3-12.js figuras/_tema_MATEM3-12.json
+    node figuras/_varredura_banco.js
 
 A prova da base tem par envenenado para cada trava: um tema (ou uma figura) limpo que ela tem que aprovar e um com exatamente o defeito que ela caca, que ela tem que reprovar nomeando o item. Trava nova entra na base com o par, nunca so num piloto de tema.
 

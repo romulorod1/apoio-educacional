@@ -24,11 +24,85 @@
  *   ...a medicao no fluxo deste tema, com P.conf e P.medido...
  *   process.exit(P.placar());
  *
+ * ---------------------------------------------------------------------------
+ * POR QUE OS PLACARES SUBIRAM, e por que isso NAO e criterio apertando
+ *
+ * Na unificacao, o MATEM3-12 foi de 88 conferencias para 92, e o MATEM3-03 de
+ * 40 para 47. Nenhum dos dois temas mudou, nenhuma folha mudou um byte, e
+ * nenhum criterio ficou mais exigente. O que faltava era PERGUNTA.
+ *
+ * Cada piloto era uma copia, e cada copia tinha nascido de uma folha diferente,
+ * entao cada uma perguntava um conjunto proprio. Duas travas existiam em UM SO
+ * dos tres pilotos:
+ *
+ *   numero de escala riscado por arco   so no _piloto_MATEM3-03.js. Nasceu de
+ *                                       11 numeros por lingua riscados pela
+ *                                       circunferencia naquele tema, e nenhuma
+ *                                       trava do kit acusava.
+ *   rotulo impresso em cima de outro    so no _piloto_MATEM3-03.js. Nasceu do
+ *                                       "(3, 4)" que subiu para onde o "s" da
+ *                                       reta mora e a folha imprimiu "(3 s 4)".
+ *
+ * O MATEM3-12 passava nas duas desde sempre. So que ninguem tinha perguntado:
+ * a resposta era zero e zero, e ela ficou dois anos de figura sem ser pedida. O
+ * mesmo vale ao contrario: a trava de conferirFigura e a de escala existiam so
+ * no MATEM3-12, e o MATEM3-03 nunca tinha sido perguntado sobre elas. Com a
+ * base comum, todo tema responde ao conjunto inteiro, e por isso o placar sobe
+ * sem que um unico veredito mude.
+ *
+ * A trava 8 (figura prometida e ausente no tema) e a unica NOVA, e ela nasceu
+ * vazia por construcao dentro do piloto: quem a roda de verdade e o
+ * figuras/_varredura_banco.js, sobre o banco inteiro. Esta escrito no lugar
+ * dela, mais abaixo.
+ *
+ * UMA conferencia morreu e voltou. Na primeira escrita, a conferencia editorial
+ * do MATEM3-12 "nenhuma figura marcada fora de escala: todas saem exatas" foi
+ * substituida pela trava E generica, que e mais fraca porque aceita figura fora
+ * de escala com legenda. O tema deixou de afirmar o que afirmava, e o commit da
+ * unificacao dizia que nenhuma conferencia tinha morrido. Ela voltou como a
+ * opcao `figurasForaDeEscala`, com o mesmo rotulo e a mesma semantica, e o
+ * MATEM3-12 subiu de 91 para 92.
+ *
+ * AS QUATRO FOLHAS NAO MUDARAM. Fato datado de 07/09/2026: as folhas geradas
+ * pelos pilotos unificados sao byte a byte as mesmas de antes da unificacao,
+ * conferidas por sha-256 contra as chamadas literais do piloto antigo.
+ *
+ *   MATEM3-12  material  d06ec574a7b998b6c94b456cd68e036aa7f6bc445861f5fa8f6f0f6baa1ec1c2
+ *              lista     607537d7bc61ad4156ae89d5159377df4d955cdb25ea2ce017bbfd3815ce9a93
+ *              gabarito  7a329aa6f2a36ca33c5cfb93766a33a573a7c7c33aaff250780a2fb5bde49f95
+ *              en        20ac771761bf11fad37f8abf58694f9e251f88e65e1eca3b0b9d1cd81539a80b
+ *   MATEM3-03  material  c57e82885bd634b13fa71e76b8488b5465132b79070b928fab409cc51b8d386e
+ *              lista     38d847858142d3ac87b17bbc6bf5fa1fcbc91920d06a33b00f6aa1e1c4c84c66
+ *              gabarito  1aee50a67459fb39a6f9327deb02d89ccdee22ae982bb42eadf6105d8ed801cf
+ *              en        135f0aeeaab9630cd31101b4f4fe22fbeee8761f27549f9767aba454583a71e2
+ *
+ * O piloto reimprime esses sha a cada rodada, em medido(), e NAO os confere:
+ * a razao esta escrita no lugar onde eles sao calculados.
+ *
+ * ---------------------------------------------------------------------------
+ * DIVIDA CONHECIDA, herdada do piloto antigo e nao consertada aqui de proposito
+ *
+ * 1. O casamento de figura com exercicio usa indexOf('id=' + f.id), que casa
+ *    PREFIXO: um tema com id=q1 e id=q14 pode achar o exercicio errado. Vem do
+ *    _piloto_MATEM3-12.js e nao mordeu ainda porque nenhum tema tem par de ids
+ *    em que um seja prefixo do outro. Conserto e casar id= com fronteira.
+ * 2. ctx.figs olha so as folhas em portugues (docPT mais docGab). As travas C,
+ *    D e a conta de marcas ativas, portanto, nao veem as figuras que so a folha
+ *    inglesa desenha. Hoje as duas linguas usam as mesmas receitas na mesma
+ *    ordem (trava B garante), entao as duas listas coincidem; o dia em que um
+ *    tema divergir de proposito, isto vira defeito.
+ *
  * Regra da casa: nunca usar travessao.
  */
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const PDFGen = require('../pdf.js');
+/* Os dois so servem para PERGUNTAR: ao base.js o que e numero, ao receitas.js
+ * quais chaves de cada receita sao metricas. Este arquivo nao mantem lista
+ * propria de nenhuma das duas coisas. */
+const Bfig = require('./base.js');
+const Receitas = require('./receitas.js');
 
 const RAIZ = path.join(__dirname, '..');
 const PADRAO = path.join(RAIZ, 'temas', 'banco.json');
@@ -195,10 +269,25 @@ function familiasDeVarredura(f) {
   });
   return Object.keys(fam).map((k) => fam[k]).filter((g) => g.n >= 3);
 }
+function ehAlinhadaAoEixo(a) { return Math.min(a, Math.abs(a - 90), Math.abs(a - 180)) < 2; }
+/* A regra de "tem perpendicular do mesmo porte, entao e malha" custou caro na
+ * primeira escrita: o aneis= do receitas.js alterna 45 e 135 DE PROPOSITO, para
+ * cada anel se distinguir do vizinho, e a figura de aneis saia com 56 segmentos
+ * de varredura e ZERO inclinacao de hachura. Era regressao de verdade contra o
+ * "varreduras > 0" antigo, e nenhum dos dois primeiros temas usa aneis, entao
+ * nenhum placar acusava.
+ *
+ * A perpendicularidade so acusa malha quando as duas familias estao ALINHADAS
+ * AOS EIXOS, que e como a malha e a fileira de tiques saem; e uma familia
+ * alinhada ao eixo dentro de uma figura com plano cartesiano e malha sem
+ * precisar da perpendicular, porque o plano e quem a desenha. Par a 45 e 135
+ * fora de plano e hachura dupla, e sempre foi. */
 function inclinacoesDeHachura(f) {
   const fam = familiasDeVarredura(f);
+  const temPlano = !!planoDaFigura(f);
   return fam.filter(function (g) {
-    /* Com uma perpendicular do mesmo porte, isto e malha e nao hachura. */
+    if (!ehAlinhadaAoEixo(g.angulo)) return true;
+    if (temPlano) return false;
     return !fam.some(function (h) {
       const d = Math.abs(((h.angulo - g.angulo) % 180 + 180) % 180 - 90);
       return d < 2 && h.n >= 3;
@@ -213,15 +302,86 @@ function semDiretiva(s) { return String(s || '').replace(/(^|\s)@fig\s[^\n]*/g, 
 function diretivasDe(s) { return String(s || '').match(/(^|\s)@fig\s[^\n]*/g) || []; }
 function clonar(t) { return JSON.parse(JSON.stringify(t)); }
 
-/* As expressoes de remissao a figura, generalizadas para servir a qualquer
- * tema. So entram substantivos que NOMEIAM um desenho: "abaixo", "acima",
- * "shown" e "below" aparecem em prosa de matematica sem haver figura nenhuma
- * ("os numeros abaixo de zero") e transformariam a trava 3 numa maquina de
- * acusar tema limpo. */
-const REMETE = {
-  pt: /\b(figura|figuras|desenho|desenhos|esquema|esquemas|diagrama|diagramas|gr[áa]fico|gr[áa]ficos|ilustra[çc][ãa]o|ilustra[çc][õo]es)\b/i,
-  en: /\b(figure|figures|drawing|drawings|diagram|diagrams|sketch|sketches|picture|pictures|graph|graphs|illustration|illustrations)\b/i
+/* REMISSAO A FIGURA: o texto manda OLHAR um desenho que esta na folha.
+ *
+ * A primeira versao desta lista era so o substantivo ("figura", "desenho",
+ * "grafico") e ela nao servia: rodada sobre os 148 temas do banco, acusava 62
+ * temas de prometer figura sem ter, e 33 na trava 3. Os falsos positivos sao
+ * reais e sao de quatro tipos, todos medidos no banco de 07/09/2026:
+ *
+ *   figura como FORMA          "Qual figura nao tem nenhum canto?" (MAT02-06),
+ *                              "a area da figura que sobrou" (MAT04-09),
+ *                              "um lado da figura original" (MAT09-08)
+ *   figura como ICONE          "cada figura de livro vale 4 livros" (MAT04-12)
+ *   figura como TERMO          "quantos elementos tem cada figura" (MAT07-08)
+ *   desenho como O QUE QUEM    "marque a seta no desenho" (MAT04-07),
+ *   RESOLVE VAI DESENHAR       "Ler no desenho mental da parabola" (MATEM1-05)
+ *
+ * O conserto tem duas partes e a ordem importa. Primeiro APAGA-SE do texto o
+ * uso em que "figura" e a forma medida, e nao o desenho na folha: isso e o
+ * SENTIDO_DE_FORMA, reconhecido pelo substantivo de medida antes ("area da",
+ * "perimetro da", "contorno da", "volta na", "dentro da") ou pelo qualificador
+ * depois ("figura composta", "figura original", "figura que sobrou"). Depois se
+ * procura a remissao no que sobrou.
+ *
+ * O que sobra e a forma da casa: "<objeto> da figura" e "na figura"
+ * ("A piramide reta DA FIGURA tem base quadrada", MATEM3-12; "os oito angulos
+ * formados NA FIGURA", MAT08-11), mais as deiticas explicitas.
+ *
+ * Em ingles, "in the drawing" ficou de fora de proposito: em prosa inglesa "the
+ * drawing" costuma ser o desenho que quem resolve vai fazer, e foi o unico
+ * falso positivo que sobrou na medicao (MAT09-07, "in the drawing it is always
+ * the one facing the right angle", num tema sem figura nenhuma). A forma da
+ * casa no banco bilingue e "in the figure".
+ *
+ * Medido em 07/09/2026 sobre os 148 temas: entre os temas SEM nenhuma diretiva,
+ * esta lista acusa exatamente dois, MAT08-11 e MAT08-12, que sao remissao de
+ * verdade nas duas linguas. E ela enxerga os controles que TEM figura e
+ * remetem: 12 remissoes no MATEM3-03, 14 no MAT08-13, 15 no MATEM3-12. Quem
+ * mexer aqui roda o figuras/_varredura_banco.js antes e depois. */
+const SENTIDO_DE_FORMA = {
+  /* Sem \b antes de "area": em JavaScript \b e ASCII, e entre um espaco e o
+   * "a" acentuado nao ha fronteira de palavra nenhuma. Com o \b, "a area da
+   * figura" escapava do apagador e o tema vinha para a lista. */
+  pt: [
+    /(?:[áa]rea|per[íi]metro|contorno|volta|lado|lados|dentro|redor|interior|total|metade)\s+(?:d[ao]|n[ao])\s+figura\b/gi,
+    /\b(?:d[ao]|n[ao])\s+figura\s+(?:composta|original|plana|planas|geom[ée]trica|toda|que|[ée]|s[ãa]o)\b/gi
+  ],
+  en: [
+    /\b(?:area|perimeter|outline|inside|around)\s+of the figure\b/gi,
+    /\b(?:in|of) the figure\s+(?:that|which)\b/gi
+  ]
 };
+const REMETE = {
+  pt: /\b(?:n[ao]|d[ao])\s+figura\b|\b(?:conforme|observe|veja)\s+[ao]\s+figura\b|\b[ao]s?\s+(?:figura|desenho|esquema|diagrama)s?\s+(?:a seguir|abaixo|acima|ao lado)\b|\b[ao]\s+(?:figura|desenho|esquema|diagrama)\s+mostra\b/i,
+  en: /\bin the (?:figure|diagram|picture)\b|\b(?:figure|diagram|picture|drawing)s?\s+(?:below|above|alongside)\b|\bthe (?:figure|diagram|picture|drawing) shows\b|\bas shown\b/i
+};
+/* O texto sem as diretivas e sem os usos de "figura" que sao forma medida. E
+ * sobre ELE que a remissao se procura. */
+function textoDeRemissao(s, lingua) {
+  let t = semDiretiva(s);
+  SENTIDO_DE_FORMA[lingua].forEach(function (rx) {
+    t = t.replace(new RegExp(rx.source, 'gi'), ' ');
+  });
+  return t;
+}
+function remeteAFigura(s, lingua) { return REMETE[lingua].test(textoDeRemissao(s, lingua)); }
+/* Todas as ocorrencias, com a frase inteira, para o verificador poder mostrar
+ * ao leitor o que casou em vez de so um id de tema. Uma lista de ids nao e
+ * auditavel: foi abrindo o arquivo que se descobriu o falso positivo do
+ * MAT02-06. */
+function ocorrenciasDeRemissao(s, lingua) {
+  const t = textoDeRemissao(s, lingua), saida = [];
+  const rx = new RegExp(REMETE[lingua].source, 'gi');
+  let m;
+  while ((m = rx.exec(t))) {
+    let a = m.index, b = m.index;
+    while (a > 0 && '.!?\n'.indexOf(t[a - 1]) < 0) a--;
+    while (b < t.length && '.!?\n'.indexOf(t[b]) < 0) b++;
+    saida.push({ casou: m[0], frase: t.slice(a, b + 1).replace(/\s+/g, ' ').trim() });
+  }
+  return saida;
+}
 /* A glosa da hachura: a palavra que diz o que a textura quer dizer. */
 const GLOSA = { pt: /hachurad/i, en: /hatched/i };
 
@@ -324,6 +484,29 @@ function abrir(op) {
     lingua: 'en', incluirMaterial: true, incluirLista: true, incluirGabarito: true
   });
 
+  /* O SHA-256 das quatro folhas, IMPRESSO e nunca conferido contra nada.
+   *
+   * A tentacao e cravar o SHA de hoje numa conferencia, e ela e errada: as
+   * receitas estao vivas (o escalaFora e as chaves base= e altura= estao
+   * mudando enquanto isto e escrito) e figura de prototipo MUDA de proposito.
+   * Uma trava assim ficaria vermelha a cada melhoria legitima, seria atualizada
+   * para ficar verde, e trava que se atualiza para ficar verde ensina quem le a
+   * ignorar trava.
+   *
+   * Impresso, o SHA e outra coisa: e o registro datado do que esta folha era
+   * nesta rodada. Duas rodadas seguidas com o mesmo SHA provam que a mudanca no
+   * codigo nao encostou no desenho, que e exatamente a pergunta de toda
+   * refatoracao. A comparacao e de quem le, e nao da maquina. */
+  const sha = {};
+  [['material', material], ['lista', lista], ['gabarito', gabarito], ['en', ingles]]
+    .forEach(function (par) {
+      sha[par[0]] = crypto.createHash('sha256').update(Buffer.from(par[1])).digest('hex');
+    });
+  console.log('  sha-256 das quatro folhas desta rodada (registro, nao conferencia):');
+  Object.keys(sha).forEach(function (k) {
+    console.log('        ' + (k + '        ').slice(0, 9) + ' ' + sha[k]);
+  });
+
   const docPT = comDoc(tema, 'pt', { material: true });
   const docGab = comDoc(tema, 'pt', { gabarito: true });
   const docEN = comDoc(tema, 'en', { material: true });
@@ -340,7 +523,7 @@ function abrir(op) {
 
   return {
     ID: ID, RAIZ: RAIZ, PADRAO: PADRAO, BANCO: BANCO, FONTE: FONTE, tema: tema,
-    material: material, lista: lista, gabarito: gabarito, ingles: ingles,
+    material: material, lista: lista, gabarito: gabarito, ingles: ingles, sha: sha,
     docPT: docPT, docGab: docGab, docEN: docEN, docGabEN: docGabEN,
     figs: figs, todasAsFiguras: todasAsFiguras,
     porId: porId, gabPorId: gabPorId, daExplicacao: daExplicacao,
@@ -370,7 +553,7 @@ function semRemissao(t) {
   ['pt', 'en'].forEach(function (lingua) {
     (t[lingua].exercicios || []).forEach(function (ex) {
       const temFig = diretivasDe(ex.enunciado).length > 0;
-      const remete = REMETE[lingua].test(semDiretiva(ex.enunciado));
+      const remete = remeteAFigura(ex.enunciado, lingua);
       if (temFig && !remete) acusa.push(lingua + ' ' + ex.n + ' tem figura e nao remete a ela');
       if (!temFig && remete) acusa.push(lingua + ' ' + ex.n + ' fala da figura e nao tem nenhuma');
     });
@@ -430,12 +613,12 @@ function figuraPrometidaEAusente(t) {
   if (contarDiretivas(t) > 0) return acusa;
   ['pt', 'en'].forEach(function (lingua) {
     const d = t[lingua] || {};
-    if (REMETE[lingua].test(semDiretiva(d.explicacao))) {
+    if (remeteAFigura(d.explicacao, lingua)) {
       acusa.push(lingua + ' explicacao promete figura e o tema nao tem nenhuma');
     }
     (d.exercicios || []).forEach(function (e) {
-      if (REMETE[lingua].test(semDiretiva(e.enunciado))) acusa.push(lingua + ' ' + e.n + ' promete figura e o tema nao tem nenhuma');
-      if (REMETE[lingua].test(semDiretiva(e.resposta))) acusa.push(lingua + ' resposta ' + e.n + ' promete figura e o tema nao tem nenhuma');
+      if (remeteAFigura(e.enunciado, lingua)) acusa.push(lingua + ' ' + e.n + ' promete figura e o tema nao tem nenhuma');
+      if (remeteAFigura(e.resposta, lingua)) acusa.push(lingua + ' resposta ' + e.n + ' promete figura e o tema nao tem nenhuma');
     });
   });
   return acusa;
@@ -449,21 +632,37 @@ function figuraPrometidaEAusente(t) {
  * exata, e a afirmacao falsa sobre um desenho fiel: pelo foraDeEscala do
  * base.js, isso so acontece com escala=fora escrito na diretiva, porque sem ele
  * a marca nasce justamente de haver valor que nao e numero. */
-const CHAVES_DE_TEXTO = ['id', 'legenda', 'tipo', 'fase', 'escala', 'nome', 'nomes',
-  'titulo', 'casos', 'cor', 'estilo', 'papel', 'rotulo', 'texto', 'glosa', 'receita'];
-function valoresMetricos(diretiva) {
-  const saida = [], rx = /(^|\s)([a-zA-Z]+)=(\S+)/g;
-  let m;
-  while ((m = rx.exec(String(diretiva || '')))) {
-    const chave = m[2].toLowerCase(), valor = m[3];
-    if (CHAVES_DE_TEXTO.indexOf(chave) >= 0) continue;
-    if (/^(sim|nao|yes|no)$/i.test(valor)) continue;
-    saida.push(valor);
-  }
+/* Quais chaves de uma diretiva sao METRICAS depende da receita, e a receita e
+ * quem sabe. A primeira escrita desta trava mantinha aqui uma lista propria de
+ * chaves de texto, contra a regra da casa: este arquivo nao mantem lista
+ * propria, ele pergunta. Agora pergunta ao receitas.js, receita por receita, o
+ * mesmo `metricas` que o escalaFora() de la usa para decidir a escala. Uma
+ * chave nova numa receita (o `base=` e o `altura=` que estao entrando no
+ * triangulo e no quadrilatero) passa a valer aqui sozinha, sem ninguem lembrar
+ * de vir mexer nesta linha. */
+function metricasDaReceita(nome) {
+  const r = ((Receitas && Receitas.receitas) || {})[nome];
+  return r && Array.isArray(r.metricas) ? r.metricas : null;
+}
+/* Os valores metricos escritos na diretiva, com a chave, na ordem das chaves da
+ * receita. Devolve null quando a receita e desconhecida: dai a trava nao afirma
+ * nada, em vez de afirmar sobre uma lista vazia. */
+function valoresMetricos(diretiva, receita) {
+  const metricas = metricasDaReceita(receita);
+  if (!metricas) return null;
+  const texto = String(diretiva || ''), saida = [];
+  metricas.forEach(function (chave) {
+    const rx = new RegExp('(^|\\s)' + chave + '=(\\S+)', 'g');
+    let m;
+    while ((m = rx.exec(texto))) saida.push({ chave: chave, valor: m[2] });
+  });
   return saida;
 }
+/* Numerico e o que o base.js chama de numero, parte por parte do valor
+ * composto: e a mesma pergunta que o foraDeEscala() de la faz. */
 function ehValorNumerico(v) {
-  return String(v).split(';').every(function (p) { return p === '' || /^-?\d+(\.\d+)?$/.test(p); });
+  const partes = String(v).split(';');
+  return partes.every(function (p) { return p === '' || Bfig.ehNumero(p); });
 }
 function escalaIncoerente(registros) {
   const acusa = [];
@@ -471,9 +670,11 @@ function escalaIncoerente(registros) {
     if (!f.foraDeEscala) return;
     if (!f.legenda) { acusa.push(nomeDaFigura(f) + ' marcada fora de escala e sem legenda'); return; }
     if (!/(^|\s)escala=fora(\s|$)/.test(String(f.diretiva))) return;
-    const vals = valoresMetricos(f.diretiva);
-    if (vals.length && vals.every(ehValorNumerico)) {
-      acusa.push(nomeDaFigura(f) + ' marcada fora de escala e saiu exata: todo valor da diretiva e numero');
+    const vals = valoresMetricos(f.diretiva, f.receita);
+    if (vals === null) return;
+    if (vals.length && vals.every(function (v) { return ehValorNumerico(v.valor); })) {
+      acusa.push(nomeDaFigura(f) + ' marcada fora de escala e saiu exata: ' +
+        vals.map(function (v) { return v.chave + '=' + v.valor; }).join(' ') + ', todo valor e numero');
     }
   });
   return acusa;
@@ -721,13 +922,23 @@ function travasGenericas(ctx, op) {
    * proposito. Escrita porque quem edita o .md esquece de regerar o retrato, e
    * as conferencias passam todas sobre uma versao velha. */
   const ehRetratoDesteTema = new RegExp('_tema_' + ctx.ID + '\\.json$').test(ctx.BANCO);
-  if (ctx.FONTE && fs.existsSync(ctx.FONTE) && (ctx.BANCO === ctx.PADRAO || ehRetratoDesteTema)) {
+  const bancoComparavel = ctx.BANCO === ctx.PADRAO || ehRetratoDesteTema;
+  /* Os tres ramos sao separados de proposito. Antes havia um so, e um caminho
+   * de .md digitado errado imprimia "o banco lido nao e o padrao nem o retrato
+   * deste tema", que e FALSO, e a trava ficava desligada com placar verde.
+   * Trava desligada tem que dizer o motivo verdadeiro, senao ela mente duas
+   * vezes: sobre o tema e sobre si mesma. */
+  if (!ctx.FONTE) {
+    medido('trava 0 nao rodou: este piloto nao passou caminhoDoMd');
+  } else if (!fs.existsSync(ctx.FONTE)) {
+    medido('trava 0 nao rodou: o .md nao existe em ' + ctx.FONTE);
+  } else if (!bancoComparavel) {
+    medido('trava 0 nao rodou: o banco lido nao e o padrao nem o retrato deste tema (' + ctx.BANCO + ')');
+  } else {
     const noMd = (fs.readFileSync(ctx.FONTE, 'utf8').match(/(^|\s)@fig\s/g) || []).length;
     const noBanco = contarDiretivas(tema);
     conf('o banco lido foi gerado do ' + ctx.ID + '.md de hoje (' + noMd + ' diretivas no .md)',
       noBanco === noMd ? 'sim' : 'NAO: o banco tem ' + noBanco + ' diretivas, regere o retrato ou rode gerar_banco.py', 'sim');
-  } else {
-    medido('trava 0 nao rodou: o banco lido nao e o padrao nem o retrato deste tema');
   }
 
   /* C. Sanidade da geracao, parte um: nenhuma diretiva saiu impressa como
@@ -742,6 +953,18 @@ function travasGenericas(ctx, op) {
    * propria trava: um detector que nao acha nada nao prova nada. */
   const naoTraduz = NAO_TRADUZ.concat(op.naoTraduz || []);
   const MARCA_PT = montarMarcaPt(op.palavrasPt);
+  /* Sem palavrasPt a trava A roda so sobre o nucleo, que e acento e cabecalho:
+   * "prisma" numa folha em ingles passaria batido. Isso e escolha legitima num
+   * tema de aritmetica e e defeito num tema de geometria, e quem le a folha
+   * precisa saber qual dos dois esta vendo. */
+  if (op.palavrasPt && op.palavrasPt.length) {
+    medido('trava A com ' + op.palavrasPt.length + ' palavras deste tema alem do nucleo: ' + op.palavrasPt.join(' '));
+  } else {
+    medido('trava A sem palavrasPt: roda so sobre o nucleo (acento e cabecalho), e palavra portuguesa sem acento passa');
+  }
+  if (op.naoTraduz && op.naoTraduz.length) {
+    medido('trava A com ' + op.naoTraduz.length + ' pecas isentas alem das da casa: ' + op.naoTraduz.join(' | '));
+  }
   conf('nenhuma palavra portuguesa na folha em ingles',
     [...new Set(palavrasPortuguesasNaFolha(ctx.ingles, MARCA_PT, naoTraduz))].join(', ') || 'nenhuma', 'nenhuma');
   conf('e o mesmo padrao acha portugues na folha em portugues',
@@ -792,9 +1015,28 @@ function travasGenericas(ctx, op) {
   console.log('  marcas ativas por figura: ' +
     ctx.figs.map(function (f) { return nomeDaFigura(f) + ':' + f.marcasAtivas; }).join(' '));
 
-  /* E. Escala coerente. */
+  /* E. Escala coerente. Duas conferencias, e elas dizem coisas diferentes.
+   *
+   * A primeira e a trava generica: qualquer figura fora de escala precisa de
+   * legenda, e nenhuma figura exata pode ser marcada de fora de escala. Ela
+   * ACEITA figura fora de escala com legenda, porque prototipo em letra e
+   * legitimo.
+   *
+   * A segunda e editorial e vem por opcao, porque e afirmacao sobre AQUELE
+   * tema: "neste tema nenhuma figura e chute, entao nenhuma pode sair marcada".
+   * Ela existe porque foi perdida uma vez: na unificacao dos pilotos a
+   * conferencia do MATEM3-12 "nenhuma figura marcada fora de escala: todas saem
+   * exatas" foi substituida pela generica, que e mais fraca, e o tema deixou de
+   * afirmar o que afirmava. Quem tem tema com prototipo em letra simplesmente
+   * nao passa a opcao. */
   conf('nenhuma figura afirma escala falsa: fora de escala pede legenda, e desenho exato nao se marca',
     escalaIncoerente(ctx.todasAsFiguras).join('; ') || 'nenhuma', 'nenhuma');
+  const aFora = alvo(op.figurasForaDeEscala, 'as figuras marcadas fora de escala sao as esperadas');
+  if (aFora) {
+    conf(aFora.rotulo,
+      ctx.todasAsFiguras.filter(function (f) { return f.foraDeEscala; })
+        .map(nomeDaFigura).join(', ') || 'nenhuma', aFora.n);
+  } else medido('trava E sem a conta editorial: sem figurasForaDeEscala, so a coerencia e conferida');
 
   /* B. Paridade PT x EN: as duas linguas usam as mesmas receitas, na mesma
    * ordem, item a item, e tambem na explicacao. */
@@ -879,7 +1121,24 @@ function travasGenericas(ctx, op) {
     (sobrepostos.length ? ' (' + sobrepostos.join('; ') + ')' : ''));
   conf('nenhum rotulo e impresso em cima de outro', sobrepostos.length, 0);
 
-  /* 8. */
+  /* 8. Figura prometida e ausente no tema inteiro.
+   *
+   * Aqui ela e VAZIA POR CONSTRUCAO e isso esta escrito na folha de proposito.
+   * O figuraPrometidaEAusente devolve vazio assim que o tema tem uma diretiva,
+   * e um piloto de tema so existe para tema que TEM figura: neste lugar ela
+   * passa porque nao tem o que perguntar, e nao porque o tema esteja limpo.
+   * Deixa-la aqui verde e calada seria a pior especie de trava, a que da
+   * garantia sem conferir nada.
+   *
+   * Quem de fato roda esta trava e o figuras/_varredura_banco.js, sobre os 148
+   * temas do banco, que sao majoritariamente temas SEM piloto: e la que o
+   * defeito existe. A conferencia fica aqui so para o caso do tema que perdeu
+   * todas as diretivas numa edicao e continua falando de figura. */
+  const diretivasDoTema = contarDiretivas(tema);
+  if (diretivasDoTema > 0) {
+    medido('trava 8 vazia por construcao: o tema tem ' + diretivasDoTema +
+      ' diretivas, entao ela nao pode acusar. Quem roda a trava 8 de verdade e o _varredura_banco.js, sobre o banco inteiro');
+  }
   conf('o tema nao promete figura sem ter nenhuma',
     figuraPrometidaEAusente(tema).join('; ') || 'nenhum', 'nenhum');
 }
@@ -916,7 +1175,10 @@ module.exports = {
   nomeDaFigura: nomeDaFigura, bolinhasDe: bolinhasDe, segmentos09: segmentos09,
   planoDaFigura: planoDaFigura, pecasDeTexto: pecasDeTexto,
   semDiretiva: semDiretiva, diretivasDe: diretivasDe, clonar: clonar,
-  REMETE: REMETE, GLOSA: GLOSA, NAO_TRADUZ: NAO_TRADUZ, MARCA_PT_NUCLEO: MARCA_PT_NUCLEO,
+  REMETE: REMETE, SENTIDO_DE_FORMA: SENTIDO_DE_FORMA,
+  textoDeRemissao: textoDeRemissao, remeteAFigura: remeteAFigura,
+  ocorrenciasDeRemissao: ocorrenciasDeRemissao,
+  GLOSA: GLOSA, NAO_TRADUZ: NAO_TRADUZ, MARCA_PT_NUCLEO: MARCA_PT_NUCLEO,
   NUMERO_PURO: NUMERO_PURO, ehNumeroDeEscala: ehNumeroDeEscala,
   ehHachurada: ehHachurada, inclinacoesDeHachura: inclinacoesDeHachura,
   semRemissao: semRemissao, numeroSoNoDesenho: numeroSoNoDesenho,

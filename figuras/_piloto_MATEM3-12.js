@@ -85,6 +85,12 @@ P.travasGenericas(ctx, {
     rotulo: 'o material desenha 16 registros: 4 figuras mais as 5 celulas do painel na explicacao, e 7 nos enunciados'
   },
   figurasNoGabarito: { n: 3, rotulo: 'e o gabarito tem 3 (8, 17 e 18)' },
+  /* Nenhuma figura deste tema e chute: as numericas saem fieis por construcao e
+   * as de letra sao prototipos ou se deduzem (inscrito=10 raio=r). Entao
+   * nenhuma pode sair MARCADA fora de escala, que e a afirmacao falsa sobre um
+   * desenho exato. E afirmacao editorial deste tema, e nao regra da casa: um
+   * tema com prototipo em letra nao passa esta opcao. */
+  figurasForaDeEscala: { n: 'nenhuma', rotulo: 'nenhuma figura marcada fora de escala: todas saem exatas' },
   idsDoGabarito: { n: 's8 s17 s18', rotulo: 'as tres do gabarito sao as dos ids s8, s17 e s18' },
   hachurasMinimas: { n: 6, rotulo: 'ha hachura para glosar (o setor de alfa, o 14 e o 16, em cada lingua)' }
 });
