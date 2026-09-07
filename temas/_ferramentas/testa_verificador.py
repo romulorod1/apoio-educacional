@@ -451,7 +451,7 @@ def _sem_linha(texto, comeco):
     return '\n'.join(l for l in texto.split('\n') if not l.startswith(comeco))
 
 
-def _com_fechadas(texto, letras):
+def _com_fechadas(texto, letras, certa_longa=False):
     """Troca os itens 3, 4 e 5 do BASE_POR7 (abertos) por fechados com quatro alternativas,
     cada um com a letra certa dada em `letras`; com o item 2, que ja e fechado em b, o tema
     fica com quatro fechadas. E a prova da trava E7 nos dois sentidos."""
@@ -462,7 +462,9 @@ def _com_fechadas(texto, letras):
         padrao = _re.compile(r'^(%d\. [^\n]*)$' % n, _re.M)
         achado = padrao.search(saida)
         assert achado, 'BASE_POR7 sem o item %d' % n
-        alternativas = '\n'.join('   %s) resposta %s, numero %d de quatro.' % (l, l, n) for l in 'abcd')
+        alternativas = '\n'.join('   %s) resposta %s, numero %d de quatro%s.' % (
+            l, l, n, ' e por acaso a mais comprida das quatro' if certa_longa and l == letra else '')
+            for l in 'abcd')
         saida = saida[:achado.end()] + '\n' + alternativas + saida[achado.end():]
         # o gabarito vira a letra
         bloco = _re.compile(r'^%d\. espera_se:.*?(?=^\d+\. |\Z)' % n, _re.M | _re.S)
@@ -750,6 +752,9 @@ PARES = [
      'por/07/POR07-99.md', BASE_POR7, None, None),
     ('por7: quatro fechadas com a mesma letra certa reprovam (E7)',
      'por/07/POR07-99.md', _com_fechadas(BASE_POR7, 'bbb'), 'resposta certa em 4 das 4', None),
+    ('por7: a certa sendo a mais longa em 3 das 4 fechadas reprova (E7)',
+     'por/07/POR07-99.md', _com_fechadas(BASE_POR7, 'acd', certa_longa=True),
+     'alternativa mais longa em 3 das 4', None),
     ('por7: quatro fechadas com letras espalhadas passam',
      'por/07/POR07-99.md', _com_fechadas(BASE_POR7, 'acd'), None, None),
     ('G8: bloco recuado no lugar do texto de apoio vira trecho do item e reprova',

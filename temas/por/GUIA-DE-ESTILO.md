@@ -48,7 +48,7 @@ permitidos: a criança sabe por que está ali.
   reportagem, divulgação científica, propaganda) e nos anos iniciais. Pessoas, lugares e fatos
   inventados, e a `procedencia` diz isso. Nome de personagem é permitido; nome de aluno real, nunca.
 - Fatos científicos e históricos em texto escrito precisam ser verdadeiros e verificáveis
-  (o experimento da ponte dupla existe: Bruxelas, 1990). Sem estatística inventada.
+  (o experimento da ponte dupla existe: Bruxelas, 1989 e 1990, e a procedência da fonte cita os artigos). Sem estatística inventada.
 - Prosa quebrada em linhas de até uns 85 caracteres; poema, um verso por linha. Linha em branco
   entre parágrafos e estrofes. Sem tab.
 - Tamanho do texto de apoio por série: 2º ao 5º, até 20 linhas; 6º e 7º, de 25 a 60; 8º e 9º, até

@@ -1410,6 +1410,7 @@ def problemas_nos_itens(exerc, gab, com_catalogo, raiz_fontes=None):
     vigente = None
     posicao = 0
     letras_certas = []
+    certas_longas = []
     for evento in eventos:
         if evento['tipo'] == 'texto':
             vigente = evento
@@ -1424,7 +1425,13 @@ def problemas_nos_itens(exerc, gab, com_catalogo, raiz_fontes=None):
         erros.extend(_problemas_do_item(evento, ex, gb, texto_do_item))
         if gb and 'letra' in gb:
             letras_certas.append(gb['letra'])
+            comprimentos = dict((alt['letra'], len(alt['texto'])) for alt in ex['alternativas'])
+            if comprimentos and gb['letra'] in comprimentos:
+                outras = [v for l, v in comprimentos.items() if l != gb['letra']]
+                # empate nao conta: so a certa estritamente mais longa que todas as outras
+                certas_longas.append(bool(outras) and comprimentos[gb['letra']] > max(outras))
     erros.extend(_letras_concentradas(letras_certas))
+    erros.extend(_certas_mais_longas(certas_longas))
     respostas = [' '.join(l.strip() for l in i['linhas']) for i in itens_gab]
     return erros, enunciados, respostas
 
@@ -1444,6 +1451,20 @@ def _letras_concentradas(letras_certas):
         return ['a letra "%s" e a resposta certa em %d das %d questoes fechadas: redistribua as '
                 'alternativas, senao o aluno acerta pelo padrao e nao pela leitura'
                 % (letra, quantas, len(letras_certas))]
+    return []
+
+
+# E7, segunda conta: a certa tambem nao pode ser a alternativa mais comprida na maioria
+# das fechadas. Medido no piloto: 31 de 43, mesmo depois de espalhar as letras. O aluno
+# que aprende "marca a maior" acerta sem ler.
+def _certas_mais_longas(certas_longas):
+    if len(certas_longas) < 4:
+        return []
+    quantas = sum(1 for eh in certas_longas if eh)
+    if quantas * 2 > len(certas_longas):
+        return ['a resposta certa e a alternativa mais longa em %d das %d questoes fechadas: '
+                'encurte a certa ou alongue um distrator, senao o aluno acerta pelo tamanho'
+                % (quantas, len(certas_longas))]
     return []
 
 
