@@ -445,6 +445,34 @@ function comAviso(texto, pedaco) {
   });
   return (d.avisosFigura || []).filter((a) => a.indexOf(pedaco) >= 0).length;
 }
+/* O par mais importante desta secao NAO e uma recusa: e uma figura que tem que
+ * DESENHAR. O quadrilatero irregular e o unico tipo sem entrada no PROTO_BH,
+ * porque ele nao tem base; a linha que promove o primeiro lado= a base para a
+ * construcao (escrita para o "losango de lado 6") valia para todo tipo, mandava o
+ * irregular para o modelo do retangulo, e "tipo=quadrilatero lado=5" passou a
+ * sair NULO SEM AVISO NENHUM: a folha do tema imprimiria sem a figura e ninguem
+ * saberia. Some sem aviso e o defeito que esta familia inteira existe para
+ * impedir, e ele entrou por uma linha escrita para consertar outro. Achado
+ * rodando os quatro commits da familia lado a lado, nao lendo o codigo. */
+function desenhouCalado(texto) {
+  const d = new PDFGen.Doc();
+  d.novaPagina();
+  d.partesDeFigura(texto).forEach(function (p) {
+    if (p.tipo === 'figura') d.figura(p.diretiva, { x: MARG_E + 20, largura: LARGURA });
+  });
+  return { desenhou: (d.figurasDesenhadas || []).length === 1, avisos: (d.avisosFigura || []).length };
+}
+{
+  const a = desenhouCalado('@fig quadrilatero tipo=quadrilatero lado=5');
+  conf('o quadrilatero irregular com um lado medido DESENHA, e calado',
+    a.desenhou && a.avisos === 0, 'desenhou=' + a.desenhou + ' avisos=' + a.avisos);
+  const b = desenhouCalado('@fig quadrilatero tipo=quadrilatero lado=5 angulo=70');
+  conf('e quando ele recusa, recusa FALANDO: recusa calada nao existe',
+    !b.desenhou && b.avisos >= 1, 'desenhou=' + b.desenhou + ' avisos=' + b.avisos);
+  const c = desenhouCalado('@fig quadrilatero tipo=losango lado=6 altura=5');
+  conf('e a promocao do lado= a base continua valendo onde o tipo TEM base',
+    c.desenhou && c.avisos === 0, 'desenhou=' + c.desenhou + ' avisos=' + c.avisos);
+}
 conf('Pitagoras que nao fecha e recusado (d = 12 num retangulo de 4 por 3)',
   comAviso('@fig quadrilatero tipo=retangulo base=4 altura=3 diagonal=A;C;12;d',
     'mede 5 no desenho e nao 12') === 1);

@@ -3296,8 +3296,20 @@
        * saia do prototipo, e ai a regua acusava a ALTURA: "tipo=losango lado=6
        * altura=5" era recusado com "a altura escrita 5 vale 5.27", culpando o dado
        * certo pelo erro do outro. */
+      /* Mas SO nos tipos que tem modelo de base e altura, e quem responde isso e
+       * a propria tabela PROTO_BH, em vez de uma lista escrita aqui que
+       * divergiria dela no dia em que alguem acrescentasse um tipo. O
+       * quadrilatero irregular e o unico sem entrada la, porque ele nao tem base:
+       * promover o lado= a base nele mandava a construcao para o modelo do
+       * retangulo (o "|| PROTO_BH.retangulo" logo abaixo), que devolvia nulo, e a
+       * figura SUMIA DA FOLHA sem um aviso. "tipo=quadrilatero lado=5" desenhava
+       * antes desta familia existir e voltou a desenhar. Some sem aviso e o
+       * defeito que esta familia inteira existe para impedir, e ele entrou por
+       * uma linha escrita para consertar outro. */
       var basesConstrucao = bases;
-      if (!bases.length && ladosBrutos.length) basesConstrucao = [medidaDe(B, ladosBrutos[0])];
+      if (!bases.length && ladosBrutos.length && PROTO_BH[tipo]) {
+        basesConstrucao = [medidaDe(B, ladosBrutos[0])];
+      }
       var deduzidas = completarPorPitagoras(B, doc, tipo, basesConstrucao, alturas, diagonais);
       if (deduzidas === false) return null;
       if (res.t !== null && (!(res.t > fam.min) || !(res.t < fam.max))) {
@@ -3308,6 +3320,7 @@
       }
       /* As diagonais fecham o losango sozinhas, e antes da base e da altura: ali
        * elas sao o dado do enunciado, e nao um rotulo por cima do prototipo. */
+      var avisosAntesDaForma = (doc.avisosFigura || []).length;
       var formaDiagonal = tipo === 'losango' && res.t === null
         ? losangoPorDiagonais(B, doc, basesConstrucao, diagonais) : null;
       if (formaDiagonal === false) return null;
@@ -3316,7 +3329,19 @@
           basesConstrucao, alturas, deduzidas);
       var formaBH = formaDiagonal ||
         (dimQ ? quadrilateroPorBaseAltura(B, doc, tipo, dimQ, basesConstrucao, alturas, res.t) : null);
-      if (dimQ && !formaBH) return null;
+      /* Rede de seguranca, e ela e sobre o SILENCIO e nao sobre o veredito: sair
+       * daqui com nulo e recusar a figura, e recusa sem aviso e a folha impressa
+       * sem o desenho e sem ninguem saber. O quadrilateroPorBaseAltura avisa em
+       * quase todos os caminhos, e o "quase" foi por onde escapou o
+       * "tipo=quadrilatero lado=5". Se ele nao tiver dito nada, esta linha diz. */
+      if (dimQ && !formaBH) {
+        if ((doc.avisosFigura || []).length === avisosAntesDaForma) {
+          B.avisar(doc, 'quadrilatero: os valores escritos nao montam um ' + tipo +
+            ' e a receita nao soube dizer qual deles esta sobrando. A figura nao foi ' +
+            'desenhada; escreva base= e altura=, ou tire o dado que nao couber');
+        }
+        return null;
+      }
       var pontos;
       if (formaBH) {
         /* A volta ja saiu com AB na base e o resto por cima, que e o que a tabela
