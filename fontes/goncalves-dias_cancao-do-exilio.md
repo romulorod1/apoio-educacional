@@ -36,7 +36,7 @@ Onde canta o Sabiá.
 
 Não permita Deus que eu morra,
 Sem que eu volte para lá;
-Sem que desfrute os primores
+Sem que eu desfrute os primores
 Que não encontro por cá;
 Sem qu'inda aviste as palmeiras,
 Onde canta o Sabiá.

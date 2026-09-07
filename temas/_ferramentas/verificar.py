@@ -1409,6 +1409,7 @@ def problemas_nos_itens(exerc, gab, com_catalogo, raiz_fontes=None):
 
     vigente = None
     posicao = 0
+    letras_certas = []
     for evento in eventos:
         if evento['tipo'] == 'texto':
             vigente = evento
@@ -1421,8 +1422,29 @@ def problemas_nos_itens(exerc, gab, com_catalogo, raiz_fontes=None):
         enunciados.append(ex['enunciado'])
         texto_do_item = ex['trecho'] or vigente
         erros.extend(_problemas_do_item(evento, ex, gb, texto_do_item))
+        if gb and 'letra' in gb:
+            letras_certas.append(gb['letra'])
+    erros.extend(_letras_concentradas(letras_certas))
     respostas = [' '.join(l.strip() for l in i['linhas']) for i in itens_gab]
     return erros, enunciados, respostas
+
+
+# E7: a resposta certa nao pode ter letra preferida. Medido no piloto antes desta
+# trava: 35 das 43 fechadas em "b". Um aluno de doze anos percebe na segunda folha e
+# passa a marcar pelo padrao, e a questao deixa de medir leitura. Com quatro ou mais
+# fechadas no tema, nenhuma letra pode ser a certa em mais da metade delas.
+def _letras_concentradas(letras_certas):
+    if len(letras_certas) < 4:
+        return []
+    contagem = {}
+    for letra in letras_certas:
+        contagem[letra] = contagem.get(letra, 0) + 1
+    letra, quantas = max(contagem.items(), key=lambda par: par[1])
+    if quantas * 2 > len(letras_certas):
+        return ['a letra "%s" e a resposta certa em %d das %d questoes fechadas: redistribua as '
+                'alternativas, senao o aluno acerta pelo padrao e nao pela leitura'
+                % (letra, quantas, len(letras_certas))]
+    return []
 
 
 def _problemas_do_item(evento, ex, gb, texto_do_item):

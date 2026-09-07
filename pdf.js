@@ -3407,11 +3407,25 @@
            * texto sozinho no pé da folha manda a aluna virar a página para achar
            * o texto de que ele fala. */
           var metaApoio = doc.metadadosDaFonte(apoio.fonte);
-          reservarBloco(18 + 3 * 14.5 + 6);
-          doc.y -= 18;
-          doc.textoRico(metaApoio.titulo || apoio.fonte, MARG_E, doc.y,
-            { tam: 11, bold: true, cor: COR.navy });
-          doc.y -= 2;
+          /* Texto escrito para o exercício costuma trazer o próprio título na
+           * primeira linha (notícia, artigo): o subtítulo repetiria a linha 1 logo
+           * acima dela, e na folha isso lê como erro de impressão. Quando a
+           * primeira linha do bloco é o título, o bloco fala por si. */
+          var primeiraLinha = '';
+          for (var pl = 0; pl < (apoio.conteudo || []).length; pl++) {
+            if (String(apoio.conteudo[pl] || '').trim()) { primeiraLinha = apoio.conteudo[pl]; break; }
+          }
+          var normal = function (t) { return String(t || '').replace(/\s+/g, ' ').trim().toLowerCase(); };
+          var repeteTitulo = !!metaApoio.titulo && normal(primeiraLinha) === normal(metaApoio.titulo);
+          reservarBloco((repeteTitulo ? 0 : 18) + 3 * 14.5 + 6);
+          if (!repeteTitulo) {
+            doc.y -= 18;
+            doc.textoRico(metaApoio.titulo || apoio.fonte, MARG_E, doc.y,
+              { tam: 11, bold: true, cor: COR.navy });
+            doc.y -= 2;
+          } else {
+            doc.y -= 6;
+          }
           doc.citacao(apoio, { tam: 10 });
         }
         var medEx = medirItem(ex.enunciado, 10, MARG_E + 20, 15, {

@@ -7,7 +7,7 @@ genero: teatro
 ano: 1838
 dominio: publico
 licenca: domínio público, Lei 9.610/98 art. 41
-procedencia: Wikisource pt, página "O Juiz de Paz na Roça", cena XI (https://pt.wikisource.org/wiki/O_Juiz_de_Paz_na_Roça), lida em 08/09/2026, copiada sem alteração; conferida palavra a palavra, neste trecho, com a edição digitalizada pelo projeto BDTeatro da UFU (https://www.bdteatro.ufu.br/bitstream/123456789/120/1/TT00149.pdf), que só difere na ortografia de antes de 1971 (êle, cêrca) e em rubricas; o trecho vai do requerimento do leitão até a saída de Tomás, dentro da cena XI
+procedencia: Wikisource pt, página "O Juiz de Paz na Roça", cena XI (https://pt.wikisource.org/wiki/O_Juiz_de_Paz_na_Roça), lida em 08/09/2026, copiada sem alteração de palavra; ortografia levada ao acordo de 2009 por nós em quatro pontos (Assembléia, três vezes, e dêem); conferida palavra a palavra, neste trecho, com a edição digitalizada pelo projeto BDTeatro da UFU (https://www.bdteatro.ufu.br/bitstream/123456789/120/1/TT00149.pdf), que só difere na ortografia de antes de 1971 (êle, cêrca) e em rubricas; o trecho vai do requerimento do leitão até a saída de Tomás, dentro da cena XI
 ortografia: atualizada
 integral: nao
 ---
@@ -42,7 +42,7 @@ TOMÁS - Deixe-me, senhor!
 JUIZ - Sr. ESCRIVÃO, chame o meirinho. (Os dous apartam-se.) Espere, Sr. ESCRIVÃO, não
 é preciso. (Assenta-se.) Meus senhores, só vejo um modo de conciliar esta contenda,
 que é darem os senhores este leitão de presente a alguma pessoa. Não digo com isso que
-mo dêem.
+mo deem.
 
 TOMÁS - Lembra Vossa Senhoria bem. Peço licença a Vossa Senhoria para lhe oferecer.
 
@@ -68,13 +68,13 @@ SAMPAIO - Tenho ainda um requerimento que fazer.
 
 JUIZ - Então, qual é?
 
-SAMPAIO - Desejava que Vossa Senhoria mandasse citar a Assembléia Provincial.
+SAMPAIO - Desejava que Vossa Senhoria mandasse citar a Assembleia Provincial.
 
-JUIZ - Ó homem! Citar a Assembléia Provincial? E para quê?
+JUIZ - Ó homem! Citar a Assembleia Provincial? E para quê?
 
 SAMPAIO - Pra mandar fazer cercado de espinhos em todas as hortas.
 
-JUIZ - Isto é impossível! A Assembléia Provincial não pode ocupar-se com estas
+JUIZ - Isto é impossível! A Assembleia Provincial não pode ocupar-se com estas
 insignificâncias.
 
 TOMÁS - Insignificância, bem! Mas os votos que Vossa Senhoria pediu-me para aqueles

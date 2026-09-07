@@ -451,6 +451,27 @@ def _sem_linha(texto, comeco):
     return '\n'.join(l for l in texto.split('\n') if not l.startswith(comeco))
 
 
+def _com_fechadas(texto, letras):
+    """Troca os itens 3, 4 e 5 do BASE_POR7 (abertos) por fechados com quatro alternativas,
+    cada um com a letra certa dada em `letras`; com o item 2, que ja e fechado em b, o tema
+    fica com quatro fechadas. E a prova da trava E7 nos dois sentidos."""
+    import re as _re
+    saida = texto
+    for n, letra in zip((3, 4, 5), letras):
+        # o enunciado ganha quatro alternativas
+        padrao = _re.compile(r'^(%d\. [^\n]*)$' % n, _re.M)
+        achado = padrao.search(saida)
+        assert achado, 'BASE_POR7 sem o item %d' % n
+        alternativas = '\n'.join('   %s) resposta %s, numero %d de quatro.' % (l, l, n) for l in 'abcd')
+        saida = saida[:achado.end()] + '\n' + alternativas + saida[achado.end():]
+        # o gabarito vira a letra
+        bloco = _re.compile(r'^%d\. espera_se:.*?(?=^\d+\. |\Z)' % n, _re.M | _re.S)
+        achado = bloco.search(saida)
+        assert achado, 'BASE_POR7 sem o gabarito %d' % n
+        saida = saida[:achado.start()] + '%d. %s\n\n' % (n, letra) + saida[achado.end():]
+    return saida
+
+
 def _troca(texto, de, para):
     if de not in texto:
         raise SystemExit('o teste esta desatualizado: nao achei "%s" no tema' % de[:60])
@@ -727,6 +748,10 @@ PARES = [
     # dentro do item 8
     ('G8: o tema completo de portugues passa',
      'por/07/POR07-99.md', BASE_POR7, None, None),
+    ('por7: quatro fechadas com a mesma letra certa reprovam (E7)',
+     'por/07/POR07-99.md', _com_fechadas(BASE_POR7, 'bbb'), 'resposta certa em 4 das 4', None),
+    ('por7: quatro fechadas com letras espalhadas passam',
+     'por/07/POR07-99.md', _com_fechadas(BASE_POR7, 'acd'), None, None),
     ('G8: bloco recuado no lugar do texto de apoio vira trecho do item e reprova',
      'por/07/POR07-99.md',
      _troca(BASE_POR7, '\n@fonte escrito_bilhete-da-geladeira linhas=1-2\n> Mãe',

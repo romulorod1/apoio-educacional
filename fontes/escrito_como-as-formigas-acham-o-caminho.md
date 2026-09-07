@@ -6,7 +6,7 @@ ano: 2026
 genero: artigo
 dominio: autoral
 licenca: escrito para este banco, uso livre
-procedencia: escrito pela frente 2 (sessão romul-c3) em 08/09/2026 para o tema POR07-03; pessoas, lugares e fatos são inventados
+procedencia: escrito pela frente 2 (sessão romul-c3) em 08/09/2026 para o tema POR07-03; a cena e as pessoas são inventadas, mas o experimento da ponte dupla é real: Goss, Aron, Deneubourg e Pasteels, Naturwissenschaften, 1989, e Deneubourg, Aron, Goss e Pasteels, Journal of Insect Behavior, 1990, Universidade Livre de Bruxelas, com formigas-argentinas
 integral: sim
 ---
 Como as formigas acham o caminho de volta

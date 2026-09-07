@@ -571,6 +571,25 @@ console.log('\n=== P1: a folha antiga não mudou nem um byte ===');
 }
 
 console.log('\n' + '='.repeat(60));
+/* Texto escrito para o exercício traz o próprio título na primeira linha (notícia,
+ * artigo). O subtítulo do texto de apoio repetiria a linha 1 logo acima dela, e na
+ * folha isso lê como erro de impressão (achado da revisão adversarial do piloto).
+ * Quando a linha 1 é o título, o subtítulo em negrito 11 não sai; quando não é,
+ * continua saindo. O subtítulo é a única peça em /F2 11 Tf com o título dentro. */
+console.log('\n=== texto cujo título é a primeira linha ===');
+{
+  const RX_SUBTITULO = /\/F2 11 Tf [^\n]*Manh/;
+  const comTitulo = JSON.parse(JSON.stringify(TEMA_POR));
+  comTitulo.pt.textos[0].conteudo = ['Manhã na varanda', ''].concat(CONTEUDO_APOIO);
+  comTitulo.pt.textos[0].linhas = [1, 13];
+  const brutoCom = gerar({ tema: comTitulo, lingua: 'pt', incluirLista: true });
+  const brutoSem = gerar({ tema: TEMA_POR, lingua: 'pt', incluirLista: true });
+  conf('quando a linha 1 é o título, o subtítulo em negrito 11 não sai', RX_SUBTITULO.test(brutoCom), false);
+  conf('e o título sai mesmo assim, como linha 1 do bloco e no crédito',
+    quantasVezes('Manhã na varanda', corrido(brutoCom)), 2);
+  conf('quando a linha 1 não é o título, o subtítulo continua saindo', RX_SUBTITULO.test(brutoSem), true);
+}
+
 console.log(passes + ' verificações passaram, ' + falhas + ' falharam.');
 if (falhas) { console.log('\nFALHAS:'); erros.forEach(function (e) { console.log(' - ' + e); }); }
 console.log('='.repeat(60));

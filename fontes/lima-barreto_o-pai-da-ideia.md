@@ -3,7 +3,6 @@ id: lima-barreto_o-pai-da-ideia
 titulo: O pai da ideia
 autor: Lima Barreto
 autor_morte: 1922
-obra: Vida urbana
 ano: 1920
 genero: cronica
 dominio: publico

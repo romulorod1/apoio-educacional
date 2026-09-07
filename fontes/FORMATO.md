@@ -79,7 +79,6 @@ id: lima-barreto_o-pai-da-ideia
 titulo: O pai da ideia
 autor: Lima Barreto
 autor_morte: 1922
-obra: Vida urbana
 ano: 1920
 genero: cronica
 dominio: publico
@@ -128,7 +127,7 @@ No tema, o bloco de citação é a diretiva `@fonte <id> linhas=<a>-<b>` seguida
 cada uma começando com `> `, e a linha em branco da fonte vira `>` sozinho. A seção 9 de
 `temas/FORMATO.md` explica o resto: texto de apoio, trecho dentro da questão, alternativas e
 gabarito com âncora. O crédito impresso embaixo do bloco é montado pelo gerador a partir deste
-cabeçalho: `Lima Barreto. *O pai da ideia*. In: *Vida urbana*, 1920.`; `Texto escrito para este
+cabeçalho: `Lima Barreto. *O pai da ideia*, 1920.`; `Texto escrito para este
 exercício.`; e, no tradicional, o título com a coletânea.
 
 ## 6. O que a trava garante e o que não garante
