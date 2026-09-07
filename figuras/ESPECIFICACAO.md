@@ -534,6 +534,37 @@ Tres travas mudaram em 02/09/2026, cada uma com prova nos dois sentidos em
   o semieixo em F1, e um ponto em que dois tracos so terminam nao tem quatro angulos
   nascendo. O traco conta quando o ponto esta a mais de 2 pt de cada extremidade.
 
+## O piloto de tema
+
+Cada tema com figura tem um piloto, `figuras/_piloto_<ID>.js`, que gera as quatro folhas pelo caminho de verdade (o `gerarMaterialTema` do `pdf.js`, lendo o tema do banco) e confere o que saiu. O que e generico mora no `figuras/_piloto_base.js`, e nao e copiado por tema: `abrir({id, caminhoDoMd})` resolve o banco (o `argv[2]` ou o `temas/banco.json`), gera `_exemplo_<ID>_material.pdf`, `_lista.pdf`, `_gabarito.pdf` e `_en.pdf`, monta os quatro documentos medidos e devolve o contexto; `conf`, `medido` e `placar` mantem o placar da casa ("N passaram, M falharam."); e os leitores de folha (`lerCaminhos`, `emBezier`, `caixaDe`, `voltasInteiras`, `textos`, `tem`, `quadradinhos`, `triangulos`, `bolinhasDe`, `planoDaFigura`, `ehHachurada`) leem o que vai sair impresso, nunca o que a receita disse que ia desenhar.
+
+`travasGenericas(ctx, op)` roda as travas numeradas:
+
+- **0** o banco lido e o do `.md` de hoje (vale para o `temas/banco.json` e para o retrato `figuras/_tema_<ID>.json`)
+- **A** nenhuma palavra portuguesa na folha em ingles, e o mesmo padrao acha portugues na folha em portugues
+- **B** paridade PT x EN: as mesmas receitas, na mesma ordem, item a item e na explicacao
+- **C** sanidade: nenhuma diretiva impressa, nenhuma figura com erro, nenhum aviso nas quatro folhas, nenhuma reprovada pelo `conferirFigura`, todo `q` com o seu `Q` e nenhum tracejado fora de envelope
+- **D** teto de cinco marcas ativas
+- **E** escala coerente: fora de escala pede legenda, e desenho exato nao se marca fora de escala
+- **F** ao menos um terco dos exercicios sem figura nenhuma
+- **1** dois rotulos na mesma linha de base a menos de 14 pt viram um rotulo so
+- **2** o rotulo de vertice fica mais perto do vertice dele do que do concorrente
+- **3** enunciado com figura remete a ela, e enunciado sem figura nao fala dela
+- **4** nenhum dado numerico existe so no desenho
+- **5** toda hachura tem glosa, na legenda e, dentro de exercicio, tambem no enunciado
+- **6** nenhum numero de escala e riscado por arco de 1,1 a 1,3 pt
+- **7** nenhum rotulo e impresso em cima de outro, em direcao nenhuma
+- **8** o tema nao promete figura em texto nenhum sem ter uma diretiva `@fig` em lugar nenhum
+
+O piloto do tema traz so tres coisas: o ID, os numeros editoriais daquele tema (`diretivasNaExplicacao`, `enunciadosComFigura`, `registrosNoMaterial`, `figurasNoGabarito`, `idsDoGabarito`, `hachurasMinimas`, `palavrasPt`, cada um com o rotulo editorial dele) e a medicao no fluxo da familia de receitas dele. Opcao que nao vem desliga a trava correspondente, e a base escreve na folha que desligou: nao existe trava silenciosamente ausente num tema que passou.
+
+Roda-se assim, um comando por tema, mais a prova da base:
+
+    node figuras/_prova_piloto_base.js
+    node figuras/_piloto_MATEM3-12.js figuras/_tema_MATEM3-12.json
+
+A prova da base tem par envenenado para cada trava: um tema (ou uma figura) limpo que ela tem que aprovar e um com exatamente o defeito que ela caca, que ela tem que reprovar nomeando o item. Trava nova entra na base com o par, nunca so num piloto de tema.
+
 ## O que NAO fazer
 
 - Nao escrever COR.vermelho. Ele nao existe: a tabela COR tem navy, teal, gold, muted, fio, soft, softEsc, branco, texto e marca. Testei o comportamento e ele e pior do que um erro: o doc.linha faz c || COR.fio, entao a linha sai desenhada em COR.fio, que mede 1,53 de contraste contra o branco. O traco do gabarito nao quebra nada, apenas desaparece na folha impressa. Varias das convencoes levantadas e o proprio briefing supoem que COR.vermelho existe. O destaque e COR.teal, e a camada de resposta vem sempre em teal MAIS tracejado.
