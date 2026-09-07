@@ -2001,8 +2001,13 @@
     geografia: 'Geografia',
     filosofia: 'Filosofia',
     sociologia: 'Sociologia',
+    literatura: 'Literatura',
+    estudo: 'Método de estudo',
     outra: 'Outra'
   };
+  /* Esta cópia é conferida contra Core.MATERIAS pelo _teste/testa_materias.js:
+   * matéria que entrar lá e não entrar aqui reprova o portão, em vez de sair
+   * crua na folha da família. */
 
   /* Ficha de mapeamento do aluno, em uma folha.
    *

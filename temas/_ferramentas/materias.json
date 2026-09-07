@@ -1,0 +1,139 @@
+{
+  "origem": "core.js, via exporta_materias.js",
+  "materias": [
+    {
+      "id": "matematica",
+      "rotulo": "Matemática",
+      "topicos": null,
+      "temas": {
+        "pasta": "mat",
+        "prefixo": "MAT",
+        "raiz": "banco/",
+        "linguas": [
+          "pt",
+          "en"
+        ],
+        "unidades": {
+          "numeros": "Números",
+          "algebra": "Álgebra",
+          "geometria": "Geometria",
+          "grandezas": "Grandezas",
+          "estatistica": "Estatística"
+        },
+        "citacao": false
+      }
+    },
+    {
+      "id": "portugues",
+      "rotulo": "Português",
+      "topicos": "portugues",
+      "temas": {
+        "pasta": "por",
+        "prefixo": "POR",
+        "raiz": "banco/portugues/",
+        "linguas": [
+          "pt"
+        ],
+        "unidades": {
+          "leitura": "Leitura e interpretação",
+          "analise": "Análise linguística",
+          "producao": "Produção de texto",
+          "oralidade": "Oralidade"
+        },
+        "citacao": true
+      }
+    },
+    {
+      "id": "literatura",
+      "rotulo": "Literatura",
+      "topicos": "literatura",
+      "temas": {
+        "pasta": "lit",
+        "prefixo": "LIT",
+        "raiz": "banco/literatura/",
+        "linguas": [
+          "pt"
+        ],
+        "unidades": {
+          "leitura": "Leitura literária",
+          "periodos": "Períodos e movimentos",
+          "obras": "Obras e autores",
+          "teoria": "Teoria literária"
+        },
+        "citacao": true
+      }
+    },
+    {
+      "id": "redacao",
+      "rotulo": "Redação",
+      "topicos": "redacao",
+      "temas": null
+    },
+    {
+      "id": "ingles",
+      "rotulo": "Inglês",
+      "topicos": "ingles",
+      "temas": null
+    },
+    {
+      "id": "ciencias",
+      "rotulo": "Ciências",
+      "topicos": "ciencias",
+      "temas": null
+    },
+    {
+      "id": "fisica",
+      "rotulo": "Física",
+      "topicos": "fisica",
+      "temas": null
+    },
+    {
+      "id": "quimica",
+      "rotulo": "Química",
+      "topicos": "quimica",
+      "temas": null
+    },
+    {
+      "id": "biologia",
+      "rotulo": "Biologia",
+      "topicos": "biologia",
+      "temas": null
+    },
+    {
+      "id": "historia",
+      "rotulo": "História",
+      "topicos": "historia",
+      "temas": null
+    },
+    {
+      "id": "geografia",
+      "rotulo": "Geografia",
+      "topicos": "geografia",
+      "temas": null
+    },
+    {
+      "id": "filosofia",
+      "rotulo": "Filosofia",
+      "topicos": "filosofia-sociologia",
+      "temas": null
+    },
+    {
+      "id": "sociologia",
+      "rotulo": "Sociologia",
+      "topicos": "filosofia-sociologia",
+      "temas": null
+    },
+    {
+      "id": "estudo",
+      "rotulo": "Método de estudo",
+      "topicos": "estudo",
+      "temas": null
+    },
+    {
+      "id": "outra",
+      "rotulo": "Outra",
+      "topicos": null,
+      "temas": null
+    }
+  ]
+}

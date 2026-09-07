@@ -121,6 +121,11 @@ roda "trilha (motor)" node _teste/testa_trilha.js
 roda "dinheiro"      node _teste/testa_dinheiro.js
 roda "cartao do mes" node _teste/testa_cartao.js
 roda "proposta"      node _teste/testa_proposta.js
+# A tabela de materias e uma so (core.js) e as copias tem que bater com ela:
+# a do cartao.js, a do pdf.js, o banco/topicos/indice.json e a exportada para
+# o Python. Foi a divergencia entre quatro vocabularios de materia que deixou
+# "matematica" escrita a mao em oito pontos do app.js.
+roda "materias"      node _teste/testa_materias.js
 
 # As provas do kit de figuras nao rodavam aqui. Duas delas estavam falhando
 # desde o commit que as criou, algumas horas antes (_base_prova_travas, 34 de

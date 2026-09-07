@@ -4090,7 +4090,9 @@
       texto: 'Marque também as disciplinas que você vai acompanhar além da primeira. ' +
         'A primeira da lista é a que manda nas marcações abaixo.'
     }));
-    b2.appendChild(gradeDeMarcar(Core.MATERIAS, p.materias, 0, function () {
+    /* Sem 'Método de estudo': é disciplina do catálogo de tópicos, não matéria
+     * que se propõe a uma família. */
+    b2.appendChild(gradeDeMarcar(Core.MATERIAS.filter(function (m) { return m.mapa !== false; }), p.materias, 0, function () {
       /* A ordem importa: a primeira matéria é a que decide quais itens
        * aparecem e se existe lista de lacunas. Reordenar pela lista de
        * matérias deixa matemática na frente sempre que ela estiver marcada,
@@ -5734,6 +5736,10 @@
     var selMateria = el('select', { id: 'mapa-materia' });
     var jaPreenchidas = Core.materiasDoMapeamento(trabalho);
     Core.MATERIAS.forEach(function (mat) {
+      /* 'Método de estudo' está na tabela porque é uma disciplina do catálogo
+       * de tópicos, mas não é matéria que se mapeia nem que se propõe: fica
+       * fora do select. */
+      if (mat.mapa === false) return;
       var jaTem = jaPreenchidas.indexOf(mat.id) >= 0;
       var o = el('option', {
         value: mat.id,

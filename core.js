@@ -1013,22 +1013,109 @@
    * trigonometria, que já existem no banco de temas e a busca já sabe achar:
    * não é preciso escrever uma lista de lacunas de física para isso funcionar.
    *
-   * A última é "Outra", com o nome em branco, porque nenhuma lista prevê tudo. */
+   * A última é "Outra", com o nome em branco, porque nenhuma lista prevê tudo.
+   *
+   * ESTA É A TABELA ÚNICA DE MATÉRIAS, e tudo deriva dela.
+   *
+   * O aplicativo nasceu para uma matéria só, e isso ficou escrito em quatro
+   * lugares que não se falavam: esta lista, o banco/topicos/indice.json, uma
+   * cópia no cartao.js e outra no pdf.js, mais a palavra "matematica" à mão em
+   * oito pontos do app.js, o gerador varrendo uma pasta fixa e o identificador
+   * lido por regex com MAT dentro. Abrir o banco a outra matéria exigia tocar
+   * em tudo isso. Decisão de 08/09/2026: uma matéria nova custa uma linha aqui
+   * e uma pasta, e nenhuma linha de código.
+   *
+   * `topicos` é a chave da disciplina em banco/topicos (o catálogo de títulos
+   * que a tela de assunto já navega). Filosofia e sociologia são duas matérias
+   * aqui e um arquivo só lá: as duas apontam para a mesma chave.
+   *
+   * `temas` só existe quando a matéria tem banco de material, e declara:
+   *   pasta    onde os .md de autoria vivem (temas/<pasta>/<serie>/)
+   *   prefixo  começo do identificador de tema (MAT07-01, POR07-01, LITEM2-03)
+   *   raiz     de onde o aplicativo baixa indice, busca e as séries. A da
+   *            matemática é 'banco/' por LEGADO e não pode mudar nunca: a
+   *            chave no cache BAIXADOS dos tablets é a URL que o app pede, e
+   *            não há código que renomeie chave. Mudar isso faz sumir, sem
+   *            sinal, toda série que ela já baixou. Matéria nova nasce em
+   *            'banco/<id>/'.
+   *   linguas  quais blocos o tema traz. Inglês é propriedade da matéria, não
+   *            do banco: matemática tem versão em inglês para colégio
+   *            bilíngue; português e literatura nascem só em pt.
+   *   unidades os eixos que o verificador aceita, com o rótulo da tela.
+   *   citacao  se o texto de apoio pode ter travessão e reticências dentro de
+   *            bloco de citação marcado. Texto de autor não se reescreve; fora
+   *            do bloco a regra da casa continua valendo.
+   *
+   * A cópia para o Python (temas/_ferramentas/materias.json) é GERADA daqui
+   * por temas/_ferramentas/exporta_materias.js, e _teste/testa_materias.js
+   * reprova se ela, o cartao.js, o pdf.js ou o banco/topicos/indice.json
+   * divergirem desta lista. */
   var MATERIAS = [
-    { id: 'matematica', rotulo: 'Matemática', escada: true },
-    { id: 'portugues', rotulo: 'Português' },
-    { id: 'redacao', rotulo: 'Redação' },
-    { id: 'ingles', rotulo: 'Inglês' },
-    { id: 'ciencias', rotulo: 'Ciências' },
-    { id: 'fisica', rotulo: 'Física', apoiaEmMatematica: true },
-    { id: 'quimica', rotulo: 'Química', apoiaEmMatematica: true },
-    { id: 'biologia', rotulo: 'Biologia' },
-    { id: 'historia', rotulo: 'História' },
-    { id: 'geografia', rotulo: 'Geografia' },
-    { id: 'filosofia', rotulo: 'Filosofia' },
-    { id: 'sociologia', rotulo: 'Sociologia' },
+    {
+      id: 'matematica', rotulo: 'Matemática', escada: true,
+      temas: {
+        pasta: 'mat', prefixo: 'MAT', raiz: 'banco/', linguas: ['pt', 'en'],
+        unidades: {
+          numeros: 'Números', algebra: 'Álgebra', geometria: 'Geometria',
+          grandezas: 'Grandezas', estatistica: 'Estatística'
+        },
+        citacao: false
+      }
+    },
+    {
+      id: 'portugues', rotulo: 'Português', topicos: 'portugues',
+      temas: {
+        pasta: 'por', prefixo: 'POR', raiz: 'banco/portugues/', linguas: ['pt'],
+        unidades: {
+          leitura: 'Leitura e interpretação', analise: 'Análise linguística',
+          producao: 'Produção de texto', oralidade: 'Oralidade'
+        },
+        citacao: true
+      }
+    },
+    {
+      id: 'literatura', rotulo: 'Literatura', topicos: 'literatura',
+      temas: {
+        pasta: 'lit', prefixo: 'LIT', raiz: 'banco/literatura/', linguas: ['pt'],
+        unidades: {
+          leitura: 'Leitura literária', periodos: 'Períodos e movimentos',
+          obras: 'Obras e autores', teoria: 'Teoria literária'
+        },
+        citacao: true
+      }
+    },
+    { id: 'redacao', rotulo: 'Redação', topicos: 'redacao' },
+    { id: 'ingles', rotulo: 'Inglês', topicos: 'ingles' },
+    { id: 'ciencias', rotulo: 'Ciências', topicos: 'ciencias' },
+    { id: 'fisica', rotulo: 'Física', apoiaEmMatematica: true, topicos: 'fisica' },
+    { id: 'quimica', rotulo: 'Química', apoiaEmMatematica: true, topicos: 'quimica' },
+    { id: 'biologia', rotulo: 'Biologia', topicos: 'biologia' },
+    { id: 'historia', rotulo: 'História', topicos: 'historia' },
+    { id: 'geografia', rotulo: 'Geografia', topicos: 'geografia' },
+    { id: 'filosofia', rotulo: 'Filosofia', topicos: 'filosofia-sociologia' },
+    { id: 'sociologia', rotulo: 'Sociologia', topicos: 'filosofia-sociologia' },
+    { id: 'estudo', rotulo: 'Método de estudo', topicos: 'estudo', mapa: false },
     { id: 'outra', rotulo: 'Outra', livre: true }
   ];
+
+  /* As matérias que têm banco de material, na ordem da tabela. É o que o
+   * gerador varre, o que o verificador aceita e o que o aplicativo sabe
+   * baixar. Hoje só matemática tem temas escritos; português e literatura já
+   * estão declaradas para o banco delas nascer sem tocar em código. */
+  function materiasComTemas() {
+    return MATERIAS.filter(function (m) { return !!m.temas; });
+  }
+
+  /* A matéria dona de um identificador de tema, pelo prefixo declarado. O
+   * identificador de tópico tem '-T' e nunca é tema: devolve null para ele,
+   * para a trilha nunca confundir os dois (ela compara por igualdade de id). */
+  function materiaDoTema(id) {
+    var s = String(id || '').toUpperCase();
+    if (!s || s.indexOf('-T') !== -1) return null;
+    return materiasComTemas().filter(function (m) {
+      return s.indexOf(m.temas.prefixo) === 0;
+    })[0] || null;
+  }
 
   var MATERIA_PADRAO = 'matematica';
 
@@ -3587,6 +3674,7 @@
     rotuloNivel: rotuloNivel, mapeamentoNovo: mapeamentoNovo, mapeamentosDe: mapeamentosDe,
     mapeamentoAtual: mapeamentoAtual, mapeado: mapeado,
     MATERIAS: MATERIAS, MATERIA_PADRAO: MATERIA_PADRAO, materiaPorId: materiaPorId,
+    materiasComTemas: materiasComTemas, materiaDoTema: materiaDoTema,
     rotuloMateria: rotuloMateria, temLacunaDeAnoAnterior: temLacunaDeAnoAnterior,
     itensDoAluno: itensDoAluno, itensDaMateria: itensDaMateria,
     gruposDoAluno: gruposDoAluno, gruposDaMateria: gruposDaMateria,
