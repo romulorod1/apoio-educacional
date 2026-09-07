@@ -1,0 +1,242 @@
+{
+  "tema": "POR06-10",
+  "assinatura": "8db7822e03671529be8253b93aa014cadcdddc96604891436701925a9ffc03e5",
+  "data": "2026-09-07",
+  "modelos": {
+    "leitores": "sonnet",
+    "juiz": "sonnet",
+    "lente": "fable"
+  },
+  "questoes": [
+    {
+      "n": 2,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O item que não entra na massa é a manteiga e a farinha para untar a forma. Elas servem para cobrir o fundo e os lados da forma, assim o bolo não gruda depois de assado.",
+          "veredito": "espera_se",
+          "motivo": "Aponta manteiga e farinha e explica que servem para untar a forma e evitar que o bolo grude, exatamente como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "É a manteiga e a farinha. Elas servem para untar a forma, não entram na massa.",
+          "veredito": "espera_se",
+          "motivo": "Aponta manteiga e farinha e diz que servem para untar a forma e nao entram na massa, cumprindo o espera_se de forma direta."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O item que não entra na massa é a manteiga e a farinha do fim da lista, que servem para untar a forma, como diz a linha 11: manteiga e farinha para untar a forma. Elas aparecem de novo no passo 2, que manda untar a forma com manteiga e polvilhar farinha por cima, cobrindo fundo e lados. Serve para o bolo não grudar na forma depois de assado, o que ajuda a desenformar sem quebrar, que é o último passo da receita.",
+          "veredito": "espera_se",
+          "motivo": "Aponta manteiga e farinha, cita a linha da lista e explica a funcao de untar para nao grudar e permitir desenformar, cumprindo o espera_se com detalhe extra."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 4,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Acenda, unte, descasque e bata.",
+          "veredito": "espera_se",
+          "motivo": "Quatro verbos de comando corretos, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Acenda, unte, descasque e bata são quatro verbos de comando da receita.",
+          "veredito": "espera_se",
+          "motivo": "Mesmos quatro verbos do espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Quatro verbos que dão ordem são: acenda, unte, descasque e bata (linhas 13, 14, 15 e 16).",
+          "veredito": "espera_se",
+          "motivo": "Mesmos quatro verbos do espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 6,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Acenda vira não acenda, unte vira não unte, e descasque vira não descasque.",
+          "veredito": "espera_se",
+          "motivo": "Três pares corretos de imperativo afirmativo e negativo, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Acenda vira não acenda, unte vira não unte, e despeje vira não despeje.",
+          "veredito": "espera_se",
+          "motivo": "Mesma resposta com verbos diferentes, igualmente corretos."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Escolhendo acenda, unte e bata, no imperativo negativo ficam: não acenda, não unte e não bata.",
+          "veredito": "espera_se",
+          "motivo": "Mesma resposta com verbos do espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 8,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Untar a forma no começo serve para o bolo não grudar, e assim, no fim, ele consegue sair fácil da forma na hora de desenformar.",
+          "veredito": "espera_se",
+          "motivo": "Liga untar a não grudar e a poder desenformar, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A forma é untada no começo pra o bolo não grudar nela, e por isso no final fica fácil desenformar o bolo sem quebrar.",
+          "veredito": "espera_se",
+          "motivo": "Mesma ligação entre untar e desenformar."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A forma é untada no começo para que a massa não grude nela, e assim, no fim, quando o bolo já está assado e frio, ele consegue sair da forma sem quebrar.",
+          "veredito": "espera_se",
+          "motivo": "Mesma ligação entre untar e desenformar sem quebrar."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 10,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Porque os passos numerados ficam mais claros e organizados, ajudando quem está cozinhando a não se perder nem pular nenhuma etapa.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que a numeração organiza e evita pular etapa, batendo com o aceita_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Porque assim fica mais fácil seguir a ordem certa dos passos, um de cada vez.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que ajuda a seguir a ordem um passo de cada vez, como no aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Os passos vêm numerados para ajudar quem está cozinhando a seguir a ordem certa sem se perder nem pular nenhuma etapa, já que na cozinha é importante fazer cada coisa na hora certa.",
+          "veredito": "aceita_se",
+          "motivo": "Mesma ideia de organizar a execução sem pular etapa, como no aceita_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 12,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O teste do palito serve para saber se o bolo já assou por dentro. Se o palito sair limpo, o bolo está pronto, e se sair com massa grudada, a receita manda assar mais cinco minutos e testar de novo.",
+          "veredito": "espera_se",
+          "motivo": "Explica o teste do palito e os dois resultados, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O teste serve pra saber se o bolo já assou por dentro. Se o palito sair limpo o bolo está pronto, se sair com massa grudada tem que assar mais cinco minutos.",
+          "veredito": "espera_se",
+          "motivo": "Mesma explicação com os dois resultados."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O teste do palito serve para verificar se o bolo já assou por dentro. Se o palito sair limpo, o bolo está assado (linha 21). Se sair com massa grudada, a receita manda assar mais cinco minutos e espetar de novo (linha 22).",
+          "veredito": "espera_se",
+          "motivo": "Mesma explicação com os dois resultados e linhas citadas."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 14,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Na lista de ingredientes, as frases são curtas, só com quantidade e nome do ingrediente. No modo de fazer, as frases são mais completas, com verbos de comando, porque ali é preciso explicar a ação que a pessoa deve fazer, não só listar o que vai usar.",
+          "veredito": "espera_se",
+          "motivo": "Explica a ausência de verbo na lista e o imperativo no modo de fazer, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Na lista de ingredientes não tem verbo de comando, só as quantidades de cada coisa. No modo de fazer tem verbo de comando em cada passo, porque ali é pra explicar o que fazer.",
+          "veredito": "espera_se",
+          "motivo": "Mesma explicação sobre verbo de comando presente só no modo de fazer."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A lista de ingredientes é escrita em itens soltos, só com quantidade e nome, como \"3 ovos\". O modo de fazer é escrito em frases numeradas com verbos de comando. Isso muda porque a lista serve só para separar o que vai usar, enquanto o modo de fazer precisa explicar uma ação passo a passo.",
+          "veredito": "espera_se",
+          "motivo": "Mesma explicação com exemplo da lista."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 15,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Um motivo a favor de deixar no fim é que assim não atrapalha quem já sabe cozinhar e quer ir direto às instruções. Um motivo a favor de colocar antes é que assim quem vai usar o forno já fica avisado do perigo antes mesmo de começar a receita.",
+          "veredito": "espera_se",
+          "motivo": "Dá um argumento a favor de cada posição apoiado no conteúdo da advertência, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A favor de deixar no fim, porque assim não atrapalha quem já sabe cozinhar. A favor de colocar antes, porque assim a pessoa já fica avisada e não se queima sem querer.",
+          "veredito": "espera_se",
+          "motivo": "Mesma estrutura de um argumento para cada lado."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A favor de deixar no fim: a pessoa já sabe todo o passo a passo antes de se preocupar com os perigos, sem interromper a receita no meio. A favor de colocar antes: assim a pessoa saberia dos riscos do forno quente e do pano molhado logo no início, evitando acidentes desde o primeiro passo.",
+          "veredito": "espera_se",
+          "motivo": "Mesma estrutura com mais detalhe sobre os riscos do forno."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    }
+  ],
+  "resultado": {
+    "aprovadas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      14,
+      15
+    ],
+    "ambiguas": [],
+    "estreitas": []
+  }
+}
