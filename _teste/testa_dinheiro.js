@@ -15,8 +15,15 @@
  *
  * Trava também que o número que é só dela nunca aparece no documento que a
  * família recebe, e que a sugestão de reajuste funciona sem internet nenhuma.
+ *
+ * As duas últimas seções olham o documento pronto: o markdown e o PDF. O PDF é
+ * o que a família de fato recebe, e por muito tempo nada aqui o abria: a
+ * conferência das combinações do fechamento morava num script de rascunho, que
+ * morre com a sessão. O pdf.js roda em node, então a trava cabe aqui, sem
+ * navegador nenhum.
  */
 const Core = require('../core.js');
+const PDFGen = require('../pdf.js');
 
 let passes = 0, falhas = 0;
 const erros = [];
@@ -397,6 +404,193 @@ conf('sem data devolve nada', Core.mesesEntre('', '2026-09-15'), null);
 conf('porcentagem em português', Core.pctBR(8.81), '8,81%');
 conf('sem casa sobrando', Core.pctBR(9), '9%');
 conf('e com uma casa só quando é o caso', Core.pctBR(2.5), '2,5%');
+
+// ================================================================
+secao('14. O total do mês sai como total, e não como nota de rodapé');
+
+/* Uma mãe paga adiantado: ela recebe o fechamento antes de as aulas do mês
+ * acontecerem, e o número que serve a ela é o total do mês. Esse número saía do
+ * documento só dentro de um aviso de rodapé, que ainda começava dizendo que
+ * aquelas datas não entravam no total acima. Quem lia via R$ 220,00 em negrito e
+ * o R$ 340,00 no meio de uma frase de letra apagada, e pagava o valor errado.
+ *
+ * Agora o mês fechado é linha de total, com o mesmo peso do total do que já
+ * aconteceu. O que não mudou: as duas tabelas continuam separadas e o documento
+ * continua sem contar como dada uma aula que ainda não aconteceu. */
+const mdSet = Core.markdownFechamento(set, {});
+const linhasSet = mdSet.split('\n');
+const totalDoMes = linhasSet.filter(l => l.indexOf('**Total do mês') === 0)[0] || '(não saiu)';
+
+conf('o mês fechado sai como linha de total, e não dentro de frase', totalDoMes,
+  '**Total do mês, já contando as datas ainda marcadas:** R$ 340,00 (5 encontros, 3:00 h)');
+conf('a nota que escondia esse número não existe mais',
+  /não entram no total acima/.test(mdSet), false);
+conf('nem o resto dela', /fecha em/.test(mdSet), false);
+/* Esta trava dizia "**Total a cobrar até 15/09:** R$ 220,00" e foi trocada de
+ * propósito. Com a palavra de pagar em cima do número PARCIAL, e o total do mês,
+ * maior, mais abaixo na folha, a mãe que paga adiantado procurava "cobrar" para
+ * saber quanto depositar e lia o parcial: no dia 3 do mês isso é R$ 0,00, e é
+ * erro de pagar A MENOS, na mesma família que motivou a mudança. Agora o
+ * parcial diz o que é, e a palavra de pagar só aparece no mês vencido, quando
+ * não há total nenhum embaixo dela. */
+conf('o total do que já aconteceu continua saindo, com a data de corte',
+  linhasSet.filter(l => l === '**Total das aulas dadas até 15/09:** R$ 220,00').length, 1);
+conf('e o parcial não carrega mais a palavra de pagar',
+  /Total a cobrar/.test(mdSet), false);
+conf('e as duas tabelas continuam separadas',
+  mdSet.indexOf('## Ainda marcadas neste mês') > 0, true);
+
+/* Um encontro só à frente, e o documento fala no singular: é o mês inteiro no
+ * futuro, que é justamente o caso de quem paga adiantado no dia 1. */
+const mdNovembro = Core.markdownFechamento(novembro, {});
+conf('com um encontro só, o mês fecha no singular',
+  mdNovembro.split('\n').filter(l => l.indexOf('**Total do mês') === 0)[0],
+  '**Total do mês, já contando as datas ainda marcadas:** R$ 120,00 (1 encontro, 1:00 h)');
+
+/* Mês vencido não tem nada marcado à frente, e aí não há linha nova nenhuma: o
+ * fechamento que ela já mandava continua palavra por palavra o mesmo. */
+const mdJunho = Core.markdownFechamento(junho, {});
+conf('mês vencido não ganha linha de total do mês', /Total do mês/.test(mdJunho), false);
+conf('nem seção de datas ainda marcadas', /Ainda marcadas/.test(mdJunho), false);
+conf('e o total dele continua sem data de corte',
+  mdJunho.indexOf('**Total a cobrar:** ') > 0, true);
+
+/* O caminho comum é o documento de TODAS as famílias já mandadas, e por isso ele
+ * é conferido linha a linha, e não por "contém". Uma linha de total nova que
+ * vazasse para o mês vencido passaria despercebida: ninguém relê um fechamento
+ * que já saiu certo dezenas de vezes. São duas linhas de total, nem uma a mais,
+ * e a do dinheiro é palavra por palavra a de sempre. */
+const totaisJunho = mdJunho.split('\n').filter(l => l.indexOf('**Total') === 0);
+conf('mês vencido tem exatamente duas linhas de total', totaisJunho.length, 2);
+conf('e a linha do dinheiro é a de sempre, palavra por palavra',
+  totaisJunho.filter(l => l.indexOf('**Total a cobrar') === 0)[0], '**Total a cobrar:** R$ 100,00');
+
+// ================================================================
+secao('15. O PDF, que é o que a família recebe, diz o mesmo que o texto');
+
+/* Nada aqui abria o PDF. As 186 combinações do fechamento foram conferidas uma
+ * vez num script de rascunho, na pasta de arquivos temporários da sessão, que
+ * morre junto com ela: na prática o PDF ficou sem trava nenhuma enquanto o
+ * markdown tinha a seção 14 inteira. Como o PDF é justamente o arquivo que a
+ * mãe abre para saber quanto depositar, o defeito relatado vira teste aqui.
+ *
+ * O pdf.js roda em node por causa do module.exports, então isto não precisa de
+ * navegador. A leitura do PDF é a mesma do testa_material.js: o gerador escreve
+ * os operadores de texto em claro, sem compressão, e cada pedaço desenhado sai
+ * do próprio byte. A única diferença é que aqui o x e o y do Td são guardados
+ * junto, porque uma das travas é de alinhamento de coluna. */
+function pecasDoPdf(bytes) {
+  const bruto = Buffer.from(bytes).toString('latin1');
+  const rx = /(-?[\d.]+) (-?[\d.]+) Td \(((?:[^()\\]|\\.)*)\) Tj/g;
+  const pecas = [];
+  let m;
+  while ((m = rx.exec(bruto))) {
+    pecas.push({
+      x: parseFloat(m[1]), y: parseFloat(m[2]),
+      txt: m[3].replace(/\\([\\()])/g, '$1')
+    });
+  }
+  return pecas;
+}
+/* O valor de uma linha da folha é o pedaço mais à direita na mesma altura: as
+ * colunas de dinheiro são alinhadas à direita, e a coluna Valor é a última.
+ * Achar pelo y do rótulo, e não pelo texto do número, para a trava não depender
+ * de dois valores diferentes por acaso. */
+function valorNaLinhaDe(pecas, comeco) {
+  const rotulo = pecas.filter(p => p.txt.indexOf(comeco) === 0)[0];
+  /* Falta de rótulo devolve peça com recado, e não undefined: quando esta trava
+   * quebrar, quem lê o placar tem que saber se o que sumiu foi o rótulo ou o
+   * número, sem abrir o PDF. */
+  if (!rotulo) return { x: null, txt: '(não achei o rótulo "' + comeco + '")' };
+  const naLinha = pecas.filter(p => p.y === rotulo.y && /^R\$ /.test(p.txt));
+  if (!naLinha.length) return { x: null, txt: '(linha "' + comeco + '" sem valor)' };
+  return naLinha.sort((a, b) => b.x - a.x)[0];
+}
+
+const pdfSet = pecasDoPdf(PDFGen.gerarFechamento(set, {}));
+const textoSet = pdfSet.map(p => p.txt).join('\n');
+
+conf('a nota que escondia o total do mês não existe no PDF',
+  /não entram no total acima/.test(textoSet), false);
+conf('e a faixa do total do mês sai uma vez só, nem zero nem duas',
+  pdfSet.filter(p => p.txt.indexOf('Total do mês, já contando as datas ainda marcadas') === 0).length, 1);
+
+const valorDoMes = valorNaLinhaDe(pdfSet, 'Total do mês, já contando');
+conf('o valor do mês está impresso na folha', valorDoMes.txt, 'R$ 340,00');
+
+/* O rótulo novo do parcial também no PDF: a linha de Total da tabela de cima
+ * dizia só "3 encontros até 15/09", sem dizer o que aqueles encontros eram,
+ * enquanto o texto dizia "a cobrar" em cima do mesmo número. Os dois documentos
+ * apontavam para números diferentes com a mesma força. */
+const valorParcial = valorNaLinhaDe(pdfSet, '3 encontros dados até 15/09');
+conf('o parcial do PDF diz que os encontros foram dados',
+  pdfSet.filter(p => p.txt === '3 encontros dados até 15/09').length, 1);
+conf('e o valor dele é o que já aconteceu', valorParcial.txt, 'R$ 220,00');
+
+/* Os dois números comparados entre si, e não com a medida que alguém anotou à
+ * mão: se a folha mudar de largura, a trava tem que continuar valendo. A faixa
+ * do mês é desenhada por outra lista de colunas que não a da tabela, e é
+ * exatamente aí que o valor do mês escorregaria para o meio da folha, longe da
+ * coluna Valor em que a família confere a soma. */
+conf('o valor do mês cai na mesma coluna do valor parcial',
+  valorDoMes.x, valorParcial.x);
+
+/* Mês vencido: a folha de todas as famílias já mandadas. Sem faixa, sem tabela
+ * de baixo, e a linha de Total falando de "N encontros" e nada mais. */
+const pdfJunho = pecasDoPdf(PDFGen.gerarFechamento(junho, {}));
+const textoJunho = pdfJunho.map(p => p.txt).join('\n');
+conf('mês vencido não ganha faixa de total do mês no PDF',
+  /Total do mês/.test(textoJunho), false);
+conf('nem a tabela das datas ainda marcadas',
+  /Ainda marcadas/.test(textoJunho), false);
+conf('e a linha de Total dele sai como sempre saiu',
+  pdfJunho.filter(p => /^\d+ encontros?/.test(p.txt)).map(p => p.txt).join(' | '), '1 encontro');
+conf('sem data de corte em lugar nenhum da folha',
+  /até 15\/09/.test(textoJunho), false);
+
+/* A faixa do total do mês não pode nascer sozinha no alto de uma folha nova.
+ *
+ * A reserva de espaço ficava antes da própria faixa, e o comentário ali dizia
+ * que ela não deixava a faixa ficar órfã da tabela. Não deixava coisa nenhuma:
+ * quando o espaço acabava, era justamente essa reserva que virava a página, e a
+ * faixa começava a folha nova sem uma linha de tabela e sem o título "Ainda
+ * marcadas neste mês", como um número solto no meio do nada. O caso abaixo, uma
+ * aula passada e vinte e cinco marcadas à frente, é o que os revisores
+ * reproduziram: a folha 2 saía com a faixa, o Feedback e mais nada.
+ *
+ * As páginas são separadas pela numeração do rodapé, que a moldura escreve no
+ * fim do fluxo de cada uma. */
+function fechamentoCom(passadas, futuras) {
+  const aulas = [];
+  for (let i = 0; i < passadas; i++) {
+    aulas.push({ id: 'p' + i, alunoId: 'a1', data: '2026-09-0' + (1 + (i % 9)), duracaoMin: 60, status: 'realizada' });
+  }
+  for (let i = 0; i < futuras; i++) {
+    aulas.push({ id: 'f' + i, alunoId: 'a1', data: '2026-09-' + String(16 + (i % 15)), duracaoMin: 60, status: 'realizada' });
+  }
+  return Core.calcularFechamento({
+    alunos: [{ id: 'a1', nome: 'Ana', precos: [{ id: 'p1', inicio: '2026-01-01', fim: null, valorHora: 100 }] }],
+    aulas: aulas, resumos: [], ajustes: {}
+  }, 'a1', '2026-09', HOJE);
+}
+function paginasDoPdf(bytes) {
+  const pags = [[]];
+  pecasDoPdf(bytes).forEach(p => {
+    if (/^Página \d+ de \d+$/.test(p.txt)) { pags.push([]); return; }
+    pags[pags.length - 1].push(p);
+  });
+  if (!pags[pags.length - 1].length) pags.pop();
+  return pags;
+}
+
+const pagsLongo = paginasDoPdf(PDFGen.gerarFechamento(fechamentoCom(1, 25), {}));
+const pagDaFaixa = pagsLongo.filter(pg =>
+  pg.some(p => p.txt.indexOf('Total do mês, já contando') === 0))[0] || [];
+conf('a folha longa realmente vira de página', pagsLongo.length > 1, true);
+conf('a faixa do mês não fica órfã: a linha de Total da tabela vem junto',
+  pagDaFaixa.some(p => /encontros? marcados?$/.test(p.txt)), true);
+conf('e o cabeçalho da tabela é redesenhado na folha nova',
+  pagDaFaixa.some(p => p.txt === 'Situação'), true);
 
 // ================================================================
 console.log('\n' + '='.repeat(60));

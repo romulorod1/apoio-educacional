@@ -3150,8 +3150,15 @@
      * 3 dizia à família que onze encontros tinham acontecido quando três
      * tinham. O item 02 desta rodada separou as duas somas no motor; aqui a
      * tabela se separa junto: em cima o que aconteceu até hoje, embaixo o que
-     * está marcado à frente, com o total do mês fechado por escrito para
-     * ninguém precisar somar.
+     * está marcado à frente, e o total do mês fechado logo abaixo, como linha
+     * de total, no mesmo peso da linha de total de cima.
+     *
+     * Esse total do mês já saiu daqui como nota de rodapé, em letra de aviso, e
+     * isso quebrou uma família: a mãe paga adiantado e recebe o fechamento
+     * antes de as aulas acontecerem, então o número que ela precisa ler é
+     * justamente o total do mês, e ele estava escondido dentro de uma frase que
+     * ainda começava dizendo que aquilo não entrava no total. Separar as duas
+     * somas continua certo; esconder a soma que a família vai pagar, não.
      *
      * Com o mês vencido não há nada à frente, e aí sai exatamente o documento
      * de sempre, palavra por palavra: é assim que o fechamento fechado não
@@ -3214,7 +3221,30 @@
       });
     }
     L.push('');
-    L.push('**Total a cobrar' + ate + ':** ' + fmtMoeda(valorACobrar));
+    /* O número parcial não pode carregar a palavra de pagar enquanto existir um
+     * total maior embaixo dele.
+     *
+     * Com datas à frente esta linha saía como "**Total a cobrar até 03/10:**
+     * R$ 0,00", e o mês fechado, maior, vinha só depois da tabela das datas
+     * ainda marcadas. A mãe que paga adiantado recebe o fechamento no dia 3,
+     * procura no documento a palavra "cobrar" para saber quanto depositar, e
+     * lia zero: é o erro de pagar A MENOS, e é a família que motivou esta
+     * mudança inteira. Agora a linha diz o que o número é, com o "dadas" que o
+     * documento já usa em "Horas ainda por dar", e a única palavra de pagar da
+     * folha fica no total do mês, que é o número a depositar.
+     *
+     * A linha de horas logo acima foi lida junto e ficou como estava, de
+     * propósito: ali "cobradas" não diz quanto pagar, diz QUAIS horas entraram
+     * na soma, e faz par com "Horas não cobradas" logo abaixo. Trocar por
+     * "dadas" tornaria a linha falsa, porque as horas que ela deu de graça já
+     * aconteceram e não estão nesse total.
+     *
+     * Mês vencido não tem nada à frente nem total embaixo, e por isso não muda
+     * uma letra: sai o "**Total a cobrar:**" de sempre, palavra por palavra, que
+     * é o documento de todas as famílias já mandadas. */
+    L.push(previstas.length
+      ? '**Total das aulas dadas' + ate + ':** ' + fmtMoeda(valorACobrar)
+      : '**Total a cobrar:** ' + fmtMoeda(valorACobrar));
     if (f.semPreco.length) {
       L.push('');
       L.push('> Atenção: não há valor por hora vigente para ' + f.semPreco.map(ddmm).join(', ') + '.');
@@ -3232,10 +3262,12 @@
       L.push('**Horas ainda por dar:** ' + f.horasPrevistas + ' h');
       L.push('**Valor destas datas:** ' + fmtMoeda(f.valorPrevisto));
       L.push('');
-      L.push('> Estas datas ainda não aconteceram e não entram no total acima. ' +
-        'Se todas acontecerem, o mês fecha em ' + f.qtdEncontros + ' encontro' +
-        (f.qtdEncontros === 1 ? '' : 's') + ', ' + f.totalHoras + ' h e ' +
-        fmtMoeda(f.totalValor) + '.');
+      /* O fechamento do mês inteiro sai como linha de total, e não como
+       * rodapé: a mãe que paga adiantado lê este número. O motivo está inteiro
+       * no comentário das duas tabelas, no alto desta função. */
+      L.push('**Total do mês, já contando as datas ainda marcadas:** ' +
+        fmtMoeda(f.totalValor) + ' (' + f.qtdEncontros + ' encontro' +
+        (f.qtdEncontros === 1 ? '' : 's') + ', ' + f.totalHoras + ' h)');
     }
 
     if (exibeListas(opcoes) && temasNoTexto.length) {
