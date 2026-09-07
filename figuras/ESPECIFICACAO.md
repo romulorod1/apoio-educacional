@@ -87,10 +87,12 @@ A glosa da hachura, que e uma das duas unicas legendas permitidas:
 
 Rotulo com palavra, que muda de lingua e por isso e escrito na diretiva de cada secao:
 
-  PT:  @fig triangulo id=t9 base=10 altura=6 rotuloaltura=altura
-  EN:  @fig triangulo id=t9 base=10 altura=6 rotuloaltura=height
+  PT:  @fig triangulo id=t9 base=10 altura=6;altura
+  EN:  @fig triangulo id=t9 base=10 altura=6;height
 
 As duas passam no numeros_de com o mesmo conjunto (10 e 6) e na trava de paridade de receita, e nenhuma palavra portuguesa fica presa dentro do desenhador.
+
+A chave `rotuloaltura`, que este exemplo trazia antes de a `altura=` existir, nao chegou a nascer e nao vai nascer: o rotulo ja entra pelo segundo campo da propria medida, na gramatica `valor[;rotulo]` que o `circulo` e o `solido` usam desde 02/09/2026. Duas portas para a mesma coisa custam duas travas, duas linhas de documentacao e um dia em que uma delas e esquecida; e a segunda porta nao acrescentaria nada, porque o rotulo ali ja e texto vindo do tema e o desenhador continua sem inventar palavra. Escrita hoje, `rotuloaltura=` e recusada como chave nao declarada.
 
 ### A equacao de bloco: @eq
 
@@ -160,6 +162,71 @@ auditor independente em MuPDF (`_audita_receitas_curvas.py`):
 O que ainda NAO existe: painel de excentricidade (tres elipses lado a lado), a chave
 `cheio` (circunferencia contra circulo), a semielipse apoiada e a demonstracao da area por
 doze setores.
+
+### As receitas de plano: triangulo e quadrilatero
+
+As duas receitas mais antigas do kit ganharam em 07/09/2026 as chaves de MEDIDA que faltavam,
+com um caso por chave e por combinacao em `_prova_receitas_plano.js`. Ate aqui o `triangulo`
+aceitava `angulo` e `lado` e o `quadrilatero` aceitava `tipo`, `angulo`, `lado` e uma
+`diagonal` sem medida e sem letra: nao havia como dizer "este retangulo tem base b e altura
+h" nem "esta e a diagonal d", que sao as tres frases do `MATEM3-12` e a falta que bloqueia
+todo tema de area e de Pitagoras do 6o ao 9o ano.
+
+A gramatica e a mesma do `circulo` e do `solido`, `valor[;rotulo]`: o primeiro valor CONSTROI
+e a letra so rotula. Onde a diretiva deixou letra, a dimensao sai da proporcao do prototipo,
+e a figura ja sai marcada fora de escala pela regra de escala abaixo.
+
+- `base=V[;R]`: o lado de baixo, cotado. No triangulo e o lado c (entre A e B) escrito por
+  outro nome, e uma so; no quadrilatero e o lado a (AB), e o trapezio aceita DUAS, a maior
+  primeiro. Quando o lado ja carrega tracinho de congruencia ou seta de paralelismo, a medida
+  sai em COTA por fora, e nao empilhada sobre a aresta. **Uma marca.**
+  Ex.: `@fig triangulo base=10 altura=6` e `@fig quadrilatero tipo=trapezio base=10;B base=6;b altura=4;h`.
+- `altura=V[;R[;X]]`: o segmento tracejado do vertice ate o pe, na espessura auxiliar, com o
+  quadradinho de angulo reto no pe; quando o pe cai fora do lado (triangulo obtusangulo,
+  paralelogramo muito inclinado) o lado sai prolongado em tracejado mais claro ate ele. Uma
+  so por figura. No triangulo o terceiro campo e o vertice de partida, e sem ele a altura e a
+  relativa a base; no quadrilatero ela e sempre a distancia entre as duas bases paralelas, e
+  no retangulo e no quadrado ela E o lado DA, entao sai como medida dele. `altura=` num
+  quadrilatero irregular e recusada, porque ali nao ha par de lados paralelos.
+  **Duas marcas: o rotulo conta uma e o quadradinho conta outra.** Um triangulo com base,
+  altura e as tres letras de vertice ja soma seis e e recusado pelo `conferirFigura`.
+  Ex.: `@fig triangulo lado=4 lado=6 lado=9 altura=h;h;A escala=fiel`.
+- `diagonal=A;C[;V][;R]`: continua sendo o corte que parte o quadrilatero em dois triangulos,
+  agora com medida e letra. `diagonal=A;C` e a forma antiga e sai identica; `diagonal=A;C;d`
+  rotula; `diagonal=A;C;13;d` constroi conferindo o 13 e escreve d. Linha CONTINUA e fina,
+  nunca tracejada: ela existe de verdade dentro da figura. Par de vertices VIZINHOS e
+  recusado, porque ali a diagonal e um lado. **Sem rotulo nao custa marca nenhuma (o traco
+  nao e dado a ler); com rotulo, uma.**
+  Ex.: `@fig quadrilatero tipo=retangulo base=4 altura=3 diagonal=A;C;5;d`.
+
+Quando `base=`, `altura=` e `diagonal=` chegam as tres com numero, a diagonal e CONFERIDA
+contra a conta, que num retangulo e o teorema de Pitagoras, e a figura e recusada com aviso
+se nao fechar: uma figura que diz d igual a 12 num retangulo de 3 por 4 e a folha do proprio
+material contradizendo o teorema da pagina ao lado. Pela mesma regra, `base=` que contradiz
+um `lado=`, e base com altura que contradizem os angulos escritos, saem recusadas com os dois
+valores no aviso.
+
+Na camada de gabarito a letra vira o valor medido na propria figura, em teal, corpo de
+resposta e negrito, como o raio focal da conica: `diagonal=A;C;d` num retangulo de 4 por 3
+sai "d = 5". So quando a forma foi DEDUZIDA dos dados: no paralelogramo e no trapezio
+escaleno a inclinacao das pernas sai do prototipo, e ali a letra fica como veio, porque medir
+seria medir o chute. E so o retangulo e o quadrado levam base, altura e diagonal ate o
+gabarito por baixo do teto de cinco marcas: nos outros tipos a camada de resposta acrescenta
+os quatro valores de angulo e a figura passa de cinco.
+
+**A escala automatica passou a ter tres saidas e nao duas.** So numero: a figura e construida
+com os valores escritos e sai FIEL, como sempre foi. So letra: nenhum valor metrico e numero,
+a figura sai do PROTOTIPO, que e exato por construcao (o retangulo do prototipo tem quatro
+angulos retos de verdade), e ela NAO esta fora de escala de nada, nao pede legenda e nao
+precisa mais de `escala=fiel` escrito a mao. Mistura: `base=10 altura=h` afirma uma proporcao
+que o desenho nao garante, e ai a figura E fora de escala e a legenda continua obrigatoria. O
+valor metrico e o primeiro campo de cada ocorrencia, entao o rotulo de `altura=6;h` e o de
+`diagonal=A;C;d` nao contam como letra. `escala=fiel` e `escala=fora` escritos na diretiva
+continuam mandando por cima.
+
+O que ainda NAO existe: `mediana=` e `bissetriz=` com medida (a `ceviana=` traca as tres e
+mede nenhuma), a altura relativa a um lado que nao seja a base no quadrilatero, e duas alturas
+na mesma figura, que a regra de uma ideia por figura desaconselha.
 
 ### As receitas de espaco: solido e painelsolidos
 
