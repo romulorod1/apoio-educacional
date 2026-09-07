@@ -246,6 +246,16 @@ def rodar():
     else:
         print('O verificador pegou os %d defeitos, passou nas %d frases e manteve as %d decisoes do ambiente.'
               % (len(CASOS), len(FRASES), len(AMBIENTE_ESPERADO)))
+    # O PLACAR SAI NO DIALETO DOS IRMAOS: "N passaram, M falharam."
+    #
+    # Este teste falava sozinho, e falava de um jeito que enganaria o portao na
+    # pior direcao possivel. O portao le duas coisas: quantas verificacoes
+    # falharam, por "N falharam", e se o teste chegou a se declarar, por
+    # "passaram|PASSARAM|CONFIRMAD". A linha de reprovacao daqui era "%d
+    # defeito(s) PASSARAM sem ser notados", que casa com a segunda e nao casa
+    # com a primeira: um verificador furado seria anunciado como ok.
+    total = 1 + len(CASOS) + len(FRASES) + len(AMBIENTE_ESPERADO)
+    print('%d passaram, %d falharam.' % (total - falhas, falhas))
     print('=' * 60)
     return 1 if falhas else 0
 
