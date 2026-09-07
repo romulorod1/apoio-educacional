@@ -18,11 +18,13 @@ aos de antes desta ferramenta aprender outras materias: a ausencia do campo
 
 Uso:
     python gerar_banco.py                        gera para toda materia com temas
+    python gerar_banco.py --so portugues         gera so a materia pedida
     python gerar_banco.py --provar               monta uma lista de exemplo e mostra
     python gerar_banco.py --temas DIR --saida DIR
         raizes alternativas: DIR/<pasta>/<serie>/*.md na entrada e DIR/<raiz da
         materia>/ na saida. E como se prova o caminho de uma materia nova sem
         deixar tema falso dentro do repositorio.
+    python gerar_banco.py --fontes DIR           outra raiz para a colecao de textos
 """
 import io
 import os
@@ -79,7 +81,114 @@ def blocos_e_itens(texto):
     return itens
 
 
-def ler(caminho, materia=None):
+def credito_da_fonte(cab):
+    """A linha de credito que a folha imprime embaixo do bloco de citacao.
+
+    Montada aqui, e nao no pdf.js, para a folha nao ter que saber regra de
+    citacao: ela recebe a cadeia pronta e desenha.
+    """
+    dominio = cab['dominio']
+    if dominio == 'autoral':
+        return 'Texto escrito para este exercício.'
+    if dominio == 'tradicional':
+        # A coletanea, sem o endereco: o endereco e para quem confere a fonte,
+        # e nao para o credito impresso ao pe da folha.
+        origem = cab['procedencia'].split('http')[0].strip().rstrip(',').strip()
+        return '%s, tradição popular. Fonte: %s.' % (cab['titulo'], origem)
+    credito = '%s. *%s*' % (cab['autor'], cab['titulo'])
+    if cab.get('obra'):
+        credito += '. In: *%s*, %s.' % (cab['obra'], cab['ano'])
+    else:
+        credito += ', %s.' % cab['ano']
+    if dominio == 'cc':
+        credito += ' Licença %s.' % cab['licenca']
+    return credito
+
+
+def _registro_de_fonte(cab):
+    """Os metadados de uma fonte citada, na ordem de chaves do desenho."""
+    registro = {'titulo': cab['titulo'], 'autor': cab['autor']}
+    if cab.get('obra'):
+        registro['obra'] = cab['obra']
+    registro['ano'] = int(cab['ano'])
+    registro['dominio'] = cab['dominio']
+    registro['credito'] = credito_da_fonte(cab)
+    return registro
+
+
+def _gabarito_estruturado(gab):
+    """O gabarito na ordem de chaves do desenho, sem os campos que nao existem."""
+    if 'letra' in gab:
+        saida = {'letra': gab['letra']}
+        for campo in ('ancora', 'porque'):
+            if gab.get(campo):
+                saida[campo] = gab[campo]
+        return saida
+    return {'espera_se': gab.get('espera_se', ''),
+            'aceita_se': gab.get('aceita_se', []),
+            'nao_aceita': gab.get('nao_aceita', []),
+            'ancora': gab.get('ancora', '')}
+
+
+def ler_com_catalogo(cab, corpo, lingua, fontes):
+    """A parte de lingua de um tema de materia com catalogo.
+
+    Le a lista pelo parser estruturado do verificador: texto de apoio, questao
+    fechada com alternativas, questao aberta com criterio e trecho dentro do
+    item. `fontes` e preenchido no caminho, na ordem de primeira aparicao, para
+    o tema viajar so com os metadados dos textos que ele cita.
+    """
+    t = TITULOS[lingua]
+    parte = verificar.secao(corpo, t['secao'])
+    explicacao = (verificar.subsecao(parte, t['explicacao']) or '').strip()
+    eventos = verificar.itens_estruturados(verificar.subsecao(parte, t['exercicios']), True)
+    eventos_gab = verificar.itens_estruturados(verificar.subsecao(parte, t['gabarito']), True)
+    itens_gab = [e for e in eventos_gab if e['tipo'] == 'item']
+
+    # A explicacao viaja como markdown cru, com os blocos dentro, e as fontes
+    # dela entram no mapa antes das da lista: a ordem e a de aparicao no tema.
+    for bloco in verificar.blocos_de_citacao(explicacao):
+        fontes.setdefault(bloco['id'], None)
+
+    textos, exercicios = [], []
+    bloco_atual = ''
+    vigente = None
+    posicao = 0
+    for evento in eventos:
+        if evento['tipo'] == 'bloco':
+            bloco_atual = evento['nome']
+            continue
+        if evento['tipo'] == 'texto':
+            fontes.setdefault(evento['fonte'], None)
+            vigente = len(textos)
+            textos.append({'fonte': evento['fonte'], 'linhas': evento['linhas'],
+                           'conteudo': evento['conteudo']})
+            continue
+        ex = verificar.ler_exercicio(evento['linhas'])
+        gab = verificar.ler_gabarito(itens_gab[posicao]['linhas']) if posicao < len(itens_gab) else {}
+        posicao += 1
+
+        saida = {'n': evento['n'], 'bloco': bloco_atual}
+        if vigente is not None:
+            saida['texto'] = vigente
+        saida['tipo'] = 'fechada' if ex['alternativas'] else 'aberta'
+        saida['enunciado'] = ex['enunciado']
+        if ex['alternativas']:
+            saida['alternativas'] = ex['alternativas']
+        if ex['trecho']:
+            fontes.setdefault(ex['trecho']['fonte'], None)
+            saida['trecho'] = ex['trecho']
+        # `resposta` continua existindo como texto, para qualquer leitor que so
+        # saiba ler texto: na aberta e o espera_se, na fechada e a letra.
+        saida['resposta'] = gab.get('letra') or gab.get('espera_se') or gab.get('corrido', '')
+        saida['gabarito'] = _gabarito_estruturado(gab)
+        exercicios.append(saida)
+
+    return {'titulo': cab['titulo_%s' % lingua], 'resumo': cab['resumo_%s' % lingua],
+            'explicacao': explicacao, 'textos': textos, 'exercicios': exercicios}
+
+
+def ler(caminho, materia=None, raiz_fontes=None):
     """Le um tema para o dicionario que vai no JSON.
 
     A ordem das chaves importa: e ela que sai no arquivo, e o da matematica
@@ -90,6 +199,7 @@ def ler(caminho, materia=None):
     materia = materia or verificar.materia_do_caminho(caminho)
     cab, corpo = verificar.ler_tema(caminho)
     legada = materia['id'] == MATERIA_LEGADA
+    com_catalogo = bool(materia.get('topicos'))
     tema = {'id': cab['id']}
     if not legada:
         tema['materia'] = materia['id']
@@ -100,7 +210,17 @@ def ler(caminho, materia=None):
     tema['prerequisitos'] = verificar.lista_do_cabecalho(cab.get('prerequisitos'))
     if not legada and 'topicos' in cab:
         tema['topicos'] = verificar.lista_do_cabecalho(cab['topicos'])
+    fontes = {}
+    if com_catalogo:
+        tema['bncc'] = verificar.lista_do_cabecalho(cab.get('bncc'))
+        tema['vestibular'] = verificar.lista_do_cabecalho(cab.get('vestibular'), sep=';')
+        # A chave entra aqui, vazia, para ficar antes da lingua na ordem do
+        # arquivo; o conteudo dela e montado enquanto a lingua e lida.
+        tema['fontes'] = fontes
     for lingua in materia['temas']['linguas']:
+        if com_catalogo:
+            tema[lingua] = ler_com_catalogo(cab, corpo, lingua, fontes)
+            continue
         t = TITULOS[lingua]
         parte = verificar.secao(corpo, t['secao'])
         exercicios = blocos_e_itens(verificar.subsecao(parte, t['exercicios']))
@@ -119,6 +239,12 @@ def ler(caminho, materia=None):
                 for i, it in enumerate(exercicios)
             ],
         }
+    for ident in list(fontes):
+        lida = verificar.fonte_do_catalogo(ident, raiz_fontes)
+        if lida is None:
+            raise SystemExit('o tema %s cita a fonte "%s", que nao existe em fontes/. O '
+                             'verificador teria reprovado antes: rode-o.' % (cab['id'], ident))
+        fontes[ident] = _registro_de_fonte(lida[0])
     return tema
 
 
@@ -288,18 +414,28 @@ def gerar_materia(materia, temas, pasta_banco, raiz_temas):
     return banco
 
 
-def gerar(raiz_temas=None, raiz_saida=None):
+def gerar(raiz_temas=None, raiz_saida=None, so=None, raiz_fontes=None):
     """Gera o que o aplicativo consome, para cada materia que tem tema escrito.
 
     Materia declarada na tabela mas ainda sem tema nao gera nada: escrever um
     indice vazio em banco/portugues/ criaria arquivo no repositorio antes de
     existir conteudo, e o aplicativo trataria a pasta como banco disponivel.
     Devolve {id da materia: banco inteiro}.
+
+    Com `so`, uma materia so e regerada. E o que a frente 2 usa: a matematica
+    nunca e tocada, e a prova de que a folha dela nao mudou continua sendo o
+    arquivo intacto no disco.
     """
     raiz_temas = os.path.abspath(raiz_temas or RAIZ)
     raiz_saida = os.path.abspath(raiz_saida or RAIZ_PROJETO)
     bancos = {}
+    conhecidas = [m['id'] for m in verificar.materias()]
+    if so and so not in conhecidas:
+        raise SystemExit('nao conheco a materia "%s"; as que tem banco de temas sao: %s'
+                         % (so, ', '.join(conhecidas)))
     for materia in verificar.materias():
+        if so and materia['id'] != so:
+            continue
         pasta = materia['temas']['pasta']
         arquivos = sorted(glob.glob(os.path.join(raiz_temas, pasta, '*', '*.md')))
         if not arquivos:
@@ -309,11 +445,11 @@ def gerar(raiz_temas=None, raiz_saida=None):
         temas = []
         reprovados = []
         for caminho in arquivos:
-            erros, avisos, manuais, cab = verificar.conferir(caminho)
+            erros, avisos, manuais, cab = verificar.conferir(caminho, raiz_fontes)
             if erros:
                 reprovados.append((os.path.basename(caminho), erros[0]))
                 continue
-            temas.append(ler(caminho, materia))
+            temas.append(ler(caminho, materia, raiz_fontes))
 
         # a raiz da tabela e relativa ao projeto e termina em barra: banco/ ou
         # banco/<id>/
@@ -397,6 +533,7 @@ def _argumento(nome):
 
 
 if __name__ == '__main__':
-    bancos = gerar(_argumento('--temas'), _argumento('--saida'))
+    bancos = gerar(_argumento('--temas'), _argumento('--saida'),
+                   _argumento('--so'), _argumento('--fontes'))
     if '--provar' in sys.argv and MATERIA_LEGADA in bancos:
         provar(bancos[MATERIA_LEGADA])

@@ -222,10 +222,12 @@
 
   /* Lista, sem repetir, os caracteres que sairiam como interrogação. É a trava de
    * quem escreve o tema: melhor descobrir aqui do que na folha impressa. A
-   * marcação ^{} e _{} não conta, porque ela nunca chega até a fonte. */
+   * marcação ^{} e _{} não conta, porque ela nunca chega até a fonte, e o
+   * asterisco também não: desde o itálico, o partirEstilo consome "***", "**" e
+   * "*" como interruptor de estilo, e nenhum deles chega à Helvetica. */
   function caracteresQueNaoDesenha(texto) {
     var limpo = String(texto == null ? '' : texto)
-      .replace(RE_NIVEL_G, '$2').replace(/\*\*/g, '');
+      .replace(RE_NIVEL_G, '$2').replace(/\*+/g, '');
     var fora = [], visto = {};
     for (var i = 0; i < limpo.length; i++) {
       var ch = limpo.charAt(i);
@@ -245,7 +247,11 @@
    * ou null quando não sobrou nada. O aninhamento é proibido de propósito: o
    * partirNivel só reconhece chave sem chave dentro. */
   function marcacaoQueSobrou(texto) {
-    var limpo = String(texto == null ? '' : texto).replace(RE_NIVEL_G, '$2');
+    /* O asterisco sai antes da busca pelo mesmo motivo do caracteresQueNaoDesenha:
+     * ele é interruptor de estilo e não chega à folha, então não pode aparecer no
+     * trecho ofensor que esta função devolve. */
+    var limpo = String(texto == null ? '' : texto)
+      .replace(RE_NIVEL_G, '$2').replace(/\*+/g, '');
     var achado = /[\^_]\{|[{}]/.exec(limpo);
     if (!achado) return null;
     return limpo.slice(Math.max(0, achado.index - 12), achado.index + 20);
@@ -314,6 +320,11 @@
   var Y_FIO_ROD = PAGINA_A - 795.89;          // 46.00
   var Y_TOPO = Y_FIO_CAB - 30;                // inicio do conteudo
   var Y_LIMITE = Y_FIO_ROD + 18;              // fim do conteudo
+  /* Largura do texto dentro do bloco de citacao (numero de linha, fio e recuo a
+   * esquerda, respiro a direita). Exportada porque o verificador mede cada linha
+   * de fontes/ por ela: linha da fonte que nao cabe aqui viraria duas na folha e
+   * a numeracao mentiria. */
+  var LARGURA_CITACAO = MARG_D - (MARG_E + 36) - 6;   // 473.28
 
   /* O vao que fica entre o fio do cabecalho e o TOPO das letras do titulo,
    * em milimetros. Vale para todo documento que o aplicativo gera.
@@ -363,6 +374,14 @@
 
   function cor3(c) { return c[0].toFixed(6) + ' ' + c[1].toFixed(6) + ' ' + c[2].toFixed(6); }
 
+  /* A fonte de texto de cada par negrito/itálico. As quatro são base-14 e as
+   * duas oblíquas têm as MESMAS larguras das retas, então o medir() não muda e
+   * uma linha em itálico quebra exatamente onde a mesma linha reta quebraria. */
+  function fonteDeEstilo(bold, italico) {
+    if (italico) return bold ? 'F5' : 'F4';
+    return bold ? 'F2' : 'F1';
+  }
+
   // ================= documento =================
 
   function Doc() {
@@ -372,7 +391,13 @@
     this.fonteRegular = 0;
     this.fonteBold = 0;
     this.fonteSimbolo = 0;
+    this.fonteItalico = 0;
+    this.fonteBoldItalico = 0;
     this.pag = null;
+    /* Metadados das fontes citadas pelo tema, id por id, como o gerador de banco
+     * os monta. Nasce vazio porque quase todo documento desta casa (fechamento,
+     * proposta, ficha, material de matemática) não cita texto nenhum. */
+    this.fontes = {};
     /* Língua da MOLDURA, e só dela: quem gera a folha diz qual é. Fica no
      * documento e não no parâmetro de cada chamada porque a moldura é escrita no
      * finalizar(), depois de todo o conteúdo, quando o parâmetro já se perdeu. */
@@ -381,7 +406,7 @@
 
   Doc.prototype.novaPagina = function (opcoes) {
     opcoes = opcoes || {};
-    this.pag = { ops: [], usaImg: {}, usaSim: false, semMoldura: !!opcoes.semMoldura };
+    this.pag = { ops: [], usaImg: {}, usaSim: false, usaIta: false, semMoldura: !!opcoes.semMoldura };
     this.paginas.push(this.pag);
     this.y = Y_TOPO;
     if (!opcoes.semMarca) this.marcaDagua();
@@ -394,6 +419,11 @@
     opcoes = opcoes || {};
     var tam = opcoes.tam || 10;
     var bold = !!opcoes.bold;
+    /* O itálico é a Helvetica-Oblique (F4) ou a Helvetica-BoldOblique (F5). A
+     * página anota que usou uma das duas, e só por causa dessa marca o
+     * finalizar() as registra: folha sem itálico nenhum não ganha objeto de
+     * fonte novo, que é o que mantém a folha de matemática byte a byte igual. */
+    var italico = !!opcoes.italic;
     var c = opcoes.cor || COR.texto;
     var tr = opcoes.tracking || 0;
     txt = String(txt == null ? '' : txt);
@@ -404,7 +434,8 @@
     if (!RE_SIMBOLO.test(txt)) {
       var wa = paraWinAnsi(txt);
       if (!wa.length) return;
-      this.op('BT ' + cor3(c) + ' rg /' + (bold ? 'F2' : 'F1') + ' ' + tam + ' Tf ' +
+      if (italico && this.pag) this.pag.usaIta = true;
+      this.op('BT ' + cor3(c) + ' rg /' + fonteDeEstilo(bold, italico) + ' ' + tam + ' Tf ' +
         (tr ? tr.toFixed(3) + ' Tc ' : '') +
         px.toFixed(2) + ' ' + y.toFixed(2) + ' Td (' + escapar(wa) + ') Tj ' +
         (tr ? '0 Tc ' : '') + 'ET');
@@ -416,11 +447,15 @@
     for (var i = 0; i < trechos.length; i++) {
       var bytes = trechos[i].sim ? trechos[i].txt : paraWinAnsi(trechos[i].txt);
       if (!bytes.length) continue;
-      ops.push('/' + (trechos[i].sim ? 'F3' : (bold ? 'F2' : 'F1')) + ' ' + tam + ' Tf (' +
+      ops.push('/' + (trechos[i].sim ? 'F3' : fonteDeEstilo(bold, italico)) + ' ' + tam + ' Tf (' +
         escapar(bytes) + ') Tj');
     }
     if (!ops.length) return;
     if (this.pag) this.pag.usaSim = true;
+    /* A Symbol não tem oblíqua na base-14: dentro de um trecho em itálico o
+     * glifo de símbolo continua saindo reto, do mesmo jeito que já sai fino
+     * dentro de um trecho em negrito. */
+    if (italico && this.pag) this.pag.usaIta = true;
     this.op('BT ' + cor3(c) + ' rg ' + (tr ? tr.toFixed(3) + ' Tc ' : '') +
       px.toFixed(2) + ' ' + y.toFixed(2) + ' Td ' + ops.join(' ') + ' ' +
       (tr ? '0 Tc ' : '') + 'ET');
@@ -658,6 +693,16 @@
     for (var s = 0; s < this.paginas.length; s++) if (this.paginas[s].usaSim) precisaSimbolo = true;
     this.fonteSimbolo = precisaSimbolo ?
       w.add('<< /Type /Font /Subtype /Type1 /BaseFont /Symbol >>') : 0;
+    /* As duas oblíquas entram no arquivo pelo mesmo critério da Symbol: só
+     * quando alguma página escreveu com elas. Sem esta condição toda folha de
+     * matemática ganharia dois objetos de fonte a mais, e a prova de regressão
+     * byte a byte da folha antiga cairia por causa de uma fonte que ninguém usa. */
+    var precisaItalico = false;
+    for (var t = 0; t < this.paginas.length; t++) if (this.paginas[t].usaIta) precisaItalico = true;
+    if (precisaItalico) {
+      this.fonteItalico = w.add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding >>');
+      this.fonteBoldItalico = w.add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-BoldOblique /Encoding /WinAnsiEncoding >>');
+    }
     var numPaginas = w.alloc();
     var refs = [];
     for (var j = 0; j < this.paginas.length; j++) {
@@ -668,7 +713,8 @@
         if (this.imagens[ref]) xo.push('/' + this.imagens[ref].nome + ' ' + this.imagens[ref].obj + ' 0 R');
       }
       var recursos = '/Font << /F1 ' + this.fonteRegular + ' 0 R /F2 ' + this.fonteBold + ' 0 R' +
-        (pg.usaSim ? ' /F3 ' + this.fonteSimbolo + ' 0 R' : '') + ' >>' +
+        (pg.usaSim ? ' /F3 ' + this.fonteSimbolo + ' 0 R' : '') +
+        (pg.usaIta ? ' /F4 ' + this.fonteItalico + ' 0 R /F5 ' + this.fonteBoldItalico + ' 0 R' : '') + ' >>' +
         (xo.length ? ' /XObject << ' + xo.join(' ') + ' >>' : '');
       var pgNum = w.add('<< /Type /Page /Parent ' + numPaginas + ' 0 R /MediaBox [0 0 ' +
         PAGINA_L.toFixed(4) + ' ' + PAGINA_A.toFixed(4) + '] /Resources << ' + recursos +
@@ -1178,21 +1224,41 @@
   // moldura do fechamento, para o material que a criança recebe ter a cara da
   // marca, e não a de uma folha genérica.
 
-  /* Quebra um texto em pedaços conforme o negrito, para a linha poder misturar
-   * as duas fontes. */
-  function partirNegrito(texto) {
+  /* Quebra um texto nos trechos de negrito e de itálico, para a linha poder
+   * misturar as quatro fontes.
+   *
+   * É um tokenizador COM ESTADO: anda pela string e trata "***", "**" e "*" como
+   * interruptores, casando sempre o mais longo primeiro. "***" inverte negrito e
+   * itálico juntos, "**" inverte o negrito, "*" inverte o itálico. O estado é o
+   * que faz o aninhamento funcionar em qualquer ordem: a leitura anterior, por
+   * par de "**" com regex, não sabia o que fazer com "**a *b* c**" nem com
+   * "***x***", e o asterisco de dentro saía IMPRESSO na folha.
+   *
+   * Interruptor sem par no fim da linha: o resto sai com o estado que ficou, e o
+   * asterisco nunca sai impresso. Na fonte do tema isso já é reprovado pelo
+   * verificador (em matéria com catálogo, o número de "**" e o de "*" solto têm
+   * que ser pares em cada linha); aqui é defesa.
+   *
+   * "* " no começo de uma linha NÃO chega aqui: quem o consome é o ramo de item
+   * de lista do Doc.prototype.markdown, o /^([-*])\s+(.*)$/ que vem antes do ramo
+   * de parágrafo; só o conteúdo do item desce para esta tubulação. */
+  function partirEstilo(texto) {
     var partes = [];
-    var resto = String(texto == null ? '' : texto);
-    var re = /\*\*(.+?)\*\*/;
-    var achado = re.exec(resto);
-    while (achado) {
-      if (achado.index > 0) partes.push({ txt: resto.slice(0, achado.index), bold: false });
-      partes.push({ txt: achado[1], bold: true });
-      resto = resto.slice(achado.index + achado[0].length);
-      achado = re.exec(resto);
+    var s = String(texto == null ? '' : texto);
+    var bold = false, italico = false, atual = '';
+    function fechar() {
+      if (atual) partes.push({ txt: atual, bold: bold, italic: italico });
+      atual = '';
     }
-    if (resto) partes.push({ txt: resto, bold: false });
-    return partes.filter(function (p) { return p.txt.length; });
+    for (var i = 0; i < s.length; i++) {
+      if (s.charAt(i) !== '*') { atual += s.charAt(i); continue; }
+      fechar();
+      if (s.substr(i, 3) === '***') { bold = !bold; italico = !italico; i += 2; continue; }
+      if (s.substr(i, 2) === '**') { bold = !bold; i += 1; continue; }
+      italico = !italico;
+    }
+    fechar();
+    return partes;
   }
 
   /* Expande a marcação de expoente e de índice. Cada pedaço ganha um nível: 0 na
@@ -1201,24 +1267,24 @@
   function partirNivel(partes) {
     var saida = [];
     for (var i = 0; i < partes.length; i++) {
-      var resto = partes[i].txt, bold = partes[i].bold;
+      var resto = partes[i].txt, bold = partes[i].bold, italico = !!partes[i].italic;
       var achado = RE_NIVEL.exec(resto);
       while (achado) {
-        if (achado.index > 0) saida.push({ txt: resto.slice(0, achado.index), bold: bold, nivel: 0 });
+        if (achado.index > 0) saida.push({ txt: resto.slice(0, achado.index), bold: bold, italic: italico, nivel: 0 });
         if (achado[2].length) {
-          saida.push({ txt: achado[2], bold: bold, nivel: achado[1] === '^' ? 1 : -1 });
+          saida.push({ txt: achado[2], bold: bold, italic: italico, nivel: achado[1] === '^' ? 1 : -1 });
         }
         resto = resto.slice(achado.index + achado[0].length);
         achado = RE_NIVEL.exec(resto);
       }
-      if (resto) saida.push({ txt: resto, bold: bold, nivel: 0 });
+      if (resto) saida.push({ txt: resto, bold: bold, italic: italico, nivel: 0 });
     }
     return saida;
   }
 
-  /* A entrada da tubulação de texto rico: negrito primeiro, nível depois. */
+  /* A entrada da tubulação de texto rico: estilo primeiro, nível depois. */
   function partirRico(texto) {
-    return partirNivel(partirNegrito(texto));
+    return partirNivel(partirEstilo(texto));
   }
 
   function corpoNivel(tam) { return Math.round(tam * CORPO_NIVEL * 100) / 100; }
@@ -1247,7 +1313,7 @@
     partes.forEach(function (parte) {
       parte.txt.split(/(\s+)/).forEach(function (tok) {
         if (!tok) return;
-        var seg = { txt: tok, bold: parte.bold, nivel: parte.nivel || 0 };
+        var seg = { txt: tok, bold: parte.bold, italic: !!parte.italic, nivel: parte.nivel || 0 };
         if (!tok.trim()) {
           if (palavra) { itens.push({ segs: palavra, espaco: false }); palavra = null; }
           itens.push({ segs: [seg], espaco: true });
@@ -1273,12 +1339,12 @@
         var ch = s.txt.charAt(c);
         var w = medirSeg({ txt: ch, bold: s.bold, nivel: s.nivel }, tam);
         if (usado > 0 && usado + w > largura) {
-          if (corrente) { atual.push({ txt: corrente, bold: s.bold, nivel: s.nivel }); corrente = ''; }
+          if (corrente) { atual.push({ txt: corrente, bold: s.bold, italic: s.italic, nivel: s.nivel }); corrente = ''; }
           linhas.push(atual); atual = []; usado = 0;
         }
         corrente += ch; usado += w;
       }
-      if (corrente) atual.push({ txt: corrente, bold: s.bold, nivel: s.nivel });
+      if (corrente) atual.push({ txt: corrente, bold: s.bold, italic: s.italic, nivel: s.nivel });
     }
     return { linhas: linhas, aberta: atual, usado: usado };
   }
@@ -1321,10 +1387,14 @@
     for (var i = 0; i < segmentos.length; i++) {
       var s = segmentos[i];
       var bold = s.bold || !!opcoes.bold;
+      /* O itálico do segmento e o de quem chamou se somam, como já acontece com
+       * o negrito: a mini-citação da âncora do gabarito pede a linha inteira em
+       * itálico e o texto dela pode trazer um "*obra*" dentro. */
+      var italico = s.italic || !!opcoes.italic;
       var corpo = s.nivel ? corpoNivel(tam) : tam;
       var desloca = s.nivel > 0 ? tam * SOBE_NIVEL : (s.nivel < 0 ? -tam * DESCE_NIVEL : 0);
       if (s.txt.trim()) {
-        this.texto(s.txt, px, y + desloca, { tam: corpo, bold: bold, cor: opcoes.cor });
+        this.texto(s.txt, px, y + desloca, { tam: corpo, bold: bold, italic: italico, cor: opcoes.cor });
       }
       px += medir(s.txt, corpo, bold);
     }
@@ -1346,7 +1416,8 @@
     var px = x;
     if (opcoes.align === 'centro') px = x - largura / 2;
     else if (opcoes.align === 'direita') px = x - largura;
-    this.escreverSegmentos(partirRico(txt), px, y, { tam: tam, bold: bold, cor: opcoes.cor });
+    this.escreverSegmentos(partirRico(txt), px, y,
+      { tam: tam, bold: bold, italic: !!opcoes.italic, cor: opcoes.cor });
     return largura;
   };
 
@@ -1644,6 +1715,156 @@
     return { texto: corrido.join(' '), figuras: figuras.length };
   };
 
+  // ================= bloco de citação =================
+  //
+  // O texto de português e literatura é citado, nunca reescrito: a folha traz o
+  // trecho com o número da linha ao lado, para o enunciado poder dizer "linha 12"
+  // e a aluna achar a linha sem contar do começo.
+
+  /* UMA definição de linha de citação (M7), e o verificador tem a gêmea: até três
+   * espaços iniciais e depois ">" seguido de espaço ou de fim de linha. Lá ela
+   * também reprova a linha cujo texto sem espaços começa por ">" e não casa com
+   * esta, que é o "sinal de citação indentado demais"; aqui ela só reconhece. */
+  var RE_CITACAO = /^ {0,3}>( |$)/;
+  /* A diretiva que abre o bloco ocupa a linha inteira: "@fonte <id> linhas=<a>-<b>".
+   * O par de linhas é obrigatório e conta as linhas NÃO VAZIAS da fonte. */
+  var RE_FONTE = /^@fonte\s+(\S+)\s+linhas=(\d+)-(\d+)\s*$/;
+  /* O sinal e o espaço que vem depois dele, que não fazem parte do texto citado. */
+  var RE_MARCA_CITACAO = /^ {0,3}> ?/;
+
+  var CIT_X_NUM = MARG_E + 18;        // número da linha, alinhado à direita aqui
+  var CIT_X_FIO = MARG_E + 26;        // fio vertical do bloco
+  var CIT_X_TXT = MARG_E + 36;        // texto citado (LARGURA_CITACAO sai deste x)
+  var CIT_RECUO_CONT = 12;            // continuação de linha que não coube
+  var CIT_RESPIRO = 6;                // folga acima e abaixo do bloco
+  var CIT_TAM_NUM = 7.5;
+  var CIT_TAM_CREDITO = 8.5;
+
+  /* Tira o fim de linha e os espaços à direita, sem tocar nos da esquerda: a
+   * regra de citação conta os até três espaços iniciais, então trim() cru
+   * apagaria justamente o que ela mede. */
+  function semFimDeLinha(s) {
+    return String(s == null ? '' : s).replace(/\s+$/, '');
+  }
+
+  /* Os metadados de uma fonte citada, ou um erro que diz o id.
+   *
+   * Sem eles a folha imprimiria "[machado-de-assis_missa-do-galo]" no lugar do
+   * crédito e seguiria em frente: um defeito de dado viraria uma folha entregue
+   * à aluna com colchete no rodapé do trecho. Erro alto e cedo, na geração. */
+  Doc.prototype.metadadosDaFonte = function (id) {
+    var f = this.fontes && this.fontes[id];
+    if (!f) throw new Error('fonte sem metadados no tema: ' + id);
+    return f;
+  };
+
+  /* Desenha o bloco de citação: número de linha, fio vertical e o trecho.
+   *
+   * bloco: { fonte, linhas: [a, b], conteudo: [linha, ...] }, com "" na linha em
+   * branco da fonte. O número impresso é a + (índice da linha NÃO VAZIA): a
+   * primeira linha não vazia é a linha "a" da fonte, e as vazias não contam, que
+   * é a mesma conta que o verificador faz para conferir a cópia. Sai na primeira
+   * linha do trecho e em toda linha múltipla de 5.
+   *
+   * O fio fecha na página que acaba e reabre na seguinte: um fio só, desenhado do
+   * topo do bloco até o pé dele, viraria uma reta que atravessa a moldura quando
+   * o trecho vira a página.
+   *
+   * bloco sem fonte: sem número e sem crédito. É defesa, e não caminho: em
+   * matéria com catálogo o verificador já reprovou o bloco sem @fonte. */
+  Doc.prototype.citacao = function (bloco, opcoes) {
+    bloco = bloco || {};
+    opcoes = opcoes || {};
+    var tam = opcoes.tam || 10;
+    var entre = tam * 1.45;
+    var conteudo = bloco.conteudo || [];
+    var primeira = (bloco.linhas && Number(bloco.linhas[0])) || 0;
+    var euMesmo = this;
+
+    this.garanteEspaco(entre * 3);
+    this.y -= CIT_RESPIRO;
+    var pagDoFio = this.pag, topoDoFio = this.y, algoNaPagina = false;
+
+    /* O fio é desenhado na página que ele fecha, e não na página corrente: quando
+     * o bloco vira a folha, a operação precisa entrar no fluxo da página que
+     * ficou para trás. Daí a troca temporária de this.pag. */
+    function fecharFio(ate) {
+      if (!algoNaPagina) return;
+      var corrente = euMesmo.pag;
+      euMesmo.pag = pagDoFio;
+      euMesmo.linha(CIT_X_FIO, topoDoFio, CIT_X_FIO, ate, COR.fioForte, 0.8);
+      euMesmo.pag = corrente;
+    }
+    function virarPagina() {
+      fecharFio(euMesmo.y - 2);
+      euMesmo.novaPagina();
+      pagDoFio = euMesmo.pag;
+      topoDoFio = euMesmo.y;
+      algoNaPagina = false;
+    }
+
+    var naoVazias = 0;
+    for (var i = 0; i < conteudo.length; i++) {
+      var linha = String(conteudo[i] == null ? '' : conteudo[i]);
+      if (!linha.trim()) {
+        // linha em branco da fonte: meia entrelinha, sem número
+        if (this.y - entre / 2 < Y_LIMITE) virarPagina();
+        this.y -= entre / 2;
+        continue;
+      }
+      naoVazias++;
+      var numero = primeira ? primeira + naoVazias - 1 : 0;
+      var segmentos = quebrarRico(partirRico(linha), LARGURA_CITACAO, tam);
+      for (var k = 0; k < segmentos.length; k++) {
+        if (this.y - entre < Y_LIMITE) virarPagina();
+        this.y -= entre;
+        algoNaPagina = true;
+        /* Linha da fonte que mesmo assim não coube na largura: a continuação
+         * recua mais 12 pt e não repete o número, para o número continuar
+         * apontando uma linha da fonte e não uma linha da folha. O verificador
+         * impede isso medindo cada linha de fontes/ por LARGURA_CITACAO; aqui é
+         * defesa. */
+        this.escreverSegmentos(segmentos[k], k ? CIT_X_TXT + CIT_RECUO_CONT : CIT_X_TXT,
+          this.y, { tam: tam, italic: !!opcoes.italic });
+        if (k === 0 && numero && (naoVazias === 1 || numero % 5 === 0)) {
+          this.texto(String(numero), CIT_X_NUM, this.y,
+            { tam: CIT_TAM_NUM, cor: COR.muted, align: 'direita' });
+        }
+      }
+    }
+    fecharFio(this.y - 2);
+    this.y -= CIT_RESPIRO;
+
+    if (bloco.fonte && opcoes.credito !== false) {
+      /* O crédito vem montado pelo gerador de banco, com o título da obra em
+       * itálico, para a folha não ter que saber regra de citação. */
+      var meta = this.metadadosDaFonte(bloco.fonte);
+      this.garanteEspaco(CIT_TAM_CREDITO * 2);
+      this.y -= CIT_TAM_CREDITO * 1.35;
+      this.textoRico(meta.credito || meta.titulo || bloco.fonte, MARG_D, this.y,
+        { tam: CIT_TAM_CREDITO, cor: COR.muted, align: 'direita' });
+      this.y -= 2;
+    }
+  };
+
+  /* Quanto de folha o bloco vai gastar, sem desenhar nada. Serve à reserva de
+   * quem precisa manter o bloco junto do que vem antes dele: o subtítulo do
+   * texto de apoio, o enunciado do item com trecho próprio e o gabarito. */
+  Doc.prototype.alturaDeCitacao = function (bloco, opcoes) {
+    opcoes = opcoes || {};
+    var tam = opcoes.tam || 10;
+    var entre = tam * 1.45;
+    var conteudo = (bloco && bloco.conteudo) || [];
+    var alto = CIT_RESPIRO * 2;
+    for (var i = 0; i < conteudo.length; i++) {
+      var linha = String(conteudo[i] == null ? '' : conteudo[i]);
+      if (!linha.trim()) { alto += entre / 2; continue; }
+      alto += quebrarRico(partirRico(linha), LARGURA_CITACAO, tam).length * entre;
+    }
+    if (bloco && bloco.fonte && opcoes.credito !== false) alto += CIT_TAM_CREDITO * 1.35 + 2;
+    return alto;
+  };
+
   /* Escreve um bloco em Markdown simples: subtítulos, parágrafos com negrito,
    * listas e tabelas. É o suficiente para o material dos temas. */
   Doc.prototype.markdown = function (texto, opcoes) {
@@ -1707,6 +1928,38 @@
         i++; continue;
       }
 
+      /* bloco de citação: a diretiva "@fonte <id> linhas=<a>-<b>" e as linhas de
+       * citação que vêm logo depois dela.
+       *
+       * Vem antes do ramo de parágrafo pelo mesmo motivo do @fig: nenhum outro
+       * ramo do markdown reconhece essas linhas, então sem este a diretiva sairia
+       * escrita por extenso no meio da folha, em silêncio.
+       *
+       * Linha de citação sem @fonte antes: o bloco é desenhado sem número e sem
+       * crédito. Em matéria com catálogo o verificador já reprovou isso na fonte
+       * do tema; aqui é defesa. */
+      var diretivaDeFonte = RE_FONTE.exec(limpo);
+      if (diretivaDeFonte || RE_CITACAO.test(semFimDeLinha(linha))) {
+        var idDaFonte = null, deLinha = 0, ateLinha = 0;
+        if (diretivaDeFonte) {
+          idDaFonte = diretivaDeFonte[1];
+          deLinha = Number(diretivaDeFonte[2]);
+          ateLinha = Number(diretivaDeFonte[3]);
+          i++;
+        }
+        var conteudoCitado = [];
+        while (i < linhas.length && RE_CITACAO.test(semFimDeLinha(linhas[i]))) {
+          // ">" sozinho e "> " são a linha em branco da fonte, e viram ""
+          conteudoCitado.push(semFimDeLinha(linhas[i]).replace(RE_MARCA_CITACAO, ''));
+          i++;
+        }
+        if (conteudoCitado.length) {
+          this.citacao({ fonte: idDaFonte, linhas: [deLinha, ateLinha], conteudo: conteudoCitado },
+            { tam: tam });
+        }
+        continue;
+      }
+
       // subtítulo
       var titulo = /^#{3,6}\s+(.*)$/.exec(limpo);
       if (titulo) {
@@ -1768,7 +2021,8 @@
         // motivo do laço de parágrafo: diretiva colada em item de lista sairia
         // impressa por extenso na folha, em silêncio
         while (i + 1 < linhas.length && /^\s{2,}\S/.test(linhas[i + 1]) &&
-               !/^@(fig|eq)(\s|$)/.test(linhas[i + 1].trim()) &&
+               !/^@(fig|eq|fonte)(\s|$)/.test(linhas[i + 1].trim()) &&
+               !RE_CITACAO.test(semFimDeLinha(linhas[i + 1])) &&
              !/^<!--/.test(linhas[i + 1].trim()) &&
                !/^\s*([-*]|\d+\.)\s/.test(linhas[i + 1])) {
           conteudo += ' ' + linhas[i + 1].trim();
@@ -1811,7 +2065,11 @@
       var paragrafo = limpo;
       while (i + 1 < linhas.length && linhas[i + 1].trim() &&
              linhas[i + 1].trim().charAt(0) !== '|' &&
-             !/^@(fig|eq)(\s|$)/.test(linhas[i + 1].trim()) &&
+             /* Para na diretiva e na linha de citação pelo mesmo motivo de sempre:
+              * coladas no fim do parágrafo, elas nunca chegariam ao ramo que sabe
+              * desenhá-las e sairiam impressas com sinal e tudo. */
+             !/^@(fig|eq|fonte)(\s|$)/.test(linhas[i + 1].trim()) &&
+             !RE_CITACAO.test(semFimDeLinha(linhas[i + 1])) &&
              !/^<!--/.test(linhas[i + 1].trim()) &&
              !/^#{3,6}\s/.test(linhas[i + 1].trim()) &&
              /* Para em marcador de topico sempre. Em numero mais ponto, so para
@@ -2870,6 +3128,10 @@
    * explicação, a lista, o gabarito, ou só um deles. */
   function gerarMaterialTema(op) {
     var doc = new Doc();
+    /* Os metadados das fontes citadas pelo tema, montados pelo gerador de banco.
+     * Vêm antes de qualquer desenho porque a explicação já pode trazer bloco de
+     * citação, e o crédito sai de doc.fontes. */
+    doc.fontes = op.tema.fontes || {};
     var lingua = op.lingua === 'en' ? 'en' : 'pt';
     doc.lingua = lingua;          // a moldura lê daqui, no finalizar()
     var dados = op.tema[lingua];
@@ -2931,19 +3193,82 @@
      * com o desenho dele aparecendo no topo da seguinte, acima de nada e antes do
      * número do exercício seguinte. Medido numa lista de 8 exercícios iguais: 30
      * de 41 valores de espaçoParaResposta reproduziam. */
-    function medirItem(bruto, tam, recuo, alturaLinha) {
-      var partes = doc.partesDeFigura(bruto);
-      var corrido = [], figuras = [];
-      partes.forEach(function (p) {
-        if (p.tipo === 'figura') figuras.push(p.diretiva); else corrido.push(p.valor);
+    /* O que fazer com cada pedaço do item é decidido pelo TIPO, num lugar só. O
+     * partesDeFigura entrega hoje 'texto' e 'figura'; um tipo novo (a equação de
+     * bloco dentro do exercício) entra acrescentando um caso nesta tabela e uma
+     * linha em cada metade, sem mexer no resto do item.
+     *
+     * Pedaço de tipo desconhecido vira aviso e NÃO sai impresso: marcação
+     * impressa por extenso na folha da aluna é o defeito silencioso que toda
+     * esta separação existe para impedir. */
+    var PEDACO_DO_ITEM = {
+      texto: function (saida, p) { saida.texto.push(p.valor); },
+      figura: function (saida, p) { saida.figura.push(p.diretiva); }
+    };
+    function separarPorTipo(bruto) {
+      var saida = { texto: [], figura: [] };
+      doc.partesDeFigura(bruto).forEach(function (p) {
+        var caso = PEDACO_DO_ITEM[p.tipo];
+        if (!caso) { doc.avisoDeFigura('pedaço de tipo desconhecido no item: ' + p.tipo); return; }
+        caso(saida, p);
       });
-      var segmentos = quebrarRico(partirRico(corrido.join(' ')), MARG_D - recuo, tam);
+      return saida;
+    }
+
+    /* Alternativa: uma linha por letra, o rótulo em COR.teal no recuo do item e o
+     * texto 16 pt à frente, pela tubulação rica e com quebra na largura. */
+    var ALT_TAM = 10, ALT_ENTRE = 14.5, ALT_RECUO = 16;
+
+    function medirAlternativas(ex, recuo) {
+      var lista = (ex && ex.alternativas) || [];
+      return lista.map(function (alt) {
+        return {
+          letra: String(alt.letra == null ? '' : alt.letra) + ')',
+          linhas: quebrarRico(partirRico(alt.texto), MARG_D - recuo - ALT_RECUO, ALT_TAM)
+        };
+      });
+    }
+
+    function alturaDeAlternativas(medidas) {
+      var alto = 0;
+      for (var i = 0; i < medidas.length; i++) alto += medidas[i].linhas.length * ALT_ENTRE;
+      return alto;
+    }
+
+    function escreverAlternativas(medidas, recuo) {
+      for (var i = 0; i < (medidas || []).length; i++) {
+        for (var k = 0; k < medidas[i].linhas.length; k++) {
+          doc.garanteEspaco(ALT_ENTRE);
+          doc.y -= ALT_ENTRE;
+          if (k === 0) doc.texto(medidas[i].letra, recuo, doc.y, { tam: ALT_TAM, cor: COR.teal });
+          doc.escreverSegmentos(medidas[i].linhas[k], recuo + ALT_RECUO, doc.y, { tam: ALT_TAM });
+        }
+      }
+    }
+
+    /* extras: { ex, creditoDoTrecho }, e só o item de português tem. O trecho
+     * próprio e as alternativas entram na MESMA altura do enunciado, para o
+     * número, o enunciado, o trecho e as alternativas ficarem na mesma página
+     * quando cabem; o teto de uma folha continua no reservarBloco. */
+    function medirItem(bruto, tam, recuo, alturaLinha, extras) {
+      var pedacos = separarPorTipo(bruto);
+      var figuras = pedacos.figura;
+      var segmentos = quebrarRico(partirRico(pedacos.texto.join(' ')), MARG_D - recuo, tam);
       // a primeira linha divide a linha do número, então só as seguintes descem
       var altura = Math.max(0, segmentos.length - 1) * alturaLinha;
       figuras.forEach(function (d) {
         altura += doc.alturaDeFigura(d, { x: recuo, largura: MARG_D - recuo });
       });
-      return { segmentos: segmentos, figuras: figuras, altura: altura };
+      var ex = extras && extras.ex;
+      var trecho = (ex && ex.trecho && ex.trecho.conteudo) ? ex.trecho : null;
+      var creditoDoTrecho = !!(extras && extras.creditoDoTrecho);
+      var alternativas = medirAlternativas(ex, recuo);
+      if (trecho) altura += doc.alturaDeCitacao(trecho, { tam: 10, credito: creditoDoTrecho });
+      altura += alturaDeAlternativas(alternativas);
+      return {
+        segmentos: segmentos, figuras: figuras, altura: altura,
+        trecho: trecho, creditoDoTrecho: creditoDoTrecho, alternativas: alternativas
+      };
     }
 
     function escreverItem(med, tam, recuo, alturaLinha) {
@@ -2954,7 +3279,102 @@
       med.figuras.forEach(function (d) {
         doc.figura(d, { x: recuo, largura: MARG_D - recuo });
       });
+      /* O trecho próprio do item (G6) sai LOGO DEPOIS do enunciado e antes das
+       * alternativas, com número e fio. O crédito só quando a fonte dele é
+       * diferente da do texto de apoio do item: repetido embaixo do texto de
+       * apoio e de novo embaixo do trecho, ele viraria ruído. */
+      if (med.trecho) {
+        doc.citacao(med.trecho, { tam: 10, credito: med.creditoDoTrecho });
+      }
+      escreverAlternativas(med.alternativas, recuo);
       return med.figuras.length;
+    }
+
+    /* Rótulos do gabarito aberto. Ficam em português porque matéria com catálogo
+     * (português e literatura) não tem versão em inglês; a folha de matemática
+     * nunca chega aqui, porque não tem gabarito estruturado. */
+    var ROTULO_GABARITO = {
+      espera_se: 'Espera-se', aceita_se: 'Aceita-se',
+      nao_aceita: 'Não se aceita', ancora: 'No texto'
+    };
+    var GAB_TAM = 9.5, GAB_ENTRE = 13.5, GAB_RECUO_MARCADOR = 12;
+
+    /* O gabarito estruturado, medido inteiro antes de escrever, pela mesma
+     * metade que mede o enunciado: sem a medida não dá para reservar o bloco, e o
+     * critério da resposta aberta partiria no meio na virada da folha, que é
+     * justamente onde a professora precisa dele inteiro.
+     *
+     * A âncora é a única parte que é TEXTO e não julgamento, então sai como
+     * mini-citação: recuo, fio e itálico, sem número e sem crédito. */
+    function medirGabarito(ex, recuo) {
+      var gab = ex.gabarito || {};
+      var pecas = [], alto = 0;
+
+      function corrido(txt, opcoes) {
+        opcoes = opcoes || {};
+        var deslocamento = opcoes.recuo || 0;
+        var linhas = quebrarRico(partirRico(String(txt == null ? '' : txt)),
+          MARG_D - recuo - deslocamento, GAB_TAM);
+        pecas.push({ tipo: 'corrido', linhas: linhas, recuo: deslocamento,
+          bold: !!opcoes.bold, marcador: opcoes.marcador || '' });
+        alto += linhas.length * GAB_ENTRE;
+      }
+      function rotulo(chave) {
+        pecas.push({ tipo: 'rotulo', txt: ROTULO_GABARITO[chave] });
+        alto += GAB_ENTRE;
+      }
+      function ancora(txt) {
+        var bloco = { fonte: null, linhas: [0, 0], conteudo: [String(txt)] };
+        pecas.push({ tipo: 'ancora', bloco: bloco });
+        alto += doc.alturaDeCitacao(bloco, { tam: GAB_TAM, credito: false });
+      }
+      function listaMarcada(itens) {
+        (itens || []).forEach(function (it) {
+          corrido(it, { recuo: GAB_RECUO_MARCADOR, marcador: '\u2022' });
+        });
+      }
+
+      if (gab.letra) {
+        corrido(gab.letra, { bold: true });
+        if (gab.porque) corrido(gab.porque, {});
+        if (gab.ancora) ancora(gab.ancora);
+      } else if (gab.espera_se) {
+        rotulo('espera_se'); corrido(gab.espera_se, {});
+        rotulo('aceita_se'); listaMarcada(gab.aceita_se);
+        rotulo('nao_aceita'); listaMarcada(gab.nao_aceita);
+        if (gab.ancora) { rotulo('ancora'); ancora(gab.ancora); }
+      }
+      // a primeira linha divide a linha do número, como no item da lista
+      return { pecas: pecas, altura: Math.max(0, alto - GAB_ENTRE) };
+    }
+
+    function escreverGabarito(med, recuo) {
+      var naLinhaDoNumero = true;
+      function descer() {
+        if (naLinhaDoNumero) { naLinhaDoNumero = false; return; }
+        doc.garanteEspaco(GAB_ENTRE);
+        doc.y -= GAB_ENTRE;
+      }
+      med.pecas.forEach(function (p) {
+        if (p.tipo === 'rotulo') {
+          descer();
+          doc.texto(p.txt, recuo, doc.y, { tam: GAB_TAM, bold: true, cor: COR.teal });
+          return;
+        }
+        if (p.tipo === 'ancora') {
+          naLinhaDoNumero = false;
+          doc.citacao(p.bloco, { tam: GAB_TAM, italic: true, credito: false });
+          return;
+        }
+        for (var k = 0; k < p.linhas.length; k++) {
+          descer();
+          if (k === 0 && p.marcador) {
+            doc.texto(p.marcador, recuo, doc.y, { tam: GAB_TAM, cor: COR.teal });
+          }
+          doc.escreverSegmentos(p.linhas[k], recuo + p.recuo, doc.y,
+            { tam: GAB_TAM, bold: p.bold });
+        }
+      });
     }
 
     /* Reserva de bloco: nunca mais do que uma folha inteira, senão um item
@@ -2966,6 +3386,11 @@
     if (op.incluirLista && selecionados.length) {
       abrirParte(rotulos.lista);
       var blocoAtual = null;
+      /* Cada texto de apoio sai UMA vez por folha, na primeira questão
+       * SELECIONADA que o usa: ela desmarca questões, e o texto tem que
+       * acompanhar a que ficou. O gabarito não repete o texto: a âncora basta. */
+      var textos = dados.textos || [];
+      var textoJaSaiu = {};
       selecionados.forEach(function (ex, i) {
         if (ex.bloco && ex.bloco !== blocoAtual) {
           blocoAtual = ex.bloco;
@@ -2975,7 +3400,39 @@
           doc.textoRico(blocoAtual, MARG_E, doc.y, { tam: 11, bold: true, cor: COR.teal });
           doc.y -= 4;
         }
-        var medEx = medirItem(ex.enunciado, 10, MARG_E + 20, 15);
+        var apoio = (typeof ex.texto === 'number') ? textos[ex.texto] : null;
+        if (apoio && !textoJaSaiu[ex.texto]) {
+          textoJaSaiu[ex.texto] = true;
+          /* O subtítulo leva junto as três primeiras linhas do bloco: título de
+           * texto sozinho no pé da folha manda a aluna virar a página para achar
+           * o texto de que ele fala. */
+          var metaApoio = doc.metadadosDaFonte(apoio.fonte);
+          /* Texto escrito para o exercício costuma trazer o próprio título na
+           * primeira linha (notícia, artigo): o subtítulo repetiria a linha 1 logo
+           * acima dela, e na folha isso lê como erro de impressão. Quando a
+           * primeira linha do bloco é o título, o bloco fala por si. */
+          var primeiraLinha = '';
+          for (var pl = 0; pl < (apoio.conteudo || []).length; pl++) {
+            if (String(apoio.conteudo[pl] || '').trim()) { primeiraLinha = apoio.conteudo[pl]; break; }
+          }
+          var normal = function (t) { return String(t || '').replace(/\s+/g, ' ').trim().toLowerCase(); };
+          var repeteTitulo = !!metaApoio.titulo && normal(primeiraLinha) === normal(metaApoio.titulo);
+          reservarBloco((repeteTitulo ? 0 : 18) + 3 * 14.5 + 6);
+          if (!repeteTitulo) {
+            doc.y -= 18;
+            doc.textoRico(metaApoio.titulo || apoio.fonte, MARG_E, doc.y,
+              { tam: 11, bold: true, cor: COR.navy });
+            doc.y -= 2;
+          } else {
+            doc.y -= 6;
+          }
+          doc.citacao(apoio, { tam: 10 });
+        }
+        var medEx = medirItem(ex.enunciado, 10, MARG_E + 20, 15, {
+          ex: ex,
+          creditoDoTrecho: !!(ex.trecho && ex.trecho.fonte &&
+            ex.trecho.fonte !== (apoio ? apoio.fonte : null))
+        });
         reservarBloco(15 + medEx.altura + (op.espacoParaResposta || 0));
         doc.y -= 15;
         doc.texto(String(i + 1) + '.', MARG_E, doc.y, { tam: 10, bold: true, cor: COR.navy });
@@ -2987,6 +3444,18 @@
     if (op.incluirGabarito && selecionados.length) {
       abrirParte(rotulos.gabarito);
       selecionados.forEach(function (ex, i) {
+        /* Gabarito estruturado: letra da fechada, ou o critério da aberta em
+         * quatro partes. Item sem nenhum dos dois segue pelo caminho de sempre,
+         * que é o da resposta corrida da matemática. */
+        var gab = ex.gabarito;
+        if (gab && (gab.letra || gab.espera_se)) {
+          var medGab = medirGabarito(ex, MARG_E + 20);
+          reservarBloco(14 + medGab.altura);
+          doc.y -= 14;
+          doc.texto(String(i + 1) + '.', MARG_E, doc.y, { tam: 9.5, bold: true, cor: COR.navy });
+          escreverGabarito(medGab, MARG_E + 20);
+          return;
+        }
         /* A resposta passa pelo mesmo caminho: quando ela traz
          * "@fig id=t7 fase=gabarito", a diretiva vira figura em vez de sair
          * impressa como texto, e o bloco inteiro é reservado antes do número. */
@@ -3014,6 +3483,7 @@
      * poder encolher uma figura mais alta do que a folha. Ele pergunta em vez de
      * manter constante própria: lista repetida em dois lugares diverge no dia em
      * que alguém mexe em um só. */
-    Y_TOPO: Y_TOPO, Y_LIMITE: Y_LIMITE
+    Y_TOPO: Y_TOPO, Y_LIMITE: Y_LIMITE,
+    LARGURA_CITACAO: LARGURA_CITACAO
   };
 });

@@ -215,8 +215,144 @@ imprime no fim. Em português e literatura a maior parte dos itens é assim, e t
 
 ## 8. O que não fazer
 
-- Não citar código de habilidade da BNCC. A organização segue as unidades temáticas, que são
+- Não citar código de habilidade da BNCC no corpo do tema. A organização segue as unidades temáticas, que são
   estáveis. Citar código específico é onde se erra com aparência de precisão.
+  Em matéria com catálogo de tópicos (português e literatura) o código é dado do cabeçalho, no
+  campo `bncc`, conferido contra tabela; ver a seção 9.
 - Não inventar dado histórico, nome de matemático com data, nem estatística sobre o mundo real dentro
   de enunciado. Se o problema precisa de contexto, usar situação cotidiana e verificável.
 - Não usar uma resposta "bonita" como prova de que a conta está certa. A prova é o verificador.
+
+## 9. Matéria com catálogo: citação, texto de apoio, questão fechada e aberta
+
+Vale para toda matéria que tem catálogo de tópicos na tabela (`topicos` preenchido: português e
+literatura). Matemática não passa por nada desta seção. Decisão de 08/09/2026 (Fase 2 da frente
+de português); a coleção de textos está descrita em `fontes/FORMATO.md`.
+
+### 9.1 Dois campos a mais no cabeçalho
+
+```
+bncc: [EF67LP28, EF69LP47]
+vestibular: [contagem de sílabas poéticas e nome da medida do verso]
+```
+
+`bncc` lista os códigos de habilidade de Língua Portuguesa que o tema cobre, conferidos contra a
+tabela `temas/_ferramentas/bncc_lp.json` (código fora da tabela reprova; série do tema fora da
+faixa do código é aviso, porque revisão atravessa anos). `vestibular` lista, em palavras e
+separadas por `;`, as exigências de vestibular sem habilidade correspondente na Base. Pelo menos
+uma das duas não pode ser vazia. Em matemática os dois campos são proibidos. O código vai no
+cabeçalho e só nele: a regra 8 continua valendo para o corpo.
+
+`serie` é o nível de profundidade: o mesmo tópico em dois níveis é dois temas, em duas séries.
+Cursinho usa `em3`.
+
+### 9.2 O bloco de citação tem fonte
+
+Toda citação de texto, na explicação ou na lista, é um bloco assim:
+
+```
+@fonte lima-barreto_o-pai-da-ideia linhas=9-10
+> Pouca gente leu o artigo do honesto facultativo, mas todos os seus colegas o fizeram,
+> sem que, entretanto, nada dissessem logo.
+```
+
+- A diretiva `@fonte <id> linhas=<a>-<b>` ocupa a linha inteira e vem logo antes do bloco. O id é
+  o nome do arquivo em `fontes/`; `linhas` conta as linhas não vazias da fonte e é obrigatório.
+- As linhas do bloco começam com `> ` (até três espaços antes do sinal, e um espaço depois). A
+  linha em branco da fonte vira `>` sozinho. Sinal de citação com mais recuo, ou colado ao texto,
+  reprova.
+- O bloco é cópia exata das linhas `a` a `b` da fonte, com os brancos entre elas. Uma palavra
+  trocada reprova, e a mensagem diz a primeira linha que difere.
+- Bloco `>` sem `@fonte` na linha anterior reprova: não existe citação sem fonte, nem de duas
+  linhas. Texto escrito para o exercício também é fonte (`dominio: autoral`).
+- Dentro do bloco não rodam as travas de rascunho nem a de referência cruzada: a fidelidade já
+  exclui rascunho. Travessão e reticências dentro do bloco continuam permitidos (seção 6).
+
+### 9.3 Texto de apoio na lista
+
+Em `### Exercícios`, um bloco `@fonte` em coluna zero que aparece antes de um item numerado é
+texto de apoio, e os itens depois dele, até o próximo bloco, pertencem a ele. A lista pode ter mais
+de um texto e itens sem texto. O bloco pode vir antes ou depois do cabeçalho `**Bloco A. ...**`.
+
+O enunciado nunca cita o texto pelo número ("no Texto 2"): ela desmarca questões e o segundo texto
+pode virar o único. Diz "no texto", "no poema", ou cita a linha: "linha 12", "linhas 3 a 5". A
+numeração citada é a da fonte, e tem que cair dentro de `linhas=a-b` do texto do item.
+
+Na folha, o texto sai uma vez, na primeira questão selecionada que o usa, com o título da fonte,
+os números de linha de cinco em cinco, um fio à esquerda e o crédito embaixo.
+
+### 9.4 Trecho dentro da questão
+
+Quando uma questão precisa de um trecho que não está no texto de apoio (ou de outra fonte), o bloco
+vai dentro do item, indentado com três espaços, logo depois do enunciado e antes das alternativas:
+
+```
+14. O Hino Nacional repete, entre aspas, palavras deste poema. O que as aspas indicam?
+   @fonte duque-estrada_hino-nacional-brasileiro linhas=1-4
+   > Do que a terra mais garrida
+   > Teus risonhos, lindos campos têm mais flores,
+   > "Nossos bosques têm mais vida"
+   > "Nossa vida" no teu seio "mais amores".
+   a) Que o autor do hino discorda de Gonçalves Dias.
+   b) Que os versos estão sendo citados de outro texto, e o hino reconhece isso.
+```
+
+O trecho pertence só àquele item, sai com número de linha e fio, e leva crédito quando a fonte é
+diferente da do texto de apoio vigente. No máximo um trecho por item.
+
+### 9.5 Questão fechada
+
+Alternativas são linhas do próprio item, indentadas, com letra e parêntese, quatro ou cinco, de
+`a)` a `e)`, em ordem. O gabarito é a letra, e pode trazer `ancora:` e `porque:`:
+
+```
+3. b
+   ancora: contava eu dezessete, ela trinta
+   porque: "contar anos" é ter idade; a frase compara as duas idades.
+```
+
+Alternativas exigem gabarito em letra e vice-versa; a letra tem que existir. `tipo: fechada` sai
+inferido no JSON.
+
+### 9.6 Questão aberta
+
+O gabarito é critério, não frase. Quatro campos, todos obrigatórios:
+
+```
+1. espera_se: que o aluno perceba que o narrador conta a história muitos anos depois.
+   aceita_se:
+   - dizer que ele era jovem na época e escreve mais velho
+   - apontar a distância de tempo sem falar em idade
+   nao_aceita:
+   - dizer que a história acontece no presente
+   ancora: Nunca pude entender a conversação que tive com uma senhora, há muitos anos
+```
+
+- `espera_se`: a resposta que a professora quer ver, em uma frase.
+- `aceita_se` e `nao_aceita`: listas com pelo menos um item cada.
+- `ancora`: trecho literal, com pelo menos três palavras, que tem que ser substring de UM parágrafo
+  do texto do item (o trecho próprio se houver, senão o texto de apoio, senão o enunciado), com os
+  espaços normalizados. A âncora não atravessa linha em branco. A linha `ancora:` fica isenta de
+  travessão, reticências e rascunho, porque ela é cópia.
+
+Gabarito em texto corrido reprova em matéria com catálogo. Nos anos iniciais o esquema é o mesmo.
+
+### 9.7 Itálico
+
+`*texto*` é itálico, `**texto**` é negrito, `***texto***` os dois; em qualquer ordem de
+aninhamento. Em cada linha o número de `**` e o de `*` solto tem que ser par, senão reprova. Em
+matemática, `*` fora de `**` reprova.
+
+### 9.8 A seção VERIFICACAO é opcional
+
+Em matéria só em português a seção `## VERIFICACAO` pode faltar. Sem ela nenhuma conta é conferida
+e o aviso "exercícios sem verificação" não sai. O que garante o material é o resto desta seção mais
+o portão de português (fidelidade, domínio, esquema do gabarito, cobertura, painel cego).
+
+### 9.9 O que sai no JSON
+
+Além do que já sai, o tema de matéria com catálogo leva `bncc`, `vestibular`, `fontes` (metadados
+e crédito de cada texto citado), `textos` (os textos de apoio, com as linhas) e, em cada
+exercício, `texto` (índice em `textos`), `tipo`, `alternativas`, `trecho`, `resposta` (a letra ou o
+`espera_se`, para quem só lê texto) e `gabarito` estruturado. O gerador aceita `--so portugues`
+para regerar uma matéria só; a matemática não é tocada.

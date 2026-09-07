@@ -20,10 +20,17 @@ tabela e uma pasta.
 
 Um tema que falhe em qualquer ponto nao entra no banco.
 
+Nas materias com catalogo de topicos (portugues e literatura) o verificador
+confere tambem a colecao `fontes/`: cada texto citado mora num arquivo proprio,
+com cabecalho de procedencia e dominio, e o bloco citado no tema tem que ser
+copia exata das linhas da fonte.
+
 Uso:
     python verificar.py                confere tudo
     python verificar.py MAT06-05       confere um tema
     python verificar.py --temas DIR    confere os temas de outra raiz (prova do gerador)
+    python verificar.py --fontes DIR   confere as fontes de outra raiz
+    python verificar.py --ano 2027     faz a conta do dominio publico em outro ano
 """
 import io
 import os
@@ -47,7 +54,16 @@ from sympy import (symbols, solve, Eq, simplify, expand, factor, Rational, sqrt,
                    I, re as parte_real, im as parte_imag, arg, conjugate, Abs as modulo)
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+RAIZ_PROJETO = os.path.dirname(RAIZ)
 ARQUIVO_MATERIAS = os.path.join(AQUI, 'materias.json')
+ARQUIVO_BNCC = os.path.join(AQUI, 'bncc_lp.json')
+
+# A colecao de textos citados. Fica na raiz do projeto, plana, um arquivo por
+# texto: o que separa os textos e o campo `dominio`, e uma pasta por dominio
+# seria um segundo lugar dizendo a mesma coisa. E um modulo-global porque o
+# gerador e os testes precisam apontar para uma raiz de mentira sem sujar o
+# repositorio; a linha de comando troca por --fontes.
+RAIZ_FONTES = os.path.join(RAIZ_PROJETO, 'fontes')
 
 # simbolos disponiveis nas expressoes de verificacao
 # Declarados reais de proposito: sem isso o sympy recusa resolver equacao com
@@ -189,14 +205,22 @@ def campos_obrigatorios(materia):
     return campos
 
 
-def lista_do_cabecalho(valor):
-    """'[MAT06-02, MAT06-03]' -> ['MAT06-02', 'MAT06-03']; '[]' -> []."""
-    return [p.strip() for p in (valor or '').strip().strip('[]').split(',') if p.strip()]
+def lista_do_cabecalho(valor, sep=','):
+    """'[MAT06-02, MAT06-03]' -> ['MAT06-02', 'MAT06-03']; '[]' -> [].
+
+    O separador e virgula em quase tudo. O campo `vestibular` usa ponto e
+    virgula, porque cada item dele e uma frase em portugues e frase leva
+    virgula dentro.
+    """
+    return [p.strip() for p in (valor or '').strip().strip('[]').split(sep) if p.strip()]
 
 
-def ler_tema(caminho):
-    materia = materia_do_caminho(caminho)
-    texto = io.open(caminho, encoding='utf-8').read()
+def ler_cabecalho(texto):
+    """(cabecalho, corpo) de um arquivo com cabecalho entre dois '---'.
+
+    Nao valida campo nenhum: quem sabe o que e obrigatorio e quem chama. E o
+    mesmo molde no tema e no arquivo de fonte, e por isso o parser e um so.
+    """
     if not texto.startswith('---'):
         raise Problema('falta o cabecalho no inicio do arquivo')
     fim = texto.index('---', 3)
@@ -209,6 +233,13 @@ def ler_tema(caminho):
             continue
         chave, valor = linha.split(':', 1)
         cab[chave.strip()] = valor.strip()
+    return cab, corpo
+
+
+def ler_tema(caminho):
+    materia = materia_do_caminho(caminho)
+    texto = io.open(caminho, encoding='utf-8').read()
+    cab, corpo = ler_cabecalho(texto)
 
     for campo in campos_obrigatorios(materia):
         if campo not in cab:
@@ -287,7 +318,15 @@ def numeros_de(texto):
 # linha de continuacao sem sinal nenhum, mas uma isencao que dependesse de
 # entender Markdown seria dificil de conferir no olho. A regra e mecanica de
 # proposito: a linha tem o sinal, ou nao tem a isencao.
-_MARCA_DE_CITACAO = re.compile(r'^ {0,3}> ')
+#
+# Esta e a UNICA definicao de linha de citacao no repositorio, e por isso ela e
+# exportada. A linha em branco da fonte vira '>' sozinho dentro do bloco, entao
+# o sinal pode vir seguido de espaco ou de fim de linha, e de mais nada. Em
+# materia com catalogo, toda linha que comeca por '>' e nao casa com esta
+# expressao reprova: '>colado' e '    > indentado demais' sao defeito, e nao
+# citacao silenciosamente sem isencao.
+RE_CITACAO = re.compile(r'^ {0,3}>( |$)')
+_MARCA_DE_CITACAO = RE_CITACAO
 
 # Escritos pelo codigo, e nao colados, para o proprio verificador passar na
 # busca por travessao que a casa faz em todo arquivo.
@@ -296,16 +335,30 @@ RETICENCIAS = u'\\.\\.\\.|\u2026'
 
 
 def eh_linha_de_citacao(linha):
-    return bool(_MARCA_DE_CITACAO.match(linha))
+    return bool(RE_CITACAO.match(linha))
 
 
-def travessoes(texto, citacao=False):
+# A linha `ancora:` do gabarito aberto e trecho literal do texto: E4 exige que
+# ela seja substring de um paragrafo do texto do item, e a fidelidade do bloco
+# (F2) ja garante que o texto e copia da fonte. Por isso ela herda a mesma
+# isencao da linha de citacao, e nao passa por travessao, reticencias nem
+# rascunho. Sem isso a ancora de um conto com travessao seria impossivel.
+_MARCA_DE_ANCORA = re.compile(r'^\s*ancora:')
+
+
+def eh_linha_de_ancora(linha):
+    return bool(_MARCA_DE_ANCORA.match(linha))
+
+
+def travessoes(texto, citacao=False, catalogo=False):
     """[(linha, trecho)] de cada linha com travessao, fora de citacao marcada."""
     achados = []
     for numero, linha in enumerate(texto.split('\n'), 1):
         if not TRAVESSAO.search(linha):
             continue
         if citacao and eh_linha_de_citacao(linha):
+            continue
+        if catalogo and eh_linha_de_ancora(linha):
             continue
         achados.append((numero, linha.strip()[:60]))
     return achados
@@ -333,13 +386,16 @@ RASCUNHO_AVISO = [
 ]
 
 
-def marcas_de_rascunho(corpo, lista=None, citacao=False):
+def marcas_de_rascunho(corpo, lista=None, citacao=False, catalogo=False):
     """Procura sinais de que o texto ficou com raciocinio do autor dentro.
 
     Com citacao=True, a regra das reticencias nao vale dentro de linha de
-    citacao marcada: reticencia de autor e pontuacao, nao rascunho. As outras
-    regras continuam valendo la dentro, porque a decisao de 08/09/2026 cobre
-    travessao e reticencias, e nada alem disso.
+    citacao marcada: reticencia de autor e pontuacao, nao rascunho.
+
+    Com catalogo=True (portugues e literatura), a linha de citacao inteira sai
+    da varredura, e a linha `ancora:` tambem. As duas sao texto copiado, e a
+    trava de fidelidade ja garante que o que esta ali e o que estava na fonte:
+    "ou melhor," escrito por Machado nao e rascunho de quem montou o tema.
     """
     achados = []
     regras = lista if lista is not None else RASCUNHO_ERRO
@@ -348,6 +404,8 @@ def marcas_de_rascunho(corpo, lista=None, citacao=False):
         if linha.strip().startswith('#'):
             continue
         citada = citacao and eh_linha_de_citacao(linha)
+        if catalogo and (citada or eh_linha_de_ancora(linha)):
+            continue
         for padrao, motivo, ignora_caixa in regras:
             if citada and padrao == RETICENCIAS:
                 continue
@@ -392,11 +450,18 @@ REFERENCIA_CRUZADA = [
 ]
 
 
-def referencias_cruzadas(corpo):
-    """Acha enunciado que depende de outro pelo numero."""
+def referencias_cruzadas(corpo, catalogo=False):
+    """Acha enunciado que depende de outro pelo numero.
+
+    Em materia com catalogo, a linha de citacao e a linha `ancora:` ficam de
+    fora: um conto que fale em "questao 3" na propria narrativa nao esta
+    dependendo de nenhum exercicio.
+    """
     achados = []
     texto = corpo.split('## VERIFICACAO')[0]
     for numero, linha in enumerate(texto.split(chr(10)), 1):
+        if catalogo and (eh_linha_de_citacao(linha) or eh_linha_de_ancora(linha)):
+            continue
         for padrao in REFERENCIA_CRUZADA:
             achado = re.search(padrao, linha, re.I)
             if achado:
@@ -468,6 +533,64 @@ def _perguntar_ao_gerador(caracteres):
     return set(resposta.get('ruins', [])), resposta.get('simbolos', [])
 
 
+# A largura do bloco de citacao e a mesma pergunta feita de outro jeito: quem
+# desenha e o pdf.js, entao e ele que diz quanto mede uma linha e quanto cabe.
+# Sem esta trava, uma linha larga demais da fonte viraria duas linhas na folha,
+# e a numeracao que o exercicio cita ("linha 12") passaria a mentir.
+_PERGUNTA_LARGURA = (
+    "const fs=require('fs');"
+    "const P=require(process.argv[1]);"
+    "const ls=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));"
+    "process.stdout.write(JSON.stringify({"
+    "larguras: ls.map(function(l){return P.medirRico(l, 10, false);}),"
+    "limite: P.LARGURA_CITACAO"
+    "}));"
+)
+
+_largura = {}           # linha -> pontos que ela ocupa no bloco de citacao
+_limite_citacao = [None]
+
+
+def _medir_no_gerador(linhas):
+    """Pergunta ao pdf.js quanto mede cada linha, em UMA chamada por lote.
+
+    As linhas vao por arquivo, e nao pela linha de comando: um poema inteiro
+    passa dos 32 mil caracteres que o Windows aceita num comando, e o erro
+    apareceria so no dia em que a fonte fosse grande.
+    """
+    import subprocess
+    import tempfile
+    pdf = os.path.join(RAIZ_PROJETO, 'pdf.js')
+    with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False, encoding='utf-8') as f:
+        json.dump(linhas, f, ensure_ascii=False)
+        entrada = f.name
+    try:
+        saida = subprocess.run(['node', '-e', _PERGUNTA_LARGURA, pdf, entrada],
+                               capture_output=True, text=True, encoding='utf-8')
+    except OSError:
+        raise Problema('o node nao esta instalado ou nao esta no PATH. Ele e '
+                       'necessario para medir a largura das linhas da fonte.')
+    finally:
+        os.unlink(entrada)
+    if saida.returncode != 0:
+        raise Problema('nao consegui perguntar ao pdf.js quanto mede a linha da '
+                       'fonte: %s' % saida.stderr[:300])
+    resposta = json.loads(saida.stdout or '{}')
+    return resposta.get('larguras', []), resposta.get('limite')
+
+
+def larguras_de(linhas):
+    """({linha: pontos}, limite) para as linhas dadas, com cache por execucao."""
+    novas = sorted(set(l for l in linhas if l not in _largura))
+    if novas or _limite_citacao[0] is None:
+        medidas, limite = _medir_no_gerador(novas)
+        for linha, pontos in zip(novas, medidas):
+            _largura[linha] = pontos
+        if limite is not None:
+            _limite_citacao[0] = limite
+    return dict((l, _largura.get(l)) for l in linhas), _limite_citacao[0]
+
+
 # Alem do que o PDF desenha, ha coisa que simplesmente nao deve estar num
 # arquivo de tema, mesmo sendo desenhavel. Controle e uma delas: o gerador
 # transforma em espaco e segue, mas no fonte e sempre erro de edicao.
@@ -532,6 +655,220 @@ def marcacao_quebrada(texto):
         if '^{' in resto or '_{' in resto:
             achados.append((numero, linha.strip()[:70]))
     return achados
+
+
+# ------------------------------------------------------------------- fontes
+
+# Um arquivo por texto em fontes/<id>.md, com cabecalho de procedencia. A trava
+# do dominio nao decide nada sozinha: ela repete a conta da Lei 9.610/98, art.
+# 41 (setenta anos contados de 1 de janeiro do ano seguinte a morte, ou seja,
+# livre no ano A quando morte + 71 <= A) e recusa o arquivo que nao a satisfaz.
+# O ano entra por parametro de proposito: a conta so afrouxa com o tempo, e um
+# par envenenado escrito com o relogio explodiria sozinho na virada do ano.
+GENEROS_DE_FONTE = ['conto', 'poema', 'cronica', 'fabula', 'noticia', 'reportagem', 'artigo',
+                    'entrevista', 'propaganda', 'verbete', 'bilhete', 'carta', 'teatro', 'romance',
+                    'ensaio', 'cantiga', 'parlenda', 'outro']
+DOMINIOS_DE_FONTE = ['publico', 'autoral', 'cc', 'tradicional']
+CAMPOS_DE_FONTE = ['id', 'titulo', 'autor', 'ano', 'genero', 'dominio',
+                   'licenca', 'procedencia', 'integral']
+ANOS_DE_PROTECAO = 71
+
+
+def ler_fonte(caminho):
+    """(cabecalho, linhas do corpo) de um arquivo de fontes/.
+
+    As linhas vem sem a quebra, e sem as vazias das pontas. Linha em branco e a
+    que tem strip() vazio: e a mesma definicao no corpo da fonte, no bloco de
+    citacao do tema e no JSON que o tablet baixa, e e ela que decide quais
+    linhas recebem numero.
+    """
+    bruto = io.open(caminho, encoding='utf-8', newline='').read()
+    cab, corpo = ler_cabecalho(bruto)
+    corpo = corpo.replace(chr(13) + chr(10), chr(10)).replace(chr(13), chr(10))
+    linhas = corpo.split(chr(10))
+    while linhas and linhas[0].strip() == '':
+        linhas.pop(0)
+    while linhas and linhas[-1].strip() == '':
+        linhas.pop()
+    return cab, linhas
+
+
+def numerar(linhas):
+    """[(numero, texto)] em que so a linha nao vazia recebe numero, a partir de 1.
+
+    E o numero que a folha imprime ao lado da linha e que o exercicio cita
+    ("linha 12"). Ele conta so as nao vazias porque assim nao depende de como o
+    gerador quebra a pagina: cada linha da fonte e uma linha impressa.
+    """
+    saida = []
+    numero = 0
+    for texto in linhas:
+        if texto.strip() == '':
+            saida.append((None, texto))
+        else:
+            numero += 1
+            saida.append((numero, texto))
+    return saida
+
+
+def fatia(linhas, a, b):
+    """As linhas de numero a ate b, inclusive, com as vazias do meio.
+
+    Sem vazias nas pontas: o bloco citado no tema comeca e termina em linha com
+    texto. A linha vazia sai normalizada para '', que e a forma dela em todo
+    lugar (no bloco ela e '>' sozinho, no JSON e "").
+    """
+    saida = []
+    for numero, texto in numerar(linhas):
+        if numero is not None and a <= numero <= b:
+            saida.append(texto)
+        elif numero is None and saida:
+            saida.append('')
+    while saida and saida[-1] == '':
+        saida.pop()
+    return saida
+
+
+def _anos_de_morte(valor):
+    """[1908] ou [1908, 1955] na coautoria; None quando nao e ano nenhum."""
+    partes = [p.strip() for p in (valor or '').split(',') if p.strip()]
+    anos = []
+    for parte in partes:
+        if not re.match(r'^\d{3,4}$', parte):
+            return None
+        anos.append(int(parte))
+    return anos or None
+
+
+def _retornos_soltos(caminho):
+    """As linhas com retorno de carro que nao faz par com quebra de linha.
+
+    O io.open em modo texto normaliza CR, CRLF e LF para LF, entao um CR solto
+    no meio da fonte viraria uma linha a mais em silencio e a numeracao passaria
+    a mentir. Aqui o arquivo e lido cru, de proposito, so para isso.
+    """
+    bruto = io.open(caminho, encoding='utf-8', newline='').read()
+    achados = []
+    for i, c in enumerate(bruto):
+        if c == chr(13) and (i + 1 >= len(bruto) or bruto[i + 1] != chr(10)):
+            achados.append(bruto.count(chr(10), 0, i) + 1)
+    return achados
+
+
+def problemas_na_fonte(caminho, ano):
+    """Lista de erros de um arquivo de fontes/, com a conta do dominio no ano dado."""
+    erros = []
+    nome = os.path.splitext(os.path.basename(caminho))[0]
+    try:
+        cab, linhas = ler_fonte(caminho)
+    except Problema as e:
+        return [str(e)]
+    except ValueError:
+        return ['o cabecalho nao esta fechado: falta o segundo "---"']
+
+    for campo in CAMPOS_DE_FONTE:
+        if campo not in cab:
+            erros.append('falta o campo "%s" no cabecalho' % campo)
+    if erros:
+        return erros
+
+    if cab['id'] != nome:
+        erros.append('o id "%s" nao bate com o nome do arquivo "%s"' % (cab['id'], nome))
+    if not re.match(r'^\d{3,4}$', cab['ano']):
+        erros.append('o campo ano tem que ser um numero inteiro, e esta "%s"' % cab['ano'][:30])
+    if cab['genero'] not in GENEROS_DE_FONTE:
+        erros.append('genero invalido: %s (os que existem sao: %s)'
+                     % (cab['genero'], ', '.join(GENEROS_DE_FONTE)))
+    if cab['integral'] not in ('sim', 'nao'):
+        erros.append('o campo integral so aceita sim ou nao, e esta "%s"' % cab['integral'][:20])
+
+    dominio = cab['dominio']
+    if dominio not in DOMINIOS_DE_FONTE:
+        erros.append('dominio invalido: %s (os que existem sao: %s)'
+                     % (dominio, ', '.join(DOMINIOS_DE_FONTE)))
+
+    if dominio == 'publico':
+        if 'autor_morte' not in cab:
+            erros.append('dominio publico exige autor_morte: e por ele que a conta da '
+                         'Lei 9.610/98 art. 41 e feita')
+        else:
+            anos = _anos_de_morte(cab['autor_morte'])
+            if anos is None:
+                erros.append('autor_morte tem que ser ano inteiro, ou anos separados por '
+                             'virgula na coautoria, e esta "%s"' % cab['autor_morte'][:30])
+            elif max(anos) + ANOS_DE_PROTECAO > ano:
+                erros.append('o texto ainda nao esta em dominio publico em %d: o autor morreu '
+                             'em %d e a obra fica livre em %d (morte mais %d, Lei 9.610/98 art. 41)'
+                             % (ano, max(anos), max(anos) + ANOS_DE_PROTECAO, ANOS_DE_PROTECAO))
+    elif dominio in ('autoral', 'tradicional') and 'autor_morte' in cab:
+        erros.append('dominio %s nao pode ter autor_morte: o campo e sinal de que o dominio '
+                     'foi marcado errado' % dominio)
+
+    if dominio == 'cc':
+        if not cab['licenca'].startswith('CC '):
+            erros.append('dominio cc exige licenca com o nome exato da licenca, comecando por '
+                         '"CC ", e esta "%s"' % cab['licenca'][:40])
+        if 'http' not in cab['procedencia']:
+            erros.append('dominio cc exige procedencia com endereco: a licenca so vale com a '
+                         'origem verificavel')
+
+    if dominio == 'tradicional' and not cab['procedencia'].strip():
+        erros.append('dominio tradicional exige procedencia: e a coletanea publica de onde o '
+                     'texto foi copiado')
+
+    if 'tradutor' in cab:
+        if 'tradutor_morte' not in cab:
+            erros.append('tradutor exige tradutor_morte: a traducao tem direito proprio e a '
+                         'conta vale para ela tambem')
+        else:
+            anos = _anos_de_morte(cab['tradutor_morte'])
+            if anos is None:
+                erros.append('tradutor_morte tem que ser ano inteiro, e esta "%s"'
+                             % cab['tradutor_morte'][:30])
+            elif max(anos) + ANOS_DE_PROTECAO > ano:
+                erros.append('a traducao ainda nao esta em dominio publico em %d: o tradutor '
+                             'morreu em %d e ela fica livre em %d'
+                             % (ano, max(anos), max(anos) + ANOS_DE_PROTECAO))
+
+    # O corpo pode ter travessao e reticencias, porque e texto de autor. O
+    # cabecalho nao pode: ele e escrito por quem monta a fonte.
+    for chave, valor in sorted(cab.items()):
+        if TRAVESSAO.search(valor):
+            erros.append('travessao no campo "%s" do cabecalho: %s' % (chave, valor[:50]))
+        if re.search(RETICENCIAS, valor):
+            erros.append('reticencias no campo "%s" do cabecalho: %s' % (chave, valor[:50]))
+
+    for numero in _retornos_soltos(caminho):
+        erros.append('linha %d: retorno de carro solto, sem quebra de linha junto' % numero)
+
+    for i, linha in enumerate(linhas, 1):
+        if chr(9) in linha:
+            erros.append('linha %d: tab ou espaco solto (use espaco, e nunca tab)' % i)
+        elif linha.strip() == '' and linha != '':
+            erros.append('linha %d: tab ou espaco solto (linha em branco tem que ser '
+                         'vazia mesmo)' % i)
+
+    cheias = [l for l in linhas if l.strip() != '']
+    if cheias:
+        medidas, limite = larguras_de(cheias)
+        for numero, texto in numerar(linhas):
+            if numero is None:
+                continue
+            pontos = medidas.get(texto)
+            if pontos is not None and limite is not None and pontos > limite:
+                erros.append('linha %d passa da largura do bloco de citacao por %.1f pontos '
+                             '(mede %.1f, cabem %.1f): quebre a linha mais cedo | %s'
+                             % (numero, pontos - limite, pontos, limite, texto[:50]))
+    return erros
+
+
+def arquivos_de_fontes(raiz=None):
+    """Todo fontes/*.md, menos o FORMATO.md, que e documentacao e nao texto."""
+    raiz = raiz or RAIZ_FONTES
+    if not os.path.isdir(raiz):
+        return []
+    return sorted(a for a in glob.glob(os.path.join(raiz, '*.md'))
+                  if os.path.basename(a) != 'FORMATO.md')
 
 
 # ------------------------------------------------------ identificador e topicos
@@ -619,24 +956,638 @@ def problemas_nos_topicos(cab, materia):
     return erros
 
 
+# --------------------------------------------------------- citacao com fonte
+
+# A diretiva que abre um bloco de citacao. A expressao e estrita de proposito:
+# o id tem a forma de nome de arquivo de fontes/ (minusculas, digitos e hifen,
+# com um sublinhado separando autor de titulo) e as linhas sao dois inteiros.
+# Qualquer folga aqui viraria arquivo nao encontrado la na frente.
+_ID_DE_FONTE = r'[a-z0-9]+(?:-[a-z0-9]+)*(?:_[a-z0-9]+(?:-[a-z0-9]+)*)?'
+RE_FONTE = re.compile(r'^( {0,3})@fonte (%s) linhas=(\d+)-(\d+)\s*$' % _ID_DE_FONTE)
+# Uma linha que tenta ser diretiva e nao consegue precisa reprovar dizendo isso,
+# e nao passar batida como paragrafo comum.
+RE_FONTE_SOLTA = re.compile(r'^\s*@fonte\b')
+
+
+def texto_citado(linha):
+    """O que a linha de citacao carrega, sem o sinal: '> a' -> 'a', '>' -> ''."""
+    achou = RE_CITACAO.match(linha)
+    if not achou:
+        return None
+    resto = linha[achou.end():]
+    return '' if resto.strip() == '' else resto
+
+
+def blocos_de_citacao(corpo):
+    """[{linha, id, a, b, conteudo, indentado}] de cada bloco @fonte do texto.
+
+    `conteudo` sao as linhas '>' seguintes, ja sem o sinal, ate a primeira que
+    nao e citacao. `indentado` diz se a diretiva veio recuada, que e a forma do
+    trecho que pertence a um item so.
+    """
+    linhas = (corpo or '').split(chr(10))
+    blocos = []
+    i = 0
+    while i < len(linhas):
+        achou = RE_FONTE.match(linhas[i])
+        if not achou:
+            i += 1
+            continue
+        conteudo = []
+        j = i + 1
+        while j < len(linhas) and RE_CITACAO.match(linhas[j]):
+            conteudo.append(texto_citado(linhas[j]))
+            j += 1
+        blocos.append({'linha': i + 1, 'id': achou.group(2),
+                       'a': int(achou.group(3)), 'b': int(achou.group(4)),
+                       'conteudo': conteudo, 'indentado': len(achou.group(1)) > 0})
+        i = j
+    return blocos
+
+
+_fontes_lidas = {}
+
+
+def fonte_do_catalogo(ident, raiz_fontes=None):
+    """(cabecalho, linhas) da fonte, ou None quando o arquivo nao existe."""
+    raiz = raiz_fontes or RAIZ_FONTES
+    caminho = os.path.join(raiz, '%s.md' % ident)
+    if caminho in _fontes_lidas:
+        return _fontes_lidas[caminho]
+    if not os.path.isfile(caminho):
+        _fontes_lidas[caminho] = None
+        return None
+    try:
+        lida = ler_fonte(caminho)
+    except (Problema, ValueError):
+        lida = None
+    _fontes_lidas[caminho] = lida
+    return lida
+
+
+def problemas_de_citacao(corpo, com_catalogo, raiz_fontes=None):
+    """F1 a F4 e M7: o bloco de citacao aponta uma fonte e a copia exatamente."""
+    erros = []
+    linhas = (corpo or '').split(chr(10))
+
+    if not com_catalogo:
+        # F4: materia sem catalogo nao cita ninguem. A diretiva ali e engano.
+        for numero, linha in enumerate(linhas, 1):
+            if RE_FONTE_SOLTA.match(linha):
+                erros.append('linha %d: @fonte numa materia sem citacao; o bloco de citacao '
+                             'com fonte so existe onde a tabela declara catalogo de topicos'
+                             % numero)
+        return erros
+
+    # M7: uma so definicao de linha de citacao. O que comeca por '>' e nao casa
+    # com ela nao ganha a isencao de travessao em silencio: reprova.
+    for numero, linha in enumerate(linhas, 1):
+        if linha.lstrip().startswith('>') and not RE_CITACAO.match(linha):
+            erros.append('sinal de citacao indentado demais na linha %d: a linha de citacao '
+                         'comeca com ate tres espacos, o sinal e um espaco (ou o sinal '
+                         'sozinho na linha em branco) | %s' % (numero, linha.strip()[:50]))
+
+    for numero, linha in enumerate(linhas, 1):
+        if RE_FONTE_SOLTA.match(linha) and not RE_FONTE.match(linha):
+            erros.append('linha %d: a diretiva tem a forma "@fonte <id> linhas=<a>-<b>", em '
+                         'coluna zero ou recuada com tres espacos | %s'
+                         % (numero, linha.strip()[:60]))
+
+    blocos = blocos_de_citacao(corpo)
+    cobertas = set()
+    for bloco in blocos:
+        for k in range(bloco['linha'], bloco['linha'] + len(bloco['conteudo'])):
+            cobertas.add(k + 1)
+
+    # F3: bloco '>' sem diretiva antes. Nao existe citacao sem fonte, nem o
+    # bilhete de duas linhas escrito para o exercicio.
+    for numero, linha in enumerate(linhas, 1):
+        if RE_CITACAO.match(linha) and numero not in cobertas:
+            erros.append('bloco de citacao sem @fonte na linha %d: toda citacao aponta um '
+                         'arquivo de fontes/, inclusive o texto escrito para o exercicio '
+                         '(que e fonte com dominio: autoral)' % numero)
+
+    for bloco in blocos:
+        if bloco['a'] > bloco['b']:
+            erros.append('linha %d: linhas=%d-%d esta de tras para frente'
+                         % (bloco['linha'], bloco['a'], bloco['b']))
+            continue
+        lida = fonte_do_catalogo(bloco['id'], raiz_fontes)
+        if lida is None:
+            # F1
+            erros.append('linha %d: a fonte "%s" nao existe em fontes/%s.md'
+                         % (bloco['linha'], bloco['id'], bloco['id']))
+            continue
+        esperado = fatia(lida[1], bloco['a'], bloco['b'])
+        if not esperado:
+            erros.append('linha %d: a fonte "%s" nao tem as linhas %d a %d'
+                         % (bloco['linha'], bloco['id'], bloco['a'], bloco['b']))
+            continue
+        # F2: copia exata, e a mensagem diz a PRIMEIRA linha que difere.
+        if bloco['conteudo'] != esperado:
+            erros.append(_diferenca_do_bloco(bloco, esperado))
+    return erros
+
+
+def _diferenca_do_bloco(bloco, esperado):
+    obtido = bloco['conteudo']
+    for i in range(max(len(obtido), len(esperado))):
+        aqui = obtido[i] if i < len(obtido) else None
+        la = esperado[i] if i < len(esperado) else None
+        if aqui == la:
+            continue
+        numero = bloco['a'] + len([x for x in esperado[:i] if x != ''])
+        if aqui is None:
+            return ('linha %d: o bloco de "%s" tem linha a menos; falta a linha %d da fonte: %s'
+                    % (bloco['linha'], bloco['id'], numero, (la or '(em branco)')[:60]))
+        if la is None:
+            return ('linha %d: o bloco de "%s" tem linha a mais depois da linha %d da fonte: %s'
+                    % (bloco['linha'], bloco['id'], bloco['b'], (aqui or '(em branco)')[:60]))
+        return ('linha %d: o bloco nao e copia exata de "%s"; a primeira linha que difere e a '
+                '%d da fonte | fonte: %s | tema: %s'
+                % (bloco['linha'], bloco['id'], numero, (la or '(em branco)')[:60],
+                   (aqui or '(em branco)')[:60]))
+    return 'linha %d: o bloco nao e copia exata de "%s"' % (bloco['linha'], bloco['id'])
+
+
+# ------------------------------------------------------------------ BNCC
+
+# A forma do codigo de habilidade de Lingua Portuguesa, e a tabela dos que
+# existem. Forma sozinha nao basta: EM12LP01 tem a cara certa e nao existe.
+RE_BNCC = re.compile(r'^(EF\d{2}LP\d{2}|EM13LP\d{2})$')
+_bncc = None
+
+
+def bncc():
+    global _bncc
+    if _bncc is None:
+        _bncc = json.load(io.open(ARQUIVO_BNCC, encoding='utf-8'))
+    return _bncc
+
+
+def problemas_no_catalogo(cab, materia, com_catalogo):
+    """C1 e C2: bncc e vestibular no cabecalho, so em materia com catalogo."""
+    erros, avisos = [], []
+    if not com_catalogo:
+        for campo in ('bncc', 'vestibular'):
+            if campo in cab:
+                erros.append('o cabecalho tem "%s", mas %s nao tem catalogo de topicos; '
+                             'tire o campo' % (campo, materia['id']))
+        return erros, avisos
+
+    for campo in ('bncc', 'vestibular'):
+        if campo not in cab:
+            erros.append('falta o campo "%s" no cabecalho: em %s o tema declara a cobertura, '
+                         'e uma das duas listas pode ser vazia, mas as duas nao'
+                         % (campo, materia['id']))
+    if erros:
+        return erros, avisos
+
+    codigos = lista_do_cabecalho(cab['bncc'])
+    # O vestibular separa por ponto e virgula: cada item e uma frase, e frase
+    # em portugues leva virgula dentro.
+    exigencias = lista_do_cabecalho(cab['vestibular'], sep=';')
+    if not codigos and not exigencias:
+        erros.append('bncc e vestibular estao as duas vazias: pelo menos uma tem que dizer o '
+                     'que o tema cobre, senao nao ha como saber se ele foi coberto')
+
+    tabela = bncc()
+    for codigo in codigos:
+        if not RE_BNCC.match(codigo):
+            erros.append('o codigo "%s" esta fora da forma EF<dois digitos>LP<dois digitos> ou '
+                         'EM13LP<dois digitos>, como EF67LP28 ou EM13LP01' % codigo)
+            continue
+        if codigo not in tabela['codigos']:
+            erros.append('o codigo "%s" nao existe na tabela da BNCC de Lingua Portuguesa '
+                         '(%d codigos, %s)' % (codigo, tabela['total'], 'bncc_lp.json'))
+            continue
+        series = tabela['codigos'][codigo]
+        if series and cab.get('serie') not in series:
+            # Aviso, e nao erro: revisao atravessa anos, e um tema do 8 ano pode
+            # retomar habilidade do 6 de proposito.
+            avisos.append('o codigo %s e das series %s, e este tema e da serie %s'
+                          % (codigo, ', '.join(series), cab.get('serie')))
+    return erros, avisos
+
+
+# ------------------------------------------------------------------- estilo
+
+# `*texto*` e italico onde `**texto**` ja e negrito, e `***texto***` e os dois.
+# Quem desenha e o pdf.js, por um tokenizador com estado. A trava aqui e de
+# paridade: marca que abre e nao fecha imprime asterisco na folha.
+_MARCADOR_DE_LISTA = re.compile(r'^(\s*)\*\s')
+
+
+def problemas_de_estilo(corpo, com_catalogo):
+    """G1, G2, M11: asterisco desemparelhado (com catalogo) ou solto (sem)."""
+    erros = []
+    texto = (corpo or '').split('## VERIFICACAO')[0]
+    for numero, linha in enumerate(texto.split(chr(10)), 1):
+        # '* ' no comeco da linha e marcador de lista Markdown, e nao italico.
+        limpo = _MARCADOR_DE_LISTA.sub(r'\1', linha)
+        sem_triplo = limpo.replace('***', '')
+        duplos = sem_triplo.count('**')
+        soltos = sem_triplo.replace('**', '').count('*')
+        if com_catalogo:
+            if duplos % 2:
+                erros.append('negrito sem fechar na linha %d: %d marcas ** na linha | %s'
+                             % (numero, duplos, linha.strip()[:60]))
+            if soltos % 2:
+                erros.append('italico sem fechar na linha %d: %d asterisco(s) solto(s) na '
+                             'linha | %s' % (numero, soltos, linha.strip()[:60]))
+        elif soltos:
+            erros.append('asterisco solto na linha %d: nesta materia o asterisco so existe '
+                         'como marca de negrito, aos pares | %s' % (numero, linha.strip()[:60]))
+    return erros
+
+
+# --------------------------------------------------- itens estruturados
+
+RE_ITEM = re.compile(r'^(\d+)\.\s')
+RE_CABECALHO_DE_BLOCO = re.compile(r'^\*\*(?:Bloco|Block)\s+([A-C])[.．]?\s*(.*?)\*\*\s*$')
+RE_ALTERNATIVA = re.compile(r'^\s+([a-e])\)\s+(.*)$')
+RE_ROTULO = re.compile(r'^\s*(espera_se|aceita_se|nao_aceita|ancora|porque):\s*(.*)$')
+RE_LETRA_SO = re.compile(r'^([a-e])\s*$')
+# O enunciado nunca cita o texto pelo numero: ela desmarca questoes e o Texto 2
+# pode virar o unico da folha.
+RE_TEXTO_NUMERADO = re.compile(r'\b[Tt]exto\s+[0-9IVX]+\b')
+# "linha 12", "linhas 3 a 5": o numero tem que cair dentro do trecho do item.
+RE_LINHA_CITADA = re.compile(r'\blinhas?\s+(\d+)(?:\s+a\s+(\d+))?')
+
+
+def itens_estruturados(texto, com_catalogo=True):
+    """Os eventos da lista de exercicios, na ordem em que aparecem.
+
+    Devolve {'tipo': 'bloco', 'nome'}, {'tipo': 'texto', 'fonte', 'linhas',
+    'conteudo'} e {'tipo': 'item', 'n', 'linhas'}. O item guarda as linhas
+    CRUAS, e nao o texto juntado com espaco: alternativa e gabarito estruturado
+    morrem se as linhas forem coladas.
+
+    O item termina na proxima linha que comeca outro item, um cabecalho de
+    bloco, um @fonte em coluna zero ou um '>' em coluna zero. Sem isso o bloco
+    que aparece entre a questao 6 e a 7 gruda no enunciado da 6.
+    """
+    linhas = (texto or '').split(chr(10))
+    eventos = []
+    i = 0
+    atual = None
+    while i < len(linhas):
+        linha = linhas[i]
+        cabecalho = RE_CABECALHO_DE_BLOCO.match(linha.strip())
+        comeco = RE_ITEM.match(linha)
+        fonte = RE_FONTE.match(linha) if not linha.startswith(' ') else None
+        citacao = RE_CITACAO.match(linha) and not linha.startswith(' ')
+
+        if cabecalho or comeco or fonte or citacao:
+            atual = None
+        if cabecalho:
+            eventos.append({'tipo': 'bloco', 'nome': cabecalho.group(2).strip()})
+            i += 1
+            continue
+        if fonte:
+            conteudo = []
+            j = i + 1
+            while j < len(linhas) and RE_CITACAO.match(linhas[j]):
+                conteudo.append(texto_citado(linhas[j]))
+                j += 1
+            eventos.append({'tipo': 'texto', 'fonte': fonte.group(2),
+                            'linhas': [int(fonte.group(3)), int(fonte.group(4))],
+                            'conteudo': conteudo})
+            i = j
+            continue
+        if citacao:
+            # Bloco solto: problemas_de_citacao ja reprovou. Aqui ele so nao
+            # pode ser engolido pelo item anterior.
+            i += 1
+            continue
+        if comeco:
+            atual = {'tipo': 'item', 'n': int(comeco.group(1)), 'linhas': [linha]}
+            eventos.append(atual)
+            i += 1
+            continue
+        if atual is not None and linha.strip():
+            atual['linhas'].append(linha)
+        i += 1
+    return eventos
+
+
+def ler_exercicio(linhas_do_item):
+    """{enunciado, alternativas, trecho} de um item da lista.
+
+    O enunciado vai ate a primeira alternativa ou ate o @fonte recuado, e sai
+    juntado com espaco, que e como o pdf.js o recebe. As alternativas saem em
+    ordem, com a continuacao recuada colada na anterior. O trecho e o bloco de
+    citacao que vive dentro do item e pertence so a ele.
+    """
+    enunciado = []
+    alternativas = []
+    trecho = None
+    i = 0
+    linhas = list(linhas_do_item)
+    if linhas:
+        primeira = RE_ITEM.match(linhas[0])
+        if primeira:
+            linhas[0] = linhas[0][primeira.end():]
+    while i < len(linhas):
+        linha = linhas[i]
+        fonte = RE_FONTE.match(linha)
+        if fonte:
+            conteudo = []
+            j = i + 1
+            while j < len(linhas) and RE_CITACAO.match(linhas[j]):
+                conteudo.append(texto_citado(linhas[j]))
+                j += 1
+            if trecho is None:
+                trecho = {'fonte': fonte.group(2),
+                          'linhas': [int(fonte.group(3)), int(fonte.group(4))],
+                          'conteudo': conteudo}
+            i = j
+            continue
+        alternativa = RE_ALTERNATIVA.match(linha)
+        if alternativa:
+            alternativas.append({'letra': alternativa.group(1),
+                                 'texto': alternativa.group(2).strip()})
+            i += 1
+            continue
+        if alternativas:
+            # continuacao recuada de uma alternativa
+            if linha.strip():
+                alternativas[-1]['texto'] += ' ' + linha.strip()
+            i += 1
+            continue
+        if linha.strip():
+            enunciado.append(linha.strip())
+        i += 1
+    return {'enunciado': ' '.join(enunciado).strip(),
+            'alternativas': alternativas, 'trecho': trecho}
+
+
+def ler_gabarito(linhas_do_item):
+    """A resposta de um item: letra, criterio de resposta aberta ou texto corrido."""
+    linhas = list(linhas_do_item)
+    if linhas:
+        primeira = RE_ITEM.match(linhas[0])
+        if primeira:
+            linhas[0] = linhas[0][primeira.end():]
+
+    if linhas and RE_LETRA_SO.match(linhas[0].strip()):
+        gab = {'letra': linhas[0].strip()}
+        corrente = None
+        for linha in linhas[1:]:
+            rotulo = RE_ROTULO.match(linha)
+            if rotulo and rotulo.group(1) in ('ancora', 'porque'):
+                corrente = rotulo.group(1)
+                gab[corrente] = rotulo.group(2).strip()
+            elif corrente and linha.strip():
+                gab[corrente] += ' ' + linha.strip()
+        return gab
+
+    rotulos = [RE_ROTULO.match(l) for l in linhas]
+    if any(r and r.group(1) in ('espera_se', 'aceita_se', 'nao_aceita') for r in rotulos):
+        gab = {'espera_se': '', 'aceita_se': [], 'nao_aceita': [], 'ancora': ''}
+        corrente = None
+        for linha in linhas:
+            rotulo = RE_ROTULO.match(linha)
+            if rotulo:
+                corrente = rotulo.group(1)
+                resto = rotulo.group(2).strip()
+                if corrente in ('aceita_se', 'nao_aceita'):
+                    if resto:
+                        gab[corrente].append(resto)
+                else:
+                    gab[corrente] = resto
+                continue
+            if corrente is None or not linha.strip():
+                continue
+            item = re.match(r'^\s*-\s+(.*)$', linha)
+            if corrente in ('aceita_se', 'nao_aceita'):
+                if item:
+                    gab[corrente].append(item.group(1).strip())
+                elif gab[corrente]:
+                    gab[corrente][-1] += ' ' + linha.strip()
+            else:
+                gab[corrente] = (gab[corrente] + ' ' + linha.strip()).strip()
+        return gab
+
+    return {'corrido': ' '.join(l.strip() for l in linhas if l.strip()).strip()}
+
+
+def paragrafos(conteudo):
+    """Os paragrafos de um trecho citado: o que fica entre linhas em branco.
+
+    A ancora nao atravessa linha em branco de proposito (M5): juntar o fim de
+    um paragrafo com o comeco do seguinte inventaria um trecho que nao existe.
+    """
+    saida, atual = [], []
+    for linha in conteudo:
+        if linha.strip() == '':
+            if atual:
+                saida.append(' '.join(atual))
+                atual = []
+        else:
+            atual.append(linha.strip())
+    if atual:
+        saida.append(' '.join(atual))
+    return saida
+
+
+def _normal(texto):
+    return ' '.join((texto or '').split())
+
+
+def problemas_nos_itens(exerc, gab, com_catalogo, raiz_fontes=None):
+    """E1 a E6, M5 e M6: alternativas, gabarito, ancora e linha citada.
+
+    Devolve (erros, enunciados, respostas), com uma entrada por item de cada
+    lado: e por essas duas listas que a contagem de exercicios e de respostas
+    continua sendo feita, como sempre foi.
+    """
+    eventos = itens_estruturados(exerc, com_catalogo)
+    eventos_gab = itens_estruturados(gab, com_catalogo)
+    itens_gab = [e for e in eventos_gab if e['tipo'] == 'item']
+    erros, enunciados = [], []
+
+    vigente = None
+    posicao = 0
+    letras_certas = []
+    certas_longas = []
+    for evento in eventos:
+        if evento['tipo'] == 'texto':
+            vigente = evento
+            continue
+        if evento['tipo'] != 'item':
+            continue
+        ex = ler_exercicio(evento['linhas'])
+        gb = ler_gabarito(itens_gab[posicao]['linhas']) if posicao < len(itens_gab) else None
+        posicao += 1
+        enunciados.append(ex['enunciado'])
+        texto_do_item = ex['trecho'] or vigente
+        erros.extend(_problemas_do_item(evento, ex, gb, texto_do_item))
+        if gb and 'letra' in gb:
+            letras_certas.append(gb['letra'])
+            comprimentos = dict((alt['letra'], len(alt['texto'])) for alt in ex['alternativas'])
+            if comprimentos and gb['letra'] in comprimentos:
+                outras = [v for l, v in comprimentos.items() if l != gb['letra']]
+                # empate nao conta: so a certa estritamente mais longa que todas as outras
+                certas_longas.append(bool(outras) and comprimentos[gb['letra']] > max(outras))
+    erros.extend(_letras_concentradas(letras_certas))
+    erros.extend(_certas_mais_longas(certas_longas))
+    respostas = [' '.join(l.strip() for l in i['linhas']) for i in itens_gab]
+    return erros, enunciados, respostas
+
+
+# E7: a resposta certa nao pode ter letra preferida. Medido no piloto antes desta
+# trava: 35 das 43 fechadas em "b". Um aluno de doze anos percebe na segunda folha e
+# passa a marcar pelo padrao, e a questao deixa de medir leitura. Com quatro ou mais
+# fechadas no tema, nenhuma letra pode ser a certa em mais da metade delas.
+def _letras_concentradas(letras_certas):
+    if len(letras_certas) < 4:
+        return []
+    contagem = {}
+    for letra in letras_certas:
+        contagem[letra] = contagem.get(letra, 0) + 1
+    letra, quantas = max(contagem.items(), key=lambda par: par[1])
+    if quantas * 2 > len(letras_certas):
+        return ['a letra "%s" e a resposta certa em %d das %d questoes fechadas: redistribua as '
+                'alternativas, senao o aluno acerta pelo padrao e nao pela leitura'
+                % (letra, quantas, len(letras_certas))]
+    return []
+
+
+# E7, segunda conta: a certa tambem nao pode ser a alternativa mais comprida na maioria
+# das fechadas. Medido no piloto: 31 de 43, mesmo depois de espalhar as letras. O aluno
+# que aprende "marca a maior" acerta sem ler.
+def _certas_mais_longas(certas_longas):
+    if len(certas_longas) < 4:
+        return []
+    quantas = sum(1 for eh in certas_longas if eh)
+    if quantas * 2 > len(certas_longas):
+        return ['a resposta certa e a alternativa mais longa em %d das %d questoes fechadas: '
+                'encurte a certa ou alongue um distrator, senao o aluno acerta pelo tamanho'
+                % (quantas, len(certas_longas))]
+    return []
+
+
+def _problemas_do_item(evento, ex, gb, texto_do_item):
+    erros = []
+    n = evento['n']
+
+    # E6 / L1: o enunciado nunca cita o texto pelo numero.
+    achado = RE_TEXTO_NUMERADO.search(ex['enunciado'])
+    if achado:
+        erros.append('o item %d cita "%s": ela desmarca questoes e o Texto 2 pode virar o '
+                     'unico da folha; escreva "no texto", "no poema" ou cite a linha'
+                     % (n, achado.group(0)))
+
+    # E1: quatro ou cinco alternativas, de a) em diante, em ordem.
+    letras = [a['letra'] for a in ex['alternativas']]
+    if letras:
+        if len(letras) not in (4, 5):
+            erros.append('o item %d tem %d alternativas: sao quatro ou cinco'
+                         % (n, len(letras)))
+        esperado = [chr(ord('a') + i) for i in range(len(letras))]
+        if letras != esperado:
+            erros.append('as alternativas do item %d estao fora de ordem ou pulam letra: %s'
+                         % (n, ', '.join(letras)))
+
+    if gb is None:
+        return erros
+
+    # E5: gabarito corrido nao serve para interpretacao.
+    if 'corrido' in gb:
+        erros.append('o gabarito do item %d e resposta corrida: em materia com catalogo a '
+                     'questao fechada responde com a letra e a aberta com os quatro campos '
+                     '(espera_se, aceita_se, nao_aceita, ancora)' % n)
+        return erros
+
+    # E2: alternativas e letra andam juntas.
+    if letras and 'letra' not in gb:
+        erros.append('o item %d tem alternativas e o gabarito nao e uma letra' % n)
+    if 'letra' in gb and not letras:
+        erros.append('o gabarito do item %d e a letra "%s" e o item nao tem alternativas'
+                     % (n, gb['letra']))
+    if 'letra' in gb and letras and gb['letra'] not in letras:
+        erros.append('o gabarito do item %d aponta a letra "%s", que nao esta entre as '
+                     'alternativas (%s)' % (n, gb['letra'], ', '.join(letras)))
+
+    # E3: a aberta exige os quatro campos, e as listas com pelo menos um item.
+    if 'espera_se' in gb:
+        if not gb['espera_se'].strip():
+            erros.append('o item %d nao diz espera_se: e a resposta que a professora quer ver' % n)
+        for campo in ('aceita_se', 'nao_aceita'):
+            if not gb[campo]:
+                erros.append('o item %d nao tem %s: a lista precisa de pelo menos um item' % (n, campo))
+        if not gb.get('ancora', '').strip():
+            erros.append('o item %d nao tem ancora: o trecho literal que justifica a resposta' % n)
+
+    erros.extend(_problemas_da_ancora(n, ex, gb, texto_do_item))
+    erros.extend(_problemas_da_linha_citada(n, ex, texto_do_item))
+    return erros
+
+
+def _problemas_da_ancora(n, ex, gb, texto_do_item):
+    """E4 e M5: a ancora e trecho literal de UM paragrafo do texto do item."""
+    ancora = (gb.get('ancora') or '').strip()
+    if not ancora:
+        return []
+    if len(ancora.split()) < 3:
+        return ['a ancora do item %d tem menos de tres palavras: "%s"' % (n, ancora)]
+    if texto_do_item:
+        onde = 'no texto do item'
+        candidatos = paragrafos(texto_do_item['conteudo'])
+    else:
+        onde = 'no enunciado (o item nao tem texto)'
+        candidatos = [ex['enunciado']]
+    alvo = _normal(ancora)
+    for paragrafo in candidatos:
+        if alvo in _normal(paragrafo):
+            return []
+    return ['a ancora do item %d nao esta %s: ela tem que ser trecho literal de um paragrafo '
+            'so, sem atravessar linha em branco | %s' % (n, onde, ancora[:70])]
+
+
+def _problemas_da_linha_citada(n, ex, texto_do_item):
+    """M6: "linha 12" no enunciado tem que cair dentro do trecho do item."""
+    erros = []
+    for achado in RE_LINHA_CITADA.finditer(ex['enunciado']):
+        primeira = int(achado.group(1))
+        ultima = int(achado.group(2)) if achado.group(2) else primeira
+        if texto_do_item is None:
+            erros.append('o item %d cita "%s" e nao tem texto: sem bloco de citacao o numero '
+                         'da linha nao aponta nada' % (n, achado.group(0)))
+            continue
+        a, b = texto_do_item['linhas']
+        if primeira < a or ultima > b:
+            erros.append('o item %d cita "%s", fora das linhas %d a %d do texto dele'
+                         % (n, achado.group(0), a, b))
+    return erros
+
+
 # ----------------------------------------------------------------- conferir
 
-def conferir(caminho):
+def conferir(caminho, raiz_fontes=None):
     """Devolve (erros, avisos, manuais, cabecalho)."""
     erros, avisos, manuais = [], [], []
     materia = materia_do_caminho(caminho)
     cab, corpo = ler_tema(caminho)
     linguas = materia['temas']['linguas']
     citacao = bool(materia['temas'].get('citacao'))
+    # Materia com catalogo de topicos e materia com texto: portugues e
+    # literatura hoje. E a mesma condicao do campo `topicos`, e por isso ela e
+    # lida da tabela e nao escrita a mao aqui.
+    com_catalogo = bool(materia.get('topicos'))
 
     erros.extend(problemas_no_id(cab, caminho, materia))
     erros.extend(problemas_nos_topicos(cab, materia))
+    erros_bncc, avisos_bncc = problemas_no_catalogo(cab, materia, com_catalogo)
+    erros.extend(erros_bncc)
+    avisos.extend(avisos_bncc)
 
     inteiro = io.open(caminho, encoding='utf-8').read()
 
     # travessao, em qualquer lugar do arquivo, salvo citacao marcada onde a
     # materia permite
-    for numero, trecho in travessoes(inteiro, citacao):
+    for numero, trecho in travessoes(inteiro, citacao, com_catalogo):
         erros.append('travessao na linha %d: %s' % (numero, trecho))
 
     for numero, trecho in marcacao_quebrada(inteiro):
@@ -647,15 +1598,19 @@ def conferir(caminho):
         erros.append('caractere que o PDF nao desenha na linha %d: %s | %s'
                      % (numero, codigo, trecho))
 
-    for numero, motivo, trecho in marcas_de_rascunho(corpo, citacao=citacao):
+    for numero, motivo, trecho in marcas_de_rascunho(corpo, citacao=citacao, catalogo=com_catalogo):
         erros.append('possivel rascunho na linha %d (%s): %s' % (numero, motivo, trecho))
-    for numero, motivo, trecho in marcas_de_rascunho(corpo, RASCUNHO_AVISO, citacao=citacao):
+    for numero, motivo, trecho in marcas_de_rascunho(corpo, RASCUNHO_AVISO, citacao=citacao,
+                                                     catalogo=com_catalogo):
         avisos.append('linha %d, %s: %s' % (numero, motivo, trecho))
 
-    for numero, citada, trecho in referencias_cruzadas(corpo):
+    for numero, citada, trecho in referencias_cruzadas(corpo, catalogo=com_catalogo):
         erros.append('linha %d cita "%s": o enunciado precisa se sustentar sozinho, '
                      'porque a numeracao muda quando ela monta a lista | %s'
                      % (numero, citada, trecho))
+
+    erros.extend(problemas_de_estilo(corpo, com_catalogo))
+    erros.extend(problemas_de_citacao(corpo, com_catalogo, raiz_fontes))
 
     # As secoes de lingua: uma por lingua que a materia declara. Secao de uma
     # lingua que a materia nao tem e aviso, nao erro: ninguem proibiu escrever
@@ -688,6 +1643,15 @@ def conferir(caminho):
                 erros.append('falta a subsecao "%s"' % nome)
         listas[lingua] = itens_numerados(exerc)
         respostas[lingua] = itens_numerados(gab)
+        # Em materia com catalogo quem le a lista e o parser estruturado: o
+        # itens_numerados junta continuacao com espaco, e alternativa, trecho e
+        # gabarito de criterio morrem coladas.
+        if com_catalogo and lingua == 'pt':
+            erros_itens, enunciados, gabaritos = problemas_nos_itens(
+                exerc, gab, com_catalogo, raiz_fontes)
+            erros.extend(erros_itens)
+            listas[lingua] = enunciados
+            respostas[lingua] = gabaritos
     if erros:
         return erros, avisos, manuais, cab
 
@@ -743,28 +1707,47 @@ def conferir(caminho):
             if not ok:
                 erros.append('%s deu falso: %s' % (rotulo, expressao[:70]))
 
+    # V1: em materia so em portugues a secao VERIFICACAO e opcional. Ausente,
+    # nada e avaliado e o aviso nao sai: em interpretacao de texto a conta que o
+    # sympy sabe fazer nao existe, e um aviso que aparece em todo tema vira
+    # ruido e para de ser lido. Nas bilingues (matematica) nada muda.
+    sem_verificacao = secao(corpo, 'VERIFICACAO') is None and linguas == ['pt']
     cobertos = len(rotulos_exercicio) + len([r for r, _ in marcados if r.startswith('E')])
-    if cobertos < len(lista_pt):
+    if cobertos < len(lista_pt) and not sem_verificacao:
         avisos.append('%d exercicios sem verificacao nem marca de conferencia humana'
                       % (len(lista_pt) - cobertos))
 
     return erros, avisos, manuais, cab
 
 
+def _tirar_opcao(args, nome):
+    """O valor que segue --nome, retirado da lista; None quando nao veio."""
+    if nome not in args:
+        return None
+    i = args.index(nome)
+    valor = args[i + 1] if i + 1 < len(args) else None
+    del args[i:i + 2]
+    return valor
+
+
 def main():
+    import datetime
+    global RAIZ_FONTES
     args = sys.argv[1:]
-    raiz = RAIZ
-    if '--temas' in args:
-        i = args.index('--temas')
-        raiz = os.path.abspath(args[i + 1])
-        del args[i:i + 2]
+    raiz = _tirar_opcao(args, '--temas')
+    raiz = os.path.abspath(raiz) if raiz else RAIZ
+    fontes = _tirar_opcao(args, '--fontes')
+    if fontes:
+        RAIZ_FONTES = os.path.abspath(fontes)
+    # A conta do dominio publico so afrouxa com o tempo, entao o relogio e um
+    # padrao seguro. O parametro existe para o teste poder fixar um ano e para
+    # alguem poder perguntar o que estara livre no ano que vem.
+    ano = _tirar_opcao(args, '--ano')
+    ano = int(ano) if ano else datetime.datetime.now().year
     alvo = args[0] if args else None
     arquivos = arquivos_de_temas(raiz)
     if alvo:
         arquivos = [a for a in arquivos if alvo in os.path.basename(a)]
-    if not arquivos:
-        print('nenhum tema encontrado.')
-        return 0
 
     total_erros = 0
     total_avisos = 0
@@ -774,6 +1757,36 @@ def main():
 
     # As linhas "  ok        NOME" e "  REPROVADO NOME" sao lidas pelo portao
     # (_teste/confere_tudo.sh conta as duas): nao mude a forma delas.
+    #
+    # As fontes vem antes dos temas de proposito: um tema so pode ser conferido
+    # contra uma fonte que ja passou, e ler o erro na ordem em que ele nasce
+    # poupa quem esta consertando.
+    arquivos_fonte = arquivos_de_fontes()
+    for caminho in arquivos_fonte:
+        nome = os.path.basename(caminho)
+        try:
+            erros = problemas_na_fonte(caminho, ano)
+        except Exception as e:
+            print('  REPROVADO %s: erro inesperado: %s' % (nome, e))
+            traceback.print_exc()
+            total_erros += 1
+            continue
+        if erros:
+            print('  REPROVADO %s' % nome)
+            for e in erros:
+                print('      %s' % e)
+            total_erros += len(erros)
+        else:
+            print('  ok        %s' % nome)
+    if arquivos_fonte:
+        print('%d fonte(s) conferida(s) com a conta do dominio publico em %d.'
+              % (len(arquivos_fonte), ano))
+        print('')
+
+    if not arquivos:
+        print('nenhum tema encontrado.')
+        return 1 if total_erros else 0
+
     for caminho in arquivos:
         nome = os.path.basename(caminho)
         materia_id = materia_do_caminho(caminho)['id']
@@ -807,8 +1820,8 @@ def main():
 
     print('')
     print('=' * 66)
-    print('%d tema(s) conferido(s), %d aprovado(s), %d erro(s), %d aviso(s).'
-          % (len(arquivos), len(aprovados), total_erros, total_avisos))
+    print('%d tema(s) conferido(s) e %d fonte(s), %d aprovado(s), %d erro(s), %d aviso(s).'
+          % (len(arquivos), len(arquivos_fonte), len(aprovados), total_erros, total_avisos))
     print('por materia: %s' % '; '.join(
         '%s %d' % (mat['id'], por_materia.get(mat['id'], 0)) for mat in materias()))
     if pendentes:

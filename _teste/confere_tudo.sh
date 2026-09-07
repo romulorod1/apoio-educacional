@@ -112,10 +112,19 @@ printf '  %s     verificar.py             %s temas ok, %s reprovados\n' \
 # acima vinha sendo uma afirmacao sobre um instrumento que ninguem aferia.
 roda "provas do verificador" python temas/_ferramentas/testa_verificador.py
 
+# FRENTE 2 (portugues e literatura). A colecao fontes/ tem travas proprias (dominio
+# publico pela conta da Lei 9.610/98, largura de linha medida pelo pdf.js, cabecalho),
+# provadas nos dois sentidos pelo testa_fontes.py: par envenenado por trava, com o ano
+# fixo em 2026 e um segundo par em 2027 provando que a conta so afrouxa.
+roda "provas das fontes"    python temas/_ferramentas/testa_fontes.py
+
 titulo "sem navegador"
 roda "notacao"        node _teste/testa_notacao.js
 roda "busca (regras)" node _teste/testa_busca_regras.js
 roda "material (PDF)" node _teste/testa_material.js
+# FRENTE 2: bloco de citacao com numero de linha, fio e credito, italico por F4/F5,
+# alternativas e gabarito em criterio, e a folha legada byte a byte igual a base do merge.
+roda "citacao (PDF)"  node _teste/testa_citacao_pdf.js
 roda "trilha (dados)" node _teste/testa_trilha_dados.js
 roda "trilha (motor)" node _teste/testa_trilha.js
 roda "dinheiro"      node _teste/testa_dinheiro.js
