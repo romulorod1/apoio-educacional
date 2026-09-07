@@ -491,6 +491,33 @@ console.log('\n=== o fio do bloco ===');
     paginasLongas.filter(function (f) { return corrido(f).indexOf('do texto comprido') >= 0; }).length, 2);
 }
 
+{
+  /* Linha da fonte que não cabe em LARGURA_CITACAO: a continuação recua mais
+   * 12 pt (de x = 76,00 para x = 88,00) e NÃO repete o número, senão o número
+   * passaria a apontar uma linha da FOLHA em vez de uma linha da fonte. O
+   * verificador impede isso medindo cada linha de fontes/; aqui é defesa.
+   *
+   * O par que prova que a medida não é um acidente: a linha curta ao lado sai
+   * inteira em x = 76,00 e leva o número dela. */
+  const doc = new PDFGen.Doc();
+  doc.novaPagina();
+  doc.fontes = FONTES;
+  const comprida = [];
+  for (let i = 0; i < 30; i++) comprida.push('palavra' + i);
+  doc.citacao({
+    fonte: 'escrito_manha-na-varanda', linhas: [9, 10],
+    conteudo: [comprida.join(' '), 'Uma linha curta que cabe.']
+  }, { tam: 10, credito: false });
+  const largo = Buffer.from(doc.finalizar()).toString('latin1');
+  const txt = pecas(largo).map(function (x) { return x.txt; });
+  conf('a linha larga demais numera uma vez só', txt.filter(function (t) { return t === '9'; }).length, 1);
+  conf('e a linha seguinte, que é múltipla de 5, leva o número dela',
+    txt.indexOf('10') >= 0, true);
+  conf('a continuação recua mais 12 pt', /\n[^\n]* 88\.00 [\d.]+ Td \(/.test(largo), true);
+  conf('e a primeira linha começa no recuo do bloco',
+    /\n[^\n]* 76\.00 [\d.]+ Td \(/.test(largo), true);
+}
+
 console.log('\n=== P1: a folha antiga não mudou nem um byte ===');
 
 /* O mesmo mecanismo do _teste/compara_pdfs_base.js, com a fixture inline: o
