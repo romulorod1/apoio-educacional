@@ -6719,70 +6719,169 @@
    * suplementares, e 35 com 70 e recusado do mesmo jeito que "angulo=35;1
    * angulo=70;2" seria. */
   function retasInclinacao(B, doc, d, entradas, temParalelas) {
-    var i, achado = null, deQuem = null, ehDeducao = false;
+    var i, achado = null, ehDeducao = false;
 
+    /* Os numericos. O PRIMEIRO fixa a figura inteira; os outros nao sao
+     * liberdade nenhuma e sim conferencia, e ela roda no laco final junto com as
+     * expressoes, uma unica porta para os dois formatos. */
     for (i = 0; i < entradas.length; i++) {
       var e = entradas[i];
-      if (e.incognita || !B.ehNumero(e.texto)) continue;
+      if (!B.ehNumero(e.texto)) continue;
       var v = parseFloat(e.texto);
       if (!(v > 0.5) || !(v < 179.5)) {
         B.avisar(doc, 'retas: angulo=' + e.texto + ' nao e um angulo de cruzamento (o valor fica ' +
           'entre 0 e 180, e 0 e 180 sao a propria reta)');
         return null;
       }
-      var cand = retasIncDe(e.pos, v);
-      if (achado === null) { achado = cand; deQuem = e; ehDeducao = true; continue; }
-      if (Math.abs(cand - achado) > 0.5) {
-        var esperado = arredondar(retasValorEm(e.pos, achado));
-        B.avisar(doc, 'retas: ' + deQuem.texto + ' na posicao ' + deQuem.pos + ' e ' + e.texto +
-          ' na posicao ' + e.pos + ' nao cabem na mesma figura' +
-          (temParalelas ? ' com r e s paralelas' : '') + ': dado o primeiro, a posicao ' + e.pos +
-          ' mede ' + esperado + ' e nao ' + e.texto + '. Uma figura que afirma o paralelismo com a ' +
-          'setinha e escreve estes dois valores contradiz, na mesma folha, o teorema que o tema ' +
-          'esta ensinando');
-        return null;
-      }
+      if (achado === null) { achado = retasIncDe(e.pos, v); ehDeducao = true; }
     }
-    if (achado !== null) return { ang: achado, deduzido: ehDeducao };
 
-    /* Duas expressoes na mesma incognita fecham o sistema pela relacao que a
-     * POSICAO ja garante (iguais nas de mesma paridade, suplementares nas de
-     * paridade diferente), e ai a figura e construida com os valores achados.
-     * Isto nao e luxo: sem resolver, a receita desenharia o agudo onde a resposta
-     * e obtusa e o conferirFigura reprovaria o tema por inversao de ordem, que e
-     * o defeito que a legenda de fora de escala nao cobre. */
-    var lins = [];
+    /* As expressoes, agrupadas por LETRA. Cada letra e uma incognita propria:
+     * "nomeiaangulos=a;b;c;d" sao quatro letras diferentes e nao um sistema, e
+     * "angulo=3x+10 angulo=5x-30" e uma letra so em duas equacoes. */
+    var porLetra = {}, letras = [];
     for (i = 0; i < entradas.length; i++) {
+      if (B.ehNumero(entradas[i].texto)) continue;
       var li = lerLinear(entradas[i].texto);
-      if (li && li.letra) lins.push({ lin: li, pos: entradas[i].pos, bruto: entradas[i].texto });
+      if (!li || !li.letra) continue;
+      if (!porLetra[li.letra]) { porLetra[li.letra] = []; letras.push(li.letra); }
+      porLetra[li.letra].push({ lin: li, pos: entradas[i].pos, bruto: entradas[i].texto });
     }
-    if (lins.length >= 2 && lins[0].lin.letra === lins[1].lin.letra) {
-      var A = lins[0], Bq = lins[1];
-      var mesmaParidade = (A.pos % 2) === (Bq.pos % 2);
-      var x = null;
-      if (mesmaParidade) {
-        if (Math.abs(A.lin.a - Bq.lin.a) > 1e-9) x = (Bq.lin.b - A.lin.b) / (A.lin.a - Bq.lin.a);
-      } else if (Math.abs(A.lin.a + Bq.lin.a) > 1e-9) {
-        x = (180 - A.lin.b - Bq.lin.b) / (A.lin.a + Bq.lin.a);
-      }
-      if (x !== null) {
-        var vA = A.lin.a * x + A.lin.b;
-        if (vA > 0.5 && vA < 179.5) return { ang: retasIncDe(A.pos, vA), deduzido: true };
+
+    /* Sem numero nenhum, duas expressoes da MESMA letra fecham o sistema pela
+     * relacao que a POSICAO ja garante (iguais nas de mesma paridade,
+     * suplementares nas de paridade diferente), e a figura e construida com os
+     * valores achados. Isto nao e luxo: sem resolver, a receita desenharia o
+     * agudo onde a resposta e obtusa e o conferirFigura reprovaria o tema por
+     * inversao de ordem, que e o defeito que a legenda de fora de escala nao
+     * cobre.
+     *
+     * Sistema que fecha FORA do intervalo de um angulo de cruzamento e recusa e
+     * nao silencio. O caso medido: "angulo=3x+10;1 incognita=x;3 oposto=sim",
+     * que estava no exemplo desta receita na especificacao e na propria folha de
+     * prova. Opostos pelo vertice sao iguais, entao 3x + 10 = x da x = -5, e a
+     * figura saia com 55 e 55 vinda do padrao, com o desenho chutado e a prova
+     * afirmando que a construcao era exata. Passava pelo motivo errado. */
+    for (var q = 0; q < letras.length && achado === null; q++) {
+      var lista = porLetra[letras[q]];
+      for (i = 0; i < lista.length && achado === null; i++) {
+        for (var j = i + 1; j < lista.length && achado === null; j++) {
+          var A = lista[i], Bq = lista[j];
+          var mesmaParidade = (A.pos % 2) === (Bq.pos % 2);
+          var x = null;
+          if (mesmaParidade) {
+            if (Math.abs(A.lin.a - Bq.lin.a) > 1e-9) x = (Bq.lin.b - A.lin.b) / (A.lin.a - Bq.lin.a);
+          } else if (Math.abs(A.lin.a + Bq.lin.a) > 1e-9) {
+            x = (180 - A.lin.b - Bq.lin.b) / (A.lin.a + Bq.lin.a);
+          }
+          if (x === null) continue;
+          var vA = A.lin.a * x + A.lin.b;
+          if (!(vA > 0.5) || !(vA < 179.5)) {
+            B.avisar(doc, 'retas: ' + A.bruto + ' na posicao ' + A.pos + ' e ' + Bq.bruto +
+              ' na posicao ' + Bq.pos + ' formam um sistema que fecha em ' + letras[q] + ' = ' +
+              arredondar(x) + ', e ai a posicao ' + A.pos + ' mediria ' + arredondar(vA) +
+              ' graus, que nao e angulo de cruzamento nenhum. A configuracao escrita nao existe: ' +
+              'corrija as expressoes ou as posicoes');
+            return null;
+          }
+          achado = retasIncDe(A.pos, vA);
+          ehDeducao = true;
+        }
       }
     }
-    return { ang: null, deduzido: false };
+    return { ang: achado, deduzido: ehDeducao, porLetra: porLetra, letras: letras };
+  }
+
+  /* A conferencia final, com o ang JA RESOLVIDO, seja ele vindo de um numero, de
+   * um sistema de expressoes, da inclinacao declarada, do reto=sim ou do padrao.
+   *
+   * CAMPO MINIMO: nenhum. Ela roda em toda figura e sobre TODA entrada, numerica
+   * ou algebrica, e e por isso que ela mora aqui e nao dentro do retasInclinacao:
+   * la ela so via o formato que tinha acabado de ler, e o que nao fosse numero
+   * passava sem conferencia nenhuma. Os dois casos medidos que passavam:
+   *
+   *   angulo=110;3 angulo=2x+30;5 angulo=x+10;1     a posicao 5 pede x = 40 e a
+   *                                                 posicao 1 pede x = 100
+   *   angulo=2x;1 angulo=x+60;3 angulo=x+10;2       a posicao 2 mede 60 e o
+   *                                                 rotulo dela diz 70
+   *
+   * Numero e conferido contra o valor da posicao; expressao e conferida por
+   * LETRA, porque cada letra e uma incognita propria: a primeira ocorrencia de
+   * uma letra fixa o valor dela e as seguintes tem que cair no mesmo, dentro de
+   * meio grau medido em GRAUS e nao em x, para a tolerancia nao mudar de tamanho
+   * conforme o coeficiente. */
+  function retasConferirEntradas(B, doc, entradas, ang, temParalelas) {
+    var i, valorDaLetra = {}, deQuem = {};
+    var comParalelas = temParalelas
+      ? ' Uma figura que afirma o paralelismo com a setinha e escreve estes dois valores contradiz, ' +
+        'na mesma folha, o teorema que o tema esta ensinando.'
+      : ' Num cruzamento so existem duas medidas, uma e o suplemento da outra, e estes dois valores ' +
+        'nao sao nenhuma das duas.';
+    for (i = 0; i < entradas.length; i++) {
+      var e = entradas[i], medido = retasValorEm(e.pos, ang);
+      if (B.ehNumero(e.texto)) {
+        if (Math.abs(parseFloat(e.texto) - medido) > 0.5) {
+          B.avisar(doc, 'retas: a posicao ' + e.pos + ' mede ' + arredondar(medido) +
+            ' graus nesta figura e o rotulo dela diz ' + e.texto + '.' + comParalelas);
+          return false;
+        }
+        continue;
+      }
+      var li = lerLinear(e.texto);
+      if (!li || !li.letra || Math.abs(li.a) < 1e-9) continue;
+      var x = (medido - li.b) / li.a;
+      if (valorDaLetra[li.letra] === undefined) {
+        valorDaLetra[li.letra] = x; deQuem[li.letra] = e; continue;
+      }
+      var esperado = li.a * valorDaLetra[li.letra] + li.b;
+      if (Math.abs(esperado - medido) > 0.5) {
+        B.avisar(doc, 'retas: ' + deQuem[li.letra].texto + ' na posicao ' + deQuem[li.letra].pos +
+          ' pede ' + li.letra + ' = ' + arredondar(valorDaLetra[li.letra]) + ', e ' + e.texto +
+          ' na posicao ' + e.pos + ' pede ' + li.letra + ' = ' + arredondar(x) +
+          '. As duas expressoes nao podem valer ao mesmo tempo nesta figura.' + comParalelas);
+        return false;
+      }
+    }
+    return true;
   }
 
   /* Os grupos de congruencia, ja em posicoes. Cada ocorrencia da chave e um grupo
    * novo e ganha um arco a mais, que e a notacao do livro: mesma marca significa
    * mesma medida, marcas diferentes significam medidas diferentes.
    *
+   * DUAS TRAVAS, e as duas nasceram de figuras que saiam limpas afirmando o
+   * contrario do teorema.
+   *
+   * A primeira e a PARIDADE. Num cruzamento so existem duas medidas, uma o
+   * suplemento da outra, e quem diz qual e qual e a paridade da posicao: impares
+   * medem o angulo da transversal, pares medem o suplemento. Entao um grupo que
+   * mistura as duas paridades esta pedindo o mesmo numero de arcos em dois
+   * angulos que sao SUPLEMENTARES e nao congruentes. Medido:
+   * "angulo=35;1 congruentes=1;6" saia com um arco de 35 e um arco de 145,1
+   * graus marcados igual, com a setinha de paralelismo por cima afirmando o
+   * paralelismo que produz exatamente o contrario.
+   *
+   * A segunda e a REDUNDANCIA. Grupo em que TODOS os membros ja carregam valor
+   * escrito nao acrescenta afirmacao nenhuma (os numeros ja disseram quais sao
+   * iguais) e acrescenta arco: num cruzamento com os quatro angulos rotulados os
+   * arcos a mais fecham um no de seis arcos num circulo de 24 pt, medido na
+   * rasterizacao a 150 dpi. A congruencia por CONTAGEM existe para a figura que
+   * NAO escreve numero, e e la que ela e o unico canal disponivel.
+   *
+   * CAMPO MINIMO das duas: o proprio grupo. Elas nao dependem de haver valor
+   * escrito em lugar nenhum: a paridade e propriedade da posicao.
+   *
    * oposto=sim e acucar para o grupo dos dois opostos pelo vertice da primeira
    * posicao marcada. O tema fala em "opostos pelo vertice" e nao em "posicoes 1 e
    * 3", e obrigar quem escreve o tema a calcular o numero da posicao oposta e
-   * criar uma chance de errar sem ganhar nada. */
+   * criar uma chance de errar sem ganhar nada. Opostos tem sempre a mesma
+   * paridade, entao ele nunca cai na primeira trava. */
   function retasCongruentes(B, doc, d, entradas, nPos) {
     var brutos = pares(B, d.args, 'congruentes'), grupos = [], i, j;
+    function temValor(p) {
+      for (var w = 0; w < entradas.length; w++) if (entradas[w].pos === p) return entradas[w];
+      return null;
+    }
     for (i = 0; i < brutos.length; i++) {
       var grupo = [];
       for (j = 0; j < brutos[i].length; j++) {
@@ -6797,9 +6896,28 @@
             ' nao existe nesta figura, que tem ' + nPos);
           return null;
         }
+        if (grupo.length && (p % 2) !== (grupo[0] % 2)) {
+          B.avisar(doc, 'retas: congruentes=' + brutos[i].join(';') + ' junta as posicoes ' +
+            grupo[0] + ' e ' + p + ', que sao SUPLEMENTARES e nao congruentes: uma e impar e a ' +
+            'outra e par, e num cruzamento as duas paridades medem uma o suplemento da outra. ' +
+            'Marcadas com o mesmo numero de arcos, a figura afirma que os dois angulos sao iguais ' +
+            'e contradiz o proprio paralelismo que a setinha declara');
+          return null;
+        }
         grupo.push(p);
       }
-      if (grupo.length) grupos.push(grupo);
+      if (!grupo.length) continue;
+      var todosComValor = true;
+      for (j = 0; j < grupo.length; j++) if (!temValor(grupo[j])) todosComValor = false;
+      if (todosComValor) {
+        B.avisar(doc, 'retas: congruentes=' + brutos[i].join(';') + ' marca posicoes que ja ' +
+          'carregam valor escrito, e ai o grupo nao afirma nada que os numeros nao tenham ' +
+          'afirmado: o que ele acrescenta e arco. Num cruzamento com os quatro angulos rotulados ' +
+          'os arcos a mais fecham um no em volta do ponto. Tire a chave: os angulos de mesma ' +
+          'medida ja saem com arcos de raio igual, que e a mesma notacao');
+        return null;
+      }
+      grupos.push(grupo);
     }
     var oposto = B.primeiro(d.args, 'oposto');
     if (oposto && String(oposto).toLowerCase() !== 'nao') {
@@ -6889,6 +7007,20 @@
       for (i = 0; i < ordem.length; i++) if (ordem[i].papel !== 'transversal') { bases.push(ordem[i]); break; }
     }
 
+    /* A inclinacao do GRUPO e a da primeira reta dele, e o resto do grupo e
+     * paralelo a ela por definicao. Uma segunda inclinacao escrita dentro do
+     * grupo, diferente da primeira, e um valor que a figura joga fora: com
+     * "reta=r reta=s;30 paralelas=r;s" as duas saiam desenhadas na horizontal e o
+     * 30 nao chegava a lugar nenhum. */
+    for (i = 1; i < bases.length; i++) {
+      if (bases[i].inc === null || Math.abs(bases[i].inc - (bases[0].inc === null ? 0 : bases[0].inc)) < 0.5) continue;
+      B.avisar(doc, 'retas: a reta "' + bases[i].nome + '" esta declarada com ' + bases[i].inc +
+        ' graus e "' + bases[0].nome + '", que abre o mesmo grupo de paralelas, com ' +
+        (bases[0].inc === null ? 0 : bases[0].inc) + ': duas paralelas tem uma inclinacao so, e a ' +
+        'segunda nao chegaria na folha. Escreva a inclinacao uma vez, na primeira reta do grupo');
+      return null;
+    }
+
     var transv = null;
     for (i = 0; i < ordem.length; i++) if (ordem[i].papel === 'transversal') transv = ordem[i];
     if (!transv) {
@@ -6919,6 +7051,28 @@
       return null;
     }
 
+    /* Toda reta declarada precisa de PAPEL. Sem paralelas=, a receita pegava a
+     * primeira reta como base e a segunda como transversal, e a terceira sumia da
+     * folha em silencio: "reta=r reta=s transversal=t angulo=35;1" desenhava r e t
+     * e o s desaparecia. Reta escrita que nao chega na folha e o mesmo defeito
+     * que valor escrito que nao chega, e este arquivo inteiro existe para
+     * impedi-lo.
+     *
+     * CAMPO MINIMO: nenhum. A conferencia e sobre a lista de declaradas, que
+     * existe sempre; ela nao pergunta se paralelas= foi escrita. */
+    var sobrando = [];
+    for (i = 0; i < ordem.length; i++) {
+      if (ordem[i] === transv || bases.indexOf(ordem[i]) >= 0) continue;
+      sobrando.push(ordem[i].nome);
+    }
+    if (sobrando.length) {
+      B.avisar(doc, 'retas: a reta "' + sobrando.join('", "') + '" foi declarada e nao tem papel ' +
+        'nesta figura, entao ela nao seria desenhada: sem paralelas= a receita usa a primeira reta ' +
+        'como base e a segunda como transversal, e o que sobra some da folha. Escreva ' +
+        'paralelas= com o grupo, ou tire a reta que nao entra');
+      return null;
+    }
+
     var nCruz = bases.length, nPos = semTransversal ? 0 : 4 * nCruz;
     var entradas = retasEntradas(B, doc, d, nPos);
     if (entradas === null) return null;
@@ -6931,6 +7085,11 @@
      * ele virou losango. */
     var ehReto = !semTransversal && !!B.primeiro(d.args, 'reto') &&
       String(B.primeiro(d.args, 'reto')).toLowerCase() !== 'nao';
+    if (ehReto && (B.valores(d.args, 'congruentes').length || B.primeiro(d.args, 'oposto'))) {
+      B.avisar(doc, 'retas: reto=sim nao desenha arco nenhum, entao congruentes= e oposto= nao ' +
+        'teriam onde sair; o quadradinho ja diz que os quatro angulos sao retos e iguais');
+      return null;
+    }
     if (ehReto && entradas.length) {
       B.avisar(doc, 'retas: reto=sim ja diz que o cruzamento e perpendicular, e o quadradinho ' +
         'nao convive com arco no mesmo vertice; os valores escritos (' +
@@ -6981,6 +7140,13 @@
       ang = 90; deduzido = true;
     }
     if (ang === null) { ang = RETAS_INC; deduzido = false; }
+
+    /* A conferencia de TODA entrada contra o ang ja decidido. Ela vem depois de
+     * todos os caminhos que podem fixar a inclinacao (numero, sistema de
+     * expressoes, inclinacao declarada, reto=sim, padrao), e e isso que a faz
+     * rodar sempre e sobre os dois formatos. Ver o cabecalho do
+     * retasConferirEntradas para os dois casos medidos que passavam. */
+    if (!retasConferirEntradas(B, doc, entradas, ang, bases.length > 1)) return null;
 
     /* CAMPO MINIMO: nenhum. Esta roda em toda figura, inclusive na que nao
      * escreveu angulo nenhum, porque ela olha o ang JA RESOLVIDO e nao a
@@ -7156,6 +7322,7 @@
   var FEIXE_INC_B = 64;      // e da segunda; diferentes, senao as duas sao paralelas entre si
   var FEIXE_X_A = -30;       // por onde cada uma passa na altura do meio do feixe
   var FEIXE_X_B = 34;
+  var FEIXE_VAO = 40;        // vao minimo entre as duas transversais, em toda paralela
 
   /* corta=t;6;x, na gramatica valor[;rotulo] do resto do kit com o nome da reta
    * na frente: o primeiro campo diz DE QUAL transversal e o segmento, o segundo
@@ -7255,8 +7422,13 @@
       return null;
     }
 
+    /* Paralela do feixe sem nome escrito fica SEM nome, e nao com um nome de
+     * fabrica. O marcador interno vazava para a folha por nomeiaretas=sim, e a
+     * trava do "texto que nao veio do tema" nao o pegava porque ela compara com a
+     * diretiva palavra a palavra e o marcador nao era palavra. Palavra nenhuma
+     * nasce no desenhador: o que a diretiva nao nomeou, a folha nao escreve. */
     var nomesBase = [];
-    for (i = 0; i < n; i++) nomesBase.push(bruto.length > i + 1 ? String(bruto[i + 1]) : '(paralela sem nome ' + i + ')');
+    for (i = 0; i < n; i++) nomesBase.push(bruto.length > i + 1 ? String(bruto[i + 1]) : null);
 
     var trans = pares(B, d.args, 'transversal');
     if (trans.length !== 2) {
@@ -7300,6 +7472,53 @@
     var R = retasRazoes(B, doc, cortes, nomesTrans, nVaos);
     if (R === null) return null;
 
+    /* A ESCALA ENTRE AS DUAS TRANSVERSAIS.
+     *
+     * Tales garante a razao DENTRO de cada transversal, e nao entre elas: o
+     * segmento que uma transversal recorta num vao vale g/sen(inclinacao), entao
+     * duas transversais de inclinacoes diferentes recortam comprimentos
+     * diferentes do MESMO vao. Com as inclinacoes fixas de 76 e 64 graus a folha
+     * saia com razao 1,080 entre elas enquanto os numeros escritos pediam 1,5, e
+     * com "6 e 10" nas DUAS transversais o 6 de uma media o dobro do 6 da outra.
+     * Numero igual com comprimento diferente e a figura mentindo para quem mede
+     * com a regua, que e a unica coisa que "fora de escala" pode querer dizer.
+     *
+     * CAMPO MINIMO: um indice em que as DUAS transversais tragam numero. Sem
+     * isso nao ha razao entre elas a cumprir e as inclinacoes padrao ficam.
+     * Havendo, sao dois caminhos, e nenhum deles e ficar calado:
+     *
+     *   nenhuma inclinacao escrita   a receita ESCOLHE a inclinacao da segunda
+     *                                para cumprir a razao, e a figura sai fiel
+     *   inclinacao escrita a mao     a receita nao mexe no que o autor fixou, e
+     *                                marca a figura fora de escala, que passa a
+     *                                exigir a legenda pelo figura() */
+    var kEntre = null;
+    for (i = 0; i < nVaos && kEntre === null; i++) {
+      var ca = cortes[nomesTrans[0]][i], cb = cortes[nomesTrans[1]][i];
+      if (!ca || !cb || ca.valor === null || cb.valor === null || !(ca.valor > 0)) continue;
+      kEntre = cb.valor / ca.valor;
+    }
+    var foraDoFeixe = false;
+    var SENO_MIN = Math.sin(25 * Math.PI / 180);
+    if (kEntre !== null && kEntre > 0) {
+      var declarouInc = (trans[0].length > 1 && B.ehNumero(trans[0][1])) ||
+                        (trans[1].length > 1 && B.ehNumero(trans[1][1]));
+      if (declarouInc) {
+        var razaoGeo = Math.sin(incs[0] * Math.PI / 180) / Math.sin(incs[1] * Math.PI / 180);
+        if (Math.abs(razaoGeo - kEntre) > 0.01 * kEntre) foraDoFeixe = true;
+      } else {
+        var senoRef = Math.sin(FEIXE_INC_A * Math.PI / 180);
+        var alvo = kEntre >= 1 ? senoRef / kEntre : senoRef * kEntre;
+        if (alvo >= SENO_MIN && alvo <= 1) {
+          var novo = Math.asin(alvo) * 180 / Math.PI;
+          if (kEntre >= 1) { incs[0] = FEIXE_INC_A; incs[1] = novo; }
+          else { incs[1] = FEIXE_INC_A; incs[0] = novo; }
+        } else {
+          foraDoFeixe = true;
+        }
+      }
+    }
+
     var soma = 0;
     for (i = 0; i < nVaos; i++) soma += R.fracoes[i];
     var altura = nVaos * RETAS_VAO;
@@ -7316,6 +7535,22 @@
     for (i = 0; i < 2; i++) {
       us.push(pt(Math.cos(incs[i] * Math.PI / 180), Math.sin(incs[i] * Math.PI / 180)));
     }
+
+    /* As duas transversais nao podem se cruzar dentro do feixe. Elas nao sao
+     * paralelas entre si (e a razao de Tales que decide a inclinacao da segunda),
+     * entao encontram-se em algum lugar; o que a figura escolhe e onde. Cruzadas
+     * no meio do feixe, o ponto de encontro vira um cruzamento a mais que nao
+     * significa nada, e as linhas de chamada das cotas passam por cima da outra
+     * transversal. A segunda desliza para a direita ate manter um vao de
+     * FEIXE_VAO unidades em TODA paralela, e o encontro sai da moldura. */
+    var menorVao = Infinity;
+    for (k = 0; k < n; k++) {
+      var tgA = Math.tan(incs[0] * Math.PI / 180), tgB = Math.tan(incs[1] * Math.PI / 180);
+      var xA = xs[0] + (Math.abs(tgA) > 1e-9 ? ys[k] / tgA : 0);
+      var xB = xs[1] + (Math.abs(tgB) > 1e-9 ? ys[k] / tgB : 0);
+      if (xB - xA < menorVao) menorVao = xB - xA;
+    }
+    if (menorVao < FEIXE_VAO) xs[1] += FEIXE_VAO - menorVao;
     for (i = 0; i < 2; i++) {
       for (k = 0; k < n; k++) {
         var tg = Math.tan(incs[i] * Math.PI / 180);
@@ -7331,7 +7566,7 @@
     for (k = 0; k < n; k++) {
       var corte = retaNaMoldura(pt(0, ys[k]), e, jx, jy);
       linhas.push({ nome: nomesBase[k], papel: 'base', de: corte[0], ate: corte[1], u: e, k: k,
-                    travessias: [] });
+                    travessias: [], semNome: nomesBase[k] === null });
     }
     var porTrans = [];
     for (i = 0; i < 2; i++) {
@@ -7352,7 +7587,7 @@
 
     return {
       modo: 'feixe', nCruz: n * 2, nPos: 0, n: n, nVaos: nVaos,
-      linhas: linhas, cruzamentos: cruzamentos, porTrans: porTrans,
+      linhas: linhas, cruzamentos: cruzamentos, porTrans: porTrans, fora: foraDoFeixe,
       entradas: [], grupos: [], reto: false, temParalelas: true, deduzido: R.ref !== null,
       unidades: { x0: -jx, y0: -jy, x1: jx, y1: jy },
       nomesBase: nomesBase, nomesTrans: nomesTrans
@@ -7371,9 +7606,20 @@
        * halo dele nao achava lugar livre e o rotulo() saia em tarja estreita, que
        * e a folha avisando que o numero encostou na linha. A resposta e afastar a
        * linha de cota, e nao encolher o corpo: encolher desce do piso de leitura
-       * justamente na peca que carrega a resposta. */
+       * justamente na peca que carrega a resposta.
+       *
+       * Rotulo que e EXPRESSAO tem a incognita resolvida antes de sair: "2x =
+       * 6.67" nao e resposta nenhuma, e a conta pela metade com a divisao ainda
+       * por fazer, e ainda por cima com o decimal na convencao errada. Resolvido,
+       * sai "x = 3,33", que e o que a questao pede. */
+      var lin = lerLinear(c.rotulo);
+      var esq = c.rotulo, dir = c.deduzido;
+      if (lin && lin.letra && Math.abs(lin.a) > 1e-9 && (lin.a !== 1 || lin.b !== 0)) {
+        esq = lin.letra;
+        dir = (c.deduzido - lin.b) / lin.a;
+      }
       return {
-        texto: c.rotulo + ' = ' + arredondar(c.deduzido),
+        texto: esq + ' = ' + numeroNaFolha(doc, arredondar(dir)),
         cor: COR.teal, tam: TAM_RESPOSTA, bold: true, longo: true
       };
     }
@@ -7394,7 +7640,8 @@
         altura: op.altura != null ? op.altura
           : (G ? alturaParaCaixa(B, op, G.unidades, 108, 168) : null),
         legenda: d.legenda || null,
-        foraDeEscala: escalaFora(B, d, retas.metricas, [])
+        foraDeEscala: d.escala === 'fora' ||
+          (d.escala !== 'fiel' && !!G && G.modo === 'feixe' && !!G.fora)
       };
     },
 
@@ -7407,7 +7654,23 @@
           'eles nao ha reta nem arco');
         return null;
       }
-      var fora = escalaFora(B, d, retas.metricas, []);
+      /* No modo cruzamento a figura e SEMPRE exata, e por construcao: o primeiro
+       * valor numerico fixa a inclinacao, o sistema das expressoes fixa quando
+       * nao ha numero, e o retasConferirEntradas ja recusou tudo que nao fecha
+       * com o desenho. Nao sobra caso em que um rotulo diga um numero e o arco
+       * varra outro, que e a unica coisa que "fora de escala" pode significar
+       * aqui.
+       *
+       * Por isso o automatico do escalaFora nao vale nesta receita: ele nasceu de
+       * uma epoca em que letra na diretiva significava figura chutada, e liga a
+       * marca so por haver letra junto de numero. Medido: "angulo=35;1
+       * angulo=x+30;2" saia exigindo legenda de fora de escala com o desenho
+       * EXATO (x = 115, a posicao 2 mede 145), que e a escala que mente ao
+       * contrario. escala=fora escrito a mao continua mandando, para o caso do
+       * desenho enganoso de proposito. O feixe decide a escala por outro caminho,
+       * o da razao entre as duas transversais, e traz o proprio G.fora. */
+      var fora = d.escala === 'fora' ||
+        (d.escala !== 'fiel' && G.modo === 'feixe' && !!G.fora);
       var corGab = corDaCamada(doc, d, COR);
       var i, k;
 
@@ -7416,7 +7679,25 @@
         !(nomeia.length === 1 && String(nomeia[0]).toLowerCase() === 'nao');
       var todosOsNomes = nomeia.length === 1 && String(nomeia[0]).toLowerCase() === 'sim';
 
+      /* nomeiaretas=sim num feixe cujas paralelas nao foram nomeadas nao teria o
+       * que escrever, e ficar calado seria a chave escrita que nao chega na
+       * folha. */
+      if (querNomes) {
+        for (i = 0; i < G.linhas.length; i++) {
+          if (!G.linhas[i].semNome) continue;
+          B.avisar(doc, 'retas: nomeiaretas= pede o nome de uma paralela que o feixe nao nomeou; ' +
+            'escreva feixe=' + G.n + ';a;b;c com as letras do tema, ou tire a chave');
+          return null;
+        }
+      }
+
       var pontos = B.lista(d.args, 'ponto');
+      if (G.modo === 'feixe' && pontos.length) {
+        B.avisar(doc, 'retas: ponto= nomeia o cruzamento de uma transversal com uma paralela para ' +
+          'dizer qual angulo a pergunta quer, e o feixe de Tales nao marca angulo nenhum: aqui a ' +
+          'pergunta e sobre os segmentos, que ja saem cotados por corta=');
+        return null;
+      }
       if (pontos.length > G.nCruz) {
         B.avisar(doc, 'retas: ponto=' + pontos.join(';') + ' nomeia ' + pontos.length +
           ' cruzamentos e esta figura tem ' + G.nCruz);
@@ -7615,24 +7896,36 @@
            * escreve numero, e e la que ela e o unico canal disponivel. */
           var voltasDe = {}, soArco = {}, raioDe;
           for (q = 0; q < G.grupos.length; q++) {
-            var n = Math.min(3, q + 1), acrescentou = false;
+            var n = Math.min(3, q + 1);
             for (j = 0; j < G.grupos[q].length; j++) {
               var pp = G.grupos[q][j];
+              /* As voltas valem para TODOS os membros do grupo, com valor ou sem.
+               * Aplicadas so a quem nao tem valor, o segundo grupo saia com dois
+               * arcos num membro e um arco no outro, e pela convencao do livro
+               * marcas diferentes significam MEDIDAS diferentes: a figura passava
+               * a dizer que os dois membros do grupo sao diferentes, que e o
+               * contrario exato do que o grupo declara. Medido em
+               * "angulo=63;1 angulo=117;2 congruentes=1;3 congruentes=2;4": a
+               * posicao 2 saia com raio 14,0 e um arco e a 4 com raio 17,5 e
+               * dois. */
+              voltasDe[pp] = n;
               var temValor = false;
               for (var w = 0; w < G.entradas.length; w++) if (G.entradas[w].pos === pp) temValor = true;
-              if (temValor) continue;
-              voltasDe[pp] = n;
-              soArco[pp] = n;
-              acrescentou = true;
+              if (!temValor) soArco[pp] = n;
             }
-            if (acrescentou) ctx.anota('marca', { tipo: 'congruencia', n: n, angulos: G.grupos[q].length });
+            ctx.anota('marca', { tipo: 'congruencia', n: n, angulos: G.grupos[q].length });
           }
 
           raioDe = retasRaios(G, voltasDe);
           if (!G.reto) {
             for (q = 0; q < G.entradas.length; q++) {
               var en = G.entradas[q];
-              var texto = rotuloDeAngulo(en.texto, B);
+              /* O valor do ENUNCIADO tambem passa pelo numeroNaFolha, e nao so a
+               * resposta do gabarito: "angulo=32.5" saia "32.5°" numa folha
+               * portuguesa que escrevia "4,5" na cota da mesma figura. A regra do
+               * kit e uma so, e esta escrita no numeroNaFolha: toda receita que
+               * imprime numero vindo do tema passa por ali. */
+              var texto = numeroNaFolha(doc, rotuloDeAngulo(en.texto, B));
               var cor = corGab || undefined, tam = TAM_DADO, bold = false;
               /* A camada de gabarito e a folha do enunciado MAIS a resposta: a
                * letra da incognita da lugar ao valor medido na propria figura, em
@@ -7642,7 +7935,12 @@
                * letra nomeia o ANGULO e nao uma medida, e quatro rotulos por
                * cruzamento no formato longo nao cabem na cunha de 35 graus. */
               if (en.incognita && d.fase === 'gabarito' && G.deduzido) {
-                texto = arredondar(retasValorEm(en.pos, G.ang)) + '°';
+                /* O numero passa pelo numeroNaFolha como todo numero que esta
+                 * receita imprime: sem ele um angulo de 32,5 graus saia "32.5°"
+                 * numa folha portuguesa que, na mesma figura, escrevia "4,5" na
+                 * cota. Duas convencoes de decimal na mesma folha e pior do que
+                 * a errada, porque nem se descobre qual e a certa. */
+                texto = numeroNaFolha(doc, arredondar(retasValorEm(en.pos, G.ang))) + '°';
                 cor = COR.teal; tam = TAM_RESPOSTA; bold = true;
               }
               retasArco(ctx, G, en.pos, texto, voltasDe[en.pos] || en.voltas,
@@ -7666,6 +7964,7 @@
           if (querNomes) {
             for (q = 0; q < G.linhas.length; q++) {
               var L = G.linhas[q];
+              if (L.semNome || !L.nome) continue;
               if (!todosOsNomes && nomeia.indexOf(L.nome) < 0) continue;
               var P = ctx.p(L.de), Q = ctx.p(L.ate);
               var ancora = pt(P.x + (Q.x - P.x) * 0.06, P.y + (Q.y - P.y) * 0.06);

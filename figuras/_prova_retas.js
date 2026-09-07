@@ -65,16 +65,20 @@ const CASOS = [
   { nome: 'colaterais gab', titulo: 'o mesmo no gabarito: x = 70 graus em teal',
     fig: '@fig id=r3 fase=gabarito',
     gabaritoDe: '@fig retas id=r3 reta=r reta=s paralelas=r;s transversal=t angulo=110;3 incognita=x;6' },
-  { nome: 'correspondentes', titulo: 'correspondentes: 70 nas posicoes 1 e 5, os dois com um arco',
-    fig: '@fig retas id=r4 reta=r reta=s paralelas=r;s transversal=t angulo=70;1 angulo=70;5 congruentes=1;5' },
+  { nome: 'correspondentes', titulo: 'correspondentes: 70 nas posicoes 1 e 5, os dois com um arco de raio igual',
+    fig: '@fig retas id=r4 reta=r reta=s paralelas=r;s transversal=t angulo=70;1 angulo=70;5' },
+  { nome: 'congruencia muda', titulo: 'MAT08-11 explicacao: os correspondentes marcados SEM numero, so pela contagem de arcos',
+    fig: '@fig retas id=r4b reta=r reta=s paralelas=r;s transversal=t congruentes=1;5 congruentes=2;6' },
+  { nome: 'congruencia mista', titulo: 'MAT06-09 exercicio 4: 63 e 117 escritos, os opostos marcados pela contagem',
+    fig: '@fig retas id=r5b reta=r reta=s angulo=63;1 angulo=117;2 congruentes=1;3 congruentes=2;4' },
   { nome: 'expressoes colaterais', titulo: 'MAT08-11 exercicio 6: (2x + 30) e (x + 30) colaterais internos',
     fig: '@fig retas id=r6 reta=r reta=s paralelas=r;s transversal=t angulo=2x+30;3 angulo=x+30;6' },
   { nome: 'expressoes correspondentes', titulo: 'MAT08-11 exercicio 7: (4x - 20) e (2x + 40) correspondentes',
     fig: '@fig retas id=r7 reta=r reta=s paralelas=r;s transversal=t angulo=4x-20;1 angulo=2x+40;5' },
-  { nome: 'opostos', titulo: 'MAT07-11 exercicio 10: opostos pelo vertice, os dois com o mesmo arco',
-    fig: '@fig retas id=r10 reta=r reta=s angulo=3x+10;1 incognita=x;3 oposto=sim' },
-  { nome: 'quatro angulos', titulo: 'MAT06-09: duas concorrentes com 63 e 117 nos quatro angulos, dois grupos de arcos',
-    fig: '@fig retas id=r5 reta=r reta=s angulo=63;1 angulo=117;2 angulo=63;3 angulo=117;4 congruentes=1;3 congruentes=2;4' },
+  { nome: 'opostos', titulo: 'MAT07-11 exercicio 10: (3x + 10) e (5x - 30) opostos pelo vertice, x = 20',
+    fig: '@fig retas id=r10 reta=r reta=s angulo=3x+10;1 angulo=5x-30;3' },
+  { nome: 'quatro angulos', titulo: 'MAT06-09: duas concorrentes com 63 e 117 nos quatro angulos, um arco cada',
+    fig: '@fig retas id=r5 reta=r reta=s angulo=63;1 angulo=117;2 angulo=63;3 angulo=117;4' },
   { nome: 'paralelas soltas', titulo: 'MAT04-07: duas paralelas sem transversal nenhuma, so as setinhas',
     fig: '@fig retas id=r14 reta=r reta=s paralelas=r;s nomeiaretas=sim' },
   { nome: 'perpendicular', titulo: 'MAT04-07 exercicio 3: duas retas perpendiculares, um quadradinho e nenhum arco',
@@ -410,6 +414,9 @@ console.log('\nopostos pelo vertice: mesmo numero de arcos, mesmo raio');
   const aq = arcos(q);
   conf('os quatro angulos rotulados saem com um arco cada, e nao com as voltas',
     aq.length === 4, aq.length + ' arcos');
+  conf('e a chave congruentes= sobre os quatro, que ja carregam valor, e recusada',
+    comAviso('@fig retas reta=r reta=s angulo=63;1 angulo=117;2 angulo=63;3 angulo=117;4 congruentes=1;3',
+      'nao afirma nada que os numeros') === 1);
   const r63 = aq.filter((x) => Math.abs(x.abertura - 63) < 1).map((x) => x.raio);
   const r117 = aq.filter((x) => Math.abs(x.abertura - 117) < 1).map((x) => x.raio);
   conf('os dois de 63 no mesmo raio, que e o que diz que sao iguais',
@@ -429,6 +436,69 @@ console.log('\nopostos pelo vertice: mesmo numero de arcos, mesmo raio');
     conf('e a figura custa duas marcas, uma por grupo de congruencia',
       v.marcasAtivas === 2, v.marcasAtivas + ' marcas');
   }
+
+  /* A congruencia por CONTAGEM, que e o unico canal quando nao ha numero: os
+   * dois membros de cada grupo tem que sair com o MESMO numero de arcos. */
+  {
+    const m2 = achar('congruencia muda');
+    const a2 = arcos(m2);
+    conf('os dois grupos mudos saem com dois arcos e quatro arcos', a2.length === 6,
+      a2.length + ' arcos');
+    const porRaio = {};
+    for (const x of a2) porRaio[x.raio.toFixed(1)] = (porRaio[x.raio.toFixed(1)] || 0) + 1;
+    conf('o primeiro grupo com uma volta nos dois membros e o segundo com duas nos dois',
+      Object.keys(porRaio).length === 3 && Object.keys(porRaio).every((k) => porRaio[k] === 2),
+      JSON.stringify(porRaio));
+    conf('e custa tres marcas: uma por grupo mais o paralelismo',
+      m2.reg.marcasAtivas === 3, m2.reg.marcasAtivas + ' marcas');
+  }
+
+  /* GRUPO MISTO, valorado com nao valorado. E aqui que a figura mentia: as
+   * voltas do grupo eram aplicadas so a quem nao tinha valor, entao o segundo
+   * grupo saia com DOIS arcos num membro e UM no outro. Pela convencao do livro
+   * marcas diferentes significam medidas diferentes, ou seja, a figura afirmava
+   * que os dois membros do grupo, que ela mesma declarou congruentes, sao
+   * diferentes. Medido antes do conserto: posicao 2 com raio 14,0 e um arco,
+   * posicao 4 com raio 17,5 e dois. */
+  {
+    const mi = achar('congruencia mista');
+    const ai = arcos(mi);
+    const de63 = ai.filter((x) => Math.abs(x.abertura - 63) < 1);
+    const de117 = ai.filter((x) => Math.abs(x.abertura - 117) < 1);
+    conf('o grupo dos 63 sai com o mesmo numero de arcos nos dois membros',
+      de63.length === 2 && Math.abs(de63[0].raio - de63[1].raio) < 0.2,
+      de63.map((x) => x.raio.toFixed(1)).join(', '));
+    conf('e o grupo dos 117, que leva duas voltas, sai com DUAS nos dois membros',
+      de117.length === 4, de117.length + ' arcos de 117');
+    const raios117 = {};
+    for (const x of de117) raios117[x.raio.toFixed(1)] = (raios117[x.raio.toFixed(1)] || 0) + 1;
+    conf('as duas voltas do grupo pousam nos dois membros, e nao num so',
+      Object.keys(raios117).length === 2 && Object.keys(raios117).every((k) => raios117[k] === 2),
+      JSON.stringify(raios117));
+  }
+
+  /* PARIDADE. Posicao impar mede o angulo da transversal e par mede o suplemento
+   * dele, entao um grupo que mistura as duas paridades pede o mesmo numero de
+   * arcos em dois angulos SUPLEMENTARES. Medido antes do conserto:
+   * "angulo=35;1 congruentes=1;6" saia limpa com um arco de 35 e um de 145,1
+   * marcados igual, com a setinha de paralelismo por cima. */
+  conf('envenenado: congruentes=1;6 junta impar com par e e recusado',
+    comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=35;1 congruentes=1;6',
+      'SUPLEMENTARES e nao congruentes') === 1);
+  conf('envenenado: congruentes=1;2, o mesmo defeito no mesmo cruzamento',
+    comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t congruentes=1;2',
+      'SUPLEMENTARES e nao congruentes') === 1);
+  conf('limpo: congruentes=1;5, correspondentes, passa',
+    comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t congruentes=1;5',
+      'SUPLEMENTARES e nao congruentes') === 0);
+  conf('limpo: congruentes=3;5, alternos internos, tambem',
+    comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t congruentes=3;5',
+      'SUPLEMENTARES e nao congruentes') === 0);
+  /* CAMPO AUSENTE: o valor. A trava e sobre a PARIDADE DA POSICAO, que existe
+   * sempre, entao ela roda igual na figura que nao escreve numero nenhum. */
+  conf('ausente: sem valor escrito em lugar nenhum a paridade continua sendo conferida',
+    comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t congruentes=2;5',
+      'SUPLEMENTARES e nao congruentes') === 1);
 }
 
 console.log('\nparalelas soltas: sem cruzamento nenhum, so as duas retas e as setas');
@@ -449,6 +519,75 @@ console.log('\nparalelas soltas: sem cruzamento nenhum, so as duas retas e as se
     comAviso('@fig retas reta=r reta=s paralelas=r;s angulo=35;1', 'nao chegaria na folha') === 1);
   conf('limpo: com transversal= o mesmo angulo passa',
     comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=35;1', 'nao chegaria na folha') === 0);
+}
+
+console.log('\nas expressoes conferidas contra o desenho, e nao so as numericas');
+{
+  /* A conferencia de contradicao rodava so sobre valores NUMERICOS, e o
+   * retasInclinacao resolvia apenas as duas primeiras expressoes e ignorava o
+   * resto. Os dois casos abaixo passavam limpos e as figuras contradiziam os
+   * proprios rotulos. */
+  conf('envenenado: 110 com 2x+30 e x+10 pede x = 40 e x = 100 ao mesmo tempo',
+    comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=110;3 angulo=2x+30;5 angulo=x+10;1',
+      'nao podem valer ao mesmo tempo') === 1);
+  conf('limpo: 110 com 2x+30 e x+70, que fecham os dois em x = 40',
+    comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=110;3 angulo=2x+30;5 angulo=x+70;1',
+      'nao podem valer ao mesmo tempo') === 0);
+  conf('envenenado: 2x, x+60 e x+10 sem numero nenhum, a terceira nao fecha',
+    comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=2x;1 angulo=x+60;3 angulo=x+10;2',
+      'nao podem valer ao mesmo tempo') === 1);
+  conf('limpo: 2x, x+60 e x-60 fecham os tres em x = 60',
+    comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=2x;1 angulo=x+60;3 angulo=x-0;2',
+      'nao podem valer ao mesmo tempo') === 0);
+  /* CAMPO AUSENTE: o valor NUMERICO. A trava nao depende de haver numero: ela
+   * roda contra o ang ja resolvido, venha ele de onde vier. */
+  {
+    const v = saiu('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=2x+30;3 angulo=x+30;6');
+    const a = (v.medido.arcos || []).map((x) => x.abertura).sort((p, q2) => p - q2);
+    conf('ausente: so com expressoes o sistema fecha e cada arco varre o valor da sua',
+      a.length === 2 && Math.abs(a[0] - 70) < 1 && Math.abs(a[1] - 110) < 1,
+      a.map((x) => x.toFixed(1)).join(' e '));
+  }
+  /* Sistema que fecha FORA do intervalo de um angulo de cruzamento: antes caia
+   * calado no padrao de 55 graus, com a figura chutada e a prova afirmando que a
+   * construcao era exata. */
+  conf('envenenado: 3x+10 igual a x da x = -5, e a configuracao nao existe',
+    comAviso('@fig retas reta=r reta=s angulo=3x+10;1 incognita=x;3 oposto=sim',
+      'nao e angulo de cruzamento nenhum') === 1);
+  conf('limpo: 3x+10 com 5x-30, que e o exercicio 10 de verdade, fecha em x = 20',
+    comAviso('@fig retas reta=r reta=s angulo=3x+10;1 angulo=5x-30;3',
+      'nao e angulo de cruzamento nenhum') === 0);
+  /* A escala: com o sistema resolvido a construcao e EXATA, e exigir legenda de
+   * fora de escala ali seria a escala que mente ao contrario. */
+  {
+    const v = saiu('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=35;1 angulo=x+30;2');
+    conf('mistura de numero com letra NAO sai fora de escala, porque o desenho e exato',
+      v.foraDeEscala === false);
+    const a = (v.medido.arcos || []).map((x) => x.abertura).sort((p, q2) => p - q2);
+    conf('e o x+30 pousa no arco que mede 145, ou seja x = 115',
+      a.length === 2 && Math.abs(a[1] - 145) < 1, a.map((x) => x.toFixed(1)).join(' e '));
+  }
+}
+
+console.log('\ntoda reta declarada tem papel, e toda inclinacao chega na folha');
+{
+  conf('envenenado: reta=s sem papel some da folha, e e recusada com o nome dela',
+    comAviso('@fig retas reta=r reta=s transversal=t angulo=35;1', 'nao tem papel nesta figura') === 1);
+  conf('limpo: com paralelas=r;s as tres retas tem papel',
+    comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=35;1',
+      'nao tem papel nesta figura') === 0);
+  conf('limpo: duas retas sem paralelas= tambem, uma base e uma transversal',
+    comAviso('@fig retas reta=r reta=s angulo=35;1', 'nao tem papel nesta figura') === 0);
+  /* CAMPO AUSENTE: paralelas=. A conferencia e sobre a lista de retas
+   * declaradas, que existe sempre; ela nao pergunta se paralelas= foi escrita. */
+  conf('ausente: sem paralelas=, tres retas declaradas continuam sendo conferidas',
+    comAviso('@fig retas reta=r reta=s reta=z angulo=35;1', 'nao tem papel nesta figura') === 1);
+  conf('envenenado: inclinacao escrita na segunda reta do grupo nao chega na folha',
+    comAviso('@fig retas reta=r reta=s;30 paralelas=r;s transversal=t angulo=35;1',
+      'duas paralelas tem uma inclinacao so') === 1);
+  conf('limpo: a inclinacao do grupo escrita uma vez, na primeira reta',
+    comAviso('@fig retas reta=r;30 reta=s paralelas=r;s transversal=t angulo=35;1',
+      'duas paralelas tem uma inclinacao so') === 0);
 }
 
 console.log('\nperpendicular: um quadradinho, nenhum arco e nenhum 90 escrito');
@@ -531,6 +670,87 @@ console.log('\no feixe de Tales: a razao medida na folha');
   conf('nenhuma LINHA sai em teal no gabarito, so o numero', tealFinas.length === 0,
     tealFinas.length + ' caminhos teal');
 
+  /* A ESCALA ENTRE AS DUAS TRANSVERSAIS. Tales garante a razao DENTRO de cada
+   * transversal; entre elas, o comprimento recortado do mesmo vao vale
+   * g/sen(inclinacao), entao inclinacoes diferentes recortam comprimentos
+   * diferentes. Com as inclinacoes fixas de 76 e 64 a folha saia com razao 1,080
+   * entre as duas enquanto os numeros pediam 9/6 = 1,5, e com "6 e 10" nas DUAS
+   * o 6 de uma media o dobro do 6 da outra. */
+  {
+    const P = paralelas.map((p) => transversais.map((t) => cruzar(t, p)));
+    const compT = [dist(P[0][0], P[1][0]), dist(P[1][0], P[2][0])];
+    const compU = [dist(P[0][1], P[1][1]), dist(P[1][1], P[2][1])];
+    conf('o 9 da segunda transversal sai uma vez e meia o 6 da primeira, na folha',
+      Math.abs(compU[0] / compT[0] - 1.5) < 0.01, 'medido ' + (compU[0] / compT[0]).toFixed(4));
+    conf('e o 15 deduzido sai uma vez e meia o 10',
+      Math.abs(compU[1] / compT[1] - 1.5) < 0.01, 'medido ' + (compU[1] / compT[1]).toFixed(4));
+  }
+  /* O par: o mesmo numero nas duas transversais tem que sair com o mesmo
+   * comprimento, e ai as duas ficam paralelas entre si, que e o que a geometria
+   * manda. */
+  {
+    const d3 = new PDFGen.Doc();
+    d3.novaPagina();
+    const pag3 = d3.pag, de3 = pag3.ops.length;
+    d3.partesDeFigura('@fig retas feixe=3;a;b;c transversal=t transversal=u corta=t;6 corta=t;10 corta=u;6 corta=u;10')
+      .forEach(function (p) { if (p.tipo === 'figura') d3.figura(p.diretiva, { x: MARG_E + 20, largura: LARGURA }); });
+    const rs3 = retasDoFluxo(pag3.ops.slice(de3));
+    const par3 = rs3.filter((r) => Math.min(r.graus, 180 - r.graus) < 1).sort((a, b) => b.a.y - a.a.y);
+    const tr3 = rs3.filter((r) => Math.min(r.graus, 180 - r.graus) >= 1);
+    const c3 = par3.map((p) => tr3.map((t) => cruzar(t, p)));
+    conf('com 6 e 10 nas duas, o 6 de uma mede o mesmo que o 6 da outra',
+      Math.abs(dist(c3[0][0], c3[1][0]) - dist(c3[0][1], c3[1][1])) < 0.05,
+      dist(c3[0][0], c3[1][0]).toFixed(2) + ' contra ' + dist(c3[0][1], c3[1][1]).toFixed(2) + ' pt');
+    conf('e a figura nao sai fora de escala, porque ela cumpre o que escreve',
+      d3.figurasDesenhadas[0].foraDeEscala === false);
+  }
+  /* Quando o autor FIXA as duas inclinacoes, a receita nao mexe no que ele
+   * escreveu: ela marca a figura fora de escala, e o figura() passa a exigir a
+   * legenda. O que ela nao faz e deixar as duas coisas se contradizerem caladas. */
+  conf('inclinacao fixada a mao que nao cumpre a razao sai fora de escala e pede legenda',
+    comAviso('@fig retas feixe=3;a;b;c transversal=t;90 transversal=u;30 corta=t;6 corta=t;10 corta=u;6 corta=u;10',
+      'fora de escala sem legenda') === 1);
+  conf('e com a legenda escrita ela passa',
+    comAviso('@fig retas feixe=3;a;b;c transversal=t;90 transversal=u;30 corta=t;6 corta=t;10 corta=u;6 corta=u;10 ' + LEG_ESCALA,
+      'fora de escala') === 0);
+  /* CAMPO AUSENTE: os numeros da segunda transversal. Sem eles nao ha razao
+   * ENTRE as duas a cumprir, e as inclinacoes padrao ficam; a figura continua
+   * fiel ao que ela escreve, que e a razao dentro de cada uma. */
+  conf('ausente: com numero so numa transversal, a figura sai fiel do mesmo jeito',
+    saiu('@fig retas feixe=3;a;b;c transversal=t transversal=u corta=t;6 corta=t;10').foraDeEscala === false);
+
+  /* nomeiaretas= num feixe cujas paralelas nao foram nomeadas imprimia o
+   * marcador interno da receita na folha, e a trava do texto que nao veio do
+   * tema nao pegava porque o marcador nao era palavra. */
+  conf('envenenado: nomeiaretas=sim num feixe sem nomes e recusado',
+    comAviso('@fig retas feixe=3 transversal=t transversal=u corta=t;6 corta=t;10 nomeiaretas=sim',
+      'uma paralela que o feixe nao nomeou') === 1);
+  conf('limpo: com feixe=3;a;b;c os nomes saem',
+    comAviso('@fig retas feixe=3;a;b;c transversal=t transversal=u corta=t;6 corta=t;10 nomeiaretas=sim',
+      'uma paralela que o feixe nao nomeou') === 0);
+  conf('e o feixe sem nomes e sem nomeiaretas= desenha limpo',
+    !!saiu('@fig retas feixe=3 transversal=t transversal=u corta=t;6 corta=t;10'));
+  conf('ponto= no feixe e recusado dizendo o motivo certo',
+    comAviso('@fig retas feixe=3;a;b;c transversal=t transversal=u corta=t;6 corta=t;10 ponto=A',
+      'o feixe de Tales nao marca angulo nenhum') === 1);
+  /* Rotulo de cota que e EXPRESSAO tem a incognita resolvida antes de sair:
+   * "2x = 6.67" e a conta pela metade, e ainda com o decimal na convencao
+   * errada. */
+  {
+    const g2 = saiu('@fig retas feixe=3;a;b;c transversal=t transversal=u corta=t;6 corta=t;10 corta=u;9;b1 corta=u;2x fase=gabarito');
+    const t2 = (g2.medido.textos || []).map((t) => t.txt);
+    conf('a cota com rotulo 2x sai resolvida em x, e com virgula na folha portuguesa',
+      t2.indexOf('x = 7,5') >= 0, t2.join(' '));
+  }
+  /* Decimal localizado tambem no valor de ANGULO, e nao so na cota: a mesma
+   * folha escrevia "32.5°" e "4,5". */
+  {
+    const dg = saiu('@fig retas reta=r reta=s angulo=32.5;1 incognita=x;3 fase=gabarito');
+    const td = (dg.medido.textos || []).map((t) => t.txt);
+    conf('angulo com casa decimal sai com virgula na folha portuguesa',
+      td.filter((t) => t === '32,5\u00b0').length === 2 && td.indexOf('32.5\u00b0') < 0, td.join(' '));
+  }
+
   const L = achar('tales letras');
   conf('o feixe so com letras sai com a1, a2, b1 e b2',
     tem(L, 'a1') === 1 && tem(L, 'a2') === 1 && tem(L, 'b1') === 1 && tem(L, 'b2') === 1);
@@ -592,13 +812,13 @@ conf('limpo: com 55 graus a mesma figura sai',
 
 console.log('  trava: valores que contradizem o paralelismo que a figura afirma');
 conf('envenenado: colaterais internos 70 e 80 sao recusados',
-  comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=70;3 angulo=80;6', 'nao cabem na mesma figura') === 1);
+  comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=70;3 angulo=80;6', 'e o rotulo dela diz 80') === 1);
 conf('limpo: 70 e 110 passam, porque somam 180',
-  comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=70;3 angulo=110;6', 'nao cabem na mesma figura') === 0);
+  comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=70;3 angulo=110;6', 'e o rotulo dela diz') === 0);
 conf('envenenado: correspondentes 70 e 75 sao recusados',
-  comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=70;1 angulo=75;5', 'nao cabem na mesma figura') === 1);
+  comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=70;1 angulo=75;5', 'e o rotulo dela diz 75') === 1);
 conf('limpo: correspondentes 70 e 70 passam',
-  comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=70;1 angulo=70;5', 'nao cabem na mesma figura') === 0);
+  comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=70;1 angulo=70;5', 'e o rotulo dela diz') === 0);
 /* CAMPO AUSENTE: o SEGUNDO valor. E aqui que a familia irma se perdeu. Um valor
  * numerico ja fixa a figura inteira, entao a conferencia nao precisa de dois:
  * ela roda contra a configuracao deduzida. A prova disso e medir as OITO
@@ -617,9 +837,9 @@ conf('limpo: correspondentes 70 e 70 passam',
  * continua sendo conferido: 35 e 70 caem em 1 e 2, que sao suplementares, e a
  * mesma recusa acontece. Omitir a posicao nao desliga a trava. */
 conf('ausente: sem posicao escrita, angulo=35 angulo=70 cai em 1 e 2 e e recusado igual',
-  comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=35 angulo=70', 'nao cabem na mesma figura') === 1);
+  comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=35 angulo=70', 'e o rotulo dela diz 70') === 1);
 conf('e angulo=35 angulo=145, que sao suplementares, passa',
-  comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=35 angulo=145', 'nao cabem na mesma figura') === 0);
+  comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=35 angulo=145', 'e o rotulo dela diz') === 0);
 /* CAMPO AUSENTE: nenhum valor. A figura sai do padrao, nao esta deduzida, e a
  * camada de gabarito se RECUSA a escrever numero: escrever seria medir o chute. */
 {
@@ -657,7 +877,7 @@ conf('envenenado: reto=sim com angulo escrito e recusado, porque o valor nao che
 /* CAMPO AUSENTE: reto=. Sem ele, a receita nao desenha 90 em arco calada: ela
  * recusa e diz qual chave falta. */
 conf('ausente: reto= omitido nao faz a figura passar calada com arco de 90',
-  comAviso('@fig retas reta=r reta=s transversal=t;90', 'Escreva reto=sim') === 1);
+  comAviso('@fig retas reta=r reta=s paralelas=r;s transversal=t;90', 'Escreva reto=sim') === 1);
 
 console.log('  trava: o feixe de Tales');
 conf('envenenado: 6 e 10 contra 9 e 12 nao guardam a razao e sao recusados',
