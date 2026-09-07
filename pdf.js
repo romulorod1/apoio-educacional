@@ -222,10 +222,12 @@
 
   /* Lista, sem repetir, os caracteres que sairiam como interrogação. É a trava de
    * quem escreve o tema: melhor descobrir aqui do que na folha impressa. A
-   * marcação ^{} e _{} não conta, porque ela nunca chega até a fonte. */
+   * marcação ^{} e _{} não conta, porque ela nunca chega até a fonte, e o
+   * asterisco também não: desde o itálico, o partirEstilo consome "***", "**" e
+   * "*" como interruptor de estilo, e nenhum deles chega à Helvetica. */
   function caracteresQueNaoDesenha(texto) {
     var limpo = String(texto == null ? '' : texto)
-      .replace(RE_NIVEL_G, '$2').replace(/\*\*/g, '');
+      .replace(RE_NIVEL_G, '$2').replace(/\*+/g, '');
     var fora = [], visto = {};
     for (var i = 0; i < limpo.length; i++) {
       var ch = limpo.charAt(i);
@@ -245,7 +247,11 @@
    * ou null quando não sobrou nada. O aninhamento é proibido de propósito: o
    * partirNivel só reconhece chave sem chave dentro. */
   function marcacaoQueSobrou(texto) {
-    var limpo = String(texto == null ? '' : texto).replace(RE_NIVEL_G, '$2');
+    /* O asterisco sai antes da busca pelo mesmo motivo do caracteresQueNaoDesenha:
+     * ele é interruptor de estilo e não chega à folha, então não pode aparecer no
+     * trecho ofensor que esta função devolve. */
+    var limpo = String(texto == null ? '' : texto)
+      .replace(RE_NIVEL_G, '$2').replace(/\*+/g, '');
     var achado = /[\^_]\{|[{}]/.exec(limpo);
     if (!achado) return null;
     return limpo.slice(Math.max(0, achado.index - 12), achado.index + 20);
@@ -314,6 +320,11 @@
   var Y_FIO_ROD = PAGINA_A - 795.89;          // 46.00
   var Y_TOPO = Y_FIO_CAB - 30;                // inicio do conteudo
   var Y_LIMITE = Y_FIO_ROD + 18;              // fim do conteudo
+  /* Largura do texto dentro do bloco de citacao (numero de linha, fio e recuo a
+   * esquerda, respiro a direita). Exportada porque o verificador mede cada linha
+   * de fontes/ por ela: linha da fonte que nao cabe aqui viraria duas na folha e
+   * a numeracao mentiria. */
+  var LARGURA_CITACAO = MARG_D - (MARG_E + 36) - 6;   // 473.28
 
   /* O vao que fica entre o fio do cabecalho e o TOPO das letras do titulo,
    * em milimetros. Vale para todo documento que o aplicativo gera.
@@ -363,6 +374,14 @@
 
   function cor3(c) { return c[0].toFixed(6) + ' ' + c[1].toFixed(6) + ' ' + c[2].toFixed(6); }
 
+  /* A fonte de texto de cada par negrito/itálico. As quatro são base-14 e as
+   * duas oblíquas têm as MESMAS larguras das retas, então o medir() não muda e
+   * uma linha em itálico quebra exatamente onde a mesma linha reta quebraria. */
+  function fonteDeEstilo(bold, italico) {
+    if (italico) return bold ? 'F5' : 'F4';
+    return bold ? 'F2' : 'F1';
+  }
+
   // ================= documento =================
 
   function Doc() {
@@ -372,7 +391,13 @@
     this.fonteRegular = 0;
     this.fonteBold = 0;
     this.fonteSimbolo = 0;
+    this.fonteItalico = 0;
+    this.fonteBoldItalico = 0;
     this.pag = null;
+    /* Metadados das fontes citadas pelo tema, id por id, como o gerador de banco
+     * os monta. Nasce vazio porque quase todo documento desta casa (fechamento,
+     * proposta, ficha, material de matemática) não cita texto nenhum. */
+    this.fontes = {};
     /* Língua da MOLDURA, e só dela: quem gera a folha diz qual é. Fica no
      * documento e não no parâmetro de cada chamada porque a moldura é escrita no
      * finalizar(), depois de todo o conteúdo, quando o parâmetro já se perdeu. */
@@ -381,7 +406,7 @@
 
   Doc.prototype.novaPagina = function (opcoes) {
     opcoes = opcoes || {};
-    this.pag = { ops: [], usaImg: {}, usaSim: false, semMoldura: !!opcoes.semMoldura };
+    this.pag = { ops: [], usaImg: {}, usaSim: false, usaIta: false, semMoldura: !!opcoes.semMoldura };
     this.paginas.push(this.pag);
     this.y = Y_TOPO;
     if (!opcoes.semMarca) this.marcaDagua();
@@ -394,6 +419,11 @@
     opcoes = opcoes || {};
     var tam = opcoes.tam || 10;
     var bold = !!opcoes.bold;
+    /* O itálico é a Helvetica-Oblique (F4) ou a Helvetica-BoldOblique (F5). A
+     * página anota que usou uma das duas, e só por causa dessa marca o
+     * finalizar() as registra: folha sem itálico nenhum não ganha objeto de
+     * fonte novo, que é o que mantém a folha de matemática byte a byte igual. */
+    var italico = !!opcoes.italic;
     var c = opcoes.cor || COR.texto;
     var tr = opcoes.tracking || 0;
     txt = String(txt == null ? '' : txt);
@@ -404,7 +434,8 @@
     if (!RE_SIMBOLO.test(txt)) {
       var wa = paraWinAnsi(txt);
       if (!wa.length) return;
-      this.op('BT ' + cor3(c) + ' rg /' + (bold ? 'F2' : 'F1') + ' ' + tam + ' Tf ' +
+      if (italico && this.pag) this.pag.usaIta = true;
+      this.op('BT ' + cor3(c) + ' rg /' + fonteDeEstilo(bold, italico) + ' ' + tam + ' Tf ' +
         (tr ? tr.toFixed(3) + ' Tc ' : '') +
         px.toFixed(2) + ' ' + y.toFixed(2) + ' Td (' + escapar(wa) + ') Tj ' +
         (tr ? '0 Tc ' : '') + 'ET');
@@ -416,11 +447,15 @@
     for (var i = 0; i < trechos.length; i++) {
       var bytes = trechos[i].sim ? trechos[i].txt : paraWinAnsi(trechos[i].txt);
       if (!bytes.length) continue;
-      ops.push('/' + (trechos[i].sim ? 'F3' : (bold ? 'F2' : 'F1')) + ' ' + tam + ' Tf (' +
+      ops.push('/' + (trechos[i].sim ? 'F3' : fonteDeEstilo(bold, italico)) + ' ' + tam + ' Tf (' +
         escapar(bytes) + ') Tj');
     }
     if (!ops.length) return;
     if (this.pag) this.pag.usaSim = true;
+    /* A Symbol não tem oblíqua na base-14: dentro de um trecho em itálico o
+     * glifo de símbolo continua saindo reto, do mesmo jeito que já sai fino
+     * dentro de um trecho em negrito. */
+    if (italico && this.pag) this.pag.usaIta = true;
     this.op('BT ' + cor3(c) + ' rg ' + (tr ? tr.toFixed(3) + ' Tc ' : '') +
       px.toFixed(2) + ' ' + y.toFixed(2) + ' Td ' + ops.join(' ') + ' ' +
       (tr ? '0 Tc ' : '') + 'ET');
@@ -658,6 +693,16 @@
     for (var s = 0; s < this.paginas.length; s++) if (this.paginas[s].usaSim) precisaSimbolo = true;
     this.fonteSimbolo = precisaSimbolo ?
       w.add('<< /Type /Font /Subtype /Type1 /BaseFont /Symbol >>') : 0;
+    /* As duas oblíquas entram no arquivo pelo mesmo critério da Symbol: só
+     * quando alguma página escreveu com elas. Sem esta condição toda folha de
+     * matemática ganharia dois objetos de fonte a mais, e a prova de regressão
+     * byte a byte da folha antiga cairia por causa de uma fonte que ninguém usa. */
+    var precisaItalico = false;
+    for (var t = 0; t < this.paginas.length; t++) if (this.paginas[t].usaIta) precisaItalico = true;
+    if (precisaItalico) {
+      this.fonteItalico = w.add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding >>');
+      this.fonteBoldItalico = w.add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-BoldOblique /Encoding /WinAnsiEncoding >>');
+    }
     var numPaginas = w.alloc();
     var refs = [];
     for (var j = 0; j < this.paginas.length; j++) {
@@ -668,7 +713,8 @@
         if (this.imagens[ref]) xo.push('/' + this.imagens[ref].nome + ' ' + this.imagens[ref].obj + ' 0 R');
       }
       var recursos = '/Font << /F1 ' + this.fonteRegular + ' 0 R /F2 ' + this.fonteBold + ' 0 R' +
-        (pg.usaSim ? ' /F3 ' + this.fonteSimbolo + ' 0 R' : '') + ' >>' +
+        (pg.usaSim ? ' /F3 ' + this.fonteSimbolo + ' 0 R' : '') +
+        (pg.usaIta ? ' /F4 ' + this.fonteItalico + ' 0 R /F5 ' + this.fonteBoldItalico + ' 0 R' : '') + ' >>' +
         (xo.length ? ' /XObject << ' + xo.join(' ') + ' >>' : '');
       var pgNum = w.add('<< /Type /Page /Parent ' + numPaginas + ' 0 R /MediaBox [0 0 ' +
         PAGINA_L.toFixed(4) + ' ' + PAGINA_A.toFixed(4) + '] /Resources << ' + recursos +
@@ -1178,21 +1224,41 @@
   // moldura do fechamento, para o material que a criança recebe ter a cara da
   // marca, e não a de uma folha genérica.
 
-  /* Quebra um texto em pedaços conforme o negrito, para a linha poder misturar
-   * as duas fontes. */
-  function partirNegrito(texto) {
+  /* Quebra um texto nos trechos de negrito e de itálico, para a linha poder
+   * misturar as quatro fontes.
+   *
+   * É um tokenizador COM ESTADO: anda pela string e trata "***", "**" e "*" como
+   * interruptores, casando sempre o mais longo primeiro. "***" inverte negrito e
+   * itálico juntos, "**" inverte o negrito, "*" inverte o itálico. O estado é o
+   * que faz o aninhamento funcionar em qualquer ordem: a leitura anterior, por
+   * par de "**" com regex, não sabia o que fazer com "**a *b* c**" nem com
+   * "***x***", e o asterisco de dentro saía IMPRESSO na folha.
+   *
+   * Interruptor sem par no fim da linha: o resto sai com o estado que ficou, e o
+   * asterisco nunca sai impresso. Na fonte do tema isso já é reprovado pelo
+   * verificador (em matéria com catálogo, o número de "**" e o de "*" solto têm
+   * que ser pares em cada linha); aqui é defesa.
+   *
+   * "* " no começo de uma linha NÃO chega aqui: quem o consome é o ramo de item
+   * de lista do Doc.prototype.markdown, o /^([-*])\s+(.*)$/ que vem antes do ramo
+   * de parágrafo; só o conteúdo do item desce para esta tubulação. */
+  function partirEstilo(texto) {
     var partes = [];
-    var resto = String(texto == null ? '' : texto);
-    var re = /\*\*(.+?)\*\*/;
-    var achado = re.exec(resto);
-    while (achado) {
-      if (achado.index > 0) partes.push({ txt: resto.slice(0, achado.index), bold: false });
-      partes.push({ txt: achado[1], bold: true });
-      resto = resto.slice(achado.index + achado[0].length);
-      achado = re.exec(resto);
+    var s = String(texto == null ? '' : texto);
+    var bold = false, italico = false, atual = '';
+    function fechar() {
+      if (atual) partes.push({ txt: atual, bold: bold, italic: italico });
+      atual = '';
     }
-    if (resto) partes.push({ txt: resto, bold: false });
-    return partes.filter(function (p) { return p.txt.length; });
+    for (var i = 0; i < s.length; i++) {
+      if (s.charAt(i) !== '*') { atual += s.charAt(i); continue; }
+      fechar();
+      if (s.substr(i, 3) === '***') { bold = !bold; italico = !italico; i += 2; continue; }
+      if (s.substr(i, 2) === '**') { bold = !bold; i += 1; continue; }
+      italico = !italico;
+    }
+    fechar();
+    return partes;
   }
 
   /* Expande a marcação de expoente e de índice. Cada pedaço ganha um nível: 0 na
@@ -1201,24 +1267,24 @@
   function partirNivel(partes) {
     var saida = [];
     for (var i = 0; i < partes.length; i++) {
-      var resto = partes[i].txt, bold = partes[i].bold;
+      var resto = partes[i].txt, bold = partes[i].bold, italico = !!partes[i].italic;
       var achado = RE_NIVEL.exec(resto);
       while (achado) {
-        if (achado.index > 0) saida.push({ txt: resto.slice(0, achado.index), bold: bold, nivel: 0 });
+        if (achado.index > 0) saida.push({ txt: resto.slice(0, achado.index), bold: bold, italic: italico, nivel: 0 });
         if (achado[2].length) {
-          saida.push({ txt: achado[2], bold: bold, nivel: achado[1] === '^' ? 1 : -1 });
+          saida.push({ txt: achado[2], bold: bold, italic: italico, nivel: achado[1] === '^' ? 1 : -1 });
         }
         resto = resto.slice(achado.index + achado[0].length);
         achado = RE_NIVEL.exec(resto);
       }
-      if (resto) saida.push({ txt: resto, bold: bold, nivel: 0 });
+      if (resto) saida.push({ txt: resto, bold: bold, italic: italico, nivel: 0 });
     }
     return saida;
   }
 
-  /* A entrada da tubulação de texto rico: negrito primeiro, nível depois. */
+  /* A entrada da tubulação de texto rico: estilo primeiro, nível depois. */
   function partirRico(texto) {
-    return partirNivel(partirNegrito(texto));
+    return partirNivel(partirEstilo(texto));
   }
 
   function corpoNivel(tam) { return Math.round(tam * CORPO_NIVEL * 100) / 100; }
@@ -1247,7 +1313,7 @@
     partes.forEach(function (parte) {
       parte.txt.split(/(\s+)/).forEach(function (tok) {
         if (!tok) return;
-        var seg = { txt: tok, bold: parte.bold, nivel: parte.nivel || 0 };
+        var seg = { txt: tok, bold: parte.bold, italic: !!parte.italic, nivel: parte.nivel || 0 };
         if (!tok.trim()) {
           if (palavra) { itens.push({ segs: palavra, espaco: false }); palavra = null; }
           itens.push({ segs: [seg], espaco: true });
@@ -1273,12 +1339,12 @@
         var ch = s.txt.charAt(c);
         var w = medirSeg({ txt: ch, bold: s.bold, nivel: s.nivel }, tam);
         if (usado > 0 && usado + w > largura) {
-          if (corrente) { atual.push({ txt: corrente, bold: s.bold, nivel: s.nivel }); corrente = ''; }
+          if (corrente) { atual.push({ txt: corrente, bold: s.bold, italic: s.italic, nivel: s.nivel }); corrente = ''; }
           linhas.push(atual); atual = []; usado = 0;
         }
         corrente += ch; usado += w;
       }
-      if (corrente) atual.push({ txt: corrente, bold: s.bold, nivel: s.nivel });
+      if (corrente) atual.push({ txt: corrente, bold: s.bold, italic: s.italic, nivel: s.nivel });
     }
     return { linhas: linhas, aberta: atual, usado: usado };
   }
@@ -1321,10 +1387,14 @@
     for (var i = 0; i < segmentos.length; i++) {
       var s = segmentos[i];
       var bold = s.bold || !!opcoes.bold;
+      /* O itálico do segmento e o de quem chamou se somam, como já acontece com
+       * o negrito: a mini-citação da âncora do gabarito pede a linha inteira em
+       * itálico e o texto dela pode trazer um "*obra*" dentro. */
+      var italico = s.italic || !!opcoes.italic;
       var corpo = s.nivel ? corpoNivel(tam) : tam;
       var desloca = s.nivel > 0 ? tam * SOBE_NIVEL : (s.nivel < 0 ? -tam * DESCE_NIVEL : 0);
       if (s.txt.trim()) {
-        this.texto(s.txt, px, y + desloca, { tam: corpo, bold: bold, cor: opcoes.cor });
+        this.texto(s.txt, px, y + desloca, { tam: corpo, bold: bold, italic: italico, cor: opcoes.cor });
       }
       px += medir(s.txt, corpo, bold);
     }
@@ -1346,7 +1416,8 @@
     var px = x;
     if (opcoes.align === 'centro') px = x - largura / 2;
     else if (opcoes.align === 'direita') px = x - largura;
-    this.escreverSegmentos(partirRico(txt), px, y, { tam: tam, bold: bold, cor: opcoes.cor });
+    this.escreverSegmentos(partirRico(txt), px, y,
+      { tam: tam, bold: bold, italic: !!opcoes.italic, cor: opcoes.cor });
     return largura;
   };
 
@@ -3014,6 +3085,7 @@
      * poder encolher uma figura mais alta do que a folha. Ele pergunta em vez de
      * manter constante própria: lista repetida em dois lugares diverge no dia em
      * que alguém mexe em um só. */
-    Y_TOPO: Y_TOPO, Y_LIMITE: Y_LIMITE
+    Y_TOPO: Y_TOPO, Y_LIMITE: Y_LIMITE,
+    LARGURA_CITACAO: LARGURA_CITACAO
   };
 });
