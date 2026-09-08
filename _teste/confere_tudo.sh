@@ -353,6 +353,72 @@ else
   falhou=1
 fi
 
+# O CONTEUDO DOS ARQUIVOS DO CACHE, e nao so a lista.
+#
+# A trava de cima compara a LISTA de ARQUIVOS com a base do merge e exige nome
+# novo quando ela muda. Ela nao olha o CONTEUDO dos arquivos listados, e dois
+# deles sao gerados: './banco/indice.json' e './banco/busca.json' saem do
+# gerar_banco.py. A varredura de figuras regenera o banco uma vez por lote, e
+# sao mais uns dezessete lotes: cada um muda o conteudo sem mudar a lista.
+#
+# Sem esta trava, esse merge passa verde e o tablet dela continua servindo o
+# banco velho do cache antigo, com o aplicativo novo por cima, ate o proximo
+# release que por acaso promova o nome. E o mesmo defeito do incidente de
+# sw.js:12-16 por outra porta: some sem erro, e so aparece na casa da familia.
+#
+# A PROVA VEM ANTES DA CONFERENCIA. O veredito e uma funcao de duas entradas, e
+# as quatro combinacoes sao afirmadas aqui antes de a funcao ser usada de
+# verdade. Os dois lados do par importam: mudar conteudo sem promover REPROVA, e
+# promover sem mudar conteudo PASSA. Sem o segundo lado, uma trava que exigisse
+# nome novo sempre ficaria verde e ninguem veria que ela virou carimbo.
+veredito_cache() {
+  # $1 = mudou conteudo (sim/nao); $2 = nome novo (sim/nao)
+  if [ "$1" = "sim" ] && [ "$2" = "nao" ]; then echo "reprova"; else echo "passa"; fi
+}
+p_cache=0; f_cache=0
+afere_cache() {
+  obtido=$(veredito_cache "$1" "$2")
+  if [ "$obtido" = "$3" ]; then
+    p_cache=$((p_cache + 1))
+  else
+    f_cache=$((f_cache + 1))
+    printf '    prova do cache: conteudo=%s nome=%s deu %s, esperado %s\n' "$1" "$2" "$obtido" "$3"
+  fi
+}
+afere_cache sim nao reprova
+afere_cache sim sim passa
+afere_cache nao sim passa
+afere_cache nao nao passa
+if [ "$f_cache" != "0" ]; then
+  printf '  FALHOU  %-24s a prova da trava nao passou: %s de 4\n' "conteudo no cache" "$p_cache"
+  falhou=1
+elif [ -z "$base" ]; then
+  printf '  INSTAVEL %-23s sem base de merge para comparar o conteudo\n' "conteudo no cache"
+  instavel=1
+else
+  # So os arquivos de verdade: a entrada './' e a raiz, que nao e arquivo.
+  caminhos=$(printf '%s\n' "$lista_agora" | grep -v '^$' | grep -v '^\.$' | grep -v '^/$')
+  mudados=""
+  for c in $caminhos; do
+    [ -f "$c" ] || continue
+    if ! git diff --quiet "$base" -- "$c" 2>/dev/null; then
+      mudados="$mudados $c"
+    fi
+  done
+  nome_agora=$(nome_sw "$sw_agora")
+  nome_antes=$(nome_sw "$sw_antes")
+  if [ -z "$mudados" ]; then
+    printf '  ok      %-24s nenhum arquivo do pacote mudou de conteudo desde a base\n' "conteudo no cache"
+  elif [ "$nome_agora" != "$nome_antes" ]; then
+    printf '  ok      %-24s%s arquivo(s) do pacote mudaram e o cache subiu para %s\n' \
+      "conteudo no cache" "$(printf '%s' "$mudados" | wc -w | tr -d ' ')" "$nome_agora"
+  else
+    printf '  FALHOU  %-24s mudou de conteudo e o cache continua %s:%s\n' \
+      "conteudo no cache" "$nome_agora" "$mudados"
+    falhou=1
+  fi
+fi
+
 # A LINHA DE carregarSerie QUE MONTA O CAMINHO DAS SERIES DA MATEMATICA.
 #
 # O app.js le a tabela de materias (Core.MATERIAS) para saber de que raiz vem
