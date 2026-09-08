@@ -7625,15 +7625,24 @@
    * graus marcados igual, com a setinha de paralelismo por cima afirmando o
    * paralelismo que produz exatamente o contrario.
    *
-   * A segunda e a REDUNDANCIA. Grupo em que TODOS os membros ja carregam valor
-   * escrito nao acrescenta afirmacao nenhuma (os numeros ja disseram quais sao
-   * iguais) e acrescenta arco: num cruzamento com os quatro angulos rotulados os
-   * arcos a mais fecham um no de seis arcos num circulo de 24 pt, medido na
-   * rasterizacao a 150 dpi. A congruencia por CONTAGEM existe para a figura que
-   * NAO escreve numero, e e la que ela e o unico canal disponivel.
+   * A segunda e a REDUNDANCIA, e ela vale SO PARA NUMERO. Grupo em que todos os
+   * membros trazem numero nao acrescenta afirmacao nenhuma (os numeros ja
+   * disseram quais sao iguais) e acrescenta arco: num cruzamento com os quatro
+   * angulos rotulados os arcos a mais fecham um no de seis arcos num circulo de
+   * 24 pt, medido na rasterizacao a 150 dpi.
    *
-   * CAMPO MINIMO das duas: o proprio grupo. Elas nao dependem de haver valor
-   * escrito em lugar nenhum: a paridade e propriedade da posicao.
+   * Letra e expressao NAO contam como valor aqui, e a primeira versao desta
+   * trava contava, e recusava diretiva legitima. Letra nao afirma medida
+   * nenhuma: em "incognita=x;1 incognita=y;3 congruentes=1;3" o grupo e o UNICO
+   * canal que diz que os dois sao iguais, e em "angulo=3x+10;1 angulo=5x-30;3
+   * congruentes=1;3" ele E a hipotese do exercicio, porque quem resolve nao ve
+   * que as duas expressoes valem o mesmo antes de escrever a equacao. A figura
+   * dos opostos na forma do livro, "nomeiaangulos=a;b;c;d congruentes=1;3
+   * congruentes=2;4", tambem caia por aqui.
+   *
+   * CAMPO MINIMO das duas: o proprio grupo. A paridade e propriedade da posicao
+   * e nao depende de valor nenhum; a redundancia pergunta pelo numero, que e o
+   * unico formato que afirma medida sozinho.
    *
    * oposto=sim e acucar para o grupo dos dois opostos pelo vertice da primeira
    * posicao marcada. O tema fala em "opostos pelo vertice" e nao em "posicoes 1 e
@@ -7642,10 +7651,15 @@
    * paridade, entao ele nunca cai na primeira trava. */
   function retasCongruentes(B, doc, d, entradas, nPos) {
     var brutos = pares(B, d.args, 'congruentes'), grupos = [], i, j;
-    function temValor(p) {
-      for (var w = 0; w < entradas.length; w++) if (entradas[w].pos === p) return entradas[w];
-      return null;
+    /* Valor que afirma medida sozinho e NUMERO. Letra e expressao ocupam a
+     * posicao e ganham arco, mas nao dizem quanto ela mede. */
+    function temNumero(p) {
+      for (var w = 0; w < entradas.length; w++) {
+        if (entradas[w].pos === p) return B.ehNumero(entradas[w].texto);
+      }
+      return false;
     }
+    var candidatos = [];
     for (i = 0; i < brutos.length; i++) {
       var grupo = [];
       for (j = 0; j < brutos[i].length; j++) {
@@ -7670,19 +7684,16 @@
         }
         grupo.push(p);
       }
-      if (!grupo.length) continue;
-      var todosComValor = true;
-      for (j = 0; j < grupo.length; j++) if (!temValor(grupo[j])) todosComValor = false;
-      if (todosComValor) {
-        B.avisar(doc, 'retas: congruentes=' + brutos[i].join(';') + ' marca posicoes que ja ' +
-          'carregam valor escrito, e ai o grupo nao afirma nada que os numeros nao tenham ' +
-          'afirmado: o que ele acrescenta e arco. Num cruzamento com os quatro angulos rotulados ' +
-          'os arcos a mais fecham um no em volta do ponto. Tire a chave: os angulos de mesma ' +
-          'medida ja saem com arcos de raio igual, que e a mesma notacao');
-        return null;
-      }
-      grupos.push(grupo);
+      if (grupo.length) candidatos.push({ grupo: grupo, escrito: brutos[i].join(';') });
     }
+
+    /* oposto=sim entra na MESMA porta dos grupos escritos a mao, e nao depois
+     * dela. Empurrado direto para a lista, ele escapava da conferencia de
+     * redundancia: "angulo=63;1 angulo=63;3 congruentes=1;3" era recusado e
+     * "angulo=63;1 angulo=63;3 oposto=sim", que produz exatamente o mesmo grupo,
+     * passava. Dois caminhos para a mesma coisa com vereditos opostos e pior do
+     * que veredito nenhum, porque quem escreve o tema aprende a usar o caminho
+     * que nao reclama. */
     var oposto = B.primeiro(d.args, 'oposto');
     if (oposto && String(oposto).toLowerCase() !== 'nao') {
       if (!entradas.length) {
@@ -7692,7 +7703,22 @@
       }
       var base0 = entradas[0].pos;
       var dentro = ((base0 - 1) % 4), cruz = Math.floor((base0 - 1) / 4);
-      grupos.push([base0, cruz * 4 + ((dentro + 2) % 4) + 1]);
+      var parOposto = [base0, cruz * 4 + ((dentro + 2) % 4) + 1];
+      candidatos.push({ grupo: parOposto, escrito: 'oposto=sim (posicoes ' + parOposto.join(' e ') + ')' });
+    }
+
+    for (i = 0; i < candidatos.length; i++) {
+      var g2 = candidatos[i].grupo, todosNumericos = true;
+      for (j = 0; j < g2.length; j++) if (!temNumero(g2[j])) todosNumericos = false;
+      if (todosNumericos) {
+        B.avisar(doc, 'retas: ' + candidatos[i].escrito + ' marca posicoes que ja trazem NUMERO, ' +
+          'e ai o grupo nao afirma nada que os numeros nao tenham afirmado: o que ele acrescenta ' +
+          'e arco. Num cruzamento com os quatro angulos rotulados os arcos a mais fecham um no em ' +
+          'volta do ponto. Tire a chave: os angulos de mesma medida ja saem com arcos de raio ' +
+          'igual, que e a mesma notacao');
+        return null;
+      }
+      grupos.push(g2);
     }
     return grupos;
   }
@@ -8087,6 +8113,7 @@
   var FEIXE_X_A = -30;       // por onde cada uma passa na altura do meio do feixe
   var FEIXE_X_B = 34;
   var FEIXE_VAO = 40;        // vao minimo entre as duas transversais, em toda paralela
+  var FEIXE_SEPARA = 8;      // abaixo disto as duas transversais leem como paralelas entre si
 
   /* corta=t;6;x, na gramatica valor[;rotulo] do resto do kit com o nome da reta
    * na frente: o primeiro campo diz DE QUAL transversal e o segmento, o segundo
@@ -8275,6 +8302,20 @@
         var alvo = kEntre >= 1 ? senoRef / kEntre : senoRef * kEntre;
         if (alvo >= SENO_MIN && alvo <= 1) {
           var novo = Math.asin(alvo) * 180 / Math.PI;
+          /* O seno tem DUAS solucoes no intervalo, a aguda e a espelhada (180
+           * menos ela), e as duas recortam o mesmo comprimento. Quando a razao
+           * escrita e perto de 1 a solucao aguda cai em cima da inclinacao da
+           * primeira transversal, as duas saem PARALELAS entre si e a folha vira
+           * uma grade de paralelogramo: um feixe de Tales com as transversais
+           * paralelas nao mostra o teorema, porque o que ele passa a mostrar e
+           * que segmentos entre paralelas sao congruentes. E o caso do exercicio
+           * 17 do MAT09-08, em que os dois lados trazem os mesmos valores.
+           *
+           * A espelhada resolve sem mexer em comprimento nenhum: ela inclina a
+           * segunda transversal para o outro lado, as duas convergem, e a razao
+           * continua exata porque sen(180 - a) = sen(a). Ela entra sempre que a
+           * aguda ficaria a menos de FEIXE_SEPARA graus da primeira. */
+          if (Math.abs(novo - FEIXE_INC_A) < FEIXE_SEPARA) novo = 180 - novo;
           if (kEntre >= 1) { incs[0] = FEIXE_INC_A; incs[1] = novo; }
           else { incs[1] = FEIXE_INC_A; incs[0] = novo; }
         } else {

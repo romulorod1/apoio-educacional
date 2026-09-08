@@ -88,15 +88,6 @@ const CASOS = [
   ['MAT09-08', 'exercicio 8',
    '@fig retas id=t8 feixe=3;a;b;c transversal=t transversal=u corta=t;6 corta=t;10 corta=u;9 corta=u;x'],
   ['MAT09-08', 'gabarito 8', '@fig id=t8 fase=gabarito'],
-  /* O 17 pede "x e x+4" numa transversal e "6 e 10" na outra. A expressao x+4
-   * NAO pode ser impressa: a trava (a) do conferirFigura classifica qualquer
-   * expressao algebrica numa figura como valor de ANGULO e cobra dela um arco, e
-   * a cota de um segmento nao tem arco. A figura sai construida com a resposta
-   * (x = 6) e rotulada com letras simples; o enunciado e que diz que a segunda
-   * mede x + 4. */
-  ['MAT09-08', 'exercicio 17',
-   '@fig retas id=t17 feixe=3;a;b;c transversal=t transversal=u corta=t;6;x corta=t;10;y corta=u;6 corta=u;10'],
-
   /* ---------------------------------------------------- MAT06-09, angulos e retas */
   ['MAT06-09', 'explicacao, duas concorrentes com os quatro angulos',
    '@fig retas id=c4 reta=r reta=s angulo=63;1 angulo=117;2 angulo=63;3 angulo=117;4'],
@@ -105,8 +96,14 @@ const CASOS = [
   ['MAT06-09', 'exercicio 4',
    '@fig retas id=c6 reta=r reta=s angulo=63;1 incognita=x;2 incognita=y;3 incognita=z;4'],
   ['MAT06-09', 'gabarito 4', '@fig id=c6 fase=gabarito'],
+  /* O 65 tem que morar numa posicao INTERNA (3, 4, 5 ou 6): so angulo interno
+   * tem alterno interno e colateral interno, que e o que o enunciado pede. Posto
+   * na 1, que e externa, o "alterno interno" virava o oposto pelo vertice e o
+   * colateral interno nao aparecia na figura; o gabarito ainda imprimiria 65 por
+   * coincidencia, nomeando outro angulo. Com o 65 na 4: correspondente 8,
+   * alterno interno 6, colateral interno 5. */
   ['MAT06-09', 'exercicio 8',
-   '@fig retas id=c8 reta=r reta=s paralelas=r;s transversal=t angulo=65;1 incognita=x;5 incognita=y;3'],
+   '@fig retas id=c8 reta=r reta=s paralelas=r;s transversal=t angulo=65;4 incognita=x;8 incognita=y;6 incognita=z;5'],
   ['MAT06-09', 'exercicio 15',
    '@fig retas id=c15 reta=r reta=s paralelas=r;s transversal=t angulo=2x+30;3 angulo=3x+10;6'],
   ['MAT06-09', 'exercicio 17',
@@ -115,8 +112,11 @@ const CASOS = [
   /* ---------------------------------------------------- MAT04-07, retas, angulos e giros */
   ['MAT04-07', 'explicacao, painel de retas: paralelas',
    '@fig retas id=q1 reta=r reta=s paralelas=r;s nomeiaretas=sim'],
+  /* O painel do 4o ano mostra o que as retas SAO, e nao quanto medem: medida na
+   * figura entra no 4o ano, mas aqui a celula do meio so precisa dizer "estas se
+   * cruzam". O 55 seria numero sem pergunta. */
   ['MAT04-07', 'explicacao, painel de retas: concorrentes',
-   '@fig retas id=q2 reta=r reta=s nomeiaretas=sim angulo=55;1'],
+   '@fig retas id=q2 reta=r reta=s nomeiaretas=sim'],
   ['MAT04-07', 'explicacao, painel de retas: perpendiculares',
    '@fig retas id=q3 reta=r reta=s reto=sim nomeiaretas=sim'],
   ['MAT04-07', 'exercicio 3',
@@ -158,7 +158,14 @@ const FORA = [
   ['paralelogramo', 'MAT08-11 14. E quadrilatero, que ja desenha'],
   ['painel ponto, reta, semirreta e segmento', 'MAT04-07 explicacao. Pede semirreta e segmento'],
   ['os dois triangulos semelhantes, a sombra do poste, o trapezio com as diagonais e a rampa',
-   'MAT09-08. Sao triangulo e quadrilatero']
+   'MAT09-08. Sao triangulo e quadrilatero'],
+  ['MAT09-08 exercicio 17, o feixe com x e x+4 numa transversal e 6 e 10 na outra',
+   'a expressao "x+4" nao pode ser impressa: a trava (a) do conferirFigura classifica qualquer ' +
+   'expressao algebrica dentro de uma figura como valor de ANGULO e cobra dela um arco, e a cota ' +
+   'de um segmento nao tem arco. Rotular a segunda cota com outra letra faria a figura ' +
+   'CONTRADIZER o enunciado, porque um y le como incognita independente e o exercicio diz que a ' +
+   'segunda mede x mais 4, e diretiva que contradiz o texto nao pode sair colavel. O exercicio ' +
+   'fica sem figura ate a trava do base.js distinguir rotulo de cota de valor de angulo']
 ];
 
 /* ================================================================ a conferencia */
