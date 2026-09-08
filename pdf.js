@@ -1585,6 +1585,11 @@
   Doc.prototype.equacao = function (latex, opcoes) {
     opcoes = opcoes || {};
     var tam = opcoes.tam || 11;
+    /* A coluna em que a fórmula é centrada. Sem argumento é a folha inteira, que
+     * é a explicação; dentro de um exercício é a coluna do item, senão a fórmula
+     * sai centrada na folha e desalinhada do enunciado que fala dela. */
+    var xEsq = (opcoes.x == null) ? MARG_E : opcoes.x;
+    var largura = (opcoes.largura == null) ? UTIL : opcoes.largura;
     var mod = moduloFormula();
     if (!mod) {
       /* Sem o módulo, a diretiva NÃO sai impressa como texto. Já aconteceu com o
@@ -1605,7 +1610,7 @@
     this.y -= FOLGA_EQ + (m.altura || 0);
     var r = null;
     try {
-      r = mod.desenhar(this, latex, MARG_E + UTIL / 2, this.y, tam, { align: 'centro', lingua: this.lingua });
+      r = mod.desenhar(this, latex, xEsq + largura / 2, this.y, tam, { align: 'centro', lingua: this.lingua });
     } catch (e) {
       this.avisoDeFigura('não deu para desenhar a fórmula: ' + (e && e.message ? e.message : e));
     }
@@ -1616,9 +1621,9 @@
     var avisos = (r && r.avisos) || m.avisos || [];
     for (var a = 0; a < avisos.length; a++) this.avisoDeFigura('fórmula: ' + avisos[a]);
 
-    if (m.largura > UTIL) {
-      this.avisoDeFigura('fórmula mais larga que a folha (' +
-        Math.round(m.largura) + ' pt contra ' + Math.round(UTIL) + '): @eq ' + latex);
+    if (m.largura > largura) {
+      this.avisoDeFigura('fórmula mais larga que a coluna (' +
+        Math.round(m.largura) + ' pt contra ' + Math.round(largura) + '): @eq ' + latex);
     }
     return r;
   };
@@ -1643,7 +1648,7 @@
    * diretiva ainda sai, e a diretiva é descartada com aviso, nunca impressa. */
   Doc.prototype.partesDeFigura = function (texto) {
     var mod = moduloFiguras();
-    if (mod) return mod.partirEnunciado(texto);
+    if (mod) return expandirEquacoes(this, mod.partirEnunciado(texto));
     /* Sem o módulo, a MESMA regra de leitura, e não uma regra própria mais
      * frouxa. As duas perdas que a regra frouxa causava eram silenciosas na
      * folha: um "contato@figuras.com" no enunciado virava diretiva e o texto
@@ -1660,7 +1665,7 @@
       this.avisoDeFigura(porqueSemFiguras() + ', diretiva descartada: ' + s.slice(pos, fim).trim());
       i = fim;
     }
-    return partes;
+    return expandirEquacoes(this, partes);
   };
 
   /* A mesma trava de isolamento do acharDiretiva do figuras/base.js: arroba
@@ -1703,6 +1708,77 @@
     if (t) partes.push({ tipo: 'texto', valor: t });
   }
 
+  /* A mesma trava de isolamento do acharFigCru, agora para o "@eq": arroba
+   * precedida de espaço ou início, e seguida de espaço ou fim. Ela existe para
+   * "contato@figuras.com" não virar diretiva, e vale igual aqui. */
+  function acharEqCru(s, de) {
+    var pos = s.indexOf('@eq', de || 0);
+    while (pos >= 0) {
+      var antes = pos === 0 || /\s/.test(s.charAt(pos - 1));
+      var depois = pos + 3 >= s.length || /\s/.test(s.charAt(pos + 3));
+      if (antes && depois) return pos;
+      pos = s.indexOf('@eq', pos + 3);
+    }
+    return -1;
+  }
+
+  /* Onde a equação termina. O fimDaDiretivaCrua NÃO serve aqui, e é por isso que
+   * esta função existe: a gramática do "@eq" é outra. O "@fig" são pares
+   * chave=valor sem espaço, e o "@eq" é LaTeX, onde o espaço FAZ PARTE da
+   * fórmula ("\frac{1}{2} + x"). Parando no primeiro token que não casa
+   * chave=valor, a fórmula sairia cortada na primeira palavra.
+   *
+   * Então a equação vai do "@eq" até o fim do trecho, ou até a próxima diretiva
+   * ("@fig" ou outro "@eq"), o que vier primeiro. */
+  function fimDaEquacaoCrua(s, inicio) {
+    var fim = s.length;
+    var outraEq = acharEqCru(s, inicio + 3);
+    var figura = acharFigCru(s, inicio + 3);
+    if (outraEq >= 0 && outraEq < fim) fim = outraEq;
+    if (figura >= 0 && figura < fim) fim = figura;
+    return fim;
+  }
+
+  /* Expande os pedaços de TEXTO nas equações que houver dentro deles.
+   *
+   * Este é o mesmo defeito que o comentário do ramo de figura deste arquivo
+   * registra ter acontecido com o "@fig": a diretiva saía IMPRESSA por extenso
+   * no meio da folha da aluna, em silêncio, porque nenhum ramo do caminho do
+   * exercício a reconhecia. O conserto de então foi feito SÓ PARA O "@fig", e é
+   * exatamente por isso que o buraco sobreviveu para o "@eq" e a folha saiu com
+   * "@eq A = \begin{bmatrix} 1 & 2 \\ 3 & 5 \end{bmatrix}" escrito. Consertar de
+   * novo pela metade, para uma diretiva só, reabre o buraco na próxima: quem
+   * separa aqui devolve PEDAÇOS COM TIPO, e quem consome decide pelo tipo, numa
+   * tabela só (a PEDACO_DO_ITEM), onde tipo desconhecido vira aviso e nunca
+   * texto impresso.
+   *
+   * Roda DEPOIS da separação das figuras, e por isso o pedaço de texto que chega
+   * aqui nunca contém uma diretiva de figura: a ordem em que as duas aparecem no
+   * item é preservada. */
+  function expandirEquacoes(doc, partes) {
+    var saida = [];
+    for (var i = 0; i < (partes || []).length; i++) {
+      var p = partes[i];
+      if (!p || p.tipo !== 'texto') { saida.push(p); continue; }
+      var s = String(p.valor == null ? '' : p.valor);
+      if (acharEqCru(s, 0) < 0) { saida.push(p); continue; }
+      var j = 0;
+      while (j < s.length) {
+        var pos = acharEqCru(s, j);
+        if (pos < 0) { empurrarTextoCru(saida, s.slice(j)); break; }
+        empurrarTextoCru(saida, s.slice(j, pos));
+        var fim = fimDaEquacaoCrua(s, pos);
+        var latex = s.slice(pos + 3, fim).trim();
+        /* "@eq" sem fórmula nenhuma some com aviso, nunca impresso: uma diretiva
+         * vazia na folha da aluna é ruído que ela não tem como interpretar. */
+        if (latex) saida.push({ tipo: 'equacao', latex: latex });
+        else if (doc) doc.avisoDeFigura('@eq sem fórmula nenhuma, diretiva descartada');
+        j = fim;
+      }
+    }
+    return saida;
+  }
+
   Doc.prototype.avisoDeFigura = function (texto) {
     (this.avisosFigura = this.avisosFigura || []).push(texto);
     if (typeof console !== 'undefined' && console.warn) console.warn('[figura] ' + texto);
@@ -1737,14 +1813,28 @@
    * ser a única trava. */
   Doc.prototype.separarFiguras = function (texto) {
     var s = String(texto == null ? '' : texto);
-    if (s.indexOf('@fig') < 0) return { texto: s, figuras: [] };
+    /* O atalho tem que olhar as DUAS diretivas. Olhando só o "@fig", um trecho
+     * com "@eq" voltava inteiro daqui e a fórmula saía impressa como LaTeX cru. */
+    if (s.indexOf('@fig') < 0 && s.indexOf('@eq') < 0) {
+      return { texto: s, figuras: [], equacoes: [] };
+    }
     var partes = this.partesDeFigura(s);
-    var corrido = [], figuras = [];
+    var corrido = [], figuras = [], equacoes = [];
     for (var i = 0; i < partes.length; i++) {
       if (partes[i].tipo === 'figura') figuras.push(partes[i].diretiva);
+      else if (partes[i].tipo === 'equacao') equacoes.push(partes[i].latex);
       else corrido.push(partes[i].valor);
     }
-    return { texto: corrido.join(' '), figuras: figuras };
+    /* Quem chama daqui são os ramos do markdown (parágrafo, item de lista,
+     * subtítulo, célula de tabela), e todos eles já têm ramo próprio para a
+     * "@eq" que ocupa a linha inteira, que é a forma como os temas a escrevem.
+     * A que aparece no MEIO da linha chega até aqui e o chamador não tem onde
+     * desenhá-la: ela sai da folha COM AVISO, e nunca impressa por extenso.
+     * Trocar um defeito visível por um silencioso seria pior do que o defeito. */
+    for (var e = 0; e < equacoes.length; e++) {
+      this.avisoDeFigura('@eq no meio da linha, fora do item: fórmula não desenhada: ' + equacoes[e]);
+    }
+    return { texto: corrido.join(' '), figuras: figuras, equacoes: equacoes };
   };
 
   /* Guarda os ids das figuras de um texto sem desenhar nada. O gabarito pode ser
@@ -1761,16 +1851,25 @@
   Doc.prototype.textoComFiguras = function (texto, opcoes) {
     opcoes = opcoes || {};
     var partes = this.partesDeFigura(texto);
-    var corrido = [], figuras = [];
+    /* Uma lista só, na ORDEM em que os blocos apareceram: com "@fig" e "@eq" na
+     * mesma linha, duas listas separadas trocariam a ordem dos dois na folha. */
+    var corrido = [], blocos = [];
     for (var i = 0; i < partes.length; i++) {
-      if (partes[i].tipo === 'figura') figuras.push(partes[i].diretiva);
-      else corrido.push(partes[i].valor);
+      if (partes[i].tipo === 'texto') corrido.push(partes[i].valor);
+      else blocos.push(partes[i]);
     }
     if (typeof opcoes.escrever === 'function' && corrido.length) opcoes.escrever(corrido.join(' '));
-    for (var f = 0; f < figuras.length; f++) {
-      this.figura(figuras[f], { x: opcoes.x, largura: opcoes.largura, altura: opcoes.altura });
+    var figuras = 0, equacoes = 0;
+    for (var f = 0; f < blocos.length; f++) {
+      if (blocos[f].tipo === 'equacao') {
+        equacoes++;
+        this.equacao(blocos[f].latex, { tam: opcoes.tamEq, x: opcoes.x, largura: opcoes.largura });
+      } else {
+        figuras++;
+        this.figura(blocos[f].diretiva, { x: opcoes.x, largura: opcoes.largura, altura: opcoes.altura });
+      }
     }
-    return { texto: corrido.join(' '), figuras: figuras.length };
+    return { texto: corrido.join(' '), figuras: figuras, equacoes: equacoes };
   };
 
   // ================= bloco de citação =================
@@ -3259,12 +3358,17 @@
      * Pedaço de tipo desconhecido vira aviso e NÃO sai impresso: marcação
      * impressa por extenso na folha da aluna é o defeito silencioso que toda
      * esta separação existe para impedir. */
+    /* Figura e equação vão para a MESMA lista, na ordem em que apareceram no
+     * item: com as duas no mesmo enunciado, duas listas separadas trocariam a
+     * ordem delas na folha e a frase que manda olhar para uma apontaria para a
+     * outra. O texto continua em lista própria porque ele sai todo antes. */
     var PEDACO_DO_ITEM = {
       texto: function (saida, p) { saida.texto.push(p.valor); },
-      figura: function (saida, p) { saida.figura.push(p.diretiva); }
+      figura: function (saida, p) { saida.blocos.push({ tipo: 'figura', diretiva: p.diretiva }); },
+      equacao: function (saida, p) { saida.blocos.push({ tipo: 'equacao', latex: p.latex }); }
     };
     function separarPorTipo(bruto) {
-      var saida = { texto: [], figura: [] };
+      var saida = { texto: [], blocos: [] };
       doc.partesDeFigura(bruto).forEach(function (p) {
         var caso = PEDACO_DO_ITEM[p.tipo];
         if (!caso) { doc.avisoDeFigura('pedaço de tipo desconhecido no item: ' + p.tipo); return; }
@@ -3308,14 +3412,21 @@
      * próprio e as alternativas entram na MESMA altura do enunciado, para o
      * número, o enunciado, o trecho e as alternativas ficarem na mesma página
      * quando cabem; o teto de uma folha continua no reservarBloco. */
+    /* A fórmula do item sai um ponto maior que o texto dele, que é a mesma
+     * relação que a explicação usa (tam + 1): a equação é bloco, e no mesmo
+     * corpo do texto ela se confundiria com a frase em volta. */
+    function tamDaEquacao(tam) { return tam + 1; }
+
     function medirItem(bruto, tam, recuo, alturaLinha, extras) {
       var pedacos = separarPorTipo(bruto);
-      var figuras = pedacos.figura;
+      var blocos = pedacos.blocos;
       var segmentos = quebrarRico(partirRico(pedacos.texto.join(' ')), MARG_D - recuo, tam);
       // a primeira linha divide a linha do número, então só as seguintes descem
       var altura = Math.max(0, segmentos.length - 1) * alturaLinha;
-      figuras.forEach(function (d) {
-        altura += doc.alturaDeFigura(d, { x: recuo, largura: MARG_D - recuo });
+      blocos.forEach(function (b) {
+        altura += (b.tipo === 'equacao')
+          ? doc.alturaDeEquacao(b.latex, { tam: tamDaEquacao(tam) })
+          : doc.alturaDeFigura(b.diretiva, { x: recuo, largura: MARG_D - recuo });
       });
       var ex = extras && extras.ex;
       var trecho = (ex && ex.trecho && ex.trecho.conteudo) ? ex.trecho : null;
@@ -3324,7 +3435,7 @@
       if (trecho) altura += doc.alturaDeCitacao(trecho, { tam: 10, credito: creditoDoTrecho });
       altura += alturaDeAlternativas(alternativas);
       return {
-        segmentos: segmentos, figuras: figuras, altura: altura,
+        segmentos: segmentos, blocos: blocos, altura: altura,
         trecho: trecho, creditoDoTrecho: creditoDoTrecho, alternativas: alternativas
       };
     }
@@ -3334,8 +3445,16 @@
         if (k > 0) { doc.garanteEspaco(alturaLinha); doc.y -= alturaLinha; }
         doc.escreverSegmentos(med.segmentos[k], recuo, doc.y, { tam: tam });
       }
-      med.figuras.forEach(function (d) {
-        doc.figura(d, { x: recuo, largura: MARG_D - recuo });
+      /* A ordem fixa do bloco não muda: número, texto completo, e só então o
+       * desenho, seja ele figura ou fórmula. A fórmula é bloco e nunca sai no
+       * meio da frase, pelo mesmo motivo da figura: o texto do exercício é
+       * coluna única e não tem reflow para abrir espaço no meio de uma linha. */
+      med.blocos.forEach(function (b) {
+        if (b.tipo === 'equacao') {
+          doc.equacao(b.latex, { tam: tamDaEquacao(tam), x: recuo, largura: MARG_D - recuo });
+        } else {
+          doc.figura(b.diretiva, { x: recuo, largura: MARG_D - recuo });
+        }
       });
       /* O trecho próprio do item (G6) sai LOGO DEPOIS do enunciado e antes das
        * alternativas, com número e fio. O crédito só quando a fonte dele é
@@ -3345,7 +3464,7 @@
         doc.citacao(med.trecho, { tam: 10, credito: med.creditoDoTrecho });
       }
       escreverAlternativas(med.alternativas, recuo);
-      return med.figuras.length;
+      return med.blocos.length;
     }
 
     /* Rótulos do gabarito aberto. Ficam em português porque matéria com catálogo

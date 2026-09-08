@@ -105,6 +105,38 @@ registro, nunca LaTeX cru como texto. O delimitador e `@eq` e nao `$...$` porque
 tem 135 cifroes e todos sao `R$`. O nome de funcao segue a lingua da folha: `\sin` sai
 "sen" em portugues e "sin" em ingles, inclusive dentro de fracao, raiz e expoente.
 
+Ela vale tambem DENTRO do exercicio e DENTRO da resposta, desde 08/09/2026, com a mesma
+posicao fixa da figura: numero, enunciado completo, depois a formula, depois o espaco de
+resposta. A formula e bloco e nunca sai no meio da frase, pelo mesmo motivo da figura: o
+texto do exercicio e coluna unica e nao tem reflow para abrir espaco no meio de uma linha.
+Dentro do item ela e centrada na COLUNA do item, e nao na folha, para nao ficar desalinhada
+do enunciado que fala dela. Antes disto a diretiva saia impressa como LaTeX cru na folha da
+aluna, sem aviso nenhum: `Escreva o elemento ... @eq A = \begin{bmatrix} 1 & 2 \\ 3 & 5
+\end{bmatrix}`.
+
+  1. Escreva o elemento da segunda linha e primeira coluna da matriz.
+  @eq A = \begin{bmatrix} 1 & 2 \\ 3 & 5 \end{bmatrix}
+
+  1. A transposta e
+  @eq \begin{bmatrix} 1 & 3 \\ 2 & 5 \end{bmatrix}
+
+A gramatica do `@eq` DIFERE da do `@fig`, e e por isso que ela nao passa pelo mesmo leitor:
+o `@fig` sao pares `chave=valor` sem espaco, e o `@eq` e LaTeX, onde **o espaco faz parte da
+formula**. Parando no primeiro token que nao casa `chave=valor`, `@eq A = \frac{1}{2}` sairia
+cortado em `A`. Entao a equacao vai do `@eq` ate o fim do item, ou ate a proxima diretiva
+(`@fig` ou outro `@eq`), o que vier primeiro. Mais de uma `@eq` no mesmo item funciona, e
+`@eq` e `@fig` no mesmo item tambem, cada uma saindo na ordem em que aparece.
+
+Vale a mesma trava de isolamento do arroba do `@fig`: a diretiva so e reconhecida precedida
+de espaco ou de inicio e seguida de espaco ou de fim, para `contato@equipe.com` escrito num
+tema nao virar diretiva e nao levar embora o resto da frase. `@eq` sem formula nenhuma some
+com aviso, nunca impressa.
+
+Travas: `_teste/testa_material.js` (par envenenado, com a busca generica de arroba seguida
+de letra no texto desenhado de qualquer folha, e o controle positivo de que a formula foi
+DESENHADA e nao apenas apagada) e `figuras/_sonda_eq_no_exercicio.js` (a prova sobre uma
+copia do MATEM2-04, com o controle da explicacao).
+
 ### As receitas de circulo, conicas e poligono regular
 
 Chegaram em 02/09/2026, com um caso por chave em `_prova_receitas_circulo.js` e um
