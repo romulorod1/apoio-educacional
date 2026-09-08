@@ -392,30 +392,89 @@ afere_cache nao nao passa
 if [ "$f_cache" != "0" ]; then
   printf '  FALHOU  %-24s a prova da trava nao passou: %s de 4\n' "conteudo no cache" "$p_cache"
   falhou=1
-elif [ -z "$base" ]; then
-  printf '  INSTAVEL %-23s sem base de merge para comparar o conteudo\n' "conteudo no cache"
+elif [ -z "$base" ] || [ -z "$sw_antes" ] || [ -z "$sw_agora" ]; then
+  # A MESMA guarda da trava vizinha, de proposito. Com base presente e sw.js
+  # ausente na base, a vizinha dizia INSTAVEL e esta dizia ok verde.
+  printf '  INSTAVEL %-23s sem base de merge com sw.js para comparar o conteudo\n' "conteudo no cache"
   instavel=1
 else
-  # So os arquivos de verdade: a entrada './' e a raiz, que nao e arquivo.
-  caminhos=$(printf '%s\n' "$lista_agora" | grep -v '^$' | grep -v '^\.$' | grep -v '^/$')
+  # A entrada './' e a raiz e sai como linha VAZIA da extracao, porque o grupo
+  # opcional come o './' e o resto casa nada. Quem a remove e este grep -v '^$'.
+  #
+  # O `|| true` e obrigatorio e nao e enfeite: sob set -e, um grep que filtra a
+  # lista inteira devolve 1, a atribuicao devolve 1, e o portao MORRE aqui,
+  # calado, antes do resumo e antes das travas seguintes. Uma delas e a que
+  # impede nome de aluno de entrar num repositorio publico. E a mesma armadilha
+  # que este arquivo ja documenta na secao da privacidade.
+  caminhos=$(printf '%s\n' "$lista_agora" | grep -v '^$' || true)
   mudados=""
+  sumidos=""
+  fora_do_git=""
+  # IFS so com quebra de linha, e glob desligado em volta do laco. Sem isso,
+  # caminho com espaco vira duas palavras, nenhuma existe, as duas caem no
+  # continue, e o arquivo sai da conferencia sem uma linha de aviso. Nenhuma das
+  # entradas de hoje tem espaco; a proxima pode ter.
+  ifs_antes=$IFS
+  IFS='
+'
+  set -f
   for c in $caminhos; do
-    [ -f "$c" ] || continue
+    if [ ! -f "$c" ]; then
+      sumidos="$sumidos $c"
+      continue
+    fi
+    # git diff so enxerga o que o git rastreia. Arquivo do pacote ignorado pelo
+    # .gitignore seria invisivel para esta trava, que e ponto cego dentro de uma
+    # trava que existe para nao ter ponto cego. Entao ele reprova em vez de
+    # passar calado.
+    if [ -z "$(git ls-files -- "$c" 2>/dev/null)" ]; then
+      fora_do_git="$fora_do_git $c"
+      continue
+    fi
     if ! git diff --quiet "$base" -- "$c" 2>/dev/null; then
       mudados="$mudados $c"
     fi
   done
+  set +f
+  IFS=$ifs_antes
   nome_agora=$(nome_sw "$sw_agora")
   nome_antes=$(nome_sw "$sw_antes")
-  if [ -z "$mudados" ]; then
-    printf '  ok      %-24s nenhum arquivo do pacote mudou de conteudo desde a base\n' "conteudo no cache"
-  elif [ "$nome_agora" != "$nome_antes" ]; then
-    printf '  ok      %-24s%s arquivo(s) do pacote mudaram e o cache subiu para %s\n' \
-      "conteudo no cache" "$(printf '%s' "$mudados" | wc -w | tr -d ' ')" "$nome_agora"
-  else
-    printf '  FALHOU  %-24s mudou de conteudo e o cache continua %s:%s\n' \
-      "conteudo no cache" "$nome_agora" "$mudados"
+  if [ -z "$nome_agora" ] || [ -z "$nome_antes" ]; then
+    # Nome vazio passava como "promovido", porque vazio e diferente de v22. Uma
+    # reformatacao do sw.js (aspas duplas, const, espaco a mais) faria nome_sw
+    # devolver vazio, e a trava imprimiria ok com o nome em branco.
+    printf '  FALHOU  %-24s nao consegui ler o nome do cache no sw.js (agora:[%s] base:[%s])\n' \
+      "conteudo no cache" "$nome_agora" "$nome_antes"
     falhou=1
+  elif [ -n "$sumidos" ]; then
+    printf '  FALHOU  %-24s a lista pede arquivo que nao existe no disco, o install morre no 404:%s\n' \
+      "conteudo no cache" "$sumidos"
+    falhou=1
+  elif [ -n "$fora_do_git" ]; then
+    printf '  FALHOU  %-24s arquivo do pacote fora do git: esta trava nao consegue ver o conteudo dele:%s\n' \
+      "conteudo no cache" "$fora_do_git"
+    falhou=1
+  else
+    # A DECISAO EXISTE NUM LUGAR SO.
+    #
+    # Antes, a prova afirmava veredito_cache e o caminho real reimplementava a
+    # mesma decisao numa cadeia propria. Trocar um caractere na cadeia (um != por
+    # um =) virava a trava em carimbo, com a prova continuando 4 de 4 sem uma
+    # palavra: prova verde afirmando uma funcao que ninguem usava. Numa trava que
+    # existe para pegar divergencia, isso era a categoria se fechando sobre si
+    # mesma. Agora quem decide e a funcao que a prova exercita.
+    if [ -n "$mudados" ]; then mudou_conteudo=sim; else mudou_conteudo=nao; fi
+    if [ "$nome_agora" != "$nome_antes" ]; then nome_novo=sim; else nome_novo=nao; fi
+    if [ "$(veredito_cache "$mudou_conteudo" "$nome_novo")" = "reprova" ]; then
+      printf '  FALHOU  %-24s mudou de conteudo e o cache continua %s:%s\n' \
+        "conteudo no cache" "$nome_agora" "$mudados"
+      falhou=1
+    elif [ "$mudou_conteudo" = "nao" ]; then
+      printf '  ok      %-24s nenhum arquivo do pacote mudou de conteudo desde a base\n' "conteudo no cache"
+    else
+      printf '  ok      %-24s%s arquivo(s) do pacote mudaram e o cache subiu para %s\n' \
+        "conteudo no cache" "$(printf '%s' "$mudados" | wc -w | tr -d ' ')" "$nome_agora"
+    fi
   fi
 fi
 
