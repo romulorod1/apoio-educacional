@@ -381,8 +381,26 @@ veneno_some=$(printf '%s\n' "$app_agora" \
 n_agora=$(linhas_serie_mat "$app_agora"); [ -n "$n_agora" ] || n_agora=0
 n_troca=$(linhas_serie_mat "$veneno_troca"); [ -n "$n_troca" ] || n_troca=0
 n_some=$(linhas_serie_mat "$veneno_some"); [ -n "$n_some" ] || n_some=0
+#
+# A ORDEM DESTES TESTES E O CONSERTO, e nao detalhe de estilo.
+#
+# Antes, a pergunta "algum veneno deixou de mudar o app.js?" vinha ANTES de
+# "o codigo de hoje ainda produz o literal?". Isso da o diagnostico trocado
+# justamente no caso que a trava existe para pegar: quando alguem tira o literal
+# da linha de codigo de carregarSerie, o sed do veneno_some nao acha mais o que
+# substituir, o texto sai igual ao original, e o portao reprovava dizendo "um dos
+# venenos nao mudou o app.js: a prova da trava nao prova nada". Quem lia ia
+# conferir a prova da trava, que estava boa, em vez de olhar o app.js, que estava
+# quebrado. Reprovar certo pelo motivo errado custa a hora de quem procura.
+#
+# Perguntando n_agora primeiro, o defeito real e nomeado pelo nome, e a queixa
+# sobre o veneno so aparece quando o codigo de hoje esta bom e a prova e que
+# apodreceu.
 if [ -z "$app_agora" ]; then
   printf '  FALHOU  %-24s nao consegui ler o app.js\n' "serie da matematica"
+  falhou=1
+elif [ "$n_agora" = "0" ]; then
+  printf '  FALHOU  %-24s a linha de carregarSerie nao produz mais o literal banco/serie- para a matematica\n' "serie da matematica"
   falhou=1
 elif [ "$veneno_troca" = "$app_agora" ] || [ "$veneno_some" = "$app_agora" ]; then
   printf '  FALHOU  %-24s um dos venenos nao mudou o app.js: a prova da trava nao prova nada\n' "serie da matematica"
@@ -390,9 +408,6 @@ elif [ "$veneno_troca" = "$app_agora" ] || [ "$veneno_some" = "$app_agora" ]; th
 elif [ "$n_troca" != "0" ] || [ "$n_some" != "0" ]; then
   printf '  FALHOU  %-24s a trava nao enxerga o veneno (literal trocado: %s linha, literal so no comentario: %s linha)\n' \
     "serie da matematica" "$n_troca" "$n_some"
-  falhou=1
-elif [ "$n_agora" = "0" ]; then
-  printf '  FALHOU  %-24s a linha de carregarSerie nao produz mais o literal banco/serie- para a matematica\n' "serie da matematica"
   falhou=1
 else
   printf '  ok      %-24s carregarSerie produz banco/serie- para a matematica (%s linha), e a trava pega os dois venenos\n' \

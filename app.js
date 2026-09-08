@@ -7874,6 +7874,23 @@
     return chavesDeTopico;
   }
 
+  /* ESCREVE NO OBJETO VIVO DA AULA, e isso e proposital e inofensivo.
+   *
+   * Isto roda de dentro da tela de escolha de assunto, que so abre com uma aula
+   * aberta: `aulaEmEdicao` aponta para o MESMO objeto que o laco abaixo percorre,
+   * porque os dois saem de `db.aulas`. Ou seja, a migracao mexe no registro que
+   * esta na mao dela naquele segundo.
+   *
+   * E seguro por tres motivos, e os tres estao provados nas regras acima: e
+   * ADITIVA (so escreve `id` em item que nao tem, e nunca toca em titulo,
+   * disciplina, grupo ou qualquer outro campo), e IDEMPOTENTE, e nao remove item
+   * nenhum. Nada do que a tela ja desenhou muda de valor, entao nao ha tela para
+   * redesenhar e nao ha edicao dela para ser sobrescrita.
+   *
+   * O que NAO se pode fazer aqui, e por isso esta escrito: qualquer mexida futura
+   * que passe a alterar campo existente, reordenar `aula.temas` ou remover item
+   * precisa deixar de rodar com aula aberta, ou salvar por cima do que ela
+   * estiver digitando. O `salvar()` do fim grava o db inteiro. */
   function migrarIdsDosTopicos() {
     if (!topicosPlanos) return 0;
     var chaves = chavesDoCatalogo();
@@ -10193,7 +10210,20 @@
             avisar('Números atualizados: escolas ' + Core.pctBR(lido.escolas12m) +
               ' e inflação ' + Core.pctBR(lido.inflacao12m) + '.');
             desenharAjustes();
-            desenharFechamento();
+            /* Redesenha SÓ o painel de valores, e não o Fechamento inteiro.
+             *
+             * Este é o quarto caminho que leva ao IBGE, e o único em que a
+             * busca sai porque ELA pediu, tocando em "Procurar os números
+             * agora". Os outros três agendam sozinhos e já respeitam o painel
+             * recolhido. Aqui não havia sinal a poupar: havia tela a poupar, e
+             * o conserto tinha sido feito só no caminho automático.
+             *
+             * No Fechamento, quem lê o índice é o painel de valores, e mais
+             * nada: nem o seletor de mês, nem os quatro números, nem a lista de
+             * cartões de todos os alunos. Ela toca neste botão em Ajustes, e se
+             * voltar para o Fechamento antes de a resposta chegar, era a tela
+             * inteira sendo trocada debaixo dos dedos dela. */
+            desenharPanoramaDeValores();
           }).catch(function () {
             if (b) { b.disabled = false; b.textContent = 'Procurar os números agora'; }
             avisar('Não consegui buscar agora. Continua valendo o número de ' +
