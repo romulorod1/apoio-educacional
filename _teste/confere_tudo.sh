@@ -495,18 +495,28 @@ else
     printf '  FALHOU  %-24s nao consegui ler o nome do cache no sw.js (agora:[%s] base:[%s])\n' \
       "conteudo no cache" "$nome_agora" "$nome_antes"
     falhou=1
-  elif [ -n "$caixa_trocada" ]; then
-    printf '  FALHOU  %-24s a lista escreve com caixa diferente da do git, e o GitHub Pages e sensivel a caixa:%s\n' \
-      "conteudo no cache" "$caixa_trocada"
-    falhou=1
-  elif [ -n "$sumidos" ] || [ -n "$fora_do_git" ]; then
-    # UMA falha so, com as duas listas: separadas em duas falhas, quem conserta
-    # uma roda de novo e so entao descobre a outra, e sao duas voltas de quinze
-    # minutos. Em linhas de continuacao indentadas porque numa linha so ela
-    # passava de mil colunas com poucos arquivos e enterrava o proprio FALHOU.
+  elif [ -n "$caixa_trocada" ] || [ -n "$sumidos" ] || [ -n "$fora_do_git" ]; then
+    # UMA falha so, com os TRES motivos: separados em falhas diferentes, quem
+    # conserta um roda de novo e so entao descobre o proximo, e cada volta e
+    # quinze minutos de portao. A primeira versao disto juntava dois e deixava a
+    # caixa trocada de fora, que era o mesmo erro que ela consertava.
+    #
+    # Cada motivo so imprime a propria linha se tiver o que dizer, e em linha de
+    # continuacao indentada: numa linha so, com poucos arquivos, ela passava de
+    # mil colunas e enterrava o proprio FALHOU no comeco do paragrafo.
+    #
+    # If explicito e nao lista curta com ||, que aqui seria segura mas casa o
+    # padrao que este arquivo proibe por escrito em outras duas secoes.
     printf '  FALHOU  %-24s a lista pede o que o portao nao consegue conferir\n' "conteudo no cache"
-    printf '            fora do disco (o install morre no primeiro 404):%s\n' "${sumidos:- nenhum}"
-    printf '            fora do git (esta trava nao ve o conteudo):%s\n' "${fora_do_git:- nenhum}"
+    if [ -n "$caixa_trocada" ]; then
+      printf '            caixa diferente da do git, e o GitHub Pages e sensivel a ela:%s\n' "$caixa_trocada"
+    fi
+    if [ -n "$sumidos" ]; then
+      printf '            fora do disco, o install morre no primeiro 404:%s\n' "$sumidos"
+    fi
+    if [ -n "$fora_do_git" ]; then
+      printf '            fora do git, esta trava nao ve o conteudo:%s\n' "$fora_do_git"
+    fi
     falhou=1
   else
     if [ "$(decide_cache "$mudados" "$nome_agora" "$nome_antes")" = "reprova" ]; then
