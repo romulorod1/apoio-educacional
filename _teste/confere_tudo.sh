@@ -375,20 +375,37 @@ veredito_cache() {
   # $1 = mudou conteudo (sim/nao); $2 = nome novo (sim/nao)
   if [ "$1" = "sim" ] && [ "$2" = "nao" ]; then echo "reprova"; else echo "passa"; fi
 }
+# QUEM DECIDE RECEBE AS FORMAS REAIS, e nao sim/nao ja mastigado.
+#
+# A versao anterior desta trava provava so o VEREDITO, e o mapeamento das
+# entradas ficava numa cadeia solta ao lado. Trocar um caractere ali, um != por
+# um =, virava a trava em carimbo: conteudo mudado, cache parado, saida "ok o
+# cache subiu para" com o MESMO nome de antes, e a prova continuando 4 de 4 sem
+# uma palavra. Numa trava que existe para pegar divergencia, era a categoria se
+# fechando sobre si mesma. Agora o mapeamento esta aqui dentro, e as quatro
+# asercoes abaixo o exercitam com argumento de verdade.
+#
+# $1 = lista de mudados (vazia = nada mudou); $2 = nome de agora; $3 = nome da base
+decide_cache() {
+  if [ -n "$1" ]; then dc_mudou=sim; else dc_mudou=nao; fi
+  if [ "$2" != "$3" ]; then dc_novo=sim; else dc_novo=nao; fi
+  veredito_cache "$dc_mudou" "$dc_novo"
+}
 p_cache=0; f_cache=0
 afere_cache() {
-  obtido=$(veredito_cache "$1" "$2")
-  if [ "$obtido" = "$3" ]; then
+  obtido=$(decide_cache "$1" "$2" "$3")
+  if [ "$obtido" = "$4" ]; then
     p_cache=$((p_cache + 1))
   else
     f_cache=$((f_cache + 1))
-    printf '    prova do cache: conteudo=%s nome=%s deu %s, esperado %s\n' "$1" "$2" "$obtido" "$3"
+    printf '    prova do cache: mudados=[%s] agora=%s antes=%s deu %s, esperado %s\n' \
+      "$1" "$2" "$3" "$obtido" "$4"
   fi
 }
-afere_cache sim nao reprova
-afere_cache sim sim passa
-afere_cache nao sim passa
-afere_cache nao nao passa
+afere_cache "app.js" apoio-v22 apoio-v22 reprova
+afere_cache "app.js" apoio-v23 apoio-v22 passa
+afere_cache ""       apoio-v23 apoio-v22 passa
+afere_cache ""       apoio-v22 apoio-v22 passa
 if [ "$f_cache" != "0" ]; then
   printf '  FALHOU  %-24s a prova da trava nao passou: %s de 4\n' "conteudo no cache" "$p_cache"
   falhou=1
@@ -404,34 +421,53 @@ else
   # O `|| true` e obrigatorio e nao e enfeite: sob set -e, um grep que filtra a
   # lista inteira devolve 1, a atribuicao devolve 1, e o portao MORRE aqui,
   # calado, antes do resumo e antes das travas seguintes. Uma delas e a que
-  # impede nome de aluno de entrar num repositorio publico. E a mesma armadilha
-  # que este arquivo ja documenta na secao da privacidade.
+  # impede nome de aluno de entrar num repositorio publico.
   caminhos=$(printf '%s\n' "$lista_agora" | grep -v '^$' || true)
   mudados=""
   sumidos=""
   fora_do_git=""
+  caixa_trocada=""
   # IFS so com quebra de linha, e glob desligado em volta do laco. Sem isso,
   # caminho com espaco vira duas palavras, nenhuma existe, as duas caem no
-  # continue, e o arquivo sai da conferencia sem uma linha de aviso. Nenhuma das
-  # entradas de hoje tem espaco; a proxima pode ter.
+  # continue, e o arquivo sai da conferencia sem uma linha de aviso.
+  #
+  # E --literal-pathspecs nos comandos do git, porque set -f desliga o glob do
+  # SHELL e o git faz o glob DELE, por dentro, no pathspec. Sem a flag, uma lista
+  # pedindo './banco/tudo[1].json' era atestada lendo o irmao 'banco/tudo1.json',
+  # que existe, esta rastreado e nao mudou: a trava dava ok sobre o arquivo
+  # errado, e o proprio teste de rastreado era enganado pelo mesmo glob.
   ifs_antes=$IFS
   IFS='
 '
   set -f
   for c in $caminhos; do
     if [ ! -f "$c" ]; then
-      sumidos="$sumidos $c"
+      if [ -n "$(git --icase-pathspecs ls-files -- "$c" 2>/dev/null)" ]; then
+        caixa_trocada="$caixa_trocada $c"
+      else
+        sumidos="$sumidos $c"
+      fi
       continue
     fi
     # git diff so enxerga o que o git rastreia. Arquivo do pacote ignorado pelo
-    # .gitignore seria invisivel para esta trava, que e ponto cego dentro de uma
-    # trava que existe para nao ter ponto cego. Entao ele reprova em vez de
-    # passar calado.
-    if [ -z "$(git ls-files -- "$c" 2>/dev/null)" ]; then
-      fora_do_git="$fora_do_git $c"
+    # .gitignore, ou que entrou na lista e ficou fora do commit, seria invisivel
+    # para esta trava: ponto cego dentro de uma trava que existe para nao ter
+    # ponto cego.
+    if [ -z "$(git --literal-pathspecs ls-files -- "$c" 2>/dev/null)" ]; then
+      # A SONDA DE CAIXA roda nos DOIS ramos de propósito, e o motivo e que sem
+      # ela o MESMO defeito sai com mensagens diferentes conforme o computador:
+      # no NTFS o [ -f ] acha 'Core.js' e o git nao, entao caia aqui; num sistema
+      # sensivel a caixa o [ -f ] falha e caia nos sumidos. Reprovar certo pelo
+      # motivo errado custa a hora de quem procura, que e a licao que este
+      # arquivo ja tem escrita na ordem do carregarSerie.
+      if [ -n "$(git --icase-pathspecs ls-files -- "$c" 2>/dev/null)" ]; then
+        caixa_trocada="$caixa_trocada $c"
+      else
+        fora_do_git="$fora_do_git $c"
+      fi
       continue
     fi
-    if ! git diff --quiet "$base" -- "$c" 2>/dev/null; then
+    if ! git --literal-pathspecs diff --quiet "$base" -- "$c" 2>/dev/null; then
       mudados="$mudados $c"
     fi
   done
@@ -446,30 +482,22 @@ else
     printf '  FALHOU  %-24s nao consegui ler o nome do cache no sw.js (agora:[%s] base:[%s])\n' \
       "conteudo no cache" "$nome_agora" "$nome_antes"
     falhou=1
-  elif [ -n "$sumidos" ]; then
-    printf '  FALHOU  %-24s a lista pede arquivo que nao existe no disco, o install morre no 404:%s\n' \
-      "conteudo no cache" "$sumidos"
+  elif [ -n "$caixa_trocada" ]; then
+    printf '  FALHOU  %-24s a lista escreve com caixa diferente da do git, e o GitHub Pages e sensivel a caixa:%s\n' \
+      "conteudo no cache" "$caixa_trocada"
     falhou=1
-  elif [ -n "$fora_do_git" ]; then
-    printf '  FALHOU  %-24s arquivo do pacote fora do git: esta trava nao consegue ver o conteudo dele:%s\n' \
-      "conteudo no cache" "$fora_do_git"
+  elif [ -n "$sumidos" ] || [ -n "$fora_do_git" ]; then
+    # As duas listas na MESMA linha: separadas, quem conserta uma roda de novo e
+    # so entao descobre a outra, e sao duas voltas de quinze minutos.
+    printf '  FALHOU  %-24s a lista pede o que o portao nao consegue conferir. Fora do disco (o install morre no 404):%s. Fora do git:%s\n' \
+      "conteudo no cache" "${sumidos:- nenhum}" "${fora_do_git:- nenhum}"
     falhou=1
   else
-    # A DECISAO EXISTE NUM LUGAR SO.
-    #
-    # Antes, a prova afirmava veredito_cache e o caminho real reimplementava a
-    # mesma decisao numa cadeia propria. Trocar um caractere na cadeia (um != por
-    # um =) virava a trava em carimbo, com a prova continuando 4 de 4 sem uma
-    # palavra: prova verde afirmando uma funcao que ninguem usava. Numa trava que
-    # existe para pegar divergencia, isso era a categoria se fechando sobre si
-    # mesma. Agora quem decide e a funcao que a prova exercita.
-    if [ -n "$mudados" ]; then mudou_conteudo=sim; else mudou_conteudo=nao; fi
-    if [ "$nome_agora" != "$nome_antes" ]; then nome_novo=sim; else nome_novo=nao; fi
-    if [ "$(veredito_cache "$mudou_conteudo" "$nome_novo")" = "reprova" ]; then
+    if [ "$(decide_cache "$mudados" "$nome_agora" "$nome_antes")" = "reprova" ]; then
       printf '  FALHOU  %-24s mudou de conteudo e o cache continua %s:%s\n' \
         "conteudo no cache" "$nome_agora" "$mudados"
       falhou=1
-    elif [ "$mudou_conteudo" = "nao" ]; then
+    elif [ -z "$mudados" ]; then
       printf '  ok      %-24s nenhum arquivo do pacote mudou de conteudo desde a base\n' "conteudo no cache"
     else
       printf '  ok      %-24s%s arquivo(s) do pacote mudaram e o cache subiu para %s\n' \
