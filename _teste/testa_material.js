@@ -72,10 +72,21 @@ function pecasDeTexto(bytes) {
   while ((m = rx.exec(cru))) pecas.push(m[1]);
   return pecas;
 }
+/* Devolve a arroba achada MAIS a frase em que ela apareceu, e não só o token.
+ *
+ * O motivo é de quem vai ler a falha daqui a meses: "achei @tabela" não diz se
+ * nasceu uma diretiva nova que ninguém ensinou a desenhar, ou se um tema passou a
+ * citar um endereço de e-mail legítimo, e as duas coisas pedem consertos
+ * opostos. Com a frase inteira, quem lê distingue as duas em um segundo. Pedido
+ * pela frente 1 em 08/09/2026, prevendo o corpus de português, em que arroba
+ * aparece em endereço, em citação de rede social e em texto moderno. */
 function arrobasDesenhadas(bytes) {
   const achadas = [];
   pecasDeTexto(bytes).forEach(function (p) {
-    (p.match(/@[A-Za-z][A-Za-z0-9]*/g) || []).forEach(function (a) { achadas.push(a); });
+    (p.match(/@[A-Za-z][A-Za-z0-9]*/g) || []).forEach(function (a) {
+      const frase = p.trim().replace(/\s+/g, ' ');
+      achadas.push(a + ' em "' + (frase.length > 90 ? frase.slice(0, 90) + '...' : frase) + '"');
+    });
   });
   return [...new Set(achadas)];
 }
@@ -218,7 +229,16 @@ console.log('\n=== a diretiva dentro do exercício, com par envenenado ===');
    * seria satisfeito por um detector quebrado. */
   conf('o detector genérico acha arroba seguida de letra quando ela existe',
     arrobasDesenhadas(Buffer.from('BT /F1 10 Tf 1 1 Td (veja @eq e @tabela) Tj ET', 'latin1'))
-      .join(','), '@eq,@tabela');
+      .join(' | '),
+    '@eq em "veja @eq e @tabela" | @tabela em "veja @eq e @tabela"');
+  /* E ele traz a FRASE junto, que é o que separa "nasceu uma diretiva nova" de
+   * "um tema passou a citar um endereço": os dois pedem consertos opostos, e a
+   * contagem sozinha não distingue. */
+  conf('e ele traz a frase inteira, não só o token',
+    arrobasDesenhadas(Buffer.from(
+      'BT /F1 10 Tf 1 1 Td (Escreva para contato@figuras.com em caso de duvida) Tj ET', 'latin1'))
+      .join(' | '),
+    '@figuras em "Escreva para contato@figuras.com em caso de duvida"');
 
   const FOLHAS = [
     ['material completo', { lingua: 'pt', incluirMaterial: true, incluirLista: true, incluirGabarito: true }],

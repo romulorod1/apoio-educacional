@@ -255,6 +255,55 @@ const limpa = {
     /transposta/.test(textoDaFolha(folha.gabarito)), true);
 }
 
+/* ====================================== os OUTROS caminhos, um por um
+ *
+ * A extracao da @eq acontece dentro do separarFiguras, e ele tem CINCO
+ * consumidores no pdf.js: a definicao, o subtitulo, o item de lista, o paragrafo
+ * e a celula de tabela. So o caminho do exercicio (que passa pelo separarPorTipo,
+ * outro caminho) sabe DESENHAR a formula. Nos outros quatro ela e tirada do texto
+ * e nao ha onde por.
+ *
+ * Isso e aceitavel numa condicao e so nela: que ela saia COM AVISO. Tirar do
+ * texto e nao desenhar e nao avisar seria reabrir, em quatro lugares, a mesma
+ * categoria que este arquivo existe para fechar, e seria PIOR que o defeito
+ * original, porque o LaTeX cru pelo menos aparecia na folha e alguem reclamava.
+ *
+ * Estas conferencias existem porque a prova estava verde por AUSENCIA DE CASO:
+ * ela media o exercicio, que e o caminho consertado, e nao media nenhum dos
+ * quatro. Apontado pela frente 1 em 08/09/2026, medido aqui, e agora fixo. */
+console.log('\n=== os quatro ramos do markdown, e a linha propria ===');
+{
+  const M = '\\begin{bmatrix} 1 & 2 \\\\ 3 & 5 \\end{bmatrix}';
+  const RAMOS = [
+    ['linha propria (a forma como os 148 temas escrevem)', 'Antes.\n\n@eq ' + M + '\n\nDepois.', true],
+    ['meio de paragrafo', 'A matriz @eq ' + M + ' no meio da frase.', false],
+    ['subtitulo', '#### Titulo com @eq ' + M + '\n\nCorpo.', false],
+    ['item de lista', '- Item com @eq ' + M + ' no meio.\n- Outro.', false],
+    ['celula de tabela', '| a | b |\n|---|---|\n| @eq ' + M + ' | dois |', false]
+  ];
+  RAMOS.forEach(function (r) {
+    const nome = r[0], md = r[1], desenha = r[2];
+    const d = new PDFGen.Doc();
+    d.novaPagina();
+    d.markdown(md, {});
+    const bytes = d.finalizar();
+    const fluxo = Buffer.from(bytes).toString('latin1');
+    let impresso = '';
+    const re = /\(((?:\\.|[^()\\])*)\)\s*Tj/g;
+    let m;
+    while ((m = re.exec(fluxo)) !== null) impresso += m[1] + ' ';
+    const cru = /@eq|bmatrix/.test(impresso);
+    const avisos = (d.avisosFigura || []).length;
+    conf(nome + ': LaTeX cru NAO sai impresso', cru, false);
+    if (desenha) {
+      conf(nome + ': desenha, e por isso nao avisa', avisos, 0);
+    } else {
+      /* A conferencia que importa: nem impressa, nem calada. */
+      conf(nome + ': nao desenha, entao AVISA (nunca some calada)', avisos >= 1, true);
+    }
+  });
+}
+
 console.log('\n' + '='.repeat(60));
 console.log(passes + ' passaram, ' + falhas + ' falharam.');
 if (falhas) { console.log('\nFALHAS:'); erros.forEach(function (e) { console.log(' - ' + e); }); }
