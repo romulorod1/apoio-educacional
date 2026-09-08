@@ -51,12 +51,17 @@ function gerar(nome, minKB, op) {
    * meio do exercício, em silêncio. Quando nascer "@tabela", o buraco não
    * reabre.
    *
-   * A linha de base foi medida antes de a trava ser escrita, e não presumida:
-   * as 296 folhas do banco (148 temas nas duas línguas, com material, lista e
-   * gabarito) trazem ZERO arroba seguida de letra no texto desenhado, e a fonte
-   * dos temas só tem "@fig" e "@eq" como arroba. Por isso a asserção é zero e
-   * não "não cresceu além de N": não há ocorrência legítima para preservar.
-   * Medido em 08/09/2026. Se um dia um tema precisar escrever um endereço de
+   * A linha de base foi medida antes de a trava ser escrita, e não presumida.
+   * A primeira medida estava CONTADA EM DOBRO, e o número errado chegou a sair
+   * daqui para outras duas frentes: o temas/banco.json e os banco/serie-*.json
+   * são o MESMO corpo de 148 temas, um inteiro e o outro repartido por série, e
+   * somar os dois deu 252 "@fig" e 20 "@eq" onde há 126 e 10. A conta certa,
+   * medida em 08/09/2026: 126 "@fig" e 10 "@eq" nos 148 temas de matemática, 12
+   * "@fonte" nos 6 temas de português, e nenhuma outra arroba seguida de letra
+   * em nenhum dos dois. No texto DESENHADO das folhas, zero.
+   *
+   * Por isso a asserção é zero e não "não cresceu além de N": não há ocorrência
+   * legítima para preservar. Se um dia um tema precisar escrever um endereço de
    * e-mail na folha, o número muda AQUI, com a data e o motivo ao lado. */
   conf(nome + ': nenhuma arroba seguida de letra no texto desenhado',
     arrobasDesenhadas(bytes).join(', ') || 0, 0);
@@ -97,6 +102,36 @@ function arrobasDesenhadas(bytes) {
 function tracosDaFolha(bytes) {
   const cru = Buffer.from(bytes).toString('latin1');
   return (cru.match(/(?:^|\s)[ml](?=\s)/g) || []).length;
+}
+
+/* Todas as palavras escritas na folha, contadas.
+ *
+ * O rodapé de página fica de fora: uma fórmula a mais empurra a lista para uma
+ * página a mais, e aí "Página 1 de 2" vira "Página 1 de 3" nas duas folhas que
+ * se comparam. Isso é a paginação mudando, e não texto perdido. */
+function bagDePalavras(pecas) {
+  const bag = {};
+  pecas.forEach(function (p) {
+    if (/^P.gina \d+ de \d+$/.test(p) || /^Page \d+ of \d+$/.test(p)) return;
+    String(p).split(/\s+/).forEach(function (w) { if (w) bag[w] = (bag[w] || 0) + 1; });
+  });
+  return bag;
+}
+
+/* Que palavras da folha SEM a diretiva sumiram da folha COM a diretiva.
+ *
+ * É a conferência que mede a presença do que importa, e não a ausência do
+ * defeito. Contagem e não igualdade: a folha com a fórmula tem palavras A MAIS,
+ * e é assim que tem que ser, porque o renderizador escreve os números da matriz
+ * como texto. O que não pode é ter palavra A MENOS. */
+function faltandoNaFolha(bytesComDiretiva, bytesSemDiretiva) {
+  const tem = bagDePalavras(pecasDeTexto(bytesComDiretiva));
+  const quer = bagDePalavras(pecasDeTexto(bytesSemDiretiva));
+  const perdidas = [];
+  Object.keys(quer).forEach(function (w) {
+    if ((tem[w] || 0) < quer[w]) perdidas.push(w + ' (' + (tem[w] || 0) + ' de ' + quer[w] + ')');
+  });
+  return perdidas;
 }
 
 const completo = gerar('tema_completo.pdf', 60, {
@@ -199,30 +234,41 @@ console.log('\n=== a diretiva dentro do exercício, com par envenenado ===');
    * lembrança. A diretiva vai colada no fim do texto, que é a forma como o
    * gerar_banco.py entrega uma diretiva escrita em linha própria dentro do
    * item. */
-  function preparar(comDiretiva) {
+  /* O veneno é dosado por LUGAR, e não ligado e desligado de uma vez.
+   *
+   * Com uma dose só, dois dos quatro controles positivos ficavam verdes pelo
+   * motivo errado: o veneno também plantava uma "@eq" na explicação, e era ELA
+   * que produzia o traço a mais na folha completa e na folha em inglês. As duas
+   * conferências diziam "a fórmula do item foi desenhada" medindo a fórmula da
+   * explicação, que é o caminho que já funcionava antes deste PR. */
+  function preparar(onde) {
     const t = JSON.parse(JSON.stringify(tema));
-    function mais(texto, diretiva) { return comDiretiva ? texto + ' ' + diretiva : texto; }
+    const noItem = (onde === 'item' || onde === 'ambos');
+    const naExplicacao = (onde === 'explicacao' || onde === 'ambos');
     ['pt', 'en'].forEach(function (lg) {
       if (!t[lg] || !t[lg].exercicios || !t[lg].exercicios.length) return;
       const ex = t[lg].exercicios;
-      ex[0].enunciado = mais(ex[0].enunciado, '@eq ' + MATRIZ);
-      ex[0].resposta = mais(ex[0].resposta, '@eq ' + TRANSPOSTA);
-      t[lg].explicacao = comDiretiva ? t[lg].explicacao + '\n\n@eq ' + MATRIZ + '\n'
-                                     : t[lg].explicacao;
+      if (noItem) {
+        ex[0].enunciado = ex[0].enunciado + ' @eq ' + MATRIZ;
+        ex[0].resposta = ex[0].resposta + ' @eq ' + TRANSPOSTA;
+      }
+      if (naExplicacao) t[lg].explicacao = t[lg].explicacao + '\n\n@eq ' + MATRIZ + '\n';
     });
     return t;
   }
 
-  const venenoso = preparar(true);
-  const limpo = preparar(false);
+  const venenoso = preparar('item');
+  const limpo = preparar('nenhum');
   const cruVenenoso = JSON.stringify(venenoso);
   const cruLimpo = JSON.stringify(limpo);
 
   /* O veneno pegou? Veneno que não casa nada deixa o modo envenenado verde
    * afirmando o contrário do que promete, e isso já aconteceu neste portão. */
   conf('o veneno mudou mesmo o tema', cruVenenoso !== cruLimpo, true);
-  conf('e ele plantou 6 diretivas @eq (3 por língua)',
-    (cruVenenoso.match(/@eq/g) || []).length, 6);
+  conf('e ele plantou 4 diretivas @eq no ITEM (2 por língua)',
+    (cruVenenoso.match(/@eq/g) || []).length, 4);
+  conf('e nenhuma na explicação, que é o caminho que já funcionava',
+    (JSON.stringify(venenoso.pt.explicacao).match(/@eq/g) || []).length, 0);
   conf('e o tema limpo não ficou com nenhuma', (cruLimpo.match(/@eq/g) || []).length, 0);
 
   /* E o detector detecta: sem esta linha, "zero ocorrências" nas folhas abaixo
@@ -278,6 +324,94 @@ console.log('\n=== a diretiva dentro do exercício, com par envenenado ===');
     pecasDeTexto(listaComEq).indexOf(primeiraPalavra) >= 0, true);
   conf('e ele já estava escrito na folha limpa, que é a comparação justa',
     pecasDeTexto(listaSemEq).indexOf(primeiraPalavra) >= 0, true);
+
+  /* E a conferência que mede a PRESENÇA e não a ausência: TODA palavra da folha
+   * sem a diretiva continua na folha com a diretiva, na mesma ordem.
+   *
+   * Sem ela a suíte inteira passava com a frase sumindo da folha, porque "não
+   * saiu LaTeX cru" e "avisou" continuavam verdadeiros enquanto o texto depois
+   * da fórmula era descartado. Medir a ausência do defeito não é medir a
+   * presença do que importa. */
+  conf('e nenhuma palavra da folha limpa se perdeu na folha envenenada',
+    faltandoNaFolha(listaComEq, listaSemEq).join(' ') || 'nada faltou', 'nada faltou');
+
+  /* A explicação continua sendo o CONTROLE: ela já funcionava antes deste PR, e
+   * é medida sozinha, sem o veneno do item por perto. */
+  const soExplicacao = PDFGen.gerarMaterialTema({
+    tema: preparar('explicacao'), lingua: 'pt', incluirMaterial: true
+  });
+  const semNada = PDFGen.gerarMaterialTema({
+    tema: limpo, lingua: 'pt', incluirMaterial: true
+  });
+  conf('CONTROLE: a explicação desenha a fórmula dela',
+    tracosDaFolha(soExplicacao) > tracosDaFolha(semNada), true);
+  conf('CONTROLE: e não imprime arroba nenhuma',
+    arrobasDesenhadas(soExplicacao).join(', ') || 0, 0);
+}
+
+console.log('\n=== a arroba no banco inteiro, e não num tema só ===');
+
+/* A trava acima roda sobre UM tema, o MAT06-05, em quatro variantes. Um "@eq"
+ * vazando no MATEM2-04 não seria pego por ela.
+ *
+ * A cobertura completa é em duas camadas, e o argumento é que uma folha só pode
+ * imprimir uma arroba que exista na FONTE:
+ *
+ *   camada 1: nenhuma arroba seguida de letra na fonte dos 154 temas além das
+ *   três diretivas conhecidas (@fig, @eq, @fonte). Isto pega o e-mail, o
+ *   "@tabela" que ainda não nasceu e o erro de digitação, em qualquer tema;
+ *   camada 2: todo tema que TRAZ diretiva gera as folhas de verdade e não pode
+ *   imprimir arroba nenhuma. Hoje são 12 temas (6 de matemática com @fig ou
+ *   @eq, e os 6 de português com @fonte).
+ *
+ * Juntas cobrem os 154: quem não tem arroba na fonte não pode imprimir arroba,
+ * e quem tem passa pela camada 2. Gerar as 308 folhas do banco a cada portão
+ * custaria minutos e não acrescentaria caso nenhum. */
+{
+  const DIRETIVAS = { '@fig': 1, '@eq': 1, '@fonte': 1 };
+  const bancos = [
+    ['matemática', banco],
+    ['português', JSON.parse(fs.readFileSync(
+      path.join(__dirname, '..', 'temas', 'banco-portugues.json'), 'utf8'))]
+  ];
+  let temasVistos = 0, comDiretiva = [];
+  const estranhas = [];
+  bancos.forEach(function (par) {
+    (par[1].temas || []).forEach(function (t) {
+      temasVistos++;
+      const cru = JSON.stringify(t);
+      (cru.match(/@[A-Za-z][A-Za-z0-9]*/g) || []).forEach(function (a) {
+        if (!DIRETIVAS[a]) estranhas.push(t.id + ': ' + a);
+      });
+      if (/@(fig|eq|fonte)/.test(cru)) comDiretiva.push(t);
+    });
+  });
+  conf('os dois bancos somam 154 temas', temasVistos, 154);
+  conf('nenhuma arroba na fonte que não seja @fig, @eq ou @fonte',
+    [...new Set(estranhas)].slice(0, 5).join(', ') || 0, 0);
+  /* A trava da trava: se a varredura parasse de achar as diretivas conhecidas,
+   * ela teria virado uma varredura sobre nada e passaria sempre. */
+  conf('e a varredura acha os temas que trazem diretiva', comDiretiva.length >= 12, true);
+
+  const vazando = [];
+  comDiretiva.forEach(function (t) {
+    ['pt', 'en'].forEach(function (lg) {
+      if (!t[lg]) return;
+      let bytes;
+      try {
+        bytes = PDFGen.gerarMaterialTema({
+          tema: t, lingua: lg, incluirMaterial: true, incluirLista: true, incluirGabarito: true
+        });
+      } catch (e) {
+        vazando.push(t.id + '/' + lg + ' estourou: ' + (e && e.message));
+        return;
+      }
+      const achadas = arrobasDesenhadas(bytes);
+      if (achadas.length) vazando.push(t.id + '/' + lg + ': ' + achadas.join(' '));
+    });
+  });
+  conf('e nenhum tema com diretiva imprime arroba na folha',
+    vazando.slice(0, 5).join(' | ') || 0, 0);
 }
 
 console.log('\n=== o navegador recebe o kit de figuras inteiro ===');

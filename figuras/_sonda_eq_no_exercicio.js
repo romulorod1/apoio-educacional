@@ -158,6 +158,37 @@ conf('arroba colado em palavra tambem nao vira diretiva', tipos('valor de x@eqy 
     (d.avisosFigura || []).some(function (a) { return /@eq sem f/.test(a); }), true);
 }
 
+/* A frase que vem DEPOIS da formula.
+ *
+ * "Ir ate o fim do trecho" e a regra certa para a diretiva escrita onde os temas
+ * a escrevem, que e no fim do item, e destrutiva no meio de uma frase: ela
+ * engolia "e explique o metodo usado." para dentro do LaTeX, e o item saia com
+ * "eexpliqueometodousado." em italico matematico, colado na matriz e sem aviso
+ * nenhum. O @fig na mesma posicao preserva o texto, porque o fim de diretiva
+ * dele para no primeiro token que nao e par: era assimetria silenciosa.
+ *
+ * O corte e conservador de proposito. Cortar demais apagaria formula legitima,
+ * que e o defeito pior dos dois. */
+{
+  const meio = 'Calcule o determinante de @eq ' + MATRIZ + ' e explique o metodo usado.';
+  conf('a frase depois da formula volta a ser texto', tipos(meio), 'texto+equacao+texto');
+  conf('e a formula fica sem a prosa', partes(meio)[1].latex, MATRIZ);
+  conf('e a frase volta inteira', partes(meio)[2].valor, 'e explique o metodo usado.');
+  const d = new PDFGen.Doc();
+  d.partesDeFigura(meio);
+  conf('e o corte AVISA, para nao ser mais uma coisa silenciosa',
+    (d.avisosFigura || []).some(function (a) { return /engoliu texto/.test(a); }), true);
+}
+/* E o outro lado do corte: formula legitima que TERMINA em letra nao e cortada. */
+[['A = B', 'A = B'],
+ ['V = b h', 'V = b h'],
+ ['d = 30 km', 'd = 30 km'],
+ ['A = ' + MATRIZ, 'A = ' + MATRIZ],
+ ['x = \\frac{1}{2}', 'x = \\frac{1}{2}']].forEach(function (par) {
+  conf('a formula "' + par[0] + '" sai inteira, sem corte',
+    partes('Veja. @eq ' + par[0])[1].latex, par[1]);
+});
+
 /* ================================================= as folhas de verdade */
 console.log('\n=== as folhas, pelo caminho de verdade ===');
 
@@ -172,12 +203,42 @@ function gerar(nome, tema, op) {
 
 /* O texto sai do proprio PDF, com a mesma leitura que o _teste/testa_material.js
  * usa: cada peca escrita e um "Td (...) Tj" do fluxo de conteudo. */
-function textoDaFolha(bytes) {
+function pecasDaFolha(bytes) {
   const cru = Buffer.from(bytes).toString('latin1');
   const rx = /Td \(((?:[^()\\]|\\.)*)\) Tj/g;
   let m; const pecas = [];
   while ((m = rx.exec(cru))) pecas.push(m[1]);
-  return pecas.join(' ');
+  return pecas;
+}
+function textoDaFolha(bytes) { return pecasDaFolha(bytes).join(' '); }
+
+/* As palavras escritas na folha, na ordem. O rodape de pagina fica de fora: uma
+ * formula a mais empurra a folha para uma pagina a mais, e "Pagina 1 de 2" vira
+ * "Pagina 1 de 3". Isso e paginacao mudando, e nao texto perdido. */
+function palavrasDaFolha(bytes) {
+  const saida = [];
+  pecasDaFolha(bytes).forEach(function (p) {
+    if (/^P.gina \d+ de \d+$/.test(p) || /^Page \d+ of \d+$/.test(p)) return;
+    String(p).split(/\s+/).forEach(function (w) { if (w) saida.push(w); });
+  });
+  return saida;
+}
+
+/* Que palavras ESPERADAS sumiram. Contagem e nao igualdade: a folha com a
+ * formula tem palavras A MAIS, e e assim que tem que ser, porque o renderizador
+ * escreve os numeros da matriz como texto. O que nao pode e ter palavra A
+ * MENOS. E a conferencia que mede a PRESENCA do que importa, e nao a ausencia
+ * do defeito. */
+function faltando(todas, esperadas) {
+  const tem = {};
+  todas.forEach(function (w) { tem[w] = (tem[w] || 0) + 1; });
+  const quer = {};
+  esperadas.forEach(function (w) { quer[w] = (quer[w] || 0) + 1; });
+  const perdidas = [];
+  Object.keys(quer).forEach(function (w) {
+    if ((tem[w] || 0) < quer[w]) perdidas.push(w + ' (' + (tem[w] || 0) + ' de ' + quer[w] + ')');
+  });
+  return perdidas;
 }
 
 /* Quanto traco a folha tem. O colchete da matriz e DESENHADO, nao e glifo de
@@ -257,51 +318,188 @@ const limpa = {
 
 /* ====================================== os OUTROS caminhos, um por um
  *
- * A extracao da @eq acontece dentro do separarFiguras, e ele tem CINCO
- * consumidores no pdf.js: a definicao, o subtitulo, o item de lista, o paragrafo
- * e a celula de tabela. So o caminho do exercicio (que passa pelo separarPorTipo,
- * outro caminho) sabe DESENHAR a formula. Nos outros quatro ela e tirada do texto
- * e nao ha onde por.
+ * A extracao da @eq acontece dentro do separarFiguras, e ele tem QUATRO
+ * consumidores de verdade no pdf.js: o subtitulo, o item de lista, o paragrafo e
+ * a celula de tabela (a definicao nao e consumidor). Mais o textoComFiguras, que
+ * e o quinto e desenha sozinho, e o caminho do exercicio, que passa pelo
+ * separarPorTipo. Estas conferencias existem porque a prova estava verde por
+ * AUSENCIA DE CASO: ela media o exercicio, que e o caminho consertado, e nao
+ * media nenhum dos outros. Apontado pela frente 1 em 08/09/2026.
  *
- * Isso e aceitavel numa condicao e so nela: que ela saia COM AVISO. Tirar do
- * texto e nao desenhar e nao avisar seria reabrir, em quatro lugares, a mesma
- * categoria que este arquivo existe para fechar, e seria PIOR que o defeito
- * original, porque o LaTeX cru pelo menos aparecia na folha e alguem reclamava.
+ * E a conferencia NAO e "nao sai cru e avisa". Foi essa formulacao que deixou
+ * passar o pior defeito deste PR: os quatro ramos pararam de imprimir a formula
+ * e passaram a APAGAR O RESTO DA FRASE, e a prova ficou verde afirmando que
+ * estava tudo bem, porque "nao saiu cru" e "avisou" eram as duas coisas
+ * verdadeiras. "A matriz @eq ... fecha o assunto de hoje." saia da folha como
+ * "A matriz". O pai imprimia feio e COMPLETO, entao aquilo era regressao.
  *
- * Estas conferencias existem porque a prova estava verde por AUSENCIA DE CASO:
- * ela media o exercicio, que e o caminho consertado, e nao media nenhum dos
- * quatro. Apontado pela frente 1 em 08/09/2026, medido aqui, e agora fixo. */
+ * A conferencia certa e a PRESENCA do que importa: o texto que nao e diretiva
+ * chega inteiro a folha, comparado com o MESMO markdown sem a diretiva. */
 console.log('\n=== os quatro ramos do markdown, e a linha propria ===');
 {
   const M = '\\begin{bmatrix} 1 & 2 \\\\ 3 & 5 \\end{bmatrix}';
+  /* Cada caso e um PAR: o mesmo markdown com a diretiva e sem ela. O texto de
+   * fora da diretiva tem que sair identico nos dois. */
   const RAMOS = [
-    ['linha propria (a forma como os 148 temas escrevem)', 'Antes.\n\n@eq ' + M + '\n\nDepois.', true],
-    ['meio de paragrafo', 'A matriz @eq ' + M + ' no meio da frase.', false],
-    ['subtitulo', '#### Titulo com @eq ' + M + '\n\nCorpo.', false],
-    ['item de lista', '- Item com @eq ' + M + ' no meio.\n- Outro.', false],
-    ['celula de tabela', '| a | b |\n|---|---|\n| @eq ' + M + ' | dois |', false]
+    ['linha propria (como os 148 temas escrevem)',
+     'Antes da formula.\n\n@eq ' + M + '\n\nDepois da formula.',
+     'Antes da formula.\n\nDepois da formula.', 0],
+    ['meio de paragrafo',
+     'A matriz @eq ' + M + ' fecha o assunto de hoje.',
+     'A matriz fecha o assunto de hoje.', 1],
+    ['subtitulo',
+     '#### Titulo com formula @eq ' + M + '\n\nCorpo do texto.',
+     '#### Titulo com formula\n\nCorpo do texto.', 0],
+    ['item de lista',
+     '- Item com @eq ' + M + ' no fim da frase.\n- Outro item.',
+     '- Item com no fim da frase.\n- Outro item.', 1],
+    ['celula de tabela',
+     '| um | dois |\n|---|---|\n| @eq ' + M + ' | quatro |',
+     '| um | dois |\n|---|---|\n|  | quatro |', 0],
+    ['ramo do @fig, que desenha sozinho (o textoComFiguras)',
+     'Olhe.\n\n' + TRIANGULO + ' @eq ' + M + '\n\nFim do trecho.',
+     'Olhe.\n\n' + TRIANGULO + '\n\nFim do trecho.', 0]
   ];
-  RAMOS.forEach(function (r) {
-    const nome = r[0], md = r[1], desenha = r[2];
+  function folhaDeMarkdown(md) {
     const d = new PDFGen.Doc();
     d.novaPagina();
     d.markdown(md, {});
     const bytes = d.finalizar();
-    const fluxo = Buffer.from(bytes).toString('latin1');
-    let impresso = '';
-    const re = /\(((?:\\.|[^()\\])*)\)\s*Tj/g;
-    let m;
-    while ((m = re.exec(fluxo)) !== null) impresso += m[1] + ' ';
-    const cru = /@eq|bmatrix/.test(impresso);
-    const avisos = (d.avisosFigura || []).length;
-    conf(nome + ': LaTeX cru NAO sai impresso', cru, false);
-    if (desenha) {
-      conf(nome + ': desenha, e por isso nao avisa', avisos, 0);
-    } else {
-      /* A conferencia que importa: nem impressa, nem calada. */
-      conf(nome + ': nao desenha, entao AVISA (nunca some calada)', avisos >= 1, true);
-    }
+    return { bytes: bytes, doc: d, palavras: palavrasDaFolha(bytes) };
+  }
+  RAMOS.forEach(function (r) {
+    const nome = r[0], com = folhaDeMarkdown(r[1]), sem = folhaDeMarkdown(r[2]);
+    const avisosEsperados = r[3];
+    conf(nome + ': LaTeX cru NAO sai impresso',
+      /@eq|bmatrix|\\begin/.test(com.palavras.join(' ')), false);
+    /* A conferencia que o revisor pediu, e a que teria pego a frase sumindo. */
+    conf(nome + ': o texto que nao e diretiva chega INTEIRO a folha',
+      faltando(com.palavras, sem.palavras).join(' ') || 'nada faltou', 'nada faltou');
+    conf(nome + ': e a formula foi DESENHADA (ganhou traco)',
+      tracos(com.bytes) > tracos(sem.bytes), true);
+    /* Aviso so onde houve corte de prosa: a diretiva no meio da frase engole o
+     * que vem depois dela, e o aviso e o que conta que isso aconteceu. */
+    conf(nome + ': avisos', (com.doc.avisosFigura || []).length, avisosEsperados);
   });
+}
+
+/* ====================================== a legenda que engolia a equacao
+ *
+ * "ate a proxima diretiva" so conhecia o @fig, nos DOIS lugares que leem legenda
+ * (pdf.js e figuras/base.js). Uma @eq escrita depois de uma legenda ia parar
+ * DENTRO dela, e a folha saia com o LaTeX inteiro impresso embaixo do desenho.
+ * Pre-existente, e e a garantia de manchete deste PR. */
+console.log('\n=== a legenda para na proxima diretiva, seja ela qual for ===');
+{
+  const M = '\\begin{bmatrix} 1 & 2 \\\\ 3 & 5 \\end{bmatrix}';
+  const comLegenda = TRIANGULO + ' legenda=A parte pedida e a de baixo. @eq ' + M;
+  const p = partes(comLegenda);
+  conf('a legenda e a equacao viram dois pedacos', tipos(comLegenda), 'figura+equacao');
+  conf('e a legenda para antes do @eq',
+    p[0] && p[0].diretiva && p[0].diretiva.legenda, 'A parte pedida e a de baixo.');
+  conf('e a equacao sai inteira do outro lado', p[1] && p[1].latex, M);
+  const d = new PDFGen.Doc();
+  d.novaPagina();
+  d.markdown('Olhe.\n\n' + comLegenda + '\n', {});
+  const palavras = palavrasDaFolha(d.finalizar()).join(' ');
+  conf('e na folha nao sai LaTeX cru embaixo do desenho',
+    /@eq|bmatrix|\\begin/.test(palavras), false);
+  conf('e a legenda continua escrita', /parte pedida/.test(palavras), true);
+}
+
+/* ====================================== o gabarito estruturado e a alternativa
+ *
+ * O SETIMO consumidor. Quando o exercicio tem gabarito.letra ou espera_se, o
+ * texto ia direto para o quebrarRico, sem separador nenhum, e sao 101 exercicios
+ * do banco de portugues que passam por esse ramo. Mesma coisa para o texto das
+ * alternativas. */
+console.log('\n=== o gabarito estruturado e as alternativas ===');
+{
+  const M = '\\begin{bmatrix} 1 & 2 \\\\ 3 & 5 \\end{bmatrix}';
+  function temaComGabarito(comDiretiva) {
+    const mais = function (t, d) { return comDiretiva ? t + ' ' + d : t; };
+    return {
+      fontes: {},
+      pt: {
+        titulo: 'Gabarito estruturado', resumo: 'r', explicacao: 'Um paragrafo.',
+        exercicios: [{
+          enunciado: 'Qual alternativa esta certa?',
+          alternativas: [
+            { letra: 'a', texto: mais('A primeira alternativa.', '@eq ' + M) },
+            { letra: 'b', texto: 'A segunda alternativa.' }
+          ],
+          gabarito: {
+            letra: 'a', porque: mais('Porque a conta fecha.', '@eq ' + M)
+          },
+          resposta: 'a'
+        }, {
+          enunciado: 'Explique com suas palavras.',
+          gabarito: {
+            espera_se: mais('Espera-se a conta feita.', '@eq ' + M),
+            aceita_se: [mais('Aceita-se a forma curta.', '@eq ' + M)],
+            nao_aceita: ['Nao se aceita so o resultado.']
+          },
+          resposta: 'aberta'
+        }]
+      }
+    };
+  }
+  const comEq = PDFGen.gerarMaterialTema({
+    tema: temaComGabarito(true), lingua: 'pt', incluirLista: true, incluirGabarito: true
+  });
+  const semEq = PDFGen.gerarMaterialTema({
+    tema: temaComGabarito(false), lingua: 'pt', incluirLista: true, incluirGabarito: true
+  });
+  conf('o gabarito estruturado nao imprime arroba seguida de letra',
+    (palavrasDaFolha(comEq).join(' ').match(/@[A-Za-z]/g) || []).length, 0);
+  conf('nem LaTeX cru', /bmatrix|\\begin/.test(palavrasDaFolha(comEq).join(' ')), false);
+  conf('e o texto do gabarito e das alternativas chega INTEIRO',
+    faltando(palavrasDaFolha(comEq), palavrasDaFolha(semEq)).join(' ') || 'nada faltou',
+    'nada faltou');
+  conf('e as quatro formulas foram DESENHADAS', tracos(comEq) > tracos(semEq), true);
+}
+
+/* ====================================== a formula larga demais para a coluna
+ *
+ * O aviso de largura passou a comparar com a COLUNA do item e nao com a folha.
+ * Sem caso, desligar o aviso nao reprovaria nada. */
+console.log('\n=== a formula mais larga que a coluna avisa ===');
+{
+  const Formula = require('./formula.js');
+  const COLUNA = PDFGen.MARG_D - PDFGen.MARG_E - 20;   // a coluna do item
+  const FOLHA = PDFGen.UTIL;                           // a folha inteira
+
+  /* A formula do caso tem que cair ENTRE as duas larguras. Uma que estoura as
+   * duas avisaria dos dois lados e nao separaria nada: seria um caso verde por
+   * sorte, e desligar a medida pela coluna continuaria passando. A faixa entre
+   * a coluna e a folha e estreita (cerca de 20 pt), entao ela e PROCURADA, e
+   * nao chutada. */
+  let entre = null;
+  for (let n = 1; n < 200 && !entre; n++) {
+    let f = 'x = 1';
+    for (let i = 0; i < n; i++) f += ' + 1';
+    const larg = Formula.medir(f, 11, {}).largura;
+    if (larg > COLUNA && larg <= FOLHA) entre = { latex: f, largura: larg };
+  }
+  conf('existe formula que cabe na folha e nao na coluna do item', !!entre, true);
+
+  function avisosDeLargura(latex, op) {
+    const d = new PDFGen.Doc();
+    d.novaPagina();
+    d.equacao(latex, op);
+    return (d.avisosFigura || []).filter(function (a) { return /mais larga que a coluna/.test(a); }).length;
+  }
+  if (entre) {
+    conf('ela avisa na coluna estreita do item',
+      avisosDeLargura(entre.latex, { tam: 11, x: PDFGen.MARG_E + 20, largura: COLUNA }), 1);
+    /* O outro lado do par: na folha inteira a MESMA formula nao avisa. Sem esta
+     * linha, a medida podia estar comparando com a folha e ninguem veria. */
+    conf('e nao avisa na folha inteira, que e o outro lado do par',
+      avisosDeLargura(entre.latex, { tam: 11 }), 0);
+  }
+  conf('e uma formula curta nao avisa em nenhuma das duas',
+    avisosDeLargura('x = 1', { tam: 11, x: PDFGen.MARG_E + 20, largura: COLUNA }) +
+    avisosDeLargura('x = 1', { tam: 11 }), 0);
 }
 
 console.log('\n' + '='.repeat(60));
