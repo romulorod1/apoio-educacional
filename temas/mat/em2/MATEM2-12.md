@@ -19,7 +19,10 @@ dificuldade: 4
 
 O **cilindro** tem duas bases circulares iguais e paralelas. O **cone** tem uma base circular e um
 vértice, e a **geratriz** é o segmento que liga o vértice a um ponto da borda da base. A **esfera**
-é o conjunto dos pontos que ficam a uma distância fixa do centro.
+é o conjunto dos pontos que ficam a uma distância fixa do centro. Os três estão na figura, com o
+raio r e a altura h que aparecem nas fórmulas.
+
+@fig painelsolidos ordem=cilindro;cone;esfera nome=cilindro;cone;esfera raio=r altura=h
 
 Os três aparecem em tudo que é embalagem, tanque, casquinha e bola, e a maior parte dos problemas
 mistura dois deles.
@@ -49,9 +52,12 @@ mesma altura:
 
 V = (1/3) · π · r^{2} · h
 
-O raio, a altura e a geratriz g formam um triângulo retângulo, com a geratriz no papel de
-hipotenusa, o que dá g^{2} = r^{2} + h^{2}. A área lateral é A_{l} = π · r · g, e a área total soma
-a base:
+O raio, a altura e a geratriz g formam o triângulo retângulo da figura, com a geratriz no papel de
+hipotenusa, o que dá g^{2} = r^{2} + h^{2}.
+
+@fig solido tipo=cone triangulo=sim raio=r altura=h geratriz=g
+
+A área lateral é A_{l} = π · r · g, e a área total soma a base:
 
 A_{t} = π · r · g + π · r^{2}
 
@@ -120,13 +126,18 @@ antes de qualquer conta.
 7. Calcule a área total de um cone de raio 3 e altura 4, deixando a resposta em função de π.
 8. Um cilindro tem raio 5 e volume 100π. Calcule a altura.
 9. Uma esfera tem área 144π. Calcule o raio e o volume, deixando o volume em função de π.
-10. Um cone tem raio 6 e geratriz 10. Calcule a altura e o volume, deixando o volume em função de π.
+10. O cone da figura tem raio 6 e geratriz 10. Calcule a altura h e o volume, deixando o volume em
+    função de π.
+    @fig solido id=s10 tipo=cone triangulo=sim raio=6 geratriz=10 altura=h
 11. Um cilindro tem raio 5 centímetros e altura 8 centímetros. Considerando π = 3,14, calcule o
     volume em centímetros cúbicos.
-12. Uma esfera de raio 3 está dentro de um cilindro de raio 3 e altura 6, encostando na superfície
-    lateral e nas duas bases. Calcule o volume do espaço vazio, deixando a resposta em função de π.
-13. Um cilindro e um cone têm o mesmo raio 6 e a mesma altura 9. Calcule os dois volumes em função
-    de π e diga quantas vezes um é maior que o outro.
+12. A esfera da figura, de raio 3, está dentro de um cilindro de raio 3 e altura 6, encostando na
+    superfície lateral e nas duas bases. Calcule o volume do espaço vazio, deixando a resposta em
+    função de π.
+    @fig solido id=s12 tipo=cilindro esfera=inscrita raio=3 altura=6
+13. O cilindro e o cone da figura têm o mesmo raio 6 e a mesma altura 9. Calcule os dois volumes em
+    função de π e diga quantas vezes um é maior que o outro.
+    @fig painelsolidos ordem=cilindro;cone nome=cilindro;cone raio=6 altura=9
 
 **Bloco C. Aprofundamento**
 
@@ -172,7 +183,10 @@ antes de qualquer conta.
 
 A **cylinder** has two equal parallel circular bases. A **cone** has one circular base and a vertex,
 and the **slant side** is the segment joining the vertex to a point on the rim of the base. A
-**sphere** is the set of points lying at a fixed distance from the centre.
+**sphere** is the set of points lying at a fixed distance from the centre. The three of them are in
+the figure, with the radius r and the height h that appear in the formulas.
+
+@fig painelsolidos ordem=cilindro;cone;esfera nome=cylinder;cone;sphere raio=r altura=h
 
 The three of them turn up in every package, tank, ice cream cone and ball, and most problems mix two
 of them.
@@ -203,9 +217,12 @@ base and the same height:
 
 V = (1/3) · π · r^{2} · h
 
-The radius, the height and the slant side g form a right triangle, with the slant side playing the
-part of the hypotenuse, which gives g^{2} = r^{2} + h^{2}. The lateral area is A_{l} = π · r · g,
-and the total area adds the base:
+The radius, the height and the slant side g form the right triangle in the figure, with the slant
+side playing the part of the hypotenuse, which gives g^{2} = r^{2} + h^{2}.
+
+@fig solido tipo=cone triangulo=sim raio=r altura=h geratriz=g
+
+The lateral area is A_{l} = π · r · g, and the total area adds the base:
 
 A_{t} = π · r · g + π · r^{2}
 
@@ -274,14 +291,18 @@ any calculation.
 7. Find the total area of a cone of radius 3 and height 4, leaving your answer in terms of π.
 8. A cylinder has radius 5 and volume 100π. Find the height.
 9. A sphere has area 144π. Find the radius and the volume, leaving the volume in terms of π.
-10. A cone has radius 6 and slant side 10. Find the height and the volume, leaving the volume in
-    terms of π.
+10. The cone in the figure has radius 6 and slant side 10. Find the height h and the volume, leaving
+    the volume in terms of π.
+    @fig solido id=s10 tipo=cone triangulo=sim raio=6 geratriz=10 altura=h
 11. A cylinder has radius 5 centimetres and height 8 centimetres. Taking π = 3.14, find the volume
     in cubic centimetres.
-12. A sphere of radius 3 sits inside a cylinder of radius 3 and height 6, touching the lateral
-    surface and both bases. Find the volume of the empty space, leaving your answer in terms of π.
-13. A cylinder and a cone have the same radius 6 and the same height 9. Find both volumes in terms
-    of π and say how many times one is larger than the other.
+12. The sphere in the figure, of radius 3, sits inside a cylinder of radius 3 and height 6, touching
+    the lateral surface and both bases. Find the volume of the empty space, leaving your answer in
+    terms of π.
+    @fig solido id=s12 tipo=cilindro esfera=inscrita raio=3 altura=6
+13. The cylinder and the cone in the figure have the same radius 6 and the same height 9. Find both
+    volumes in terms of π and say how many times one is larger than the other.
+    @fig painelsolidos ordem=cilindro;cone nome=cylinder;cone raio=6 altura=9
 
 **Block C. Going further**
 
