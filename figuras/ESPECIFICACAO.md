@@ -254,7 +254,10 @@ a volta comeca em cima e a direita da transversal e segue no sentido anti-horari
       ---+---------- s
         7 \ 8
 
-Fixada a volta, as relacoes do tema viram aritmetica de posicao: opostos pelo vertice (1,3),
+A volta e lida no QUADRO da construcao, ANTES do `giro=`: "em cima e a direita" quer dizer em
+cima e a direita das paralelas deitadas na horizontal, e nao da folha; girada a figura, a
+posicao 1 acompanha o giro. Fixada a volta, as relacoes do tema viram aritmetica de posicao:
+opostos pelo vertice (1,3),
 (2,4), (5,7), (6,8); correspondentes (1,5), (2,6), (3,7), (4,8); alternos internos (3,5) e
 (4,6); alternos externos (1,7) e (2,8); colaterais internos (3,6) e (4,5); colaterais externos
 (1,8) e (2,7). Posicao IMPAR mede o angulo da transversal com a paralela e posicao PAR mede o
@@ -293,14 +296,20 @@ responder no gabarito.
   diferentes significam medidas diferentes, ou seja a figura afirmava que os dois membros do
   grupo sao diferentes. Duas recusas: **paridade misturada** (uma posicao impar com uma par
   sao SUPLEMENTARES e nao congruentes, e marcadas igual a figura contradiz o proprio
-  paralelismo que a setinha declara) e **grupo em que todos os membros ja carregam valor** (os
+  paralelismo que a setinha declara) e **grupo em que todos os membros trazem NUMERO** (os
   numeros ja disseram quais sao iguais, e o que o grupo acrescenta e arco: num cruzamento com
-  os quatro angulos rotulados os arcos a mais fecham um no em volta do ponto). **Uma marca por
-  grupo.** Ex.: `@fig retas reta=r reta=s congruentes=1;3 congruentes=2;4`.
+  os quatro angulos rotulados os arcos a mais fecham um no em volta do ponto). Letra e expressao
+  NAO contam como valor para a segunda: letra nao afirma medida nenhuma, e ali o grupo e o unico
+  canal que diz que os dois sao iguais, ou e a propria hipotese do exercicio
+  (`angulo=3x+10;1 angulo=5x-30;3 congruentes=1;3`, em que quem resolve nao ve que as duas
+  expressoes valem o mesmo antes de escrever a equacao). **Uma marca por grupo.**
+  Ex.: `@fig retas reta=r reta=s congruentes=1;3 congruentes=2;4`.
 - `oposto=sim`: acucar para o grupo de congruencia dos dois opostos pelo vertice do primeiro
   angulo marcado, para o tema nao precisar calcular o numero da posicao oposta. Opostos tem
   sempre a mesma paridade, entao ele nunca cai na recusa de paridade. **Conta como o grupo que
-  ele cria.** Ex.: `@fig retas reta=r reta=s congruentes=1;3` num cruzamento sem valor escrito.
+  ele cria.** Ele passa pela MESMA porta dos grupos escritos a mao, e nao depois dela: empurrado
+  direto para a lista, escapava da recusa de redundancia e os dois caminhos davam vereditos
+  opostos para o mesmo grupo. Ex.: `@fig retas reta=r reta=s angulo=3x+10;1 angulo=5x-30;3 oposto=sim`.
 - `reto=sim`: o cruzamento e perpendicular e leva o quadradinho, um por cruzamento e nunca
   quatro. Nao convive com `angulo=` nem com `incognita=` (o valor nao chegaria na folha) nem
   com `ponto=`. **Uma marca.** Ex.: `@fig retas reta=r reta=s reto=sim nomeiaretas=sim`.
@@ -383,12 +392,34 @@ valor caber dentro dela sem fio de chamada.
   inclinacao da segunda para cumprir a razao (quando o autor nao a escreveu), ou marca a figura
   fora de escala, que passa a exigir a legenda (quando ele a escreveu). O que ela nao faz e
   deixar as duas coisas se contradizerem caladas.
+
+  Duas coisas sabidas sobre esse automatico, para quem for escrever tema. **O alcance e de cerca
+  de 0,44 a 2,3** na razao entre as duas transversais: fora dele a inclinacao que cumpriria a
+  razao ficaria abaixo de 25 graus, o que espeta a figura, e a receita prefere marcar fora de
+  escala e pedir a legenda. **E o feixe fica mais legivel perto do centro do alcance**: quanto
+  mais a razao se afasta de 1, mais as duas transversais convergem, e no extremo o ponto de
+  encontro delas entra na moldura e o apice passa a ler como vertice de triangulo, que e outra
+  figura. Razao perto de 1 tem o cuidado oposto ja embutido: a inclinacao sai ESPELHADA (180
+  menos a da primeira) em vez de igual a ela, porque duas transversais paralelas entre si
+  transformam o feixe numa grade de paralelogramo, e feixe de Tales com transversais paralelas
+  nao mostra o teorema, mostra que segmentos entre paralelas sao congruentes.
 - `ponto=` num cruzamento sem angulo marcado. A trava equivalente do `conferirFigura` nao
   alcanca esta receita, porque la o laco pula todo traco de papel `contorno`, que e o papel das
   retas daqui. E `ponto=` dentro do feixe, onde nao ha angulo nenhum a pedir.
 - `nomeiaretas=` pedindo o nome de uma paralela que o `feixe=` nao nomeou. Palavra nenhuma nasce
   no desenhador: o que a diretiva nao nomeou, a folha nao escreve.
 - figura acima do teto de cinco marcas, pelo `conferirFigura`.
+
+**Escolher a POSICAO e escolher de qual angulo o exercicio fala, e isso se confere contra o
+texto.** Angulo INTERNO (posicoes 3, 4, 5 e 6) e o unico que tem alterno interno e colateral
+interno; angulo EXTERNO (1, 2, 7 e 8) e o unico que tem alterno externo e colateral externo;
+correspondente e oposto pelo vertice existem para os oito. O caso medido, o exercicio 8 do
+MAT06-09, que pede o correspondente, o alterno interno e o colateral interno de um angulo de
+65: escrito com o 65 na posicao 1, que e externa, o "alterno interno" virava o oposto pelo
+vertice e o colateral interno nao aparecia na figura, e o gabarito ainda imprimia 65 por
+coincidencia, nomeando outro angulo. A forma certa e `angulo=65;4 incognita=x;8 incognita=y;6
+incognita=z;5`. Nenhuma trava pega isto: a figura esta correta, ela apenas responde a outra
+pergunta.
 
 **O exercicio 8 do MAT08-11, os oito angulos, dentro do teto de cinco.** Sao duas figuras
 pequenas na mesma configuracao e na mesma escala, divididas por METADE DA FOLHA e nao por
@@ -398,6 +429,13 @@ cinco, e cada cruzamento fica com DOIS arcos e nao quatro, que e a diferenca ent
 o suplemento dele" e um circulo com duas mordidas em volta do ponto. A segunda figura nao
 repete o dado: ela constroi por `transversal=t;35`, que fixa a mesma configuracao sem gastar
 marca nenhuma.
+
+As duas figuras da explicacao do `MAT08-11` nomeiam SEIS dos oito angulos, a e b na de cima e
+c, d, e e f na de baixo: g e h, que sao as posicoes 7 e 8, nunca aparecem, porque a terceira
+figura que os traria custaria as mesmas cinco marcas para dizer o que as duas primeiras ja
+disseram. Quem escrever a explicacao precisa saber disso ao redigir o texto ao lado. E o painel
+de retas do `MAT04-07` nao leva numero: a celula das concorrentes so precisa dizer "estas se
+cruzam", e `reta=r reta=s nomeiaretas=sim` basta.
 
 O que ainda NAO existe: o painel de ponto, reta, semirreta e segmento do `MAT04-07`; a faixa
 sombreada entre as paralelas que separa interno de externo; bissetriz de angulo tracada sobre
