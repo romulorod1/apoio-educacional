@@ -21,6 +21,35 @@ resumo() {
   printf '%s\n' "$1" | grep -E "passaram|PASSARAM|CONFIRMAD" | tail -1
 }
 
+# MEMORIA LIVRE E NAVEGADORES VIVOS, para um FALHOU se explicar sozinho.
+#
+# Em 08/09/2026 este portao imprimiu TRES FALHOU falsos seguidos, todos
+# ERR_CONNECTION_REFUSED, numa maquina de 8 GB com 713 MB livres. O servidor
+# ficou intermitentemente indisponivel sob pressao de memoria, e o testa_aluno
+# PASSOU no meio dos tres, com 145 conferencias: prova de que ele nao tinha
+# caido de vez. Repetir nao resolve, porque a causa dura mais que a segunda
+# tentativa, e a repeticao ja tinha acontecido nos tres.
+#
+# Os vinte testes de navegador rodam num laco, um node por teste, cada um
+# subindo o proprio Chrome, e o laco nao mata nada entre um e outro: depende de
+# cada teste chamar o close() dele. Teste morto no meio deixa o Chrome vivo e o
+# proximo sobe por cima, entao o acumulo e por construcao.
+#
+# Matar orfao consertaria o sintoma. Isto aqui conserta o DIAGNOSTICO, que e o
+# dano maior: um FALHOU sem contexto manda quem le procurar defeito no ramo, e
+# alarme falso em portao de merge ensina a ignorar alarme, que foi como uma
+# regressao de tabela ja subiu para producao aqui.
+#
+# Degrada sozinho: sem powershell ou sem tasklist sai "?" e nada quebra.
+estado_da_maquina() {
+  livre=$(powershell -NoProfile -Command \
+    "[int]((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1024)" 2>/dev/null | tr -d '\r')
+  navs=$(tasklist /FI "IMAGENAME eq chrome.exe" /NH 2>/dev/null | grep -c "chrome.exe" || true)
+  [ -n "$livre" ] || livre="?"
+  [ -n "$navs" ] || navs="?"
+  printf '%s MB livres, %s navegador(es) vivo(s)' "$livre" "$navs"
+}
+
 # Roda um teste. Se falhar, roda UMA segunda vez antes de reprovar.
 #
 # Os testes de navegador esperam por tempo fixo depois de recarregar a pagina
@@ -72,6 +101,7 @@ roda() {
   if [ "$ruim2" = "1" ]; then
     if passou_de_verdade "$saida2"; then
       printf '  FALHOU  %-24s %s\n' "$nome" "$(resumo "$saida2")"
+      printf '          (na hora da falha: %s)\n' "$(estado_da_maquina)"
     else
       # Sem placar nenhum na saida. Sao dois casos, e o texto vale para os dois:
       # o teste morreu antes de comecar, ou ele rodou e falou um dialeto que
@@ -85,7 +115,15 @@ roda() {
       motivo=$(printf '%s\n' "$saida2" | grep -iE "error|cannot find|not found" | head -1 | cut -c1-90)
       [ -n "$motivo" ] || motivo=$(printf '%s\n' "$saida2" | grep -v '^[[:space:]]*$' | tail -1 | cut -c1-90)
       [ -n "$motivo" ] || motivo="nao imprimiu nada"
-      printf '  FALHOU  %-24s nao disse que passou: %s\n' "$nome" "$motivo"
+      # O servidor mudo tem nome proprio, e nao e "o teste falhou". Ele foi a
+      # causa dos tres FALHOU falsos de 08/09, e sai separado para quem le nao
+      # comecar procurando no ramo.
+      if printf '%s\n' "$saida2" | grep -q "ERR_CONNECTION_REFUSED"; then
+        printf '  FALHOU  %-24s o servidor de 8777 nao respondeu; pode nao ser defeito do ramo\n' "$nome"
+      else
+        printf '  FALHOU  %-24s nao disse que passou: %s\n' "$nome" "$motivo"
+      fi
+      printf '          (na hora da falha: %s)\n' "$(estado_da_maquina)"
     fi
     falhou=1
   else
@@ -239,6 +277,9 @@ limpa_servidor() {
 trap limpa_servidor EXIT INT TERM
 
 titulo "com navegador"
+# A linha de base da maquina ANTES dos vinte navegadores, para a comparacao com
+# o estado na hora de uma falha dizer alguma coisa.
+printf '  (maquina no comeco da bateria: %s)\n' "$(estado_da_maquina)"
 for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento \
          testa_perfil testa_olho testa_atualizacao testa_atualizacao_real \
          testa_biblioteca_offline \
