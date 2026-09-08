@@ -1693,7 +1693,11 @@
       var tok = s.slice(i, j);
       if (!tok) break;
       if (/^legenda=/i.test(tok)) {
-        var prox = acharFigCru(s, j);
+        /* "Até a próxima diretiva" tem que conhecer as DUAS. Enquanto conhecia
+         * só o "@fig", uma "@eq" escrita depois de uma legenda ia parar dentro
+         * da legenda, e a folha saía com "@eq \begin{bmatrix} ..." impresso
+         * embaixo do desenho. */
+        var prox = acharDiretivaCrua(s, j);
         return prox >= 0 ? prox : n;
       }
       if (/^[a-zA-Z]+=/.test(tok)) { i = j; primeiro = false; continue; }
@@ -1706,6 +1710,19 @@
   function empurrarTextoCru(partes, txt) {
     var t = String(txt || '').trim();
     if (t) partes.push({ tipo: 'texto', valor: t });
+  }
+
+  /* A próxima diretiva de QUALQUER tipo, que é o que "até a próxima diretiva"
+   * sempre quis dizer. Uma função só, e não um indexOf('@fig') copiado em cada
+   * lugar que precisa parar numa diretiva: foi um desses copiados que deixou o
+   * "legenda=" engolir uma "@eq" inteira e imprimi-la embaixo do desenho. O
+   * figuras/base.js tem a gêmea desta, porque ele roda no navegador sem o
+   * pdf.js ao lado; as duas param nas mesmas duas diretivas. */
+  function acharDiretivaCrua(s, de) {
+    var fig = acharFigCru(s, de), eq = acharEqCru(s, de);
+    if (fig < 0) return eq;
+    if (eq < 0) return fig;
+    return fig < eq ? fig : eq;
   }
 
   /* A mesma trava de isolamento do acharFigCru, agora para o "@eq": arroba
@@ -1739,6 +1756,44 @@
     return fim;
   }
 
+  /* Palavra de prosa: só letras, com um sinal de pontuação de fim no máximo.
+   * Nada de barra invertida, chave, cifrão, dígito ou operador, que são o que a
+   * fórmula tem. */
+  var RE_PALAVRA_DE_PROSA = /^[A-Za-zÀ-ÖØ-öø-ÿ]+[.,;:!?]?$/;
+
+  /* Separa da fórmula a FRASE que ela engoliu.
+   *
+   * "Ir até o fim do trecho" é a regra certa para a diretiva escrita onde os
+   * temas a escrevem, que é no fim do item, mas é destrutiva no meio de uma
+   * frase: "Calcule o determinante de @eq \begin{bmatrix} ... \end{bmatrix} e
+   * explique o método usado." desenhava a matriz e emendava
+   * "eexpliqueométodousado." em itálico matemático, colado e sem aviso. E na
+   * explicação era pior: o trecho inteiro depois da fórmula SUMIA da folha, e o
+   * que a criança perdia não era a fórmula, era a frase. Imprimir feio e
+   * completo, que é o que este arquivo fazia antes, era melhor do que isso.
+   *
+   * Então a cauda de palavras de prosa volta a ser TEXTO. O corte é conservador
+   * de propósito, porque errar para o lado de cortar apagaria fórmula legítima:
+   * só corta com duas palavras ou mais, e com pelo menos uma de quatro letras.
+   * Assim "A = B", "V = b h" e "d = 30 km" continuam inteiros como fórmula, e
+   * "fecha o assunto de hoje." volta para a frase. */
+  function partirProsaDaFormula(latex) {
+    var tok = String(latex == null ? '' : latex).split(/\s+/);
+    var limpos = [];
+    for (var t = 0; t < tok.length; t++) if (tok[t]) limpos.push(tok[t]);
+    var corte = limpos.length;
+    while (corte > 0 && RE_PALAVRA_DE_PROSA.test(limpos[corte - 1])) corte--;
+    var cauda = limpos.slice(corte);
+    var temPalavraLonga = false;
+    for (var c = 0; c < cauda.length; c++) {
+      if (cauda[c].replace(/[.,;:!?]$/, '').length >= 4) temPalavraLonga = true;
+    }
+    if (cauda.length < 2 || !temPalavraLonga) {
+      return { formula: limpos.join(' '), prosa: '' };
+    }
+    return { formula: limpos.slice(0, corte).join(' '), prosa: cauda.join(' ') };
+  }
+
   /* Expande os pedaços de TEXTO nas equações que houver dentro deles.
    *
    * Este é o mesmo defeito que o comentário do ramo de figura deste arquivo
@@ -1768,11 +1823,20 @@
         if (pos < 0) { empurrarTextoCru(saida, s.slice(j)); break; }
         empurrarTextoCru(saida, s.slice(j, pos));
         var fim = fimDaEquacaoCrua(s, pos);
-        var latex = s.slice(pos + 3, fim).trim();
+        var corte = partirProsaDaFormula(s.slice(pos + 3, fim).trim());
         /* "@eq" sem fórmula nenhuma some com aviso, nunca impresso: uma diretiva
          * vazia na folha da aluna é ruído que ela não tem como interpretar. */
-        if (latex) saida.push({ tipo: 'equacao', latex: latex });
+        if (corte.formula) saida.push({ tipo: 'equacao', latex: corte.formula });
         else if (doc) doc.avisoDeFigura('@eq sem fórmula nenhuma, diretiva descartada');
+        /* O que a fórmula engoliu volta ao texto, na posição em que estava, e o
+         * aviso diz o que aconteceu: NUNCA descartado, que era o defeito. */
+        if (corte.prosa) {
+          if (doc) {
+            doc.avisoDeFigura('a @eq no meio da frase engoliu texto que não é fórmula, ' +
+              'e ele voltou para o texto: "' + corte.prosa + '"');
+          }
+          empurrarTextoCru(saida, corte.prosa);
+        }
         j = fim;
       }
     }
@@ -1793,11 +1857,16 @@
   /* Quanto de folha a figura desta diretiva vai gastar, sem desenhar nada. A
    * conta mora no módulo de figuras, que é quem sabe a altura de cada receita, a
    * folga dos rótulos externos e a linha de legenda. */
-  Doc.prototype.alturaDeFigura = function (diretiva, opcoes) {
+  Doc.prototype.alturaDeFigura = function (bloco, opcoes) {
+    opcoes = opcoes || {};
+    if (bloco && bloco.tipo === 'equacao') {
+      return this.alturaDeEquacao(bloco.latex, { tam: opcoes.tamEq || 11 });
+    }
+    var diretiva = (bloco && bloco.tipo === 'figura') ? bloco.diretiva : bloco;
     var mod = moduloFiguras();
     if (!mod || !mod.alturaDoBloco || !diretiva) return 0;
     try {
-      return Number(mod.alturaDoBloco(this, diretiva, opcoes || {})) || 0;
+      return Number(mod.alturaDoBloco(this, diretiva, opcoes)) || 0;
     } catch (e) {
       this.avisoDeFigura('não deu para medir a figura: ' + (e && e.message ? e.message : e));
       return 0;
@@ -1821,19 +1890,26 @@
     var partes = this.partesDeFigura(s);
     var corrido = [], figuras = [], equacoes = [];
     for (var i = 0; i < partes.length; i++) {
-      if (partes[i].tipo === 'figura') figuras.push(partes[i].diretiva);
-      else if (partes[i].tipo === 'equacao') equacoes.push(partes[i].latex);
-      else corrido.push(partes[i].valor);
+      if (partes[i].tipo === 'figura') {
+        figuras.push({ tipo: 'figura', diretiva: partes[i].diretiva });
+      } else if (partes[i].tipo === 'equacao') {
+        figuras.push({ tipo: 'equacao', latex: partes[i].latex });
+        equacoes.push(partes[i].latex);
+      } else {
+        corrido.push(partes[i].valor);
+      }
     }
-    /* Quem chama daqui são os ramos do markdown (parágrafo, item de lista,
-     * subtítulo, célula de tabela), e todos eles já têm ramo próprio para a
-     * "@eq" que ocupa a linha inteira, que é a forma como os temas a escrevem.
-     * A que aparece no MEIO da linha chega até aqui e o chamador não tem onde
-     * desenhá-la: ela sai da folha COM AVISO, e nunca impressa por extenso.
-     * Trocar um defeito visível por um silencioso seria pior do que o defeito. */
-    for (var e = 0; e < equacoes.length; e++) {
-      this.avisoDeFigura('@eq no meio da linha, fora do item: fórmula não desenhada: ' + equacoes[e]);
-    }
+    /* Os quatro ramos do markdown que chamam daqui (parágrafo, item de lista,
+     * subtítulo e célula de tabela) terminam TODOS no desenharFiguras e no
+     * alturaDeFigura, e por isso a lista devolvida é uma só, com os blocos na
+     * ordem em que apareceram e cada um marcado com o seu tipo: quem desenha
+     * decide pelo tipo, e nenhum dos quatro ramos precisa saber que a equação
+     * existe.
+     *
+     * A versão anterior devolvia as equações numa lista à parte que nenhum ramo
+     * lia, e o efeito foi pior do que o defeito que ela consertava: a fórmula
+     * era separada do texto e descartada, e "A matriz @eq ... fecha o assunto de
+     * hoje." saía da folha como "A matriz". O pai imprimia feio e COMPLETO. */
     return { texto: corrido.join(' '), figuras: figuras, equacoes: equacoes };
   };
 
@@ -2061,7 +2137,7 @@
       if (/^@fig(\s|$)/.test(limpo)) {
         var euMesmo = this;
         this.textoComFiguras(limpo, {
-          x: MARG_E, largura: UTIL,
+          x: MARG_E, largura: UTIL, tamEq: tam + 1,
           escrever: function (t) { euMesmo.escreverRico(t, { tam: tam, alturaLinha: tam * 1.45 }); }
         });
         i++; continue;
@@ -2153,7 +2229,7 @@
         var tit = this.separarFiguras(titulo[1]);
         this.textoRico(tit.texto, MARG_E, this.y, { tam: tam + 1.5, bold: true, cor: COR.navy });
         this.y -= tam * 0.35;
-        this.desenharFiguras(tit.figuras, { x: MARG_E, largura: UTIL });
+        this.desenharFiguras(tit.figuras, { x: MARG_E, largura: UTIL, tamEq: tam + 1 });
         i++; continue;
       }
 
@@ -2198,7 +2274,7 @@
         var altoDoItem = tam * 1.5 + Math.max(0, segmentos.length - 1) * tam * 1.45;
         for (var nf = 0; nf < noItem.figuras.length; nf++) {
           altoDoItem += this.alturaDeFigura(noItem.figuras[nf],
-            { x: recuo, largura: MARG_D - recuo });
+            { x: recuo, largura: MARG_D - recuo, tamEq: tam + 1 });
         }
         this.garanteEspaco(Math.min(altoDoItem, Y_TOPO - Y_LIMITE));
         this.y -= tam * 1.45;
@@ -2207,7 +2283,7 @@
           if (k > 0) { this.garanteEspaco(tam * 1.45); this.y -= tam * 1.45; }
           this.escreverSegmentos(segmentos[k], recuo, this.y, { tam: tam });
         }
-        this.desenharFiguras(noItem.figuras, { x: recuo, largura: MARG_D - recuo });
+        this.desenharFiguras(noItem.figuras, { x: recuo, largura: MARG_D - recuo, tamEq: tam + 1 });
         i++; continue;
       }
 
@@ -2270,7 +2346,7 @@
        * vem na linha seguinte, que é o caso comum no banco. */
       var reserva = 0;
       for (var nf2 = 0; nf2 < par.figuras.length; nf2++) {
-        reserva += this.alturaDeFigura(par.figuras[nf2], { x: MARG_E, largura: UTIL });
+        reserva += this.alturaDeFigura(par.figuras[nf2], { x: MARG_E, largura: UTIL, tamEq: tam + 1 });
       }
       /* Pula as linhas em branco para achar a diretiva: na fonte dos temas ela
        * vem SEMPRE separada do parágrafo por uma linha vazia, e olhar só a linha
@@ -2292,7 +2368,7 @@
       this.escreverRico(par.texto, {
         tam: tam, alturaLinha: tam * 1.45, reservaFinal: reserva
       });
-      this.desenharFiguras(par.figuras, { x: MARG_E, largura: UTIL });
+      this.desenharFiguras(par.figuras, { x: MARG_E, largura: UTIL, tamEq: tam + 1 });
       i++;
     }
   };
@@ -2300,9 +2376,20 @@
   /* Desenha uma lista de diretivas já separadas do texto, na ordem em que
    * apareceram. Uma linha, num lugar só, porque todos os ramos do markdown
    * terminam aqui. */
-  Doc.prototype.desenharFiguras = function (figuras, opcoes) {
-    for (var i = 0; i < (figuras || []).length; i++) this.figura(figuras[i], opcoes || {});
-    return (figuras || []).length;
+  Doc.prototype.desenharFiguras = function (blocos, opcoes) {
+    opcoes = opcoes || {};
+    for (var i = 0; i < (blocos || []).length; i++) {
+      var b = blocos[i];
+      /* Um bloco marcado com tipo vem do separarFiguras; uma diretiva solta vem
+       * de quem já tinha a receita na mão. Os dois passam por aqui, porque este
+       * é o único funil dos quatro ramos do markdown. */
+      if (b && b.tipo === 'equacao') {
+        this.equacao(b.latex, { tam: opcoes.tamEq || 11, x: opcoes.x, largura: opcoes.largura });
+      } else {
+        this.figura((b && b.tipo === 'figura') ? b.diretiva : b, opcoes);
+      }
+    }
+    return (blocos || []).length;
   };
 
   /* Lê uma diretiva de uma linha, sem desenhar. Serve à reserva de espaço, que
@@ -2368,7 +2455,7 @@
       this.linha(MARG_E, this.y, MARG_D, this.y, COR.fioForte, 0.6);
     }
     this.y -= tam * 0.4;
-    this.desenharFiguras(pendentes, { x: MARG_E, largura: UTIL });
+    this.desenharFiguras(pendentes, { x: MARG_E, largura: UTIL, tamEq: tam + 1 });
   };
 
   Doc.prototype.cabecalhoDeSecao = function (titulo, subtitulo) {
@@ -3384,16 +3471,23 @@
     function medirAlternativas(ex, recuo) {
       var lista = (ex && ex.alternativas) || [];
       return lista.map(function (alt) {
+        var partido = textoESeusBlocos(alt.texto);
         return {
           letra: String(alt.letra == null ? '' : alt.letra) + ')',
-          linhas: quebrarRico(partirRico(alt.texto), MARG_D - recuo - ALT_RECUO, ALT_TAM)
+          linhas: quebrarRico(partirRico(partido.texto), MARG_D - recuo - ALT_RECUO, ALT_TAM),
+          blocos: partido.blocos, recuo: recuo
         };
       });
     }
 
     function alturaDeAlternativas(medidas) {
       var alto = 0;
-      for (var i = 0; i < medidas.length; i++) alto += medidas[i].linhas.length * ALT_ENTRE;
+      for (var i = 0; i < medidas.length; i++) {
+        alto += medidas[i].linhas.length * ALT_ENTRE;
+        for (var b = 0; b < medidas[i].blocos.length; b++) {
+          alto += alturaDoBloco(medidas[i].blocos[b], medidas[i].recuo + ALT_RECUO, ALT_TAM);
+        }
+      }
       return alto;
     }
 
@@ -3404,6 +3498,9 @@
           doc.y -= ALT_ENTRE;
           if (k === 0) doc.texto(medidas[i].letra, recuo, doc.y, { tam: ALT_TAM, cor: COR.teal });
           doc.escreverSegmentos(medidas[i].linhas[k], recuo + ALT_RECUO, doc.y, { tam: ALT_TAM });
+        }
+        for (var d = 0; d < medidas[i].blocos.length; d++) {
+          escreverBloco(medidas[i].blocos[d], recuo + ALT_RECUO, ALT_TAM);
         }
       }
     }
@@ -3417,17 +3514,49 @@
      * corpo do texto ela se confundiria com a frase em volta. */
     function tamDaEquacao(tam) { return tam + 1; }
 
+    /* TODO texto que a folha escreve passa por aqui antes de virar linha, e não
+     * só o enunciado e a resposta.
+     *
+     * O gabarito estruturado e o texto das alternativas iam direto para o
+     * quebrarRico, sem separador nenhum: uma "@eq" escrita num gab.porque, num
+     * espera_se ou numa alternativa saía IMPRESSA crua, com zero avisos. São
+     * 101 exercícios de português que passam por esse ramo, e é por isso que
+     * "a diretiva vale dentro do exercício" tem que valer em todo lugar onde a
+     * folha escreve texto do autor do tema, e não só nos dois que a gente
+     * lembrou de consertar. Foi assim que o buraco do "@eq" nasceu.
+     *
+     * Sem diretiva nenhuma o texto volta INTOCADO, e não passado por um
+     * separador que apara espaço: assim os 101 exercícios de hoje saem byte a
+     * byte iguais. */
+    function textoESeusBlocos(bruto) {
+      var s = String(bruto == null ? '' : bruto);
+      if (s.indexOf('@fig') < 0 && s.indexOf('@eq') < 0) return { texto: s, blocos: [] };
+      var pedacos = separarPorTipo(s);
+      return { texto: pedacos.texto.join(' '), blocos: pedacos.blocos };
+    }
+
+    /* Medir e desenhar um bloco do item, num lugar só: a mesma decisão por tipo
+     * servindo o enunciado, a resposta, o gabarito estruturado e a alternativa. */
+    function alturaDoBloco(b, recuo, tam) {
+      return (b.tipo === 'equacao')
+        ? doc.alturaDeEquacao(b.latex, { tam: tamDaEquacao(tam) })
+        : doc.alturaDeFigura(b.diretiva, { x: recuo, largura: MARG_D - recuo });
+    }
+    function escreverBloco(b, recuo, tam) {
+      if (b.tipo === 'equacao') {
+        doc.equacao(b.latex, { tam: tamDaEquacao(tam), x: recuo, largura: MARG_D - recuo });
+      } else {
+        doc.figura(b.diretiva, { x: recuo, largura: MARG_D - recuo });
+      }
+    }
+
     function medirItem(bruto, tam, recuo, alturaLinha, extras) {
       var pedacos = separarPorTipo(bruto);
       var blocos = pedacos.blocos;
       var segmentos = quebrarRico(partirRico(pedacos.texto.join(' ')), MARG_D - recuo, tam);
       // a primeira linha divide a linha do número, então só as seguintes descem
       var altura = Math.max(0, segmentos.length - 1) * alturaLinha;
-      blocos.forEach(function (b) {
-        altura += (b.tipo === 'equacao')
-          ? doc.alturaDeEquacao(b.latex, { tam: tamDaEquacao(tam) })
-          : doc.alturaDeFigura(b.diretiva, { x: recuo, largura: MARG_D - recuo });
-      });
+      blocos.forEach(function (b) { altura += alturaDoBloco(b, recuo, tam); });
       var ex = extras && extras.ex;
       var trecho = (ex && ex.trecho && ex.trecho.conteudo) ? ex.trecho : null;
       var creditoDoTrecho = !!(extras && extras.creditoDoTrecho);
@@ -3449,13 +3578,7 @@
        * desenho, seja ele figura ou fórmula. A fórmula é bloco e nunca sai no
        * meio da frase, pelo mesmo motivo da figura: o texto do exercício é
        * coluna única e não tem reflow para abrir espaço no meio de uma linha. */
-      med.blocos.forEach(function (b) {
-        if (b.tipo === 'equacao') {
-          doc.equacao(b.latex, { tam: tamDaEquacao(tam), x: recuo, largura: MARG_D - recuo });
-        } else {
-          doc.figura(b.diretiva, { x: recuo, largura: MARG_D - recuo });
-        }
-      });
+      med.blocos.forEach(function (b) { escreverBloco(b, recuo, tam); });
       /* O trecho próprio do item (G6) sai LOGO DEPOIS do enunciado e antes das
        * alternativas, com número e fio. O crédito só quando a fonte dele é
        * diferente da do texto de apoio do item: repetido embaixo do texto de
@@ -3490,11 +3613,19 @@
       function corrido(txt, opcoes) {
         opcoes = opcoes || {};
         var deslocamento = opcoes.recuo || 0;
-        var linhas = quebrarRico(partirRico(String(txt == null ? '' : txt)),
+        /* O gabarito estruturado é o SÉTIMO consumidor de texto do autor do
+         * tema, e era o único que não passava por separador nenhum: "@eq" num
+         * gab.porque, num espera_se ou num aceita_se saía impressa crua. */
+        var partido = textoESeusBlocos(txt);
+        var linhas = quebrarRico(partirRico(partido.texto),
           MARG_D - recuo - deslocamento, GAB_TAM);
         pecas.push({ tipo: 'corrido', linhas: linhas, recuo: deslocamento,
           bold: !!opcoes.bold, marcador: opcoes.marcador || '' });
         alto += linhas.length * GAB_ENTRE;
+        partido.blocos.forEach(function (b) {
+          pecas.push({ tipo: 'bloco', bloco: b, recuo: deslocamento });
+          alto += alturaDoBloco(b, recuo + deslocamento, GAB_TAM);
+        });
       }
       function rotulo(chave) {
         pecas.push({ tipo: 'rotulo', txt: ROTULO_GABARITO[chave] });
@@ -3541,6 +3672,11 @@
         if (p.tipo === 'ancora') {
           naLinhaDoNumero = false;
           doc.citacao(p.bloco, { tam: GAB_TAM, italic: true, credito: false });
+          return;
+        }
+        if (p.tipo === 'bloco') {
+          naLinhaDoNumero = false;
+          escreverBloco(p.bloco, recuo + (p.recuo || 0), GAB_TAM);
           return;
         }
         for (var k = 0; k < p.linhas.length; k++) {

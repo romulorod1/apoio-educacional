@@ -1946,6 +1946,34 @@
     return -1;
   }
 
+  /* A mesma trava de isolamento do acharDiretiva, agora para o "@eq". */
+  function acharEquacao(s, de) {
+    var pos = s.indexOf('@eq', de || 0);
+    while (pos >= 0) {
+      var antes = pos === 0 || /\s/.test(s.charAt(pos - 1));
+      var depois = pos + 3 >= s.length || /\s/.test(s.charAt(pos + 3));
+      if (antes && depois) return pos;
+      pos = s.indexOf('@eq', pos + 3);
+    }
+    return -1;
+  }
+
+  /* A proxima diretiva de QUALQUER tipo, que e o que "ate a proxima diretiva"
+   * sempre quis dizer. O acharDiretiva acima continua achando so o "@fig",
+   * porque e ele que o partirEnunciado usa para saber onde comeca uma FIGURA;
+   * quem precisa e o legenda=, que engole uma frase inteira e tem que parar
+   * tambem numa "@eq". Enquanto ele parava so no "@fig", a legenda engolia a
+   * equacao e a folha saia com "@eq \begin{bmatrix} ..." impresso embaixo do
+   * desenho, que e o mesmo defeito de diretiva impressa por extenso, so que num
+   * lugar onde ninguem tinha olhado. O pdf.js tem a gemea desta funcao, para o
+   * caso de este kit nao estar carregado. */
+  function acharProximaDiretiva(s, de) {
+    var fig = acharDiretiva(s, de), eq = acharEquacao(s, de);
+    if (fig < 0) return eq;
+    if (eq < 0) return fig;
+    return fig < eq ? fig : eq;
+  }
+
   /* Le uma diretiva a partir da posicao do "@fig". Devolve a diretiva e o indice
    * onde ela terminou, para o chamador saber o que ainda e texto. */
   function lerDiretivaEm(texto, inicio) {
@@ -1985,7 +2013,7 @@
         /* A legenda e a unica chave cujo valor tem espaco: ela e uma frase e vai
          * sempre por ultimo. Engole ate a proxima diretiva ou ate o fim. */
         var resto = texto.slice(i + m[1].length + 1);
-        var prox = acharDiretiva(resto, 0);
+        var prox = acharProximaDiretiva(resto, 0);
         var frase = (prox >= 0 ? resto.slice(0, prox) : resto).trim();
         d.legenda = frase;
         i = prox >= 0 ? i + m[1].length + 1 + prox : n;

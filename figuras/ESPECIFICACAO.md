@@ -19,6 +19,8 @@ Uma linha que comeca na coluna zero com "@fig ", seguida do nome da receita e de
 
 Chaves reservadas, validas em qualquer receita: id (nomeia a figura dentro do arquivo), fase (enunciado ou gabarito), escala (fiel ou fora), legenda.
 
+A `legenda=` e a unica chave cujo valor tem espaco: ela e uma frase e vai sempre por ultimo, engolindo ate a proxima diretiva ou ate o fim do trecho. "Proxima diretiva" quer dizer QUALQUER diretiva, `@fig` ou `@eq`. Enquanto quis dizer so `@fig`, uma `@eq` escrita depois de uma legenda ia parar dentro dela e a folha saia com o LaTeX inteiro impresso embaixo do desenho. Corrigido em 08/09/2026 nos dois lugares que leem legenda (`pdf.js` e `figuras/base.js`), cada um com uma funcao so que conhece as duas diretivas.
+
 Posicao. Na explicacao a diretiva e um bloco: linha em branco antes e depois. Dentro de um exercicio ou de uma resposta, e uma linha propria dentro do item, depois do texto. Uma diretiva por linha, sempre, e nunca no meio de uma frase.
 
 Camada de gabarito. A resposta nao repete os dados: ela chama a mesma figura pelo id, so trocando a fase.
@@ -105,14 +107,20 @@ registro, nunca LaTeX cru como texto. O delimitador e `@eq` e nao `$...$` porque
 tem 135 cifroes e todos sao `R$`. O nome de funcao segue a lingua da folha: `\sin` sai
 "sen" em portugues e "sin" em ingles, inclusive dentro de fracao, raiz e expoente.
 
-Ela vale tambem DENTRO do exercicio e DENTRO da resposta, desde 08/09/2026, com a mesma
-posicao fixa da figura: numero, enunciado completo, depois a formula, depois o espaco de
-resposta. A formula e bloco e nunca sai no meio da frase, pelo mesmo motivo da figura: o
+Ela vale, desde 08/09/2026, em TODO lugar onde a folha escreve texto do autor do tema, e nao
+so na explicacao: no enunciado, na resposta, no texto de uma alternativa e nas quatro partes
+do gabarito estruturado (`letra`, `porque`, `espera_se`, `aceita_se`). Sao seis caminhos, e
+consertar dois deles seria repetir exatamente o erro que abriu este buraco: o `@fig` foi
+consertado so no caminho que alguem tinha na mao, e o `@eq` herdou o furo. O gabarito
+estruturado sozinho e 101 exercicios do banco de portugues.
+
+A posicao e a mesma fixa da figura: numero, texto completo, depois a formula, depois o espaco
+de resposta. A formula e bloco e nunca sai no meio da frase, pelo mesmo motivo da figura: o
 texto do exercicio e coluna unica e nao tem reflow para abrir espaco no meio de uma linha.
 Dentro do item ela e centrada na COLUNA do item, e nao na folha, para nao ficar desalinhada
-do enunciado que fala dela. Antes disto a diretiva saia impressa como LaTeX cru na folha da
-aluna, sem aviso nenhum: `Escreva o elemento ... @eq A = \begin{bmatrix} 1 & 2 \\ 3 & 5
-\end{bmatrix}`.
+do enunciado que fala dela, e o aviso de "mais larga que a coluna" mede a coluna do item.
+Antes disto a diretiva saia impressa como LaTeX cru na folha da aluna, sem aviso nenhum:
+`Escreva o elemento ... @eq A = \begin{bmatrix} 1 & 2 \\ 3 & 5 \end{bmatrix}`.
 
   1. Escreva o elemento da segunda linha e primeira coluna da matriz.
   @eq A = \begin{bmatrix} 1 & 2 \\ 3 & 5 \end{bmatrix}
@@ -127,15 +135,41 @@ cortado em `A`. Entao a equacao vai do `@eq` ate o fim do item, ou ate a proxima
 (`@fig` ou outro `@eq`), o que vier primeiro. Mais de uma `@eq` no mesmo item funciona, e
 `@eq` e `@fig` no mesmo item tambem, cada uma saindo na ordem em que aparece.
 
+Escreva a `@eq` no FIM do item, ou logo antes de outra diretiva. Ir ate o fim do trecho e a
+regra certa para a diretiva escrita onde os temas a escrevem, e destrutiva no meio de uma
+frase: "Calcule o determinante de `@eq` ... e explique o metodo usado." punha "e explique o
+metodo usado." dentro do LaTeX, e o item saia com `eexpliqueometodousado.` em italico
+matematico, colado na matriz. Hoje a cauda de palavras que nao parece formula volta a ser
+TEXTO, com aviso no registro. O corte e conservador de proposito, porque cortar demais
+apagaria formula legitima: so corta com duas palavras ou mais e com pelo menos uma de quatro
+letras, entao `A = B`, `V = b h` e `d = 30 km` continuam inteiros.
+
+Abaixo desse limiar a cauda NAO volta: ela e desenhada como parte da formula. Medido em
+08/09/2026: "#### Titulo com `@eq` <matriz> no fim" sai com "nofim" colado a matriz, em italico
+matematico e sem espaco, porque o renderizador de formula colapsa o espaco. Nao ha aviso, porque
+do ponto de vista do corte nao houve nada a cortar. E o preco de errar para o lado seguro, e o
+lado seguro e este: cortar demais apagaria formula legitima da folha, e sair feio e melhor do
+que sair faltando. A saida para quem escreve tema e a que a secao ja manda: **a diretiva vai no
+FIM do item**, e ai nao ha cauda nenhuma.
+
 Vale a mesma trava de isolamento do arroba do `@fig`: a diretiva so e reconhecida precedida
 de espaco ou de inicio e seguida de espaco ou de fim, para `contato@equipe.com` escrito num
 tema nao virar diretiva e nao levar embora o resto da frase. `@eq` sem formula nenhuma some
 com aviso, nunca impressa.
 
-Travas: `_teste/testa_material.js` (par envenenado, com a busca generica de arroba seguida
-de letra no texto desenhado de qualquer folha, e o controle positivo de que a formula foi
-DESENHADA e nao apenas apagada) e `figuras/_sonda_eq_no_exercicio.js` (a prova sobre uma
-copia do MATEM2-04, com o controle da explicacao).
+Travas, e a lista tem uma forma so: nenhuma delas afirma "nao saiu marcacao crua", porque
+essa formulacao ja deixou passar o defeito de a FRASE sumir da folha enquanto a marcacao
+sumia junto. Toda uma delas afirma a PRESENCA do que importa, comparada com a mesma folha
+sem a diretiva.
+
+- `_teste/testa_material.js`: par envenenado num tema de verdade, com busca generica de
+  arroba seguida de letra em qualquer folha, o controle positivo de que a formula foi
+  DESENHADA (contagem de traco), a conferencia de que nenhuma palavra da folha limpa se
+  perdeu, e a varredura em duas camadas do banco inteiro (a fonte dos 154 temas, mais as
+  folhas de todo tema que traz diretiva).
+- `figuras/_sonda_eq_no_exercicio.js`: a prova sobre uma copia do MATEM2-04, com o controle
+  da explicacao, os seis caminhos um por um, a legenda, o gabarito estruturado e a
+  alternativa, e o par da largura de coluna. Roda no portao (`_teste/confere_tudo.sh`).
 
 ### As receitas de circulo, conicas e poligono regular
 
