@@ -695,6 +695,226 @@ secao('15. A marca d\'água não sai cortada no meio da palavra');
 }
 
 // ================================================================
+secao('16. O comNotacao da TELA: expoente, índice e itálico');
+
+/* Este arquivo sempre olhou a notação NA FOLHA. A mesma marcação aparece na
+ * TELA, no modal de exercícios, e quem a traduz lá é o comNotacao do app.js,
+ * que não tinha teste nenhum. O itálico entrou nele porque o enunciado de
+ * português cita a palavra em itálico ("o *que* da linha 12"); sem trava, um
+ * asterisco desemparelhado some do enunciado sem ninguém ver, e o que ela lê
+ * na tela deixa de ser o que está no banco.
+ *
+ * O app.js é uma IIFE que só roda com navegador. Aqui a função é RECORTADA do
+ * arquivo e executada contra um documento de mentira, que devolve objetos em
+ * vez de nós: o que se confere é a árvore que ela monta, não a pintura. */
+{
+  const fs = require('fs');
+  const path = require('path');
+  const fonte = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+  const ini = fonte.indexOf('function comNotacao(texto) {');
+  const fim = fonte.indexOf('\n  }', ini);
+  conf('o comNotacao foi encontrado no app.js', ini > 0 && fim > ini, true);
+  const corpo = fonte.slice(ini, fim + 4);
+
+  const doc = { createTextNode: t => ({ tag: '#texto', txt: String(t) }) };
+  const el = (tag, atributos, filhos) => ({
+    tag: tag,
+    txt: atributos && atributos.texto !== undefined ? String(atributos.texto) : '',
+    filhos: filhos || []
+  });
+  const comNotacao = new Function('document', 'el', corpo + '\nreturn comNotacao;')(doc, el);
+
+  /* Achata a árvore num texto que se lê: sobrescrito vira ^(...), subscrito
+   * _(...), itálico vira <i>...</i>. Assim a falha imprime o que saiu, e não
+   * "[object Object]". */
+  function achatar(nos) {
+    return nos.map(n => {
+      if (n.tag === '#texto') return n.txt;
+      if (n.tag === 'sup') return '^(' + n.txt + ')';
+      if (n.tag === 'sub') return '_(' + n.txt + ')';
+      if (n.tag === 'em') return '<i>' + achatar(n.filhos) + '</i>';
+      return '<' + n.tag + '?>';
+    }).join('');
+  }
+  const naTela = s => achatar(comNotacao(s));
+
+  // o que já funcionava antes do itálico continua igual
+  conf('expoente', naTela('Calcule 2^{5} e some.'), 'Calcule 2^(5) e some.');
+  conf('índice', naTela('O termo a_{1} da sequência'), 'O termo a_(1) da sequência');
+  conf('os dois na mesma linha', naTela('x^{2} + a_{10}'), 'x^(2) + a_(10)');
+  conf('enunciado sem marcação nenhuma sai igual', naTela('Quantos lados tem?'), 'Quantos lados tem?');
+
+  // o itálico
+  conf('a palavra citada vira itálico', naTela('o *que* da linha 12'), 'o <i>que</i> da linha 12');
+  conf('dois itálicos na mesma linha', naTela('*a* e *b*'), '<i>a</i> e <i>b</i>');
+  conf('itálico com expoente dentro não perde o expoente',
+    naTela('*x^{2}*'), '<i>x^(2)</i>');
+  conf('e o que vem depois do expoente, dentro do itálico, continua lá',
+    naTela('*vale x^{2} sempre*'), '<i>vale x^(2) sempre</i>');
+  conf('expoente antes e itálico depois, na mesma linha',
+    naTela('x^{2} é o *quadrado*'), 'x^(2) é o <i>quadrado</i>');
+
+  /* Asterisco que não casa sai LITERAL. Sumir com um caractere do enunciado é
+   * o defeito que estas travas existem para pegar: entre o banco e o olho dela
+   * não há verificador nenhum. */
+  conf('asterisco solto no meio', naTela('2 * 3 = 6'), '2 * 3 = 6');
+  conf('asterisco sem par abrindo', naTela('*sozinho aqui'), '*sozinho aqui');
+  conf('asterisco sem par fechando', naTela('aqui sozinho*'), 'aqui sozinho*');
+  conf('asterisco colado sem par', naTela('a*b'), 'a*b');
+  conf('um asterisco e nada mais', naTela('*'), '*');
+  conf('dois asteriscos colados, nada entre eles', naTela('**'), '**');
+
+  // "**" é negrito no pdf.js, e negrito não é itálico: sai como veio
+  conf('"**" duplo não vira itálico', naTela('**negrito**'), '**negrito**');
+  conf('"***" não vira itálico', naTela('***os três***'), '***os três***');
+  conf('"**" com um solto no meio', naTela('**a*b**'), '**a*b**');
+
+  // marcação dentro da chave não é marcação: quem manda ali é a chave
+  conf('asterisco preso na chave do expoente', naTela('x^{*}'), 'x^(*)');
+  conf('chave vazia continua virando sobrescrito vazio, como sempre foi',
+    naTela('x^{}'), 'x^()');
+
+  /* A chave só protege quando o casamento COMEÇA nela.
+   *
+   * Isto está aqui porque o comentário do comNotacao afirmava que o asterisco
+   * dentro de ^{...} fica preso lá, ponto, e não é verdade: a alternância da
+   * expressão só desempata o que começa na mesma posição, então um itálico
+   * aberto ANTES da chave atravessa e ganha. O revisor adversarial mediu e o
+   * comentário foi corrigido; estas duas linhas travam a decisão em vez de
+   * descrevê-la, para ela não voltar a ser uma frase que alguém acredita.
+   *
+   * Nenhum caractere some nos dois casos, e é o que a conta fechada abaixo
+   * confere. Hoje isto não morde ninguém: os enunciados publicados têm zero
+   * asteriscos, e é por isso que estes dois casos são trava e não conserto. */
+  conf('itálico aberto antes da chave atravessa a chave',
+    naTela('*veja 2^{*}*'), '<i>veja 2^{</i>}*');
+  conf('e o mesmo vale com texto depois da chave',
+    naTela('*a x^{b*c} fim*'), '<i>a x^{b</i>c} fim*');
+
+  /* Nenhum caractere pode sumir, e a conta é fechada: o único asterisco que o
+   * comNotacao pode comer é o par que virou itálico, dois por <i>. */
+  [
+    'o *que* da linha 12', '2 * 3 = 6', '**negrito**', '***os três***',
+    '*sozinho aqui', 'a*b', '*a* e *b*', 'x^{*}', '**a*b**', 'a * b * c',
+    '*veja 2^{*}*', '*a x^{b*c} fim*'
+  ].forEach(s => {
+    const saida = naTela(s);
+    const italicos = (saida.match(/<i>/g) || []).length;
+    conf('não some asterisco em "' + s + '"',
+      (saida.match(/\*/g) || []).length + 2 * italicos, (s.match(/\*/g) || []).length);
+  });
+
+  /* Parentesco com a folha, e não uma segunda sintaxe. O pdf.js tokeniza com
+   * ESTADO (partirEstilo): "a * b * c" acende e apaga o itálico no meio da
+   * linha, e o "b" sai inclinado NA FOLHA, na fonte F4. O verificador do banco
+   * aceita essa linha, porque os "*" soltos estão em número par; então a tela
+   * tinha que concordar com a folha, e não inventar regra própria. Aqui os dois
+   * lados são medidos, e o do PDF é lido do conteúdo gerado. */
+  conf('na tela, o "b" de "a * b * c" sai em itálico', naTela('a * b * c'), 'a <i> b </i> c');
+  {
+    const folha = paginaCom(d => d.escreverRico('a * b * c', PDFGen.MARG_E, 400, { tam: 10 }));
+    conf('na folha, o "b" da mesma linha sai na fonte itálica (F4)',
+      /\/F4 10 Tf [\d.]+ [\d.]+ Td \(b\) Tj/.test(folha.texto), true);
+    conf('e o "a" da mesma linha sai na fonte de sempre (F1)',
+      /\/F1 10 Tf [\d.]+ [\d.]+ Td \(a\) Tj/.test(folha.texto), true);
+  }
+
+  /* O banco publicado, do começo ao fim: nenhum enunciado tem asterisco hoje.
+   * É esta medida que autoriza o comentário do comNotacao a dizer que nada
+   * muda de aparência agora. No dia em que um asterisco entrar num enunciado,
+   * esta linha cai e a decisão volta para a mesa em vez de a tela mudar
+   * calada. (Os 7860 "**" do banco vivem na `explicacao`, que só o PDF lê: o
+   * app.js não mostra explicacao em lugar nenhum.) */
+  {
+    let enunciados = 0, asteriscos = 0;
+    const anda = p => fs.readdirSync(p, { withFileTypes: true }).forEach(f => {
+      const cheio = path.join(p, f.name);
+      if (f.isDirectory()) { if (f.name !== 'topicos') anda(cheio); return; }
+      if (!/^serie-.*\.json$/.test(f.name)) return;
+      const d = JSON.parse(fs.readFileSync(cheio, 'utf8'));
+      (d.temas || []).forEach(t => ['pt', 'en'].forEach(l => {
+        if (!t[l] || !t[l].exercicios) return;
+        t[l].exercicios.forEach(e => {
+          enunciados++;
+          asteriscos += (String(e.enunciado).match(/\*/g) || []).length;
+        });
+      }));
+    });
+    anda(path.join(__dirname, '..', 'banco'));
+    conf('o banco publicado tem enunciado que chegue para conferir', enunciados > 5000, true);
+    conf('e nenhum deles tem asterisco (' + enunciados + ' conferidos)', asteriscos, 0);
+  }
+
+  /* E o enunciado real de português, um por um: sem asterisco e sem chave, o
+   * que sai da tela tem que ser idêntico ao que estava no banco. */
+  {
+    const serie = JSON.parse(fs.readFileSync(
+      path.join(__dirname, '..', 'banco', 'portugues', 'serie-07.json'), 'utf8'));
+    const mexeu = [];
+    let olhados = 0;
+    serie.temas.forEach(t => t.pt.exercicios.forEach(e => {
+      if (/[*^_]/.test(e.enunciado)) return;
+      olhados++;
+      if (naTela(e.enunciado) !== e.enunciado) mexeu.push(t.id + ' #' + e.n);
+    }));
+    conf('os enunciados de português foram conferidos', olhados > 90, true);
+    conf('e nenhum deles muda de texto ao passar pela tela', mexeu.join(', '), '');
+  }
+}
+
+// ================================================================
+secao('17. O título do texto de apoio, na tela');
+
+/* O modal de exercícios passou a dizer de que texto cada questão fala, e a
+ * regra é a do dado real: ex.texto é ÍNDICE em tema[lingua].textos, o texto
+ * traz a chave `fonte`, e o nome está em tema.fontes[chave].titulo. A trava
+ * está aqui, e não só no navegador, porque o buraco perigoso é silencioso:
+ * "Texto de apoio: undefined" embaixo do enunciado, na aula, na frente da
+ * família. */
+{
+  const fs = require('fs');
+  const path = require('path');
+  const fonte = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+  const ini = fonte.indexOf('function tituloDoTextoDeApoio(tema, dados, ex) {');
+  const fim = fonte.indexOf('\n  }', ini);
+  conf('o tituloDoTextoDeApoio foi encontrado no app.js', ini > 0 && fim > ini, true);
+  const titulo = new Function(fonte.slice(ini, fim + 4) + '\nreturn tituloDoTextoDeApoio;')();
+
+  const serie = JSON.parse(fs.readFileSync(
+    path.join(__dirname, '..', 'banco', 'portugues', 'serie-07.json'), 'utf8'));
+  const tema = serie.temas.find(t => t.id === 'POR07-01');
+  const doisTextos = serie.temas.find(t => t.id === 'POR07-04');
+
+  conf('o tema de português acha o título do texto de apoio',
+    titulo(tema, tema.pt, tema.pt.exercicios[0]), 'O relógio da sala de música');
+  conf('todo exercício de POR07-01 acha o seu',
+    tema.pt.exercicios.filter(e => !titulo(tema, tema.pt, e)).length, 0);
+
+  /* O tema com DOIS textos é o motivo de a linha existir: as questões da
+   * notícia e as da reportagem chegam na mesma lista. */
+  const titulos = Array.from(new Set(doisTextos.pt.exercicios.map(e => titulo(doisTextos, doisTextos.pt, e))));
+  conf('o tema de dois textos distingue um do outro na tela', titulos.length, 2);
+  conf('e os dois títulos são os do banco', titulos.sort().join(' | '),
+    ['Biblioteca do Jardim Alto reabre depois de oito meses fechada',
+      'A biblioteca que o bairro não deixou fechar'].sort().join(' | '));
+
+  // as três lacunas: nada aparece, e nunca "undefined"
+  conf('exercício sem texto de apoio (a matemática inteira) não devolve nada',
+    titulo(tema, tema.pt, { n: 1, enunciado: 'Calcule 2^{5}.' }), '');
+  conf('índice que não aponta para texto nenhum não devolve nada',
+    titulo(tema, tema.pt, { n: 1, texto: 9 }), '');
+  conf('fonte que o tema não declara não devolve nada',
+    titulo({ fontes: {} }, { textos: [{ fonte: 'nao-existe' }] }, { n: 1, texto: 0 }), '');
+  conf('tema sem fontes nenhuma não devolve nada',
+    titulo({}, { textos: [{ fonte: 'x' }] }, { n: 1, texto: 0 }), '');
+  conf('fonte declarada mas sem título não devolve nada',
+    titulo({ fontes: { x: { autor: 'alguém' } } }, { textos: [{ fonte: 'x' }] }, { n: 1, texto: 0 }), '');
+  conf('nenhuma das lacunas devolve a palavra undefined',
+    [titulo(tema, tema.pt, { n: 1 }), titulo(tema, tema.pt, { n: 1, texto: 9 }),
+      titulo({}, {}, { n: 1, texto: 0 })].join('|'), '||');
+}
+
+// ================================================================
 console.log('\n' + '='.repeat(60));
 console.log(passes + ' verificações passaram, ' + falhas + ' falharam.');
 if (falhas) { console.log('\nFALHAS:'); erros.forEach(e => console.log(' - ' + e)); }

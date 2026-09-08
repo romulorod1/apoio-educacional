@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.17.0';
+  var VERSAO = '1.18.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -22,6 +22,25 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.18.0',
+      itens: [
+        'O material de Português chegou ao aplicativo. Ao escolher o assunto da aula, procure ' +
+          'pelo que você vai trabalhar: os temas de Português do 7º ano aparecem na lista junto ' +
+          'com os de Matemática, cada um dizendo a matéria e o ano. Escolhendo um deles, a linha ' +
+          'do assunto ganha o botão Material, do mesmo jeito da Matemática, e a folha sai com o ' +
+          'texto para ler, os exercícios e, se você marcar, o gabarito. São seis para começar: ' +
+          'conto de mistério, crônica, artigo de divulgação científica, notícia e reportagem, ' +
+          'poema e texto teatral.',
+        'Na hora de escolher os exercícios, cada questão passou a dizer de que texto ela fala, ' +
+          'logo abaixo do enunciado. Em Português a mesma folha pode trazer dois textos, e assim ' +
+          'você vê quais questões são de um e quais são do outro antes de gerar. Onde não existe ' +
+          'texto de apoio, como na Matemática, não aparece linha nenhuma.',
+        'Para o Português ficar guardado no tablet, abra o aplicativo uma vez com internet e ' +
+          'entre num tema de Português. Depois disso ele abre sem sinal, como a Matemática já ' +
+          'abre. Na primeira vez, sem internet, o aplicativo avisa o que fazer em vez de falhar.'
+      ]
+    },
     {
       versao: '1.17.0',
       itens: [
@@ -477,19 +496,62 @@
     return e;
   }
 
-  /* Os enunciados do banco escrevem expoente e indice como x^{2} e a_{1}, que
-   * e a marcacao que o gerador de PDF entende. Na tela isso apareceria cru, e
+  /* Os enunciados do banco escrevem expoente e índice como x^{2} e a_{1}, que
+   * é a marcação que o gerador de PDF entende. Na tela isso apareceria cru, e
    * ela leria "Calcule 2^{5}" em vez de "Calcule 2 elevado a 5". Aqui a mesma
-   * marcacao vira sobrescrito e subscrito de verdade, que o navegador desenha
-   * melhor do que o PDF. */
+   * marcação vira sobrescrito e subscrito de verdade, que o navegador desenha
+   * melhor do que o PDF.
+   *
+   * O *assim* vira itálico na mesma passada. É o enunciado de português que
+   * pede: citar a palavra dentro da pergunta ("o *que* da linha 12") é o que a
+   * folha já sabe imprimir, e o asterisco cru na tela pareceria erro de
+   * digitação. A sintaxe é a MESMA do pdf.js (partirEstilo),
+   * e não uma segunda: lá "***" inverte negrito e itálico juntos, "**" inverte
+   * o negrito e "*" sozinho inverte o itálico, casando sempre o mais longo
+   * primeiro. Aqui só o itálico tem desenho, então o "**" é reconhecido para
+   * ser DEIXADO como veio, e nunca lido como um par de itálicos.
+   *
+   * O que não casa sai literal, e essa é a diferença deliberada para o pdf.js,
+   * que engole o asterisco sem par e vira o estado até o fim da linha. Na folha
+   * o verificador do banco já reprova a linha desparelhada antes de imprimir;
+   * entre o banco e o olho dela, na tela, não há verificador nenhum, e sumir
+   * com um caractere do enunciado é pior do que mostrá-lo. Medido em
+   * 08/09/2026 nos doze banco/serie-*.json publicados: 5143 enunciados, zero
+   * asteriscos, matemática e português. Então nada muda de aparência hoje: os
+   * 7860 "**" do banco vivem na `explicacao` de cada tema, que só o PDF lê, e
+   * o app.js não mostra explicacao em lugar nenhum. A regra existe para o dia
+   * em que um enunciado citar a palavra em itálico, e é o testa_notacao que
+   * segura a medida (seção 16), para esse dia não chegar calado. */
   function comNotacao(texto) {
     var partes = [];
     var resto = String(texto == null ? '' : texto);
-    var re = /([\^_])\{([^}]*)\}/;
+    /* Um laço só, com as três possibilidades na mesma expressão, para uma não
+     * estragar a outra: o "**" tem alternativa própria, que o consome inteiro e
+     * impede meio negrito de virar itálico, e o miolo do itálico é [^*]+, que
+     * não atravessa o asterisco seguinte.
+     *
+     * A chave protege o "*" que estiver dentro dela SÓ quando o casamento
+     * começa na chave: "x^{*}" sai com o asterisco no expoente. Um itálico
+     * aberto ANTES da chave atravessa e ganha, porque a alternância só desempata
+     * o que começa na mesma posição, e aí a chave sai literal. Medido:
+     * "*veja 2^{*}*" sai "<i>veja 2^{</i>}*". Nenhum caractere some em caso
+     * nenhum, e é isso que a seção 16 do testa_notacao trava, com este caso
+     * dentro. Hoje não morde: os enunciados publicados têm zero asteriscos. */
+    var re = /([\^_])\{([^}]*)\}|\*\*|\*(?!\*)([^*]+)\*(?!\*)/;
     var m;
     while ((m = re.exec(resto))) {
       if (m.index) partes.push(document.createTextNode(resto.slice(0, m.index)));
-      partes.push(el(m[1] === '^' ? 'sup' : 'sub', { texto: m[2] }));
+      if (m[1]) {
+        partes.push(el(m[1] === '^' ? 'sup' : 'sub', { texto: m[2] }));
+      } else if (m[3] !== undefined) {
+        /* Um degrau de recursão, e no máximo um: o miolo casado não tem
+         * asterisco nenhum, então ele nunca volta a entrar pelo itálico. É o
+         * que faz "*x^{2}*" sair em itálico COM o 2 em cima. */
+        partes.push(el('em', null, comNotacao(m[3])));
+      } else {
+        // "**" reconhecido só para sair inteiro, do jeito que entrou.
+        partes.push(document.createTextNode(m[0]));
+      }
       resto = resto.slice(m.index + m[0].length);
     }
     if (resto) partes.push(document.createTextNode(resto));
@@ -7669,9 +7731,10 @@
   }
 
   /* Os índices das outras matérias com banco (Core.materiasComTemas), cada um
-   * em <raiz>indice.json, SE existir. Hoje nenhum existe: português e
-   * literatura estão declaradas na tabela para o banco delas nascer sem tocar
-   * em código, e o arquivo ainda não foi publicado.
+   * em <raiz>indice.json, SE existir. Português já existe
+   * (banco/portugues/indice.json, na lista ARQUIVOS do sw.js desde o cache
+   * v22); literatura está declarada na tabela e o arquivo dela ainda não foi
+   * publicado.
    *
    * "Se existir" é decidido pelo PACOTE, e não por um pedido à rede. Medido em
    * 07/09/2026: um fetch de banco/portugues/indice.json que volta 404 aparece
@@ -7874,6 +7937,23 @@
     return chavesDeTopico;
   }
 
+  /* ESCREVE NO OBJETO VIVO DA AULA, e isso e proposital e inofensivo.
+   *
+   * Isto roda de dentro da tela de escolha de assunto, que so abre com uma aula
+   * aberta: `aulaEmEdicao` aponta para o MESMO objeto que o laco abaixo percorre,
+   * porque os dois saem de `db.aulas`. Ou seja, a migracao mexe no registro que
+   * esta na mao dela naquele segundo.
+   *
+   * E seguro por tres motivos, e os tres estao provados nas regras acima: e
+   * ADITIVA (so escreve `id` em item que nao tem, e nunca toca em titulo,
+   * disciplina, grupo ou qualquer outro campo), e IDEMPOTENTE, e nao remove item
+   * nenhum. Nada do que a tela ja desenhou muda de valor, entao nao ha tela para
+   * redesenhar e nao ha edicao dela para ser sobrescrita.
+   *
+   * O que NAO se pode fazer aqui, e por isso esta escrito: qualquer mexida futura
+   * que passe a alterar campo existente, reordenar `aula.temas` ou remover item
+   * precisa deixar de rodar com aula aberta, ou salvar por cima do que ela
+   * estiver digitando. O `salvar()` do fim grava o db inteiro. */
   function migrarIdsDosTopicos() {
     if (!topicosPlanos) return 0;
     var chaves = chavesDoCatalogo();
@@ -8348,6 +8428,7 @@
           if (completa) exatos++;
           achados.push({
             titulo: t.pt.titulo, detalhe: nomeDaMateria + ', ' + nomeDoAno(t.serie),
+            doBanco: true, materia: materiaId,
             item: { id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: materiaId }
           });
         });
@@ -8360,8 +8441,39 @@
         achados.push({
           titulo: p.titulo,
           detalhe: p.disciplinaNome + ', ' + p.grupoRotulo + ' · ' + p.bloco,
+          doBanco: false, materia: p.disciplina,
           item: itemDeTopico(p)
         });
+      });
+
+      /* "com material pronto" só sai quando há dúvida para responder.
+       *
+       * A dúvida é esta, medida no navegador quando o banco de português entrou.
+       * Procurando "mistério" saem duas linhas:
+       *   "Conto de mistério: pistas, suspeitos e dedução"  Português, 7º ano
+       *   "Conto de mistério"                               Português, 7º ano · Leitura e gêneros
+       * A primeira é o tema do banco, com dezessete exercícios; a segunda é o
+       * homônimo do catálogo de tópicos, sem material nenhum. Havia distinção na
+       * tela, pelo título mais longo e pelo rótulo do grupo, e nenhuma das duas
+       * dizia qual delas tinha material. Escolhida a segunda, o assunto grava do
+       * mesmo jeito e o botão Material não aparece na linha da aula.
+       *
+       * Marcar TODO achado de banco foi a primeira tentativa, e saiu pior:
+       * numa busca de matemática eram nove linhas seguidas terminando na mesma
+       * frase, que não responde pergunta nenhuma e ainda atrapalha achar o ano.
+       * A matemática nunca tem o par, porque não está no catálogo de tópicos.
+       *
+       * Então a marca é resposta, e não etiqueta: sai só na matéria em que ESTA
+       * busca devolveu os dois tipos de linha. A frase é a mesma que a lista de
+       * matérias já usa, de propósito. */
+      var temTopicoNaMateria = {};
+      achados.forEach(function (a) {
+        if (!a.doBanco) temTopicoNaMateria[a.materia] = true;
+      });
+      achados.forEach(function (a) {
+        if (a.doBanco && temTopicoNaMateria[a.materia]) {
+          a.detalhe += ' · com material pronto';
+        }
       });
 
       var livre = linha('Usar "' + termo + '" assim mesmo',
@@ -8648,6 +8760,24 @@
     });
   }
 
+  /* O título do texto de apoio de um exercício, ou '' quando não há.
+   *
+   * O caminho é o do dado real (banco/portugues/serie-07.json): ex.texto é o
+   * ÍNDICE dentro de tema[lingua].textos, cada texto traz a chave `fonte`, e o
+   * nome está em tema.fontes[chave].titulo. Toda lacuna devolve '' e a linha
+   * nem nasce: exercício sem texto de apoio (toda a matemática, onde ex.texto
+   * simplesmente não existe), índice que não aponta para texto nenhum, fonte
+   * que o tema não declara e fonte declarada sem título. Nenhuma delas pode
+   * virar um vão em branco embaixo do enunciado nem um "undefined" na tela
+   * dela. */
+  function tituloDoTextoDeApoio(tema, dados, ex) {
+    if (!ex || typeof ex.texto !== 'number') return '';
+    var texto = ((dados && dados.textos) || [])[ex.texto];
+    if (!texto) return '';
+    var fonte = ((tema && tema.fontes) || {})[texto.fonte];
+    return fonte && fonte.titulo ? String(fonte.titulo) : '';
+  }
+
   function desenharMontagem(tema, aula, aluno, opcoes) {
     opcoes = opcoes || {};
     var corpo = $('#corpo-modal-tema');
@@ -8764,12 +8894,25 @@
           marcados[ex.n] = this.checked;
           atualizarRodape();
         });
-        caixaExercicios.appendChild(el('label', { class: 'item-exercicio' }, [
-          chk,
-          el('div', { class: 'cresce' }, [
-            el('div', { class: 'texto-exercicio' }, comNotacao(ex.enunciado))
-          ])
-        ]));
+        var corpoDoItem = el('div', { class: 'cresce' }, [
+          el('div', { class: 'texto-exercicio' }, comNotacao(ex.enunciado))
+        ]);
+        /* De que texto a pergunta fala. Em português a folha pode trazer mais
+         * de um texto de apoio (o POR07-04 tem dois: a notícia e a reportagem
+         * sobre o mesmo fato), e a pergunta só se entende colada ao texto de
+         * onde saiu. Sem esta linha as questões dos dois chegam misturadas na
+         * mesma lista, sem nada dizendo qual é de qual: ela marca de um e de
+         * outro sem perceber, e a folha sai com os dois textos inteiros
+         * (o pdf.js imprime cada texto que tenha questão marcada) quando ela
+         * queria trabalhar um só. */
+        var apoio = tituloDoTextoDeApoio(tema, dados, ex);
+        if (apoio) {
+          corpoDoItem.appendChild(el('div', {
+            texto: 'Texto de apoio: ' + apoio,
+            style: 'font-size:12px;color:var(--muted);margin-top:3px;line-height:1.35'
+          }));
+        }
+        caixaExercicios.appendChild(el('label', { class: 'item-exercicio' }, [chk, corpoDoItem]));
       });
       atualizarRodape();
     }
@@ -8821,16 +8964,34 @@
     if (incluir.lista) partes.push('lista');
     if (incluir.gabarito) partes.push('gabarito');
 
-    var bytes = PDFGen.gerarMaterialTema({
-      tema: tema, lingua: lingua,
-      incluirMaterial: incluir.material,
-      incluirLista: incluir.lista,
-      incluirGabarito: incluir.gabarito,
-      escolhidos: escolhidos,
-      aluno: aluno ? aluno.nome : '',
-      data: aula ? Core.ddmmaaaa(aula.data) : Core.ddmmaaaa(Core.hojeIso()),
-      espacoParaResposta: incluir.lista && !incluir.gabarito ? 24 : 0
-    });
+    /* A montagem do PDF é síncrona e acontece no toque do botão, com a janela
+     * aberta na frente dela. O pdf.js passou a LANÇAR erro quando um tema cita
+     * uma fonte sem metadados (metadadosDaFonte), em vez de imprimir o
+     * identificador entre colchetes no rodapé do trecho: é a escolha certa para
+     * a folha, e sem este try seria a tela caindo calada no meio da aula, na
+     * casa da família, com o toque dela sem resposta nenhuma. Hoje o
+     * verificador do banco recusa o tema com fonte sem metadados antes de
+     * publicar, então isto é defesa e não caminho.
+     *
+     * A janela fica aberta: ela troca a escolha e tenta de novo sem refazer o
+     * caminho todo. Nada foi salvo até esta linha, então não há o que desfazer. */
+    var bytes;
+    try {
+      bytes = PDFGen.gerarMaterialTema({
+        tema: tema, lingua: lingua,
+        incluirMaterial: incluir.material,
+        incluirLista: incluir.lista,
+        incluirGabarito: incluir.gabarito,
+        escolhidos: escolhidos,
+        aluno: aluno ? aluno.nome : '',
+        data: aula ? Core.ddmmaaaa(aula.data) : Core.ddmmaaaa(Core.hojeIso()),
+        espacoParaResposta: incluir.lista && !incluir.gabarito ? 24 : 0
+      });
+    } catch (erro) {
+      avisar('Não deu para montar a folha deste tema. Escolha outro tema, ou siga a aula sem ' +
+        'ela: nada do que você já anotou mudou.');
+      return;
+    }
 
     var nome = Core.nomeArquivo(tema[lingua].titulo) + '_' + tema.id + '.pdf';
     var blob = new Blob([bytes], { type: 'application/pdf' });
@@ -10193,7 +10354,20 @@
             avisar('Números atualizados: escolas ' + Core.pctBR(lido.escolas12m) +
               ' e inflação ' + Core.pctBR(lido.inflacao12m) + '.');
             desenharAjustes();
-            desenharFechamento();
+            /* Redesenha SÓ o painel de valores, e não o Fechamento inteiro.
+             *
+             * Este é o quarto caminho que leva ao IBGE, e o único em que a
+             * busca sai porque ELA pediu, tocando em "Procurar os números
+             * agora". Os outros três agendam sozinhos e já respeitam o painel
+             * recolhido. Aqui não havia sinal a poupar: havia tela a poupar, e
+             * o conserto tinha sido feito só no caminho automático.
+             *
+             * No Fechamento, quem lê o índice é o painel de valores, e mais
+             * nada: nem o seletor de mês, nem os quatro números, nem a lista de
+             * cartões de todos os alunos. Ela toca neste botão em Ajustes, e se
+             * voltar para o Fechamento antes de a resposta chegar, era a tela
+             * inteira sendo trocada debaixo dos dedos dela. */
+            desenharPanoramaDeValores();
           }).catch(function () {
             if (b) { b.disabled = false; b.textContent = 'Procurar os números agora'; }
             avisar('Não consegui buscar agora. Continua valendo o número de ' +

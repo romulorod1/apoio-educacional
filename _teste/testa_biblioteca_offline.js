@@ -124,7 +124,11 @@ async function esperar(rotulo, ler, condicao, limiteMs) {
  * que são um caminho entre aspas, nada de comentário. Escrever a lista à mão
  * aqui seria uma segunda lista para ficar desatualizada. A entrada './' fica
  * na lista porque vira uma chave própria no cache (a raiz, separada de
- * index.html): medido, o install guarda 36 chaves para 35 arquivos. */
+ * index.html): o install guarda uma chave a mais do que a quantidade de
+ * arquivos. O numero exato nao fica escrito aqui de proposito: ele ja envelheceu
+ * uma vez (era 36 para 35, virou 37 para 36 quando o indice de portugues entrou
+ * na lista) e numero medido que envelhece calado vira comentario que contradiz o
+ * teste. Quem confere le lista.length, que e calculado. */
 function lerListaArquivos(sw) {
   const bloco = (sw.match(/var ARQUIVOS = \[([\s\S]*?)\];/) || [])[1];
   if (!bloco) throw new Error('não achei a lista ARQUIVOS no sw.js');

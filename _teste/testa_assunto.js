@@ -676,6 +676,74 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   await pag2.close();
 
   // ================================================================
+  secao('12. "com material pronto" sai só onde há dúvida');
+
+  /* A marca existe para responder UMA pergunta, e só aparece quando ela é feita.
+   *
+   * Quando o banco de português entrou, procurar "mistério" passou a devolver
+   * duas linhas da mesma matéria e do mesmo ano: o tema do banco, com dezessete
+   * exercícios, e o homônimo do catálogo de tópicos, sem material nenhum. As
+   * duas se distinguiam pelo título mais longo e pelo rótulo do grupo, e
+   * nenhuma dizia qual delas tinha material. Escolhida a errada, o assunto
+   * grava do mesmo jeito e o botão Material não aparece, sem explicação.
+   *
+   * A primeira forma marcava TODO achado vindo de índice de matéria, e foi
+   * reprovada por dois conferentes: numa busca de matemática saíam nove linhas
+   * seguidas terminando na mesma frase, que não responde pergunta nenhuma e
+   * ainda atrapalha achar o ano. A matemática nunca tem o par, porque não está
+   * no catálogo de tópicos.
+   *
+   * As duas formas passam em tudo o que já existia, então sem estas quatro
+   * conferências a forma larga volta calada. */
+  async function detalhesDaBusca(termo) {
+    await pag.evaluate((t) => {
+      const c = document.querySelector('#busca-assunto');
+      c.value = t;
+      c.dispatchEvent(new Event('input', { bubbles: true }));
+    }, termo);
+    await espera(900);
+    return pag.$$eval('#corpo-modal-tema .item-lista', es => es.map(e => ({
+      nome: e.querySelector('.nome') ? e.querySelector('.nome').textContent.trim() : '',
+      detalhe: e.querySelector('.detalhe') ? e.querySelector('.detalhe').textContent.trim() : ''
+    })).filter(x => x.nome));
+  }
+
+  /* O botao muda de nome quando a aula ja tem assunto: nasce "Escolher o
+   * assunto da aula" e vira "O assunto da aula" depois do primeiro. As secoes
+   * acima ja registraram varios, entao aqui os dois nomes servem. */
+  await pag.evaluate(() => {
+    const b = Array.from(document.querySelectorAll('#modal-aula button'))
+      .find(x => /assunto da aula/i.test(x.textContent));
+    if (b) b.click();
+  });
+  await espera(1200);
+
+  const naMatematica = await detalhesDaBusca('equacao');
+  conf('a busca de matemática devolve muita coisa', naMatematica.length > 3, true);
+  conf('e nenhuma linha dela carrega a marca',
+    naMatematica.filter(x => /com material pronto/.test(x.detalhe)).length, 0);
+
+  const noPortugues = await detalhesDaBusca('misterio');
+  const doBanco = noPortugues.filter(x => /pistas, suspeitos/.test(x.nome))[0];
+  const doCatalogo = noPortugues.filter(x => x.nome.trim() === 'Conto de mistério')[0];
+  if (doBanco && doCatalogo) {
+    conf('com os dois na mesma lista, a linha do banco diz que tem material',
+      / · com material pronto$/.test(doBanco.detalhe), true);
+    conf('e a linha do catálogo continua sem dizer',
+      /com material pronto/.test(doCatalogo.detalhe), false);
+  } else {
+    /* Sem os dois na tela não há dúvida para medir, e afirmar qualquer coisa
+     * aqui seria afirmar por ausência. Reprova, para a falta aparecer. */
+    conf('as duas linhas de "Conto de mistério" estão na busca',
+      (doBanco ? 'banco ' : '') + (doCatalogo ? 'catalogo' : ''), 'banco catalogo');
+  }
+  await pag.evaluate(() => {
+    const b = document.querySelector('#modal-tema [data-fechar]');
+    if (b) b.click();
+  });
+  await espera(500);
+
+  // ================================================================
   secao('9. Erros de página');
 
   const reais = errosDePagina.filter(e => !/favicon|manifest|sw\.js|ServiceWorker/i.test(e));
