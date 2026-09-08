@@ -442,7 +442,13 @@ else
   set -f
   for c in $caminhos; do
     if [ ! -f "$c" ]; then
-      if [ -n "$(git --icase-pathspecs ls-files -- "$c" 2>/dev/null)" ]; then
+      # Caixa trocada quer dizer o literal falhar E o icase achar. Sondar so o
+      # icase aqui acusava caixa para arquivo rastreado no caminho EXATO e
+      # apagado do disco, que e coisa banal: alguem apaga para regerar e esquece.
+      # A pessoa ia comparar maiuscula que nao existe em vez de reparar que o
+      # arquivo sumiu e que o install morre no 404.
+      if [ -z "$(git ls-files -- ":(literal)$c" 2>/dev/null)" ] \
+         && [ -n "$(git ls-files -- ":(literal,icase)$c" 2>/dev/null)" ]; then
         caixa_trocada="$caixa_trocada $c"
       else
         sumidos="$sumidos $c"
@@ -454,13 +460,20 @@ else
     # para esta trava: ponto cego dentro de uma trava que existe para nao ter
     # ponto cego.
     if [ -z "$(git --literal-pathspecs ls-files -- "$c" 2>/dev/null)" ]; then
-      # A SONDA DE CAIXA roda nos DOIS ramos de propósito, e o motivo e que sem
+      # A SONDA DE CAIXA roda nos DOIS ramos de proposito, e o motivo e que sem
       # ela o MESMO defeito sai com mensagens diferentes conforme o computador:
       # no NTFS o [ -f ] acha 'Core.js' e o git nao, entao caia aqui; num sistema
       # sensivel a caixa o [ -f ] falha e caia nos sumidos. Reprovar certo pelo
       # motivo errado custa a hora de quem procura, que e a licao que este
       # arquivo ja tem escrita na ordem do carregarSerie.
-      if [ -n "$(git --icase-pathspecs ls-files -- "$c" 2>/dev/null)" ]; then
+      #
+      # A sonda usa o prefixo magico :(literal,icase) e NAO a flag global
+      # --icase-pathspecs, e a diferenca importa: a flag de caixa nao desliga o
+      # glob, entao 'cor[e].js' casaria 'core.js' e a trava acusaria caixa onde o
+      # defeito e outro. A magica combina os dois; ela e a flag global sao
+      # mutuamente exclusivas e dao fatal na mesma invocacao, e e por isso que o
+      # ls-files e o diff do caminho principal ficam com a flag e as sondas nao.
+      if [ -n "$(git ls-files -- ":(literal,icase)$c" 2>/dev/null)" ]; then
         caixa_trocada="$caixa_trocada $c"
       else
         fora_do_git="$fora_do_git $c"
@@ -487,10 +500,13 @@ else
       "conteudo no cache" "$caixa_trocada"
     falhou=1
   elif [ -n "$sumidos" ] || [ -n "$fora_do_git" ]; then
-    # As duas listas na MESMA linha: separadas, quem conserta uma roda de novo e
-    # so entao descobre a outra, e sao duas voltas de quinze minutos.
-    printf '  FALHOU  %-24s a lista pede o que o portao nao consegue conferir. Fora do disco (o install morre no 404):%s. Fora do git:%s\n' \
-      "conteudo no cache" "${sumidos:- nenhum}" "${fora_do_git:- nenhum}"
+    # UMA falha so, com as duas listas: separadas em duas falhas, quem conserta
+    # uma roda de novo e so entao descobre a outra, e sao duas voltas de quinze
+    # minutos. Em linhas de continuacao indentadas porque numa linha so ela
+    # passava de mil colunas com poucos arquivos e enterrava o proprio FALHOU.
+    printf '  FALHOU  %-24s a lista pede o que o portao nao consegue conferir\n' "conteudo no cache"
+    printf '            fora do disco (o install morre no primeiro 404):%s\n' "${sumidos:- nenhum}"
+    printf '            fora do git (esta trava nao ve o conteudo):%s\n' "${fora_do_git:- nenhum}"
     falhou=1
   else
     if [ "$(decide_cache "$mudados" "$nome_agora" "$nome_antes")" = "reprova" ]; then
