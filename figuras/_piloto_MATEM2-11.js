@@ -254,9 +254,18 @@ console.log('\npares envenenados com o texto deste tema');
   medido('diagonal= no solido: ' + semDiagonal.figs.length + ' figura(s), avisos ' + semDiagonal.avisos.join(' | '));
   conf('limite do kit: diagonal= nao e chave declarada do solido, e a diretiva e acusada (bloqueia o 5 e o 12)',
     semDiagonal.avisos.filter(function (a) { return a.indexOf('chave nao declarada') >= 0 && a.indexOf('diagonal') >= 0; }).length, 1);
+  /* Este limite deixou de existir: o molde do prisma foi escrito. A trava nao
+   * some junto com ele, TROCA DE LADO, e passa a guardar a capacidade. O par
+   * envenenado e o tipo que CONTINUA sem molde: ele tem que avisar, e o aviso
+   * tem que dizer quais tipos tem, senao quem escreve tema fica adivinhando. */
   const planifPrisma = P.rascunho('@fig solido tipo=prisma aresta=4 altura=6 planificacao=sim');
-  conf('limite do kit: planificacao=sim so vale para o cone, e o kit avisa em vez de calar',
-    planifPrisma.avisos.filter(function (a) { return a.indexOf('planificacao=sim so vale para cone') >= 0; }).length, 1);
+  medido('molde do prisma: ' + planifPrisma.figs.length + ' figura(s), avisos '
+    + (planifPrisma.avisos.join(' | ') || '(nenhum)'));
+  conf('o molde do prisma desenha, e desenha calado',
+    planifPrisma.figs.length === 1 && planifPrisma.avisos.length === 0, true);
+  const planifPiramide = P.rascunho('@fig solido tipo=piramide aresta=4 altura=6 planificacao=sim');
+  conf('e o tipo que ainda nao tem molde avisa, dizendo quais tem',
+    planifPiramide.avisos.filter(function (a) { return a.indexOf('vale para cone') >= 0; }).length, 1);
   /* O defeito que tirou a figura do exercicio 17, provado nos dois sentidos: a
    * cota de aresta numa celula do painel sai EM CIMA do nome da celula, e a
    * mesma diretiva sem `aresta=` sai limpa. */
@@ -267,13 +276,19 @@ console.log('\npares envenenados com o texto deste tema');
     P.rotulosSobrepostos(comAresta.figs).length, 2);
   conf('e a mesma diretiva sem aresta= sai sem rotulo nenhum sobreposto',
     P.rotulosSobrepostos(semAresta.figs).length, 0);
-  /* E o outro defeito do painel, que e por que o 17 nao teria trava mesmo se a
-   * cota nao colidisse: o painelsolidos nao repassa o id para as celulas, entao
-   * as travas 3, 4 e 5, que casam figura com exercicio pelo id, ficam cegas
-   * numa figura de enunciado feita com ele. */
+  /* O outro defeito do painel tambem caiu: o painelsolidos passou a repassar o
+   * id para as celulas, entao as travas 3, 4 e 5, que casam figura com exercicio
+   * pelo id, enxergam um painel de enunciado. Aqui tambem a trava troca de lado,
+   * e o par envenenado e a diretiva SEM id=, que nao pode inventar um: id vindo
+   * do nada casaria com exercicio errado, que e pior que nao casar com nenhum. */
   const comId = P.rascunho('@fig painelsolidos id=p9 ordem=prisma;piramide nome=prisma;pirâmide altura=h');
-  conf('limite do kit: o painelsolidos nao repassa o id= para as celulas',
-    comId.figs.filter(function (f) { return f.id === 'p9'; }).length, 0);
+  const semId = P.rascunho('@fig painelsolidos ordem=prisma;piramide nome=prisma;pirâmide altura=h');
+  medido('painelsolidos id=p9: ' + comId.figs.filter(function (f) { return f.id === 'p9'; }).length
+    + ' celula(s) com o id, de ' + comId.figs.length + ' desenhada(s)');
+  conf('o painelsolidos repassa o id= para as celulas',
+    comId.figs.filter(function (f) { return f.id === 'p9'; }).length, 2);
+  conf('e sem id= na diretiva nenhuma celula inventa um',
+    semId.figs.filter(function (f) { return f.id; }).length, 0);
 }
 
 const saida = P.placar();

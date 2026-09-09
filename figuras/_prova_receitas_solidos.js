@@ -87,7 +87,7 @@ const CASOS = [
     fig: '@fig solido id=s7 tipo=cone triangulo=sim raio=r altura=h geratriz=g' },
   { nome: 'cone triangulo 5 12', titulo: 'solido: o cone com triangulo de raio 5 e altura 12, geratriz pedida',
     fig: '@fig solido id=s8 tipo=cone triangulo=sim raio=5 altura=12 geratriz=g' },
-  { nome: 'cone triangulo 5 12 gab', titulo: 'no gabarito: g = 13 escrito (a composicao nao tem porta de cor por rotulo, ver o relatorio)',
+  { nome: 'cone triangulo 5 12 gab', titulo: 'no gabarito: g = 13 em TEAL na composicao, e o 5 e o 12 do enunciado em preto',
     fig: '@fig id=s8 fase=gabarito', gabaritoDe: '@fig solido id=s8 tipo=cone triangulo=sim raio=5 altura=12 geratriz=g' },
   { nome: 'piramide triangulo', titulo: 'solido: piramide de aresta 10 e altura 12 com o triangulo interno, apotemas em letra',
     fig: '@fig solido id=s9 tipo=piramide triangulo=sim aresta=10 altura=12 apotema=m apotemabase=a' },
@@ -105,8 +105,18 @@ const CASOS = [
     fig: '@fig solido id=s13 tipo=cone planificacao=sim setor=10 arco=10π raio=5 altura=5√3 geratriz=10' },
   { nome: 'planificacao letras', titulo: 'solido: o mesmo setor com o cone em letras',
     fig: '@fig solido id=s14 tipo=cone planificacao=sim setor=10 arco=10π raio=r altura=h geratriz=g' },
-  { nome: 'planificacao gab', titulo: 'no gabarito: g = 10 na geratriz; r e h colados ficam letra (o valor nao cabe colado)',
+  { nome: 'planificacao gab', titulo: 'no gabarito: g = 10 na geratriz, em teal; r e h colados ficam letra (o valor nao cabe colado)',
     fig: '@fig id=s14 fase=gabarito', gabaritoDe: '@fig solido id=s14 tipo=cone planificacao=sim setor=10 arco=10π raio=r altura=h geratriz=g' },
+
+  /* ---------------------------------------------------- os dois moldes novos */
+  { nome: 'planif cilindro', titulo: 'solido: o molde do cilindro de raio 3 e altura 10, com as duas bases CIRCULARES tangentes',
+    fig: '@fig solido id=s30 tipo=cilindro planificacao=sim raio=3 altura=10 arco=2πr' },
+  { nome: 'planif cilindro letras', titulo: 'solido: o mesmo molde em letras',
+    fig: '@fig solido id=s31 tipo=cilindro planificacao=sim raio=r altura=h arco=2πr' },
+  { nome: 'planif cubo', titulo: 'solido: o molde do cubo de aresta 4, os seis quadrados em cruz (MAT05-08)',
+    fig: '@fig solido id=s32 tipo=prisma planificacao=sim aresta=4 altura=4' },
+  { nome: 'planif prisma', titulo: 'solido: o molde do bloco 4 por 3 por 6, com as tres medidas',
+    fig: '@fig solido id=s33 tipo=prisma planificacao=sim aresta=4 profundidade=3 altura=6' },
 
   /* ---------------------------------------------------- painel */
   { nome: 'painel letras', titulo: 'painelsolidos: os cinco com a, r e h, nomes por parametro',
@@ -347,7 +357,16 @@ console.log('\ncone com o triangulo interno');
   const gres = texto(gb, 'g = 13')[0];
   medido('gabarito da composicao: ' + textos(gb).map((t) => t.txt + (mesma(t.cor, TEAL) ? '(teal)' : '(preto)')).join(' '));
   conf('gabarito da composicao: g = 13 escrito', !!gres);
-  conf('gabarito da composicao: SEM teal, porque a composicao nao tem porta de cor por rotulo (gap declarado no relatorio)', !!gres && mesma(gres.cor, TEXTO));
+  /* Era "SEM teal, porque a composicao nao tem porta de cor por rotulo". A
+   * porta existia (a receita ja mandava op.cores, com as mesmas chaves de
+   * op.rotulos) e o solidos.js nao a lia: o campo chegava e era descartado. Em
+   * fotocopia preto e branco isso apagava a diferenca entre o dado do enunciado
+   * e o valor que a RESPOSTA acrescenta, que e a unica coisa que a camada de
+   * gabarito faz. Agora o campo e lido, e as tres composicoes que a receita usa
+   * saem como o circulo e a conica ja saiam. */
+  conf('gabarito da composicao: g = 13 sai em TEAL, e nao na tinta do contorno', !!gres && mesma(gres.cor, TEAL));
+  conf('e o 5 e o 12, que ja estavam impressos no enunciado, continuam em preto',
+    ['5', '12'].every((v) => texto(gb, v).length === 1 && mesma(texto(gb, v)[0].cor, TEXTO)));
   conf('gabarito da composicao: caixa e escala iguais as do enunciado', gb.escala === reg.escala && gb.caixa.altura === reg.caixa.altura);
 }
 
@@ -674,6 +693,230 @@ console.log('\nteto, avisos e estado');
   conf('todo q tem o seu Q e nenhum d ou W sai de envelope', problemas, 0);
   const cru = Buffer.from(fs.readFileSync(path.join(__dirname, '_prova_receitas_solidos.pdf'))).toString('latin1');
   conf('nenhuma diretiva saiu impressa como texto de figura (so no cabecalho de cada pagina)', (cru.match(/@fig/g) || []).length, CASOS.length);
+}
+
+
+
+/* ================================================================ os dois moldes novos
+ *
+ * A planificacao deixou de existir so para o cone. O que esta secao mede sao as
+ * DUAS convencoes que a especificacao fixa, e nao a ausencia de defeito:
+ *
+ *   sem perspectiva   a base do cilindro sai como CIRCUNFERENCIA e nao como
+ *                     elipse. Quem responde e o ajustarCirculo do base.js, que
+ *                     so aceita no medido.arcos o sub-caminho que fecha um
+ *                     circulo de verdade: a base do cilindro MONTADO, achatada
+ *                     de proposito na mesma figura, nao entra nessa lista, e e
+ *                     ela a testemunha de que a medicao sabe distinguir as duas
+ *   dobra e corte     no FLUXO, todo traco de 0,6 pt sai tracejado [2 2] e todo
+ *                     traco de 1,2 pt sai continuo. Medido no que vai para a
+ *                     folha e nao no que a receita disse que ia desenhar
+ *   encostam          a peca encosta na tira exatamente na linha da dobra: a
+ *                     circunferencia tangencia a dobra no ponto medio dela, e as
+ *                     pontas de toda dobra sao pontas do contorno de corte */
+
+console.log('\nos moldes do cilindro e do prisma: sem perspectiva, dobra tracejada e corte cheio');
+
+/* Um doc de rascunho, para as diretivas que nao tem pagina propria na folha. E
+ * a mesma funcao da secao de recusas, repetida aqui porque aquela e local ao
+ * bloco dela. */
+function rascunhoM(fig, registra) {
+  const d = new PDFGen.Doc(); d.novaPagina();
+  if (registra) d.registrarFiguras(registra);
+  let regs = 0;
+  d.partesDeFigura(fig).forEach((p) => { if (p.tipo === 'figura') { if (d.figura(p.diretiva, { x: X, largura: LARGURA })) regs++; } });
+  return { avisos: d.avisosFigura || [], regs: regs, figs: d.figurasDesenhadas || [] };
+}
+function tracosDe(reg, papel) {
+  return ((reg && reg.tracos) || []).filter((t) => t.papel === papel);
+}
+function segsDo(reg) { return ((reg && reg.medido && reg.medido.segmentos) || []); }
+function continuo(s) { return String(s.tracejado || '').replace(/\s+/g, ' ').indexOf('[]') === 0; }
+function pontilhado(s) { return String(s.tracejado || '').replace(/\s+/g, ' ').indexOf('[2 2]') === 0; }
+/* Os circulos de verdade que o fluxo imprimiu, so os de contorno e fechados. */
+function circulosDe(reg) {
+  return ((reg && reg.medido && reg.medido.arcos) || [])
+    .filter((a) => Math.abs(a.abertura - 360) < 0.5 && a.w >= 1.19);
+}
+
+{
+  const reg = achar('planif cilindro').reg, sd = reg.saida;
+  const circulos = circulosDe(reg);
+  medido('circunferencias fechadas de contorno no fluxo: ' + circulos.length +
+    ', raios ' + circulos.map((a) => n2(a.raio)).join(' e ') +
+    '; o cilindro montado tem raio ' + n2(sd.cilindro.raio) + ' e semieixo menor ' + n2(sd.cilindro.semieixoMenor));
+  conf('as DUAS bases do molde saem como circunferencia, e o ajustarCirculo as reconhece', circulos.length === 2);
+  conf('e as duas tem o mesmo raio',
+    circulos.length === 2 && Math.abs(circulos[0].raio - circulos[1].raio) < 0.01);
+  conf('os dois arcos do molde sao rx igual a ry na chamada, sem achatamento nenhum',
+    Math.abs(sd.tampaTopo.rx - sd.tampaTopo.ry) < 1e-9 && Math.abs(sd.tampaFundo.rx - sd.tampaFundo.ry) < 1e-9);
+  /* A testemunha: na MESMA figura o cilindro montado tem a base achatada, e ela
+   * NAO entrou na lista acima. Sem esta linha, "duas circunferencias" seria
+   * compativel com uma medicao que aceita elipse. */
+  conf('e a base do cilindro MONTADO e elipse (achatada), e por isso nao esta entre elas',
+    sd.cilindro.semieixoMenor < sd.cilindro.raio - 0.01);
+
+  /* A base do retangulo e 2 pi r na escala da figura, que e a frase inteira do
+   * MATEM2-12: "um retangulo cuja base e o comprimento da circunferencia". */
+  const R = sd.retangulo;
+  const base = dist(R[0], R[1]), lado = dist(R[0], R[3]);
+  const k = circulos[0].raio / 3;
+  medido('retangulo do molde: base ' + n2(base / k) + ' e altura ' + n2(lado / k) +
+    ' em unidades do problema, contra 2 pi r = ' + n2(2 * Math.PI * 3) + ' e h = 10');
+  conf('a base do retangulo mede 2 pi r na escala da figura, e nao um numero qualquer',
+    Math.abs(base / k - 2 * Math.PI * 3) < 0.05);
+  conf('e a altura dele mede h', Math.abs(lado / k - 10) < 0.05);
+
+  /* Dobra contra corte, no fluxo. */
+  const finos = segsDo(reg).filter((s) => Math.abs(s.w - 0.6) < 0.01);
+  const grossos = segsDo(reg).filter((s) => Math.abs(s.w - 1.2) < 0.01);
+  const dobras = tracosDe(reg, 'dobra');
+  medido('no fluxo: ' + finos.length + ' traco(s) de 0,6 pt e ' + grossos.length + ' de 1,2 pt; ' +
+    'a receita anotou ' + dobras.length + ' dobra(s)');
+  conf('as duas dobras do molde do cilindro sao as duas horizontais do retangulo, a 0,6 pt',
+    dobras.length === 2 && dobras.every((t) => Math.abs(t.espessura - 0.6) < 0.01));
+  conf('e no fluxo todo traco de 0,6 pt sai TRACEJADO [2 2]: a dobra e fina e tracejada',
+    finos.length > 0 && finos.every(pontilhado));
+  conf('e todo traco de 1,2 pt sai CONTINUO: o corte e cheio',
+    grossos.length > 0 && grossos.every(continuo));
+  /* As pecas encostam exatamente onde o molde dobra. */
+  const meioDobraTopo = { x: (R[3].x + R[2].x) / 2, y: (R[3].y + R[2].y) / 2 };
+  const vaoTangencia = Math.abs(dist(sd.centroTopo, meioDobraTopo) - circulos[0].raio);
+  medido('a tampa de cima toca a dobra no ponto medio: sobra ' + n2(vaoTangencia) + ' pt');
+  conf('a circunferencia encosta na dobra EXATAMENTE no ponto medio dela', vaoTangencia < 0.05);
+}
+{
+  const reg = achar('planif cubo').reg;
+  const dobras = tracosDe(reg, 'dobra');
+  const cortes = tracosDe(reg, 'contorno');
+  const finos = segsDo(reg).filter((s) => Math.abs(s.w - 0.6) < 0.01);
+  const grossos = segsDo(reg).filter((s) => Math.abs(s.w - 1.2) < 0.01);
+  medido('molde do cubo: ' + dobras.length + ' dobra(s) e ' + cortes.length + ' traco(s) de corte; ' +
+    'no fluxo ' + finos.length + ' de 0,6 pt e ' + grossos.length + ' de 1,2 pt');
+  conf('o molde do prisma tem CINCO dobras: as tres verticais da tira e as duas em que as bases encostam',
+    dobras.length === 5);
+  conf('e no fluxo os tracos de 0,6 pt saem todos tracejados e os de 1,2 todos continuos',
+    finos.length > 0 && finos.every(pontilhado) && grossos.length > 0 && grossos.every(continuo));
+  /* As duas pontas de cada dobra sao pontas de traco de corte: e o que quer
+   * dizer "as pecas encostam exatamente onde o molde dobra". Peca solta no
+   * espaco nao mostra onde dobra. */
+  const pontasDoCorte = [];
+  cortes.forEach(function (t) {
+    pontasDoCorte.push({ x: t.x1, y: t.y1 });
+    pontasDoCorte.push({ x: t.x2, y: t.y2 });
+  });
+  let soltas = 0;
+  dobras.forEach(function (t) {
+    [{ x: t.x1, y: t.y1 }, { x: t.x2, y: t.y2 }].forEach(function (P) {
+      if (!pontasDoCorte.some((Q) => dist(Q, P) < 0.05)) soltas++;
+    });
+  });
+  medido('pontas de dobra que nao encostam no contorno de corte: ' + soltas + ' de 10');
+  conf('as dez pontas das cinco dobras encostam no contorno de corte: nenhuma peca solta no espaco',
+    soltas === 0);
+  conf('o cubo sai FIEL, e nao fora de escala', reg.foraDeEscala === false);
+}
+{
+  /* O prisma que nao e cubo: as tres medidas rotuladas, e a profundidade
+   * herdando a aresta quando a diretiva nao a escreve, exatamente como no prisma
+   * simples. Sem essa regra repetida nos dois lugares, o mesmo tipo=prisma
+   * aresta=4 altura=6 sairia com base quadrada montado e com base 0,8 no molde. */
+  const bloco = achar('planif prisma').reg;
+  conf('o molde do bloco imprime as tres medidas', textos(bloco).map((t) => t.txt).sort().join(' '), '3 4 6');
+  const cubo = achar('planif cubo').reg;
+  conf('e o do cubo imprime duas, porque sem profundidade= a base e quadrada',
+    textos(cubo).map((t) => t.txt).sort().join(' '), '4 4');
+}
+{
+  /* O par com e sem: a mesma diretiva com planificacao=sim e sem ela. */
+  const com = rascunhoM('@fig solido tipo=cilindro planificacao=sim raio=3 altura=10');
+  const sem = rascunhoM('@fig solido tipo=cilindro raio=3 altura=10');
+  medido('cilindro com planificacao=sim: ' + com.figs[0].tracos.length + ' traco(s); sem ela: ' + sem.figs[0].tracos.length);
+  conf('planificacao=sim no cilindro desenha o molde, e sem ela sai o cilindro de sempre',
+    com.figs[0].tracos.length > sem.figs[0].tracos.length && com.avisos.length === 0 && sem.avisos.length === 0);
+  /* E o aviso antigo continua existindo para quem NAO tem molde escrito: a
+   * piramide e o prisma triangular ficaram de fora deste PR, e a chave avisa e e
+   * ignorada em vez de trocar a figura por baixo do pano. */
+  const pir = rascunhoM('@fig solido tipo=piramide planificacao=sim aresta=4 altura=6');
+  conf('planificacao=sim na piramide continua avisando e sendo ignorada: o molde dela nao existe ainda',
+    pir.regs === 1 && pir.avisos.some((a) => /planificacao=sim vale para cone, cilindro, prisma/.test(a)));
+  /* setor= e angulo= continuam sendo do setor do CONE, e agora o aviso diz isso
+   * em vez de dizer "so vale com planificacao=sim". */
+  const set = rascunhoM('@fig solido tipo=cilindro planificacao=sim raio=3 altura=10 setor=8');
+  conf('setor= num molde de cilindro avisa: setor so existe no cone',
+    set.avisos.some((a) => /setor= so vale com planificacao=sim no cone/.test(a)));
+  /* E as duas figuras do mesmo cilindro nao se sobrepoem em silencio. */
+  const dois = rascunhoM('@fig solido tipo=cilindro planificacao=sim esfera=inscrita raio=3 altura=6');
+  conf('planificacao=sim com esfera=inscrita avisa e a planificacao manda',
+    dois.regs === 1 && dois.avisos.some((a) => /a planificacao manda e a esfera foi ignorada/.test(a)));
+}
+
+/* ================================================================ o centro do setor do cone
+ *
+ * Defeito 3 do verificador das duas primeiras folhas: no semicirculo planificado
+ * do MATEM3-12 exercicio 17 nao havia nada marcando o centro. Com o angulo
+ * padrao de 180 graus os dois raios do setor ficam EM LINHA, e o que se ve e um
+ * segmento reto de ponta a ponta: o "10" pousado sobre a metade esquerda dele se
+ * le como a cota do DIAMETRO, e o setor de raio 10 passa a dizer raio 5. */
+
+console.log('\no centro marcado no setor planificado do cone');
+{
+  const reg = achar('planificacao').reg, sd = reg.saida;
+  const pontos = reg.pontos || [];
+  const noCentro = pontos.filter((p) => dist(p, sd.centroSetor) < 0.05);
+  medido('pontos anotados na figura: ' + pontos.length + '; no centro do setor: ' + noCentro.length);
+  conf('o centro do setor leva bolinha', noCentro.length === 1);
+  conf('e ela tem o raio da bolinha de centro do resto do kit (1,6 pt)',
+    noCentro.length === 1 && Math.abs(noCentro[0].raio - 1.6) < 0.01);
+  /* Quanto isso custa de MARCA, medido e nao suposto. O anota do base.js manda
+   * ponto para registro.pontos, e marcasAtivas soma rotulos mais marcas: a
+   * bolinha custa ZERO. A planificacao continua custando as CINCO dos cinco
+   * rotulos, que e exatamente o teto, e continua cabendo. */
+  medido('marcas ativas da planificacao: ' + reg.marcasAtivas + ' (rotulos ' + reg.rotulos.length +
+    ' + marcas ' + reg.marcas.length + '); pontos ' + reg.pontos.length + ', que nao entram na conta');
+  conf('a planificacao continua custando CINCO marcas, uma por rotulo: a bolinha custa zero',
+    reg.marcasAtivas === 5 && reg.rotulos.length === 5);
+  conf('e ela nao passa do teto nem ganha falha de conferencia', (reg.conferencia || []).length === 0);
+  /* A bolinha nao depende de haver rotulo a proteger: ela marca o centro, e o
+   * centro existe com rotulo ou sem. */
+  const semRotulos = rascunhoM('@fig solido tipo=cone planificacao=sim setor=10 geratriz=10');
+  conf('a bolinha sai mesmo quando a figura nao tem rotulo nenhum',
+    (semRotulos.figs[0].pontos || []).length === 1);
+}
+
+/* ================================================================ o id nas celulas do painel
+ *
+ * As travas 3, 4 e 5 do _piloto_base.js casam figura com exercicio pelo id, e o
+ * "@fig id=... fase=gabarito" rechama a figura pelo id. O painelDeSolidos
+ * carimbava id NULO em toda celula, entao um painel dentro de um exercicio ficava
+ * invisivel para as tres travas e nao podia ser rechamado no gabarito: o autor do
+ * lote 2 teve que refazer a trava 4 a mao no piloto do MATEM2-12. A receita
+ * painel, a de triangulo e quadrilatero, tinha o MESMO furo. */
+
+console.log('\no id da diretiva chega nas celulas do painel');
+{
+  const comId = rascunhoM('@fig painelsolidos id=p13 ordem=cilindro;cone nome=cilindro;cone raio=6 altura=9');
+  const semId = rascunhoM('@fig painelsolidos ordem=cilindro;cone nome=cilindro;cone raio=6 altura=9');
+  medido('painelsolidos com id=p13: celulas ' + comId.figs.length + ', ids ' + comId.figs.map((f) => String(f.id)).join('/') +
+    '; sem id=: ids ' + semId.figs.map((f) => String(f.id)).join('/'));
+  conf('todas as celulas do painelsolidos recebem o id da diretiva',
+    comId.figs.length === 2 && comId.figs.every((f) => f.id === 'p13'));
+  conf('e sem id= escrito elas continuam com id nulo, como sempre',
+    semId.figs.length === 2 && semId.figs.every((f) => f.id === null));
+  /* Medir a ausencia do defeito nao e medir a presenca do que importa: o resto
+   * do registro tem que sair IDENTICO, senao o id trouxe carona. */
+  const iguais = comId.figs.length === semId.figs.length && comId.figs.every(function (f, i) {
+    const g = semId.figs[i];
+    return f.caixa.altura === g.caixa.altura && f.escala === g.escala &&
+      f.tracos.length === g.tracos.length && f.rotulos.length === g.rotulos.length &&
+      f.marcasAtivas === g.marcasAtivas;
+  });
+  conf('e fora do id as duas saidas sao identicas: caixa, escala, tracos, rotulos e marcas',
+    iguais && comId.avisos.length === 0 && semId.avisos.length === 0);
+  /* O mesmo furo na receita painel, a de triangulo e quadrilatero. */
+  const painel = rascunhoM('@fig painel id=q9 celula=lados;3;4;5 celula=lados;5;5;5 nome=escaleno nome=equilátero');
+  conf('a receita painel tinha o mesmo furo, e as celulas dela tambem recebem o id',
+    painel.figs.length === 2 && painel.figs.every((f) => f.id === 'q9'));
 }
 
 console.log('\nrecusas e avisos, num doc de rascunho');
