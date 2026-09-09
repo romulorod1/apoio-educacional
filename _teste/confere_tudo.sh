@@ -235,26 +235,66 @@ printf '\n  (maquina no comeco do portao: %s)\n' "$(estado_da_maquina)"
 #
 # Medido em 09/09/2026: 56 candidatos, 51 no portao, 5 fora. Tres sao exclusao
 # legitima e DOIS sao divida declarada, que e diferente de esquecimento.
+#
+# A REGRA DO CANDIDATO, escrita porque ela e uma lista implicita.
+#
+# O conjunto abaixo e definido por CONVENCAO DE NOME, e isso e o mesmo defeito da
+# lista de exclusao implicita, um nivel acima: quem escrever _confere_x.js escapa
+# sem ninguem ver. Nao da para consertar de vez sem inventar outra convencao, e
+# por isso a regra fica escrita aqui, para quem ampliar depois saber o que estava
+# coberto e o que nao estava.
+#
+# Sao candidatos hoje:
+#   _teste/testa_*.js            as suites do aplicativo
+#   _teste/e2e*.js               ponta a ponta, que imprimem o mesmo dialeto
+#   figuras/_prova_*.js          as provas do kit
+#   figuras/_piloto_*.js         os pilotos de tema
+#   figuras/_audita_*.js         os auditores
+#   temas/_ferramentas/testa_*.py as provas do verificador
+#
+# NAO sao candidatos, de proposito: rasterizadores (*_png.py, *_render.py), que
+# geram imagem para olhar e nao afirmam nada, e o resto do codigo de producao.
+#
+# O e2e*.js entrou nesta lista por medida e nao por simetria: os dois imprimem
+# "N passaram, M falharam" e nenhum dos dois estava ligado. Escapavam so pelo
+# nome, que e exatamente o que esta regra existe para nao deixar acontecer.
 FORA_DO_PORTAO="figuras/_piloto_base.js|biblioteca do piloto de tema, nao afirma nada sozinha; quem afirma e o _prova_piloto_base.js, que esta no portao
 figuras/_prova_desenho_auditor.js|auditor usado pelo _prova_desenho.js, nao roda sozinho
 figuras/_prova_formula.js|gera a folha _prova_formula.pdf para OLHAR, nao imprime placar; quem afirma e o figuras/testa_formula.js
 figuras/_prova_marcas_bloco.js|DIVIDA: imprime 'nenhuma reprova', dialeto que a funcao roda nao le. A prova existe e nao roda. Sai da divida ensinando o dialeto a ela ou trocando a saida da prova
-figuras/_prova_marcas_travas.js|DIVIDA: imprime 'todos os resultados', mesmo caso do bloco acima"
+figuras/_prova_marcas_travas.js|DIVIDA: imprime 'todos os resultados', mesmo caso do bloco acima
+_teste/e2e.js|DIVIDA: imprime no dialeto do portao e nao roda. Escapava por se chamar e2e e nao testa_. Precisa de decisao: ligar no portao ou aposentar
+_teste/e2e_correcoes.js|DIVIDA: mesmo caso do e2e.js
+figuras/_audita_desenho.js|biblioteca do _prova_desenho.js, nao roda sozinha
+figuras/_audita_receitas.js|auditor rodado a mao pela frente de figuras, nao imprime placar no dialeto do portao
+figuras/_audita_receitas_cor.js|mesmo caso do _audita_receitas.js
+figuras/_audita_receitas_gab.js|reprova hoje na main: dois arcos rotulados com angulo diferente do que varrem. Ja estava citado no comentario da secao do kit"
 
 titulo "toda prova no portao"
-# A PROPRIA LISTA DE FORA SAI DA BUSCA, e nao so os comentarios.
+# A TRAVA TIRA DO TEXTO A SUA PROPRIA MAQUINARIA, e nao so os comentarios.
 #
-# Ela nao e comentario, e atribuicao, entao os nomes dela apareciam no texto
-# procurado e contavam como "esta no portao": o primeiro ensaio deu "56 de 56, 0
-# fora" onde a medida a mao dava 51 e 5. E a mesma armadilha que este arquivo ja
-# documenta duas vezes, de procurar um nome no arquivo inteiro e ser cegado por
-# uma mencao que nao e chamada.
-sem_comentario=$(sed '/^FORA_DO_PORTAO="/,/"$/d' "$0" | grep -v '^[[:space:]]*#')
+# Ela procura nomes de arquivo dentro deste arquivo, e ela FAZ PARTE dele. A
+# mesma armadilha apareceu tres vezes seguidas aqui, em tres formas:
+#
+#   1. o comentario que cita o nome de uma prova (tirado pelo grep -v)
+#   2. a lista FORA_DO_PORTAO, que nao e comentario, e atribuicao: os cinco
+#      nomes dela contavam como "esta no portao", e o ensaio deu 56 de 56 onde a
+#      medida a mao dava 51 e 5
+#   3. o proprio padrao de candidatos do laco abaixo, que contem os globs que
+#      ele procura: o _teste/e2e.js casava com o '_teste/e2e*.js' da linha do
+#      for, e a conta deu 52 onde a mao dava 51
+#
+# E o mesmo defeito que este arquivo ja documenta em outros dois lugares, de
+# procurar um nome no arquivo inteiro e ser cegado por uma mencao que nao e
+# chamada. Quem procura no proprio arquivo tira TODA a sua maquinaria do texto.
+sem_comentario=$(sed -e '/^FORA_DO_PORTAO="/,/"$/d' -e '/^for prova in /,/; do$/d' "$0" \
+  | grep -v '^[[:space:]]*#')
 candidatos=0
 no_portao=0
 esquecidas=""
 declaradas=0
-for prova in _teste/testa_*.js figuras/_prova_*.js figuras/_piloto_*.js temas/_ferramentas/testa_*.py; do
+for prova in _teste/testa_*.js _teste/e2e*.js figuras/_prova_*.js figuras/_piloto_*.js \
+             figuras/_audita_*.js temas/_ferramentas/testa_*.py; do
   [ -f "$prova" ] || continue
   candidatos=$((candidatos + 1))
   nu=$(basename "$prova"); nu=${nu%.js}; nu=${nu%.py}
