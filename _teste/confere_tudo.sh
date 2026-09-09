@@ -167,6 +167,13 @@ roda "receitas sol."    node figuras/_prova_receitas_solidos.js
 roda "piloto MAT08-13"  node figuras/_piloto_MAT08-13.js
 roda "piloto MATEM3-04" node figuras/_piloto_MATEM3-04.js
 roda "tinta"            node figuras/_prova_desenho_tinta.js
+# A prova da @eq dentro do exercicio (frente 3, 08/09/2026). Ela nasceu sonda,
+# mediu o defeito (a diretiva saindo impressa como LaTeX cru no meio da folha da
+# crianca, sem aviso nenhum) e virou prova com placar. Entra AQUI porque
+# conferencia que so roda quando alguem lembra nao e conferencia: as travas dela
+# cobrem os seis caminhos que escrevem texto do autor do tema, e a maior parte
+# delas existe justamente porque um deles tinha ficado sem caso.
+roda "@eq no exercicio"  node figuras/_sonda_eq_no_exercicio.js
 # Frente 3 (figuras), 07/09/2026. Os dois pilotos novos rodam SEM argumento, ou
 # seja, contra o temas/banco.json, que e como os outros tres ja rodam aqui: o
 # retrato figuras/_tema_<ID>.json e gitignored e serve so a autoria. O
