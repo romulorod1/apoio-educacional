@@ -139,10 +139,42 @@ Escreva a `@eq` no FIM do item, ou logo antes de outra diretiva. Ir ate o fim do
 regra certa para a diretiva escrita onde os temas a escrevem, e destrutiva no meio de uma
 frase: "Calcule o determinante de `@eq` ... e explique o metodo usado." punha "e explique o
 metodo usado." dentro do LaTeX, e o item saia com `eexpliqueometodousado.` em italico
-matematico, colado na matriz. Hoje a cauda de palavras que nao parece formula volta a ser
-TEXTO, com aviso no registro. O corte e conservador de proposito, porque cortar demais
-apagaria formula legitima: so corta com duas palavras ou mais e com pelo menos uma de quatro
-letras, entao `A = B`, `V = b h` e `d = 30 km` continuam inteiros.
+matematico, colado na matriz.
+
+Duas coisas acontecem hoje, e sao INDEPENDENTES uma da outra.
+
+A primeira e o corte: a cauda de palavras de prosa volta a ser TEXTO. Ele e conservador de
+proposito, porque cortar demais apagaria formula legitima: so corta com duas palavras ou
+mais e com pelo menos uma de quatro letras, entao `A = B`, `V = b h` e `d = 30 km` continuam
+inteiros. Ele anda de tras para frente e **para no primeiro token que nao e palavra de prosa
+pura**, e isto NAO e um limiar de duas palavras: um unico token estranho em qualquer posicao
+bloqueia a recuperacao da oracao inteira. Um "(em metros)", um "passo-a-passo.", um `"porque"`
+entre aspas ou um "R$ 30" e o bastante para nove palavras ficarem dentro da formula. E a
+recuperacao pode ser PARCIAL, partindo a frase em duas: em "... e some 2 ao total.", o "e
+some 2" fica na formula e o "ao total." volta como texto.
+
+A segunda e o aviso, e ele existe justamente porque o corte nao alcanca esses casos: quatro
+letras ou mais coladas dentro do LaTeX, que nao venham depois de barra invertida e nao
+estejam num `\text{}`, viram aviso no registro. Medido: zero alarme falso nas 10 formulas
+`@eq` do banco e em 10 escritas a mao (com `\text{}` aninhado entre elas), e pega 5 dos 7
+casos silenciosos. Os 2 que sobram sao de palavra curta ("no fim"), e continuam saindo feios
+e calados: e ali que "sair feio e completo" ainda se sustenta. **Este e o unico caso que
+nenhuma outra trava do repositorio ve**: nao tem arroba, nao tem `\begin`, nao perde palavra,
+entao a busca generica de arroba, a comparacao de palavras da folha e os pilotos sao todos
+cegos para ele.
+
+Fronteira de quatro letras e arbitraria, e o `sen` escapa enquanto o `seno` nao. Formula
+escrita por PALAVRAS INTEIRAS pede `\text{}` ou `\cdot`: `area = base altura`,
+`A = base vezes altura`, `y = seno x`, `perimetro = lado lado lado lado`,
+`massa = volume densidade` e `taxa = delta espaco` sao cortadas pelo corte e as palavras
+voltam como texto, com aviso. O dano e contido e anunciado, mas nao e o que o autor queria.
+
+E o texto recuperado volta junto ao texto do item, ANTES do bloco, e nao na posicao literal
+onde estava: "Calcule o determinante de `@eq` ... e explique o metodo usado." sai como
+"Calcule o determinante de e explique o metodo usado." mais a matriz embaixo. E o certo dada
+a forma fixa do item (numero, texto completo, desenho), e a mesma que o `@fig` no meio de uma
+frase ja impunha, mas a frase completa fica esquisita: mais um motivo para escrever a
+diretiva no fim.
 
 Abaixo desse limiar a cauda NAO volta: ela e desenhada como parte da formula. Medido em
 08/09/2026: "#### Titulo com `@eq` <matriz> no fim" sai com "nofim" colado a matriz, em italico

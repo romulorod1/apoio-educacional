@@ -179,6 +179,90 @@ conf('arroba colado em palavra tambem nao vira diretiva', tipos('valor de x@eqy 
   conf('e o corte AVISA, para nao ser mais uma coisa silenciosa',
     (d.avisosFigura || []).some(function (a) { return /engoliu texto/.test(a); }), true);
 }
+/* O SILENCIO que sobra do corte, e que e mais largo do que o corte.
+ *
+ * O corte anda de tras para frente e para no primeiro token que nao e palavra
+ * de prosa pura, entao UM token estranho no meio bloqueia a recuperacao da
+ * oracao inteira: nove palavras podem ficar dentro da formula por causa de um
+ * "(em metros)". Sai colado, em italico matematico, e nenhuma outra trava deste
+ * repositorio ve: nao tem arroba, nao tem "\begin", nao perde palavra. Por isso
+ * o aviso e INDEPENDENTE do corte.
+ *
+ * Achado pela frente 1 em 08/09/2026, com os sete casos abaixo medidos. Dois
+ * continuam calados de proposito, e estao aqui escritos como calados: sao de
+ * palavra curta, onde "sair feio" ainda se sustenta. */
+console.log('\n=== palavra solta dentro da formula avisa ===');
+{
+  function avisosDeSolta(texto) {
+    const d = new PDFGen.Doc();
+    d.partesDeFigura(texto);
+    return (d.avisosFigura || []).filter(function (a) { return /palavra solta/.test(a); }).length;
+  }
+  [['token estranho no meio', 'Calcule @eq x^{2} + 1 e explique o metodo (em metros).', 1],
+   ['hifen', 'Calcule @eq x^{2} + 1 e explique passo-a-passo.', 1],
+   ['aspas', 'Calcule @eq x^{2} + 1 e explique o "porque".', 1],
+   ['cifrao', 'Calcule @eq x^{2} + 1 e diga se custa R$ 30 reais.', 1],
+   ['recuperacao parcial da frase', 'Calcule @eq x^{2} + 1 e some 2 ao total.', 1],
+   ['palavra curta, CALADO de proposito', 'Calcule @eq ' + MATRIZ + ' no fim.', 0],
+   ['palavra curta 2, CALADO de proposito', 'Calcule @eq x + 1 ate o fim.', 0]
+  ].forEach(function (caso) {
+    conf('palavra solta, ' + caso[0], avisosDeSolta(caso[1]), caso[2]);
+  });
+
+  /* Alarme falso e o que treina a ignorar alarme, entao o outro lado do par sai
+   * das formulas DE VERDADE do banco, e nao de uma lista escrita a mao aqui:
+   * lista a mao so cobre o que quem escreveu imaginou. */
+  const doBanco = [];
+  banco.temas.forEach(function (t) {
+    ['pt', 'en'].forEach(function (lg) {
+      if (!t[lg]) return;
+      String(t[lg].explicacao || '').split(/\r?\n/).forEach(function (l) {
+        if (/^@eq(\s|$)/.test(l.trim())) doBanco.push(l.trim().slice(3).trim());
+      });
+    });
+  });
+  conf('a serie tem formula @eq de verdade para conferir', doBanco.length >= 10, true);
+  conf('e nenhuma delas dispara alarme falso',
+    doBanco.filter(function (f) { return avisosDeSolta('Veja. @eq ' + f); }).join(' | ') || 0, 0);
+  const LEGITIMAS = [
+    'x = \\frac{-b \\pm \\sqrt{b^{2} - 4ac}}{2a}',
+    '\\begin{vmatrix} 2 & -1 \\\\ 3 & 5 \\end{vmatrix} = 13',
+    '\\left\\{ x \\in \\mathrm{R} \\; | \\; x \\geq \\frac{1}{2} \\right\\}',
+    '\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}',
+    '\\lim_{x \\to 0} \\frac{\\sen(x)}{x} = 1',
+    'V = b h', 'd = 30 km', 'AB = CD',
+    /* O \text{} e o lugar CERTO de escrever palavra dentro de formula, e por
+     * isso ele nao pode disparar o aviso, nem com comando aninhado dentro. */
+    '\\text{area do triangulo} = \\frac{b \\cdot h}{2}',
+    '\\text{raiz de \\sqrt{2}}'
+  ];
+  conf('nem as ' + LEGITIMAS.length + ' escritas a mao, com \\text{} entre elas',
+    LEGITIMAS.filter(function (f) { return avisosDeSolta('Veja. @eq ' + f); }).join(' | ') || 0, 0);
+}
+
+/* A altura da equacao na RESERVA do bloco.
+ *
+ * E a conta que impede a formula de se separar do texto na virada da folha, e o
+ * alturaDeFigura passou a atende-la para os quatro ramos do markdown. Sem caso,
+ * desligar esse ramo devolveria zero e ninguem veria: a folha voltaria a partir
+ * o item ao meio, que e defeito de folha impressa. */
+console.log('\n=== a reserva conhece a altura da equacao ===');
+{
+  const d = new PDFGen.Doc();
+  d.novaPagina();
+  const bloco = { tipo: 'equacao', latex: MATRIZ };
+  const alto = d.alturaDeFigura(bloco, { x: PDFGen.MARG_E, largura: PDFGen.UTIL, tamEq: 11 });
+  conf('a altura de um bloco de equacao nao e zero', alto > 20, true);
+  conf('e e a MESMA que o alturaDeEquacao devolve', alto, d.alturaDeEquacao(MATRIZ, { tam: 11 }));
+  conf('e ela cresce com o corpo da formula',
+    d.alturaDeFigura(bloco, { tamEq: 22 }) > alto, true);
+  /* E uma diretiva de figura solta continua passando por ali, que e o caminho
+   * de sempre e nao podia mudar. */
+  conf('e uma diretiva de figura continua medindo pelo caminho dela',
+    d.alturaDeFigura(partes('Veja. ' + TRIANGULO)[1].diretiva,
+      { x: PDFGen.MARG_E, largura: PDFGen.UTIL }) > 20, true);
+}
+
 /* E o outro lado do corte: formula legitima que TERMINA em letra nao e cortada. */
 [['A = B', 'A = B'],
  ['V = b h', 'V = b h'],
@@ -212,14 +296,22 @@ function pecasDaFolha(bytes) {
 }
 function textoDaFolha(bytes) { return pecasDaFolha(bytes).join(' '); }
 
-/* As palavras escritas na folha, na ordem. O rodape de pagina fica de fora: uma
- * formula a mais empurra a folha para uma pagina a mais, e "Pagina 1 de 2" vira
- * "Pagina 1 de 3". Isso e paginacao mudando, e nao texto perdido. */
+/* As palavras escritas na folha, na ordem.
+ *
+ * Duas coisas ficam de fora, e nenhuma das duas por conveniencia. O rodape de
+ * pagina, porque uma formula a mais empurra a folha para uma pagina a mais e
+ * "Pagina 1 de 2" vira "Pagina 1 de 3": e a paginacao mudando, nao texto
+ * perdido. E a marca d'agua, porque a palavra dela e descartada POR PROJETO
+ * quando uma placa branca fatia a caixa de tinta, que e o que a placa de uma
+ * formula faz: sem isto a conferencia reprovaria com "NW (0 de 1)" so por o
+ * veneno cair perto do meio da folha, e alarme falso e o que treina a ignorar
+ * alarme. Medido pela frente 1 em 08/09/2026. */
+const FORA_DA_CONTA = { 'NW': 1, 'APOIO': 1, 'EDUCACIONAL': 1 };
 function palavrasDaFolha(bytes) {
   const saida = [];
   pecasDaFolha(bytes).forEach(function (p) {
     if (/^P.gina \d+ de \d+$/.test(p) || /^Page \d+ of \d+$/.test(p)) return;
-    String(p).split(/\s+/).forEach(function (w) { if (w) saida.push(w); });
+    String(p).split(/\s+/).forEach(function (w) { if (w && !FORA_DA_CONTA[w]) saida.push(w); });
   });
   return saida;
 }
@@ -381,6 +473,51 @@ console.log('\n=== os quatro ramos do markdown, e a linha propria ===');
      * que vem depois dela, e o aviso e o que conta que isso aconteceu. */
     conf(nome + ': avisos', (com.doc.avisosFigura || []).length, avisosEsperados);
   });
+}
+
+/* ====================================== a marca d'agua fora da conta
+ *
+ * A conferencia de "o texto chega inteiro" podia dar ALARME FALSO, e o alarme
+ * falso em portao e o que treina a ignorar alarme. A palavra da marca d'agua e
+ * descartada por projeto quando uma placa branca fatia a caixa de tinta dela, e
+ * a @eq desloca a figura cuja placa faz isso: a mesma folha, com e sem a
+ * diretiva, "perdia" o NW. Varrido em 42 combinacoes de item e espaco de
+ * resposta: reproduz em 8 delas, sempre como "NW (0 de 1)" ou "NW (1 de 2)".
+ *
+ * O caso guarda as DUAS metades: que a conta de hoje nao acusa, e que a conta
+ * SEM pular a marca acusaria. Sem a segunda metade, o dia em que alguem tirar o
+ * FORA_DA_CONTA a suite fica vermelha sem defeito nenhum, e ninguem vai saber
+ * por que. */
+console.log('\n=== a marca d\'agua nao entra na conta de palavras ===');
+{
+  const M = '\\begin{bmatrix} 1 & 2 \\\\ 3 & 5 \\end{bmatrix}';
+  function comFigura(comEq) {
+    const ex = [];
+    for (let i = 0; i < 2; i++) {
+      ex.push({
+        enunciado: 'Item numero ' + (i + 1) + ' com desenho. ' + TRIANGULO +
+          (comEq && i === 0 ? ' @eq ' + M : ''),
+        resposta: 'Resposta ' + (i + 1) + '.'
+      });
+    }
+    return { fontes: {}, pt: { titulo: 't', resumo: 'r', explicacao: 'Um paragrafo.', exercicios: ex } };
+  }
+  const op = { lingua: 'pt', incluirLista: true, espacoParaResposta: 50 };
+  const com = PDFGen.gerarMaterialTema(Object.assign({ tema: comFigura(true) }, op));
+  const sem = PDFGen.gerarMaterialTema(Object.assign({ tema: comFigura(false) }, op));
+  conf('a conta de hoje nao acusa nada nesta folha',
+    faltando(palavrasDaFolha(com), palavrasDaFolha(sem)).join(' ') || 'nada faltou', 'nada faltou');
+  /* A outra metade: sem pular a marca, a MESMA folha acusaria. */
+  function comMarca(bytes) {
+    const saida = [];
+    pecasDaFolha(bytes).forEach(function (p) {
+      if (/^P.gina \d+ de \d+$/.test(p)) return;
+      String(p).split(/\s+/).forEach(function (w) { if (w) saida.push(w); });
+    });
+    return saida;
+  }
+  conf('e sem pular a marca ela acusaria, que e o motivo de pular',
+    faltando(comMarca(com), comMarca(sem)).some(function (f) { return /^NW/.test(f); }), true);
 }
 
 /* ====================================== a legenda que engolia a equacao
