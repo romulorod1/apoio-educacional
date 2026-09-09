@@ -581,9 +581,27 @@ if [ -n "$livre_mb" ] && [ "$livre_mb" -lt "$PISO_MB" ] 2>/dev/null; then
   printf '                Duas mortes medidas em 08/09, com 713 MB e com 579 MB livres.\n'
 fi
 if [ "$roda_bateria" = "sim" ]; then
-# A SEGUNDA MEDIDA, logo depois do primeiro navegador. A diferenca entre ela e a
-# linha de base e o CUSTO DA ENTRADA, que e o numero que falta para o piso poder
-# descer com dado em vez de palpite. Sai de graca na primeira rodada verde.
+# A SEGUNDA MEDIDA, DEPOIS DO PRIMEIRO TESTE DE NAVEGADOR, e ela NAO e o custo
+# de entrada. Ja foi rotulada assim e o rotulo era falso.
+#
+# Medido na primeira rodada verde, em 09/09/2026: linha de base 1404 MB, esta
+# medida 1417 MB. SUBIU 13 MB. Nao ha custo nenhum a ler aqui, e o motivo e a
+# posicao: a linha esta depois de `roda` retornar, e `roda` espera o teste
+# terminar, entao o navegador ja fechou e devolveu tudo. O proprio texto
+# impresso denuncia, ao dizer "0 navegador(es) vivo(s)" ao lado do numero.
+#
+# O que ela serve para ver: se a maquina ficou pior DEPOIS de um ciclo completo
+# de teste, o que acusaria navegador orfao ou memoria nao devolvida.
+#
+# O CUSTO DE ENTRADA continua sem medida propria, e nao confundir com os 257 MB
+# do bloco do piso: aqueles foram MEDIDOS, e bem, mas medem OUTRA GRANDEZA. Sao
+# o pico de UM navegador isolado; o custo de entrar e o primeiro navegador
+# subindo com TODO o resto ainda carregado, que e onde as duas mortes
+# aconteceram. Mesmo nome no discurso, condicao diferente.
+#
+# Medi-lo exige amostrar DURANTE o primeiro teste, o que nao cabe dentro deste
+# script: um amostrador por fora, comecando antes da bateria, entrega o vale
+# inteiro sem tocar numa linha daqui.
 primeiro_navegador=sim
 for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento \
          testa_perfil testa_olho testa_atualizacao testa_atualizacao_real \
@@ -594,7 +612,8 @@ for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento 
   roda "$t" node "_teste/$t.js"
   if [ "$primeiro_navegador" = "sim" ]; then
     primeiro_navegador=nao
-    printf '  (depois do primeiro navegador: %s)\n' "$(estado_da_maquina)"
+    printf '  (depois do primeiro teste, com o navegador dele ja fechado: %s)\n' \
+      "$(estado_da_maquina)"
   fi
 done
 # O mesmo teste duas vezes de proposito. Sem argumento ele prova que a serie
