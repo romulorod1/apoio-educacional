@@ -1,7 +1,7 @@
 {
   "tema": "POR07-03",
-  "assinatura": "20fb22e181004ac9cf0f72b9446b4709a3b5a118a181f8d103656fd62d0cc079",
-  "data": "2026-09-08",
+  "assinatura": "ee59f77ee84bc268bc6df8578fcf29ba497153af549d22f0a720d8d7862566f6",
+  "data": "2026-09-09",
   "modelos": {
     "leitores": "sonnet",
     "juiz": "sonnet",
@@ -13,25 +13,26 @@
       "respostas": [
         {
           "leitor": "A",
-          "resposta": "Feromônio é uma espécie de cheiro que a formiga vai deixando no chão quando volta do lugar onde achou comida. As outras formigas da colônia sentem esse cheiro com as antenas e seguem o rastro dele.",
+          "resposta": "Feromônio é uma substância química que a formiga deixa no chão enquanto caminha, formando um cheiro que as outras formigas da colônia reconhecem com as antenas e seguem para achar o caminho até a comida.",
           "veredito": "espera_se",
-          "motivo": "Define feromonio como cheiro deixado no chao que as outras formigas seguem com as antenas, como pede o espera_se."
+          "motivo": "Define feromônio como substância que a formiga deixa no chão e que as outras seguem pelas antenas, como o critério espera."
         },
         {
           "leitor": "B",
-          "resposta": "Feromonio e um cheiro que a formiga deixa no chao quando encontra comida, e as outras formigas seguem esse cheiro.",
-          "veredito": "aceita_se",
-          "motivo": "Da a definicao simplificada de cheiro deixado no chao que as formigas seguem, batendo com a parafrase de rastro do aceita_se."
+          "resposta": "Feromônio é uma substância com cheiro que a formiga vai deixando no chão, e as outras formigas reconhecem esse cheiro com as antenas para seguir o caminho.",
+          "veredito": "espera_se",
+          "motivo": "A resposta define feromônio como substância com cheiro deixada no chão e reconhecida pelas antenas para seguir o caminho, reproduzindo o espera_se quase à letra."
         },
         {
           "leitor": "C",
-          "resposta": "Segundo o texto, feromônio é uma substância que a formiga vai deixando no chão no caminho de volta para o ninho, depois de encontrar comida (linhas 10 e 11). É um cheiro que as outras formigas da colônia conseguem reconhecer com as antenas. Esse cheiro é o jeito que as formigas usam para avisar umas às outras onde tem comida.",
+          "resposta": "Feromônio é uma substância química que a formiga vai deixando no chão enquanto anda procurando comida, tipo um rastro de cheiro. As outras formigas sentem esse cheiro com as antenas e acabam seguindo o caminho que ele marca. Quanto mais formiga passa reforçando o rastro, mais forte fica o cheiro e mais formiga é atraída para aquele caminho. Na minha opinião isso é parecido com uma trilha de migalhas de pão, só que em vez de migalha é cheiro, e o mais legal é que ele some sozinho depois de um tempo.",
           "veredito": "espera_se",
-          "motivo": "Define feromonio como substancia deixada no chao reconhecida pelas antenas, como pede o espera_se."
+          "motivo": "Define feromônio com precisão equivalente ao esperado, cheiro deixado no chão que as outras formigas seguem."
         }
       ],
       "lente": {
-        "veredito": "criterio_ok"
+        "veredito": "criterio_ok",
+        "motivo": "As quatro linhas de aceita_se exigem o núcleo cheiro ou substância deixada no chão pela formiga, o que barra definir feromônio pela comida, pelo caminho ou por uma substância genérica, e as leituras defensáveis do texto cabem na lista aberta de funções da última linha."
       },
       "resultado": "aprovada"
     },
@@ -67,25 +68,26 @@
       "respostas": [
         {
           "leitor": "A",
-          "resposta": "Quando a comida acaba, as formigas param de passar por ali e de deixar mais feromônio, então o cheiro vai enfraquecendo até sumir em poucos minutos. O texto chama isso de detalhe importante porque mostra que a colônia consegue parar de seguir um caminho sozinha, sem que ninguém precise avisar que a comida acabou.",
+          "resposta": "Quando a comida acaba, as formigas deixam de passar por ali e de reforçar o rastro, então o cheiro do feromônio enfraquece aos poucos e a trilha desaparece sozinha. O texto chama isso de detalhe importante porque mostra que a colônia não precisa de ninguém para avisar que a comida acabou, o próprio chão esquece o caminho.",
           "veredito": "espera_se",
-          "motivo": "Explica a evaporacao do cheiro e a importancia de a colonia abandonar sozinha o caminho, como pede o espera_se."
+          "motivo": "Explica o enfraquecimento do rastro e por que isso é importante, os dois pontos que o critério pede."
         },
         {
           "leitor": "B",
-          "resposta": "Quando a comida acaba, as formigas param de deixar o cheiro, e o rastro desaparece sozinho em poucos minutos. E importante porque assim ninguem precisa avisar as formigas que acabou a comida.",
+          "resposta": "Quando a comida acaba, as formigas param de reforçar o cheiro, ele evapora em algumas horas e a trilha some sozinha. É importante porque assim a colônia esquece o caminho sem precisar que ninguém avise.",
           "veredito": "espera_se",
-          "motivo": "Explica a evaporacao do cheiro e a importancia de ninguem precisar avisar, como pede o espera_se."
+          "motivo": "A resposta explica que o rastro evapora, a trilha some e a colônia abandona o caminho sem precisar de aviso, reproduzindo o espera_se quase à letra."
         },
         {
           "leitor": "C",
-          "resposta": "Quando a comida acaba, as formigas param de reforçar o rastro com mais feromônio, e por isso \"o cheiro enfraquece em poucos minutos e a trilha desaparece\" (linhas 16 e 17). O texto chama isso de \"detalhe importante\" porque mostra que a colônia não precisa de nenhuma formiga avisando que a comida acabou, o próprio cheiro sumindo já resolve isso sozinho. É impressionante porque é uma solução automática, sem ninguém decidindo nada de propósito.",
+          "resposta": "Quando a comida acaba, as formigas param de reforçar o rastro porque não tem mais motivo para ir até lá, e como o feromônio evapora, o cheiro vai enfraquecendo ao longo de algumas horas até a trilha sumir de vez. O texto chama isso de detalhe importante porque assim a colônia não precisa de ninguém avisando que a comida acabou, o próprio chão esquece o caminho sozinho. Se o cheiro ficasse para sempre, as formigas continuariam andando à toa por um caminho que não leva a nada. Na minha opinião é um jeito bem inteligente da natureza resolver um problema sem precisar de um chefe mandando parar.",
           "veredito": "espera_se",
-          "motivo": "Explica a evaporacao do cheiro e a importancia da solucao automatica, com citacoes, como pede o espera_se."
+          "motivo": "Explica os dois pontos pedidos, o desaparecimento do rastro e a razão de ser um detalhe importante."
         }
       ],
       "lente": {
-        "veredito": "criterio_ok"
+        "veredito": "criterio_ok",
+        "motivo": "As variantes que testei, inclusive a que liga a evaporação à dica de limpar o chão da cozinha, trazem junto a ideia de que o caminho inútil se apaga sozinho."
       },
       "resultado": "aprovada"
     },
@@ -94,25 +96,26 @@
       "respostas": [
         {
           "leitor": "A",
-          "resposta": "No começo as formigas se dividiam quase igual entre os dois ramos. Só que as que iam pelo ramo curto voltavam mais rápido e deixavam feromônio mais cedo, então esse ramo ficou com mais cheiro e atraiu mais formigas, que deixaram ainda mais cheiro, até que quase todas passaram a usar o caminho mais curto.",
+          "resposta": "No começo as formigas se dividiam quase igualmente entre os dois ramos, mas as que iam pelo ramo curto chegavam e voltavam mais rápido, deixando feromônio nele mais cedo. Com mais cheiro, o ramo curto passou a atrair mais formigas, que deixavam ainda mais feromônio, até que a maior parte da fila passasse a segui-lo.",
           "veredito": "espera_se",
-          "motivo": "Descreve o ciclo completo de reforco do cheiro passo a passo, como pede o espera_se."
+          "motivo": "Explica passo a passo a divisão inicial e o ciclo de reforço do cheiro, como o critério pede."
         },
         {
           "leitor": "B",
-          "resposta": "As formigas do ramo curto chegavam e voltavam mais rapido, entao deixavam cheiro mais cedo. Com mais cheiro, mais formigas iam por ali e deixavam ainda mais cheiro, ate quase todas passarem pelo caminho curto.",
+          "resposta": "As formigas do ramo curto chegavam e voltavam mais rápido, então deixavam cheiro nele primeiro. Isso atraiu mais formigas para o ramo curto, e o cheiro foi ficando cada vez mais forte por lá.",
           "veredito": "aceita_se",
-          "motivo": "Nao menciona a divisao inicial igual entre os ramos, mas descreve o ciclo de reforco do cheiro, ficando no aceita_se por duvida quanto a completude do passo a passo."
+          "motivo": "A resposta traz a ideia de reforço, chegar e voltar mais rápido atrai mais formigas e fortalece o cheiro, mas omite a divisão inicial igualitária e o resultado numérico final do espera_se, cabendo na entrada aceita que permite passos resumidos desde que a ideia de reforço apareça."
         },
         {
           "leitor": "C",
-          "resposta": "Primeiro, as formigas se dividiam quase igualmente entre os dois ramos da ponte. Como as que iam pelo ramo curto chegavam e voltavam mais rápido, elas deixavam feromônio nesse ramo mais cedo, o que fez esse caminho ficar com mais cheiro e atrair mais formigas, que deixavam ainda mais cheiro (linhas 25 e 26). Assim, aos poucos, quase toda a fila passou a escolher o ramo curto, porque o cheiro dele ficou muito mais forte do que o do ramo longo.",
+          "resposta": "No começo as formigas se dividiam quase igual entre os dois ramos, porque nenhuma delas sabia qual caminho era mais curto. As que foram pelo ramo curto chegaram e voltaram mais rápido, então deixaram feromônio ali primeiro, e cheiro mais forte atrai mais formiga, que reforça o rastro ainda mais. Esse é um ciclo que vai se alimentando sozinho, quanto mais formiga passa, mais cheiro fica, e mais formiga escolhe aquele ramo. Depois de meia hora mais de oito em cada dez formigas já seguiam pelo ramo curto, e o texto deixa bem claro que nenhuma formiga mediu os dois ramos, a escolha surgiu só da soma de muitas decisões pequenas.",
           "veredito": "espera_se",
-          "motivo": "Descreve o ciclo completo de reforco do cheiro passo a passo, com citacao de linha, como pede o espera_se."
+          "motivo": "Explica todos os passos do ciclo de reforço, incluindo a proporção final, como o critério espera."
         }
       ],
       "lente": {
-        "veredito": "criterio_ok"
+        "veredito": "criterio_ok",
+        "motivo": "A cadeia que escrevi sem fechar o ciclo em voz alta ainda diz mais cheiro e mais formigas, que é o reforço exigido em aceita_se."
       },
       "resultado": "aprovada"
     },
@@ -175,25 +178,26 @@
       "respostas": [
         {
           "leitor": "A",
-          "resposta": "O texto dá esses detalhes para mostrar que a informação é real e pode ser conferida, e não uma coisa inventada. Isso dá mais credibilidade ao texto, porque mostra exatamente quem fez a pesquisa e quando ela foi feita.",
+          "resposta": "Dar o nome da universidade, o país e o ano torna a informação verificável e mostra que se trata de um experimento real e específico, e não de uma afirmação vaga, o que dá mais credibilidade ao texto.",
           "veredito": "espera_se",
-          "motivo": "Diz que os detalhes dao credibilidade e permitem conferir a pesquisa, como pede o espera_se."
+          "motivo": "Explica que a informação torna a pesquisa verificável e dá credibilidade, como o critério espera."
         },
         {
           "leitor": "B",
-          "resposta": "Isso da mais confianca ao leitor porque mostra que a informacao e verdadeira e vem de uma pesquisa real, nao e so um comentario qualquer.",
-          "veredito": "aceita_se",
-          "motivo": "Diz apenas que a informacao da mais confianca, sem contrastar com o vago 'cientistas descobriram', batendo com o aceita_se."
+          "resposta": "Dar o nome da universidade e o ano mostra que é um fato real e que dá para conferir, não uma coisa inventada.",
+          "veredito": "espera_se",
+          "motivo": "A resposta diz que citar universidade e ano mostra que é um fato real e conferível, e não uma invenção, reproduzindo o espera_se quase à letra."
         },
         {
           "leitor": "C",
-          "resposta": "O texto dá o nome da universidade e o ano porque isso mostra que a informação vem de uma pesquisa real, feita por pessoas específicas em um lugar e tempo determinados. Isso dá mais credibilidade ao texto, já que o leitor pode até procurar de onde veio essa descoberta. Só dizer \"cientistas descobriram\" seria mais vago e pareceria menos confiável.",
+          "resposta": "O texto dá o nome da universidade e o ano porque assim a informação fica mais confiável, dá até para checar se quiser, em vez de só confiar numa frase vaga. Dizer cientistas descobriram poderia ser qualquer pessoa, em qualquer lugar e qualquer época, mas falar Universidade Livre de Bruxelas e 1989 mostra que teve gente de verdade fazendo esse experimento. Isso é bem comum em textos de divulgação científica, porque dá mais credibilidade ao que está sendo contado. Na minha opinião isso também ajuda o leitor a entender que não é lenda nem invenção, é um fato que pode ser conferido por outras pessoas.",
           "veredito": "espera_se",
-          "motivo": "Diz que os detalhes dao credibilidade e contrasta com o vago 'cientistas descobriram', como pede o espera_se."
+          "motivo": "Explica com detalhe a credibilidade e a possibilidade de conferir a pesquisa, como o critério espera."
         }
       ],
       "lente": {
-        "veredito": "criterio_ok"
+        "veredito": "criterio_ok",
+        "motivo": "As respostas alternativas, de separar pesquisa de opinião a mostrar que a fonte pode ser procurada, caem em dar credibilidade ou em mostrar que não é invenção do autor."
       },
       "resultado": "aprovada"
     },
@@ -293,6 +297,29 @@
       17
     ],
     "ambiguas": [],
-    "estreitas": []
-  }
+    "estreitas": [],
+    "largas": []
+  },
+  "historico": [
+    {
+      "assinatura": "20fb22e181004ac9cf0f72b9446b4709a3b5a118a181f8d103656fd62d0cc079",
+      "data": "2026-09-08",
+      "resultado": {
+        "aprovadas": [
+          2,
+          4,
+          5,
+          7,
+          9,
+          11,
+          13,
+          14,
+          16,
+          17
+        ],
+        "ambiguas": [],
+        "estreitas": []
+      }
+    }
+  ]
 }

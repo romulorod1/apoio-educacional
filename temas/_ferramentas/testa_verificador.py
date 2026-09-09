@@ -508,6 +508,39 @@ def _com_fechadas(texto, letras, certa_longa=False, certa_curta=False):
     return saida
 
 
+def _com_fechadas_medidas(texto, letras, postos, itens=(3, 4, 5, 6, 7, 8)):
+    """Como _com_fechadas, mas controlando a POSICAO de comprimento da certa em cada item.
+
+    `postos[i]` diz onde a alternativa certa fica quando as quatro sao ordenadas da mais
+    longa (1) para a mais curta (4). E a prova da terceira conta da E7, que mede a
+    distribuicao inteira em vez dos dois extremos, e que so vale a partir de seis
+    fechadas: os seis itens convertidos mais o item 2, que ja e fechado, dao sete.
+
+    O item 2 do BASE_POR7 tem a certa na SEGUNDA posicao, e isso entra na conta: quem
+    escrever um caso novo tem que somar essa unidade ao que pedir aqui.
+    """
+    import re as _re
+    saida = texto
+    enchimento = ' com uma explicacao a mais para alongar a alternativa'
+    for n, letra, posto in zip(itens, letras, postos):
+        padrao = _re.compile(r'^(%d\. [^\n]*)$' % n, _re.M)
+        achado = padrao.search(saida)
+        assert achado, 'BASE_POR7 sem o item %d' % n
+        # quatro tamanhos distintos; a certa fica com o que corresponde ao posto pedido
+        sobra = [3, 2, 1, 0]
+        quantos = {letra: sobra.pop(posto - 1)}
+        for l in [x for x in 'abcd' if x != letra]:
+            quantos[l] = sobra.pop(0)
+        alternativas = nl_join = '\n'.join(
+            '   %s) resposta %s%s.' % (l, l, enchimento * quantos[l]) for l in 'abcd')
+        saida = saida[:achado.end()] + '\n' + alternativas + saida[achado.end():]
+        bloco = _re.compile(r'^%d\. espera_se:.*?(?=^\d+\. |\Z)' % n, _re.M | _re.S)
+        achado = bloco.search(saida)
+        assert achado, 'BASE_POR7 sem o gabarito %d' % n
+        saida = saida[:achado.start()] + '%d. %s\n\n' % (n, letra) + saida[achado.end():]
+    return saida
+
+
 def _troca(texto, de, para):
     if de not in texto:
         raise SystemExit('o teste esta desatualizado: nao achei "%s" no tema' % de[:60])
@@ -802,6 +835,17 @@ PARES = [
      'alternativa mais curta em 3 das 4', None),
     ('por7: quatro fechadas com letras espalhadas passam',
      'por/07/POR07-99.md', _com_fechadas(BASE_POR7, 'acd'), None, None),
+    ('por7: a certa na mesma posicao de comprimento em 7 das 7 reprova (E7, a terceira conta)',
+     'por/07/POR07-99.md',
+     _com_fechadas_medidas(BASE_POR7, 'acdabc', (2, 2, 2, 2, 2, 2)),
+     'segunda mais longa em 7 das 7', None),
+    ('por7: a certa nunca sendo a mais curta reprova, mesmo sem maioria (E7, os extremos)',
+     'por/07/POR07-99.md',
+     _com_fechadas_medidas(BASE_POR7, 'acdabc', (1, 1, 2, 3, 2, 3)),
+     'a certa e a mais curta', None),
+    ('por7: sete fechadas com os comprimentos espalhados passam',
+     'por/07/POR07-99.md',
+     _com_fechadas_medidas(BASE_POR7, 'acdabc', (1, 4, 3, 2, 4, 1)), None, None),
     ('G8: bloco recuado no lugar do texto de apoio vira trecho do item e reprova',
      'por/07/POR07-99.md',
      _troca(BASE_POR7, '\n@fonte escrito_bilhete-da-geladeira linhas=1-2\n> Mãe',
@@ -1044,6 +1088,22 @@ def _com_lente_estreita(registro):
     return registro
 
 
+def _com_lente_larga(registro):
+    # o outro lado do estreito: o criterio aceita resposta errada. Enquanto a lente so
+    # sabia dizer "estreito", cada rodada acrescentava uma linha de aceita_se e nenhuma
+    # tirava, e um criterio alargado tres vezes deixa de ser criterio.
+    registro['questoes'][0]['lente'] = {
+        'veredito': 'largo',
+        'resposta': 'que o narrador ficou pensando na noite',
+        'motivo': 'a terceira linha de aceita_se engole resposta que nao diz nada'}
+    return registro
+
+
+def _com_larga_no_resumo(registro):
+    registro['resultado']['largas'] = [1]
+    return registro
+
+
 def _com_assinatura_velha(registro):
     registro['assinatura'] = '0' * 64
     return registro
@@ -1081,6 +1141,9 @@ PARES_DE_PAINEL = [
     ('resumo com ambigua nao vazia reprova', _com_ambigua_no_resumo, 'como ambiguas'),
     ('lente adversarial em estreito reprova', _com_lente_estreita,
      'a questao 1 esta estreita pela lente adversarial'),
+    ('lente adversarial em largo reprova (o outro lado do estreito)', _com_lente_larga,
+     'a questao 1 esta larga pela lente adversarial'),
+    ('resumo com larga nao vazia reprova', _com_larga_no_resumo, 'como largas'),
     ('o mesmo leitor duas vezes na mesma questao reprova', _com_leitor_repetido,
      'o mesmo leitor duas vezes'),
     ('resposta em branco no registro reprova', _com_resposta_vazia,

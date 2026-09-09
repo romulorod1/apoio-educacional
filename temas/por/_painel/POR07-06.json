@@ -1,7 +1,7 @@
 {
   "tema": "POR07-06",
-  "assinatura": "715408a9aed690edf27fe63488f7dd26fad85d9efb10505f15d6368e360b5701",
-  "data": "2026-09-08",
+  "assinatura": "770ce694766a5e633e0c4a76c45947f00d8f36d4e93c1aeafcefc88e46036c7f",
+  "data": "2026-09-09",
   "modelos": {
     "leitores": "sonnet",
     "juiz": "sonnet",
@@ -265,6 +265,28 @@
       16
     ],
     "ambiguas": [],
-    "estreitas": []
-  }
+    "estreitas": [],
+    "largas": []
+  },
+  "historico": [
+    {
+      "assinatura": "715408a9aed690edf27fe63488f7dd26fad85d9efb10505f15d6368e360b5701",
+      "data": "2026-09-08",
+      "resultado": {
+        "aprovadas": [
+          2,
+          4,
+          6,
+          8,
+          9,
+          11,
+          13,
+          14,
+          16
+        ],
+        "ambiguas": [],
+        "estreitas": []
+      }
+    }
+  ]
 }

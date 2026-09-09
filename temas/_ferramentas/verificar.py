@@ -1491,6 +1491,7 @@ def problemas_nos_itens(exerc, gab, com_catalogo, raiz_fontes=None):
     letras_certas = []
     certas_longas = []
     certas_curtas = []
+    postos_da_certa = []
     for evento in eventos:
         if evento['tipo'] == 'texto':
             vigente = evento
@@ -1512,8 +1513,13 @@ def problemas_nos_itens(exerc, gab, com_catalogo, raiz_fontes=None):
                 minha = comprimentos[gb['letra']]
                 certas_longas.append(bool(outras) and minha > max(outras))
                 certas_curtas.append(bool(outras) and minha < min(outras))
+                # a posicao da certa entre as quatro, da mais longa (1) para a mais
+                # curta (4). Empate empurra para baixo, que e o caso mais favoravel ao
+                # tema: a trava so reprova o que ela consegue provar.
+                postos_da_certa.append(1 + sum(1 for v in outras if v > minha))
     erros.extend(_letras_concentradas(letras_certas))
     erros.extend(_certas_no_extremo(certas_longas, certas_curtas))
+    erros.extend(_posto_previsivel(postos_da_certa))
     respostas = [' '.join(l.strip() for l in i['linhas']) for i in itens_gab]
     return erros, enunciados, respostas
 
@@ -1557,6 +1563,44 @@ def _certas_no_extremo(certas_longas, certas_curtas):
             erros.append('a resposta certa e a alternativa %s em %d das %d questoes fechadas: '
                          '%s, senao o aluno acerta pelo tamanho'
                          % (lado, quantas, len(lista), conserto))
+    return erros
+
+
+# E7, terceira conta: a POSICAO de comprimento da certa nao pode ser previsivel.
+#
+# A segunda conta ficou simetrica nos dois extremos, e a producao fugiu para o meio: no
+# piloto do 7 ano a certa e a SEGUNDA mais longa em 36 das 43 fechadas, e em dois temas
+# em 7 de 7. Um aluno que elimina a mais longa e a mais curta sem ler nada passa de 25
+# para 45 por cento de acerto no lote inteiro, e nenhuma das duas contas anteriores ve
+# isso, porque as duas olham extremo e o defeito mora na distribuicao.
+#
+# E a terceira vez que a mesma licao aparece nesta fase, e por isso ela agora se escreve
+# sobre a propriedade inteira: o comprimento nao diz qual e a certa. Duas contas, nos
+# temas com seis ou mais fechadas (abaixo disso o acaso explica qualquer padrao):
+#
+#   (a) nenhuma das quatro posicoes vale mais da metade das fechadas do tema;
+#   (b) a certa e a mais longa ao menos uma vez e a mais curta ao menos uma vez, senao
+#       "elimine os extremos" continua funcionando mesmo com (a) satisfeita.
+def _posto_previsivel(postos):
+    if len(postos) < 6:
+        return []
+    erros = []
+    contagem = {}
+    for p in postos:
+        contagem[p] = contagem.get(p, 0) + 1
+    posto, quantas = max(contagem.items(), key=lambda par: par[1])
+    nomes = {1: 'mais longa', 2: 'segunda mais longa', 3: 'terceira mais longa',
+             4: 'mais curta'}
+    if quantas * 2 > len(postos):
+        erros.append('a resposta certa e a %s em %d das %d questoes fechadas: espalhe os'
+                     ' comprimentos, senao o aluno acha a certa pela posicao e nao pela'
+                     ' leitura' % (nomes[posto], quantas, len(postos)))
+    faltam = [nomes[p] for p in (1, 4) if contagem.get(p, 0) == 0]
+    if faltam:
+        erros.append('em nenhuma das %d questoes fechadas a certa e a %s: quem elimina os'
+                     ' extremos sem ler acerta o dobro, entao pelo menos uma questao do'
+                     ' tema precisa ter a certa nesse comprimento'
+                     % (len(postos), ' nem a '.join(faltam)))
     return erros
 
 

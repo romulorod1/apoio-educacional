@@ -1,7 +1,7 @@
 {
   "tema": "POR06-08",
-  "assinatura": "569434d480b87b1dcc816c5bf88392d88ab1d9ef15d5f731976276f75b8da7c3",
-  "data": "2026-09-08",
+  "assinatura": "d39371495301461bf5f530d46e0caf0349fd418916dff77fba16982e2bfcb70c",
+  "data": "2026-09-09",
   "modelos": {
     "leitores": "sonnet",
     "juiz": "sonnet",
@@ -203,24 +203,25 @@
         {
           "leitor": "A",
           "resposta": "Ficariam os fatos principais, como o número de inscritos, o ano em que o clube começou e a chegada às escolas. Sairiam os detalhes mais longos, como as falas completas das pessoas e a cena final da menina jogando com Lauro.",
-          "veredito": "espera_se",
-          "motivo": "Separa dados que ficariam de cenas e falas que sairiam, com exemplo do texto, como no espera_se."
+          "veredito": "aceita_se",
+          "motivo": "Separa corretamente dados que ficariam de cenas e falas que sairiam, cabendo na entrada aceita."
         },
         {
           "leitor": "B",
           "resposta": "Ficaria o principal, tipo quantos inscritos o clube tem e como ele começou. Sairia os detalhes, tipo as falas das pessoas e a parte do que ainda falta.",
           "veredito": "aceita_se",
-          "motivo": "Separa dados de cenas e falas de forma correta, mas sem citar exemplos literais do texto."
+          "motivo": "Também separa dados de cenas e falas de forma correta, ainda que de modo mais genérico."
         },
         {
           "leitor": "C",
           "resposta": "Numa notícia curta ficariam os números principais, como os 112 inscritos e as duas escolas, e talvez uma fala breve de Lauro. Sairiam detalhes como a cena da banca de jornal e a cena final da menina jogando com Lauro, porque enriquecem o texto mas não são essenciais ao fato principal.",
           "veredito": "aceita_se",
-          "motivo": "Separa corretamente a maior parte, mas sugere manter uma fala de Lauro que o espera_se prevê cortar."
+          "motivo": "Propõe manter uma fala curta de fonte identificada além dos números, exatamente o que a entrada aceita prevê."
         }
       ],
       "lente": {
-        "veredito": "criterio_ok"
+        "veredito": "criterio_ok",
+        "motivo": "Procurei respostas defensáveis fora do critério e o primeiro item de aceita_se funciona como regra geral de separar dados de cenas e falas, cobrindo as variantes que testei, inclusive guardar uma fala com fonte, guardar os fatos finais da prefeitura, usar os números da cena de abertura e cortar a história de 2023 como contexto."
       },
       "resultado": "aprovada"
     },
@@ -265,6 +266,28 @@
       16
     ],
     "ambiguas": [],
-    "estreitas": []
-  }
+    "estreitas": [],
+    "largas": []
+  },
+  "historico": [
+    {
+      "assinatura": "569434d480b87b1dcc816c5bf88392d88ab1d9ef15d5f731976276f75b8da7c3",
+      "data": "2026-09-08",
+      "resultado": {
+        "aprovadas": [
+          2,
+          4,
+          5,
+          7,
+          9,
+          11,
+          13,
+          15,
+          16
+        ],
+        "ambiguas": [],
+        "estreitas": []
+      }
+    }
+  ]
 }

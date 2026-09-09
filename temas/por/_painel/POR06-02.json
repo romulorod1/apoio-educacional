@@ -1,7 +1,7 @@
 {
   "tema": "POR06-02",
-  "assinatura": "f0455650a5161ffb155ac5d80520c69ffb80d2017e5986b95a5c6e6967a4a7f0",
-  "data": "2026-09-08",
+  "assinatura": "212be08572bc2b115f2b095645a0dc69c870d1e8931d5154cc846ad3251e380c",
+  "data": "2026-09-09",
   "modelos": {
     "leitores": "sonnet",
     "juiz": "sonnet",
@@ -202,25 +202,26 @@
       "respostas": [
         {
           "leitor": "A",
-          "resposta": "Isso mostra que o mito não fica igual para sempre, ele muda um pouco cada vez que é contado, porque nunca foi escrito por um dono e cada lugar conta a história do seu jeito.",
+          "resposta": "Isso mostra que o mito não tem uma versão fixa nem um dono, pois foi passado de boca em boca ao longo do tempo, ganhando nomes diferentes e pequenas mudanças conforme quem conta a história.",
           "veredito": "espera_se",
-          "motivo": "Diz que o mito muda a cada boca porque nunca foi escrito por um dono, conforme espera_se."
+          "motivo": "Diz exatamente o que o critério espera, que o mito não tem versão fixa nem dono e muda de boca em boca ganhando nomes diferentes."
         },
         {
           "leitor": "B",
-          "resposta": "Mostra que o mito muda de nome e de jeito de contar dependendo do lugar, porque ele passa de boca em boca e cada um conta de um jeito.",
-          "veredito": "aceita_se",
-          "motivo": "Diz que o mito muda de nome e de jeito por lugar por ser transmitido de boca em boca, batendo com o primeiro item de aceita_se sem explicitar a ideia de conservacao de espera_se."
+          "resposta": "Mostra que o mito muda porque é contado de boca em boca, sem dono e sem nunca ter sido escrito, então em cada lugar a história e o nome ficam um pouco diferentes.",
+          "veredito": "espera_se",
+          "motivo": "A resposta explica que o mito muda porque é contado de boca em boca, sem dono e sem nunca ter sido escrito, reproduzindo o mecanismo de conservação descrito no espera_se."
         },
         {
           "leitor": "C",
-          "resposta": "Isso mostra que o mito não tem uma versão única e fixa: ele muda de nome e de detalhes conforme passa de boca em boca, como diz a linha 36, \"a história muda um pouco de boca para boca\". Um mito se conserva assim, sendo recontado sempre um pouco diferente, e não guardado igual como num livro.",
+          "resposta": "Isso mostra que um mito não pertence a uma pessoa só, ele vai passando de boca em boca e cada lugar guarda um pedacinho diferente, como o próprio texto diz, que ele é chamado de Batatão, Baitatá ou Mboitatá. Como a história nunca foi escrita por um dono, cada contador pode mudar um detalhe sem que isso esteja errado. Isso é bem diferente de um livro, que fica sempre igual depois de impresso. Na minha opinião, isso deixa o mito mais vivo, porque ele muda junto com as pessoas que contam, quase como uma brincadeira de telefone sem fio que nunca termina.",
           "veredito": "espera_se",
-          "motivo": "Diz explicitamente que o mito se conserva sendo recontado sempre um pouco diferente, o nucleo de espera_se."
+          "motivo": "Repete a ideia central do critério, que o mito não pertence a ninguém e muda de boca em boca ao longo do tempo."
         }
       ],
       "lente": {
-        "veredito": "criterio_ok"
+        "veredito": "criterio_ok",
+        "motivo": "As respostas que montei, de que sem dono não existe versão certa e de que só o essencial se conserva, já estão em espera_se ou nas duas linhas de aceita_se."
       },
       "resultado": "aprovada"
     },
@@ -231,23 +232,24 @@
           "leitor": "A",
           "resposta": "Sim, eu concordo, porque o texto diz que o Boitatá persegue quem toca fogo no mato à toa, então a história serve para as pessoas terem medo e não colocarem fogo no mato por brincadeira.",
           "veredito": "espera_se",
-          "motivo": "Concorda citando que o Boitata persegue quem toca fogo no mato, conforme espera_se."
+          "motivo": "Concorda citando a perseguição a quem toca fogo no mato, exatamente o que o critério espera."
         },
         {
           "leitor": "B",
           "resposta": "Eu concordo, porque o texto diz que ele persegue quem toca fogo no mato à toa, isso é um aviso.",
           "veredito": "espera_se",
-          "motivo": "Concorda citando a mesma perseguicao a quem toca fogo, conforme espera_se."
+          "motivo": "Concorda citando o mesmo trecho sobre perseguir quem toca fogo no mato à toa."
         },
         {
           "leitor": "C",
           "resposta": "Eu concordo, porque o texto diz na linha 29 que ele \"persegue quem toca fogo no mato à toa\". Isso funciona como um aviso, quase um susto para as pessoas não colocarem fogo no mato por brincadeira, senão o Boitatá vem atrás delas.",
           "veredito": "espera_se",
-          "motivo": "Concorda citando a perseguicao a quem toca fogo no mato, conforme espera_se."
+          "motivo": "Concorda citando a mesma passagem sobre a perseguição, com a linha indicada."
         }
       ],
       "lente": {
-        "veredito": "criterio_ok"
+        "veredito": "criterio_ok",
+        "motivo": "Toda linha de aceita_se exige um elemento do texto e a linha mais aberta ainda exige que o aluno explique por que aquele elemento funciona como aviso, o que barra a resposta que apenas reconta a lenda ou que afirma ser aviso sem dizer por quê, e nenhuma resposta defensável de concordância ou de discordância ficou fora."
       },
       "resultado": "aprovada"
     }
@@ -265,6 +267,28 @@
       16
     ],
     "ambiguas": [],
-    "estreitas": []
-  }
+    "estreitas": [],
+    "largas": []
+  },
+  "historico": [
+    {
+      "assinatura": "f0455650a5161ffb155ac5d80520c69ffb80d2017e5986b95a5c6e6967a4a7f0",
+      "data": "2026-09-08",
+      "resultado": {
+        "aprovadas": [
+          2,
+          4,
+          5,
+          7,
+          9,
+          11,
+          13,
+          15,
+          16
+        ],
+        "ambiguas": [],
+        "estreitas": []
+      }
+    }
+  ]
 }

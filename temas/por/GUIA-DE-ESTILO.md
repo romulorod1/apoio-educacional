@@ -108,7 +108,59 @@ antes de citar: o código tem que dizer o que a lista faz). `vestibular` só qua
 código, dita em palavras. `topicos` com o tópico principal e, se houver, o da série anterior que o
 tema retoma.
 
-## 7. O que reprova de cara
+## 7. O material não responde o exercício
+
+A prioridade deste acervo é interpretação de texto, e questão que se responde copiando a folha
+não exercita interpretação nenhuma. Duas armadilhas, as duas medidas no lote 1:
+
+- **A glosa que entrega a resposta.** Se a tabela de vocabulário da explicação traz o sentido de
+  uma palavra, nenhuma questão pode pedir o sentido dessa palavra. A tabela ensina o método, que
+  é descobrir pelo contexto; a questão cobra o método em outra palavra. A exceção é a tabela que
+  ensina uma DISTINÇÃO (uma série de sinônimos com sentidos diferentes) e a questão que manda
+  aplicar a distinção a outro ponto do texto: ali houve ensino, e não entrega.
+- **O exemplo que já fez a análise.** Se um "Exemplo" da explicação analisa uma passagem, nenhuma
+  questão pode pedir a mesma análise da mesma passagem. Troque a passagem do exemplo ou a da
+  questão. Em uma folha do lote 1 havia quatro questões seguidas respondíveis sem abrir o texto.
+
+Conferência antes de fechar o tema: leia a lista com a explicação ao lado e pergunte, questão por
+questão, se um aluno que não leu o texto acerta só com a folha na mão.
+
+## 8. O que se afirma sobre o mundo
+
+Texto autoral que fala de fato real (um experimento, uma tradição, uma data, uma edição) afirma
+com a mesma responsabilidade de um livro didático, e o aluno vai repetir na prova o que a folha
+disser. Três regras, as três compradas caro no lote 1:
+
+- **Fonte primária, e não lembrança.** O artigo das formigas datava em 1990 um experimento de
+  1989, dizia que o feromônio some em poucos minutos quando o artigo original declara meia-vida
+  de cerca de trinta minutos, e dizia "quase toda a fila" onde o dado publicado é "mais de 80 por
+  cento do tráfego". A procedência da fonte registra o que foi conferido, contra o que, e quando.
+- **Não atribuir à edição impressa o que é da transcrição.** Se a página de onde copiamos imprime
+  o poema em bloco único, isso é propriedade da página. Dizer "assim se imprimia em livro antigo"
+  é inventar explicação para um fato que não foi conferido.
+- **Generalização absoluta só quando for verdadeira.** "Sempre", "nenhum", "tudo" e "toda" se
+  conferem antes de entrar. No lote 1 saíram quatro: a notícia que "tem" quatro partes (a linha
+  fina falta em notícia curta), "nenhuma entrevista" começa pela primeira pergunta, os verbos
+  "tudo no presente" numa crônica que tem três no passado, e o mesmo pedido "nas duas partes" de
+  uma fábula em que a cigarra pede agasalho numa e comida emprestada na outra.
+
+## 9. Regra de gramática vem com a ressalva que a torna verdadeira
+
+A folha da receita ensinava a montar o imperativo tirando a terminação do infinitivo, sem dizer
+que a conta vale para a forma de tratamento "você" e só para os verbos regulares. Aplicada como
+estava, ela produz "faza", "diza" e "ia". Regra sem ressalva é regra falsa, e o aluno usa.
+
+E não batize categoria que não existe. "Ordem física" e "ordem por consequência" pareciam
+terminologia de gramática e não são de nenhuma; o aluno leva para a prova um nome que o professor
+não reconhece. Explique a distinção com palavras comuns, ou use o nome que existe.
+
+## 10. Duas fontes na mesma folha
+
+Cada fonte é numerada a partir de 1, então "linha 10" quer dizer duas coisas na mesma página.
+Toda citação de linha diz de qual texto é: "linha 10 do anúncio", "linhas 5 e 6 da fábula". Vale
+no enunciado, no campo `porque` e no critério.
+
+## 11. O que reprova de cara
 
 Travessão ou reticências fora de `> ` e de `ancora:`. Citação sem `@fonte`. Palavra trocada num
 verso. Código BNCC fora da tabela. Alternativa `e)` com quatro alternativas. Gabarito corrido.

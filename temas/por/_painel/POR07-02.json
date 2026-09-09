@@ -1,7 +1,7 @@
 {
   "tema": "POR07-02",
-  "assinatura": "00ab33fcef93587dc348d3ec2b3db21b4a6155e32644c75bd009ad404f75bece",
-  "data": "2026-09-08",
+  "assinatura": "7018c3d6182d4281d39250f92f226ab82fcbe7a49c2059a53e1b2b64b1904862",
+  "data": "2026-09-09",
   "modelos": {
     "leitores": "sonnet",
     "juiz": "sonnet",
@@ -15,23 +15,24 @@
           "leitor": "A",
           "resposta": "Ao chamar o lugar de certo país e depois de naquele país, em vez de dizer Brasil ou Rio de Janeiro, o cronista finge estar falando de um país distante. Isso torna a crítica mais forte e irônica, pois o leitor da época sabia muito bem que ele estava falando do próprio país.",
           "veredito": "espera_se",
-          "motivo": "Diz que o cronista finge falar de um lugar distante como recurso que torna a crítica mais forte e irônica, e que o leitor da época reconhecia que era o próprio país dele, o que bate com o espera_se (fingir lugar distante como ironia que deixa o leitor reconhecer que 'aquele país' é o dele)."
+          "motivo": "Reproduz a essência do modelo, o cronista finge falar de um lugar distante e o leitor brasileiro reconhece que a crítica é ao próprio país, o que torna o efeito mais irônico e mais forte."
         },
         {
           "leitor": "B",
           "resposta": "Ele fala certo país e naquele país para não dizer Brasil direto. Assim parece que é em outro lugar, mas é uma crítica ao próprio país dele.",
-          "veredito": "aceita_se",
-          "motivo": "Capta o essencial do espera_se (fingir outro lugar para, na verdade, criticar o próprio país), mas de forma rasa, sem nomear a ironia nem explicar por que essa escolha reforça a crítica; como a dúvida é entre espera_se e aceita_se, fica em aceita_se."
+          "veredito": "espera_se",
+          "motivo": "Mesmo de forma sucinta, capta o essencial do modelo, o disfarce de país distante não engana o leitor, que percebe que a crítica é ao próprio país do cronista."
         },
         {
           "leitor": "C",
           "resposta": "O cronista usa certo país logo na linha 1 e naquele país na linha 35 para fingir que a história aconteceu bem longe. Mas como a crônica saiu numa revista do Rio, para leitores brasileiros, todo mundo entendia que ele estava falando do próprio Brasil. Isso deixa a crítica mais irônica, como se ele estivesse com pena de apontar o dedo, mas na verdade está mostrando que esse tipo de injustiça é tão comum aqui que nem precisa dizer o nome do lugar.",
           "veredito": "espera_se",
-          "motivo": "Explica que o cronista finge que a história ocorreu longe, que o leitor brasileiro da revista do Rio entendia que era o próprio Brasil, e que isso torna a crítica mais irônica, cobrindo os mesmos elementos do espera_se (fingimento de distância, reconhecimento do leitor, efeito irônico)."
+          "motivo": "Reproduz a essência do modelo com elaboração adicional plausível, ligando o disfarce a uma ironia que mostra a injustiça como algo comum no próprio país do cronista."
         }
       ],
       "lente": {
-        "veredito": "criterio_ok"
+        "veredito": "criterio_ok",
+        "motivo": "As saídas que escrevi, do medo de processo à crítica que vale para qualquer lugar e ao tom de deboche do fecho, caem em espera_se ou nas duas linhas de aceita_se."
       },
       "resultado": "aprovada"
     },
@@ -321,6 +322,30 @@
       17
     ],
     "ambiguas": [],
-    "estreitas": []
-  }
+    "estreitas": [],
+    "largas": []
+  },
+  "historico": [
+    {
+      "assinatura": "00ab33fcef93587dc348d3ec2b3db21b4a6155e32644c75bd009ad404f75bece",
+      "data": "2026-09-08",
+      "resultado": {
+        "aprovadas": [
+          2,
+          4,
+          6,
+          7,
+          9,
+          10,
+          12,
+          13,
+          14,
+          16,
+          17
+        ],
+        "ambiguas": [],
+        "estreitas": []
+      }
+    }
+  ]
 }

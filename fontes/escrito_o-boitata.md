@@ -55,5 +55,5 @@ brincadeira.
 
 O nome vem da língua dos tupis: "mboi" é cobra, "tatá" é fogo. Cobra de fogo. Em
 muitos lugares do Brasil ele também é chamado de Batatão, de Baitatá ou de
-Mãe-de-ouro, e a história muda um pouco de boca para boca, como acontece com tudo o
+Mboitatá, e a história muda um pouco de boca para boca, como acontece com tudo o
 que se conta em voz alta e nunca foi escrito por um dono.
