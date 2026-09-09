@@ -612,6 +612,23 @@ titulo "com navegador"
 # Corolario para quem for ajustar: nao vale a pena mexer no piso por dezenas de
 # MB. Mexer vale quando a DERIVACAO muda, como mudou duas vezes hoje.
 #
+# E DE QUE LADO ELE ERRA, que e diferente de quanto ele erra.
+#
+# A parcela do custo e "o pior observado", ou seja um MAXIMO SOBRE A AMOSTRA, e
+# isso e um estimador ENVIESADO PARA BAIXO do pior real: cada perfil novo tem
+# chance de bater o recorde, e entao a sequencia sobe por construcao. Ate agora:
+#
+#   472  ->  567  ->  591
+#
+# Uma parcela definida como "o pior que eu ja vi" tem GARANTIA de ser excedida
+# outra vez. O piso e portanto OTIMISTA por construcao, e sempre para o mesmo
+# lado.
+#
+# A consequencia que muda o comportamento de quem le: se uma rodada morrer com a
+# leitura da porta ACIMA do piso, isso NAO e surpresa nem defeito da regra. E o
+# comportamento esperado de uma parcela enviesada para baixo. A resposta certa e
+# atualizar a parcela com o novo pior, e nao desconfiar do desenho.
+#
 # O QUE ESTA MUDANCA NAO E, e isto importa para quem ajustar depois: NAO e
 # fronteira medida. Nenhum ponto de porta conhecido cai entre 950 e 1280, entao
 # qualquer piso nessa faixa classifica os observados igualmente bem e o dado NAO
