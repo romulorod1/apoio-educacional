@@ -210,6 +210,63 @@ e a figura ja sai marcada fora de escala pela regra de escala abaixo.
   recuadas (as que nao levam o destaque) continuam em 0,6 pt, e ai a diferenca entre elas
   esta dita duas vezes, por peso e por tinta.
 
+**`entre=V`, no `triangulo`: dois lados e o angulo ENTRE eles.** E a entrada da lei dos cossenos, e
+ate 08/09/2026 ela nao desenhava nada: `@fig triangulo angulo=60 lado=30 lado=40` era recusada com
+"os lados 30 e 40 nao saem nessa proporcao no desenho (dois lados soltos nao definem triangulo)",
+que naquela configuracao e uma frase FALSA. Os dois lados nao estao soltos: dois lados e o angulo
+entre eles determinam o triangulo, e faltava so dizer ONDE o angulo mora. Bloqueava quatro
+exercicios do `MATEM2-03`, o tema que existe para ensinar exatamente essa configuracao (o 11, o 12,
+o 15 e o Exemplo 2).
+
+`entre=V` nomeia o vertice em que o unico `angulo=` escrito mora, e esse vertice e o que os dois
+`lado=` escritos COMPARTILHAM. O terceiro lado sai da lei dos cossenos e **nao se escreve**:
+
+    @fig triangulo lado=30 lado=40 angulo=60 entre=C
+
+O lado de indice s e o oposto ao vertice s, entao os dois lados que TOCAM o vertice v sao os dois de
+indice diferente de v, e o que falta e o de indice v. Dai em diante nao ha caso novo: a construcao e
+a mesma dos tres lados, com o mesmo `trianguloPorLados`, os tres angulos deduzidos e a mesma
+conferencia de rotulos. **A figura sai FIEL**, porque os tres lados estao determinados. Como dois
+`lado=` caem sempre nos slots a e b, que compartilham C, `entre=C` e a grafia dos quatro exercicios;
+`base=` ocupa o terceiro slot e abre o outro par, `lado=30 base=40 angulo=60 entre=B`.
+
+**A gramatica e explicita e nao posicional, e a razao e mecanica.** O `lerDiretivaEm` do `base.js`
+guarda os argumentos num dicionario por CHAVE (`d.args[chave].push(valor)`), e a ordem entre chaves
+DIFERENTES e destruida ali: `lado=30 angulo=60 lado=40` e `angulo=60 lado=30 lado=40` chegam na
+receita com args identicos, byte a byte. Gramatica posicional (o `angulo=` escrito entre os dois
+`lado=`) so existiria mudando o `base.js`. Explicita, portanto, e explicita pelo VERTICE, que e o
+unico jeito de a diretiva dizer a configuracao sem ambiguidade: o angulo entre dois lados E o
+vertice comum a eles.
+
+O terceiro lado entra na CONSTRUCAO e nao nos rotulos. Ele e a RESPOSTA do exercicio: impresso, o 13
+do exercicio 12 sairia na folha do enunciado e a trava do piloto que exige todo numero da figura no
+texto do item o acusaria, com razao. No gabarito o que a resposta acrescenta sao os dois angulos que
+a lei dos cossenos fecha, em teal; o angulo dado e os dois lados dados ficam pretos.
+
+Cinco recusas nascem com a chave, e as cinco so podem ser alcancadas por uma diretiva que escreve
+`entre=`, ou seja **nenhuma delas derruba diretiva legitima nenhuma**: `entre=` escrito duas vezes;
+`entre=` que nao e vertice; `entre=` num vertice que os dois lados escritos nao compartilham (o aviso
+nomeia os dois vertices certos); `entre=` com o terceiro lado ja escrito; `entre=` sem um `angulo=`
+numerico entre 0 e 180; e `entre=V` junto com `incognita=V`, que pedem coisas contrarias no mesmo
+vertice. **Uma marca por rotulo, como sempre**: os quatro exercicios saem em tres marcas (o angulo e
+os dois lados).
+
+Sem `entre=` nada muda, inclusive a recusa, que continua existindo. O que mudou nela foi a frase: na
+configuracao exata da lei dos cossenos (dois lados numericos, um angulo numerico, sem `entre=`) o
+aviso passa a nomear o vertice compartilhado e a mandar escrever `entre=`. Nao e trava nova e nao
+recusa nada de novo; e o mesmo motivo pelo qual a `base=` entrou no `ladosEfetivos`: aviso errado e
+pior do que aviso nenhum, porque manda o autor consertar o que nao esta quebrado. Dois lados SEM
+angulo nenhum nao ganham a dica, porque ali eles estao mesmo soltos e a frase antiga e verdade.
+
+**A configuracao de entrada do triangulo e uma classificacao, e o `_prova_receitas_plano.js` prova
+que ela e uma particao.** Cinco baldes, definidos pelo que a receita FAZ com a diretiva e medidos na
+folha por quatro sinais independentes (desenhou, fora de escala, o contorno fecha, avisou): constroi
+dos dados; constroi do prototipo (fora de escala, legenda obrigatoria); desenha o vao; recusa
+falando; e recusa CALADA, que tem que ficar vazio. Os cinco predicados rodam em TODA entrada, e a
+prova exige que exatamente um responda sim, alem de a soma dos baldes ser o total. Com 27 entradas,
+uma de cada tipo problematico: 10 no primeiro, 2 no segundo, 2 no terceiro, 13 no quarto e **zero no
+quinto**.
+
 Quando `base=`, `altura=` e `diagonal=` chegam as tres com numero, a diagonal e CONFERIDA
 contra a conta, que num retangulo e o teorema de Pitagoras, e a figura e recusada com aviso
 se nao fechar: uma figura que diz d igual a 12 num retangulo de 3 por 4 e a folha do proprio
@@ -374,18 +431,119 @@ aviso, em vez de desenhar uma que mente.
   `aresta`; sem `profundidade` a base do prisma e quadrada. Chave que so faz sentido num
   tipo avisa nos outros e e ignorada, em vez de trocar o tipo por baixo do pano:
   `geratriz` so no cone, `apotema` e `apotemabase` so na piramide com `triangulo=sim`,
-  `setor` e `arco` so com `planificacao=sim`. As tres composicoes sao `triangulo=sim` (o
+  `setor` e `angulo` so com `planificacao=sim` no cone e `arco` so com `planificacao=sim` no
+  cone ou no cilindro. As tres composicoes sao `triangulo=sim` (o
   triangulo retangulo interno do cone e da piramide), `esfera=inscrita` (a esfera que toca
-  as duas bases do cilindro) e `planificacao=sim` (o setor plano do cone, com `angulo` em
-  graus, 180 por padrao). `centro` e a letra do centro e so tem onde sair na esfera, no
+  as duas bases do cilindro) e `planificacao=sim` (o molde: o setor plano do cone, com
+  `angulo` em graus e 180 por padrao; o retangulo mais as duas circunferencias do cilindro;
+  a cruz de seis pecas do prisma). `centro` e a letra do centro e so tem onde sair na esfera, no
   cilindro com esfera e no cone ou piramide com triangulo. Nao ha chave de giro: a fuga e
   uma constante da folha inteira.
   Ex.: `@fig solido id=s8 tipo=cone triangulo=sim raio=5 altura=12 geratriz=g`.
 - `painelsolidos`: nome, ordem, aresta, lado, raio, altura. Os cinco solidos lado a lado,
   cada celula com fundo branco e teto de cinco marcas proprios. `nome` traz o nome de cada
   celula pelo tema, nas duas linguas, e `ordem` escolhe quais celulas e em que sequencia,
-  entre prisma, cilindro, piramide, cone e esfera.
+  entre prisma, cilindro, piramide, cone e esfera. O `id=` da diretiva vai para TODAS as
+  celulas, e nao para nenhuma: ver a nota abaixo.
   Ex.: `@fig painelsolidos id=p1 nome=prisma;cilindro;pirâmide;cone;esfera aresta=a raio=r altura=h`.
+
+**A planificacao deixou de existir so para o cone (08/09/2026).** `planificacao=sim` vale agora para
+`cone`, `cilindro` e `prisma`, e cada um abre a propria composicao no `solidos.js`
+(`planificacaoDoCone`, `planificacaoDoCilindro`, `planificacaoDoPrisma`). As tres tem o mesmo layout:
+o MOLDE a esquerda, a seta, e o solido MONTADO a direita, na altura larga e baixa de 170 pt. Nos
+outros tipos a chave continua avisando e sendo ignorada, com o aviso dizendo quais tipos tem molde.
+
+- **Cilindro.** O retangulo da superficie lateral, de base 2 pi r e altura h, com as duas
+  circunferencias de raio r TANGENTES ao lado de cima e ao de baixo, tocando no ponto medio. E a
+  figura da frase que o `MATEM2-12` escrevia sem poder desenhar, "planificando a superficie lateral
+  aparece um retangulo cuja base e o comprimento da circunferencia": a base do retangulo E o 2 pi r,
+  e o `arco=` rotula ela justamente por isso. Os tres rotulos moram todos no molde (`arco` na base do
+  retangulo por dentro, `altura` no lado esquerdo por fora, `raio` colado no raio da tampa de cima,
+  com a bolinha do centro), e o cilindro montado sai limpo: cada dado aparece em UM lugar so.
+  **Tres marcas.** Ex.: `@fig solido tipo=cilindro planificacao=sim raio=3 altura=10 arco=2πr`.
+- **Prisma.** A cruz deitada: a tira das quatro faces laterais, de larguras a, p, a, p e altura h, com
+  as duas bases (a por p) grudadas em cima e embaixo da PRIMEIRA face. Sem `profundidade=` a base e
+  quadrada, a mesma regra do prisma simples, e com a igual a p e h igual a a sai a planificacao do
+  cubo em seis quadrados, que e a figura do `MAT05-08`. Os rotulos sao `aresta` na borda de cima da
+  base de cima, `profundidade` na borda esquerda dela e `altura` na borda esquerda da tira, os tres
+  em borda de corte. **Uma marca por rotulo: tres no bloco, duas no cubo.**
+  Ex.: `@fig solido tipo=prisma planificacao=sim aresta=4 altura=4`.
+- **Piramide e prisma triangular ficaram de fora**, e nao por esquecimento: a piramide de base
+  quadrada abre em quadrado mais quatro triangulos isosceles cuja altura e o APOTEMA DA FACE e nao a
+  altura do solido, o que e um terceiro comprimento a deduzir, e o prisma triangular abre em tira de
+  tres mais dois triangulos equilateros. Nenhum dos dois esta nas frases que faltavam.
+
+**As duas convencoes do molde, medidas e nao supostas.** Planificacao NAO tem perspectiva: no molde
+circunferencia e circunferencia e quadrado e quadrado, e por isso as bases do cilindro saem pelo
+`arco()` com rx igual a ry e nao pelo `baseEmPerspectiva`. Quem confere e o `ajustarCirculo` do
+`base.js`, que so aceita no `medido.arcos` o sub-caminho que fecha um circulo de verdade: as duas
+tampas do molde entram nessa lista com o mesmo raio e a base do cilindro MONTADO, achatada de
+proposito na mesma figura, nao entra, e e ela a testemunha de que a medicao distingue as duas.
+Linha de DOBRA vai tracejada e fina (0,6 pt, padrao `[2 2]`) e contorno de CORTE vai cheio (1,2 pt),
+e as duas medidas saem do fluxo: no molde do cilindro e no do prisma, todo traco de 0,6 pt sai
+tracejado e todo traco de 1,2 pt sai continuo. As pecas encostam exatamente onde o molde dobra: a
+circunferencia tangencia a dobra no ponto medio dela, e as dez pontas das cinco dobras do prisma sao
+pontas do contorno de corte.
+
+O padrao da dobra e `[2 2]` e nao `[3 2]` nem `[1 2]`, e nenhum dos tres e escolha de gosto. O
+`[3 2]` e a construcao acrescentada pelo GABARITO, e o `tintaDePapel` do `desenho.js` o apaga de
+proposito na camada de enunciado: a dobra sairia continua, em silencio, e o molde perderia a
+distincao inteira. O `[1 2]` e a guia de leitura, e a regra R3 do auditor o proibe em linha que
+carrega informacao, porque um `[1 2]` deposita um terco da tinta pelo mesmo caminho e some na segunda
+geracao de fotocopia. Sobra o `[2 2]`, e o papel da linha e `dobra`.
+
+`setor=` e `angulo=` continuam sendo do setor do CONE (o cilindro e o prisma nao tem setor nem angulo
+de setor) e avisam nos outros; `arco=` vale no cone e no cilindro, porque nos dois ele e o pedaco do
+molde que vira a circunferencia da base. `planificacao=sim` junto com `esfera=inscrita` sao duas
+figuras diferentes do mesmo cilindro: a planificacao manda, porque e o pedido mais especifico, e a
+esfera e ignorada com aviso.
+
+**O centro do setor planificado do cone passou a levar bolinha.** Era o defeito 3 do verificador das
+duas primeiras folhas: no `MATEM3-12` exercicio 17 nao havia nada marcando o centro, e com o angulo
+padrao de 180 graus os dois raios do setor ficam EM LINHA. O que se ve e um segmento reto de ponta a
+ponta, e o "10" pousado sobre a metade esquerda dele se le como a cota do DIAMETRO: o setor de raio
+10 passa a dizer raio 5. Com o centro marcado o segmento volta a se ler como dois raios que se
+encontram. **Custa ZERO marcas, e isso e medido e nao suposto**: o `anota` do `base.js` manda ponto
+para `registro.pontos` e `marcasAtivas` soma `rotulos` mais `marcas`, entao a planificacao do cone
+continua custando as CINCO dos cinco rotulos, que e exatamente o teto, e continua cabendo. E a mesma
+bolinha de 1,6 pt do centro da esfera, e sai com rotulo ou sem.
+
+**As composicoes passaram a ler `op.cores`.** A receita ja mandava a cor de cada rotulo em
+`op.cores`, com as mesmas chaves de `op.rotulos`, e nenhuma das cinco composicoes lia o campo: ele
+chegava e era descartado. O efeito estava medido na folha, `m = 5` saindo na tinta do CONTORNO numa
+camada de gabarito, e em fotocopia preto e branco o valor resolvido deixava de se distinguir do dado.
+Agora `coneComTriangulo`, `piramideComTriangulo`, `cilindroComEsfera`, `prismaTriangular` e
+`planificacaoDoCone` saem como o `circulo` e a `conica` ja saiam: o valor que a resposta acrescenta
+em teal, o que ja estava impresso em preto. Nas cotas o teal vai no TEXTO e nao na linha, que e o que
+a `cotaRadial` da esfera simples ja fazia: a linha de cota e alfabeto da figura, o numero e que e a
+resposta.
+
+**Limite MEDIDO que fica, e agora com o motivo certo.** O rotulo COLADO da composicao continua
+recebendo a letra e nao o valor resolvido (ver `COLADOS_DA_COMPOSICAO`), e a porta do halo foi aberta
+e experimentada antes de se decidir isso: com `halo` no colado, o `rotuloColado` desiste da posicao
+colada e entrega ao `rotulo()` com halo, que foge e liga o fio de chamada, e e isso que salva o
+solido SIMPLES. Nas composicoes nao salva, porque ali a letra colada mora DENTRO do desenho e nao ha
+para onde fugir: medido no `_prova_receitas_solidos.js`, `a = 5` no apotema da base da piramide e
+`h = 8.66` e `r = 5` na planificacao saem com vao NEGATIVO INFINITO contra a linha que atravessam (a
+caixa cobre o traco inteiro), e o `h = 8.66` ainda cobra a tarja estreita do `desenho.js`. Nao e caro
+de escrever, e caro na folha: o conserto de verdade e a composicao escolher a posicao do valor
+resolvido FORA do solido, e isso e desenho novo e nao passagem de parametro. Consequencia editorial,
+para quem escreve tema: no `coneComTriangulo` so a geratriz resolve, entao um exercicio que pergunta
+a ALTURA do cone nao tem figura de gabarito que acrescente algo, e o `MATEM2-12` exercicio 10 e
+exatamente esse caso. A cor, essa passa: teal nao muda a caixa do texto nem onde ele pousa, e por
+isso ela nao esta na mesma frase. O colado que ficou com a letra sai em PRETO, e nao em teal: ele nao
+acrescentou nada, e pintado de teal afirmaria ser novidade.
+
+**O `id=` da diretiva chega nas celulas do painel (08/09/2026).** O `painelDeSolidos` carimbava id
+NULO em toda celula, e a receita `painel` (a de triangulo e quadrilatero) tinha o mesmo furo. A
+consequencia era seria: um painel dentro de um exercicio ficava invisivel para as travas 3, 4 e 5 do
+`_piloto_base.js`, que casam figura com exercicio pelo id, e nao podia ser rechamado no gabarito por
+`@fig id=... fase=gabarito`. O autor do lote 2 teve que refazer a trava 4 a mao no piloto do
+`MATEM2-12`. Agora o id vai para TODAS as celulas, e o id repetido nelas nao colide com nada: quem
+guarda diretiva por id e o `resolverPorId` do `base.js`, a partir da DIRETIVA, que continua sendo uma
+so, e aqui o id e so o carimbo do registro. Um painel de tres celulas e mesmo tres registros do mesmo
+exercicio. Sem `id=` escrito, as celulas continuam com id nulo, e fora do id as duas saidas sao
+identicas em caixa, escala, tracos, rotulos e marcas.
 
 ### Dentro do exercicio
 

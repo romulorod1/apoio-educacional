@@ -33,9 +33,11 @@ a mesma:
 
 a / sen(A) = b / sen(B) = c / sen(C)
 
-onde a, b e c são os lados e A, B e C os ângulos opostos a eles, o lado a oposto ao ângulo A e assim
-por diante. Essa razão comum tem um significado geométrico bonito: ela vale o dobro do raio da
-circunferência circunscrita ao triângulo.
+onde a, b e c são os lados e A, B e C os ângulos opostos a eles, como mostra a figura: o lado a fica
+em frente ao vértice A, o lado b em frente ao vértice B, e assim por diante. Essa razão comum tem um
+significado geométrico bonito: ela vale o dobro do raio da circunferência circunscrita ao triângulo.
+
+@fig triangulo vertices=A;B;C lado=a lado=b
 
 **Quando usar.** Quando o dado disponível é um par formado por um lado e o ângulo oposto a ele, mais
 um outro lado ou um outro ângulo.
@@ -44,6 +46,8 @@ um outro lado ou um outro ângulo.
 mede 8. Achar o lado oposto ao ângulo B.
 Pela lei dos senos, b = 8 · sen(45°) / sen(30°). Como sen(45°) = √2/2 e sen(30°) = 1/2, o resultado
 é 8√2.
+
+@fig triangulo angulo=30 angulo=45 lado=8 lado=b
 
 #### A lei dos cossenos
 
@@ -67,7 +71,10 @@ mede 13.
 **Exemplo 3.** Os lados de um triângulo medem 5, 7 e 8. Achar o cosseno do ângulo oposto ao lado que
 mede 7.
 Isolando o cosseno na lei, com o lado 7 no papel de a, temos
-cos(A) = (25 + 64 - 49) / (2 · 5 · 8) = 40/80 = 1/2. O ângulo mede 60°.
+cos(A) = (25 + 64 - 49) / (2 · 5 · 8) = 40/80 = 1/2. O ângulo mede 60°. Na figura, ele é o ângulo
+formado pelos lados 5 e 8.
+
+@fig triangulo angulo=60 lado=7 lado=5 lado=8
 
 O sinal do cosseno já entrega o tipo de ângulo: cosseno positivo indica ângulo agudo, cosseno
 negativo indica ângulo obtuso, e cosseno zero indica ângulo reto. Essa leitura rápida vale ouro em
@@ -141,8 +148,9 @@ testar se o ângulo suplementar também fecha um triângulo.
     e a área do triângulo.
 16. Os lados de um triângulo medem 3, 5 e x. Determine todos os valores de x para os quais o ângulo
     oposto ao lado que mede x é obtuso.
-17. Num terreno triangular de vértices A, B e C, o ângulo em A mede 45°, o ângulo em B mede 60° e o
-    lado AC mede 60 metros. Calcule o lado BC.
+17. No terreno triangular da figura, de vértices A, B e C, o ângulo em A mede 45°, o ângulo em B
+    mede 60° e o lado AC mede 60 metros. Calcule o lado BC.
+    @fig triangulo id=t17 vertices=A;B;C angulo=45 angulo=60
 18. Mostre que, quando o ângulo A é reto, a lei dos cossenos aplicada ao lado a se reduz ao teorema
     de Pitágoras.
 19. Num triângulo, um lado mede 5, o ângulo oposto a ele mede 30° e um outro lado mede 8. Calcule o
@@ -196,9 +204,11 @@ always the same:
 
 a / sin(A) = b / sin(B) = c / sin(C)
 
-where a, b and c are the sides and A, B and C the angles opposite them, side a opposite angle A and
-so on. That common ratio has a lovely geometric meaning: it equals twice the radius of the circle
-through the three vertices.
+where a, b and c are the sides and A, B and C the angles opposite them, as the figure shows: side a
+faces vertex A, side b faces vertex B, and so on. That common ratio has a lovely geometric meaning:
+it equals twice the radius of the circle through the three vertices.
+
+@fig triangulo vertices=A;B;C lado=a lado=b
 
 **When to use it.** When the data you have is a pair made of a side and the angle opposite it, plus
 one more side or one more angle.
@@ -207,6 +217,8 @@ one more side or one more angle.
 A measures 8. Find the side opposite angle B.
 By the law of sines, b = 8 · sin(45°) / sin(30°). Since sin(45°) = √2/2 and sin(30°) = 1/2, the
 result is 8√2.
+
+@fig triangulo angulo=30 angulo=45 lado=8 lado=b
 
 #### The law of cosines
 
@@ -230,7 +242,10 @@ measures 13.
 **Example 3.** The sides of a triangle measure 5, 7 and 8. Find the cosine of the angle opposite the
 side measuring 7.
 Isolating the cosine in the law, with the side measuring 7 in the role of a,
-cos(A) = (25 + 64 - 49) / (2 · 5 · 8) = 40/80 = 1/2. The angle measures 60°.
+cos(A) = (25 + 64 - 49) / (2 · 5 · 8) = 40/80 = 1/2. The angle measures 60°. In the figure, it is the
+angle formed by the sides 5 and 8.
+
+@fig triangulo angulo=60 lado=7 lado=5 lado=8
 
 The sign of the cosine already gives away the type of angle: a positive cosine means an acute angle,
 a negative cosine means an obtuse angle, and a zero cosine means a right angle. That quick reading is
@@ -309,8 +324,9 @@ sides, you have to test whether the supplementary angle also closes a triangle.
     third side and the area of the triangle.
 16. The sides of a triangle measure 3, 5 and x. Find every value of x for which the angle opposite
     the side measuring x is obtuse.
-17. In a triangular plot with vertices A, B and C, the angle at A measures 45°, the angle at B
-    measures 60° and side AC measures 60 metres. Find side BC.
+17. In the triangular plot in the figure, with vertices A, B and C, the angle at A measures 45°, the
+    angle at B measures 60° and side AC measures 60 metres. Find side BC.
+    @fig triangulo id=t17 vertices=A;B;C angulo=45 angulo=60
 18. Show that, when angle A is right, the law of cosines applied to side a reduces to the Pythagorean
     theorem.
 19. In a triangle, one side measures 5, the angle opposite it measures 30° and another side measures

@@ -1642,7 +1642,7 @@
 
   var triangulo = {
     chaves: ['angulo', 'lado', 'base', 'altura', 'vertices', 'incognita', 'giro',
-             'congruentes', 'externo', 'ceviana', 'encontro'],
+             'congruentes', 'externo', 'ceviana', 'encontro', 'entre'],
     /* base e altura entram nas metricas para a decisao de escala e a paridade
      * PT/EN as enxergarem: sem isso, "base=b altura=h" seria lido como figura sem
      * medida nenhuma e a mistura "base=10 altura=h" sairia declarada fiel. */
@@ -1682,6 +1682,7 @@
       var lados = B.numeros(d.args, 'lado');
       var nomes = B.lista(d.args, 'vertices');
       var incognitas = B.lista(d.args, 'incognita');
+      var entreBrutos = B.lista(d.args, 'entre');
       var giro = B.numero(d.args, 'giro') || 0;
       var fora = escalaFora(B, d, {
           metricas: triangulo.metricas, comprimentos: triangulo.comprimentos,
@@ -1706,6 +1707,57 @@
         ehIncognita[iq] = true;
       }
       var nIncognitas = incognitas.length;
+
+      /* ------------------------------------------------ LAL: entre=V
+       *
+       * "Dois lados e o angulo ENTRE eles" e a entrada da lei dos cossenos e
+       * determina o triangulo inteiro. O que faltava nao era a construcao, era
+       * dizer ONDE mora o angulo, e a chave entre= diz isso: entre=C afirma que
+       * o unico angulo escrito fica no vertice C, que e o vertice que os dois
+       * lados escritos COMPARTILHAM.
+       *
+       * Por que uma chave nova, e nao a ordem em que a diretiva foi escrita.
+       * O leitor do base.js (lerDiretivaEm, :2004) guarda os argumentos num
+       * dicionario por CHAVE, "d.args[chave].push(valor)": a ordem entre chaves
+       * DIFERENTES e destruida ali. "lado=30 angulo=60 lado=40" e
+       * "angulo=60 lado=30 lado=40" chegam nesta funcao com args identicos, byte
+       * a byte, entao gramatica posicional (o angulo escrito ENTRE os dois
+       * lados) so existiria mudando o base.js, que esta fora do escopo deste PR.
+       * Explicita, portanto, e explicita com o VERTICE, que e o unico jeito de a
+       * diretiva dizer a configuracao sem ambiguidade, como pede a semantica: o
+       * angulo entre dois lados E o vertice comum a eles.
+       *
+       * A chave e NOVA, e isso e o que garante que ela nao derruba diretiva
+       * legitima nenhuma: sem entre= escrito, tudo abaixo se comporta
+       * exatamente como antes, inclusive o caminho de recuo e as recusas que ja
+       * existiam. Toda trava desta secao so pode ser alcancada por uma diretiva
+       * que escreveu entre=, e nenhuma diretiva do banco escreve. */
+      var iEntre = -1;
+      if (entreBrutos.length) {
+        if (entreBrutos.length > 1) {
+          B.avisar(doc, 'triangulo: entre= vale uma vez so (escrito ' + entreBrutos.join(', ') +
+            '): ela nomeia o unico vertice em que o angulo dado mora');
+          return null;
+        }
+        iEntre = indiceDeVertice(nomes, entreBrutos[0], 3);
+        if (iEntre < 0) {
+          B.avisar(doc, 'triangulo: entre=' + entreBrutos[0] + ' nao e um dos vertices (' +
+            [nomeDoVertice(nomes, 0), nomeDoVertice(nomes, 1), nomeDoVertice(nomes, 2)].join(', ') + ')');
+          return null;
+        }
+        if (ehIncognita[iEntre]) {
+          B.avisar(doc, 'triangulo: entre=' + nomeDoVertice(nomes, iEntre) + ' e incognita=' +
+            nomeDoVertice(nomes, iEntre) + ' pedem coisas contrarias no mesmo vertice: o entre= ' +
+            'poe ali o angulo DADO e a incognita poe ali o angulo perguntado');
+          return null;
+        }
+        if (angulosBrutos.length !== 1) {
+          B.avisar(doc, 'triangulo: entre=' + nomeDoVertice(nomes, iEntre) + ' diz onde mora UM ' +
+            'angulo, e a diretiva escreveu ' + angulosBrutos.length + ' (' +
+            (angulosBrutos.join(', ') || 'nenhum') + ')');
+          return null;
+        }
+      }
 
       /* Valor escrito na diretiva que nao chega na folha e SEMPRE erro de quem
        * escreveu o tema. O laco de preenchimento so tem tres posicoes, entao o
@@ -1748,6 +1800,13 @@
       for (var iv2 = 0, prox = 0; iv2 < 3; iv2++) {
         if (ehIncognita[iv2]) { porVertice[iv2] = 'x'; continue; }
         if (prox < angulosBrutos.length) porVertice[iv2] = angulosBrutos[prox++];
+      }
+      /* Com entre= o angulo deixa de ser posicional e vai para o vertice
+       * nomeado. Sem ela nada muda: o laco acima ja rodou e continua mandando. */
+      if (iEntre >= 0) {
+        porVertice = [null, null, null];
+        for (var iv3 = 0; iv3 < 3; iv3++) if (ehIncognita[iv3]) porVertice[iv3] = 'x';
+        porVertice[iEntre] = angulosBrutos[0];
       }
 
       /* O angulo externo entra na CONSTRUCAO e nao so no desenho: com
@@ -1804,6 +1863,60 @@
         ladosNum.push(B.ehNumero(bruto) ? parseFloat(bruto) : null);
       }
       var ladosTodosNum = ladosNum[0] !== null && ladosNum[1] !== null && ladosNum[2] !== null;
+
+      /* ------------------------------------------------ LAL: a lei dos cossenos
+       *
+       * O lado de indice s e o OPOSTO ao vertice s, entao os dois lados que
+       * TOCAM o vertice v sao exatamente os dois de indice diferente de v, e o
+       * que falta e o de indice v. Com entre=V a diretiva escreve esses dois e
+       * o angulo em V, e o terceiro sai por
+       *
+       *     lado_v ao quadrado = p ao quadrado + q ao quadrado - 2 p q cos(V)
+       *
+       * que e literalmente a lei dos cossenos. Dai em diante nao ha caso novo: a
+       * construcao e a mesma dos TRES lados, que ja existe logo abaixo, com o
+       * mesmo trianguloPorLados, o mesmo deduzido de tres verdades e a mesma
+       * conferencia de rotulos. A figura sai FIEL porque os tres lados estao
+       * determinados.
+       *
+       * O terceiro lado entra no ladosNum, que e a CONSTRUCAO, e nao no
+       * ladosEfetivos, que e o que a folha imprime e o que o conferirRotulos
+       * cruza. Escrito nos dois, o "13" do exercicio 12 (que e a RESPOSTA) sairia
+       * impresso no enunciado, e a trava do piloto que exige todo numero da
+       * figura no texto do item o acusaria, com razao. */
+      if (iEntre >= 0) {
+        var angEntre = B.ehNumero(angulosBrutos[0]) ? parseFloat(angulosBrutos[0]) : null;
+        var faltando = [], p = null, q = null;
+        for (var ke2 = 0; ke2 < 3; ke2++) {
+          if (ke2 === iEntre) continue;
+          if (ladosNum[ke2] === null || !(ladosNum[ke2] > 0)) faltando.push(ke2);
+          else if (p === null) p = ladosNum[ke2]; else q = ladosNum[ke2];
+        }
+        if (faltando.length) {
+          B.avisar(doc, 'triangulo: entre=' + nomeDoVertice(nomes, iEntre) + ' pede os DOIS lados ' +
+            'que tocam esse vertice com valor numerico, e sao os que ficam opostos a ' +
+            nomeDoVertice(nomes, (iEntre + 1) % 3) + ' e a ' + nomeDoVertice(nomes, (iEntre + 2) % 3) +
+            '. Escreva os dois lado= (o terceiro sai da lei dos cossenos e nao se escreve)');
+          return null;
+        }
+        if (ladosEfetivos[iEntre] !== null && ladosEfetivos[iEntre] !== undefined &&
+            String(ladosEfetivos[iEntre]) !== '') {
+          B.avisar(doc, 'triangulo: com entre=' + nomeDoVertice(nomes, iEntre) + ' o lado oposto a ' +
+            nomeDoVertice(nomes, iEntre) + ' e o que a lei dos cossenos ACHA, e a diretiva ja o ' +
+            'escreveu como ' + ladosEfetivos[iEntre] + ': tire um dos dois');
+          return null;
+        }
+        if (angEntre === null || !(angEntre > 0 && angEntre < 180)) {
+          B.avisar(doc, 'triangulo: entre=' + nomeDoVertice(nomes, iEntre) + ' precisa de um angulo ' +
+            'NUMERICO entre 0 e 180 (escrito ' + angulosBrutos[0] + '): sem ele os dois lados ficam ' +
+            'soltos e nao definem triangulo');
+          return null;
+        }
+        var cosV = Math.cos(angEntre * Math.PI / 180);
+        ladosNum[iEntre] = Math.sqrt(p * p + q * q - 2 * p * q * cosV);
+        temTresLados = true;
+        ladosTodosNum = true;
+      }
 
       var pontos = null, vao = null, deduzido = [false, false, false];
       /* O vertice que leva o quadradinho da CLASSE (triangulo retangulo pelos tres
@@ -2005,7 +2118,7 @@
        * desenho enganoso. */
       var briga = d.escala === 'fora' ? null
         : conferirRotulos(geo, B, pontos, porVertice, ladosEfetivos, externos, congruentes, nomes);
-      if (briga) { B.avisar(doc, 'triangulo: ' + briga); return null; }
+      if (briga) { B.avisar(doc, 'triangulo: ' + briga + dicaDeLal(B, nomes, ladosEfetivos, angulosBrutos, iEntre)); return null; }
 
       if (giro) pontos = geo.girar(pontos, giro);
 
@@ -2849,6 +2962,36 @@
       }
     }
     return null;
+  }
+
+  /* A frase "dois lados soltos nao definem triangulo" e VERDADE quando os dois
+   * lados vem sozinhos e MENTIRA quando vem com o angulo entre eles: ali os dois
+   * lados nao estao soltos, esta faltando UMA palavra na diretiva. Aviso errado
+   * e pior do que aviso nenhum, porque manda o autor consertar o que nao esta
+   * quebrado, e este e o mesmo motivo pelo qual a base= entrou no ladosEfetivos.
+   *
+   * Isto NAO e trava nova e nao recusa nada: a diretiva ja era recusada, aqui so
+   * se acrescenta a frase que diz como sair. A dica so nasce na configuracao
+   * exata da lei dos cossenos (dois lados numericos, um angulo numerico, sem
+   * entre= escrito), e o vertice que ela nomeia e o que os dois lados escritos
+   * compartilham, que e o slot vazio. */
+  function dicaDeLal(B, nomes, ladosEfetivos, angulosBrutos, iEntre) {
+    if (iEntre >= 0) return '';
+    var vazio = -1, numericos = 0, s;
+    for (s = 0; s < 3; s++) {
+      var v = ladosEfetivos[s];
+      var branco = v === null || v === undefined || String(v) === '';
+      if (branco) { if (vazio >= 0) return ''; vazio = s; continue; }
+      if (!B.ehNumero(v)) return '';
+      numericos++;
+    }
+    if (vazio < 0 || numericos !== 2) return '';
+    var ang = 0;
+    for (s = 0; s < angulosBrutos.length; s++) if (B.ehNumero(angulosBrutos[s])) ang++;
+    if (ang !== 1 || angulosBrutos.length !== 1) return '';
+    return '. Se o angulo ' + angulosBrutos[0] + ' e o angulo ENTRE esses dois lados, escreva ' +
+      'entre=' + nomeDoVertice(nomes, vazio) + ': os dois lados e o angulo entre eles determinam ' +
+      'o triangulo pela lei dos cossenos, e a figura sai fiel';
   }
 
   /* ============================================================ o triangulo que nao existe
@@ -3950,7 +4093,10 @@
     return B.figura(doc, {
       x: caixa.x, largura: caixa.largura, altura: caixa.altura, folga: folga,
       unidades: unidades, legenda: caixa.legenda, foraDeEscala: caixa.foraDeEscala,
-      fase: d.fase, id: null, receita: 'painel'
+      /* O mesmo furo do painelsolidos, e conferido: sem o id da diretiva nas
+       * celulas, um painel dentro de um exercicio fica invisivel para as travas
+       * 3, 4 e 5 do piloto, que casam figura com exercicio pelo id. */
+      fase: d.fase, id: d.id || null, receita: 'painel'
     }, function (ctx) {
       var P = ctx.pontos(pontos);
       var n = P.length;
@@ -6633,15 +6779,17 @@
    * preto; na figura que nasce no gabarito todo valor sai em teal. Isso vale
    * inteiro nos tipos que esta receita rotula com as primitivas (os cinco
    * solidos simples): la o valor resolvido vai com halo, e foge com fio de
-   * chamada quando nao cabe onde a letra cabia. Nas cinco COMPOSICOES valem
-   * duas restricoes, as duas do lado do solidos.js: o texto resolvido sai na
-   * tinta do contorno, porque elas recebem os rotulos como texto e nao tem
-   * porta para a cor de cada um (a receita manda a cor em op.cores, com as
-   * mesmas chaves de op.rotulos, para o dia em que o solidos.js ler esse
-   * campo); e so os rotulos que elas poem com halo recebem o valor resolvido,
-   * porque a letra colada nao tem lugar para "a = 5" (ver
-   * COLADOS_DA_COMPOSICAO). A folha do gabarito de uma composicao fica sem
-   * teal e com a letra colada como veio, e nao fica errada.
+   * chamada quando nao cabe onde a letra cabia. Nas cinco COMPOSICOES a COR
+   * passou a valer tambem, e sobrou UMA restricao. A receita sempre mandou a
+   * cor de cada rotulo em op.cores, com as mesmas chaves de op.rotulos, e o
+   * solidos.js nao lia o campo: em 08/09/2026 ele passou a ler, e "g = 13" sai
+   * em teal na composicao como ja saia no solido simples. O que fica e o rotulo
+   * COLADO, que continua recebendo a letra e nao o valor resolvido (ver
+   * COLADOS_DA_COMPOSICAO): ali a letra mora DENTRO do desenho e nao ha para
+   * onde fugir, e o motivo esta medido no _prova_receitas_solidos.js, com vao
+   * negativo infinito contra a linha atravessada. Consequencia editorial: no
+   * coneComTriangulo so a geratriz resolve, entao o exercicio que pergunta a
+   * ALTURA nao tem figura de gabarito que acrescente algo.
    *
    * Sem giro: a fuga e uma constante da folha inteira, por decisao escrita no
    * cabecalho do solidos.js, e um solido girado teria a altura fora da vertical
@@ -6653,6 +6801,13 @@
   var ALTURA_SOLIDO_MAX = 160;
   var ALTURA_PLANIFICACAO = 170;  // a mesma da composicao, que e larga e baixa
   var TIPOS_DE_SOLIDO = ['prisma', 'cilindro', 'piramide', 'cone', 'esfera', 'prismatriangular'];
+  /* Quem tem molde escrito. A piramide e o prisma triangular ficaram de fora
+   * deste PR de proposito e nao por esquecimento: a piramide de base quadrada
+   * abre em quadrado mais quatro triangulos isosceles cuja altura e o APOTEMA da
+   * face e nao a altura do solido, o que e um terceiro comprimento a deduzir, e
+   * o prisma triangular abre em tira de tres mais dois triangulos equilateros.
+   * Nenhum dos dois esta nas frases que este PR desbloqueia. */
+  var TIPOS_COM_PLANIFICACAO = ['cone', 'cilindro', 'prisma'];
   var DIMS_POR_TIPO = {
     prisma: ['aresta', 'profundidade', 'altura'], cilindro: ['raio', 'altura'],
     piramide: ['aresta', 'altura'], cone: ['raio', 'altura'], esfera: ['raio'],
@@ -6664,7 +6819,18 @@
     piramideComTriangulo: { altura: 'altura', apotemaBase: 'apotemabase', apotema: 'apotema' },
     cilindroComEsfera: { raio: 'raio', altura: 'altura' },
     prismaTriangular: { lado: 'aresta', altura: 'altura' },
-    planificacaoDoCone: { raioSetor: 'setor', raio: 'raio', altura: 'altura', geratriz: 'geratriz' }
+    planificacaoDoCone: { raioSetor: 'setor', raio: 'raio', altura: 'altura', geratriz: 'geratriz' },
+    planificacaoDoCilindro: { raio: 'raio', altura: 'altura' },
+    planificacaoDoPrisma: { aresta: 'aresta', profundidade: 'profundidade', altura: 'altura' }
+  };
+
+  /* As tres composicoes que montam MOLDE, e nao solido. Elas calculam a propria
+   * caixa de unidades (o molde mais a seta mais o solido montado nao cabem na
+   * caixaDoSolido de nenhum dos dois) e pedem a altura larga e baixa da
+   * planificacao. Escrito como conjunto e nao como tres comparacoes espalhadas:
+   * a lista de tres estava em quatro lugares diferentes quando so havia uma. */
+  var COMPOSICOES_DE_MOLDE = {
+    planificacaoDoCone: 1, planificacaoDoCilindro: 1, planificacaoDoPrisma: 1
   };
 
   /* A proporcao do prototipo de cada solido, que e a do painel do solidos.js,
@@ -6808,11 +6974,29 @@
      * de trocar o tipo por baixo do pano. */
     if (triangulo && tipo !== 'cone' && tipo !== 'piramide') { avisarSolido('triangulo=sim so vale para cone e piramide, ignorado em ' + tipo); triangulo = false; }
     if (esfera && tipo !== 'cilindro') { avisarSolido('esfera=inscrita so vale para cilindro, ignorada em ' + tipo); esfera = false; }
-    if (planif && tipo !== 'cone') { avisarSolido('planificacao=sim so vale para cone, ignorada em ' + tipo); planif = false; }
+    if (planif && TIPOS_COM_PLANIFICACAO.indexOf(tipo) < 0) {
+      avisarSolido('planificacao=sim vale para ' + TIPOS_COM_PLANIFICACAO.join(', ') + ', ignorada em ' + tipo);
+      planif = false;
+    }
+    if (planif && esfera) {
+      /* Duas figuras diferentes do MESMO cilindro, e a folha so desenha uma. A
+       * planificacao manda porque ela e o pedido mais especifico: quem escreveu
+       * planificacao=sim quer o molde, e a esfera inscrita nao aparece em molde
+       * nenhum. Avisa e ignora, como toda chave que nao cabe. */
+      avisarSolido('esfera=inscrita e planificacao=sim sao duas figuras diferentes do mesmo cilindro; a planificacao manda e a esfera foi ignorada');
+      esfera = false;
+    }
     if ((med.apotema || med.apotemabase) && !(tipo === 'piramide' && triangulo)) avisarSolido('apotema= e apotemabase= so saem na piramide com triangulo=sim, ignorados');
     if (med.geratriz && tipo !== 'cone') avisarSolido('geratriz= so vale para cone, ignorada em ' + tipo);
-    if (med.setor && !planif) avisarSolido('setor= so vale com planificacao=sim, ignorado');
-    if (arco && !planif) avisarSolido('arco= so vale com planificacao=sim, ignorado');
+    /* setor= e o raio do SETOR, e so a planificacao do cone tem setor; o
+      * angulo do setor idem. arco= e o pedaco do molde que vira a circunferencia
+      * da base, e isso o cone e o cilindro tem os dois: no cone e o arco do
+      * setor, no cilindro e a base do retangulo, que e a mesma frase do tema
+      * ("um retangulo cuja base e o comprimento da circunferencia"). No prisma
+      * nao ha circunferencia nenhuma. */
+    if (med.setor && !(planif && tipo === 'cone')) avisarSolido('setor= so vale com planificacao=sim no cone, ignorado');
+    if (anguloBruto !== null && !(planif && tipo === 'cone')) avisarSolido('angulo= so vale com planificacao=sim no cone, ignorado');
+    if (arco && !(planif && (tipo === 'cone' || tipo === 'cilindro'))) avisarSolido('arco= so vale com planificacao=sim no cone ou no cilindro, ignorado');
     var temCentro = tipo === 'esfera' || (tipo === 'cilindro' && esfera) || ((tipo === 'cone' || tipo === 'piramide') && triangulo);
     if (centro && !temCentro) avisarSolido('centro= nao tem onde sair em ' + tipo + ' sem composicao, ignorado');
 
@@ -6853,6 +7037,22 @@
       }
       dims = { raio: rc, altura: hc };
       dimsComp = { raio: R, angulo: angulo };
+    } else if (tipo === 'cilindro' && planif) {
+      /* O molde do cilindro nao deduz nada que o cilindro simples ja nao deduza:
+       * o retangulo mede 2 pi r por h, e r e h sao as duas medidas do proprio
+       * cilindro. O que a planificacao acrescenta e a FIGURA, e nao uma conta. */
+      res = dimensoesDoSolido(proto, med, DIMS_POR_TIPO.cilindro);
+      dims = res.dims; numerico = res.numerico; chute = res.chute;
+      comp = 'planificacaoDoCilindro'; dimsComp = dims;
+    } else if (tipo === 'prisma' && planif) {
+      /* Sem profundidade= a base e QUADRADA, exatamente como no prisma simples:
+       * a mesma regra nos dois lugares, senao o mesmo tipo=prisma aresta=4
+       * altura=6 sairia com base quadrada montado e com base 0,8 no molde. */
+      var quadradaP = !med.profundidade;
+      res = dimensoesDoSolido(proto, med, quadradaP ? ['aresta', 'altura'] : DIMS_POR_TIPO.prisma);
+      dims = res.dims; numerico = res.numerico; chute = res.chute;
+      if (quadradaP) dims.profundidade = dims.aresta;
+      comp = 'planificacaoDoPrisma'; dimsComp = dims;
     } else if (tipo === 'cone') {
       /* g ao quadrado igual a r ao quadrado mais h ao quadrado: duas medidas
        * numericas fecham a terceira. */
@@ -6934,8 +7134,8 @@
     calarMudas(med);
 
     if (comp === 'prismaTriangular') unidades = S.caixaDoSolido('prisma', { base: 'triangular', aresta: dims.lado, altura: dims.altura });
-    else if (comp !== 'planificacaoDoCone') unidades = S.caixaDoSolido(tipo, dims);
-    if (comp !== 'planificacaoDoCone' && !unidades) return recusarSolido('dimensoes invalidas para ' + tipo);
+    else if (!COMPOSICOES_DE_MOLDE[comp]) unidades = S.caixaDoSolido(tipo, dims);
+    if (!COMPOSICOES_DE_MOLDE[comp] && !unidades) return recusarSolido('dimensoes invalidas para ' + tipo);
 
     return {
       tipo: tipo, comp: comp, dims: dims, dimsComp: dimsComp, med: med,
@@ -6946,7 +7146,7 @@
 
   function alturaDoSolido(B, op, G) {
     if (op.altura != null) return op.altura;
-    if (G.comp === 'planificacaoDoCone' || !G.unidades) return ALTURA_PLANIFICACAO;
+    if (COMPOSICOES_DE_MOLDE[G.comp] || !G.unidades) return ALTURA_PLANIFICACAO;
     return alturaParaCaixa(B, op, G.unidades, ALTURA_SOLIDO_MIN, ALTURA_SOLIDO_MAX, G.folga);
   }
 
@@ -6976,7 +7176,8 @@
   var COLADOS_DA_COMPOSICAO = {
     coneComTriangulo: { altura: 1, raio: 1 },
     piramideComTriangulo: { altura: 1, apotemaBase: 1 },
-    planificacaoDoCone: { altura: 1, raio: 1 }
+    planificacaoDoCone: { altura: 1, raio: 1 },
+    planificacaoDoCilindro: { raio: 1 }
   };
 
   /* O solido simples dentro do figura() da receita: a funcao do solidos.js
@@ -7052,11 +7253,35 @@
       if (!Object.prototype.hasOwnProperty.call(mapa, k)) continue;
       var m = R[mapa[k]];
       if (!m) continue;
+      /* O rotulo COLADO continua recebendo a letra, e agora com a razao MEDIDA e
+       * nao herdada. A porta do halo foi aberta e experimentada: com
+       * halos[k] = m.resolvido, o rotuloColado desiste da posicao colada e
+       * entrega ao rotulo() com halo, que foge e liga o fio de chamada, que e o
+       * que salva o solido SIMPLES. Nas composicoes nao salva, porque ali a
+       * letra colada mora DENTRO do desenho e nao ha para onde fugir: medido no
+       * _prova_receitas_solidos.js, "a = 5" no apotema da base da piramide e
+       * "h = 8.66" e "r = 5" na planificacao saem com vao NEGATIVO INFINITO
+       * contra a linha que atravessam (a caixa cobre o traco inteiro), e o
+       * "h = 8.66" ainda cobra a tarja estreita do desenho.js. Nao e caro de
+       * escrever, e caro na folha: o conserto de verdade e a composicao passar a
+       * escolher a posicao do valor resolvido fora do solido, e isso e desenho
+       * novo e nao passagem de parametro.
+       *
+       * A COR, essa passa, e e por isso que ela nao esta na mesma frase: teal
+       * nao muda a caixa do texto nem onde ele pousa. */
       rot[k] = colados[k] ? m.letra : m.texto;
+      /* Teal marca o que a resposta ACRESCENTA, e o rotulo colado que ficou com
+       * a letra nao acrescentou nada: ele sai identico ao do enunciado. Pintado
+       * de teal ele afirmaria ser novidade, que e mentira do mesmo tipo que a
+       * legenda de escala numa figura fiel. Medido na folha: o "a" do apotema da
+       * base da piramide saia em teal exibindo a mesma letra do enunciado. */
       if (m.cor && !(colados[k] && m.resolvido)) cores[k] = m.cor;
     }
-    if (G.comp === 'planificacaoDoCone' && G.arco) rot.arco = G.arco;
-    if (G.centro && G.comp !== 'prismaTriangular' && G.comp !== 'planificacaoDoCone') rot.centro = G.centro;
+    /* O arco= e o pedaco do molde que vira a circunferencia da base: no cone e
+     * o arco do setor, no cilindro e a base do retangulo. Nos dois ele e TEXTO
+     * do tema (10π) e nao medida, entao vem por fora do mapa de rotulos. */
+    if ((G.comp === 'planificacaoDoCone' || G.comp === 'planificacaoDoCilindro') && G.arco) rot.arco = G.arco;
+    if (G.centro && G.comp !== 'prismaTriangular' && !COMPOSICOES_DE_MOLDE[G.comp]) rot.centro = G.centro;
     return S[G.comp](doc, {
       dims: G.dimsComp, rotulos: rot, cores: cores,
       bloco: { x: op.x, largura: op.largura, altura: altura, folga: G.folga },
@@ -7220,7 +7445,7 @@
       var P = S.painelDeSolidos(doc, {
         nomes: L.nomes, cotas: L.cotas, dims: L.dims, ordem: L.ordem,
         x: op.x, largura: op.largura, legenda: d.legenda, foraDeEscala: L.fora,
-        fase: d.fase, receita: 'painelsolidos'
+        fase: d.fase, id: d.id, receita: 'painelsolidos'
       });
       if (!P) return null;
       /* A medida feita antes de desenhar e a celula desenhada tem que ser a

@@ -31,8 +31,28 @@
  * pdf.js). Os quatro já estão na lista abaixo, que continua igual. O v22
  * (08/09/2026) acrescenta uma linha à lista, a primeira desde o v16, que levou
  * o './cartao.js': é o índice dos temas de português. Aí o nome novo é
- * obrigatório pelo motivo original, e não pelo hábito do release. */
-var CACHE = 'apoio-educacional-v22';
+ * obrigatório pelo motivo original, e não pelo hábito do release.
+ *
+ * O v26 (09/09/2026) é da série de bumps de conteúdo: a lista continua igual e o
+ * que muda é o CONTEÚDO de TRÊS arquivos que já estão nela. Dois são deste
+ * trabalho, o './figuras/receitas.js' e o './figuras/solidos.js', que ganharam a
+ * família de sólidos; o terceiro é o './banco/busca.json'.
+ *
+ * E o terceiro não é deste ramo, o que importa para quem for ler o diff: este
+ * ramo está EMPILHADO sobre o do lote 2, então o banco regenerado por ele vem
+ * junto na comparação com a base do merge. Medido com a ferramenta que faz a
+ * interseção entre a lista e o diff, e não pela intenção do bump: são três
+ * arquivos, e a autoria de um deles é do ramo de baixo. Quem mergear o lote 2
+ * primeiro, que é a ordem obrigatória da dupla, vai ver este número cair para
+ * dois sem nada ter mudado aqui.
+ *
+ * Ele salta o v23, o v24 e o v25, que estão noutros três ramos de figuras. A
+ * ordem e o número de cada ramo não se leem aqui, de propósito: vivem em
+ * `Consolidado/Retomada/ORDEM-DE-MERGE-E-CACHE.md`, e quem mergear depois
+ * confere o número lá e sobe se preciso. Comentário que copia um valor de fora
+ * envelhece a cada correção; apontar para onde o valor mora não envelhece, desde
+ * que o lugar apontado exista, o que já falhou uma vez e foi consertado. */
+var CACHE = 'apoio-educacional-v26';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

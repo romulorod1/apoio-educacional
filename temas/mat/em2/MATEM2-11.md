@@ -24,7 +24,9 @@ prisma hexagonal.
 
 Uma **pirâmide** tem uma única base e um vértice fora do plano dela, ligado a todos os vértices da
 base por faces triangulares. Numa pirâmide regular, a base é um polígono regular e o vértice fica
-exatamente acima do centro da base.
+exatamente acima do centro da base. A figura mostra os dois lado a lado, com a mesma altura h.
+
+@fig painelsolidos ordem=prisma;piramide nome=prisma;pirâmide altura=h
 
 Duas fórmulas concentram quase tudo:
 
@@ -62,10 +64,16 @@ Quando a base é um triângulo equilátero de lado L, sua área é
 
 A_{b} = (L^{2} · √3) / 4
 
+e o prisma reto que tem essa base é o da figura, de altura h.
+
+@fig solido tipo=prismatriangular aresta=L altura=h
+
 Quando a base é um hexágono regular de lado L, ela vale seis vezes essa mesma área, porque o
-hexágono regular se divide em seis triângulos equiláteros:
+hexágono regular se divide em seis triângulos equiláteros, como mostra a figura:
 
 A_{b} = 6 · (L^{2} · √3) / 4
+
+@fig poligonoregular lados=6 lado=L raio=L decomposto=sim
 
 **Exemplo 2.** Um prisma reto tem base triangular equilátera de lado 6 e altura 10. Calcular o
 volume.
@@ -79,6 +87,11 @@ Numa pirâmide regular de base quadrada, três triângulos retângulos resolvem 
   triangular.
 - altura, metade da diagonal da base e **aresta lateral**.
 - apótema da face, metade do lado da base e aresta lateral.
+
+O primeiro deles é o da figura: a altura h, o apótema da base a, que vai do centro ao meio de um
+lado, e o apótema da face m no papel de hipotenusa.
+
+@fig solido tipo=piramide triangulo=sim altura=h apotema=m apotemabase=a
 
 **Exemplo 3.** Uma pirâmide regular tem base quadrada de lado 6 e altura 4. Calcular o volume, o
 apótema da face lateral e a área total.
@@ -125,13 +138,16 @@ conversão. Um decímetro cúbico é um litro.
    resposta em forma de raiz.
 7. Um prisma reto de base quadrada tem lado da base 5 e volume 200. Calcule a altura.
 8. Calcule a área total de um paralelepípedo reto retângulo de dimensões 3, 4 e 5.
-9. Uma pirâmide regular tem base quadrada de lado 6 e altura 4. Calcule o apótema da face lateral e
-   a área total.
+9. A pirâmide regular da figura tem base quadrada de lado 6 e altura 4. Calcule o apótema m da face
+   lateral e a área total.
+   @fig solido id=s9 tipo=piramide triangulo=sim aresta=6 altura=4 apotema=m apotemabase=a
 10. Um prisma reto tem base hexagonal regular de lado 4 e altura 10. Calcule o volume, deixando a
     resposta em forma de raiz.
 11. Uma pirâmide de base quadrada tem volume 100 e altura 12. Calcule o lado da base.
 12. A diagonal de um cubo mede 6√3. Calcule a aresta e o volume desse cubo.
-13. Um prisma reto tem base retangular de 3 por 8 e altura 5. Calcule a área lateral e a área total.
+13. O prisma reto da figura tem base retangular de 3 por 8 e altura 5. Calcule a área lateral e a
+    área total.
+    @fig solido id=s13 tipo=prisma aresta=8 profundidade=3 altura=5
 
 **Bloco C. Aprofundamento**
 
@@ -161,7 +177,9 @@ conversão. Um decímetro cúbico é um litro.
 6. 90√3. A área da base é 9√3.
 7. 8.
 8. 94.
-9. O apótema da face lateral mede 5 e a área total é 96. A área lateral é 60 e a base tem área 36.
+9. O apótema da base a mede 3, metade do lado, então o apótema m da face lateral mede 5. A área
+   lateral é 60, a base tem área 36 e a área total é 96.
+   @fig id=s9 fase=gabarito
 10. 240√3. A área da base é 24√3.
 11. 5. A área da base vem de A_{b} = 3 · V / h, o que dá 25.
 12. A aresta mede 6 e o volume é 216.
@@ -189,7 +207,10 @@ hexagonal base gives a hexagonal prism.
 
 A **pyramid** has a single base and one vertex off the plane of that base, joined to every vertex of
 the base by triangular faces. In a regular pyramid, the base is a regular polygon and the vertex
-sits exactly above the centre of the base.
+sits exactly above the centre of the base. The figure shows the two side by side, with the same
+height h.
+
+@fig painelsolidos ordem=prisma;piramide nome=prism;pyramid altura=h
 
 Two formulas carry almost everything:
 
@@ -228,10 +249,16 @@ When the base is an equilateral triangle of side L, its area is
 
 A_{b} = (L^{2} · √3) / 4
 
+and the right prism with that base is the one in the figure, of height h.
+
+@fig solido tipo=prismatriangular aresta=L altura=h
+
 When the base is a regular hexagon of side L, it is six times that same area, because a regular
-hexagon splits into six equilateral triangles:
+hexagon splits into six equilateral triangles, as the figure shows:
 
 A_{b} = 6 · (L^{2} · √3) / 4
+
+@fig poligonoregular lados=6 lado=L raio=L decomposto=sim
 
 **Example 2.** A right prism has an equilateral triangular base of side 6 and height 10. Find the
 volume.
@@ -245,6 +272,11 @@ In a regular pyramid with a square base, three right triangles settle everything
   height of one triangular face.
 - the height, half the diagonal of the base and the **lateral edge**.
 - the slant height of a face, half the side of the base and the lateral edge.
+
+The first of them is the one in the figure: the height h, the apothem of the base a, which runs from
+the centre to the middle of a side, and the slant height of a face m playing the part of hypotenuse.
+
+@fig solido tipo=piramide triangulo=sim altura=h apotema=m apotemabase=a
 
 **Example 3.** A regular pyramid has a square base of side 6 and height 4. Find the volume, the
 slant height of a lateral face and the total area.
@@ -291,14 +323,16 @@ decimetre is one litre.
    leaving your answer in surd form.
 7. A right prism with a square base has base side 5 and volume 200. Find the height.
 8. Find the total area of a rectangular block with dimensions 3, 4 and 5.
-9. A regular pyramid has a square base of side 6 and height 4. Find the slant height of a lateral
-   face and the total area.
+9. The regular pyramid in the figure has a square base of side 6 and height 4. Find the slant height
+   m of a lateral face and the total area.
+   @fig solido id=s9 tipo=piramide triangulo=sim aresta=6 altura=4 apotema=m apotemabase=a
 10. A right prism has a regular hexagonal base of side 4 and height 10. Find the volume, leaving
     your answer in surd form.
 11. A pyramid with a square base has volume 100 and height 12. Find the side of the base.
 12. The diagonal of a cube measures 6√3. Find the edge and the volume of that cube.
-13. A right prism has a rectangular base of 3 by 8 and height 5. Find the lateral area and the total
-    area.
+13. The right prism in the figure has a rectangular base of 3 by 8 and height 5. Find the lateral
+    area and the total area.
+    @fig solido id=s13 tipo=prisma aresta=8 profundidade=3 altura=5
 
 **Block C. Going further**
 
@@ -328,8 +362,9 @@ decimetre is one litre.
 6. 90√3. The area of the base is 9√3.
 7. 8.
 8. 94.
-9. The slant height of a lateral face is 5 and the total area is 96. The lateral area is 60 and the
-   base has area 36.
+9. The apothem of the base a measures 3, half the side, so the slant height m of a lateral face
+   measures 5. The lateral area is 60, the base has area 36 and the total area is 96.
+   @fig id=s9 fase=gabarito
 10. 240√3. The area of the base is 24√3.
 11. 5. The area of the base comes from A_{b} = 3 · V / h, which gives 25.
 12. The edge is 6 and the volume is 216.

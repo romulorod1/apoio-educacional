@@ -179,6 +179,7 @@
    * cabem. A cota de seta sai a 14 pt do lado e o numero em cima dela pede mais
    * uma meia caixa, entao as composicoes cotadas pedem um anel maior. */
   var ALTURA_COMPOSICAO = 150;
+  var ALTURA_MOLDE = 170;        // a planificacao e larga e baixa: molde, seta e solido lado a lado
   var FOLGA_COMPOSICAO = 22;
   var FOLGA_COTADA = 28;
   var AFAST_COTA = 14;
@@ -886,6 +887,8 @@
    *
    *   dims     as dimensoes do solido, em unidades do problema
    *   rotulos  os textos, TODOS por parametro; o que nao vier nao sai
+   *   cores    a tinta de CADA rotulo, com as mesmas chaves de rotulos; o que
+   *            nao vier sai na tinta do contorno, como sempre saiu
    *   bloco    {x, largura, altura, folga, antes, depois} do figura()
    *   legenda, foraDeEscala, fase, id, receita, travas, conferir: passam direto
    *   tinta    {cor, espessura, oculta} do solido */
@@ -909,6 +912,24 @@
   function cinzaDeArea() {
     var M = marcas();
     return M.corDeArea ? M.corDeArea() : M.COR_AREA;
+  }
+
+  /* A tinta de cada rotulo da composicao, pela chave do proprio rotulo.
+   *
+   * Ate aqui as composicoes recebiam op.cores e o IGNORAVAM: a receita ja
+   * mandava o campo, com as mesmas chaves de op.rotulos, e nenhuma das cinco o
+   * lia. O efeito estava medido na folha, "m = 5" saindo na tinta do CONTORNO
+   * numa camada de gabarito, e em fotocopia preto e branco o valor resolvido
+   * deixava de se distinguir do dado. As receitas circulo e conica ja faziam
+   * certo, pelo corDaCamada, e o que faltava aqui era so a porta.
+   *
+   * undefined e a resposta certa para o que nao vier: e o que as primitivas do
+   * desenho.js entendem como "use a tinta padrao", e nao null, que em algumas
+   * delas passa pelo op.cor || COR.texto do mesmo jeito mas em outras vira
+   * conferirCor de um valor que nao e cor. Sem op.cores a folha sai identica. */
+  function tintaDoRotulo(op, chave) {
+    var c = op && op.cores ? op.cores[chave] : null;
+    return c || undefined;
   }
 
   /* ------------------------------------------------ cone com o triangulo
@@ -942,14 +963,14 @@
         saida.anguloReto = M.marcaAnguloReto(ctx.doc, O, P, V, { ctx: ctx });
       });
       ctx.rotulos(function () {
-        if (rot.altura) rotuloColado(ctx, rot.altura, V, O, pt(-1, 0), { candidatos: EM_ALTURA_CONE });
+        if (rot.altura) rotuloColado(ctx, rot.altura, V, O, pt(-1, 0), { candidatos: EM_ALTURA_CONE, cor: tintaDoRotulo(op, 'altura') });
         /* O r vai por cima do raio, dentro do triangulo cinza e sem halo: o
          * halo branco abriria um buraco no preenchimento, e a tinta do texto da
          * 5,57:1 contra o cinza de area. */
-        if (rot.raio) rotuloColado(ctx, rot.raio, O, P, pt(0, 1), { candidatos: EM_RAIO_CONE, afastamento: AFAST_RAIO });
-        if (rot.geratriz) D.rotuloLado(ctx, rot.geratriz, V, P, { centro: O });
-        if (rot.vertice) D.rotulo(ctx, rot.vertice, V, { direcao: pt(0, 1) });
-        if (rot.centro) D.rotulo(ctx, rot.centro, O, { direcao: pt(-0.7071, -0.7071) });
+        if (rot.raio) rotuloColado(ctx, rot.raio, O, P, pt(0, 1), { candidatos: EM_RAIO_CONE, afastamento: AFAST_RAIO, cor: tintaDoRotulo(op, 'raio') });
+        if (rot.geratriz) D.rotuloLado(ctx, rot.geratriz, V, P, { centro: O, cor: tintaDoRotulo(op, 'geratriz') });
+        if (rot.vertice) D.rotulo(ctx, rot.vertice, V, { direcao: pt(0, 1), cor: tintaDoRotulo(op, 'vertice') });
+        if (rot.centro) D.rotulo(ctx, rot.centro, O, { direcao: pt(-0.7071, -0.7071), cor: tintaDoRotulo(op, 'centro') });
       });
     });
   }
@@ -988,16 +1009,16 @@
         saida.anguloReto = M.marcaAnguloReto(ctx.doc, O, Mp, V, { ctx: ctx });
       });
       ctx.rotulos(function () {
-        if (rot.altura) rotuloColado(ctx, rot.altura, V, O, pt(-1, 0), { candidatos: EM_ALTURA_PIRAMIDE });
+        if (rot.altura) rotuloColado(ctx, rot.altura, V, O, pt(-1, 0), { candidatos: EM_ALTURA_PIRAMIDE, cor: tintaDoRotulo(op, 'altura') });
         /* Por CIMA do apotema da base, dentro do triangulo: por baixo dele so
          * ha 0,177 a ate a aresta da frente (14,9 pt com a = 84), menos do que
          * a caixa do rotulo pede, e a letra saia empurrada para fora da
          * piramide com fio de chamada. E perto do centro, porque a aresta V B
          * cruza o apotema a 0,57 do centro. */
-        if (rot.apotemaBase) rotuloColado(ctx, rot.apotemaBase, O, Mp, pt(0, 1), { candidatos: EM_APOTEMA_BASE });
-        if (rot.apotema) D.rotuloLado(ctx, rot.apotema, V, Mp, { centro: O });
-        if (rot.vertice) D.rotulo(ctx, rot.vertice, V, { direcao: pt(0, 1) });
-        if (rot.centro) D.rotulo(ctx, rot.centro, O, { direcao: pt(-0.7071, -0.7071) });
+        if (rot.apotemaBase) rotuloColado(ctx, rot.apotemaBase, O, Mp, pt(0, 1), { candidatos: EM_APOTEMA_BASE, cor: tintaDoRotulo(op, 'apotemaBase') });
+        if (rot.apotema) D.rotuloLado(ctx, rot.apotema, V, Mp, { centro: O, cor: tintaDoRotulo(op, 'apotema') });
+        if (rot.vertice) D.rotulo(ctx, rot.vertice, V, { direcao: pt(0, 1), cor: tintaDoRotulo(op, 'vertice') });
+        if (rot.centro) D.rotulo(ctx, rot.centro, O, { direcao: pt(-0.7071, -0.7071), cor: tintaDoRotulo(op, 'centro') });
       });
     });
   }
@@ -1027,13 +1048,16 @@
         saida.esfera = esfera(ctx, C, { raio: rk }, mesclar(op.tinta, { tudoOculto: true }));
       });
       ctx.marcas(function () {
-        if (rot.raio) saida.cotaRaio = D.cotaRadial(ctx, C, rk, rot.raio, { angulo: 0 });
+        /* Nas cotas o teal vai no TEXTO e nao na linha, que e o mesmo que a
+         * receita ja faz na cotaRadial da esfera simples: a linha de cota e
+         * alfabeto da figura, o numero e que e a resposta. */
+        if (rot.raio) saida.cotaRaio = D.cotaRadial(ctx, C, rk, rot.raio, { angulo: 0, corTexto: tintaDoRotulo(op, 'raio') });
         if (rot.altura) {
           saida.cotaAltura = D.cota(ctx, saida.cilindro.baseDir, saida.cilindro.topoDir, rot.altura,
-            { fora: C, afastamento: AFAST_COTA });
+            { fora: C, afastamento: AFAST_COTA, corTexto: tintaDoRotulo(op, 'altura') });
         }
         saida.ponto = D.ponto(ctx, C, {
-          raio: 1.8, rotulo: rot.centro || null,
+          raio: 1.8, rotulo: rot.centro || null, corRotulo: tintaDoRotulo(op, 'centro'),
           direcoes: [pt(-0.7071, 0.7071), pt(-1, 0), pt(0, 1)]
         });
       });
@@ -1061,8 +1085,8 @@
       });
       ctx.marcas(function () {
         var S = saida.prisma, dentro = pt(S.centroBase.x, S.centroBase.y + G.altura * k / 2);
-        if (rot.lado) saida.cotaLado = D.cota(ctx, S.vertices.A, S.vertices.B, rot.lado, { fora: dentro, afastamento: AFAST_COTA });
-        if (rot.altura) saida.cotaAltura = D.cota(ctx, S.vertices.A, S.vertices.D, rot.altura, { fora: dentro, afastamento: AFAST_COTA });
+        if (rot.lado) saida.cotaLado = D.cota(ctx, S.vertices.A, S.vertices.B, rot.lado, { fora: dentro, afastamento: AFAST_COTA, corTexto: tintaDoRotulo(op, 'lado') });
+        if (rot.altura) saida.cotaAltura = D.cota(ctx, S.vertices.A, S.vertices.D, rot.altura, { fora: dentro, afastamento: AFAST_COTA, corTexto: tintaDoRotulo(op, 'altura') });
       });
     });
   }
@@ -1103,7 +1127,7 @@
     var unidades = uniaoDeCaixas([cxSetor, cxCone]);
     var ySeta = (unidades.y0 + unidades.y1) / 2;
 
-    return abrirFigura(doc, op, unidades, 170, FOLGA_COMPOSICAO, function (ctx, saida) {
+    return abrirFigura(doc, op, unidades, ALTURA_MOLDE, FOLGA_COMPOSICAO, function (ctx, saida) {
       var k = ctx.k;
       var Cs = ctx.p(pt(0, 0));
       var P0 = ctx.p(pt(R * Math.cos(rad(a0)), R * Math.sin(rad(a0))));
@@ -1125,15 +1149,247 @@
       });
       ctx.marcas(function () {
         D.seta(ctx, S0, S1, { tam: 7, espessura: ESPESSURA.marca, papel: 'traco' });
+        /* A bolinha no CENTRO do setor, e ela nao e enfeite.
+         *
+         * Os dois raios do setor ja saem tracados (o saida.raios, acima, e o
+         * corte que se cola na geratriz), mas no angulo padrao de 180 graus eles
+         * ficam em linha e o que se ve e UM segmento reto de ponta a ponta.
+         * Medido na folha do MATEM3-12, exercicio 17: sem nada marcando o meio,
+         * o "10" pousado sobre a metade esquerda desse segmento se le como a cota
+         * do DIAMETRO, e o setor de raio 10 passa a dizer raio 5. Com o centro
+         * marcado o segmento volta a se ler como dois raios que se encontram, e o
+         * 10 fica ancorado de onde ate onde ele mede.
+         *
+         * E a mesma bolinha do centro da esfera, com o mesmo raio de 1,6 pt, e
+         * pelo mesmo motivo: ponto notavel da figura marcado como ponto. */
+        saida.pontoCentro = D.ponto(ctx, Cs, { raio: 1.6 });
         saida.altura = linhaInterna(ctx, V, Oc);
         saida.raio = linhaInterna(ctx, Oc, P);
       });
       ctx.rotulos(function () {
-        if (rot.arco) D.rotulo(ctx, rot.arco, topoArco, { direcao: pt(0, 1) });
-        if (rot.raioSetor) D.rotuloLado(ctx, rot.raioSetor, Cs, P1, { direcao: pt(0, -1) });
-        if (rot.altura) rotuloColado(ctx, rot.altura, V, Oc, pt(-1, 0), { candidatos: EM_ALTURA_CONE });
-        if (rot.raio) rotuloColado(ctx, rot.raio, Oc, P, pt(0, 1), { candidatos: EM_RAIO_CONE, afastamento: AFAST_RAIO });
-        if (rot.geratriz) D.rotuloLado(ctx, rot.geratriz, V, P, { centro: Oc });
+        if (rot.arco) D.rotulo(ctx, rot.arco, topoArco, { direcao: pt(0, 1), cor: tintaDoRotulo(op, 'arco') });
+        if (rot.raioSetor) D.rotuloLado(ctx, rot.raioSetor, Cs, P1, { direcao: pt(0, -1), cor: tintaDoRotulo(op, 'raioSetor') });
+        if (rot.altura) rotuloColado(ctx, rot.altura, V, Oc, pt(-1, 0), { candidatos: EM_ALTURA_CONE, cor: tintaDoRotulo(op, 'altura') });
+        if (rot.raio) rotuloColado(ctx, rot.raio, Oc, P, pt(0, 1), { candidatos: EM_RAIO_CONE, afastamento: AFAST_RAIO, cor: tintaDoRotulo(op, 'raio') });
+        if (rot.geratriz) D.rotuloLado(ctx, rot.geratriz, V, P, { centro: Oc, cor: tintaDoRotulo(op, 'geratriz') });
+      });
+    });
+  }
+
+  /* ------------------------------------------------ o molde, e as duas convencoes dele
+   *
+   * A planificacao NAO tem perspectiva nenhuma: o molde esta deitado na mesa, e
+   * ali circunferencia e circunferencia e quadrado e quadrado. Desenhar a base
+   * do cilindro como elipse seria uma contradicao dentro da propria figura, e
+   * desmonta a unica ideia que a planificacao existe para ensinar, que e "isto
+   * aqui e o mesmo objeto aberto". Por isso as circunferencias do molde saem
+   * pelo arco() com rx igual a ry, e nao pelo baseEmPerspectiva.
+   *
+   * E as duas linhas do molde nao sao a mesma linha. O CORTE e onde a tesoura
+   * passa: contorno cheio, 1,2 pt. A DOBRA e onde o papel vira: tracejada e
+   * fina, 0,6 pt. Sem essa diferenca o molde vira um amontoado de retangulos e
+   * ninguem sabe quais pecas ja estao grudadas. As pecas encostam exatamente
+   * onde o molde dobra, entao dobra e sempre a linha COMPARTILHADA por duas
+   * pecas, e o corte e sempre a borda de fora.
+   *
+   * O padrao da dobra e o [2 2] e nao o [3 2] nem o [1 2], e nenhum dos tres e
+   * escolha de gosto. O [3 2] e a construcao acrescentada pelo GABARITO, e o
+   * tintaDePapel do desenho.js o apaga de proposito na camada de enunciado: a
+   * dobra sairia continua, em silencio, e o molde perderia a distincao inteira.
+   * O [1 2] e a guia de leitura, e a regra R3 do auditor o proibe em linha que
+   * carrega informacao, porque um [1 2] deposita um terco da tinta pelo mesmo
+   * caminho e some na segunda geracao de fotocopia. Sobra o [2 2], que ja e o
+   * tracejado de "esta linha existe e voce nao a ve como as outras". */
+  var PAPEL_DOBRA = 'dobra';
+
+  function dobra(alvo, P, Q) {
+    return desenho().poligono(alvo, [P, Q], {
+      fechado: false, espessura: ESPESSURA.auxiliar, tracejado: OCULTA, papel: PAPEL_DOBRA
+    });
+  }
+
+  function corte(alvo, pontos, fechado) {
+    return desenho().poligono(alvo, pontos, {
+      fechado: !!fechado, espessura: ESPESSURA.contorno, papel: 'contorno'
+    });
+  }
+
+  /* ------------------------------------------------ o molde do cilindro
+   *
+   *   planificacaoDoCilindro(doc, {dims: {raio, altura}, rotulos: {arco,
+   *                                altura, raio}, ...})
+   *
+   * A esquerda o molde: o retangulo da superficie lateral, de base 2 pi r e
+   * altura h, com as duas circunferencias de raio r TANGENTES ao lado de cima e
+   * ao de baixo, tocando no ponto medio. Depois a seta, e a direita o cilindro
+   * montado. E a figura da frase que o MATEM2-12 escrevia sem poder desenhar,
+   * "planificando a superficie lateral aparece um retangulo cuja base e o
+   * comprimento da circunferencia": a base do retangulo E o 2 pi r, e o rotulo
+   * arco= vai nela justamente por isso.
+   *
+   * Os tres rotulos moram todos no MOLDE, e o cilindro montado sai limpo. Ele
+   * esta ali para dizer o que o molde vira, e nao para ser cotado de novo: cada
+   * dado aparece em UM lugar so, e r e h repetidos dos dois lados dobrariam a
+   * carga de leitura sem acrescentar nada. */
+  function planificacaoDoCilindro(doc, op) {
+    op = op || {};
+    var D = desenho();
+    var dims = op.dims || {};
+    var r = positivo(dims.raio), h = positivo(dims.altura);
+    if (!r || !h) {
+      avisar(doc, 'planificacaoDoCilindro: dims.raio e dims.altura precisam ser positivos');
+      return null;
+    }
+    var rot = op.rotulos || {};
+    var L = 2 * Math.PI * r;
+    var Gc = geometriaCilindro({ raio: r, altura: h });
+
+    /* Molde em unidades: o retangulo de (0,0) a (L,h), a circunferencia de cima
+     * com centro em (L/2, h+r) e a de baixo em (L/2, -r). */
+    var meioX = L / 2;
+    var cxMolde = caixaDeLimites(0, -2 * r, L, h + 2 * r);
+    var VAO = L * 0.10, SETA = L * 0.22;
+    var xSeta0 = cxMolde.x1 + VAO, xSeta1 = xSeta0 + SETA;
+    var xCil = xSeta1 + VAO + r;
+    var cxCil = caixaDeLimites(xCil + Gc.caixa.x0, Gc.caixa.y0, xCil + Gc.caixa.x1, Gc.caixa.y1);
+    var unidades = uniaoDeCaixas([cxMolde, cxCil]);
+    var ySeta = (unidades.y0 + unidades.y1) / 2;
+
+    return abrirFigura(doc, op, unidades, ALTURA_MOLDE, FOLGA_COMPOSICAO, function (ctx, saida) {
+      var k = ctx.k;
+      var A = ctx.p(pt(0, 0)), Bq = ctx.p(pt(L, 0));
+      var C = ctx.p(pt(L, h)), E = ctx.p(pt(0, h));
+      var Ctopo = ctx.p(pt(meioX, h + r)), Cfundo = ctx.p(pt(meioX, -r));
+      var S0 = ctx.p(pt(xSeta0, ySeta)), S1 = ctx.p(pt(xSeta1, ySeta));
+      var Ocil = ctx.p(pt(xCil, 0));
+      saida.retangulo = [A, Bq, C, E];
+      saida.centroTopo = Ctopo; saida.centroFundo = Cfundo;
+      saida.seta = [S0, S1]; saida.O = Ocil;
+      saida.raioMolde = r * k; saida.baseMolde = L; saida.escala = k;
+
+      ctx.contorno(function () {
+        /* Corte: os dois lados verticais do retangulo, e as duas
+         * circunferencias inteiras. Circunferencia mesmo: rx igual a ry, sem
+         * achatamento nenhum. */
+        saida.ladoEsq = corte(ctx, [A, E], false);
+        saida.ladoDir = corte(ctx, [Bq, C], false);
+        saida.tampaTopo = D.arco(ctx, Ctopo, r * k, r * k, 0, 360, { espessura: ESPESSURA.contorno });
+        saida.tampaFundo = D.arco(ctx, Cfundo, r * k, r * k, 0, 360, { espessura: ESPESSURA.contorno });
+        saida.cilindro = cilindro(ctx, Ocil, { raio: r * k, altura: h * k }, op.tinta);
+      });
+      ctx.marcas(function () {
+        /* Dobra: os dois lados horizontais do retangulo, que sao exatamente as
+         * duas linhas em que as tampas ja estao grudadas. */
+        saida.dobraTopo = dobra(ctx, E, C);
+        saida.dobraFundo = dobra(ctx, A, Bq);
+        D.seta(ctx, S0, S1, { tam: 7, espessura: ESPESSURA.marca, papel: 'traco' });
+        /* O raio da tampa de cima, do centro marcado ate a borda. A bolinha e o
+         * que impede o segmento de ser lido como meio diametro, pelo mesmo
+         * motivo do centro do setor do cone. */
+        if (rot.raio) {
+          saida.pontoCentro = D.ponto(ctx, Ctopo, { raio: 1.6 });
+          saida.raio = D.poligono(ctx, [Ctopo, pt(Ctopo.x + r * k, Ctopo.y)],
+            { fechado: false, espessura: ESPESSURA.marca, papel: 'objeto' });
+        }
+      });
+      ctx.rotulos(function () {
+        /* O 2 pi r fica DENTRO do retangulo, encostado na dobra de baixo: por
+         * fora ele cairia sobre a circunferencia que esta grudada ali. */
+        if (rot.arco) {
+          D.rotuloLado(ctx, rot.arco, A, Bq, { direcao: pt(0, 1), cor: tintaDoRotulo(op, 'arco') });
+        }
+        if (rot.altura) {
+          D.rotuloLado(ctx, rot.altura, A, E, { direcao: pt(-1, 0), cor: tintaDoRotulo(op, 'altura') });
+        }
+        if (rot.raio) {
+          rotuloColado(ctx, rot.raio, Ctopo, pt(Ctopo.x + r * k, Ctopo.y), pt(0, 1),
+            { candidatos: EM_RAIO_TAMPA, afastamento: AFAST_RAIO, cor: tintaDoRotulo(op, 'raio') });
+        }
+      });
+    });
+  }
+
+  /* ------------------------------------------------ o molde do prisma
+   *
+   *   planificacaoDoPrisma(doc, {dims: {aresta, profundidade, altura},
+   *                              rotulos: {aresta, profundidade, altura}, ...})
+   *
+   * A esquerda o molde em CRUZ deitada: a tira das quatro faces laterais, de
+   * larguras a, p, a, p e altura h, com as duas bases (a por p) grudadas em cima
+   * e embaixo da PRIMEIRA face. Depois a seta, e a direita o prisma montado.
+   * Com a igual a p e h igual a a e a planificacao do cubo em seis quadrados,
+   * que e a figura do MAT05-08.
+   *
+   * Dobra sao as tres verticais internas da tira e as duas horizontais em que as
+   * bases encostam: cinco linhas, e sao exatamente as cinco arestas por onde o
+   * molde fecha. Corte e todo o resto do contorno, num caminho so. */
+  function planificacaoDoPrisma(doc, op) {
+    op = op || {};
+    var D = desenho();
+    var dims = op.dims || {};
+    var a = positivo(dims.aresta != null ? dims.aresta : dims.lado);
+    var p = dims.profundidade != null ? positivo(dims.profundidade) : a;
+    var h = positivo(dims.altura);
+    if (!a || !p || !h) {
+      avisar(doc, 'planificacaoDoPrisma: dims.aresta, dims.profundidade e dims.altura precisam ser positivos');
+      return null;
+    }
+    var rot = op.rotulos || {};
+    var Gp = geometriaPrisma({ aresta: a, profundidade: p, altura: h });
+    if (!Gp) { avisar(doc, 'planificacaoDoPrisma: dimensoes invalidas para o prisma montado'); return null; }
+
+    /* A tira comeca na origem e anda para a direita; as bases sobem e descem a
+     * partir da primeira face. */
+    var x1 = a, x2 = a + p, x3 = 2 * a + p, x4 = 2 * (a + p);
+    var cxMolde = caixaDeLimites(0, -p, x4, h + p);
+    var VAO = x4 * 0.08, SETA = x4 * 0.16;
+    var xSeta0 = cxMolde.x1 + VAO, xSeta1 = xSeta0 + SETA;
+    var xPri = xSeta1 + VAO - Gp.caixa.x0;
+    var cxPri = caixaDeLimites(xPri + Gp.caixa.x0, Gp.caixa.y0, xPri + Gp.caixa.x1, Gp.caixa.y1);
+    var unidades = uniaoDeCaixas([cxMolde, cxPri]);
+    var ySeta = (unidades.y0 + unidades.y1) / 2;
+
+    return abrirFigura(doc, op, unidades, ALTURA_MOLDE, FOLGA_COMPOSICAO, function (ctx, saida) {
+      var k = ctx.k;
+      function u(x, y) { return ctx.p(pt(x, y)); }
+      var S0 = ctx.p(pt(xSeta0, ySeta)), S1 = ctx.p(pt(xSeta1, ySeta));
+      var Opri = ctx.p(pt(xPri, 0));
+      /* O contorno de corte, numa volta so, comecando no canto de baixo a
+       * esquerda da tira e subindo pela base de cima e descendo pela de baixo. */
+      var volta = [
+        u(0, 0), u(0, h), u(0, h + p), u(x1, h + p), u(x1, h),
+        u(x2, h), u(x3, h), u(x4, h), u(x4, 0),
+        u(x3, 0), u(x2, 0), u(x1, 0), u(x1, -p), u(0, -p)
+      ];
+      saida.volta = volta; saida.seta = [S0, S1]; saida.O = Opri; saida.escala = k;
+
+      ctx.contorno(function () {
+        saida.corte = corte(ctx, volta, true);
+        saida.prisma = prisma(ctx, Opri, { aresta: a * k, profundidade: p * k, altura: h * k }, op.tinta);
+      });
+      ctx.marcas(function () {
+        saida.dobras = [
+          dobra(ctx, u(x1, 0), u(x1, h)),
+          dobra(ctx, u(x2, 0), u(x2, h)),
+          dobra(ctx, u(x3, 0), u(x3, h)),
+          dobra(ctx, u(0, h), u(x1, h)),
+          dobra(ctx, u(0, 0), u(x1, 0))
+        ];
+        D.seta(ctx, S0, S1, { tam: 7, espessura: ESPESSURA.marca, papel: 'traco' });
+      });
+      ctx.rotulos(function () {
+        /* a na borda de CIMA da base de cima, p na borda da ESQUERDA dela, h na
+         * borda da esquerda da tira: os tres em bordas de corte, por fora, sem
+         * nada por cima. */
+        if (rot.aresta) {
+          D.rotuloLado(ctx, rot.aresta, u(0, h + p), u(x1, h + p), { direcao: pt(0, -1), cor: tintaDoRotulo(op, 'aresta') });
+        }
+        if (rot.profundidade) {
+          D.rotuloLado(ctx, rot.profundidade, u(0, h), u(0, h + p), { direcao: pt(-1, 0), cor: tintaDoRotulo(op, 'profundidade') });
+        }
+        if (rot.altura) {
+          D.rotuloLado(ctx, rot.altura, u(0, 0), u(0, h), { direcao: pt(-1, 0), cor: tintaDoRotulo(op, 'altura') });
+        }
       });
     });
   }
@@ -1217,7 +1473,16 @@
         x: x + i * passo, largura: passo, altura: alturaCelula, folga: folga,
         unidades: unidades,
         legenda: ultima ? op.legenda : null, foraDeEscala: ultima && !!op.foraDeEscala,
-        fase: op.fase, id: null, receita: op.receita || null, travas: op.travas, conferir: op.conferir
+        /* O id da diretiva vai para TODAS as celulas, e nao para nenhuma. As
+         * travas 3, 4 e 5 do _piloto_base.js casam figura com exercicio pelo id,
+         * e o @fig id=... fase=gabarito rechama a figura pelo id: com id nulo um
+         * painel dentro de um exercicio ficava invisivel para as tres travas e
+         * nao podia ser rechamado no gabarito. O id repetido nas celulas nao
+         * colide com nada: quem guarda diretiva por id e o resolverPorId do
+         * base.js, a partir da DIRETIVA, que continua sendo uma so; aqui o id e
+         * so o carimbo do registro, e um painel de tres celulas e mesmo tres
+         * registros do mesmo exercicio. */
+        fase: op.fase, id: op.id || null, receita: op.receita || null, travas: op.travas, conferir: op.conferir
       }, celulaDoPainel(D, item, nomes[i] != null ? String(nomes[i]) : '', cotas[item.tipo] || {})));
     }
     doc.y = yInicial - alturaCelula - med.alturaLegenda - med.antes - med.depois;
@@ -1283,6 +1548,8 @@
     coneComTriangulo: coneComTriangulo, piramideComTriangulo: piramideComTriangulo,
     cilindroComEsfera: cilindroComEsfera, prismaTriangular: prismaTriangular,
     planificacaoDoCone: planificacaoDoCone,
+    planificacaoDoCilindro: planificacaoDoCilindro,
+    planificacaoDoPrisma: planificacaoDoPrisma,
     rotuloColado: rotuloColado, linhaInterna: linhaInterna, emLivre: emLivre,
     posicaoColada: posicaoColada, FOLGA_COLADO: FOLGA_COLADO,
     geometria: GEOMETRIA, caixaDoSolido: caixaDoSolido, projetar: projetar, emPontos: emPontos,
