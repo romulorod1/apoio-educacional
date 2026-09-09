@@ -336,7 +336,7 @@ def _envelope(materia, corpo):
     return envelope
 
 
-def gerar_materia(materia, temas, pasta_banco, raiz_temas):
+def gerar_materia(materia, temas, pasta_banco, raiz_dos_temas_do_banco):
     """Grava o indice, um arquivo por serie, o indice de busca e o banco inteiro.
 
     Sao dois niveis, de proposito. O indice e leve e carrega sempre, para a
@@ -402,7 +402,11 @@ def gerar_materia(materia, temas, pasta_banco, raiz_temas):
     # juntar serie: temas/banco.json e o nome legado, lido pelos pilotos de
     # figuras/; materia nova ganha temas/banco-<id>.json ao lado.
     nome_banco = 'banco.json' if legada else 'banco-%s.json' % materia['id']
-    caminho_banco = os.path.join(raiz_temas, nome_banco)
+    # A raiz aqui e a de SAIDA, e nao a de entrada: com --saida apontando para uma pasta
+    # temporaria, este arquivo tem que ir para la tambem. Enquanto ele saia sobre a raiz
+    # de entrada, nao existia ensaio a seco: quem rodasse --saida num scratchpad, achando
+    # que nao tocava no repositorio, sobrescrevia o temas/banco.json de verdade, sem aviso.
+    caminho_banco = os.path.join(raiz_dos_temas_do_banco, nome_banco)
     banco = _envelope(materia, {'temas': temas})
     _gravar(caminho_banco, banco)
 
@@ -465,7 +469,13 @@ def gerar(raiz_temas=None, raiz_saida=None, so=None, raiz_fontes=None, raiz_pain
         # banco/<id>/
         partes = [p for p in materia['temas']['raiz'].split('/') if p]
         pasta_banco = os.path.join(raiz_saida, *partes)
-        bancos[materia['id']] = gerar_materia(materia, temas, pasta_banco, raiz_temas)
+        # o banco inteiro acompanha a raiz de SAIDA: em producao as duas coincidem, e numa
+        # prova com --saida ele fica na pasta temporaria com os arquivos de serie
+        raiz_do_banco = os.path.join(raiz_saida, os.path.basename(RAIZ)) \
+            if os.path.abspath(raiz_saida) != os.path.abspath(RAIZ_PROJETO) else RAIZ
+        if not os.path.isdir(raiz_do_banco):
+            os.makedirs(raiz_do_banco)
+        bancos[materia['id']] = gerar_materia(materia, temas, pasta_banco, raiz_do_banco)
         if reprovados:
             print('')
             print('  %d tema(s) ficaram de fora por nao passarem na conferencia:' % len(reprovados))
