@@ -11,6 +11,11 @@ cd "$(dirname "$0")/.."
 
 falhou=0
 instavel=0
+# O TERCEIRO ESTADO. Nao e ok, porque nao conferiu; nao e FALHOU, porque nao ha
+# defeito. E o portao dizendo que uma parte dele nao rodou, e por isso ele nao
+# pode dizer TUDO PASSOU nem sair com zero: "portao verde rodado solto uma vez"
+# deixa de estar satisfeito EXPLICITAMENTE, e nao por omissao.
+nao_conferido=0
 titulo() { printf '\n=== %s ===\n' "$1"; }
 
 # Quantas verificacoes falharam na saida de um teste (vazio = nenhuma).
@@ -277,9 +282,61 @@ limpa_servidor() {
 trap limpa_servidor EXIT INT TERM
 
 titulo "com navegador"
-# A linha de base da maquina ANTES dos vinte navegadores, para a comparacao com
-# o estado na hora de uma falha dizer alguma coisa.
-printf '  (maquina no comeco da bateria: %s)\n' "$(estado_da_maquina)"
+# O PORTAO SE RECUSA A COMECAR A BATERIA SEM MEMORIA.
+#
+# Duas mortes medidas em 08/09/2026, as duas pelo sistema, por falta de memoria,
+# as duas deixando o python da 8777 pendurado e nenhuma delas dizendo o motivo:
+#
+#   713 MB livres: morreu NO MEIO da bateria, depois de tres FALHOU falsos por
+#                  ERR_CONNECTION_REFUSED, com o testa_aluno passando entre eles,
+#                  com 145 conferencias, o que provou que o servidor nao tinha
+#                  caido de vez: ficou intermitente sob pressao
+#   579 MB livres: morreu AO ENTRAR na bateria, logo depois de levantar o
+#                  servidor, com 38 ok e zero FALHOU
+#
+# Morrer no meio custa quinze minutos, nao imprime veredito nenhum e deixa
+# servidor orfao, que envenena a rodada seguinte. Recusar-se a comecar custa dois
+# segundos, diz o numero que falta e nao suja nada.
+#
+# DE ONDE VEM O PISO, e ele e DERIVADO e nao escolhido.
+#
+#   maior fracasso conhecido ............ 713 MB livres
+#   custo medido de UM navegador do laco  257 MB de pico
+#   ------------------------------------------------------
+#   piso ................................ 950 MB (713 + 257, arredondado)
+#
+# Os 257 MB foram medidos em 08/09/2026 subindo UM Chrome do jeito que os testes
+# sobem (headless novo, perfil proprio, o aplicativo aberto e uma tela usada) e
+# amostrando a memoria livre do sistema a cada 600 ms: caiu de 604 para 347 no
+# vale, e voltou a 962 depois de fechar.
+#
+# A soma tem logica: 713 MB nao bastaram para o laco continuar, entao o piso
+# precisa cobrir aquele fracasso MAIS o pico de um navegador a mais.
+#
+# COMO AJUSTAR, e o numero nao e sagrado. Sobe quando uma morte acontecer acima
+# dele, e a data entra na lista de cima. DESCE quando alguem registrar uma
+# rodada inteira BEM SUCEDIDA abaixo dele, que e a evidencia que hoje falta:
+# ninguem anotou a memoria livre das rodadas que passaram.
+#
+# Piso baixo demais deixa o portao morrer; piso alto demais deixa o portao
+# recusar sem precisar. As duas falhas sao VISIVEIS, e e isso que torna o ajuste
+# barato: uma imprime NAO CONFERIDO com o numero, a outra deixa cadaver.
+PISO_MB=950
+livre_mb=$(powershell -NoProfile -Command \
+  "[int]((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1024)" 2>/dev/null | tr -d '\r')
+# Este numero fica no log de PROPOSITO, em toda rodada, inclusive nas que passam:
+# e a evidencia que falta hoje para o piso poder DESCER com fundamento.
+printf '  (maquina no comeco da bateria: %s, piso %s MB)\n' "$(estado_da_maquina)" "$PISO_MB"
+roda_bateria=sim
+if [ -n "$livre_mb" ] && [ "$livre_mb" -lt "$PISO_MB" ] 2>/dev/null; then
+  roda_bateria=nao
+  nao_conferido=1
+  printf '  NAO CONFERIDO %-19s a bateria nao rodou: %s MB livres, piso %s MB\n' \
+    "com navegador" "$livre_mb" "$PISO_MB"
+  printf '                isto e a MAQUINA e nao o ramo. Feche o que puder e rode de novo.\n'
+  printf '                Duas mortes medidas em 08/09, com 713 MB e com 579 MB livres.\n'
+fi
+if [ "$roda_bateria" = "sim" ]; then
 for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento \
          testa_perfil testa_olho testa_atualizacao testa_atualizacao_real \
          testa_biblioteca_offline \
@@ -301,6 +358,7 @@ roda "testa_biblioteca_offline --envenenado" node "_teste/testa_biblioteca_offli
 # que apagasse o BAIXADOS passaria pelas duas sem ninguem ter provado que elas
 # sabem reprovar.
 roda "testa_biblioteca_offline --envenenado-activate" node "_teste/testa_biblioteca_offline.js" --envenenado-activate
+fi
 
 # O painel "Cada aluno, desde quando e por quanto" nasce recolhido no
 # Fechamento. Esta trava guarda quatro coisas: ele nasce fechado, o botao
@@ -664,10 +722,24 @@ fi
 printf '\n'
 if [ "$falhou" != "0" ]; then
   printf 'HA FALHA. Nao faca o merge antes de resolver.\n'
+elif [ "$nao_conferido" != "0" ]; then
+  # Sem a bateria de navegador o portao NAO conferiu o que promete conferir.
+  # Dizer TUDO PASSOU aqui seria aprovar por nao ter rodado, que e a versao
+  # macro do teste que aprova por nao afirmar nada.
+  printf 'NAO CONFERIDO. O portao nao rodou inteiro, entao ele nao aprova nada.\n'
+  printf 'Nao e defeito do ramo: e a maquina. Libere memoria e rode de novo.\n'
 elif [ "$instavel" != "0" ]; then
   printf 'TUDO PASSOU, mas algum teste so passou na segunda vez (INSTAVEL acima).\n'
   printf 'Nao e impedimento de merge; e aviso de que aquele teste depende de tempo.\n'
 else
   printf 'TUDO PASSOU. Pode seguir para o merge.\n'
 fi
-exit "$falhou"
+# Sai diferente de zero tambem quando nao conferiu: quem automatizar em cima do
+# codigo de saida nao pode ler "nao rodou" como "passou".
+if [ "$falhou" != "0" ]; then
+  exit 1
+fi
+if [ "$nao_conferido" != "0" ]; then
+  exit 2
+fi
+exit 0
