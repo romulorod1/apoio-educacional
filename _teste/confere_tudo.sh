@@ -137,6 +137,18 @@ roda() {
   fi
 }
 
+# A MAQUINA NO COMECO DE TUDO, e nao so na porta da bateria.
+#
+# Medido em 08/09: uma rodada lancada com 1.035 MB livres, conferidos a mao antes
+# de comecar, chegou na bateria com 783. O PROPRIO portao consome uns 250 MB nas
+# secoes anteriores, antes de abrir o primeiro navegador.
+#
+# Por isso o par de numeros fica no log. Medir antes de lancar NAO basta: quem
+# lanca com 1.000 chega na porta da bateria com 750 e e recusado, depois de ja ter
+# gasto os cinco minutos das secoes anteriores. Com os dois numeros em toda
+# rodada, esse custo deixa de ser deducao e vira dado.
+printf '\n  (maquina no comeco do portao: %s)\n' "$(estado_da_maquina)"
+
 titulo "banco de temas"
 saida=$(python temas/_ferramentas/verificar.py 2>&1) || true
 rep=$(printf '%s\n' "$saida" | grep -c "REPROVADO" || true)
