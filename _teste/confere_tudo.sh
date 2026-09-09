@@ -580,14 +580,25 @@ titulo "com navegador"
 # novo.
 #
 # E "espalhamento das medidas" SO significa alguma coisa depois de dizer SOB QUE
-# REGUA, E COM QUE PORTA. Os cinco perfis, com a regua unica e com a porta que o
-# PORTAO REGISTOU no log de cada um:
+# REGUA, COM QUE PORTA, e DE ONDE VEIO CADA PORTA. Os cinco perfis, com a regua
+# unica, e a proveniencia de cada linha ao lado, porque ela nao e a mesma:
 #
-#   eq          porta 1761  fundo 1194  custo 567
-#   lote1       porta 1560  fundo 1047  custo 513
-#   frente1     porta 1512  fundo 1040  custo 472
-#   lote2       porta 1348  fundo  757  custo 591
-#   solidos     porta 1369  fundo  779  custo 590
+#   eq          porta 1761  fundo 1194  custo 567   porta ANUNCIADA pela frente 3
+#   lote1       porta 1560  fundo 1047  custo 513   porta ANUNCIADA pela frente 3
+#   frente1     porta 1512  fundo 1040  custo 472   porta do LOG deste portao
+#   lote2       porta 1348  fundo  757  custo 591   porta ANUNCIADA pela frente 3
+#   solidos     porta 1369  fundo  779  custo 590   porta ANUNCIADA pela frente 3
+#
+# "Anunciada" quer dizer: a frente 3 mediu a mao antes de entrar, tres leituras e
+# a menor, que e o mesmo metodo do portao, e disse o numero por mensagem. Nao sai
+# de log nenhum, porque a linha que mede a maquina e DESTE ramo e nao estava nos
+# ramos onde aquelas rodadas correram. Uma das cinco e verificavel por quem le
+# este arquivo; as outras quatro sao palavra de quem mediu.
+#
+# Isso nao derruba nada do que vem abaixo, porque continuam a ser leituras de
+# PORTA e nao aproximacoes tiradas de dentro da corrida, que era o defeito. Mas a
+# versao anterior desta linha dizia "a porta que o portao registou no log de cada
+# um", e isso era verdade para UMA das cinco.
 #
 #   de 472 a 591  ->  espalhamento 119
 #
