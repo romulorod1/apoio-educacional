@@ -367,6 +367,185 @@ else
   falhou=1
 fi
 
+# O CONTEUDO DOS ARQUIVOS DO CACHE, e nao so a lista.
+#
+# A trava de cima compara a LISTA de ARQUIVOS com a base do merge e exige nome
+# novo quando ela muda. Ela nao olha o CONTEUDO dos arquivos listados, e dois
+# deles sao gerados: './banco/indice.json' e './banco/busca.json' saem do
+# gerar_banco.py. A varredura de figuras regenera o banco uma vez por lote, e
+# sao mais uns dezessete lotes: cada um muda o conteudo sem mudar a lista.
+#
+# Sem esta trava, esse merge passa verde e o tablet dela continua servindo o
+# banco velho do cache antigo, com o aplicativo novo por cima, ate o proximo
+# release que por acaso promova o nome. E o mesmo defeito do incidente de
+# sw.js:12-16 por outra porta: some sem erro, e so aparece na casa da familia.
+#
+# A PROVA VEM ANTES DA CONFERENCIA. O veredito e uma funcao de duas entradas, e
+# as quatro combinacoes sao afirmadas aqui antes de a funcao ser usada de
+# verdade. Os dois lados do par importam: mudar conteudo sem promover REPROVA, e
+# promover sem mudar conteudo PASSA. Sem o segundo lado, uma trava que exigisse
+# nome novo sempre ficaria verde e ninguem veria que ela virou carimbo.
+veredito_cache() {
+  # $1 = mudou conteudo (sim/nao); $2 = nome novo (sim/nao)
+  if [ "$1" = "sim" ] && [ "$2" = "nao" ]; then echo "reprova"; else echo "passa"; fi
+}
+# QUEM DECIDE RECEBE AS FORMAS REAIS, e nao sim/nao ja mastigado.
+#
+# A versao anterior desta trava provava so o VEREDITO, e o mapeamento das
+# entradas ficava numa cadeia solta ao lado. Trocar um caractere ali, um != por
+# um =, virava a trava em carimbo: conteudo mudado, cache parado, saida "ok o
+# cache subiu para" com o MESMO nome de antes, e a prova continuando 4 de 4 sem
+# uma palavra. Numa trava que existe para pegar divergencia, era a categoria se
+# fechando sobre si mesma. Agora o mapeamento esta aqui dentro, e as quatro
+# asercoes abaixo o exercitam com argumento de verdade.
+#
+# $1 = lista de mudados (vazia = nada mudou); $2 = nome de agora; $3 = nome da base
+decide_cache() {
+  if [ -n "$1" ]; then dc_mudou=sim; else dc_mudou=nao; fi
+  if [ "$2" != "$3" ]; then dc_novo=sim; else dc_novo=nao; fi
+  veredito_cache "$dc_mudou" "$dc_novo"
+}
+p_cache=0; f_cache=0
+afere_cache() {
+  obtido=$(decide_cache "$1" "$2" "$3")
+  if [ "$obtido" = "$4" ]; then
+    p_cache=$((p_cache + 1))
+  else
+    f_cache=$((f_cache + 1))
+    printf '    prova do cache: mudados=[%s] agora=%s antes=%s deu %s, esperado %s\n' \
+      "$1" "$2" "$3" "$obtido" "$4"
+  fi
+}
+afere_cache "app.js" apoio-v22 apoio-v22 reprova
+afere_cache "app.js" apoio-v23 apoio-v22 passa
+afere_cache ""       apoio-v23 apoio-v22 passa
+afere_cache ""       apoio-v22 apoio-v22 passa
+if [ "$f_cache" != "0" ]; then
+  printf '  FALHOU  %-24s a prova da trava nao passou: %s de 4\n' "conteudo no cache" "$p_cache"
+  falhou=1
+elif [ -z "$base" ] || [ -z "$sw_antes" ] || [ -z "$sw_agora" ]; then
+  # A MESMA guarda da trava vizinha, de proposito. Com base presente e sw.js
+  # ausente na base, a vizinha dizia INSTAVEL e esta dizia ok verde.
+  printf '  INSTAVEL %-23s sem base de merge com sw.js para comparar o conteudo\n' "conteudo no cache"
+  instavel=1
+else
+  # A entrada './' e a raiz e sai como linha VAZIA da extracao, porque o grupo
+  # opcional come o './' e o resto casa nada. Quem a remove e este grep -v '^$'.
+  #
+  # O `|| true` e obrigatorio e nao e enfeite: sob set -e, um grep que filtra a
+  # lista inteira devolve 1, a atribuicao devolve 1, e o portao MORRE aqui,
+  # calado, antes do resumo e antes das travas seguintes. Uma delas e a que
+  # impede nome de aluno de entrar num repositorio publico.
+  caminhos=$(printf '%s\n' "$lista_agora" | grep -v '^$' || true)
+  mudados=""
+  sumidos=""
+  fora_do_git=""
+  caixa_trocada=""
+  # IFS so com quebra de linha, e glob desligado em volta do laco. Sem isso,
+  # caminho com espaco vira duas palavras, nenhuma existe, as duas caem no
+  # continue, e o arquivo sai da conferencia sem uma linha de aviso.
+  #
+  # E --literal-pathspecs nos comandos do git, porque set -f desliga o glob do
+  # SHELL e o git faz o glob DELE, por dentro, no pathspec. Sem a flag, uma lista
+  # pedindo './banco/tudo[1].json' era atestada lendo o irmao 'banco/tudo1.json',
+  # que existe, esta rastreado e nao mudou: a trava dava ok sobre o arquivo
+  # errado, e o proprio teste de rastreado era enganado pelo mesmo glob.
+  ifs_antes=$IFS
+  IFS='
+'
+  set -f
+  for c in $caminhos; do
+    if [ ! -f "$c" ]; then
+      # Caixa trocada quer dizer o literal falhar E o icase achar. Sondar so o
+      # icase aqui acusava caixa para arquivo rastreado no caminho EXATO e
+      # apagado do disco, que e coisa banal: alguem apaga para regerar e esquece.
+      # A pessoa ia comparar maiuscula que nao existe em vez de reparar que o
+      # arquivo sumiu e que o install morre no 404.
+      if [ -z "$(git ls-files -- ":(literal)$c" 2>/dev/null)" ] \
+         && [ -n "$(git ls-files -- ":(literal,icase)$c" 2>/dev/null)" ]; then
+        caixa_trocada="$caixa_trocada $c"
+      else
+        sumidos="$sumidos $c"
+      fi
+      continue
+    fi
+    # git diff so enxerga o que o git rastreia. Arquivo do pacote ignorado pelo
+    # .gitignore, ou que entrou na lista e ficou fora do commit, seria invisivel
+    # para esta trava: ponto cego dentro de uma trava que existe para nao ter
+    # ponto cego.
+    if [ -z "$(git --literal-pathspecs ls-files -- "$c" 2>/dev/null)" ]; then
+      # A SONDA DE CAIXA roda nos DOIS ramos de proposito, e o motivo e que sem
+      # ela o MESMO defeito sai com mensagens diferentes conforme o computador:
+      # no NTFS o [ -f ] acha 'Core.js' e o git nao, entao caia aqui; num sistema
+      # sensivel a caixa o [ -f ] falha e caia nos sumidos. Reprovar certo pelo
+      # motivo errado custa a hora de quem procura, que e a licao que este
+      # arquivo ja tem escrita na ordem do carregarSerie.
+      #
+      # A sonda usa o prefixo magico :(literal,icase) e NAO a flag global
+      # --icase-pathspecs, e a diferenca importa: a flag de caixa nao desliga o
+      # glob, entao 'cor[e].js' casaria 'core.js' e a trava acusaria caixa onde o
+      # defeito e outro. A magica combina os dois; ela e a flag global sao
+      # mutuamente exclusivas e dao fatal na mesma invocacao, e e por isso que o
+      # ls-files e o diff do caminho principal ficam com a flag e as sondas nao.
+      if [ -n "$(git ls-files -- ":(literal,icase)$c" 2>/dev/null)" ]; then
+        caixa_trocada="$caixa_trocada $c"
+      else
+        fora_do_git="$fora_do_git $c"
+      fi
+      continue
+    fi
+    if ! git --literal-pathspecs diff --quiet "$base" -- "$c" 2>/dev/null; then
+      mudados="$mudados $c"
+    fi
+  done
+  set +f
+  IFS=$ifs_antes
+  nome_agora=$(nome_sw "$sw_agora")
+  nome_antes=$(nome_sw "$sw_antes")
+  if [ -z "$nome_agora" ] || [ -z "$nome_antes" ]; then
+    # Nome vazio passava como "promovido", porque vazio e diferente de v22. Uma
+    # reformatacao do sw.js (aspas duplas, const, espaco a mais) faria nome_sw
+    # devolver vazio, e a trava imprimiria ok com o nome em branco.
+    printf '  FALHOU  %-24s nao consegui ler o nome do cache no sw.js (agora:[%s] base:[%s])\n' \
+      "conteudo no cache" "$nome_agora" "$nome_antes"
+    falhou=1
+  elif [ -n "$caixa_trocada" ] || [ -n "$sumidos" ] || [ -n "$fora_do_git" ]; then
+    # UMA falha so, com os TRES motivos: separados em falhas diferentes, quem
+    # conserta um roda de novo e so entao descobre o proximo, e cada volta e
+    # quinze minutos de portao. A primeira versao disto juntava dois e deixava a
+    # caixa trocada de fora, que era o mesmo erro que ela consertava.
+    #
+    # Cada motivo so imprime a propria linha se tiver o que dizer, e em linha de
+    # continuacao indentada: numa linha so, com poucos arquivos, ela passava de
+    # mil colunas e enterrava o proprio FALHOU no comeco do paragrafo.
+    #
+    # If explicito e nao lista curta com ||, que aqui seria segura mas casa o
+    # padrao que este arquivo proibe por escrito em outras duas secoes.
+    printf '  FALHOU  %-24s a lista pede o que o portao nao consegue conferir\n' "conteudo no cache"
+    if [ -n "$caixa_trocada" ]; then
+      printf '            caixa diferente da do git, e o GitHub Pages e sensivel a ela:%s\n' "$caixa_trocada"
+    fi
+    if [ -n "$sumidos" ]; then
+      printf '            fora do disco, o install morre no primeiro 404:%s\n' "$sumidos"
+    fi
+    if [ -n "$fora_do_git" ]; then
+      printf '            fora do git, esta trava nao ve o conteudo:%s\n' "$fora_do_git"
+    fi
+    falhou=1
+  else
+    if [ "$(decide_cache "$mudados" "$nome_agora" "$nome_antes")" = "reprova" ]; then
+      printf '  FALHOU  %-24s mudou de conteudo e o cache continua %s:%s\n' \
+        "conteudo no cache" "$nome_agora" "$mudados"
+      falhou=1
+    elif [ -z "$mudados" ]; then
+      printf '  ok      %-24s nenhum arquivo do pacote mudou de conteudo desde a base\n' "conteudo no cache"
+    else
+      printf '  ok      %-24s%s arquivo(s) do pacote mudaram e o cache subiu para %s\n' \
+        "conteudo no cache" "$(printf '%s' "$mudados" | wc -w | tr -d ' ')" "$nome_agora"
+    fi
+  fi
+fi
+
 # A LINHA DE carregarSerie QUE MONTA O CAMINHO DAS SERIES DA MATEMATICA.
 #
 # O app.js le a tabela de materias (Core.MATERIAS) para saber de que raiz vem
