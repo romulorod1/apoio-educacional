@@ -75,8 +75,20 @@ livre_mb_agora() {
 # `//FI` funcionaria neste shell, e nao e usado de proposito: depender de como
 # cada shell trata a barra foi exatamente o que quebrou. Sem filtro, conta-se na
 # saida e acabou.
+# ZERO SO PODE SIGNIFICAR ZERO. O codigo de saida do tasklist e a unica
+# testemunha de que a contagem aconteceu, e a versao anterior descartava-o:
+# `tasklist 2>/dev/null | grep -c ...` devolve 0 tanto para "nenhum processo"
+# como para "o comando nao rodou", e o 2>/dev/null ainda esconde o motivo.
+#
+# Foi assim que a forma com switch enganou toda a gente durante dois dias. Nao
+# repetir o mesmo padrao um nivel acima.
 conta_processo() {
-  tasklist 2>/dev/null | grep -c "$1" || true
+  saida_tl=$(tasklist 2>&1) && codigo_tl=0 || codigo_tl=$?
+  if [ "$codigo_tl" != "0" ] || [ -z "$saida_tl" ]; then
+    printf '?'
+    return
+  fi
+  printf '%s\n' "$saida_tl" | grep -c "$1" || true
 }
 quantos_node() { conta_processo "node.exe"; }
 estado_da_maquina() {
@@ -694,7 +706,9 @@ printf '  (memoria na porta, tres leituras: %s MB; decide a menor, %s MB)\n' "$l
 # dele e de DIAGNOSTICO: quem le "pouca memoria" fecha programas quando o que
 # precisava era matar o proprio lixo da rodada morta.
 nodes_na_porta=$(quantos_node)
-if [ -n "$nodes_na_porta" ] && [ "$nodes_na_porta" -gt 0 ] 2>/dev/null; then
+if [ "$nodes_na_porta" = "?" ]; then
+  printf '  (a contagem de processos NAO MEDIU: o tasklist nao rodou. Nao e zero.)\n'
+elif [ -n "$nodes_na_porta" ] && [ "$nodes_na_porta" -gt 0 ] 2>/dev/null; then
   printf '  (ATENCAO: %s processo(s) node vivos ANTES da bateria. Nesta maquina o node\n' "$nodes_na_porta"
   printf '   so roda por causa dela, entao provavelmente sao orfaos de uma rodada morta.\n'
   printf '   Eles derrubam a leitura acima. Antes de fechar programas, mate-os pela raiz.)\n'
