@@ -1088,6 +1088,42 @@ PARES_DE_PAINEL = [
 ]
 
 
+def testar_ensaio_a_seco():
+    # --saida existe para provar o gerador sem sujar o repositorio, e por isso ele
+    # precisa levar TODOS os arquivos, inclusive o banco inteiro (temas/banco.json).
+    #
+    # Enquanto esse arquivo saia sobre a raiz de ENTRADA, o ensaio a seco nao existia: quem
+    # rodasse --saida numa pasta temporaria sobrescrevia o banco de verdade sem aviso, e foi
+    # o que aconteceu com um agente de outra frente. A prova compara o arquivo do repositorio
+    # antes e depois, byte a byte, e exige que ele apareca na pasta temporaria.
+    import hashlib
+    import gerar_banco
+    real = os.path.join(verificar.RAIZ, "banco.json")
+    if not os.path.exists(real):
+        print("  OK     ensaio a seco: sem banco.json no repositorio, nada a proteger")
+        return 0, 1
+    antes = hashlib.sha256(io.open(real, "rb").read()).hexdigest()
+    saida = tempfile.mkdtemp(prefix="seco_")
+    falhas, total = 0, 2
+    try:
+        gerar_banco.gerar(verificar.RAIZ, saida, so="matematica")
+        depois = hashlib.sha256(io.open(real, "rb").read()).hexdigest()
+        if antes == depois:
+            print("  OK     ensaio a seco: --saida nao toca o banco.json do repositorio")
+        else:
+            print("  FALHA  ensaio a seco: --saida sobrescreveu o banco.json do repositorio")
+            falhas += 1
+        achou = [os.path.join(dp, f) for dp, _, fs in os.walk(saida) for f in fs if f == "banco.json"]
+        if achou:
+            print("  OK     ensaio a seco: o banco inteiro foi para a pasta de saida")
+        else:
+            print("  FALHA  ensaio a seco: o banco inteiro nao apareceu na pasta de saida")
+            falhas += 1
+    finally:
+        shutil.rmtree(saida, ignore_errors=True)
+    return falhas, total
+
+
 def testar_historico_do_painel():
     # O registro do painel guarda o resumo das rodadas anteriores: sem isso, quem le
     # daqui a seis meses nao sabe que uma questao teve leituras fora do criterio antes
@@ -1358,6 +1394,10 @@ def rodar():
         total += quantos
 
         parciais, quantos = testar_historico_do_painel()
+        falhas += parciais
+        total += quantos
+
+        parciais, quantos = testar_ensaio_a_seco()
         falhas += parciais
         total += quantos
 
