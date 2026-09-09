@@ -57,12 +57,36 @@ livre_mb_agora() {
   powershell -NoProfile -Command \
     "[int]((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1024)" 2>/dev/null | tr -d '\r'
 }
+# CONTAR SEM O FILTRO DO TASKLIST, e isto e conserto de um defeito antigo.
+#
+# A forma anterior era `tasklist /FI "IMAGENAME eq chrome.exe" /NH`, e ela NUNCA
+# funcionou aqui: o MSYS converte o `/FI` num caminho do Windows antes de o
+# tasklist o ver, e sai
+#
+#   ERROR: Invalid argument/option - 'C:/Program Files/Git/FI'.
+#
+# O comando sai com codigo 1, a saida nao contem o nome do processo, e o grep -c
+# devolve ZERO. Medido com oito Chrome vivos na maquina: a forma antiga dizia 0.
+#
+# Ou seja TODA linha "N navegador(es) vivo(s)" de ontem e de hoje foi zero por
+# defeito, e nao por medida. A parte da memoria da mesma linha sempre esteve
+# certa, porque `livre_mb_agora` usa PowerShell e nao passa por aqui.
+#
+# `//FI` funcionaria neste shell, e nao e usado de proposito: depender de como
+# cada shell trata a barra foi exatamente o que quebrou. Sem filtro, conta-se na
+# saida e acabou.
+conta_processo() {
+  tasklist 2>/dev/null | grep -c "$1" || true
+}
+quantos_node() { conta_processo "node.exe"; }
 estado_da_maquina() {
   livre=$(livre_mb_agora)
-  navs=$(tasklist /FI "IMAGENAME eq chrome.exe" /NH 2>/dev/null | grep -c "chrome.exe" || true)
+  navs=$(conta_processo "chrome.exe")
+  nodes=$(quantos_node)
   [ -n "$livre" ] || livre="?"
   [ -n "$navs" ] || navs="?"
-  printf '%s MB livres, %s navegador(es) vivo(s)' "$livre" "$navs"
+  [ -n "$nodes" ] || nodes="?"
+  printf '%s MB livres, %s navegador(es) e %s node vivo(s)' "$livre" "$navs" "$nodes"
 }
 
 # A PORTA DECIDE POR AMOSTRA, E NAO POR UMA LEITURA.
@@ -656,6 +680,25 @@ leituras=${amostra#*|}
 # piso precisa ver a dispersao e nao so o numero escolhido.
 printf '  (maquina no comeco da bateria: %s, piso %s MB)\n' "$(estado_da_maquina)" "$PISO_MB"
 printf '  (memoria na porta, tres leituras: %s MB; decide a menor, %s MB)\n' "$leituras" "$livre_mb"
+# ORFAO DA RODADA ANTERIOR, avisado ANTES de a memoria ser julgada.
+#
+# Ideia da frente 3, com argumento medido: a alternativa era lembrar de parar o
+# amostrador depois de ler o perfil, e a taxa de acerto da lembranca hoje foi
+# ZERO EM DOIS, uma falha de cada frente. Varredura nao depende de lembranca.
+#
+# Conta `node` e nao `chrome`: nesta maquina o node so existe por causa da
+# bateria, e o Chrome pode ser o navegador do Romulo aberto.
+#
+# AVISA e nao RECUSA, de proposito. Orfao derruba a leitura livre, ou seja
+# empurra a decisao para o lado SEGURO e nao cria risco de entrar mal. O dano
+# dele e de DIAGNOSTICO: quem le "pouca memoria" fecha programas quando o que
+# precisava era matar o proprio lixo da rodada morta.
+nodes_na_porta=$(quantos_node)
+if [ -n "$nodes_na_porta" ] && [ "$nodes_na_porta" -gt 0 ] 2>/dev/null; then
+  printf '  (ATENCAO: %s processo(s) node vivos ANTES da bateria. Nesta maquina o node\n' "$nodes_na_porta"
+  printf '   so roda por causa dela, entao provavelmente sao orfaos de uma rodada morta.\n'
+  printf '   Eles derrubam a leitura acima. Antes de fechar programas, mate-os pela raiz.)\n'
+fi
 livre_na_porta=$livre_mb
 roda_bateria=sim
 if [ -n "$livre_mb" ] && [ "$livre_mb" -lt "$PISO_MB" ] 2>/dev/null; then
@@ -673,8 +716,13 @@ if [ "$roda_bateria" = "sim" ]; then
 # Medido na primeira rodada verde, em 09/09/2026: linha de base 1404 MB, esta
 # medida 1417 MB. SUBIU 13 MB. Nao ha custo nenhum a ler aqui, e o motivo e a
 # posicao: a linha esta depois de `roda` retornar, e `roda` espera o teste
-# terminar, entao o navegador ja fechou e devolveu tudo. O proprio texto
-# impresso denuncia, ao dizer "0 navegador(es) vivo(s)" ao lado do numero.
+# terminar, entao o navegador ja fechou e devolveu tudo.
+#
+# CORRECAO DE UMA EVIDENCIA MINHA: eu escrevi aqui que "o proprio texto denuncia,
+# ao dizer 0 navegador(es) vivo(s) ao lado do numero". A conclusao esta certa e a
+# evidencia era ARTEFATO: naquela altura a contagem de navegadores estava
+# quebrada e imprimia zero sempre, com Chrome vivo ou nao. Ver o bloco de
+# `conta_processo`. A conclusao vale pela POSICAO, medida, e nao por aquele zero.
 #
 # O que ela serve para ver: se a maquina ficou pior DEPOIS de um ciclo completo
 # de teste, o que acusaria navegador orfao ou memoria nao devolvida.
