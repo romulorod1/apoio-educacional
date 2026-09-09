@@ -1,7 +1,7 @@
 {
   "tema": "POR07-01",
   "assinatura": "08f592702d9d2fea6963d2a20d049b875a6403c7786a4c8055735c900c8e7b41",
-  "data": "2026-09-07",
+  "data": "2026-09-08",
   "modelos": {
     "leitores": "sonnet",
     "juiz": "sonnet",
@@ -194,7 +194,7 @@
       ],
       "lente": {
         "veredito": "criterio_ok",
-        "motivo": "rodadas 2 e 3 apontaram o limbo do nao justificado; a sugestao da rodada 3 (abrir o parentese como exemplo) foi aplicada literalmente no aceita_se"
+        "motivo": "O criterio hoje aceita as tres polaridades defensaveis (sim, quase/em parte, nao/nao totalmente), com ou sem numero de linha, e o bullet de \"pelo menos tres pistas com o lugar aproximado\" nao esta preso a uma polaridade, entao ele absorve tambem a leitura mais fina de fair play (a pilha nova da linha 41 chegar so no momento em que Cecilia entende, ou o motivo da pilha do afinador aparecer so na confissao); as duas recusas restantes atingem apenas resposta sem justificativa alguma ou acusacao de informacao externa sem apontar qual, que nao sao respostas defensaveis pelo texto."
       },
       "resultado": "aprovada"
     },

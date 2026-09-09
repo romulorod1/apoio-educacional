@@ -1,7 +1,7 @@
 {
   "tema": "POR06-05",
-  "assinatura": "e241ec18574c77b8d2e3aeaa4226f9cb3cfcd992794ffc3dd3378695678500a8",
-  "data": "2026-09-07",
+  "assinatura": "b1a281418dcbc475e7ba31c74d616c61d45957dba51d3a309d29480dd0ce40e5",
+  "data": "2026-09-08",
   "modelos": {
     "leitores": "sonnet",
     "juiz": "sonnet",
@@ -67,21 +67,21 @@
       "respostas": [
         {
           "leitor": "A",
-          "resposta": "Um rato perguntou quem iria amarrar o guizo no pescoço do gato, e ninguém teve coragem de se oferecer, uns porque não sabiam dar nó e outros porque tinham medo. Foi por isso que a boa ideia não pôde ser realizada.",
+          "resposta": "O rato casmurro perguntou quem iria amarrar o guizo no pescoço de Faro-Fino, e nenhum dos ratos quis fazer isso. Um disse que não sabia dar nó, outro disse que não era tolo e os demais não tinham coragem, por isso a assembleia se desfez em consternação.",
           "veredito": "espera_se",
-          "motivo": "Explica que a pergunta sobre quem amarraria o guizo revelou a falta de voluntarios, conforme espera_se."
+          "motivo": "Aponta a pergunta do rato casmurro sobre quem amarraria o guizo, lista as três recusas (nao sabia dar no, nao era tolo, nao tinha coragem) e liga isso explicitamente ao desfecho, dizendo por isso a assembleia se desfez em consternacao, cobrindo pergunta e mudanca de humor do espera_se."
         },
         {
           "leitor": "B",
-          "resposta": "Ninguém quis amarrar o guizo no pescoço do gato, cada um deu uma desculpa diferente, e por isso a alegria virou tristeza.",
-          "veredito": "espera_se",
-          "motivo": "Explica que ninguem quis amarrar o guizo e por isso a alegria virou tristeza, conforme espera_se."
+          "resposta": "O rato casmurro perguntou quem ia amarrar o guizo no pescoço do gato, e ninguém quis fazer isso: um disse que não sabia dar nó, outro que não era tolo, e os outros não tinham coragem.",
+          "veredito": "aceita_se",
+          "motivo": "Identifica a pergunta e as tres recusas, batendo no aceita_se descobriram que ninguem teria coragem de amarrar o guizo, mas encerra na ultima desculpa sem fechar explicitamente a ligacao com a mudanca de humor da assembleia, por isso fica em aceita_se e nao em espera_se."
         },
         {
           "leitor": "C",
-          "resposta": "Entre os dois momentos, o rato casmurro pergunta quem vai amarrar o guizo no pescoço do gato (linha 11), e ninguém tem coragem nem sabe como fazer isso. Foi essa pergunta que fez a alegria virar desânimo.",
+          "resposta": "Entre um momento e outro, o rato casmurro faz a pergunta que ninguém tinha pensado: \"quem vai amarrar o guizo no pescoço de Faro-Fino?\" (linha 11). Depois disso vem o \"silêncio geral\", e o texto explica que cada rato arranja uma desculpa: um não sabia dar nó, outro não era tolo, e todos, na verdade, não tinham coragem (linhas 12 e 13). Ou seja, era fácil aplaudir a ideia, mas ninguém queria ser o rato a fazer a parte perigosa, por isso a alegria vira consternação.",
           "veredito": "espera_se",
-          "motivo": "Explica que a pergunta do rato casmurro fez a alegria virar desanimo, conforme espera_se."
+          "motivo": "Cita a pergunta com a linha, o silencio geral e as tres desculpas com linha, e fecha com a sintese ninguem queria ser o rato a fazer a parte perigosa, por isso a alegria vira consternacao, o que reproduz com precisao o espera_se."
         }
       ],
       "lente": {

@@ -1490,6 +1490,7 @@ def problemas_nos_itens(exerc, gab, com_catalogo, raiz_fontes=None):
     posicao = 0
     letras_certas = []
     certas_longas = []
+    certas_curtas = []
     for evento in eventos:
         if evento['tipo'] == 'texto':
             vigente = evento
@@ -1507,10 +1508,12 @@ def problemas_nos_itens(exerc, gab, com_catalogo, raiz_fontes=None):
             comprimentos = dict((alt['letra'], len(alt['texto'])) for alt in ex['alternativas'])
             if comprimentos and gb['letra'] in comprimentos:
                 outras = [v for l, v in comprimentos.items() if l != gb['letra']]
-                # empate nao conta: so a certa estritamente mais longa que todas as outras
-                certas_longas.append(bool(outras) and comprimentos[gb['letra']] > max(outras))
+                # empate nao conta: so a certa estritamente no extremo, de um lado ou do outro
+                minha = comprimentos[gb['letra']]
+                certas_longas.append(bool(outras) and minha > max(outras))
+                certas_curtas.append(bool(outras) and minha < min(outras))
     erros.extend(_letras_concentradas(letras_certas))
-    erros.extend(_certas_mais_longas(certas_longas))
+    erros.extend(_certas_no_extremo(certas_longas, certas_curtas))
     respostas = [' '.join(l.strip() for l in i['linhas']) for i in itens_gab]
     return erros, enunciados, respostas
 
@@ -1533,18 +1536,28 @@ def _letras_concentradas(letras_certas):
     return []
 
 
-# E7, segunda conta: a certa tambem nao pode ser a alternativa mais comprida na maioria
-# das fechadas. Medido no piloto: 31 de 43, mesmo depois de espalhar as letras. O aluno
-# que aprende "marca a maior" acerta sem ler.
-def _certas_mais_longas(certas_longas):
+# E7, segunda conta: a certa tambem nao pode ser o EXTREMO de comprimento na maioria
+# das fechadas, nem o de cima nem o de baixo.
+#
+# A primeira versao olhava so a mais longa, porque foi assim que o defeito apareceu no
+# piloto do 7 ano: 31 de 43. O primeiro lote da escala caiu do outro lado, e a trava
+# nao viu: a certa era a mais CURTA em 55 das 78 fechadas do 6 ano, com os distratores
+# cheios de oracao explicativa e a certa nua. O aluno que aprende "marca a menor"
+# acerta sem ler, exatamente como o que aprende "marca a maior", e uma trava que so
+# conhece um dos lados ensina a fugir para o outro.
+def _certas_no_extremo(certas_longas, certas_curtas):
     if len(certas_longas) < 4:
         return []
-    quantas = sum(1 for eh in certas_longas if eh)
-    if quantas * 2 > len(certas_longas):
-        return ['a resposta certa e a alternativa mais longa em %d das %d questoes fechadas: '
-                'encurte a certa ou alongue um distrator, senao o aluno acerta pelo tamanho'
-                % (quantas, len(certas_longas))]
-    return []
+    erros = []
+    for lista, lado, conserto in (
+            (certas_longas, 'mais longa', 'encurte a certa ou alongue um distrator'),
+            (certas_curtas, 'mais curta', 'alongue a certa ou encurte os distratores')):
+        quantas = sum(1 for eh in lista if eh)
+        if quantas * 2 > len(lista):
+            erros.append('a resposta certa e a alternativa %s em %d das %d questoes fechadas: '
+                         '%s, senao o aluno acerta pelo tamanho'
+                         % (lado, quantas, len(lista), conserto))
+    return erros
 
 
 def _problemas_do_item(evento, ex, gb, texto_do_item):
