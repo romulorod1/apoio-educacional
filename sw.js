@@ -31,8 +31,23 @@
  * pdf.js). Os quatro já estão na lista abaixo, que continua igual. O v22
  * (08/09/2026) acrescenta uma linha à lista, a primeira desde o v16, que levou
  * o './cartao.js': é o índice dos temas de português. Aí o nome novo é
- * obrigatório pelo motivo original, e não pelo hábito do release. */
-var CACHE = 'apoio-educacional-v22';
+ * obrigatório pelo motivo original, e não pelo hábito do release.
+ *
+ * O v25 (09/09/2026) é da série de bumps de conteúdo: a lista continua igual e o
+ * que muda é o CONTEÚDO de um arquivo que já está nela, o './banco/busca.json',
+ * regenerado quando o lote 2 deu figura a quatro temas do 2º e do 3º ano do
+ * ensino médio e ao 9º ano. Medido com a ferramenta que faz a interseção entre a
+ * lista e o diff, e não pela intenção do bump: o comentário do v23 afirmou dois
+ * arquivos por não ter feito essa conta, e a correção está lá.
+ *
+ * Ele salta o v23 e o v24, que estão noutros dois ramos de figuras. **A ordem e o
+ * número de cada ramo não se leem aqui**, e é deliberado: cinco comentários que
+ * concordam por enquanto não são uma ordem. A ordem vive em
+ * `Consolidado/Retomada/ORDEM-DE-MERGE-E-CACHE.md`, na pasta do aplicativo, e
+ * quem mergear segundo confere o número lá e sobe se preciso. Comentário que
+ * copia um valor de fora envelhece a cada correção; apontar para onde o valor
+ * mora não envelhece. */
+var CACHE = 'apoio-educacional-v25';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

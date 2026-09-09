@@ -177,6 +177,20 @@ roda "prova do piloto"  node figuras/_prova_piloto_base.js
 roda "receitas plano"   node figuras/_prova_receitas_plano.js
 roda "piloto MATEM3-12" node figuras/_piloto_MATEM3-12.js
 roda "piloto MATEM3-03" node figuras/_piloto_MATEM3-03.js
+# Lote 1 da varredura (frente 3), 08/09/2026: os quatro primeiros temas que
+# ganharam figura. Rodam sem argumento, contra o temas/banco.json, como os
+# outros pilotos desta secao.
+roda "piloto MATEM1-14" node figuras/_piloto_MATEM1-14.js
+roda "piloto MAT08-12"  node figuras/_piloto_MAT08-12.js
+roda "piloto MAT03-07"  node figuras/_piloto_MAT03-07.js
+roda "piloto MAT09-09"  node figuras/_piloto_MAT09-09.js
+# Lote 2 da varredura (frente 3), 08/09/2026: os quatro temas de geometria que
+# faltavam ao alcance do kit. Com o lote 1 eles fecham a geometria que o kit de
+# hoje cobre. Rodam sem argumento, contra o temas/banco.json.
+roda "piloto MAT09-07"  node figuras/_piloto_MAT09-07.js
+roda "piloto MATEM2-03" node figuras/_piloto_MATEM2-03.js
+roda "piloto MATEM2-11" node figuras/_piloto_MATEM2-11.js
+roda "piloto MATEM2-12" node figuras/_piloto_MATEM2-12.js
 roda "varredura banco"  node figuras/_varredura_banco.js
 saida=$(node figuras/_prova_desenho.js 2>&1) || true
 if printf '%s\n' "$saida" | grep -qE "^avisos: 0$" && printf '%s\n' "$saida" | grep -qE "^vazamentos de estado: 0$"; then
