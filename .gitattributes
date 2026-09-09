@@ -1,0 +1,3 @@
+# Os validadores Python passam pelo portão: o repositório guarda-os em LF para
+# que CR de fim de linha não apareça como espaço em branco em todo diff.
+*.py text eol=lf
