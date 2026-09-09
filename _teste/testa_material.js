@@ -109,11 +109,22 @@ function tracosDaFolha(bytes) {
  * O rodapé de página fica de fora: uma fórmula a mais empurra a lista para uma
  * página a mais, e aí "Página 1 de 2" vira "Página 1 de 3" nas duas folhas que
  * se comparam. Isso é a paginação mudando, e não texto perdido. */
+/* A marca d'água sai da conta junto com o rodapé, e não por conveniência.
+ *
+ * A palavra da marca é descartada POR PROJETO quando uma placa branca fatia a
+ * caixa de tinta dela, e a placa de uma fórmula faz exatamente isso. Medido
+ * pela frente 1: chamando esta função com o par das alternativas, ela acusava
+ * "NW (0 de 1)". Hoje passaria por sorte, porque o veneno cai onde a placa não
+ * encosta na marca; mover o veneno um centímetro reprovaria a suíte sem haver
+ * defeito, e alarme falso em portão é o que treina a ignorar alarme. */
+const FORA_DA_CONTA = { 'NW': 1, 'APOIO': 1, 'EDUCACIONAL': 1 };
 function bagDePalavras(pecas) {
   const bag = {};
   pecas.forEach(function (p) {
     if (/^P.gina \d+ de \d+$/.test(p) || /^Page \d+ of \d+$/.test(p)) return;
-    String(p).split(/\s+/).forEach(function (w) { if (w) bag[w] = (bag[w] || 0) + 1; });
+    String(p).split(/\s+/).forEach(function (w) {
+      if (w && !FORA_DA_CONTA[w]) bag[w] = (bag[w] || 0) + 1;
+    });
   });
   return bag;
 }
@@ -366,9 +377,27 @@ console.log('\n=== a arroba no banco inteiro, e não num tema só ===');
  *
  * Juntas cobrem os 154: quem não tem arroba na fonte não pode imprimir arroba,
  * e quem tem passa pela camada 2. Gerar as 308 folhas do banco a cada portão
- * custaria minutos e não acrescentaria caso nenhum. */
+ * custaria minutos e não acrescentaria caso nenhum.
+ *
+ * O argumento vale para o texto DO TEMA, e só para ele. O que entra na folha
+ * por fora do banco não passa por camada nenhuma: `aluno: 'contato@equipe.com'`
+ * sai impresso no cabeçalho e as duas camadas são cegas para isso. Fica escrito
+ * porque a cobertura é forte o suficiente para alguém confundi-la com total. */
 {
   const DIRETIVAS = { '@fig': 1, '@eq': 1, '@fonte': 1 };
+  /* A camada 1 numa função, e não solta no laço, para poder ser CHAMADA com
+   * tema estragado. Sem isso ela era a única contagem deste arquivo sem o par
+   * "o detector detecta": afrouxando a lista branca para aceitar qualquer
+   * arroba, tudo continuava verde, e é ela que sustenta o argumento de
+   * cobertura para 142 dos 154 temas. */
+  function arrobasEstranhas(tema) {
+    const achadas = [];
+    (JSON.stringify(tema).match(/@[A-Za-z][A-Za-z0-9]*/g) || []).forEach(function (a) {
+      if (!DIRETIVAS[a]) achadas.push(a);
+    });
+    return [...new Set(achadas)];
+  }
+
   const bancos = [
     ['matemática', banco],
     ['português', JSON.parse(fs.readFileSync(
@@ -379,11 +408,8 @@ console.log('\n=== a arroba no banco inteiro, e não num tema só ===');
   bancos.forEach(function (par) {
     (par[1].temas || []).forEach(function (t) {
       temasVistos++;
-      const cru = JSON.stringify(t);
-      (cru.match(/@[A-Za-z][A-Za-z0-9]*/g) || []).forEach(function (a) {
-        if (!DIRETIVAS[a]) estranhas.push(t.id + ': ' + a);
-      });
-      if (/@(fig|eq|fonte)/.test(cru)) comDiretiva.push(t);
+      arrobasEstranhas(t).forEach(function (a) { estranhas.push(t.id + ': ' + a); });
+      if (/@(fig|eq|fonte)/.test(JSON.stringify(t))) comDiretiva.push(t);
     });
   });
   conf('os dois bancos somam 154 temas', temasVistos, 154);
@@ -392,6 +418,21 @@ console.log('\n=== a arroba no banco inteiro, e não num tema só ===');
   /* A trava da trava: se a varredura parasse de achar as diretivas conhecidas,
    * ela teria virado uma varredura sobre nada e passaria sempre. */
   conf('e a varredura acha os temas que trazem diretiva', comDiretiva.length >= 12, true);
+
+  /* E o controle positivo da camada 1: ela tem que ACUSAR o que existe para
+   * achar. A diretiva que ainda não nasceu e o endereço de e-mail são os dois
+   * casos concretos: o primeiro é o buraco do "@eq" se repetindo com outro
+   * nome, e o segundo é a única arroba legítima que um tema poderia querer. */
+  conf('a camada 1 acusa uma diretiva que ainda não existe',
+    arrobasEstranhas({ id: 'X', pt: { explicacao: 'Olhe a @tabela linhas=3.' } }).join(','),
+    '@tabela');
+  conf('e acusa um endereço de e-mail escrito num tema',
+    arrobasEstranhas({ id: 'X', pt: { explicacao: 'Escreva para contato@equipe.com hoje.' } })
+      .join(','), '@equipe');
+  conf('e não acusa as três diretivas conhecidas',
+    arrobasEstranhas({ id: 'X', pt: {
+      explicacao: '@fig triangulo lado=3\n\n@eq x = 1\n\n@fonte f1 linhas=1-2'
+    } }).join(',') || 0, 0);
 
   const vazando = [];
   comDiretiva.forEach(function (t) {

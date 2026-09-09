@@ -1777,6 +1777,57 @@
    * só corta com duas palavras ou mais, e com pelo menos uma de quatro letras.
    * Assim "A = B", "V = b h" e "d = 30 km" continuam inteiros como fórmula, e
    * "fecha o assunto de hoje." volta para a frase. */
+  /* Tira do LaTeX o que é lugar legítimo de palavra: o \text{}, que é onde se
+   * escreve palavra dentro de fórmula, e o nome do ambiente do \begin{} e do
+   * \end{}. O \text{} vem com contagem de chaves porque ele aceita comando
+   * dentro ("\text{raiz de \sqrt{2}}"). */
+  function semLugarDePalavra(latex) {
+    var s = String(latex == null ? '' : latex), saida = '', i = 0;
+    while (i < s.length) {
+      var pos = s.indexOf('\\text', i);
+      if (pos < 0) { saida += s.slice(i); break; }
+      saida += s.slice(i, pos);
+      var j = pos + 5;
+      while (j < s.length && /\s/.test(s.charAt(j))) j++;
+      if (s.charAt(j) !== '{') { i = pos + 5; continue; }   // \textbf e parentes
+      var nivel = 0;
+      for (; j < s.length; j++) {
+        if (s.charAt(j) === '{') nivel++;
+        else if (s.charAt(j) === '}') { nivel--; if (!nivel) { j++; break; } }
+      }
+      i = j;
+    }
+    return saida.replace(/\\(begin|end)\s*\{[^{}]*\}/g, ' ');
+  }
+
+  /* Palavra solta DENTRO da fórmula, que é o silêncio que sobrou do corte.
+   *
+   * O corte anda de trás para frente e para no primeiro token que não é palavra
+   * de prosa pura, então UM token estranho no meio bloqueia a recuperação da
+   * oração inteira: "@eq x^{2} + 1 e explique o metodo (em metros)." saía como
+   * "x² + 1eexpliqueometodo(emmetros).", colado, em itálico matemático e SEM
+   * AVISO NENHUM. O mesmo com hífen, com aspas e com "R$". E a recuperação pode
+   * ser PARCIAL, partindo a frase em duas.
+   *
+   * É o único caso que nenhuma outra trava vê: não tem arroba, não tem
+   * "\begin", não perde palavra nenhuma. A busca genérica de arroba, a
+   * comparação de palavras da folha e os pilotos são todos cegos para ele.
+   * Feio e completo é melhor do que faltando; feio, completo e CALADO é pior do
+   * que feio, completo e anunciado.
+   *
+   * Então o aviso é INDEPENDENTE do corte: quatro letras ou mais coladas, que
+   * não venham depois de barra invertida e não estejam num \text{}. Medido:
+   * zero alarme falso nas 10 fórmulas do banco. Quatro letras é fronteira
+   * arbitrária e o "sen" escapa enquanto o "seno" não: palavra curta continua
+   * saindo feia e calada, e é ali que "sair feio" ainda se sustenta. */
+  function palavraSoltaNaFormula(latex) {
+    /* Todo comando sai junto (\sqrt, \frac, \sen, \cdot): o que sobrar de letra
+     * colada não veio de comando nenhum. */
+    var s = semLugarDePalavra(latex).replace(/\\[A-Za-zÀ-ÖØ-öø-ÿ]+/g, ' ');
+    var m = s.match(/[A-Za-zÀ-ÖØ-öø-ÿ]{4,}/);
+    return m ? m[0] : '';
+  }
+
   function partirProsaDaFormula(latex) {
     var tok = String(latex == null ? '' : latex).split(/\s+/);
     var limpos = [];
@@ -1826,8 +1877,18 @@
         var corte = partirProsaDaFormula(s.slice(pos + 3, fim).trim());
         /* "@eq" sem fórmula nenhuma some com aviso, nunca impresso: uma diretiva
          * vazia na folha da aluna é ruído que ela não tem como interpretar. */
-        if (corte.formula) saida.push({ tipo: 'equacao', latex: corte.formula });
-        else if (doc) doc.avisoDeFigura('@eq sem fórmula nenhuma, diretiva descartada');
+        if (corte.formula) {
+          saida.push({ tipo: 'equacao', latex: corte.formula });
+          /* E o aviso que NÃO depende do corte: palavra solta que sobrou dentro
+           * da fórmula sai colada e em itálico matemático, e nenhuma outra trava
+           * enxerga isso. */
+          var solta = doc && palavraSoltaNaFormula(corte.formula);
+          if (solta) {
+            doc.avisoDeFigura('a @eq tem palavra solta dentro da fórmula ("' + solta +
+              '"), e ela vai sair colada e em itálico matemático. Escreva a diretiva no ' +
+              'fim do item, ou ponha a palavra em \\text{}: @eq ' + corte.formula);
+          }
+        } else if (doc) doc.avisoDeFigura('@eq sem fórmula nenhuma, diretiva descartada');
         /* O que a fórmula engoliu volta ao texto, na posição em que estava, e o
          * aviso diz o que aconteceu: NUNCA descartado, que era o defeito. */
         if (corte.prosa) {
