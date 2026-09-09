@@ -316,7 +316,17 @@ for prova in _teste/testa_*.js _teste/e2e*.js figuras/_prova_*.js figuras/_pilot
   # e foi assim que uma medicao minha errou antes de eu conferir.
   if printf '%s\n' "$sem_comentario" | grep -qE "(^|[^A-Za-z0-9_-])$nu([^A-Za-z0-9_-]|\$)"; then
     no_portao=$((no_portao + 1))
-  elif printf '%s\n' "$FORA_DO_PORTAO" | grep -qF "$prova|"; then
+  # O VALOR INTEIRO, e nao o comeco dele. Este braco casava por subcadeia
+  # enquanto o irmao acima casa com fronteira de palavra, e a assimetria abria
+  # dois buracos, os dois medidos com veneno: um motivo que nomeia outra prova
+  # seguida de barra vertical dava a prova por declarada, e uma entrada cujo
+  # caminho TERMINA com o nome da prova tambem passava. A lista ja e cheia de
+  # motivos que citam o nome de outra prova, entao a protecao era acidental.
+  #
+  # O awk compara o primeiro campo por IGUALDADE e exige motivo nao vazio no
+  # segundo, para entrada sem motivo continuar reprovando.
+  elif printf '%s\n' "$FORA_DO_PORTAO" \
+       | awk -F'|' -v p="$prova" '$1 == p && $2 != "" { achou = 1 } END { exit !achou }'; then
     declaradas=$((declaradas + 1))
   else
     esquecidas="$esquecidas $prova"
