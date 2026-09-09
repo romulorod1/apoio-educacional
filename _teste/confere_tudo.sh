@@ -112,8 +112,21 @@ registra_memoria() {
   # As chaves em volta importam: o 2>/dev/null solto silencia o printf, e quem
   # reclama de caminho impossivel e o SHELL, na redirecao. Sem elas, um
   # PORTAO_HISTORICO invalido imprime linha de erro no meio do log do portao.
+  cabecalho='data\thora\tlivre_na_porta_MB\tpiso_MB\tdesfecho\torigem\tleituras'
   if [ ! -f "$HISTORICO_MEM" ]; then
-    { printf 'data\thora\tlivre_na_porta_MB\tpiso_MB\tdesfecho\torigem\tleituras\n' > "$HISTORICO_MEM"; } 2>/dev/null || return 0
+    { printf '%b\n' "$cabecalho" > "$HISTORICO_MEM"; } 2>/dev/null || return 0
+  else
+    # CONFERIR O CABECALHO, e nao so a existencia do arquivo. A coluna das tres
+    # leituras entrou depois de o arquivo nascer: um arquivo antigo tem seis
+    # colunas no cabecalho e passaria a receber linhas de sete, em silencio, e
+    # quem calibrasse o piso depois leria a coluna errada. Historico e registro
+    # e nao conferencia, entao aqui se AVISA e segue; nunca derruba o portao.
+    primeira=$(head -n 1 "$HISTORICO_MEM" 2>/dev/null || true)
+    esperado=$(printf '%b' "$cabecalho")
+    if [ "$primeira" != "$esperado" ]; then
+      printf '  (aviso: %s tem cabecalho de outra versao; as linhas novas tem 7 colunas)\n' \
+        "$HISTORICO_MEM"
+    fi
   fi
   # A coluna de origem existe para uma linha anotada a mao nunca se passar por
   # medida do portao. Daqui a um mes ninguem lembra qual e qual, e o piso vai ser
