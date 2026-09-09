@@ -31,8 +31,14 @@
  * pdf.js). Os quatro já estão na lista abaixo, que continua igual. O v22
  * (08/09/2026) acrescenta uma linha à lista, a primeira desde o v16, que levou
  * o './cartao.js': é o índice dos temas de português. Aí o nome novo é
- * obrigatório pelo motivo original, e não pelo hábito do release. */
-var CACHE = 'apoio-educacional-v22';
+ * obrigatório pelo motivo original, e não pelo hábito do release.
+ * O v23 (08/09/2026) e do tipo novo que a trava "conteudo no cache" passou a
+ * cobrar: a lista continua igual, e o que muda e o CONTEUDO de um arquivo que
+ * ja esta nela, o './banco/portugues/indice.json', que passou de seis para
+ * dezesseis temas quando o material do 6o ano entrou. Sem nome novo o tablet
+ * continuaria servindo o indice velho e os dez assuntos novos nao existiriam
+ * para ela, com ou sem sinal. */
+var CACHE = 'apoio-educacional-v23';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
