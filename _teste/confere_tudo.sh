@@ -118,6 +118,13 @@ roda "provas do verificador" python temas/_ferramentas/testa_verificador.py
 # fixo em 2026 e um segundo par em 2027 provando que a conta so afrouxa.
 roda "provas das fontes"    python temas/_ferramentas/testa_fontes.py
 
+# E o portao de portugues reprovando a si mesmo (camada 3): seis venenos montados
+# em pasta temporaria e passados pelo CAMINHO REAL, o verificar.py e o
+# gerar_banco.py pela linha de comando. Uma trava pode estar perfeita e nao estar
+# ligada no comando que alguem digita, e foi assim que o testa_verificador.py
+# ficou anos fora deste arquivo.
+roda "portao de portugues" python temas/_ferramentas/testa_portao_portugues.py
+
 titulo "sem navegador"
 roda "notacao"        node _teste/testa_notacao.js
 roda "busca (regras)" node _teste/testa_busca_regras.js

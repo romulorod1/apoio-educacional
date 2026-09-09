@@ -1,0 +1,293 @@
+{
+  "tema": "POR06-01",
+  "assinatura": "177098f4cbe44b04ac7724e933dbe5dd3fc36ce2c93039b4ae081680be58fedb",
+  "data": "2026-09-09",
+  "modelos": {
+    "leitores": "sonnet",
+    "juiz": "sonnet",
+    "lente": "fable"
+  },
+  "questoes": [
+    {
+      "n": 2,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A frase é: \"Entre, amiga, que aqui terá cama e mesa durante todo o mau tempo.\" A formiga oferece abrigo e comida para a cigarra durante todo o mau tempo.",
+          "veredito": "aceita_se",
+          "motivo": "Copia exatamente a frase alternativa prevista no criterio, 'Entre, amiga, que aqui tera cama e mesa durante todo o mau tempo', com a explicacao da oferta."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A frase é: Pois entre, amiguinha! Entre, amiga, que aqui terá cama e mesa durante todo o mau tempo. Ela oferece pra cigarra ficar morando lá, com comida e cama, até acabar o mau tempo.",
+          "veredito": "aceita_se",
+          "motivo": "Copia o inicio Pois entre, amiguinha e o trecho final durante todo o mau tempo, ainda que resuma o meio, e descreve corretamente a oferta de casa e comida, como pede o primeiro item de aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A frase é: \"Pois entre, amiguinha! Nunca poderemos esquecer as boas horas que sua cantoria nos proporcionou... Entre, amiga, que aqui terá cama e mesa durante todo o mau tempo.\" A formiga oferece abrigo e comida para a cigarra durante todo o mau tempo, como agradecimento pelas cantorias que ela ouvia enquanto trabalhava.",
+          "veredito": "aceita_se",
+          "motivo": "Copia a frase longa completa de Pois entre, amiguinha ate durante todo o mau tempo e explica a oferta de abrigo e comida, batendo com o primeiro item de aceita_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 4,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Segundo a formiga, a cantoria da cigarra distraía as formigas e aliviava o trabalho delas enquanto elas enchiam as tulhas.",
+          "veredito": "espera_se",
+          "motivo": "Diz que a cantoria distraia e aliviava o trabalho das formigas, o nucleo exato de espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A cantoria da cigarra distraía as formigas e aliviava o trabalho delas.",
+          "veredito": "espera_se",
+          "motivo": "Repete quase literalmente que a cantoria distraia e aliviava o trabalho, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A formiga diz na linha 22: \"Aquele chiado nos distraía e aliviava o trabalho.\" Ou seja, a cantoria da cigarra fazia o trabalho pesado parecer mais leve, porque distraía as formigas enquanto elas enchiam as tulhas.",
+          "veredito": "espera_se",
+          "motivo": "Cita a fala da formiga e parafraseia que o trabalho ficava mais leve por causa da distracao, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 6,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Essa palavra e essa expressão mostram que a cigarra estava muito fraca e machucada, mal conseguindo andar até o formigueiro.",
+          "veredito": "espera_se",
+          "motivo": "Diz que a cigarra estava fraca, machucada e mal conseguia andar, o nucleo de espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Mostram que a cigarra estava bem fraca e machucada, quase não conseguia andar direito.",
+          "veredito": "espera_se",
+          "motivo": "Descreve a cigarra fraca e machucada, quase incapaz de andar, batendo com espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "As duas expressões mostram que a cigarra estava muito fraca e machucada, quase sem forças para andar. Ela mancava e arrastava uma asa, o que dá a impressão de um bicho abatido pelo frio e pela fome, chegando quase se arrastando ao formigueiro.",
+          "veredito": "espera_se",
+          "motivo": "Descreve fraqueza, ferimento e dificuldade de locomocao da cigarra, cobrindo o nucleo de espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 8,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O primeiro motivo é que a formiga era usurária, sem entranhas. O segundo é que ela era invejosa, pois não sabia cantar e tinha ódio da cigarra por vê-la querida de todos.",
+          "veredito": "aceita_se",
+          "motivo": "Aponta usuraria e invejosa como os dois motivos, batendo com o primeiro item de aceita_se (avarenta e invejosa)."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O primeiro motivo é que a formiga era muito sovina e não queria dar nada de graça. O segundo é que ela tinha inveja, porque não sabia cantar e todo mundo gostava da cigarra.",
+          "veredito": "aceita_se",
+          "motivo": "Aponta sovina (avarenta) e invejosa como os dois motivos, conforme o primeiro item de aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O texto diz nas linhas 37 e 38: \"a formiga era uma usurária sem entranhas. Além disso, invejosa. Como não soubesse cantar, tinha ódio à cigarra por vê-la querida de todos os seres.\" Então os dois motivos são a avareza dela e a inveja de a cigarra ser querida por todos.",
+          "veredito": "aceita_se",
+          "motivo": "Cita o texto para apontar avareza e inveja como os dois motivos, conforme o primeiro item de aceita_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 10,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A cigarra pede emprestados uns restos de comida e promete pagar com juros altos assim que o tempo permitisse.",
+          "veredito": "espera_se",
+          "motivo": "Diz que a cigarra pede comida emprestada e promete pagar com juros altos, o nucleo de espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Ela pede comida emprestada e promete pagar depois com juros altos, quando o tempo melhorar.",
+          "veredito": "espera_se",
+          "motivo": "Repete que ela pede emprestado e promete juros altos quando o tempo melhorar, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A cigarra pede emprestado uns restos de comida, como diz a linha 34: \"implorou, emprestado, notem!, uns miseráveis restos de comida.\" Em troca, ela promete pagar com juros altos assim que o tempo bom voltasse.",
+          "veredito": "espera_se",
+          "motivo": "Cita o texto e explica o pedido emprestado com promessa de juros altos, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 12,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "No fim da primeira parte a cigarra é acolhida, sara da tosse e volta a cantar feliz, porque a formiga boa a ajudou. No fim da segunda parte a cigarra morre de frio, porque a formiga má fechou a porta e não quis ajudar.",
+          "veredito": "espera_se",
+          "motivo": "Liga corretamente cada final (vive/morre) a acolhida ou recusa da formiga, nucleo de espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Na primeira parte a cigarra entra na casa da formiga boa, sara e volta a cantar. Na segunda parte a formiga má fecha a porta pra ela e a cigarra morre de frio.",
+          "veredito": "espera_se",
+          "motivo": "Descreve os dois finais e liga a morte ao fechar da porta, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Na primeira parte a cigarra entra na casa da formiga boa, sara da tosse e volta a cantar nos dias de sol, porque foi acolhida. Na segunda parte ela morre gelada, porque a formiga má fechou a porta na cara dela e não quis ajudar em nada.",
+          "veredito": "espera_se",
+          "motivo": "Descreve os dois finais com causa explicita (acolhida x porta fechada), conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 13,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Essa frase quer dizer que os artistas são como a cigarra: não produzem comida ou coisas assim, mas alegram a vida das pessoas com sua arte. Ela se liga à história porque mostra que o canto da cigarra também tinha valor, mesmo sendo diferente do trabalho das formigas.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que o trabalho do artista tem valor mesmo nao sendo trabalho de guardar, conforme o primeiro item de aceita_se, mas nao chega a explicar a perda do mundo sem eles, como pede espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Quer dizer que os artistas são como a cigarra, eles alegram a vida dos outros com a arte deles. Se liga à história porque a cigarra cantava pra alegrar todo mundo, mas quase ninguém quis ajudar ela quando precisou.",
+          "veredito": "aceita_se",
+          "motivo": "Liga a cigarra ao artista que alegra e nao foi ajudado, tocando o valor do artista do primeiro item de aceita_se sem chegar a formulacao completa de espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Essa frase quer dizer que os artistas são como a cigarra: eles não produzem coisas para guardar, como comida, mas produzem beleza e alegria através da arte. Isso se liga à história porque mostra que, assim como a cigarra que cantava merecia ser ajudada e não desprezada, os artistas também merecem ser valorizados pelo que oferecem ao mundo.",
+          "veredito": "aceita_se",
+          "motivo": "Explica que artistas nao produzem para guardar mas merecem ser valorizados, conforme o primeiro item de aceita_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 15,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Colocar a formiga boa antes da formiga má mostra que a recusa não é a única resposta possível diante de quem pede ajuda: existe também o acolhimento, que reconhece o valor do canto da cigarra e a salva. Assim a fábula passa a comparar duas atitudes diferentes, e não apresenta mais uma moral única e fechada.",
+          "veredito": "aceita_se",
+          "motivo": "Mostra que passam a existir duas atitudes para comparar, uma boa e uma má, o que cai na entrada aceita sobre a comparação entre atitudes."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Antes da formiga má, tem uma formiga boa que acolhe a cigarra porque gostou do canto dela. Isso mostra que nem toda formiga agia daquele jeito ruim, a recusa foi escolha só da formiga má.",
+          "veredito": "espera_se",
+          "motivo": "A resposta diz que a recusa foi escolha só da formiga má, o que reproduz a leitura central do espera_se de que a recusa deixa de parecer natural e passa a ser uma decisão."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Muda que agora existem duas formigas bem diferentes, uma que lembra do canto da cigarra e a acolhe com casa e comida, e outra que fecha a porta e deixa a cigarra morrer de frio. A formiga boa entende que a cigarra ajudou todo mundo a trabalhar mais feliz cantando, então ela retribui isso quando a cigarra precisa de ajuda. Já a formiga má só pensa em quem trabalhou igual a ela e não perdoa quem foi diferente. Eu acho, na minha opinião, que colocar a formiga boa antes deixa a história mais justa, porque mostra que nem todo mundo pensa igual e que ajudar também pode dar certo, não só a recusa que a fábula antiga sempre mostrava.",
+          "veredito": "aceita_se",
+          "motivo": "Também chega à ideia de duas atitudes diferentes para comparar, mostrando que a recusa deixa de ser a única resposta possível."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok",
+        "motivo": "Escrevi leituras alternativas, entre elas a defesa do valor do artista e a de que a maldade vira exceção, e todas caem na comparação entre as duas atitudes que a quarta linha de aceita_se já prevê."
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 16,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Sim, eu concordo, porque o texto diz que o mundo ficou com um aspecto mais triste depois que a cigarra morreu, já que faltava o som estridente dela na música do mundo.",
+          "veredito": "espera_se",
+          "motivo": "Concorda citando a frase sobre a musica do mundo, exatamente o exemplo de espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Eu concordo, porque o texto diz que faltava na música do mundo o som da cigarra, isso mostra que ela fazia falta pra todo mundo.",
+          "veredito": "espera_se",
+          "motivo": "Concorda citando a mesma frase sobre a musica do mundo, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Eu concordo, porque o próprio texto diz nas linhas 43 e 44 que \"faltava na música do mundo o som estridente daquela cigarra morta\", mostrando que até a natureza sentia falta dela. Isso prova que algo que parece pequeno, como o canto de um bicho, pode fazer muita diferença quando desaparece.",
+          "veredito": "espera_se",
+          "motivo": "Concorda citando a frase sobre a musica do mundo e amplia a reflexao, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    }
+  ],
+  "resultado": {
+    "aprovadas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      13,
+      15,
+      16
+    ],
+    "ambiguas": [],
+    "estreitas": [],
+    "largas": []
+  },
+  "historico": [
+    {
+      "assinatura": "4a14a8e8e29cf210623eb31bdb99d2c2e2c5bc66e26c56c0404211e8823b4b87",
+      "data": "2026-09-08",
+      "resultado": {
+        "aprovadas": [
+          2,
+          4,
+          6,
+          8,
+          10,
+          12,
+          13,
+          15,
+          16
+        ],
+        "ambiguas": [],
+        "estreitas": []
+      }
+    }
+  ]
+}

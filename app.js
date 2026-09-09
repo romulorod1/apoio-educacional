@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.18.0';
+  var VERSAO = '1.19.0';
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -22,6 +22,20 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.19.0',
+      itens: [
+        'Português: entram dez assuntos de leitura do 6º ano, e os do 7º ano passam a ' +
+          'dizer de que texto cada questão fala. Os do 6º ano são fábula, mito, crônica, ' +
+          'poema, intenção do autor, relato pessoal, notícia, reportagem, entrevista e ' +
+          'texto de instrução, e cada folha traz o texto para ler, os exercícios e, se ' +
+          'você marcar, o gabarito.',
+        'Nas questões abertas, o gabarito passou a trazer o que se espera da resposta, o ' +
+          'que também vale, o que não vale e o trecho do texto que sustenta cada uma. É ' +
+          'para você corrigir mostrando ao aluno onde está a resposta, sem precisar de ' +
+          'uma frase pronta que nem sempre serve.'
+      ]
+    },
     {
       versao: '1.18.0',
       itens: [

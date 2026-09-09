@@ -356,3 +356,20 @@ e crédito de cada texto citado), `textos` (os textos de apoio, com as linhas) e
 exercício, `texto` (índice em `textos`), `tipo`, `alternativas`, `trecho`, `resposta` (a letra ou o
 `espera_se`, para quem só lê texto) e `gabarito` estruturado. O gerador aceita `--so portugues`
 para regerar uma matéria só; a matemática não é tocada.
+
+### 9.10 O painel cego das questões abertas
+
+Toda questão **aberta** passa por um painel antes de o tema entrar no banco: três leitores leem o
+enunciado e o texto sem ver o gabarito e respondem como alunos da série, um juiz diz se o critério
+alcança cada resposta, e uma lente adversarial olha o critério pelos dois lados: primeiro se ele
+ficou **largo**, escrevendo ela mesma uma resposta errada para ver se alguma linha de `aceita_se` a
+engole, e só depois se ficou **estreito**, com resposta defensável que ele deixaria de fora. Os dois
+vereditos barram o tema. A ordem importa: enquanto a lente só sabia dizer `estreito`, cada rodada
+acrescentava uma linha de critério e nenhuma tirava, e critério que aceita quase tudo faz a
+professora dar certo para resposta errada. O que o painel viu fica gravado em `temas/<pasta>/_painel/<ID>.json`, com as respostas por
+extenso, e o portão exige esse registro: sem ele, ou com ele assinado para outra versão do texto, o
+tema reprova e fica de fora do banco.
+
+O protocolo, os três prompts prontos para colar, o formato de cada arquivo e os quatro verbos da
+ferramenta estão em `temas/_ferramentas/PAINEL.md`. Enquanto o tema está sendo escrito,
+`verificar.py --sem-painel` mostra o resto sem exigir o registro; o gerador nunca desliga.

@@ -1,0 +1,292 @@
+{
+  "tema": "POR06-03",
+  "assinatura": "6f2fb65f571226114adc106041960ec20fe962460aa49c66d7d999654ee8ee4e",
+  "data": "2026-09-09",
+  "modelos": {
+    "leitores": "sonnet",
+    "juiz": "sonnet",
+    "lente": "fable"
+  },
+  "questoes": [
+    {
+      "n": 2,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Ele fecha os olhos imediatamente para fingir que dorme. Isso revela que ele não sabe a resposta e finge para não precisar admitir.",
+          "veredito": "espera_se",
+          "motivo": "Diz que ele finge dormir para nao admitir que nao sabe, o nucleo de espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Ele fecha os olhos na hora pra fingir que está dormindo. Isso revela que ele não sabe a resposta e não quer admitir isso.",
+          "veredito": "espera_se",
+          "motivo": "Diz que ele finge dormir para nao admitir que nao sabe, conforme espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Assim que ouve a pergunta, o senhor Rodrigues \"fecha os olhos imediatamente para fingir que dorme\" (linha 13). Isso revela que ele não sabe a resposta e prefere fingir sono a admitir a ignorância na frente do filho.",
+          "veredito": "espera_se",
+          "motivo": "Cita a linha e explica que ele prefere fingir sono a admitir a ignorancia, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 4,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A frase é: \"Não admira que ele não saiba, porque eu também não sei.\" O marido reage espantado e nega, dizendo que já deu provas de não ser nenhum ignorante, como se ficasse ofendido.",
+          "veredito": "espera_se",
+          "motivo": "Copia a frase certa e descreve a reacao de espanto e a alegacao de nao ser ignorante, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A frase é: Não admira que ele não saiba, porque eu também não sei. Ele fica com raiva e diz que ela só quer irritar ele.",
+          "veredito": "aceita_se",
+          "motivo": "Copia a frase certa mas descreve a reacao apenas como raiva e acusacao de querer irritar, cobrindo o ofender-se do primeiro item de aceita_se sem citar a alegacao de nao ser ignorante."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A frase é: \"Não admira que ele não saiba, porque eu também não sei\" (linha 30). O marido reage muito surpreso, dizendo \"Que me diz?!\" e depois tenta se defender afirmando que já deu provas de não ser nenhum ignorante (linha 33).",
+          "veredito": "espera_se",
+          "motivo": "Copia a frase certa e cita a reacao de espanto e a defesa de nao ser ignorante, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 6,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Ele diz que não fala para não se humilhar diante dos filhos, que não dá o braço a torcer e que quer conservar a força moral que deve ter na casa.",
+          "veredito": "espera_se",
+          "motivo": "Reproduz os tres motivos com as palavras do texto, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Ele diz que não conta pra não se humilhar na frente dos filhos, e porque quer manter a força moral que deve ter em casa.",
+          "veredito": "aceita_se",
+          "motivo": "Reproduz dois dos tres motivos com as palavras do texto, conforme o primeiro item de aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Ele mesmo explica nas linhas 50 e 51: \"Não digo para me não humilhar diante de meus filhos! Não dou o braço a torcer! Quero conservar a força moral que devo ter nesta casa!\" Ou seja, ele acha que admitir que não sabe vai fazer ele perder a autoridade de pai.",
+          "veredito": "espera_se",
+          "motivo": "Cita os tres motivos com as palavras do proprio personagem, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 8,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O leitor descobre porque o texto diz que no quarto havia algumas gotas de água de flor de laranja e um dicionário, então dá para entender que ele consultou o dicionário, mesmo sem o narrador contar isso diretamente.",
+          "veredito": "espera_se",
+          "motivo": "Explica que o leitor infere pelo dicionario citado, sem o narrador afirmar diretamente, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O leitor descobre porque o texto conta que no quarto tinha um dicionário, então dá pra entender que ele foi lá escondido descobrir a palavra.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que o leitor descobre pelo dicionario citado no quarto, conforme o primeiro item de aceita_se, sem destacar que o narrador nao afirma nada."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O leitor descobre porque as linhas 54 e 55 contam que \"no quarto havia o que ele mais precisava naquela ocasião: algumas gotas de água de flor de laranja e um dicionário\". Como ele volta sabendo a definição certa, dá para entender que consultou o dicionário escondido.",
+          "veredito": "espera_se",
+          "motivo": "Cita o trecho e explica a inferencia do leitor a partir do objeto, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 10,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Ela lembra que um dia Manduca perguntou o que era proletário, o senhor Rodrigues respondeu, mas o menino ficou sem entender. Ela traz esse caso para mostrar que o marido costuma inventar respostas em vez de admitir que não sabe.",
+          "veredito": "espera_se",
+          "motivo": "Identifica o caso do proletario e explica que serve para mostrar que ele finge saber, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "É o caso de quando Manduca perguntou o que era proletário e o pai respondeu errado, deixando o menino sem entender. Ela lembra isso pra mostrar que o marido sempre finge que sabe tudo.",
+          "veredito": "aceita_se",
+          "motivo": "Identifica o caso do proletario mas afirma que ele respondeu errado, detalhe nao confirmado pelo texto, ainda que o proposito apontado bata com o segundo item de aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Dona Bernardina lembra que outro dia, quando Manduca perguntou o que era proletário, o marido respondeu e o menino ficou sem entender (linhas 37 a 39). Ela traz isso para mostrar que ele já fingiu saber antes e não explicou direito, tentando convencê-lo a admitir de vez que não sabe.",
+          "veredito": "espera_se",
+          "motivo": "Identifica o caso do proletario e explica que mostra que ele ja fingiu saber antes, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 12,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Manduca pede: \"chame papai e façam as pazes\", e a menina diz: \"façam as pazes! Que tolice! duas pessoas que se estimam tanto zangarem-se por causa do plebiscito!\" Quem se sente culpado é Manduca, porque o texto diz que ele estava pesaroso por ter causado a discussão.",
+          "veredito": "espera_se",
+          "motivo": "Cita as duas falas dos filhos e aponta corretamente Manduca como o culpado, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Manduca pede pra chamar o pai e fazer as pazes, e a menina pede em tom manso a mesma coisa. Manduca é quem se sente culpado, porque foi ele que fez a pergunta.",
+          "veredito": "aceita_se",
+          "motivo": "Resume as duas falas sem detalhar a da menina e aponta corretamente Manduca como culpado, conforme o segundo item de aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Manduca diz \"pois sim, mamãe; chame papai e façam as pazes\" (linha 60 e 61), muito arrependido por ter começado a discussão. A menina diz \"Sim! sim! façam as pazes!... Que tolice! duas pessoas que se estimam tanto zangarem-se por causa do plebiscito!\" (linhas 62 e 63). Quem se sente culpado é Manduca, porque foi ele quem fez a pergunta que causou a briga.",
+          "veredito": "espera_se",
+          "motivo": "Cita as duas falas dos filhos e aponta corretamente Manduca como o culpado, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 13,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A graça é que ele fala a definição de plebiscito com ar de sabichão na frente de todos, mas na verdade tirou essa definição do dicionário escondido, depois de fingir que sabia tudo o tempo todo.",
+          "veredito": "aceita_se",
+          "motivo": "Explica que ele finge ter sabido sempre para parecer sabichao, batendo com o segundo item de aceita_se, sem tocar a ironia do estrangeirismo que espera_se destaca."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A graça é que ele fala com muita certeza, como se soubesse tudo, mas a resposta que ele dá saiu do dicionário que ele consultou escondido.",
+          "veredito": "aceita_se",
+          "motivo": "Explica que ele fala com certeza fingida apos consultar o dicionario escondido, conforme o segundo item de aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A graça está em que ele fala com um ar de sabe tudo, como se sempre soubesse a resposta, mas o leitor sabe que ele só descobriu correndo escondido ao dicionário do quarto. Toda aquela pose de conhecimento é fingida, e por isso a fala soa engraçada.",
+          "veredito": "aceita_se",
+          "motivo": "Explica que a pose de conhecimento e fingida apos a consulta escondida ao dicionario, conforme o segundo item de aceita_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 15,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Um trecho é: \"E olha para todos os lados a ver se há por ali mais alguém que possa aproveitar a lição.\" Isso mostra o ridículo porque ele quer parecer importante na frente de mais gente, mas o narrador só descreve a cena, sem dizer nada de julgamento.",
+          "veredito": "espera_se",
+          "motivo": "Copia um trecho descritivo do narrador e explica que ele so descreve, sem julgar, conforme o mecanismo pedido por espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O trecho é: No quarto havia o que ele mais precisava naquela ocasião, algumas gotas de água de flor de laranja e um dicionário. Isso mostra o ridículo porque dá pra entender que ele foi se acalmar e estudar escondido, sem o narrador precisar dizer nada.",
+          "veredito": "espera_se",
+          "motivo": "Copia a frase do dicionario e da agua de flor de laranja, um dos exemplos de espera_se, com a explicacao correta."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Um trecho é: \"E olha para todos os lados a ver se há por ali mais alguém que possa aproveitar a lição\" (linhas 73 e 74). Isso mostra o ridículo sem dizer nenhuma palavra de julgamento, porque o narrador só descreve o gesto dele, e o leitor percebe sozinho que ele está se exibindo à toa.",
+          "veredito": "espera_se",
+          "motivo": "Copia o mesmo trecho descritivo do narrador e explica que o leitor conclui sozinho, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 17,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Eu acho que ela fez bem, porque ela mesma diz que não é nenhuma vergonha ignorar qualquer palavra, e estava tentando ensinar ao marido que é melhor admitir que não sabe do que fingir.",
+          "veredito": "espera_se",
+          "motivo": "Defende que ela fez bem citando a frase sobre nao ser vergonha ignorar uma palavra, conforme espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Eu acho que ela fez bem, porque assim ele aprende que não tem vergonha nenhuma em dizer que não sabe uma coisa.",
+          "veredito": "aceita_se",
+          "motivo": "Defende que ela fez bem parafraseando a ideia de que nao ha vergonha em nao saber, sem citar diretamente um trecho especifico, batendo de forma mais frouxa com aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Eu acho que ela fez bem, porque ela mesma explica na linha 45 que seria muito mais simples ele confessar que não sabia e mandar o filho buscar o dicionário. Ela estava tentando ensinar uma lição sincera para as crianças, mesmo que isso tenha deixado o marido com raiva.",
+          "veredito": "espera_se",
+          "motivo": "Defende que ela fez bem citando a linha em que ela diz que seria mais simples confessar, conforme espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    }
+  ],
+  "resultado": {
+    "aprovadas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      13,
+      15,
+      17
+    ],
+    "ambiguas": [],
+    "estreitas": [],
+    "largas": []
+  },
+  "historico": [
+    {
+      "assinatura": "9deabaa0a7d6d145cb9cbc4d14df77987d66b9bd6b03571ebc94eab5fc1e98a3",
+      "data": "2026-09-08",
+      "resultado": {
+        "aprovadas": [
+          2,
+          4,
+          6,
+          8,
+          10,
+          12,
+          13,
+          15,
+          17
+        ],
+        "ambiguas": [],
+        "estreitas": []
+      }
+    }
+  ]
+}

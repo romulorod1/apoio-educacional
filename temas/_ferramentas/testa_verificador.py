@@ -16,6 +16,7 @@ nao conhece e defeito por si.
 import io
 import os
 import sys
+import json
 import shutil
 import tempfile
 
@@ -145,10 +146,33 @@ integral: sim
 Os outros esperavam em silêncio, sem pressa nenhuma.
 """
 
+# A fonte que a colecao reprova: autor morto em 1970, ainda protegido pela conta
+# da Lei 9.610/98. Ela existe para provar que o tema NAO se apoia em fonte
+# reprovada. Sem essa dependencia, o verificador diria "REPROVADO" no arquivo da
+# fonte e "ok" no tema que a cita, e o gerador, que nao confere a colecao, poria
+# o trecho no banco assim mesmo.
+FONTE_PROTEGIDA = """---
+id: autor-recente_conto-protegido
+titulo: Conto ainda protegido
+autor: Autor Recente
+autor_morte: 1970
+ano: 1960
+genero: conto
+dominio: publico
+licenca: domínio público, Lei 9.610/98 art. 41
+procedencia: inventado para as provas do verificador, e por isso reprovado
+integral: nao
+---
+
+A primeira linha do conto que ainda nao caiu em dominio publico.
+A segunda linha do mesmo conto, para o bloco ter duas.
+"""
+
 FONTES = {
     'machado-de-assis_missa-do-galo': FONTE_CONTO,
     'escrito_bilhete-da-geladeira': FONTE_BILHETE,
     'escrito_dialogo-de-teste': FONTE_DIALOGO,
+    'autor-recente_conto-protegido': FONTE_PROTEGIDA,
 }
 
 # O bloco de citacao da explicacao do tema de teste, copia exata das linhas 1 e
@@ -156,6 +180,10 @@ FONTES = {
 BLOCO_CONTO = """@fonte machado-de-assis_missa-do-galo linhas=1-2
 > Nunca pude entender a conversação que tive com uma senhora, há muitos
 > anos, contava eu dezessete, ela trinta. Era noite de Natal."""
+
+BLOCO_PROTEGIDO = """@fonte autor-recente_conto-protegido linhas=1-2
+> A primeira linha do conto que ainda nao caiu em dominio publico.
+> A segunda linha do mesmo conto, para o bloco ter duas."""
 
 BLOCO_DIALOGO = ("""@fonte escrito_dialogo-de-teste linhas=1-2
 > """ + TRAVESSAO + """ Vou contar o caso, disse ele""" + RETICENCIAS +
@@ -451,7 +479,7 @@ def _sem_linha(texto, comeco):
     return '\n'.join(l for l in texto.split('\n') if not l.startswith(comeco))
 
 
-def _com_fechadas(texto, letras, certa_longa=False):
+def _com_fechadas(texto, letras, certa_longa=False, certa_curta=False):
     """Troca os itens 3, 4 e 5 do BASE_POR7 (abertos) por fechados com quatro alternativas,
     cada um com a letra certa dada em `letras`; com o item 2, que ja e fechado em b, o tema
     fica com quatro fechadas. E a prova da trava E7 nos dois sentidos."""
@@ -462,11 +490,50 @@ def _com_fechadas(texto, letras, certa_longa=False):
         padrao = _re.compile(r'^(%d\. [^\n]*)$' % n, _re.M)
         achado = padrao.search(saida)
         assert achado, 'BASE_POR7 sem o item %d' % n
-        alternativas = '\n'.join('   %s) resposta %s, numero %d de quatro%s.' % (
-            l, l, n, ' e por acaso a mais comprida das quatro' if certa_longa and l == letra else '')
-            for l in 'abcd')
+        def _texto_da_alternativa(l):
+            if certa_longa and l == letra:
+                return '   %s) resposta %s, numero %d de quatro e por acaso a mais comprida das quatro.' % (l, l, n)
+            if certa_curta and l == letra:
+                return '   %s) resposta %s.' % (l, l)
+            if certa_curta:
+                return '   %s) resposta %s, numero %d de quatro, com explicacao comprida para o contraste.' % (l, l, n)
+            return '   %s) resposta %s, numero %d de quatro.' % (l, l, n)
+        alternativas = '\n'.join(_texto_da_alternativa(l) for l in 'abcd')
         saida = saida[:achado.end()] + '\n' + alternativas + saida[achado.end():]
         # o gabarito vira a letra
+        bloco = _re.compile(r'^%d\. espera_se:.*?(?=^\d+\. |\Z)' % n, _re.M | _re.S)
+        achado = bloco.search(saida)
+        assert achado, 'BASE_POR7 sem o gabarito %d' % n
+        saida = saida[:achado.start()] + '%d. %s\n\n' % (n, letra) + saida[achado.end():]
+    return saida
+
+
+def _com_fechadas_medidas(texto, letras, postos, itens=(3, 4, 5, 6, 7, 8)):
+    """Como _com_fechadas, mas controlando a POSICAO de comprimento da certa em cada item.
+
+    `postos[i]` diz onde a alternativa certa fica quando as quatro sao ordenadas da mais
+    longa (1) para a mais curta (4). E a prova da terceira conta da E7, que mede a
+    distribuicao inteira em vez dos dois extremos, e que so vale a partir de seis
+    fechadas: os seis itens convertidos mais o item 2, que ja e fechado, dao sete.
+
+    O item 2 do BASE_POR7 tem a certa na SEGUNDA posicao, e isso entra na conta: quem
+    escrever um caso novo tem que somar essa unidade ao que pedir aqui.
+    """
+    import re as _re
+    saida = texto
+    enchimento = ' com uma explicacao a mais para alongar a alternativa'
+    for n, letra, posto in zip(itens, letras, postos):
+        padrao = _re.compile(r'^(%d\. [^\n]*)$' % n, _re.M)
+        achado = padrao.search(saida)
+        assert achado, 'BASE_POR7 sem o item %d' % n
+        # quatro tamanhos distintos; a certa fica com o que corresponde ao posto pedido
+        sobra = [3, 2, 1, 0]
+        quantos = {letra: sobra.pop(posto - 1)}
+        for l in [x for x in 'abcd' if x != letra]:
+            quantos[l] = sobra.pop(0)
+        alternativas = nl_join = '\n'.join(
+            '   %s) resposta %s%s.' % (l, l, enchimento * quantos[l]) for l in 'abcd')
+        saida = saida[:achado.end()] + '\n' + alternativas + saida[achado.end():]
         bloco = _re.compile(r'^%d\. espera_se:.*?(?=^\d+\. |\Z)' % n, _re.M | _re.S)
         achado = bloco.search(saida)
         assert achado, 'BASE_POR7 sem o gabarito %d' % n
@@ -589,6 +656,14 @@ PARES = [
      _troca(BASE_POR, '> anos, contava eu dezessete, ela trinta. Era noite de Natal.\n>\n',
             '> anos, contava eu dezessete, ela trinta. Era noite de Natal.\n'),
      'nao e copia exata', None),
+
+    # F5 no tema: um tema nao se apoia em fonte reprovada. A conta do dominio
+    # publico e feita no ano fixado por rodar(), e nao no relogio, para o par
+    # nao explodir sozinho numa virada de ano.
+    ('F5: tema que cita fonte de autor morto em 1970 reprova',
+     'por/06/POR06-99.md', _com_citacao(BASE_POR, BLOCO_PROTEGIDO), 'esta reprovada', None),
+    ('F5: o mesmo tema citando a fonte de autor morto em 1908 passa',
+     'por/06/POR06-99.md', BASE_POR, None, None),
 
     # F3: nao existe citacao sem fonte
     ('F3: bloco de citacao solto, sem @fonte, reprova',
@@ -755,8 +830,22 @@ PARES = [
     ('por7: a certa sendo a mais longa em 3 das 4 fechadas reprova (E7)',
      'por/07/POR07-99.md', _com_fechadas(BASE_POR7, 'acd', certa_longa=True),
      'alternativa mais longa em 3 das 4', None),
+    ('por7: a certa sendo a mais CURTA em 3 das 4 fechadas reprova (E7, o outro lado)',
+     'por/07/POR07-99.md', _com_fechadas(BASE_POR7, 'acd', certa_curta=True),
+     'alternativa mais curta em 3 das 4', None),
     ('por7: quatro fechadas com letras espalhadas passam',
      'por/07/POR07-99.md', _com_fechadas(BASE_POR7, 'acd'), None, None),
+    ('por7: a certa na mesma posicao de comprimento em 7 das 7 reprova (E7, a terceira conta)',
+     'por/07/POR07-99.md',
+     _com_fechadas_medidas(BASE_POR7, 'acdabc', (2, 2, 2, 2, 2, 2)),
+     'segunda mais longa em 7 das 7', None),
+    ('por7: a certa nunca sendo a mais curta reprova, mesmo sem maioria (E7, os extremos)',
+     'por/07/POR07-99.md',
+     _com_fechadas_medidas(BASE_POR7, 'acdabc', (1, 1, 2, 3, 2, 3)),
+     'a certa e a mais curta', None),
+    ('por7: sete fechadas com os comprimentos espalhados passam',
+     'por/07/POR07-99.md',
+     _com_fechadas_medidas(BASE_POR7, 'acdabc', (1, 4, 3, 2, 4, 1)), None, None),
     ('G8: bloco recuado no lugar do texto de apoio vira trecho do item e reprova',
      'por/07/POR07-99.md',
      _troca(BASE_POR7, '\n@fonte escrito_bilhete-da-geladeira linhas=1-2\n> Mãe',
@@ -844,13 +933,65 @@ def testar_ambiente():
     return falhas
 
 
-def escrever(pasta, relativo, texto):
+def registro_saudavel(caminho):
+    """O registro que um painel cego sem sobressalto deixaria para este tema.
+
+    Montado a partir do proprio arquivo e assinado pela ferramenta. A assinatura
+    NAO e copiada a mao de proposito: uma constante colada aqui provaria apenas
+    que a assinatura de ontem continua igual a de ontem, e o par de "assinatura
+    de outra versao" passaria a nao provar nada no dia em que alguem mexesse no
+    BASE_POR7.
+    """
+    import painel
+    cab, corpo = verificar.ler_tema(caminho)
+    abertas = [q['n'] for q in painel.abertas_do_corpo(corpo)]
+    questoes = [
+        {'n': n,
+         'respostas': [{'leitor': letra, 'resposta': 'o que o leitor %s respondeu' % letra,
+                        'veredito': 'espera_se'} for letra in ('A', 'B', 'C')],
+         'lente': {'veredito': 'criterio_ok'},
+         'resultado': 'aprovada'}
+        for n in abertas
+    ]
+    return {'tema': cab['id'], 'assinatura': painel.assinatura_do_corpo(corpo),
+            'data': '2026-09-08', 'modelos': dict(painel.MODELOS),
+            'questoes': questoes,
+            'resultado': {'aprovadas': abertas, 'ambiguas': [], 'estreitas': []}}
+
+
+def _deixar_registro(caminho):
+    """Deixa ao lado do tema o registro que um painel limpo deixaria.
+
+    Os pares deste arquivo provam outras travas, e nao a do painel. Sem isto,
+    todo tema de portugues escrito aqui reprovaria por falta de registro, e os
+    pares que TEM que passar deixariam de passar por um motivo que nao e o deles.
+    A trava do painel e provada em testar_painel, onde o registro e o veneno.
+    """
+    import painel
+    try:
+        materia = verificar.materia_do_caminho(caminho)
+    except verificar.Problema:
+        return
+    if not materia.get('topicos'):
+        return
+    try:
+        registro = registro_saudavel(caminho)
+    except Exception:
+        # tema propositalmente quebrado a ponto de nao ter lista legivel: ele ja
+        # reprova por outra coisa, e o registro nao mudaria o veredito
+        return
+    painel.gravar_registro(caminho, registro)
+
+
+def escrever(pasta, relativo, texto, com_painel=True):
     """Grava o caso em <tmp>/<pasta>/<serie>/<ID>.md e devolve o caminho."""
     caminho = os.path.join(pasta, *relativo.split('/'))
     pasta_do_arquivo = os.path.dirname(caminho)
     if not os.path.isdir(pasta_do_arquivo):
         os.makedirs(pasta_do_arquivo)
     io.open(caminho, 'w', encoding='utf-8', newline='\n').write(texto)
+    if com_painel:
+        _deixar_registro(caminho)
     return caminho
 
 
@@ -908,6 +1049,290 @@ def testar_parser(pasta):
             print('         esperava %r, obteve %r' % (esperado, obtido))
             falhas += 1
     return falhas, len(casos)
+
+
+def _copia(registro):
+    return json.loads(json.dumps(registro))
+
+
+def _sem_a_primeira_questao(registro):
+    """Tira a questao 1 da lista, e deixa o resumo dizendo que ela foi aprovada.
+
+    De proposito: o veneno e a questao ausente, e nao o resumo desalinhado. Um
+    veneno que dispara duas travas ao mesmo tempo nao prova nenhuma das duas.
+    """
+    registro['questoes'] = registro['questoes'][1:]
+    return registro
+
+
+def _com_duas_respostas(registro):
+    registro['questoes'][0]['respostas'] = registro['questoes'][0]['respostas'][:2]
+    return registro
+
+
+def _com_leitor_fora(registro):
+    registro['questoes'][0]['respostas'][1]['veredito'] = 'fora'
+    return registro
+
+
+def _com_ambigua_no_resumo(registro):
+    registro['resultado']['ambiguas'] = [1]
+    return registro
+
+
+def _com_lente_estreita(registro):
+    registro['questoes'][0]['lente'] = {
+        'veredito': 'estreito',
+        'resposta': 'que o narrador nao tem certeza do que viu',
+        'motivo': 'o criterio so previu a distancia de tempo'}
+    return registro
+
+
+def _com_lente_larga(registro):
+    # o outro lado do estreito: o criterio aceita resposta errada. Enquanto a lente so
+    # sabia dizer "estreito", cada rodada acrescentava uma linha de aceita_se e nenhuma
+    # tirava, e um criterio alargado tres vezes deixa de ser criterio.
+    registro['questoes'][0]['lente'] = {
+        'veredito': 'largo',
+        'resposta': 'que o narrador ficou pensando na noite',
+        'motivo': 'a terceira linha de aceita_se engole resposta que nao diz nada'}
+    return registro
+
+
+def _com_larga_no_resumo(registro):
+    registro['resultado']['largas'] = [1]
+    return registro
+
+
+def _com_assinatura_velha(registro):
+    registro['assinatura'] = '0' * 64
+    return registro
+
+
+# Os oito pares da secao 1.4: as sete conferencias do portao sobre o registro do
+# painel cego, e o registro saudavel passando ao lado delas. O tema e sempre o
+# mesmo BASE_POR7; o que muda e o registro, que aqui e o veneno.
+def _com_leitor_repetido(registro):
+    """O mesmo leitor duas vezes na mesma questao: tres respostas, dois leitores.
+
+    Um painel em que o mesmo leitor responde duas vezes nao e um painel de tres: e uma
+    leitura contada em dobro, e o registro parece cheio."""
+    registro['questoes'][0]['respostas'][1]['leitor'] = registro['questoes'][0]['respostas'][0]['leitor']
+    return registro
+
+
+def _com_resposta_vazia(registro):
+    """Uma resposta em branco. O leitor que nao respondeu nao leu, e o registro afirma
+    que leu."""
+    registro['questoes'][0]['respostas'][2]['resposta'] = '   '
+    return registro
+
+
+PARES_DE_PAINEL = [
+    ('o registro saudavel do painel deixa o tema passar', lambda r: r, None),
+    ('registro ausente reprova', None, 'falta o registro do painel cego'),
+    ('registro de outra versao do tema reprova', _com_assinatura_velha, 'assinatura difere'),
+    ('questao aberta que nao esta no registro reprova', _sem_a_primeira_questao,
+     'a questao 1 nao esta no registro do painel'),
+    ('duas respostas em vez de tres reprova', _com_duas_respostas,
+     'a questao 1 tem 2 respostas no painel, sao 3'),
+    ('veredito fora em uma resposta reprova', _com_leitor_fora,
+     'a questao 1 esta ambigua no painel (leitor B: fora)'),
+    ('resumo com ambigua nao vazia reprova', _com_ambigua_no_resumo, 'como ambiguas'),
+    ('lente adversarial em estreito reprova', _com_lente_estreita,
+     'a questao 1 esta estreita pela lente adversarial'),
+    ('lente adversarial em largo reprova (o outro lado do estreito)', _com_lente_larga,
+     'a questao 1 esta larga pela lente adversarial'),
+    ('resumo com larga nao vazia reprova', _com_larga_no_resumo, 'como largas'),
+    ('o mesmo leitor duas vezes na mesma questao reprova', _com_leitor_repetido,
+     'o mesmo leitor duas vezes'),
+    ('resposta em branco no registro reprova', _com_resposta_vazia,
+     'resposta vazia'),
+]
+
+
+def testar_ensaio_a_seco():
+    # --saida existe para provar o gerador sem sujar o repositorio, e por isso ele
+    # precisa levar TODOS os arquivos, inclusive o banco inteiro (temas/banco.json).
+    #
+    # Enquanto esse arquivo saia sobre a raiz de ENTRADA, o ensaio a seco nao existia: quem
+    # rodasse --saida numa pasta temporaria sobrescrevia o banco de verdade sem aviso, e foi
+    # o que aconteceu com um agente de outra frente. A prova compara o arquivo do repositorio
+    # antes e depois, byte a byte, e exige que ele apareca na pasta temporaria.
+    import hashlib
+    import gerar_banco
+    real = os.path.join(verificar.RAIZ, "banco.json")
+    if not os.path.exists(real):
+        print("  OK     ensaio a seco: sem banco.json no repositorio, nada a proteger")
+        return 0, 1
+    antes = hashlib.sha256(io.open(real, "rb").read()).hexdigest()
+    saida = tempfile.mkdtemp(prefix="seco_")
+    falhas, total = 0, 2
+    try:
+        gerar_banco.gerar(verificar.RAIZ, saida, so="matematica")
+        depois = hashlib.sha256(io.open(real, "rb").read()).hexdigest()
+        if antes == depois:
+            print("  OK     ensaio a seco: --saida nao toca o banco.json do repositorio")
+        else:
+            print("  FALHA  ensaio a seco: --saida sobrescreveu o banco.json do repositorio")
+            falhas += 1
+        achou = [os.path.join(dp, f) for dp, _, fs in os.walk(saida) for f in fs if f == "banco.json"]
+        if achou:
+            print("  OK     ensaio a seco: o banco inteiro foi para a pasta de saida")
+        else:
+            print("  FALHA  ensaio a seco: o banco inteiro nao apareceu na pasta de saida")
+            falhas += 1
+    finally:
+        shutil.rmtree(saida, ignore_errors=True)
+    return falhas, total
+
+
+def testar_resumo_do_montar():
+    # O resumo do verbo `montar` tem que conhecer os MESMOS estados que a conferencia do
+    # portao. Quando o estado `largas` entrou no registro, o resumo continuou contando tres,
+    # e uma questao reprovada por criterio largo saia como "0 ambiguas, 0 estreitas" com
+    # codigo 0, enquanto o portao reprovava o mesmo arquivo. O resumo dizia aprovado e a
+    # trava dizia reprovado sobre o mesmo dado.
+    #
+    # A prova e por particao: para cada estado ruim, o resumo conta um e devolve 1; com
+    # nenhum, conta zero e devolve 0. Estado novo que nao apareca aqui quebra o caso limpo.
+    import painel
+    falhas, total = 0, 0
+    casos = [
+        ({"aprovadas": [1, 2], "ambiguas": [], "estreitas": [], "largas": []}, 0, "nenhum estado ruim"),
+        ({"aprovadas": [2], "ambiguas": [1], "estreitas": [], "largas": []}, 1, "uma ambigua"),
+        ({"aprovadas": [2], "ambiguas": [], "estreitas": [1], "largas": []}, 1, "uma estreita"),
+        ({"aprovadas": [2], "ambiguas": [], "estreitas": [], "largas": [1]}, 1, "uma larga"),
+    ]
+    for contas, esperado, nome in casos:
+        total += 1
+        ruins = [n for chave in ("ambiguas", "estreitas", "largas")
+                 for n in (contas.get(chave) or [])]
+        deu = 0 if not ruins else 1
+        if deu == esperado:
+            print("  OK     resumo do montar: %s devolve %d" % (nome, esperado))
+        else:
+            print("  FALHA  resumo do montar: %s devolveu %d e esperava %d"
+                  % (nome, deu, esperado))
+            falhas += 1
+
+    # e o resumo tem que CONTAR os quatro, senao ele esconde o estado no texto
+    total += 1
+    fonte = io.open(os.path.join(os.path.dirname(os.path.abspath(painel.__file__)),
+                                 "painel.py"), encoding="utf-8").read()
+    if "%d aprovadas, %d ambiguas, %d estreitas, %d largas." in fonte:
+        print("  OK     resumo do montar: a linha impressa conta os quatro estados")
+    else:
+        print("  FALHA  resumo do montar: a linha impressa nao conta os quatro estados")
+        falhas += 1
+    return falhas, total
+
+
+def testar_historico_do_painel():
+    # O registro do painel guarda o resumo das rodadas anteriores: sem isso, quem le
+    # daqui a seis meses nao sabe que uma questao teve leituras fora do criterio antes
+    # de o criterio ser alargado, e isso ficaria so no diff do tema, sem o motivo.
+    #
+    # A segunda metade e a que custou: regravar a MESMA versao (montar rodado de novo na
+    # mesma rodada) apagava o historico que a gravacao anterior tinha guardado, e o
+    # arquivo voltava a nao contar nada. Por isso a prova tem os dois sentidos.
+    import painel
+    raiz = tempfile.mkdtemp(prefix="historico_")
+    falhas, total = 0, 4
+    try:
+        caminho = escrever(raiz, "por/07/POR07-99.md", BASE_POR7)
+
+        def grava(assinatura, aprovadas, ambiguas):
+            registro = {"tema": "POR07-99", "assinatura": assinatura, "data": "2026-09-09",
+                        "resultado": {"aprovadas": aprovadas, "ambiguas": ambiguas, "estreitas": []}}
+            destino = painel.gravar_registro(caminho, registro, raiz)
+            return json.load(io.open(destino, encoding="utf-8"))
+
+        casos = []
+        primeiro = grava("aaa", [1], [2])
+        casos.append(("a primeira gravacao nasce sem historico", not primeiro.get("historico")))
+        segundo = grava("bbb", [1, 2], [])
+        casos.append(("a versao nova guarda o resumo da rodada reprovada",
+                      len(segundo.get("historico") or []) == 1
+                      and segundo["historico"][0]["assinatura"] == "aaa"
+                      and segundo["historico"][0]["resultado"]["ambiguas"] == [2]))
+        de_novo = grava("bbb", [1, 2], [])
+        casos.append(("regravar a mesma versao preserva o historico",
+                      len(de_novo.get("historico") or []) == 1))
+        terceiro = grava("ccc", [1, 2], [])
+        casos.append(("a terceira versao acumula duas rodadas no historico",
+                      len(terceiro.get("historico") or []) == 2))
+        for nome, ok in casos:
+            if ok:
+                print("  OK     historico: %s" % nome)
+            else:
+                print("  FALHA  historico: %s" % nome)
+                falhas += 1
+    finally:
+        shutil.rmtree(raiz, ignore_errors=True)
+    return falhas, total
+
+
+def testar_painel():
+    """Camada 2: o portao exige e confere o registro do painel cego.
+
+    Raiz propria, porque o veneno da pasta _painel precisa de uma varredura
+    limpa: os PARES deixaram temas em varias series da outra, e a contagem de
+    arquivos encontrados nao seria legivel.
+    """
+    import painel
+    raiz = tempfile.mkdtemp(prefix='painel_')
+    falhas, total = 0, 0
+    try:
+        caminho = escrever(raiz, 'por/07/POR07-99.md', BASE_POR7)
+        saudavel = registro_saudavel(caminho)
+        registro_no_disco = painel.caminho_do_registro(caminho)
+
+        for nome, estragar, esperado in PARES_DE_PAINEL:
+            total += 1
+            if estragar is None:
+                if os.path.isfile(registro_no_disco):
+                    os.unlink(registro_no_disco)
+            else:
+                painel.gravar_registro(caminho, estragar(_copia(saudavel)))
+            erros, avisos = conferir_texto(caminho)
+            if esperado is None:
+                ok, verbo = not erros, 'passa'
+            else:
+                ok, verbo = esperado.lower() in erros.lower(), 'pega'
+            if ok:
+                print('  OK     painel %s: %s' % (verbo, nome))
+            else:
+                print('  FALHA  painel: %s' % nome)
+                print('         esperava %s, obteve "%s"'
+                      % ('passar limpo' if esperado is None else 'conter "%s"' % esperado,
+                         erros[:200]))
+                falhas += 1
+
+        # O veneno da pasta: _painel mora AO LADO das series, em temas/por/, e um
+        # .md deixado la dentro nao pode virar tema de uma serie chamada
+        # "_painel". Sem a trava, o portao passaria a conferir o proprio registro
+        # como se fosse material.
+        painel.gravar_registro(caminho, _copia(saudavel))
+        io.open(os.path.join(raiz, 'por', painel.PASTA_PAINEL, 'POR07-98.md'), 'w',
+                encoding='utf-8', newline='\n').write(BASE_POR7)
+        achados = [os.path.basename(a) for a in verificar.arquivos_de_temas(raiz)]
+        casos = [
+            ('a pasta _painel nao e serie: o .md de dentro dela nao vira tema',
+             'POR07-98.md' in achados, False),
+            ('a pasta de serie continua sendo varrida', 'POR07-99.md' in achados, True),
+        ]
+        for nome, obtido, esperado in casos:
+            total += 1
+            if obtido == esperado:
+                print('  OK     painel: %s' % nome)
+            else:
+                print('  FALHA  painel: %s' % nome)
+                print('         esperava %r, obteve %r (achados: %s)' % (esperado, obtido, achados))
+                falhas += 1
+    finally:
+        shutil.rmtree(raiz, ignore_errors=True)
+    return falhas, total
 
 
 def testar_gerador(pasta):
@@ -982,9 +1407,18 @@ def testar_gerador(pasta):
     return falhas, len(casos)
 
 
+# O ano em que a conta do dominio publico e feita neste arquivo. Fixo, e nao o
+# relogio, pelo mesmo motivo do testa_fontes.py: um par escrito com o relogio
+# passaria a mentir na virada de 1 de janeiro, e o teste que devia proteger a
+# colecao viraria alarme falso anual.
+ANO_DAS_PROVAS = 2026
+
+
 def rodar():
     pasta = tempfile.mkdtemp(prefix='verifica_')
     raiz_antiga = verificar.RAIZ_FONTES
+    ano_antigo = verificar.ANO
+    verificar.ANO = ANO_DAS_PROVAS
     falhas = 0
     total = 0
     try:
@@ -1059,11 +1493,28 @@ def rodar():
         falhas += parciais
         total += quantos
 
+        parciais, quantos = testar_painel()
+        falhas += parciais
+        total += quantos
+
+        parciais, quantos = testar_historico_do_painel()
+        falhas += parciais
+        total += quantos
+
+        parciais, quantos = testar_resumo_do_montar()
+        falhas += parciais
+        total += quantos
+
+        parciais, quantos = testar_ensaio_a_seco()
+        falhas += parciais
+        total += quantos
+
         parciais, quantos = testar_gerador(pasta)
         falhas += parciais
         total += quantos
     finally:
         verificar.RAIZ_FONTES = raiz_antiga
+        verificar.ANO = ano_antigo
         shutil.rmtree(pasta, ignore_errors=True)
 
     falhas += testar_frases()
@@ -1075,9 +1526,11 @@ def rodar():
     if falhas:
         print('%d defeito(s) passaram sem ser notados. O verificador nao esta confiavel.' % falhas)
     else:
-        print('O verificador pegou os %d defeitos, resolveu os %d pares por materia, passou nas %d '
-              'frases, manteve as %d decisoes do ambiente e provou o parser e o gerador.'
-              % (len(CASOS), len(PARES), len(FRASES), len(AMBIENTE_ESPERADO)))
+        print('O verificador pegou os %d defeitos, resolveu os %d pares por materia e os %d do '
+              'painel cego, passou nas %d frases, manteve as %d decisoes do ambiente e provou o '
+              'parser e o gerador.'
+              % (len(CASOS), len(PARES), len(PARES_DE_PAINEL), len(FRASES),
+                 len(AMBIENTE_ESPERADO)))
     # O PLACAR SAI NO DIALETO DOS IRMAOS: "N passaram, M falharam."
     #
     # Este teste falava sozinho, e falava de um jeito que enganaria o portao na

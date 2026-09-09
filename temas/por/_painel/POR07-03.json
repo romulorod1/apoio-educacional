@@ -1,0 +1,325 @@
+{
+  "tema": "POR07-03",
+  "assinatura": "ee59f77ee84bc268bc6df8578fcf29ba497153af549d22f0a720d8d7862566f6",
+  "data": "2026-09-09",
+  "modelos": {
+    "leitores": "sonnet",
+    "juiz": "sonnet",
+    "lente": "fable"
+  },
+  "questoes": [
+    {
+      "n": 2,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Feromônio é uma substância química que a formiga deixa no chão enquanto caminha, formando um cheiro que as outras formigas da colônia reconhecem com as antenas e seguem para achar o caminho até a comida.",
+          "veredito": "espera_se",
+          "motivo": "Define feromônio como substância que a formiga deixa no chão e que as outras seguem pelas antenas, como o critério espera."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Feromônio é uma substância com cheiro que a formiga vai deixando no chão, e as outras formigas reconhecem esse cheiro com as antenas para seguir o caminho.",
+          "veredito": "espera_se",
+          "motivo": "A resposta define feromônio como substância com cheiro deixada no chão e reconhecida pelas antenas para seguir o caminho, reproduzindo o espera_se quase à letra."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Feromônio é uma substância química que a formiga vai deixando no chão enquanto anda procurando comida, tipo um rastro de cheiro. As outras formigas sentem esse cheiro com as antenas e acabam seguindo o caminho que ele marca. Quanto mais formiga passa reforçando o rastro, mais forte fica o cheiro e mais formiga é atraída para aquele caminho. Na minha opinião isso é parecido com uma trilha de migalhas de pão, só que em vez de migalha é cheiro, e o mais legal é que ele some sozinho depois de um tempo.",
+          "veredito": "espera_se",
+          "motivo": "Define feromônio com precisão equivalente ao esperado, cheiro deixado no chão que as outras formigas seguem."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok",
+        "motivo": "As quatro linhas de aceita_se exigem o núcleo cheiro ou substância deixada no chão pela formiga, o que barra definir feromônio pela comida, pelo caminho ou por uma substância genérica, e as leituras defensáveis do texto cabem na lista aberta de funções da última linha."
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 4,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Os intertítulos servem para organizar o texto em partes e avisar o leitor sobre o assunto de cada trecho. O primeiro explica como o rastro de cheiro se forma, o segundo conta o experimento da ponte dupla, e o terceiro mostra por que isso interessa mesmo a quem não estuda formigas.",
+          "veredito": "espera_se",
+          "motivo": "Explica a funcao dos tres intertitulos com o conteudo de cada um, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Os intertitulos ajudam o leitor a saber do que cada parte vai falar antes de ler. O primeiro explica o cheiro que vira caminho, o segundo conta o experimento da ponte e o terceiro fala por que isso interessa a quem nao e formiga.",
+          "veredito": "espera_se",
+          "motivo": "Explica a funcao dos tres intertitulos com o conteudo de cada um, como pede o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Os intertítulos servem para organizar o texto em partes e ajudar o leitor a saber o que vai ser explicado em cada trecho. \"O cheiro que vira caminho\" (linha 8) explica o que é o feromônio e como ele funciona, \"O experimento da ponte dupla\" (linha 19) conta a pesquisa que provou essa ideia, e \"Por que isso interessa a quem não é formiga\" (linha 30) mostra a utilidade da descoberta para as pessoas. Cada parte cumpre uma função diferente dentro da explicação geral.",
+          "veredito": "espera_se",
+          "motivo": "Explica a funcao dos tres intertitulos com citacoes e o conteudo de cada um, como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 5,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Quando a comida acaba, as formigas deixam de passar por ali e de reforçar o rastro, então o cheiro do feromônio enfraquece aos poucos e a trilha desaparece sozinha. O texto chama isso de detalhe importante porque mostra que a colônia não precisa de ninguém para avisar que a comida acabou, o próprio chão esquece o caminho.",
+          "veredito": "espera_se",
+          "motivo": "Explica o enfraquecimento do rastro e por que isso é importante, os dois pontos que o critério pede."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Quando a comida acaba, as formigas param de reforçar o cheiro, ele evapora em algumas horas e a trilha some sozinha. É importante porque assim a colônia esquece o caminho sem precisar que ninguém avise.",
+          "veredito": "espera_se",
+          "motivo": "A resposta explica que o rastro evapora, a trilha some e a colônia abandona o caminho sem precisar de aviso, reproduzindo o espera_se quase à letra."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Quando a comida acaba, as formigas param de reforçar o rastro porque não tem mais motivo para ir até lá, e como o feromônio evapora, o cheiro vai enfraquecendo ao longo de algumas horas até a trilha sumir de vez. O texto chama isso de detalhe importante porque assim a colônia não precisa de ninguém avisando que a comida acabou, o próprio chão esquece o caminho sozinho. Se o cheiro ficasse para sempre, as formigas continuariam andando à toa por um caminho que não leva a nada. Na minha opinião é um jeito bem inteligente da natureza resolver um problema sem precisar de um chefe mandando parar.",
+          "veredito": "espera_se",
+          "motivo": "Explica os dois pontos pedidos, o desaparecimento do rastro e a razão de ser um detalhe importante."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok",
+        "motivo": "As variantes que testei, inclusive a que liga a evaporação à dica de limpar o chão da cozinha, trazem junto a ideia de que o caminho inútil se apaga sozinho."
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 7,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "No começo as formigas se dividiam quase igualmente entre os dois ramos, mas as que iam pelo ramo curto chegavam e voltavam mais rápido, deixando feromônio nele mais cedo. Com mais cheiro, o ramo curto passou a atrair mais formigas, que deixavam ainda mais feromônio, até que a maior parte da fila passasse a segui-lo.",
+          "veredito": "espera_se",
+          "motivo": "Explica passo a passo a divisão inicial e o ciclo de reforço do cheiro, como o critério pede."
+        },
+        {
+          "leitor": "B",
+          "resposta": "As formigas do ramo curto chegavam e voltavam mais rápido, então deixavam cheiro nele primeiro. Isso atraiu mais formigas para o ramo curto, e o cheiro foi ficando cada vez mais forte por lá.",
+          "veredito": "aceita_se",
+          "motivo": "A resposta traz a ideia de reforço, chegar e voltar mais rápido atrai mais formigas e fortalece o cheiro, mas omite a divisão inicial igualitária e o resultado numérico final do espera_se, cabendo na entrada aceita que permite passos resumidos desde que a ideia de reforço apareça."
+        },
+        {
+          "leitor": "C",
+          "resposta": "No começo as formigas se dividiam quase igual entre os dois ramos, porque nenhuma delas sabia qual caminho era mais curto. As que foram pelo ramo curto chegaram e voltaram mais rápido, então deixaram feromônio ali primeiro, e cheiro mais forte atrai mais formiga, que reforça o rastro ainda mais. Esse é um ciclo que vai se alimentando sozinho, quanto mais formiga passa, mais cheiro fica, e mais formiga escolhe aquele ramo. Depois de meia hora mais de oito em cada dez formigas já seguiam pelo ramo curto, e o texto deixa bem claro que nenhuma formiga mediu os dois ramos, a escolha surgiu só da soma de muitas decisões pequenas.",
+          "veredito": "espera_se",
+          "motivo": "Explica todos os passos do ciclo de reforço, incluindo a proporção final, como o critério espera."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok",
+        "motivo": "A cadeia que escrevi sem fechar o ciclo em voz alta ainda diz mais cheiro e mais formigas, que é o reforço exigido em aceita_se."
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 9,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A palavra esquece vem entre aspas porque o chão não esquece de verdade, já que ele não pensa nem tem memória. O texto usa essa palavra apenas para comparar o sumiço do cheiro com o esquecimento, num sentido de comparação.",
+          "veredito": "espera_se",
+          "motivo": "Explica que as aspas indicam comparacao, ja que o chao nao tem memoria, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A palavra esta entre aspas porque o chao nao esquece de verdade, e so um jeito de dizer que o cheiro sumiu e o caminho parou de existir.",
+          "veredito": "espera_se",
+          "motivo": "Explica que as aspas indicam que o chao nao esquece de verdade, como pede o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A palavra \"esquece\" está entre aspas porque o chão não pensa nem tem memória de verdade, é só uma comparação com o esquecimento humano. O que ela quer dizer ali é que o cheiro do feromônio desaparece, como se o caminho tivesse sido apagado sozinho. As aspas avisam o leitor que a palavra está sendo usada num sentido figurado, não ao pé da letra.",
+          "veredito": "espera_se",
+          "motivo": "Explica que as aspas indicam sentido figurado, ja que o chao nao tem memoria, como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 11,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O conselho é não adiantar matar as formigas da fila, porque o que guia elas é o cheiro do feromônio, e não a própria formiga, então enquanto o rastro existir outras formigas vão continuar seguindo ele. Por isso o certo é limpar o chão para apagar o cheiro e fechar o açucareiro, atacando a causa que o texto explicou.",
+          "veredito": "espera_se",
+          "motivo": "Explica que matar as formigas nao resolve e que e preciso limpar o rastro e fechar o acucareiro, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Como o rastro e feito de cheiro e nao das formigas, matar as formigas nao resolve, porque o cheiro continua la. Por isso o certo e limpar o chao para apagar o cheiro.",
+          "veredito": "aceita_se",
+          "motivo": "Explica que limpar o rastro resolve, mas nao menciona fechar o acucareiro, ficando no aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O conselho é que não adianta matar as formigas da fila, e sim limpar o rastro de cheiro e fechar o açucareiro (linhas 36 a 38). Isso decorre da explicação porque, se o feromônio ainda estiver no chão, outras formigas vão continuar seguindo o rastro mesmo que as primeiras desapareçam. Então o problema de verdade é o cheiro, não as formigas em si, e por isso o jeito certo de resolver é apagar esse rastro.",
+          "veredito": "espera_se",
+          "motivo": "Explica que matar as formigas nao resolve e que e preciso limpar o rastro e fechar o acucareiro, com citacao, como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 13,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Dar o nome da universidade, o país e o ano torna a informação verificável e mostra que se trata de um experimento real e específico, e não de uma afirmação vaga, o que dá mais credibilidade ao texto.",
+          "veredito": "espera_se",
+          "motivo": "Explica que a informação torna a pesquisa verificável e dá credibilidade, como o critério espera."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Dar o nome da universidade e o ano mostra que é um fato real e que dá para conferir, não uma coisa inventada.",
+          "veredito": "espera_se",
+          "motivo": "A resposta diz que citar universidade e ano mostra que é um fato real e conferível, e não uma invenção, reproduzindo o espera_se quase à letra."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O texto dá o nome da universidade e o ano porque assim a informação fica mais confiável, dá até para checar se quiser, em vez de só confiar numa frase vaga. Dizer cientistas descobriram poderia ser qualquer pessoa, em qualquer lugar e qualquer época, mas falar Universidade Livre de Bruxelas e 1989 mostra que teve gente de verdade fazendo esse experimento. Isso é bem comum em textos de divulgação científica, porque dá mais credibilidade ao que está sendo contado. Na minha opinião isso também ajuda o leitor a entender que não é lenda nem invenção, é um fato que pode ser conferido por outras pessoas.",
+          "veredito": "espera_se",
+          "motivo": "Explica com detalhe a credibilidade e a possibilidade de conferir a pesquisa, como o critério espera."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok",
+        "motivo": "As respostas alternativas, de separar pesquisa de opinião a mostrar que a fonte pode ser procurada, caem em dar credibilidade ou em mostrar que não é invenção do autor."
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 14,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Essa abertura serve para prender a atenção do leitor com uma cena que ele já deve ter visto na vida real, antes de entrar na explicação científica mais complicada. Assim o assunto fica mais fácil de entender e mais interessante logo de início.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que a cena prende a atencao do leitor antes da explicacao cientifica, batendo com a entrada do aceita_se sobre 'prender ou enganchar'."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Essa abertura serve para o leitor se lembrar de algo que ele ja viu, ficando mais facil de entender a explicacao que vem depois.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que a cena aproxima o leitor de algo ja visto, batendo com a entrada do aceita_se, sem tratar da necessidade de comecar pelo conhecido."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A abertura com a cena da cozinha serve para aproximar o assunto científico da experiência do leitor, já que muita gente já viu formigas em fila em casa. Isso prende a atenção antes de entrar na explicação mais técnica sobre o feromônio. Assim o texto fica mais fácil de entender, porque começa com algo familiar antes de explicar a ciência por trás.",
+          "veredito": "aceita_se",
+          "motivo": "Liga a cena da cozinha ao familiar antes da ciencia, mas nao diz que sem essa cena muita gente pararia de ler, ficando no aceita_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 16,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Uma diferença é que a notícia conta um fato específico que aconteceu num dia certo, enquanto esse texto explica algo que acontece sempre, sem data marcada. Outra diferença é o tempo dos verbos: a notícia costuma usar o passado para contar o que já aconteceu, e esse texto usa bastante o presente, porque fala de algo que é sempre verdade.",
+          "veredito": "espera_se",
+          "motivo": "Da duas diferencas corretas (assunto/data e tempo verbal), como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Uma diferenca e que a noticia fala de um fato que aconteceu, e esse texto explica como uma coisa funciona sempre. Outra diferenca e que esse texto tem intertitulos explicando um assunto de ciencia, e os verbos estao no presente para mostrar algo que sempre acontece.",
+          "veredito": "espera_se",
+          "motivo": "Da duas diferencas corretas (assunto e verbos/estrutura), como pede o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Uma diferença é o assunto: a notícia costuma falar de um fato recente e específico, enquanto este texto explica um fenômeno da natureza que não tem uma data de acontecimento. Outra diferença é o tempo dos verbos: a notícia geralmente usa o passado para contar o que aconteceu, mas este texto usa bastante o presente, como em \"anda de forma quase aleatória\" (linha 9), porque está explicando algo que acontece sempre, e não um fato único.",
+          "veredito": "espera_se",
+          "motivo": "Da duas diferencas corretas (assunto/data e tempo verbal), com citacao, como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 17,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O texto se dirige ao leitor logo no início, quando fala em quem já viu uma fila de formigas atravessando a cozinha, e no final, quando dá o conselho sobre o açucareiro. Isso deixa o texto mais próximo da vida do leitor e mostra que a ciência também serve para resolver problemas do dia a dia.",
+          "veredito": "espera_se",
+          "motivo": "Aponta os dois trechos que se dirigem ao leitor e explica o efeito de aproximacao, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Um trecho e quem ja viu uma fila de formigas atravessando a cozinha e outro e a licao do final sobre limpar o chao. Isso deixa o texto de ciencia mais proximo do leitor, como se estivesse conversando com ele.",
+          "veredito": "espera_se",
+          "motivo": "Aponta os dois trechos que se dirigem ao leitor e explica o efeito de aproximacao, como pede o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O texto se dirige ao leitor em \"Quem já viu uma fila de formigas atravessando a cozinha\" (linha 4) e em \"não adianta matar as formigas da fila\" (linha 37), que é quase um conselho direto para quem está lendo. Esse efeito aproxima o texto científico da vida do leitor, fazendo parecer uma conversa e não uma explicação distante. Isso ajuda a prender a atenção de quem está lendo sobre um assunto de ciência.",
+          "veredito": "espera_se",
+          "motivo": "Aponta os dois trechos que se dirigem ao leitor, com citacoes, e explica o efeito de aproximacao, como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    }
+  ],
+  "resultado": {
+    "aprovadas": [
+      2,
+      4,
+      5,
+      7,
+      9,
+      11,
+      13,
+      14,
+      16,
+      17
+    ],
+    "ambiguas": [],
+    "estreitas": [],
+    "largas": []
+  },
+  "historico": [
+    {
+      "assinatura": "20fb22e181004ac9cf0f72b9446b4709a3b5a118a181f8d103656fd62d0cc079",
+      "data": "2026-09-08",
+      "resultado": {
+        "aprovadas": [
+          2,
+          4,
+          5,
+          7,
+          9,
+          11,
+          13,
+          14,
+          16,
+          17
+        ],
+        "ambiguas": [],
+        "estreitas": []
+      }
+    }
+  ]
+}

@@ -25,13 +25,14 @@ Uso:
         materia>/ na saida. E como se prova o caminho de uma materia nova sem
         deixar tema falso dentro do repositorio.
     python gerar_banco.py --fontes DIR           outra raiz para a colecao de textos
+    python gerar_banco.py --painel DIR           outra raiz para os registros do painel cego
+    python gerar_banco.py --ano 2027             faz a conta do dominio publico em outro ano
 """
 import io
 import os
 import re
 import sys
 import json
-import glob
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import verificar
@@ -335,7 +336,7 @@ def _envelope(materia, corpo):
     return envelope
 
 
-def gerar_materia(materia, temas, pasta_banco, raiz_temas):
+def gerar_materia(materia, temas, pasta_banco, raiz_dos_temas_do_banco):
     """Grava o indice, um arquivo por serie, o indice de busca e o banco inteiro.
 
     Sao dois niveis, de proposito. O indice e leve e carrega sempre, para a
@@ -401,7 +402,11 @@ def gerar_materia(materia, temas, pasta_banco, raiz_temas):
     # juntar serie: temas/banco.json e o nome legado, lido pelos pilotos de
     # figuras/; materia nova ganha temas/banco-<id>.json ao lado.
     nome_banco = 'banco.json' if legada else 'banco-%s.json' % materia['id']
-    caminho_banco = os.path.join(raiz_temas, nome_banco)
+    # A raiz aqui e a de SAIDA, e nao a de entrada: com --saida apontando para uma pasta
+    # temporaria, este arquivo tem que ir para la tambem. Enquanto ele saia sobre a raiz
+    # de entrada, nao existia ensaio a seco: quem rodasse --saida num scratchpad, achando
+    # que nao tocava no repositorio, sobrescrevia o temas/banco.json de verdade, sem aviso.
+    caminho_banco = os.path.join(raiz_dos_temas_do_banco, nome_banco)
     banco = _envelope(materia, {'temas': temas})
     _gravar(caminho_banco, banco)
 
@@ -414,7 +419,8 @@ def gerar_materia(materia, temas, pasta_banco, raiz_temas):
     return banco
 
 
-def gerar(raiz_temas=None, raiz_saida=None, so=None, raiz_fontes=None):
+def gerar(raiz_temas=None, raiz_saida=None, so=None, raiz_fontes=None, raiz_painel=None,
+          ano=None):
     """Gera o que o aplicativo consome, para cada materia que tem tema escrito.
 
     Materia declarada na tabela mas ainda sem tema nao gera nada: escrever um
@@ -437,7 +443,10 @@ def gerar(raiz_temas=None, raiz_saida=None, so=None, raiz_fontes=None):
         if so and materia['id'] != so:
             continue
         pasta = materia['temas']['pasta']
-        arquivos = sorted(glob.glob(os.path.join(raiz_temas, pasta, '*', '*.md')))
+        # A lista de arquivos e a do verificador, e nao um curinga proprio: a
+        # pasta _painel/ mora ao lado das series e nao pode virar serie aqui
+        # depois de ter deixado de ser serie la.
+        arquivos = verificar.arquivos_da_materia(materia, raiz_temas)
         if not arquivos:
             print('%s: nenhum tema escrito ainda em %s/, nada gerado' % (materia['id'], pasta))
             continue
@@ -445,7 +454,12 @@ def gerar(raiz_temas=None, raiz_saida=None, so=None, raiz_fontes=None):
         temas = []
         reprovados = []
         for caminho in arquivos:
-            erros, avisos, manuais, cab = verificar.conferir(caminho, raiz_fontes)
+            # sem_painel=False escrito de proposito: quem escreve tema pode
+            # desligar a conferencia do painel cego na linha de comando do
+            # verificador, para ver o resto passar antes de rodar os leitores. O
+            # gerador nunca desliga, porque e ele que grava o que o tablet baixa.
+            erros, avisos, manuais, cab = verificar.conferir(
+                caminho, raiz_fontes, raiz_painel, sem_painel=False, ano=ano)
             if erros:
                 reprovados.append((os.path.basename(caminho), erros[0]))
                 continue
@@ -455,7 +469,13 @@ def gerar(raiz_temas=None, raiz_saida=None, so=None, raiz_fontes=None):
         # banco/<id>/
         partes = [p for p in materia['temas']['raiz'].split('/') if p]
         pasta_banco = os.path.join(raiz_saida, *partes)
-        bancos[materia['id']] = gerar_materia(materia, temas, pasta_banco, raiz_temas)
+        # o banco inteiro acompanha a raiz de SAIDA: em producao as duas coincidem, e numa
+        # prova com --saida ele fica na pasta temporaria com os arquivos de serie
+        raiz_do_banco = os.path.join(raiz_saida, os.path.basename(RAIZ)) \
+            if os.path.abspath(raiz_saida) != os.path.abspath(RAIZ_PROJETO) else RAIZ
+        if not os.path.isdir(raiz_do_banco):
+            os.makedirs(raiz_do_banco)
+        bancos[materia['id']] = gerar_materia(materia, temas, pasta_banco, raiz_do_banco)
         if reprovados:
             print('')
             print('  %d tema(s) ficaram de fora por nao passarem na conferencia:' % len(reprovados))
@@ -533,7 +553,12 @@ def _argumento(nome):
 
 
 if __name__ == '__main__':
+    # O ano da conta do dominio publico. Sem a opcao vale o relogio, porque a
+    # conta so afrouxa com o tempo; ela existe para a bateria do portao fixar o
+    # ano e nao virar alarme falso numa passagem de ano.
+    _ano = _argumento('--ano')
     bancos = gerar(_argumento('--temas'), _argumento('--saida'),
-                   _argumento('--so'), _argumento('--fontes'))
+                   _argumento('--so'), _argumento('--fontes'), _argumento('--painel'),
+                   int(_ano) if _ano else None)
     if '--provar' in sys.argv and MATERIA_LEGADA in bancos:
         provar(bancos[MATERIA_LEGADA])
