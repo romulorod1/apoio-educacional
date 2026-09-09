@@ -313,6 +313,17 @@ titulo "com navegador"
 # A soma tem logica: 713 MB nao bastaram para o laco continuar, entao o piso
 # precisa cobrir aquele fracasso MAIS o pico de um navegador a mais.
 #
+# E O QUE O PISO GUARDA E A ENTRADA, e nao a travessia. Tres pontos medidos em
+# 08/09 dizem isso:
+#
+#   595 MB no MEIO da bateria, com o navegador ja dentro dela: NAO matou
+#   579 MB ao ENTRAR, com o primeiro navegador subindo:        matou
+#   713 MB ao entrar, degradando depois:                       matou
+#
+# O primeiro navegador sobe enquanto TODO o resto ainda esta carregado, e e ali
+# que estoura. Depois o consumo cai, porque cada teste fecha o dele. Por isso o
+# piso e conferido uma vez, na porta, e nao a cada teste.
+#
 # COMO AJUSTAR, e o numero nao e sagrado. Sobe quando uma morte acontecer acima
 # dele, e a data entra na lista de cima. DESCE quando alguem registrar uma
 # rodada inteira BEM SUCEDIDA abaixo dele, que e a evidencia que hoje falta:
@@ -337,6 +348,10 @@ if [ -n "$livre_mb" ] && [ "$livre_mb" -lt "$PISO_MB" ] 2>/dev/null; then
   printf '                Duas mortes medidas em 08/09, com 713 MB e com 579 MB livres.\n'
 fi
 if [ "$roda_bateria" = "sim" ]; then
+# A SEGUNDA MEDIDA, logo depois do primeiro navegador. A diferenca entre ela e a
+# linha de base e o CUSTO DA ENTRADA, que e o numero que falta para o piso poder
+# descer com dado em vez de palpite. Sai de graca na primeira rodada verde.
+primeiro_navegador=sim
 for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento \
          testa_perfil testa_olho testa_atualizacao testa_atualizacao_real \
          testa_biblioteca_offline \
@@ -344,6 +359,10 @@ for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento 
          testa_assunto testa_aluno testa_familia testa_proposta_tela \
          testa_tabela_no_app; do
   roda "$t" node "_teste/$t.js"
+  if [ "$primeiro_navegador" = "sim" ]; then
+    primeiro_navegador=nao
+    printf '  (depois do primeiro navegador: %s)\n' "$(estado_da_maquina)"
+  fi
 done
 # O mesmo teste duas vezes de proposito. Sem argumento ele prova que a serie
 # de temas baixada sobrevive a uma atualizacao feita sem sinal; com
