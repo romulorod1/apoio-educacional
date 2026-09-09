@@ -55,6 +55,35 @@ estado_da_maquina() {
   printf '%s MB livres, %s navegador(es) vivo(s)' "$livre" "$navs"
 }
 
+# UMA LINHA DE HISTORICO POR RODADA, para o piso poder descer com dado.
+#
+# O numero da porta ja existe, e se perde no log de uma corrida so. Guardando uma
+# linha por rodada, a primeira rodada VERDE de qualquer frente entra sozinha, e
+# em tres ou quatro rodadas o piso se calibra pela distribuicao real em vez de
+# por opiniao. Hoje falta exatamente isso: ha duas mortes anotadas (713 e 579) e
+# nenhuma entrada bem sucedida.
+#
+# O caminho e configuravel e o padrao fica DENTRO do repositorio, ignorado pelo
+# git. Cravar aqui o caminho de um Drive pessoal seria fragil e desnecessario:
+# quem quiser o historico compartilhado entre as frentes aponta PORTAO_HISTORICO
+# para o arquivo comum. Falha de escrita nao derruba o portao: historico e
+# registro, e nao conferencia.
+HISTORICO_MEM="${PORTAO_HISTORICO:-_teste/_memoria.tsv}"
+registra_memoria() {
+  # $1 = livre na porta da bateria (ou vazio), $2 = desfecho
+  # As chaves em volta importam: o 2>/dev/null solto silencia o printf, e quem
+  # reclama de caminho impossivel e o SHELL, na redirecao. Sem elas, um
+  # PORTAO_HISTORICO invalido imprime linha de erro no meio do log do portao.
+  if [ ! -f "$HISTORICO_MEM" ]; then
+    { printf 'data\thora\tlivre_na_porta_MB\tpiso_MB\tdesfecho\torigem\n' > "$HISTORICO_MEM"; } 2>/dev/null || return 0
+  fi
+  # A coluna de origem existe para uma linha anotada a mao nunca se passar por
+  # medida do portao. Daqui a um mes ninguem lembra qual e qual, e o piso vai ser
+  # calibrado com estas linhas.
+  { printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$(date +%Y-%m-%d)" "$(date +%H:%M)" "${1:-?}" "${PISO_MB:-?}" "$2" "portao" >> "$HISTORICO_MEM"; } 2>/dev/null || true
+}
+
 # Roda um teste. Se falhar, roda UMA segunda vez antes de reprovar.
 #
 # Os testes de navegador esperam por tempo fixo depois de recarregar a pagina
@@ -350,6 +379,7 @@ livre_mb=$(powershell -NoProfile -Command \
 # Este numero fica no log de PROPOSITO, em toda rodada, inclusive nas que passam:
 # e a evidencia que falta hoje para o piso poder DESCER com fundamento.
 printf '  (maquina no comeco da bateria: %s, piso %s MB)\n' "$(estado_da_maquina)" "$PISO_MB"
+livre_na_porta=$livre_mb
 roda_bateria=sim
 if [ -n "$livre_mb" ] && [ "$livre_mb" -lt "$PISO_MB" ] 2>/dev/null; then
   roda_bateria=nao
@@ -752,17 +782,23 @@ fi
 
 printf '\n'
 if [ "$falhou" != "0" ]; then
+  registra_memoria "$livre_na_porta" "HA FALHA"
   printf 'HA FALHA. Nao faca o merge antes de resolver.\n'
 elif [ "$nao_conferido" != "0" ]; then
+  registra_memoria "$livre_na_porta" "NAO CONFERIDO"
   # Sem a bateria de navegador o portao NAO conferiu o que promete conferir.
   # Dizer TUDO PASSOU aqui seria aprovar por nao ter rodado, que e a versao
   # macro do teste que aprova por nao afirmar nada.
   printf 'NAO CONFERIDO. O portao nao rodou inteiro, entao ele nao aprova nada.\n'
   printf 'Nao e defeito do ramo: e a maquina. Libere memoria e rode de novo.\n'
 elif [ "$instavel" != "0" ]; then
+  registra_memoria "$livre_na_porta" "TUDO PASSOU (instavel)"
   printf 'TUDO PASSOU, mas algum teste so passou na segunda vez (INSTAVEL acima).\n'
   printf 'Nao e impedimento de merge; e aviso de que aquele teste depende de tempo.\n'
 else
+  # A linha que mais falta hoje: uma rodada VERDE com o numero da porta. E ela
+  # que permite o piso descer com fundamento.
+  registra_memoria "$livre_na_porta" "TUDO PASSOU"
   printf 'TUDO PASSOU. Pode seguir para o merge.\n'
 fi
 # Sai diferente de zero tambem quando nao conferiu: quem automatizar em cima do

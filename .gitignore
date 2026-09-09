@@ -41,3 +41,5 @@ figuras/*_clips.json
 figuras/_tema_*.json
 # PDF de prova gerado na raiz pelo testa_formula
 /_prova_formula.pdf
+# historico de memoria do portao, uma linha por rodada
+_teste/_memoria.tsv
