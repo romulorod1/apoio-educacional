@@ -31,8 +31,27 @@
  * pdf.js). Os quatro já estão na lista abaixo, que continua igual. O v22
  * (08/09/2026) acrescenta uma linha à lista, a primeira desde o v16, que levou
  * o './cartao.js': é o índice dos temas de português. Aí o nome novo é
- * obrigatório pelo motivo original, e não pelo hábito do release. */
-var CACHE = 'apoio-educacional-v22';
+ * obrigatório pelo motivo original, e não pelo hábito do release.
+ *
+ * O v27 (09/09/2026) é da série de bumps de conteúdo, e é o mais enxuto dela: a
+ * lista continua igual e o que muda é o CONTEÚDO de UM arquivo que já está nela,
+ * o './figuras/receitas.js', onde nasceu a receita das duas retas cortadas por
+ * uma transversal.
+ *
+ * UM arquivo, e nenhum do banco, e isso não é acidente: este ramo ainda não
+ * regenerou o banco. As diretivas dos cinco temas de retas entram no lote 3, e é
+ * esse lote que vai mudar o './banco/busca.json' de novo. O bump de hoje protege
+ * só o kit: sem nome novo, o tablet serviria o receitas.js velho do cache antigo
+ * e a figura das retas sairia muda na folha, sem erro nenhum, na casa da família
+ * e muitas vezes sem sinal.
+ *
+ * Ele salta o v23, o v24, o v25 e o v26, que estão noutros quatro ramos de
+ * figuras. A ordem e o número de cada ramo não se leem aqui, de propósito:
+ * vivem em `Consolidado/Retomada/ORDEM-DE-MERGE-E-CACHE.md`, e quem mergear
+ * depois confere o número lá e sobe se preciso. Comentário que copia um valor de
+ * fora envelhece a cada correção; apontar para onde o valor mora não envelhece,
+ * desde que o lugar apontado exista, o que já falhou uma vez e foi consertado. */
+var CACHE = 'apoio-educacional-v27';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
