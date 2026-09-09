@@ -16,6 +16,13 @@ instavel=0
 # pode dizer TUDO PASSOU nem sair com zero: "portao verde rodado solto uma vez"
 # deixa de estar satisfeito EXPLICITAMENTE, e nao por omissao.
 nao_conferido=0
+# O QUE ficou sem conferir, para o resumo dizer em vez de supor.
+nao_conferido_motivos=""
+anota_nao_conferido() {
+  nao_conferido=1
+  nao_conferido_motivos="$nao_conferido_motivos
+  - $1"
+}
 titulo() { printf '\n=== %s ===\n' "$1"; }
 
 # Quantas verificacoes falharam na saida de um teste (vazio = nenhuma).
@@ -567,7 +574,7 @@ livre_na_porta=$livre_mb
 roda_bateria=sim
 if [ -n "$livre_mb" ] && [ "$livre_mb" -lt "$PISO_MB" ] 2>/dev/null; then
   roda_bateria=nao
-  nao_conferido=1
+  anota_nao_conferido "a bateria de navegador, por falta de memoria na maquina"
   printf '  NAO CONFERIDO %-19s a bateria nao rodou: %s MB livres, piso %s MB\n' \
     "com navegador" "$livre_mb" "$PISO_MB"
   printf '                isto e a MAQUINA e nao o ramo. Feche o que puder e rode de novo.\n'
@@ -685,8 +692,9 @@ if [ -n "$base" ]; then
   sw_antes=$(git show "$base:sw.js" 2>/dev/null | tr -d '\r' || true)
 fi
 if [ -z "$sw_antes" ] || [ -z "$sw_agora" ]; then
-  printf '  INSTAVEL %-23s sem base de merge com sw.js para comparar\n' "nome do cache"
-  instavel=1
+  # NAO CONFERIDO, e nao instavel: nao comparar nao e passar na segunda vez.
+  printf '  NAO CONFERIDO %-19s sem base de merge com sw.js para comparar\n' "nome do cache"
+  anota_nao_conferido "o nome do cache no sw.js, por falta de base de merge"
 elif [ "$lista_agora" = "$(entradas_sw "$(lista_sw "$sw_antes")")" ]; then
   printf '  ok      %-24s a lista nao mudou desde a base do merge\n' "nome do cache"
 elif [ "$(nome_sw "$sw_agora")" != "$(nome_sw "$sw_antes")" ]; then
@@ -756,8 +764,9 @@ if [ "$f_cache" != "0" ]; then
 elif [ -z "$base" ] || [ -z "$sw_antes" ] || [ -z "$sw_agora" ]; then
   # A MESMA guarda da trava vizinha, de proposito. Com base presente e sw.js
   # ausente na base, a vizinha dizia INSTAVEL e esta dizia ok verde.
-  printf '  INSTAVEL %-23s sem base de merge com sw.js para comparar o conteudo\n' "conteudo no cache"
-  instavel=1
+  # NAO CONFERIDO, pelo mesmo motivo da vizinha.
+  printf '  NAO CONFERIDO %-19s sem base de merge com sw.js para comparar o conteudo\n' "conteudo no cache"
+  anota_nao_conferido "o conteudo do cache no sw.js, por falta de base de merge"
 else
   # A entrada './' e a raiz e sai como linha VAZIA da extracao, porque o grupo
   # opcional come o './' e o resto casa nada. Quem a remove e este grep -v '^$'.
@@ -982,7 +991,21 @@ if [ "$codigo" = "1" ]; then
   falhou=1
 fi
 if [ "$codigo" = "2" ]; then
-  instavel=1
+  # NAO CONFERIDO, e nao instavel. Sao coisas diferentes e a diferenca decide o
+  # merge: `instavel` neste portao quer dizer "passou na segunda tentativa,
+  # depende de tempo, NAO impede merge", e o 2 desta trava quer dizer "eu nao
+  # consegui conferir".
+  #
+  # Medido em 09/09/2026: a conferencia de conteudo le o nome sensivel de um
+  # arquivo que vive FORA do repositorio e fora do Drive
+  # (~/.claude/projects/C--Users-romul/memory/.aluno-sensivel). Sem ele ela sai
+  # com 2, o portao marcava instavel e imprimia TUDO PASSOU com codigo 0. Numa
+  # maquina nova, onde esse arquivo nao existe, o portao aprovaria o merge com a
+  # conferencia do nome de uma crianca sem ter rodado.
+  #
+  # Guarda ausente lida como guarda que passou e o pior silencio que este
+  # repositorio pode ter, porque o repositorio e publico.
+  anota_nao_conferido "o nome do aluno DENTRO dos arquivos, por falta da lista de nomes"
 fi
 
 printf '\n'
@@ -995,7 +1018,11 @@ elif [ "$nao_conferido" != "0" ]; then
   # Dizer TUDO PASSOU aqui seria aprovar por nao ter rodado, que e a versao
   # macro do teste que aprova por nao afirmar nada.
   printf 'NAO CONFERIDO. O portao nao rodou inteiro, entao ele nao aprova nada.\n'
-  printf 'Nao e defeito do ramo: e a maquina. Libere memoria e rode de novo.\n'
+  # DIZER o que ficou de fora, e nao supor a causa. Enquanto a unica entrada
+  # neste estado era a bateria, "libere memoria" era conselho certo; com tres
+  # entradas, mandar liberar memoria por falta de base de merge e conselho
+  # errado, e conselho errado num resumo e pior que conselho nenhum.
+  printf 'Ficou sem conferir:%b\n' "$nao_conferido_motivos"
 elif [ "$instavel" != "0" ]; then
   registra_memoria "$livre_na_porta" "TUDO PASSOU (instavel)"
   printf 'TUDO PASSOU, mas algum teste so passou na segunda vez (INSTAVEL acima).\n'
