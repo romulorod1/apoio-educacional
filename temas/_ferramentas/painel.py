@@ -23,7 +23,7 @@ Opcoes de raiz, iguais as do verificador:
     --painel DIR   outra raiz para os registros (por padrao temas/<pasta>/_painel)
     --saida DIR    onde exportar e criterios gravam (por padrao uma pasta temporaria)
 
-O pacote cego NAO pode conter gabarito. A ferramenta reprova a si mesma (sai 2)
+O pacote cego NAO pode conter gabarito. A ferramenta reprova a si mesma (sai 1)
 se a palavra espera_se, aceita_se, nao_aceita ou ancora aparecer nele: um leitor
 que enxerga o criterio nao esta lendo como aluno, e o painel inteiro passaria a
 nao provar nada.
@@ -623,7 +623,9 @@ def main():
             if vazou:
                 print('o pacote cego de %s traz palavra de gabarito: %s. O leitor nao pode ver o '
                       'criterio, senao o painel nao prova nada.' % (ident, ', '.join(vazou)))
-                return 2
+                # 1, e nao 2: vazamento e defeito achado. O 2 desta ferramenta quer dizer
+                # "nao consegui conferir" (uso errado, tema inexistente, arquivo faltando).
+                return 1
             pasta = saida or tempfile.mkdtemp(prefix='painel_')
             destino = _gravar_pacote(pasta, ident, 'pacote', pacote)
             print('pacote cego de %s: %d questao(oes) aberta(s)' % (ident, len(pacote['questoes'])))
@@ -653,10 +655,15 @@ def main():
                 else:
                     print('  %d: %s' % (questao['n'], questao['resultado']))
             contas = registro['resultado']
-            print('%d aprovadas, %d ambiguas, %d estreitas.'
-                  % (len(contas['aprovadas']), len(contas['ambiguas']), len(contas['estreitas'])))
+            # os quatro estados, e nao tres: um estado novo no registro que nao apareca
+            # aqui faz o resumo dizer aprovado sobre o arquivo que o portao reprova.
+            ruins = [n for chave in ('ambiguas', 'estreitas', 'largas')
+                     for n in (contas.get(chave) or [])]
+            print('%d aprovadas, %d ambiguas, %d estreitas, %d largas.'
+                  % (len(contas['aprovadas']), len(contas['ambiguas']),
+                     len(contas['estreitas']), len(contas.get('largas') or [])))
             print('registro em %s' % destino)
-            return 0 if not contas['ambiguas'] and not contas['estreitas'] else 1
+            return 0 if not ruins else 1
 
         erros = conferir_registro(caminho, raiz_painel)
         if erros:

@@ -1187,6 +1187,47 @@ def testar_ensaio_a_seco():
     return falhas, total
 
 
+def testar_resumo_do_montar():
+    # O resumo do verbo `montar` tem que conhecer os MESMOS estados que a conferencia do
+    # portao. Quando o estado `largas` entrou no registro, o resumo continuou contando tres,
+    # e uma questao reprovada por criterio largo saia como "0 ambiguas, 0 estreitas" com
+    # codigo 0, enquanto o portao reprovava o mesmo arquivo. O resumo dizia aprovado e a
+    # trava dizia reprovado sobre o mesmo dado.
+    #
+    # A prova e por particao: para cada estado ruim, o resumo conta um e devolve 1; com
+    # nenhum, conta zero e devolve 0. Estado novo que nao apareca aqui quebra o caso limpo.
+    import painel
+    falhas, total = 0, 0
+    casos = [
+        ({"aprovadas": [1, 2], "ambiguas": [], "estreitas": [], "largas": []}, 0, "nenhum estado ruim"),
+        ({"aprovadas": [2], "ambiguas": [1], "estreitas": [], "largas": []}, 1, "uma ambigua"),
+        ({"aprovadas": [2], "ambiguas": [], "estreitas": [1], "largas": []}, 1, "uma estreita"),
+        ({"aprovadas": [2], "ambiguas": [], "estreitas": [], "largas": [1]}, 1, "uma larga"),
+    ]
+    for contas, esperado, nome in casos:
+        total += 1
+        ruins = [n for chave in ("ambiguas", "estreitas", "largas")
+                 for n in (contas.get(chave) or [])]
+        deu = 0 if not ruins else 1
+        if deu == esperado:
+            print("  OK     resumo do montar: %s devolve %d" % (nome, esperado))
+        else:
+            print("  FALHA  resumo do montar: %s devolveu %d e esperava %d"
+                  % (nome, deu, esperado))
+            falhas += 1
+
+    # e o resumo tem que CONTAR os quatro, senao ele esconde o estado no texto
+    total += 1
+    fonte = io.open(os.path.join(os.path.dirname(os.path.abspath(painel.__file__)),
+                                 "painel.py"), encoding="utf-8").read()
+    if "%d aprovadas, %d ambiguas, %d estreitas, %d largas." in fonte:
+        print("  OK     resumo do montar: a linha impressa conta os quatro estados")
+    else:
+        print("  FALHA  resumo do montar: a linha impressa nao conta os quatro estados")
+        falhas += 1
+    return falhas, total
+
+
 def testar_historico_do_painel():
     # O registro do painel guarda o resumo das rodadas anteriores: sem isso, quem le
     # daqui a seis meses nao sabe que uma questao teve leituras fora do criterio antes
@@ -1457,6 +1498,10 @@ def rodar():
         total += quantos
 
         parciais, quantos = testar_historico_do_painel()
+        falhas += parciais
+        total += quantos
+
+        parciais, quantos = testar_resumo_do_montar()
         falhas += parciais
         total += quantos
 
