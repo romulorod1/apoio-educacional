@@ -632,6 +632,18 @@ else
   sumidos=""
   fora_do_git=""
   caixa_trocada=""
+  # QUEM PROCURA TEM QUE DIZER QUANTO OLHOU.
+  #
+  # Sem estes contadores, uma lista_agora vazia faz o laco nao rodar, mudados
+  # ficar vazio, e esta trava imprimir "ok: nenhum arquivo do pacote mudou".
+  # Verde, afirmando sobre ZERO arquivos. A trava vizinha reprova a lista vazia,
+  # entao o portao nao aprovaria o merge, mas esta linha continuaria mentindo, e
+  # mentira verde no meio de um log e o que ensina a nao ler o log.
+  #
+  # "Zero achados" sozinho e indistinguivel de cegueira. "Zero achados em 37 de
+  # 37" e uma afirmacao.
+  na_lista=0
+  conferidos=0
   # IFS so com quebra de linha, e glob desligado em volta do laco. Sem isso,
   # caminho com espaco vira duas palavras, nenhuma existe, as duas caem no
   # continue, e o arquivo sai da conferencia sem uma linha de aviso.
@@ -646,6 +658,7 @@ else
 '
   set -f
   for c in $caminhos; do
+    na_lista=$((na_lista + 1))
     if [ ! -f "$c" ]; then
       # Caixa trocada quer dizer o literal falhar E o icase achar. Sondar so o
       # icase aqui acusava caixa para arquivo rastreado no caminho EXATO e
@@ -685,6 +698,7 @@ else
       fi
       continue
     fi
+    conferidos=$((conferidos + 1))
     if ! git --literal-pathspecs diff --quiet "$base" -- "$c" 2>/dev/null; then
       mudados="$mudados $c"
     fi
@@ -693,7 +707,13 @@ else
   IFS=$ifs_antes
   nome_agora=$(nome_sw "$sw_agora")
   nome_antes=$(nome_sw "$sw_antes")
-  if [ -z "$nome_agora" ] || [ -z "$nome_antes" ]; then
+  if [ "$na_lista" = "0" ]; then
+    # Nao e "nada mudou": e "nao olhei nada". As duas saidas sao iguais para quem
+    # le, e so uma delas e uma conferencia.
+    printf '  FALHOU  %-24s a lista ARQUIVOS do sw.js veio vazia: nao conferi arquivo nenhum\n' \
+      "conteudo no cache"
+    falhou=1
+  elif [ -z "$nome_agora" ] || [ -z "$nome_antes" ]; then
     # Nome vazio passava como "promovido", porque vazio e diferente de v22. Uma
     # reformatacao do sw.js (aspas duplas, const, espaco a mais) faria nome_sw
     # devolver vazio, e a trava imprimiria ok com o nome em branco.
@@ -729,7 +749,8 @@ else
         "conteudo no cache" "$nome_agora" "$mudados"
       falhou=1
     elif [ -z "$mudados" ]; then
-      printf '  ok      %-24s nenhum arquivo do pacote mudou de conteudo desde a base\n' "conteudo no cache"
+      printf '  ok      %-24s nenhum dos %s arquivos do pacote mudou de conteudo desde a base\n' \
+        "conteudo no cache" "$conferidos"
     else
       printf '  ok      %-24s%s arquivo(s) do pacote mudaram e o cache subiu para %s\n' \
         "conteudo no cache" "$(printf '%s' "$mudados" | wc -w | tr -d ' ')" "$nome_agora"
