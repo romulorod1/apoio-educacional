@@ -93,6 +93,18 @@ livre_amostrado() {
   printf '%s|%s %s %s' "$la_menor" "$la_1" "$la_2" "$la_3"
 }
 
+# LINHA ANOTADA A MAO DEIXA A COLUNA DA PORTA VAZIA quando a medida nao for de
+# porta. Nome de coluna e uma AFIRMACAO sobre o numero que esta nela, e quem le
+# a tabela depois le a afirmacao da coluna, nao a ressalva no texto ao lado.
+#
+# Aconteceu comigo em 09/09/2026: pus os 595 MB medidos NO MEIO da bateria na
+# coluna livre_na_porta_MB, escrevi "nao e leitura de porta" no desfecho, e
+# depois li a minha propria tabela concluindo que havia uma morte com 713 ACIMA
+# de uma sobrevivencia com 595, e que o numero da porta nao predizia a morte.
+# Falso: 713 e 579 sao medidas de PORTA e 595 e de TRAVESSIA, e o bloco do piso
+# la embaixo ja explicava a diferenca. Nome igual e unidade igual nao fazem duas
+# medidas comparaveis.
+#
 # UMA LINHA DE HISTORICO POR RODADA, para o piso poder descer com dado.
 #
 # O numero da porta ja existe, e se perde no log de uma corrida so. Guardando uma
