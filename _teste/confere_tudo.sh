@@ -529,27 +529,48 @@ titulo "com navegador"
 # DE ONDE VEM O PISO, e ele e DERIVADO e nao escolhido.
 #
 #   maior fracasso conhecido na porta ... 713 MB livres
-#   custo MEDIDO de entrar na bateria ... 510 MB
+#   pior custo medido, tres perfis ...... 567 MB
 #   ------------------------------------------------------
-#   piso ................................ 1200 MB (713 + 510, arredondado)
+#   piso ................................ 1280 MB (713 + 567)
 #
 # O PISO SUBIU EM 09/09/2026, e a formula nao mudou: mudou a segunda parcela.
-# Ela era 257 MB, o pico de UM navegador medido ISOLADO, e virou 510 MB, o custo
-# de ENTRAR na bateria com todo o resto ainda carregado. Sao grandezas
-# diferentes, e a antiga estava no lugar da nova.
+# Ela era 257 MB, o pico de UM navegador medido ISOLADO, e a grandeza certa e
+# quanto a bateria consome A PARTIR DA PORTA, porque e com a leitura da porta
+# que o piso e comparado. Sao grandezas diferentes, e a antiga estava no lugar
+# da nova.
 #
-# Os 510 saem de um amostrador que roda POR FORA do portao, 128 leituras em 524 s
-# numa rodada que passou: 1699 MB antes da bateria, 1187 aos 39 s (queda de 512
-# em treze segundos), planalto entre 1200 e 1400 pelos 470 s seguintes, e 1727
-# depois de fechar. Medir por dentro nao da: quando o portao le, o navegador do
-# primeiro teste ja fechou.
+# O numero passou por duas correcoes antes de assentar, e as duas ficam ditas
+# porque explicam por que nao se deve confiar na primeira medida de nada:
+#
+#   1. o primeiro valor reportado, 510, era a QUEDA entre amostras vizinhas, e
+#      nao o consumo a partir da porta. Foi retirado por quem o mediu;
+#   2. o segundo, tirado da amostra mais funda de cada perfil, estava inflado por
+#      leitura solta. Com "fundo" definido como PATAMAR (a mediana das cinco
+#      leituras mais baixas) os tres perfis descem. A escolha escondida dentro da
+#      palavra "fundo" valia 40 MB em dois perfis e 131 MB no terceiro.
+#
+# Os tres perfis, dois operadores, mesma regua:
+#
+#   figuras-eq     porta 1761  fundo 1194  ->  567   <- o pior, e o que a formula usa
+#   figuras-lote1  porta 1560  fundo 1047  ->  513
+#   frente1        porta 1512  fundo 1040  ->  472
+#
+# Medidos com um amostrador que roda POR FORA do portao, porque por dentro nao
+# da: quando o portao le, o navegador do primeiro teste ja fechou.
 #
 # O QUE ESTA MUDANCA NAO E, e isto importa para quem ajustar depois: NAO e
-# fronteira medida. Nenhum dos seis pontos de porta conhecidos cai entre 950 e
-# 1200, entao os dois pisos classificam os seis igualmente bem e o dado NAO
+# fronteira medida. Nenhum ponto de porta conhecido cai entre 950 e 1280, entao
+# qualquer piso nessa faixa classifica os observados igualmente bem e o dado NAO
 # distingue um do outro. E correcao da DERIVACAO, e nao medicao do LIMITE.
 #
-# O que ela corrige e uma promessa implicita. Com custo de 510, um piso de 950
+# E a propria formula e HEURISTICA, e nao derivacao de um limiar de sobrevivencia:
+# "pior fracasso na porta mais o custo" exige, com custo de 567, um fundo de 713,
+# que por acaso e o valor de uma PORTA de uma morte. A forma coincidir nao faz
+# principio. O que os dados dizem e sobre o FUNDO: morre com fundo perto de zero
+# ou de cem, sobrevive com fundo de 1040 para cima. Entre cem e mil nao ha medida
+# nenhuma, e e essa a evidencia que falta.
+#
+# O que ela corrige e uma promessa implicita. Com custo de 567, um piso de 950
 # deixaria 440 MB de fundo; o menor fundo ja observado a sobreviver e 856, na
 # rodada que entrou com 1366. O piso antigo afirmava seguranca 416 MB abaixo de
 # qualquer coisa observada.
@@ -561,7 +582,7 @@ titulo "com navegador"
 #   porta 1659  fundo 1149  passou
 #   porta 1761  fundo 1251  passou
 #
-# E o 510 e UM ponto, de UMA rodada. Um segundo perfil o confirma ou o derruba.
+# Tres perfis, dois operadores. O quarto entra na mesma tabela com a mesma regua.
 #
 # Os 257 MB foram medidos em 08/09/2026 subindo UM Chrome do jeito que os testes
 # sobem (headless novo, perfil proprio, o aplicativo aberto e uma tela usada) e
@@ -571,16 +592,33 @@ titulo "com navegador"
 # A soma tem logica: 713 MB nao bastaram para o laco continuar, entao o piso
 # precisa cobrir aquele fracasso MAIS o custo de entrar na bateria.
 #
-# E O QUE O PISO GUARDA E A ENTRADA, e nao a travessia. Tres pontos medidos em
-# 08/09 dizem isso:
+# O PISO E CONFERIDO UMA VEZ, NA PORTA, E ISSO E UMA ESCOLHA COM LIMITE CONHECIDO.
 #
-#   595 MB no MEIO da bateria, com o navegador ja dentro dela: NAO matou
-#   579 MB ao ENTRAR, com o primeiro navegador subindo:        matou
-#   713 MB ao entrar, degradando depois:                       matou
+# Ate 09/09/2026 o motivo escrito aqui era que o pico e a ENTRADA: o primeiro
+# navegador sobe com todo o resto ainda carregado, e depois o consumo cai porque
+# cada teste fecha o dele. Vinha de tres pontos grossos de 08/09 (595 MB no meio
+# da bateria nao matou; 579 e 713 ao entrar mataram).
 #
-# O primeiro navegador sobe enquanto TODO o resto ainda esta carregado, e e ali
-# que estoura. Depois o consumo cai, porque cada teste fecha o dele. Por isso o
-# piso e conferido uma vez, na porta, e nao a cada teste.
+# TRES PERFIS COMPLETOS, de DOIS operadores, mediram isso em 09/09 e a premissa
+# NAO se sustenta. Com regua unica (fundo = mediana das cinco leituras mais
+# baixas), comparando o fundo da ENTRADA, ate 180 s, com o fundo do RESTO:
+#
+#   figuras-lote1   entrada 1047, tardio 1165   a ENTRADA e pior por 118 MB
+#   frente1         entrada 1199, tardio 1040   o TARDIO e pior por 159 MB
+#   figuras-eq      entrada 1214, tardio 1196   EMPATE, 18 MB
+#
+# Um diz entrada, um diz tardio, um empata: O PIOR MOMENTO NAO TEM LUGAR FIXO.
+#
+# Entao conferir so na porta nao e "suficiente porque o pico e ali": e uma
+# escolha que troca cobertura por simplicidade, e cujo limite agora esta medido.
+# Ela continua defensavel, porque a margem do piso cobre o tardio nas tres
+# rodadas observadas, e porque abortar no meio custa a rodada de qualquer jeito.
+#
+# PENDENCIA REGISTRADA, e nao consertada aqui: uma conferencia no MEIO da
+# bateria, que abortasse limpo em vez de deixar o sistema matar. Morrer no meio
+# custa quinze minutos, nao imprime veredito e deixa servidor orfao; abortar
+# custa dois segundos e diz o numero. E o mesmo argumento que criou a conferencia
+# da porta, aplicado ao lugar que os perfis mostraram.
 #
 # COMO AJUSTAR, e o numero nao e sagrado. Sobe quando uma morte acontecer acima
 # dele, e a data entra na lista de cima. DESCE quando alguem registrar uma
@@ -590,7 +628,7 @@ titulo "com navegador"
 # Piso baixo demais deixa o portao morrer; piso alto demais deixa o portao
 # recusar sem precisar. As duas falhas sao VISIVEIS, e e isso que torna o ajuste
 # barato: uma imprime NAO CONFERIDO com o numero, a outra deixa cadaver.
-PISO_MB=1200
+PISO_MB=1280
 amostra=$(livre_amostrado)
 livre_mb=${amostra%%|*}
 leituras=${amostra#*|}
@@ -623,16 +661,15 @@ if [ "$roda_bateria" = "sim" ]; then
 # O que ela serve para ver: se a maquina ficou pior DEPOIS de um ciclo completo
 # de teste, o que acusaria navegador orfao ou memoria nao devolvida.
 #
-# O CUSTO DE ENTRADA JA TEM MEDIDA, desde 09/09/2026: 510 MB, e nao os 257 do
-# bloco do piso. Os 257 tambem foram medidos, e bem, mas medem OUTRA GRANDEZA:
-# o pico de UM navegador isolado. O custo de entrar e o primeiro navegador
-# subindo com TODO o resto ainda carregado, que e onde as duas mortes
-# aconteceram. Mesmo nome no discurso, condicao diferente, e o dobro do valor.
+# O CUSTO DE ENTRADA TEM MEDIDA DESDE 09/09/2026, e ela vive no BLOCO DO PISO,
+# la em cima, com os tres perfis e a regua. Nao repito o numero aqui de
+# proposito: este comentario ja teve de ser reescrito TRES vezes em duas horas,
+# porque citava um valor que estava a mudar. Apontar para onde o numero vive nao
+# envelhece; copiar o numero envelhece a cada correcao.
 #
-# Veio de onde este comentario dizia que teria de vir: um amostrador POR FORA do
-# portao, comecando antes da bateria. 128 leituras em 524 s, queda de 512 MB em
-# treze segundos aos 39 s, e planalto pelos 470 s seguintes. Foi esse numero que
-# fez o piso subir de 950 para 1200, no bloco la em cima.
+# O que importa saber neste ponto do arquivo e so isto: a medida NAO sai daqui,
+# e sai de um amostrador que roda POR FORA do portao, comecando antes da bateria.
+# Aqui o navegador ja fechou.
 primeiro_navegador=sim
 for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento \
          testa_perfil testa_olho testa_atualizacao testa_atualizacao_real \
