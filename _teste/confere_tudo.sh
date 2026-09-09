@@ -219,6 +219,70 @@ roda() {
 # rodada, esse custo deixa de ser deducao e vira dado.
 printf '\n  (maquina no comeco do portao: %s)\n' "$(estado_da_maquina)"
 
+# TODA PROVA ESTA NO PORTAO, OU NA LISTA DE FORA COM MOTIVO.
+#
+# Aconteceu DUAS vezes na frente de figuras: uma prova de 1013 linhas e 171
+# conferencias existia e nao estava aqui. Na primeira vez foi um revisor que
+# achou; na segunda, a propria frente, muito trabalho depois. Ela afirmava so
+# enquanto alguem lembrasse de roda-la a mao, e ninguem lembra duas vezes.
+#
+# Duas ocorrencias do mesmo esquecimento querem dizer que ele NAO PODE VIVER NA
+# LEMBRANCA. Aqui ele reprova.
+#
+# A lista de fora nao e escape: e declaracao. Cada linha carrega o motivo, e o
+# motivo fica no arquivo para quem vier depois discordar dele. Prova nova que
+# ninguem ligou nao entra na lista sozinha: ela reprova ate alguem decidir.
+#
+# Medido em 09/09/2026: 56 candidatos, 51 no portao, 5 fora. Tres sao exclusao
+# legitima e DOIS sao divida declarada, que e diferente de esquecimento.
+FORA_DO_PORTAO="figuras/_piloto_base.js|biblioteca do piloto de tema, nao afirma nada sozinha; quem afirma e o _prova_piloto_base.js, que esta no portao
+figuras/_prova_desenho_auditor.js|auditor usado pelo _prova_desenho.js, nao roda sozinho
+figuras/_prova_formula.js|gera a folha _prova_formula.pdf para OLHAR, nao imprime placar; quem afirma e o figuras/testa_formula.js
+figuras/_prova_marcas_bloco.js|DIVIDA: imprime 'nenhuma reprova', dialeto que a funcao roda nao le. A prova existe e nao roda. Sai da divida ensinando o dialeto a ela ou trocando a saida da prova
+figuras/_prova_marcas_travas.js|DIVIDA: imprime 'todos os resultados', mesmo caso do bloco acima"
+
+titulo "toda prova no portao"
+# A PROPRIA LISTA DE FORA SAI DA BUSCA, e nao so os comentarios.
+#
+# Ela nao e comentario, e atribuicao, entao os nomes dela apareciam no texto
+# procurado e contavam como "esta no portao": o primeiro ensaio deu "56 de 56, 0
+# fora" onde a medida a mao dava 51 e 5. E a mesma armadilha que este arquivo ja
+# documenta duas vezes, de procurar um nome no arquivo inteiro e ser cegado por
+# uma mencao que nao e chamada.
+sem_comentario=$(sed '/^FORA_DO_PORTAO="/,/"$/d' "$0" | grep -v '^[[:space:]]*#')
+candidatos=0
+no_portao=0
+esquecidas=""
+declaradas=0
+for prova in _teste/testa_*.js figuras/_prova_*.js figuras/_piloto_*.js temas/_ferramentas/testa_*.py; do
+  [ -f "$prova" ] || continue
+  candidatos=$((candidatos + 1))
+  nu=$(basename "$prova"); nu=${nu%.js}; nu=${nu%.py}
+  # Nome NU, porque a bateria de navegador chama pelo laco, sem extensao. E o
+  # comentario fica de fora da busca: citar o nome num comentario nao roda nada,
+  # e foi assim que uma medicao minha errou antes de eu conferir.
+  if printf '%s\n' "$sem_comentario" | grep -qE "(^|[^A-Za-z0-9_-])$nu([^A-Za-z0-9_-]|\$)"; then
+    no_portao=$((no_portao + 1))
+  elif printf '%s\n' "$FORA_DO_PORTAO" | grep -qF "$prova|"; then
+    declaradas=$((declaradas + 1))
+  else
+    esquecidas="$esquecidas $prova"
+  fi
+done
+if [ "$candidatos" = "0" ]; then
+  printf '  FALHOU  %-24s nao achei prova nenhuma para conferir: o padrao de nomes mudou?\n' "toda prova no portao"
+  falhou=1
+elif [ -n "$esquecidas" ]; then
+  printf '  FALHOU  %-24s prova que existe e ninguem roda, e nao esta na lista de fora:%s\n' \
+    "toda prova no portao" "$esquecidas"
+  printf '            ou entra no portao, ou entra no FORA_DO_PORTAO com o motivo escrito.\n'
+  falhou=1
+else
+  printf '  ok      %-24s %s de %s provas no portao, %s fora com motivo declarado\n' \
+    "toda prova no portao" "$no_portao" "$candidatos" "$declaradas"
+fi
+
+
 titulo "banco de temas"
 saida=$(python temas/_ferramentas/verificar.py 2>&1) || true
 rep=$(printf '%s\n' "$saida" | grep -c "REPROVADO" || true)
