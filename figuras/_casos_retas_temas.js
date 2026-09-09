@@ -37,8 +37,29 @@ const CASOS = [
    '@fig retas id=b8a reta=r reta=s paralelas=r;s transversal=t nomeiaangulos=a;b nomeiaretas=r;s'],
   ['MAT08-11', 'explicacao, a figura base, metade de baixo',
    '@fig retas id=b8b reta=r reta=s paralelas=r;s transversal=t;55 incognita=c;3 incognita=d;4 incognita=e;5 incognita=f;6'],
+  /* UM par por figura, e nao os dois. A versao anterior era
+   * "congruentes=1;3 congruentes=2;4", que marca as QUATRO cunhas do cruzamento,
+   * e a folha rasterizada le como um circulo riscado por duas retas: nao se
+   * conta quais arcos sao duplos sem ampliar seis vezes.
+   *
+   * Medido, porque o olho sozinho nao serve de argumento: as quatro cunhas somam
+   * 610 graus de arco dentro de uma faixa de raio de 11,5 pt (14, 17,5 e 25,5),
+   * e 500 desses graus ficam entre 14 e 17,5 pt, isto e duas voltas quase
+   * completas separadas por 3,5 pt. Inverter a ordem dos grupos baixa para 470 e
+   * nao resolve, porque a classe larga sozinha ja poe 250 graus num raio so.
+   * Com um par, sao 250 graus num raio unico e a figura le limpa: dois arcos
+   * claramente separados em angulos opostos.
+   *
+   * O piso do conferirFigura nao pega isto, e nem devia: ele mede o VAO entre
+   * dois arcos (aqui 8 pt, acima do piso de 6) e o que estraga e outra coisa, a
+   * COBERTURA ANGULAR somada numa faixa estreita de raio. Fica registrado como
+   * falta de kit; a saida de autoria e esta, e nao esperar o kit.
+   *
+   * O par largo (2 e 4) foi o escolhido por ser o que sobra com o valor legivel
+   * do lado de fora, e um par basta para ensinar: a explicacao diz por escrito
+   * que o outro par tambem e igual. */
   ['MAT08-11', 'explicacao, um cruzamento ampliado, opostos pelo vertice',
-   '@fig retas id=b8c reta=r reta=s congruentes=1;3 congruentes=2;4'],
+   '@fig retas id=b8c reta=r reta=s congruentes=2;4'],
   ['MAT08-11', 'explicacao, painel do par: correspondentes',
    '@fig retas id=p1 reta=r reta=s paralelas=r;s transversal=t congruentes=1;5'],
   ['MAT08-11', 'explicacao, painel do par: alternos internos',
