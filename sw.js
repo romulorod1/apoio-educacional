@@ -31,8 +31,25 @@
  * pdf.js). Os quatro já estão na lista abaixo, que continua igual. O v22
  * (08/09/2026) acrescenta uma linha à lista, a primeira desde o v16, que levou
  * o './cartao.js': é o índice dos temas de português. Aí o nome novo é
- * obrigatório pelo motivo original, e não pelo hábito do release. */
-var CACHE = 'apoio-educacional-v22';
+ * obrigatório pelo motivo original, e não pelo hábito do release.
+ *
+ * O v24 (09/09/2026) é do tipo que o v23 anunciou ao dizer-se "o primeiro de uma
+ * série": a lista continua igual e o que muda é o CONTEÚDO de dois arquivos que
+ * já estão nela, o './pdf.js' e o './figuras/base.js', por causa da diretiva de
+ * equação dentro do exercício. Sem nome novo, o tablet continuaria servindo o
+ * pdf.js antigo e o conserto nunca chegaria à folha.
+ *
+ * Ele salta o v23 de propósito, e o salto é a ORDEM DE MERGE escrita no código:
+ * o v23 está no ramo do lote 1 de figuras, que sobe primeiro. Duas frentes
+ * pegando o mesmo número faria a segunda a mergear chegar com a lista mudada e o
+ * nome igual ao da base, que é exatamente o que a trava de conteúdo do cache
+ * reprova. Se a ordem se inverter, este v24 continua válido (ele difere do v22),
+ * mas o lote 1 precisará de v25 para não descer de número.
+ *
+ * E este bump existe porque a trava o cobrou: o portão reprovou este ramo com
+ * "mudou de conteudo e o cache continua apoio-educacional-v22: pdf.js
+ * figuras/base.js". Sem ela, o trabalho teria entrado no main e não no tablet. */
+var CACHE = 'apoio-educacional-v24';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
