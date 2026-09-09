@@ -46,13 +46,51 @@ resumo() {
 # regressao de tabela ja subiu para producao aqui.
 #
 # Degrada sozinho: sem powershell ou sem tasklist sai "?" e nada quebra.
+livre_mb_agora() {
+  powershell -NoProfile -Command \
+    "[int]((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1024)" 2>/dev/null | tr -d '\r'
+}
 estado_da_maquina() {
-  livre=$(powershell -NoProfile -Command \
-    "[int]((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1024)" 2>/dev/null | tr -d '\r')
+  livre=$(livre_mb_agora)
   navs=$(tasklist /FI "IMAGENAME eq chrome.exe" /NH 2>/dev/null | grep -c "chrome.exe" || true)
   [ -n "$livre" ] || livre="?"
   [ -n "$navs" ] || navs="?"
   printf '%s MB livres, %s navegador(es) vivo(s)' "$livre" "$navs"
+}
+
+# A PORTA DECIDE POR AMOSTRA, E NAO POR UMA LEITURA.
+#
+# Medido em 08/09, quatro leituras em oito minutos com a carga parada (o total do
+# claude variou 15 MB): o LIVRE variou 429 MB, de 418 a 847. Uma leitura
+# instantanea de memoria livre erra por mais de 400 MB nesta maquina, e a
+# diferenca entre passar e ser recusado cabe inteira dentro desse ruido.
+#
+# Entao a porta le TRES vezes, com alguns segundos entre elas, e decide pela
+# MENOR. Menor e a escolha conservadora: a bateria vai entrar num instante que
+# ninguem escolhe, e o que importa e o pior momento provavel, e nao o melhor.
+# Custa nove segundos num portao de quinze minutos.
+#
+# O QUE ESTA AFIRMADO E SO ISTO: o livre variou 429 MB com a carga parada. A
+# causa NAO foi isolada. O salto coincidiu com a Memory Compression esvaziando de
+# 211 para 28 MB, o que e indicio e nao prova: quatro medidas numa maquina, sem
+# repeticao em outra condicao e sem isolar o que esvaziava a compressao. A
+# amostra vale mesmo que a causa seja outra, e e por isso que ela e o conserto.
+#
+# A medida do estado_da_maquina continua uma leitura so, de proposito: la ela e
+# DIAGNOSTICO e nao decisao, e o custo de errar e uma linha imprecisa no log, e
+# nao uma rodada perdida.
+livre_amostrado() {
+  # Ecoa "menor|l1 l2 l3".
+  la_1=$(livre_mb_agora); sleep 3
+  la_2=$(livre_mb_agora); sleep 3
+  la_3=$(livre_mb_agora)
+  la_menor=$la_1
+  for la_v in $la_2 $la_3; do
+    if [ -n "$la_v" ] && [ -n "$la_menor" ] && [ "$la_v" -lt "$la_menor" ] 2>/dev/null; then
+      la_menor=$la_v
+    fi
+  done
+  printf '%s|%s %s %s' "$la_menor" "$la_1" "$la_2" "$la_3"
 }
 
 # UMA LINHA DE HISTORICO POR RODADA, para o piso poder descer com dado.
@@ -75,13 +113,16 @@ registra_memoria() {
   # reclama de caminho impossivel e o SHELL, na redirecao. Sem elas, um
   # PORTAO_HISTORICO invalido imprime linha de erro no meio do log do portao.
   if [ ! -f "$HISTORICO_MEM" ]; then
-    { printf 'data\thora\tlivre_na_porta_MB\tpiso_MB\tdesfecho\torigem\n' > "$HISTORICO_MEM"; } 2>/dev/null || return 0
+    { printf 'data\thora\tlivre_na_porta_MB\tpiso_MB\tdesfecho\torigem\tleituras\n' > "$HISTORICO_MEM"; } 2>/dev/null || return 0
   fi
   # A coluna de origem existe para uma linha anotada a mao nunca se passar por
   # medida do portao. Daqui a um mes ninguem lembra qual e qual, e o piso vai ser
   # calibrado com estas linhas.
-  { printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
-    "$(date +%Y-%m-%d)" "$(date +%H:%M)" "${1:-?}" "${PISO_MB:-?}" "$2" "portao" >> "$HISTORICO_MEM"; } 2>/dev/null || true
+  # A coluna das leituras existe porque o numero da porta e a MENOR de tres, e
+  # sem as tres a distribuicao que vai calibrar o piso nasce com o ruido de 429
+  # MB dentro dela, sem ninguem poder ver.
+  { printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$(date +%Y-%m-%d)" "$(date +%H:%M)" "${1:-?}" "${PISO_MB:-?}" "$2" "portao" "${leituras:-?}" >> "$HISTORICO_MEM"; } 2>/dev/null || true
 }
 
 # Roda um teste. Se falhar, roda UMA segunda vez antes de reprovar.
@@ -374,11 +415,15 @@ titulo "com navegador"
 # recusar sem precisar. As duas falhas sao VISIVEIS, e e isso que torna o ajuste
 # barato: uma imprime NAO CONFERIDO com o numero, a outra deixa cadaver.
 PISO_MB=950
-livre_mb=$(powershell -NoProfile -Command \
-  "[int]((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1024)" 2>/dev/null | tr -d '\r')
-# Este numero fica no log de PROPOSITO, em toda rodada, inclusive nas que passam:
-# e a evidencia que falta hoje para o piso poder DESCER com fundamento.
+amostra=$(livre_amostrado)
+livre_mb=${amostra%%|*}
+leituras=${amostra#*|}
+# Estes numeros ficam no log de PROPOSITO, em toda rodada, inclusive nas que
+# passam: e a evidencia que falta hoje para o piso poder DESCER com fundamento.
+# As TRES leituras vao junto porque a decisao e pela menor, e quem for calibrar o
+# piso precisa ver a dispersao e nao so o numero escolhido.
 printf '  (maquina no comeco da bateria: %s, piso %s MB)\n' "$(estado_da_maquina)" "$PISO_MB"
+printf '  (memoria na porta, tres leituras: %s MB; decide a menor, %s MB)\n' "$leituras" "$livre_mb"
 livre_na_porta=$livre_mb
 roda_bateria=sim
 if [ -n "$livre_mb" ] && [ "$livre_mb" -lt "$PISO_MB" ] 2>/dev/null; then
