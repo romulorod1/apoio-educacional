@@ -502,8 +502,34 @@ def montar(caminho_do_tema, arquivos_de_leitores, arquivo_do_juiz, arquivo_da_le
 
 
 def gravar_registro(caminho_do_tema, registro, raiz_painel=None):
-    """Grava temas/<pasta>/_painel/<ID>.json, com recuo: e dado que se le."""
+    """Grava temas/<pasta>/_painel/<ID>.json, com recuo: e dado que se le.
+
+    Quando ja existe um registro de outra versao do tema, o resumo dele desce para
+    `historico` antes de ser substituido. Sem isso o arquivo guarda so a rodada que
+    passou, e quem ler daqui a seis meses nao tem como saber que uma questao teve tres
+    leituras fora do criterio antes de o criterio ser alargado: isso ficaria so no diff
+    do tema, sem o motivo. O historico e curto de proposito, um resumo por rodada, e nao
+    a copia inteira: o que importa e que houve rodada anterior e como ela terminou."""
     caminho = caminho_do_registro(caminho_do_tema, raiz_painel)
+    if os.path.exists(caminho):
+        try:
+            velho = json.load(io.open(caminho, encoding="utf-8"))
+        except ValueError:
+            velho = None
+        if velho and velho.get("assinatura") == registro.get("assinatura"):
+            # regravar a MESMA versao (montar rodado de novo) nao pode apagar o que
+            # ja se sabia: sem esta linha, a segunda montagem da mesma rodada zerava
+            # o historico que a primeira tinha guardado.
+            if velho.get("historico") and not registro.get("historico"):
+                registro["historico"] = velho["historico"]
+        if velho and velho.get("assinatura") != registro.get("assinatura"):
+            historico = list(velho.get("historico") or [])
+            historico.append({
+                "assinatura": velho.get("assinatura"),
+                "data": velho.get("data"),
+                "resultado": velho.get("resultado"),
+            })
+            registro["historico"] = historico
     pasta = os.path.dirname(caminho)
     if not os.path.isdir(pasta):
         os.makedirs(pasta)

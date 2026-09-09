@@ -479,7 +479,7 @@ def _sem_linha(texto, comeco):
     return '\n'.join(l for l in texto.split('\n') if not l.startswith(comeco))
 
 
-def _com_fechadas(texto, letras, certa_longa=False):
+def _com_fechadas(texto, letras, certa_longa=False, certa_curta=False):
     """Troca os itens 3, 4 e 5 do BASE_POR7 (abertos) por fechados com quatro alternativas,
     cada um com a letra certa dada em `letras`; com o item 2, que ja e fechado em b, o tema
     fica com quatro fechadas. E a prova da trava E7 nos dois sentidos."""
@@ -490,9 +490,15 @@ def _com_fechadas(texto, letras, certa_longa=False):
         padrao = _re.compile(r'^(%d\. [^\n]*)$' % n, _re.M)
         achado = padrao.search(saida)
         assert achado, 'BASE_POR7 sem o item %d' % n
-        alternativas = '\n'.join('   %s) resposta %s, numero %d de quatro%s.' % (
-            l, l, n, ' e por acaso a mais comprida das quatro' if certa_longa and l == letra else '')
-            for l in 'abcd')
+        def _texto_da_alternativa(l):
+            if certa_longa and l == letra:
+                return '   %s) resposta %s, numero %d de quatro e por acaso a mais comprida das quatro.' % (l, l, n)
+            if certa_curta and l == letra:
+                return '   %s) resposta %s.' % (l, l)
+            if certa_curta:
+                return '   %s) resposta %s, numero %d de quatro, com explicacao comprida para o contraste.' % (l, l, n)
+            return '   %s) resposta %s, numero %d de quatro.' % (l, l, n)
+        alternativas = '\n'.join(_texto_da_alternativa(l) for l in 'abcd')
         saida = saida[:achado.end()] + '\n' + alternativas + saida[achado.end():]
         # o gabarito vira a letra
         bloco = _re.compile(r'^%d\. espera_se:.*?(?=^\d+\. |\Z)' % n, _re.M | _re.S)
@@ -791,6 +797,9 @@ PARES = [
     ('por7: a certa sendo a mais longa em 3 das 4 fechadas reprova (E7)',
      'por/07/POR07-99.md', _com_fechadas(BASE_POR7, 'acd', certa_longa=True),
      'alternativa mais longa em 3 das 4', None),
+    ('por7: a certa sendo a mais CURTA em 3 das 4 fechadas reprova (E7, o outro lado)',
+     'por/07/POR07-99.md', _com_fechadas(BASE_POR7, 'acd', certa_curta=True),
+     'alternativa mais curta em 3 das 4', None),
     ('por7: quatro fechadas com letras espalhadas passam',
      'por/07/POR07-99.md', _com_fechadas(BASE_POR7, 'acd'), None, None),
     ('G8: bloco recuado no lugar do texto de apoio vira trecho do item e reprova',
@@ -1043,6 +1052,22 @@ def _com_assinatura_velha(registro):
 # Os oito pares da secao 1.4: as sete conferencias do portao sobre o registro do
 # painel cego, e o registro saudavel passando ao lado delas. O tema e sempre o
 # mesmo BASE_POR7; o que muda e o registro, que aqui e o veneno.
+def _com_leitor_repetido(registro):
+    """O mesmo leitor duas vezes na mesma questao: tres respostas, dois leitores.
+
+    Um painel em que o mesmo leitor responde duas vezes nao e um painel de tres: e uma
+    leitura contada em dobro, e o registro parece cheio."""
+    registro['questoes'][0]['respostas'][1]['leitor'] = registro['questoes'][0]['respostas'][0]['leitor']
+    return registro
+
+
+def _com_resposta_vazia(registro):
+    """Uma resposta em branco. O leitor que nao respondeu nao leu, e o registro afirma
+    que leu."""
+    registro['questoes'][0]['respostas'][2]['resposta'] = '   '
+    return registro
+
+
 PARES_DE_PAINEL = [
     ('o registro saudavel do painel deixa o tema passar', lambda r: r, None),
     ('registro ausente reprova', None, 'falta o registro do painel cego'),
@@ -1056,7 +1081,56 @@ PARES_DE_PAINEL = [
     ('resumo com ambigua nao vazia reprova', _com_ambigua_no_resumo, 'como ambiguas'),
     ('lente adversarial em estreito reprova', _com_lente_estreita,
      'a questao 1 esta estreita pela lente adversarial'),
+    ('o mesmo leitor duas vezes na mesma questao reprova', _com_leitor_repetido,
+     'o mesmo leitor duas vezes'),
+    ('resposta em branco no registro reprova', _com_resposta_vazia,
+     'resposta vazia'),
 ]
+
+
+def testar_historico_do_painel():
+    # O registro do painel guarda o resumo das rodadas anteriores: sem isso, quem le
+    # daqui a seis meses nao sabe que uma questao teve leituras fora do criterio antes
+    # de o criterio ser alargado, e isso ficaria so no diff do tema, sem o motivo.
+    #
+    # A segunda metade e a que custou: regravar a MESMA versao (montar rodado de novo na
+    # mesma rodada) apagava o historico que a gravacao anterior tinha guardado, e o
+    # arquivo voltava a nao contar nada. Por isso a prova tem os dois sentidos.
+    import painel
+    raiz = tempfile.mkdtemp(prefix="historico_")
+    falhas, total = 0, 4
+    try:
+        caminho = escrever(raiz, "por/07/POR07-99.md", BASE_POR7)
+
+        def grava(assinatura, aprovadas, ambiguas):
+            registro = {"tema": "POR07-99", "assinatura": assinatura, "data": "2026-09-09",
+                        "resultado": {"aprovadas": aprovadas, "ambiguas": ambiguas, "estreitas": []}}
+            destino = painel.gravar_registro(caminho, registro, raiz)
+            return json.load(io.open(destino, encoding="utf-8"))
+
+        casos = []
+        primeiro = grava("aaa", [1], [2])
+        casos.append(("a primeira gravacao nasce sem historico", not primeiro.get("historico")))
+        segundo = grava("bbb", [1, 2], [])
+        casos.append(("a versao nova guarda o resumo da rodada reprovada",
+                      len(segundo.get("historico") or []) == 1
+                      and segundo["historico"][0]["assinatura"] == "aaa"
+                      and segundo["historico"][0]["resultado"]["ambiguas"] == [2]))
+        de_novo = grava("bbb", [1, 2], [])
+        casos.append(("regravar a mesma versao preserva o historico",
+                      len(de_novo.get("historico") or []) == 1))
+        terceiro = grava("ccc", [1, 2], [])
+        casos.append(("a terceira versao acumula duas rodadas no historico",
+                      len(terceiro.get("historico") or []) == 2))
+        for nome, ok in casos:
+            if ok:
+                print("  OK     historico: %s" % nome)
+            else:
+                print("  FALHA  historico: %s" % nome)
+                falhas += 1
+    finally:
+        shutil.rmtree(raiz, ignore_errors=True)
+    return falhas, total
 
 
 def testar_painel():
@@ -1279,7 +1353,11 @@ def rodar():
         falhas += parciais
         total += quantos
 
-        parciais, quantos = testar_painel()
+        parciais, quantos = testar_painel()
+        falhas += parciais
+        total += quantos
+
+        parciais, quantos = testar_historico_do_painel()
         falhas += parciais
         total += quantos
 
