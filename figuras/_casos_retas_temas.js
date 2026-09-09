@@ -127,8 +127,21 @@ const CASOS = [
    '@fig retas id=c8 reta=r reta=s paralelas=r;s transversal=t angulo=65;4 incognita=x;8 incognita=y;6 incognita=z;5'],
   ['MAT06-09', 'exercicio 15',
    '@fig retas id=c15 reta=r reta=s paralelas=r;s transversal=t angulo=2x+30;3 angulo=3x+10;6'],
+  /* SO o valor dado, sem incognita nenhuma, e a razao e o enunciado deste
+   * exercicio em particular. Ele pergunta "quais sao as medidas possiveis e
+   * QUANTOS angulos existem de cada medida", e o gabarito responde quatro de
+   * cada. A versao anterior marcava quatro dos oito (143 na 2, mais x, y e z nas
+   * posicoes 1, 5 e 6), e pela paridade isso imprime 143, 37, 37 e 143: quem
+   * contasse pelo desenho responderia DOIS de cada, que e errado, e erraria
+   * justamente a pergunta feita. Figura que conduz a resposta errada e pior que
+   * figura ausente.
+   *
+   * Marcar os oito nao e saida: custa 9 marcas e o teto e 5, e a receita recusa
+   * (medido). Com so o dado, a figura mostra a configuracao e o unico valor
+   * conhecido, os oito angulos existem visualmente sem marca, e a contagem volta
+   * a ser o raciocinio que o exercicio cobra. */
   ['MAT06-09', 'exercicio 17',
-   '@fig retas id=c17 reta=r reta=s paralelas=r;s transversal=t angulo=143;2 incognita=x;1 incognita=y;5 incognita=z;6'],
+   '@fig retas id=c17 reta=r reta=s paralelas=r;s transversal=t angulo=143;2'],
 
   /* ---------------------------------------------------- MAT04-07, retas, angulos e giros */
   ['MAT04-07', 'explicacao, painel de retas: paralelas',
@@ -140,8 +153,18 @@ const CASOS = [
    '@fig retas id=q2 reta=r reta=s nomeiaretas=sim'],
   ['MAT04-07', 'explicacao, painel de retas: perpendiculares',
    '@fig retas id=q3 reta=r reta=s reto=sim nomeiaretas=sim'],
-  ['MAT04-07', 'exercicio 3',
-   '@fig retas id=q4 reta=r reta=s reto=sim nomeiaretas=sim'],
+  /* O exercicio 3 do MAT04-07 SAI SEM FIGURA, e a diretiva que estava aqui foi
+   * removida. Ela era "reta=r reta=s reto=sim nomeiaretas=sim", byte a byte a
+   * mesma celula de perpendiculares da explicacao tres paragrafos acima, e o
+   * enunciado pergunta "que nome recebem essas retas?". Com a mesma figura ja
+   * rotulada "perpendiculares" na mesma folha, a pergunta deixa de ser pergunta
+   * e vira consulta. Pior, o enunciado tem duas partes ("e como se chamam duas
+   * retas que nunca se cruzam?") e a figura responde uma so, entao ela ainda
+   * sugere que a resposta esta toda ali.
+   *
+   * E o enunciado descreve a configuracao por escrito ("duas retas se cruzam
+   * formando quatro angulos retos"), o que ja atende a regra de que figura no
+   * enunciado e excecao. */
 
   /* ---------------------------------------------------- MAT07-11, medir, somar e classificar */
   ['MAT07-11', 'explicacao, duas retas cruzadas com as duas classes de congruencia',
