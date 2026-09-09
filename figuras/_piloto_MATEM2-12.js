@@ -279,25 +279,38 @@ console.log('\npares envenenados com o texto deste tema');
 }
 {
   /* Os limites do kit que decidiram a lista de "ficou de fora" deste tema,
-   * provados aqui para nao serem redescobertos. O primeiro e o que custou a
-   * terceira figura da explicacao: planificacao so existe para o cone, e a
-   * frase do texto que pedia desenho fala da planificacao do CILINDRO. */
+   * provados aqui para nao serem redescobertos. O primeiro DEIXOU DE SER limite:
+   * a explicacao pedia por escrito a planificacao do CILINDRO e o kit so tinha a
+   * do cone, e agora o molde do cilindro existe. A trava nao some, troca de
+   * lado, e passa a guardar a capacidade que custou a terceira figura. */
   const planifCilindro = P.rascunho('@fig solido tipo=cilindro raio=3 altura=10 planificacao=sim');
-  conf('limite do kit: planificacao=sim so vale para o cone, e o cilindro so avisa e ignora',
-    planifCilindro.avisos.filter(function (a) { return a.indexOf('planificacao=sim so vale para cone') >= 0; }).length, 1);
+  medido('molde do cilindro: ' + planifCilindro.figs.length + ' figura(s), avisos '
+    + (planifCilindro.avisos.join(' | ') || '(nenhum)'));
+  conf('o molde do cilindro desenha, e desenha calado',
+    planifCilindro.figs.length === 1 && planifCilindro.avisos.length === 0, true);
+  const planifPiramide = P.rascunho('@fig solido tipo=piramide aresta=4 altura=6 planificacao=sim');
+  conf('e o tipo que ainda nao tem molde avisa, dizendo quais tem',
+    planifPiramide.avisos.filter(function (a) { return a.indexOf('vale para cone') >= 0; }).length, 1);
   /* O segundo e o que tirou a figura do 16: com um unico comprimento numerico o
    * resto sai chutado e a figura sai fora de escala, cobrando legenda. */
   const soAltura = P.rascunho('@fig solido tipo=cone triangulo=sim altura=8 raio=r geratriz=g');
   medido('cone so com a altura numerica: fora de escala = ' + (soAltura.figs[0] || {}).foraDeEscala);
   conf('limite do kit: cone com um unico comprimento numerico sai FORA DE ESCALA, e por isso o 16 fica sem figura',
     (soAltura.figs[0] || {}).foraDeEscala, true);
-  /* E o terceiro, que vale para os dois temas de solido: o painelsolidos nao
-   * repassa o id= para as celulas, entao uma figura de enunciado feita com ele
-   * fica invisivel para as travas 3, 4 e 5, que casam figura com exercicio pelo
-   * id. Por isso a trava 4 do 13 foi refeita a mao, acima. */
+  /* E o terceiro, que valia para os dois temas de solido, tambem caiu: o
+   * painelsolidos passou a repassar o id= para as celulas, entao uma figura de
+   * enunciado feita com ele deixou de ser invisivel para as travas 3, 4 e 5. A
+   * trava 4 do 13, refeita a mao acima por causa disto, continua valendo e agora
+   * tem o caminho normal ao lado. O veneno e a diretiva SEM id=: celula que
+   * inventa id casaria com o exercicio errado, que e pior que nao casar. */
   const comId = P.rascunho('@fig painelsolidos id=p13 ordem=cilindro;cone nome=cilindro;cone raio=6 altura=9');
-  conf('limite do kit: o painelsolidos nao repassa o id= para as celulas',
-    comId.figs.filter(function (f) { return f.id === 'p13'; }).length, 0);
+  const semId = P.rascunho('@fig painelsolidos ordem=cilindro;cone nome=cilindro;cone raio=6 altura=9');
+  medido('painelsolidos id=p13: ' + comId.figs.filter(function (f) { return f.id === 'p13'; }).length
+    + ' celula(s) com o id, de ' + comId.figs.length + ' desenhada(s)');
+  conf('o painelsolidos repassa o id= para as celulas',
+    comId.figs.filter(function (f) { return f.id === 'p13'; }).length, 2);
+  conf('e sem id= na diretiva nenhuma celula inventa um',
+    semId.figs.filter(function (f) { return f.id; }).length, 0);
 }
 
 const saida = P.placar();

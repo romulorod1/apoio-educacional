@@ -58,6 +58,19 @@ const CASOS = [
   { nome: 'tri base girada', titulo: 'triangulo: base 10 e altura 6 com a figura girada 24 graus',
     fig: '@fig triangulo id=t6 base=10 altura=6 giro=24', mede: 'triangulo' },
 
+  /* ---------------------------------------------------------- LAL, a lei dos cossenos */
+  { nome: 'lal 30 40 60', titulo: 'LAL: os lados 30 e 40 com o angulo de 60 ENTRE eles (o exercicio 11 do MATEM2-03)',
+    fig: '@fig triangulo id=t9 lado=30 lado=40 angulo=60 entre=C', mede: 'triangulo' },
+  { nome: 'lal 5 12 90', titulo: 'LAL com o angulo reto: 5 e 12 a 90 graus, e o quadradinho no vertice entre eles',
+    fig: '@fig triangulo id=t10 lado=5 lado=12 angulo=90 entre=C', mede: 'triangulo' },
+  { nome: 'lal 6 10 120', titulo: 'LAL obtusangulo: 6 e 10 a 120 graus (o exercicio 15 do MATEM2-03)',
+    fig: '@fig triangulo id=t11 lado=6 lado=10 angulo=120 entre=C', mede: 'triangulo' },
+  { nome: 'lal com base', titulo: 'LAL pelo outro par: lado 30 e base 40 com o angulo em B, que e o vertice que eles compartilham',
+    fig: '@fig triangulo id=t12 lado=30 base=40 angulo=60 entre=B', mede: 'triangulo' },
+  { nome: 'lal gab', titulo: 'o LAL no gabarito: os dois angulos que a lei dos cossenos acha saem em teal; o 60 dado fica preto',
+    fig: '@fig id=t9 fase=gabarito', mede: 'triangulo',
+    gabaritoDe: '@fig triangulo id=t9 lado=30 lado=40 angulo=60 entre=C' },
+
   /* ---------------------------------------------------------- quadrilatero */
   { nome: 'ret 4 3 5', titulo: 'retangulo de base 4 e altura 3 com a diagonal 5 rotulada d (Pitagoras fecha)',
     fig: '@fig quadrilatero id=q1 tipo=retangulo base=4 altura=3 diagonal=A;C;5;d', mede: 'quadrilatero' },
@@ -434,6 +447,295 @@ console.log('\nquadrilatero: a altura entre as duas bases paralelas');
   conf('e o quadradinho continua no pe', marcasDe(m, 'anguloReto').length === 1 &&
     Math.min(dist({ x: alt[0].x1, y: alt[0].y1 }, marcasDe(m, 'anguloReto')[0]),
              dist({ x: alt[0].x2, y: alt[0].y2 }, marcasDe(m, 'anguloReto')[0])) < 0.05);
+}
+
+
+/* ================================================================ LAL: dois lados e o angulo ENTRE eles
+ *
+ * A entrada da lei dos cossenos. Ate aqui "angulo=60 lado=30 lado=40" era
+ * RECUSADO com a frase "dois lados soltos nao definem triangulo", que e falsa
+ * nessa configuracao: os dois lados nao estao soltos, esta faltando dizer ONDE
+ * mora o angulo. A chave entre= diz isso, e o terceiro lado sai de
+ *
+ *     lado_v ao quadrado = p ao quadrado + q ao quadrado - 2 p q cos(V)
+ *
+ * A gramatica e EXPLICITA e nao posicional, e a razao e mecanica e nao de gosto:
+ * o lerDiretivaEm do base.js guarda os argumentos num dicionario por chave, entao
+ * "lado=30 angulo=60 lado=40" e "angulo=60 lado=30 lado=40" chegam na receita com
+ * args identicos. A ordem entre chaves diferentes nao existe do lado de dentro.
+ *
+ * O que esta secao mede, e nao supoe:
+ *
+ *   fidelidade   o angulo dado sai medido NO VERTICE que os dois lados
+ *                compartilham, e a razao entre os dois lados sai no desenho
+ *   discricao    o terceiro lado, que e a RESPOSTA do exercicio, NAO sai
+ *                impresso: ele entra so na construcao
+ *   comparacao   a mesma figura COM entre= e SEM entre=, para a diferenca ser a
+ *                chave e nao outra coisa qualquer */
+
+console.log('\nLAL: dois lados e o angulo entre eles (a entrada da lei dos cossenos)');
+
+function figuraDe(texto, gabaritoDe) {
+  const d = new PDFGen.Doc();
+  d.novaPagina();
+  if (gabaritoDe) d.registrarFiguras(gabaritoDe);
+  d.partesDeFigura(texto).forEach(function (p) {
+    if (p.tipo === 'figura') d.figura(p.diretiva, { x: MARG_E + 20, largura: LARGURA });
+  });
+  return { figs: d.figurasDesenhadas || [], avisos: d.avisosFigura || [] };
+}
+
+/* Os tres vertices do contorno impresso, reconstruidos dos segmentos do
+ * registro: e o que saiu na folha, e nao o que a receita disse que ia sair. */
+function contornoLal(reg) {
+  return ((reg && reg.tracos) || []).filter((t) => t.papel === 'contorno');
+}
+function verticesDo(reg) {
+  const cs = contornoLal(reg);
+  const pts = [];
+  cs.forEach(function (t) {
+    [{ x: t.x1, y: t.y1 }, { x: t.x2, y: t.y2 }].forEach(function (P) {
+      if (!pts.some((Q) => dist(Q, P) < 0.01)) pts.push(P);
+    });
+  });
+  return pts;
+}
+/* O contorno FECHA quando cada ponta e ponta de exatamente dois segmentos. E o
+ * que separa o triangulo da figura do VAO, em que as tres reguas ficam deitadas
+ * em fila e a ponta de cima sobra. Nao depende de giro nem de orientacao. */
+function fecha(reg) {
+  const cs = contornoLal(reg);
+  if (cs.length < 3) return false;
+  const pts = verticesDo(reg);
+  return pts.every(function (P) {
+    let n = 0;
+    cs.forEach(function (t) {
+      if (dist({ x: t.x1, y: t.y1 }, P) < 0.01) n++;
+      if (dist({ x: t.x2, y: t.y2 }, P) < 0.01) n++;
+    });
+    return n === 2;
+  });
+}
+function anguloEmGraus(V, A, B) {
+  const u = { x: A.x - V.x, y: A.y - V.y }, w = { x: B.x - V.x, y: B.y - V.y };
+  const c = (u.x * w.x + u.y * w.y) / (Math.sqrt(u.x * u.x + u.y * u.y) * Math.sqrt(w.x * w.x + w.y * w.y));
+  return Math.acos(Math.max(-1, Math.min(1, c))) * 180 / Math.PI;
+}
+/* Os tres angulos do triangulo impresso, em ordem crescente. Comparados como
+ * conjunto, e nao por vertice, porque o que se afirma e "o angulo dado esta na
+ * figura, no vertice entre os dois lados dados", e o nome do vertice ja e
+ * conferido pelo conferirRotulos da propria receita. */
+function angulosDo(reg) {
+  const P = verticesDo(reg);
+  if (P.length !== 3) return null;
+  return [anguloEmGraus(P[0], P[1], P[2]), anguloEmGraus(P[1], P[2], P[0]), anguloEmGraus(P[2], P[0], P[1])]
+    .sort((a, b) => a - b);
+}
+function ladosDo(reg) {
+  const P = verticesDo(reg);
+  if (P.length !== 3) return null;
+  return [dist(P[0], P[1]), dist(P[1], P[2]), dist(P[2], P[0])].sort((a, b) => a - b);
+}
+
+{
+  /* Os quatro exercicios do MATEM2-03 que esta chave desbloqueia, medidos na
+   * folha: o 11 (30 e 40 a 60 graus), o 12 (5 e 12 a 90), o 15 (6 e 10 a 120) e
+   * o Exemplo 2 (7 e 15 a 60). Para cada um, o angulo dado e a razao dos dois
+   * lados dados sao reconstruidos do contorno impresso. */
+  const casos = [
+    { fig: '@fig triangulo lado=30 lado=40 angulo=60 entre=C', p: 30, q: 40, ang: 60, resposta: 10 * Math.sqrt(13) },
+    { fig: '@fig triangulo lado=5 lado=12 angulo=90 entre=C', p: 5, q: 12, ang: 90, resposta: 13 },
+    { fig: '@fig triangulo lado=6 lado=10 angulo=120 entre=C', p: 6, q: 10, ang: 120, resposta: 14 },
+    { fig: '@fig triangulo lado=7 lado=15 angulo=60 entre=C', p: 7, q: 15, ang: 60, resposta: 13 }
+  ];
+  let todosFieis = true, todosDiscretos = true, linhas = [];
+  casos.forEach(function (c) {
+    const r = figuraDe(c.fig);
+    const reg = r.figs[0];
+    if (!reg) { todosFieis = false; linhas.push(c.fig + ': NAO DESENHOU'); return; }
+    const angs = angulosDo(reg), lads = ladosDo(reg);
+    /* A escala da figura: o lado p impresso dividido por p. O terceiro lado tem
+     * que sair com a medida da lei dos cossenos NESSA escala. */
+    const esperados = [c.p, c.q, c.resposta].sort((a, b) => a - b);
+    const k = lads[0] / esperados[0];
+    const erroLado = Math.max.apply(null, [0, 1, 2].map((i) => Math.abs(lads[i] / k - esperados[i])));
+    const dadoNaFolha = angs.some((a) => Math.abs(a - c.ang) < 0.05);
+    const impressos = textos({ reg: reg }).map((t) => t.txt);
+    const semResposta = !impressos.some((t) => Math.abs(parseFloat(t) - c.resposta) < 0.01);
+    if (!dadoNaFolha || erroLado > 0.02 || r.avisos.length) todosFieis = false;
+    if (!semResposta) todosDiscretos = false;
+    linhas.push(c.p + ' e ' + c.q + ' a ' + c.ang + ' graus: angulos ' +
+      angs.map(n2c).join('/') + ', lados ' + lads.map((v) => n2c(v / k)).join('/') +
+      ' (o terceiro vale ' + n2c(c.resposta) + '), textos ' + (impressos.join(' ') || 'nenhum'));
+  });
+  linhas.forEach(medido);
+  conf('LAL: nos quatro casos o angulo DADO sai medido na folha e os tres lados saem na escala da lei dos cossenos',
+    todosFieis);
+  conf('e o terceiro lado, que e a RESPOSTA, nao sai impresso em nenhum deles',
+    todosDiscretos);
+}
+{
+  /* Medir a ausencia do defeito nao e medir a presenca do que importa: aqui a
+   * saida COM entre= e comparada com a saida SEM entre= na MESMA diretiva. A
+   * unica diferenca legitima e que uma desenha e a outra recusa; o que se exige
+   * e que a recusa passe a dizer a verdade e a apontar a saida. */
+  const com = figuraDe('@fig triangulo lado=30 lado=40 angulo=60 entre=C');
+  const sem = figuraDe('@fig triangulo lado=30 lado=40 angulo=60');
+  conf('COM entre= a figura sai, calada', com.figs.length === 1 && com.avisos.length === 0);
+  conf('SEM entre= a mesma diretiva continua recusada, como sempre foi', sem.figs.length === 0 && sem.avisos.length === 1);
+  medido('aviso de hoje: ' + sem.avisos.join(' | '));
+  conf('e a recusa deixou de mentir: ela nomeia o vertice e manda escrever entre=C',
+    sem.avisos.some((a) => a.indexOf('escreva entre=C') >= 0));
+  /* A dica so nasce na configuracao da lei dos cossenos. Com tres lados o "dois
+   * lados soltos" nunca aparece, e com dois lados sem angulo nenhum a frase
+   * antiga e VERDADE e continua sozinha: dica que nasce em todo lugar nao
+   * informa nada. */
+  const soltos = figuraDe('@fig triangulo lado=30 lado=40');
+  medido('dois lados e nenhum angulo: ' + (soltos.avisos.join(' | ') || 'desenhou sem aviso'));
+  conf('dois lados sem angulo nenhum NAO ganham a dica: ali eles estao mesmo soltos',
+    !soltos.avisos.some((a) => a.indexOf('entre=') >= 0));
+}
+{
+  /* A camada de gabarito. Os tres lados estao determinados, entao os tres
+   * angulos sao deducao dos dados e a resposta pode ser medida na figura. */
+  const gb = figuraDe('@fig id=t9 fase=gabarito', '@fig triangulo id=t9 lado=30 lado=40 angulo=60 entre=C');
+  const ts = textos({ reg: gb.figs[0] });
+  medido('gabarito do LAL: ' + ts.map((t) => t.txt + (mesmaCor(t.cor, COR.teal) ? '(teal)' : '(preto)')).join(' '));
+  conf('gabarito do LAL: os dois angulos que a lei dos cossenos acha saem em teal',
+    ts.filter((t) => mesmaCor(t.cor, COR.teal)).length === 2);
+  conf('e o 60 dado e os dois lados dados continuam em preto',
+    ['60°', '30', '40'].every((v) => ts.some((t) => t.txt === v && !mesmaCor(t.cor, COR.teal))));
+}
+
+/* ---------------------------------------------------------------- a particao
+ *
+ * "Nao achei defeito" e mais fraco do que "nao existe caminho que escape". A
+ * configuracao de entrada de um triangulo e uma CLASSIFICACAO, e o que segue e a
+ * prova de que ela e uma particao de verdade, nas duas metades que uma particao
+ * exige:
+ *
+ *   a soma dos baldes e o total          nada some
+ *   nenhum balde se sobrepoe             nada conta duas vezes
+ *
+ * Os cinco baldes sao o que a receita FAZ com a diretiva, medido na folha e nao
+ * declarado pela receita, a partir de quatro sinais independentes: desenhou,
+ * fora de escala, o contorno fecha, avisou. Cada balde e um predicado escrito
+ * separadamente, e o teste roda os CINCO em cada entrada e exige que exatamente
+ * um responda sim: escritos separados, eles poderiam se sobrepor, e e por isso
+ * que a disjuncao e medida em vez de ser afirmada.
+ *
+ * O quinto balde e o que nao pode ter ninguem: recusar CALADO e o defeito que
+ * esta familia inteira existe para impedir, porque a folha sai sem a figura e
+ * ninguem fica sabendo.
+ *
+ * E a lista de entrada tem um caso de cada tipo PROBLEMATICO, e nao uma amostra
+ * do caminho feliz: as cinco recusas novas do entre=, a contradicao entre lado e
+ * angulo, os angulos que nao fecham, a desigualdade triangular, o degenerado
+ * exato, o lado negativo, o simbolo com coeficiente e a mistura que nao
+ * determina. Uma lista so de casos bonitos prova a particao do caminho feliz. */
+
+console.log('\na particao das configuracoes de entrada do triangulo');
+
+const BALDES = [
+  { nome: 'constroi dos dados',
+    diz: 'desenha, fiel, com o contorno fechado: a forma saiu dos dados',
+    quer: (m) => m.desenhou && m.fecha && !m.fora },
+  { nome: 'constroi do prototipo',
+    diz: 'desenha, mas FORA DE ESCALA: a forma saiu do prototipo e a legenda e obrigatoria',
+    quer: (m) => m.desenhou && m.fecha && m.fora },
+  { nome: 'desenha o vao',
+    diz: 'desenha as tres reguas em fila: os tres lados sao numeros que nao fecham',
+    quer: (m) => m.desenhou && !m.fecha },
+  { nome: 'recusa falando',
+    diz: 'nao desenha, e diz por que',
+    quer: (m) => !m.desenhou && m.avisou },
+  { nome: 'recusa calada',
+    diz: 'nao desenha e nao diz nada: este balde tem que ficar VAZIO',
+    quer: (m) => !m.desenhou && !m.avisou }
+];
+
+const ENTRADAS = [
+  /* LAL, o balde novo */
+  { fig: '@fig triangulo lado=30 lado=40 angulo=60 entre=C', balde: 'constroi dos dados', tipo: 'LAL, o exercicio 11' },
+  { fig: '@fig triangulo lado=5 lado=12 angulo=90 entre=C', balde: 'constroi dos dados', tipo: 'LAL com angulo reto' },
+  { fig: '@fig triangulo lado=6 lado=10 angulo=120 entre=C', balde: 'constroi dos dados', tipo: 'LAL obtusangulo' },
+  { fig: '@fig triangulo lado=30 base=40 angulo=60 entre=B', balde: 'constroi dos dados', tipo: 'LAL com base= no terceiro slot' },
+  /* as outras configuracoes que ja construiam */
+  { fig: '@fig triangulo lado=3 lado=4 lado=5', balde: 'constroi dos dados', tipo: 'tres lados numericos' },
+  { fig: '@fig triangulo angulo=52 angulo=61 lado=10', balde: 'constroi dos dados', tipo: 'dois angulos e um lado' },
+  { fig: '@fig triangulo angulo=52 angulo=61', balde: 'constroi dos dados', tipo: 'dois angulos e nenhum comprimento' },
+  { fig: '@fig triangulo angulo=90 base=4 altura=3', balde: 'constroi dos dados', tipo: 'um angulo mais base e altura' },
+  { fig: '@fig triangulo lado=a lado=a lado=b', balde: 'constroi dos dados', tipo: 'isosceles por simbolo' },
+  { fig: '@fig triangulo lado=a lado=b lado=c', balde: 'constroi dos dados', tipo: 'tres simbolos distintos' },
+  /* o prototipo */
+  { fig: '@fig triangulo base=10 altura=h', balde: 'constroi do prototipo', tipo: 'mistura que nao determina' },
+  { fig: '@fig triangulo lado=a+1 lado=a lado=a', balde: 'constroi do prototipo', tipo: 'simbolo com termo constante' },
+  /* o vao */
+  { fig: '@fig triangulo lado=4 lado=7 lado=12', balde: 'desenha o vao', tipo: 'desigualdade triangular' },
+  { fig: '@fig triangulo lado=5 lado=5 lado=10', balde: 'desenha o vao', tipo: 'degenerado exato, que ainda cobra legenda' },
+  /* as recusas antigas */
+  { fig: '@fig triangulo angulo=60 lado=30 lado=40', balde: 'recusa falando', tipo: 'dois lados e um angulo SEM entre=' },
+  { fig: '@fig triangulo lado=3 lado=4 lado=5 angulo=50', balde: 'recusa falando', tipo: 'lado e angulo em contradicao' },
+  { fig: '@fig triangulo angulo=100 angulo=95', balde: 'recusa falando', tipo: 'angulos que nao fecham' },
+  { fig: '@fig triangulo lado=-5 lado=7 lado=12', balde: 'recusa falando', tipo: 'lado que nao e comprimento' },
+  { fig: '@fig triangulo base=10 altura=6;h;B', balde: 'recusa falando', tipo: 'base e altura de vertices diferentes' },
+  { fig: '@fig triangulo lado=4 lado=6 lado=9 altura=8', balde: 'recusa falando', tipo: 'altura que contradiz a escala' },
+  /* as cinco recusas NOVAS, uma por trava do entre= */
+  { fig: '@fig triangulo lado=30 lado=40 angulo=60 entre=Z', balde: 'recusa falando', tipo: 'entre= que nao e vertice' },
+  { fig: '@fig triangulo lado=30 lado=40 angulo=60 entre=A', balde: 'recusa falando', tipo: 'entre= num vertice que os dois lados nao compartilham' },
+  { fig: '@fig triangulo lado=30 lado=40 lado=50 angulo=60 entre=C', balde: 'recusa falando', tipo: 'entre= com o terceiro lado ja escrito' },
+  { fig: '@fig triangulo lado=30 lado=40 angulo=x entre=C', balde: 'recusa falando', tipo: 'entre= sem angulo numerico' },
+  { fig: '@fig triangulo lado=30 lado=40 angulo=60 angulo=50 entre=C', balde: 'recusa falando', tipo: 'entre= com dois angulos' },
+  { fig: '@fig triangulo lado=30 lado=40 angulo=60 entre=C entre=B', balde: 'recusa falando', tipo: 'entre= escrito duas vezes' },
+  { fig: '@fig triangulo lado=30 lado=40 angulo=60 entre=C incognita=C', balde: 'recusa falando', tipo: 'entre= e incognita no mesmo vertice' }
+];
+
+{
+  const contagem = {}, ondeCaiu = [];
+  BALDES.forEach((b) => { contagem[b.nome] = 0; });
+  let emDois = [], emNenhum = [], noBaldeErrado = [];
+  ENTRADAS.forEach(function (e) {
+    const r = figuraDe(e.fig);
+    const reg = r.figs[0] || null;
+    const m = {
+      desenhou: r.figs.length === 1,
+      fora: !!(reg && reg.foraDeEscala),
+      fecha: fecha(reg),
+      avisou: r.avisos.length > 0
+    };
+    const casaram = BALDES.filter((b) => b.quer(m));
+    if (casaram.length > 1) emDois.push(e.tipo + ' -> ' + casaram.map((b) => b.nome).join(' e '));
+    if (casaram.length === 0) emNenhum.push(e.tipo);
+    if (casaram.length === 1) {
+      contagem[casaram[0].nome]++;
+      ondeCaiu.push({ tipo: e.tipo, caiu: casaram[0].nome });
+      if (casaram[0].nome !== e.balde) {
+        noBaldeErrado.push(e.tipo + ': caiu em "' + casaram[0].nome + '" e o contrato diz "' + e.balde + '"');
+      }
+    }
+  });
+  BALDES.forEach(function (b) {
+    medido(contagem[b.nome] + '  ' + b.nome + ': ' + b.diz);
+    ondeCaiu.filter((o) => o.caiu === b.nome).forEach((o) => console.log('              ' + o.tipo));
+  });
+  const soma = BALDES.reduce((t, b) => t + contagem[b.nome], 0);
+  /* A primeira metade: a soma dos baldes e o total. Uma entrada que nao casasse
+   * com balde nenhum sairia da conta em silencio, e e exatamente esse silencio
+   * que a soma pega. */
+  conf('particao, metade 1: a soma dos baldes e o total (' + soma + ' de ' + ENTRADAS.length + '), nenhuma entrada ficou de fora',
+    soma === ENTRADAS.length && emNenhum.length === 0, emNenhum.join(' | '));
+  /* A segunda: nenhum balde se sobrepoe. Os cinco predicados sao rodados em
+   * TODA entrada, e nao ate o primeiro que responde sim. */
+  conf('particao, metade 2: nenhuma entrada casou com dois baldes',
+    emDois.length === 0, emDois.join(' | '));
+  conf('e cada entrada caiu no balde que o contrato promete',
+    noBaldeErrado.length === 0, noBaldeErrado.join(' | '));
+  conf('o balde da recusa CALADA ficou vazio: recusa que nao fala apaga a figura em silencio',
+    contagem['recusa calada'] === 0);
+  /* A contagem na outra direcao: a lista de entrada tem mesmo um caso de cada
+   * tipo problematico, e nao vinte casos do mesmo tipo. */
+  conf('e os cinco baldes que podem ter gente tem gente: a lista nao prova a particao do caminho feliz',
+    BALDES.slice(0, 4).every((b) => contagem[b.nome] > 0));
 }
 
 console.log('\nas recusas: o que a receita se nega a desenhar, cada uma com o par limpo ao lado');
