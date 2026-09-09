@@ -565,9 +565,20 @@ titulo "com navegador"
 # DE ONDE VEM O PISO, e ele e DERIVADO e nao escolhido.
 #
 #   maior fracasso conhecido na porta ... 713 MB livres
-#   pior custo medido, tres perfis ...... 567 MB
+#   pior custo medido quando o piso foi fixado, tres perfis ... 567 MB
 #   ------------------------------------------------------
 #   piso ................................ 1280 MB (713 + 567)
+#
+# O PIOR MEDIDO JA SUBIU DESDE ENTAO, e o piso NAO acompanhou, de proposito. Com
+# cinco perfis o pior e 591, replicado em 590 na corrida seguinte, e a formula
+# daria 1304. A diferenca e de 24 MB, que e menos que o espalhamento das proprias
+# medidas, e persegui-la commit a commit e exatamente a corrida atras do recorde
+# que a nota do vies, mais abaixo, diz que nao acaba.
+#
+# A REGRA PARA MEXER, entao, e esta: atualizar o piso quando o pior medido o
+# ultrapassar por MAIS do que o espalhamento das medidas, e nao a cada recorde
+# novo. Hoje: pior 591, custos observados de 472 a 591, espalhamento 119, piso
+# 1280 contra formula 1304. Nao mexe.
 #
 # O PISO SUBIU EM 09/09/2026, e a formula nao mudou: mudou a segunda parcela.
 # Ela era 257 MB, o pico de UM navegador medido ISOLADO, e a grandeza certa e
@@ -670,15 +681,25 @@ titulo "com navegador"
 # cada teste fecha o dele. Vinha de tres pontos grossos de 08/09 (595 MB no meio
 # da bateria nao matou; 579 e 713 ao entrar mataram).
 #
-# TRES PERFIS COMPLETOS, de DOIS operadores, mediram isso em 09/09 e a premissa
-# NAO se sustenta. Com regua unica (fundo = mediana das cinco leituras mais
-# baixas), comparando o fundo da ENTRADA, ate 180 s, com o fundo do RESTO:
+# NAO SE SABE ONDE FICA O PIOR MOMENTO, e a premissa velha nunca foi medida.
 #
-#   figuras-lote1   entrada 1047, tardio 1165   a ENTRADA e pior por 118 MB
-#   frente1         entrada 1199, tardio 1040   o TARDIO e pior por 159 MB
-#   figuras-eq      entrada 1214, tardio 1196   EMPATE, 18 MB
+# Ela foi inferida de tres leituras grossas de porta, e nao de nenhum perfil.
+# Cinco perfis completos foram medidos em 09/09 e NENHUM responde a pergunta,
+# por um defeito do instrumento que quem o escreveu retirou: a fronteira entre a
+# janela de "entrada" e a de "tardio" e uma CONSTANTE de 180 s, e as corridas
+# duram cerca de 560. A constante nao separa entrada de sustentacao: separa o
+# primeiro terco do resto.
 #
-# Um diz entrada, um diz tardio, um empata: O PIOR MOMENTO NAO TEM LUGAR FIXO.
+# E o sinal da comparacao inverteu entre dois perfis seguidos, o que confirma que
+# ela nao esta a medir o que o nome dela diz:
+#
+#   lote2      entrada 810, tardio 757
+#   solidos    entrada 787, tardio 801
+#
+# Entao o estado da questao e NAO SE SABE, que e mais fraco e mais honesto que
+# "nao tem lugar fixo", como eu tinha escrito aqui a partir de uma comparacao que
+# o autor dela depois retirou. Responder exige uma fronteira DERIVADA da corrida,
+# e nao fixa, o que e mudanca de instrumento e nao de leitura.
 #
 # Entao conferir so na porta nao e "suficiente porque o pico e ali": e uma
 # escolha que troca cobertura por simplicidade, e cujo limite agora esta medido.
