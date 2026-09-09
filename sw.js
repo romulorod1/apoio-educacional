@@ -28,8 +28,11 @@
  * mudados juntos: o painel "Cada aluno, desde quando e por quanto" passou a
  * nascer recolhido no Fechamento (app.js e index.html) e o fechamento que vai
  * para a família ganhou a linha do total do mês, no texto e no PDF (core.js e
- * pdf.js). Os quatro já estão na lista abaixo, que continua igual. */
-var CACHE = 'apoio-educacional-v21';
+ * pdf.js). Os quatro já estão na lista abaixo, que continua igual. O v22
+ * (08/09/2026) acrescenta uma linha à lista, a primeira desde o v16, que levou
+ * o './cartao.js': é o índice dos temas de português. Aí o nome novo é
+ * obrigatório pelo motivo original, e não pelo hábito do release. */
+var CACHE = 'apoio-educacional-v22';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -66,6 +69,21 @@ var ARQUIVOS = [
   // o índice de busca acompanha o de temas: é ele que faz o campo de assunto
   // achar por conteúdo, e não só por título.
   './banco/busca.json',
+  /* O índice dos temas de português, ao lado dos outros dois e por um motivo a
+   * mais: o índice de uma matéria que não é a padrão é procurado no CACHE, e
+   * não na rede (app.js, carregarOutrosIndices, que pergunta ao cache para um
+   * 404 não virar linha de erro no console a cada sessão; a rede só sobra para
+   * o navegador sem service worker). Fora desta lista o português não existe
+   * para o aplicativo nem com sinal.
+   *
+   * Só o índice, e os outros dois arquivos de banco/portugues/ ficam de fora de
+   * propósito. O serie-07.json são 156 KB e é série: séries moram no BAIXADOS e
+   * entram sozinhas na primeira vez que a série for aberta, como as onze da
+   * matemática. O busca.json de português ninguém lê: a busca por conteúdo pede
+   * 'banco/busca.json' por extenso, e as outras matérias procuram em título e
+   * resumo do próprio índice. Cada linha daqui é uma chance a mais de a
+   * instalação falhar inteira numa conexão ruim. */
+  './banco/portugues/indice.json',
   /* Os TREZE arquivos dos assuntos das outras matérias. O assunto da aula é
    * registro, e não atalho para material: ela precisa poder escolher o assunto
    * na casa da família, sem sinal, do mesmo jeito que abre a lista de temas.

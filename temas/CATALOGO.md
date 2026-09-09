@@ -172,6 +172,7 @@ ainda não foi escrito.
 | MATEM1-12 | Sequências e recorrência | algebra | pronto |
 | MATEM1-13 | Estatística descritiva | estatistica | pronto |
 | MATEM1-14 | Trigonometria no triângulo retângulo | geometria | pronto |
+| MATEM1-15 | Função composta | algebra | pronto |
 
 ## 2º ano do ensino médio
 
@@ -191,6 +192,7 @@ ainda não foi escrito.
 | MATEM2-12 | Cilindros, cones e esferas | geometria | pronto |
 | MATEM2-13 | Juros compostos | numeros | pronto |
 | MATEM2-14 | Distribuições e dispersão | estatistica | pronto |
+| MATEM2-15 | Identidades trigonométricas: adição de arcos e arco duplo | algebra | pronto |
 
 ## 3º ano do ensino médio
 
@@ -213,4 +215,8 @@ ainda não foi escrito.
 
 ---
 
-**Total: 146 temas.** Anos iniciais com 12 cada, anos finais e ensino médio com 14 cada.
+**Total: 148 temas.** Do 2º ao 5º ano do fundamental, 12 cada. Do 6º ao 9º, 14 cada. No ensino
+médio, 15 no 1º ano, 15 no 2º e 14 no 3º.
+
+A conta sai do disco, e não da memória: quem confere é o `atualizar_catalogo.py`, que avisa
+quando há tema escrito sem linha aqui. Foi assim que o 1º e o 2º ano do médio apareceram com 15.
