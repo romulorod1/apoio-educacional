@@ -175,6 +175,12 @@ roda "tinta"            node figuras/_prova_desenho_tinta.js
 # folha nao tem), e por isso ele fica aqui e nao no piloto de um tema.
 roda "prova do piloto"  node figuras/_prova_piloto_base.js
 roda "receitas plano"   node figuras/_prova_receitas_plano.js
+# A prova da familia retas: 171 conferencias, com o par envenenado de cada trava
+# e as diretivas dos cinco temas que ela destrava, guardadas em
+# _casos_retas_temas.js para serem reproduziveis. Ela nasceu FORA daqui, e a
+# omissao repetiu um defeito que esta frente ja tinha pego uma vez: prova nova
+# que nao entra no portao afirma so enquanto alguem lembra de roda-la a mao.
+roda "prova retas"      node figuras/_prova_retas.js
 roda "piloto MATEM3-12" node figuras/_piloto_MATEM3-12.js
 roda "piloto MATEM3-03" node figuras/_piloto_MATEM3-03.js
 roda "varredura banco"  node figuras/_varredura_banco.js

@@ -356,6 +356,220 @@ O que ainda NAO existe: `mediana=` e `bissetriz=` com medida (a `ceviana=` traca
 mede nenhuma), a altura relativa a um lado que nao seja a base no quadrilatero, e duas alturas
 na mesma figura, que a regra de uma ideia por figura desaconselha.
 
+### A receita de retas: retas soltas, paralelas com transversal e o feixe de Tales
+
+Chegou em 07/09/2026, com um caso por chave e por recusa em `figuras/_prova_retas.js` e a
+rasterizacao a 150 dpi pelo `figuras/_prova_retas_png.py`. Era o maior buraco de desenho do
+banco: 40 exercicios julgados indispensaveis em cinco temas (`MAT08-11`, segundo pior do
+banco; `MAT09-08`, oitavo; `MAT06-09`, decimo primeiro; `MAT04-07`, decimo quarto;
+`MAT07-11`, decimo quinto), nenhum com figura, porque as onze receitas anteriores desenham
+figura FECHADA (triangulo, quadrilatero, poligono regular, circulo, conica, solido) ou painel
+dessas, e nenhuma desenha reta. O caso que a auditoria escolheu para nomear o defeito e o
+exercicio 8 do `MAT08-11`: "escreva as medidas dos oito angulos formados NA FIGURA", numa
+figura que nao existia.
+
+**As posicoes.** O que a receita acrescenta ao kit e um sistema de ENDERECO para os angulos.
+Num cruzamento nascem quatro, e o tema fala deles pela posicao ("o correspondente", "o
+alterno interno"), nunca por coordenada. A numeracao e fixa: no cruzamento da primeira
+paralela as posicoes sao 1, 2, 3 e 4; no da segunda, 5, 6, 7 e 8; e dentro de cada cruzamento
+a volta comeca em cima e a direita da transversal e segue no sentido anti-horario.
+
+        \  2 | 1
+      ---+---------- r
+        3 \ 4
+           \
+        \  6 | 5
+      ---+---------- s
+        7 \ 8
+
+A volta e lida no QUADRO da construcao, ANTES do `giro=`: "em cima e a direita" quer dizer em
+cima e a direita das paralelas deitadas na horizontal, e nao da folha; girada a figura, a
+posicao 1 acompanha o giro. Fixada a volta, as relacoes do tema viram aritmetica de posicao:
+opostos pelo vertice (1,3),
+(2,4), (5,7), (6,8); correspondentes (1,5), (2,6), (3,7), (4,8); alternos internos (3,5) e
+(4,6); alternos externos (1,7) e (2,8); colaterais internos (3,6) e (4,5); colaterais externos
+(1,8) e (2,7). Posicao IMPAR mede o angulo da transversal com a paralela e posicao PAR mede o
+suplemento dele, e e essa unica regra que a receita usa para construir, para conferir e para
+responder no gabarito.
+
+- `reta=N[;I]`: declara uma reta pelo nome N, repetivel, com inclinacao I em graus (padrao 0
+  na primeira). O nome so identifica a reta para as outras chaves; ele nao e impresso.
+  **Nenhuma marca.** Ex.: `@fig retas reta=r reta=s angulo=63;1`.
+- `paralelas=r;s[;t...]`: declara o grupo de paralelas, que ganha uma ponta de seta em cada
+  reta (o glifo de paralelo sai como interrogacao na base-14, entao a setinha e o unico canal
+  que existe). Reta nao declarada e recusada. O grupo inteiro conta **uma marca**, porque o
+  que se le nao sao duas setas independentes e sim a frase "estas retas sao paralelas". Sem
+  `transversal=` a figura sai como o grupo solto, que e a celula "paralelas" do painel do
+  `MAT04-07`; ali nao ha cruzamento e toda chave de angulo e recusada.
+  Ex.: `@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=35;1` e
+  `@fig retas reta=r reta=s paralelas=r;s nomeiaretas=sim`.
+- `transversal=N[;I]`: a reta que corta o grupo. Uma so fora do feixe. Sem inclinacao escrita
+  ela sai do valor de `angulo=`, e sem valor nenhum sai da inclinacao padrao de 55 graus.
+  **Nenhuma marca.** Ex.: `transversal=t;35`, que constroi sem escrever numero na folha.
+- `angulo=V[;P]`: o valor V na posicao P (padrao: a proxima livre, na volta). V pode ser
+  numero (`35`), expressao do primeiro grau (`2x+30`) ou letra. Sai como arco com o valor na
+  bissetriz, do lado de fora do arco. **Uma marca por ocorrencia.**
+  Ex.: `@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=2x+30;3 angulo=x+30;6`.
+- `incognita=L[;P]`: o que a questao pergunta, com a letra L na posicao P. Mesmo arco do
+  `angulo=`, porque angulo desconhecido recebe arco com a incognita e nunca arco vazio. Na
+  camada de gabarito a letra vira o valor medido na figura, em teal e no corpo de resposta, e
+  so quando a forma foi DEDUZIDA dos dados. **Uma marca por ocorrencia.**
+  Ex.: `@fig retas id=r3 reta=r reta=s paralelas=r;s transversal=t angulo=110;3 incognita=x;6`.
+  Cuidado com a letra: `incognita=x` E a expressao x, entao `angulo=3x+10;1 incognita=x;3` diz
+  3x + 10 = x, que fecha em x = -5 e e recusado.
+- `congruentes=P;Q[;R...]`: grupo de posicoes que recebem o mesmo numero de arcos, repetivel
+  (a segunda ocorrencia ganha dois arcos, a terceira tres). O numero de voltas vale para TODOS
+  os membros do grupo, com valor escrito ou sem: aplicado so a quem nao tem valor, o segundo
+  grupo saia com dois arcos num membro e um no outro, e pela convencao do livro marcas
+  diferentes significam medidas diferentes, ou seja a figura afirmava que os dois membros do
+  grupo sao diferentes. Duas recusas: **paridade misturada** (uma posicao impar com uma par
+  sao SUPLEMENTARES e nao congruentes, e marcadas igual a figura contradiz o proprio
+  paralelismo que a setinha declara) e **grupo em que todos os membros trazem NUMERO** (os
+  numeros ja disseram quais sao iguais, e o que o grupo acrescenta e arco: num cruzamento com
+  os quatro angulos rotulados os arcos a mais fecham um no em volta do ponto). Letra e expressao
+  NAO contam como valor para a segunda: letra nao afirma medida nenhuma, e ali o grupo e o unico
+  canal que diz que os dois sao iguais, ou e a propria hipotese do exercicio
+  (`angulo=3x+10;1 angulo=5x-30;3 congruentes=1;3`, em que quem resolve nao ve que as duas
+  expressoes valem o mesmo antes de escrever a equacao). **Uma marca por grupo.**
+  Ex.: `@fig retas reta=r reta=s congruentes=1;3 congruentes=2;4`.
+- `oposto=sim`: acucar para o grupo de congruencia dos dois opostos pelo vertice do primeiro
+  angulo marcado, para o tema nao precisar calcular o numero da posicao oposta. Opostos tem
+  sempre a mesma paridade, entao ele nunca cai na recusa de paridade. **Conta como o grupo que
+  ele cria.** Ele passa pela MESMA porta dos grupos escritos a mao, e nao depois dela: empurrado
+  direto para a lista, escapava da recusa de redundancia e os dois caminhos davam vereditos
+  opostos para o mesmo grupo. Ex.: `@fig retas reta=r reta=s angulo=3x+10;1 angulo=5x-30;3 oposto=sim`.
+- `reto=sim`: o cruzamento e perpendicular e leva o quadradinho, um por cruzamento e nunca
+  quatro. Nao convive com `angulo=` nem com `incognita=` (o valor nao chegaria na folha) nem
+  com `ponto=`. **Uma marca.** Ex.: `@fig retas reta=r reta=s reto=sim nomeiaretas=sim`.
+- `feixe=N[;n1;n2...]`: o feixe de N paralelas do Teorema de Tales, cortado por DUAS
+  transversais, com os nomes opcionais. Modo proprio: aqui a pergunta e a razao entre pedacos
+  de reta e nao ha posicao de angulo, entao `angulo=` junto de `feixe=` e recusado. As
+  paralelas ganham a seta, **uma marca pelo grupo**.
+  Ex.: `@fig retas feixe=3;a;b;c transversal=t transversal=u corta=t;6 corta=t;10 corta=u;9 corta=u;x`.
+- `corta=R;V[;L]`: o segmento que a transversal R recorta entre duas paralelas vizinhas,
+  cotado, na ordem de cima para baixo. O numero CONSTROI (os vaos saem proporcionais aos
+  segmentos escritos, entao quem medir com a regua e recompensado) e a letra L rotula. No
+  gabarito a letra vira o valor deduzido pela razao de Tales, em teal. **Uma marca por
+  ocorrencia.** Ex.: `corta=t;3;a1 corta=t;5;a2 corta=u;3;b1 corta=u;5;b2`.
+- `nomeiaangulos=a;b;c;d[;e;f;g;h]`: acucar para uma `incognita=` por posicao, na volta.
+  **Uma marca por letra**, entao as oito de uma vez estouram o teto e sao reprovadas pelo
+  `conferirFigura`. Ex.: `@fig retas reta=r reta=s paralelas=r;s transversal=t nomeiaangulos=a;b;c;d`.
+- `nomeiaretas=sim` ou `nomeiaretas=r;s`: escreve a letra da reta na ponta dela, do lado de
+  fora. So quando o tema pede, porque o enunciado que diz "as retas r e s" precisa da letra na
+  folha e a figura dos oito angulos nao tem essa marca sobrando. **Uma marca por nome.**
+- `ponto=A[;B...]`: nomeia os cruzamentos, na ordem. So pousa em cruzamento que ja tem angulo
+  marcado, e na cunha livre do lado de FORA da faixa entre as paralelas. **Uma marca por
+  letra.** Ex.: `@fig retas reta=r reta=s paralelas=r;s transversal=t angulo=75;4 incognita=x;5 ponto=A;B`.
+- `giro=G`: gira a configuracao inteira, para o exercicio nao repetir a posicao prototipica da
+  explicacao. **Nenhuma marca.** Ex.: `@fig retas ... angulo=118;1 giro=20`.
+
+**A escala nao e automatica nesta receita, e nao precisa ser.** No modo cruzamento a figura e
+sempre exata por construcao: o primeiro valor numerico fixa a inclinacao, o sistema das
+expressoes a fixa quando nao ha numero, e a conferencia ja recusou tudo que nao fecha com o
+desenho. Nao sobra caso em que um rotulo diga um numero e o arco varra outro, que e a unica
+coisa que "fora de escala" pode significar aqui. O automatico do `escalaFora`, que liga a marca
+so por haver letra junto de numero, e falso neste contexto: `angulo=35;1 angulo=x+30;2` saia
+exigindo legenda com o desenho exato (x = 115), que e a escala que mente ao contrario.
+`escala=fora` escrito a mao continua mandando. No feixe a escala e decidida pela razao entre as
+duas transversais, acima.
+
+**Reta atravessa a moldura inteira**, cortada nos quatro lados do quadro, e nunca para nos
+pontos que a determinam: reta que para vira segmento e ensina que a solucao so pode estar
+entre eles. E ela sai **sem ponta de seta nas extremidades**, ao contrario da convencao geral
+do kit: a marca de paralelismo E uma ponta de seta, na mesma tinta e no mesmo peso, e mora no
+meio da MESMA reta; com ponta na extremidade a figura passa a ter tres pontas por reta e a do
+meio deixa de se ler como paralelismo. O corte na moldura ja diz que a reta continua.
+
+**Dois raios de arco por cruzamento, e nao quatro.** Quatro angulos marcados no mesmo vertice
+sao quatro arcos que se encostam nas semirretas que compartilham, e arcos encostados emendam
+num arco unico na fotocopia (o `conferirFigura` reprova abaixo de 6 pt de vao). Os dois
+angulos opostos pelo vertice tem a mesma abertura e ficam em setores opostos, entao dividem o
+mesmo raio sem se tocarem: sobram dois niveis, um por classe de abertura, e o de FORA fica com
+a classe mais fechada, porque a cunha estreita precisa de mais distancia do vertice para o
+valor caber dentro dela sem fio de chamada.
+
+**As recusas, cada uma com o campo minimo para ela rodar.** Todas devolvem null com aviso:
+
+- transversal declarada com a inclinacao do grupo (nao corta, nao nasce angulo). Campo minimo:
+  nenhum; a trava olha o angulo ja resolvido, e o padrao de 55 graus nunca produz uma
+  transversal paralela.
+- valor que nao cabe na figura. Campo minimo: **nenhum**. A conferencia roda com a inclinacao
+  JA RESOLVIDA, venha ela de um numero, do sistema das expressoes, da inclinacao declarada, do
+  `reto=sim` ou do padrao, e ela olha TODA entrada: numero e conferido contra o valor da
+  posicao, e expressao e conferida por letra, porque cada letra e uma incognita propria. Rodava
+  so sobre numeros, e ai `angulo=110;3 angulo=2x+30;5 angulo=x+10;1` passava limpa pedindo
+  x = 40 e x = 100 ao mesmo tempo. Sem posicao escrita ela continua rodando, porque as posicoes
+  livres sao preenchidas na volta.
+- sistema de expressoes que fecha FORA do intervalo de um angulo de cruzamento. Caia calado no
+  padrao de 55 graus, e ai a figura era chute com aparencia de deducao.
+- reta declarada que nao tem papel na figura, e inclinacao escrita na segunda reta de um grupo
+  de paralelas: as duas sao valor escrito que nao chega na folha.
+- cruzamento que da 90 graus sem `reto=sim`, e `reto=sim` com valor escrito.
+- `paralelas=` citando reta que ninguem declarou, e `paralelas=` com uma reta so; e chave de
+  angulo num grupo de paralelas SEM transversal, onde nao nasce angulo nenhum.
+- posicao que nao existe naquele cruzamento, e duas ocorrencias no mesmo endereco.
+- `feixe=` com menos de duas paralelas, com uma transversal so, e segmentos que nao guardam a
+  razao de Tales. Campo minimo da razao: dois segmentos numericos numa MESMA transversal; com
+  dois na outra a razao e conferida, com um numero e uma letra a letra e deduzida, e sem
+  numero em transversal nenhuma os vaos saem iguais e a receita AVISA, porque vao igual e uma
+  afirmacao (a de que os segmentos sao congruentes) e nao a ausencia de uma.
+- a ESCALA ENTRE as duas transversais do feixe. Tales garante a razao DENTRO de cada uma; entre
+  elas o segmento recortado do mesmo vao vale `g/sen(inclinacao)`, entao inclinacoes diferentes
+  recortam comprimentos diferentes, e com "6 e 10" nas duas o 6 de uma saia com o dobro do 6 da
+  outra. Campo minimo: um indice em que as DUAS tragam numero. Havendo, ou a receita ESCOLHE a
+  inclinacao da segunda para cumprir a razao (quando o autor nao a escreveu), ou marca a figura
+  fora de escala, que passa a exigir a legenda (quando ele a escreveu). O que ela nao faz e
+  deixar as duas coisas se contradizerem caladas.
+
+  Duas coisas sabidas sobre esse automatico, para quem for escrever tema. **O alcance e de cerca
+  de 0,44 a 2,3** na razao entre as duas transversais: fora dele a inclinacao que cumpriria a
+  razao ficaria abaixo de 25 graus, o que espeta a figura, e a receita prefere marcar fora de
+  escala e pedir a legenda. **E o feixe fica mais legivel perto do centro do alcance**: quanto
+  mais a razao se afasta de 1, mais as duas transversais convergem, e no extremo o ponto de
+  encontro delas entra na moldura e o apice passa a ler como vertice de triangulo, que e outra
+  figura. Razao perto de 1 tem o cuidado oposto ja embutido: a inclinacao sai ESPELHADA (180
+  menos a da primeira) em vez de igual a ela, porque duas transversais paralelas entre si
+  transformam o feixe numa grade de paralelogramo, e feixe de Tales com transversais paralelas
+  nao mostra o teorema, mostra que segmentos entre paralelas sao congruentes.
+- `ponto=` num cruzamento sem angulo marcado. A trava equivalente do `conferirFigura` nao
+  alcanca esta receita, porque la o laco pula todo traco de papel `contorno`, que e o papel das
+  retas daqui. E `ponto=` dentro do feixe, onde nao ha angulo nenhum a pedir.
+- `nomeiaretas=` pedindo o nome de uma paralela que o `feixe=` nao nomeou. Palavra nenhuma nasce
+  no desenhador: o que a diretiva nao nomeou, a folha nao escreve.
+- figura acima do teto de cinco marcas, pelo `conferirFigura`.
+
+**Escolher a POSICAO e escolher de qual angulo o exercicio fala, e isso se confere contra o
+texto.** Angulo INTERNO (posicoes 3, 4, 5 e 6) e o unico que tem alterno interno e colateral
+interno; angulo EXTERNO (1, 2, 7 e 8) e o unico que tem alterno externo e colateral externo;
+correspondente e oposto pelo vertice existem para os oito. O caso medido, o exercicio 8 do
+MAT06-09, que pede o correspondente, o alterno interno e o colateral interno de um angulo de
+65: escrito com o 65 na posicao 1, que e externa, o "alterno interno" virava o oposto pelo
+vertice e o colateral interno nao aparecia na figura, e o gabarito ainda imprimia 65 por
+coincidencia, nomeando outro angulo. A forma certa e `angulo=65;4 incognita=x;8 incognita=y;6
+incognita=z;5`. Nenhuma trava pega isto: a figura esta correta, ela apenas responde a outra
+pergunta.
+
+**O exercicio 8 do MAT08-11, os oito angulos, dentro do teto de cinco.** Sao duas figuras
+pequenas na mesma configuracao e na mesma escala, divididas por METADE DA FOLHA e nao por
+cruzamento: a primeira leva os quatro angulos de cima (posicoes 1, 2, 5 e 6) e a segunda os
+quatro de baixo (3, 4, 7 e 8). Cada uma soma quatro rotulos mais o paralelismo, exatamente
+cinco, e cada cruzamento fica com DOIS arcos e nao quatro, que e a diferenca entre "o angulo e
+o suplemento dele" e um circulo com duas mordidas em volta do ponto. A segunda figura nao
+repete o dado: ela constroi por `transversal=t;35`, que fixa a mesma configuracao sem gastar
+marca nenhuma.
+
+As duas figuras da explicacao do `MAT08-11` nomeiam SEIS dos oito angulos, a e b na de cima e
+c, d, e e f na de baixo: g e h, que sao as posicoes 7 e 8, nunca aparecem, porque a terceira
+figura que os traria custaria as mesmas cinco marcas para dizer o que as duas primeiras ja
+disseram. Quem escrever a explicacao precisa saber disso ao redigir o texto ao lado. E o painel
+de retas do `MAT04-07` nao leva numero: a celula das concorrentes so precisa dizer "estas se
+cruzam", e `reta=r reta=s nomeiaretas=sim` basta.
+
+O que ainda NAO existe: o painel de ponto, reta, semirreta e segmento do `MAT04-07`; a faixa
+sombreada entre as paralelas que separa interno de externo; bissetriz de angulo tracada sobre
+o cruzamento (`MAT08-11` 15 e 17); e segmento com extremos nomeados saindo de um ponto entre
+as paralelas (`MAT08-11` 16 e 20), que pede uma receita de poligono aberto e nao de retas.
+
 ### As receitas de espaco: solido e painelsolidos
 
 Chegaram em 02/09/2026, com 122 conferencias em `_prova_receitas_solidos.js` e um render
