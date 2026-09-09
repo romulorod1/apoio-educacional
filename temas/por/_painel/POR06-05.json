@@ -1,7 +1,7 @@
 {
   "tema": "POR06-05",
-  "assinatura": "b1a281418dcbc475e7ba31c74d616c61d45957dba51d3a309d29480dd0ce40e5",
-  "data": "2026-09-08",
+  "assinatura": "2245267df54b5d2beb41b07be5a95cd1b6106750ba88e4e141dd0c5e6d21b29c",
+  "data": "2026-09-09",
   "modelos": {
     "leitores": "sonnet",
     "juiz": "sonnet",
@@ -67,25 +67,26 @@
       "respostas": [
         {
           "leitor": "A",
-          "resposta": "O rato casmurro perguntou quem iria amarrar o guizo no pescoço de Faro-Fino, e nenhum dos ratos quis fazer isso. Um disse que não sabia dar nó, outro disse que não era tolo e os demais não tinham coragem, por isso a assembleia se desfez em consternação.",
+          "resposta": "Entre os dois momentos, um rato perguntou quem iria amarrar o guizo no pescoço do gato, e ninguém se ofereceu: um disse que não sabia dar nó, outro que não era tolo, e todos alegaram falta de coragem. Assim a ideia, que parecia perfeita, mostrou ser impossível de executar.",
           "veredito": "espera_se",
-          "motivo": "Aponta a pergunta do rato casmurro sobre quem amarraria o guizo, lista as três recusas (nao sabia dar no, nao era tolo, nao tinha coragem) e liga isso explicitamente ao desfecho, dizendo por isso a assembleia se desfez em consternacao, cobrindo pergunta e mudanca de humor do espera_se."
+          "motivo": "Explica com precisão que a pergunta sobre quem amarraria o guizo revelou que ninguém executaria o plano, batendo com o esperado."
         },
         {
           "leitor": "B",
-          "resposta": "O rato casmurro perguntou quem ia amarrar o guizo no pescoço do gato, e ninguém quis fazer isso: um disse que não sabia dar nó, outro que não era tolo, e os outros não tinham coragem.",
-          "veredito": "aceita_se",
-          "motivo": "Identifica a pergunta e as tres recusas, batendo no aceita_se descobriram que ninguem teria coragem de amarrar o guizo, mas encerra na ultima desculpa sem fechar explicitamente a ligacao com a mudanca de humor da assembleia, por isso fica em aceita_se e nao em espera_se."
+          "resposta": "Um rato perguntou quem ia amarrar o guizo no gato, e ninguém quis: uns não sabiam dar nó, outros tiveram medo. Por isso a festa virou silêncio e desânimo.",
+          "veredito": "espera_se",
+          "motivo": "A resposta identifica a pergunta sobre quem amarraria o guizo, a falta de voluntários e a virada de ânimo, exatamente o que o espera_se pede."
         },
         {
           "leitor": "C",
-          "resposta": "Entre um momento e outro, o rato casmurro faz a pergunta que ninguém tinha pensado: \"quem vai amarrar o guizo no pescoço de Faro-Fino?\" (linha 11). Depois disso vem o \"silêncio geral\", e o texto explica que cada rato arranja uma desculpa: um não sabia dar nó, outro não era tolo, e todos, na verdade, não tinham coragem (linhas 12 e 13). Ou seja, era fácil aplaudir a ideia, mas ninguém queria ser o rato a fazer a parte perigosa, por isso a alegria vira consternação.",
+          "resposta": "Entre os dois momentos, um rato casmurro perguntou quem ia amarrar o guizo no pescoço do gato Faro Fino, e aí ninguém soube responder. Um disse que não sabia dar nó, outro disse que não era tolo, e no fim todos admitiram que não tinham coragem de chegar perto do gato. Então a ideia que parecia perfeita na hora dos aplausos virou impossível na hora de executar, e por isso a alegria virou consternação. A própria fábula resume isso na última frase, dizer é fácil, fazer é que são elas, e eu acho, opinião minha, que isso também acontece com a gente quando combina um monte de coisa legal mas ninguém quer ser o primeiro a agir.",
           "veredito": "espera_se",
-          "motivo": "Cita a pergunta com a linha, o silencio geral e as tres desculpas com linha, e fecha com a sintese ninguem queria ser o rato a fazer a parte perigosa, por isso a alegria vira consternacao, o que reproduz com precisao o espera_se."
+          "motivo": "Explica o mesmo mecanismo do critério esperado, a pergunta que expôs a falta de quem executasse o plano."
         }
       ],
       "lente": {
-        "veredito": "criterio_ok"
+        "veredito": "criterio_ok",
+        "motivo": "As variações que escrevi, do silêncio e das desculpas ao medo de chegar perto do gato, caem na pergunta do rato casmurro ou na falta de coragem de amarrar o guizo."
       },
       "resultado": "aprovada"
     },
@@ -148,25 +149,26 @@
       "respostas": [
         {
           "leitor": "A",
-          "resposta": "O problema é que a mochila fica pesada e no fim do dia o ombro dói. Começar pelo problema ajuda a vender porque faz o leitor se identificar e sentir que precisa da solução que o anúncio oferece.",
+          "resposta": "O problema é o peso da mochila, que carrega livro, caderno, estojo, garrafa e casaco e faz o ombro doer no fim do dia. Começar por esse problema ajuda a vender porque faz o leitor se identificar com a dificuldade antes de conhecer a solução, tornando o produto mais desejado.",
           "veredito": "espera_se",
-          "motivo": "Explica que o problema do ombro dolorido aproxima o leitor antes da oferta, conforme espera_se."
+          "motivo": "Identifica o peso do material e a dor no ombro e explica que começar pelo problema faz o leitor se identificar antes da solução."
         },
         {
           "leitor": "B",
-          "resposta": "O problema é a dor no ombro de carregar peso o dia todo. Começar falando disso ajuda a vender, porque a pessoa se identifica com o problema e quer resolver comprando o produto.",
-          "veredito": "espera_se",
-          "motivo": "Explica que a identificacao com a dor no ombro leva a compra, conforme espera_se."
+          "resposta": "O problema é a dor no ombro de carregar a mochila pesada o dia todo. Começar por ele ajuda a vender porque o leitor se reconhece no problema e já quer a solução que vem em seguida.",
+          "veredito": "aceita_se",
+          "motivo": "A resposta acerta o problema e diz que o leitor se reconhece nele e já quer a solução, o que cai na entrada aceita de que o problema aproxima o leitor e prepara a oferta, sem chegar à formulação completa do espera_se sobre reconhecer a cena antes de saber do produto."
         },
         {
           "leitor": "C",
-          "resposta": "O problema é a dor no ombro causada pelo peso da mochila no fim do dia (linha 3 e 4). Começar por esse problema ajuda a vender porque faz o leitor se identificar com a dor e sentir que precisa do produto para resolver aquilo.",
+          "resposta": "O problema é o peso que a criança carrega todo dia, livro, caderno, estojo, garrafa e até o casaco que a professora manda levar, e isso faz o ombro doer no fim do dia. Começar falando do problema ajuda a vender porque quem está lendo se reconhece na situação e pensa, é exatamente isso que acontece comigo. Depois que o leitor já se identificou, a mochila aparece como a solução perfeita, com a alça larga e o fundo reforçado resolvendo o que acabou de ser descrito. Na minha opinião esse é um truque bem esperto de propaganda, porque mexe com o sentimento da pessoa antes de mostrar o produto que ela vai comprar.",
           "veredito": "espera_se",
-          "motivo": "Explica que a identificacao com a dor no ombro prepara a venda, conforme espera_se."
+          "motivo": "Identifica o problema e explica com precisão o efeito de identificação do leitor antes da oferta, como o critério pede."
         }
       ],
       "lente": {
-        "veredito": "criterio_ok"
+        "veredito": "criterio_ok",
+        "motivo": "As explicações alternativas para começar pelo problema, criar a necessidade ou disfarçar a propaganda, cabem em aproximar o leitor e preparar a oferta."
       },
       "resultado": "aprovada"
     },
@@ -203,24 +205,25 @@
         {
           "leitor": "A",
           "resposta": "A fábula promete, de certa forma, uma lição de vida sobre coragem e ação. O anúncio promete que a mochila resolve a dor no ombro e tem cinco anos de garantia. A promessa que pode ser conferida por alguém de fora é a garantia do anúncio, porque é uma coisa concreta.",
-          "veredito": "espera_se",
-          "motivo": "Aponta a garantia do anuncio como a promessa verificavel, conforme espera_se."
+          "veredito": "aceita_se",
+          "motivo": "Aponta uma promessa de cada texto e diz que a do anúncio é a verificável, cabendo na entrada aceita."
         },
         {
           "leitor": "B",
           "resposta": "A fábula ensina que quem fala fácil nem sempre faz. O anúncio promete que a mochila acaba com a dor no ombro. A promessa do anúncio dá pra conferir de fora, testando a mochila.",
           "veredito": "aceita_se",
-          "motivo": "Aponta uma promessa de cada texto e diz que a do anuncio e a verificavel, conforme o item de aceita_se, ainda que trate a fala da fabula mais como licao do que como promessa."
+          "motivo": "Trata a fábula como lição, não como promessa, e aponta a promessa verificável do anúncio, cabendo na entrada aceita."
         },
         {
           "leitor": "C",
           "resposta": "O anúncio promete que a mochila alivia a dor no ombro e traz cinco anos de garantia. A fábula promete, através da moral, que fazer é mais difícil que falar. A promessa que pode ser conferida por alguém de fora é a do anúncio, porque dá para comprar a mochila e testar se ela realmente funciona.",
-          "veredito": "espera_se",
-          "motivo": "Aponta a garantia do anuncio como a promessa verificavel, conforme espera_se."
+          "veredito": "aceita_se",
+          "motivo": "Aponta uma promessa de cada texto e identifica a do anúncio como a que se confere, cabendo na entrada aceita."
         }
       ],
       "lente": {
-        "veredito": "criterio_ok"
+        "veredito": "criterio_ok",
+        "motivo": "A primeira linha de aceita_se serve para qualquer par de promessas apontado, e a leitura de que a lição da fábula também se confere na vida já está em nao_aceita."
       },
       "resultado": "aprovada"
     },
@@ -229,25 +232,26 @@
       "respostas": [
         {
           "leitor": "A",
-          "resposta": "O prazo faz o leitor sentir que precisa comprar logo, com medo de perder o desconto. Eu acho que não é totalmente honesto, porque o anúncio não explica por que o preço vai subir depois, e isso parece só um jeito de apressar quem está lendo.",
+          "resposta": "O prazo faz o leitor sentir que precisa decidir logo, para não perder o desconto. Considero um recurso comum de propaganda e não necessariamente desonesto, já que o anúncio informa claramente o preço antigo e o novo, sem esconder nenhuma informação sobre a mochila.",
           "veredito": "espera_se",
-          "motivo": "Identifica o efeito de urgencia e argumenta pela desonestidade com base no texto, conforme espera_se."
+          "motivo": "Identifica o efeito de urgência e sustenta a posição de honestidade citando que o anúncio mostra os dois preços claramente."
         },
         {
           "leitor": "B",
-          "resposta": "O prazo faz a pessoa ter pressa de comprar logo. Eu acho meio desonesto, porque parece que o desconto vai acabar mesmo, quando talvez não acabe.",
-          "veredito": "espera_se",
-          "motivo": "Identifica o efeito de urgencia e argumenta pela desonestidade com base no desconto, conforme espera_se."
+          "resposta": "O prazo dá pressa para comprar logo, com medo de perder o desconto. Acho honesto, porque o texto só avisa a data do fim da promoção, sem inventar outra urgência.",
+          "veredito": "aceita_se",
+          "motivo": "A resposta identifica o efeito de urgência do prazo e sustenta a posição de honestidade com uma referência ao que o texto realmente informa, o que cabe na entrada aceita que permite sustentar qualquer das duas posições com um elemento do texto."
         },
         {
           "leitor": "C",
-          "resposta": "O prazo faz o leitor sentir urgência e medo de perder o desconto, então ele decide comprar mais rápido sem pensar com calma. Eu acho que não é totalmente honesto usar esse recurso, porque a linha 11 mostra um prazo apertado só para apressar a decisão de quem lê.",
+          "resposta": "O prazo até o fim do mês faz o leitor sentir pressa, como se fosse perder o desconto de 249 para 189 reais se não decidir rápido. Isso pode levar a pessoa a comprar sem pensar direito se realmente precisa da mochila naquele momento. Eu acho, na minha opinião, que não é totalmente honesto, porque cria uma urgência que pode não ser tão real assim, só para vender mais depressa. Mas também não chega a ser mentira, porque o próprio anúncio mostra o preço e o prazo, então dá para o leitor conferir antes de decidir.",
           "veredito": "espera_se",
-          "motivo": "Identifica o efeito de urgencia e cita a linha 11 para argumentar, conforme espera_se."
+          "motivo": "Aborda os dois lados, urgência e honestidade, apoiado em elemento do texto, como o critério pede."
         }
       ],
       "lente": {
-        "veredito": "criterio_ok"
+        "veredito": "criterio_ok",
+        "motivo": "A linha que aceita qualquer das duas posições sustentada por um trecho cobre inclusive a defesa de que o prazo é honesto por vir escrito no anúncio."
       },
       "resultado": "aprovada"
     }
@@ -265,6 +269,28 @@
       17
     ],
     "ambiguas": [],
-    "estreitas": []
-  }
+    "estreitas": [],
+    "largas": []
+  },
+  "historico": [
+    {
+      "assinatura": "b1a281418dcbc475e7ba31c74d616c61d45957dba51d3a309d29480dd0ce40e5",
+      "data": "2026-09-08",
+      "resultado": {
+        "aprovadas": [
+          2,
+          4,
+          6,
+          8,
+          9,
+          11,
+          13,
+          15,
+          17
+        ],
+        "ambiguas": [],
+        "estreitas": []
+      }
+    }
+  ]
 }

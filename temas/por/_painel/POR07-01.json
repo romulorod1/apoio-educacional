@@ -1,7 +1,7 @@
 {
   "tema": "POR07-01",
-  "assinatura": "08f592702d9d2fea6963d2a20d049b875a6403c7786a4c8055735c900c8e7b41",
-  "data": "2026-09-08",
+  "assinatura": "41180849fe2bf2ef7289f3f8fc6d48e942c3630ecfa88df8af899121fd157d4d",
+  "data": "2026-09-09",
   "modelos": {
     "leitores": "sonnet",
     "juiz": "sonnet",
@@ -177,24 +177,24 @@
           "leitor": "A",
           "resposta": "Sim, o conto é justo com o leitor, porque as três pistas aparecem bem antes da solução: a pilha invertida nas linhas 8 a 10, e a linha vermelha e o risco no prego na linha 14. Tudo isso surge muito antes de Teodoro explicar o que aconteceu, lá pelas linhas 47 a 54.",
           "veredito": "aceita_se",
-          "motivo": "Aponta três pistas (pilha, linha vermelha, risco na parede) com linha aproximada, o que cai em aceita_se: apontar pelo menos três pistas com o lugar aproximado no texto."
+          "motivo": "Aponta pelo menos três pistas materiais (pilha invertida, linha vermelha e risco no prego) com localização aproximada no texto e conclui que sim, o que corresponde ao primeiro item do aceita_se, sem chegar à lista completa do espera_se."
         },
         {
           "leitor": "B",
           "resposta": "Sim, cumpre. A pilha invertida aparece nas linhas 8 a 10, e a linha vermelha e o risco no prego aparecem nas linhas 14 a 16, tudo antes de Cecilia explicar o misterio.",
           "veredito": "aceita_se",
-          "motivo": "Aponta as mesmas três pistas com linhas aproximadas, sem cobrir os demais itens do espera_se, o que cai em aceita_se: apontar pelo menos três pistas com o lugar aproximado no texto."
+          "motivo": "Aponta as mesmas três pistas com linhas bastante precisas, oito a dez e quatorze a dezesseis, antes da solução, satisfazendo o critério mínimo do aceita_se, mas sem reconhecer o que só a confissão acrescenta."
         },
         {
           "leitor": "C",
           "resposta": "O conto cumpre o combinado, porque as três pistas aparecem bem antes da explicação final. A pilha invertida e a linha vermelha estão nas linhas 8 a 14, o risco no prego está nas linhas 14 a 16, e só depois, nas linhas 45 a 54, é que Teodoro explica tudo. Como o leitor conhece as pistas antes da solução, ele pode tentar montar o quebra cabeça sozinho, do mesmo jeito que Cecília fez.",
           "veredito": "aceita_se",
-          "motivo": "Também aponta só três das cinco pistas do espera_se, com linhas aproximadas, o que cai em aceita_se: apontar pelo menos três pistas com o lugar aproximado no texto."
+          "motivo": "Também aponta as três pistas com localização aproximada no texto e responde que o conto cumpre o combinado, cumprindo o item do aceita_se sem cobrir todos os grupos de pistas do espera_se."
         }
       ],
       "lente": {
         "veredito": "criterio_ok",
-        "motivo": "O criterio hoje aceita as tres polaridades defensaveis (sim, quase/em parte, nao/nao totalmente), com ou sem numero de linha, e o bullet de \"pelo menos tres pistas com o lugar aproximado\" nao esta preso a uma polaridade, entao ele absorve tambem a leitura mais fina de fair play (a pilha nova da linha 41 chegar so no momento em que Cecilia entende, ou o motivo da pilha do afinador aparecer so na confissao); as duas recusas restantes atingem apenas resposta sem justificativa alguma ou acusacao de informacao externa sem apontar qual, que nao sao respostas defensaveis pelo texto."
+        "motivo": "O critério aceita sim, quase e não, com ou sem número de linha, e o por exemplo da terceira linha deixa aberta a lista do que falta, inclusive a corda nova do violão."
       },
       "resultado": "aprovada"
     },
@@ -266,6 +266,28 @@
       16
     ],
     "ambiguas": [],
-    "estreitas": []
-  }
+    "estreitas": [],
+    "largas": []
+  },
+  "historico": [
+    {
+      "assinatura": "08f592702d9d2fea6963d2a20d049b875a6403c7786a4c8055735c900c8e7b41",
+      "data": "2026-09-08",
+      "resultado": {
+        "aprovadas": [
+          2,
+          4,
+          6,
+          7,
+          9,
+          11,
+          13,
+          14,
+          16
+        ],
+        "ambiguas": [],
+        "estreitas": []
+      }
+    }
+  ]
 }

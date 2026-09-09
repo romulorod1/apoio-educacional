@@ -1,7 +1,7 @@
 {
   "tema": "POR06-01",
-  "assinatura": "4a14a8e8e29cf210623eb31bdb99d2c2e2c5bc66e26c56c0404211e8823b4b87",
-  "data": "2026-09-08",
+  "assinatura": "177098f4cbe44b04ac7724e933dbe5dd3fc36ce2c93039b4ae081680be58fedb",
+  "data": "2026-09-09",
   "modelos": {
     "leitores": "sonnet",
     "juiz": "sonnet",
@@ -202,25 +202,26 @@
       "respostas": [
         {
           "leitor": "A",
-          "resposta": "Ao colocar antes uma formiga que acolhe, o autor mostra que era possível ajudar a cigarra. Assim, a recusa da segunda formiga fica ainda mais injusta, porque o leitor vê que existia outro jeito de agir.",
-          "veredito": "espera_se",
-          "motivo": "Explica que a acolhida anterior torna a recusa uma escolha injusta, o nucleo exato de espera_se."
+          "resposta": "Colocar a formiga boa antes da formiga má mostra que a recusa não é a única resposta possível diante de quem pede ajuda: existe também o acolhimento, que reconhece o valor do canto da cigarra e a salva. Assim a fábula passa a comparar duas atitudes diferentes, e não apresenta mais uma moral única e fechada.",
+          "veredito": "aceita_se",
+          "motivo": "Mostra que passam a existir duas atitudes para comparar, uma boa e uma má, o que cai na entrada aceita sobre a comparação entre atitudes."
         },
         {
           "leitor": "B",
-          "resposta": "Muda porque agora dá pra comparar duas atitudes diferentes, mostrando que nem toda formiga é ruim, tem formiga boa e formiga má.",
-          "veredito": "aceita_se",
-          "motivo": "Diz que passam a existir duas atitudes para comparar, formiga boa e formiga ma, o que corresponde ao ultimo item de aceita_se, sem chegar ao detalhe do espera_se sobre a recusa deixar de parecer natural."
+          "resposta": "Antes da formiga má, tem uma formiga boa que acolhe a cigarra porque gostou do canto dela. Isso mostra que nem toda formiga agia daquele jeito ruim, a recusa foi escolha só da formiga má.",
+          "veredito": "espera_se",
+          "motivo": "A resposta diz que a recusa foi escolha só da formiga má, o que reproduz a leitura central do espera_se de que a recusa deixa de parecer natural e passa a ser uma decisão."
         },
         {
           "leitor": "C",
-          "resposta": "Colocar uma formiga boa antes muda a história porque mostra que existem dois jeitos diferentes de reagir ao pedido de ajuda, e não só um. Isso torna a crueldade da segunda formiga ainda mais chocante, porque o leitor já viu que era possível ser gentil, e por isso a fábula acaba com uma mensagem mais completa sobre bondade e maldade.",
-          "veredito": "espera_se",
-          "motivo": "Diz que a crueldade da segunda formiga fica mais chocante porque ja se viu que era possivel ser gentil, o nucleo de espera_se."
+          "resposta": "Muda que agora existem duas formigas bem diferentes, uma que lembra do canto da cigarra e a acolhe com casa e comida, e outra que fecha a porta e deixa a cigarra morrer de frio. A formiga boa entende que a cigarra ajudou todo mundo a trabalhar mais feliz cantando, então ela retribui isso quando a cigarra precisa de ajuda. Já a formiga má só pensa em quem trabalhou igual a ela e não perdoa quem foi diferente. Eu acho, na minha opinião, que colocar a formiga boa antes deixa a história mais justa, porque mostra que nem todo mundo pensa igual e que ajudar também pode dar certo, não só a recusa que a fábula antiga sempre mostrava.",
+          "veredito": "aceita_se",
+          "motivo": "Também chega à ideia de duas atitudes diferentes para comparar, mostrando que a recusa deixa de ser a única resposta possível."
         }
       ],
       "lente": {
-        "veredito": "criterio_ok"
+        "veredito": "criterio_ok",
+        "motivo": "Escrevi leituras alternativas, entre elas a defesa do valor do artista e a de que a maldade vira exceção, e todas caem na comparação entre as duas atitudes que a quarta linha de aceita_se já prevê."
       },
       "resultado": "aprovada"
     },
@@ -265,6 +266,28 @@
       16
     ],
     "ambiguas": [],
-    "estreitas": []
-  }
+    "estreitas": [],
+    "largas": []
+  },
+  "historico": [
+    {
+      "assinatura": "4a14a8e8e29cf210623eb31bdb99d2c2e2c5bc66e26c56c0404211e8823b4b87",
+      "data": "2026-09-08",
+      "resultado": {
+        "aprovadas": [
+          2,
+          4,
+          6,
+          8,
+          10,
+          12,
+          13,
+          15,
+          16
+        ],
+        "ambiguas": [],
+        "estreitas": []
+      }
+    }
+  ]
 }

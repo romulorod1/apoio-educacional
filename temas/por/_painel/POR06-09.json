@@ -1,7 +1,7 @@
 {
   "tema": "POR06-09",
   "assinatura": "e0e4f0cf9724099b61ad86229b733bd06a2699397c853fa28f7034fe83c05703",
-  "data": "2026-09-08",
+  "data": "2026-09-09",
   "modelos": {
     "leitores": "sonnet",
     "juiz": "sonnet",
@@ -237,6 +237,7 @@
       15
     ],
     "ambiguas": [],
-    "estreitas": []
+    "estreitas": [],
+    "largas": []
   }
 }

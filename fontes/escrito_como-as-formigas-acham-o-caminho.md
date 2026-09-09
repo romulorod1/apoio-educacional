@@ -6,7 +6,7 @@ ano: 2026
 genero: artigo
 dominio: autoral
 licenca: escrito para este banco, uso livre
-procedencia: escrito pela frente 2 (sessão romul-c3) em 08/09/2026 para o tema POR07-03; a cena e as pessoas são inventadas, mas o experimento da ponte dupla é real: Goss, Aron, Deneubourg e Pasteels, Naturwissenschaften, 1989, e Deneubourg, Aron, Goss e Pasteels, Journal of Insect Behavior, 1990, Universidade Livre de Bruxelas, com formigas-argentinas
+procedencia: escrito pela frente 2 (sessão romul-c3) em 08/09/2026 para o tema POR07-03; a cena e as pessoas são inventadas, mas o experimento da ponte dupla é real: Goss, Aron, Deneubourg e Pasteels, Naturwissenschaften 76: 579-581, 1989 (ramos de comprimentos diferentes), e Deneubourg, Aron, Goss e Pasteels, Journal of Insect Behavior 3: 159-168, 1990 (ramos iguais), Universidade Livre de Bruxelas, com formigas-argentinas. Em 09/09/2026 o texto foi conferido contra o artigo de 1989 lido na íntegra e corrigido em quatro pontos: o ano (dizia 1990), a duracão do rastro (dizia poucos minutos, e o artigo declara meia-vida de cerca de 30 minutos), a proporção final (dizia quase toda a fila, e o dado publicado é mais de 80 por cento do tráfego entre o 30º e o 40º minuto) e a marcação nos dois sentidos, que o artigo aponta como condição do resultado
 integral: sim
 ---
 Como as formigas acham o caminho de volta
@@ -21,31 +21,31 @@ formiga guia na frente. O que existe é um rastro químico no chão.
 
 O cheiro que vira caminho
 
-Quando uma formiga operária sai do ninho procurando comida, ela anda de forma quase
-aleatória. Se encontra alguma coisa que vale a pena, volta para o ninho e, no caminho
-de volta, vai deixando no chão uma substância chamada feromônio. É um cheiro que as
-outras formigas da colônia reconhecem com as antenas. Uma formiga que cruza esse
-rastro tende a segui-lo; ao chegar à comida e voltar, deixa mais feromônio por cima.
+Quando uma formiga operária sai do ninho procurando comida, ela anda quase ao acaso
+e vai deixando no chão, na ida e na volta, uma substância chamada feromônio. Se ela
+encontra alguma coisa que vale a pena, volta ao ninho reforçando o rastro. É um cheiro
+que as outras formigas da colônia reconhecem com as antenas. Uma formiga que cruza
+esse rastro tende a segui-lo e, ao voltar da comida, deixa mais feromônio por cima.
 Quanto mais formigas passam, mais forte fica o cheiro, e mais formigas ele atrai.
 
 O detalhe importante é que o feromônio evapora. Se a comida acaba, as formigas param
-de reforçar o rastro, o cheiro enfraquece em poucos minutos e a trilha desaparece. A
+de reforçar o rastro, o cheiro enfraquece ao longo de algumas horas e a trilha some. A
 colônia não precisa de ninguém para avisar que a fonte de comida acabou: o próprio
 chão "esquece" o caminho.
 
 O experimento da ponte dupla
 
-Em 1990, pesquisadores da Universidade Livre de Bruxelas, na Bélgica, fizeram um
+Em 1989, pesquisadores da Universidade Livre de Bruxelas, na Bélgica, fizeram um
 experimento simples para entender como a colônia escolhe entre dois caminhos. Ligaram
-o ninho de formigas-argentinas a uma fonte de comida por uma ponte que se dividia em
-dois ramos, um curto e um longo, que se juntavam de novo antes da comida.
+o ninho de formigas-argentinas a uma fonte de comida por uma ponte em que, duas vezes
+seguidas, o caminho se dividia num ramo curto e num ramo longo, que se juntavam depois.
 
 No começo, as formigas se dividiam mais ou menos igualmente entre os dois ramos. Mas
-as que iam pelo ramo curto chegavam antes e voltavam antes, depositando feromônio nele
-mais cedo. Em pouco tempo o ramo curto tinha mais cheiro, atraía mais formigas, que
-deixavam ainda mais cheiro. Depois de alguns minutos, quase toda a fila passava pelo
-caminho mais curto. Nenhuma formiga mediu os dois ramos. A escolha surgiu da soma de
-milhares de decisões pequenas.
+a formiga-argentina marca o chão na ida e na volta, e as que iam pelo ramo curto
+chegavam antes e voltavam antes, deixando feromônio nele mais cedo. O ramo curto
+passou a ter mais cheiro, atraía mais formigas, e depois de meia hora mais de oito em
+cada dez seguiam por ele. Nenhuma formiga mediu os dois ramos. A escolha surgiu da
+soma de milhares de decisões pequenas.
 
 Por que isso interessa a quem não é formiga
 

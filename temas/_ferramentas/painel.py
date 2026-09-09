@@ -57,7 +57,7 @@ PASTA_PAINEL = '_painel'
 # resposta nem para aceitar nem para recusar.
 VEREDITOS = ('espera_se', 'aceita_se', 'nao_aceita', 'fora')
 VEREDITOS_BONS = ('espera_se', 'aceita_se')
-VEREDITOS_DA_LENTE = ('criterio_ok', 'estreito')
+VEREDITOS_DA_LENTE = ('criterio_ok', 'estreito', 'largo')
 
 # Os modelos do protocolo (PAINEL.md). Ficam gravados no registro para se saber,
 # meses depois, quem leu.
@@ -297,9 +297,12 @@ def problemas_no_registro(registro, corpo, abertas):
                          % (n, ' ou '.join(VEREDITOS_DA_LENTE)))
         elif lente.get('veredito') == 'estreito':
             erros.append('a questao %d esta estreita pela lente adversarial' % n)
+        elif lente.get('veredito') == 'largo':
+            erros.append('a questao %d esta larga pela lente adversarial: o criterio aceita '
+                         'resposta errada, e nao se conserta alargando mais' % n)
 
     resultado = registro.get('resultado') or {}
-    for chave in ('ambiguas', 'estreitas'):
+    for chave in ('ambiguas', 'estreitas', 'largas'):
         marcadas = sorted(resultado.get(chave) or [])
         if marcadas:
             erros.append('o painel marcou a(s) questao(oes) %s como %s: o tema so entra no banco '
@@ -420,16 +423,23 @@ def ler_lente(caminho, ident_do_tema):
 def resultado_da_questao(respostas, lente):
     """(resultado, motivo) pela tabela 1.2 da especificacao.
 
-    A ambiguidade vem antes do estreitamento quando as duas aparecem: leitura de
+    A ambiguidade vem primeiro quando aparece junto com as outras: leitura de
     aluno que cai fora do criterio e a evidencia mais forte sobre o item, e e ela
-    que a mensagem tem que mostrar primeiro. As duas barram o tema do mesmo
+    que a mensagem tem que mostrar primeiro. As tres barram o tema do mesmo
     jeito, entao a ordem so decide o que se le.
+
+    `larga` e a mais nova das tres, e nasceu de uma catraca: enquanto a lente so
+    sabia dizer `estreito`, cada rodada acrescentava uma linha de aceita_se e
+    nenhuma tirava. Um criterio alargado tres vezes aceita quase tudo, e quem o
+    usa da certo para resposta errada.
     """
     ruins = [r for r in respostas if r['veredito'] not in VEREDITOS_BONS]
     if ruins:
         return 'ambigua', 'leitor %s: %s' % (ruins[0]['leitor'], ruins[0]['veredito'])
     if lente.get('veredito') == 'estreito':
         return 'estreita', ''
+    if lente.get('veredito') == 'largo':
+        return 'larga', ''
     return 'aprovada', ''
 
 
@@ -496,6 +506,7 @@ def montar(caminho_do_tema, arquivos_de_leitores, arquivo_do_juiz, arquivo_da_le
             'aprovadas': [q['n'] for q in questoes if q['resultado'] == 'aprovada'],
             'ambiguas': [q['n'] for q in questoes if q['resultado'] == 'ambigua'],
             'estreitas': [q['n'] for q in questoes if q['resultado'] == 'estreita'],
+            'largas': [q['n'] for q in questoes if q['resultado'] == 'larga'],
         },
     }
     return registro, questoes

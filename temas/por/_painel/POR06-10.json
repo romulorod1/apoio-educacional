@@ -1,7 +1,7 @@
 {
   "tema": "POR06-10",
-  "assinatura": "3b50a89b1e7938078f33583130715da56da8208978a7a0e37a630ebaa4f7e34c",
-  "data": "2026-09-08",
+  "assinatura": "cf8d0f774bb67374659f7428fa1266619e7eff647b43161e5eace54f1994a209",
+  "data": "2026-09-09",
   "modelos": {
     "leitores": "sonnet",
     "juiz": "sonnet",
@@ -42,23 +42,24 @@
           "leitor": "A",
           "resposta": "Acenda, unte, descasque e bata.",
           "veredito": "espera_se",
-          "motivo": "Quatro verbos de comando corretos, como no espera_se."
+          "motivo": "Copia quatro verbos diferentes da lista esperada, corretamente."
         },
         {
           "leitor": "B",
           "resposta": "Acenda, unte, descasque e bata são quatro verbos de comando da receita.",
           "veredito": "espera_se",
-          "motivo": "Mesmos quatro verbos do espera_se."
+          "motivo": "Copia os mesmos quatro verbos da lista esperada, corretamente."
         },
         {
           "leitor": "C",
           "resposta": "Quatro verbos que dão ordem são: acenda, unte, descasque e bata (linhas 13, 14, 15 e 16).",
           "veredito": "espera_se",
-          "motivo": "Mesmos quatro verbos do espera_se."
+          "motivo": "Copia os mesmos quatro verbos da lista esperada, com as linhas corretas."
         }
       ],
       "lente": {
-        "veredito": "criterio_ok"
+        "veredito": "criterio_ok",
+        "motivo": "Levantei todos os imperativos do texto, inclusive segure e adiante, e a linha que libera os verbos da advertência já alcança os que ficaram de fora da lista de espera_se."
       },
       "resultado": "aprovada"
     },
@@ -202,25 +203,26 @@
       "respostas": [
         {
           "leitor": "A",
-          "resposta": "Um motivo a favor de deixar no fim é que assim não atrapalha quem já sabe cozinhar e quer ir direto às instruções. Um motivo a favor de colocar antes é que assim quem vai usar o forno já fica avisado do perigo antes mesmo de começar a receita.",
+          "resposta": "A favor do fim, a advertência reúne de uma vez todos os cuidados sobre passos diferentes da receita, depois que o leitor já entendeu o processo inteiro. A favor do início, como os avisos envolvem acender o forno e tirar a forma quente, que acontecem logo no começo e no meio, colocar a advertência antes evitaria que alguém se queimasse por ainda não ter lido o aviso.",
           "veredito": "espera_se",
-          "motivo": "Dá um argumento a favor de cada posição apoiado no conteúdo da advertência, como no espera_se."
+          "motivo": "Dá um argumento para cada lado apoiado no conteúdo da advertência, como o critério espera."
         },
         {
           "leitor": "B",
-          "resposta": "A favor de deixar no fim, porque assim não atrapalha quem já sabe cozinhar. A favor de colocar antes, porque assim a pessoa já fica avisada e não se queima sem querer.",
-          "veredito": "espera_se",
-          "motivo": "Mesma estrutura de um argumento para cada lado."
+          "resposta": "No fim funciona porque junta os cuidados depois que já se sabe a receita toda. Antes do primeiro passo seria melhor porque o aviso de chamar um adulto para acender o forno já vale desde o passo 1.",
+          "veredito": "aceita_se",
+          "motivo": "A resposta dá um argumento razoável para cada lado apoiado no conteúdo da advertência, mas o argumento a favor do início não é o de evitar acidente citado no espera_se, e sim o de que o aviso já vale desde o primeiro passo."
         },
         {
           "leitor": "C",
-          "resposta": "A favor de deixar no fim: a pessoa já sabe todo o passo a passo antes de se preocupar com os perigos, sem interromper a receita no meio. A favor de colocar antes: assim a pessoa saberia dos riscos do forno quente e do pano molhado logo no início, evitando acidentes desde o primeiro passo.",
+          "resposta": "Um motivo a favor de deixar a advertência no fim é que a pessoa já aprendeu o passo a passo inteiro antes de se preocupar com os riscos do forno quente e do fermento. Um motivo a favor de colocar antes do primeiro passo é que assim quem vai fazer o bolo já sabe desde o início que precisa de um adulto para acender o forno e tirar a forma, evitando um acidente logo de cara. O texto mesmo avisa que a forma sai a 180 graus e queima a mão até através de um pano fino, então esse cuidado é bem sério. Na minha opinião seria mais seguro colocar no começo, porque nem sempre a gente lê a receita inteira antes de já estar cozinhando.",
           "veredito": "espera_se",
-          "motivo": "Mesma estrutura com mais detalhe sobre os riscos do forno."
+          "motivo": "Dá um argumento para cada lado com apoio no texto, incluindo o risco do forno quente."
         }
       ],
       "lente": {
-        "veredito": "criterio_ok"
+        "veredito": "criterio_ok",
+        "motivo": "As duas linhas de aceita_se cobrem qualquer par razoável de argumentos, e a proposta de espalhar cada aviso pelo passo correspondente não responde ao que o enunciado pede."
       },
       "resultado": "aprovada"
     }
@@ -237,6 +239,27 @@
       15
     ],
     "ambiguas": [],
-    "estreitas": []
-  }
+    "estreitas": [],
+    "largas": []
+  },
+  "historico": [
+    {
+      "assinatura": "3b50a89b1e7938078f33583130715da56da8208978a7a0e37a630ebaa4f7e34c",
+      "data": "2026-09-08",
+      "resultado": {
+        "aprovadas": [
+          2,
+          4,
+          6,
+          8,
+          10,
+          12,
+          14,
+          15
+        ],
+        "ambiguas": [],
+        "estreitas": []
+      }
+    }
+  ]
 }

@@ -59,6 +59,6 @@ Atenção
 
 Peça a um adulto para acender o forno e para tirar a forma quente: ela sai a 180
 graus e queima a mão mesmo através de um pano fino. Nunca segure forma quente com
-pano molhado, porque a água vira vapor e o vapor queima mais do que o metal. E não
-adiante o fermento: batido no liquidificador junto com o resto, ele perde o gás
-antes de ir ao forno, e o bolo assa baixo e pesado.
+pano molhado, porque a água leva o calor da forma até a mão muito mais rápido do
+que o pano seco. E não adiante o fermento: batido no liquidificador junto com o
+resto, ele perde o gás antes de ir ao forno, e o bolo assa baixo e pesado.

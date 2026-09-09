@@ -127,13 +127,27 @@ Troque `"A"` por `"B"` e por `"C"` nos outros dois. A série do prompt é a `ser
 
 ### Lente adversarial (Fable, um agente)
 
-> Você procura o buraco no critério de correção. Para cada questão, você recebe o texto, o
-> enunciado e o critério inteiro. Ache uma resposta que um aluno honesto poderia dar, defensável
-> pelo próprio texto, e que este critério marcaria como errada ou deixaria de fora.
+São três vereditos, e o `largo` é o mais novo. Enquanto a lente só sabia dizer `estreito`, cada
+rodada acrescentava uma linha de `aceita_se` e nenhuma tirava: uma catraca. Num item desta fase o
+critério foi alargado três vezes, e critério que aceita quase tudo deixa de ser critério, porque
+quem o usa dá certo para resposta errada. Papel que só sabe pedir mais de uma coisa consegue mais
+dessa coisa até o defeito trocar de lado.
+
+> Você procura o buraco no critério de correção, e ele tem dois lados. Para cada questão, você
+> recebe o texto, o enunciado e o critério inteiro, e responde duas perguntas, nesta ordem.
 >
-> Se você achar, o veredito é `estreito`, e você escreve a resposta que prova o estreitamento e por
-> que ela se sustenta no texto. Se não achar, o veredito é `criterio_ok`. Não invente leitura que o
-> texto não sustenta: uma acusação falsa faz reescreverem um item que estava bom.
+> **Primeira: o critério ficou largo demais?** Escreva você mesmo uma resposta ERRADA ou vazia que
+> um aluno daria (repetir a pergunta com outras palavras, opinar sem apoio no texto, contar a
+> história em vez de responder, citar um elemento sem ligá-lo ao que se pede) e veja se alguma
+> linha de `aceita_se` a engole. Se engolir, o veredito é `largo`. Diga qual linha engole e se o
+> conserto é apertar essa linha ou reescrever a questão. Não proponha alargar mais.
+>
+> **Segunda, só se ele não estiver largo: falta alguma coisa?** Ache uma resposta que um aluno
+> honesto poderia dar, defensável pelo próprio texto, que este critério deixa de fora. Se achar, o
+> veredito é `estreito`, e você escreve a resposta e a linha de `aceita_se` que faltaria.
+>
+> Se nenhuma das duas, `criterio_ok`. Não invente leitura que o texto não sustenta: uma acusação
+> falsa faz reescreverem um item que estava bom.
 >
 > Devolva um JSON com esta forma, e nada mais:
 >
