@@ -577,8 +577,56 @@ titulo "com navegador"
 #
 # A REGRA PARA MEXER, entao, e esta: atualizar o piso quando o pior medido o
 # ultrapassar por MAIS do que o espalhamento das medidas, e nao a cada recorde
-# novo. Hoje: pior 591, custos observados de 472 a 591, espalhamento 119, piso
-# 1280 contra formula 1304. Nao mexe.
+# novo.
+#
+# E "espalhamento das medidas" SO significa alguma coisa depois de dizer SOB QUE
+# REGUA, E COM QUE PORTA. Os cinco perfis, com a regua unica e com a porta que o
+# PORTAO REGISTOU no log de cada um:
+#
+#   eq          porta 1761  fundo 1194  custo 567
+#   lote1       porta 1560  fundo 1047  custo 513
+#   frente1     porta 1512  fundo 1040  custo 472
+#   lote2       porta 1348  fundo  757  custo 591
+#   solidos     porta 1369  fundo  779  custo 590
+#
+#   de 472 a 591  ->  espalhamento 119
+#
+# HOJE: pior 591, formula 1304, piso 1280, excesso 24, e 24 e menor que 119. NAO
+# MEXE.
+#
+# ESTA LINHA JA DISSE 82, e o 82 estava errado. Ele saiu de uma repassagem que,
+# para os tres perfis antigos, usou a PRIMEIRA LEITURA DO AMOSTRADOR como se
+# fosse a porta, quando a porta real estava no log do portao dos tres. E a
+# aproximacao nao erra sempre para o mesmo lado, o que era a justificativa para a
+# tratar como piso:
+#
+#   eq     aprox 1703 MENOR que a porta 1761   subestima o custo
+#   lote1  aprox 1587 MAIOR que a porta 1560   superestima o custo
+#
+# Nao e piso nem teto: e ruido nao controlado a substituir um valor registado. E
+# eu aceitei o 82 sem o conferir, o que e o mesmo erro que este arquivo ja
+# documenta em dois lugares. A decisao nao mudava nem com um numero nem com o
+# outro, e foi por isso que nada o acusou.
+#
+# E UMA SUPOSICAO DESTA FORMULA QUE NUNCA FOI ENUNCIADA: somar uma parcela FIXA
+# assume que o custo de entrar NAO depende de com quanta memoria se entra.
+#
+# Chegou a haver evidencia a favor, com os cinco pontos a formar dois grupos
+# limpos, e ela CAIU junto com as portas erradas. Ordenando pela porta registada:
+#
+#   porta 1348  custo 591
+#   porta 1369  custo 590
+#   porta 1512  custo 472
+#   porta 1560  custo 513
+#   porta 1761  custo 567
+#
+# Os dois menores dao os dois maiores custos, e depois o custo VOLTA A SUBIR com
+# a porta. Nao e monotono, e nao sustenta a hipotese como ela foi enunciada.
+#
+# A suposicao, porem, NAO deixa de ser suposicao so porque a evidencia a favor
+# caiu: agora nao ha evidencia em nenhum sentido. Fica em aberto, e o teste que a
+# separaria continua barato e continua por fazer: dois perfis na MESMA sessao, um
+# com a maquina folgada e outro com ela apertada de proposito.
 #
 # O PISO SUBIU EM 09/09/2026, e a formula nao mudou: mudou a segunda parcela.
 # Ela era 257 MB, o pico de UM navegador medido ISOLADO, e a grandeza certa e
