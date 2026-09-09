@@ -558,6 +558,24 @@ titulo "com navegador"
 # Medidos com um amostrador que roda POR FORA do portao, porque por dentro nao
 # da: quando o portao le, o navegador do primeiro teste ja fechou.
 #
+# O 1280 NAO E UM NUMERO PRECISO, e os quatro digitos enganam. As duas parcelas
+# sao grossas: 713 e UMA morte, e 567 e o pior de tres perfis que variaram de 472
+# a 567. Qualquer valor numa faixa de umas dezenas de MB em volta serve
+# igualmente bem, e nenhum dado observado distingue um do outro.
+#
+# E ha um caso em que a precisao aparente engana de verdade: em 09/09/2026 este
+# piso recusou uma entrada com 1274 MB, ou seja por SEIS MB, numa amostra cujas
+# tres leituras variavam TREZE. A margem da decisao ficou menor que o ruido da
+# leitura, e quando isso acontece QUEM DECIDE E A REGRA, E NAO A MEDIDA.
+#
+# A regra continua boa por assimetria, e nao por precisao: decidir pela MENOR das
+# tres erra para o lado seguro, recusando maquina que talvez aguentasse e nunca
+# aceitando maquina que nao aguenta. Errar recusando custa espera; errar
+# aceitando custa a rodada e deixa orfaos.
+#
+# Corolario para quem for ajustar: nao vale a pena mexer no piso por dezenas de
+# MB. Mexer vale quando a DERIVACAO muda, como mudou duas vezes hoje.
+#
 # O QUE ESTA MUDANCA NAO E, e isto importa para quem ajustar depois: NAO e
 # fronteira medida. Nenhum ponto de porta conhecido cai entre 950 e 1280, entao
 # qualquer piso nessa faixa classifica os observados igualmente bem e o dado NAO
