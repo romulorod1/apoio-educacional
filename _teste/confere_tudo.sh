@@ -11,6 +11,18 @@ cd "$(dirname "$0")/.."
 
 falhou=0
 instavel=0
+# O TERCEIRO ESTADO. Nao e ok, porque nao conferiu; nao e FALHOU, porque nao ha
+# defeito. E o portao dizendo que uma parte dele nao rodou, e por isso ele nao
+# pode dizer TUDO PASSOU nem sair com zero: "portao verde rodado solto uma vez"
+# deixa de estar satisfeito EXPLICITAMENTE, e nao por omissao.
+nao_conferido=0
+# O QUE ficou sem conferir, para o resumo dizer em vez de supor.
+nao_conferido_motivos=""
+anota_nao_conferido() {
+  nao_conferido=1
+  nao_conferido_motivos="$nao_conferido_motivos
+  - $1"
+}
 titulo() { printf '\n=== %s ===\n' "$1"; }
 
 # Quantas verificacoes falharam na saida de um teste (vazio = nenhuma).
@@ -19,6 +31,166 @@ quantas_falhas() {
 }
 resumo() {
   printf '%s\n' "$1" | grep -E "passaram|PASSARAM|CONFIRMAD" | tail -1
+}
+
+# MEMORIA LIVRE E NAVEGADORES VIVOS, para um FALHOU se explicar sozinho.
+#
+# Em 08/09/2026 este portao imprimiu TRES FALHOU falsos seguidos, todos
+# ERR_CONNECTION_REFUSED, numa maquina de 8 GB com 713 MB livres. O servidor
+# ficou intermitentemente indisponivel sob pressao de memoria, e o testa_aluno
+# PASSOU no meio dos tres, com 145 conferencias: prova de que ele nao tinha
+# caido de vez. Repetir nao resolve, porque a causa dura mais que a segunda
+# tentativa, e a repeticao ja tinha acontecido nos tres.
+#
+# Os vinte testes de navegador rodam num laco, um node por teste, cada um
+# subindo o proprio Chrome, e o laco nao mata nada entre um e outro: depende de
+# cada teste chamar o close() dele. Teste morto no meio deixa o Chrome vivo e o
+# proximo sobe por cima, entao o acumulo e por construcao.
+#
+# Matar orfao consertaria o sintoma. Isto aqui conserta o DIAGNOSTICO, que e o
+# dano maior: um FALHOU sem contexto manda quem le procurar defeito no ramo, e
+# alarme falso em portao de merge ensina a ignorar alarme, que foi como uma
+# regressao de tabela ja subiu para producao aqui.
+#
+# Degrada sozinho: sem powershell ou sem tasklist sai "?" e nada quebra.
+livre_mb_agora() {
+  powershell -NoProfile -Command \
+    "[int]((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1024)" 2>/dev/null | tr -d '\r'
+}
+# CONTAR SEM O FILTRO DO TASKLIST, e isto e conserto de um defeito antigo.
+#
+# A forma anterior era `tasklist /FI "IMAGENAME eq chrome.exe" /NH`, e ela NUNCA
+# funcionou aqui: o MSYS converte o `/FI` num caminho do Windows antes de o
+# tasklist o ver, e sai
+#
+#   ERROR: Invalid argument/option - 'C:/Program Files/Git/FI'.
+#
+# O comando sai com codigo 1, a saida nao contem o nome do processo, e o grep -c
+# devolve ZERO. Medido com oito Chrome vivos na maquina: a forma antiga dizia 0.
+#
+# Ou seja TODA linha "N navegador(es) vivo(s)" de ontem e de hoje foi zero por
+# defeito, e nao por medida. A parte da memoria da mesma linha sempre esteve
+# certa, porque `livre_mb_agora` usa PowerShell e nao passa por aqui.
+#
+# `//FI` funcionaria neste shell, e nao e usado de proposito: depender de como
+# cada shell trata a barra foi exatamente o que quebrou. Sem filtro, conta-se na
+# saida e acabou.
+# ZERO SO PODE SIGNIFICAR ZERO. O codigo de saida do tasklist e a unica
+# testemunha de que a contagem aconteceu, e a versao anterior descartava-o:
+# `tasklist 2>/dev/null | grep -c ...` devolve 0 tanto para "nenhum processo"
+# como para "o comando nao rodou", e o 2>/dev/null ainda esconde o motivo.
+#
+# Foi assim que a forma com switch enganou toda a gente durante dois dias. Nao
+# repetir o mesmo padrao um nivel acima.
+conta_processo() {
+  saida_tl=$(tasklist 2>&1) && codigo_tl=0 || codigo_tl=$?
+  if [ "$codigo_tl" != "0" ] || [ -z "$saida_tl" ]; then
+    printf '?'
+    return
+  fi
+  printf '%s\n' "$saida_tl" | grep -c "$1" || true
+}
+quantos_node() { conta_processo "node.exe"; }
+estado_da_maquina() {
+  livre=$(livre_mb_agora)
+  navs=$(conta_processo "chrome.exe")
+  nodes=$(quantos_node)
+  [ -n "$livre" ] || livre="?"
+  [ -n "$navs" ] || navs="?"
+  [ -n "$nodes" ] || nodes="?"
+  printf '%s MB livres, %s navegador(es) e %s node vivo(s)' "$livre" "$navs" "$nodes"
+}
+
+# A PORTA DECIDE POR AMOSTRA, E NAO POR UMA LEITURA.
+#
+# Medido em 08/09, quatro leituras em oito minutos com a carga parada (o total do
+# claude variou 15 MB): o LIVRE variou 429 MB, de 418 a 847. Uma leitura
+# instantanea de memoria livre erra por mais de 400 MB nesta maquina, e a
+# diferenca entre passar e ser recusado cabe inteira dentro desse ruido.
+#
+# Entao a porta le TRES vezes, com alguns segundos entre elas, e decide pela
+# MENOR. Menor e a escolha conservadora: a bateria vai entrar num instante que
+# ninguem escolhe, e o que importa e o pior momento provavel, e nao o melhor.
+# Custa nove segundos num portao de quinze minutos.
+#
+# O QUE ESTA AFIRMADO E SO ISTO: o livre variou 429 MB com a carga parada. A
+# causa NAO foi isolada. O salto coincidiu com a Memory Compression esvaziando de
+# 211 para 28 MB, o que e indicio e nao prova: quatro medidas numa maquina, sem
+# repeticao em outra condicao e sem isolar o que esvaziava a compressao. A
+# amostra vale mesmo que a causa seja outra, e e por isso que ela e o conserto.
+#
+# A medida do estado_da_maquina continua uma leitura so, de proposito: la ela e
+# DIAGNOSTICO e nao decisao, e o custo de errar e uma linha imprecisa no log, e
+# nao uma rodada perdida.
+livre_amostrado() {
+  # Ecoa "menor|l1 l2 l3".
+  la_1=$(livre_mb_agora); sleep 3
+  la_2=$(livre_mb_agora); sleep 3
+  la_3=$(livre_mb_agora)
+  la_menor=$la_1
+  for la_v in $la_2 $la_3; do
+    if [ -n "$la_v" ] && [ -n "$la_menor" ] && [ "$la_v" -lt "$la_menor" ] 2>/dev/null; then
+      la_menor=$la_v
+    fi
+  done
+  printf '%s|%s %s %s' "$la_menor" "$la_1" "$la_2" "$la_3"
+}
+
+# LINHA ANOTADA A MAO DEIXA A COLUNA DA PORTA VAZIA quando a medida nao for de
+# porta. Nome de coluna e uma AFIRMACAO sobre o numero que esta nela, e quem le
+# a tabela depois le a afirmacao da coluna, nao a ressalva no texto ao lado.
+#
+# Aconteceu comigo em 09/09/2026: pus os 595 MB medidos NO MEIO da bateria na
+# coluna livre_na_porta_MB, escrevi "nao e leitura de porta" no desfecho, e
+# depois li a minha propria tabela concluindo que havia uma morte com 713 ACIMA
+# de uma sobrevivencia com 595, e que o numero da porta nao predizia a morte.
+# Falso: 713 e 579 sao medidas de PORTA e 595 e de TRAVESSIA, e o bloco do piso
+# la embaixo ja explicava a diferenca. Nome igual e unidade igual nao fazem duas
+# medidas comparaveis.
+#
+# UMA LINHA DE HISTORICO POR RODADA, para o piso poder descer com dado.
+#
+# O numero da porta ja existe, e se perde no log de uma corrida so. Guardando uma
+# linha por rodada, a primeira rodada VERDE de qualquer frente entra sozinha, e
+# em tres ou quatro rodadas o piso se calibra pela distribuicao real em vez de
+# por opiniao. Hoje falta exatamente isso: ha duas mortes anotadas (713 e 579) e
+# nenhuma entrada bem sucedida.
+#
+# O caminho e configuravel e o padrao fica DENTRO do repositorio, ignorado pelo
+# git. Cravar aqui o caminho de um Drive pessoal seria fragil e desnecessario:
+# quem quiser o historico compartilhado entre as frentes aponta PORTAO_HISTORICO
+# para o arquivo comum. Falha de escrita nao derruba o portao: historico e
+# registro, e nao conferencia.
+HISTORICO_MEM="${PORTAO_HISTORICO:-_teste/_memoria.tsv}"
+registra_memoria() {
+  # $1 = livre na porta da bateria (ou vazio), $2 = desfecho
+  # As chaves em volta importam: o 2>/dev/null solto silencia o printf, e quem
+  # reclama de caminho impossivel e o SHELL, na redirecao. Sem elas, um
+  # PORTAO_HISTORICO invalido imprime linha de erro no meio do log do portao.
+  cabecalho='data\thora\tlivre_na_porta_MB\tpiso_MB\tdesfecho\torigem\tleituras'
+  if [ ! -f "$HISTORICO_MEM" ]; then
+    { printf '%b\n' "$cabecalho" > "$HISTORICO_MEM"; } 2>/dev/null || return 0
+  else
+    # CONFERIR O CABECALHO, e nao so a existencia do arquivo. A coluna das tres
+    # leituras entrou depois de o arquivo nascer: um arquivo antigo tem seis
+    # colunas no cabecalho e passaria a receber linhas de sete, em silencio, e
+    # quem calibrasse o piso depois leria a coluna errada. Historico e registro
+    # e nao conferencia, entao aqui se AVISA e segue; nunca derruba o portao.
+    primeira=$(head -n 1 "$HISTORICO_MEM" 2>/dev/null || true)
+    esperado=$(printf '%b' "$cabecalho")
+    if [ "$primeira" != "$esperado" ]; then
+      printf '  (aviso: %s tem cabecalho de outra versao; as linhas novas tem 7 colunas)\n' \
+        "$HISTORICO_MEM"
+    fi
+  fi
+  # A coluna de origem existe para uma linha anotada a mao nunca se passar por
+  # medida do portao. Daqui a um mes ninguem lembra qual e qual, e o piso vai ser
+  # calibrado com estas linhas.
+  # A coluna das leituras existe porque o numero da porta e a MENOR de tres, e
+  # sem as tres a distribuicao que vai calibrar o piso nasce com o ruido de 429
+  # MB dentro dela, sem ninguem poder ver.
+  { printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$(date +%Y-%m-%d)" "$(date +%H:%M)" "${1:-?}" "${PISO_MB:-?}" "$2" "portao" "${leituras:-?}" >> "$HISTORICO_MEM"; } 2>/dev/null || true
 }
 
 # Roda um teste. Se falhar, roda UMA segunda vez antes de reprovar.
@@ -72,6 +244,7 @@ roda() {
   if [ "$ruim2" = "1" ]; then
     if passou_de_verdade "$saida2"; then
       printf '  FALHOU  %-24s %s\n' "$nome" "$(resumo "$saida2")"
+      printf '          (na hora da falha: %s)\n' "$(estado_da_maquina)"
     else
       # Sem placar nenhum na saida. Sao dois casos, e o texto vale para os dois:
       # o teste morreu antes de comecar, ou ele rodou e falou um dialeto que
@@ -85,7 +258,15 @@ roda() {
       motivo=$(printf '%s\n' "$saida2" | grep -iE "error|cannot find|not found" | head -1 | cut -c1-90)
       [ -n "$motivo" ] || motivo=$(printf '%s\n' "$saida2" | grep -v '^[[:space:]]*$' | tail -1 | cut -c1-90)
       [ -n "$motivo" ] || motivo="nao imprimiu nada"
-      printf '  FALHOU  %-24s nao disse que passou: %s\n' "$nome" "$motivo"
+      # O servidor mudo tem nome proprio, e nao e "o teste falhou". Ele foi a
+      # causa dos tres FALHOU falsos de 08/09, e sai separado para quem le nao
+      # comecar procurando no ramo.
+      if printf '%s\n' "$saida2" | grep -q "ERR_CONNECTION_REFUSED"; then
+        printf '  FALHOU  %-24s o servidor de 8777 nao respondeu; pode nao ser defeito do ramo\n' "$nome"
+      else
+        printf '  FALHOU  %-24s nao disse que passou: %s\n' "$nome" "$motivo"
+      fi
+      printf '          (na hora da falha: %s)\n' "$(estado_da_maquina)"
     fi
     falhou=1
   else
@@ -93,6 +274,132 @@ roda() {
     instavel=1
   fi
 }
+
+# A MAQUINA NO COMECO DE TUDO, e nao so na porta da bateria.
+#
+# Medido em 08/09: uma rodada lancada com 1.035 MB livres, conferidos a mao antes
+# de comecar, chegou na bateria com 783. O PROPRIO portao consome uns 250 MB nas
+# secoes anteriores, antes de abrir o primeiro navegador.
+#
+# Por isso o par de numeros fica no log. Medir antes de lancar NAO basta: quem
+# lanca com 1.000 chega na porta da bateria com 750 e e recusado, depois de ja ter
+# gasto os cinco minutos das secoes anteriores. Com os dois numeros em toda
+# rodada, esse custo deixa de ser deducao e vira dado.
+printf '\n  (maquina no comeco do portao: %s)\n' "$(estado_da_maquina)"
+
+# TODA PROVA ESTA NO PORTAO, OU NA LISTA DE FORA COM MOTIVO.
+#
+# Aconteceu DUAS vezes na frente de figuras: uma prova de 1013 linhas e 171
+# conferencias existia e nao estava aqui. Na primeira vez foi um revisor que
+# achou; na segunda, a propria frente, muito trabalho depois. Ela afirmava so
+# enquanto alguem lembrasse de roda-la a mao, e ninguem lembra duas vezes.
+#
+# Duas ocorrencias do mesmo esquecimento querem dizer que ele NAO PODE VIVER NA
+# LEMBRANCA. Aqui ele reprova.
+#
+# A lista de fora nao e escape: e declaracao. Cada linha carrega o motivo, e o
+# motivo fica no arquivo para quem vier depois discordar dele. Prova nova que
+# ninguem ligou nao entra na lista sozinha: ela reprova ate alguem decidir.
+#
+# Medido em 09/09/2026: 56 candidatos, 51 no portao, 5 fora. Tres sao exclusao
+# legitima e DOIS sao divida declarada, que e diferente de esquecimento.
+#
+# A REGRA DO CANDIDATO, escrita porque ela e uma lista implicita.
+#
+# O conjunto abaixo e definido por CONVENCAO DE NOME, e isso e o mesmo defeito da
+# lista de exclusao implicita, um nivel acima: quem escrever _confere_x.js escapa
+# sem ninguem ver. Nao da para consertar de vez sem inventar outra convencao, e
+# por isso a regra fica escrita aqui, para quem ampliar depois saber o que estava
+# coberto e o que nao estava.
+#
+# Sao candidatos hoje:
+#   _teste/testa_*.js            as suites do aplicativo
+#   _teste/e2e*.js               ponta a ponta, que imprimem o mesmo dialeto
+#   figuras/_prova_*.js          as provas do kit
+#   figuras/_piloto_*.js         os pilotos de tema
+#   figuras/_audita_*.js         os auditores
+#   temas/_ferramentas/testa_*.py as provas do verificador
+#
+# NAO sao candidatos, de proposito: rasterizadores (*_png.py, *_render.py), que
+# geram imagem para olhar e nao afirmam nada, e o resto do codigo de producao.
+#
+# O e2e*.js entrou nesta lista por medida e nao por simetria: os dois imprimem
+# "N passaram, M falharam" e nenhum dos dois estava ligado. Escapavam so pelo
+# nome, que e exatamente o que esta regra existe para nao deixar acontecer.
+FORA_DO_PORTAO="figuras/_piloto_base.js|biblioteca do piloto de tema, nao afirma nada sozinha; quem afirma e o _prova_piloto_base.js, que esta no portao
+figuras/_prova_desenho_auditor.js|auditor usado pelo _prova_desenho.js, nao roda sozinho
+figuras/_prova_formula.js|gera a folha _prova_formula.pdf para OLHAR, nao imprime placar; quem afirma e o figuras/testa_formula.js
+figuras/_prova_marcas_bloco.js|DIVIDA: imprime 'nenhuma reprova', dialeto que a funcao roda nao le. A prova existe e nao roda. Sai da divida ensinando o dialeto a ela ou trocando a saida da prova
+figuras/_prova_marcas_travas.js|DIVIDA: imprime 'todos os resultados', mesmo caso do bloco acima
+_teste/e2e.js|DIVIDA: imprime no dialeto do portao e nao roda. Escapava por se chamar e2e e nao testa_. Precisa de decisao: ligar no portao ou aposentar
+_teste/e2e_correcoes.js|DIVIDA: mesmo caso do e2e.js
+figuras/_audita_desenho.js|biblioteca do _prova_desenho.js, nao roda sozinha
+figuras/_audita_receitas.js|auditor rodado a mao pela frente de figuras, nao imprime placar no dialeto do portao
+figuras/_audita_receitas_cor.js|mesmo caso do _audita_receitas.js
+figuras/_audita_receitas_gab.js|reprova hoje na main: dois arcos rotulados com angulo diferente do que varrem. Ja estava citado no comentario da secao do kit"
+
+titulo "toda prova no portao"
+# A TRAVA TIRA DO TEXTO A SUA PROPRIA MAQUINARIA, e nao so os comentarios.
+#
+# Ela procura nomes de arquivo dentro deste arquivo, e ela FAZ PARTE dele. A
+# mesma armadilha apareceu tres vezes seguidas aqui, em tres formas:
+#
+#   1. o comentario que cita o nome de uma prova (tirado pelo grep -v)
+#   2. a lista FORA_DO_PORTAO, que nao e comentario, e atribuicao: os cinco
+#      nomes dela contavam como "esta no portao", e o ensaio deu 56 de 56 onde a
+#      medida a mao dava 51 e 5
+#   3. o proprio padrao de candidatos do laco abaixo, que contem os globs que
+#      ele procura: o _teste/e2e.js casava com o '_teste/e2e*.js' da linha do
+#      for, e a conta deu 52 onde a mao dava 51
+#
+# E o mesmo defeito que este arquivo ja documenta em outros dois lugares, de
+# procurar um nome no arquivo inteiro e ser cegado por uma mencao que nao e
+# chamada. Quem procura no proprio arquivo tira TODA a sua maquinaria do texto.
+sem_comentario=$(sed -e '/^FORA_DO_PORTAO="/,/"$/d' -e '/^for prova in /,/; do$/d' "$0" \
+  | grep -v '^[[:space:]]*#')
+candidatos=0
+no_portao=0
+esquecidas=""
+declaradas=0
+for prova in _teste/testa_*.js _teste/e2e*.js figuras/_prova_*.js figuras/_piloto_*.js \
+             figuras/_audita_*.js temas/_ferramentas/testa_*.py; do
+  [ -f "$prova" ] || continue
+  candidatos=$((candidatos + 1))
+  nu=$(basename "$prova"); nu=${nu%.js}; nu=${nu%.py}
+  # Nome NU, porque a bateria de navegador chama pelo laco, sem extensao. E o
+  # comentario fica de fora da busca: citar o nome num comentario nao roda nada,
+  # e foi assim que uma medicao minha errou antes de eu conferir.
+  if printf '%s\n' "$sem_comentario" | grep -qE "(^|[^A-Za-z0-9_-])$nu([^A-Za-z0-9_-]|\$)"; then
+    no_portao=$((no_portao + 1))
+  # O VALOR INTEIRO, e nao o comeco dele. Este braco casava por subcadeia
+  # enquanto o irmao acima casa com fronteira de palavra, e a assimetria abria
+  # dois buracos, os dois medidos com veneno: um motivo que nomeia outra prova
+  # seguida de barra vertical dava a prova por declarada, e uma entrada cujo
+  # caminho TERMINA com o nome da prova tambem passava. A lista ja e cheia de
+  # motivos que citam o nome de outra prova, entao a protecao era acidental.
+  #
+  # O awk compara o primeiro campo por IGUALDADE e exige motivo nao vazio no
+  # segundo, para entrada sem motivo continuar reprovando.
+  elif printf '%s\n' "$FORA_DO_PORTAO" \
+       | awk -F'|' -v p="$prova" '$1 == p && $2 != "" { achou = 1 } END { exit !achou }'; then
+    declaradas=$((declaradas + 1))
+  else
+    esquecidas="$esquecidas $prova"
+  fi
+done
+if [ "$candidatos" = "0" ]; then
+  printf '  FALHOU  %-24s nao achei prova nenhuma para conferir: o padrao de nomes mudou?\n' "toda prova no portao"
+  falhou=1
+elif [ -n "$esquecidas" ]; then
+  printf '  FALHOU  %-24s prova que existe e ninguem roda, e nao esta na lista de fora:%s\n' \
+    "toda prova no portao" "$esquecidas"
+  printf '            ou entra no portao, ou entra no FORA_DO_PORTAO com o motivo escrito.\n'
+  falhou=1
+else
+  printf '  ok      %-24s %s de %s provas no portao, %s fora com motivo declarado\n' \
+    "toda prova no portao" "$no_portao" "$candidatos" "$declaradas"
+fi
+
 
 titulo "banco de temas"
 saida=$(python temas/_ferramentas/verificar.py 2>&1) || true
@@ -239,6 +546,308 @@ limpa_servidor() {
 trap limpa_servidor EXIT INT TERM
 
 titulo "com navegador"
+# O PORTAO SE RECUSA A COMECAR A BATERIA SEM MEMORIA.
+#
+# Duas mortes medidas em 08/09/2026, as duas pelo sistema, por falta de memoria,
+# as duas deixando o python da 8777 pendurado e nenhuma delas dizendo o motivo:
+#
+#   713 MB livres: morreu NO MEIO da bateria, depois de tres FALHOU falsos por
+#                  ERR_CONNECTION_REFUSED, com o testa_aluno passando entre eles,
+#                  com 145 conferencias, o que provou que o servidor nao tinha
+#                  caido de vez: ficou intermitente sob pressao
+#   579 MB livres: morreu AO ENTRAR na bateria, logo depois de levantar o
+#                  servidor, com 38 ok e zero FALHOU
+#
+# Morrer no meio custa quinze minutos, nao imprime veredito nenhum e deixa
+# servidor orfao, que envenena a rodada seguinte. Recusar-se a comecar custa dois
+# segundos, diz o numero que falta e nao suja nada.
+#
+# DE ONDE VEM O PISO, e ele e DERIVADO e nao escolhido.
+#
+#   maior fracasso conhecido na porta ... 713 MB livres
+#   pior custo medido quando o piso foi fixado, tres perfis ... 567 MB
+#   ------------------------------------------------------
+#   piso ................................ 1280 MB (713 + 567)
+#
+# O PIOR MEDIDO JA SUBIU DESDE ENTAO, e o piso NAO acompanhou, de proposito. Com
+# cinco perfis o pior e 591, replicado em 590 na corrida seguinte, e a formula
+# daria 1304. A diferenca e de 24 MB, que e menos que o espalhamento das proprias
+# medidas, e persegui-la commit a commit e exatamente a corrida atras do recorde
+# que a nota do vies, mais abaixo, diz que nao acaba.
+#
+# A REGRA PARA MEXER, entao, e esta: atualizar o piso quando o pior medido o
+# ultrapassar por MAIS do que o espalhamento das medidas, e nao a cada recorde
+# novo.
+#
+# E "espalhamento das medidas" SO significa alguma coisa depois de dizer SOB QUE
+# REGUA, COM QUE PORTA, e DE ONDE VEIO CADA PORTA. Os cinco perfis, com a regua
+# unica, e a proveniencia de cada linha ao lado, porque ela nao e a mesma:
+#
+#   eq          porta 1761  fundo 1194  custo 567   porta ANUNCIADA pela frente 3
+#   lote1       porta 1560  fundo 1047  custo 513   porta ANUNCIADA pela frente 3
+#   frente1     porta 1512  fundo 1040  custo 472   porta do LOG deste portao
+#   lote2       porta 1348  fundo  757  custo 591   porta ANUNCIADA pela frente 3
+#   solidos     porta 1369  fundo  779  custo 590   porta ANUNCIADA pela frente 3
+#
+# "Anunciada" quer dizer: a frente 3 mediu a mao antes de entrar, tres leituras e
+# a menor, que e o mesmo metodo do portao, e disse o numero por mensagem. Nao sai
+# de log nenhum, porque a linha que mede a maquina e DESTE ramo e nao estava nos
+# ramos onde aquelas rodadas correram. Uma das cinco e verificavel por quem le
+# este arquivo; as outras quatro sao palavra de quem mediu.
+#
+# Isso nao derruba nada do que vem abaixo, porque continuam a ser leituras de
+# PORTA e nao aproximacoes tiradas de dentro da corrida, que era o defeito. Mas a
+# versao anterior desta linha dizia "a porta que o portao registou no log de cada
+# um", e isso era verdade para UMA das cinco.
+#
+#   de 472 a 591  ->  espalhamento 119
+#
+# HOJE: pior 591, formula 1304, piso 1280, excesso 24, e 24 e menor que 119. NAO
+# MEXE.
+#
+# ESTA LINHA JA DISSE 82, e o 82 estava errado. Ele saiu de uma repassagem que,
+# para os tres perfis antigos, usou a PRIMEIRA LEITURA DO AMOSTRADOR como se
+# fosse a porta, quando a porta real estava no log do portao dos tres. E a
+# aproximacao nao erra sempre para o mesmo lado, o que era a justificativa para a
+# tratar como piso:
+#
+#   eq     aprox 1703 MENOR que a porta 1761   subestima o custo
+#   lote1  aprox 1587 MAIOR que a porta 1560   superestima o custo
+#
+# Nao e piso nem teto: e ruido nao controlado a substituir um valor registado. E
+# eu aceitei o 82 sem o conferir, o que e o mesmo erro que este arquivo ja
+# documenta em dois lugares. A decisao nao mudava nem com um numero nem com o
+# outro, e foi por isso que nada o acusou.
+#
+# E UMA SUPOSICAO DESTA FORMULA QUE NUNCA FOI ENUNCIADA: somar uma parcela FIXA
+# assume que o custo de entrar NAO depende de com quanta memoria se entra.
+#
+# Chegou a haver evidencia a favor, com os cinco pontos a formar dois grupos
+# limpos, e ela CAIU junto com as portas erradas. Ordenando pela porta registada:
+#
+#   porta 1348  custo 591
+#   porta 1369  custo 590
+#   porta 1512  custo 472
+#   porta 1560  custo 513
+#   porta 1761  custo 567
+#
+# Os dois menores dao os dois maiores custos, e depois o custo VOLTA A SUBIR com
+# a porta. Nao e monotono, e nao sustenta a hipotese como ela foi enunciada.
+#
+# A suposicao, porem, NAO deixa de ser suposicao so porque a evidencia a favor
+# caiu: agora nao ha evidencia em nenhum sentido. Fica em aberto, e o teste que a
+# separaria continua barato e continua por fazer: dois perfis na MESMA sessao, um
+# com a maquina folgada e outro com ela apertada de proposito.
+#
+# O PISO SUBIU EM 09/09/2026, e a formula nao mudou: mudou a segunda parcela.
+# Ela era 257 MB, o pico de UM navegador medido ISOLADO, e a grandeza certa e
+# quanto a bateria consome A PARTIR DA PORTA, porque e com a leitura da porta
+# que o piso e comparado. Sao grandezas diferentes, e a antiga estava no lugar
+# da nova.
+#
+# O numero passou por duas correcoes antes de assentar, e as duas ficam ditas
+# porque explicam por que nao se deve confiar na primeira medida de nada:
+#
+#   1. o primeiro valor reportado, 510, era a QUEDA entre amostras vizinhas, e
+#      nao o consumo a partir da porta. Foi retirado por quem o mediu;
+#   2. o segundo, tirado da amostra mais funda de cada perfil, estava inflado por
+#      leitura solta. Com "fundo" definido como PATAMAR (a mediana das cinco
+#      leituras mais baixas) os tres perfis descem. A escolha escondida dentro da
+#      palavra "fundo" valia 40 MB em dois perfis e 131 MB no terceiro.
+#
+# Os tres perfis, dois operadores, mesma regua:
+#
+#   figuras-eq     porta 1761  fundo 1194  ->  567   <- o pior, e o que a formula usa
+#   figuras-lote1  porta 1560  fundo 1047  ->  513
+#   frente1        porta 1512  fundo 1040  ->  472
+#
+# Medidos com um amostrador que roda POR FORA do portao, porque por dentro nao
+# da: quando o portao le, o navegador do primeiro teste ja fechou.
+#
+# O 1280 NAO E UM NUMERO PRECISO, e os quatro digitos enganam. As duas parcelas
+# sao grossas: 713 e UMA morte, e 567 e o pior de tres perfis que variaram de 472
+# a 567. Qualquer valor numa faixa de umas dezenas de MB em volta serve
+# igualmente bem, e nenhum dado observado distingue um do outro.
+#
+# E ha um caso em que a precisao aparente engana de verdade: em 09/09/2026 este
+# piso recusou uma entrada com 1274 MB, ou seja por SEIS MB, numa amostra cujas
+# tres leituras variavam TREZE. A margem da decisao ficou menor que o ruido da
+# leitura, e quando isso acontece QUEM DECIDE E A REGRA, E NAO A MEDIDA.
+#
+# A regra continua boa por assimetria, e nao por precisao: decidir pela MENOR das
+# tres erra para o lado seguro, recusando maquina que talvez aguentasse e nunca
+# aceitando maquina que nao aguenta. Errar recusando custa espera; errar
+# aceitando custa a rodada e deixa orfaos.
+#
+# Corolario para quem for ajustar: nao vale a pena mexer no piso por dezenas de
+# MB. Mexer vale quando a DERIVACAO muda, como mudou duas vezes hoje.
+#
+# E DE QUE LADO ELE ERRA, que e diferente de quanto ele erra.
+#
+# A parcela do custo e "o pior observado", ou seja um MAXIMO SOBRE A AMOSTRA, e
+# isso e um estimador ENVIESADO PARA BAIXO do pior real: cada perfil novo tem
+# chance de bater o recorde, e entao a sequencia sobe por construcao. Ate agora:
+#
+#   472  ->  567  ->  591
+#
+# Uma parcela definida como "o pior que eu ja vi" tem GARANTIA de ser excedida
+# outra vez. O piso e portanto OTIMISTA por construcao, e sempre para o mesmo
+# lado.
+#
+# A consequencia que muda o comportamento de quem le: se uma rodada morrer com a
+# leitura da porta ACIMA do piso, isso NAO e surpresa nem defeito da regra. E o
+# comportamento esperado de uma parcela enviesada para baixo. A resposta certa e
+# atualizar a parcela com o novo pior, e nao desconfiar do desenho.
+#
+# O QUE ESTA MUDANCA NAO E, e isto importa para quem ajustar depois: NAO e
+# fronteira medida. Nenhum ponto de porta conhecido cai entre 950 e 1280, entao
+# qualquer piso nessa faixa classifica os observados igualmente bem e o dado NAO
+# distingue um do outro. E correcao da DERIVACAO, e nao medicao do LIMITE.
+#
+# E a propria formula e HEURISTICA, e nao derivacao de um limiar de sobrevivencia:
+# "pior fracasso na porta mais o custo" exige, com custo de 567, um fundo de 713,
+# que por acaso e o valor de uma PORTA de uma morte. A forma coincidir nao faz
+# principio. O que os dados dizem e sobre o FUNDO: morre com fundo perto de zero
+# ou de cem, sobrevive com fundo de 1040 para cima. Entre cem e mil nao ha medida
+# nenhuma, e e essa a evidencia que falta.
+#
+# O que ela corrige e uma promessa implicita. Com custo de 567, um piso de 950
+# deixaria 440 MB de fundo; o menor fundo ja observado a sobreviver e 856, na
+# rodada que entrou com 1366. O piso antigo afirmava seguranca 416 MB abaixo de
+# qualquer coisa observada.
+#
+#   porta  579  fundo   69  morreu
+#   porta  713  fundo  203  morreu
+#   porta 1366  fundo  856  passou   <- o menor fundo que se sabe sobreviver
+#   porta 1542  fundo 1032  passou
+#   porta 1659  fundo 1149  passou
+#   porta 1761  fundo 1251  passou
+#
+# Tres perfis, dois operadores. O quarto entra na mesma tabela com a mesma regua.
+#
+# Os 257 MB foram medidos em 08/09/2026 subindo UM Chrome do jeito que os testes
+# sobem (headless novo, perfil proprio, o aplicativo aberto e uma tela usada) e
+# amostrando a memoria livre do sistema a cada 600 ms: caiu de 604 para 347 no
+# vale, e voltou a 962 depois de fechar.
+#
+# A soma tem logica: 713 MB nao bastaram para o laco continuar, entao o piso
+# precisa cobrir aquele fracasso MAIS o custo de entrar na bateria.
+#
+# O PISO E CONFERIDO UMA VEZ, NA PORTA, E ISSO E UMA ESCOLHA COM LIMITE CONHECIDO.
+#
+# Ate 09/09/2026 o motivo escrito aqui era que o pico e a ENTRADA: o primeiro
+# navegador sobe com todo o resto ainda carregado, e depois o consumo cai porque
+# cada teste fecha o dele. Vinha de tres pontos grossos de 08/09 (595 MB no meio
+# da bateria nao matou; 579 e 713 ao entrar mataram).
+#
+# NAO SE SABE ONDE FICA O PIOR MOMENTO, e a premissa velha nunca foi medida.
+#
+# Ela foi inferida de tres leituras grossas de porta, e nao de nenhum perfil.
+# Cinco perfis completos foram medidos em 09/09 e NENHUM responde a pergunta,
+# por um defeito do instrumento que quem o escreveu retirou: a fronteira entre a
+# janela de "entrada" e a de "tardio" e uma CONSTANTE de 180 s, e as corridas
+# duram cerca de 560. A constante nao separa entrada de sustentacao: separa o
+# primeiro terco do resto.
+#
+# E o sinal da comparacao inverteu entre dois perfis seguidos, o que confirma que
+# ela nao esta a medir o que o nome dela diz:
+#
+#   lote2      entrada 810, tardio 757
+#   solidos    entrada 787, tardio 801
+#
+# Entao o estado da questao e NAO SE SABE, que e mais fraco e mais honesto que
+# "nao tem lugar fixo", como eu tinha escrito aqui a partir de uma comparacao que
+# o autor dela depois retirou. Responder exige uma fronteira DERIVADA da corrida,
+# e nao fixa, o que e mudanca de instrumento e nao de leitura.
+#
+# Entao conferir so na porta nao e "suficiente porque o pico e ali": e uma
+# escolha que troca cobertura por simplicidade, e cujo limite agora esta medido.
+# Ela continua defensavel, porque a margem do piso cobre o tardio nas tres
+# rodadas observadas, e porque abortar no meio custa a rodada de qualquer jeito.
+#
+# PENDENCIA REGISTRADA, e nao consertada aqui: uma conferencia no MEIO da
+# bateria, que abortasse limpo em vez de deixar o sistema matar. Morrer no meio
+# custa quinze minutos, nao imprime veredito e deixa servidor orfao; abortar
+# custa dois segundos e diz o numero. E o mesmo argumento que criou a conferencia
+# da porta, aplicado ao lugar que os perfis mostraram.
+#
+# COMO AJUSTAR, e o numero nao e sagrado. Sobe quando uma morte acontecer acima
+# dele, e a data entra na lista de cima. DESCE quando alguem registrar uma
+# rodada inteira BEM SUCEDIDA abaixo dele, que e a evidencia que hoje falta:
+# ninguem anotou a memoria livre das rodadas que passaram.
+#
+# Piso baixo demais deixa o portao morrer; piso alto demais deixa o portao
+# recusar sem precisar. As duas falhas sao VISIVEIS, e e isso que torna o ajuste
+# barato: uma imprime NAO CONFERIDO com o numero, a outra deixa cadaver.
+PISO_MB=1280
+amostra=$(livre_amostrado)
+livre_mb=${amostra%%|*}
+leituras=${amostra#*|}
+# Estes numeros ficam no log de PROPOSITO, em toda rodada, inclusive nas que
+# passam: e a evidencia que falta hoje para o piso poder DESCER com fundamento.
+# As TRES leituras vao junto porque a decisao e pela menor, e quem for calibrar o
+# piso precisa ver a dispersao e nao so o numero escolhido.
+printf '  (maquina no comeco da bateria: %s, piso %s MB)\n' "$(estado_da_maquina)" "$PISO_MB"
+printf '  (memoria na porta, tres leituras: %s MB; decide a menor, %s MB)\n' "$leituras" "$livre_mb"
+# ORFAO DA RODADA ANTERIOR, avisado ANTES de a memoria ser julgada.
+#
+# Ideia da frente 3, com argumento medido: a alternativa era lembrar de parar o
+# amostrador depois de ler o perfil, e a taxa de acerto da lembranca hoje foi
+# ZERO EM DOIS, uma falha de cada frente. Varredura nao depende de lembranca.
+#
+# Conta `node` e nao `chrome`: nesta maquina o node so existe por causa da
+# bateria, e o Chrome pode ser o navegador do Romulo aberto.
+#
+# AVISA e nao RECUSA, de proposito. Orfao derruba a leitura livre, ou seja
+# empurra a decisao para o lado SEGURO e nao cria risco de entrar mal. O dano
+# dele e de DIAGNOSTICO: quem le "pouca memoria" fecha programas quando o que
+# precisava era matar o proprio lixo da rodada morta.
+nodes_na_porta=$(quantos_node)
+if [ "$nodes_na_porta" = "?" ]; then
+  printf '  (a contagem de processos NAO MEDIU: o tasklist nao rodou. Nao e zero.)\n'
+elif [ -n "$nodes_na_porta" ] && [ "$nodes_na_porta" -gt 0 ] 2>/dev/null; then
+  printf '  (ATENCAO: %s processo(s) node vivos ANTES da bateria. Nesta maquina o node\n' "$nodes_na_porta"
+  printf '   so roda por causa dela, entao provavelmente sao orfaos de uma rodada morta.\n'
+  printf '   Eles derrubam a leitura acima. Antes de fechar programas, mate-os pela raiz.)\n'
+fi
+livre_na_porta=$livre_mb
+roda_bateria=sim
+if [ -n "$livre_mb" ] && [ "$livre_mb" -lt "$PISO_MB" ] 2>/dev/null; then
+  roda_bateria=nao
+  anota_nao_conferido "a bateria de navegador, por falta de memoria na maquina"
+  printf '  NAO CONFERIDO %-19s a bateria nao rodou: %s MB livres, piso %s MB\n' \
+    "com navegador" "$livre_mb" "$PISO_MB"
+  printf '                isto e a MAQUINA e nao o ramo. Feche o que puder e rode de novo.\n'
+  printf '                Duas mortes medidas em 08/09, com 713 MB e com 579 MB livres.\n'
+fi
+if [ "$roda_bateria" = "sim" ]; then
+# A SEGUNDA MEDIDA, DEPOIS DO PRIMEIRO TESTE DE NAVEGADOR, e ela NAO e o custo
+# de entrada. Ja foi rotulada assim e o rotulo era falso.
+#
+# Medido na primeira rodada verde, em 09/09/2026: linha de base 1404 MB, esta
+# medida 1417 MB. SUBIU 13 MB. Nao ha custo nenhum a ler aqui, e o motivo e a
+# posicao: a linha esta depois de `roda` retornar, e `roda` espera o teste
+# terminar, entao o navegador ja fechou e devolveu tudo.
+#
+# CORRECAO DE UMA EVIDENCIA MINHA: eu escrevi aqui que "o proprio texto denuncia,
+# ao dizer 0 navegador(es) vivo(s) ao lado do numero". A conclusao esta certa e a
+# evidencia era ARTEFATO: naquela altura a contagem de navegadores estava
+# quebrada e imprimia zero sempre, com Chrome vivo ou nao. Ver o bloco de
+# `conta_processo`. A conclusao vale pela POSICAO, medida, e nao por aquele zero.
+#
+# O que ela serve para ver: se a maquina ficou pior DEPOIS de um ciclo completo
+# de teste, o que acusaria navegador orfao ou memoria nao devolvida.
+#
+# O CUSTO DE ENTRADA TEM MEDIDA DESDE 09/09/2026, e ela vive no BLOCO DO PISO,
+# la em cima, com os tres perfis e a regua. Nao repito o numero aqui de
+# proposito: este comentario ja teve de ser reescrito TRES vezes em duas horas,
+# porque citava um valor que estava a mudar. Apontar para onde o numero vive nao
+# envelhece; copiar o numero envelhece a cada correcao.
+#
+# O que importa saber neste ponto do arquivo e so isto: a medida NAO sai daqui,
+# e sai de um amostrador que roda POR FORA do portao, comecando antes da bateria.
+# Aqui o navegador ja fechou.
+primeiro_navegador=sim
 for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento \
          testa_perfil testa_olho testa_atualizacao testa_atualizacao_real \
          testa_biblioteca_offline \
@@ -246,6 +855,11 @@ for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento 
          testa_assunto testa_aluno testa_familia testa_proposta_tela \
          testa_tabela_no_app; do
   roda "$t" node "_teste/$t.js"
+  if [ "$primeiro_navegador" = "sim" ]; then
+    primeiro_navegador=nao
+    printf '  (depois do primeiro teste, com o navegador dele ja fechado: %s)\n' \
+      "$(estado_da_maquina)"
+  fi
 done
 # O mesmo teste duas vezes de proposito. Sem argumento ele prova que a serie
 # de temas baixada sobrevive a uma atualizacao feita sem sinal; com
@@ -260,6 +874,7 @@ roda "testa_biblioteca_offline --envenenado" node "_teste/testa_biblioteca_offli
 # que apagasse o BAIXADOS passaria pelas duas sem ninguem ter provado que elas
 # sabem reprovar.
 roda "testa_biblioteca_offline --envenenado-activate" node "_teste/testa_biblioteca_offline.js" --envenenado-activate
+fi
 
 # O painel "Cada aluno, desde quando e por quanto" nasce recolhido no
 # Fechamento. Esta trava guarda quatro coisas: ele nasce fechado, o botao
@@ -341,8 +956,9 @@ if [ -n "$base" ]; then
   sw_antes=$(git show "$base:sw.js" 2>/dev/null | tr -d '\r' || true)
 fi
 if [ -z "$sw_antes" ] || [ -z "$sw_agora" ]; then
-  printf '  INSTAVEL %-23s sem base de merge com sw.js para comparar\n' "nome do cache"
-  instavel=1
+  # NAO CONFERIDO, e nao instavel: nao comparar nao e passar na segunda vez.
+  printf '  NAO CONFERIDO %-19s sem base de merge com sw.js para comparar\n' "nome do cache"
+  anota_nao_conferido "o nome do cache no sw.js, por falta de base de merge"
 elif [ "$lista_agora" = "$(entradas_sw "$(lista_sw "$sw_antes")")" ]; then
   printf '  ok      %-24s a lista nao mudou desde a base do merge\n' "nome do cache"
 elif [ "$(nome_sw "$sw_agora")" != "$(nome_sw "$sw_antes")" ]; then
@@ -412,8 +1028,9 @@ if [ "$f_cache" != "0" ]; then
 elif [ -z "$base" ] || [ -z "$sw_antes" ] || [ -z "$sw_agora" ]; then
   # A MESMA guarda da trava vizinha, de proposito. Com base presente e sw.js
   # ausente na base, a vizinha dizia INSTAVEL e esta dizia ok verde.
-  printf '  INSTAVEL %-23s sem base de merge com sw.js para comparar o conteudo\n' "conteudo no cache"
-  instavel=1
+  # NAO CONFERIDO, pelo mesmo motivo da vizinha.
+  printf '  NAO CONFERIDO %-19s sem base de merge com sw.js para comparar o conteudo\n' "conteudo no cache"
+  anota_nao_conferido "o conteudo do cache no sw.js, por falta de base de merge"
 else
   # A entrada './' e a raiz e sai como linha VAZIA da extracao, porque o grupo
   # opcional come o './' e o resto casa nada. Quem a remove e este grep -v '^$'.
@@ -427,6 +1044,18 @@ else
   sumidos=""
   fora_do_git=""
   caixa_trocada=""
+  # QUEM PROCURA TEM QUE DIZER QUANTO OLHOU.
+  #
+  # Sem estes contadores, uma lista_agora vazia faz o laco nao rodar, mudados
+  # ficar vazio, e esta trava imprimir "ok: nenhum arquivo do pacote mudou".
+  # Verde, afirmando sobre ZERO arquivos. A trava vizinha reprova a lista vazia,
+  # entao o portao nao aprovaria o merge, mas esta linha continuaria mentindo, e
+  # mentira verde no meio de um log e o que ensina a nao ler o log.
+  #
+  # "Zero achados" sozinho e indistinguivel de cegueira. "Zero achados em 37 de
+  # 37" e uma afirmacao.
+  na_lista=0
+  conferidos=0
   # IFS so com quebra de linha, e glob desligado em volta do laco. Sem isso,
   # caminho com espaco vira duas palavras, nenhuma existe, as duas caem no
   # continue, e o arquivo sai da conferencia sem uma linha de aviso.
@@ -441,6 +1070,7 @@ else
 '
   set -f
   for c in $caminhos; do
+    na_lista=$((na_lista + 1))
     if [ ! -f "$c" ]; then
       # Caixa trocada quer dizer o literal falhar E o icase achar. Sondar so o
       # icase aqui acusava caixa para arquivo rastreado no caminho EXATO e
@@ -480,6 +1110,7 @@ else
       fi
       continue
     fi
+    conferidos=$((conferidos + 1))
     if ! git --literal-pathspecs diff --quiet "$base" -- "$c" 2>/dev/null; then
       mudados="$mudados $c"
     fi
@@ -488,7 +1119,13 @@ else
   IFS=$ifs_antes
   nome_agora=$(nome_sw "$sw_agora")
   nome_antes=$(nome_sw "$sw_antes")
-  if [ -z "$nome_agora" ] || [ -z "$nome_antes" ]; then
+  if [ "$na_lista" = "0" ]; then
+    # Nao e "nada mudou": e "nao olhei nada". As duas saidas sao iguais para quem
+    # le, e so uma delas e uma conferencia.
+    printf '  FALHOU  %-24s a lista ARQUIVOS do sw.js veio vazia: nao conferi arquivo nenhum\n' \
+      "conteudo no cache"
+    falhou=1
+  elif [ -z "$nome_agora" ] || [ -z "$nome_antes" ]; then
     # Nome vazio passava como "promovido", porque vazio e diferente de v22. Uma
     # reformatacao do sw.js (aspas duplas, const, espaco a mais) faria nome_sw
     # devolver vazio, e a trava imprimiria ok com o nome em branco.
@@ -524,7 +1161,8 @@ else
         "conteudo no cache" "$nome_agora" "$mudados"
       falhou=1
     elif [ -z "$mudados" ]; then
-      printf '  ok      %-24s nenhum arquivo do pacote mudou de conteudo desde a base\n' "conteudo no cache"
+      printf '  ok      %-24s nenhum dos %s arquivos do pacote mudou de conteudo desde a base\n' \
+        "conteudo no cache" "$conferidos"
     else
       printf '  ok      %-24s%s arquivo(s) do pacote mudaram e o cache subiu para %s\n' \
         "conteudo no cache" "$(printf '%s' "$mudados" | wc -w | tr -d ' ')" "$nome_agora"
@@ -617,16 +1255,54 @@ if [ "$codigo" = "1" ]; then
   falhou=1
 fi
 if [ "$codigo" = "2" ]; then
-  instavel=1
+  # NAO CONFERIDO, e nao instavel. Sao coisas diferentes e a diferenca decide o
+  # merge: `instavel` neste portao quer dizer "passou na segunda tentativa,
+  # depende de tempo, NAO impede merge", e o 2 desta trava quer dizer "eu nao
+  # consegui conferir".
+  #
+  # Medido em 09/09/2026: a conferencia de conteudo le o nome sensivel de um
+  # arquivo que vive FORA do repositorio e fora do Drive
+  # (~/.claude/projects/C--Users-romul/memory/.aluno-sensivel). Sem ele ela sai
+  # com 2, o portao marcava instavel e imprimia TUDO PASSOU com codigo 0. Numa
+  # maquina nova, onde esse arquivo nao existe, o portao aprovaria o merge com a
+  # conferencia do nome de uma crianca sem ter rodado.
+  #
+  # Guarda ausente lida como guarda que passou e o pior silencio que este
+  # repositorio pode ter, porque o repositorio e publico.
+  anota_nao_conferido "o nome do aluno DENTRO dos arquivos, por falta da lista de nomes"
 fi
 
 printf '\n'
 if [ "$falhou" != "0" ]; then
+  registra_memoria "$livre_na_porta" "HA FALHA"
   printf 'HA FALHA. Nao faca o merge antes de resolver.\n'
+elif [ "$nao_conferido" != "0" ]; then
+  registra_memoria "$livre_na_porta" "NAO CONFERIDO"
+  # Sem a bateria de navegador o portao NAO conferiu o que promete conferir.
+  # Dizer TUDO PASSOU aqui seria aprovar por nao ter rodado, que e a versao
+  # macro do teste que aprova por nao afirmar nada.
+  printf 'NAO CONFERIDO. O portao nao rodou inteiro, entao ele nao aprova nada.\n'
+  # DIZER o que ficou de fora, e nao supor a causa. Enquanto a unica entrada
+  # neste estado era a bateria, "libere memoria" era conselho certo; com tres
+  # entradas, mandar liberar memoria por falta de base de merge e conselho
+  # errado, e conselho errado num resumo e pior que conselho nenhum.
+  printf 'Ficou sem conferir:%b\n' "$nao_conferido_motivos"
 elif [ "$instavel" != "0" ]; then
+  registra_memoria "$livre_na_porta" "TUDO PASSOU (instavel)"
   printf 'TUDO PASSOU, mas algum teste so passou na segunda vez (INSTAVEL acima).\n'
   printf 'Nao e impedimento de merge; e aviso de que aquele teste depende de tempo.\n'
 else
+  # A linha que mais falta hoje: uma rodada VERDE com o numero da porta. E ela
+  # que permite o piso descer com fundamento.
+  registra_memoria "$livre_na_porta" "TUDO PASSOU"
   printf 'TUDO PASSOU. Pode seguir para o merge.\n'
 fi
-exit "$falhou"
+# Sai diferente de zero tambem quando nao conferiu: quem automatizar em cima do
+# codigo de saida nao pode ler "nao rodou" como "passou".
+if [ "$falhou" != "0" ]; then
+  exit 1
+fi
+if [ "$nao_conferido" != "0" ]; then
+  exit 2
+fi
+exit 0
