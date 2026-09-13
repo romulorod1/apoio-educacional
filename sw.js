@@ -31,8 +31,21 @@
  * pdf.js). Os quatro já estão na lista abaixo, que continua igual. O v22
  * (08/09/2026) acrescenta uma linha à lista, a primeira desde o v16, que levou
  * o './cartao.js': é o índice dos temas de português. Aí o nome novo é
- * obrigatório pelo motivo original, e não pelo hábito do release. */
-var CACHE = 'apoio-educacional-v22';
+ * obrigatório pelo motivo original, e não pelo hábito do release. O v23
+ * (08/09/2026) é o primeiro de uma série: a lista continua igual, e o que muda é
+ * o CONTEÚDO de UM arquivo que já está nela, o './banco/busca.json', regenerado
+ * pelo gerar_banco.py quando o lote 1 deu figura a quatro temas. Sem nome novo o
+ * tablet continuaria servindo o banco velho do cache antigo com o aplicativo
+ * novo por cima, e nada acusaria: é o caso que a trava "conteúdo no cache" do
+ * portão passou a pegar.
+ *
+ * Este parágrafo dizia DOIS arquivos, incluindo o './banco/indice.json', e isso
+ * foi medido em 09/09/2026 e é falso: o índice ESTÁ na lista, mas o lote 1 não o
+ * altera, porque ele guarda título e metadado de tema e nenhum dos dois mudou.
+ * Os arquivos de série mudaram, e nenhum deles está na lista. A frase vinha da
+ * intenção do bump e não do diff, e o número do cache continua certo pelo
+ * './banco/busca.json' sozinho. */
+var CACHE = 'apoio-educacional-v23';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

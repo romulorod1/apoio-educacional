@@ -32,6 +32,10 @@ os **catetos**. A novidade da trigonometria é que os catetos ganham nomes que d
 - **Cateto oposto** ao ângulo é o que fica do outro lado dele, sem tocá-lo.
 - **Cateto adjacente** ao ângulo é o que forma o ângulo junto com a hipotenusa.
 
+Na figura, θ é o ângulo observado, c é a hipotenusa, a é o cateto oposto e b é o adjacente.
+
+@fig triangulo angulo=90 angulo=θ lado=c lado=a lado=b legenda=Figura fora de escala.
+
 Trocando o ângulo observado, oposto e adjacente trocam de papel. A hipotenusa nunca muda.
 
 #### As três razões
@@ -168,7 +172,8 @@ dois triângulos distintos que compartilham apenas a altura.
 1. Num triângulo retângulo os catetos medem 3 e 4 e a hipotenusa mede 5. Calcule o seno, o cosseno e
    a tangente do ângulo agudo oposto ao cateto que mede 3.
 2. Escreva sen(45°), cos(45°) e tg(45°).
-3. Num triângulo retângulo, o cateto oposto ao ângulo de 30° mede 5. Calcule a hipotenusa.
+3. No triângulo retângulo da figura, o cateto oposto ao ângulo de 30° mede 5. Calcule a hipotenusa x.
+   @fig triangulo id=e3 angulo=90 angulo=30 lado=x lado=5
 4. Num triângulo retângulo a hipotenusa mede 8 e um dos ângulos agudos mede 60°. Calcule o cateto
    oposto a esse ângulo.
 5. Num triângulo retângulo um dos ângulos agudos mede 40°. Quanto mede o outro ângulo agudo, e que
@@ -176,10 +181,12 @@ dois triângulos distintos que compartilham apenas a altura.
 
 **Bloco B. Consolidação**
 
-6. Uma escada de 6 metros se apoia numa parede e forma 60° com o chão. A que altura da parede ela
-   encosta e a que distância da parede está o seu pé?
+6. Uma escada de 6 metros se apoia numa parede e forma 60° com o chão, como na figura. Calcule a
+   altura h em que ela encosta na parede e a distância d do seu pé até a parede.
+   @fig triangulo id=e6 angulo=90 angulo=60 lado=6 lado=h lado=d
 7. De um ponto do chão a 60 metros da base de uma torre, o topo é visto sob um ângulo de 30° com a
-   horizontal. Calcule a altura da torre.
+   horizontal, como na figura. Calcule a altura h da torre.
+   @fig triangulo id=e7 angulo=90 angulo=30 base=60 altura=h
 8. Num triângulo retângulo o seno de um ângulo agudo vale 3/5. Calcule o cosseno e a tangente desse
    mesmo ângulo.
 9. Uma rampa sobe 4 metros de altura ao longo de 8 metros de rampa. Calcule o seno do ângulo que a
@@ -187,8 +194,9 @@ dois triângulos distintos que compartilham apenas a altura.
 10. Um triângulo retângulo tem os dois catetos medindo 5. Calcule a hipotenusa e os dois ângulos
     agudos.
 11. Calcule o valor de 2 · sen(30°) + 4 · cos(60°).
-12. Num triângulo retângulo, um dos catetos mede 12 e o ângulo agudo adjacente a ele mede 30°.
-    Calcule o outro cateto e a hipotenusa.
+12. No triângulo retângulo da figura, um dos catetos mede 12 e o ângulo agudo adjacente a ele mede
+    30°. Calcule o outro cateto x e a hipotenusa c.
+    @fig triangulo id=e12 angulo=90 angulo=30 lado=c lado=x lado=12
 13. Um avião decola mantendo um ângulo constante de 30° com a pista. Depois de percorrer 2000
     metros em linha reta, a que altura do chão ele está?
 
@@ -252,6 +260,11 @@ angle you are looking at:
 
 - The **opposite leg** is the one on the far side of the angle, not touching it.
 - The **adjacent leg** is the one that forms the angle together with the hypotenuse.
+
+In the figure, θ is the angle being looked at, c is the hypotenuse, a is the opposite leg and b the
+adjacent one.
+
+@fig triangulo angulo=90 angulo=θ lado=c lado=a lado=b legenda=Figure not to scale.
 
 If you switch the angle you are looking at, opposite and adjacent swap roles. The hypotenuse never
 changes.
@@ -393,7 +406,9 @@ are two distinct triangles that share only the height.
 1. In a right triangle the legs are 3 and 4 and the hypotenuse is 5. Find the sine, the cosine and
    the tangent of the acute angle opposite the leg that measures 3.
 2. Write sin(45°), cos(45°) and tan(45°).
-3. In a right triangle, the leg opposite the angle of 30° measures 5. Find the hypotenuse.
+3. In the right triangle in the figure, the leg opposite the angle of 30° measures 5. Find the
+   hypotenuse x.
+   @fig triangulo id=e3 angulo=90 angulo=30 lado=x lado=5
 4. In a right triangle the hypotenuse measures 8 and one of the acute angles is 60°. Find the leg
    opposite that angle.
 5. In a right triangle one of the acute angles is 40°. How large is the other acute angle, and what
@@ -401,18 +416,21 @@ are two distinct triangles that share only the height.
 
 **Block B. Building up**
 
-6. A 6 metre ladder leans against a wall and makes 60° with the ground. At what height on the wall
-   does it touch and how far from the wall is its foot?
+6. A 6 metre ladder leans against a wall and makes 60° with the ground, as in the figure. Find the
+   height h at which it touches the wall and the distance d from its foot to the wall.
+   @fig triangulo id=e6 angulo=90 angulo=60 lado=6 lado=h lado=d
 7. From a point on the ground 60 metres from the base of a tower, the top is seen at an angle of
-   30° with the horizontal. Find the height of the tower.
+   30° with the horizontal, as in the figure. Find the height h of the tower.
+   @fig triangulo id=e7 angulo=90 angulo=30 base=60 altura=h
 8. In a right triangle the sine of an acute angle is 3/5. Find the cosine and the tangent of that
    same angle.
 9. A ramp rises 4 metres in height along 8 metres of ramp. Find the sine of the angle the ramp makes
    with the ground and say how large that angle is.
 10. A right triangle has both legs measuring 5. Find the hypotenuse and the two acute angles.
 11. Find the value of 2 · sin(30°) + 4 · cos(60°).
-12. In a right triangle, one of the legs measures 12 and the acute angle adjacent to it is 30°.
-    Find the other leg and the hypotenuse.
+12. In the right triangle in the figure, one of the legs measures 12 and the acute angle adjacent to
+    it is 30°. Find the other leg x and the hypotenuse c.
+    @fig triangulo id=e12 angulo=90 angulo=30 lado=c lado=x lado=12
 13. A plane takes off keeping a constant angle of 30° with the runway. After travelling 2000
     metres in a straight line, how high above the ground is it?
 
