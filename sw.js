@@ -31,28 +31,16 @@
  * pdf.js). Os quatro já estão na lista abaixo, que continua igual. O v22
  * (08/09/2026) acrescenta uma linha à lista, a primeira desde o v16, que levou
  * o './cartao.js': é o índice dos temas de português. Aí o nome novo é
- * obrigatório pelo motivo original, e não pelo hábito do release. O v23
- * (08/09/2026) é o primeiro de uma série: a lista continua igual, e o que muda é
- * o CONTEÚDO de UM arquivo que já está nela, o './banco/busca.json', regenerado
- * pelo gerar_banco.py quando o lote 1 deu figura a quatro temas. Sem nome novo o
- * tablet continuaria servindo o banco velho do cache antigo com o aplicativo
- * novo por cima, e nada acusaria: é o caso que a trava "conteúdo no cache" do
- * portão passou a pegar.
+ * obrigatório pelo motivo original, e não pelo hábito do release. O v23 iniciou
+ * a série de mudanças de conteúdo do cache; v24 atualizou a diretiva de equação
+ * e v25 atualizou o banco do lote 2.
  *
- * Este parágrafo dizia DOIS arquivos, incluindo o './banco/indice.json', e isso
- * foi medido em 09/09/2026 e é falso: o índice ESTÁ na lista, mas o lote 1 não o
- * altera, porque ele guarda título e metadado de tema e nenhum dos dois mudou.
- * Os arquivos de série mudaram, e nenhum deles está na lista. A frase vinha da
- * intenção do bump e não do diff, e o número do cache continua certo pelo
- * './banco/busca.json' sozinho.
- *
- * O v24 continua a série: a lista permanece igual, mas mudaram './pdf.js' e
- * './figuras/base.js', por causa da diretiva de equação dentro do exercício.
- *
- * O v25 continua a série de conteúdo: o './banco/busca.json' é regenerado quando
- * o lote 2 dá figura a quatro temas. A ordem v23, v24 e v25 evita regressão do
- * nome do cache e é confirmada pelo portão sobre cada estado integrado. */
-var CACHE = 'apoio-educacional-v25';
+ * O v26 continua a série: a lista permanece igual, mas mudaram dois arquivos já
+ * listados, './figuras/receitas.js' e './figuras/solidos.js'. Eles corrigem a
+ * família de sólidos medida no uso real. A ordem v23, v24, v25 e v26 evita
+ * regressão do nome do cache e é confirmada pelo portão sobre cada estado
+ * integrado. */
+var CACHE = 'apoio-educacional-v26';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
