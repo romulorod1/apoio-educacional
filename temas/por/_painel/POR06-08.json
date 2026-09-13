@@ -1,0 +1,293 @@
+{
+  "tema": "POR06-08",
+  "assinatura": "d39371495301461bf5f530d46e0caf0349fd418916dff77fba16982e2bfcb70c",
+  "data": "2026-09-09",
+  "modelos": {
+    "leitores": "sonnet",
+    "juiz": "sonnet",
+    "lente": "fable"
+  },
+  "questoes": [
+    {
+      "n": 2,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Os três intertítulos são: \"Quatro tabuleiros e uma mesa de cimento\", \"Da praça para a sala de aula\" e \"O que ainda falta\". O primeiro conta como o clube começou, o segundo conta como o xadrez chegou às escolas, e o terceiro conta as dificuldades que o clube ainda enfrenta.",
+          "veredito": "espera_se",
+          "motivo": "Os três intertítulos certos com o conteúdo de cada, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Quatro tabuleiros e uma mesa de cimento conta como o clube começou. Da praça para a sala de aula conta que o clube foi pras escolas. O que ainda falta conta os problemas que o clube ainda tem.",
+          "veredito": "espera_se",
+          "motivo": "Mesma resposta do espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O primeiro intertítulo é \"Quatro tabuleiros e uma mesa de cimento\", que conta como o clube começou com Lauro Bentivegna. O segundo é \"Da praça para a sala de aula\", que conta como o clube passou a ter oficinas nas escolas. O terceiro é \"O que ainda falta\", que conta as dificuldades do clube, como a falta de cobertura na praça.",
+          "veredito": "espera_se",
+          "motivo": "Mesma resposta, citando também o fundador."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 4,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O clube tem hoje 112 inscritos, sendo 68 com até 14 anos e 44 com 15 anos ou mais.",
+          "veredito": "espera_se",
+          "motivo": "112 inscritos com a divisão 68 e 44, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O clube tem 112 inscritos hoje, sendo 68 com até 14 anos e 44 com 15 anos ou mais.",
+          "veredito": "espera_se",
+          "motivo": "Mesma resposta do espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O clube tem hoje 112 inscritos, sendo 68 com até 14 anos e 44 com 15 anos ou mais (linha 19).",
+          "veredito": "espera_se",
+          "motivo": "Mesma resposta do espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 5,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "São os quatro tabuleiros do começo mais vinte e seis doados por moradores, que juntos somam trinta tabuleiros.",
+          "veredito": "espera_se",
+          "motivo": "Mostra a soma quatro mais vinte e seis igual a trinta, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "São trinta tabuleiros, os quatro do começo mais vinte e seis que foram doados pelos moradores.",
+          "veredito": "espera_se",
+          "motivo": "Mesma soma do espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Se chega aos trinta tabuleiros somando os quatro tabuleiros do começo com os vinte e seis que foram doados por moradores depois (linhas 19 e 20).",
+          "veredito": "espera_se",
+          "motivo": "Mesma soma do espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 7,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Porque mostrar a cena da praça cheia é mais interessante e prende a atenção do leitor, enquanto só dar o número de inscritos logo de início seria mais seco e menos convidativo.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que a cena prende a atenção do leitor, batendo com o aceita_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Porque assim o leitor já vê como o clube está hoje, bem cheio de gente, antes de saber que ele começou bem pequeno.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que a cena mostra o clube cheio hoje antes de saber que comecou pequeno, reproduzindo o terceiro item de aceita_se sobre o contraste buscado."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A reportagem abre com a cena da praça cheia porque isso prende mais a atenção do leitor, mostrando o clima e os sons do lugar, do que começar direto com números frios. Os números vêm depois para confirmar o que a cena já mostrou.",
+          "veredito": "espera_se",
+          "motivo": "Diz que a cena prende o leitor e que os números vêm depois como confirmação, como no espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 9,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A fala de Lauro conta como o clube começou, algo que só ele viveu. A fala de Sirlene mostra o que ela observa na escola sobre o comportamento dos alunos. A fala de Marcos Aurélio mostra como o clube afeta até o comércio da região.",
+          "veredito": "aceita_se",
+          "motivo": "Comenta as três falas com precisão, mas sem a ressalva de Sirlene sobre não ter número que prove, prevista no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Lauro conta a história de como o clube surgiu. A coordenadora conta o que ela percebe nos alunos. O dono da banca conta como é guardar os tabuleiros toda semana.",
+          "veredito": "aceita_se",
+          "motivo": "Comenta corretamente as tres falas, cada uma resumida em uma linha sem trocar quem disse o que, conforme aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Lauro conta a experiência pessoal de ter fundado o clube (linhas 15 a 18). Sirlene, a coordenadora, dá a opinião de dentro da escola sobre o que percebe nos alunos (linhas 28 a 30). Marcos Aurélio, dono da banca, conta como o clube afeta o comércio dele (linhas 37 a 39). Nenhuma dessas vivências o repórter poderia contar sozinho sem ouvir cada um deles.",
+          "veredito": "espera_se",
+          "motivo": "Comenta as três falas com precisão, incluindo a ressalva de Sirlene, como no espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 11,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Porque isso mostra que a reportagem é honesta e completa, contando a realidade toda, não só a parte boa, o que dá mais credibilidade ao texto.",
+          "veredito": "espera_se",
+          "motivo": "Diz que mostra a reportagem honesta e completa, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Porque assim a reportagem mostra a verdade toda, não só as coisas boas do clube.",
+          "veredito": "espera_se",
+          "motivo": "Mesma ideia de mostrar a verdade toda, de forma resumida."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A reportagem conta o que ainda não deu certo porque uma boa reportagem mostra os dois lados da história, não só o sucesso, para dar uma visão mais completa e honesta da situação.",
+          "veredito": "espera_se",
+          "motivo": "Mesma ideia com o contraste dos dois lados da história."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 13,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O título destaca que foi o bairro inteiro que aprendeu, não só uma pessoa, e que tudo aconteceu num espaço público, a praça. Isso revela que a reportagem olha para o xadrez como algo que uniu a comunidade.",
+          "veredito": "espera_se",
+          "motivo": "Diz que o título destaca o bairro como protagonista coletivo, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O título destaca que foi o bairro inteiro que aprendeu, não só uma pessoa. Isso mostra que quem escreveu quis falar da comunidade, não só do clube.",
+          "veredito": "espera_se",
+          "motivo": "Mesma leitura do título do espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O título destaca o bairro inteiro, e não só o clube ou o fundador, como se todo mundo tivesse aprendido junto. Isso revela um ponto de vista coletivo, valorizando o impacto do xadrez na comunidade toda.",
+          "veredito": "espera_se",
+          "motivo": "Mesma leitura do título com ponto de vista coletivo."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 15,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Ficariam os fatos principais, como o número de inscritos, o ano em que o clube começou e a chegada às escolas. Sairiam os detalhes mais longos, como as falas completas das pessoas e a cena final da menina jogando com Lauro.",
+          "veredito": "aceita_se",
+          "motivo": "Separa corretamente dados que ficariam de cenas e falas que sairiam, cabendo na entrada aceita."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Ficaria o principal, tipo quantos inscritos o clube tem e como ele começou. Sairia os detalhes, tipo as falas das pessoas e a parte do que ainda falta.",
+          "veredito": "aceita_se",
+          "motivo": "Também separa dados de cenas e falas de forma correta, ainda que de modo mais genérico."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Numa notícia curta ficariam os números principais, como os 112 inscritos e as duas escolas, e talvez uma fala breve de Lauro. Sairiam detalhes como a cena da banca de jornal e a cena final da menina jogando com Lauro, porque enriquecem o texto mas não são essenciais ao fato principal.",
+          "veredito": "aceita_se",
+          "motivo": "Propõe manter uma fala curta de fonte identificada além dos números, exatamente o que a entrada aceita prevê."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok",
+        "motivo": "Procurei respostas defensáveis fora do critério e o primeiro item de aceita_se funciona como regra geral de separar dados de cenas e falas, cobrindo as variantes que testei, inclusive guardar uma fala com fonte, guardar os fatos finais da prefeitura, usar os números da cena de abertura e cortar a história de 2023 como contexto."
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 16,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Escolhi a fala de Lauro: \"Eu trouxe quatro tabuleiros e sentei.\" Ela aparece entre aspas porque são as palavras exatas dele, e isso dá mais verdade à reportagem do que se o repórter só resumisse o que ele disse.",
+          "veredito": "espera_se",
+          "motivo": "Escolhe uma fala e explica a fidelidade das palavras exatas, como no espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Escolhi a fala do dono da banca: chega tabuleiro aqui em caixa de papelão, e eu guardo. Ela aparece entre aspas porque é a opinião dele mesmo, do jeito que ele falou.",
+          "veredito": "aceita_se",
+          "motivo": "Explica a fala pelo jeito de falar da pessoa, mas usa opinião de forma imprecisa para uma fala fatual."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Escolho a fala de Marcos Aurélio Pinho: \"Mas eu vendo mais revista de passatempo desde que eles jogam ali. Então tudo bem\" (linhas 38 e 39). Ela aparece entre aspas porque é a opinião pessoal dele, e citar as palavras exatas dá mais verdade do que se o repórter só resumisse com as próprias palavras.",
+          "veredito": "espera_se",
+          "motivo": "Mesma explicação sobre palavras exatas darem mais verdade que o resumo do repórter."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    }
+  ],
+  "resultado": {
+    "aprovadas": [
+      2,
+      4,
+      5,
+      7,
+      9,
+      11,
+      13,
+      15,
+      16
+    ],
+    "ambiguas": [],
+    "estreitas": [],
+    "largas": []
+  },
+  "historico": [
+    {
+      "assinatura": "569434d480b87b1dcc816c5bf88392d88ab1d9ef15d5f731976276f75b8da7c3",
+      "data": "2026-09-08",
+      "resultado": {
+        "aprovadas": [
+          2,
+          4,
+          5,
+          7,
+          9,
+          11,
+          13,
+          15,
+          16
+        ],
+        "ambiguas": [],
+        "estreitas": []
+      }
+    }
+  ]
+}

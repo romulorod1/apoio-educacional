@@ -23,13 +23,18 @@ Um tema que falhe em qualquer ponto nao entra no banco.
 Nas materias com catalogo de topicos (portugues e literatura) o verificador
 confere tambem a colecao `fontes/`: cada texto citado mora num arquivo proprio,
 com cabecalho de procedencia e dominio, e o bloco citado no tema tem que ser
-copia exata das linhas da fonte.
+copia exata das linhas da fonte. E confere tambem o registro do painel cego
+(temas/<pasta>/_painel/<ID>.json, gravado pelo painel.py): tema com questao
+aberta so entra no banco depois de tres leitores, um juiz e uma lente
+adversarial terem lido, e o registro tem que ser do texto de hoje.
 
 Uso:
     python verificar.py                confere tudo
     python verificar.py MAT06-05       confere um tema
     python verificar.py --temas DIR    confere os temas de outra raiz (prova do gerador)
     python verificar.py --fontes DIR   confere as fontes de outra raiz
+    python verificar.py --painel DIR   le os registros do painel cego de outra raiz
+    python verificar.py --sem-painel   nao exige o registro do painel cego
     python verificar.py --ano 2027     faz a conta do dominio publico em outro ano
 """
 import io
@@ -64,6 +69,19 @@ ARQUIVO_BNCC = os.path.join(AQUI, 'bncc_lp.json')
 # gerador e os testes precisam apontar para uma raiz de mentira sem sujar o
 # repositorio; a linha de comando troca por --fontes.
 RAIZ_FONTES = os.path.join(RAIZ_PROJETO, 'fontes')
+
+# A raiz dos registros do painel cego (camada 2). None significa "ao lado das
+# series", temas/<pasta>/_painel/, que e onde eles moram no repositorio; a linha
+# de comando troca por --painel, e as provas em pasta temporaria usam isso.
+RAIZ_PAINEL = None
+# --sem-painel desliga a conferencia do painel, para quem esta escrevendo um
+# tema e quer ver o resto passar antes de rodar os leitores. O gerador NUNCA
+# desliga: ele passa sem_painel=False de proposito.
+SEM_PAINEL = False
+# O ano em que a conta do dominio publico e feita. None significa o relogio: a
+# conta so afrouxa com o tempo, entao o relogio e seguro como padrao, e o
+# parametro existe para o teste fixar o ano e nao explodir na virada.
+ANO = None
 
 # simbolos disponiveis nas expressoes de verificacao
 # Declarados reais de proposito: sem isso o sympy recusa resolver equacao com
@@ -158,6 +176,31 @@ def materia_do_caminho(caminho):
     return mapa[pasta]
 
 
+def pastas_de_serie(raiz, pasta):
+    """As pastas de serie de uma materia: <raiz>/<pasta>/<serie>/, em ordem.
+
+    Pasta que comeca por sublinhado NAO e serie. O registro do painel cego mora
+    em temas/<pasta>/_painel/, ao lado das series e nao dentro de uma delas,
+    porque o registro e do tema. Sem esta linha, um arquivo deixado ali dentro
+    viraria tema de uma serie chamada "_painel", e o portao passaria a conferir
+    o proprio registro como se fosse material.
+    """
+    achadas = []
+    for caminho in sorted(glob.glob(os.path.join(raiz, pasta, '*'))):
+        if os.path.isdir(caminho) and not os.path.basename(caminho).startswith('_'):
+            achadas.append(caminho)
+    return achadas
+
+
+def arquivos_da_materia(materia, raiz=None):
+    """Todos os .md de tema de uma materia, em ordem. O gerador le pela mesma."""
+    raiz = raiz or RAIZ
+    arquivos = []
+    for pasta_serie in pastas_de_serie(raiz, materia['temas']['pasta']):
+        arquivos.extend(glob.glob(os.path.join(pasta_serie, '*.md')))
+    return sorted(arquivos)
+
+
 def arquivos_de_temas(raiz=None):
     """Todos os .md de tema, materia por materia, na ordem da tabela.
 
@@ -165,10 +208,9 @@ def arquivos_de_temas(raiz=None):
     engoliria temas/_antes, que e um retrato local do banco com 146 arquivos,
     e qualquer outra pasta que alguem deixe ao lado.
     """
-    raiz = raiz or RAIZ
     arquivos = []
     for mat in materias():
-        arquivos.extend(sorted(glob.glob(os.path.join(raiz, mat['temas']['pasta'], '*', '*.md'))))
+        arquivos.extend(arquivos_da_materia(mat, raiz))
     return arquivos
 
 
@@ -667,7 +709,7 @@ def marcacao_quebrada(texto):
 # par envenenado escrito com o relogio explodiria sozinho na virada do ano.
 GENEROS_DE_FONTE = ['conto', 'poema', 'cronica', 'fabula', 'noticia', 'reportagem', 'artigo',
                     'entrevista', 'propaganda', 'verbete', 'bilhete', 'carta', 'teatro', 'romance',
-                    'ensaio', 'cantiga', 'parlenda', 'outro']
+                    'ensaio', 'cantiga', 'parlenda', 'relato', 'instrucao', 'outro']
 DOMINIOS_DE_FONTE = ['publico', 'autoral', 'cc', 'tradicional']
 CAMPOS_DE_FONTE = ['id', 'titulo', 'autor', 'ano', 'genero', 'dominio',
                    'licenca', 'procedencia', 'integral']
@@ -871,6 +913,32 @@ def arquivos_de_fontes(raiz=None):
                   if os.path.basename(a) != 'FORMATO.md')
 
 
+def ano_corrente():
+    """O ano da conta do dominio publico: o fixado, ou o do relogio."""
+    import datetime
+    return ANO or datetime.datetime.now().year
+
+
+_fontes_conferidas = {}
+
+
+def problemas_da_fonte_citada(ident, raiz_fontes=None, ano=None):
+    """Os erros do ARQUIVO de fonte que um tema cita, com cache por execucao.
+
+    O main confere a colecao antes dos temas, e a razao ja estava escrita la: um
+    tema so pode ser conferido contra uma fonte que ja passou. Aqui isso vira
+    dependencia de verdade, e nao ordem de impressao. Sem ela o gerador, que nao
+    confere a colecao, montaria alegremente um tema apoiado num autor que morreu
+    em 1970, e a folha sairia com o credito de uma obra ainda protegida.
+    """
+    caminho = os.path.join(raiz_fontes or RAIZ_FONTES, '%s.md' % ident)
+    ano = ano or ano_corrente()
+    chave = (caminho, ano)
+    if chave not in _fontes_conferidas:
+        _fontes_conferidas[chave] = problemas_na_fonte(caminho, ano)
+    return _fontes_conferidas[chave]
+
+
 # ------------------------------------------------------ identificador e topicos
 
 def problemas_no_id(cab, caminho, materia):
@@ -1025,8 +1093,8 @@ def fonte_do_catalogo(ident, raiz_fontes=None):
     return lida
 
 
-def problemas_de_citacao(corpo, com_catalogo, raiz_fontes=None):
-    """F1 a F4 e M7: o bloco de citacao aponta uma fonte e a copia exatamente."""
+def problemas_de_citacao(corpo, com_catalogo, raiz_fontes=None, ano=None):
+    """F1 a F4 e M7: o bloco de citacao aponta uma fonte boa e a copia exatamente."""
     erros = []
     linhas = (corpo or '').split(chr(10))
 
@@ -1067,6 +1135,7 @@ def problemas_de_citacao(corpo, com_catalogo, raiz_fontes=None):
                          'arquivo de fontes/, inclusive o texto escrito para o exercicio '
                          '(que e fonte com dominio: autoral)' % numero)
 
+    conferidas = set()
     for bloco in blocos:
         if bloco['a'] > bloco['b']:
             erros.append('linha %d: linhas=%d-%d esta de tras para frente'
@@ -1078,6 +1147,16 @@ def problemas_de_citacao(corpo, com_catalogo, raiz_fontes=None):
             erros.append('linha %d: a fonte "%s" nao existe em fontes/%s.md'
                          % (bloco['linha'], bloco['id'], bloco['id']))
             continue
+        # A fonte citada tem que estar boa: dominio publico dentro da conta,
+        # cabecalho completo, linha que cabe no bloco. Uma vez por fonte, e nao
+        # uma vez por bloco, para o tema que cita o mesmo conto tres vezes nao
+        # repetir o mesmo erro tres vezes.
+        if bloco['id'] not in conferidas:
+            conferidas.add(bloco['id'])
+            ruins = problemas_da_fonte_citada(bloco['id'], raiz_fontes, ano)
+            if ruins:
+                erros.append('linha %d: a fonte "%s" esta reprovada, e o tema nao pode se apoiar '
+                             'nela | %s' % (bloco['linha'], bloco['id'], ruins[0]))
         esperado = fatia(lida[1], bloco['a'], bloco['b'])
         if not esperado:
             erros.append('linha %d: a fonte "%s" nao tem as linhas %d a %d'
@@ -1411,6 +1490,8 @@ def problemas_nos_itens(exerc, gab, com_catalogo, raiz_fontes=None):
     posicao = 0
     letras_certas = []
     certas_longas = []
+    certas_curtas = []
+    postos_da_certa = []
     for evento in eventos:
         if evento['tipo'] == 'texto':
             vigente = evento
@@ -1428,10 +1509,17 @@ def problemas_nos_itens(exerc, gab, com_catalogo, raiz_fontes=None):
             comprimentos = dict((alt['letra'], len(alt['texto'])) for alt in ex['alternativas'])
             if comprimentos and gb['letra'] in comprimentos:
                 outras = [v for l, v in comprimentos.items() if l != gb['letra']]
-                # empate nao conta: so a certa estritamente mais longa que todas as outras
-                certas_longas.append(bool(outras) and comprimentos[gb['letra']] > max(outras))
+                # empate nao conta: so a certa estritamente no extremo, de um lado ou do outro
+                minha = comprimentos[gb['letra']]
+                certas_longas.append(bool(outras) and minha > max(outras))
+                certas_curtas.append(bool(outras) and minha < min(outras))
+                # a posicao da certa entre as quatro, da mais longa (1) para a mais
+                # curta (4). Empate empurra para baixo, que e o caso mais favoravel ao
+                # tema: a trava so reprova o que ela consegue provar.
+                postos_da_certa.append(1 + sum(1 for v in outras if v > minha))
     erros.extend(_letras_concentradas(letras_certas))
-    erros.extend(_certas_mais_longas(certas_longas))
+    erros.extend(_certas_no_extremo(certas_longas, certas_curtas))
+    erros.extend(_posto_previsivel(postos_da_certa))
     respostas = [' '.join(l.strip() for l in i['linhas']) for i in itens_gab]
     return erros, enunciados, respostas
 
@@ -1454,18 +1542,66 @@ def _letras_concentradas(letras_certas):
     return []
 
 
-# E7, segunda conta: a certa tambem nao pode ser a alternativa mais comprida na maioria
-# das fechadas. Medido no piloto: 31 de 43, mesmo depois de espalhar as letras. O aluno
-# que aprende "marca a maior" acerta sem ler.
-def _certas_mais_longas(certas_longas):
+# E7, segunda conta: a certa tambem nao pode ser o EXTREMO de comprimento na maioria
+# das fechadas, nem o de cima nem o de baixo.
+#
+# A primeira versao olhava so a mais longa, porque foi assim que o defeito apareceu no
+# piloto do 7 ano: 31 de 43. O primeiro lote da escala caiu do outro lado, e a trava
+# nao viu: a certa era a mais CURTA em 55 das 78 fechadas do 6 ano, com os distratores
+# cheios de oracao explicativa e a certa nua. O aluno que aprende "marca a menor"
+# acerta sem ler, exatamente como o que aprende "marca a maior", e uma trava que so
+# conhece um dos lados ensina a fugir para o outro.
+def _certas_no_extremo(certas_longas, certas_curtas):
     if len(certas_longas) < 4:
         return []
-    quantas = sum(1 for eh in certas_longas if eh)
-    if quantas * 2 > len(certas_longas):
-        return ['a resposta certa e a alternativa mais longa em %d das %d questoes fechadas: '
-                'encurte a certa ou alongue um distrator, senao o aluno acerta pelo tamanho'
-                % (quantas, len(certas_longas))]
-    return []
+    erros = []
+    for lista, lado, conserto in (
+            (certas_longas, 'mais longa', 'encurte a certa ou alongue um distrator'),
+            (certas_curtas, 'mais curta', 'alongue a certa ou encurte os distratores')):
+        quantas = sum(1 for eh in lista if eh)
+        if quantas * 2 > len(lista):
+            erros.append('a resposta certa e a alternativa %s em %d das %d questoes fechadas: '
+                         '%s, senao o aluno acerta pelo tamanho'
+                         % (lado, quantas, len(lista), conserto))
+    return erros
+
+
+# E7, terceira conta: a POSICAO de comprimento da certa nao pode ser previsivel.
+#
+# A segunda conta ficou simetrica nos dois extremos, e a producao fugiu para o meio: no
+# piloto do 7 ano a certa e a SEGUNDA mais longa em 36 das 43 fechadas, e em dois temas
+# em 7 de 7. Um aluno que elimina a mais longa e a mais curta sem ler nada passa de 25
+# para 45 por cento de acerto no lote inteiro, e nenhuma das duas contas anteriores ve
+# isso, porque as duas olham extremo e o defeito mora na distribuicao.
+#
+# E a terceira vez que a mesma licao aparece nesta fase, e por isso ela agora se escreve
+# sobre a propriedade inteira: o comprimento nao diz qual e a certa. Duas contas, nos
+# temas com seis ou mais fechadas (abaixo disso o acaso explica qualquer padrao):
+#
+#   (a) nenhuma das quatro posicoes vale mais da metade das fechadas do tema;
+#   (b) a certa e a mais longa ao menos uma vez e a mais curta ao menos uma vez, senao
+#       "elimine os extremos" continua funcionando mesmo com (a) satisfeita.
+def _posto_previsivel(postos):
+    if len(postos) < 6:
+        return []
+    erros = []
+    contagem = {}
+    for p in postos:
+        contagem[p] = contagem.get(p, 0) + 1
+    posto, quantas = max(contagem.items(), key=lambda par: par[1])
+    nomes = {1: 'mais longa', 2: 'segunda mais longa', 3: 'terceira mais longa',
+             4: 'mais curta'}
+    if quantas * 2 > len(postos):
+        erros.append('a resposta certa e a %s em %d das %d questoes fechadas: espalhe os'
+                     ' comprimentos, senao o aluno acha a certa pela posicao e nao pela'
+                     ' leitura' % (nomes[posto], quantas, len(postos)))
+    faltam = [nomes[p] for p in (1, 4) if contagem.get(p, 0) == 0]
+    if faltam:
+        erros.append('em nenhuma das %d questoes fechadas a certa e a %s: quem elimina os'
+                     ' extremos sem ler acerta o dobro, entao pelo menos uma questao do'
+                     ' tema precisa ter a certa nesse comprimento'
+                     % (len(postos), ' nem a '.join(faltam)))
+    return erros
 
 
 def _problemas_do_item(evento, ex, gb, texto_do_item):
@@ -1565,9 +1701,22 @@ def _problemas_da_linha_citada(n, ex, texto_do_item):
 
 # ----------------------------------------------------------------- conferir
 
-def conferir(caminho, raiz_fontes=None):
+def _painel():
+    """O modulo do painel cego, importado tarde para nao fechar ciclo.
+
+    O painel.py importa este arquivo (ele le a lista pelo mesmo parser do
+    gerador), entao a importacao aqui e adiada ate a hora da chamada.
+    """
+    import painel
+    return painel
+
+
+def conferir(caminho, raiz_fontes=None, raiz_painel=None, sem_painel=None, ano=None):
     """Devolve (erros, avisos, manuais, cabecalho)."""
     erros, avisos, manuais = [], [], []
+    raiz_painel = raiz_painel or RAIZ_PAINEL
+    sem_painel = SEM_PAINEL if sem_painel is None else sem_painel
+    ano = ano or ano_corrente()
     materia = materia_do_caminho(caminho)
     cab, corpo = ler_tema(caminho)
     linguas = materia['temas']['linguas']
@@ -1610,7 +1759,7 @@ def conferir(caminho, raiz_fontes=None):
                      % (numero, citada, trecho))
 
     erros.extend(problemas_de_estilo(corpo, com_catalogo))
-    erros.extend(problemas_de_citacao(corpo, com_catalogo, raiz_fontes))
+    erros.extend(problemas_de_citacao(corpo, com_catalogo, raiz_fontes, ano))
 
     # As secoes de lingua: uma por lingua que a materia declara. Secao de uma
     # lingua que a materia nao tem e aviso, nao erro: ninguem proibiu escrever
@@ -1652,6 +1801,20 @@ def conferir(caminho, raiz_fontes=None):
             erros.extend(erros_itens)
             listas[lingua] = enunciados
             respostas[lingua] = gabaritos
+    if erros:
+        return erros, avisos, manuais, cab
+
+    # Camada 2: a prova cega. Toda questao aberta de tema com catalogo passa por
+    # um painel antes de o tema entrar no banco, e o portao confere o registro
+    # que o painel deixou: que ele existe, que e do texto de hoje, e que todas as
+    # abertas foram aprovadas. E erro, e nao aviso: um item ambiguo chega na mao
+    # dela como se estivesse conferido.
+    #
+    # Vem depois das travas de estrutura de proposito. Num tema com o gabarito
+    # quebrado, "falta o registro do painel" seria a mensagem errada a ler
+    # primeiro: o que falta ali e o gabarito.
+    if com_catalogo and not sem_painel:
+        erros.extend(_painel().conferir_registro(caminho, raiz_painel))
     if erros:
         return erros, avisos, manuais, cab
 
@@ -1731,19 +1894,25 @@ def _tirar_opcao(args, nome):
 
 
 def main():
-    import datetime
-    global RAIZ_FONTES
+    global RAIZ_FONTES, RAIZ_PAINEL, SEM_PAINEL, ANO
     args = sys.argv[1:]
     raiz = _tirar_opcao(args, '--temas')
     raiz = os.path.abspath(raiz) if raiz else RAIZ
     fontes = _tirar_opcao(args, '--fontes')
     if fontes:
         RAIZ_FONTES = os.path.abspath(fontes)
+    painel = _tirar_opcao(args, '--painel')
+    if painel:
+        RAIZ_PAINEL = os.path.abspath(painel)
+    if '--sem-painel' in args:
+        args.remove('--sem-painel')
+        SEM_PAINEL = True
     # A conta do dominio publico so afrouxa com o tempo, entao o relogio e um
     # padrao seguro. O parametro existe para o teste poder fixar um ano e para
     # alguem poder perguntar o que estara livre no ano que vem.
     ano = _tirar_opcao(args, '--ano')
-    ano = int(ano) if ano else datetime.datetime.now().year
+    ANO = int(ano) if ano else None
+    ano = ano_corrente()
     alvo = args[0] if args else None
     arquivos = arquivos_de_temas(raiz)
     if alvo:

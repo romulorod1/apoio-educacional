@@ -368,15 +368,17 @@ console.log('\n=== a arroba no banco inteiro, e não num tema só ===');
  * A cobertura completa é em duas camadas, e o argumento é que uma folha só pode
  * imprimir uma arroba que exista na FONTE:
  *
- *   camada 1: nenhuma arroba seguida de letra na fonte dos 154 temas além das
+ *   camada 1: nenhuma arroba seguida de letra na fonte de todos os temas dos
+ *   índices além das
  *   três diretivas conhecidas (@fig, @eq, @fonte). Isto pega o e-mail, o
  *   "@tabela" que ainda não nasceu e o erro de digitação, em qualquer tema;
  *   camada 2: todo tema que TRAZ diretiva gera as folhas de verdade e não pode
  *   imprimir arroba nenhuma. Hoje são 12 temas (6 de matemática com @fig ou
  *   @eq, e os 6 de português com @fonte).
  *
- * Juntas cobrem os 154: quem não tem arroba na fonte não pode imprimir arroba,
- * e quem tem passa pela camada 2. Gerar as 308 folhas do banco a cada portão
+ * Juntas cobrem todos os temas dos índices: quem não tem arroba na fonte não
+ * pode imprimir arroba, e quem tem passa pela camada 2. Gerar todas as folhas
+ * do banco a cada portão
  * custaria minutos e não acrescentaria caso nenhum.
  *
  * O argumento vale para o texto DO TEMA, e só para ele. O que entra na folha
@@ -389,7 +391,7 @@ console.log('\n=== a arroba no banco inteiro, e não num tema só ===');
    * tema estragado. Sem isso ela era a única contagem deste arquivo sem o par
    * "o detector detecta": afrouxando a lista branca para aceitar qualquer
    * arroba, tudo continuava verde, e é ela que sustenta o argumento de
-   * cobertura para 142 dos 154 temas. */
+   * cobertura para todos os temas sem diretiva. */
   function arrobasEstranhas(tema) {
     const achadas = [];
     (JSON.stringify(tema).match(/@[A-Za-z][A-Za-z0-9]*/g) || []).forEach(function (a) {
@@ -403,6 +405,13 @@ console.log('\n=== a arroba no banco inteiro, e não num tema só ===');
     ['português', JSON.parse(fs.readFileSync(
       path.join(__dirname, '..', 'temas', 'banco-portugues.json'), 'utf8'))]
   ];
+  const indices = [
+    JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'banco', 'indice.json'), 'utf8')),
+    JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'banco', 'portugues', 'indice.json'), 'utf8'))
+  ];
+  const totalEsperado = indices.reduce(function (soma, indice) {
+    return soma + (indice.temas || []).length;
+  }, 0);
   let temasVistos = 0, comDiretiva = [];
   const estranhas = [];
   bancos.forEach(function (par) {
@@ -412,7 +421,7 @@ console.log('\n=== a arroba no banco inteiro, e não num tema só ===');
       if (/@(fig|eq|fonte)/.test(JSON.stringify(t))) comDiretiva.push(t);
     });
   });
-  conf('os dois bancos somam 154 temas', temasVistos, 154);
+  conf('os dois bancos somam os temas declarados nos índices', temasVistos, totalEsperado);
   conf('nenhuma arroba na fonte que não seja @fig, @eq ou @fonte',
     [...new Set(estranhas)].slice(0, 5).join(', ') || 0, 0);
   /* A trava da trava: se a varredura parasse de achar as diretivas conhecidas,

@@ -31,16 +31,13 @@
  * pdf.js). Os quatro já estão na lista abaixo, que continua igual. O v22
  * (08/09/2026) acrescenta uma linha à lista, a primeira desde o v16, que levou
  * o './cartao.js': é o índice dos temas de português. Aí o nome novo é
- * obrigatório pelo motivo original, e não pelo hábito do release. O v23 iniciou
- * a série de mudanças de conteúdo do cache; v24 atualizou a diretiva de equação
- * e v25 atualizou o banco do lote 2.
+ * obrigatório pelo motivo original, e não pelo hábito do release. Os v23 a v26
+ * promoveram mudanças de conteúdo em figuras e no banco de Matemática.
  *
- * O v26 continua a série: a lista permanece igual, mas mudaram dois arquivos já
- * listados, './figuras/receitas.js' e './figuras/solidos.js'. Eles corrigem a
- * família de sólidos medida no uso real. A ordem v23, v24, v25 e v26 evita
- * regressão do nome do cache e é confirmada pelo portão sobre cada estado
- * integrado. */
-var CACHE = 'apoio-educacional-v26';
+ * O v27 promove o índice de Português: ele passa de seis para dezesseis temas,
+ * com os dez materiais e listas do 6º ano. Sem nome novo, o tablet continuaria
+ * servindo o índice antigo e esses temas não apareceriam, com ou sem sinal. */
+var CACHE = 'apoio-educacional-v27';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

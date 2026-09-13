@@ -1,0 +1,293 @@
+{
+  "tema": "POR07-01",
+  "assinatura": "41180849fe2bf2ef7289f3f8fc6d48e942c3630ecfa88df8af899121fd157d4d",
+  "data": "2026-09-09",
+  "modelos": {
+    "leitores": "sonnet",
+    "juiz": "sonnet",
+    "lente": "fable"
+  },
+  "questoes": [
+    {
+      "n": 2,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "As três pistas físicas são a pilha do relógio que estava colocada ao contrário, um fio de linha vermelha preso na poeira dentro da tampa e um risco novo na tinta do prego da parede.",
+          "veredito": "espera_se",
+          "motivo": "Cita as tres pistas exatas (pilha invertida, linha vermelha na tampa, risco no prego), batendo com o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "As tres pistas sao a pilha que estava invertida, um fio de linha vermelha preso na poeira da tampa e um risco novo na tinta do prego da parede.",
+          "veredito": "espera_se",
+          "motivo": "Cita as tres pistas exatas com outras palavras, batendo com o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "As três pistas físicas são a pilha colocada ao contrário dentro do relógio, o fio de linha vermelha preso na poeira do fundo da tampa e o risco novo na tinta do prego da parede. O texto diz que \"a pilha estava lá, mas não estava do jeito certo\" e fala também de \"um fio de linha vermelha\" e de \"um risco novo na tinta\" (linhas 8 a 16). Essas três coisas mostram, antes de qualquer suspeita, que alguém mexeu no relógio pouco antes de ele parar.",
+          "veredito": "espera_se",
+          "motivo": "Cita as tres pistas exatas, com apoio em citacoes do texto, batendo com o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 4,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Os quatro suspeitos são os alunos do coral, que entram às terças; a turma de flauta, que entra às quintas; o pessoal da limpeza, que entra todo dia às sete; e o Teodoro, que passa ali para afinar o violão emprestado antes da aula. O critério de Cecília é pensar em quem entra na sala de música sem pedir licença.",
+          "veredito": "espera_se",
+          "motivo": "Lista os quatro suspeitos certos e da o criterio de quem entra na sala sem pedir, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Os suspeitos sao os alunos do coral, a turma de flauta, o pessoal da limpeza e o Teodoro. O criterio dela e pensar em quem entra na sala de musica sem pedir.",
+          "veredito": "espera_se",
+          "motivo": "Lista os quatro suspeitos certos e da o criterio de acesso a sala, como pede o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Os quatro suspeitos são os alunos do coral, a turma de flauta, o pessoal da limpeza e o Teodoro. O critério que Cecília usa é pensar em \"quem entra na sala de música sem pedir\" (linha 17), ou seja, ela lista todo mundo que tem acesso à sala sem precisar de autorização. Nesse momento ela ainda não sabe qual dos quatro tem motivo, só sabe quem poderia ter feito.",
+          "veredito": "espera_se",
+          "motivo": "Lista os quatro suspeitos certos e da o criterio de acesso a sala, como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 6,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Cecília percebe que um relógio parado não cancela o ensaio, porque o professor tem celular e pode avisar de outro jeito. Por isso ela conclui que o motivo de quem mexeu no relógio não tinha a ver com atrapalhar a hora do ensaio, mas com o próprio relógio.",
+          "veredito": "espera_se",
+          "motivo": "Da o argumento do celular e a conclusao de que o motivo era o relogio em si, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Ela pensa que um relogio parado nao cancela o ensaio porque o professor tem celular para avisar todo mundo. Entao ela conclui que o motivo e sobre o relogio mesmo, nao sobre a hora do ensaio.",
+          "veredito": "espera_se",
+          "motivo": "Da o argumento do celular e a conclusao de que o motivo era o relogio em si, como pede o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Cecília descarta a sabotagem porque um relógio parado não cancela o ensaio, já que \"o professor tem celular\" (linha 32) para avisar todo mundo direto. Por isso ela conclui que \"o motivo não era esse\" e que \"o motivo tinha a ver com o relógio em si, não com a hora\" (linhas 32 e 33). Assim ela percebe que precisa procurar uma razão ligada ao próprio objeto, e não ao horário do ensaio.",
+          "veredito": "espera_se",
+          "motivo": "Da o argumento do celular e a conclusao de que o motivo era o relogio em si, com citacao, como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 7,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Cecília pensa em quem usa linha vermelha na escola e lembra da festa junina, mas isso já tinha acontecido há três meses, então não podia ser aquilo. Ela pensa então em costura de fantasia e lembra que os coletes vermelhos do coral estavam sendo feitos na sala ao lado pela mãe do Teodoro, que é costureira.",
+          "veredito": "espera_se",
+          "motivo": "Reproduz o caminho completo: linha vermelha, festa junina descartada, costura, coletes, mae do Teodoro."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Ela pensa em quem usa linha vermelha na escola e lembra da turma de artes, mas a festa junina ja tinha passado. Ai ela lembra que os coletes vermelhos da festa de encerramento estavam sendo costurados pela mae do Teodoro.",
+          "veredito": "aceita_se",
+          "motivo": "Troca a etapa da festa junina por 'turma de artes' e 'festa de encerramento', mas ainda liga linha vermelha, coletes e mae do Teodoro, o que o aceita_se permite ao dispensar as bandeirinhas."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Cecília pensa em quem usa linha vermelha na escola e primeiro lembra da festa junina, mas descarta porque \"a festa junina tinha sido há três meses\" (linha 35). Então ela pensa em costura de fantasia e lembra que os coletes do coral, que são vermelhos, estavam sendo feitos na sala ao lado pela mãe do Teodoro, \"que era costureira\" (linhas 37 e 38). Assim ela chega até a mãe do Teodoro juntando a cor da linha com a atividade de costura que estava acontecendo naquele momento.",
+          "veredito": "espera_se",
+          "motivo": "Reproduz o caminho completo com citacoes de linha, batendo com o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 9,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Teodoro explica direitinho a pilha trocada e invertida, porque mexeu no relógio no escuro, e explica a linha vermelha, que tinha grudado na mão dele depois de ajudar a mãe com os coletes. Mas o risco novo no prego, feito quando ele pendurou o relógio com pressa no escuro, fica por dedução, porque ele não fala isso diretamente.",
+          "veredito": "espera_se",
+          "motivo": "Explica pilha e linha por Teodoro e diz que o risco fica por deducao, ligado ao escuro e a pressa, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A explicacao dele conta certinho a pilha trocada e a linha vermelha grudada na mao. Mas o risco novo no prego ele nao fala, entao isso fica por deducao, porque ele deve ter pendurado o relogio com pressa.",
+          "veredito": "aceita_se",
+          "motivo": "Explica as duas pistas certas e liga o risco a pressa, sem mencionar o escuro, batendo com a entrada do aceita_se sobre citar so a pressa."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A fala de Teodoro explica a pilha invertida, pois ele diz que trocou a pilha do afinador com a do relógio \"no escuro\" e que deve ter colocado ao contrário (linhas 49 e 50), e explica a linha vermelha, porque ele tinha \"acabado de ajudar\" a mãe com os coletes (linha 53). Mas ele não fala do risco novo na tinta do prego, então essa pista fica por dedução do leitor, já que o texto tinha dito antes que o relógio parecia ter sido \"pendurado com pressa e batido antes de encaixar\" (linhas 15 e 16), o que combina com alguém mexendo depressa e no escuro.",
+          "veredito": "espera_se",
+          "motivo": "Explica pilha e linha por Teodoro com citacoes e liga o risco a pressa e ao escuro, como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 11,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "A pilha nova, ainda na cartela, que Cecília encontra no chão da sala ao lado, é a pista que liga aquela sala, onde ficam os coletes, ao caso do relógio, porque mostra que ali tinha uma pilha do mesmo tipo. Isso confirma que o mistério passa por aquele lugar antes de chegar ao Teodoro.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que a pilha liga a sala ao caso e confirma o misterio, mas nao chega a dizer que mostra intencao de trocar a pilha nem a ausencia de ma intencao, ficando no nivel de 'ultima prova' do aceita_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A pilha nova na cartela mostra que a mae do Teodoro ja tinha comprado pilha para trocar, e isso ajuda Cecilia a confirmar que foi ali que aconteceu a troca.",
+          "veredito": "espera_se",
+          "motivo": "Diz que a mae ja tinha comprado a pilha para trocar, ligando a familia do Teodoro ao relogio, como pede o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "A pilha nova ainda na cartela, achada embaixo da mesa de costura, ajuda Cecília a perceber que a mãe do Teodoro tinha comprado pilha havia pouco tempo, o que bate com a fala dele depois, quando conta que \"minha mãe comprou pilha nova no sábado\" (linha 51). Essa pista liga o objeto encontrado na sala ao lado à explicação final de Teodoro, fechando o mistério antes mesmo dele confessar.",
+          "veredito": "espera_se",
+          "motivo": "Liga a pilha nova a fala de Teodoro sobre a compra da pilha, fechando o misterio como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 13,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Sim, o conto é justo com o leitor, porque as três pistas aparecem bem antes da solução: a pilha invertida nas linhas 8 a 10, e a linha vermelha e o risco no prego na linha 14. Tudo isso surge muito antes de Teodoro explicar o que aconteceu, lá pelas linhas 47 a 54.",
+          "veredito": "aceita_se",
+          "motivo": "Aponta pelo menos três pistas materiais (pilha invertida, linha vermelha e risco no prego) com localização aproximada no texto e conclui que sim, o que corresponde ao primeiro item do aceita_se, sem chegar à lista completa do espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Sim, cumpre. A pilha invertida aparece nas linhas 8 a 10, e a linha vermelha e o risco no prego aparecem nas linhas 14 a 16, tudo antes de Cecilia explicar o misterio.",
+          "veredito": "aceita_se",
+          "motivo": "Aponta as mesmas três pistas com linhas bastante precisas, oito a dez e quatorze a dezesseis, antes da solução, satisfazendo o critério mínimo do aceita_se, mas sem reconhecer o que só a confissão acrescenta."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O conto cumpre o combinado, porque as três pistas aparecem bem antes da explicação final. A pilha invertida e a linha vermelha estão nas linhas 8 a 14, o risco no prego está nas linhas 14 a 16, e só depois, nas linhas 45 a 54, é que Teodoro explica tudo. Como o leitor conhece as pistas antes da solução, ele pode tentar montar o quebra cabeça sozinho, do mesmo jeito que Cecília fez.",
+          "veredito": "aceita_se",
+          "motivo": "Também aponta as três pistas com localização aproximada no texto e responde que o conto cumpre o combinado, cumprindo o item do aceita_se sem cobrir todos os grupos de pistas do espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok",
+        "motivo": "O critério aceita sim, quase e não, com ou sem número de linha, e o por exemplo da terceira linha deixa aberta a lista do que falta, inclusive a corda nova do violão."
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 14,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Essa decisão mostra que Cecília é justa e não quer humilhar o Teodoro, dando a ele a chance de assumir o próprio erro. Ela dá esse motivo porque acha certo que o professor saiba a verdade, já que ele passou o dia todo enganado, achando que o relógio tinha parado sozinho, de velho.",
+          "veredito": "espera_se",
+          "motivo": "Diz que Cecilia e justa e nao quer humilhar Teodoro, e liga o motivo ao professor saber a verdade, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Isso mostra que Cecilia e gentil e nao quer humilhar o Teodoro, deixando ele mesmo se explicar. O motivo e porque nao e justo o professor Otavio continuar enganado achando besteira sobre o relogio.",
+          "veredito": "espera_se",
+          "motivo": "Diz que Cecilia e gentil e nao quer humilhar Teodoro, e liga o motivo a justica com o professor, como pede o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Cecília pede que Teodoro conte para o professor porque acha mais justo que ele mesmo assuma o que fez, em vez de ela contar no lugar dele. Isso mostra que ela é uma pessoa que valoriza a honestidade e não gosta de resolver as coisas escondido. O motivo que ela dá, \"porque ele passou a segunda feira inteira achando que o relógio parou de velhice\" (linhas 56 e 57), mostra que ela quer que o professor Otávio saiba a verdade, já que ele ficou o dia todo com uma ideia errada.",
+          "veredito": "espera_se",
+          "motivo": "Diz que Cecilia valoriza a honestidade e quer que o professor saiba a verdade, como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 16,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Essa frase quer dizer que a gente só dá valor ou repara nas coisas que funcionam bem quando elas param de funcionar, porque enquanto estão certas ninguém presta atenção nelas. Isso vale para muitas coisas na vida, não só para relógio, como pessoas ou aparelhos que a gente só nota quando falham.",
+          "veredito": "espera_se",
+          "motivo": "Generaliza a frase para alem do relogio com exemplo (pessoas, aparelhos), como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Essa frase quer dizer que a gente so da valor pras coisas quando elas param de funcionar, porque enquanto tudo esta bem a gente nem percebe.",
+          "veredito": "aceita_se",
+          "motivo": "Generaliza a ideia sem dar exemplo concreto alem do relogio, ficando no nivel de reflexao geral do aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Essa frase quer dizer que as pessoas só prestam atenção nas coisas quando elas param de funcionar direito, e não quando estão funcionando bem o tempo todo. Isso vale para muitas situações da vida, não só para relógios, porque a gente costuma notar mais o que dá errado do que o que está certo. Por exemplo, a gente só repara numa lâmpada quando ela queima, não enquanto ela fica acesa normalmente todos os dias.",
+          "veredito": "espera_se",
+          "motivo": "Generaliza a frase com exemplo concreto (a lampada), como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    }
+  ],
+  "resultado": {
+    "aprovadas": [
+      2,
+      4,
+      6,
+      7,
+      9,
+      11,
+      13,
+      14,
+      16
+    ],
+    "ambiguas": [],
+    "estreitas": [],
+    "largas": []
+  },
+  "historico": [
+    {
+      "assinatura": "08f592702d9d2fea6963d2a20d049b875a6403c7786a4c8055735c900c8e7b41",
+      "data": "2026-09-08",
+      "resultado": {
+        "aprovadas": [
+          2,
+          4,
+          6,
+          7,
+          9,
+          11,
+          13,
+          14,
+          16
+        ],
+        "ambiguas": [],
+        "estreitas": []
+      }
+    }
+  ]
+}

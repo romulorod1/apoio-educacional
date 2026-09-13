@@ -10,7 +10,7 @@ dominio: publico
 licenca: domínio público, Lei 9.610/98 art. 41
 procedencia: Wikisource pt, página "Canção do Exílio (Gonçalves Dias)", incluída a linha final de lugar e data, transcrição da edição Primeiros Cantos, Rio de Janeiro, Typographia Universal de Laemmert, 1846, p. 9-10 (https://pt.wikisource.org/wiki/Canção_do_Exílio_(Gonçalves_Dias)), lida em 08/09/2026; ortografia atualizada por nós a partir dessa edição (gorgeião, céo, estrellas, varzeas, scismar, sósinho, á, taes, permitta, Deos, desfructe; e o acento de "têm"), sem mudar palavra nem pontuação; a epígrafe de Goethe e a nota do autor ficaram de fora
 ortografia: atualizada
-integral: sim
+integral: nao
 ---
 Minha terra tem palmeiras,
 Onde canta o Sabiá;

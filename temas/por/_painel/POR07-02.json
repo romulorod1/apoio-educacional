@@ -1,0 +1,351 @@
+{
+  "tema": "POR07-02",
+  "assinatura": "7018c3d6182d4281d39250f92f226ab82fcbe7a49c2059a53e1b2b64b1904862",
+  "data": "2026-09-09",
+  "modelos": {
+    "leitores": "sonnet",
+    "juiz": "sonnet",
+    "lente": "fable"
+  },
+  "questoes": [
+    {
+      "n": 2,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Ao chamar o lugar de certo país e depois de naquele país, em vez de dizer Brasil ou Rio de Janeiro, o cronista finge estar falando de um país distante. Isso torna a crítica mais forte e irônica, pois o leitor da época sabia muito bem que ele estava falando do próprio país.",
+          "veredito": "espera_se",
+          "motivo": "Reproduz a essência do modelo, o cronista finge falar de um lugar distante e o leitor brasileiro reconhece que a crítica é ao próprio país, o que torna o efeito mais irônico e mais forte."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Ele fala certo país e naquele país para não dizer Brasil direto. Assim parece que é em outro lugar, mas é uma crítica ao próprio país dele.",
+          "veredito": "espera_se",
+          "motivo": "Mesmo de forma sucinta, capta o essencial do modelo, o disfarce de país distante não engana o leitor, que percebe que a crítica é ao próprio país do cronista."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O cronista usa certo país logo na linha 1 e naquele país na linha 35 para fingir que a história aconteceu bem longe. Mas como a crônica saiu numa revista do Rio, para leitores brasileiros, todo mundo entendia que ele estava falando do próprio Brasil. Isso deixa a crítica mais irônica, como se ele estivesse com pena de apontar o dedo, mas na verdade está mostrando que esse tipo de injustiça é tão comum aqui que nem precisa dizer o nome do lugar.",
+          "veredito": "espera_se",
+          "motivo": "Reproduz a essência do modelo com elaboração adicional plausível, ligando o disfarce a uma ironia que mostra a injustiça como algo comum no próprio país do cronista."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok",
+        "motivo": "As saídas que escrevi, do medo de processo à crítica que vale para qualquer lugar e ao tom de deboche do fecho, caem em espera_se ou nas duas linhas de aceita_se."
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 4,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Os dois artigos tinham em comum a mesma ideia, a de criar mais hospitais pela cidade, sem nenhuma diferença de conteúdo. A diferença estava no jeito de escrever: o de Mendonça era simples e claro, e o do jornal principal era cheio de palavras antigas, citações e termos difíceis, além de não citar o nome de quem teve a ideia primeiro.",
+          "veredito": "espera_se",
+          "motivo": "Da o assunto comum e duas diferencas (estilo e nao citar Mendonca), cobrindo o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Os dois falavam da mesma ideia de criar mais hospitais. A diferenca e que o artigo de Mendonca era simples e claro, e o do jornal era cheio de palavras dificeis e citacoes.",
+          "veredito": "aceita_se",
+          "motivo": "Da so a diferenca de estilo, equivalente a dizer que o segundo mudou apenas a forma, do aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Os dois artigos tinham em comum o assunto, já que falavam da mesma ideia de criar mais hospitais, como diz o texto: \"Apesar do assunto ser o mesmo, sem discrepância alguma\" (linha 16). A diferença é que o artigo de Mendonça era \"simples, claro, sem arrebiques\" (linha 5), enquanto o artigo do jornal principal era \"desmedido, escrito com o bolor de vocábulos antigos\" (linhas 12 e 13). Ou seja, o conteúdo era igual, mas a forma de escrever era bem diferente.",
+          "veredito": "aceita_se",
+          "motivo": "Da so a diferenca de estilo, com citacoes, equivalente a dizer que o segundo mudou apenas a forma, do aceita_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 6,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Essa expressão quer dizer que o médico Mendonça era um bom profissional que não fazia alarde nem chamava atenção para si mesmo. Isso destaca a humildade e a discrição do doutor Mendonça, que não buscava fama.",
+          "veredito": "espera_se",
+          "motivo": "Explica a expressao como ausencia de alarde e nomeia a modestia, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Isso quer dizer que o doutor Mendonca era um medico bom que nao fazia alarde nem se exibia. A expressao mostra que ele era humilde.",
+          "veredito": "espera_se",
+          "motivo": "Explica a expressao como ausencia de alarde e nomeia a humildade, como pede o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Essa expressão quer dizer que o doutor Mendonça era um médico simples, que não fazia alarde nem chamava atenção para si mesmo. \"Trombetas, bulha e matinada\" são barulhos, então dizer que ele era sem essas coisas mostra que ele agia com discrição. A qualidade que a expressão destaca é a modéstia dele, já que ele fez o trabalho sem tentar aparecer.",
+          "veredito": "espera_se",
+          "motivo": "Explica a expressao como ausencia de alarde e nomeia a modestia, com citacao, como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 7,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Essa frase é uma opinião, porque é um julgamento do cronista sobre o que ele acabou de contar, e não algo que se possa provar com números ou dados. Fato seria dizer só o que aconteceu, e opinião é o comentário que ele faz por cima do fato.",
+          "veredito": "espera_se",
+          "motivo": "Diz que e opiniao porque e julgamento nao verificavel do cronista, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "E uma opiniao, porque o cronista esta dando um julgamento sobre como as coisas funcionam naquele pais, e nao contando um fato que pode ser provado.",
+          "veredito": "espera_se",
+          "motivo": "Diz que e opiniao porque e julgamento do cronista sobre como as coisas funcionam, como pede o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Essa frase é uma opinião, porque o cronista está dando um julgamento pessoal sobre como as coisas funcionam, e não contando um fato que se pode comprovar com dados. Um fato é algo que aconteceu de verdade, como o artigo ter sido publicado, mas dizer que \"assim são as coisas\" é uma conclusão do cronista sobre a história que ele contou. Ele resume sua crítica em forma de opinião no final da crônica.",
+          "veredito": "espera_se",
+          "motivo": "Diz que e opiniao porque e julgamento pessoal nao comprovavel, como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 9,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Essa frase parece elogiar o doutor Juventa, dizendo que ele era um homem feliz e por isso respeitado. Mas na verdade ela é irônica, porque o final revela que essa felicidade não incluía os doentes dele, sugerindo que ele não era um bom médico.",
+          "veredito": "aceita_se",
+          "motivo": "Explica que 'feliz' e elogio desmentido por 'menos com os doentes', mas nao menciona que a acusacao e posta na boca dos 'maldosos', ficando no aceita_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A frase parece so dizer que ele era feliz, mas na verdade esta dizendo que ele era um medico ruim, porque so os doentes dele nao eram felizes.",
+          "veredito": "aceita_se",
+          "motivo": "Explica que 'feliz' e elogio desmentido por 'menos com os doentes', mas nao menciona os 'maldosos', ficando no aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Essa frase parece dizer que Juventa era respeitado por ser feliz, mas na verdade ela sugere, com ironia, que ele não fazia os pacientes felizes, já que \"menos com os seus doentes\" (linha 31) quer dizer que os doentes dele não ficavam bem tratados. A ironia mostra que ele era considerado importante por uma qualidade que não tem nada a ver com ser um bom médico. Assim o cronista critica Juventa escondido atrás de uma frase que parece um elogio.",
+          "veredito": "aceita_se",
+          "motivo": "Explica que 'feliz' e elogio desmentido por 'menos com os doentes', mas nao menciona os 'maldosos', ficando no aceita_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 10,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Isso significa que, depois desse artigo, ninguém mais lembrou que a ideia tinha sido do doutor Mendonça. O nome dele foi esquecido para sempre, como se estivesse enterrado, e o crédito ficou só com os outros médicos.",
+          "veredito": "espera_se",
+          "motivo": "Diz que ninguem mais lembrou que a ideia era de Mendonca, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Quer dizer que ninguem mais vai lembrar que a ideia foi do doutor Mendonca, porque o artigo apagou o credito dele para sempre.",
+          "veredito": "espera_se",
+          "motivo": "Diz que ninguem mais lembrara que a ideia foi de Mendonca, como pede o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Isso significa que ninguém mais lembrou que a ideia dos hospitais tinha sido primeiro de Mendonça, como se o nome dele tivesse sido apagado de vez. O artigo do jornal principal, ao repetir a ideia sem citar quem pensou nela primeiro, fez todo mundo achar que a ideia era de outra pessoa. Por isso o texto diz que o artigo \"enterrou para sempre o nome do simplório doutor Mendonça\" (linhas 33 e 34), como um enterro mesmo, só que do crédito dele.",
+          "veredito": "espera_se",
+          "motivo": "Diz que ninguem mais lembrou que a ideia era de Mendonca, com citacao, como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 12,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "O cronista descreve o artigo de Mendonça como simples e claro, sem enfeites nem pretensão, e o artigo do jornal principal como exagerado, cheio de palavras antigas e difíceis e citações de fora. Isso mostra que ele valoriza a escrita simples e honesta e despreza a escrita cheia de enfeite que só serve para impressionar.",
+          "veredito": "espera_se",
+          "motivo": "Contrasta a escrita simples de Mendonca com a exagerada do jornal e nomeia o que o cronista valoriza e despreza, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "O artigo de Mendonca e chamado de simples e claro, e o do jornal e chamado de cheio de palavras antigas e dificeis. O cronista valoriza a escrita simples e despreza a escrita cheia de enfeite.",
+          "veredito": "espera_se",
+          "motivo": "Contrasta a escrita simples com a cheia de enfeite e nomeia o que o cronista valoriza e despreza, como pede o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O cronista descreve o artigo de Mendonça como \"simples, claro\" (linha 5) e o artigo do jornal principal como \"desmedido\" e cheio de \"bolor de vocábulos antigos\" (linhas 12 e 13). Isso mostra que ele valoriza uma escrita direta, que qualquer pessoa entende, e despreza uma escrita cheia de palavras difíceis só para parecer importante. Ele parece achar que escrever complicado não é sinal de ser mais inteligente.",
+          "veredito": "espera_se",
+          "motivo": "Contrasta a escrita simples com a exagerada, com citacoes, e nomeia o que o cronista valoriza e despreza, como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 13,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Contar uma história em vez de escrever a opinião direto ajuda o leitor a perceber sozinho a injustiça, sem sentir que estão dizendo o que ele deve pensar. Isso torna o texto mais convincente, porque o exemplo prende a atenção e fica mais fácil de lembrar do que uma frase de opinião solta.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que a historia convence mais porque o leitor chega sozinho a conclusao, mas nao menciona a vantagem de criticar sem nomear com humor e ironia, ficando no aceita_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Contando uma historia o leitor entende o problema sozinho e sente mais o que aconteceu, em vez de so ouvir uma frase pronta.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que a historia faz o leitor entender e sentir mais, sem mencionar a vantagem de criticar sem nomear, ficando no aceita_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Contar uma história em vez de dizer direto que é injusto ajuda o leitor a entender a injustiça sozinho, vendo os fatos acontecerem um depois do outro. Quando o leitor descobre que Mendonça teve a ideia primeiro e depois foi esquecido, ele mesmo chega à conclusão de que isso é errado, sem precisar que ninguém afirme isso com todas as letras. Assim a crítica fica mais forte, porque parece nascer da própria história.",
+          "veredito": "aceita_se",
+          "motivo": "Diz que a historia faz o leitor chegar sozinho a conclusao, sem mencionar a vantagem de criticar sem nomear, ficando no aceita_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 14,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Ele finge não saber se é verdade que o doutor Juventa não tinha sorte com os doentes, mas afirma com toda a certeza que o artigo apagou para sempre o nome do doutor Mendonça. Isso mostra que o cronista critica de um jeito manhoso e irônico, escondendo a crítica mais forte entre uma coisa que ele diz não saber.",
+          "veredito": "espera_se",
+          "motivo": "Diz que o cronista finge nao saber sobre Juventa mas afirma com certeza o apagamento do nome de Mendonca, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "Ele finge nao saber se o doutor Juventa e mesmo ruim com os doentes, mas afirma com certeza que o artigo apagou o nome de Mendonca. Isso mostra que ele critica de um jeito manso, sem acusar direto.",
+          "veredito": "espera_se",
+          "motivo": "Diz que o cronista finge nao saber sobre Juventa mas afirma com certeza o apagamento do nome de Mendonca, como pede o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "O cronista finge não saber se o doutor Juventa era mesmo ruim com os doentes, dizendo \"nada sabemos disso\" (linha 33) sobre o comentário dos maldosos. Mas logo depois ele afirma com certeza algo que sabe, que \"o artigo enterrou para sempre o nome do simplório doutor Mendonça\" (linhas 33 e 34). Essa combinação mostra que o cronista critica de um jeito indireto, fingindo dúvida numa coisa para depois afirmar com força o que realmente quer dizer.",
+          "veredito": "espera_se",
+          "motivo": "Diz que o cronista finge nao saber sobre Juventa mas afirma com certeza o apagamento do nome de Mendonca, com citacoes, como pede o espera_se."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 16,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "As reticências dão a impressão de que a frase continua, como se essa injustiça se repetisse sem parar naquele país. Isso mostra que o cronista não tem muita esperança de que a situação mude, como se fosse algo comum e sem fim.",
+          "veredito": "espera_se",
+          "motivo": "Explica o efeito de resignacao e falta de esperanca das reticencias, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "As reticencias dao a impressao de que a historia vai continuar acontecendo sempre do mesmo jeito. Isso mostra que o cronista nao tem muita esperanca de que as coisas mudem.",
+          "veredito": "espera_se",
+          "motivo": "Explica o efeito de resignacao e falta de esperanca das reticencias, como pede o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "As reticências no final deixam a frase em aberto, como se o cronista estivesse suspirando ou deixando no ar que a situação continua sem solução. Elas dão a entender que ele não tem muita esperança de que as coisas mudem, porque termina de um jeito cansado, como quem já viu essa injustiça se repetir várias vezes. O efeito é de resignação, não de esperança de mudança.",
+          "veredito": "espera_se",
+          "motivo": "Reproduz quase literalmente o espera_se original da questão 16 (reticências): frase suspensa, tom de suspiro e resignação, sem esperança de que as coisas mudem."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    },
+    {
+      "n": 17,
+      "respostas": [
+        {
+          "leitor": "A",
+          "resposta": "Uma marca de outra época é a palavra esculápio, usada para dizer médico, que hoje quase ninguém usa, além da forma de escrever, bem formal e antiga. A situação que a crônica critica, os famosos levarem o crédito de ideias de gente simples, ainda pode acontecer hoje, porque isso continua sendo comum em vários lugares.",
+          "veredito": "espera_se",
+          "motivo": "Aponta marca de epoca (esculapio) e da posicao justificada sobre hoje, como pede o espera_se."
+        },
+        {
+          "leitor": "B",
+          "resposta": "A palavra facultativo para chamar o medico mostra que o texto e antigo. Acho que ainda pode acontecer hoje, porque tem gente que copia ideia dos outros e nao da credito.",
+          "veredito": "espera_se",
+          "motivo": "Aponta marca de epoca ('facultativo') e da posicao justificada sobre hoje, como pede o espera_se."
+        },
+        {
+          "leitor": "C",
+          "resposta": "Uma marca de outra época no texto é a palavra \"facultativo\" usada para chamar o médico, que quase ninguém usa hoje. Eu acho que a situação criticada ainda poderia acontecer hoje, porque existem pessoas que têm ideias boas e não recebem crédito, enquanto outras mais famosas ficam com a fama por repetir a mesma ideia depois. Isso tem a ver com fama e reconhecimento, coisas que não mudam só porque o tempo passa.",
+          "veredito": "espera_se",
+          "motivo": "Aponta a marca de época 'facultativo', citada no próprio espera_se original da questão 17, e justifica com argumento próprio a posição de que a situação ainda pode ocorrer hoje."
+        }
+      ],
+      "lente": {
+        "veredito": "criterio_ok"
+      },
+      "resultado": "aprovada"
+    }
+  ],
+  "resultado": {
+    "aprovadas": [
+      2,
+      4,
+      6,
+      7,
+      9,
+      10,
+      12,
+      13,
+      14,
+      16,
+      17
+    ],
+    "ambiguas": [],
+    "estreitas": [],
+    "largas": []
+  },
+  "historico": [
+    {
+      "assinatura": "00ab33fcef93587dc348d3ec2b3db21b4a6155e32644c75bd009ad404f75bece",
+      "data": "2026-09-08",
+      "resultado": {
+        "aprovadas": [
+          2,
+          4,
+          6,
+          7,
+          9,
+          10,
+          12,
+          13,
+          14,
+          16,
+          17
+        ],
+        "ambiguas": [],
+        "estreitas": []
+      }
+    }
+  ]
+}
