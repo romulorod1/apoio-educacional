@@ -46,16 +46,13 @@
  * intenção do bump e não do diff, e o número do cache continua certo pelo
  * './banco/busca.json' sozinho.
  *
- * O v24 (09/09/2026) continua a série: a lista permanece igual, mas mudaram dois
- * arquivos que já estão nela, './pdf.js' e './figuras/base.js', por causa da
- * diretiva de equação dentro do exercício. Sem nome novo, o tablet continuaria
- * servindo o pdf.js antigo e o conserto nunca chegaria à folha.
+ * O v24 continua a série: a lista permanece igual, mas mudaram './pdf.js' e
+ * './figuras/base.js', por causa da diretiva de equação dentro do exercício.
  *
- * A ordem v23, depois v24, evita regressão do nome de cache. Este bump existe
- * porque a trava reprovou o ramo com "mudou de conteudo e o cache continua
- * apoio-educacional-v22: pdf.js figuras/base.js". Sem ela, o trabalho teria
- * entrado no main e não no tablet. */
-var CACHE = 'apoio-educacional-v24';
+ * O v25 continua a série de conteúdo: o './banco/busca.json' é regenerado quando
+ * o lote 2 dá figura a quatro temas. A ordem v23, v24 e v25 evita regressão do
+ * nome do cache e é confirmada pelo portão sobre cada estado integrado. */
+var CACHE = 'apoio-educacional-v25';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
