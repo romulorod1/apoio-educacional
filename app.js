@@ -10529,14 +10529,73 @@
     if (conceitos && conceitos.length) {
       var linhaTags = el('div', { style: 'display:flex;flex-wrap:wrap;gap:6px;margin-top:8px' });
       conceitos.forEach(function (c) {
+        var txtTag = (typeof c === 'object' && c !== null) ? (c.termo || '') : c;
+        if (!txtTag) return;
         linhaTags.appendChild(el('span', {
           style: 'background:#E2E8F0;color:#2D3748;padding:3px 8px;border-radius:4px;font-size:12px;font-weight:600',
-          texto: c
+          texto: txtTag
         }));
       });
       cartaoCabecalho.appendChild(linhaTags);
     }
     container.appendChild(cartaoCabecalho);
+
+    // Mapa Mental para a Criança (Visual, Estruturado e Completo)
+    var mapaMental = modulo.mapa_mental || (modulo.benchmark_didatico && modulo.benchmark_didatico.mapa_mental) || null;
+    if (mapaMental) {
+      var cardMapa = el('div', { class: 'bloco-mapa-mental' });
+
+      var topoMapa = el('div', { class: 'mapa-topo' }, [
+        el('div', { style: 'display:flex;align-items:center;gap:10px' }, [
+          el('span', { class: 'mapa-icone-destaque', texto: '🧠' }),
+          el('div', {}, [
+            el('h3', { class: 'mapa-titulo', texto: 'Mapa Mental de Estudo da Criança' }),
+            el('div', { class: 'mapa-subtitulo', texto: 'Visual, estruturado e com conexões rápidas para fixar o assunto (Método Kumon & Apoio Escolar)' })
+          ])
+        ])
+      ]);
+      cardMapa.appendChild(topoMapa);
+
+      if (mapaMental.nucleo) {
+        var nucleoBox = el('div', { class: 'mapa-nucleo' }, [
+          el('span', { class: 'mapa-badge-nucleo', texto: '🎯 CONCEITO CENTRAL' }),
+          el('div', { class: 'mapa-texto-nucleo', texto: mapaMental.nucleo })
+        ]);
+        cardMapa.appendChild(nucleoBox);
+      }
+
+      if (mapaMental.ramos && mapaMental.ramos.length) {
+        var gradeRamos = el('div', { class: 'grade-ramos-mapa' });
+        mapaMental.ramos.forEach(function (ramo) {
+          var boxRamo = el('div', { class: 'card-ramo-mapa', style: 'border-top: 4px solid ' + (ramo.cor || '#3182CE') });
+          var titRamo = el('div', { class: 'ramo-cabecalho' }, [
+            el('span', { style: 'font-size:18px', texto: ramo.icone || '📌' }),
+            el('strong', { style: 'color:' + (ramo.cor || '#2D3748'), texto: ramo.titulo })
+          ]);
+          boxRamo.appendChild(titRamo);
+
+          if (ramo.topicos && ramo.topicos.length) {
+            var listaTopicos = el('ul', { class: 'ramo-lista' });
+            ramo.topicos.forEach(function (topico) {
+              listaTopicos.appendChild(el('li', { texto: topico }));
+            });
+            boxRamo.appendChild(listaTopicos);
+          }
+          gradeRamos.appendChild(boxRamo);
+        });
+        cardMapa.appendChild(gradeRamos);
+      }
+
+      if (mapaMental.dica_ninja) {
+        var boxDica = el('div', { class: 'mapa-dica-ninja' }, [
+          el('span', { style: 'font-size:20px;margin-right:8px', texto: '💡' }),
+          el('div', { texto: mapaMental.dica_ninja })
+        ]);
+        cardMapa.appendChild(boxDica);
+      }
+
+      container.appendChild(cardMapa);
+    }
 
     // 1. Resumo Teórico
     if (textoTeorico) {

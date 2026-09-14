@@ -63,7 +63,13 @@ files.forEach(f => {
     if (bd.resumo_teorico) {
       expLines.push('#### Resumo Teórico');
       if (bd.resumo_teorico.conceitos_chave && bd.resumo_teorico.conceitos_chave.length) {
-        bd.resumo_teorico.conceitos_chave.forEach(c => expLines.push('- ' + c));
+        bd.resumo_teorico.conceitos_chave.forEach(c => {
+          if (typeof c === 'object' && c !== null) {
+            expLines.push('- **' + (c.termo || '') + ':** ' + (c.definicao || ''));
+          } else {
+            expLines.push('- ' + c);
+          }
+        });
         expLines.push('');
       }
       if (bd.resumo_teorico.atencao_ponto_cego) {
@@ -75,10 +81,35 @@ files.forEach(f => {
       const ex = bd.exemplo_resolvido;
       expLines.push('#### Exemplo Resolvido: ' + (ex.titulo || ''));
       if (ex.enunciado) expLines.push(ex.enunciado);
-      if (ex.resolucao_passo_a_passo && ex.resolucao_passo_a_passo.length) {
+      if (ex.resolucao_passo_a_passo) {
         expLines.push('**Resolução:**');
-        ex.resolucao_passo_a_passo.forEach(p => expLines.push(p));
+        if (Array.isArray(ex.resolucao_passo_a_passo)) {
+          ex.resolucao_passo_a_passo.forEach(p => expLines.push(p));
+        } else if (typeof ex.resolucao_passo_a_passo === 'string') {
+          ex.resolucao_passo_a_passo.split('\n').forEach(p => expLines.push(p));
+        }
       }
+    }
+  }
+
+  // Seção especial: Mapa Mental para a Criança (visual e formatado no PDF)
+  if (data.mapa_mental) {
+    const mm = data.mapa_mental;
+    expLines.push('### 🧠 Mapa Mental para a Criança');
+    if (mm.nucleo) expLines.push('**🎯 Conceito Central:** ' + mm.nucleo);
+    expLines.push('');
+    if (mm.ramos && mm.ramos.length) {
+      mm.ramos.forEach(r => {
+        expLines.push('**' + (r.icone || '📌') + ' ' + r.titulo + '**');
+        if (r.topicos && r.topicos.length) {
+          r.topicos.forEach(t => expLines.push('- ' + t));
+        }
+        expLines.push('');
+      });
+    }
+    if (mm.dica_ninja) {
+      expLines.push(mm.dica_ninja);
+      expLines.push('');
     }
   }
 
@@ -128,6 +159,7 @@ files.forEach(f => {
     exemplo_resolvido: bDidatico.exemplo_resolvido || null,
     niveis: niveisMod,
     benchmark_didatico: data.benchmark_didatico,
+    mapa_mental: data.mapa_mental || null,
     questoes: data.questoes || [],
     qtdQuestoes: (data.questoes || []).length,
     temaCompativel: {
