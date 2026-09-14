@@ -10153,17 +10153,54 @@
     return cores[chave] || '#475569';
   }
 
+  function sanitizarNotacaoAcervo(texto) {
+    if (!texto) return '';
+    return String(texto)
+      .replace(/\\\[([\s\S]*?)\\\]/g, '$1')
+      .replace(/\\\(([\s\S]*?)\\\)/g, '$1')
+      .replace(/💡\s*(DICA NINJA DA NATH|DICA NINJA|DICA DA NATH):?\s*/gi, '💡 Dica de Fixação: ')
+      .replace(/DICA NINJA DA NATH:?\s*/gi, 'Dica de Fixação: ')
+      .replace(/DICA NINJA:?\s*/gi, 'Dica de Fixação: ')
+      .replace(/\\iff/g, '⇔')
+      .replace(/\\implies/g, '⇒')
+      .replace(/\\cdot/g, '·')
+      .replace(/\\times/g, '×')
+      .replace(/\\Delta/g, 'Δ')
+      .replace(/\\pm/g, '±')
+      .replace(/\\pi/g, 'π')
+      .replace(/\\theta/g, 'θ')
+      .replace(/\\alpha/g, 'α')
+      .replace(/\\beta/g, 'β')
+      .replace(/\\omega/g, 'ω')
+      .replace(/\\approx/g, '≈')
+      .replace(/\\sin/g, 'sen')
+      .replace(/\\cos/g, 'cos')
+      .replace(/\\tan/g, 'tg')
+      .replace(/\\arg/g, 'arg')
+      .replace(/\\bar\{([^}]+)\}/g, '$1*')
+      .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1) / ($2)')
+      .replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '($1) / ($2)')
+      .replace(/\\frac/g, '')
+      .replace(/\\sqrt\{([^}]+)\}/g, '√($1)')
+      .replace(/\\sqrt/g, '√')
+      .replace(/\\log_([a-zA-Z0-9]+)\(([^)]+)\)/g, 'log_{$1}($2)')
+      .replace(/\\log_\{([^}]+)\}\(([^)]+)\)/g, 'log_{$1}($2)')
+      .replace(/\\log_([a-zA-Z0-9]+)/g, 'log_{$1}')
+      .replace(/\\log_\{([^}]+)\}/g, 'log_{$1}')
+      .replace(/\\log/g, 'log')
+      .replace(/\s*!=\s*/g, ' ≠ ');
+  }
+
   function renderizarTextoRicoAcervo(texto) {
     if (!texto) return el('div');
     var container = el('div');
-    var paragrafos = String(texto).split('\n\n');
+    var textoLimpo = sanitizarNotacaoAcervo(texto);
+    var paragrafos = String(textoLimpo).split('\n\n');
     paragrafos.forEach(function (par) {
       par = par.trim();
       if (!par) return;
       var p = el('p', { style: 'margin:0 0 10px;line-height:1.55;color:#2D3748' });
-      var limpo = par.replace(/\\\[([\s\S]*?)\\\]/g, '$1')
-                     .replace(/\\\(([\s\S]*?)\\\)/g, '$1');
-      var partesBold = limpo.split(/(\*\*[^*]+\*\*)/g);
+      var partesBold = par.split(/(\*\*[^*]+\*\*)/g);
       partesBold.forEach(function (pb) {
         if (pb.startsWith('**') && pb.endsWith('**')) {
           var miolo = pb.slice(2, -2);
@@ -10586,10 +10623,20 @@
         cardMapa.appendChild(gradeRamos);
       }
 
-      if (mapaMental.dica_ninja) {
-        var boxDica = el('div', { class: 'mapa-dica-ninja' }, [
+      var textoDica = mapaMental.dica_fixacao || mapaMental.dica_ninja || null;
+      if (textoDica) {
+        var dicaLimpa = String(textoDica)
+          .replace(/💡\s*(DICA NINJA DA NATH|DICA NINJA|DICA DA NATH):?\s*/gi, '')
+          .replace(/^(DICA NINJA DA NATH|DICA NINJA|DICA DA NATH):?\s*/gi, '')
+          .replace(/^💡\s*Dica de Fixação:?\s*/gi, '')
+          .replace(/^Dica de Fixação:?\s*/gi, '')
+          .trim();
+        var boxDica = el('div', { class: 'mapa-dica-ninja mapa-dica-fixacao' }, [
           el('span', { style: 'font-size:20px;margin-right:8px', texto: '💡' }),
-          el('div', { texto: mapaMental.dica_ninja })
+          el('div', [
+            el('strong', { texto: 'Dica de Fixação: ' }),
+            document.createTextNode(dicaLimpa)
+          ])
         ]);
         cardMapa.appendChild(boxDica);
       }

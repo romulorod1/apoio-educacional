@@ -40,8 +40,9 @@
  * família de sólidos medida no uso real.
  * A ordem v23, v24, v25, v26 e v27 evita regressão do nome do cache e é
  * confirmada pelo portão sobre cada estado integrado. O v28 traz a revisão
- * e expansão aprofundada completa da base de dados e acervo pedagógico. */
-var CACHE = 'apoio-educacional-v28';
+ * e expansão aprofundada completa da base de dados e acervo pedagógico. O v29
+ * limpa a notação de fórmulas matemáticas e atualiza a apresentação das dicas. */
+var CACHE = 'apoio-educacional-v29';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
