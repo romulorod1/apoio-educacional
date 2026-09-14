@@ -1222,6 +1222,120 @@ button.alvo-rascunho:hover { background: var(--soft); }
   font-size: 14px;
 }
 
+/* ---------- mapa mental para a criança ---------- */
+
+.bloco-mapa-mental {
+  background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%);
+  border: 2px solid #BFDBFE;
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.mapa-topo {
+  margin-bottom: 14px;
+}
+
+.mapa-icone-destaque {
+  font-size: 28px;
+  background: #DBEAFE;
+  padding: 6px 10px;
+  border-radius: 10px;
+}
+
+.mapa-titulo {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #1E3A8A;
+}
+
+.mapa-subtitulo {
+  font-size: 12px;
+  color: #64748B;
+  margin-top: 2px;
+}
+
+.mapa-nucleo {
+  background: #FFFFFF;
+  border: 2px solid #3B82F6;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+}
+
+.mapa-badge-nucleo {
+  display: inline-block;
+  background: #3B82F6;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+
+.mapa-texto-nucleo {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1E293B;
+  line-height: 1.4;
+}
+
+.grade-ramos-mapa {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.card-ramo-mapa {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.ramo-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.ramo-lista {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.45;
+}
+
+.ramo-lista li {
+  margin-bottom: 6px;
+}
+
+.mapa-dica-ninja {
+  display: flex;
+  align-items: flex-start;
+  background: #FEF3C7;
+  border: 1px solid #FDE68A;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400E;
+  line-height: 1.45;
+}
+
 /* ---------- telas estreitas ---------- */
 
 @media (max-width: 720px) {

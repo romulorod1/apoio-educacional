@@ -37,10 +37,11 @@
  *
  * O v26 continua a série: a lista permanece igual, mas mudaram dois arquivos já
  * listados, './figuras/receitas.js' e './figuras/solidos.js'. Eles corrigem a
- * família de sólidos medida no uso real. A ordem v23, v24, v25 e v26 evita
- * regressão do nome do cache e é confirmada pelo portão sobre cada estado
- * integrado. */
-var CACHE = 'apoio-educacional-v27';
+ * família de sólidos medida no uso real.
+ * A ordem v23, v24, v25, v26 e v27 evita regressão do nome do cache e é
+ * confirmada pelo portão sobre cada estado integrado. O v28 traz a revisão
+ * e expansão aprofundada completa da base de dados e acervo pedagógico. */
+var CACHE = 'apoio-educacional-v28';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
