@@ -10319,7 +10319,10 @@
       }
       if (temasFiltroDificuldade !== 'todas') {
         var nivNum = parseInt(temasFiltroDificuldade, 10);
-        var temNivel = (m.questoes || []).some(function (q) { return q.nivel_dificuldade === nivNum; });
+        var temNivel = (m.niveis && m.niveis.indexOf(nivNum) !== -1) ||
+                       (m.questoes || []).some(function (q) {
+                         return (q.dificuldade_nivel || q.nivel_dificuldade) === nivNum;
+                       });
         if (!temNivel) return false;
       }
       if (palavras.length) {
@@ -10397,14 +10400,15 @@
         el('div', {
           class: 'detalhe',
           style: 'font-size:13px;color:var(--muted);margin-bottom:8px',
-          texto: m.capitulo || ''
+          texto: m.capitulo || (m.benchmark_didatico && m.benchmark_didatico.capitulo) || ''
         })
       ]);
 
       // Conceitos chave tags
-      if (m.conceitos_chave && m.conceitos_chave.length) {
+      var conceitosCard = m.conceitos_chave || (m.benchmark_didatico && m.benchmark_didatico.resumo_teorico && m.benchmark_didatico.resumo_teorico.conceitos_chave) || [];
+      if (conceitosCard && conceitosCard.length) {
         var tagsConceito = el('div', { style: 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px' });
-        m.conceitos_chave.slice(0, 4).forEach(function (c) {
+        conceitosCard.slice(0, 4).forEach(function (c) {
           tagsConceito.appendChild(el('span', {
             style: 'background:#EDF2F7;color:#4A5568;padding:2px 6px;border-radius:4px;font-size:11px',
             texto: c
@@ -10490,6 +10494,19 @@
     ]);
     container.appendChild(barraTopo);
 
+    var bDidatico = modulo.benchmark_didatico || {};
+    var rTeorico = bDidatico.resumo_teorico || {};
+    var capitulo = modulo.capitulo || bDidatico.capitulo || '';
+    var conceitos = (modulo.conceitos_chave && modulo.conceitos_chave.length)
+      ? modulo.conceitos_chave
+      : (rTeorico.conceitos_chave || []);
+    var atencao = modulo.atencao_ponto_cego || rTeorico.atencao_ponto_cego || '';
+    var exResolvido = modulo.exemplo_resolvido || bDidatico.exemplo_resolvido || null;
+    var textoTeorico = modulo.resumo_teorico;
+    if (!textoTeorico && modulo.temaCompativel && modulo.temaCompativel.pt && modulo.temaCompativel.pt.explicacao) {
+      textoTeorico = modulo.temaCompativel.pt.explicacao;
+    }
+
     // Bloco de cabeçalho do tema
     var cartaoCabecalho = el('div', { class: 'cartao', style: 'margin-bottom:16px' }, [
       el('div', { class: 'barra', style: 'margin-bottom:8px' }, [
@@ -10505,13 +10522,13 @@
         })
       ]),
       el('h2', { class: 'titulo', style: 'margin-bottom:4px', texto: modulo.assunto }),
-      el('div', { class: 'detalhe', style: 'font-size:14px;color:var(--muted);margin-bottom:12px', texto: modulo.capitulo || '' })
+      el('div', { class: 'detalhe', style: 'font-size:14px;color:var(--muted);margin-bottom:12px', texto: capitulo })
     ]);
 
     // Tags de conceitos chave
-    if (modulo.conceitos_chave && modulo.conceitos_chave.length) {
+    if (conceitos && conceitos.length) {
       var linhaTags = el('div', { style: 'display:flex;flex-wrap:wrap;gap:6px;margin-top:8px' });
-      modulo.conceitos_chave.forEach(function (c) {
+      conceitos.forEach(function (c) {
         linhaTags.appendChild(el('span', {
           style: 'background:#E2E8F0;color:#2D3748;padding:3px 8px;border-radius:4px;font-size:12px;font-weight:600',
           texto: c
@@ -10522,31 +10539,38 @@
     container.appendChild(cartaoCabecalho);
 
     // 1. Resumo Teórico
-    var blocoTeoria = el('div', { class: 'bloco-teorico-detalhe' }, [
-      el('h3', { class: 'subtitulo', style: 'margin-top:0;border:none;color:var(--navy)', texto: 'Resumo Teórico' }),
-      renderizarTextoRicoAcervo(modulo.resumo_teorico)
-    ]);
-    container.appendChild(blocoTeoria);
+    if (textoTeorico) {
+      var blocoTeoria = el('div', { class: 'bloco-teorico-detalhe' }, [
+        el('h3', { class: 'subtitulo', style: 'margin-top:0;border:none;color:var(--navy)', texto: 'Material Didático & Teoria' }),
+        renderizarTextoRicoAcervo(textoTeorico)
+      ]);
+      container.appendChild(blocoTeoria);
+    }
 
     // 2. Atenção / Ponto Cego (se houver)
-    if (modulo.atencao_ponto_cego) {
+    if (atencao) {
       var blocoAtencao = el('div', { class: 'bloco-atencao-detalhe' }, [
         el('strong', { texto: 'Atenção aos Pontos Cegos & Pegadinhas: ' }),
-        document.createTextNode(modulo.atencao_ponto_cego)
+        document.createTextNode(atencao)
       ]);
       container.appendChild(blocoAtencao);
     }
 
     // 3. Exemplo Resolvido (se houver)
-    if (modulo.exemplo_resolvido && modulo.exemplo_resolvido.enunciado) {
+    if (exResolvido && exResolvido.enunciado) {
+      var passoAPasso = Array.isArray(exResolvido.resolucao_passo_a_passo)
+        ? exResolvido.resolucao_passo_a_passo.join('\n\n')
+        : (exResolvido.resolucao_passo_a_passo || '');
       var blocoExemplo = el('div', { class: 'bloco-exemplo-detalhe' }, [
-        el('h4', { style: 'margin:0 0 8px;font-size:14px;font-weight:700;color:var(--navy)', texto: 'Exemplo Resolvido Guiado' }),
-        renderizarTextoRicoAcervo(modulo.exemplo_resolvido.enunciado),
-        el('div', { style: 'margin-top:10px;padding-top:8px;border-top:1px dashed #CBD5E0' }, [
-          el('strong', { style: 'font-size:13px;color:#2C5282', texto: 'Resolução Passo a Passo: ' }),
-          renderizarTextoRicoAcervo(modulo.exemplo_resolvido.resolucao_passo_a_passo)
-        ])
+        el('h4', { style: 'margin:0 0 8px;font-size:14px;font-weight:700;color:var(--navy)', texto: exResolvido.titulo || 'Exemplo Resolvido Guiado' }),
+        renderizarTextoRicoAcervo(exResolvido.enunciado)
       ]);
+      if (passoAPasso) {
+        blocoExemplo.appendChild(el('div', { style: 'margin-top:10px;padding-top:8px;border-top:1px dashed #CBD5E0' }, [
+          el('strong', { style: 'font-size:13px;color:#2C5282', texto: 'Resolução Passo a Passo: ' }),
+          renderizarTextoRicoAcervo(passoAPasso)
+        ]));
+      }
       container.appendChild(blocoExemplo);
     }
 
@@ -10562,10 +10586,12 @@
       var cardQ = el('div', { class: 'card-questao-detalhe' });
 
       // Cabeçalho da questão
-      var badgeClasseNivel = 'badge-nivel-' + (q.nivel_dificuldade || 1);
-      var rotuloNivel = q.nivel_dificuldade === 4 ? 'Nível 4 · IME/ITA/Olimpíada' :
-                        q.nivel_dificuldade === 3 ? 'Nível 3 · Difícil' :
-                        q.nivel_dificuldade === 2 ? 'Nível 2 · Médio' : 'Nível 1 · Fundamental/Fácil';
+      var nivelNum = q.dificuldade_nivel || q.nivel_dificuldade || 1;
+      var badgeClasseNivel = 'badge-nivel-' + nivelNum;
+      var rotuloNivel = q.dificuldade_rotulo ||
+                        (nivelNum === 4 ? 'Nível 4 · IME/ITA/Olimpíada' :
+                         nivelNum === 3 ? 'Nível 3 · Difícil' :
+                         nivelNum === 2 ? 'Nível 2 · Médio' : 'Nível 1 · Fundamental/Fácil');
 
       var topoQ = el('div', { class: 'barra', style: 'margin-bottom:8px;align-items:center' }, [
         el('strong', { style: 'color:var(--navy);font-size:14px', texto: 'Questão ' + (idx + 1) + (q.origem ? ' · ' + q.origem : '') + (q.ano ? ' (' + q.ano + ')' : '') }),
@@ -10577,11 +10603,12 @@
       // Enunciado
       cardQ.appendChild(renderizarTextoRicoAcervo(q.enunciado));
 
-      // Esquema visual / Imagem se necessária
-      if (q.imagem_figura && q.imagem_figura.necessaria) {
+      // Esquema visual / Imagem se presente
+      var descFigura = q.imagem_descricao || (q.imagem_figura && q.imagem_figura.descricao_detalhada);
+      if (descFigura) {
         cardQ.appendChild(el('div', { class: 'esquema-visual-box' }, [
-          el('strong', { texto: 'Esquema visual da questão: ' }),
-          document.createTextNode(q.imagem_figura.descricao_detalhada || 'Figura ilustrativa referenciada no enunciado.')
+          el('strong', { texto: 'Esquema visual / Figura: ' }),
+          document.createTextNode(descFigura)
         ]));
       }
 
@@ -10599,16 +10626,40 @@
         cardQ.appendChild(listaAlt);
       }
 
-      // Gabarito e Resolução revelável
+      // Gabarito e Resolução revelável (extração robusta de string ou objeto)
+      var textoGabarito = '';
+      var justificativaGabarito = '';
+
+      if (typeof q.gabarito === 'string') {
+        textoGabarito = q.gabarito;
+      } else if (q.gabarito && typeof q.gabarito === 'object') {
+        if (q.gabarito.letra) {
+          textoGabarito = 'Alternativa ' + q.gabarito.letra.toUpperCase() +
+            (q.resposta && q.resposta !== q.gabarito.letra ? ' (' + q.resposta + ')' : '');
+        } else if (q.resposta) {
+          textoGabarito = q.resposta;
+        }
+        justificativaGabarito = q.gabarito.porque || q.gabarito.espera_se || q.gabarito.ancora || '';
+        if (q.gabarito.ancora && q.gabarito.ancora !== justificativaGabarito) {
+          justificativaGabarito = justificativaGabarito + '\n\n**Fundamentação / Âncora:** ' + q.gabarito.ancora;
+        }
+      } else if (q.resposta) {
+        textoGabarito = q.resposta;
+      }
+
+      var resolucaoTexto = q.resolucao_passo_a_passo || justificativaGabarito;
+
       var caixaGabarito = el('div', { class: 'gabarito-detalhe', style: 'display:none' });
-      caixaGabarito.appendChild(el('div', { style: 'margin-bottom:6px' }, [
-        el('strong', { style: 'color:#166534', texto: 'Gabarito: ' }),
-        el('span', { style: 'font-weight:700', texto: q.gabarito })
-      ]));
-      if (q.resolucao_passo_a_passo) {
+      if (textoGabarito) {
+        caixaGabarito.appendChild(el('div', { style: 'margin-bottom:6px' }, [
+          el('strong', { style: 'color:#166534', texto: 'Gabarito: ' }),
+          el('span', { style: 'font-weight:700', texto: textoGabarito })
+        ]));
+      }
+      if (resolucaoTexto) {
         caixaGabarito.appendChild(el('div', { style: 'margin-top:6px;padding-top:6px;border-top:1px solid #DCFCE7' }, [
-          el('strong', { style: 'color:#166534;font-size:13px', texto: 'Resolução detalhada: ' }),
-          renderizarTextoRicoAcervo(q.resolucao_passo_a_passo)
+          el('strong', { style: 'color:#166534;font-size:13px', texto: 'Resolução detalhada / Critério: ' }),
+          renderizarTextoRicoAcervo(resolucaoTexto)
         ]));
       }
 

@@ -110,6 +110,10 @@ files.forEach(f => {
     };
   });
 
+  const bDidatico = data.benchmark_didatico || {};
+  const rTeorico = bDidatico.resumo_teorico || {};
+  const niveisMod = Array.from(new Set((data.questoes || []).map(q => q.dificuldade_nivel).filter(Boolean)));
+
   const modulo = {
     id: modId,
     disciplina: data.disciplina,
@@ -118,6 +122,11 @@ files.forEach(f => {
     cor: discInfo.cor,
     assunto: data.assunto,
     publico_alvo: data.publico_alvo,
+    capitulo: bDidatico.capitulo || '',
+    conceitos_chave: rTeorico.conceitos_chave || [],
+    atencao_ponto_cego: rTeorico.atencao_ponto_cego || '',
+    exemplo_resolvido: bDidatico.exemplo_resolvido || null,
+    niveis: niveisMod,
     benchmark_didatico: data.benchmark_didatico,
     questoes: data.questoes || [],
     qtdQuestoes: (data.questoes || []).length,
