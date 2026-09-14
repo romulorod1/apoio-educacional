@@ -1016,6 +1016,7 @@
     desenharAgenda();
     desenharAlunos();
     desenharFechamento();
+    desenharTemas();
     desenharAjustes();
   }
 
@@ -1029,9 +1030,8 @@
         $$('.tela').forEach(function (t) { t.classList.remove('ativa'); });
         $('#tela-' + b.dataset.tela).classList.add('ativa');
         $('.conteudo').scrollTop = 0;
-        /* Ajustes mostra coisa que muda enquanto ela usa: a data da última
-         * cópia, o estado da versão e as buscas que não acharam nada. Sem
-         * redesenhar ao abrir, ela via o estado de quando o aplicativo subiu. */
+        /* Redesenha a tela ao abrir para exibir dados atualizados */
+        if (b.dataset.tela === 'temas') desenharTemas();
         if (b.dataset.tela === 'ajustes') desenharAjustes();
         /* Os números do IBGE se atualizam sozinhos quando ela abre uma tela que
          * os usa, e nunca na abertura do aplicativo: a hora em que ela abre o
@@ -2031,9 +2031,9 @@
         detalhe = rotuloDisciplina(disciplina) + (nomeGrupo ? ', ' + nomeGrupo : '');
       }
 
-      /* Material existe para qualquer tema que o índice da matéria conhece, e
-       * só para ele: oferecer para os outros seria prometer o que não há. */
-      var podeMaterial = !comMaterial && !!registro;
+      /* Material existe para qualquer tema que o índice da matéria conhece ou do acervo */
+      var modAcervo = moduloAcervoPorAssunto(t);
+      var podeMaterial = !comMaterial && (!!registro || !!modAcervo);
 
       caixa.appendChild(el('div', { class: 'item-lista item-assunto-aula' }, [
         el('div', { class: 'cresce' }, [
@@ -2048,14 +2048,18 @@
         podeMaterial ? el('button', {
           type: 'button', class: 'btn pequeno', texto: 'Material',
           aoClick: function () {
-            $('#titulo-modal-tema').textContent = 'Material de aula' +
-              (aluno ? ', ' + aluno.nome : '');
-            abrirModal('modal-tema');
-            abrirMontagem(registro, aula, aluno, {
-              itemExistente: t,
-              rotuloVoltar: '‹ Voltar para a aula',
-              voltar: function () { fecharModal('modal-tema'); }
-            });
+            if (modAcervo) {
+              montarMaterialAcervoParaAula(modAcervo, aula, aluno, t);
+            } else {
+              $('#titulo-modal-tema').textContent = 'Material de aula' +
+                (aluno ? ', ' + aluno.nome : '');
+              abrirModal('modal-tema');
+              abrirMontagem(registro, aula, aluno, {
+                itemExistente: t,
+                rotuloVoltar: '‹ Voltar para a aula',
+                voltar: function () { fecharModal('modal-tema'); }
+              });
+            }
           }
         }) : null,
         /* A folga sai dos 12 px da linha para 32: Tirar apaga, Material não, e
@@ -8046,11 +8050,12 @@
     }));
     abrirModal('modal-tema');
 
-    /* Os dois bancos em paralelo, e nenhum deles é obrigatório: faltando um, a
+    /* Os três bancos em paralelo, e nenhum deles é obrigatório: faltando um, a
      * tela abre com o que veio, e escrever o assunto à mão sempre funciona. */
     Promise.all([
       carregarIndice().catch(function () { indiceTemasFalhou = true; return null; }),
-      carregarTopicos().catch(function () { indiceTopicosFalhou = true; return null; })
+      carregarTopicos().catch(function () { indiceTopicosFalhou = true; return null; }),
+      carregarAcervo().catch(function () { return []; })
     ]).then(function () {
       desenharEscolhaAssunto(aula, aluno);
       migrarIdsDosTopicos();
@@ -8331,8 +8336,11 @@
         });
       }
 
-      // 3. Por matéria, com a matemática na frente.
+      // 3. Por matéria, com a matemática e acervo completo
       lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Por matéria' }));
+      lista.appendChild(linha('Temas do Acervo Educacional',
+        (acervoModulos ? acervoModulos.length + ' temas' : '40 temas') + ' com material pronto (todas as matérias)',
+        function () { abrirEscolhaAcervoComoAssunto(aula, aluno); }, true));
       lista.appendChild(linha(rotuloDisciplina(Core.MATERIA_PADRAO),
         indiceTemas ? indiceTemas.length + ' temas, com material pronto' : 'temas com material pronto',
         function () { abrirMatematicaComoAssunto(aula, aluno); }, true));
@@ -8443,6 +8451,19 @@
           detalhe: p.disciplinaNome + ', ' + p.grupoRotulo + ' · ' + p.bloco,
           doBanco: false, materia: p.disciplina,
           item: itemDeTopico(p)
+        });
+      });
+
+      (acervoModulos || []).forEach(function (m) {
+        var textoMod = m.assunto + ' ' + (m.disciplina || '') + ' ' + (m.capitulo || '');
+        var chaveMod = Core.chaveDeBusca(textoMod);
+        if (!casaTopico(chaveMod, palavras)) return;
+        exatos++;
+        achados.push({
+          titulo: m.assunto,
+          detalhe: m.disciplinaRotulo + (m.publico_alvo ? ' · ' + m.publico_alvo : ''),
+          doBanco: true, materia: m.disciplinaKey,
+          item: { id: m.id, titulo: m.assunto, fonte: 'acervo', disciplina: m.disciplinaKey, acervoId: m.id }
         });
       });
 
@@ -10062,6 +10083,647 @@
         'Fechamento de ' + f.alunoNome);
     }).catch(function (e) {
       avisar('Não foi possível gerar o PDF.');
+    });
+  }
+
+  // ================= temas (acervo educacional) =================
+
+  var acervoModulos = null;
+  var acervoPromessa = null;
+  var temasFiltroDisciplina = 'todas';
+  var temasFiltroDificuldade = 'todas';
+  var temasTermoBusca = '';
+  var temaEmDetalhe = null;
+
+  function carregarAcervo() {
+    if (acervoModulos) return Promise.resolve(acervoModulos);
+    if (acervoPromessa) return acervoPromessa;
+    acervoPromessa = fetch('banco/acervo.json').then(function (r) {
+      if (!r.ok) throw new Error('status ' + r.status);
+      return r.json();
+    }).then(function (dados) {
+      acervoModulos = dados;
+      return acervoModulos;
+    }).catch(function (e) {
+      acervoPromessa = null;
+      throw e;
+    });
+    return acervoPromessa;
+  }
+
+  function moduloAcervoPorId(id) {
+    if (!acervoModulos) return null;
+    for (var i = 0; i < acervoModulos.length; i++) {
+      if (acervoModulos[i].id === id) return acervoModulos[i];
+    }
+    return null;
+  }
+
+  function moduloAcervoPorAssunto(t) {
+    if (!acervoModulos || !acervoModulos.length) return null;
+    if (!t) return null;
+    var id = typeof t === 'object' ? (t.acervoId || t.id) : null;
+    var tit = typeof t === 'object' ? (t.titulo || '') : String(t);
+    var chaveTit = Core.chaveDeBusca(tit);
+    for (var i = 0; i < acervoModulos.length; i++) {
+      var m = acervoModulos[i];
+      if (id && m.id === id) return m;
+      if (chaveTit && (Core.chaveDeBusca(m.assunto) === chaveTit || (m.temaCompativel && Core.chaveDeBusca(m.temaCompativel.pt.titulo) === chaveTit))) {
+        return m;
+      }
+    }
+    return null;
+  }
+
+  function corDisciplinaAcervo(chave) {
+    var cores = {
+      portugues: '#1F3A5F',
+      literatura: '#8B4513',
+      matematica: '#0284C7',
+      fisica: '#7C3AED',
+      quimica: '#059669',
+      biologia: '#16A34A',
+      historia: '#D97706',
+      geografia: '#0D9488',
+      filosofia: '#9333EA',
+      sociologia: '#DC2626',
+      ingles: '#2563EB',
+      espanhol: '#EA580C'
+    };
+    return cores[chave] || '#475569';
+  }
+
+  function renderizarTextoRicoAcervo(texto) {
+    if (!texto) return el('div');
+    var container = el('div');
+    var paragrafos = String(texto).split('\n\n');
+    paragrafos.forEach(function (par) {
+      par = par.trim();
+      if (!par) return;
+      var p = el('p', { style: 'margin:0 0 10px;line-height:1.55;color:#2D3748' });
+      var limpo = par.replace(/\\\[([\s\S]*?)\\\]/g, '$1')
+                     .replace(/\\\(([\s\S]*?)\\\)/g, '$1');
+      var partesBold = limpo.split(/(\*\*[^*]+\*\*)/g);
+      partesBold.forEach(function (pb) {
+        if (pb.startsWith('**') && pb.endsWith('**')) {
+          var miolo = pb.slice(2, -2);
+          var bEl = el('strong');
+          comNotacao(miolo).forEach(function (n) { bEl.appendChild(n); });
+          p.appendChild(bEl);
+        } else {
+          comNotacao(pb).forEach(function (n) { p.appendChild(n); });
+        }
+      });
+      container.appendChild(p);
+    });
+    return container;
+  }
+
+  function desenharTemas() {
+    var tela = $('#tela-temas');
+    if (!tela) return;
+
+    if (!acervoModulos) {
+      var contagem = $('#contagem-temas-acervo');
+      if (contagem) contagem.textContent = 'Carregando acervo...';
+      carregarAcervo().then(function () {
+        desenharTemas();
+      }).catch(function () {
+        if (contagem) contagem.textContent = 'Erro ao carregar acervo';
+        var grade = $('#grade-temas-acervo');
+        if (grade) {
+          grade.innerHTML = '';
+          grade.appendChild(el('div', { class: 'faixa-aviso', texto: 'Não foi possível carregar os temas do acervo.' }));
+        }
+      });
+      return;
+    }
+
+    if (temaEmDetalhe) {
+      $('#visao-lista-temas').style.display = 'none';
+      $('#visao-detalhe-tema').style.display = 'block';
+      desenharDetalheTema(temaEmDetalhe);
+    } else {
+      $('#visao-lista-temas').style.display = 'block';
+      $('#visao-detalhe-tema').style.display = 'none';
+      renderizarTelaTemas();
+    }
+  }
+
+  function renderizarTelaTemas() {
+    var contagem = $('#contagem-temas-acervo');
+    if (contagem) {
+      contagem.textContent = (acervoModulos ? acervoModulos.length : 0) + ' temas no acervo';
+    }
+
+    // Input de busca
+    var inputBusca = $('#busca-temas-acervo');
+    var btnLimpar = $('#limpar-busca-acervo');
+    if (inputBusca && !inputBusca._ouvindo) {
+      inputBusca._ouvindo = true;
+      inputBusca.value = temasTermoBusca;
+      inputBusca.addEventListener('input', function () {
+        temasTermoBusca = inputBusca.value;
+        if (btnLimpar) btnLimpar.style.display = temasTermoBusca ? 'block' : 'none';
+        filtrarERenderizarGradeTemas();
+      });
+    }
+    if (btnLimpar && !btnLimpar._ouvindo) {
+      btnLimpar._ouvindo = true;
+      btnLimpar.addEventListener('click', function () {
+        temasTermoBusca = '';
+        if (inputBusca) inputBusca.value = '';
+        btnLimpar.style.display = 'none';
+        filtrarERenderizarGradeTemas();
+      });
+    }
+
+    // Filtros de Disciplinas
+    desenharFiltrosDisciplinasTemas();
+    // Filtros de Dificuldade
+    desenharFiltrosDificuldadeTemas();
+    // Grade de temas
+    filtrarERenderizarGradeTemas();
+  }
+
+  function desenharFiltrosDisciplinasTemas() {
+    var caixa = $('#filtro-disciplinas-acervo');
+    if (!caixa) return;
+    caixa.innerHTML = '';
+
+    var discUnicas = [{ chave: 'todas', rotulo: 'Todas as Matérias' }];
+    var mapaDisc = {};
+    (acervoModulos || []).forEach(function (m) {
+      if (m.disciplinaKey && !mapaDisc[m.disciplinaKey]) {
+        mapaDisc[m.disciplinaKey] = true;
+        discUnicas.push({ chave: m.disciplinaKey, rotulo: m.disciplinaRotulo });
+      }
+    });
+
+    discUnicas.forEach(function (d) {
+      var ativo = temasFiltroDisciplina === d.chave;
+      var chip = el('button', {
+        type: 'button',
+        class: 'chip-filtro' + (ativo ? ' ativo' : ''),
+        texto: d.rotulo,
+        aoClick: function () {
+          temasFiltroDisciplina = d.chave;
+          desenharFiltrosDisciplinasTemas();
+          filtrarERenderizarGradeTemas();
+        }
+      });
+      caixa.appendChild(chip);
+    });
+  }
+
+  function desenharFiltrosDificuldadeTemas() {
+    var caixa = $('#filtro-dificuldade-acervo');
+    if (!caixa) return;
+    caixa.innerHTML = '';
+
+    var niveis = [
+      { chave: 'todas', rotulo: 'Todos os Níveis' },
+      { chave: '1', rotulo: 'Nível 1 · Fundamental II' },
+      { chave: '2', rotulo: 'Nível 2 · Médio / ENEM' },
+      { chave: '3', rotulo: 'Nível 3 · Vestibulares Tradicionais' },
+      { chave: '4', rotulo: 'Nível 4 · IME / ITA / Olimpíadas' }
+    ];
+
+    niveis.forEach(function (nv) {
+      var ativo = temasFiltroDificuldade === nv.chave;
+      var chip = el('button', {
+        type: 'button',
+        class: 'chip-filtro' + (ativo ? ' ativo' : ''),
+        texto: nv.rotulo,
+        aoClick: function () {
+          temasFiltroDificuldade = nv.chave;
+          desenharFiltrosDificuldadeTemas();
+          filtrarERenderizarGradeTemas();
+        }
+      });
+      caixa.appendChild(chip);
+    });
+  }
+
+  function filtrarERenderizarGradeTemas() {
+    var grade = $('#grade-temas-acervo');
+    if (!grade) return;
+    grade.innerHTML = '';
+
+    var termo = Core.chaveDeBusca(temasTermoBusca.trim());
+    var palavras = termo ? termo.split(/\s+/).filter(Boolean) : [];
+
+    var filtrados = (acervoModulos || []).filter(function (m) {
+      if (temasFiltroDisciplina !== 'todas' && m.disciplinaKey !== temasFiltroDisciplina) {
+        return false;
+      }
+      if (temasFiltroDificuldade !== 'todas') {
+        var nivNum = parseInt(temasFiltroDificuldade, 10);
+        var temNivel = (m.questoes || []).some(function (q) { return q.nivel_dificuldade === nivNum; });
+        if (!temNivel) return false;
+      }
+      if (palavras.length) {
+        var textoMod = m.assunto + ' ' + (m.disciplina || '') + ' ' + (m.capitulo || '') + ' ' +
+          (m.publico_alvo || '') + ' ' + (m.resumo_teorico || '') + ' ' +
+          (m.conceitos_chave || []).join(' ') + ' ' +
+          (m.questoes || []).map(function (q) {
+            return (q.origem || '') + ' ' + (q.topico || '') + ' ' + (q.enunciado || '');
+          }).join(' ');
+        var chaveMod = Core.chaveDeBusca(textoMod);
+        for (var i = 0; i < palavras.length; i++) {
+          if (chaveMod.indexOf(palavras[i]) === -1) return false;
+        }
+      }
+      return true;
+    });
+
+    if (!filtrados.length) {
+      grade.appendChild(el('div', {
+        class: 'vazio',
+        style: 'grid-column: 1 / -1; padding: 32px 16px; text-align: center'
+      }, [
+        el('p', { texto: 'Nenhum tema encontrado com os filtros selecionados.' }),
+        el('button', {
+          type: 'button', class: 'btn pequeno', texto: 'Limpar filtros',
+          aoClick: function () {
+            temasFiltroDisciplina = 'todas';
+            temasFiltroDificuldade = 'todas';
+            temasTermoBusca = '';
+            var ib = $('#busca-temas-acervo');
+            if (ib) ib.value = '';
+            var lb = $('#limpar-busca-acervo');
+            if (lb) lb.style.display = 'none';
+            desenharFiltrosDisciplinasTemas();
+            desenharFiltrosDificuldadeTemas();
+            filtrarERenderizarGradeTemas();
+          }
+        })
+      ]));
+      return;
+    }
+
+    var divGrade = el('div', { class: 'grade-cards-temas' });
+    filtrados.forEach(function (m) {
+      var card = el('div', { class: 'card-tema-acervo' });
+
+      // Cabeçalho do Card
+      var corDisc = corDisciplinaAcervo(m.disciplinaKey);
+      var cabecalho = el('div', { class: 'barra', style: 'margin-bottom:0;align-items:flex-start' }, [
+        el('span', {
+          class: 'badge-disciplina',
+          style: 'background-color:' + corDisc,
+          texto: m.disciplinaRotulo
+        }),
+        el('span', { class: 'cresce' }),
+        el('span', {
+          class: 'ajuda',
+          style: 'margin:0;font-size:12px;font-weight:600',
+          texto: m.publico_alvo || ''
+        })
+      ]);
+      card.appendChild(cabecalho);
+
+      // Título e Capítulo
+      var infoCorpo = el('div', { class: 'cresce' }, [
+        el('h3', {
+          class: 'nome',
+          style: 'font-size:16px;line-height:1.3;margin:0 0 4px;cursor:pointer;color:var(--navy)',
+          texto: m.assunto,
+          aoClick: function () {
+            temaEmDetalhe = m;
+            desenharTemas();
+          }
+        }),
+        el('div', {
+          class: 'detalhe',
+          style: 'font-size:13px;color:var(--muted);margin-bottom:8px',
+          texto: m.capitulo || ''
+        })
+      ]);
+
+      // Conceitos chave tags
+      if (m.conceitos_chave && m.conceitos_chave.length) {
+        var tagsConceito = el('div', { style: 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px' });
+        m.conceitos_chave.slice(0, 4).forEach(function (c) {
+          tagsConceito.appendChild(el('span', {
+            style: 'background:#EDF2F7;color:#4A5568;padding:2px 6px;border-radius:4px;font-size:11px',
+            texto: c
+          }));
+        });
+        infoCorpo.appendChild(tagsConceito);
+      }
+
+      // Metadados de questões e níveis
+      var nQuestoes = (m.questoes || []).length;
+      var bancas = [];
+      (m.questoes || []).forEach(function (q) {
+        if (q.origem && bancas.indexOf(q.origem) === -1) bancas.push(q.origem);
+      });
+
+      var metaQuestoes = el('div', {
+        class: 'detalhe',
+        style: 'font-size:12px;font-weight:600;color:#2D3748;margin-bottom:6px'
+      }, [
+        document.createTextNode(nQuestoes + ' questões ' + (bancas.length ? '(' + bancas.slice(0, 4).join(', ') + ')' : ''))
+      ]);
+      infoCorpo.appendChild(metaQuestoes);
+
+      card.appendChild(infoCorpo);
+
+      // Ações do card
+      var acoes = el('div', { class: 'barra', style: 'margin-top:4px;margin-bottom:0;gap:8px' }, [
+        el('button', {
+          type: 'button',
+          class: 'btn pequeno principal',
+          style: 'flex:1',
+          texto: 'Ver Conteúdo & Questões',
+          aoClick: function () {
+            temaEmDetalhe = m;
+            desenharTemas();
+          }
+        }),
+        el('button', {
+          type: 'button',
+          class: 'btn pequeno',
+          texto: 'PDF',
+          title: 'Exportar material em PDF',
+          aoClick: function () {
+            exportarPdfTema(m);
+          }
+        })
+      ]);
+      card.appendChild(acoes);
+
+      divGrade.appendChild(card);
+    });
+
+    grade.appendChild(divGrade);
+  }
+
+  function desenharDetalheTema(modulo) {
+    var container = $('#visao-detalhe-tema');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // Barra de navegação e botões
+    var corDisc = corDisciplinaAcervo(modulo.disciplinaKey);
+    var barraTopo = el('div', { class: 'barra', style: 'margin-bottom:14px;flex-wrap:wrap;gap:8px' }, [
+      el('button', {
+        type: 'button',
+        class: 'btn pequeno',
+        texto: '‹ Voltar para os Temas',
+        aoClick: function () {
+          temaEmDetalhe = null;
+          desenharTemas();
+          $('.conteudo').scrollTop = 0;
+        }
+      }),
+      el('span', { class: 'cresce' }),
+      el('button', {
+        type: 'button',
+        class: 'btn pequeno principal',
+        texto: 'Exportar PDF',
+        aoClick: function () {
+          exportarPdfTema(modulo);
+        }
+      })
+    ]);
+    container.appendChild(barraTopo);
+
+    // Bloco de cabeçalho do tema
+    var cartaoCabecalho = el('div', { class: 'cartao', style: 'margin-bottom:16px' }, [
+      el('div', { class: 'barra', style: 'margin-bottom:8px' }, [
+        el('span', {
+          class: 'badge-disciplina',
+          style: 'background-color:' + corDisc,
+          texto: modulo.disciplinaRotulo
+        }),
+        el('span', {
+          class: 'ajuda',
+          style: 'margin:0;font-weight:600',
+          texto: modulo.publico_alvo || ''
+        })
+      ]),
+      el('h2', { class: 'titulo', style: 'margin-bottom:4px', texto: modulo.assunto }),
+      el('div', { class: 'detalhe', style: 'font-size:14px;color:var(--muted);margin-bottom:12px', texto: modulo.capitulo || '' })
+    ]);
+
+    // Tags de conceitos chave
+    if (modulo.conceitos_chave && modulo.conceitos_chave.length) {
+      var linhaTags = el('div', { style: 'display:flex;flex-wrap:wrap;gap:6px;margin-top:8px' });
+      modulo.conceitos_chave.forEach(function (c) {
+        linhaTags.appendChild(el('span', {
+          style: 'background:#E2E8F0;color:#2D3748;padding:3px 8px;border-radius:4px;font-size:12px;font-weight:600',
+          texto: c
+        }));
+      });
+      cartaoCabecalho.appendChild(linhaTags);
+    }
+    container.appendChild(cartaoCabecalho);
+
+    // 1. Resumo Teórico
+    var blocoTeoria = el('div', { class: 'bloco-teorico-detalhe' }, [
+      el('h3', { class: 'subtitulo', style: 'margin-top:0;border:none;color:var(--navy)', texto: 'Resumo Teórico' }),
+      renderizarTextoRicoAcervo(modulo.resumo_teorico)
+    ]);
+    container.appendChild(blocoTeoria);
+
+    // 2. Atenção / Ponto Cego (se houver)
+    if (modulo.atencao_ponto_cego) {
+      var blocoAtencao = el('div', { class: 'bloco-atencao-detalhe' }, [
+        el('strong', { texto: 'Atenção aos Pontos Cegos & Pegadinhas: ' }),
+        document.createTextNode(modulo.atencao_ponto_cego)
+      ]);
+      container.appendChild(blocoAtencao);
+    }
+
+    // 3. Exemplo Resolvido (se houver)
+    if (modulo.exemplo_resolvido && modulo.exemplo_resolvido.enunciado) {
+      var blocoExemplo = el('div', { class: 'bloco-exemplo-detalhe' }, [
+        el('h4', { style: 'margin:0 0 8px;font-size:14px;font-weight:700;color:var(--navy)', texto: 'Exemplo Resolvido Guiado' }),
+        renderizarTextoRicoAcervo(modulo.exemplo_resolvido.enunciado),
+        el('div', { style: 'margin-top:10px;padding-top:8px;border-top:1px dashed #CBD5E0' }, [
+          el('strong', { style: 'font-size:13px;color:#2C5282', texto: 'Resolução Passo a Passo: ' }),
+          renderizarTextoRicoAcervo(modulo.exemplo_resolvido.resolucao_passo_a_passo)
+        ])
+      ]);
+      container.appendChild(blocoExemplo);
+    }
+
+    // 4. Questões de Vestibulares e Concursos
+    var questoes = modulo.questoes || [];
+    var blocoQuestoes = el('div', { style: 'margin-top:20px' });
+    blocoQuestoes.appendChild(el('h3', {
+      class: 'subtitulo',
+      texto: 'Banco de Exercícios e Questões (' + questoes.length + ')'
+    }));
+
+    questoes.forEach(function (q, idx) {
+      var cardQ = el('div', { class: 'card-questao-detalhe' });
+
+      // Cabeçalho da questão
+      var badgeClasseNivel = 'badge-nivel-' + (q.nivel_dificuldade || 1);
+      var rotuloNivel = q.nivel_dificuldade === 4 ? 'Nível 4 · IME/ITA/Olimpíada' :
+                        q.nivel_dificuldade === 3 ? 'Nível 3 · Difícil' :
+                        q.nivel_dificuldade === 2 ? 'Nível 2 · Médio' : 'Nível 1 · Fundamental/Fácil';
+
+      var topoQ = el('div', { class: 'barra', style: 'margin-bottom:8px;align-items:center' }, [
+        el('strong', { style: 'color:var(--navy);font-size:14px', texto: 'Questão ' + (idx + 1) + (q.origem ? ' · ' + q.origem : '') + (q.ano ? ' (' + q.ano + ')' : '') }),
+        el('span', { class: 'cresce' }),
+        el('span', { class: 'badge-dificuldade ' + badgeClasseNivel, texto: rotuloNivel })
+      ]);
+      cardQ.appendChild(topoQ);
+
+      // Enunciado
+      cardQ.appendChild(renderizarTextoRicoAcervo(q.enunciado));
+
+      // Esquema visual / Imagem se necessária
+      if (q.imagem_figura && q.imagem_figura.necessaria) {
+        cardQ.appendChild(el('div', { class: 'esquema-visual-box' }, [
+          el('strong', { texto: 'Esquema visual da questão: ' }),
+          document.createTextNode(q.imagem_figura.descricao_detalhada || 'Figura ilustrativa referenciada no enunciado.')
+        ]));
+      }
+
+      // Alternativas se houver
+      if (q.alternativas) {
+        var listaAlt = el('div', { style: 'margin:10px 0;display:flex;flex-direction:column;gap:5px' });
+        ['a', 'b', 'c', 'd', 'e'].forEach(function (letra) {
+          if (q.alternativas[letra]) {
+            listaAlt.appendChild(el('div', { style: 'font-size:14px;line-height:1.4' }, [
+              el('strong', { texto: letra.toUpperCase() + ') ' }),
+              document.createTextNode(q.alternativas[letra])
+            ]));
+          }
+        });
+        cardQ.appendChild(listaAlt);
+      }
+
+      // Gabarito e Resolução revelável
+      var caixaGabarito = el('div', { class: 'gabarito-detalhe', style: 'display:none' });
+      caixaGabarito.appendChild(el('div', { style: 'margin-bottom:6px' }, [
+        el('strong', { style: 'color:#166534', texto: 'Gabarito: ' }),
+        el('span', { style: 'font-weight:700', texto: q.gabarito })
+      ]));
+      if (q.resolucao_passo_a_passo) {
+        caixaGabarito.appendChild(el('div', { style: 'margin-top:6px;padding-top:6px;border-top:1px solid #DCFCE7' }, [
+          el('strong', { style: 'color:#166534;font-size:13px', texto: 'Resolução detalhada: ' }),
+          renderizarTextoRicoAcervo(q.resolucao_passo_a_passo)
+        ]));
+      }
+
+      var btnGabarito = el('button', {
+        type: 'button',
+        class: 'btn pequeno',
+        style: 'margin-top:8px',
+        texto: 'Ver Gabarito e Resolução'
+      });
+      btnGabarito.addEventListener('click', function () {
+        var aberto = caixaGabarito.style.display !== 'none';
+        caixaGabarito.style.display = aberto ? 'none' : 'block';
+        btnGabarito.textContent = aberto ? 'Ver Gabarito e Resolução' : 'Ocultar Gabarito';
+      });
+
+      cardQ.appendChild(btnGabarito);
+      cardQ.appendChild(caixaGabarito);
+
+      blocoQuestoes.appendChild(cardQ);
+    });
+
+    container.appendChild(blocoQuestoes);
+
+    // Rodapé do detalhe com botões de ação
+    var rodapeDetalhe = el('div', { class: 'barra', style: 'margin-top:20px;padding-top:12px;border-top:1px solid var(--fio)' }, [
+      el('button', {
+        type: 'button',
+        class: 'btn',
+        texto: '‹ Voltar para a lista',
+        aoClick: function () {
+          temaEmDetalhe = null;
+          desenharTemas();
+          $('.conteudo').scrollTop = 0;
+        }
+      }),
+      el('span', { class: 'cresce' }),
+      el('button', {
+        type: 'button',
+        class: 'btn principal',
+        texto: 'Exportar PDF deste Tema',
+        aoClick: function () {
+          exportarPdfTema(modulo);
+        }
+      })
+    ]);
+    container.appendChild(rodapeDetalhe);
+  }
+
+  function exportarPdfTema(modulo) {
+    if (!modulo || !modulo.temaCompativel) {
+      avisar('Não há estrutura compatível para exportar o PDF deste tema.');
+      return;
+    }
+    $('#titulo-modal-tema').textContent = 'Exportar Tema: ' + modulo.assunto;
+    abrirModal('modal-tema');
+    desenharMontagem(modulo.temaCompativel, null, null, {
+      rotuloVoltar: '‹ Fechar',
+      voltar: function () { fecharModal('modal-tema'); }
+    });
+  }
+
+  function montarMaterialAcervoParaAula(modAcervo, aula, aluno, itemExistente) {
+    if (!modAcervo || !modAcervo.temaCompativel) {
+      avisar('Não há estrutura compatível para exportar este tema.');
+      return;
+    }
+    $('#titulo-modal-tema').textContent = 'Material de aula' + (aluno ? ', ' + aluno.nome : '');
+    abrirModal('modal-tema');
+    desenharMontagem(modAcervo.temaCompativel, aula, aluno, {
+      itemExistente: itemExistente,
+      rotuloVoltar: '‹ Voltar para a aula',
+      voltar: function () { fecharModal('modal-tema'); }
+    });
+  }
+
+  function abrirEscolhaAcervoComoAssunto(aula, aluno) {
+    carregarAcervo().then(function (modulos) {
+      if (!modulos || !modulos.length) {
+        avisar('O acervo de temas não abriu agora.');
+        return;
+      }
+      var corpo = $('#corpo-modal-tema');
+      var rodape = $('#rodape-modal-tema');
+      corpo.innerHTML = '';
+      rodape.innerHTML = '';
+
+      corpo.appendChild(el('div', { class: 'barra', style: 'margin-bottom:8px' }, [
+        el('button', {
+          type: 'button', class: 'btn pequeno', texto: '‹ Voltar',
+          aoClick: function () { desenharEscolhaAssunto(aula, aluno); }
+        }),
+        el('h3', { class: 'titulo', style: 'font-size:17px', texto: 'Temas do Acervo Educacional' })
+      ]));
+
+      var lista = el('div');
+      modulos.forEach(function (m) {
+        var linhaItem = el('div', { class: 'item-lista' }, [
+          el('div', { class: 'cresce' }, [
+            el('div', { class: 'nome', texto: m.assunto }),
+            el('div', { class: 'detalhe', texto: m.disciplinaRotulo + (m.publico_alvo ? ' · ' + m.publico_alvo : '') + ' · com material pronto' })
+          ]),
+          el('button', {
+            type: 'button', class: 'btn pequeno', texto: 'Usar',
+            aoClick: function () {
+              registrarAssunto(aula, {
+                id: m.id, titulo: m.assunto, fonte: 'acervo', disciplina: m.disciplinaKey, acervoId: m.id
+              });
+            }
+          })
+        ]);
+        lista.appendChild(linhaItem);
+      });
+      corpo.appendChild(lista);
+    }).catch(function () {
+      avisar('Não foi possível carregar o acervo de temas.');
     });
   }
 

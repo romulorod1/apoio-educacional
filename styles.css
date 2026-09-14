@@ -1090,6 +1090,138 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .alvo-rascunho .trecho::before { content: '\00B7'; margin-right: 6px; font-style: normal; }
 .apaga-rascunho { flex-shrink: 0; min-width: 44px; padding: 10px 14px; }
 
+/* ---------- aba temas (acervo educacional) ---------- */
+
+.chips-filtro {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip-filtro {
+  border: 1px solid var(--fio);
+  background: var(--branco);
+  color: var(--navy);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .15s ease;
+}
+
+.chip-filtro:hover {
+  background: var(--soft);
+}
+
+.chip-filtro.ativo {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: var(--branco);
+}
+
+.grade-cards-temas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.card-tema-acervo {
+  border: 1px solid var(--fio);
+  background: var(--branco);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+
+.card-tema-acervo:hover {
+  border-color: #BCCCDC;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+}
+
+.badge-disciplina {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.badge-dificuldade {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.badge-nivel-1 { background: #E3F2FD; color: #1565C0; }
+.badge-nivel-2 { background: #E8F5E9; color: #2E7D32; }
+.badge-nivel-3 { background: #FFF3E0; color: #E65100; }
+.badge-nivel-4 { background: #FCE4EC; color: #C2185B; font-weight: 700; }
+
+.bloco-teorico-detalhe {
+  background: #F7F9FC;
+  border: 1px solid #D9E2EC;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.bloco-atencao-detalhe {
+  background: #FFFBEA;
+  border-left: 4px solid #D97706;
+  padding: 10px 14px;
+  border-radius: 4px;
+  margin: 12px 0;
+  color: #78350F;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.bloco-exemplo-detalhe {
+  background: #EEF2F7;
+  border-left: 4px solid var(--navy);
+  padding: 12px 16px;
+  border-radius: 0 8px 8px 0;
+  margin: 14px 0;
+}
+
+.card-questao-detalhe {
+  border: 1px solid var(--fio);
+  background: var(--branco);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.esquema-visual-box {
+  background: #F8FAFC;
+  border: 1px dashed #94A3B8;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  font-size: 13px;
+  color: #334155;
+  font-style: italic;
+}
+
+.gabarito-detalhe {
+  margin-top: 10px;
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
 /* ---------- telas estreitas ---------- */
 
 @media (max-width: 720px) {

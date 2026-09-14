@@ -40,7 +40,7 @@
  * família de sólidos medida no uso real. A ordem v23, v24, v25 e v26 evita
  * regressão do nome do cache e é confirmada pelo portão sobre cada estado
  * integrado. */
-var CACHE = 'apoio-educacional-v26';
+var CACHE = 'apoio-educacional-v27';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -77,6 +77,9 @@ var ARQUIVOS = [
   // o índice de busca acompanha o de temas: é ele que faz o campo de assunto
   // achar por conteúdo, e não só por título.
   './banco/busca.json',
+  // o acervo educacional completo (40 temas em 12 disciplinas)
+  './banco/acervo.json',
+  './banco/acervo_indice.json',
   /* O índice dos temas de português, ao lado dos outros dois e por um motivo a
    * mais: o índice de uma matéria que não é a padrão é procurado no CACHE, e
    * não na rede (app.js, carregarOutrosIndices, que pergunta ao cache para um
