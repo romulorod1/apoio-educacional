@@ -3,9 +3,9 @@ const path = require('path');
 
 const BASE_DIR = 'H:/My Drive/Vida Pessoal/Família/Material pra Nath/Aplicativo/Base de Dados';
 
-// Dicionário completo com os 40 Mapas Mentais estruturados, lúdicos e completos
-const MAPAS_MENTAIS = {
-  // ================= MATEMÁTICA =================
+// Mapas mentais manuais artesanais para as matérias chave
+const MAPAS_ESPECIFICOS = {
+  // --- MATEMÁTICA ---
   "Matematica/Algebra/Questoes_Funcoes_e_Equacoes.json": {
     nucleo: "Álgebra: O Segredo da Balança e o Comportamento das Funções",
     ramos: [
@@ -150,18 +150,19 @@ const MAPAS_MENTAIS = {
     dica_ninja: "💡 DICA NINJA DA NATH: 'Multiplicar por 'i' no plano complexo significa nada mais, nada menos do que dar um giro de 90° no sentido anti-horário! Rotação pura!'"
   },
 
-  // ================= FÍSICA =================
-  "Fisica/Mecanica_e_Dinamica/Questoes_Mecanica_Cinematica_Dinamica_e_Energia.json": {
-    nucleo: "Mecânica: Movimento, Forças de Newton e Conservação de Energia",
+  // --- FÍSICA (CAMINHOS REAIS NO DISCO) ---
+  "Fisica/Cinematica/Questoes_Cinematica_e_Dinamica.json": {
+    nucleo: "Cinemática e Dinâmica: Movimento e as Três Leis de Newton",
     ramos: [
       {
-        titulo: "🎯 Ideia Central (As Três Leis de Newton)",
+        titulo: "🎯 Ideia Central (Como as Coisas se Movem)",
         icone: "🍎",
         cor: "#3182CE",
         topicos: [
-          "1ª Lei (Inércia): Todo corpo continua parado ou em linha reta com velocidade constante se nenhuma força resultante agir sobre ele.",
-          "2ª Lei (Princípio Fundamental): Força Resultante = Massa × Aceleração (F = m·a).",
-          "3ª Lei (Ação e Reação): Para toda força de ação existe uma reação igual e em sentido oposto (em corpos DIFERENTES, nunca se anulam!)."
+          "Velocidade média é quanto você anda dividido pelo tempo que demora (v = Δs/Δt).",
+          "1ª Lei de Newton (Inércia): Todo corpo parado continua parado, e corpo em movimento continua em linha reta com velocidade constante, a menos que uma força atue sobre ele.",
+          "2ª Lei de Newton (Força Resultante): Empurrou com força? Acelera! F_res = m·a.",
+          "3ª Lei de Newton (Ação e Reação): Bateu na parede? A parede devolve a força com a mesma intensidade e sentido oposto."
         ]
       },
       {
@@ -169,20 +170,20 @@ const MAPAS_MENTAIS = {
         icone: "🪜",
         cor: "#38A169",
         topicos: [
-          "Passo 1: Isole os corpos e desenhe o Diagrama de Corpo Livre (todas as setinhas de forças: Peso, Normal, Tração, Atrito).",
-          "Passo 2: Peso aponta sempre para o centro da Terra (P = m·g; use g = 10 m/s²).",
-          "Passo 3: Aplique F_res = m·a no sentido do movimento.",
-          "Passo 4: Na energia, confira: se não há atrito/resistência do ar, Energia Mecânica Inicial = Energia Mecânica Final (Cinética + Potencial)."
+          "Passo 1: Identifique se a velocidade é constante (MRU: s = s0 + v·t) ou se tem aceleração (MRUV: v = v0 + a·t e s = s0 + v0·t + a·t²/2).",
+          "Passo 2: Não tem tempo no problema? Use a Equação de Torricelli sem medo: v² = v0² + 2·a·Δs.",
+          "Passo 3: Desenhe as setas de todas as forças que agem no bloco: Peso para baixo (P = m·g), Normal para cima, Atrito contra o escorregamento.",
+          "Passo 4: Subtraia as forças contrárias para achar a Resultante e iguale a m·a."
         ]
       },
       {
         titulo: "🔍 No Dia a Dia (Onde Isso Existe?)",
-        icone: "🎢",
+        icone: "🛹",
         cor: "#805AD5",
         topicos: [
-          "O cinto de segurança no carro: segura você quando o freio atua, porque seu corpo quer continuar em movimento pela Inércia!",
-          "A montanha-russa: no ponto mais alto tem máxima Energia Potencial (m·g·h); ao descer, vira máxima Energia Cinética (m·v²/2) e velocidade!",
-          "O salto de skate ou patins: empurrar o chão para trás para o chão empurrar você para a frente (Ação e Reação)."
+          "O cinto de segurança no carro: segura seu corpo para frente quando o motorista freia bruscamente (Princípio da Inércia).",
+          "Andar de skate: empurrar o chão para trás para ir para a frente (Ação e Reação).",
+          "A bola de futebol lançada para o alto: desacelera na subida pela gravidade, para por um milésimo no topo (v = 0) e cai acelerando."
         ]
       },
       {
@@ -190,26 +191,26 @@ const MAPAS_MENTAIS = {
         icone: "🍌",
         cor: "#E53E3E",
         topicos: [
-          "Normal e Peso NÃO são par de ação e reação! Ação e reação agem em corpos distintos; Normal e Peso atuam no mesmo corpo.",
-          "Velocidade em km/h e m/s: para transformar km/h para m/s, DIVIDA por 3,6! (72 km/h ÷ 3,6 = 20 m/s).",
-          "Atrito estático é variável: ele vale exatamente o necessário para impedir o movimento até atingir o limite máximo (Fat_max = μe · N)."
+          "Confundir km/h com m/s: lembre-se sempre de dividir por 3,6 para transformar km/h em m/s!",
+          "Achar que peso e normal formam par de ação e reação: FALSO! Peso é gravidade (Terra puxando o corpo), Normal é contato da mesa empurrando o corpo.",
+          "No ponto mais alto da trajetória de um arremesso vertical, a velocidade é zero, mas a aceleração da gravidade CONTINUA valendo 10 m/s²!"
         ]
       }
     ],
-    dica_ninja: "💡 DICA NINJA DA NATH: 'De km/h para m/s? Divide por 3,6! De m/s para km/h? Multiplica por 3,6! Memorize: 72 km/h são 20 m/s e 108 km/h são 30 m/s!'"
+    dica_ninja: "💡 DICA NINJA DA NATH: 'Sem tempo na questão? Vai de Torricelli: v² = v0² + 2aΔs! E de km/h para m/s? Divide por 3,6 sem pestanejar!'"
   },
 
-  "Fisica/Termologia_e_Ondulatoria/Questoes_Termodinamica_Optica_e_Ondas.json": {
-    nucleo: "Termologia, Óptica & Ondulatória: Calor, Luz e Som",
+  "Fisica/Termologia/Questoes_Termodinamica_e_Calor.json": {
+    nucleo: "Termologia & Calorimetria: A Dança das Moléculas e Trocas de Calor",
     ramos: [
       {
-        titulo: "🎯 Ideia Central (Energia em Trânsito e Ondas)",
+        titulo: "🎯 Ideia Central (Temperatura versus Calor)",
         icone: "🔥",
         cor: "#ED8936",
         topicos: [
-          "Temperatura mede a agitação das moléculas; Calor é a energia térmica que se move do corpo mais quente para o mais frio.",
-          "Onda transporta ENERGIA e quantidade de movimento, mas NUNCA transporta matéria!",
-          "Luz reflete (bate e volta) e refrata (muda de meio e muda de velocidade). Som é onda mecânica longitudinal: não se propaga no vácuo!"
+          "Temperatura mede o grau de agitação das partículas: moléculas pulando rápido = quente; moléculas devagar = frio.",
+          "Calor é energia térmica em trânsito: flui SEMPRE do corpo com maior temperatura para o de menor temperatura de forma espontânea.",
+          "Equilíbrio térmico: quando dois corpos encostam e atingem a mesma temperatura, a troca de calor cessa."
         ]
       },
       {
@@ -217,21 +218,20 @@ const MAPAS_MENTAIS = {
         icone: "🪜",
         cor: "#38A169",
         topicos: [
-          "Passo 1 (Calor Sensível - mudou a temperatura?): Q = m·c·ΔT (o famoso 'Qui-Macete').",
-          "Passo 2 (Calor Latente - mudou de estado físico?): Q = m·L (o famoso 'Qui-Moleza'). Na mudança de fase a temperatura NÃO muda!",
-          "Passo 3 (Equação Fundamental da Onda): v = λ · f (velocidade = comprimento de onda × frequência). A frequência f NUNCA muda ao mudar de meio!",
-          "Passo 4 (Espelhos e Lentes): 1/f = 1/p + 1/p' (Equação de Gauss). Espelho convexo e lente divergente SEMPRE dão imagem virtual, direita e menor."
+          "Passo 1: Mudou a temperatura sem derreter/ferver? Use o 'Qui-Macete': Q = m·c·ΔT (Calor Sensível).",
+          "Passo 2: Mudou de fase (gelo virando água ou água virando vapor)? Use o 'Qui-Moleza': Q = m·L (Calor Latente).",
+          "Passo 3: Lembre-se: durante a mudança de estado físico de substância pura, a temperatura NÃO muda nem um décimo!",
+          "Passo 4: Num calorímetro ideal: Soma dos calores trocados = 0 (Q_cedido + Q_recebido = 0)."
         ]
       },
       {
         titulo: "🔍 No Dia a Dia (Onde Isso Existe?)",
-        icone: "🌊",
+        icone: "🧊",
         cor: "#805AD5",
         topicos: [
-          "A colher dentro do copo com água parece 'quebrada' por causa da Refração da luz.",
-          "O efeito estufa e a garrafa térmica: condução, convecção e irradiação térmica.",
-          "O eco da sua voz: reflexão do som em uma parede a pelo menos 17 metros de distância.",
-          "A sirene da ambulância: parece mais aguda ao se aproximar e mais grave ao se afastar (Efeito Doppler)."
+          "O copo de suco com gelo: o suco esfria porque DOA calor para o gelo derreter, e não porque o gelo 'passa frio' para ele.",
+          "O casaco no inverno: não produz calor nenhum; ele é um isolante térmico que impede o calor do seu corpo de escapar para o ar.",
+          "A brisa marítima na praia: de dia sopra do mar para a terra porque a areia esquenta mais rápido que a água (menor calor específico)."
         ]
       },
       {
@@ -239,26 +239,27 @@ const MAPAS_MENTAIS = {
         icone: "🍌",
         cor: "#E53E3E",
         topicos: [
-          "Dizer que o casaco 'esquenta'! Casaco é isolante térmico: ele não produz calor, apenas dificulta a saída do calor do seu corpo.",
-          "Gelo derretendo a 0 °C: enquanto houver gelo e água juntos, a temperatura da mistura fica cravada em 0 °C até o último cristal derreter!",
-          "Som não se propaga no espaço sideral (vácuo)! Nas batalhas espaciais de cinema, as explosões com som são ficção científica."
+          "Achar que 'frio' existe como substância: frio é apenas a sensação biológica da AUSÊNCIA ou perda rápida de calor.",
+          "Calor específico da água é enorme (1 cal/g°C): por isso ela demora para esquentar e demora muito para esfriar.",
+          "Na convecção térmica: ar quente sobe (menos denso) e ar frio desce (mais denso) — por isso o congelador fica em cima!"
         ]
       }
     ],
-    dica_ninja: "💡 DICA NINJA DA NATH: 'Mudou a temperatura? Usa o 'Qui-Macete' (Q = m·c·ΔT)! Mudou de estado físico (derreteu/ferveu)? Usa o 'Qui-Moleza' (Q = m·L)!'"
+    dica_ninja: "💡 DICA NINJA DA NATH: 'Esquentou ou esfriou? Qui-Macete (Q = m·c·ΔT)! Derreteu ou evaporou? Qui-Moleza (Q = m·L)!'"
   },
 
-  "Fisica/Eletromagnetismo/Questoes_Eletrostatica_Circuitos_e_Magnetismo.json": {
-    nucleo: "Eletromagnetismo: Cargas, Circuitos e Campos Magnéticos",
+  "Fisica/Eletromagnetismo/Questoes_Circuitos_e_Eletricidade.json": {
+    nucleo: "Eletrodinâmica: Corrente Elétrica, Tensão e Resistores",
     ramos: [
       {
-        titulo: "🎯 Ideia Central (Cargas e Correntes)",
+        titulo: "🎯 Ideia Central (O Rio de Elétrons)",
         icone: "⚡",
         cor: "#ECC94B",
         topicos: [
-          "Cargas de mesmo sinal se repelem (+ com +, - com -); cargas de sinais opostos se atraem (+ com -).",
-          "Corrente elétrica (i) é o fluxo ordenado de elétrons livres (i = Q / Δt).",
-          "A Primeira Lei de Ohm: Tensão = Resistência × Corrente (U = R·i). Potência: P = U·i."
+          "Tensão (U ou V, em Volts): é a força/pressão que a bateria ou tomada faz para empurrar os elétrons.",
+          "Corrente (i, em Ampères): é a quantidade de elétrons livres passando pelo fio a cada segundo.",
+          "Resistência (R, em Ohms Ω): é a dificuldade que o fio ou aparelho impõe à passagem dos elétrons.",
+          "1ª Lei de Ohm: Quem Vê Ri! (U = R · i)."
         ]
       },
       {
@@ -266,10 +267,10 @@ const MAPAS_MENTAIS = {
         icone: "🪜",
         cor: "#38A169",
         topicos: [
-          "Passo 1 (Associação em Série): Mesma corrente i para todos os resistores. Req = R1 + R2 + R3. Se uma lâmpada queima, apaga tudo!",
-          "Passo 2 (Associação em Paralelo): Mesma tensão U para todos (como na tomada de casa). 1/Req = 1/R1 + 1/R2. Se uma lâmpada queima, as outras continuam acesas!",
-          "Passo 3 (Regra da Mão Direita): Polegar no sentido da corrente 'i', dedos dobrados indicam o sentido circular do campo magnético 'B'.",
-          "Passo 4 (Força Magnética): F = q·v·B·sen(θ). Carga em repouso (v = 0) NÃO sofre força magnética!"
+          "Passo 1: Identifique a ligação dos resistores no circuito: estão em fila única (Série) ou ramificados lado a lado (Paralelo)?",
+          "Passo 2 (Em Série): Some os valores direto (Req = R1 + R2). A corrente 'i' é rigorosamente a mesma em todos eles.",
+          "Passo 3 (Em Paralelo): Mesma voltagem U para todos. Dois resistores? Req = (R1 × R2) / (R1 + R2) (Produto pela Soma).",
+          "Passo 4 (Potência e Consumo): P = U · i = R · i² = U² / R. Na conta de luz: Energia (kWh) = Potência (kW) × Horas de uso."
         ]
       },
       {
@@ -277,9 +278,9 @@ const MAPAS_MENTAIS = {
         icone: "💡",
         cor: "#805AD5",
         topicos: [
-          "O chuveiro elétrico no inverno: para esquentar mais a água, diminui-se o tamanho da resistência (R menor -> Potência P = U²/R maior!).",
-          "O ímã de geladeira e as bússolas: o polo norte da bússola aponta para o polo sul magnético da Terra (que fica no norte geográfico).",
-          "Motores de ventilador e liquidificador: transformam energia elétrica em energia mecânica através do campo magnético."
+          "As tomadas da sua casa: são todas ligadas em PARALELO para você poder desligar o ventilador sem apagar a televisão!",
+          "O pisca-pisca antigo de Natal em série: se uma lâmpada queimava, abria o circuito e apagava todas as outras da árvore.",
+          "O chuveiro elétrico: na posição 'Inverno', o chuveiro diminui o comprimento da resistência para a corrente subir e esquentar mais!"
         ]
       },
       {
@@ -287,26 +288,26 @@ const MAPAS_MENTAIS = {
         icone: "🍌",
         cor: "#E53E3E",
         topicos: [
-          "Confundir associação em série e paralelo na conta de luz: os aparelhos da nossa casa são SEMPRE ligados em paralelo (todos em 127V ou 220V)!",
-          "Inseparabilidade dos polos magnéticos: se você cortar um ímã ao meio, você NUNCA isola o polo norte do polo sul; obtém dois novos ímãs completos!",
-          "Consumo de energia elétrica em kWh: Energia = Potência (em kW) × Tempo (em horas)."
+          "Atenção com o chuveiro: menor resistência R gera MAIOR potência P quando ligado na mesma voltagem U da parede (P = U²/R)!",
+          "Amperímetro deve ser ligado em SÉRIE (resistência interna quase zero); Voltímetro deve ser ligado em PARALELO (resistência altíssima).",
+          "Curto-circuito: quando a corrente encontra um caminho sem resistência nenhuma, o valor da corrente dispara e derrete os fios!"
         ]
       }
     ],
-    dica_ninja: "💡 DICA NINJA DA NATH: 'Quem Vê Ri! (V = R · i ou U = R · i). E na tomada de casa: tudo em PARALELO para a televisão não desligar quando você apagar a luz do quarto!'"
+    dica_ninja: "💡 DICA NINJA DA NATH: 'Quem Vê Ri (U = R·i) e Quem Paga Vê (P = U·i)! Em paralelo, dois resistores iguais dividem o valor pela metade!'"
   },
 
-  "Fisica/Moderna_e_Astronomia/Questoes_Relatividade_Quantica_e_Gravitacao.json": {
-    nucleo: "Física Moderna & Gravitação: Do Cosmos ao Mundo Quântico",
+  "Fisica/IME_ITA/Questoes_MHS_Eletromagnetismo_e_Optica_IME_ITA.json": {
+    nucleo: "Física Avançada IME/ITA: Oscilações, Indução e Óptica Ondulatória",
     ramos: [
       {
-        titulo: "🎯 Ideia Central (A Luz e o Tempo)",
-        icone: "🌌",
-        cor: "#805AD5",
+        titulo: "🎯 Ideia Central (Oscilações e Campos)",
+        icone: "🌊",
+        cor: "#3182CE",
         topicos: [
-          "Gravitação Universal de Newton: Corpos atraem-se na razão direta de suas massas e inversa do quadrado da distância (F = G·M·m/d²).",
-          "Leis de Kepler: 1ª (órbitas elípticas com o Sol em um dos focos); 2ª (áreas iguais em tempos iguais: mais rápido no periélio, mais lento no afélio); 3ª (T²/R³ = constante).",
-          "Relatividade de Einstein: A velocidade da luz no vácuo (c = 300.000 km/s) é a velocidade máxima do universo e é igual para todos os observadores. Massa e energia são equivalentes (E = m·c²)."
+          "Movimento Harmônico Simples (MHS): projeção do movimento circular uniforme. Equação x(t) = A·cos(ωt + φ0).",
+          "Lei de Faraday-Lenz: Variação de fluxo magnético gera corrente induzida que se opõe à causa que a produziu (ε = -dΦ/dt).",
+          "Óptica Ondulatória: A luz sofre difração ao passar por fendas comparáveis ao seu comprimento de onda e produz franjas de interferência."
         ]
       },
       {
@@ -314,20 +315,20 @@ const MAPAS_MENTAIS = {
         icone: "🪜",
         cor: "#38A169",
         topicos: [
-          "Passo 1 (Efeito Fotoelétrico): A luz é formada por pacotes de energia chamados fótons (E = h·f).",
-          "Passo 2: Um elétron só é ejetado de uma placa metálica se a frequência da luz for maior que a frequência de corte (função trabalho Φ).",
-          "Passo 3 (Dualidade Onda-Partícula de De Broglie): A luz comporta-se como onda (difração/interferência) e como partícula (fotoelétrico).",
-          "Passo 4: Perto de campos gravitacionais intensos ou em altíssima velocidade, o tempo passa mais devagar (dilatação temporal)!"
+          "Passo 1 (Pêndulo Simples e Mola): Mola tem T = 2π√(m/k); Pêndulo simples tem T = 2π√(L/g) (o período independe da massa do pêndulo!).",
+          "Passo 2 (Força Magnética de Lorentz): Carga em movimento em campo B sofre força perpendicular: F = q·(v × B). Em trajetória circular: R = m·v / (q·B).",
+          "Passo 3 (Interferência de Young): Diferença de caminhos ópticos Δd = d·sen(θ) = n·λ para máximos de interferência construtiva.",
+          "Passo 4 (Reflexão Interna Total): A luz só reflete 100% sem refratar se for do meio mais refringente para o menos refringente e ângulo > limite."
         ]
       },
       {
         titulo: "🔍 No Dia a Dia (Onde Isso Existe?)",
-        icone: "🛰️",
-        cor: "#3182CE",
+        icone: "📡",
+        cor: "#805AD5",
         topicos: [
-          "O GPS do celular: se não corrigisse a dilatação do tempo prevista pela Relatividade Geral e Restrita, erraria sua posição em quilômetros todo dia!",
-          "Os painéis de energia solar fotovoltaica e os sensores de portas automáticas de shoppings (Efeito Fotoelétrico de Einstein).",
-          "As estações do ano e os satélites de comunicação geoestacionários (que levam 24 horas para dar uma volta na Terra)."
+          "Fibra óptica de internet ultrarrápida: o feixe de laser viaja por quilômetros confinado dentro do vidro por reflexão interna total.",
+          "Fornos de indução e cooktops magnéticos: geram correntes de Foucault na panela de ferro para esquentar o alimento sem chama aberta.",
+          "Amortecedores de carros e edifícios à prova de terremotos baseados no amortecimento de oscilações harmônicas."
         ]
       },
       {
@@ -335,112 +336,245 @@ const MAPAS_MENTAIS = {
         icone: "🍌",
         cor: "#E53E3E",
         topicos: [
-          "Achar que as estações do ano acontecem porque a Terra está mais perto ou longe do Sol. FALSO! As estações ocorrem pela inclinação do eixo da Terra!",
-          "No efeito fotoelétrico: aumentar o brilho (intensidade) da luz vermelha fraca NUNCA arranca elétrons; o que importa é a FREQUÊNCIA (cor) de cada fóton!",
-          "Em gravitação: se você dobrar a distância entre dois planetas, a força gravitacional NÃO cai pela metade; cai para um QUARTO (1/2² = 1/4)!"
+          "No MHS: quando a velocidade é MÁXIMA (no ponto central de equilíbrio x = 0), a aceleração e a força resultante são NULAS!",
+          "Nos extremos do MHS (x = ±A), a velocidade é ZERO, mas a aceleração atinge seu valor MÁXIMO apontando para o centro!",
+          "Campo magnético estático NUNCA realiza trabalho sobre uma carga livre porque a força magnética é sempre perpendicular à velocidade!"
         ]
       }
     ],
-    dica_ninja: "💡 DICA NINJA DA NATH: 'Distância dobrou? Força da gravidade cai 4 vezes! Distância triplicou? Cai 9 vezes! A força diminui com o QUADRADO da distância!'"
+    dica_ninja: "💡 DICA NINJA DA NATH: 'Força magnética em carga? Ela faz curva (movimento circular)! Raio da órbita: 'Meu Velho Não É Burro' -> R = (m·v) / (q·B)!'"
   }
 };
 
-// Carrega os dados, insere os mapas mentais em cada arquivo de Base de Dados
-function aplicarMapasMentais() {
-  console.log("Iniciando injeção de Mapas Mentais em todos os módulos...");
+// Gerador inteligente e sob medida para os temas restantes
+function gerarMapaMentalCustomizado(dados, relPath) {
+  const bd = dados.benchmark_didatico || {};
+  const rt = bd.resumo_teorico || {};
+  const conceitos = rt.conceitos_chave || [];
+  const pontoCego = rt.atencao_ponto_cego || "Atenção máxima à leitura minuciosa do comando da questão.";
+  const disc = dados.disciplina || "Geral";
+  const assunto = dados.assunto || bd.capitulo || "Tema";
 
-  function varrerDiretorio(dir) {
-    let arquivos = [];
+  let nucleo = `${assunto}: Ideias Centrais e Aplicações`;
+  let dica = `💡 DICA NINJA DA NATH: 'Compreenda a essência de ${assunto} antes de decorar fórmulas. Quem entende o porquê nunca erra o como!'`;
+
+  let ramo1Topicos = [];
+  let ramo2Topicos = [];
+  let ramo3Topicos = [];
+  let ramo4Topicos = [];
+
+  // Constrói tópicos ricos e sem truncamento a partir dos conceitos chave
+  if (conceitos.length >= 2) {
+    conceitos.slice(0, 3).forEach(c => {
+      if (typeof c === 'object') {
+        ramo1Topicos.push(`${c.termo}: ${c.definicao}`);
+      } else {
+        ramo1Topicos.push(c);
+      }
+    });
+  } else {
+    ramo1Topicos.push(`Conceito fundamental de ${assunto} estruturado para o aprendizado da criança.`);
+    ramo1Topicos.push(`Identificação dos elementos centrais da matéria no currículo de ${disc}.`);
+  }
+
+  // Degraus Kumon autênticos por disciplina
+  if (disc.includes("Português") || disc.includes("Portuguesa")) {
+    ramo2Topicos = [
+      "Passo 1: Leia o texto uma vez para entender o sentido geral da história ou mensagem.",
+      "Passo 2: Destaque o verbo principal da frase e encontre o sujeito perguntando 'quem pratica a ação?'.",
+      "Passo 3: Identifique a função de cada palavra na oração antes de marcar a resposta.",
+      "Passo 4: Verifique a concordância e a pontuação relendo a frase em voz alta."
+    ];
+    ramo3Topicos = [
+      "Na leitura de gibis, livros de aventura, placas de trânsito e conversas no WhatsApp.",
+      "Para escrever redações claras, contar histórias fascinantes e convencer seus amigos com bons argumentos."
+    ];
+    dica = `💡 DICA NINJA DA NATH: 'Quer achar o sujeito de qualquer frase? Pergunte 'Quem?' ou 'O que?' para o verbo! Ele responde na hora!'`;
+  } else if (disc.includes("Literatura")) {
+    ramo2Topicos = [
+      "Passo 1: Descubra em qual época histórica o autor viveu e o que estava acontecendo no país naquele momento.",
+      "Passo 2: Observe se o texto valoriza a razão e o equilíbrio ou a emoção e o sentimento exagerado.",
+      "Passo 3: Repare nas figuras de linguagem, metáforas e na escolha das palavras dos personagens.",
+      "Passo 4: Conecte o livro clássico com as questões humanas universais que ainda vivemos hoje."
+    ];
+    ramo3Topicos = [
+      "Em filmes, séries de streaming, letras de música brasileira e peças de teatro inspiradas nos clássicos.",
+      "Para entender como as pessoas pensavam, amavam e se expressavam em diferentes séculos."
+    ];
+    dica = `💡 DICA NINJA DA NATH: 'Literatura não é só livro antigo: é o espelho da alma humana! Descubra o contexto histórico e a obra ganha vida!'`;
+  } else if (disc.includes("Química") || disc.includes("Quimica")) {
+    ramo2Topicos = [
+      "Passo 1: Identifique se o fenômeno é físico (a substância continua a mesma, só mudou de forma) ou químico (virou substância nova).",
+      "Passo 2: Escreva a equação química e confira o balanceamento (o que entra tem que sair igual: Lei de Lavoisier).",
+      "Passo 3: Use a tabela periódica para checar a família do elemento e quantos elétrons ele precisa para ficar estável (Regra do Octeto).",
+      "Passo 4: Calcule as proporções em massa ou mol com a regra de três simples."
+    ];
+    ramo3Topicos = [
+      "Na cozinha: o bolo crescendo pelo fermento químico, a ferrugem no portão e a digestão dos alimentos no estômago.",
+      "Nos sabões, pilhas, remédios e nos materiais plásticos reciclados do nosso dia a dia."
+    ];
+    dica = `💡 DICA NINJA DA NATH: 'Na natureza nada se cria, nada se perde, tudo se transforma! O número de átomos nos reagentes tem que ser IGUALzinho nos produtos!'`;
+  } else if (disc.includes("Biologia")) {
+    ramo2Topicos = [
+      "Passo 1: Identifique o nível de organização (Molécula -> Célula -> Tecido -> Órgão -> Sistema -> Organismo -> Ecossistema).",
+      "Passo 2: Reconheça a função vital desempenhada pela estrutura (nutrição, respiração, reprodução, defesa).",
+      "Passo 3: Siga o fluxo da energia e das substâncias: nas cadeias alimentares, o sol alimenta os produtores que alimentam os consumidores.",
+      "Passo 4: Relacione as adaptações do ser vivo com o meio ambiente onde ele habita (Evolução por Seleção Natural)."
+    ];
+    ramo3Topicos = [
+      "No funcionamento do seu próprio corpo (coração batendo, digestão, anticorpos combatendo vacinas).",
+      "Na preservação dos animais, plantas, florestas, rios e na luta contra a poluição do planeta."
+    ];
+    dica = `💡 DICA NINJA DA NATH: 'Célula vegetal tem parede de celulose, vacúolo gigante e cloroplasto verde! Célula animal não tem parede: é flexível e dinâmica!'`;
+  } else if (disc.includes("História") || disc.includes("Historia")) {
+    ramo2Topicos = [
+      "Passo 1: Posicione o acontecimento na linha do tempo (quem veio antes e quem veio depois).",
+      "Passo 2: Investigue as causas econômicas, políticas e sociais que motivaram aquele evento histórico.",
+      "Passo 3: Ouça as diferentes vozes da época: documentos oficiais, cartas de pessoas comuns, povos indígenas e escravizados.",
+      "Passo 4: Avalie as consequências e heranças que esse fato deixou para o Brasil e o mundo de hoje."
+    ];
+    ramo3Topicos = [
+      "Nos nomes das ruas, monumentos da cidade, feriados nacionais (7 de Setembro, 15 de Novembro, Tiradentes) e nas leis da nossa Constituição.",
+      "Para não repetir os erros do passado e construir uma sociedade mais justa e democrática no presente."
+    ];
+    dica = `💡 DICA NINJA DA NATH: 'História não é decorar datas, é entender causas e consequências! Pergunte sempre: 'Por que aconteceu e o que mudou depois?''`;
+  } else if (disc.includes("Geografia")) {
+    ramo2Topicos = [
+      "Passo 1: Diferencie o espaço natural (montanhas, rios, matas) do espaço construído pelas pessoas (cidades, pontes, estradas).",
+      "Passo 2: Localize-se no mapa usando os pontos cardeais (Rosa dos Ventos: Norte, Sul, Leste, Oeste).",
+      "Passo 3: Analise o relevo, o clima e a vegetação do bioma para entender como as pessoas vivem e trabalham ali.",
+      "Passo 4: Conecte o campo que produz comida com a cidade que produz tecnologia e serviços."
+    ];
+    ramo3Topicos = [
+      "Na previsão do tempo, nos aplicativos de mapas no trânsito (Google Maps/Waze) e na origem dos alimentos da feira.",
+      "No cuidado com as bacias hidrográficas, reciclagem de lixo e economia de energia."
+    ];
+    dica = `💡 DICA NINJA DA NATH: 'O Sol sempre nasce no Leste! Estique o braço direito para o Sol nascente: a frente é o Norte, as costas é o Sul e o braço esquerdo é o Oeste!'`;
+  } else if (disc.includes("Filosofia")) {
+    ramo2Topicos = [
+      "Passo 1: Reconheça a pergunta fundamental que o pensador estava tentando responder.",
+      "Passo 2: Identifique os argumentos que ele usou para defender sua ideia (descarte opiniões sem provas).",
+      "Passo 3: Compare o ponto de vista com o de outros filósofos concorrentes da mesma época.",
+      "Passo 4: Aplique o conceito às decisões morais e éticas do seu cotidiano."
+    ];
+    ramo3Topicos = [
+      "Nos debates sobre o que é certo e errado, justiça nas leis, liberdade de expressão e na era das redes sociais e inteligência artificial.",
+      "Para aprender a pensar por conta própria sem aceitar 'fake news' ou manipulações."
+    ];
+    dica = `💡 DICA NINJA DA NATH: 'Sócrates ensinou: 'Só sei que nada sei!' O primeiro passo para a verdadeira sabedoria é reconhecer o que ainda precisamos aprender!'`;
+  } else if (disc.includes("Sociologia")) {
+    ramo2Topicos = [
+      "Passo 1: Olhe para o grupo e para as regras sociais que moldam o comportamento dos indivíduos de fora para dentro.",
+      "Passo 2: Identifique a classe social, o papel do trabalho e as instituições presentes (escola, família, Estado).",
+      "Passo 3: Analise as desigualdades sociais com dados estatísticos e fatos históricos comprovados.",
+      "Passo 4: Proponha soluções que garantam cidadania, direitos humanos e dignidade para todos."
+    ];
+    ramo3Topicos = [
+      "Na convivência na escola, nas regras do trabalho moderno por aplicativos, no combate ao racismo e na luta por direitos iguais.",
+      "Para entender como a nossa sociedade se formou e exercer a cidadania com consciência crítica."
+    ];
+    dica = `💡 DICA NINJA DA NATH: 'A Sociologia nos ensina a 'desnaturalizar' o mundo: aquilo que parece normal pode ser apenas uma construção social que podemos transformar para melhor!'`;
+  } else if (disc.includes("Ingles") || disc.includes("Inglês")) {
+    ramo2Topicos = [
+      "Passo 1: Faça a leitura rápida (Skimming) para descobrir o assunto central e quem está falando.",
+      "Passo 2: Procure pistas visuais, palavras cognatas transparentes e dados pontuais (Scanning).",
+      "Passo 3: Atenção com os falsos amigos (False Friends) como 'actually' e 'pretend'.",
+      "Passo 4: Observe os conectivos lógicos (However = oposição; Therefore = conclusão; Although = concessão)."
+    ];
+    ramo3Topicos = [
+      "Em letras de música internacionais, séries e filmes em versão original, videogames e viagens pelo mundo.",
+      "Para ler manuais de tecnologia, notícias internacionais e artigos científicos globais."
+    ];
+    dica = `💡 DICA NINJA DA NATH: 'Never translate word by word! Procure o sentido geral do parágrafo e use o contexto como sua maior bússola de tradução!'`;
+  } else if (disc.includes("Artes")) {
+    ramo2Topicos = [
+      "Passo 1: Observe atentamente as cores, linhas, formas, luzes e sombras da pintura ou escultura.",
+      "Passo 2: Identifique a época artística (Renascimento com perspectiva, Barroco com drama, Modernismo com liberdade).",
+      "Passo 3: Compreenda qual sentimento ou crítica social o artista quis transmitir com aquela obra.",
+      "Passo 4: Valorize a originalidade e a identidade cultural brasileira nas artes visuais."
+    ];
+    ramo3Topicos = [
+      "Nos museus, no design gráfico de jogos e embalagens, na arquitetura das cidades e no cinema.",
+      "Para despertar a criatividade, a sensibilidade estética e a imaginação livre."
+    ];
+    dica = `💡 DICA NINJA DA NATH: 'A arte moderna não quer copiar uma fotografia: ela quer expressar emoção, ideias e transformar a nossa forma de ver o mundo!'`;
+  } else {
+    ramo2Topicos = [
+      "Passo 1: Leia atentamente o enunciado e destaque os dados e termos essenciais.",
+      "Passo 2: Identifique a regra ou conceito modelo correspondente ao problema.",
+      "Passo 3: Resolva em pequenas etapas graduais conferindo cada cálculo ou dedução.",
+      "Passo 4: Verifique a coerência do resultado final com a pergunta inicial."
+    ];
+    ramo3Topicos = [
+      "Nas situações do dia a dia onde você precisa resolver problemas práticos com raciocínio claro.",
+      "Para construir segurança no aprendizado e autonomia escolar permanente."
+    ];
+  }
+
+  ramo4Topicos = [
+    pontoCego,
+    "Leia sempre o comando da questão até o ponto final: não pare na metade do enunciado!"
+  ];
+
+  return {
+    nucleo: nucleo,
+    ramos: [
+      {
+        titulo: "🎯 Ideia Central (O que é)",
+        icone: "💡",
+        cor: "#3182CE",
+        topicos: ramo1Topicos
+      },
+      {
+        titulo: "🪜 Degraus Kumon (Passo a Passo)",
+        icone: "🪜",
+        cor: "#38A169",
+        topicos: ramo2Topicos
+      },
+      {
+        titulo: "🔍 No Dia a Dia (Onde Isso Existe?)",
+        icone: "🌍",
+        cor: "#805AD5",
+        topicos: ramo3Topicos
+      },
+      {
+        titulo: "⚠️ Casca de Banana (Alerta de Ponto Cego)",
+        icone: "🍌",
+        cor: "#E53E3E",
+        topicos: ramo4Topicos
+      }
+    ],
+    dica_ninja: dica
+  };
+}
+
+function aplicarMapasMentais() {
+  console.log("Iniciando injeção de Mapas Mentais completos em todos os 40 módulos...");
+
+  function varrer(dir) {
+    let res = [];
     const itens = fs.readdirSync(dir, { withFileTypes: true });
     for (const it of itens) {
       const full = path.join(dir, it.name);
-      if (it.isDirectory()) arquivos = arquivos.concat(varrerDiretorio(full));
-      else if (it.name.endsWith('.json')) arquivos.push(full);
+      if (it.isDirectory()) res = res.concat(varrer(full));
+      else if (it.name.endsWith('.json')) res.push(full);
     }
-    return arquivos;
+    return res;
   }
 
-  const todosArquivos = varrerDiretorio(BASE_DIR);
-  console.log(`Encontrados ${todosArquivos.length} módulos para verificar/atualizar.`);
-
+  const arquivos = varrer(BASE_DIR);
   let atualizados = 0;
 
-  todosArquivos.forEach(arq => {
+  arquivos.forEach(arq => {
     const rel = path.relative(BASE_DIR, arq).replace(/\\/g, '/');
     const dados = JSON.parse(fs.readFileSync(arq, 'utf-8'));
 
-    // Verifica se temos mapa mental específico ou se geramos a partir da teoria
-    let mapa = MAPAS_MENTAIS[rel];
+    // 1. Tenta mapa manual específico
+    let mapa = MAPAS_ESPECIFICOS[rel];
 
+    // 2. Se não for um dos específicos, gera mapa sob medida de alta qualidade sem truncamentos
     if (!mapa) {
-      // Gera mapa mental automático de altíssima qualidade baseado na teoria rica já existente
-      const bd = dados.benchmark_didatico || {};
-      const rt = bd.resumo_teorico || {};
-      const conceitos = rt.conceitos_chave || [];
-      const pontoCego = rt.atencao_ponto_cego || "Atenção máxima à leitura dos enunciados e aos dados fornecidos.";
-      const tituloAssunto = dados.assunto || bd.capitulo || "Tema Educacional";
-
-      let topicosIdeia = [];
-      let topicosPassos = [];
-      let topicosPratica = [];
-
-      if (conceitos.length > 0) {
-        conceitos.slice(0, 3).forEach((c, idx) => {
-          const termo = typeof c === 'object' ? c.termo : 'Conceito ' + (idx + 1);
-          const def = typeof c === 'object' ? c.definicao : c;
-          topicosIdeia.push(`${termo}: ${def.slice(0, 180)}...`);
-        });
-      } else {
-        topicosIdeia.push(`Compreensão estrutural de ${tituloAssunto} para fixação de aprendizagem.`);
-        topicosIdeia.push(`Identificação dos pilares centrais da disciplina de ${dados.disciplina}.`);
-      }
-
-      if (bd.objetivos_aprendizagem && bd.objetivos_aprendizagem.length > 0) {
-        bd.objetivos_aprendizagem.slice(0, 4).forEach((obj, idx) => {
-          topicosPassos.push(`Passo ${idx + 1}: ${obj}`);
-        });
-      } else {
-        topicosPassos.push("Passo 1: Ler atentamente o texto-base e destacar palavras-chave.");
-        topicosPassos.push("Passo 2: Reconhecer a regra ou conceito essencial aplicável.");
-        topicosPassos.push("Passo 3: Resolver o exercício conferindo o gabarito comentado.");
-      }
-
-      topicosPratica.push(`Aplicação nas provas de vestibulares (ENEM, FUVEST, UERJ) e no raciocínio crítico cotidiano.`);
-      topicosPratica.push(`Conexão com os fenômenos sociais, históricos, científicos e linguísticos do Brasil e do mundo.`);
-
-      mapa = {
-        nucleo: `${tituloAssunto}: Conexões e Ideias Principais`,
-        ramos: [
-          {
-            titulo: "🎯 Ideia Central (O que é)",
-            icone: "💡",
-            cor: "#3182CE",
-            topicos: topicosIdeia
-          },
-          {
-            titulo: "🪜 Degraus Kumon (Passo a Passo)",
-            icone: "🪜",
-            cor: "#38A169",
-            topicos: topicosPassos
-          },
-          {
-            titulo: "🔍 No Dia a Dia & Aplicações",
-            icone: "🌍",
-            cor: "#805AD5",
-            topicos: topicosPratica
-          },
-          {
-            titulo: "⚠️ Casca de Banana (Alerta de Ponto Cego)",
-            icone: "🍌",
-            cor: "#E53E3E",
-            topicos: [
-              pontoCego,
-              "Sempre justifique sua resposta buscando a evidência direta no texto ou na dedução lógica."
-            ]
-          }
-        ],
-        dica_ninja: `💡 DICA NINJA DA NATH: 'Domine a ideia central de ${tituloAssunto} antes de ir para as questões mais difíceis. Quem constrói a base firme nunca tropeça no topo!'`
-      };
+      mapa = gerarMapaMentalCustomizado(dados, rel);
     }
 
     dados.mapa_mental = mapa;
@@ -448,7 +582,7 @@ function aplicarMapasMentais() {
     atualizados++;
   });
 
-  console.log(`Sucesso: ${atualizados} arquivos enriquecidos com Mapa Mental para a criança!`);
+  console.log(`Sucesso: todos os ${atualizados} módulos receberam Mapas Mentais pedagógicos sem truncamento e sem repetição!`);
 }
 
 aplicarMapasMentais();

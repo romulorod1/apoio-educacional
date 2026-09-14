@@ -122,6 +122,7 @@ titulo "sem navegador"
 roda "notacao"        node _teste/testa_notacao.js
 roda "busca (regras)" node _teste/testa_busca_regras.js
 roda "material (PDF)" node _teste/testa_material.js
+roda "acervo e mapas" node _teste/testa_acervo.js
 # FRENTE 2: bloco de citacao com numero de linha, fio e credito, italico por F4/F5,
 # alternativas e gabarito em criterio, e a folha legada byte a byte igual a base do merge.
 roda "citacao (PDF)"  node _teste/testa_citacao_pdf.js

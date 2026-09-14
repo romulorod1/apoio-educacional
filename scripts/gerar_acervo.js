@@ -18,16 +18,22 @@ function getFiles(dir) {
 
 const DISC_MAP = {
   'Matemática': { key: 'matematica', rotulo: 'Matemática', cor: '#1F3A5F' },
+  'Matematica': { key: 'matematica', rotulo: 'Matemática', cor: '#1F3A5F' },
   'Língua Portuguesa': { key: 'portugues', rotulo: 'Português', cor: '#2E7D6B' },
+  'Lingua Portuguesa': { key: 'portugues', rotulo: 'Português', cor: '#2E7D6B' },
   'Literatura': { key: 'literatura', rotulo: 'Literatura', cor: '#8A6D2F' },
   'Física': { key: 'fisica', rotulo: 'Física', cor: '#2F7DA3' },
+  'Fisica': { key: 'fisica', rotulo: 'Física', cor: '#2F7DA3' },
   'Química': { key: 'quimica', rotulo: 'Química', cor: '#B4453C' },
+  'Quimica': { key: 'quimica', rotulo: 'Química', cor: '#B4453C' },
   'Biologia': { key: 'biologia', rotulo: 'Biologia', cor: '#4A7C3F' },
   'História': { key: 'historia', rotulo: 'História', cor: '#9C413D' },
+  'Historia': { key: 'historia', rotulo: 'História', cor: '#9C413D' },
   'Geografia': { key: 'geografia', rotulo: 'Geografia', cor: '#3F6F8C' },
   'Sociologia': { key: 'sociologia', rotulo: 'Sociologia', cor: '#7A5EA6' },
   'Filosofia': { key: 'filosofia', rotulo: 'Filosofia', cor: '#5B6B82' },
   'Língua Inglesa': { key: 'ingles', rotulo: 'Inglês', cor: '#C9A961' },
+  'Lingua Inglesa': { key: 'ingles', rotulo: 'Inglês', cor: '#C9A961' },
   'Artes': { key: 'artes', rotulo: 'Artes', cor: '#A64B7E' }
 };
 
