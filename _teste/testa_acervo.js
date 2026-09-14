@@ -69,10 +69,17 @@ if (fs.existsSync(pAcervo) && fs.existsSync(pIndice)) {
 
     // Validação de Mapa Mental
     const mm = m.mapa_mental;
-    const temMM = !!(mm && mm.nucleo && Array.isArray(mm.ramos) && mm.ramos.length === 4 && mm.dica_ninja);
+    const temDica = !!(mm && (mm.dica_fixacao || mm.dica_ninja));
+    const temMM = !!(mm && mm.nucleo && Array.isArray(mm.ramos) && mm.ramos.length === 4 && temDica);
     if (temMM) temasComMapaMental++;
     asseverar(temMM, 'Tema ' + m.id + ' deve conter Mapa Mental estruturado completo com 4 ramos e dica');
   });
+
+  const textoAcervo = fs.readFileSync(pAcervo, 'utf-8');
+  asseverar(!textoAcervo.includes('DICA NINJA DA NATH'), 'Nenhuma menção a DICA NINJA DA NATH deve existir no acervo');
+  asseverar(!textoAcervo.includes('\\log_b'), 'Nenhum comando LaTeX \\log_b cru deve existir no acervo');
+  asseverar(!textoAcervo.includes('\\iff'), 'Nenhum comando LaTeX \\iff cru deve existir no acervo');
+  asseverar(!textoAcervo.includes('\\frac'), 'Nenhum comando LaTeX \\frac cru deve existir no acervo');
 
   asseverar(temasOutra === 0, 'Nenhum tema pode estar classificado como disciplinaKey outra');
   asseverar(totalQuestoes === 600, 'Acervo deve conter exatamente 600 questões (encontradas ' + totalQuestoes + ')');

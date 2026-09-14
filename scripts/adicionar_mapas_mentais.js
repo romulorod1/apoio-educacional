@@ -51,7 +51,7 @@ const MAPAS_ESPECIFICOS = {
         ]
       }
     ],
-    dica_ninja: "💡 DICA NINJA DA NATH: 'Para achar o Vértice da Parábola, lembre-se do 'Xis da Questão': Xv = -b / (2a). Achou o Xv? Joga ele dentro da função e o Yv cai no seu colo!'"
+    dica_fixacao: "💡 Dica de Fixação: 'Para achar o Vértice da Parábola, lembre-se do 'Xis da Questão': Xv = -b / (2a). Achou o Xv? Joga ele dentro da função e o Yv cai no seu colo!'"
   },
 
   "Matematica/Geometria/Questoes_Geometria_Plana_e_Espacial.json": {
@@ -99,7 +99,7 @@ const MAPAS_ESPECIFICOS = {
         ]
       }
     ],
-    dica_ninja: "💡 DICA NINJA DA NATH: 'Figura com teto reto (prisma/cilindro)? Base vezes altura! Terminou em ponta de foguete (cone/pirâmide)? Base vezes altura DIVIDIDO POR TRÊS!'"
+    dica_fixacao: "💡 Dica de Fixação: 'Figura com teto reto (prisma/cilindro)? Base vezes altura! Terminou em ponta de foguete (cone/pirâmide)? Base vezes altura DIVIDIDO POR TRÊS!'"
   },
 
   "Matematica/IME_ITA/Questoes_Numeros_Complexos_e_Polinomios_IME_ITA.json": {
@@ -147,7 +147,7 @@ const MAPAS_ESPECIFICOS = {
         ]
       }
     ],
-    dica_ninja: "💡 DICA NINJA DA NATH: 'Multiplicar por 'i' no plano complexo significa nada mais, nada menos do que dar um giro de 90° no sentido anti-horário! Rotação pura!'"
+    dica_fixacao: "💡 Dica de Fixação: 'Multiplicar por 'i' no plano complexo significa nada mais, nada menos do que dar um giro de 90° no sentido anti-horário! Rotação pura!'"
   },
 
   // --- FÍSICA (CAMINHOS REAIS NO DISCO) ---
@@ -197,7 +197,7 @@ const MAPAS_ESPECIFICOS = {
         ]
       }
     ],
-    dica_ninja: "💡 DICA NINJA DA NATH: 'Sem tempo na questão? Vai de Torricelli: v² = v0² + 2aΔs! E de km/h para m/s? Divide por 3,6 sem pestanejar!'"
+    dica_fixacao: "💡 Dica de Fixação: 'Sem tempo na questão? Vai de Torricelli: v² = v0² + 2aΔs! E de km/h para m/s? Divide por 3,6 sem pestanejar!'"
   },
 
   "Fisica/Termologia/Questoes_Termodinamica_e_Calor.json": {
@@ -245,7 +245,7 @@ const MAPAS_ESPECIFICOS = {
         ]
       }
     ],
-    dica_ninja: "💡 DICA NINJA DA NATH: 'Esquentou ou esfriou? Qui-Macete (Q = m·c·ΔT)! Derreteu ou evaporou? Qui-Moleza (Q = m·L)!'"
+    dica_fixacao: "💡 Dica de Fixação: 'Esquentou ou esfriou? Qui-Macete (Q = m·c·ΔT)! Derreteu ou evaporou? Qui-Moleza (Q = m·L)!'"
   },
 
   "Fisica/Eletromagnetismo/Questoes_Circuitos_e_Eletricidade.json": {
@@ -294,7 +294,7 @@ const MAPAS_ESPECIFICOS = {
         ]
       }
     ],
-    dica_ninja: "💡 DICA NINJA DA NATH: 'Quem Vê Ri (U = R·i) e Quem Paga Vê (P = U·i)! Em paralelo, dois resistores iguais dividem o valor pela metade!'"
+    dica_fixacao: "💡 Dica de Fixação: 'Quem Vê Ri (U = R·i) e Quem Paga Vê (P = U·i)! Em paralelo, dois resistores iguais dividem o valor pela metade!'"
   },
 
   "Fisica/IME_ITA/Questoes_MHS_Eletromagnetismo_e_Optica_IME_ITA.json": {
@@ -342,7 +342,7 @@ const MAPAS_ESPECIFICOS = {
         ]
       }
     ],
-    dica_ninja: "💡 DICA NINJA DA NATH: 'Força magnética em carga? Ela faz curva (movimento circular)! Raio da órbita: 'Meu Velho Não É Burro' -> R = (m·v) / (q·B)!'"
+    dica_fixacao: "💡 Dica de Fixação: 'Força magnética em carga? Ela faz curva (movimento circular)! Raio da órbita: 'Meu Velho Não É Burro' -> R = (m·v) / (q·B)!'"
   }
 };
 
@@ -356,7 +356,7 @@ function gerarMapaMentalCustomizado(dados, relPath) {
   const assunto = dados.assunto || bd.capitulo || "Tema";
 
   let nucleo = `${assunto}: Ideias Centrais e Aplicações`;
-  let dica = `💡 DICA NINJA DA NATH: 'Compreenda a essência de ${assunto} antes de decorar fórmulas. Quem entende o porquê nunca erra o como!'`;
+  let dica = `💡 Dica de Fixação: 'Compreenda a essência de ${assunto} antes de decorar fórmulas. Quem entende o porquê nunca erra o como!'`;
 
   let ramo1Topicos = [];
   let ramo2Topicos = [];
@@ -389,7 +389,7 @@ function gerarMapaMentalCustomizado(dados, relPath) {
       "Na leitura de gibis, livros de aventura, placas de trânsito e conversas no WhatsApp.",
       "Para escrever redações claras, contar histórias fascinantes e convencer seus amigos com bons argumentos."
     ];
-    dica = `💡 DICA NINJA DA NATH: 'Quer achar o sujeito de qualquer frase? Pergunte 'Quem?' ou 'O que?' para o verbo! Ele responde na hora!'`;
+    dica = `💡 Dica de Fixação: 'Quer achar o sujeito de qualquer frase? Pergunte 'Quem?' ou 'O que?' para o verbo! Ele responde na hora!'`;
   } else if (disc.includes("Literatura")) {
     ramo2Topicos = [
       "Passo 1: Descubra em qual época histórica o autor viveu e o que estava acontecendo no país naquele momento.",
@@ -401,7 +401,7 @@ function gerarMapaMentalCustomizado(dados, relPath) {
       "Em filmes, séries de streaming, letras de música brasileira e peças de teatro inspiradas nos clássicos.",
       "Para entender como as pessoas pensavam, amavam e se expressavam em diferentes séculos."
     ];
-    dica = `💡 DICA NINJA DA NATH: 'Literatura não é só livro antigo: é o espelho da alma humana! Descubra o contexto histórico e a obra ganha vida!'`;
+    dica = `💡 Dica de Fixação: 'Literatura não é só livro antigo: é o espelho da alma humana! Descubra o contexto histórico e a obra ganha vida!'`;
   } else if (disc.includes("Química") || disc.includes("Quimica")) {
     ramo2Topicos = [
       "Passo 1: Identifique se o fenômeno é físico (a substância continua a mesma, só mudou de forma) ou químico (virou substância nova).",
@@ -413,7 +413,7 @@ function gerarMapaMentalCustomizado(dados, relPath) {
       "Na cozinha: o bolo crescendo pelo fermento químico, a ferrugem no portão e a digestão dos alimentos no estômago.",
       "Nos sabões, pilhas, remédios e nos materiais plásticos reciclados do nosso dia a dia."
     ];
-    dica = `💡 DICA NINJA DA NATH: 'Na natureza nada se cria, nada se perde, tudo se transforma! O número de átomos nos reagentes tem que ser IGUALzinho nos produtos!'`;
+    dica = `💡 Dica de Fixação: 'Na natureza nada se cria, nada se perde, tudo se transforma! O número de átomos nos reagentes tem que ser IGUALzinho nos produtos!'`;
   } else if (disc.includes("Biologia")) {
     ramo2Topicos = [
       "Passo 1: Identifique o nível de organização (Molécula -> Célula -> Tecido -> Órgão -> Sistema -> Organismo -> Ecossistema).",
@@ -425,7 +425,7 @@ function gerarMapaMentalCustomizado(dados, relPath) {
       "No funcionamento do seu próprio corpo (coração batendo, digestão, anticorpos combatendo vacinas).",
       "Na preservação dos animais, plantas, florestas, rios e na luta contra a poluição do planeta."
     ];
-    dica = `💡 DICA NINJA DA NATH: 'Célula vegetal tem parede de celulose, vacúolo gigante e cloroplasto verde! Célula animal não tem parede: é flexível e dinâmica!'`;
+    dica = `💡 Dica de Fixação: 'Célula vegetal tem parede de celulose, vacúolo gigante e cloroplasto verde! Célula animal não tem parede: é flexível e dinâmica!'`;
   } else if (disc.includes("História") || disc.includes("Historia")) {
     ramo2Topicos = [
       "Passo 1: Posicione o acontecimento na linha do tempo (quem veio antes e quem veio depois).",
@@ -437,7 +437,7 @@ function gerarMapaMentalCustomizado(dados, relPath) {
       "Nos nomes das ruas, monumentos da cidade, feriados nacionais (7 de Setembro, 15 de Novembro, Tiradentes) e nas leis da nossa Constituição.",
       "Para não repetir os erros do passado e construir uma sociedade mais justa e democrática no presente."
     ];
-    dica = `💡 DICA NINJA DA NATH: 'História não é decorar datas, é entender causas e consequências! Pergunte sempre: 'Por que aconteceu e o que mudou depois?''`;
+    dica = `💡 Dica de Fixação: 'História não é decorar datas, é entender causas e consequências! Pergunte sempre: 'Por que aconteceu e o que mudou depois?''`;
   } else if (disc.includes("Geografia")) {
     ramo2Topicos = [
       "Passo 1: Diferencie o espaço natural (montanhas, rios, matas) do espaço construído pelas pessoas (cidades, pontes, estradas).",
@@ -449,7 +449,7 @@ function gerarMapaMentalCustomizado(dados, relPath) {
       "Na previsão do tempo, nos aplicativos de mapas no trânsito (Google Maps/Waze) e na origem dos alimentos da feira.",
       "No cuidado com as bacias hidrográficas, reciclagem de lixo e economia de energia."
     ];
-    dica = `💡 DICA NINJA DA NATH: 'O Sol sempre nasce no Leste! Estique o braço direito para o Sol nascente: a frente é o Norte, as costas é o Sul e o braço esquerdo é o Oeste!'`;
+    dica = `💡 Dica de Fixação: 'O Sol sempre nasce no Leste! Estique o braço direito para o Sol nascente: a frente é o Norte, as costas é o Sul e o braço esquerdo é o Oeste!'`;
   } else if (disc.includes("Filosofia")) {
     ramo2Topicos = [
       "Passo 1: Reconheça a pergunta fundamental que o pensador estava tentando responder.",
@@ -461,7 +461,7 @@ function gerarMapaMentalCustomizado(dados, relPath) {
       "Nos debates sobre o que é certo e errado, justiça nas leis, liberdade de expressão e na era das redes sociais e inteligência artificial.",
       "Para aprender a pensar por conta própria sem aceitar 'fake news' ou manipulações."
     ];
-    dica = `💡 DICA NINJA DA NATH: 'Sócrates ensinou: 'Só sei que nada sei!' O primeiro passo para a verdadeira sabedoria é reconhecer o que ainda precisamos aprender!'`;
+    dica = `💡 Dica de Fixação: 'Sócrates ensinou: 'Só sei que nada sei!' O primeiro passo para a verdadeira sabedoria é reconhecer o que ainda precisamos aprender!'`;
   } else if (disc.includes("Sociologia")) {
     ramo2Topicos = [
       "Passo 1: Olhe para o grupo e para as regras sociais que moldam o comportamento dos indivíduos de fora para dentro.",
@@ -473,7 +473,7 @@ function gerarMapaMentalCustomizado(dados, relPath) {
       "Na convivência na escola, nas regras do trabalho moderno por aplicativos, no combate ao racismo e na luta por direitos iguais.",
       "Para entender como a nossa sociedade se formou e exercer a cidadania com consciência crítica."
     ];
-    dica = `💡 DICA NINJA DA NATH: 'A Sociologia nos ensina a 'desnaturalizar' o mundo: aquilo que parece normal pode ser apenas uma construção social que podemos transformar para melhor!'`;
+    dica = `💡 Dica de Fixação: 'A Sociologia nos ensina a 'desnaturalizar' o mundo: aquilo que parece normal pode ser apenas uma construção social que podemos transformar para melhor!'`;
   } else if (disc.includes("Ingles") || disc.includes("Inglês")) {
     ramo2Topicos = [
       "Passo 1: Faça a leitura rápida (Skimming) para descobrir o assunto central e quem está falando.",
@@ -485,7 +485,7 @@ function gerarMapaMentalCustomizado(dados, relPath) {
       "Em letras de música internacionais, séries e filmes em versão original, videogames e viagens pelo mundo.",
       "Para ler manuais de tecnologia, notícias internacionais e artigos científicos globais."
     ];
-    dica = `💡 DICA NINJA DA NATH: 'Never translate word by word! Procure o sentido geral do parágrafo e use o contexto como sua maior bússola de tradução!'`;
+    dica = `💡 Dica de Fixação: 'Never translate word by word! Procure o sentido geral do parágrafo e use o contexto como sua maior bússola de tradução!'`;
   } else if (disc.includes("Artes")) {
     ramo2Topicos = [
       "Passo 1: Observe atentamente as cores, linhas, formas, luzes e sombras da pintura ou escultura.",
@@ -497,7 +497,7 @@ function gerarMapaMentalCustomizado(dados, relPath) {
       "Nos museus, no design gráfico de jogos e embalagens, na arquitetura das cidades e no cinema.",
       "Para despertar a criatividade, a sensibilidade estética e a imaginação livre."
     ];
-    dica = `💡 DICA NINJA DA NATH: 'A arte moderna não quer copiar uma fotografia: ela quer expressar emoção, ideias e transformar a nossa forma de ver o mundo!'`;
+    dica = `💡 Dica de Fixação: 'A arte moderna não quer copiar uma fotografia: ela quer expressar emoção, ideias e transformar a nossa forma de ver o mundo!'`;
   } else {
     ramo2Topicos = [
       "Passo 1: Leia atentamente o enunciado e destaque os dados e termos essenciais.",
@@ -544,7 +544,7 @@ function gerarMapaMentalCustomizado(dados, relPath) {
         topicos: ramo4Topicos
       }
     ],
-    dica_ninja: dica
+    dica_fixacao: dica
   };
 }
 

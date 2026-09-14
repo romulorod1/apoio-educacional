@@ -1323,6 +1323,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
   margin-bottom: 6px;
 }
 
+.mapa-dica-fixacao,
 .mapa-dica-ninja {
   display: flex;
   align-items: flex-start;
