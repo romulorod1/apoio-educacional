@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.19.1';
+  var VERSAO = '1.20.0';
 
   /* O acervo de 14/09 (aba Temas e o atalho dele na escolha de assunto da
    * aula) saiu do ar até ser refeito com revisão. Os arquivos do banco ficam
@@ -1137,6 +1137,8 @@
     $('#baixar-copia').addEventListener('click', baixarCopia);
     $('#restaurar-copia').addEventListener('click', function () { $('#arquivo-copia').click(); });
     $('#arquivo-copia').addEventListener('change', restaurarCopia);
+    $('#importar-biblioteca').addEventListener('click', function () { $('#arquivo-biblioteca').click(); });
+    $('#arquivo-biblioteca').addEventListener('change', importarBiblioteca);
     $('#limpar-orfaos').addEventListener('click', liberarEspaco);
     $('#apagar-exemplo').addEventListener('click', apagarExemplo);
     $('#apagar-tudo').addEventListener('click', apagarTudo);
@@ -11046,6 +11048,7 @@
 
     desenharAjustesDoFechamento();
     desenharAjustesDeReajuste();
+    desenharPacotesBiblioteca();
 
     Store.estimarEspaco().then(function (e) {
       if (!e) { $('#info-espaco').textContent = ''; return; }
@@ -11399,6 +11402,109 @@
     };
     leitor.readAsText(arquivo);
     ev.target.value = '';
+  }
+
+  // ================= biblioteca: importar pacote =================
+
+  /* O pacote é um .zip que ela escolhe no seletor do Android (o Drive aparece
+   * ali). Nada é gravado antes de o pacote inteiro ser conferido: manifest,
+   * lista de arquivos nos dois sentidos, hash de cada um e os assets que os
+   * exercícios citam (biblioteca.js). Depois, o espaço livre; e só então a
+   * gravação, numa transação só (store.js). Qualquer recusa deixa o tablet
+   * exatamente como estava, e a tela diz por quê. */
+  function mostrarEstadoImportacao(classe, linhas) {
+    var caixa = $('#estado-importacao-biblioteca');
+    if (!caixa) return;
+    caixa.innerHTML = '';
+    if (!linhas || !linhas.length) return;
+    caixa.appendChild(el('div', { class: classe, style: 'margin-bottom:10px' }, linhas.map(function (l, i) {
+      return el('div', { style: i ? '' : 'font-weight:600' }, [l]);
+    })));
+  }
+
+  function importarBiblioteca(ev) {
+    var arquivo = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!arquivo) return;
+    if (typeof Zip === 'undefined' || !Zip.suportado()) {
+      mostrarEstadoImportacao('faixa-aviso', [Biblioteca.SEM_NAVEGADOR]);
+      return;
+    }
+    var botao = $('#importar-biblioteca');
+    if (botao) botao.disabled = true;
+    mostrarEstadoImportacao('faixa-info', ['Conferindo o pacote ' + arquivo.name + '...']);
+    var aberto = null;
+    arquivo.arrayBuffer().then(function (conteudo) {
+      return Biblioteca.abrirPacote(conteudo, function (feitos, total) {
+        if (feitos % 50 === 0 || feitos === total) {
+          mostrarEstadoImportacao('faixa-info', ['Conferindo o pacote ' + arquivo.name + '...',
+            feitos + ' de ' + total + ' arquivos conferidos.']);
+        }
+      });
+    }).then(function (a) {
+      aberto = a;
+      return Store.listarPacotesBiblioteca();
+    }).then(function (lista) {
+      var atual = lista.filter(function (p) { return p.pacote === aberto.manifest.pacote; })[0];
+      if (atual && atual.versao >= aberto.manifest.versao) {
+        var e = new Error('versao');
+        e.versaoAtual = atual.versao;
+        throw e;
+      }
+      return Store.estimarEspaco();
+    }).then(function (espaco) {
+      /* A quota do navegador é o teto; a folga de 20% cobre o índice e os
+       * registros, que o total dos arquivos não conta. */
+      if (espaco && espaco.quota) {
+        var livre = espaco.quota - (espaco.usage || 0);
+        var precisa = Math.round(aberto.bytesTotais * 1.2);
+        if (livre < precisa) {
+          throw new Error('O tablet não tem espaço para este pacote: ele precisa de ' +
+            Biblioteca.mb(precisa) + ' e há ' + Biblioteca.mb(Math.max(0, livre)) + ' livres. Nada foi gravado.');
+        }
+      }
+      return Store.tornarPersistente();
+    }).then(function () {
+      mostrarEstadoImportacao('faixa-info', ['Gravando a biblioteca no tablet...']);
+      return Store.gravarPacoteBiblioteca(aberto);
+    }).then(function (registro) {
+      mostrarEstadoImportacao('faixa-info',
+        ['Biblioteca importada.'].concat(Biblioteca.resumo(registro.manifest, registro.bytes)));
+      desenharPacotesBiblioteca();
+    }).catch(function (e) {
+      if (e && e.versaoAtual != null) {
+        var nova = aberto.manifest.versao;
+        mostrarEstadoImportacao('faixa-aviso', [e.versaoAtual === nova
+          ? 'Esta versão do pacote já está no tablet. Nada foi mudado.'
+          : 'O tablet já tem a versão ' + e.versaoAtual + ' deste pacote, mais nova que a do arquivo (versão ' +
+            nova + '). Nada foi mudado.']);
+        return;
+      }
+      mostrarEstadoImportacao('faixa-aviso', ['O pacote não foi importado.',
+        (e && e.message) || 'Não foi possível ler o arquivo.']);
+    }).then(function () {
+      if (botao) botao.disabled = false;
+    });
+  }
+
+  function desenharPacotesBiblioteca() {
+    var caixa = $('#lista-pacotes-biblioteca');
+    if (!caixa) return;
+    Store.listarPacotesBiblioteca().then(function (lista) {
+      caixa.innerHTML = '';
+      lista.forEach(function (p) {
+        var linhas = Biblioteca.resumo(p.manifest, p.bytes);
+        var d = p.importadoEm ? new Date(p.importadoEm) : null;
+        // a data do tablet, e não a de Greenwich: à noite o dia UTC já virou
+        var quando = d && !isNaN(d) ? Core.ddmmaaaa(d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) +
+          '-' + ('0' + d.getDate()).slice(-2)) : '';
+        caixa.appendChild(el('div', { class: 'cartao compacto', style: 'margin-bottom:10px' }, [
+          el('div', { style: 'font-weight:600', texto: linhas[0] }),
+          el('div', { class: 'ajuda', style: 'margin:4px 0 0', texto: linhas.slice(1).join('. ') +
+            (quando ? '. Importado em ' + quando + '.' : '.') })
+        ]));
+      });
+    }).catch(function () { caixa.innerHTML = ''; });
   }
 
   function liberarEspaco() {

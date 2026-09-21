@@ -142,6 +142,11 @@ roda "materias"      node _teste/testa_materias.js
 # os seguintes em silencio, e o item gravado no tablet passaria a apontar para
 # outro topico. Este teste casa titulo por titulo com o registro.
 roda "ids de topicos" node _teste/testa_topicos_ids.js
+# FRENTE B (biblioteca): o leitor de zip e a conferencia do pacote, com o pacote
+# SINTETICO gerado na hora (o real mora no Drive e nunca entra no repositorio).
+# Cada veneno (corrompido deflate e stored, hash, sobrando, faltando, asset
+# citado, esquema) tem de ser recusado pelo motivo certo.
+roda "biblioteca (zip)" node _teste/testa_biblioteca_zip.js
 
 # As provas do kit de figuras nao rodavam aqui. Duas delas estavam falhando
 # desde o commit que as criou, algumas horas antes (_base_prova_travas, 34 de
@@ -296,6 +301,13 @@ roda "testa_biblioteca_offline --envenenado-activate" node "_teste/testa_bibliot
 # e a perda silenciosa, na tela tudo funciona e so a visita seguinte mostra o
 # defeito. Um veneno que so cobre a primeira nao prova nada sobre a segunda.
 # Ficam fora do laco porque o laco nao passa argumento.
+# FRENTE B: importar a biblioteca em Ajustes (migracao do banco para a versao 2,
+# substituicao por versao, venenos na tela, copia de seguranca com uso e
+# etiquetas). O modo envenenado serve um biblioteca.js que nao confere o hash,
+# e o teste tem que enxergar o pacote errado entrando.
+roda "biblioteca importar"                      node "_teste/testa_biblioteca_importar.js"
+roda "biblioteca importar --envenenado-hash"    node "_teste/testa_biblioteca_importar.js" --envenenado-hash
+
 roda "painel de valores"                        node "_teste/testa_painel_valores.js"
 roda "painel de valores --envenenado-aberto"    node "_teste/testa_painel_valores.js" --envenenado-aberto
 roda "painel de valores --envenenado-esquece"   node "_teste/testa_painel_valores.js" --envenenado-esquece

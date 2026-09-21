@@ -270,6 +270,20 @@
         <div id="lista-historico"></div>
       </div>
 
+      <h3 class="subtitulo">Biblioteca</h3>
+      <div class="cartao">
+        <p class="ajuda" style="margin-top:0">
+          A biblioteca chega em pacotes (um arquivo .zip por série), guardados no Google Drive.
+          Importado uma vez, o pacote fica neste tablet e abre sem internet.
+        </p>
+        <div id="lista-pacotes-biblioteca"></div>
+        <div id="estado-importacao-biblioteca"></div>
+        <div class="barra" style="margin-bottom:0">
+          <button class="btn" id="importar-biblioteca" type="button">Importar biblioteca</button>
+          <input type="file" id="arquivo-biblioteca" accept=".zip,application/zip,application/x-zip-compressed" hidden>
+        </div>
+      </div>
+
       <h3 class="subtitulo">Espaço e manutenção</h3>
       <div class="cartao">
         <div id="info-espaco" class="ajuda" style="margin-top:0"></div>
@@ -571,6 +585,8 @@
   <script src="figuras/solidos.js"></script>
   <script src="figuras/formula.js"></script>
   <script src="store.js"></script>
+  <script src="zip.js"></script>
+  <script src="biblioteca.js"></script>
   <script src="draw.js"></script>
   <!-- O cartão do mês, desenhado em canvas. Entra ANTES do app.js, que procura
        o global Cartao para montar a prévia. Precisa estar também na lista
