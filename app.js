@@ -4,7 +4,12 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.18.0';
+  var VERSAO = '1.19.0';
+
+  /* O acervo de 14/09 (aba Temas e o atalho dele na escolha de assunto da
+   * aula) saiu do ar até ser refeito com revisão. Os arquivos do banco ficam
+   * intactos: voltar para false devolve tudo como estava. */
+  var ACERVO_EM_CONSTRUCAO = true;
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -22,6 +27,13 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.19.0',
+      itens: [
+        'Agora a sua chave Pix pode aparecer no PDF do fechamento. Configure uma única vez em ' +
+          'Ajustes, no campo "Chave Pix para pagamento", e depois a inclusão é automática.'
+      ]
+    },
     {
       versao: '1.18.0',
       itens: [
@@ -8338,9 +8350,11 @@
 
       // 3. Por matéria, com a matemática e acervo completo
       lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Por matéria' }));
-      lista.appendChild(linha('Temas do Acervo Educacional',
-        (acervoModulos ? acervoModulos.length + ' temas' : '40 temas') + ' com material pronto (todas as matérias)',
-        function () { abrirEscolhaAcervoComoAssunto(aula, aluno); }, true));
+      if (!ACERVO_EM_CONSTRUCAO) {
+        lista.appendChild(linha('Temas do Acervo Educacional',
+          (acervoModulos ? acervoModulos.length + ' temas' : '40 temas') + ' com material pronto (todas as matérias)',
+          function () { abrirEscolhaAcervoComoAssunto(aula, aluno); }, true));
+      }
       lista.appendChild(linha(rotuloDisciplina(Core.MATERIA_PADRAO),
         indiceTemas ? indiceTemas.length + ' temas, com material pronto' : 'temas com material pronto',
         function () { abrirMatematicaComoAssunto(aula, aluno); }, true));
@@ -10012,10 +10026,17 @@
     return !(db.ajustes && db.ajustes.esconderNaoCobradas);
   }
 
+  /* O telefone dela não vai para o código, que é público: a chave nasce vazia e
+   * quem preenche é ela, em Ajustes. */
+  function chavePix() {
+    return String((db.ajustes && db.ajustes.chavePix) || '').trim();
+  }
+
   function opcoesDoDocumento(extra) {
     var o = extra || {};
     o.exibirTemasEAreas = exibirTemasEAreas();
     o.mostrarNaoCobradas = mostrarNaoCobradas();
+    o.chavePix = chavePix();
     return o;
   }
 
@@ -10096,6 +10117,10 @@
   var temaEmDetalhe = null;
 
   function carregarAcervo() {
+    if (ACERVO_EM_CONSTRUCAO) {
+      acervoModulos = [];
+      return Promise.resolve(acervoModulos);
+    }
     if (acervoModulos) return Promise.resolve(acervoModulos);
     if (acervoPromessa) return acervoPromessa;
     acervoPromessa = fetch('banco/acervo.json').then(function (r) {
@@ -10219,6 +10244,19 @@
   function desenharTemas() {
     var tela = $('#tela-temas');
     if (!tela) return;
+
+    if (ACERVO_EM_CONSTRUCAO) {
+      $('#visao-lista-temas').style.display = 'none';
+      $('#visao-detalhe-tema').style.display = 'none';
+      $('#contagem-temas-acervo').textContent = '';
+      if (!$('#temas-em-construcao')) {
+        tela.appendChild(el('div', { class: 'vazio', id: 'temas-em-construcao' }, [
+          el('p', { style: 'font-size:18px;font-weight:600;color:var(--navy);margin:0 0 8px', texto: 'Em construção' }),
+          el('p', { style: 'margin:0', texto: 'Esta área está sendo preparada.' })
+        ]));
+      }
+      return;
+    }
 
     if (!acervoModulos) {
       var contagem = $('#contagem-temas-acervo');
@@ -11094,6 +11132,10 @@
       if (reajuste && reajuste.parentNode === tela) tela.insertBefore(caixa, reajuste);
       else tela.appendChild(caixa);
     }
+    /* A busca do IBGE redesenha Ajustes um ou dois segundos depois de a tela
+     * abrir. Com ela escrevendo a chave, refazer a caixa apagaria o que ainda
+     * está no meio da digitação. */
+    if (document.activeElement && document.activeElement.id === 'campo-chave-pix') return;
     caixa.innerHTML = '';
 
     caixa.appendChild(el('h3', { class: 'subtitulo', texto: 'O documento da família' }));
@@ -11126,6 +11168,42 @@
     }));
 
     caixa.appendChild(cartao);
+
+    var cartaoPix = el('div', { class: 'cartao' });
+    var campoPix = el('input', {
+      type: 'text', id: 'campo-chave-pix', autocomplete: 'off', autocapitalize: 'off',
+      autocorrect: 'off', spellcheck: 'false',
+      placeholder: 'Telefone, e-mail, CPF ou chave aleatória'
+    });
+    campoPix.value = chavePix();
+    var tempoPix = null;
+    function guardarPix() {
+      clearTimeout(tempoPix);
+      var valor = campoPix.value.trim();
+      if (valor === chavePix()) return;
+      db.ajustes = db.ajustes || {};
+      if (valor) db.ajustes.chavePix = valor;
+      else delete db.ajustes.chavePix;
+      salvar();
+    }
+    campoPix.addEventListener('input', function () {
+      clearTimeout(tempoPix);
+      tempoPix = setTimeout(guardarPix, 500);
+    });
+    /* Sair do campo só grava, sem redesenhar: refazer a caixa trocaria a
+     * caixinha de cima debaixo do dedo, se ela saísse do campo tocando nela. */
+    campoPix.addEventListener('change', guardarPix);
+    campoPix.addEventListener('blur', guardarPix);
+    cartaoPix.appendChild(el('label', { class: 'campo', style: 'margin:0' }, [
+      el('span', { texto: 'Chave Pix para pagamento' }),
+      campoPix
+    ]));
+    cartaoPix.appendChild(el('p', {
+      class: 'ajuda', style: 'margin:8px 0 0',
+      texto: 'A chave sai no fechamento que a família recebe, no texto e no PDF, logo abaixo do '
+        + 'total. Com o campo vazio, o fechamento continua como sempre foi.'
+    }));
+    caixa.appendChild(cartaoPix);
   }
 
   function desenharAjustesDeReajuste() {

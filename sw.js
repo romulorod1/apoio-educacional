@@ -41,8 +41,10 @@
  * A ordem v23, v24, v25, v26 e v27 evita regressão do nome do cache e é
  * confirmada pelo portão sobre cada estado integrado. O v28 traz a revisão
  * e expansão aprofundada completa da base de dados e acervo pedagógico. O v29
- * limpa a notação de fórmulas matemáticas e atualiza a apresentação das dicas. */
-var CACHE = 'apoio-educacional-v29';
+ * limpa a notação de fórmulas matemáticas e atualiza a apresentação das dicas.
+ * O v30 tira o acervo do ar (aba Temas em construção) e leva a chave Pix ao
+ * fechamento da família, com a lista igual. */
+var CACHE = 'apoio-educacional-v30';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
