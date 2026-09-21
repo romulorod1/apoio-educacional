@@ -3279,6 +3279,13 @@
         (f.qtdEncontros === 1 ? '' : 's') + ', ' + f.totalHoras + ' h)');
     }
 
+    /* A chave vem de Ajustes e mora só no tablet. Sem chave, o documento sai
+     * exatamente como sempre saiu. */
+    if (opcoes.chavePix) {
+      L.push('');
+      L.push('**Chave Pix para pagamento:** ' + opcoes.chavePix);
+    }
+
     if (exibeListas(opcoes) && temasNoTexto.length) {
       L.push('');
       L.push('## Temas trabalhados');

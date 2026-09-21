@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.18.1';
+  var VERSAO = '1.19.0';
 
   /* O acervo de 14/09 (aba Temas e o atalho dele na escolha de assunto da
    * aula) saiu do ar até ser refeito com revisão. Os arquivos do banco ficam
@@ -27,6 +27,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.19.0',
+      itens: [
+        'Agora a sua chave Pix pode aparecer no PDF do fechamento. Configure uma única vez em ' +
+          'Ajustes, no campo "Chave Pix para pagamento", e depois ela entra automaticamente em ' +
+          'todos os fechamentos.'
+      ]
+    },
     {
       versao: '1.18.0',
       itens: [
@@ -10019,10 +10027,17 @@
     return !(db.ajustes && db.ajustes.esconderNaoCobradas);
   }
 
+  /* O telefone dela não vai para o código, que é público: a chave nasce vazia e
+   * quem preenche é ela, em Ajustes. */
+  function chavePix() {
+    return String((db.ajustes && db.ajustes.chavePix) || '').trim();
+  }
+
   function opcoesDoDocumento(extra) {
     var o = extra || {};
     o.exibirTemasEAreas = exibirTemasEAreas();
     o.mostrarNaoCobradas = mostrarNaoCobradas();
+    o.chavePix = chavePix();
     return o;
   }
 
@@ -11118,6 +11133,10 @@
       if (reajuste && reajuste.parentNode === tela) tela.insertBefore(caixa, reajuste);
       else tela.appendChild(caixa);
     }
+    /* A busca do IBGE redesenha Ajustes um ou dois segundos depois de a tela
+     * abrir. Com ela escrevendo a chave, refazer a caixa apagaria o que ainda
+     * está no meio da digitação. */
+    if (document.activeElement && document.activeElement.id === 'campo-chave-pix') return;
     caixa.innerHTML = '';
 
     caixa.appendChild(el('h3', { class: 'subtitulo', texto: 'O documento da família' }));
@@ -11150,6 +11169,45 @@
     }));
 
     caixa.appendChild(cartao);
+
+    var cartaoPix = el('div', { class: 'cartao' });
+    var campoPix = el('input', {
+      type: 'text', id: 'campo-chave-pix', autocomplete: 'off',
+      placeholder: 'Telefone, e-mail, CPF ou chave aleatória'
+    });
+    campoPix.value = chavePix();
+    var tempoPix = null;
+    function guardarPix() {
+      clearTimeout(tempoPix);
+      var valor = campoPix.value.trim();
+      if (valor === chavePix()) return;
+      db.ajustes = db.ajustes || {};
+      if (valor) db.ajustes.chavePix = valor;
+      else delete db.ajustes.chavePix;
+      salvar();
+    }
+    campoPix.addEventListener('input', function () {
+      clearTimeout(tempoPix);
+      tempoPix = setTimeout(guardarPix, 500);
+    });
+    campoPix.addEventListener('change', guardarPix);
+    campoPix.addEventListener('blur', function () {
+      guardarPix();
+      desenharAjustesDoFechamento();
+    });
+    cartaoPix.appendChild(el('label', { class: 'campo', style: 'margin:0' }, [
+      el('span', { texto: 'Chave Pix para pagamento' }),
+      campoPix
+    ]));
+    cartaoPix.appendChild(el('p', {
+      class: 'ajuda', style: 'margin:8px 0 0',
+      texto: chavePix()
+        ? 'A chave sai no fechamento que a família recebe, no texto e no PDF, logo abaixo do '
+          + 'total. Para tirar, apague o campo.'
+        : 'Escreva aqui a chave em que você recebe. Ela passa a sair no fechamento que a família '
+          + 'recebe, logo abaixo do total. Com o campo vazio, o fechamento continua como sempre foi.'
+    }));
+    caixa.appendChild(cartaoPix);
   }
 
   function desenharAjustesDeReajuste() {

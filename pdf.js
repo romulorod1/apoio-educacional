@@ -1117,6 +1117,17 @@
       }, 0, true, COLUNAS_TOTAL_MES);
     }
 
+    /* Mesma regra do markdown: a chave vem de Ajustes, e sem ela a folha não
+       muda. */
+    if (opcoes.chavePix) {
+      doc.y -= 22;
+      doc.garanteEspaco(16);
+      var rotuloPix = 'Chave Pix para pagamento: ';
+      doc.texto(rotuloPix, MARG_E, doc.y, { tam: 10, cor: COR.texto });
+      doc.texto(opcoes.chavePix, MARG_E + medir(rotuloPix, 10, false), doc.y,
+        { tam: 10, bold: true, cor: COR.navy });
+    }
+
     /* O que foi trabalhado. Vem antes do resumo escrito porque é o que a
      * família procura quando abre o documento: o mês em uma olhada. */
     function tituloDeSecao(texto, larguraFio) {
