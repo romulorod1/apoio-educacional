@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.19.0';
+  var VERSAO = '1.19.1';
 
   /* O acervo de 14/09 (aba Temas e o atalho dele na escolha de assunto da
    * aula) saiu do ar até ser refeito com revisão. Os arquivos do banco ficam
@@ -27,6 +27,13 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.19.1',
+      itens: [
+        'Para alunos com fechamento antes do término do mês, a seção "Feedback" é removida ' +
+          'mediante confirmação (não precisa mais apagar o termo "Feedback" manualmente).'
+      ]
+    },
     {
       versao: '1.19.0',
       itens: [
@@ -9276,7 +9283,8 @@
       if (!temResumo) {
         cartao.appendChild(el('div', {
           class: 'ajuda', style: 'margin:8px 0 0',
-          texto: 'O feedback ainda não foi escrito. Ele entra no PDF logo abaixo da tabela.'
+          texto: 'O feedback ainda não foi escrito. Ele entra no PDF logo abaixo da tabela; ' +
+            'em branco, o PDF sai sem ele.'
         }));
       }
 
@@ -10063,6 +10071,11 @@
   }
 
   function exportarAlunoEmPdf(f, comFolhas) {
+    /* Feedback em branco não sai no PDF, nem o título dele. Ela confirma antes,
+     * porque esquecer de escrever é mais comum do que decidir mandar sem. */
+    if (!(f.resumoTexto || '').trim() &&
+        !confirmar('O feedback de ' + f.alunoNome + ' (' + f.mesExtenso + ') está em branco. ' +
+          'Gerar o PDF sem o feedback?')) return;
     var aulasComNota = f.linhas.filter(function (l) { return l.temNota; });
     var passo = Promise.resolve({ notas: [], imagens: {} });
 
@@ -10096,8 +10109,7 @@
       var bytes = PDFGen.gerarFechamento(f, opcoesDoDocumento({
         incluirNotas: comFolhas,
         notas: extra.notas,
-        imagens: extra.imagens,
-        sempreResumo: true
+        imagens: extra.imagens
       }));
       entregarArquivo(nomeBase(f) + (comFolhas ? '_com_folhas' : '') + '.pdf',
         new Blob([bytes], { type: 'application/pdf' }),
