@@ -4,7 +4,12 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.18.0';
+  var VERSAO = '1.18.1';
+
+  /* O acervo de 14/09 (aba Temas e o atalho dele na escolha de assunto da
+   * aula) saiu do ar até ser refeito com revisão. Os arquivos do banco ficam
+   * intactos: voltar para false devolve tudo como estava. */
+  var ACERVO_EM_CONSTRUCAO = true;
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -8338,9 +8343,11 @@
 
       // 3. Por matéria, com a matemática e acervo completo
       lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Por matéria' }));
-      lista.appendChild(linha('Temas do Acervo Educacional',
-        (acervoModulos ? acervoModulos.length + ' temas' : '40 temas') + ' com material pronto (todas as matérias)',
-        function () { abrirEscolhaAcervoComoAssunto(aula, aluno); }, true));
+      if (!ACERVO_EM_CONSTRUCAO) {
+        lista.appendChild(linha('Temas do Acervo Educacional',
+          (acervoModulos ? acervoModulos.length + ' temas' : '40 temas') + ' com material pronto (todas as matérias)',
+          function () { abrirEscolhaAcervoComoAssunto(aula, aluno); }, true));
+      }
       lista.appendChild(linha(rotuloDisciplina(Core.MATERIA_PADRAO),
         indiceTemas ? indiceTemas.length + ' temas, com material pronto' : 'temas com material pronto',
         function () { abrirMatematicaComoAssunto(aula, aluno); }, true));
@@ -10096,6 +10103,10 @@
   var temaEmDetalhe = null;
 
   function carregarAcervo() {
+    if (ACERVO_EM_CONSTRUCAO) {
+      acervoModulos = [];
+      return Promise.resolve(acervoModulos);
+    }
     if (acervoModulos) return Promise.resolve(acervoModulos);
     if (acervoPromessa) return acervoPromessa;
     acervoPromessa = fetch('banco/acervo.json').then(function (r) {
@@ -10219,6 +10230,19 @@
   function desenharTemas() {
     var tela = $('#tela-temas');
     if (!tela) return;
+
+    if (ACERVO_EM_CONSTRUCAO) {
+      $('#visao-lista-temas').style.display = 'none';
+      $('#visao-detalhe-tema').style.display = 'none';
+      $('#contagem-temas-acervo').textContent = '';
+      if (!$('#temas-em-construcao')) {
+        tela.appendChild(el('div', { class: 'vazio', id: 'temas-em-construcao' }, [
+          el('p', { style: 'font-size:18px;font-weight:600;color:var(--navy);margin:0 0 8px', texto: 'Em construção' }),
+          el('p', { style: 'margin:0', texto: 'Esta área está sendo preparada.' })
+        ]));
+      }
+      return;
+    }
 
     if (!acervoModulos) {
       var contagem = $('#contagem-temas-acervo');
