@@ -31,8 +31,7 @@
       versao: '1.19.0',
       itens: [
         'Agora a sua chave Pix pode aparecer no PDF do fechamento. Configure uma única vez em ' +
-          'Ajustes, no campo "Chave Pix para pagamento", e depois ela entra automaticamente em ' +
-          'todos os fechamentos.'
+          'Ajustes, no campo "Chave Pix para pagamento", e depois a inclusão é automática.'
       ]
     },
     {
@@ -11172,7 +11171,8 @@
 
     var cartaoPix = el('div', { class: 'cartao' });
     var campoPix = el('input', {
-      type: 'text', id: 'campo-chave-pix', autocomplete: 'off',
+      type: 'text', id: 'campo-chave-pix', autocomplete: 'off', autocapitalize: 'off',
+      autocorrect: 'off', spellcheck: 'false',
       placeholder: 'Telefone, e-mail, CPF ou chave aleatória'
     });
     campoPix.value = chavePix();
@@ -11190,22 +11190,18 @@
       clearTimeout(tempoPix);
       tempoPix = setTimeout(guardarPix, 500);
     });
+    /* Sair do campo só grava, sem redesenhar: refazer a caixa trocaria a
+     * caixinha de cima debaixo do dedo, se ela saísse do campo tocando nela. */
     campoPix.addEventListener('change', guardarPix);
-    campoPix.addEventListener('blur', function () {
-      guardarPix();
-      desenharAjustesDoFechamento();
-    });
+    campoPix.addEventListener('blur', guardarPix);
     cartaoPix.appendChild(el('label', { class: 'campo', style: 'margin:0' }, [
       el('span', { texto: 'Chave Pix para pagamento' }),
       campoPix
     ]));
     cartaoPix.appendChild(el('p', {
       class: 'ajuda', style: 'margin:8px 0 0',
-      texto: chavePix()
-        ? 'A chave sai no fechamento que a família recebe, no texto e no PDF, logo abaixo do '
-          + 'total. Para tirar, apague o campo.'
-        : 'Escreva aqui a chave em que você recebe. Ela passa a sair no fechamento que a família '
-          + 'recebe, logo abaixo do total. Com o campo vazio, o fechamento continua como sempre foi.'
+      texto: 'A chave sai no fechamento que a família recebe, no texto e no PDF, logo abaixo do '
+        + 'total. Com o campo vazio, o fechamento continua como sempre foi.'
     }));
     caixa.appendChild(cartaoPix);
   }

@@ -3235,8 +3235,9 @@
      * para a outra metade. Por isso cada linha diz só DE QUAL SOMA se trata:
      * esta espelha o "**Valor destas datas:**" da tabela de baixo e fecha a
      * tabela "Datas trabalhadas" a que se refere. Quem separa os dois números é
-     * a posição: o total do mês é a última linha em negrito da folha, e nunca é
-     * menor do que este.
+     * a posição: o total do mês é a última linha de valor da folha (a chave Pix,
+     * quando configurada, vem depois e não traz valor), e nunca é menor do que
+     * este.
      *
      * O rótulo também não diz "dadas", e dizer já foi tentado: falta sem aviso é
      * cobrável por padrão, entra nesta soma e conta como encontro. Chamar de
