@@ -58,8 +58,10 @@
  * styles.css), com a lista igual. O v37 põe a dificuldade à vista na lista de
  * exercícios: o filtro Fácil, Médio e Difícil, o rótulo "estimada" ou
  * "curada" e o CSV das etiquetas dela em Ajustes (app.js, index.html e
- * styles.css), com a lista igual. */
-var CACHE = 'apoio-educacional-v37';
+ * styles.css), com a lista igual. O v38 tira do repositório o acervo de
+ * 14/09: saem da lista './banco/acervo.json' e './banco/acervo_indice.json', e
+ * do app.js, index.html e styles.css a aba Temas antiga. */
+var CACHE = 'apoio-educacional-v38';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -100,9 +102,6 @@ var ARQUIVOS = [
   // o índice de busca acompanha o de temas: é ele que faz o campo de assunto
   // achar por conteúdo, e não só por título.
   './banco/busca.json',
-  // o acervo educacional completo (40 temas em 12 disciplinas)
-  './banco/acervo.json',
-  './banco/acervo_indice.json',
   /* O índice dos temas de português, ao lado dos outros dois e por um motivo a
    * mais: o índice de uma matéria que não é a padrão é procurado no CACHE, e
    * não na rede (app.js, carregarOutrosIndices, que pergunta ao cache para um
@@ -151,6 +150,14 @@ var ARQUIVOS = [
 var ENDERECOS = ARQUIVOS.map(function (u) { return new URL(u, self.location.href).href; });
 function doPacote(endereco) { return ENDERECOS.indexOf(endereco) !== -1; }
 
+/* Arquivos que já foram do pacote e saíram dele. O resgate abaixo guarda no
+ * BAIXADOS tudo o que não é do pacote, e o BAIXADOS nunca se apaga: sem esta
+ * lista, o acervo de 14/09 (2,4 MB, fora do pacote desde o v38) iria para lá
+ * como se ela o tivesse baixado, e ficaria no tablet para sempre. */
+var APOSENTADOS = ['./banco/acervo.json', './banco/acervo_indice.json']
+  .map(function (u) { return new URL(u, self.location.href).href; });
+function aposentado(endereco) { return APOSENTADOS.indexOf(endereco) !== -1; }
+
 /* Não assume o controle sozinho: fica esperando. Quem manda trocar de versão
  * é ela, pelo aviso que aparece no aplicativo. Assim uma atualização nunca
  * recarrega a tela no meio de uma aula.
@@ -185,7 +192,7 @@ function resgatarEApagar(baixados, nome) {
   return caches.open(nome).then(function (velho) {
     return velho.keys().then(function (chaves) {
       return Promise.all(chaves.map(function (pedido) {
-        if (doPacote(pedido.url)) return null;
+        if (doPacote(pedido.url) || aposentado(pedido.url)) return null;
         return velho.match(pedido).then(function (r) {
           return r ? baixados.put(pedido, r) : null;
         });
