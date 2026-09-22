@@ -53,8 +53,14 @@ def para_busca(texto):
 
 
 def sem_tracos(texto):
-    """Troca travessao e meia-risca por hifen: nada disso vai para a tela."""
-    return texto.replace('\u2014', '-').replace('\u2013', '-')
+    """Troca travessao, meia-risca e sinal de menos por hifen: nada disso vai para a tela.
+
+    O sinal de menos (U+2212) entra por decisao do contrato (secao 4): a fonte o
+    usa como traco em titulo e origem ("Adaptada do ENEM \u22122013",
+    "Probabilidade \u2212Miscelanea"). Vale so para exibicao e busca; o recorte
+    nunca e tocado.
+    """
+    return texto.replace('\u2014', '-').replace('\u2013', '-').replace('\u2212', '-')
 
 
 # ------------------------------------------------------------------ nomes

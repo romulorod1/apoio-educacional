@@ -70,6 +70,7 @@ MARGEM_X = 24.0        # borda externa das colunas
 # largura) continua fora do recorte.
 AFASTA_FIO = 1.2
 TOLERANCIA_MARGEM = 12.0
+RECUO_MAX = 40.0       # recuo de paragrafo que ainda aceita o marcador (recuado_na_linha)
 ALTURA_MIN_ENUNCIADO = 20.0
 ALTURA_MIN_SOLUCAO = 9.0
 DPI_CONFERENCIA = 100
@@ -85,11 +86,14 @@ FONTE = {
 }
 
 
-# Pedacos do nome da fonte que marcam negrito. No 9o ano bastam os dois; a B2
-# mediu 139 solucoes do 1o medio em CMBX10 e passa --fontes-negrito
-# SSBX,Bold,CMBX. Nao entra CMBX por padrao porque no 9o ano CMBX10 aparece em
-# palavra destacada no meio do texto.
-FONTES_NEGRITO = ['SSBX', 'Bold']
+# Pedacos do nome da fonte que marcam negrito. CMBX10 (negrito com serifa) e o
+# marcador das solucoes em 6 listas do 1o medio (Circulo Trigonometrico e Leis
+# dos Senos e dos Cossenos, 139 solucoes). Medido pela B2 nas 230 listas das 7
+# series: span CMBX10 na margem da coluna comecando por numero so aparece
+# nessas 6 listas, e sao exatamente os 139 marcadores; os outros 156 spans CMBX
+# na margem sao CMBX12 de 14,3 pt, o numero do titulo de secao. Por isso entra
+# CMBX10, e nao CMBX: o CMBX12 fica como esta.
+FONTES_NEGRITO = ['SSBX', 'Bold', 'CMBX10']
 
 
 def negrito(fonte):
@@ -221,8 +225,14 @@ def margem_da_coluna(col, geo):
     return 29.5 if col == 0 else geo['xsep'] + 10.0
 
 
-def marcadores(els, geo, em_solucoes):
-    """Marcadores de item e titulos de secao, com o jeito como cada um foi achado."""
+def marcadores(els, geo, em_solucoes, ja_teve_enunciado=False, secao_1_abre_solucoes=True):
+    """Marcadores de item e titulos de secao, com o jeito como cada um foi achado.
+
+    Lista sem o titulo "Respostas e Solucoes" (8o ano, Potenciacao): as
+    solucoes comecam quando a secao "1 Exercicios Introdutorios" reaparece
+    depois de ja ter havido enunciados. Esse titulo sai como titulo_solucoes
+    implicito.
+    """
     txt = [e for e in els if e['tipo'] == 'txt']
     out = []
     virou_solucoes = None
@@ -265,11 +275,18 @@ def marcadores(els, geo, em_solucoes):
             continue
         # titulo de secao: numero grande sozinho ou "Exercicios ..." grande
         if e['tam'] > 12.5 and (re.match(r'^\d+$', t) or t.startswith('Exerc')):
+            # pelo texto da linha, e nao pelo "1": no modelo CM o numero da secao e
+            # CMBX12, que nao conta como negrito (ver FONTES_NEGRITO)
+            if (secao_1_abre_solucoes and t.startswith('Exerc') and ja_teve_enunciado and not em_solucoes
+                    and virou_solucoes is None and 'Introdut' in _linha_a_partir(e, txt)):
+                out.append({'tipo': 'titulo_solucoes', 'col': e['col'], 'el': e, 'implicito': True})
+                virou_solucoes = e
+                continue
             out.append({'tipo': 'secao', 'col': e['col'], 'el': e})
             continue
         if e['tam'] > 12.5:
             continue
-        if abs(e['bb'][0] - margem_da_coluna(e['col'], geo)) > TOLERANCIA_MARGEM:
+        if abs(e['bb'][0] - margem_da_coluna(e['col'], geo)) > TOLERANCIA_MARGEM and not recuado_na_linha(e, txt, geo):
             continue
         vizinhos = sorted([o for o in txt if o is not e and o['col'] == e['col']
                            and abs(centro_y(o['bb']) - centro_y(e['bb'])) < 3
@@ -292,6 +309,33 @@ def marcadores(els, geo, em_solucoes):
                 out.append({'tipo': 'solucao', 'col': e['col'], 'el': e, 'numero': int(m.group(1)),
                             'forma': 'junto' if m.group(2) else 'separado'})
     return out
+
+
+def recuado_na_linha(e, txt, geo):
+    """"Exercicio" com recuo de paragrafo: ate RECUO_MAX do fim da margem e primeiro da linha.
+
+    O LaTeX recua o paragrafo que vem depois de uma formula centrada, e o
+    marcador sai 23,5 pt para dentro (Exercicio 7 de Exercicios sobre Fracoes,
+    6o ano: o unico em 4.455 marcadores das 7 series). Nada pode vir antes dele
+    na mesma linha visual, senao e palavra no meio do texto.
+    """
+    t = e['texto'].strip()
+    if not t.startswith('Exerc') or re.match(r'^Exerc\S*cios', t):
+        return False
+    recuo = e['bb'][0] - margem_da_coluna(e['col'], geo)
+    if not (0 < recuo <= RECUO_MAX):
+        return False
+    cy = centro_y(e['bb'])
+    return not any(o is not e and o['col'] == e['col'] and abs(centro_y(o['bb']) - cy) < 4
+                   and o['bb'][2] <= e['bb'][0] + 0.5 for o in txt)
+
+
+def _linha_a_partir(e, txt):
+    """Texto da linha visual de `e`, dele para a direita, com os acentos recompostos."""
+    cy = centro_y(e['bb'])
+    linha = sorted([o for o in txt if o['col'] == e['col'] and abs(centro_y(o['bb']) - cy) < 4
+                    and o['bb'][0] >= e['bb'][0] - 0.5], key=lambda o: o['bb'][0])
+    return portal.recompor(' '.join(o['texto'] for o in linha))
 
 
 def topo_da_linha(marc, els):
@@ -418,8 +462,12 @@ def borda_cruza_tinta(doc, pno, caixa, cache):
     return False
 
 
-def detectar(doc):
-    """Acha os itens de uma lista. Devolve enunciados e solucoes com os seus pedacos."""
+def detectar(doc, secao_1_abre_solucoes=True):
+    """Acha os itens de uma lista. Devolve enunciados e solucoes com os seus pedacos.
+
+    secao_1_abre_solucoes=False desliga a regra da lista sem titulo de solucoes
+    (so para o veneno da prova).
+    """
     geo_doc = geometria(doc)
     if not geo_doc:
         return {'erro': 'sem divisa de colunas (nem fio, nem margem de texto)'}
@@ -432,6 +480,7 @@ def detectar(doc):
     formas = collections.Counter()
     cruzados = []
     pagina_solucoes = None
+    solucoes_sem_titulo = False
     em_solucoes = False
     aberto = None  # (tipo, numero, chave)
     chave_seq = 0
@@ -450,7 +499,7 @@ def detectar(doc):
         for e in els:
             if e['cruza']:
                 cruzados.append({'pagina': pno + 1, 'bb': [round(v, 1) for v in e['bb']]})
-        marcs = marcadores(els, geo, em_solucoes)
+        marcs = marcadores(els, geo, em_solucoes, bool(ordem['enunciado']), secao_1_abre_solucoes)
         for col in (0, 1):
             cx0, cx1 = faixa_da_coluna(col, geo, pg)
             ms = sorted([m for m in marcs if m['col'] == col], key=lambda m: m['el']['bb'][1])
@@ -468,6 +517,8 @@ def detectar(doc):
                     if m['tipo'] == 'titulo_solucoes':
                         em_solucoes = True
                         pagina_solucoes = pagina_solucoes or pno + 1
+                        if m.get('implicito'):
+                            solucoes_sem_titulo = True
                         aberto = None
                         continue
                     if m['tipo'] == 'nota':
@@ -481,7 +532,7 @@ def detectar(doc):
                     formas[(tipo, m['forma'])] += 1
                     texto_pos = m['el']['texto'].strip()
                     continua = (tipo == 'solucao' and ordem['solucao'] and ordem['solucao'][-1][0] == m['numero']
-                                and _depois_do_numero(m, els_col).startswith('Outro'))
+                                and continua_o_anterior(_depois_do_numero(m, els_col)))
                     if continua:
                         chave = ordem['solucao'][-1][1]
                     else:
@@ -529,9 +580,24 @@ def detectar(doc):
                 pedacos[aberto[0]][aberto[2]].append({'pno': pno, 'col': col, 'rect': r, 'xsep': geo['xsep'],
                                                      'transborda': transborda})
     geo_doc['divisas_por_pagina'] = {str(k): v for k, v in sorted(divisas.items())}
-    return {'geo': geo_doc, 'pagina_solucoes': pagina_solucoes, 'ordem': ordem, 'pedacos': pedacos, 'rotulos': rotulos,
+    return {'geo': geo_doc, 'pagina_solucoes': pagina_solucoes, 'solucoes_sem_titulo': solucoes_sem_titulo,
+            'ordem': ordem, 'pedacos': pedacos, 'rotulos': rotulos,
             'rotulos_inseguros': rotulos_inseguros,
             'formas': {'%s_%s' % k: v for k, v in sorted(formas.items())}, 'cruzados': cruzados}
+
+
+# Numero de solucao repetido logo em seguida, com uma destas frases, e a segunda
+# resolucao do MESMO item, e nao outro item: "5. Outro metodo:" (9o ano, Poligonos
+# Regulares), "2. (Outra solucao.)" (8o ano, Divisibilidade e Teorema da Divisao
+# Euclidiana) e "21. Solucao 2." (1o medio, Introducao as Inequacoes de 2o Grau).
+# Numero repetido sem uma delas continua saindo com motivo. Confere sem os
+# espacos: a juncao dos spans parte a palavra ("Solu cao 2.", Inequacoes).
+CONTINUACAO = re.compile(r'^\(?(?:Outr[oa](?:solu|m[eé]todo|modo|maneira|forma|resolu)|Solu[cç][aã]o2(?!\d)|Segundasolu)',
+                         re.I)
+
+
+def continua_o_anterior(texto_depois_do_numero):
+    return CONTINUACAO.match(re.sub(r'\s+', '', texto_depois_do_numero)) is not None
 
 
 def _depois_do_numero(m, els_col):
@@ -700,7 +766,11 @@ def primeira_linha_na_margem(doc, pno, rect, col, xsep):
     """
     palavras = doc[pno].get_text('words', clip=pymupdf.Rect(rect))
     margem = margem_da_coluna(col, {'xsep': xsep})
-    na_margem = [w for w in palavras if abs(w[0] - margem) <= TOLERANCIA_MARGEM]
+    # mais o "Exercicio" com recuo de paragrafo (ver recuado_na_linha): so a
+    # palavra do marcador, para o radical ou o numerador acima da linha, que
+    # tambem ficam para dentro da margem, nao virarem a primeira linha
+    na_margem = [w for w in palavras if abs(w[0] - margem) <= TOLERANCIA_MARGEM
+                 or (0 < w[0] - margem <= RECUO_MAX and w[4].startswith('Exerc'))]
     if not na_margem:
         return ''
     topo = min(na_margem, key=lambda w: (w[1], w[0]))
@@ -854,6 +924,40 @@ def montar_busca(docs):
             'temas': indice}
 
 
+def titulo_do_modulo(slug, capas_listas, capas_teorias):
+    """Titulo do modulo pela capa mais frequente das LISTAS; sem lista, das teorias.
+
+    A primeira capa lida nao serve: a fonte erra o nome do modulo em algumas
+    capas, e "__exercicios" vem antes de "__teoria" na ordem dos arquivos. Fracao
+    como Porcentagem e como Probabilidade (6o ano) saia "Divisibilidade", que e o
+    que a capa de "Exercicios Diversos de Fracoes como Porcentagens" escreve. As
+    listas e nao as teorias, porque a capa da teoria escreve o modulo em caixa
+    alta ("CONJUNTOS") ou corta a linha ("Geometria Plana - Parte"). Variantes que
+    so diferem em maiuscula contam juntas; a grafia e a da primeira lista do
+    grupo. Empate: o grupo que aparece primeiro, na ordem dos arquivos.
+    Modulo com slug "-parte-N" cujo titulo nao diz a parte ganha " - Parte N"
+    (Elementos Basicos de Geometria Plana, 8o ano: tres modulos, capas iguais).
+    """
+    for capas in (capas_listas, capas_teorias):
+        capas = [c for c in capas if c]
+        if not capas:
+            continue
+        grupos = collections.OrderedDict()
+        for c in capas:
+            grupos.setdefault(c.casefold(), []).append(c)
+        melhor = max(grupos.values(), key=len)  # max devolve o primeiro no empate
+        titulo = melhor[0]
+        break
+    else:
+        titulo = slug.replace('-', ' ').capitalize()
+    titulo = portal.sem_tracos(titulo)
+    titulo = re.sub(r'(?<=\S) -(?=\S)|(?<=\S)- (?=\S)', ' - ', titulo)
+    m = re.search(r'-parte-(\d+)$', slug)
+    if m and 'parte' not in titulo.casefold():
+        titulo += ' - Parte %s' % m.group(1)
+    return titulo
+
+
 def commit_do_gerador():
     try:
         r = subprocess.run(['git', '-C', RAIZ, 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True)
@@ -881,17 +985,16 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
     for a in arquivos:
         por_modulo.setdefault(a['modulo'], {'teoria': [], 'exercicios': []})[a['tipo']].append(a)
     abertos = {}
-    tit_mod = {}
+    capas_mod = collections.defaultdict(lambda: {'exercicios': [], 'teoria': []})
     for a in arquivos:
         doc = pymupdf.open(os.path.join(pdfs, a['arquivo']))
         abertos[a['arquivo']] = doc
         capa = portal.capa_da_teoria(doc) if a['tipo'] == 'teoria' else portal.capa_da_lista(doc)
         a['capa'] = capa
-        if capa.get('modulo') and a['modulo'] not in tit_mod:
-            tit_mod[a['modulo']] = portal.sem_tracos(capa['modulo'])
+        capas_mod[a['modulo']][a['tipo']].append(capa.get('modulo'))
 
     def titulo_modulo(slug):
-        return tit_mod.get(slug) or slug.replace('-', ' ').capitalize()
+        return titulo_do_modulo(slug, capas_mod[slug]['exercicios'], capas_mod[slug]['teoria'])
 
     for mod, grupos in por_modulo.items():
         modulo = {'slug': mod, 'titulo': titulo_modulo(mod)}
@@ -911,6 +1014,7 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                 continue
             rel.update({'modelo': 'CM' if det['geo']['xsep'] < 300 else 'Palladio', 'fio_colunas_x': det['geo']['xsep'],
                         'fio_rodape_y': det['geo']['yrod'], 'pagina_solucoes': det['pagina_solucoes'],
+                        'solucoes_sem_titulo': det['solucoes_sem_titulo'],
                         'origem_da_divisa': det['geo']['origem_da_divisa'], 'divisas_por_pagina': det['geo']['divisas_por_pagina'],
                         'rotulos_sem_caixa_por_encostar_em_tinta': det['rotulos_inseguros'],
                         'formas_do_marcador': det['formas'], 'elementos_que_cruzam_o_fio': det['cruzados']})

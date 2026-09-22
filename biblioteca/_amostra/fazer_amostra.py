@@ -24,6 +24,10 @@ Solucoes" em pagina propria; bloco de creditos
 ("Elaborado por", "Produzido por") no fim do documento. A lista tem tres paginas, e
 nao duas, porque as solucoes do Portal comecam sempre em pagina propria.
 
+A terceira lista, lista-variantes (modelo CM), traz os padroes que a B2 mediu
+nas outras series: solucoes sem o titulo "Respostas e Solucoes", marcador com
+recuo de paragrafo e solucoes em duas partes (ver lista_variantes).
+
 Venenos: --sem-item N tira o item N dos enunciados da lista-de-amostra (o
 item 2 e o de marcador num span so); --duplica-solucao N rotula a solucao N
 com o numero N-1, como o "9." duas vezes de Areas de figuras planas.
@@ -149,6 +153,63 @@ def lista(caminho, modelo='palladio', sem_item=None, duplica=None):
     doc.save(caminho, garbage=3, deflate=True, no_new_id=True)
 
 
+def lista_variantes(caminho):
+    """Lista no modelo CM com os padroes que a B2 mediu fora do 9o ano.
+
+    - soluções SEM o titulo "Respostas e Solucoes": comecam quando a secao
+      "1 Exercicios Introdutorios" reaparece (8o ano, Potenciacao);
+    - "Exercicio 3." com recuo de paragrafo de 23,5 pt, depois de uma formula
+      centrada (6o ano, Exercicios sobre Fracoes, exercicio 7);
+    - solucao 2 em duas partes, "2." e "2. (Outra solucao.)" (8o ano,
+      Divisibilidade), e solucao 3 em duas, "3." e "3. Solucao 2." (1o medio,
+      Inequacoes de 2o grau): cada par e UM item.
+    """
+    g = MODELOS['cm']
+    X0, X1, T = g['x0'], g['x1'], g['topo']
+    doc = pymupdf.open()
+    capa = doc.new_page(width=612, height=792)
+    capa.insert_text((150, 80), 'Módulo de Amostra Sintética', fontname='hebo', fontsize=14.3)
+    capa.insert_text((150, 150), 'Lista de Variantes.', fontname='hebo', fontsize=14.3)
+    capa.insert_text((258, 225), 'Nono Ano', fontname='hebo', fontsize=14.3)
+    p = Pagina(doc, g)
+    p.fios(1)
+    p.secao(X0, T + 60, 1, 'Exercícios Introdutórios')
+    xt = p.marcador(X0, T + 90, 1)
+    p.pg.insert_text((xt, T + 90), 'Calcule o valor da soma de', fontname='helv', fontsize=10)
+    p.texto(X0, T + 102, ['3 com 4.'])
+    xt = p.marcador(X0, T + 120, 2)
+    p.pg.insert_text((xt, T + 120), 'Quanto vale a expressão', fontname='helv', fontsize=10)
+    p.pg.insert_text((120, T + 140), '10 - 7 + 0 = ?', fontname='helv', fontsize=10)
+    # o marcador depois da formula centrada sai com o recuo de paragrafo
+    xt = p.marcador(X0 + 23.5, T + 166, 3)
+    p.pg.insert_text((xt, T + 166), 'Que fração expressa', fontname='helv', fontsize=10)
+    p.texto(X0, T + 178, ['a soma de um meio com um quarto?'])
+    p.secao(X1, T + 60, 2, 'Exercícios de Fixação')
+    xt = p.marcador(X1, T + 90, 4)
+    p.pg.insert_text((xt, T + 90), 'Um quadrado tem 5 cm de lado.', fontname='helv', fontsize=10)
+    p.texto(X1, T + 102, ['Qual é a sua área?'])
+    # solucoes, sem "Respostas e Solucoes": a secao 1 reaparece
+    p = Pagina(doc, g)
+    p.fios(2)
+    p.secao(X0, T + 40, 1, 'Exercícios Introdutórios')
+    p.numero_solucao(X0, T + 70, 1)
+    p.texto(X0 + 14, T + 70, ['Temos 3 + 4 = 7.'])
+    p.numero_solucao(X0, T + 100, 2)
+    p.texto(X0 + 14, T + 100, ['(Extraído da Amostra) Temos 10 - 7 = 3.'])
+    p.numero_solucao(X0, T + 130, 2)
+    p.texto(X0 + 14, T + 130, ['(Outra solução.) Contando de 7 até 10,'])
+    p.texto(X0, T + 142, ['são 3 passos.'])
+    p.numero_solucao(X0, T + 172, 3)
+    p.texto(X0 + 14, T + 172, ['Um meio mais um quarto dá três quartos.'])
+    p.numero_solucao(X0, T + 202, 3)
+    p.texto(X0 + 14, T + 202, ['Solução 2. Em quartos: 2 + 1 = 3.'])
+    p.secao(X1, T + 40, 2, 'Exercícios de Fixação')
+    p.numero_solucao(X1, T + 70, 4)
+    p.texto(X1 + 14, T + 70, ['A área é 5 · 5 = 25 cm².'])
+    doc.set_metadata(FIXO)
+    doc.save(caminho, garbage=3, deflate=True, no_new_id=True)
+
+
 def teoria(caminho):
     doc = pymupdf.open()
     pg = doc.new_page(width=612, height=792)
@@ -171,6 +232,7 @@ def fazer(pasta, sem_item=None, duplica=None):
     os.makedirs(pasta, exist_ok=True)
     lista(os.path.join(pasta, 'amostra-sintetica__exercicios-lista-de-amostra.pdf'), 'palladio', sem_item, duplica)
     lista(os.path.join(pasta, 'amostra-sintetica__exercicios-lista-cm.pdf'), 'cm')
+    lista_variantes(os.path.join(pasta, 'amostra-sintetica__exercicios-lista-variantes.pdf'))
     teoria(os.path.join(pasta, 'amostra-sintetica__teoria-lista-de-amostra-parte-i.pdf'))
 
 

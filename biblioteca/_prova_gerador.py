@@ -28,6 +28,10 @@ Travas (CONTRATO_pacote_biblioteca.md, secao 9, mais os pedidos da B4):
   origem        origem_citada literal na fonte
   fidelidade    20 pedacos sorteados com semente fixa: SVG no Chrome contra o
                 pixmap do pymupdf do mesmo retangulo, diferenca abaixo de 1%
+  series (B2)   padroes medidos fora do 9o ano (Biblioteca/PADROES_numeracao_6_series.md):
+                solucoes sem titulo, marcador com recuo de paragrafo, solucao
+                em duas partes, marcador em CMBX10, titulo do modulo pela capa
+                das listas; toda lista com solucoes
 
 Saida no dialeto do portao: "N verificacoes passaram, M falharam".
 """
@@ -134,6 +138,10 @@ def trava_contagens(p):
             erros.append('%s: itens no pacote %s mais excluidos %s nao dao 1..%d' % (l['aula'], no_pacote, excl, n))
         if any(not e.get('motivo') for e in l['excluidos']):
             erros.append('%s: excluido sem motivo' % l['aula'])
+        # as 230 listas das 7 series tem solucoes (medido pela B2); lista sem elas
+        # e detector que perdeu a secao (Potenciacao, 8o ano, nao tem o titulo)
+        if not l.get('pagina_solucoes'):
+            erros.append('%s: lista sem solucoes detectadas' % l['aula'])
         if l.get('pagina_solucoes'):
             for x in no_pacote:
                 if ns.count(x) != 1:
@@ -507,6 +515,82 @@ def trava_origem(p):
         t = re.sub(r'([a-z\u00e0-\u00ff])\d(\.?\))', r'\1\2', t)
         if '(' + oc + ')' not in portal.sem_tracos(t):
             erros.append('%s: origem_citada %r nao esta literal na %s da fonte' % (it['id'], oc, onde))
+    return erros
+
+
+# ------------------------------------------------------------------ padroes das outras series (B2)
+
+def trava_variantes(p):
+    """A lista de variantes da amostra sai inteira e com as solucoes certas.
+
+    Ela imita tres padroes medidos fora do 9o ano: solucoes sem o titulo
+    "Respostas e Solucoes", marcador com recuo de paragrafo (item 3) e solucao
+    em duas partes (itens 2 e 3). Cada par de partes tem de ser UM item, com
+    os dois pedacos empilhados.
+    """
+    erros = []
+    lst = [l for l in p.relatorio['listas'] if l['aula'] == 'lista-variantes']
+    if not lst:
+        return ['a amostra nao tem a lista de variantes']
+    l = lst[0]
+    if not l.get('solucoes_sem_titulo'):
+        erros.append('lista-variantes: as solucoes nao foram achadas pela secao 1 que reaparece')
+    nums = sorted(i['numero'] for i in p.itens if i['aula']['slug'] == 'lista-variantes')
+    if nums != [1, 2, 3, 4]:
+        erros.append('lista-variantes: itens no pacote %s, e nao 1 a 4 (excluidos: %s)' % (
+            nums, [(e['numero'], e['motivo'][:60]) for e in l['excluidos']]))
+    for i in p.itens:
+        if i['aula']['slug'] == 'lista-variantes' and i['numero'] in (2, 3):
+            if len(pedacos(i, 'solucao')) != 2:
+                erros.append('lista-variantes: solucao %d com %d pedaco(s), e nao as duas partes' % (
+                    i['numero'], len(pedacos(i, 'solucao'))))
+    return erros
+
+
+def trava_fontes_negrito():
+    """O marcador de solucao em CMBX10 (1o medio) e reconhecido; o CMBX12 de secao nao vira marcador.
+
+    A amostra sintetica so tem as fontes-base do PDF, entao a prova monta os
+    elementos de uma linha como o gerador os le de uma pagina real.
+    """
+    geo = {'xsep': 291.0, 'yrod': 747.0}
+    def el(texto, fonte, x, y, tam=10.0):
+        return {'tipo': 'txt', 'bb': (x, y, x + 6 * len(texto), y + tam), 'texto': texto, 'fonte': fonte,
+                'tam': tam, 'col': 0 if x < 291 else 1, 'cruza': False}
+    erros = []
+    ms = gerar_pacote.marcadores([el('5.', 'ABCDEF+CMBX10', 29.5, 100), el('Temos', 'CMR10', 45, 100)], geo, True)
+    if not any(m['tipo'] == 'solucao' and m['numero'] == 5 for m in ms):
+        erros.append('marcador "5." em CMBX10 nao reconhecido como solucao')
+    ms = gerar_pacote.marcadores([el('2', 'ABCDEF+CMBX12', 29.5, 300, 14.3), el('Exercícios', 'ABCDEF+CMSSBX10', 59, 300, 14.3)],
+                                 geo, True)
+    if any(m['tipo'] == 'solucao' for m in ms):
+        erros.append('numero de secao em CMBX12 lido como marcador de solucao')
+    return erros
+
+
+def trava_titulo_modulo():
+    """O titulo do modulo sai da capa mais frequente das listas, nao da primeira capa lida."""
+    erros = []
+    casos = [
+        # 6o ano: a primeira capa (em ordem de arquivo) erra o modulo
+        ('fracao-como-porcentagem-e-como-probabilidade',
+         ['Divisibilidade', 'Fração como Porcentagem e Probabilidade', 'Fração como Porcentagem e Probabilidade'],
+         ['FRAÇÃO COMO PORCENTAGEM E COMO PROBABILIDADE'], 'Fração como Porcentagem e Probabilidade'),
+        # a teoria em caixa alta nao ganha da lista
+        ('conjuntos', ['Conjuntos', 'Conjuntos'], ['CONJUNTOS', 'CONJUNTOS', 'CONJUNTOS'], 'Conjuntos'),
+        # modulo so com teoria
+        ('introducao-a-funcao-quadratica', [], ['Introdução à Função Quadrática'], 'Introdução à Função Quadrática'),
+        # a parte do slug entra quando a capa nao diz
+        ('elementos-basicos-de-geometria-plana-parte-2', ['Elementos básicos de geometria plana'], [],
+         'Elementos básicos de geometria plana - Parte 2'),
+        # sinal de menos da fonte vira hifen com espaco
+        ('probabilidade-miscelanea-de-exercicios', ['Probabilidade −Miscelânea de Exercícios'], [],
+         'Probabilidade - Miscelânea de Exercícios'),
+    ]
+    for slug, listas, teorias, esperado in casos:
+        obtido = gerar_pacote.titulo_do_modulo(slug, listas, teorias)
+        if obtido != esperado:
+            erros.append('%s: titulo %r, e nao %r' % (slug, obtido, esperado))
     return erros
 
 
@@ -889,6 +973,51 @@ def venenos(p, temp, placar, curadoria):
     return it_obj, it_simples
 
 
+def venenos_series(p, temp, placar, curadoria):
+    """Um veneno por padrao que a B2 acrescentou; cada um tem de reprovar pelo motivo esperado."""
+    # soluções sem titulo: sem a regra da secao 1, a lista de variantes fica sem solucoes
+    antes = gerar_pacote.detectar
+    gerar_pacote.detectar = lambda doc: antes(doc, secao_1_abre_solucoes=False)
+    try:
+        gerar(p.pdfs, os.path.join(temp, 'v_sem_titulo'), curadoria)
+    finally:
+        gerar_pacote.detectar = antes
+    q = Pacote(os.path.join(temp, 'v_sem_titulo'), p.pdfs)
+    placar.conferir('lista sem titulo de solucoes', trava_contagens(q), True, 'lista sem solucoes detectadas')
+    # recuo de paragrafo: sem ele, o "Exercicio 3." recuado some e a sequencia quebra
+    antes_r = gerar_pacote.RECUO_MAX
+    gerar_pacote.RECUO_MAX = 0.0
+    try:
+        gerar(p.pdfs, os.path.join(temp, 'v_recuo'), curadoria)
+    finally:
+        gerar_pacote.RECUO_MAX = antes_r
+    q = Pacote(os.path.join(temp, 'v_recuo'), p.pdfs)
+    placar.conferir('marcador com recuo de paragrafo', trava_contagens(q), True, 'fora de sequencia')
+    # continuacao: sem ela, "2." e "2. (Outra solucao.)" viram duas solucoes 2 e o item sai
+    antes_c = gerar_pacote.continua_o_anterior
+    gerar_pacote.continua_o_anterior = lambda t: False
+    try:
+        gerar(p.pdfs, os.path.join(temp, 'v_continua'), curadoria)
+    finally:
+        gerar_pacote.continua_o_anterior = antes_c
+    q = Pacote(os.path.join(temp, 'v_continua'), p.pdfs)
+    placar.conferir('solucao em duas partes', trava_variantes(q), True, 'itens no pacote')
+    # CMBX10 fora da lista de negrito: o marcador do 1o medio deixa de ser lido
+    antes_f = list(gerar_pacote.FONTES_NEGRITO)
+    gerar_pacote.FONTES_NEGRITO[:] = ['SSBX', 'Bold']
+    try:
+        placar.conferir('negrito sem CMBX10', trava_fontes_negrito(), True, 'CMBX10')
+    finally:
+        gerar_pacote.FONTES_NEGRITO[:] = antes_f
+    # titulo pela primeira capa lida (a regra antiga): o 6o ano sai "Divisibilidade"
+    antes_t = gerar_pacote.titulo_do_modulo
+    gerar_pacote.titulo_do_modulo = lambda slug, listas, teorias: next((c for c in listas + teorias if c), slug)
+    try:
+        placar.conferir('titulo pela primeira capa', trava_titulo_modulo(), True, 'fracao-como-porcentagem')
+    finally:
+        gerar_pacote.titulo_do_modulo = antes_t
+
+
 def principal():
     ap = argparse.ArgumentParser()
     ap.add_argument('--real', action='store_true')
@@ -932,7 +1061,11 @@ def principal():
             placar.conferir('curadoria sobrescreve o proxy',
                             [] if any(i['dificuldade_origem'] == 'curadoria' and i['numero'] == 4 and i['dificuldade'] == 1
                                       for i in p.itens) else ['a linha do dificuldade.csv nao chegou ao item'])
+            placar.conferir('variantes: sem titulo, recuo, duas partes', trava_variantes(p))
+            placar.conferir('marcador em CMBX10', trava_fontes_negrito())
+            placar.conferir('titulo do modulo pela capa das listas', trava_titulo_modulo())
             it_obj, it_simples = venenos(p, temp, placar, cur)
+            venenos_series(p, temp, placar, cur)
         if not a.sem_navegador:
             sorteio = sortear_pedacos(p)
             erros, medidas = trava_fidelidade(p, sorteio, temp)
