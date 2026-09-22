@@ -754,6 +754,15 @@
   /* Uma aula pode ter mais de um tema: hora e meia dá tempo de fechar um assunto
    * e começar outro. O campo antigo, de um tema só, continua sendo lido para não
    * perder registro de quem já usou. */
+  function modulosDaBiblioteca(au) {
+    var saida = [];
+    (au.anexos || []).forEach(function (an) {
+      if (!an || !an.biblioteca) return;
+      (an.modulos || []).forEach(function (m) { if (m && saida.indexOf(m) < 0) saida.push(m); });
+    });
+    return saida;
+  }
+
   function temasDaAula(au) {
     if (au.temas && au.temas.length) return au.temas.slice();
     if (au.tema) return [au.tema];
@@ -2708,6 +2717,10 @@
         temNota: !!(au.notaTexto || (au.nota && au.nota.paginas && au.nota.paginas.length) || (au.anexos && au.anexos.length)),
         notaTexto: au.notaTexto || '',
         temas: temasDaAula(au),
+        /* Os módulos dos exercícios que foram para esta aula pela biblioteca
+         * (gravados no anexo). Entram só na lista "Temas trabalhados" do mês,
+         * que já obedece à caixa "exibir temas e áreas". */
+        modulosBiblioteca: modulosDaBiblioteca(au),
         areas: (au.areas || []).slice()
       });
     }
@@ -2751,6 +2764,10 @@
       l.temas.forEach(function (t) {
         guardaTema(vistos, temasDoMes, t.titulo, l.data);
         if (!l.futura) guardaTema(vistosFeitos, temasFeitos, t.titulo, l.data);
+      });
+      (l.modulosBiblioteca || []).forEach(function (titulo) {
+        guardaTema(vistos, temasDoMes, titulo, l.data);
+        if (!l.futura) guardaTema(vistosFeitos, temasFeitos, titulo, l.data);
       });
       l.areas.forEach(function (id) {
         contagemAreas[id] = (contagemAreas[id] || 0) + 1;
