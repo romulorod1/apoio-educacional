@@ -144,6 +144,9 @@ const lerEtiquetas = pag => pag.evaluate(() => Store.etiquetasDaBiblioteca());
   // ================================================================
   secao('6a. Exportar sem etiqueta nenhuma: avisa e não gera arquivo');
   await H.irParaAba(pag, 'ajustes');
+  conf('sem pacote, o botão de exportar não aparece (Ajustes igual ao de antes)', await pag.evaluate(() => {
+    const b = document.querySelector('#exportar-etiquetas'); return !!b && b.hidden && b.offsetParent === null;
+  }), true);
   const zip = path.join(TMP, 'nono.zip');
   Sintetico.gerar(zip, { curadoria: CURADORIA });
   conf('importou o pacote sintético com dois curados', /^Biblioteca importada\./.test(await importar(pag, zip)), true);
@@ -164,6 +167,12 @@ const lerEtiquetas = pag => pag.evaluate(() => Store.etiquetasDaBiblioteca());
   conf('exercício 2 (curado): "curada: difícil"', await rotuloFonte(pag, 2), 'curada: difícil');
   conf('exercício 5: "estimada: médio"', await rotuloFonte(pag, 5), 'estimada: médio');
   conf('exercício 8 (curado): "curada: fácil"', await rotuloFonte(pag, 8), 'curada: fácil');
+  // cada cartão diz a origem que o pacote traz, e nunca "curada" num item proxy
+  const origens = await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo .bib-cartao')).map(c =>
+    ({ id: c.getAttribute('data-id'), rotulo: (c.querySelector('.bib-dif-fonte') || {}).textContent || '' })));
+  const origemEsperada = origens.map(o => (CURADORIA[o.id] ? 'curada' : 'estimada'));
+  conf('os 8 cartões: "curada" só no 2 e no 8, que o pacote marca como curadoria; "estimada" nos 6 proxy',
+    origens.map(o => o.rotulo.split(':')[0]).join(','), origemEsperada.join(','));
   conf('nenhum cartão com o rótulo antigo ("revisada" ou só "Fácil")', await pag.evaluate(() =>
     Array.from(document.querySelectorAll('#bib-corpo .bib-tags .tag')).filter(t => /revisada|^(Fácil|Médio|Difícil)$/i.test(t.textContent.trim())).length), 0);
   await tocarEtiqueta(pag, 3, 1);
@@ -190,7 +199,7 @@ const lerEtiquetas = pag => pag.evaluate(() => Store.etiquetasDaBiblioteca());
   conf('começa em Todas: os 8', await visiveis(pag), '1,2,3,4,5,6,7,8');
   await filtrar(pag, 1);
   conf('Fácil: 1, 3 e o 8 curado (o 2 curado como Difícil sai)', await visiveis(pag), '1,3,8');
-  conf('com a contagem', await pag.evaluate(() => document.querySelector('#bib-filtro-dif-info').textContent), '3 exercícios de 8 nesta dificuldade.');
+  conf('com a contagem do que está na tela', await pag.evaluate(() => document.querySelector('#bib-filtro-dif-info').textContent), '3 exercícios de 8 na tela.');
   await filtrar(pag, 2);
   conf('Médio: 4, 5 e 6', await visiveis(pag), '4,5,6');
   await filtrar(pag, 3);
@@ -222,6 +231,7 @@ const lerEtiquetas = pag => pag.evaluate(() => Store.etiquetasDaBiblioteca());
   await pag.select('#bib-filtro-aluno', alunoId);
   await esperar('filtro de uso aplicado', () => visiveis(pag), v => v === '1,2', 5000);
   conf('Difícil e "ainda não usei com": o 7 usado sai, ficam 1 e 2', await visiveis(pag), '1,2');
+  conf('e a contagem é a dos dois filtros juntos', await pag.evaluate(() => document.querySelector('#bib-filtro-dif-info').textContent), '2 exercícios de 8 na tela.');
   await filtrar(pag, null);
   conf('Todas com o filtro de uso: só o 7 escondido', await visiveis(pag), '1,2,3,4,5,6,8');
   await pag.select('#bib-filtro-aluno', '');
@@ -236,6 +246,19 @@ const lerEtiquetas = pag => pag.evaluate(() => Store.etiquetasDaBiblioteca());
   await filtrar(pag, 3);
   await esperar('etiquetas relidas', () => visiveis(pag), v => v === '1,2,7', 5000);
   conf('depois de recarregar, Difícil ainda traz o 1 dela', await visiveis(pag), '1,2,7');
+  // o filtro fica ligado de uma lista para a outra: voltar ao módulo e reabrir a lista, sem tocar no filtro,
+  // com as etiquetas chegando depois do desenho (a corrida do carregarEtiquetas)
+  await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
+  await pausa(150);
+  await tocarLinha(pag, 'Soma e Produto');
+  await esperar('lista reaberta com o filtro ligado', () => visiveis(pag), v => v === '1,2,7', 5000);
+  conf('reaberta a lista, o Difícil continua ligado e traz o 1 dela', await visiveis(pag), '1,2,7');
+  conf('com o chip Difícil marcado', await pag.evaluate(() => (document.querySelector('#bib-filtro-dif .chip-filtro.ativo') || {}).textContent), 'Difícil');
+  // pelo menu, os filtros voltam para todos
+  await H.irParaAba(pag, 'agenda');
+  await abrirSomaEProduto(pag);
+  await esperar('lista pelo menu', () => visiveis(pag), v => v === '1,2,3,4,5,6,7,8', 5000);
+  conf('entrando pela aba, o filtro de dificuldade volta para Todas', await visiveis(pag), '1,2,3,4,5,6,7,8');
 
   // ================================================================
   secao('6b. Exportar as etiquetas: o CSV da curadoria');

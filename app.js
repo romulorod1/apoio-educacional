@@ -1081,9 +1081,9 @@
         /* Redesenha a tela ao abrir para exibir dados atualizados */
         if (b.dataset.tela === 'temas') desenharTemas();
         if (b.dataset.tela === 'biblioteca') {
-          /* Pelo menu, e não pelo Material de uma aula: sem aula de origem, e o
-           * filtro "ainda não usei" volta para todos. */
-          if (!bibVindoDoMaterial) { bibContexto = null; bibFiltroAluno = ''; }
+          /* Pelo menu, e não pelo Material de uma aula: sem aula de origem, e os
+           * filtros "ainda não usei" e de dificuldade voltam para todos. */
+          if (!bibVindoDoMaterial) { bibContexto = null; bibFiltroAluno = ''; bibFiltroDif = null; }
           bibVindoDoMaterial = false;
           desenharBiblioteca();
         }
@@ -11653,8 +11653,11 @@
   function desenharPacotesBiblioteca() {
     var caixa = $('#lista-pacotes-biblioteca');
     if (!caixa) return;
+    var exportar = $('#exportar-etiquetas');
     Store.listarPacotesBiblioteca().then(function (lista) {
       caixa.innerHTML = '';
+      // o botão das etiquetas só aparece com pacote: sem ele, Ajustes fica igual ao de antes
+      if (exportar) exportar.hidden = !lista.length;
       lista.forEach(function (p) {
         var linhas = Biblioteca.resumo(p.manifest, p.bytes);
         var d = p.importadoEm ? new Date(p.importadoEm) : null;
@@ -11667,7 +11670,7 @@
             (quando ? '. Importado em ' + quando + '.' : '.') })
         ]));
       });
-    }).catch(function () { caixa.innerHTML = ''; });
+    }).catch(function () { caixa.innerHTML = ''; if (exportar) exportar.hidden = true; });
   }
 
   // ================= biblioteca: navegar =================
@@ -11999,7 +12002,7 @@
         it.origem_citada ? el('div', { class: 'bib-origem', texto: it.origem_citada }) : null
       ]), 'itens', it.id, etiquetaDela(it)));
     });
-    corpo.appendChild(barraFiltroDeDificuldade(grade, lista));
+    corpo.appendChild(barraFiltroDeDificuldade(grade, lista, mod.banco));
     corpo.appendChild(barraFiltroDeUso(grade));
     corpo.appendChild(grade);
     observarMiniaturas(grade);
@@ -12013,7 +12016,7 @@
   /* Fácil, Médio, Difícil: vale a etiqueta dela quando existe, e a do pacote
    * (estimada ou curada) quando não. Exercício sem dificuldade nenhuma só
    * aparece em "Todas". O filtro fica ligado de uma lista para a outra. */
-  function barraFiltroDeDificuldade(grade, lista) {
+  function barraFiltroDeDificuldade(grade, lista, banco) {
     var chips = el('div', { class: 'chips-filtro', role: 'group', 'aria-label': 'Dificuldade', id: 'bib-filtro-dif' });
     var info = el('span', { class: 'ajuda bib-filtro-info', id: 'bib-filtro-dif-info' });
     function desenha() {
@@ -12029,6 +12032,7 @@
     }
     grade._info = info;
     grade._lista = lista;
+    grade._banco = !!banco;
     desenha();
     aplicarFiltroDeDificuldade(grade, lista);
     return el('div', { class: 'barra bib-filtro-uso bib-filtro-dif' }, [
@@ -12039,21 +12043,28 @@
   function aplicarFiltroDeDificuldade(grade, lista) {
     var porId = {};
     lista.itens.forEach(function (it) { porId[it.id] = it; });
-    var mostrados = 0;
     Array.prototype.slice.call(grade.querySelectorAll('.bib-celula')).forEach(function (c) {
       var cartao = c.querySelector('.bib-cartao');
       var it = cartao && porId[cartao.getAttribute('data-id')];
       var fora = bibFiltroDif !== null && !!it && dificuldadeEfetiva(it) !== bibFiltroDif;
       c.setAttribute('data-fora-dif', fora ? '1' : '');
-      if (!fora) mostrados++;
       mostrarCelula(c);
     });
+    contarFiltroDeDificuldade(grade);
+  }
+
+  /* A contagem é do que está na tela, com os dois filtros: "Difícil" e "ainda
+   * não usei" juntos contam só o que sobrou dos dois. */
+  function contarFiltroDeDificuldade(grade) {
     var info = grade._info;
-    if (info) {
-      info.textContent = bibFiltroDif === null ? ''
-        : mostrados ? plural(mostrados, 'exercício', 'exercícios') + ' de ' + lista.itens.length + ' nesta dificuldade.'
-        : 'Nenhum exercício desta lista nesta dificuldade.';
-    }
+    if (!info) return;
+    if (bibFiltroDif === null) { info.textContent = ''; return; }
+    var celulas = Array.prototype.slice.call(grade.querySelectorAll('.bib-celula'));
+    var mostrados = celulas.filter(function (c) { return !c.hidden; }).length;
+    var um = grade._banco ? 'problema' : 'exercício', varios = grade._banco ? 'problemas' : 'exercícios';
+    info.textContent = mostrados
+      ? plural(mostrados, um, varios) + ' de ' + celulas.length + ' na tela.'
+      : (grade._banco ? 'Nenhum problema' : 'Nenhum exercício') + ' desta lista nesta dificuldade.';
   }
 
   /* Os dois filtros escondem a mesma célula por motivos diferentes: ela só
@@ -12158,6 +12169,7 @@
     if (!alunoId || !alunoPorId(alunoId)) {
       celulas.forEach(function (c) { c.setAttribute('data-fora-uso', ''); mostrarCelula(c); });
       info.textContent = '';
+      contarFiltroDeDificuldade(grade);
       return Promise.resolve();
     }
     return Store.usoDaBiblioteca().then(function (usos) {
@@ -12174,6 +12186,7 @@
         mostrarCelula(c);
         if (usado) escondidos++;
       });
+      contarFiltroDeDificuldade(grade);
       var nome = alunoPorId(alunoId).nome;
       info.textContent = escondidos
         ? plural(escondidos, 'exercício já usado', 'exercícios já usados') + ' com ' + nome + (escondidos === 1 ? ' está escondido.' : ' estão escondidos.')
@@ -13086,6 +13099,8 @@
 
   /* Tocar num resultado sai da busca e leva ao lugar dele na árvore. */
   function abrirDaBusca(nav) {
+    // o que ela procurou não pode chegar escondido por um filtro de dificuldade de antes
+    bibFiltroDif = null;
     bibTermo = '';
     var campo = $('#busca-biblioteca');
     if (campo) campo.value = '';
