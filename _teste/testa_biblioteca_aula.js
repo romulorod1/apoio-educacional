@@ -39,7 +39,7 @@ const { conf, secao, pausa, esperar } = H;
 const PORTA = 8794;
 const VENENO = process.argv.indexOf('--envenenado-aluno') !== -1;
 const APP_REPO = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
-const LINHA_ALUNO = 'if (u.alunoId === alunoId && aulas[u.aulaId]) usados[u.itemId] = true;';
+const LINHA_ALUNO = 'if (aulas[u.aulaId] === alunoId) usados[u.itemId] = true;';
 const trocas = {};
 if (VENENO) trocas['/app.js'] = APP_REPO.split(LINHA_ALUNO).join('if (aulas[u.aulaId]) usados[u.itemId] = true;');
 const SALVAR = process.env.SALVAR_PRINTS || '';
@@ -132,7 +132,9 @@ const lerUso = pag => pag.evaluate(() => Store.usoDaBiblioteca());
     const alunos = d.alunos.slice(0, 2);
     d.aulas.push({ id: 'aula-bib-teste', alunoId: alunos[0].id, serieId: null, destacada: false, data: h, hora: '10:00',
       duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', notaPrivada: '', temNota: false, anexos: [],
-      temas: [{ titulo: 'Bhaskara', fonte: 'livre' }] });
+      temas: [{ titulo: 'Bhaskara', fonte: 'livre' },
+        // tema autoral que o pacote do 9º ano não tem: o Material tem de seguir para o material de sempre
+        { id: 'MAT06-05', titulo: 'Frações: o que são e como comparar', lingua: 'pt' }] });
     await Store.salvar(d);
     return { aluno: alunos[0].id, nome: alunos[0].nome, outro: alunos[1].id };
   }, hojeIso);
@@ -140,7 +142,7 @@ const lerUso = pag => pag.evaluate(() => Store.usoDaBiblioteca());
   await H.abrirApp(pag, amb.ORIGEM);
 
   // ================================================================
-  secao('1. O botão Material da linha do assunto abre a biblioteca');
+  secao('1a. Assunto autoral que a biblioteca não tem: o Material de sempre');
   await H.irParaAba(pag, 'agenda');
   for (let i = 0; i < 24; i++) {
     if (await pag.evaluate(h => !!document.querySelector('[data-dia="' + h + '"]'), hojeIso)) break;
@@ -159,6 +161,24 @@ const lerUso = pag => pag.evaluate(() => Store.usoDaBiblioteca());
     return !!b;
   }), v => v === true, 8000);
   conf('o assunto livre ganhou o botão Material (há pacote)', botao.ok, true);
+  // o registro do tema autoral vem de um índice carregado à parte: a linha mostra o ano quando ele chega
+  await esperar('índice do tema autoral', () => pag.evaluate(() => {
+    const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => /Frações/.test(x.textContent));
+    return l ? l.textContent : '';
+  }), v => /6º ano/.test(v || ''), 10000);
+  await pag.evaluate(() => {
+    const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => /Frações/.test(x.textContent));
+    Array.from(l.querySelectorAll('button')).find(x => x.textContent.trim() === 'Material').click();
+  });
+  const deSempre = await esperar('material autoral aberto', () => pag.evaluate(() => ({
+    tema: document.querySelector('#modal-tema').classList.contains('aberto'),
+    aba: document.querySelector('#abas .aba.ativa').dataset.tela
+  })), v => v && v.tema, 8000);
+  conf('abriu a montagem autoral, e não a biblioteca', deSempre.ok && deSempre.valor.aba !== 'biblioteca', true);
+  await pag.evaluate(() => { const b = document.querySelector('#modal-tema [data-fechar]'); if (b) b.click(); });
+  await pausa(300);
+
+  secao('1b. O botão Material da linha do assunto abre a biblioteca');
   await pag.evaluate(() => {
     const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => /Bhaskara/.test(x.textContent));
     Array.from(l.querySelectorAll('button')).find(x => x.textContent.trim() === 'Material').click();
@@ -203,9 +223,12 @@ const lerUso = pag => pag.evaluate(() => Store.usoDaBiblioteca());
 
   // ================================================================
   secao('4. De volta à lista: os usados somem para aquele aluno');
+  conf('depois de anexar, a faixa da aula de origem sumiu', await pag.evaluate(() => document.querySelector('#bib-contexto').hidden), true);
   await H.irParaAba(pag, 'agenda');
   await H.irParaAba(pag, 'biblioteca');
   await esperar('lista de novo', () => pag.evaluate(() => !!document.querySelector('#bib-filtro-aluno')), v => v === true, 5000);
+  conf('pelo menu, o filtro volta para "qualquer aluno"', await pag.$eval('#bib-filtro-aluno', e => e.value), '');
+  await pag.select('#bib-filtro-aluno', ids.aluno);
   await esperar('filtro aplicado', () => visiveis(pag), v => v === 5, 5000);
   conf('5 visíveis com o filtro do aluno', await visiveis(pag), 5);
   conf('e o aviso diz quantos estão escondidos', await infoFiltro(pag), '3 exercícios já usados com ' + ids.nome + ' estão escondidos.');

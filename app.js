@@ -1080,7 +1080,13 @@
         $('.conteudo').scrollTop = 0;
         /* Redesenha a tela ao abrir para exibir dados atualizados */
         if (b.dataset.tela === 'temas') desenharTemas();
-        if (b.dataset.tela === 'biblioteca') desenharBiblioteca();
+        if (b.dataset.tela === 'biblioteca') {
+          /* Pelo menu, e não pelo Material de uma aula: sem aula de origem, e o
+           * filtro "ainda não usei" volta para todos. */
+          if (!bibVindoDoMaterial) { bibContexto = null; bibFiltroAluno = ''; }
+          bibVindoDoMaterial = false;
+          desenharBiblioteca();
+        }
         if (b.dataset.tela === 'ajustes') desenharAjustes();
         /* Os números do IBGE se atualizam sozinhos quando ela abre uma tela que
          * os usa, e nunca na abertura do aplicativo: a hora em que ela abre o
@@ -2100,6 +2106,20 @@
        * matemática abre a biblioteca procurando pelo título do assunto. O
        * material autoral continua no botão "Material de aula" da janela. */
       var pelaBiblioteca = !comMaterial && temPacoteBiblioteca && disciplina === Core.MATERIA_PADRAO;
+      function materialDeSempre() {
+        if (modAcervo) {
+          montarMaterialAcervoParaAula(modAcervo, aula, aluno, t);
+        } else if (registro) {
+          $('#titulo-modal-tema').textContent = 'Material de aula' +
+            (aluno ? ', ' + aluno.nome : '');
+          abrirModal('modal-tema');
+          abrirMontagem(registro, aula, aluno, {
+            itemExistente: t,
+            rotuloVoltar: '‹ Voltar para a aula',
+            voltar: function () { fecharModal('modal-tema'); }
+          });
+        }
+      }
       var podeMaterial = !comMaterial && (pelaBiblioteca || !!registro || !!modAcervo);
 
       caixa.appendChild(el('div', { class: 'item-lista item-assunto-aula' }, [
@@ -2115,20 +2135,20 @@
         podeMaterial ? el('button', {
           type: 'button', class: 'btn pequeno', texto: 'Material',
           aoClick: function () {
-            if (pelaBiblioteca) {
+            if (pelaBiblioteca && !registro && !modAcervo) {
               abrirBibliotecaDoAssunto(t, aula);
-            } else if (modAcervo) {
-              montarMaterialAcervoParaAula(modAcervo, aula, aluno, t);
-            } else {
-              $('#titulo-modal-tema').textContent = 'Material de aula' +
-                (aluno ? ', ' + aluno.nome : '');
-              abrirModal('modal-tema');
-              abrirMontagem(registro, aula, aluno, {
-                itemExistente: t,
-                rotuloVoltar: '‹ Voltar para a aula',
-                voltar: function () { fecharModal('modal-tema'); }
-              });
+              return;
             }
+            /* Assunto com material autoral: a biblioteca só toma o lugar dele
+             * quando tem o assunto (um módulo que casa todas as palavras do
+             * título); senão o toque segue para o material de sempre, e não
+             * para uma busca vazia. */
+            var vaiParaBiblioteca = pelaBiblioteca
+              ? bibliotecaTemOAssunto(t.titulo) : Promise.resolve(false);
+            vaiParaBiblioteca.then(function (tem) {
+              if (tem) { abrirBibliotecaDoAssunto(t, aula); return; }
+              materialDeSempre();
+            });
           }
         }) : null,
         /* A folga sai dos 12 px da linha para 32: Tirar apaga, Material não, e
@@ -11973,6 +11993,17 @@
    * aplicativo (tema_app vem nulo). Até essa tabela existir, "filtrar pelo
    * módulo" é procurar pelo título do assunto na busca da biblioteca, com os
    * apelidos do pacote ("bhaskara" leva a "equação do segundo grau"). */
+  /* A biblioteca tem o assunto? Algum módulo casou TODAS as palavras do título
+   * (nota de 1000 para cima no busca.js), com os apelidos do pacote. */
+  function bibliotecaTemOAssunto(titulo) {
+    return carregarBiblioteca().then(function () {
+      var g = procurarNaBiblioteca(String(titulo || '').trim());
+      return g.modulo.some(function (m) { return m.nota >= 1000; });
+    }, function () { return false; });
+  }
+
+  var bibVindoDoMaterial = false;
+
   function abrirBibliotecaDoAssunto(t, aula) {
     bibContexto = { aulaId: aula.id, alunoId: aula.alunoId };
     bibFiltroAluno = aula.alunoId;
@@ -11985,6 +12016,7 @@
       if (limpar) limpar.style.display = bibTermo ? '' : 'none';
     }
     var aba = $$('#abas .aba').filter(function (b) { return b.dataset.tela === 'biblioteca'; })[0];
+    bibVindoDoMaterial = true;
     if (aba) aba.click();
   }
 
@@ -12029,9 +12061,10 @@
     }
     return Store.usoDaBiblioteca().then(function (usos) {
       var aulas = {};
-      db.aulas.forEach(function (a) { aulas[a.id] = true; });
+      // o aluno ATUAL de cada aula: aula trocada de aluno conta para o aluno novo
+      db.aulas.forEach(function (a) { aulas[a.id] = a.alunoId; });
       var usados = {};
-      (usos || []).forEach(function (u) { if (u.alunoId === alunoId && aulas[u.aulaId]) usados[u.itemId] = true; });
+      (usos || []).forEach(function (u) { if (aulas[u.aulaId] === alunoId) usados[u.itemId] = true; });
       var escondidos = 0;
       celulas.forEach(function (c) {
         var cartao = c.querySelector('.bib-cartao');
@@ -12484,6 +12517,11 @@
     if (!op.semAvisoDeMontagem) avisar('Montando o material. Isso leva alguns segundos.');
     var usaItens = (op.lista || op.gabarito) ? itens : [];
     var pecas, teoria, anexado = false, id = null, saida = null, etapa = 'montar';
+    // na série, qualquer aviso final espera o Desfazer dela vencer
+    function avisarNaHora(t, r, f) {
+      var espera = Math.max(0, (op.avisoDepoisDe || 0) - Date.now());
+      if (espera) setTimeout(function () { avisar(t, r, f); }, espera); else avisar(t, r, f);
+    }
     return emFila(usaItens, function (it, i) { return comNomeDoExercicio(pecasDoItem(it, op.gabarito), it, i + 1); }).then(function (r) {
       pecas = r;
       return emFila(op.teoria ? paginas : [], function (p) {
@@ -12555,9 +12593,9 @@
          * escondida no material do próximo aluno. O Desfazer do aviso devolve,
          * para ela gerar o mesmo material para outra aula. */
         var devolver = desmarcarDepoisDeAnexar();
+        // o material da aula de origem foi feito: ela não fica escolhida para o próximo
+        if (bibContexto && bibContexto.aulaId === aula.id) { bibContexto = null; desenharContextoBiblioteca(); }
         var desmarcada = ' A seleção foi desmarcada.';
-        var espera = Math.max(0, (op.avisoDepoisDe || 0) - Date.now());
-        var avisarNaHora = function (t, r, f) { if (espera) setTimeout(function () { avisar(t, r, f); }, espera); else avisar(t, r, f); };
         /* "Marcar de novo", e não "Desfazer": no app, Desfazer desfaz a ação do
          * aviso, e aqui ela acharia que tirou o anexo da aula. */
         if (indiceFolha != null) {
@@ -12575,14 +12613,14 @@
        * o detalhe técnico fica só no console. */
       if (anexado) {
         var remarcar = desmarcarDepoisDeAnexar();
-        avisar(etapa === 'folha'
+        avisarNaHora(etapa === 'folha'
           ? 'O material foi anexado na aula, mas a lista não abriu como folha. O PDF está na aula; não precisa gerar de novo.'
           : 'O material foi anexado na aula, mas não consegui marcar os exercícios como usados. O PDF está na aula; não precisa gerar de novo.',
           'Marcar de novo', remarcar);
       }
-      else if (e && e.exercicio) avisar(e.exercicio + ' não abriu. Desmarque esse exercício e gere de novo. Nada foi anexado.');
-      else if (e && e.pagina) avisar(e.pagina + ' não abriu. Desmarque essa página e gere de novo. Nada foi anexado.');
-      else avisar('Não consegui montar o material. Nada foi anexado; tente de novo daqui a pouco.');
+      else if (e && e.exercicio) avisarNaHora(e.exercicio + ' não abriu. Desmarque esse exercício e gere de novo. Nada foi anexado.');
+      else if (e && e.pagina) avisarNaHora(e.pagina + ' não abriu. Desmarque essa página e gere de novo. Nada foi anexado.');
+      else avisarNaHora('Não consegui montar o material. Nada foi anexado; tente de novo daqui a pouco.');
     }).then(function () {
       gerandoMaterial = false;
       $$('#rodape-modal-bib-gerar button').forEach(function (b) { b.disabled = false; });
