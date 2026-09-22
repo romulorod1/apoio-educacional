@@ -38,7 +38,7 @@ const VENENO_HASH = process.argv.indexOf('--envenenado-hash') !== -1;
 const PORTA = 8791;
 
 const BIB_REPO = fs.readFileSync(path.join(H.RAIZ, 'biblioteca.js'), 'utf8');
-const LINHA_HASH = "if (h !== m[1]) throw Recusa('O arquivo ' + nome + ' do pacote não confere com o manifest.');";
+const LINHA_HASH = "if (h !== m[1]) throw Recusa('O arquivo ' + nome + ' do pacote não confere com o manifest.', 'defeito');";
 const trocas = {};
 if (VENENO_HASH) trocas['/biblioteca.js'] = BIB_REPO.split(LINHA_HASH).join('void h;');
 
@@ -180,6 +180,7 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
     const abriu = await esperar('o aplicativo abre depois que a antiga larga o banco', () => nova.evaluate(() =>
       !!document.querySelector('#abas .aba') && document.querySelector('#versao-app').textContent.length > 1), v => v === true, 20000);
     conf('e o aplicativo abre sozinho quando a janela antiga fecha', abriu.ok, true);
+    conf('e o aviso some quando o banco é liberado', await nova.evaluate(() => !!document.querySelector('#aviso-banco-bloqueado')), false);
     await ctx.close();
   }
 
@@ -270,7 +271,7 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
   const esperado = {
     'corrompido-deflate': tela(BAIXE, 'O arquivo assets/9ano/equacoes-do-segundo-grau/soma-e-produto/ex-02.svg do pacote está corrompido.'),
     'corrompido-stored': tela(BAIXE, 'O arquivo assets/9ano/equacoes-do-segundo-grau/soma-e-produto-das-raizes/teo-p02.svg do pacote está corrompido.'),
-    'hash': tela(BAIXE, 'O arquivo assets/9ano/equacoes-do-segundo-grau/soma-e-produto/ex-02.svg do pacote não confere com o manifest.'),
+    'hash': tela(DEFEITO, 'O arquivo assets/9ano/equacoes-do-segundo-grau/soma-e-produto/ex-02.svg do pacote não confere com o manifest.'),
     'sobrando': tela(DEFEITO, 'O pacote tem arquivo fora da lista do manifest: assets/9ano/intruso.svg.'),
     'faltando': tela(DEFEITO, 'O pacote está incompleto: falta assets/9ano/nao-existe/ex-01.svg.'),
     'asset-fora': tela(DEFEITO, 'O pacote cita uma imagem fora da pasta assets: figs/fora.svg.'),

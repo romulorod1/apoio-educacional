@@ -104,7 +104,7 @@ async function recusa(zip) {
     'esquema': /esquema 2/,
     'asset-fora': /imagem fora da pasta assets: figs\/fora\.svg/
   };
-  const TIPO = { 'corrompido-deflate': 'download', 'corrompido-stored': 'download', 'hash': 'download',
+  const TIPO = { 'corrompido-deflate': 'download', 'corrompido-stored': 'download', 'hash': 'defeito',
     'sobrando': 'defeito', 'faltando': 'defeito', 'asset-citado': 'defeito', 'esquema': 'atualizar', 'asset-fora': 'defeito' };
   for (const v of Sintetico.VENENOS) {
     const e = await recusa(Sintetico.gerar(null, { veneno: v }).zip);

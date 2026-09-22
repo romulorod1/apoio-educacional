@@ -60,7 +60,7 @@
 
   function json(nome, bytes) {
     try { return JSON.parse(texto(bytes)); }
-    catch (e) { throw Recusa('O arquivo ' + nome + ' do pacote não pôde ser lido.'); }
+    catch (e) { throw Recusa('O arquivo ' + nome + ' do pacote não pôde ser lido.', 'defeito'); }
   }
 
   /* Caminho seguro para virar chave de gravação: relativo, sem subir pasta. */
@@ -111,7 +111,7 @@
     }
     return Zip.extrair(zip, porNome['manifest.json']).then(function (bytes) {
       var manifest = json('manifest.json', bytes);
-      if (!manifest || typeof manifest !== 'object') throw Recusa('O manifest.json do pacote não pôde ser lido.');
+      if (!manifest || typeof manifest !== 'object') throw Recusa('O manifest.json do pacote não pôde ser lido.', 'defeito');
       if (manifest.esquema !== ESQUEMA) {
         if (typeof manifest.esquema === 'number' && manifest.esquema > ESQUEMA) {
           throw Recusa('O pacote é do esquema ' + manifest.esquema + ' e este aplicativo lê o esquema ' + ESQUEMA + '.', 'atualizar');
@@ -161,7 +161,7 @@
         if (!m) return Promise.reject(Recusa('O manifest.json não traz o hash de ' + nome + '.'));
         return Zip.extrair(zip, porNome[nome]).then(function (bytes) {
           return sha256(bytes).then(function (h) {
-            if (h !== m[1]) throw Recusa('O arquivo ' + nome + ' do pacote não confere com o manifest.');
+            if (h !== m[1]) throw Recusa('O arquivo ' + nome + ' do pacote não confere com o manifest.', 'defeito');
             bytesTotais += bytes.length;
             if (/^assets\//.test(nome)) {
               var tipo = tipoDoAsset(nome) || 'application/octet-stream';

@@ -98,6 +98,7 @@
           conexao.close();
           if (bancoAberto === conexao) bancoAberto = null;
         };
+        if (typeof root.aoBancoLiberado === 'function') root.aoBancoLiberado();
         resolve(conexao);
       };
       req.onerror = function () { reject(req.error); };

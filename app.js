@@ -20,6 +20,11 @@
    * outra janela do aplicativo, ainda na versão antiga, estiver aberta, a
    * subida espera ela fechar, e sem este aviso a tela ficaria parada em
    * branco. Os dados não correm risco: é só espera. */
+  // e sai da frente assim que a janela antiga larga o banco
+  self.aoBancoLiberado = function () {
+    var faixa = document.querySelector('#aviso-banco-bloqueado');
+    if (faixa) faixa.remove();
+  };
   self.aoBancoBloqueado = function () {
     if (document.querySelector('#aviso-banco-bloqueado')) return;
     var faixa = document.createElement('div');
