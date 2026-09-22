@@ -1,31 +1,48 @@
 /* testa_biblioteca_aula.js
  *
- * A biblioteca a partir da aula (PR D da B4), com o pacote SINTÉTICO na forma
- * "compor". O pacote real do Drive nunca entra aqui.
+ * A biblioteca a partir da aula (PR D e PR H da B4), com o pacote SINTÉTICO na
+ * forma "compor". O pacote real do Drive nunca entra aqui.
  *
  * Sem navegador (Node):
  *   0. o fechamento de um mês SEM biblioteca sai byte a byte igual ao de main
- *      (PDF e texto, com e sem "exibir temas e áreas"); com um anexo da
- *      biblioteca, os módulos entram em "Temas trabalhados" só quando ela marca
- *      "exibir temas e áreas", e o resto do documento não muda.
+ *      (PDF e texto, com e sem "exibir temas e áreas"); o anexo da biblioteca
+ *      sozinho não põe nada em "Temas trabalhados" (a regra antiga saiu, sem
+ *      migração); o assunto gravado pela biblioteca sai igual a qualquer
+ *      assunto, e o mesmo título escrito de outro jeito é uma linha só.
  *
  * No Chrome:
- *   1. aula de hoje com o assunto "Bhaskara": o botão Material da linha do
- *      assunto abre a aba Biblioteca já procurando "Bhaskara", com o módulo de
- *      equações do segundo grau achado (pelo apelido do pacote) e a faixa
- *      "Material para a aula de ...";
- *   2. na lista, "Ainda não usei com:" já vem com o aluno da aula;
- *   3. marca 3 exercícios, gera: a aula de onde ela veio já vem escolhida;
- *   4. de volta à lista: os 3 usados somem para aquele aluno, com o aviso de
- *      quantos estão escondidos; para outro aluno, e para "todos", voltam os 8;
- *   5. o fechamento do mês calculado na página traz o módulo;
+ *   S. sem pacote, a linha do assunto é a de sempre;
+ *   1. com pacote, o botão Material só aparece quando a biblioteca tem o
+ *      assunto ("Bhaskara", pelo apelido), ou quando há material autoral; o
+ *      toque abre a biblioteca procurando o título, com a faixa da aula;
+ *   2. "Ainda não usei com:" já vem com o aluno da aula;
+ *   3. gerar e anexar na aula de onde ela veio: o módulo vira o segundo
+ *      assunto (o dela continua), e o aviso diz qual; o mesmo título sem
+ *      acento, ou com espaços a mais, não vira assunto repetido;
+ *   4. de volta à lista: os usados somem para aquele aluno;
+ *   5. o fechamento traz o assunto dela e o do módulo;
+ *   7. o Material do assunto da biblioteca abre o módulo direto;
+ *   8. anexar de novo o mesmo material: nenhum assunto novo;
+ *   9. ela tira o assunto: não volta sozinho (nem ao reabrir, nem ao
+ *      recarregar); volta se ela anexar de novo material do módulo;
+ *  10. material de dois módulos, teoria primeiro: dois assuntos, na ordem;
+ *  11. só páginas de teoria: um assunto, nenhum uso;
+ *  12. lista como folha: o assunto entra e a folha abre;
+ *  13. "Só gerar o arquivo": nenhuma aula muda;
+ *  14. autoral com módulo: vai à biblioteca;
+ *  15. "Nova aula hoje", avulsa e em série: o assunto só na aula do dia;
+ *  16. série desfeita enquanto monta: nada gravado;
  *   6. a aula apagada: o uso dela não esconde mais nada;
- *   7. nenhum erro de JavaScript.
+ *      e nenhum erro de JavaScript.
  *
- * Modo envenenado:
+ * Modos envenenados:
  *   node _teste/testa_biblioteca_aula.js --envenenado-aluno
  *     o app.js servido conta o uso de QUALQUER aluno no filtro. Os 3 usados com
  *     um aluno somem também para o outro, e o teste tem de ENXERGAR isso.
+ *   node _teste/testa_biblioteca_aula.js --envenenado-acento
+ *     o app.js servido compara os títulos sem tirar acento nem caixa: a aula
+ *     que já tem "equacoes do segundo grau" ganha "Equações do Segundo Grau"
+ *     repetido, e o teste tem de ENXERGAR isso.
  */
 'use strict';
 const fs = require('fs');
@@ -38,16 +55,19 @@ const { conf, secao, pausa, esperar } = H;
 
 const PORTA = 8794;
 const VENENO = process.argv.indexOf('--envenenado-aluno') !== -1;
+const VENENO_ACENTO = process.argv.indexOf('--envenenado-acento') !== -1;
 const APP_REPO = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const LINHA_ALUNO = 'if (aulas[u.aulaId] === alunoId) usados[u.itemId] = true;';
+const LINHA_ACENTO = "return Core.chaveDeBusca(String(titulo || '').trim().replace(/\\s+/g, ' '));";
 const trocas = {};
 if (VENENO) trocas['/app.js'] = APP_REPO.split(LINHA_ALUNO).join('if (aulas[u.aulaId]) usados[u.itemId] = true;');
+if (VENENO_ACENTO) trocas['/app.js'] = APP_REPO.split(LINHA_ACENTO).join("return String(titulo || '').trim().replace(/\\s+/g, ' ');");
 const SALVAR = process.env.SALVAR_PRINTS || '';
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'bib_aula_'));
 process.on('exit', () => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { /* ok */ } });
 
 // ---------------------------------------------------------------- 0 (Node)
-secao('0. Fechamento: sem biblioteca, igual a main; com biblioteca, só os temas');
+secao('0. Fechamento: sem biblioteca, igual a main; o assunto da biblioteca é um assunto como os outros');
 const RAIZ = path.join(__dirname, '..');
 const MAIN = path.join(TMP, 'main');
 execSync('git ls-tree -r --name-only origin/main core.js pdf.js figuras', { cwd: RAIZ, encoding: 'utf8' })
@@ -58,46 +78,61 @@ execSync('git ls-tree -r --name-only origin/main core.js pdf.js figuras', { cwd:
 const CoreN = require('../core.js'), PDFN = require('../pdf.js');
 const CoreM = require(path.join(MAIN, 'core.js')), PDFM = require(path.join(MAIN, 'pdf.js'));
 const igual = (a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b)) === 0;
-function banco(comBiblioteca) {
+const PRIMEIRO = { id: 'MAT08-03', titulo: 'Equações do primeiro grau', lingua: 'pt', partes: ['lista'], exercicios: 6 };
+/* temasPorDia: { dia: [temas] }; anexosPorDia: { dia: [módulos do anexo antigo] } */
+function banco(temasPorDia, anexosPorDia) {
   const al = { id: 'a1', nome: 'Aluno Teste', responsavel: 'Resp', ativo: true,
     precos: [{ id: 'p1', inicio: '2026-01-01', fim: null, valorHora: 130 }] };
   const db = { alunos: [al], series: [], aulas: [], resumos: [], ajustes: {} };
-  // dia 9: aula SEM assunto e com material da biblioteca; dia 16: aula COM assunto e com material da biblioteca
-  const anexo = mods => [{ id: 'an' + mods.length, nome: 'x_biblioteca.pdf', tamanho: 10, biblioteca: true, modulos: mods }];
   [2, 9, 16].forEach(d => db.aulas.push({ id: 'x' + d, alunoId: 'a1', data: '2026-06-' + String(d).padStart(2, '0'),
     hora: '15:30', duracaoMin: 90, status: 'realizada', cobravel: true, areas: ['metodo'],
-    anexos: !comBiblioteca ? [] : d === 9 ? anexo(['Equações do Segundo Grau', 'Produtos Notáveis e Fatoração'])
-      : d === 16 ? anexo(['Teorema de Pitágoras']) : [],
-    temas: comBiblioteca && d === 9 ? []
-      : [{ id: 'MAT08-03', titulo: 'Equações do primeiro grau', lingua: 'pt', partes: ['lista'], exercicios: 6 }] }));
+    anexos: (anexosPorDia || {})[d] ? [{ id: 'an' + d, nome: 'x_biblioteca.pdf', tamanho: 10, biblioteca: true, modulos: anexosPorDia[d] }] : [],
+    temas: (temasPorDia[d] || []).map(t => Object.assign({}, t)) }));
   return db;
 }
-const fSem = CoreN.calcularFechamento(banco(false), 'a1', '2026-06');
-const fSemM = CoreM.calcularFechamento(banco(false), 'a1', '2026-06');
+const fech = db => CoreN.calcularFechamento(db, 'a1', '2026-06');
+function mesmoDocumento(fa, fb) {
+  return [{}, { exibirTemasEAreas: true }].every(op =>
+    igual(PDFN.gerarFechamento(fa, Object.assign({ sempreResumo: true }, op)), PDFN.gerarFechamento(fb, Object.assign({ sempreResumo: true }, op))) &&
+    CoreN.markdownFechamento(fa, op) === CoreN.markdownFechamento(fb, op));
+}
+const SO_PRIMEIRO = { 2: [PRIMEIRO], 9: [PRIMEIRO], 16: [PRIMEIRO] };
+const fSem = fech(banco(SO_PRIMEIRO));
+const fSemM = CoreM.calcularFechamento(banco(SO_PRIMEIRO), 'a1', '2026-06');
 [{}, { exibirTemasEAreas: true }].forEach(op => {
   const rot = op.exibirTemasEAreas ? ' (exibindo temas)' : '';
   conf('mês sem biblioteca: PDF igual a main' + rot, igual(PDFN.gerarFechamento(fSem, Object.assign({ sempreResumo: true }, op)),
     PDFM.gerarFechamento(fSemM, Object.assign({ sempreResumo: true }, op))), true);
   conf('mês sem biblioteca: texto igual a main' + rot, CoreN.markdownFechamento(fSem, op) === CoreM.markdownFechamento(fSemM, op), true);
 });
-const fCom = CoreN.calcularFechamento(banco(true), 'a1', '2026-06');
-const titulos = fCom.temasDoMes.map(t => t.titulo).join(' | ');
-conf('aula sem assunto: os módulos dela entram; aula com assunto: só o assunto', titulos, 'Equações do primeiro grau | Equações do Segundo Grau | Produtos Notáveis e Fatoração');
-conf('o módulo da aula com assunto não aparece (a palavra dela vence)', titulos.indexOf('Pitágoras') < 0, true);
-conf('os módulos na data da aula sem assunto', JSON.stringify(fCom.temasDoMes[1].datas), '["2026-06-09"]');
-const mdSem = CoreN.markdownFechamento(fCom, {}), mdCom = CoreN.markdownFechamento(fCom, { exibirTemasEAreas: true });
-conf('sem "exibir temas e áreas": o texto não traz os módulos', mdSem.indexOf('Equações do Segundo Grau') < 0, true);
-conf('com "exibir temas e áreas": o texto traz os módulos', mdCom.indexOf('Equações do Segundo Grau') >= 0 && mdCom.indexOf('Produtos Notáveis e Fatoração') >= 0, true);
-// a prova de "nada mais muda": mesmo mês, mesmos assuntos, só com e sem os anexos da biblioteca
-function semAnexos(db) { db.aulas.forEach(a => { a.anexos = []; }); return db; }
-const fMesmoSemBib = CoreN.calcularFechamento(semAnexos(banco(true)), 'a1', '2026-06');
-conf('sem "exibir temas e áreas": o PDF é o mesmo do mesmo mês sem os anexos da biblioteca',
-  igual(PDFN.gerarFechamento(fCom, { sempreResumo: true }), PDFN.gerarFechamento(fMesmoSemBib, { sempreResumo: true })), true);
-conf('e o texto também', mdSem === CoreN.markdownFechamento(fMesmoSemBib, {}), true);
+// anexo antigo (do PR C/D, sem assunto gravado), numa aula sem assunto: não vira tema, sem migração
+const ANTIGO = { 9: ['Equações do Segundo Grau', 'Produtos Notáveis e Fatoração'], 16: ['Teorema de Pitágoras'] };
+const TEMAS_ANTIGO = { 2: [PRIMEIRO], 16: [PRIMEIRO] };
+const fAntigo = fech(banco(TEMAS_ANTIGO, ANTIGO));
+conf('anexo antigo: nenhum módulo em "Temas trabalhados"', fAntigo.temasDoMes.map(t => t.titulo).join(' | '), 'Equações do primeiro grau');
+conf('anexo antigo: o documento é o mesmo do mês sem os anexos (PDF e texto, com e sem a caixa)',
+  mesmoDocumento(fAntigo, fech(banco(TEMAS_ANTIGO))), true);
+// o assunto gravado pela biblioteca, igual a um assunto escrito por ela com o mesmo título
+const DA_BIB = { titulo: 'Equações do Segundo Grau', fonte: 'biblioteca', modulo: '9ano:equacoes-do-segundo-grau' };
+const fBib = fech(banco({ 2: [PRIMEIRO], 9: [DA_BIB], 16: [PRIMEIRO, DA_BIB] }));
+conf('o assunto da biblioteca entra em "Temas trabalhados", nas duas datas', JSON.stringify(fBib.temasDoMes.map(t => [t.titulo, t.datas])),
+  JSON.stringify([['Equações do primeiro grau', ['2026-06-02', '2026-06-16']], ['Equações do Segundo Grau', ['2026-06-09', '2026-06-16']]]));
+conf('e o documento é o mesmo de um assunto escrito por ela (PDF e texto, com e sem a caixa)',
+  mesmoDocumento(fBib, fech(banco({ 2: [PRIMEIRO], 9: [{ titulo: 'Equações do Segundo Grau', fonte: 'livre' }],
+    16: [PRIMEIRO, { titulo: 'Equações do Segundo Grau', fonte: 'livre' }] }))), true);
+const mdSemCaixa = CoreN.markdownFechamento(fBib, {}), mdComCaixa = CoreN.markdownFechamento(fBib, { exibirTemasEAreas: true });
+conf('sem "exibir temas e áreas", o texto não traz o assunto; com a caixa, traz', mdSemCaixa.indexOf('Segundo Grau') < 0 && mdComCaixa.indexOf('Equações do Segundo Grau') >= 0, true);
+const fDois = fech(banco({ 2: [{ titulo: 'equacoes do segundo grau', fonte: 'livre' }], 9: [DA_BIB] }));
+conf('o mesmo título escrito sem acento em outra aula: uma linha só', fDois.temasDoMes.length, 1);
 
 // ---------------------------------------------------------------- navegador
 const amb = H.criarAmbiente(PORTA, 'perfil_bib_aula', trocas);
 const hojeIso = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+const daquiA = dias => { const d = new Date(); d.setDate(d.getDate() + dias); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const SP = '9ano:equacoes-do-segundo-grau:soma-e-produto:ex:';
+const TEO_PIT = '9ano:teorema-de-pitagoras:o-teorema:teo:p01';
+const TEO_PN = '9ano:produtos-notaveis-e-fatoracao:produtos-notaveis:teo:p02';
+const EQ = 'Equações do Segundo Grau';
 
 async function importar(pag, arquivo) {
   await H.irParaAba(pag, 'ajustes');
@@ -119,31 +154,106 @@ async function tocarLinha(pag, nome) {
 const visiveis = pag => pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo .bib-celula')).filter(c => !c.hidden).length);
 const infoFiltro = pag => pag.evaluate(() => (document.querySelector('#bib-filtro-info') || {}).textContent || '');
 const lerUso = pag => pag.evaluate(() => Store.usoDaBiblioteca());
+const lerDados = pag => pag.evaluate(() => Store.carregar());
+const temasDe = (pag, aulaId) => lerDados(pag).then(d => {
+  const a = d.aulas.filter(x => x.id === aulaId)[0];
+  return a ? (a.temas || (a.tema ? [a.tema] : [])) : null;
+});
+const titulosDe = (pag, aulaId) => temasDe(pag, aulaId).then(t => t ? t.map(x => x.titulo).join(' | ') : null);
+const anexosDa = (pag, aulaId) => lerDados(pag).then(d => { const a = d.aulas.filter(x => x.id === aulaId)[0]; return a ? (a.anexos || []).length : -1; });
+
+/* Abre a aula de hoje daquela hora pela agenda. */
+async function abrirAulaDeHoje(pag, hora) {
+  await H.irParaAba(pag, 'agenda');
+  for (let i = 0; i < 24; i++) {
+    if (await pag.evaluate(h => !!document.querySelector('[data-dia="' + h + '"]'), hojeIso)) break;
+    await pag.click(i < 12 ? '#mes-seguinte' : '#mes-anterior');
+    await pausa(120);
+  }
+  const ok = await pag.evaluate((h, hr) => {
+    const alvo = Array.from(document.querySelectorAll('[data-dia="' + h + '"] .pilula')).find(p => p.textContent.indexOf(hr) === 0);
+    if (!alvo) return false; alvo.click(); return true;
+  }, hojeIso, hora);
+  await esperar('aula das ' + hora + ' aberta', () => pag.evaluate(() => document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
+  return ok;
+}
+/* As linhas de assunto da aula aberta: título, detalhe e se tem o botão Material. */
+const linhasDoAssunto = pag => pag.evaluate(() => Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).map(l => ({
+  titulo: l.querySelector('.nome').firstChild.textContent,
+  detalhe: (l.querySelector('.detalhe') || {}).textContent || '',
+  material: Array.from(l.querySelectorAll('button')).some(b => b.textContent.trim() === 'Material')
+})));
+const resumoLinhas = ls => ls.map(l => l.titulo + (l.material ? ' [Material]' : '')).join(' | ');
+async function tocarMaterial(pag, titulo) {
+  return pag.evaluate(t => {
+    const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => x.querySelector('.nome').firstChild.textContent === t);
+    const b = l && Array.from(l.querySelectorAll('button')).find(x => x.textContent.trim() === 'Material');
+    if (!b) return false; b.click(); return true;
+  }, titulo);
+}
+async function fecharAula(pag) {
+  await pag.evaluate(() => { const b = document.querySelector('#modal-aula [data-fechar]'); if (b) b.click(); });
+  await pausa(250);
+}
+
+/* Marca a seleção guardada no aparelho, recarrega o app (a seleção volta) e
+ * abre a janela Gerar material. */
+async function abrirGerarCom(pag, itens, paginas) {
+  await pag.evaluate((i, p) => localStorage.setItem('apoio-educacional:bib-carrinho', JSON.stringify({ itens: i, paginas: p })), itens, paginas);
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.abrirApp(pag, amb.ORIGEM);
+  await H.irParaAba(pag, 'biblioteca');
+  await esperar('seleção de volta', () => pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-gerar'); return !!b && !b.disabled; }), v => v === true, 10000);
+  await pag.click('#bib-carrinho-gerar');
+  await esperar('janela Gerar material', () => pag.$eval('#modal-bib-gerar', e => e.classList.contains('aberto')), v => v === true, 5000);
+}
+/* Anexa numa aula da lista e devolve o aviso final. */
+async function anexarEm(pag, aulaId, itens, paginas, extra) {
+  await abrirGerarCom(pag, itens, paginas);
+  const antes = await anexosDa(pag, aulaId);
+  await pag.evaluate((id, ex) => {
+    document.querySelector('#bib-gerar-aulas [data-aula="' + id + '"]').click();
+    if (ex && ex.folha) document.querySelector('#bib-gerar-folha').click();
+    document.querySelector('#aviso-texto').textContent = '';
+  }, aulaId, extra || null);
+  await pag.click('#bib-gerar-anexar');
+  const r = await esperar('anexado na aula ' + aulaId, () => Promise.all([anexosDa(pag, aulaId),
+    pag.evaluate(() => document.querySelector('#aviso-texto').textContent)]), v => v && v[0] === antes + 1 && /^Material anexado/.test(v[1]), 30000);
+  return r.ok ? r.valor[1] : '(não anexou)';
+}
 
 (async () => {
-  if (VENENO) {
+  if (VENENO || VENENO_ACENTO) {
     secao('O veneno é de verdade');
     conf('o app.js servido ficou DIFERENTE do repositório', trocas['/app.js'] !== APP_REPO ? 'diferente' : 'IGUAL', 'diferente');
-    conf('e o veneno trocou exatamente uma ocorrência', APP_REPO.split(LINHA_ALUNO).length - 1, 1);
+    conf('e o veneno trocou exatamente uma ocorrência', APP_REPO.split(VENENO ? LINHA_ALUNO : LINHA_ACENTO).length - 1, 1);
   }
   await amb.subir();
   const pag = await amb.pagina();
   await H.abrirApp(pag, amb.ORIGEM);
-  const zip = path.join(TMP, 'nono.zip');
-  Sintetico.gerar(zip, { compor: true });
-  conf('importou o pacote sintético', /^Biblioteca importada\./.test(await importar(pag, zip)), true);
 
-  // aula de hoje com o assunto "Bhaskara", gravada direto no banco, e o app aberto de novo
+  // as aulas de hoje, gravadas direto no banco, e o app aberto de novo
   const ids = await pag.evaluate(async h => {
     const d = await Store.carregar();
     const alunos = d.alunos.slice(0, 2);
-    d.aulas.push({ id: 'aula-bib-teste', alunoId: alunos[0].id, serieId: null, destacada: false, data: h, hora: '10:00',
-      duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', notaPrivada: '', temNota: false, anexos: [],
-      temas: [{ titulo: 'Bhaskara', fonte: 'livre' },
-        // tema autoral que o pacote do 9º ano não tem: o Material tem de seguir para o material de sempre
-        { id: 'MAT06-05', titulo: 'Frações: o que são e como comparar', lingua: 'pt' },
-        // assunto escrito por ela que a biblioteca não tem: aviso, e ela fica na aula
-        { titulo: 'Revisão para a prova', fonte: 'livre' }] });
+    // três alunos a mais, para as aulas novas de hoje (a série pula o dia que já tem aula do aluno)
+    ['Teste Avulsa', 'Teste Série', 'Teste Desfeita'].forEach((nome, i) => {
+      d.alunos.push(Object.assign(JSON.parse(JSON.stringify(alunos[0])), { id: 'aluno-teste-' + i, nome }));
+    });
+    const aula = (id, alunoId, hora, temas) => ({ id, alunoId, serieId: null, destacada: false, data: h, hora,
+      duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', notaPrivada: '', temNota: false, anexos: [], temas });
+    d.aulas.push(aula('aula-bib-teste', alunos[0].id, '10:00', [{ titulo: 'Bhaskara', fonte: 'livre' },
+      // tema autoral que o pacote do 9º ano não tem: o Material segue para o material de sempre
+      { id: 'MAT06-05', titulo: 'Frações: o que são e como comparar', lingua: 'pt' },
+      // assunto escrito por ela que a biblioteca não tem: sem o botão
+      { titulo: 'Revisão para a prova', fonte: 'livre' }]));
+    d.aulas.push(aula('aula-acento', alunos[1].id, '11:00', [{ titulo: 'equacoes do segundo grau', fonte: 'livre' }]));
+    d.aulas.push(aula('aula-espacos', alunos[1].id, '12:00', [{ titulo: '  Equações   do Segundo Grau ', fonte: 'livre' }]));
+    d.aulas.push(aula('aula-vazia', alunos[1].id, '13:00', []));
+    d.aulas.push(aula('aula-teoria', alunos[1].id, '14:00', []));
+    d.aulas.push(aula('aula-folha', alunos[1].id, '15:00', []));
+    // tema autoral que o pacote também tem (Teorema de Pitágoras)
+    d.aulas.push(aula('aula-autoral', alunos[0].id, '16:00', [{ id: 'MAT09-07', titulo: 'Teorema de Pitágoras', lingua: 'pt' }]));
     await Store.salvar(d);
     return { aluno: alunos[0].id, nome: alunos[0].nome, outro: alunos[1].id };
   }, hojeIso);
@@ -151,60 +261,33 @@ const lerUso = pag => pag.evaluate(() => Store.usoDaBiblioteca());
   await H.abrirApp(pag, amb.ORIGEM);
 
   // ================================================================
-  secao('1a. Assunto autoral que a biblioteca não tem: o Material de sempre');
-  await H.irParaAba(pag, 'agenda');
-  for (let i = 0; i < 24; i++) {
-    if (await pag.evaluate(h => !!document.querySelector('[data-dia="' + h + '"]'), hojeIso)) break;
-    await pag.click(i < 12 ? '#mes-seguinte' : '#mes-anterior');
-    await pausa(120);
-  }
-  const abriuAula = await pag.evaluate(h => {
-    const pilulas = Array.from(document.querySelectorAll('[data-dia="' + h + '"] .pilula'));
-    const alvo = pilulas.find(p => /10:00/.test(p.textContent)) || pilulas[0];
-    if (!alvo) return false; alvo.click(); return true;
-  }, hojeIso);
-  conf('a aula de hoje abriu', abriuAula, true);
-  const botao = await esperar('botão Material na linha do assunto', () => pag.evaluate(() => {
-    const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => /Bhaskara/.test(x.textContent));
-    const b = l && Array.from(l.querySelectorAll('button')).find(x => x.textContent.trim() === 'Material');
-    return !!b;
-  }), v => v === true, 8000);
-  conf('o assunto livre ganhou o botão Material (há pacote)', botao.ok, true);
-  // o registro do tema autoral vem de um índice carregado à parte: a linha mostra o ano quando ele chega
-  await esperar('índice do tema autoral', () => pag.evaluate(() => {
-    const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => /Frações/.test(x.textContent));
-    return l ? l.textContent : '';
-  }), v => /6º ano/.test(v || ''), 10000);
-  await pag.evaluate(() => {
-    const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => /Frações/.test(x.textContent));
-    Array.from(l.querySelectorAll('button')).find(x => x.textContent.trim() === 'Material').click();
-  });
+  secao('S. Sem pacote: a linha do assunto é a de sempre');
+  conf('a aula de hoje abriu', await abrirAulaDeHoje(pag, '10:00'), true);
+  const semPacote = await esperar('linhas sem pacote', () => linhasDoAssunto(pag), v => v && v.length === 3 && v[1].material, 10000);
+  conf('só o tema autoral tem Material', resumoLinhas(semPacote.valor || []), 'Bhaskara | Frações: o que são e como comparar [Material] | Revisão para a prova');
+  await fecharAula(pag);
+
+  const zip = path.join(TMP, 'nono.zip');
+  Sintetico.gerar(zip, { compor: true });
+  conf('importou o pacote sintético', /^Biblioteca importada\./.test(await importar(pag, zip)), true);
+
+  // ================================================================
+  secao('1a. Com pacote: o botão Material só onde a biblioteca tem o assunto, ou há material autoral');
+  conf('a aula de hoje abriu', await abrirAulaDeHoje(pag, '10:00'), true);
+  const comPacote = await esperar('linhas com pacote', () => linhasDoAssunto(pag), v => v && v.length === 3 && v[0].material && v[1].material, 10000);
+  conf('Bhaskara (a biblioteca tem, pelo apelido) e o autoral; "Revisão para a prova" sem o botão',
+    resumoLinhas(comPacote.valor || []), 'Bhaskara [Material] | Frações: o que são e como comparar [Material] | Revisão para a prova');
+  await tocarMaterial(pag, 'Frações: o que são e como comparar');
   const deSempre = await esperar('material autoral aberto', () => pag.evaluate(() => ({
     tema: document.querySelector('#modal-tema').classList.contains('aberto'),
     aba: document.querySelector('#abas .aba.ativa').dataset.tela
   })), v => v && v.tema, 8000);
-  conf('abriu a montagem autoral, e não a biblioteca', deSempre.ok && deSempre.valor.aba !== 'biblioteca', true);
+  conf('o autoral sem módulo abre a montagem autoral, e não a biblioteca', deSempre.ok && deSempre.valor.aba !== 'biblioteca', true);
   await pag.evaluate(() => { const b = document.querySelector('#modal-tema [data-fechar]'); if (b) b.click(); });
   await pausa(300);
 
-  secao('1b. Assunto que a biblioteca não tem: aviso, e ela fica na aula');
-  await pag.evaluate(() => {
-    const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => /Revisão para a prova/.test(x.textContent));
-    Array.from(l.querySelectorAll('button')).find(x => x.textContent.trim() === 'Material').click();
-  });
-  const semAssunto = await esperar('aviso de assunto que não existe', () => pag.evaluate(() => ({
-    aviso: document.querySelector('#aviso').classList.contains('aberto') ? document.querySelector('#aviso-texto').textContent : '',
-    aula: document.querySelector('#modal-aula').classList.contains('aberto'),
-    aba: document.querySelector('#abas .aba.ativa').dataset.tela
-  })), v => v && /^A biblioteca não tem/.test(v.aviso), 8000);
-  conf('o aviso diz que a biblioteca não tem o assunto', semAssunto.ok, true);
-  conf('e ela continua na aula', semAssunto.valor && semAssunto.valor.aula && semAssunto.valor.aba !== 'biblioteca', true);
-
   secao('1c. O botão Material da linha do assunto abre a biblioteca');
-  await pag.evaluate(() => {
-    const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => /Bhaskara/.test(x.textContent));
-    Array.from(l.querySelectorAll('button')).find(x => x.textContent.trim() === 'Material').click();
-  });
+  await tocarMaterial(pag, 'Bhaskara');
   const abriu = await esperar('aba Biblioteca com a busca', () => pag.evaluate(() => ({
     aba: (document.querySelector('#abas .aba.ativa') || {}).dataset ? document.querySelector('#abas .aba.ativa').dataset.tela : '',
     campo: document.querySelector('#busca-biblioteca').value,
@@ -221,7 +304,7 @@ const lerUso = pag => pag.evaluate(() => Store.usoDaBiblioteca());
 
   // ================================================================
   secao('2. "Ainda não usei com" já vem com o aluno da aula');
-  await tocarLinha(pag, 'Equações do Segundo Grau');
+  await tocarLinha(pag, EQ);
   await tocarLinha(pag, 'Soma e Produto');
   await esperar('lista', () => visiveis(pag), v => v === 8, 8000);
   conf('o filtro já vem com o aluno', await pag.$eval('#bib-filtro-aluno', e => e.value), ids.aluno);
@@ -229,8 +312,7 @@ const lerUso = pag => pag.evaluate(() => Store.usoDaBiblioteca());
   conf('nada usado ainda: os 8 aparecem', await visiveis(pag), 8);
 
   // ================================================================
-  secao('3. Gerar: a aula de onde ela veio já vem escolhida');
-  const SP = '9ano:equacoes-do-segundo-grau:soma-e-produto:ex:';
+  secao('3. Gerar: a aula de onde ela veio já vem escolhida, e o módulo vira assunto');
   for (const n of [1, 5, 6]) await pag.evaluate(i => document.querySelector('input[data-carrinho="itens"][data-id="' + i + '"]').click(), SP + n);
   await pag.click('#bib-carrinho-gerar');
   await esperar('janela Gerar material', () => pag.$eval('#modal-bib-gerar', e => e.classList.contains('aberto')), v => v === true, 5000);
@@ -239,17 +321,46 @@ const lerUso = pag => pag.evaluate(() => Store.usoDaBiblioteca());
     return { id: l ? l.getAttribute('data-aula') : '', botao: document.querySelector('#bib-gerar-anexar').disabled };
   });
   conf('a aula do contexto está escolhida e o botão ligado', escolhida.id + ',' + escolhida.botao, 'aula-bib-teste,false');
+  await pag.evaluate(() => { document.querySelector('#aviso-texto').textContent = ''; });
   await pag.click('#bib-gerar-anexar');
   const usou = await esperar('uso gravado', () => lerUso(pag), v => v && v.filter(u => u.aulaId === 'aula-bib-teste').length === 3, 30000);
-  conf('3 usos gravados para a aula', usou.ok, true);
+  conf('3 usos gravados para a aula, um por exercício', usou.ok, true);
+  const aviso3 = await esperar('aviso do anexo', () => pag.evaluate(() => document.querySelector('#aviso-texto').textContent), v => /^Material anexado/.test(v || ''), 10000);
+  conf('o aviso diz o assunto registrado', aviso3.valor,
+    'Material anexado na aula de ' + ids.nome + ' (' + hojeIso.split('-').reverse().join('/') + '). Assunto registrado: ' + EQ + '. A seleção foi desmarcada.');
+  const temas3 = await temasDe(pag, 'aula-bib-teste');
+  conf('o assunto dela continua; o módulo entra depois, como assunto novo', temas3.map(t => t.titulo).join(' | '),
+    'Bhaskara | Frações: o que são e como comparar | Revisão para a prova | ' + EQ);
+  conf('gravado com a fonte e o módulo, sem campo a mais', JSON.stringify(temas3[3]), JSON.stringify({ titulo: EQ, fonte: 'biblioteca', modulo: '9ano:equacoes-do-segundo-grau' }));
+
+  // no veneno do aluno, o 3b não roda: o uso do outro aluno mudaria a conta do filtro
+  if (!VENENO) {
+  secao('3b. O mesmo título sem acento e sem caixa, ou com espaços a mais: nenhum assunto repetido');
+  const avisoAcento = await anexarEm(pag, 'aula-acento', [SP + 2], []);
+  const titulosAcento = await titulosDe(pag, 'aula-acento');
+  if (VENENO_ACENTO) {
+    conf('VENENO ENXERGADO: a aula ficou com o assunto repetido', titulosAcento, 'equacoes do segundo grau | ' + EQ);
+    throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
+  }
+  conf('"equacoes do segundo grau" já estava: nada novo', titulosAcento, 'equacoes do segundo grau');
+  conf('e o aviso não fala de assunto', /Assunto/.test(avisoAcento), false);
+  await anexarEm(pag, 'aula-espacos', [SP + 2], []);
+  conf('"  Equações   do Segundo Grau " já estava: nada novo', await titulosDe(pag, 'aula-espacos'), '  Equações   do Segundo Grau ');
+  }
 
   // ================================================================
   secao('4. De volta à lista: os usados somem para aquele aluno');
-  const depois = await pag.evaluate(() => ({ texto: document.querySelector('#bib-contexto').innerText,
-    voltar: !!document.querySelector('#bib-voltar-aula'), sair: !!document.querySelector('#bib-sair-contexto') }));
-  conf('depois de anexar, a faixa diz que anexou e oferece voltar para a aula', /^Material anexado na aula de /.test(depois.texto) && depois.voltar && !depois.sair, true);
   await H.irParaAba(pag, 'agenda');
   await H.irParaAba(pag, 'biblioteca');
+  // sem o 3b (que recarrega o app), a biblioteca volta na mesma lista
+  const naLista = await esperar('biblioteca', () => pag.evaluate(() => document.querySelector('#bib-filtro-aluno') ? 'lista'
+    : document.querySelectorAll('#bib-corpo .item-lista').length ? 'modulos' : ''), v => !!v, 8000);
+  if (naLista.valor !== 'lista') {
+    await pag.evaluate(() => { const c = document.querySelector('#busca-biblioteca'); c.value = ''; c.dispatchEvent(new Event('input')); });
+    await pausa(400);
+    await tocarLinha(pag, EQ);
+    await tocarLinha(pag, 'Soma e Produto');
+  }
   await esperar('lista de novo', () => pag.evaluate(() => !!document.querySelector('#bib-filtro-aluno')), v => v === true, 5000);
   conf('pelo menu, o filtro volta para "qualquer aluno"', await pag.$eval('#bib-filtro-aluno', e => e.value), '');
   await pag.select('#bib-filtro-aluno', ids.aluno);
@@ -265,22 +376,170 @@ const lerUso = pag => pag.evaluate(() => Store.usoDaBiblioteca());
     conf('VENENO ENXERGADO: para outro aluno os 3 continuam escondidos', await visiveis(pag), 5);
     throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
   }
-  await esperar('outro aluno', () => visiveis(pag), v => v === 8, 5000);
-  conf('para outro aluno, os 8 voltam', await visiveis(pag), 8);
+  // o outro aluno usou o exercício 2 duas vezes (3b): só ele some
+  await esperar('outro aluno', () => visiveis(pag), v => v === 7, 5000);
+  conf('para outro aluno, só o que ele usou some', await visiveis(pag), 7);
   await pag.select('#bib-filtro-aluno', '');
   await esperar('todos', () => visiveis(pag), v => v === 8, 5000);
   conf('para "qualquer aluno", os 8', await visiveis(pag), 8);
 
   // ================================================================
-  secao('5. O fechamento do mês traz o módulo');
-  const fech = await pag.evaluate(async (alunoId, h) => {
+  secao('5. O fechamento do mês traz o assunto dela e o do módulo');
+  const fechTela = await pag.evaluate(async (alunoId, h) => {
     const d = await Store.carregar();
     const f = Core.calcularFechamento(d, alunoId, h.slice(0, 7));
     return { temas: f.temasDoMes.map(t => t.titulo), md: Core.markdownFechamento(f, { exibirTemasEAreas: true }), mdSem: Core.markdownFechamento(f, {}) };
   }, ids.aluno, hojeIso);
-  // a aula tem assunto (Bhaskara): a palavra dela vence, e o módulo não se repete com outro nome
-  conf('Temas do mês: o assunto dela, e não o módulo', fech.temas.indexOf('Bhaskara') >= 0 && fech.temas.indexOf('Equações do Segundo Grau') < 0, true);
-  conf('no texto com "exibir temas e áreas", o assunto', /Bhaskara/.test(fech.md) && !/Equações do Segundo Grau/.test(fech.md), true);
+  conf('Temas do mês: Bhaskara e o módulo, cada um uma vez', fechTela.temas.filter(t => t === 'Bhaskara' || t === EQ).join(' | '), 'Bhaskara | ' + EQ);
+  conf('no texto com "exibir temas e áreas", os dois', /Bhaskara/.test(fechTela.md) && fechTela.md.indexOf(EQ) >= 0, true);
+  conf('sem a caixa, nenhum', /Bhaskara/.test(fechTela.mdSem) || fechTela.mdSem.indexOf(EQ) >= 0, false);
+
+  // ================================================================
+  secao('7. O Material do assunto da biblioteca abre o módulo direto');
+  conf('a aula abriu', await abrirAulaDeHoje(pag, '10:00'), true);
+  const comBib = await esperar('linhas', () => linhasDoAssunto(pag), v => v && v.length === 4 && v[3].material, 10000);
+  conf('a linha diz de onde veio e tem o Material', comBib.valor && comBib.valor[3].detalhe + ',' + comBib.valor[3].material, 'da biblioteca da OBMEP,true');
+  if (SALVAR) await pag.screenshot({ path: path.join(SALVAR, 'aula_3_assunto_da_biblioteca.png') });
+  await tocarMaterial(pag, EQ);
+  const direto = await esperar('módulo aberto', () => pag.evaluate(() => ({
+    aba: document.querySelector('#abas .aba.ativa').dataset.tela,
+    campo: document.querySelector('#busca-biblioteca').value,
+    texto: document.querySelector('#bib-corpo').innerText,
+    contexto: (document.querySelector('#bib-contexto') || {}).innerText || ''
+  })), v => v && v.aba === 'biblioteca' && /Soma e Produto das Raízes/.test(v.texto), 8000);
+  const dv = direto.valor || {};
+  conf('abre a tela do módulo, sem busca', direto.ok && dv.campo === '' && /Resultados Básicos - Parte I/.test(dv.texto), true);
+  conf('com a faixa da aula', new RegExp('^Material para a aula de ' + ids.nome).test(dv.contexto), true);
+  if (SALVAR) await pag.screenshot({ path: path.join(SALVAR, 'aula_4_modulo_direto.png') });
+
+  // ================================================================
+  secao('8. O mesmo material de novo na mesma aula: nenhum assunto novo');
+  const aviso8 = await anexarEm(pag, 'aula-bib-teste', [SP + 7], []);
+  conf('a aula continua com 4 assuntos', (await temasDe(pag, 'aula-bib-teste')).length, 4);
+  conf('e o aviso não fala de assunto', /Assunto/.test(aviso8), false);
+
+  // ================================================================
+  secao('9. Ela tira o assunto: não volta sozinho; volta se ela anexar de novo');
+  conf('a aula abriu', await abrirAulaDeHoje(pag, '10:00'), true);
+  await esperar('linhas', () => linhasDoAssunto(pag), v => v && v.length === 4, 8000);
+  await pag.evaluate(t => {
+    const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => x.querySelector('.nome').firstChild.textContent === t);
+    Array.from(l.querySelectorAll('button')).find(x => x.textContent.trim() === 'Tirar').click();
+  }, EQ);
+  await esperar('assunto tirado', () => titulosDe(pag, 'aula-bib-teste'), v => v && v.indexOf(EQ) < 0, 5000);
+  await fecharAula(pag);
+  conf('a aula abriu de novo', await abrirAulaDeHoje(pag, '10:00'), true);
+  conf('não voltou ao reabrir', (await linhasDoAssunto(pag)).map(l => l.titulo).indexOf(EQ), -1);
+  await fecharAula(pag);
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.abrirApp(pag, amb.ORIGEM);
+  await pausa(500);
+  conf('nem ao recarregar o app', (await titulosDe(pag, 'aula-bib-teste')).indexOf(EQ), -1);
+  const aviso9 = await anexarEm(pag, 'aula-bib-teste', [SP + 8], []);
+  conf('anexar de novo material do módulo nesta aula traz de volta (ação dela)', (await titulosDe(pag, 'aula-bib-teste')).split(' | ').pop(), EQ);
+  conf('e o aviso diz', aviso9.indexOf('Assunto registrado: ' + EQ + '.') >= 0, true);
+
+  // ================================================================
+  secao('10. Material de dois módulos: dois assuntos, na ordem do material');
+  const aviso10 = await anexarEm(pag, 'aula-vazia', [SP + 1], [TEO_PIT]);
+  conf('a teoria vem primeiro no material, e o assunto também', await titulosDe(pag, 'aula-vazia'), 'Teorema de Pitágoras | ' + EQ);
+  conf('o aviso diz os dois', aviso10.indexOf('Assuntos registrados: Teorema de Pitágoras e ' + EQ + '.') >= 0, true);
+  if (SALVAR) await pag.screenshot({ path: path.join(SALVAR, 'aula_5_aviso_dois_assuntos.png') });
+
+  // ================================================================
+  secao('11. Só páginas de teoria: um assunto, nenhum uso');
+  const usoAntes = (await lerUso(pag)).length;
+  await anexarEm(pag, 'aula-teoria', [], [TEO_PN]);
+  conf('o módulo da teoria vira assunto', await titulosDe(pag, 'aula-teoria'), 'Produtos Notáveis e Fatoração');
+  conf('nenhum uso gravado (uso é de exercício)', (await lerUso(pag)).length, usoAntes);
+
+  // ================================================================
+  secao('12. Lista como folha: o assunto entra e a folha abre');
+  await anexarEm(pag, 'aula-folha', [SP + 3], [], { folha: true });
+  conf('o assunto entrou', await titulosDe(pag, 'aula-folha'), EQ);
+  const folha = await esperar('folha aberta', () => lerDados(pag).then(d => d.aulas.filter(x => x.id === 'aula-folha')[0].temNota), v => v === true, 8000);
+  conf('e a lista virou folha da aula', folha.ok, true);
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.abrirApp(pag, amb.ORIGEM);
+
+  // ================================================================
+  secao('13. "Só gerar o arquivo": nenhuma aula muda');
+  const antes13 = JSON.stringify((await lerDados(pag)).aulas);
+  await abrirGerarCom(pag, [SP + 1], []);
+  await pag.evaluate(() => {
+    try { navigator.canShare = () => false; } catch (e) { /* ok */ }
+    document.querySelector('#bib-gerar-aulas [data-aula="aula-vazia"]').click();
+  });
+  await pag.click('#bib-gerar-baixar');
+  await esperar('janela fechada', () => pag.$eval('#modal-bib-gerar', e => e.classList.contains('aberto')), v => v === false, 30000);
+  await pausa(500);
+  conf('as aulas estão iguais', JSON.stringify((await lerDados(pag)).aulas) === antes13, true);
+
+  // ================================================================
+  secao('14. Tema autoral que a biblioteca também tem: o Material vai à biblioteca');
+  conf('a aula abriu', await abrirAulaDeHoje(pag, '16:00'), true);
+  // o registro do tema autoral vem de um índice à parte: a linha mostra o ano quando ele chega
+  await esperar('linha com o botão e o registro', () => linhasDoAssunto(pag), v => v && v.length === 1 && v[0].material && /9º ano/.test(v[0].detalhe), 10000);
+  await tocarMaterial(pag, 'Teorema de Pitágoras');
+  const autoral = await esperar('biblioteca aberta', () => pag.evaluate(() => ({
+    aba: document.querySelector('#abas .aba.ativa').dataset.tela,
+    campo: document.querySelector('#busca-biblioteca').value,
+    aviso: document.querySelector('#aviso-texto').textContent
+  })), v => v && v.aba === 'biblioteca', 8000);
+  conf('vai à biblioteca, procurando o título', autoral.ok && autoral.valor.campo, 'Teorema de Pitágoras');
+  conf('e diz onde está o material dela', /^Abri a biblioteca da OBMEP\./.test(autoral.valor && autoral.valor.aviso), true);
+
+  // ================================================================
+  secao('15. "Nova aula hoje", avulsa e em série: o assunto só na aula do dia');
+  async function novaAulaHoje(alunoId, serie) {
+    await abrirGerarCom(pag, [SP + 1, SP + 5, SP + 6], []);
+    await pag.evaluate(() => document.querySelector('#bib-gerar-aulas [data-aula="nova"]').click());
+    await pag.click('#bib-gerar-anexar');
+    await esperar('janela de aula nova', () => pag.evaluate(() => document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
+    await pag.select('#campo-aluno', alunoId);
+    if (serie) {
+      await pag.click('#campo-repetir');
+      await pausa(250);
+      await pag.evaluate(ate => { const c = document.querySelector('#campo-repetir-ate'); c.value = ate; c.dispatchEvent(new Event('change')); }, daquiA(14));
+    }
+    await pag.click('#salvar-aula');
+  }
+  await novaAulaHoje('aluno-teste-0', false);
+  const avulsa = await esperar('aula avulsa com o assunto', () => lerDados(pag).then(d => d.aulas.filter(x => x.alunoId === 'aluno-teste-0')
+    .map(x => (x.temas || []).map(t => t.titulo).join(',') + '/' + (x.anexos || []).length)), v => v && v.join() === EQ + '/1', 30000);
+  conf('a aula nova tem o anexo e o assunto', avulsa.ok, true);
+  await pausa(600);
+  await novaAulaHoje('aluno-teste-1', true);
+  const serie = await esperar('série com o assunto na aula do dia', () => lerDados(pag).then(d => d.aulas.filter(x => x.alunoId === 'aluno-teste-1')
+    .sort((x, y) => x.data < y.data ? -1 : 1).map(x => x.data + ':' + (x.temas || []).map(t => t.titulo).join(','))), v => v && v.length === 3 && v[0] === hojeIso + ':' + EQ, 40000);
+  conf('só a aula de hoje da série ganhou o assunto', serie.ok && serie.valor.slice(1).every(s => /:$/.test(s)), true);
+
+  // ================================================================
+  secao('16. Série desfeita enquanto o material é montado: nada gravado');
+  // o aviso final da série espera o Desfazer dela vencer
+  await esperar('aviso da série vencido', () => pag.evaluate(() => document.querySelector('#aviso-texto').textContent), v => /^Material anexado/.test(v || ''), 20000);
+  const anexosAntes16 = await H.contarDeposito(pag, 'anexos');
+  await novaAulaHoje('aluno-teste-2', true);
+  // o processador mais lento, para o Desfazer dela cair no meio da montagem (no tablet, ela leva segundos)
+  await pag.emulateCPUThrottling(20);
+  const desfez = await esperar('Desfazer da série', () => pag.evaluate(() => {
+    const t = document.querySelector('#aviso-texto').textContent, b = document.querySelector('#aviso-acao');
+    if (!/^Aulas repetidas criadas/.test(t) || b.style.display === 'none') return false;
+    // o botão Gerar desligado é o sinal de que o material ainda está sendo montado
+    const montando = document.querySelector('#bib-gerar-anexar').disabled;
+    b.click(); return { montando };
+  }), v => !!v, 8000);
+  conf('ela desfez a série enquanto o material era montado', desfez.ok && desfez.valor.montando, true);
+  // a montagem terminou quando o botão Gerar volta a ligar (a janela está fechada, mas é a mesma)
+  await esperar('montagem terminada', () => pag.evaluate(() => {
+    const b = document.querySelector('#bib-gerar-anexar'); return !b.disabled && b.textContent === 'Gerar e anexar';
+  }), v => v === true, 60000);
+  await pag.emulateCPUThrottling(1);
+  await pausa(300);
+  conf('o arquivo montado não ficou órfão no aparelho', await H.contarDeposito(pag, 'anexos'), anexosAntes16);
+  const dados16 = await lerDados(pag);
+  conf('nenhuma aula do aluno da série desfeita', dados16.aulas.filter(x => x.alunoId === 'aluno-teste-2').length, 0);
+  conf('nenhum uso gravado para ele', (await lerUso(pag)).filter(u => u.alunoId === 'aluno-teste-2').length, 0);
 
   // ================================================================
   secao('6. Aula apagada: o uso dela não esconde mais nada');
@@ -295,13 +554,13 @@ const lerUso = pag => pag.evaluate(() => Store.usoDaBiblioteca());
   await esperar('módulos', () => pag.evaluate(() => document.querySelectorAll('#bib-corpo .item-lista').length), v => v > 0, 8000);
   await pag.evaluate(() => { const c = document.querySelector('#busca-biblioteca'); c.value = ''; c.dispatchEvent(new Event('input')); });
   await pausa(400);
-  await tocarLinha(pag, 'Equações do Segundo Grau');
+  await tocarLinha(pag, EQ);
   await tocarLinha(pag, 'Soma e Produto');
   await esperar('lista', () => pag.evaluate(() => !!document.querySelector('#bib-filtro-aluno')), v => v === true, 8000);
   await pag.select('#bib-filtro-aluno', ids.aluno);
   await esperar('filtro com a aula apagada', () => infoFiltro(pag), v => /^Nenhum exercício/.test(v), 5000);
   conf('os 8 aparecem: uso de aula que não existe não conta', await visiveis(pag), 8);
-  conf('o uso continua gravado (a cópia de segurança não perde nada)', (await lerUso(pag)).filter(u => u.aulaId === 'aula-bib-teste').length, 3);
+  conf('o uso continua gravado (a cópia de segurança não perde nada)', (await lerUso(pag)).filter(u => u.aulaId === 'aula-bib-teste').length, 5);
 
   if (pag.errosDePagina.length) console.log('   erros de página: ' + pag.errosDePagina.join(' | ').slice(0, 400));
   conf('nenhum erro de JavaScript na página', pag.errosDePagina.length, 0);
