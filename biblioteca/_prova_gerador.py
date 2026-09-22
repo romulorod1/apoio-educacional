@@ -184,6 +184,12 @@ def comeco_do_recorte(pg, bbox):
             continue
         for l in b['lines']:
             for sp in l['spans']:
+                # glifo de extensao (radical e parentese grandes, fonte CMEX) nao e
+                # texto de leitura: os radicais da 2a linha da solucao 23 de Fatoracao
+                # (8o ano) tem base 4 pt abaixo do "23." e a margem mais a esquerda
+                # que ele, e faziam a linha do rotulo parecer suspensa
+                if 'CMEX' in sp['font']:
+                    continue
                 for c in sp['chars']:
                     x0, y0, x1, y1 = c['bbox']
                     # pelo centro: a caixa da fonte passa da tinta, e o recorte e pela tinta
@@ -389,10 +395,22 @@ def trava_tinta_coberta(p):
                     continue
                 # linha suspensa logo acima de um marcador (o numerador "AB.GE" da
                 # fracao de "26. A area ... e AB.GE sobre 2", Areas, p. 12) e do
-                # item desse marcador, que ainda nao foi lido
+                # item desse marcador, que ainda nao foi lido. A fracao pode empilhar
+                # varias linhas suspensas (o expoente do numerador de "3(-1/2)^2 + 1/4",
+                # Expressoes Numericas, 8o ano, 27 pt de base acima do rotulo 5): sobe a pilha
+                # de linhas coladas (menos de 9,5 pt entre bases), ate 30 pt abaixo
+                # desta, ate a primeira que comeca a esquerda dela com um rotulo
                 dono_l = dono
-                prox = linhas[k_l + 1] if k_l + 1 < len(linhas) else None
-                if prox and prox[0][0] == col and 0 < prox[0][1] - base < 9.5 and prox[1][0][0] < cs[0][0] - 5:
+                prox = None
+                for j in range(k_l + 1, len(linhas)):
+                    (cj, bj), csj = linhas[j]
+                    if cj != col or not 0 < bj - base < 30 or not bj - linhas[j - 1][0][1] < 9.5:
+                        break
+                    sj = re.sub(r'\s+', '', portal.recompor(''.join(c[1] for c in csj)))
+                    if csj[0][0] < cs[0][0] - 5 and (re.match(r'^Exerc\S*cio\d+\.', sj) or re.match(r'^\d+\.', primeira_palavra(csj))):
+                        prox = linhas[j]
+                        break
+                if prox:
                     pw = primeira_palavra(prox[1])
                     mm = re.match(r'^Exerc\S*cio(\d+)\.', re.sub(r'\s+', '', portal.recompor(''.join(c[1] for c in prox[1]))))
                     if mm and not em_sol:
@@ -403,7 +421,7 @@ def trava_tinta_coberta(p):
                     continue
                 dono_msg = dono_l
                 erros.append('%s p%d: linha fora de todo recorte, no item %s: %r' % (l['aula'], pno + 1, dono_msg, texto[:50]))
-    return erros[:10]
+    return erros
 
 
 def enunciados_no_texto(doc):
@@ -609,8 +627,10 @@ def conteudo_na_caixa(p, it, pg, pz):
             if (miudo and all(sp['size'] <= 8.5 for sp in miudo) and not corpo_abaixo
                     and any(r.contains(pymupdf.Rect(sp['bbox'])) for sp in miudo)):
                 erros.append('nota de rodape dentro do recorte')
-    largos = [d['rect'] for d in pg.get_drawings() if d['rect'].height < 1.5 and d['rect'].width > 400
-              and d['rect'].y0 < pg.rect.height]
+    # desenho ou imagem: em Produtos Notaveis (8o ano) o fio do rodape e uma imagem
+    largos = [q for q in [d['rect'] for d in pg.get_drawings()] +
+              [pymupdf.Rect(b['bbox']) for b in pg.get_text('dict')['blocks'] if b['type'] == 1]
+              if q.height < 1.5 and q.width > 400 and q.y0 < pg.rect.height]
     if largos:
         rod = max(largos, key=lambda q: q.y0)
         # por coordenada: o fio tem altura zero, e o intersects do PyMuPDF trata
@@ -855,6 +875,25 @@ def trava_origem(p):
 
 # ------------------------------------------------------------------ padroes das outras series (B2)
 
+def trava_bordas(p):
+    """A lista de bordas da amostra: 1, 2 e 5 no pacote; 3 e 4 fora pela calha.
+
+    A tabela do 3 cruza o fio com tracos retos, e o 4 esta na mesma altura da
+    outra coluna: os dois saem com o motivo da calha, e nenhum outro sai.
+    """
+    lst = [l for l in p.relatorio['listas'] if l['aula'] == 'lista-bordas']
+    if not lst:
+        return ['a amostra nao tem a lista de bordas']
+    erros = []
+    nums = sorted(i['numero'] for i in p.itens if i['aula']['slug'] == 'lista-bordas')
+    if nums != [1, 2, 5]:
+        erros.append('lista-bordas: itens no pacote %s, e nao 1, 2 e 5' % nums)
+    fora = sorted(e['numero'] for e in lst[0]['excluidos'] if 'fio entre as colunas' in e['motivo'])
+    if fora != [3, 4]:
+        erros.append('lista-bordas: excluidos pela calha %s, e nao 3 e 4' % fora)
+    return erros
+
+
 def trava_variantes(p):
     """A lista de variantes da amostra sai inteira e com as solucoes certas.
 
@@ -951,7 +990,7 @@ def trava_glifos(p):
                 if faltam:
                     erros.append('%s %s p%d: %d caractere(s) do PDF sem glifo no SVG (%r)' % (
                         it['id'], tipo, k + 1, len(faltam), ''.join(faltam)[:20]))
-    return erros[:10]
+    return erros
 
 
 def so_miudo(pg, bbox):
@@ -963,9 +1002,11 @@ def so_miudo(pg, bbox):
     if not sps or any(sp['size'] > 8.5 for sp in sps):
         return False
     # a primeira palavra e a mais a esquerda da primeira linha: o numero da nota,
-    # em sobrescrito menor, tem o topo mais baixo que o do texto dela
-    topo = min(sp['bbox'][1] for sp in sps)
-    primeiro = min([sp for sp in sps if sp['bbox'][1] < topo + 4], key=lambda sp: sp['bbox'][0])
+    # em sobrescrito menor, tem o topo mais baixo que o do texto dela, e uma
+    # fracao no comeco da nota sobe acima dele. A primeira linha e o que cruza a
+    # altura do objeto mais alto
+    alto = min(sps, key=lambda sp: sp['bbox'][1])['bbox']
+    primeiro = min([sp for sp in sps if sp['bbox'][1] < alto[3] and sp['bbox'][3] > alto[1]], key=lambda sp: sp['bbox'][0])
     return bool(re.match(r'^\d+$', primeiro['text'].strip()))
 
 
@@ -1034,7 +1075,7 @@ def trava_notas(p):
                     erros.append('%s: o pedaco da nota %s de %s leva outra coisa alem da nota' % (l['aula'], r['numero'], r['id']))
             elif not r.get('motivo'):
                 erros.append('%s: nota %s da p%d fora de todo item e sem motivo' % (l['aula'], r.get('numero'), r['pagina']))
-    return erros[:10]
+    return erros
 
 
 def trava_curadoria(p):
@@ -1308,6 +1349,9 @@ class Placar:
         if erros:
             self.falhas += 1
             print('  FALHOU  %-41s %d problema(s): %s' % (nome, len(erros), ' | '.join(e[:120] for e in erros[:4])))
+            # a lista inteira, um por linha: a prova real acha dezenas, e o resumo mostra 4
+            for e in erros[4:]:
+                print('           | %s' % e[:200])
         else:
             self.ok += 1
             print('  ok      %s' % nome)
@@ -1331,9 +1375,11 @@ def travas_simples(p, placar, zip_caminho=None, rotulo=''):
 
 
 def venenos(p, temp, placar, curadoria):
-    it_obj = next(i for i in p.itens if i['formato'] == 'objetiva')
-    it_multi = next(i for i in p.itens if i['origem']['enunciado'].get('pedacos'))
-    it_simples = next(i for i in p.itens if i['numero'] == 2)
+    # os alvos dos venenos sao da lista de amostra: as outras listas vem antes na ordem
+    da = [i for i in p.itens if i['aula']['slug'] == 'lista-de-amostra']
+    it_obj = next(i for i in da if i['formato'] == 'objetiva')
+    it_multi = next(i for i in da if i['origem']['enunciado'].get('pedacos'))
+    it_simples = next(i for i in da if i['numero'] == 2)
 
     # determinismo: um asset que sai diferente na segunda geracao
     q = copia(p, temp, 'v_det')
@@ -1618,6 +1664,24 @@ def venenos_series(p, temp, placar, curadoria):
         if attr == 'ESTENDE_BORDA':
             # o mesmo veneno na coluna da esquerda: a palavra rente a divisa sai cortada
             placar.conferir('recorte preso antes da divisa', trava_recorte(q), True, 'lista-variantes:ex:3 enunciado: tinta cortada')
+    # bordas: cada regra da lista de bordas, desligada, tem de reprovar
+    for nome, attr, valor, trava, motivo in (
+            ('tabela que cruza o fio fica', 'CALHA_TRACO', False, trava_recorte, 'lista-bordas:ex:3 enunciado: tinta cortada'),
+            ('tabela que cruza o fio fica (contagem)', 'CALHA_TRACO', False, trava_bordas, 'itens no pacote'),
+            ('traco recortado antes do fio tira o item', 'tinta_dos_dois_lados', lambda pg, x, bb: True, trava_bordas,
+             'itens no pacote'),
+            ('expoente alto fica no item de cima', 'TOPO_MAX', 12, trava_recorte, 'lista-bordas:ex:2 enunciado: tinta cortada'),
+            ('nota que comeca por fracao', 'NOTA_LINHA_TODA', False, trava_recorte, 'lista-bordas:ex:5 enunciado: tinta cortada'),
+            ('fio do rodape em imagem', 'FIO_IMAGEM', False, trava_recorte, 'lista-fio-imagem:ex:2 enunciado: fio horizontal longo')):
+        pasta = os.path.join(temp, 'v_' + attr.lower())
+        if not os.path.exists(os.path.join(pasta, 'itens.json')):
+            antes_v = getattr(gerar_pacote, attr)
+            setattr(gerar_pacote, attr, valor)
+            try:
+                gerar(p.pdfs, pasta, curadoria)
+            finally:
+                setattr(gerar_pacote, attr, antes_v)
+        placar.conferir(nome, trava(Pacote(pasta, p.pdfs)), True, motivo)
     antes_oc = gerar_pacote.objetos_claros
     gerar_pacote.objetos_claros = lambda pg: []
     try:
@@ -1776,6 +1840,7 @@ def principal():
                                       for i in p.itens) else ['a linha do dificuldade.csv nao chegou ao item'])
             placar.conferir('apelidos', trava_apelidos(p))
             placar.conferir('variantes: sem titulo, recuo, duas partes', trava_variantes(p))
+            placar.conferir('bordas: expoente alto, tabela no fio, nota com fracao', trava_bordas(p))
             placar.conferir('marcador em CMBX10', trava_fontes_negrito())
             placar.conferir('titulo do modulo pela capa das listas', trava_titulo_modulo())
             it_obj, it_simples = venenos(p, temp, placar, cur)

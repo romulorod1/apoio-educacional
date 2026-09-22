@@ -69,6 +69,10 @@ MARGEM_X = 24.0        # borda externa das colunas
 # 23): a borda direita cortava a ultima letra. Com 1,2 pt o fio (0,4 pt de
 # largura) continua fora do recorte.
 AFASTA_FIO = 1.2
+FIO_IMAGEM = True   # fio de coluna ou de rodape feito de imagem conta como fio (fios_da_pagina); False so no veneno
+CALHA_TRACO = True  # traco reto que cruza o fio exclui o item como texto que cruza; False so no veneno
+NOTA_LINHA_TODA = True  # a nota comeca no topo da linha do numero, nao no numero; False so no veneno
+TOPO_MAX = 30     # quanto a linha do marcador sobe pelo texto que a atravessa (ver topo_da_linha); 12 so no veneno
 TOLERANCIA_MARGEM = 12.0
 RECUO_MAX = 40.0       # recuo de paragrafo que ainda aceita o marcador (recuado_na_linha)
 NOTA_SO_NO_PE = True   # nota de rodape so no pe da coluna (ver marcadores); False so no veneno
@@ -110,9 +114,14 @@ def centro_y(bb):
 # ------------------------------------------------------------------ geometria da lista
 
 def fios_da_pagina(pg):
+    """Fios verticais (divisa) e horizontais do pe da pagina, desenhados ou em imagem.
+
+    Em Produtos Notaveis (8o ano) os dois fios sao imagens de 0,6 pt, e nao
+    desenhos: sem eles o recorte do fim da coluna levava o fio do rodape.
+    """
     seps, rods = [], []
-    for d in pg.get_drawings():
-        r = d['rect']
+    imagens = [pymupdf.Rect(b['bbox']) for b in pg.get_text('dict')['blocks'] if b['type'] == 1] if FIO_IMAGEM else []
+    for r in [d['rect'] for d in pg.get_drawings()] + imagens:
         if r.width < 1.5 and r.height > 400:
             seps.append(round(r.x0 * 2) / 2)
         if r.height < 1.5 and r.width > 400 and r.y0 > pg.rect.height * 0.8:
@@ -194,7 +203,8 @@ def elementos(pg, geo):
     d = pg.get_text('dict')
     for b in d['blocks']:
         if b['type'] == 1:
-            out.append({'tipo': 'img', 'bb': tuple(b['bbox'])})
+            if not (FIO_IMAGEM and eh_decoracao(pymupdf.Rect(b['bbox']), geo, pg)):
+                out.append({'tipo': 'img', 'bb': tuple(b['bbox'])})
             continue
         for l in b['lines']:
             for s in l['spans']:
@@ -216,6 +226,16 @@ def elementos(pg, geo):
         e['cruza'] = x0 < geo['xsep'] - AFASTA_FIO and x1 > geo['xsep'] + AFASTA_FIO
         fica.append(e)
     return fica, fundo
+
+
+def tinta_dos_dois_lados(pg, xsep, bb):
+    """Ha tinta na altura de `bb` logo a esquerda e logo a direita do fio, fora dele."""
+    for x0, x1 in ((xsep - 3.0, xsep - 0.8), (xsep + 0.8, xsep + 3.0)):
+        clip = pymupdf.Rect(x0, bb[1] - 1.0, x1, bb[3] + 1.0)
+        pix = pg.get_pixmap(dpi=288, clip=clip, colorspace=pymupdf.csGRAY)
+        if not any(v < LIMIAR_TINTA for v in pix.samples):
+            return False
+    return True
 
 
 def faixa_da_coluna(col, geo, pg):
@@ -354,12 +374,14 @@ def topo_da_linha(marc, els):
     (o radical de "Ja sabemos que raiz de 1 = 1", Conjuntos Numericos,
     exercicio 3) sobe mais: o topo dele virava um pedaco de 5 pt grudado no
     item anterior e saia cortado deste. Entra todo texto que atravessa a
-    linha do marcador, ate 12 pt acima dela.
+    linha do marcador, ate TOPO_MAX pt acima dela: a fracao de fracoes na
+    linha do rotulo (Numeros Racionais, 7o ano, exercicio 22) sobe 22,5 pt,
+    e com 12 o numerador ficava fora de todo recorte.
     """
     mb = marc['el']['bb']
     cy = centro_y(mb)
     topo, pe = mb[1], mb[3]
-    txt = [e for e in els if e['col'] == marc['col'] and e['tipo'] == 'txt' and e['bb'][1] >= mb[1] - 12]
+    txt = [e for e in els if e['col'] == marc['col'] and e['tipo'] == 'txt' and e['bb'][1] >= mb[1] - TOPO_MAX]
     # em cadeia: o numerador de uma fracao encosta na linha, e o expoente do
     # numerador encosta no numerador (Conjuntos Numericos, solucao 18, "2 a 12
     # sobre 2 a 12"): o expoente tambem e desta linha
@@ -554,6 +576,16 @@ def detectar(doc, secao_1_abre_solucoes=True):
         # nenhum recorte de coluna pega esse trecho inteiro
         cruzam = [(e['bb'][1], e['bb'][3]) for e in els if e['tipo'] == 'txt'
                   and e['bb'][0] < geo['xsep'] - 0.5 and e['bb'][2] > geo['xsep'] + 0.5]
+        # e traco reto que cruza o fio: a tabela da solucao 19 de Operacoes com
+        # Numeros Naturais (6o ano) passa 2 pt do fio, e a borda direita dela
+        # saia cortada de um recorte e colada no da outra coluna. So traco reto,
+        # e so com tinta dos dois lados do fio: a caixa de uma curva, ou de um
+        # traco que a figura recorta por clip (Angulos, 8o ano, exercicio 14),
+        # cruza o fio sem que a tinta cruze
+        if CALHA_TRACO:
+            cruzam += [(e['bb'][1], e['bb'][3]) for e in els if e['tipo'] == 'des' and e['cruza']
+                       and min(e['bb'][2] - e['bb'][0], e['bb'][3] - e['bb'][1]) < 1.5
+                       and tinta_dos_dois_lados(pg, geo['xsep'], e['bb'])]
         caracteres = [(c['bbox'], c['c'], c['origin'][1], sp['size']) for b in pg.get_text('rawdict')['blocks']
                       if b['type'] == 0 for l in b['lines'] for sp in l['spans'] for c in sp['chars']]
         for e in els:
@@ -707,11 +739,16 @@ def notas_de_rodape(doc, regioes, pedacos):
                 out.append({'pagina': pno + 1, 'coluna': col + 1, 'numero': None, 'texto': portal.sem_tracos(texto[:120]),
                             'motivo': 'a nota nao comeca por um numero'})
                 continue
+            # topo da primeira linha de cada nota: o numero em sobrescrito, e o que
+            # atravessa a linha dele (a fracao k(k-1)/2 no comeco da nota 1 de
+            # Introducao a Porcentagem, 7o ano, sobe 4 pt acima do numero)
+            tops = [min([ini['bbox'][1]] + [sp['bbox'][1] for sp in miudos if NOTA_LINHA_TODA
+                                            and sp['bbox'][1] < ini['bbox'][3] and sp['bbox'][3] > ini['bbox'][1]])
+                    for ini in inicios]
             for k, ini in enumerate(inicios):
-                # o pedaco comeca abaixo do fio da nota (contrato, 8a): o numero em
-                # sobrescrito sobe ate 1 pt dele
-                y_a = max(ini['bbox'][1] - 1.0, y_fio + 1.0)
-                y_b = inicios[k + 1]['bbox'][1] - 1.0 if k + 1 < len(inicios) else y_fim
+                # o pedaco comeca abaixo do fio da nota (contrato, 8a)
+                y_a = max(tops[k] - 1.0, y_fio + 1.0)
+                y_b = tops[k + 1] - 1.0 if k + 1 < len(inicios) else y_fim
                 corpo = [sp for sp in miudos if y_a <= sp['bbox'][1] < y_b]
                 if tinta_pag is None:
                     tmp = pymupdf.open()

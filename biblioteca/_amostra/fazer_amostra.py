@@ -238,6 +238,126 @@ def lista_variantes(caminho):
     doc.save(caminho, garbage=3, deflate=True, no_new_id=True)
 
 
+def lista_bordas(caminho):
+    """Lista no modelo Palladio com o que passa das bordas de uma linha ou coluna.
+
+    - fracao de fracoes na linha do rotulo do exercicio 2, com o expoente 20 pt
+      acima do topo do rotulo (7o ano, Numeros Racionais, exercicio 22): o
+      recorte do 2 comeca no alto dela, e o do 1 acaba antes;
+    - tabela no exercicio 3 cujos tracos passam 2 pt do fio entre as colunas
+      (6o ano, Operacoes com Numeros Naturais, solucao 19): o 3 e o 4, que esta
+      na mesma altura da outra coluna, saem pela regra da calha;
+    - nota de rodape do exercicio 5 que comeca por uma fracao mais alta que o
+      numero da nota (7o ano, Introducao a Porcentagem, nota da solucao 40);
+    - traco do exercicio 1 recortado por clip antes do fio: so a caixa cruza.
+    """
+    g = MODELOS['palladio']
+    X0, X1, T, XS = g['x0'], g['x1'], g['topo'], g['xsep']
+    doc = pymupdf.open()
+    capa = doc.new_page(width=612, height=792)
+    capa.insert_text((150, 80), 'Módulo de Amostra Sintética', fontname='hebo', fontsize=14.3)
+    capa.insert_text((150, 150), 'Lista de Bordas.', fontname='hebo', fontsize=14.3)
+    capa.insert_text((258, 225), 'Nono Ano', fontname='hebo', fontsize=14.3)
+    p = Pagina(doc, g)
+    p.fios(1)
+    p.secao(X0, T + 60, 1, 'Exercícios Introdutórios')
+    xt = p.marcador(X0, T + 90, 1)
+    p.pg.insert_text((xt, T + 90), 'Quanto é 2 + 2?', fontname='helv', fontsize=10)
+    p.texto(X0, T + 102, ['a) 3.', 'b) 4.'])
+    # traco que a figura recorta por clip: a caixa cruza o fio, a tinta para em
+    # 250 pt (8o ano, Angulos, exercicio 14). O 1 fica no pacote
+    xref = p.pg.get_contents()[-1]
+    yb = 792 - (T + 110)
+    doc.update_stream(xref, doc.xref_stream(xref) + (
+        b' q 29 %.1f 221 6 re W n 0.4 w 29.5 %.1f m 330 %.1f l S Q ' % (yb - 3, yb, yb)))
+    y = T + 156
+    xt = p.marcador(X0, y, 2)
+    p.pg.insert_text((xt, y), 'Simplifique', fontname='helv', fontsize=10)
+    p.pg.insert_text((160, y - 7), '(a + 1)', fontname='helv', fontsize=10)
+    # expoente em escada, com a tinta continua do parentese ate o alto
+    for k, c in enumerate('234'):
+        p.pg.insert_text((192 + 4 * k, y - 13 - 5 * k), c, fontname='helv', fontsize=7)
+    p.pg.draw_line((158, y - 3.5), (200, y - 3.5), width=0.4)
+    p.pg.insert_text((175, y + 7), 'b', fontname='helv', fontsize=10)
+    p.pg.insert_text((205, y), 'e dê o resultado.', fontname='helv', fontsize=10)
+    y = T + 190
+    xt = p.marcador(X0, y, 3)
+    p.pg.insert_text((xt, y), 'Complete a tabela.', fontname='helv', fontsize=10)
+    for i in range(4):
+        p.pg.draw_line((X0, y + 10 + 20 * i), (XS + 2.0, y + 10 + 20 * i), width=0.4)
+        p.pg.draw_line((XS + 2.0, y + 10 + 20 * i), (XS + 2.0, y + 30 + 20 * i), width=0.4) if i < 3 else None
+        if i < 3:
+            p.pg.insert_text((X0 + 10, y + 24 + 20 * i), '%d   %d   %d' % (i, 2 * i, 3 * i), fontname='helv', fontsize=10)
+    p.texto(X0, y + 84, ['Qual é a regra?'])
+    xt = p.marcador(X1, T + 90, 4)
+    p.pg.insert_text((xt, T + 90), 'Quanto é 3 + 3?', fontname='helv', fontsize=10)
+    p.texto(X1, T + 102, ['Explique a conta com desenhos e palavras,', 'passo a passo, em cada linha.'] + [
+        'Linha %d da explicação.' % k for k in range(1, 11)])
+    xt = p.marcador(X1, T + 300, 5)
+    p.pg.insert_text((xt, T + 300), 'Conte os pares de objetos', fontname='helv', fontsize=10)
+    largura = pymupdf.get_text_length('distintos', fontname='helv', fontsize=10)
+    p.pg.insert_text((X1, T + 312), 'distintos', fontname='helv', fontsize=10)
+    p.pg.insert_text((X1 + largura + 0.3, T + 308), '1', fontname='helv', fontsize=7)
+    p.pg.insert_text((X1 + largura + 5, T + 312), 'de um conjunto.', fontname='helv', fontsize=10)
+    yr = g['yrod']
+    p.pg.draw_line((X1, yr - 50), (X1 + 100, yr - 50), width=0.4)
+    p.pg.insert_text((X1, yr - 32), '1', fontname='helv', fontsize=5)
+    p.pg.insert_text((X1 + 6, yr - 30), 'Entre k objetos, existem', fontname='helv', fontsize=7)
+    p.pg.insert_text((X1 + 90, yr - 35), 'k(k - 1)', fontname='helv', fontsize=7)
+    p.pg.draw_line((X1 + 89, yr - 32.5), (X1 + 116, yr - 32.5), width=0.4)
+    p.pg.insert_text((X1 + 100, yr - 25), '2', fontname='helv', fontsize=7)
+    p.pg.insert_text((X1 + 120, yr - 30), 'pares.', fontname='helv', fontsize=7)
+    p = Pagina(doc, g)
+    p.fios(2)
+    p.pg.insert_text((114, T + 12), 'Respostas e Soluções.', fontname='hebo', fontsize=10)
+    p.secao(X0, T + 40, 1, 'Exercícios Introdutórios')
+    for k in range(1, 6):
+        p.numero_solucao(X0, T + 40 + 30 * k, k)
+        p.texto(X0 + 14, T + 40 + 30 * k, ['A resposta do exercício %d.' % k])
+    doc.set_metadata(FIXO)
+    doc.save(caminho, garbage=3, deflate=True, no_new_id=True)
+
+
+def lista_fio_imagem(caminho):
+    """Lista no modelo CM com os fios (coluna e rodape) feitos de imagem, e nao de desenho.
+
+    8o ano, Produtos Notaveis: o fio do rodape e uma imagem de 0,6 pt, e o
+    exercicio 2, que vai ate perto do pe da coluna, nao pode levar o fio.
+    """
+    g = MODELOS['cm']
+    X0, X1, T = g['x0'], g['x1'], g['topo']
+    preto = pymupdf.Pixmap(pymupdf.csGRAY, pymupdf.IRect(0, 0, 1, 1), False)
+    preto.clear_with(0)
+    doc = pymupdf.open()
+    capa = doc.new_page(width=612, height=792)
+    capa.insert_text((150, 80), 'Módulo de Amostra Sintética', fontname='hebo', fontsize=14.3)
+    capa.insert_text((150, 150), 'Lista de Fio em Imagem.', fontname='hebo', fontsize=14.3)
+    capa.insert_text((258, 225), 'Nono Ano', fontname='hebo', fontsize=14.3)
+    for n in (1, 2):
+        p = Pagina(doc, g)
+        p.pg.insert_image(pymupdf.Rect(g['xsep'] + 0.2, T, g['xsep'] + 0.8, g['yrod'] - 18), pixmap=preto)
+        p.pg.insert_image(pymupdf.Rect(29, g['yrod'] - 0.6, 582, g['yrod']), pixmap=preto)
+        p.pg.insert_text((29.5, g['yrod'] + 13), 'http://matematica.obmep.org.br/', fontname='cour', fontsize=10)
+        p.pg.insert_text((303, g['yrod'] + 13), str(n), fontname='helv', fontsize=10)
+        if n == 1:
+            p.secao(X0, T + 60, 1, 'Exercícios Introdutórios')
+            xt = p.marcador(X0, T + 90, 1)
+            p.pg.insert_text((xt, T + 90), 'Quanto é 5 + 5?', fontname='helv', fontsize=10)
+            p.texto(X0, T + 102, ['Responda com um número.'])
+            xt = p.marcador(X0, T + 120, 2)
+            p.pg.insert_text((xt, T + 120), 'Some os números de cada linha.', fontname='helv', fontsize=10)
+            p.texto(X0, T + 132, ['Linha %d: %d + %d.' % (k, k, 2 * k) for k in range(1, 47)])
+        else:
+            p.pg.insert_text((114, T + 12), 'Respostas e Soluções.', fontname='hebo', fontsize=10)
+            p.secao(X0, T + 40, 1, 'Exercícios Introdutórios')
+            p.numero_solucao(X0, T + 70, 1)
+            p.texto(X0 + 14, T + 70, ['A soma é 10.'])
+            p.numero_solucao(X0, T + 100, 2)
+            p.texto(X0 + 14, T + 100, ['Cada linha dá o triplo do seu número.'])
+    doc.set_metadata(FIXO)
+    doc.save(caminho, garbage=3, deflate=True, no_new_id=True)
+
+
 def teoria(caminho):
     doc = pymupdf.open()
     pg = doc.new_page(width=612, height=792)
@@ -261,6 +381,8 @@ def fazer(pasta, sem_item=None, duplica=None):
     lista(os.path.join(pasta, 'amostra-sintetica__exercicios-lista-de-amostra.pdf'), 'palladio', sem_item, duplica)
     lista(os.path.join(pasta, 'amostra-sintetica__exercicios-lista-cm.pdf'), 'cm')
     lista_variantes(os.path.join(pasta, 'amostra-sintetica__exercicios-lista-variantes.pdf'))
+    lista_bordas(os.path.join(pasta, 'amostra-sintetica__exercicios-lista-bordas.pdf'))
+    lista_fio_imagem(os.path.join(pasta, 'amostra-sintetica__exercicios-lista-fio-imagem.pdf'))
     teoria(os.path.join(pasta, 'amostra-sintetica__teoria-lista-de-amostra-parte-i.pdf'))
 
 
