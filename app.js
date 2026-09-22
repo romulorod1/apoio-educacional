@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.21.0';
+  var VERSAO = '1.21.1';
 
   /* O acervo de 14/09 (aba Temas e o atalho dele na escolha de assunto da
    * aula) saiu do ar até ser refeito com revisão. Os arquivos do banco ficam
@@ -12020,8 +12020,27 @@
         }
       });
     });
-    Object.keys(grupos).forEach(function (g) {
-      grupos[g].sort(function (a, b) { return b.nota - a.nota || ordemNaArvore(a.id) - ordemNaArvore(b.id) || (a.id < b.id ? -1 : 1); });
+    grupos.modulo.sort(function (a, b) { return b.nota - a.nota || (a.id < b.id ? -1 : 1); });
+    /* Teoria e exercícios dos módulos achados vêm primeiro, na ordem desses
+     * módulos e das aulas, e só depois o resto por nota. Medido com o pacote
+     * real do 9º ano: "bhaskara" traz o módulo de equações do 2º grau no topo,
+     * mas a palavra também aparece nas páginas de Conjuntos e de Tales, e uma
+     * aula de Funções casa no título; pela nota pura elas vinham antes das
+     * quatro teorias do módulo. Nada some: só a ordem muda. */
+    var posModulo = {};
+    grupos.modulo.forEach(function (m, i) { if (posModulo[m.id] === undefined) posModulo[m.id] = i; });
+    function doModuloAchado(id) {
+      var t = bib.teoriaPorId[id] || bib.itemPorId[id];
+      var chave = t ? t.serie + ':' + t.modulo.slug : null;
+      return chave && posModulo[chave] !== undefined ? posModulo[chave] : Infinity;
+    }
+    ['teoria', 'exercicio', 'banco'].forEach(function (g) {
+      grupos[g].sort(function (a, b) {
+        var ma = doModuloAchado(a.id), mb = doModuloAchado(b.id);
+        if (ma !== mb) return ma - mb;
+        if (ma !== Infinity) return ordemNaArvore(a.id) - ordemNaArvore(b.id) || (a.id < b.id ? -1 : 1);
+        return b.nota - a.nota || ordemNaArvore(a.id) - ordemNaArvore(b.id) || (a.id < b.id ? -1 : 1);
+      });
     });
     return grupos;
   }

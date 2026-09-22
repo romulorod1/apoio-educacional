@@ -279,8 +279,8 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   conf('Módulos: Equações do Segundo Grau no topo', corpo.blocos[0].linhas[0], 'Equações do Segundo Grau');
   conf('Teoria: as quatro aulas do módulo', corpo.blocos[1].linhas.slice().sort().join(' | '),
     ['Equações Biquadradas', 'Resultados Básicos - Parte I', 'Resultados Básicos - Parte II', 'Soma e Produto das Raízes'].join(' | '));
-  conf('e, no empate de nota, na ordem das aulas (Parte I antes da Parte II)',
-    corpo.blocos[1].linhas.indexOf('Resultados Básicos - Parte I') < corpo.blocos[1].linhas.indexOf('Resultados Básicos - Parte II'), true);
+  conf('e as teorias do módulo achado vêm primeiro, na ordem das aulas', corpo.blocos[1].linhas.join(' | '),
+    ['Resultados Básicos - Parte I', 'Resultados Básicos - Parte II', 'Soma e Produto das Raízes', 'Equações Biquadradas'].join(' | '));
   conf('Exercícios: as duas listas', corpo.blocos[2].linhas.slice().sort().join(' | '),
     'Equações do Segundo Grau: Resultados Básicos | Soma e Produto');
   conf('Banco: o problema da equação do segundo grau', corpo.blocos[3].linhas.join(' | '), 'As raízes escondidas');
