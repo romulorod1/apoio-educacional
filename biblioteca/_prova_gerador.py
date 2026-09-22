@@ -28,14 +28,20 @@ Travas (CONTRATO_pacote_biblioteca.md, secao 9, mais os pedidos da B4):
   origem        origem_citada literal na fonte
   fidelidade    20 pedacos sorteados com semente fixa: SVG no Chrome contra o
                 pixmap do pymupdf do mesmo retangulo, diferenca abaixo de 1%
+  series (B2)   padroes medidos fora do 9o ano (Biblioteca/PADROES_numeracao_6_series.md):
+                solucoes sem titulo, marcador com recuo de paragrafo, solucao
+                em duas partes, marcador em CMBX10, titulo do modulo pela capa
+                das listas; toda lista com solucoes
 
 Saida no dialeto do portao: "N verificacoes passaram, M falharam".
 """
 import argparse
+import collections
 import copy
 import hashlib
 import io
 import json
+import math
 import os
 import random
 import re
@@ -48,6 +54,7 @@ import pymupdf
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, AQUI)
+import apelidos as apelidos_mod  # noqa: E402
 import gerar_pacote  # noqa: E402
 import portal  # noqa: E402
 
@@ -104,6 +111,336 @@ def fio_da_pagina(pg):
     return [d['rect'] for d in pg.get_drawings() if d['rect'].width < 1.5 and d['rect'].height > 400]
 
 
+# ------------------------------------------------------------------ oraculos da prova
+#
+# Achado da lente 2 do #47: tres travas decidiam com as funcoes do proprio
+# gerador (a primeira linha do recorte, a letra da objetiva e a divisa de
+# colunas quando a pagina nao tem fio), e entao comparavam o gerador com ele
+# mesmo. Os oraculos abaixo leem a pagina por outro caminho; a trava
+# "prova independente do gerador" roda as travas com aquelas funcoes do
+# gerador trocadas por uma que falha, e exige o mesmo resultado.
+
+def divisa_pela_tinta(pg):
+    """Divisa de colunas pelo corredor sem tinta entre 250 e 360 pt, na pagina renderizada.
+
+    Nao usa fio nem margem de texto: a faixa vertical mais larga sem nenhum
+    pixel escuro no corpo da pagina (entre 10% e 90% da altura), e a divisa 5
+    pt antes de onde ela termina. Pelo fim, e nao pelo meio: a coluna direita
+    comeca sempre na mesma margem, e a esquerda termina onde cada linha acaba
+    (o meio variava de 272 a 297 pt entre as paginas de Produtos Notaveis).
+    """
+    tmp = pymupdf.open()
+    tmp.insert_pdf(pg.parent, from_page=pg.number, to_page=pg.number)
+    pix = tmp[0].get_pixmap(dpi=72, colorspace=pymupdf.csGRAY)
+    tmp.close()
+    w, h, s = pix.width, pix.height, pix.samples
+    ya, yb = int(h * 0.1), int(h * 0.9)
+    livre = [not any(s[y * w + x] < 160 for y in range(ya, yb)) for x in range(w)]
+    # o corredor mais a direita (com 4 px ou mais) que termina em tinta antes de 360:
+    # a coluna direita comeca sempre na margem, entao a direita do vao nao sobra
+    # corredor; o mais largo falhava quando uma linha da esquerda ia ate quase o
+    # vao e sobrava um corredor maior no meio da coluna (amostra, "fim"). Sem
+    # nenhum assim (coluna direita vazia), o mais largo.
+    corredores, ini = [], None
+    for x in range(250, min(361, w)):
+        if livre[x] and ini is None:
+            ini = x
+        if (not livre[x] or x == min(360, w - 1)) and ini is not None:
+            fim = x if not livre[x] else x + 1
+            corredores.append((ini, fim, not livre[x]))
+            ini = None
+    fechados = [c for c in corredores if c[2] and c[1] - c[0] >= 4]
+    if fechados:
+        return fechados[-1][1] - 5.0
+    if corredores:
+        return max(corredores, key=lambda c: c[1] - c[0])[1] - 5.0
+    return None
+
+
+def divisa_da_prova(doc, pg):
+    """O fio da pagina; sem ele, o fio mais frequente do documento; sem nenhum, a tinta."""
+    fios = fio_da_pagina(pg)
+    if fios:
+        return fios[0].x0
+    todos = [round(f.x0, 1) for q in doc for f in fio_da_pagina(q)]
+    if todos:
+        return max(set(todos), key=todos.count)
+    return divisa_pela_tinta(pg)
+
+
+def comeco_do_recorte(pg, bbox):
+    """O texto que o leitor le primeiro no recorte, pelos caracteres do PDF.
+
+    A linha e a dos caracteres com a mesma linha de base. A primeira e a de
+    base mais alta entre as que comecam ate 45 pt da borda esquerda do
+    recorte: o que sobe acima da linha do marcador (radical, numerador) comeca
+    depois do "Exercicio N.", mais para dentro, e o marcador com recuo de
+    paragrafo (23,5 pt) ainda conta.
+    """
+    r = pymupdf.Rect(bbox)
+    cs = []
+    for b in pg.get_text('rawdict')['blocks']:
+        if b['type'] != 0:
+            continue
+        for l in b['lines']:
+            for sp in l['spans']:
+                # glifo de extensao (radical e parentese grandes, fonte CMEX) nao e
+                # texto de leitura: os radicais da 2a linha da solucao 23 de Fatoracao
+                # (8o ano) tem base 4 pt abaixo do "23." e a margem mais a esquerda
+                # que ele, e faziam a linha do rotulo parecer suspensa
+                if 'CMEX' in sp['font']:
+                    continue
+                for c in sp['chars']:
+                    x0, y0, x1, y1 = c['bbox']
+                    # pelo centro: a caixa da fonte passa da tinta, e o recorte e pela tinta
+                    if c['c'].strip() and r.contains(pymupdf.Point((x0 + x1) / 2, (y0 + y1) / 2)):
+                        cs.append((x0, c['origin'][1], c['c']))
+    linhas = []
+    for c in sorted(cs, key=lambda c: c[1]):
+        if linhas and abs(c[1] - linhas[-1][0]) < 2.0:
+            linhas[-1][1].append(c)
+        else:
+            linhas.append([c[1], [c]])
+    # glifo solto (o radical de "A = raiz de 21(21-13)...", Areas, solucao 8, e o
+    # parentese grande) forma "linha" de um caractere: nao conta
+    inicio = [(base, min(c[0] for c in cs_l), cs_l) for base, cs_l in linhas if len(cs_l) >= 2]
+    # linha suspensa (numerador de fracao, expoente): outra linha comeca mais a
+    # esquerda logo abaixo dela, a menos de 9,5 pt (a entrelinha e 12 pt; o
+    # numerador de "A = 4(5+7) sobre 2" sobe uns 7 pt, Areas, solucao 5)
+    perto = [(b, x, l) for b, x, l in inicio if x <= r.x0 + 45
+             and not any(0 < b2 - b < 9.5 and x2 < x - 5 for b2, x2, _ in inicio)]
+    if not perto:
+        return ''
+    return portal.recompor(''.join(c[2] for c in sorted(perto[0][2], key=lambda c: c[0])))
+
+
+def letras_da_solucao(texto):
+    """As letras de resposta que a solucao escreve, lidas palavra a palavra.
+
+    Depois de "resposta", "letra", "alternativa" ou "opcao", a primeira palavra
+    que e uma letra solta de A a E (com ou sem parenteses e pontuacao), a ate
+    8 palavras dali. Ou a solucao inteira e "N. X.".
+    """
+    import unicodedata
+    t = unicodedata.normalize('NFD', texto)
+    t = ''.join(c for c in t if unicodedata.category(c) != 'Mn')
+    palavras = t.split()
+    achadas = set()
+    gatilhos = ('resposta', 'letra', 'alternativa', 'opcao')
+    for k, p in enumerate(palavras):
+        if p.lower().strip(':.,;()') in gatilhos:
+            for q in palavras[k + 1:k + 9]:
+                n = q.strip('.,;:()')
+                if len(n) == 1 and n in 'ABCDE':
+                    achadas.add(n)
+                    break
+                if re.search(r'[A-Za-z]{2,}', n) and n.lower() not in ('letra', 'e', 'a', 'o', 'da', 'de'):
+                    break
+    so = re.match(r'^\s*\d+\s*\.\s*\(?([A-E])\)?\s*\.?\s*$', ' '.join(palavras))
+    if so:
+        achadas.add(so.group(1))
+    return achadas
+
+
+def primeira_palavra(cs):
+    """Primeira palavra da linha: caracteres a menos de 2,5 pt um do outro.
+
+    A linha de base junta coisas distantes: um "2" solto em x 29,5 e o "15."
+    de "10 raiz de 15." em x 43,5 liam "215." (Relacao de Euler, p. 5).
+    """
+    out = [cs[0]]
+    for a, b in zip(cs, cs[1:]):
+        if b[0] - a[4][2] > 2.5:
+            break
+        out.append(b)
+    return ''.join(c[1] for c in out).strip()
+
+
+LIMIAR_TINTA_PROVA = 235   # de 255: cinza claro de figura ainda e tinta
+CORTE_PERMITIDO = re.compile(r'^(\d+)?Exerc\S*cios(Introdut|deFixa|deAprofund)|^deExames|^Exames|^Respostas?eSolu'
+                             r'|^E?laboradopor|^P?roduzidopor|^Materialelaboradopor|cursoarquimedes')
+# linha que so se pula, sem fechar o item aberto: endereco do rodape e numero
+# solto (numero da pagina, denominador "2" de uma fracao centrada)
+SO_PULA = re.compile(r'^http|^matematica\.obmep|^\d+$')
+
+
+def _linhas_da_pagina(doc, pno):
+    """Linhas de corpo normal (acima de 8,5 pt) da pagina, por coluna e em ordem, e o teste de tinta.
+
+    A tinta e da pagina renderizada: glifo sem tinta (o "." invisivel no fim de
+    uma formula de Conjuntos Numericos) nao e conteudo. Limiar claro, 235: o
+    rotulo cinza de uma figura (BH[180], Nocoes Basicas) e conteudo.
+    """
+    pg = doc[pno]
+    xsep = divisa_da_prova(doc, pg)
+    tmp = pymupdf.open()
+    tmp.insert_pdf(doc, from_page=pno, to_page=pno)
+    pix = tmp[0].get_pixmap(dpi=100, colorspace=pymupdf.csGRAY)
+    tmp.close()
+    kpx = 100 / 72.0
+    amostras = pix.samples  # uma copia so: cada acesso a pix.samples copia a imagem
+
+    def tem_tinta(bb, fora_de=()):
+        """Ha tinta na caixa do glifo, nos pixels que nao estao em nenhum dos retangulos?
+
+        So fora deles: a caixa de um glifo de simbolo e bem mais alta que o desenho
+        (189 a 220 pt, com a tinta de 192 a 199), e a parte dela dentro do recorte
+        nao e texto perdido.
+        """
+        xa, xb = max(0, int(bb[0] * kpx)), min(pix.width, int(bb[2] * kpx) + 1)
+        ya, yb = max(0, int(bb[1] * kpx)), min(pix.height, int(bb[3] * kpx) + 1)
+        rs = [(r.x0 * kpx, r.y0 * kpx, r.x1 * kpx, r.y1 * kpx) for r in fora_de]
+        for y in range(ya, yb):
+            for x in range(xa, xb):
+                if amostras[y * pix.width + x] < LIMIAR_TINTA_PROVA and not any(
+                        a <= x + 0.5 <= c and b <= y + 0.5 <= d for a, b, c, d in rs):
+                    return True
+        return False
+
+    largos = [d['rect'].y0 for d in pg.get_drawings() if d['rect'].height < 1.5 and d['rect'].width > 400
+              and d['rect'].y0 > pg.rect.height * 0.8]
+    pe = min(largos) if largos else pg.rect.height - 45
+    por_linha = collections.defaultdict(list)
+    for b in pg.get_text('rawdict')['blocks']:
+        if b['type'] != 0:
+            continue
+        for ln in b['lines']:
+            for sp in ln['spans']:
+                if sp['size'] <= 8.5:
+                    continue
+                for c in sp['chars']:
+                    if not c['c'].strip():
+                        continue
+                    cx, cy = (c['bbox'][0] + c['bbox'][2]) / 2, (c['bbox'][1] + c['bbox'][3]) / 2
+                    if cy >= pe:
+                        continue
+                    # caractere por cima do fio entre as colunas: e da regra de exclusao
+                    # por calha, que tem trava propria (exclusoes_por_calha_sem_base); pelo
+                    # centro ele cairia na coluna do lado e no item errado (o "." de
+                    # Conjuntos Numericos, p. 9, do item 23, ja excluido por isso)
+                    if c['bbox'][0] < xsep - 0.5 and c['bbox'][2] > xsep + 0.5:
+                        continue
+                    col = 0 if cx < xsep else 1
+                    por_linha[(col, round(c['origin'][1]))].append((c['bbox'][0], c['c'], cx, cy, tuple(c['bbox'])))
+    # linhas de base a menos de 2 pt sao a mesma linha
+    linhas = []
+    for k in sorted(por_linha):
+        if linhas and linhas[-1][0][0] == k[0] and abs(linhas[-1][0][1] - k[1]) <= 2:
+            linhas[-1][1].extend(por_linha[k])
+        else:
+            linhas.append([k, list(por_linha[k])])
+    for _, cs in linhas:
+        cs.sort()
+    return linhas, tem_tinta
+
+
+def trava_tinta_coberta(p):
+    """Todo texto de corpo normal da lista esta num recorte, ou e um corte permitido.
+
+    Pedido depois do achado da nota falsa (Inequacoes Mistas, 1o medio): a
+    barra de uma fracao na margem virou "nota de rodape", e o resto do
+    exercicio 9 ficou fora de todo recorte sem nenhuma trava ver, porque as
+    travas so olhavam o que ESTAVA no recorte. Aqui manda a pagina: linha a
+    linha, em ordem de leitura, cada linha de corpo normal (acima de 8,5 pt,
+    o que deixa de fora nota de rodape e expoente) pertence ao item aberto
+    naquele ponto. Linha sem recorte so passa se for titulo de secao,
+    cabecalho, credito, rodape ou texto de item excluido com motivo.
+    """
+    erros = []
+    for l in p.relatorio['listas']:
+        if 'erro' in l:
+            continue
+        doc = p.doc(l['arquivo'])
+        excluidos = {e['numero'] for e in l['excluidos']}
+        rects = collections.defaultdict(list)
+        for it in p.itens:
+            if os.path.basename(it['origem']['arquivo']) != l['arquivo']:
+                continue
+            for tipo in ('enunciado', 'solucao'):
+                for pz in pedacos(it, tipo):
+                    rects[pz['pagina']].append(pymupdf.Rect(pz['bbox']))
+        paginas = {pno: _linhas_da_pagina(doc, pno) for pno in range(1, doc.page_count)}
+        # margem de cada coluna, na lista inteira: o menor comeco de linha que
+        # aparece pelo menos 3 vezes (a 1 pt). Nao a moda nem por pagina: uma
+        # tabela recuada em x 70 enchia a p. 6 de Conjuntos Numericos, que so
+        # tinha duas linhas na margem
+        margem = {}
+        for col in (0, 1):
+            xs = [int(min(c[0] for c in cs)) for linhas, _ in paginas.values() for (cc, _b), cs in linhas if cc == col]
+            rep = [x for x in set(xs) if sum(1 for y in xs if abs(y - x) <= 1) >= 3]
+            margem[col] = min(rep) if rep else None
+        dono, em_sol, viu_enunciado = None, False, False
+        for pno in range(1, doc.page_count):
+            linhas, tem_tinta = paginas[pno]
+            for k_l, ((col, base), cs) in enumerate(linhas):
+                texto = portal.recompor(''.join(c[1] for c in cs))
+                sem = re.sub(r'\s+', '', texto)
+                if SO_PULA.search(sem):
+                    continue
+                if CORTE_PERMITIDO.search(sem):
+                    if re.match(r'^Respostas?eSolu', sem):
+                        em_sol = True
+                    elif viu_enunciado and not em_sol and re.match(r'^(1)?Exerc\S*ciosIntrodut', sem):
+                        em_sol = True  # solucoes sem titulo (Potenciacao)
+                    dono = None
+                    continue
+                m = re.match(r'^Exerc\S*cio(\d+)\.', sem)
+                if m and not em_sol:
+                    dono, viu_enunciado = int(m.group(1)), True
+                elif (em_sol and re.match(r'^\d+\.', primeira_palavra(cs)) and margem[col] is not None
+                      and abs(cs[0][0] - margem[col]) <= 12
+                      # a numeracao das solucoes anda de um em um (a mesma, na solucao em
+                      # duas partes): "11. Resposta B." e o fim da solucao 21 de Operacoes
+                      # com Numeros Naturais (6o ano), e nao a 11; "1986." e um ano
+                      and (dono is None or 0 <= int(re.match(r'^(\d+)', primeira_palavra(cs)).group(1)) - dono <= 3)):
+                    dono = int(re.match(r'^(\d+)', primeira_palavra(cs)).group(1))
+                fora = [c for c in cs if not any(r.contains(pymupdf.Point(c[2], c[3])) for r in rects[pno + 1])]
+                if not [c for c in fora if tem_tinta(c[4], rects[pno + 1])]:
+                    continue
+                # linha suspensa logo acima de um marcador (o numerador "AB.GE" da
+                # fracao de "26. A area ... e AB.GE sobre 2", Areas, p. 12) e do
+                # item desse marcador, que ainda nao foi lido. A fracao pode empilhar
+                # varias linhas suspensas (o expoente do numerador de "3(-1/2)^2 + 1/4",
+                # Expressoes Numericas, 8o ano, 27 pt de base acima do rotulo 5): sobe a pilha
+                # de linhas coladas (menos de 9,5 pt entre bases), ate 30 pt abaixo
+                # desta, ate a primeira que comeca a esquerda dela com um rotulo
+                dono_l = dono
+                prox = None
+                for j in range(k_l + 1, len(linhas)):
+                    (cj, bj), csj = linhas[j]
+                    # glifo solto (o alto do radical do exercicio 10 de Inequacoes Mistas,
+                    # 1o medio) tem a base 10 pt acima da linha do rotulo
+                    passo = 12.0 if j == k_l + 1 and len(cs) == 1 else 9.5
+                    if cj != col or not 0 < bj - base < 30 or not bj - linhas[j - 1][0][1] < passo:
+                        break
+                    sj = re.sub(r'\s+', '', portal.recompor(''.join(c[1] for c in csj)))
+                    if csj[0][0] < cs[0][0] - 5 and (re.match(r'^Exerc\S*cio\d+\.', sj) or re.match(r'^\d+\.', primeira_palavra(csj))):
+                        prox = linhas[j]
+                        break
+                if prox:
+                    pw = primeira_palavra(prox[1])
+                    mm = re.match(r'^Exerc\S*cio(\d+)\.', re.sub(r'\s+', '', portal.recompor(''.join(c[1] for c in prox[1]))))
+                    if mm and not em_sol:
+                        dono_l = int(mm.group(1))
+                    elif em_sol and re.match(r'^\d+\.', pw):
+                        dono_l = int(re.match(r'^(\d+)', pw).group(1))
+                if dono_l is None or dono_l in excluidos:
+                    continue
+                dono_msg = dono_l
+                erros.append('%s p%d: linha fora de todo recorte, no item %s: %r' % (l['aula'], pno + 1, dono_msg, texto[:50]))
+    return erros
+
+
+def enunciados_no_texto(doc):
+    """Numeros dos "Exercicio N." no texto do PDF, antes das solucoes, sem o detector."""
+    nums = []
+    for pno in range(1, doc.page_count):
+        t = portal.recompor(doc[pno].get_text('text'))
+        for m in re.finditer(r'Exerc\S*cio\s*(\d+)\s*\.', t):
+            nums.append(int(m.group(1)))
+    return nums
+
+
 # ------------------------------------------------------------------ travas
 
 def trava_determinismo(a, b):
@@ -127,6 +464,12 @@ def trava_contagens(p):
         n = len(ne)
         if ne != list(range(1, n + 1)):
             erros.append('%s: enunciados fora de sequencia %s' % (l['aula'], ne))
+        # pelo texto do PDF, sem o detector: pega o ultimo item perdido, que deixa
+        # a sequencia 1..N-1 perfeita. Citacao repetida ("veja o Exercicio 3.") pode.
+        no_texto = set(enunciados_no_texto(p.doc(l['arquivo'])))
+        if no_texto != set(range(1, n + 1)):
+            erros.append('%s: o texto do PDF tem os enunciados %s, e o detector achou 1..%d' % (
+                l['aula'], sorted(no_texto), n))
         # por arquivo, e nao por aula: ha duas listas "resolucao-de-exercicios"
         no_pacote = sorted(por_aula.get(l['arquivo'], []))
         excl = sorted(e['numero'] for e in l['excluidos'])
@@ -134,6 +477,10 @@ def trava_contagens(p):
             erros.append('%s: itens no pacote %s mais excluidos %s nao dao 1..%d' % (l['aula'], no_pacote, excl, n))
         if any(not e.get('motivo') for e in l['excluidos']):
             erros.append('%s: excluido sem motivo' % l['aula'])
+        # as 230 listas das 7 series tem solucoes (medido pela B2); lista sem elas
+        # e detector que perdeu a secao (Potenciacao, 8o ano, nao tem o titulo)
+        if not l.get('pagina_solucoes'):
+            erros.append('%s: lista sem solucoes detectadas' % l['aula'])
         if l.get('pagina_solucoes'):
             for x in no_pacote:
                 if ns.count(x) != 1:
@@ -238,9 +585,13 @@ def conteudo_na_caixa(p, it, pg, pz):
     # nao e corte: dois itens colados na fonte dividem a borda sem perder nada.
     tmp = pymupdf.open()
     tmp.insert_pdf(p.doc(it['origem']['arquivo']), from_page=pz['pagina'] - 1, to_page=pz['pagina'] - 1)
-    k = DPI_FIDELIDADE / 72.0
+    # 4 pixels por ponto, com a caixa em ponto inteiro: a borda cai entre dois
+    # pixels. A 150 dpi o ultimo pixel "de dentro" passava 0,16 pt da borda e
+    # via a tinta do item de baixo que so comeca nela (exercicio 20 de Equacoes
+    # Algebricas, 3o medio, expoente em y 80,0 com o 19 acabando em 80)
+    k = 4.0
     fora = r + (-2, -2, 2, 2)
-    pix = tmp[0].get_pixmap(dpi=DPI_FIDELIDADE, colorspace=pymupdf.csGRAY, clip=fora)
+    pix = tmp[0].get_pixmap(dpi=288, colorspace=pymupdf.csGRAY, clip=fora)
     w, h, s = pix.width, pix.height, pix.samples
     x0, y0 = int(round((r.x0 - fora.x0) * k)), int(round((r.y0 - fora.y0) * k))
     x1, y1 = int(round((r.x1 - fora.x0) * k)) - 1, int(round((r.y1 - fora.y0) * k)) - 1
@@ -254,10 +605,19 @@ def conteudo_na_caixa(p, it, pg, pz):
     for nome, v in cortes.items():
         if v:
             erros.append('tinta cortada na borda %s' % nome)
-    fios = fio_da_pagina(pg)
-    # pagina sem fio (Razoes Trigonometricas, pagina 5): a divisa do documento
-    xsep = fios[0].x0 if fios else gerar_pacote.geometria(p.doc(it['origem']['arquivo']))['xsep']
-    lado = 0 if r.x1 <= xsep + 3 else 1
+    # recorte que passa da margem da pagina (24 pt de cada lado) encosta na
+    # tinta, a ate 2,5 pt da borda: desenho recortado por clip tem caixa ate a
+    # borda da pagina, e o recorte esticado ate ela e so branco (Areas, 9o ano)
+    for nome, a, b in (('esquerda', r.x0, min(r.x0 + 2.5, r.x1)), ('direita', max(r.x1 - 2.5, r.x0), r.x1)):
+        fora_da_margem = r.x0 < 24.0 if nome == 'esquerda' else r.x1 > pg.rect.width - 24.0
+        if fora_da_margem:
+            xa, xb = int(round((a - fora.x0) * k)), int(round((b - fora.x0) * k))
+            if not any(s[y * w + x] < 200 for y in range(y0, y1 + 1) for x in range(xa, xb)):
+                erros.append('recorte passa da margem %s sem tinta ali' % nome)
+    # pagina sem fio (Razoes Trigonometricas, pagina 5; Produtos Notaveis inteira):
+    # a divisa medida pela prova, e nao a do gerador
+    xsep = divisa_da_prova(p.doc(it['origem']['arquivo']), pg)
+    lado = 0 if (r.x0 + r.x1) / 2 < xsep else 1
     for b in pg.get_text('dict')['blocks']:
         if b['type'] != 0:
             continue
@@ -269,16 +629,32 @@ def conteudo_na_caixa(p, it, pg, pz):
                 cx = (bb.x0 + bb.x1) / 2
                 if ((cx < xsep) != (lado == 0)) and bb.intersects(r) and (bb & r).width > 2:
                     erros.append('texto da outra coluna dentro: %r' % sp['text'][:25])
-    # nota de rodape: fio curto na margem com texto miudo logo abaixo, dentro da caixa
+    # nota de rodape: fio curto na margem com texto miudo logo abaixo, dentro da
+    # caixa, e nada de corpo normal abaixo dele na coluna (a nota fica no pe; a
+    # barra de uma fracao na margem tem o resto do item embaixo)
+    # o rodape da pagina (endereco, numero) fica fora da conta
+    fios_pe = [d['rect'].y0 for d in pg.get_drawings() if d['rect'].height < 1.5 and d['rect'].width > 400
+               and d['rect'].y0 > pg.rect.height * 0.8]
+    y_pe = min(fios_pe) if fios_pe else pg.rect.height - 45
+    spans = [sp for b in pg.get_text('dict')['blocks'] if b['type'] == 0 for l in b['lines'] for sp in l['spans']
+             if sp['text'].strip() and sp['bbox'][1] < y_pe]
     for d in pg.get_drawings():
         q = d['rect']
         if q.height < 1.5 and 40 <= q.width <= 140 and r.y0 <= q.y0 <= r.y1 and r.x0 <= q.x0 <= r.x1:
-            miudo = [sp for b in pg.get_text('dict')['blocks'] if b['type'] == 0 for l in b['lines'] for sp in l['spans']
-                     if sp['text'].strip() and 0 <= sp['bbox'][1] - q.y0 <= 12 and q.x0 - 1 <= sp['bbox'][0] <= q.x1]
-            if miudo and all(sp['size'] <= 8.5 for sp in miudo) and any(r.contains(pymupdf.Rect(sp['bbox'])) for sp in miudo):
+            miudo = [sp for sp in spans if 0 <= sp['bbox'][1] - q.y0 <= 12 and q.x0 - 1 <= sp['bbox'][0] <= q.x1]
+            corpo_abaixo = any(sp['size'] > 8.5 and sp['bbox'][1] > q.y0 + 0.5
+                               and ((sp['bbox'][0] + sp['bbox'][2]) / 2 < xsep) == (lado == 0) for sp in spans)
+            # a nota abre com o numero dela no comeco do fio; a barra da fracao
+            # x(x-1)...(x-k+1) sobre k!, no pe da coluna (Equacoes Algebricas,
+            # coeficientes reais, 3o medio, exercicio 7), tem "k!" miudo embaixo
+            numero = any(re.match(r'^\d+$', sp['text'].strip()) and sp['bbox'][0] <= q.x0 + 15 for sp in miudo)
+            if (miudo and numero and all(sp['size'] <= 8.5 for sp in miudo) and not corpo_abaixo
+                    and any(r.contains(pymupdf.Rect(sp['bbox'])) for sp in miudo)):
                 erros.append('nota de rodape dentro do recorte')
-    largos = [d['rect'] for d in pg.get_drawings() if d['rect'].height < 1.5 and d['rect'].width > 400
-              and d['rect'].y0 < pg.rect.height]
+    # desenho ou imagem: em Produtos Notaveis (8o ano) o fio do rodape e uma imagem
+    largos = [q for q in [d['rect'] for d in pg.get_drawings()] +
+              [pymupdf.Rect(b['bbox']) for b in pg.get_text('dict')['blocks'] if b['type'] == 1]
+              if q.height < 1.5 and q.width > 400 and q.y0 < pg.rect.height]
     if largos:
         rod = max(largos, key=lambda q: q.y0)
         # por coordenada: o fio tem altura zero, e o intersects do PyMuPDF trata
@@ -316,14 +692,15 @@ def trava_recorte(p):
                 for (a, b, dono) in ocupado.get(chave, []):
                     if y0 < b - 0.01 and a < y1 - 0.01:
                         erros.append('%s %s: sobrepoe o recorte de %s' % (it['id'], tipo, dono))
-                ocupado.setdefault(chave, []).append((y0, y1, it['id']))
+                # a nota de rodape (ultimo pedaco, so texto miudo) fica no pe da coluna,
+                # abaixo de itens de numero maior: nao entra na conta da ordem
+                if not (k > 0 and k == len(ps) - 1 and so_miudo(pg, pz['bbox'])):
+                    ocupado.setdefault(chave, []).append((y0, y1, it['id']))
             if total < minimo:
                 erros.append('%s %s: %.1f pt de altura, abaixo de %d' % (it['id'], tipo, total, minimo))
             primeiro = ps[0]
-            xsep = [f.x0 for f in fio_da_pagina(doc[primeiro['pagina'] - 1])]
-            xsep = xsep[0] if xsep else gerar_pacote.geometria(doc)['xsep']
-            linha = gerar_pacote.primeira_linha_na_margem(doc, primeiro['pagina'] - 1, primeiro['bbox'],
-                                                         primeiro['coluna'] - 1, xsep)
+            # pelos caracteres do recorte, sem a funcao do gerador (lente 2 do #47)
+            linha = comeco_do_recorte(doc[primeiro['pagina'] - 1], primeiro['bbox'])
             alvo = (r'^Exerc\S*cio\s*%d\s*\.' if tipo == 'enunciado' else r'^%d\s*\.') % it['numero']
             if not re.match(alvo, linha):
                 erros.append('%s %s: primeira linha nao comeca pelo numero: %r' % (it['id'], tipo, linha[:40]))
@@ -368,10 +745,8 @@ def trava_objetiva(p):
             erros.append('%s: objetiva com resposta %r' % (it['id'], r))
             continue
         s = texto_da_solucao(p, it)
-        letras = set(gerar_pacote.RESPOSTA.findall(s))
-        m = gerar_pacote.SO_LETRA.match(' '.join(s.split()))
-        if m:
-            letras.add(m.group(1))
+        # lida palavra a palavra, sem as expressoes do gerador (lente 2 do #47)
+        letras = letras_da_solucao(s)
         if letras != {r}:
             erros.append('%s: resposta %s, e a solucao da fonte escreve %s' % (it['id'], r, sorted(letras) or 'nenhuma letra'))
     return erros
@@ -410,6 +785,8 @@ def trava_svg(p):
     """
     erros = []
     alvos = [(it['assets'][t], it['medidas'][t]) for it in p.itens for t in ('enunciado', 'solucao') if it['assets'].get(t)]
+    pilhas = {it['assets'][t]: pedacos(it, t) for it in p.itens for t in ('enunciado', 'solucao')
+              if it['assets'].get(t) and len(pedacos(it, t)) > 1}
     alvos += [(pg['asset'], pg['medidas']) for t in p.teoria for pg in t['paginas']]
     for cam, med in alvos:
         s = p.bytes_de(cam).decode('utf-8')
@@ -431,6 +808,14 @@ def trava_svg(p):
         esperado = [med['largura_pt'], med['altura_pt']] * 2
         if any(abs(v - e) > 0.6 for v, e in zip(valores, esperado)):
             erros.append('%s: width, height ou viewBox %s nao batem com medidas %s' % (cam, valores, med))
+        # pedacos empilhados: cada um no lugar certo (a fidelidade desenha cada um
+        # sozinho, entao a posicao na pilha e conferida aqui)
+        ps = pilhas.get(cam)
+        if ps:
+            ys = posicoes_na_pilha(s)
+            certo = [sum(q['bbox'][3] - q['bbox'][1] for q in ps[:j]) + gerar_pacote.FOLGA_PILHA * j for j in range(len(ps))]
+            if len(ys) != len(certo) or any(abs(a - b) > 0.01 for a, b in zip(ys, certo)):
+                erros.append('%s: pedacos na pilha em %s, e o certo e %s' % (cam, ys, certo))
     return erros
 
 
@@ -505,12 +890,508 @@ def trava_origem(p):
             continue
         # a chamada de nota colada antes do fecha-parenteses nao e parte da origem
         t = re.sub(r'([a-z\u00e0-\u00ff])\d(\.?\))', r'\1\2', t)
-        if '(' + oc + ')' not in portal.sem_tracos(t):
+        # espaco junto do parentese e so a extracao do texto ("(Extraido do vestibular da
+        # UFSCar(SP) -2013 )", 6o ano): o texto de dentro e que tem de ser literal
+        if not re.search(r'\(\s*' + re.escape(oc) + r'\s*\)', portal.sem_tracos(t)):
             erros.append('%s: origem_citada %r nao esta literal na %s da fonte' % (it['id'], oc, onde))
     return erros
 
 
-def fracao_diferente(ref, cro, w, h, y0):
+# ------------------------------------------------------------------ padroes das outras series (B2)
+
+def trava_divisa_fina(divisa=None):
+    """A divisa entre dois itens colados cai no vao em branco, pela tinta fina.
+
+    Pagina sintetica: texto que acaba em y 103 e tinta do item de baixo a partir
+    de y 108,9. A pagina a 72 dpi nao mostra a linha 108 (so 0,1 pt dela tem
+    tinta), e a divisa pela linha de 1 pt caia em 109, cortando 0,2 pt do item de
+    baixo (exercicio 20 de Equacoes Algebricas, 3o medio). A divisa tem de ficar
+    entre 104 e 108.
+    """
+    divisa = divisa or gerar_pacote.divisa_fina
+    doc = pymupdf.open()
+    pg = doc.new_page(width=612, height=792)
+    pg.insert_text((29.5, 100), 'raizes sejam reais.', fontname='helv', fontsize=10)
+    pg.draw_rect(pymupdf.Rect(60, 108.9, 64, 118), color=None, fill=(0, 0, 0), width=0)
+    erros = []
+    tinta = gerar_pacote.linhas_com_tinta(doc, 0, {'xsep': 306.0, 'yrod': 767.0})[0]
+    if tinta[108]:
+        erros.append('a pagina a 72 dpi ja mostra a linha 108: o caso nao prova nada')
+    k = divisa(doc, 0, 24.0, 304.0, 100, 110)
+    if k is None or not 104 <= k <= 108:
+        erros.append('divisa em %r, e nao no vao entre 104 e 108' % (k,))
+    return erros
+
+
+def trava_subida_fina(subida=None):
+    """O topo da linha do marcador sobe pelo traco fino que a pagina a 72 dpi nao mostra.
+
+    Pagina sintetica: tinta da linha a partir de y 110 e um traco de 0,15 pt de
+    largura subindo ate y 106 (o expoente de 2 elevado a x ao quadrado, solucao 19
+    de Equacoes Exponenciais, 1o medio). A 72 dpi o traco nao escurece linha
+    nenhuma, e o topo ficava em 110. Com as caixas do texto em 104, o topo tem de
+    ficar entre 104 e 106.
+    """
+    subida = subida or gerar_pacote.subida_fina
+    doc = pymupdf.open()
+    pg = doc.new_page(width=612, height=792)
+    pg.draw_rect(pymupdf.Rect(40, 110, 120, 118), color=None, fill=(0, 0, 0), width=0)
+    pg.draw_line((80, 106), (80, 110), width=0.15)
+    erros = []
+    tinta = gerar_pacote.linhas_com_tinta(doc, 0, {'xsep': 306.0, 'yrod': 767.0})[0]
+    if any(tinta[y] for y in (106, 107, 108, 109)):
+        erros.append('a pagina a 72 dpi ja mostra o traco: o caso nao prova nada')
+    y = subida(doc, 0, 24.0, 304.0, 110.0, 104.0)
+    if not 104 <= y <= 106:
+        erros.append('topo em %r, e nao entre 104 e 106' % (y,))
+    return erros
+
+
+def trava_descida_fina(descida=None):
+    """O fim do pedaco desce pelo traco fino que a pagina a 72 dpi nao mostra.
+
+    Pagina sintetica: tinta ate y 110 e um traco de 0,15 pt de largura descendo
+    ate y 116 (o eixo da figura da solucao 6 de Circulo Trigonometrico, 2o medio).
+    Descendo de 110, com limite em 125, o fim tem de ficar entre 115,5 e 116,5.
+    """
+    descida = descida or gerar_pacote.descida_fina
+    doc = pymupdf.open()
+    pg = doc.new_page(width=612, height=792)
+    pg.draw_rect(pymupdf.Rect(40, 100, 120, 110), color=None, fill=(0, 0, 0), width=0)
+    pg.draw_line((80, 110), (80, 116), width=0.15)
+    erros = []
+    tinta = gerar_pacote.linhas_com_tinta(doc, 0, {'xsep': 306.0, 'yrod': 767.0})[0]
+    if any(tinta[y] for y in (111, 112, 113, 114, 115)):
+        erros.append('a pagina a 72 dpi ja mostra o traco: o caso nao prova nada')
+    y = descida(doc, 0, 24.0, 304.0, 110.0, 125.0)
+    if not 115.5 <= y <= 116.5:
+        erros.append('fim em %r, e nao entre 115,5 e 116,5' % (y,))
+    return erros
+
+
+def trava_encosta():
+    """A seta de reta sobre as letras, 0,1 pt acima da caixa do rotulo, e da linha dele.
+
+    Elementos sinteticos no formato do detector: rotulo "12." com a caixa de 368,8
+    a 378,7 e a seta "<->" de 360,9 a 368,7 (Pontos, Retas e Planos, 3o medio,
+    solucao 12). O topo da linha tem de subir ate a seta.
+    """
+    marc = {'col': 1, 'el': {'bb': (300.9, 368.8, 313.4, 378.7), 'tipo': 'txt', 'col': 1}}
+    els = [marc['el'], {'tipo': 'txt', 'col': 1, 'bb': (495.1, 368.7, 507.2, 378.7), 'texto': 'LB'},
+           {'tipo': 'txt', 'col': 1, 'bb': (497.1, 360.9, 505.0, 368.7), 'texto': '<->', 'tam': 7.9}]
+    topo = gerar_pacote.topo_da_linha(marc, els)
+    return [] if topo <= 361.0 else ['topo da linha em %.1f, abaixo da seta (360,9)' % topo]
+
+
+def trava_encostado(p):
+    """Na lista de fio em imagem, o que encosta por cima de um rotulo fica no item certo.
+
+    Os quatro itens no pacote. O "=" miudo encostado por cima do rotulo 4 esta no
+    recorte do 4 (centro da tinta, lida pela pagina a 288 dpi), e nada dele no do
+    3. A ultima linha do 1, com a caixa encostada no rotulo 2, fica no 1: o 2 sai
+    da lista se o topo dele subir ate ela (o texto deixa de comecar pelo rotulo).
+    """
+    lst = [i for i in p.itens if i['aula']['slug'] == 'lista-fio-imagem']
+    it = {i['numero']: i for i in lst}
+    erros = ['lista-fio-imagem: exercicio %d fora do pacote' % n for n in (1, 2, 3, 4, 5) if n not in it]
+    if erros:
+        return erros
+    doc = p.doc(lst[0]['origem']['arquivo'])
+    pg = doc[1]
+    sp = [s for b in pg.get_text('dict')['blocks'] if b['type'] == 0 for l in b['lines'] for s in l['spans']
+          if s['text'].strip() == '=']
+    if not sp:
+        return ['lista-fio-imagem: a pagina nao tem o "="']
+    bb = pymupdf.Rect(sp[0]['bbox'])
+    pix = pg.get_pixmap(dpi=288, colorspace=pymupdf.csGRAY, clip=bb)
+    linhas = [y for y in range(pix.height) if any(pix.samples[y * pix.width + x] < 200 for x in range(pix.width))]
+    topo = bb.y0 + linhas[0] / 4.0
+    ponto = pymupdf.Point((bb.x0 + bb.x1) / 2, topo + 0.3)
+    for n, deve in ((3, False), (4, True)):
+        dentro = any(pymupdf.Rect(pz['bbox']).contains(ponto) for pz in pedacos(it[n], 'enunciado') if pz['pagina'] == 2)
+        if dentro != deve:
+            erros.append('lista-fio-imagem: o "=" (tinta a partir de y %.2f) esta %s do exercicio %d' % (
+                topo, 'no recorte' if dentro else 'fora do recorte', n))
+    # a barra de segmento sobre "AB" e da linha do rotulo 3
+    barras = [d['rect'] for d in pg.get_drawings() if d['rect'].height < 1.5 and 10 < d['rect'].width < 30
+              and d['rect'].x0 > 300]
+    if not barras:
+        erros.append('lista-fio-imagem: a pagina nao tem a barra de segmento')
+    else:
+        b = min(barras, key=lambda q: q.y0)
+        if not any(pz['bbox'][1] <= b.y0 for pz in pedacos(it[5], 'enunciado') if pz['pagina'] == 2):
+            erros.append('lista-fio-imagem: a barra de segmento (y %.2f) esta fora do recorte do exercicio 5' % b.y0)
+    # o "c" que rotula a figura do 1 nao e do 2
+    sc = [s for b in pg.get_text('dict')['blocks'] if b['type'] == 0 for l in b['lines'] for s in l['spans']
+          if s['text'].strip() == 'c' and s['size'] > 8.5]
+    if not sc:
+        erros.append('lista-fio-imagem: a pagina nao tem o "c"')
+    else:
+        c = pymupdf.Point((sc[0]['bbox'][0] + sc[0]['bbox'][2]) / 2, (sc[0]['bbox'][1] + sc[0]['bbox'][3]) / 2)
+        if any(pymupdf.Rect(pz['bbox']).contains(c) for pz in pedacos(it[2], 'enunciado') if pz['pagina'] == 2):
+            erros.append('lista-fio-imagem: o "c" da figura do 1 entrou no recorte do exercicio 2')
+    # o credito do autor nao entra na ultima solucao
+    for n in (1, 2, 3, 4, 5):
+        for pz in pedacos(it[n], 'solucao'):
+            if pz['pagina'] != 3:
+                continue
+            tx = p.doc(lst[0]['origem']['arquivo'])[2].get_text('text', clip=pymupdf.Rect(pz['bbox']))
+            if 'Material elaborado' in tx:
+                erros.append('lista-fio-imagem: o credito do autor entrou na solucao %d' % n)
+    return erros
+
+
+def trava_solucao_com_conteudo(p):
+    """Toda solucao do pacote traz algo alem do rotulo: texto depois do numero, ou figura.
+
+    A fonte as vezes poe so o numero no lugar da solucao (3o medio, Sistemas
+    Lineares, 10 e 12): o item sai pela curadoria, com motivo. A prova le o texto
+    dos pedacos pela pagina, tira o rotulo "N." do comeco, e aceita o que sobrar,
+    ou um recorte com mais de 20 pt de altura (figura sem texto).
+    """
+    erros = []
+    for it in p.itens:
+        if not it['assets'].get('solucao'):
+            continue
+        doc = p.doc(it['origem']['arquivo'])
+        ps = pedacos(it, 'solucao')
+        texto = ' '.join(doc[pz['pagina'] - 1].get_text('text', clip=pymupdf.Rect(pz['bbox'])) for pz in ps)
+        resto = re.sub(r'^\s*%d\s*\.' % it['numero'], '', texto).strip()
+        alto = max(pz['bbox'][3] - pz['bbox'][1] for pz in ps)
+        if not resto and alto <= 20:
+            erros.append('%s solucao: so o rotulo, sem texto nem figura' % it['id'])
+    return erros
+
+
+def trava_barra_acima(topo=None):
+    """A barra de segmento 1,2 pt acima da linha do marcador entra no recorte dele.
+
+    Elementos sinteticos no formato do detector: rotulo "10." com a caixa de 335,0
+    a 345,0, o texto "BO" da mesma linha e a barra dele, de 333,8 a 333,8 (solucao
+    10 de Relacoes Metricas, 9o ano). Com o topo em 335 (o que a tinta a 72 dpi da),
+    o corte tem de subir para antes da barra.
+    """
+    topo = topo or gerar_pacote.topo_com_barra
+    marc = {'col': 0, 'el': {'bb': (29.0, 335.0, 41.4, 345.0), 'tipo': 'txt', 'col': 0, 'tam': 10.0}}
+    els = [marc['el'],
+           {'tipo': 'txt', 'col': 0, 'bb': (208.7, 334.9, 222.6, 344.9), 'texto': 'BO', 'tam': 10.0},
+           {'tipo': 'des', 'col': 0, 'bb': (208.4, 333.8, 222.7, 333.8)}]
+    y = topo(els, marc, 335.0)
+    return [] if y <= 333.8 else ['corte em %.2f, abaixo da barra (333,8)' % y]
+
+
+def trava_corte_sem_tinta(fn=None):
+    """O corte entre itens, ja arredondado, nao passa por cima de tinta.
+
+    Pagina sintetica: um retangulo preto de 684,0 a 690,25 (o "b" que rotula a
+    figura do exercicio 11 de Produtos Notaveis, 8o ano) e o corte em 690,32, que
+    arredondado vira 690 e parte o retangulo. O corte tem de subir para antes dele.
+    """
+    fn = fn or gerar_pacote.topo_sem_cortar
+    doc = pymupdf.open()
+    pg = doc.new_page(width=612, height=792)
+    pg.draw_rect(pymupdf.Rect(440, 684.0, 452, 690.25), color=None, fill=(0, 0, 0), width=0)
+    y = fn(doc, 0, 293.0, 588.0, 690.32, 690.32)
+    return [] if y <= 684.0 else ['corte em %.2f: o arredondamento parte a tinta que acaba em 690,25' % y]
+
+
+def trava_topo_da_linha():
+    """A fracao de fracoes na linha do rotulo sobe o topo da linha ate o alto dela.
+
+    Elementos sinteticos com as medidas do exercicio 22 de Numeros Racionais (7o
+    ano): rotulo "Exercicio 22." de 582,7 a 592,7 e a fracao 3(-1/2)^2 + 1/4 em
+    cima dele, em cadeia, com o expoente em 560,2. O topo tem de chegar a 560,2.
+    """
+    marc = {'col': 0, 'el': {'bb': (29.5, 582.7, 74.0, 592.7), 'tipo': 'txt', 'col': 0, 'tam': 10.0}}
+    els = [marc['el'],
+           {'tipo': 'txt', 'col': 0, 'bb': (97.0, 583.4, 201.0, 593.3), 'texto': 'Simplificando', 'tam': 10.0},
+           {'tipo': 'txt', 'col': 0, 'bb': (239.1, 576.8, 244.1, 586.8), 'texto': '2', 'tam': 10.0},
+           {'tipo': 'txt', 'col': 0, 'bb': (215.4, 570.0, 220.3, 580.0), 'texto': '3', 'tam': 10.0},
+           {'tipo': 'txt', 'col': 0, 'bb': (239.1, 563.3, 244.1, 573.2), 'texto': '1', 'tam': 10.0},
+           {'tipo': 'txt', 'col': 0, 'bb': (252.8, 560.2, 256.6, 567.8), 'texto': '2', 'tam': 7.6}]
+    topo = gerar_pacote.topo_da_linha(marc, els)
+    return [] if topo <= 560.3 else ['topo da linha em %.1f, abaixo do alto da fracao (560,2)' % topo]
+
+
+def trava_bordas(p):
+    """A lista de bordas da amostra: 1, 2 e 5 no pacote; 3 e 4 fora pela calha.
+
+    A tabela do 3 cruza o fio com tracos retos, e o 4 esta na mesma altura da
+    outra coluna: os dois saem com o motivo da calha, e nenhum outro sai.
+    """
+    lst = [l for l in p.relatorio['listas'] if l['aula'] == 'lista-bordas']
+    if not lst:
+        return ['a amostra nao tem a lista de bordas']
+    erros = []
+    nums = sorted(i['numero'] for i in p.itens if i['aula']['slug'] == 'lista-bordas')
+    if nums != [1, 2, 5]:
+        erros.append('lista-bordas: itens no pacote %s, e nao 1, 2 e 5' % nums)
+    fora = sorted(e['numero'] for e in lst[0]['excluidos'] if 'fio entre as colunas' in e['motivo'])
+    if fora != [3, 4]:
+        erros.append('lista-bordas: excluidos pela calha %s, e nao 3 e 4' % fora)
+    # o alto do expoente em escada ("4", 19 pt acima do rotulo) e do exercicio 2
+    it = {i['numero']: i for i in p.itens if i['aula']['slug'] == 'lista-bordas'}
+    if 2 in it:
+        doc = p.doc(it[2]['origem']['arquivo'])
+        sp = [x for b in doc[1].get_text('dict')['blocks'] if b['type'] == 0 for l in b['lines'] for x in l['spans']
+              if '4' in x['text'] and x['size'] < 8 and x['bbox'][0] < 290 and x['bbox'][1] < 200]
+        sp.sort(key=lambda x: x['bbox'][1])
+        if not sp:
+            erros.append('lista-bordas: a pagina nao tem o alto do expoente')
+        else:
+            c = pymupdf.Point((sp[0]['bbox'][0] + sp[0]['bbox'][2]) / 2, (sp[0]['bbox'][1] + sp[0]['bbox'][3]) / 2)
+            if not any(pymupdf.Rect(pz['bbox']).contains(c) for pz in pedacos(it[2], 'enunciado') if pz['pagina'] == 2):
+                erros.append('lista-bordas: o alto do expoente esta fora do recorte do exercicio 2')
+    return erros
+
+
+def trava_variantes(p):
+    """A lista de variantes da amostra sai inteira e com as solucoes certas.
+
+    Ela imita tres padroes medidos fora do 9o ano: solucoes sem o titulo
+    "Respostas e Solucoes", marcador com recuo de paragrafo (item 3) e solucao
+    em duas partes (itens 2 e 3). Cada par de partes tem de ser UM item, com
+    os dois pedacos empilhados.
+    """
+    erros = []
+    lst = [l for l in p.relatorio['listas'] if l['aula'] == 'lista-variantes']
+    if not lst:
+        return ['a amostra nao tem a lista de variantes']
+    l = lst[0]
+    if not l.get('solucoes_sem_titulo'):
+        erros.append('lista-variantes: as solucoes nao foram achadas pela secao 1 que reaparece')
+    nums = sorted(i['numero'] for i in p.itens if i['aula']['slug'] == 'lista-variantes')
+    if nums != [1, 2, 3, 4]:
+        erros.append('lista-variantes: itens no pacote %s, e nao 1 a 4 (excluidos: %s)' % (
+            nums, [(e['numero'], e['motivo'][:60]) for e in l['excluidos']]))
+    for i in p.itens:
+        if i['aula']['slug'] == 'lista-variantes' and i['numero'] == 1:
+            if i.get('origem_citada') != 'Adaptado da Amostra - 2020':
+                erros.append('lista-variantes: "(Adaptado da ...)" nao virou origem_citada literal (%r)' % i.get('origem_citada'))
+        if i['aula']['slug'] == 'lista-variantes' and i['numero'] in (2, 3):
+            if len(pedacos(i, 'solucao')) != 2:
+                erros.append('lista-variantes: solucao %d com %d pedaco(s), e nao as duas partes' % (
+                    i['numero'], len(pedacos(i, 'solucao'))))
+    return erros
+
+
+def trava_apelidos(p):
+    """Todo apelido do pacote leva a um modulo do pacote, e todo modulo tem apelido.
+
+    No pacote real a conta e contra as 7 series (python biblioteca/apelidos.py);
+    aqui, contra os modulos que a pasta de PDFs tem.
+    """
+    modulos = apelidos_mod.modulos_da_pasta(p.pdfs, p.manifest['series'][0])
+    falhas, _ = apelidos_mod.conferir(p.apelidos, modulos)
+    if any(k.startswith('_') for k in p.apelidos):
+        falhas.append('apelidos.json do pacote leva chave de comentario (comeca com _)')
+    return falhas
+
+
+USO_GLIFO = re.compile(r'<use [^>]*transform="matrix\(([-\d.e]+),([-\d.e]+),([-\d.e]+),([-\d.e]+),([-\d.e]+),([-\d.e]+)\)"')
+
+
+def origens_dos_glifos(svg, n_pedacos):
+    """Por pedaco, as origens (x, y) dos glifos do SVG, em pt relativos ao canto do pedaco."""
+    if n_pedacos == 1:
+        blocos = [svg]
+    else:
+        blocos = re.split(r'<g transform="translate\(0 [\d.]+\)">', svg)[1:]
+    return [[(float(m.group(5)), float(m.group(6))) for m in USO_GLIFO.finditer(b)] for b in blocos]
+
+
+def trava_glifos(p):
+    """Todo caractere do PDF dentro do recorte tem o seu glifo no SVG, na mesma origem.
+
+    Pendencia (a) da lente 2 do #47: a fidelidade por pixel tem pouco dente para
+    defeito pequeno (3 glifos a menos davam 0,13% do pedaco), e a comparacao por
+    linha tambem nao serve (ruido de ate 12,5% numa linha certa, medido). Com o
+    texto em contorno, cada caractere vira um <use> com a origem na matriz;
+    medido no 9o ano: 1.098 de 1.098 pedacos com todos os caracteres casados a
+    menos de 0,6 pt. Um glifo a menos deixa um caractere sem par; glifo a mais
+    (a folga da redacao na borda) nao atrapalha.
+    """
+    erros = []
+    for it in p.itens:
+        doc = p.doc(it['origem']['arquivo'])
+        for tipo in ('enunciado', 'solucao'):
+            ps = pedacos(it, tipo)
+            if not ps or not it['assets'].get(tipo):
+                continue
+            ors = origens_dos_glifos(p.bytes_de(it['assets'][tipo]).decode('utf-8'), len(ps))
+            if len(ors) != len(ps):
+                erros.append('%s %s: o SVG tem %d pedacos e a origem %d' % (it['id'], tipo, len(ors), len(ps)))
+                continue
+            for k, pz in enumerate(ps):
+                r = pymupdf.Rect(pz['bbox'])
+                faltam = []
+                for b in doc[pz['pagina'] - 1].get_text('rawdict')['blocks']:
+                    if b['type'] != 0:
+                        continue
+                    for l in b['lines']:
+                        for sp in l['spans']:
+                            for c in sp['chars']:
+                                if not c['c'].strip():
+                                    continue
+                                if not r.contains(pymupdf.Point((c['bbox'][0] + c['bbox'][2]) / 2, (c['bbox'][1] + c['bbox'][3]) / 2)):
+                                    continue
+                                ox, oy = c['origin'][0] - r.x0, c['origin'][1] - r.y0
+                                if not any(abs(ux - ox) < 0.6 and abs(uy - oy) < 0.6 for ux, uy in ors[k]):
+                                    faltam.append(c['c'])
+                if faltam:
+                    erros.append('%s %s p%d: %d caractere(s) do PDF sem glifo no SVG (%r)' % (
+                        it['id'], tipo, k + 1, len(faltam), ''.join(faltam)[:20]))
+    return erros
+
+
+def so_miudo(pg, bbox):
+    """O retangulo so tem texto miudo (ate 8,5 pt), comecando por um numero: e uma nota."""
+    r = pymupdf.Rect(bbox)
+    sps = [sp for b in pg.get_text('dict', clip=r)['blocks'] if b['type'] == 0 for l in b['lines'] for sp in l['spans']
+           if sp['text'].strip() and r.contains(pymupdf.Point((sp['bbox'][0] + sp['bbox'][2]) / 2,
+                                                              (sp['bbox'][1] + sp['bbox'][3]) / 2))]
+    if not sps or any(sp['size'] > 8.5 for sp in sps):
+        return False
+    # a primeira palavra e a mais a esquerda da primeira linha: o numero da nota,
+    # em sobrescrito menor, tem o topo mais baixo que o do texto dela, e uma
+    # fracao no comeco da nota sobe acima dele. A primeira linha e o que cruza a
+    # altura do objeto mais alto
+    alto = min(sps, key=lambda sp: sp['bbox'][1])['bbox']
+    primeiro = min([sp for sp in sps if sp['bbox'][1] < alto[3] and sp['bbox'][3] > alto[1]], key=lambda sp: sp['bbox'][0])
+    return bool(re.match(r'^\d+$', primeiro['text'].strip()))
+
+
+def notas_na_pagina(doc, pg):
+    """Notas de rodape da pagina, lidas pela prova: [(coluna, numero, Point do numero)].
+
+    Fio curto (40 a 140 pt) na margem da coluna, texto miudo logo abaixo e nada de
+    corpo normal depois dele na coluna. Cada numero miudo na margem abre uma nota.
+    """
+    xsep = divisa_da_prova(doc, pg)
+    fios_pe = [d['rect'].y0 for d in pg.get_drawings() if d['rect'].height < 1.5 and d['rect'].width > 400
+               and d['rect'].y0 > pg.rect.height * 0.8]
+    y_pe = min(fios_pe) if fios_pe else pg.rect.height - 45
+    sps = [sp for b in pg.get_text('dict')['blocks'] if b['type'] == 0 for l in b['lines'] for sp in l['spans']
+           if sp['text'].strip() and sp['bbox'][1] < y_pe]
+    lado = lambda bb: 0 if (bb[0] + bb[2]) / 2 < xsep else 1
+    out = []
+    for d in pg.get_drawings():
+        q = d['rect']
+        if not (q.height < 1.5 and 40 <= q.width <= 140):
+            continue
+        col = lado((q.x0, q.y0, q.x1, q.y1))
+        abaixo = [sp for sp in sps if lado(sp['bbox']) == col and sp['bbox'][1] > q.y0 + 0.5]
+        if not abaixo or any(sp['size'] > 8.5 for sp in abaixo):
+            continue
+        if not any(0 <= sp['bbox'][1] - q.y0 <= 12 and q.x0 - 1 <= sp['bbox'][0] <= q.x1 for sp in abaixo):
+            continue
+        x_marg = min(sp['bbox'][0] for sp in abaixo)
+        for sp in abaixo:
+            if re.match(r'^\d+$', sp['text'].strip()) and sp['bbox'][0] <= x_marg + 15:
+                out.append((col, sp['text'].strip(), pymupdf.Point((sp['bbox'][0] + sp['bbox'][2]) / 2,
+                                                                    (sp['bbox'][1] + sp['bbox'][3]) / 2)))
+    return out
+
+
+def trava_notas(p):
+    """Toda nota de rodape da lista esta com um item (como ultimo pedaco) ou registrada com motivo.
+
+    Contrato, 8a (decidido com a B2 em 22/09): a nota vai com o item que a chama,
+    como ultimo pedaco, so com a chamada unica. A prova acha as notas pela
+    pagina, sem o detector, e confere contra o relatorio.
+    """
+    erros = []
+    for l in p.relatorio['listas']:
+        if 'erro' in l:
+            continue
+        doc = p.doc(l['arquivo'])
+        achadas = [(pno + 1, col, num, pt) for pno in range(1, doc.page_count) for col, num, pt in notas_na_pagina(doc, doc[pno])]
+        regs = l.get('notas_de_rodape', [])
+        if len(achadas) != len([r for r in regs if r.get('numero')]):
+            erros.append('%s: a pagina tem %d nota(s) de rodape, e o relatorio registra %d' % (
+                l['aula'], len(achadas), len([r for r in regs if r.get('numero')])))
+        por_id = {i['id']: i for i in p.itens}
+        for r in regs:
+            if r.get('id'):
+                it = por_id.get(r['id'])
+                if not it:
+                    if not any(e['id'] == r['id'] for e in l['excluidos']):
+                        erros.append('%s: nota %s levada para %s, que nao esta no pacote' % (l['aula'], r['numero'], r['id']))
+                    continue
+                ult = pedacos(it, r['em'])[-1]
+                pt = next((pt for pg_n, col, num, pt in achadas if pg_n == r['pagina'] and num == r['numero']), None)
+                if pt is None or ult['pagina'] != r['pagina'] or not pymupdf.Rect(ult['bbox']).contains(pt):
+                    erros.append('%s: a nota %s da p%d nao e o ultimo pedaco de %s' % (l['aula'], r['numero'], r['pagina'], r['id']))
+                elif not so_miudo(p.doc(it['origem']['arquivo'])[ult['pagina'] - 1], ult['bbox']):
+                    erros.append('%s: o pedaco da nota %s de %s leva outra coisa alem da nota' % (l['aula'], r['numero'], r['id']))
+            elif not r.get('motivo'):
+                erros.append('%s: nota %s da p%d fora de todo item e sem motivo' % (l['aula'], r.get('numero'), r['pagina']))
+    return erros
+
+
+def trava_curadoria(p):
+    """Toda linha de curadoria desta serie achou o seu item."""
+    return ['%s nao achou o item no pacote' % k for k in p.relatorio.get('curadoria_sem_item', [])]
+
+
+def trava_gerador_no_manifest(p):
+    """manifest.gerador diz com que PyMuPDF o pacote foi feito, e e o que esta instalado aqui."""
+    v = p.manifest.get('gerador', {}).get('pymupdf')
+    if not v:
+        return ['manifest.gerador sem a versao do PyMuPDF']
+    if v != pymupdf.VersionBind:
+        return ['manifest.gerador diz PyMuPDF %s, e o instalado e %s: o pacote nao se reproduz aqui' % (v, pymupdf.VersionBind)]
+    return []
+
+
+def trava_fontes_negrito():
+    """O marcador de solucao em CMBX10 (1o medio) e reconhecido; o CMBX12 de secao nao vira marcador.
+
+    A amostra sintetica so tem as fontes-base do PDF, entao a prova monta os
+    elementos de uma linha como o gerador os le de uma pagina real.
+    """
+    geo = {'xsep': 291.0, 'yrod': 747.0}
+    def el(texto, fonte, x, y, tam=10.0):
+        return {'tipo': 'txt', 'bb': (x, y, x + 6 * len(texto), y + tam), 'texto': texto, 'fonte': fonte,
+                'tam': tam, 'col': 0 if x < 291 else 1, 'cruza': False}
+    erros = []
+    ms = gerar_pacote.marcadores([el('5.', 'ABCDEF+CMBX10', 29.5, 100), el('Temos', 'CMR10', 45, 100)], geo, True)
+    if not any(m['tipo'] == 'solucao' and m['numero'] == 5 for m in ms):
+        erros.append('marcador "5." em CMBX10 nao reconhecido como solucao')
+    ms = gerar_pacote.marcadores([el('2', 'ABCDEF+CMBX12', 29.5, 300, 14.3), el('Exercícios', 'ABCDEF+CMSSBX10', 59, 300, 14.3)],
+                                 geo, True)
+    if any(m['tipo'] == 'solucao' for m in ms):
+        erros.append('numero de secao em CMBX12 lido como marcador de solucao')
+    return erros
+
+
+def trava_titulo_modulo():
+    """O titulo do modulo sai da capa mais frequente das listas, nao da primeira capa lida."""
+    erros = []
+    casos = [
+        # 6o ano: a primeira capa (em ordem de arquivo) erra o modulo
+        ('fracao-como-porcentagem-e-como-probabilidade',
+         ['Divisibilidade', 'Fração como Porcentagem e Probabilidade', 'Fração como Porcentagem e Probabilidade'],
+         ['FRAÇÃO COMO PORCENTAGEM E COMO PROBABILIDADE'], 'Fração como Porcentagem e Probabilidade'),
+        # a teoria em caixa alta nao ganha da lista
+        ('conjuntos', ['Conjuntos', 'Conjuntos'], ['CONJUNTOS', 'CONJUNTOS', 'CONJUNTOS'], 'Conjuntos'),
+        # modulo so com teoria
+        ('introducao-a-funcao-quadratica', [], ['Introdução à Função Quadrática'], 'Introdução à Função Quadrática'),
+        # a parte do slug entra quando a capa nao diz
+        ('elementos-basicos-de-geometria-plana-parte-2', ['Elementos básicos de geometria plana'], [],
+         'Elementos básicos de geometria plana - Parte 2'),
+        # sinal de menos da fonte vira hifen com espaco
+        ('probabilidade-miscelanea-de-exercicios', ['Probabilidade −Miscelânea de Exercícios'], [],
+         'Probabilidade - Miscelânea de Exercícios'),
+    ]
+    for slug, listas, teorias, esperado in casos:
+        obtido = gerar_pacote.titulo_do_modulo(slug, listas, teorias)
+        if obtido != esperado:
+            erros.append('%s: titulo %r, e nao %r' % (slug, obtido, esperado))
+    return erros
+
+
+def fracao_diferente(ref, cro, w, h):
     """Fracao de pixels sem correspondente na outra imagem.
 
     Um pixel so conta como diferente se NENHUM pixel a ate 1 px dele, na outra
@@ -523,7 +1404,7 @@ def fracao_diferente(ref, cro, w, h, y0):
     """
     import numpy as np
     a = np.frombuffer(ref.samples, dtype=np.uint8).reshape(ref.height, ref.width)[:h, :w].astype(np.int16)
-    b = np.frombuffer(cro.samples, dtype=np.uint8).reshape(cro.height, cro.width)[y0:y0 + h, :w].astype(np.int16)
+    b = np.frombuffer(cro.samples, dtype=np.uint8).reshape(cro.height, cro.width)[:h, :w].astype(np.int16)
 
     def sem_par(x, y):
         pad = np.pad(y, 1, mode='edge')
@@ -547,6 +1428,18 @@ def sortear_pedacos(p, n=20, semente=SEMENTE):
     return sorted(rnd.sample(todos, min(n, len(todos))))
 
 
+def pedaco_do_svg(svg, k):
+    """O k-esimo <svg> aninhado de um SVG empilhado, como documento proprio."""
+    blocos = re.split(r'<g transform="translate\(0 [\d.]+\)">', svg)[1:]
+    b = blocos[k]
+    fim = b.rfind('</g>')
+    return b[:fim].strip() + '\n'
+
+
+def posicoes_na_pilha(svg):
+    return [float(y) for y in re.findall(r'<g transform="translate\(0 ([\d.]+)\)">', svg)]
+
+
 def trava_fidelidade(p, sorteio, temp):
     """SVG renderizado no Chrome contra o pixmap do pymupdf do mesmo retangulo."""
     por_id = {i['id']: i for i in p.itens}
@@ -559,34 +1452,47 @@ def trava_fidelidade(p, sorteio, temp):
         ps = pedacos(it, tipo)
         med = it['medidas'][tipo]
         png = os.path.join(temp, 'chrome_%02d.png' % n)
-        pedidos.append({'svg': os.path.join(p.pasta, *it['assets'][tipo].split('/')), 'png': png,
-                        'largura_pt': med['largura_pt'], 'altura_pt': med['altura_pt'], 'escala': escala})
-        desloc = sum(ps[j]['bbox'][3] - ps[j]['bbox'][1] for j in range(k)) + gerar_pacote.FOLGA_PILHA * k
-        casos.append((iid, tipo, k, ps[k], desloc, png))
+        caminho = os.path.join(p.pasta, *it['assets'][tipo].split('/'))
+        if len(ps) > 1:
+            # Pedaco empilhado: o Chrome desenha o glifo em fracao de pixel quando o
+            # pedaco comeca, por exemplo, em 537,5 px, e o mesmo SVG sai 0,96%
+            # diferente dele mesmo desenhado sozinho (medido na amostra do Banco).
+            # Entao o k-esimo <svg> aninhado sai do proprio asset entregue e e
+            # desenhado sozinho; a posicao dele na pilha e conferida a parte, na
+            # trava_svg (translate igual a soma das alturas mais a folga).
+            aninhado = pedaco_do_svg(p.bytes_de(it['assets'][tipo]).decode('utf-8'), k)
+            caminho = os.path.join(temp, 'pedaco_%02d.svg' % n)
+            open(caminho, 'w', encoding='utf-8').write(aninhado)
+            b = ps[k]['bbox']
+            largura, altura = b[2] - b[0], b[3] - b[1]
+        else:
+            largura, altura = med['largura_pt'], med['altura_pt']
+        pedidos.append({'svg': caminho, 'png': png, 'largura_pt': largura, 'altura_pt': altura, 'escala': escala})
+        casos.append((iid, tipo, k, ps[k], png))
     arq = os.path.join(temp, 'pedidos.json')
     json.dump(pedidos, open(arq, 'w', encoding='utf-8'))
     r = subprocess.run(['node', os.path.join(AQUI, '_fidelidade.js'), arq], capture_output=True, text=True)
     if r.returncode != 0:
         return ['o Chrome nao renderizou: %s' % r.stderr[-300:]], []
     erros, medidas = [], []
-    for iid, tipo, k, pz, desloc, png in casos:
+    for iid, tipo, k, pz, png in casos:
         it = por_id[iid]
         # referencia: copia limpa da pagina com o cropbox no retangulo, para o
         # canto do pixmap cair exatamente no canto do SVG
         tmp = pymupdf.open()
         tmp.insert_pdf(p.doc(it['origem']['arquivo']), from_page=pz['pagina'] - 1, to_page=pz['pagina'] - 1)
-        tmp[0].set_cropbox(pymupdf.Rect(pz['bbox']))
+        b = pz['bbox']
+        tmp[0].set_cropbox(pymupdf.Rect(*b))
         ref = tmp[0].get_pixmap(dpi=DPI_FIDELIDADE, colorspace=pymupdf.csGRAY)
         cro = pymupdf.Pixmap(pymupdf.csGRAY, pymupdf.Pixmap(png))
-        y0 = int(round(desloc * escala))
         # o asset empilhado tem a largura do pedaco mais largo: o pedaco fica
         # encostado a esquerda, e a comparacao e na largura dele
         w = min(ref.width, cro.width)
-        h = min(ref.height, cro.height - y0)
+        h = min(ref.height, cro.height)
         if h <= 0 or w <= 0 or cro.width < ref.width - 2 or abs(ref.height - (h)) > 2:
             erros.append('%s %s p%d: tamanhos nao conferem (%dx%d contra %dx%d)' % (iid, tipo, k + 1, ref.width, ref.height, cro.width, cro.height))
             continue
-        frac = fracao_diferente(ref, cro, w, h, y0)
+        frac = fracao_diferente(ref, cro, w, h)
         medidas.append((frac, iid, tipo, k))
         if frac >= LIMITE_FIDELIDADE:
             erros.append('%s %s p%d: %.2f%% dos pixels diferem' % (iid, tipo, k + 1, 100 * frac))
@@ -628,7 +1534,7 @@ def trava_fidelidade_teoria(p, temp, n=10, semente=SEMENTE, trocar=None):
         if abs(ref.width - cro.width) > 2 or abs(ref.height - cro.height) > 2:
             erros.append('%s: tamanhos nao conferem' % pg['id'])
             continue
-        frac = fracao_diferente(ref, cro, w, h, 0)
+        frac = fracao_diferente(ref, cro, w, h)
         medidas.append((frac, pg['id']))
         if frac >= LIMITE_FIDELIDADE:
             erros.append('%s: %.2f%% dos pixels diferem' % (pg['id'], 100 * frac))
@@ -638,8 +1544,9 @@ def trava_fidelidade_teoria(p, temp, n=10, semente=SEMENTE, trocar=None):
 # ------------------------------------------------------------------ amostra e venenos
 
 def gerar(pdfs, trabalho, curadoria, **kw):
-    return gerar_pacote.gerar(pdfs, '9ano', 1, trabalho + '_zip', curadoria, trabalho=trabalho,
-                              gerado_em='2026-09-21T00:00:00-03:00', commit='amostra', **kw)
+    kw.setdefault('gerado_em', '2026-09-21T00:00:00-03:00')
+    kw.setdefault('commit', 'amostra')
+    return gerar_pacote.gerar(pdfs, '9ano', 1, trabalho + '_zip', curadoria, trabalho=trabalho, **kw)
 
 
 def curadoria_da_amostra(pasta):
@@ -647,7 +1554,7 @@ def curadoria_da_amostra(pasta):
     io.open(os.path.join(pasta, 'dificuldade.csv'), 'w', encoding='utf-8', newline='').write(
         'id;dificuldade;quem;data;observacao\n9ano:amostra-sintetica:lista-de-amostra:ex:4;1;prova;2026-09-21;curadoria de teste\n')
     io.open(os.path.join(pasta, 'apelidos.json'), 'w', encoding='utf-8', newline='').write(
-        '{"bhaskara": ["equação do segundo grau"]}\n')
+        '{"_nota": "comentario, fora do pacote", "bhaskara": ["amostra sintética"]}\n')
     io.open(os.path.join(pasta, 'exclusoes.csv'), 'w', encoding='utf-8', newline='').write(
         'id;motivo;quem;data\n9ano:amostra-sintetica:lista-cm:ex:2;defeito de teste da prova;prova;2026-09-22\n')
     return pasta
@@ -686,6 +1593,9 @@ class Placar:
         if erros:
             self.falhas += 1
             print('  FALHOU  %-41s %d problema(s): %s' % (nome, len(erros), ' | '.join(e[:120] for e in erros[:4])))
+            # a lista inteira, um por linha: a prova real acha dezenas, e o resumo mostra 4
+            for e in erros[4:]:
+                print('           | %s' % e[:200])
         else:
             self.ok += 1
             print('  ok      %s' % nome)
@@ -700,12 +1610,21 @@ def travas_simples(p, placar, zip_caminho=None, rotulo=''):
     placar.conferir('manifesto' + rotulo, trava_manifesto(p, zip_caminho))
     placar.conferir('sem travessao' + rotulo, trava_tracos(p))
     placar.conferir('origem literal' + rotulo, trava_origem(p))
+    placar.conferir('PyMuPDF no manifest' + rotulo, trava_gerador_no_manifest(p))
+    placar.conferir('prova independente do gerador' + rotulo, trava_independencia(p))
+    placar.conferir('nenhum texto fora de recorte' + rotulo, trava_tinta_coberta(p))
+    placar.conferir('curadoria aplicada' + rotulo, trava_curadoria(p))
+    placar.conferir('todo caractere com o seu glifo' + rotulo, trava_glifos(p))
+    placar.conferir('notas de rodape com o item ou registradas' + rotulo, trava_notas(p))
+    placar.conferir('solucao com conteudo alem do rotulo' + rotulo, trava_solucao_com_conteudo(p))
 
 
 def venenos(p, temp, placar, curadoria):
-    it_obj = next(i for i in p.itens if i['formato'] == 'objetiva')
-    it_multi = next(i for i in p.itens if i['origem']['enunciado'].get('pedacos'))
-    it_simples = next(i for i in p.itens if i['numero'] == 2)
+    # os alvos dos venenos sao da lista de amostra: as outras listas vem antes na ordem
+    da = [i for i in p.itens if i['aula']['slug'] == 'lista-de-amostra']
+    it_obj = next(i for i in da if i['formato'] == 'objetiva')
+    it_multi = next(i for i in da if i['origem']['enunciado'].get('pedacos'))
+    it_simples = next(i for i in da if i['numero'] == 2)
 
     # determinismo: um asset que sai diferente na segunda geracao
     q = copia(p, temp, 'v_det')
@@ -753,6 +1672,13 @@ def venenos(p, temp, placar, curadoria):
             b = i['origem']['enunciado']['bbox']
             i['origem']['enunciado']['bbox'] = [b[0], b[1] + 15, b[2], b[3] + 15]
     placar.conferir('recorte: caixa deslocada', trava_recorte(q), True, 'nao comeca pelo numero')
+    # solucao so com o rotulo: a caixa da solucao do item 2 reduzida a linha do "2."
+    q = copia(p, temp, 'v_so_rotulo')
+    for i in q.itens:
+        if i['id'] == it_simples['id']:
+            b = i['origem']['solucao']['bbox']
+            i['origem']['solucao']['bbox'] = [b[0], b[1], b[2], b[1] + 12]
+    placar.conferir('solucao so com o rotulo', trava_solucao_com_conteudo(q), True, 'so o rotulo')
     # recorte: o fio entre colunas dentro da caixa
     q = copia(p, temp, 'v_fio')
     for i in q.itens:
@@ -764,7 +1690,8 @@ def venenos(p, temp, placar, curadoria):
     q = copia(p, temp, 'v_secao')
     for i in q.itens:
         if i['id'] == it_multi['id']:
-            ult = i['origem']['enunciado']['pedacos'][-1]
+            # o pedaco do alto da coluna direita (o ultimo agora e a nota de rodape)
+            ult = [pz for pz in i['origem']['enunciado']['pedacos'] if pz['coluna'] == 2][-1]
             ult['bbox'] = [ult['bbox'][0], ult['bbox'][1], ult['bbox'][2], ult['bbox'][3] + 30]
     placar.conferir('recorte: titulo de secao colado', trava_recorte(q), True, 'titulo de secao')
     # recorte: caixa do rotulo deslocada para cima do texto
@@ -833,6 +1760,12 @@ def venenos(p, temp, placar, curadoria):
     cam = it_simples['assets']['enunciado']
     regravar_asset(q, cam, q.bytes_de(cam).replace(b'</svg>', b'<use data-text="a"/></svg>'))
     placar.conferir('svg: data-text', trava_svg(q), True, 'data-text')
+    q = copia(p, temp, 'v_svg_pilha')
+    cam = it_multi['assets']['enunciado']
+    b = q.bytes_de(cam)
+    regravar_asset(q, cam, re.sub(rb'<g transform="translate\(0 ([\d.]+)\)">', lambda m: b'<g transform="translate(0 %s)">'
+                                  % (b'0' if m.group(1) == b'0' else b'1' + m.group(1)), b))
+    placar.conferir('svg: pedaco fora do lugar na pilha', trava_svg(q), True, 'na pilha')
     q = copia(p, temp, 'v_svg_vb')
     cam = it_simples['assets']['enunciado']
     b = q.bytes_de(cam)
@@ -861,6 +1794,27 @@ def venenos(p, temp, placar, curadoria):
     regravar_asset(q, cam, q.bytes_de(cam).replace(b'</svg>', b'<g data-text="&#x001a;"/></svg>'))
     placar.conferir('svg: caractere de controle', trava_xml(q), True, 'caractere de controle')
 
+    # notas de rodape: sem a regra, a nota da amostra (chamada no item 3) fica fora
+    # de todo item e sem registro
+    antes_n = gerar_pacote.LEVA_NOTA
+    gerar_pacote.LEVA_NOTA = False
+    try:
+        gerar(p.pdfs, os.path.join(temp, 'v_nota_fora'), curadoria)
+    finally:
+        gerar_pacote.LEVA_NOTA = antes_n
+    q = Pacote(os.path.join(temp, 'v_nota_fora'), p.pdfs)
+    placar.conferir('nota de rodape sem dono', trava_notas(q), True, 'nota(s) de rodape')
+
+    # glifos: um unico glifo apagado do SVG (defeito que a fidelidade por pixel
+    # quase nao ve)
+    q = copia(p, temp, 'v_glifo')
+    cam = it_simples['assets']['enunciado']
+    svg = q.bytes_de(cam).decode('utf-8')
+    usos = list(re.finditer(r'<use [^>]*/>', svg))
+    meio = usos[len(usos) // 2]
+    regravar_asset(q, cam, (svg[:meio.start()] + svg[meio.end():]).encode('utf-8'))
+    placar.conferir('um glifo a menos', trava_glifos(q), True, 'sem glifo no SVG')
+
     # manifesto: um byte trocado num asset
     q = copia(p, temp, 'v_man')
     cam = it_obj['assets']['solucao']
@@ -887,6 +1841,241 @@ def venenos(p, temp, placar, curadoria):
             i['origem_citada'] = i['origem_citada'] + 'a2.'
     placar.conferir('origem: chamada de nota colada', trava_origem(q), True, 'chamada de nota')
     return it_obj, it_simples
+
+
+class _Sabotado:
+    """Funcao ou expressao do gerador que nao pode ser usada pela prova."""
+
+    def __init__(self, nome):
+        self.nome = nome
+
+    def __call__(self, *a, **k):
+        raise RuntimeError('a prova usou %s do gerador' % self.nome)
+
+    def __getattr__(self, attr):
+        raise RuntimeError('a prova usou %s.%s do gerador' % (self.nome, attr))
+
+
+def trava_independencia(p, zip_caminho=None):
+    """As travas nao decidem com as funcoes de decisao do gerador.
+
+    Roda as travas duas vezes: como sao, e com a primeira linha, a letra da
+    objetiva, a divisa de colunas e o detector do gerador trocados por algo
+    que falha ao ser usado. As duas rodadas tem de dar os mesmos erros.
+    """
+    nomes = ['primeira_linha_na_margem', 'RESPOSTA', 'SO_LETRA', 'geometria', 'geometria_da_pagina',
+             'divisa_pelo_texto', 'detectar', 'marcadores', 'classificar', 'EXTRAIDO', 'origem_citada']
+
+    def rodar():
+        return [trava_contagens(p), trava_recorte(p), trava_objetiva(p), trava_origem(p)]
+
+    antes = rodar()
+    guardados = {n: getattr(gerar_pacote, n) for n in nomes}
+    try:
+        for n in nomes:
+            setattr(gerar_pacote, n, _Sabotado(n))
+        try:
+            depois = rodar()
+        except RuntimeError as e:
+            return [str(e)]
+    finally:
+        for n, v in guardados.items():
+            setattr(gerar_pacote, n, v)
+    if depois != antes:
+        return ['as travas mudam de resultado sem as funcoes do gerador']
+    return []
+
+
+def venenos_series(p, temp, placar, curadoria):
+    """Um veneno por padrao que a B2 acrescentou; cada um tem de reprovar pelo motivo esperado."""
+    # oraculo do texto: o detector perde o ULTIMO item da lista CM. A sequencia
+    # 1..3 continua perfeita e as travas antigas passavam; o texto do PDF tem o 4
+    q = copia(p, temp, 'v_ultimo')
+    q.itens = [i for i in q.itens if not (i['aula']['slug'] == 'lista-cm' and i['numero'] == 4)]
+    for l in q.relatorio['listas']:
+        if l['aula'] == 'lista-cm':
+            l['numeros_enunciado'] = [x for x in l['numeros_enunciado'] if x != 4]
+            l['numeros_solucao'] = [x for x in l['numeros_solucao'] if x != 4]
+            l['excluidos'] = [e for e in l['excluidos'] if e['numero'] != 4]
+    q.manifest['contagens']['itens'] = len(q.itens)
+    q.manifest['contagens']['itens_com_solucao'] = sum(1 for i in q.itens if i['assets']['solucao'])
+    q.manifest['contagens']['itens_excluidos'] = sum(len(l['excluidos']) for l in q.relatorio['listas'])
+    placar.conferir('ultimo item perdido pelo detector', trava_contagens(q), True, 'o texto do PDF tem')
+    # tinta coberta: tres defeitos que tiravam conteudo do recorte sem nenhuma
+    # outra trava ver. Cada um, desligado, tem de reprovar aqui.
+    for nome, attr, valor, motivo in (('barra de fracao lida como nota', 'NOTA_SO_NO_PE', False, 'Portanto'),
+                                      ('recorte preso na borda direita', 'ESTENDE_BORDA', False, 'Conferindo')):
+        antes_v = getattr(gerar_pacote, attr)
+        setattr(gerar_pacote, attr, valor)
+        try:
+            gerar(p.pdfs, os.path.join(temp, 'v_' + attr.lower()), curadoria)
+        finally:
+            setattr(gerar_pacote, attr, antes_v)
+        q = Pacote(os.path.join(temp, 'v_' + attr.lower()), p.pdfs)
+        placar.conferir(nome, [re.sub(r'\s+', '', e) for e in trava_tinta_coberta(q)], True, motivo)
+        if attr == 'ESTENDE_BORDA':
+            # o mesmo veneno na coluna da esquerda: a palavra rente a divisa sai cortada
+            placar.conferir('recorte preso antes da divisa', trava_recorte(q), True, 'lista-variantes:ex:3 enunciado: tinta cortada')
+            placar.conferir('figura antes da margem cortada', trava_recorte(q), True, 'lista-bordas:ex:1 enunciado: tinta cortada na borda esquerda')
+    antes_te = gerar_pacote.tinta_extrema
+    gerar_pacote.tinta_extrema = lambda doc, pno, x0, y0, x1, y1, lado: x0 if lado == 'esquerda' else x1
+    try:
+        gerar(p.pdfs, os.path.join(temp, 'v_caixa_clip'), curadoria)
+    finally:
+        gerar_pacote.tinta_extrema = antes_te
+    placar.conferir('recorte esticado ate a caixa do clip', trava_recorte(Pacote(os.path.join(temp, 'v_caixa_clip'), p.pdfs)),
+                    True, 'lista-bordas:ex:1 enunciado: recorte passa da margem esquerda sem tinta')
+    # pasta de trabalho reaproveitada: o asset de um item que saiu na geracao
+    # seguinte nao pode ficar solto (6o ano, solucoes 19 e 21 depois da calha)
+    for limpa in (True, False):
+        pasta = os.path.join(temp, 'v_pasta_%s' % limpa)
+        solto = os.path.join(pasta, 'assets', '9ano', 'amostra-sintetica', 'lista-cm', 'ex-99.svg')
+        os.makedirs(os.path.dirname(solto), exist_ok=True)
+        open(solto, 'w').write('<svg/>')
+        antes_l = gerar_pacote.LIMPA_PASTA
+        gerar_pacote.LIMPA_PASTA = limpa
+        try:
+            gerar(p.pdfs, pasta, curadoria)
+        finally:
+            gerar_pacote.LIMPA_PASTA = antes_l
+        erros_m = trava_manifesto(Pacote(pasta, p.pdfs), None)
+        if limpa:
+            placar.conferir('pasta reaproveitada sai limpa', erros_m)
+        else:
+            placar.conferir('asset solto de geracao anterior', erros_m, True, 'ex-99.svg existe e nao esta no manifest')
+    # bordas: cada regra da lista de bordas, desligada, tem de reprovar
+    for nome, attr, valor, trava, motivo in (
+            ('tabela que cruza o fio fica', 'CALHA_TRACO', False, trava_recorte, 'lista-bordas:ex:3 enunciado: tinta cortada'),
+            ('tabela que cruza o fio fica (contagem)', 'CALHA_TRACO', False, trava_bordas, 'itens no pacote'),
+            ('traco recortado antes do fio tira o item', 'tinta_dos_dois_lados', lambda pg, x, bb: True, trava_bordas,
+             'itens no pacote'),
+            ('nota que comeca por fracao', 'NOTA_LINHA_TODA', False, trava_recorte, 'lista-bordas:ex:5 enunciado: tinta cortada'),
+            # sem o fio em imagem a lista perde a geometria: o 2 leva o fio do rodape ou sai
+            ('fio do rodape em imagem', 'FIO_IMAGEM', False, lambda q: trava_recorte(q) + trava_encostado(q), 'lista-fio-imagem'),
+            ('credito do autor dentro da solucao', 'CREDITO_MATERIAL', False, trava_encostado, 'o credito do autor'),
+            ('rotulo de figura do item de cima', 'SOBREPOSICAO_MIN', 0.0, trava_encostado, 'exercicio 1 fora do pacote'),
+            ('texto encostado no rotulo vai para o item de cima', 'TINTA_DO_QUE_ENCOSTA', False, trava_encostado, 'no recorte do exercicio 3'),
+            ('linha de cima encostada sobe o topo', 'MIUDO_QUE_ENCOSTA', 99.0, trava_encostado, 'exercicio 2 fora do pacote')):
+        pasta = os.path.join(temp, 'v_' + attr.lower())
+        if not os.path.exists(os.path.join(pasta, 'itens.json')):
+            antes_v = getattr(gerar_pacote, attr)
+            setattr(gerar_pacote, attr, valor)
+            try:
+                gerar(p.pdfs, pasta, curadoria)
+            finally:
+                setattr(gerar_pacote, attr, antes_v)
+        placar.conferir(nome, trava(Pacote(pasta, p.pdfs)), True, motivo)
+    antes_oc = gerar_pacote.objetos_claros
+    gerar_pacote.objetos_claros = lambda pg: []
+    try:
+        gerar(p.pdfs, os.path.join(temp, 'v_claro'), curadoria)
+    finally:
+        gerar_pacote.objetos_claros = antes_oc
+    q = Pacote(os.path.join(temp, 'v_claro'), p.pdfs)
+    placar.conferir('conteudo cinza claro cortado', [re.sub(r'\s+', '', e) for e in trava_tinta_coberta(q)], True, 'Figuraemcinza')
+    # independencia: uma trava que volte a chamar o gerador tem de reprovar
+    antes_ob = trava_objetiva.__globals__['letras_da_solucao']
+    trava_objetiva.__globals__['letras_da_solucao'] = lambda s: set(gerar_pacote.RESPOSTA.findall(s))
+    try:
+        placar.conferir('trava que usa o gerador', trava_independencia(p), True, 'a prova usou RESPOSTA')
+    finally:
+        trava_objetiva.__globals__['letras_da_solucao'] = antes_ob
+    # soluções sem titulo: sem a regra da secao 1, a lista de variantes fica sem solucoes
+    antes = gerar_pacote.detectar
+    gerar_pacote.detectar = lambda doc: antes(doc, secao_1_abre_solucoes=False)
+    try:
+        gerar(p.pdfs, os.path.join(temp, 'v_sem_titulo'), curadoria)
+    finally:
+        gerar_pacote.detectar = antes
+    q = Pacote(os.path.join(temp, 'v_sem_titulo'), p.pdfs)
+    placar.conferir('lista sem titulo de solucoes', trava_contagens(q), True, 'lista sem solucoes detectadas')
+    # recuo de paragrafo: sem ele, o "Exercicio 3." recuado some e a sequencia quebra
+    antes_r = gerar_pacote.RECUO_MAX
+    gerar_pacote.RECUO_MAX = 0.0
+    try:
+        gerar(p.pdfs, os.path.join(temp, 'v_recuo'), curadoria)
+    finally:
+        gerar_pacote.RECUO_MAX = antes_r
+    q = Pacote(os.path.join(temp, 'v_recuo'), p.pdfs)
+    placar.conferir('marcador com recuo de paragrafo', trava_contagens(q), True, 'fora de sequencia')
+    # continuacao: sem ela, "2." e "2. (Outra solucao.)" viram duas solucoes 2 e o item sai
+    antes_c = gerar_pacote.continua_o_anterior
+    gerar_pacote.continua_o_anterior = lambda t: False
+    try:
+        gerar(p.pdfs, os.path.join(temp, 'v_continua'), curadoria)
+    finally:
+        gerar_pacote.continua_o_anterior = antes_c
+    q = Pacote(os.path.join(temp, 'v_continua'), p.pdfs)
+    placar.conferir('solucao em duas partes', trava_variantes(q), True, 'itens no pacote')
+    # origem: sem "Adaptado" na regra, a origem do item 1 some
+    antes_e = gerar_pacote.EXTRAIDO
+    gerar_pacote.EXTRAIDO = re.compile(r'\((Extra[íi]d[oa]\s[^()]*(?:\([^()]*\)[^()]*)*)\)')
+    try:
+        gerar(p.pdfs, os.path.join(temp, 'v_adaptado'), curadoria)
+    finally:
+        gerar_pacote.EXTRAIDO = antes_e
+    q = Pacote(os.path.join(temp, 'v_adaptado'), p.pdfs)
+    placar.conferir('origem "Adaptado da"', trava_variantes(q), True, 'Adaptado')
+    # curadoria de dificuldade (brief B2): a linha muda o item, e so ele; o pacote
+    # sem a linha e o pacote com ela sao, cada um, deterministicos
+    cur_sem = os.path.join(temp, 'cur_sem_linha')
+    shutil.copytree(curadoria, cur_sem)
+    io.open(os.path.join(cur_sem, 'dificuldade.csv'), 'w', encoding='utf-8', newline='').write(
+        'id;dificuldade;quem;data;observacao\n')
+    gerar(p.pdfs, os.path.join(temp, 'v_sem_linha'), cur_sem)
+    q = Pacote(os.path.join(temp, 'v_sem_linha'), p.pdfs)
+    alvo = '9ano:amostra-sintetica:lista-de-amostra:ex:4'
+    antes_i, depois_i = {i['id']: i for i in q.itens}, {i['id']: i for i in p.itens}
+    erros = []
+    if antes_i[alvo]['dificuldade_origem'] != 'proxy' or depois_i[alvo]['dificuldade_origem'] != 'curadoria':
+        erros.append('a linha do dificuldade.csv nao mudou a origem da dificuldade do item')
+    mudaram = sorted(k for k in depois_i if json.dumps(depois_i[k], sort_keys=True) != json.dumps(antes_i.get(k), sort_keys=True))
+    if mudaram != [alvo]:
+        erros.append('a linha do dificuldade.csv mudou %s, e nao so o item dela' % mudaram)
+    gerar(p.pdfs, os.path.join(temp, 'v_sem_linha_b'), cur_sem, gerado_em='2031-01-01T00:00:00-03:00')
+    erros += trava_determinismo(q, Pacote(os.path.join(temp, 'v_sem_linha_b'), p.pdfs))
+    placar.conferir('curadoria muda so o seu item, deterministica', erros)
+    # curadoria: id desta serie digitado errado nao pode passar calado
+    cur_errada = os.path.join(temp, 'cur_errada')
+    shutil.copytree(curadoria, cur_errada)
+    with io.open(os.path.join(cur_errada, 'dificuldade.csv'), 'a', encoding='utf-8', newline='') as f:
+        f.write('9ano:amostra-sintetica:lista-de-amostra:ex:44;3;prova;2026-09-22;id que nao existe\n')
+    gerar(p.pdfs, os.path.join(temp, 'v_cur_errada'), cur_errada)
+    placar.conferir('curadoria com id errado', trava_curadoria(Pacote(os.path.join(temp, 'v_cur_errada'), p.pdfs)),
+                    True, 'ex:44')
+    # curadoria: dificuldade fora de 1 a 3 para a geracao
+    with io.open(os.path.join(cur_errada, 'dificuldade.csv'), 'a', encoding='utf-8', newline='') as f:
+        f.write('9ano:amostra-sintetica:lista-cm:ex:3;4;prova;2026-09-22;fora da escala\n')
+    try:
+        gerar(p.pdfs, os.path.join(temp, 'v_cur_4'), cur_errada)
+        placar.conferir('curadoria com dificuldade 4', [], True, 'dificuldade')
+    except SystemExit as e:
+        placar.conferir('curadoria com dificuldade 4', [str(e)], True, 'dificuldade tem de ser')
+    # apelidos: um orfao e um modulo sem apelido
+    q = copia(p, temp, 'v_apelido')
+    q.apelidos = dict(q.apelidos, **{'assunto inventado': ['modulo que nao existe no portal']})
+    placar.conferir('apelido orfao', trava_apelidos(q), True, 'assunto inventado')
+    q = copia(p, temp, 'v_sem_apelido')
+    q.apelidos = {}
+    placar.conferir('modulo sem apelido', trava_apelidos(q), True, 'modulo sem apelido')
+    # manifest sem a versao do PyMuPDF
+    q = copia(p, temp, 'v_pymupdf')
+    del q.manifest['gerador']['pymupdf']
+    placar.conferir('manifest sem PyMuPDF', trava_gerador_no_manifest(q), True, 'sem a versao')
+    # CMBX10 fora da lista de negrito: o marcador do 1o medio deixa de ser lido
+    antes_f = list(gerar_pacote.FONTES_NEGRITO)
+    gerar_pacote.FONTES_NEGRITO[:] = ['SSBX', 'Bold']
+    try:
+        placar.conferir('negrito sem CMBX10', trava_fontes_negrito(), True, 'CMBX10')
+    finally:
+        gerar_pacote.FONTES_NEGRITO[:] = antes_f
+    # titulo pela primeira capa lida (a regra antiga): o 6o ano sai "Divisibilidade"
+    antes_t = gerar_pacote.titulo_do_modulo
+    gerar_pacote.titulo_do_modulo = lambda slug, listas, teorias: next((c for c in listas + teorias if c), slug)
+    try:
+        placar.conferir('titulo pela primeira capa', trava_titulo_modulo(), True, 'fracao-como-porcentagem')
+    finally:
+        gerar_pacote.titulo_do_modulo = antes_t
 
 
 def principal():
@@ -932,7 +2121,55 @@ def principal():
             placar.conferir('curadoria sobrescreve o proxy',
                             [] if any(i['dificuldade_origem'] == 'curadoria' and i['numero'] == 4 and i['dificuldade'] == 1
                                       for i in p.itens) else ['a linha do dificuldade.csv nao chegou ao item'])
+            placar.conferir('apelidos', trava_apelidos(p))
+            placar.conferir('variantes: sem titulo, recuo, duas partes', trava_variantes(p))
+            placar.conferir('bordas: expoente alto, tabela no fio, nota com fracao', trava_bordas(p))
+            placar.conferir('divisa fina entre itens colados', trava_divisa_fina())
+            placar.conferir('subida fina pelo traco', trava_subida_fina())
+            placar.conferir('descida fina pelo traco', trava_descida_fina())
+            placar.conferir('seta que encosta no rotulo', trava_encosta())
+            placar.conferir('barra de segmento acima da linha', trava_barra_acima())
+            placar.conferir('corte sem passar por tinta', trava_corte_sem_tinta())
+            placar.conferir('fracao alta na linha do rotulo', trava_topo_da_linha())
+            antes_tm = gerar_pacote.TOPO_MAX
+            gerar_pacote.TOPO_MAX = 12
+            try:
+                placar.conferir('fracao alta cortada em 12 pt', trava_topo_da_linha(), True, 'topo da linha em')
+            finally:
+                gerar_pacote.TOPO_MAX = antes_tm
+            antes_cs = gerar_pacote.CORTE_SEM_TINTA
+            gerar_pacote.CORTE_SEM_TINTA = False
+            try:
+                placar.conferir('corte por cima da tinta', trava_corte_sem_tinta(), True, 'arredondamento parte a tinta')
+            finally:
+                gerar_pacote.CORTE_SEM_TINTA = antes_cs
+            antes_ba = gerar_pacote.BARRA_ACIMA
+            gerar_pacote.BARRA_ACIMA = False
+            try:
+                placar.conferir('barra de segmento no item de cima', trava_barra_acima(), True, 'corte em')
+            finally:
+                gerar_pacote.BARRA_ACIMA = antes_ba
+            placar.conferir('texto encostado no rotulo e do item dele', trava_encostado(p))
+            antes_en = gerar_pacote.ENCOSTA
+            gerar_pacote.ENCOSTA = 0.0
+            try:
+                placar.conferir('seta fora da linha do rotulo', trava_encosta(), True, 'topo da linha em')
+            finally:
+                gerar_pacote.ENCOSTA = antes_en
+            placar.conferir('descida pela linha de 1 pt', trava_descida_fina(lambda doc, pno, x0, x1, y, lim: y), True, 'fim em')
+            placar.conferir('subida pela linha de 1 pt', trava_subida_fina(lambda doc, pno, x0, x1, y, lim: y), True, 'topo em')
+            placar.conferir('divisa pela linha de 1 pt', trava_divisa_fina(lambda doc, pno, x0, x1, a, b: float(math.floor(b) - 1)),
+                            True, 'divisa em')
+            antes_fo = gerar_pacote.FOLGA_ANTES_DO_PROXIMO
+            gerar_pacote.FOLGA_ANTES_DO_PROXIMO = False
+            try:
+                placar.conferir('sem folga antes do proximo', trava_divisa_fina(), True, 'divisa em None')
+            finally:
+                gerar_pacote.FOLGA_ANTES_DO_PROXIMO = antes_fo
+            placar.conferir('marcador em CMBX10', trava_fontes_negrito())
+            placar.conferir('titulo do modulo pela capa das listas', trava_titulo_modulo())
             it_obj, it_simples = venenos(p, temp, placar, cur)
+            venenos_series(p, temp, placar, cur)
         if not a.sem_navegador:
             sorteio = sortear_pedacos(p)
             erros, medidas = trava_fidelidade(p, sorteio, temp)
