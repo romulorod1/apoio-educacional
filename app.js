@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.24.1';
+  var VERSAO = '1.25.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -2056,6 +2056,17 @@
         faltaTopicos = true;
       }
     });
+    /* Com pacote, o botão Material só aparece quando a biblioteca tem o
+     * assunto, e para saber isso o índice da biblioteca precisa estar aberto.
+     * A linha nasce sem o botão e é redesenhada quando ele abre; se não abrir,
+     * fica sem o botão da biblioteca (e com o material autoral, se houver). */
+    if (temPacoteBiblioteca && !bib && lista.some(function (t) {
+      return !t.anexoId && disciplinaDoAssunto(t) === Core.MATERIA_PADRAO;
+    })) {
+      carregarBiblioteca().then(function () {
+        if (caixa.parentNode) desenharTemasDaAula(caixa, aula, aluno);
+      }, function () {});
+    }
     if (faltaIndice || faltaTopicos) {
       /* Sem sinal os dois podem não vir. A falha fica anotada para a lista não
        * ficar buscando de novo a cada redesenho: sem material a linha aparece
@@ -2082,6 +2093,8 @@
           (t.partes && t.partes.length ? ' · ' + t.partes.join(', ') : '');
       } else if (t.fonte === 'livre') {
         detalhe = 'assunto escrito por você';
+      } else if (t.fonte === 'biblioteca') {
+        detalhe = 'da biblioteca da OBMEP';
       } else if (registro) {
         /* Tema com registro no índice: matéria e ano vêm do REGISTRO, não do
          * item gravado. A matéria padrão continua sem nome na etiqueta, como
@@ -2099,9 +2112,11 @@
        * comum, só com o título, sem material próprio; com pacote, o de
        * matemática ganha o Material que abre a biblioteca, como qualquer outro. */
       /* Com um pacote da biblioteca importado, o Material de um assunto de
-       * matemática abre a biblioteca procurando pelo título do assunto. O
+       * matemática abre a biblioteca quando ela tem o assunto: o módulo direto,
+       * no assunto que veio da biblioteca; a busca pelo título, nos outros. O
        * material autoral continua no botão "Material de aula" da janela. */
-      var pelaBiblioteca = !comMaterial && temPacoteBiblioteca && disciplina === Core.MATERIA_PADRAO;
+      var bibliotecaPodeTer = !comMaterial && temPacoteBiblioteca && disciplina === Core.MATERIA_PADRAO;
+      var pelaBiblioteca = bibliotecaPodeTer && !!bib && !!moduloDoAssunto(t);
       function materialDeSempre() {
         if (registro) {
           $('#titulo-modal-tema').textContent = 'Material de aula' +
@@ -2135,19 +2150,21 @@
              * para uma busca vazia. A primeira consulta abre o índice da
              * biblioteca, então o botão avisa que está abrindo. */
             var botao = ev && ev.currentTarget;
-            if (!pelaBiblioteca) { materialDeSempre(); return; }
+            // o índice da biblioteca ainda abrindo não decide por ela: o toque espera por ele
+            if (!pelaBiblioteca && !(bibliotecaPodeTer && !bib)) { materialDeSempre(); return; }
             if (botao) { botao.disabled = true; botao.textContent = 'Abrindo...'; }
-            bibliotecaTemOAssunto(t.titulo).then(function (tem) {
+            // o pacote pode ter mudado desde que a linha foi desenhada: confere de novo
+            carregarBiblioteca().then(function () { return moduloDoAssunto(t); }).catch(function () { return null; }).then(function (achado) {
               if (botao) { botao.disabled = false; botao.textContent = 'Material'; }
               // ela pode ter saído da aula enquanto a biblioteca abria: aí não a leva embora
               if (!$('#modal-aula').classList.contains('aberto') || !aulaEmEdicao || aulaEmEdicao.id !== aula.id) return;
-              if (tem === null) {
+              if (achado === null) {
                 if (registro) { materialDeSempre(); return; }
                 avisar('Não consegui abrir a biblioteca agora. Tente de novo daqui a pouco.');
                 return;
               }
-              if (tem) {
-                abrirBibliotecaDoAssunto(t, aula);
+              if (achado) {
+                abrirBibliotecaDoAssunto(t, aula, achado.direto ? achado.chave : null);
                 if (registro && !avisouMaterialAutoral) {
                   avisouMaterialAutoral = true;   // uma vez por uso do aplicativo
                   avisar('Abri a biblioteca da OBMEP. O seu material deste assunto continua em "Material de aula", na janela da aula.');
@@ -8314,9 +8331,9 @@
         if (saida.length >= daTrilha + 5) return;
         Core.temasDaAula(a).forEach(function (t) {
           if (saida.length >= daTrilha + 5) return;
-          juntar({
-            id: t.id, titulo: t.titulo, fonte: t.fonte, disciplina: t.disciplina, grupo: t.grupo
-          }, 'já dado em ' + Core.ddmm(a.data));
+          var sugerido = { id: t.id, titulo: t.titulo, fonte: t.fonte, disciplina: t.disciplina, grupo: t.grupo };
+          if (t.modulo) sugerido.modulo = t.modulo;
+          juntar(sugerido, 'já dado em ' + Core.ddmm(a.data));
         });
       });
 
@@ -11127,12 +11144,12 @@
   }
 
   /* A dificuldade que vem no pacote diz de onde veio: "estimada" pela posição
-   * do exercício na lista (proxy) ou "curada" por quem revisou. Fica sem cor,
+   * do exercício na lista (proxy) ou "revisada" pela curadoria. Fica sem cor,
    * porque a única dificuldade colorida do cartão é a dela, no "Para mim". */
   function rotuloDificuldade(it) {
     var nome = NOME_DIFICULDADE[it.dificuldade];
     if (!nome) return null;
-    return (it.dificuldade_origem === 'curadoria' ? 'curada: ' : 'estimada: ') + nome.toLowerCase();
+    return (it.dificuldade_origem === 'curadoria' ? 'revisada: ' : 'estimada: ') + nome.toLowerCase();
   }
 
   /* A que vale para o filtro: a dela, quando ela deu uma; senão, a do pacote. */
@@ -11173,7 +11190,7 @@
   var bibFiltroDif = null;         // null = todas; 1, 2 ou 3
 
   /* Fácil, Médio, Difícil: vale a etiqueta dela quando existe, e a do pacote
-   * (estimada ou curada) quando não. Exercício sem dificuldade nenhuma só
+   * (estimada ou revisada) quando não. Exercício sem dificuldade nenhuma só
    * aparece em "Todas". O filtro fica ligado de uma lista para a outra. */
   function barraFiltroDeDificuldade(grade, lista, banco) {
     var chips = el('div', { class: 'chips-filtro', role: 'group', 'aria-label': 'Dificuldade', id: 'bib-filtro-dif' });
@@ -11251,24 +11268,46 @@
    * aplicativo (tema_app vem nulo). Até essa tabela existir, "filtrar pelo
    * módulo" é procurar pelo título do assunto na busca da biblioteca, com os
    * apelidos do pacote ("bhaskara" leva a "equação do segundo grau"). */
-  /* A biblioteca tem o assunto? Algum módulo casou TODAS as palavras do título
-   * (nota de 1000 para cima no busca.js), com os apelidos do pacote. */
-  function bibliotecaTemOAssunto(titulo) {
-    return carregarBiblioteca().then(function () {
-      var g = procurarNaBiblioteca(String(titulo || '').trim());
-      return g.modulo.some(function (m) { return m.nota >= 1000; });
-    }, function () { return null; });   // null: não deu para abrir, que não é "não tem"
+  /* A biblioteca tem o assunto? No assunto que veio da biblioteca, o módulo
+   * gravado nele, se ainda estiver no pacote; nos outros (e se o módulo saiu
+   * do pacote), algum módulo que casou TODAS as palavras do título (nota de
+   * 1000 para cima no busca.js), com os apelidos do pacote. Devolve
+   * { chave, direto } ou false; pede o índice da biblioteca já aberto. A
+   * resposta por título fica guardada no próprio índice, que é refeito a cada
+   * importação. */
+  function moduloDoAssunto(t) {
+    try { return moduloDoAssuntoNoIndice(t); } catch (e) { return false; }
+  }
+  function moduloDoAssuntoNoIndice(t) {
+    if (t.fonte === 'biblioteca' && t.modulo && bib.modulos[t.modulo]) return { chave: t.modulo, direto: true };
+    var memo = bib.assuntos = bib.assuntos || Object.create(null);
+    var k = chaveDoAssunto(t.titulo || '');
+    if (!k) return false;
+    if (memo[k] === undefined) {
+      var g = procurarNaBiblioteca(String(t.titulo || '').trim());
+      var m = g.modulo.filter(function (x) { return x.nota >= 1000; })[0];
+      memo[k] = m ? { chave: m.id, direto: false } : false;
+    }
+    return memo[k];
   }
 
   var avisouMaterialAutoral = false;
 
   var bibVindoDoMaterial = false;
 
-  function abrirBibliotecaDoAssunto(t, aula) {
+  function abrirBibliotecaDoAssunto(t, aula, chaveModulo) {
     bibContexto = { aulaId: aula.id, alunoId: aula.alunoId };
     bibFiltroAluno = aula.alunoId;
     bibFiltroDif = null;
-    bibTermo = String(t.titulo || '').trim();
+    bibTermo = chaveModulo ? '' : String(t.titulo || '').trim();
+    if (chaveModulo) {
+      // o assunto veio da biblioteca: abre o módulo dele, sem busca
+      bibNav.modulo = chaveModulo;
+      bibNav.aula = null;
+      var mod = bib && bib.modulos[chaveModulo];
+      // o módulo do Banco tem nível no lugar da série: abre na primeira série que ele atende
+      if (mod) bibNav.serie = (bib.listaSeries || []).filter(function (s) { return mod.series[s]; })[0] || mod.serie;
+    }
     fecharModal('modal-aula');
     var campo = $('#busca-biblioteca');
     if (campo) {
@@ -11824,7 +11863,7 @@
     if (botao) botao.textContent = 'Montando...';
     if (!op.semAvisoDeMontagem) avisar('Montando o material. Isso leva alguns segundos.');
     var usaItens = (op.lista || op.gabarito) ? itens : [];
-    var pecas, teoria, anexado = false, id = null, saida = null, etapa = 'montar';
+    var pecas, teoria, anexado = false, id = null, saida = null, etapa = 'montar', assuntosNovos = [];
     // na série, qualquer aviso final espera o Desfazer dela vencer
     function avisarNaHora(t, r, f) {
       var espera = Math.max(0, (op.avisoDepoisDe || 0) - Date.now());
@@ -11865,16 +11904,25 @@
           var sem = new Error('aula desfeita'); sem.desfeita = true; throw sem;
         }
         aula.anexos = aula.anexos || [];
-        /* Os módulos dos exercícios vão junto no anexo, para o fechamento (PR D)
-         * ler "Temas trabalhados" da própria aula, de forma síncrona. */
+        // os módulos dos exercícios ficam anotados no anexo, como registro de onde ele veio
         var modulos = [];
         usaItens.forEach(function (it) { if (modulos.indexOf(it.modulo.titulo) < 0) modulos.push(it.modulo.titulo); });
         var registro = { id: id, nome: nome, tamanho: blob.size, biblioteca: true, modulos: modulos };
         aula.anexos.push(registro);
+        /* Cada módulo do material vira assunto da aula, no mesmo salvar do
+         * anexo: sem pergunta, e só quando a aula ainda não tem assunto com o
+         * mesmo título. */
+        var antes = aula.temas, antesTema = aula.tema;
+        assuntosNovos = modulosComoAssunto(aula, modulosDoMaterial(op.teoria ? paginas : [], usaItens));
         titulosGuardados()[aula.alunoId] = { titulo: op.titulo, subtitulo: op.subtitulo };
         return salvar().catch(function (e) {
           // não gravou: o anexo sai da memória, senão o próximo salvar o gravaria e a nova tentativa duplicaria
           aula.anexos = aula.anexos.filter(function (x) { return x !== registro; });
+          if (assuntosNovos.length) {
+            if (antes === undefined) delete aula.temas; else aula.temas = antes;
+            if (antesTema !== undefined) aula.tema = antesTema;
+            assuntosNovos = [];
+          }
           Store.apagarAnexo(id);
           throw e;
         });
@@ -11904,7 +11952,7 @@
         // o material da aula de origem foi feito: ela não fica escolhida para o próximo
         // anexado: a faixa fica para ela voltar à aula, mas a aula não vem mais escolhida no próximo material
         if (bibContexto && bibContexto.aulaId === aula.id) { bibContexto.anexado = true; desenharContextoBiblioteca(); }
-        var desmarcada = ' A seleção foi desmarcada.';
+        var desmarcada = textoDosAssuntos(assuntosNovos) + ' A seleção foi desmarcada.';
         /* "Marcar de novo", e não "Desfazer": no app, Desfazer desfaz a ação do
          * aviso, e aqui ela acharia que tirou o anexo da aula. */
         if (indiceFolha != null) {
@@ -11923,8 +11971,8 @@
       if (anexado) {
         var remarcar = desmarcarDepoisDeAnexar();
         avisarNaHora(etapa === 'folha'
-          ? 'O material foi anexado na aula, mas a lista não abriu como folha. O PDF está na aula; não precisa gerar de novo.'
-          : 'O material foi anexado na aula, mas não consegui marcar os exercícios como usados. O PDF está na aula; não precisa gerar de novo.',
+          ? 'O material foi anexado na aula, mas a lista não abriu como folha. O PDF está na aula; não precisa gerar de novo.' + textoDosAssuntos(assuntosNovos)
+          : 'O material foi anexado na aula, mas não consegui marcar os exercícios como usados. O PDF está na aula; não precisa gerar de novo.' + textoDosAssuntos(assuntosNovos),
           'Marcar de novo', remarcar);
       }
       else if (e && e.exercicio) avisarNaHora(e.exercicio + ' não abriu. Desmarque esse exercício e gere de novo. Nada foi anexado.');
@@ -11935,6 +11983,57 @@
       $$('#rodape-modal-bib-gerar button').forEach(function (b) { b.disabled = false; });
       if (abrirModalGerar.atualizar) abrirModalGerar.atualizar();
     });
+  }
+
+  /* Os módulos do material, na ordem em que aparecem nele: primeiro os das
+   * páginas de teoria, depois os dos exercícios. O módulo do Banco não entra:
+   * "Banco de Questões 2018" é o nome da fonte, não um tema, e iria para o
+   * fechamento da família (decisão da orquestradora, 22/09). */
+  function modulosDoMaterial(paginas, itens) {
+    var saida = [], vistos = {};
+    function guarda(serie, m) {
+      var chave = serie + ':' + m.slug;
+      if (vistos[chave]) return;
+      vistos[chave] = true;
+      saida.push({ titulo: m.titulo, modulo: chave });
+    }
+    paginas.forEach(function (p) { guarda(p.aula.serie, p.aula.modulo); });
+    itens.forEach(function (it) { if (!eDoBanco(it)) guarda(it.serie, it.modulo); });
+    return saida;
+  }
+
+  /* Título igual é igual sem acento, sem caixa e sem os espaços a mais. A chave
+   * do fechamento (guardaTema) é a mesma sem o aparo de espaços: título igual
+   * ao do módulo nunca sai duas vezes para a família. */
+  function chaveDoAssunto(titulo) {
+    return Core.chaveDeBusca(String(titulo || '').trim().replace(/\s+/g, ' '));
+  }
+
+  /* Grava na aula os módulos que ainda não estão lá como assunto e devolve os
+   * títulos gravados. Assunto que ela tirou não volta sozinho: só volta se ela
+   * anexar de novo material daquele módulo nesta aula. */
+  function modulosComoAssunto(aula, modulos) {
+    var tem = {};
+    Core.temasDaAula(aula).forEach(function (t) { tem[chaveDoAssunto(t.titulo || '')] = true; });
+    var novos = [];
+    modulos.forEach(function (m) {
+      var k = chaveDoAssunto(m.titulo);
+      if (!k || tem[k]) return;
+      tem[k] = true;
+      novos.push({ titulo: m.titulo, fonte: 'biblioteca', modulo: m.modulo });
+    });
+    if (!novos.length) return [];
+    aula.temas = Core.temasDaAula(aula).concat(novos);
+    delete aula.tema;
+    return novos.map(function (t) { return t.titulo; });
+  }
+
+  /* Com dois ou mais, só a conta: os títulos do pacote têm vírgula e "e", e a
+   * lista deles não se lê nos segundos do aviso. Os nomes estão na aula. */
+  function textoDosAssuntos(titulos) {
+    if (!titulos.length) return '';
+    if (titulos.length === 1) return ' Assunto registrado: ' + titulos[0] + '.';
+    return ' ' + titulos.length + ' assuntos registrados na aula.';
   }
 
   /* A lista, riscável: cada enunciado entra como imagem na folha da aula, com

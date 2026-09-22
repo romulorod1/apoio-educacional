@@ -60,8 +60,12 @@
  * "curada" e o CSV das etiquetas dela em Ajustes (app.js, index.html e
  * styles.css), com a lista igual. O v38 tira do repositório o acervo de
  * 14/09: saem da lista './banco/acervo.json' e './banco/acervo_indice.json', e
- * do app.js, index.html e styles.css a aba Temas antiga. */
-var CACHE = 'apoio-educacional-v38';
+ * do app.js, index.html e styles.css a aba Temas antiga. O v39 troca, a pedido
+ * do Romulo, o rótulo "curada" por "revisada" na dificuldade (app.js), com a
+ * lista igual. O v40 faz o módulo do material da biblioteca virar assunto da
+ * aula ao anexar, e o botão Material só aparecer quando a biblioteca tem o
+ * assunto (app.js e core.js), com a lista igual. */
+var CACHE = 'apoio-educacional-v40';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

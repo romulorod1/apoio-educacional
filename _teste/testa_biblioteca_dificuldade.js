@@ -10,7 +10,7 @@
  *
  * O que prova:
  *   1. o cartão diz de onde veio a dificuldade: "estimada: fácil" ou
- *      "curada: difícil", sem cor, e a etiqueta dela ("Para mim") é a única
+ *      "revisada: difícil", sem cor, e a etiqueta dela ("Para mim") é a única
  *      colorida quando marcada: as duas não se confundem;
  *   2. o filtro Fácil, Médio, Difícil mostra 1, 3 e 8; 4, 5 e 6; 2 e 7;
  *      "Todas" volta os 8;
@@ -164,17 +164,17 @@ const lerEtiquetas = pag => pag.evaluate(() => Store.etiquetasDaBiblioteca());
   secao('1. O cartão diz de onde veio a dificuldade');
   await abrirSomaEProduto(pag);
   conf('exercício 1: "estimada: fácil"', await rotuloFonte(pag, 1), 'estimada: fácil');
-  conf('exercício 2 (curado): "curada: difícil"', await rotuloFonte(pag, 2), 'curada: difícil');
+  conf('exercício 2 (curado): "revisada: difícil"', await rotuloFonte(pag, 2), 'revisada: difícil');
   conf('exercício 5: "estimada: médio"', await rotuloFonte(pag, 5), 'estimada: médio');
-  conf('exercício 8 (curado): "curada: fácil"', await rotuloFonte(pag, 8), 'curada: fácil');
-  // cada cartão diz a origem que o pacote traz, e nunca "curada" num item proxy
+  conf('exercício 8 (curado): "revisada: fácil"', await rotuloFonte(pag, 8), 'revisada: fácil');
+  // cada cartão diz a origem que o pacote traz, e nunca "revisada" num item proxy
   const origens = await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo .bib-cartao')).map(c =>
     ({ id: c.getAttribute('data-id'), rotulo: (c.querySelector('.bib-dif-fonte') || {}).textContent || '' })));
-  const origemEsperada = origens.map(o => (CURADORIA[o.id] ? 'curada' : 'estimada'));
-  conf('os 8 cartões: "curada" só no 2 e no 8, que o pacote marca como curadoria; "estimada" nos 6 proxy',
+  const origemEsperada = origens.map(o => (CURADORIA[o.id] ? 'revisada' : 'estimada'));
+  conf('os 8 cartões: "revisada" só no 2 e no 8, que o pacote marca como curadoria; "estimada" nos 6 proxy',
     origens.map(o => o.rotulo.split(':')[0]).join(','), origemEsperada.join(','));
-  conf('nenhum cartão com o rótulo antigo ("revisada" ou só "Fácil")', await pag.evaluate(() =>
-    Array.from(document.querySelectorAll('#bib-corpo .bib-tags .tag')).filter(t => /revisada|^(Fácil|Médio|Difícil)$/i.test(t.textContent.trim())).length), 0);
+  conf('nenhum cartão com os rótulos antigos ("curada", ", revisada" ou só "Fácil")', await pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#bib-corpo .bib-tags .tag')).filter(t => /curada|, revisada|^(Fácil|Médio|Difícil)$/i.test(t.textContent.trim())).length), 0);
   await tocarEtiqueta(pag, 3, 1);
   await esperar('etiqueta do 3 marcada', () => pag.evaluate(id => !!document.querySelector('#bib-corpo .bib-cartao[data-id="' + id + '"]')
     .closest('.bib-celula').querySelector('.bib-etiqueta-botao.ativa'), SP + 3), v => v === true, 5000);
@@ -190,7 +190,7 @@ const lerEtiquetas = pag => pag.evaluate(() => Store.etiquetasDaBiblioteca());
   conf('o rótulo do pacote não sai em maiúsculas', cores.maiusculas, 'none');
   conf('os chips do filtro têm 44 px de altura, como os do "Para mim"', await pag.evaluate(() =>
     Array.from(document.querySelectorAll('#bib-filtro-dif .chip-filtro')).every(b => b.getBoundingClientRect().height >= 44)), true);
-  if (SALVAR) await pag.screenshot({ path: path.join(SALVAR, 'b5_1_cartao_estimada_curada_para_mim.png') });
+  if (SALVAR) await pag.screenshot({ path: path.join(SALVAR, 'b5_1_cartao_estimada_revisada_para_mim.png') });
   await tocarEtiqueta(pag, 3, 1);   // tira de novo
   await esperar('etiqueta do 3 tirada', () => lerEtiquetas(pag), v => v && v.some(e => e.itemId === SP + 3 && e.dificuldade === null), 5000);
 
