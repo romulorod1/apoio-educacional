@@ -1021,9 +1021,10 @@ def _linhas_claras_giradas(pg):
             continue
         for l in b['lines']:
             s0 = l['spans'][0]
-            marca = abs(l['dir'][1]) > 1e-6 and s0['color'] > MARCA_CLARA and s0['size'] > MARCA_GRANDE
+            girada = abs(l['dir'][1]) > 1e-6
+            marca = girada and s0['color'] > MARCA_CLARA and s0['size'] > MARCA_GRANDE
             fora.append({'texto': ''.join(c['c'] for s in l['spans'] for c in s['chars']),
-                         'bbox': l['bbox'], 'marca': marca})
+                         'bbox': l['bbox'], 'marca': marca, 'girada': girada})
     return fora
 
 
@@ -1128,27 +1129,54 @@ def trava_marca_no_pacote(p):
     return erros
 
 
-def trava_teoria_sem_marca(p, n_pixel=10, semente=SEMENTE):
-    """Pagina de teoria que nao tem a marca sai intacta, com a remocao ligada.
+# O que a marca escreve, inclusive quebrado pela fonte embutida: nas sete series
+# saem "Portal OBMEP", "Portal da OBMEP", "ortal OBME", "tal OBM" e "da OB". A
+# regra abaixo olha o TEXTO da linha, e nao o corpo, a cor nem o angulo dela: e
+# de proposito que ela nao usa nenhuma medida do detector.
+DIZ_MARCA = re.compile(r'ortal|obme|^da\s*ob', re.I)
 
-    Ha modulos inteiros do Portal sem marca nenhuma (Conjuntos, no 9o ano; 135
-    paginas no 3o medio, 26 no 9o): o fluxo de conteudo dessas paginas nao pode
-    ser reescrito, o texto nao pode perder nem ganhar um caractere e o desenho
-    nao pode mudar um pixel (n_pixel paginas sorteadas com semente fixa, para a
-    conta caber). As paginas saem de copias proprias do PDF: o `p.doc` e a
-    referencia COM a marca de outras travas e nao pode ser mexido.
+
+def linha_da_marca_pelo_texto(texto):
+    """A linha girada diz o que a marca diz? (completude, sem olhar geometria)"""
+    return bool(DIZ_MARCA.search(re.sub(r'\s+', ' ', texto).strip()))
+
+
+def trava_teoria_sem_marca(p, n_pixel=10, semente=SEMENTE):
+    """Completude e inocuidade da remocao, com a pagina julgada pelo TEXTO.
+
+    Uma passada por toda pagina de teoria da fonte, com a remocao ligada:
+
+    1. completude: depois da remocao, nenhuma linha girada da pagina pode dizer
+       o que a marca diz -- qualquer corpo, qualquer cor, qualquer angulo. E a
+       conferencia que NAO usa a regra do detector como regua: se a proxima
+       marca vier em 12 pt, em cinza mais escuro ou em outro angulo, ela
+       reprova aqui, ainda que o detector nao a veja;
+    2. inocuidade: a pagina que nao dizia nada da marca antes tem de sair
+       intacta -- fluxo de conteudo nao reescrito, nenhum caractere a mais nem a
+       menos e, em n_pixel paginas sorteadas, nenhum pixel mudado.
+
+    As paginas saem de copias proprias do PDF: o `p.doc` e a referencia COM a
+    marca de outras travas e nao pode ser mexido.
     """
     erros, limpas = [], []
+    com_marca = 0
     arquivos = sorted({'%s__teoria-%s.pdf' % (t['modulo']['slug'], t['aula']['slug']) for t in p.teoria})
     for arq in arquivos:
         doc = pymupdf.open(os.path.join(p.pdfs, arq))
         for pno in range(doc.page_count):
-            if linhas_da_marca(doc[pno]):
-                continue
-            limpas.append((arq, pno))
+            giradas = [l for l in _linhas_claras_giradas(doc[pno]) if l['girada']]
+            dizia = [l['texto'] for l in giradas if linha_da_marca_pelo_texto(l['texto'])]
             fluxo = [doc.xref_stream(x) for x in doc[pno].get_contents()]
             texto = caracteres_da_pagina(doc[pno])
             pg, saiu = gerar_pacote.tirar_marca(doc, pno)
+            sobrou = [l['texto'] for l in _linhas_claras_giradas(pg)
+                      if l['girada'] and linha_da_marca_pelo_texto(l['texto'])]
+            if sobrou:
+                erros.append('%s p%d: sobrou linha girada dizendo a marca: %r' % (arq, pno + 1, sobrou[:2]))
+            if dizia:
+                com_marca += 1
+                continue
+            limpas.append((arq, pno))
             if saiu:
                 erros.append('%s p%d: a remocao tirou %d objeto(s) de uma pagina sem marca' % (arq, pno + 1, saiu))
             if [doc.xref_stream(x) for x in pg.get_contents()] != fluxo:
@@ -1165,6 +1193,62 @@ def trava_teoria_sem_marca(p, n_pixel=10, semente=SEMENTE):
         if pg.get_pixmap(dpi=DPI_MARCA, colorspace=pymupdf.csGRAY).samples != antes:
             erros.append('%s p%d: o desenho da pagina sem marca mudou' % (arq, pno + 1))
         doc.close()
+    if not erros:
+        print('          teoria: %d paginas dizendo a marca, %d sem dizer nada dela (%d conferidas por pixel)'
+              % (com_marca, len(limpas), min(n_pixel, len(limpas))))
+    return erros
+
+
+MENCOES = os.path.join(AQUI, '_dados', 'mencoes_portal.csv')
+PORTAL_NO_TEXTO = re.compile(r'portal')
+OBMEP_COLADO = re.compile(r'(?<=[a-z])obmep|obmep(?=[a-z])')
+
+
+def mencoes_do_texto(texto):
+    """Cada 'portal' do texto com o trecho em volta, sem acento e sem maiuscula."""
+    s = re.sub(r'\s+', ' ', sem_acento(texto))
+    return [(m.start(), s[max(0, m.start() - 24):m.start() + 30].strip()) for m in PORTAL_NO_TEXTO.finditer(s)]
+
+
+def sem_acento(s):
+    import unicodedata
+    s = unicodedata.normalize('NFD', s.lower())
+    return ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+
+
+def trava_mencoes_portal(p, lista=MENCOES):
+    """Toda mencao ao Portal no texto da teoria esta na lista curada.
+
+    A marca d'agua escrevia "Portal" no meio do conteudo; o conteudo tambem
+    fala do Portal de verdade ("no proprio portal", "portal da matematica").
+    Em vez de olhar o residuo e aprovar de olho, a lista de mencoes legitimas e
+    curada e versionada (biblioteca/_dados/mencoes_portal.csv, com serie,
+    arquivo, pagina e trecho): mencao fora da lista reprova.
+
+    Alem disso, "obmep" colado dentro de outra palavra ("antonioobmepcaminha")
+    e assinatura da marca atravessando a linha do conteudo, e reprova sempre: no
+    texto de verdade a sigla vem sempre solta ou com pontuacao.
+    """
+    if not os.path.exists(lista):
+        return ['a lista curada de mencoes ao Portal nao existe: %s' % lista]
+    curadas = set()
+    with io.open(lista, encoding='utf-8') as f:
+        for n, linha in enumerate(f):
+            if n == 0 or not linha.strip():
+                continue
+            campos = linha.rstrip('\n').split(';')
+            curadas.add((campos[0], campos[4]))
+    erros = []
+    for t in p.teoria:
+        for pag in t['paginas']:
+            for _, trecho in mencoes_do_texto(pag['texto']):
+                if (pag['id'], trecho) not in curadas:
+                    erros.append('%s: mencao ao Portal fora da lista curada: %r' % (pag['id'], trecho))
+            colado = OBMEP_COLADO.search(sem_acento(pag['texto']))
+            if colado:
+                i = colado.start()
+                erros.append('%s: "obmep" colado no meio de palavra: %r'
+                             % (pag['id'], sem_acento(pag['texto'])[max(0, i - 20):i + 20]))
     return erros
 
 
@@ -1866,7 +1950,8 @@ def travas_simples(p, placar, zip_caminho=None, rotulo=''):
     placar.conferir('notas de rodape com o item ou registradas' + rotulo, trava_notas(p))
     placar.conferir('solucao com conteudo alem do rotulo' + rotulo, trava_solucao_com_conteudo(p))
     placar.conferir('marca d\'agua fora do texto da teoria' + rotulo, trava_marca_no_pacote(p))
-    placar.conferir('teoria sem marca sai intacta' + rotulo, trava_teoria_sem_marca(p))
+    placar.conferir('nenhuma linha girada ainda diz a marca' + rotulo, trava_teoria_sem_marca(p))
+    placar.conferir('mencao ao Portal so a curada' + rotulo, trava_mencoes_portal(p))
 
 
 def venenos(p, temp, placar, curadoria):
@@ -2433,6 +2518,17 @@ def principal():
                     placar.conferir(nome, trava_marca(temp), True, motivo)
                 finally:
                     setattr(gerar_pacote, attr, antes_m)
+            # completude: com a remocao desligada, e com o limite antigo de 30
+            # pt, sobra linha girada dizendo o que a marca diz. Esta trava julga
+            # pelo texto da linha, e nao pela regra que remove
+            for nome, attr, valor in (('marca inteira desligada', 'TIRA_MARCA', False),
+                                      ('marca inteira so acima de 30 pt', 'MARCA_CORPO', 30.0)):
+                antes_c = getattr(gerar_pacote, attr)
+                setattr(gerar_pacote, attr, valor)
+                try:
+                    placar.conferir(nome, trava_teoria_sem_marca(p), True, 'sobrou linha girada dizendo a marca')
+                finally:
+                    setattr(gerar_pacote, attr, antes_c)
             # regra solta demais: sem nenhuma das tres condicoes, a remocao come
             # o texto da pagina que nao tem marca
             guardados = {n: getattr(gerar_pacote, n) for n in ('MARCA_CINZA', 'MARCA_SENO', 'MARCA_CORPO')}
