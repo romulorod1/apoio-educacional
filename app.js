@@ -4,17 +4,17 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.20.0';
+  var VERSAO = '1.21.0';
 
   /* O acervo de 14/09 (aba Temas e o atalho dele na escolha de assunto da
    * aula) saiu do ar até ser refeito com revisão. Os arquivos do banco ficam
    * intactos: voltar para false devolve tudo como estava. */
   var ACERVO_EM_CONSTRUCAO = true;
 
-  /* O cartão "Biblioteca" de Ajustes só aparece quando existir a aba que
-   * mostra o que foi importado. Até lá ela não vê nada de novo: importar sem
-   * ter onde abrir seria prometer o que não acontece. */
-  var BIBLIOTECA_NO_AR = false;
+  /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
+   * que foi importado: importar sem ter onde abrir seria prometer o que não
+   * acontece. Ligada na 1.21.0, com a aba Biblioteca. */
+  var BIBLIOTECA_NO_AR = true;
 
   /* A versão 1.20.0 sobe o banco do tablet para a versão 2 (store.js). Se
    * outra janela do aplicativo, ainda na versão antiga, estiver aberta, a
@@ -676,6 +676,9 @@
      * família que ainda não existe no aplicativo: perder isso ao fechar sem
      * querer seria perder tudo o que ela digitou, e não há para onde voltar. */
     if (id === 'modal-proposta') guardarRascunhoDeProposta();
+    /* O visor da biblioteca, fechado pelo × ou tocando fora: solta a imagem
+     * em tela cheia da memória, como o botão Fechar. */
+    if (id === 'modal-biblioteca') soltarVisor();
     if (!$$('.fundo-modal.aberto').length) degrauModal = 50;
     posicionarAviso();
   }
@@ -1076,6 +1079,7 @@
         $('.conteudo').scrollTop = 0;
         /* Redesenha a tela ao abrir para exibir dados atualizados */
         if (b.dataset.tela === 'temas') desenharTemas();
+        if (b.dataset.tela === 'biblioteca') desenharBiblioteca();
         if (b.dataset.tela === 'ajustes') desenharAjustes();
         /* Os números do IBGE se atualizam sozinhos quando ela abre uma tela que
          * os usa, e nunca na abertura do aplicativo: a hora em que ela abre o
@@ -1164,6 +1168,15 @@
     $('#arquivo-copia').addEventListener('change', restaurarCopia);
     $('#importar-biblioteca').addEventListener('click', function () { $('#arquivo-biblioteca').click(); });
     $('#arquivo-biblioteca').addEventListener('change', importarBiblioteca);
+    $('#bib-anterior').addEventListener('click', function () { andarNoVisor(-1); });
+    $('#bib-proxima').addEventListener('click', function () { andarNoVisor(1); });
+    $('#bib-solucao').addEventListener('click', function () {
+      if (!bibVendo) return;
+      bibVendo.solucao = !bibVendo.solucao;
+      desenharVisor();
+    });
+    $('#bib-como-folha').addEventListener('click', escolherAulaParaFolha);
+    $('#bib-fechar-visor').addEventListener('click', fecharVisor);
     $('#limpar-orfaos').addEventListener('click', liberarEspaco);
     $('#apagar-exemplo').addEventListener('click', apagarExemplo);
     $('#apagar-tudo').addEventListener('click', apagarTudo);
@@ -1361,6 +1374,9 @@
   var DURACOES = [30, 45, 60, 90, 120, 150, 180];
 
   function abrirAula(aulaId, dataSugerida) {
+    /* A página da biblioteca à espera de uma aula nova só vale para a janela
+     * que o "Nova aula hoje" abriu: quem chama depois de pôr a espera é ele. */
+    folhaPendenteDaBiblioteca = null;
     if (!db.alunos.length) {
       avisar('Cadastre um aluno antes de marcar a primeira aula.');
       return;
@@ -2399,6 +2415,8 @@
         if (!dias.length) { avisar('Escolha ao menos um dia da semana.'); return; }
         var ate = $('#campo-repetir-ate').value || null;
         if (ate && ate < data) { avisar('A data final não pode ser antes do início.'); return; }
+        var daBibliotecaNaSerie = folhaPendenteDaBiblioteca;
+        folhaPendenteDaBiblioteca = null;
         comDesfazer('Aulas repetidas criadas.', function () {
           Core.criarSerie(db, {
             alunoId: alunoId, dias: dias, hora: hora, duracaoMin: duracao,
@@ -2407,6 +2425,16 @@
         }).then(function () {
           fecharModal('modal-aula');
           desenharTudo();
+          /* Veio do "Abrir como folha" e ela marcou Repetir: a página vai para
+           * a primeira aula da série, a do dia escolhido. */
+          if (daBibliotecaNaSerie) {
+            /* A da série nova primeiro; se já havia uma aula avulsa nesse dia, a
+             * série pulou a data e a página vai para essa, em página nova. */
+            var doDia = db.aulas.filter(function (a) { return a.alunoId === alunoId && a.data === data; });
+            var primeira = doDia.filter(function (a) { return a.serieId; })[0] || doDia[0];
+            if (primeira) colarNaFolhaDaAula(primeira.id, daBibliotecaNaSerie);
+            else avisar('As aulas foram criadas, mas nenhuma cai no dia escolhido; a página não foi colada.');
+          }
         });
         return;
       }
@@ -2416,9 +2444,14 @@
         notaTexto: '', notaPrivada: '', temNota: false, anexos: []
       };
       db.aulas.push(nova);
+      var daBiblioteca = folhaPendenteDaBiblioteca;
+      folhaPendenteDaBiblioteca = null;
       salvar().then(function () {
         fecharModal('modal-aula');
         desenharTudo();
+        /* Veio do "Abrir como folha" da biblioteca: a página vai para a folha
+         * da aula recém-criada, e a folha abre no lugar da janela da aula. */
+        if (daBiblioteca) { colarNaFolhaDaAula(nova.id, daBiblioteca); return; }
         // Reabre para ela já poder escrever na folha ou puxar o material. Numa
         // repetição não faz sentido: seriam muitas aulas criadas de uma vez.
         abrirAula(nova.id);
@@ -5279,7 +5312,7 @@
 
   // ================= editor da folha de aula =================
 
-  function abrirEditorNota(aulaId) {
+  function abrirEditorNota(aulaId, paginaInicial) {
     var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
     if (!aula) return;
     var aluno = alunoPorId(aula.alunoId);
@@ -5302,12 +5335,12 @@
           img.src = x.midia.dataUrl;
           midiasCarregadas[x.ref] = { dataUrl: x.midia.dataUrl, w: x.midia.w, h: x.midia.h, img: img };
         });
-        montarEditor(aula, usada);
+        montarEditor(aula, usada, paginaInicial);
       });
     });
   }
 
-  function montarEditor(aula, nota) {
+  function montarEditor(aula, nota, paginaInicial) {
     abrirModal('modal-nota');
 
     if (editorAtual) { editorAtual.destruir(); editorAtual = null; }
@@ -5325,6 +5358,10 @@
     // Antes isso era definido dentro do desenho da barra de ferramentas, e um
     // tropeço ali deixava a folha sem dono e sem ser salva.
     editorAtual._aulaId = aula.id;
+    /* Aberta pela biblioteca: já na página que acabou de ser colada, ANTES de
+     * a barra e o rodapé serem desenhados, para o contador e o fundo mostrados
+     * serem os da página que está na tela. */
+    if (paginaInicial) editorAtual.irParaPagina(paginaInicial);
 
     // o canvas só tem tamanho depois que o painel aparece
     setTimeout(function () { if (editorAtual) editorAtual.ajustarTamanho(); }, 30);
@@ -11517,6 +11554,7 @@
       mostrarEstadoImportacao('faixa-info',
         ['Biblioteca importada.'].concat(Biblioteca.resumo(registro.manifest, registro.bytes)));
       desenharPacotesBiblioteca();
+      bibliotecaMudou();
     }).catch(function (e) {
       if (e && e.versaoAtual != null) {
         var nova = aberto.manifest.versao;
@@ -11586,6 +11624,799 @@
         ]));
       });
     }).catch(function () { caixa.innerHTML = ''; });
+  }
+
+  // ================= biblioteca: navegar =================
+
+  /* A aba Biblioteca. Sem pacote importado, mostra o mesmo "Em construção"
+   * da aba Temas de hoje: nada muda para ela até importar. Com pacote, a
+   * árvore que já existe na fonte: Série, Módulo, Aula; a teoria por página,
+   * os exercícios por recorte, e uma busca só.
+   *
+   * Os pacotes moram no IndexedDB (store.js). Ao abrir a aba, os exercícios
+   * e as aulas de teoria são lidos uma vez e montados em árvore na memória;
+   * importar um pacote novo joga a árvore fora (bibliotecaMudou).
+   *
+   * As imagens NUNCA são todas desenhadas de uma vez: cada miniatura nasce do
+   * SVG num canvas quando entra na tela (IntersectionObserver), no máximo três
+   * por vez, e fica guardada em 'midias' com a chave do pacote, da versão e do
+   * caminho, para a próxima visita não desenhar de novo. */
+  var bib = null;
+  var bibPromessa = null;
+  var bibNav = { serie: null, modulo: null, aula: null };
+  var bibTermo = '';
+  var bibObservador = null;
+  var bibFila = [];
+  var bibDesenhando = 0;
+  var MAX_MINIATURAS_JUNTAS = 3;
+  var ORDEM_SERIES = ['6ano', '7ano', '8ano', '9ano', '1em', '2em', '3em'];
+  var NOME_DIFICULDADE = { 1: 'Fácil', 2: 'Médio', 3: 'Difícil' };
+
+  function bibliotecaMudou() {
+    bib = null;
+    bibPromessa = null;
+    if ($('#tela-biblioteca') && $('#tela-biblioteca').classList.contains('ativa')) desenharBiblioteca();
+  }
+
+  function eDoBanco(item) {
+    return String(item.id).indexOf('banco:') === 0;
+  }
+
+  /* Monta a árvore: módulos por série, cada um com as aulas de teoria e as
+   * listas de exercícios; e o índice de busca de todos os pacotes juntos. */
+  function montarArvoreBiblioteca(pacotes, itens, teoria) {
+    var arv = { pacotes: pacotes, modulos: {}, series: {}, itemPorId: {}, teoriaPorId: {}, indice: [], apelidos: {} };
+    function modulo(chave, serie, m, banco, pacote) {
+      var mod = arv.modulos[chave];
+      if (!mod) {
+        mod = arv.modulos[chave] = { chave: chave, serie: serie, slug: m.slug, titulo: m.titulo, banco: banco,
+          pacote: pacote, series: {}, teorias: [], listas: {}, ordemListas: [] };
+      }
+      return mod;
+    }
+    teoria.forEach(function (t) {
+      arv.teoriaPorId[t.id] = t;
+      var mod = modulo(t.serie + ':' + t.modulo.slug, t.serie, t.modulo, false, t.pacote);
+      mod.series[t.serie] = true;
+      arv.series[t.serie] = true;
+      mod.teorias.push(t);
+    });
+    itens.forEach(function (it) {
+      arv.itemPorId[it.id] = it;
+      var banco = eDoBanco(it);
+      var mod = modulo(it.serie + ':' + it.modulo.slug, it.serie, it.modulo, banco, it.pacote);
+      var series = banco && it.series_equivalentes && it.series_equivalentes.length ? it.series_equivalentes : [it.serie];
+      series.forEach(function (s) { mod.series[s] = true; arv.series[s] = true; });
+      var lista = mod.listas[it.aula.slug];
+      if (!lista) {
+        lista = mod.listas[it.aula.slug] = { slug: it.aula.slug, titulo: it.aula.titulo, n: it.aula.n || 0, itens: [], modulo: mod };
+        mod.ordemListas.push(lista);
+      }
+      lista.itens.push(it);
+    });
+    Object.keys(arv.modulos).forEach(function (k) {
+      var mod = arv.modulos[k];
+      mod.teorias.sort(function (a, b) { return (a.aula.n || 0) - (b.aula.n || 0) || (a.id < b.id ? -1 : 1); });
+      mod.ordemListas.sort(function (a, b) { return a.n - b.n || (a.slug < b.slug ? -1 : 1); });
+      mod.ordemListas.forEach(function (l) { l.itens.sort(function (a, b) { return a.numero - b.numero; }); });
+    });
+    pacotes.forEach(function (p) {
+      ((p.busca && p.busca.temas) || []).forEach(function (r) { arv.indice.push(r); });
+      Object.keys(p.apelidos || {}).forEach(function (k) {
+        if (k.charAt(0) === '_') return;
+        arv.apelidos[k] = (arv.apelidos[k] || []).concat(p.apelidos[k] || []);
+      });
+    });
+    arv.listaSeries = ORDEM_SERIES.filter(function (s) { return arv.series[s]; })
+      .concat(Object.keys(arv.series).filter(function (s) { return ORDEM_SERIES.indexOf(s) < 0 && !/^n[0-9]$/.test(s); }).sort());
+    arv.versaoDe = {};
+    pacotes.forEach(function (p) { arv.versaoDe[p.pacote] = p.versao; });
+    return arv;
+  }
+
+  function carregarBiblioteca() {
+    if (bib) return Promise.resolve(bib);
+    if (bibPromessa) return bibPromessa;
+    bibPromessa = Promise.all([
+      Store.listarPacotesBiblioteca(), Store.itensDaBiblioteca(), Store.teoriaDaBiblioteca()
+    ]).then(function (r) {
+      bib = montarArvoreBiblioteca(r[0] || [], r[1] || [], r[2] || []);
+      bibPromessa = null;
+      return bib;
+    }).catch(function (e) { bibPromessa = null; throw e; });
+    return bibPromessa;
+  }
+
+  function modulosDaSerie(serie) {
+    var lista = Object.keys(bib.modulos).map(function (k) { return bib.modulos[k]; })
+      .filter(function (m) { return m.series[serie]; });
+    function porTitulo(a, b) { return a.titulo.localeCompare(b.titulo, 'pt-BR'); }
+    return {
+      portal: lista.filter(function (m) { return !m.banco; }).sort(porTitulo),
+      banco: lista.filter(function (m) { return m.banco; }).sort(porTitulo)
+    };
+  }
+
+  function contarItens(mod) {
+    return mod.ordemListas.reduce(function (s, l) { return s + l.itens.length; }, 0);
+  }
+
+  function plural(n, um, varios) { return n + ' ' + (n === 1 ? um : varios); }
+
+  // ---------- a tela ----------
+
+  function desenharBiblioteca() {
+    var corpo = $('#bib-corpo');
+    if (!corpo) return;
+    carregarBiblioteca().then(function (arv) {
+      var cartaoBusca = $('#bib-busca-cartao');
+      if (!arv.pacotes.length) {
+        cartaoBusca.style.display = 'none';
+        $('#bib-contagem').textContent = '';
+        corpo.innerHTML = '';
+        corpo.appendChild(el('div', { class: 'vazio', id: 'biblioteca-em-construcao' }, [
+          el('p', { style: 'font-size:18px;font-weight:600;color:var(--navy);margin:0 0 8px', texto: 'Em construção' }),
+          el('p', { style: 'margin:0', texto: 'Esta área está sendo preparada.' })
+        ]));
+        return;
+      }
+      cartaoBusca.style.display = '';
+      var ids = Object.keys(arv.itemPorId);
+      var nBanco = ids.filter(function (id) { return id.indexOf('banco:') === 0; }).length;
+      var nTeoria = Object.keys(arv.teoriaPorId).length;
+      $('#bib-contagem').textContent = [
+        nTeoria ? plural(nTeoria, 'aula de teoria', 'aulas de teoria') : '',
+        ids.length - nBanco ? plural(ids.length - nBanco, 'exercício', 'exercícios') : '',
+        nBanco ? plural(nBanco, 'problema do Banco', 'problemas do Banco') : ''
+      ].filter(Boolean).join(', ');
+      ligarBuscaBiblioteca();
+      if (!bibNav.serie || arv.listaSeries.indexOf(bibNav.serie) < 0) {
+        // abre na primeira série que tem módulo do Portal, e não numa só de Banco
+        var comPortal = arv.listaSeries.filter(function (s) { return modulosDaSerie(s).portal.length; });
+        bibNav.serie = comPortal[0] || arv.listaSeries[0] || null;
+      }
+      if (bibNav.modulo && !arv.modulos[bibNav.modulo]) { bibNav.modulo = null; bibNav.aula = null; }
+      desenharCorpoBiblioteca();
+    }).catch(function () {
+      corpo.innerHTML = '';
+      corpo.appendChild(el('div', { class: 'faixa-aviso', texto: 'Não consegui abrir a biblioteca guardada no tablet. Feche e abra o aplicativo.' }));
+    });
+  }
+
+  function desenharCorpoBiblioteca() {
+    var corpo = $('#bib-corpo');
+    pararMiniaturas();
+    corpo.innerHTML = '';
+    if (bibTermo.trim()) { desenharBuscaBiblioteca(corpo, bibTermo.trim()); return; }
+    var mod = bibNav.modulo ? bib.modulos[bibNav.modulo] : null;
+    if (mod && bibNav.aula) {
+      if (bibNav.aula.tipo === 'teoria') {
+        var t = bib.teoriaPorId[bibNav.aula.id];
+        if (t) { desenharAulaDeTeoria(corpo, mod, t); return; }
+      } else if (mod.listas[bibNav.aula.slug]) {
+        desenharListaDeExercicios(corpo, mod, mod.listas[bibNav.aula.slug]);
+        return;
+      }
+      bibNav.aula = null;
+    }
+    if (mod) { desenharModulo(corpo, mod); return; }
+    desenharModulosDaSerie(corpo);
+  }
+
+  function irNaBiblioteca(nav) {
+    bibNav.modulo = nav.modulo === undefined ? bibNav.modulo : nav.modulo;
+    bibNav.aula = nav.aula === undefined ? bibNav.aula : nav.aula;
+    if (nav.serie) bibNav.serie = nav.serie;
+    desenharCorpoBiblioteca();
+    var cont = $('.conteudo');
+    if (cont) cont.scrollTop = 0;
+  }
+
+  function linhaBib(titulo, detalhe, aoTocar, extra) {
+    return el('div', { class: 'item-lista clicavel', role: 'button', tabindex: '0', aoClick: aoTocar }, [
+      el('div', { class: 'cresce' }, [
+        el('div', { class: 'nome', texto: titulo }),
+        detalhe ? el('div', { class: 'detalhe', texto: detalhe }) : null
+      ]),
+      extra || null,
+      el('span', { class: 'bib-seta', texto: '›', 'aria-hidden': 'true' })
+    ]);
+  }
+
+  function voltarBib(rotulo, aoTocar) {
+    return el('button', { type: 'button', class: 'btn pequeno bib-voltar', texto: '‹ ' + rotulo, aoClick: aoTocar });
+  }
+
+  function desenharModulosDaSerie(corpo) {
+    if (bib.listaSeries.length > 1) {
+      var chips = el('div', { class: 'chips-filtro bib-series', role: 'tablist' });
+      bib.listaSeries.forEach(function (s) {
+        chips.appendChild(el('button', {
+          type: 'button', class: 'chip-filtro' + (s === bibNav.serie ? ' ativo' : ''), texto: Biblioteca.nomeDaSerie(s),
+          'aria-selected': s === bibNav.serie ? 'true' : 'false',
+          aoClick: function () { irNaBiblioteca({ serie: s, modulo: null, aula: null }); }
+        }));
+      });
+      corpo.appendChild(chips);
+    } else if (bibNav.serie) {
+      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: Biblioteca.nomeDaSerie(bibNav.serie) }));
+    }
+    var mods = modulosDaSerie(bibNav.serie);
+    if (mods.portal.length) {
+      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Módulos' }));
+      mods.portal.forEach(function (m) {
+        var partes = [];
+        if (m.teorias.length) partes.push(plural(m.teorias.length, 'aula de teoria', 'aulas de teoria'));
+        if (m.ordemListas.length) partes.push(plural(m.ordemListas.length, 'lista', 'listas') + ', ' +
+          plural(contarItens(m), 'exercício', 'exercícios'));
+        corpo.appendChild(linhaBib(m.titulo, partes.join(' · '), function () {
+          irNaBiblioteca({ modulo: m.chave, aula: null });
+        }));
+      });
+    }
+    if (mods.banco.length) {
+      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Banco de Questões' }));
+      mods.banco.forEach(function (m) {
+        corpo.appendChild(linhaBib(m.titulo, plural(contarItens(m), 'problema', 'problemas'), function () {
+          irNaBiblioteca({ modulo: m.chave, aula: null });
+        }));
+      });
+    }
+    if (!mods.portal.length && !mods.banco.length) {
+      corpo.appendChild(el('div', { class: 'vazio', texto: 'Nenhum módulo desta série no tablet.' }));
+    }
+  }
+
+  function desenharModulo(corpo, mod) {
+    corpo.appendChild(voltarBib(Biblioteca.nomeDaSerie(bibNav.serie), function () { irNaBiblioteca({ modulo: null, aula: null }); }));
+    corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: mod.titulo }));
+    if (mod.teorias.length) {
+      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Teoria' }));
+      mod.teorias.forEach(function (t) {
+        corpo.appendChild(linhaBib(t.aula.titulo, plural(t.paginas.length, 'página', 'páginas'), function () {
+          irNaBiblioteca({ aula: { tipo: 'teoria', id: t.id } });
+        }));
+      });
+    }
+    if (mod.ordemListas.length) {
+      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: mod.banco ? 'Problemas' : 'Exercícios' }));
+      mod.ordemListas.forEach(function (l) {
+        corpo.appendChild(linhaBib(l.titulo, plural(l.itens.length, mod.banco ? 'problema' : 'exercício', mod.banco ? 'problemas' : 'exercícios'), function () {
+          irNaBiblioteca({ aula: { tipo: 'exercicios', slug: l.slug } });
+        }));
+      });
+    }
+  }
+
+  function desenharAulaDeTeoria(corpo, mod, t) {
+    corpo.appendChild(voltarBib(mod.titulo, function () { irNaBiblioteca({ aula: null }); }));
+    corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: t.aula.titulo }));
+    var autoria = [t.aula.autor, t.aula.revisor ? 'revisão: ' + t.aula.revisor : null].filter(Boolean).join(', ');
+    if (autoria) corpo.appendChild(el('p', { class: 'ajuda bib-autoria', texto: autoria }));
+    var grade = el('div', { class: 'bib-grade bib-grade-paginas' });
+    t.paginas.forEach(function (p, i) {
+      grade.appendChild(el('button', {
+        type: 'button', class: 'bib-cartao', 'data-id': p.id,
+        aoClick: function () { verNaBiblioteca({ tipo: 'teoria', aula: t, indice: i }); }
+      }, [
+        miniaturaBib(t.pacote, p.asset, p.medidas, 360),
+        el('div', { class: 'bib-rotulo', texto: p.capa ? 'Capa' : 'Página ' + p.n })
+      ]));
+    });
+    corpo.appendChild(grade);
+    observarMiniaturas(grade);
+  }
+
+  function rotuloDificuldade(it) {
+    var nome = NOME_DIFICULDADE[it.dificuldade];
+    if (!nome) return null;
+    return nome + (it.dificuldade_origem === 'curadoria' ? ', revisada' : '');
+  }
+
+  function desenharListaDeExercicios(corpo, mod, lista) {
+    corpo.appendChild(voltarBib(mod.titulo, function () { irNaBiblioteca({ aula: null }); }));
+    corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: lista.titulo }));
+    var grade = el('div', { class: 'bib-grade bib-grade-exercicios' });
+    lista.itens.forEach(function (it, i) {
+      var tags = [
+        it.formato === 'objetiva' ? el('span', { class: 'tag', texto: 'Objetiva' }) : null,
+        rotuloDificuldade(it) ? el('span', { class: 'tag serie', texto: rotuloDificuldade(it) }) : null,
+        it.sem_solucao ? el('span', { class: 'tag excecao', texto: 'sem solução' }) : null
+      ];
+      grade.appendChild(el('button', {
+        type: 'button', class: 'bib-cartao', 'data-id': it.id,
+        aoClick: function () { verNaBiblioteca({ tipo: 'exercicio', lista: lista, indice: i }); }
+      }, [
+        el('div', { class: 'bib-rotulo bib-numero', texto: (mod.banco ? 'Problema ' : 'Exercício ') + it.numero +
+          (it.titulo ? ': ' + it.titulo : '') }),
+        miniaturaBib(it.pacote, it.assets.enunciado, it.medidas && it.medidas.enunciado, 520),
+        el('div', { class: 'bib-tags' }, tags),
+        it.origem_citada ? el('div', { class: 'bib-origem', texto: it.origem_citada }) : null
+      ]));
+    });
+    corpo.appendChild(grade);
+    observarMiniaturas(grade);
+  }
+
+  // ---------- busca ----------
+
+  function ligarBuscaBiblioteca() {
+    var campo = $('#busca-biblioteca');
+    var limpar = $('#limpar-busca-biblioteca');
+    if (!campo || campo._ouvindo) return;
+    campo._ouvindo = true;
+    var espera = null;
+    campo.addEventListener('input', function () {
+      clearTimeout(espera);
+      limpar.style.display = campo.value ? '' : 'none';
+      espera = setTimeout(function () {
+        bibTermo = campo.value;
+        desenharCorpoBiblioteca();
+      }, 180);
+    });
+    limpar.addEventListener('click', function () {
+      campo.value = '';
+      limpar.style.display = 'none';
+      bibTermo = '';
+      desenharCorpoBiblioteca();
+    });
+  }
+
+  function normalizarBusca(t) {
+    return ' ' + Busca.semAcento(t).replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
+  }
+
+  /* O que ela digitou e as formas que os apelidos do pacote dão a ele:
+   * "bhaskara" também procura "equação do segundo grau". */
+  function termosComApelidos(termo) {
+    var norm = normalizarBusca(termo);
+    var saida = [termo];
+    Object.keys(bib.apelidos).forEach(function (k) {
+      var nk = normalizarBusca(k);
+      if (nk.trim() && norm.indexOf(nk) >= 0) {
+        bib.apelidos[k].forEach(function (troca) { saida.push(norm.replace(nk, ' ' + troca + ' ').trim()); });
+      }
+    });
+    return saida;
+  }
+
+  /* O índice é partido por grupo e cada grupo é procurado sozinho. Junto,
+   * o corte de cauda do Busca (o que fica abaixo de 12% do melhor sai) fazia
+   * o título de um módulo derrubar o problema do Banco que só cita o assunto
+   * no enunciado: cada grupo tem de ser julgado entre os seus. */
+  function indicesPorGrupo() {
+    if (bib.indicesPorGrupo) return bib.indicesPorGrupo;
+    var g = { modulo: [], teoria: [], exercicio: [], banco: [] };
+    bib.indice.forEach(function (r) {
+      if (r.k === 'modulo') g.modulo.push(r);
+      else if (r.k === 'teoria') g.teoria.push(r);
+      else if (r.k === 'exercicio') (String(r.i).indexOf('banco:') === 0 ? g.banco : g.exercicio).push(r);
+    });
+    bib.indicesPorGrupo = g;
+    return g;
+  }
+
+  function procurarNaBiblioteca(termo) {
+    var indices = indicesPorGrupo();
+    var termos = termosComApelidos(termo);
+    var grupos = { modulo: [], teoria: [], exercicio: [], banco: [] };
+    Object.keys(indices).forEach(function (nome) {
+      if (!indices[nome].length) return;
+      var nota = {};
+      termos.forEach(function (t) {
+        var r = Busca.procurar(indices[nome], t, { limite: 100000 });
+        ((r && r.itens) || []).forEach(function (x) {
+          if (nota[x.id] === undefined || x.nota > nota[x.id]) nota[x.id] = x.nota;
+        });
+      });
+      Object.keys(nota).forEach(function (id) {
+        if (nome === 'modulo') {
+          var mod = moduloDoRegistroDeBusca(id);
+          if (mod) grupos.modulo.push({ id: mod.chave, nota: nota[id] });
+        } else if (nome === 'teoria') {
+          if (bib.teoriaPorId[id]) grupos.teoria.push({ id: id, nota: nota[id] });
+        } else if (bib.itemPorId[id]) {
+          grupos[nome].push({ id: id, nota: nota[id] });
+        }
+      });
+    });
+    Object.keys(grupos).forEach(function (g) {
+      grupos[g].sort(function (a, b) { return b.nota - a.nota || ordemNaArvore(a.id) - ordemNaArvore(b.id) || (a.id < b.id ? -1 : 1); });
+    });
+    return grupos;
+  }
+
+  function ordemNaArvore(id) {
+    var t = bib.teoriaPorId[id] || bib.itemPorId[id];
+    if (!t) return 0;
+    return ((t.aula && t.aula.n) || 0) * 1000 + (t.numero || 0);
+  }
+
+  /* O registro de módulo no índice tem o id "<serie>:<modulo>", que é a
+   * chave da árvore. Se o gerador escrever outro formato (o Banco, por
+   * exemplo), o módulo é o dos exercícios cujo id começa por ele. */
+  function moduloDoRegistroDeBusca(id) {
+    if (bib.modulos[id]) return bib.modulos[id];
+    var prefixo = id + ':';
+    var chaves = Object.keys(bib.itemPorId);
+    for (var i = 0; i < chaves.length; i++) {
+      if (chaves[i].indexOf(prefixo) === 0) {
+        var it = bib.itemPorId[chaves[i]];
+        return bib.modulos[it.serie + ':' + it.modulo.slug] || null;
+      }
+    }
+    return null;
+  }
+
+  function desenharBuscaBiblioteca(corpo, termo) {
+    var g = procurarNaBiblioteca(termo);
+    var total = g.modulo.length + g.teoria.length + g.exercicio.length + g.banco.length;
+    if (!total) {
+      corpo.appendChild(el('div', { class: 'vazio', texto: 'Nada na biblioteca casou com "' + termo + '".' }));
+      return;
+    }
+    if (g.modulo.length) {
+      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Módulos' }));
+      g.modulo.forEach(function (x) {
+        var m = bib.modulos[x.id];
+        corpo.appendChild(linhaBib(m.titulo, Biblioteca.nomeDaSerie(m.serie), function () {
+          abrirDaBusca({ serie: primeiraSerie(m), modulo: m.chave, aula: null });
+        }));
+      });
+    }
+    if (g.teoria.length) {
+      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Teoria' }));
+      g.teoria.forEach(function (x) {
+        var t = bib.teoriaPorId[x.id];
+        var m = bib.modulos[t.serie + ':' + t.modulo.slug];
+        corpo.appendChild(linhaBib(t.aula.titulo, t.modulo.titulo + ', ' + Biblioteca.nomeDaSerie(t.serie) + ', ' +
+          plural(t.paginas.length, 'página', 'páginas'), function () {
+          abrirDaBusca({ serie: primeiraSerie(m), modulo: m.chave, aula: { tipo: 'teoria', id: t.id } });
+        }));
+      });
+    }
+    if (g.exercicio.length) {
+      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Exercícios' }));
+      // um por lista, na ordem da melhor nota de cada uma
+      var listas = [], vistas = {};
+      g.exercicio.forEach(function (x) {
+        var it = bib.itemPorId[x.id];
+        var chave = it.serie + ':' + it.modulo.slug + ':' + it.aula.slug;
+        if (!vistas[chave]) { vistas[chave] = { it: it, n: 0 }; listas.push(vistas[chave]); }
+        vistas[chave].n++;
+      });
+      listas.forEach(function (l) {
+        var m = bib.modulos[l.it.serie + ':' + l.it.modulo.slug];
+        var lista = m.listas[l.it.aula.slug];
+        corpo.appendChild(linhaBib(lista.titulo, l.it.modulo.titulo + ', ' + Biblioteca.nomeDaSerie(l.it.serie) + ', ' +
+          plural(lista.itens.length, 'exercício', 'exercícios'), function () {
+          abrirDaBusca({ serie: primeiraSerie(m), modulo: m.chave, aula: { tipo: 'exercicios', slug: lista.slug } });
+        }));
+      });
+    }
+    if (g.banco.length) {
+      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Banco de Questões' }));
+      g.banco.forEach(function (x) {
+        var it = bib.itemPorId[x.id];
+        var m = bib.modulos[it.serie + ':' + it.modulo.slug];
+        var lista = m.listas[it.aula.slug];
+        corpo.appendChild(linhaBib(it.titulo || ('Problema ' + it.numero), it.modulo.titulo + ', ' + it.aula.titulo +
+          ', problema ' + it.numero, function () {
+          verNaBiblioteca({ tipo: 'exercicio', lista: lista, indice: lista.itens.indexOf(it) });
+        }));
+      });
+    }
+  }
+
+  function primeiraSerie(m) {
+    if (m.series[bibNav.serie]) return bibNav.serie;
+    return bib.listaSeries.filter(function (s) { return m.series[s]; })[0] || bibNav.serie;
+  }
+
+  /* Tocar num resultado sai da busca e leva ao lugar dele na árvore. */
+  function abrirDaBusca(nav) {
+    bibTermo = '';
+    var campo = $('#busca-biblioteca');
+    if (campo) campo.value = '';
+    if ($('#limpar-busca-biblioteca')) $('#limpar-busca-biblioteca').style.display = 'none';
+    irNaBiblioteca(nav);
+  }
+
+  // ---------- miniaturas ----------
+
+  /* Uma caixa com a proporção do recorte, reservada antes de a imagem
+   * existir, para a lista não pular enquanto as miniaturas chegam. */
+  function miniaturaBib(pacote, caminho, medidas, larguraPx) {
+    var wpt = (medidas && medidas.largura_pt) || 612;
+    var hpt = (medidas && medidas.altura_pt) || 792;
+    var img = el('img', { class: 'bib-mini', alt: '', draggable: 'false', style: 'aspect-ratio:' + wpt + ' / ' + hpt });
+    img._bib = { pacote: pacote, versao: bib.versaoDe[pacote], caminho: caminho, wpt: wpt, hpt: hpt, largura: larguraPx };
+    return img;
+  }
+
+  function pararMiniaturas() {
+    if (bibObservador) { bibObservador.disconnect(); bibObservador = null; }
+    bibFila = [];
+  }
+
+  function observarMiniaturas(caixa) {
+    var imgs = Array.prototype.slice.call(caixa.querySelectorAll('img.bib-mini'));
+    if (typeof IntersectionObserver !== 'function') { imgs.forEach(pedirMiniatura); return; }
+    bibObservador = new IntersectionObserver(function (entradas, obs) {
+      entradas.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        obs.unobserve(e.target);
+        pedirMiniatura(e.target);
+      });
+    }, { root: $('.conteudo'), rootMargin: '300px 0px' });
+    imgs.forEach(function (i) { bibObservador.observe(i); });
+  }
+
+  function pedirMiniatura(img) {
+    if (img._pedida) return;
+    img._pedida = true;
+    bibFila.push(img);
+    andarFilaDeMiniaturas();
+  }
+
+  function andarFilaDeMiniaturas() {
+    while (bibDesenhando < MAX_MINIATURAS_JUNTAS && bibFila.length) {
+      var img = bibFila.shift();
+      if (!img.isConnected) continue;
+      bibDesenhando++;
+      miniaturaPronta(img._bib).then(function (alvo) {
+        return function (dataUrl) { alvo.src = dataUrl; alvo.classList.add('pronta'); };
+      }(img), function (alvo) {
+        return function () { alvo.classList.add('falhou'); };
+      }(img)).then(function () {
+        bibDesenhando--;
+        andarFilaDeMiniaturas();
+      });
+    }
+  }
+
+  function miniaturaPronta(m) {
+    var chave = Store.chaveMiniatura(m.pacote, m.versao, m.caminho) + '#' + m.largura;
+    return Store.lerMidia(chave).then(function (guardada) {
+      if (guardada && guardada.dataUrl) return guardada.dataUrl;
+      var altura = Math.max(1, Math.round(m.largura * m.hpt / m.wpt));
+      return desenharAssetBib(m.pacote, m.caminho, m.largura, altura).then(function (c) {
+        var dataUrl = c.toDataURL('image/jpeg', 0.82);
+        // o pacote foi reimportado enquanto desenhava: mostra, mas não guarda
+        if (!bib || bib.versaoDe[m.pacote] !== m.versao) return dataUrl;
+        return Store.salvarMidia(chave, { dataUrl: dataUrl, w: c.width, h: c.height })
+          .catch(function () { /* sem espaço: mostra sem guardar */ })
+          .then(function () { return dataUrl; });
+      });
+    });
+  }
+
+  /* O SVG do pacote desenhado num canvas de fundo branco, no tamanho pedido.
+   * Nunca altera o asset. */
+  function desenharAssetBib(pacote, caminho, largura, altura) {
+    return Store.lerAssetBiblioteca(pacote, caminho).then(function (blob) {
+      if (!blob) throw new Error('imagem ausente');
+      return new Promise(function (resolve, reject) {
+        var url = URL.createObjectURL(blob);
+        var img = new Image();
+        img.onload = function () {
+          var c = document.createElement('canvas');
+          c.width = largura; c.height = altura;
+          var ctx = c.getContext('2d');
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, largura, altura);
+          ctx.drawImage(img, 0, 0, largura, altura);
+          URL.revokeObjectURL(url);
+          resolve(c);
+        };
+        img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('imagem ilegível')); };
+        img.src = url;
+      });
+    });
+  }
+
+  // ---------- ver em tela cheia ----------
+
+  var bibVendo = null;
+  var bibUrlVendo = null;
+  var bibVezDoVisor = 0;
+
+  /* alvo: { tipo: 'teoria', aula, indice } ou { tipo: 'exercicio', lista, indice } */
+  function verNaBiblioteca(alvo) {
+    bibVendo = { tipo: alvo.tipo, aula: alvo.aula, lista: alvo.lista, indice: alvo.indice, solucao: false };
+    desenharVisor();
+    abrirModal('modal-biblioteca');
+  }
+
+  function pecaVista() {
+    var v = bibVendo;
+    if (v.tipo === 'teoria') {
+      var p = v.aula.paginas[v.indice];
+      return { pacote: v.aula.pacote, caminho: p.asset, medidas: p.medidas, forma: 'pagina',
+        titulo: v.aula.aula.titulo + ', ' + (p.capa ? 'capa' : 'página ' + p.n) + ' de ' + v.aula.paginas.length,
+        total: v.aula.paginas.length };
+    }
+    var it = v.lista.itens[v.indice];
+    var sol = v.solucao && it.assets.solucao;
+    return { pacote: it.pacote, caminho: sol ? it.assets.solucao : it.assets.enunciado,
+      medidas: (sol ? it.medidas && it.medidas.solucao : it.medidas && it.medidas.enunciado) || null, forma: 'recorte',
+      titulo: v.lista.titulo + ', ' + (eDoBanco(it) ? 'problema ' : 'exercício ') + it.numero +
+        ' (' + (v.indice + 1) + ' de ' + v.lista.itens.length + ')' + (sol ? ', solução' : ''),
+      total: v.lista.itens.length, item: it };
+  }
+
+  function desenharVisor() {
+    var peca = pecaVista();
+    $('#titulo-modal-biblioteca').textContent = peca.titulo;
+    var corpo = $('#corpo-modal-biblioteca');
+    corpo.innerHTML = '';
+    if (bibUrlVendo) { URL.revokeObjectURL(bibUrlVendo); bibUrlVendo = null; }
+    var larguraMax = peca.forma === 'pagina' ? 900 : Math.round(((peca.medidas && peca.medidas.largura_pt) || 262) * 2.4);
+    var img = el('img', { id: 'bib-imagem-cheia', class: 'bib-cheia', alt: peca.titulo,
+      style: 'max-width:' + larguraMax + 'px' + (peca.medidas ? ';aspect-ratio:' + peca.medidas.largura_pt + ' / ' + peca.medidas.altura_pt : '') });
+    corpo.appendChild(img);
+    if (peca.item && peca.item.origem_citada) {
+      corpo.appendChild(el('div', { class: 'bib-origem', style: 'text-align:center', texto: peca.item.origem_citada }));
+    }
+    var vez = ++bibVezDoVisor;
+    Store.lerAssetBiblioteca(peca.pacote, peca.caminho).then(function (blob) {
+      // ela pode ter andado para outra página enquanto esta era lida
+      if (!blob || vez !== bibVezDoVisor) return;
+      bibUrlVendo = URL.createObjectURL(blob);
+      img.src = bibUrlVendo;
+    });
+    var anterior = $('#bib-anterior'), proxima = $('#bib-proxima'), sol = $('#bib-solucao');
+    anterior.disabled = bibVendo.indice <= 0;
+    proxima.disabled = bibVendo.indice >= peca.total - 1;
+    if (bibVendo.tipo === 'exercicio' && peca.item.assets.solucao) {
+      sol.style.display = '';
+      sol.textContent = bibVendo.solucao ? 'Ver enunciado' : 'Ver solução';
+    } else {
+      sol.style.display = 'none';
+    }
+    corpo.scrollTop = 0;
+  }
+
+  function andarNoVisor(passo) {
+    if (!bibVendo) return;
+    var total = bibVendo.tipo === 'teoria' ? bibVendo.aula.paginas.length : bibVendo.lista.itens.length;
+    var novo = bibVendo.indice + passo;
+    if (novo < 0 || novo >= total) return;
+    bibVendo.indice = novo;
+    bibVendo.solucao = false;
+    desenharVisor();
+  }
+
+  function fecharVisor() {
+    fecharModal('modal-biblioteca');
+  }
+
+  function soltarVisor() {
+    if (bibUrlVendo) { URL.revokeObjectURL(bibUrlVendo); bibUrlVendo = null; }
+    bibVendo = null;
+    bibVezDoVisor++;
+  }
+
+  // ---------- abrir como folha ----------
+
+  /* A página (ou o recorte) vira imagem colada numa página nova da folha da
+   * aula, pronta para a S Pen. A imagem é o SVG desenhado num canvas e
+   * guardado como JPEG em 'midias', do mesmo jeito que uma foto inserida à
+   * mão: a folha não sabe que veio da biblioteca, e continua abrindo sem ela. */
+  var folhaPendenteDaBiblioteca = null;
+
+  function escolherAulaParaFolha() {
+    if (!bibVendo) return;
+    var peca = pecaVista();
+    var alvo = { pacote: peca.pacote, caminho: peca.caminho, medidas: peca.medidas, forma: peca.forma, titulo: peca.titulo };
+    var corpo = $('#corpo-modal-bib-folha');
+    corpo.innerHTML = '';
+    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', texto: peca.titulo }));
+    var hoje = Core.hojeIso();
+    var aulas = db.aulas.filter(function (a) { return alunoPorId(a.alunoId); });
+    var doDia = aulas.filter(function (a) { return a.data === hoje; })
+      .sort(function (a, b) { return String(a.hora || '').localeCompare(String(b.hora || '')); });
+    var dist = function (a) { return Math.abs(Core.dataLocal(a.data) - Core.dataLocal(hoje)); };
+    var perto = aulas.filter(function (a) { return a.data !== hoje && dist(a) <= 14 * 86400000; })
+      .sort(function (a, b) { return dist(a) - dist(b) || (a.data < b.data ? 1 : -1); }).slice(0, 12);
+    function linhaAula(a) {
+      var aluno = alunoPorId(a.alunoId);
+      return linhaBib(aluno.nome, Core.ddmmaaaa(a.data) + (a.hora ? ', ' + a.hora : '') + (a.temNota ? ', já tem folha' : ''),
+        function () { colarNaFolhaDaAula(a.id, alvo); });
+    }
+    corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Aulas de hoje' }));
+    if (doDia.length) doDia.forEach(function (a) { corpo.appendChild(linhaAula(a)); });
+    else corpo.appendChild(el('p', { class: 'ajuda', texto: 'Nenhuma aula marcada para hoje.' }));
+    corpo.appendChild(el('div', { class: 'barra', style: 'margin:6px 0 4px' }, [
+      el('button', { type: 'button', class: 'btn', id: 'bib-nova-aula', texto: 'Nova aula hoje', aoClick: function () {
+        if (!db.alunos.length) { avisar('Cadastre um aluno antes de marcar a primeira aula.'); return; }
+        fecharModal('modal-bib-folha');
+        fecharVisor();
+        abrirAula(null, hoje);
+        folhaPendenteDaBiblioteca = alvo;
+        // nesse caminho, depois de salvar abre a folha, e não a janela da aula
+        var ajudaPadrao = $('#ajuda-aula-nova');
+        if (ajudaPadrao) ajudaPadrao.remove();
+        var corpoAula = $('#corpo-modal-aula');
+        if (corpoAula) {
+          corpoAula.insertBefore(el('div', { class: 'faixa-info', id: 'aviso-folha-da-biblioteca' }, [
+            el('strong', { texto: 'Da biblioteca: ' }),
+            document.createTextNode('ao salvar, "' + alvo.titulo + '" vai para a folha desta aula.')
+          ]), corpoAula.firstChild);
+        }
+      } })
+    ]));
+    if (perto.length) {
+      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Outras aulas perto de hoje' }));
+      perto.forEach(function (a) { corpo.appendChild(linhaAula(a)); });
+    }
+    abrirModal('modal-bib-folha');
+  }
+
+  /* Onde a imagem entra na folha (1000 por 1343 unidades). A página de teoria
+   * ocupa a folha inteira com uma margem pequena; o recorte entra no alto, no
+   * tamanho em que estava impresso, com a folha livre embaixo para resolver. */
+  function posicaoNaFolha(alvo) {
+    var L = Draw.FOLHA_L, A = Draw.FOLHA_A;
+    var wpt = (alvo.medidas && alvo.medidas.largura_pt) || 612;
+    var hpt = (alvo.medidas && alvo.medidas.altura_pt) || 792;
+    var esc;
+    if (alvo.forma === 'pagina') {
+      esc = Math.min((L - 32) / wpt, (A - 32) / hpt);
+      return { x: (L - wpt * esc) / 2, y: 16, w: wpt * esc, h: hpt * esc };
+    }
+    esc = Math.min(2.05, (L - 80) / wpt, (A * 0.6) / hpt);
+    return { x: 40, y: 40, w: wpt * esc, h: hpt * esc };
+  }
+
+  /* Um toque de cada vez: no tablet o desenho da página leva alguns segundos,
+   * e um segundo toque colaria a mesma página duas vezes. */
+  var colandoNaFolha = false;
+
+  function colarNaFolhaDaAula(aulaId, alvo) {
+    var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
+    if (!aula) return Promise.resolve();
+    if (colandoNaFolha) {
+      avisar('Ainda estou colando a página anterior. Espere um instante e tente de novo.');
+      return Promise.resolve();
+    }
+    colandoNaFolha = true;
+    var pos = posicaoNaFolha(alvo);
+    // duas vezes a resolução da folha, com teto, para a letra do recorte ficar nítida
+    var escalaPx = Math.min(2, 2400 / Math.max(pos.w, pos.h));
+    var lpx = Math.round(pos.w * escalaPx), apx = Math.round(pos.h * escalaPx);
+    var ref = Core.uid();
+    var indice = 0;
+    return desenharAssetBib(alvo.pacote, alvo.caminho, lpx, apx).then(function (c) {
+      /* Enquanto a página desenhava ela pode ter tocado Desfazer (a série
+       * recém-criada, por exemplo): sem a aula, nada é gravado. */
+      aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
+      if (!aula) { var sem = new Error('aula desfeita'); sem.desfeita = true; throw sem; }
+      return Store.salvarMidia(ref, { dataUrl: c.toDataURL('image/jpeg', 0.9), w: lpx, h: apx });
+    }).then(function () {
+      return Store.lerNota(aulaId);
+    }).then(function (nota) {
+      var pagina = { fundo: 'branco', itens: [{ t: 'imagem', ref: ref, x: pos.x, y: pos.y, w: pos.w, h: pos.h }] };
+      var temConteudo = nota && nota.paginas && nota.paginas.some(function (p) { return (p.itens || []).length; });
+      if (temConteudo) nota.paginas.push(pagina);
+      else nota = { paginas: [pagina] };
+      indice = nota.paginas.length - 1;
+      return Store.salvarNota(aulaId, nota);
+    }).then(function () {
+      aula.temNota = true;
+      return salvar();
+    }).then(function () {
+      fecharModal('modal-bib-folha');
+      fecharVisor();
+      desenharAgenda();
+      abrirEditorNota(aulaId, indice);
+      avisar('Colado na folha da aula (folha ' + (indice + 1) + ').');
+    }).catch(function (e) {
+      if (e && e.desfeita) return;
+      avisar('Não consegui colar na folha. Tente de novo.');
+    }).then(function () {
+      colandoNaFolha = false;
+    });
   }
 
   function liberarEspaco() {

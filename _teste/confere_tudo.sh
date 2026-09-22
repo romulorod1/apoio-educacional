@@ -307,6 +307,12 @@ roda "testa_biblioteca_offline --envenenado-activate" node "_teste/testa_bibliot
 # e o teste tem que enxergar o pacote errado entrando.
 roda "biblioteca importar"                      node "_teste/testa_biblioteca_importar.js"
 roda "biblioteca importar --envenenado-hash"    node "_teste/testa_biblioteca_importar.js" --envenenado-hash
+# FRENTE B: a aba Biblioteca (sem pacote, "Em construcao"; com pacote, serie,
+# modulo, aula, miniaturas sob demanda, lista de 40 abaixo de 2 s, tela cheia,
+# busca "bhaskara" agrupada, abrir como folha). O modo envenenado serve um app.js
+# que ignora os apelidos do pacote, e "bhaskara" tem de perder as listas.
+roda "biblioteca navegar"                       node "_teste/testa_biblioteca_navegar.js"
+roda "biblioteca navegar --envenenado-apelidos" node "_teste/testa_biblioteca_navegar.js" --envenenado-apelidos
 
 roda "painel de valores"                        node "_teste/testa_painel_valores.js"
 roda "painel de valores --envenenado-aberto"    node "_teste/testa_painel_valores.js" --envenenado-aberto
