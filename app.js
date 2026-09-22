@@ -2134,20 +2134,26 @@
         ].filter(Boolean)),
         podeMaterial ? el('button', {
           type: 'button', class: 'btn pequeno', texto: 'Material',
-          aoClick: function () {
-            if (pelaBiblioteca && !registro && !modAcervo) {
-              abrirBibliotecaDoAssunto(t, aula);
-              return;
-            }
-            /* Assunto com material autoral: a biblioteca só toma o lugar dele
-             * quando tem o assunto (um módulo que casa todas as palavras do
-             * título); senão o toque segue para o material de sempre, e não
-             * para uma busca vazia. */
-            var vaiParaBiblioteca = pelaBiblioteca
-              ? bibliotecaTemOAssunto(t.titulo) : Promise.resolve(false);
-            vaiParaBiblioteca.then(function (tem) {
-              if (tem) { abrirBibliotecaDoAssunto(t, aula); return; }
-              materialDeSempre();
+          aoClick: function (ev) {
+            /* A biblioteca só toma o toque quando tem o assunto (um módulo que
+             * casa todas as palavras do título). Senão: o material autoral de
+             * sempre, se houver; e, se não houver, um aviso, sem tirá-la da aula
+             * para uma busca vazia. A primeira consulta abre o índice da
+             * biblioteca, então o botão avisa que está abrindo. */
+            var botao = ev && ev.currentTarget;
+            if (!pelaBiblioteca) { materialDeSempre(); return; }
+            if (botao) { botao.disabled = true; botao.textContent = 'Abrindo...'; }
+            bibliotecaTemOAssunto(t.titulo).then(function (tem) {
+              if (botao) { botao.disabled = false; botao.textContent = 'Material'; }
+              if (tem) {
+                abrirBibliotecaDoAssunto(t, aula);
+                if (registro || modAcervo) {
+                  avisar('Abri a biblioteca da OBMEP. O seu material deste assunto continua em "Material de aula", na janela da aula.');
+                }
+                return;
+              }
+              if (registro || modAcervo) { materialDeSempre(); return; }
+              avisar('A biblioteca não tem "' + t.titulo + '". Procure por outra palavra na aba Biblioteca, ou navegue pela série.');
             });
           }
         }) : null,
@@ -12028,9 +12034,22 @@
     var aluno = aula ? alunoPorId(aula.alunoId) : null;
     caixa.hidden = !aluno;
     if (!aluno) { bibContexto = null; return; }
-    caixa.appendChild(el('span', { texto: 'Material para a aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + ').' }));
-    caixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-sair-contexto', texto: 'Não é para esta aula',
-      aoClick: function () { bibContexto = null; desenharContextoBiblioteca(); } }));
+    var quando = aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + ')';
+    caixa.appendChild(el('span', { texto: bibContexto.anexado
+      ? 'Material anexado na aula de ' + quando + '.' : 'Material para a aula de ' + quando + '.' }));
+    caixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-voltar-aula', texto: 'Voltar para a aula',
+      aoClick: function () { var id = bibContexto.aulaId; bibContexto = null; desenharContextoBiblioteca(); abrirAula(id); } }));
+    if (!bibContexto.anexado) {
+      caixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-sair-contexto', texto: 'Não é para esta aula',
+        aoClick: function () {
+          // sem a aula de origem, o filtro dela também sai
+          bibContexto = null;
+          bibFiltroAluno = '';
+          desenharContextoBiblioteca();
+          var sel = $('#bib-filtro-aluno');
+          if (sel) { sel.value = ''; sel.dispatchEvent(new Event('change')); }
+        } }));
+    }
   }
 
   /* "Ainda não usei com este aluno": esconde da lista os exercícios que já
@@ -12038,7 +12057,7 @@
    * desfeita pelo "Voltar a este ponto") não conta. */
   function barraFiltroDeUso(grade) {
     var sel = el('select', { id: 'bib-filtro-aluno', 'aria-label': 'Ainda não usei com' });
-    sel.appendChild(el('option', { value: '', texto: 'qualquer aluno (mostrar todos)' }));
+    sel.appendChild(el('option', { value: '', texto: 'Todos os exercícios' }));
     db.alunos.slice().sort(function (a, b) { return String(a.nome).localeCompare(String(b.nome), 'pt-BR'); })
       .forEach(function (a) { sel.appendChild(el('option', { value: a.id, texto: a.nome })); });
     sel.value = bibFiltroAluno && alunoPorId(bibFiltroAluno) ? bibFiltroAluno : '';
@@ -12415,7 +12434,7 @@
      * sozinha, o material podia ir para a aula de outro aluno por distração.
      * A exceção é a aula de onde ela veio pelo botão Material: essa escolha ela
      * já fez, e a faixa no alto da aba diz qual é. */
-    if (bibContexto) {
+    if (bibContexto && !bibContexto.anexado) {
       var daAula = listaAulas.querySelector('[data-aula="' + bibContexto.aulaId + '"]');
       if (!daAula) {
         var aulaCtx = db.aulas.filter(function (a) { return a.id === bibContexto.aulaId; })[0];
@@ -12594,7 +12613,8 @@
          * para ela gerar o mesmo material para outra aula. */
         var devolver = desmarcarDepoisDeAnexar();
         // o material da aula de origem foi feito: ela não fica escolhida para o próximo
-        if (bibContexto && bibContexto.aulaId === aula.id) { bibContexto = null; desenharContextoBiblioteca(); }
+        // anexado: a faixa fica para ela voltar à aula, mas a aula não vem mais escolhida no próximo material
+        if (bibContexto && bibContexto.aulaId === aula.id) { bibContexto.anexado = true; desenharContextoBiblioteca(); }
         var desmarcada = ' A seleção foi desmarcada.';
         /* "Marcar de novo", e não "Desfazer": no app, Desfazer desfaz a ação do
          * aviso, e aqui ela acharia que tirou o anexo da aula. */
@@ -12889,7 +12909,7 @@
     var g = procurarNaBiblioteca(termo);
     var total = g.modulo.length + g.teoria.length + g.exercicio.length + g.banco.length;
     if (!total) {
-      corpo.appendChild(el('div', { class: 'vazio', texto: 'Nada na biblioteca casou com "' + termo + '".' }));
+      corpo.appendChild(el('div', { class: 'vazio', texto: 'A biblioteca não tem nada com "' + termo + '". Procure por outra palavra, ou navegue pela série.' }));
       return;
     }
     if (g.modulo.length) {

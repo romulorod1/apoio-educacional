@@ -1400,7 +1400,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .bib-filtro-uso { gap: 10px; flex-wrap: wrap; margin: 6px 0 2px; }
 .bib-filtro-rotulo { font-weight: 700; color: var(--navy); font-size: 14px; }
 #bib-filtro-aluno { min-height: 44px; max-width: 260px; }
-.bib-filtro-info { margin: 0; }
+.bib-filtro-info { margin: 0; color: var(--navy); font-weight: 600; }
 .bib-celula[hidden] { display: none; }
 .bib-carrinho-texto { font-weight: 700; }
 .bib-carrinho .btn:not(.principal) { background: transparent; color: var(--branco); border-color: rgba(255, 255, 255, .6); }

@@ -134,7 +134,9 @@ const lerUso = pag => pag.evaluate(() => Store.usoDaBiblioteca());
       duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', notaPrivada: '', temNota: false, anexos: [],
       temas: [{ titulo: 'Bhaskara', fonte: 'livre' },
         // tema autoral que o pacote do 9º ano não tem: o Material tem de seguir para o material de sempre
-        { id: 'MAT06-05', titulo: 'Frações: o que são e como comparar', lingua: 'pt' }] });
+        { id: 'MAT06-05', titulo: 'Frações: o que são e como comparar', lingua: 'pt' },
+        // assunto escrito por ela que a biblioteca não tem: aviso, e ela fica na aula
+        { titulo: 'Revisão para a prova', fonte: 'livre' }] });
     await Store.salvar(d);
     return { aluno: alunos[0].id, nome: alunos[0].nome, outro: alunos[1].id };
   }, hojeIso);
@@ -178,7 +180,20 @@ const lerUso = pag => pag.evaluate(() => Store.usoDaBiblioteca());
   await pag.evaluate(() => { const b = document.querySelector('#modal-tema [data-fechar]'); if (b) b.click(); });
   await pausa(300);
 
-  secao('1b. O botão Material da linha do assunto abre a biblioteca');
+  secao('1b. Assunto que a biblioteca não tem: aviso, e ela fica na aula');
+  await pag.evaluate(() => {
+    const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => /Revisão para a prova/.test(x.textContent));
+    Array.from(l.querySelectorAll('button')).find(x => x.textContent.trim() === 'Material').click();
+  });
+  const semAssunto = await esperar('aviso de assunto que não existe', () => pag.evaluate(() => ({
+    aviso: document.querySelector('#aviso').classList.contains('aberto') ? document.querySelector('#aviso-texto').textContent : '',
+    aula: document.querySelector('#modal-aula').classList.contains('aberto'),
+    aba: document.querySelector('#abas .aba.ativa').dataset.tela
+  })), v => v && /^A biblioteca não tem/.test(v.aviso), 8000);
+  conf('o aviso diz que a biblioteca não tem o assunto', semAssunto.ok, true);
+  conf('e ela continua na aula', semAssunto.valor && semAssunto.valor.aula && semAssunto.valor.aba !== 'biblioteca', true);
+
+  secao('1c. O botão Material da linha do assunto abre a biblioteca');
   await pag.evaluate(() => {
     const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => /Bhaskara/.test(x.textContent));
     Array.from(l.querySelectorAll('button')).find(x => x.textContent.trim() === 'Material').click();
@@ -223,7 +238,9 @@ const lerUso = pag => pag.evaluate(() => Store.usoDaBiblioteca());
 
   // ================================================================
   secao('4. De volta à lista: os usados somem para aquele aluno');
-  conf('depois de anexar, a faixa da aula de origem sumiu', await pag.evaluate(() => document.querySelector('#bib-contexto').hidden), true);
+  const depois = await pag.evaluate(() => ({ texto: document.querySelector('#bib-contexto').innerText,
+    voltar: !!document.querySelector('#bib-voltar-aula'), sair: !!document.querySelector('#bib-sair-contexto') }));
+  conf('depois de anexar, a faixa diz que anexou e oferece voltar para a aula', /^Material anexado na aula de /.test(depois.texto) && depois.voltar && !depois.sair, true);
   await H.irParaAba(pag, 'agenda');
   await H.irParaAba(pag, 'biblioteca');
   await esperar('lista de novo', () => pag.evaluate(() => !!document.querySelector('#bib-filtro-aluno')), v => v === true, 5000);
