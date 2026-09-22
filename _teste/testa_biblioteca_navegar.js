@@ -213,7 +213,20 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   conf('cartão: número de origem e dificuldade (aberta não leva etiqueta)', primeiro, 'Exercício 1 | Fácil');
   const quinto = await pag.evaluate(() => (c => Array.from(c.children).map(e => e.classList.contains('bib-tags') ? Array.from(e.children).map(t => t.textContent).join(' | ') : e.textContent).filter(Boolean).join(' | '))(document.querySelectorAll('#bib-corpo .bib-cartao')[4]));
   conf('origem citada em letra pequena', quinto, 'Exercício 5 | Fácil | Extraído da Olimpíada Sintética');
-  await pag.evaluate(() => { const c = document.querySelector('.conteudo'); c.scrollTop = c.scrollHeight; });
+  /* Rola uma tela de cada vez até o fim, como o dedo dela, e não num salto só.
+   * O salto do topo para o fim só deixava passar pela área visível as linhas do
+   * começo e do fim, e as do meio não eram pedidas nunca; enquanto a lista era
+   * curta, as duas janelas (com os 300 px de margem do observador) cobriam as
+   * 40. O PR C (B4, #46) pôs a caixa "No material" e a avaliação "Para mim:"
+   * embaixo de cada cartão, a lista ficou mais alta, e o salto passou a deixar
+   * o meio de fora. A exigência continua a mesma: as 40 desenhadas. */
+  await pag.evaluate(async () => {
+    const c = document.querySelector('.conteudo');
+    while (c.scrollTop + c.clientHeight < c.scrollHeight - 2) {
+      c.scrollTop += Math.round(c.clientHeight * 0.8);
+      await new Promise(r => setTimeout(r, 250));
+    }
+  });
   const todas = await esperar('ao rolar até o fim, as outras chegam', () => estadoMinis(pag), v => v && v.prontas === 40, 15000);
   conf('rolando, as 40 ficam desenhadas', todas.valor && todas.valor.prontas, 40);
   conf('nenhuma falhou', todas.valor && todas.valor.falhas, 0);
