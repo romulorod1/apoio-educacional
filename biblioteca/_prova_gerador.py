@@ -1129,16 +1129,29 @@ def trava_marca_no_pacote(p):
     return erros
 
 
-# O que a marca escreve, inclusive quebrado pela fonte embutida: nas sete series
-# saem "Portal OBMEP", "Portal da OBMEP", "ortal OBME", "tal OBM" e "da OB". A
-# regra abaixo olha o TEXTO da linha, e nao o corpo, a cor nem o angulo dela: e
-# de proposito que ela nao usa nenhuma medida do detector.
-DIZ_MARCA = re.compile(r'ortal|obme|^da\s*ob', re.I)
+# O que a marca escreve, inclusive quebrado pela fonte embutida. A extracao
+# perde glifos e nunca inventa: das sete series saem "Portal OBMEP", "Portal da
+# OBMEP", "ortal OBME", "rtal da OBM", "tal OBM" e "da OB". Por isso a regra e
+# de SUBSEQUENCIA, e nao de pedaco fixo: as letras da linha, na ordem, cabem
+# dentro do que a marca escreve. Ela olha o TEXTO da linha e nao o corpo, a cor
+# nem o angulo: de proposito, nao usa nenhuma medida do detector.
+DIZ_MARCA = ('portalobmep', 'portaldaobmep')
+LETRAS_MIN = 4   # "da OB" e o menor pedaco medido
 
 
 def linha_da_marca_pelo_texto(texto):
     """A linha girada diz o que a marca diz? (completude, sem olhar geometria)"""
-    return bool(DIZ_MARCA.search(re.sub(r'\s+', ' ', texto).strip()))
+    s = re.sub(r'[^a-z]', '', sem_acento(texto))
+    if len(s) < LETRAS_MIN:
+        return False
+    for alvo in DIZ_MARCA:
+        i = 0
+        for c in alvo:
+            if i < len(s) and s[i] == c:
+                i += 1
+        if i == len(s):
+            return True
+    return False
 
 
 def trava_teoria_sem_marca(p, n_pixel=10, semente=SEMENTE):
