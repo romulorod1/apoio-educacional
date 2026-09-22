@@ -12062,7 +12062,9 @@
     var celulas = Array.prototype.slice.call(grade.querySelectorAll('.bib-celula'));
     var mostrados = celulas.filter(function (c) { return !c.hidden; }).length;
     var um = grade._banco ? 'problema' : 'exercício', varios = grade._banco ? 'problemas' : 'exercícios';
-    info.textContent = mostrados
+    // lista vazia porque o "ainda não usei" tirou o que havia na dificuldade: não dizer que não há nenhum
+    var naDificuldade = celulas.some(function (c) { return c.getAttribute('data-fora-dif') !== '1'; });
+    info.textContent = mostrados || naDificuldade
       ? 'Mostrando ' + mostrados + ' de ' + plural(celulas.length, um, varios) + '.'
       : (grade._banco ? 'Nenhum problema' : 'Nenhum exercício') + ' desta lista nesta dificuldade.';
   }
