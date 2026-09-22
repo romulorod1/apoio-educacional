@@ -31,8 +31,8 @@
  * Opção compor (gerar(saida, { compor: true }), para o testa_biblioteca_compor):
  * a lista "Soma e Produto" ganha o que o compositor tem de tratar, e o resto do
  * pacote fica igual ao de sempre (as contagens dos outros testes não mudam):
- *   medidas.*.rotulo em todos os itens, na caixa colorida do canto, que é o que
- *     a folha cobre de branco (dá para ver na folha se cobriu);
+ *   medidas.*.rotulo em todos os itens, na barra colorida do canto (4,4 a 60,16
+ *     pt), que é o que a folha cobre de branco (dá para ver na folha se cobriu);
  *   item 2 sem rótulo (rotulo null): o número sai numa linha acima;
  *   item 4 sem solução na fonte (sem_solucao, assets.solucao null);
  *   item 7 com a solução em dois pedaços empilhados (8a), 400 + 380 pt, que
@@ -103,7 +103,7 @@ function montarZip(arquivos) {
 /* Um "recorte" sintético: moldura, linhas cinzas no lugar do texto e uma
  * barra colorida cujo comprimento depende do número, para as miniaturas
  * serem distinguíveis a olho. Sem <text>, sem fonte, sem referência externa. */
-function svgRecorte(largura, altura, numero, cor) {
+function svgRecorte(largura, altura, numero, cor, rotuloLargo) {
   const linhas = [];
   for (let y = 26, k = 0; y < altura - 10; y += 14, k++) {
     const w = largura - 40 - ((numero * 7 + k * 13) % 60);
@@ -112,7 +112,8 @@ function svgRecorte(largura, altura, numero, cor) {
   const barra = 20 + (numero % 10) * ((largura - 40) / 10);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${largura}pt" height="${altura}pt" viewBox="0 0 ${largura} ${altura}">` +
     `<rect x="0" y="0" width="${largura}" height="${altura}" fill="#ffffff"/>` +
-    `<rect x="4" y="4" width="18" height="14" fill="${cor}"/>` +
+    (rotuloLargo ? `<rect x="4" y="4" width="56" height="12" fill="${cor}"/>`
+      : `<rect x="4" y="4" width="18" height="14" fill="${cor}"/>`) +
     `<rect x="26" y="8" width="${barra}" height="6" fill="${cor}"/>` +
     linhas.join('') + '</svg>';
 }
@@ -122,7 +123,11 @@ function svgRecorte(largura, altura, numero, cor) {
 function svgEmpilhado(largura, alturas, numero, cor) {
   let y = 0;
   const partes = alturas.map((h, i) => {
-    const s = svgRecorte(largura, h, numero + i, cor).replace('<svg ', `<svg x="0" y="${y}" `);
+    // pedaço aninhado SEM unidade, como o gerador faz: com "pt" ele seria
+    // desenhado 4/3 maior dentro do viewBox do externo
+    const s = svgRecorte(largura, h, numero + i, cor, i === 0)
+      .replace(`width="${largura}pt" height="${h}pt"`, `width="${largura}" height="${h}"`)
+      .replace('<svg ', `<svg x="0" y="${y}" `);
     y += h + 6;
     return s;
   });
@@ -229,13 +234,14 @@ function gerar(saida, opcoes) {
         const semSolucao = deCompor && n === 4;
         const empilhada = deCompor && n === 7 ? [400, 380] : null;
         const altSol = empilhada ? 400 + 6 + 380 : alt + 60;
-        arquivos[base + '.svg'] = { dados: Buffer.from(svgRecorte(262, alt, n, m.cor)), metodo: 8 };
+        arquivos[base + '.svg'] = { dados: Buffer.from(svgRecorte(262, alt, n, m.cor, deCompor)), metodo: 8 };
         if (!semSolucao) {
           arquivos[base + '-sol.svg'] = { dados: Buffer.from(empilhada ? svgEmpilhado(262, empilhada, n + 3, '#C9A961')
-            : svgRecorte(262, altSol, n + 3, '#C9A961')), metodo: 8 };
+            : svgRecorte(262, altSol, n + 3, '#C9A961', deCompor)), metodo: 8 };
           comSolucao++;
         }
-        const rotulo = deCompor ? (n === 2 ? null : [4, 4, 22, 18]) : undefined;
+        // no modo compor, o "rótulo" é a barra do canto (4,4 a 60,16 pt)
+        const rotulo = deCompor ? (n === 2 ? null : [4, 4, 60, 16]) : undefined;
         const terco = Math.min(3, 1 + Math.floor(3 * (n - 1) / l.itens));
         const texto = `resolva o exercicio ${n} sobre ${l.titulo.toLowerCase()}`;
         itens.push({

@@ -327,7 +327,16 @@
           var p = document.createElement('canvas');
           p.width = cv.width;
           p.height = Math.round(h * k);
-          p.getContext('2d').drawImage(cv, 0, Math.round(y * k), cv.width, p.height, 0, 0, cv.width, p.height);
+          /* O arredondamento de cada fronteira pode pedir uma linha além do fim
+           * do canvas de origem; essa linha viria transparente, e transparente
+           * vira preto no JPEG (um fio escuro embaixo do último pedaço). Fundo
+           * branco e a altura lida limitada ao que a origem tem. */
+          var cp = p.getContext('2d');
+          cp.fillStyle = '#FFFFFF';
+          cp.fillRect(0, 0, p.width, p.height);
+          var y0 = Math.round(y * k);
+          var alto = Math.min(p.height, cv.height - y0);
+          if (alto > 0) cp.drawImage(cv, 0, y0, cv.width, alto, 0, 0, cv.width, alto);
           y += h + FOLGA_PEDACOS;
           return canvasParaJpeg(p).then(function (img) { return { img: img, alturaPt: h }; });
         })).then(function (lista) { base.pedacos = lista; ok(base); }, falha);
