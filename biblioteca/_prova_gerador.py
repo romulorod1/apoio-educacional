@@ -1076,6 +1076,8 @@ def trava_marca(temp, tirar=None):
             erros.append('p%d: %d pixel(s) mais escuros depois da remocao' % (pno, int((dif < 0).sum())))
         if int((dif > 52).sum()):
             erros.append('p%d: %d pixel(s) clarearam mais que a tinta da marca' % (pno, int((dif > 52).sum())))
+        if not marca and int((dif != 0).sum()):
+            erros.append('p%d: pagina sem marca mudou %d pixel(s)' % (pno, int((dif != 0).sum())))
         if marca:
             e = DPI_MARCA / 72.0
             dentro = np.zeros(dif.shape, dtype=bool)
@@ -1116,6 +1118,46 @@ def trava_marca_no_pacote(p):
                 if achado > esperado:
                     erros.append('%s: o texto da pagina tem a marca %r %d vez(es), e a fonte sem ela tem %d'
                                  % (pag['id'], palavra, achado, esperado))
+    return erros
+
+
+def trava_teoria_sem_marca(p, n_pixel=10, semente=SEMENTE):
+    """Pagina de teoria que nao tem a marca sai intacta, com a remocao ligada.
+
+    Ha modulos inteiros do Portal sem marca nenhuma (Conjuntos, no 9o ano; 135
+    paginas no 3o medio, 26 no 9o): o fluxo de conteudo dessas paginas nao pode
+    ser reescrito, o texto nao pode perder nem ganhar um caractere e o desenho
+    nao pode mudar um pixel (n_pixel paginas sorteadas com semente fixa, para a
+    conta caber). As paginas saem de copias proprias do PDF: o `p.doc` e a
+    referencia COM a marca de outras travas e nao pode ser mexido.
+    """
+    erros, limpas = [], []
+    arquivos = sorted({'%s__teoria-%s.pdf' % (t['modulo']['slug'], t['aula']['slug']) for t in p.teoria})
+    for arq in arquivos:
+        doc = pymupdf.open(os.path.join(p.pdfs, arq))
+        for pno in range(doc.page_count):
+            if linhas_da_marca(doc[pno]):
+                continue
+            limpas.append((arq, pno))
+            fluxo = [doc.xref_stream(x) for x in doc[pno].get_contents()]
+            texto = caracteres_da_pagina(doc[pno])
+            pg, saiu = gerar_pacote.tirar_marca(doc, pno)
+            if saiu:
+                erros.append('%s p%d: a remocao tirou %d objeto(s) de uma pagina sem marca' % (arq, pno + 1, saiu))
+            if [doc.xref_stream(x) for x in pg.get_contents()] != fluxo:
+                erros.append('%s p%d: o fluxo da pagina sem marca foi reescrito' % (arq, pno + 1))
+            depois = caracteres_da_pagina(pg)
+            if depois != texto:
+                erros.append('%s p%d: o texto da pagina sem marca mudou (%d caracteres, e nao %d)'
+                             % (arq, pno + 1, len(depois), len(texto)))
+        doc.close()
+    for arq, pno in random.Random(semente).sample(limpas, min(n_pixel, len(limpas))):
+        doc = pymupdf.open(os.path.join(p.pdfs, arq))
+        antes = doc[pno].get_pixmap(dpi=DPI_MARCA, colorspace=pymupdf.csGRAY).samples
+        pg, _ = gerar_pacote.tirar_marca(doc, pno)
+        if pg.get_pixmap(dpi=DPI_MARCA, colorspace=pymupdf.csGRAY).samples != antes:
+            erros.append('%s p%d: o desenho da pagina sem marca mudou' % (arq, pno + 1))
+        doc.close()
     return erros
 
 
@@ -1817,6 +1859,7 @@ def travas_simples(p, placar, zip_caminho=None, rotulo=''):
     placar.conferir('notas de rodape com o item ou registradas' + rotulo, trava_notas(p))
     placar.conferir('solucao com conteudo alem do rotulo' + rotulo, trava_solucao_com_conteudo(p))
     placar.conferir('marca d\'agua fora do texto da teoria' + rotulo, trava_marca_no_pacote(p))
+    placar.conferir('teoria sem marca sai intacta' + rotulo, trava_teoria_sem_marca(p))
 
 
 def venenos(p, temp, placar, curadoria):
@@ -2380,6 +2423,15 @@ def principal():
                     placar.conferir(nome, trava_marca(temp), True, motivo)
                 finally:
                     setattr(gerar_pacote, attr, antes_m)
+            # regra solta demais: sem nenhuma das tres condicoes, a remocao come
+            # o texto da pagina que nao tem marca
+            guardados = {n: getattr(gerar_pacote, n) for n in ('MARCA_CINZA', 'MARCA_SENO', 'MARCA_CORPO')}
+            gerar_pacote.MARCA_CINZA, gerar_pacote.MARCA_SENO, gerar_pacote.MARCA_CORPO = (0.0, 1.0), (0.0, 1.0), 0.0
+            try:
+                placar.conferir('marca sem condicao nenhuma', trava_teoria_sem_marca(p), True, 'sem marca')
+            finally:
+                for n, v in guardados.items():
+                    setattr(gerar_pacote, n, v)
             # e, no pacote inteiro, sem a remocao o "Portal" volta ao teoria.json
             antes_m = gerar_pacote.TIRA_MARCA
             gerar_pacote.TIRA_MARCA = False
