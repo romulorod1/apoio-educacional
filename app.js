@@ -676,6 +676,9 @@
      * família que ainda não existe no aplicativo: perder isso ao fechar sem
      * querer seria perder tudo o que ela digitou, e não há para onde voltar. */
     if (id === 'modal-proposta') guardarRascunhoDeProposta();
+    /* O visor da biblioteca, fechado pelo × ou tocando fora: solta a imagem
+     * em tela cheia da memória, como o botão Fechar. */
+    if (id === 'modal-biblioteca') soltarVisor();
     if (!$$('.fundo-modal.aberto').length) degrauModal = 50;
     posicionarAviso();
   }
@@ -12258,8 +12261,12 @@
 
   function fecharVisor() {
     fecharModal('modal-biblioteca');
+  }
+
+  function soltarVisor() {
     if (bibUrlVendo) { URL.revokeObjectURL(bibUrlVendo); bibUrlVendo = null; }
     bibVendo = null;
+    bibVezDoVisor++;
   }
 
   // ---------- abrir como folha ----------
