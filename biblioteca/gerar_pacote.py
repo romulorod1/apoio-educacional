@@ -69,6 +69,7 @@ MARGEM_X = 24.0        # borda externa das colunas
 # 23): a borda direita cortava a ultima letra. Com 1,2 pt o fio (0,4 pt de
 # largura) continua fora do recorte.
 AFASTA_FIO = 1.2
+ENCOSTA = 0.5  # caixa a menos disto acima da linha do marcador ainda e da linha (topo_da_linha); 0 so no veneno
 SUBIDA_FINA = True  # o topo da linha do marcador sobe pela tinta a 288 dpi (subida_fina); False so no veneno
 FOLGA_ANTES_DO_PROXIMO = True  # o recorte acaba 1 pt antes do proximo item (ver detectar); False so no veneno
 LIMPA_PASTA = True  # asset solto de geracao anterior sai da pasta de trabalho (gravar_pacote); False so no veneno
@@ -464,7 +465,10 @@ def topo_da_linha(marc, els):
     while mudou:
         mudou = False
         for e in txt:
-            if e['bb'][1] < topo and (abs(centro_y(e['bb']) - cy) < 4 or (e['bb'][1] < pe and e['bb'][3] > topo)):
+            # "encosta" com ENCOSTA pt de folga: a seta sobre "LB" na linha do
+            # rotulo 12 de Pontos, Retas e Planos (3o medio) acaba 0,1 pt acima da
+            # caixa do rotulo, e ficava no recorte de cima
+            if e['bb'][1] < topo and (abs(centro_y(e['bb']) - cy) < 4 or (e['bb'][1] < pe and e['bb'][3] > topo - ENCOSTA)):
                 topo = e['bb'][1]
                 mudou = True
     # a barra de um radical longo ou de uma fracao e desenho, nao texto

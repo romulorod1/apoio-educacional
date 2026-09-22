@@ -969,6 +969,20 @@ def trava_descida_fina(descida=None):
     return erros
 
 
+def trava_encosta():
+    """A seta de reta sobre as letras, 0,1 pt acima da caixa do rotulo, e da linha dele.
+
+    Elementos sinteticos no formato do detector: rotulo "12." com a caixa de 368,8
+    a 378,7 e a seta "<->" de 360,9 a 368,7 (Pontos, Retas e Planos, 3o medio,
+    solucao 12). O topo da linha tem de subir ate a seta.
+    """
+    marc = {'col': 1, 'el': {'bb': (300.9, 368.8, 313.4, 378.7), 'tipo': 'txt', 'col': 1}}
+    els = [marc['el'], {'tipo': 'txt', 'col': 1, 'bb': (495.1, 368.7, 507.2, 378.7), 'texto': 'LB'},
+           {'tipo': 'txt', 'col': 1, 'bb': (497.1, 360.9, 505.0, 368.7), 'texto': '<->'}]
+    topo = gerar_pacote.topo_da_linha(marc, els)
+    return [] if topo <= 361.0 else ['topo da linha em %.1f, abaixo da seta (360,9)' % topo]
+
+
 def trava_bordas(p):
     """A lista de bordas da amostra: 1, 2 e 5 no pacote; 3 e 4 fora pela calha.
 
@@ -1965,6 +1979,13 @@ def principal():
             placar.conferir('divisa fina entre itens colados', trava_divisa_fina())
             placar.conferir('subida fina pelo traco', trava_subida_fina())
             placar.conferir('descida fina pelo traco', trava_descida_fina())
+            placar.conferir('seta que encosta no rotulo', trava_encosta())
+            antes_en = gerar_pacote.ENCOSTA
+            gerar_pacote.ENCOSTA = 0.0
+            try:
+                placar.conferir('seta fora da linha do rotulo', trava_encosta(), True, 'topo da linha em')
+            finally:
+                gerar_pacote.ENCOSTA = antes_en
             placar.conferir('descida pela linha de 1 pt', trava_descida_fina(lambda doc, pno, x0, x1, y, lim: y), True, 'fim em')
             placar.conferir('subida pela linha de 1 pt', trava_subida_fina(lambda doc, pno, x0, x1, y, lim: y), True, 'topo em')
             placar.conferir('divisa pela linha de 1 pt', trava_divisa_fina(lambda doc, pno, x0, x1, a, b: float(math.floor(b) - 1)),
