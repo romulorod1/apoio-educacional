@@ -1391,7 +1391,7 @@ def trava_titulo_modulo():
     return erros
 
 
-def fracao_diferente(ref, cro, w, h, y0):
+def fracao_diferente(ref, cro, w, h):
     """Fracao de pixels sem correspondente na outra imagem.
 
     Um pixel so conta como diferente se NENHUM pixel a ate 1 px dele, na outra
@@ -1404,7 +1404,7 @@ def fracao_diferente(ref, cro, w, h, y0):
     """
     import numpy as np
     a = np.frombuffer(ref.samples, dtype=np.uint8).reshape(ref.height, ref.width)[:h, :w].astype(np.int16)
-    b = np.frombuffer(cro.samples, dtype=np.uint8).reshape(cro.height, cro.width)[y0:y0 + h, :w].astype(np.int16)
+    b = np.frombuffer(cro.samples, dtype=np.uint8).reshape(cro.height, cro.width)[:h, :w].astype(np.int16)
 
     def sem_par(x, y):
         pad = np.pad(y, 1, mode='edge')
@@ -1468,38 +1468,31 @@ def trava_fidelidade(p, sorteio, temp):
         else:
             largura, altura = med['largura_pt'], med['altura_pt']
         pedidos.append({'svg': caminho, 'png': png, 'largura_pt': largura, 'altura_pt': altura, 'escala': escala})
-        casos.append((iid, tipo, k, ps[k], 0.0, png))
+        casos.append((iid, tipo, k, ps[k], png))
     arq = os.path.join(temp, 'pedidos.json')
     json.dump(pedidos, open(arq, 'w', encoding='utf-8'))
     r = subprocess.run(['node', os.path.join(AQUI, '_fidelidade.js'), arq], capture_output=True, text=True)
     if r.returncode != 0:
         return ['o Chrome nao renderizou: %s' % r.stderr[-300:]], []
     erros, medidas = [], []
-    for iid, tipo, k, pz, desloc, png in casos:
+    for iid, tipo, k, pz, png in casos:
         it = por_id[iid]
         # referencia: copia limpa da pagina com o cropbox no retangulo, para o
         # canto do pixmap cair exatamente no canto do SVG
         tmp = pymupdf.open()
         tmp.insert_pdf(p.doc(it['origem']['arquivo']), from_page=pz['pagina'] - 1, to_page=pz['pagina'] - 1)
-        # O pedaco empilhado pode comecar em fracao de pixel (258 pt a 150 dpi sao
-        # 537,5 px): o Chrome o desenha ali, e a referencia tem de sair com a
-        # mesma fracao, senao toda borda de letra difere (1,27% num pedaco
-        # identico a olho, amostra do Banco). A referencia sobe a fracao.
-        exato = desloc * escala
-        y0 = int(math.floor(exato + 1e-6))
-        delta = (exato - y0) / escala
         b = pz['bbox']
-        tmp[0].set_cropbox(pymupdf.Rect(b[0], b[1] - delta, b[2], b[3] - delta))
+        tmp[0].set_cropbox(pymupdf.Rect(*b))
         ref = tmp[0].get_pixmap(dpi=DPI_FIDELIDADE, colorspace=pymupdf.csGRAY)
         cro = pymupdf.Pixmap(pymupdf.csGRAY, pymupdf.Pixmap(png))
         # o asset empilhado tem a largura do pedaco mais largo: o pedaco fica
         # encostado a esquerda, e a comparacao e na largura dele
         w = min(ref.width, cro.width)
-        h = min(ref.height, cro.height - y0)
+        h = min(ref.height, cro.height)
         if h <= 0 or w <= 0 or cro.width < ref.width - 2 or abs(ref.height - (h)) > 2:
             erros.append('%s %s p%d: tamanhos nao conferem (%dx%d contra %dx%d)' % (iid, tipo, k + 1, ref.width, ref.height, cro.width, cro.height))
             continue
-        frac = fracao_diferente(ref, cro, w, h, y0)
+        frac = fracao_diferente(ref, cro, w, h)
         medidas.append((frac, iid, tipo, k))
         if frac >= LIMITE_FIDELIDADE:
             erros.append('%s %s p%d: %.2f%% dos pixels diferem' % (iid, tipo, k + 1, 100 * frac))
@@ -1541,7 +1534,7 @@ def trava_fidelidade_teoria(p, temp, n=10, semente=SEMENTE, trocar=None):
         if abs(ref.width - cro.width) > 2 or abs(ref.height - cro.height) > 2:
             erros.append('%s: tamanhos nao conferem' % pg['id'])
             continue
-        frac = fracao_diferente(ref, cro, w, h, 0)
+        frac = fracao_diferente(ref, cro, w, h)
         medidas.append((frac, pg['id']))
         if frac >= LIMITE_FIDELIDADE:
             erros.append('%s: %.2f%% dos pixels diferem' % (pg['id'], 100 * frac))
