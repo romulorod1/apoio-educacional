@@ -646,8 +646,23 @@ def detectar(doc, secao_1_abre_solucoes=True):
                     alem = [e['bb'][2] for e in els_col if e['bb'][2] > cx1 and e['bb'][1] < y1 and e['bb'][3] > y0]
                     if alem:
                         x_dir = min(pg.rect.width - 4.0, max(alem) + 1.0)
-                r = (float(math.floor(cx0) if col == 0 else math.ceil(cx0)), float(y0),
-                     float(math.floor(x_dir) if x_dir == cx1 else math.ceil(x_dir)), float(y1))
+                # na coluna da esquerda, a linha que vai ate quase o fio sem cruzar ("...,"
+                # no fim de uma sequencia de simbolos, Exercicios sobre Divisibilidade, 6o
+                # ano, exercicio 18) tinha o ultimo glifo cortado pela borda, 1,2 pt antes
+                # do fio. A borda acompanha a tinta ate 0,3 pt do fio; o fio (0,4 pt de
+                # largura) fica fora. Conteudo que cruza o fio e a regra de exclusao por calha.
+                if col == 0 and ESTENDE_BORDA:
+                    alem = [e['bb'][2] for e in els_col if e['tipo'] == 'txt' and e['bb'][2] > cx1
+                            and e['bb'][1] < y1 and e['bb'][3] > y0 and not e['cruza']]
+                    if alem:
+                        x_dir = min(geo['xsep'] - 0.3, max(alem) + 0.5)
+                if x_dir == cx1:
+                    x_fim = math.floor(x_dir)
+                elif col == 0:
+                    x_fim = math.floor(x_dir * 10) / 10.0  # para baixo: o fio fica fora
+                else:
+                    x_fim = math.ceil(x_dir)
+                r = (float(math.floor(cx0) if col == 0 else math.ceil(cx0)), float(y0), float(x_fim), float(y1))
                 transborda = any(r[1] <= (a + b) / 2.0 <= r[3] for a, b in cruzam)
                 pedacos[aberto[0]][aberto[2]].append({'pno': pno, 'col': col, 'rect': r, 'xsep': geo['xsep'],
                                                      'transborda': transborda})

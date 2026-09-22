@@ -136,16 +136,25 @@ def divisa_pela_tinta(pg):
     w, h, s = pix.width, pix.height, pix.samples
     ya, yb = int(h * 0.1), int(h * 0.9)
     livre = [not any(s[y * w + x] < 160 for y in range(ya, yb)) for x in range(w)]
-    melhor, ini = (0, None), None
+    # o corredor mais a direita (com 4 px ou mais) que termina em tinta antes de 360:
+    # a coluna direita comeca sempre na margem, entao a direita do vao nao sobra
+    # corredor; o mais largo falhava quando uma linha da esquerda ia ate quase o
+    # vao e sobrava um corredor maior no meio da coluna (amostra, "fim"). Sem
+    # nenhum assim (coluna direita vazia), o mais largo.
+    corredores, ini = [], None
     for x in range(250, min(361, w)):
         if livre[x] and ini is None:
             ini = x
         if (not livre[x] or x == min(360, w - 1)) and ini is not None:
             fim = x if not livre[x] else x + 1
-            if fim - ini > melhor[0]:
-                melhor = (fim - ini, fim - 5.0)
+            corredores.append((ini, fim, not livre[x]))
             ini = None
-    return melhor[1]
+    fechados = [c for c in corredores if c[2] and c[1] - c[0] >= 4]
+    if fechados:
+        return fechados[-1][1] - 5.0
+    if corredores:
+        return max(corredores, key=lambda c: c[1] - c[0])[1] - 5.0
+    return None
 
 
 def divisa_da_prova(doc, pg):
@@ -837,7 +846,9 @@ def trava_origem(p):
             continue
         # a chamada de nota colada antes do fecha-parenteses nao e parte da origem
         t = re.sub(r'([a-z\u00e0-\u00ff])\d(\.?\))', r'\1\2', t)
-        if '(' + oc + ')' not in portal.sem_tracos(t):
+        # espaco junto do parentese e so a extracao do texto ("(Extraido do vestibular da
+        # UFSCar(SP) -2013 )", 6o ano): o texto de dentro e que tem de ser literal
+        if not re.search(r'\(\s*' + re.escape(oc) + r'\s*\)', portal.sem_tracos(t)):
             erros.append('%s: origem_citada %r nao esta literal na %s da fonte' % (it['id'], oc, onde))
     return erros
 
@@ -1604,6 +1615,9 @@ def venenos_series(p, temp, placar, curadoria):
             setattr(gerar_pacote, attr, antes_v)
         q = Pacote(os.path.join(temp, 'v_' + attr.lower()), p.pdfs)
         placar.conferir(nome, [re.sub(r'\s+', '', e) for e in trava_tinta_coberta(q)], True, motivo)
+        if attr == 'ESTENDE_BORDA':
+            # o mesmo veneno na coluna da esquerda: a palavra rente a divisa sai cortada
+            placar.conferir('recorte preso antes da divisa', trava_recorte(q), True, 'lista-variantes:ex:3 enunciado: tinta cortada')
     antes_oc = gerar_pacote.objetos_claros
     gerar_pacote.objetos_claros = lambda pg: []
     try:

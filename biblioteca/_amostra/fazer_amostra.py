@@ -196,6 +196,10 @@ def lista_variantes(caminho):
     xt = p.marcador(X0 + 23.5, T + 166, 3)
     p.pg.insert_text((xt, T + 166), 'Que fração expressa', fontname='helv', fontsize=10)
     p.texto(X0, T + 178, ['a soma de um meio com um quarto?'])
+    # palavra que termina a 0,6 pt da divisa, sem cruzar (6o ano, Exercicios sobre
+    # Divisibilidade, exercicio 18): a borda da coluna esquerda tem de acompanhar
+    fim = pymupdf.get_text_length('fim', fontname='helv', fontsize=10)
+    p.pg.insert_text((X1 - 10.0 - 0.6 - fim, T + 178), 'fim', fontname='helv', fontsize=10)
     p.secao(X1, T + 60, 2, 'Exercícios de Fixação')
     xt = p.marcador(X1, T + 90, 4)
     p.pg.insert_text((xt, T + 90), 'Um quadrado tem 5 cm de lado.', fontname='helv', fontsize=10)
