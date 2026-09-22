@@ -388,7 +388,11 @@ def trava_tinta_coberta(p):
                 if m and not em_sol:
                     dono, viu_enunciado = int(m.group(1)), True
                 elif (em_sol and re.match(r'^\d+\.', primeira_palavra(cs)) and margem[col] is not None
-                      and abs(cs[0][0] - margem[col]) <= 12):
+                      and abs(cs[0][0] - margem[col]) <= 12
+                      # a numeracao das solucoes anda de um em um (a mesma, na solucao em
+                      # duas partes): "11. Resposta B." e o fim da solucao 21 de Operacoes
+                      # com Numeros Naturais (6o ano), e nao a 11; "1986." e um ano
+                      and (dono is None or 0 <= int(re.match(r'^(\d+)', primeira_palavra(cs)).group(1)) - dono <= 3)):
                     dono = int(re.match(r'^(\d+)', primeira_palavra(cs)).group(1))
                 fora = [c for c in cs if not any(r.contains(pymupdf.Point(c[2], c[3])) for r in rects[pno + 1])]
                 if not [c for c in fora if tem_tinta(c[4], rects[pno + 1])]:
@@ -1664,6 +1668,24 @@ def venenos_series(p, temp, placar, curadoria):
         if attr == 'ESTENDE_BORDA':
             # o mesmo veneno na coluna da esquerda: a palavra rente a divisa sai cortada
             placar.conferir('recorte preso antes da divisa', trava_recorte(q), True, 'lista-variantes:ex:3 enunciado: tinta cortada')
+    # pasta de trabalho reaproveitada: o asset de um item que saiu na geracao
+    # seguinte nao pode ficar solto (6o ano, solucoes 19 e 21 depois da calha)
+    for limpa in (True, False):
+        pasta = os.path.join(temp, 'v_pasta_%s' % limpa)
+        solto = os.path.join(pasta, 'assets', '9ano', 'amostra-sintetica', 'lista-cm', 'ex-99.svg')
+        os.makedirs(os.path.dirname(solto), exist_ok=True)
+        open(solto, 'w').write('<svg/>')
+        antes_l = gerar_pacote.LIMPA_PASTA
+        gerar_pacote.LIMPA_PASTA = limpa
+        try:
+            gerar(p.pdfs, pasta, curadoria)
+        finally:
+            gerar_pacote.LIMPA_PASTA = antes_l
+        erros_m = trava_manifesto(Pacote(pasta, p.pdfs), None)
+        if limpa:
+            placar.conferir('pasta reaproveitada sai limpa', erros_m)
+        else:
+            placar.conferir('asset solto de geracao anterior', erros_m, True, 'ex-99.svg existe e nao esta no manifest')
     # bordas: cada regra da lista de bordas, desligada, tem de reprovar
     for nome, attr, valor, trava, motivo in (
             ('tabela que cruza o fio fica', 'CALHA_TRACO', False, trava_recorte, 'lista-bordas:ex:3 enunciado: tinta cortada'),

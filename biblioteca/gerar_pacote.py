@@ -69,6 +69,7 @@ MARGEM_X = 24.0        # borda externa das colunas
 # 23): a borda direita cortava a ultima letra. Com 1,2 pt o fio (0,4 pt de
 # largura) continua fora do recorte.
 AFASTA_FIO = 1.2
+LIMPA_PASTA = True  # asset solto de geracao anterior sai da pasta de trabalho (gravar_pacote); False so no veneno
 FIO_IMAGEM = True   # fio de coluna ou de rodape feito de imagem conta como fio (fios_da_pagina); False so no veneno
 CALHA_TRACO = True  # traco reto que cruza o fio exclui o item como texto que cruza; False so no veneno
 NOTA_LINHA_TODA = True  # a nota comeca no topo da linha do numero, nao no numero; False so no veneno
@@ -1202,6 +1203,14 @@ def gravar_pacote(conteudo, manifest_b, nome, versao, saida, trabalho, gravar_zi
         os.makedirs(os.path.dirname(c), exist_ok=True)
         with open(c, 'wb') as f:
             f.write(v)
+    # asset de uma geracao anterior que saiu do pacote (item excluido depois)
+    # nao pode ficar solto na pasta: a pasta tem de ser igual ao zip
+    pasta_assets = os.path.join(trabalho, 'assets')
+    for raiz, _, arqs in (os.walk(pasta_assets) if LIMPA_PASTA else []):
+        for a in arqs:
+            rel = os.path.relpath(os.path.join(raiz, a), trabalho).replace(os.sep, '/')
+            if rel not in conteudo:
+                os.remove(os.path.join(raiz, a))
     zip_caminho = os.path.join(saida, '%s-v%d.zip' % (nome, versao))
     if gravar_zip:
         os.makedirs(saida, exist_ok=True)
