@@ -2115,8 +2115,8 @@
        * matemática abre a biblioteca quando ela tem o assunto: o módulo direto,
        * no assunto que veio da biblioteca; a busca pelo título, nos outros. O
        * material autoral continua no botão "Material de aula" da janela. */
-      var pelaBiblioteca = !comMaterial && temPacoteBiblioteca && disciplina === Core.MATERIA_PADRAO &&
-        !!bib && !!moduloDoAssunto(t);
+      var bibliotecaPodeTer = !comMaterial && temPacoteBiblioteca && disciplina === Core.MATERIA_PADRAO;
+      var pelaBiblioteca = bibliotecaPodeTer && !!bib && !!moduloDoAssunto(t);
       function materialDeSempre() {
         if (registro) {
           $('#titulo-modal-tema').textContent = 'Material de aula' +
@@ -2150,10 +2150,11 @@
              * para uma busca vazia. A primeira consulta abre o índice da
              * biblioteca, então o botão avisa que está abrindo. */
             var botao = ev && ev.currentTarget;
-            if (!pelaBiblioteca) { materialDeSempre(); return; }
+            // o índice da biblioteca ainda abrindo não decide por ela: o toque espera por ele
+            if (!pelaBiblioteca && !(bibliotecaPodeTer && !bib)) { materialDeSempre(); return; }
             if (botao) { botao.disabled = true; botao.textContent = 'Abrindo...'; }
             // o pacote pode ter mudado desde que a linha foi desenhada: confere de novo
-            carregarBiblioteca().then(function () { return moduloDoAssunto(t); }, function () { return null; }).then(function (achado) {
+            carregarBiblioteca().then(function () { return moduloDoAssunto(t); }).catch(function () { return null; }).then(function (achado) {
               if (botao) { botao.disabled = false; botao.textContent = 'Material'; }
               // ela pode ter saído da aula enquanto a biblioteca abria: aí não a leva embora
               if (!$('#modal-aula').classList.contains('aberto') || !aulaEmEdicao || aulaEmEdicao.id !== aula.id) return;
@@ -8330,9 +8331,9 @@
         if (saida.length >= daTrilha + 5) return;
         Core.temasDaAula(a).forEach(function (t) {
           if (saida.length >= daTrilha + 5) return;
-          juntar({
-            id: t.id, titulo: t.titulo, fonte: t.fonte, disciplina: t.disciplina, grupo: t.grupo
-          }, 'já dado em ' + Core.ddmm(a.data));
+          var sugerido = { id: t.id, titulo: t.titulo, fonte: t.fonte, disciplina: t.disciplina, grupo: t.grupo };
+          if (t.modulo) sugerido.modulo = t.modulo;
+          juntar(sugerido, 'já dado em ' + Core.ddmm(a.data));
         });
       });
 
@@ -11275,6 +11276,9 @@
    * resposta por título fica guardada no próprio índice, que é refeito a cada
    * importação. */
   function moduloDoAssunto(t) {
+    try { return moduloDoAssuntoNoIndice(t); } catch (e) { return false; }
+  }
+  function moduloDoAssuntoNoIndice(t) {
     if (t.fonte === 'biblioteca' && t.modulo && bib.modulos[t.modulo]) return { chave: t.modulo, direto: true };
     var memo = bib.assuntos = bib.assuntos || Object.create(null);
     var k = chaveDoAssunto(t.titulo || '');
@@ -11300,7 +11304,9 @@
       // o assunto veio da biblioteca: abre o módulo dele, sem busca
       bibNav.modulo = chaveModulo;
       bibNav.aula = null;
-      if (bib && bib.modulos[chaveModulo]) bibNav.serie = bib.modulos[chaveModulo].serie;
+      var mod = bib && bib.modulos[chaveModulo];
+      // o módulo do Banco tem nível no lugar da série: abre na primeira série que ele atende
+      if (mod) bibNav.serie = (bib.listaSeries || []).filter(function (s) { return mod.series[s]; })[0] || mod.serie;
     }
     fecharModal('modal-aula');
     var campo = $('#busca-biblioteca');
@@ -11965,8 +11971,8 @@
       if (anexado) {
         var remarcar = desmarcarDepoisDeAnexar();
         avisarNaHora(etapa === 'folha'
-          ? 'O material foi anexado na aula, mas a lista não abriu como folha. O PDF está na aula; não precisa gerar de novo.'
-          : 'O material foi anexado na aula, mas não consegui marcar os exercícios como usados. O PDF está na aula; não precisa gerar de novo.',
+          ? 'O material foi anexado na aula, mas a lista não abriu como folha. O PDF está na aula; não precisa gerar de novo.' + textoDosAssuntos(assuntosNovos)
+          : 'O material foi anexado na aula, mas não consegui marcar os exercícios como usados. O PDF está na aula; não precisa gerar de novo.' + textoDosAssuntos(assuntosNovos),
           'Marcar de novo', remarcar);
       }
       else if (e && e.exercicio) avisarNaHora(e.exercicio + ' não abriu. Desmarque esse exercício e gere de novo. Nada foi anexado.');
@@ -11994,9 +12000,9 @@
     return saida;
   }
 
-  /* Título igual é igual sem acento, sem caixa e sem os espaços a mais, a mesma
-   * chave com que o fechamento junta os temas do mês: o mesmo assunto nunca
-   * aparece duas vezes para a família. */
+  /* Título igual é igual sem acento, sem caixa e sem os espaços a mais. A chave
+   * do fechamento (guardaTema) é a mesma sem o aparo de espaços: título igual
+   * ao do módulo nunca sai duas vezes para a família. */
   function chaveDoAssunto(titulo) {
     return Core.chaveDeBusca(String(titulo || '').trim().replace(/\s+/g, ' '));
   }

@@ -489,6 +489,27 @@ async function anexarEm(pag, aulaId, itens, paginas, extra) {
   conf('vai à biblioteca, procurando o título', autoral.ok && autoral.valor.campo, 'Teorema de Pitágoras');
   conf('e diz onde está o material dela', /^Abri a biblioteca da OBMEP\./.test(autoral.valor && autoral.valor.aviso), true);
 
+  secao('14b. O mesmo toque antes de o índice da biblioteca abrir: ainda vai à biblioteca');
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.abrirApp(pag, amb.ORIGEM);
+  // a biblioteca demora a abrir (no tablet, com pacotes grandes, ela leva segundos): o registro do
+  // tema autoral chega antes, e o botão Material aparece por ele
+  await pag.evaluate(() => {
+    const original = Store.itensDaBiblioteca;
+    Store.itensDaBiblioteca = function () { return new Promise(r => setTimeout(r, 3000)).then(() => original.apply(Store, arguments)); };
+  });
+  await abrirAulaDeHoje(pag, '16:00');
+  const cedo = await esperar('primeiro botão Material', () => pag.evaluate(() => {
+    const l = document.querySelector('#corpo-modal-aula .item-assunto-aula');
+    const b = l && Array.from(l.querySelectorAll('button')).find(x => x.textContent.trim() === 'Material');
+    if (!b) return false;
+    b.click(); return true;
+  }), v => v === true, 10000);
+  const foi = await esperar('biblioteca aberta', () => pag.evaluate(() => ({
+    aba: document.querySelector('#abas .aba.ativa').dataset.tela, tema: document.querySelector('#modal-tema').classList.contains('aberto')
+  })), v => v && (v.aba === 'biblioteca' || v.tema), 15000);
+  conf('tocado assim que o botão apareceu, vai à biblioteca, e não à montagem autoral', cedo.ok && foi.ok && foi.valor.aba === 'biblioteca' && !foi.valor.tema, true);
+
   // ================================================================
   secao('15. "Nova aula hoje", avulsa e em série: o assunto só na aula do dia');
   async function novaAulaHoje(alunoId, serie) {
