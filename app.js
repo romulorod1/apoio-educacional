@@ -11,10 +11,10 @@
    * intactos: voltar para false devolve tudo como estava. */
   var ACERVO_EM_CONSTRUCAO = true;
 
-  /* O cartão "Biblioteca" de Ajustes só aparece quando existir a aba que
-   * mostra o que foi importado. Até lá ela não vê nada de novo: importar sem
-   * ter onde abrir seria prometer o que não acontece. */
-  var BIBLIOTECA_NO_AR = false;
+  /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
+   * que foi importado: importar sem ter onde abrir seria prometer o que não
+   * acontece. Ligada na 1.21.0, com a aba Biblioteca. */
+  var BIBLIOTECA_NO_AR = true;
 
   /* A versão 1.20.0 sobe o banco do tablet para a versão 2 (store.js). Se
    * outra janela do aplicativo, ainda na versão antiga, estiver aberta, a
