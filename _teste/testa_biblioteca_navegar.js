@@ -160,7 +160,7 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   let corpo = await lerCorpo(pag);
   const chips = await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo .chip-filtro')).map(c => c.textContent + (c.classList.contains('ativo') ? '*' : '')));
   conf('séries: 8º (só Banco) e 9º, abrindo no 9º', chips.join(','), '8º ano,9º ano*');
-  conf('contagem no alto', await pag.$eval('#bib-contagem', e => e.textContent), '6 aulas de teoria, 72 exercícios');
+  conf('contagem no alto', await pag.$eval('#bib-contagem', e => e.textContent), '6 aulas de teoria, 60 exercícios, 12 problemas do Banco');
   conf('campo de busca visível', await pag.$eval('#bib-busca-cartao', e => getComputedStyle(e).display !== 'none'), true);
   conf('blocos do 9º ano: Módulos e Banco de Questões', corpo.blocos.map(b => b.titulo).join(','), 'Módulos,Banco de Questões');
   conf('módulos do Portal, em ordem alfabética', corpo.blocos[0].linhas.join(' | '),
@@ -210,9 +210,9 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
     const c = document.querySelector('#bib-corpo .bib-cartao');
     return (c => Array.from(c.children).map(e => e.classList.contains('bib-tags') ? Array.from(e.children).map(t => t.textContent).join(' | ') : e.textContent).filter(Boolean).join(' | '))(c);
   });
-  conf('cartão: número de origem, tipo e dificuldade', primeiro, 'Exercício 1 | Aberta | Fácil, estimada');
+  conf('cartão: número de origem e dificuldade (aberta não leva etiqueta)', primeiro, 'Exercício 1 | Fácil');
   const quinto = await pag.evaluate(() => (c => Array.from(c.children).map(e => e.classList.contains('bib-tags') ? Array.from(e.children).map(t => t.textContent).join(' | ') : e.textContent).filter(Boolean).join(' | '))(document.querySelectorAll('#bib-corpo .bib-cartao')[4]));
-  conf('origem citada em letra pequena', quinto, 'Exercício 5 | Aberta | Fácil, estimada | Extraído da Olimpíada Sintética');
+  conf('origem citada em letra pequena', quinto, 'Exercício 5 | Fácil | Extraído da Olimpíada Sintética');
   await pag.evaluate(() => { const c = document.querySelector('.conteudo'); c.scrollTop = c.scrollHeight; });
   const todas = await esperar('ao rolar até o fim, as outras chegam', () => estadoMinis(pag), v => v && v.prontas === 40, 15000);
   conf('rolando, as 40 ficam desenhadas', todas.valor && todas.valor.prontas, 40);
@@ -247,16 +247,16 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
       aberto: document.querySelector('#modal-biblioteca').classList.contains('aberto'), src: i.src.slice(0, 5),
       largura: Math.round(i.getBoundingClientRect().width) } : null;
   }), v => !!v, 10000);
-  conf('abre com o título do exercício', cheia.valor && cheia.valor.titulo, 'Equações do Segundo Grau: Resultados Básicos, exercício 3');
+  conf('abre com o título do exercício e a posição na lista', cheia.valor && cheia.valor.titulo, 'Equações do Segundo Grau: Resultados Básicos, exercício 3 (3 de 40)');
   conf('a imagem vem do pacote (blob)', cheia.valor && cheia.valor.src, 'blob:');
   conf('maior que a miniatura', cheia.valor && cheia.valor.largura > 400, true);
   await pag.click('#bib-solucao');
   await esperar('solução', () => pag.$eval('#titulo-modal-biblioteca', e => e.textContent), v => /solução$/.test(v || ''), 5000);
   conf('Ver solução troca para a solução', await pag.$eval('#bib-solucao', e => e.textContent), 'Ver enunciado');
   await pag.click('#bib-proxima');
-  await esperar('próxima', () => pag.$eval('#titulo-modal-biblioteca', e => e.textContent), v => /exercício 4$/.test(v || ''), 5000);
+  await esperar('próxima', () => pag.$eval('#titulo-modal-biblioteca', e => e.textContent), v => /exercício 4 \(4 de 40\)$/.test(v || ''), 5000);
   conf('Próxima vai para o exercício 4, no enunciado', await pag.$eval('#titulo-modal-biblioteca', e => e.textContent),
-    'Equações do Segundo Grau: Resultados Básicos, exercício 4');
+    'Equações do Segundo Grau: Resultados Básicos, exercício 4 (4 de 40)');
   await pag.click('#bib-fechar-visor');
   await pausa(150);
   conf('Fechar fecha', await pag.$eval('#modal-biblioteca', e => e.classList.contains('aberto')), false);
@@ -279,6 +279,8 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   conf('Módulos: Equações do Segundo Grau no topo', corpo.blocos[0].linhas[0], 'Equações do Segundo Grau');
   conf('Teoria: as quatro aulas do módulo', corpo.blocos[1].linhas.slice().sort().join(' | '),
     ['Equações Biquadradas', 'Resultados Básicos - Parte I', 'Resultados Básicos - Parte II', 'Soma e Produto das Raízes'].join(' | '));
+  conf('e, no empate de nota, na ordem das aulas (Parte I antes da Parte II)',
+    corpo.blocos[1].linhas.indexOf('Resultados Básicos - Parte I') < corpo.blocos[1].linhas.indexOf('Resultados Básicos - Parte II'), true);
   conf('Exercícios: as duas listas', corpo.blocos[2].linhas.slice().sort().join(' | '),
     'Equações do Segundo Grau: Resultados Básicos | Soma e Produto');
   conf('Banco: o problema da equação do segundo grau', corpo.blocos[3].linhas.join(' | '), 'As raízes escondidas');
@@ -288,7 +290,7 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   await esperar('lista aberta pela busca', () => estadoMinis(pag), v => v && v.total === 8, 5000);
   conf('a busca levou à lista, e o campo ficou limpo', await pag.$eval('#busca-biblioteca', e => e.value), '');
   const objetiva = await pag.evaluate(() => (c => Array.from(c.children).map(e => e.classList.contains('bib-tags') ? Array.from(e.children).map(t => t.textContent).join(' | ') : e.textContent).filter(Boolean).join(' | '))(document.querySelectorAll('#bib-corpo .bib-cartao')[2]));
-  conf('exercício objetivo marcado', objetiva, 'Exercício 3 | Objetiva | Fácil, estimada');
+  conf('exercício objetivo marcado', objetiva, 'Exercício 3 | Objetiva | Fácil');
 
   // ================================================================
   secao('6. Abrir como folha, numa aula nova de hoje');
@@ -298,13 +300,14 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   await tocarLinha(pag, 'Resultados Básicos - Parte II');
   await esperar('páginas', () => estadoMinis(pag), v => v && v.total === 4, 5000);
   await pag.evaluate(() => document.querySelectorAll('#bib-corpo .bib-cartao')[1].click());
-  await esperar('tela cheia da página 2', () => pag.$eval('#titulo-modal-biblioteca', e => e.textContent), v => v === 'Resultados Básicos - Parte II, página 2', 5000);
+  await esperar('tela cheia da página 2', () => pag.$eval('#titulo-modal-biblioteca', e => e.textContent), v => v === 'Resultados Básicos - Parte II, página 2 de 4', 5000);
   await pag.click('#bib-como-folha');
   await esperar('escolha da aula', () => pag.$eval('#modal-bib-folha', e => e.classList.contains('aberto')), v => v === true, 5000);
   await pag.click('#bib-nova-aula');
   await esperar('janela de aula nova com o aviso da biblioteca', () => pag.evaluate(() =>
     document.querySelector('#modal-aula').classList.contains('aberto') && !!document.querySelector('#aviso-folha-da-biblioteca')), v => v === true, 5000);
   conf('a data da aula nova é hoje', await pag.$eval('#campo-data', e => e.value), hojeIso);
+  conf('e a janela não promete reabrir a aula (vai abrir a folha)', await pag.evaluate(() => !document.querySelector('#ajuda-aula-nova')), true);
   await pag.click('#salvar-aula');
   const editor = await esperar('a folha abriu com a página colada', () => pag.evaluate(() =>
     document.querySelector('#modal-nota').classList.contains('aberto') ? document.querySelector('#titulo-modal-nota').textContent : null), v => !!v, 10000);
@@ -405,7 +408,7 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   await tocarLinha(pag, 'Resultados Básicos - Parte II');
   await esperar('páginas', () => estadoMinis(pag), v => v && v.total === 4, 5000);
   await pag.evaluate(() => document.querySelectorAll('#bib-corpo .bib-cartao')[2].click());
-  await esperar('tela cheia da página 3', () => pag.$eval('#titulo-modal-biblioteca', e => e.textContent), v => /página 3$/.test(v || ''), 5000);
+  await esperar('tela cheia da página 3', () => pag.$eval('#titulo-modal-biblioteca', e => e.textContent), v => /página 3 de 4$/.test(v || ''), 5000);
   await pag.click('#bib-como-folha');
   await esperar('escolha da aula', () => pag.$eval('#modal-bib-folha', e => e.classList.contains('aberto')), v => v === true, 5000);
   const linhasDeHoje = await pag.evaluate(() => Array.from(document.querySelectorAll('#corpo-modal-bib-folha .item-lista .detalhe')).map(d => d.textContent));

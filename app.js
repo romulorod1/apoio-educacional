@@ -11761,10 +11761,14 @@
         return;
       }
       cartaoBusca.style.display = '';
-      var nItens = Object.keys(arv.itemPorId).length;
+      var ids = Object.keys(arv.itemPorId);
+      var nBanco = ids.filter(function (id) { return id.indexOf('banco:') === 0; }).length;
       var nTeoria = Object.keys(arv.teoriaPorId).length;
-      $('#bib-contagem').textContent = plural(nTeoria, 'aula de teoria', 'aulas de teoria') + ', ' +
-        plural(nItens, 'exercício', 'exercícios');
+      $('#bib-contagem').textContent = [
+        nTeoria ? plural(nTeoria, 'aula de teoria', 'aulas de teoria') : '',
+        ids.length - nBanco ? plural(ids.length - nBanco, 'exercício', 'exercícios') : '',
+        nBanco ? plural(nBanco, 'problema do Banco', 'problemas do Banco') : ''
+      ].filter(Boolean).join(', ');
       ligarBuscaBiblioteca();
       if (!bibNav.serie || arv.listaSeries.indexOf(bibNav.serie) < 0) {
         // abre na primeira série que tem módulo do Portal, e não numa só de Banco
@@ -11906,7 +11910,7 @@
   function rotuloDificuldade(it) {
     var nome = NOME_DIFICULDADE[it.dificuldade];
     if (!nome) return null;
-    return nome + (it.dificuldade_origem === 'curadoria' ? ', curada' : ', estimada');
+    return nome + (it.dificuldade_origem === 'curadoria' ? ', revisada' : '');
   }
 
   function desenharListaDeExercicios(corpo, mod, lista) {
@@ -11915,7 +11919,7 @@
     var grade = el('div', { class: 'bib-grade bib-grade-exercicios' });
     lista.itens.forEach(function (it, i) {
       var tags = [
-        el('span', { class: 'tag', texto: it.formato === 'objetiva' ? 'Objetiva' : 'Aberta' }),
+        it.formato === 'objetiva' ? el('span', { class: 'tag', texto: 'Objetiva' }) : null,
         rotuloDificuldade(it) ? el('span', { class: 'tag serie', texto: rotuloDificuldade(it) }) : null,
         it.sem_solucao ? el('span', { class: 'tag excecao', texto: 'sem solução' }) : null
       ];
@@ -12017,9 +12021,15 @@
       });
     });
     Object.keys(grupos).forEach(function (g) {
-      grupos[g].sort(function (a, b) { return b.nota - a.nota || (a.id < b.id ? -1 : 1); });
+      grupos[g].sort(function (a, b) { return b.nota - a.nota || ordemNaArvore(a.id) - ordemNaArvore(b.id) || (a.id < b.id ? -1 : 1); });
     });
     return grupos;
+  }
+
+  function ordemNaArvore(id) {
+    var t = bib.teoriaPorId[id] || bib.itemPorId[id];
+    if (!t) return 0;
+    return ((t.aula && t.aula.n) || 0) * 1000 + (t.numero || 0);
   }
 
   /* O registro de módulo no índice tem o id "<serie>:<modulo>", que é a
@@ -12223,13 +12233,15 @@
     if (v.tipo === 'teoria') {
       var p = v.aula.paginas[v.indice];
       return { pacote: v.aula.pacote, caminho: p.asset, medidas: p.medidas, forma: 'pagina',
-        titulo: v.aula.aula.titulo + ', ' + (p.capa ? 'capa' : 'página ' + p.n), total: v.aula.paginas.length };
+        titulo: v.aula.aula.titulo + ', ' + (p.capa ? 'capa' : 'página ' + p.n) + ' de ' + v.aula.paginas.length,
+        total: v.aula.paginas.length };
     }
     var it = v.lista.itens[v.indice];
     var sol = v.solucao && it.assets.solucao;
     return { pacote: it.pacote, caminho: sol ? it.assets.solucao : it.assets.enunciado,
       medidas: (sol ? it.medidas && it.medidas.solucao : it.medidas && it.medidas.enunciado) || null, forma: 'recorte',
-      titulo: v.lista.titulo + ', ' + (eDoBanco(it) ? 'problema ' : 'exercício ') + it.numero + (sol ? ', solução' : ''),
+      titulo: v.lista.titulo + ', ' + (eDoBanco(it) ? 'problema ' : 'exercício ') + it.numero +
+        ' (' + (v.indice + 1) + ' de ' + v.lista.itens.length + ')' + (sol ? ', solução' : ''),
       total: v.lista.itens.length, item: it };
   }
 
@@ -12322,6 +12334,9 @@
         fecharVisor();
         abrirAula(null, hoje);
         folhaPendenteDaBiblioteca = alvo;
+        // nesse caminho, depois de salvar abre a folha, e não a janela da aula
+        var ajudaPadrao = $('#ajuda-aula-nova');
+        if (ajudaPadrao) ajudaPadrao.remove();
         var corpoAula = $('#corpo-modal-aula');
         if (corpoAula) {
           corpoAula.insertBefore(el('div', { class: 'faixa-info', id: 'aviso-folha-da-biblioteca' }, [
@@ -12395,7 +12410,7 @@
       fecharVisor();
       desenharAgenda();
       abrirEditorNota(aulaId, indice);
-      avisar('Colado na folha da aula, página ' + (indice + 1) + '.');
+      avisar('Colado na folha da aula (folha ' + (indice + 1) + ').');
     }).catch(function (e) {
       if (e && e.desfeita) return;
       avisar('Não consegui colar na folha. Tente de novo.');
