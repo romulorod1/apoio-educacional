@@ -789,7 +789,10 @@ RESPOSTA = re.compile(r'(?:Resposta\s*(?:letra\s*)?:?|\b(?:na|a)\s+(?:letra|alte
                       r'[\s\d]{0,40}?\(?([A-E])\)?(?=[\s.,;)]|$)')
 SO_LETRA = re.compile(r'^\s*\d+\s*\.\s*\(?([A-E])\)?\s*\.?\s*$')
 CHAMADA_DE_NOTA = re.compile(r'([a-z\u00e0-\u00ff])\d(\.?)$')
-EXTRAIDO = re.compile(r'\((Extra[íi]d[oa]\s[^()]*(?:\([^()]*\)[^()]*)*)\)')
+# "(Extraido da ...)" e, por decisao do contrato (secao 4), "(Adaptado da ...)",
+# literal e com a palavra: problema adaptado nao pode passar por questao original
+# da prova. Nas 7 series: 1.149 "Extraido/a" e 389 "Adaptado/a".
+EXTRAIDO = re.compile(r'\(((?:Extra[íi]d[oa]|Adaptad[oa])\s[^()]*(?:\([^()]*\)[^()]*)*)\)')
 
 
 def rotulos(texto):
@@ -1224,7 +1227,10 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
     manifest = {
         'esquema': 1, 'pacote': nome, 'versao': versao,
         'gerado_em': gerado_em or datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).replace(microsecond=0).isoformat(),
-        'gerador': {'nome': 'biblioteca/gerar_pacote.py', 'commit': commit or commit_do_gerador()},
+        # a versao do PyMuPDF muda o SVG (e o hash) de um mesmo recorte: fica no
+        # manifest para a reproducao, e nao so no relatorio (lente 2 do #47)
+        'gerador': {'nome': 'biblioteca/gerar_pacote.py', 'commit': commit or commit_do_gerador(),
+                    'pymupdf': pymupdf.VersionBind},
         'materia': 'matematica', 'fonte': FONTE, 'series': [serie], 'contagens': contagens,
         'arquivos': {k: sha(conteudo[k]) for k in sorted(conteudo)},
     }

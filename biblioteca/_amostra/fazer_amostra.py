@@ -193,7 +193,7 @@ def lista_variantes(caminho):
     p.fios(2)
     p.secao(X0, T + 40, 1, 'Exercícios Introdutórios')
     p.numero_solucao(X0, T + 70, 1)
-    p.texto(X0 + 14, T + 70, ['Temos 3 + 4 = 7.'])
+    p.texto(X0 + 14, T + 70, ['(Adaptado da Amostra - 2020) Temos 3 + 4 = 7.'])
     p.numero_solucao(X0, T + 100, 2)
     p.texto(X0 + 14, T + 100, ['(Extraído da Amostra) Temos 10 - 7 = 3.'])
     p.numero_solucao(X0, T + 130, 2)

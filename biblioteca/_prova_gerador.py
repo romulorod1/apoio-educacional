@@ -540,11 +540,24 @@ def trava_variantes(p):
         erros.append('lista-variantes: itens no pacote %s, e nao 1 a 4 (excluidos: %s)' % (
             nums, [(e['numero'], e['motivo'][:60]) for e in l['excluidos']]))
     for i in p.itens:
+        if i['aula']['slug'] == 'lista-variantes' and i['numero'] == 1:
+            if i.get('origem_citada') != 'Adaptado da Amostra - 2020':
+                erros.append('lista-variantes: "(Adaptado da ...)" nao virou origem_citada literal (%r)' % i.get('origem_citada'))
         if i['aula']['slug'] == 'lista-variantes' and i['numero'] in (2, 3):
             if len(pedacos(i, 'solucao')) != 2:
                 erros.append('lista-variantes: solucao %d com %d pedaco(s), e nao as duas partes' % (
                     i['numero'], len(pedacos(i, 'solucao'))))
     return erros
+
+
+def trava_gerador_no_manifest(p):
+    """manifest.gerador diz com que PyMuPDF o pacote foi feito, e e o que esta instalado aqui."""
+    v = p.manifest.get('gerador', {}).get('pymupdf')
+    if not v:
+        return ['manifest.gerador sem a versao do PyMuPDF']
+    if v != pymupdf.VersionBind:
+        return ['manifest.gerador diz PyMuPDF %s, e o instalado e %s: o pacote nao se reproduz aqui' % (v, pymupdf.VersionBind)]
+    return []
 
 
 def trava_fontes_negrito():
@@ -784,6 +797,7 @@ def travas_simples(p, placar, zip_caminho=None, rotulo=''):
     placar.conferir('manifesto' + rotulo, trava_manifesto(p, zip_caminho))
     placar.conferir('sem travessao' + rotulo, trava_tracos(p))
     placar.conferir('origem literal' + rotulo, trava_origem(p))
+    placar.conferir('PyMuPDF no manifest' + rotulo, trava_gerador_no_manifest(p))
 
 
 def venenos(p, temp, placar, curadoria):
@@ -1002,6 +1016,19 @@ def venenos_series(p, temp, placar, curadoria):
         gerar_pacote.continua_o_anterior = antes_c
     q = Pacote(os.path.join(temp, 'v_continua'), p.pdfs)
     placar.conferir('solucao em duas partes', trava_variantes(q), True, 'itens no pacote')
+    # origem: sem "Adaptado" na regra, a origem do item 1 some
+    antes_e = gerar_pacote.EXTRAIDO
+    gerar_pacote.EXTRAIDO = re.compile(r'\((Extra[íi]d[oa]\s[^()]*(?:\([^()]*\)[^()]*)*)\)')
+    try:
+        gerar(p.pdfs, os.path.join(temp, 'v_adaptado'), curadoria)
+    finally:
+        gerar_pacote.EXTRAIDO = antes_e
+    q = Pacote(os.path.join(temp, 'v_adaptado'), p.pdfs)
+    placar.conferir('origem "Adaptado da"', trava_variantes(q), True, 'Adaptado')
+    # manifest sem a versao do PyMuPDF
+    q = copia(p, temp, 'v_pymupdf')
+    del q.manifest['gerador']['pymupdf']
+    placar.conferir('manifest sem PyMuPDF', trava_gerador_no_manifest(q), True, 'sem a versao')
     # CMBX10 fora da lista de negrito: o marcador do 1o medio deixa de ser lido
     antes_f = list(gerar_pacote.FONTES_NEGRITO)
     gerar_pacote.FONTES_NEGRITO[:] = ['SSBX', 'Bold']
