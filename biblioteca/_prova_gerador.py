@@ -53,6 +53,7 @@ import pymupdf
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, AQUI)
+import apelidos as apelidos_mod  # noqa: E402
 import gerar_pacote  # noqa: E402
 import portal  # noqa: E402
 
@@ -841,6 +842,24 @@ def trava_variantes(p):
     return erros
 
 
+def trava_apelidos(p):
+    """Todo apelido do pacote leva a um modulo do pacote, e todo modulo tem apelido.
+
+    No pacote real a conta e contra as 7 series (python biblioteca/apelidos.py);
+    aqui, contra os modulos que a pasta de PDFs tem.
+    """
+    modulos = apelidos_mod.modulos_da_pasta(p.pdfs, p.manifest['series'][0])
+    falhas, _ = apelidos_mod.conferir(p.apelidos, modulos)
+    if any(k.startswith('_') for k in p.apelidos):
+        falhas.append('apelidos.json do pacote leva chave de comentario (comeca com _)')
+    return falhas
+
+
+def trava_curadoria(p):
+    """Toda linha de curadoria desta serie achou o seu item."""
+    return ['%s nao achou o item no pacote' % k for k in p.relatorio.get('curadoria_sem_item', [])]
+
+
 def trava_gerador_no_manifest(p):
     """manifest.gerador diz com que PyMuPDF o pacote foi feito, e e o que esta instalado aqui."""
     v = p.manifest.get('gerador', {}).get('pymupdf')
@@ -1026,8 +1045,9 @@ def trava_fidelidade_teoria(p, temp, n=10, semente=SEMENTE, trocar=None):
 # ------------------------------------------------------------------ amostra e venenos
 
 def gerar(pdfs, trabalho, curadoria, **kw):
-    return gerar_pacote.gerar(pdfs, '9ano', 1, trabalho + '_zip', curadoria, trabalho=trabalho,
-                              gerado_em='2026-09-21T00:00:00-03:00', commit='amostra', **kw)
+    kw.setdefault('gerado_em', '2026-09-21T00:00:00-03:00')
+    kw.setdefault('commit', 'amostra')
+    return gerar_pacote.gerar(pdfs, '9ano', 1, trabalho + '_zip', curadoria, trabalho=trabalho, **kw)
 
 
 def curadoria_da_amostra(pasta):
@@ -1035,7 +1055,7 @@ def curadoria_da_amostra(pasta):
     io.open(os.path.join(pasta, 'dificuldade.csv'), 'w', encoding='utf-8', newline='').write(
         'id;dificuldade;quem;data;observacao\n9ano:amostra-sintetica:lista-de-amostra:ex:4;1;prova;2026-09-21;curadoria de teste\n')
     io.open(os.path.join(pasta, 'apelidos.json'), 'w', encoding='utf-8', newline='').write(
-        '{"bhaskara": ["equação do segundo grau"]}\n')
+        '{"_nota": "comentario, fora do pacote", "bhaskara": ["amostra sintética"]}\n')
     io.open(os.path.join(pasta, 'exclusoes.csv'), 'w', encoding='utf-8', newline='').write(
         'id;motivo;quem;data\n9ano:amostra-sintetica:lista-cm:ex:2;defeito de teste da prova;prova;2026-09-22\n')
     return pasta
@@ -1091,6 +1111,7 @@ def travas_simples(p, placar, zip_caminho=None, rotulo=''):
     placar.conferir('PyMuPDF no manifest' + rotulo, trava_gerador_no_manifest(p))
     placar.conferir('prova independente do gerador' + rotulo, trava_independencia(p))
     placar.conferir('nenhum texto fora de recorte' + rotulo, trava_tinta_coberta(p))
+    placar.conferir('curadoria aplicada' + rotulo, trava_curadoria(p))
 
 
 def venenos(p, temp, placar, curadoria):
@@ -1401,6 +1422,48 @@ def venenos_series(p, temp, placar, curadoria):
         gerar_pacote.EXTRAIDO = antes_e
     q = Pacote(os.path.join(temp, 'v_adaptado'), p.pdfs)
     placar.conferir('origem "Adaptado da"', trava_variantes(q), True, 'Adaptado')
+    # curadoria de dificuldade (brief B2): a linha muda o item, e so ele; o pacote
+    # sem a linha e o pacote com ela sao, cada um, deterministicos
+    cur_sem = os.path.join(temp, 'cur_sem_linha')
+    shutil.copytree(curadoria, cur_sem)
+    io.open(os.path.join(cur_sem, 'dificuldade.csv'), 'w', encoding='utf-8', newline='').write(
+        'id;dificuldade;quem;data;observacao\n')
+    gerar(p.pdfs, os.path.join(temp, 'v_sem_linha'), cur_sem)
+    q = Pacote(os.path.join(temp, 'v_sem_linha'), p.pdfs)
+    alvo = '9ano:amostra-sintetica:lista-de-amostra:ex:4'
+    antes_i, depois_i = {i['id']: i for i in q.itens}, {i['id']: i for i in p.itens}
+    erros = []
+    if antes_i[alvo]['dificuldade_origem'] != 'proxy' or depois_i[alvo]['dificuldade_origem'] != 'curadoria':
+        erros.append('a linha do dificuldade.csv nao mudou a origem da dificuldade do item')
+    mudaram = sorted(k for k in depois_i if json.dumps(depois_i[k], sort_keys=True) != json.dumps(antes_i.get(k), sort_keys=True))
+    if mudaram != [alvo]:
+        erros.append('a linha do dificuldade.csv mudou %s, e nao so o item dela' % mudaram)
+    gerar(p.pdfs, os.path.join(temp, 'v_sem_linha_b'), cur_sem, gerado_em='2031-01-01T00:00:00-03:00')
+    erros += trava_determinismo(q, Pacote(os.path.join(temp, 'v_sem_linha_b'), p.pdfs))
+    placar.conferir('curadoria muda so o seu item, deterministica', erros)
+    # curadoria: id desta serie digitado errado nao pode passar calado
+    cur_errada = os.path.join(temp, 'cur_errada')
+    shutil.copytree(curadoria, cur_errada)
+    with io.open(os.path.join(cur_errada, 'dificuldade.csv'), 'a', encoding='utf-8', newline='') as f:
+        f.write('9ano:amostra-sintetica:lista-de-amostra:ex:44;3;prova;2026-09-22;id que nao existe\n')
+    gerar(p.pdfs, os.path.join(temp, 'v_cur_errada'), cur_errada)
+    placar.conferir('curadoria com id errado', trava_curadoria(Pacote(os.path.join(temp, 'v_cur_errada'), p.pdfs)),
+                    True, 'ex:44')
+    # curadoria: dificuldade fora de 1 a 3 para a geracao
+    with io.open(os.path.join(cur_errada, 'dificuldade.csv'), 'a', encoding='utf-8', newline='') as f:
+        f.write('9ano:amostra-sintetica:lista-cm:ex:3;4;prova;2026-09-22;fora da escala\n')
+    try:
+        gerar(p.pdfs, os.path.join(temp, 'v_cur_4'), cur_errada)
+        placar.conferir('curadoria com dificuldade 4', [], True, 'dificuldade')
+    except SystemExit as e:
+        placar.conferir('curadoria com dificuldade 4', [str(e)], True, 'dificuldade tem de ser')
+    # apelidos: um orfao e um modulo sem apelido
+    q = copia(p, temp, 'v_apelido')
+    q.apelidos = dict(q.apelidos, **{'assunto inventado': ['modulo que nao existe no portal']})
+    placar.conferir('apelido orfao', trava_apelidos(q), True, 'assunto inventado')
+    q = copia(p, temp, 'v_sem_apelido')
+    q.apelidos = {}
+    placar.conferir('modulo sem apelido', trava_apelidos(q), True, 'modulo sem apelido')
     # manifest sem a versao do PyMuPDF
     q = copia(p, temp, 'v_pymupdf')
     del q.manifest['gerador']['pymupdf']
@@ -1464,6 +1527,7 @@ def principal():
             placar.conferir('curadoria sobrescreve o proxy',
                             [] if any(i['dificuldade_origem'] == 'curadoria' and i['numero'] == 4 and i['dificuldade'] == 1
                                       for i in p.itens) else ['a linha do dificuldade.csv nao chegou ao item'])
+            placar.conferir('apelidos', trava_apelidos(p))
             placar.conferir('variantes: sem titulo, recuo, duas partes', trava_variantes(p))
             placar.conferir('marcador em CMBX10', trava_fontes_negrito())
             placar.conferir('titulo do modulo pela capa das listas', trava_titulo_modulo())

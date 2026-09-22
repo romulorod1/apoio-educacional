@@ -953,8 +953,13 @@ def ler_curadoria(pasta):
             if not linha or i == 0:
                 continue
             partes = linha.split(';')
-            if len(partes) >= 2 and partes[1].strip() in ('1', '2', '3'):
-                dif[partes[0].strip()] = int(partes[1])
+            # linha de curadoria que nao se aplica nao pode passar calada: valor
+            # fora de 1 a 3 para a geracao (o id de outra serie e normal, o
+            # arquivo e um so para todas; id desta serie que nao existe vai para
+            # o relatorio e a prova reprova)
+            if len(partes) < 2 or partes[1].strip() not in ('1', '2', '3'):
+                raise SystemExit('dificuldade.csv, linha %d: dificuldade tem de ser 1, 2 ou 3: %r' % (i + 1, linha))
+            dif[partes[0].strip()] = int(partes[1])
     apelidos = json.load(io.open(os.path.join(pasta, 'apelidos.json'), encoding='utf-8'))
     apelidos = {k: apelidos[k] for k in sorted(apelidos) if not k.startswith('_')}
     # exclusoes.csv (id;motivo;quem;data): item que a revisao visual achou com
@@ -1335,6 +1340,14 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
             tam[k] += len(v)
     if anterior:
         relatorio['comparacao_com_anterior'] = comparar_com_anterior(itens, anterior)
+    # curadoria desta serie que nao achou item: id digitado errado nao pode
+    # passar calado (o arquivo e um so para todas as series)
+    ids = {i['id'] for i in itens}
+    ids_excl = {e['id'] for e in relatorio['excluidos']}
+    prefixo = serie + ':'
+    relatorio['curadoria_sem_item'] = sorted(
+        ['dificuldade.csv: ' + k for k in dif_cur if k.startswith(prefixo) and k not in ids and k not in ids_excl] +
+        ['exclusoes.csv: ' + k for k in excl_cur if k.startswith(prefixo) and k not in ids_excl])
     relatorio.update({
         'contagens': contagens,
         'hash_manifest_arquivos': sha(json.dumps(manifest['arquivos'], sort_keys=True).encode('utf-8')),
