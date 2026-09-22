@@ -12162,7 +12162,7 @@
     guardarCarrinho();
     desenharCarrinho();
     // o material daquela aula já foi anexado: o que ela marca agora é para outra coisa
-    if (marcado && bibContexto && bibContexto.anexado) { bibContexto = null; desenharContextoBiblioteca(); }
+    if (marcado && bibContexto && bibContexto.anexado) { bibContexto = null; bibFiltroAluno = ''; desenharContextoBiblioteca(); }
   }
 
   function desenharCarrinho() {
