@@ -50,8 +50,10 @@
  * biblioteca sem internet. O v33 troca a aba Temas pela aba Biblioteca
  * (app.js, index.html e styles.css), com a lista igual. O v34 põe, na busca da
  * Biblioteca, a teoria, os exercícios e o Banco do módulo achado antes do resto
- * (app.js). */
-var CACHE = 'apoio-educacional-v34';
+ * (app.js). O v35 traz o material da biblioteca: caixas, carrinho, gerar o
+ * PDF com gabarito e anexar na aula (app.js, pdf.js, biblioteca.js, index.html
+ * e styles.css), com a lista igual. */
+var CACHE = 'apoio-educacional-v35';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

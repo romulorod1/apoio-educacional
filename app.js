@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.21.1';
+  var VERSAO = '1.22.0';
 
   /* O acervo de 14/09 (aba Temas e o atalho dele na escolha de assunto da
    * aula) saiu do ar até ser refeito com revisão. Os arquivos do banco ficam
