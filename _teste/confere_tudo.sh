@@ -348,6 +348,8 @@ roda "painel de valores --envenenado-esquece"   node "_teste/testa_painel_valore
 # o veneno so conta se reprovar PELO motivo esperado. Fica aqui, e nao em "sem
 # navegador", porque a fidelidade renderiza os SVG no Chrome.
 roda "gerador da biblioteca"                    python biblioteca/_prova_gerador.py
+# O Banco de Questoes (2016 a 2020), sobre um volume sintetico do mesmo modelo.
+roda "banco da biblioteca"                      python biblioteca/_prova_banco.py
 
 # Duas conferencias aqui, e a primeira e a que pega o defeito de verdade.
 #
