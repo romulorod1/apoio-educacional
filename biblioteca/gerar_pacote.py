@@ -261,6 +261,21 @@ def subida_fina(doc, pno, x0, x1, y, limite):
     return max(limite, limite + r / 4.0)
 
 
+def descida_fina(doc, pno, x0, x1, y, limite):
+    """Desce de y pela tinta a 288 dpi enquanto ela continua, sem passar de limite."""
+    if limite - y < 0.25:
+        return y
+    tmp = pymupdf.open()
+    tmp.insert_pdf(doc, from_page=pno, to_page=pno)
+    pix = tmp[0].get_pixmap(dpi=288, colorspace=pymupdf.csGRAY, clip=pymupdf.Rect(x0, y, x1, limite))
+    tmp.close()
+    w, h, smp = pix.width, pix.height, pix.samples
+    r = 0
+    while r < h and any(smp[r * w + x] < LIMIAR_TINTA for x in range(w)):
+        r += 1
+    return min(limite, y + r / 4.0)
+
+
 def divisa_fina(doc, pno, x0, x1, y_de, y_ate):
     """Ponto inteiro no ultimo vao em branco entre y_de e y_ate, pela tinta a 288 dpi, ou None."""
     tmp = pymupdf.open()
@@ -701,6 +716,11 @@ def detectar(doc, secao_1_abre_solucoes=True):
                     continue
                 y0 = com_tinta[0] - FOLGA
                 y1 = com_tinta[-1] + 1 + FOLGA
+                if SUBIDA_FINA:
+                    # e desce pela tinta fina: a linha de 0,5 pt do eixo da figura da
+                    # solucao 6 de Circulo Trigonometrico (2o medio) passa 9 pt da ultima
+                    # linha que a pagina a 72 dpi mostra, e saia cortada
+                    y1 = max(y1, descida_fina(doc, pno, cx0, cx1, com_tinta[-1] + 1, min(y_fim - 0.5, fundo)) + FOLGA)
                 if m is not None:
                     # o pedaco do marcador comeca no topo da linha do marcador, que e a
                     # caixa da fonte e fica um pouco acima da tinta

@@ -938,6 +938,28 @@ def trava_subida_fina(subida=None):
     return erros
 
 
+def trava_descida_fina(descida=None):
+    """O fim do pedaco desce pelo traco fino que a pagina a 72 dpi nao mostra.
+
+    Pagina sintetica: tinta ate y 110 e um traco de 0,15 pt de largura descendo
+    ate y 116 (o eixo da figura da solucao 6 de Circulo Trigonometrico, 2o medio).
+    Descendo de 110, com limite em 125, o fim tem de ficar entre 115,5 e 116,5.
+    """
+    descida = descida or gerar_pacote.descida_fina
+    doc = pymupdf.open()
+    pg = doc.new_page(width=612, height=792)
+    pg.draw_rect(pymupdf.Rect(40, 100, 120, 110), color=None, fill=(0, 0, 0), width=0)
+    pg.draw_line((80, 110), (80, 116), width=0.15)
+    erros = []
+    tinta = gerar_pacote.linhas_com_tinta(doc, 0, {'xsep': 306.0, 'yrod': 767.0})[0]
+    if any(tinta[y] for y in (111, 112, 113, 114, 115)):
+        erros.append('a pagina a 72 dpi ja mostra o traco: o caso nao prova nada')
+    y = descida(doc, 0, 24.0, 304.0, 110.0, 125.0)
+    if not 115.5 <= y <= 116.5:
+        erros.append('fim em %r, e nao entre 115,5 e 116,5' % (y,))
+    return erros
+
+
 def trava_bordas(p):
     """A lista de bordas da amostra: 1, 2 e 5 no pacote; 3 e 4 fora pela calha.
 
@@ -1925,6 +1947,8 @@ def principal():
             placar.conferir('bordas: expoente alto, tabela no fio, nota com fracao', trava_bordas(p))
             placar.conferir('divisa fina entre itens colados', trava_divisa_fina())
             placar.conferir('subida fina pelo traco', trava_subida_fina())
+            placar.conferir('descida fina pelo traco', trava_descida_fina())
+            placar.conferir('descida pela linha de 1 pt', trava_descida_fina(lambda doc, pno, x0, x1, y, lim: y), True, 'fim em')
             placar.conferir('subida pela linha de 1 pt', trava_subida_fina(lambda doc, pno, x0, x1, y, lim: y), True, 'topo em')
             placar.conferir('divisa pela linha de 1 pt', trava_divisa_fina(lambda doc, pno, x0, x1, a, b: float(math.floor(b) - 1)),
                             True, 'divisa em')
