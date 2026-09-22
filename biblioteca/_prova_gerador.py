@@ -402,23 +402,35 @@ def trava_xml(p):
 
 
 def trava_svg(p):
+    """Todo SVG do pacote (recorte E pagina de teoria) e autocontido e do tamanho declarado.
+
+    Achado da lente 2: a versao anterior so olhava os recortes, e so via se o
+    viewBox existia. Agora: sem <text>, sem @font-face, sem data-text, sem
+    referencia externa; width, height e viewBox iguais a medidas.
+    """
     erros = []
-    for it in p.itens:
-        for tipo in ('enunciado', 'solucao'):
-            cam = it['assets'].get(tipo)
-            if not cam:
-                continue
-            s = p.bytes_de(cam).decode('utf-8')
-            if '<text' in s or '@font-face' in s:
-                erros.append('%s: SVG com texto ou fonte embutida' % cam)
-            if re.search(r'(?:xlink:)?href="(?!#|data:)', s):
-                erros.append('%s: SVG com referencia externa' % cam)
-            m = re.search(r'<svg\b[^>]*\bwidth="([\d.]+)"[^>]*\bheight="([\d.]+)"', s)
-            med = it['medidas'][tipo]
-            if not m or abs(float(m.group(1)) - med['largura_pt']) > 0.2 or abs(float(m.group(2)) - med['altura_pt']) > 0.2:
-                erros.append('%s: width e height do SVG nao batem com medidas %s' % (cam, med))
-            if 'viewBox="0 0 ' not in s[:600]:
-                erros.append('%s: SVG sem viewBox' % cam)
+    alvos = [(it['assets'][t], it['medidas'][t]) for it in p.itens for t in ('enunciado', 'solucao') if it['assets'].get(t)]
+    alvos += [(pg['asset'], pg['medidas']) for t in p.teoria for pg in t['paginas']]
+    for cam, med in alvos:
+        s = p.bytes_de(cam).decode('utf-8')
+        if '<text' in s or '@font-face' in s:
+            erros.append('%s: SVG com texto ou fonte embutida' % cam)
+        if 'data-text=' in s:
+            erros.append('%s: SVG com data-text' % cam)
+        if re.search(r'(?:xlink:)?href="(?!#|data:)', s):
+            erros.append('%s: SVG com referencia externa' % cam)
+        raiz = re.search(r'<svg\b[^>]*>', s)
+        raiz = raiz.group(0) if raiz else ''
+        w = re.search(r'\bwidth="([\d.]+)"', raiz)
+        h = re.search(r'\bheight="([\d.]+)"', raiz)
+        vb = re.search(r'\bviewBox="0 0 ([\d.]+) ([\d.]+)"', raiz)
+        if not (w and h and vb):
+            erros.append('%s: SVG sem width, height ou viewBox na raiz' % cam)
+            continue
+        valores = [float(w.group(1)), float(h.group(1)), float(vb.group(1)), float(vb.group(2))]
+        esperado = [med['largura_pt'], med['altura_pt']] * 2
+        if any(abs(v - e) > 0.6 for v, e in zip(valores, esperado)):
+            erros.append('%s: width, height ou viewBox %s nao batem com medidas %s' % (cam, valores, med))
     return erros
 
 
@@ -636,6 +648,8 @@ def curadoria_da_amostra(pasta):
         'id;dificuldade;quem;data;observacao\n9ano:amostra-sintetica:lista-de-amostra:ex:4;1;prova;2026-09-21;curadoria de teste\n')
     io.open(os.path.join(pasta, 'apelidos.json'), 'w', encoding='utf-8', newline='').write(
         '{"bhaskara": ["equação do segundo grau"]}\n')
+    io.open(os.path.join(pasta, 'exclusoes.csv'), 'w', encoding='utf-8', newline='').write(
+        'id;motivo;quem;data\n9ano:amostra-sintetica:lista-cm:ex:2;defeito de teste da prova;prova;2026-09-22\n')
     return pasta
 
 
@@ -810,6 +824,37 @@ def venenos(p, temp, placar, curadoria):
     cam = it_simples['assets']['enunciado']
     regravar_asset(q, cam, q.bytes_de(cam).replace(b'</svg>', b'<text x="1" y="9">x</text></svg>'))
     placar.conferir('svg: texto vivo', trava_svg(q), True, 'texto ou fonte')
+    # svg: texto vivo e data-text numa pagina de teoria; viewBox que nao bate
+    q = copia(p, temp, 'v_svg_teo')
+    cam = q.teoria[0]['paginas'][0]['asset']
+    regravar_asset(q, cam, q.bytes_de(cam).replace(b'</svg>', b'<text x="1" y="9">x</text></svg>'))
+    placar.conferir('svg: texto vivo na teoria', trava_svg(q), True, 'texto ou fonte')
+    q = copia(p, temp, 'v_svg_dt')
+    cam = it_simples['assets']['enunciado']
+    regravar_asset(q, cam, q.bytes_de(cam).replace(b'</svg>', b'<use data-text="a"/></svg>'))
+    placar.conferir('svg: data-text', trava_svg(q), True, 'data-text')
+    q = copia(p, temp, 'v_svg_vb')
+    cam = it_simples['assets']['enunciado']
+    b = q.bytes_de(cam)
+    regravar_asset(q, cam, re.sub(rb'viewBox="0 0 ([\d.]+)', b'viewBox="0 0 999', b, count=1))
+    placar.conferir('svg: viewBox trocado', trava_svg(q), True, 'nao batem com medidas')
+    # manifesto: arquivo sobrando e arquivo faltando; zip com hash trocado
+    q = copia(p, temp, 'v_man_sobra')
+    open(os.path.join(q.pasta, 'assets', 'sobrando.svg'), 'wb').write(b'<svg/>')
+    placar.conferir('manifesto: arquivo sobrando', trava_manifesto(q), True, 'nao esta no manifest')
+    q = copia(p, temp, 'v_man_falta')
+    os.remove(os.path.join(q.pasta, *it_obj['assets']['enunciado'].split('/')))
+    placar.conferir('manifesto: arquivo faltando', trava_manifesto(q), True, 'que nao existe')
+    import zipfile
+    zorig = os.path.join(temp, 'a_zip', 'matematica-obmep-9ano-v1.zip')
+    zruim = os.path.join(temp, 'zip_ruim.zip')
+    with zipfile.ZipFile(zorig) as zi, zipfile.ZipFile(zruim, 'w') as zo:
+        for n in zi.namelist():
+            dado = zi.read(n)
+            if n == it_obj['assets']['solucao']:
+                dado = dado.replace(b'</svg>', b'<!-- -->\n</svg>')
+            zo.writestr(n, dado)
+    placar.conferir('zip: asset diferente do manifest', trava_manifesto(p, zruim), True, 'no zip, hash')
     # svg: caractere de controle numa pagina de teoria (o &#x001a; que a B3 achou)
     q = copia(p, temp, 'v_xml')
     cam = q.teoria[0]['paginas'][1]['asset']
@@ -869,11 +914,21 @@ def principal():
             fazer_amostra.fazer(pdfs)
             cur = curadoria_da_amostra(os.path.join(temp, 'curadoria'))
             gerar(pdfs, os.path.join(temp, 'a'), cur)
-            gerar(pdfs, os.path.join(temp, 'b'), cur)
+            # a segunda geracao muda tudo o que NAO pode entrar nos hashes: outra
+            # data, outro commit e outra pasta de PDFs (achado da lente 2)
+            pdfs_b = os.path.join(temp, 'pdfs_outra_pasta')
+            fazer_amostra.fazer(pdfs_b)
+            gerar_pacote.gerar(pdfs_b, '9ano', 1, os.path.join(temp, 'b') + '_zip', cur, trabalho=os.path.join(temp, 'b'),
+                               gerado_em='2030-01-01T12:34:56-03:00', commit='outro')
             p = Pacote(os.path.join(temp, 'a'), pdfs)
             print('amostra sintetica: %d itens em %d listas (modelos Palladio e CM)' % (len(p.itens), len(p.relatorio['listas'])))
             placar.conferir('determinismo', trava_determinismo(p, Pacote(os.path.join(temp, 'b'), pdfs)))
-            travas_simples(p, placar)
+            travas_simples(p, placar, os.path.join(temp, 'a_zip', 'matematica-obmep-9ano-v1.zip'))
+            placar.conferir('curadoria exclui o item listado',
+                            [] if not any(i['aula']['slug'] == 'lista-cm' and i['numero'] == 2 for i in p.itens)
+                            and any(e['numero'] == 2 and e['motivo'].startswith('curadoria:') for l in p.relatorio['listas']
+                                    if l['aula'] == 'lista-cm' for e in l['excluidos'])
+                            else ['a linha do exclusoes.csv nao tirou o item'])
             placar.conferir('curadoria sobrescreve o proxy',
                             [] if any(i['dificuldade_origem'] == 'curadoria' and i['numero'] == 4 and i['dificuldade'] == 1
                                       for i in p.itens) else ['a linha do dificuldade.csv nao chegou ao item'])

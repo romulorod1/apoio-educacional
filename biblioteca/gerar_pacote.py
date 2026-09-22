@@ -1093,6 +1093,7 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                            'paginas': paginas})
             docs_busca.append({'id': tid, 'serie': SERIE_BUSCA.get(serie, serie), 'tipo': 'teoria', 'titulo': aula_tit,
                                'resumo': modulo['titulo'], 'texto': portal.sem_tracos(' '.join(textos[1:]))})
+            limpo.close()
             relatorio['teorias'].append({'arquivo': a['arquivo'], 'paginas': doc.page_count,
                                          'segundos': round(time.time() - t0, 1)})
         docs_busca.append({'id': '%s:%s' % (serie, mod), 'serie': SERIE_BUSCA.get(serie, serie), 'tipo': 'modulo',
