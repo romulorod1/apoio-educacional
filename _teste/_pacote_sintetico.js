@@ -34,6 +34,7 @@
  *   medidas.*.rotulo em todos os itens, na barra colorida do canto (4,4 a 60,16
  *     pt), que é o que a folha cobre de branco (dá para ver na folha se cobriu);
  *   item 2 sem rótulo (rotulo null): o número sai numa linha acima;
+ *   item 4 com a caixa do rótulo estreita (10 pt): o número também sai acima;
  *   item 4 sem solução na fonte (sem_solucao, assets.solucao null);
  *   item 7 com a solução em dois pedaços empilhados (8a), 400 + 380 pt, que
  *     não cabe numa folha e tem de quebrar entre os pedaços.
@@ -241,7 +242,8 @@ function gerar(saida, opcoes) {
           comSolucao++;
         }
         // no modo compor, o "rótulo" é a barra do canto (4,4 a 60,16 pt)
-        const rotulo = deCompor ? (n === 2 ? null : [4, 4, 60, 16]) : undefined;
+        // o 4 tem a caixa do rótulo estreita: o número não cabe com 7 pt e vai para a faixa de cima
+        const rotulo = deCompor ? (n === 2 ? null : n === 4 ? [4, 4, 14, 16] : [4, 4, 60, 16]) : undefined;
         const terco = Math.min(3, 1 + Math.floor(3 * (n - 1) / l.itens));
         const texto = `resolva o exercicio ${n} sobre ${l.titulo.toLowerCase()}`;
         itens.push({

@@ -322,6 +322,11 @@ roda "biblioteca navegar --envenenado-apelidos" node "_teste/testa_biblioteca_na
 roda "biblioteca compor (pdf)"                 node "_teste/testa_biblioteca_compor.js"
 roda "biblioteca compor"                       node "_teste/testa_biblioteca_compor_tela.js"
 roda "biblioteca compor --envenenado-sem-solucao" node "_teste/testa_biblioteca_compor_tela.js" --envenenado-sem-solucao
+# FRENTE B: a biblioteca a partir da aula (botao Material do assunto, filtro
+# "ainda nao usei com", fechamento com os modulos, e o fechamento sem biblioteca
+# byte a byte igual ao de main). O veneno conta o uso de qualquer aluno.
+roda "biblioteca aula"                         node "_teste/testa_biblioteca_aula.js"
+roda "biblioteca aula --envenenado-aluno"      node "_teste/testa_biblioteca_aula.js" --envenenado-aluno
 
 roda "painel de valores"                        node "_teste/testa_painel_valores.js"
 roda "painel de valores --envenenado-aberto"    node "_teste/testa_painel_valores.js" --envenenado-aberto

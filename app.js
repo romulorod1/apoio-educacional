@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.22.0';
+  var VERSAO = '1.23.0';
 
   /* O acervo de 14/09 (aba Temas e o atalho dele na escolha de assunto da
    * aula) saiu do ar até ser refeito com revisão. Os arquivos do banco ficam
@@ -993,6 +993,7 @@
       ligarEventos();
       atualizarBotaoOlho();
       desenharTudo();
+      atualizarTemBiblioteca();
       setTimeout(mostrarNovidades, 900);
       registrarServiceWorker();
     }).catch(function (e) {
@@ -1079,7 +1080,13 @@
         $('.conteudo').scrollTop = 0;
         /* Redesenha a tela ao abrir para exibir dados atualizados */
         if (b.dataset.tela === 'temas') desenharTemas();
-        if (b.dataset.tela === 'biblioteca') desenharBiblioteca();
+        if (b.dataset.tela === 'biblioteca') {
+          /* Pelo menu, e não pelo Material de uma aula: sem aula de origem, e o
+           * filtro "ainda não usei" volta para todos. */
+          if (!bibVindoDoMaterial) { bibContexto = null; bibFiltroAluno = ''; }
+          bibVindoDoMaterial = false;
+          desenharBiblioteca();
+        }
         if (b.dataset.tela === 'ajustes') desenharAjustes();
         /* Os números do IBGE se atualizam sozinhos quando ela abre uma tela que
          * os usa, e nunca na abertura do aplicativo: a hora em que ela abre o
@@ -2095,7 +2102,25 @@
 
       /* Material existe para qualquer tema que o índice da matéria conhece ou do acervo */
       var modAcervo = moduloAcervoPorAssunto(t);
-      var podeMaterial = !comMaterial && (!!registro || !!modAcervo);
+      /* Com um pacote da biblioteca importado, o Material de um assunto de
+       * matemática abre a biblioteca procurando pelo título do assunto. O
+       * material autoral continua no botão "Material de aula" da janela. */
+      var pelaBiblioteca = !comMaterial && temPacoteBiblioteca && disciplina === Core.MATERIA_PADRAO;
+      function materialDeSempre() {
+        if (modAcervo) {
+          montarMaterialAcervoParaAula(modAcervo, aula, aluno, t);
+        } else if (registro) {
+          $('#titulo-modal-tema').textContent = 'Material de aula' +
+            (aluno ? ', ' + aluno.nome : '');
+          abrirModal('modal-tema');
+          abrirMontagem(registro, aula, aluno, {
+            itemExistente: t,
+            rotuloVoltar: '‹ Voltar para a aula',
+            voltar: function () { fecharModal('modal-tema'); }
+          });
+        }
+      }
+      var podeMaterial = !comMaterial && (pelaBiblioteca || !!registro || !!modAcervo);
 
       caixa.appendChild(el('div', { class: 'item-lista item-assunto-aula' }, [
         el('div', { class: 'cresce' }, [
@@ -2109,19 +2134,35 @@
         ].filter(Boolean)),
         podeMaterial ? el('button', {
           type: 'button', class: 'btn pequeno', texto: 'Material',
-          aoClick: function () {
-            if (modAcervo) {
-              montarMaterialAcervoParaAula(modAcervo, aula, aluno, t);
-            } else {
-              $('#titulo-modal-tema').textContent = 'Material de aula' +
-                (aluno ? ', ' + aluno.nome : '');
-              abrirModal('modal-tema');
-              abrirMontagem(registro, aula, aluno, {
-                itemExistente: t,
-                rotuloVoltar: '‹ Voltar para a aula',
-                voltar: function () { fecharModal('modal-tema'); }
-              });
-            }
+          aoClick: function (ev) {
+            /* A biblioteca só toma o toque quando tem o assunto (um módulo que
+             * casa todas as palavras do título). Senão: o material autoral de
+             * sempre, se houver; e, se não houver, um aviso, sem tirá-la da aula
+             * para uma busca vazia. A primeira consulta abre o índice da
+             * biblioteca, então o botão avisa que está abrindo. */
+            var botao = ev && ev.currentTarget;
+            if (!pelaBiblioteca) { materialDeSempre(); return; }
+            if (botao) { botao.disabled = true; botao.textContent = 'Abrindo...'; }
+            bibliotecaTemOAssunto(t.titulo).then(function (tem) {
+              if (botao) { botao.disabled = false; botao.textContent = 'Material'; }
+              // ela pode ter saído da aula enquanto a biblioteca abria: aí não a leva embora
+              if (!$('#modal-aula').classList.contains('aberto') || !aulaEmEdicao || aulaEmEdicao.id !== aula.id) return;
+              if (tem === null) {
+                if (registro || modAcervo) { materialDeSempre(); return; }
+                avisar('Não consegui abrir a biblioteca agora. Tente de novo daqui a pouco.');
+                return;
+              }
+              if (tem) {
+                abrirBibliotecaDoAssunto(t, aula);
+                if ((registro || modAcervo) && !avisouMaterialAutoral) {
+                  avisouMaterialAutoral = true;   // uma vez por uso do aplicativo
+                  avisar('Abri a biblioteca da OBMEP. O seu material deste assunto continua em "Material de aula", na janela da aula.');
+                }
+                return;
+              }
+              if (registro || modAcervo) { materialDeSempre(); return; }
+              avisar('A biblioteca não tem "' + t.titulo + '". Procure por outra palavra na aba Biblioteca, ou navegue pela série.');
+            });
           }
         }) : null,
         /* A folga sai dos 12 px da linha para 32: Tirar apaga, Material não, e
@@ -11654,9 +11695,20 @@
   var ORDEM_SERIES = ['6ano', '7ano', '8ano', '9ano', '1em', '2em', '3em'];
   var NOME_DIFICULDADE = { 1: 'Fácil', 2: 'Médio', 3: 'Difícil' };
 
+  /* Há pacote importado? O botão Material da linha do assunto depende disto, e
+   * a janela da aula é desenhada sem esperar: por isso a resposta fica guardada
+   * e é refeita a cada importação. Pergunta só pelos manifests, que são poucos. */
+  var temPacoteBiblioteca = false;
+  function atualizarTemBiblioteca() {
+    return Store.listarPacotesBiblioteca().then(function (l) {
+      temPacoteBiblioteca = !!(l && l.length);
+    }, function () { temPacoteBiblioteca = false; });
+  }
+
   function bibliotecaMudou() {
     bib = null;
     bibPromessa = null;
+    atualizarTemBiblioteca();
     if ($('#tela-biblioteca') && $('#tela-biblioteca').classList.contains('ativa')) desenharBiblioteca();
   }
 
@@ -11773,6 +11825,7 @@
       ].filter(Boolean).join(', ');
       ligarBuscaBiblioteca();
       desenharCarrinho();
+      desenharContextoBiblioteca();
       if (!bibNav.serie || arv.listaSeries.indexOf(bibNav.serie) < 0) {
         // abre na primeira série que tem módulo do Portal, e não numa só de Banco
         var comPortal = arv.listaSeries.filter(function (s) { return modulosDaSerie(s).portal.length; });
@@ -11937,9 +11990,122 @@
         it.origem_citada ? el('div', { class: 'bib-origem', texto: it.origem_citada }) : null
       ]), 'itens', it.id, etiquetaDela(it)));
     });
+    corpo.appendChild(barraFiltroDeUso(grade));
     corpo.appendChild(grade);
     observarMiniaturas(grade);
     carregarEtiquetas();
+  }
+
+  // ---------- vindo da aula: contexto e "ainda não usei" ----------
+
+  /* A aula de onde ela veio pelo botão Material: a janela Gerar material já a
+   * oferece escolhida, e o filtro "ainda não usei" já vem com o aluno dela. */
+  var bibContexto = null;          // { aulaId, alunoId }
+  var bibFiltroAluno = '';         // '' = mostrar todos
+
+  /* LIMITAÇÃO REGISTRADA: o pacote ainda não liga o módulo do Portal ao tema do
+   * aplicativo (tema_app vem nulo). Até essa tabela existir, "filtrar pelo
+   * módulo" é procurar pelo título do assunto na busca da biblioteca, com os
+   * apelidos do pacote ("bhaskara" leva a "equação do segundo grau"). */
+  /* A biblioteca tem o assunto? Algum módulo casou TODAS as palavras do título
+   * (nota de 1000 para cima no busca.js), com os apelidos do pacote. */
+  function bibliotecaTemOAssunto(titulo) {
+    return carregarBiblioteca().then(function () {
+      var g = procurarNaBiblioteca(String(titulo || '').trim());
+      return g.modulo.some(function (m) { return m.nota >= 1000; });
+    }, function () { return null; });   // null: não deu para abrir, que não é "não tem"
+  }
+
+  var avisouMaterialAutoral = false;
+
+  var bibVindoDoMaterial = false;
+
+  function abrirBibliotecaDoAssunto(t, aula) {
+    bibContexto = { aulaId: aula.id, alunoId: aula.alunoId };
+    bibFiltroAluno = aula.alunoId;
+    bibTermo = String(t.titulo || '').trim();
+    fecharModal('modal-aula');
+    var campo = $('#busca-biblioteca');
+    if (campo) {
+      campo.value = bibTermo;
+      var limpar = $('#limpar-busca-biblioteca');
+      if (limpar) limpar.style.display = bibTermo ? '' : 'none';
+    }
+    var aba = $$('#abas .aba').filter(function (b) { return b.dataset.tela === 'biblioteca'; })[0];
+    bibVindoDoMaterial = true;
+    if (aba) aba.click();
+  }
+
+  function desenharContextoBiblioteca() {
+    var caixa = $('#bib-contexto');
+    if (!caixa) return;
+    caixa.innerHTML = '';
+    var aula = bibContexto ? db.aulas.filter(function (a) { return a.id === bibContexto.aulaId; })[0] : null;
+    var aluno = aula ? alunoPorId(aula.alunoId) : null;
+    caixa.hidden = !aluno;
+    if (!aluno) { bibContexto = null; return; }
+    var quando = aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + ')';
+    caixa.appendChild(el('span', { texto: bibContexto.anexado
+      ? 'Material anexado na aula de ' + quando + '.' : 'Material para a aula de ' + quando + '.' }));
+    caixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-voltar-aula', texto: 'Voltar para a aula',
+      aoClick: function () { var id = bibContexto.aulaId; bibContexto = null; desenharContextoBiblioteca(); abrirAula(id); } }));
+    if (!bibContexto.anexado) {
+      caixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-sair-contexto', texto: 'Não é para esta aula',
+        aoClick: function () {
+          // sem a aula de origem, o filtro dela também sai
+          bibContexto = null;
+          bibFiltroAluno = '';
+          desenharContextoBiblioteca();
+          var sel = $('#bib-filtro-aluno');
+          if (sel) { sel.value = ''; sel.dispatchEvent(new Event('change')); }
+        } }));
+    }
+  }
+
+  /* "Ainda não usei com este aluno": esconde da lista os exercícios que já
+   * foram para uma aula dele. Uso de aula que não existe mais (apagada, ou
+   * desfeita pelo "Voltar a este ponto") não conta. */
+  function barraFiltroDeUso(grade) {
+    var sel = el('select', { id: 'bib-filtro-aluno', 'aria-label': 'Ainda não usei com' });
+    sel.appendChild(el('option', { value: '', texto: 'Todos os exercícios' }));
+    db.alunos.slice().sort(function (a, b) { return String(a.nome).localeCompare(String(b.nome), 'pt-BR'); })
+      .forEach(function (a) { sel.appendChild(el('option', { value: a.id, texto: a.nome })); });
+    sel.value = bibFiltroAluno && alunoPorId(bibFiltroAluno) ? bibFiltroAluno : '';
+    var info = el('span', { class: 'ajuda bib-filtro-info', id: 'bib-filtro-info' });
+    sel.addEventListener('change', function () { bibFiltroAluno = sel.value; aplicarFiltroDeUso(grade, info); });
+    var barra = el('div', { class: 'barra bib-filtro-uso' }, [
+      el('label', { class: 'bib-filtro-rotulo', for: 'bib-filtro-aluno', texto: 'Ainda não usei com:' }), sel, info
+    ]);
+    aplicarFiltroDeUso(grade, info);
+    return barra;
+  }
+
+  function aplicarFiltroDeUso(grade, info) {
+    var celulas = Array.prototype.slice.call(grade.querySelectorAll('.bib-celula'));
+    var alunoId = bibFiltroAluno;
+    if (!alunoId || !alunoPorId(alunoId)) {
+      celulas.forEach(function (c) { c.hidden = false; });
+      info.textContent = '';
+      return Promise.resolve();
+    }
+    return Store.usoDaBiblioteca().then(function (usos) {
+      var aulas = {};
+      // o aluno ATUAL de cada aula: aula trocada de aluno conta para o aluno novo
+      db.aulas.forEach(function (a) { aulas[a.id] = a.alunoId; });
+      var usados = {};
+      (usos || []).forEach(function (u) { if (aulas[u.aulaId] === alunoId) usados[u.itemId] = true; });
+      var escondidos = 0;
+      celulas.forEach(function (c) {
+        var cartao = c.querySelector('.bib-cartao');
+        var usado = !!(cartao && usados[cartao.getAttribute('data-id')]);
+        c.hidden = usado;
+        if (usado) escondidos++;
+      });
+      var nome = alunoPorId(alunoId).nome;
+      info.textContent = escondidos
+        ? plural(escondidos, 'exercício já usado', 'exercícios já usados') + ' com ' + nome + (escondidos === 1 ? ' está escondido.' : ' estão escondidos.')
+        : 'Nenhum exercício desta lista foi usado com ' + nome + '.';
+    }, function () { info.textContent = ''; });
   }
 
   // ---------- material desta aula: caixas, carrinho e folha ----------
@@ -11983,6 +12149,11 @@
 
   function noCarrinho(tipo, id) { return bibCarrinho[tipo].indexOf(id) >= 0; }
 
+  function juntarSelecoes(a, b) {
+    function junta(x, y) { return x.concat(y.filter(function (id) { return x.indexOf(id) < 0; })); }
+    return { itens: junta(a.itens, b.itens), paginas: junta(a.paginas, b.paginas) };
+  }
+
   function marcarNoCarrinho(tipo, id, marcado) {
     var lista = bibCarrinho[tipo];
     var i = lista.indexOf(id);
@@ -11990,6 +12161,8 @@
     if (!marcado && i >= 0) lista.splice(i, 1);
     guardarCarrinho();
     desenharCarrinho();
+    // o material daquela aula já foi anexado: o que ela marca agora é para outra coisa
+    if (marcado && bibContexto && bibContexto.anexado) { bibContexto = null; bibFiltroAluno = ''; desenharContextoBiblioteca(); }
   }
 
   function desenharCarrinho() {
@@ -12022,7 +12195,7 @@
         desenharCarrinho();
         marcarNaTela();
         avisar('Seleção desmarcada.', 'Desfazer', function () {
-          bibCarrinho = antes;
+          bibCarrinho = juntarSelecoes(antes, bibCarrinho);
           guardarCarrinho();
           desenharCarrinho();
           marcarNaTela();
@@ -12236,8 +12409,10 @@
         fecharModal('modal-bib-gerar');
         abrirAula(null, Core.hojeIso());
         folhaPendenteDaBiblioteca = { titulo: op.titulo, aoCriar: function (aulaId, como) {
-          // na série, o aviso "Montando" tiraria da tela o Desfazer dela
+          // na série, o aviso "Montando" tiraria da tela o Desfazer dela; e o aviso
+          // final espera o Desfazer da série vencer (os 9 s do avisar)
           op.semAvisoDeMontagem = !!(como && como.serie);
+          op.avisoDepoisDe = como && como.serie ? Date.now() + 9500 : 0;
           gerarEAnexar(aulaId, itens, paginas, op);
         } };
         var ajudaPadrao = $('#ajuda-aula-nova');
@@ -12267,8 +12442,22 @@
     rodape.appendChild(botaoGerar);
     corpo.appendChild(dica);
     abrirModalGerar.atualizar = atualizarRodape;
-    /* A aula é escolhida sempre por ela, mesmo quando só há uma hoje: escolhida
-     * sozinha, o material podia ir para a aula de outro aluno por distração. */
+    /* A aula é escolhida por ela, mesmo quando só há uma hoje: escolhida
+     * sozinha, o material podia ir para a aula de outro aluno por distração.
+     * A exceção é a aula de onde ela veio pelo botão Material: essa escolha ela
+     * já fez, e a faixa no alto da aba diz qual é. */
+    if (bibContexto && !bibContexto.anexado) {
+      var daAula = listaAulas.querySelector('[data-aula="' + bibContexto.aulaId + '"]');
+      if (!daAula) {
+        var aulaCtx = db.aulas.filter(function (a) { return a.id === bibContexto.aulaId; })[0];
+        if (aulaCtx && alunoPorId(aulaCtx.alunoId)) {
+          listaAulas.insertBefore(el('div', { class: 'bloco-exercicios', texto: 'Aula de onde você veio' }), listaAulas.firstChild);
+          daAula = linhaAula(aulaCtx);
+          listaAulas.insertBefore(daAula, listaAulas.children[1]);
+        }
+      }
+      if (daAula) marcarAula(daAula, bibContexto.aulaId, false);
+    }
     atualizarRodape();
     abrirModal('modal-bib-gerar');
   }
@@ -12339,7 +12528,8 @@
     desenharCarrinho();
     $$('#bib-corpo input[data-carrinho]').forEach(function (c) { c.checked = false; });
     return function () {
-      bibCarrinho = usada;
+      // junta com o que ela marcou nesses segundos, em vez de apagar
+      bibCarrinho = juntarSelecoes(usada, bibCarrinho);
       guardarCarrinho();
       desenharCarrinho();
       $$('#bib-corpo input[data-carrinho]').forEach(function (c) { c.checked = noCarrinho(c.dataset.carrinho, c.dataset.id); });
@@ -12358,6 +12548,11 @@
     if (!op.semAvisoDeMontagem) avisar('Montando o material. Isso leva alguns segundos.');
     var usaItens = (op.lista || op.gabarito) ? itens : [];
     var pecas, teoria, anexado = false, id = null, saida = null, etapa = 'montar';
+    // na série, qualquer aviso final espera o Desfazer dela vencer
+    function avisarNaHora(t, r, f) {
+      var espera = Math.max(0, (op.avisoDepoisDe || 0) - Date.now());
+      if (espera) setTimeout(function () { avisar(t, r, f); }, espera); else avisar(t, r, f);
+    }
     return emFila(usaItens, function (it, i) { return comNomeDoExercicio(pecasDoItem(it, op.gabarito), it, i + 1); }).then(function (r) {
       pecas = r;
       return emFila(op.teoria ? paginas : [], function (p) {
@@ -12429,14 +12624,17 @@
          * escondida no material do próximo aluno. O Desfazer do aviso devolve,
          * para ela gerar o mesmo material para outra aula. */
         var devolver = desmarcarDepoisDeAnexar();
+        // o material da aula de origem foi feito: ela não fica escolhida para o próximo
+        // anexado: a faixa fica para ela voltar à aula, mas a aula não vem mais escolhida no próximo material
+        if (bibContexto && bibContexto.aulaId === aula.id) { bibContexto.anexado = true; desenharContextoBiblioteca(); }
         var desmarcada = ' A seleção foi desmarcada.';
         /* "Marcar de novo", e não "Desfazer": no app, Desfazer desfaz a ação do
          * aviso, e aqui ela acharia que tirou o anexo da aula. */
         if (indiceFolha != null) {
           abrirEditorNota(aula.id, indiceFolha);
-          avisar('Material anexado na aula de ' + aluno.nome + ', e a lista abriu como folha.' + menor + desmarcada, 'Marcar de novo', devolver);
+          avisarNaHora('Material anexado na aula de ' + aluno.nome + ', e a lista abriu como folha.' + menor + desmarcada, 'Marcar de novo', devolver);
         } else {
-          avisar('Material anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + ').' + menor + desmarcada, 'Marcar de novo', devolver);
+          avisarNaHora('Material anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + ').' + menor + desmarcada, 'Marcar de novo', devolver);
         }
       });
     }).catch(function (e) {
@@ -12447,14 +12645,14 @@
        * o detalhe técnico fica só no console. */
       if (anexado) {
         var remarcar = desmarcarDepoisDeAnexar();
-        avisar(etapa === 'folha'
+        avisarNaHora(etapa === 'folha'
           ? 'O material foi anexado na aula, mas a lista não abriu como folha. O PDF está na aula; não precisa gerar de novo.'
           : 'O material foi anexado na aula, mas não consegui marcar os exercícios como usados. O PDF está na aula; não precisa gerar de novo.',
           'Marcar de novo', remarcar);
       }
-      else if (e && e.exercicio) avisar(e.exercicio + ' não abriu. Desmarque esse exercício e gere de novo. Nada foi anexado.');
-      else if (e && e.pagina) avisar(e.pagina + ' não abriu. Desmarque essa página e gere de novo. Nada foi anexado.');
-      else avisar('Não consegui montar o material. Nada foi anexado; tente de novo daqui a pouco.');
+      else if (e && e.exercicio) avisarNaHora(e.exercicio + ' não abriu. Desmarque esse exercício e gere de novo. Nada foi anexado.');
+      else if (e && e.pagina) avisarNaHora(e.pagina + ' não abriu. Desmarque essa página e gere de novo. Nada foi anexado.');
+      else avisarNaHora('Não consegui montar o material. Nada foi anexado; tente de novo daqui a pouco.');
     }).then(function () {
       gerandoMaterial = false;
       $$('#rodape-modal-bib-gerar button').forEach(function (b) { b.disabled = false; });
@@ -12723,7 +12921,7 @@
     var g = procurarNaBiblioteca(termo);
     var total = g.modulo.length + g.teoria.length + g.exercicio.length + g.banco.length;
     if (!total) {
-      corpo.appendChild(el('div', { class: 'vazio', texto: 'Nada na biblioteca casou com "' + termo + '".' }));
+      corpo.appendChild(el('div', { class: 'vazio', texto: 'A biblioteca não tem nada com "' + termo + '". Procure por outra palavra, ou navegue pela série.' }));
       return;
     }
     if (g.modulo.length) {
