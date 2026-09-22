@@ -1080,6 +1080,39 @@ def trava_barra_acima(topo=None):
     return [] if y <= 333.8 else ['corte em %.2f, abaixo da barra (333,8)' % y]
 
 
+def trava_corte_sem_tinta(fn=None):
+    """O corte entre itens, ja arredondado, nao passa por cima de tinta.
+
+    Pagina sintetica: um retangulo preto de 684,0 a 690,25 (o "b" que rotula a
+    figura do exercicio 11 de Produtos Notaveis, 8o ano) e o corte em 690,32, que
+    arredondado vira 690 e parte o retangulo. O corte tem de subir para antes dele.
+    """
+    fn = fn or gerar_pacote.topo_sem_cortar
+    doc = pymupdf.open()
+    pg = doc.new_page(width=612, height=792)
+    pg.draw_rect(pymupdf.Rect(440, 684.0, 452, 690.25), color=None, fill=(0, 0, 0), width=0)
+    y = fn(doc, 0, 293.0, 588.0, 690.32, 690.32)
+    return [] if y <= 684.0 else ['corte em %.2f: o arredondamento parte a tinta que acaba em 690,25' % y]
+
+
+def trava_topo_da_linha():
+    """A fracao de fracoes na linha do rotulo sobe o topo da linha ate o alto dela.
+
+    Elementos sinteticos com as medidas do exercicio 22 de Numeros Racionais (7o
+    ano): rotulo "Exercicio 22." de 582,7 a 592,7 e a fracao 3(-1/2)^2 + 1/4 em
+    cima dele, em cadeia, com o expoente em 560,2. O topo tem de chegar a 560,2.
+    """
+    marc = {'col': 0, 'el': {'bb': (29.5, 582.7, 74.0, 592.7), 'tipo': 'txt', 'col': 0, 'tam': 10.0}}
+    els = [marc['el'],
+           {'tipo': 'txt', 'col': 0, 'bb': (97.0, 583.4, 201.0, 593.3), 'texto': 'Simplificando', 'tam': 10.0},
+           {'tipo': 'txt', 'col': 0, 'bb': (239.1, 576.8, 244.1, 586.8), 'texto': '2', 'tam': 10.0},
+           {'tipo': 'txt', 'col': 0, 'bb': (215.4, 570.0, 220.3, 580.0), 'texto': '3', 'tam': 10.0},
+           {'tipo': 'txt', 'col': 0, 'bb': (239.1, 563.3, 244.1, 573.2), 'texto': '1', 'tam': 10.0},
+           {'tipo': 'txt', 'col': 0, 'bb': (252.8, 560.2, 256.6, 567.8), 'texto': '2', 'tam': 7.6}]
+    topo = gerar_pacote.topo_da_linha(marc, els)
+    return [] if topo <= 560.3 else ['topo da linha em %.1f, abaixo do alto da fracao (560,2)' % topo]
+
+
 def trava_bordas(p):
     """A lista de bordas da amostra: 1, 2 e 5 no pacote; 3 e 4 fora pela calha.
 
@@ -1096,6 +1129,19 @@ def trava_bordas(p):
     fora = sorted(e['numero'] for e in lst[0]['excluidos'] if 'fio entre as colunas' in e['motivo'])
     if fora != [3, 4]:
         erros.append('lista-bordas: excluidos pela calha %s, e nao 3 e 4' % fora)
+    # o alto do expoente em escada ("4", 19 pt acima do rotulo) e do exercicio 2
+    it = {i['numero']: i for i in p.itens if i['aula']['slug'] == 'lista-bordas'}
+    if 2 in it:
+        doc = p.doc(it[2]['origem']['arquivo'])
+        sp = [x for b in doc[1].get_text('dict')['blocks'] if b['type'] == 0 for l in b['lines'] for x in l['spans']
+              if '4' in x['text'] and x['size'] < 8 and x['bbox'][0] < 290 and x['bbox'][1] < 200]
+        sp.sort(key=lambda x: x['bbox'][1])
+        if not sp:
+            erros.append('lista-bordas: a pagina nao tem o alto do expoente')
+        else:
+            c = pymupdf.Point((sp[0]['bbox'][0] + sp[0]['bbox'][2]) / 2, (sp[0]['bbox'][1] + sp[0]['bbox'][3]) / 2)
+            if not any(pymupdf.Rect(pz['bbox']).contains(c) for pz in pedacos(it[2], 'enunciado') if pz['pagina'] == 2):
+                erros.append('lista-bordas: o alto do expoente esta fora do recorte do exercicio 2')
     return erros
 
 
@@ -1910,12 +1956,11 @@ def venenos_series(p, temp, placar, curadoria):
             ('tabela que cruza o fio fica (contagem)', 'CALHA_TRACO', False, trava_bordas, 'itens no pacote'),
             ('traco recortado antes do fio tira o item', 'tinta_dos_dois_lados', lambda pg, x, bb: True, trava_bordas,
              'itens no pacote'),
-            ('expoente alto fica no item de cima', 'TOPO_MAX', 12, trava_recorte, 'lista-bordas:ex:2 enunciado: tinta cortada'),
             ('nota que comeca por fracao', 'NOTA_LINHA_TODA', False, trava_recorte, 'lista-bordas:ex:5 enunciado: tinta cortada'),
             # sem o fio em imagem a lista perde a geometria: o 2 leva o fio do rodape ou sai
             ('fio do rodape em imagem', 'FIO_IMAGEM', False, lambda q: trava_recorte(q) + trava_encostado(q), 'lista-fio-imagem'),
             ('credito do autor dentro da solucao', 'CREDITO_MATERIAL', False, trava_encostado, 'o credito do autor'),
-            ('rotulo de figura do item de cima', 'SOBREPOSICAO_MIN', 0.0, trava_recorte, 'lista-fio-imagem:ex:1 enunciado: tinta cortada'),
+            ('rotulo de figura do item de cima', 'SOBREPOSICAO_MIN', 0.0, trava_encostado, 'exercicio 1 fora do pacote'),
             ('texto encostado no rotulo vai para o item de cima', 'TINTA_DO_QUE_ENCOSTA', False, trava_encostado, 'no recorte do exercicio 3'),
             ('linha de cima encostada sobe o topo', 'MIUDO_QUE_ENCOSTA', 99.0, trava_encostado, 'exercicio 2 fora do pacote')):
         pasta = os.path.join(temp, 'v_' + attr.lower())
@@ -2091,6 +2136,20 @@ def principal():
             placar.conferir('descida fina pelo traco', trava_descida_fina())
             placar.conferir('seta que encosta no rotulo', trava_encosta())
             placar.conferir('barra de segmento acima da linha', trava_barra_acima())
+            placar.conferir('corte sem passar por tinta', trava_corte_sem_tinta())
+            placar.conferir('fracao alta na linha do rotulo', trava_topo_da_linha())
+            antes_tm = gerar_pacote.TOPO_MAX
+            gerar_pacote.TOPO_MAX = 12
+            try:
+                placar.conferir('fracao alta cortada em 12 pt', trava_topo_da_linha(), True, 'topo da linha em')
+            finally:
+                gerar_pacote.TOPO_MAX = antes_tm
+            antes_cs = gerar_pacote.CORTE_SEM_TINTA
+            gerar_pacote.CORTE_SEM_TINTA = False
+            try:
+                placar.conferir('corte por cima da tinta', trava_corte_sem_tinta(), True, 'arredondamento parte a tinta')
+            finally:
+                gerar_pacote.CORTE_SEM_TINTA = antes_cs
             antes_ba = gerar_pacote.BARRA_ACIMA
             gerar_pacote.BARRA_ACIMA = False
             try:

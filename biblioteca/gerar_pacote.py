@@ -70,6 +70,7 @@ MARGEM_X = 24.0        # borda externa das colunas
 # largura) continua fora do recorte.
 AFASTA_FIO = 1.2
 ENCOSTA = 0.5  # caixa a menos disto acima da linha do marcador ainda e da linha (topo_da_linha); 0 so no veneno
+CORTE_SEM_TINTA = True  # o corte entre itens nunca passa por cima de tinta (topo_sem_cortar); False so no veneno
 BARRA_ACIMA = True  # barra de segmento acima da linha do marcador entra no recorte; False so no veneno
 CREDITO_MATERIAL = True  # "Material elaborado por" fecha o item, como os creditos; False so no veneno
 SOBREPOSICAO_MIN = 0.25  # quanto da caixa tem de estar na linha para ser dela (topo_da_linha); 0 so no veneno
@@ -517,6 +518,36 @@ def topo_da_linha(marc, els):
 LIMIAR_TINTA = 200  # cinza abaixo disto e tinta
 
 
+def topo_sem_cortar(doc, pno, x0, x1, y_t, limite):
+    """Sobe o corte enquanto ele passa por cima de tinta, ate o comeco da tinta.
+
+    Nem toda linha se separa da de cima por um corte reto: o "b" que rotula a
+    figura do exercicio 11 de Produtos Notaveis (8o ano) cobre 2,2 pt da linha do
+    rotulo do 12, e cortar em qualquer ponto parte o "b" ou o rotulo. Entre cortar
+    e levar junto, leva junto: o corte sobe ate o alto daquele bloco de tinta.
+    """
+    if not CORTE_SEM_TINTA:
+        return y_t
+    # pelo ponto inteiro: a borda do recorte e inteira, e o arredondamento e que
+    # pode jogar o corte para dentro da tinta
+    corte = float(math.floor(y_t))
+    alto = max(0.0, min(limite, corte) - 14.0)
+    if corte - alto < 0.25:
+        return y_t
+    tmp = pymupdf.open()
+    tmp.insert_pdf(doc, from_page=pno, to_page=pno)
+    pix = tmp[0].get_pixmap(dpi=288, colorspace=pymupdf.csGRAY, clip=pymupdf.Rect(x0, alto, x1, corte + 0.25))
+    tmp.close()
+    w, h, smp = pix.width, pix.height, pix.samples
+    tinta = [any(smp[y * w + x] < LIMIAR_TINTA for x in range(w)) for y in range(h)]
+    r = h - 1  # a linha logo abaixo do corte
+    if r < 1 or not tinta[r] or not tinta[r - 1]:
+        return y_t
+    while r > 0 and tinta[r - 1]:
+        r -= 1
+    return max(alto, alto + r / 4.0 - 0.25)
+
+
 def topo_com_barra(els, marc, y_t):
     """Sobe o topo ate a barra de segmento que cobre texto da linha do marcador.
 
@@ -749,6 +780,7 @@ def detectar(doc, secao_1_abre_solucoes=True):
                             if y_e is not None:
                                 y_t = max(topo_caixas, min(y_t, y_e))
                     y_t = topo_com_barra(els, m, y_t)
+                    y_t = topo_sem_cortar(doc, pno, cx0, cx1, y_t, topo_caixas)
                 cortes.append((y_t, m))
             lim_col = [(y, m) for y, m in cortes]
             els_col = [e for e in els if e['col'] == col]
