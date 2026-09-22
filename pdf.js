@@ -3903,22 +3903,23 @@
    * Peca = { larguraPt, alturaPt, rotulo: [x0,y0,x1,y1] | null,
    *          img: {bytes, wPx, hPx}  ou  pedacos: [{ img, alturaPt }] }
    *
-   * Devolve { bytes, total, paginas: {teoria, lista, gabarito}, reduzidos },
-   * com os índices das páginas de cada parte e os números da lista que
-   * precisaram de escala menor para caber. */
+   * Devolve { bytes, total, paginas: {teoria, lista, gabarito},
+   * reduzidos: {lista, gabarito} }, com os índices das páginas de cada parte e,
+   * em cada parte, os números que precisaram de escala menor para caber. */
   function gerarMaterialBiblioteca(op) {
     var doc = new Doc();
     doc.lingua = 'pt';
     var itens = op.itens || [];
     var CHEIA = Y_TOPO - Y_LIMITE;
     var mapa = { teoria: [], lista: [], gabarito: [] };
-    var reduzidos = [];
+    var reduzidos = { lista: [], gabarito: [] };
     var cont = 0;
 
-    /* Item sem solução só é aceito quando o pacote diz que a fonte não tem
-     * solução. Solução que devia existir e não chegou (asset que não abriu) para
-     * a folha aqui, em vez de sair um número com nada embaixo no gabarito. */
-    itens.forEach(function (it, i) {
+    /* Com gabarito, item sem solução só é aceito quando o pacote diz que a
+     * fonte não tem solução. Solução que devia existir e não chegou para a folha
+     * aqui, em vez de sair um número com nada embaixo no gabarito. Sem gabarito,
+     * a solução nem é pedida. */
+    if (op.incluirGabarito) itens.forEach(function (it, i) {
       if (!it.solucao && !it.semSolucao) {
         throw new Error('A solução do exercício ' + (i + 1) + ' não chegou para a folha (' + it.id + ').');
       }
@@ -3948,10 +3949,16 @@
       doc.y -= 6;
     }
 
-    /* O rótulo novo no lugar do antigo. k é a escala do recorte na folha. */
+    /* O rótulo novo no lugar do antigo, no corpo que cabe na caixa coberta.
+     * Abaixo de CORPO_MIN ele ficaria ilegível ("Exercício 12." numa caixa feita
+     * para "7."): aí o número sai numa linha própria, acima do recorte. */
+    var CORPO_MIN = 7;
+    function corpoDoRotulo(texto, r, k) {
+      return Math.min((r[3] - r[1]) * k * 1.05, (r[2] - r[0] + 2) * k / medir(texto, 1, true));
+    }
     function rotuloNoLugar(texto, r, k, topo) {
-      var tam = Math.min((r[3] - r[1]) * k * 1.05, (r[2] - r[0] + 2) * k / medir(texto, 1, true));
-      doc.texto(texto, MARG_E + r[0] * k, topo - r[3] * k + 1.5, { tam: tam, bold: true, cor: COR.navy });
+      doc.texto(texto, MARG_E + r[0] * k, topo - r[3] * k + 1.5,
+        { tam: corpoDoRotulo(texto, r, k), bold: true, cor: COR.navy });
     }
 
     function linhaDeOrigem(origem) {
@@ -3965,32 +3972,45 @@
      * escala do item diminui. Nunca se corta recorte por altura fixa. */
     function recorte(parte, n, peca, extra, origem) {
       var rotuloNovo = (parte === 'lista' ? 'Exercício ' : '') + n + '.';
-      var acima = peca.rotulo ? 0 : 16;
-      var cauda = extra + (origem ? 11 : 0) + 8;
+      var cauda = extra + (origem ? 11 : 0) + 8;      // espaço para resposta, origem e folga
       var pedacos = peca.pedacos && peca.pedacos.length ? peca.pedacos
         : [{ img: peca.img, alturaPt: peca.alturaPt }];
       var k = Math.min(1, UTIL / peca.larguraPt);
-      var inteiro = pedacos.length === 1 || peca.alturaPt * k + acima + cauda <= CHEIA;
+      var noLugar = function () { return !!peca.rotulo && corpoDoRotulo(rotuloNovo, peca.rotulo, k) >= CORPO_MIN; };
+      var acima = noLugar() ? 0 : 16;
+      var inteiro = pedacos.length === 1 || peca.alturaPt * k + acima + cauda + 4 <= CHEIA;
       var maior = inteiro ? peca.alturaPt
         : Math.max.apply(null, pedacos.map(function (p) { return p.alturaPt; }));
-      var teto = CHEIA - 8 - acima;
-      if (maior * k > teto) { k = teto / maior; reduzidos.push(n); }
+      /* Quanto cabe: a folha inteira; ou, logo abaixo do título da parte, o que
+       * sobra nela, para a página do título não ficar vazia por causa de um
+       * recorte que vai ser reduzido de qualquer jeito. */
+      var logoAbaixoDoTitulo = Y_TOPO - doc.y < 110;
+      var util = logoAbaixoDoTitulo ? doc.y - Y_LIMITE : CHEIA;
+      var teto = util - 4 - acima - cauda;
+      if (maior * k > teto) {
+        k = teto / maior;
+        if (!noLugar() && !acima) { acima = 16; k = (teto - 16) / maior; }
+        reduzidos[parte].push(n);
+      }
+      if (!noLugar()) acima = 16;
       var largura = peca.larguraPt * k;
-      doc.garanteEspaco(inteiro ? Math.min(peca.alturaPt * k + acima + cauda, CHEIA)
-        : acima + pedacos[0].alturaPt * k + 8);
-      if (!peca.rotulo) {
+      doc.garanteEspaco(inteiro ? peca.alturaPt * k + acima + cauda + 4
+        : acima + pedacos[0].alturaPt * k + 4);
+      if (!noLugar()) {
         doc.y -= 12;
         doc.texto(rotuloNovo, MARG_E, doc.y, { tam: parte === 'lista' ? 11 : 10, bold: true, cor: COR.navy });
       }
       doc.y -= 4;
       pedacos.forEach(function (p, i) {
         var altura = p.alturaPt * k;
+        var ultimo = i === pedacos.length - 1;
         if (i > 0) {
           doc.y -= 6 * k;                            // a folga entre pedaços do gerador
-          if (!inteiro) doc.garanteEspaco(altura + 8);   // a fronteira pode virar a página
+          // a fronteira pode virar a página; o último pedaço leva a cauda junto
+          if (!inteiro) doc.garanteEspaco(altura + (ultimo ? cauda : 4));
         }
         imagem(p.img, MARG_E, doc.y - altura, largura, altura);
-        if (i === 0 && peca.rotulo) rotuloNoLugar(rotuloNovo, peca.rotulo, k, doc.y);
+        if (i === 0 && noLugar()) rotuloNoLugar(rotuloNovo, peca.rotulo, k, doc.y);
         doc.y -= altura;
         anota(parte);
       });

@@ -18,7 +18,13 @@
  *      saem byte a byte iguais aos do pdf.js de main;
  *   7. recorte mais alto que a folha: quebra entre pedaços, nunca no meio; um
  *      pedaço sozinho alto demais é reduzido e sai inteiro;
- *   8. nenhum travessão ou meia-risca no texto impresso.
+ *   8. nenhum travessão ou meia-risca no texto impresso;
+ *   9. lista SEM gabarito: as soluções nem são pedidas, e a folha sai;
+ *  10. espaço para resposta e origem cabem acima do limite da folha, num
+ *      recorte alto de um pedaço só;
+ *  11. recorte reduzido logo abaixo do título fica na página do título;
+ *  12. rótulo em caixa estreita demais (corpo abaixo de 7 pt): o número sai numa
+ *      linha própria, acima do recorte.
  */
 'use strict';
 const fs = require('fs');
@@ -112,7 +118,7 @@ secao('2. lista renumerada');
 const lista = r.paginas.lista.map(i => pdf.paginas[i].texto).join(' ');
 const numeros = (lista.match(/Exercício \d+\./g) || []).join(' ');
 conf('Exercício 1. a 8., em ordem', numeros, [1, 2, 3, 4, 5, 6, 7, 8].map(n => 'Exercício ' + n + '.').join(' '));
-conf('nenhum número da fonte sobrou impresso', /Exercício (9|1\d)\./.test(lista), false);
+conf('exatamente 8 rótulos novos na lista', (lista.match(/Exercício \d+\./g) || []).length, 8);
 
 secao('3. gabarito');
 const primeiraGab = r.paginas.gabarito[0];
@@ -147,7 +153,9 @@ const gs = Object.keys(pdf.objs).find(k => pdf.objs[k] === '<< /Type /ExtGState 
 conf('um estado gráfico de multiplicação no arquivo', !!gs, true);
 conf('toda página chama o estado', pdf.paginas.every(p => p.obj.indexOf('/ExtGState << /GSm ' + gs + ' 0 R >>') >= 0 &&
   /q \/GSm gs[\s\S]*NW[\s\S]*Q/.test(p.fluxo)), true);
-conf('a marca vem depois do conteúdo (por cima)', pdf.paginas.every(p =>
+const comImagem = pdf.paginas.filter(p => p.imagens.length);
+conf('páginas com imagem para conferir a ordem', comImagem.length, pdf.paginas.length);
+conf('a marca vem depois da última imagem (por cima)', comImagem.every(p =>
   p.fluxo.indexOf('q /GSm gs') > p.fluxo.lastIndexOf(' Do Q')), true);
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'bib_compor_'));
@@ -188,6 +196,9 @@ if (antigo) {
   const f = Core.calcularFechamento(db, 'a1', '2026-06');
   conf('fechamento do mês byte a byte igual', igual(PDFGen.gerarFechamento(f, { sempreResumo: true }),
     antigo.gerarFechamento(f, { sempreResumo: true })), true);
+  const mes = Core.calcularMesInteiro(db, '2026-06');
+  conf('resumo do mês byte a byte igual', igual(PDFGen.gerarResumoMes(mes, 'Junho de 2026'),
+    antigo.gerarResumoMes(mes, 'Junho de 2026')), true);
 }
 
 // ---------------------------------------------------------------- 7
@@ -204,10 +215,51 @@ const im1 = pa.paginas[onde('Im1')].imagens.find(i => i.nome === 'Im1');
 const im2 = pa.paginas[onde('Im2')].imagens.find(i => i.nome === 'Im2');
 conf('pedaços na escala 1 (sem redução)', im1.a.toFixed(0) + ',' + im2.a.toFixed(0), '420,380');
 conf('o pedaço 2 abre a página nova no topo', (im2.y + im2.a) > PDFGen.Y_TOPO - 10, true);
-conf('exercício 2 reduzido e listado', JSON.stringify(alto.reduzidos), '[2]');
+conf('exercício 2 reduzido e listado (na lista)', JSON.stringify(alto.reduzidos), '{"lista":[2],"gabarito":[]}');
 const im3 = pa.paginas[onde('Im3')].imagens.find(i => i.nome === 'Im3');
 conf('exercício 2 inteiro dentro da área útil', im3.y >= PDFGen.Y_LIMITE - 0.01 && im3.y + im3.a <= PDFGen.Y_TOPO + 0.01, true);
 conf('proporção do exercício 2 mantida', Math.abs(im3.l / im3.a - 260 / 900) < 0.001, true);
+
+// ---------------------------------------------------------------- 9 a 12
+secao('9. lista sem gabarito: as soluções nem são pedidas');
+let semGab = null, erroSemGab = null;
+try {
+  semGab = PDFGen.gerarMaterialBiblioteca(Object.assign({}, BASE, { incluirTeoria: false, incluirGabarito: false,
+    itens: oitoItens().map(it => Object.assign({}, it, { solucao: null, semSolucao: false })) }));
+} catch (e) { erroSemGab = e; }
+conf('a folha sai', erroSemGab ? erroSemGab.message : 'saiu', 'saiu');
+conf('e não tem gabarito', semGab ? semGab.paginas.gabarito.length : -1, 0);
+
+secao('10. espaço para resposta e origem num recorte alto');
+const cauda = PDFGen.gerarMaterialBiblioteca(Object.assign({}, BASE, { incluirTeoria: false, incluirGabarito: false,
+  espacoParaResposta: 60, mostrarOrigem: true, itens: [
+    { id: 'x:1', origem: 'Portal da OBMEP, teste, exercício 1', enunciado: peca(650), solucao: peca(50) },
+    { id: 'x:2', origem: 'Portal da OBMEP, teste, exercício 2', enunciado: empilhada([400, 380]), solucao: peca(50) }
+  ] }));
+const pc = lerPdf(cauda.bytes);
+const imgsC = pc.paginas.map(p => p.imagens).reduce((a, b) => a.concat(b), []);
+const fundoDaImagem = nome => imgsC.find(i => i.nome === nome).y;
+// a origem sai 9 pt abaixo da imagem, e o espaço de 60 pt vem depois dela
+conf('recorte de 650 pt: origem e espaço acima do limite', fundoDaImagem('Im1') - 9 - 60 >= PDFGen.Y_LIMITE - 0.01, true);
+conf('recorte em pedaços: o último leva origem e espaço junto', fundoDaImagem('Im3') - 9 - 60 >= PDFGen.Y_LIMITE - 0.01, true);
+const origens = pc.paginas.map(p => p.textos.filter(t => /^Portal da OBMEP, teste/.test(t)).length).reduce((a, b) => a + b, 0);
+conf('as duas origens impressas', origens, 2);
+
+secao('11. recorte reduzido logo abaixo do título fica na página do título');
+const titulo = PDFGen.gerarMaterialBiblioteca(Object.assign({}, BASE, { incluirTeoria: false, incluirGabarito: false,
+  itens: [{ id: 'x:1', enunciado: peca(900), solucao: peca(50) }] }));
+const pt = lerPdf(titulo.bytes);
+conf('uma página só, com o título e o recorte', pt.paginas.length + ',' + pt.paginas[0].imagens.length, '1,1');
+conf('o recorte cabe acima do limite', pt.paginas[0].imagens[0].y >= PDFGen.Y_LIMITE - 0.01, true);
+
+secao('12. rótulo em caixa estreita: número numa linha própria');
+const estreita = PDFGen.gerarMaterialBiblioteca(Object.assign({}, BASE, { incluirTeoria: false, incluirGabarito: false,
+  itens: [{ id: 'x:1', enunciado: peca(100, [4, 2, 14, 12]), solucao: peca(50) }] }));
+const pe = lerPdf(estreita.bytes);
+const mTd = pe.paginas[0].fluxo.match(/\/F2 ([\d.]+) Tf ([\d.]+) ([\d.]+) Td \(Exerc\S* 1\.\) Tj/);
+conf('"Exercício 1." em corpo legível, na margem', mTd ? (+mTd[1] >= 7) + ',' + mTd[2] : 'não achei', 'true,40.00');
+const imE = pe.paginas[0].imagens[0];
+conf('e acima do recorte', mTd ? +mTd[3] > imE.y + imE.a : false, true);
 
 // ---------------------------------------------------------------- 8
 secao('8. texto sem travessão nem meia-risca');

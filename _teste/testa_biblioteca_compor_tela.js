@@ -21,7 +21,10 @@
  *      guardado para o aluno;
  *   7. de novo na mesma aula, com "Abrir a lista como folha": a folha abre com
  *      a lista colada, riscável;
- *   8. nenhum erro de JavaScript.
+ *   8. só a lista, sem gabarito (o caminho mais comum): o anexo sai com a lista
+ *      e sem folha de gabarito; "Abrir a lista como folha" desliga quando a
+ *      Lista é desmarcada;
+ *   9. nenhum erro de JavaScript.
  *
  * Modo envenenado:
  *   node _teste/testa_biblioteca_compor_tela.js --envenenado-sem-solucao
@@ -372,6 +375,42 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
   conf('o segundo material gravou mais 8 usos', (await lerDeposito(pag, 'biblioteca_uso')).length - usosAntes, 8);
   await pausa(800);
   if (SALVAR) await pag.screenshot({ path: path.join(SALVAR, 'tela_4_lista_como_folha.png') });
+
+  // ================================================================
+  secao('8. Só a lista, sem gabarito');
+  await pag.evaluate(() => Array.from(document.querySelectorAll('#rodape-nota button')).find(b => b.textContent.trim() === 'Concluir').click());
+  await esperar('editor fechado', () => pag.$eval('#modal-nota', e => e.classList.contains('aberto')), v => v === false, 5000);
+  await H.irParaAba(pag, 'biblioteca');
+  await esperar('contador', () => contador(pag), v => !!v, 5000);
+  await pag.click('#bib-carrinho-gerar');
+  await esperar('janela Gerar material', () => pag.$eval('#modal-bib-gerar', e => e.classList.contains('aberto')), v => v === true, 5000);
+  await pag.evaluate(i => document.querySelector('#bib-gerar-aulas [data-aula="' + i + '"]').click(), aulaId);
+  const folhaComLista = await pag.$eval('#bib-gerar-folha', e => e.disabled);
+  await pag.evaluate(() => { const l = document.querySelector('#bib-gerar-lista'); l.click(); });
+  const folhaSemLista = await pag.$eval('#bib-gerar-folha', e => e.disabled);
+  conf('"Abrir a lista como folha" desliga sem a Lista', folhaComLista + ',' + folhaSemLista, 'false,true');
+  await pag.evaluate(() => {
+    document.querySelector('#bib-gerar-lista').click();          // a Lista de volta
+    document.querySelector('#bib-gerar-gabarito').click();       // e o gabarito fora
+    document.querySelector('#bib-gerar-teoria').click();         // e a teoria fora
+    document.querySelector('#bib-gerar-subtitulo').value = 'Só a lista';
+  });
+  const antes = (await lerDados(pag)).aulas.filter(a => a.id === aulaId)[0].anexos.length;
+  await pag.click('#bib-gerar-anexar');
+  const soLista = await esperar('anexo só com a lista', () => lerDados(pag).then(d => {
+    const a = d.aulas.filter(x => x.id === aulaId)[0];
+    return a.anexos.length > antes ? a.anexos[a.anexos.length - 1] : null;
+  }), v => !!v, 30000);
+  conf('o anexo saiu (sem erro de solução)', soLista.ok, true);
+  if (soLista.ok) {
+    const bl = Buffer.from(await lerAnexo(pag, soLista.valor.id) || '', 'base64');
+    const pl = lerPdf(bl);
+    const txt = pl.map(p => p.texto).join(' ');
+    conf('lista de 1 a 8', (txt.match(/Exercício \d+\./g) || []).length, 8);
+    conf('sem gabarito e sem teoria', /Gabarito/.test(txt) + ',' + /Teoria/.test(txt), 'false,false');
+    conf('o subtítulo novo na folha', txt.indexOf('Só a lista') >= 0, true);
+    if (SALVAR) fs.writeFileSync(path.join(SALVAR, 'material_so_lista.pdf'), bl);
+  }
 
   if (pag.errosDePagina.length) console.log('   erros de página: ' + pag.errosDePagina.join(' | ').slice(0, 400));
   conf('nenhum erro de JavaScript na página', pag.errosDePagina.length, 0);
