@@ -867,6 +867,62 @@ def trava_apelidos(p):
     return falhas
 
 
+USO_GLIFO = re.compile(r'<use [^>]*transform="matrix\(([-\d.e]+),([-\d.e]+),([-\d.e]+),([-\d.e]+),([-\d.e]+),([-\d.e]+)\)"')
+
+
+def origens_dos_glifos(svg, n_pedacos):
+    """Por pedaco, as origens (x, y) dos glifos do SVG, em pt relativos ao canto do pedaco."""
+    if n_pedacos == 1:
+        blocos = [svg]
+    else:
+        blocos = re.split(r'<g transform="translate\(0 [\d.]+\)">', svg)[1:]
+    return [[(float(m.group(5)), float(m.group(6))) for m in USO_GLIFO.finditer(b)] for b in blocos]
+
+
+def trava_glifos(p):
+    """Todo caractere do PDF dentro do recorte tem o seu glifo no SVG, na mesma origem.
+
+    Pendencia (a) da lente 2 do #47: a fidelidade por pixel tem pouco dente para
+    defeito pequeno (3 glifos a menos davam 0,13% do pedaco), e a comparacao por
+    linha tambem nao serve (ruido de ate 12,5% numa linha certa, medido). Com o
+    texto em contorno, cada caractere vira um <use> com a origem na matriz;
+    medido no 9o ano: 1.098 de 1.098 pedacos com todos os caracteres casados a
+    menos de 0,6 pt. Um glifo a menos deixa um caractere sem par; glifo a mais
+    (a folga da redacao na borda) nao atrapalha.
+    """
+    erros = []
+    for it in p.itens:
+        doc = p.doc(it['origem']['arquivo'])
+        for tipo in ('enunciado', 'solucao'):
+            ps = pedacos(it, tipo)
+            if not ps or not it['assets'].get(tipo):
+                continue
+            ors = origens_dos_glifos(p.bytes_de(it['assets'][tipo]).decode('utf-8'), len(ps))
+            if len(ors) != len(ps):
+                erros.append('%s %s: o SVG tem %d pedacos e a origem %d' % (it['id'], tipo, len(ors), len(ps)))
+                continue
+            for k, pz in enumerate(ps):
+                r = pymupdf.Rect(pz['bbox'])
+                faltam = []
+                for b in doc[pz['pagina'] - 1].get_text('rawdict')['blocks']:
+                    if b['type'] != 0:
+                        continue
+                    for l in b['lines']:
+                        for sp in l['spans']:
+                            for c in sp['chars']:
+                                if not c['c'].strip():
+                                    continue
+                                if not r.contains(pymupdf.Point((c['bbox'][0] + c['bbox'][2]) / 2, (c['bbox'][1] + c['bbox'][3]) / 2)):
+                                    continue
+                                ox, oy = c['origin'][0] - r.x0, c['origin'][1] - r.y0
+                                if not any(abs(ux - ox) < 0.6 and abs(uy - oy) < 0.6 for ux, uy in ors[k]):
+                                    faltam.append(c['c'])
+                if faltam:
+                    erros.append('%s %s p%d: %d caractere(s) do PDF sem glifo no SVG (%r)' % (
+                        it['id'], tipo, k + 1, len(faltam), ''.join(faltam)[:20]))
+    return erros[:10]
+
+
 def trava_curadoria(p):
     """Toda linha de curadoria desta serie achou o seu item."""
     return ['%s nao achou o item no pacote' % k for k in p.relatorio.get('curadoria_sem_item', [])]
@@ -1124,6 +1180,7 @@ def travas_simples(p, placar, zip_caminho=None, rotulo=''):
     placar.conferir('prova independente do gerador' + rotulo, trava_independencia(p))
     placar.conferir('nenhum texto fora de recorte' + rotulo, trava_tinta_coberta(p))
     placar.conferir('curadoria aplicada' + rotulo, trava_curadoria(p))
+    placar.conferir('todo caractere com o seu glifo' + rotulo, trava_glifos(p))
 
 
 def venenos(p, temp, placar, curadoria):
@@ -1284,6 +1341,16 @@ def venenos(p, temp, placar, curadoria):
     cam = q.teoria[0]['paginas'][1]['asset']
     regravar_asset(q, cam, q.bytes_de(cam).replace(b'</svg>', b'<g data-text="&#x001a;"/></svg>'))
     placar.conferir('svg: caractere de controle', trava_xml(q), True, 'caractere de controle')
+
+    # glifos: um unico glifo apagado do SVG (defeito que a fidelidade por pixel
+    # quase nao ve)
+    q = copia(p, temp, 'v_glifo')
+    cam = it_simples['assets']['enunciado']
+    svg = q.bytes_de(cam).decode('utf-8')
+    usos = list(re.finditer(r'<use [^>]*/>', svg))
+    meio = usos[len(usos) // 2]
+    regravar_asset(q, cam, (svg[:meio.start()] + svg[meio.end():]).encode('utf-8'))
+    placar.conferir('um glifo a menos', trava_glifos(q), True, 'sem glifo no SVG')
 
     # manifesto: um byte trocado num asset
     q = copia(p, temp, 'v_man')

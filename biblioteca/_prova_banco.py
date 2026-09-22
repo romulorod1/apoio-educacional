@@ -288,6 +288,7 @@ def travas(p, placar, zip_caminho=None, esperado=None, amostra=False):
     placar.conferir('banco: sem travessao', pg.trava_tracos(p))
     placar.conferir('banco: PyMuPDF no manifest', pg.trava_gerador_no_manifest(p))
     placar.conferir('banco: curadoria aplicada', pg.trava_curadoria(p))
+    placar.conferir('banco: todo caractere com o seu glifo', pg.trava_glifos(p))
 
 
 def venenos(p, temp, placar, cur):
