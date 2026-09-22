@@ -718,6 +718,7 @@ ROTULO_LETRA = re.compile(r'(?:^|(?<=\s))\(?([a-zA-Z])\)(?=\s)', re.M)
 RESPOSTA = re.compile(r'(?:Resposta\s*(?:letra\s*)?:?|\b(?:na|a)\s+(?:letra|alternativa|op[çc][ãa]o)\s+)'
                       r'[\s\d]{0,40}?\(?([A-E])\)?(?=[\s.,;)]|$)')
 SO_LETRA = re.compile(r'^\s*\d+\s*\.\s*\(?([A-E])\)?\s*\.?\s*$')
+CHAMADA_DE_NOTA = re.compile(r'([a-z\u00e0-\u00ff])\d(\.?)$')
 EXTRAIDO = re.compile(r'\((Extra[íi]d[oa]\s[^()]*(?:\([^()]*\)[^()]*)*)\)')
 
 
@@ -786,7 +787,10 @@ def origem_citada(texto_enun, texto_sol):
         s = ' '.join(portal.recompor(t).split())
         m = EXTRAIDO.search(s[:400] if onde == 'solucao' else s)
         if m:
-            return portal.sem_tracos(m.group(1).strip()), onde
+            # a chamada de nota de rodape vem colada na palavra ("livro chines" e o
+            # expoente 2, Razoes Trigonometricas 12): sai da origem, que vai para a
+            # tela. Ano vem sempre depois de espaco ou hifen, e nao e tocado.
+            return portal.sem_tracos(CHAMADA_DE_NOTA.sub(r'\1\2', m.group(1).strip())), onde
     return None, None
 
 

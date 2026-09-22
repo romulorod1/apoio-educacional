@@ -488,6 +488,11 @@ def trava_origem(p):
         doc = p.doc(it['origem']['arquivo'])
         t = ' '.join(portal.recompor('\n'.join(doc[pz['pagina'] - 1].get_text('text', clip=pymupdf.Rect(pz['bbox']))
                                                for pz in pedacos(it, onde))).split()) if onde in ('enunciado', 'solucao') else ''
+        if re.search(r'[a-z\u00e0-\u00ff]\d\.?$', oc):
+            erros.append('%s: origem_citada termina numa chamada de nota colada (%r)' % (it['id'], oc))
+            continue
+        # a chamada de nota colada antes do fecha-parenteses nao e parte da origem
+        t = re.sub(r'([a-z\u00e0-\u00ff])\d(\.?\))', r'\1\2', t)
         if '(' + oc + ')' not in portal.sem_tracos(t):
             erros.append('%s: origem_citada %r nao esta literal na %s da fonte' % (it['id'], oc, onde))
     return erros
@@ -830,6 +835,12 @@ def venenos(p, temp, placar, curadoria):
         if i['id'] == it_obj['id']:
             i['origem_citada'] = 'Extraído da IMO - 1999'
     placar.conferir('origem: citacao inventada', trava_origem(q), True, 'nao esta literal')
+    # origem: a chamada da nota de rodape colada no fim ("chines2.")
+    q = copia(p, temp, 'v_ori_nota')
+    for i in q.itens:
+        if i['id'] == it_obj['id']:
+            i['origem_citada'] = i['origem_citada'] + 'a2.'
+    placar.conferir('origem: chamada de nota colada', trava_origem(q), True, 'chamada de nota')
     return it_obj, it_simples
 
 

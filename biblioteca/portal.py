@@ -47,6 +47,8 @@ def para_busca(texto):
     s = unicodedata.normalize('NFD', s)
     s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
     s = sem_tracos(s.replace('\u2212', '-'))
+    # os delimitadores grandes do LaTeX saem como caractere de controle
+    s = re.sub('[\x00-\x08\x0b\x0c\x0e-\x1f]', ' ', s)
     return re.sub(r'\s+', ' ', s).strip()
 
 
