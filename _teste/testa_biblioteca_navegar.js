@@ -283,7 +283,8 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
       'Resultados Básicos - Parte II', 'Soma e Produto das Raízes'].join(' | '));
   /* Dois módulos achados (Equações e Produtos Notáveis, pela aula que casa no
    * título) formam um patamar só, ordenado pela nota; a teoria de Pitágoras,
-   * de módulo não achado, só cita o discriminante e vem depois de todas. */
+   * de módulo não achado, cita o discriminante e passa de três do módulo pela
+   * nota, mas vem depois de todas: é o que reprova a ordem por nota pura. */
   conf('Módulos achados: Equações no topo, e Produtos Notáveis pela aula que casa', corpo.blocos[0].linhas.join(' | '),
     'Equações do Segundo Grau | Produtos Notáveis e Fatoração');
   conf('no patamar dos módulos achados vale a nota: os dois títulos que casam na frente',

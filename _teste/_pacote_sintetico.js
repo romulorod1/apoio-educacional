@@ -155,7 +155,7 @@ const MODULOS = [
   {
     slug: 'teorema-de-pitagoras', titulo: 'Teorema de Pitágoras', cor: '#B4453C',
     teorias: [{ slug: 'o-teorema', titulo: 'O Teorema', paginas: 3,
-      texto: 'triangulo retangulo hipotenusa catetos quadrado da hipotenusa e o discriminante delta de uma equacao auxiliar' }],
+      texto: 'triangulo retangulo hipotenusa catetos quadrado da hipotenusa e o discriminante delta de uma equacao auxiliar, discriminante delta' }],
     listas: [{ slug: 'aplicacoes', titulo: 'Aplicações do Teorema', itens: 6, pareada: ['o-teorema'] }]
   }
 ];
