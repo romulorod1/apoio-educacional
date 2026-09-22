@@ -222,7 +222,8 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
    * o meio de fora. A exigência continua a mesma: as 40 desenhadas. */
   await pag.evaluate(async () => {
     const c = document.querySelector('.conteudo');
-    while (c.scrollTop + c.clientHeight < c.scrollHeight - 2) {
+    // com teto: se a rolagem empacar, o esperar abaixo mostra quantas ficaram desenhadas
+    for (let k = 0; k < 200 && c.scrollTop + c.clientHeight < c.scrollHeight - 2; k++) {
       c.scrollTop += Math.round(c.clientHeight * 0.8);
       await new Promise(r => setTimeout(r, 250));
     }
