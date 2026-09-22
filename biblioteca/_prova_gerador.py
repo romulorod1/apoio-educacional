@@ -605,6 +605,15 @@ def conteudo_na_caixa(p, it, pg, pz):
     for nome, v in cortes.items():
         if v:
             erros.append('tinta cortada na borda %s' % nome)
+    # recorte que passa da margem da pagina (24 pt de cada lado) encosta na
+    # tinta, a ate 2,5 pt da borda: desenho recortado por clip tem caixa ate a
+    # borda da pagina, e o recorte esticado ate ela e so branco (Areas, 9o ano)
+    for nome, a, b in (('esquerda', r.x0, min(r.x0 + 2.5, r.x1)), ('direita', max(r.x1 - 2.5, r.x0), r.x1)):
+        fora_da_margem = r.x0 < 24.0 if nome == 'esquerda' else r.x1 > pg.rect.width - 24.0
+        if fora_da_margem:
+            xa, xb = int(round((a - fora.x0) * k)), int(round((b - fora.x0) * k))
+            if not any(s[y * w + x] < 200 for y in range(y0, y1 + 1) for x in range(xa, xb)):
+                erros.append('recorte passa da margem %s sem tinta ali' % nome)
     # pagina sem fio (Razoes Trigonometricas, pagina 5; Produtos Notaveis inteira):
     # a divisa medida pela prova, e nao a do gerador
     xsep = divisa_da_prova(p.doc(it['origem']['arquivo']), pg)
@@ -1750,6 +1759,14 @@ def venenos_series(p, temp, placar, curadoria):
             # o mesmo veneno na coluna da esquerda: a palavra rente a divisa sai cortada
             placar.conferir('recorte preso antes da divisa', trava_recorte(q), True, 'lista-variantes:ex:3 enunciado: tinta cortada')
             placar.conferir('figura antes da margem cortada', trava_recorte(q), True, 'lista-bordas:ex:1 enunciado: tinta cortada na borda esquerda')
+    antes_te = gerar_pacote.tinta_extrema
+    gerar_pacote.tinta_extrema = lambda doc, pno, x0, y0, x1, y1, lado: x0 if lado == 'esquerda' else x1
+    try:
+        gerar(p.pdfs, os.path.join(temp, 'v_caixa_clip'), curadoria)
+    finally:
+        gerar_pacote.tinta_extrema = antes_te
+    placar.conferir('recorte esticado ate a caixa do clip', trava_recorte(Pacote(os.path.join(temp, 'v_caixa_clip'), p.pdfs)),
+                    True, 'lista-bordas:ex:1 enunciado: recorte passa da margem esquerda sem tinta')
     # pasta de trabalho reaproveitada: o asset de um item que saiu na geracao
     # seguinte nao pode ficar solto (6o ano, solucoes 19 e 21 depois da calha)
     for limpa in (True, False):

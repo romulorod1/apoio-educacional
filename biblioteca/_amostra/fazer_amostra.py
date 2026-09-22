@@ -272,7 +272,10 @@ def lista_bordas(caminho):
     xref = p.pg.get_contents()[-1]
     yb = 792 - (T + 110)
     doc.update_stream(xref, doc.xref_stream(xref) + (
-        b' q 29 %.1f 221 6 re W n 0.4 w 29.5 %.1f m 330 %.1f l S Q ' % (yb - 3, yb, yb)))
+        b' q 29 %.1f 221 6 re W n 0.4 w 29.5 %.1f m 330 %.1f l S Q ' % (yb - 3, yb, yb) +
+        # e outro que comeca em x 5, com o clip na margem: a caixa passa da margem,
+        # a tinta nao, e o recorte nao estica ate a caixa (Areas, 9o ano)
+        b' q 29 %.1f 221 6 re W n 0.4 w 5 %.1f m 200 %.1f l S Q ' % (yb + 1, yb + 4, yb + 4)))
     y = T + 156
     xt = p.marcador(X0, y, 2)
     p.pg.insert_text((xt, y), 'Simplifique', fontname='helv', fontsize=10)

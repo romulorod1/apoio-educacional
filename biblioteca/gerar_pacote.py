@@ -276,6 +276,21 @@ def descida_fina(doc, pno, x0, x1, y, limite):
     return min(limite, y + r / 4.0)
 
 
+def tinta_extrema(doc, pno, x0, y0, x1, y1, lado):
+    """A tinta mais a esquerda (ou a direita) na faixa, a 288 dpi, ou None se a faixa esta limpa."""
+    if x1 - x0 < 0.25 or y1 - y0 < 0.25:
+        return None
+    tmp = pymupdf.open()
+    tmp.insert_pdf(doc, from_page=pno, to_page=pno)
+    pix = tmp[0].get_pixmap(dpi=288, colorspace=pymupdf.csGRAY, clip=pymupdf.Rect(x0, y0, x1, y1))
+    tmp.close()
+    w, h, smp = pix.width, pix.height, pix.samples
+    cols = [x for x in range(w) if any(smp[y * w + x] < LIMIAR_TINTA for y in range(h))]
+    if not cols:
+        return None
+    return x0 + (cols[0] / 4.0 if lado == 'esquerda' else (cols[-1] + 1) / 4.0)
+
+
 def divisa_fina(doc, pno, x0, x1, y_de, y_ate):
     """Ponto inteiro no ultimo vao em branco entre y_de e y_ate, pela tinta a 288 dpi, ou None."""
     tmp = pymupdf.open()
@@ -757,7 +772,11 @@ def detectar(doc, secao_1_abre_solucoes=True):
                 if col == 1 and ESTENDE_BORDA:
                     alem = [e['bb'][2] for e in els_col if e['bb'][2] > cx1 and e['bb'][1] < y1 and e['bb'][3] > y0]
                     if alem:
-                        x_dir = min(pg.rect.width - 4.0, max(alem) + 1.0)
+                        # ate a tinta, e nao ate a caixa: desenho recortado por clip tem
+                        # caixa ate a borda da pagina (Areas, 9o ano, exercicio 3)
+                        x_t = tinta_extrema(doc, pno, cx1, y0, min(pg.rect.width - 4.0, max(alem) + 1.0), y1, 'direita')
+                        if x_t is not None:
+                            x_dir = min(pg.rect.width - 4.0, x_t + 1.0)
                 # na coluna da esquerda, a linha que vai ate quase o fio sem cruzar ("...,"
                 # no fim de uma sequencia de simbolos, Exercicios sobre Divisibilidade, 6o
                 # ano, exercicio 18) tinha o ultimo glifo cortado pela borda, 1,2 pt antes
@@ -781,7 +800,9 @@ def detectar(doc, secao_1_abre_solucoes=True):
                 if col == 0 and ESTENDE_BORDA:
                     antes = [e['bb'][0] for e in els_col if e['bb'][0] < x_ini and e['bb'][1] < y1 and e['bb'][3] > y0]
                     if antes:
-                        x_ini = math.floor(max(4.0, min(antes) - 0.5))
+                        x_t = tinta_extrema(doc, pno, max(4.0, min(antes) - 0.5), y0, x_ini, y1, 'esquerda')
+                        if x_t is not None:
+                            x_ini = math.floor(max(4.0, x_t - 0.5))
                 r = (float(x_ini), float(y0), float(x_fim), float(y1))
                 transborda = any(r[1] <= (a + b) / 2.0 <= r[3] for a, b in cruzam)
                 pedacos[aberto[0]][aberto[2]].append({'pno': pno, 'col': col, 'rect': r, 'xsep': geo['xsep'],
