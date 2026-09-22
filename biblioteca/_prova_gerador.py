@@ -264,10 +264,22 @@ def _linhas_da_pagina(doc, pno):
     kpx = 100 / 72.0
     amostras = pix.samples  # uma copia so: cada acesso a pix.samples copia a imagem
 
-    def tem_tinta(bb):
+    def tem_tinta(bb, fora_de=()):
+        """Ha tinta na caixa do glifo, nos pixels que nao estao em nenhum dos retangulos?
+
+        So fora deles: a caixa de um glifo de simbolo e bem mais alta que o desenho
+        (189 a 220 pt, com a tinta de 192 a 199), e a parte dela dentro do recorte
+        nao e texto perdido.
+        """
         xa, xb = max(0, int(bb[0] * kpx)), min(pix.width, int(bb[2] * kpx) + 1)
         ya, yb = max(0, int(bb[1] * kpx)), min(pix.height, int(bb[3] * kpx) + 1)
-        return any(amostras[y * pix.width + x] < LIMIAR_TINTA_PROVA for y in range(ya, yb) for x in range(xa, xb))
+        rs = [(r.x0 * kpx, r.y0 * kpx, r.x1 * kpx, r.y1 * kpx) for r in fora_de]
+        for y in range(ya, yb):
+            for x in range(xa, xb):
+                if amostras[y * pix.width + x] < LIMIAR_TINTA_PROVA and not any(
+                        a <= x + 0.5 <= c and b <= y + 0.5 <= d for a, b, c, d in rs):
+                    return True
+        return False
 
     largos = [d['rect'].y0 for d in pg.get_drawings() if d['rect'].height < 1.5 and d['rect'].width > 400
               and d['rect'].y0 > pg.rect.height * 0.8]
@@ -357,7 +369,7 @@ def trava_tinta_coberta(p):
                       and abs(cs[0][0] - margem[col]) <= 12):
                     dono = int(re.match(r'^(\d+)', primeira_palavra(cs)).group(1))
                 fora = [c for c in cs if not any(r.contains(pymupdf.Point(c[2], c[3])) for r in rects[pno + 1])]
-                if not [c for c in fora if tem_tinta(c[4])]:
+                if not [c for c in fora if tem_tinta(c[4], rects[pno + 1])]:
                     continue
                 # linha suspensa logo acima de um marcador (o numerador "AB.GE" da
                 # fracao de "26. A area ... e AB.GE sobre 2", Areas, p. 12) e do

@@ -1041,6 +1041,29 @@ def commit_do_gerador():
         return None
 
 
+def gravar_pacote(conteudo, manifest_b, nome, versao, saida, trabalho, gravar_zip=True):
+    """Grava a pasta de trabalho (tudo solto) e o zip deterministico. Devolve o caminho do zip."""
+    os.makedirs(trabalho, exist_ok=True)
+    for k, v in list(conteudo.items()) + [('manifest.json', manifest_b)]:
+        c = os.path.join(trabalho, *k.split('/'))
+        os.makedirs(os.path.dirname(c), exist_ok=True)
+        with open(c, 'wb') as f:
+            f.write(v)
+    zip_caminho = os.path.join(saida, '%s-v%d.zip' % (nome, versao))
+    if gravar_zip:
+        os.makedirs(saida, exist_ok=True)
+        ordem = ['manifest.json', 'itens.json', 'teoria.json', 'busca.json', 'apelidos.json'] +                 sorted(k for k in conteudo if k.startswith('assets/'))
+        with zipfile.ZipFile(zip_caminho + '.tmp', 'w') as z:
+            for k in ordem:
+                zi = zipfile.ZipInfo(k, date_time=(1980, 1, 1, 0, 0, 0))
+                zi.compress_type = zipfile.ZIP_DEFLATED
+                zi.external_attr = 0o644 << 16
+                zi.create_system = 0
+                z.writestr(zi, manifest_b if k == 'manifest.json' else conteudo[k], compresslevel=9)
+        os.replace(zip_caminho + '.tmp', zip_caminho)
+    return zip_caminho
+
+
 def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, commit=None,
           so_modulos=None, gravar_zip=True, anterior=None):
     t_ini = time.time()
@@ -1308,27 +1331,7 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
     }
     manifest_b = (json.dumps(manifest, ensure_ascii=False, indent=1) + '\n').encode('utf-8')
 
-    # pasta de trabalho: tudo solto
-    os.makedirs(trabalho, exist_ok=True)
-    for k, v in list(conteudo.items()) + [('manifest.json', manifest_b)]:
-        c = os.path.join(trabalho, *k.split('/'))
-        os.makedirs(os.path.dirname(c), exist_ok=True)
-        with open(c, 'wb') as f:
-            f.write(v)
-
-    zip_caminho = os.path.join(saida, '%s-v%d.zip' % (nome, versao))
-    if gravar_zip:
-        os.makedirs(saida, exist_ok=True)
-        ordem = ['manifest.json', 'itens.json', 'teoria.json', 'busca.json', 'apelidos.json'] + \
-                sorted(k for k in conteudo if k.startswith('assets/'))
-        with zipfile.ZipFile(zip_caminho + '.tmp', 'w') as z:
-            for k in ordem:
-                zi = zipfile.ZipInfo(k, date_time=(1980, 1, 1, 0, 0, 0))
-                zi.compress_type = zipfile.ZIP_DEFLATED
-                zi.external_attr = 0o644 << 16
-                zi.create_system = 0
-                z.writestr(zi, manifest_b if k == 'manifest.json' else conteudo[k], compresslevel=9)
-        os.replace(zip_caminho + '.tmp', zip_caminho)
+    zip_caminho = gravar_pacote(conteudo, manifest_b, nome, versao, saida, trabalho, gravar_zip)
 
     tam = collections.Counter()
     for k, v in conteudo.items():
