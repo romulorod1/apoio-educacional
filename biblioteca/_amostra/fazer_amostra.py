@@ -328,7 +328,8 @@ def lista_fio_imagem(caminho):
     """Lista no modelo CM com os fios (coluna e rodape) feitos de imagem, e nao de desenho.
 
     8o ano, Produtos Notaveis: o fio do rodape e uma imagem de 0,6 pt, e o
-    exercicio 2, que vai ate perto do pe da coluna, nao pode levar o fio.
+    exercicio 2, que vai ate perto do pe da coluna, nao pode levar o fio. E o
+    "=" encostado por cima da linha do rotulo 2 e do exercicio 2.
     """
     g = MODELOS['cm']
     X0, X1, T = g['x0'], g['x1'], g['topo']
@@ -350,9 +351,13 @@ def lista_fio_imagem(caminho):
             xt = p.marcador(X0, T + 90, 1)
             p.pg.insert_text((xt, T + 90), 'Quanto é 5 + 5?', fontname='helv', fontsize=10)
             p.texto(X0, T + 102, ['Responda com um número.'])
-            xt = p.marcador(X0, T + 120, 2)
-            p.pg.insert_text((xt, T + 120), 'Some os números de cada linha.', fontname='helv', fontsize=10)
-            p.texto(X0, T + 132, ['Linha %d: %d + %d.' % (k, k, 2 * k) for k in range(1, 47)])
+            xt = p.marcador(X0, T + 124, 2)
+            p.pg.insert_text((xt, T + 124), 'Some os números de cada linha.', fontname='helv', fontsize=10)
+            # texto sobre a linha do rotulo 2 com a caixa 0,1 pt acima da caixa do
+            # rotulo e a tinta separada dela (a seta sobre "LB", 3o medio, Pontos,
+            # Retas e Planos, solucao 12): e do exercicio 2, e nao do 1
+            p.pg.insert_text((200, T + 124 - 13.17), '=', fontname='helv', fontsize=7.9)
+            p.texto(X0, T + 136, ['Linha %d: %d + %d.' % (k, k, 2 * k) for k in range(1, 47)])
         else:
             p.pg.insert_text((114, T + 12), 'Respostas e Soluções.', fontname='hebo', fontsize=10)
             p.secao(X0, T + 40, 1, 'Exercícios Introdutórios')

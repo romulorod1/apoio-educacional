@@ -70,6 +70,7 @@ MARGEM_X = 24.0        # borda externa das colunas
 # largura) continua fora do recorte.
 AFASTA_FIO = 1.2
 ENCOSTA = 0.5  # caixa a menos disto acima da linha do marcador ainda e da linha (topo_da_linha); 0 so no veneno
+TINTA_DO_QUE_ENCOSTA = True  # o que encosta por cima da linha do marcador vale pelo topo da tinta dele; False so no veneno
 SUBIDA_FINA = True  # o topo da linha do marcador sobe pela tinta a 288 dpi (subida_fina); False so no veneno
 FOLGA_ANTES_DO_PROXIMO = True  # o recorte acaba 1 pt antes do proximo item (ver detectar); False so no veneno
 LIMPA_PASTA = True  # asset solto de geracao anterior sai da pasta de trabalho (gravar_pacote); False so no veneno
@@ -290,6 +291,21 @@ def tinta_extrema(doc, pno, x0, y0, x1, y1, lado):
     if not cols:
         return None
     return x0 + (cols[0] / 4.0 if lado == 'esquerda' else (cols[-1] + 1) / 4.0)
+
+
+def topo_da_tinta(doc, pno, r):
+    """A linha mais alta com tinta dentro do retangulo, a 288 dpi, ou None."""
+    if r.width < 0.25 or r.height < 0.25:
+        return None
+    tmp = pymupdf.open()
+    tmp.insert_pdf(doc, from_page=pno, to_page=pno)
+    pix = tmp[0].get_pixmap(dpi=288, colorspace=pymupdf.csGRAY, clip=r)
+    tmp.close()
+    w, h, smp = pix.width, pix.height, pix.samples
+    for y in range(h):
+        if any(smp[y * w + x] < LIMIAR_TINTA for x in range(w)):
+            return r.y0 + y / 4.0
+    return None
 
 
 def divisa_fina(doc, pno, x0, x1, y_de, y_ate):
@@ -680,6 +696,15 @@ def detectar(doc, secao_1_abre_solucoes=True):
                 y_t = topo_pela_tinta(topo_caixas, m, tinta[col])
                 if SUBIDA_FINA:
                     y_t = subida_fina(doc, pno, cx0, cx1, y_t, topo_caixas)
+                    # o que encosta por cima da linha (a seta sobre "LB") tem tinta
+                    # propria, separada da linha por um vao: vale o topo dela
+                    mb = m['el']['bb']
+                    for e in (els if TINTA_DO_QUE_ENCOSTA else []):
+                        if (e['col'] == m['col'] and e['tipo'] == 'txt' and mb[1] - ENCOSTA < e['bb'][3] <= mb[1] + ENCOSTA
+                                and e['bb'][1] < y_t):
+                            y_e = topo_da_tinta(doc, pno, pymupdf.Rect(e['bb']))
+                            if y_e is not None:
+                                y_t = max(topo_caixas, min(y_t, y_e))
                 cortes.append((y_t, m))
             lim_col = [(y, m) for y, m in cortes]
             els_col = [e for e in els if e['col'] == col]

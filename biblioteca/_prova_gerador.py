@@ -983,6 +983,38 @@ def trava_encosta():
     return [] if topo <= 361.0 else ['topo da linha em %.1f, abaixo da seta (360,9)' % topo]
 
 
+def trava_encostado(p):
+    """O "=" encostado por cima da linha do rotulo 2 da lista de fio em imagem esta no recorte do 2.
+
+    O centro do span e a tinta dele (pela pagina, a 288 dpi) tem de cair no
+    recorte do enunciado 2, e nada dele no do 1.
+    """
+    lst = [i for i in p.itens if i['aula']['slug'] == 'lista-fio-imagem']
+    if not lst:
+        return ['lista-fio-imagem: nenhum item da lista no pacote']
+    it = {i['numero']: i for i in lst}
+    doc = p.doc(lst[0]['origem']['arquivo'])
+    pg = doc[1]
+    sp = [s for b in pg.get_text('dict')['blocks'] if b['type'] == 0 for l in b['lines'] for s in l['spans']
+          if s['text'].strip() == '=']
+    if not sp:
+        return ['lista-fio-imagem: a pagina nao tem o "="']
+    bb = pymupdf.Rect(sp[0]['bbox'])
+    pix = pg.get_pixmap(dpi=288, colorspace=pymupdf.csGRAY, clip=bb)
+    linhas = [y for y in range(pix.height) if any(pix.samples[y * pix.width + x] < 200 for x in range(pix.width))]
+    topo = bb.y0 + linhas[0] / 4.0
+    erros = []
+    for n, onde in ((1, 'no recorte do exercicio 1'), (2, 'fora do recorte do exercicio 2')):
+        if n not in it:
+            erros.append('lista-fio-imagem: exercicio %d fora do pacote' % n)
+            continue
+        r = [pymupdf.Rect(pz['bbox']) for pz in pedacos(it[n], 'enunciado') if pz['pagina'] == 2]
+        dentro = any(q.y0 <= topo and q.contains(pymupdf.Point(bb.x0 + 1, topo + 0.5)) for q in r)
+        if (n == 1 and dentro) or (n == 2 and not dentro):
+            erros.append('lista-fio-imagem: o "=" (tinta a partir de y %.2f) esta %s' % (topo, onde))
+    return erros
+
+
 def trava_bordas(p):
     """A lista de bordas da amostra: 1, 2 e 5 no pacote; 3 e 4 fora pela calha.
 
@@ -1807,7 +1839,9 @@ def venenos_series(p, temp, placar, curadoria):
              'itens no pacote'),
             ('expoente alto fica no item de cima', 'TOPO_MAX', 12, trava_recorte, 'lista-bordas:ex:2 enunciado: tinta cortada'),
             ('nota que comeca por fracao', 'NOTA_LINHA_TODA', False, trava_recorte, 'lista-bordas:ex:5 enunciado: tinta cortada'),
-            ('fio do rodape em imagem', 'FIO_IMAGEM', False, trava_recorte, 'lista-fio-imagem:ex:2 enunciado: fio horizontal longo')):
+            # sem o fio em imagem a lista perde a geometria: o 2 leva o fio do rodape ou sai
+            ('fio do rodape em imagem', 'FIO_IMAGEM', False, lambda q: trava_recorte(q) + trava_encostado(q), 'lista-fio-imagem'),
+            ('texto encostado no rotulo vai para o item de cima', 'TINTA_DO_QUE_ENCOSTA', False, trava_encostado, 'no recorte do exercicio 1')):
         pasta = os.path.join(temp, 'v_' + attr.lower())
         if not os.path.exists(os.path.join(pasta, 'itens.json')):
             antes_v = getattr(gerar_pacote, attr)
@@ -1980,6 +2014,7 @@ def principal():
             placar.conferir('subida fina pelo traco', trava_subida_fina())
             placar.conferir('descida fina pelo traco', trava_descida_fina())
             placar.conferir('seta que encosta no rotulo', trava_encosta())
+            placar.conferir('texto encostado no rotulo e do item dele', trava_encostado(p))
             antes_en = gerar_pacote.ENCOSTA
             gerar_pacote.ENCOSTA = 0.0
             try:
