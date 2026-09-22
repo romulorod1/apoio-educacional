@@ -226,6 +226,18 @@ def marcadores(els, geo, em_solucoes):
     txt = [e for e in els if e['tipo'] == 'txt']
     out = []
     virou_solucoes = None
+    # nota de rodape: fio curto na margem da coluna com texto miudo logo abaixo
+    # (Razoes Trigonometricas, solucao 16 levava a nota "2O antigo livro chines
+    # Jiuzhang..." de outro exercicio). A regiao da nota fica fora de todo recorte.
+    for e in els:
+        if e['tipo'] != 'des':
+            continue
+        x0, y0, x1, y1 = e['bb']
+        if y1 - y0 > 1.5 or not (40 <= x1 - x0 <= 140) or abs(x0 - margem_da_coluna(e['col'], geo)) > 3:
+            continue
+        abaixo = [o for o in txt if o['col'] == e['col'] and 0 <= o['bb'][1] - y0 <= 12]
+        if abaixo and all(o['tam'] <= 8.5 for o in abaixo):
+            out.append({'tipo': 'nota', 'col': e['col'], 'el': e})
     for e in txt:
         t = e['texto'].strip()
         if re.match(r'^Respostas\s*(e\s*Solu)?', t) and negrito(e['fonte']):
@@ -458,6 +470,8 @@ def detectar(doc):
                         pagina_solucoes = pagina_solucoes or pno + 1
                         aberto = None
                         continue
+                    if m['tipo'] == 'nota':
+                        continue  # pula a regiao da nota sem fechar o item aberto
                     if m['tipo'] in ('secao', 'creditos'):
                         aberto = None
                         continue
@@ -671,7 +685,10 @@ def rotulo_relativo(caixa, rect):
 
 
 def texto_do_retangulo(doc, pno, rect):
-    return doc[pno].get_text('text', clip=pymupdf.Rect(rect), sort=True)
+    # ordem natural do PDF, e nao sort=True: a ordenacao por altura colava o
+    # "a)" no fim da linha de cima de uma fracao ("ln" + "a) sen") e o rotulo da
+    # alternativa sumia (Poligonos Regulares, exercicio 21)
+    return doc[pno].get_text('text', clip=pymupdf.Rect(rect))
 
 
 def primeira_linha_na_margem(doc, pno, rect, col, xsep):
@@ -698,7 +715,8 @@ def primeira_linha_na_margem(doc, pno, rect, col, xsep):
 ROTULO_LETRA = re.compile(r'(?:^|(?<=\s))\(?([a-zA-Z])\)(?=\s)', re.M)
 # Entre "Resposta" e a letra so pode haver espaco, ou digitos de uma fracao que a
 # extracao deslocou para a linha do meio ("= 31. Resposta / 2 2 / C.").
-RESPOSTA = re.compile(r'Resposta\s*(?:letra\s*)?:?[\s\d]{0,40}?\(?([A-E])\)?(?=[\s.,;)]|$)')
+RESPOSTA = re.compile(r'(?:Resposta\s*(?:letra\s*)?:?|\b(?:na|a)\s+(?:letra|alternativa|op[çc][ãa]o)\s+)'
+                      r'[\s\d]{0,40}?\(?([A-E])\)?(?=[\s.,;)]|$)')
 SO_LETRA = re.compile(r'^\s*\d+\s*\.\s*\(?([A-E])\)?\s*\.?\s*$')
 EXTRAIDO = re.compile(r'\((Extra[íi]d[oa]\s[^()]*(?:\([^()]*\)[^()]*)*)\)')
 

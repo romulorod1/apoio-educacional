@@ -269,6 +269,14 @@ def conteudo_na_caixa(p, it, pg, pz):
                 cx = (bb.x0 + bb.x1) / 2
                 if ((cx < xsep) != (lado == 0)) and bb.intersects(r) and (bb & r).width > 2:
                     erros.append('texto da outra coluna dentro: %r' % sp['text'][:25])
+    # nota de rodape: fio curto na margem com texto miudo logo abaixo, dentro da caixa
+    for d in pg.get_drawings():
+        q = d['rect']
+        if q.height < 1.5 and 40 <= q.width <= 140 and r.y0 <= q.y0 <= r.y1 and r.x0 <= q.x0 <= r.x1:
+            miudo = [sp for b in pg.get_text('dict')['blocks'] if b['type'] == 0 for l in b['lines'] for sp in l['spans']
+                     if sp['text'].strip() and 0 <= sp['bbox'][1] - q.y0 <= 12 and q.x0 - 1 <= sp['bbox'][0] <= q.x1]
+            if miudo and all(sp['size'] <= 8.5 for sp in miudo) and any(r.contains(pymupdf.Rect(sp['bbox'])) for sp in miudo):
+                erros.append('nota de rodape dentro do recorte')
     largos = [d['rect'] for d in pg.get_drawings() if d['rect'].height < 1.5 and d['rect'].width > 400
               and d['rect'].y0 < pg.rect.height]
     if largos:
@@ -763,6 +771,13 @@ def venenos(p, temp, placar, curadoria):
             b = i['origem']['solucao']['bbox']
             i['origem']['solucao']['bbox'] = [b[0], b[1], b[2], b[3] + 40]
     placar.conferir('recorte: creditos colados', trava_recorte(q), True, 'titulo de secao')
+    # recorte: a nota de rodape do pe da coluna colada no item 3
+    q = copia(p, temp, 'v_nota')
+    for i in q.itens:
+        if i['aula']['slug'] == 'lista-de-amostra' and i['numero'] == 3:
+            prim = i['origem']['enunciado']['pedacos'][0]
+            prim['bbox'] = [prim['bbox'][0], prim['bbox'][1], prim['bbox'][2], 760.0]
+    placar.conferir('recorte: nota de rodape colada', trava_recorte(q), True, 'nota de rodape')
     # recorte: caixa descendo ate o fio do rodape
     q = copia(p, temp, 'v_rodape')
     for i in q.itens:

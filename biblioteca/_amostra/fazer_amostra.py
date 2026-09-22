@@ -19,7 +19,8 @@ Em cada lista: capa; marcador "Exercicio" e numero em spans separados (itens
 1, 3 e 4) e num span so (item 2); titulo de secao logo abaixo do fim de um
 item; item que atravessa a coluna (item 3); objetiva com alternativas a) a e)
 e "Resposta B." na solucao, que traz a origem "(Extraido da OBMEP - 2013)";
-secao "Respostas e Solucoes" em pagina propria; bloco de creditos
+nota de rodape no pe da coluna, abaixo do item 3; secao "Respostas e
+Solucoes" em pagina propria; bloco de creditos
 ("Elaborado por", "Produzido por") no fim do documento. A lista tem tres paginas, e
 nao duas, porque as solucoes do Portal comecam sempre em pagina propria.
 
@@ -109,6 +110,9 @@ def lista(caminho, modelo='palladio', sem_item=None, duplica=None):
         p.texto(X0, y3 + 12, ['x² - 5x + 6 = 0 usando a fórmula de', 'Bhaskara e responda aos itens.',
                               'a) Qual é o discriminante?', 'b) Quais são as raízes?', 'c) Qual é a soma das raízes?',
                               'd) Qual é o produto das raízes?', 'e) Confira as raízes na equação.'])
+        # nota de rodape no pe da coluna: fio curto na margem e texto miudo
+        p.pg.draw_line((X0, g['yrod'] - 36), (X0 + 100, g['yrod'] - 36), width=0.4)
+        p.pg.insert_text((X0 + 6, g['yrod'] - 28), '1 Nota de rodape de outro assunto.', fontname='helv', fontsize=7)
         # continua no alto da coluna direita
         p.texto(X1, T + 20, ['f) Escreva a equação na forma fatorada.', 'g) Desenhe as raízes na reta.'])
         p.pg.draw_line((X1 + 10, T + 60), (X1 + 200, T + 60), width=1)
