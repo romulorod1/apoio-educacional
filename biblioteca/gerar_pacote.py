@@ -386,7 +386,17 @@ def marcadores(els, geo, em_solucoes, ja_teve_enunciado=False, secao_1_abre_solu
         # (no modelo CM vem uma palavra por span: "Produzido", "por", "Arquimedes")
         # e nas versaletes do Palladio a inicial vem separada: "E" + "laborado por".
         # Por isso vale o texto da linha a partir deste span.
-        if CREDITO_MATERIAL and re.match(r'^Material elaborado por\b', t):
+        if CREDITO_MATERIAL and re.match(r'^M', t):
+            # a fonte parte o span ("Ma" + "terial elaborado por"): vale o texto da
+            # linha a partir deste span, como no bloco de creditos do fim
+            cy_m = centro_y(e['bb'])
+            linha = sorted([o for o in txt if o['col'] == e['col'] and o['bb'][1] < e['bb'][3] - 1
+                            and o['bb'][3] > e['bb'][1] + 1 and abs(centro_y(o['bb']) - cy_m) < 4
+                            and 0 <= o['bb'][0] - e['bb'][0] < 260], key=lambda o: o['bb'][0])
+            t = re.sub(r'\s+', ' ', ' '.join(o['texto'] for o in linha)).strip()
+            # nas versaletes do Palladio a inicial vem num span proprio ("M" + "aterial")
+            t = re.sub(r'^([A-Z]) (?=[a-z])', r'\1', t)
+        if CREDITO_MATERIAL and re.match(r'^Material\s*elaborado por\b', t):
             # credito do autor no pe da ultima coluna da lista ("Material elaborado
             # por <nome>.", corpo 9, centrado): fecha o item, como o bloco de creditos
             # do fim do documento. Sem isto entrava no recorte de 23 solucoes
