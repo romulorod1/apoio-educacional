@@ -73,6 +73,7 @@ TOLERANCIA_MARGEM = 12.0
 RECUO_MAX = 40.0       # recuo de paragrafo que ainda aceita o marcador (recuado_na_linha)
 NOTA_SO_NO_PE = True   # nota de rodape so no pe da coluna (ver marcadores); False so no veneno
 ESTENDE_BORDA = True   # recorte passa da borda direita quando a fonte passa (ver detectar); False so no veneno
+LEVA_NOTA = True       # nota de rodape vai com o item que a chama (notas_de_rodape); False so no veneno
 ALTURA_MIN_ENUNCIADO = 20.0
 ALTURA_MIN_SOLUCAO = 9.0
 DPI_CONFERENCIA = 100
@@ -538,6 +539,7 @@ def detectar(doc, secao_1_abre_solucoes=True):
     formas = collections.Counter()
     cruzados = []
     pagina_solucoes = None
+    regioes_nota = []  # (pno, col, y do fio, y do fim, xsep, x0, x1)
     solucoes_sem_titulo = False
     em_solucoes = False
     aberto = None  # (tipo, numero, chave)
@@ -580,7 +582,10 @@ def detectar(doc, secao_1_abre_solucoes=True):
                         aberto = None
                         continue
                     if m['tipo'] == 'nota':
-                        continue  # pula a regiao da nota sem fechar o item aberto
+                        # pula a regiao da nota sem fechar o item aberto; a nota e
+                        # guardada para ir com o item que a chama (contrato, 8a)
+                        regioes_nota.append((pno, col, m['el']['bb'][1], min(y_fim, fundo), geo['xsep'], cx0, cx1))
+                        continue
                     if m['tipo'] in ('secao', 'creditos'):
                         aberto = None
                         continue
@@ -647,10 +652,106 @@ def detectar(doc, secao_1_abre_solucoes=True):
                 pedacos[aberto[0]][aberto[2]].append({'pno': pno, 'col': col, 'rect': r, 'xsep': geo['xsep'],
                                                      'transborda': transborda})
     geo_doc['divisas_por_pagina'] = {str(k): v for k, v in sorted(divisas.items())}
+    notas = notas_de_rodape(doc, regioes_nota, pedacos) if LEVA_NOTA else []
     return {'geo': geo_doc, 'pagina_solucoes': pagina_solucoes, 'solucoes_sem_titulo': solucoes_sem_titulo,
-            'ordem': ordem, 'pedacos': pedacos, 'rotulos': rotulos,
+            'ordem': ordem, 'pedacos': pedacos, 'rotulos': rotulos, 'notas': notas,
             'rotulos_inseguros': rotulos_inseguros,
             'formas': {'%s_%s' % k: v for k, v in sorted(formas.items())}, 'cruzados': cruzados}
+
+
+def notas_de_rodape(doc, regioes, pedacos):
+    """Cada nota de rodape vai, como ULTIMO pedaco, com o item que a chama (contrato, 8a).
+
+    Medido nas 7 series: 25 notas, 21 com a chamada unica na pagina. A regiao
+    abaixo do fio curto e dividida em notas pelo numero miudo que abre cada uma,
+    e cada nota e recortada so pela sua tinta, sem o fio e sem a nota vizinha.
+    A chamada e o mesmo numero, em corpo miudo (ate 8,5 pt), com a linha de base
+    acima da do texto vizinho, fora das notas, na mesma pagina. Com uma chamada
+    so, dentro do recorte de um item so, a nota vai com ele; senao fica fora,
+    com o motivo, no relatorio. As notas entram depois de todo o documento, para
+    ficarem por ultimo mesmo com o item continuando na pagina seguinte.
+    """
+    out = []
+    por_pagina = collections.defaultdict(list)
+    for r in regioes:
+        por_pagina[r[0]].append(r)
+    for pno, regs in sorted(por_pagina.items()):
+        pg = doc[pno]
+        spans = [sp for b in pg.get_text('dict')['blocks'] if b['type'] == 0 for l in b['lines'] for sp in l['spans']
+                 if sp['text'].strip()]
+        tinta_pag = None
+        notas_pag = []
+        for (_, col, y_fio, y_fim, xsep, cx0, cx1) in regs:
+            miudos = sorted([sp for sp in spans if sp['size'] <= 8.5 and y_fio < sp['bbox'][1] < y_fim
+                             and cx0 <= (sp['bbox'][0] + sp['bbox'][2]) / 2 <= cx1],
+                            key=lambda sp: (sp['bbox'][1], sp['bbox'][0]))
+            margem = margem_da_coluna(col, {'xsep': xsep})
+            inicios = [sp for sp in miudos if re.match(r'^\d+$', sp['text'].strip()) and sp['bbox'][0] <= margem + 15]
+            if not inicios:
+                texto = portal.recompor(' '.join(sp['text'] for sp in miudos)).strip()
+                out.append({'pagina': pno + 1, 'coluna': col + 1, 'numero': None, 'texto': portal.sem_tracos(texto[:120]),
+                            'motivo': 'a nota nao comeca por um numero'})
+                continue
+            for k, ini in enumerate(inicios):
+                # o pedaco comeca abaixo do fio da nota (contrato, 8a): o numero em
+                # sobrescrito sobe ate 1 pt dele
+                y_a = max(ini['bbox'][1] - 1.0, y_fio + 1.0)
+                y_b = inicios[k + 1]['bbox'][1] - 1.0 if k + 1 < len(inicios) else y_fim
+                corpo = [sp for sp in miudos if y_a <= sp['bbox'][1] < y_b]
+                if tinta_pag is None:
+                    tmp = pymupdf.open()
+                    tmp.insert_pdf(doc, from_page=pno, to_page=pno)
+                    pix = tmp[0].get_pixmap(dpi=72, colorspace=pymupdf.csGRAY)
+                    tmp.close()
+                    tinta_pag = (pix.width, pix.height, pix.samples)
+                w, h, smp = tinta_pag
+                a, b = max(0, int(cx0 + 1)), min(w, int(cx1))
+                linhas = [y for y in range(max(0, int(y_a)), min(h, int(y_b)))
+                          if any(smp[y * w + x] < LIMIAR_TINTA for x in range(a, b))]
+                if not linhas:
+                    continue
+                r = (float(math.floor(cx0) if col == 0 else math.ceil(cx0)), float(math.ceil(max(y_a, linhas[0] - FOLGA))),
+                     float(math.floor(cx1)), float(min(math.ceil(linhas[-1] + 1 + FOLGA), math.floor(y_b))))
+                notas_pag.append({'pagina': pno + 1, 'coluna': col + 1, 'numero': ini['text'].strip(), 'rect': r,
+                                  'pno': pno, 'col': col, 'xsep': xsep,
+                                  'texto': portal.sem_tracos(portal.recompor(ini['text'].strip() + ' ' + ' '.join(
+                                      sp['text'] for sp in corpo if sp is not ini)).strip()[:120])})
+        areas = [pymupdf.Rect(n['rect']) for n in notas_pag]
+        todos = [sp for bl in pg.get_text('dict')['blocks'] if bl['type'] == 0 for l in bl['lines'] for sp in l['spans']
+                 if sp['text'].strip()]
+        for n in notas_pag:
+            chamadas = []
+            for sp in todos:
+                if sp['text'].strip() != n['numero'] or sp['size'] > 8.5:
+                    continue
+                c = pymupdf.Point((sp['bbox'][0] + sp['bbox'][2]) / 2, (sp['bbox'][1] + sp['bbox'][3]) / 2)
+                if any(ar.contains(c) for ar in areas):
+                    continue
+                # sobrescrito colado a direita de texto de corpo normal cuja linha de
+                # base e mais baixa, na mesma linha do PDF ou nao
+                if any(o['size'] > 8.5 and o['origin'][1] > sp['origin'][1] + 1
+                       and o['bbox'][1] < sp['bbox'][3] and o['bbox'][3] > sp['bbox'][1]
+                       and sp['bbox'][0] - 3 <= o['bbox'][2] <= sp['bbox'][0] + 1 for o in todos):
+                    chamadas.append(c)
+            donos = []
+            for c in chamadas:
+                for tipo in ('enunciado', 'solucao'):
+                    for chave, ps in pedacos[tipo].items():
+                        if any(p['pno'] == pno and pymupdf.Rect(p['rect']).contains(c) for p in ps):
+                            donos.append((tipo, chave))
+            reg = {k: n[k] for k in ('pagina', 'coluna', 'numero', 'texto')}
+            if len(chamadas) != 1:
+                reg['motivo'] = ('chamada ambigua: %d candidatas na pagina' % len(chamadas)) if chamadas else \
+                    'chamada nao achada na pagina'
+            elif len(set(donos)) != 1:
+                reg['motivo'] = 'a chamada nao cai no recorte de um item so'
+            else:
+                tipo, chave = donos[0]
+                pedacos[tipo][chave].append({'pno': n['pno'], 'col': n['col'], 'rect': n['rect'], 'xsep': n['xsep'],
+                                             'transborda': False, 'nota': True})
+                reg.update({'tipo': tipo, 'chave': chave})
+            out.append(reg)
+    return out
 
 
 # Numero de solucao repetido logo em seguida, com uma destas frases, e a segunda
@@ -1116,6 +1217,16 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                         'origem_da_divisa': det['geo']['origem_da_divisa'], 'divisas_por_pagina': det['geo']['divisas_por_pagina'],
                         'rotulos_sem_caixa_por_encostar_em_tinta': det['rotulos_inseguros'],
                         'formas_do_marcador': det['formas'], 'elementos_que_cruzam_o_fio': det['cruzados']})
+            # notas de rodape: com que item foi cada uma, e as que ficaram fora (8a)
+            rel['notas_de_rodape'] = []
+            for nt in det.get('notas', []):
+                reg = {k: nt.get(k) for k in ('pagina', 'coluna', 'numero', 'texto')}
+                if 'chave' in nt:
+                    num = next(n for n, ch in det['ordem'][nt['tipo']] if ch == nt['chave'])
+                    reg.update({'id': '%s:%s:%s:ex:%d' % (serie, mod, a['aula'], num), 'em': nt['tipo']})
+                else:
+                    reg['motivo'] = nt['motivo']
+                rel['notas_de_rodape'].append(reg)
             ne = [n for n, _ in det['ordem']['enunciado']]
             ns = [n for n, _ in det['ordem']['solucao']]
             total = len(ne)

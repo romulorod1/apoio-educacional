@@ -112,12 +112,21 @@ def lista(caminho, modelo='palladio', sem_item=None, duplica=None):
     if sem_item != 3:
         xt = p.marcador(X0, y3, 3)
         p.pg.insert_text((xt, y3), 'Resolva a equação do segundo grau', fontname='helv', fontsize=10)
-        p.texto(X0, y3 + 12, ['x² - 5x + 6 = 0 usando a fórmula de', 'Bhaskara e responda aos itens.',
-                              'a) Qual é o discriminante?', 'b) Quais são as raízes?', 'c) Qual é a soma das raízes?',
+        p.texto(X0, y3 + 12, ['x² - 5x + 6 = 0 usando a fórmula de'])
+        # chamada da nota, em sobrescrito miudo colado em "Bhaskara" (contrato, 8a:
+        # a nota vai com o item que a chama, como ultimo pedaco). No Portal o LaTeX
+        # parte o texto na chamada, entao aqui tambem: palavra, chamada, resto
+        largura = pymupdf.get_text_length('Bhaskara', fontname='helv', fontsize=10)
+        p.pg.insert_text((X0, y3 + 24), 'Bhaskara', fontname='helv', fontsize=10)
+        p.pg.insert_text((X0 + largura + 0.3, y3 + 20), '1', fontname='helv', fontsize=7)
+        p.pg.insert_text((X0 + largura + 5, y3 + 24), 'e responda aos itens.', fontname='helv', fontsize=10)
+        p.texto(X0, y3 + 36, ['a) Qual é o discriminante?', 'b) Quais são as raízes?', 'c) Qual é a soma das raízes?',
                               'd) Qual é o produto das raízes?', 'e) Confira as raízes na equação.'])
         # nota de rodape no pe da coluna: fio curto na margem e texto miudo
         p.pg.draw_line((X0, g['yrod'] - 36), (X0 + 100, g['yrod'] - 36), width=0.4)
-        p.pg.insert_text((X0 + 6, g['yrod'] - 28), '1 Nota de rodape de outro assunto.', fontname='helv', fontsize=7)
+        # o numero da nota e um span proprio, em sobrescrito, como no Portal
+        p.pg.insert_text((X0, g['yrod'] - 30), '1', fontname='helv', fontsize=5)
+        p.pg.insert_text((X0 + 6, g['yrod'] - 28), 'Nota de rodape de outro assunto.', fontname='helv', fontsize=7)
         # continua no alto da coluna direita
         p.texto(X1, T + 20, ['f) Escreva a equação na forma fatorada.', 'g) Desenhe as raízes na reta.'])
         p.pg.draw_line((X1 + 10, T + 60), (X1 + 200, T + 60), width=1)

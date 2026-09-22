@@ -41,6 +41,7 @@ import copy
 import hashlib
 import io
 import json
+import math
 import os
 import random
 import re
@@ -632,7 +633,10 @@ def trava_recorte(p):
                 for (a, b, dono) in ocupado.get(chave, []):
                     if y0 < b - 0.01 and a < y1 - 0.01:
                         erros.append('%s %s: sobrepoe o recorte de %s' % (it['id'], tipo, dono))
-                ocupado.setdefault(chave, []).append((y0, y1, it['id']))
+                # a nota de rodape (ultimo pedaco, so texto miudo) fica no pe da coluna,
+                # abaixo de itens de numero maior: nao entra na conta da ordem
+                if not (k > 0 and k == len(ps) - 1 and so_miudo(pg, pz['bbox'])):
+                    ocupado.setdefault(chave, []).append((y0, y1, it['id']))
             if total < minimo:
                 erros.append('%s %s: %.1f pt de altura, abaixo de %d' % (it['id'], tipo, total, minimo))
             primeiro = ps[0]
@@ -722,6 +726,8 @@ def trava_svg(p):
     """
     erros = []
     alvos = [(it['assets'][t], it['medidas'][t]) for it in p.itens for t in ('enunciado', 'solucao') if it['assets'].get(t)]
+    pilhas = {it['assets'][t]: pedacos(it, t) for it in p.itens for t in ('enunciado', 'solucao')
+              if it['assets'].get(t) and len(pedacos(it, t)) > 1}
     alvos += [(pg['asset'], pg['medidas']) for t in p.teoria for pg in t['paginas']]
     for cam, med in alvos:
         s = p.bytes_de(cam).decode('utf-8')
@@ -743,6 +749,14 @@ def trava_svg(p):
         esperado = [med['largura_pt'], med['altura_pt']] * 2
         if any(abs(v - e) > 0.6 for v, e in zip(valores, esperado)):
             erros.append('%s: width, height ou viewBox %s nao batem com medidas %s' % (cam, valores, med))
+        # pedacos empilhados: cada um no lugar certo (a fidelidade desenha cada um
+        # sozinho, entao a posicao na pilha e conferida aqui)
+        ps = pilhas.get(cam)
+        if ps:
+            ys = posicoes_na_pilha(s)
+            certo = [sum(q['bbox'][3] - q['bbox'][1] for q in ps[:j]) + gerar_pacote.FOLGA_PILHA * j for j in range(len(ps))]
+            if len(ys) != len(certo) or any(abs(a - b) > 0.01 for a, b in zip(ys, certo)):
+                erros.append('%s: pedacos na pilha em %s, e o certo e %s' % (cam, ys, certo))
     return erros
 
 
@@ -923,6 +937,89 @@ def trava_glifos(p):
     return erros[:10]
 
 
+def so_miudo(pg, bbox):
+    """O retangulo so tem texto miudo (ate 8,5 pt), comecando por um numero: e uma nota."""
+    r = pymupdf.Rect(bbox)
+    sps = [sp for b in pg.get_text('dict', clip=r)['blocks'] if b['type'] == 0 for l in b['lines'] for sp in l['spans']
+           if sp['text'].strip() and r.contains(pymupdf.Point((sp['bbox'][0] + sp['bbox'][2]) / 2,
+                                                              (sp['bbox'][1] + sp['bbox'][3]) / 2))]
+    if not sps or any(sp['size'] > 8.5 for sp in sps):
+        return False
+    # a primeira palavra e a mais a esquerda da primeira linha: o numero da nota,
+    # em sobrescrito menor, tem o topo mais baixo que o do texto dela
+    topo = min(sp['bbox'][1] for sp in sps)
+    primeiro = min([sp for sp in sps if sp['bbox'][1] < topo + 4], key=lambda sp: sp['bbox'][0])
+    return bool(re.match(r'^\d+$', primeiro['text'].strip()))
+
+
+def notas_na_pagina(doc, pg):
+    """Notas de rodape da pagina, lidas pela prova: [(coluna, numero, Point do numero)].
+
+    Fio curto (40 a 140 pt) na margem da coluna, texto miudo logo abaixo e nada de
+    corpo normal depois dele na coluna. Cada numero miudo na margem abre uma nota.
+    """
+    xsep = divisa_da_prova(doc, pg)
+    fios_pe = [d['rect'].y0 for d in pg.get_drawings() if d['rect'].height < 1.5 and d['rect'].width > 400
+               and d['rect'].y0 > pg.rect.height * 0.8]
+    y_pe = min(fios_pe) if fios_pe else pg.rect.height - 45
+    sps = [sp for b in pg.get_text('dict')['blocks'] if b['type'] == 0 for l in b['lines'] for sp in l['spans']
+           if sp['text'].strip() and sp['bbox'][1] < y_pe]
+    lado = lambda bb: 0 if (bb[0] + bb[2]) / 2 < xsep else 1
+    out = []
+    for d in pg.get_drawings():
+        q = d['rect']
+        if not (q.height < 1.5 and 40 <= q.width <= 140):
+            continue
+        col = lado((q.x0, q.y0, q.x1, q.y1))
+        abaixo = [sp for sp in sps if lado(sp['bbox']) == col and sp['bbox'][1] > q.y0 + 0.5]
+        if not abaixo or any(sp['size'] > 8.5 for sp in abaixo):
+            continue
+        if not any(0 <= sp['bbox'][1] - q.y0 <= 12 and q.x0 - 1 <= sp['bbox'][0] <= q.x1 for sp in abaixo):
+            continue
+        x_marg = min(sp['bbox'][0] for sp in abaixo)
+        for sp in abaixo:
+            if re.match(r'^\d+$', sp['text'].strip()) and sp['bbox'][0] <= x_marg + 15:
+                out.append((col, sp['text'].strip(), pymupdf.Point((sp['bbox'][0] + sp['bbox'][2]) / 2,
+                                                                    (sp['bbox'][1] + sp['bbox'][3]) / 2)))
+    return out
+
+
+def trava_notas(p):
+    """Toda nota de rodape da lista esta com um item (como ultimo pedaco) ou registrada com motivo.
+
+    Contrato, 8a (decidido com a B2 em 22/09): a nota vai com o item que a chama,
+    como ultimo pedaco, so com a chamada unica. A prova acha as notas pela
+    pagina, sem o detector, e confere contra o relatorio.
+    """
+    erros = []
+    for l in p.relatorio['listas']:
+        if 'erro' in l:
+            continue
+        doc = p.doc(l['arquivo'])
+        achadas = [(pno + 1, col, num, pt) for pno in range(1, doc.page_count) for col, num, pt in notas_na_pagina(doc, doc[pno])]
+        regs = l.get('notas_de_rodape', [])
+        if len(achadas) != len([r for r in regs if r.get('numero')]):
+            erros.append('%s: a pagina tem %d nota(s) de rodape, e o relatorio registra %d' % (
+                l['aula'], len(achadas), len([r for r in regs if r.get('numero')])))
+        por_id = {i['id']: i for i in p.itens}
+        for r in regs:
+            if r.get('id'):
+                it = por_id.get(r['id'])
+                if not it:
+                    if not any(e['id'] == r['id'] for e in l['excluidos']):
+                        erros.append('%s: nota %s levada para %s, que nao esta no pacote' % (l['aula'], r['numero'], r['id']))
+                    continue
+                ult = pedacos(it, r['em'])[-1]
+                pt = next((pt for pg_n, col, num, pt in achadas if pg_n == r['pagina'] and num == r['numero']), None)
+                if pt is None or ult['pagina'] != r['pagina'] or not pymupdf.Rect(ult['bbox']).contains(pt):
+                    erros.append('%s: a nota %s da p%d nao e o ultimo pedaco de %s' % (l['aula'], r['numero'], r['pagina'], r['id']))
+                elif not so_miudo(p.doc(it['origem']['arquivo'])[ult['pagina'] - 1], ult['bbox']):
+                    erros.append('%s: o pedaco da nota %s de %s leva outra coisa alem da nota' % (l['aula'], r['numero'], r['id']))
+            elif not r.get('motivo'):
+                erros.append('%s: nota %s da p%d fora de todo item e sem motivo' % (l['aula'], r.get('numero'), r['pagina']))
+    return erros[:10]
+
+
 def trava_curadoria(p):
     """Toda linha de curadoria desta serie achou o seu item."""
     return ['%s nao achou o item no pacote' % k for k in p.relatorio.get('curadoria_sem_item', [])]
@@ -1022,6 +1119,18 @@ def sortear_pedacos(p, n=20, semente=SEMENTE):
     return sorted(rnd.sample(todos, min(n, len(todos))))
 
 
+def pedaco_do_svg(svg, k):
+    """O k-esimo <svg> aninhado de um SVG empilhado, como documento proprio."""
+    blocos = re.split(r'<g transform="translate\(0 [\d.]+\)">', svg)[1:]
+    b = blocos[k]
+    fim = b.rfind('</g>')
+    return b[:fim].strip() + '\n'
+
+
+def posicoes_na_pilha(svg):
+    return [float(y) for y in re.findall(r'<g transform="translate\(0 ([\d.]+)\)">', svg)]
+
+
 def trava_fidelidade(p, sorteio, temp):
     """SVG renderizado no Chrome contra o pixmap do pymupdf do mesmo retangulo."""
     por_id = {i['id']: i for i in p.itens}
@@ -1034,10 +1143,23 @@ def trava_fidelidade(p, sorteio, temp):
         ps = pedacos(it, tipo)
         med = it['medidas'][tipo]
         png = os.path.join(temp, 'chrome_%02d.png' % n)
-        pedidos.append({'svg': os.path.join(p.pasta, *it['assets'][tipo].split('/')), 'png': png,
-                        'largura_pt': med['largura_pt'], 'altura_pt': med['altura_pt'], 'escala': escala})
-        desloc = sum(ps[j]['bbox'][3] - ps[j]['bbox'][1] for j in range(k)) + gerar_pacote.FOLGA_PILHA * k
-        casos.append((iid, tipo, k, ps[k], desloc, png))
+        caminho = os.path.join(p.pasta, *it['assets'][tipo].split('/'))
+        if len(ps) > 1:
+            # Pedaco empilhado: o Chrome desenha o glifo em fracao de pixel quando o
+            # pedaco comeca, por exemplo, em 537,5 px, e o mesmo SVG sai 0,96%
+            # diferente dele mesmo desenhado sozinho (medido na amostra do Banco).
+            # Entao o k-esimo <svg> aninhado sai do proprio asset entregue e e
+            # desenhado sozinho; a posicao dele na pilha e conferida a parte, na
+            # trava_svg (translate igual a soma das alturas mais a folga).
+            aninhado = pedaco_do_svg(p.bytes_de(it['assets'][tipo]).decode('utf-8'), k)
+            caminho = os.path.join(temp, 'pedaco_%02d.svg' % n)
+            open(caminho, 'w', encoding='utf-8').write(aninhado)
+            b = ps[k]['bbox']
+            largura, altura = b[2] - b[0], b[3] - b[1]
+        else:
+            largura, altura = med['largura_pt'], med['altura_pt']
+        pedidos.append({'svg': caminho, 'png': png, 'largura_pt': largura, 'altura_pt': altura, 'escala': escala})
+        casos.append((iid, tipo, k, ps[k], 0.0, png))
     arq = os.path.join(temp, 'pedidos.json')
     json.dump(pedidos, open(arq, 'w', encoding='utf-8'))
     r = subprocess.run(['node', os.path.join(AQUI, '_fidelidade.js'), arq], capture_output=True, text=True)
@@ -1050,10 +1172,17 @@ def trava_fidelidade(p, sorteio, temp):
         # canto do pixmap cair exatamente no canto do SVG
         tmp = pymupdf.open()
         tmp.insert_pdf(p.doc(it['origem']['arquivo']), from_page=pz['pagina'] - 1, to_page=pz['pagina'] - 1)
-        tmp[0].set_cropbox(pymupdf.Rect(pz['bbox']))
+        # O pedaco empilhado pode comecar em fracao de pixel (258 pt a 150 dpi sao
+        # 537,5 px): o Chrome o desenha ali, e a referencia tem de sair com a
+        # mesma fracao, senao toda borda de letra difere (1,27% num pedaco
+        # identico a olho, amostra do Banco). A referencia sobe a fracao.
+        exato = desloc * escala
+        y0 = int(math.floor(exato + 1e-6))
+        delta = (exato - y0) / escala
+        b = pz['bbox']
+        tmp[0].set_cropbox(pymupdf.Rect(b[0], b[1] - delta, b[2], b[3] - delta))
         ref = tmp[0].get_pixmap(dpi=DPI_FIDELIDADE, colorspace=pymupdf.csGRAY)
         cro = pymupdf.Pixmap(pymupdf.csGRAY, pymupdf.Pixmap(png))
-        y0 = int(round(desloc * escala))
         # o asset empilhado tem a largura do pedaco mais largo: o pedaco fica
         # encostado a esquerda, e a comparacao e na largura dele
         w = min(ref.width, cro.width)
@@ -1181,6 +1310,7 @@ def travas_simples(p, placar, zip_caminho=None, rotulo=''):
     placar.conferir('nenhum texto fora de recorte' + rotulo, trava_tinta_coberta(p))
     placar.conferir('curadoria aplicada' + rotulo, trava_curadoria(p))
     placar.conferir('todo caractere com o seu glifo' + rotulo, trava_glifos(p))
+    placar.conferir('notas de rodape com o item ou registradas' + rotulo, trava_notas(p))
 
 
 def venenos(p, temp, placar, curadoria):
@@ -1245,7 +1375,8 @@ def venenos(p, temp, placar, curadoria):
     q = copia(p, temp, 'v_secao')
     for i in q.itens:
         if i['id'] == it_multi['id']:
-            ult = i['origem']['enunciado']['pedacos'][-1]
+            # o pedaco do alto da coluna direita (o ultimo agora e a nota de rodape)
+            ult = [pz for pz in i['origem']['enunciado']['pedacos'] if pz['coluna'] == 2][-1]
             ult['bbox'] = [ult['bbox'][0], ult['bbox'][1], ult['bbox'][2], ult['bbox'][3] + 30]
     placar.conferir('recorte: titulo de secao colado', trava_recorte(q), True, 'titulo de secao')
     # recorte: caixa do rotulo deslocada para cima do texto
@@ -1314,6 +1445,12 @@ def venenos(p, temp, placar, curadoria):
     cam = it_simples['assets']['enunciado']
     regravar_asset(q, cam, q.bytes_de(cam).replace(b'</svg>', b'<use data-text="a"/></svg>'))
     placar.conferir('svg: data-text', trava_svg(q), True, 'data-text')
+    q = copia(p, temp, 'v_svg_pilha')
+    cam = it_multi['assets']['enunciado']
+    b = q.bytes_de(cam)
+    regravar_asset(q, cam, re.sub(rb'<g transform="translate\(0 ([\d.]+)\)">', lambda m: b'<g transform="translate(0 %s)">'
+                                  % (b'0' if m.group(1) == b'0' else b'1' + m.group(1)), b))
+    placar.conferir('svg: pedaco fora do lugar na pilha', trava_svg(q), True, 'na pilha')
     q = copia(p, temp, 'v_svg_vb')
     cam = it_simples['assets']['enunciado']
     b = q.bytes_de(cam)
@@ -1341,6 +1478,17 @@ def venenos(p, temp, placar, curadoria):
     cam = q.teoria[0]['paginas'][1]['asset']
     regravar_asset(q, cam, q.bytes_de(cam).replace(b'</svg>', b'<g data-text="&#x001a;"/></svg>'))
     placar.conferir('svg: caractere de controle', trava_xml(q), True, 'caractere de controle')
+
+    # notas de rodape: sem a regra, a nota da amostra (chamada no item 3) fica fora
+    # de todo item e sem registro
+    antes_n = gerar_pacote.LEVA_NOTA
+    gerar_pacote.LEVA_NOTA = False
+    try:
+        gerar(p.pdfs, os.path.join(temp, 'v_nota_fora'), curadoria)
+    finally:
+        gerar_pacote.LEVA_NOTA = antes_n
+    q = Pacote(os.path.join(temp, 'v_nota_fora'), p.pdfs)
+    placar.conferir('nota de rodape sem dono', trava_notas(q), True, 'nota(s) de rodape')
 
     # glifos: um unico glifo apagado do SVG (defeito que a fidelidade por pixel
     # quase nao ve)
