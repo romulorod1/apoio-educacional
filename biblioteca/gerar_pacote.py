@@ -69,6 +69,7 @@ MARGEM_X = 24.0        # borda externa das colunas
 # 23): a borda direita cortava a ultima letra. Com 1,2 pt o fio (0,4 pt de
 # largura) continua fora do recorte.
 AFASTA_FIO = 1.2
+SUBIDA_FINA = True  # o topo da linha do marcador sobe pela tinta a 288 dpi (subida_fina); False so no veneno
 FOLGA_ANTES_DO_PROXIMO = True  # o recorte acaba 1 pt antes do proximo item (ver detectar); False so no veneno
 LIMPA_PASTA = True  # asset solto de geracao anterior sai da pasta de trabalho (gravar_pacote); False so no veneno
 FIO_IMAGEM = True   # fio de coluna ou de rodape feito de imagem conta como fio (fios_da_pagina); False so no veneno
@@ -238,6 +239,26 @@ def tinta_dos_dois_lados(pg, xsep, bb):
         if not any(v < LIMIAR_TINTA for v in pix.samples):
             return False
     return True
+
+
+def subida_fina(doc, pno, x0, x1, y, limite):
+    """Sobe o topo da linha do marcador pela tinta a 288 dpi, sem passar do topo das caixas.
+
+    Traco fino (o expoente de 2 elevado a x ao quadrado, solucao 19 de Equacoes
+    Exponenciais, 1o medio) nao escurece a linha de 1 pt da pagina a 72 dpi, e a
+    subida parava 3 pt abaixo dele: o traco ia para o recorte de cima.
+    """
+    if y - limite < 0.25:
+        return y
+    tmp = pymupdf.open()
+    tmp.insert_pdf(doc, from_page=pno, to_page=pno)
+    pix = tmp[0].get_pixmap(dpi=288, colorspace=pymupdf.csGRAY, clip=pymupdf.Rect(x0, limite, x1, y + 0.5))
+    tmp.close()
+    w, h, smp = pix.width, pix.height, pix.samples
+    r = min(h, int(round((y - limite) * 4)))  # a linha fina logo acima de y
+    while r - 1 >= 0 and any(smp[(r - 1) * w + x] < LIMIAR_TINTA for x in range(w)):
+        r -= 1
+    return max(limite, limite + r / 4.0)
 
 
 def divisa_fina(doc, pno, x0, x1, y_de, y_ate):
@@ -619,7 +640,13 @@ def detectar(doc, secao_1_abre_solucoes=True):
         for col in (0, 1):
             cx0, cx1 = faixa_da_coluna(col, geo, pg)
             ms = sorted([m for m in marcs if m['col'] == col], key=lambda m: m['el']['bb'][1])
-            cortes = [(topo_pela_tinta(topo_da_linha(m, els), m, tinta[col]), m) for m in ms]
+            cortes = []
+            for m in ms:
+                topo_caixas = topo_da_linha(m, els)
+                y_t = topo_pela_tinta(topo_caixas, m, tinta[col])
+                if SUBIDA_FINA:
+                    y_t = subida_fina(doc, pno, cx0, cx1, y_t, topo_caixas)
+                cortes.append((y_t, m))
             lim_col = [(y, m) for y, m in cortes]
             els_col = [e for e in els if e['col'] == col]
             inicios = [None] + lim_col

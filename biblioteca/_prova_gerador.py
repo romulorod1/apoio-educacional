@@ -914,6 +914,30 @@ def trava_divisa_fina(divisa=None):
     return erros
 
 
+def trava_subida_fina(subida=None):
+    """O topo da linha do marcador sobe pelo traco fino que a pagina a 72 dpi nao mostra.
+
+    Pagina sintetica: tinta da linha a partir de y 110 e um traco de 0,15 pt de
+    largura subindo ate y 106 (o expoente de 2 elevado a x ao quadrado, solucao 19
+    de Equacoes Exponenciais, 1o medio). A 72 dpi o traco nao escurece linha
+    nenhuma, e o topo ficava em 110. Com as caixas do texto em 104, o topo tem de
+    ficar entre 104 e 106.
+    """
+    subida = subida or gerar_pacote.subida_fina
+    doc = pymupdf.open()
+    pg = doc.new_page(width=612, height=792)
+    pg.draw_rect(pymupdf.Rect(40, 110, 120, 118), color=None, fill=(0, 0, 0), width=0)
+    pg.draw_line((80, 106), (80, 110), width=0.15)
+    erros = []
+    tinta = gerar_pacote.linhas_com_tinta(doc, 0, {'xsep': 306.0, 'yrod': 767.0})[0]
+    if any(tinta[y] for y in (106, 107, 108, 109)):
+        erros.append('a pagina a 72 dpi ja mostra o traco: o caso nao prova nada')
+    y = subida(doc, 0, 24.0, 304.0, 110.0, 104.0)
+    if not 104 <= y <= 106:
+        erros.append('topo em %r, e nao entre 104 e 106' % (y,))
+    return erros
+
+
 def trava_bordas(p):
     """A lista de bordas da amostra: 1, 2 e 5 no pacote; 3 e 4 fora pela calha.
 
@@ -1900,6 +1924,8 @@ def principal():
             placar.conferir('variantes: sem titulo, recuo, duas partes', trava_variantes(p))
             placar.conferir('bordas: expoente alto, tabela no fio, nota com fracao', trava_bordas(p))
             placar.conferir('divisa fina entre itens colados', trava_divisa_fina())
+            placar.conferir('subida fina pelo traco', trava_subida_fina())
+            placar.conferir('subida pela linha de 1 pt', trava_subida_fina(lambda doc, pno, x0, x1, y, lim: y), True, 'topo em')
             placar.conferir('divisa pela linha de 1 pt', trava_divisa_fina(lambda doc, pno, x0, x1, a, b: float(math.floor(b) - 1)),
                             True, 'divisa em')
             placar.conferir('marcador em CMBX10', trava_fontes_negrito())
