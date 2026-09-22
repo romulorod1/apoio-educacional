@@ -12021,9 +12021,12 @@
       });
     });
     grupos.modulo.sort(function (a, b) { return b.nota - a.nota || (a.id < b.id ? -1 : 1); });
-    /* Teoria, exercícios e Banco dos módulos achados vêm primeiro, na ordem
-     * desses módulos; dentro de cada módulo, e no resto, vale a nota, e a
-     * árvore só desempata. Medido com o pacote real do 9º ano: "bhaskara" traz
+    /* Teoria, exercícios e Banco dos módulos achados vêm primeiro, todos num
+     * patamar só; dentro dele, e no resto, vale a nota, e a árvore só
+     * desempata. (A ordem entre módulos achados não entra: dois módulos com
+     * nota quase igual deixariam uma aula de título exato atrás de outra que
+     * mal casa, como "Noções Básicas - Parte 01" de Conjuntos atrás de
+     * Funções no pacote real.) Medido com o pacote real do 9º ano: "bhaskara" traz
      * o módulo de equações do 2º grau no topo, mas a palavra também aparece nas
      * páginas de Conjuntos e de Tales, e uma aula de Funções casa no título;
      * pela nota pura elas vinham antes das quatro teorias do módulo. A nota
@@ -12040,7 +12043,7 @@
     ['teoria', 'exercicio', 'banco'].forEach(function (g) {
       grupos[g].sort(function (a, b) {
         var ma = doModuloAchado(a.id), mb = doModuloAchado(b.id);
-        if (ma !== mb) return ma - mb;
+        if ((ma === Infinity) !== (mb === Infinity)) return ma === Infinity ? 1 : -1;
         return b.nota - a.nota || ordemNaArvore(a.id) - ordemNaArvore(b.id) || (a.id < b.id ? -1 : 1);
       });
     });

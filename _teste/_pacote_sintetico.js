@@ -145,8 +145,9 @@ const MODULOS = [
     slug: 'produtos-notaveis-e-fatoracao', titulo: 'Produtos Notáveis e Fatoração', cor: '#2E7D6B',
     teorias: [{ slug: 'produtos-notaveis', titulo: 'Produtos Notáveis', paginas: 3,
       texto: 'quadrado da soma quadrado da diferenca produto da soma pela diferenca' },
-      // de OUTRO módulo e casa no título com "equação do segundo grau", como a
-      // aula de Funções do pacote real: prova que o módulo achado vem antes
+      // de outro módulo e casa no título com "equação do segundo grau": o
+      // módulo dela também é achado (o resumo cita a aula), então ela entra no
+      // mesmo patamar e disputa pela nota com as do módulo de equações
       { slug: 'equacao-do-segundo-grau-e-fatoracao', titulo: 'Equação do Segundo Grau e Fatoração', paginas: 2,
         texto: 'fatorar o trinomio para achar as raizes' }],
     listas: [{ slug: 'produtos-notaveis', titulo: 'Produtos Notáveis', itens: 6, pareada: ['produtos-notaveis'] }]

@@ -281,13 +281,14 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
     corpo.blocos[1].linhas.slice().sort().join(' | '),
     ['Equação do Segundo Grau e Fatoração', 'Equações Biquadradas', 'O Teorema', 'Resultados Básicos - Parte I',
       'Resultados Básicos - Parte II', 'Soma e Produto das Raízes'].join(' | '));
-  /* A teoria de Pitágoras cita Bhaskara no texto: aparece, mas depois das
-   * quatro do módulo achado. */
-  conf('as quatro teorias do módulo achado vêm primeiro', corpo.blocos[1].linhas.slice(0, 4).sort().join(' | '),
-    ['Equações Biquadradas', 'Resultados Básicos - Parte I', 'Resultados Básicos - Parte II', 'Soma e Produto das Raízes'].join(' | '));
-  conf('e as de outros módulos vêm depois, mesmo a que casa no título', corpo.blocos[1].linhas.slice(4).join(' | '),
-    'Equação do Segundo Grau e Fatoração | O Teorema');
-  conf('dentro do módulo vale a nota: o título que casa vem na frente', corpo.blocos[1].linhas[0], 'Equações Biquadradas');
+  /* Dois módulos achados (Equações e Produtos Notáveis, pela aula que casa no
+   * título) formam um patamar só, ordenado pela nota; a teoria de Pitágoras,
+   * de módulo não achado, só cita o discriminante e vem depois de todas. */
+  conf('Módulos achados: Equações no topo, e Produtos Notáveis pela aula que casa', corpo.blocos[0].linhas.join(' | '),
+    'Equações do Segundo Grau | Produtos Notáveis e Fatoração');
+  conf('no patamar dos módulos achados vale a nota: os dois títulos que casam na frente',
+    corpo.blocos[1].linhas.slice(0, 2).join(' | '), 'Equação do Segundo Grau e Fatoração | Equações Biquadradas');
+  conf('e a teoria de módulo não achado vem por último', corpo.blocos[1].linhas[corpo.blocos[1].linhas.length - 1], 'O Teorema');
   conf('Exercícios: as duas listas', corpo.blocos[2].linhas.slice().sort().join(' | '),
     'Equações do Segundo Grau: Resultados Básicos | Soma e Produto');
   conf('Banco: o problema da equação do segundo grau', corpo.blocos[3].linhas.join(' | '), 'As raízes escondidas');
