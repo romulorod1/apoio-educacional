@@ -249,7 +249,8 @@ def lista_bordas(caminho):
       na mesma altura da outra coluna, saem pela regra da calha;
     - nota de rodape do exercicio 5 que comeca por uma fracao mais alta que o
       numero da nota (7o ano, Introducao a Porcentagem, nota da solucao 40);
-    - traco do exercicio 1 recortado por clip antes do fio: so a caixa cruza.
+    - traco do exercicio 1 recortado por clip antes do fio: so a caixa cruza;
+    - circulo do exercicio 1 que comeca em x 18, antes da margem da coluna.
     """
     g = MODELOS['palladio']
     X0, X1, T, XS = g['x0'], g['x1'], g['topo'], g['xsep']
@@ -264,6 +265,8 @@ def lista_bordas(caminho):
     xt = p.marcador(X0, T + 90, 1)
     p.pg.insert_text((xt, T + 90), 'Quanto é 2 + 2?', fontname='helv', fontsize=10)
     p.texto(X0, T + 102, ['a) 3.', 'b) 4.'])
+    # figura que comeca antes da margem da coluna (1o medio, PAs Inteiras, ex. 2)
+    p.pg.draw_circle((22.0, T + 122), 4.0, color=(0, 0, 0), fill=(0.2, 0.4, 0.8))
     # traco que a figura recorta por clip: a caixa cruza o fio, a tinta para em
     # 250 pt (8o ano, Angulos, exercicio 14). O 1 fica no pacote
     xref = p.pg.get_contents()[-1]

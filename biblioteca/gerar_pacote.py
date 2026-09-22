@@ -695,7 +695,15 @@ def detectar(doc, secao_1_abre_solucoes=True):
                     x_fim = math.floor(x_dir * 10) / 10.0  # para baixo: o fio fica fora
                 else:
                     x_fim = math.ceil(x_dir)
-                r = (float(math.floor(cx0) if col == 0 else math.ceil(cx0)), float(y0), float(x_fim), float(y1))
+                # e a borda esquerda da coluna da esquerda acompanha figura que comeca
+                # antes da margem (a imagem da solucao em x 18 no exercicio 2 de PAs
+                # Inteiras, 1o medio, com a caixa em 24), ate 4 pt da pagina
+                x_ini = math.floor(cx0) if col == 0 else math.ceil(cx0)
+                if col == 0 and ESTENDE_BORDA:
+                    antes = [e['bb'][0] for e in els_col if e['bb'][0] < x_ini and e['bb'][1] < y1 and e['bb'][3] > y0]
+                    if antes:
+                        x_ini = math.floor(max(4.0, min(antes) - 0.5))
+                r = (float(x_ini), float(y0), float(x_fim), float(y1))
                 transborda = any(r[1] <= (a + b) / 2.0 <= r[3] for a, b in cruzam)
                 pedacos[aberto[0]][aberto[2]].append({'pno': pno, 'col': col, 'rect': r, 'xsep': geo['xsep'],
                                                      'transborda': transborda})

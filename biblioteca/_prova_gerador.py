@@ -408,7 +408,10 @@ def trava_tinta_coberta(p):
                 prox = None
                 for j in range(k_l + 1, len(linhas)):
                     (cj, bj), csj = linhas[j]
-                    if cj != col or not 0 < bj - base < 30 or not bj - linhas[j - 1][0][1] < 9.5:
+                    # glifo solto (o alto do radical do exercicio 10 de Inequacoes Mistas,
+                    # 1o medio) tem a base 10 pt acima da linha do rotulo
+                    passo = 12.0 if j == k_l + 1 and len(cs) == 1 else 9.5
+                    if cj != col or not 0 < bj - base < 30 or not bj - linhas[j - 1][0][1] < passo:
                         break
                     sj = re.sub(r'\s+', '', portal.recompor(''.join(c[1] for c in csj)))
                     if csj[0][0] < cs[0][0] - 5 and (re.match(r'^Exerc\S*cio\d+\.', sj) or re.match(r'^\d+\.', primeira_palavra(csj))):
@@ -1668,6 +1671,7 @@ def venenos_series(p, temp, placar, curadoria):
         if attr == 'ESTENDE_BORDA':
             # o mesmo veneno na coluna da esquerda: a palavra rente a divisa sai cortada
             placar.conferir('recorte preso antes da divisa', trava_recorte(q), True, 'lista-variantes:ex:3 enunciado: tinta cortada')
+            placar.conferir('figura antes da margem cortada', trava_recorte(q), True, 'lista-bordas:ex:1 enunciado: tinta cortada na borda esquerda')
     # pasta de trabalho reaproveitada: o asset de um item que saiu na geracao
     # seguinte nao pode ficar solto (6o ano, solucoes 19 e 21 depois da calha)
     for limpa in (True, False):
