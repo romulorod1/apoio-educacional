@@ -1015,6 +1015,28 @@ def trava_encostado(p):
     return erros
 
 
+def trava_solucao_com_conteudo(p):
+    """Toda solucao do pacote traz algo alem do rotulo: texto depois do numero, ou figura.
+
+    A fonte as vezes poe so o numero no lugar da solucao (3o medio, Sistemas
+    Lineares, 10 e 12): o item sai pela curadoria, com motivo. A prova le o texto
+    dos pedacos pela pagina, tira o rotulo "N." do comeco, e aceita o que sobrar,
+    ou um recorte com mais de 20 pt de altura (figura sem texto).
+    """
+    erros = []
+    for it in p.itens:
+        if not it['assets'].get('solucao'):
+            continue
+        doc = p.doc(it['origem']['arquivo'])
+        ps = [pz for pz in pedacos(it, 'solucao') if not pz.get('nota')]
+        texto = ' '.join(doc[pz['pagina'] - 1].get_text('text', clip=pymupdf.Rect(pz['bbox'])) for pz in ps)
+        resto = re.sub(r'^\s*%d\s*\.' % it['numero'], '', texto).strip()
+        alto = max(pz['bbox'][3] - pz['bbox'][1] for pz in ps)
+        if not resto and alto <= 20:
+            erros.append('%s solucao: so o rotulo, sem texto nem figura' % it['id'])
+    return erros
+
+
 def trava_bordas(p):
     """A lista de bordas da amostra: 1, 2 e 5 no pacote; 3 e 4 fora pela calha.
 
@@ -1512,6 +1534,7 @@ def travas_simples(p, placar, zip_caminho=None, rotulo=''):
     placar.conferir('curadoria aplicada' + rotulo, trava_curadoria(p))
     placar.conferir('todo caractere com o seu glifo' + rotulo, trava_glifos(p))
     placar.conferir('notas de rodape com o item ou registradas' + rotulo, trava_notas(p))
+    placar.conferir('solucao com conteudo alem do rotulo' + rotulo, trava_solucao_com_conteudo(p))
 
 
 def venenos(p, temp, placar, curadoria):
@@ -1567,6 +1590,13 @@ def venenos(p, temp, placar, curadoria):
             b = i['origem']['enunciado']['bbox']
             i['origem']['enunciado']['bbox'] = [b[0], b[1] + 15, b[2], b[3] + 15]
     placar.conferir('recorte: caixa deslocada', trava_recorte(q), True, 'nao comeca pelo numero')
+    # solucao so com o rotulo: a caixa da solucao do item 2 reduzida a linha do "2."
+    q = copia(p, temp, 'v_so_rotulo')
+    for i in q.itens:
+        if i['id'] == it_simples['id']:
+            b = i['origem']['solucao']['bbox']
+            i['origem']['solucao']['bbox'] = [b[0], b[1], b[2], b[1] + 12]
+    placar.conferir('solucao so com o rotulo', trava_solucao_com_conteudo(q), True, 'so o rotulo')
     # recorte: o fio entre colunas dentro da caixa
     q = copia(p, temp, 'v_fio')
     for i in q.itens:
