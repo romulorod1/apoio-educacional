@@ -263,6 +263,7 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
   if (!anexou.ok) throw Object.assign(new Error('sem anexo'), { jaContado: true });
   const aulaId = anexou.valor.aulaId;
   conf('nome termina em _biblioteca.pdf', /_biblioteca\.pdf$/.test(anexou.valor.anexo.nome), true);
+  conf('o anexo guarda os módulos dos exercícios', JSON.stringify(anexou.valor.anexo.modulos), '["Equações do Segundo Grau"]');
 
   // ================================================================
   secao('5. O PDF anexado');
