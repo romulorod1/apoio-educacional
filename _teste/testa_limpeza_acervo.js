@@ -33,8 +33,10 @@ const ler = f => fs.readFileSync(path.join(RAIZ, f), 'utf8');
 const SW = ler('sw.js');
 const APP = ler('app.js');
 const trocas = {};
-const ANCORA_SW = "var ARQUIVOS = [\n";
-if (VENENO) trocas['/sw.js'] = SW.split(ANCORA_SW).join(ANCORA_SW + "  './banco/acervo.json',\n");
+// o worktree pode ter o sw.js com CRLF (core.autocrlf): a âncora e a linha envenenada seguem o arquivo
+const FIM_SW = SW.indexOf('\r\n') >= 0 ? '\r\n' : '\n';
+const ANCORA_SW = 'var ARQUIVOS = [' + FIM_SW;
+if (VENENO) trocas['/sw.js'] = SW.split(ANCORA_SW).join(ANCORA_SW + "  './banco/acervo.json'," + FIM_SW);
 
 // ---------------------------------------------------------------- 1 e 2 (Node)
 secao('1. O acervo saiu do repositório e ninguém o pede');
