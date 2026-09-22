@@ -58,8 +58,10 @@
  * styles.css), com a lista igual. O v37 põe a dificuldade à vista na lista de
  * exercícios: o filtro Fácil, Médio e Difícil, o rótulo "estimada" ou
  * "curada" e o CSV das etiquetas dela em Ajustes (app.js, index.html e
- * styles.css), com a lista igual. */
-var CACHE = 'apoio-educacional-v37';
+ * styles.css), com a lista igual. O v38 tira do repositório o acervo de
+ * 14/09: saem da lista './banco/acervo.json' e './banco/acervo_indice.json', e
+ * do app.js, index.html e styles.css a aba Temas antiga. */
+var CACHE = 'apoio-educacional-v38';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -100,9 +102,6 @@ var ARQUIVOS = [
   // o índice de busca acompanha o de temas: é ele que faz o campo de assunto
   // achar por conteúdo, e não só por título.
   './banco/busca.json',
-  // o acervo educacional completo (40 temas em 12 disciplinas)
-  './banco/acervo.json',
-  './banco/acervo_indice.json',
   /* O índice dos temas de português, ao lado dos outros dois e por um motivo a
    * mais: o índice de uma matéria que não é a padrão é procurado no CACHE, e
    * não na rede (app.js, carregarOutrosIndices, que pergunta ao cache para um

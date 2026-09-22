@@ -122,7 +122,6 @@ titulo "sem navegador"
 roda "notacao"        node _teste/testa_notacao.js
 roda "busca (regras)" node _teste/testa_busca_regras.js
 roda "material (PDF)" node _teste/testa_material.js
-roda "acervo e mapas" node _teste/testa_acervo.js
 # FRENTE 2: bloco de citacao com numero de linha, fio e credito, italico por F4/F5,
 # alternativas e gabarito em criterio, e a folha legada byte a byte igual a base do merge.
 roda "citacao (PDF)"  node _teste/testa_citacao_pdf.js
@@ -332,6 +331,12 @@ roda "biblioteca aula --envenenado-aluno"      node "_teste/testa_biblioteca_aul
 # curadoria). O veneno ignora a etiqueta dela no filtro.
 roda "biblioteca dificuldade"                  node "_teste/testa_biblioteca_dificuldade.js"
 roda "biblioteca dificuldade --envenenado-etiqueta" node "_teste/testa_biblioteca_dificuldade.js" --envenenado-etiqueta
+# FRENTE B: o acervo de 14/09 saiu do repositorio (arquivos, lista do sw.js, aba
+# Temas antiga); sem pacote a Biblioteca segue "Em construcao", e uma aula com
+# assunto gravado do acervo abre como assunto comum. O veneno devolve um arquivo
+# que nao existe a lista do sw.js, e o service worker nao pode instalar.
+roda "limpeza do acervo"                        node "_teste/testa_limpeza_acervo.js"
+roda "limpeza do acervo --envenenado-lista"     node "_teste/testa_limpeza_acervo.js" --envenenado-lista
 
 roda "painel de valores"                        node "_teste/testa_painel_valores.js"
 roda "painel de valores --envenenado-aberto"    node "_teste/testa_painel_valores.js" --envenenado-aberto
