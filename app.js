@@ -11498,7 +11498,8 @@
         var precisa = Math.round(aberto.bytesTotais * 1.2);
         if (livre < precisa) {
           var semEspaco = new Error('O tablet não tem espaço para este pacote: ele precisa de ' +
-            Biblioteca.mb(precisa) + ' e há ' + Biblioteca.mb(Math.max(0, livre)) + ' livres.');
+            Biblioteca.mb(precisa) + ' e há ' + Biblioteca.mb(Math.max(0, livre)) + ' livres. ' +
+            'Libere espaço no tablet (apagando arquivos ou fotos que não usa) e tente de novo.');
           semEspaco.espaco = true;
           throw semEspaco;
         }
@@ -11530,8 +11531,8 @@
    * pode fazer, que nada mudou, e o detalhe técnico em letra pequena (só das
    * recusas, que são em português; erro cru do navegador não vai para a tela). */
   var ORIENTACAO_RECUSA = {
-    download: 'Um arquivo do pacote chegou diferente do original. Baixe o pacote de novo do Drive e tente outra vez.',
-    defeito: 'Este pacote veio com defeito e não pode ser usado.',
+    download: 'O pacote chegou estragado ou incompleto. Baixe de novo do Drive e tente outra vez.',
+    defeito: 'Este pacote veio com defeito e não pode ser usado. Avise quem mandou o pacote; enquanto isso, continue usando o que já está no tablet.',
     atualizar: 'Este pacote é de uma versão mais nova do aplicativo. Atualize o aplicativo (Ajustes, Procurar atualização) e tente de novo.',
     navegador: 'Este navegador não consegue abrir o pacote da biblioteca. Atualize o Chrome e tente de novo.',
     nao_pacote: 'O arquivo escolhido não é um pacote da biblioteca. Escolha o arquivo .zip da biblioteca no Drive.'
@@ -11548,7 +11549,7 @@
     } else if (e && (e.name === 'NotReadableError' || e.name === 'NotFoundError')) {
       linhas.push('Não consegui ler o arquivo. Se ele está no Drive, espere o download terminar e tente de novo.');
     } else {
-      linhas.push('Não consegui gravar o pacote. Feche e abra o aplicativo e tente de novo.');
+      linhas.push('Não consegui ler ou gravar o pacote agora. Feche e abra o aplicativo e tente de novo.');
     }
     linhas.push('O que já estava no tablet continua igual.');
     if (e && e.recusa && e.tipo !== 'navegador' && e.tipo !== 'nao_pacote') linhas.push({ detalhe: 'Detalhe: ' + e.message });

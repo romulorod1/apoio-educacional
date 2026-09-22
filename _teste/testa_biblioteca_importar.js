@@ -263,8 +263,8 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
   secao('7. Venenos: recusados, com mensagem na tela, e nada muda');
   const NAO = 'O pacote não foi importado.';
   const IGUAL = 'O que já estava no tablet continua igual.';
-  const BAIXE = 'Um arquivo do pacote chegou diferente do original. Baixe o pacote de novo do Drive e tente outra vez.';
-  const DEFEITO = 'Este pacote veio com defeito e não pode ser usado.';
+  const BAIXE = 'O pacote chegou estragado ou incompleto. Baixe de novo do Drive e tente outra vez.';
+  const DEFEITO = 'Este pacote veio com defeito e não pode ser usado. Avise quem mandou o pacote; enquanto isso, continue usando o que já está no tablet.';
   const ATUALIZE = 'Este pacote é de uma versão mais nova do aplicativo. Atualize o aplicativo (Ajustes, Procurar atualização) e tente de novo.';
   const tela = (orientacao, detalhe) => [NAO, orientacao, IGUAL].concat(detalhe ? ['Detalhe: ' + detalhe] : []).join('\n');
   const esperado = {
@@ -318,7 +318,7 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
   await H.abrirApp(apertada, amb.ORIGEM);
   await H.irParaAba(apertada, 'ajustes');
   msg = await importar(apertada, zip('apertado', { versao: 8 }), 'importação sem espaço');
-  conf('mensagem de falta de espaço, com os MB', /^O pacote não foi importado\.\nO tablet não tem espaço para este pacote: ele precisa de .* MB e há menos de 0,1 MB livres\.\nO que já estava no tablet continua igual\.$/.test(msg), true);
+  conf('mensagem de falta de espaço, com os MB', /^O pacote não foi importado\.\nO tablet não tem espaço para este pacote: ele precisa de .* MB e há menos de 0,1 MB livres\. Libere espaço no tablet \(apagando arquivos ou fotos que não usa\) e tente de novo\.\nO que já estava no tablet continua igual\.$/.test(msg), true);
   conf('e nada foi gravado', JSON.stringify(await lerPacote(apertada)), JSON.stringify([{ pacote: 'matematica-sintetico-9ano', versao: 2 }]));
   await apertada.close();
 

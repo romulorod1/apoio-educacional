@@ -129,6 +129,16 @@ async function recusa(zip) {
     { nome: 'manifest.json', dados: Buffer.from(JSON.stringify({ esquema: 1, pacote: 'x', versao: 1, arquivos: { constructor: 'sha256:' + '0'.repeat(64) } })), metodo: 8 }]));
   conf('manifest listando "constructor" sem o arquivo: recusado como faltando', e && /falta constructor/.test(e.message), true);
 
+  secao('falha do navegador no meio da conferência não vira defeito do pacote');
+  const digest = crypto.subtle.digest;
+  crypto.subtle.digest = () => Promise.reject(new TypeError('Array buffer allocation failed'));
+  try {
+    e = await recusa(limpo.zip);
+    conf('o erro sai como erro comum, sem a marca de recusa', e && (e.recusa ? 'recusa ' + e.tipo : 'comum ' + e.name), 'comum TypeError');
+  } finally {
+    crypto.subtle.digest = digest;
+  }
+
   secao('navegador sem DecompressionStream');
   const guardado = global.DecompressionStream;
   global.DecompressionStream = undefined;

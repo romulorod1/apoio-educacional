@@ -210,7 +210,10 @@
       });
     }).catch(function (e) {
       if (e && e.message === 'SEM_DESCOMPRESSAO') throw Recusa(SEM_NAVEGADOR);
-      if (e && !e.recusa) throw Recusa(e.message || 'O pacote não pôde ser aberto.');
+      /* Só o que veio do leitor de zip vira recusa do pacote. Falha do próprio
+       * navegador (falta de memória, por exemplo) não é defeito do pacote:
+       * segue como erro comum, e a tela não culpa o pacote nem mostra inglês. */
+      if (e && e.zip) throw Recusa(e.message || 'O pacote não pôde ser aberto.');
       throw e;
     });
   }
