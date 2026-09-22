@@ -2145,9 +2145,17 @@
             if (botao) { botao.disabled = true; botao.textContent = 'Abrindo...'; }
             bibliotecaTemOAssunto(t.titulo).then(function (tem) {
               if (botao) { botao.disabled = false; botao.textContent = 'Material'; }
+              // ela pode ter saído da aula enquanto a biblioteca abria: aí não a leva embora
+              if (!$('#modal-aula').classList.contains('aberto') || !aulaEmEdicao || aulaEmEdicao.id !== aula.id) return;
+              if (tem === null) {
+                if (registro || modAcervo) { materialDeSempre(); return; }
+                avisar('Não consegui abrir a biblioteca agora. Tente de novo daqui a pouco.');
+                return;
+              }
               if (tem) {
                 abrirBibliotecaDoAssunto(t, aula);
-                if (registro || modAcervo) {
+                if ((registro || modAcervo) && !avisouMaterialAutoral) {
+                  avisouMaterialAutoral = true;   // uma vez por uso do aplicativo
                   avisar('Abri a biblioteca da OBMEP. O seu material deste assunto continua em "Material de aula", na janela da aula.');
                 }
                 return;
@@ -12005,8 +12013,10 @@
     return carregarBiblioteca().then(function () {
       var g = procurarNaBiblioteca(String(titulo || '').trim());
       return g.modulo.some(function (m) { return m.nota >= 1000; });
-    }, function () { return false; });
+    }, function () { return null; });   // null: não deu para abrir, que não é "não tem"
   }
+
+  var avisouMaterialAutoral = false;
 
   var bibVindoDoMaterial = false;
 
@@ -12151,6 +12161,8 @@
     if (!marcado && i >= 0) lista.splice(i, 1);
     guardarCarrinho();
     desenharCarrinho();
+    // o material daquela aula já foi anexado: o que ela marca agora é para outra coisa
+    if (marcado && bibContexto && bibContexto.anexado) { bibContexto = null; desenharContextoBiblioteca(); }
   }
 
   function desenharCarrinho() {

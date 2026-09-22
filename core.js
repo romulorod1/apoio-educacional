@@ -2719,8 +2719,11 @@
         temas: temasDaAula(au),
         /* Os módulos dos exercícios que foram para esta aula pela biblioteca
          * (gravados no anexo). Entram só na lista "Temas trabalhados" do mês,
-         * que já obedece à caixa "exibir temas e áreas". */
-        modulosBiblioteca: modulosDaBiblioteca(au),
+         * que já obedece à caixa "exibir temas e áreas", e SÓ quando a aula não
+         * tem assunto registrado: quando ela escreveu o assunto, a palavra dela
+         * vence, e o documento da família não mostra o mesmo tema com dois nomes
+         * (decisão da orquestradora em 22/09). */
+        modulosBiblioteca: temasDaAula(au).length ? [] : modulosDaBiblioteca(au),
         areas: (au.areas || []).slice()
       });
     }

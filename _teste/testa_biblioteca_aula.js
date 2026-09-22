@@ -62,11 +62,14 @@ function banco(comBiblioteca) {
   const al = { id: 'a1', nome: 'Aluno Teste', responsavel: 'Resp', ativo: true,
     precos: [{ id: 'p1', inicio: '2026-01-01', fim: null, valorHora: 130 }] };
   const db = { alunos: [al], series: [], aulas: [], resumos: [], ajustes: {} };
+  // dia 9: aula SEM assunto e com material da biblioteca; dia 16: aula COM assunto e com material da biblioteca
+  const anexo = mods => [{ id: 'an' + mods.length, nome: 'x_biblioteca.pdf', tamanho: 10, biblioteca: true, modulos: mods }];
   [2, 9, 16].forEach(d => db.aulas.push({ id: 'x' + d, alunoId: 'a1', data: '2026-06-' + String(d).padStart(2, '0'),
     hora: '15:30', duracaoMin: 90, status: 'realizada', cobravel: true, areas: ['metodo'],
-    anexos: comBiblioteca && d === 9 ? [{ id: 'an1', nome: 'x_biblioteca.pdf', tamanho: 10, biblioteca: true,
-      modulos: ['Equações do Segundo Grau', 'Produtos Notáveis e Fatoração'] }] : [],
-    temas: [{ id: 'MAT08-03', titulo: 'Equações do primeiro grau', lingua: 'pt', partes: ['lista'], exercicios: 6 }] }));
+    anexos: !comBiblioteca ? [] : d === 9 ? anexo(['Equações do Segundo Grau', 'Produtos Notáveis e Fatoração'])
+      : d === 16 ? anexo(['Teorema de Pitágoras']) : [],
+    temas: comBiblioteca && d === 9 ? []
+      : [{ id: 'MAT08-03', titulo: 'Equações do primeiro grau', lingua: 'pt', partes: ['lista'], exercicios: 6 }] }));
   return db;
 }
 const fSem = CoreN.calcularFechamento(banco(false), 'a1', '2026-06');
@@ -79,14 +82,18 @@ const fSemM = CoreM.calcularFechamento(banco(false), 'a1', '2026-06');
 });
 const fCom = CoreN.calcularFechamento(banco(true), 'a1', '2026-06');
 const titulos = fCom.temasDoMes.map(t => t.titulo).join(' | ');
-conf('com biblioteca: os módulos entram nos temas do mês', titulos, 'Equações do primeiro grau | Equações do Segundo Grau | Produtos Notáveis e Fatoração');
-conf('na data da aula em que foram usados', JSON.stringify(fCom.temasDoMes[1].datas), '["2026-06-09"]');
+conf('aula sem assunto: os módulos dela entram; aula com assunto: só o assunto', titulos, 'Equações do primeiro grau | Equações do Segundo Grau | Produtos Notáveis e Fatoração');
+conf('o módulo da aula com assunto não aparece (a palavra dela vence)', titulos.indexOf('Pitágoras') < 0, true);
+conf('os módulos na data da aula sem assunto', JSON.stringify(fCom.temasDoMes[1].datas), '["2026-06-09"]');
 const mdSem = CoreN.markdownFechamento(fCom, {}), mdCom = CoreN.markdownFechamento(fCom, { exibirTemasEAreas: true });
 conf('sem "exibir temas e áreas": o texto não traz os módulos', mdSem.indexOf('Equações do Segundo Grau') < 0, true);
-conf('e é o mesmo texto do mês sem biblioteca', mdSem === CoreN.markdownFechamento(fSem, {}), true);
 conf('com "exibir temas e áreas": o texto traz os módulos', mdCom.indexOf('Equações do Segundo Grau') >= 0 && mdCom.indexOf('Produtos Notáveis e Fatoração') >= 0, true);
-conf('sem "exibir temas e áreas": o PDF é o mesmo do mês sem biblioteca',
-  igual(PDFN.gerarFechamento(fCom, { sempreResumo: true }), PDFN.gerarFechamento(fSem, { sempreResumo: true })), true);
+// a prova de "nada mais muda": mesmo mês, mesmos assuntos, só com e sem os anexos da biblioteca
+function semAnexos(db) { db.aulas.forEach(a => { a.anexos = []; }); return db; }
+const fMesmoSemBib = CoreN.calcularFechamento(semAnexos(banco(true)), 'a1', '2026-06');
+conf('sem "exibir temas e áreas": o PDF é o mesmo do mesmo mês sem os anexos da biblioteca',
+  igual(PDFN.gerarFechamento(fCom, { sempreResumo: true }), PDFN.gerarFechamento(fMesmoSemBib, { sempreResumo: true })), true);
+conf('e o texto também', mdSem === CoreN.markdownFechamento(fMesmoSemBib, {}), true);
 
 // ---------------------------------------------------------------- navegador
 const amb = H.criarAmbiente(PORTA, 'perfil_bib_aula', trocas);
@@ -271,9 +278,9 @@ const lerUso = pag => pag.evaluate(() => Store.usoDaBiblioteca());
     const f = Core.calcularFechamento(d, alunoId, h.slice(0, 7));
     return { temas: f.temasDoMes.map(t => t.titulo), md: Core.markdownFechamento(f, { exibirTemasEAreas: true }), mdSem: Core.markdownFechamento(f, {}) };
   }, ids.aluno, hojeIso);
-  conf('Temas do mês: o assunto e o módulo', fech.temas.indexOf('Bhaskara') >= 0 && fech.temas.indexOf('Equações do Segundo Grau') >= 0, true);
-  conf('no texto com "exibir temas e áreas"', /Equações do Segundo Grau/.test(fech.md), true);
-  conf('e fora dele sem a caixa marcada', /Equações do Segundo Grau/.test(fech.mdSem), false);
+  // a aula tem assunto (Bhaskara): a palavra dela vence, e o módulo não se repete com outro nome
+  conf('Temas do mês: o assunto dela, e não o módulo', fech.temas.indexOf('Bhaskara') >= 0 && fech.temas.indexOf('Equações do Segundo Grau') < 0, true);
+  conf('no texto com "exibir temas e áreas", o assunto', /Bhaskara/.test(fech.md) && !/Equações do Segundo Grau/.test(fech.md), true);
 
   // ================================================================
   secao('6. Aula apagada: o uso dela não esconde mais nada');
