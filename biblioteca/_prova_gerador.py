@@ -585,9 +585,13 @@ def conteudo_na_caixa(p, it, pg, pz):
     # nao e corte: dois itens colados na fonte dividem a borda sem perder nada.
     tmp = pymupdf.open()
     tmp.insert_pdf(p.doc(it['origem']['arquivo']), from_page=pz['pagina'] - 1, to_page=pz['pagina'] - 1)
-    k = DPI_FIDELIDADE / 72.0
+    # 4 pixels por ponto, com a caixa em ponto inteiro: a borda cai entre dois
+    # pixels. A 150 dpi o ultimo pixel "de dentro" passava 0,16 pt da borda e
+    # via a tinta do item de baixo que so comeca nela (exercicio 20 de Equacoes
+    # Algebricas, 3o medio, expoente em y 80,0 com o 19 acabando em 80)
+    k = 4.0
     fora = r + (-2, -2, 2, 2)
-    pix = tmp[0].get_pixmap(dpi=DPI_FIDELIDADE, colorspace=pymupdf.csGRAY, clip=fora)
+    pix = tmp[0].get_pixmap(dpi=288, colorspace=pymupdf.csGRAY, clip=fora)
     w, h, s = pix.width, pix.height, pix.samples
     x0, y0 = int(round((r.x0 - fora.x0) * k)), int(round((r.y0 - fora.y0) * k))
     x1, y1 = int(round((r.x1 - fora.x0) * k)) - 1, int(round((r.y1 - fora.y0) * k)) - 1
@@ -631,7 +635,11 @@ def conteudo_na_caixa(p, it, pg, pz):
             miudo = [sp for sp in spans if 0 <= sp['bbox'][1] - q.y0 <= 12 and q.x0 - 1 <= sp['bbox'][0] <= q.x1]
             corpo_abaixo = any(sp['size'] > 8.5 and sp['bbox'][1] > q.y0 + 0.5
                                and ((sp['bbox'][0] + sp['bbox'][2]) / 2 < xsep) == (lado == 0) for sp in spans)
-            if (miudo and all(sp['size'] <= 8.5 for sp in miudo) and not corpo_abaixo
+            # a nota abre com o numero dela no comeco do fio; a barra da fracao
+            # x(x-1)...(x-k+1) sobre k!, no pe da coluna (Equacoes Algebricas,
+            # coeficientes reais, 3o medio, exercicio 7), tem "k!" miudo embaixo
+            numero = any(re.match(r'^\d+$', sp['text'].strip()) and sp['bbox'][0] <= q.x0 + 15 for sp in miudo)
+            if (miudo and numero and all(sp['size'] <= 8.5 for sp in miudo) and not corpo_abaixo
                     and any(r.contains(pymupdf.Rect(sp['bbox'])) for sp in miudo)):
                 erros.append('nota de rodape dentro do recorte')
     # desenho ou imagem: em Produtos Notaveis (8o ano) o fio do rodape e uma imagem
@@ -881,6 +889,30 @@ def trava_origem(p):
 
 
 # ------------------------------------------------------------------ padroes das outras series (B2)
+
+def trava_divisa_fina(divisa=None):
+    """A divisa entre dois itens colados cai no vao em branco, pela tinta fina.
+
+    Pagina sintetica: texto que acaba em y 103 e tinta do item de baixo a partir
+    de y 108,9. A pagina a 72 dpi nao mostra a linha 108 (so 0,1 pt dela tem
+    tinta), e a divisa pela linha de 1 pt caia em 109, cortando 0,2 pt do item de
+    baixo (exercicio 20 de Equacoes Algebricas, 3o medio). A divisa tem de ficar
+    entre 104 e 108.
+    """
+    divisa = divisa or gerar_pacote.divisa_fina
+    doc = pymupdf.open()
+    pg = doc.new_page(width=612, height=792)
+    pg.insert_text((29.5, 100), 'raizes sejam reais.', fontname='helv', fontsize=10)
+    pg.draw_rect(pymupdf.Rect(60, 108.9, 64, 118), color=None, fill=(0, 0, 0), width=0)
+    erros = []
+    tinta = gerar_pacote.linhas_com_tinta(doc, 0, {'xsep': 306.0, 'yrod': 767.0})[0]
+    if tinta[108]:
+        erros.append('a pagina a 72 dpi ja mostra a linha 108: o caso nao prova nada')
+    k = divisa(doc, 0, 24.0, 304.0, 100, 110)
+    if k is None or not 104 <= k <= 108:
+        erros.append('divisa em %r, e nao no vao entre 104 e 108' % (k,))
+    return erros
+
 
 def trava_bordas(p):
     """A lista de bordas da amostra: 1, 2 e 5 no pacote; 3 e 4 fora pela calha.
@@ -1867,6 +1899,9 @@ def principal():
             placar.conferir('apelidos', trava_apelidos(p))
             placar.conferir('variantes: sem titulo, recuo, duas partes', trava_variantes(p))
             placar.conferir('bordas: expoente alto, tabela no fio, nota com fracao', trava_bordas(p))
+            placar.conferir('divisa fina entre itens colados', trava_divisa_fina())
+            placar.conferir('divisa pela linha de 1 pt', trava_divisa_fina(lambda doc, pno, x0, x1, a, b: float(math.floor(b) - 1)),
+                            True, 'divisa em')
             placar.conferir('marcador em CMBX10', trava_fontes_negrito())
             placar.conferir('titulo do modulo pela capa das listas', trava_titulo_modulo())
             it_obj, it_simples = venenos(p, temp, placar, cur)

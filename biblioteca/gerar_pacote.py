@@ -69,6 +69,7 @@ MARGEM_X = 24.0        # borda externa das colunas
 # 23): a borda direita cortava a ultima letra. Com 1,2 pt o fio (0,4 pt de
 # largura) continua fora do recorte.
 AFASTA_FIO = 1.2
+FOLGA_ANTES_DO_PROXIMO = True  # o recorte acaba 1 pt antes do proximo item (ver detectar); False so no veneno
 LIMPA_PASTA = True  # asset solto de geracao anterior sai da pasta de trabalho (gravar_pacote); False so no veneno
 FIO_IMAGEM = True   # fio de coluna ou de rodape feito de imagem conta como fio (fios_da_pagina); False so no veneno
 CALHA_TRACO = True  # traco reto que cruza o fio exclui o item como texto que cruza; False so no veneno
@@ -237,6 +238,28 @@ def tinta_dos_dois_lados(pg, xsep, bb):
         if not any(v < LIMIAR_TINTA for v in pix.samples):
             return False
     return True
+
+
+def divisa_fina(doc, pno, x0, x1, y_de, y_ate):
+    """Ponto inteiro no ultimo vao em branco entre y_de e y_ate, pela tinta a 288 dpi, ou None."""
+    tmp = pymupdf.open()
+    tmp.insert_pdf(doc, from_page=pno, to_page=pno)
+    pix = tmp[0].get_pixmap(dpi=288, colorspace=pymupdf.csGRAY, clip=pymupdf.Rect(x0, y_de, x1, y_ate))
+    tmp.close()
+    w, h, smp = pix.width, pix.height, pix.samples
+    k = 4.0
+    tinta = [any(smp[y * w + x] < LIMIAR_TINTA for x in range(w)) for y in range(h)]
+    fim = h
+    while fim > 0 and tinta[fim - 1]:
+        fim -= 1  # a tinta do item de baixo, no fim da faixa
+    ini = fim
+    while ini > 0 and not tinta[ini - 1]:
+        ini -= 1  # o vao em branco acima dela
+    if ini == fim or ini == 0:
+        return None
+    a, b = y_de + ini / k, y_de + fim / k
+    n = math.floor(b)
+    return float(n) if n >= a else None
 
 
 def faixa_da_coluna(col, geo, pg):
@@ -668,6 +691,15 @@ def detectar(doc, secao_1_abre_solucoes=True):
                 # 1 pt a mais invadia o radical da primeira linha do item de baixo, que
                 # entao perdia o topo (Equacoes, solucoes 17 e 18)
                 y1 = min(math.ceil(y1), math.floor(y_fim))
+                # quando a folga de baixo encosta no corte seguinte, a divisa sai da
+                # tinta lida fina (288 dpi), num ponto inteiro do vao em branco: a
+                # tinta do item de baixo pode comecar uns decimos acima da linha de
+                # 1 pt em que a pagina a 72 dpi a mostra (o expoente do exercicio 20
+                # de Equacoes Algebricas, 3o medio, em y 79,9, com o 19 acabando em 80)
+                if FOLGA_ANTES_DO_PROXIMO and i + 1 < len(inicios) and y1 >= math.floor(y_fim) - 1:
+                    k = divisa_fina(doc, pno, cx0, cx1, com_tinta[-1], math.floor(y_fim) + 1)
+                    if k is not None:
+                        y1 = min(y1, k)
                 if anteriores:
                     y0 = max(y0, max(p['rect'][3] for p in anteriores))
                 # a coluna da direita vai ate 24 pt da borda da pagina, e a fonte as
