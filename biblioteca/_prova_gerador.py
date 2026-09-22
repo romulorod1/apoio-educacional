@@ -977,7 +977,10 @@ def trava_descida_fina(descida=None):
 
 DPI_MARCA = 144
 MARCA_CLARA = 0xAAAAAA   # de 0xFFFFFF: acima disto a cor da linha e clara
-MARCA_GRANDE = 30.0      # corpo, em pt, da marca (Biblioteca/b2_insumos/MARCA_DAGUA_achado.md)
+# Corpo da marca, medido em toda linha girada e clara das sete series: conteudo
+# de verdade tem 8 ou 10 pt, a menor marca tem 17,4 pt
+# (Biblioteca/b2_insumos/MARCA_DAGUA_achado.md).
+MARCA_GRANDE = 14.0
 TINTA_DA_MARCA = (190, 215)   # o cinza 0xCC (204) renderizado, com folga
 
 
@@ -1060,8 +1063,12 @@ def trava_marca(temp, tirar=None):
         if not marca:
             if [doc.xref_stream(x) for x in pg.get_contents()] != fluxo:
                 erros.append('p%d: pagina sem marca foi reescrita' % pno)
-        elif [c for c in depois if c in da_marca]:
-            erros.append('p%d: a marca continua na pagina: %r' % (pno, [m['texto'] for m in marca]))
+        else:
+            ficaram = [c for c in depois if c in da_marca]
+            if ficaram:
+                corpos = sorted({c[5] for c in ficaram})
+                erros.append('p%d: a marca continua na pagina: %r (corpo %s)'
+                             % (pno, ''.join(c[2] for c in ficaram)[:40], corpos))
         esperado = [c for c in antes if c not in da_marca]
         sumiu = [c[2] for c in esperado if c not in depois]
         entrou = [c[2] for c in depois if c not in antes]
@@ -2416,7 +2423,10 @@ def principal():
                     ('remocao da marca desligada', 'TIRA_MARCA', False, 'a marca continua na pagina'),
                     ('marca sem olhar a cor', 'MARCA_CINZA', (0.0, 1.0), 'sumiu do desenho'),
                     ('marca sem olhar o giro', 'MARCA_SENO', (0.0, 1.0), 'sumiu do desenho'),
-                    ('marca sem olhar o corpo', 'MARCA_CORPO', 0.0, 'sumiu do desenho')):
+                    ('marca sem olhar o corpo', 'MARCA_CORPO', 0.0, 'sumiu do desenho'),
+                    # o limite de 30 pt que a B2 usou primeiro deixava passar a
+                    # marca miuda do Teorema de Tales, e o "Portal" ia para a busca
+                    ('marca so acima de 30 pt', 'MARCA_CORPO', 30.0, 'a marca continua na pagina')):
                 antes_m = getattr(gerar_pacote, attr)
                 setattr(gerar_pacote, attr, valor)
                 try:

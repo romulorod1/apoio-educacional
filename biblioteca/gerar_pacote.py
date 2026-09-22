@@ -1148,7 +1148,12 @@ def svg_redigido(doc, pno, rect):
 TIRA_MARCA = True           # a marca girada sai da pagina antes do SVG e do texto; False so no veneno
 MARCA_SENO = (0.66, 0.75)   # |seno| do giro: 45 graus com folga de 4 graus
 MARCA_CINZA = (0.75, 0.85)  # cinza do preenchimento: pega 0.8 e 0.800781
-MARCA_CORPO = 30.0          # corpo efetivo, em pt, acima disto
+# Corpo efetivo, em pt, acima disto. O limite sai da medida de TODA linha girada
+# e clara das sete series (teoria e exercicios): o que e conteudo de verdade tem
+# 8 pt ("|tg a|") ou 10 pt ("a = 1", "ai1 x b1j"), e a MENOR marca medida tem
+# 17,4 pt (Teorema de Tales - Parte I, 9o ano; as outras vao de 38 a 567 pt).
+# Com 30 pt aquela marca passava batida, e "Portal" acabava no texto da busca.
+MARCA_CORPO = 14.0
 
 _ESPACO = b'\x00\t\n\x0c\r '
 _DELIM = b'()<>[]{}/%'
