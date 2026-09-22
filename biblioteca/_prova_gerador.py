@@ -118,7 +118,7 @@ def trava_contagens(p):
     erros = []
     por_aula = {}
     for i in p.itens:
-        por_aula.setdefault(i['aula']['slug'], []).append(i['numero'])
+        por_aula.setdefault(os.path.basename(i['origem']['arquivo']), []).append(i['numero'])
     for l in p.relatorio['listas']:
         if 'erro' in l:
             erros.append('%s: %s' % (l['aula'], l['erro']))
@@ -127,7 +127,8 @@ def trava_contagens(p):
         n = len(ne)
         if ne != list(range(1, n + 1)):
             erros.append('%s: enunciados fora de sequencia %s' % (l['aula'], ne))
-        no_pacote = sorted(por_aula.get(l['aula'], []))
+        # por arquivo, e nao por aula: ha duas listas "resolucao-de-exercicios"
+        no_pacote = sorted(por_aula.get(l['arquivo'], []))
         excl = sorted(e['numero'] for e in l['excluidos'])
         if sorted(no_pacote + excl) != list(range(1, n + 1)):
             erros.append('%s: itens no pacote %s mais excluidos %s nao dao 1..%d' % (l['aula'], no_pacote, excl, n))
@@ -148,8 +149,9 @@ def trava_contagens(p):
 
 
 def texto_na_caixa(pg, caixa):
-    """Caracteres com o centro dentro da caixa. As caixas de fonte de duas linhas
-    seguidas se sobrepoem, entao ler por intersecao traria a linha de baixo."""
+    """Caracteres com o centro e a linha de base dentro da caixa. As caixas de
+    fonte de duas linhas seguidas se sobrepoem, entao ler por intersecao traria
+    a linha de baixo; e o radical da linha de baixo tem o centro alto."""
     out = []
     for b in pg.get_text('rawdict')['blocks']:
         if b['type'] != 0:
@@ -158,9 +160,30 @@ def texto_na_caixa(pg, caixa):
             for sp in l['spans']:
                 for c in sp['chars']:
                     cx, cy = (c['bbox'][0] + c['bbox'][2]) / 2, (c['bbox'][1] + c['bbox'][3]) / 2
-                    if caixa.x0 <= cx <= caixa.x1 and caixa.y0 <= cy <= caixa.y1:
+                    base = c['origin'][1]
+                    if caixa.x0 <= cx <= caixa.x1 and caixa.y0 <= cy <= caixa.y1 and caixa.y0 <= base <= caixa.y1:
                         out.append((c['bbox'][0], c['c']))
     return ''.join(portal.recompor(''.join(c for _, c in sorted(out))).split())
+
+
+def borda_com_tinta(p, it, pz, caixa):
+    """A borda de cima ou a de baixo da caixa do rotulo passa por cima de tinta?
+
+    O aplicativo cobre a caixa de branco para escrever o numero novo. Se a
+    borda horizontal da caixa cruza tinta na pagina original, a caixa esta
+    alta demais e o branco apagaria o pedaco de uma linha vizinha (o radical
+    de "tem entre raiz de 8", Conjuntos Numericos, exercicio 10).
+    """
+    tmp = pymupdf.open()
+    tmp.insert_pdf(p.doc(it['origem']['arquivo']), from_page=pz['pagina'] - 1, to_page=pz['pagina'] - 1)
+    pix = tmp[0].get_pixmap(dpi=DPI_FIDELIDADE, colorspace=pymupdf.csGRAY, clip=caixa)
+    w, h, s = pix.width, pix.height, pix.samples
+    lados = []
+    if any(s[x] < 128 for x in range(w)):
+        lados.append('de cima')
+    if any(s[(h - 1) * w + x] < 128 for x in range(w)):
+        lados.append('de baixo')
+    return ' e '.join(lados)
 
 
 def trava_recorte(p):
@@ -212,6 +235,10 @@ def trava_recorte(p):
                 alvo_r = (r'^Exerc\S*cio%d\.$' if tipo == 'enunciado' else r'^%d\.$') % it['numero']
                 if not re.match(alvo_r, lido):
                     erros.append('%s %s: a caixa do rotulo le %r' % (it['id'], tipo, lido[:30]))
+                corte = borda_com_tinta(p, it, primeiro, caixa)
+                if corte:
+                    erros.append('%s %s: a caixa do rotulo corta tinta na borda %s; cobrir de branco '
+                                 'apagaria parte de outra linha' % (it['id'], tipo, corte))
     # ordem: dentro da mesma coluna, o item de numero menor vem antes
     for chave, lst in ocupado.items():
         nums = [(y0, int(dono.split(':')[-1])) for y0, y1, dono in sorted(lst)]
@@ -558,6 +585,13 @@ def venenos(p, temp, placar, curadoria):
             r = i['medidas']['enunciado']['rotulo']
             i['medidas']['enunciado']['rotulo'] = [r[0] + 60, r[1], r[2] + 60, r[3]]
     placar.conferir('recorte: rotulo fora do lugar', trava_recorte(q), True, 'rotulo')
+    # recorte: caixa do rotulo alta demais, descendo ate a linha de baixo
+    q = copia(p, temp, 'v_rot_alto')
+    for i in q.itens:
+        if i['id'] == it_obj['id']:  # a linha de baixo comeca 12 pt abaixo do rotulo
+            r = i['medidas']['enunciado']['rotulo']
+            i['medidas']['enunciado']['rotulo'] = [r[0], r[1], r[2], r[3] + 6]
+    placar.conferir('recorte: rotulo alto demais', trava_recorte(q), True, 'corta tinta')
 
     # objetiva: letra trocada
     q = copia(p, temp, 'v_obj')

@@ -318,6 +318,13 @@ roda "painel de valores"                        node "_teste/testa_painel_valore
 roda "painel de valores --envenenado-aberto"    node "_teste/testa_painel_valores.js" --envenenado-aberto
 roda "painel de valores --envenenado-esquece"   node "_teste/testa_painel_valores.js" --envenenado-esquece
 
+# Gerador do pacote da Biblioteca (frente B). Roda sobre a amostra sintetica
+# que a propria prova desenha na hora, nos dois modelos de pagina do Portal,
+# porque PDF do Portal nao entra no repositorio. Cada trava tem o seu veneno e
+# o veneno so conta se reprovar PELO motivo esperado. Fica aqui, e nao em "sem
+# navegador", porque a fidelidade renderiza os SVG no Chrome.
+roda "gerador da biblioteca"                    python biblioteca/_prova_gerador.py
+
 # Duas conferencias aqui, e a primeira e a que pega o defeito de verdade.
 #
 # 1) O pacote offline tem DUAS listas que precisam bater: os <script src=

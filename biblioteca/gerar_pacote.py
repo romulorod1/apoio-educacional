@@ -298,6 +298,12 @@ def caixa_do_rotulo(caracteres, marc, tipo, numero):
     O span negrito as vezes traz palavras depois do numero ("40. Deduza a
     formula"); a caixa para no ponto depois do numero. O app cobre esta caixa
     para renumerar, entao caixa larga demais apagaria texto.
+
+    Embaixo, a caixa para um pouco abaixo da linha de base (o rotulo nao tem
+    descendente), e nao no pe da caixa da fonte, que alcancava o traco do
+    radical da linha de baixo ("tem entre raiz de 8", Conjuntos Numericos,
+    exercicio 10): cobrir de branco apagaria o radical. Em cima fica a caixa
+    da fonte, que cobre o acento do i de Exercicio.
     """
     x0 = marc['el']['bb'][0]
     cy = centro_y(marc['el']['bb'])
@@ -307,13 +313,38 @@ def caixa_do_rotulo(caracteres, marc, tipo, numero):
                    and x0 - 1 <= c[0][0] <= x0 + 140], key=lambda c: c[0][0])
     alvo = re.compile((r'^Exerc\S*cio\s*%d\s*\.$' if tipo == 'enunciado' else r'^%d\s*\.$') % numero)
     texto, caixa = '', None
-    for bb, ch in cand:
+    for bb, ch, base, corpo in cand:
         texto += ch
         if ch.strip():
-            caixa = bb if caixa is None else (min(caixa[0], bb[0]), min(caixa[1], bb[1]), max(caixa[2], bb[2]), max(caixa[3], bb[3]))
+            justa = (bb[0], bb[1], bb[2], base + 0.12 * corpo)
+            caixa = justa if caixa is None else (min(caixa[0], justa[0]), min(caixa[1], justa[1]),
+                                                 max(caixa[2], justa[2]), max(caixa[3], justa[3]))
         if alvo.match(texto.strip()):
             return caixa
     return None
+
+
+def borda_cruza_tinta(doc, pno, caixa, cache):
+    """A borda de cima ou a de baixo da caixa passa por cima de tinta da pagina?
+
+    Se passa, cobrir a caixa de branco apagaria um pedaco de outra coisa: a
+    fonte as vezes encosta a linha de baixo no rotulo (Nocoes Basicas de
+    Conjuntos, solucao 6: o parentese de "a)" sobe ate a linha do "6.").
+    Renderiza uma copia limpa da pagina, uma vez por pagina.
+    """
+    if pno not in cache:
+        tmp = pymupdf.open()
+        tmp.insert_pdf(doc, from_page=pno, to_page=pno)
+        cache[pno] = tmp[0].get_pixmap(dpi=150, colorspace=pymupdf.csGRAY)
+        tmp.close()
+    pix = cache[pno]
+    k = 150 / 72.0
+    w, s = pix.width, pix.samples
+    xa, xb = max(0, int(caixa[0] * k)), min(w, int(math.ceil(caixa[2] * k)))
+    for y in (int(caixa[1] * k), int(math.ceil(caixa[3] * k)) - 1):
+        if 0 <= y < pix.height and any(s[y * w + x] < 128 for x in range(xa, xb)):
+            return True
+    return False
 
 
 def detectar(doc):
@@ -325,6 +356,8 @@ def detectar(doc):
     pedacos = {'enunciado': collections.defaultdict(list), 'solucao': collections.defaultdict(list)}
     ordem = {'enunciado': [], 'solucao': []}
     rotulos = {}
+    rotulos_inseguros = []
+    paginas_150 = {}
     formas = collections.Counter()
     cruzados = []
     pagina_solucoes = None
@@ -337,8 +370,8 @@ def detectar(doc):
         divisas[geo['xsep']] += 1
         els, fundo = elementos(pg, geo)
         tinta = linhas_com_tinta(doc, pno, geo)
-        caracteres = [(c['bbox'], c['c']) for b in pg.get_text('rawdict')['blocks'] if b['type'] == 0
-                      for l in b['lines'] for sp in l['spans'] for c in sp['chars']]
+        caracteres = [(c['bbox'], c['c'], c['origin'][1], sp['size']) for b in pg.get_text('rawdict')['blocks']
+                      if b['type'] == 0 for l in b['lines'] for sp in l['spans'] for c in sp['chars']]
         for e in els:
             if e['cruza']:
                 cruzados.append({'pagina': pno + 1, 'bb': [round(v, 1) for v in e['bb']]})
@@ -379,6 +412,9 @@ def detectar(doc):
                         chave = chave_seq
                         ordem[tipo].append((m['numero'], chave))
                         rotulos[chave] = caixa_do_rotulo(caracteres, m, tipo, m['numero'])
+                        if rotulos[chave] and borda_cruza_tinta(doc, pno, rotulos[chave], paginas_150):
+                            rotulos[chave] = None
+                            rotulos_inseguros.append({'tipo': tipo, 'numero': m['numero'], 'pagina': pno + 1})
                     aberto = (tipo, m['numero'], chave)
                     del texto_pos
                 if aberto is None:
@@ -412,6 +448,7 @@ def detectar(doc):
                 pedacos[aberto[0]][aberto[2]].append({'pno': pno, 'col': col, 'rect': r, 'xsep': geo['xsep']})
     geo_doc['divisas_por_pagina'] = {str(k): v for k, v in sorted(divisas.items())}
     return {'geo': geo_doc, 'pagina_solucoes': pagina_solucoes, 'ordem': ordem, 'pedacos': pedacos, 'rotulos': rotulos,
+            'rotulos_inseguros': rotulos_inseguros,
             'formas': {'%s_%s' % k: v for k, v in sorted(formas.items())}, 'cruzados': cruzados}
 
 
@@ -750,6 +787,7 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
             rel.update({'modelo': 'CM' if det['geo']['xsep'] < 300 else 'Palladio', 'fio_colunas_x': det['geo']['xsep'],
                         'fio_rodape_y': det['geo']['yrod'], 'pagina_solucoes': det['pagina_solucoes'],
                         'origem_da_divisa': det['geo']['origem_da_divisa'], 'divisas_por_pagina': det['geo']['divisas_por_pagina'],
+                        'rotulos_sem_caixa_por_encostar_em_tinta': det['rotulos_inseguros'],
                         'formas_do_marcador': det['formas'], 'elementos_que_cruzam_o_fio': det['cruzados']})
             ne = [n for n, _ in det['ordem']['enunciado']]
             ns = [n for n, _ in det['ordem']['solucao']]
@@ -880,7 +918,8 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                 itens.append(item)
                 docs_busca.append({'id': iid, 'serie': SERIE_BUSCA.get(serie, serie), 'tipo': 'exercicio',
                                    'titulo': '', 'resumo': '%s %s' % (aula_tit, modulo['titulo']),
-                                   'texto': portal.recompor(txt_e), 'explicacao': portal.recompor(txt_s or '')})
+                                   'texto': portal.sem_tracos(portal.recompor(txt_e)),
+                                   'explicacao': portal.sem_tracos(portal.recompor(txt_s or ''))})
             rel['itens_no_pacote'] = sum(1 for i in itens if i['origem']['arquivo'].endswith(a['arquivo']))
             rel['enunciados_com_mais_de_um_pedaco'] = multi_e
             rel['solucoes_com_mais_de_um_pedaco'] = multi_s
@@ -919,7 +958,7 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                                                                   l['capa'].get('titulo'))],
                            'paginas': paginas})
             docs_busca.append({'id': tid, 'serie': SERIE_BUSCA.get(serie, serie), 'tipo': 'teoria', 'titulo': aula_tit,
-                               'resumo': modulo['titulo'], 'texto': ' '.join(textos[1:])})
+                               'resumo': modulo['titulo'], 'texto': portal.sem_tracos(' '.join(textos[1:]))})
             relatorio['teorias'].append({'arquivo': a['arquivo'], 'paginas': doc.page_count,
                                          'segundos': round(time.time() - t0, 1)})
         docs_busca.append({'id': '%s:%s' % (serie, mod), 'serie': SERIE_BUSCA.get(serie, serie), 'tipo': 'modulo',

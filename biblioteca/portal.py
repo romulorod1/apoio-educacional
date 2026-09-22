@@ -46,7 +46,7 @@ def para_busca(texto):
     s = recompor(texto).lower()
     s = unicodedata.normalize('NFD', s)
     s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
-    s = s.replace('\u2212', '-')
+    s = sem_tracos(s.replace('\u2212', '-'))
     return re.sub(r'\s+', ' ', s).strip()
 
 
