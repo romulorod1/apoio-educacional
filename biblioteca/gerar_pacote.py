@@ -28,6 +28,9 @@ Biblioteca/PADROES_numeracao_9ano.md):
   de uma coluna antes do primeiro marcador continua o item aberto: e um pedaco
   a mais, e os pedacos saem empilhados num SVG so.
 
+Na teoria, a marca d'agua girada do Portal sai da pagina antes do SVG e antes
+do texto que vai para a busca (ver tirar_marca).
+
 O SVG e o da pagina com o cropbox no recorte, depois de apagar por redacao o
 que fica fora dele (com folga), porque o cropbox sozinho leva a pagina inteira
 para dentro do arquivo. Cada pedaco e conferido: o pixmap da pagina redigida
@@ -1131,6 +1134,198 @@ def svg_redigido(doc, pno, rect):
     return melhor
 
 
+# ------------------------------------------------------- marca d'agua do Portal
+#
+# As paginas de teoria do Portal trazem "Portal OBMEP" (ou "Portal da OBMEP")
+# atravessada na diagonal, em cinza claro e corpo grande. E texto, desenhado no
+# fluxo da propria pagina e sempre antes do conteudo, em dois formatos: o giro
+# vem da matriz do desenho (`cm`) ou da matriz do texto (`Tm`). Medido nas sete
+# series em Biblioteca/b2_insumos/MARCA_DAGUA_achado.md: 2.132 paginas de teoria
+# com a marca, nenhuma pagina de exercicios. A saida do gerador desenha a pagina
+# sem ela; o rodape com a URL do Portal e os creditos dos autores ficam, porque
+# sao texto horizontal, preto e miudo.
+
+TIRA_MARCA = True           # a marca girada sai da pagina antes do SVG e do texto; False so no veneno
+MARCA_SENO = (0.66, 0.75)   # |seno| do giro: 45 graus com folga de 4 graus
+MARCA_CINZA = (0.75, 0.85)  # cinza do preenchimento: pega 0.8 e 0.800781
+MARCA_CORPO = 30.0          # corpo efetivo, em pt, acima disto
+
+_ESPACO = b'\x00\t\n\x0c\r '
+_DELIM = b'()<>[]{}/%'
+_IDENTIDADE = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+_MOSTRA_TEXTO = (b'Tj', b'TJ', b"'", b'"')
+
+
+def _objeto(fluxo, i):
+    """Proximo objeto do fluxo de conteudo a partir de i, ou None no fim.
+
+    Devolve (tipo, valor, inicio, fim), com tipo 'num' (numero), 'op'
+    (operador) ou 'obj' (string, nome ou delimitador de array e dicionario, cujo
+    valor nao interessa a esta conta).
+    """
+    n = len(fluxo)
+    while i < n:
+        c = fluxo[i:i + 1]
+        if c in _ESPACO:
+            i += 1
+        elif c == b'%':
+            while i < n and fluxo[i:i + 1] not in b'\r\n':
+                i += 1
+        else:
+            break
+    if i >= n:
+        return None
+    c = fluxo[i:i + 1]
+    if c == b'(':
+        j, prof = i + 1, 1
+        while j < n and prof:
+            d = fluxo[j:j + 1]
+            if d == b'\\':
+                j += 2
+                continue
+            prof += 1 if d == b'(' else -1 if d == b')' else 0
+            j += 1
+        return ('obj', fluxo[i:j], i, j)
+    if fluxo[i:i + 2] in (b'<<', b'>>'):
+        return ('obj', fluxo[i:i + 2], i, i + 2)
+    if c == b'<':
+        j = fluxo.find(b'>', i)
+        j = n if j < 0 else j + 1
+        return ('obj', fluxo[i:j], i, j)
+    if c in b'>[]{}':
+        return ('obj', c, i, i + 1)
+    if c == b'/':
+        j = i + 1
+        while j < n and fluxo[j:j + 1] not in _ESPACO and fluxo[j:j + 1] not in _DELIM:
+            j += 1
+        return ('obj', fluxo[i:j], i, j)
+    j = i
+    while j < n and fluxo[j:j + 1] not in _ESPACO and fluxo[j:j + 1] not in _DELIM:
+        j += 1
+    t = fluxo[i:j]
+    try:
+        return ('num', float(t), i, j)
+    except ValueError:
+        return ('op', t, i, j)
+
+
+def _fim_da_imagem(fluxo, i):
+    """Pula a imagem embutida (BI ... ID <binario> EI): o binario nao e codigo."""
+    j = fluxo.find(b'ID', i)
+    if j < 0:
+        return len(fluxo)
+    j += 3
+    while True:
+        k = fluxo.find(b'EI', j)
+        if k < 0:
+            return len(fluxo)
+        depois = fluxo[k + 2:k + 3]
+        if fluxo[k - 1:k] in _ESPACO and (depois == b'' or depois in _ESPACO or depois in _DELIM):
+            return k + 2
+        j = k + 2
+
+
+def _multiplicar(m, n):
+    """m aplicada antes de n, na ordem em que o PDF compoe as matrizes."""
+    return (m[0] * n[0] + m[1] * n[2], m[0] * n[1] + m[1] * n[3],
+            m[2] * n[0] + m[3] * n[2], m[2] * n[1] + m[3] * n[3],
+            m[4] * n[0] + m[5] * n[2] + n[4], m[4] * n[1] + m[5] * n[3] + n[5])
+
+
+def marcas_do_fluxo(fluxo):
+    """Faixas (inicio, fim, medida) dos objetos de texto que sao a marca d'agua.
+
+    Anda pelo fluxo guardando a matriz do desenho (q, Q, cm) e o cinza do
+    preenchimento (g, rg, k, sc, scn) e julga cada BT..ET pela matriz efetiva do
+    texto (a do texto vezes a do desenho): giro de 45 graus, cinza claro e corpo
+    grande, os tres ao mesmo tempo. O que so esta girado -- rotulo de figura,
+    "|sen a|" na vertical -- e preto e miudo, e fica.
+    """
+    faixas = []
+    ctm, cinza, pilha = _IDENTIDADE, 0.0, []
+    num, texto, i = [], None, 0
+    while True:
+        o = _objeto(fluxo, i)
+        if o is None:
+            break
+        tipo, valor, ini, fim = o
+        i = fim
+        if tipo == 'num':
+            num.append(valor)
+            continue
+        if tipo == 'obj':
+            continue
+        if valor == b'q':
+            pilha.append((ctm, cinza))
+        elif valor == b'Q':
+            if pilha:
+                ctm, cinza = pilha.pop()
+        elif valor == b'cm' and len(num) >= 6:
+            ctm = _multiplicar(tuple(num[-6:]), ctm)
+        elif valor == b'g' and num:
+            cinza = num[-1]
+        elif valor == b'rg' and len(num) >= 3:
+            cinza = num[-3] if num[-3] == num[-2] == num[-1] else None
+        elif valor == b'k' and len(num) >= 4:
+            cinza = 1.0 - num[-1] if num[-4] == num[-3] == num[-2] == 0.0 else None
+        elif valor in (b'sc', b'scn'):
+            if len(num) == 1 or (len(num) == 3 and num[0] == num[1] == num[2]):
+                cinza = num[0]
+            elif num:
+                cinza = None
+        elif valor == b'BT':
+            texto = {'ini': ini, 'tm': _IDENTIDADE, 'corpo': 0.0, 'cinza': cinza, 'mostrou': False}
+        elif valor == b'Tf' and num and texto is not None:
+            texto['corpo'] = num[-1]
+        elif valor == b'Tm' and len(num) >= 6 and texto is not None:
+            texto['tm'] = tuple(num[-6:])
+        elif valor in _MOSTRA_TEXTO and texto is not None and not texto['mostrou']:
+            texto['mostrou'] = True
+            texto['cinza'] = cinza     # a cor que vale e a do momento em que o texto sai
+        elif valor == b'ET' and texto is not None:
+            m = _multiplicar(texto['tm'], ctm)
+            ex = math.hypot(m[0], m[1]) or 1.0
+            ey = math.hypot(m[2], m[3]) or 1.0
+            medida = {'seno': min(abs(m[1]) / ex, abs(m[2]) / ey), 'cinza': texto['cinza'],
+                      'corpo': texto['corpo'] * ey}
+            if (texto['mostrou'] and MARCA_SENO[0] <= medida['seno'] <= MARCA_SENO[1]
+                    and medida['cinza'] is not None and MARCA_CINZA[0] <= medida['cinza'] <= MARCA_CINZA[1]
+                    and medida['corpo'] > MARCA_CORPO):
+                faixas.append((texto['ini'], fim, medida))
+            texto = None
+        elif valor == b'BI':
+            i = _fim_da_imagem(fluxo, fim)
+        num = []
+    return faixas
+
+
+def tirar_marca(doc, pno):
+    """Tira a marca d'agua girada da pagina. Devolve (pagina, quantas sairam).
+
+    Mexe so no fluxo de conteudo, e so quando acha: pagina sem marca (ha modulos
+    inteiros sem ela) nao e reescrita, e pagina de exercicios nao tem nenhuma.
+    A pagina volta recarregada quando o fluxo mudou, para o texto e o SVG sairem
+    do fluxo novo.
+    """
+    pg = doc[pno]
+    if not TIRA_MARCA:
+        return pg, 0
+    saiu = 0
+    for xref in pg.get_contents():
+        fluxo = doc.xref_stream(xref)
+        faixas = marcas_do_fluxo(fluxo)
+        if not faixas:
+            continue
+        pedacos, fim = [], 0
+        for a, b, _ in faixas:
+            pedacos.append(fluxo[fim:a])
+            fim = b
+        pedacos.append(fluxo[fim:])
+        doc.update_stream(xref, b''.join(pedacos))
+        saiu += len(faixas)
+    return (doc[pno] if saiu else pg), saiu
+
+
 RAIZ_SVG = re.compile(r'<svg\b[^>]*>', re.S)
 DATA_TEXT = re.compile(r'\sdata-text="[^"]*"')
 CONTROLE = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1f]|&#(x0*(?:[0-8bcef]|1[0-9a-f])|0*(?:[0-8]|1[124-9]|2[0-9]|3[01]));', re.I)
@@ -1675,9 +1870,15 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
             # SVG de um arquivo aberto agora: a capa ja foi lida com get_text('dict')
             # no `doc`, e isso muda como o PyMuPDF desenha imagem raster (svg_do_pedaco)
             limpo = pymupdf.open(os.path.join(pdfs, a['arquivo']))
+            marcas = 0
             for pno in range(doc.page_count):
-                pg = doc[pno]
-                svg = limpar_svg(limpo[pno].get_svg_image(text_as_path=True))
+                # a marca d'agua sai das duas copias: da que desenha o SVG e da
+                # que da o texto da busca (o "Portal" girado vinha colado no meio
+                # de uma linha de conteudo do teoria.json)
+                sem_marca, n_marca = tirar_marca(limpo, pno)
+                pg, _ = tirar_marca(doc, pno)
+                marcas += n_marca
+                svg = limpar_svg(sem_marca.get_svg_image(text_as_path=True))
                 cam = 'assets/%s/%s/%s/teo-p%s.svg' % (serie, mod, a['aula'], ('%02d' if doc.page_count < 100 else '%03d') % (pno + 1))
                 conteudo[cam] = svg.encode('utf-8')
                 t = pg.get_text('text', sort=True)
@@ -1694,7 +1895,7 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                                'resumo': modulo['titulo'], 'texto': portal.sem_tracos(' '.join(textos[1:]))})
             limpo.close()
             relatorio['teorias'].append({'arquivo': a['arquivo'], 'paginas': doc.page_count,
-                                         'segundos': round(time.time() - t0, 1)})
+                                         'marcas_dagua': marcas, 'segundos': round(time.time() - t0, 1)})
         docs_busca.append({'id': '%s:%s' % (serie, mod), 'serie': SERIE_BUSCA.get(serie, serie), 'tipo': 'modulo',
                            'titulo': modulo['titulo'], 'resumo': ' '.join(titulos_aulas), 'texto': ''})
 

@@ -24,6 +24,12 @@ Solucoes" em pagina propria; bloco de creditos
 ("Elaborado por", "Produzido por") no fim do documento. A lista tem tres paginas, e
 nao duas, porque as solucoes do Portal comecam sempre em pagina propria.
 
+O PDF de teoria tem quatro paginas: capa; uma com a marca d'agua "Portal da
+OBMEP" girada pela matriz do TEXTO; uma com a marca girada pela matriz do
+DESENHO, mais quatro controles que a remocao nao pode levar (girado preto e
+miudo, girado preto e grande, claro e grande sem giro, claro girado e miudo) e
+o rodape com a URL; e uma pagina sem marca nenhuma.
+
 A terceira lista, lista-variantes (modelo CM), traz os padroes que a B2 mediu
 nas outras series: solucoes sem o titulo "Respostas e Solucoes", marcador com
 recuo de paragrafo e solucoes em duas partes (ver lista_variantes).
@@ -401,6 +407,33 @@ def lista_fio_imagem(caminho):
     doc.save(caminho, garbage=3, deflate=True, no_new_id=True)
 
 
+# A marca d'agua "Portal OBMEP" das paginas de teoria, nos dois formatos
+# medidos nas sete series (Biblioteca/b2_insumos/MARCA_DAGUA_achado.md): o giro
+# vem da matriz do desenho (`cm`) ou da matriz do texto (`Tm`). Vai no comeco do
+# fluxo, antes do conteudo, como no Portal: a marca passa POR BAIXO do texto.
+MARCAS = {
+    'cm': b'q .70711 .70711 -.70711 .70711 0 0 cm 0.8 g 0.8 G BT /helv 76 Tf 254.6 169.7 Td [(Portal)-350(OBMEP)]TJ ET Q\n',
+    # sem q/Q, como o Portal escreve este formato: a cor volta a preto depois
+    'tm': b'0.800781 g BT /helv 76 Tf 0.707107 0.707107 -0.707107 0.707107 40 380 Tm [(P)-2(ortal)-350(da)-350(OBMEP)]TJ ET 0 g\n',
+}
+# Um controle por condicao da regra, e nenhum pode sair da pagina: girado mas
+# preto e miudo (rotulo de figura, o "|sen a|" que a sonda achou em duas
+# paginas de exercicios), girado e grande mas preto, claro e grande mas sem
+# giro, claro e girado mas miudo.
+CONTROLES = (b'0 g BT /helv 8 Tf 0.707107 0.707107 -0.707107 0.707107 400 200 Tm (|sen a| girado em preto)Tj ET\n'
+             b'0 g BT /helv 36 Tf 0.707107 0.707107 -0.707107 0.707107 250 120 Tm (Eixo girado)Tj ET\n'
+             b'0.8 g BT /helv 40 Tf 1 0 0 1 60 640 Tm (Titulo claro e reto)Tj ET\n'
+             b'0.8 g BT /helv 9 Tf 0.707107 0.707107 -0.707107 0.707107 430 120 Tm (nota clara girada e miuda)Tj ET 0 g\n')
+
+
+def marca_dagua(pg, formato, controles=False):
+    """Poe a marca d'agua do Portal (e, se pedido, os controles) no fluxo da pagina."""
+    doc = pg.parent
+    pg.insert_font(fontname='helv')
+    xref = pg.get_contents()[0]
+    doc.update_stream(xref, MARCAS[formato] + (CONTROLES if controles else b'') + doc.xref_stream(xref))
+
+
 def teoria(caminho):
     doc = pymupdf.open()
     pg = doc.new_page(width=612, height=792)
@@ -415,6 +448,22 @@ def teoria(caminho):
                            'Uma equação do segundo grau tem a forma ax² + bx + c = 0.',
                            'A fórmula de Bhaskara dá as raízes a partir do discriminante.']):
         pg.insert_text((60, 80 + 12 * i), l, fontname='helv', fontsize=10)
+    marca_dagua(pg, 'tm')
+    # pagina com a marca no outro formato, cruzando o texto, e com os controles
+    pg = doc.new_page(width=612, height=792)
+    for i, l in enumerate(['2 Discriminante', '',
+                           'O discriminante diz quantas raízes reais a equação tem.',
+                           'Com discriminante negativo não há raiz real.']):
+        pg.insert_text((60, 300 + 12 * i), l, fontname='helv', fontsize=10)
+    pg.insert_text((60, 770), 'http://matematica.obmep.org.br/', fontname='cour', fontsize=10)
+    marca_dagua(pg, 'cm', controles=True)
+    # pagina sem marca nenhuma: a remocao nao pode mexer nela (ha modulos
+    # inteiros do Portal sem a marca)
+    pg = doc.new_page(width=612, height=792)
+    for i, l in enumerate(['3 Soma e produto das raízes', '',
+                           'A soma das raízes é menos b sobre a.',
+                           'O produto das raízes é c sobre a.']):
+        pg.insert_text((60, 300 + 12 * i), l, fontname='helv', fontsize=10)
     doc.set_metadata(FIXO)
     doc.save(caminho, garbage=3, deflate=True, no_new_id=True)
 
