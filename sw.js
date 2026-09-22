@@ -48,8 +48,10 @@
  * O v32 acrescenta duas linhas à lista, './zip.js' e './biblioteca.js': o
  * Importar biblioteca de Ajustes, que abre e confere o pacote .zip da
  * biblioteca sem internet. O v33 troca a aba Temas pela aba Biblioteca
- * (app.js, index.html e styles.css), com a lista igual. */
-var CACHE = 'apoio-educacional-v33';
+ * (app.js, index.html e styles.css), com a lista igual. O v34 põe, na busca da
+ * Biblioteca, a teoria, os exercícios e o Banco do módulo achado antes do resto
+ * (app.js). */
+var CACHE = 'apoio-educacional-v34';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

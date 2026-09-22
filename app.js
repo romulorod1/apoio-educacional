@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.21.0';
+  var VERSAO = '1.21.1';
 
   /* O acervo de 14/09 (aba Temas e o atalho dele na escolha de assunto da
    * aula) saiu do ar até ser refeito com revisão. Os arquivos do banco ficam
@@ -12020,8 +12020,41 @@
         }
       });
     });
-    Object.keys(grupos).forEach(function (g) {
-      grupos[g].sort(function (a, b) { return b.nota - a.nota || ordemNaArvore(a.id) - ordemNaArvore(b.id) || (a.id < b.id ? -1 : 1); });
+    grupos.modulo.sort(function (a, b) { return b.nota - a.nota || (a.id < b.id ? -1 : 1); });
+    /* Teoria, exercícios e Banco dos módulos achados vêm primeiro, todos num
+     * patamar só; dentro dele, e no resto, vale a nota, e a árvore só
+     * desempata. (A ordem entre módulos achados não entra: dois módulos com
+     * nota quase igual deixariam uma aula de título exato atrás de outra que
+     * mal casa, como "Noções Básicas - Parte 01" de Conjuntos atrás de
+     * Funções no pacote real.) Medido com o pacote real do 9º ano: "bhaskara" traz
+     * o módulo de equações do 2º grau no topo, mas a palavra também aparece nas
+     * páginas de Conjuntos e de Tales, e uma aula de Funções casa no título;
+     * pela nota pura elas vinham antes das quatro teorias do módulo. A nota
+     * continua mandando DENTRO do módulo porque o número da aula no pacote
+     * segue o nome do arquivo, e não a ordem didática: sem isso, procurar o
+     * título de uma aula por extenso a tirava do primeiro lugar. Nada some. */
+    var posModulo = {};
+    /* Só entra no patamar da frente o módulo que casou TODAS as palavras da
+     * busca: no busca.js a nota é (casadas/palavras)² x 1000 mais o peso do
+     * lugar, então nota de 1000 para cima quer dizer casamento completo.
+     * Módulo que casou só em parte (um apelido que se desdobra em
+     * "triângulo", por exemplo) aparece em Módulos, mas não puxa para o topo
+     * o que é dele: medido no pacote real, "baricentro" e "circuncentro"
+     * abriam com Trigonometria e Menelaus. */
+    grupos.modulo.forEach(function (m, i) {
+      if (m.nota >= 1000 && posModulo[m.id] === undefined) posModulo[m.id] = i;
+    });
+    function doModuloAchado(id) {
+      var t = bib.teoriaPorId[id] || bib.itemPorId[id];
+      var chave = t ? t.serie + ':' + t.modulo.slug : null;
+      return chave && posModulo[chave] !== undefined ? posModulo[chave] : Infinity;
+    }
+    ['teoria', 'exercicio', 'banco'].forEach(function (g) {
+      grupos[g].sort(function (a, b) {
+        var ma = doModuloAchado(a.id), mb = doModuloAchado(b.id);
+        if ((ma === Infinity) !== (mb === Infinity)) return ma === Infinity ? 1 : -1;
+        return b.nota - a.nota || ordemNaArvore(a.id) - ordemNaArvore(b.id) || (a.id < b.id ? -1 : 1);
+      });
     });
     return grupos;
   }
@@ -12077,7 +12110,7 @@
     }
     if (g.exercicio.length) {
       corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Exercícios' }));
-      // um por lista, na ordem da melhor nota de cada uma
+      // um por lista, na ordem em que a primeira de cada uma aparece (módulo achado, depois nota)
       var listas = [], vistas = {};
       g.exercicio.forEach(function (x) {
         var it = bib.itemPorId[x.id];

@@ -160,7 +160,7 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   let corpo = await lerCorpo(pag);
   const chips = await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo .chip-filtro')).map(c => c.textContent + (c.classList.contains('ativo') ? '*' : '')));
   conf('séries: 8º (só Banco) e 9º, abrindo no 9º', chips.join(','), '8º ano,9º ano*');
-  conf('contagem no alto', await pag.$eval('#bib-contagem', e => e.textContent), '6 aulas de teoria, 60 exercícios, 12 problemas do Banco');
+  conf('contagem no alto', await pag.$eval('#bib-contagem', e => e.textContent), '7 aulas de teoria, 60 exercícios, 12 problemas do Banco');
   conf('campo de busca visível', await pag.$eval('#bib-busca-cartao', e => getComputedStyle(e).display !== 'none'), true);
   conf('blocos do 9º ano: Módulos e Banco de Questões', corpo.blocos.map(b => b.titulo).join(','), 'Módulos,Banco de Questões');
   conf('módulos do Portal, em ordem alfabética', corpo.blocos[0].linhas.join(' | '),
@@ -277,14 +277,25 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   }
   conf('grupos, nesta ordem', corpo.blocos.map(b => b.titulo).join(','), 'Módulos,Teoria,Exercícios,Banco de Questões');
   conf('Módulos: Equações do Segundo Grau no topo', corpo.blocos[0].linhas[0], 'Equações do Segundo Grau');
-  conf('Teoria: as quatro aulas do módulo', corpo.blocos[1].linhas.slice().sort().join(' | '),
-    ['Equações Biquadradas', 'Resultados Básicos - Parte I', 'Resultados Básicos - Parte II', 'Soma e Produto das Raízes'].join(' | '));
-  conf('e, no empate de nota, na ordem das aulas (Parte I antes da Parte II)',
-    corpo.blocos[1].linhas.indexOf('Resultados Básicos - Parte I') < corpo.blocos[1].linhas.indexOf('Resultados Básicos - Parte II'), true);
+  conf('Teoria: as quatro do módulo, a de Produtos que casa no título e a de Pitágoras que cita o discriminante',
+    corpo.blocos[1].linhas.slice().sort().join(' | '),
+    ['Equação do Segundo Grau e Fatoração', 'Equações Biquadradas', 'O Teorema', 'Resultados Básicos - Parte I',
+      'Resultados Básicos - Parte II', 'Soma e Produto das Raízes'].join(' | '));
+  /* Dois módulos achados (Equações e Produtos Notáveis, pela aula que casa no
+   * título) formam um patamar só, ordenado pela nota; a teoria de Pitágoras,
+   * de módulo não achado, cita o discriminante e passa de três do módulo pela
+   * nota, mas vem depois de todas: é o que reprova a ordem por nota pura. */
+  conf('Módulos achados: Equações no topo, e Produtos Notáveis pela aula que casa', corpo.blocos[0].linhas.join(' | '),
+    'Equações do Segundo Grau | Produtos Notáveis e Fatoração');
+  conf('no patamar dos módulos achados vale a nota: os dois títulos que casam na frente',
+    corpo.blocos[1].linhas.slice(0, 2).join(' | '), 'Equação do Segundo Grau e Fatoração | Equações Biquadradas');
+  conf('e a teoria de módulo não achado vem por último', corpo.blocos[1].linhas[corpo.blocos[1].linhas.length - 1], 'O Teorema');
   conf('Exercícios: as duas listas', corpo.blocos[2].linhas.slice().sort().join(' | '),
     'Equações do Segundo Grau: Resultados Básicos | Soma e Produto');
   conf('Banco: o problema da equação do segundo grau', corpo.blocos[3].linhas.join(' | '), 'As raízes escondidas');
-  conf('nada de Pitágoras nem de Produtos Notáveis', /Pitágoras|Produtos Notáveis/.test(corpo.texto), false);
+  conf('em Exercícios e Banco, nada de Produtos Notáveis nem de Pitágoras',
+    corpo.blocos.filter(b => b.titulo === 'Exercícios' || b.titulo === 'Banco de Questões')
+      .some(b => b.linhas.some(l => /Pitágoras|Teorema|Produtos|Fatoração/.test(l))), false);
   // tocar numa lista leva a ela e limpa a busca
   await tocarLinha(pag, 'Soma e Produto');
   await esperar('lista aberta pela busca', () => estadoMinis(pag), v => v && v.total === 8, 5000);
