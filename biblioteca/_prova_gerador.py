@@ -299,6 +299,12 @@ def _linhas_da_pagina(doc, pno):
                     cx, cy = (c['bbox'][0] + c['bbox'][2]) / 2, (c['bbox'][1] + c['bbox'][3]) / 2
                     if cy >= pe:
                         continue
+                    # caractere por cima do fio entre as colunas: e da regra de exclusao
+                    # por calha, que tem trava propria (exclusoes_por_calha_sem_base); pelo
+                    # centro ele cairia na coluna do lado e no item errado (o "." de
+                    # Conjuntos Numericos, p. 9, do item 23, ja excluido por isso)
+                    if c['bbox'][0] < xsep - 0.5 and c['bbox'][2] > xsep + 0.5:
+                        continue
                     col = 0 if cx < xsep else 1
                     por_linha[(col, round(c['origin'][1]))].append((c['bbox'][0], c['c'], cx, cy, tuple(c['bbox'])))
     # linhas de base a menos de 2 pt sao a mesma linha
