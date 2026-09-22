@@ -151,12 +151,20 @@ conf('lista e gabarito na mesma página', JSON.stringify(junto.paginas.lista) + 
 secao('6. marca por cima e regressão dos outros documentos');
 const gs = Object.keys(pdf.objs).find(k => pdf.objs[k] === '<< /Type /ExtGState /BM /Multiply >>');
 conf('um estado gráfico de multiplicação no arquivo', !!gs, true);
-conf('toda página chama o estado', pdf.paginas.every(p => p.obj.indexOf('/ExtGState << /GSm ' + gs + ' 0 R >>') >= 0 &&
+const deTeoria = pdf.paginas.filter((p, i) => r.paginas.teoria.indexOf(i) >= 0);
+const deLista = pdf.paginas.filter((p, i) => r.paginas.teoria.indexOf(i) < 0);
+conf('lista e gabarito: marca por cima em toda página', deLista.every(p => p.obj.indexOf('/ExtGState << /GSm ' + gs + ' 0 R >>') >= 0 &&
   /q \/GSm gs[\s\S]*NW[\s\S]*Q/.test(p.fluxo)), true);
-const comImagem = pdf.paginas.filter(p => p.imagens.length);
-conf('páginas com imagem para conferir a ordem', comImagem.length, pdf.paginas.length);
-conf('a marca vem depois da última imagem (por cima)', comImagem.every(p =>
+conf('páginas de lista e gabarito com imagem', deLista.filter(p => p.imagens.length).length, deLista.length);
+conf('a marca vem depois da última imagem (por cima)', deLista.every(p =>
   p.fluxo.indexOf('q /GSm gs') > p.fluxo.lastIndexOf(' Do Q')), true);
+// teoria: a página da fonte já traz a marca dela; só o selo pequeno no rodapé
+conf('teoria: sem a marca grande e sem multiplicação', deTeoria.every(p => p.obj.indexOf('/ExtGState') < 0 &&
+  p.fluxo.indexOf('/GSm') < 0 && !/ 82 Tf/.test(p.fluxo)), true);
+conf('teoria: o selo NW no rodapé, depois da imagem', deTeoria.every(p => {
+  const m = p.fluxo.match(/\/F2 8 Tf ([\d.]+) ([\d.]+) Td \(NW\) Tj/);
+  return !!m && +m[2] < 45 && p.fluxo.indexOf('(NW) Tj') > p.fluxo.lastIndexOf(' Do Q');
+}), true);
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'bib_compor_'));
 process.on('exit', () => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { /* ok */ } });

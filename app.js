@@ -11948,6 +11948,7 @@
    * ids: o item e a página vêm do bib na hora de gerar, e o que sumiu numa
    * reimportação cai fora sozinho. Mora na memória do aplicativo, então
    * atravessa a troca de aba; fechar o aplicativo começa de novo. */
+  var CHAVE_CARRINHO = 'apoio-educacional:bib-carrinho';   // antes da leitura: var não sobe com valor
   var bibCarrinho = lerCarrinhoGuardado();
   var bibEtiquetas = null;          // itemId -> 1, 2 ou 3, a etiqueta dela
   var ESPACO_RESPOSTA = 100;        // pt depois de cada exercício (uns 3,5 cm), quando marcado
@@ -11955,7 +11956,6 @@
   /* A seleção fica guardada no próprio aparelho, para sobreviver ao Android
    * fechar o aplicativo quando ela sai para a câmera ou para uma mensagem. É só
    * conveniência: se o armazenamento falhar, começa vazia. */
-  var CHAVE_CARRINHO = 'apoio-educacional:bib-carrinho';
   function lerCarrinhoGuardado() {
     try {
       var c = JSON.parse(localStorage.getItem(CHAVE_CARRINHO) || 'null');
@@ -12009,7 +12009,7 @@
       return;
     }
     faixa.appendChild(el('span', { class: 'bib-carrinho-texto', id: 'bib-carrinho-contagem',
-      texto: 'Material desta aula: ' + plural(n, 'exercício', 'exercícios') + ', ' + plural(m, 'página', 'páginas') }));
+      texto: 'Material marcado: ' + plural(n, 'exercício', 'exercícios') + ', ' + plural(m, 'página de teoria', 'páginas de teoria') }));
     faixa.appendChild(el('span', { class: 'cresce' }));
     faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-carrinho-limpar', texto: 'Desmarcar tudo',
       aoClick: function () {
@@ -12235,6 +12235,7 @@
         if (!db.alunos.length) { avisar('Cadastre um aluno antes de marcar a primeira aula.'); return; }
         fecharModal('modal-bib-gerar');
         abrirAula(null, Core.hojeIso());
+        op.daAulaNova = true;
         folhaPendenteDaBiblioteca = { titulo: op.titulo, aoCriar: function (aulaId) { gerarEAnexar(aulaId, itens, paginas, op); } };
         var ajudaPadrao = $('#ajuda-aula-nova');
         if (ajudaPadrao) ajudaPadrao.remove();
@@ -12263,11 +12264,8 @@
     rodape.appendChild(botaoGerar);
     corpo.appendChild(dica);
     abrirModalGerar.atualizar = atualizarRodape;
-    // uma aula só hoje: já vem escolhida
-    if (aulas.hoje.length === 1) {
-      var unica = listaAulas.querySelector('[data-aula="' + aulas.hoje[0].id + '"]');
-      if (unica) marcarAula(unica, aulas.hoje[0].id, false);
-    }
+    /* A aula é escolhida sempre por ela, mesmo quando só há uma hoje: escolhida
+     * sozinha, o material podia ir para a aula de outro aluno por distração. */
     atualizarRodape();
     abrirModal('modal-bib-gerar');
   }
@@ -12310,7 +12308,8 @@
     function trabalhador() {
       if (proximo >= lista.length) return Promise.resolve();
       var i = proximo++;
-      return fazer(lista[i], i).then(function (r) { saida[i] = r; return trabalhador(); });
+      return Promise.resolve().then(function () { return fazer(lista[i], i); })
+        .then(function (r) { saida[i] = r; return trabalhador(); });
     }
     var ts = [];
     for (var k = 0; k < Math.min(juntos || 2, lista.length); k++) ts.push(trabalhador());
@@ -12337,9 +12336,9 @@
     $$('#rodape-modal-bib-gerar button').forEach(function (b) { b.disabled = true; });
     var botao = $('#bib-gerar-anexar');
     if (botao) botao.textContent = 'Montando...';
-    avisar('Montando o material. Isso leva alguns segundos.');
+    if (!op.daAulaNova) avisar('Montando o material. Isso leva alguns segundos.');
     var usaItens = (op.lista || op.gabarito) ? itens : [];
-    var pecas, teoria, anexado = false, id = null, saida = null;
+    var pecas, teoria, anexado = false, id = null, saida = null, etapa = 'montar';
     return emFila(usaItens, function (it, i) { return comNomeDoExercicio(pecasDoItem(it, op.gabarito), it, i + 1); }).then(function (r) {
       pecas = r;
       return emFila(op.teoria ? paginas : [], function (p) {
@@ -12374,11 +12373,18 @@
          * ler "Temas trabalhados" da própria aula, de forma síncrona. */
         var modulos = [];
         usaItens.forEach(function (it) { if (modulos.indexOf(it.modulo.titulo) < 0) modulos.push(it.modulo.titulo); });
-        aula.anexos.push({ id: id, nome: nome, tamanho: blob.size, biblioteca: true, modulos: modulos });
+        var registro = { id: id, nome: nome, tamanho: blob.size, biblioteca: true, modulos: modulos };
+        aula.anexos.push(registro);
         titulosGuardados()[aula.alunoId] = { titulo: op.titulo, subtitulo: op.subtitulo };
-        return salvar();
+        return salvar().catch(function (e) {
+          // não gravou: o anexo sai da memória, senão o próximo salvar o gravaria e a nova tentativa duplicaria
+          aula.anexos = aula.anexos.filter(function (x) { return x !== registro; });
+          Store.apagarAnexo(id);
+          throw e;
+        });
       }).then(function () {
         anexado = true;
+        etapa = 'uso';
         /* O uso: um registro por exercício que entrou na folha, só se a aula
          * ainda existe (um Desfazer pode ter caído entre o salvar e aqui). */
         if (!db.aulas.some(function (a) { return a.id === aulaId; })) return null;
@@ -12386,6 +12392,7 @@
           return Store.registrarUsoBiblioteca({ itemId: it.id, alunoId: aula.alunoId, aulaId: aula.id, data: aula.data });
         }, 1);
       }).then(function () {
+        etapa = 'folha';
         if (op.folha && op.lista) return listaComoFolha(aula.id, usaItens, pecas);
         return null;
       }).then(function (indiceFolha) {
@@ -12407,7 +12414,9 @@
       /* Depois do anexo gravado, o erro não é "nada foi anexado": tentar de novo
        * duplicaria o arquivo na aula. Antes dele, a mensagem diz o que fazer, e
        * o detalhe técnico fica só no console. */
-      if (anexado) avisar('O material foi anexado na aula, mas a lista não abriu como folha. ' +
+      if (anexado && etapa === 'folha') avisar('O material foi anexado na aula, mas a lista não abriu como folha. ' +
+        'O PDF está na aula; não precisa gerar de novo.');
+      else if (anexado) avisar('O material foi anexado na aula, mas não consegui marcar os exercícios como usados. ' +
         'O PDF está na aula; não precisa gerar de novo.');
       else if (e && e.exercicio) avisar(e.exercicio + ' não abriu. Desmarque-o e gere de novo. Nada foi anexado.');
       else avisar('Não consegui montar o material. Nada foi anexado; tente de novo daqui a pouco.');
@@ -12428,7 +12437,7 @@
     var tarefas = [];
     pecas.forEach(function (p, i) {
       var e = p.enunciado;
-      var altPt = e.alturaPt + (e.rotulo ? 0 : 16);      // sem rótulo, a faixa do número em cima
+      var altPt = e.alturaPt + (numeroNoLugar(e, i + 1) ? 0 : 16);   // na faixa, o número soma 16 pt em cima
       var esc = Math.min(1.9, (L - 2 * MARGEM) / e.larguraPt);
       var h = altPt * esc;
       if (h > A - 2 * MARGEM) { esc = (A - 2 * MARGEM) / altPt; h = A - 2 * MARGEM; }
@@ -12459,6 +12468,20 @@
       if (aula) aula.temNota = true;
       return salvar();
     }).then(function () { return indice; });
+  }
+
+  /* "Exercício N." cabe no lugar do rótulo coberto com pelo menos 7 pt? A mesma
+   * regra do PDF, decidida uma vez: o espaço na folha e o desenho usam esta
+   * resposta, senão a imagem sairia achatada. */
+  function numeroNoLugar(peca, n) {
+    var r = peca.rotulo;
+    if (!r) return false;
+    var cv = numeroNoLugar.cv = numeroNoLugar.cv || document.createElement('canvas');
+    var cx = cv.getContext('2d');
+    cx.font = 'bold 100px Helvetica, Arial, sans-serif';
+    var porPt = cx.measureText('Exercício ' + n + '.').width / 100;
+    var tam = Math.min((r[3] - r[1]) * 1.05, (r[2] - r[0] + 2) / porPt);
+    return tam >= 7;
   }
 
   /* O enunciado já rasterizado (JPEG, rótulo coberto), junto de novo num canvas
@@ -12497,7 +12520,7 @@
         if (larg > caixa) tam = tam * caixa / larg;
       }
       // o mesmo piso do PDF: abaixo de 7 pt o número vai para a faixa de cima
-      if (r && tam >= 7 * k) {
+      if (numeroNoLugar(peca, n)) {
         cx.font = 'bold ' + tam + 'px Helvetica, Arial, sans-serif';
         cx.textBaseline = 'alphabetic';
         cx.fillText(texto, r[0] * k, r[3] * k - 1.5 * k);

@@ -3997,8 +3997,9 @@
       }
       if (!noLugar()) acima = 16;
       var largura = peca.larguraPt * k;
-      doc.garanteEspaco(inteiro ? peca.alturaPt * k + acima + cauda + 4
-        : acima + pedacos[0].alturaPt * k + 4);
+      // 0,01 pt de folga: k = teto / maior deixa a soma um fio acima do que cabe
+      doc.garanteEspaco((inteiro ? peca.alturaPt * k + acima + cauda + 4
+        : acima + pedacos[0].alturaPt * k + 4) - 0.01);
       if (!noLugar()) {
         doc.y -= 12;
         doc.texto(rotuloNovo, MARG_E, doc.y, { tam: parte === 'lista' ? 11 : 10, bold: true, cor: COR.navy });
@@ -4070,8 +4071,24 @@
       });
     }
 
-    // a marca por cima vale para toda página desta folha, e só desta
-    doc.paginas.forEach(function (p) { p.marcaPorCima = true; });
+    /* A marca por tipo de página (decisão da orquestradora em 22/09, PLANO,
+     * seção 7). Lista e gabarito, que o app compõe em fundo branco: a marca de
+     * sempre, por cima, em multiplicação. Teoria, que é a página inteira da
+     * fonte e já traz a marca e o rodapé dela: só um selo pequeno no rodapé da
+     * moldura, para não sobrepor duas marcas no texto. */
+    doc.paginas.forEach(function (p, i) {
+      if (mapa.teoria.indexOf(i) >= 0) {
+        p.marca = null;
+        var guardada = doc.pag;
+        doc.pag = p;
+        var cx = PAGINA_L / 2, cy = PAGINA_A - 809.4 + 2.6;
+        doc.circulo(cx, cy, 8.5, COR.fio, false);
+        doc.texto('NW', cx, cy - 3, { tam: 8, bold: true, cor: COR.fio, align: 'centro' });
+        doc.pag = guardada;
+      } else {
+        p.marcaPorCima = true;
+      }
+    });
     return { bytes: doc.finalizar(), total: doc.paginas.length, paginas: mapa, reduzidos: reduzidos };
   }
 

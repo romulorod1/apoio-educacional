@@ -7,8 +7,8 @@
  *
  * O que prova, na ordem em que ela viveria:
  *   1. marca 4 exercícios de "Soma e Produto", 4 de "Resultados Básicos" e 3
- *      páginas de teoria pelas caixas; o contador diz "Material desta aula:
- *      8 exercícios, 3 páginas";
+ *      páginas de teoria pelas caixas; o contador diz "Material marcado:
+ *      8 exercícios, 3 páginas de teoria";
  *   2. troca de aba e volta: o carrinho e as caixas continuam;
  *   3. etiqueta de dificuldade com um toque, sem sair da lista; outro toque tira;
  *   4. "Gerar material": título do módulo, caixas nos padrões do brief;
@@ -193,7 +193,7 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
   conf('caixa e etiqueta com alvo de toque de 44 px', alvoToque >= 44, true);
   const yAntes = await yGrade();
   for (const id of MARCADOS.slice(0, 4)) await marcar(pag, 'itens', id);
-  conf('contador depois de 4', await contador(pag), 'Material desta aula: 4 exercícios, 0 páginas');
+  conf('contador depois de 4', await contador(pag), 'Material marcado: 4 exercícios, 0 páginas de teoria');
   conf('a grade não pulou no primeiro toque (menos de 8 px)', Math.abs((await yGrade()) - yAntes) < 8, true);
   // o toque na caixa não abre a tela cheia
   conf('marcar não abriu a tela cheia', await pag.$eval('#modal-biblioteca', e => e.classList.contains('aberto')), false);
@@ -207,7 +207,7 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
   await tocarLinha(pag, 'Resultados Básicos - Parte I');
   await esperar('páginas de teoria', () => pag.evaluate(() => document.querySelectorAll('#bib-corpo input[data-carrinho="paginas"]').length), v => v === 5, 8000);
   for (const n of ['01', '02', '03']) await marcar(pag, 'paginas', TEO + n);
-  conf('contador com tudo', await contador(pag), 'Material desta aula: 8 exercícios, 3 páginas');
+  conf('contador com tudo', await contador(pag), 'Material marcado: 8 exercícios, 3 páginas de teoria');
   if (SALVAR) await pag.screenshot({ path: path.join(SALVAR, 'tela_1_caixas_teoria.png') });
 
   // ================================================================
@@ -215,9 +215,19 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
   await H.irParaAba(pag, 'agenda');
   await H.irParaAba(pag, 'biblioteca');
   await esperar('aba desenhada de novo', () => contador(pag), v => !!v, 5000);
-  conf('contador depois de ir e voltar', await contador(pag), 'Material desta aula: 8 exercícios, 3 páginas');
+  conf('contador depois de ir e voltar', await contador(pag), 'Material marcado: 8 exercícios, 3 páginas de teoria');
   const aindaMarcadas = await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo input[data-carrinho="paginas"]')).map(c => c.checked).join(','));
   conf('e as caixas da teoria continuam marcadas', aindaMarcadas, 'true,true,true,false,false');
+  // o aplicativo fechado e aberto de novo: a seleção volta
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.abrirApp(pag, amb.ORIGEM);
+  await H.irParaAba(pag, 'biblioteca');
+  await esperar('aba depois de recarregar', () => contador(pag), v => !!v, 8000);
+  conf('depois de recarregar, a seleção continua', await contador(pag), 'Material marcado: 8 exercícios, 3 páginas de teoria');
+  await subirNaBiblioteca(pag);
+  await tocarLinha(pag, 'Equações do Segundo Grau');
+  await tocarLinha(pag, 'Resultados Básicos - Parte I');
+  await esperar('páginas de teoria', () => pag.evaluate(() => document.querySelectorAll('#bib-corpo input[data-carrinho="paginas"]').length), v => v === 5, 8000);
   // Desmarcar tudo com Desfazer
   await pag.click('#bib-carrinho-limpar');
   conf('Desmarcar tudo zera a faixa', await pag.evaluate(() => !!document.querySelector('#bib-carrinho-vazio')), true);
@@ -227,7 +237,7 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
   });
   conf('o aviso oferece Desfazer', desfez, true);
   await pausa(200);
-  conf('e o Desfazer devolve a seleção inteira', await contador(pag), 'Material desta aula: 8 exercícios, 3 páginas');
+  conf('e o Desfazer devolve a seleção inteira', await contador(pag), 'Material marcado: 8 exercícios, 3 páginas de teoria');
   conf('com as caixas marcadas de novo', await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo input[data-carrinho="paginas"]')).map(c => c.checked).join(',')), 'true,true,true,false,false');
 
   // ================================================================
@@ -313,7 +323,8 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
   }
   // a solução do exercício 4 (dois pedaços, 786 pt) não cabe numa folha e quebra entre os pedaços
   conf('7 soluções com imagem, a de dois pedaços contando duas', pags.slice(iGab).reduce((s, p) => s + p.imagens, 0), 8);
-  conf('marca por cima em toda página', pags.every(p => /\/ExtGState << \/GSm \d+ 0 R >>/.test(p.obj) && p.fluxo.indexOf('q /GSm gs') >= 0), true);
+  conf('lista e gabarito: marca por cima', pags.slice(3).every(p => /\/ExtGState << \/GSm \d+ 0 R >>/.test(p.obj) && p.fluxo.indexOf('q /GSm gs') >= 0), true);
+  conf('teoria: só o selo no rodapé, sem a marca grande', pags.slice(0, 3).every(p => p.obj.indexOf('/ExtGState') < 0 && /\(NW\) Tj/.test(p.fluxo)), true);
   conf('nenhum travessão ou meia-risca', /[–—\x96\x97]/.test(todo), false);
 
   // o rótulo original coberto: a barra colorida do canto (4,4 a 60,16 pt) some na folha
