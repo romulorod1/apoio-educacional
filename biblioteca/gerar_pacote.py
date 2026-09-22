@@ -71,6 +71,8 @@ MARGEM_X = 24.0        # borda externa das colunas
 AFASTA_FIO = 1.2
 TOLERANCIA_MARGEM = 12.0
 RECUO_MAX = 40.0       # recuo de paragrafo que ainda aceita o marcador (recuado_na_linha)
+NOTA_SO_NO_PE = True   # nota de rodape so no pe da coluna (ver marcadores); False so no veneno
+ESTENDE_BORDA = True   # recorte passa da borda direita quando a fonte passa (ver detectar); False so no veneno
 ALTURA_MIN_ENUNCIADO = 20.0
 ALTURA_MIN_SOLUCAO = 9.0
 DPI_CONFERENCIA = 100
@@ -246,7 +248,13 @@ def marcadores(els, geo, em_solucoes, ja_teve_enunciado=False, secao_1_abre_solu
         if y1 - y0 > 1.5 or not (40 <= x1 - x0 <= 140) or abs(x0 - margem_da_coluna(e['col'], geo)) > 3:
             continue
         abaixo = [o for o in txt if o['col'] == e['col'] and 0 <= o['bb'][1] - y0 <= 12]
-        if abaixo and all(o['tam'] <= 8.5 for o in abaixo):
+        # a nota fica no pe da coluna: abaixo dela so texto miudo. A barra de uma
+        # fracao na margem, com o denominador miudo embaixo, parecia nota e cortava
+        # o resto do item (Inequacoes Mistas, 1o medio, exercicio 9: o "e igual a"
+        # e as alternativas saiam do recorte). Medido nas 7 series: as 25 notas
+        # de verdade nao tem texto de corpo normal abaixo; a barra tinha 243.
+        corpo_abaixo = any(o['col'] == e['col'] and o['bb'][1] > y0 + 0.5 and o['tam'] > 8.5 for o in txt)
+        if abaixo and all(o['tam'] <= 8.5 for o in abaixo) and not (NOTA_SO_NO_PE and corpo_abaixo):
             out.append({'tipo': 'nota', 'col': e['col'], 'el': e})
     for e in txt:
         t = e['texto'].strip()
@@ -404,6 +412,56 @@ def linhas_com_tinta(doc, pno, geo):
         x0, x1 = faixa_da_coluna(col, geo, doc[pno])
         a, b = max(0, int(x0 + 1)), min(w, int(x1))
         out[col] = [any(s[y * w + x] < LIMIAR_TINTA for x in range(a, b)) for y in range(h)]
+    # Conteudo em cor clara (rotulo e caixa cinza de uma figura: "BH[180]",
+    # Nocoes Basicas, solucao 16) fica acima do limiar e sairia do recorte. Nao
+    # basta baixar o limiar: a borda suavizada de todo glifo preto tambem passa
+    # a contar e quase todo recorte cresce 1 pt. Entao o objeto claro conta pela
+    # sua caixa.
+    for y0, y1, cx in objetos_claros(doc[pno]):
+        col = 0 if cx < geo['xsep'] else 1
+        for y in range(max(0, int(y0)), min(h, int(math.ceil(y1)))):
+            out[col][y] = True
+    return out
+
+
+LUMINANCIA_CLARA = (LIMIAR_TINTA, 250)  # de 255: visivel, mas acima do limiar de tinta
+
+
+def _luminancia(cor):
+    if cor is None:
+        return None
+    if isinstance(cor, int):
+        r, g, b = (cor >> 16) & 255, (cor >> 8) & 255, cor & 255
+    else:
+        if len(cor) == 1:
+            return 255 * cor[0]
+        if len(cor) == 4:  # CMYK
+            c, m, yy, k = cor
+            r, g, b = 255 * (1 - c) * (1 - k), 255 * (1 - m) * (1 - k), 255 * (1 - yy) * (1 - k)
+        else:
+            r, g, b = [255 * v for v in cor[:3]]
+    return 0.299 * r + 0.587 * g + 0.114 * b
+
+
+def objetos_claros(pg):
+    """(y0, y1, centro x) de texto e desenho em cor clara, mas visivel."""
+    a, b = LUMINANCIA_CLARA
+    out = []
+    for bl in pg.get_text('dict')['blocks']:
+        if bl['type'] != 0:
+            continue
+        for l in bl['lines']:
+            for sp in l['spans']:
+                lum = _luminancia(sp.get('color'))
+                if sp['text'].strip() and lum is not None and a <= lum < b:
+                    out.append((sp['bbox'][1], sp['bbox'][3], (sp['bbox'][0] + sp['bbox'][2]) / 2))
+    for d in pg.get_drawings():
+        for chave in ('color', 'fill'):
+            lum = _luminancia(d.get(chave))
+            if lum is not None and a <= lum < b:
+                r = d['rect']
+                out.append((r.y0, r.y1, (r.x0 + r.x1) / 2))
+                break
     return out
 
 
@@ -574,8 +632,17 @@ def detectar(doc, secao_1_abre_solucoes=True):
                 y1 = min(math.ceil(y1), math.floor(y_fim))
                 if anteriores:
                     y0 = max(y0, max(p['rect'][3] for p in anteriores))
+                # a coluna da direita vai ate 24 pt da borda da pagina, e a fonte as
+                # vezes passa disso com o ponto final ou o expoente de uma formula
+                # longa (15 glifos nas 7 series, ate 594,7 pt): so entao o recorte
+                # passa da borda, ate 4 pt do fim da pagina
+                x_dir = cx1
+                if col == 1 and ESTENDE_BORDA:
+                    alem = [e['bb'][2] for e in els_col if e['bb'][2] > cx1 and e['bb'][1] < y1 and e['bb'][3] > y0]
+                    if alem:
+                        x_dir = min(pg.rect.width - 4.0, max(alem) + 1.0)
                 r = (float(math.floor(cx0) if col == 0 else math.ceil(cx0)), float(y0),
-                     float(math.floor(cx1)), float(y1))
+                     float(math.floor(x_dir) if x_dir == cx1 else math.ceil(x_dir)), float(y1))
                 transborda = any(r[1] <= (a + b) / 2.0 <= r[3] for a, b in cruzam)
                 pedacos[aberto[0]][aberto[2]].append({'pno': pno, 'col': col, 'rect': r, 'xsep': geo['xsep'],
                                                      'transborda': transborda})

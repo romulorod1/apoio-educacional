@@ -36,6 +36,7 @@ Travas (CONTRATO_pacote_biblioteca.md, secao 9, mais os pedidos da B4):
 Saida no dialeto do portao: "N verificacoes passaram, M falharam".
 """
 import argparse
+import collections
 import copy
 import hashlib
 import io
@@ -224,6 +225,158 @@ def letras_da_solucao(texto):
     return achadas
 
 
+def primeira_palavra(cs):
+    """Primeira palavra da linha: caracteres a menos de 2,5 pt um do outro.
+
+    A linha de base junta coisas distantes: um "2" solto em x 29,5 e o "15."
+    de "10 raiz de 15." em x 43,5 liam "215." (Relacao de Euler, p. 5).
+    """
+    out = [cs[0]]
+    for a, b in zip(cs, cs[1:]):
+        if b[0] - a[4][2] > 2.5:
+            break
+        out.append(b)
+    return ''.join(c[1] for c in out).strip()
+
+
+LIMIAR_TINTA_PROVA = 235   # de 255: cinza claro de figura ainda e tinta
+CORTE_PERMITIDO = re.compile(r'^(\d+)?Exerc\S*cios(Introdut|deFixa|deAprofund)|^deExames|^Exames|^Respostas?eSolu'
+                             r'|^E?laboradopor|^P?roduzidopor|cursoarquimedes')
+# linha que so se pula, sem fechar o item aberto: endereco do rodape e numero
+# solto (numero da pagina, denominador "2" de uma fracao centrada)
+SO_PULA = re.compile(r'^http|^matematica\.obmep|^\d+$')
+
+
+def _linhas_da_pagina(doc, pno):
+    """Linhas de corpo normal (acima de 8,5 pt) da pagina, por coluna e em ordem, e o teste de tinta.
+
+    A tinta e da pagina renderizada: glifo sem tinta (o "." invisivel no fim de
+    uma formula de Conjuntos Numericos) nao e conteudo. Limiar claro, 235: o
+    rotulo cinza de uma figura (BH[180], Nocoes Basicas) e conteudo.
+    """
+    pg = doc[pno]
+    xsep = divisa_da_prova(doc, pg)
+    tmp = pymupdf.open()
+    tmp.insert_pdf(doc, from_page=pno, to_page=pno)
+    pix = tmp[0].get_pixmap(dpi=100, colorspace=pymupdf.csGRAY)
+    tmp.close()
+    kpx = 100 / 72.0
+    amostras = pix.samples  # uma copia so: cada acesso a pix.samples copia a imagem
+
+    def tem_tinta(bb):
+        xa, xb = max(0, int(bb[0] * kpx)), min(pix.width, int(bb[2] * kpx) + 1)
+        ya, yb = max(0, int(bb[1] * kpx)), min(pix.height, int(bb[3] * kpx) + 1)
+        return any(amostras[y * pix.width + x] < LIMIAR_TINTA_PROVA for y in range(ya, yb) for x in range(xa, xb))
+
+    largos = [d['rect'].y0 for d in pg.get_drawings() if d['rect'].height < 1.5 and d['rect'].width > 400
+              and d['rect'].y0 > pg.rect.height * 0.8]
+    pe = min(largos) if largos else pg.rect.height - 45
+    por_linha = collections.defaultdict(list)
+    for b in pg.get_text('rawdict')['blocks']:
+        if b['type'] != 0:
+            continue
+        for ln in b['lines']:
+            for sp in ln['spans']:
+                if sp['size'] <= 8.5:
+                    continue
+                for c in sp['chars']:
+                    if not c['c'].strip():
+                        continue
+                    cx, cy = (c['bbox'][0] + c['bbox'][2]) / 2, (c['bbox'][1] + c['bbox'][3]) / 2
+                    if cy >= pe:
+                        continue
+                    col = 0 if cx < xsep else 1
+                    por_linha[(col, round(c['origin'][1]))].append((c['bbox'][0], c['c'], cx, cy, tuple(c['bbox'])))
+    # linhas de base a menos de 2 pt sao a mesma linha
+    linhas = []
+    for k in sorted(por_linha):
+        if linhas and linhas[-1][0][0] == k[0] and abs(linhas[-1][0][1] - k[1]) <= 2:
+            linhas[-1][1].extend(por_linha[k])
+        else:
+            linhas.append([k, list(por_linha[k])])
+    for _, cs in linhas:
+        cs.sort()
+    return linhas, tem_tinta
+
+
+def trava_tinta_coberta(p):
+    """Todo texto de corpo normal da lista esta num recorte, ou e um corte permitido.
+
+    Pedido depois do achado da nota falsa (Inequacoes Mistas, 1o medio): a
+    barra de uma fracao na margem virou "nota de rodape", e o resto do
+    exercicio 9 ficou fora de todo recorte sem nenhuma trava ver, porque as
+    travas so olhavam o que ESTAVA no recorte. Aqui manda a pagina: linha a
+    linha, em ordem de leitura, cada linha de corpo normal (acima de 8,5 pt,
+    o que deixa de fora nota de rodape e expoente) pertence ao item aberto
+    naquele ponto. Linha sem recorte so passa se for titulo de secao,
+    cabecalho, credito, rodape ou texto de item excluido com motivo.
+    """
+    erros = []
+    for l in p.relatorio['listas']:
+        if 'erro' in l:
+            continue
+        doc = p.doc(l['arquivo'])
+        excluidos = {e['numero'] for e in l['excluidos']}
+        rects = collections.defaultdict(list)
+        for it in p.itens:
+            if os.path.basename(it['origem']['arquivo']) != l['arquivo']:
+                continue
+            for tipo in ('enunciado', 'solucao'):
+                for pz in pedacos(it, tipo):
+                    rects[pz['pagina']].append(pymupdf.Rect(pz['bbox']))
+        paginas = {pno: _linhas_da_pagina(doc, pno) for pno in range(1, doc.page_count)}
+        # margem de cada coluna, na lista inteira: o menor comeco de linha que
+        # aparece pelo menos 3 vezes (a 1 pt). Nao a moda nem por pagina: uma
+        # tabela recuada em x 70 enchia a p. 6 de Conjuntos Numericos, que so
+        # tinha duas linhas na margem
+        margem = {}
+        for col in (0, 1):
+            xs = [int(min(c[0] for c in cs)) for linhas, _ in paginas.values() for (cc, _b), cs in linhas if cc == col]
+            rep = [x for x in set(xs) if sum(1 for y in xs if abs(y - x) <= 1) >= 3]
+            margem[col] = min(rep) if rep else None
+        dono, em_sol, viu_enunciado = None, False, False
+        for pno in range(1, doc.page_count):
+            linhas, tem_tinta = paginas[pno]
+            for k_l, ((col, base), cs) in enumerate(linhas):
+                texto = portal.recompor(''.join(c[1] for c in cs))
+                sem = re.sub(r'\s+', '', texto)
+                if SO_PULA.search(sem):
+                    continue
+                if CORTE_PERMITIDO.search(sem):
+                    if re.match(r'^Respostas?eSolu', sem):
+                        em_sol = True
+                    elif viu_enunciado and not em_sol and re.match(r'^(1)?Exerc\S*ciosIntrodut', sem):
+                        em_sol = True  # solucoes sem titulo (Potenciacao)
+                    dono = None
+                    continue
+                m = re.match(r'^Exerc\S*cio(\d+)\.', sem)
+                if m and not em_sol:
+                    dono, viu_enunciado = int(m.group(1)), True
+                elif (em_sol and re.match(r'^\d+\.', primeira_palavra(cs)) and margem[col] is not None
+                      and abs(cs[0][0] - margem[col]) <= 12):
+                    dono = int(re.match(r'^(\d+)', primeira_palavra(cs)).group(1))
+                fora = [c for c in cs if not any(r.contains(pymupdf.Point(c[2], c[3])) for r in rects[pno + 1])]
+                if not [c for c in fora if tem_tinta(c[4])]:
+                    continue
+                # linha suspensa logo acima de um marcador (o numerador "AB.GE" da
+                # fracao de "26. A area ... e AB.GE sobre 2", Areas, p. 12) e do
+                # item desse marcador, que ainda nao foi lido
+                dono_l = dono
+                prox = linhas[k_l + 1] if k_l + 1 < len(linhas) else None
+                if prox and prox[0][0] == col and 0 < prox[0][1] - base < 9.5 and prox[1][0][0] < cs[0][0] - 5:
+                    pw = primeira_palavra(prox[1])
+                    mm = re.match(r'^Exerc\S*cio(\d+)\.', re.sub(r'\s+', '', portal.recompor(''.join(c[1] for c in prox[1]))))
+                    if mm and not em_sol:
+                        dono_l = int(mm.group(1))
+                    elif em_sol and re.match(r'^\d+\.', pw):
+                        dono_l = int(re.match(r'^(\d+)', pw).group(1))
+                if dono_l is None or dono_l in excluidos:
+                    continue
+                dono_msg = dono_l
+                erros.append('%s p%d: linha fora de todo recorte, no item %s: %r' % (l['aula'], pno + 1, dono_msg, texto[:50]))
+    return erros[:10]
+
+
 def enunciados_no_texto(doc):
     """Numeros dos "Exercicio N." no texto do PDF, antes das solucoes, sem o detector."""
     nums = []
@@ -409,13 +562,23 @@ def conteudo_na_caixa(p, it, pg, pz):
                 cx = (bb.x0 + bb.x1) / 2
                 if ((cx < xsep) != (lado == 0)) and bb.intersects(r) and (bb & r).width > 2:
                     erros.append('texto da outra coluna dentro: %r' % sp['text'][:25])
-    # nota de rodape: fio curto na margem com texto miudo logo abaixo, dentro da caixa
+    # nota de rodape: fio curto na margem com texto miudo logo abaixo, dentro da
+    # caixa, e nada de corpo normal abaixo dele na coluna (a nota fica no pe; a
+    # barra de uma fracao na margem tem o resto do item embaixo)
+    # o rodape da pagina (endereco, numero) fica fora da conta
+    fios_pe = [d['rect'].y0 for d in pg.get_drawings() if d['rect'].height < 1.5 and d['rect'].width > 400
+               and d['rect'].y0 > pg.rect.height * 0.8]
+    y_pe = min(fios_pe) if fios_pe else pg.rect.height - 45
+    spans = [sp for b in pg.get_text('dict')['blocks'] if b['type'] == 0 for l in b['lines'] for sp in l['spans']
+             if sp['text'].strip() and sp['bbox'][1] < y_pe]
     for d in pg.get_drawings():
         q = d['rect']
         if q.height < 1.5 and 40 <= q.width <= 140 and r.y0 <= q.y0 <= r.y1 and r.x0 <= q.x0 <= r.x1:
-            miudo = [sp for b in pg.get_text('dict')['blocks'] if b['type'] == 0 for l in b['lines'] for sp in l['spans']
-                     if sp['text'].strip() and 0 <= sp['bbox'][1] - q.y0 <= 12 and q.x0 - 1 <= sp['bbox'][0] <= q.x1]
-            if miudo and all(sp['size'] <= 8.5 for sp in miudo) and any(r.contains(pymupdf.Rect(sp['bbox'])) for sp in miudo):
+            miudo = [sp for sp in spans if 0 <= sp['bbox'][1] - q.y0 <= 12 and q.x0 - 1 <= sp['bbox'][0] <= q.x1]
+            corpo_abaixo = any(sp['size'] > 8.5 and sp['bbox'][1] > q.y0 + 0.5
+                               and ((sp['bbox'][0] + sp['bbox'][2]) / 2 < xsep) == (lado == 0) for sp in spans)
+            if (miudo and all(sp['size'] <= 8.5 for sp in miudo) and not corpo_abaixo
+                    and any(r.contains(pymupdf.Rect(sp['bbox'])) for sp in miudo)):
                 erros.append('nota de rodape dentro do recorte')
     largos = [d['rect'] for d in pg.get_drawings() if d['rect'].height < 1.5 and d['rect'].width > 400
               and d['rect'].y0 < pg.rect.height]
@@ -927,6 +1090,7 @@ def travas_simples(p, placar, zip_caminho=None, rotulo=''):
     placar.conferir('origem literal' + rotulo, trava_origem(p))
     placar.conferir('PyMuPDF no manifest' + rotulo, trava_gerador_no_manifest(p))
     placar.conferir('prova independente do gerador' + rotulo, trava_independencia(p))
+    placar.conferir('nenhum texto fora de recorte' + rotulo, trava_tinta_coberta(p))
 
 
 def venenos(p, temp, placar, curadoria):
@@ -1174,6 +1338,26 @@ def venenos_series(p, temp, placar, curadoria):
     q.manifest['contagens']['itens_com_solucao'] = sum(1 for i in q.itens if i['assets']['solucao'])
     q.manifest['contagens']['itens_excluidos'] = sum(len(l['excluidos']) for l in q.relatorio['listas'])
     placar.conferir('ultimo item perdido pelo detector', trava_contagens(q), True, 'o texto do PDF tem')
+    # tinta coberta: tres defeitos que tiravam conteudo do recorte sem nenhuma
+    # outra trava ver. Cada um, desligado, tem de reprovar aqui.
+    for nome, attr, valor, motivo in (('barra de fracao lida como nota', 'NOTA_SO_NO_PE', False, 'Portanto'),
+                                      ('recorte preso na borda direita', 'ESTENDE_BORDA', False, 'Conferindo')):
+        antes_v = getattr(gerar_pacote, attr)
+        setattr(gerar_pacote, attr, valor)
+        try:
+            gerar(p.pdfs, os.path.join(temp, 'v_' + attr.lower()), curadoria)
+        finally:
+            setattr(gerar_pacote, attr, antes_v)
+        q = Pacote(os.path.join(temp, 'v_' + attr.lower()), p.pdfs)
+        placar.conferir(nome, [re.sub(r'\s+', '', e) for e in trava_tinta_coberta(q)], True, motivo)
+    antes_oc = gerar_pacote.objetos_claros
+    gerar_pacote.objetos_claros = lambda pg: []
+    try:
+        gerar(p.pdfs, os.path.join(temp, 'v_claro'), curadoria)
+    finally:
+        gerar_pacote.objetos_claros = antes_oc
+    q = Pacote(os.path.join(temp, 'v_claro'), p.pdfs)
+    placar.conferir('conteudo cinza claro cortado', [re.sub(r'\s+', '', e) for e in trava_tinta_coberta(q)], True, 'Figuraemcinza')
     # independencia: uma trava que volte a chamar o gerador tem de reprovar
     antes_ob = trava_objetiva.__globals__['letras_da_solucao']
     trava_objetiva.__globals__['letras_da_solucao'] = lambda s: set(gerar_pacote.RESPOSTA.findall(s))

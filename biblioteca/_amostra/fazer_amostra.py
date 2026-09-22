@@ -209,6 +209,18 @@ def lista_variantes(caminho):
     p.secao(X1, T + 40, 2, 'Exercícios de Fixação')
     p.numero_solucao(X1, T + 70, 4)
     p.texto(X1 + 14, T + 70, ['A área é 5 · 5 = 25 cm².'])
+    # barra de fracao na margem com o denominador miudo embaixo: nao e nota de
+    # rodape, e o que vem depois e do item (1o medio, Inequacoes Mistas, ex. 9)
+    p.pg.insert_text((X1 + 20, T + 94), 'x + 1', fontname='helv', fontsize=7)
+    p.pg.draw_line((X1, T + 98), (X1 + 60, T + 98), width=0.4)
+    p.pg.insert_text((X1 + 20, T + 106), 'x + 2', fontname='helv', fontsize=7)
+    p.texto(X1, T + 124, ['Portanto a área do quadrado é 25 cm².'])
+    # ponto final que passa da borda da coluna direita (1o e 3o medio)
+    p.pg.insert_text((X1, T + 146), 'Conferindo:', fontname='helv', fontsize=10)
+    p.pg.insert_text((589.0, T + 146), '.', fontname='helv', fontsize=10)
+    # rotulo cinza claro de figura, no fim do item (9o ano, Nocoes Basicas):
+    # e no fim que o aperto pela tinta o cortava
+    p.pg.insert_text((X1 + 40, T + 170), 'Figura em cinza', fontname='helv', fontsize=10, color=(0.85, 0.85, 0.85))
     doc.set_metadata(FIXO)
     doc.save(caminho, garbage=3, deflate=True, no_new_id=True)
 
