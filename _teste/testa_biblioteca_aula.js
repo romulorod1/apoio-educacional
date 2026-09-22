@@ -252,6 +252,7 @@ async function anexarEm(pag, aulaId, itens, paginas, extra) {
     d.aulas.push(aula('aula-vazia', alunos[1].id, '13:00', []));
     d.aulas.push(aula('aula-teoria', alunos[1].id, '14:00', []));
     d.aulas.push(aula('aula-folha', alunos[1].id, '15:00', []));
+    d.aulas.push(aula('aula-banco', alunos[1].id, '17:00', []));
     // tema autoral que o pacote também tem (Teorema de Pitágoras)
     d.aulas.push(aula('aula-autoral', alunos[0].id, '16:00', [{ id: 'MAT09-07', titulo: 'Teorema de Pitágoras', lingua: 'pt' }]));
     await Store.salvar(d);
@@ -270,6 +271,9 @@ async function anexarEm(pag, aulaId, itens, paginas, extra) {
   const zip = path.join(TMP, 'nono.zip');
   Sintetico.gerar(zip, { compor: true });
   conf('importou o pacote sintético', /^Biblioteca importada\./.test(await importar(pag, zip)), true);
+  const zipBanco = path.join(TMP, 'banco.zip');
+  Sintetico.gerarBanco(zipBanco);
+  conf('importou o pacote sintético do Banco', /^Biblioteca importada\./.test(await importar(pag, zipBanco)), true);
 
   // ================================================================
   secao('1a. Com pacote: o botão Material só onde a biblioteca tem o assunto, ou há material autoral');
@@ -443,8 +447,16 @@ async function anexarEm(pag, aulaId, itens, paginas, extra) {
   secao('10. Material de dois módulos: dois assuntos, na ordem do material');
   const aviso10 = await anexarEm(pag, 'aula-vazia', [SP + 1], [TEO_PIT]);
   conf('a teoria vem primeiro no material, e o assunto também', await titulosDe(pag, 'aula-vazia'), 'Teorema de Pitágoras | ' + EQ);
-  conf('o aviso diz os dois', aviso10.indexOf('Assuntos registrados: Teorema de Pitágoras e ' + EQ + '.') >= 0, true);
+  conf('o aviso diz quantos (os nomes estão na aula)', aviso10.indexOf('. 2 assuntos registrados na aula. A seleção foi desmarcada.') >= 0, true);
   if (SALVAR) await pag.screenshot({ path: path.join(SALVAR, 'aula_5_aviso_dois_assuntos.png') });
+
+  // ================================================================
+  secao('10b. Exercício do Banco: o nome da fonte não vira assunto');
+  const usoAntesBanco = (await lerUso(pag)).length;
+  const aviso10b = await anexarEm(pag, 'aula-banco', [SP + 1, 'banco:2020:n2:4'], []);
+  conf('só o módulo do Portal vira assunto', await titulosDe(pag, 'aula-banco'), EQ);
+  conf('o aviso fala de um assunto', aviso10b.indexOf('Assunto registrado: ' + EQ + '.') >= 0, true);
+  conf('o exercício do Banco conta como usado, como sempre', (await lerUso(pag)).length - usoAntesBanco, 2);
 
   // ================================================================
   secao('11. Só páginas de teoria: um assunto, nenhum uso');

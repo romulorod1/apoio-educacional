@@ -11986,7 +11986,9 @@
   }
 
   /* Os módulos do material, na ordem em que aparecem nele: primeiro os das
-   * páginas de teoria, depois os dos exercícios. */
+   * páginas de teoria, depois os dos exercícios. O módulo do Banco não entra:
+   * "Banco de Questões 2018" é o nome da fonte, não um tema, e iria para o
+   * fechamento da família (decisão da orquestradora, 22/09). */
   function modulosDoMaterial(paginas, itens) {
     var saida = [], vistos = {};
     function guarda(serie, m) {
@@ -11996,7 +11998,7 @@
       saida.push({ titulo: m.titulo, modulo: chave });
     }
     paginas.forEach(function (p) { guarda(p.aula.serie, p.aula.modulo); });
-    itens.forEach(function (it) { guarda(it.serie, it.modulo); });
+    itens.forEach(function (it) { if (!eDoBanco(it)) guarda(it.serie, it.modulo); });
     return saida;
   }
 
@@ -12026,11 +12028,12 @@
     return novos.map(function (t) { return t.titulo; });
   }
 
+  /* Com dois ou mais, só a conta: os títulos do pacote têm vírgula e "e", e a
+   * lista deles não se lê nos segundos do aviso. Os nomes estão na aula. */
   function textoDosAssuntos(titulos) {
     if (!titulos.length) return '';
-    var junto = titulos.length === 1 ? titulos[0]
-      : titulos.slice(0, -1).join(', ') + ' e ' + titulos[titulos.length - 1];
-    return (titulos.length === 1 ? ' Assunto registrado: ' : ' Assuntos registrados: ') + junto + '.';
+    if (titulos.length === 1) return ' Assunto registrado: ' + titulos[0] + '.';
+    return ' ' + titulos.length + ' assuntos registrados na aula.';
   }
 
   /* A lista, riscável: cada enunciado entra como imagem na folha da aula, com
