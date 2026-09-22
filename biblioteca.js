@@ -81,7 +81,7 @@
 
   /* Abre o zip, confere tudo e devolve o pacote pronto para gravar:
    *   { manifest, itens, teoria, busca, apelidos,
-   *     assets: [{ caminho, tipo, bytes }], bytesTotais }
+   *     assets: [{ caminho, tipo, blob }], bytesTotais }
    * Recusa com Error.recusa = true e a mensagem para a tela. */
   function abrirPacote(conteudo, aoProgredir) {
     if (!Zip.suportado()) return Promise.reject(Recusa(SEM_NAVEGADOR));
@@ -89,7 +89,7 @@
     try { zip = Zip.ler(conteudo); }
     catch (e) { return Promise.reject(Recusa(e.message)); }
 
-    var porNome = {};
+    var porNome = Object.create(null);
     zip.entradas.forEach(function (en) { porNome[en.nome] = en; });
 
     // 1. o manifest
@@ -131,9 +131,11 @@
         if (!porNome[n]) throw Recusa('O pacote está incompleto: falta ' + n + '.');
       });
 
-      // Extrai e confere o hash, um arquivo por vez (não segura dois inflados
-      // de uma vez além do que já foi aceito).
-      var extraidos = {};
+      /* Extrai e confere o hash, um arquivo por vez. A imagem vira Blob logo
+       * depois do hash e os bytes inflados são soltos: com milhares de SVG, o
+       * pacote não fica duas vezes na memória do tablet. */
+      var extraidos = Object.create(null);
+      var imagens = [];
       var bytesTotais = 0;
       var i = 0;
       function proximo() {
@@ -145,8 +147,14 @@
         return Zip.extrair(zip, porNome[nome]).then(function (bytes) {
           return sha256(bytes).then(function (h) {
             if (h !== m[1]) throw Recusa('O arquivo ' + nome + ' do pacote não confere com o manifest.');
-            extraidos[nome] = bytes;
             bytesTotais += bytes.length;
+            if (/^assets\//.test(nome)) {
+              var tipo = tipoDoAsset(nome) || 'application/octet-stream';
+              imagens.push({ caminho: nome, tipo: tipo, blob: new Blob([bytes], { type: tipo }) });
+              extraidos[nome] = true;
+            } else {
+              extraidos[nome] = bytes;
+            }
             if (aoProgredir) aoProgredir(i, nomesZip.length);
             return proximo();
           });
@@ -171,12 +179,14 @@
         // 3. todo asset citado existe no zip, e é imagem que o app sabe mostrar
         var citados = assetsCitados(itens, teoria);
         citados.forEach(function (c) {
+          if (!caminhoValido(c.caminho) || c.caminho.indexOf('assets/') !== 0) {
+            throw Recusa('O pacote cita uma imagem fora da pasta assets: ' + c.caminho + '.');
+          }
           if (!extraidos[c.caminho]) throw Recusa('O pacote está incompleto: ' + c.de + ' cita ' + c.caminho + ', que não está no zip.');
           if (!tipoDoAsset(c.caminho)) throw Recusa('O pacote cita um arquivo que não é imagem: ' + c.caminho + '.');
         });
 
-        var assets = Object.keys(extraidos).filter(function (n) { return /^assets\//.test(n); }).sort()
-          .map(function (n) { return { caminho: n, tipo: tipoDoAsset(n) || 'application/octet-stream', bytes: extraidos[n] }; });
+        var assets = imagens.sort(function (a, b) { return a.caminho < b.caminho ? -1 : 1; });
 
         return {
           manifest: manifest, itens: itens, teoria: teoria, busca: busca, apelidos: apelidos,
@@ -203,6 +213,7 @@
 
   function mb(bytes) {
     var v = bytes / (1024 * 1024);
+    if (v > 0 && v < 0.1) return 'menos de 0,1 MB';
     return (v < 10 ? Math.round(v * 10) / 10 : Math.round(v)).toString().replace('.', ',') + ' MB';
   }
 
@@ -210,13 +221,18 @@
   function resumo(manifest, bytesTotais) {
     var c = manifest.contagens || {};
     var fonte = (manifest.fonte && manifest.fonte.nome) || '';
-    var series = (manifest.series || []).map(nomeDaSerie).join(', ');
+    /* O Banco não tem série escolar: o nível vem com as séries a que ele
+     * equivale (contrato, seção 8b). */
+    var equiv = manifest.series_equivalentes || {};
+    var series = (manifest.series || []).map(function (s) {
+      return nomeDaSerie(s) + (equiv[s] && equiv[s].length ? ' (' + equiv[s].map(nomeDaSerie).join(', ') + ')' : '');
+    }).join(', ');
     var linhas = [];
     linhas.push((NOME_MATERIA[manifest.materia] || manifest.materia || '') +
       (series ? ', ' + series : '') + (fonte ? ', ' + fonte : ''));
     var partes = [];
     if (c.modulos != null) partes.push(c.modulos + (c.modulos === 1 ? ' módulo' : ' módulos'));
-    if (c.aulas_teoria != null) partes.push(c.aulas_teoria + (c.aulas_teoria === 1 ? ' aula de teoria' : ' aulas de teoria') +
+    if (c.aulas_teoria) partes.push(c.aulas_teoria + (c.aulas_teoria === 1 ? ' aula de teoria' : ' aulas de teoria') +
       (c.paginas_teoria != null ? ' (' + c.paginas_teoria + ' páginas)' : ''));
     if (c.itens != null) partes.push(c.itens + (c.itens === 1 ? ' exercício' : ' exercícios') +
       (c.itens_com_solucao != null ? ', ' + c.itens_com_solucao + ' com solução' : ''));

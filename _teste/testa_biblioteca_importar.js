@@ -152,6 +152,34 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
   conf('e o aplicativo mostra a aluna', naTela, true);
 
   // ================================================================
+  secao('1b. Outra janela na versão antiga segura o banco: aviso, e depois abre');
+  {
+    const ctx = await pag.browser().createBrowserContext();
+    const velhaJanela = await ctx.newPage();
+    await velhaJanela.goto(amb.ORIGEM + '/vazio.html', { waitUntil: 'load' });
+    // a janela antiga abre o banco na versão 1 e NÃO larga (o código 1.19.1 não tem onversionchange)
+    await velhaJanela.evaluate(() => new Promise(r => {
+      const q = indexedDB.open('apoio-educacional', 1);
+      q.onupgradeneeded = () => { q.result.createObjectStore('dados'); };
+      q.onsuccess = () => { window.__con = q.result; r(); };
+    }));
+    const nova = await ctx.newPage();
+    nova.on('dialog', async d => { try { await d.accept(); } catch (e) { /* ok */ } });
+    await nova.goto(amb.ORIGEM + '/index.html', { waitUntil: 'domcontentloaded' });
+    const aviso = await esperar('aviso de banco bloqueado', () => nova.evaluate(() => {
+      const f = document.querySelector('#aviso-banco-bloqueado');
+      return f ? f.textContent : null;
+    }), v => !!v, 15000);
+    conf('a janela nova avisa que outra janela antiga está aberta', aviso.valor,
+      'O aplicativo está aberto em outra janela com a versão anterior. Feche as outras janelas do aplicativo; esta abre sozinha em seguida. Nada foi perdido.');
+    await velhaJanela.evaluate(() => window.__con.close());
+    const abriu = await esperar('o aplicativo abre depois que a antiga larga o banco', () => nova.evaluate(() =>
+      !!document.querySelector('#abas .aba') && document.querySelector('#versao-app').textContent.length > 1), v => v === true, 20000);
+    conf('e o aplicativo abre sozinho quando a janela antiga fecha', abriu.ok, true);
+    await ctx.close();
+  }
+
+  // ================================================================
   secao('2. Ajustes: o cartão Biblioteca, vazio');
   await H.irParaAba(pag, 'ajustes');
   const cartao = await pag.evaluate(() => {
@@ -217,12 +245,14 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
 
   // ================================================================
   secao('7. Venenos: recusados, com mensagem na tela, e nada muda');
+  const GUIA = '\nO arquivo pode ter chegado incompleto. Baixe de novo do Drive e tente outra vez.';
   const esperado = {
-    'corrompido-deflate': 'O arquivo assets/9ano/equacoes-do-segundo-grau/soma-e-produto/ex-02.svg do pacote está corrompido.',
-    'corrompido-stored': 'O arquivo assets/9ano/equacoes-do-segundo-grau/soma-e-produto-das-raizes/teo-p02.svg do pacote está corrompido.',
-    'hash': 'O arquivo assets/9ano/equacoes-do-segundo-grau/soma-e-produto/ex-02.svg do pacote não confere com o manifest.',
+    'corrompido-deflate': 'O arquivo assets/9ano/equacoes-do-segundo-grau/soma-e-produto/ex-02.svg do pacote está corrompido.' + GUIA,
+    'corrompido-stored': 'O arquivo assets/9ano/equacoes-do-segundo-grau/soma-e-produto-das-raizes/teo-p02.svg do pacote está corrompido.' + GUIA,
+    'hash': 'O arquivo assets/9ano/equacoes-do-segundo-grau/soma-e-produto/ex-02.svg do pacote não confere com o manifest.' + GUIA,
     'sobrando': 'O pacote tem arquivo fora da lista do manifest: assets/9ano/intruso.svg.',
-    'faltando': 'O pacote está incompleto: falta assets/9ano/nao-existe/ex-01.svg.',
+    'faltando': 'O pacote está incompleto: falta assets/9ano/nao-existe/ex-01.svg.' + GUIA,
+    'asset-fora': 'O pacote cita uma imagem fora da pasta assets: figs/fora.svg.',
     'asset-citado': 'O pacote está incompleto: 9ano:equacoes-do-segundo-grau:equacao-do-2o-grau-resultados-basicos:ex:4 cita ' +
       'assets/9ano/equacoes-do-segundo-grau/equacao-do-2o-grau-resultados-basicos/ex-04-sumiu.svg, que não está no zip.',
     'esquema': 'Este pacote é de uma versão do aplicativo que ainda não chegou aqui (esquema 2). Atualize o aplicativo e tente de novo.'
@@ -248,6 +278,28 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
     const texto = await pag.evaluate(() => document.querySelector('#tela-ajustes').innerText.length);
     conf('e a tela de Ajustes continua inteira', texto > 500, true);
   }
+
+  // ================================================================
+  secao('7b. Pacote de outro nome com os mesmos exercícios: recusado');
+  msg = await importar(pag, zip('outro-nome', { pacote: 'matematica-outro-9ano' }), 'pacote com ids alheios');
+  conf('recusa por conteúdo que já veio de outro pacote', msg,
+    'O pacote não foi importado.\nEste pacote repete conteúdo que já veio de outro pacote (matematica-sintetico-9ano). Nada foi gravado.');
+  conf('e os exercícios continuam do pacote original', JSON.stringify(await lerPacote(pag)),
+    JSON.stringify([{ pacote: 'matematica-sintetico-9ano', versao: 2 }]));
+
+  // ================================================================
+  secao('7c. Sem espaço no tablet: recusado antes de gravar');
+  const apertada = await amb.pagina();
+  await apertada.evaluateOnNewDocument(() => {
+    navigator.storage.estimate = () => Promise.resolve({ quota: 50 * 1024 * 1024, usage: 50 * 1024 * 1024 - 1000 });
+  });
+  await H.abrirApp(apertada, amb.ORIGEM);
+  await H.irParaAba(apertada, 'ajustes');
+  msg = await importar(apertada, zip('apertado', { versao: 8 }), 'importação sem espaço');
+  conf('mensagem de falta de espaço, com os MB', /^O pacote não foi importado\.\nO tablet não tem espaço para este pacote: ele precisa de .* MB e há menos de 0,1 MB livres\. Nada foi gravado\.$/.test(msg), true);
+  console.log('   tela: ' + JSON.stringify(msg));
+  conf('e nada foi gravado', JSON.stringify(await lerPacote(apertada)), JSON.stringify([{ pacote: 'matematica-sintetico-9ano', versao: 2 }]));
+  await apertada.close();
 
   // ================================================================
   secao('8. Navegador sem DecompressionStream');

@@ -85,12 +85,20 @@
     return new Promise(function (resolve, reject) {
       var req = indexedDB.open(NOME_BANCO, VERSAO_BANCO);
       req.onupgradeneeded = function (e) { criarDepositos(e.target.result); };
+      /* Outra janela do aplicativo, ainda na versão antiga, segura o banco na
+       * versão 1: a subida espera ela fechar. Sem aviso, a tela ficaria em
+       * branco sem motivo aparente; quem mostra o aviso é o app.js. */
+      req.onblocked = function () { if (typeof root.aoBancoBloqueado === 'function') root.aoBancoBloqueado(); };
       req.onsuccess = function () {
-        bancoAberto = req.result;
+        var conexao = req.result;
+        bancoAberto = conexao;
         /* Uma aba com a versão nova do aplicativo pede para subir o banco:
          * esta conexão sai do caminho em vez de travar a outra. */
-        bancoAberto.onversionchange = function () { bancoAberto.close(); bancoAberto = null; };
-        resolve(bancoAberto);
+        conexao.onversionchange = function () {
+          conexao.close();
+          if (bancoAberto === conexao) bancoAberto = null;
+        };
+        resolve(conexao);
       };
       req.onerror = function () { reject(req.error); };
     });
@@ -206,7 +214,7 @@
     var assets = aberto.assets.map(function (a) {
       return {
         chave: chave + ':' + a.caminho, pacote: chave, versao: versao, caminho: a.caminho,
-        blob: new Blob([a.bytes], { type: a.tipo })
+        blob: a.blob || new Blob([a.bytes], { type: a.tipo })
       };
     });
     var registro = {

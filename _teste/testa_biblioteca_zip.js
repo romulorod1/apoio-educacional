@@ -54,12 +54,11 @@ async function recusa(zip) {
   // byte a byte: um SVG deflate e uma página stored, comparados com a origem
   const umEx = aberto.assets.find(a => /soma-e-produto\/ex-02\.svg$/.test(a.caminho));
   const umaPag = aberto.assets.find(a => /teo-p02\.svg$/.test(a.caminho));
-  conf('SVG deflate sai byte a byte igual à origem',
-    Buffer.compare(Buffer.from(umEx.bytes), limpo.arquivos[umEx.caminho].dados), 0);
-  conf('página stored sai byte a byte igual à origem',
-    Buffer.compare(Buffer.from(umaPag.bytes), limpo.arquivos[umaPag.caminho].dados), 0);
-  conf('SVG deflate começa com <svg', Buffer.from(umEx.bytes).toString().slice(0, 4), '<svg');
-  conf('página stored começa com <svg', Buffer.from(umaPag.bytes).toString().slice(0, 4), '<svg');
+  const bEx = Buffer.from(await umEx.blob.arrayBuffer());
+  const bPag = Buffer.from(await umaPag.blob.arrayBuffer());
+  conf('SVG deflate sai byte a byte igual à origem', Buffer.compare(bEx, limpo.arquivos[umEx.caminho].dados), 0);
+  conf('página stored sai byte a byte igual à origem', Buffer.compare(bPag, limpo.arquivos[umaPag.caminho].dados), 0);
+  conf('a imagem sai como Blob com o tipo certo', umEx.blob.type + ' ' + (umEx.bytes === undefined), 'image/svg+xml true');
   conf('tipo do asset', umEx.tipo, 'image/svg+xml');
   conf('resumo: primeira linha', Biblioteca.resumo(aberto.manifest, aberto.bytesTotais)[0],
     'Matemática, 9º ano, Pacote sintético de teste');
@@ -102,7 +101,8 @@ async function recusa(zip) {
     'sobrando': /fora da lista do manifest: assets\/9ano\/intruso\.svg/,
     'faltando': /incompleto: falta assets\/9ano\/nao-existe/,
     'asset-citado': /cita .*-sumiu\.svg, que não está no zip/,
-    'esquema': /esquema 2/
+    'esquema': /esquema 2/,
+    'asset-fora': /imagem fora da pasta assets: figs\/fora\.svg/
   };
   for (const v of Sintetico.VENENOS) {
     const e = await recusa(Sintetico.gerar(null, { veneno: v }).zip);
@@ -119,7 +119,11 @@ async function recusa(zip) {
   conf('zip sem manifest: recusado', e && /falta o manifest\.json/.test(e.message), true);
   const cortado = limpo.zip.subarray(0, limpo.zip.length - 40);
   e = await recusa(cortado);
-  conf('zip cortado no fim: recusado', !!(e && e.recusa), true);
+  conf('zip cortado no fim: recusado como download incompleto', e && e.message,
+    'O pacote está incompleto. Baixe o arquivo de novo do Drive e tente outra vez.');
+  e = await recusa(Sintetico.montarZip([
+    { nome: 'manifest.json', dados: Buffer.from(JSON.stringify({ esquema: 1, pacote: 'x', versao: 1, arquivos: { constructor: 'sha256:' + '0'.repeat(64) } })), metodo: 8 }]));
+  conf('manifest listando "constructor" sem o arquivo: recusado como faltando', e && /falta constructor/.test(e.message), true);
 
   secao('navegador sem DecompressionStream');
   const guardado = global.DecompressionStream;

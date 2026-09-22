@@ -77,7 +77,13 @@
     for (var p = b.length - 22; p >= ate; p--) {
       if (v.getUint32(p, true) === SIG_FIM) { fim = p; break; }
     }
-    if (fim < 0) throw ErroZip('O arquivo escolhido não é um pacote (.zip).');
+    if (fim < 0) {
+      // Começa como zip e não tem o fim: o download parou no meio.
+      if (v.getUint32(0, true) === SIG_LOCAL) {
+        throw ErroZip('O pacote está incompleto. Baixe o arquivo de novo do Drive e tente outra vez.');
+      }
+      throw ErroZip('O arquivo escolhido não é um pacote (.zip).');
+    }
 
     var disco = v.getUint16(fim + 4, true);
     var discoDir = v.getUint16(fim + 6, true);
@@ -94,7 +100,7 @@
     if (inicioDir + tamDir > fim) throw ErroZip('O pacote está incompleto ou corrompido.');
 
     var entradas = [];
-    var vistos = {};
+    var vistos = Object.create(null);
     var q = inicioDir;
     for (var i = 0; i < total; i++) {
       if (q + 46 > fim || v.getUint32(q, true) !== SIG_CENTRAL) {

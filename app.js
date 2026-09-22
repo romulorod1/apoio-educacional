@@ -11,6 +11,21 @@
    * intactos: voltar para false devolve tudo como estava. */
   var ACERVO_EM_CONSTRUCAO = true;
 
+  /* A versão 1.20.0 sobe o banco do tablet para a versão 2 (store.js). Se
+   * outra janela do aplicativo, ainda na versão antiga, estiver aberta, a
+   * subida espera ela fechar, e sem este aviso a tela ficaria parada em
+   * branco. Os dados não correm risco: é só espera. */
+  self.aoBancoBloqueado = function () {
+    if (document.querySelector('#aviso-banco-bloqueado')) return;
+    var faixa = document.createElement('div');
+    faixa.id = 'aviso-banco-bloqueado';
+    faixa.className = 'faixa-aviso';
+    faixa.style.cssText = 'position:fixed;top:12px;left:12px;right:12px;z-index:999';
+    faixa.textContent = 'O aplicativo está aberto em outra janela com a versão anterior. ' +
+      'Feche as outras janelas do aplicativo; esta abre sozinha em seguida. Nada foi perdido.';
+    (document.body || document.documentElement).appendChild(faixa);
+  };
+
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
   var editorAtual = null;
@@ -11443,6 +11458,19 @@
       });
     }).then(function (a) {
       aberto = a;
+      return Promise.all([Store.itensDaBiblioteca(), Store.teoriaDaBiblioteca()]);
+    }).then(function (r) {
+      /* Um exercício é gravado pelo id do contrato. Se o mesmo id já veio de
+       * OUTRO pacote, gravar por cima trocaria o dono dele, e o registro de
+       * uso passaria a apontar para outro material. Recusa. */
+      var meus = {};
+      aberto.itens.forEach(function (it) { meus[it.id] = true; });
+      aberto.teoria.forEach(function (t) { meus[t.id] = true; });
+      var alheio = r[0].concat(r[1]).filter(function (x) { return meus[x.id] && x.pacote !== aberto.manifest.pacote; })[0];
+      if (alheio) {
+        throw new Error('Este pacote repete conteúdo que já veio de outro pacote (' + alheio.pacote +
+          '). Nada foi gravado.');
+      }
       return Store.listarPacotesBiblioteca();
     }).then(function (lista) {
       var atual = lista.filter(function (p) { return p.pacote === aberto.manifest.pacote; })[0];
@@ -11480,8 +11508,19 @@
             nova + '). Nada foi mudado.']);
         return;
       }
-      mostrarEstadoImportacao('faixa-aviso', ['O pacote não foi importado.',
-        (e && e.message) || 'Não foi possível ler o arquivo.']);
+      var linhas = ['O pacote não foi importado.'];
+      if (e && e.name === 'QuotaExceededError') {
+        linhas.push('O tablet ficou sem espaço no meio da gravação. Nada foi gravado.');
+      } else if (e && (e.name === 'NotReadableError' || e.name === 'NotFoundError')) {
+        linhas.push('Não consegui ler o arquivo. Se ele está no Drive, espere o download terminar e tente de novo.');
+      } else {
+        linhas.push((e && e.message) || 'Não foi possível ler o arquivo.');
+        // arquivo estragado no caminho: baixar de novo resolve
+        if (e && e.recusa && /corrompido|não confere|incompleto: falta/.test(e.message)) {
+          linhas.push('O arquivo pode ter chegado incompleto. Baixe de novo do Drive e tente outra vez.');
+        }
+      }
+      mostrarEstadoImportacao('faixa-aviso', linhas);
     }).then(function () {
       if (botao) botao.disabled = false;
     });

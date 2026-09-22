@@ -26,6 +26,7 @@
  *   faltando            o manifest lista um arquivo que o zip não tem
  *   asset-citado        o itens.json cita um asset que não existe
  *   esquema             manifest com esquema 2
+ *   asset-fora          um exercício cita uma imagem fora de assets/ (no zip e no manifest)
  */
 'use strict';
 const fs = require('fs');
@@ -233,6 +234,10 @@ function gerar(saida, opcoes) {
   const apelidos = { bhaskara: ['equação do segundo grau'], pitagoras: ['teorema de pitagoras'] };
 
   if (veneno === 'asset-citado') itens[3].assets.solucao = itens[3].assets.solucao.replace('-sol.svg', '-sumiu.svg');
+  if (veneno === 'asset-fora') {
+    arquivos['figs/fora.svg'] = { dados: Buffer.from(svgRecorte(100, 60, 1, '#000')), metodo: 8 };
+    itens[2].assets.enunciado = 'figs/fora.svg';
+  }
 
   arquivos['itens.json'] = { dados: json(itens), metodo: 8 };
   arquivos['teoria.json'] = { dados: json(teoria), metodo: 8 };
@@ -250,7 +255,7 @@ function gerar(saida, opcoes) {
 
   const manifest = {
     esquema: veneno === 'esquema' ? 2 : 1,
-    pacote: 'matematica-sintetico-9ano', versao,
+    pacote: opcoes.pacote || 'matematica-sintetico-9ano', versao,
     gerado_em: '2026-09-21T21:00:00-03:00',
     gerador: { nome: '_teste/_pacote_sintetico.js', commit: null },
     materia: 'matematica',
@@ -274,7 +279,7 @@ function gerar(saida, opcoes) {
   return { zip, manifest, itens, teoria, busca, apelidos, arquivos };
 }
 
-const VENENOS = ['corrompido-deflate', 'corrompido-stored', 'hash', 'sobrando', 'faltando', 'asset-citado', 'esquema'];
+const VENENOS = ['corrompido-deflate', 'corrompido-stored', 'hash', 'sobrando', 'faltando', 'asset-citado', 'esquema', 'asset-fora'];
 
 module.exports = { gerar, montarZip, crc32, VENENOS, MODULOS };
 
