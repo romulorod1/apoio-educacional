@@ -214,7 +214,8 @@ conf('pedaço 1 e pedaço 2 do exercício 1 em páginas diferentes', onde('Im1')
 const im1 = pa.paginas[onde('Im1')].imagens.find(i => i.nome === 'Im1');
 const im2 = pa.paginas[onde('Im2')].imagens.find(i => i.nome === 'Im2');
 conf('pedaços na escala 1 (sem redução)', im1.a.toFixed(0) + ',' + im2.a.toFixed(0), '420,380');
-conf('o pedaço 2 abre a página nova no topo', (im2.y + im2.a) > PDFGen.Y_TOPO - 10, true);
+conf('o pedaço 2 abre a página nova logo abaixo do aviso de continuação', (im2.y + im2.a) > PDFGen.Y_TOPO - 24, true);
+conf('a página nova diz "Exercício 1. (continuação)"', pa.paginas[onde('Im2')].textos.indexOf('Exercício 1. (continuação)') >= 0, true);
 conf('exercício 2 reduzido e listado (na lista)', JSON.stringify(alto.reduzidos), '{"lista":[2],"gabarito":[]}');
 const im3 = pa.paginas[onde('Im3')].imagens.find(i => i.nome === 'Im3');
 conf('exercício 2 inteiro dentro da área útil', im3.y >= PDFGen.Y_LIMITE - 0.01 && im3.y + im3.a <= PDFGen.Y_TOPO + 0.01, true);

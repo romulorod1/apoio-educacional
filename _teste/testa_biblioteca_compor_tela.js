@@ -93,8 +93,8 @@ async function marcar(pag, tipo, id) {
   if (!ok) throw Object.assign(new Error('não consegui marcar ' + id), { jaContado: false });
 }
 const contador = pag => pag.evaluate(() => {
-  const f = document.querySelector('#bib-carrinho');
-  return f && !f.hidden ? (document.querySelector('#bib-carrinho-contagem') || {}).textContent : '';
+  const c = document.querySelector('#bib-carrinho-contagem');
+  return c ? c.textContent : '';
 });
 
 // Um depósito inteiro, de dentro da página.
@@ -177,7 +177,11 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
   secao('1. Marcar 8 exercícios de duas listas e 3 páginas de teoria');
   await H.irParaAba(pag, 'biblioteca');
   await esperar('módulos', () => pag.evaluate(() => document.querySelectorAll('#bib-corpo .item-lista').length), v => v > 0, 10000);
-  conf('sem nada marcado, o contador não aparece', await contador(pag), '');
+  conf('sem nada marcado, a faixa diz que nada foi marcado (e já ocupa o lugar)', await pag.evaluate(() => {
+    const f = document.querySelector('#bib-carrinho'), v = document.querySelector('#bib-carrinho-vazio');
+    return !f.hidden && f.offsetHeight > 30 && !!v && /^Nada marcado ainda\./.test(v.textContent);
+  }), true);
+  const yGrade = () => pag.evaluate(() => { const g = document.querySelector('#bib-corpo'); return Math.round(g.getBoundingClientRect().top); });
   await tocarLinha(pag, 'Equações do Segundo Grau');
   await tocarLinha(pag, 'Soma e Produto');
   await esperar('lista Soma e Produto', () => pag.evaluate(() => document.querySelectorAll('#bib-corpo input[data-carrinho="itens"]').length), v => v === 8, 8000);
@@ -187,8 +191,10 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
     return Math.min(l.height, e.height, e.width);
   });
   conf('caixa e etiqueta com alvo de toque de 44 px', alvoToque >= 44, true);
+  const yAntes = await yGrade();
   for (const id of MARCADOS.slice(0, 4)) await marcar(pag, 'itens', id);
   conf('contador depois de 4', await contador(pag), 'Material desta aula: 4 exercícios, 0 páginas');
+  conf('a grade não pulou no primeiro toque (menos de 8 px)', Math.abs((await yGrade()) - yAntes) < 8, true);
   // o toque na caixa não abre a tela cheia
   conf('marcar não abriu a tela cheia', await pag.$eval('#modal-biblioteca', e => e.classList.contains('aberto')), false);
   await subirNaBiblioteca(pag);
@@ -212,6 +218,17 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
   conf('contador depois de ir e voltar', await contador(pag), 'Material desta aula: 8 exercícios, 3 páginas');
   const aindaMarcadas = await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo input[data-carrinho="paginas"]')).map(c => c.checked).join(','));
   conf('e as caixas da teoria continuam marcadas', aindaMarcadas, 'true,true,true,false,false');
+  // Desmarcar tudo com Desfazer
+  await pag.click('#bib-carrinho-limpar');
+  conf('Desmarcar tudo zera a faixa', await pag.evaluate(() => !!document.querySelector('#bib-carrinho-vazio')), true);
+  const desfez = await pag.evaluate(() => {
+    const b = Array.from(document.querySelectorAll('button')).find(x => x.textContent.trim() === 'Desfazer' && x.offsetParent);
+    if (!b) return false; b.click(); return true;
+  });
+  conf('o aviso oferece Desfazer', desfez, true);
+  await pausa(200);
+  conf('e o Desfazer devolve a seleção inteira', await contador(pag), 'Material desta aula: 8 exercícios, 3 páginas');
+  conf('com as caixas marcadas de novo', await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo input[data-carrinho="paginas"]')).map(c => c.checked).join(',')), 'true,true,true,false,false');
 
   // ================================================================
   secao('3. Etiqueta de dificuldade com um toque');
@@ -248,11 +265,13 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
   conf('subtítulo vazio quando as aulas são várias', padroes.sub, '');
   conf('caixas nos padrões do brief', padroes.caixas, 'teoria=true,lista=true,gabarito=true,espaco=false,origem=false');
   conf('"Gerar e anexar" espera a escolha da aula', padroes.anexar, true);
+  conf('e a dica diz por quê', await pag.evaluate(() => { const d = document.querySelector('#bib-gerar-dica'); return !!d && !d.hidden && d.offsetParent !== null; }), true);
   if (SALVAR) await pag.screenshot({ path: path.join(SALVAR, 'tela_3_gerar_material.png') });
   await pag.evaluate(() => {
     document.querySelector('#bib-gerar-subtitulo').value = 'Revisão de terça';
     document.querySelector('#bib-gerar-aulas [data-aula="nova"]').click();
   });
+  conf('escolhida a aula, a dica some', await pag.evaluate(() => document.querySelector('#bib-gerar-dica').hidden), true);
   await pag.click('#bib-gerar-anexar');
   await esperar('janela de aula nova', () => pag.evaluate(() => document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
   conf('a janela da aula avisa que o material vai junto', await pag.evaluate(() => !!document.querySelector('#aviso-folha-da-biblioteca')), true);

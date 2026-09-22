@@ -3972,7 +3972,7 @@
      * escala do item diminui. Nunca se corta recorte por altura fixa. */
     function recorte(parte, n, peca, extra, origem) {
       var rotuloNovo = (parte === 'lista' ? 'Exercício ' : '') + n + '.';
-      var cauda = extra + (origem ? 11 : 0) + 8;      // espaço para resposta, origem e folga
+      var cauda = extra + (origem ? 11 : 0) + 12;     // espaço para resposta, origem e folga
       var pedacos = peca.pedacos && peca.pedacos.length ? peca.pedacos
         : [{ img: peca.img, alturaPt: peca.alturaPt }];
       var k = Math.min(1, UTIL / peca.larguraPt);
@@ -4010,7 +4010,14 @@
         if (i > 0) {
           doc.y -= 6 * k;                            // a folga entre pedaços do gerador
           // a fronteira pode virar a página; o último pedaço leva a cauda junto
-          if (!inteiro) doc.garanteEspaco(altura + (ultimo ? cauda : 4));
+          /* a fronteira pode virar a página; o último pedaço leva a cauda junto.
+           * Na página nova, o pedaço abre com "4. (continuação)", para quem corrige
+           * saber de que exercício é aquele bloco. */
+          if (!inteiro && doc.garanteEspaco(altura + (ultimo ? cauda : 4) + 16)) {
+            doc.y -= 12;
+            doc.texto(rotuloNovo + ' (continuação)', MARG_E, doc.y, { tam: 9, bold: true, cor: COR.navy });
+            doc.y -= 4;
+          }
         }
         imagem(p.img, MARG_E, doc.y - altura, largura, altura);
         if (i === 0 && noLugar()) rotuloNoLugar(rotuloNovo, peca.rotulo, k, doc.y);
@@ -4018,7 +4025,7 @@
         anota(parte);
       });
       if (origem) linhaDeOrigem(origem);
-      doc.y -= extra + 8;
+      doc.y -= extra + 12;        // folga entre um recorte e o seguinte
     }
 
     doc.novaPagina();

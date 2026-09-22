@@ -11948,9 +11948,24 @@
    * ids: o item e a página vêm do bib na hora de gerar, e o que sumiu numa
    * reimportação cai fora sozinho. Mora na memória do aplicativo, então
    * atravessa a troca de aba; fechar o aplicativo começa de novo. */
-  var bibCarrinho = { itens: [], paginas: [] };
+  var bibCarrinho = lerCarrinhoGuardado();
   var bibEtiquetas = null;          // itemId -> 1, 2 ou 3, a etiqueta dela
-  var ESPACO_RESPOSTA = 60;         // pt depois de cada exercício, quando marcado
+  var ESPACO_RESPOSTA = 100;        // pt depois de cada exercício (uns 3,5 cm), quando marcado
+
+  /* A seleção fica guardada no próprio aparelho, para sobreviver ao Android
+   * fechar o aplicativo quando ela sai para a câmera ou para uma mensagem. É só
+   * conveniência: se o armazenamento falhar, começa vazia. */
+  var CHAVE_CARRINHO = 'apoio-educacional:bib-carrinho';
+  function lerCarrinhoGuardado() {
+    try {
+      var c = JSON.parse(localStorage.getItem(CHAVE_CARRINHO) || 'null');
+      if (c && Array.isArray(c.itens) && Array.isArray(c.paginas)) return { itens: c.itens, paginas: c.paginas };
+    } catch (e) { /* sem armazenamento: começa vazio */ }
+    return { itens: [], paginas: [] };
+  }
+  function guardarCarrinho() {
+    try { localStorage.setItem(CHAVE_CARRINHO, JSON.stringify(bibCarrinho)); } catch (e) { /* segue na memória */ }
+  }
 
   function paginaDeTeoriaPorId(id) {
     var aulaId = id.replace(/:p\d+$/, '');
@@ -11973,6 +11988,7 @@
     var i = lista.indexOf(id);
     if (marcado && i < 0) lista.push(id);
     if (!marcado && i >= 0) lista.splice(i, 1);
+    guardarCarrinho();
     desenharCarrinho();
   }
 
@@ -11982,16 +11998,35 @@
     limparCarrinhoOrfao();
     var n = bibCarrinho.itens.length, m = bibCarrinho.paginas.length;
     faixa.innerHTML = '';
-    faixa.hidden = !(n || m);
-    if (!(n || m)) return;
+    /* A faixa ocupa o lugar desde o começo, vazia ou não: se ela aparecesse só
+     * no primeiro toque, a grade pularia para baixo e o toque seguinte cairia
+     * no cartão errado. */
+    faixa.hidden = false;
+    faixa.classList.toggle('vazia', !(n || m));
+    if (!(n || m)) {
+      faixa.appendChild(el('span', { class: 'bib-carrinho-texto', id: 'bib-carrinho-vazio',
+        texto: 'Nada marcado ainda. Marque "No material" nos exercícios e nas páginas que vão para a folha.' }));
+      return;
+    }
     faixa.appendChild(el('span', { class: 'bib-carrinho-texto', id: 'bib-carrinho-contagem',
       texto: 'Material desta aula: ' + plural(n, 'exercício', 'exercícios') + ', ' + plural(m, 'página', 'páginas') }));
     faixa.appendChild(el('span', { class: 'cresce' }));
-    faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-carrinho-limpar', texto: 'Limpar',
+    faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-carrinho-limpar', texto: 'Desmarcar tudo',
       aoClick: function () {
+        var antes = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
+        function marcarNaTela() {
+          $$('#bib-corpo input[data-carrinho]').forEach(function (c) { c.checked = noCarrinho(c.dataset.carrinho, c.dataset.id); });
+        }
         bibCarrinho = { itens: [], paginas: [] };
+        guardarCarrinho();
         desenharCarrinho();
-        $$('#bib-corpo input[data-carrinho]').forEach(function (c) { c.checked = false; });
+        marcarNaTela();
+        avisar('Seleção desmarcada.', 'Desfazer', function () {
+          bibCarrinho = antes;
+          guardarCarrinho();
+          desenharCarrinho();
+          marcarNaTela();
+        });
       } }));
     faixa.appendChild(el('button', { type: 'button', class: 'btn principal pequeno', id: 'bib-carrinho-gerar',
       texto: 'Gerar material', aoClick: abrirGerarMaterial }));
@@ -12018,7 +12053,7 @@
     var caixa = el('div', { class: 'bib-etiqueta', role: 'group', 'aria-label': 'Minha etiqueta de dificuldade' });
     function desenha() {
       caixa.innerHTML = '';
-      caixa.appendChild(el('span', { class: 'bib-etiqueta-rotulo', texto: 'Sua avaliação:' }));
+      caixa.appendChild(el('span', { class: 'bib-etiqueta-rotulo', texto: 'Para mim:' }));
       [1, 2, 3].forEach(function (d) {
         var ativa = bibEtiquetas && bibEtiquetas[it.id] === d;
         caixa.appendChild(el('button', {
@@ -12087,6 +12122,7 @@
   }
 
   var gerandoMaterial = false;
+  function abrirModalGerar() { /* guarda o atualizar() da janela aberta */ }
 
   function abrirGerarMaterial() {
     if (!bib) return;
@@ -12155,13 +12191,17 @@
       var b = linhaBib(aluno.nome, Core.ddmmaaaa(a.data) + (a.hora ? ', ' + a.hora : ''), function () { marcarAula(b, a.id, false); });
       b.setAttribute('data-aula', a.id);
       b.setAttribute('aria-pressed', 'false');
+      semSeta(b);
       return b;
     }
+    // a linha só escolhe, não navega: a seta de "entrar" confundiria
+    function semSeta(b) { var seta = b.querySelector('.bib-seta'); if (seta) seta.remove(); }
     listaAulas.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Aulas de hoje' }));
     if (aulas.hoje.length) aulas.hoje.forEach(function (a) { listaAulas.appendChild(linhaAula(a)); });
     else listaAulas.appendChild(el('p', { class: 'ajuda', texto: 'Nenhuma aula marcada para hoje.' }));
     var nova = linhaBib('Nova aula hoje', 'Marca a aula e anexa o material nela', function () { marcarAula(nova, null, true); });
     nova.setAttribute('data-aula', 'nova');
+    semSeta(nova);
     listaAulas.appendChild(nova);
     if (aulas.perto.length) {
       listaAulas.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Outras aulas perto de hoje' }));
@@ -12170,9 +12210,13 @@
     corpo.appendChild(el('div', { class: 'campo' }, [el('span', { class: 'bib-gerar-rotulo', texto: 'Anexar em qual aula' }), listaAulas]));
 
     var botaoGerar = el('button', { type: 'button', class: 'btn principal', id: 'bib-gerar-anexar', texto: 'Gerar e anexar' });
+    var dica = el('p', { class: 'ajuda bib-gerar-dica', id: 'bib-gerar-dica', texto: 'Escolha a aula acima para anexar o material.' });
     var botaoBaixar = el('button', { type: 'button', class: 'btn', id: 'bib-gerar-baixar', texto: 'Só gerar o arquivo' });
     function atualizarRodape() {
+      if (gerandoMaterial) return;
       botaoGerar.disabled = !(escolha.aulaId || escolha.nova);
+      botaoGerar.textContent = 'Gerar e anexar';
+      dica.hidden = !botaoGerar.disabled;
       caixas.folha.disabled = !itens.length || !caixas.lista.checked || !(escolha.aulaId || escolha.nova);
       if (caixas.folha.disabled) caixas.folha.checked = false;
       caixas.folha.parentNode.classList.toggle('desligada', caixas.folha.disabled);
@@ -12209,12 +12253,21 @@
       var op = opcoesDaTela();
       if (!op.teoria && !op.lista && !op.gabarito) { avisar('Marque ao menos Teoria, Lista ou Gabarito.'); return; }
       op.folha = false;
+      // sem anexar, mas com o aluno e a data da aula escolhida no cabeçalho, se houver
+      op.cabecalhoDaAula = escolha.aulaId;
       gerarEAnexar(null, itens, paginas, op);
     });
     rodape.appendChild(el('button', { type: 'button', class: 'btn', 'data-fechar': '', texto: 'Cancelar',
       aoClick: function () { fecharModal('modal-bib-gerar'); } }));
     rodape.appendChild(botaoBaixar);
     rodape.appendChild(botaoGerar);
+    corpo.appendChild(dica);
+    abrirModalGerar.atualizar = atualizarRodape;
+    // uma aula só hoje: já vem escolhida
+    if (aulas.hoje.length === 1) {
+      var unica = listaAulas.querySelector('[data-aula="' + aulas.hoje[0].id + '"]');
+      if (unica) marcarAula(unica, aulas.hoje[0].id, false);
+    }
     atualizarRodape();
     abrirModal('modal-bib-gerar');
   }
@@ -12264,16 +12317,30 @@
     return Promise.all(ts).then(function () { return saida; });
   }
 
+  /* O erro de um recorte que não abriu diz qual exercício, na numeração da
+   * folha e na da fonte, para ela saber qual desmarcar. */
+  function comNomeDoExercicio(promessa, it, n) {
+    return promessa.catch(function (e) {
+      var err = new Error(e && e.message);
+      err.exercicio = 'O exercício ' + n + ' (' + it.modulo.titulo + ', ' +
+        (eDoBanco(it) ? 'problema ' : 'exercício ') + it.numero + ')';
+      throw err;
+    });
+  }
+
   function gerarEAnexar(aulaId, itens, paginas, op) {
     if (gerandoMaterial) { avisar('Ainda estou montando o material anterior. Espere um instante.'); return Promise.resolve(); }
     gerandoMaterial = true;
     var aula = aulaId ? db.aulas.filter(function (a) { return a.id === aulaId; })[0] : null;
-    var aluno = aula ? alunoPorId(aula.alunoId) : null;
+    var daCabeca = aula || (op.cabecalhoDaAula ? db.aulas.filter(function (a) { return a.id === op.cabecalhoDaAula; })[0] : null);
+    var aluno = daCabeca ? alunoPorId(daCabeca.alunoId) : null;
+    $$('#rodape-modal-bib-gerar button').forEach(function (b) { b.disabled = true; });
     var botao = $('#bib-gerar-anexar');
-    if (botao) { botao.disabled = true; botao.textContent = 'Montando...'; }
+    if (botao) botao.textContent = 'Montando...';
+    avisar('Montando o material. Isso leva alguns segundos.');
     var usaItens = (op.lista || op.gabarito) ? itens : [];
     var pecas, teoria, anexado = false, id = null, saida = null;
-    return emFila(usaItens, function (it) { return pecasDoItem(it, op.gabarito); }).then(function (r) {
+    return emFila(usaItens, function (it, i) { return comNomeDoExercicio(pecasDoItem(it, op.gabarito), it, i + 1); }).then(function (r) {
       pecas = r;
       return emFila(op.teoria ? paginas : [], function (p) {
         return blobDoAsset(p.aula.pacote, p.pagina.asset).then(function (b) { return Biblioteca.rasterizarPagina(b, p.pagina.medidas); });
@@ -12282,7 +12349,7 @@
       teoria = r;
       saida = PDFGen.gerarMaterialBiblioteca({
         titulo: op.titulo, subtitulo: op.subtitulo, aluno: aluno ? aluno.nome : '',
-        data: aula ? Core.ddmmaaaa(aula.data) : Core.ddmmaaaa(Core.hojeIso()),
+        data: daCabeca ? Core.ddmmaaaa(daCabeca.data) : Core.ddmmaaaa(Core.hojeIso()),
         incluirTeoria: op.teoria, incluirLista: op.lista, incluirGabarito: op.gabarito, gabaritoSeparado: true,
         espacoParaResposta: op.espaco ? ESPACO_RESPOSTA : 0, mostrarOrigem: op.origem,
         teoria: teoria, itens: pecas
@@ -12336,16 +12403,18 @@
       });
     }).catch(function (e) {
       if (e && e.desfeita) return;
-      var motivo = e && e.message ? e.message : 'erro desconhecido';
+      if (window.console) console.warn('biblioteca, gerar material:', e);
       /* Depois do anexo gravado, o erro não é "nada foi anexado": tentar de novo
-       * duplicaria o arquivo na aula. */
-      if (anexado) avisar('O material foi anexado na aula, mas a etapa seguinte falhou (' + motivo +
-        '). Não precisa gerar de novo: o PDF está na aula.');
-      else avisar('Não consegui montar o material: ' + motivo + '. Nada foi anexado; tente de novo.');
+       * duplicaria o arquivo na aula. Antes dele, a mensagem diz o que fazer, e
+       * o detalhe técnico fica só no console. */
+      if (anexado) avisar('O material foi anexado na aula, mas a lista não abriu como folha. ' +
+        'O PDF está na aula; não precisa gerar de novo.');
+      else if (e && e.exercicio) avisar(e.exercicio + ' não abriu. Desmarque-o e gere de novo. Nada foi anexado.');
+      else avisar('Não consegui montar o material. Nada foi anexado; tente de novo daqui a pouco.');
     }).then(function () {
       gerandoMaterial = false;
-      var b = $('#bib-gerar-anexar');
-      if (b) { b.disabled = false; b.textContent = 'Gerar e anexar'; }
+      $$('#rodape-modal-bib-gerar button').forEach(function (b) { b.disabled = false; });
+      if (abrirModalGerar.atualizar) abrirModalGerar.atualizar();
     });
   }
 
