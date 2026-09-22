@@ -105,6 +105,10 @@ def fazer(pasta, nome='banco-de-questoes-2099.pdf'):
     f.cab(200, '3 Caixas e mentiras', 3)
     f.texto(230, ['a) Basta abrir uma caixa da ponta: se o diamante estivesse no meio,',
                   'duas mensagens seriam verdadeiras.', 'b) A mesma conta vale para 101.'])
+    # o livro fecha com o indice remissivo (2018 a 2020): nao e da ultima solucao
+    f = Folha(doc, 6)
+    f.secao(120, 'ÍNDICE REMISSIVO')
+    f.texto(200, ['Caixas e mentiras, 3', 'Cachorro e o gato, 1', 'Quadrados perfeitos, 2'])
     doc.set_metadata(FIXO)
     caminho = os.path.join(pasta, nome)
     doc.save(caminho, garbage=3, deflate=True, no_new_id=True)

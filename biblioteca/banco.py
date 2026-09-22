@@ -58,6 +58,9 @@ JUNTA_CABECALHO = True
 SEGUNDA_E_SOLUCAO = True
 
 
+FIM_REMISSIVO = True  # indice remissivo e errata fecham o conteudo (marcos); False so no veneno
+
+
 def pe_util(pg):
     """Fim util da pagina: 3 pt acima da linha "www.obmep.org.br" do rodape.
 
@@ -160,7 +163,10 @@ def marcos(doc):
                     out.append((i, corte, 'secao', {'tipo': 'sol' if m.group(1) else 'enun', 'nivel': int(m.group(2))}))
                     k += 1
                     continue
-                if n.startswith('INDICE DE PROBLEMAS'):
+                # fim do conteudo: o indice de problemas (2016 e 2017) ou o indice
+                # remissivo e a errata (2018 a 2020), sem o que a ultima solucao do
+                # nivel 3 ia ate o fim do livro
+                if n.startswith('INDICE DE PROBLEMAS') or (FIM_REMISSIVO and (n.startswith('INDICE REMISSIVO') or n == 'ERRATA')):
                     out.append((i, corte, 'fim', {}))
                     k += 1
                     continue

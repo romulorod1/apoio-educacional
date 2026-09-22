@@ -230,6 +230,38 @@ def trava_tinta(p):
     return erros[:10]
 
 
+def trava_fim_do_livro(p):
+    """Nenhum pedaco passa do fim do conteudo do livro.
+
+    Le a pagina, e nao o detector: o fim e o primeiro titulo de 15 pt ou mais
+    que comeca por "INDICE" ou e "ERRATA" (indice de problemas em 2016 e 2017,
+    indice remissivo e errata de 2018 a 2020). Nenhum pedaco fica numa pagina
+    depois dele, nem abaixo dele na mesma pagina.
+    """
+    erros = []
+    for a in p.relatorio['anos']:
+        doc = p.doc('PDF/matematica/' + a['arquivo'])
+        fim = None
+        for pno in range(doc.page_count):
+            for tam, cs, bruto in _linhas_banco(doc, pno)[0]:
+                n = banco.norm(portal.recompor(bruto).strip())
+                if tam >= banco.CORPO_SECAO and (n.startswith('INDICE') or n == 'ERRATA') and cs[0][3] > banco.TOPO_UTIL:
+                    fim = (pno + 1, min(c[4][1] for c in cs))
+                    break
+            if fim:
+                break
+        if not fim:
+            continue
+        for it in p.itens:
+            if it['modulo']['slug'] != 'banco-%d' % a['ano']:
+                continue
+            for t in ('enunciado', 'solucao'):
+                for pz in pg.pedacos(it, t):
+                    if pz['pagina'] > fim[0] or (pz['pagina'] == fim[0] and pz['bbox'][3] > fim[1]):
+                        erros.append('%s %s: pedaco na p%d passa do fim do conteudo (p%d)' % (it['id'], t, pz['pagina'], fim[0]))
+    return erros
+
+
 def _linhas_banco(doc, pno):
     """Linhas de texto de corpo normal da pagina (uma coluna), com o corpo e o teste de tinta."""
     import numpy as np
@@ -289,6 +321,7 @@ def travas(p, placar, zip_caminho=None, esperado=None, amostra=False):
     placar.conferir('banco: PyMuPDF no manifest', pg.trava_gerador_no_manifest(p))
     placar.conferir('banco: curadoria aplicada', pg.trava_curadoria(p))
     placar.conferir('banco: todo caractere com o seu glifo', pg.trava_glifos(p))
+    placar.conferir('banco: nada depois do fim do conteudo', trava_fim_do_livro(p))
 
 
 def venenos(p, temp, placar, cur):
@@ -302,6 +335,15 @@ def venenos(p, temp, placar, cur):
             setattr(banco, attr, antes)
         placar.conferir(nome, trava_tudo_no_pacote(PacoteBanco(os.path.join(temp, 'v_' + attr.lower()), p.pdfs)),
                         True, 'entraram')
+    # sem o indice remissivo como fim, a ultima solucao vai ate o fim do livro
+    antes = banco.FIM_REMISSIVO
+    banco.FIM_REMISSIVO = False
+    try:
+        gerar_amostra(p.pdfs, os.path.join(temp, 'v_remissivo'), cur)
+    finally:
+        banco.FIM_REMISSIVO = antes
+    placar.conferir('ultima solucao com o indice remissivo', trava_fim_do_livro(PacoteBanco(os.path.join(temp, 'v_remissivo'), p.pdfs)),
+                    True, 'passa do fim do conteudo')
     # a fronteira no topo do texto, e nao da caixa do numero: sobra uma lasca
     antes = banco.ACIMA_DO_CAB
     banco.ACIMA_DO_CAB = 0.0
