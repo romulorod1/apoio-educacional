@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.24.1';
+  var VERSAO = '1.24.2';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -11127,12 +11127,12 @@
   }
 
   /* A dificuldade que vem no pacote diz de onde veio: "estimada" pela posição
-   * do exercício na lista (proxy) ou "curada" por quem revisou. Fica sem cor,
+   * do exercício na lista (proxy) ou "revisada" pela curadoria. Fica sem cor,
    * porque a única dificuldade colorida do cartão é a dela, no "Para mim". */
   function rotuloDificuldade(it) {
     var nome = NOME_DIFICULDADE[it.dificuldade];
     if (!nome) return null;
-    return (it.dificuldade_origem === 'curadoria' ? 'curada: ' : 'estimada: ') + nome.toLowerCase();
+    return (it.dificuldade_origem === 'curadoria' ? 'revisada: ' : 'estimada: ') + nome.toLowerCase();
   }
 
   /* A que vale para o filtro: a dela, quando ela deu uma; senão, a do pacote. */
@@ -11173,7 +11173,7 @@
   var bibFiltroDif = null;         // null = todas; 1, 2 ou 3
 
   /* Fácil, Médio, Difícil: vale a etiqueta dela quando existe, e a do pacote
-   * (estimada ou curada) quando não. Exercício sem dificuldade nenhuma só
+   * (estimada ou revisada) quando não. Exercício sem dificuldade nenhuma só
    * aparece em "Todas". O filtro fica ligado de uma lista para a outra. */
   function barraFiltroDeDificuldade(grade, lista, banco) {
     var chips = el('div', { class: 'chips-filtro', role: 'group', 'aria-label': 'Dificuldade', id: 'bib-filtro-dif' });
