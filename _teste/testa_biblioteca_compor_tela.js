@@ -376,7 +376,14 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
   // ================================================================
   secao('7. De novo, na aula de hoje, com a lista como folha');
   await H.irParaAba(pag, 'biblioteca');
+  conf('depois de anexar, a seleção foi desmarcada', await pag.evaluate(() => !!document.querySelector('#bib-carrinho-vazio')), true);
+  const devolveu = await pag.evaluate(() => {
+    const b = Array.from(document.querySelectorAll('button')).find(x => x.textContent.trim() === 'Desfazer' && x.offsetParent);
+    if (!b) return false; b.click(); return true;
+  });
+  conf('e o Desfazer do aviso devolve a seleção', devolveu, true);
   await esperar('contador', () => contador(pag), v => !!v, 5000);
+  conf('com os mesmos 8 e 3', await contador(pag), 'Material marcado: 8 exercícios, 3 páginas de teoria');
   await pag.click('#bib-carrinho-gerar');
   await esperar('janela Gerar material', () => pag.$eval('#modal-bib-gerar', e => e.classList.contains('aberto')), v => v === true, 5000);
   await pag.evaluate(i => document.querySelector('#bib-gerar-aulas [data-aula="' + i + '"]').click(), aulaId);
@@ -401,8 +408,27 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
   }), aulaId);
   const imagens = nota ? nota.paginas.reduce((s, p) => s + p.itens.filter(x => x.t === 'imagem').length, 0) : 0;
   conf('a folha tem os 8 enunciados colados', imagens, 8);
+  // cada imagem na folha na proporção do JPEG guardado (nada achatado)
+  const proporcoes = await pag.evaluate(async i => {
+    const q = await new Promise(r => { const o = indexedDB.open('apoio-educacional'); o.onsuccess = () => r(o.result); });
+    const nota = await new Promise(r => { const g = q.transaction('notas', 'readonly').objectStore('notas').get(i); g.onsuccess = () => r(g.result); });
+    const out = [];
+    for (const pg of nota.paginas) for (const it of pg.itens.filter(x => x.t === 'imagem')) {
+      const m = await new Promise(r => { const g = q.transaction('midias', 'readonly').objectStore('midias').get(it.ref); g.onsuccess = () => r(g.result); });
+      if (m && m.w && m.h) out.push(Math.abs((it.w / it.h) / (m.w / m.h) - 1));
+    }
+    q.close();
+    return out;
+  }, aulaId);
+  conf('nenhum enunciado achatado na folha (proporção dentro de 1%)', proporcoes.length >= 8 && proporcoes.every(d => d < 0.01), true);
   conf('dentro da folha (1000 x 1343)', nota && nota.paginas.every(p => p.itens.every(x => x.x >= 0 && x.y >= 0 && x.x + x.w <= 1000.5 && x.y + x.h <= 1343.5)), true);
   conf('o segundo material gravou mais 8 usos', (await lerDeposito(pag, 'biblioteca_uso')).length - usosAntes, 8);
+  // o segundo anexo também desmarcou; o Desfazer do aviso devolve para o passo 8
+  const devolveu2 = await pag.evaluate(() => {
+    const b = Array.from(document.querySelectorAll('button')).find(x => x.textContent.trim() === 'Desfazer' && x.offsetParent);
+    if (!b) return false; b.click(); return true;
+  });
+  conf('o Desfazer aparece também com a folha aberta', devolveu2, true);
   await pausa(800);
   if (SALVAR) await pag.screenshot({ path: path.join(SALVAR, 'tela_4_lista_como_folha.png') });
 

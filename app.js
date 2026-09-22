@@ -2432,7 +2432,7 @@
              * série pulou a data e a página vai para essa, em página nova. */
             var doDia = db.aulas.filter(function (a) { return a.alunoId === alunoId && a.data === data; });
             var primeira = doDia.filter(function (a) { return a.serieId; })[0] || doDia[0];
-            if (primeira && daBibliotecaNaSerie.aoCriar) daBibliotecaNaSerie.aoCriar(primeira.id);
+            if (primeira && daBibliotecaNaSerie.aoCriar) daBibliotecaNaSerie.aoCriar(primeira.id, { serie: true });
             else if (primeira) colarNaFolhaDaAula(primeira.id, daBibliotecaNaSerie);
             else avisar('As aulas foram criadas, mas nenhuma cai no dia escolhido; a página não foi colada.');
           }
@@ -12005,7 +12005,7 @@
     faixa.classList.toggle('vazia', !(n || m));
     if (!(n || m)) {
       faixa.appendChild(el('span', { class: 'bib-carrinho-texto', id: 'bib-carrinho-vazio',
-        texto: 'Nada marcado ainda. Marque "No material" nos exercícios e nas páginas que vão para a folha.' }));
+        texto: 'Nada marcado ainda.' }));
       return;
     }
     faixa.appendChild(el('span', { class: 'bib-carrinho-texto', id: 'bib-carrinho-contagem',
@@ -12235,8 +12235,11 @@
         if (!db.alunos.length) { avisar('Cadastre um aluno antes de marcar a primeira aula.'); return; }
         fecharModal('modal-bib-gerar');
         abrirAula(null, Core.hojeIso());
-        op.daAulaNova = true;
-        folhaPendenteDaBiblioteca = { titulo: op.titulo, aoCriar: function (aulaId) { gerarEAnexar(aulaId, itens, paginas, op); } };
+        folhaPendenteDaBiblioteca = { titulo: op.titulo, aoCriar: function (aulaId, como) {
+          // na série, o aviso "Montando" tiraria da tela o Desfazer dela
+          op.semAvisoDeMontagem = !!(como && como.serie);
+          gerarEAnexar(aulaId, itens, paginas, op);
+        } };
         var ajudaPadrao = $('#ajuda-aula-nova');
         if (ajudaPadrao) ajudaPadrao.remove();
         var corpoAula = $('#corpo-modal-aula');
@@ -12336,13 +12339,18 @@
     $$('#rodape-modal-bib-gerar button').forEach(function (b) { b.disabled = true; });
     var botao = $('#bib-gerar-anexar');
     if (botao) botao.textContent = 'Montando...';
-    if (!op.daAulaNova) avisar('Montando o material. Isso leva alguns segundos.');
+    if (!op.semAvisoDeMontagem) avisar('Montando o material. Isso leva alguns segundos.');
     var usaItens = (op.lista || op.gabarito) ? itens : [];
     var pecas, teoria, anexado = false, id = null, saida = null, etapa = 'montar';
     return emFila(usaItens, function (it, i) { return comNomeDoExercicio(pecasDoItem(it, op.gabarito), it, i + 1); }).then(function (r) {
       pecas = r;
       return emFila(op.teoria ? paginas : [], function (p) {
-        return blobDoAsset(p.aula.pacote, p.pagina.asset).then(function (b) { return Biblioteca.rasterizarPagina(b, p.pagina.medidas); });
+        return blobDoAsset(p.aula.pacote, p.pagina.asset).then(function (b) { return Biblioteca.rasterizarPagina(b, p.pagina.medidas); })
+          .catch(function (e) {
+            var err = new Error(e && e.message);
+            err.pagina = 'A página ' + p.pagina.n + ' de ' + p.aula.aula.titulo;
+            throw err;
+          });
       });
     }).then(function (r) {
       teoria = r;
@@ -12401,11 +12409,26 @@
         var nRed = saida.reduzidos.lista.length + saida.reduzidos.gabarito.length;
         var menor = nRed ? ' ' + (nRed === 1 ? 'Um recorte saiu' : nRed + ' recortes saíram') +
           ' um pouco menor, para caber na folha.' : '';
+        /* A seleção é desmarcada ao anexar: guardada no aparelho, ela entraria
+         * escondida no material do próximo aluno. O Desfazer do aviso devolve,
+         * para ela gerar o mesmo material para outra aula. */
+        var usada = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
+        bibCarrinho = { itens: [], paginas: [] };
+        guardarCarrinho();
+        desenharCarrinho();
+        $$('#bib-corpo input[data-carrinho]').forEach(function (c) { c.checked = false; });
+        function devolver() {
+          bibCarrinho = usada;
+          guardarCarrinho();
+          desenharCarrinho();
+          $$('#bib-corpo input[data-carrinho]').forEach(function (c) { c.checked = noCarrinho(c.dataset.carrinho, c.dataset.id); });
+        }
+        var desmarcada = ' A seleção foi desmarcada.';
         if (indiceFolha != null) {
           abrirEditorNota(aula.id, indiceFolha);
-          avisar('Material anexado na aula de ' + aluno.nome + ', e a lista abriu como folha.' + menor);
+          avisar('Material anexado na aula de ' + aluno.nome + ', e a lista abriu como folha.' + menor + desmarcada, 'Desfazer', devolver);
         } else {
-          avisar('Material anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + ').' + menor);
+          avisar('Material anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + ').' + menor + desmarcada, 'Desfazer', devolver);
         }
       });
     }).catch(function (e) {
@@ -12418,7 +12441,8 @@
         'O PDF está na aula; não precisa gerar de novo.');
       else if (anexado) avisar('O material foi anexado na aula, mas não consegui marcar os exercícios como usados. ' +
         'O PDF está na aula; não precisa gerar de novo.');
-      else if (e && e.exercicio) avisar(e.exercicio + ' não abriu. Desmarque-o e gere de novo. Nada foi anexado.');
+      else if (e && e.exercicio) avisar(e.exercicio + ' não abriu. Desmarque esse exercício e gere de novo. Nada foi anexado.');
+      else if (e && e.pagina) avisar(e.pagina + ' não abriu. Desmarque essa página e gere de novo. Nada foi anexado.');
       else avisar('Não consegui montar o material. Nada foi anexado; tente de novo daqui a pouco.');
     }).then(function () {
       gerandoMaterial = false;

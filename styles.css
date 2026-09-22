@@ -1389,7 +1389,8 @@ button.alvo-rascunho:hover { background: var(--soft); }
   margin-bottom: 12px; padding: 10px 14px; background: var(--navy); color: var(--branco); border-radius: 10px;
   box-shadow: var(--sombra); }
 .bib-carrinho[hidden] { display: none; }
-.bib-carrinho.vazia { background: var(--soft); color: var(--navy); box-shadow: none; min-height: 50px; }
+.bib-carrinho { min-height: 56px; box-sizing: border-box; }
+.bib-carrinho.vazia { background: var(--soft); color: var(--navy); box-shadow: none; }
 .bib-carrinho.vazia .bib-carrinho-texto { font-weight: 600; font-size: 14px; }
 #bib-carrinho-limpar { margin-right: 18px; }
 .bib-gerar-dica { margin: 8px 0 0; font-weight: 600; color: var(--navy); }
