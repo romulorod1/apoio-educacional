@@ -23,10 +23,23 @@
   var OBRIGATORIOS = ['itens.json', 'teoria.json', 'busca.json', 'apelidos.json'];
   var SEM_NAVEGADOR = 'Este navegador não consegue abrir o pacote da biblioteca. Atualize o Chrome e tente de novo.';
 
-  function Recusa(mensagem) {
+  /* Toda recusa leva o detalhe técnico (a mensagem) e um TIPO, que diz à
+   * tela o que ela pode fazer: 'download' (o arquivo chegou estragado: baixar
+   * de novo resolve), 'defeito' (o pacote veio errado de quem gerou),
+   * 'atualizar' (pacote de uma versão mais nova do aplicativo), 'navegador'
+   * (Chrome sem o que precisa) e 'nao_pacote' (ela escolheu outro arquivo). */
+  function Recusa(mensagem, tipo) {
     var e = new Error(mensagem);
     e.recusa = true;
+    e.tipo = tipo || tipoDaMensagem(mensagem);
     return e;
+  }
+
+  function tipoDaMensagem(m) {
+    if (m === SEM_NAVEGADOR) return 'navegador';
+    if (/não é um pacote/.test(m)) return 'nao_pacote';
+    if (/corrompido|não confere|incompleto|não pôde ser lido/.test(m)) return 'download';
+    return 'defeito';
   }
 
   function hex(buffer) {
@@ -100,8 +113,10 @@
       var manifest = json('manifest.json', bytes);
       if (!manifest || typeof manifest !== 'object') throw Recusa('O manifest.json do pacote não pôde ser lido.');
       if (manifest.esquema !== ESQUEMA) {
-        throw Recusa('Este pacote é de uma versão do aplicativo que ainda não chegou aqui (esquema ' +
-          manifest.esquema + '). Atualize o aplicativo e tente de novo.');
+        if (typeof manifest.esquema === 'number' && manifest.esquema > ESQUEMA) {
+          throw Recusa('O pacote é do esquema ' + manifest.esquema + ' e este aplicativo lê o esquema ' + ESQUEMA + '.', 'atualizar');
+        }
+        throw Recusa('O manifest.json não informa um esquema válido.', 'defeito');
       }
       if (typeof manifest.pacote !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(manifest.pacote)) {
         throw Recusa('O manifest.json do pacote não diz o nome do pacote.');
@@ -119,7 +134,7 @@
       var faltando = Object.keys(lista).filter(function (n) { return n !== 'manifest.json' && !porNome[n]; });
       if (faltando.length) {
         throw Recusa('O pacote está incompleto: falta ' + faltando[0] +
-          (faltando.length > 1 ? ' e mais ' + (faltando.length - 1) + ' arquivo(s)' : '') + '.');
+          (faltando.length > 1 ? ' e mais ' + (faltando.length - 1) + ' arquivo(s)' : '') + '.', 'defeito');
       }
       if (sobrando.length) {
         throw Recusa('O pacote tem arquivo fora da lista do manifest: ' + sobrando[0] + '.');
@@ -128,7 +143,7 @@
         if (!caminhoValido(n)) throw Recusa('O pacote tem um caminho de arquivo inválido: ' + n + '.');
       });
       OBRIGATORIOS.forEach(function (n) {
-        if (!porNome[n]) throw Recusa('O pacote está incompleto: falta ' + n + '.');
+        if (!porNome[n]) throw Recusa('O pacote está incompleto: falta ' + n + '.', 'defeito');
       });
 
       /* Extrai e confere o hash, um arquivo por vez. A imagem vira Blob logo
@@ -182,7 +197,7 @@
           if (!caminhoValido(c.caminho) || c.caminho.indexOf('assets/') !== 0) {
             throw Recusa('O pacote cita uma imagem fora da pasta assets: ' + c.caminho + '.');
           }
-          if (!extraidos[c.caminho]) throw Recusa('O pacote está incompleto: ' + c.de + ' cita ' + c.caminho + ', que não está no zip.');
+          if (!extraidos[c.caminho]) throw Recusa(c.de + ' cita ' + c.caminho + ', que não está no pacote.', 'defeito');
           if (!tipoDoAsset(c.caminho)) throw Recusa('O pacote cita um arquivo que não é imagem: ' + c.caminho + '.');
         });
 
@@ -228,8 +243,8 @@
       return nomeDaSerie(s) + (equiv[s] && equiv[s].length ? ' (' + equiv[s].map(nomeDaSerie).join(', ') + ')' : '');
     }).join(', ');
     var linhas = [];
-    linhas.push((NOME_MATERIA[manifest.materia] || manifest.materia || '') +
-      (series ? ', ' + series : '') + (fonte ? ', ' + fonte : ''));
+    var titulo = [NOME_MATERIA[manifest.materia] || manifest.materia || '', series, fonte].filter(Boolean).join(', ');
+    linhas.push(titulo || 'Pacote da biblioteca');
     var partes = [];
     if (c.modulos != null) partes.push(c.modulos + (c.modulos === 1 ? ' módulo' : ' módulos'));
     if (c.aulas_teoria) partes.push(c.aulas_teoria + (c.aulas_teoria === 1 ? ' aula de teoria' : ' aulas de teoria') +

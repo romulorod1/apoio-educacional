@@ -11,6 +11,11 @@
    * intactos: voltar para false devolve tudo como estava. */
   var ACERVO_EM_CONSTRUCAO = true;
 
+  /* O cartão "Biblioteca" de Ajustes só aparece quando existir a aba que
+   * mostra o que foi importado. Até lá ela não vê nada de novo: importar sem
+   * ter onde abrir seria prometer o que não acontece. */
+  var BIBLIOTECA_NO_AR = false;
+
   /* A versão 1.20.0 sobe o banco do tablet para a versão 2 (store.js). Se
    * outra janela do aplicativo, ainda na versão antiga, estiver aberta, a
    * subida espera ela fechar, e sem este aviso a tela ficaria parada em
@@ -11063,6 +11068,7 @@
 
     desenharAjustesDoFechamento();
     desenharAjustesDeReajuste();
+    mostrarCartaoBiblioteca();
     desenharPacotesBiblioteca();
 
     Store.estimarEspaco().then(function (e) {
@@ -11433,6 +11439,8 @@
     caixa.innerHTML = '';
     if (!linhas || !linhas.length) return;
     caixa.appendChild(el('div', { class: classe, style: 'margin-bottom:10px' }, linhas.map(function (l, i) {
+      // linha de detalhe técnico: pequena, para quem for investigar
+      if (l && l.detalhe) return el('div', { style: 'font-size:12px;opacity:.75;margin-top:4px', texto: l.detalhe });
       return el('div', { style: i ? '' : 'font-weight:600' }, [l]);
     })));
   }
@@ -11442,7 +11450,7 @@
     ev.target.value = '';
     if (!arquivo) return;
     if (typeof Zip === 'undefined' || !Zip.suportado()) {
-      mostrarEstadoImportacao('faixa-aviso', [Biblioteca.SEM_NAVEGADOR]);
+      mostrarEstadoImportacao('faixa-aviso', linhasDaRecusa({ recusa: true, tipo: 'navegador' }));
       return;
     }
     var botao = $('#importar-biblioteca');
@@ -11468,8 +11476,10 @@
       aberto.teoria.forEach(function (t) { meus[t.id] = true; });
       var alheio = r[0].concat(r[1]).filter(function (x) { return meus[x.id] && x.pacote !== aberto.manifest.pacote; })[0];
       if (alheio) {
-        throw new Error('Este pacote repete conteúdo que já veio de outro pacote (' + alheio.pacote +
-          '). Nada foi gravado.');
+        var r2 = new Error('Repete conteúdo que já veio do pacote ' + alheio.pacote + '.');
+        r2.recusa = true;
+        r2.tipo = 'defeito';
+        throw r2;
       }
       return Store.listarPacotesBiblioteca();
     }).then(function (lista) {
@@ -11487,8 +11497,10 @@
         var livre = espaco.quota - (espaco.usage || 0);
         var precisa = Math.round(aberto.bytesTotais * 1.2);
         if (livre < precisa) {
-          throw new Error('O tablet não tem espaço para este pacote: ele precisa de ' +
-            Biblioteca.mb(precisa) + ' e há ' + Biblioteca.mb(Math.max(0, livre)) + ' livres. Nada foi gravado.');
+          var semEspaco = new Error('O tablet não tem espaço para este pacote: ele precisa de ' +
+            Biblioteca.mb(precisa) + ' e há ' + Biblioteca.mb(Math.max(0, livre)) + ' livres.');
+          semEspaco.espaco = true;
+          throw semEspaco;
         }
       }
       return Store.tornarPersistente();
@@ -11508,21 +11520,45 @@
             nova + '). Nada foi mudado.']);
         return;
       }
-      var linhas = ['O pacote não foi importado.'];
-      if (e && e.name === 'QuotaExceededError') {
-        linhas.push('O tablet ficou sem espaço no meio da gravação. Nada foi gravado.');
-      } else if (e && (e.name === 'NotReadableError' || e.name === 'NotFoundError')) {
-        linhas.push('Não consegui ler o arquivo. Se ele está no Drive, espere o download terminar e tente de novo.');
-      } else {
-        linhas.push((e && e.message) || 'Não foi possível ler o arquivo.');
-        // arquivo estragado no caminho: baixar de novo resolve
-        if (e && e.recusa && /corrompido|não confere|incompleto: falta/.test(e.message)) {
-          linhas.push('O arquivo pode ter chegado incompleto. Baixe de novo do Drive e tente outra vez.');
-        }
-      }
-      mostrarEstadoImportacao('faixa-aviso', linhas);
+      mostrarEstadoImportacao('faixa-aviso', linhasDaRecusa(e));
     }).then(function () {
       if (botao) botao.disabled = false;
+    });
+  }
+
+  /* O que a tela diz quando o pacote não entra: o que aconteceu, o que ela
+   * pode fazer, que nada mudou, e o detalhe técnico em letra pequena (só das
+   * recusas, que são em português; erro cru do navegador não vai para a tela). */
+  var ORIENTACAO_RECUSA = {
+    download: 'Um arquivo do pacote chegou diferente do original. Baixe o pacote de novo do Drive e tente outra vez.',
+    defeito: 'Este pacote veio com defeito e não pode ser usado.',
+    atualizar: 'Este pacote é de uma versão mais nova do aplicativo. Atualize o aplicativo (Ajustes, Procurar atualização) e tente de novo.',
+    navegador: 'Este navegador não consegue abrir o pacote da biblioteca. Atualize o Chrome e tente de novo.',
+    nao_pacote: 'O arquivo escolhido não é um pacote da biblioteca. Escolha o arquivo .zip da biblioteca no Drive.'
+  };
+
+  function linhasDaRecusa(e) {
+    var linhas = ['O pacote não foi importado.'];
+    if (e && e.recusa) {
+      linhas.push(ORIENTACAO_RECUSA[e.tipo] || ORIENTACAO_RECUSA.defeito);
+    } else if (e && e.espaco) {
+      linhas.push(e.message);
+    } else if (e && e.name === 'QuotaExceededError') {
+      linhas.push('O tablet ficou sem espaço no meio da gravação.');
+    } else if (e && (e.name === 'NotReadableError' || e.name === 'NotFoundError')) {
+      linhas.push('Não consegui ler o arquivo. Se ele está no Drive, espere o download terminar e tente de novo.');
+    } else {
+      linhas.push('Não consegui gravar o pacote. Feche e abra o aplicativo e tente de novo.');
+    }
+    linhas.push('O que já estava no tablet continua igual.');
+    if (e && e.recusa && e.tipo !== 'navegador' && e.tipo !== 'nao_pacote') linhas.push({ detalhe: 'Detalhe: ' + e.message });
+    return linhas;
+  }
+
+  function mostrarCartaoBiblioteca() {
+    ['#titulo-cartao-biblioteca', '#cartao-biblioteca'].forEach(function (s) {
+      var e = $(s);
+      if (e) e.hidden = !BIBLIOTECA_NO_AR;
     });
   }
 

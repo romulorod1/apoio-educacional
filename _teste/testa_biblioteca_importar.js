@@ -63,7 +63,11 @@ const lerLista = pag => pag.evaluate(() => {
 });
 
 async function importar(pag, arquivo, rotulo) {
-  await pag.evaluate(() => { document.querySelector('#estado-importacao-biblioteca').innerHTML = ''; });
+  await pag.evaluate(() => {
+    document.querySelector('#estado-importacao-biblioteca').innerHTML = '';
+    // com a chave desligada o cartão nasce escondido; a importação é a mesma
+    document.querySelector('#cartao-biblioteca').hidden = false;
+  });
   const entrada = await pag.$('#arquivo-biblioteca');
   await entrada.uploadFile(arquivo);
   const r = await esperar(rotulo, () => Promise.all([lerEstado(pag), pag.$eval('#importar-biblioteca', b => b.disabled)]),
@@ -182,6 +186,18 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
   // ================================================================
   secao('2. Ajustes: o cartão Biblioteca, vazio');
   await H.irParaAba(pag, 'ajustes');
+  /* Com a chave BIBLIOTECA_NO_AR desligada, o cartão existe e não aparece,
+   * porque ainda não há aba para abrir o que for importado. O teste confere o
+   * estado da chave e depois mostra o cartão à mão para exercitar a importação. */
+  const escondido = await pag.evaluate(() => [document.querySelector('#cartao-biblioteca').hidden,
+    document.querySelector('#titulo-cartao-biblioteca').hidden, !!document.querySelector('#importar-biblioteca').offsetParent].join(','));
+  const NO_AR = /var BIBLIOTECA_NO_AR = true;/.test(fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8'));
+  conf('com a chave ' + (NO_AR ? 'ligada o cartão aparece' : 'desligada o cartão não aparece'), escondido,
+    NO_AR ? 'false,false,true' : 'true,true,false');
+  await pag.evaluate(() => {
+    document.querySelector('#cartao-biblioteca').hidden = false;
+    document.querySelector('#titulo-cartao-biblioteca').hidden = false;
+  });
   const cartao = await pag.evaluate(() => {
     const b = document.querySelector('#importar-biblioteca');
     const i = document.querySelector('#arquivo-biblioteca');
@@ -245,17 +261,22 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
 
   // ================================================================
   secao('7. Venenos: recusados, com mensagem na tela, e nada muda');
-  const GUIA = '\nO arquivo pode ter chegado incompleto. Baixe de novo do Drive e tente outra vez.';
+  const NAO = 'O pacote não foi importado.';
+  const IGUAL = 'O que já estava no tablet continua igual.';
+  const BAIXE = 'Um arquivo do pacote chegou diferente do original. Baixe o pacote de novo do Drive e tente outra vez.';
+  const DEFEITO = 'Este pacote veio com defeito e não pode ser usado.';
+  const ATUALIZE = 'Este pacote é de uma versão mais nova do aplicativo. Atualize o aplicativo (Ajustes, Procurar atualização) e tente de novo.';
+  const tela = (orientacao, detalhe) => [NAO, orientacao, IGUAL].concat(detalhe ? ['Detalhe: ' + detalhe] : []).join('\n');
   const esperado = {
-    'corrompido-deflate': 'O arquivo assets/9ano/equacoes-do-segundo-grau/soma-e-produto/ex-02.svg do pacote está corrompido.' + GUIA,
-    'corrompido-stored': 'O arquivo assets/9ano/equacoes-do-segundo-grau/soma-e-produto-das-raizes/teo-p02.svg do pacote está corrompido.' + GUIA,
-    'hash': 'O arquivo assets/9ano/equacoes-do-segundo-grau/soma-e-produto/ex-02.svg do pacote não confere com o manifest.' + GUIA,
-    'sobrando': 'O pacote tem arquivo fora da lista do manifest: assets/9ano/intruso.svg.',
-    'faltando': 'O pacote está incompleto: falta assets/9ano/nao-existe/ex-01.svg.' + GUIA,
-    'asset-fora': 'O pacote cita uma imagem fora da pasta assets: figs/fora.svg.',
-    'asset-citado': 'O pacote está incompleto: 9ano:equacoes-do-segundo-grau:equacao-do-2o-grau-resultados-basicos:ex:4 cita ' +
-      'assets/9ano/equacoes-do-segundo-grau/equacao-do-2o-grau-resultados-basicos/ex-04-sumiu.svg, que não está no zip.',
-    'esquema': 'Este pacote é de uma versão do aplicativo que ainda não chegou aqui (esquema 2). Atualize o aplicativo e tente de novo.'
+    'corrompido-deflate': tela(BAIXE, 'O arquivo assets/9ano/equacoes-do-segundo-grau/soma-e-produto/ex-02.svg do pacote está corrompido.'),
+    'corrompido-stored': tela(BAIXE, 'O arquivo assets/9ano/equacoes-do-segundo-grau/soma-e-produto-das-raizes/teo-p02.svg do pacote está corrompido.'),
+    'hash': tela(BAIXE, 'O arquivo assets/9ano/equacoes-do-segundo-grau/soma-e-produto/ex-02.svg do pacote não confere com o manifest.'),
+    'sobrando': tela(DEFEITO, 'O pacote tem arquivo fora da lista do manifest: assets/9ano/intruso.svg.'),
+    'faltando': tela(DEFEITO, 'O pacote está incompleto: falta assets/9ano/nao-existe/ex-01.svg.'),
+    'asset-fora': tela(DEFEITO, 'O pacote cita uma imagem fora da pasta assets: figs/fora.svg.'),
+    'asset-citado': tela(DEFEITO, '9ano:equacoes-do-segundo-grau:equacao-do-2o-grau-resultados-basicos:ex:4 cita ' +
+      'assets/9ano/equacoes-do-segundo-grau/equacao-do-2o-grau-resultados-basicos/ex-04-sumiu.svg, que não está no pacote.'),
+    'esquema': tela(ATUALIZE, 'O pacote é do esquema 2 e este aplicativo lê o esquema 1.')
   };
   for (const v of Sintetico.VENENOS) {
     // versão 3, para a recusa não poder vir do aviso de versão
@@ -265,7 +286,7 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
       // o resto da rodada parte de um tablet já estragado: acaba aqui
       return;
     }
-    conf('veneno ' + v + ': recusado com a mensagem certa', msg, 'O pacote não foi importado.\n' + esperado[v]);
+    conf('veneno ' + v + ': recusado com a mensagem certa', msg, esperado[v]);
     conf('veneno ' + v + ': o tablet continua na versão 2', JSON.stringify(await lerPacote(pag)),
       JSON.stringify([{ pacote: 'matematica-sintetico-9ano', versao: 2 }]));
   }
@@ -274,7 +295,8 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
       JSON.stringify(await versoesDeposito(pag, 'biblioteca_itens')) + JSON.stringify(await versoesDeposito(pag, 'biblioteca_assets')),
       '{"2":60}{"2":141}');
     msg = await importar(pag, path.join(H.RAIZ, 'manifest.webmanifest'), 'arquivo que não é zip');
-    conf('arquivo que não é zip: recusado com mensagem', msg, 'O pacote não foi importado.\nO arquivo escolhido não é um pacote (.zip).');
+    conf('arquivo que não é zip: recusado com mensagem', msg,
+      tela('O arquivo escolhido não é um pacote da biblioteca. Escolha o arquivo .zip da biblioteca no Drive.'));
     const texto = await pag.evaluate(() => document.querySelector('#tela-ajustes').innerText.length);
     conf('e a tela de Ajustes continua inteira', texto > 500, true);
   }
@@ -283,7 +305,7 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
   secao('7b. Pacote de outro nome com os mesmos exercícios: recusado');
   msg = await importar(pag, zip('outro-nome', { pacote: 'matematica-outro-9ano' }), 'pacote com ids alheios');
   conf('recusa por conteúdo que já veio de outro pacote', msg,
-    'O pacote não foi importado.\nEste pacote repete conteúdo que já veio de outro pacote (matematica-sintetico-9ano). Nada foi gravado.');
+    tela(DEFEITO, 'Repete conteúdo que já veio do pacote matematica-sintetico-9ano.'));
   conf('e os exercícios continuam do pacote original', JSON.stringify(await lerPacote(pag)),
     JSON.stringify([{ pacote: 'matematica-sintetico-9ano', versao: 2 }]));
 
@@ -296,8 +318,7 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
   await H.abrirApp(apertada, amb.ORIGEM);
   await H.irParaAba(apertada, 'ajustes');
   msg = await importar(apertada, zip('apertado', { versao: 8 }), 'importação sem espaço');
-  conf('mensagem de falta de espaço, com os MB', /^O pacote não foi importado\.\nO tablet não tem espaço para este pacote: ele precisa de .* MB e há menos de 0,1 MB livres\. Nada foi gravado\.$/.test(msg), true);
-  console.log('   tela: ' + JSON.stringify(msg));
+  conf('mensagem de falta de espaço, com os MB', /^O pacote não foi importado\.\nO tablet não tem espaço para este pacote: ele precisa de .* MB e há menos de 0,1 MB livres\.\nO que já estava no tablet continua igual\.$/.test(msg), true);
   conf('e nada foi gravado', JSON.stringify(await lerPacote(apertada)), JSON.stringify([{ pacote: 'matematica-sintetico-9ano', versao: 2 }]));
   await apertada.close();
 
@@ -309,7 +330,8 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
   await H.irParaAba(velha, 'ajustes');
   conf('o navegador desta página não tem DecompressionStream', await velha.evaluate(() => typeof DecompressionStream), 'undefined');
   msg = await importar(velha, zip('limpo-v9', { versao: 9 }), 'importação sem DecompressionStream');
-  conf('mensagem de atualizar o Chrome', msg, 'Este navegador não consegue abrir o pacote da biblioteca. Atualize o Chrome e tente de novo.');
+  conf('mensagem de atualizar o Chrome', msg,
+    tela('Este navegador não consegue abrir o pacote da biblioteca. Atualize o Chrome e tente de novo.'));
   conf('e nada foi gravado', JSON.stringify(await lerPacote(velha)), JSON.stringify([{ pacote: 'matematica-sintetico-9ano', versao: 2 }]));
   await velha.close();
 

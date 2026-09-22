@@ -100,27 +100,31 @@ async function recusa(zip) {
     'hash': /ex-02\.svg do pacote não confere com o manifest/,
     'sobrando': /fora da lista do manifest: assets\/9ano\/intruso\.svg/,
     'faltando': /incompleto: falta assets\/9ano\/nao-existe/,
-    'asset-citado': /cita .*-sumiu\.svg, que não está no zip/,
+    'asset-citado': /cita .*-sumiu\.svg, que não está no pacote/,
     'esquema': /esquema 2/,
     'asset-fora': /imagem fora da pasta assets: figs\/fora\.svg/
   };
+  const TIPO = { 'corrompido-deflate': 'download', 'corrompido-stored': 'download', 'hash': 'download',
+    'sobrando': 'defeito', 'faltando': 'defeito', 'asset-citado': 'defeito', 'esquema': 'atualizar', 'asset-fora': 'defeito' };
   for (const v of Sintetico.VENENOS) {
     const e = await recusa(Sintetico.gerar(null, { veneno: v }).zip);
     conf('veneno ' + v + ': recusado', !!(e && e.recusa), true);
     conf('veneno ' + v + ': pelo motivo certo', e && esperado[v].test(e.message), true);
+    conf('veneno ' + v + ': do tipo ' + TIPO[v], e && e.tipo, TIPO[v]);
     if (e && !esperado[v].test(e.message)) console.log('         mensagem: ' + e.message);
   }
   conf('todo veneno tem motivo esperado escrito aqui', Sintetico.VENENOS.every(v => esperado[v]), true);
 
   secao('arquivos que não são pacote');
   let e = await recusa(Buffer.from('isto nao e um zip, e so texto qualquer com tamanho'));
-  conf('texto qualquer: recusado como não-pacote', e && /não é um pacote/.test(e.message), true);
+  conf('texto qualquer: recusado como não-pacote', e && /não é um pacote/.test(e.message) && e.tipo, 'nao_pacote');
   e = await recusa(Sintetico.montarZip([{ nome: 'leia.txt', dados: Buffer.from('oi'), metodo: 8 }]));
   conf('zip sem manifest: recusado', e && /falta o manifest\.json/.test(e.message), true);
   const cortado = limpo.zip.subarray(0, limpo.zip.length - 40);
   e = await recusa(cortado);
   conf('zip cortado no fim: recusado como download incompleto', e && e.message,
-    'O pacote está incompleto. Baixe o arquivo de novo do Drive e tente outra vez.');
+    'O pacote está incompleto: o fim do arquivo não chegou.');
+  conf('e é do tipo "baixe de novo"', e && e.tipo, 'download');
   e = await recusa(Sintetico.montarZip([
     { nome: 'manifest.json', dados: Buffer.from(JSON.stringify({ esquema: 1, pacote: 'x', versao: 1, arquivos: { constructor: 'sha256:' + '0'.repeat(64) } })), metodo: 8 }]));
   conf('manifest listando "constructor" sem o arquivo: recusado como faltando', e && /falta constructor/.test(e.message), true);

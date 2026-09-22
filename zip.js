@@ -80,7 +80,7 @@
     if (fim < 0) {
       // Começa como zip e não tem o fim: o download parou no meio.
       if (v.getUint32(0, true) === SIG_LOCAL) {
-        throw ErroZip('O pacote está incompleto. Baixe o arquivo de novo do Drive e tente outra vez.');
+        throw ErroZip('O pacote está incompleto: o fim do arquivo não chegou.');
       }
       throw ErroZip('O arquivo escolhido não é um pacote (.zip).');
     }
