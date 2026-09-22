@@ -378,10 +378,10 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
   await H.irParaAba(pag, 'biblioteca');
   conf('depois de anexar, a seleção foi desmarcada', await pag.evaluate(() => !!document.querySelector('#bib-carrinho-vazio')), true);
   const devolveu = await pag.evaluate(() => {
-    const b = Array.from(document.querySelectorAll('button')).find(x => x.textContent.trim() === 'Desfazer' && x.offsetParent);
+    const b = Array.from(document.querySelectorAll('button')).find(x => x.textContent.trim() === 'Marcar de novo' && x.offsetParent);
     if (!b) return false; b.click(); return true;
   });
-  conf('e o Desfazer do aviso devolve a seleção', devolveu, true);
+  conf('e o "Marcar de novo" do aviso devolve a seleção', devolveu, true);
   await esperar('contador', () => contador(pag), v => !!v, 5000);
   conf('com os mesmos 8 e 3', await contador(pag), 'Material marcado: 8 exercícios, 3 páginas de teoria');
   await pag.click('#bib-carrinho-gerar');
@@ -425,10 +425,10 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
   conf('o segundo material gravou mais 8 usos', (await lerDeposito(pag, 'biblioteca_uso')).length - usosAntes, 8);
   // o segundo anexo também desmarcou; o Desfazer do aviso devolve para o passo 8
   const devolveu2 = await pag.evaluate(() => {
-    const b = Array.from(document.querySelectorAll('button')).find(x => x.textContent.trim() === 'Desfazer' && x.offsetParent);
+    const b = Array.from(document.querySelectorAll('button')).find(x => x.textContent.trim() === 'Marcar de novo' && x.offsetParent);
     if (!b) return false; b.click(); return true;
   });
-  conf('o Desfazer aparece também com a folha aberta', devolveu2, true);
+  conf('o "Marcar de novo" aparece também com a folha aberta', devolveu2, true);
   await pausa(800);
   if (SALVAR) await pag.screenshot({ path: path.join(SALVAR, 'tela_4_lista_como_folha.png') });
 

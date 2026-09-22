@@ -12330,6 +12330,22 @@
     });
   }
 
+  /* Desmarca a seleção depois de um anexo (guardada no aparelho, ela entraria
+   * escondida no material do próximo aluno) e devolve a função que remarca. */
+  function desmarcarDepoisDeAnexar() {
+    var usada = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
+    bibCarrinho = { itens: [], paginas: [] };
+    guardarCarrinho();
+    desenharCarrinho();
+    $$('#bib-corpo input[data-carrinho]').forEach(function (c) { c.checked = false; });
+    return function () {
+      bibCarrinho = usada;
+      guardarCarrinho();
+      desenharCarrinho();
+      $$('#bib-corpo input[data-carrinho]').forEach(function (c) { c.checked = noCarrinho(c.dataset.carrinho, c.dataset.id); });
+    };
+  }
+
   function gerarEAnexar(aulaId, itens, paginas, op) {
     if (gerandoMaterial) { avisar('Ainda estou montando o material anterior. Espere um instante.'); return Promise.resolve(); }
     gerandoMaterial = true;
@@ -12348,7 +12364,7 @@
         return blobDoAsset(p.aula.pacote, p.pagina.asset).then(function (b) { return Biblioteca.rasterizarPagina(b, p.pagina.medidas); })
           .catch(function (e) {
             var err = new Error(e && e.message);
-            err.pagina = 'A página ' + p.pagina.n + ' de ' + p.aula.aula.titulo;
+            err.pagina = (p.pagina.capa ? 'A capa' : 'A página ' + p.pagina.n) + ' de ' + p.aula.aula.titulo;
             throw err;
           });
       });
@@ -12412,23 +12428,15 @@
         /* A seleção é desmarcada ao anexar: guardada no aparelho, ela entraria
          * escondida no material do próximo aluno. O Desfazer do aviso devolve,
          * para ela gerar o mesmo material para outra aula. */
-        var usada = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
-        bibCarrinho = { itens: [], paginas: [] };
-        guardarCarrinho();
-        desenharCarrinho();
-        $$('#bib-corpo input[data-carrinho]').forEach(function (c) { c.checked = false; });
-        function devolver() {
-          bibCarrinho = usada;
-          guardarCarrinho();
-          desenharCarrinho();
-          $$('#bib-corpo input[data-carrinho]').forEach(function (c) { c.checked = noCarrinho(c.dataset.carrinho, c.dataset.id); });
-        }
+        var devolver = desmarcarDepoisDeAnexar();
         var desmarcada = ' A seleção foi desmarcada.';
+        /* "Marcar de novo", e não "Desfazer": no app, Desfazer desfaz a ação do
+         * aviso, e aqui ela acharia que tirou o anexo da aula. */
         if (indiceFolha != null) {
           abrirEditorNota(aula.id, indiceFolha);
-          avisar('Material anexado na aula de ' + aluno.nome + ', e a lista abriu como folha.' + menor + desmarcada, 'Desfazer', devolver);
+          avisar('Material anexado na aula de ' + aluno.nome + ', e a lista abriu como folha.' + menor + desmarcada, 'Marcar de novo', devolver);
         } else {
-          avisar('Material anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + ').' + menor + desmarcada, 'Desfazer', devolver);
+          avisar('Material anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + ').' + menor + desmarcada, 'Marcar de novo', devolver);
         }
       });
     }).catch(function (e) {
@@ -12437,10 +12445,13 @@
       /* Depois do anexo gravado, o erro não é "nada foi anexado": tentar de novo
        * duplicaria o arquivo na aula. Antes dele, a mensagem diz o que fazer, e
        * o detalhe técnico fica só no console. */
-      if (anexado && etapa === 'folha') avisar('O material foi anexado na aula, mas a lista não abriu como folha. ' +
-        'O PDF está na aula; não precisa gerar de novo.');
-      else if (anexado) avisar('O material foi anexado na aula, mas não consegui marcar os exercícios como usados. ' +
-        'O PDF está na aula; não precisa gerar de novo.');
+      if (anexado) {
+        var remarcar = desmarcarDepoisDeAnexar();
+        avisar(etapa === 'folha'
+          ? 'O material foi anexado na aula, mas a lista não abriu como folha. O PDF está na aula; não precisa gerar de novo.'
+          : 'O material foi anexado na aula, mas não consegui marcar os exercícios como usados. O PDF está na aula; não precisa gerar de novo.',
+          'Marcar de novo', remarcar);
+      }
       else if (e && e.exercicio) avisar(e.exercicio + ' não abriu. Desmarque esse exercício e gere de novo. Nada foi anexado.');
       else if (e && e.pagina) avisar(e.pagina + ' não abriu. Desmarque essa página e gere de novo. Nada foi anexado.');
       else avisar('Não consegui montar o material. Nada foi anexado; tente de novo daqui a pouco.');
