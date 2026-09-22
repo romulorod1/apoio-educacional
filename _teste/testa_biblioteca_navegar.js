@@ -210,9 +210,9 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
     const c = document.querySelector('#bib-corpo .bib-cartao');
     return (c => Array.from(c.children).map(e => e.classList.contains('bib-tags') ? Array.from(e.children).map(t => t.textContent).join(' | ') : e.textContent).filter(Boolean).join(' | '))(c);
   });
-  conf('cartão: número de origem e dificuldade (aberta não leva etiqueta)', primeiro, 'Exercício 1 | Fácil');
+  conf('cartão: número de origem e dificuldade (aberta não leva etiqueta)', primeiro, 'Exercício 1 | estimada: fácil');
   const quinto = await pag.evaluate(() => (c => Array.from(c.children).map(e => e.classList.contains('bib-tags') ? Array.from(e.children).map(t => t.textContent).join(' | ') : e.textContent).filter(Boolean).join(' | '))(document.querySelectorAll('#bib-corpo .bib-cartao')[4]));
-  conf('origem citada em letra pequena', quinto, 'Exercício 5 | Fácil | Extraído da Olimpíada Sintética');
+  conf('origem citada em letra pequena', quinto, 'Exercício 5 | estimada: fácil | Extraído da Olimpíada Sintética');
   /* Rola uma tela de cada vez até o fim, como o dedo dela, e não num salto só.
    * O salto do topo para o fim só deixava passar pela área visível as linhas do
    * começo e do fim, e as do meio não eram pedidas nunca; enquanto a lista era
@@ -315,7 +315,7 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   await esperar('lista aberta pela busca', () => estadoMinis(pag), v => v && v.total === 8, 5000);
   conf('a busca levou à lista, e o campo ficou limpo', await pag.$eval('#busca-biblioteca', e => e.value), '');
   const objetiva = await pag.evaluate(() => (c => Array.from(c.children).map(e => e.classList.contains('bib-tags') ? Array.from(e.children).map(t => t.textContent).join(' | ') : e.textContent).filter(Boolean).join(' | '))(document.querySelectorAll('#bib-corpo .bib-cartao')[2]));
-  conf('exercício objetivo marcado', objetiva, 'Exercício 3 | Objetiva | Fácil');
+  conf('exercício objetivo marcado', objetiva, 'Exercício 3 | Objetiva | estimada: fácil');
 
   // ================================================================
   secao('6. Abrir como folha, numa aula nova de hoje');

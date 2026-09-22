@@ -55,8 +55,11 @@
  * e styles.css), com a lista igual. O v36 liga a biblioteca à aula: o botão
  * Material do assunto abre a biblioteca, o filtro "ainda não usei com" e os
  * módulos usados em "Temas trabalhados" (app.js, core.js, index.html e
+ * styles.css), com a lista igual. O v37 põe a dificuldade à vista na lista de
+ * exercícios: o filtro Fácil, Médio e Difícil, o rótulo "estimada" ou
+ * "curada" e o CSV das etiquetas dela em Ajustes (app.js, index.html e
  * styles.css), com a lista igual. */
-var CACHE = 'apoio-educacional-v36';
+var CACHE = 'apoio-educacional-v37';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

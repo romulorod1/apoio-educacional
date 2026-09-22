@@ -255,7 +255,9 @@ function gerar(saida, opcoes) {
           resposta: objetiva ? 'C' : null, subitens: [],
           texto, origem_citada: n === 5 ? 'Extraído da Olimpíada Sintética' : null,
           origem_citada_em: n === 5 ? 'solucao' : undefined,
-          dificuldade: terco, dificuldade_origem: 'proxy',
+          // opcoes.curadoria ({ id: 1 a 3 }) marca itens como curados, para o teste da B5; sem ela, nada muda
+          dificuldade: (opcoes.curadoria && opcoes.curadoria[id]) || terco,
+          dificuldade_origem: opcoes.curadoria && opcoes.curadoria[id] ? 'curadoria' : 'proxy',
           proxy: { posicao: Math.round(1000 * (n - 1) / l.itens) / 1000, terco }, tema_app: null,
           assets: { enunciado: base + '.svg', solucao: semSolucao ? null : base + '-sol.svg' },
           medidas: { enunciado: { largura_pt: 262, altura_pt: alt, rotulo },
