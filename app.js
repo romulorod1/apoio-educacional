@@ -2096,7 +2096,8 @@
 
       /* Material existe para qualquer tema que o índice da matéria conhece. Um
        * assunto gravado do acervo de 14/09 ({fonte: 'acervo'}) fica como assunto
-       * comum, só com o título, sem botão Material. */
+       * comum, só com o título, sem material próprio; com pacote, o de
+       * matemática ganha o Material que abre a biblioteca, como qualquer outro. */
       /* Com um pacote da biblioteca importado, o Material de um assunto de
        * matemática abre a biblioteca procurando pelo título do assunto. O
        * material autoral continua no botão "Material de aula" da janela. */

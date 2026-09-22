@@ -40,7 +40,9 @@ if (VENENO) trocas['/sw.js'] = SW.split(ANCORA_SW).join(ANCORA_SW + "  './banco/
 secao('1. O acervo saiu do repositório e ninguém o pede');
 ['banco/acervo.json', 'banco/acervo_indice.json', 'scripts', '_teste/testa_acervo.js'].forEach(f =>
   conf(f + ' não existe mais', fs.existsSync(path.join(RAIZ, f)), false));
-conf('o sw.js não lista nada do acervo', /acervo\.json|acervo_indice/.test(SW.split('var ARQUIVOS')[1] || ''), false);
+const listaSW = (SW.split('var ARQUIVOS = [')[1] || '').split('];')[0];
+conf('a lista ARQUIVOS do sw.js foi achada', listaSW.indexOf("'./index.html'") >= 0, true);
+conf('o sw.js não lista nada do acervo no pacote', /acervo\.json|acervo_indice/.test(listaSW), false);
 conf('o confere_tudo.sh não roda o testa_acervo', ler('_teste/confere_tudo.sh').indexOf('testa_acervo') < 0, true);
 conf('o app.js não tem a chave ACERVO_EM_CONSTRUCAO', APP.indexOf('ACERVO_EM_CONSTRUCAO') < 0, true);
 const funcoes = ['carregarAcervo', 'moduloAcervoPorAssunto', 'desenharTemas()', 'montarMaterialAcervoParaAula',
@@ -66,16 +68,30 @@ const ASSUNTO_ACERVO = { id: 'acervo-mat-funcoes', titulo: 'Funções: domínio 
   }
   await amb.subir();
   const pag = await amb.pagina();
+  // um tablet vindo da 1.24.0: o cache v37 tinha o acervo no pacote e uma série que ela baixou
+  amb.extras['/vazio.html'] = { tipo: 'text/html; charset=utf-8', corpo: '<!doctype html><title>vazio</title><link rel="icon" href="data:,">' };
+  await pag.goto(amb.ORIGEM + '/vazio.html');
+  await pag.evaluate(async () => {
+    const c = await caches.open('apoio-educacional-v37');
+    await c.put('./banco/acervo.json', new Response('[]', { headers: { 'Content-Type': 'application/json' } }));
+    await c.put('./banco/acervo_indice.json', new Response('[]', { headers: { 'Content-Type': 'application/json' } }));
+    await c.put('./banco/serie-06.json', new Response('{"serie":"06"}', { headers: { 'Content-Type': 'application/json' } }));
+  });
   await H.abrirApp(pag, amb.ORIGEM);
 
   // o service worker instala: todo arquivo da lista existe
   const sw = await esperar('service worker ativo', () => pag.evaluate(() =>
-    navigator.serviceWorker.getRegistration().then(r => !!(r && r.active))), v => v === true, VENENO ? 8000 : 30000);
+    navigator.serviceWorker.getRegistration().then(r => !!(r && r.active))), v => v === true, 30000);
   if (VENENO) {
     conf('VENENO ENXERGADO: com um arquivo que não existe na lista, o service worker não instala', sw.ok, false);
+    conf('e a causa é o acervo.json que não existe mais (404)', amb.quatrocentos.indexOf('/banco/acervo.json') >= 0, true);
     throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
   }
   conf('o service worker instalou com a lista nova (nenhum arquivo faltando)', sw.ok, true);
+  const caixas = await esperar('cache v37 apagado na ativação', () => pag.evaluate(() => caches.keys()), v => v && v.indexOf('apoio-educacional-v37') < 0, 15000);
+  conf('o cache antigo foi apagado', caixas.ok, true);
+  const baixados = await pag.evaluate(() => caches.open('apoio-educacional-baixados').then(c => c.keys()).then(k => k.map(r => new URL(r.url).pathname).sort().join(',')));
+  conf('a série que ela baixou foi resgatada para o BAIXADOS, e o acervo aposentado não', baixados, '/banco/serie-06.json');
 
   // ================================================================
   secao('3. Biblioteca sem pacote: "Em construção"; a aba Temas não existe');
