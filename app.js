@@ -2428,7 +2428,10 @@
           /* Veio do "Abrir como folha" e ela marcou Repetir: a página vai para
            * a primeira aula da série, a do dia escolhido. */
           if (daBibliotecaNaSerie) {
-            var primeira = db.aulas.filter(function (a) { return a.alunoId === alunoId && a.data === data; })[0];
+            /* A da série nova primeiro; se já havia uma aula avulsa nesse dia, a
+             * série pulou a data e a página vai para essa, em página nova. */
+            var doDia = db.aulas.filter(function (a) { return a.alunoId === alunoId && a.data === data; });
+            var primeira = doDia.filter(function (a) { return a.serieId; })[0] || doDia[0];
             if (primeira) colarNaFolhaDaAula(primeira.id, daBibliotecaNaSerie);
             else avisar('As aulas foram criadas, mas nenhuma cai no dia escolhido; a página não foi colada.');
           }
@@ -12357,7 +12360,11 @@
 
   function colarNaFolhaDaAula(aulaId, alvo) {
     var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
-    if (!aula || colandoNaFolha) return Promise.resolve();
+    if (!aula) return Promise.resolve();
+    if (colandoNaFolha) {
+      avisar('Ainda estou colando a página anterior. Espere um instante e tente de novo.');
+      return Promise.resolve();
+    }
     colandoNaFolha = true;
     var pos = posicaoNaFolha(alvo);
     // duas vezes a resolução da folha, com teto, para a letra do recorte ficar nítida
@@ -12366,6 +12373,10 @@
     var ref = Core.uid();
     var indice = 0;
     return desenharAssetBib(alvo.pacote, alvo.caminho, lpx, apx).then(function (c) {
+      /* Enquanto a página desenhava ela pode ter tocado Desfazer (a série
+       * recém-criada, por exemplo): sem a aula, nada é gravado. */
+      aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
+      if (!aula) { var sem = new Error('aula desfeita'); sem.desfeita = true; throw sem; }
       return Store.salvarMidia(ref, { dataUrl: c.toDataURL('image/jpeg', 0.9), w: lpx, h: apx });
     }).then(function () {
       return Store.lerNota(aulaId);
@@ -12385,7 +12396,8 @@
       desenharAgenda();
       abrirEditorNota(aulaId, indice);
       avisar('Colado na folha da aula, página ' + (indice + 1) + '.');
-    }).catch(function () {
+    }).catch(function (e) {
+      if (e && e.desfeita) return;
       avisar('Não consegui colar na folha. Tente de novo.');
     }).then(function () {
       colandoNaFolha = false;

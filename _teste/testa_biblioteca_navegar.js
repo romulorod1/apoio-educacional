@@ -221,6 +221,12 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   await pag.evaluate(() => document.querySelector('.bib-voltar').click());
   await pausa(100);
   const chavesAntes = await chavesDeMiniatura(pag, '^bib:');
+  // espião: na segunda visita nenhum SVG pode ser lido do pacote para desenhar
+  await pag.evaluate(() => {
+    window.__leiturasDeAsset = 0;
+    const orig = Store.lerAssetBiblioteca;
+    Store.lerAssetBiblioteca = function () { window.__leiturasDeAsset++; return orig.apply(this, arguments); };
+  });
   const t1 = Date.now();
   await tocarLinha(pag, 'Equações do Segundo Grau: Resultados Básicos');
   await esperar('segunda visita', () => minisVisiveisProntas(pag), v => v && v.visiveis > 0 && v.prontas === v.visiveis, 10000);
@@ -229,6 +235,7 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   conf('segunda visita também abaixo de 2 segundos', ms2 < 2000, true);
   await pausa(500);
   conf('e veio do cache: nenhuma miniatura nova gravada em midias', await chavesDeMiniatura(pag, '^bib:'), chavesAntes);
+  conf('e nenhum SVG foi lido do pacote para redesenhar', await pag.evaluate(() => window.__leiturasDeAsset), 0);
   conf('as 40 miniaturas da lista estão no cache', await chavesDeMiniatura(pag, 'resultados-basicos/ex-\\d+\\.svg#520$'), 40);
 
   // ================================================================
@@ -403,7 +410,8 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   await esperar('escolha da aula', () => pag.$eval('#modal-bib-folha', e => e.classList.contains('aberto')), v => v === true, 5000);
   const linhasDeHoje = await pag.evaluate(() => Array.from(document.querySelectorAll('#corpo-modal-bib-folha .item-lista .detalhe')).map(d => d.textContent));
   conf('a aula de hoje aparece dizendo que já tem folha', linhasDeHoje.some(t => /já tem folha/.test(t)), true);
-  // dois toques seguidos: tem de colar UMA vez
+  // dois toques seguidos: tem de colar UMA vez (uma imagem nova em midias, fora as miniaturas)
+  const imagensAntes = await chavesDeMiniatura(pag, '^(?!bib:)');
   await pag.evaluate(() => { const l = document.querySelector('#corpo-modal-bib-folha .item-lista'); l.click(); l.click(); });
   await esperar('editor aberto na página colada', () => pag.$eval('#modal-nota', e => e.classList.contains('aberto')), v => v === true, 10000);
   await pausa(600);
@@ -411,6 +419,7 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   conf('o rodapé mostra a página colada, e não a primeira', rod.contador, 'Folha 2 de 2');
   conf('e o fundo mostrado é o da página colada (sem pauta)', rod.fundo, 'branco');
   conf('dois toques colaram uma página só', (await lerNotaDeHoje()).paginas, 2);
+  conf('e gravaram uma imagem só em midias', (await chavesDeMiniatura(pag, '^(?!bib:)')) - imagensAntes, 1);
 
   // ================================================================
   secao('8. Nova aula com "Repetir toda semana": a página vai para a aula do dia');
