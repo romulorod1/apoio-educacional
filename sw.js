@@ -44,8 +44,11 @@
  * limpa a notação de fórmulas matemáticas e atualiza a apresentação das dicas.
  * O v30 tira o acervo do ar (aba Temas em construção) e leva a chave Pix ao
  * fechamento da família, com a lista igual. O v31 tira do PDF do fechamento a
- * seção Feedback quando ela está em branco, depois de a Nathália confirmar. */
-var CACHE = 'apoio-educacional-v31';
+ * seção Feedback quando ela está em branco, depois de a Nathália confirmar.
+ * O v32 acrescenta duas linhas à lista, './zip.js' e './biblioteca.js': o
+ * Importar biblioteca de Ajustes, que abre e confere o pacote .zip da
+ * biblioteca sem internet. */
+var CACHE = 'apoio-educacional-v32';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -66,6 +69,10 @@ var ARQUIVOS = [
   './figuras/solidos.js',
   './store.js',
   './draw.js',
+  /* O leitor de zip e a conferência do pacote da biblioteca. O pacote em si
+   * nunca passa por aqui: ele vai para o IndexedDB ao ser importado. */
+  './zip.js',
+  './biblioteca.js',
   /* O cartao do mes: ela toca uma vez no fechamento e manda a imagem por
    * WhatsApp. Se ficasse de fora da lista, o app.js novo rodaria contra o
    * cartao.js velho servido do cache de sobra, depois de uma atualizacao. */

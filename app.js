@@ -4,12 +4,37 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.19.1';
+  var VERSAO = '1.20.0';
 
   /* O acervo de 14/09 (aba Temas e o atalho dele na escolha de assunto da
    * aula) saiu do ar até ser refeito com revisão. Os arquivos do banco ficam
    * intactos: voltar para false devolve tudo como estava. */
   var ACERVO_EM_CONSTRUCAO = true;
+
+  /* O cartão "Biblioteca" de Ajustes só aparece quando existir a aba que
+   * mostra o que foi importado. Até lá ela não vê nada de novo: importar sem
+   * ter onde abrir seria prometer o que não acontece. */
+  var BIBLIOTECA_NO_AR = false;
+
+  /* A versão 1.20.0 sobe o banco do tablet para a versão 2 (store.js). Se
+   * outra janela do aplicativo, ainda na versão antiga, estiver aberta, a
+   * subida espera ela fechar, e sem este aviso a tela ficaria parada em
+   * branco. Os dados não correm risco: é só espera. */
+  // e sai da frente assim que a janela antiga larga o banco
+  self.aoBancoLiberado = function () {
+    var faixa = document.querySelector('#aviso-banco-bloqueado');
+    if (faixa) faixa.remove();
+  };
+  self.aoBancoBloqueado = function () {
+    if (document.querySelector('#aviso-banco-bloqueado')) return;
+    var faixa = document.createElement('div');
+    faixa.id = 'aviso-banco-bloqueado';
+    faixa.className = 'faixa-aviso';
+    faixa.style.cssText = 'position:fixed;top:12px;left:12px;right:12px;z-index:999';
+    faixa.textContent = 'O aplicativo está aberto em outra janela com a versão anterior. ' +
+      'Feche as outras janelas do aplicativo; esta abre sozinha em seguida. Nada foi perdido.';
+    (document.body || document.documentElement).appendChild(faixa);
+  };
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
@@ -1137,6 +1162,8 @@
     $('#baixar-copia').addEventListener('click', baixarCopia);
     $('#restaurar-copia').addEventListener('click', function () { $('#arquivo-copia').click(); });
     $('#arquivo-copia').addEventListener('change', restaurarCopia);
+    $('#importar-biblioteca').addEventListener('click', function () { $('#arquivo-biblioteca').click(); });
+    $('#arquivo-biblioteca').addEventListener('change', importarBiblioteca);
     $('#limpar-orfaos').addEventListener('click', liberarEspaco);
     $('#apagar-exemplo').addEventListener('click', apagarExemplo);
     $('#apagar-tudo').addEventListener('click', apagarTudo);
@@ -11046,6 +11073,8 @@
 
     desenharAjustesDoFechamento();
     desenharAjustesDeReajuste();
+    mostrarCartaoBiblioteca();
+    desenharPacotesBiblioteca();
 
     Store.estimarEspaco().then(function (e) {
       if (!e) { $('#info-espaco').textContent = ''; return; }
@@ -11399,6 +11428,164 @@
     };
     leitor.readAsText(arquivo);
     ev.target.value = '';
+  }
+
+  // ================= biblioteca: importar pacote =================
+
+  /* O pacote é um .zip que ela escolhe no seletor do Android (o Drive aparece
+   * ali). Nada é gravado antes de o pacote inteiro ser conferido: manifest,
+   * lista de arquivos nos dois sentidos, hash de cada um e os assets que os
+   * exercícios citam (biblioteca.js). Depois, o espaço livre; e só então a
+   * gravação, numa transação só (store.js). Qualquer recusa deixa o tablet
+   * exatamente como estava, e a tela diz por quê. */
+  function mostrarEstadoImportacao(classe, linhas) {
+    var caixa = $('#estado-importacao-biblioteca');
+    if (!caixa) return;
+    caixa.innerHTML = '';
+    if (!linhas || !linhas.length) return;
+    caixa.appendChild(el('div', { class: classe, style: 'margin-bottom:10px' }, linhas.map(function (l, i) {
+      // linha de detalhe técnico: pequena, para quem for investigar
+      if (l && l.detalhe) return el('div', { style: 'font-size:12px;opacity:.75;margin-top:4px', texto: l.detalhe });
+      return el('div', { style: i ? '' : 'font-weight:600' }, [l]);
+    })));
+  }
+
+  function importarBiblioteca(ev) {
+    var arquivo = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!arquivo) return;
+    if (typeof Zip === 'undefined' || !Zip.suportado()) {
+      mostrarEstadoImportacao('faixa-aviso', linhasDaRecusa({ recusa: true, tipo: 'navegador' }));
+      return;
+    }
+    var botao = $('#importar-biblioteca');
+    if (botao) botao.disabled = true;
+    mostrarEstadoImportacao('faixa-info', ['Conferindo o pacote ' + arquivo.name + '...']);
+    var aberto = null;
+    arquivo.arrayBuffer().then(function (conteudo) {
+      return Biblioteca.abrirPacote(conteudo, function (feitos, total) {
+        if (feitos % 50 === 0 || feitos === total) {
+          mostrarEstadoImportacao('faixa-info', ['Conferindo o pacote ' + arquivo.name + '...',
+            feitos + ' de ' + total + ' arquivos conferidos.']);
+        }
+      });
+    }).then(function (a) {
+      aberto = a;
+      return Promise.all([Store.itensDaBiblioteca(), Store.teoriaDaBiblioteca()]);
+    }).then(function (r) {
+      /* Um exercício é gravado pelo id do contrato. Se o mesmo id já veio de
+       * OUTRO pacote, gravar por cima trocaria o dono dele, e o registro de
+       * uso passaria a apontar para outro material. Recusa. */
+      var meus = {};
+      aberto.itens.forEach(function (it) { meus[it.id] = true; });
+      aberto.teoria.forEach(function (t) { meus[t.id] = true; });
+      var alheio = r[0].concat(r[1]).filter(function (x) { return meus[x.id] && x.pacote !== aberto.manifest.pacote; })[0];
+      if (alheio) {
+        var r2 = new Error('Repete conteúdo que já veio do pacote ' + alheio.pacote + '.');
+        r2.recusa = true;
+        r2.tipo = 'defeito';
+        throw r2;
+      }
+      return Store.listarPacotesBiblioteca();
+    }).then(function (lista) {
+      var atual = lista.filter(function (p) { return p.pacote === aberto.manifest.pacote; })[0];
+      if (atual && atual.versao >= aberto.manifest.versao) {
+        var e = new Error('versao');
+        e.versaoAtual = atual.versao;
+        throw e;
+      }
+      return Store.estimarEspaco();
+    }).then(function (espaco) {
+      /* A quota do navegador é o teto; a folga de 20% cobre o índice e os
+       * registros, que o total dos arquivos não conta. */
+      if (espaco && espaco.quota) {
+        var livre = espaco.quota - (espaco.usage || 0);
+        var precisa = Math.round(aberto.bytesTotais * 1.2);
+        if (livre < precisa) {
+          var semEspaco = new Error('O tablet não tem espaço para este pacote: ele precisa de ' +
+            Biblioteca.mb(precisa) + ' e há ' + Biblioteca.mb(Math.max(0, livre)) + ' livres. ' +
+            'Libere espaço no tablet (apagando arquivos ou fotos que não usa) e tente de novo.');
+          semEspaco.espaco = true;
+          throw semEspaco;
+        }
+      }
+      return Store.tornarPersistente();
+    }).then(function () {
+      mostrarEstadoImportacao('faixa-info', ['Gravando a biblioteca no tablet...']);
+      return Store.gravarPacoteBiblioteca(aberto);
+    }).then(function (registro) {
+      mostrarEstadoImportacao('faixa-info',
+        ['Biblioteca importada.'].concat(Biblioteca.resumo(registro.manifest, registro.bytes)));
+      desenharPacotesBiblioteca();
+    }).catch(function (e) {
+      if (e && e.versaoAtual != null) {
+        var nova = aberto.manifest.versao;
+        mostrarEstadoImportacao('faixa-aviso', [e.versaoAtual === nova
+          ? 'Esta versão do pacote já está no tablet. Nada foi mudado.'
+          : 'O tablet já tem a versão ' + e.versaoAtual + ' deste pacote, mais nova que a do arquivo (versão ' +
+            nova + '). Nada foi mudado.']);
+        return;
+      }
+      mostrarEstadoImportacao('faixa-aviso', linhasDaRecusa(e));
+    }).then(function () {
+      if (botao) botao.disabled = false;
+    });
+  }
+
+  /* O que a tela diz quando o pacote não entra: o que aconteceu, o que ela
+   * pode fazer, que nada mudou, e o detalhe técnico em letra pequena (só das
+   * recusas, que são em português; erro cru do navegador não vai para a tela). */
+  var ORIENTACAO_RECUSA = {
+    download: 'O pacote chegou estragado ou incompleto. Baixe de novo do Drive e tente outra vez.',
+    defeito: 'Este pacote veio com defeito e não pode ser usado. Avise quem mandou o pacote; enquanto isso, continue usando o que já está no tablet.',
+    atualizar: 'Este pacote é de uma versão mais nova do aplicativo. Atualize o aplicativo (Ajustes, Procurar atualização) e tente de novo.',
+    navegador: 'Este navegador não consegue abrir o pacote da biblioteca. Atualize o Chrome e tente de novo.',
+    nao_pacote: 'O arquivo escolhido não é um pacote da biblioteca. Escolha o arquivo .zip da biblioteca no Drive.'
+  };
+
+  function linhasDaRecusa(e) {
+    var linhas = ['O pacote não foi importado.'];
+    if (e && e.recusa) {
+      linhas.push(ORIENTACAO_RECUSA[e.tipo] || ORIENTACAO_RECUSA.defeito);
+    } else if (e && e.espaco) {
+      linhas.push(e.message);
+    } else if (e && e.name === 'QuotaExceededError') {
+      linhas.push('O tablet ficou sem espaço no meio da gravação.');
+    } else if (e && (e.name === 'NotReadableError' || e.name === 'NotFoundError')) {
+      linhas.push('Não consegui ler o arquivo. Se ele está no Drive, espere o download terminar e tente de novo.');
+    } else {
+      linhas.push('Não consegui ler ou gravar o pacote agora. Feche e abra o aplicativo e tente de novo.');
+    }
+    linhas.push('O que já estava no tablet continua igual.');
+    if (e && e.recusa && e.tipo !== 'navegador' && e.tipo !== 'nao_pacote') linhas.push({ detalhe: 'Detalhe: ' + e.message });
+    return linhas;
+  }
+
+  function mostrarCartaoBiblioteca() {
+    ['#titulo-cartao-biblioteca', '#cartao-biblioteca'].forEach(function (s) {
+      var e = $(s);
+      if (e) e.hidden = !BIBLIOTECA_NO_AR;
+    });
+  }
+
+  function desenharPacotesBiblioteca() {
+    var caixa = $('#lista-pacotes-biblioteca');
+    if (!caixa) return;
+    Store.listarPacotesBiblioteca().then(function (lista) {
+      caixa.innerHTML = '';
+      lista.forEach(function (p) {
+        var linhas = Biblioteca.resumo(p.manifest, p.bytes);
+        var d = p.importadoEm ? new Date(p.importadoEm) : null;
+        // a data do tablet, e não a de Greenwich: à noite o dia UTC já virou
+        var quando = d && !isNaN(d) ? Core.ddmmaaaa(d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) +
+          '-' + ('0' + d.getDate()).slice(-2)) : '';
+        caixa.appendChild(el('div', { class: 'cartao compacto', style: 'margin-bottom:10px' }, [
+          el('div', { style: 'font-weight:600', texto: linhas[0] }),
+          el('div', { class: 'ajuda', style: 'margin:4px 0 0', texto: linhas.slice(1).join('. ') +
+            (quando ? '. Importado em ' + quando + '.' : '.') })
+        ]));
+      });
+    }).catch(function () { caixa.innerHTML = ''; });
   }
 
   function liberarEspaco() {

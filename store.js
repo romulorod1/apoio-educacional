@@ -9,32 +9,98 @@
  *   anexos    : arquivos avulsos (PDF do Samsung Notes, fotos).
  *   historico : instantâneos para desfazer.
  *
+ * E os da biblioteca (versão 2 do banco), no formato do contrato do pacote
+ * (CONTRATO_pacote_biblioteca.md, seção 8):
+ *   biblioteca_pacotes  : o manifest de cada pacote importado, com o índice
+ *                         de busca e os apelidos dele.
+ *   biblioteca_itens    : um exercício por registro, pelo id do contrato.
+ *   biblioteca_teoria   : uma aula de teoria por registro, com as páginas.
+ *   biblioteca_assets   : os SVG (Blob), por pacote e caminho.
+ *   biblioteca_uso      : que exercício foi para que aluno, em que aula.
+ *   biblioteca_etiquetas: a dificuldade que ela deu a um exercício.
+ * Os quatro primeiros vêm do pacote e se refazem importando de novo; por isso
+ * a cópia de segurança leva só uso e etiquetas, que são dela.
+ *
  * Nada sai daqui sem a Nathália mandar. Não há servidor nem envio automático.
  */
 (function (root) {
   'use strict';
 
   var NOME_BANCO = 'apoio-educacional';
-  var VERSAO_BANCO = 1;
+  /* Versão 2 (biblioteca): a migração só CRIA os depósitos que faltam. Nenhum
+   * dado da versão 1 é lido, mudado ou copiado.
+   *
+   * O número NUNCA desce. Um app.js antigo que pedisse a versão 1 a um banco
+   * já na 2 receberia VersionError e não abriria os dados dela: desfazer este
+   * release é republicar o código antigo COM VERSAO_BANCO = 2. */
+  var VERSAO_BANCO = 2;
   var MAX_HISTORICO = 25;
 
+  /* Chave das miniaturas da biblioteca dentro de 'midias'. Elas são cache
+   * refeito a partir do SVG do pacote: ficam fora da cópia de segurança e da
+   * limpeza de órfãos, e somem quando o pacote é substituído. */
+  var PREFIXO_MINIATURA = 'bib:';
+
   var bancoAberto = null;
+
+  function criarDepositos(b) {
+    if (!b.objectStoreNames.contains('dados')) b.createObjectStore('dados');
+    if (!b.objectStoreNames.contains('notas')) b.createObjectStore('notas');
+    if (!b.objectStoreNames.contains('midias')) b.createObjectStore('midias');
+    if (!b.objectStoreNames.contains('anexos')) b.createObjectStore('anexos');
+    if (!b.objectStoreNames.contains('historico')) {
+      b.createObjectStore('historico', { keyPath: 'id', autoIncrement: true });
+    }
+    var s;
+    if (!b.objectStoreNames.contains('biblioteca_pacotes')) {
+      b.createObjectStore('biblioteca_pacotes', { keyPath: 'pacote' });
+    }
+    if (!b.objectStoreNames.contains('biblioteca_itens')) {
+      s = b.createObjectStore('biblioteca_itens', { keyPath: 'id' });
+      s.createIndex('serie', 'serie');
+      s.createIndex('modulo', 'modulo.slug');
+      s.createIndex('tema_app', 'tema_app');
+      s.createIndex('pacote', 'pacote');
+    }
+    if (!b.objectStoreNames.contains('biblioteca_teoria')) {
+      s = b.createObjectStore('biblioteca_teoria', { keyPath: 'id' });
+      s.createIndex('pacote', 'pacote');
+    }
+    if (!b.objectStoreNames.contains('biblioteca_assets')) {
+      s = b.createObjectStore('biblioteca_assets', { keyPath: 'chave' });
+      s.createIndex('pacote', 'pacote');
+    }
+    if (!b.objectStoreNames.contains('biblioteca_uso')) {
+      s = b.createObjectStore('biblioteca_uso', { keyPath: 'id', autoIncrement: true });
+      s.createIndex('itemId', 'itemId');
+      s.createIndex('alunoId', 'alunoId');
+    }
+    if (!b.objectStoreNames.contains('biblioteca_etiquetas')) {
+      b.createObjectStore('biblioteca_etiquetas', { keyPath: 'itemId' });
+    }
+  }
 
   function abrir() {
     if (bancoAberto) return Promise.resolve(bancoAberto);
     return new Promise(function (resolve, reject) {
       var req = indexedDB.open(NOME_BANCO, VERSAO_BANCO);
-      req.onupgradeneeded = function (e) {
-        var b = e.target.result;
-        if (!b.objectStoreNames.contains('dados')) b.createObjectStore('dados');
-        if (!b.objectStoreNames.contains('notas')) b.createObjectStore('notas');
-        if (!b.objectStoreNames.contains('midias')) b.createObjectStore('midias');
-        if (!b.objectStoreNames.contains('anexos')) b.createObjectStore('anexos');
-        if (!b.objectStoreNames.contains('historico')) {
-          b.createObjectStore('historico', { keyPath: 'id', autoIncrement: true });
-        }
+      req.onupgradeneeded = function (e) { criarDepositos(e.target.result); };
+      /* Outra janela do aplicativo, ainda na versão antiga, segura o banco na
+       * versão 1: a subida espera ela fechar. Sem aviso, a tela ficaria em
+       * branco sem motivo aparente; quem mostra o aviso é o app.js. */
+      req.onblocked = function () { if (typeof root.aoBancoBloqueado === 'function') root.aoBancoBloqueado(); };
+      req.onsuccess = function () {
+        var conexao = req.result;
+        bancoAberto = conexao;
+        /* Uma aba com a versão nova do aplicativo pede para subir o banco:
+         * esta conexão sai do caminho em vez de travar a outra. */
+        conexao.onversionchange = function () {
+          conexao.close();
+          if (bancoAberto === conexao) bancoAberto = null;
+        };
+        if (typeof root.aoBancoLiberado === 'function') root.aoBancoLiberado();
+        resolve(conexao);
       };
-      req.onsuccess = function () { bancoAberto = req.result; resolve(bancoAberto); };
       req.onerror = function () { reject(req.error); };
     });
   }
@@ -131,6 +197,105 @@
   function lerAnexo(id) { return ler('anexos', id); }
   function apagarAnexo(id) { return apagar('anexos', id); }
 
+  // ---------- biblioteca (pacotes importados) ----------
+
+  /* Grava um pacote já aberto e conferido pelo biblioteca.js, numa transação
+   * só: ou entra tudo, ou nada muda. A versão anterior do mesmo pacote é
+   * apagada no fim da MESMA transação, depois de a nova estar escrita.
+   *
+   * Pacote com a mesma chave e versão igual ou maior no tablet: não grava e
+   * recusa com e.versaoAtual, para a tela avisar. A conferência é feita dentro
+   * da transação, e não antes dela, para dois toques seguidos não gravarem
+   * duas vezes. */
+  function gravarPacoteBiblioteca(aberto) {
+    var m = aberto.manifest;
+    var chave = m.pacote, versao = m.versao;
+    var DEPOSITOS = ['biblioteca_pacotes', 'biblioteca_itens', 'biblioteca_teoria', 'biblioteca_assets', 'midias'];
+    // Os Blobs nascem antes da transação: nada assíncrono pode ficar no meio dela.
+    var assets = aberto.assets.map(function (a) {
+      return {
+        chave: chave + ':' + a.caminho, pacote: chave, versao: versao, caminho: a.caminho,
+        blob: a.blob || new Blob([a.bytes], { type: a.tipo })
+      };
+    });
+    var registro = {
+      pacote: chave, versao: versao, manifest: m, busca: aberto.busca, apelidos: aberto.apelidos,
+      bytes: aberto.bytesTotais, importadoEm: new Date().toISOString()
+    };
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = b.transaction(DEPOSITOS, 'readwrite');
+        var recusa = null;
+        var pacotes = t.objectStore('biblioteca_pacotes');
+        var req = pacotes.get(chave);
+        req.onsuccess = function () {
+          var atual = req.result;
+          if (atual && atual.versao >= versao) {
+            recusa = new Error('versao');
+            recusa.versaoAtual = atual.versao;
+            t.abort();
+            return;
+          }
+          pacotes.put(registro);
+          var itens = t.objectStore('biblioteca_itens');
+          aberto.itens.forEach(function (it) {
+            var r = Object.assign({}, it, { pacote: chave, versao: versao });
+            itens.put(r);
+          });
+          var teoria = t.objectStore('biblioteca_teoria');
+          aberto.teoria.forEach(function (au) {
+            teoria.put(Object.assign({}, au, { pacote: chave, versao: versao }));
+          });
+          var dep = t.objectStore('biblioteca_assets');
+          assets.forEach(function (a) { dep.put(a); });
+          // o que era da versão anterior e não foi reescrito agora
+          ['biblioteca_itens', 'biblioteca_teoria', 'biblioteca_assets'].forEach(function (nome) {
+            var cur = t.objectStore(nome).index('pacote').openCursor(IDBKeyRange.only(chave));
+            cur.onsuccess = function (e) {
+              var c = e.target.result;
+              if (!c) return;
+              if (c.value.versao !== versao) c.delete();
+              c.continue();
+            };
+          });
+          // miniaturas da versão anterior: o desenho pode ter mudado
+          var pref = PREFIXO_MINIATURA + chave + '@';
+          t.objectStore('midias').delete(IDBKeyRange.bound(pref, pref + '￿'));
+        };
+        t.oncomplete = function () { resolve(registro); };
+        t.onabort = function () { reject(recusa || t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
+
+  function listarPacotesBiblioteca() {
+    return todosOsValores('biblioteca_pacotes').then(function (l) {
+      return (l || []).sort(function (a, b) { return a.pacote < b.pacote ? -1 : a.pacote > b.pacote ? 1 : 0; });
+    });
+  }
+  function itensDaBiblioteca() { return todosOsValores('biblioteca_itens'); }
+  function teoriaDaBiblioteca() { return todosOsValores('biblioteca_teoria'); }
+  function lerAssetBiblioteca(pacote, caminho) {
+    return ler('biblioteca_assets', pacote + ':' + caminho).then(function (r) { return r ? r.blob : null; });
+  }
+
+  function chaveMiniatura(pacote, versao, caminho) {
+    return PREFIXO_MINIATURA + pacote + '@' + versao + ':' + caminho;
+  }
+
+  function registrarUsoBiblioteca(reg) {
+    return trans('biblioteca_uso', 'readwrite').then(function (s) {
+      return comoPromessa(s.add({ itemId: reg.itemId, alunoId: reg.alunoId, aulaId: reg.aulaId, data: reg.data }));
+    });
+  }
+  function usoDaBiblioteca() { return todosOsValores('biblioteca_uso'); }
+  function gravarEtiquetaBiblioteca(reg) {
+    return trans('biblioteca_etiquetas', 'readwrite').then(function (s) {
+      return comoPromessa(s.put({ itemId: reg.itemId, dificuldade: reg.dificuldade, data: reg.data }));
+    });
+  }
+  function etiquetasDaBiblioteca() { return todosOsValores('biblioteca_etiquetas'); }
+
   // ---------- histórico de desfazer ----------
 
   /* Guarda o estado ANTES da ação, para poder voltar.
@@ -202,7 +367,9 @@
     }).then(function () {
       return todasAsChaves('midias');
     }).then(function (chaves) {
-      return Promise.all((chaves || []).filter(function (k) { return !midiasUsadas[k]; })
+      return Promise.all((chaves || []).filter(function (k) {
+        return !midiasUsadas[k] && String(k).indexOf(PREFIXO_MINIATURA) !== 0;
+      })
         .map(function (k) { relatorio.midias++; return apagarMidia(k); }));
     }).then(function () {
       return todasAsChaves('anexos');
@@ -251,7 +418,10 @@
       pacote.notas = notas;
       return todasAsChaves('midias');
     }).then(function (chaves) {
-      return Promise.all((chaves || []).map(function (k) {
+      // miniatura da biblioteca é cache refeito do pacote: não vai para a cópia
+      return Promise.all((chaves || []).filter(function (k) {
+        return String(k).indexOf(PREFIXO_MINIATURA) !== 0;
+      }).map(function (k) {
         return lerMidia(k).then(function (v) { return { id: k, valor: v }; });
       }));
     }).then(function (midias) {
@@ -272,7 +442,14 @@
           registro.conteudo = texto;
           pacote.anexos[a.id] = registro;
         });
-      })).then(function () { return pacote; });
+      }));
+    }).then(function () {
+      /* Da biblioteca vão só o uso e as etiquetas, que são dela. Os pacotes,
+       * os exercícios e as imagens voltam importando o pacote de novo. */
+      return Promise.all([usoDaBiblioteca(), etiquetasDaBiblioteca()]);
+    }).then(function (bib) {
+      pacote.biblioteca = { uso: bib[0] || [], etiquetas: bib[1] || [] };
+      return pacote;
     });
   }
 
@@ -294,7 +471,27 @@
         }
       });
       return Promise.all(passos);
+    }).then(function () {
+      /* Cópia feita antes da biblioteca não tem o campo: aí o que o tablet já
+       * tem de uso e etiquetas fica como está. */
+      if (!pacote.biblioteca) return null;
+      return restaurarBiblioteca(pacote.biblioteca);
     }).then(function () { return pacote.dados; });
+  }
+
+  function restaurarBiblioteca(bib) {
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = b.transaction(['biblioteca_uso', 'biblioteca_etiquetas'], 'readwrite');
+        var uso = t.objectStore('biblioteca_uso');
+        var etq = t.objectStore('biblioteca_etiquetas');
+        uso.clear(); etq.clear();
+        (bib.uso || []).forEach(function (r) { if (r && r.itemId) uso.put(r); });
+        (bib.etiquetas || []).forEach(function (r) { if (r && r.itemId) etq.put(r); });
+        t.oncomplete = function () { resolve(); };
+        t.onabort = function () { reject(t.error); };
+      });
+    });
   }
 
   function apagarTudo() {
@@ -303,7 +500,11 @@
       trans('notas', 'readwrite').then(function (s) { return comoPromessa(s.clear()); }),
       trans('midias', 'readwrite').then(function (s) { return comoPromessa(s.clear()); }),
       trans('anexos', 'readwrite').then(function (s) { return comoPromessa(s.clear()); }),
-      trans('historico', 'readwrite').then(function (s) { return comoPromessa(s.clear()); })
+      trans('historico', 'readwrite').then(function (s) { return comoPromessa(s.clear()); }),
+      /* O uso e as etiquetas são dela e saem junto. Os pacotes ficam: são
+       * conteúdo reimportável, como o próprio aplicativo. */
+      trans('biblioteca_uso', 'readwrite').then(function (s) { return comoPromessa(s.clear()); }),
+      trans('biblioteca_etiquetas', 'readwrite').then(function (s) { return comoPromessa(s.clear()); })
     ]);
   }
 
@@ -316,6 +517,11 @@
     registrarHistorico: registrarHistorico, listarHistorico: listarHistorico,
     desfazer: desfazer, limparHistorico: limparHistorico,
     limparOrfaos: limparOrfaos, estimarEspaco: estimarEspaco, tornarPersistente: tornarPersistente,
-    exportarTudo: exportarTudo, importarTudo: importarTudo, apagarTudo: apagarTudo
+    exportarTudo: exportarTudo, importarTudo: importarTudo, apagarTudo: apagarTudo,
+    gravarPacoteBiblioteca: gravarPacoteBiblioteca, listarPacotesBiblioteca: listarPacotesBiblioteca,
+    itensDaBiblioteca: itensDaBiblioteca, teoriaDaBiblioteca: teoriaDaBiblioteca,
+    lerAssetBiblioteca: lerAssetBiblioteca, chaveMiniatura: chaveMiniatura,
+    registrarUsoBiblioteca: registrarUsoBiblioteca, usoDaBiblioteca: usoDaBiblioteca,
+    gravarEtiquetaBiblioteca: gravarEtiquetaBiblioteca, etiquetasDaBiblioteca: etiquetasDaBiblioteca
   };
 })(typeof self !== 'undefined' ? self : this);
