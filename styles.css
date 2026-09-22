@@ -1402,6 +1402,9 @@ button.alvo-rascunho:hover { background: var(--soft); }
 #bib-filtro-aluno { min-height: 44px; max-width: 260px; }
 .bib-filtro-info { margin: 0; color: var(--navy); font-weight: 600; }
 .bib-celula[hidden] { display: none; }
+/* a dificuldade do pacote fica sem cor e em minúsculas: a colorida é a dela, no "Para mim" */
+.tag.bib-dif-fonte { background: var(--branco); border: 1px solid var(--fio); color: var(--navy);
+  text-transform: none; letter-spacing: 0; font-weight: 600; }
 .bib-carrinho-texto { font-weight: 700; }
 .bib-carrinho .btn:not(.principal) { background: transparent; color: var(--branco); border-color: rgba(255, 255, 255, .6); }
 .bib-carrinho .btn.principal { background: var(--branco); color: var(--navy); border-color: var(--branco); }

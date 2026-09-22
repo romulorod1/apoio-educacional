@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.23.0';
+  var VERSAO = '1.24.0';
 
   /* O acervo de 14/09 (aba Temas e o atalho dele na escolha de assunto da
    * aula) saiu do ar até ser refeito com revisão. Os arquivos do banco ficam
@@ -1174,6 +1174,7 @@
     $('#restaurar-copia').addEventListener('click', function () { $('#arquivo-copia').click(); });
     $('#arquivo-copia').addEventListener('change', restaurarCopia);
     $('#importar-biblioteca').addEventListener('click', function () { $('#arquivo-biblioteca').click(); });
+    $('#exportar-etiquetas').addEventListener('click', exportarEtiquetas);
     $('#arquivo-biblioteca').addEventListener('change', importarBiblioteca);
     $('#bib-anterior').addEventListener('click', function () { andarNoVisor(-1); });
     $('#bib-proxima').addEventListener('click', function () { andarNoVisor(1); });
@@ -11963,10 +11964,18 @@
     observarMiniaturas(grade);
   }
 
+  /* A dificuldade que vem no pacote diz de onde veio: "estimada" pela posição
+   * do exercício na lista (proxy) ou "curada" por quem revisou. Fica sem cor,
+   * porque a única dificuldade colorida do cartão é a dela, no "Para mim". */
   function rotuloDificuldade(it) {
     var nome = NOME_DIFICULDADE[it.dificuldade];
     if (!nome) return null;
-    return nome + (it.dificuldade_origem === 'curadoria' ? ', revisada' : '');
+    return (it.dificuldade_origem === 'curadoria' ? 'curada: ' : 'estimada: ') + nome.toLowerCase();
+  }
+
+  /* A que vale para o filtro: a dela, quando ela deu uma; senão, a do pacote. */
+  function dificuldadeEfetiva(it) {
+    return (bibEtiquetas && bibEtiquetas[it.id]) || it.dificuldade || null;
   }
 
   function desenharListaDeExercicios(corpo, mod, lista) {
@@ -11976,7 +11985,7 @@
     lista.itens.forEach(function (it, i) {
       var tags = [
         it.formato === 'objetiva' ? el('span', { class: 'tag', texto: 'Objetiva' }) : null,
-        rotuloDificuldade(it) ? el('span', { class: 'tag serie', texto: rotuloDificuldade(it) }) : null,
+        rotuloDificuldade(it) ? el('span', { class: 'tag bib-dif-fonte', texto: rotuloDificuldade(it) }) : null,
         it.sem_solucao ? el('span', { class: 'tag excecao', texto: 'sem solução' }) : null
       ];
       grade.appendChild(celulaComCaixa(el('button', {
@@ -11990,10 +11999,73 @@
         it.origem_citada ? el('div', { class: 'bib-origem', texto: it.origem_citada }) : null
       ]), 'itens', it.id, etiquetaDela(it)));
     });
+    corpo.appendChild(barraFiltroDeDificuldade(grade, lista));
     corpo.appendChild(barraFiltroDeUso(grade));
     corpo.appendChild(grade);
     observarMiniaturas(grade);
     carregarEtiquetas();
+  }
+
+  // ---------- filtro por dificuldade ----------
+
+  var bibFiltroDif = null;         // null = todas; 1, 2 ou 3
+
+  /* Fácil, Médio, Difícil: vale a etiqueta dela quando existe, e a do pacote
+   * (estimada ou curada) quando não. Exercício sem dificuldade nenhuma só
+   * aparece em "Todas". O filtro fica ligado de uma lista para a outra. */
+  function barraFiltroDeDificuldade(grade, lista) {
+    var chips = el('div', { class: 'chips-filtro', role: 'group', 'aria-label': 'Dificuldade', id: 'bib-filtro-dif' });
+    var info = el('span', { class: 'ajuda bib-filtro-info', id: 'bib-filtro-dif-info' });
+    function desenha() {
+      chips.innerHTML = '';
+      [null, 1, 2, 3].forEach(function (d) {
+        var ativo = bibFiltroDif === d;
+        chips.appendChild(el('button', {
+          type: 'button', class: 'chip-filtro' + (ativo ? ' ativo' : ''), 'data-dificuldade': d === null ? '' : d,
+          'aria-pressed': ativo ? 'true' : 'false', texto: d === null ? 'Todas' : NOME_DIFICULDADE[d],
+          aoClick: function () { bibFiltroDif = d; desenha(); aplicarFiltroDeDificuldade(grade, lista); }
+        }));
+      });
+    }
+    grade._info = info;
+    grade._lista = lista;
+    desenha();
+    aplicarFiltroDeDificuldade(grade, lista);
+    return el('div', { class: 'barra bib-filtro-uso bib-filtro-dif' }, [
+      el('span', { class: 'bib-filtro-rotulo', texto: 'Dificuldade:' }), chips, info
+    ]);
+  }
+
+  function aplicarFiltroDeDificuldade(grade, lista) {
+    var porId = {};
+    lista.itens.forEach(function (it) { porId[it.id] = it; });
+    var mostrados = 0;
+    Array.prototype.slice.call(grade.querySelectorAll('.bib-celula')).forEach(function (c) {
+      var cartao = c.querySelector('.bib-cartao');
+      var it = cartao && porId[cartao.getAttribute('data-id')];
+      var fora = bibFiltroDif !== null && !!it && dificuldadeEfetiva(it) !== bibFiltroDif;
+      c.setAttribute('data-fora-dif', fora ? '1' : '');
+      if (!fora) mostrados++;
+      mostrarCelula(c);
+    });
+    var info = grade._info;
+    if (info) {
+      info.textContent = bibFiltroDif === null ? ''
+        : mostrados ? plural(mostrados, 'exercício', 'exercícios') + ' de ' + lista.itens.length + ' nesta dificuldade.'
+        : 'Nenhum exercício desta lista nesta dificuldade.';
+    }
+  }
+
+  /* Os dois filtros escondem a mesma célula por motivos diferentes: ela só
+   * aparece quando nenhum dos dois a tira. */
+  function mostrarCelula(c) {
+    c.hidden = c.getAttribute('data-fora-dif') === '1' || c.getAttribute('data-fora-uso') === '1';
+  }
+
+  function reaplicarFiltroDeDificuldade() {
+    var grade = $('#bib-corpo .bib-grade-exercicios');
+    if (!grade || !grade._lista) return;
+    aplicarFiltroDeDificuldade(grade, grade._lista);
   }
 
   // ---------- vindo da aula: contexto e "ainda não usei" ----------
@@ -12084,7 +12156,7 @@
     var celulas = Array.prototype.slice.call(grade.querySelectorAll('.bib-celula'));
     var alunoId = bibFiltroAluno;
     if (!alunoId || !alunoPorId(alunoId)) {
-      celulas.forEach(function (c) { c.hidden = false; });
+      celulas.forEach(function (c) { c.setAttribute('data-fora-uso', ''); mostrarCelula(c); });
       info.textContent = '';
       return Promise.resolve();
     }
@@ -12098,7 +12170,8 @@
       celulas.forEach(function (c) {
         var cartao = c.querySelector('.bib-cartao');
         var usado = !!(cartao && usados[cartao.getAttribute('data-id')]);
-        c.hidden = usado;
+        c.setAttribute('data-fora-uso', usado ? '1' : '');
+        mostrarCelula(c);
         if (usado) escondidos++;
       });
       var nome = alunoPorId(alunoId).nome;
@@ -12238,6 +12311,8 @@
               bibEtiquetas = bibEtiquetas || {};
               if (nova) bibEtiquetas[it.id] = nova; else delete bibEtiquetas[it.id];
               desenha();
+              // com o filtro ligado, a etiqueta nova pode tirar o exercício da lista: é o que o filtro diz
+              reaplicarFiltroDeDificuldade();
             }, function () { avisar('Não consegui guardar a etiqueta. Tente de novo.'); });
           }
         }));
@@ -12256,8 +12331,35 @@
       bibEtiquetas = {};
       (lista || []).forEach(function (e) { if (e && e.dificuldade) bibEtiquetas[e.itemId] = e.dificuldade; });
       $$('#bib-corpo .bib-etiqueta').forEach(function (c) { if (c._desenha) c._desenha(); });
+      reaplicarFiltroDeDificuldade();
       return bibEtiquetas;
     }, function () { bibEtiquetas = {}; return bibEtiquetas; });
+  }
+
+  /* As etiquetas dela no formato da curadoria (Biblioteca\curadoria\
+   * dificuldade.csv: id;dificuldade;quem;data;observacao), para o Romulo levar
+   * as linhas para lá e a próxima versão do pacote trazer a dificuldade curada.
+   * Só sai quando ela toca no botão. Etiqueta desmarcada fica gravada sem
+   * dificuldade e não entra. */
+  function csvDasEtiquetas(lista) {
+    var linhas = (lista || []).filter(function (e) {
+      return e && e.itemId && (e.dificuldade === 1 || e.dificuldade === 2 || e.dificuldade === 3);
+    }).sort(function (a, b) { return a.itemId < b.itemId ? -1 : a.itemId > b.itemId ? 1 : 0; });
+    if (!linhas.length) return null;
+    return 'id;dificuldade;quem;data;observacao\n' + linhas.map(function (e) {
+      // o id do pacote nunca tem ';' nem quebra de linha; se um dia tiver, a linha não pode quebrar a planilha
+      var id = /[;"\n\r]/.test(e.itemId) ? '"' + String(e.itemId).replace(/"/g, '""') + '"' : e.itemId;
+      return [id, e.dificuldade, 'Nathalia', /^\d{4}-\d{2}-\d{2}$/.test(e.data || '') ? e.data : '', ''].join(';');
+    }).join('\n') + '\n';
+  }
+
+  function exportarEtiquetas() {
+    Store.etiquetasDaBiblioteca().then(function (lista) {
+      var csv = csvDasEtiquetas(lista);
+      if (!csv) { avisar('Nenhuma etiqueta de dificuldade ainda.'); return; }
+      entregarArquivo('etiquetas-dificuldade-' + Core.hojeIso() + '.csv',
+        new Blob([csv], { type: 'text/csv' }), 'Etiquetas de dificuldade');
+    }, function () { avisar('Não consegui ler as etiquetas. Tente de novo.'); });
   }
 
   // ---------- gerar o material ----------

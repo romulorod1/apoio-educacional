@@ -327,6 +327,11 @@ roda "biblioteca compor --envenenado-sem-solucao" node "_teste/testa_biblioteca_
 # byte a byte igual ao de main). O veneno conta o uso de qualquer aluno.
 roda "biblioteca aula"                         node "_teste/testa_biblioteca_aula.js"
 roda "biblioteca aula --envenenado-aluno"      node "_teste/testa_biblioteca_aula.js" --envenenado-aluno
+# FRENTE B: a dificuldade na lista (rotulo estimada/curada, filtro Facil, Medio,
+# Dificil com a etiqueta dela valendo, e o CSV das etiquetas no formato da
+# curadoria). O veneno ignora a etiqueta dela no filtro.
+roda "biblioteca dificuldade"                  node "_teste/testa_biblioteca_dificuldade.js"
+roda "biblioteca dificuldade --envenenado-etiqueta" node "_teste/testa_biblioteca_dificuldade.js" --envenenado-etiqueta
 
 roda "painel de valores"                        node "_teste/testa_painel_valores.js"
 roda "painel de valores --envenenado-aberto"    node "_teste/testa_painel_valores.js" --envenenado-aberto
