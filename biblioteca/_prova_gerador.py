@@ -258,7 +258,7 @@ def primeira_palavra(cs):
 
 LIMIAR_TINTA_PROVA = 235   # de 255: cinza claro de figura ainda e tinta
 CORTE_PERMITIDO = re.compile(r'^(\d+)?Exerc\S*cios(Introdut|deFixa|deAprofund)|^deExames|^Exames|^Respostas?eSolu'
-                             r'|^E?laboradopor|^P?roduzidopor|cursoarquimedes')
+                             r'|^E?laboradopor|^P?roduzidopor|^Materialelaboradopor|cursoarquimedes')
 # linha que so se pula, sem fechar o item aberto: endereco do rodape e numero
 # solto (numero da pagina, denominador "2" de uma fracao centrada)
 SO_PULA = re.compile(r'^http|^matematica\.obmep|^\d+$')
@@ -993,7 +993,7 @@ def trava_encostado(p):
     """
     lst = [i for i in p.itens if i['aula']['slug'] == 'lista-fio-imagem']
     it = {i['numero']: i for i in lst}
-    erros = ['lista-fio-imagem: exercicio %d fora do pacote' % n for n in (1, 2, 3, 4) if n not in it]
+    erros = ['lista-fio-imagem: exercicio %d fora do pacote' % n for n in (1, 2, 3, 4, 5) if n not in it]
     if erros:
         return erros
     doc = p.doc(lst[0]['origem']['arquivo'])
@@ -1012,6 +1012,32 @@ def trava_encostado(p):
         if dentro != deve:
             erros.append('lista-fio-imagem: o "=" (tinta a partir de y %.2f) esta %s do exercicio %d' % (
                 topo, 'no recorte' if dentro else 'fora do recorte', n))
+    # a barra de segmento sobre "AB" e da linha do rotulo 3
+    barras = [d['rect'] for d in pg.get_drawings() if d['rect'].height < 1.5 and 10 < d['rect'].width < 30
+              and d['rect'].x0 > 300]
+    if not barras:
+        erros.append('lista-fio-imagem: a pagina nao tem a barra de segmento')
+    else:
+        b = min(barras, key=lambda q: q.y0)
+        if not any(pz['bbox'][1] <= b.y0 for pz in pedacos(it[5], 'enunciado') if pz['pagina'] == 2):
+            erros.append('lista-fio-imagem: a barra de segmento (y %.2f) esta fora do recorte do exercicio 5' % b.y0)
+    # o "c" que rotula a figura do 1 nao e do 2
+    sc = [s for b in pg.get_text('dict')['blocks'] if b['type'] == 0 for l in b['lines'] for s in l['spans']
+          if s['text'].strip() == 'c' and s['size'] > 8.5]
+    if not sc:
+        erros.append('lista-fio-imagem: a pagina nao tem o "c"')
+    else:
+        c = pymupdf.Point((sc[0]['bbox'][0] + sc[0]['bbox'][2]) / 2, (sc[0]['bbox'][1] + sc[0]['bbox'][3]) / 2)
+        if any(pymupdf.Rect(pz['bbox']).contains(c) for pz in pedacos(it[2], 'enunciado') if pz['pagina'] == 2):
+            erros.append('lista-fio-imagem: o "c" da figura do 1 entrou no recorte do exercicio 2')
+    # o credito do autor nao entra na ultima solucao
+    for n in (1, 2, 3, 4, 5):
+        for pz in pedacos(it[n], 'solucao'):
+            if pz['pagina'] != 3:
+                continue
+            tx = p.doc(lst[0]['origem']['arquivo'])[2].get_text('text', clip=pymupdf.Rect(pz['bbox']))
+            if 'Material elaborado' in tx:
+                erros.append('lista-fio-imagem: o credito do autor entrou na solucao %d' % n)
     return erros
 
 
@@ -1035,6 +1061,23 @@ def trava_solucao_com_conteudo(p):
         if not resto and alto <= 20:
             erros.append('%s solucao: so o rotulo, sem texto nem figura' % it['id'])
     return erros
+
+
+def trava_barra_acima(topo=None):
+    """A barra de segmento 1,2 pt acima da linha do marcador entra no recorte dele.
+
+    Elementos sinteticos no formato do detector: rotulo "10." com a caixa de 335,0
+    a 345,0, o texto "BO" da mesma linha e a barra dele, de 333,8 a 333,8 (solucao
+    10 de Relacoes Metricas, 9o ano). Com o topo em 335 (o que a tinta a 72 dpi da),
+    o corte tem de subir para antes da barra.
+    """
+    topo = topo or gerar_pacote.topo_com_barra
+    marc = {'col': 0, 'el': {'bb': (29.0, 335.0, 41.4, 345.0), 'tipo': 'txt', 'col': 0, 'tam': 10.0}}
+    els = [marc['el'],
+           {'tipo': 'txt', 'col': 0, 'bb': (208.7, 334.9, 222.6, 344.9), 'texto': 'BO', 'tam': 10.0},
+           {'tipo': 'des', 'col': 0, 'bb': (208.4, 333.8, 222.7, 333.8)}]
+    y = topo(els, marc, 335.0)
+    return [] if y <= 333.8 else ['corte em %.2f, abaixo da barra (333,8)' % y]
 
 
 def trava_bordas(p):
@@ -1871,6 +1914,8 @@ def venenos_series(p, temp, placar, curadoria):
             ('nota que comeca por fracao', 'NOTA_LINHA_TODA', False, trava_recorte, 'lista-bordas:ex:5 enunciado: tinta cortada'),
             # sem o fio em imagem a lista perde a geometria: o 2 leva o fio do rodape ou sai
             ('fio do rodape em imagem', 'FIO_IMAGEM', False, lambda q: trava_recorte(q) + trava_encostado(q), 'lista-fio-imagem'),
+            ('credito do autor dentro da solucao', 'CREDITO_MATERIAL', False, trava_encostado, 'o credito do autor'),
+            ('rotulo de figura do item de cima', 'SOBREPOSICAO_MIN', 0.0, trava_recorte, 'lista-fio-imagem:ex:1 enunciado: tinta cortada'),
             ('texto encostado no rotulo vai para o item de cima', 'TINTA_DO_QUE_ENCOSTA', False, trava_encostado, 'no recorte do exercicio 3'),
             ('linha de cima encostada sobe o topo', 'MIUDO_QUE_ENCOSTA', 99.0, trava_encostado, 'exercicio 2 fora do pacote')):
         pasta = os.path.join(temp, 'v_' + attr.lower())
@@ -2045,6 +2090,13 @@ def principal():
             placar.conferir('subida fina pelo traco', trava_subida_fina())
             placar.conferir('descida fina pelo traco', trava_descida_fina())
             placar.conferir('seta que encosta no rotulo', trava_encosta())
+            placar.conferir('barra de segmento acima da linha', trava_barra_acima())
+            antes_ba = gerar_pacote.BARRA_ACIMA
+            gerar_pacote.BARRA_ACIMA = False
+            try:
+                placar.conferir('barra de segmento no item de cima', trava_barra_acima(), True, 'corte em')
+            finally:
+                gerar_pacote.BARRA_ACIMA = antes_ba
             placar.conferir('texto encostado no rotulo e do item dele', trava_encostado(p))
             antes_en = gerar_pacote.ENCOSTA
             gerar_pacote.ENCOSTA = 0.0

@@ -330,7 +330,9 @@ def lista_fio_imagem(caminho):
     8o ano, Produtos Notaveis: o fio do rodape e uma imagem de 0,6 pt, e o
     exercicio 2, que vai ate perto do pe da coluna, nao pode levar o fio. A ultima
     linha do 1 encosta por cima do rotulo 2 e e do 1; o "=" miudo encostado por
-    cima do rotulo 4 e do 4.
+    cima do rotulo 4 e do 4; a barra de segmento sobre "AB" e da linha do rotulo 5, e nao do 4;
+    o "c" que rotula a figura do 1 so encosta na linha do rotulo 2, e fica no 1; e o
+    credito "Material elaborado por" fecha a ultima solucao.
     """
     g = MODELOS['cm']
     X0, X1, T = g['x0'], g['x1'], g['topo']
@@ -366,7 +368,20 @@ def lista_fio_imagem(caminho):
             # do rotulo e a tinta separada dela (a seta sobre "LB", 3o medio, Pontos,
             # Retas e Planos, solucao 12): e do exercicio 4, e nao do 3
             p.pg.insert_text((X1 + 170, T + 124 - 13.17), '=', fontname='helv', fontsize=7.9)
+            # rótulo de figura do exercício 1, em corpo normal, que passa 0,8 pt na
+            # caixa do rótulo 2 (8o ano, Produtos Notáveis 11 e 12): é do 1, e não do 2
+            p.pg.insert_text((250, T + 124 - 12.5), 'c', fontname='helv', fontsize=10)
             p.texto(X1, T + 136, ['e diga o total.'])
+            # o 4 acaba 3,6 pt acima da barra do 5: assim a folga dele alcanca a barra
+            p.texto(X1, T + 152, ['Escreva a conta por extenso.'])
+            xt = p.marcador(X1, T + 170, 5)
+            p.pg.insert_text((xt, T + 170), 'Some AB com AB.', fontname='helv', fontsize=10)
+            # barra de segmento sobre o primeiro "AB", 1,2 pt acima da caixa do rótulo,
+            # com um vão em branco (9o ano, Relações Métricas, solução 10): é da linha
+            # do rótulo 5, e não do exercício 4, que acaba logo acima
+            largura = pymupdf.get_text_length('AB', fontname='helv', fontsize=10)
+            p.pg.draw_line((xt + 30, T + 170 - 11.9), (xt + 30 + largura, T + 170 - 11.9), width=0.4)
+            p.texto(X1, T + 182, ['Responda com uma soma.'])
         else:
             p.pg.insert_text((114, T + 12), 'Respostas e Soluções.', fontname='hebo', fontsize=10)
             p.secao(X0, T + 40, 1, 'Exercícios Introdutórios')
@@ -378,6 +393,10 @@ def lista_fio_imagem(caminho):
             p.texto(X0 + 14, T + 130, ['A soma é 12.'])
             p.numero_solucao(X0, T + 160, 4)
             p.texto(X0 + 14, T + 160, ['Cada par dá o dobro.'])
+            p.numero_solucao(X0, T + 190, 5)
+            p.texto(X0 + 14, T + 190, ['O dobro de AB.'])
+            # crédito do autor no pé da coluna, como no Portal: fecha o último item
+            p.pg.insert_text((X0 + 60, g['yrod'] - 24), 'Material elaborado por Autor da Amostra.', fontname='helv', fontsize=9)
     doc.set_metadata(FIXO)
     doc.save(caminho, garbage=3, deflate=True, no_new_id=True)
 

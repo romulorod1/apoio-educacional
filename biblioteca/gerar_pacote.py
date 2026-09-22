@@ -70,6 +70,9 @@ MARGEM_X = 24.0        # borda externa das colunas
 # largura) continua fora do recorte.
 AFASTA_FIO = 1.2
 ENCOSTA = 0.5  # caixa a menos disto acima da linha do marcador ainda e da linha (topo_da_linha); 0 so no veneno
+BARRA_ACIMA = True  # barra de segmento acima da linha do marcador entra no recorte; False so no veneno
+CREDITO_MATERIAL = True  # "Material elaborado por" fecha o item, como os creditos; False so no veneno
+SOBREPOSICAO_MIN = 0.25  # quanto da caixa tem de estar na linha para ser dela (topo_da_linha); 0 so no veneno
 MIUDO_QUE_ENCOSTA = 8.5  # so o miudo que encosta vale pela tinta propria; 99 so no veneno
 TINTA_DO_QUE_ENCOSTA = True  # o que encosta por cima da linha do marcador vale pelo topo da tinta dele; False so no veneno
 SUBIDA_FINA = True  # o topo da linha do marcador sobe pela tinta a 288 dpi (subida_fina); False so no veneno
@@ -382,6 +385,12 @@ def marcadores(els, geo, em_solucoes, ja_teve_enunciado=False, secao_1_abre_solu
         # (no modelo CM vem uma palavra por span: "Produzido", "por", "Arquimedes")
         # e nas versaletes do Palladio a inicial vem separada: "E" + "laborado por".
         # Por isso vale o texto da linha a partir deste span.
+        if CREDITO_MATERIAL and re.match(r'^Material elaborado por\b', t):
+            # credito do autor no pe da ultima coluna da lista ("Material elaborado
+            # por <nome>.", corpo 9, centrado): fecha o item, como o bloco de creditos
+            # do fim do documento. Sem isto entrava no recorte de 23 solucoes
+            out.append({'tipo': 'creditos', 'col': e['col'], 'el': e})
+            continue
         if re.match(r'^[EP]$|^(Elaborado|Produzido)\b', t) or 'cursoarquimedes' in t:
             cy_e = centro_y(e['bb'])
             # sobreposicao vertical, e nao centro: a inicial tem corpo maior que a versalete
@@ -487,7 +496,15 @@ def topo_da_linha(marc, els):
             # caixa do rotulo, e ficava no recorte de cima
             # (so o miudo: a linha de 10 pt do item de cima tambem encosta, e nao e desta)
             folga = ENCOSTA if e.get('tam', 99) <= MIUDO_QUE_ENCOSTA else 0.0
-            if e['bb'][1] < topo and (abs(centro_y(e['bb']) - cy) < 4 or (e['bb'][1] < pe and e['bb'][3] > topo - folga)):
+            # e a sobreposicao com a linha tem de ser boa parte da caixa: as letras
+            # "a" e "b" que rotulam a figura do exercicio de cima (8o ano, Produtos
+            # Notaveis 11 e 12) passam 0,8 pt na linha do rotulo de baixo, 8% da
+            # altura delas, e entravam no recorte do 12
+            sobre = min(e['bb'][3], pe) - max(e['bb'][1], topo)
+            alt = max(0.1, e['bb'][3] - e['bb'][1])
+            basta = sobre >= SOBREPOSICAO_MIN * alt or sobre >= 2.5
+            if e['bb'][1] < topo and (abs(centro_y(e['bb']) - cy) < 4
+                                      or (e['bb'][1] < pe and e['bb'][3] > topo - folga and (basta or folga > 0))):
                 topo = e['bb'][1]
                 mudou = True
     # a barra de um radical longo ou de uma fracao e desenho, nao texto
@@ -498,6 +515,26 @@ def topo_da_linha(marc, els):
 
 
 LIMIAR_TINTA = 200  # cinza abaixo disto e tinta
+
+
+def topo_com_barra(els, marc, y_t):
+    """Sobe o topo ate a barra de segmento que cobre texto da linha do marcador.
+
+    A barra sobre "BO" e "DO" (solucao 10 de Relacoes Metricas, 9o ano) fica 1,2 pt
+    acima da linha, com um vao em branco: a subida pela tinta nao chega nela, e ela
+    caia no recorte do item de cima. So a barra fina que cobre, em x, texto desta
+    linha, e no maximo 6 pt acima do marcador.
+    """
+    if not BARRA_ACIMA:
+        return y_t
+    mb = marc['el']['bb']
+    for e in els:
+        if (e['col'] == marc['col'] and e['tipo'] == 'des' and e['bb'][3] - e['bb'][1] < 1.5
+                and mb[1] - 6 <= e['bb'][1] < y_t
+                and any(o['tipo'] == 'txt' and o['col'] == marc['col'] and o['bb'][0] < e['bb'][2]
+                        and o['bb'][2] > e['bb'][0] and abs(centro_y(o['bb']) - centro_y(mb)) < 4 for o in els)):
+            y_t = min(y_t, e['bb'][1] - 0.25)
+    return y_t
 
 
 def topo_pela_tinta(topo_caixas, marc, tinta_col):
@@ -711,6 +748,7 @@ def detectar(doc, secao_1_abre_solucoes=True):
                             y_e = topo_da_tinta(doc, pno, pymupdf.Rect(e['bb']))
                             if y_e is not None:
                                 y_t = max(topo_caixas, min(y_t, y_e))
+                    y_t = topo_com_barra(els, m, y_t)
                 cortes.append((y_t, m))
             lim_col = [(y, m) for y, m in cortes]
             els_col = [e for e in els if e['col'] == col]
