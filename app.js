@@ -2415,6 +2415,8 @@
         if (!dias.length) { avisar('Escolha ao menos um dia da semana.'); return; }
         var ate = $('#campo-repetir-ate').value || null;
         if (ate && ate < data) { avisar('A data final não pode ser antes do início.'); return; }
+        var daBibliotecaNaSerie = folhaPendenteDaBiblioteca;
+        folhaPendenteDaBiblioteca = null;
         comDesfazer('Aulas repetidas criadas.', function () {
           Core.criarSerie(db, {
             alunoId: alunoId, dias: dias, hora: hora, duracaoMin: duracao,
@@ -2423,6 +2425,13 @@
         }).then(function () {
           fecharModal('modal-aula');
           desenharTudo();
+          /* Veio do "Abrir como folha" e ela marcou Repetir: a página vai para
+           * a primeira aula da série, a do dia escolhido. */
+          if (daBibliotecaNaSerie) {
+            var primeira = db.aulas.filter(function (a) { return a.alunoId === alunoId && a.data === data; })[0];
+            if (primeira) colarNaFolhaDaAula(primeira.id, daBibliotecaNaSerie);
+            else avisar('As aulas foram criadas, mas nenhuma cai no dia escolhido; a página não foi colada.');
+          }
         });
         return;
       }
@@ -5323,14 +5332,12 @@
           img.src = x.midia.dataUrl;
           midiasCarregadas[x.ref] = { dataUrl: x.midia.dataUrl, w: x.midia.w, h: x.midia.h, img: img };
         });
-        montarEditor(aula, usada);
-        // aberta pela biblioteca: já na página que acabou de ser colada
-        if (paginaInicial && editorAtual) editorAtual.irParaPagina(paginaInicial);
+        montarEditor(aula, usada, paginaInicial);
       });
     });
   }
 
-  function montarEditor(aula, nota) {
+  function montarEditor(aula, nota, paginaInicial) {
     abrirModal('modal-nota');
 
     if (editorAtual) { editorAtual.destruir(); editorAtual = null; }
@@ -5348,6 +5355,10 @@
     // Antes isso era definido dentro do desenho da barra de ferramentas, e um
     // tropeço ali deixava a folha sem dono e sem ser salva.
     editorAtual._aulaId = aula.id;
+    /* Aberta pela biblioteca: já na página que acabou de ser colada, ANTES de
+     * a barra e o rodapé serem desenhados, para o contador e o fundo mostrados
+     * serem os da página que está na tela. */
+    if (paginaInicial) editorAtual.irParaPagina(paginaInicial);
 
     // o canvas só tem tamanho depois que o painel aparece
     setTimeout(function () { if (editorAtual) editorAtual.ajustarTamanho(); }, 30);
@@ -12106,7 +12117,7 @@
     var wpt = (medidas && medidas.largura_pt) || 612;
     var hpt = (medidas && medidas.altura_pt) || 792;
     var img = el('img', { class: 'bib-mini', alt: '', draggable: 'false', style: 'aspect-ratio:' + wpt + ' / ' + hpt });
-    img._bib = { pacote: pacote, caminho: caminho, wpt: wpt, hpt: hpt, largura: larguraPx };
+    img._bib = { pacote: pacote, versao: bib.versaoDe[pacote], caminho: caminho, wpt: wpt, hpt: hpt, largura: larguraPx };
     return img;
   }
 
@@ -12152,12 +12163,14 @@
   }
 
   function miniaturaPronta(m) {
-    var chave = Store.chaveMiniatura(m.pacote, bib ? bib.versaoDe[m.pacote] : 0, m.caminho) + '#' + m.largura;
+    var chave = Store.chaveMiniatura(m.pacote, m.versao, m.caminho) + '#' + m.largura;
     return Store.lerMidia(chave).then(function (guardada) {
       if (guardada && guardada.dataUrl) return guardada.dataUrl;
       var altura = Math.max(1, Math.round(m.largura * m.hpt / m.wpt));
       return desenharAssetBib(m.pacote, m.caminho, m.largura, altura).then(function (c) {
         var dataUrl = c.toDataURL('image/jpeg', 0.82);
+        // o pacote foi reimportado enquanto desenhava: mostra, mas não guarda
+        if (!bib || bib.versaoDe[m.pacote] !== m.versao) return dataUrl;
         return Store.salvarMidia(chave, { dataUrl: dataUrl, w: c.width, h: c.height })
           .catch(function () { /* sem espaço: mostra sem guardar */ })
           .then(function () { return dataUrl; });
@@ -12338,9 +12351,14 @@
     return { x: 40, y: 40, w: wpt * esc, h: hpt * esc };
   }
 
+  /* Um toque de cada vez: no tablet o desenho da página leva alguns segundos,
+   * e um segundo toque colaria a mesma página duas vezes. */
+  var colandoNaFolha = false;
+
   function colarNaFolhaDaAula(aulaId, alvo) {
     var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
-    if (!aula) return Promise.resolve();
+    if (!aula || colandoNaFolha) return Promise.resolve();
+    colandoNaFolha = true;
     var pos = posicaoNaFolha(alvo);
     // duas vezes a resolução da folha, com teto, para a letra do recorte ficar nítida
     var escalaPx = Math.min(2, 2400 / Math.max(pos.w, pos.h));
@@ -12369,6 +12387,8 @@
       avisar('Colado na folha da aula, página ' + (indice + 1) + '.');
     }).catch(function () {
       avisar('Não consegui colar na folha. Tente de novo.');
+    }).then(function () {
+      colandoNaFolha = false;
     });
   }
 

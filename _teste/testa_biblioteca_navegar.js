@@ -82,6 +82,30 @@ async function tocarLinha(pag, nome) {
   await pausa(100);
 }
 
+/* Pixels da cor do título da página sintética (#1F3A5F, azul do módulo) no
+ * canvas do editor. Fundo branco não prova nada: a folha sem pauta já é branca;
+ * a cor só aparece se a imagem colada estiver desenhada. */
+const pixelsDaPagina = pag => pag.evaluate(() => {
+  const c = document.querySelector('#tela-desenho');
+  const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  let n = 0;
+  for (let i = 0; i < d.length; i += 4 * 7) {
+    if (Math.abs(d[i] - 31) < 26 && Math.abs(d[i + 1] - 58) < 26 && Math.abs(d[i + 2] - 95) < 26) n++;
+  }
+  return n;
+});
+const rodapeDaFolha = pag => pag.evaluate(() => ({
+  contador: (document.querySelector('#rodape-nota').innerText.match(/Folha \d+ de \d+/) || [''])[0],
+  fundo: (document.querySelector('#rodape-nota select') || {}).value
+}));
+const chavesDeMiniatura = (pag, filtro) => pag.evaluate(f => new Promise(r => {
+  const q = indexedDB.open('apoio-educacional');
+  q.onsuccess = () => {
+    const g = q.result.transaction('midias', 'readonly').objectStore('midias').getAllKeys();
+    g.onsuccess = () => { q.result.close(); r(g.result.filter(k => new RegExp(f).test(String(k))).length); };
+  };
+}), filtro);
+
 const estadoMinis = pag => pag.evaluate(() => {
   const imgs = Array.from(document.querySelectorAll('#bib-corpo img.bib-mini'));
   return { total: imgs.length, prontas: imgs.filter(i => i.classList.contains('pronta') && i.naturalWidth > 0).length,
@@ -196,12 +220,16 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   // segunda visita: do cache
   await pag.evaluate(() => document.querySelector('.bib-voltar').click());
   await pausa(100);
+  const chavesAntes = await chavesDeMiniatura(pag, '^bib:');
   const t1 = Date.now();
   await tocarLinha(pag, 'Equações do Segundo Grau: Resultados Básicos');
   await esperar('segunda visita', () => minisVisiveisProntas(pag), v => v && v.visiveis > 0 && v.prontas === v.visiveis, 10000);
   const ms2 = Date.now() - t1;
   console.log('   segunda visita: ' + ms2 + ' ms');
   conf('segunda visita também abaixo de 2 segundos', ms2 < 2000, true);
+  await pausa(500);
+  conf('e veio do cache: nenhuma miniatura nova gravada em midias', await chavesDeMiniatura(pag, '^bib:'), chavesAntes);
+  conf('as 40 miniaturas da lista estão no cache', await chavesDeMiniatura(pag, 'resultados-basicos/ex-\\d+\\.svg#520$'), 40);
 
   // ================================================================
   secao('4. Tela cheia');
@@ -287,15 +315,9 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
     ev('pointerup', pts[pts.length - 1][0], pts[pts.length - 1][1], 0.5);
   });
   await pausa(900);
-  const pixel = await pag.evaluate(() => {
-    // o canvas mostra a página (não é tudo cinza do fundo do editor)
-    const c = document.querySelector('#tela-desenho');
-    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-    let brancos = 0;
-    for (let i = 0; i < d.length; i += 4 * 97) if (d[i] > 245 && d[i + 1] > 245 && d[i + 2] > 245) brancos++;
-    return brancos;
-  });
-  conf('a página aparece no editor (pixels brancos da folha)', pixel > 100, true);
+  const pixel = await pixelsDaPagina(pag);
+  console.log('   pixels da cor da página no editor: ' + pixel);
+  conf('a página aparece no editor (a cor do título dela está no canvas)', pixel > 30, true);
   await pag.evaluate(() => Array.from(document.querySelectorAll('#rodape-nota button')).find(b => b.textContent.trim() === 'Concluir').click());
   await esperar('editor fechado', () => pag.$eval('#modal-nota', e => e.classList.contains('aberto')), v => v === false, 5000);
 
@@ -351,15 +373,83 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
     return true;
   });
   conf('a aula de hoje oferece "Abrir folha de aula"', abriu, true);
-  const reaberta = await esperar('folha reaberta depois de recarregar', () => pag.evaluate(() => {
-    if (!document.querySelector('#modal-nota').classList.contains('aberto')) return null;
-    const c = document.querySelector('#tela-desenho');
-    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-    let brancos = 0;
-    for (let i = 0; i < d.length; i += 4 * 97) if (d[i] > 245 && d[i + 1] > 245 && d[i + 2] > 245) brancos++;
-    return brancos;
-  }), v => v > 100, 8000);
+  const reaberta = await esperar('folha reaberta depois de recarregar', () => pag.evaluate(() =>
+    document.querySelector('#modal-nota').classList.contains('aberto')).then(a => a ? pixelsDaPagina(pag) : 0), v => v > 30, 8000);
   conf('e a folha reabre com a página desenhada', reaberta.ok, true);
+
+  const concluir = async () => {
+    await pag.evaluate(() => Array.from(document.querySelectorAll('#rodape-nota button')).find(b => b.textContent.trim() === 'Concluir').click());
+    await esperar('editor fechado', () => pag.$eval('#modal-nota', e => e.classList.contains('aberto')), v => v === false, 5000);
+  };
+  const subirNaBiblioteca = async () => {
+    for (let k = 0; k < 4; k++) {
+      const v = await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); return !!b; });
+      if (!v) break;
+      await pausa(150);
+    }
+  };
+
+  // ================================================================
+  secao('7. Colar numa aula que JÁ tem folha: página nova, e o rodapé na página certa');
+  await concluir();
+  await H.irParaAba(pag, 'biblioteca');
+  await subirNaBiblioteca();
+  await tocarLinha(pag, 'Equações do Segundo Grau');
+  await tocarLinha(pag, 'Resultados Básicos - Parte II');
+  await esperar('páginas', () => estadoMinis(pag), v => v && v.total === 4, 5000);
+  await pag.evaluate(() => document.querySelectorAll('#bib-corpo .bib-cartao')[2].click());
+  await esperar('tela cheia da página 3', () => pag.$eval('#titulo-modal-biblioteca', e => e.textContent), v => /página 3$/.test(v || ''), 5000);
+  await pag.click('#bib-como-folha');
+  await esperar('escolha da aula', () => pag.$eval('#modal-bib-folha', e => e.classList.contains('aberto')), v => v === true, 5000);
+  const linhasDeHoje = await pag.evaluate(() => Array.from(document.querySelectorAll('#corpo-modal-bib-folha .item-lista .detalhe')).map(d => d.textContent));
+  conf('a aula de hoje aparece dizendo que já tem folha', linhasDeHoje.some(t => /já tem folha/.test(t)), true);
+  // dois toques seguidos: tem de colar UMA vez
+  await pag.evaluate(() => { const l = document.querySelector('#corpo-modal-bib-folha .item-lista'); l.click(); l.click(); });
+  await esperar('editor aberto na página colada', () => pag.$eval('#modal-nota', e => e.classList.contains('aberto')), v => v === true, 10000);
+  await pausa(600);
+  const rod = await rodapeDaFolha(pag);
+  conf('o rodapé mostra a página colada, e não a primeira', rod.contador, 'Folha 2 de 2');
+  conf('e o fundo mostrado é o da página colada (sem pauta)', rod.fundo, 'branco');
+  conf('dois toques colaram uma página só', (await lerNotaDeHoje()).paginas, 2);
+
+  // ================================================================
+  secao('8. Nova aula com "Repetir toda semana": a página vai para a aula do dia');
+  await concluir();
+  await H.irParaAba(pag, 'biblioteca');
+  await pag.evaluate(() => document.querySelectorAll('#bib-corpo .bib-cartao')[0].click());
+  await esperar('tela cheia da capa', () => pag.$eval('#modal-biblioteca', e => e.classList.contains('aberto')), v => v === true, 5000);
+  await pag.click('#bib-como-folha');
+  await esperar('escolha da aula', () => pag.$eval('#modal-bib-folha', e => e.classList.contains('aberto')), v => v === true, 5000);
+  await pag.click('#bib-nova-aula');
+  await esperar('janela de aula nova', () => pag.evaluate(() => document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
+  const outroAluno = await pag.evaluate(() => {
+    const sel = document.querySelector('#campo-aluno');
+    sel.selectedIndex = Math.min(2, sel.options.length - 1);
+    sel.dispatchEvent(new Event('change'));
+    const chk = document.querySelector('#campo-repetir');
+    chk.checked = true;
+    chk.dispatchEvent(new Event('change'));
+    return sel.value;
+  });
+  await pag.click('#salvar-aula');
+  const colou = await esperar('a série foi criada e a página colada na aula do dia', () => pag.evaluate((a, h) => new Promise(r => {
+    const q = indexedDB.open('apoio-educacional');
+    q.onsuccess = () => {
+      const t = q.result.transaction(['dados', 'notas'], 'readonly');
+      const d = t.objectStore('dados').get('principal');
+      const n = t.objectStore('notas').getAll();
+      const k = t.objectStore('notas').getAllKeys();
+      t.oncomplete = () => {
+        q.result.close();
+        const doAluno = d.result.aulas.filter(x => x.alunoId === a);
+        const doDia = doAluno.filter(x => x.data === h)[0];
+        const i = doDia ? k.result.indexOf(doDia.id) : -1;
+        r({ aulas: doAluno.length, temImagem: i >= 0 && n.result[i].paginas.some(pg => pg.itens.some(it => it.t === 'imagem')) });
+      };
+    };
+  }), outroAluno, hojeIso), v => v && v.temImagem, 10000);
+  conf('a série tem mais de uma aula', colou.valor && colou.valor.aulas > 1, true);
+  conf('e a aula do dia recebeu a página na folha', colou.valor && colou.valor.temImagem, true);
 
   if (pag.errosDePagina.length) console.log('   erros de página: ' + pag.errosDePagina.join(' | ').slice(0, 400));
   conf('nenhum erro de JavaScript na página', pag.errosDePagina.length, 0);
