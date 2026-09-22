@@ -328,8 +328,9 @@ def lista_fio_imagem(caminho):
     """Lista no modelo CM com os fios (coluna e rodape) feitos de imagem, e nao de desenho.
 
     8o ano, Produtos Notaveis: o fio do rodape e uma imagem de 0,6 pt, e o
-    exercicio 2, que vai ate perto do pe da coluna, nao pode levar o fio. E o
-    "=" encostado por cima da linha do rotulo 2 e do exercicio 2.
+    exercicio 2, que vai ate perto do pe da coluna, nao pode levar o fio. A ultima
+    linha do 1 encosta por cima do rotulo 2 e e do 1; o "=" miudo encostado por
+    cima do rotulo 4 e do 4.
     """
     g = MODELOS['cm']
     X0, X1, T = g['x0'], g['x1'], g['topo']
@@ -350,14 +351,22 @@ def lista_fio_imagem(caminho):
             p.secao(X0, T + 60, 1, 'Exercícios Introdutórios')
             xt = p.marcador(X0, T + 90, 1)
             p.pg.insert_text((xt, T + 90), 'Quanto é 5 + 5?', fontname='helv', fontsize=10)
-            p.texto(X0, T + 102, ['Responda com um número.'])
+            # a ultima linha do 1 com a caixa 0,1 pt acima da caixa do rotulo 2 (6o
+            # ano, Divisibilidade, solucoes 18 e 19): e do 1, e o 2 comeca no rotulo
+            p.texto(X0, T + 124 - 13.79, ['Responda com um número.'])
             xt = p.marcador(X0, T + 124, 2)
             p.pg.insert_text((xt, T + 124), 'Some os números de cada linha.', fontname='helv', fontsize=10)
-            # texto sobre a linha do rotulo 2 com a caixa 0,1 pt acima da caixa do
-            # rotulo e a tinta separada dela (a seta sobre "LB", 3o medio, Pontos,
-            # Retas e Planos, solucao 12): e do exercicio 2, e nao do 1
-            p.pg.insert_text((200, T + 124 - 13.17), '=', fontname='helv', fontsize=7.9)
             p.texto(X0, T + 136, ['Linha %d: %d + %d.' % (k, k, 2 * k) for k in range(1, 47)])
+            xt = p.marcador(X1, T + 90, 3)
+            p.pg.insert_text((xt, T + 90), 'Quanto é 6 + 6?', fontname='helv', fontsize=10)
+            p.texto(X1, T + 102, ['Responda com um número.'])
+            xt = p.marcador(X1, T + 124, 4)
+            p.pg.insert_text((xt, T + 124), 'Some os pares de cada linha.', fontname='helv', fontsize=10)
+            # sinal miudo sobre a linha do rotulo 4 com a caixa 0,1 pt acima da caixa
+            # do rotulo e a tinta separada dela (a seta sobre "LB", 3o medio, Pontos,
+            # Retas e Planos, solucao 12): e do exercicio 4, e nao do 3
+            p.pg.insert_text((X1 + 170, T + 124 - 13.17), '=', fontname='helv', fontsize=7.9)
+            p.texto(X1, T + 136, ['e diga o total.'])
         else:
             p.pg.insert_text((114, T + 12), 'Respostas e Soluções.', fontname='hebo', fontsize=10)
             p.secao(X0, T + 40, 1, 'Exercícios Introdutórios')
@@ -365,6 +374,10 @@ def lista_fio_imagem(caminho):
             p.texto(X0 + 14, T + 70, ['A soma é 10.'])
             p.numero_solucao(X0, T + 100, 2)
             p.texto(X0 + 14, T + 100, ['Cada linha dá o triplo do seu número.'])
+            p.numero_solucao(X0, T + 130, 3)
+            p.texto(X0 + 14, T + 130, ['A soma é 12.'])
+            p.numero_solucao(X0, T + 160, 4)
+            p.texto(X0 + 14, T + 160, ['Cada par dá o dobro.'])
     doc.set_metadata(FIXO)
     doc.save(caminho, garbage=3, deflate=True, no_new_id=True)
 
