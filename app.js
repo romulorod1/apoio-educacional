@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.21.1';
+  var VERSAO = '1.22.0';
 
   /* O acervo de 14/09 (aba Temas e o atalho dele na escolha de assunto da
    * aula) saiu do ar até ser refeito com revisão. Os arquivos do banco ficam
@@ -2432,7 +2432,8 @@
              * série pulou a data e a página vai para essa, em página nova. */
             var doDia = db.aulas.filter(function (a) { return a.alunoId === alunoId && a.data === data; });
             var primeira = doDia.filter(function (a) { return a.serieId; })[0] || doDia[0];
-            if (primeira) colarNaFolhaDaAula(primeira.id, daBibliotecaNaSerie);
+            if (primeira && daBibliotecaNaSerie.aoCriar) daBibliotecaNaSerie.aoCriar(primeira.id, { serie: true });
+            else if (primeira) colarNaFolhaDaAula(primeira.id, daBibliotecaNaSerie);
             else avisar('As aulas foram criadas, mas nenhuma cai no dia escolhido; a página não foi colada.');
           }
         });
@@ -2451,6 +2452,7 @@
         desenharTudo();
         /* Veio do "Abrir como folha" da biblioteca: a página vai para a folha
          * da aula recém-criada, e a folha abre no lugar da janela da aula. */
+        if (daBiblioteca && daBiblioteca.aoCriar) { daBiblioteca.aoCriar(nova.id); return; }
         if (daBiblioteca) { colarNaFolhaDaAula(nova.id, daBiblioteca); return; }
         // Reabre para ela já poder escrever na folha ou puxar o material. Numa
         // repetição não faz sentido: seriam muitas aulas criadas de uma vez.
@@ -11770,6 +11772,7 @@
         nBanco ? plural(nBanco, 'problema do Banco', 'problemas do Banco') : ''
       ].filter(Boolean).join(', ');
       ligarBuscaBiblioteca();
+      desenharCarrinho();
       if (!bibNav.serie || arv.listaSeries.indexOf(bibNav.serie) < 0) {
         // abre na primeira série que tem módulo do Portal, e não numa só de Banco
         var comPortal = arv.listaSeries.filter(function (s) { return modulosDaSerie(s).portal.length; });
@@ -11895,13 +11898,13 @@
     if (autoria) corpo.appendChild(el('p', { class: 'ajuda bib-autoria', texto: autoria }));
     var grade = el('div', { class: 'bib-grade bib-grade-paginas' });
     t.paginas.forEach(function (p, i) {
-      grade.appendChild(el('button', {
+      grade.appendChild(celulaComCaixa(el('button', {
         type: 'button', class: 'bib-cartao', 'data-id': p.id,
         aoClick: function () { verNaBiblioteca({ tipo: 'teoria', aula: t, indice: i }); }
       }, [
         miniaturaBib(t.pacote, p.asset, p.medidas, 360),
         el('div', { class: 'bib-rotulo', texto: p.capa ? 'Capa' : 'Página ' + p.n })
-      ]));
+      ]), 'paginas', p.id));
     });
     corpo.appendChild(grade);
     observarMiniaturas(grade);
@@ -11923,7 +11926,7 @@
         rotuloDificuldade(it) ? el('span', { class: 'tag serie', texto: rotuloDificuldade(it) }) : null,
         it.sem_solucao ? el('span', { class: 'tag excecao', texto: 'sem solução' }) : null
       ];
-      grade.appendChild(el('button', {
+      grade.appendChild(celulaComCaixa(el('button', {
         type: 'button', class: 'bib-cartao', 'data-id': it.id,
         aoClick: function () { verNaBiblioteca({ tipo: 'exercicio', lista: lista, indice: i }); }
       }, [
@@ -11932,11 +11935,646 @@
         miniaturaBib(it.pacote, it.assets.enunciado, it.medidas && it.medidas.enunciado, 520),
         el('div', { class: 'bib-tags' }, tags),
         it.origem_citada ? el('div', { class: 'bib-origem', texto: it.origem_citada }) : null
-      ]));
+      ]), 'itens', it.id, etiquetaDela(it)));
     });
     corpo.appendChild(grade);
     observarMiniaturas(grade);
+    carregarEtiquetas();
   }
+
+  // ---------- material desta aula: caixas, carrinho e folha ----------
+
+  /* O que ela marcou para o material, na ordem em que marcou. Guarda só os
+   * ids: o item e a página vêm do bib na hora de gerar, e o que sumiu numa
+   * reimportação cai fora sozinho. Mora na memória do aplicativo, então
+   * atravessa a troca de aba; fechar o aplicativo começa de novo. */
+  var CHAVE_CARRINHO = 'apoio-educacional:bib-carrinho';   // antes da leitura: var não sobe com valor
+  var bibCarrinho = lerCarrinhoGuardado();
+  var bibEtiquetas = null;          // itemId -> 1, 2 ou 3, a etiqueta dela
+  var ESPACO_RESPOSTA = 100;        // pt depois de cada exercício (uns 3,5 cm), quando marcado
+
+  /* A seleção fica guardada no próprio aparelho, para sobreviver ao Android
+   * fechar o aplicativo quando ela sai para a câmera ou para uma mensagem. É só
+   * conveniência: se o armazenamento falhar, começa vazia. */
+  function lerCarrinhoGuardado() {
+    try {
+      var c = JSON.parse(localStorage.getItem(CHAVE_CARRINHO) || 'null');
+      if (c && Array.isArray(c.itens) && Array.isArray(c.paginas)) return { itens: c.itens, paginas: c.paginas };
+    } catch (e) { /* sem armazenamento: começa vazio */ }
+    return { itens: [], paginas: [] };
+  }
+  function guardarCarrinho() {
+    try { localStorage.setItem(CHAVE_CARRINHO, JSON.stringify(bibCarrinho)); } catch (e) { /* segue na memória */ }
+  }
+
+  function paginaDeTeoriaPorId(id) {
+    var aulaId = id.replace(/:p\d+$/, '');
+    var t = bib && bib.teoriaPorId[aulaId];
+    if (!t) return null;
+    var p = t.paginas.filter(function (x) { return x.id === id; })[0];
+    return p ? { aula: t, pagina: p } : null;
+  }
+
+  function limparCarrinhoOrfao() {
+    if (!bib) return;
+    bibCarrinho.itens = bibCarrinho.itens.filter(function (id) { return !!bib.itemPorId[id]; });
+    bibCarrinho.paginas = bibCarrinho.paginas.filter(function (id) { return !!paginaDeTeoriaPorId(id); });
+  }
+
+  function noCarrinho(tipo, id) { return bibCarrinho[tipo].indexOf(id) >= 0; }
+
+  function marcarNoCarrinho(tipo, id, marcado) {
+    var lista = bibCarrinho[tipo];
+    var i = lista.indexOf(id);
+    if (marcado && i < 0) lista.push(id);
+    if (!marcado && i >= 0) lista.splice(i, 1);
+    guardarCarrinho();
+    desenharCarrinho();
+  }
+
+  function desenharCarrinho() {
+    var faixa = $('#bib-carrinho');
+    if (!faixa) return;
+    limparCarrinhoOrfao();
+    var n = bibCarrinho.itens.length, m = bibCarrinho.paginas.length;
+    faixa.innerHTML = '';
+    /* A faixa ocupa o lugar desde o começo, vazia ou não: se ela aparecesse só
+     * no primeiro toque, a grade pularia para baixo e o toque seguinte cairia
+     * no cartão errado. */
+    faixa.hidden = false;
+    faixa.classList.toggle('vazia', !(n || m));
+    if (!(n || m)) {
+      faixa.appendChild(el('span', { class: 'bib-carrinho-texto', id: 'bib-carrinho-vazio',
+        texto: 'Nada marcado ainda.' }));
+      return;
+    }
+    faixa.appendChild(el('span', { class: 'bib-carrinho-texto', id: 'bib-carrinho-contagem',
+      texto: 'Material marcado: ' + plural(n, 'exercício', 'exercícios') + ', ' + plural(m, 'página de teoria', 'páginas de teoria') }));
+    faixa.appendChild(el('span', { class: 'cresce' }));
+    faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-carrinho-limpar', texto: 'Desmarcar tudo',
+      aoClick: function () {
+        var antes = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
+        function marcarNaTela() {
+          $$('#bib-corpo input[data-carrinho]').forEach(function (c) { c.checked = noCarrinho(c.dataset.carrinho, c.dataset.id); });
+        }
+        bibCarrinho = { itens: [], paginas: [] };
+        guardarCarrinho();
+        desenharCarrinho();
+        marcarNaTela();
+        avisar('Seleção desmarcada.', 'Desfazer', function () {
+          bibCarrinho = antes;
+          guardarCarrinho();
+          desenharCarrinho();
+          marcarNaTela();
+        });
+      } }));
+    faixa.appendChild(el('button', { type: 'button', class: 'btn principal pequeno', id: 'bib-carrinho-gerar',
+      texto: 'Gerar material', aoClick: abrirGerarMaterial }));
+  }
+
+  /* A caixa fica AO LADO do cartão, e não dentro dele: o cartão é o botão que
+   * abre a tela cheia, e um toque na caixa não pode abrir a página. */
+  function celulaComCaixa(cartao, tipo, id, extra) {
+    var chk = el('input', { type: 'checkbox', 'data-carrinho': tipo, 'data-id': id });
+    chk.checked = noCarrinho(tipo, id);
+    chk.addEventListener('change', function () { marcarNoCarrinho(tipo, id, chk.checked); });
+    return el('div', { class: 'bib-celula' }, [
+      cartao,
+      el('div', { class: 'bib-acoes' }, [
+        el('label', { class: 'bib-marcar' }, [chk, el('span', { texto: 'No material' })]),
+        extra || null
+      ])
+    ]);
+  }
+
+  /* A etiqueta de dificuldade dela, com um toque e sem sair da lista. Tocar na
+   * que já está marcada desmarca. */
+  function etiquetaDela(it) {
+    var caixa = el('div', { class: 'bib-etiqueta', role: 'group', 'aria-label': 'Minha etiqueta de dificuldade' });
+    function desenha() {
+      caixa.innerHTML = '';
+      caixa.appendChild(el('span', { class: 'bib-etiqueta-rotulo', texto: 'Para mim:' }));
+      [1, 2, 3].forEach(function (d) {
+        var ativa = bibEtiquetas && bibEtiquetas[it.id] === d;
+        caixa.appendChild(el('button', {
+          type: 'button', class: 'bib-etiqueta-botao' + (ativa ? ' ativa' : ''), 'data-dificuldade': d,
+          'aria-pressed': ativa ? 'true' : 'false', texto: NOME_DIFICULDADE[d],
+          aoClick: function () {
+            var nova = ativa ? null : d;
+            Store.gravarEtiquetaBiblioteca({ itemId: it.id, dificuldade: nova, data: Core.hojeIso() }).then(function () {
+              bibEtiquetas = bibEtiquetas || {};
+              if (nova) bibEtiquetas[it.id] = nova; else delete bibEtiquetas[it.id];
+              desenha();
+            }, function () { avisar('Não consegui guardar a etiqueta. Tente de novo.'); });
+          }
+        }));
+      });
+    }
+    caixa._desenha = desenha;
+    desenha();
+    return caixa;
+  }
+
+  /* As etiquetas gravadas chegam depois do primeiro desenho da lista: quando
+   * chegam, cada grupo na tela se redesenha. */
+  function carregarEtiquetas() {
+    // relidas a cada lista desenhada: uma cópia de segurança restaurada troca todas
+    return Store.etiquetasDaBiblioteca().then(function (lista) {
+      bibEtiquetas = {};
+      (lista || []).forEach(function (e) { if (e && e.dificuldade) bibEtiquetas[e.itemId] = e.dificuldade; });
+      $$('#bib-corpo .bib-etiqueta').forEach(function (c) { if (c._desenha) c._desenha(); });
+      return bibEtiquetas;
+    }, function () { bibEtiquetas = {}; return bibEtiquetas; });
+  }
+
+  // ---------- gerar o material ----------
+
+  function tituloPadraoDoCarrinho(itens, paginas) {
+    var primeiro = itens[0] || null, pag = paginas[0] || null;
+    var modulos = [];
+    itens.forEach(function (it) { if (modulos.indexOf(it.modulo.titulo) < 0) modulos.push(it.modulo.titulo); });
+    paginas.forEach(function (p) { if (modulos.indexOf(p.aula.modulo.titulo) < 0) modulos.push(p.aula.modulo.titulo); });
+    var titulo = modulos.length === 1 ? modulos[0] : modulos.length === 2 ? modulos.join(' e ') : 'Material';
+    var aulas = [];
+    itens.forEach(function (it) { if (aulas.indexOf(it.aula.titulo) < 0) aulas.push(it.aula.titulo); });
+    paginas.forEach(function (p) { if (aulas.indexOf(p.aula.aula.titulo) < 0) aulas.push(p.aula.aula.titulo); });
+    var subtitulo = aulas.length === 1 ? aulas[0] : '';
+    if (!primeiro && !pag) titulo = 'Material';
+    return { titulo: titulo, subtitulo: subtitulo };
+  }
+
+  function titulosGuardados() {
+    db.ajustes = db.ajustes || {};
+    return db.ajustes.bibliotecaTitulos = db.ajustes.bibliotecaTitulos || {};
+  }
+
+  /* Aulas que fazem sentido para o material: as de hoje e as de até duas
+   * semanas para os lados, como no "Abrir como folha". */
+  function aulasParaMaterial() {
+    var hoje = Core.hojeIso();
+    var aulas = db.aulas.filter(function (a) { return alunoPorId(a.alunoId); });
+    var doDia = aulas.filter(function (a) { return a.data === hoje; })
+      .sort(function (a, b) { return String(a.hora || '').localeCompare(String(b.hora || '')); });
+    var dist = function (a) { return Math.abs(Core.dataLocal(a.data) - Core.dataLocal(hoje)); };
+    var perto = aulas.filter(function (a) { return a.data !== hoje && dist(a) <= 14 * 86400000; })
+      .sort(function (a, b) { return dist(a) - dist(b) || (a.data < b.data ? 1 : -1); }).slice(0, 12);
+    return { hoje: doDia, perto: perto };
+  }
+
+  var gerandoMaterial = false;
+  function abrirModalGerar() { /* guarda o atualizar() da janela aberta */ }
+
+  function abrirGerarMaterial() {
+    if (!bib) return;
+    limparCarrinhoOrfao();
+    var itens = bibCarrinho.itens.map(function (id) { return bib.itemPorId[id]; });
+    var paginas = bibCarrinho.paginas.map(paginaDeTeoriaPorId);
+    if (!itens.length && !paginas.length) return;
+    var padrao = tituloPadraoDoCarrinho(itens, paginas);
+    var escolha = { aulaId: null, nova: false };
+    var corpo = $('#corpo-modal-bib-gerar');
+    var rodape = $('#rodape-modal-bib-gerar');
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+
+    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', id: 'bib-gerar-resumo',
+      texto: plural(itens.length, 'exercício', 'exercícios') + ' e ' + plural(paginas.length, 'página de teoria', 'páginas de teoria') +
+        ', na ordem em que você marcou.' }));
+
+    var campoTitulo = el('input', { type: 'text', id: 'bib-gerar-titulo', value: padrao.titulo, autocomplete: 'off' });
+    var campoSub = el('input', { type: 'text', id: 'bib-gerar-subtitulo', value: padrao.subtitulo, autocomplete: 'off' });
+    var ultimo = el('div', { id: 'bib-gerar-ultimo' });
+    corpo.appendChild(el('label', { class: 'campo' }, [el('span', { texto: 'Título' }), campoTitulo]));
+    corpo.appendChild(el('label', { class: 'campo' }, [el('span', { texto: 'Subtítulo' }), campoSub]));
+    corpo.appendChild(ultimo);
+
+    var caixas = {};
+    var LISTA_CAIXAS = [
+      ['teoria', 'Teoria', paginas.length > 0, !paginas.length],
+      ['lista', 'Lista', itens.length > 0, !itens.length],
+      ['gabarito', 'Gabarito em folha separada', itens.length > 0, !itens.length],
+      ['espaco', 'Espaço para resposta', false, !itens.length],
+      ['origem', 'Mostrar a origem em letra pequena', false, false],
+      ['folha', 'Abrir a lista como folha da aula', false, !itens.length]
+    ];
+    var grade = el('div', { class: 'bib-gerar-caixas' });
+    LISTA_CAIXAS.forEach(function (c) {
+      var chk = el('input', { type: 'checkbox', id: 'bib-gerar-' + c[0] });
+      chk.checked = c[2];
+      chk.disabled = c[3];
+      caixas[c[0]] = chk;
+      grade.appendChild(el('label', { class: 'bib-marcar' + (c[3] ? ' desligada' : '') }, [chk, el('span', { texto: c[1] })]));
+    });
+    corpo.appendChild(el('div', { class: 'campo' }, [el('span', { class: 'bib-gerar-rotulo', texto: 'O que entra' }), grade]));
+    caixas.lista.addEventListener('change', function () { atualizarRodape(); });
+
+    // para qual aula
+    var aulas = aulasParaMaterial();
+    var listaAulas = el('div', { id: 'bib-gerar-aulas' });
+    function marcarAula(botao, aulaId, nova) {
+      escolha.aulaId = aulaId; escolha.nova = nova;
+      $$('#bib-gerar-aulas .item-lista').forEach(function (b) { b.classList.remove('escolhida'); b.setAttribute('aria-pressed', 'false'); });
+      botao.classList.add('escolhida');
+      botao.setAttribute('aria-pressed', 'true');
+      var aula = aulaId ? db.aulas.filter(function (a) { return a.id === aulaId; })[0] : null;
+      var guardado = aula ? titulosGuardados()[aula.alunoId] : null;
+      ultimo.innerHTML = '';
+      if (guardado && (guardado.titulo !== campoTitulo.value || (guardado.subtitulo || '') !== campoSub.value)) {
+        ultimo.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-gerar-usar-ultimo',
+          texto: 'Usar o último título com ' + alunoPorId(aula.alunoId).nome + ': ' + guardado.titulo,
+          aoClick: function () { campoTitulo.value = guardado.titulo; campoSub.value = guardado.subtitulo || ''; ultimo.innerHTML = ''; } }));
+      }
+      atualizarRodape();
+    }
+    function linhaAula(a) {
+      var aluno = alunoPorId(a.alunoId);
+      var b = linhaBib(aluno.nome, Core.ddmmaaaa(a.data) + (a.hora ? ', ' + a.hora : ''), function () { marcarAula(b, a.id, false); });
+      b.setAttribute('data-aula', a.id);
+      b.setAttribute('aria-pressed', 'false');
+      semSeta(b);
+      return b;
+    }
+    // a linha só escolhe, não navega: a seta de "entrar" confundiria
+    function semSeta(b) { var seta = b.querySelector('.bib-seta'); if (seta) seta.remove(); }
+    listaAulas.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Aulas de hoje' }));
+    if (aulas.hoje.length) aulas.hoje.forEach(function (a) { listaAulas.appendChild(linhaAula(a)); });
+    else listaAulas.appendChild(el('p', { class: 'ajuda', texto: 'Nenhuma aula marcada para hoje.' }));
+    var nova = linhaBib('Nova aula hoje', 'Marca a aula e anexa o material nela', function () { marcarAula(nova, null, true); });
+    nova.setAttribute('data-aula', 'nova');
+    semSeta(nova);
+    listaAulas.appendChild(nova);
+    if (aulas.perto.length) {
+      listaAulas.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Outras aulas perto de hoje' }));
+      aulas.perto.forEach(function (a) { listaAulas.appendChild(linhaAula(a)); });
+    }
+    corpo.appendChild(el('div', { class: 'campo' }, [el('span', { class: 'bib-gerar-rotulo', texto: 'Anexar em qual aula' }), listaAulas]));
+
+    var botaoGerar = el('button', { type: 'button', class: 'btn principal', id: 'bib-gerar-anexar', texto: 'Gerar e anexar' });
+    var dica = el('p', { class: 'ajuda bib-gerar-dica', id: 'bib-gerar-dica', texto: 'Escolha a aula acima para anexar o material.' });
+    var botaoBaixar = el('button', { type: 'button', class: 'btn', id: 'bib-gerar-baixar', texto: 'Só gerar o arquivo' });
+    function atualizarRodape() {
+      if (gerandoMaterial) return;
+      botaoGerar.disabled = !(escolha.aulaId || escolha.nova);
+      botaoGerar.textContent = 'Gerar e anexar';
+      dica.hidden = !botaoGerar.disabled;
+      caixas.folha.disabled = !itens.length || !caixas.lista.checked || !(escolha.aulaId || escolha.nova);
+      if (caixas.folha.disabled) caixas.folha.checked = false;
+      caixas.folha.parentNode.classList.toggle('desligada', caixas.folha.disabled);
+    }
+    function opcoesDaTela() {
+      return {
+        titulo: campoTitulo.value.trim() || padrao.titulo, subtitulo: campoSub.value.trim(),
+        teoria: caixas.teoria.checked, lista: caixas.lista.checked, gabarito: caixas.gabarito.checked,
+        espaco: caixas.espaco.checked, origem: caixas.origem.checked, folha: caixas.folha.checked && !caixas.folha.disabled
+      };
+    }
+    botaoGerar.addEventListener('click', function () {
+      var op = opcoesDaTela();
+      if (!op.teoria && !op.lista && !op.gabarito) { avisar('Marque ao menos Teoria, Lista ou Gabarito.'); return; }
+      if (escolha.nova) {
+        if (!db.alunos.length) { avisar('Cadastre um aluno antes de marcar a primeira aula.'); return; }
+        fecharModal('modal-bib-gerar');
+        abrirAula(null, Core.hojeIso());
+        folhaPendenteDaBiblioteca = { titulo: op.titulo, aoCriar: function (aulaId, como) {
+          // na série, o aviso "Montando" tiraria da tela o Desfazer dela
+          op.semAvisoDeMontagem = !!(como && como.serie);
+          gerarEAnexar(aulaId, itens, paginas, op);
+        } };
+        var ajudaPadrao = $('#ajuda-aula-nova');
+        if (ajudaPadrao) ajudaPadrao.remove();
+        var corpoAula = $('#corpo-modal-aula');
+        if (corpoAula) {
+          corpoAula.insertBefore(el('div', { class: 'faixa-info', id: 'aviso-folha-da-biblioteca' }, [
+            el('strong', { texto: 'Da biblioteca: ' }),
+            document.createTextNode('ao salvar, o material "' + op.titulo + '" vai anexado nesta aula.')
+          ]), corpoAula.firstChild);
+        }
+        return;
+      }
+      gerarEAnexar(escolha.aulaId, itens, paginas, op);
+    });
+    botaoBaixar.addEventListener('click', function () {
+      var op = opcoesDaTela();
+      if (!op.teoria && !op.lista && !op.gabarito) { avisar('Marque ao menos Teoria, Lista ou Gabarito.'); return; }
+      op.folha = false;
+      // sem anexar, mas com o aluno e a data da aula escolhida no cabeçalho, se houver
+      op.cabecalhoDaAula = escolha.aulaId;
+      gerarEAnexar(null, itens, paginas, op);
+    });
+    rodape.appendChild(el('button', { type: 'button', class: 'btn', 'data-fechar': '', texto: 'Cancelar',
+      aoClick: function () { fecharModal('modal-bib-gerar'); } }));
+    rodape.appendChild(botaoBaixar);
+    rodape.appendChild(botaoGerar);
+    corpo.appendChild(dica);
+    abrirModalGerar.atualizar = atualizarRodape;
+    /* A aula é escolhida sempre por ela, mesmo quando só há uma hoje: escolhida
+     * sozinha, o material podia ir para a aula de outro aluno por distração. */
+    atualizarRodape();
+    abrirModal('modal-bib-gerar');
+  }
+
+  function origemCurta(it) {
+    var fonte = it.fonte === 'obmep-portal' ? 'Portal da OBMEP' : it.fonte === 'obmep-banco' ? 'Banco de Questões da OBMEP' : (it.fonte || '');
+    return [fonte, it.modulo.titulo, (eDoBanco(it) ? 'problema ' : 'exercício ') + it.numero]
+      .filter(Boolean).join(', ') + (it.origem_citada ? ' (' + it.origem_citada + ')' : '');
+  }
+
+  function blobDoAsset(pacote, caminho) {
+    return Store.lerAssetBiblioteca(pacote, caminho).then(function (b) {
+      if (!b) throw new Error('imagem ausente: ' + caminho);
+      return b;
+    });
+  }
+
+  /* Um item virando o que o compositor recebe. Solução que o pacote diz que
+   * não existe vai como semSolucao; solução que devia existir e não abriu faz
+   * a folha inteira parar (o compositor recusa), em vez de sair em branco. */
+  function pecasDoItem(it, comSolucao) {
+    var enun = blobDoAsset(it.pacote, it.assets.enunciado).then(function (b) {
+      return Biblioteca.rasterizarRecorte(b, it.medidas.enunciado, it.origem && it.origem.enunciado && it.origem.enunciado.pedacos);
+    });
+    var sol = (!comSolucao || it.sem_solucao || !it.assets.solucao) ? Promise.resolve(null)
+      : blobDoAsset(it.pacote, it.assets.solucao).then(function (b) {
+        return Biblioteca.rasterizarRecorte(b, it.medidas.solucao, it.origem && it.origem.solucao && it.origem.solucao.pedacos);
+      });
+    return Promise.all([enun, sol]).then(function (r) {
+      return { id: it.id, origem: origemCurta(it), enunciado: r[0], solucao: r[1],
+        semSolucao: !!(it.sem_solucao || !it.assets.solucao) };
+    });
+  }
+
+  /* No máximo DUAS imagens desenhando ao mesmo tempo, como as miniaturas: cada
+   * recorte vira um canvas de alguns MB a 200 dpi, e um carrinho grande todo de
+   * uma vez faria o tablet ficar sem memória no meio da folha. */
+  function emFila(lista, fazer, juntos) {
+    var saida = new Array(lista.length), proximo = 0;
+    function trabalhador() {
+      if (proximo >= lista.length) return Promise.resolve();
+      var i = proximo++;
+      return Promise.resolve().then(function () { return fazer(lista[i], i); })
+        .then(function (r) { saida[i] = r; return trabalhador(); });
+    }
+    var ts = [];
+    for (var k = 0; k < Math.min(juntos || 2, lista.length); k++) ts.push(trabalhador());
+    return Promise.all(ts).then(function () { return saida; });
+  }
+
+  /* O erro de um recorte que não abriu diz qual exercício, na numeração da
+   * folha e na da fonte, para ela saber qual desmarcar. */
+  function comNomeDoExercicio(promessa, it, n) {
+    return promessa.catch(function (e) {
+      var err = new Error(e && e.message);
+      err.exercicio = 'O exercício ' + n + ' (' + it.modulo.titulo + ', ' +
+        (eDoBanco(it) ? 'problema ' : 'exercício ') + it.numero + ')';
+      throw err;
+    });
+  }
+
+  /* Desmarca a seleção depois de um anexo (guardada no aparelho, ela entraria
+   * escondida no material do próximo aluno) e devolve a função que remarca. */
+  function desmarcarDepoisDeAnexar() {
+    var usada = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
+    bibCarrinho = { itens: [], paginas: [] };
+    guardarCarrinho();
+    desenharCarrinho();
+    $$('#bib-corpo input[data-carrinho]').forEach(function (c) { c.checked = false; });
+    return function () {
+      bibCarrinho = usada;
+      guardarCarrinho();
+      desenharCarrinho();
+      $$('#bib-corpo input[data-carrinho]').forEach(function (c) { c.checked = noCarrinho(c.dataset.carrinho, c.dataset.id); });
+    };
+  }
+
+  function gerarEAnexar(aulaId, itens, paginas, op) {
+    if (gerandoMaterial) { avisar('Ainda estou montando o material anterior. Espere um instante.'); return Promise.resolve(); }
+    gerandoMaterial = true;
+    var aula = aulaId ? db.aulas.filter(function (a) { return a.id === aulaId; })[0] : null;
+    var daCabeca = aula || (op.cabecalhoDaAula ? db.aulas.filter(function (a) { return a.id === op.cabecalhoDaAula; })[0] : null);
+    var aluno = daCabeca ? alunoPorId(daCabeca.alunoId) : null;
+    $$('#rodape-modal-bib-gerar button').forEach(function (b) { b.disabled = true; });
+    var botao = $('#bib-gerar-anexar');
+    if (botao) botao.textContent = 'Montando...';
+    if (!op.semAvisoDeMontagem) avisar('Montando o material. Isso leva alguns segundos.');
+    var usaItens = (op.lista || op.gabarito) ? itens : [];
+    var pecas, teoria, anexado = false, id = null, saida = null, etapa = 'montar';
+    return emFila(usaItens, function (it, i) { return comNomeDoExercicio(pecasDoItem(it, op.gabarito), it, i + 1); }).then(function (r) {
+      pecas = r;
+      return emFila(op.teoria ? paginas : [], function (p) {
+        return blobDoAsset(p.aula.pacote, p.pagina.asset).then(function (b) { return Biblioteca.rasterizarPagina(b, p.pagina.medidas); })
+          .catch(function (e) {
+            var err = new Error(e && e.message);
+            err.pagina = (p.pagina.capa ? 'A capa' : 'A página ' + p.pagina.n) + ' de ' + p.aula.aula.titulo;
+            throw err;
+          });
+      });
+    }).then(function (r) {
+      teoria = r;
+      saida = PDFGen.gerarMaterialBiblioteca({
+        titulo: op.titulo, subtitulo: op.subtitulo, aluno: aluno ? aluno.nome : '',
+        data: daCabeca ? Core.ddmmaaaa(daCabeca.data) : Core.ddmmaaaa(Core.hojeIso()),
+        incluirTeoria: op.teoria, incluirLista: op.lista, incluirGabarito: op.gabarito, gabaritoSeparado: true,
+        espacoParaResposta: op.espaco ? ESPACO_RESPOSTA : 0, mostrarOrigem: op.origem,
+        teoria: teoria, itens: pecas
+      });
+      var nome = Core.nomeArquivo(op.titulo + (op.subtitulo ? ' ' + op.subtitulo : '')) + '_biblioteca.pdf';
+      var blob = new Blob([saida.bytes], { type: 'application/pdf' });
+      if (!aula) {
+        fecharModal('modal-bib-gerar');
+        entregarArquivo(nome, blob, op.titulo);
+        return null;
+      }
+      id = Core.uid();
+      return Store.salvarAnexo(id, { nome: nome, tipo: 'application/pdf', blob: blob }).then(function () {
+        aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
+        if (!aula) {
+          // a aula foi desfeita enquanto a folha era montada: o arquivo não fica órfão
+          Store.apagarAnexo(id);
+          var sem = new Error('aula desfeita'); sem.desfeita = true; throw sem;
+        }
+        aula.anexos = aula.anexos || [];
+        /* Os módulos dos exercícios vão junto no anexo, para o fechamento (PR D)
+         * ler "Temas trabalhados" da própria aula, de forma síncrona. */
+        var modulos = [];
+        usaItens.forEach(function (it) { if (modulos.indexOf(it.modulo.titulo) < 0) modulos.push(it.modulo.titulo); });
+        var registro = { id: id, nome: nome, tamanho: blob.size, biblioteca: true, modulos: modulos };
+        aula.anexos.push(registro);
+        titulosGuardados()[aula.alunoId] = { titulo: op.titulo, subtitulo: op.subtitulo };
+        return salvar().catch(function (e) {
+          // não gravou: o anexo sai da memória, senão o próximo salvar o gravaria e a nova tentativa duplicaria
+          aula.anexos = aula.anexos.filter(function (x) { return x !== registro; });
+          Store.apagarAnexo(id);
+          throw e;
+        });
+      }).then(function () {
+        anexado = true;
+        etapa = 'uso';
+        /* O uso: um registro por exercício que entrou na folha, só se a aula
+         * ainda existe (um Desfazer pode ter caído entre o salvar e aqui). */
+        if (!db.aulas.some(function (a) { return a.id === aulaId; })) return null;
+        return emFila(usaItens, function (it) {
+          return Store.registrarUsoBiblioteca({ itemId: it.id, alunoId: aula.alunoId, aulaId: aula.id, data: aula.data });
+        }, 1);
+      }).then(function () {
+        etapa = 'folha';
+        if (op.folha && op.lista) return listaComoFolha(aula.id, usaItens, pecas);
+        return null;
+      }).then(function (indiceFolha) {
+        fecharModal('modal-bib-gerar');
+        desenharAgenda();
+        var nRed = saida.reduzidos.lista.length + saida.reduzidos.gabarito.length;
+        var menor = nRed ? ' ' + (nRed === 1 ? 'Um recorte saiu' : nRed + ' recortes saíram') +
+          ' um pouco menor, para caber na folha.' : '';
+        /* A seleção é desmarcada ao anexar: guardada no aparelho, ela entraria
+         * escondida no material do próximo aluno. O Desfazer do aviso devolve,
+         * para ela gerar o mesmo material para outra aula. */
+        var devolver = desmarcarDepoisDeAnexar();
+        var desmarcada = ' A seleção foi desmarcada.';
+        /* "Marcar de novo", e não "Desfazer": no app, Desfazer desfaz a ação do
+         * aviso, e aqui ela acharia que tirou o anexo da aula. */
+        if (indiceFolha != null) {
+          abrirEditorNota(aula.id, indiceFolha);
+          avisar('Material anexado na aula de ' + aluno.nome + ', e a lista abriu como folha.' + menor + desmarcada, 'Marcar de novo', devolver);
+        } else {
+          avisar('Material anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + ').' + menor + desmarcada, 'Marcar de novo', devolver);
+        }
+      });
+    }).catch(function (e) {
+      if (e && e.desfeita) return;
+      if (window.console) console.warn('biblioteca, gerar material:', e);
+      /* Depois do anexo gravado, o erro não é "nada foi anexado": tentar de novo
+       * duplicaria o arquivo na aula. Antes dele, a mensagem diz o que fazer, e
+       * o detalhe técnico fica só no console. */
+      if (anexado) {
+        var remarcar = desmarcarDepoisDeAnexar();
+        avisar(etapa === 'folha'
+          ? 'O material foi anexado na aula, mas a lista não abriu como folha. O PDF está na aula; não precisa gerar de novo.'
+          : 'O material foi anexado na aula, mas não consegui marcar os exercícios como usados. O PDF está na aula; não precisa gerar de novo.',
+          'Marcar de novo', remarcar);
+      }
+      else if (e && e.exercicio) avisar(e.exercicio + ' não abriu. Desmarque esse exercício e gere de novo. Nada foi anexado.');
+      else if (e && e.pagina) avisar(e.pagina + ' não abriu. Desmarque essa página e gere de novo. Nada foi anexado.');
+      else avisar('Não consegui montar o material. Nada foi anexado; tente de novo daqui a pouco.');
+    }).then(function () {
+      gerandoMaterial = false;
+      $$('#rodape-modal-bib-gerar button').forEach(function (b) { b.disabled = false; });
+      if (abrirModalGerar.atualizar) abrirModalGerar.atualizar();
+    });
+  }
+
+  /* A lista, riscável: cada enunciado entra como imagem na folha da aula, com
+   * o número novo escrito no lugar do rótulo coberto e espaço embaixo para
+   * resolver. É a mesma folha do "Abrir como folha", só que com vários
+   * recortes por página. */
+  function listaComoFolha(aulaId, itens, pecas) {
+    var L = Draw.FOLHA_L, A = Draw.FOLHA_A, MARGEM = 40, ESPACO = 150;
+    var paginas = [], atual = null, y = 0;
+    var tarefas = [];
+    pecas.forEach(function (p, i) {
+      var e = p.enunciado;
+      var altPt = e.alturaPt + (numeroNoLugar(e, i + 1) ? 0 : 16);   // na faixa, o número soma 16 pt em cima
+      var esc = Math.min(1.9, (L - 2 * MARGEM) / e.larguraPt);
+      var h = altPt * esc;
+      if (h > A - 2 * MARGEM) { esc = (A - 2 * MARGEM) / altPt; h = A - 2 * MARGEM; }
+      if (!atual || y + h > A - MARGEM) { atual = { fundo: 'branco', itens: [] }; paginas.push(atual); y = MARGEM; }
+      var ref = Core.uid();
+      var destino = atual;
+      var pos = { x: MARGEM, y: y, w: e.larguraPt * esc, h: h };
+      tarefas.push(function () {
+        return imagemNumerada(e, i + 1, esc).then(function (r) {
+          return Store.salvarMidia(ref, r).then(function () {
+            destino.itens.push({ t: 'imagem', ref: ref, x: pos.x, y: pos.y, w: pos.w, h: pos.h });
+          });
+        });
+      });
+      y += h + ESPACO;
+    });
+    var indice = 0;
+    return emFila(tarefas, function (t) { return t(); }, 1).then(function () {
+      return Store.lerNota(aulaId);
+    }).then(function (nota) {
+      var temConteudo = nota && nota.paginas && nota.paginas.some(function (p) { return (p.itens || []).length; });
+      if (!temConteudo) nota = { paginas: [] };
+      indice = nota.paginas.length;
+      paginas.forEach(function (p) { nota.paginas.push(p); });
+      return Store.salvarNota(aulaId, nota);
+    }).then(function () {
+      var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
+      if (aula) aula.temNota = true;
+      return salvar();
+    }).then(function () { return indice; });
+  }
+
+  /* "Exercício N." cabe no lugar do rótulo coberto com pelo menos 7 pt? A mesma
+   * regra do PDF, decidida uma vez: o espaço na folha e o desenho usam esta
+   * resposta, senão a imagem sairia achatada. */
+  function numeroNoLugar(peca, n) {
+    var r = peca.rotulo;
+    if (!r) return false;
+    var cv = numeroNoLugar.cv = numeroNoLugar.cv || document.createElement('canvas');
+    var cx = cv.getContext('2d');
+    cx.font = 'bold 100px Helvetica, Arial, sans-serif';
+    var porPt = cx.measureText('Exercício ' + n + '.').width / 100;
+    var tam = Math.min((r[3] - r[1]) * 1.05, (r[2] - r[0] + 2) / porPt);
+    return tam >= 7;
+  }
+
+  /* O enunciado já rasterizado (JPEG, rótulo coberto), junto de novo num canvas
+   * com "Exercício N." escrito onde o rótulo estava. */
+  function imagemNumerada(peca, n, escFolha) {
+    var partes = peca.pedacos ? peca.pedacos : [{ img: peca.img, alturaPt: peca.alturaPt }];
+    return Promise.all(partes.map(function (p) {
+      return new Promise(function (ok, falha) {
+        var url = URL.createObjectURL(new Blob([p.img.bytes], { type: 'image/jpeg' }));
+        var im = new Image();
+        im.onload = function () { URL.revokeObjectURL(url); ok({ im: im, p: p }); };
+        im.onerror = function () { URL.revokeObjectURL(url); falha(new Error('recorte ilegível')); };
+        im.src = url;
+      });
+    })).then(function (imgs) {
+      var k = imgs[0].im.width / peca.larguraPt;           // px por pt do JPEG
+      var cv = document.createElement('canvas');
+      cv.width = imgs[0].im.width;
+      cv.height = Math.round(peca.alturaPt * k);
+      var cx = cv.getContext('2d');
+      cx.fillStyle = '#FFFFFF';
+      cx.fillRect(0, 0, cv.width, cv.height);
+      var y = 0;
+      imgs.forEach(function (x) {
+        cx.drawImage(x.im, 0, Math.round(y * k), cv.width, Math.round(x.p.alturaPt * k));
+        y += x.p.alturaPt + 6;
+      });
+      var texto = 'Exercício ' + n + '.';
+      var r = peca.rotulo;
+      cx.fillStyle = '#1F3A5F';
+      var tam = r ? (r[3] - r[1]) * k * 1.05 : 0;
+      if (r) {
+        cx.font = 'bold ' + tam + 'px Helvetica, Arial, sans-serif';
+        var larg = cx.measureText(texto).width;
+        var caixa = (r[2] - r[0] + 2) * k;
+        if (larg > caixa) tam = tam * caixa / larg;
+      }
+      // o mesmo piso do PDF: abaixo de 7 pt o número vai para a faixa de cima
+      if (numeroNoLugar(peca, n)) {
+        cx.font = 'bold ' + tam + 'px Helvetica, Arial, sans-serif';
+        cx.textBaseline = 'alphabetic';
+        cx.fillText(texto, r[0] * k, r[3] * k - 1.5 * k);
+        return { dataUrl: cv.toDataURL('image/jpeg', 0.9), w: cv.width, h: cv.height };
+      }
+      // sem caixa do rótulo: uma faixa em cima com o número
+      var faixa = Math.round(16 * k);
+      var cv2 = document.createElement('canvas');
+      cv2.width = cv.width; cv2.height = cv.height + faixa;
+      var c2 = cv2.getContext('2d');
+      c2.fillStyle = '#FFFFFF'; c2.fillRect(0, 0, cv2.width, cv2.height);
+      c2.fillStyle = '#1F3A5F';
+      c2.font = 'bold ' + Math.round(11 * k) + 'px Helvetica, Arial, sans-serif';
+      c2.fillText(texto, 0, Math.round(12 * k));
+      c2.drawImage(cv, 0, faixa);
+      return { dataUrl: cv2.toDataURL('image/jpeg', 0.9), w: cv2.width, h: cv2.height };
+    });
+  }
+
 
   // ---------- busca ----------
 

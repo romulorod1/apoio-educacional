@@ -406,7 +406,8 @@
 
   Doc.prototype.novaPagina = function (opcoes) {
     opcoes = opcoes || {};
-    this.pag = { ops: [], usaImg: {}, usaSim: false, usaIta: false, semMoldura: !!opcoes.semMoldura };
+    this.pag = { ops: [], usaImg: {}, usaSim: false, usaIta: false, semMoldura: !!opcoes.semMoldura,
+      marcaPorCima: false };
     this.paginas.push(this.pag);
     this.y = Y_TOPO;
     if (!opcoes.semMarca) this.marcaDagua();
@@ -574,6 +575,14 @@
     return saida;
   }
 
+  /* A marca inteira, sem a regra da palavra fatiada: por cima nao ha placa
+   * branca que a corte. */
+  function opsDaMarcaInteira(pag) {
+    var lista = pag.marca || [], saida = [];
+    for (var i = 0; i < lista.length; i++) saida = saida.concat(lista[i].ops);
+    return saida;
+  }
+
   Doc.prototype.moldura = function (numero, total) {
     // Cabecalho identico ao samsung_template_branco.
     this.texto('Nathália Wajsenzon', MARG_E, PAGINA_A - 46.5, { tam: 12, bold: true, cor: COR.navy });
@@ -676,7 +685,16 @@
     // no comeco, que e onde ela fica embaixo de tudo.
     for (var i = 0; i < total; i++) {
       this.pag = this.paginas[i];
-      var antes = opsDaMarca(this.pag).concat(this.pag.ops);
+      /* Folha da biblioteca: a pagina do livro entra como imagem opaca, e a marca
+       * no fundo sumiria atras dela. Nessas paginas (e so nelas) a marca vem POR
+       * CIMA, em multiplicacao: sobre o branco sai a mesma tinta de sempre, e
+       * sobre o preto do texto nao apaga nada, porque multiplicar pelo quase
+       * branco da marca deixa o preto preto. Medido no MuPDF e no Chrome: nenhum
+       * pixel de texto dentro do anel ficou mais claro. Pagina sem a marca por
+       * cima sai byte a byte igual a de antes. */
+      var antes = this.pag.marcaPorCima
+        ? this.pag.ops.concat(['q /GSm gs'], opsDaMarcaInteira(this.pag), ['Q'])
+        : opsDaMarca(this.pag).concat(this.pag.ops);
       this.pag.marca = null;   // finalizar duas vezes nao empilha a marca
       if (this.pag.semMoldura) { this.pag.ops = antes; continue; }
       this.pag.ops = [];
@@ -703,6 +721,12 @@
       this.fonteItalico = w.add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding >>');
       this.fonteBoldItalico = w.add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-BoldOblique /Encoding /WinAnsiEncoding >>');
     }
+    /* O estado grafico da multiplicacao so entra no arquivo se alguma pagina
+     * usou: os outros documentos continuam byte a byte iguais. */
+    var gsMultiplica = 0;
+    for (var g = 0; g < this.paginas.length; g++) {
+      if (this.paginas[g].marcaPorCima && !gsMultiplica) gsMultiplica = w.add('<< /Type /ExtGState /BM /Multiply >>');
+    }
     var numPaginas = w.alloc();
     var refs = [];
     for (var j = 0; j < this.paginas.length; j++) {
@@ -715,7 +739,8 @@
       var recursos = '/Font << /F1 ' + this.fonteRegular + ' 0 R /F2 ' + this.fonteBold + ' 0 R' +
         (pg.usaSim ? ' /F3 ' + this.fonteSimbolo + ' 0 R' : '') +
         (pg.usaIta ? ' /F4 ' + this.fonteItalico + ' 0 R /F5 ' + this.fonteBoldItalico + ' 0 R' : '') + ' >>' +
-        (xo.length ? ' /XObject << ' + xo.join(' ') + ' >>' : '');
+        (xo.length ? ' /XObject << ' + xo.join(' ') + ' >>' : '') +
+        (pg.marcaPorCima ? ' /ExtGState << /GSm ' + gsMultiplica + ' 0 R >>' : '');
       var pgNum = w.add('<< /Type /Page /Parent ' + numPaginas + ' 0 R /MediaBox [0 0 ' +
         PAGINA_L.toFixed(4) + ' ' + PAGINA_A.toFixed(4) + '] /Resources << ' + recursos +
         ' >> /Contents ' + conteudo + ' 0 R >>');
@@ -3855,12 +3880,225 @@
     return doc.finalizar();
   }
 
+  // ================= material da biblioteca =================
+
+  /* Folha montada com os recortes da biblioteca (pacote do Portal da OBMEP):
+   * páginas de teoria, lista renumerada e gabarito, na moldura dela.
+   *
+   * Quem chama já rasterizou cada SVG no navegador (Biblioteca.rasterizar), no
+   * dpi desta folha, e entrega o JPEG pronto, porque aqui só entra DCTDecode.
+   * O rótulo original do recorte ("Exercício 7.") já veio coberto de branco na
+   * rasterização, e aqui se escreve o número novo no lugar dele, no corpo que
+   * cabe na caixa coberta. Sem a caixa do rótulo (medidas.*.rotulo nulo), o
+   * número novo sai numa linha própria, acima do recorte.
+   *
+   * op = {
+   *   titulo, subtitulo, aluno, data,
+   *   incluirTeoria, incluirLista, incluirGabarito, gabaritoSeparado,
+   *   espacoParaResposta (pt), mostrarOrigem,
+   *   teoria: [{ img: {bytes, wPx, hPx}, larguraPt, alturaPt }],
+   *   itens: [{ id, origem, semSolucao,
+   *             enunciado: Peca, solucao: Peca | null }]
+   * }
+   * Peca = { larguraPt, alturaPt, rotulo: [x0,y0,x1,y1] | null,
+   *          img: {bytes, wPx, hPx}  ou  pedacos: [{ img, alturaPt }] }
+   *
+   * Devolve { bytes, total, paginas: {teoria, lista, gabarito},
+   * reduzidos: {lista, gabarito} }, com os índices das páginas de cada parte e,
+   * em cada parte, os números que precisaram de escala menor para caber. */
+  function gerarMaterialBiblioteca(op) {
+    var doc = new Doc();
+    doc.lingua = 'pt';
+    var itens = op.itens || [];
+    var CHEIA = Y_TOPO - Y_LIMITE;
+    var mapa = { teoria: [], lista: [], gabarito: [] };
+    var reduzidos = { lista: [], gabarito: [] };
+    var cont = 0;
+
+    /* Com gabarito, item sem solução só é aceito quando o pacote diz que a
+     * fonte não tem solução. Solução que devia existir e não chegou para a folha
+     * aqui, em vez de sair um número com nada embaixo no gabarito. Sem gabarito,
+     * a solução nem é pedida. */
+    if (op.incluirGabarito) itens.forEach(function (it, i) {
+      if (!it.solucao && !it.semSolucao) {
+        throw new Error('A solução do exercício ' + (i + 1) + ' não chegou para a folha (' + it.id + ').');
+      }
+    });
+
+    function anota(parte) {
+      var p = doc.paginas.length - 1;
+      if (mapa[parte].indexOf(p) < 0) mapa[parte].push(p);
+    }
+
+    function imagem(img, x, y, largura, altura) {
+      var ref = 'bib' + (++cont);
+      doc.registraImagem(ref, img.bytes, img.wPx, img.hPx);
+      doc.desenhaImagem(ref, x, y, largura, altura);
+    }
+
+    var primeira = true;
+    function abrirParte(nome, paginaNova) {
+      if (!primeira && paginaNova) doc.novaPagina();
+      else if (!primeira) doc.garanteEspaco(90);
+      primeira = false;
+      doc.cabecalhoDeSecao(op.titulo || 'Material', nome + (op.subtitulo ? '  ·  ' + op.subtitulo : ''));
+      if (op.aluno) {
+        doc.y -= 14;
+        doc.texto('Aluno: ' + op.aluno + (op.data ? '   ' + op.data : ''), MARG_E, doc.y, { tam: 9, cor: COR.muted });
+      }
+      doc.y -= 6;
+    }
+
+    /* O rótulo novo no lugar do antigo, no corpo que cabe na caixa coberta.
+     * Abaixo de CORPO_MIN ele ficaria ilegível ("Exercício 12." numa caixa feita
+     * para "7."): aí o número sai numa linha própria, acima do recorte. */
+    var CORPO_MIN = 7;
+    function corpoDoRotulo(texto, r, k) {
+      return Math.min((r[3] - r[1]) * k * 1.05, (r[2] - r[0] + 2) * k / medir(texto, 1, true));
+    }
+    function rotuloNoLugar(texto, r, k, topo) {
+      doc.texto(texto, MARG_E + r[0] * k, topo - r[3] * k + 1.5,
+        { tam: corpoDoRotulo(texto, r, k), bold: true, cor: COR.navy });
+    }
+
+    function linhaDeOrigem(origem) {
+      doc.y -= 9;
+      doc.texto(origem, MARG_E, doc.y, { tam: 6.5, cor: COR.muted });
+    }
+
+    /* Um recorte. Se ele inteiro não cabe numa folha e vem em pedaços (8a do
+     * contrato), quebra na fronteira entre pedaços, nunca no meio de um. Só
+     * quando um pedaço sozinho (ou o recorte de pedaço único) não cabe é que a
+     * escala do item diminui. Nunca se corta recorte por altura fixa. */
+    function recorte(parte, n, peca, extra, origem) {
+      var rotuloNovo = (parte === 'lista' ? 'Exercício ' : '') + n + '.';
+      var cauda = extra + (origem ? 11 : 0) + 12;     // espaço para resposta, origem e folga
+      var pedacos = peca.pedacos && peca.pedacos.length ? peca.pedacos
+        : [{ img: peca.img, alturaPt: peca.alturaPt }];
+      var k = Math.min(1, UTIL / peca.larguraPt);
+      var noLugar = function () { return !!peca.rotulo && corpoDoRotulo(rotuloNovo, peca.rotulo, k) >= CORPO_MIN; };
+      var acima = noLugar() ? 0 : 16;
+      var inteiro = pedacos.length === 1 || peca.alturaPt * k + acima + cauda + 4 <= CHEIA;
+      var maior = inteiro ? peca.alturaPt
+        : Math.max.apply(null, pedacos.map(function (p) { return p.alturaPt; }));
+      /* Quanto cabe: a folha inteira; ou, logo abaixo do título da parte, o que
+       * sobra nela, para a página do título não ficar vazia por causa de um
+       * recorte que vai ser reduzido de qualquer jeito. */
+      var tetoCheio = CHEIA - 4 - acima - cauda;
+      var reduzDeQualquerJeito = maior * k > tetoCheio;
+      var logoAbaixoDoTitulo = Y_TOPO - doc.y < 110;
+      // recorte que cabe numa folha nova não encolhe para caber na do título
+      var util = logoAbaixoDoTitulo && reduzDeQualquerJeito ? doc.y - Y_LIMITE : CHEIA;
+      var teto = util - 4 - acima - cauda;
+      if (maior * k > teto) {
+        k = teto / maior;
+        if (!noLugar() && !acima) { acima = 16; k = (teto - 16) / maior; }
+        reduzidos[parte].push(n);
+      }
+      if (!noLugar()) acima = 16;
+      var largura = peca.larguraPt * k;
+      // 0,01 pt de folga: k = teto / maior deixa a soma um fio acima do que cabe
+      doc.garanteEspaco((inteiro ? peca.alturaPt * k + acima + cauda + 4
+        : acima + pedacos[0].alturaPt * k + 4) - 0.01);
+      if (!noLugar()) {
+        doc.y -= 12;
+        doc.texto(rotuloNovo, MARG_E, doc.y, { tam: parte === 'lista' ? 11 : 10, bold: true, cor: COR.navy });
+      }
+      doc.y -= 4;
+      pedacos.forEach(function (p, i) {
+        var altura = p.alturaPt * k;
+        var ultimo = i === pedacos.length - 1;
+        if (i > 0) {
+          doc.y -= 6 * k;                            // a folga entre pedaços do gerador
+          // a fronteira pode virar a página; o último pedaço leva a cauda junto
+          /* a fronteira pode virar a página; o último pedaço leva a cauda junto.
+           * Na página nova, o pedaço abre com "4. (continuação)", para quem corrige
+           * saber de que exercício é aquele bloco. */
+          if (!inteiro && doc.garanteEspaco(altura + (ultimo ? cauda : 4) + 16)) {
+            doc.y -= 12;
+            doc.texto(rotuloNovo + ' (continuação)', MARG_E, doc.y, { tam: 9, bold: true, cor: COR.navy });
+            doc.y -= 4;
+          }
+        }
+        imagem(p.img, MARG_E, doc.y - altura, largura, altura);
+        if (i === 0 && noLugar()) rotuloNoLugar(rotuloNovo, peca.rotulo, k, doc.y);
+        doc.y -= altura;
+        anota(parte);
+      });
+      if (origem) linhaDeOrigem(origem);
+      doc.y -= extra + 12;        // folga entre um recorte e o seguinte
+    }
+
+    doc.novaPagina();
+
+    if (op.incluirTeoria && op.teoria && op.teoria.length) {
+      abrirParte('Teoria', false);
+      op.teoria.forEach(function (pg, i) {
+        if (i > 0) doc.novaPagina();
+        var alto = doc.y - Y_LIMITE;
+        var k = Math.min(UTIL / pg.larguraPt, alto / pg.alturaPt);
+        var l = pg.larguraPt * k, a = pg.alturaPt * k;
+        var x = MARG_E + (UTIL - l) / 2;
+        imagem(pg.img, x, doc.y - a, l, a);
+        // fio fino em volta: separa a página do livro da moldura dela
+        doc.op(cor3(COR.fio) + ' RG 0.50 w ' + x.toFixed(2) + ' ' + (doc.y - a).toFixed(2) + ' ' +
+          l.toFixed(2) + ' ' + a.toFixed(2) + ' re S');
+        doc.y -= a;
+        anota('teoria');
+      });
+    }
+
+    if (op.incluirLista && itens.length) {
+      abrirParte('Exercícios', !!(op.incluirTeoria && op.teoria && op.teoria.length));
+      itens.forEach(function (it, i) {
+        recorte('lista', i + 1, it.enunciado, op.espacoParaResposta || 0, op.mostrarOrigem ? it.origem : null);
+      });
+    }
+
+    if (op.incluirGabarito && itens.length) {
+      abrirParte('Gabarito', op.gabaritoSeparado !== false && !primeira);
+      itens.forEach(function (it, i) {
+        if (it.solucao) {
+          recorte('gabarito', i + 1, it.solucao, 0, op.mostrarOrigem ? it.origem : null);
+          return;
+        }
+        doc.garanteEspaco(24);
+        doc.y -= 14;
+        doc.texto(String(i + 1) + '.', MARG_E, doc.y, { tam: 10, bold: true, cor: COR.navy });
+        doc.texto('Sem solução na fonte.', MARG_E + 20, doc.y, { tam: 9.5, italic: true, cor: COR.muted });
+        doc.y -= 8;
+        anota('gabarito');
+      });
+    }
+
+    /* A marca por tipo de página (decisão da orquestradora em 22/09, PLANO,
+     * seção 7). Lista e gabarito, que o app compõe em fundo branco: a marca de
+     * sempre, por cima, em multiplicação. Teoria, que é a página inteira da
+     * fonte e já traz a marca e o rodapé dela: só um selo pequeno no rodapé da
+     * moldura, para não sobrepor duas marcas no texto. */
+    doc.paginas.forEach(function (p, i) {
+      if (mapa.teoria.indexOf(i) >= 0) {
+        p.marca = null;
+        var guardada = doc.pag;
+        doc.pag = p;
+        var cx = PAGINA_L / 2, cy = PAGINA_A - 809.4 + 2.6;
+        doc.circulo(cx, cy, 8.5, COR.fio, false);
+        doc.texto('NW', cx, cy - 3, { tam: 8, bold: true, cor: COR.fio, align: 'centro' });
+        doc.pag = guardada;
+      } else {
+        p.marcaPorCima = true;
+      }
+    });
+    return { bytes: doc.finalizar(), total: doc.paginas.length, paginas: mapa, reduzidos: reduzidos };
+  }
+
   return {
     Doc: Doc, COR: COR, medir: medir, medirRico: medirRico, paraWinAnsi: paraWinAnsi,
     SIMBOLOS: SIMBOLOS, caracteresQueNaoDesenha: caracteresQueNaoDesenha,
     marcacaoQueSobrou: marcacaoQueSobrou,
     gerarFechamento: gerarFechamento, gerarResumoMes: gerarResumoMes,
     gerarMaterialTema: gerarMaterialTema, gerarFichaMapeamento: gerarFichaMapeamento,
+    gerarMaterialBiblioteca: gerarMaterialBiblioteca,
     gerarProposta: gerarProposta,
     NOTA_L: NOTA_L, NOTA_A: NOTA_A,
     PAGINA_L: PAGINA_L, PAGINA_A: PAGINA_A, MARG_E: MARG_E, MARG_D: MARG_D, UTIL: UTIL,

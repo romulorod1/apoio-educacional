@@ -27,6 +27,16 @@
  *   asset-citado        o itens.json cita um asset que não existe
  *   esquema             manifest com esquema 2
  *   asset-fora          um exercício cita uma imagem fora de assets/ (no zip e no manifest)
+ *
+ * Opção compor (gerar(saida, { compor: true }), para o testa_biblioteca_compor):
+ * a lista "Soma e Produto" ganha o que o compositor tem de tratar, e o resto do
+ * pacote fica igual ao de sempre (as contagens dos outros testes não mudam):
+ *   medidas.*.rotulo em todos os itens, na barra colorida do canto (4,4 a 60,16
+ *     pt), que é o que a folha cobre de branco (dá para ver na folha se cobriu);
+ *   item 2 sem rótulo (rotulo null): o número sai numa linha acima;
+ *   item 4 sem solução na fonte (sem_solucao, assets.solucao null);
+ *   item 7 com a solução em dois pedaços empilhados (8a), 400 + 380 pt, que
+ *     não cabe numa folha e tem de quebrar entre os pedaços.
  */
 'use strict';
 const fs = require('fs');
@@ -93,7 +103,7 @@ function montarZip(arquivos) {
 /* Um "recorte" sintético: moldura, linhas cinzas no lugar do texto e uma
  * barra colorida cujo comprimento depende do número, para as miniaturas
  * serem distinguíveis a olho. Sem <text>, sem fonte, sem referência externa. */
-function svgRecorte(largura, altura, numero, cor) {
+function svgRecorte(largura, altura, numero, cor, rotuloLargo) {
   const linhas = [];
   for (let y = 26, k = 0; y < altura - 10; y += 14, k++) {
     const w = largura - 40 - ((numero * 7 + k * 13) % 60);
@@ -102,9 +112,28 @@ function svgRecorte(largura, altura, numero, cor) {
   const barra = 20 + (numero % 10) * ((largura - 40) / 10);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${largura}pt" height="${altura}pt" viewBox="0 0 ${largura} ${altura}">` +
     `<rect x="0" y="0" width="${largura}" height="${altura}" fill="#ffffff"/>` +
-    `<rect x="4" y="4" width="18" height="14" fill="${cor}"/>` +
+    (rotuloLargo ? `<rect x="4" y="4" width="56" height="12" fill="${cor}"/>`
+      : `<rect x="4" y="4" width="18" height="14" fill="${cor}"/>`) +
     `<rect x="26" y="8" width="${barra}" height="6" fill="${cor}"/>` +
     linhas.join('') + '</svg>';
+}
+
+/* Dois pedaços empilhados como o gerador faz (8a): um <svg> externo com o
+ * total e cada pedaço aninhado, com 6 pt de folga entre eles. */
+function svgEmpilhado(largura, alturas, numero, cor) {
+  let y = 0;
+  const partes = alturas.map((h, i) => {
+    // pedaço aninhado SEM unidade, como o gerador faz: com "pt" ele seria
+    // desenhado 4/3 maior dentro do viewBox do externo
+    const s = svgRecorte(largura, h, numero + i, cor, i === 0)
+      .replace(`width="${largura}pt" height="${h}pt"`, `width="${largura}" height="${h}"`)
+      .replace('<svg ', `<svg x="0" y="${y}" `);
+    y += h + 6;
+    return s;
+  });
+  const total = y - 6;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${largura}pt" height="${total}pt" viewBox="0 0 ${largura} ${total}">` +
+    partes.join('') + '</svg>';
 }
 
 function svgPagina(numero, cor) {
@@ -201,9 +230,18 @@ function gerar(saida, opcoes) {
         const base = `assets/${SERIE}/${m.slug}/${l.slug}/ex-${dd(n)}`;
         const objetiva = (l.objetivas || []).indexOf(n) >= 0;
         const alt = 90 + (n % 5) * 20;
-        arquivos[base + '.svg'] = { dados: Buffer.from(svgRecorte(262, alt, n, m.cor)), metodo: 8 };
-        arquivos[base + '-sol.svg'] = { dados: Buffer.from(svgRecorte(262, alt + 60, n + 3, '#C9A961')), metodo: 8 };
-        comSolucao++;
+        const deCompor = !!opcoes.compor && l.slug === 'soma-e-produto';
+        const semSolucao = deCompor && n === 4;
+        const empilhada = deCompor && n === 7 ? [400, 380] : null;
+        const altSol = empilhada ? 400 + 6 + 380 : alt + 60;
+        arquivos[base + '.svg'] = { dados: Buffer.from(svgRecorte(262, alt, n, m.cor, deCompor)), metodo: 8 };
+        if (!semSolucao) {
+          arquivos[base + '-sol.svg'] = { dados: Buffer.from(empilhada ? svgEmpilhado(262, empilhada, n + 3, '#C9A961')
+            : svgRecorte(262, altSol, n + 3, '#C9A961', deCompor)), metodo: 8 };
+          comSolucao++;
+        }
+        // no modo compor, o "rótulo" é a barra do canto (4,4 a 60,16 pt)
+        const rotulo = deCompor ? (n === 2 ? null : [4, 4, 60, 16]) : undefined;
         const terco = Math.min(3, 1 + Math.floor(3 * (n - 1) / l.itens));
         const texto = `resolva o exercicio ${n} sobre ${l.titulo.toLowerCase()}`;
         itens.push({
@@ -217,11 +255,16 @@ function gerar(saida, opcoes) {
           origem_citada_em: n === 5 ? 'solucao' : undefined,
           dificuldade: terco, dificuldade_origem: 'proxy',
           proxy: { posicao: Math.round(1000 * (n - 1) / l.itens) / 1000, terco }, tema_app: null,
-          assets: { enunciado: base + '.svg', solucao: base + '-sol.svg' },
-          medidas: { enunciado: { largura_pt: 262, altura_pt: alt }, solucao: { largura_pt: 262, altura_pt: alt + 60 } },
+          assets: { enunciado: base + '.svg', solucao: semSolucao ? null : base + '-sol.svg' },
+          medidas: { enunciado: { largura_pt: 262, altura_pt: alt, rotulo },
+            solucao: semSolucao ? undefined : { largura_pt: 262, altura_pt: altSol, rotulo } },
+          sem_solucao: semSolucao || undefined,
           origem: { arquivo: `PDF/matematica/sintetico/${SERIE}/${m.slug}__exercicios-${l.slug}.pdf`,
             enunciado: { pagina: 1, coluna: 1, bbox: [33, 100, 295, 100 + alt] },
-            solucao: { pagina: 5, coluna: 1, bbox: [33, 100, 295, 160 + alt] } }
+            solucao: semSolucao ? undefined : empilhada
+              ? { pagina: 5, coluna: 1, bbox: [33, 100, 295, 500],
+                pedacos: [{ pagina: 5, coluna: 1, bbox: [33, 100, 295, 500] }, { pagina: 5, coluna: 2, bbox: [305, 60, 567, 440] }] }
+              : { pagina: 5, coluna: 1, bbox: [33, 100, 295, 160 + alt] } }
         });
         docs.push({ id, tipo: 'exercicio', titulo: '', resumo: `${l.titulo} ${m.titulo}`, texto });
       }

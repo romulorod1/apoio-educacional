@@ -258,6 +258,7 @@
           <button class="btn pequeno" id="limpar-busca-biblioteca" type="button" style="display:none">Limpar</button>
         </div>
       </div>
+      <div class="bib-carrinho" id="bib-carrinho" hidden></div>
       <div id="bib-corpo"></div>
     </section>
 
@@ -445,6 +446,18 @@
       <div class="modal-rodape">
         <button class="btn" data-fechar type="button">Cancelar</button>
       </div>
+    </div>
+  </div>
+
+  <!-- biblioteca: montar o material marcado e anexar na aula -->
+  <div class="fundo-modal" id="modal-bib-gerar">
+    <div class="modal">
+      <div class="modal-cabecalho">
+        <h3>Gerar material</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-bib-gerar"></div>
+      <div class="modal-rodape" id="rodape-modal-bib-gerar"></div>
     </div>
   </div>
 

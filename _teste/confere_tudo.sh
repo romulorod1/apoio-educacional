@@ -313,6 +313,15 @@ roda "biblioteca importar --envenenado-hash"    node "_teste/testa_biblioteca_im
 # que ignora os apelidos do pacote, e "bhaskara" tem de perder as listas.
 roda "biblioteca navegar"                       node "_teste/testa_biblioteca_navegar.js"
 roda "biblioteca navegar --envenenado-apelidos" node "_teste/testa_biblioteca_navegar.js" --envenenado-apelidos
+# FRENTE B: selecionar e compor. Sem navegador, o compositor do pdf.js (lista
+# renumerada, gabarito separado, sem solucao escrito, quebra entre pedacos, marca
+# por cima so nesta folha e os outros documentos byte a byte iguais aos de main).
+# No navegador, caixas, carrinho, gerar, anexar, uso, etiqueta e lista como folha;
+# o modo envenenado serve um pdf.js que nao escreve "Sem solucao na fonte.", e o
+# teste tem que enxergar o numero vazio no gabarito.
+roda "biblioteca compor (pdf)"                 node "_teste/testa_biblioteca_compor.js"
+roda "biblioteca compor"                       node "_teste/testa_biblioteca_compor_tela.js"
+roda "biblioteca compor --envenenado-sem-solucao" node "_teste/testa_biblioteca_compor_tela.js" --envenenado-sem-solucao
 
 roda "painel de valores"                        node "_teste/testa_painel_valores.js"
 roda "painel de valores --envenenado-aberto"    node "_teste/testa_painel_valores.js" --envenenado-aberto

@@ -259,9 +259,104 @@
     return linhas;
   }
 
+  // ---------- recorte para a folha (PDF) ----------
+
+  /* O dpi em que o recorte vira imagem dentro do PDF. O pdf.js só embute JPEG
+   * (DCTDecode), então o SVG é desenhado num canvas nesse dpi e sai JPEG. */
+  var DPI_RECORTE = 200;
+  var DPI_TEORIA = 150;
+  var FOLGA_PEDACOS = 6;     // a mesma do gerador, entre pedaços empilhados (8a)
+
+  /* As alturas dos pedaços empilhados, na ordem de leitura, ou null quando o
+   * recorte é de um pedaço só. Se as alturas não fecharem com a medida do
+   * asset (folga de 6 pt entre elas), não se adivinha fronteira: o recorte vai
+   * inteiro, e o compositor reduz a escala se ele não couber na folha. */
+  function alturasDosPedacos(medidas, pedacos) {
+    if (!pedacos || pedacos.length < 2) return null;
+    var alturas = pedacos.map(function (p) { return p.bbox[3] - p.bbox[1]; });
+    var soma = alturas.reduce(function (s, h) { return s + h; }, 0) + FOLGA_PEDACOS * (alturas.length - 1);
+    if (Math.abs(soma - medidas.altura_pt) > 1) return null;
+    return alturas;
+  }
+
+  function canvasParaJpeg(canvas) {
+    return new Promise(function (ok, falha) {
+      canvas.toBlob(function (b) {
+        if (!b) { falha(new Error('o canvas não virou JPEG')); return; }
+        b.arrayBuffer().then(function (buf) {
+          ok({ bytes: new Uint8Array(buf), wPx: canvas.width, hPx: canvas.height });
+        }, falha);
+      }, 'image/jpeg', 0.92);
+    });
+  }
+
+  /* Um asset (SVG, ou o WebP de reserva) virando a peça que o
+   * PDFGen.gerarMaterialBiblioteca recebe:
+   *   { larguraPt, alturaPt, rotulo, img }  ou  { ..., pedacos: [{ img, alturaPt }] }.
+   * O rótulo original ("Exercício 7.") é coberto de branco com folga de 1 pt,
+   * aqui e só aqui: o asset guardado no tablet nunca muda. */
+  function rasterizarRecorte(blob, medidas, pedacos, dpi) {
+    dpi = dpi || DPI_RECORTE;
+    var k = dpi / 72;
+    var rotulo = medidas.rotulo || null;
+    var alturas = alturasDosPedacos(medidas, pedacos);
+    return new Promise(function (ok, falha) {
+      var url = URL.createObjectURL(blob);
+      var im = new Image();
+      im.onload = function () {
+        URL.revokeObjectURL(url);
+        var cv = document.createElement('canvas');
+        cv.width = Math.round(medidas.largura_pt * k);
+        cv.height = Math.round(medidas.altura_pt * k);
+        var cx = cv.getContext('2d');
+        cx.fillStyle = '#FFFFFF';
+        cx.fillRect(0, 0, cv.width, cv.height);
+        cx.drawImage(im, 0, 0, cv.width, cv.height);
+        if (rotulo) {
+          cx.fillStyle = '#FFFFFF';
+          cx.fillRect((rotulo[0] - 1) * k, (rotulo[1] - 1) * k,
+            (rotulo[2] - rotulo[0] + 2) * k, (rotulo[3] - rotulo[1] + 2) * k);
+        }
+        var base = { larguraPt: medidas.largura_pt, alturaPt: medidas.altura_pt, rotulo: rotulo };
+        if (!alturas) {
+          canvasParaJpeg(cv).then(function (img) { base.img = img; ok(base); }, falha);
+          return;
+        }
+        var y = 0;
+        Promise.all(alturas.map(function (h) {
+          var p = document.createElement('canvas');
+          p.width = cv.width;
+          p.height = Math.round(h * k);
+          /* O arredondamento de cada fronteira pode pedir uma linha além do fim
+           * do canvas de origem; essa linha viria transparente, e transparente
+           * vira preto no JPEG (um fio escuro embaixo do último pedaço). Fundo
+           * branco e a altura lida limitada ao que a origem tem. */
+          var cp = p.getContext('2d');
+          cp.fillStyle = '#FFFFFF';
+          cp.fillRect(0, 0, p.width, p.height);
+          var y0 = Math.round(y * k);
+          var alto = Math.min(p.height, cv.height - y0);
+          if (alto > 0) cp.drawImage(cv, 0, y0, cv.width, alto, 0, 0, cv.width, alto);
+          y += h + FOLGA_PEDACOS;
+          return canvasParaJpeg(p).then(function (img) { return { img: img, alturaPt: h }; });
+        })).then(function (lista) { base.pedacos = lista; ok(base); }, falha);
+      };
+      im.onerror = function () { URL.revokeObjectURL(url); falha(new Error('o recorte não abriu')); };
+      im.src = url;
+    });
+  }
+
+  /* Página de teoria inteira, sem rótulo e sem pedaços. */
+  function rasterizarPagina(blob, medidas) {
+    return rasterizarRecorte(blob, { largura_pt: medidas.largura_pt, altura_pt: medidas.altura_pt, rotulo: null },
+      null, DPI_TEORIA).then(function (p) { return { img: p.img, larguraPt: p.larguraPt, alturaPt: p.alturaPt }; });
+  }
+
   return {
     ESQUEMA: ESQUEMA, SEM_NAVEGADOR: SEM_NAVEGADOR,
     abrirPacote: abrirPacote, resumo: resumo, nomeDaSerie: nomeDaSerie, mb: mb,
-    sha256: sha256, tipoDoAsset: tipoDoAsset
+    sha256: sha256, tipoDoAsset: tipoDoAsset,
+    rasterizarRecorte: rasterizarRecorte, rasterizarPagina: rasterizarPagina,
+    alturasDosPedacos: alturasDosPedacos
   };
 });
