@@ -12034,7 +12034,16 @@
      * segue o nome do arquivo, e não a ordem didática: sem isso, procurar o
      * título de uma aula por extenso a tirava do primeiro lugar. Nada some. */
     var posModulo = {};
-    grupos.modulo.forEach(function (m, i) { if (posModulo[m.id] === undefined) posModulo[m.id] = i; });
+    /* Só entra no patamar da frente o módulo que casou TODAS as palavras da
+     * busca: no busca.js a nota é (casadas/palavras)² x 1000 mais o peso do
+     * lugar, então nota de 1000 para cima quer dizer casamento completo.
+     * Módulo que casou só em parte (um apelido que se desdobra em
+     * "triângulo", por exemplo) aparece em Módulos, mas não puxa para o topo
+     * o que é dele: medido no pacote real, "baricentro" e "circuncentro"
+     * abriam com Trigonometria e Menelaus. */
+    grupos.modulo.forEach(function (m, i) {
+      if (m.nota >= 1000 && posModulo[m.id] === undefined) posModulo[m.id] = i;
+    });
     function doModuloAchado(id) {
       var t = bib.teoriaPorId[id] || bib.itemPorId[id];
       var chave = t ? t.serie + ':' + t.modulo.slug : null;
