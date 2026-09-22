@@ -47,8 +47,9 @@
  * seção Feedback quando ela está em branco, depois de a Nathália confirmar.
  * O v32 acrescenta duas linhas à lista, './zip.js' e './biblioteca.js': o
  * Importar biblioteca de Ajustes, que abre e confere o pacote .zip da
- * biblioteca sem internet. */
-var CACHE = 'apoio-educacional-v32';
+ * biblioteca sem internet. O v33 troca a aba Temas pela aba Biblioteca
+ * (app.js, index.html e styles.css), com a lista igual. */
+var CACHE = 'apoio-educacional-v33';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

@@ -279,9 +279,65 @@ function gerar(saida, opcoes) {
   return { zip, manifest, itens, teoria, busca, apelidos, arquivos };
 }
 
+/* Pacote sintético do Banco de Questões, no formato da seção 8b do contrato:
+ * nível 2, equivalente ao 8º e ao 9º ano, dois "anos" com seis problemas cada.
+ * O problema 4 de 2020 fala de equação do segundo grau, para a busca
+ * "bhaskara" ter o que mostrar no grupo Banco. */
+function gerarBanco(saida, opcoes) {
+  opcoes = opcoes || {};
+  const versao = opcoes.versao || 1;
+  const arquivos = {}, itens = [], docs = [];
+  const equivalentes = ['8ano', '9ano'];
+  for (const ano of [2019, 2020]) {
+    const mod = { slug: 'banco-' + ano, titulo: 'Banco de Questões ' + ano };
+    for (let n = 1; n <= 6; n++) {
+      const id = `banco:${ano}:n2:${n}`;
+      const base = `assets/banco/${ano}/n2/q-${dd(n)}`;
+      const alt = 110 + n * 10;
+      arquivos[base + '.svg'] = { dados: Buffer.from(svgRecorte(262, alt, n, '#7C3AED')), metodo: 8 };
+      arquivos[base + '-sol.svg'] = { dados: Buffer.from(svgRecorte(262, alt + 40, n + 1, '#C9A961')), metodo: 8 };
+      const segundoGrau = ano === 2020 && n === 4;
+      const titulo = segundoGrau ? 'As raízes escondidas' : 'Problema sintético ' + n;
+      const texto = segundoGrau ? 'uma equacao do segundo grau tem raizes inteiras encontre os coeficientes'
+        : 'problema sintetico numero ' + n + ' de contagem';
+      itens.push({ id, fonte: 'obmep-banco', serie: 'n2', series_equivalentes: equivalentes,
+        modulo: mod, aula: { slug: 'nivel-2', titulo: 'Nível 2', n: 2 }, numero: n, titulo,
+        formato: 'aberta', alternativas: null, resposta: null, subitens: [], texto, origem_citada: null,
+        dificuldade: 2, dificuldade_origem: 'proxy', proxy: { nivel: 2 }, tema_app: null,
+        assets: { enunciado: base + '.svg', solucao: base + '-sol.svg' },
+        medidas: { enunciado: { largura_pt: 262, altura_pt: alt }, solucao: { largura_pt: 262, altura_pt: alt + 40 } },
+        origem: { arquivo: `PDF/matematica/sintetico/banco/${ano}.pdf`, enunciado: { pagina: 3, coluna: 1, bbox: [33, 100, 295, 100 + alt] },
+          solucao: { pagina: 9, coluna: 1, bbox: [33, 100, 295, 140 + alt] } } });
+      docs.push({ id, tipo: 'exercicio', titulo, resumo: 'Banco de Questões ' + ano + ' Nível 2', texto });
+    }
+    docs.push({ id: 'banco:' + ano + ':n2', tipo: 'modulo', titulo: mod.titulo, resumo: 'Nível 2', texto: '' });
+  }
+  docs.sort((a, b) => a.id < b.id ? -1 : 1);
+  const indice = Busca.montarIndice(docs.map(d => ({ id: d.id, serie: '08', titulo: d.titulo, resumo: d.resumo, explicacao: '', enunciados: d.texto })));
+  const tipos = {}; docs.forEach(d => { tipos[d.id] = d.tipo; });
+  indice.forEach(r => { r.k = tipos[r.i]; });
+  arquivos['itens.json'] = { dados: json(itens), metodo: 8 };
+  arquivos['teoria.json'] = { dados: json([]), metodo: 8 };
+  arquivos['busca.json'] = { dados: json({ formato: 'indice-de-busca', versao: 1, tipos: { k: 'modulo, teoria ou exercicio' }, temas: indice }), metodo: 8 };
+  arquivos['apelidos.json'] = { dados: json({ bhaskara: ['equação do segundo grau'] }), metodo: 0 };
+  const nomes = Object.keys(arquivos).sort();
+  const lista = {};
+  nomes.forEach(n => { lista[n] = sha(arquivos[n].dados); });
+  const manifest = { esquema: 1, pacote: 'matematica-sintetico-banco-n2', versao, gerado_em: '2026-09-21T21:00:00-03:00',
+    gerador: { nome: '_teste/_pacote_sintetico.js', commit: null }, materia: 'matematica',
+    fonte: { id: 'obmep-banco', nome: 'Banco sintético de teste', url: 'https://example.invalid/', licenca: 'gerado para teste' },
+    series: ['n2'], series_equivalentes: { n2: equivalentes },
+    contagens: { modulos: 2, aulas_teoria: 0, paginas_teoria: 0, aulas_exercicios: 2, itens: itens.length, itens_com_solucao: itens.length, itens_excluidos: 0 },
+    arquivos: lista };
+  const zip = montarZip([{ nome: 'manifest.json', dados: json(manifest), metodo: 8 }]
+    .concat(nomes.map(n => ({ nome: n, dados: arquivos[n].dados, metodo: arquivos[n].metodo }))));
+  if (saida) fs.writeFileSync(saida, zip);
+  return { zip, manifest, itens, arquivos };
+}
+
 const VENENOS = ['corrompido-deflate', 'corrompido-stored', 'hash', 'sobrando', 'faltando', 'asset-citado', 'esquema', 'asset-fora'];
 
-module.exports = { gerar, montarZip, crc32, VENENOS, MODULOS };
+module.exports = { gerar, gerarBanco, montarZip, crc32, VENENOS, MODULOS };
 
 if (require.main === module) {
   const saida = process.argv[2];

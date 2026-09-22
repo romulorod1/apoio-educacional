@@ -143,7 +143,7 @@
       <button class="aba ativa" data-tela="agenda" type="button">Agenda</button>
       <button class="aba" data-tela="alunos" type="button">Alunos</button>
       <button class="aba" data-tela="fechamento" type="button">Fechamento</button>
-      <button class="aba" data-tela="temas" type="button">Temas</button>
+      <button class="aba" data-tela="biblioteca" type="button">Biblioteca</button>
       <button class="aba" data-tela="ajustes" type="button">Ajustes</button>
     </nav>
   </header>
@@ -241,6 +241,24 @@
       </div>
 
       <div id="visao-detalhe-tema" style="display:none"></div>
+    </section>
+
+    <!-- ---------------- biblioteca ----------------
+         Substitui a aba Temas (a seção acima fica sem botão até a limpeza do
+         acervo). Sem pacote importado, mostra o mesmo "Em construção". -->
+    <section class="tela" id="tela-biblioteca">
+      <div class="barra" style="margin-bottom:12px">
+        <h2 class="titulo">Biblioteca</h2>
+        <span class="cresce"></span>
+        <div id="bib-contagem" class="ajuda" style="margin:0;font-weight:600"></div>
+      </div>
+      <div class="cartao" id="bib-busca-cartao" style="margin-bottom:14px;padding:12px 14px;display:none">
+        <div class="barra" style="margin-bottom:0;gap:8px">
+          <input type="search" id="busca-biblioteca" placeholder="Buscar na biblioteca: assunto, fórmula ou nome (bhaskara, pitágoras...)" style="flex:1;min-width:200px" autocomplete="off">
+          <button class="btn pequeno" id="limpar-busca-biblioteca" type="button" style="display:none">Limpar</button>
+        </div>
+      </div>
+      <div id="bib-corpo"></div>
     </section>
 
     <!-- ---------------- ajustes ---------------- -->
@@ -395,6 +413,38 @@
         <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
       </div>
       <div class="modal-corpo" id="corpo-modal-escopo"></div>
+    </div>
+  </div>
+
+  <!-- biblioteca: uma página ou um recorte em tela cheia -->
+  <div class="fundo-modal" id="modal-biblioteca">
+    <div class="modal largo">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-biblioteca">Biblioteca</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+      </div>
+      <div class="modal-corpo bib-visor" id="corpo-modal-biblioteca"></div>
+      <div class="modal-rodape">
+        <button class="btn esquerda" id="bib-anterior" type="button">‹ Anterior</button>
+        <button class="btn" id="bib-proxima" type="button">Próxima ›</button>
+        <button class="btn" id="bib-solucao" type="button">Ver solução</button>
+        <button class="btn" id="bib-fechar-visor" type="button">Fechar</button>
+        <button class="btn principal" id="bib-como-folha" type="button">Abrir como folha</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- biblioteca: em que aula a página vira folha -->
+  <div class="fundo-modal" id="modal-bib-folha">
+    <div class="modal">
+      <div class="modal-cabecalho">
+        <h3>Abrir como folha de qual aula?</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-bib-folha"></div>
+      <div class="modal-rodape">
+        <button class="btn" data-fechar type="button">Cancelar</button>
+      </div>
     </div>
   </div>
 

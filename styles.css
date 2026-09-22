@@ -1349,3 +1349,27 @@ button.alvo-rascunho:hover { background: var(--soft); }
   .cabecalho { position: relative; }
   .conteudo { padding: 12px; }
 }
+
+/* ---------- biblioteca ---------- */
+
+.bib-series { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.bib-seta { color: var(--muted); font-size: 22px; line-height: 1; }
+.bib-voltar { margin-bottom: 6px; }
+.bib-titulo { margin: 6px 0 4px; }
+.bib-autoria { margin: 0 0 8px; }
+.bib-grade { display: grid; gap: 12px; margin-top: 10px; }
+.bib-grade-exercicios { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.bib-grade-paginas { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.bib-cartao {
+  display: flex; flex-direction: column; gap: 6px; text-align: left;
+  background: var(--branco); border: 1px solid var(--fio); border-radius: 10px;
+  padding: 10px; cursor: pointer; font-family: inherit; color: inherit;
+}
+.bib-cartao:hover { border-color: var(--teal); }
+.bib-mini { width: 100%; height: auto; display: block; background: #F3F5F8; border: 1px solid var(--fio); border-radius: 4px; }
+.bib-mini.pronta { background: #FFFFFF; }
+.bib-rotulo { font-size: 13px; font-weight: 700; color: var(--navy); }
+.bib-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.bib-origem { font-size: 11px; color: var(--muted); }
+.bib-visor { background: #DDE3EA; }
+.bib-cheia { width: 100%; height: auto; display: block; margin: 0 auto; background: #FFFFFF; box-shadow: var(--sombra); }
