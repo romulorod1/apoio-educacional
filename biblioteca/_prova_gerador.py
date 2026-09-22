@@ -140,11 +140,43 @@ def trava_contagens(p):
                     erros.append('%s: item %d no pacote com %d solucoes rotuladas %d. na fonte' % (l['aula'], x, ns.count(x), x))
             if len(ns) != n and not excl:
                 erros.append('%s: %d enunciados e %d solucoes sem lacuna registrada' % (l['aula'], n, len(ns)))
+    erros.extend(exclusoes_por_calha_sem_base(p))
     c = p.manifest['contagens']
     if c['itens'] != len(p.itens) or c['itens_com_solucao'] != sum(1 for i in p.itens if i['assets']['solucao']):
         erros.append('manifest.contagens nao bate com itens.json')
     if c['itens_excluidos'] != sum(len(l['excluidos']) for l in p.relatorio['listas']):
         erros.append('manifest.contagens.itens_excluidos nao bate com o relatorio')
+    return erros
+
+
+def exclusoes_por_calha_sem_base(p):
+    """Item excluido por "conteudo por cima do fio" tem de ter tinta de verdade ali.
+
+    Confere pela pagina original, com o fio que esta desenhado nela, e nao com
+    a divisa que o gerador mediu: com a divisa errada o gerador excluiria em
+    massa, com motivo e tudo, e a contagem fecharia.
+    """
+    erros = []
+    for l in p.relatorio['listas']:
+        for e in l['excluidos']:
+            c = e.get('calha')
+            if not c:
+                continue
+            doc = p.doc(l['arquivo'])
+            pg = doc[c['pagina'] - 1]
+            fios = fio_da_pagina(pg)
+            if not fios:
+                erros.append('%s %d: excluido por calha numa pagina sem fio' % (l['aula'], e['numero']))
+                continue
+            x = fios[0].x0
+            tmp = pymupdf.open()
+            tmp.insert_pdf(doc, from_page=c['pagina'] - 1, to_page=c['pagina'] - 1)
+            tinta = False
+            for faixa in (pymupdf.Rect(x - 2.5, c['y'][0], x - 0.8, c['y'][1]), pymupdf.Rect(x + 0.8, c['y'][0], x + 2.5, c['y'][1])):
+                pix = tmp[0].get_pixmap(dpi=DPI_FIDELIDADE, colorspace=pymupdf.csGRAY, clip=faixa)
+                tinta = tinta or any(v < 128 for v in pix.samples)
+            if not tinta:
+                erros.append('%s %d: excluido por conteudo sobre o fio, e nao ha tinta junto do fio da pagina' % (l['aula'], e['numero']))
     return erros
 
 
@@ -186,6 +218,68 @@ def borda_com_tinta(p, it, pz, caixa):
     return ' e '.join(lados)
 
 
+def conteudo_na_caixa(p, it, pg, pz):
+    """O recorte tem por inteiro o que esta dentro dele, e nada da outra coluna?
+
+    Pedido da orquestradora depois da conferencia do pacote: caixa estreita
+    corta texto na borda, e a prova de fidelidade nao enxerga isso, porque
+    compara o recorte com ele mesmo. Aqui manda a pagina original:
+    - nenhuma das quatro bordas da caixa passa por cima de tinta (o recorte e
+      apertado pela tinta com 3 pt de folga; tinta na borda e conteudo
+      cortado). E por tinta, e nao pela caixa do span, porque a caixa de fonte
+      do radical e dos parenteses grandes e bem maior que o desenho;
+    - nenhum span com o centro na outra coluna encosta na caixa;
+    - o fio do rodape (o fio longo mais baixo da pagina) nao entra na caixa.
+    """
+    erros = []
+    r = pymupdf.Rect(pz['bbox'])
+    # Corte e tinta que atravessa a borda: escuro no ultimo pixel de dentro E no
+    # primeiro de fora, na mesma coluna (ou linha). Tinta que so COMECA na borda
+    # nao e corte: dois itens colados na fonte dividem a borda sem perder nada.
+    tmp = pymupdf.open()
+    tmp.insert_pdf(p.doc(it['origem']['arquivo']), from_page=pz['pagina'] - 1, to_page=pz['pagina'] - 1)
+    k = DPI_FIDELIDADE / 72.0
+    fora = r + (-2, -2, 2, 2)
+    pix = tmp[0].get_pixmap(dpi=DPI_FIDELIDADE, colorspace=pymupdf.csGRAY, clip=fora)
+    w, h, s = pix.width, pix.height, pix.samples
+    x0, y0 = int(round((r.x0 - fora.x0) * k)), int(round((r.y0 - fora.y0) * k))
+    x1, y1 = int(round((r.x1 - fora.x0) * k)) - 1, int(round((r.y1 - fora.y0) * k)) - 1
+    esc = lambda x, y: 0 <= x < w and 0 <= y < h and s[y * w + x] < 128
+    cortes = {
+        'de cima': any(esc(x, y0) and esc(x, y0 - 1) for x in range(x0, x1 + 1)),
+        'de baixo': any(esc(x, y1) and esc(x, y1 + 1) for x in range(x0, x1 + 1)),
+        'esquerda': any(esc(x0, y) and esc(x0 - 1, y) for y in range(y0, y1 + 1)),
+        'direita': any(esc(x1, y) and esc(x1 + 1, y) for y in range(y0, y1 + 1)),
+    }
+    for nome, v in cortes.items():
+        if v:
+            erros.append('tinta cortada na borda %s' % nome)
+    fios = fio_da_pagina(pg)
+    # pagina sem fio (Razoes Trigonometricas, pagina 5): a divisa do documento
+    xsep = fios[0].x0 if fios else gerar_pacote.geometria(p.doc(it['origem']['arquivo']))['xsep']
+    lado = 0 if r.x1 <= xsep + 3 else 1
+    for b in pg.get_text('dict')['blocks']:
+        if b['type'] != 0:
+            continue
+        for l in b['lines']:
+            for sp in l['spans']:
+                if not sp['text'].strip():
+                    continue
+                bb = pymupdf.Rect(sp['bbox'])
+                cx = (bb.x0 + bb.x1) / 2
+                if ((cx < xsep) != (lado == 0)) and bb.intersects(r) and (bb & r).width > 2:
+                    erros.append('texto da outra coluna dentro: %r' % sp['text'][:25])
+    largos = [d['rect'] for d in pg.get_drawings() if d['rect'].height < 1.5 and d['rect'].width > 400
+              and d['rect'].y0 < pg.rect.height]
+    if largos:
+        rod = max(largos, key=lambda q: q.y0)
+        # por coordenada: o fio tem altura zero, e o intersects do PyMuPDF trata
+        # retangulo vazio como sem intersecao
+        if r.y0 <= rod.y0 <= r.y1 and rod.x0 < r.x1 and rod.x1 > r.x0:
+            erros.append('fio horizontal longo (rodape) dentro do recorte')
+    return erros[:3]
+
+
 def trava_recorte(p):
     erros = []
     ocupado = {}
@@ -206,6 +300,7 @@ def trava_recorte(p):
                 for f in fio_da_pagina(pg):
                     if x0 <= f.x0 <= x1 and f.y1 > y0 and f.y0 < y1:
                         erros.append('%s %s: o fio entre colunas (x %.1f) entra no recorte' % (it['id'], tipo, f.x0))
+                erros.extend('%s %s: %s' % (it['id'], tipo, e) for e in conteudo_na_caixa(p, it, pg, pz))
                 txt = portal.recompor(pg.get_text('text', clip=pymupdf.Rect(pz['bbox'])))
                 if SECAO.search(txt):
                     erros.append('%s %s: titulo de secao dentro do recorte' % (it['id'], tipo))
@@ -585,6 +680,22 @@ def venenos(p, temp, placar, curadoria):
             r = i['medidas']['enunciado']['rotulo']
             i['medidas']['enunciado']['rotulo'] = [r[0] + 60, r[1], r[2] + 60, r[3]]
     placar.conferir('recorte: rotulo fora do lugar', trava_recorte(q), True, 'rotulo')
+    # recorte: caixa estreitada de proposito, o texto sai cortado na borda direita
+    q = copia(p, temp, 'v_estreita')
+    for i in q.itens:
+        if i['id'] == it_obj['id']:
+            b = i['origem']['enunciado']['bbox']
+            # corta por dentro de "Exercicio": no meio de uma linha comum o corte
+            # pode cair justo no espaco entre duas palavras
+            i['origem']['enunciado']['bbox'] = [b[0] + 40, b[1], b[2], b[3]]
+    placar.conferir('recorte: caixa estreita', trava_recorte(q), True, 'tinta cortada na borda')
+    # recorte: caixa descendo ate o fio do rodape
+    q = copia(p, temp, 'v_rodape')
+    for i in q.itens:
+        if i['id'] == it_multi['id']:
+            prim = i['origem']['enunciado']['pedacos'][0]
+            prim['bbox'] = [prim['bbox'][0], prim['bbox'][1], prim['bbox'][2], 772.0]
+    placar.conferir('recorte: fio do rodape dentro', trava_recorte(q), True, 'fio horizontal longo')
     # recorte: caixa do rotulo alta demais, descendo ate a linha de baixo
     q = copia(p, temp, 'v_rot_alto')
     for i in q.itens:

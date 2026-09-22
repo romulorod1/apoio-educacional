@@ -4,7 +4,9 @@
 
 Uma folha (PNG) para os enunciados de cada lista e outra para as solucoes; lista
 comprida vira mais de uma folha ("-1", "-2"). Cada recorte e o proprio SVG do
-pacote renderizado, com o rotulo embaixo ("ex 7", o id curto) e a caixa do
+pacote renderizado NO CHROME (o caminho do tablet; o leitor de SVG do MuPDF
+ignora o clipPath e reescala o texto, e deu alarme falso de recorte cortado em
+21/09), com o rotulo embaixo ("ex 7", o id curto) e a caixa do
 rotulo original desenhada em vermelho fino, porque e ela que o aplicativo cobre
 para renumerar. Fundo cinza claro em volta de cada recorte, para a borda do
 recorte aparecer.
@@ -15,7 +17,10 @@ ele, com a figura, e o numero bate com o rotulo?
 import io
 import json
 import os
+import shutil
+import subprocess
 import sys
+import tempfile
 
 import pymupdf
 
@@ -25,6 +30,8 @@ MARGEM = 14.0
 LEGENDA = 16.0
 ALTURA_MAX = 1500.0
 DPI = 110
+ESCALA_CHROME = 110 / 72.0
+AQUI = os.path.dirname(os.path.abspath(__file__))
 
 
 def folhas(itens, tipo, pasta_trab):
@@ -57,7 +64,7 @@ def folhas(itens, tipo, pasta_trab):
     return paginas
 
 
-def desenhar(pagina_itens, tipo, pasta_trab, destino, titulo):
+def desenhar(pagina_itens, tipo, pasta_trab, destino, titulo, pngs):
     altura = max(y + max(h for _, _, h in linha) + LEGENDA + MARGEM for y, linha in pagina_itens) + 20
     doc = pymupdf.open()
     pg = doc.new_page(width=COLUNAS * LARGURA_COLUNA + MARGEM, height=altura + 20)
@@ -70,10 +77,7 @@ def desenhar(pagina_itens, tipo, pasta_trab, destino, titulo):
             caixa = pymupdf.Rect(x, y + 20, x + w, y + 20 + h)
             pg.draw_rect(caixa + (-3, -3, 3, 3), color=None, fill=(0.88, 0.88, 0.88))
             pg.draw_rect(caixa, color=None, fill=(1, 1, 1))
-            svg = open(os.path.join(pasta_trab, *it['assets'][tipo].split('/')), 'rb').read()
-            fonte = pymupdf.open(stream=svg, filetype='svg')
-            pdf = pymupdf.open('pdf', fonte.convert_to_pdf())
-            pg.show_pdf_page(caixa, pdf, 0)
+            pg.insert_image(caixa, filename=pngs[it['assets'][tipo]])
             rot = med.get('rotulo')
             if rot:
                 r = pymupdf.Rect(x + rot[0] * escala, y + 20 + rot[1] * escala, x + rot[2] * escala, y + 20 + rot[3] * escala)
@@ -92,14 +96,32 @@ def gerar(pasta_trab, saida):
     por_aula = {}
     for it in itens:
         por_aula.setdefault((it['modulo']['slug'], it['aula']['slug']), []).append(it)
+    # todos os recortes renderizados no Chrome de uma vez, um navegador so
+    temp = tempfile.mkdtemp(prefix='contato_')
+    pedidos, pngs = [], {}
+    for it in itens:
+        for tipo in ('enunciado', 'solucao'):
+            cam = it['assets'].get(tipo)
+            if cam:
+                png = os.path.join(temp, '%05d.png' % len(pedidos))
+                med = it['medidas'][tipo]
+                pedidos.append({'svg': os.path.join(pasta_trab, *cam.split('/')), 'png': png,
+                                'largura_pt': med['largura_pt'], 'altura_pt': med['altura_pt'], 'escala': ESCALA_CHROME})
+                pngs[cam] = png
+    arq = os.path.join(temp, 'pedidos.json')
+    json.dump(pedidos, open(arq, 'w', encoding='utf-8'))
+    r = subprocess.run(['node', os.path.join(AQUI, '_fidelidade.js'), arq], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise SystemExit('o Chrome nao renderizou: %s' % r.stderr[-300:])
     feitas = []
     for (mod, aula), lst in sorted(por_aula.items()):
         for tipo, nome in (('enunciado', 'enunciados'), ('solucao', 'solucoes')):
             pags = folhas(lst, tipo, pasta_trab)
             for n, pagina in enumerate(pags, 1):
-                destino = os.path.join(saida, '%s__%s-%d.png' % (aula, nome, n))
+                destino = os.path.join(saida, '%s__%s__%s-%d.png' % (mod, aula, nome, n))
                 titulo = '%s / %s: %s, folha %d de %d' % (mod, aula, nome, n, len(pags))
-                feitas.append(desenhar(pagina, tipo, pasta_trab, destino, titulo))
+                feitas.append(desenhar(pagina, tipo, pasta_trab, destino, titulo, pngs))
+    shutil.rmtree(temp, ignore_errors=True)
     return feitas
 
 

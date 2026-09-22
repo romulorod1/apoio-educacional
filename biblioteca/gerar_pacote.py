@@ -64,7 +64,11 @@ FOLGA = 3.0            # pt em volta do conteudo do recorte
 FOLGAS_REDACAO = (6.0, 18.0, 40.0)
 FOLGA_PILHA = 6.0      # pt entre pedacos empilhados
 MARGEM_X = 24.0        # borda externa das colunas
-AFASTA_FIO = 2.5       # distancia minima entre o recorte e o fio separador
+# distancia entre o recorte e o fio separador. Era 2,5 pt, e a fonte as vezes
+# deixa a linha passar de leve do fim da coluna (Conjuntos Numericos, solucao
+# 23): a borda direita cortava a ultima letra. Com 1,2 pt o fio (0,4 pt de
+# largura) continua fora do recorte.
+AFASTA_FIO = 1.2
 TOLERANCIA_MARGEM = 12.0
 ALTURA_MIN_ENUNCIADO = 20.0
 ALTURA_MIN_SOLUCAO = 9.0
@@ -262,13 +266,51 @@ def marcadores(els, geo, em_solucoes):
 
 
 def topo_da_linha(marc, els):
-    """Topo da linha visual do marcador: o texto ao lado pode subir 2 pt acima dele."""
-    cy = centro_y(marc['el']['bb'])
-    linha = [e for e in els if e['col'] == marc['col'] and abs(centro_y(e['bb']) - cy) < 4 and e['tipo'] == 'txt']
-    return min([e['bb'][1] for e in linha] + [marc['el']['bb'][1]])
+    """Topo da linha visual do marcador.
+
+    O texto ao lado pode subir 2 pt acima dele, e um glifo alto da mesma linha
+    (o radical de "Ja sabemos que raiz de 1 = 1", Conjuntos Numericos,
+    exercicio 3) sobe mais: o topo dele virava um pedaco de 5 pt grudado no
+    item anterior e saia cortado deste. Entra todo texto que atravessa a
+    linha do marcador, ate 12 pt acima dela.
+    """
+    mb = marc['el']['bb']
+    cy = centro_y(mb)
+    topo, pe = mb[1], mb[3]
+    txt = [e for e in els if e['col'] == marc['col'] and e['tipo'] == 'txt' and e['bb'][1] >= mb[1] - 12]
+    # em cadeia: o numerador de uma fracao encosta na linha, e o expoente do
+    # numerador encosta no numerador (Conjuntos Numericos, solucao 18, "2 a 12
+    # sobre 2 a 12"): o expoente tambem e desta linha
+    mudou = True
+    while mudou:
+        mudou = False
+        for e in txt:
+            if e['bb'][1] < topo and (abs(centro_y(e['bb']) - cy) < 4 or (e['bb'][1] < pe and e['bb'][3] > topo)):
+                topo = e['bb'][1]
+                mudou = True
+    # a barra de um radical longo ou de uma fracao e desenho, nao texto
+    # (Conjuntos Numericos, exercicio 21): barra fina ate 6 pt acima da linha
+    barras = [e['bb'][1] for e in els if e['col'] == marc['col'] and e['tipo'] == 'des'
+              and e['bb'][3] - e['bb'][1] < 1.5 and topo - 6 <= e['bb'][1] < topo]
+    return min([topo] + barras)
 
 
 LIMIAR_TINTA = 200  # cinza abaixo disto e tinta
+
+
+def topo_pela_tinta(topo_caixas, marc, tinta_col):
+    """O topo da linha do marcador pela tinta, limitado pelo topo das caixas.
+
+    A caixa de fonte do radical comeca uns 7 pt acima do desenho dele e puxava
+    o topo para dentro da linha de cima, cortando os descendentes do item
+    anterior (Conjuntos Numericos, exercicios 20 e 21). Sobe do marcador
+    enquanto houver tinta continua, e nunca alem do topo das caixas.
+    """
+    y = int(marc['el']['bb'][1])
+    limite = int(math.floor(topo_caixas))
+    while y - 1 >= limite and 0 <= y - 1 < len(tinta_col) and tinta_col[y - 1]:
+        y -= 1
+    return max(topo_caixas, float(y)) if y > limite else topo_caixas
 
 
 def linhas_com_tinta(doc, pno, geo):
@@ -370,6 +412,10 @@ def detectar(doc):
         divisas[geo['xsep']] += 1
         els, fundo = elementos(pg, geo)
         tinta = linhas_com_tinta(doc, pno, geo)
+        # texto que a fonte passa por cima do fio ("+ 49", solucao 2 de Equacoes):
+        # nenhum recorte de coluna pega esse trecho inteiro
+        cruzam = [(e['bb'][1], e['bb'][3]) for e in els if e['tipo'] == 'txt'
+                  and e['bb'][0] < geo['xsep'] - 0.5 and e['bb'][2] > geo['xsep'] + 0.5]
         caracteres = [(c['bbox'], c['c'], c['origin'][1], sp['size']) for b in pg.get_text('rawdict')['blocks']
                       if b['type'] == 0 for l in b['lines'] for sp in l['spans'] for c in sp['chars']]
         for e in els:
@@ -379,7 +425,7 @@ def detectar(doc):
         for col in (0, 1):
             cx0, cx1 = faixa_da_coluna(col, geo, pg)
             ms = sorted([m for m in marcs if m['col'] == col], key=lambda m: m['el']['bb'][1])
-            cortes = [(topo_da_linha(m, els), m) for m in ms]
+            cortes = [(topo_pela_tinta(topo_da_linha(m, els), m, tinta[col]), m) for m in ms]
             lim_col = [(y, m) for y, m in cortes]
             els_col = [e for e in els if e['col'] == col]
             inicios = [None] + lim_col
@@ -440,12 +486,17 @@ def detectar(doc):
                 # pixels e o Chrome nao, e a prova de fidelidade media 1,8% de
                 # diferenca num recorte identico (0,01% com a origem inteira)
                 y0 = math.floor(y0)
-                y1 = math.ceil(y1)
+                # o fim arredonda para cima, mas nunca passa do topo da linha seguinte:
+                # 1 pt a mais invadia o radical da primeira linha do item de baixo, que
+                # entao perdia o topo (Equacoes, solucoes 17 e 18)
+                y1 = min(math.ceil(y1), math.floor(y_fim))
                 if anteriores:
                     y0 = max(y0, max(p['rect'][3] for p in anteriores))
                 r = (float(math.floor(cx0) if col == 0 else math.ceil(cx0)), float(y0),
                      float(math.floor(cx1)), float(y1))
-                pedacos[aberto[0]][aberto[2]].append({'pno': pno, 'col': col, 'rect': r, 'xsep': geo['xsep']})
+                transborda = any(r[1] <= (a + b) / 2.0 <= r[3] for a, b in cruzam)
+                pedacos[aberto[0]][aberto[2]].append({'pno': pno, 'col': col, 'rect': r, 'xsep': geo['xsep'],
+                                                     'transborda': transborda})
     geo_doc['divisas_por_pagina'] = {str(k): v for k, v in sorted(divisas.items())}
     return {'geo': geo_doc, 'pagina_solucoes': pagina_solucoes, 'ordem': ordem, 'pedacos': pedacos, 'rotulos': rotulos,
             'rotulos_inseguros': rotulos_inseguros,
@@ -480,7 +531,8 @@ def resumo_de_lista(doc):
 
 # ------------------------------------------------------------------ recorte
 
-def svg_do_pedaco(doc, pno, rect, imagens=pymupdf.PDF_REDACT_IMAGE_REMOVE, folga=FOLGAS_REDACAO[0]):
+def svg_do_pedaco(doc, pno, rect, imagens=pymupdf.PDF_REDACT_IMAGE_REMOVE, folga=FOLGAS_REDACAO[0],
+                  desenhos=pymupdf.PDF_REDACT_LINE_ART_REMOVE_IF_TOUCHED):
     """SVG so com o conteudo do retangulo, e a diferenca de pixels contra a pagina original."""
     r = pymupdf.Rect(rect)
     tmp = pymupdf.open()
@@ -498,7 +550,7 @@ def svg_do_pedaco(doc, pno, rect, imagens=pymupdf.PDF_REDACT_IMAGE_REMOVE, folga
               pymupdf.Rect(0, g.y0, g.x0, g.y1), pymupdf.Rect(g.x1, g.y0, W, g.y1)):
         if f.width > 0 and f.height > 0:
             pg.add_redact_annot(f, fill=False)
-    pg.apply_redactions(images=imagens, graphics=pymupdf.PDF_REDACT_LINE_ART_REMOVE_IF_COVERED,
+    pg.apply_redactions(images=imagens, graphics=desenhos,
                         text=pymupdf.PDF_REDACT_TEXT_REMOVE)
     b = pg.get_pixmap(dpi=DPI_CONFERENCIA, colorspace=pymupdf.csGRAY, clip=r)
     sa, sb = a.samples, b.samples
@@ -514,16 +566,25 @@ def svg_redigido(doc, pno, rect):
 
     Se nenhuma folga basta tirando as imagens de fora, tenta mantendo as imagens.
     Devolve a melhor tentativa e a diferenca medida; quem chama decide.
+
+    Primeiro apaga tambem o desenho que so ENCOSTA na faixa de fora (o fio do
+    rodape, o separador de colunas, o traco de uma figura vizinha): o SVG sai
+    sem nada que dependa do clipPath para nao aparecer, e ha leitor de SVG que
+    ignora o clip (o do MuPDF desenhava o fio do rodape dentro do recorte). Se
+    isso mexe em pixel do recorte, cai para so o desenho inteiro de fora.
     """
     melhor = None
-    for imagens, obs in ((pymupdf.PDF_REDACT_IMAGE_REMOVE, None), (pymupdf.PDF_REDACT_IMAGE_NONE, 'imagens mantidas')):
-        for folga in FOLGAS_REDACAO:
-            svg, dif = svg_do_pedaco(doc, pno, rect, imagens, folga)
-            nota = obs if folga == FOLGAS_REDACAO[0] else ((obs + ', ' if obs else '') + 'folga de %g pt' % folga)
-            if melhor is None or dif < melhor[1]:
-                melhor = (svg, dif, nota)
-            if dif <= LIMITE_REDACAO:
-                return svg, dif, nota
+    for imagens, obs_i in ((pymupdf.PDF_REDACT_IMAGE_REMOVE, None), (pymupdf.PDF_REDACT_IMAGE_NONE, 'imagens mantidas')):
+        for desenhos, obs_d in ((pymupdf.PDF_REDACT_LINE_ART_REMOVE_IF_TOUCHED, None),
+                                (pymupdf.PDF_REDACT_LINE_ART_REMOVE_IF_COVERED, 'desenho que encosta mantido')):
+            for folga in FOLGAS_REDACAO:
+                svg, dif = svg_do_pedaco(doc, pno, rect, imagens, folga, desenhos)
+                notas = [x for x in (obs_i, obs_d, None if folga == FOLGAS_REDACAO[0] else 'folga de %g pt' % folga) if x]
+                nota = ', '.join(notas) or None
+                if melhor is None or dif < melhor[1]:
+                    melhor = (svg, dif, nota)
+                if dif <= LIMITE_REDACAO:
+                    return svg, dif, nota
     return melhor
 
 
@@ -738,7 +799,7 @@ def commit_do_gerador():
 
 
 def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, commit=None,
-          so_modulos=None, gravar_zip=True):
+          so_modulos=None, gravar_zip=True, anterior=None):
     t_ini = time.time()
     nome = 'matematica-obmep-%s' % serie
     trabalho = trabalho or os.path.join(os.path.dirname(os.path.abspath(saida)), 'trabalho', '%s-v%d' % (nome, versao))
@@ -815,6 +876,13 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                               'item, sai' % (numero, ', '.join(str(x) for x in range(1, total + 1) if cont_s[x] == 0) or 'outra'))
                 p_enun = det['pedacos']['enunciado'].get(ch, [])
                 p_sol = det['pedacos']['solucao'].get(chave_sol[numero][0], []) if cont_s[numero] == 1 else []
+                vaza = [p for p in p_enun + p_sol if p.get('transborda')]
+                if not motivo and vaza:
+                    motivo = ('na pagina %d a fonte passa conteudo por cima do fio entre as colunas, na altura deste '
+                              'item: o recorte da coluna cortaria esse trecho ou pegaria a outra coluna' % (vaza[0]['pno'] + 1))
+                    rel['excluidos'].append({'id': iid, 'numero': numero, 'motivo': motivo,
+                                             'calha': {'pagina': vaza[0]['pno'] + 1, 'y': [vaza[0]['rect'][1], vaza[0]['rect'][3]]}})
+                    continue
                 if not motivo and not p_enun:
                     motivo = 'enunciado sem conteudo detectado'
                 if not motivo and not sem_secao and not p_sol:
@@ -1021,6 +1089,8 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
             tam['n_' + tipo] += 1
         else:
             tam[k] += len(v)
+    if anterior:
+        relatorio['comparacao_com_anterior'] = comparar_com_anterior(itens, anterior)
     relatorio.update({
         'contagens': contagens,
         'hash_manifest_arquivos': sha(json.dumps(manifest['arquivos'], sort_keys=True).encode('utf-8')),
@@ -1044,6 +1114,24 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
     return manifest, relatorio, trabalho
 
 
+def comparar_com_anterior(itens, caminho):
+    """Quantos itens mudaram de caixa (enunciado ou solucao) contra uma geracao anterior."""
+    antes = {i['id']: i for i in json.load(io.open(caminho, encoding='utf-8'))}
+    agora = {i['id']: i for i in itens}
+
+    def caixas(i, tipo):
+        o = i['origem'].get(tipo)
+        if not o:
+            return None
+        return [tuple(pz['bbox']) for pz in (o.get('pedacos') or [o])]
+
+    mudou = sorted(k for k in set(antes) & set(agora)
+                   if any(caixas(antes[k], t) != caixas(agora[k], t) for t in ('enunciado', 'solucao')))
+    return {'arquivo': caminho.replace('\\', '/'), 'itens_antes': len(antes), 'itens_agora': len(agora),
+            'sairam': sorted(set(antes) - set(agora)), 'entraram': sorted(set(agora) - set(antes)),
+            'com_caixa_diferente': len(mudou), 'ids_com_caixa_diferente': mudou}
+
+
 def principal(argv=None):
     ap = argparse.ArgumentParser(description='Gera o pacote de biblioteca de uma serie do Portal da OBMEP.')
     ap.add_argument('--pdfs', required=True)
@@ -1056,13 +1144,14 @@ def principal(argv=None):
     ap.add_argument('--commit')
     ap.add_argument('--modulos', help='so estes modulos, separados por virgula')
     ap.add_argument('--sem-zip', action='store_true')
+    ap.add_argument('--anterior', help='itens.json de uma geracao anterior, para contar as caixas que mudaram')
     ap.add_argument('--fontes-negrito', help='pedacos de nome de fonte negrito, separados por virgula '
                     '(padrao %s)' % ','.join(FONTES_NEGRITO))
     a = ap.parse_args(argv)
     if a.fontes_negrito:
         FONTES_NEGRITO[:] = [x for x in a.fontes_negrito.split(',') if x]
     manifest, rel, trab = gerar(a.pdfs, a.serie, a.versao, a.saida, a.curadoria, a.trabalho, a.gerado_em, a.commit,
-                                a.modulos.split(',') if a.modulos else None, not a.sem_zip)
+                                a.modulos.split(',') if a.modulos else None, not a.sem_zip, a.anterior)
     print(json.dumps({'contagens': manifest['contagens'], 'zip': rel['zip'], 'bytes_por_tipo': rel['bytes_por_tipo'],
                       'excluidos': len(rel['excluidos']), 'segundos': rel['segundos'], 'trabalho': trab},
                      ensure_ascii=False, indent=1))
