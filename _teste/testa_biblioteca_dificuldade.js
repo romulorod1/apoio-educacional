@@ -155,7 +155,7 @@ const lerEtiquetas = pag => pag.evaluate(() => Store.etiquetasDaBiblioteca());
     return !!b && !!b.closest('#cartao-biblioteca') && b.offsetParent !== null && b.textContent.trim();
   }), 'Exportar minhas etiquetas de dificuldade');
   await pag.click('#exportar-etiquetas');
-  const aviso = await esperar('aviso sem etiquetas', () => pag.evaluate(() => document.body.innerText.indexOf('Nenhuma etiqueta de dificuldade ainda.') >= 0), v => v === true, 5000);
+  const aviso = await esperar('aviso sem etiquetas', () => pag.evaluate(() => document.body.innerText.indexOf('Nenhuma etiqueta de dificuldade ainda. Marque no "Para mim" de cada exercício, na Biblioteca.') >= 0), v => v === true, 5000);
   conf('sem etiqueta: "Nenhuma etiqueta de dificuldade ainda."', aviso.ok, true);
   await pausa(400);
   conf('e nenhum arquivo saiu', await pag.evaluate(() => window.__baixados.length), 0);
@@ -188,6 +188,8 @@ const lerEtiquetas = pag => pag.evaluate(() => Store.etiquetasDaBiblioteca());
   conf('o rótulo do pacote e a etiqueta dela têm fundos diferentes', cores.fonteFundo !== cores.delaFundo, true);
   conf('e cores de letra diferentes', cores.fonteCor !== cores.delaCor, true);
   conf('o rótulo do pacote não sai em maiúsculas', cores.maiusculas, 'none');
+  conf('os chips do filtro têm 44 px de altura, como os do "Para mim"', await pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#bib-filtro-dif .chip-filtro')).every(b => b.getBoundingClientRect().height >= 44)), true);
   if (SALVAR) await pag.screenshot({ path: path.join(SALVAR, 'b5_1_cartao_estimada_curada_para_mim.png') });
   await tocarEtiqueta(pag, 3, 1);   // tira de novo
   await esperar('etiqueta do 3 tirada', () => lerEtiquetas(pag), v => v && v.some(e => e.itemId === SP + 3 && e.dificuldade === null), 5000);
@@ -199,7 +201,7 @@ const lerEtiquetas = pag => pag.evaluate(() => Store.etiquetasDaBiblioteca());
   conf('começa em Todas: os 8', await visiveis(pag), '1,2,3,4,5,6,7,8');
   await filtrar(pag, 1);
   conf('Fácil: 1, 3 e o 8 curado (o 2 curado como Difícil sai)', await visiveis(pag), '1,3,8');
-  conf('com a contagem do que está na tela', await pag.evaluate(() => document.querySelector('#bib-filtro-dif-info').textContent), '3 exercícios de 8 na tela.');
+  conf('com a contagem do que está na tela', await pag.evaluate(() => document.querySelector('#bib-filtro-dif-info').textContent), 'Mostrando 3 de 8 exercícios.');
   await filtrar(pag, 2);
   conf('Médio: 4, 5 e 6', await visiveis(pag), '4,5,6');
   await filtrar(pag, 3);
@@ -215,12 +217,14 @@ const lerEtiquetas = pag => pag.evaluate(() => Store.etiquetasDaBiblioteca());
   await tocarEtiqueta(pag, 1, 3);
   await esperar('etiqueta Difícil no 1', () => lerEtiquetas(pag), v => v && v.some(e => e.itemId === SP + 1 && e.dificuldade === 3), 5000);
   await pausa(150);
+  conf('o cartão não some debaixo do dedo: o 1 fica na tela até ela trocar o filtro', await visiveis(pag), '1,3,8');
+  await filtrar(pag, 1);
   if (VENENO) {
     // o app envenenado só olha a dificuldade do pacote: o 1 continua no Fácil
     conf('VENENO ENXERGADO: com a etiqueta ignorada, o 1 continua no Fácil', await visiveis(pag), '1,3,8');
     throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
   }
-  conf('com Fácil ligado, o 1 marcado Difícil por ela sai da lista', await visiveis(pag), '3,8');
+  conf('tocado o Fácil de novo, o 1 marcado Difícil por ela sai da lista', await visiveis(pag), '3,8');
   await filtrar(pag, 3);
   conf('e aparece no Difícil', await visiveis(pag), '1,2,7');
   if (SALVAR) await pag.screenshot({ path: path.join(SALVAR, 'b5_3_etiqueta_dela_no_filtro.png') });
@@ -231,7 +235,7 @@ const lerEtiquetas = pag => pag.evaluate(() => Store.etiquetasDaBiblioteca());
   await pag.select('#bib-filtro-aluno', alunoId);
   await esperar('filtro de uso aplicado', () => visiveis(pag), v => v === '1,2', 5000);
   conf('Difícil e "ainda não usei com": o 7 usado sai, ficam 1 e 2', await visiveis(pag), '1,2');
-  conf('e a contagem é a dos dois filtros juntos', await pag.evaluate(() => document.querySelector('#bib-filtro-dif-info').textContent), '2 exercícios de 8 na tela.');
+  conf('e a contagem é a dos dois filtros juntos', await pag.evaluate(() => document.querySelector('#bib-filtro-dif-info').textContent), 'Mostrando 2 de 8 exercícios.');
   await filtrar(pag, null);
   conf('Todas com o filtro de uso: só o 7 escondido', await visiveis(pag), '1,2,3,4,5,6,8');
   await pag.select('#bib-filtro-aluno', '');

@@ -12063,7 +12063,7 @@
     var mostrados = celulas.filter(function (c) { return !c.hidden; }).length;
     var um = grade._banco ? 'problema' : 'exercício', varios = grade._banco ? 'problemas' : 'exercícios';
     info.textContent = mostrados
-      ? plural(mostrados, um, varios) + ' de ' + celulas.length + ' na tela.'
+      ? 'Mostrando ' + mostrados + ' de ' + plural(celulas.length, um, varios) + '.'
       : (grade._banco ? 'Nenhum problema' : 'Nenhum exercício') + ' desta lista nesta dificuldade.';
   }
 
@@ -12106,6 +12106,7 @@
   function abrirBibliotecaDoAssunto(t, aula) {
     bibContexto = { aulaId: aula.id, alunoId: aula.alunoId };
     bibFiltroAluno = aula.alunoId;
+    bibFiltroDif = null;
     bibTermo = String(t.titulo || '').trim();
     fecharModal('modal-aula');
     var campo = $('#busca-biblioteca');
@@ -12323,9 +12324,9 @@
             Store.gravarEtiquetaBiblioteca({ itemId: it.id, dificuldade: nova, data: Core.hojeIso() }).then(function () {
               bibEtiquetas = bibEtiquetas || {};
               if (nova) bibEtiquetas[it.id] = nova; else delete bibEtiquetas[it.id];
+              // o cartão fica na tela mesmo que a etiqueta nova o tire do filtro: sumir
+              // debaixo do dedo parece exercício apagado. Sai quando ela trocar o filtro ou a lista.
               desenha();
-              // com o filtro ligado, a etiqueta nova pode tirar o exercício da lista: é o que o filtro diz
-              reaplicarFiltroDeDificuldade();
             }, function () { avisar('Não consegui guardar a etiqueta. Tente de novo.'); });
           }
         }));
@@ -12369,7 +12370,7 @@
   function exportarEtiquetas() {
     Store.etiquetasDaBiblioteca().then(function (lista) {
       var csv = csvDasEtiquetas(lista);
-      if (!csv) { avisar('Nenhuma etiqueta de dificuldade ainda.'); return; }
+      if (!csv) { avisar('Nenhuma etiqueta de dificuldade ainda. Marque no "Para mim" de cada exercício, na Biblioteca.'); return; }
       entregarArquivo('etiquetas-dificuldade-' + Core.hojeIso() + '.csv',
         new Blob([csv], { type: 'text/csv' }), 'Etiquetas de dificuldade');
     }, function () { avisar('Não consegui ler as etiquetas. Tente de novo.'); });

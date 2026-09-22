@@ -1403,6 +1403,8 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .bib-filtro-info { margin: 0; color: var(--navy); font-weight: 600; }
 .bib-celula[hidden] { display: none; }
 #exportar-etiquetas[hidden] { display: none; }
+/* os chips do filtro de dificuldade são alvos de toque do tablet, como os do "Para mim" */
+.bib-filtro-dif .chip-filtro { min-height: 44px; min-width: 44px; padding: 10px 16px; font-size: 14px; }
 /* a dificuldade do pacote fica sem cor e em minúsculas: a colorida é a dela, no "Para mim" */
 .tag.bib-dif-fonte { background: var(--branco); border: 1px solid var(--fio); color: var(--navy);
   text-transform: none; letter-spacing: 0; font-weight: 600; }
