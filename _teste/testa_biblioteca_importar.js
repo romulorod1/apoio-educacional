@@ -7,8 +7,8 @@
  *   0. o banco que ela já tem (versão 1, com aluno, folha e imagem) sobe para
  *      a versão 2 sem perder nada, e ganha os seis depósitos da biblioteca;
  *   1. Ajustes mostra o cartão Biblioteca vazio e o botão Importar;
- *   2. o pacote limpo entra: resumo com contagens e MB, 60 exercícios, 6 aulas,
- *      141 imagens; o espaço foi consultado e o armazenamento pedido como
+ *   2. o pacote limpo entra: resumo com contagens e MB, 60 exercícios, 7 aulas,
+ *      143 imagens; o espaço foi consultado e o armazenamento pedido como
  *      persistente ANTES de gravar;
  *   3. o mesmo pacote de novo: aviso, nada muda;
  *   4. a versão 2 substitui a 1 inteira, e as miniaturas da 1 somem;
@@ -218,12 +218,12 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
   console.log('   tela: ' + msg.replace(/\n/g, ' | '));
   conf('a tela diz que importou', /^Biblioteca importada\./.test(msg), true);
   conf('com a matéria, a série e a fonte', msg.indexOf('Matemática, 9º ano, Pacote sintético de teste') >= 0, true);
-  conf('com as contagens', msg.indexOf('3 módulos; 6 aulas de teoria (21 páginas); 60 exercícios, 60 com solução') >= 0, true);
+  conf('com as contagens', msg.indexOf('3 módulos; 7 aulas de teoria (23 páginas); 60 exercícios, 60 com solução') >= 0, true);
   conf('com a versão e os MB', /Versão 1, [0-9]+(,[0-9])? MB no tablet/.test(msg), true);
   conf('pacotes gravados', await H.contarDeposito(pag, 'biblioteca_pacotes'), 1);
   conf('exercícios gravados', await H.contarDeposito(pag, 'biblioteca_itens'), 60);
-  conf('aulas de teoria gravadas', await H.contarDeposito(pag, 'biblioteca_teoria'), 6);
-  conf('imagens gravadas (120 recortes + 21 páginas)', await H.contarDeposito(pag, 'biblioteca_assets'), 141);
+  conf('aulas de teoria gravadas', await H.contarDeposito(pag, 'biblioteca_teoria'), 7);
+  conf('imagens gravadas (120 recortes + 23 páginas)', await H.contarDeposito(pag, 'biblioteca_assets'), 143);
   const ordem = await pag.evaluate(() => window.__ordem.join(','));
   conf('o espaço foi consultado e o armazenamento pedido persistente, nesta ordem', ordem, 'estimar,persistir');
   const umAsset = await pag.evaluate(() => Store.lerAssetBiblioteca('matematica-sintetico-9ano',
@@ -248,8 +248,8 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
   conf('importou a versão 2', /^Biblioteca importada\.[\s\S]*Versão 2,/.test(msg), true);
   conf('um pacote só', JSON.stringify(await lerPacote(pag)), JSON.stringify([{ pacote: 'matematica-sintetico-9ano', versao: 2 }]));
   conf('exercícios: todos da versão 2', JSON.stringify(await versoesDeposito(pag, 'biblioteca_itens')), '{"2":60}');
-  conf('teoria: toda da versão 2', JSON.stringify(await versoesDeposito(pag, 'biblioteca_teoria')), '{"2":6}');
-  conf('imagens: todas da versão 2', JSON.stringify(await versoesDeposito(pag, 'biblioteca_assets')), '{"2":141}');
+  conf('teoria: toda da versão 2', JSON.stringify(await versoesDeposito(pag, 'biblioteca_teoria')), '{"2":7}');
+  conf('imagens: todas da versão 2', JSON.stringify(await versoesDeposito(pag, 'biblioteca_assets')), '{"2":143}');
   const miniVelha = await pag.evaluate(() => Store.lerMidia(Store.chaveMiniatura('matematica-sintetico-9ano', 1, 'assets/x.svg')));
   conf('a miniatura da versão 1 sumiu', miniVelha === undefined || miniVelha === null, true);
   conf('a imagem da folha dela continua', !!(await pag.evaluate(() => Store.lerMidia('m1'))), true);
@@ -292,9 +292,9 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
       JSON.stringify([{ pacote: 'matematica-sintetico-9ano', versao: 2 }]));
   }
   if (!VENENO_HASH) {
-    conf('depois dos venenos: 60 exercícios, 141 imagens, todos da versão 2',
+    conf('depois dos venenos: 60 exercícios, 143 imagens, todos da versão 2',
       JSON.stringify(await versoesDeposito(pag, 'biblioteca_itens')) + JSON.stringify(await versoesDeposito(pag, 'biblioteca_assets')),
-      '{"2":60}{"2":141}');
+      '{"2":60}{"2":143}');
     msg = await importar(pag, path.join(H.RAIZ, 'manifest.webmanifest'), 'arquivo que não é zip');
     conf('arquivo que não é zip: recusado com mensagem', msg,
       tela('O arquivo escolhido não é um pacote da biblioteca. Escolha o arquivo .zip da biblioteca no Drive.'));

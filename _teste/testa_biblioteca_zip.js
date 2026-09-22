@@ -63,7 +63,7 @@ async function recusa(zip) {
   conf('resumo: primeira linha', Biblioteca.resumo(aberto.manifest, aberto.bytesTotais)[0],
     'Matemática, 9º ano, Pacote sintético de teste');
   conf('resumo: contagens', Biblioteca.resumo(aberto.manifest, aberto.bytesTotais)[1],
-    '3 módulos; 6 aulas de teoria (21 páginas); 60 exercícios, 60 com solução');
+    '3 módulos; 7 aulas de teoria (23 páginas); 60 exercícios, 60 com solução');
 
   secao('zip escrito pelo zipfile do Python');
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bib_zip_'));

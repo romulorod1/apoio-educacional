@@ -12021,12 +12021,15 @@
       });
     });
     grupos.modulo.sort(function (a, b) { return b.nota - a.nota || (a.id < b.id ? -1 : 1); });
-    /* Teoria e exercícios dos módulos achados vêm primeiro, na ordem desses
-     * módulos e das aulas, e só depois o resto por nota. Medido com o pacote
-     * real do 9º ano: "bhaskara" traz o módulo de equações do 2º grau no topo,
-     * mas a palavra também aparece nas páginas de Conjuntos e de Tales, e uma
-     * aula de Funções casa no título; pela nota pura elas vinham antes das
-     * quatro teorias do módulo. Nada some: só a ordem muda. */
+    /* Teoria, exercícios e Banco dos módulos achados vêm primeiro, na ordem
+     * desses módulos; dentro de cada módulo, e no resto, vale a nota, e a
+     * árvore só desempata. Medido com o pacote real do 9º ano: "bhaskara" traz
+     * o módulo de equações do 2º grau no topo, mas a palavra também aparece nas
+     * páginas de Conjuntos e de Tales, e uma aula de Funções casa no título;
+     * pela nota pura elas vinham antes das quatro teorias do módulo. A nota
+     * continua mandando DENTRO do módulo porque o número da aula no pacote
+     * segue o nome do arquivo, e não a ordem didática: sem isso, procurar o
+     * título de uma aula por extenso a tirava do primeiro lugar. Nada some. */
     var posModulo = {};
     grupos.modulo.forEach(function (m, i) { if (posModulo[m.id] === undefined) posModulo[m.id] = i; });
     function doModuloAchado(id) {
@@ -12038,7 +12041,6 @@
       grupos[g].sort(function (a, b) {
         var ma = doModuloAchado(a.id), mb = doModuloAchado(b.id);
         if (ma !== mb) return ma - mb;
-        if (ma !== Infinity) return ordemNaArvore(a.id) - ordemNaArvore(b.id) || (a.id < b.id ? -1 : 1);
         return b.nota - a.nota || ordemNaArvore(a.id) - ordemNaArvore(b.id) || (a.id < b.id ? -1 : 1);
       });
     });
@@ -12096,7 +12098,7 @@
     }
     if (g.exercicio.length) {
       corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Exercícios' }));
-      // um por lista, na ordem da melhor nota de cada uma
+      // um por lista, na ordem em que a primeira de cada uma aparece (módulo achado, depois nota)
       var listas = [], vistas = {};
       g.exercicio.forEach(function (x) {
         var it = bib.itemPorId[x.id];
