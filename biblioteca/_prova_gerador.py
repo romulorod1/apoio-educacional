@@ -108,6 +108,132 @@ def fio_da_pagina(pg):
     return [d['rect'] for d in pg.get_drawings() if d['rect'].width < 1.5 and d['rect'].height > 400]
 
 
+# ------------------------------------------------------------------ oraculos da prova
+#
+# Achado da lente 2 do #47: tres travas decidiam com as funcoes do proprio
+# gerador (a primeira linha do recorte, a letra da objetiva e a divisa de
+# colunas quando a pagina nao tem fio), e entao comparavam o gerador com ele
+# mesmo. Os oraculos abaixo leem a pagina por outro caminho; a trava
+# "prova independente do gerador" roda as travas com aquelas funcoes do
+# gerador trocadas por uma que falha, e exige o mesmo resultado.
+
+def divisa_pela_tinta(pg):
+    """Divisa de colunas pelo corredor sem tinta entre 250 e 360 pt, na pagina renderizada.
+
+    Nao usa fio nem margem de texto: a faixa vertical mais larga sem nenhum
+    pixel escuro no corpo da pagina (entre 10% e 90% da altura), e a divisa 5
+    pt antes de onde ela termina. Pelo fim, e nao pelo meio: a coluna direita
+    comeca sempre na mesma margem, e a esquerda termina onde cada linha acaba
+    (o meio variava de 272 a 297 pt entre as paginas de Produtos Notaveis).
+    """
+    tmp = pymupdf.open()
+    tmp.insert_pdf(pg.parent, from_page=pg.number, to_page=pg.number)
+    pix = tmp[0].get_pixmap(dpi=72, colorspace=pymupdf.csGRAY)
+    tmp.close()
+    w, h, s = pix.width, pix.height, pix.samples
+    ya, yb = int(h * 0.1), int(h * 0.9)
+    livre = [not any(s[y * w + x] < 160 for y in range(ya, yb)) for x in range(w)]
+    melhor, ini = (0, None), None
+    for x in range(250, min(361, w)):
+        if livre[x] and ini is None:
+            ini = x
+        if (not livre[x] or x == min(360, w - 1)) and ini is not None:
+            fim = x if not livre[x] else x + 1
+            if fim - ini > melhor[0]:
+                melhor = (fim - ini, fim - 5.0)
+            ini = None
+    return melhor[1]
+
+
+def divisa_da_prova(doc, pg):
+    """O fio da pagina; sem ele, o fio mais frequente do documento; sem nenhum, a tinta."""
+    fios = fio_da_pagina(pg)
+    if fios:
+        return fios[0].x0
+    todos = [round(f.x0, 1) for q in doc for f in fio_da_pagina(q)]
+    if todos:
+        return max(set(todos), key=todos.count)
+    return divisa_pela_tinta(pg)
+
+
+def comeco_do_recorte(pg, bbox):
+    """O texto que o leitor le primeiro no recorte, pelos caracteres do PDF.
+
+    A linha e a dos caracteres com a mesma linha de base. A primeira e a de
+    base mais alta entre as que comecam ate 45 pt da borda esquerda do
+    recorte: o que sobe acima da linha do marcador (radical, numerador) comeca
+    depois do "Exercicio N.", mais para dentro, e o marcador com recuo de
+    paragrafo (23,5 pt) ainda conta.
+    """
+    r = pymupdf.Rect(bbox)
+    cs = []
+    for b in pg.get_text('rawdict')['blocks']:
+        if b['type'] != 0:
+            continue
+        for l in b['lines']:
+            for sp in l['spans']:
+                for c in sp['chars']:
+                    x0, y0, x1, y1 = c['bbox']
+                    # pelo centro: a caixa da fonte passa da tinta, e o recorte e pela tinta
+                    if c['c'].strip() and r.contains(pymupdf.Point((x0 + x1) / 2, (y0 + y1) / 2)):
+                        cs.append((x0, c['origin'][1], c['c']))
+    linhas = []
+    for c in sorted(cs, key=lambda c: c[1]):
+        if linhas and abs(c[1] - linhas[-1][0]) < 2.0:
+            linhas[-1][1].append(c)
+        else:
+            linhas.append([c[1], [c]])
+    # glifo solto (o radical de "A = raiz de 21(21-13)...", Areas, solucao 8, e o
+    # parentese grande) forma "linha" de um caractere: nao conta
+    inicio = [(base, min(c[0] for c in cs_l), cs_l) for base, cs_l in linhas if len(cs_l) >= 2]
+    # linha suspensa (numerador de fracao, expoente): outra linha comeca mais a
+    # esquerda logo abaixo dela, a menos de 9,5 pt (a entrelinha e 12 pt; o
+    # numerador de "A = 4(5+7) sobre 2" sobe uns 7 pt, Areas, solucao 5)
+    perto = [(b, x, l) for b, x, l in inicio if x <= r.x0 + 45
+             and not any(0 < b2 - b < 9.5 and x2 < x - 5 for b2, x2, _ in inicio)]
+    if not perto:
+        return ''
+    return portal.recompor(''.join(c[2] for c in sorted(perto[0][2], key=lambda c: c[0])))
+
+
+def letras_da_solucao(texto):
+    """As letras de resposta que a solucao escreve, lidas palavra a palavra.
+
+    Depois de "resposta", "letra", "alternativa" ou "opcao", a primeira palavra
+    que e uma letra solta de A a E (com ou sem parenteses e pontuacao), a ate
+    8 palavras dali. Ou a solucao inteira e "N. X.".
+    """
+    import unicodedata
+    t = unicodedata.normalize('NFD', texto)
+    t = ''.join(c for c in t if unicodedata.category(c) != 'Mn')
+    palavras = t.split()
+    achadas = set()
+    gatilhos = ('resposta', 'letra', 'alternativa', 'opcao')
+    for k, p in enumerate(palavras):
+        if p.lower().strip(':.,;()') in gatilhos:
+            for q in palavras[k + 1:k + 9]:
+                n = q.strip('.,;:()')
+                if len(n) == 1 and n in 'ABCDE':
+                    achadas.add(n)
+                    break
+                if re.search(r'[A-Za-z]{2,}', n) and n.lower() not in ('letra', 'e', 'a', 'o', 'da', 'de'):
+                    break
+    so = re.match(r'^\s*\d+\s*\.\s*\(?([A-E])\)?\s*\.?\s*$', ' '.join(palavras))
+    if so:
+        achadas.add(so.group(1))
+    return achadas
+
+
+def enunciados_no_texto(doc):
+    """Numeros dos "Exercicio N." no texto do PDF, antes das solucoes, sem o detector."""
+    nums = []
+    for pno in range(1, doc.page_count):
+        t = portal.recompor(doc[pno].get_text('text'))
+        for m in re.finditer(r'Exerc\S*cio\s*(\d+)\s*\.', t):
+            nums.append(int(m.group(1)))
+    return nums
+
+
 # ------------------------------------------------------------------ travas
 
 def trava_determinismo(a, b):
@@ -131,6 +257,12 @@ def trava_contagens(p):
         n = len(ne)
         if ne != list(range(1, n + 1)):
             erros.append('%s: enunciados fora de sequencia %s' % (l['aula'], ne))
+        # pelo texto do PDF, sem o detector: pega o ultimo item perdido, que deixa
+        # a sequencia 1..N-1 perfeita. Citacao repetida ("veja o Exercicio 3.") pode.
+        no_texto = set(enunciados_no_texto(p.doc(l['arquivo'])))
+        if no_texto != set(range(1, n + 1)):
+            erros.append('%s: o texto do PDF tem os enunciados %s, e o detector achou 1..%d' % (
+                l['aula'], sorted(no_texto), n))
         # por arquivo, e nao por aula: ha duas listas "resolucao-de-exercicios"
         no_pacote = sorted(por_aula.get(l['arquivo'], []))
         excl = sorted(e['numero'] for e in l['excluidos'])
@@ -262,10 +394,10 @@ def conteudo_na_caixa(p, it, pg, pz):
     for nome, v in cortes.items():
         if v:
             erros.append('tinta cortada na borda %s' % nome)
-    fios = fio_da_pagina(pg)
-    # pagina sem fio (Razoes Trigonometricas, pagina 5): a divisa do documento
-    xsep = fios[0].x0 if fios else gerar_pacote.geometria(p.doc(it['origem']['arquivo']))['xsep']
-    lado = 0 if r.x1 <= xsep + 3 else 1
+    # pagina sem fio (Razoes Trigonometricas, pagina 5; Produtos Notaveis inteira):
+    # a divisa medida pela prova, e nao a do gerador
+    xsep = divisa_da_prova(p.doc(it['origem']['arquivo']), pg)
+    lado = 0 if (r.x0 + r.x1) / 2 < xsep else 1
     for b in pg.get_text('dict')['blocks']:
         if b['type'] != 0:
             continue
@@ -328,10 +460,8 @@ def trava_recorte(p):
             if total < minimo:
                 erros.append('%s %s: %.1f pt de altura, abaixo de %d' % (it['id'], tipo, total, minimo))
             primeiro = ps[0]
-            xsep = [f.x0 for f in fio_da_pagina(doc[primeiro['pagina'] - 1])]
-            xsep = xsep[0] if xsep else gerar_pacote.geometria(doc)['xsep']
-            linha = gerar_pacote.primeira_linha_na_margem(doc, primeiro['pagina'] - 1, primeiro['bbox'],
-                                                         primeiro['coluna'] - 1, xsep)
+            # pelos caracteres do recorte, sem a funcao do gerador (lente 2 do #47)
+            linha = comeco_do_recorte(doc[primeiro['pagina'] - 1], primeiro['bbox'])
             alvo = (r'^Exerc\S*cio\s*%d\s*\.' if tipo == 'enunciado' else r'^%d\s*\.') % it['numero']
             if not re.match(alvo, linha):
                 erros.append('%s %s: primeira linha nao comeca pelo numero: %r' % (it['id'], tipo, linha[:40]))
@@ -376,10 +506,8 @@ def trava_objetiva(p):
             erros.append('%s: objetiva com resposta %r' % (it['id'], r))
             continue
         s = texto_da_solucao(p, it)
-        letras = set(gerar_pacote.RESPOSTA.findall(s))
-        m = gerar_pacote.SO_LETRA.match(' '.join(s.split()))
-        if m:
-            letras.add(m.group(1))
+        # lida palavra a palavra, sem as expressoes do gerador (lente 2 do #47)
+        letras = letras_da_solucao(s)
         if letras != {r}:
             erros.append('%s: resposta %s, e a solucao da fonte escreve %s' % (it['id'], r, sorted(letras) or 'nenhuma letra'))
     return erros
@@ -798,6 +926,7 @@ def travas_simples(p, placar, zip_caminho=None, rotulo=''):
     placar.conferir('sem travessao' + rotulo, trava_tracos(p))
     placar.conferir('origem literal' + rotulo, trava_origem(p))
     placar.conferir('PyMuPDF no manifest' + rotulo, trava_gerador_no_manifest(p))
+    placar.conferir('prova independente do gerador' + rotulo, trava_independencia(p))
 
 
 def venenos(p, temp, placar, curadoria):
@@ -987,8 +1116,71 @@ def venenos(p, temp, placar, curadoria):
     return it_obj, it_simples
 
 
+class _Sabotado:
+    """Funcao ou expressao do gerador que nao pode ser usada pela prova."""
+
+    def __init__(self, nome):
+        self.nome = nome
+
+    def __call__(self, *a, **k):
+        raise RuntimeError('a prova usou %s do gerador' % self.nome)
+
+    def __getattr__(self, attr):
+        raise RuntimeError('a prova usou %s.%s do gerador' % (self.nome, attr))
+
+
+def trava_independencia(p, zip_caminho=None):
+    """As travas nao decidem com as funcoes de decisao do gerador.
+
+    Roda as travas duas vezes: como sao, e com a primeira linha, a letra da
+    objetiva, a divisa de colunas e o detector do gerador trocados por algo
+    que falha ao ser usado. As duas rodadas tem de dar os mesmos erros.
+    """
+    nomes = ['primeira_linha_na_margem', 'RESPOSTA', 'SO_LETRA', 'geometria', 'geometria_da_pagina',
+             'divisa_pelo_texto', 'detectar', 'marcadores', 'classificar', 'EXTRAIDO', 'origem_citada']
+
+    def rodar():
+        return [trava_contagens(p), trava_recorte(p), trava_objetiva(p), trava_origem(p)]
+
+    antes = rodar()
+    guardados = {n: getattr(gerar_pacote, n) for n in nomes}
+    try:
+        for n in nomes:
+            setattr(gerar_pacote, n, _Sabotado(n))
+        try:
+            depois = rodar()
+        except RuntimeError as e:
+            return [str(e)]
+    finally:
+        for n, v in guardados.items():
+            setattr(gerar_pacote, n, v)
+    if depois != antes:
+        return ['as travas mudam de resultado sem as funcoes do gerador']
+    return []
+
+
 def venenos_series(p, temp, placar, curadoria):
     """Um veneno por padrao que a B2 acrescentou; cada um tem de reprovar pelo motivo esperado."""
+    # oraculo do texto: o detector perde o ULTIMO item da lista CM. A sequencia
+    # 1..3 continua perfeita e as travas antigas passavam; o texto do PDF tem o 4
+    q = copia(p, temp, 'v_ultimo')
+    q.itens = [i for i in q.itens if not (i['aula']['slug'] == 'lista-cm' and i['numero'] == 4)]
+    for l in q.relatorio['listas']:
+        if l['aula'] == 'lista-cm':
+            l['numeros_enunciado'] = [x for x in l['numeros_enunciado'] if x != 4]
+            l['numeros_solucao'] = [x for x in l['numeros_solucao'] if x != 4]
+            l['excluidos'] = [e for e in l['excluidos'] if e['numero'] != 4]
+    q.manifest['contagens']['itens'] = len(q.itens)
+    q.manifest['contagens']['itens_com_solucao'] = sum(1 for i in q.itens if i['assets']['solucao'])
+    q.manifest['contagens']['itens_excluidos'] = sum(len(l['excluidos']) for l in q.relatorio['listas'])
+    placar.conferir('ultimo item perdido pelo detector', trava_contagens(q), True, 'o texto do PDF tem')
+    # independencia: uma trava que volte a chamar o gerador tem de reprovar
+    antes_ob = trava_objetiva.__globals__['letras_da_solucao']
+    trava_objetiva.__globals__['letras_da_solucao'] = lambda s: set(gerar_pacote.RESPOSTA.findall(s))
+    try:
+        placar.conferir('trava que usa o gerador', trava_independencia(p), True, 'a prova usou RESPOSTA')
+    finally:
+        trava_objetiva.__globals__['letras_da_solucao'] = antes_ob
     # soluções sem titulo: sem a regra da secao 1, a lista de variantes fica sem solucoes
     antes = gerar_pacote.detectar
     gerar_pacote.detectar = lambda doc: antes(doc, secao_1_abre_solucoes=False)

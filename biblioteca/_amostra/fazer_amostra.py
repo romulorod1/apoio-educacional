@@ -51,9 +51,10 @@ class Pagina:
         self.pg = doc.new_page(width=612, height=792)
         self.g = g
 
-    def fios(self, n):
+    def fios(self, n, separador=True):
         g = self.g
-        self.pg.draw_line((g['xsep'], g['topo']), (g['xsep'], g['yrod'] - 18), width=0.4)
+        if separador:
+            self.pg.draw_line((g['xsep'], g['topo']), (g['xsep'], g['yrod'] - 18), width=0.4)
         self.pg.draw_line((29, g['yrod']), (582, g['yrod']), width=0.4)
         self.pg.insert_text((29.5, g['yrod'] + 13), 'http://matematica.obmep.org.br/', fontname='cour', fontsize=10)
         self.pg.insert_text((303, g['yrod'] + 13), str(n), fontname='helv', fontsize=10)
@@ -162,7 +163,9 @@ def lista_variantes(caminho):
       centrada (6o ano, Exercicios sobre Fracoes, exercicio 7);
     - solucao 2 em duas partes, "2." e "2. (Outra solucao.)" (8o ano,
       Divisibilidade), e solucao 3 em duas, "3." e "3. Solucao 2." (1o medio,
-      Inequacoes de 2o grau): cada par e UM item.
+      Inequacoes de 2o grau): cada par e UM item;
+    - nenhum fio separador de colunas em pagina nenhuma: a divisa sai da margem
+      do texto (8o ano, Produtos Notaveis).
     """
     g = MODELOS['cm']
     X0, X1, T = g['x0'], g['x1'], g['topo']
@@ -172,7 +175,7 @@ def lista_variantes(caminho):
     capa.insert_text((150, 150), 'Lista de Variantes.', fontname='hebo', fontsize=14.3)
     capa.insert_text((258, 225), 'Nono Ano', fontname='hebo', fontsize=14.3)
     p = Pagina(doc, g)
-    p.fios(1)
+    p.fios(1, separador=False)
     p.secao(X0, T + 60, 1, 'Exercícios Introdutórios')
     xt = p.marcador(X0, T + 90, 1)
     p.pg.insert_text((xt, T + 90), 'Calcule o valor da soma de', fontname='helv', fontsize=10)
@@ -190,7 +193,7 @@ def lista_variantes(caminho):
     p.texto(X1, T + 102, ['Qual é a sua área?'])
     # solucoes, sem "Respostas e Solucoes": a secao 1 reaparece
     p = Pagina(doc, g)
-    p.fios(2)
+    p.fios(2, separador=False)
     p.secao(X0, T + 40, 1, 'Exercícios Introdutórios')
     p.numero_solucao(X0, T + 70, 1)
     p.texto(X0 + 14, T + 70, ['(Adaptado da Amostra - 2020) Temos 3 + 4 = 7.'])
