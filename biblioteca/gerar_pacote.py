@@ -315,6 +315,8 @@ def topo_da_tinta(doc, pno, r):
 
 def divisa_fina(doc, pno, x0, x1, y_de, y_ate):
     """Ponto inteiro no ultimo vao em branco entre y_de e y_ate, pela tinta a 288 dpi, ou None."""
+    if not FOLGA_ANTES_DO_PROXIMO:
+        return None
     tmp = pymupdf.open()
     tmp.insert_pdf(doc, from_page=pno, to_page=pno)
     pix = tmp[0].get_pixmap(dpi=288, colorspace=pymupdf.csGRAY, clip=pymupdf.Rect(x0, y_de, x1, y_ate))
@@ -873,7 +875,7 @@ def detectar(doc, secao_1_abre_solucoes=True):
                 # tinta do item de baixo pode comecar uns decimos acima da linha de
                 # 1 pt em que a pagina a 72 dpi a mostra (o expoente do exercicio 20
                 # de Equacoes Algebricas, 3o medio, em y 79,9, com o 19 acabando em 80)
-                if FOLGA_ANTES_DO_PROXIMO and i + 1 < len(inicios) and y1 >= math.floor(y_fim) - 1:
+                if i + 1 < len(inicios) and y1 >= math.floor(y_fim) - 1:
                     k = divisa_fina(doc, pno, cx0, cx1, com_tinta[-1], math.floor(y_fim) + 1)
                     if k is not None:
                         y1 = min(y1, k)

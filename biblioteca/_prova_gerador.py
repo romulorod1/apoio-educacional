@@ -1054,7 +1054,7 @@ def trava_solucao_com_conteudo(p):
         if not it['assets'].get('solucao'):
             continue
         doc = p.doc(it['origem']['arquivo'])
-        ps = [pz for pz in pedacos(it, 'solucao') if not pz.get('nota')]
+        ps = pedacos(it, 'solucao')
         texto = ' '.join(doc[pz['pagina'] - 1].get_text('text', clip=pymupdf.Rect(pz['bbox'])) for pz in ps)
         resto = re.sub(r'^\s*%d\s*\.' % it['numero'], '', texto).strip()
         alto = max(pz['bbox'][3] - pz['bbox'][1] for pz in ps)
@@ -2167,6 +2167,12 @@ def principal():
             placar.conferir('subida pela linha de 1 pt', trava_subida_fina(lambda doc, pno, x0, x1, y, lim: y), True, 'topo em')
             placar.conferir('divisa pela linha de 1 pt', trava_divisa_fina(lambda doc, pno, x0, x1, a, b: float(math.floor(b) - 1)),
                             True, 'divisa em')
+            antes_fo = gerar_pacote.FOLGA_ANTES_DO_PROXIMO
+            gerar_pacote.FOLGA_ANTES_DO_PROXIMO = False
+            try:
+                placar.conferir('sem folga antes do proximo', trava_divisa_fina(), True, 'divisa em None')
+            finally:
+                gerar_pacote.FOLGA_ANTES_DO_PROXIMO = antes_fo
             placar.conferir('marcador em CMBX10', trava_fontes_negrito())
             placar.conferir('titulo do modulo pela capa das listas', trava_titulo_modulo())
             it_obj, it_simples = venenos(p, temp, placar, cur)
