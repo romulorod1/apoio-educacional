@@ -58,7 +58,7 @@ LIMITE_FIDELIDADE = 0.01
 DIFERENCA_PIXEL = 64      # de 255: abaixo disto e antialias, nao e conteudo
 DPI_FIDELIDADE = 150
 SEMENTE = 2026
-SECAO = re.compile(r'Exerc\S*cios\s+(Introdut|de\s+Fixa|de\s+Aprofund)|Respostas\s*e\s*Solu')
+SECAO = re.compile(r'Exerc\S*cios\s+(Introdut|de\s+Fixa|de\s+Aprofund)|Respostas\s*e\s*Solu|E\s*laborado\s+por\b|P\s*roduzido\s+por\b|cursoarquimedes')
 
 
 # ------------------------------------------------------------------ pacote em disco
@@ -369,6 +369,30 @@ def trava_objetiva(p):
     return erros
 
 
+def trava_xml(p):
+    """Todo SVG do pacote (recorte e teoria) e XML bem formado, sem caractere de controle.
+
+    O Chrome recusa o SVG inteiro por um unico &#x001a;, e a pagina sai em
+    branco no tablet (9 paginas de teoria, achado da B3 em 21/09).
+    """
+    import xml.etree.ElementTree as ET
+    erros = []
+    ruim = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1f]')
+    for cam in sorted(p.manifest['arquivos']):
+        if not cam.endswith('.svg'):
+            continue
+        b = p.bytes_de(cam)
+        t = b.decode('utf-8', errors='replace')
+        if ruim.search(t) or re.search(r'&#(x0*(?:[0-8bcef]|1[0-9a-f])|0*(?:[0-8]|1[124-9]|2[0-9]|3[01]));', t, re.I):
+            erros.append('%s: caractere de controle' % cam)
+            continue
+        try:
+            ET.fromstring(b)
+        except ET.ParseError as e:
+            erros.append('%s: XML invalido (%s)' % (cam, e))
+    return erros
+
+
 def trava_svg(p):
     erros = []
     for it in p.itens:
@@ -544,6 +568,48 @@ def trava_fidelidade(p, sorteio, temp):
     return erros, medidas
 
 
+def trava_fidelidade_teoria(p, temp, n=10, semente=SEMENTE, trocar=None):
+    """Paginas de teoria sorteadas: SVG no Chrome contra o pixmap da pagina do PDF.
+
+    Pedido da orquestradora: a amostra dos recortes nunca olhava teoria, e foi
+    na teoria que a B3 achou SVG que o Chrome recusava. `trocar` (so no veneno)
+    renderiza o SVG de outra pagina no lugar.
+    """
+    paginas = [(t, pg) for t in p.teoria for pg in t['paginas']]
+    rnd = random.Random(semente)
+    sorteio = rnd.sample(paginas, min(n, len(paginas)))
+    escala = DPI_FIDELIDADE / 72.0
+    pedidos = []
+    for k, (t, pg) in enumerate(sorteio):
+        cam = pg['asset']
+        if trocar and k == 0:
+            # o SVG de uma pagina que nao e esta
+            cam = next(o['asset'] for tt, o in paginas if o['asset'] != pg['asset'])
+        pedidos.append({'svg': os.path.join(p.pasta, *cam.split('/')), 'png': os.path.join(temp, 'teo_%02d.png' % k),
+                        'largura_pt': pg['medidas']['largura_pt'], 'altura_pt': pg['medidas']['altura_pt'], 'escala': escala})
+    arq = os.path.join(temp, 'pedidos_teoria.json')
+    json.dump(pedidos, open(arq, 'w', encoding='utf-8'))
+    r = subprocess.run(['node', os.path.join(AQUI, '_fidelidade.js'), arq], capture_output=True, text=True)
+    if r.returncode != 0:
+        return ['o Chrome nao renderizou a teoria: %s' % r.stderr[-300:]], []
+    erros, medidas = [], []
+    for k, (t, pg) in enumerate(sorteio):
+        arquivo = 'PDF/matematica/obmep-portal/%s/%s__teoria-%s.pdf' % (t['serie'], t['modulo']['slug'], t['aula']['slug'])
+        tmp = pymupdf.open()
+        tmp.insert_pdf(p.doc(arquivo), from_page=pg['n'] - 1, to_page=pg['n'] - 1)
+        ref = tmp[0].get_pixmap(dpi=DPI_FIDELIDADE, colorspace=pymupdf.csGRAY)
+        cro = pymupdf.Pixmap(pymupdf.csGRAY, pymupdf.Pixmap(pedidos[k]['png']))
+        w, h = min(ref.width, cro.width), min(ref.height, cro.height)
+        if abs(ref.width - cro.width) > 2 or abs(ref.height - cro.height) > 2:
+            erros.append('%s: tamanhos nao conferem' % pg['id'])
+            continue
+        frac = fracao_diferente(ref, cro, w, h, 0)
+        medidas.append((frac, pg['id']))
+        if frac >= LIMITE_FIDELIDADE:
+            erros.append('%s: %.2f%% dos pixels diferem' % (pg['id'], 100 * frac))
+    return erros, medidas
+
+
 # ------------------------------------------------------------------ amostra e venenos
 
 def gerar(pdfs, trabalho, curadoria, **kw):
@@ -603,6 +669,7 @@ def travas_simples(p, placar, zip_caminho=None, rotulo=''):
     placar.conferir('recorte' + rotulo, trava_recorte(p))
     placar.conferir('objetiva' + rotulo, trava_objetiva(p))
     placar.conferir('svg autocontido' + rotulo, trava_svg(p))
+    placar.conferir('svg bem formado (todos)' + rotulo, trava_xml(p))
     placar.conferir('manifesto' + rotulo, trava_manifesto(p, zip_caminho))
     placar.conferir('sem travessao' + rotulo, trava_tracos(p))
     placar.conferir('origem literal' + rotulo, trava_origem(p))
@@ -689,6 +756,13 @@ def venenos(p, temp, placar, curadoria):
             # pode cair justo no espaco entre duas palavras
             i['origem']['enunciado']['bbox'] = [b[0] + 40, b[1], b[2], b[3]]
     placar.conferir('recorte: caixa estreita', trava_recorte(q), True, 'tinta cortada na borda')
+    # recorte: bloco de creditos do fim do documento colado na ultima solucao
+    q = copia(p, temp, 'v_creditos')
+    for i in q.itens:
+        if i['aula']['slug'] == 'lista-de-amostra' and i['numero'] == 4:
+            b = i['origem']['solucao']['bbox']
+            i['origem']['solucao']['bbox'] = [b[0], b[1], b[2], b[3] + 40]
+    placar.conferir('recorte: creditos colados', trava_recorte(q), True, 'titulo de secao')
     # recorte: caixa descendo ate o fio do rodape
     q = copia(p, temp, 'v_rodape')
     for i in q.itens:
@@ -716,6 +790,11 @@ def venenos(p, temp, placar, curadoria):
     cam = it_simples['assets']['enunciado']
     regravar_asset(q, cam, q.bytes_de(cam).replace(b'</svg>', b'<text x="1" y="9">x</text></svg>'))
     placar.conferir('svg: texto vivo', trava_svg(q), True, 'texto ou fonte')
+    # svg: caractere de controle numa pagina de teoria (o &#x001a; que a B3 achou)
+    q = copia(p, temp, 'v_xml')
+    cam = q.teoria[0]['paginas'][1]['asset']
+    regravar_asset(q, cam, q.bytes_de(cam).replace(b'</svg>', b'<g data-text="&#x001a;"/></svg>'))
+    placar.conferir('svg: caractere de controle', trava_xml(q), True, 'caractere de controle')
 
     # manifesto: um byte trocado num asset
     q = copia(p, temp, 'v_man')
@@ -781,6 +860,11 @@ def principal():
                 fr = [m[0] for m in medidas]
                 print('          fidelidade: media %.3f%%, pior %.3f%% (%s %s p%d)' % (
                     100 * sum(fr) / len(fr), 100 * max(fr), *max(medidas)[1:3], max(medidas)[3] + 1))
+            erros_t, med_t = trava_fidelidade_teoria(p, temp)
+            placar.conferir('fidelidade da teoria (%d paginas)' % len(med_t), erros_t)
+            if med_t:
+                ft = [m[0] for m in med_t]
+                print('          teoria: media %.3f%%, pior %.3f%% (%s)' % (100 * sum(ft) / len(ft), 100 * max(ft), max(med_t)[1]))
             if a.saida_fidelidade:
                 json.dump([{'fracao': m[0], 'id': m[1], 'tipo': m[2], 'pedaco': m[3] + 1} for m in medidas],
                           open(a.saida_fidelidade, 'w', encoding='utf-8'), indent=1)
@@ -794,6 +878,9 @@ def principal():
                 regravar_asset(q, cam, q.bytes_de(outro['assets']['solucao']))
                 erros_v, _ = trava_fidelidade(q, [alvo], temp)
                 placar.conferir('fidelidade: SVG trocado', erros_v, True, 'diferem')
+                # veneno: a primeira pagina sorteada da teoria recebe o SVG de outra
+                erros_tv, _ = trava_fidelidade_teoria(p, temp, n=2, trocar=True)
+                placar.conferir('fidelidade: teoria trocada', erros_tv, True, 'diferem')
     finally:
         shutil.rmtree(temp, ignore_errors=True)
     print('%d verificacoes passaram, %d falharam' % (placar.ok, placar.falhas))

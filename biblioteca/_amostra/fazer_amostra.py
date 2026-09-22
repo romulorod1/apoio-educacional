@@ -19,7 +19,8 @@ Em cada lista: capa; marcador "Exercicio" e numero em spans separados (itens
 1, 3 e 4) e num span so (item 2); titulo de secao logo abaixo do fim de um
 item; item que atravessa a coluna (item 3); objetiva com alternativas a) a e)
 e "Resposta B." na solucao, que traz a origem "(Extraido da OBMEP - 2013)";
-secao "Respostas e Solucoes" em pagina propria. A lista tem tres paginas, e
+secao "Respostas e Solucoes" em pagina propria; bloco de creditos
+("Elaborado por", "Produzido por") no fim do documento. A lista tem tres paginas, e
 nao duas, porque as solucoes do Portal comecam sempre em pagina propria.
 
 Venenos: --sem-item N tira o item N dos enunciados da lista-de-amostra (o
@@ -138,6 +139,8 @@ def lista(caminho, modelo='palladio', sem_item=None, duplica=None):
     p.secao(X1, T + 70, 2, 'Exercícios de Fixação')
     p.numero_solucao(X1, T + 100, rot[4])
     p.texto(X1 + 14, T + 100, ['A área é 12 · 30 = 360 m².'])
+    # bloco de creditos do fim do documento, logo abaixo da ultima solucao
+    p.texto(X1 + 30, T + 124, ['Elaborado por Autor da Amostra', 'Produzido por Amostra Sintética'])
     doc.set_metadata(FIXO)
     doc.save(caminho, garbage=3, deflate=True, no_new_id=True)
 

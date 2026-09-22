@@ -4,7 +4,7 @@
  *        [--pdfjs <caminho do pdf.js>] [--marca multiplicar|fundo]
  *
  * Monta: 3 paginas de teoria de "Resultados Basicos - Parte I" (sem a capa), os
- * exercicios 4 a 11 da lista "Equacao do 2o grau: resultados basicos"
+ * 8 exercicios da lista "Equacao do 2o grau: resultados basicos"
  * renumerados de 1 a 8, com a origem em letra pequena, e o gabarito em folha
  * separada, tudo dentro da moldura do pdf.js (cabecalho, rodape, numeracao).
  *
@@ -27,7 +27,8 @@ const CHROME = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application
 const DPI_ITEM = 200;
 const DPI_TEORIA = 150;
 const TEORIA = { modulo: 'equacoes-do-segundo-grau', aula: 'resultados-basicos-parte-i', paginas: [2, 3, 4] };
-const LISTA = { modulo: 'equacoes-do-segundo-grau', aula: 'equacao-do-2o-grau-resultados-basicos', numeros: [4, 5, 6, 7, 8, 9, 10, 11] };
+// os 8 primeiros itens do pacote a partir do 4 (o 5 saiu do pacote: texto da fonte sobre o fio)
+const LISTA = { modulo: 'equacoes-do-segundo-grau', aula: 'equacao-do-2o-grau-resultados-basicos', aPartirDe: 4, quantos: 8 };
 
 function argumento(nome, padrao) {
   const i = process.argv.indexOf(nome);
@@ -70,7 +71,9 @@ function rasterizarNoNavegador(svg, larguraPt, alturaPt, dpi, rotulo) {
 
   const aulaTeoria = teoria.find(t => t.modulo.slug === TEORIA.modulo && t.aula.slug === TEORIA.aula);
   const paginasTeoria = TEORIA.paginas.map(n => aulaTeoria.paginas.find(p => p.n === n));
-  const escolhidos = LISTA.numeros.map(n => itens.find(i => i.modulo.slug === LISTA.modulo && i.aula.slug === LISTA.aula && i.numero === n));
+  const escolhidos = itens.filter(i => i.modulo.slug === LISTA.modulo && i.aula.slug === LISTA.aula && i.numero >= LISTA.aPartirDe)
+    .sort((x, y) => x.numero - y.numero).slice(0, LISTA.quantos);
+  if (escolhidos.length < LISTA.quantos) throw new Error('a lista tem menos de ' + LISTA.quantos + ' itens a partir do ' + LISTA.aPartirDe);
   if (escolhidos.some(x => !x) || paginasTeoria.some(x => !x)) throw new Error('item ou pagina ausente no pacote');
 
   const navegador = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--no-sandbox'] });

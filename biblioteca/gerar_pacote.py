@@ -232,6 +232,23 @@ def marcadores(els, geo, em_solucoes):
             out.append({'tipo': 'titulo_solucoes', 'col': e['col'], 'el': e})
             virou_solucoes = e
             continue
+        # o bloco de creditos do fim do documento ("Elaborado por ...", "Produzido
+        # por Arquimedes ...") fecha o ultimo item, como um titulo de secao: sem
+        # isto ele entrava no recorte do ultimo exercicio (olho de fora, 9 casos)
+        # (no modelo CM vem uma palavra por span: "Produzido", "por", "Arquimedes")
+        # e nas versaletes do Palladio a inicial vem separada: "E" + "laborado por".
+        # Por isso vale o texto da linha a partir deste span.
+        if re.match(r'^[EP]$|^(Elaborado|Produzido)\b', t) or 'cursoarquimedes' in t:
+            cy_e = centro_y(e['bb'])
+            # sobreposicao vertical, e nao centro: a inicial tem corpo maior que a versalete
+            linha = sorted([o for o in txt if o['col'] == e['col'] and o['bb'][1] < e['bb'][3] - 1
+                            and o['bb'][3] > e['bb'][1] + 1 and abs(centro_y(o['bb']) - cy_e) < 4
+                            and 0 <= o['bb'][0] - e['bb'][0] < 260], key=lambda o: o['bb'][0])
+            t = re.sub(r'\s+', ' ', ' '.join(o['texto'] for o in linha)).strip()
+            t = re.sub(r'^([EP]) (laborado|roduzido)', r'\1\2', t)
+        if re.match(r'^(Elaborado|Produzido)\b', t) or 'cursoarquimedes' in t:
+            out.append({'tipo': 'creditos', 'col': e['col'], 'el': e})
+            continue
         if not negrito(e['fonte']):
             continue
         # titulo de secao: numero grande sozinho ou "Exercicios ..." grande
@@ -441,7 +458,7 @@ def detectar(doc):
                         pagina_solucoes = pagina_solucoes or pno + 1
                         aberto = None
                         continue
-                    if m['tipo'] == 'secao':
+                    if m['tipo'] in ('secao', 'creditos'):
                         aberto = None
                         continue
                     tipo = m['tipo']
@@ -556,7 +573,7 @@ def svg_do_pedaco(doc, pno, rect, imagens=pymupdf.PDF_REDACT_IMAGE_REMOVE, folga
     sa, sb = a.samples, b.samples
     dif = sum(1 for i in range(len(sa)) if abs(sa[i] - sb[i]) > 32) / float(max(1, len(sa)))
     pg.set_cropbox(r)
-    svg = pg.get_svg_image(text_as_path=True)
+    svg = limpar_svg(pg.get_svg_image(text_as_path=True))
     tmp.close()
     return svg, dif
 
@@ -589,6 +606,20 @@ def svg_redigido(doc, pno, rect):
 
 
 RAIZ_SVG = re.compile(r'<svg\b[^>]*>', re.S)
+DATA_TEXT = re.compile(r'\sdata-text="[^"]*"')
+CONTROLE = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1f]|&#(x0*(?:[0-8bcef]|1[0-9a-f])|0*(?:[0-8]|1[124-9]|2[0-9]|3[01]));', re.I)
+
+
+def limpar_svg(svg):
+    """Tira o data-text dos glifos e qualquer caractere de controle.
+
+    O PyMuPDF grava em cada glifo um data-text com o caractere original, e na
+    teoria vinham U+0018 e U+001A (&#x001a;), que nao valem em XML 1.0: o
+    Chrome recusava a pagina inteira e ela saia em branco (achado da B3, 9
+    paginas de teoria). O texto para busca ja esta em itens.json e teoria.json;
+    no SVG o data-text e peso morto.
+    """
+    return CONTROLE.sub('', DATA_TEXT.sub('', svg))
 
 
 def prefixar_ids(svg, pref):
@@ -764,7 +795,18 @@ def ler_curadoria(pasta):
                 dif[partes[0].strip()] = int(partes[1])
     apelidos = json.load(io.open(os.path.join(pasta, 'apelidos.json'), encoding='utf-8'))
     apelidos = {k: apelidos[k] for k in sorted(apelidos) if not k.startswith('_')}
-    return dif, apelidos
+    # exclusoes.csv (id;motivo;quem;data): item que a revisao visual achou com
+    # defeito DA FONTE (figura fora do lugar, frase da solucao no enunciado). O
+    # recorte e fiel a pagina; o defeito e do conteudo, e so leitura pega.
+    excl = {}
+    caminho = os.path.join(pasta, 'exclusoes.csv')
+    if os.path.exists(caminho):
+        for i, linha in enumerate(io.open(caminho, encoding='utf-8-sig')):
+            partes = linha.rstrip('\r\n').split(';')
+            if i == 0 or len(partes) < 2 or not partes[0].strip():
+                continue
+            excl[partes[0].strip()] = partes[1].strip()
+    return dif, apelidos, excl
 
 
 def montar_busca(docs):
@@ -806,7 +848,7 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
     arquivos = portal.listar(pdfs)
     if so_modulos:
         arquivos = [a for a in arquivos if a['modulo'] in so_modulos]
-    dif_cur, apelidos = ler_curadoria(curadoria)
+    dif_cur, apelidos, excl_cur = ler_curadoria(curadoria)
     conteudo = {}   # caminho no zip -> bytes
     itens, teoria, docs_busca = [], [], []
     relatorio = {'pacote': nome, 'versao': versao, 'serie': serie, 'pymupdf': portal.versao_pymupdf(),
@@ -867,7 +909,9 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
             for numero, ch in det['ordem']['enunciado']:
                 iid = '%s:%s:%s:ex:%d' % (serie, mod, a['aula'], numero)
                 motivo = None
-                if cont_e[numero] > 1:
+                if iid in excl_cur:
+                    motivo = 'curadoria: ' + excl_cur[iid]
+                elif cont_e[numero] > 1:
                     motivo = 'numero %d aparece %d vezes nos enunciados da fonte' % (numero, cont_e[numero])
                 elif not sem_secao and cont_s[numero] == 0:
                     motivo = 'a fonte nao tem solucao rotulada %d.' % numero
@@ -1012,7 +1056,7 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
             limpo = pymupdf.open(os.path.join(pdfs, a['arquivo']))
             for pno in range(doc.page_count):
                 pg = doc[pno]
-                svg = limpo[pno].get_svg_image(text_as_path=True)
+                svg = limpar_svg(limpo[pno].get_svg_image(text_as_path=True))
                 cam = 'assets/%s/%s/%s/teo-p%s.svg' % (serie, mod, a['aula'], ('%02d' if doc.page_count < 100 else '%03d') % (pno + 1))
                 conteudo[cam] = svg.encode('utf-8')
                 t = pg.get_text('text', sort=True)
