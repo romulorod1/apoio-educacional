@@ -3984,8 +3984,11 @@
       /* Quanto cabe: a folha inteira; ou, logo abaixo do título da parte, o que
        * sobra nela, para a página do título não ficar vazia por causa de um
        * recorte que vai ser reduzido de qualquer jeito. */
+      var tetoCheio = CHEIA - 4 - acima - cauda;
+      var reduzDeQualquerJeito = maior * k > tetoCheio;
       var logoAbaixoDoTitulo = Y_TOPO - doc.y < 110;
-      var util = logoAbaixoDoTitulo ? doc.y - Y_LIMITE : CHEIA;
+      // recorte que cabe numa folha nova não encolhe para caber na do título
+      var util = logoAbaixoDoTitulo && reduzDeQualquerJeito ? doc.y - Y_LIMITE : CHEIA;
       var teto = util - 4 - acima - cauda;
       if (maior * k > teto) {
         k = teto / maior;

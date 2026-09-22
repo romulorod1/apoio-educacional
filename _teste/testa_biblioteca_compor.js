@@ -251,6 +251,12 @@ const titulo = PDFGen.gerarMaterialBiblioteca(Object.assign({}, BASE, { incluirT
 const pt = lerPdf(titulo.bytes);
 conf('uma página só, com o título e o recorte', pt.paginas.length + ',' + pt.paginas[0].imagens.length, '1,1');
 conf('o recorte cabe acima do limite', pt.paginas[0].imagens[0].y >= PDFGen.Y_LIMITE - 0.01, true);
+// e o que cabe numa folha nova NÃO encolhe para caber na do título
+const cabe = PDFGen.gerarMaterialBiblioteca(Object.assign({}, BASE, { incluirTeoria: false, incluirGabarito: false,
+  itens: [{ id: 'x:1', enunciado: peca(660), solucao: peca(50) }] }));
+const pcb = lerPdf(cabe.bytes);
+conf('recorte de 660 pt: vai inteiro para a folha seguinte, sem redução', JSON.stringify(cabe.reduzidos.lista) + ',' +
+  pcb.paginas.length + ',' + pcb.paginas[1].imagens[0].a.toFixed(0), '[],2,660');
 
 secao('12. rótulo em caixa estreita: número numa linha própria');
 const estreita = PDFGen.gerarMaterialBiblioteca(Object.assign({}, BASE, { incluirTeoria: false, incluirGabarito: false,
