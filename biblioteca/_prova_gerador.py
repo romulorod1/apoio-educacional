@@ -1336,6 +1336,7 @@ def trava_teoria_sem_marca(p, n_pixel=10, semente=SEMENTE):
 
 
 MENCOES = os.path.join(AQUI, '_dados', 'mencoes_portal.csv')
+MENCOES_AMOSTRA = os.path.join(AQUI, '_dados', 'mencoes_amostra.csv')
 PORTAL_NO_TEXTO = re.compile(r'portal')
 OBMEP_COLADO = re.compile(r'(?<=[a-z])obmep|obmep(?=[a-z])')
 
@@ -1353,23 +1354,20 @@ def sem_acento(s):
 
 
 def lista_das_mencoes(p):
-    """A lista curada que vale para este pacote.
+    """A lista curada que vale para este pacote: um ARQUIVO, sempre.
 
     A amostra sintetica nao esta no `mencoes_portal.csv` (que e do corpus de
     verdade): ela tem uma mencao propria, escrita em fazer_amostra, e a lista
-    dela e montada aqui. Sem isto a trava examinaria zero mencoes na amostra e
-    passaria por vazio (achado da lente 2, segunda volta).
+    dela e `mencoes_amostra.csv`, escrita a mao ao lado.
+
+    A primeira versao disto MONTAVA a lista varrendo o proprio pacote que ia
+    julgar. Era espelho: os dois lados da comparacao saiam do mesmo arquivo, e a
+    trava nao tinha como reprovar nada -- com a marca inteira dentro do texto,
+    ela imprimia `ok` e escrevia os residuos na propria lista (achado da
+    terceira lente). Lista curada e lista escrita a mao e versionada.
     """
-    if any(t['serie'] != '9ano' or t['modulo']['slug'] != 'amostra-sintetica' for t in p.teoria):
-        return MENCOES
-    destino = os.path.join(p.pasta, '_mencoes_da_amostra.csv')
-    with io.open(destino, 'w', encoding='utf-8', newline='\n') as f:
-        f.write('id_pagina;serie;arquivo;pagina;trecho\n')
-        for t in p.teoria:
-            for pag in t['paginas']:
-                for _, trecho in mencoes_do_texto(pag['texto']):
-                    f.write('%s;amostra;amostra.pdf;%d;%s\n' % (pag['id'], pag['n'], trecho))
-    return destino
+    da_amostra = all(t['serie'] == '9ano' and t['modulo']['slug'] == 'amostra-sintetica' for t in p.teoria)
+    return MENCOES_AMOSTRA if da_amostra else MENCOES
 
 
 def trava_mencoes_portal(p, lista=MENCOES):
@@ -1486,7 +1484,8 @@ def marca_fora_do_svg(fonte, ref, cro, pid):
 
     dentro = np.zeros(a.shape, dtype=bool)
     pintar(dentro, [m['bbox'] for m in marcas], True, folga=0)
-    pintar(dentro, [l['bbox'] for l in _linhas_claras_giradas(fonte) if not l['marca']], False)
+    pintar(dentro, [l['bbox'] for l in _linhas_claras_giradas(fonte)
+                   if not (l['girada'] and linha_da_marca_pelo_texto(l['texto']))], False)
     pintar(dentro, [d['rect'] for d in fonte.get_drawings()], False)
     pintar(dentro, [b1['bbox'] for b1 in fonte.get_text('rawdict')['blocks'] if b1['type'] != 0], False)
     tinta = dentro & (a >= TINTA_DA_MARCA[0]) & (a <= TINTA_DA_MARCA[1])

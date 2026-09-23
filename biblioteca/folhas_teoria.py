@@ -17,10 +17,12 @@ import io
 import json
 import os
 import random
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import unicodedata
 
 import pymupdf
 
@@ -36,22 +38,43 @@ PARES_POR_LINHA = 2
 LINHAS_POR_FOLHA = 4
 
 
-def tem_marca(pg):
-    """Linha girada, clara e de corpo grande: a marca d'agua do Portal.
+DIZ_MARCA = ('portalobmep', 'portaldaobmep')
+LETRAS_MIN = 4
 
-    O corpo minimo vem de `gerar_pacote.MARCA_CORPO`, e nao de um numero escrito
-    aqui: com 30 fixo, esta funcao classificava como "sem marca" justamente a
-    pagina do Teorema de Tales, cuja marca de 17,4 pt motivou a versao -- e a
-    folha de contato a mostrava ao revisor como controle que nao podia mudar.
+
+def diz_a_marca(texto):
+    """As letras da linha, na ordem, cabem no que a marca escreve?
+
+    Regra de subsequencia, porque a fonte embutida do Portal perde glifos e a
+    extracao devolve pedacos ("rtal da OBM", "tal OBM", "da OB"). Esta copia
+    vive aqui de proposito: a folha de contato NAO pode classificar a pagina
+    pelo mesmo limite que a remocao usa -- se usasse, toda pagina cuja marca o
+    detector nao enxerga cairia no balde "sem marca" e iria ao revisor como
+    controle que nao podia mudar. Foi o que aconteceu com a pagina do Teorema de
+    Tales enquanto isto aqui tinha um numero fixo.
     """
-    import gerar_pacote
+    s = re.sub(r'[^a-z]', '', unicodedata.normalize('NFD', texto.lower()))
+    if len(s) < LETRAS_MIN:
+        return False
+    for alvo in DIZ_MARCA:
+        i = 0
+        for c in alvo:
+            if i < len(s) and s[i] == c:
+                i += 1
+        if i == len(s):
+            return True
+    return False
+
+
+def tem_marca(pg):
+    """A pagina traz uma linha girada que diz o que a marca d'agua diz."""
     for b in pg.get_text('rawdict')['blocks']:
         if b['type'] != 0:
             continue
         for l in b['lines']:
-            s0 = l['spans'][0]
-            if abs(l['dir'][1]) > 1e-6 and s0['color'] > 0xAAAAAA and s0['size'] > gerar_pacote.MARCA_CORPO:
-                return True
+            if abs(l['dir'][1]) > 1e-6:
+                if diz_a_marca(''.join(c['c'] for s in l['spans'] for c in s['chars'])):
+                    return True
     return False
 
 
