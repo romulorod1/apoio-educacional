@@ -283,19 +283,22 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   conf('e ocupa a linha inteira', entrada.largura > entrada.larguraDoCorpo * 0.7, true);
   conf('a ajuda explica que o assunto entra no fechamento',
     /assunto entra no fechamento do mês/i.test(entrada.ajuda), true);
-  conf('e que o material sai daí mesmo, quando ela quiser',
-    /material pronto, ele sai daqui mesmo/i.test(entrada.ajuda), true);
+  /* Sem material autoral e sem pacote da biblioteca importado não há material
+   * para prometer, e a ajuda não promete: o assunto vale sozinho. */
+  conf('e não promete material que não existe',
+    /material pronto, ele sai daqui mesmo|material da biblioteca/i.test(entrada.ajuda), false);
 
   /* Travas de propósito: o pedido dela foi tirar o assunto de dentro do botão,
-   * e não renomear o botão nem reescrever a ajuda da folha. Estão conferidas no
-   * testa_temas também, e ficam aqui porque é esta frente que mexe na tela. */
+   * e não renomear o botão nem reescrever a ajuda da folha. O "Material de
+   * aula" saiu da fileira com o material autoral (testa_sem_material_autoral);
+   * o resto da fileira e o texto da folha continuam palavra por palavra. */
   const fileira = await pag.$$eval('#linha-folha button', bs => bs.map(b => b.textContent.trim()));
-  conf('a fileira dos quatro botões continua a mesma', fileira.join(' | '),
-    'Escrever à mão na folha | Material de aula | Anexar PDF | Anexar foto');
+  conf('a fileira da folha continua a mesma, sem o material autoral', fileira.join(' | '),
+    'Escrever à mão na folha | Anexar PDF | Anexar foto');
   const ajudaFolha = await pag.$eval('#ajuda-folha', e => e.textContent);
   conf('a ajuda da folha continua dizendo que a folha é o começo',
     /folha em branco é sempre o começo/i.test(ajudaFolha), true);
-  conf('e que o material é atalho opcional', /atalho opcional/i.test(ajudaFolha), true);
+  conf('e continua explicando o Samsung Notes', /Samsung Notes/.test(ajudaFolha), true);
 
   conf('a aula ainda não tem assunto nenhum',
     ((await aulaDoDia(marcelo)).temas || []).length, 0);
@@ -458,11 +461,11 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
     new RegExp(DISCIPLINA, 'i').test(linhas[1].tudo), true);
   conf('e diz o grupo', linhas[1].tudo.indexOf(GRUPO.rotulo) >= 0, true);
 
-  /* O material continua alcançável, mas só de onde faz sentido: tema de
-   * matemática que existe no índice. Oferecer para os outros seria prometer o
-   * que não existe. */
-  conf('só a linha de matemática oferece Material',
-    linhas.map(l => l.botoes.some(b => /^Material$/i.test(b))).join(','), 'true,false,false');
+  /* Sem material autoral, o botão Material é da BIBLIOTECA e de mais ninguém:
+   * sem pacote importado, nenhuma das três linhas o oferece. Com pacote, quem
+   * o ganha é o assunto que a biblioteca tem (testa_biblioteca_aula). */
+  conf('nenhuma das três oferece Material, porque não há pacote da biblioteca',
+    linhas.map(l => l.botoes.some(b => /^Material$/i.test(b))).join(','), 'false,false,false');
   conf('e as três podem ser tiradas',
     linhas.every(l => l.botoes.some(b => /Tirar/i.test(b))), true);
 
@@ -727,8 +730,12 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   const doBanco = noPortugues.filter(x => /pistas, suspeitos/.test(x.nome))[0];
   const doCatalogo = noPortugues.filter(x => x.nome.trim() === 'Conto de mistério')[0];
   if (doBanco && doCatalogo) {
-    conf('com os dois na mesma lista, a linha do banco diz que tem material',
-      / · com material pronto$/.test(doBanco.detalhe), true);
+    /* A marca "com material pronto" existia para desempatar o tema do banco e
+     * o homônimo do catálogo quando só um deles tinha material. Sem material
+     * autoral não há o que desempatar: os dois são assuntos iguais, e nenhuma
+     * das duas linhas promete nada. */
+    conf('a linha do banco não promete mais material',
+      /com material pronto/.test(doBanco.detalhe), false);
     conf('e a linha do catálogo continua sem dizer',
       /com material pronto/.test(doCatalogo.detalhe), false);
   } else {

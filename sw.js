@@ -64,8 +64,14 @@
  * do Romulo, o rótulo "curada" por "revisada" na dificuldade (app.js), com a
  * lista igual. O v40 faz o módulo do material da biblioteca virar assunto da
  * aula ao anexar, e o botão Material só aparecer quando a biblioteca tem o
- * assunto (app.js e core.js), com a lista igual. */
-var CACHE = 'apoio-educacional-v40';
+ * assunto (app.js e core.js), com a lista igual. O v41 desliga o material
+ * autoral: sai o botão "Material de aula" da janela da aula e a montagem do
+ * PDF autoral, e a biblioteca ganha o caminho curto da aula (módulo inteiro já
+ * marcado), o marcar de dentro da tela cheia, o "Marcar os N deste módulo" e o
+ * Remover pacote em Ajustes (app.js, store.js, index.html e styles.css), com a
+ * lista igual. Nenhum tema sai do banco: os arquivos de banco/ continuam na
+ * lista e o carregarSerie continua lendo 'banco/serie-'. */
+var CACHE = 'apoio-educacional-v41';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

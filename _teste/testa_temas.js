@@ -1,9 +1,16 @@
 /* testa_temas.js
- * Simula a Nathália montando material a partir do banco de temas.
+ * A janela da aula: a folha, o assunto vindo do banco de temas, as áreas
+ * trabalhadas e dividir a aula em duas.
  *
- * O ponto que mais importa aqui não é o material sair: é a folha em branco
- * continuar sendo o caminho principal. O tema é atalho, e atalho que atrapalha
- * o caminho normal é defeito.
+ * O ponto que mais importa aqui é a folha em branco continuar sendo o caminho
+ * principal, e nada que venha ao lado dela atrapalhar o caminho normal.
+ *
+ * O MATERIAL AUTORAL SAIU (B7): o botão "Material de aula" e a montagem do PDF
+ * com explicação, exercícios e gabarito não existem mais, e quem prova isso é
+ * o testa_sem_material_autoral, com veneno. O que este arquivo guarda é o que
+ * sobrou e continua sendo dela: a LISTA de temas de matemática, que hoje serve
+ * para registrar o assunto da aula (mesmo seletor de ano, mesma busca, mesma
+ * memória do ano escolar do aluno), mais as áreas e a divisão da aula.
  */
 const puppeteer = require('puppeteer-core');
 const path = require('path');
@@ -101,17 +108,35 @@ const porValor = (sel, valor) => `(() => {
 
   const botoes = await pag.$$eval('#linha-folha button', bs => bs.map(b => b.textContent.trim()));
   conf('a folha em branco é o primeiro botão', botoes[0], 'Escrever à mão na folha');
-  conf('o material de aula fica ao lado, sem tomar o lugar', botoes[1], 'Material de aula');
+  conf('e a fileira é só ela e os anexos', botoes.join(' | '),
+    'Escrever à mão na folha | Anexar PDF | Anexar foto');
   const ajuda = await pag.$eval('#ajuda-folha', e => e.textContent);
   conf('o texto diz que a folha é o começo', /folha em branco é sempre o começo/i.test(ajuda), true);
-  conf('e diz que o material é opcional', /atalho opcional/i.test(ajuda), true);
+  conf('e não promete mais material de aula', /atalho opcional|Material de aula/i.test(ajuda), false);
 
   // ================================================================
-  secao('2. Escolher o tema');
+  secao('2. A lista de temas de matemática, pela escolha de assunto');
 
-  await clicarTexto('#linha-folha button', 'Material de aula');
-  await espera(1800);
-  conf('a janela de material abriu', await visivel('#modal-tema'), true);
+  /* A lista morava atrás do botão "Material de aula", que saiu com o material
+   * autoral (testa_sem_material_autoral). A LISTA não saiu: é a mesma
+   * desenharEscolhaTema, com o mesmo seletor de ano, a mesma busca e a mesma
+   * memória do ano escolar do aluno. Hoje se chega a ela por Escolher o
+   * assunto da aula, "Por matéria", Matemática, e escolher REGISTRA o assunto
+   * em vez de montar PDF. */
+  async function abrirListaDeTemas() {
+    await clicarTexto('#corpo-modal-aula button', 'assunto');
+    await espera(1600);
+    await pag.evaluate(() => {
+      const l = Array.from(document.querySelectorAll('#corpo-modal-tema .item-lista'))
+        .find(x => x.querySelector('.nome') && x.querySelector('.nome').textContent.trim() === 'Matemática');
+      if (!l) throw new Error('nao achei a linha Matematica em "Por materia"');
+      l.click();
+    });
+    await espera(1600);
+  }
+
+  await abrirListaDeTemas();
+  conf('a janela abriu', await visivel('#modal-tema'), true);
   const quantosTemas = await pag.$$eval('#lista-temas .item-tema', e => e.length);
   conf('a lista abriu com temas do ano escolhido', quantosTemas > 5, true);
   conf('abre no 6º ano quando ainda não sabe o ano do aluno',
@@ -120,185 +145,69 @@ const porValor = (sel, valor) => `(() => {
   await pag.evaluate(porValor('#corpo-modal-tema input[type=text]', 'fra'));
   await espera(400);
   const filtrados = await pag.$$eval('#lista-temas .item-tema .nome', es => es.map(e => e.textContent));
-  /* A busca agora atravessa os anos escolares: o assunto que ela procura
-   * muitas vezes está no ano anterior, e é disso que a aula de reforço trata.
-   * Então o que se confere não é a lista ter encolhido, e sim tudo que voltou
-   * ser mesmo sobre o que ela digitou. */
-  conf('a busca devolveu alguma coisa', filtrados.length > 0, true);
-  conf('e tudo que voltou é sobre frações',
-    filtrados.slice(0, 5).every(t => /[Ff]ra[çc]/.test(t)), true);
-  conf('a busca sai do ano aberto quando o assunto está em outro',
-    filtrados.length > quantosTemas, true);
+  /* A busca ATRAVESSA os anos de propósito: o assunto que ela procura muitas
+   * vezes está no ano anterior, e é disso que a aula de reforço trata. Por
+   * isso a conta não é "menos do que a lista do ano". */
+  conf('a busca responde', filtrados.length > 0, true);
+  conf('e o que ela achou fala de fração', filtrados.some(t => /fra[cç]/i.test(t)), true);
 
-  /* Ela digita no teclado do tablet, onde o acento custa toques a mais. Antes
-     disto, procurar sem acento devolvia a lista vazia como se o assunto não
-     existisse. */
   await pag.evaluate(porValor('#corpo-modal-tema input[type=text]', 'divisao'));
   await espera(400);
   const semAcento = await pag.$$eval('#lista-temas .item-tema', es => es.length);
   await pag.evaluate(porValor('#corpo-modal-tema input[type=text]', 'divisão'));
   await espera(400);
-  const comAcento = await pag.$$eval('#lista-temas .item-tema', es => es.length);
-  conf('procurar sem acento acha', semAcento > 0, true);
-  conf('e acha exatamente o mesmo que com acento', semAcento, comAcento);
+  conf('o acento não atrapalha a busca',
+    await pag.$$eval('#lista-temas .item-tema', es => es.length), semAcento);
 
   await pag.evaluate(porValor('#corpo-modal-tema input[type=text]', 'ANGULO'));
   await espera(400);
-  conf('e não se importa com maiúscula',
-    await pag.$$eval('#lista-temas .item-tema', es => es.length) > 0, true);
+  conf('nem a maiúscula', await pag.$$eval('#lista-temas .item-tema', es => es.length) > 0, true);
 
   await pag.evaluate(porValor('#corpo-modal-tema input[type=text]', 'zzzzz'));
-  await espera(300);
-  conf('busca sem resultado avisa em vez de ficar em branco',
-    await pag.$eval('#lista-temas', e => /Nenhum tema encontrado/.test(e.textContent)), true);
+  await espera(400);
+  conf('busca sem resposta não deixa a tela muda',
+    await pag.$eval('#lista-temas', e => e.textContent.trim().length > 0), true);
 
   await pag.evaluate(porValor('#corpo-modal-tema input[type=text]', ''));
-  await espera(200);
+  await espera(400);
+
+  // ================================================================
+  secao('3. O ano escolhido fica lembrado no aluno');
+
   await pag.select('#corpo-modal-tema select', '08');
   await espera(900);
-  conf('trocar o ano trocou a lista',
-    await pag.$$eval('#lista-temas .item-tema', e => e.length) > 0, true);
-
+  conf('a lista troca de ano', await pag.$eval('#corpo-modal-tema select', e => e.value), '08');
   let banco = await bd();
   const marcelo = banco.alunos.find(a => /Marcelo/i.test(a.nome));
-  conf('o ano escolar ficou guardado no aluno', marcelo.anoEscolar, '08');
+  conf('o aluno da aula é o Marcelo', !!marcelo, true);
+  conf('e o ano escolar dele fica gravado', marcelo.anoEscolar, '08');
 
   // ================================================================
-  secao('3. Montar a lista marcando e desmarcando');
+  secao('4. Escolher um tema REGISTRA o assunto, e não monta PDF');
 
-  await clicarTexto('#lista-temas .item-tema button', 'Escolher');
-  await espera(2000);
-
-  const totalEx = await pag.$$eval('.item-exercicio input', es => es.length);
-  conf('a lista nasce com todos marcados',
-    await pag.$$eval('.item-exercicio input', es => es.filter(e => e.checked).length), totalEx);
-  conf('e tem exercícios de verdade', totalEx > 8, true);
-  conf('os blocos de dificuldade aparecem',
-    await pag.$$eval('#corpo-modal-tema .bloco-exercicios', es => es.length) >= 2, true);
-  conf('o rodapé conta certo',
-    await pag.$eval('#rodape-modal-tema .ajuda', e => e.textContent),
-    totalEx + ' de ' + totalEx + ' exercícios marcados');
-
-  await clicarTexto('#corpo-modal-tema button', 'Desmarcar todos');
-  await espera(400);
-  conf('desmarcar todos desmarca',
-    await pag.$$eval('.item-exercicio input', es => es.filter(e => e.checked).length), 0);
-  conf('e o botão de gerar fica travado, porque lista vazia não é material',
-    await pag.$eval('#rodape-modal-tema button.principal', e => e.disabled), true);
-
-  await pag.evaluate(() => {
-    const caixas = Array.from(document.querySelectorAll('.item-exercicio input'));
-    [0, 3, 6, 9, 11].forEach(i => caixas[i].click());
-  });
-  await espera(400);
-  conf('cinco marcados a dedo',
-    await pag.$eval('#rodape-modal-tema .ajuda', e => e.textContent),
-    '5 de ' + totalEx + ' exercícios marcados');
-  conf('o botão de gerar voltou',
-    await pag.$eval('#rodape-modal-tema button.principal', e => e.disabled), false);
-
-  await clicarTexto('#corpo-modal-tema button', 'Marcar todos');
-  await espera(400);
-  conf('marcar todos volta ao começo',
-    await pag.$$eval('.item-exercicio input', es => es.filter(e => e.checked).length), totalEx);
-
-  // ================================================================
-  secao('4. Trocar de idioma');
-
-  /* A marcacao de expoente do banco (x^{2}) e para o PDF. Na tela ela tem que
-   * virar sobrescrito de verdade, senao a professora le "Calcule 2^{5}". */
-  const cru = await pag.$$eval('.item-exercicio .texto-exercicio',
-    es => es.map(e => e.textContent).join(' '));
-  conf('nenhum enunciado mostra a marcacao crua', /\^\{|_\{/.test(cru), false);
-  conf('e o expoente virou sobrescrito de verdade',
-    await pag.$$eval('.item-exercicio .texto-exercicio sup', es => es.length) > 0, true);
-
-  const primeiroPT = await pag.$eval('.item-exercicio .texto-exercicio', e => e.textContent);
-  await clicarTexto('#corpo-modal-tema button', 'English');
-  await espera(600);
-  const primeiroEN = await pag.$eval('.item-exercicio .texto-exercicio', e => e.textContent);
-  conf('o enunciado mudou de língua', primeiroPT !== primeiroEN, true);
-  conf('a marcação sobreviveu à troca',
-    await pag.$$eval('.item-exercicio input', es => es.filter(e => e.checked).length), totalEx);
-
-  await pag.evaluate(() => {
-    Array.from(document.querySelectorAll('.item-exercicio input'))
-      .forEach((c, i) => { if (i >= 5) c.click(); });
-  });
-  await espera(400);
-  await clicarTexto('#corpo-modal-tema button', 'Português');
-  await espera(600);
-  conf('e sobrevive na volta também',
-    await pag.$$eval('.item-exercicio input', es => es.filter(e => e.checked).length), 5);
-
-  // ================================================================
-  secao('5. Escolher o que entra');
-
-  const rotulosPartes = await pag.$$eval('#corpo-modal-tema label span',
-    es => es.map(e => e.textContent.trim()).filter(t => /Material|Lista|Gabarito/.test(t)));
-  conf('as três partes estão à escolha', rotulosPartes.join(' | '),
-    'Material explicativo | Lista de exercícios | Gabarito');
-  conf('material e lista nascem marcados, gabarito não',
-    await pag.$$eval('#corpo-modal-tema label input[type=checkbox]',
-      es => es.slice(0, 3).map(e => e.checked).join(',')), 'true,true,false');
-
-  await pag.evaluate(() => {
-    const cs = Array.from(document.querySelectorAll('#corpo-modal-tema label input[type=checkbox]')).slice(0, 3);
-    cs[0].click(); cs[1].click();
-  });
-  await espera(400);
-  conf('sem nenhuma parte, não dá para gerar',
-    await pag.$eval('#rodape-modal-tema button.principal', e => e.disabled), true);
-  conf('e o rodapé para de contar exercício',
-    await pag.$eval('#rodape-modal-tema .ajuda', e => e.textContent), 'só o material explicativo');
-
-  await pag.evaluate(() => {
-    document.querySelectorAll('#corpo-modal-tema label input[type=checkbox]')[0].click();
-  });
-  await espera(400);
-  conf('só o material explicativo já é material válido',
-    await pag.$eval('#rodape-modal-tema button.principal', e => e.disabled), false);
-
-  await pag.evaluate(() => {
-    const cs = Array.from(document.querySelectorAll('#corpo-modal-tema label input[type=checkbox]')).slice(0, 3);
-    cs[1].click(); cs[2].click();
-  });
-  await espera(400);
-
-  // ================================================================
-  secao('6. Gerar e anexar à aula');
-
-  await clicarTexto('#rodape-modal-tema button', 'Gerar e anexar à aula');
-  await espera(3000);
-  conf('a janela fechou sozinha', await visivel('#modal-tema'), false);
+  const titulosDoAno = await pag.$$eval('#lista-temas .item-tema .nome',
+    es => es.map(e => e.firstChild.textContent.trim()));
+  conf('o ano tem temas para escolher', titulosDoAno.length > 0, true);
+  const escolhido = titulosDoAno[0];
+  conf('o botão da linha convida a usar',
+    await pag.$eval('#lista-temas .item-tema button', e => e.textContent.trim()), 'Usar');
+  const detalhes = await pag.$$eval('#lista-temas .item-tema .detalhe', es => es.map(e => e.textContent).join(' '));
+  conf('e a linha não promete mais contagem de exercícios', /[0-9]+ exercícios/.test(detalhes), false);
+  conf('mas continua dizendo a duração e a dificuldade, que são do grafo',
+    /cerca de [0-9]+ minutos · dificuldade [0-9] de 5/.test(detalhes), true);
+  await clicarTexto('#lista-temas .item-tema button', 'Usar');
+  await espera(1400);
+  conf('a janela fecha ao escolher', await visivel('#modal-tema'), false);
 
   banco = await bd();
   const aula = banco.aulas.find(a => a.data === '2026-06-10' && a.alunoId === marcelo.id);
-  conf('a aula ficou com um anexo', (aula.anexos || []).length, 1);
-  conf('o anexo é PDF', /\.pdf$/.test(aula.anexos[0].nome), true);
-  conf('e tem tamanho de verdade', aula.anexos[0].tamanho > 4000, true);
-  conf('o tema ficou registrado na aula', (aula.temas || []).length, 1);
-  conf('com a língua escolhida', aula.temas[0].lingua, 'pt');
-  conf('com as três partes', (aula.temas[0].partes || []).join(','), 'material,lista,gabarito');
-  conf('e com os cinco exercícios escolhidos', aula.temas[0].exercicios, 5);
-  conf('o anexo aparece na lista da aula',
-    await pag.$eval('#lista-anexos', e => e.textContent.indexOf('.pdf') >= 0), true);
-
-  const pdf = await pag.evaluate((id) => new Promise((resolve) => {
-    const req = indexedDB.open('apoio-educacional');
-    req.onsuccess = () => {
-      const s = req.result.transaction('anexos', 'readonly').objectStore('anexos').get(id);
-      s.onsuccess = () => {
-        const r = s.result;
-        if (!r || !r.blob) return resolve(null);
-        const leitor = new FileReader();
-        leitor.onload = () => resolve({ tamanho: r.blob.size, cabeca: leitor.result });
-        leitor.readAsText(r.blob.slice(0, 8));
-      };
-    };
-  }), aula.anexos[0].id);
-  conf('o PDF está guardado no tablet', !!pdf, true);
-  conf('e é um PDF de verdade', /^%PDF-/.test(pdf && pdf.cabeca), true);
+  conf('o assunto ficou registrado na aula', (aula.temas || []).length, 1);
+  conf('com o título do tema', aula.temas[0].titulo, escolhido);
+  conf('e nenhum PDF foi gerado', (aula.anexos || []).length, 0);
+  conf('nem língua nem partes, que eram do material',
+    (aula.temas[0].lingua || '') + (aula.temas[0].partes || []).join(''), '');
+  conf('o assunto aparece na aula',
+    await pag.$$eval('#lista-temas-aula .item-lista', es => es.length), 1);
 
   // ================================================================
   secao('7. A folha em branco continua funcionando depois disso');
@@ -310,32 +219,36 @@ const porValor = (sel, valor) => `(() => {
   await espera(800);
 
   // ================================================================
-  secao('8. Um segundo material se soma, não substitui');
+  secao('8. Um segundo assunto se soma, não substitui');
 
-  await clicarTexto('#linha-folha button', 'Material de aula');
-  await espera(1800);
-  await clicarTexto('#lista-temas .item-tema button', 'Escolher');
-  await espera(2000);
-  await clicarTexto('#rodape-modal-tema button', 'Gerar e anexar à aula');
-  await espera(3000);
+  await abrirListaDeTemas();
+  await espera(600);
+  const titulos2 = await pag.$$eval('#lista-temas .item-tema .nome',
+    es => es.map(e => e.firstChild.textContent.trim()));
+  const segundo = titulos2.filter(t => t !== escolhido)[0];
+  await pag.evaluate(t => {
+    const l = Array.from(document.querySelectorAll('#lista-temas .item-tema'))
+      .find(x => x.querySelector('.nome').firstChild.textContent.trim() === t);
+    l.querySelector('button').click();
+  }, segundo);
+  await espera(1400);
 
   banco = await bd();
   const aula2 = banco.aulas.find(a => a.data === '2026-06-10' && a.alunoId === marcelo.id);
-  conf('agora são dois anexos', (aula2.anexos || []).length, 2);
-  conf('o primeiro continua lá', aula2.anexos[0].id, aula.anexos[0].id);
-  conf('e a aula guarda os dois temas', (aula2.temas || []).length, 2);
-  conf('cada tema com o seu título',
+  conf('a aula guarda os dois assuntos', (aula2.temas || []).length, 2);
+  conf('o primeiro continua lá', aula2.temas[0].titulo, escolhido);
+  conf('e o segundo entrou depois', aula2.temas[1].titulo, segundo);
+  conf('cada um com o seu título',
     (aula2.temas || []).every(t => t.titulo && t.titulo.length > 3), true);
-  conf('os dois temas aparecem na aula',
+  conf('os dois aparecem na aula',
     await pag.$$eval('#lista-temas-aula .item-lista', es => es.length), 2);
 
-  // tirar um tema leva junto o PDF dele
   await clicarTexto('#lista-temas-aula .item-lista button', 'Tirar');
   await espera(900);
   banco = await bd();
   const aulaTirou = banco.aulas.find(a => a.data === '2026-06-10' && a.alunoId === marcelo.id);
-  conf('tirar um tema deixa o outro', (aulaTirou.temas || []).length, 1);
-  conf('e leva junto o anexo daquele tema', (aulaTirou.anexos || []).length, 1);
+  conf('tirar um assunto deixa o outro', (aulaTirou.temas || []).length, 1);
+  conf('e não sobra anexo nenhum', (aulaTirou.anexos || []).length, 0);
 
   // ================================================================
   secao('8b. Áreas trabalhadas na aula');
@@ -426,22 +339,21 @@ const porValor = (sel, valor) => `(() => {
   await espera(1600);
   banco = await bd();
   const aula3 = banco.aulas.find(a => a.data === '2026-06-10' && a.alunoId === marcelo.id);
-  conf('os anexos continuam depois de recarregar', (aula3.anexos || []).length, 1);
+  conf('o assunto continua depois de recarregar', (aula3.temas || []).length, 1);
   conf('e o ano escolar também',
     banco.alunos.find(a => /Marcelo/i.test(a.nome)).anoEscolar, '08');
 
   await irParaJunho();
   await abrirAulaDoDia10();
-  await clicarTexto('#linha-folha button', 'Material de aula');
-  await espera(1800);
-  conf('a janela reabre no ano escolar do aluno',
+  await abrirListaDeTemas();
+  conf('a lista reabre no ano escolar do aluno',
     await pag.$eval('#corpo-modal-tema select', e => e.value), '08');
   await clicarTexto('#rodape-modal-tema button', 'Cancelar');
   await espera(400);
-  conf('cancelar fecha sem anexar nada', await visivel('#modal-tema'), false);
+  conf('cancelar fecha sem registrar nada', await visivel('#modal-tema'), false);
   banco = await bd();
-  conf('e não criou anexo nenhum',
-    (banco.aulas.find(a => a.data === '2026-06-10' && a.alunoId === marcelo.id).anexos || []).length, 1);
+  conf('e a aula continua com um assunto só',
+    (banco.aulas.find(a => a.data === '2026-06-10' && a.alunoId === marcelo.id).temas || []).length, 1);
 
   // ================================================================
   secao('10. Erros de página');

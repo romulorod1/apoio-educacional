@@ -4,12 +4,41 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.25.0';
+  var VERSAO = '1.26.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
    * acontece. Ligada na 1.21.0, com a aba Biblioteca. */
   var BIBLIOTECA_NO_AR = true;
+
+  /* O MATERIAL AUTORAL SAI DO AR (1.26.0).
+   *
+   * EM UMA LINHA: esta chave desliga o material autoral dos temas do banco (o
+   * botão "Material de aula" e a montagem do PDF com explicação, exercícios e
+   * gabarito). Ela NÃO é ajuste da usuária, não aparece em tela nenhuma e não
+   * se lê de dado gravado: é uma constante deste arquivo. Trocar false por
+   * true aqui devolve tudo, exatamente como era, sem migração nenhuma.
+   *
+   * Os 148 temas de matemática traziam explicação, exercícios autorais e
+   * gabarito, oferecidos pelo botão "Material de aula" da janela da aula. A
+   * Nathália deu retorno negativo desse material, e com a biblioteca da OBMEP
+   * importada o caminho bom passou a ser o da biblioteca. Esta chave desliga o
+   * OFERECIMENTO: some o botão da janela da aula, some a montagem do PDF
+   * autoral, e o botão "Material" da linha do assunto deixa de ter bifurcação
+   * (ou a biblioteca tem o assunto e ele a abre, ou ele não aparece).
+   *
+   * O QUE ELA NÃO FAZ, de propósito:
+   *   - não apaga tema nenhum. O tema é duas coisas no mesmo registro: material,
+   *     que sai daqui, e GRAFO (id, título, ano, dificuldade, prerequisitos),
+   *     que fica e sustenta a trilha de aprendizado, a lacuna e o mapeamento
+   *     (Core.trilhaDerivada ordena topologicamente os prerequisitos);
+   *   - não mexe em material já anexado numa aula: o anexo é arquivo gravado
+   *     (t.anexoId) e continua abrindo;
+   *   - não apaga o banco nem o leitor de série (carregarSerie), porque o
+   *     destino final dos 148 temas é decisão à parte.
+   *
+   * Ligar de volta é trocar false por true aqui, e nada mais. */
+  var MATERIAL_AUTORAL_NO_AR = false;
 
   /* A versão 1.20.0 sobe o banco do tablet para a versão 2 (store.js). Se
    * outra janela do aplicativo, ainda na versão antiga, estiver aberta, a
@@ -1176,6 +1205,7 @@
       bibVendo.solucao = !bibVendo.solucao;
       desenharVisor();
     });
+    $('#bib-marcar-visor').addEventListener('click', alternarMarcaNoVisor);
     $('#bib-como-folha').addEventListener('click', escolherAulaParaFolha);
     $('#bib-fechar-visor').addEventListener('click', fecharVisor);
     $('#limpar-orfaos').addEventListener('click', liberarEspaco);
@@ -1679,11 +1709,13 @@
         texto: aulaEmEdicao.temNota ? 'Abrir folha de aula' : 'Escrever à mão na folha',
         aoClick: function () { abrirEditorNota(aulaEmEdicao.id); }
       }));
-      linhaFolha.appendChild(el('button', {
-        type: 'button', class: 'btn',
-        texto: 'Material de aula',
-        aoClick: function () { abrirTemas(aulaEmEdicao.id); }
-      }));
+      if (MATERIAL_AUTORAL_NO_AR) {
+        linhaFolha.appendChild(el('button', {
+          type: 'button', class: 'btn',
+          texto: 'Material de aula',
+          aoClick: function () { abrirTemas(aulaEmEdicao.id); }
+        }));
+      }
       linhaFolha.appendChild(el('button', {
         type: 'button', class: 'btn',
         texto: 'Anexar PDF',
@@ -1699,9 +1731,10 @@
         el('strong', { texto: 'A folha em branco é sempre o começo: ' }),
         document.createTextNode('ela aceita escrita com a S Pen, imagem colada e texto digitado, ' +
           'e serve para você planejar a aula do jeito que quiser. '),
-        el('strong', { texto: 'Material de aula ' }),
-        document.createTextNode('é um atalho opcional, para quando quiser puxar explicação e ' +
-          'exercícios prontos de um tema. '),
+        MATERIAL_AUTORAL_NO_AR ? el('strong', { texto: 'Material de aula ' }) : null,
+        MATERIAL_AUTORAL_NO_AR ? document.createTextNode(
+          'é um atalho opcional, para quando quiser puxar explicação e ' +
+          'exercícios prontos de um tema. ') : null,
         el('strong', { texto: 'Para trazer uma aula do Samsung Notes: ' }),
         document.createTextNode('lá dentro toque em Compartilhar, escolha PDF, e depois use "Anexar PDF" aqui. ' +
           'O arquivo fica guardado junto da aula e você abre ou compartilha quando quiser. ' +
@@ -1869,10 +1902,16 @@
         })
       ]));
       if (!quantos) {
+        /* A segunda frase promete material, então ela só aparece quando há
+         * material para oferecer: o autoral, enquanto estiver no ar, ou a
+         * biblioteca, quando há pacote importado. Sem nenhum dos dois o
+         * assunto vale sozinho, e é só isso que a linha diz. */
         bloco.appendChild(el('div', {
           class: 'ajuda', style: 'margin-top:4px',
-          texto: 'O assunto entra no fechamento do mês. Se quiser material pronto, ' +
-            'ele sai daqui mesmo.'
+          texto: 'O assunto entra no fechamento do mês.' +
+            (MATERIAL_AUTORAL_NO_AR
+              ? ' Se quiser material pronto, ele sai daqui mesmo.'
+              : (temPacoteBiblioteca ? ' O material da biblioteca sai daqui mesmo.' : ''))
         }));
       }
     }
@@ -2107,18 +2146,20 @@
         detalhe = rotuloDisciplina(disciplina) + (nomeGrupo ? ', ' + nomeGrupo : '');
       }
 
-      /* Material existe para qualquer tema que o índice da matéria conhece. Um
-       * assunto gravado do acervo de 14/09 ({fonte: 'acervo'}) fica como assunto
-       * comum, só com o título, sem material próprio; com pacote, o de
-       * matemática ganha o Material que abre a biblioteca, como qualquer outro. */
-      /* Com um pacote da biblioteca importado, o Material de um assunto de
-       * matemática abre a biblioteca quando ela tem o assunto: o módulo direto,
-       * no assunto que veio da biblioteca; a busca pelo título, nos outros. O
-       * material autoral continua no botão "Material de aula" da janela. */
+      /* SEM MATERIAL AUTORAL, O BOTÃO NÃO TEM MAIS BIFURCAÇÃO: ou a biblioteca
+       * tem o assunto, e ele a abre, ou ele não aparece.
+       *
+       * Um tema do banco passa a se comportar como um assunto do acervo de
+       * 14/09 já se comporta: assunto comum, sem material próprio. O registro
+       * do índice continua sendo lido, porque dele saem a etiqueta do ano e a
+       * matéria, que são grafo e não material.
+       *
+       * Material já anexado numa aula antiga (comMaterial) não passa por aqui:
+       * ele abre pelo anexo, como sempre. */
       var bibliotecaPodeTer = !comMaterial && temPacoteBiblioteca && disciplina === Core.MATERIA_PADRAO;
       var pelaBiblioteca = bibliotecaPodeTer && !!bib && !!moduloDoAssunto(t);
       function materialDeSempre() {
-        if (registro) {
+        if (registro && MATERIAL_AUTORAL_NO_AR) {
           $('#titulo-modal-tema').textContent = 'Material de aula' +
             (aluno ? ', ' + aluno.nome : '');
           abrirModal('modal-tema');
@@ -2127,9 +2168,17 @@
             rotuloVoltar: '‹ Voltar para a aula',
             voltar: function () { fecharModal('modal-tema'); }
           });
+          return true;
         }
+        return false;
       }
-      var podeMaterial = !comMaterial && (pelaBiblioteca || !!registro);
+      /* O autoral só conta para o botão enquanto estiver no ar. Desligado, o
+       * botão é da biblioteca e de mais ninguém: enquanto o índice da
+       * biblioteca não abriu não se sabe se ela tem o assunto, e a linha nasce
+       * sem o botão e o ganha no redesenho (o carregarBiblioteca logo acima).
+       * Mostrar antes de saber seria prometer o que pode não existir. */
+      var temAutoral = MATERIAL_AUTORAL_NO_AR && !!registro;
+      var podeMaterial = !comMaterial && (pelaBiblioteca || temAutoral);
 
       caixa.appendChild(el('div', { class: 'item-lista item-assunto-aula' }, [
         el('div', { class: 'cresce' }, [
@@ -2145,10 +2194,10 @@
           type: 'button', class: 'btn pequeno', texto: 'Material',
           aoClick: function (ev) {
             /* A biblioteca só toma o toque quando tem o assunto (um módulo que
-             * casa todas as palavras do título). Senão: o material autoral de
-             * sempre, se houver; e, se não houver, um aviso, sem tirá-la da aula
-             * para uma busca vazia. A primeira consulta abre o índice da
-             * biblioteca, então o botão avisa que está abrindo. */
+             * casa todas as palavras do título). Senão: o material autoral,
+             * enquanto ele estiver no ar; e, se não houver, um aviso, sem
+             * tirá-la da aula para uma busca vazia. A primeira consulta abre o
+             * índice da biblioteca, então o botão avisa que está abrindo. */
             var botao = ev && ev.currentTarget;
             // o índice da biblioteca ainda abrindo não decide por ela: o toque espera por ele
             if (!pelaBiblioteca && !(bibliotecaPodeTer && !bib)) { materialDeSempre(); return; }
@@ -2159,19 +2208,19 @@
               // ela pode ter saído da aula enquanto a biblioteca abria: aí não a leva embora
               if (!$('#modal-aula').classList.contains('aberto') || !aulaEmEdicao || aulaEmEdicao.id !== aula.id) return;
               if (achado === null) {
-                if (registro) { materialDeSempre(); return; }
+                if (materialDeSempre()) return;
                 avisar('Não consegui abrir a biblioteca agora. Tente de novo daqui a pouco.');
                 return;
               }
               if (achado) {
-                abrirBibliotecaDoAssunto(t, aula, achado.direto ? achado.chave : null);
-                if (registro && !avisouMaterialAutoral) {
+                abrirBibliotecaDoAssunto(t, aula, achado.chave);
+                if (MATERIAL_AUTORAL_NO_AR && registro && !avisouMaterialAutoral) {
                   avisouMaterialAutoral = true;   // uma vez por uso do aplicativo
                   avisar('Abri a biblioteca da OBMEP. O seu material deste assunto continua em "Material de aula", na janela da aula.');
                 }
                 return;
               }
-              if (registro) { materialDeSempre(); return; }
+              if (materialDeSempre()) return;
               avisar('A biblioteca não tem "' + t.titulo + '". Procure por outra palavra na aba Biblioteca, ou navegue pela série.');
             });
           }
@@ -5716,7 +5765,7 @@
       'O que ele acha que sabe e o que acha que não sabe. Vale mais o que ele diz ' +
       'do que a nota do boletim.'],
     ['Sondagem escrita, 25 minutos',
-      'Use "Material de aula" e monte uma lista curta com exercícios de anos anteriores. ' +
+      'Monte uma lista curta com exercícios de anos anteriores, na aba Biblioteca. ' +
       'Não é prova: é para ver onde ele trava e como ele pensa.'],
     ['Preencher o mapeamento, 10 minutos',
       'Marque pontos fortes, pontos de atenção e lacunas, e escreva o plano inicial.'],
@@ -6563,8 +6612,26 @@
        * uma tela vazia. Hoje as vinte e duas têm alvo, mas o dado pode mudar
        * sem que este arquivo mude junto. */
       if (!r.candidatos.length) {
-        fecharModal('modal-trilha');
-        abrirTemasPorBusca(item.busca, aluno);
+        if (MATERIAL_AUTORAL_NO_AR) {
+          fecharModal('modal-trilha');
+          abrirTemasPorBusca(item.busca, aluno);
+          return;
+        }
+        /* Sem material autoral não há lista solta para onde desviar. Hoje as
+         * vinte e duas lacunas têm alvo curado, então este ramo não acontece;
+         * ele existe porque o dado pode mudar sem este arquivo mudar junto, e
+         * uma tela vazia seria pior do que uma frase. */
+        corpo.innerHTML = '';
+        corpo.appendChild(el('div', { class: 'vazio' }, [
+          el('p', { texto: 'Esta lacuna ainda não tem um assunto de chegada no banco.' }),
+          el('p', { class: 'ajuda', texto: 'Monte a trilha do zero escolhendo o assunto direto no ' +
+            'banco de matemática, na ficha do aluno.' })
+        ]));
+        rodape.innerHTML = '';
+        rodape.appendChild(el('button', {
+          type: 'button', class: 'btn principal', texto: 'Fechar',
+          aoClick: function () { fecharModal('modal-trilha'); }
+        }));
         return;
       }
       desenharEscolhaDoAlvo(aluno, item, r, temas);
@@ -6642,11 +6709,13 @@
 
     /* Mesmo id da versão que fica dentro da trilha montada: as duas telas nunca
      * existem ao mesmo tempo, e assim o caminho antigo tem um só endereço. */
-    rodape.appendChild(el('button', {
-      type: 'button', class: 'btn esquerda', id: 'trilha-temas-soltos',
-      texto: 'Ver os temas soltos', style: 'min-height:44px',
-      aoClick: function () { abrirTemasPorBusca(item.busca, aluno); }
-    }));
+    if (MATERIAL_AUTORAL_NO_AR) {
+      rodape.appendChild(el('button', {
+        type: 'button', class: 'btn esquerda', id: 'trilha-temas-soltos',
+        texto: 'Ver os temas soltos', style: 'min-height:44px',
+        aoClick: function () { abrirTemasPorBusca(item.busca, aluno); }
+      }));
+    }
     rodape.appendChild(el('button', {
       type: 'button', class: 'btn', texto: 'Cancelar', style: 'min-height:44px',
       aoClick: function () { fecharModal('modal-trilha'); }
@@ -6963,16 +7032,25 @@
         }
       }));
     }
-    barraDoFim.push(botaoTemasSoltos(trilha, aluno));
-    corpo.appendChild(el('div', { class: 'barra', style: 'margin:12px 0 4px' }, barraDoFim));
-    corpo.appendChild(el('div', {
-      class: 'ajuda',
-      texto: encerrada
+    /* "Ver os temas soltos" existe para abrir o material autoral fora de
+     * ordem. Sem o material, o botão levaria a uma lista que não gera nada:
+     * ele sai junto, e a trilha fica com os passos, que é o que ela usa. */
+    if (MATERIAL_AUTORAL_NO_AR) barraDoFim.push(botaoTemasSoltos(trilha, aluno));
+    /* Barra vazia não nasce: numa trilha encerrada, com o material fora do ar,
+     * não sobra botão nenhum aqui, e uma faixa vazia deixaria um vão na tela. */
+    if (barraDoFim.length) {
+      corpo.appendChild(el('div', { class: 'barra', style: 'margin:12px 0 4px' }, barraDoFim));
+    }
+    var ajudaDoFim = !MATERIAL_AUTORAL_NO_AR
+      ? (encerrada
+        ? ''
+        : 'Acrescentar passo abre o banco de matemática para escolher o assunto do passo.')
+      : (encerrada
         ? 'Ver os temas soltos abre a lista de sempre, para quando você quiser rever o material ' +
           'que esta trilha usou.'
         : 'Acrescentar passo abre o banco de matemática. Ver os temas soltos abre a mesma ' +
-          'lista de sempre, sem ordem nenhuma, para quando você quiser só olhar o material.'
-    }));
+          'lista de sempre, sem ordem nenhuma, para quando você quiser só olhar o material.');
+    if (ajudaDoFim) corpo.appendChild(el('div', { class: 'ajuda', texto: ajudaDoFim }));
 
     // ---- rodapé ----
     if (proposta) {
@@ -7753,8 +7831,13 @@
   // ================= banco de temas =================
   //
   // O tema é sempre opcional. A folha em branco continua sendo o caminho
-  // principal, e existe para ela planejar a aula do jeito que quiser. Isto aqui
-  // é um atalho para quando ela quiser material pronto, e nada mais.
+  // principal, e existe para ela planejar a aula do jeito que quiser.
+  //
+  // Com MATERIAL_AUTORAL_NO_AR desligado, o que sobra daqui é o GRAFO: o índice
+  // alimenta a etiqueta do ano na linha do assunto, a escolha do assunto por
+  // matéria, o alvo da trilha e a lacuna do mapeamento. A montagem do PDF
+  // autoral (abrirTemas, abrirMontagem, desenharMontagem, gerarMaterialDoTema)
+  // continua escrita e sem nenhuma porta de entrada na tela.
 
   var SERIES_NOMES = [
     ['02', '2º ano'], ['03', '3º ano'], ['04', '4º ano'], ['05', '5º ano'],
@@ -8474,8 +8557,13 @@
 
       // 3. Por matéria, com a matemática
       lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Por matéria' }));
+      /* "com material pronto" era verdade quando o tema trazia explicação e
+       * exercícios autorais. Fora do ar o material, a linha diz só o que ela
+       * é: a lista de assuntos de matemática, por ano. */
       lista.appendChild(linha(rotuloDisciplina(Core.MATERIA_PADRAO),
-        indiceTemas ? indiceTemas.length + ' temas, com material pronto' : 'temas com material pronto',
+        MATERIAL_AUTORAL_NO_AR
+          ? (indiceTemas ? indiceTemas.length + ' temas, com material pronto' : 'temas com material pronto')
+          : (indiceTemas ? indiceTemas.length + ' assuntos, por ano' : 'assuntos por ano'),
         function () { abrirMatematicaComoAssunto(aula, aluno); }, true));
       (indiceTopicos || []).forEach(function (d) {
         lista.appendChild(linha(d.nome, d.topicos + ' assuntos', function () {
@@ -8606,16 +8694,22 @@
        *
        * Então a marca é resposta, e não etiqueta: sai só na matéria em que ESTA
        * busca devolveu os dois tipos de linha. A frase é a mesma que a lista de
-       * matérias já usa, de propósito. */
-      var temTopicoNaMateria = {};
-      achados.forEach(function (a) {
-        if (!a.doBanco) temTopicoNaMateria[a.materia] = true;
-      });
-      achados.forEach(function (a) {
-        if (a.doBanco && temTopicoNaMateria[a.materia]) {
-          a.detalhe += ' · com material pronto';
-        }
-      });
+       * matérias já usa, de propósito.
+       *
+       * Com o material autoral fora do ar não há material pronto para prometer,
+       * e a marca sai inteira: o tema do banco e o homônimo do catálogo passam
+       * a ser dois assuntos iguais, que é o que eles são agora. */
+      if (MATERIAL_AUTORAL_NO_AR) {
+        var temTopicoNaMateria = {};
+        achados.forEach(function (a) {
+          if (!a.doBanco) temTopicoNaMateria[a.materia] = true;
+        });
+        achados.forEach(function (a) {
+          if (a.doBanco && temTopicoNaMateria[a.materia]) {
+            a.detalhe += ' · com material pronto';
+          }
+        });
+      }
 
       var livre = linha('Usar "' + termo + '" assim mesmo',
         'grava exatamente o que você escreveu', function () {
@@ -8842,16 +8936,21 @@
             el('div', { class: 'detalhe', texto: t.pt.resumo }),
             el('div', {
               class: 'detalhe',
-              texto: t.qtd + ' exercícios · cerca de ' + t.duracaoMin + ' minutos · dificuldade ' +
-                t.dificuldade + ' de 5'
+              /* A contagem de exercícios é do MATERIAL: fora do ar o material,
+               * ela viraria uma promessa que a tela não cumpre. Duração e
+               * dificuldade ficam, porque são grafo e é com elas que a trilha
+               * estima os encontros. */
+              texto: (MATERIAL_AUTORAL_NO_AR ? t.qtd + ' exercícios · cerca de ' : 'cerca de ') +
+                t.duracaoMin + ' minutos · dificuldade ' + t.dificuldade + ' de 5'
             })
           ]),
           el('button', {
             type: 'button', class: 'btn pequeno principal',
             texto: opcoes.rotuloEscolher || 'Escolher',
             aoClick: function () {
-              if (opcoes.aoEscolher) opcoes.aoEscolher(t);
-              else abrirMontagem(t, aula, aluno, opcoes);
+              if (opcoes.aoEscolher) { opcoes.aoEscolher(t); return; }
+              // sem material autoral não há montagem para abrir: esta lista só registra
+              if (MATERIAL_AUTORAL_NO_AR) abrirMontagem(t, aula, aluno, opcoes);
             }
           })
         ]));
@@ -10843,10 +10942,49 @@
         caixa.appendChild(el('div', { class: 'cartao compacto', style: 'margin-bottom:10px' }, [
           el('div', { style: 'font-weight:600', texto: linhas[0] }),
           el('div', { class: 'ajuda', style: 'margin:4px 0 0', texto: linhas.slice(1).join('. ') +
-            (quando ? '. Importado em ' + quando + '.' : '.') })
+            (quando ? '. Importado em ' + quando + '.' : '.') }),
+          el('div', { class: 'barra', style: 'margin:8px 0 0' }, [
+            el('button', {
+              type: 'button', class: 'btn pequeno perigo', 'data-remover-pacote': p.pacote,
+              texto: 'Remover', aoClick: function () { removerPacote(p, linhas[0]); }
+            })
+          ])
         ]));
       });
     }).catch(function () { caixa.innerHTML = ''; if (exportar) exportar.hidden = true; });
+  }
+
+  /* Tirar do tablet uma série que ela não vai usar, e devolver o espaço.
+   *
+   * A pergunta diz o que SAI e o que FICA, nesta ordem, porque o que assusta
+   * aqui não é perder o pacote (ele volta do Drive num toque) e sim perder o
+   * trabalho dela: as etiquetas de dificuldade e o registro de quem já fez o
+   * quê. Os dois ficam, e a frase diz isso com todas as letras. */
+  function removerPacote(p, titulo) {
+    var espaco = Biblioteca.mb(p.bytes || 0);
+    /* O QUE FICA vem antes do quanto volta. O espaço é o motivo de ela estar
+     * aqui, mas não é o que assusta: abrir a pergunta por "0,3 MB" faz a frase
+     * começar pelo que menos importa, e o que ela precisa saber para decidir é
+     * que o trabalho dela não vai junto. */
+    if (!confirmar('Tirar "' + titulo + '" deste tablet?\n\n' +
+        'Ficam guardadas as suas etiquetas de dificuldade e o registro de quais exercícios você já ' +
+        'usou com cada aluno, e o material já anexado nas aulas continua abrindo. Para usar esta ' +
+        'série de novo, é só importar o pacote outra vez do Drive.\n\n' +
+        'Voltam ' + espaco + ' de espaço.')) {
+      return Promise.resolve();
+    }
+    return Store.removerPacoteBiblioteca(p.pacote).then(function (contas) {
+      if (!contas.achou) { avisar('Este pacote já não estava no tablet.'); }
+      /* Remover não tem Desfazer: o caminho de volta é importar de novo, e o
+       * aviso diz isso na hora, em vez de deixá-la procurar. */
+      else { avisar('Série removida do tablet. Voltaram ' + espaco + '. Para usar de novo, importe o pacote do Drive.'); }
+      desenharPacotesBiblioteca();
+      /* A aba se refaz do zero: sem nenhum pacote ela volta ao "Em construção".
+       * O carrinho perde sozinho o que era do pacote (limparCarrinhoOrfao). */
+      bibliotecaMudou();
+    }, function () {
+      avisar('Não consegui remover a série agora. Nada foi mudado.');
+    });
   }
 
   // ================= biblioteca: navegar =================
@@ -10987,6 +11125,22 @@
       if (!arv.pacotes.length) {
         cartaoBusca.style.display = 'none';
         $('#bib-contagem').textContent = '';
+        /* SEM PACOTE, A TELA FICA INTEIRA VAZIA, e não só o miolo.
+         *
+         * Achado no marco visual do B7: depois de remover a última série, a
+         * aba voltava ao "Em construção" com a faixa de cima ainda dizendo
+         * "Material marcado: 6 exercícios" e com o "Gerar material" clicável.
+         * Os seis não existiam mais, o botão não fazia nada, e a faixa da aula
+         * de origem continuava oferecendo material de uma biblioteca que saiu.
+         * Aqui a seleção órfã cai fora (inclusive do aparelho), a faixa do
+         * carrinho se esconde e o contexto da aula se desfaz. */
+        limparCarrinhoOrfao();
+        guardarCarrinho();
+        var faixa = $('#bib-carrinho');
+        if (faixa) { faixa.innerHTML = ''; faixa.hidden = true; }
+        bibContexto = null;
+        bibFiltroAluno = '';
+        desenharContextoBiblioteca();
         corpo.innerHTML = '';
         corpo.appendChild(el('div', { class: 'vazio', id: 'biblioteca-em-construcao' }, [
           el('p', { style: 'font-size:18px;font-weight:600;color:var(--navy);margin:0 0 8px', texto: 'Em construção' }),
@@ -11103,13 +11257,77 @@
     }
   }
 
+  /* "Marcar os N deste módulo".
+   *
+   * Na navegação livre nada vem marcado por padrão (o carrinho é global e
+   * atravessa módulos), mas marcar dezoito exercícios um a um, com o dedo, é o
+   * que ela reclamou. Aqui é um toque, e o mesmo botão desmarca quando todos
+   * já estão marcados, para o caminho ter volta.
+   *
+   * Só exercícios: as páginas de teoria têm caixa própria na aula de teoria, e
+   * juntar as duas coisas num botão faria o rótulo mentir sobre o número. */
+  function botaoMarcarModulo(mod) {
+    var caixa = el('span', { class: 'bib-marcar-modulo' });
+    var ids = [];
+    (mod.ordemListas || []).forEach(function (l) {
+      l.itens.forEach(function (it) { ids.push(it.id); });
+    });
+    function todosMarcados() {
+      return ids.length > 0 && ids.every(function (id) { return noCarrinho('itens', id); });
+    }
+    function desenha() {
+      caixa.innerHTML = '';
+      if (!ids.length) return;
+      var todos = todosMarcados();
+      /* O MESMO botão nos dois estados, e quem muda é o rótulo. Quando um dos
+       * estados vinha realçado e o outro não, o não realçado se lia como
+       * desabilitado e ela não sabia se podia tocar. */
+      caixa.appendChild(el('button', {
+        type: 'button', class: 'btn pequeno',
+        id: 'bib-marcar-modulo',
+        'aria-pressed': todos ? 'true' : 'false',
+        texto: (todos ? 'Desmarcar os ' : 'Marcar os ') + ids.length +
+          (mod.banco ? ' deste grupo' : ' deste módulo'),
+        aoClick: function () {
+          var marcar = !todos;
+          ids.forEach(function (id) {
+            var i = bibCarrinho.itens.indexOf(id);
+            if (marcar && i < 0) bibCarrinho.itens.push(id);
+            if (!marcar && i >= 0) bibCarrinho.itens.splice(i, 1);
+          });
+          guardarCarrinho();
+          desenharCarrinho();
+          /* A tela do módulo inteira se refaz: o rótulo do botão troca e as
+           * linhas passam a dizer quantos daquela aula ou lista entraram. */
+          desenharCorpoBiblioteca();
+        }
+      }));
+    }
+    caixa._desenha = desenha;
+    desenha();
+    return caixa;
+  }
+
+  /* Quantos daquela aula ou lista já estão no material. A tela do módulo não
+   * tem caixa nenhuma, então sem esta linha ela marcava o módulo inteiro, via
+   * só o número da faixa lá em cima e não sabia de ONDE ele tinha vindo: as
+   * linhas ficavam idênticas antes e depois. */
+  function quantosNoMaterial(tipo, ids) {
+    var n = 0;
+    ids.forEach(function (id) { if (noCarrinho(tipo, id)) n++; });
+    return n ? ' · ' + n + ' no material' : '';
+  }
+
   function desenharModulo(corpo, mod) {
     corpo.appendChild(voltarBib(Biblioteca.nomeDaSerie(bibNav.serie), function () { irNaBiblioteca({ modulo: null, aula: null }); }));
     corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: mod.titulo }));
+    corpo.appendChild(botaoMarcarModulo(mod));
     if (mod.teorias.length) {
       corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Teoria' }));
       mod.teorias.forEach(function (t) {
-        corpo.appendChild(linhaBib(t.aula.titulo, plural(t.paginas.length, 'página', 'páginas'), function () {
+        var detalhe = plural(t.paginas.length, 'página', 'páginas') +
+          quantosNoMaterial('paginas', t.paginas.map(function (p) { return p.id; }));
+        corpo.appendChild(linhaBib(t.aula.titulo, detalhe, function () {
           irNaBiblioteca({ aula: { tipo: 'teoria', id: t.id } });
         }));
       });
@@ -11117,7 +11335,9 @@
     if (mod.ordemListas.length) {
       corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: mod.banco ? 'Problemas' : 'Exercícios' }));
       mod.ordemListas.forEach(function (l) {
-        corpo.appendChild(linhaBib(l.titulo, plural(l.itens.length, mod.banco ? 'problema' : 'exercício', mod.banco ? 'problemas' : 'exercícios'), function () {
+        var detalhe = plural(l.itens.length, mod.banco ? 'problema' : 'exercício', mod.banco ? 'problemas' : 'exercícios') +
+          quantosNoMaterial('itens', l.itens.map(function (it) { return it.id; }));
+        corpo.appendChild(linhaBib(l.titulo, detalhe, function () {
           irNaBiblioteca({ aula: { tipo: 'exercicios', slug: l.slug } });
         }));
       });
@@ -11295,29 +11515,91 @@
 
   var bibVindoDoMaterial = false;
 
+  /* Tudo o que o módulo tem, na ordem em que ele se apresenta: as páginas de
+   * teoria aula por aula, e os exercícios lista por lista. É o conteúdo do
+   * "caminho curto": vindo da aula, o material nasce cheio e ela tira. */
+  function tudoDoModulo(mod, foraItens) {
+    var paginas = [], itens = [];
+    (mod.teorias || []).forEach(function (a) {
+      (a.paginas || []).forEach(function (p) { paginas.push(p.id); });
+    });
+    (mod.ordemListas || []).forEach(function (l) {
+      l.itens.forEach(function (it) { if (!foraItens || !foraItens[it.id]) itens.push(it.id); });
+    });
+    return { itens: itens, paginas: paginas };
+  }
+
+  /* VINDO DA AULA, O MATERIAL NASCE CHEIO E JÁ MARCADO.
+   *
+   * O escopo aqui é um módulo só, com começo e fim, escolhido pelo assunto da
+   * aula: marcar tudo e deixar ela TIRAR é menos toque do que marcar um por um.
+   * Não vale para a navegação livre na aba, onde o carrinho é global, persiste
+   * no aparelho e atravessa módulos.
+   *
+   * Fora da marcação ficam os exercícios que ela JÁ USOU com este aluno: eles
+   * são os mesmos que o filtro "Ainda não usei com" tira da lista, e marcar o
+   * que ela não vê faria a folha sair com questão repetida para a mesma
+   * criança. O aviso diz quantos ficaram de fora.
+   *
+   * A seleção anterior é substituída, e não somada: o Desfazer do aviso a traz
+   * de volta inteira. */
   function abrirBibliotecaDoAssunto(t, aula, chaveModulo) {
     bibContexto = { aulaId: aula.id, alunoId: aula.alunoId };
     bibFiltroAluno = aula.alunoId;
     bibFiltroDif = null;
     bibTermo = chaveModulo ? '' : String(t.titulo || '').trim();
+    var mod = null;
     if (chaveModulo) {
-      // o assunto veio da biblioteca: abre o módulo dele, sem busca
+      // abre o módulo do assunto, sem busca
       bibNav.modulo = chaveModulo;
       bibNav.aula = null;
-      var mod = bib && bib.modulos[chaveModulo];
+      mod = bib && bib.modulos[chaveModulo];
       // o módulo do Banco tem nível no lugar da série: abre na primeira série que ele atende
       if (mod) bibNav.serie = (bib.listaSeries || []).filter(function (s) { return mod.series[s]; })[0] || mod.serie;
     }
-    fecharModal('modal-aula');
-    var campo = $('#busca-biblioteca');
-    if (campo) {
-      campo.value = bibTermo;
-      var limpar = $('#limpar-busca-biblioteca');
-      if (limpar) limpar.style.display = bibTermo ? '' : 'none';
-    }
-    var aba = $$('#abas .aba').filter(function (b) { return b.dataset.tela === 'biblioteca'; })[0];
-    bibVindoDoMaterial = true;
-    if (aba) aba.click();
+    var antes = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
+    var jaUsados = {};
+    var espera = mod
+      ? Store.usoDaBiblioteca().then(function (usos) {
+        var aulas = {};
+        db.aulas.forEach(function (a) { aulas[a.id] = a.alunoId; });
+        (usos || []).forEach(function (u) { if (aulas[u.aulaId] === aula.alunoId) jaUsados[u.itemId] = true; });
+      }, function () { /* sem o uso, marca o módulo inteiro */ })
+      : Promise.resolve();
+
+    return espera.then(function () {
+      var quantosDeFora = 0;
+      if (mod) {
+        var tudo = tudoDoModulo(mod, jaUsados);
+        quantosDeFora = tudoDoModulo(mod, null).itens.length - tudo.itens.length;
+        bibCarrinho = tudo;
+        guardarCarrinho();
+      }
+      fecharModal('modal-aula');
+      var campo = $('#busca-biblioteca');
+      if (campo) {
+        campo.value = bibTermo;
+        var limpar = $('#limpar-busca-biblioteca');
+        if (limpar) limpar.style.display = bibTermo ? '' : 'none';
+      }
+      var aba = $$('#abas .aba').filter(function (b) { return b.dataset.tela === 'biblioteca'; })[0];
+      bibVindoDoMaterial = true;
+      if (aba) aba.click();
+      if (!mod) return;
+      var aluno = alunoPorId(aula.alunoId);
+      avisar('Marquei o módulo inteiro: ' + plural(bibCarrinho.itens.length, 'exercício', 'exercícios') +
+        ' e ' + plural(bibCarrinho.paginas.length, 'página de teoria', 'páginas de teoria') + '.' +
+        (quantosDeFora && aluno
+          ? ' Fora ' + quantosDeFora + ' que você já usou com ' + aluno.nome + '.'
+          : '') +
+        ' Tire o que não quiser e toque em Gerar material.',
+        'Desfazer', function () {
+          bibCarrinho = antes;
+          guardarCarrinho();
+          desenharCarrinho();
+          marcarCaixasDoCarrinho();
+        });
+    });
   }
 
   function desenharContextoBiblioteca() {
@@ -11436,6 +11718,28 @@
 
   function noCarrinho(tipo, id) { return bibCarrinho[tipo].indexOf(id) >= 0; }
 
+  /* Põe as caixas da lista de acordo com o carrinho. Chamada por quem mexe no
+   * carrinho de fora da caixa: o "Desmarcar tudo" e o seu Desfazer, o módulo
+   * inteiro marcado pela aula, e a volta da tela cheia. */
+  function marcarCaixasDoCarrinho() {
+    /* A TELA DO MÓDULO NÃO TEM CAIXA: o que ela mostra do carrinho é o rótulo
+     * do botão e o "N no material" de cada linha, e os dois só se refazem
+     * redesenhando. Sem isto a faixa dizia "Nada marcado ainda." e a linha logo
+     * abaixo continuava dizendo "1 no material", na mesma tela. Redesenhar só
+     * aqui, e não nas telas de lista, porque lá as miniaturas seriam pedidas de
+     * novo e a rolagem voltaria para o alto. */
+    if (!$('#bib-corpo input[data-carrinho]') && $('#bib-marcar-modulo')) {
+      desenharCorpoBiblioteca();
+      return;
+    }
+    $$('#bib-corpo input[data-carrinho]').forEach(function (c) {
+      c.checked = noCarrinho(c.dataset.carrinho, c.dataset.id);
+    });
+    $$('#bib-corpo .bib-marcar-modulo').forEach(function (b) {
+      if (b._desenha) b._desenha();
+    });
+  }
+
   function juntarSelecoes(a, b) {
     function junta(x, y) { return x.concat(y.filter(function (id) { return x.indexOf(id) < 0; })); }
     return { itens: junta(a.itens, b.itens), paginas: junta(a.paginas, b.paginas) };
@@ -11448,6 +11752,8 @@
     if (!marcado && i >= 0) lista.splice(i, 1);
     guardarCarrinho();
     desenharCarrinho();
+    // o rótulo do "Marcar os N" conta o carrinho: marcar o último vira "Desmarcar"
+    $$('#bib-corpo .bib-marcar-modulo').forEach(function (b) { if (b._desenha) b._desenha(); });
     // o material daquela aula já foi anexado: o que ela marca agora é para outra coisa
     if (marcado && bibContexto && bibContexto.anexado) { bibContexto = null; bibFiltroAluno = ''; desenharContextoBiblioteca(); }
   }
@@ -11468,24 +11774,28 @@
         texto: 'Nada marcado ainda.' }));
       return;
     }
+    /* Só o que existe entra na conta. Contar "0 páginas de teoria" era contar o
+     * que não há, e ela parava para entender o que estava faltando; acontece
+     * toda vez que ela usa o "Marcar os N deste módulo", que só marca
+     * exercícios. */
     faixa.appendChild(el('span', { class: 'bib-carrinho-texto', id: 'bib-carrinho-contagem',
-      texto: 'Material marcado: ' + plural(n, 'exercício', 'exercícios') + ', ' + plural(m, 'página de teoria', 'páginas de teoria') }));
+      texto: 'Material marcado: ' + [
+        n ? plural(n, 'exercício', 'exercícios') : '',
+        m ? plural(m, 'página de teoria', 'páginas de teoria') : ''
+      ].filter(Boolean).join(', ') }));
     faixa.appendChild(el('span', { class: 'cresce' }));
     faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-carrinho-limpar', texto: 'Desmarcar tudo',
       aoClick: function () {
         var antes = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
-        function marcarNaTela() {
-          $$('#bib-corpo input[data-carrinho]').forEach(function (c) { c.checked = noCarrinho(c.dataset.carrinho, c.dataset.id); });
-        }
         bibCarrinho = { itens: [], paginas: [] };
         guardarCarrinho();
         desenharCarrinho();
-        marcarNaTela();
+        marcarCaixasDoCarrinho();
         avisar('Seleção desmarcada.', 'Desfazer', function () {
           bibCarrinho = juntarSelecoes(antes, bibCarrinho);
           guardarCarrinho();
           desenharCarrinho();
-          marcarNaTela();
+          marcarCaixasDoCarrinho();
         });
       } }));
     faixa.appendChild(el('button', { type: 'button', class: 'btn principal pequeno', id: 'bib-carrinho-gerar',
@@ -11842,13 +12152,13 @@
     bibCarrinho = { itens: [], paginas: [] };
     guardarCarrinho();
     desenharCarrinho();
-    $$('#bib-corpo input[data-carrinho]').forEach(function (c) { c.checked = false; });
+    marcarCaixasDoCarrinho();
     return function () {
       // junta com o que ela marcou nesses segundos, em vez de apagar
       bibCarrinho = juntarSelecoes(usada, bibCarrinho);
       guardarCarrinho();
       desenharCarrinho();
-      $$('#bib-corpo input[data-carrinho]').forEach(function (c) { c.checked = noCarrinho(c.dataset.carrinho, c.dataset.id); });
+      marcarCaixasDoCarrinho();
     };
   }
 
@@ -12481,7 +12791,7 @@
       var p = v.aula.paginas[v.indice];
       return { pacote: v.aula.pacote, caminho: p.asset, medidas: p.medidas, forma: 'pagina',
         titulo: v.aula.aula.titulo + ', ' + (p.capa ? 'capa' : 'página ' + p.n) + ' de ' + v.aula.paginas.length,
-        total: v.aula.paginas.length };
+        total: v.aula.paginas.length, marca: { tipo: 'paginas', id: p.id } };
     }
     var it = v.lista.itens[v.indice];
     var sol = v.solucao && it.assets.solucao;
@@ -12489,7 +12799,23 @@
       medidas: (sol ? it.medidas && it.medidas.solucao : it.medidas && it.medidas.enunciado) || null, forma: 'recorte',
       titulo: v.lista.titulo + ', ' + (eDoBanco(it) ? 'problema ' : 'exercício ') + it.numero +
         ' (' + (v.indice + 1) + ' de ' + v.lista.itens.length + ')' + (sol ? ', solução' : ''),
-      total: v.lista.itens.length, item: it };
+      total: v.lista.itens.length, item: it, marca: { tipo: 'itens', id: it.id } };
+  }
+
+  /* MARCAR DE DENTRO DA TELA CHEIA.
+   *
+   * O mesmo carrinho da lista, pelo mesmo caminho (marcarNoCarrinho), para o
+   * estado ser um só: marcar aqui e voltar tem que mostrar a caixa da lista
+   * marcada, e marcar na lista e abrir aqui tem que mostrar "Marcado, tirar".
+   *
+   * Vale para exercício e para página de teoria, porque o material leva os dois.
+   * Ver a solução não muda de peça: o que ela marca é o exercício. */
+  function alternarMarcaNoVisor() {
+    if (!bibVendo) return;
+    var m = pecaVista().marca;
+    if (!m) return;
+    marcarNoCarrinho(m.tipo, m.id, !noCarrinho(m.tipo, m.id));
+    desenharVisor();
   }
 
   function desenharVisor() {
@@ -12500,8 +12826,24 @@
     if (bibUrlVendo) { URL.revokeObjectURL(bibUrlVendo); bibUrlVendo = null; }
     var larguraMax = peca.forma === 'pagina' ? 900 : Math.round(((peca.medidas && peca.medidas.largura_pt) || 262) * 2.4);
     var img = el('img', { id: 'bib-imagem-cheia', class: 'bib-cheia', alt: peca.titulo,
-      style: 'max-width:' + larguraMax + 'px' + (peca.medidas ? ';aspect-ratio:' + peca.medidas.largura_pt + ' / ' + peca.medidas.altura_pt : '') });
-    corpo.appendChild(img);
+      style: peca.medidas ? 'aspect-ratio:' + peca.medidas.largura_pt + ' / ' + peca.medidas.altura_pt : '' });
+    /* O selo fica no alto da folha, e não só no rótulo do botão: andando pelo
+     * Anterior e Próxima ela olha a folha, não o rodapé, e precisa saber num
+     * relance se aquela já está no material.
+     *
+     * A LARGURA MÁXIMA MORA NA CAIXA, e não na imagem. A imagem preenche a
+     * caixa, e a caixa é exatamente a moldura da folha: é assim que o selo se
+     * prende ao canto dela. Com o limite na imagem e a caixa encolhendo até o
+     * conteúdo, as duas se definiam uma pela outra e o recorte saía do tamanho
+     * natural, bem menor do que o da lista. */
+    var marcada = !!peca.marca && noCarrinho(peca.marca.tipo, peca.marca.id);
+    corpo.appendChild(el('div', {
+      class: 'bib-cheia-caixa' + (marcada ? ' marcada' : ''),
+      style: 'max-width:' + larguraMax + 'px'
+    }, [
+      img,
+      marcada ? el('span', { class: 'bib-selo-marcado', id: 'bib-selo-marcado', texto: 'Marcado' }) : null
+    ]));
     if (peca.item && peca.item.origem_citada) {
       corpo.appendChild(el('div', { class: 'bib-origem', style: 'text-align:center', texto: peca.item.origem_citada }));
     }
@@ -12520,6 +12862,16 @@
       sol.textContent = bibVendo.solucao ? 'Ver enunciado' : 'Ver solução';
     } else {
       sol.style.display = 'none';
+    }
+    var marcar = $('#bib-marcar-visor');
+    if (marcar) {
+      marcar.style.display = peca.marca ? '' : 'none';
+      /* O MESMO botão nos dois estados: muda o rótulo, e mais nada. Realçar só
+       * o "Marcar" fazia o "Marcado, tirar" sair apagado, e o estado LIGADO
+       * passava a ter cara de estado desligado. Quem diz o estado aqui é o
+       * rótulo, o aria-pressed e o selo sobre a folha. */
+      marcar.textContent = marcada ? 'Marcado, tirar' : 'Marcar para o material';
+      marcar.setAttribute('aria-pressed', marcada ? 'true' : 'false');
     }
     corpo.scrollTop = 0;
   }
@@ -12542,6 +12894,10 @@
     if (bibUrlVendo) { URL.revokeObjectURL(bibUrlVendo); bibUrlVendo = null; }
     bibVendo = null;
     bibVezDoVisor++;
+    /* Ao fechar a tela cheia, as caixas da lista mostram o que ela marcou lá
+     * dentro. Sem isto a lista ficava com a marcação de antes e ela remarcava
+     * o que já estava marcado. */
+    marcarCaixasDoCarrinho();
   }
 
   // ---------- abrir como folha ----------

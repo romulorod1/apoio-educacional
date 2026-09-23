@@ -140,10 +140,33 @@ function lerListaArquivos(sw) {
   return entradas;
 }
 
+/* O APP.JS SERVIDO AQUI VAI COM O MATERIAL AUTORAL LIGADO, e isto é
+ * deliberado.
+ *
+ * O que este teste guarda é a rede do CACHE: uma coisa que ela baixou durante
+ * o uso (banco/serie-*.json) tem de sobreviver a uma atualização feita sem
+ * sinal, e o incidente que ele impede está narrado em sw.js:12-16. O único
+ * caminho de tela que BAIXA uma série é o do material autoral, que saiu do ar
+ * na 1.26.0 (MATERIAL_AUTORAL_NO_AR). O código do carregarSerie e os arquivos
+ * das séries continuam inteiros no repositório, e é esse código que este teste
+ * exercita: ele publica a árvore com a chave ligada, para o caminho existir na
+ * cópia servida, e mede o cache.
+ *
+ * A troca é conferida logo abaixo, no lugar em que o teste imprime o placar: um
+ * teste que achasse que ligou a chave e não ligasse morreria em "sem botão
+ * Material de aula", e não passaria calado. */
+const CHAVE_DESLIGADA = 'var MATERIAL_AUTORAL_NO_AR = false;';
+const CHAVE_LIGADA = 'var MATERIAL_AUTORAL_NO_AR = true;';
+
 function copiarParaPasta(rel) {
   const de = path.join(RAIZ, rel);
   const para = path.join(PASTA, rel);
   fs.mkdirSync(path.dirname(para), { recursive: true });
+  if (rel === 'app.js') {
+    const texto = fs.readFileSync(de, 'utf8');
+    fs.writeFileSync(para, texto.split(CHAVE_DESLIGADA).join(CHAVE_LIGADA));
+    return;
+  }
   fs.copyFileSync(de, para);
 }
 
@@ -380,6 +403,13 @@ function publicarVersaoNova() {
   fs.mkdirSync(PASTA, { recursive: true });
   arquivos.concat(extras).forEach(copiarParaPasta);
   console.log('   ' + lista.length + ' entradas em ARQUIVOS, ' + arquivos.length + ' arquivos copiados, mais ' + extras.join(', '));
+  /* A chave do material autoral, ligada só na cópia servida: é por ela que o
+   * caminho de tela que baixa uma série existe aqui. O repositório continua
+   * com ela desligada, e esta linha reprova se um dia ela sumir do app.js. */
+  conf('o app.js do repositório continua com o material autoral desligado',
+    APP_REPO.indexOf(CHAVE_DESLIGADA) >= 0, true);
+  conf('e a cópia servida foi publicada com ele ligado, para exercitar o carregarSerie',
+    fs.readFileSync(path.join(PASTA, 'app.js'), 'utf8').indexOf(CHAVE_LIGADA) >= 0, true);
 
   if (await portaOcupada()) {
     conf('a porta 127.0.0.1:' + PORTA + ' está livre antes de subir o servidor', 'ocupada', 'livre');

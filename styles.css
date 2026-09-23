@@ -1156,6 +1156,35 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .bib-origem { font-size: 11px; color: var(--muted); }
 .bib-visor { background: #DDE3EA; }
 .bib-cheia { width: 100%; height: auto; display: block; margin: 0 auto; background: #FFFFFF; box-shadow: var(--sombra); }
+/* o selo "Marcado" sobre a imagem da tela cheia: ela anda pelo Anterior e
+   Próxima olhando a folha, e o estado precisa se ler sem descer até o rodapé.
+   A caixa existe só para o selo ter a que se prender, e não muda a imagem.
+   Ela encolhe até a largura da imagem (fit-content) porque o recorte de um
+   exercício é estreito: numa caixa da largura da janela o selo ia parar longe
+   da folha, do outro lado da tela, e deixava de ser selo DELA. Por isso a
+   largura máxima da folha mora AQUI (o app.js a põe no style), e a imagem
+   preenche a caixa: a caixa é a moldura da folha. A folga de cima fica SEMPRE,
+   marcada ou não: se ela nascesse junto com o selo, a folha pularia para baixo
+   no toque, e o toque seguinte cairia no lugar errado. */
+.bib-cheia-caixa { position: relative; display: block; width: 100%; margin: 34px auto 0; }
+/* O selo fica ENCOSTADO no alto da folha, e não por cima do enunciado.
+   Medido no print do marco: dentro da imagem, no canto de cima à direita, ele
+   tapava o fim da primeira linha do exercício, que é justamente onde o recorte
+   do Portal costuma ter texto. Fora dela, colado na borda, ele se lê no mesmo
+   relance e não esconde uma palavra. O contorno pinta a folha inteira, que é o
+   sinal que ela pega de longe andando pelo Anterior e Próxima. */
+.bib-selo-marcado { position: absolute; right: 0; bottom: 100%; margin-bottom: 6px; z-index: 2;
+  padding: 6px 14px; border-radius: 999px; background: var(--teal); color: var(--branco);
+  font-size: 13px; font-weight: 700; letter-spacing: .02em; box-shadow: var(--sombra); }
+.bib-cheia-caixa.marcada .bib-cheia { outline: 3px solid var(--teal); }
+/* "Marcar os N deste módulo": fica sozinho, abaixo do título do módulo */
+.bib-marcar-modulo { display: block; margin: 0 0 12px; }
+.bib-marcar-modulo .btn { min-height: 44px; }
+/* O botão de marcar da tela cheia tem largura FIXA nos dois estados.
+   "Marcar para o material" e "Marcado, tirar" têm tamanhos diferentes, e sem
+   isto a fileira inteira se reacomodava no toque: ela marcava, o dedo já ia
+   para "Próxima ›" e o botão tinha saído de baixo dele. */
+#bib-marcar-visor { min-width: 196px; }
 /* material desta aula: a caixa fica ao lado do cartão, e o alvo de toque tem 44 px */
 .bib-celula { display: flex; flex-direction: column; gap: 12px; }
 .bib-acoes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

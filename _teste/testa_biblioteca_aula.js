@@ -11,10 +11,10 @@
  *      assunto, e o mesmo título escrito de outro jeito é uma linha só.
  *
  * No Chrome:
- *   S. sem pacote, a linha do assunto é a de sempre;
+ *   S. sem pacote, nenhuma linha de assunto oferece Material;
  *   1. com pacote, o botão Material só aparece quando a biblioteca tem o
- *      assunto ("Bhaskara", pelo apelido), ou quando há material autoral; o
- *      toque abre a biblioteca procurando o título, com a faixa da aula;
+ *      assunto ("Bhaskara", pelo apelido); o toque abre o MÓDULO dele, com a
+ *      faixa da aula, e sem busca no caminho (B7, itens 1 e 2);
  *   2. "Ainda não usei com:" já vem com o aluno da aula;
  *   3. gerar e anexar na aula de onde ela veio: o módulo vira o segundo
  *      assunto (o dela continua), e o aviso diz qual; o mesmo título sem
@@ -29,7 +29,7 @@
  *  11. só páginas de teoria: um assunto, nenhum uso;
  *  12. lista como folha: o assunto entra e a folha abre;
  *  13. "Só gerar o arquivo": nenhuma aula muda;
- *  14. autoral com módulo: vai à biblioteca;
+ *  14. tema do banco que a biblioteca também tem: vai ao módulo dela;
  *  15. "Nova aula hoje", avulsa e em série: o assunto só na aula do dia;
  *  16. série desfeita enquanto monta: nada gravado;
  *   6. a aula apagada: o uso dela não esconde mais nada;
@@ -262,10 +262,13 @@ async function anexarEm(pag, aulaId, itens, paginas, extra) {
   await H.abrirApp(pag, amb.ORIGEM);
 
   // ================================================================
-  secao('S. Sem pacote: a linha do assunto é a de sempre');
+  secao('S. Sem pacote: nenhuma linha oferece Material');
+  /* Sem material autoral, o botão Material é da BIBLIOTECA e de mais ninguém.
+   * Sem pacote importado não há biblioteca, então nenhuma das três linhas o
+   * tem, nem a que aponta para um tema do banco de matemática. */
   conf('a aula de hoje abriu', await abrirAulaDeHoje(pag, '10:00'), true);
-  const semPacote = await esperar('linhas sem pacote', () => linhasDoAssunto(pag), v => v && v.length === 3 && v[1].material, 10000);
-  conf('só o tema autoral tem Material', resumoLinhas(semPacote.valor || []), 'Bhaskara | Frações: o que são e como comparar [Material] | Revisão para a prova');
+  const semPacote = await esperar('linhas sem pacote', () => linhasDoAssunto(pag), v => v && v.length === 3, 10000);
+  conf('nenhuma linha tem Material', resumoLinhas(semPacote.valor || []), 'Bhaskara | Frações: o que são e como comparar | Revisão para a prova');
   await fecharAula(pag);
 
   const zip = path.join(TMP, 'nono.zip');
@@ -276,39 +279,34 @@ async function anexarEm(pag, aulaId, itens, paginas, extra) {
   conf('importou o pacote sintético do Banco', /^Biblioteca importada\./.test(await importar(pag, zipBanco)), true);
 
   // ================================================================
-  secao('1a. Com pacote: o botão Material só onde a biblioteca tem o assunto, ou há material autoral');
+  secao('1a. Com pacote: o botão Material só onde a biblioteca tem o assunto');
   conf('a aula de hoje abriu', await abrirAulaDeHoje(pag, '10:00'), true);
-  const comPacote = await esperar('linhas com pacote', () => linhasDoAssunto(pag), v => v && v.length === 3 && v[0].material && v[1].material, 10000);
-  conf('Bhaskara (a biblioteca tem, pelo apelido) e o autoral; "Revisão para a prova" sem o botão',
-    resumoLinhas(comPacote.valor || []), 'Bhaskara [Material] | Frações: o que são e como comparar [Material] | Revisão para a prova');
-  await tocarMaterial(pag, 'Frações: o que são e como comparar');
-  const deSempre = await esperar('material autoral aberto', () => pag.evaluate(() => ({
-    tema: document.querySelector('#modal-tema').classList.contains('aberto'),
-    aba: document.querySelector('#abas .aba.ativa').dataset.tela
-  })), v => v && v.tema, 8000);
-  conf('o autoral sem módulo abre a montagem autoral, e não a biblioteca', deSempre.ok && deSempre.valor.aba !== 'biblioteca', true);
-  await pag.evaluate(() => { const b = document.querySelector('#modal-tema [data-fechar]'); if (b) b.click(); });
-  await pausa(300);
+  const comPacote = await esperar('linhas com pacote', () => linhasDoAssunto(pag), v => v && v.length === 3 && v[0].material, 10000);
+  /* "Frações" tem registro no índice de matemática, mas o pacote sintético não
+   * tem módulo de frações: sem material autoral, essa linha fica sem o botão.
+   * Quem o ganha é "Bhaskara", que a biblioteca tem pelo apelido. */
+  conf('só Bhaskara, que a biblioteca tem pelo apelido',
+    resumoLinhas(comPacote.valor || []), 'Bhaskara [Material] | Frações: o que são e como comparar | Revisão para a prova');
 
-  secao('1c. O botão Material da linha do assunto abre a biblioteca');
+  secao('1c. O botão Material abre o módulo do assunto, cheio e já marcado');
   await tocarMaterial(pag, 'Bhaskara');
-  const abriu = await esperar('aba Biblioteca com a busca', () => pag.evaluate(() => ({
+  const abriu = await esperar('aba Biblioteca no módulo', () => pag.evaluate(() => ({
     aba: (document.querySelector('#abas .aba.ativa') || {}).dataset ? document.querySelector('#abas .aba.ativa').dataset.tela : '',
     campo: document.querySelector('#busca-biblioteca').value,
     aulaFechada: !document.querySelector('#modal-aula').classList.contains('aberto'),
+    titulo: (document.querySelector('#bib-corpo .bib-titulo') || {}).textContent || '',
     texto: document.querySelector('#bib-corpo').innerText,
     contexto: (document.querySelector('#bib-contexto') || {}).innerText || ''
-  })), v => v && v.aba === 'biblioteca' && /Equações do Segundo Grau/.test(v.texto), 8000);
+  })), v => v && v.aba === 'biblioteca' && v.titulo === EQ, 12000);
   const a = abriu.valor || {};
   conf('a janela da aula fechou e a aba é a Biblioteca', a.aulaFechada + ',' + a.aba, 'true,biblioteca');
-  conf('a busca veio com o título do assunto', a.campo, 'Bhaskara');
-  conf('e achou o módulo de equações do segundo grau (pelo apelido)', /Equações do Segundo Grau/.test(a.texto), true);
+  conf('o toque leva direto ao módulo achado pelo apelido, sem busca', a.titulo + '|' + a.campo, EQ + '|');
+  conf('e a tela do módulo traz as aulas dele', /Resultados Básicos - Parte I/.test(a.texto), true);
   conf('a faixa diz para qual aula', new RegExp('^Material para a aula de ' + ids.nome).test(a.contexto), true);
   if (SALVAR) await pag.screenshot({ path: path.join(SALVAR, 'aula_1_busca_do_assunto.png') });
 
   // ================================================================
   secao('2. "Ainda não usei com" já vem com o aluno da aula');
-  await tocarLinha(pag, EQ);
   await tocarLinha(pag, 'Soma e Produto');
   await esperar('lista', () => visiveis(pag), v => v === 8, 8000);
   conf('o filtro já vem com o aluno', await pag.$eval('#bib-filtro-aluno', e => e.value), ids.aluno);
@@ -317,6 +315,11 @@ async function anexarEm(pag, aulaId, itens, paginas, extra) {
 
   // ================================================================
   secao('3. Gerar: a aula de onde ela veio já vem escolhida, e o módulo vira assunto');
+  /* Vindo da aula, o módulo inteiro já está marcado (B7, item 2). Esta seção
+   * mede o anexo de TRÊS exercícios escolhidos, então ela desmarca tudo antes
+   * e marca os três, que é o que a Nathália faz quando quer uma lista curta. */
+  await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-limpar'); if (b) b.click(); });
+  await esperar('seleção zerada', () => pag.evaluate(() => !!document.querySelector('#bib-carrinho-vazio')), v => v === true, 8000);
   for (const n of [1, 5, 6]) await pag.evaluate(i => document.querySelector('input[data-carrinho="itens"][data-id="' + i + '"]').click(), SP + n);
   await pag.click('#bib-carrinho-gerar');
   await esperar('janela Gerar material', () => pag.$eval('#modal-bib-gerar', e => e.classList.contains('aberto')), v => v === true, 5000);
@@ -488,24 +491,32 @@ async function anexarEm(pag, aulaId, itens, paginas, extra) {
   conf('as aulas estão iguais', JSON.stringify((await lerDados(pag)).aulas) === antes13, true);
 
   // ================================================================
-  secao('14. Tema autoral que a biblioteca também tem: o Material vai à biblioteca');
+  secao('14. Tema do banco que a biblioteca também tem: o Material abre o módulo');
   conf('a aula abriu', await abrirAulaDeHoje(pag, '16:00'), true);
-  // o registro do tema autoral vem de um índice à parte: a linha mostra o ano quando ele chega
+  // o registro do tema vem de um índice à parte: a linha mostra o ano quando ele chega
   await esperar('linha com o botão e o registro', () => linhasDoAssunto(pag), v => v && v.length === 1 && v[0].material && /9º ano/.test(v[0].detalhe), 10000);
   await tocarMaterial(pag, 'Teorema de Pitágoras');
   const autoral = await esperar('biblioteca aberta', () => pag.evaluate(() => ({
     aba: document.querySelector('#abas .aba.ativa').dataset.tela,
     campo: document.querySelector('#busca-biblioteca').value,
+    titulo: (document.querySelector('#bib-corpo .bib-titulo') || {}).textContent || '',
     aviso: document.querySelector('#aviso-texto').textContent
-  })), v => v && v.aba === 'biblioteca', 8000);
-  conf('vai à biblioteca, procurando o título', autoral.ok && autoral.valor.campo, 'Teorema de Pitágoras');
-  conf('e diz onde está o material dela', /^Abri a biblioteca da OBMEP\./.test(autoral.valor && autoral.valor.aviso), true);
+  })), v => v && v.aba === 'biblioteca' && v.titulo, 12000);
+  conf('vai à biblioteca, no módulo do assunto', autoral.ok && autoral.valor.titulo, 'Teorema de Pitágoras');
+  conf('sem busca no caminho', autoral.valor && autoral.valor.campo, '');
+  /* O aviso "o seu material continua em Material de aula" era sobre o material
+   * autoral, que saiu. O aviso de hoje é o do módulo marcado. */
+  conf('e o aviso é o do módulo inteiro marcado',
+    /^Marquei o módulo inteiro:/.test(autoral.valor && autoral.valor.aviso), true);
+  conf('sem falar de "Material de aula", que não existe mais',
+    /Material de aula/.test((autoral.valor || {}).aviso || ''), false);
 
   secao('14b. O mesmo toque antes de o índice da biblioteca abrir: ainda vai à biblioteca');
   await pag.reload({ waitUntil: 'networkidle0' });
   await H.abrirApp(pag, amb.ORIGEM);
-  // a biblioteca demora a abrir (no tablet, com pacotes grandes, ela leva segundos): o registro do
-  // tema autoral chega antes, e o botão Material aparece por ele
+  // a biblioteca demora a abrir (no tablet, com pacotes grandes, ela leva segundos): o botão
+  // Material só nasce quando o índice diz que a biblioteca tem o assunto, e o toque tem de
+  // chegar ao módulo do mesmo jeito
   await pag.evaluate(() => {
     const original = Store.itensDaBiblioteca;
     Store.itensDaBiblioteca = function () { return new Promise(r => setTimeout(r, 3000)).then(() => original.apply(Store, arguments)); };
