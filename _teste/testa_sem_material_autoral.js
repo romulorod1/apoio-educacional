@@ -46,11 +46,13 @@
  * Modo envenenado:
  *   node _teste/testa_sem_material_autoral.js --envenenado-liga
  *     o app.js servido volta com MATERIAL_AUTORAL_NO_AR = true, o percurso é o
- *     MESMO do modo normal do começo ao fim, e no fim o teste confere as SEIS
+ *     MESMO do modo normal do começo ao fim, e no fim o teste confere as SETE
  *     ausências virando presença: o botão "Material de aula" na janela da
  *     aula, o "atalho opcional" na ajuda da folha, o botão Material na linha
  *     do assunto, o "material pronto" na ajuda do assunto, o "Ver os temas
- *     soltos" dentro da trilha e o "material pronto" na escolha de assunto.
+ *     soltos" dentro da trilha E a ajuda do fim dela, o "material pronto" na
+ *     escolha de assunto, e o título padrão da janela de tema, que mora no
+ *     index.html e é reescrito pelo iniciar() quando a chave está ligada.
  *
  *     Uma ausência sem par não prova nada sobre a chave: ela passaria igual
  *     num app.js em que aquele pedaço de tela nunca fosse desenhado por outro
@@ -134,8 +136,21 @@ const corpoCarregarSerie = corpoBruto
 conf('achei a assinatura de carregarSerie no app.js', depoisDaAssinatura.length > 0, true);
 conf('e o corte parou no fim da função, em vez de levar o resto do arquivo',
   corpoBruto.length > 0 && corpoBruto.length < 3000, true);
-conf('o escopo é mesmo o desta função (tem a linha da url e não tem a próxima função)',
-  /var url = /.test(corpoBruto) && corpoBruto.indexOf('function carregarSerie(') < 0, true);
+/* A SEGUNDA METADE TEM DE PODER FALHAR.
+ *
+ * A primeira versão desta linha perguntava se o corpo contém
+ * 'function carregarSerie(' e afirmava que não. Isso é verdade por
+ * CONSTRUÇÃO: corpoBruto nasce de um split por essa mesma string, e
+ * String.split nunca deixa o delimitador nas partes. Era -1 sempre, e o
+ * rótulo prometia "não tem a próxima função" sem medir nada disso.
+ *
+ * A pergunta certa é por uma função IRMÃ, no mesmo nível da IIFE: dois espaços
+ * de indentação depois de uma quebra de linha. Dentro do corpo de verdade não
+ * existe nenhuma (a única `function` de lá é a `function (r)` do `.then`, na
+ * mesma linha do fetch), e a primeira apareceria no instante em que o corte
+ * passasse do fim da função, que é exatamente o defeito a pegar. */
+conf('o escopo é mesmo o desta função (tem a linha da url e não invade a função seguinte)',
+  /var url = /.test(corpoBruto) && corpoBruto.indexOf('\n  function ') < 0, true);
 conf('carregarSerie continua produzindo o literal banco/serie-', /'banco\/serie-'\s*\+/.test(corpoCarregarSerie), true);
 conf('o pdf.js continua com o gerarMaterialTema', ler('pdf.js').indexOf('function gerarMaterialTema(') >= 0, true);
 conf('o sw.js continua listando o índice dos temas', ler('sw.js').indexOf("'./banco/indice.json'") >= 0, true);
@@ -330,6 +345,14 @@ const ASSUNTO_COM_MATERIAL = {
     await pausa(250);
   };
   await abrirAulaDe('09:00');
+
+  /* Lido ANTES de qualquer janela de tema abrir, porque todo caminho que abre
+   * aquela janela escreve o título por cima: depois disso o padrão já não está
+   * mais lá para ser medido. */
+  venenoVisto.tituloPadraoDoTema = await pag.evaluate(() =>
+    (document.querySelector('#titulo-modal-tema') || {}).textContent || 'SEM TITULO');
+  ausencia('o título padrão da janela de tema não fala mais em material',
+    venenoVisto.tituloPadraoDoTema, 'Assunto da aula');
 
   const botoesDaFolha = await pag.evaluate(() =>
     Array.from(document.querySelectorAll('#linha-folha button')).map(b => b.textContent.trim()).join(' | '));
@@ -551,7 +574,7 @@ const ASSUNTO_COM_MATERIAL = {
 
   // ================================================================
   if (VENENO) {
-    secao('VENENO: com a chave ligada, as SEIS ausências viram presenças');
+    secao('VENENO: com a chave ligada, as SETE ausências viram presenças');
     /* Cada uma destas é o par de uma ausência conferida no modo normal, no
      * mesmo ponto do mesmo percurso. Se alguma deixar de virar presença, a
      * ausência correspondente lá em cima passou a valer por outro motivo que
@@ -566,8 +589,23 @@ const ASSUNTO_COM_MATERIAL = {
       /material pronto/i.test(venenoVisto.ajudaDoAssunto || ''), true);
     conf('5. o "Ver os temas soltos" volta para dentro da trilha',
       venenoVisto.soltosNaTrilha, true);
+    /* O BOTÃO E A AJUDA SÃO DOIS RAMOS DIFERENTES, governados pela mesma chave
+     * mas escritos em lugares distintos do app.js: o botão em `if
+     * (MATERIAL_AUTORAL_NO_AR) barraDoFim.push(...)` e a ajuda no ternário do
+     * `ajudaDoFim`, logo abaixo. Sem este par, a ausência do texto lá em cima
+     * era a única das oito sem contraparte, e passaria verde se o ajudaDoFim
+     * deixasse de ser desenhado por qualquer outro motivo. O valor já estava
+     * sendo capturado e nunca era lido. */
+    conf('5b. e a ajuda do fim da trilha volta a falar em temas soltos',
+      /temas soltos/i.test(venenoVisto.textoDaTrilha || ''), true);
     conf('6. a escolha de assunto volta a prometer "material pronto"',
       /material pronto/i.test(venenoVisto.escolhaDeAssunto || ''), true);
+    /* A SÉTIMA, que mora no index.html e por isso não enxerga a constante.
+     * Com a chave ligada, o arranque reescreve o título padrão da janela de
+     * tema para o texto da base. É o pedaço que faltava para "trocar false por
+     * true devolve tudo" ser literal, e não quase. */
+    conf('7. o título padrão da janela de tema volta a ser o da base',
+      venenoVisto.tituloPadraoDoTema, 'Material de aula');
     throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
   }
 

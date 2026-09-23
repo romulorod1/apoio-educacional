@@ -37,7 +37,28 @@
    *   - não apaga o banco nem o leitor de série (carregarSerie), porque o
    *     destino final dos 148 temas é decisão à parte.
    *
-   * Ligar de volta é trocar false por true aqui, e nada mais. */
+   * LIGAR DE VOLTA é trocar false por true aqui, e nada mais: não há migração,
+   * dado gravado nem ajuste de tela envolvido, e o único pedaço que morava
+   * fora do alcance desta constante (o título padrão da janela de tema, que
+   * está no index.html) é reescrito pelo iniciar() quando ela está ligada.
+   *
+   * O QUE ESTÁ MEDIDO, E O QUE NÃO ESTÁ. Rótulo honesto vale mais do que
+   * rótulo bonito, então: o testa_sem_material_autoral, no modo
+   * --envenenado-liga, confere SETE superfícies voltando (o botão da folha, o
+   * "atalho opcional" da ajuda, o botão Material da linha do assunto, o
+   * "material pronto" da ajuda do assunto, o "Ver os temas soltos" e a ajuda
+   * do fim da trilha, o "material pronto" da escolha de assunto, e o título
+   * padrão da janela de tema), e o testa_biblioteca_offline serve a árvore com
+   * a chave ligada e chega até a montagem abrir com exercícios.
+   *
+   * NÃO estão medidos, hoje, os passos de DENTRO da montagem: marcar e
+   * desmarcar exercícios, a contagem do rodapé, o botão de gerar travado com
+   * lista vazia, a troca de idioma preservando a marcação, a escolha das três
+   * partes, e o "Gerar e anexar à aula" gravando o PDF. O bloco de asserções
+   * que cobria isso saiu junto com o caminho de tela (testa_temas, seções 3 a
+   * 6 da versão anterior) e está listado para voltar, dentro do modo
+   * envenenado, no PR de endurecimento. Até lá, este comentário é o registro
+   * de que a volta está provada nas bordas e não no miolo. */
   var MATERIAL_AUTORAL_NO_AR = false;
 
   /* A versão 1.20.0 sobe o banco do tablet para a versão 2 (store.js). Se
@@ -998,6 +1019,20 @@
   // ================= início =================
 
   function iniciar() {
+    /* O ÚLTIMO PEDAÇO DO MATERIAL AUTORAL QUE VIVIA FORA DO ALCANCE DA CHAVE.
+     *
+     * O título padrão da janela de tema está escrito no index.html, que é
+     * HTML e não enxerga esta constante: ele era "Material de aula" e passou a
+     * ser "Assunto da aula". Na prática os quatro caminhos que abrem aquela
+     * janela escrevem o título antes de mostrá-la, então o padrão do HTML
+     * quase nunca aparece. Mas "trocar false por true devolve tudo" é uma
+     * promessa absoluta, e a chave existe para ser volta de emergência: chave
+     * que devolve quase tudo não serve. Uma linha no arranque fecha o buraco e
+     * a frase passa a ser literal. */
+    if (MATERIAL_AUTORAL_NO_AR) {
+      var tituloTema = $('#titulo-modal-tema');
+      if (tituloTema) tituloTema.textContent = 'Material de aula';
+    }
     Store.tornarPersistente();
     Store.carregar().then(function (carregado) {
       if (carregado && (carregado.alunos.length || carregado.aulas.length)) {

@@ -174,9 +174,22 @@ const porValor = (sel, valor) => `(() => {
   const MOTIVOS = ['sobre este assunto', 'tratado nos exercícios',
     'aparece nos exercícios', 'aparece na explicação'];
   conf('a lista veio com itens para conferir', comMotivo.length > 0, true);
+  const soPelaEtiqueta = x => !/fra[cç]/i.test(x.titulo) && !/fra[cç]/i.test(x.resumo) &&
+    x.etiquetas.some(t => MOTIVOS.indexOf(t) >= 0);
   conf('todo resultado fala de fração ou diz onde bateu',
     comMotivo.every(x => /fra[cç]/i.test(x.titulo) || /fra[cç]/i.test(x.resumo) ||
-      x.etiquetas.some(t => MOTIVOS.indexOf(t) >= 0)), true);
+      soPelaEtiqueta(x)), true);
+  /* O OUTRO LADO, sem o qual o `every` acima é de uma ponta só.
+   *
+   * Se a busca regredisse para casar apenas por TÍTULO, todo resultado teria
+   * "fra" no título, o `every` passaria e o comentário acima continuaria
+   * dizendo que a busca olha explicação e exercícios. Esta linha prende que a
+   * busca por CONTEÚDO está viva: pelo menos um resultado entrou sem a palavra
+   * aparecer no que se lê, e a etiqueta cinza é quem explica por quê. É
+   * também a metade que a mudança de casa deixou para trás quando a trava veio
+   * do testa_mapa_e2e. */
+  conf('e pelo menos um só se explica pela etiqueta, o que prova que a busca olha o conteúdo',
+    comMotivo.some(soPelaEtiqueta), true);
 
   /* Ela digita no teclado do tablet, onde o acento custa toques a mais. Antes
      disto, procurar sem acento devolvia a lista vazia como se o assunto não

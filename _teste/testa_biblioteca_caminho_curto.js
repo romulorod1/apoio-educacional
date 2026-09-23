@@ -416,6 +416,16 @@ const botaoDoModulo = pag => pag.evaluate(() => {
       largura: img ? Math.round(img.getBoundingClientRect().width) : -1 };
   });
   const g1 = await geometria(pag);
+  /* CONTROLE POSITIVO, ANTES DE MEDIR QUE NADA SE MEXEU.
+   *
+   * O helper devolve -1 para elemento que não existe, e o
+   * getBoundingClientRect().left de um elemento com display:none devolve 0.
+   * Sem esta linha, "o botão não mudou de lugar" era satisfeito por "o botão
+   * não está na tela": -1 igual a -1, ou 0 igual a 0. O "Ver solução" some
+   * para todo exercício sem solução e para toda página de teoria
+   * (app.js, sol.style.display = 'none'), então o caso não é hipotético. */
+  conf('os três botões do rodapé estão na tela antes de medir',
+    [g1.proxima, g1.solucao, g1.folha].every(v => v > 0), true);
   conf('a folha abre grande, e não no tamanho do recorte', g1.largura > 400, true);
   await pag.click('#bib-marcar-visor');
   await pausa(300);
