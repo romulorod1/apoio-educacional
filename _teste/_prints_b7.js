@@ -378,6 +378,66 @@ const tocarLinha = (pag, nome) => pag.evaluate(x => {
   conf('e a volta continua oferecida na faixa', voltaDepoisDoAviso.botao.trim(),
     'Devolver o item que eu tirei');
 
+  /* 20. A FAIXA NA LARGURA DO TABLET EM PÉ, NO PIOR CASO DO RÓTULO.
+   *
+   * Nas telas acima a janela é larga e os três botões da faixa cabem numa
+   * linha. Ela dá aula com o tablet em pé, e em retrato eles quebram: é a
+   * quebra que precisa ser olhada, e com o rótulo mais LONGO que a tela pode
+   * produzir, que é o plural com número de dois dígitos.
+   *
+   * Por isso esta tela marca um módulo inteiro ANTES de vir da aula: assim a
+   * troca tem muitos itens para tirar e o botão sai com o texto máximo. */
+  /* Os ids saem do BANCO, e não de uma travessia de telas: o que interessa
+   * aqui é o rótulo no pior caso, e chegar até ele pela navegação só
+   * acrescenta maneiras de o roteiro quebrar. Ficam de fora os itens do módulo
+   * que a troca vai marcar, porque só sai do carrinho o que NÃO está nele. */
+  const deOutroModulo = await pag.evaluate(() => new Promise(r => {
+    const req = indexedDB.open('apoio-educacional');
+    req.onsuccess = () => {
+      const s = req.result.transaction('biblioteca_itens', 'readonly').objectStore('biblioteca_itens').getAllKeys();
+      s.onsuccess = () => r((s.result || []).filter(k => String(k).indexOf('9ano:teorema-de-pitagoras:') !== 0).slice(0, 12));
+      s.onerror = () => r([]);
+    };
+    req.onerror = () => r([]);
+  }));
+  console.log('   itens de outro módulo para a troca tirar: ' + deOutroModulo.length);
+  await pag.evaluate(ids => localStorage.setItem('apoio-educacional:bib-carrinho',
+    JSON.stringify({ itens: ids, paginas: [] })), deOutroModulo);
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.abrirApp(pag, amb.ORIGEM);
+
+  await pag.setViewport({ width: 800, height: 1280, hasTouch: true });
+  await pausa(600);
+  await abrirAula(pag, '09:00');
+  await esperar('o Material, em retrato', () => pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula button'))
+      .some(b => b.textContent.trim() === 'Material')), v => v === true, 20000);
+  await pag.evaluate(() => {
+    const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => /Teorema/.test(x.textContent));
+    const b = l && Array.from(l.querySelectorAll('button')).find(x => x.textContent.trim() === 'Material');
+    if (b) b.click();
+  });
+  await esperar('o módulo aberto em retrato', () => pag.evaluate(() =>
+    (document.querySelector('#bib-corpo .bib-titulo') || {}).textContent || ''), v => v === 'Teorema de Pitágoras', 20000);
+  await pausa(9600);   // o aviso fora da tela, que é o estado que interessa
+  await tirar(pag, '.conteudo');
+  const emRetrato = await pag.evaluate(() => {
+    const f = document.querySelector('#bib-contexto');
+    const b = document.querySelector('#bib-desfazer-troca');
+    const doc = document.documentElement;
+    return {
+      rotulo: b ? b.textContent.trim() : 'SEM BOTÃO',
+      alturaDaFaixa: f ? Math.round(f.getBoundingClientRect().height) : -1,
+      linhasDaFaixa: f ? new Set(Array.from(f.children).map(x => Math.round(x.getBoundingClientRect().top))).size : -1,
+      rolagemHorizontal: doc.scrollWidth > doc.clientWidth,
+      botaoDentroDaTela: b ? (b.getBoundingClientRect().right <= doc.clientWidth + 1) : false
+    };
+  });
+  console.log('   RETRATO -> ' + JSON.stringify(emRetrato));
+  conf('em retrato a faixa ainda oferece a volta', emRetrato.rotulo.indexOf('Devolver') === 0, true);
+  conf('e nada foi empurrado para fora da tela', emRetrato.rolagemHorizontal, false);
+  conf('o botão da volta cabe dentro da largura', emRetrato.botaoDentroDaTela, true);
+
   conf('a pergunta da remoção tem texto', textoDaPergunta.length > 80, true);
   conf('a linha do espaço usado existe antes e depois de remover',
     !!espacoAntes && !!espacoDepois, true);
