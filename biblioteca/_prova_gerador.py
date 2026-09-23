@@ -1108,7 +1108,7 @@ def trava_marca(temp, tirar=None):
         dif = b - a
         if int((dif < -ARREDONDAMENTO).sum()):
             erros.append('p%d: %d pixel(s) mais escuros depois da remocao' % (pno, int((dif < -ARREDONDAMENTO).sum())))
-        limite = clareada_maxima(a, b)
+        limite = clareada_maxima(pa, pb)
         if int((dif > limite + ARREDONDAMENTO).sum()):
             erros.append('p%d: %d pixel(s) clarearam mais que a tinta da marca (mais de %d de 255)'
                          % (pno, int((dif > limite + ARREDONDAMENTO).sum()), limite))
