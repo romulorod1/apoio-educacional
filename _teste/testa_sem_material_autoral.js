@@ -344,14 +344,31 @@ const ASSUNTO_COM_MATERIAL = {
 
   // ================================================================
   secao('5. Assunto do banco: assunto comum, sem Material');
-  const linhaLimpa = await esperar('linha do assunto limpo', () => pag.evaluate(t => {
+  /* ESPERAR A LINHA ASSENTAR, E NÃO A LINHA EXISTIR.
+   *
+   * A linha é desenhada duas vezes: uma antes de o índice dos temas chegar, em
+   * que `registro` ainda é nulo, e outra depois, quando a etiqueta do ano
+   * aparece. O botão Material da linha depende de `registro`
+   * (`temAutoral = MATERIAL_AUTORAL_NO_AR && !!registro`), então ele só existe
+   * no SEGUNDO desenho.
+   *
+   * Com o predicado "a linha existe", a leitura podia pegar o primeiro
+   * desenho. No modo normal isso nunca aparecia, porque o esperado é "Tirar",
+   * que vale nos dois momentos; no modo envenenado o esperado é
+   * "Material,Tirar", e o veneno reprovava de vez em quando. Foi o INSTAVEL do
+   * portão das 11:33, e é a mesma família de defeito que este PR conserta: a
+   * asserção amostrava um estado transitório.
+   *
+   * A etiqueta do ano é a condição exata do assentamento, porque ela vem do
+   * mesmo `registro`, e vale nos DOIS modos. */
+  const linhaLimpa = await esperar('linha do assunto limpo, já com a etiqueta do ano', () => pag.evaluate(t => {
     const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => x.textContent.indexOf(t) >= 0);
     return l ? {
       nome: l.querySelector('.nome').textContent.trim(),
       detalhe: (l.querySelector('.detalhe') || {}).textContent || '',
       botoes: Array.from(l.querySelectorAll('button')).map(b => b.textContent.trim()).join(',')
     } : null;
-  }, ASSUNTO_LIMPO.titulo), v => !!v, 10000);
+  }, ASSUNTO_LIMPO.titulo), v => !!v && /ano|médio/i.test(v.detalhe), 10000);
   conf('o assunto aparece com o título gravado', linhaLimpa.valor && linhaLimpa.valor.nome, ASSUNTO_LIMPO.titulo);
   venenoVisto.botoesDoAssunto = linhaLimpa.valor && linhaLimpa.valor.botoes;
   venenoVisto.detalheDoAssunto = linhaLimpa.valor && linhaLimpa.valor.detalhe;
