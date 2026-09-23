@@ -24,6 +24,14 @@ Solucoes" em pagina propria; bloco de creditos
 ("Elaborado por", "Produzido por") no fim do documento. A lista tem tres paginas, e
 nao duas, porque as solucoes do Portal comecam sempre em pagina propria.
 
+O PDF de teoria tem quatro paginas: capa; uma com a marca d'agua "Portal da
+OBMEP" girada pela matriz do TEXTO e, ao lado, a marca MIUDA de 20 pt, com a
+escala entrando em dois `cm` que se cancelam (a do Teorema de Tales, 9o ano);
+uma com a marca girada pela matriz do DESENHO, mais quatro controles que a
+remocao nao pode levar (girado preto e miudo, girado preto e grande, claro e
+grande sem giro, claro girado e miudo) e o rodape com a URL; e uma pagina sem
+marca nenhuma.
+
 A terceira lista, lista-variantes (modelo CM), traz os padroes que a B2 mediu
 nas outras series: solucoes sem o titulo "Respostas e Solucoes", marcador com
 recuo de paragrafo e solucoes em duas partes (ver lista_variantes).
@@ -401,6 +409,90 @@ def lista_fio_imagem(caminho):
     doc.save(caminho, garbage=3, deflate=True, no_new_id=True)
 
 
+# A marca d'agua "Portal OBMEP" das paginas de teoria, nos dois formatos
+# medidos nas sete series (Biblioteca/b2_insumos/MARCA_DAGUA_achado.md): o giro
+# vem da matriz do desenho (`cm`) ou da matriz do texto (`Tm`). Vai no comeco do
+# fluxo, antes do conteudo, como no Portal: a marca passa POR BAIXO do texto.
+MARCAS = {
+    'cm': b'q .70711 .70711 -.70711 .70711 0 0 cm 0.8 g 0.8 G BT /helv 76 Tf 254.6 169.7 Td [(Portal)-350(OBMEP)]TJ ET Q\n',
+    # sem q/Q, como o Portal escreve este formato: a cor volta a preto depois
+    'tm': b'0.800781 g BT /helv 76 Tf 0.707107 0.707107 -0.707107 0.707107 40 380 Tm [(P)-2(ortal)-350(da)-350(OBMEP)]TJ ET 0 g\n',
+    # a marca miuda do Teorema de Tales (9o ano), no corpo exato dela -- 17,4 pt
+    # --, com a escala entrando em dois `cm` que se cancelam (0,1 e 10), como o
+    # PDF do Portal a escreve. Com o limite antigo de 30 pt ela passava batida, e
+    # e ela que prende o limite por cima: 14 pt tem de ficar ABAIXO de 17,4.
+    'miuda': b'q 0.1 0 0 0.1 0 0 cm 0.800781 g q 10 0 0 10 0 0 cm BT /helv 17.4 Tf'
+             b' 0.707107 0.707107 -0.707107 0.707107 340 96 Tm [(P)22(ortal)-298(OBMEP)]TJ ET Q Q\n',
+    # marca a 47 graus: dentro da folga de 4 graus que a regra do giro declara.
+    # Prende a folga: sem ela, esta marca sobrevive.
+    'torta': b'q 0.8 g BT /helv 44 Tf 0.68200 0.73135 -0.73135 0.68200 60 250 Tm [(Portal)-350(OBMEP)]TJ ET Q\n',
+    # marca em cinza 0,76: dentro da faixa declarada (0,75 a 0,85), e nao e
+    # nenhum dos dois valores que o Portal usa hoje. Prende a faixa por baixo.
+    'clara': b'q 0.76 g BT /helv 52 Tf 0.707107 0.707107 -0.707107 0.707107 250 60 Tm [(Portal)-350(OBMEP)]TJ ET Q\n',
+    # marca cuja matriz efetiva so sai 45 graus se a composicao for na ordem
+    # certa: o desenho estica 2x em x, e a matriz do texto compensa. Inverter a
+    # ordem em _multiplicar da 24 graus, fora da faixa, e a marca fica.
+    # marca a 43 graus: do OUTRO lado de 45, para a folga do giro ficar presa
+    # dos dois lados (a 'torta' esta a 47)
+    'torta43': b'q 0.8 g BT /helv 46 Tf 0.73135 0.68200 -0.68200 0.73135 250 400 Tm [(Portal)-350(OBMEP)]TJ ET Q\n',
+    # marca cujo corpo so passa de 14 pt por causa da escala do desenho: 9 pt
+    # vezes 2. Se a conta usar o corpo cru, ela nao e vista.
+    'escalada': b'q 2 0 0 2 0 0 cm 0.8 g BT /helv 9 Tf 0.707107 0.707107 -0.707107 0.707107 30 30 Tm'
+                b' [(Portal)-350(OBMEP)]TJ ET Q\n',
+    # marca que so fica clara DEPOIS do BT: se a cor for lida no BT, ela passa
+    # por preta e sobrevive
+    'tardia': b'q 0 g BT /helv 40 Tf 0.707107 0.707107 -0.707107 0.707107 330 330 Tm 0.8 g [(Portal)-350(OBMEP)]TJ ET Q\n',
+    # objeto de texto claro, girado e grande que nao DESENHA nada: nao e marca,
+    # e a remocao nao pode conta-lo nem tira-lo
+    'vazia': b'q 0.8 g BT /helv 60 Tf 0.707107 0.707107 -0.707107 0.707107 120 120 Tm ET Q\n',
+    # imagem embutida (BI ... ID <binario> EI) seguida de marca: se o pulo do
+    # binario estiver errado, ou a marca depois dela some do radar, ou os bytes
+    # da imagem viram "operadores"
+    # A imagem e BINARIA e os bytes dela dizem "BT(", que e comeco de objeto de
+    # texto e de string: lidos como codigo, engolem a marca que vem logo depois.
+    'imagem': b'q 20 0 0 20 400 600 cm BI /W 4 /H 2 /CS /G /BPC 8 ID BT(\x00\xff Q\n EI Q\n'
+              b'q 0.8 g BT /helv 38 Tf 0.707107 0.707107 -0.707107 0.707107 400 420 Tm [(Portal)-350(OBMEP)]TJ ET Q\n',
+    # comentario com parentese aberto: se o `%` nao for pulado, o parentese abre
+    # uma string que engole o BT da marca seguinte
+    'comentada': b'% ( comentario com parentese aberto\n'
+                 b'q 0.8 g BT /helv 36 Tf 0.707107 0.707107 -0.707107 0.707107 90 560 Tm [(Portal)-350(OBMEP)]TJ ET Q\n',
+    # string com parentese ESCAPADO: se a barra invertida nao for tratada, a
+    # string continua alem do fecha-parenteses e engole a marca seguinte
+    'escapada': b'q 0 g BT /helv 7 Tf 1 0 0 1 60 700 Tm (parentese escapado: a\\( )Tj ET Q\n'
+                b'q 0.8 g BT /helv 34 Tf 0.707107 0.707107 -0.707107 0.707107 470 520 Tm [(Portal)-350(OBMEP)]TJ ET Q\n',
+    'ordem': b'q 2 0 0 1 0 0 cm 0.8 g BT /helv 40 Tf 0.353553 0.707107 -0.353553 0.707107 30 470 Tm'
+             b' [(Portal)-350(OBMEP)]TJ ET Q\n',
+}
+# Um controle por condicao da regra, e nenhum pode sair da pagina: girado mas
+# preto e miudo (rotulo de figura, o "|sen a|" que a sonda achou em duas
+# paginas de exercicios), girado e grande mas preto, claro e grande mas sem
+# giro, claro e girado mas miudo.
+CONTROLES = (b'0 g BT /helv 8 Tf 0.707107 0.707107 -0.707107 0.707107 400 200 Tm (|sen a| girado em preto)Tj ET\n'
+             b'0 g BT /helv 36 Tf 0.707107 0.707107 -0.707107 0.707107 250 120 Tm (Eixo girado)Tj ET\n'
+             # claro, girado e de 12 pt: prende o limite de corpo por baixo, que
+             # tem de ficar ACIMA de 12 para este nao sair
+             b'0.8 g BT /helv 12 Tf 0.707107 0.707107 -0.707107 0.707107 300 150 Tm (rotulo claro girado de 12 pt)Tj ET 0 g\n'
+             # claro, grande, mas girado so 30 graus: prende a folga do giro
+             b'0.8 g BT /helv 34 Tf 0.866025 0.5 -0.5 0.866025 40 60 Tm (girado 30 graus)Tj ET 0 g\n'
+             # girado 55 graus: prende a folga do giro por cima
+             b'0.8 g BT /helv 32 Tf 0.573576 0.819152 -0.819152 0.573576 500 80 Tm (girado 55 graus)Tj ET 0 g\n'
+             # claro demais (cinza 0,88): prende a faixa de cor por cima
+             b'0.88 g BT /helv 33 Tf 0.707107 0.707107 -0.707107 0.707107 430 430 Tm (cinza 0,88)Tj ET 0 g\n'
+             # girado e grande, mas cinza 0,70: prende a faixa de cor por baixo
+             b'0.70 g BT /helv 30 Tf 0.707107 0.707107 -0.707107 0.707107 120 300 Tm (cinza 0,70)Tj ET 0 g\n'
+             b'0.8 g BT /helv 40 Tf 1 0 0 1 60 640 Tm (Titulo claro e reto)Tj ET\n'
+             b'0.8 g BT /helv 9 Tf 0.707107 0.707107 -0.707107 0.707107 430 120 Tm (nota clara girada e miuda)Tj ET 0 g\n')
+
+
+def marca_dagua(pg, formatos, controles=False):
+    """Poe a marca d'agua do Portal (e, se pedido, os controles) no fluxo da pagina."""
+    doc = pg.parent
+    pg.insert_font(fontname='helv')
+    xref = pg.get_contents()[0]
+    antes = b''.join(MARCAS[f] for f in formatos.split())
+    doc.update_stream(xref, antes + (CONTROLES if controles else b'') + doc.xref_stream(xref))
+
+
 def teoria(caminho):
     doc = pymupdf.open()
     pg = doc.new_page(width=612, height=792)
@@ -415,6 +507,27 @@ def teoria(caminho):
                            'Uma equação do segundo grau tem a forma ax² + bx + c = 0.',
                            'A fórmula de Bhaskara dá as raízes a partir do discriminante.']):
         pg.insert_text((60, 80 + 12 * i), l, fontname='helv', fontsize=10)
+    marca_dagua(pg, 'tm miuda torta torta43 clara ordem escalada tardia vazia imagem comentada escapada')
+    # pagina com a marca no outro formato, cruzando o texto, e com os controles
+    pg = doc.new_page(width=612, height=792)
+    for i, l in enumerate(['2 Discriminante', '',
+                           'O discriminante diz quantas raízes reais a equação tem.',
+                           'Com discriminante negativo não há raiz real.']):
+        pg.insert_text((60, 300 + 12 * i), l, fontname='helv', fontsize=10)
+    pg.insert_text((60, 770), 'http://matematica.obmep.org.br/', fontname='cour', fontsize=10)
+    marca_dagua(pg, 'cm', controles=True)
+    # pagina sem marca nenhuma: a remocao nao pode mexer nela (ha modulos
+    # inteiros do Portal sem a marca)
+    pg = doc.new_page(width=612, height=792)
+    for i, l in enumerate(['3 Soma e produto das raízes', '',
+                           'A soma das raízes é menos b sobre a.',
+                           'O produto das raízes é c sobre a.',
+                           '',
+                           # mencao de verdade ao Portal no conteudo, como as 11
+                           # que existem nas sete series: a lista curada tem de
+                           # aceitar esta e reprovar qualquer outra
+                           'Mais exercícios no próprio portal da matemática.']):
+        pg.insert_text((60, 300 + 12 * i), l, fontname='helv', fontsize=10)
     doc.set_metadata(FIXO)
     doc.save(caminho, garbage=3, deflate=True, no_new_id=True)
 

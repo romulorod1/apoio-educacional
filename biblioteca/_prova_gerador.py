@@ -28,6 +28,10 @@ Travas (CONTRATO_pacote_biblioteca.md, secao 9, mais os pedidos da B4):
   origem        origem_citada literal na fonte
   fidelidade    20 pedacos sorteados com semente fixa: SVG no Chrome contra o
                 pixmap do pymupdf do mesmo retangulo, diferenca abaixo de 1%
+  marca d'agua  a marca girada "Portal OBMEP" sai da pagina de teoria e so ela:
+                caractere a caractere, pixel (nada mais escuro, nada clareando
+                mais que a tinta dela, nada fora da faixa), texto do pacote e
+                SVG no Chrome
   series (B2)   padroes medidos fora do 9o ano (Biblioteca/PADROES_numeracao_6_series.md):
                 solucoes sem titulo, marcador com recuo de paragrafo, solucao
                 em duas partes, marcador em CMBX10, titulo do modulo pela capa
@@ -969,6 +973,542 @@ def trava_descida_fina(descida=None):
     return erros
 
 
+# ------------------------------------------------------------------ marca d'agua
+
+DPI_MARCA = 144
+MARCA_CLARA = 0xAAAAAA   # de 0xFFFFFF: acima disto a cor da linha e clara
+# Corpo da marca, medido em toda linha girada e clara das sete series: conteudo
+# de verdade tem 8 ou 10 pt, a menor marca tem 17,4 pt
+# (Biblioteca/b2_insumos/MARCA_DAGUA_achado.md).
+MARCA_GRANDE = 14.0
+TINTA_FOLGA = 14   # folga em volta do cinza da marca, ao medir a tinta dela
+# Um nivel de 255: e de quanto o rasterizador do MuPDF muda um pixel de figura
+# so por recompor a area sem a marca (medido nas sete series: o pior caso, em
+# pagina com foto, escurece exatamente 1). Abaixo disso nao se conclui nada.
+ARREDONDAMENTO = 1
+
+
+def caracteres_das_linhas(linhas):
+    """Os caracteres destas linhas, no mesmo formato de caracteres_da_pagina.
+
+    Sai dos proprios spans da linha, e nao da caixa dela: a caixa de um texto a
+    45 graus e enorme e pegaria o conteudo que passa por baixo.
+    """
+    return [c for l in linhas for c in l['chars']]
+
+
+def caracteres_da_pagina(pg):
+    """Todo caractere da pagina, com posicao, giro, cor e corpo, lido do rawdict."""
+    fora = []
+    for b in pg.get_text('rawdict')['blocks']:
+        if b['type'] != 0:
+            continue
+        for l in b['lines']:
+            girado = abs(l['dir'][1]) > 1e-6
+            for s in l['spans']:
+                for c in s['chars']:
+                    fora.append((round(c['origin'][0], 1), round(c['origin'][1], 1), c['c'],
+                                 girado, s['color'], round(s['size'], 1)))
+    return fora
+
+
+def linhas_da_marca(pg):
+    """Linhas giradas, claras e de corpo grande da pagina: o que a marca escreve.
+
+    Rede geometrica frouxa: 45 graus, cor clara, corpo acima de MARCA_GRANDE
+    (Biblioteca/b2_insumos/MARCA_DAGUA_achado.md), lida do texto renderizado
+    (rawdict). Serve para CONTAR e para sortear pagina; quem julga o que e marca
+    e `linhas_que_dizem_a_marca`, pelo texto.
+    """
+    return [l for l in _linhas_claras_giradas(pg) if l['marca']]
+
+
+def linhas_que_dizem_a_marca(pg):
+    """Linhas giradas cujo TEXTO e o que a marca escreve.
+
+    E a regua que o oraculo usa para decidir o que e marca: nao depende do
+    corpo, da cor nem do angulo de corte do detector. `linhas_da_marca`, acima,
+    e a rede geometrica frouxa, e serve para contar e para sortear pagina.
+    """
+    return [l for l in _linhas_claras_giradas(pg)
+            if l['girada'] and linha_da_marca_pelo_texto(l['texto'])]
+
+
+def texto_sem_a_marca(pg):
+    """Todo o texto da pagina menos o que a marca escreve.
+
+    O que e marca sai do TEXTO da linha, e nao do corpo e da cor do detector: se
+    saisse, subir o limite no gerador faria a marca sobreviver E entrar no
+    "esperado" desta conta, e a trava emudecia (achado da lente 2, segunda volta).
+    """
+    return ' '.join(l['texto'] for l in _linhas_claras_giradas(pg)
+                    if not (l['girada'] and linha_da_marca_pelo_texto(l['texto'])))
+
+
+def _linhas_claras_giradas(pg):
+    fora = []
+    for b in pg.get_text('rawdict')['blocks']:
+        if b['type'] != 0:
+            continue
+        for l in b['lines']:
+            s0 = l['spans'][0]
+            girada = abs(l['dir'][1]) > 1e-6
+            marca = girada and s0['color'] > MARCA_CLARA and s0['size'] > MARCA_GRANDE
+            chars = [(round(c['origin'][0], 1), round(c['origin'][1], 1), c['c'],
+                      girada, s['color'], round(s['size'], 1))
+                     for s in l['spans'] for c in s['chars']]
+            fora.append({'texto': ''.join(c[2] for c in chars), 'chars': chars,
+                         'bbox': l['bbox'], 'marca': marca, 'girada': girada,
+                         'cor': s0['color'], 'corpo': s0['size']})
+    return fora
+
+
+def sem_espacos(s):
+    return re.sub(r'\s+', '', s).lower()
+
+
+CAMADAS_DA_MARCA = 2   # glifos da marca que podem se sobrepor num mesmo pixel
+
+
+def teto_da_marca(marcas, camadas=CAMADAS_DA_MARCA, minimo=51):
+    """Teto fisico do clareamento, lido da COR da marca na pagina de origem.
+
+    A marca e um preenchimento cinza: o pixel mais escuro que ela consegue por
+    e o cinza dela composto sobre si mesmo `camadas` vezes (0xCC sobre 0xCC da
+    163 de 255, e nao 0). Logo a remocao nunca pode clarear mais que 255 menos
+    isso -- 92 no cinza de sempre.
+
+    Este teto nao depende do resultado da remocao: sai do `color` do span na
+    pagina ANTES dela. E o que impede o limite medido de se justificar sozinho.
+    """
+    if not marcas:
+        return minimo
+    v = min(m['cor'] & 0xFF for m in marcas)   # o canal de um cinza; 0xCC -> 204
+    composto = v
+    for _ in range(max(1, camadas) - 1):
+        composto = composto * v / 255.0
+    return max(minimo, int(round(255 - composto)))
+
+
+def resumo_do_desenho(pg):
+    """O que a pagina desenha fora do texto: tracos, preenchimentos e imagens.
+
+    Cada elemento vira (tipo, caixa arredondada, cor de preenchimento, cor de
+    traco). E a regua que nao depende de cor, de caixa da marca nem de texto: a
+    marca e um objeto de TEXTO, entao tirar a marca nao pode mudar nada disto.
+    """
+    fora = []
+    for d in pg.get_drawings():
+        fora.append(('desenho', tuple(round(v, 1) for v in d['rect']), d.get('fill'), d.get('color')))
+    for b in pg.get_text('rawdict')['blocks']:
+        if b['type'] != 0:
+            fora.append(('imagem', tuple(round(v, 1) for v in b['bbox']), None, None))
+    return sorted(fora, key=repr)
+
+
+def clareada_maxima(antes, depois, marcas=(), minimo=51):
+    """Quanto a tinta da marca clareia, no maximo, nesta pagina.
+
+    Duas contas, e vale a MENOR:
+
+    1. onde a pagina ficou branca depois da remocao so havia a marca, e o valor
+       de antes ali e a tinta dela -- 51 no cinza 0xCC de sempre, um pouco mais
+       onde dois glifos da marca se cruzam. Medir na propria pagina evita que um
+       limite fixo acuse a marca como se fosse conteudo mexido;
+    2. o teto fisico da cor da marca (`teto_da_marca`), lido da pagina de ORIGEM.
+
+    A conta 1 sozinha se justifica sozinha: se a remocao apagar tinta preta por
+    engano, essa tinta tambem vira branco, entra em `puro`, o minimo vai a zero
+    e o limite vira 255 -- quanto maior o estrago, maior a permissao. Foi o que
+    a lente 2 provou apagando uma figura preta de 200 por 200 pt sob a marca. O
+    teto da conta 2 corta isso: a figura preta clareia 255, o teto e 92, e a
+    trava acusa.
+    """
+    import numpy as np
+    a = np.frombuffer(antes.samples, dtype=np.uint8).reshape(antes.height, antes.width).astype(np.int16)
+    b = np.frombuffer(depois.samples, dtype=np.uint8).reshape(depois.height, depois.width).astype(np.int16)
+    puro = (b == 255) & (a != 255)
+    medido = max(minimo, int(255 - a[puro].min())) if puro.any() else minimo
+    return min(medido, teto_da_marca(marcas, minimo=minimo))
+
+
+def trava_marca(temp, tirar=None):
+    """A marca d'agua girada sai da pagina de teoria, e so ela.
+
+    Paginas de fazer_amostra.teoria: capa sem marca, uma pagina com a marca
+    girada pela matriz do TEXTO, outra com a marca girada pela matriz do DESENHO
+    mais tres controles que nao podem sair (girado preto e miudo; claro e grande
+    sem giro; claro, girado e miudo) e uma pagina sem marca nenhuma.
+
+    Julga o resultado, nao a regra: caractere a caractere com a posicao, e o
+    pixel a 144 dpi. No pixel a marca so pode ter clareado -- nenhum pixel mais
+    escuro, nenhum clareando mais do que a tinta da marca vale naquela pagina, e
+    nenhum pixel mudando fora da caixa da marca.
+
+    Quanto a tinta da marca vale sai da propria pagina (`clareada_maxima`), e nao
+    de um numero fixo: onde dois glifos dela se cruzam o cinza fica mais escuro
+    que o 0xCC de sempre, e um limite fixo acusaria isso como conteudo mexido.
+    """
+    import numpy as np
+    tirar = tirar or gerar_pacote.tirar_marca
+    caminho = os.path.join(temp, 'marca_amostra.pdf')
+    fazer_amostra.teoria(caminho)
+    doc = pymupdf.open(caminho)
+    erros = []
+    for pno in range(doc.page_count):
+        pg = doc[pno]
+        antes = caracteres_da_pagina(pg)
+        # a marca desta pagina sai do TEXTO da linha, e nao do corpo nem da cor:
+        # se sair da mesma regua do detector, baixar o limite no gerador e
+        # "ajustar a prova junto" passa calado (achado da lente 2). A mesma lista
+        # diz o que podia ser apagado, quantas marcas a pagina tem, onde e a
+        # faixa delas e qual e o teto de clareamento.
+        marca = linhas_que_dizem_a_marca(pg)
+        da_marca = caracteres_das_linhas(marca)
+        pa = pg.get_pixmap(dpi=DPI_MARCA, colorspace=pymupdf.csGRAY)
+        fluxo = [doc.xref_stream(x) for x in pg.get_contents()]
+        desenhos = resumo_do_desenho(pg)
+        pg, saiu = tirar(doc, pno)
+        depois = caracteres_da_pagina(pg)
+        # nenhum traco, nenhuma figura e nenhuma imagem pode sumir: a marca e
+        # TEXTO, e tirar texto nao mexe em desenho. Sem isto, figura em cinza
+        # claro apagada junto passa por baixo do teto de clareamento (lente 2)
+        if resumo_do_desenho(pg) != desenhos:
+            erros.append('p%d: o desenho da pagina mudou (%d elemento(s) antes, %d depois)'
+                         % (pno, len(desenhos), len(resumo_do_desenho(pg))))
+        pb = pg.get_pixmap(dpi=DPI_MARCA, colorspace=pymupdf.csGRAY)
+        # quantas a remocao DIZ ter tirado tem de bater com quantas a pagina
+        # tinha: sem isto, devolver sempre zero passa calado (achado da lente 2)
+        if saiu != len(marca):
+            erros.append('p%d: a remocao diz ter tirado %d marca(s), e a pagina tem %d'
+                         % (pno, saiu, len(marca)))
+        if not marca:
+            if [doc.xref_stream(x) for x in pg.get_contents()] != fluxo:
+                erros.append('p%d: pagina sem marca foi reescrita' % pno)
+        else:
+            ficaram = [c for c in depois if c in da_marca]
+            if ficaram:
+                corpos = sorted({c[5] for c in ficaram})
+                erros.append('p%d: a marca continua na pagina: %r (corpo %s)'
+                             % (pno, ''.join(c[2] for c in ficaram)[:40], corpos))
+        esperado = [c for c in antes if c not in da_marca]
+        sumiu = [c[2] for c in esperado if c not in depois]
+        entrou = [c[2] for c in depois if c not in antes]
+        if sumiu:
+            erros.append('p%d: sumiu do desenho o que nao e marca: %r' % (pno, ''.join(sumiu)[:60]))
+        if entrou:
+            erros.append('p%d: entrou no desenho o que nao estava: %r' % (pno, ''.join(entrou)[:60]))
+        a = np.frombuffer(pa.samples, dtype=np.uint8).reshape(pa.height, pa.width).astype(np.int16)
+        b = np.frombuffer(pb.samples, dtype=np.uint8).reshape(pb.height, pb.width).astype(np.int16)
+        dif = b - a
+        if int((dif < -ARREDONDAMENTO).sum()):
+            erros.append('p%d: %d pixel(s) mais escuros depois da remocao' % (pno, int((dif < -ARREDONDAMENTO).sum())))
+        limite = clareada_maxima(pa, pb, marca)
+        if int((dif > limite + ARREDONDAMENTO).sum()):
+            erros.append('p%d: %d pixel(s) clarearam mais que a tinta da marca (mais de %d de 255)'
+                         % (pno, int((dif > limite + ARREDONDAMENTO).sum()), limite))
+        if not marca and int((dif != 0).sum()):
+            erros.append('p%d: pagina sem marca mudou %d pixel(s)' % (pno, int((dif != 0).sum())))
+        if marca:
+            e = DPI_MARCA / 72.0
+            dentro = np.zeros(dif.shape, dtype=bool)
+            for m in marca:
+                x0, y0, x1, y1 = m['bbox']
+                dentro[max(0, int(y0 * e) - 2):int(y1 * e) + 2, max(0, int(x0 * e) - 2):int(x1 * e) + 2] = True
+            fora = int(((dif != 0) & ~dentro).sum())
+            if fora:
+                erros.append('p%d: %d pixel(s) mudaram fora da faixa da marca' % (pno, fora))
+    doc.close()
+    return erros
+
+
+def trava_marca_no_pacote(p):
+    """O que a marca escreve na fonte nao esta no texto de teoria do pacote.
+
+    O oraculo le a marca da propria pagina de origem (linha girada, clara e de
+    corpo grande) e conta cada palavra dela no texto da pagina do teoria.json:
+    nao pode aparecer mais vezes do que aparece na FONTE sem a marca. Contar, e
+    nao procurar, e o que separa a marca do rodape "matematica.obmep.org.br",
+    que tem a mesma palavra e fica. O defeito era o "Portal" girado colado no
+    meio de uma linha de conteudo (458 vezes no 9o ano v3); o texto da busca da
+    teoria e feito destes mesmos textos de pagina, e sai limpo com eles.
+    """
+    erros = []
+    for t in p.teoria:
+        arquivo = 'PDF/matematica/obmep-portal/%s/%s__teoria-%s.pdf' % (t['serie'], t['modulo']['slug'], t['aula']['slug'])
+        doc = p.doc(arquivo)
+        for pag in t['paginas']:
+            pgf = doc[pag['n'] - 1]
+            marcas = linhas_que_dizem_a_marca(pgf)
+            if not marcas:
+                continue
+            fonte = sem_espacos(texto_sem_a_marca(pgf))
+            alvo = sem_espacos(pag['texto'])
+            for palavra in sorted({w.lower() for m in marcas for w in re.split(r'\W+', m['texto']) if len(w) >= 4}):
+                achado, esperado = alvo.count(palavra), fonte.count(palavra)
+                if achado > esperado:
+                    erros.append('%s: o texto da pagina tem a marca %r %d vez(es), e a fonte sem ela tem %d'
+                                 % (pag['id'], palavra, achado, esperado))
+    return erros
+
+
+# O que a marca escreve, inclusive quebrado pela fonte embutida. A extracao
+# perde glifos e nunca inventa: das sete series saem "Portal OBMEP", "Portal da
+# OBMEP", "ortal OBME", "rtal da OBM", "tal OBM" e "da OB". Por isso a regra e
+# de SUBSEQUENCIA, e nao de pedaco fixo: as letras da linha, na ordem, cabem
+# dentro do que a marca escreve. Ela olha o TEXTO da linha e nao o corpo, a cor
+# nem o angulo: de proposito, nao usa nenhuma medida do detector.
+DIZ_MARCA = ('portalobmep', 'portaldaobmep')
+LETRAS_MIN = 4   # "da OB" e o menor pedaco medido
+
+
+def linha_da_marca_pelo_texto(texto):
+    """A linha girada diz o que a marca diz? (completude, sem olhar geometria)"""
+    s = re.sub(r'[^a-z]', '', sem_acento(texto))
+    if len(s) < LETRAS_MIN:
+        return False
+    for alvo in DIZ_MARCA:
+        i = 0
+        for c in alvo:
+            if i < len(s) and s[i] == c:
+                i += 1
+        if i == len(s):
+            return True
+    return False
+
+
+def trava_teoria_sem_marca(p, n_pixel=10, semente=SEMENTE):
+    """Completude e inocuidade da remocao, com a pagina julgada pelo TEXTO.
+
+    Uma passada por toda pagina de teoria da fonte, com a remocao ligada:
+
+    1. completude: depois da remocao, nenhuma linha girada da pagina pode dizer
+       o que a marca diz -- qualquer corpo, qualquer cor, qualquer angulo. E a
+       conferencia que NAO usa a regra do detector como regua: se a proxima
+       marca vier em 12 pt, em cinza mais escuro ou em outro angulo, ela
+       reprova aqui, ainda que o detector nao a veja;
+    2. inocuidade: a pagina que nao dizia nada da marca antes tem de sair
+       intacta -- fluxo de conteudo nao reescrito, nenhum caractere a mais nem a
+       menos e, em n_pixel paginas sorteadas, nenhum pixel mudado.
+
+    As paginas saem de copias proprias do PDF: o `p.doc` e a referencia COM a
+    marca de outras travas e nao pode ser mexido.
+    """
+    erros, limpas = [], []
+    com_marca = 0
+    arquivos = sorted({'%s__teoria-%s.pdf' % (t['modulo']['slug'], t['aula']['slug']) for t in p.teoria})
+    for arq in arquivos:
+        doc = pymupdf.open(os.path.join(p.pdfs, arq))
+        for pno in range(doc.page_count):
+            giradas = [l for l in _linhas_claras_giradas(doc[pno]) if l['girada']]
+            dizia = [l['texto'] for l in giradas if linha_da_marca_pelo_texto(l['texto'])]
+            fluxo = [doc.xref_stream(x) for x in doc[pno].get_contents()]
+            texto = caracteres_da_pagina(doc[pno])
+            pg, saiu = gerar_pacote.tirar_marca(doc, pno)
+            sobrou = [l['texto'] for l in _linhas_claras_giradas(pg)
+                      if l['girada'] and linha_da_marca_pelo_texto(l['texto'])]
+            if sobrou:
+                erros.append('%s p%d: sobrou linha girada dizendo a marca: %r' % (arq, pno + 1, sobrou[:2]))
+            if dizia:
+                com_marca += 1
+                continue
+            limpas.append((arq, pno))
+            if saiu:
+                erros.append('%s p%d: a remocao tirou %d objeto(s) de uma pagina sem marca' % (arq, pno + 1, saiu))
+            if [doc.xref_stream(x) for x in pg.get_contents()] != fluxo:
+                erros.append('%s p%d: o fluxo da pagina sem marca foi reescrito' % (arq, pno + 1))
+            depois = caracteres_da_pagina(pg)
+            if depois != texto:
+                erros.append('%s p%d: o texto da pagina sem marca mudou (%d caracteres, e nao %d)'
+                             % (arq, pno + 1, len(depois), len(texto)))
+        doc.close()
+    for arq, pno in random.Random(semente).sample(limpas, min(n_pixel, len(limpas))):
+        doc = pymupdf.open(os.path.join(p.pdfs, arq))
+        antes = doc[pno].get_pixmap(dpi=DPI_MARCA, colorspace=pymupdf.csGRAY).samples
+        pg, _ = gerar_pacote.tirar_marca(doc, pno)
+        if pg.get_pixmap(dpi=DPI_MARCA, colorspace=pymupdf.csGRAY).samples != antes:
+            erros.append('%s p%d: o desenho da pagina sem marca mudou' % (arq, pno + 1))
+        doc.close()
+    if not erros:
+        print('          teoria: %d paginas dizendo a marca, %d sem dizer nada dela (%d conferidas por pixel)'
+              % (com_marca, len(limpas), min(n_pixel, len(limpas))))
+    return erros
+
+
+MENCOES = os.path.join(AQUI, '_dados', 'mencoes_portal.csv')
+MENCOES_AMOSTRA = os.path.join(AQUI, '_dados', 'mencoes_amostra.csv')
+PORTAL_NO_TEXTO = re.compile(r'portal')
+OBMEP_COLADO = re.compile(r'(?<=[a-z])obmep|obmep(?=[a-z])')
+
+
+def mencoes_do_texto(texto):
+    """Cada 'portal' do texto com o trecho em volta, sem acento e sem maiuscula."""
+    s = re.sub(r'\s+', ' ', sem_acento(texto))
+    return [(m.start(), s[max(0, m.start() - 24):m.start() + 30].strip()) for m in PORTAL_NO_TEXTO.finditer(s)]
+
+
+def sem_acento(s):
+    import unicodedata
+    s = unicodedata.normalize('NFD', s.lower())
+    return ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+
+
+def lista_das_mencoes(p):
+    """A lista curada que vale para este pacote: um ARQUIVO, sempre.
+
+    A amostra sintetica nao esta no `mencoes_portal.csv` (que e do corpus de
+    verdade): ela tem uma mencao propria, escrita em fazer_amostra, e a lista
+    dela e `mencoes_amostra.csv`, escrita a mao ao lado.
+
+    A primeira versao disto MONTAVA a lista varrendo o proprio pacote que ia
+    julgar. Era espelho: os dois lados da comparacao saiam do mesmo arquivo, e a
+    trava nao tinha como reprovar nada -- com a marca inteira dentro do texto,
+    ela imprimia `ok` e escrevia os residuos na propria lista (achado da
+    terceira lente). Lista curada e lista escrita a mao e versionada.
+    """
+    da_amostra = all(t['serie'] == '9ano' and t['modulo']['slug'] == 'amostra-sintetica' for t in p.teoria)
+    return MENCOES_AMOSTRA if da_amostra else MENCOES
+
+
+def trava_mencoes_portal(p, lista=MENCOES):
+    """Toda mencao ao Portal no texto da teoria esta na lista curada.
+
+    A marca d'agua escrevia "Portal" no meio do conteudo; o conteudo tambem
+    fala do Portal de verdade ("no proprio portal", "portal da matematica").
+    Em vez de olhar o residuo e aprovar de olho, a lista de mencoes legitimas e
+    curada e versionada (biblioteca/_dados/mencoes_portal.csv, com serie,
+    arquivo, pagina e trecho): mencao fora da lista reprova.
+
+    Alem disso, "obmep" colado dentro de outra palavra ("antonioobmepcaminha")
+    e assinatura da marca atravessando a linha do conteudo, e reprova sempre: no
+    texto de verdade a sigla vem sempre solta ou com pontuacao.
+    """
+    if not os.path.exists(lista):
+        return ['a lista curada de mencoes ao Portal nao existe: %s' % lista]
+    curadas = set()
+    with io.open(lista, encoding='utf-8') as f:
+        for n, linha in enumerate(f):
+            if n == 0 or not linha.strip():
+                continue
+            # split com limite: `;` dentro do trecho nao desloca os campos
+            campos = linha.rstrip('\n').split(';', 4)
+            if len(campos) == 5:
+                curadas.add((campos[0], campos[4]))
+    erros = []
+    for t in p.teoria:
+        for pag in t['paginas']:
+            for _, trecho in mencoes_do_texto(pag['texto']):
+                if (pag['id'], trecho) not in curadas:
+                    erros.append('%s: mencao ao Portal fora da lista curada: %r' % (pag['id'], trecho))
+            colado = OBMEP_COLADO.search(sem_acento(pag['texto']))
+            if colado:
+                i = colado.start()
+                erros.append('%s: "obmep" colado no meio de palavra: %r'
+                             % (pag['id'], sem_acento(pag['texto'])[max(0, i - 20):i + 20]))
+    return erros
+
+
+USO_SVG = re.compile(r'<use\b[^>]*>')
+MATRIZ_SVG = re.compile(r'matrix\(([-\d.eE]+),([-\d.eE]+),([-\d.eE]+),([-\d.eE]+)')
+FILL_SVG = re.compile(r'fill="#([0-9a-fA-F]{6})"')
+
+
+def glifos_claros_girados(svg):
+    """Glifos do SVG desenhados girados e em cor clara, de qualquer tamanho."""
+    n = 0
+    for uso in USO_SVG.findall(svg):
+        cor = FILL_SVG.search(uso)
+        m = MATRIZ_SVG.search(uso)
+        if not cor or not m:
+            continue
+        v = int(cor.group(1)[:2], 16)
+        a, b, c, d = (float(x) for x in m.groups())
+        if v > (MARCA_CLARA >> 16) and abs(b) > 0.1 * max(abs(a), 1e-9):
+            n += 1
+    return n
+
+
+def trava_marca_no_svg(p):
+    """O SVG entregue nao tem mais glifo claro e girado do que a fonte tinha.
+
+    Conta, no SVG de cada pagina de teoria, os glifos desenhados com matriz
+    girada e cor clara -- de QUALQUER tamanho. Esse numero nao pode passar o
+    numero de caracteres de linha girada e clara da pagina de origem que NAO
+    dizem a marca (o conteudo girado de verdade: rotulo de formula, "|tg a|").
+
+    Existe porque `marca_fora_do_svg` so roda com Chrome: sem esta, a marca
+    podia ficar no SVG entregue e `--sem-navegador` passava calado (achado da
+    lente 2). A regua aqui e o texto da linha na fonte, e nao o corpo nem a cor
+    que o detector usa.
+    """
+    erros = []
+    for t in p.teoria:
+        arquivo = 'PDF/matematica/obmep-portal/%s/%s__teoria-%s.pdf' % (t['serie'], t['modulo']['slug'], t['aula']['slug'])
+        doc = p.doc(arquivo)
+        for pag in t['paginas']:
+            linhas = _linhas_claras_giradas(doc[pag['n'] - 1])
+            esperado = sum(len(l['chars']) for l in linhas
+                           if l['girada'] and l['cor'] > MARCA_CLARA and not linha_da_marca_pelo_texto(l['texto']))
+            achado = glifos_claros_girados(p.bytes_de(pag['asset']).decode('utf-8'))
+            if achado > esperado:
+                erros.append('%s: o SVG tem %d glifo(s) claro(s) e girado(s), e a fonte sem a marca tem %d'
+                             % (pag['id'], achado, esperado))
+    return erros
+
+
+def marca_fora_do_svg(fonte, ref, cro, pid):
+    """Onde a pagina de origem tem a tinta da marca, o SVG do pacote tem branco.
+
+    A marca e cinza 0xCC: contra o branco da pagina sem ela sao 51 niveis de
+    255, abaixo de DIFERENCA_PIXEL, e a fidelidade nao a ve. Sem esta conta o
+    SVG podia sair com a marca sem nenhuma trava reclamar.
+
+    Mede so onde a pagina tem a tinta da marca e nada mais: sai da conta a caixa
+    de toda linha de texto que nao e a marca, de todo desenho e de toda imagem,
+    porque conteudo em cinza claro tem a mesma tinta e fica.
+
+    Qual e "a tinta da marca" sai da COR do span dela na pagina de origem, e nao
+    de um par fixo: o par fixo (190, 215) era o 0xCC de MARCA_CINZA escrito de
+    novo, e com ele uma marca em cinza 0,90 -- que o detector tambem nao tira,
+    por cor -- sumia do filtro e a conta calava (achado da quarta lente).
+
+    Quando nao sobra tinta limpa para medir (marca inteira por baixo de
+    conteudo, ou desenho grande cobrindo a faixa), esta conta nao afirma nada:
+    quem cobre o caso e `trava_marca_no_svg`, que conta glifo claro e girado no
+    SVG entregue, roda nos dois modos e nao depende de renderizador.
+    """
+    import numpy as np
+    marcas = linhas_que_dizem_a_marca(fonte)
+    if not marcas:
+        return []
+    e = ref.height / float(fonte.rect.height)
+    a = np.frombuffer(ref.samples, dtype=np.uint8).reshape(ref.height, ref.width).astype(np.int16)
+    b = np.frombuffer(cro.samples, dtype=np.uint8).reshape(cro.height, cro.width).astype(np.int16)
+    h, w = min(a.shape[0], b.shape[0]), min(a.shape[1], b.shape[1])
+    a, b = a[:h, :w], b[:h, :w]
+
+    def pintar(mask, caixas, valor, folga=1):
+        for x0, y0, x1, y1 in caixas:
+            mask[max(0, int(y0 * e) - folga):int(y1 * e) + 1 + folga,
+                 max(0, int(x0 * e) - folga):int(x1 * e) + 1 + folga] = valor
+
+    dentro = np.zeros(a.shape, dtype=bool)
+    pintar(dentro, [m['bbox'] for m in marcas], True, folga=0)
+    pintar(dentro, [l['bbox'] for l in _linhas_claras_giradas(fonte)
+                   if not (l['girada'] and linha_da_marca_pelo_texto(l['texto']))], False)
+    pintar(dentro, [d['rect'] for d in fonte.get_drawings()], False)
+    pintar(dentro, [b1['bbox'] for b1 in fonte.get_text('rawdict')['blocks'] if b1['type'] != 0], False)
+    v = min(m['cor'] & 0xFF for m in marcas)      # o cinza da marca, como ela e desenhada
+    tinta = dentro & (a >= v - TINTA_FOLGA) & (a <= v + TINTA_FOLGA)
+    n = int(tinta.sum())
+    if n < 200:
+        return []   # a marca desta pagina nao deixa tinta limpa que de para medir
+    claros = int((b[tinta] >= 240).sum())
+    if claros < 0.9 * n:
+        return ['%s: a marca continua no SVG (%d de %d pixels dela sem clarear)' % (pid, n - claros, n)]
+    return []
+
+
 def trava_encosta():
     """A seta de reta sobre as letras, 0,1 pt acima da caixa do rotulo, e da linha dele.
 
@@ -1505,6 +2045,10 @@ def trava_fidelidade_teoria(p, temp, n=10, semente=SEMENTE, trocar=None):
     Pedido da orquestradora: a amostra dos recortes nunca olhava teoria, e foi
     na teoria que a B3 achou SVG que o Chrome recusava. `trocar` (so no veneno)
     renderiza o SVG de outra pagina no lugar.
+
+    A pagina de origem tem a marca d'agua e o SVG do pacote nao: a fracao de
+    pixels diferentes nao muda com isso (a marca vale 51 de 255, abaixo de
+    DIFERENCA_PIXEL), e quem confere que a marca saiu do SVG e marca_fora_do_svg.
     """
     paginas = [(t, pg) for t in p.teoria for pg in t['paginas']]
     rnd = random.Random(semente)
@@ -1538,6 +2082,10 @@ def trava_fidelidade_teoria(p, temp, n=10, semente=SEMENTE, trocar=None):
         medidas.append((frac, pg['id']))
         if frac >= LIMITE_FIDELIDADE:
             erros.append('%s: %.2f%% dos pixels diferem' % (pg['id'], 100 * frac))
+        # a pagina de origem ainda tem a marca d'agua e o SVG do pacote nao: a
+        # conta de cima nao ve a diferenca (51 de 255), esta ve (o rawdict vai
+        # na copia, depois do pixmap, para nao mexer no desenho de doc)
+        erros += marca_fora_do_svg(tmp[0], ref, cro, pg['id'])
     return erros, medidas
 
 
@@ -1617,6 +2165,10 @@ def travas_simples(p, placar, zip_caminho=None, rotulo=''):
     placar.conferir('todo caractere com o seu glifo' + rotulo, trava_glifos(p))
     placar.conferir('notas de rodape com o item ou registradas' + rotulo, trava_notas(p))
     placar.conferir('solucao com conteudo alem do rotulo' + rotulo, trava_solucao_com_conteudo(p))
+    placar.conferir('marca d\'agua fora do texto da teoria' + rotulo, trava_marca_no_pacote(p))
+    placar.conferir('nenhuma linha girada ainda diz a marca' + rotulo, trava_teoria_sem_marca(p))
+    placar.conferir('mencao ao Portal so a curada' + rotulo, trava_mencoes_portal(p, lista_das_mencoes(p)))
+    placar.conferir('nenhum glifo da marca no SVG entregue' + rotulo, trava_marca_no_svg(p))
 
 
 def venenos(p, temp, placar, curadoria):
@@ -2166,6 +2718,68 @@ def principal():
                 placar.conferir('sem folga antes do proximo', trava_divisa_fina(), True, 'divisa em None')
             finally:
                 gerar_pacote.FOLGA_ANTES_DO_PROXIMO = antes_fo
+            placar.conferir('marca d\'agua da teoria', trava_marca(temp))
+            # um veneno por condicao da regra: sem o flag a marca fica; sem
+            # olhar a cor, o giro ou o corpo, some um controle que tinha de ficar
+            for nome, attr, valor, motivo in (
+                    ('remocao da marca desligada', 'TIRA_MARCA', False, 'a marca continua na pagina'),
+                    ('marca sem olhar a cor', 'MARCA_CINZA', (0.0, 1.0), 'sumiu do desenho'),
+                    ('marca sem olhar o giro', 'MARCA_SENO', (0.0, 1.0), 'sumiu do desenho'),
+                    ('marca sem olhar o corpo', 'MARCA_CORPO', 0.0, 'sumiu do desenho'),
+                    # o limite de 30 pt que a B2 usou primeiro deixava passar a
+                    # marca miuda do Teorema de Tales, e o "Portal" ia para a busca
+                    ('marca so acima de 30 pt', 'MARCA_CORPO', 30.0, 'a marca continua na pagina')):
+                antes_m = getattr(gerar_pacote, attr)
+                setattr(gerar_pacote, attr, valor)
+                try:
+                    placar.conferir(nome, trava_marca(temp), True, motivo)
+                finally:
+                    setattr(gerar_pacote, attr, antes_m)
+            # completude: com a remocao desligada, e com o limite antigo de 30
+            # pt, sobra linha girada dizendo o que a marca diz. Esta trava julga
+            # pelo texto da linha, e nao pela regra que remove
+            for nome, attr, valor in (('marca inteira desligada', 'TIRA_MARCA', False),
+                                      ('marca inteira so acima de 30 pt', 'MARCA_CORPO', 30.0)):
+                antes_c = getattr(gerar_pacote, attr)
+                setattr(gerar_pacote, attr, valor)
+                try:
+                    placar.conferir(nome, trava_teoria_sem_marca(p), True, 'sobrou linha girada dizendo a marca')
+                finally:
+                    setattr(gerar_pacote, attr, antes_c)
+            # regra solta demais: sem nenhuma das tres condicoes, a remocao come
+            # o texto da pagina que nao tem marca
+            guardados = {n: getattr(gerar_pacote, n) for n in ('MARCA_CINZA', 'MARCA_SENO', 'MARCA_CORPO')}
+            gerar_pacote.MARCA_CINZA, gerar_pacote.MARCA_SENO, gerar_pacote.MARCA_CORPO = (0.0, 1.0), (0.0, 1.0), 0.0
+            try:
+                placar.conferir('marca sem condicao nenhuma', trava_teoria_sem_marca(p), True, 'sem marca')
+            finally:
+                for n, v in guardados.items():
+                    setattr(gerar_pacote, n, v)
+            # a lista curada e NECESSARIA: com ela vazia, a mencao de verdade
+            # da amostra passa a ser mencao fora da lista
+            vazia = os.path.join(temp, 'mencoes_vazia.csv')
+            io.open(vazia, 'w', encoding='utf-8', newline='\n').write('id_pagina;serie;arquivo;pagina;trecho\n')
+            placar.conferir('lista de mencoes vazia', trava_mencoes_portal(p, vazia), True, 'fora da lista curada')
+            # e uma mencao NOVA, que nao esta na lista, tambem tem de ser acusada
+            q = copia(p, temp, 'v_mencao')
+            q.teoria[0]['paginas'][1]['texto'] += ' veja no portal da matematica o caderno de exercicios'
+            q.gravar('teoria.json', q.teoria)
+            # a lista do pacote LIMPO: a mencao injetada nao esta nela
+            placar.conferir('mencao ao Portal fora da lista', trava_mencoes_portal(q, lista_das_mencoes(p)),
+                            True, 'fora da lista curada')
+            # e, no pacote inteiro, sem a remocao o "Portal" volta ao teoria.json
+            antes_m = gerar_pacote.TIRA_MARCA
+            gerar_pacote.TIRA_MARCA = False
+            try:
+                gerar(p.pdfs, os.path.join(temp, 'v_marca'), cur)
+            finally:
+                gerar_pacote.TIRA_MARCA = antes_m
+            placar.conferir('marca d\'agua no texto da teoria',
+                            trava_marca_no_pacote(Pacote(os.path.join(temp, 'v_marca'), p.pdfs)), True, 'tem a marca')
+            # o mesmo pacote sujo tem de reprovar no SVG entregue, SEM navegador
+            placar.conferir('marca no SVG, sem navegador',
+                            trava_marca_no_svg(Pacote(os.path.join(temp, 'v_marca'), p.pdfs)), True,
+                            'glifo(s) claro(s) e girado(s)')
             placar.conferir('marcador em CMBX10', trava_fontes_negrito())
             placar.conferir('titulo do modulo pela capa das listas', trava_titulo_modulo())
             it_obj, it_simples = venenos(p, temp, placar, cur)
@@ -2199,6 +2813,9 @@ def principal():
                 # veneno: a primeira pagina sorteada da teoria recebe o SVG de outra
                 erros_tv, _ = trava_fidelidade_teoria(p, temp, n=2, trocar=True)
                 placar.conferir('fidelidade: teoria trocada', erros_tv, True, 'diferem')
+                # veneno: sem a remocao, a marca d'agua volta ao SVG da teoria
+                erros_mv, _ = trava_fidelidade_teoria(Pacote(os.path.join(temp, 'v_marca'), p.pdfs), temp)
+                placar.conferir('marca d\'agua no SVG da teoria', erros_mv, True, 'a marca continua no SVG')
     finally:
         shutil.rmtree(temp, ignore_errors=True)
     print('%d verificacoes passaram, %d falharam' % (placar.ok, placar.falhas))
