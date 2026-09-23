@@ -432,6 +432,34 @@ MARCAS = {
     # marca cuja matriz efetiva so sai 45 graus se a composicao for na ordem
     # certa: o desenho estica 2x em x, e a matriz do texto compensa. Inverter a
     # ordem em _multiplicar da 24 graus, fora da faixa, e a marca fica.
+    # marca a 43 graus: do OUTRO lado de 45, para a folga do giro ficar presa
+    # dos dois lados (a 'torta' esta a 47)
+    'torta43': b'q 0.8 g BT /helv 46 Tf 0.73135 0.68200 -0.68200 0.73135 250 400 Tm [(Portal)-350(OBMEP)]TJ ET Q\n',
+    # marca cujo corpo so passa de 14 pt por causa da escala do desenho: 9 pt
+    # vezes 2. Se a conta usar o corpo cru, ela nao e vista.
+    'escalada': b'q 2 0 0 2 0 0 cm 0.8 g BT /helv 9 Tf 0.707107 0.707107 -0.707107 0.707107 30 30 Tm'
+                b' [(Portal)-350(OBMEP)]TJ ET Q\n',
+    # marca que so fica clara DEPOIS do BT: se a cor for lida no BT, ela passa
+    # por preta e sobrevive
+    'tardia': b'q 0 g BT /helv 40 Tf 0.707107 0.707107 -0.707107 0.707107 330 330 Tm 0.8 g [(Portal)-350(OBMEP)]TJ ET Q\n',
+    # objeto de texto claro, girado e grande que nao DESENHA nada: nao e marca,
+    # e a remocao nao pode conta-lo nem tira-lo
+    'vazia': b'q 0.8 g BT /helv 60 Tf 0.707107 0.707107 -0.707107 0.707107 120 120 Tm ET Q\n',
+    # imagem embutida (BI ... ID <binario> EI) seguida de marca: se o pulo do
+    # binario estiver errado, ou a marca depois dela some do radar, ou os bytes
+    # da imagem viram "operadores"
+    # A imagem e BINARIA e os bytes dela dizem "BT(", que e comeco de objeto de
+    # texto e de string: lidos como codigo, engolem a marca que vem logo depois.
+    'imagem': b'q 20 0 0 20 400 600 cm BI /W 4 /H 2 /CS /G /BPC 8 ID BT(\x00\xff Q\n EI Q\n'
+              b'q 0.8 g BT /helv 38 Tf 0.707107 0.707107 -0.707107 0.707107 400 420 Tm [(Portal)-350(OBMEP)]TJ ET Q\n',
+    # comentario com parentese aberto: se o `%` nao for pulado, o parentese abre
+    # uma string que engole o BT da marca seguinte
+    'comentada': b'% ( comentario com parentese aberto\n'
+                 b'q 0.8 g BT /helv 36 Tf 0.707107 0.707107 -0.707107 0.707107 90 560 Tm [(Portal)-350(OBMEP)]TJ ET Q\n',
+    # string com parentese ESCAPADO: se a barra invertida nao for tratada, a
+    # string continua alem do fecha-parenteses e engole a marca seguinte
+    'escapada': b'q 0 g BT /helv 7 Tf 1 0 0 1 60 700 Tm (parentese escapado: a\\( )Tj ET Q\n'
+                b'q 0.8 g BT /helv 34 Tf 0.707107 0.707107 -0.707107 0.707107 470 520 Tm [(Portal)-350(OBMEP)]TJ ET Q\n',
     'ordem': b'q 2 0 0 1 0 0 cm 0.8 g BT /helv 40 Tf 0.353553 0.707107 -0.353553 0.707107 30 470 Tm'
              b' [(Portal)-350(OBMEP)]TJ ET Q\n',
 }
@@ -446,6 +474,10 @@ CONTROLES = (b'0 g BT /helv 8 Tf 0.707107 0.707107 -0.707107 0.707107 400 200 Tm
              b'0.8 g BT /helv 12 Tf 0.707107 0.707107 -0.707107 0.707107 300 150 Tm (rotulo claro girado de 12 pt)Tj ET 0 g\n'
              # claro, grande, mas girado so 30 graus: prende a folga do giro
              b'0.8 g BT /helv 34 Tf 0.866025 0.5 -0.5 0.866025 40 60 Tm (girado 30 graus)Tj ET 0 g\n'
+             # girado 55 graus: prende a folga do giro por cima
+             b'0.8 g BT /helv 32 Tf 0.573576 0.819152 -0.819152 0.573576 500 80 Tm (girado 55 graus)Tj ET 0 g\n'
+             # claro demais (cinza 0,88): prende a faixa de cor por cima
+             b'0.88 g BT /helv 33 Tf 0.707107 0.707107 -0.707107 0.707107 430 430 Tm (cinza 0,88)Tj ET 0 g\n'
              # girado e grande, mas cinza 0,70: prende a faixa de cor por baixo
              b'0.70 g BT /helv 30 Tf 0.707107 0.707107 -0.707107 0.707107 120 300 Tm (cinza 0,70)Tj ET 0 g\n'
              b'0.8 g BT /helv 40 Tf 1 0 0 1 60 640 Tm (Titulo claro e reto)Tj ET\n'
@@ -475,7 +507,7 @@ def teoria(caminho):
                            'Uma equação do segundo grau tem a forma ax² + bx + c = 0.',
                            'A fórmula de Bhaskara dá as raízes a partir do discriminante.']):
         pg.insert_text((60, 80 + 12 * i), l, fontname='helv', fontsize=10)
-    marca_dagua(pg, 'tm miuda torta clara ordem')
+    marca_dagua(pg, 'tm miuda torta torta43 clara ordem escalada tardia vazia imagem comentada escapada')
     # pagina com a marca no outro formato, cruzando o texto, e com os controles
     pg = doc.new_page(width=612, height=792)
     for i, l in enumerate(['2 Discriminante', '',
@@ -489,7 +521,12 @@ def teoria(caminho):
     pg = doc.new_page(width=612, height=792)
     for i, l in enumerate(['3 Soma e produto das raízes', '',
                            'A soma das raízes é menos b sobre a.',
-                           'O produto das raízes é c sobre a.']):
+                           'O produto das raízes é c sobre a.',
+                           '',
+                           # mencao de verdade ao Portal no conteudo, como as 11
+                           # que existem nas sete series: a lista curada tem de
+                           # aceitar esta e reprovar qualquer outra
+                           'Mais exercícios no próprio portal da matemática.']):
         pg.insert_text((60, 300 + 12 * i), l, fontname='helv', fontsize=10)
     doc.set_metadata(FIXO)
     doc.save(caminho, garbage=3, deflate=True, no_new_id=True)

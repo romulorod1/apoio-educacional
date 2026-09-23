@@ -1015,9 +1015,10 @@ def caracteres_da_pagina(pg):
 def linhas_da_marca(pg):
     """Linhas giradas, claras e de corpo grande da pagina: o que a marca escreve.
 
-    A marca e a medida em Biblioteca/b2_insumos/MARCA_DAGUA_achado.md -- 45
-    graus, 0xCCCCCC, corpo acima de 30 pt --, lida aqui do texto renderizado
-    (rawdict), e nao do fluxo de conteudo por onde o gerador a tira.
+    Rede geometrica frouxa: 45 graus, cor clara, corpo acima de MARCA_GRANDE
+    (Biblioteca/b2_insumos/MARCA_DAGUA_achado.md), lida do texto renderizado
+    (rawdict). Serve para CONTAR e para sortear pagina; quem julga o que e marca
+    e `linhas_que_dizem_a_marca`, pelo texto.
     """
     return [l for l in _linhas_claras_giradas(pg) if l['marca']]
 
@@ -1034,8 +1035,14 @@ def linhas_que_dizem_a_marca(pg):
 
 
 def texto_sem_a_marca(pg):
-    """Todo o texto da pagina menos o que a marca escreve."""
-    return ' '.join(l['texto'] for l in _linhas_claras_giradas(pg) if not l['marca'])
+    """Todo o texto da pagina menos o que a marca escreve.
+
+    O que e marca sai do TEXTO da linha, e nao do corpo e da cor do detector: se
+    saisse, subir o limite no gerador faria a marca sobreviver E entrar no
+    "esperado" desta conta, e a trava emudecia (achado da lente 2, segunda volta).
+    """
+    return ' '.join(l['texto'] for l in _linhas_claras_giradas(pg)
+                    if not (l['girada'] and linha_da_marca_pelo_texto(l['texto'])))
 
 
 def _linhas_claras_giradas(pg):
@@ -1081,6 +1088,22 @@ def teto_da_marca(marcas, camadas=CAMADAS_DA_MARCA, minimo=51):
     for _ in range(max(1, camadas) - 1):
         composto = composto * v / 255.0
     return max(minimo, int(round(255 - composto)))
+
+
+def resumo_do_desenho(pg):
+    """O que a pagina desenha fora do texto: tracos, preenchimentos e imagens.
+
+    Cada elemento vira (tipo, caixa arredondada, cor de preenchimento, cor de
+    traco). E a regua que nao depende de cor, de caixa da marca nem de texto: a
+    marca e um objeto de TEXTO, entao tirar a marca nao pode mudar nada disto.
+    """
+    fora = []
+    for d in pg.get_drawings():
+        fora.append(('desenho', tuple(round(v, 1) for v in d['rect']), d.get('fill'), d.get('color')))
+    for b in pg.get_text('rawdict')['blocks']:
+        if b['type'] != 0:
+            fora.append(('imagem', tuple(round(v, 1) for v in b['bbox']), None, None))
+    return sorted(fora, key=repr)
 
 
 def clareada_maxima(antes, depois, marcas=(), minimo=51):
@@ -1144,8 +1167,15 @@ def trava_marca(temp, tirar=None):
         da_marca = caracteres_das_linhas(marca)
         pa = pg.get_pixmap(dpi=DPI_MARCA, colorspace=pymupdf.csGRAY)
         fluxo = [doc.xref_stream(x) for x in pg.get_contents()]
+        desenhos = resumo_do_desenho(pg)
         pg, saiu = tirar(doc, pno)
         depois = caracteres_da_pagina(pg)
+        # nenhum traco, nenhuma figura e nenhuma imagem pode sumir: a marca e
+        # TEXTO, e tirar texto nao mexe em desenho. Sem isto, figura em cinza
+        # claro apagada junto passa por baixo do teto de clareamento (lente 2)
+        if resumo_do_desenho(pg) != desenhos:
+            erros.append('p%d: o desenho da pagina mudou (%d elemento(s) antes, %d depois)'
+                         % (pno, len(desenhos), len(resumo_do_desenho(pg))))
         pb = pg.get_pixmap(dpi=DPI_MARCA, colorspace=pymupdf.csGRAY)
         # quantas a remocao DIZ ter tirado tem de bater com quantas a pagina
         # tinha: sem isto, devolver sempre zero passa calado (achado da lente 2)
@@ -1320,6 +1350,26 @@ def sem_acento(s):
     import unicodedata
     s = unicodedata.normalize('NFD', s.lower())
     return ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+
+
+def lista_das_mencoes(p):
+    """A lista curada que vale para este pacote.
+
+    A amostra sintetica nao esta no `mencoes_portal.csv` (que e do corpus de
+    verdade): ela tem uma mencao propria, escrita em fazer_amostra, e a lista
+    dela e montada aqui. Sem isto a trava examinaria zero mencoes na amostra e
+    passaria por vazio (achado da lente 2, segunda volta).
+    """
+    if any(t['serie'] != '9ano' or t['modulo']['slug'] != 'amostra-sintetica' for t in p.teoria):
+        return MENCOES
+    destino = os.path.join(p.pasta, '_mencoes_da_amostra.csv')
+    with io.open(destino, 'w', encoding='utf-8', newline='\n') as f:
+        f.write('id_pagina;serie;arquivo;pagina;trecho\n')
+        for t in p.teoria:
+            for pag in t['paginas']:
+                for _, trecho in mencoes_do_texto(pag['texto']):
+                    f.write('%s;amostra;amostra.pdf;%d;%s\n' % (pag['id'], pag['n'], trecho))
+    return destino
 
 
 def trava_mencoes_portal(p, lista=MENCOES):
@@ -2107,7 +2157,7 @@ def travas_simples(p, placar, zip_caminho=None, rotulo=''):
     placar.conferir('solucao com conteudo alem do rotulo' + rotulo, trava_solucao_com_conteudo(p))
     placar.conferir('marca d\'agua fora do texto da teoria' + rotulo, trava_marca_no_pacote(p))
     placar.conferir('nenhuma linha girada ainda diz a marca' + rotulo, trava_teoria_sem_marca(p))
-    placar.conferir('mencao ao Portal so a curada' + rotulo, trava_mencoes_portal(p))
+    placar.conferir('mencao ao Portal so a curada' + rotulo, trava_mencoes_portal(p, lista_das_mencoes(p)))
     placar.conferir('nenhum glifo da marca no SVG entregue' + rotulo, trava_marca_no_svg(p))
 
 
@@ -2695,13 +2745,18 @@ def principal():
             finally:
                 for n, v in guardados.items():
                     setattr(gerar_pacote, n, v)
-            # mencao ao Portal: na amostra sintetica nao existe nenhuma, entao a
-            # trava examinaria zero e passaria por vazio (achado da lente 2). O
-            # veneno poe uma no texto do pacote e cobra que ela seja acusada
+            # a lista curada e NECESSARIA: com ela vazia, a mencao de verdade
+            # da amostra passa a ser mencao fora da lista
+            vazia = os.path.join(temp, 'mencoes_vazia.csv')
+            io.open(vazia, 'w', encoding='utf-8', newline='\n').write('id_pagina;serie;arquivo;pagina;trecho\n')
+            placar.conferir('lista de mencoes vazia', trava_mencoes_portal(p, vazia), True, 'fora da lista curada')
+            # e uma mencao NOVA, que nao esta na lista, tambem tem de ser acusada
             q = copia(p, temp, 'v_mencao')
             q.teoria[0]['paginas'][1]['texto'] += ' veja no portal da matematica o caderno de exercicios'
             q.gravar('teoria.json', q.teoria)
-            placar.conferir('mencao ao Portal fora da lista', trava_mencoes_portal(q), True, 'fora da lista curada')
+            # a lista do pacote LIMPO: a mencao injetada nao esta nela
+            placar.conferir('mencao ao Portal fora da lista', trava_mencoes_portal(q, lista_das_mencoes(p)),
+                            True, 'fora da lista curada')
             # e, no pacote inteiro, sem a remocao o "Portal" volta ao teoria.json
             antes_m = gerar_pacote.TIRA_MARCA
             gerar_pacote.TIRA_MARCA = False
@@ -2711,6 +2766,10 @@ def principal():
                 gerar_pacote.TIRA_MARCA = antes_m
             placar.conferir('marca d\'agua no texto da teoria',
                             trava_marca_no_pacote(Pacote(os.path.join(temp, 'v_marca'), p.pdfs)), True, 'tem a marca')
+            # o mesmo pacote sujo tem de reprovar no SVG entregue, SEM navegador
+            placar.conferir('marca no SVG, sem navegador',
+                            trava_marca_no_svg(Pacote(os.path.join(temp, 'v_marca'), p.pdfs)), True,
+                            'glifo(s) claro(s) e girado(s)')
             placar.conferir('marcador em CMBX10', trava_fontes_negrito())
             placar.conferir('titulo do modulo pela capa das listas', trava_titulo_modulo())
             it_obj, it_simples = venenos(p, temp, placar, cur)

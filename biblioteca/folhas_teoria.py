@@ -37,13 +37,20 @@ LINHAS_POR_FOLHA = 4
 
 
 def tem_marca(pg):
-    """Linha girada, clara e de corpo grande: a marca d'agua do Portal."""
+    """Linha girada, clara e de corpo grande: a marca d'agua do Portal.
+
+    O corpo minimo vem de `gerar_pacote.MARCA_CORPO`, e nao de um numero escrito
+    aqui: com 30 fixo, esta funcao classificava como "sem marca" justamente a
+    pagina do Teorema de Tales, cuja marca de 17,4 pt motivou a versao -- e a
+    folha de contato a mostrava ao revisor como controle que nao podia mudar.
+    """
+    import gerar_pacote
     for b in pg.get_text('rawdict')['blocks']:
         if b['type'] != 0:
             continue
         for l in b['lines']:
             s0 = l['spans'][0]
-            if abs(l['dir'][1]) > 1e-6 and s0['color'] > 0xAAAAAA and s0['size'] > 30:
+            if abs(l['dir'][1]) > 1e-6 and s0['color'] > 0xAAAAAA and s0['size'] > gerar_pacote.MARCA_CORPO:
                 return True
     return False
 
