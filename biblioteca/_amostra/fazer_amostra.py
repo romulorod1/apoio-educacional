@@ -417,11 +417,23 @@ MARCAS = {
     'cm': b'q .70711 .70711 -.70711 .70711 0 0 cm 0.8 g 0.8 G BT /helv 76 Tf 254.6 169.7 Td [(Portal)-350(OBMEP)]TJ ET Q\n',
     # sem q/Q, como o Portal escreve este formato: a cor volta a preto depois
     'tm': b'0.800781 g BT /helv 76 Tf 0.707107 0.707107 -0.707107 0.707107 40 380 Tm [(P)-2(ortal)-350(da)-350(OBMEP)]TJ ET 0 g\n',
-    # a marca miuda do Teorema de Tales (9o ano): 20 pt, com a escala entrando
-    # em dois `cm` que se cancelam (0,1 e 10), como o PDF do Portal a escreve.
-    # Com o limite antigo de 30 pt de corpo ela passava batida.
-    'miuda': b'q 0.1 0 0 0.1 0 0 cm 0.800781 g q 10 0 0 10 0 0 cm BT /helv 20 Tf'
-             b' 0.707107 0.707107 -0.707107 0.707107 330 90 Tm [(P)22(ortal)-298(OBMEP)]TJ ET Q Q\n',
+    # a marca miuda do Teorema de Tales (9o ano), no corpo exato dela -- 17,4 pt
+    # --, com a escala entrando em dois `cm` que se cancelam (0,1 e 10), como o
+    # PDF do Portal a escreve. Com o limite antigo de 30 pt ela passava batida, e
+    # e ela que prende o limite por cima: 14 pt tem de ficar ABAIXO de 17,4.
+    'miuda': b'q 0.1 0 0 0.1 0 0 cm 0.800781 g q 10 0 0 10 0 0 cm BT /helv 17.4 Tf'
+             b' 0.707107 0.707107 -0.707107 0.707107 340 96 Tm [(P)22(ortal)-298(OBMEP)]TJ ET Q Q\n',
+    # marca a 47 graus: dentro da folga de 4 graus que a regra do giro declara.
+    # Prende a folga: sem ela, esta marca sobrevive.
+    'torta': b'q 0.8 g BT /helv 44 Tf 0.68200 0.73135 -0.73135 0.68200 60 250 Tm [(Portal)-350(OBMEP)]TJ ET Q\n',
+    # marca em cinza 0,76: dentro da faixa declarada (0,75 a 0,85), e nao e
+    # nenhum dos dois valores que o Portal usa hoje. Prende a faixa por baixo.
+    'clara': b'q 0.76 g BT /helv 52 Tf 0.707107 0.707107 -0.707107 0.707107 250 60 Tm [(Portal)-350(OBMEP)]TJ ET Q\n',
+    # marca cuja matriz efetiva so sai 45 graus se a composicao for na ordem
+    # certa: o desenho estica 2x em x, e a matriz do texto compensa. Inverter a
+    # ordem em _multiplicar da 24 graus, fora da faixa, e a marca fica.
+    'ordem': b'q 2 0 0 1 0 0 cm 0.8 g BT /helv 40 Tf 0.353553 0.707107 -0.353553 0.707107 30 470 Tm'
+             b' [(Portal)-350(OBMEP)]TJ ET Q\n',
 }
 # Um controle por condicao da regra, e nenhum pode sair da pagina: girado mas
 # preto e miudo (rotulo de figura, o "|sen a|" que a sonda achou em duas
@@ -429,6 +441,13 @@ MARCAS = {
 # giro, claro e girado mas miudo.
 CONTROLES = (b'0 g BT /helv 8 Tf 0.707107 0.707107 -0.707107 0.707107 400 200 Tm (|sen a| girado em preto)Tj ET\n'
              b'0 g BT /helv 36 Tf 0.707107 0.707107 -0.707107 0.707107 250 120 Tm (Eixo girado)Tj ET\n'
+             # claro, girado e de 12 pt: prende o limite de corpo por baixo, que
+             # tem de ficar ACIMA de 12 para este nao sair
+             b'0.8 g BT /helv 12 Tf 0.707107 0.707107 -0.707107 0.707107 300 150 Tm (rotulo claro girado de 12 pt)Tj ET 0 g\n'
+             # claro, grande, mas girado so 30 graus: prende a folga do giro
+             b'0.8 g BT /helv 34 Tf 0.866025 0.5 -0.5 0.866025 40 60 Tm (girado 30 graus)Tj ET 0 g\n'
+             # girado e grande, mas cinza 0,70: prende a faixa de cor por baixo
+             b'0.70 g BT /helv 30 Tf 0.707107 0.707107 -0.707107 0.707107 120 300 Tm (cinza 0,70)Tj ET 0 g\n'
              b'0.8 g BT /helv 40 Tf 1 0 0 1 60 640 Tm (Titulo claro e reto)Tj ET\n'
              b'0.8 g BT /helv 9 Tf 0.707107 0.707107 -0.707107 0.707107 430 120 Tm (nota clara girada e miuda)Tj ET 0 g\n')
 
@@ -456,7 +475,7 @@ def teoria(caminho):
                            'Uma equação do segundo grau tem a forma ax² + bx + c = 0.',
                            'A fórmula de Bhaskara dá as raízes a partir do discriminante.']):
         pg.insert_text((60, 80 + 12 * i), l, fontname='helv', fontsize=10)
-    marca_dagua(pg, 'tm miuda')
+    marca_dagua(pg, 'tm miuda torta clara ordem')
     # pagina com a marca no outro formato, cruzando o texto, e com os controles
     pg = doc.new_page(width=612, height=792)
     for i, l in enumerate(['2 Discriminante', '',
