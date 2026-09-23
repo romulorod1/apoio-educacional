@@ -981,7 +981,7 @@ MARCA_CLARA = 0xAAAAAA   # de 0xFFFFFF: acima disto a cor da linha e clara
 # de verdade tem 8 ou 10 pt, a menor marca tem 17,4 pt
 # (Biblioteca/b2_insumos/MARCA_DAGUA_achado.md).
 MARCA_GRANDE = 14.0
-TINTA_DA_MARCA = (190, 215)   # o cinza 0xCC (204) renderizado, com folga
+TINTA_FOLGA = 14   # folga em volta do cinza da marca, ao medir a tinta dela
 # Um nivel de 255: e de quanto o rasterizador do MuPDF muda um pixel de figura
 # so por recompor a area sem a marca (medido nas sete series: o pior caso, em
 # pagina com foto, escurece exatamente 1). Abaixo disso nao se conclui nada.
@@ -1466,6 +1466,16 @@ def marca_fora_do_svg(fonte, ref, cro, pid):
     Mede so onde a pagina tem a tinta da marca e nada mais: sai da conta a caixa
     de toda linha de texto que nao e a marca, de todo desenho e de toda imagem,
     porque conteudo em cinza claro tem a mesma tinta e fica.
+
+    Qual e "a tinta da marca" sai da COR do span dela na pagina de origem, e nao
+    de um par fixo: o par fixo (190, 215) era o 0xCC de MARCA_CINZA escrito de
+    novo, e com ele uma marca em cinza 0,90 -- que o detector tambem nao tira,
+    por cor -- sumia do filtro e a conta calava (achado da quarta lente).
+
+    Quando nao sobra tinta limpa para medir (marca inteira por baixo de
+    conteudo, ou desenho grande cobrindo a faixa), esta conta nao afirma nada:
+    quem cobre o caso e `trava_marca_no_svg`, que conta glifo claro e girado no
+    SVG entregue, roda nos dois modos e nao depende de renderizador.
     """
     import numpy as np
     marcas = linhas_que_dizem_a_marca(fonte)
@@ -1488,7 +1498,8 @@ def marca_fora_do_svg(fonte, ref, cro, pid):
                    if not (l['girada'] and linha_da_marca_pelo_texto(l['texto']))], False)
     pintar(dentro, [d['rect'] for d in fonte.get_drawings()], False)
     pintar(dentro, [b1['bbox'] for b1 in fonte.get_text('rawdict')['blocks'] if b1['type'] != 0], False)
-    tinta = dentro & (a >= TINTA_DA_MARCA[0]) & (a <= TINTA_DA_MARCA[1])
+    v = min(m['cor'] & 0xFF for m in marcas)      # o cinza da marca, como ela e desenhada
+    tinta = dentro & (a >= v - TINTA_FOLGA) & (a <= v + TINTA_FOLGA)
     n = int(tinta.sum())
     if n < 200:
         return []   # a marca desta pagina nao deixa tinta limpa que de para medir
