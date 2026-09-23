@@ -982,6 +982,10 @@ MARCA_CLARA = 0xAAAAAA   # de 0xFFFFFF: acima disto a cor da linha e clara
 # (Biblioteca/b2_insumos/MARCA_DAGUA_achado.md).
 MARCA_GRANDE = 14.0
 TINTA_DA_MARCA = (190, 215)   # o cinza 0xCC (204) renderizado, com folga
+# Um nivel de 255: e de quanto o rasterizador do MuPDF muda um pixel de figura
+# so por recompor a area sem a marca (medido nas sete series: o pior caso, em
+# pagina com foto, escurece exatamente 1). Abaixo disso nao se conclui nada.
+ARREDONDAMENTO = 1
 
 
 def caracteres_da_pagina(pg):
@@ -1032,6 +1036,24 @@ def sem_espacos(s):
     return re.sub(r'\s+', '', s).lower()
 
 
+def clareada_maxima(antes, depois, minimo=51):
+    """Quanto a tinta da marca clareia, no maximo, nesta pagina.
+
+    Onde a pagina ficou BRANCA depois da remocao so havia a marca: o valor de
+    antes ali e a tinta dela. O maior clareamento que a remocao pode explicar e
+    255 menos a mais escura dessas tintas -- 51 no cinza 0xCC de sempre, um
+    pouco mais onde dois glifos da marca se cruzam. Medir isto na propria pagina
+    evita que um limite fixo acuse a marca como se fosse conteudo mexido.
+    """
+    import numpy as np
+    a = np.frombuffer(antes.samples, dtype=np.uint8).reshape(antes.height, antes.width).astype(np.int16)
+    b = np.frombuffer(depois.samples, dtype=np.uint8).reshape(depois.height, depois.width).astype(np.int16)
+    puro = (b == 255) & (a != 255)
+    if not puro.any():
+        return minimo
+    return max(minimo, int(255 - a[puro].min()))
+
+
 def trava_marca(temp, tirar=None):
     """A marca d'agua girada sai da pagina de teoria, e so ela.
 
@@ -1042,8 +1064,12 @@ def trava_marca(temp, tirar=None):
 
     Julga o resultado, nao a regra: caractere a caractere com a posicao, e o
     pixel a 144 dpi. No pixel a marca so pode ter clareado -- nenhum pixel mais
-    escuro, nenhum clareando mais que os 51 niveis de 255 que a tinta dela vale
-    (0xCC contra branco), e nenhum pixel mudando fora da caixa da marca.
+    escuro, nenhum clareando mais do que a tinta da marca vale naquela pagina, e
+    nenhum pixel mudando fora da caixa da marca.
+
+    Quanto a tinta da marca vale sai da propria pagina (`clareada_maxima`), e nao
+    de um numero fixo: onde dois glifos dela se cruzam o cinza fica mais escuro
+    que o 0xCC de sempre, e um limite fixo acusaria isso como conteudo mexido.
     """
     import numpy as np
     tirar = tirar or gerar_pacote.tirar_marca
@@ -1080,10 +1106,12 @@ def trava_marca(temp, tirar=None):
         a = np.frombuffer(pa.samples, dtype=np.uint8).reshape(pa.height, pa.width).astype(np.int16)
         b = np.frombuffer(pb.samples, dtype=np.uint8).reshape(pb.height, pb.width).astype(np.int16)
         dif = b - a
-        if int((dif < 0).sum()):
-            erros.append('p%d: %d pixel(s) mais escuros depois da remocao' % (pno, int((dif < 0).sum())))
-        if int((dif > 52).sum()):
-            erros.append('p%d: %d pixel(s) clarearam mais que a tinta da marca' % (pno, int((dif > 52).sum())))
+        if int((dif < -ARREDONDAMENTO).sum()):
+            erros.append('p%d: %d pixel(s) mais escuros depois da remocao' % (pno, int((dif < -ARREDONDAMENTO).sum())))
+        limite = clareada_maxima(a, b)
+        if int((dif > limite + ARREDONDAMENTO).sum()):
+            erros.append('p%d: %d pixel(s) clarearam mais que a tinta da marca (mais de %d de 255)'
+                         % (pno, int((dif > limite + ARREDONDAMENTO).sum()), limite))
         if not marca and int((dif != 0).sum()):
             erros.append('p%d: pagina sem marca mudou %d pixel(s)' % (pno, int((dif != 0).sum())))
         if marca:
