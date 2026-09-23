@@ -56,7 +56,12 @@ const V_MODULO = process.argv.indexOf('--envenenado-modulo') !== -1;
 const VENENO = V_CHEIO || V_VISOR || V_MODULO;
 
 const APP_REPO = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
-const L_CHEIO = 'bibCarrinho = tudo;';
+/* A âncora segue a linha que ENCHE o carrinho, e ela mudou junto com o
+ * Desfazer: era `bibCarrinho = tudo;` e passou a copiar as duas listas, para o
+ * Desfazer poder comparar com o que a marcação pôs. O portão pegou isso na
+ * hora, pela asserção logo abaixo, que exige a âncora existir UMA vez: veneno
+ * que deixa de envenenar sem ninguém notar é o pior defeito de uma prova. */
+const L_CHEIO = 'bibCarrinho = { itens: tudo.itens.slice(), paginas: tudo.paginas.slice() };';
 /* O worktree pode ter o app.js com CRLF (core.autocrlf): a âncora segue o
  * arquivo. Um `return` logo depois desta linha pula o marcarCaixasDoCarrinho
  * que fecha o soltarVisor, e nada mais. */
