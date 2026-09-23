@@ -99,8 +99,18 @@ const ASSUNTO_ACERVO = { id: 'acervo-mat-funcoes', titulo: 'Funções: domínio 
   secao('3. Biblioteca sem pacote: "Em construção"; a aba Temas não existe');
   await H.irParaAba(pag, 'biblioteca');
   await esperar('Em construção', () => pag.evaluate(() => !!document.querySelector('#biblioteca-em-construcao')), v => v === true, 8000);
-  conf('a aba Biblioteca mostra "Em construção"', await pag.evaluate(() =>
-    (document.querySelector('#biblioteca-em-construcao') || {}).textContent || ''), 'Em construçãoEsta área está sendo preparada.');
+  /* O TEXTO MUDOU DE PROPÓSITO no B7, e este teste mudou junto. "Em
+   * construção" nasceu como o estado de quem nunca importou nada; depois que
+   * dá para REMOVER uma série, ele virou também a resposta a uma ação dela, e
+   * um estado sem caminho de volta seria um beco. A terceira linha diz onde
+   * importar. As duas primeiras continuam palavra por palavra. */
+  const emConstrucao = await pag.evaluate(() =>
+    (document.querySelector('#biblioteca-em-construcao') || {}).textContent || '');
+  conf('a aba Biblioteca mostra "Em construção"',
+    emConstrucao.indexOf('Em construçãoEsta área está sendo preparada.'), 0);
+  conf('e diz onde importar uma biblioteca',
+    await pag.evaluate(() => (document.querySelector('#biblioteca-onde-importar') || {}).textContent || ''),
+    'Para trazer uma biblioteca para este tablet, vá em Ajustes, no cartão Biblioteca, e toque em Importar biblioteca.');
   conf('as abas são Agenda, Alunos, Fechamento, Biblioteca e Ajustes', await pag.evaluate(() =>
     Array.from(document.querySelectorAll('#abas .aba')).map(a => a.textContent.trim()).join(',')), 'Agenda,Alunos,Fechamento,Biblioteca,Ajustes');
   conf('a seção antiga da aba Temas não está na página', await pag.evaluate(() => !!document.querySelector('#tela-temas')), false);

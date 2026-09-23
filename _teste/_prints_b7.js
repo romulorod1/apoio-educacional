@@ -72,6 +72,16 @@ async function semearAulas(pag) {
       { id: 'MAT09-07', titulo: 'Teorema de Pitágoras', fonte: 'banco', disciplina: 'matematica' },
       { titulo: 'Revisão para a prova de recuperação', fonte: 'livre' }
     ]));
+    /* O ESTADO QUE O DESLIGAMENTO CRIOU, e que não existia antes: um assunto
+     * vindo do BANCO DE TEMAS que a biblioteca não cobre. O subtítulo diz a
+     * matéria e o ano, porque isso é grafo e continua sendo lido, e não há
+     * botão nenhum. Português do 7º ano é o caso puro: tinha material autoral
+     * e a biblioteca da OBMEP é só de matemática. */
+    d.aulas.push(aula('aula-b7-sem-material', '09:00', [
+      { id: 'POR07-01', titulo: 'Conto de mistério: pistas, suspeitos e dedução',
+        fonte: 'banco', disciplina: 'portugues' },
+      { id: 'MAT09-07', titulo: 'Teorema de Pitágoras', fonte: 'banco', disciplina: 'matematica' }
+    ]));
     d.aulas.push(aula('aula-b7-anexo', '10:00', [
       { id: 'MAT06-05', titulo: 'Frações: o que são e como comparar', fonte: 'banco', disciplina: 'matematica',
         lingua: 'pt', partes: ['material', 'lista', 'gabarito'], exercicios: 7, anexoId: 'anexo-print-b7' }
@@ -170,6 +180,19 @@ const tocarLinha = (pag, nome) => pag.evaluate(x => {
   await rolarAte(pag, '#lista-temas-aula');
   await tirar(pag, '#modal-aula .modal');
   // 5. só o bloco dos assuntos, de perto
+  await tirar(pag, '#lista-temas-aula');
+
+  /* 6. O assunto que veio do BANCO e a biblioteca não cobre, ao lado de um que
+   * ela cobre. É o estado novo mais arriscado: o de português tem matéria e
+   * ano no subtítulo e não tem botão nenhum. */
+  await abrirAula(pag, '09:00');
+  await esperar('as duas linhas do banco', () => pag.evaluate(() =>
+    document.querySelectorAll('#corpo-modal-aula .item-assunto-aula').length), v => v === 2, 15000);
+  await esperar('o Material na linha que a biblioteca cobre', () => pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula button'))
+      .some(b => b.textContent.trim() === 'Material')), v => v === true, 20000);
+  await pausa(900);
+  await rolarAte(pag, '#lista-temas-aula');
   await tirar(pag, '#lista-temas-aula');
 
   // 6. o caminho curto: o módulo inteiro já marcado

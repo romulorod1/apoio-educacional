@@ -11141,10 +11141,20 @@
         bibContexto = null;
         bibFiltroAluno = '';
         desenharContextoBiblioteca();
+        /* A TERCEIRA LINHA DIZ ONDE IMPORTAR, e ela é nova de propósito.
+         *
+         * "Em construção" nasceu como o estado de quem nunca importou nada.
+         * Depois que dá para REMOVER uma série, ele virou também a resposta a
+         * uma ação dela, e aí não pode ser um beco: o caminho de volta estava
+         * só no aviso do rodapé, que some sozinho em poucos segundos. A linha
+         * vale nos dois casos, porque o cartão Biblioteca de Ajustes está lá
+         * nos dois. */
         corpo.innerHTML = '';
         corpo.appendChild(el('div', { class: 'vazio', id: 'biblioteca-em-construcao' }, [
           el('p', { style: 'font-size:18px;font-weight:600;color:var(--navy);margin:0 0 8px', texto: 'Em construção' }),
-          el('p', { style: 'margin:0', texto: 'Esta área está sendo preparada.' })
+          el('p', { style: 'margin:0', texto: 'Esta área está sendo preparada.' }),
+          el('p', { class: 'ajuda', style: 'margin:10px 0 0', id: 'biblioteca-onde-importar',
+            texto: 'Para trazer uma biblioteca para este tablet, vá em Ajustes, no cartão Biblioteca, e toque em Importar biblioteca.' })
         ]));
         return;
       }
@@ -11281,13 +11291,18 @@
       var todos = todosMarcados();
       /* O MESMO botão nos dois estados, e quem muda é o rótulo. Quando um dos
        * estados vinha realçado e o outro não, o não realçado se lia como
-       * desabilitado e ela não sabia se podia tocar. */
+       * desabilitado e ela não sabia se podia tocar.
+       *
+       * O RÓTULO DIZ A PALAVRA "EXERCÍCIOS", e não só o número. Vindo da aula,
+       * o módulo entra com teoria junto, e na mesma tela convivem o botão, a
+       * faixa ("6 exercícios, 3 páginas de teoria") e o aviso. Sem a palavra,
+       * os dois números brigam e ela não sabe o que o toque vai desfazer. */
       caixa.appendChild(el('button', {
         type: 'button', class: 'btn pequeno',
         id: 'bib-marcar-modulo',
         'aria-pressed': todos ? 'true' : 'false',
-        texto: (todos ? 'Desmarcar os ' : 'Marcar os ') + ids.length +
-          (mod.banco ? ' deste grupo' : ' deste módulo'),
+        texto: (todos ? 'Desmarcar os ' : 'Marcar os ') + ids.length + ' ' +
+          (mod.banco ? 'problemas deste grupo' : 'exercícios deste módulo'),
         aoClick: function () {
           var marcar = !todos;
           ids.forEach(function (id) {
@@ -11541,8 +11556,9 @@
    * que ela não vê faria a folha sair com questão repetida para a mesma
    * criança. O aviso diz quantos ficaram de fora.
    *
-   * A seleção anterior é substituída, e não somada: o Desfazer do aviso a traz
-   * de volta inteira. */
+   * A seleção anterior é substituída, e não somada. O Desfazer do aviso a traz
+   * de volta e mantém o que ela marcou depois, pela mesma regra do "Desmarcar
+   * tudo". */
   function abrirBibliotecaDoAssunto(t, aula, chaveModulo) {
     bibContexto = { aulaId: aula.id, alunoId: aula.alunoId };
     bibFiltroAluno = aula.alunoId;
@@ -11569,10 +11585,12 @@
 
     return espera.then(function () {
       var quantosDeFora = 0;
+      // o que ESTA marcação pôs no carrinho, para o Desfazer saber o que tirar
+      var tudo = { itens: [], paginas: [] };
       if (mod) {
-        var tudo = tudoDoModulo(mod, jaUsados);
+        tudo = tudoDoModulo(mod, jaUsados);
         quantosDeFora = tudoDoModulo(mod, null).itens.length - tudo.itens.length;
-        bibCarrinho = tudo;
+        bibCarrinho = { itens: tudo.itens.slice(), paginas: tudo.paginas.slice() };
         guardarCarrinho();
       }
       fecharModal('modal-aula');
@@ -11593,8 +11611,18 @@
           ? ' Fora ' + quantosDeFora + ' que você já usou com ' + aluno.nome + '.'
           : '') +
         ' Tire o que não quiser e toque em Gerar material.',
+        /* DESFAZER SEGUE A MESMA REGRA DO "Desmarcar tudo": volta o que era
+         * dela antes e MANTÉM o que ela fez depois. Lá isso é
+         * juntarSelecoes(antes, bibCarrinho), porque a ação esvazia e o que
+         * sobra no carrinho é só o que ela marcou nesses segundos. Aqui a ação
+         * ENCHE, então o "que ela fez depois" é o carrinho menos o que esta
+         * marcação pôs: tirar isso primeiro é o que faz a mesma regra valer
+         * nos dois. Juntar sem tirar deixaria o módulo marcado e ainda somaria
+         * o de antes, e o número SUBIRIA depois de um toque em Desfazer. */
         'Desfazer', function () {
-          bibCarrinho = antes;
+          var dela = { itens: semOsDe(bibCarrinho.itens, tudo.itens),
+            paginas: semOsDe(bibCarrinho.paginas, tudo.paginas) };
+          bibCarrinho = juntarSelecoes(antes, dela);
           guardarCarrinho();
           desenharCarrinho();
           marcarCaixasDoCarrinho();
@@ -11743,6 +11771,13 @@
   function juntarSelecoes(a, b) {
     function junta(x, y) { return x.concat(y.filter(function (id) { return x.indexOf(id) < 0; })); }
     return { itens: junta(a.itens, b.itens), paginas: junta(a.paginas, b.paginas) };
+  }
+
+  /* Os ids de `lista` que NÃO estão em `fora`. Serve ao Desfazer de uma ação
+   * que ENCHEU o carrinho: tirando o que ela pôs, sobra o que a Nathália
+   * marcou por conta dela depois, que é o que não pode se perder. */
+  function semOsDe(lista, fora) {
+    return lista.filter(function (id) { return fora.indexOf(id) < 0; });
   }
 
   function marcarNoCarrinho(tipo, id, marcado) {
@@ -12867,10 +12902,14 @@
     if (marcar) {
       marcar.style.display = peca.marca ? '' : 'none';
       /* O MESMO botão nos dois estados: muda o rótulo, e mais nada. Realçar só
-       * o "Marcar" fazia o "Marcado, tirar" sair apagado, e o estado LIGADO
-       * passava a ter cara de estado desligado. Quem diz o estado aqui é o
-       * rótulo, o aria-pressed e o selo sobre a folha. */
-      marcar.textContent = marcada ? 'Marcado, tirar' : 'Marcar para o material';
+       * o "Marcar" fazia o outro estado sair apagado, e o estado LIGADO passava
+       * a ter cara de estado desligado. Quem diz o estado aqui é o rótulo, o
+       * aria-pressed e o selo sobre a folha.
+       *
+       * "Tirar do material" e não "Marcado, tirar": os dois rótulos ficam
+       * simétricos e o vocabulário da tela fecha em três palavras, o verbo
+       * MARCAR, o estado MARCADO (o selo) e a coisa, o MATERIAL. */
+      marcar.textContent = marcada ? 'Tirar do material' : 'Marcar para o material';
       marcar.setAttribute('aria-pressed', marcada ? 'true' : 'false');
     }
     corpo.scrollTop = 0;

@@ -223,7 +223,13 @@ const cartoesDePacote = pag => pag.evaluate(() => Array.from(document.querySelec
   await H.irParaAba(pag, 'biblioteca');
   const vazia = await esperar('Em construção', () => pag.evaluate(() =>
     (document.querySelector('#biblioteca-em-construcao') || {}).textContent || ''), v => !!v, 15000);
-  conf('a aba Biblioteca volta ao "Em construção"', vazia.valor, 'Em construçãoEsta área está sendo preparada.');
+  conf('a aba Biblioteca volta ao "Em construção"',
+    (vazia.valor || '').indexOf('Em construçãoEsta área está sendo preparada.'), 0);
+  /* O caminho de volta não pode viver só no aviso, que some em segundos: ela
+   * pode chegar nesta tela minutos depois e precisa saber o que fazer. */
+  conf('e a tela diz onde importar de novo, sem depender do aviso',
+    await pag.evaluate(() => (document.querySelector('#biblioteca-onde-importar') || {}).textContent || ''),
+    'Para trazer uma biblioteca para este tablet, vá em Ajustes, no cartão Biblioteca, e toque em Importar biblioteca.');
   const semFantasma = await pag.evaluate(() => ({
     faixa: document.querySelector('#bib-carrinho').hidden,
     texto: document.querySelector('#bib-carrinho').textContent.trim(),

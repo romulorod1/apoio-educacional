@@ -17,7 +17,7 @@
  *      não vê mandaria questão repetida para a mesma criança.
  *
  *   3. MARCAR DE DENTRO DA TELA CHEIA. O visor ganha um botão que alterna entre
- *      "Marcar para o material" e "Marcado, tirar", sobre o MESMO carrinho da
+ *      "Marcar para o material" e "Tirar do material", sobre o MESMO carrinho da
  *      lista, valendo para exercício e para página de teoria; o selo "Marcado"
  *      fica sobre a imagem, para o estado se ler enquanto ela anda pelo Anterior
  *      e Próxima; e ao fechar o visor as caixas da lista já mostram o que ela
@@ -209,15 +209,45 @@ const botaoDoModulo = pag => pag.evaluate(() => {
   conf('o aviso diz o que foi marcado', /^Marquei o módulo inteiro: 6 exercícios e 3 páginas de teoria\./.test(await aviso(pag)), true);
   conf('e manda tirar o que não quiser', /Tire o que não quiser e toque em Gerar material\./.test(await aviso(pag)), true);
 
-  // Desfazer devolve a seleção anterior inteira
-  await pag.evaluate(() => document.querySelector('#aviso-acao').click());
+  /* DESFAZER SEGUE A REGRA DO "Desmarcar tudo": volta o que era dela antes e
+   * MANTÉM o que ela marcou nesses segundos. Aqui ela marca uma página de
+   * teoria de outro módulo antes de tocar em Desfazer: o módulo sai inteiro, o
+   * de antes volta, e a página dela fica. Juntar sem tirar o que a marcação
+   * pôs deixaria o módulo marcado e ainda somaria o de antes, e o número
+   * SUBIRIA depois de um toque em Desfazer. */
+  const AVULSA = '9ano:produtos-notaveis-e-fatoracao:produtos-notaveis:teo:p01';
+  // pela TELA, como ela faria, e depressa: o aviso com Desfazer dura nove segundos
+  await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
+  await pausa(150);
+  await tocarLinha(pag, 'Produtos Notáveis e Fatoração');
+  await tocarLinha(pag, 'Produtos Notáveis');
+  await pausa(200);
+  const marcouAvulsa = await pag.evaluate(id => {
+    const c = document.querySelector('#bib-corpo input[data-carrinho][data-id="' + id + '"]');
+    if (!c) return false; c.click(); return true;
+  }, AVULSA);
+  conf('ela marcou uma página de outro módulo enquanto o aviso estava na tela', marcouAvulsa, true);
+  const antesDoDesfazer = await carrinho(pag);
+  const nMarcado = antesDoDesfazer.itens.length + antesDoDesfazer.paginas.length;
+  const aindaTemDesfazer = await pag.evaluate(() => {
+    const b = document.querySelector('#aviso-acao');
+    const caixa = document.querySelector('#aviso');
+    if (!b || !caixa.classList.contains('aberto') || b.style.display === 'none') return false;
+    b.click(); return true;
+  });
+  conf('o aviso com Desfazer ainda estava lá', aindaTemDesfazer, true);
   await pausa(400);
   const c2 = await carrinho(pag);
-  conf('Desfazer devolve a seleção que ela tinha antes', JSON.stringify(c2), JSON.stringify(ANTES));
+  conf('Desfazer tira o módulo inteiro que a marcação pôs',
+    c2.itens.filter(i => i.indexOf(MOD + ':') === 0).length, 0);
+  conf('devolve a seleção que ela tinha antes', c2.itens.join(','), ANTES.itens.join(','));
+  conf('e mantém o que ela marcou depois', c2.paginas.join(','), AVULSA);
+  conf('o número DESCE depois do Desfazer, e não sobe',
+    c2.itens.length + c2.paginas.length < nMarcado, true);
   /* A faixa não conta o que não há: sem página de teoria marcada, a parte das
-   * páginas nem aparece. */
-  conf('e a faixa volta a contar só ela', (await faixa(pag)).split('\n')[0],
-    'Material marcado: 1 exercício');
+   * páginas nem aparece. Aqui há uma, então as duas partes saem. */
+  conf('e a faixa conta o que sobrou', (await faixa(pag)).split('\n')[0],
+    'Material marcado: 1 exercício, 1 página de teoria');
 
   // ================================================================
   secao('2b. Gerar material já vem com Teoria e Gabarito');
@@ -292,7 +322,7 @@ const botaoDoModulo = pag => pag.evaluate(() => {
   conf('nem o "Fechar"', g2.folha, g1.folha);
   conf('e a folha continua do mesmo tamanho', g2.largura, g1.largura);
   const v2 = await estadoDoVisor(pag);
-  conf('depois do toque o botão vira "Marcado, tirar"', v2.botao, 'Marcado, tirar');
+  conf('depois do toque o botão vira "Tirar do material"', v2.botao, 'Tirar do material');
   conf('com aria-pressed verdadeiro', v2.pressionado, 'true');
   conf('e o selo "Marcado" aparece sobre a imagem', v2.selo, true);
   conf('o carrinho ganhou o exercício', (await carrinho(pag)).itens.join(','), EX + '1');
@@ -304,7 +334,7 @@ const botaoDoModulo = pag => pag.evaluate(() => {
   await pag.click('#bib-anterior');
   await pausa(300);
   const v4 = await estadoDoVisor(pag);
-  conf('voltando, o estado da marcada continua lá', v4.botao, 'Marcado, tirar');
+  conf('voltando, o estado da marcada continua lá', v4.botao, 'Tirar do material');
   conf('e o selo volta com ela', v4.selo, true);
   await pag.click('#bib-fechar-visor');
   await pausa(400);
@@ -337,7 +367,7 @@ const botaoDoModulo = pag => pag.evaluate(() => {
   await pag.click('#bib-marcar-visor');
   await pausa(300);
   const vt = await estadoDoVisor(pag);
-  conf('marcar a página de teoria funciona igual', vt.botao, 'Marcado, tirar');
+  conf('marcar a página de teoria funciona igual', vt.botao, 'Tirar do material');
   conf('com o selo sobre a página', vt.selo, true);
   conf('e ela entra no carrinho como página', (await carrinho(pag)).paginas.join(','), TEO + ':p01');
   await pag.click('#bib-fechar-visor');
@@ -353,7 +383,7 @@ const botaoDoModulo = pag => pag.evaluate(() => {
   conf('a navegação livre começa sem nada marcado', /Nada marcado ainda/.test(await faixa(pag)), true);
   await tocarLinha(pag, 'Teorema de Pitágoras');
   await esperar('o cabeçalho do módulo', () => botaoDoModulo(pag), v => v && v !== '(não existe)', 10000);
-  conf('o botão conta os exercícios do módulo', await botaoDoModulo(pag), 'Marcar os ' + N_EX + ' deste módulo');
+  conf('o botão conta os exercícios do módulo', await botaoDoModulo(pag), 'Marcar os ' + N_EX + ' exercícios deste módulo');
   await pag.click('#bib-marcar-modulo');
   await pausa(400);
   const c4 = await carrinho(pag);
@@ -362,10 +392,10 @@ const botaoDoModulo = pag => pag.evaluate(() => {
   const rotulo = await botaoDoModulo(pag);
   if (V_MODULO) {
     conf('VENENO ENXERGADO: sem reconhecer "todos marcados", o botão nunca vira "Desmarcar"',
-      rotulo, 'Marcar os ' + N_EX + ' deste módulo');
+      rotulo, 'Marcar os ' + N_EX + ' exercícios deste módulo');
     throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
   }
-  conf('com todos marcados, o botão vira "Desmarcar os ' + N_EX + '"', rotulo, 'Desmarcar os ' + N_EX + ' deste módulo');
+  conf('com todos marcados, o botão vira "Desmarcar os ' + N_EX + '"', rotulo, 'Desmarcar os ' + N_EX + ' exercícios deste módulo');
   conf('a faixa conta os ' + N_EX + ', e só eles', (await faixa(pag)).split('\n')[0],
     'Material marcado: ' + N_EX + ' exercícios');
   /* A tela do módulo passa a dizer de ONDE vieram: sem isto as linhas ficavam
@@ -379,7 +409,7 @@ const botaoDoModulo = pag => pag.evaluate(() => {
   await pag.click('#bib-marcar-modulo');
   await pausa(400);
   conf('o mesmo botão desmarca', (await carrinho(pag)).itens.length, 0);
-  conf('e volta a convidar', await botaoDoModulo(pag), 'Marcar os ' + N_EX + ' deste módulo');
+  conf('e volta a convidar', await botaoDoModulo(pag), 'Marcar os ' + N_EX + ' exercícios deste módulo');
   const detalheDaLista = () => pag.evaluate(() => {
     const l = Array.from(document.querySelectorAll('#bib-corpo .item-lista'))
       .find(x => x.querySelector('.nome').textContent.trim() === 'Aplicações do Teorema');
@@ -395,7 +425,7 @@ const botaoDoModulo = pag => pag.evaluate(() => {
   await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-limpar'); if (b) b.click(); });
   await pausa(600);
   conf('o "Desmarcar tudo" da faixa também limpa a contagem da linha', await detalheDaLista(), '6 exercícios');
-  conf('e o botão do módulo acompanha', await botaoDoModulo(pag), 'Marcar os ' + N_EX + ' deste módulo');
+  conf('e o botão do módulo acompanha', await botaoDoModulo(pag), 'Marcar os ' + N_EX + ' exercícios deste módulo');
   conf('a faixa e a linha dizem a mesma coisa', /Nada marcado ainda/.test(await faixa(pag)), true);
 
   secao('4b. O rótulo acompanha a marcação feita na lista');
@@ -409,7 +439,7 @@ const botaoDoModulo = pag => pag.evaluate(() => {
   conf('desmarcando um, sobram ' + (N_EX - 1), (await carrinho(pag)).itens.length, N_EX - 1);
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
   await pausa(400);
-  conf('e o botão do módulo volta a "Marcar os ' + N_EX + '"', await botaoDoModulo(pag), 'Marcar os ' + N_EX + ' deste módulo');
+  conf('e o botão do módulo volta a "Marcar os ' + N_EX + '"', await botaoDoModulo(pag), 'Marcar os ' + N_EX + ' exercícios deste módulo');
 
   // ================================================================
   secao('5. Nenhum erro');
