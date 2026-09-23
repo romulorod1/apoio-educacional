@@ -505,9 +505,14 @@ async function anexarEm(pag, aulaId, itens, paginas, extra) {
   conf('vai à biblioteca, no módulo do assunto', autoral.ok && autoral.valor.titulo, 'Teorema de Pitágoras');
   conf('sem busca no caminho', autoral.valor && autoral.valor.campo, '');
   /* O aviso "o seu material continua em Material de aula" era sobre o material
-   * autoral, que saiu. O aviso de hoje é o do módulo marcado. */
-  conf('e o aviso é o do módulo inteiro marcado',
-    /^Marquei o módulo inteiro:/.test(autoral.valor && autoral.valor.aviso), true);
+   * autoral, que saiu. O aviso de hoje é o do módulo marcado, e ele começa
+   * pelo que SAIU: aqui ela tinha um exercício marcado de antes, e vir da aula
+   * substitui a seleção. A frase inteira, e não um "começa com", porque foi
+   * uma asserção frouxa deste tipo que deixou passar a perda silenciosa. */
+  conf('e o aviso é o do módulo inteiro marcado, dizendo antes o que saiu',
+    (autoral.valor && autoral.valor.aviso) || 'VAZIO',
+    'Tirei 1 item que estava marcado e marquei o módulo inteiro: 6 exercícios e 3 páginas de teoria. ' +
+    'Tire o que não quiser e toque em Gerar material.');
   conf('sem falar de "Material de aula", que não existe mais',
     /Material de aula/.test((autoral.valor || {}).aviso || ''), false);
 

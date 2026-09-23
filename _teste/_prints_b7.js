@@ -316,6 +316,49 @@ const tocarLinha = (pag, nome) => pag.evaluate(x => {
   await pausa(600);
   await tirar(pag, '.conteudo');
 
+  /* 17 e 18. A TROCA DO CARRINHO DEIXA DE SER SILENCIOSA.
+   *
+   * Estes dois vêm depois de tudo, e não no meio do caminho curto, só para não
+   * renumerar as imagens que já foram olhadas. O pacote volta porque a tela
+   * anterior o removeu.
+   *
+   * O estado que interessa é o que a Nathália vive: ela já tinha material
+   * marcado de outro dia e vem da aula por um assunto que a biblioteca tem. A
+   * seleção antiga SAI, e as duas telas mostram como ela fica sabendo: a
+   * primeira com o aviso, que começa pelo que saiu, e a segunda DEPOIS de o
+   * aviso morrer, que é onde a volta tinha de continuar existindo. */
+  conf('reimportou o pacote para as duas últimas telas',
+    /^Biblioteca importada\./.test(await importar(pag, zip)), true);
+  await pag.evaluate(c => localStorage.setItem('apoio-educacional:bib-carrinho', JSON.stringify(c)),
+    { itens: ['9ano:produtos-notaveis-e-fatoracao:produtos-notaveis:ex:1'], paginas: [] });
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.abrirApp(pag, amb.ORIGEM);
+  await abrirAula(pag, '09:00');
+  await esperar('o Material da linha que a biblioteca cobre', () => pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula button'))
+      .some(b => b.textContent.trim() === 'Material')), v => v === true, 20000);
+  await pag.evaluate(() => {
+    const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => /Teorema/.test(x.textContent));
+    const b = l && Array.from(l.querySelectorAll('button')).find(x => x.textContent.trim() === 'Material');
+    if (b) b.click();
+  });
+  await esperar('o módulo aberto de novo', () => pag.evaluate(() =>
+    (document.querySelector('#bib-corpo .bib-titulo') || {}).textContent || ''), v => v === 'Teorema de Pitágoras', 20000);
+  await pausa(900);
+  await tirar(pag, '.conteudo');
+
+  /* Os nove segundos do aviso, esperados de verdade: a tela de baixo só vale
+   * alguma coisa com o aviso FORA dela. */
+  await pausa(9600);
+  await tirar(pag, '.conteudo');
+  const voltaDepoisDoAviso = await pag.evaluate(() => ({
+    aviso: document.querySelector('#aviso').classList.contains('aberto'),
+    botao: (document.querySelector('#bib-desfazer-troca') || {}).textContent || ''
+  }));
+  conf('na última tela o aviso já saiu', voltaDepoisDoAviso.aviso, false);
+  conf('e a volta continua oferecida na faixa', voltaDepoisDoAviso.botao.trim(),
+    'Devolver o item que eu tirei');
+
   conf('a pergunta da remoção tem texto', textoDaPergunta.length > 80, true);
   conf('a linha do espaço usado existe antes e depois de remover',
     !!espacoAntes && !!espacoDepois, true);

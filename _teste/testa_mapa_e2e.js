@@ -379,7 +379,15 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
    * O caminho antigo, "Ver os temas soltos", levava ao material autoral e saiu
    * com ele. O que as asserções abaixo conferem é o que sobrou, que é o que ela
    * usa: a lacuna abre a trilha, a trilha monta a escada e os passos são os do
-   * grafo de pré-requisitos. */
+   * grafo de pré-requisitos.
+   *
+   * ONDE FOI PARAR O `every` ESTRITO: este bloco guardava a única trava da
+   * suíte que afirmava que TODO resultado da busca diz por que está ali (o
+   * título bate, ou a etiqueta cinza explica onde bateu). A busca não saiu, só
+   * este caminho até ela saiu, então a trava mudou de casa e hoje mora no
+   * testa_temas.js, seção 2, em "todo resultado fala de fração ou diz onde
+   * bateu". Se alguém apagar isto aqui de novo, a propriedade continua presa
+   * lá; o que não pode é ela ficar sem dono. */
 
   await abrirFichaDoMarcelo();
   await espera(700);

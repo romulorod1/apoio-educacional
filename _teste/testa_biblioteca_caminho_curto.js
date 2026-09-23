@@ -9,12 +9,20 @@
  *
  *   2. DA AULA, O MATERIAL NASCE CHEIO E JÁ MARCADO. Um toque no Material de um
  *      assunto que a biblioteca tem abre o MÓDULO dele (e não uma busca) com
- *      todos os exercícios e todas as páginas de teoria já marcados; o aviso diz
- *      o que marcou e oferece Desfazer, que devolve a seleção anterior inteira;
- *      a janela Gerar material já vem com Teoria e Gabarito ligados. Os
- *      exercícios que ela JÁ USOU com aquele aluno ficam de fora, porque são os
- *      mesmos que o filtro "Ainda não usei com" tira da lista: marcar o que ela
- *      não vê mandaria questão repetida para a mesma criança.
+ *      todos os exercícios e todas as páginas de teoria já marcados; a janela
+ *      Gerar material já vem com Teoria e Gabarito ligados. Os exercícios que
+ *      ela JÁ USOU com aquele aluno ficam de fora, porque são os mesmos que o
+ *      filtro "Ainda não usei com" tira da lista: marcar o que ela não vê
+ *      mandaria questão repetida para a mesma criança.
+ *
+ *   2a. A TROCA DO CARRINHO NÃO É SILENCIOSA, E A VOLTA NÃO MORRE EM NOVE
+ *      SEGUNDOS. Vir da aula SUBSTITUI a seleção que estava no carrinho, e isso
+ *      é o certo, porque o carrinho passa a ser "o material desta aula". O que
+ *      não pode é ela perder trabalho sem saber: o aviso começa dizendo quantos
+ *      itens SAÍRAM, e a volta fica na faixa do contexto, com o número no
+ *      rótulo, até a próxima ação dela sobre o material. A seção espera o aviso
+ *      morrer de propósito, porque provar a volta com o aviso ainda na tela
+ *      seria provar o caso fácil.
  *
  *   3. MARCAR DE DENTRO DA TELA CHEIA. O visor ganha um botão que alterna entre
  *      "Marcar para o material" e "Tirar do material", sobre o MESMO carrinho da
@@ -40,6 +48,11 @@
  *   --envenenado-modulo  o app.js servido nunca reconhece "todos marcados", e o
  *                        botão do módulo nunca vira "Desmarcar os N": o caminho
  *                        fica sem volta. Marcar em si cai alto no modo normal.
+ *   --envenenado-volta   o app.js servido não põe a volta na faixa do contexto,
+ *                        e a única saída volta a ser o botão do aviso. É o modo
+ *                        mais silencioso dos quatro: por nove segundos o
+ *                        aplicativo parece inteiro, e o teste tem de olhar a
+ *                        FAIXA, e não o aviso, para enxergar a perda.
  */
 'use strict';
 const fs = require('fs');
@@ -53,7 +66,8 @@ const PORTA = 8800;
 const V_CHEIO = process.argv.indexOf('--envenenado-cheio') !== -1;
 const V_VISOR = process.argv.indexOf('--envenenado-visor') !== -1;
 const V_MODULO = process.argv.indexOf('--envenenado-modulo') !== -1;
-const VENENO = V_CHEIO || V_VISOR || V_MODULO;
+const V_VOLTA = process.argv.indexOf('--envenenado-volta') !== -1;
+const VENENO = V_CHEIO || V_VISOR || V_MODULO || V_VOLTA;
 
 const APP_REPO = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 /* A âncora segue a linha que ENCHE o carrinho, e ela mudou junto com o
@@ -67,12 +81,19 @@ const L_CHEIO = 'bibCarrinho = { itens: tudo.itens.slice(), paginas: tudo.pagina
  * que fecha o soltarVisor, e nada mais. */
 const L_VISOR = 'bibVezDoVisor++;';
 const L_MODULO = 'return ids.length > 0 && ids.every(function (id) { return noCarrinho(\'itens\', id); });';
-const ALVO_VENENO = V_CHEIO ? L_CHEIO : V_VISOR ? L_VISOR : L_MODULO;
+/* A volta persistente: desligando a guarda que PÕE o botão na faixa, a única
+ * saída volta a ser o botão do aviso, que morre em nove segundos. É a regressão
+ * exata que a seção 2a existe para impedir, e o modo normal continua passando
+ * em tudo o mais, porque o aviso segue funcionando. */
+const L_VOLTA = 'if (bibTrocaDesfazer && !bibContexto.anexado) {';
+const ALVO_VENENO = V_CHEIO ? L_CHEIO : V_VISOR ? L_VISOR : V_MODULO ? L_MODULO : L_VOLTA;
 const TROCA_VENENO = V_CHEIO
   ? 'bibCarrinho = { itens: [], paginas: [] };'
   : V_VISOR
     ? 'bibVezDoVisor++; return;'
-    : 'return false;';
+    : V_MODULO
+      ? 'return false;'
+      : 'if (false) {';
 const trocas = {};
 if (VENENO) trocas['/app.js'] = APP_REPO.split(ALVO_VENENO).join(TROCA_VENENO);
 
@@ -211,8 +232,40 @@ const botaoDoModulo = pag => pag.evaluate(() => {
   conf('e as ' + N_PAG + ' páginas de teoria', c1.paginas.length, N_PAG);
   conf('todos os exercícios são deste módulo', c1.itens.every(i => i.indexOf(MOD + ':') === 0), true);
   conf('e a seleção anterior, de outro módulo, saiu', c1.itens.indexOf(ANTES.itens[0]) < 0, true);
-  conf('o aviso diz o que foi marcado', /^Marquei o módulo inteiro: 6 exercícios e 3 páginas de teoria\./.test(await aviso(pag)), true);
-  conf('e manda tirar o que não quiser', /Tire o que não quiser e toque em Gerar material\./.test(await aviso(pag)), true);
+  /* O AVISO COMEÇA PELO QUE SAIU. Ela tinha um exercício marcado de outro
+   * módulo, e vir da aula SUBSTITUI a seleção. Dizer só o que entrou deixava a
+   * perda invisível: ela descobriria depois, sem saber quando aconteceu. */
+  const avisoDaTroca = await aviso(pag);
+  conf('o aviso começa dizendo o que SAIU',
+    /^Tirei 1 item que estava marcado e marquei o módulo inteiro: 6 exercícios e 3 páginas de teoria\./.test(avisoDaTroca), true);
+  conf('e manda tirar o que não quiser', /Tire o que não quiser e toque em Gerar material\./.test(avisoDaTroca), true);
+
+  /* A VOLTA NÃO DEPENDE DOS NOVE SEGUNDOS DO AVISO. O botão fica na faixa do
+   * contexto, com o número do que saiu no rótulo, porque "Desfazer" sozinho,
+   * minutos depois, não lembra mais o que seria desfeito. */
+  if (V_VOLTA) {
+    conf('VENENO ENXERGADO: sem a guarda da faixa, a volta some da tela',
+      await pag.evaluate(() => !!document.querySelector('#bib-desfazer-troca')), false);
+    /* E a perda fica silenciosa justamente porque o aviso CONTINUA certo: o
+     * app envenenado parece inteiro por nove segundos. É por isso que a trava
+     * da seção 2a olha a faixa e não o aviso. */
+    conf('e o aviso continua oferecendo a volta, que é o que torna a perda silenciosa',
+      await pag.evaluate(() => {
+        const b = document.querySelector('#aviso-acao');
+        return !!b && b.style.display !== 'none' && document.querySelector('#aviso').classList.contains('aberto');
+      }), true);
+    throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
+  }
+  conf('a faixa do contexto oferece a volta, com o número do que saiu',
+    await pag.evaluate(() => {
+      const b = document.querySelector('#bib-desfazer-troca');
+      return b ? b.textContent.trim() : 'SEM BOTÃO';
+    }), 'Devolver o item que eu tirei');
+  conf('e o botão está na faixa do contexto, não dentro do aviso',
+    await pag.evaluate(() => {
+      const b = document.querySelector('#bib-desfazer-troca');
+      return !!b && !!b.closest('#bib-contexto') && !b.closest('#aviso');
+    }), true);
 
   /* DESFAZER SEGUE A REGRA DO "Desmarcar tudo": volta o que era dela antes e
    * MANTÉM o que ela marcou nesses segundos. Aqui ela marca uma página de
@@ -232,6 +285,13 @@ const botaoDoModulo = pag => pag.evaluate(() => {
     if (!c) return false; c.click(); return true;
   }, AVULSA);
   conf('ela marcou uma página de outro módulo enquanto o aviso estava na tela', marcouAvulsa, true);
+  /* A AÇÃO DELA ENCERRA O CONVITE DA FAIXA. Dali em diante a seleção já é
+   * escolha dela, e devolver a de antes passaria a destruir o que ela acabou
+   * de fazer. O botão do AVISO continua valendo enquanto o aviso estiver na
+   * tela, e é o que as asserções logo abaixo exercitam: os dois caminhos são
+   * independentes de propósito. */
+  conf('depois que ela marca alguma coisa, a faixa não oferece mais a volta',
+    await pag.evaluate(() => !!document.querySelector('#bib-desfazer-troca')), false);
   const antesDoDesfazer = await carrinho(pag);
   const nMarcado = antesDoDesfazer.itens.length + antesDoDesfazer.paginas.length;
   const aindaTemDesfazer = await pag.evaluate(() => {
@@ -253,6 +313,44 @@ const botaoDoModulo = pag => pag.evaluate(() => {
    * páginas nem aparece. Aqui há uma, então as duas partes saem. */
   conf('e a faixa conta o que sobrou', (await faixa(pag)).split('\n')[0],
     'Material marcado: 1 exercício, 1 página de teoria');
+
+  // ================================================================
+  secao('2a. A volta sobrevive ao aviso');
+  /* O PONTO DA SEÇÃO, e por que ela paga dez segundos de espera.
+   *
+   * O aviso vive nove segundos. Enquanto a única volta morava nele, perder
+   * trabalho dependia de ela LER um aviso em nove segundos, dando aula, com o
+   * aluno do lado. Esperar o aviso morrer e só então procurar a volta é a
+   * única forma honesta de provar que ela não depende disso: qualquer
+   * verificação mais rápida estaria conferindo a volta com o aviso ainda na
+   * tela, que é justamente o caso fácil. */
+  await abrirAulaDeHoje(pag, '08:00');
+  await tocarMaterial(pag, 'Teorema de Pitágoras');
+  await esperar('de volta ao módulo', () => pag.evaluate(() =>
+    (document.querySelector('#bib-corpo .bib-titulo') || {}).textContent || ''), v => v === 'Teorema de Pitágoras', 20000);
+  const antesDaEspera = await carrinho(pag);
+  conf('o módulo entrou inteiro de novo', antesDaEspera.itens.length, N_EX);
+  conf('e o aviso diz que tirou os dois que ela tinha',
+    /^Tirei 2 itens que estavam marcados e marquei o módulo inteiro/.test(await aviso(pag)), true);
+
+  await pausa(9600);   // mais do que os nove segundos do aviso
+  const depoisDoAviso = await pag.evaluate(() => ({
+    avisoAberto: document.querySelector('#aviso').classList.contains('aberto'),
+    botao: (document.querySelector('#bib-desfazer-troca') || {}).textContent || 'SEM BOTÃO'
+  }));
+  conf('o aviso já sumiu da tela', depoisDoAviso.avisoAberto, false);
+  conf('e a volta continua na faixa, com o número do que saiu',
+    depoisDoAviso.botao.trim(), 'Devolver os 2 itens que eu tirei');
+
+  await pag.evaluate(() => document.querySelector('#bib-desfazer-troca').click());
+  await pausa(500);
+  const voltou = await carrinho(pag);
+  conf('tocar nela devolve o exercício que era dela', voltou.itens.join(','), ANTES.itens.join(','));
+  conf('e a página de teoria que era dela', voltou.paginas.join(','), AVULSA);
+  conf('o módulo que a troca marcou saiu inteiro',
+    voltou.itens.filter(i => i.indexOf(MOD + ':') === 0).length, 0);
+  conf('e o convite some depois de usado',
+    await pag.evaluate(() => !!document.querySelector('#bib-desfazer-troca')), false);
 
   // ================================================================
   secao('2b. Gerar material já vem com Teoria e Gabarito');

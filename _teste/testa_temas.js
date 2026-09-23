@@ -147,26 +147,59 @@ const porValor = (sel, valor) => `(() => {
   const filtrados = await pag.$$eval('#lista-temas .item-tema .nome', es => es.map(e => e.textContent));
   /* A busca ATRAVESSA os anos de propósito: o assunto que ela procura muitas
    * vezes está no ano anterior, e é disso que a aula de reforço trata. Por
-   * isso a conta não é "menos do que a lista do ano". */
-  conf('a busca responde', filtrados.length > 0, true);
-  conf('e o que ela achou fala de fração', filtrados.some(t => /fra[cç]/i.test(t)), true);
+   * isso o que se confere não é a lista ter encolhido, e sim ela ter CRESCIDO
+   * para além do ano aberto, e tudo que voltou ser mesmo sobre o que ela
+   * digitou. As duas contas juntas: uma sozinha deixa passar busca que devolve
+   * o banco inteiro, a outra sozinha deixa passar busca presa no ano. */
+  conf('a busca devolveu alguma coisa', filtrados.length > 0, true);
+  conf('e tudo que voltou é sobre frações',
+    filtrados.slice(0, 5).every(t => /[Ff]ra[çc]/.test(t)), true);
+  conf('a busca sai do ano aberto quando o assunto está em outro',
+    filtrados.length > quantosTemas, true);
 
+  /* O `every` estrito que morava no testa_mapa_e2e, na busca aberta de dentro
+   * da trilha por "Ver os temas soltos". Aquele caminho levava ao material
+   * autoral e saiu com ele (B7), mas a PROPRIEDADE que ele guardava é da busca
+   * e continua valendo aqui: todo resultado precisa dizer POR QUE está ali.
+   *
+   * A busca olha título, resumo, explicação e exercícios, então um tema pode
+   * entrar sem a palavra aparecer no que se lê. Nesses casos a etiqueta cinza
+   * no fim da linha (Busca.ROTULO) diz onde bateu. Resultado que não fala do
+   * assunto E não traz etiqueta é resultado que ela não consegue explicar. */
+  const comMotivo = await pag.$$eval('#lista-temas .item-tema', es => es.map(e => ({
+    titulo: e.querySelector('.nome').firstChild.textContent,
+    resumo: (e.querySelector('.detalhe') || {}).textContent || '',
+    etiquetas: Array.from(e.querySelectorAll('.nome .tag')).map(t => t.textContent.trim())
+  })));
+  const MOTIVOS = ['sobre este assunto', 'tratado nos exercícios',
+    'aparece nos exercícios', 'aparece na explicação'];
+  conf('a lista veio com itens para conferir', comMotivo.length > 0, true);
+  conf('todo resultado fala de fração ou diz onde bateu',
+    comMotivo.every(x => /fra[cç]/i.test(x.titulo) || /fra[cç]/i.test(x.resumo) ||
+      x.etiquetas.some(t => MOTIVOS.indexOf(t) >= 0)), true);
+
+  /* Ela digita no teclado do tablet, onde o acento custa toques a mais. Antes
+     disto, procurar sem acento devolvia a lista vazia como se o assunto não
+     existisse. A igualdade sozinha não guarda nada, porque zero é igual a
+     zero: é o "> 0" que prende o defeito. */
   await pag.evaluate(porValor('#corpo-modal-tema input[type=text]', 'divisao'));
   await espera(400);
   const semAcento = await pag.$$eval('#lista-temas .item-tema', es => es.length);
   await pag.evaluate(porValor('#corpo-modal-tema input[type=text]', 'divisão'));
   await espera(400);
-  conf('o acento não atrapalha a busca',
-    await pag.$$eval('#lista-temas .item-tema', es => es.length), semAcento);
+  const comAcento = await pag.$$eval('#lista-temas .item-tema', es => es.length);
+  conf('procurar sem acento acha', semAcento > 0, true);
+  conf('e acha exatamente o mesmo que com acento', semAcento, comAcento);
 
   await pag.evaluate(porValor('#corpo-modal-tema input[type=text]', 'ANGULO'));
   await espera(400);
-  conf('nem a maiúscula', await pag.$$eval('#lista-temas .item-tema', es => es.length) > 0, true);
+  conf('e não se importa com maiúscula',
+    await pag.$$eval('#lista-temas .item-tema', es => es.length) > 0, true);
 
   await pag.evaluate(porValor('#corpo-modal-tema input[type=text]', 'zzzzz'));
   await espera(400);
-  conf('busca sem resposta não deixa a tela muda',
-    await pag.$eval('#lista-temas', e => e.textContent.trim().length > 0), true);
+  conf('busca sem resultado avisa em vez de ficar em branco',
+    await pag.$eval('#lista-temas', e => /Nenhum tema encontrado/.test(e.textContent)), true);
 
   await pag.evaluate(porValor('#corpo-modal-tema input[type=text]', ''));
   await espera(400);
@@ -174,9 +207,13 @@ const porValor = (sel, valor) => `(() => {
   // ================================================================
   secao('3. O ano escolhido fica lembrado no aluno');
 
+  /* Ler de volta o valor que o próprio teste acabou de escrever no select não
+   * afirma nada. O que prova que o ano trocou é a LISTA ter trocado. */
+  const temas06 = await pag.$$eval('#lista-temas .item-tema .nome', es => es.map(e => e.textContent));
   await pag.select('#corpo-modal-tema select', '08');
   await espera(900);
-  conf('a lista troca de ano', await pag.$eval('#corpo-modal-tema select', e => e.value), '08');
+  const temas08 = await pag.$$eval('#lista-temas .item-tema .nome', es => es.map(e => e.textContent));
+  conf('trocar o ano trocou a lista', temas08.length > 0 && temas08.join('|') !== temas06.join('|'), true);
   let banco = await bd();
   const marcelo = banco.alunos.find(a => /Marcelo/i.test(a.nome));
   conf('o aluno da aula é o Marcelo', !!marcelo, true);

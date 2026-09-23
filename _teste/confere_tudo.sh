@@ -357,6 +357,7 @@ roda "biblioteca caminho curto"                 node "_teste/testa_biblioteca_ca
 roda "caminho curto --envenenado-cheio"         node "_teste/testa_biblioteca_caminho_curto.js" --envenenado-cheio
 roda "caminho curto --envenenado-visor"         node "_teste/testa_biblioteca_caminho_curto.js" --envenenado-visor
 roda "caminho curto --envenenado-modulo"        node "_teste/testa_biblioteca_caminho_curto.js" --envenenado-modulo
+roda "caminho curto --envenenado-volta"         node "_teste/testa_biblioteca_caminho_curto.js" --envenenado-volta
 # FRENTE B (B7): remover um pacote importado em Ajustes. Sai tudo o que veio do
 # pacote e a contagem por deposito prova; FICAM as etiquetas de dificuldade dela
 # e o registro de uso, que sao dela e nao do pacote. O veneno leva os dois junto

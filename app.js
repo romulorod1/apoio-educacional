@@ -2213,7 +2213,19 @@
                 return;
               }
               if (achado) {
-                abrirBibliotecaDoAssunto(t, aula, achado.chave);
+                /* Caminho curto (item 2 do B7): um toque cai DENTRO do módulo,
+                 * com o material montado inteiro e já marcado.
+                 *
+                 * Com o material autoral no ar era diferente, e de propósito:
+                 * o achado por TÍTULO (direto: false) é um palpite da busca, e
+                 * saltar para dentro de um módulo palpitado enquanto o material
+                 * do tema ainda era um destino possível seria escolher no lugar
+                 * dela. Então só o achado DIRETO entrava no módulo; o por
+                 * título abria a biblioteca. Sem material autoral não há
+                 * segundo destino, e o caminho curto vale para os dois casos.
+                 * A chave devolve o comportamento de antes, inteiro. */
+                abrirBibliotecaDoAssunto(t, aula,
+                  (MATERIAL_AUTORAL_NO_AR && !achado.direto) ? null : achado.chave);
                 if (MATERIAL_AUTORAL_NO_AR && registro && !avisouMaterialAutoral) {
                   avisouMaterialAutoral = true;   // uma vez por uso do aplicativo
                   avisar('Abri a biblioteca da OBMEP. O seu material deste assunto continua em "Material de aula", na janela da aula.');
@@ -5765,7 +5777,14 @@
       'O que ele acha que sabe e o que acha que não sabe. Vale mais o que ele diz ' +
       'do que a nota do boletim.'],
     ['Sondagem escrita, 25 minutos',
-      'Monte uma lista curta com exercícios de anos anteriores, na aba Biblioteca. ' +
+      /* Atrás da chave como todo o resto: com o material autoral no ar, o
+       * roteiro mandava para "Material de aula", e é para lá que ele volta a
+       * mandar se a chave voltar. Roteiro que aponta para um botão que não
+       * existe é pior do que roteiro nenhum, e chave que devolve "quase tudo"
+       * não serve de volta de emergência. */
+      (MATERIAL_AUTORAL_NO_AR
+        ? 'Use "Material de aula" e monte uma lista curta com exercícios de anos anteriores. '
+        : 'Monte uma lista curta com exercícios de anos anteriores, na aba Biblioteca. ') +
       'Não é prova: é para ver onde ele trava e como ele pensa.'],
     ['Preencher o mapeamento, 10 minutos',
       'Marque pontos fortes, pontos de atenção e lacunas, e escreva o plano inicial.'],
@@ -11304,6 +11323,7 @@
         texto: (todos ? 'Desmarcar os ' : 'Marcar os ') + ids.length + ' ' +
           (mod.banco ? 'problemas deste grupo' : 'exercícios deste módulo'),
         aoClick: function () {
+          mexeuNoMaterial();
           var marcar = !todos;
           ids.forEach(function (id) {
             var i = bibCarrinho.itens.indexOf(id);
@@ -11530,6 +11550,58 @@
 
   var bibVindoDoMaterial = false;
 
+  /* A TROCA DO CARRINHO NÃO PODE SER SILENCIOSA.
+   *
+   * Vindo da aula, o material nasce cheio, e para isso a seleção que estava no
+   * carrinho é SUBSTITUÍDA. Substituir é o certo aqui: o carrinho passa a ser
+   * "o material desta aula", e somar o que sobrou de outro dia faria a folha
+   * sair com exercício que ela não escolheu para este aluno.
+   *
+   * O que não pode é ela PERDER trabalho sem saber. Eram duas falhas juntas: o
+   * aviso dizia o que entrou e calava o que saiu, e o Desfazer vivia os nove
+   * segundos do aviso. Nove segundos é o tempo de ela olhar para o aluno e
+   * perder a única saída.
+   *
+   * Agora o aviso começa pelo que saiu, e o Desfazer fica na faixa do contexto
+   * até a PRÓXIMA AÇÃO dela sobre o material. Enquanto ela só olha, rola a
+   * tela ou abre uma folha, a volta continua ali; no primeiro toque que muda o
+   * material (uma caixa, o módulo inteiro, o selo do visor, o Desmarcar tudo,
+   * o Gerar material) o convite some, porque a partir dali a seleção já é
+   * escolha dela e desfazer passaria a destruir o que ela acabou de fazer. */
+  var bibTrocaDesfazer = null;   // { antes, tudo, sairam } enquanto a volta estiver de pé
+
+  /* Chamada por TODA ação da mão dela que mexe no material. Sem isto, o
+   * Desfazer da faixa continuaria oferecendo voltar a uma seleção que ela já
+   * substituiu de propósito. */
+  function mexeuNoMaterial() {
+    if (!bibTrocaDesfazer) return;
+    bibTrocaDesfazer = null;
+    desenharContextoBiblioteca();
+  }
+
+  /* MESMA REGRA DO "Desmarcar tudo": volta o que era dela antes e MANTÉM o que
+   * ela marcou depois. Lá isso é juntarSelecoes(antes, bibCarrinho), porque a
+   * ação esvazia e o que sobra no carrinho é só o que ela marcou nesses
+   * segundos. Aqui a ação ENCHE, então o "que ela fez depois" é o carrinho
+   * menos o que esta marcação pôs: tirar isso primeiro é o que faz a mesma
+   * regra valer nos dois. Juntar sem tirar deixaria o módulo marcado e ainda
+   * somaria o de antes, e o número SUBIRIA depois de um toque em Desfazer.
+   *
+   * Recebe antes e tudo por PARÂMETRO, e não pela variável de estado, porque o
+   * botão do aviso tem de continuar funcionando mesmo depois de ela marcar
+   * outra coisa (é exatamente o caso que o testa_biblioteca_caminho_curto
+   * exercita). Quem depende do estado é só a VISIBILIDADE do botão da faixa. */
+  function devolverSelecaoTrocada(antes, tudo) {
+    var dela = { itens: semOsDe(bibCarrinho.itens, tudo.itens),
+      paginas: semOsDe(bibCarrinho.paginas, tudo.paginas) };
+    bibCarrinho = juntarSelecoes(antes, dela);
+    bibTrocaDesfazer = null;
+    guardarCarrinho();
+    desenharCarrinho();
+    marcarCaixasDoCarrinho();
+    desenharContextoBiblioteca();
+  }
+
   /* Tudo o que o módulo tem, na ordem em que ele se apresenta: as páginas de
    * teoria aula por aula, e os exercícios lista por lista. É o conteúdo do
    * "caminho curto": vindo da aula, o material nasce cheio e ela tira. */
@@ -11605,28 +11677,35 @@
       if (aba) aba.click();
       if (!mod) return;
       var aluno = alunoPorId(aula.alunoId);
-      avisar('Marquei o módulo inteiro: ' + plural(bibCarrinho.itens.length, 'exercício', 'exercícios') +
-        ' e ' + plural(bibCarrinho.paginas.length, 'página de teoria', 'páginas de teoria') + '.' +
-        (quantosDeFora && aluno
-          ? ' Fora ' + quantosDeFora + ' que você já usou com ' + aluno.nome + '.'
-          : '') +
-        ' Tire o que não quiser e toque em Gerar material.',
-        /* DESFAZER SEGUE A MESMA REGRA DO "Desmarcar tudo": volta o que era
-         * dela antes e MANTÉM o que ela fez depois. Lá isso é
-         * juntarSelecoes(antes, bibCarrinho), porque a ação esvazia e o que
-         * sobra no carrinho é só o que ela marcou nesses segundos. Aqui a ação
-         * ENCHE, então o "que ela fez depois" é o carrinho menos o que esta
-         * marcação pôs: tirar isso primeiro é o que faz a mesma regra valer
-         * nos dois. Juntar sem tirar deixaria o módulo marcado e ainda somaria
-         * o de antes, e o número SUBIRIA depois de um toque em Desfazer. */
-        'Desfazer', function () {
-          var dela = { itens: semOsDe(bibCarrinho.itens, tudo.itens),
-            paginas: semOsDe(bibCarrinho.paginas, tudo.paginas) };
-          bibCarrinho = juntarSelecoes(antes, dela);
-          guardarCarrinho();
-          desenharCarrinho();
-          marcarCaixasDoCarrinho();
-        });
+
+      /* O QUE SAIU VEM PRIMEIRO na frase. O que ficou de fora da marcação não
+       * conta como perda: ela nunca o teve marcado. Perda é o que ESTAVA
+       * marcado e não está mais, e é só isso que o número diz. */
+      var itensQueSairam = semOsDe(antes.itens, tudo.itens);
+      var paginasQueSairam = semOsDe(antes.paginas, tudo.paginas);
+      var sairam = itensQueSairam.length + paginasQueSairam.length;
+      bibTrocaDesfazer = sairam
+        ? { antes: antes, tudo: tudo, sairam: sairam }
+        : null;
+
+      var oQueEntrou = 'o módulo inteiro: ' +
+        plural(bibCarrinho.itens.length, 'exercício', 'exercícios') + ' e ' +
+        plural(bibCarrinho.paginas.length, 'página de teoria', 'páginas de teoria') + '.';
+      var recado = sairam
+        ? 'Tirei ' + plural(sairam, 'item que estava marcado', 'itens que estavam marcados') +
+          ' e marquei ' + oQueEntrou
+        : 'Marquei ' + oQueEntrou;
+      recado += (quantosDeFora && aluno
+        ? ' Fora ' + quantosDeFora + ' que você já usou com ' + aluno.nome + '.'
+        : '');
+      recado += ' Tire o que não quiser e toque em Gerar material.';
+
+      /* A faixa é redesenhada porque é nela que o Desfazer passa a morar. O
+       * aviso continua oferecendo a mesma volta, pela mesma função, para quem
+       * estiver olhando a tela na hora. */
+      desenharContextoBiblioteca();
+      if (sairam) avisar(recado, 'Desfazer', function () { devolverSelecaoTrocada(antes, tudo); });
+      else avisar(recado);
     });
   }
 
@@ -11637,7 +11716,9 @@
     var aula = bibContexto ? db.aulas.filter(function (a) { return a.id === bibContexto.aulaId; })[0] : null;
     var aluno = aula ? alunoPorId(aula.alunoId) : null;
     caixa.hidden = !aluno;
-    if (!aluno) { bibContexto = null; return; }
+    /* Sem contexto não há faixa onde pendurar a volta, e oferecer desfazer numa
+     * tela que ela já deixou seria oferecer o que ela não pediu. */
+    if (!aluno) { bibContexto = null; bibTrocaDesfazer = null; return; }
     var quando = aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + ')';
     caixa.appendChild(el('span', { texto: bibContexto.anexado
       ? 'Material anexado na aula de ' + quando + '.' : 'Material para a aula de ' + quando + '.' }));
@@ -11653,6 +11734,21 @@
           var sel = $('#bib-filtro-aluno');
           if (sel) { sel.value = ''; sel.dispatchEvent(new Event('change')); }
         } }));
+    }
+    /* A VOLTA FICA À VISTA, e não presa aos nove segundos do aviso. O rótulo
+     * diz o número do que saiu, porque "Desfazer" sozinho, minutos depois, não
+     * lembra mais o que seria desfeito. */
+    if (bibTrocaDesfazer && !bibContexto.anexado) {
+      caixa.appendChild(el('button', {
+        type: 'button', class: 'btn pequeno', id: 'bib-desfazer-troca',
+        texto: bibTrocaDesfazer.sairam === 1
+          ? 'Devolver o item que eu tirei'
+          : 'Devolver os ' + bibTrocaDesfazer.sairam + ' itens que eu tirei',
+        aoClick: function () {
+          var t = bibTrocaDesfazer;
+          if (t) devolverSelecaoTrocada(t.antes, t.tudo);
+        }
+      }));
     }
   }
 
@@ -11781,6 +11877,7 @@
   }
 
   function marcarNoCarrinho(tipo, id, marcado) {
+    mexeuNoMaterial();
     var lista = bibCarrinho[tipo];
     var i = lista.indexOf(id);
     if (marcado && i < 0) lista.push(id);
@@ -11821,6 +11918,7 @@
     faixa.appendChild(el('span', { class: 'cresce' }));
     faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-carrinho-limpar', texto: 'Desmarcar tudo',
       aoClick: function () {
+        mexeuNoMaterial();
         var antes = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
         bibCarrinho = { itens: [], paginas: [] };
         guardarCarrinho();
@@ -12183,6 +12281,7 @@
   /* Desmarca a seleção depois de um anexo (guardada no aparelho, ela entraria
    * escondida no material do próximo aluno) e devolve a função que remarca. */
   function desmarcarDepoisDeAnexar() {
+    mexeuNoMaterial();
     var usada = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
     bibCarrinho = { itens: [], paginas: [] };
     guardarCarrinho();
