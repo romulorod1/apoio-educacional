@@ -262,9 +262,9 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   await espera(1600);
 
   conf('a aula recém-criada abre sozinha', await visivel('#modal-aula'), true);
-  conf('e já traz a folha e o material de aula',
+  conf('e já traz a folha e os anexos à mão',
     await pag.$$eval('#linha-folha button', es => es.map(e => e.textContent.trim()).join(' | ')),
-    'Escrever à mão na folha | Material de aula | Anexar PDF | Anexar foto');
+    'Escrever à mão na folha | Anexar PDF | Anexar foto');
 
   conf('o lembrete do mapeamento está lá', await visivel('#lembrete-mapeamento'), true);
   const lembrete = await pag.$eval('#lembrete-mapeamento', e => e.textContent);
@@ -369,15 +369,25 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
     marcelo2.mapeamentos[1].marcados.atencao.length, 0);
 
   // ================================================================
-  secao('7. A lacuna leva à trilha, os temas continuam a um toque, e a ficha vira PDF');
+  secao('7. A lacuna leva à trilha, a trilha monta, e a ficha vira PDF');
 
   /* O botão da lacuna mudou de destino de propósito: antes abria a busca de
    * temas, que devolve dezoito resultados em ordem de relevância, começando pelo
    * 8º ano e pulando para o 4º. Agora monta a trilha, que é a mesma lista em
    * ordem de pré-requisito.
    *
-   * O caminho antigo NÃO sumiu, e é isso que as asserções de baixo continuam
-   * conferindo: ele está dentro da trilha, em "Ver os temas soltos". */
+   * O caminho antigo, "Ver os temas soltos", levava ao material autoral e saiu
+   * com ele. O que as asserções abaixo conferem é o que sobrou, que é o que ela
+   * usa: a lacuna abre a trilha, a trilha monta a escada e os passos são os do
+   * grafo de pré-requisitos.
+   *
+   * ONDE FOI PARAR O `every` ESTRITO: este bloco guardava a única trava da
+   * suíte que afirmava que TODO resultado da busca diz por que está ali (o
+   * título bate, ou a etiqueta cinza explica onde bateu). A busca não saiu, só
+   * este caminho até ela saiu, então a trava mudou de casa e hoje mora no
+   * testa_temas.js, seção 2, em "todo resultado fala de fração ou diz onde
+   * bateu". Se alguém apagar isto aqui de novo, a propriedade continua presa
+   * lá; o que não pode é ela ficar sem dono. */
 
   await abrirFichaDoMarcelo();
   await espera(700);
@@ -391,35 +401,23 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   const tituloTrilha = await pag.$eval('#titulo-modal-trilha', e => e.textContent.trim());
   conf('e o título diz o que ela fecha', /Fraç/i.test(tituloTrilha), true);
 
-  /* Daqui em diante é o caminho de hoje, um nível abaixo. */
-  await clicarTexto('#modal-trilha button', 'Ver os temas soltos');
-  await espera(2000);
-  conf('a janela de temas continua a um toque, de dentro da trilha',
-    await visivel('#modal-tema'), true);
-  conf('com a busca já preenchida',
-    await pag.$eval('#corpo-modal-tema input[type=text]', e => e.value), 'fração');
-  const achados = await pag.$$eval('#lista-temas .item-tema', es => es.map(e => e.textContent));
-  conf('e achou temas de fração', achados.length > 0, true);
-  /* Todo resultado precisa dizer POR QUE esta ali. A busca olha titulo, resumo,
-   * explicacao e exercicios, entao um tema pode entrar sem a palavra aparecer no
-   * que se le: nesses casos a etiqueta cinza no fim da linha diz onde bateu.
-   *
-   * Medido: por este caminho a lista traz 18 temas, cinco deles achados so pelos
-   * exercicios. Pelo caminho antigo vinham 9, porque a lista abria antes de o
-   * indice de busca terminar de carregar e caia no casamento por titulo e resumo.
-   * A busca por conteudo e a funcionalidade que ela mais elogiou, entao passar a
-   * ter os cinco aqui e ganho, desde que a etiqueta explique cada um. */
-  conf('todo resultado fala de fração ou diz onde bateu',
-    achados.every(t => /fra[cç]/i.test(t) || /tratado n/i.test(t)), true);
-  conf('o botão final não fala em anexar, porque não há aula aqui',
-    await pag.$eval('#rodape-modal-tema button', e => e.textContent.trim()), 'Cancelar');
+  const alvos = await pag.$$eval('#modal-trilha .item-alvo-trilha', es => es.map(e => e.textContent));
+  conf('ela escolhe onde ele precisa chegar', alvos.length > 0, true);
+  conf('com um sugerido', alvos.filter(t => /sugerido/i.test(t)).length, 1);
+  conf('e o caminho antigo do material autoral não está mais aqui',
+    await pag.evaluate(() => !!document.querySelector('#trilha-temas-soltos')), false);
 
-  await clicarTexto('#lista-temas .item-tema button', 'Escolher');
+  await clicarTexto('#modal-trilha .item-alvo-trilha button', 'Montar');
   await espera(1800);
-  conf('e na montagem o botão diz só gerar',
-    await pag.$eval('#rodape-modal-tema button.principal', e => e.textContent.trim()), 'Gerar material');
+  const passos = await pag.$$eval('#modal-trilha .item-passo-trilha .nome', es => es.map(e => e.textContent.trim()));
+  conf('a trilha montou a escada até o alvo', passos.length > 0, true);
+  conf('numerada, na ordem', passos.every((t, i) => t.indexOf((i + 1) + '. ') === 0), true);
+  conf('e continua dando para acrescentar passo',
+    await pag.evaluate(() => !!document.querySelector('#acrescentar-passo')), true);
+  conf('sem "Ver os temas soltos" dentro da trilha montada',
+    await pag.evaluate(() => !!document.querySelector('#trilha-temas-soltos')), false);
 
-  await clicarTexto('#rodape-modal-tema button', 'Cancelar');
+  await pag.evaluate(() => { const f = document.querySelector('#modal-trilha .fechar'); if (f) f.click(); });
   await espera(400);
 
   // ficha em PDF

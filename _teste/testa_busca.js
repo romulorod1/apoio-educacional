@@ -72,9 +72,19 @@ function secao(t) { console.log('\n=== ' + t + ' ==='); }
     document.querySelector('[data-dia="2026-09-02"]').querySelector('.pilula').click();
   });
   await espera(600);
+  /* A MESMA lista de temas de matemática, pela porta que restou.
+   *
+   * Ela morava atrás do botão "Material de aula", que saiu junto com o material
+   * autoral. A lista em si não saiu: é a mesma `desenharEscolhaTema`, com o
+   * mesmo campo de busca e a mesma anotação de busca sem resultado, e hoje se
+   * chega a ela por Escolher o assunto da aula, "Por matéria", Matemática. */
+  await pag.evaluate(() => { document.querySelector('#escolher-assunto').click(); });
+  await espera(1800);
   await pag.evaluate(() => {
-    Array.from(document.querySelectorAll('#linha-folha button'))
-      .find(b => b.textContent.trim() === 'Material de aula').click();
+    const l = Array.from(document.querySelectorAll('#corpo-modal-tema .item-lista'))
+      .find(x => x.querySelector('.nome') && x.querySelector('.nome').textContent.trim() === 'Matemática');
+    if (!l) throw new Error('não achei a linha Matemática em "Por matéria"');
+    l.click();
   });
   await espera(2200);
 

@@ -193,7 +193,8 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
   conf('caixa e etiqueta com alvo de toque de 44 px', alvoToque >= 44, true);
   const yAntes = await yGrade();
   for (const id of MARCADOS.slice(0, 4)) await marcar(pag, 'itens', id);
-  conf('contador depois de 4', await contador(pag), 'Material marcado: 4 exercícios, 0 páginas de teoria');
+  // a faixa não conta o que não há: sem página de teoria marcada, a parte delas nem aparece
+  conf('contador depois de 4', await contador(pag), 'Material marcado: 4 exercícios');
   conf('a grade não pulou no primeiro toque (menos de 8 px)', Math.abs((await yGrade()) - yAntes) < 8, true);
   // o toque na caixa não abre a tela cheia
   conf('marcar não abriu a tela cheia', await pag.$eval('#modal-biblioteca', e => e.classList.contains('aberto')), false);

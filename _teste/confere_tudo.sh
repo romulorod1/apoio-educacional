@@ -338,6 +338,41 @@ roda "biblioteca dificuldade --envenenado-etiqueta" node "_teste/testa_bibliotec
 # que nao existe a lista do sw.js, e o service worker nao pode instalar.
 roda "limpeza do acervo"                        node "_teste/testa_limpeza_acervo.js"
 roda "limpeza do acervo --envenenado-lista"     node "_teste/testa_limpeza_acervo.js" --envenenado-lista
+# FRENTE B (B7): o material autoral saiu do ar. Sem navegador, a chave desligada,
+# nada apagado do banco e a TRILHA ANTES E DEPOIS (os 148 temas como alvo, a
+# sequencia de passos do motor da base do merge contra a de hoje). No navegador,
+# a janela da aula sem o botao, o assunto do banco como assunto comum, o material
+# ja anexado numa aula antiga ainda abrindo, e a trilha sem "Ver os temas
+# soltos". O veneno religa a chave no app.js servido e percorre o MESMO caminho
+# do modo normal do comeco ao fim, conferindo no balanco final as SETE ausencias
+# virando presenca: o botao da folha, o "atalho opcional" da ajuda, o botao
+# Material da linha do assunto, o "material pronto" da ajuda do assunto, o "Ver
+# os temas soltos" e a ajuda do fim da trilha, o "material pronto" da escolha de
+# assunto, e o titulo padrao da janela de tema. Ausencia sem par passaria por
+# qualquer motivo, inclusive por um seletor errado.
+roda "sem material autoral"                     node "_teste/testa_sem_material_autoral.js"
+roda "sem autoral --envenenado-liga"            node "_teste/testa_sem_material_autoral.js" --envenenado-liga
+# FRENTE B (B7): o caminho curto da aula ate o material da biblioteca. Da aula,
+# o modulo inteiro ja marcado (menos o que ela ja usou com aquele aluno); marcar
+# de dentro da tela cheia, com selo e com as caixas da lista de acordo ao fechar;
+# e "Marcar os N deste modulo" na navegacao livre. Mais a troca do carrinho que
+# deixou de ser silenciosa: o aviso comeca pelo que SAIU e a volta fica na faixa
+# ate a proxima acao dela. Sao QUATRO venenos, cada um desligando UMA regra: o
+# carrinho que nao enche, a lista que mente depois da tela cheia, o botao do
+# modulo que nunca vira "Desmarcar", e a volta que some da faixa sobrando so a
+# do aviso, que morre em nove segundos. Este ultimo e o mais silencioso dos
+# quatro, porque por nove segundos o aplicativo envenenado parece inteiro.
+roda "biblioteca caminho curto"                 node "_teste/testa_biblioteca_caminho_curto.js"
+roda "caminho curto --envenenado-cheio"         node "_teste/testa_biblioteca_caminho_curto.js" --envenenado-cheio
+roda "caminho curto --envenenado-visor"         node "_teste/testa_biblioteca_caminho_curto.js" --envenenado-visor
+roda "caminho curto --envenenado-modulo"        node "_teste/testa_biblioteca_caminho_curto.js" --envenenado-modulo
+roda "caminho curto --envenenado-volta"         node "_teste/testa_biblioteca_caminho_curto.js" --envenenado-volta
+# FRENTE B (B7): remover um pacote importado em Ajustes. Sai tudo o que veio do
+# pacote e a contagem por deposito prova; FICAM as etiquetas de dificuldade dela
+# e o registro de uso, que sao dela e nao do pacote. O veneno leva os dois junto
+# na mesma transacao, que e a perda SILENCIOSA que este teste existe para pegar.
+roda "biblioteca remover pacote"                node "_teste/testa_biblioteca_remover.js"
+roda "remover pacote --envenenado-dela"         node "_teste/testa_biblioteca_remover.js" --envenenado-dela
 
 roda "painel de valores"                        node "_teste/testa_painel_valores.js"
 roda "painel de valores --envenenado-aberto"    node "_teste/testa_painel_valores.js" --envenenado-aberto

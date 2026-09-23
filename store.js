@@ -268,6 +268,56 @@
     });
   }
 
+  /* Tira um pacote do tablet e devolve o espaço.
+   *
+   * Sai TUDO o que veio do pacote: o registro em biblioteca_pacotes, e os
+   * biblioteca_itens, biblioteca_teoria e biblioteca_assets daquele pacote,
+   * mais as miniaturas do prefixo dele em 'midias' (cache refeito do SVG).
+   *
+   * NÃO SAI, e este é o ponto: biblioteca_etiquetas (a dificuldade que ela deu)
+   * e biblioteca_uso (que exercício foi para que aluno, em que aula). Os dois
+   * são DELA e não do pacote, e são gravados por id de exercício, que é estável
+   * entre versões: ela apaga uma série, importa de novo depois, e encontra as
+   * etiquetas e o histórico no lugar. Por isso os dois depósitos nem entram na
+   * transação: o que não está aberto não pode ser apagado por engano.
+   *
+   * Numa transação só: ou sai tudo, ou nada muda. Devolve o que foi removido,
+   * para a tela dizer quanto espaço voltou. */
+  function removerPacoteBiblioteca(chave) {
+    var DEPOSITOS = ['biblioteca_pacotes', 'biblioteca_itens', 'biblioteca_teoria', 'biblioteca_assets', 'midias'];
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = b.transaction(DEPOSITOS, 'readwrite');
+        var contas = { itens: 0, teoria: 0, assets: 0, bytes: 0, achou: false };
+        var pacotes = t.objectStore('biblioteca_pacotes');
+        var req = pacotes.get(chave);
+        req.onsuccess = function () {
+          var atual = req.result;
+          if (!atual) return;            // nada a fazer; a transação fecha sem mudar nada
+          contas.achou = true;
+          contas.bytes = atual.bytes || 0;
+          contas.manifest = atual.manifest;
+          pacotes.delete(chave);
+          [['biblioteca_itens', 'itens'], ['biblioteca_teoria', 'teoria'], ['biblioteca_assets', 'assets']]
+            .forEach(function (par) {
+              var cur = t.objectStore(par[0]).index('pacote').openCursor(IDBKeyRange.only(chave));
+              cur.onsuccess = function (e) {
+                var c = e.target.result;
+                if (!c) return;
+                contas[par[1]]++;
+                c.delete();
+                c.continue();
+              };
+            });
+          var pref = PREFIXO_MINIATURA + chave + '@';
+          t.objectStore('midias').delete(IDBKeyRange.bound(pref, pref + '￿'));
+        };
+        t.oncomplete = function () { resolve(contas); };
+        t.onabort = function () { reject(t.error || new Error('A remoção foi interrompida.')); };
+      });
+    });
+  }
+
   function listarPacotesBiblioteca() {
     return todosOsValores('biblioteca_pacotes').then(function (l) {
       return (l || []).sort(function (a, b) { return a.pacote < b.pacote ? -1 : a.pacote > b.pacote ? 1 : 0; });
@@ -518,7 +568,8 @@
     desfazer: desfazer, limparHistorico: limparHistorico,
     limparOrfaos: limparOrfaos, estimarEspaco: estimarEspaco, tornarPersistente: tornarPersistente,
     exportarTudo: exportarTudo, importarTudo: importarTudo, apagarTudo: apagarTudo,
-    gravarPacoteBiblioteca: gravarPacoteBiblioteca, listarPacotesBiblioteca: listarPacotesBiblioteca,
+    gravarPacoteBiblioteca: gravarPacoteBiblioteca, removerPacoteBiblioteca: removerPacoteBiblioteca,
+    listarPacotesBiblioteca: listarPacotesBiblioteca,
     itensDaBiblioteca: itensDaBiblioteca, teoriaDaBiblioteca: teoriaDaBiblioteca,
     lerAssetBiblioteca: lerAssetBiblioteca, chaveMiniatura: chaveMiniatura,
     registrarUsoBiblioteca: registrarUsoBiblioteca, usoDaBiblioteca: usoDaBiblioteca,

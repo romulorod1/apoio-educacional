@@ -400,6 +400,10 @@
         <button class="btn esquerda" id="bib-anterior" type="button">‹ Anterior</button>
         <button class="btn" id="bib-proxima" type="button">Próxima ›</button>
         <button class="btn" id="bib-solucao" type="button">Ver solução</button>
+        <!-- marcar sem sair da tela cheia: ela lia, fechava, marcava e abria a
+             próxima. Agora o mesmo botão marca e tira, e o selo sobre a imagem
+             diz em que estado ela está enquanto anda pelo Anterior e Próxima. -->
+        <button class="btn" id="bib-marcar-visor" type="button">Marcar para o material</button>
         <button class="btn" id="bib-fechar-visor" type="button">Fechar</button>
         <button class="btn principal" id="bib-como-folha" type="button">Abrir como folha</button>
       </div>
@@ -451,7 +455,7 @@
   <div class="fundo-modal" id="modal-tema">
     <div class="modal largo">
       <div class="modal-cabecalho">
-        <h3 id="titulo-modal-tema">Material de aula</h3>
+        <h3 id="titulo-modal-tema">Assunto da aula</h3>
         <button class="fechar" data-fechar type="button" aria-label="Fechar">&times;</button>
       </div>
       <div class="modal-corpo" id="corpo-modal-tema"></div>

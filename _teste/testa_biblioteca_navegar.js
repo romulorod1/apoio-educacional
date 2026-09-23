@@ -144,7 +144,12 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
     return v ? { texto: Array.from(v.querySelectorAll('p')).map(p => p.textContent.trim()).join('\n'), busca: getComputedStyle(document.querySelector('#bib-busca-cartao')).display,
       titulo: document.querySelector('#tela-biblioteca h2').textContent.trim(), visivel: !!v.offsetParent } : null;
   }), v => !!v, 10000);
-  conf('mostra "Em construção" e "Esta área está sendo preparada."', vazia.valor && vazia.valor.texto, 'Em construção\nEsta área está sendo preparada.');
+  /* A terceira linha entrou no B7, de propósito: depois que dá para REMOVER
+   * uma série, este estado virou também a resposta a uma ação dela, e sem o
+   * caminho de volta ele seria um beco. As duas primeiras não mudaram. */
+  conf('mostra "Em construção" e "Esta área está sendo preparada."',
+    vazia.valor && vazia.valor.texto, 'Em construção\nEsta área está sendo preparada.\n' +
+    'Para trazer uma biblioteca para este tablet, vá em Ajustes, no cartão Biblioteca, e toque em Importar biblioteca.');
   conf('visível', vazia.valor && vazia.valor.visivel, true);
   conf('sem o campo de busca', vazia.valor && vazia.valor.busca, 'none');
   conf('título Biblioteca', vazia.valor && vazia.valor.titulo, 'Biblioteca');

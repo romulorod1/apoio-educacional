@@ -256,11 +256,15 @@ const temasNaTela = p => p.$$eval('#lista-temas .item-tema', es => es.map(e => {
   const tag = nome ? nome.querySelector('.tag') : null;
   return { titulo: nome && nome.firstChild ? nome.firstChild.textContent.trim() : '', tag: tag ? tag.textContent.trim() : '' };
 }));
+/* A lista de temas de matemática, pela porta que restou.
+ *
+ * Ela morava atrás do botão "Material de aula", que saiu junto com o material
+ * autoral. A lista é a mesma (desenharEscolhaTema), com o mesmo seletor de ano
+ * e as mesmas etiquetas de unidade, e hoje se chega a ela por Escolher o
+ * assunto da aula, "Por matéria", Matemática. */
 async function abrirMaterial(p) {
-  await p.evaluate(() => {
-    const b = Array.from(document.querySelectorAll('#linha-folha button')).filter(x => x.textContent.trim() === 'Material de aula')[0];
-    if (b) b.click();
-  });
+  await abrirPicker(p);
+  await tocarLinha(p, 'Matemática');
   return esperar('a lista de temas', () => p.$$eval('#lista-temas .item-tema', es => es.length), v => v > 0, 30000);
 }
 async function escolherSerie(p, serie) {
