@@ -539,17 +539,29 @@ const ASSUNTO_COM_MATERIAL = {
   conf('a trilha guardada abriu na tela', abriuTrilha.ok, true);
   const naTrilha = await pag.evaluate(() => {
     const m = document.querySelector('#modal-trilha.aberto');
+    /* A AJUDA, E NÃO O TEXTO DO MODAL INTEIRO.
+     *
+     * Ler `m.textContent` para medir a ajuda é medir o botão de novo: com a
+     * chave ligada o rótulo "Ver os temas soltos" está dentro do modal, então
+     * a palavra aparece no texto mesmo que a ajuda não seja desenhada. Foi o
+     * que a demonstração de reprovação mostrou: apagar o ajudaDoFim não fazia
+     * a asserção cair, porque ela estava lendo o botão. O alvo certo são as
+     * `.ajuda` do corpo, que é onde o ajudaDoFim mora. */
+    const ajudas = Array.from(m.querySelectorAll('.ajuda')).map(x => x.textContent).join(' | ');
     return {
       passos: Array.from(m.querySelectorAll('.item-passo-trilha .nome')).map(x => x.textContent.replace(/^\d+\.\s*/, '').trim()).join(' > '),
       soltos: !!document.querySelector('#trilha-temas-soltos'),
+      ajudas: ajudas,
       texto: m.textContent
     };
   });
   conf('a trilha mostra os mesmos passos, na mesma ordem', naTrilha.passos, esperada);
   venenoVisto.soltosNaTrilha = naTrilha.soltos;
-  venenoVisto.textoDaTrilha = naTrilha.texto;
+  venenoVisto.ajudasDaTrilha = naTrilha.ajudas;
   ausencia('o botão "Ver os temas soltos" não existe mais dentro da trilha', naTrilha.soltos, false);
-  ausencia('e o texto de ajuda não fala mais em temas soltos', /temas soltos/i.test(naTrilha.texto), false);
+  ausencia('e a ajuda do fim da trilha não fala mais em temas soltos',
+    /temas soltos/i.test(naTrilha.ajudas), false);
+  ausencia('nem o resto do texto da janela', /temas soltos/i.test(naTrilha.texto), false);
   conf('o "+ Acrescentar passo" continua lá', await pag.evaluate(() => !!document.querySelector('#acrescentar-passo')), true);
   await pag.evaluate(() => { const f = document.querySelector('#modal-trilha .fechar'); if (f) f.click(); });
   await pausa(200);
@@ -596,8 +608,8 @@ const ASSUNTO_COM_MATERIAL = {
      * era a única das oito sem contraparte, e passaria verde se o ajudaDoFim
      * deixasse de ser desenhado por qualquer outro motivo. O valor já estava
      * sendo capturado e nunca era lido. */
-    conf('5b. e a ajuda do fim da trilha volta a falar em temas soltos',
-      /temas soltos/i.test(venenoVisto.textoDaTrilha || ''), true);
+    conf('5b. e a AJUDA do fim da trilha volta a falar em temas soltos',
+      /temas soltos/i.test(venenoVisto.ajudasDaTrilha || ''), true);
     conf('6. a escolha de assunto volta a prometer "material pronto"',
       /material pronto/i.test(venenoVisto.escolhaDeAssunto || ''), true);
     /* A SÉTIMA, que mora no index.html e por isso não enxerga a constante.
