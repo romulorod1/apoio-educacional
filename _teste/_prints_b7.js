@@ -25,7 +25,26 @@ const { conf, secao, pausa, esperar } = H;
 
 const SAIDA = process.argv[2];
 if (!SAIDA) { console.error('uso: node _teste/_prints_b7.js <pasta-de-saida>'); process.exit(2); }
-fs.mkdirSync(SAIDA, { recursive: true });
+/* A PASTA TEM DE EXISTIR, e o roteiro NÃO a cria.
+ *
+ * Isto já custou caro uma vez. Com `mkdirSync(SAIDA, { recursive: true })`, um
+ * caminho errado não falhava: ele fabricava a árvore inteira em silêncio, os
+ * prints iam para lá, a conferência lia de volta o MESMO endereço errado e
+ * dava tudo certo. O marco parecia entregue e a pasta que o revisor olhava
+ * continuava com as imagens velhas. Ninguém percebe um erro que se confirma
+ * sozinho.
+ *
+ * A pasta do marco é criada por quem decide onde ele mora, uma vez, à mão.
+ * Daqui em diante, endereço errado para alto e diz o que encontrou. */
+if (!fs.existsSync(SAIDA)) {
+  console.error('a pasta de saida NAO existe, e este roteiro nao cria pasta: ' + SAIDA);
+  console.error('confira o caminho (disco, acentos, barras) e crie a pasta antes de rodar.');
+  process.exit(2);
+}
+if (!fs.statSync(SAIDA).isDirectory()) {
+  console.error('o caminho de saida existe mas nao e uma pasta: ' + SAIDA);
+  process.exit(2);
+}
 
 const PORTA = 8802;
 const PORTA_ANTES = 8803;
