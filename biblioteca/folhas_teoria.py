@@ -91,8 +91,10 @@ def desenhar(bloco, destino, titulo, pngs, pdfs):
                 pg.insert_image(caixa, pixmap=fonte)
             else:
                 pg.insert_image(caixa, filename=pngs[pag['asset']])
-        pg.insert_text((x, y + altura_pg + 11), '%s  p%d  (fonte | pacote)%s'
-                       % (t['aula']['titulo'][:46], pag['n'], '' if com else '  [sem marca: nao pode mudar]'),
+        # a legenda nao diz o que mudou nem o que esperar: quem revisa tem de
+        # olhar a pagina, e nao o rotulo (o revisor da primeira rodada leu
+        # "com marca d'agua" no titulo e ja sabia o que procurar)
+        pg.insert_text((x, y + altura_pg + 11), '%s  p%d  (fonte | pacote)' % (t['aula']['titulo'][:46], pag['n']),
                        fontname='helv', fontsize=8, color=(0.1, 0.1, 0.5))
     for d in abertos.values():
         d.close()
@@ -122,9 +124,8 @@ def gerar(pasta_trab, pdfs, saida, quantas=80, semente=2026, todas=False):
         for n in range(0, len(escolhidas), por_folha):
             bloco = escolhidas[n:n + por_folha]
             destino = os.path.join(saida, 'teoria-%03d.png' % (n // por_folha + 1))
-            titulo = 'teoria, folha %d de %d: %d paginas, %d com marca d\'agua na fonte' % (
-                n // por_folha + 1, (len(escolhidas) + por_folha - 1) // por_folha,
-                len(bloco), sum(1 for x in bloco if x[3]))
+            titulo = 'teoria, folha %d de %d: %d paginas' % (
+                n // por_folha + 1, (len(escolhidas) + por_folha - 1) // por_folha, len(bloco))
             desenhar(bloco, destino, titulo, pngs, pdfs)
             feitas.append(destino)
         return feitas, escolhidas
