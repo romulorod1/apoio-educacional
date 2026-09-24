@@ -820,8 +820,10 @@ def main():
 
     # ---- a regra declarada, e o vocabulario novo de relaxou
     print('\n=== listas-v1: a regra declarada e o relaxou ===')
-    p.veneno('regra que nenhuma das duas conferencias conhece', confere(com_listas(
-        lambda x: x[3][0].__setitem__('regra', 'listas-v2'))), 'so conhece kits-v1 e listas-v1')
+    # (Antes da B11 o nome inventado aqui era 'listas-v2'. A listas-v2 passou a
+    # existir, a de uma aula, e o nome que ninguem conhece virou outro.)
+    p.veneno('regra que nenhuma das conferencias conhece', confere(com_listas(
+        lambda x: x[3][0].__setitem__('regra', 'listas-v9'))), 'so conhece kits-v1 e listas-v1 e listas-v2')
     # uma lista que declara kits-v1 e usa o T3 da listas-v1 tem de reprovar:
     # sem isto, o campo `regra` seria enfeite e as duas tabelas se misturariam
     p.veneno('lista com o T3 novo declarando a regra velha', confere(com_listas(
@@ -929,6 +931,74 @@ def main():
             [] if (GK.referencia(itens_l[li(3)]) == li(2)
                    and GK.poda_repetidos is original2 and GK.abre_lista is original3)
             else ['alguma funcao nao voltou'])
+
+    # ============================================ listas-v2, a lista de uma aula
+    # A listas-v1 inteira com o orcamento de 60 minutos (pedido do Romulo em
+    # 24/09). Tudo o que nao e tempo ja esta provado acima; aqui se prova o que
+    # muda: a banda da I5 (54 a 66), o teto da I6 (24) e o passo do modulo
+    # pequeno. O primeiro veneno e o que o pedido pediu por extenso: uma lista
+    # de MEIA AULA declarando a regra de uma aula tem de reprovar.
+    print('\n=== listas-v2: o orcamento de uma aula ===')
+    ml = kit_l(peca_l, MODL, 2)
+    p.limpo('a lista de meia aula do modulo-da-lista (%.1f min) passa como listas-v1' % ml['minutos'],
+            [e for e in confere(peca_l) if MODL in e and 'kit:2' in e])
+    p.veneno('lista de meia aula declarando listas-v2', confere(com_listas(
+        lambda x: kit_l(x, MODL, 2).__setitem__('regra', 'listas-v2'))), 'fora da banda de 54 a 66')
+    # As listas de uma aula que o gerador monta da amostra. A amostra e pequena
+    # (13 itens no maior modulo), entao quase todas ficam abaixo de 54 minutos
+    # e tem de DECLARAR isso: e o passo do modulo pequeno em acao.
+    base_2 = amostra_listas()
+    kits_2, _sem2, _sx2 = GK.gerar(base_2[1], [], GK.REGRA_AULA, (2, 3), False)
+    manif_2 = copy.deepcopy(base_2[0])
+    manif_2['contagens']['kits'] = len(kits_2)
+    p.limpo('as listas-v2 que o gerador monta da amostra passam na confere_kits',
+            CK.confere(manif_2, base_2[1], [], kits_2, base_2[4]))
+    p.limpo('o passo do modulo pequeno deixa todo modulo com as duas listas (10 de 10)',
+            [] if len(kits_2) == 10 else ['sairam %d listas' % len(kits_2)])
+    pequenas = [k for k in kits_2 if float(k['minutos']) < 54]
+    p.limpo('toda lista abaixo de 54 minutos declara minutos em relaxou',
+            ['%s com %s min e relaxou=%s' % (k['id'], k['minutos'], k['relaxou'])
+             for k in pequenas if 'minutos' not in (k['relaxou'] or [])])
+    # e o veneno do passo: sem ele, os modulos pequenos da amostra ficam sem
+    # lista, que e o que acontecia antes dele existir
+    guardado_orc = copy.deepcopy(GK.ORCAMENTO)
+    try:
+        del GK.ORCAMENTO[GK.REGRA_AULA]['resto']
+        sem_resto, _s, _x = GK.gerar(base_2[1], [], GK.REGRA_AULA, (2, 3), False)
+        p.veneno('listas-v2 sem o passo do modulo pequeno',
+                 ['so sairam %d listas de 10' % len(sem_resto)] if len(sem_resto) < 10 else [],
+                 'so sairam')
+        # O VENENO QUE ATRAVESSA OS DOIS LADOS: o gerador passa a achar que a
+        # listas-v2 e de meia aula. Ele monta listas de meia aula, nao declara
+        # minutos (pela banda dele, estao dentro), e a CONFERENCIA, que tem a
+        # banda escrita por conta propria, acusa.
+        GK.ORCAMENTO[GK.REGRA_AULA] = dict(guardado_orc[GK.REGRA_LISTAS])
+        meia, _s, _x = GK.gerar(base_2[1], [], GK.REGRA_AULA, (2, 3), False)
+        manif_m = copy.deepcopy(base_2[0])
+        manif_m['contagens']['kits'] = len(meia)
+        p.veneno('gerador que monta a listas-v2 com o orcamento de meia aula',
+                 CK.confere(manif_m, base_2[1], [], meia, base_2[4]), 'fora da banda de 54 a 66')
+    finally:
+        GK.ORCAMENTO.clear()
+        GK.ORCAMENTO.update(guardado_orc)
+    p.limpo('o orcamento voltou ao lugar depois dos venenos',
+            [] if GK.ORCAMENTO[GK.REGRA_AULA].get('resto') == (0, 660)
+            and GK.ORCAMENTO[GK.REGRA_AULA]['banda'] == (540, 660) else ['nao voltou'])
+
+    # I6: o teto de exercicios depende da regra. 13 itens e duro na v1 e nao e
+    # na v2; 25 e duro nas duas. Os ids repetem de proposito (a I7 reclama
+    # tambem), e o que se mede e SO a linha da I6.
+    ids13 = [d['item'] for d in ml['degraus']] * 3
+    def com_n(n, regra):
+        def muda(x):
+            k = kit_l(x, MODL, 2)
+            k['regra'] = regra
+            troca_itens(k, (ids13 * 3)[:n], x[1])
+        return confere(com_listas(muda))
+    so_i6 = lambda erros: [e for e in erros if 'I6' in e]
+    p.veneno('13 exercicios na listas-v1', com_n(13, 'listas-v1'), 'fora da banda de 4 a 12')
+    p.limpo('13 exercicios na listas-v2 nao tocam a I6', so_i6(com_n(13, 'listas-v2')))
+    p.veneno('25 exercicios na listas-v2', com_n(25, 'listas-v2'), 'fora da banda de 4 a 24')
 
     # -------------------------------------------- o zip leva o que promete
     print('\n=== o zip leva o que o manifest promete ===')
