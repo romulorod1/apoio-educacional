@@ -106,6 +106,9 @@
  *                         retângulo: ela cria um branco que não consegue tirar.
  *   --envenenado-redesenho o app.js servido volta a desenhar a tela duas vezes
  *                         por toque de seta.
+ *   --envenenado-meia-aula a frase da meia aula volta a não ter piso nem teto,
+ *                         e um exercício de poucos minutos vira "um pouco menos
+ *                         de meia aula" com o minuto ao lado desmentindo.
  */
 'use strict';
 const fs = require('fs');
@@ -161,13 +164,19 @@ const L_ORDEM_AVISO = [
   '    bibLpAviso = null;'].join(NL_APP);
 const T_ORDEM_AVISO = '  function guardarCarrinho() {';
 // o sairam volta a ser cego para a ordem, e a ordem dela some sem Desfazer
-const L_SAIRAM = "    var ordemPerdida = antes.itens.length === tudo.itens.length &&";
-const T_SAIRAM = "    var ordemPerdida = false && antes.itens.length === tudo.itens.length &&";
+/* o critério volta a enumerar casos em vez de comparar as duas listas: só
+ * "saiu item" conta, e o subconjunto reordenado passa batido */
+const L_SAIRAM = '    var perdeu = tinhaAlgo && !igualAoPacote;';
+const T_SAIRAM = '    var perdeu = sairam > 0;';
 // a linha do módulo volta a recarregar a lista que ela está mexendo
 const L_RECARREGA = '          if (listaProntaEmEdicao(lp)) irNaBiblioteca({ aula: { tipo: \'lista-pronta\', id: lp.id } });';
 const T_RECARREGA = '          if (false && listaProntaEmEdicao(lp)) irNaBiblioteca({ aula: { tipo: \'lista-pronta\', id: lp.id } });';
 // o redesenho volta para dentro do devolve-o-foco, e cada toque de seta desenha
 // a tela duas vezes, jogando fora e repedindo as miniaturas de 1080 px
+// a frase da meia aula volta a não ter piso nem teto, e cinco minutos viram
+// "um pouco menos de meia aula" com o minuto ao lado desmentindo
+const L_MEIA_AULA = '    if (minutos < 20 || minutos > 40) return null;';
+const T_MEIA_AULA = '    if (false) return null;';
 const L_REDESENHO = '  function redesenharListaPronta(id, qual) {';
 const T_REDESENHO = '  function redesenharListaPronta(id, qual) {' + NL_APP + '    desenharCorpoBiblioteca();';
 /* a seleção volta a mudar em silêncio, e a lixeira volta a nunca aparecer ao
@@ -195,7 +204,8 @@ const T_FLUTUA = [
 const L_FRASE = [
   "      texto: 'O material agora tem ' + plural(bibCarrinho.itens.length, 'exercício', 'exercícios') +",
   "        ': a lista pronta do nível ' + lp.nivel +",
-  "        (sairam ? ', no lugar do que estava marcado' : ordemPerdida ? ', de volta à ordem do pacote' : '') +",
+  "        (sairam ? ', no lugar do que estava marcado'",
+  "          : perdeu ? ', de volta como o pacote a trouxe' : '') +",
   "        '. Mude o que quiser e toque em Gerar material.',"].join(NL_APP);
 const T_FRASE = "      texto: (sairam ? 'Tirei ' + plural(sairam, 'item que estava marcado', 'itens que estavam marcados') +" +
   " ' e marquei ' : 'Marquei ') + 'a lista pronta do nível ' + lp.nivel + ': ' +" +
@@ -228,7 +238,8 @@ const VENENOS = {
   recarrega: { arq: '/app.js', de: L_RECARREGA, para: T_RECARREGA },
   volta: { arq: '/app.js', de: L_VOLTA, para: T_VOLTA },
   lixeira: { arq: '/draw.js', de: L_LIXEIRA, para: T_LIXEIRA },
-  redesenho: { arq: '/app.js', de: L_REDESENHO, para: T_REDESENHO }
+  redesenho: { arq: '/app.js', de: L_REDESENHO, para: T_REDESENHO },
+  'meia-aula': { arq: '/app.js', de: L_MEIA_AULA, para: T_MEIA_AULA }
 };
 const NOME_VENENO = Object.keys(VENENOS).filter(function (n) {
   return process.argv.indexOf('--envenenado-' + n) !== -1;
@@ -250,6 +261,7 @@ const V_RECARREGA = NOME_VENENO === 'recarrega';
 const V_VOLTA = NOME_VENENO === 'volta';
 const V_LIXEIRA = NOME_VENENO === 'lixeira';
 const V_REDESENHO = NOME_VENENO === 'redesenho';
+const V_MEIA_AULA = NOME_VENENO === 'meia-aula';
 const BASE_DE = { '/app.js': APP_REPO, '/draw.js': DRAW_REPO, '/styles.css': CSS_REPO };
 const trocas = {};
 if (VENENO) trocas[RECEITA.arq] = BASE_DE[RECEITA.arq].split(RECEITA.de).join(RECEITA.para);
@@ -422,7 +434,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   if (!VENENO) {
     secao('0. As cercas ainda apontam para o alvo');
     var nomes = Object.keys(VENENOS);
-    conf('a tabela tem os quinze venenos desta prova', nomes.length, 15);
+    conf('a tabela tem os dezesseis venenos desta prova', nomes.length, 16);
     var fora = [];
     nomes.forEach(function (n) {
       var r = VENENOS[n];
@@ -897,31 +909,35 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
    * na linha CARREGA de novo e a ordem do pacote volta. Isso é legítimo, mas
    * não pode ser silencioso: é trabalho dela indo embora. */
   secao('5b. A ordem dela nunca some sem volta');
-  /* PRIMEIRO, O CASO PURO: o carrinho tem de ficar com EXATAMENTE os itens da
-   * lista, em ordem diferente da do pacote. Sem isso, o toque na linha cairia
-   * no caso "saiu item", que já tem Desfazer desde sempre, e a asserção sobre a
-   * ordem passaria por outro motivo. Monta-se pela interface: tira o
-   * acrescentado pela caixa, e devolve pelo caminho de acrescentar o exercício
-   * que a seção 4 tinha tirado, que entra no fim e portanto fora da ordem do
-   * pacote. */
+  /* O ARRANJO, ESCRITO ANTES DO CÓDIGO, E A AFIRMAÇÃO AO LADO DELE.
+   *
+   *   Arranjo:   o carrinho é um SUBCONJUNTO da lista (ela tirou um exercício),
+   *              reordenado, e o aparelho foi fechado e reaberto.
+   *   Afirmação: tocar na linha devolve a lista do pacote e oferece Desfazer,
+   *              dizendo que ela voltou como o pacote a trouxe.
+   *
+   * As duas frases falam do mesmo arranjo, e é por isso que esta prova serve.
+   *
+   * A ESCRITA ANTERIOR NÃO SERVIA, e o defeito dela é o que fundou esta
+   * disciplina. Ela devolvia, logo antes de medir, o exercício que a seção 4
+   * tinha tirado, para o carrinho ficar com os MESMOS ids da lista em ordem
+   * diferente. O comentário justificava assim: "sem isso, o toque na linha
+   * cairia no caso 'saiu item', que já tem Desfazer desde sempre". A frase era
+   * FALSA: carrinho menor que a lista não é "saiu item" nenhum, porque `sairam`
+   * é diferença de conjunto e dá ZERO quando o que ela tem é subconjunto do que
+   * vem. O arranjo que a prova evitava, dizendo que ele já estava coberto, era
+   * exatamente o único em que o aplicativo perdia o trabalho dela em silêncio.
+   *
+   * Conferência descrita como feita, feita no arranjo vizinho. O caso volta ao
+   * revés: o exercício tirado FICA tirado. */
   conf('tirou o acrescentado pela caixa', await desmarcar(pag, novo), true);
-  await pausa(400);
-  const slugDaLista = IDS2[0].split(':')[2];
-  conf('abriu a lista cheia de onde veio a lista pronta', await pag.evaluate(s => {
-    const b = document.querySelector('#bib-lp-acrescentar [data-acrescentar="' + s + '"]');
-    if (!b) return false; b.click(); return true;
-  }, slugDaLista), true);
-  await pausa(500);
-  conf('devolveu o exercício que a seção 4 tinha tirado', await pag.evaluate(i => {
-    const c = document.querySelector('#bib-corpo input[data-carrinho="itens"][data-id="' + i + '"]');
-    if (!c) return false;
-    c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); return true;
-  }, esperada[2]), true);
   await pausa(400);
   const cPuro = await carrinho(pag);
   console.log('   carrinho do caso puro: ' + JSON.stringify(cPuro.itens));
-  conf('o carrinho tem os MESMOS ids da lista', cPuro.itens.slice().sort().join('|'), IDS2.slice().sort().join('|'));
-  conf('e em ordem DIFERENTE da do pacote', cPuro.itens.join('|') === IDS2.join('|') ? 'igual' : 'outra', 'outra');
+  conf('o carrinho é SUBCONJUNTO PRÓPRIO da lista: ela tirou um exercício',
+    cPuro.itens.length < IDS2.length && cPuro.itens.every(function (id) { return IDS2.indexOf(id) >= 0; }), true);
+  conf('e em ordem DIFERENTE da do pacote',
+    cPuro.itens.join('|') === IDS2.slice(0, cPuro.itens.length).join('|') ? 'igual' : 'outra', 'outra');
 
   await pag.reload({ waitUntil: 'networkidle0' });
   await H.abrirApp(pag, amb.ORIGEM);
@@ -936,16 +952,16 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   const c8 = await carrinho(pag);
   const avisoReload = await aviso(pag, '#bib-lp-aviso');
   console.log('   depois do reload: ' + JSON.stringify(c8.itens) + ' | ' + JSON.stringify(avisoReload.texto));
-  conf('a lista voltou à ordem do pacote', c8.itens.join('|'), IDS2.join('|'));
+  conf('a lista do pacote voltou inteira e na ordem dela', c8.itens.join('|'), IDS2.join('|'));
   if (V_SAIRAM) {
     conf('VENENO: sem enxergar a ordem, o aviso nasce SEM Desfazer',
       await pag.evaluate(() => !!document.querySelector('#bib-lp-aviso-acao')), false);
-    conf('VENENO: e a frase não diz que a ordem do pacote voltou',
-      /de volta à ordem do pacote/.test(avisoReload.texto), false);
+    conf('VENENO: e a frase não diz que a lista voltou como o pacote a trouxe',
+      /de volta como o pacote a trouxe/.test(avisoReload.texto), false);
     return;
   }
-  conf('e a tela diz que a ordem do pacote voltou',
-    /de volta à ordem do pacote/.test(avisoReload.texto), true);
+  conf('e a tela diz que a lista voltou como o pacote a trouxe',
+    /de volta como o pacote a trouxe/.test(avisoReload.texto), true);
   conf('e oferece Desfazer, porque o que se perdeu foi trabalho dela',
     await pag.evaluate(() => !!document.querySelector('#bib-lp-aviso-acao')), true);
 
@@ -1029,7 +1045,43 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   /* SEM EXERCÍCIO DA LISTA NÃO HÁ ESTIMATIVA. A tela dizia "0 exercícios · um
    * pouco menos de meia aula · ≈ 0 min (estimativa)", três afirmações falsas de
    * uma vez. Achado pela primeira lente cega do PR #57. */
-  secao('5d. A tela vazia não estima nada');
+  /* O ARRANJO, ESCRITO ANTES DO CÓDIGO, E A AFIRMAÇÃO AO LADO DELE.
+   *
+   *   Arranjo:   a lista fica com UM exercício, dos cinco, e depois com zero, e
+   *              depois só com um que ela acrescentou de fora.
+   *   Afirmação: nenhum desses três estados faz a tela prometer meia aula, e o
+   *              número que ela mostra nunca desmente a frase ao lado.
+   *
+   * A ESCRITA ANTERIOR SÓ TINHA OS DOIS ÚLTIMOS, que são os dois em que a conta
+   * dá zero, e a guarda do código era `daLista.length`, que é a mesma fronteira.
+   * Prova e conserto olhavam o mesmo lugar, e o lugar de fora ficou sem
+   * ninguém: com um exercício sobrando a tela dizia "1 exercício · um pouco
+   * menos de meia aula" com "≈ 5 min (estimativa)" embaixo, duas linhas se
+   * desmentindo. A lente cega chegou nele pelo caminho normal desta tela, que é
+   * ela tirar exercício. O estado de UM vem primeiro agora, de propósito. */
+  secao('5d. A tela não promete meia aula fora da meia aula');
+  const restaram = (await carrinho(pag)).itens.slice();
+  for (var q = 1; q < restaram.length; q++) {
+    await desmarcar(pag, restaram[q]);
+    await pausa(250);
+  }
+  const soUm = await pag.evaluate(() => ({
+    cabeca: (document.querySelector('#bib-lp-cabeca') || {}).innerText || '(não achei)',
+    cartoes: document.querySelectorAll('#bib-lp-grade .bib-celula').length
+  }));
+  console.log('   com um exercício só: ' + JSON.stringify(soUm));
+  conf('sobrou um cartão só', soUm.cartoes, 1);
+  conf('a tela conta o exercício', /^1 exercício/.test(soUm.cabeca), true);
+  conf('e mostra o minuto dele', /≈ \d+ min \(estimativa\)/.test(soUm.cabeca), true);
+  if (V_MEIA_AULA) {
+    conf('VENENO: sem piso, a tela promete meia aula para um exercício de poucos minutos',
+      /meia aula/.test(soUm.cabeca), true);
+    return;
+  }
+  conf('e NÃO promete meia aula nenhuma, porque poucos minutos não são meia aula',
+    /meia aula/.test(soUm.cabeca), false);
+
+  secao('5e. A tela vazia não estima nada');
   await pag.evaluate(() => { document.querySelector('#bib-carrinho-limpar').click(); });
   await pausa(600);
   const vazia = await pag.evaluate(() => ({

@@ -11435,7 +11435,26 @@
    * sempre a mesma coisa: uma lista de 35 minutos anunciada como "cerca de meia
    * aula" seria a tela arredondando o que o dado não arredonda. A banda de 27 a
    * 33 é a mesma do contrato (I5). */
+  /* "MEIA AULA" É UMA COMPARAÇÃO, E COMPARAÇÃO LONGE DEMAIS DEIXA DE SER UMA.
+   *
+   * A frase não tinha piso nem teto: a faixa de baixo ia de 26,9 a zero, então
+   * uma lista de cinco minutos era anunciada como "um pouco menos de meia
+   * aula", com "≈ 5 min (estimativa)" logo embaixo desmentindo. Duas linhas se
+   * contradizendo no mesmo cabeçalho é exatamente o que tirou a etiqueta de
+   * dificuldade do cartão nesta mesma frente, e voltou por outra porta. Achado
+   * por uma lente cega, e o caminho dela é o normal desta tela: ela tira quatro
+   * dos cinco exercícios.
+   *
+   * Fora da faixa a função devolve `null` e a tela não diz meia aula nenhuma:
+   * fica o número, que continua verdadeiro. Os limites são 20 e 40 minutos, e
+   * não são escolha de gosto: meia aula, numa aula de 50 a 60 minutos, é 25 a
+   * 30, e abaixo de 20 ou acima de 40 a palavra "meia" deixa de ser verdadeira
+   * em qualquer leitura. A banda de última tentativa do gerador vai de 20 a 45
+   * (`AFROUXAMENTOS_LISTAS`, em biblioteca/kits.py), então lista publicada acima
+   * de 40 existe e vai aparecer sem a frase, que é o certo: 45 minutos numa aula
+   * de 60 são três quartos, não meia. */
   function meiaAula(minutos) {
+    if (minutos < 20 || minutos > 40) return null;
     if (minutos > 33) return 'um pouco mais de meia aula';
     if (minutos < 27) return 'um pouco menos de meia aula';
     return 'cerca de meia aula';
@@ -11467,7 +11486,8 @@
     corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Listas prontas' }));
     listas.forEach(function (lp) {
       var linha = linhaBib('Lista pronta, nível ' + lp.nivel,
-        plural(lp.itens.length, 'exercício', 'exercícios') + ' · ' + meiaAula(lp.minutos),
+        plural(lp.itens.length, 'exercício', 'exercícios') +
+          (meiaAula(lp.minutos) ? ' · ' + meiaAula(lp.minutos) : ''),
         /* TOCAR NA LINHA DA LISTA QUE ELA JÁ ESTÁ MEXENDO ABRE, E NÃO RECARREGA.
          * Antes recarregava sempre, e o caminho mais natural do mundo (voltar
          * ao módulo, tocar de novo) jogava fora a ordem que ela tinha acabado
@@ -11642,7 +11662,8 @@
      * primeira lente cega do PR #57. */
     var cabeca = el('div', { class: 'bib-lp-cabeca', id: 'bib-lp-cabeca' }, [
       el('div', { class: 'bib-lp-meia', texto: !ids.length ? 'Nenhum exercício no material'
-        : plural(ids.length, 'exercício', 'exercícios') + (daLista.length ? ' · ' + meiaAula(soma) : '') }),
+        : plural(ids.length, 'exercício', 'exercícios') +
+          (daLista.length && meiaAula(soma) ? ' · ' + meiaAula(soma) : '') }),
       el('div', { class: 'ajuda bib-lp-minutos', texto: !daLista.length
         ? (ids.length ? 'Sem estimativa de tempo: o minuto vem da lista pronta, e nenhum exercício dela ficou aqui.'
           : 'Toque na linha da lista pronta para carregá-la de novo.')
@@ -12129,12 +12150,15 @@
       caixa.appendChild(el('button', {
         type: 'button', class: 'btn pequeno', id: 'bib-desfazer-troca',
         /* O terceiro caso não existia, e por isso este botão dizia "Devolver os
-         * 0 itens que eu tirei" quando o que se perdeu foi a ORDEM e não item
-         * nenhum. Quando nada saiu, o que há para devolver é a ordem. */
+         * 0 itens que eu tirei" quando nenhum item saiu. Com `sairam` zero o
+         * que se perdeu foi a lista como ela a tinha deixado: a ordem, ou
+         * exercícios que ela tinha tirado e voltaram, ou os dois. O rótulo diz
+         * isso sem enumerar, pelo mesmo motivo que o `perdeu` deixou de
+         * enumerar. */
         texto: bibTrocaDesfazer.sairam === 1
           ? 'Devolver o item que eu tirei'
           : bibTrocaDesfazer.sairam === 0
-            ? 'Devolver a ordem que eu troquei'
+            ? 'Devolver a lista como eu tinha deixado'
             : 'Devolver os ' + bibTrocaDesfazer.sairam + ' itens que eu tirei',
         aoClick: function () {
           var t = bibTrocaDesfazer;
@@ -12296,23 +12320,31 @@
     bibLpEmEdicao = lp.id;
     guardarCarrinho();
     var sairam = semOsDe(antes.itens, tudo.itens).length + antes.paginas.length;
-    /* O `sairam` É CEGO PARA A ORDEM, e isso apagava o trabalho dela em
-     * silêncio. Ele é diferença de CONJUNTO: se ela só trocou a ordem e tocou
-     * na linha de novo, `antes` e `tudo` têm os mesmos ids, `sairam` dá zero, o
-     * Desfazer não nasce, e a rampa que ela acabou de montar vai embora sem uma
-     * palavra. A primeira lente cega pegou isto, e a acusação foi justa: o
-     * raciocínio "a ORDEM é o que a lista pronta é" tinha sido aplicado ao
-     * aviso e não tinha sido aplicado aqui.
+    /* O CRITÉRIO É UM SÓ: O QUE ESTAVA NA TELA É DIFERENTE DO QUE O PACOTE
+     * TRAZ, em conjunto OU em ordem, por qualquer caminho.
+     *
+     * Duas escritas anteriores erraram aqui, e erraram do mesmo jeito: cada uma
+     * enumerou os casos que tinha em mente em vez de comparar as duas listas.
+     * A primeira olhava só `sairam`, que é diferença de CONJUNTO, e perdia a
+     * ordem. A segunda acrescentou `ordemPerdida`, que exigia comprimentos
+     * IGUAIS, e perdia o subconjunto: ela tira dois de cinco, fecha o aparelho,
+     * reabre, toca na linha, e `sairam` dá zero (nada do que ela tinha está
+     * fora da lista) e os comprimentos diferem, então não nascia Desfazer e a
+     * escolha dela ia embora calada. Medido com a conta na mão, e foi uma lente
+     * cega que apontou.
+     *
+     * Enumerar caso é como se perde trabalho dela em silêncio. Comparar as duas
+     * listas não tem caso para esquecer.
      *
      * `sairam` continua contando ITENS que saíram, porque é ele que escreve
-     * "Devolver os N itens que eu tirei". Quem decide se há o que desfazer é
-     * `perdeu`, que enxerga a ordem também. Perder a ordem é perder trabalho
-     * dela, e trabalho dela nunca some sem volta. */
-    var ordemPerdida = antes.itens.length === tudo.itens.length &&
-      antes.itens.some(function (id, i) { return id !== tudo.itens[i]; });
-    var perdeu = sairam > 0 || ordemPerdida;
-    bibTrocaDesfazer = perdeu
-      ? { antes: antes, tudo: tudo, sairam: sairam, ordemPerdida: ordemPerdida } : null;
+     * "Devolver os N itens que eu tirei"; quem decide se há o que desfazer é
+     * `perdeu`. E não há o que desfazer quando não havia nada antes. */
+    var igualAoPacote = antes.paginas.length === 0 &&
+      antes.itens.length === tudo.itens.length &&
+      !antes.itens.some(function (id, i) { return id !== tudo.itens[i]; });
+    var tinhaAlgo = antes.itens.length > 0 || antes.paginas.length > 0;
+    var perdeu = tinhaAlgo && !igualAoPacote;
+    bibTrocaDesfazer = perdeu ? { antes: antes, tudo: tudo, sairam: sairam } : null;
     /* A FRASE DIZ O TOTAL QUE FICOU, e não a conta que levou até ele.
      *
      * A forma antiga somava em voz alta: "Tirei 2 itens que estavam marcados e
@@ -12330,7 +12362,8 @@
       para: lp.id,
       texto: 'O material agora tem ' + plural(bibCarrinho.itens.length, 'exercício', 'exercícios') +
         ': a lista pronta do nível ' + lp.nivel +
-        (sairam ? ', no lugar do que estava marcado' : ordemPerdida ? ', de volta à ordem do pacote' : '') +
+        (sairam ? ', no lugar do que estava marcado'
+          : perdeu ? ', de volta como o pacote a trouxe' : '') +
         '. Mude o que quiser e toque em Gerar material.',
       rotulo: perdeu ? 'Desfazer' : null,
       aoAgir: perdeu ? function () { devolverSelecaoTrocada(antes, tudo); } : null
