@@ -11674,7 +11674,11 @@
             'exercícios que você acrescentou e não entram nessa conta') : '') })
     ]);
     corpo.appendChild(cabeca);
-    if (mudou) {
+    /* E NÃO COM A LISTA VAZIA: "o material sai na ordem que está aqui" afirma
+     * uma ordem de um material que não existe, e aparecia junto de "Nenhum
+     * exercício no material" e de "Você tirou tudo desta lista", três frases
+     * ao mesmo tempo, uma delas falsa. Achado por uma lente cega. */
+    if (mudou && ids.length) {
       corpo.appendChild(el('p', { class: 'ajuda bib-lp-mudou', id: 'bib-lp-mudou',
         texto: 'Você mudou esta lista. O material sai na ordem que está aqui.' }));
     }

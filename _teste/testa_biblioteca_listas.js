@@ -175,6 +175,10 @@ const T_RECARREGA = '          if (false && listaProntaEmEdicao(lp)) irNaBibliot
 // a tela duas vezes, jogando fora e repedindo as miniaturas de 1080 px
 // a frase da meia aula volta a não ter piso nem teto, e cinco minutos viram
 // "um pouco menos de meia aula" com o minuto ao lado desmentindo
+// o dedo volta a não cancelar o retângulo em andamento, e a palma apoiada fecha
+// o tapar que o bico tinha começado
+const L_PALMA = '    this._cancelarTapar();';
+const T_PALMA = '    if (false) this._cancelarTapar();';
 const L_MEIA_AULA = '    if (minutos < 20 || minutos > 40) return null;';
 const T_MEIA_AULA = '    if (false) return null;';
 const L_REDESENHO = '  function redesenharListaPronta(id, qual) {';
@@ -239,7 +243,8 @@ const VENENOS = {
   volta: { arq: '/app.js', de: L_VOLTA, para: T_VOLTA },
   lixeira: { arq: '/draw.js', de: L_LIXEIRA, para: T_LIXEIRA },
   redesenho: { arq: '/app.js', de: L_REDESENHO, para: T_REDESENHO },
-  'meia-aula': { arq: '/app.js', de: L_MEIA_AULA, para: T_MEIA_AULA }
+  'meia-aula': { arq: '/app.js', de: L_MEIA_AULA, para: T_MEIA_AULA },
+  palma: { arq: '/draw.js', de: L_PALMA, para: T_PALMA }
 };
 const NOME_VENENO = Object.keys(VENENOS).filter(function (n) {
   return process.argv.indexOf('--envenenado-' + n) !== -1;
@@ -262,6 +267,7 @@ const V_VOLTA = NOME_VENENO === 'volta';
 const V_LIXEIRA = NOME_VENENO === 'lixeira';
 const V_REDESENHO = NOME_VENENO === 'redesenho';
 const V_MEIA_AULA = NOME_VENENO === 'meia-aula';
+const V_PALMA = NOME_VENENO === 'palma';
 const BASE_DE = { '/app.js': APP_REPO, '/draw.js': DRAW_REPO, '/styles.css': CSS_REPO };
 const trocas = {};
 if (VENENO) trocas[RECEITA.arq] = BASE_DE[RECEITA.arq].split(RECEITA.de).join(RECEITA.para);
@@ -434,7 +440,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   if (!VENENO) {
     secao('0. As cercas ainda apontam para o alvo');
     var nomes = Object.keys(VENENOS);
-    conf('a tabela tem os dezesseis venenos desta prova', nomes.length, 16);
+    conf('a tabela tem os dezessete venenos desta prova', nomes.length, 17);
     var fora = [];
     nomes.forEach(function (n) {
       var r = VENENOS[n];
@@ -1137,6 +1143,8 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   conf('e não estima zero minuto', /≈ 0 min/.test(vazia.cabeca), false);
   conf('e diz o que há: nenhum exercício no material',
     /^Nenhum exercício no material/.test(vazia.cabeca), true);
+  conf('e NÃO afirma uma ordem de um material que não existe',
+    await pag.evaluate(() => !!document.querySelector('#bib-lp-mudou')), false);
 
   /* E COM SÓ O QUE ELA ACRESCENTOU, a tela também não estima: o minuto vem da
    * lista pronta, e nenhum exercício dela ficou aqui. Era o caso de "7
@@ -1180,6 +1188,118 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
     return { feito: !!feito, seco: seco === null, n: itens.length, item: itens[0] || null };
   });
   conf('a ferramenta de tapar cria um retângulo', tapar.feito, true);
+
+  /* O RETÂNGULO NÃO PASSA DA FOLHA, e a palma da mão não o cria.
+   *
+   *   Arranjo:   um arrasto de tapar que começa FORA da folha (acima e à
+   *              esquerda) e termina dentro; e um arrasto do bico interrompido
+   *              por um `pointerup` de DEDO.
+   *   Afirmação: o item gravado fica dentro da folha nos quatro lados, e o
+   *              toque de dedo não cria retângulo nenhum.
+   *
+   * O canvas desenha dentro de um recorte da folha e o PDF não recorta: sem
+   * isto a tela mostrava o branco aparado e o papel o imprimia inteiro, por
+   * cima do cabeçalho. E o `_cancelarTraco` do dedo não limpava o `tapando`,
+   * então a palma apoiada fechava o retângulo do bico. */
+  const bordas = await pag.evaluate(() => {
+    const c = document.createElement('canvas');
+    c.width = 300; c.height = 400;
+    document.body.appendChild(c);
+    const ed = new window.Draw.Editor(c, { nota: window.Draw.notaVazia('branco') });
+    const fora = ed.adicionarTapar(-200, -150, 500, 400);
+    const alem = ed.adicionarTapar(900, 1200, 600, 600);
+    const itens = ed.pagina().itens.slice();
+    ed.destruir && ed.destruir();
+    c.remove();
+    return {
+      fora: fora && [fora.x, fora.y, fora.w, fora.h],
+      alem: alem && [alem.x, alem.y, alem.w, alem.h],
+      n: itens.length,
+      folha: [window.Draw.FOLHA_L || 1000, window.Draw.FOLHA_A || 1343]
+    };
+  });
+  console.log('   retângulos nas bordas: ' + JSON.stringify(bordas));
+  conf('o retângulo que começa fora da folha é aparado no canto', bordas.fora && bordas.fora.slice(0, 2).join(','), '0,0');
+  conf('e não passa da folha pela direita nem por baixo',
+    bordas.alem && (bordas.alem[0] + bordas.alem[2] <= 1000) && (bordas.alem[1] + bordas.alem[3] <= 1343), true);
+
+  const palma = await pag.evaluate(() => {
+    const c = document.createElement('canvas');
+    c.width = 400; c.height = 500;
+    document.body.appendChild(c);
+    const ed = new window.Draw.Editor(c, { nota: window.Draw.notaVazia('branco') });
+    ed.ferramenta = 'tapar';
+    function ev(tipo, tipoPonteiro, id, x, y) {
+      const r = c.getBoundingClientRect();
+      c.dispatchEvent(new PointerEvent(tipo, { bubbles: true, cancelable: true, pointerId: id,
+        pointerType: tipoPonteiro, clientX: r.left + x, clientY: r.top + y,
+        buttons: tipo === 'pointerup' ? 0 : 1 }));
+    }
+    ev('pointerdown', 'pen', 1, 80, 80);
+    ev('pointermove', 'pen', 1, 260, 300);
+    ev('pointerdown', 'touch', 9, 20, 20);     // a palma encosta
+    ev('pointerup', 'touch', 9, 20, 20);       // e levanta antes do bico
+    const depoisDaPalma = ed.pagina().itens.filter(i => i.t === 'tapar').length;
+    ev('pointerup', 'pen', 1, 260, 300);
+    const depoisDoBico = ed.pagina().itens.filter(i => i.t === 'tapar').length;
+    ed.destruir && ed.destruir();
+    c.remove();
+    return { depoisDaPalma, depoisDoBico };
+  });
+  console.log('   palma: ' + JSON.stringify(palma));
+  if (V_PALMA) {
+    conf('VENENO: sem cancelar o tapar, a palma da mão fecha o retângulo do bico',
+      palma.depoisDaPalma, 1);
+    return;
+  }
+  conf('a palma da mão NÃO cria retângulo nenhum', palma.depoisDaPalma, 0);
+
+  /* O BRANCO NUMA FOLHA BRANCA: MEDIDO, PARA A ORQUESTRADORA DECIDIR.
+   *
+   *   Arranjo:   a mesma folha de fundo branco, desenhada com e sem um
+   *              retângulo de tapar em área vazia, e depois com o retângulo
+   *              sobre um texto escuro.
+   *   Afirmação: (nenhuma; esta é uma MEDIDA, e o número vai para a decisão)
+   *
+   * A folha que este PR mais produz, a de "Abrir a lista como folha da aula",
+   * nasce com fundo branco. Um retângulo branco sem borda em área vazia não
+   * muda pixel nenhum: ela não tem como saber que criou alguma coisa nem onde
+   * tocar para tirá-la. Sobre conteúdo, ele aparece. O número diz de qual dos
+   * dois casos se está falando. */
+  const invisivel = await pag.evaluate(() => {
+    function pinta(comTapar, comTexto) {
+      const c = document.createElement('canvas');
+      c.width = 400; c.height = 300;
+      document.body.appendChild(c);
+      const ed = new window.Draw.Editor(c, { nota: window.Draw.notaVazia('branco') });
+      ed.escala = 1; ed.deslocX = 0; ed.deslocY = 0;
+      ed.cor = '#1A1C1F';
+      if (comTexto) ed.adicionarTexto('AAAAAAAA', 40, 60, 60);
+      if (comTapar) ed.adicionarTapar(20, 20, 300, 120);
+      ed.desenhar();
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      // pixel EXATAMENTE branco: é a tinta do retângulo, e o fundo da folha
+      // não é branco puro, então os dois se distinguem
+      let brancoPuro = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i] === 255 && d[i + 1] === 255 && d[i + 2] === 255) brancoPuro++;
+      ed.destruir && ed.destruir();
+      c.remove();
+      return brancoPuro;
+    }
+    return { vazia: pinta(false, false), vaziaComTapar: pinta(true, false),
+      comTexto: pinta(false, true), textoComTapar: pinta(true, true) };
+  });
+  console.log('   branco puro na folha (pixels 255,255,255): ' + JSON.stringify(invisivel));
+  /* O número que interessa à decisão: quantos pixels o retângulo pinta de
+   * branco PURO numa área vazia da folha. Se for zero, ela não tem como ver o
+   * que criou; se for a área do retângulo, ele se distingue do papel. */
+  const pintados = invisivel.vaziaComTapar - invisivel.vazia;
+  console.log('   MEDIDA PARA A DECISÃO: o retângulo em área vazia pinta ' + pintados +
+    ' pixels de branco puro, de 300 por 120 = 36000 que ele ocupa');
+  conf('a régua sabe contar branco puro, senão a medida não diria nada',
+    invisivel.vaziaComTapar > 0 || invisivel.vazia > 0 || pintados > 0, true);
+  conf('e o bico, levantado depois dela, também não cria, porque o arrasto foi cancelado',
+    palma.depoisDoBico, 0);
   conf('e um toque seco não vira retângulo', tapar.seco, true);
   conf('o retângulo entra no vetor da folha', tapar.n, 1);
   conf('com o tipo tapar e as quatro medidas',
@@ -1269,10 +1389,17 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
    * oferece. As duas afirmações são compatíveis, e é por isso que só medir
    * resolve: a API tinha saída e a TELA não tinha.
    *
-   * Aqui a medição é pela interface, na folha de verdade: o dedo escolhe a
-   * ferramenta, o dedo desenha o retângulo, o dedo troca para a seleção, o dedo
-   * toca no retângulo, e então se conta quantos botões de remover existem na
-   * barra. Ferramenta que ela cria e não consegue tirar não está pronta. */
+   * Aqui a medição é pela interface, na folha de verdade, COM O BICO: o bico
+   * escolhe a ferramenta, desenha o retângulo, troca para a seleção e toca
+   * nele, e então se conta quantos botões de remover existem na barra.
+   *
+   * E é bico, e não dedo, de propósito e com o motivo escrito: nesta folha o
+   * dedo NUNCA desenha, por decisão antiga da casa (`_eDedo` sai na primeira
+   * linha do `_aoDescer`, antes de qualquer ferramenta), e isso vale igual para
+   * a caneta, o marca-texto, a borracha, o texto e a seleção. O tapar segue a
+   * regra, não inventa uma. Um comentário anterior dizia "o dedo desenha", e
+   * era falso: o evento sempre foi `pointerType: 'pen'`. Ferramenta que ela
+   * cria e não consegue tirar não está pronta. */
   secao('6b. O que ela cria, ela consegue tirar, medido pela interface');
   await pag.evaluate(async () => {
     const d = await Store.carregar();
@@ -1316,10 +1443,16 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
     if (!b) return 'sem a ferramenta';
     b.click();
     await new Promise(r => setTimeout(r, 200));
+    /* DENTRO DA FOLHA, e em fração do canvas. A primeira escrita usava pixels
+     * cravados (120,120 a 260,200) que caíam FORA da folha, num canto do canvas
+     * onde só há moldura: o retângulo nascia com coordenada negativa e só
+     * existia porque nada o recortava. Quando o recorte entrou, esta prova foi
+     * a primeira a reprovar, e reprovou com razão. */
     const c = document.querySelector('#tela-desenho');
-    tocar(c, 'pointerdown', 120, 120);
-    tocar(c, 'pointermove', 260, 200);
-    tocar(c, 'pointerup', 260, 200);
+    const cx = c.getBoundingClientRect().width, cy = c.getBoundingClientRect().height;
+    tocar(c, 'pointerdown', Math.round(cx * 0.40), Math.round(cy * 0.35));
+    tocar(c, 'pointermove', Math.round(cx * 0.62), Math.round(cy * 0.52));
+    tocar(c, 'pointerup', Math.round(cx * 0.62), Math.round(cy * 0.52));
     await new Promise(r => setTimeout(r, 300));
     await new Promise(r => setTimeout(r, 900));
     const nota = await Store.lerNota('aula-b10-tapar');
@@ -1327,6 +1460,10 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
     return itens.filter(i => i.t === 'tapar').length;
   });
   console.log('   retângulos de tapar desenhados pela interface: ' + JSON.stringify(desenhou));
+  /* MEDIDO E AFIRMADO. Esta linha era só um console.log, e um zero aqui só
+   * reprovava por tabela, na asserção da lixeira, com a mensagem errada
+   * apontando para o conserto errado. Achado por uma lente cega. */
+  conf('o arrasto pela interface criou UM retângulo na folha', desenhou, 1);
   const antesDeSelecionar = await pag.evaluate(s => document.querySelectorAll(s).length, lixeiraSeletor);
   conf('antes de selecionar, a barra NÃO tem botão de remover', antesDeSelecionar, 0);
   const aoSelecionar = await pag.evaluate(async (s) => {
@@ -1341,8 +1478,9 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
     sel.click();
     await new Promise(r => setTimeout(r, 200));
     const c = document.querySelector('#tela-desenho');
-    tocar(c, 'pointerdown', 180, 150);
-    tocar(c, 'pointerup', 180, 150);
+    const cx = c.getBoundingClientRect().width, cy = c.getBoundingClientRect().height;
+    tocar(c, 'pointerdown', Math.round(cx * 0.50), Math.round(cy * 0.43));
+    tocar(c, 'pointerup', Math.round(cx * 0.50), Math.round(cy * 0.43));
     await new Promise(r => setTimeout(r, 300));
     return { lixeiras: document.querySelectorAll(s).length };
   }, lixeiraSeletor);

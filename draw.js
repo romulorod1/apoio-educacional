@@ -271,7 +271,19 @@
    * como a imagem: ela precisa pôr o branco exatamente em cima do pedaço errado
    * do enunciado, e um retângulo que nasce no meio da folha obrigaria a
    * arrastar e redimensionar depois de cada toque. */
+  /* O RETÂNGULO NASCE RECORTADO À FOLHA, porque é assim que a tela o mostra.
+   *
+   * O canvas desenha dentro de um `clip()` da folha e o PDF não recorta nada:
+   * um arrasto começado fora da folha aparecia aparado na tela e saía inteiro
+   * no papel, por cima do cabeçalho "Folha de aula". A tela mentia sobre o que
+   * ia sair, que é exatamente o que a unificação das camadas existe para
+   * impedir. Recortar aqui, na entrada, faz o vetor guardar o que ela viu, e
+   * vale para os dois desenhos de uma vez. Achado por uma lente cega. */
   Editor.prototype.adicionarTapar = function (x, y, w, h) {
+    var x1 = Math.max(0, Math.min(FOLHA_L, x)), y1 = Math.max(0, Math.min(FOLHA_A, y));
+    var x2 = Math.max(0, Math.min(FOLHA_L, x + w)), y2 = Math.max(0, Math.min(FOLHA_A, y + h));
+    x = Math.min(x1, x2); y = Math.min(y1, y2);
+    w = Math.abs(x2 - x1); h = Math.abs(y2 - y1);
     if (w < TAPAR_MINIMO || h < TAPAR_MINIMO) return null;
     this.marcarPonto();
     var item = { t: 'tapar', x: x, y: y, w: w, h: h };
@@ -560,7 +572,21 @@
     this.precisaRedesenhar = true;
   };
 
+  /* O DEDO CANCELA O QUE O BICO ESTAVA FAZENDO, e o retângulo faltava nessa
+   * conta. `_cancelarTraco` desfazia só o traço em andamento, e o `tapando`
+   * seguia de pé: com a mão apoiada no vidro, o `pointerup` da PALMA caía no
+   * fim do arrasto e fechava o retângulo com as coordenadas do bico naquele
+   * instante, criando na folha um branco que ela não pediu e não viu nascer.
+   * O comentário do `moverNoCarrinho` diz que ela usa o tablet com a mão
+   * apoiada, então este é o gesto normal dela. Achado por uma lente cega. */
+  Editor.prototype._cancelarTapar = function () {
+    if (!this.tapando) return;
+    this.tapando = null;
+    this.cacheValido = false; this.precisaRedesenhar = true;
+  };
+
   Editor.prototype._cancelarTraco = function () {
+    this._cancelarTapar();
     if (!this.tracoAtual) return;
     var itens = this.pagina().itens;
     var i = itens.indexOf(this.tracoAtual);
