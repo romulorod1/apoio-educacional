@@ -374,6 +374,17 @@ roda "caminho curto --envenenado-volta"         node "_teste/testa_biblioteca_ca
 roda "biblioteca remover pacote"                node "_teste/testa_biblioteca_remover.js"
 roda "remover pacote --envenenado-dela"         node "_teste/testa_biblioteca_remover.js" --envenenado-dela
 
+# FRENTE B (B9): kits.json e exclusoes.json sao aditivos do esquema 1 (CONTRATO
+# 8d). A prova nao le o biblioteca.js: ela IMPORTA um pacote de brinquedo com os
+# dois arquivos no aplicativo servido do repositorio e mede o que ficou gravado,
+# que tem de ser byte por byte a mesma contagem do pacote sem eles. O veneno
+# serve um biblioteca.js que RECUSA arquivo de raiz desconhecido, ou seja um
+# aplicativo que nao e indiferente ao kits.json, e o teste tem de enxergar a
+# recusa. Para ver a LINHA DA REPROVACAO, o mesmo veneno com --controle, que
+# nao entra aqui porque tem de falhar.
+roda "biblioteca kits (aditivo)"                node "_teste/testa_biblioteca_kits.js"
+roda "biblioteca kits --envenenado-app-recusa"  node "_teste/testa_biblioteca_kits.js" --envenenado-app-recusa
+
 roda "painel de valores"                        node "_teste/testa_painel_valores.js"
 roda "painel de valores --envenenado-aberto"    node "_teste/testa_painel_valores.js" --envenenado-aberto
 roda "painel de valores --envenenado-esquece"   node "_teste/testa_painel_valores.js" --envenenado-esquece
@@ -386,6 +397,11 @@ roda "painel de valores --envenenado-esquece"   node "_teste/testa_painel_valore
 roda "gerador da biblioteca"                    python biblioteca/_prova_gerador.py
 # O Banco de Questoes (2016 a 2020), sobre um volume sintetico do mesmo modelo.
 roda "banco da biblioteca"                      python biblioteca/_prova_banco.py
+# A kits-v1 e a tempo-v1 (CONTRATO 8e), sobre uma amostra escrita a mao na
+# propria prova: um veneno por invariante de I1 a I7, um por linha da tabela dos
+# tres niveis, um por campo, e `relaxou` conferido nos dois sentidos. A amostra
+# nao sai do gerador de proposito, senao um erro do gerador viraria o esperado.
+roda "kits e tempo (regra)"                     python biblioteca/_prova_kits.py
 
 # Duas conferencias aqui, e a primeira e a que pega o defeito de verdade.
 #
