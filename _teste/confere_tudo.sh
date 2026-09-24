@@ -408,6 +408,11 @@ roda "kits e tempo (regra)"                     python biblioteca/_prova_kits.py
 # pacotes do Drive e por isso nao roda aqui; o que roda aqui e a prova de que
 # ela sabe reprovar, sem a qual o numero que ela imprime nao vale nada.
 roda "comparacao de pacotes"                    python biblioteca/_compara_pacotes.py --autoteste
+# O limiar que decide se a kits-v1 ganhou do sorteio. Fica no portao porque e o
+# numero que decide o projeto, e numero que decide nao vai para o registro sem
+# conferencia: alem dos valores que se checam a mao, a cauda binomial e batida
+# contra uma contagem por forca bruta de todas as 2^n sequencias.
+roda "limiar da comparacao cega"                python biblioteca/_apura_cega.py --autoteste
 
 # Duas conferencias aqui, e a primeira e a que pega o defeito de verdade.
 #
