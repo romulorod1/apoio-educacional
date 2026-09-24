@@ -27,6 +27,18 @@
  *   asset-citado        o itens.json cita um asset que não existe
  *   esquema             manifest com esquema 2
  *   asset-fora          um exercício cita uma imagem fora de assets/ (no zip e no manifest)
+ *   kits-fora-do-manifest  o kits.json está no zip e NÃO está na lista do manifest
+ *   kits-hash           o manifest traz o hash errado do kits.json
+ *
+ * Opção kits (gerar(saida, { kits: true }), para o testa_biblioteca_kits):
+ * o pacote leva os dois arquivos aditivos da seção 8d do contrato, kits.json e
+ * exclusoes.json, mais manifest.contagens.kits. O conteúdo deles aqui é DADO
+ * ESCRITO À MÃO, no formato do contrato, e não kit montado pela kits-v1: este
+ * pacote existe para provar que o aplicativo publicado confere e ignora os dois
+ * arquivos, e nada aqui julga a qualidade de kit nenhum. Quem monta kit é o
+ * biblioteca/kits.py, e quem confere é o biblioteca/confere_kits.py, com o
+ * pacote real. Régua e peça não saem da mesma matriz, e por isso não existe
+ * nenhuma linha de regra de kit dentro deste arquivo.
  *
  * Opção compor (gerar(saida, { compor: true }), para o testa_biblioteca_compor):
  * a lista "Soma e Produto" ganha o que o compositor tem de tratar, e o resto do
@@ -194,6 +206,58 @@ const dd = n => String(n).padStart(2, '0');
 const sha = b => 'sha256:' + crypto.createHash('sha256').update(b).digest('hex');
 const json = o => Buffer.from(JSON.stringify(o, null, 1) + '\n', 'utf8');
 
+/* Os dois arquivos aditivos da seção 8d do contrato, escritos à mão.
+ * Dois kits do mesmo módulo, nos níveis 1 e 3, no formato do contrato, com
+ * `relaxou` preenchido num deles para o formato do campo estar exercitado.
+ * Os ids apontam para itens e páginas que existem no pacote sintético. */
+const MOD_KIT = '9ano:equacoes-do-segundo-grau';
+const LISTA_KIT = '9ano:equacoes-do-segundo-grau:soma-e-produto';
+const TEO_KIT = '9ano:equacoes-do-segundo-grau:soma-e-produto-das-raizes:teo';
+const KITS = [
+  {
+    id: MOD_KIT + ':kit:1', modulo: MOD_KIT, serie: '9ano', nivel: 1,
+    titulo: 'Equações do Segundo Grau', regra: 'kits-v1', tempo_regra: 'tempo-v1', minutos: 28.4,
+    teoria: [TEO_KIT + ':p02', TEO_KIT + ':p03'],
+    degraus: [
+      { n: 1, item: LISTA_KIT + ':ex:1', degrau: 1, minutos: 4.7 },
+      { n: 2, item: LISTA_KIT + ':ex:2', degrau: 1, minutos: 5.1 },
+      { n: 3, item: LISTA_KIT + ':ex:3', degrau: 1, minutos: 5.5 },
+      { n: 4, item: LISTA_KIT + ':ex:4', degrau: 2, minutos: 6.0 },
+      { n: 5, item: LISTA_KIT + ':ex:6', degrau: 2, minutos: 7.1 }
+    ],
+    alternativas: { [LISTA_KIT + ':ex:6']: [LISTA_KIT + ':ex:7'] },
+    relaxou: null
+  },
+  {
+    id: MOD_KIT + ':kit:3', modulo: MOD_KIT, serie: '9ano', nivel: 3,
+    titulo: 'Equações do Segundo Grau', regra: 'kits-v1', tempo_regra: 'tempo-v1', minutos: 26.6,
+    teoria: [],
+    degraus: [
+      { n: 1, item: LISTA_KIT + ':ex:4', degrau: 2, minutos: 6.0 },
+      { n: 2, item: LISTA_KIT + ':ex:6', degrau: 2, minutos: 7.1 },
+      { n: 3, item: LISTA_KIT + ':ex:7', degrau: 3, minutos: 6.4 },
+      { n: 4, item: LISTA_KIT + ':ex:8', degrau: 3, minutos: 7.1 }
+    ],
+    alternativas: {},
+    relaxou: ['minutos'],
+    conferido: { quem: 'olho de fora cego', data: '2026-09-23', nota: 4 }
+  }
+];
+/* Exclusões: ids que NÃO estão em itens.json, porque saíram do pacote.
+ * São QUATRO de propósito. Os três números do manifest que andam juntos aqui
+ * têm de ser TODOS diferentes entre si, senão trocar um pelo outro passa em
+ * todas as asserções que os comparam: com 2 kits e 2 exclusões, trocar
+ * `contagens.kits` por `contagens.itens_excluidos` conferia 2 contra 2; com 3
+ * exclusões, o empate mudou de lugar e passou a bater com os 3 módulos. Agora
+ * são 3 módulos, 2 kits e 4 exclusões. Achado, nas duas formas, pelas duas
+ * rodadas da lente estreita do PR #56. */
+const EXCLUSOES = [
+  { id: LISTA_KIT + ':ex:9', motivo: 'a figura da solução veio da fonte fora do lugar', quem: 'curadoria', data: '2026-09-22' },
+  { id: LISTA_KIT + ':ex:10', motivo: 'o recorte do enunciado não começa pelo número' },
+  { id: LISTA_KIT + ':ex:11', motivo: 'a fonte numera dois enunciados com o mesmo número' },
+  { id: LISTA_KIT + ':ex:12', motivo: 'a solução da fonte não começa pelo número do exercício' }
+];
+
 function gerar(saida, opcoes) {
   opcoes = opcoes || {};
   const veneno = opcoes.veneno || null;
@@ -295,6 +359,13 @@ function gerar(saida, opcoes) {
   arquivos['teoria.json'] = { dados: json(teoria), metodo: 8 };
   arquivos['busca.json'] = { dados: json(busca), metodo: 8 };
   arquivos['apelidos.json'] = { dados: json(apelidos), metodo: 0 };
+  /* Os dois aditivos da 8d. kits.json comprimido e exclusoes.json guardado sem
+   * compressão, para os dois métodos do zip passarem pela conferência. */
+  const comKits = !!opcoes.kits;
+  if (comKits) {
+    arquivos['kits.json'] = { dados: json(KITS), metodo: 8 };
+    arquivos['exclusoes.json'] = { dados: json(EXCLUSOES), metodo: 0 };
+  }
 
   const nomes = Object.keys(arquivos).sort();
   const lista = {};
@@ -304,6 +375,9 @@ function gerar(saida, opcoes) {
   const alvoStored = `assets/${SERIE}/equacoes-do-segundo-grau/soma-e-produto-das-raizes/teo-p02.svg`;
   if (veneno === 'hash') lista[alvoDeflate] = sha(Buffer.from('outro conteudo'));
   if (veneno === 'faltando') lista['assets/9ano/nao-existe/ex-01.svg'] = sha(Buffer.from('x'));
+  // o kits.json fica no zip e sai da lista do manifest
+  if (veneno === 'kits-fora-do-manifest') delete lista['kits.json'];
+  if (veneno === 'kits-hash') lista['kits.json'] = sha(Buffer.from('outro conteudo'));
 
   const manifest = {
     esquema: veneno === 'esquema' ? 2 : 1,
@@ -313,8 +387,9 @@ function gerar(saida, opcoes) {
     materia: 'matematica',
     fonte: { id: 'obmep-portal', nome: 'Pacote sintético de teste', url: 'https://example.invalid/', licenca: 'gerado para teste' },
     series: [SERIE],
-    contagens: { modulos: MODULOS.length, aulas_teoria: teoria.length, paginas_teoria: paginasTeoria,
-      aulas_exercicios: aulasExercicios, itens: itens.length, itens_com_solucao: comSolucao, itens_excluidos: 0 },
+    contagens: Object.assign({ modulos: MODULOS.length, aulas_teoria: teoria.length, paginas_teoria: paginasTeoria,
+      aulas_exercicios: aulasExercicios, itens: itens.length, itens_com_solucao: comSolucao,
+      itens_excluidos: comKits ? EXCLUSOES.length : 0 }, comKits ? { kits: KITS.length } : {}),
     arquivos: lista
   };
 
@@ -389,7 +464,7 @@ function gerarBanco(saida, opcoes) {
 
 const VENENOS = ['corrompido-deflate', 'corrompido-stored', 'hash', 'sobrando', 'faltando', 'asset-citado', 'esquema', 'asset-fora'];
 
-module.exports = { gerar, gerarBanco, montarZip, crc32, VENENOS, MODULOS };
+module.exports = { gerar, gerarBanco, montarZip, crc32, VENENOS, MODULOS, KITS, EXCLUSOES };
 
 if (require.main === module) {
   const saida = process.argv[2];
