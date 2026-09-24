@@ -6,7 +6,7 @@
  * O que prova, no modo normal:
  *
  *   1. AS DUAS LINHAS NA TELA DO MÓDULO. "Lista pronta, nível 2" e "nível 3",
- *      cada uma dizendo quantos exercícios, a meia aula e o minuto estimado
+ *      cada uma dizendo quantos exercícios, quanto da aula e o minuto estimado
  *      colado da palavra estimativa. E, no outro sentido, o que NÃO pode estar
  *      escrito: nenhuma palavra de curadoria em lugar nenhum da tela. A
  *      comparação cega de 24/09 mediu que a nossa escolha não vence uma
@@ -15,8 +15,8 @@
  *
  *   1a. O NÚMERO É O DAQUELA LISTA. As duas listas do pacote sintético têm
  *      tamanhos e minutos diferentes de propósito, e a tela tem de mostrar os
- *      dois pares certos. A lista de 31,6 min diz 31,6 e diz "um pouco mais de
- *      meia aula", e não "cerca de meia aula": o número na tela é o da lista, e
+ *      dois pares certos. A lista de 70,0 min diz 70 e diz "um pouco mais de
+ *      uma aula", e não "cerca de uma aula": o número na tela é o da lista, e
  *      a frase acompanha o número em vez de arredondar por ele.
  *
  *   2. TOCAR CARREGA NA ORDEM DELA. O carrinho fica exatamente com os ids da
@@ -141,8 +141,8 @@ const L_RECARREGA = '          if (listaProntaEmEdicao(lp)) irNaBiblioteca({ aul
 const T_RECARREGA = '          if (false && listaProntaEmEdicao(lp)) irNaBiblioteca({ aula: { tipo: \'lista-pronta\', id: lp.id } });';
 // o redesenho volta para dentro do devolve-o-foco, e cada toque de seta desenha
 // a tela duas vezes, jogando fora e repedindo as miniaturas de 1080 px
-// a frase da meia aula volta a não ter piso nem teto, e cinco minutos viram
-// "um pouco menos de meia aula" com o minuto ao lado desmentindo
+// a frase da aula volta a não ter piso nem teto: meia hora vira "um pouco
+// menos de uma aula", e dez minutos também, com o minuto ao lado desmentindo
 // o dedo volta a não cancelar o retângulo em andamento, e a palma apoiada fecha
 // o tapar que o bico tinha começado
 // o contorno de tela some, e o branco volta a ser invisível na folha branca
@@ -156,8 +156,8 @@ const L_CONTORNO = "      ctx.strokeStyle = 'rgba(31, 58, 95, 0.35)';";
 const T_CONTORNO = "      ctx.strokeStyle = 'rgba(255, 255, 255, 1)';";
 const L_PALMA = '    this._cancelarTapar();';
 const T_PALMA = '    if (false) this._cancelarTapar();';
-const L_MEIA_AULA = '    if (minutos < 20 || minutos > 40) return null;';
-const T_MEIA_AULA = '    if (false) return null;';
+const L_UMA_AULA = '    if (minutos < 45 || minutos > 75) return null;';
+const T_UMA_AULA = '    if (false) return null;';
 const L_REDESENHO = '  function redesenharListaPronta(id, qual) {';
 const T_REDESENHO = '  function redesenharListaPronta(id, qual) {' + NL_APP + '    desenharCorpoBiblioteca();';
 /* a seleção volta a mudar em silêncio, e a lixeira volta a nunca aparecer ao
@@ -220,7 +220,7 @@ const VENENOS = {
   volta: { arq: '/app.js', de: L_VOLTA, para: T_VOLTA },
   lixeira: { arq: '/draw.js', de: L_LIXEIRA, para: T_LIXEIRA },
   redesenho: { arq: '/app.js', de: L_REDESENHO, para: T_REDESENHO },
-  'meia-aula': { arq: '/app.js', de: L_MEIA_AULA, para: T_MEIA_AULA },
+  'uma-aula': { arq: '/app.js', de: L_UMA_AULA, para: T_UMA_AULA },
   palma: { arq: '/draw.js', de: L_PALMA, para: T_PALMA },
   contorno: { arq: '/draw.js', de: L_CONTORNO, para: T_CONTORNO },
   apara: { arq: '/draw.js', de: L_APARA, para: T_APARA },
@@ -246,7 +246,7 @@ const V_RECARREGA = NOME_VENENO === 'recarrega';
 const V_VOLTA = NOME_VENENO === 'volta';
 const V_LIXEIRA = NOME_VENENO === 'lixeira';
 const V_REDESENHO = NOME_VENENO === 'redesenho';
-const V_MEIA_AULA = NOME_VENENO === 'meia-aula';
+const V_UMA_AULA = NOME_VENENO === 'uma-aula';
 const V_PALMA = NOME_VENENO === 'palma';
 const V_CONTORNO = NOME_VENENO === 'contorno';
 const V_APARA = NOME_VENENO === 'apara';
@@ -478,19 +478,19 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   const d3 = (linhas[1] || {}).detalhe || [];
   conf('o nível 2 diz quantos exercícios são', /^5 exercícios/.test(d2[0] || ''), true);
   conf('o nível 3 diz quantos exercícios são', /^4 exercícios/.test(d3[0] || ''), true);
-  conf('o nível 2, com 29,4 min, diz cerca de meia aula', /cerca de meia aula/.test(d2[0] || ''), true);
+  conf('o nível 2, com 58,4 min, diz cerca de uma aula', /cerca de uma aula/.test(d2[0] || ''), true);
   /* AS TRÊS FAIXAS DA FRASE, e é isto que impede o texto de ser uma constante:
-   * 29,4 está dentro da banda, 35,0 está acima e a lista do outro módulo, com
-   * 24,0, está abaixo. Com as três dentro, trocar meiaAula() por "cerca de
-   * meia aula" fixo passaria em tudo. A primeira escrita desta prova tinha só
+   * 58,4 está dentro da banda, 70,0 está acima e a lista do outro módulo, com
+   * 49,6, está abaixo. Com as três dentro, trocar umaAula() por "cerca de
+   * uma aula" fixo passaria em tudo. A primeira escrita desta prova tinha só
    * a de dentro, e foi rodando que isso apareceu. */
-  conf('o nível 3, com 35,0 min, diz um pouco MAIS de meia aula', /um pouco mais de meia aula/.test(d3[0] || ''), true);
-  /* O minuto da lista vai INTEIRO, meio para cima: 29,4 vira 29 e 35,0 vira
-   * 35. A décima numa estimativa de quanto o aluno leva é precisão que não
+  conf('o nível 3, com 70,0 min, diz um pouco MAIS de uma aula', /um pouco mais de uma aula/.test(d3[0] || ''), true);
+  /* O minuto da lista vai INTEIRO, meio para cima: 58,4 vira 58 e 70,0 vira
+   * 70. A décima numa estimativa de quanto o aluno leva é precisão que não
    * existe, e era ela que fazia "29" e "32,1" aparecerem lado a lado com
    * formatos diferentes. */
-  conf('o minuto do nível 2 vem embaixo, inteiro, colado da estimativa', d2[1], '≈ 29 min (estimativa)');
-  conf('o minuto do nível 3 vem embaixo, inteiro, colado da estimativa', d3[1], '≈ 35 min (estimativa)');
+  conf('o minuto do nível 2 vem embaixo, inteiro, colado da estimativa', d2[1], '≈ 58 min (estimativa)');
+  conf('o minuto do nível 3 vem embaixo, inteiro, colado da estimativa', d3[1], '≈ 70 min (estimativa)');
 
   const texto = (await textoDoCorpo(pag)).toLowerCase();
   const achadas = PROIBIDAS.filter(p => texto.indexOf(p) >= 0);
@@ -521,14 +521,14 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   conf('e ela se chama pela composição dela, que não tem nenhum desafio',
     (linhasPit[0] || {}).nome, 'Lista pronta, sem desafio no fim');
   conf('e é a do módulo certo', (linhasPit[0] || {}).id, LISTA_CURTA.id);
-  conf('com 24,6 min, diz um pouco MENOS de meia aula',
-    /um pouco menos de meia aula/.test(((linhasPit[0] || {}).detalhe || [])[0] || ''), true);
-  /* O ARREDONDAMENTO É MEIO PARA CIMA, e esta é a lista que mede isso: 24,6
-   * tem de virar 25. As outras duas têm 29,4 e 35,0, que arredondam para
+  conf('com 49,6 min, diz um pouco MENOS de uma aula',
+    /um pouco menos de uma aula/.test(((linhasPit[0] || {}).detalhe || [])[0] || ''), true);
+  /* O ARREDONDAMENTO É MEIO PARA CIMA, e esta é a lista que mede isso: 49,6
+   * tem de virar 50. As outras duas têm 58,4 e 70,0, que arredondam para
    * BAIXO e para lugar nenhum; com só elas, trocar o meio para cima por um
    * corte simples passaria nas três asserções sem nada reclamar. */
-  conf('e o minuto dela é o dela, arredondado meio PARA CIMA (24,6 vira 25)',
-    ((linhasPit[0] || {}).detalhe || [])[1], '≈ 25 min (estimativa)');
+  conf('e o minuto dela é o dela, arredondado meio PARA CIMA (49,6 vira 50)',
+    ((linhasPit[0] || {}).detalhe || [])[1], '≈ 50 min (estimativa)');
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
   await pausa(300);
   conf('voltou e abriu de novo o módulo das equações', await tocarLinha(pag, MOD_TITULO), true);
@@ -1137,7 +1137,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
    * menos de meia aula" com "≈ 5 min (estimativa)" embaixo, duas linhas se
    * desmentindo. A lente cega chegou nele pelo caminho normal desta tela, que é
    * ela tirar exercício. O estado de UM vem primeiro agora, de propósito. */
-  secao('5d. A tela não promete meia aula fora da meia aula');
+  secao('5d. A tela não promete aula fora da aula');
   const restaram = (await carrinho(pag)).itens.slice();
   for (var q = 1; q < restaram.length; q++) {
     await desmarcar(pag, restaram[q]);
@@ -1151,13 +1151,13 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   conf('sobrou um cartão só', soUm.cartoes, 1);
   conf('a tela conta o exercício', /^1 exercício/.test(soUm.cabeca), true);
   conf('e mostra o minuto dele', /≈ \d+ min \(estimativa\)/.test(soUm.cabeca), true);
-  if (V_MEIA_AULA) {
-    conf('VENENO: sem piso, a tela promete meia aula para um exercício de poucos minutos',
-      /meia aula/.test(soUm.cabeca), true);
-    return;
+  if (V_UMA_AULA) {
+    conf('VENENO: sem piso, a tela promete uma aula para um exercício de poucos minutos',
+      /uma aula/.test(soUm.cabeca), true);
+  } else {
+    conf('e NÃO promete aula nenhuma, porque poucos minutos não são uma aula',
+      /uma aula/.test(soUm.cabeca), false);
   }
-  conf('e NÃO promete meia aula nenhuma, porque poucos minutos não são meia aula',
-    /meia aula/.test(soUm.cabeca), false);
 
   secao('5e. A tela vazia não estima nada');
   await pag.evaluate(() => { document.querySelector('#bib-carrinho-limpar').click(); });
@@ -1169,7 +1169,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   }));
   console.log('   lista vazia: ' + JSON.stringify(vazia));
   conf('a tela se redesenhou e não sobrou cartão nenhum', vazia.cartoes, 0);
-  conf('e o cabeçalho não diz meia aula nenhuma', /meia aula/.test(vazia.cabeca), false);
+  conf('e o cabeçalho não diz aula nenhuma', /uma aula/.test(vazia.cabeca), false);
   conf('e não estima zero minuto', /≈ 0 min/.test(vazia.cabeca), false);
   conf('e diz o que há: nenhum exercício no material',
     /^Nenhum exercício no material/.test(vazia.cabeca), true);
@@ -1194,8 +1194,52 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   const soDeFora = await pag.evaluate(() => (document.querySelector('#bib-lp-cabeca') || {}).innerText || '(não achei)');
   console.log('   só com o acrescentado: ' + JSON.stringify(soDeFora));
   conf('a tela conta o exercício', /^1 exercício/.test(soDeFora), true);
-  conf('e não promete meia aula', /meia aula/.test(soDeFora), false);
+  conf('e não promete aula', /uma aula/.test(soDeFora), false);
   conf('e diz por que não há estimativa', /Sem estimativa de tempo/.test(soDeFora), true);
+
+  // ================================================================
+  /* MEIA HORA NÃO É UMA AULA. Desde 24/09 a lista pronta é de uma aula
+   * inteira, e a de meia hora é a que existia antes (e a que ela fica tendo se
+   * tirar metade). A tela não pode chamá-la de "um pouco menos de uma aula".
+   *
+   *   Arranjo:   a lista do nível 2 carregada de novo, com os dois últimos
+   *              exercícios tirados pela caixa: sobram três, 31,5 minutos.
+   *   Afirmação: com meia hora na tela, o cabeçalho diz o número e não diz
+   *              aula nenhuma; e a MESMA lista inteira, de 58,4, diz "cerca de
+   *              uma aula" (conferido no começo, seção 1a).
+   *
+   * O minuto é conferido junto, porque é ele que prova que o arranjo é o de
+   * meia hora e não um vizinho: sem ele, uma tela que não escrevesse frase
+   * nenhuma em estado nenhum passaria aqui. */
+  secao('5f. Meia hora não é uma aula');
+  await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-limpar'); if (b) b.click(); });
+  await pausa(500);
+  await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
+  await pausa(400);
+  if (!(await tocarLinha(pag, 'Lista pronta, 1 desafio no fim'))) {
+    await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
+    await pausa(400);
+    await tocarLinha(pag, MOD_TITULO);
+    await pausa(400);
+    conf('tocou na lista do nível 2 de novo', await tocarLinha(pag, 'Lista pronta, 1 desafio no fim'), true);
+  }
+  await pausa(500);
+  conf('a lista do nível 2 voltou inteira, na ordem dela', (await carrinho(pag)).itens.join('|'), IDS2.join('|'));
+  await desmarcar(pag, IDS2[4]);
+  await pausa(250);
+  await desmarcar(pag, IDS2[3]);
+  await pausa(400);
+  const meiaHora = await pag.evaluate(() => (document.querySelector('#bib-lp-cabeca') || {}).innerText || '(não achei)');
+  console.log('   com meia hora: ' + JSON.stringify(meiaHora));
+  conf('sobraram três exercícios', /^3 exercícios/.test(meiaHora), true);
+  conf('e o minuto é o de meia hora (31,5 vira 32)', /≈ 32 min \(estimativa\)/.test(meiaHora), true);
+  if (V_UMA_AULA) {
+    conf('VENENO: sem piso, a tela chama meia hora de uma aula', /uma aula/.test(meiaHora), true);
+    return;
+  }
+  conf('e NÃO chama meia hora de aula nenhuma', /uma aula/.test(meiaHora), false);
+  await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-limpar'); if (b) b.click(); });
+  await pausa(500);
 
   // ================================================================
   secao('6. Tapar na folha');

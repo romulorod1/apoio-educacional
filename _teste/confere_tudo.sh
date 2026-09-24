@@ -445,7 +445,7 @@ roda "biblioteca listas --envenenado-volta"         node "_teste/testa_bibliotec
 # cria um branco que a professora nao consegue tirar.
 roda "biblioteca listas --envenenado-lixeira"       node "_teste/testa_biblioteca_listas.js" --envenenado-lixeira
 roda "biblioteca listas --envenenado-redesenho"     node "_teste/testa_biblioteca_listas.js" --envenenado-redesenho
-roda "biblioteca listas --envenenado-meia-aula"     node "_teste/testa_biblioteca_listas.js" --envenenado-meia-aula
+roda "biblioteca listas --envenenado-uma-aula"      node "_teste/testa_biblioteca_listas.js" --envenenado-uma-aula
 roda "biblioteca listas --envenenado-palma"         node "_teste/testa_biblioteca_listas.js" --envenenado-palma
 roda "biblioteca listas --envenenado-contorno"      node "_teste/testa_biblioteca_listas.js" --envenenado-contorno
 # O aparo do tapar nos TRES caminhos: criar, mover e redimensionar.

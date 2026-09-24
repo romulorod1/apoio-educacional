@@ -11439,40 +11439,41 @@
     return n ? ' · ' + n + ' no material' : '';
   }
 
-  /* A UNIDADE DELA É A MEIA AULA; o minuto é a nossa, e vem embaixo, colado da
+  /* A UNIDADE DELA É A AULA; o minuto é a nossa, e vem embaixo, colado da
    * palavra estimativa. A frase de cima acompanha o número em vez de dizer
-   * sempre a mesma coisa: uma lista de 35 minutos anunciada como "cerca de meia
-   * aula" seria a tela arredondando o que o dado não arredonda. A banda de 27 a
-   * 33 é a mesma do contrato (I5). */
-  /* "MEIA AULA" É UMA COMPARAÇÃO, E COMPARAÇÃO LONGE DEMAIS DEIXA DE SER UMA.
+   * sempre a mesma coisa: uma lista de 70 minutos anunciada como "cerca de uma
+   * aula" seria a tela arredondando o que o dado não arredonda.
    *
-   * A frase não tinha piso nem teto: a faixa de baixo ia de 26,9 a zero, então
-   * uma lista de cinco minutos era anunciada como "um pouco menos de meia
-   * aula", com "≈ 5 min (estimativa)" logo embaixo desmentindo. Duas linhas se
-   * contradizendo no mesmo cabeçalho é exatamente o que tirou a etiqueta de
-   * dificuldade do cartão nesta mesma frente, e voltou por outra porta. Achado
-   * por uma lente cega, e o caminho dela é o normal desta tela: ela tira quatro
-   * dos cinco exercícios.
+   * A LISTA PRONTA É DE UMA AULA INTEIRA desde 24/09, por decisão do Romulo: a
+   * aula dela é de 60 minutos, e a lista de meia aula deixava a outra metade
+   * para ela completar. A régua acompanha: "cerca de uma aula" de 54 a 66
+   * minutos (a mesma janela de 10% que a meia aula tinha, 27 a 33, dobrada),
+   * "um pouco menos" de 45 a 53 e "um pouco mais" de 67 a 75.
    *
-   * Fora da faixa a função devolve `null` e a tela não diz meia aula nenhuma:
-   * fica o número, que continua verdadeiro. Os limites são 20 e 40 minutos, e
-   * não são escolha de gosto: meia aula, numa aula de 50 a 60 minutos, é 25 a
-   * 30, e abaixo de 20 ou acima de 40 a palavra "meia" deixa de ser verdadeira
-   * em qualquer leitura. A banda de última tentativa do gerador vai de 20 a 45
-   * (`AFROUXAMENTOS_LISTAS`, em biblioteca/kits.py), então lista publicada acima
-   * de 40 existe e vai aparecer sem a frase, que é o certo: 45 minutos numa aula
-   * de 60 são três quartos, não meia. */
-  function meiaAula(minutos) {
-    /* NÚMERO QUE NÃO É NÚMERO NÃO GANHA FRASE. Com `minutos` ausente, as duas
+   * "UMA AULA" É UMA COMPARAÇÃO, E COMPARAÇÃO LONGE DEMAIS DEIXA DE SER UMA.
+   * Fora de 45 a 75 minutos a função devolve `null` e a tela não diz aula
+   * nenhuma: fica o número, que continua verdadeiro. O piso de 45 é o que
+   * impede uma lista de meia hora (a de antes desta decisão, ou a de agora
+   * depois de ela tirar metade) de ser chamada de "um pouco menos de uma
+   * aula": 30 minutos numa aula de 60 são metade, não "um pouco menos". E o
+   * teto de 75 é o mesmo raciocínio do outro lado: uma hora e um quarto já é
+   * mais que uma aula, não "um pouco mais".
+   *
+   * Esta frase já se contradisse com o número embaixo duas vezes nesta frente
+   * (sem piso, cinco minutos eram "um pouco menos de meia aula"), e as duas
+   * foram achadas por lente cega no caminho normal da tela, que é ela tirar
+   * exercício. */
+  function umaAula(minutos) {
+    /* NÚMERO QUE NÃO É NÚMERO NÃO GANHA FRASE. Com `minutos` ausente, as
      * comparações abaixo dão FALSO (nada é menor nem maior que `undefined`) e a
-     * função caía no `return` final, prometendo "cerca de meia aula" com base em
-     * nada, ao lado de um "≈ NaN min (estimativa)". Achado por uma lente cega,
-     * e o caminho é real: o `lerKits` não confere `minutos`. */
+     * função cairia no `return` final, prometendo "cerca de uma aula" com base
+     * em nada, ao lado de um "≈ NaN min (estimativa)". O `lerKits` não confere
+     * `minutos`. */
     if (typeof minutos !== 'number' || !isFinite(minutos)) return null;
-    if (minutos < 20 || minutos > 40) return null;
-    if (minutos > 33) return 'um pouco mais de meia aula';
-    if (minutos < 27) return 'um pouco menos de meia aula';
-    return 'cerca de meia aula';
+    if (minutos < 45 || minutos > 75) return null;
+    if (minutos > 66) return 'um pouco mais de uma aula';
+    if (minutos < 54) return 'um pouco menos de uma aula';
+    return 'cerca de uma aula';
   }
 
   /* O MINUTO DA LISTA VAI INTEIRO, e é assim desde o desenho: a forma escrita
@@ -11502,7 +11503,7 @@
     listas.forEach(function (lp) {
       var linha = linhaBib(nomeDaListaPronta(lp),
         plural(lp.itens.length, 'exercício', 'exercícios') +
-          (meiaAula(lp.minutos) ? ' · ' + meiaAula(lp.minutos) : ''),
+          (umaAula(lp.minutos) ? ' · ' + umaAula(lp.minutos) : ''),
         /* TOCAR NA LINHA DA LISTA QUE ELA JÁ ESTÁ MEXENDO ABRE, E NÃO RECARREGA.
          * Antes recarregava sempre, e o caminho mais natural do mundo (voltar
          * ao módulo, tocar de novo) jogava fora a ordem que ela tinha acabado
@@ -11731,7 +11732,7 @@
            * e a do caminho principal da tela, porque acrescentar do módulo é uma
            * das três coisas que ela existe para fazer. A linha de baixo continua
            * dizendo o minuto e quantos ficaram fora da conta. */
-          (daLista.length && !deFora && meiaAula(soma) ? ' · ' + meiaAula(soma) : '') }),
+          (daLista.length && !deFora && umaAula(soma) ? ' · ' + umaAula(soma) : '') }),
       el('div', { class: 'ajuda bib-lp-minutos', texto: !daLista.length
         ? (ids.length ? 'Sem estimativa de tempo: o minuto vem da lista pronta, e nenhum exercício dela ficou aqui.'
           : 'Toque na linha da lista pronta para carregá-la de novo.')

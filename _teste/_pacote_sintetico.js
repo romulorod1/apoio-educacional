@@ -256,16 +256,18 @@ const KITS = [
  * em que o comentário é a documentação, número velho em comentário é a próxima
  * pessoa medindo a coisa errada. Achado pela segunda lente cega do PR #57.)
  *
- * 1. As listas têm TAMANHOS DIFERENTES (5, 4 e 4) e MINUTOS DIFERENTES (29,4,
- *    35,0 e 24,6), e nenhum desses números é igual a nenhuma outra contagem do
+ * 1. As listas têm TAMANHOS DIFERENTES (5, 4 e 4) e MINUTOS DIFERENTES (58,4,
+ *    70,0 e 49,6, de uma aula inteira desde 24/09), e nenhum desses números é igual a nenhuma outra contagem do
  *    pacote. Com 4 e 4 e os mesmos minutos, trocar a lista do nível 2 pela do
  *    nível 3 na tela passaria despercebido.
  * 2. A ORDEM da lista do nível 2 NÃO É a ordem dos itens no módulo: ela começa
  *    no ex:2 e o ex:1 vem depois. É isso que faz "carrega na ordem dela" ser
  *    diferente de "carrega na ordem da fonte"; com a ordem igual, as duas
  *    afirmações dariam o mesmo vetor e a asserção não mediria nada.
- * 3. OS TRÊS MINUTOS CAEM EM TRÊS FAIXAS DIFERENTES da frase da meia aula:
- *    29,4 está dentro da banda de 27 a 33, 35,0 está acima e 24,6 está abaixo.
+ * 3. OS TRÊS MINUTOS CAEM EM TRÊS FAIXAS DIFERENTES da frase da aula:
+ *    58,4 está dentro da banda de 54 a 66, 70,0 está acima e 49,6 está abaixo.
+ *    E a de 58,4 SEM os dois últimos exercícios fica com 31,5, meia hora, que
+ *    é o caso que a tela não pode chamar de aula nenhuma.
  *    Com as três dentro, trocar a função que escolhe a frase por uma constante
  *    passaria em todas as asserções: era esse o defeito da primeira escrita
  *    desta amostra, e foi o teste que o achou.
@@ -279,34 +281,34 @@ const LISTA_PIT = '9ano:teorema-de-pitagoras:aplicacoes';
 const LISTAS = [
   {
     id: MOD_KIT + ':kit:2', modulo: MOD_KIT, serie: '9ano', nivel: 2,
-    titulo: 'Equações do Segundo Grau', regra: 'listas-v1', tempo_regra: 'tempo-v1', minutos: 29.4,
+    titulo: 'Equações do Segundo Grau', regra: 'listas-v1', tempo_regra: 'tempo-v1', minutos: 58.4,
     teoria: [],
     degraus: [
-      { n: 1, item: LISTA_KIT + ':ex:2', degrau: 1, minutos: 5.1 },
-      { n: 2, item: LISTA_KIT + ':ex:1', degrau: 1, minutos: 4.7 },
-      { n: 3, item: LISTA_KIT + ':ex:4', degrau: 2, minutos: 6.0 },
-      { n: 4, item: LISTA_KIT + ':ex:6', degrau: 2, minutos: 7.1 },
-      { n: 5, item: LISTA_KIT + ':ex:7', degrau: 3, minutos: 6.5 }
+      { n: 1, item: LISTA_KIT + ':ex:2', degrau: 1, minutos: 10.1 },
+      { n: 2, item: LISTA_KIT + ':ex:1', degrau: 1, minutos: 9.4 },
+      { n: 3, item: LISTA_KIT + ':ex:4', degrau: 2, minutos: 12.0 },
+      { n: 4, item: LISTA_KIT + ':ex:6', degrau: 2, minutos: 14.2 },
+      { n: 5, item: LISTA_KIT + ':ex:7', degrau: 3, minutos: 12.7 }
     ],
     alternativas: { [LISTA_KIT + ':ex:4']: [LISTA_KIT + ':ex:5'] },
     relaxou: null
   },
   {
     id: MOD_KIT + ':kit:3', modulo: MOD_KIT, serie: '9ano', nivel: 3,
-    titulo: 'Equações do Segundo Grau', regra: 'listas-v1', tempo_regra: 'tempo-v1', minutos: 35.0,
+    titulo: 'Equações do Segundo Grau', regra: 'listas-v1', tempo_regra: 'tempo-v1', minutos: 70.0,
     teoria: [],
     degraus: [
-      { n: 1, item: LISTA_KIT + ':ex:3', degrau: 1, minutos: 5.5 },
-      { n: 2, item: LISTA_KIT + ':ex:4', degrau: 2, minutos: 9.0 },
-      { n: 3, item: LISTA_KIT + ':ex:7', degrau: 3, minutos: 9.5 },
-      { n: 4, item: LISTA_KIT + ':ex:8', degrau: 3, minutos: 11.0 }
+      { n: 1, item: LISTA_KIT + ':ex:3', degrau: 1, minutos: 11.0 },
+      { n: 2, item: LISTA_KIT + ':ex:4', degrau: 2, minutos: 18.0 },
+      { n: 3, item: LISTA_KIT + ':ex:7', degrau: 3, minutos: 19.0 },
+      { n: 4, item: LISTA_KIT + ':ex:8', degrau: 3, minutos: 22.0 }
     ],
     alternativas: {},
     relaxou: ['minutos']
   },
   {
     /* A terceira, noutro módulo e ABAIXO da banda: é ela que mede a frase "um
-     * pouco menos de meia aula", que nenhuma das outras duas alcança.
+     * pouco menos de uma aula", que nenhuma das outras duas alcança.
      *
      * E ELA É A ÚNICA SEM NENHUM ITEM DO DEGRAU MAIS ALTO, também de
      * propósito: os quatro exercícios dela caem nos dois primeiros terços da
@@ -314,16 +316,16 @@ const LISTAS = [
      * prova nenhuma alcança, e a tela promete esse nome para uma trajetória
      * futura. As outras duas têm 1 e 2, que dão o singular e o plural. */
     id: MOD_PIT + ':kit:2', modulo: MOD_PIT, serie: '9ano', nivel: 2,
-    /* 24,6 e não 24,0 de propósito: é o único dos três totais que arredonda
-     * meio PARA CIMA (vira 25). Os outros dois, 29,4 e 35,0, arredondam para
-     * baixo e para lugar nenhum, e com só eles um corte simples passaria. */
-    titulo: 'Teorema de Pitágoras', regra: 'listas-v1', tempo_regra: 'tempo-v1', minutos: 24.6,
+    /* 49,6 e não 49,0 de propósito: é o único dos três totais que arredonda
+     * PARA CIMA (vira 50). Os outros dois, 58,4 e 70,0, arredondam para baixo e
+     * para lugar nenhum, e com só eles um corte simples passaria. */
+    titulo: 'Teorema de Pitágoras', regra: 'listas-v1', tempo_regra: 'tempo-v1', minutos: 49.6,
     teoria: [],
     degraus: [
-      { n: 1, item: LISTA_PIT + ':ex:1', degrau: 1, minutos: 4.0 },
-      { n: 2, item: LISTA_PIT + ':ex:2', degrau: 1, minutos: 5.0 },
-      { n: 3, item: LISTA_PIT + ':ex:3', degrau: 2, minutos: 7.5 },
-      { n: 4, item: LISTA_PIT + ':ex:4', degrau: 2, minutos: 8.1 }
+      { n: 1, item: LISTA_PIT + ':ex:1', degrau: 1, minutos: 8.0 },
+      { n: 2, item: LISTA_PIT + ':ex:2', degrau: 1, minutos: 10.0 },
+      { n: 3, item: LISTA_PIT + ':ex:3', degrau: 2, minutos: 15.0 },
+      { n: 4, item: LISTA_PIT + ':ex:4', degrau: 2, minutos: 16.6 }
     ],
     alternativas: {},
     relaxou: ['minutos']

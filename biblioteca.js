@@ -70,7 +70,7 @@
    * frase antiga dizia que eram, o que é pior do que não conferir: recusar o
    * pacote inteiro por causa deles seria caro demais, e quem se defende da
    * ausência deles é a tela, que não escreve frase nenhuma com número que não é
-   * número (ver `meiaAula`, em app.js). O que
+   * número (ver `umaAula`, em app.js). O que
    * julga a REGRA é o biblioteca/confere_kits.py, do lado do gerador, e repetir
    * aquilo aqui seria pôr duas fontes para a mesma verdade num aparelho que não
    * tem como decidir qual das duas está certa. */

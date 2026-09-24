@@ -1215,8 +1215,8 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .bib-filtro-info { margin: 0; color: var(--navy); font-weight: 600; }
 .bib-celula[hidden] { display: none; }
 #exportar-etiquetas[hidden] { display: none; }
-/* LISTA PRONTA. A linha do módulo leva duas linhas de detalhe: a meia aula, que
-   é a unidade dela, e o minuto estimado embaixo, em corpo menor e colado da
+/* LISTA PRONTA. A linha do módulo leva duas linhas de detalhe: quanto da aula a
+   lista ocupa, que é a unidade dela, e o minuto estimado embaixo, em corpo menor e colado da
    palavra estimativa. Nada aqui afirma curadoria. */
 .bib-lista-pronta .bib-lp-minutos { font-size: 13px; color: var(--muted); }
 .bib-lp-ajuda { margin: 6px 2px 10px; }
