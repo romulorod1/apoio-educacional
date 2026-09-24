@@ -1,14 +1,28 @@
 /* _prints_b10.js
  *
- * Os prints do marco visual da B10, tirados do APLICATIVO DE VERDADE no Chrome,
- * que é o caminho do tablet. Nenhum mockup, nenhuma montagem, nenhum rótulo
- * desenhado por cima: o que está na imagem é o que a tela desenhou.
+ * O marco visual da B10, tirado do APLICATIVO DE VERDADE no Chrome, que é o
+ * caminho do tablet. Nenhum mockup, nenhuma montagem, nenhum rótulo desenhado
+ * por cima: o que está na imagem é o que a tela desenhou.
  *
  *   node _teste/_prints_b10.js <pasta-de-saida> <pacote.zip>
  *
  * O pacote é o REAL, do 9º ano, porque é dele que sai a única coisa que
  * interessa olhar aqui: o enunciado de verdade dentro da lista pronta. Ele mora
  * fora do repositório e vem por argumento.
+ *
+ * O MARCO FECHA A CADEIA, e esta é a lição que custou caro em 24/09. Telas que
+ * mostram a escolha, mais uma folha que mostra a impressão, não provam nada se
+ * a folha não for a impressão DAQUELA escolha. Por isso o roteiro percorre o
+ * caminho inteiro como usuária (abre o módulo, carrega a lista pronta, desce um
+ * exercício, tira outro) e, no fim desse percurso, GERA O MATERIAL daquela
+ * lista e guarda o PDF. O elo do meio é o que ninguém olha, e é onde o defeito
+ * mora: nós entregamos "lista pronta" e quase ninguém tinha olhado uma lista
+ * pronta impressa.
+ *
+ * E o outro lado da mesma lição: no marco entra o que ELA vai ver. Fixture de
+ * prova serve à prova e fica na prova. O marco anterior levou, sem querer, a
+ * folha que a prova do pdf.js usa, com retângulo preto e frases de teste, e o
+ * olho de fora cego gastou três parágrafos analisando artefato nosso.
  *
  * Os nomes dos arquivos são NEUTROS de propósito (b10_01 em diante). Quem olha
  * as telas de fora não pode receber, no nome do arquivo, a resposta da pergunta
@@ -74,13 +88,29 @@ const tocarLinha = (pag, nome) => pag.evaluate(t => {
 }, nome);
 
 /* As miniaturas entram sob demanda, e um print tirado antes delas mostraria
- * caixas cinzentas em vez do enunciado. Esperar o número de imagens parar de
- * subir é o que faz o print ser da tela pronta, e não da tela a meio caminho. */
-async function esperarMiniaturas(pag, quantas) {
-  await esperar('miniaturas', () => pag.evaluate(() =>
-    Array.from(document.querySelectorAll('#bib-corpo img')).filter(i => i.complete && i.naturalWidth > 0).length),
-  v => v >= quantas, 60000);
-  await pausa(500);
+ * caixas cinzentas em vez do enunciado. Com uma coluna só, quase nenhuma delas
+ * começa dentro da janela: rolar a tela inteira é o que as faz entrar, e aí o
+ * print do corpo inteiro sai com todos os enunciados desenhados. */
+async function rolarTudoEEsperar(pag) {
+  await pag.evaluate(async () => {
+    const c = document.querySelector('.conteudo');
+    if (!c) return;
+    for (let y = 0; y <= c.scrollHeight; y += Math.max(200, Math.round(c.clientHeight * 0.7))) {
+      c.scrollTop = y;
+      await new Promise(r => setTimeout(r, 250));
+    }
+    c.scrollTop = 0;
+  });
+  const r = await esperar('miniaturas da tela', () => pag.evaluate(() => {
+    const imgs = Array.from(document.querySelectorAll('#bib-corpo img.bib-mini'));
+    const prontas = imgs.filter(i => i.complete && i.naturalWidth > 0).length;
+    return imgs.length ? prontas + '/' + imgs.length : '0/0';
+  }), v => {
+    const [a, b] = String(v).split('/').map(Number);
+    return b > 0 && a === b;
+  }, 180000);
+  await pausa(600);
+  return r.valor;
 }
 
 (async () => {
@@ -93,8 +123,6 @@ async function esperarMiniaturas(pag, quantas) {
   const msg = await importar(pag, PACOTE);
   console.log('   ' + msg.replace(/\n/g, ' | '));
   conf('importou', /^Biblioteca importada\./.test(msg), true);
-  const versao = await pag.evaluate(() => (window.VERSAO_APP || document.querySelector('#versao-app') || {}).textContent || '');
-  console.log('   versão na tela: ' + String(versao).trim());
 
   secao('Os prints');
   await H.irParaAba(pag, 'biblioteca');
@@ -103,49 +131,114 @@ async function esperarMiniaturas(pag, quantas) {
   // 01: a lista de módulos da série
   await tirar(pag);
 
-  // 02: a tela do módulo, com as duas linhas de lista pronta
+  // 02 e 03: a tela do módulo, com as duas linhas de lista pronta
   conf('abriu um módulo', await tocarLinha(pag, 'Equações do Segundo Grau'), true);
   await pausa(700);
   await tirar(pag);
   await tirar(pag, '#bib-corpo');
 
-  // 03: a lista pronta do nível 2, carregada e em ordem
+  // 04: a lista pronta do nível 2, recém carregada, com a mensagem no fluxo
   conf('tocou na lista pronta do nível 2', await tocarLinha(pag, 'Lista pronta, nível 2'), true);
   await pausa(900);
-  await esperarMiniaturas(pag, 3);
+  console.log('   ' + (await rolarTudoEEsperar(pag)));
   await tirar(pag);
 
-  // 04: depois de descer o primeiro e tirar um pela caixa
+  // 05: depois de descer o primeiro exercício
   const ids = await pag.evaluate(() => {
     try { return (JSON.parse(localStorage.getItem('apoio-educacional:bib-carrinho') || '{}').itens) || []; }
     catch (e) { return []; }
   });
+  console.log('   a lista carregou ' + ids.length + ' exercícios');
   await pag.evaluate(i => {
     const b = document.querySelector('#bib-lp-grade [data-descer="' + i + '"]');
     if (b && !b.disabled) b.click();
   }, ids[0]);
   await pausa(700);
-  await esperarMiniaturas(pag, 3);
+  console.log('   ' + (await rolarTudoEEsperar(pag)));
   await tirar(pag);
 
+  // 06 e 07: depois de tirar um pela caixa
   await pag.evaluate(i => {
     const c = document.querySelector('#bib-lp-grade input[data-carrinho="itens"][data-id="' + i + '"]');
     if (c) { c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true })); }
   }, ids[2]);
   await pausa(700);
-  await esperarMiniaturas(pag, 3);
+  console.log('   ' + (await rolarTudoEEsperar(pag)));
   await tirar(pag);
   await tirar(pag, '#bib-lp-cabeca');
 
-  // 05: a lista pronta do nível 3 do mesmo módulo
+  /* O ELO DO MEIO: a folha impressa DESTA escolha.
+   *
+   * O espião guarda os bytes do PDF na fronteira em que o aplicativo entrega ao
+   * gerador, que é o mesmo lugar onde a prova da ordem mede. O download de
+   * verdade continua acontecendo e é ignorado: o que interessa aqui é o
+   * arquivo, e não o caminho do navegador até a pasta de downloads. */
+  secao('O material de verdade, gerado desta lista e nesta ordem');
+  const ordem = await pag.evaluate(() => {
+    try { return (JSON.parse(localStorage.getItem('apoio-educacional:bib-carrinho') || '{}').itens) || []; }
+    catch (e) { return []; }
+  });
+  console.log('   vai imprimir ' + ordem.length + ' exercícios, nesta ordem: ' + JSON.stringify(ordem));
+  await pag.evaluate(() => {
+    const original = window.PDFGen.gerarMaterialBiblioteca;
+    window.__pdf64 = null;
+    window.__pdfIds = null;
+    window.PDFGen.gerarMaterialBiblioteca = function (op) {
+      const r = original.apply(this, arguments);
+      try {
+        window.__pdfIds = (op.itens || []).map(p => (p.item && p.item.id) || p.id || null);
+        const b = r.bytes;
+        let s = '';
+        for (let i = 0; i < b.length; i += 4096) {
+          s += String.fromCharCode.apply(null, b.subarray(i, Math.min(i + 4096, b.length)));
+        }
+        window.__pdf64 = btoa(s);
+      } catch (e) { window.__pdf64 = 'ERRO:' + (e && e.message); }
+      return r;
+    };
+  });
+  await pag.evaluate(() => { document.querySelector('#bib-carrinho-gerar').click(); });
+  await pausa(700);
+  const opcoes = await pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#corpo-modal-bib-gerar input[type=checkbox]'))
+      .map(c => c.id.replace('bib-gerar-', '') + '=' + (c.checked ? 'sim' : 'nao')).join(' '));
+  console.log('   o que entra, como o aplicativo propõe: ' + opcoes);
+  await pag.evaluate(() => {
+    const b = Array.from(document.querySelectorAll('#rodape-modal-bib-gerar button'))
+      .find(x => /Gerar|Baixar|material/i.test(x.textContent));
+    if (b) b.click();
+  });
+  const pronto = await esperar('o PDF do material', () => pag.evaluate(() => window.__pdf64 ? window.__pdf64.length : 0),
+    v => v > 0, 240000);
+  const b64 = await pag.evaluate(() => window.__pdf64);
+  const idsNoPdf = await pag.evaluate(() => window.__pdfIds);
+  conf('o material saiu', pronto.ok && !/^ERRO:/.test(String(b64)), true);
+  conf('e o gerador recebeu os exercícios NA ORDEM DA TELA',
+    (idsNoPdf || []).join('|'), ordem.join('|'));
+  const pdf = Buffer.from(String(b64), 'base64');
+  fs.writeFileSync(path.join(SAIDA, 'b10_material.pdf'), pdf);
+  console.log('   b10_material.pdf: ' + pdf.length + ' bytes');
+  await pag.evaluate(() => {
+    const m = document.querySelector('#modal-bib-gerar');
+    if (m && m.classList.contains('aberto')) {
+      const f = Array.from(m.querySelectorAll('button')).find(x => /Fechar|Cancelar/i.test(x.textContent));
+      if (f) f.click();
+    }
+    const a = document.querySelector('#aviso');
+    if (a) a.classList.remove('aberto');
+  });
+  await pausa(500);
+
+  // 08: a lista pronta do nível 3 do mesmo módulo
+  secao('Os prints que faltam');
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
   await pausa(600);
   conf('tocou na lista pronta do nível 3', await tocarLinha(pag, 'Lista pronta, nível 3'), true);
   await pausa(900);
-  await esperarMiniaturas(pag, 3);
+  console.log('   ' + (await rolarTudoEEsperar(pag)));
   await tirar(pag);
 
-  // 06: a barra de ferramentas da folha, com a ferramenta de tapar
+  // 09: a barra de ferramentas da folha, com a ferramenta de tapar
   await pag.evaluate(async () => {
     const d = await Store.carregar();
     const aluno = d.alunos[0];
@@ -158,12 +251,34 @@ async function esperarMiniaturas(pag, quantas) {
   });
   await pag.reload({ waitUntil: 'networkidle0' });
   await H.abrirApp(pag, amb.ORIGEM);
-  const abriu = await pag.evaluate(() => {
-    if (typeof abrirFolhaDaAula === 'function') { abrirFolhaDaAula('aula-b10-folha'); return 'funcao'; }
-    return 'nao achei';
-  }).catch(() => 'erro');
-  console.log('   folha: ' + abriu);
-  await pausa(1200);
+  /* A FOLHA ABRE PELO CAMINHO DELA, e não por uma função interna: a agenda, a
+   * pílula do dia e o botão da folha dentro da janela da aula. A primeira
+   * escrita deste trecho chamava `abrirFolhaDaAula`, que mora dentro do IIFE e
+   * não existe no escopo da página: o print simplesmente não saía, e o roteiro
+   * dizia isso em uma linha que passava despercebida. */
+  await H.irParaAba(pag, 'agenda');
+  await pausa(800);
+  const hoje = new Date();
+  const iso = hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0') + '-' + String(hoje.getDate()).padStart(2, '0');
+  const abriu = await pag.evaluate(d => {
+    const dia = document.querySelector('[data-dia="' + d + '"]');
+    if (!dia) return 'sem o dia ' + d + ' na agenda';
+    const p = dia.querySelector('.pilula');
+    if (!p) return 'sem pílula no dia';
+    p.click();
+    return 'abriu a aula';
+  }, iso);
+  console.log('   aula: ' + abriu);
+  await pausa(900);
+  const foiParaFolha = await pag.evaluate(() => {
+    const b = Array.from(document.querySelectorAll('#linha-folha button, .modal-corpo button'))
+      .find(x => /folha/i.test(x.textContent));
+    if (!b) return 'sem botão de folha';
+    b.click();
+    return 'tocou em ' + b.textContent.trim();
+  });
+  console.log('   folha: ' + foiParaFolha);
+  await pausa(1600);
   const temBarra = await pag.evaluate(() => !!document.querySelector('#ferramentas-nota .ferr'));
   if (temBarra) {
     await tirar(pag, '#ferramentas-nota');
@@ -179,5 +294,5 @@ async function esperarMiniaturas(pag, quantas) {
 
   if (pag.errosDePagina.length) console.log('   erros de página: ' + pag.errosDePagina.join(' | ').slice(0, 400));
   conf('nenhum erro de JavaScript na página', pag.errosDePagina.length, 0);
-  console.log('\n   ' + n + ' prints em ' + SAIDA);
+  console.log('\n   ' + n + ' prints e o material em ' + SAIDA);
 })().then(() => H.fim(amb)(), e => H.fim(amb)(e));

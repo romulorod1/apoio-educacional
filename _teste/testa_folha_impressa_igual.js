@@ -26,11 +26,11 @@
  * mediria nada: com todo mundo na mesma ordem nos dois esquemas, qualquer um
  * dos dois daria o mesmo desenho.
  *
- *   node _teste/testa_folha_impressa_igual.js [--prints <pasta>]
+ *   node _teste/testa_folha_impressa_igual.js [--guarda-a-prova <pasta>]
  *   node _teste/testa_folha_impressa_igual.js --envenenado-ordem
  *
- * Com --prints, grava as duas páginas rasterizadas na pasta, com nomes
- * neutros, para o marco visual.
+ * Com --guarda-a-prova, grava a folha do FIXTURE na pasta, com nome que diz o
+ * que ela é. Ela NÃO vai para o marco visual: ver a nota da opção, embaixo.
  *
  * O ALCANCE DESTA PROVA, ESCRITO ANTES QUE ALGUÉM SE ANIME COM O VERDE:
  *
@@ -58,8 +58,22 @@ const { execFileSync } = require('child_process');
 
 const RAIZ = path.join(__dirname, '..');
 const ANTES = 'd80bb90';          // o aplicativo publicado, antes da B10
-const I_PRINTS = process.argv.indexOf('--prints');
-const PRINTS = I_PRINTS !== -1 ? process.argv[I_PRINTS + 1] : null;
+/* ONDE GUARDAR OS ARTEFATOS DA PROVA, e por que a opção mudou de nome.
+ *
+ * Ela se chamava `--prints` e escrevia dentro da pasta do MARCO VISUAL, com o
+ * nome do print seguinte da série. O resultado foi que a folha desta prova (um
+ * fixture com retângulo preto opaco, um ponto de caneta solto e duas frases que
+ * descrevem o cenário testado) foi parar no meio das telas mandadas ao olho de
+ * fora cego, e ele gastou três parágrafos analisando artefato nosso com
+ * seriedade. Estava certo, e a culpa não era dele: toda atenção gasta num
+ * artefato de teste é atenção que não foi gasta no produto, e o olho de fora
+ * não tem como saber a diferença, porque é por não saber que ele vale.
+ *
+ * Fixture de prova serve à prova e fica na prova. A opção continua existindo,
+ * porque olhar o que a prova mediu é legítimo, mas o nome do arquivo agora diz
+ * o que ele é e a pasta é escolhida por quem chama. */
+const I_PROVA = process.argv.indexOf('--guarda-a-prova');
+const PROVA = I_PROVA !== -1 ? process.argv[I_PROVA + 1] : null;
 const VENENO_ORDEM = process.argv.indexOf('--envenenado-ordem') !== -1;
 
 let passes = 0, falhas = 0;
@@ -228,7 +242,8 @@ function semData(bytes) {
   console.log('   a folha é a página ' + (pgFolha + 1) + ' do documento');
   let medida = null;
   try {
-    const saidaPng = PRINTS && fs.existsSync(PRINTS) ? path.join(PRINTS, 'b10_09.png') : path.join(tmp, 'folha.png');
+    const saidaPng = PROVA && fs.existsSync(PROVA)
+      ? path.join(PROVA, 'fixture_da_prova_folha.png') : path.join(tmp, 'folha.png');
     const r = execFileSync('python', [path.join(__dirname, '_rasteriza_compara.py'),
       path.join(tmp, 'antes.pdf'), path.join(tmp, 'hoje.pdf'), String(pgFolha), '--png', saidaPng],
     { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
@@ -283,13 +298,13 @@ function semData(bytes) {
       !!(controle && controle.diferentes > 1000), true);
   }
 
-  if (PRINTS) {
-    if (!fs.existsSync(PRINTS) || !fs.statSync(PRINTS).isDirectory()) {
-      console.log('   a pasta de prints não existe, e este roteiro não cria pasta: ' + PRINTS);
+  if (PROVA) {
+    if (!fs.existsSync(PROVA) || !fs.statSync(PROVA).isDirectory()) {
+      console.log('   a pasta da prova não existe, e este roteiro não cria pasta: ' + PROVA);
       falhas++;
     } else {
-      fs.copyFileSync(path.join(tmp, 'hoje.pdf'), path.join(PRINTS, 'b10_folha.pdf'));
-      console.log('   b10_folha.pdf e b10_09.png');
+      fs.copyFileSync(path.join(tmp, 'hoje.pdf'), path.join(PROVA, 'fixture_da_prova_folha.pdf'));
+      console.log('   fixture_da_prova_folha.pdf e fixture_da_prova_folha.png');
     }
   }
 
