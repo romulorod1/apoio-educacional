@@ -41,6 +41,22 @@ O concorrente sai de um sorteio UNIFORME entre todos os subconjuntos do modulo
 com aquele tamanho e aquela soma de minutos, contados por programacao dinamica.
 Sorteio por tentativa e erro daria peso maior aos conjuntos faceis de achar, e
 o peso viraria parte do resultado sem ninguem ter escolhido isso.
+
+O RESULTADO DA PRIMEIRA RODADA, 24/09/2026, sobre o 9o ano v5:
+
+  Braco A: a regra venceu 21 dos 40 julgamentos; o limiar era 26 (p = 0,4373).
+           Revisor 1: 12 de 20. Revisor 2: 9 de 20.
+           Concordancia entre os dois: 15 de 20 pares, 75%.
+  Braco B: 7 de 10; o limiar era 9 (p = 0,1719). Fica como NAO DEMONSTRADO.
+
+  A kits-v1 nao passou, e nao vai para a professora. Post-hoc, e marcado como
+  post-hoc porque nao estava pre-registrado e nao decide nada: por nivel a
+  regra venceu 11 de 14 no T1, 9 de 14 no T2 e 1 de 12 no T3.
+
+  Esta ferramenta fica porque ela e o instrumento, e nao a peca: serve para a
+  proxima regra, para outra serie, e para qualquer coisa que alguem queira
+  afirmar sobre qualidade de lista. Foi ela que custou uma rodada inteira e
+  evitou entregar 237 listas cuja unica qualidade seria existir.
 """
 import argparse
 import base64

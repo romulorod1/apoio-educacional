@@ -2,6 +2,29 @@
 
     python biblioteca/kits.py <pacote.zip ou pasta com os json> [--saida kits.json]
 
+REGRA TESTADA E REJEITADA EM 24/09/2026. NAO GERE kits.json PARA PACOTE
+PUBLICADO.
+
+Comparada as cegas contra um concorrente do mesmo modulo, com o mesmo numero
+de exercicios, o mesmo orcamento ao decimo e ORDENADO POR DEGRAU, sorteando so
+quais itens entram: a regra venceu 21 dos 40 julgamentos de dois revisores
+cegos, e o limiar declarado antes era 26 (p = 0,4373). Os dois revisores
+concordaram entre si em 15 dos 20 pares, entao o instrumento discrimina e o
+que ele nao acha e vantagem da curadoria.
+
+O que isso quer dizer: a ESTRUTURA vale (rampa mais orcamento), e o que nao
+paga e a esperteza na escolha dentro dela. Nao e derrota da ideia de kit.
+
+Este arquivo fica porque regra rejeitada COM A MEDIDA JUNTO impede que alguem
+a reinvente daqui a seis meses achando que e ideia nova, e porque foi ele que
+produziu as listas que a comparacao julgou. Os numeros e o metodo estao em
+Biblioteca\\PACOTES.md, na secao da versao 5 do 9o ano; o veredito esta na
+secao 8e do CONTRATO.
+
+Um erro de conceito desta regra, nomeado para quem for escrever a proxima:
+"escola de elite" nao quer dizer "sem aquecimento", e a tabela do T3 manda
+abrir no degrau 2 com a massa no 3. Toda lista precisa de porta de entrada.
+
 A regra esta escrita no CONTRATO_pacote_biblioteca.md, secoes 8d e 8e, e quem
 confere e o biblioteca/confere_kits.py, que NAO importa este arquivo. Este
 arquivo tambem nao importa aquele: a formula da tempo-v1 esta escrita duas

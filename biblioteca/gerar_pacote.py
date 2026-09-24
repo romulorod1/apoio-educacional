@@ -2085,9 +2085,11 @@ def principal(argv=None):
     ap.add_argument('--sem-zip', action='store_true')
     ap.add_argument('--anterior', help='itens.json de uma geracao anterior, para contar as caixas que mudaram')
     ap.add_argument('--kits', action='store_true',
-                    help='escreve tambem kits.json e exclusoes.json (CONTRATO 8d e 8e). Sem esta opcao o '
-                         'pacote sai exatamente como saia antes, e e isso que deixa provar hash a hash '
-                         'que ligar os kits nao mexeu em recorte nenhum')
+                    help='escreve tambem kits.json e exclusoes.json (CONTRATO 8d e 8e). NAO USE EM PACOTE '
+                         'PUBLICADO: a kits-v1 foi comparada as cegas contra rampa mais orcamento com '
+                         'escolha sorteada e nao venceu (21 de 40, limiar 26), e por isso nao vai para a '
+                         'professora. Sem esta opcao o pacote sai exatamente como saia antes, e e isso que '
+                         'deixa provar hash a hash que ligar os kits nao mexeu em recorte nenhum')
     ap.add_argument('--fontes-negrito', help='pedacos de nome de fonte negrito, separados por virgula '
                     '(padrao %s)' % ','.join(FONTES_NEGRITO))
     a = ap.parse_args(argv)
