@@ -11503,6 +11503,13 @@
    * preservar, e tocar nela abriria uma tela vazia em vez de carregar. */
   var bibLpEmEdicao = null;
 
+  /* A grade existe E está sendo exibida. `offsetParent` é nulo para elemento de
+   * ancestral com `display: none`, que é como as abas se escondem aqui. */
+  function telaDaListaProntaAVista() {
+    var g = $('#bib-lp-grade');
+    return !!(g && g.offsetParent);
+  }
+
   function listaProntaEmEdicao(lp) {
     return bibLpEmEdicao === lp.id &&
       bibCarrinho.itens.some(function (id) { return lp.minutosDe[id] !== undefined; });
@@ -11623,11 +11630,25 @@
     var soma = 0;
     daLista.forEach(function (id) { soma += Math.round(lp.minutosDe[id] * 10); });
     soma = Math.round(soma) / 10;
+    /* SEM EXERCÍCIO DA LISTA NÃO HÁ ESTIMATIVA, e a tela não finge que há.
+     *
+     * A conta dos minutos é a do PACOTE, por exercício da lista. Com a lista
+     * esvaziada, ou só com exercícios que ela acrescentou, a soma dá zero, e a
+     * tela dizia "0 exercícios · um pouco menos de meia aula · ≈ 0 min
+     * (estimativa)": três afirmações falsas de uma vez, porque lista vazia não
+     * é meia aula e zero minuto não é estimativa de coisa nenhuma. Pior no
+     * caso de sete exercícios acrescentados por ela, em que a tela anunciava
+     * "7 exercícios · um pouco menos de meia aula · ≈ 0 min". Achado pela
+     * primeira lente cega do PR #57. */
     var cabeca = el('div', { class: 'bib-lp-cabeca', id: 'bib-lp-cabeca' }, [
-      el('div', { class: 'bib-lp-meia', texto: plural(ids.length, 'exercício', 'exercícios') + ' · ' + meiaAula(soma) }),
-      el('div', { class: 'ajuda bib-lp-minutos', texto: minutosEstimados(soma, true) +
-        (deFora ? ', fora ' + plural(deFora, 'exercício que você acrescentou', 'exercícios que você acrescentou') +
-          ' e não entra nessa conta' : '') })
+      el('div', { class: 'bib-lp-meia', texto: !ids.length ? 'Nenhum exercício no material'
+        : plural(ids.length, 'exercício', 'exercícios') + (daLista.length ? ' · ' + meiaAula(soma) : '') }),
+      el('div', { class: 'ajuda bib-lp-minutos', texto: !daLista.length
+        ? (ids.length ? 'Sem estimativa de tempo: o minuto vem da lista pronta, e nenhum exercício dela ficou aqui.'
+          : 'Toque na linha da lista pronta para carregá-la de novo.')
+        : minutosEstimados(soma, true) +
+          (deFora ? ', fora ' + plural(deFora, 'exercício que você acrescentou e não entra nessa conta',
+            'exercícios que você acrescentou e não entram nessa conta') : '') })
     ]);
     corpo.appendChild(cabeca);
     if (mudou) {
@@ -11720,11 +11741,17 @@
     carregarEtiquetas();
   }
 
-  /* Redesenha e devolve o foco para a MESMA seta, que agora está numa linha
-   * acima ou abaixo. Sem isto, um toque em "descer" tira o foco do botão e o
-   * toque seguinte cai no cartão, que abre a tela cheia. */
+  /* DEVOLVE O FOCO para a MESMA seta, que agora está numa linha acima ou
+   * abaixo. Sem isto, um toque em "descer" tira o foco do botão e o toque
+   * seguinte cai no cartão, que abre a tela cheia.
+   *
+   * E NÃO REDESENHA, porque quem redesenha é o `desenharCarrinho`, que o
+   * `moverNoCarrinho` já chamou antes de chegar aqui. Redesenhar de novo dava
+   * DOIS desenhos por toque de seta: dois `innerHTML = ''`, duas listas de
+   * miniaturas de 1080 px jogadas fora e pedidas de novo, e a tela piscando
+   * branco duas vezes na interação principal desta tela. Achado pela segunda
+   * lente cega do PR #57. */
   function redesenharListaPronta(id, qual) {
-    desenharCorpoBiblioteca();
     var alvo = $('#bib-lp-grade [data-' + qual + '="' + id + '"]');
     if (alvo && !alvo.disabled) alvo.focus();
     else {
@@ -12363,7 +12390,14 @@
      * de cartões de pé, com o cabeçalho dizendo seis exercícios, as setas
      * acesas e nenhuma caixa marcada: uma tela que mostrava um material que já
      * não existia. Aqui é o único lugar por onde toda mudança passa. */
-    if (bibNav.aula && bibNav.aula.tipo === 'lista-pronta' && $('#bib-lp-grade')) desenharCorpoBiblioteca();
+    /* E SÓ COM A ABA À VISTA. O `#bib-lp-grade` continua no DOM depois de ela
+     * sair da Biblioteca, então o guarda de existência sozinho mandava
+     * redesenhar uma tela escondida, com cinco miniaturas de 1080 px, no pior
+     * momento possível: o `desmarcarDepoisDeAnexar` roda no meio da geração do
+     * PDF do material, que é a operação mais pesada do aplicativo. */
+    if (bibNav.aula && bibNav.aula.tipo === 'lista-pronta' && telaDaListaProntaAVista()) {
+      desenharCorpoBiblioteca();
+    }
     var n = bibCarrinho.itens.length, m = bibCarrinho.paginas.length;
     faixa.innerHTML = '';
     /* A faixa ocupa o lugar desde o começo, vazia ou não: se ela aparecesse só

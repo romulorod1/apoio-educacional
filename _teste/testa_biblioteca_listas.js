@@ -104,6 +104,8 @@
  *   --envenenado-lixeira  o draw.js servido volta a mudar a seleção em
  *                         silêncio, e a lixeira nunca acende ao tocar no
  *                         retângulo: ela cria um branco que não consegue tirar.
+ *   --envenenado-redesenho o app.js servido volta a desenhar a tela duas vezes
+ *                         por toque de seta.
  */
 'use strict';
 const fs = require('fs');
@@ -128,8 +130,10 @@ const V_SAIRAM = process.argv.indexOf('--envenenado-sairam') !== -1;
 const V_RECARREGA = process.argv.indexOf('--envenenado-recarrega') !== -1;
 const V_VOLTA = process.argv.indexOf('--envenenado-volta') !== -1;
 const V_LIXEIRA = process.argv.indexOf('--envenenado-lixeira') !== -1;
+const V_REDESENHO = process.argv.indexOf('--envenenado-redesenho') !== -1;
 const VENENO = V_ORDEM || V_SETA || V_CURADORIA || V_CAMADAS || V_COLUNA || V_FLUTUA || V_FRASE ||
-  V_DIFICULDADE || V_AGRUPA || V_AVISO_VELHO || V_SAIRAM || V_RECARREGA || V_VOLTA || V_LIXEIRA;
+  V_DIFICULDADE || V_AGRUPA || V_AVISO_VELHO || V_SAIRAM || V_RECARREGA || V_VOLTA || V_LIXEIRA ||
+  V_REDESENHO;
 
 const APP_REPO = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const DRAW_REPO = fs.readFileSync(path.join(H.RAIZ, 'draw.js'), 'utf8');
@@ -180,6 +184,10 @@ const T_SAIRAM = "    var ordemPerdida = false && antes.itens.length === tudo.it
 // a linha do módulo volta a recarregar a lista que ela está mexendo
 const L_RECARREGA = '          if (listaProntaEmEdicao(lp)) irNaBiblioteca({ aula: { tipo: \'lista-pronta\', id: lp.id } });';
 const T_RECARREGA = '          if (false && listaProntaEmEdicao(lp)) irNaBiblioteca({ aula: { tipo: \'lista-pronta\', id: lp.id } });';
+// o redesenho volta para dentro do devolve-o-foco, e cada toque de seta desenha
+// a tela duas vezes, jogando fora e repedindo as miniaturas de 1080 px
+const L_REDESENHO = '  function redesenharListaPronta(id, qual) {';
+const T_REDESENHO = '  function redesenharListaPronta(id, qual) {' + NL_APP + '    desenharCorpoBiblioteca();';
 /* a seleção volta a mudar em silêncio, e a lixeira volta a nunca aparecer ao
  * tocar no retângulo: a ferramenta cria uma coisa que ela não consegue tirar */
 const L_LIXEIRA = '      if (mudouSelecao && this.opcoes.aoSelecionar) this.opcoes.aoSelecionar(alvo);';
@@ -229,6 +237,7 @@ const RECEITA = V_ORDEM ? { arq: '/app.js', de: L_ORDEM, para: T_ORDEM }
                     : V_RECARREGA ? { arq: '/app.js', de: L_RECARREGA, para: T_RECARREGA }
                       : V_VOLTA ? { arq: '/app.js', de: L_VOLTA, para: T_VOLTA }
                         : V_LIXEIRA ? { arq: '/draw.js', de: L_LIXEIRA, para: T_LIXEIRA }
+                          : V_REDESENHO ? { arq: '/app.js', de: L_REDESENHO, para: T_REDESENHO }
                         : { arq: '/app.js', de: L_ORDEM_AVISO, para: T_ORDEM_AVISO };
 const BASE_DE = { '/app.js': APP_REPO, '/draw.js': DRAW_REPO, '/styles.css': CSS_REPO };
 const trocas = {};
@@ -920,6 +929,98 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   conf('e o aviso morreu na porta única, junto com o material que ele afirmava',
     depoisDoDesfazer.texto, '');
   conf('e a caixa flutuante do rodapé continua sem abrir', depoisDoDesfazer.flutuando, false);
+
+  // ================================================================
+  /* UM DESENHO POR TOQUE, e não dois. A régua conta as vezes em que o corpo da
+   * Biblioteca é esvaziado (o `innerHTML = ''` de cada redesenho), medindo o
+   * DOM e não o código. O alvo onde ela TEM de contar é o próprio toque: se ela
+   * marcasse zero, não estaria medindo nada. */
+  secao('5c. Um desenho por toque, e nada de desenhar tela escondida');
+  await pag.evaluate(() => {
+    window.__redesenhos = 0;
+    const alvo = document.querySelector('#bib-corpo');
+    if (window.__obs) window.__obs.disconnect();
+    window.__obs = new MutationObserver(recs => {
+      recs.forEach(r => { if (r.target === alvo && r.removedNodes.length > 1) window.__redesenhos++; });
+    });
+    window.__obs.observe(alvo, { childList: true });
+  });
+  const idsAgora = (await carrinho(pag)).itens;
+  conf('tocou em descer no primeiro cartão', await tocarSeta(pag, idsAgora[0], 'descer'), true);
+  await pausa(600);
+  const desenhos = await pag.evaluate(() => window.__redesenhos);
+  console.log('   desenhos do corpo por toque de seta: ' + desenhos);
+  conf('a régua contou desenho, senão não estaria medindo nada', desenhos > 0, true);
+  if (V_REDESENHO) {
+    conf('VENENO: com o redesenho de volta no foco, o toque desenha a tela DUAS vezes', desenhos, 2);
+    return;
+  }
+  conf('um toque de seta desenha a tela UMA vez', desenhos, 1);
+
+  /* E A TELA ESCONDIDA NÃO SE DESENHA. O guarda antigo era a existência do
+   * `#bib-lp-grade`, que continua no DOM depois de ela trocar de aba; o novo é
+   * a grade estar à VISTA. Aqui se mede a diferença entre os dois guardas no
+   * DOM real: com a aba trocada, a grade existe e não é exibida. O caminho
+   * completo que motivou o conserto (o desmarcar automático rodando no meio da
+   * geração do PDF) não é dirigido aqui, e isto está escrito de propósito. */
+  const visivel = await pag.evaluate(() => {
+    const g = document.querySelector('#bib-lp-grade');
+    return { existe: !!g, aVista: !!(g && g.offsetParent) };
+  });
+  conf('com a aba da Biblioteca aberta, a grade existe e está à vista',
+    JSON.stringify(visivel), JSON.stringify({ existe: true, aVista: true }));
+  await H.irParaAba(pag, 'ajustes');
+  await pausa(400);
+  const escondida = await pag.evaluate(() => {
+    const g = document.querySelector('#bib-lp-grade');
+    return { existe: !!g, aVista: !!(g && g.offsetParent) };
+  });
+  console.log('   com a aba trocada: ' + JSON.stringify(escondida));
+  conf('com outra aba aberta, a grade CONTINUA no DOM, que é o que enganava o guarda antigo',
+    escondida.existe, true);
+  conf('e NÃO está à vista, que é o que o guarda novo enxerga', escondida.aVista, false);
+  await H.irParaAba(pag, 'biblioteca');
+  await pausa(400);
+
+  // ================================================================
+  /* SEM EXERCÍCIO DA LISTA NÃO HÁ ESTIMATIVA. A tela dizia "0 exercícios · um
+   * pouco menos de meia aula · ≈ 0 min (estimativa)", três afirmações falsas de
+   * uma vez. Achado pela primeira lente cega do PR #57. */
+  secao('5d. A tela vazia não estima nada');
+  await pag.evaluate(() => { document.querySelector('#bib-carrinho-limpar').click(); });
+  await pausa(600);
+  const vazia = await pag.evaluate(() => ({
+    cabeca: (document.querySelector('#bib-lp-cabeca') || {}).innerText || '(não achei)',
+    vazia: !!document.querySelector('#bib-lp-vazia'),
+    cartoes: document.querySelectorAll('#bib-lp-grade .bib-celula').length
+  }));
+  console.log('   lista vazia: ' + JSON.stringify(vazia));
+  conf('a tela se redesenhou e não sobrou cartão nenhum', vazia.cartoes, 0);
+  conf('e o cabeçalho não diz meia aula nenhuma', /meia aula/.test(vazia.cabeca), false);
+  conf('e não estima zero minuto', /≈ 0 min/.test(vazia.cabeca), false);
+  conf('e diz o que há: nenhum exercício no material',
+    /^Nenhum exercício no material/.test(vazia.cabeca), true);
+
+  /* E COM SÓ O QUE ELA ACRESCENTOU, a tela também não estima: o minuto vem da
+   * lista pronta, e nenhum exercício dela ficou aqui. Era o caso de "7
+   * exercícios · um pouco menos de meia aula · ≈ 0 min". */
+  conf('abriu a outra lista do módulo', await pag.evaluate(() => {
+    const b = document.querySelector('#bib-lp-acrescentar [data-acrescentar]');
+    if (!b) return false; b.click(); return true;
+  }), true);
+  await pausa(500);
+  conf('marcou um exercício qualquer', await pag.evaluate(() => {
+    const c = document.querySelector('#bib-corpo input[data-carrinho="itens"]');
+    if (!c) return false; c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); return true;
+  }), true);
+  await pausa(400);
+  await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
+  await pausa(500);
+  const soDeFora = await pag.evaluate(() => (document.querySelector('#bib-lp-cabeca') || {}).innerText || '(não achei)');
+  console.log('   só com o acrescentado: ' + JSON.stringify(soDeFora));
+  conf('a tela conta o exercício', /^1 exercício/.test(soDeFora), true);
+  conf('e não promete meia aula', /meia aula/.test(soDeFora), false);
+  conf('e diz por que não há estimativa', /Sem estimativa de tempo/.test(soDeFora), true);
 
   // ================================================================
   secao('6. Tapar na folha');

@@ -421,6 +421,7 @@ roda "biblioteca listas --envenenado-volta"         node "_teste/testa_bibliotec
 # A lixeira do tapar: sem o aviso de selecao ela nunca acende, e a ferramenta
 # cria um branco que a professora nao consegue tirar.
 roda "biblioteca listas --envenenado-lixeira"       node "_teste/testa_biblioteca_listas.js" --envenenado-lixeira
+roda "biblioteca listas --envenenado-redesenho"     node "_teste/testa_biblioteca_listas.js" --envenenado-redesenho
 # FRENTE B (B10): A FOLHA IMPRESSA NAO MUDOU. A unificacao das camadas foi pelo
 # lado da TELA de proposito, porque o papel e o que ela entrega ao aluno. A
 # prova gera a MESMA folha com o pdf.js de hoje e com o do d80bb90 e compara
