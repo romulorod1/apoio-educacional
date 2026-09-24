@@ -125,6 +125,8 @@ TETO_TEORIA = 8
 # dois lados discordarem, quem manda e a conferencia.
 
 _ROTULO = re.compile(r'^\s*exerc[ií]cio\s+\d+[a-z]?\s*[.)]?\s*')
+# o hifen de quebra de coluna da fonte; a 8f diz por que ele se desfaz
+_HIFEN_DE_QUEBRA = re.compile(r'(\w)-\s+(\w)')
 _ANTERIOR = re.compile(r'(exerc[ií]cio|quest[aã]o|problema)\s+anterior')
 _NUMERADO = re.compile(r'(?:exerc[ií]cio|quest[aã]o|problema)s?\s+(\d+)')
 _DEMONSTRACAO = re.compile(r'^(mostre|prove|demonstre|justifique|verifique|deduza)\b')
@@ -136,7 +138,7 @@ _PARADAS = frozenset(
 
 
 def sem_rotulo(item):
-    return _ROTULO.sub('', item.get('texto') or '')
+    return _ROTULO.sub('', _HIFEN_DE_QUEBRA.sub(r'\1\2', item.get('texto') or ''))
 
 
 def referencia(item):

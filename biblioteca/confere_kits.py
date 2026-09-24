@@ -98,6 +98,14 @@ def mediana(valores):
 # texto em contorno e nao serve para ler nada.
 
 RE_ROTULO = re.compile(r'^\s*exerc[ií]cio\s+\d+[a-z]?\s*[.)]?\s*')
+# A fonte parte palavras no fim da coluna e o recorte guarda o hifen com o
+# espaco: "deter- mine", "repre- sentados". Medido no 9o ano v4: 125 dos 482
+# itens tem ao menos uma. Nos 482 isso nao muda nenhuma das duas reguas abaixo
+# (zero referencias trocadas, e o censo de semelhanca da os mesmos 11 pares),
+# mas "nao acontece neste pacote" nao e "nao pode acontecer": bastaria a fonte
+# quebrar "exerci- cio anterior" numa das outras seis series para a referencia
+# passar batida, em silencio. Desfazer custa uma linha.
+RE_HIFEN_DE_QUEBRA = re.compile(r'(\w)-\s+(\w)')
 RE_ANTERIOR = re.compile(r'(exerc[ií]cio|quest[aã]o|problema)\s+anterior')
 RE_NUMERADO = re.compile(r'(?:exerc[ií]cio|quest[aã]o|problema)s?\s+(\d+)')
 RE_DEMONSTRACAO = re.compile(r'^(mostre|prove|demonstre|justifique|verifique|deduza)\b')
@@ -113,8 +121,10 @@ PARADAS = frozenset(
 
 
 def corpo(texto):
-    """O enunciado sem o rotulo que o proprio pacote poe na frente."""
-    return RE_ROTULO.sub('', texto or '')
+    """O enunciado sem o rotulo que o proprio pacote poe na frente, e com as
+    palavras que a fonte partiu no fim da coluna remendadas. O remendo vem
+    ANTES de tirar o rotulo, porque o proprio rotulo pode vir partido."""
+    return RE_ROTULO.sub('', RE_HIFEN_DE_QUEBRA.sub(r'\1\2', texto or ''))
 
 
 def referencia(item):

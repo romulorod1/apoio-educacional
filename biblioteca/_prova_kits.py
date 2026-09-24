@@ -18,6 +18,7 @@ import copy
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -273,6 +274,10 @@ def amostra_listas():
         # quase igual ao 4, mas ABAIXO do limiar: fica na lista limpa
         L(10, 2, H45, 'exercicio 10. calcule o perimetro do retangulo de lados 5 e 9.'),
         L(11, 1, H45, 'exercicio 11. encontre os divisores positivos do numero 36.'),
+        # a fonte partiu "exercicio" no fim da coluna, como parte 125 dos 482
+        # itens do 9o ano. Este item remete ao 8 e so se le assim desfazendo o
+        # hifen de quebra: sem o remendo, a referencia passa batida em silencio.
+        L(12, 3, H45, 'exercicio 12. como no exerci- cio 8, use a diagonal do quadrado.'),
         # quase igual ao 5, ACIMA do limiar: so entra no veneno
         L(14, 2, H45, 'exercicio 14. calcule a area do trapezio de bases 5 e 9 e altura 4 usando a formula da area.'),
         # ---------------------------------------------- modulo-com-referencia
@@ -726,6 +731,23 @@ def main():
             [] if CK.referencia(itens_l[li(3)]) == li(2) else ['deu %r' % CK.referencia(itens_l[li(3)])])
     p.limpo('"no exercicio 3" e referencia, e aponta para o numero citado',
             [] if CK.referencia(itens_l[rf(4)]) == rf(3) else ['deu %r' % CK.referencia(itens_l[rf(4)])])
+    # o remendo do hifen de quebra da fonte, dos dois lados
+    p.limpo('"exerci- cio 8", partido pela fonte, continua sendo referencia',
+            [] if CK.referencia(itens_l[li(12)]) == li(8) else ['deu %r' % CK.referencia(itens_l[li(12)])])
+    # e o veneno do proprio remendo: sem ele, a mesma frase vira nada. Medido
+    # aqui e nao argumentado, porque e a unica forma de saber que a linha do
+    # remendo esta fazendo trabalho.
+    guardado = CK.RE_HIFEN_DE_QUEBRA
+    try:
+        # nunca casa, e mantem os dois grupos que o `sub` do remendo usa
+        CK.RE_HIFEN_DE_QUEBRA = re.compile(r'(\w)-REMENDO-DESLIGADO-(\w)')
+        p.veneno('a regua sem o remendo do hifen',
+                 ['perdeu a referencia: leu %r' % CK.referencia(itens_l[li(12)])]
+                 if CK.referencia(itens_l[li(12)]) != li(8) else [], 'perdeu a referencia')
+    finally:
+        CK.RE_HIFEN_DE_QUEBRA = guardado
+    p.limpo('o remendo voltou ao lugar depois do veneno',
+            [] if CK.referencia(itens_l[li(12)]) == li(8) else ['nao voltou'])
     # e NAO le o que a 8f manda deixar de fora. Sem estas quatro, alargar a
     # expressao para pegar "item anterior" tiraria itens bons do pacote real
     # sem nada reclamar: medidos no 9o ano, sao quatro itens em 482.
