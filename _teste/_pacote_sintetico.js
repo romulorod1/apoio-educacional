@@ -250,11 +250,14 @@ const KITS = [
  * biblioteca/kits.py, pelo mesmo motivo de sempre: peça de teste que sai do
  * gerador faz erro do gerador virar comportamento esperado.
  *
- * DUAS ASSIMETRIAS CRAVADAS, e cada uma existe porque sem ela uma asserção da
- * tela passaria com a regra invertida:
+ * CINCO ASSIMETRIAS CRAVADAS, e cada uma existe porque sem ela uma asserção da
+ * tela passaria com a regra invertida. (Eram duas quando este cabeçalho foi
+ * escrito, e o número ficou para trás enquanto a lista crescia: num repositório
+ * em que o comentário é a documentação, número velho em comentário é a próxima
+ * pessoa medindo a coisa errada. Achado pela segunda lente cega do PR #57.)
  *
  * 1. As listas têm TAMANHOS DIFERENTES (5, 4 e 4) e MINUTOS DIFERENTES (29,4,
- *    35,0 e 24,0), e nenhum desses números é igual a nenhuma outra contagem do
+ *    35,0 e 24,6), e nenhum desses números é igual a nenhuma outra contagem do
  *    pacote. Com 4 e 4 e os mesmos minutos, trocar a lista do nível 2 pela do
  *    nível 3 na tela passaria despercebido.
  * 2. A ORDEM da lista do nível 2 NÃO É a ordem dos itens no módulo: ela começa
@@ -262,7 +265,7 @@ const KITS = [
  *    diferente de "carrega na ordem da fonte"; com a ordem igual, as duas
  *    afirmações dariam o mesmo vetor e a asserção não mediria nada.
  * 3. OS TRÊS MINUTOS CAEM EM TRÊS FAIXAS DIFERENTES da frase da meia aula:
- *    29,4 está dentro da banda de 27 a 33, 35,0 está acima e 24,0 está abaixo.
+ *    29,4 está dentro da banda de 27 a 33, 35,0 está acima e 24,6 está abaixo.
  *    Com as três dentro, trocar a função que escolhe a frase por uma constante
  *    passaria em todas as asserções: era esse o defeito da primeira escrita
  *    desta amostra, e foi o teste que o achou.

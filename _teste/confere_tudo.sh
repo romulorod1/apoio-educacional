@@ -424,6 +424,11 @@ roda "biblioteca listas --envenenado-volta"         node "_teste/testa_bibliotec
 # byte a byte e pixel a pixel a 200 dpi, com controle de que o medidor sabe
 # acusar (duas paginas diferentes do mesmo PDF dao diferenca aos milhares).
 roda "folha impressa igual ao publicado"        node "_teste/testa_folha_impressa_igual.js"
+# E O VENENO DELA, que estava FORA da bateria. Guarda fora do portao nao e
+# guarda: esta prova e inerte contra o diff que a estreia, e o que lhe da
+# sentido e ela saber MORDER no proximo diff. Se as ancoras do veneno deixarem
+# de casar, e aqui que se descobre, e nao no dia em que a folha mudar calada.
+roda "folha impressa --envenenado-ordem"        node "_teste/testa_folha_impressa_igual.js" --envenenado-ordem
 
 roda "painel de valores"                        node "_teste/testa_painel_valores.js"
 roda "painel de valores --envenenado-aberto"    node "_teste/testa_painel_valores.js" --envenenado-aberto

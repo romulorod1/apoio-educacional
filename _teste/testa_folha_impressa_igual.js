@@ -183,11 +183,17 @@ function semData(bytes) {
       '        it.w * escala, it.h * escala);',
       '    });',
       marcaTracos].join(NL);
+    /* AS TRÊS ÂNCORAS SÃO CONTADAS, e não só duas. A terceira passava trocada
+     * sem contagem, e uma âncora que deixa de casar e não reclama é um veneno
+     * que deixou de envenenar em silêncio, que é o pior defeito que uma prova
+     * pode ter. Achado pela segunda lente cega do PR #57. */
+    const ancoraItens = '    var itens = pagina.itens || [];';
     conf('a âncora do desenho da imagem casa exatamente uma vez', fonte.split(desenha).length - 1, 1);
     conf('a âncora dos traços casa exatamente uma vez', fonte.split(marcaTracos).length - 1, 1);
+    conf('a âncora da lista de itens casa exatamente uma vez', fonte.split(ancoraItens).length - 1, 1);
     const envenenado = fonte
       .split(desenha).join(guarda)
-      .split('    var itens = pagina.itens || [];').join('    var itens = pagina.itens || [];' + NL + '    var _adiadas = [];')
+      .split(ancoraItens).join(ancoraItens + NL + '    var _adiadas = [];')
       .split(marcaTracos).join(solta);
     conf('o veneno mudou mesmo o pdf.js', envenenado !== fonte ? 'diferente' : 'IGUAL', 'diferente');
     const alvo = path.join(tmp, 'pdf_envenenado.js');
