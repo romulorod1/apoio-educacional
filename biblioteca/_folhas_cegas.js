@@ -19,7 +19,15 @@
  */
 const fs = require('fs');
 const path = require('path');
-const puppeteer = require(path.join(__dirname, '..', '_teste', 'node_modules', 'puppeteer-core'));
+/* O puppeteer entra so na hora de renderizar. Carregado no topo, o
+ * --autoteste, que nem abre navegador, morreria no require numa copia sem
+ * _teste/node_modules, e o portao leria isso como "o teste nao chegou a
+ * rodar". Ja aconteceu nesta casa: uma suite rodando em copia sem as
+ * dependencias, o testa_temas morrendo no puppeteer-core, e o portao dizendo
+ * "TUDO PASSOU. Pode seguir para o merge". */
+function abrirPuppeteer() {
+  return require(path.join(__dirname, '..', '_teste', 'node_modules', 'puppeteer-core'));
+}
 
 const CHROME = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 /* A janela e em PIXELS CSS e a folha e em PONTOS: 1 pt vale 4/3 px. O corpo
@@ -117,7 +125,7 @@ function autoteste() {
   if (raiz === '--autoteste') return autoteste();
   if (!raiz || !fs.existsSync(raiz)) { console.error('pasta nao existe: ' + raiz); process.exit(1); }
   const folhas = varrer(raiz).sort();
-  const navegador = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--no-sandbox'] });
+  const navegador = await abrirPuppeteer().launch({ executablePath: CHROME, headless: 'new', args: ['--no-sandbox'] });
   const indices = {};
   let ok = 0, imagens = 0, maiorPedaco = 0;
   try {
