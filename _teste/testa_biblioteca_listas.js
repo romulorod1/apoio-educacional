@@ -116,25 +116,7 @@ const Sintetico = require('./_pacote_sintetico.js');
 const { conf, secao, pausa, esperar } = H;
 
 const PORTA = 8806;
-const V_ORDEM = process.argv.indexOf('--envenenado-ordem') !== -1;
-const V_SETA = process.argv.indexOf('--envenenado-seta') !== -1;
-const V_CURADORIA = process.argv.indexOf('--envenenado-curadoria') !== -1;
-const V_CAMADAS = process.argv.indexOf('--envenenado-camadas') !== -1;
-const V_COLUNA = process.argv.indexOf('--envenenado-coluna') !== -1;
-const V_FLUTUA = process.argv.indexOf('--envenenado-flutua') !== -1;
-const V_FRASE = process.argv.indexOf('--envenenado-frase') !== -1;
-const V_DIFICULDADE = process.argv.indexOf('--envenenado-dificuldade') !== -1;
-const V_AGRUPA = process.argv.indexOf('--envenenado-agrupa') !== -1;
-const V_AVISO_VELHO = process.argv.indexOf('--envenenado-aviso-velho') !== -1;
-const V_SAIRAM = process.argv.indexOf('--envenenado-sairam') !== -1;
-const V_RECARREGA = process.argv.indexOf('--envenenado-recarrega') !== -1;
-const V_VOLTA = process.argv.indexOf('--envenenado-volta') !== -1;
-const V_LIXEIRA = process.argv.indexOf('--envenenado-lixeira') !== -1;
-const V_REDESENHO = process.argv.indexOf('--envenenado-redesenho') !== -1;
-const VENENO = V_ORDEM || V_SETA || V_CURADORIA || V_CAMADAS || V_COLUNA || V_FLUTUA || V_FRASE ||
-  V_DIFICULDADE || V_AGRUPA || V_AVISO_VELHO || V_SAIRAM || V_RECARREGA || V_VOLTA || V_LIXEIRA ||
-  V_REDESENHO;
-
+// as bandeiras saem da tabela de venenos, definida depois dos arquivos e das âncoras
 const APP_REPO = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const DRAW_REPO = fs.readFileSync(path.join(H.RAIZ, 'draw.js'), 'utf8');
 const CSS_REPO = fs.readFileSync(path.join(H.RAIZ, 'styles.css'), 'utf8');
@@ -195,18 +177,25 @@ const T_LIXEIRA = '      if (false && this.opcoes.aoSelecionar) this.opcoes.aoSe
 // o caminho de volta da lista cheia volta a levar para o módulo
 const L_VOLTA = "          bibVoltarPara = { id: lp.id, slug: l.slug, rotulo: 'Lista pronta, nível ' + lp.nivel };";
 const T_VOLTA = '          bibVoltarPara = null;';
-// a mensagem volta para a caixa flutuante do rodapé, e o bloco do fluxo não é desenhado
+/* A mensagem volta para a caixa flutuante do rodapé, e o bloco do fluxo não é
+ * desenhado. A ÂNCORA JÁ ENVELHECEU UMA VEZ: ela casava em `if (bibLpAviso) {`
+ * mais o `corpo.appendChild` da linha seguinte, e quando o aviso passou a ser
+ * capturado numa variável no meio das duas, o veneno deixou de casar e a
+ * corrida morreu antes de qualquer asserção, com 0 passaram e 2 falharam. É o
+ * portão fazendo o que tem de fazer, e é a razão de existir a varredura das
+ * âncoras, mais abaixo. */
 const L_FLUTUA = [
-  '    if (bibLpAviso) {',
+  '      var av = bibLpAviso;',
   "      corpo.appendChild(el('div', { class: 'bib-lp-aviso', id: 'bib-lp-aviso' }, ["].join(NL_APP);
 const T_FLUTUA = [
-  '    if (bibLpAviso) {',
-  '      avisar(bibLpAviso.texto, bibLpAviso.rotulo, bibLpAviso.aoAgir);',
+  '      var av = bibLpAviso;',
+  '      avisar(av.texto, av.rotulo, av.aoAgir);',
   "      if (0) corpo.appendChild(el('div', { class: 'bib-lp-aviso', id: 'bib-lp-aviso' }, ["].join(NL_APP);
 // a frase volta a somar em voz alta, que é exatamente a que o revisor leu como conta quebrada
 const L_FRASE = [
   "      texto: 'O material agora tem ' + plural(bibCarrinho.itens.length, 'exercício', 'exercícios') +",
-  "        ': a lista pronta do nível ' + lp.nivel + (sairam ? ', no lugar do que estava marcado' : '') +",
+  "        ': a lista pronta do nível ' + lp.nivel +",
+  "        (sairam ? ', no lugar do que estava marcado' : ordemPerdida ? ', de volta à ordem do pacote' : '') +",
   "        '. Mude o que quiser e toque em Gerar material.',"].join(NL_APP);
 const T_FRASE = "      texto: (sairam ? 'Tirei ' + plural(sairam, 'item que estava marcado', 'itens que estavam marcados') +" +
   " ' e marquei ' : 'Marquei ') + 'a lista pronta do nível ' + lp.nivel + ': ' +" +
@@ -220,25 +209,47 @@ const T_DIFICULDADE = [
   "          rotuloDificuldade(it) ? el('span', { class: 'tag bib-dif-fonte', texto: rotuloDificuldade(it) }) : null,",
   '          lp.minutosDe[id] !== undefined'].join(NL_APP);
 
-/* Uma receita por veneno: qual arquivo servido muda, e de que para quê. A
- * tabela substituiu a cadeia de ternários quando os venenos passaram de quatro
- * para oito, e é ela que garante que o "trocou exatamente uma ocorrência"
- * valha para todos sem repetição. */
-const RECEITA = V_ORDEM ? { arq: '/app.js', de: L_ORDEM, para: T_ORDEM }
-  : V_SETA ? { arq: '/app.js', de: L_SETA, para: T_SETA }
-    : V_CURADORIA ? { arq: '/app.js', de: L_CURADORIA, para: T_CURADORIA }
-      : V_CAMADAS ? { arq: '/draw.js', de: L_CAMADAS, para: T_CAMADAS }
-        : V_COLUNA ? { arq: '/styles.css', de: L_COLUNA, para: T_COLUNA }
-          : V_FLUTUA ? { arq: '/app.js', de: L_FLUTUA, para: T_FLUTUA }
-            : V_FRASE ? { arq: '/app.js', de: L_FRASE, para: T_FRASE }
-              : V_DIFICULDADE ? { arq: '/app.js', de: L_DIFICULDADE, para: T_DIFICULDADE }
-                : V_AGRUPA ? { arq: '/styles.css', de: L_AGRUPA, para: T_AGRUPA }
-                  : V_SAIRAM ? { arq: '/app.js', de: L_SAIRAM, para: T_SAIRAM }
-                    : V_RECARREGA ? { arq: '/app.js', de: L_RECARREGA, para: T_RECARREGA }
-                      : V_VOLTA ? { arq: '/app.js', de: L_VOLTA, para: T_VOLTA }
-                        : V_LIXEIRA ? { arq: '/draw.js', de: L_LIXEIRA, para: T_LIXEIRA }
-                          : V_REDESENHO ? { arq: '/app.js', de: L_REDESENHO, para: T_REDESENHO }
-                        : { arq: '/app.js', de: L_ORDEM_AVISO, para: T_ORDEM_AVISO };
+/* UMA TABELA, e não uma cadeia de ternários: qual arquivo servido muda, e de
+ * que para quê. É ela que permite varrer TODAS as âncoras de uma vez, logo
+ * abaixo, em vez de descobrir uma de cada vez quando a corrida daquele veneno
+ * morre. */
+const VENENOS = {
+  ordem: { arq: '/app.js', de: L_ORDEM, para: T_ORDEM },
+  seta: { arq: '/app.js', de: L_SETA, para: T_SETA },
+  curadoria: { arq: '/app.js', de: L_CURADORIA, para: T_CURADORIA },
+  camadas: { arq: '/draw.js', de: L_CAMADAS, para: T_CAMADAS },
+  coluna: { arq: '/styles.css', de: L_COLUNA, para: T_COLUNA },
+  flutua: { arq: '/app.js', de: L_FLUTUA, para: T_FLUTUA },
+  frase: { arq: '/app.js', de: L_FRASE, para: T_FRASE },
+  dificuldade: { arq: '/app.js', de: L_DIFICULDADE, para: T_DIFICULDADE },
+  agrupa: { arq: '/styles.css', de: L_AGRUPA, para: T_AGRUPA },
+  'aviso-velho': { arq: '/app.js', de: L_ORDEM_AVISO, para: T_ORDEM_AVISO },
+  sairam: { arq: '/app.js', de: L_SAIRAM, para: T_SAIRAM },
+  recarrega: { arq: '/app.js', de: L_RECARREGA, para: T_RECARREGA },
+  volta: { arq: '/app.js', de: L_VOLTA, para: T_VOLTA },
+  lixeira: { arq: '/draw.js', de: L_LIXEIRA, para: T_LIXEIRA },
+  redesenho: { arq: '/app.js', de: L_REDESENHO, para: T_REDESENHO }
+};
+const NOME_VENENO = Object.keys(VENENOS).filter(function (n) {
+  return process.argv.indexOf('--envenenado-' + n) !== -1;
+})[0] || null;
+const RECEITA = NOME_VENENO ? VENENOS[NOME_VENENO] : null;
+const VENENO = !!NOME_VENENO;
+const V_ORDEM = NOME_VENENO === 'ordem';
+const V_SETA = NOME_VENENO === 'seta';
+const V_CURADORIA = NOME_VENENO === 'curadoria';
+const V_CAMADAS = NOME_VENENO === 'camadas';
+const V_COLUNA = NOME_VENENO === 'coluna';
+const V_FLUTUA = NOME_VENENO === 'flutua';
+const V_FRASE = NOME_VENENO === 'frase';
+const V_DIFICULDADE = NOME_VENENO === 'dificuldade';
+const V_AGRUPA = NOME_VENENO === 'agrupa';
+const V_AVISO_VELHO = NOME_VENENO === 'aviso-velho';
+const V_SAIRAM = NOME_VENENO === 'sairam';
+const V_RECARREGA = NOME_VENENO === 'recarrega';
+const V_VOLTA = NOME_VENENO === 'volta';
+const V_LIXEIRA = NOME_VENENO === 'lixeira';
+const V_REDESENHO = NOME_VENENO === 'redesenho';
 const BASE_DE = { '/app.js': APP_REPO, '/draw.js': DRAW_REPO, '/styles.css': CSS_REPO };
 const trocas = {};
 if (VENENO) trocas[RECEITA.arq] = BASE_DE[RECEITA.arq].split(RECEITA.de).join(RECEITA.para);
@@ -394,6 +405,38 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
 }, seletor);
 
 (async () => {
+  /* AS CERCAS AINDA APONTAM PARA O ALVO, varridas TODAS de uma vez.
+   *
+   * O veneno é código que envelhece junto com o alvo. Nesta leva o aviso mudou
+   * de porta e a frase ganhou um caso, e duas âncoras deixaram de casar: as
+   * duas corridas envenenadas morreram com "0 passaram, 2 falharam", que é o
+   * feitio de veneno que não achou o que trocar. O portão pegou, e pegou
+   * porque cada veneno roda. Mas isso descobre UMA por vez, e só no dia em que
+   * aquela corrida acontece; e um veneno que passasse a trocar algo que não
+   * importa ficaria VERDE e cego, que é pior do que estar vermelho.
+   *
+   * Então a varredura roda no modo normal e olha as quinze de uma vez, contra
+   * os arquivos de verdade. Com o alvo ao lado: uma âncora inventada, do mesmo
+   * feitio das outras, que TEM de casar zero vezes. Sem ela, "todas casaram uma
+   * vez" não se distinguiria de um contador que devolve 1 para tudo. */
+  if (!VENENO) {
+    secao('0. As cercas ainda apontam para o alvo');
+    var nomes = Object.keys(VENENOS);
+    conf('a tabela tem os quinze venenos desta prova', nomes.length, 15);
+    var fora = [];
+    nomes.forEach(function (n) {
+      var r = VENENOS[n];
+      var quantas = BASE_DE[r.arq].split(r.de).length - 1;
+      if (quantas !== 1) fora.push(n + ' casa ' + quantas + ' vez(es) em ' + r.arq);
+      if (r.para === r.de) fora.push(n + ' troca por si mesmo');
+    });
+    if (fora.length) fora.forEach(function (f) { console.log('   ' + f); });
+    conf('e todas as âncoras casam exatamente uma vez no arquivo delas',
+      fora.join(' | ') || '(nenhuma fora)', '(nenhuma fora)');
+    conf('e o controle: uma âncora inventada casa ZERO vezes, senão o contador não conta',
+      APP_REPO.split('  function funcaoQueNaoExisteNesteArquivo() {').length - 1, 0);
+  }
+
   if (VENENO) {
     secao('O veneno é de verdade');
     const base = BASE_DE[RECEITA.arq];
