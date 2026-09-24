@@ -2,6 +2,29 @@
 
     python biblioteca/_comparacao_cega.py <pacote.zip> --saida <pasta> [--semente 20260923]
 
+=============================================================================
+TRAVA DE USO, decidida em 24/09/2026 e OBRIGATORIA.
+
+ESTE INSTRUMENTO NAO SE USA DE NOVO SEM UMA RODADA DE LENTE SOBRE ELE ANTES.
+
+Nao e "endurecer um dia": e condicao de uso. Se a proxima regra de kits, ou
+qualquer outra afirmacao sobre qualidade de lista, for testada com este
+aparato sem essa rodada, O RESULTADO NAO VALE.
+
+Por que: em 24/09 duas rodadas de uma lente cega estreita acharam dezessete
+fixtures cegos neste aparato, e o pior deles era a assercao que protegia o
+ponto mais perigoso de todos, o mapa de "lista A" para "regra ou sorteio":
+ela passava 15 de 15 com o mapa INVERTIDO. Os dezessete foram consertados. O
+que deixou a rodada parar ali nao foi a suite estar provada: foi o resultado
+daquela rodada ja ter sido validado POR FORA do instrumento, refazendo a
+apuracao a partir das respostas arquivadas e medindo o pior caso. Essa
+validacao de fora vale para AQUELE resultado e para mais nenhum.
+
+A lente pergunta uma coisa so: os fixtures conseguem distinguir o defeito que
+dizem pegar, ou algum e simetrico de um jeito que esconde inversao, troca de
+lados ou permutacao? O texto usado esta em Simulacoes\\biblioteca-b9\\.
+=============================================================================
+
 Por que ela existe: invariante conferida no dado prova ESTRUTURA, nao didatica.
 Um conjunto de kits pode passar em I1 a I7 e ser ruim, e ninguem perceberia ate
 ela parar de usar sem dizer por que. Foi assim que o acervo de 14/09 morreu.

@@ -2,6 +2,11 @@
  *
  *   node biblioteca/_folhas_cegas.js <pasta da comparacao>
  *
+ * TRAVA DE USO: este arquivo faz parte do instrumento da comparacao cega, e o
+ * instrumento NAO se usa de novo sem uma rodada de lente sobre ele antes. O
+ * motivo inteiro esta no cabecalho do _comparacao_cega.py. Resultado produzido
+ * sem essa rodada nao vale.
+ *
  * Varre a pasta atras de par-NN-lista-X.html, que o _comparacao_cega.py
  * escreveu, e grava os PNG ao lado, mais um INDICE.txt por pasta de revisor.
  *

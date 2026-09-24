@@ -21,6 +21,11 @@ A medida principal do braco A sao os 40 julgamentos somados dos dois
 revisores. Cada revisor sai tambem sozinho, e a concordancia entre os dois sai
 ao lado: ela e o que separa "o resultado e do instrumento" de "o resultado e
 do juiz".
+
+TRAVA DE USO: este arquivo faz parte do instrumento da comparacao cega, e o
+instrumento NAO se usa de novo sem uma rodada de lente sobre ele antes. O
+motivo inteiro esta no cabecalho do _comparacao_cega.py. Resultado produzido
+sem essa rodada nao vale.
 """
 import argparse
 import io
