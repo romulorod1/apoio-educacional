@@ -27,6 +27,23 @@
     { nome: 'Grossa', valor: 7 }
   ];
 
+  /* A ORDEM DAS CAMADAS, e ela é a mesma no canvas e no PDF.
+   *
+   * O pdf.js sempre desenhou a folha em camadas (imagem, depois texto, depois
+   * traço) enquanto o canvas desenhava na ordem do vetor. Quem manda é o PDF,
+   * porque é ele que ela imprime, e a diferença ficava invisível até existir um
+   * item cuja função é COBRIR: um retângulo que tapa no canvas e não tapa na
+   * folha impressa seria a tela mentindo sobre o que vai sair. Por isso o
+   * canvas passou a seguir a mesma ordem, e a lista está escrita num lugar só,
+   * exportada, para a prova poder comparar os dois lados em vez de acreditar.
+   *
+   * `tapar` entra logo depois da imagem: ele existe para cobrir o recorte da
+   * fonte, e nunca cobre o que ela escreveu por cima. Para tirar o que é dela
+   * existe a borracha. */
+  var ORDEM_CAMADAS = ['imagem', 'tapar', 'texto', 'traco'];
+
+  var TAPAR_MINIMO = 12;        // menor que isto é toque seco, e não retângulo
+
   function paginaVazia(fundo) {
     return { fundo: fundo || 'pautado', itens: [] };
   }
@@ -250,11 +267,25 @@
     this.cacheValido = false; this.precisaRedesenhar = true;
   };
 
+  /* O retângulo que tapa. Nasce arrastando, como o traço, e não centralizado
+   * como a imagem: ela precisa pôr o branco exatamente em cima do pedaço errado
+   * do enunciado, e um retângulo que nasce no meio da folha obrigaria a
+   * arrastar e redimensionar depois de cada toque. */
+  Editor.prototype.adicionarTapar = function (x, y, w, h) {
+    if (w < TAPAR_MINIMO || h < TAPAR_MINIMO) return null;
+    this.marcarPonto();
+    var item = { t: 'tapar', x: x, y: y, w: w, h: h };
+    this.pagina().itens.push(item);
+    this.cacheValido = false; this.precisaRedesenhar = true;
+    return item;
+  };
+
   Editor.prototype.itemEm = function (p) {
     var itens = this.pagina().itens;
     for (var i = itens.length - 1; i >= 0; i--) {
       var it = itens[i];
-      if (it.t === 'imagem' && p.x >= it.x && p.x <= it.x + it.w && p.y >= it.y && p.y <= it.y + it.h) return it;
+      if ((it.t === 'imagem' || it.t === 'tapar') &&
+          p.x >= it.x && p.x <= it.x + it.w && p.y >= it.y && p.y <= it.y + it.h) return it;
       if (it.t === 'texto') {
         var alturaAprox = it.tam * 1.3;
         var larguraAprox = it.txt.length * it.tam * 0.52;
@@ -342,6 +373,11 @@
       this.apagarEm(p, 14 / this.escala + 6);
       return;
     }
+    if (this.ferramenta === 'tapar') {
+      this.tapando = { x0: p.x, y0: p.y, x: p.x, y: p.y };
+      this.precisaRedesenhar = true;
+      return;
+    }
     if (this.ferramenta === 'selecao') {
       var alvo = this.itemEm(p);
       this.selecionado = alvo;
@@ -415,9 +451,22 @@
 
     if (this.apagando) { this.apagarEm(p, 14 / this.escala + 6); return; }
 
+    if (this.tapando) {
+      this.tapando.x = p.x;
+      this.tapando.y = p.y;
+      this.precisaRedesenhar = true;
+      return;
+    }
+
     if (this.arrasto) {
       var d = this.arrasto;
-      if (d.alca && d.item.t === 'imagem') {
+      if (d.alca && d.item.t === 'tapar') {
+        /* O retângulo que tapa não guarda proporção: o pedaço errado do
+         * enunciado é largo e baixo quase sempre, e forçar proporção obrigaria
+         * a tapar linha de texto vizinha para cobrir uma palavra. */
+        d.item.w = Math.max(TAPAR_MINIMO, d.iw + (p.x - d.ox));
+        d.item.h = Math.max(TAPAR_MINIMO, d.ih + (p.y - d.oy));
+      } else if (d.alca && d.item.t === 'imagem') {
         var nw = Math.max(40, d.iw + (p.x - d.ox));
         var proporcao = d.ih / d.iw;
         d.item.w = nw;
@@ -460,6 +509,17 @@
       this.cacheValido = false;
       this._avisarMudanca();
     }
+    if (this.tapando) {
+      var t = this.tapando;
+      this.tapando = null;
+      var novo = this.adicionarTapar(Math.min(t.x0, t.x), Math.min(t.y0, t.y),
+        Math.abs(t.x - t.x0), Math.abs(t.y - t.y0));
+      /* Toque seco não vira retângulo: um branco de dois pixels ficaria
+       * invisível na folha e aparecendo no desfazer, e ela não saberia o que
+       * tinha feito. Sem retângulo não há o que avisar. */
+      if (novo) this._avisarMudanca();
+      this.precisaRedesenhar = true;
+    }
     if (this.apagando) { this.apagando = false; this._avisarMudanca(); }
     if (this.arrasto) { this.arrasto = null; this._avisarMudanca(); }
     this.precisaRedesenhar = true;
@@ -476,7 +536,7 @@
   };
 
   Editor.prototype._alcaEm = function (p, item) {
-    if (item.t !== 'imagem') return null;
+    if (item.t !== 'imagem' && item.t !== 'tapar') return null;
     var tol = 22 / this.escala;
     return (Math.abs(p.x - (item.x + item.w)) < tol && Math.abs(p.y - (item.y + item.h)) < tol);
   };
@@ -535,7 +595,22 @@
     ctx.rect(0, 0, FOLHA_L, FOLHA_A);
     ctx.clip();
     var itens = this.pagina().itens;
-    for (var i = 0; i < itens.length; i++) this._desenharItem(ctx, itens[i]);
+    for (var c = 0; c < ORDEM_CAMADAS.length; c++) {
+      for (var i = 0; i < itens.length; i++) {
+        if (itens[i] && itens[i].t === ORDEM_CAMADAS[c]) this._desenharItem(ctx, itens[i]);
+      }
+    }
+    /* O retângulo que ela está arrastando agora, ainda sem existir no vetor:
+     * mostrado com contorno e sem branco, porque enquanto arrasta o que ela
+     * precisa ver é O QUE VAI SUMIR, e não o branco por cima. */
+    if (this.tapando) {
+      var t = this.tapando;
+      ctx.strokeStyle = '#2E7D6B';
+      ctx.lineWidth = 2 / this.escala;
+      ctx.setLineDash([8 / this.escala, 5 / this.escala]);
+      ctx.strokeRect(Math.min(t.x0, t.x), Math.min(t.y0, t.y), Math.abs(t.x - t.x0), Math.abs(t.y - t.y0));
+      ctx.setLineDash([]);
+    }
     ctx.restore();
 
     if (this.selecionado) this._desenharSelecao(ctx, this.selecionado);
@@ -603,6 +678,14 @@
       }
       return;
     }
+    if (it.t === 'tapar') {
+      /* Branco cheio, sem borda e sem transparência: é a mesma mecânica com
+       * que o compositor já cobre o rótulo original do recorte. Borda daria
+       * um retângulo visível na folha impressa, que é o contrário do pedido. */
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(it.x, it.y, it.w, it.h);
+      return;
+    }
     if (it.t === 'texto') {
       ctx.fillStyle = it.cor;
       ctx.font = it.tam + 'px Helvetica, Arial, sans-serif';
@@ -616,14 +699,14 @@
 
   Editor.prototype._desenharSelecao = function (ctx, it) {
     var x = it.x, y = it.y, w, h;
-    if (it.t === 'imagem') { w = it.w; h = it.h; }
+    if (it.t === 'imagem' || it.t === 'tapar') { w = it.w; h = it.h; }
     else { w = String(it.txt).length * it.tam * 0.52; h = it.tam * 1.3 * String(it.txt).split('\n').length; }
     ctx.strokeStyle = '#2E7D6B';
     ctx.lineWidth = 2 / this.escala;
     ctx.setLineDash([8 / this.escala, 5 / this.escala]);
     ctx.strokeRect(x - 4, y - 4, w + 8, h + 8);
     ctx.setLineDash([]);
-    if (it.t === 'imagem') {
+    if (it.t === 'imagem' || it.t === 'tapar') {
       ctx.fillStyle = '#2E7D6B';
       var r = 9 / this.escala;
       ctx.beginPath();
@@ -643,9 +726,17 @@
     if (!nota || !nota.paginas || !nota.paginas.length) return c;
     var esc = largura / FOLHA_L;
     ctx.scale(esc, esc);
-    var itens = nota.paginas[0].itens || [];
+    var todos = nota.paginas[0].itens || [];
+    // a miniatura segue a mesma ordem de camadas da folha e do PDF
+    var itens = [];
+    ORDEM_CAMADAS.forEach(function (c) {
+      todos.forEach(function (it) { if (it && it.t === c) itens.push(it); });
+    });
     itens.forEach(function (it) {
-      if (it.t === 'traco' && it.pontos.length > 1) {
+      if (it.t === 'tapar') {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(it.x, it.y, it.w, it.h);
+      } else if (it.t === 'traco' && it.pontos.length > 1) {
         ctx.strokeStyle = it.cor;
         ctx.lineCap = 'round';
         ctx.globalAlpha = it.marcatexto ? 0.32 : 1;
@@ -671,7 +762,7 @@
 
   root.Draw = {
     Editor: Editor, PALETA: PALETA, ESPESSURAS: ESPESSURAS,
-    FOLHA_L: FOLHA_L, FOLHA_A: FOLHA_A,
+    FOLHA_L: FOLHA_L, FOLHA_A: FOLHA_A, ORDEM_CAMADAS: ORDEM_CAMADAS,
     notaVazia: notaVazia, paginaVazia: paginaVazia
   };
 })(typeof self !== 'undefined' ? self : this);

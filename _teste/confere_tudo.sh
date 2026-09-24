@@ -385,6 +385,18 @@ roda "remover pacote --envenenado-dela"         node "_teste/testa_biblioteca_re
 roda "biblioteca kits (aditivo)"                node "_teste/testa_biblioteca_kits.js"
 roda "biblioteca kits --envenenado-app-recusa"  node "_teste/testa_biblioteca_kits.js" --envenenado-app-recusa
 
+# FRENTE B (B10): a TELA DA LISTA PRONTA. As duas linhas no modulo com o numero
+# daquela lista, o carregamento NA ORDEM DELA, as setas de subir e descer, tirar
+# pela caixa, acrescentar do modulo, e a ferramenta de tapar na folha. Quatro
+# venenos, e o da ordem e o mais silencioso: o carrinho fica com os MESMOS ids e
+# so a ordem muda. O das camadas mede PIXEL, e nao a constante exportada: a
+# ordem pode estar escrita certa e o laco que a usa, errado.
+roda "biblioteca listas prontas"                    node "_teste/testa_biblioteca_listas.js"
+roda "biblioteca listas --envenenado-ordem"         node "_teste/testa_biblioteca_listas.js" --envenenado-ordem
+roda "biblioteca listas --envenenado-seta"          node "_teste/testa_biblioteca_listas.js" --envenenado-seta
+roda "biblioteca listas --envenenado-curadoria"     node "_teste/testa_biblioteca_listas.js" --envenenado-curadoria
+roda "biblioteca listas --envenenado-camadas"       node "_teste/testa_biblioteca_listas.js" --envenenado-camadas
+
 roda "painel de valores"                        node "_teste/testa_painel_valores.js"
 roda "painel de valores --envenenado-aberto"    node "_teste/testa_painel_valores.js" --envenenado-aberto
 roda "painel de valores --envenenado-esquece"   node "_teste/testa_painel_valores.js" --envenenado-esquece

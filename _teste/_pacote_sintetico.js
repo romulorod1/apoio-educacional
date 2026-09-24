@@ -243,6 +243,81 @@ const KITS = [
     conferido: { quem: 'olho de fora cego', data: '2026-09-23', nota: 4 }
   }
 ];
+/* AS LISTAS PRONTAS DA listas-v1 (seção 8f), para a tela da B10.
+ *
+ * Duas listas do MESMO módulo, níveis 2 e 3, com `teoria: []`, que é o que
+ * esta rodada publica. O conteúdo é escrito à mão, e não montado pelo
+ * biblioteca/kits.py, pelo mesmo motivo de sempre: peça de teste que sai do
+ * gerador faz erro do gerador virar comportamento esperado.
+ *
+ * DUAS ASSIMETRIAS CRAVADAS, e cada uma existe porque sem ela uma asserção da
+ * tela passaria com a regra invertida:
+ *
+ * 1. As listas têm TAMANHOS DIFERENTES (5, 4 e 4) e MINUTOS DIFERENTES (29,4,
+ *    35,0 e 24,0), e nenhum desses números é igual a nenhuma outra contagem do
+ *    pacote. Com 4 e 4 e os mesmos minutos, trocar a lista do nível 2 pela do
+ *    nível 3 na tela passaria despercebido.
+ * 2. A ORDEM da lista do nível 2 NÃO É a ordem dos itens no módulo: ela começa
+ *    no ex:2 e o ex:1 vem depois. É isso que faz "carrega na ordem dela" ser
+ *    diferente de "carrega na ordem da fonte"; com a ordem igual, as duas
+ *    afirmações dariam o mesmo vetor e a asserção não mediria nada.
+ * 3. OS TRÊS MINUTOS CAEM EM TRÊS FAIXAS DIFERENTES da frase da meia aula:
+ *    29,4 está dentro da banda de 27 a 33, 35,0 está acima e 24,0 está abaixo.
+ *    Com as três dentro, trocar a função que escolhe a frase por uma constante
+ *    passaria em todas as asserções: era esse o defeito da primeira escrita
+ *    desta amostra, e foi o teste que o achou.
+ * 4. AS LISTAS FICAM EM DOIS MÓDULOS DIFERENTES. Com todas num módulo só, a
+ *    chave por módulo do índice nunca seria exercitada, e mostrar as listas do
+ *    módulo errado passaria calado.
+ * 5. A de nível 3 abre num item de DEGRAU 1, que é a porta de entrada da
+ *    entrada-v2, e a de nível 2 também: o que as distingue é a massa. */
+const MOD_PIT = '9ano:teorema-de-pitagoras';
+const LISTA_PIT = '9ano:teorema-de-pitagoras:aplicacoes';
+const LISTAS = [
+  {
+    id: MOD_KIT + ':kit:2', modulo: MOD_KIT, serie: '9ano', nivel: 2,
+    titulo: 'Equações do Segundo Grau', regra: 'listas-v1', tempo_regra: 'tempo-v1', minutos: 29.4,
+    teoria: [],
+    degraus: [
+      { n: 1, item: LISTA_KIT + ':ex:2', degrau: 1, minutos: 5.1 },
+      { n: 2, item: LISTA_KIT + ':ex:1', degrau: 1, minutos: 4.7 },
+      { n: 3, item: LISTA_KIT + ':ex:4', degrau: 2, minutos: 6.0 },
+      { n: 4, item: LISTA_KIT + ':ex:6', degrau: 2, minutos: 7.1 },
+      { n: 5, item: LISTA_KIT + ':ex:7', degrau: 3, minutos: 6.5 }
+    ],
+    alternativas: { [LISTA_KIT + ':ex:4']: [LISTA_KIT + ':ex:5'] },
+    relaxou: null
+  },
+  {
+    id: MOD_KIT + ':kit:3', modulo: MOD_KIT, serie: '9ano', nivel: 3,
+    titulo: 'Equações do Segundo Grau', regra: 'listas-v1', tempo_regra: 'tempo-v1', minutos: 35.0,
+    teoria: [],
+    degraus: [
+      { n: 1, item: LISTA_KIT + ':ex:3', degrau: 1, minutos: 5.5 },
+      { n: 2, item: LISTA_KIT + ':ex:4', degrau: 2, minutos: 9.0 },
+      { n: 3, item: LISTA_KIT + ':ex:7', degrau: 3, minutos: 9.5 },
+      { n: 4, item: LISTA_KIT + ':ex:8', degrau: 3, minutos: 11.0 }
+    ],
+    alternativas: {},
+    relaxou: ['minutos']
+  },
+  {
+    /* A terceira, noutro módulo e ABAIXO da banda: é ela que mede a frase "um
+     * pouco menos de meia aula", que nenhuma das outras duas alcança. */
+    id: MOD_PIT + ':kit:2', modulo: MOD_PIT, serie: '9ano', nivel: 2,
+    titulo: 'Teorema de Pitágoras', regra: 'listas-v1', tempo_regra: 'tempo-v1', minutos: 24.0,
+    teoria: [],
+    degraus: [
+      { n: 1, item: LISTA_PIT + ':ex:1', degrau: 1, minutos: 4.0 },
+      { n: 2, item: LISTA_PIT + ':ex:2', degrau: 1, minutos: 5.0 },
+      { n: 3, item: LISTA_PIT + ':ex:4', degrau: 2, minutos: 7.5 },
+      { n: 4, item: LISTA_PIT + ':ex:5', degrau: 3, minutos: 7.5 }
+    ],
+    alternativas: {},
+    relaxou: ['minutos']
+  }
+];
+
 /* Exclusões: ids que NÃO estão em itens.json, porque saíram do pacote.
  * São QUATRO de propósito. Os três números do manifest que andam juntos aqui
  * têm de ser TODOS diferentes entre si, senão trocar um pelo outro passa em
@@ -361,9 +436,15 @@ function gerar(saida, opcoes) {
   arquivos['apelidos.json'] = { dados: json(apelidos), metodo: 0 };
   /* Os dois aditivos da 8d. kits.json comprimido e exclusoes.json guardado sem
    * compressão, para os dois métodos do zip passarem pela conferência. */
-  const comKits = !!opcoes.kits;
+  /* `kits: true` põe as listas da kits-v1, que a B9 usou para provar que os
+   * dois arquivos são aditivos no 1.26.0. `listas: true` põe as da listas-v1,
+   * que é o que o aplicativo de hoje LÊ e mostra. As duas opções escrevem o
+   * mesmo kits.json do contrato, e nunca as duas juntas. */
+  const comListas = !!opcoes.listas;
+  const comKits = !!opcoes.kits || comListas;
+  const conteudoKits = comListas ? LISTAS : KITS;
   if (comKits) {
-    arquivos['kits.json'] = { dados: json(KITS), metodo: 8 };
+    arquivos['kits.json'] = { dados: json(conteudoKits), metodo: 8 };
     arquivos['exclusoes.json'] = { dados: json(EXCLUSOES), metodo: 0 };
   }
 
@@ -389,7 +470,7 @@ function gerar(saida, opcoes) {
     series: [SERIE],
     contagens: Object.assign({ modulos: MODULOS.length, aulas_teoria: teoria.length, paginas_teoria: paginasTeoria,
       aulas_exercicios: aulasExercicios, itens: itens.length, itens_com_solucao: comSolucao,
-      itens_excluidos: comKits ? EXCLUSOES.length : 0 }, comKits ? { kits: KITS.length } : {}),
+      itens_excluidos: comKits ? EXCLUSOES.length : 0 }, comKits ? { kits: conteudoKits.length } : {}),
     arquivos: lista
   };
 
@@ -464,7 +545,7 @@ function gerarBanco(saida, opcoes) {
 
 const VENENOS = ['corrompido-deflate', 'corrompido-stored', 'hash', 'sobrando', 'faltando', 'asset-citado', 'esquema', 'asset-fora'];
 
-module.exports = { gerar, gerarBanco, montarZip, crc32, VENENOS, MODULOS, KITS, EXCLUSOES };
+module.exports = { gerar, gerarBanco, montarZip, crc32, VENENOS, MODULOS, KITS, LISTAS, EXCLUSOES };
 
 if (require.main === module) {
   const saida = process.argv[2];

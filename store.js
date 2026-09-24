@@ -218,8 +218,15 @@
         blob: a.blob || new Blob([a.bytes], { type: a.tipo })
       };
     });
+    /* As listas prontas viajam no registro do pacote, e não num depósito novo,
+     * porque são DO PACOTE e não dela: saem junto quando ela remove a série,
+     * voltam junto quando ela reimporta, e nunca precisam de migração. É o
+     * mesmo tratamento do `busca` e do `apelidos`, que já moram aqui. O que for
+     * DELA (a lista que ela salvar com nome próprio) é que vai precisar de
+     * depósito e de versão de banco, e não é desta rodada. */
     var registro = {
       pacote: chave, versao: versao, manifest: m, busca: aberto.busca, apelidos: aberto.apelidos,
+      kits: aberto.kits || [],
       bytes: aberto.bytesTotais, importadoEm: new Date().toISOString()
     };
     return abrir().then(function (b) {

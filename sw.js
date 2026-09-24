@@ -71,7 +71,7 @@
  * Remover pacote em Ajustes (app.js, store.js, index.html e styles.css), com a
  * lista igual. Nenhum tema sai do banco: os arquivos de banco/ continuam na
  * lista e o carregarSerie continua lendo 'banco/serie-'. */
-var CACHE = 'apoio-educacional-v41';
+var CACHE = 'apoio-educacional-v42';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

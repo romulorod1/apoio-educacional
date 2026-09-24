@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.26.0';
+  var VERSAO = '1.27.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -5608,6 +5608,11 @@
     borracha: svg('<path d="M8.6 19.5H20"/>' +
       '<path d="M14.2 4.6l5.2 5.2a1.6 1.6 0 0 1 0 2.3l-7.4 7.4H7.6l-3.1-3.1a1.6 1.6 0 0 1 0-2.3z"/>' +
       '<path d="M10.1 8.7l5.2 5.2"/>'),
+    /* tapar: um retângulo cheio cobrindo metade de uma linha de texto, que é
+     * literalmente o que a ferramenta faz. Sem letra dentro, porque não é
+     * ferramenta de escrever. */
+    tapar: svg('<path d="M4 7h16M4 12h5M4 17h9"/>' +
+      '<rect x="10.5" y="9.6" width="10" height="9.4" rx="1" fill="currentColor" stroke="currentColor"/>'),
     // texto: o T clássico, mas desenhado
     texto: svg('<path d="M5 6.5V5h14v1.5"/><path d="M12 5v14"/><path d="M9 19h6"/>'),
     // mover: as quatro setas
@@ -5628,6 +5633,11 @@
       ['caneta', ICONES.caneta, 'Caneta'],
       ['marcatexto', ICONES.marcatexto, 'Marca-texto'],
       ['borracha', ICONES.borracha, 'Borracha'],
+      /* CHAMA-SE TAPAR, e não "editar o enunciado". O recorte é vetor com o
+       * texto em contorno: não há texto para editar, e prometer isso no rótulo
+       * seria prometer o que o formato não faz. Tapar e escrever por cima é o
+       * que ele faz, e é o que o botão diz. */
+      ['tapar', ICONES.tapar, 'Tapar com branco'],
       ['texto', ICONES.texto, 'Texto digitado'],
       ['selecao', ICONES.selecao, 'Mover e redimensionar']
     ];
@@ -11091,7 +11101,8 @@
   /* Monta a árvore: módulos por série, cada um com as aulas de teoria e as
    * listas de exercícios; e o índice de busca de todos os pacotes juntos. */
   function montarArvoreBiblioteca(pacotes, itens, teoria) {
-    var arv = { pacotes: pacotes, modulos: {}, series: {}, itemPorId: {}, teoriaPorId: {}, indice: [], apelidos: {} };
+    var arv = { pacotes: pacotes, modulos: {}, series: {}, itemPorId: {}, teoriaPorId: {}, indice: [],
+      apelidos: {}, listasPorModulo: {} };
     function modulo(chave, serie, m, banco, pacote) {
       var mod = arv.modulos[chave];
       if (!mod) {
@@ -11132,6 +11143,24 @@
         if (k.charAt(0) === '_') return;
         arv.apelidos[k] = (arv.apelidos[k] || []).concat(p.apelidos[k] || []);
       });
+      /* As listas prontas, por módulo. Só entra a lista cujos exercícios TODOS
+       * resolvem: um id que não resolve é exercício que saiu por curadoria, e
+       * mostrar uma lista com buraco sem saber dizer o que falta é pior do que
+       * não mostrar. Dizer o que falta é a etapa do exclusoes.json, e não é
+       * desta rodada. */
+      (p.kits || []).forEach(function (k) {
+        var itens = (k.degraus || []).map(function (d) { return arv.itemPorId[d.item]; });
+        if (itens.some(function (it) { return !it; })) return;
+        var minutosDe = {};
+        (k.degraus || []).forEach(function (d) { minutosDe[d.item] = d.minutos; });
+        (arv.listasPorModulo[k.modulo] = arv.listasPorModulo[k.modulo] || []).push({
+          id: k.id, modulo: k.modulo, nivel: k.nivel, minutos: k.minutos,
+          itens: itens, ids: itens.map(function (it) { return it.id; }), minutosDe: minutosDe
+        });
+      });
+    });
+    Object.keys(arv.listasPorModulo).forEach(function (m) {
+      arv.listasPorModulo[m].sort(function (a, b) { return (a.nivel || 0) - (b.nivel || 0); });
     });
     arv.listaSeries = ORDEM_SERIES.filter(function (s) { return arv.series[s]; })
       .concat(Object.keys(arv.series).filter(function (s) { return ORDEM_SERIES.indexOf(s) < 0 && !/^n[0-9]$/.test(s); }).sort());
@@ -11247,6 +11276,9 @@
       if (bibNav.aula.tipo === 'teoria') {
         var t = bib.teoriaPorId[bibNav.aula.id];
         if (t) { desenharAulaDeTeoria(corpo, mod, t); return; }
+      } else if (bibNav.aula.tipo === 'lista-pronta') {
+        var lp = listaProntaPorId(bibNav.aula.id);
+        if (lp) { desenharListaPronta(corpo, mod, lp); return; }
       } else if (mod.listas[bibNav.aula.slug]) {
         desenharListaDeExercicios(corpo, mod, mod.listas[bibNav.aula.slug]);
         return;
@@ -11388,10 +11420,59 @@
     return n ? ' · ' + n + ' no material' : '';
   }
 
+  /* A UNIDADE DELA É A MEIA AULA; o minuto é a nossa, e vem embaixo, colado da
+   * palavra estimativa. A frase de cima acompanha o número em vez de dizer
+   * sempre a mesma coisa: uma lista de 35 minutos anunciada como "cerca de meia
+   * aula" seria a tela arredondando o que o dado não arredonda. A banda de 27 a
+   * 33 é a mesma do contrato (I5). */
+  function meiaAula(minutos) {
+    if (minutos > 33) return 'um pouco mais de meia aula';
+    if (minutos < 27) return 'um pouco menos de meia aula';
+    return 'cerca de meia aula';
+  }
+
+  function minutosEstimados(minutos) {
+    return '≈ ' + String(minutos).replace('.', ',') + ' min (estimativa)';
+  }
+
+  /* NENHUMA AFIRMAÇÃO DE CURADORIA, e isto não é estilo: a comparação cega de
+   * 24/09 mediu que a nossa escolha não vence uma escolha simples dentro da
+   * mesma rampa e do mesmo orçamento, então a tela não pode chamar isto de kit
+   * curado nem de sugestão do professor. O que a lista é, e é só isso: uma
+   * lista dentro do tempo, do mais simples ao mais difícil, para ela mudar. */
+  function linhasDeListaPronta(corpo, mod) {
+    var listas = (bib.listasPorModulo && bib.listasPorModulo[mod.chave]) || [];
+    if (!listas.length) return;
+    corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Listas prontas' }));
+    listas.forEach(function (lp) {
+      var linha = linhaBib('Lista pronta, nível ' + lp.nivel,
+        plural(lp.itens.length, 'exercício', 'exercícios') + ' · ' + meiaAula(lp.minutos),
+        function () { usarListaPronta(lp); });
+      linha.classList.add('bib-lista-pronta');
+      linha.setAttribute('data-lista-pronta', lp.id);
+      linha.querySelector('.cresce').appendChild(
+        el('div', { class: 'detalhe bib-lp-minutos', texto: minutosEstimados(lp.minutos) }));
+      corpo.appendChild(linha);
+    });
+    corpo.appendChild(el('p', { class: 'ajuda bib-lp-ajuda', id: 'bib-lp-ajuda',
+      texto: 'Do mais simples ao mais difícil, dentro do tempo. Tire, ponha e troque a ordem à vontade.' }));
+  }
+
+  function listaProntaPorId(id) {
+    var todas = bib && bib.listasPorModulo;
+    if (!todas) return null;
+    var achada = null;
+    Object.keys(todas).forEach(function (m) {
+      todas[m].forEach(function (lp) { if (lp.id === id) achada = lp; });
+    });
+    return achada;
+  }
+
   function desenharModulo(corpo, mod) {
     corpo.appendChild(voltarBib(Biblioteca.nomeDaSerie(bibNav.serie), function () { irNaBiblioteca({ modulo: null, aula: null }); }));
     corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: mod.titulo }));
     corpo.appendChild(botaoMarcarModulo(mod));
+    linhasDeListaPronta(corpo, mod);
     if (mod.teorias.length) {
       corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Teoria' }));
       mod.teorias.forEach(function (t) {
@@ -11445,6 +11526,99 @@
   /* A que vale para o filtro: a dela, quando ela deu uma; senão, a do pacote. */
   function dificuldadeEfetiva(it) {
     return (bibEtiquetas && bibEtiquetas[it.id]) || it.dificuldade || null;
+  }
+
+  /* A TELA DA LISTA PRONTA mostra O CARRINHO, na ordem dele, e não a lista
+   * gravada no pacote. É de propósito: o que vai para o material é o carrinho,
+   * e uma tela que mostrasse a lista do pacote enquanto o material sai de outro
+   * lugar seria a tela mentindo sobre o que vai sair. Depois do primeiro toque
+   * numa seta ou numa caixa, os dois deixam de ser a mesma coisa. */
+  function desenharListaPronta(corpo, mod, lp) {
+    corpo.appendChild(voltarBib(mod.titulo, function () { irNaBiblioteca({ aula: null }); }));
+    corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: 'Lista pronta, nível ' + lp.nivel }));
+
+    var ids = bibCarrinho.itens.slice();
+    var daLista = ids.filter(function (id) { return lp.minutosDe[id] !== undefined; });
+    var deFora = ids.length - daLista.length;
+    var mudou = deFora > 0 || daLista.length !== lp.ids.length;
+
+    /* O NÚMERO É O DAQUELA LISTA, e quando ela mexe o número deixa de ser dela.
+     * Os minutos que o app soma são os que o PACOTE trouxe por exercício; ele
+     * não tem como estimar exercício que veio de fora da lista, e por isso não
+     * inventa um total: conta o que sabe e diz quantos ficaram sem conta. */
+    var soma = 0;
+    daLista.forEach(function (id) { soma += Math.round(lp.minutosDe[id] * 10); });
+    soma = Math.round(soma) / 10;
+    var cabeca = el('div', { class: 'bib-lp-cabeca', id: 'bib-lp-cabeca' }, [
+      el('div', { class: 'bib-lp-meia', texto: plural(ids.length, 'exercício', 'exercícios') + ' · ' + meiaAula(soma) }),
+      el('div', { class: 'ajuda bib-lp-minutos', texto: minutosEstimados(soma) +
+        (deFora ? ', fora ' + plural(deFora, 'exercício que você acrescentou', 'exercícios que você acrescentou') +
+          ' e não entra nessa conta' : '') })
+    ]);
+    corpo.appendChild(cabeca);
+    if (mudou) {
+      corpo.appendChild(el('p', { class: 'ajuda bib-lp-mudou', id: 'bib-lp-mudou',
+        texto: 'Você mudou esta lista. O material sai na ordem que está aqui.' }));
+    }
+
+    if (!ids.length) {
+      corpo.appendChild(el('p', { class: 'ajuda', id: 'bib-lp-vazia', texto: 'Você tirou tudo desta lista.' }));
+    }
+    var grade = el('div', { class: 'bib-grade bib-grade-exercicios bib-grade-lp', id: 'bib-lp-grade' });
+    ids.forEach(function (id, pos) {
+      var it = bib.itemPorId[id];
+      if (!it) return;
+      var setas = el('div', { class: 'bib-lp-setas', role: 'group', 'aria-label': 'Ordem' }, [
+        el('button', { type: 'button', class: 'btn pequeno bib-lp-subir', 'data-subir': id,
+          disabled: pos === 0 ? 'disabled' : null, 'aria-label': 'Subir', texto: '▲',
+          aoClick: function () { if (moverNoCarrinho(id, -1)) redesenharListaPronta(id, 'subir'); } }),
+        el('button', { type: 'button', class: 'btn pequeno bib-lp-descer', 'data-descer': id,
+          disabled: pos === ids.length - 1 ? 'disabled' : null, 'aria-label': 'Descer', texto: '▼',
+          aoClick: function () { if (moverNoCarrinho(id, 1)) redesenharListaPronta(id, 'descer'); } })
+      ]);
+      var cartao = el('button', {
+        type: 'button', class: 'bib-cartao', 'data-id': it.id,
+        aoClick: function () { verNaBiblioteca({ tipo: 'exercicio', lista: { titulo: mod.titulo, itens: ids.map(function (x) { return bib.itemPorId[x]; }) }, indice: pos }); }
+      }, [
+        el('div', { class: 'bib-rotulo bib-numero', texto: (pos + 1) + '. Exercício ' + it.numero }),
+        miniaturaBib(it.pacote, it.assets.enunciado, it.medidas && it.medidas.enunciado, 520),
+        el('div', { class: 'bib-tags' }, [
+          rotuloDificuldade(it) ? el('span', { class: 'tag bib-dif-fonte', texto: rotuloDificuldade(it) }) : null,
+          lp.minutosDe[id] !== undefined
+            ? el('span', { class: 'tag bib-lp-min-item', texto: minutosEstimados(lp.minutosDe[id]) })
+            : el('span', { class: 'tag bib-lp-min-item', texto: 'acrescentado por você' })
+        ])
+      ]);
+      grade.appendChild(celulaComCaixa(cartao, 'itens', it.id, setas));
+    });
+    corpo.appendChild(grade);
+
+    /* ACRESCENTAR ESCOLHENDO DENTRO DO UNIVERSO DO MÓDULO: abre a lista cheia
+     * da fonte com o que já está marcado, e o que ela marcar lá entra no fim
+     * daqui, onde as setas alcançam. */
+    var atalhos = el('div', { class: 'barra bib-lp-acrescentar', id: 'bib-lp-acrescentar' }, [
+      el('span', { class: 'bib-filtro-rotulo', texto: 'Acrescentar do módulo:' })
+    ]);
+    (mod.ordemListas || []).forEach(function (l) {
+      atalhos.appendChild(el('button', { type: 'button', class: 'btn pequeno', 'data-acrescentar': l.slug,
+        texto: l.titulo, aoClick: function () { irNaBiblioteca({ aula: { tipo: 'exercicios', slug: l.slug } }); } }));
+    });
+    if (mod.ordemListas && mod.ordemListas.length) corpo.appendChild(atalhos);
+    observarMiniaturas(grade);
+    carregarEtiquetas();
+  }
+
+  /* Redesenha e devolve o foco para a MESMA seta, que agora está numa linha
+   * acima ou abaixo. Sem isto, um toque em "descer" tira o foco do botão e o
+   * toque seguinte cai no cartão, que abre a tela cheia. */
+  function redesenharListaPronta(id, qual) {
+    desenharCorpoBiblioteca();
+    var alvo = $('#bib-lp-grade [data-' + qual + '="' + id + '"]');
+    if (alvo && !alvo.disabled) alvo.focus();
+    else {
+      var outro = $('#bib-lp-grade [data-' + (qual === 'subir' ? 'descer' : 'subir') + '="' + id + '"]');
+      if (outro) outro.focus();
+    }
   }
 
   function desenharListaDeExercicios(corpo, mod, lista) {
@@ -11911,6 +12085,45 @@
     return lista.filter(function (id) { return fora.indexOf(id) < 0; });
   }
 
+  /* TOCAR NA LINHA CARREGA A LISTA NA ORDEM DELA e abre a tela onde ela mexe.
+   * Substitui a seleção, como o caminho curto da aula já faz, e pela mesma
+   * razão: somar deixaria um material que não é nem o de antes nem a lista. O
+   * Desfazer devolve o de antes e mantém o que ela marcar depois. */
+  function usarListaPronta(lp) {
+    var antes = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
+    var tudo = { itens: lp.ids.slice(), paginas: [] };
+    bibCarrinho = { itens: tudo.itens.slice(), paginas: [] };
+    guardarCarrinho();
+    var sairam = semOsDe(antes.itens, tudo.itens).length + antes.paginas.length;
+    bibTrocaDesfazer = sairam ? { antes: antes, tudo: tudo, sairam: sairam } : null;
+    irNaBiblioteca({ aula: { tipo: 'lista-pronta', id: lp.id } });
+    desenharCarrinho();
+    desenharContextoBiblioteca();
+    var oQueEntrou = 'a lista pronta do nível ' + lp.nivel + ': ' +
+      plural(lp.ids.length, 'exercício', 'exercícios') + '.';
+    avisar((sairam
+      ? 'Tirei ' + plural(sairam, 'item que estava marcado', 'itens que estavam marcados') + ' e marquei ' + oQueEntrou
+      : 'Marquei ' + oQueEntrou) + ' Mude o que quiser e toque em Gerar material.',
+    sairam ? 'Desfazer' : null, sairam ? function () { devolverSelecaoTrocada(antes, tudo); } : null);
+  }
+
+  /* SUBIR E DESCER, e não arrastar: a lista tem miniatura, ela usa o tablet com
+   * a mão apoiada, e arrastar briga com o gesto de rolagem. Devolve o id que
+   * saiu do lugar, ou null quando o item já está na ponta. */
+  function moverNoCarrinho(id, direcao) {
+    var lista = bibCarrinho.itens;
+    var i = lista.indexOf(id);
+    var j = i + direcao;
+    if (i < 0 || j < 0 || j >= lista.length) return null;
+    mexeuNoMaterial();
+    var outro = lista[j];
+    lista[j] = id;
+    lista[i] = outro;
+    guardarCarrinho();
+    desenharCarrinho();
+    return outro;
+  }
+
   function marcarNoCarrinho(tipo, id, marcado) {
     mexeuNoMaterial();
     var lista = bibCarrinho[tipo];
@@ -11919,6 +12132,11 @@
     if (!marcado && i >= 0) lista.splice(i, 1);
     guardarCarrinho();
     desenharCarrinho();
+    /* NA TELA DA LISTA PRONTA a caixa não é só um estado: tirar um exercício
+     * muda a numeração de todos os de baixo e apaga uma seta da ponta. Só
+     * trocar o `checked` deixaria a tela dizendo "3." num item que virou o
+     * segundo, e a seta de descer acesa no último. */
+    if (bibNav.aula && bibNav.aula.tipo === 'lista-pronta' && $('#bib-lp-grade')) desenharCorpoBiblioteca();
     // o rótulo do "Marcar os N" conta o carrinho: marcar o último vira "Desmarcar"
     $$('#bib-corpo .bib-marcar-modulo').forEach(function (b) { if (b._desenha) b._desenha(); });
     // o material daquela aula já foi anexado: o que ela marca agora é para outra coisa

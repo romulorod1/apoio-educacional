@@ -844,6 +844,19 @@
       doc.desenhaImagem(it.ref, x0 + it.x * escala, y0 + altura - (it.y + it.h) * escala,
         it.w * escala, it.h * escala);
     }
+    /* TAPAR: retangulo branco cheio, logo depois da imagem e antes do que ela
+     * escreveu. E a mesma mecanica com que o compositor ja cobre o rotulo
+     * original do recorte, e a ordem esta escrita no Draw.ORDEM_CAMADAS, que o
+     * canvas tambem segue: a folha na tela e a folha impressa tem de empilhar
+     * igual, senao a tela mente sobre o que vai sair. */
+    var tapar = '';
+    for (var q = 0; q < itens.length; q++) {
+      var r = itens[q];
+      if (r.t !== 'tapar' || !(r.w > 0) || !(r.h > 0)) continue;
+      tapar += (x0 + r.x * escala).toFixed(2) + ' ' + (y0 + altura - (r.y + r.h) * escala).toFixed(2) +
+        ' ' + (r.w * escala).toFixed(2) + ' ' + (r.h * escala).toFixed(2) + ' re ';
+    }
+    if (tapar) doc.op('1 1 1 rg ' + tapar + 'f');
     for (var j = 0; j < itens.length; j++) {
       var t = itens[j];
       if (t.t !== 'texto' || !t.txt) continue;
