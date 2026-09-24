@@ -1229,7 +1229,15 @@ button.alvo-rascunho:hover { background: var(--soft); }
    para reordenar; o layout não pode brigar com a interação principal.
    O teto de 560 px é largura de leitura: sem ele, o recorte de um enunciado
    ocuparia os 1280 px da janela. */
-.bib-grade.bib-grade-lp { grid-template-columns: minmax(0, 560px); }
+.bib-grade.bib-grade-lp { grid-template-columns: minmax(0, 560px); gap: 28px; }
+/* O CARTÃO E OS CONTROLES DELE SÃO UM BLOCO SÓ, e quem diz isso é a distância.
+   Na grade de três colunas o par cabia dentro de uma célula estreita e não
+   havia dúvida possível. Em coluna única, com 12 px de folga dentro da célula e
+   12 px entre células, a caixa "No material" ficava exatamente no meio do
+   caminho entre o cartão de cima e o de baixo, e o olho de fora cego não soube
+   dizer de qual dos dois ela era. É a ação mais usada desta tela. Agora são
+   4 px para dentro e 28 px para fora, e o agrupamento se lê sem ler. */
+.bib-grade-lp .bib-celula { gap: 4px; }
 /* O AVISO DESTA TELA NÃO FLUTUA: ele entra no fluxo, empurra o conteúdo e não
    tapa controle nenhum. O aviso de rodapé cobria as setas e a caixa dos
    últimos cartões, que é o que esta tela existe para ela tocar. */

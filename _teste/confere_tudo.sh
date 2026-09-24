@@ -406,6 +406,11 @@ roda "biblioteca listas --envenenado-coluna"        node "_teste/testa_bibliotec
 roda "biblioteca listas --envenenado-flutua"        node "_teste/testa_biblioteca_listas.js" --envenenado-flutua
 roda "biblioteca listas --envenenado-frase"         node "_teste/testa_biblioteca_listas.js" --envenenado-frase
 roda "biblioteca listas --envenenado-dificuldade"   node "_teste/testa_biblioteca_listas.js" --envenenado-dificuldade
+# E os dois que a segunda rodada do olho de fora cego achou, ambos filhos da
+# coluna unica: a caixa "No material" no meio do caminho entre dois cartoes, e o
+# aviso sobrevivendo a troca de ordem enquanto afirma a lista do pacote.
+roda "biblioteca listas --envenenado-agrupa"        node "_teste/testa_biblioteca_listas.js" --envenenado-agrupa
+roda "biblioteca listas --envenenado-aviso-velho"   node "_teste/testa_biblioteca_listas.js" --envenenado-aviso-velho
 # FRENTE B (B10): A FOLHA IMPRESSA NAO MUDOU. A unificacao das camadas foi pelo
 # lado da TELA de proposito, porque o papel e o que ela entrega ao aluno. A
 # prova gera a MESMA folha com o pdf.js de hoje e com o do d80bb90 e compara

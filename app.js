@@ -11574,7 +11574,14 @@
     var ids = bibCarrinho.itens.slice();
     var daLista = ids.filter(function (id) { return lp.minutosDe[id] !== undefined; });
     var deFora = ids.length - daLista.length;
-    var mudou = deFora > 0 || daLista.length !== lp.ids.length;
+    /* "VOCÊ MUDOU ESTA LISTA" TEM DE VALER PARA A ORDEM TAMBÉM, e não só para
+     * quem entrou e quem saiu. Numa tela cuja razão de existir é reordenar,
+     * trocar dois exercícios de lugar é a mudança mais provável de todas, e era
+     * a única que não acendia a frase: a lista ficava diferente do pacote e a
+     * tela não dizia nada. A frase é a que avisa que o material sai na ordem
+     * que está aqui, que é justamente o que passou a ser verdade. */
+    var mudou = deFora > 0 || daLista.length !== lp.ids.length ||
+      daLista.some(function (id, i) { return id !== lp.ids[i]; });
 
     /* O NÚMERO É O DAQUELA LISTA, e quando ela mexe o número deixa de ser dela.
      * Os minutos que o app soma são os que o PACOTE trouxe por exercício; ele
@@ -11862,6 +11869,18 @@
    * Desfazer da faixa continuaria oferecendo voltar a uma seleção que ela já
    * substituiu de propósito. */
   function mexeuNoMaterial() {
+    /* O AVISO DA LISTA PRONTA MORRE NO MESMO TOQUE QUE MATA O DESFAZER DA
+     * FAIXA, e pelo mesmo motivo: ele afirma um estado ("o material agora tem
+     * 6 exercícios: a lista pronta do nível 2") que deixa de ser verdade assim
+     * que ela mexe. Trocar dois de lugar já basta, porque a ORDEM é o que a
+     * lista pronta é: reordenada, ela não é mais a lista do pacote.
+     *
+     * O olho de fora cego pegou isso num print em que um exercício já tinha
+     * subido e a frase continuava dizendo "a lista pronta do nível 2". A
+     * primeira escrita deste conserto guardava o aviso nas trocas de ordem,
+     * com o argumento de que o TOTAL não mudava; o argumento estava certo
+     * sobre o número e errado sobre a frase inteira. */
+    bibLpAviso = null;
     if (!bibTrocaDesfazer) return;
     bibTrocaDesfazer = null;
     desenharContextoBiblioteca();
@@ -12230,14 +12249,8 @@
      * muda a numeração de todos os de baixo e apaga uma seta da ponta. Só
      * trocar o `checked` deixaria a tela dizendo "3." num item que virou o
      * segundo, e a seta de descer acesa no último. */
-    if (bibNav.aula && bibNav.aula.tipo === 'lista-pronta' && $('#bib-lp-grade')) {
-      /* E O AVISO SAI, porque ele diz um TOTAL. Marcar ou desmarcar muda esse
-       * total, e o aviso passaria a dizer 6 ao lado de um cabeçalho dizendo 5,
-       * que é a mesma doença que tirou a etiqueta de dificuldade do cartão.
-       * Mudar a ORDEM não mexe no total, e ali o aviso fica. */
-      bibLpAviso = null;
-      desenharCorpoBiblioteca();
-    }
+    // o redesenho da tela da lista pronta mora no desenharCarrinho, e vale para
+    // toda mudança de material, venha ela da caixa ou de qualquer outro lugar
     // o rótulo do "Marcar os N" conta o carrinho: marcar o último vira "Desmarcar"
     $$('#bib-corpo .bib-marcar-modulo').forEach(function (b) { if (b._desenha) b._desenha(); });
     // o material daquela aula já foi anexado: o que ela marca agora é para outra coisa
@@ -12248,6 +12261,16 @@
     var faixa = $('#bib-carrinho');
     if (!faixa) return;
     limparCarrinhoOrfao();
+    /* A TELA DA LISTA PRONTA É O CARRINHO DESENHADO, então ela se redesenha
+     * sempre que o carrinho muda, venha a mudança de onde vier: da caixa, das
+     * setas, do "Desmarcar tudo" da faixa de cima, do selo da tela cheia ou do
+     * desmarcar automático depois de anexar o material a uma aula.
+     *
+     * Antes só a caixa redesenhava, e "Desmarcar tudo" deixava a tela inteira
+     * de cartões de pé, com o cabeçalho dizendo seis exercícios, as setas
+     * acesas e nenhuma caixa marcada: uma tela que mostrava um material que já
+     * não existia. Aqui é o único lugar por onde toda mudança passa. */
+    if (bibNav.aula && bibNav.aula.tipo === 'lista-pronta' && $('#bib-lp-grade')) desenharCorpoBiblioteca();
     var n = bibCarrinho.itens.length, m = bibCarrinho.paginas.length;
     faixa.innerHTML = '';
     /* A faixa ocupa o lugar desde o começo, vazia ou não: se ela aparecesse só

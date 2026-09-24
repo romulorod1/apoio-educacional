@@ -85,6 +85,12 @@
  *                         ("Tirei 2 itens ... e marquei ...: 5 exercícios").
  *   --envenenado-dificuldade o app.js servido devolve a etiqueta de
  *                         dificuldade ao cartão da lista pronta.
+ *   --envenenado-agrupa   o styles.css servido iguala a folga de dentro da
+ *                         célula à de fora, e a caixa "No material" volta a
+ *                         ficar no meio do caminho entre dois cartões.
+ *   --envenenado-aviso-velho o app.js servido deixa o aviso sobreviver à troca
+ *                         de ordem, continuando a afirmar "a lista pronta do
+ *                         nível 2" depois de ela ter mexido na ordem.
  */
 'use strict';
 const fs = require('fs');
@@ -103,7 +109,10 @@ const V_COLUNA = process.argv.indexOf('--envenenado-coluna') !== -1;
 const V_FLUTUA = process.argv.indexOf('--envenenado-flutua') !== -1;
 const V_FRASE = process.argv.indexOf('--envenenado-frase') !== -1;
 const V_DIFICULDADE = process.argv.indexOf('--envenenado-dificuldade') !== -1;
-const VENENO = V_ORDEM || V_SETA || V_CURADORIA || V_CAMADAS || V_COLUNA || V_FLUTUA || V_FRASE || V_DIFICULDADE;
+const V_AGRUPA = process.argv.indexOf('--envenenado-agrupa') !== -1;
+const V_AVISO_VELHO = process.argv.indexOf('--envenenado-aviso-velho') !== -1;
+const VENENO = V_ORDEM || V_SETA || V_CURADORIA || V_CAMADAS || V_COLUNA || V_FLUTUA || V_FRASE ||
+  V_DIFICULDADE || V_AGRUPA || V_AVISO_VELHO;
 
 const APP_REPO = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const DRAW_REPO = fs.readFileSync(path.join(H.RAIZ, 'draw.js'), 'utf8');
@@ -134,8 +143,17 @@ const L_CAMADAS = [
 const T_CAMADAS = '    for (var i = 0; i < itens.length; i++) this._desenharItem(ctx, itens[i]);';
 
 // a grade da lista pronta volta a três colunas, que é o defeito que o olho cego viu
-const L_COLUNA = '.bib-grade.bib-grade-lp { grid-template-columns: minmax(0, 560px); }';
-const T_COLUNA = '.bib-grade.bib-grade-lp { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }';
+const L_COLUNA = '.bib-grade.bib-grade-lp { grid-template-columns: minmax(0, 560px); gap: 28px; }';
+const T_COLUNA = '.bib-grade.bib-grade-lp { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 28px; }';
+// a folga de dentro da célula volta a ser igual à de fora, e a caixa "No
+// material" volta a ficar no meio do caminho entre dois cartões
+const L_AGRUPA = '.bib-grade-lp .bib-celula { gap: 4px; }';
+const T_AGRUPA = '.bib-grade-lp .bib-celula { gap: 28px; }';
+// o aviso volta a sobreviver à troca de ordem, afirmando uma lista que já mudou
+const L_ORDEM_AVISO = [
+  '    bibLpAviso = null;',
+  '    if (!bibTrocaDesfazer) return;'].join(NL_APP);
+const T_ORDEM_AVISO = '    if (!bibTrocaDesfazer) return;';
 // a mensagem volta para a caixa flutuante do rodapé, e o bloco do fluxo não é desenhado
 const L_FLUTUA = [
   '    if (bibLpAviso) {',
@@ -172,7 +190,9 @@ const RECEITA = V_ORDEM ? { arq: '/app.js', de: L_ORDEM, para: T_ORDEM }
         : V_COLUNA ? { arq: '/styles.css', de: L_COLUNA, para: T_COLUNA }
           : V_FLUTUA ? { arq: '/app.js', de: L_FLUTUA, para: T_FLUTUA }
             : V_FRASE ? { arq: '/app.js', de: L_FRASE, para: T_FRASE }
-              : { arq: '/app.js', de: L_DIFICULDADE, para: T_DIFICULDADE };
+              : V_DIFICULDADE ? { arq: '/app.js', de: L_DIFICULDADE, para: T_DIFICULDADE }
+                : V_AGRUPA ? { arq: '/styles.css', de: L_AGRUPA, para: T_AGRUPA }
+                  : { arq: '/app.js', de: L_ORDEM_AVISO, para: T_ORDEM_AVISO };
 const BASE_DE = { '/app.js': APP_REPO, '/draw.js': DRAW_REPO, '/styles.css': CSS_REPO };
 const trocas = {};
 if (VENENO) trocas[RECEITA.arq] = BASE_DE[RECEITA.arq].split(RECEITA.de).join(RECEITA.para);
@@ -254,6 +274,35 @@ const gradeDe = (pag, seletor) => pag.evaluate(s => {
   celulas.forEach(c => { bordas[Math.round(c.getBoundingClientRect().left)] = 1; });
   return { celulas: celulas.length, colunas: Object.keys(bordas).length,
     largura: Math.round((celulas[0] || g).getBoundingClientRect().width) };
+}, seletor);
+
+/* A RÉGUA DO AGRUPAMENTO mede a distância em PIXEL, que é o que o olho lê.
+ * Para cada célula: quanto sobra entre o fim do cartão e os controles dele
+ * (dentro), e quanto sobra entre esses controles e o cartão seguinte (fora).
+ * O agrupamento só existe quando "dentro" é bem menor que "fora"; com os dois
+ * iguais, a caixa "No material" fica no meio do caminho e não se sabe de qual
+ * cartão ela é. */
+const agrupamentoDe = (pag, seletor) => pag.evaluate(s => {
+  const g = document.querySelector(s);
+  if (!g) return null;
+  const celulas = Array.from(g.children).filter(c => c.getBoundingClientRect().height > 0);
+  const pares = [];
+  celulas.forEach((c, i) => {
+    const cartao = c.querySelector('.bib-cartao');
+    const acoes = c.querySelector('.bib-acoes');
+    if (!cartao || !acoes) return;
+    const dentro = Math.round(acoes.getBoundingClientRect().top - cartao.getBoundingClientRect().bottom);
+    const seguinte = celulas[i + 1] && celulas[i + 1].querySelector('.bib-cartao');
+    const fora = seguinte
+      ? Math.round(seguinte.getBoundingClientRect().top - acoes.getBoundingClientRect().bottom) : null;
+    pares.push({ dentro, fora });
+  });
+  const comVizinho = pares.filter(p => p.fora !== null);
+  return {
+    pares: pares.length,
+    dentroMax: pares.length ? Math.max.apply(null, pares.map(p => p.dentro)) : null,
+    foraMin: comVizinho.length ? Math.min.apply(null, comVizinho.map(p => p.fora)) : null
+  };
 }, seletor);
 
 /* A RÉGUA DA ETIQUETA procura por dois caminhos de propósito: a classe do
@@ -463,6 +512,36 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   }
   conf('(a) a grade da lista pronta tem UMA coluna', (gradeLp || {}).colunas, 1);
 
+  /* O CARTÃO E OS CONTROLES DELE SÃO UM BLOCO SÓ. Em coluna única isto deixou
+   * de ser de graça: com a mesma folga dentro e fora da célula, a caixa "No
+   * material" fica no meio do caminho entre dois cartões, e o olho de fora cego
+   * não soube dizer de qual dos dois ela era. */
+  const agrupa = await agrupamentoDe(pag, '#bib-lp-grade');
+  console.log('   agrupamento: ' + JSON.stringify(agrupa));
+  conf('há pelo menos dois cartões, senão "dentro e fora" não existe', (agrupa || {}).pares > 1, true);
+  if (V_AGRUPA) {
+    conf('VENENO: com a folga de dentro igual à de fora, o agrupamento some',
+      (agrupa || {}).dentroMax >= (agrupa || {}).foraMin, true);
+    return;
+  }
+  conf('(a) os controles ficam MAIS PERTO do cartão deles do que do seguinte',
+    (agrupa || {}).dentroMax * 2 <= (agrupa || {}).foraMin, true);
+  /* O CONTROLE DA RÉGUA DO AGRUPAMENTO: alvo fabricado, do mesmo tipo, na
+   * mesma tela. Igualadas as duas folgas pelo estilo em linha, a régua TEM de
+   * acusar; sem isto, "está agrupado" não se distingue de um medidor cego. */
+  await pag.evaluate(() => {
+    document.querySelectorAll('#bib-lp-grade .bib-celula').forEach(c => { c.style.gap = '28px'; });
+  });
+  await pausa(200);
+  const agrupaAlvo = await agrupamentoDe(pag, '#bib-lp-grade');
+  console.log('   alvo do agrupamento: ' + JSON.stringify(agrupaAlvo));
+  conf('e a régua ACUSA quando as duas folgas ficam iguais',
+    (agrupaAlvo || {}).dentroMax * 2 <= (agrupaAlvo || {}).foraMin, false);
+  await pag.evaluate(() => {
+    document.querySelectorAll('#bib-lp-grade .bib-celula').forEach(c => { c.style.gap = ''; });
+  });
+  await pausa(200);
+
   const etiqLp = await etiquetasDe(pag, '#bib-lp-grade');
   console.log('   etiquetas na lista pronta: ' + JSON.stringify(etiqLp));
   if (V_DIFICULDADE) {
@@ -555,6 +634,27 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
     return;
   }
   conf('os dois primeiros trocaram de lugar no carrinho', c3.itens.join('|'), esperada.join('|'));
+
+  /* O AVISO MORRE NO PRIMEIRO TOQUE QUE MUDA O MATERIAL, e a troca de ordem é
+   * um desses toques: a ORDEM é o que a lista pronta É, e reordenada ela não é
+   * mais a lista do pacote. O olho de fora cego pegou a frase antiga num print
+   * em que um exercício já tinha subido e ela continuava afirmando "a lista
+   * pronta do nível 2". E, no lugar dela, a tela passa a dizer o que virou
+   * verdade, que é a frase da ordem. */
+  const depoisDaSeta = await aviso(pag, '#bib-lp-aviso');
+  console.log('   aviso depois da seta: ' + JSON.stringify(depoisDaSeta.texto));
+  if (V_AVISO_VELHO) {
+    conf('VENENO: o aviso sobreviveu à troca de ordem e continua afirmando a lista do pacote',
+      /a lista pronta do nível 2/.test(depoisDaSeta.texto), true);
+    return;
+  }
+  conf('o aviso da lista pronta sai no primeiro toque que muda o material', depoisDaSeta.texto, '');
+  conf('e a tela passa a dizer que ela mudou a lista, mesmo tendo mudado SÓ a ordem',
+    await pag.evaluate(() => {
+      const m = document.querySelector('#bib-lp-mudou');
+      return m ? m.textContent.trim() : '(não achei)';
+    }), 'Você mudou esta lista. O material sai na ordem que está aqui.');
+
   const nums = await numerosDaTela(pag);
   conf('a numeração da tela acompanha', nums[0].indexOf('1. ') === 0 && nums[1].indexOf('2. ') === 0, true);
   conf('e o que está em primeiro agora é o outro exercício',

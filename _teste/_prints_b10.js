@@ -61,13 +61,24 @@ if (!fs.existsSync(PACOTE)) {
 const PORTA = 8807;
 const amb = H.criarAmbiente(PORTA, 'perfil_prints_b10', {});
 
-let n = 0;
-async function tirar(pag, seletor) {
-  n++;
-  const nome = 'b10_' + String(n).padStart(2, '0') + '.png';
+/* O NÚMERO DA IMAGEM É ESCOLHIDO, e não contado.
+ *
+ * A ordem em que as imagens são olhadas é a ordem em que a cadeia se lê, e ela
+ * não é a ordem em que dá jeito de produzi-las. A folha impressa só pode ser
+ * gerada depois de a lista estar editada, mas quem olha precisa vê-la logo
+ * depois da tela que a produziu; a lista pronta do outro nível e a barra da
+ * folha vêm no fim, porque são outro assunto. Na primeira montagem a numeração
+ * era sequencial e a última tela mostrada tinha 6 exercícios enquanto o papel
+ * tinha 5: o olho de fora cego concluiu, com razão, que a tela e o papel não
+ * batiam.
+ *
+ * Os números 06 a 09 ficam para as páginas do material, rasterizadas fora
+ * daqui a partir do b10_material.pdf. */
+async function tirar(pag, numero, seletor) {
+  const nome = 'b10_' + String(numero).padStart(2, '0') + '.png';
   const alvo = seletor ? await pag.$(seletor) : pag;
   await (alvo || pag).screenshot({ path: path.join(SAIDA, nome) });
-  console.log('   ' + nome);
+  console.log('   ' + nome + (seletor ? '  (' + seletor + ')' : ''));
   return nome;
 }
 
@@ -129,21 +140,20 @@ async function rolarTudoEEsperar(pag) {
   await pausa(600);
 
   // 01: a lista de módulos da série
-  await tirar(pag);
+  await tirar(pag, 1);
 
-  // 02 e 03: a tela do módulo, com as duas linhas de lista pronta
+  // 02: a tela do módulo, com as duas linhas de lista pronta
   conf('abriu um módulo', await tocarLinha(pag, 'Equações do Segundo Grau'), true);
   await pausa(700);
-  await tirar(pag);
-  await tirar(pag, '#bib-corpo');
+  await tirar(pag, 2);
 
-  // 04: a lista pronta do nível 2, recém carregada, com a mensagem no fluxo
+  // 03: a lista pronta do nível 2, recém carregada, com a mensagem no fluxo
   conf('tocou na lista pronta do nível 2', await tocarLinha(pag, 'Lista pronta, nível 2'), true);
   await pausa(900);
   console.log('   ' + (await rolarTudoEEsperar(pag)));
-  await tirar(pag);
+  await tirar(pag, 3);
 
-  // 05: depois de descer o primeiro exercício
+  // 04: depois de descer o primeiro exercício
   const ids = await pag.evaluate(() => {
     try { return (JSON.parse(localStorage.getItem('apoio-educacional:bib-carrinho') || '{}').itens) || []; }
     catch (e) { return []; }
@@ -155,17 +165,40 @@ async function rolarTudoEEsperar(pag) {
   }, ids[0]);
   await pausa(700);
   console.log('   ' + (await rolarTudoEEsperar(pag)));
-  await tirar(pag);
+  await tirar(pag, 4);
 
-  // 06 e 07: depois de tirar um pela caixa
+  /* 05: depois de tirar um pela caixa, e esta é a LISTA INTEIRA numa imagem só.
+   *
+   * É a imagem que fecha a cadeia: ela tem os cinco cartões na ordem em que ela
+   * os deixou, que é exatamente o que o papel das imagens seguintes tem de
+   * espelhar. Com o print da janela dava para ver dois cartões, e o olho de
+   * fora cego escreveu que não conseguia conferir tela contra papel.
+   *
+   * E NÃO é um print do elemento. A primeira tentativa fotografou o
+   * `#bib-corpo`, e saiu um artefato: o elemento é mais alto que a janela, e
+   * numa captura assim os elementos de posição fixa e grudada (a faixa do
+   * carrinho, a caixa do aviso do rodapé, que estava FECHADA mas tem o botão
+   * Desfazer sempre no DOM) vão parar no meio da imagem, e os cartões de baixo
+   * saem em branco. Quem olhasse veria uma tela que não existe. O jeito honesto
+   * é alargar a JANELA até a lista caber: a largura não muda, então o desenho é
+   * o mesmo, e tudo pinta no lugar. */
   await pag.evaluate(i => {
     const c = document.querySelector('#bib-lp-grade input[data-carrinho="itens"][data-id="' + i + '"]');
     if (c) { c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true })); }
   }, ids[2]);
   await pausa(700);
   console.log('   ' + (await rolarTudoEEsperar(pag)));
-  await tirar(pag);
-  await tirar(pag, '#bib-lp-cabeca');
+  const alturaToda = await pag.evaluate(() => {
+    const c = document.querySelector('.conteudo');
+    return Math.min(4200, Math.ceil((c ? c.scrollHeight : 0) + 80));
+  });
+  console.log('   a lista inteira tem ' + alturaToda + ' px de altura');
+  await pag.setViewport({ width: 1024, height: alturaToda, deviceScaleFactor: 2 });
+  await pausa(600);
+  console.log('   ' + (await rolarTudoEEsperar(pag)));
+  await tirar(pag, 5);
+  await pag.setViewport({ width: 1024, height: 1366, deviceScaleFactor: 2 });
+  await pausa(500);
 
   /* O ELO DO MEIO: a folha impressa DESTA escolha.
    *
@@ -229,16 +262,16 @@ async function rolarTudoEEsperar(pag) {
   });
   await pausa(500);
 
-  // 08: a lista pronta do nível 3 do mesmo módulo
+  // 10: a lista pronta do nível 3 do mesmo módulo
   secao('Os prints que faltam');
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
   await pausa(600);
   conf('tocou na lista pronta do nível 3', await tocarLinha(pag, 'Lista pronta, nível 3'), true);
   await pausa(900);
   console.log('   ' + (await rolarTudoEEsperar(pag)));
-  await tirar(pag);
+  await tirar(pag, 10);
 
-  // 09: a barra de ferramentas da folha, com a ferramenta de tapar
+  // 11: a barra de ferramentas da folha, com a ferramenta de tapar
   await pag.evaluate(async () => {
     const d = await Store.carregar();
     const aluno = d.alunos[0];
@@ -281,7 +314,7 @@ async function rolarTudoEEsperar(pag) {
   await pausa(1600);
   const temBarra = await pag.evaluate(() => !!document.querySelector('#ferramentas-nota .ferr'));
   if (temBarra) {
-    await tirar(pag, '#ferramentas-nota');
+    await tirar(pag, 11, '#ferramentas-nota');
     const rotulos = await pag.evaluate(() =>
       Array.from(document.querySelectorAll('#ferramentas-nota .ferr')).map(b => b.getAttribute('title') || ''));
     console.log('   ferramentas: ' + JSON.stringify(rotulos));
@@ -294,5 +327,6 @@ async function rolarTudoEEsperar(pag) {
 
   if (pag.errosDePagina.length) console.log('   erros de página: ' + pag.errosDePagina.join(' | ').slice(0, 400));
   conf('nenhum erro de JavaScript na página', pag.errosDePagina.length, 0);
-  console.log('\n   ' + n + ' prints e o material em ' + SAIDA);
+  console.log('\n   telas em ' + SAIDA + ': 01 a 05, 10 e 11.');
+  console.log('   falta rasterizar b10_material.pdf em b10_06 a b10_09, que é onde o papel entra.');
 })().then(() => H.fim(amb)(), e => H.fim(amb)(e));
