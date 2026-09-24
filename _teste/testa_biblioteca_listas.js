@@ -149,6 +149,13 @@ const T_RECARREGA = '          if (false && listaProntaEmEdicao(lp)) irNaBibliot
 // a memoria de qual lista ela mexia volta a nao atravessar o reinicio
 const L_LEMBRA = "      try { bibLpEmEdicao = localStorage.getItem(CHAVE_LP_EM_EDICAO) || null; } catch (e) { /* sem armazenamento */ }";
 const T_LEMBRA = '      bibLpEmEdicao = null;';
+// depois de anexar, a tela volta a dizer "Você tirou tudo desta lista", como
+// se quem esvaziou tivesse sido ela
+// o nome do arquivo anexado volta a não quebrar, e passa por cima do Abrir
+const L_NOME_ANEXO = '#lista-anexos .item-lista .nome { overflow-wrap: anywhere; word-break: break-word; }';
+const T_NOME_ANEXO = '#lista-anexos .item-lista .nome { }';
+const L_ANEXADA = '    var anexada = ids.length ? null : listaAnexada();';
+const T_ANEXADA = '    var anexada = null;';
 // o mover volta a nao aparar, e o retangulo sai da folha ao ser arrastado
 const L_APARA = "        d.item.x = aparado(d.ix + (p.x - d.ox), 0, Math.max(0, FOLHA_L - d.item.w));";
 const T_APARA = '        d.item.x = d.ix + (p.x - d.ox);';
@@ -184,7 +191,7 @@ const T_FLUTUA = [
 // a frase volta a somar em voz alta, que é exatamente a que o revisor leu como conta quebrada
 const L_FRASE = [
   "      texto: 'O material agora tem ' + plural(bibCarrinho.itens.length, 'exercício', 'exercícios') +",
-  "        ': a lista pronta ' + comoSeChama(lp) +",
+  "        ': “' + nomeDaListaPronta(lp) + '”' +",
   "        (sairam ? ', no lugar do que estava marcado'",
   "          : perdeu ? ', de volta como o pacote a trouxe' : '') +",
   "        '. Mude o que quiser e toque em Gerar material.',"].join(NL_APP);
@@ -224,7 +231,9 @@ const VENENOS = {
   palma: { arq: '/draw.js', de: L_PALMA, para: T_PALMA },
   contorno: { arq: '/draw.js', de: L_CONTORNO, para: T_CONTORNO },
   apara: { arq: '/draw.js', de: L_APARA, para: T_APARA },
-  lembra: { arq: '/app.js', de: L_LEMBRA, para: T_LEMBRA }
+  lembra: { arq: '/app.js', de: L_LEMBRA, para: T_LEMBRA },
+  anexada: { arq: '/app.js', de: L_ANEXADA, para: T_ANEXADA },
+  'nome-anexo': { arq: '/styles.css', de: L_NOME_ANEXO, para: T_NOME_ANEXO }
 };
 const NOME_VENENO = Object.keys(VENENOS).filter(function (n) {
   return process.argv.indexOf('--envenenado-' + n) !== -1;
@@ -251,6 +260,8 @@ const V_PALMA = NOME_VENENO === 'palma';
 const V_CONTORNO = NOME_VENENO === 'contorno';
 const V_APARA = NOME_VENENO === 'apara';
 const V_LEMBRA = NOME_VENENO === 'lembra';
+const V_ANEXADA = NOME_VENENO === 'anexada';
+const V_NOME_ANEXO = NOME_VENENO === 'nome-anexo';
 const BASE_DE = { '/app.js': APP_REPO, '/draw.js': DRAW_REPO, '/styles.css': CSS_REPO };
 const trocas = {};
 if (VENENO) trocas[RECEITA.arq] = BASE_DE[RECEITA.arq].split(RECEITA.de).join(RECEITA.para);
@@ -423,7 +434,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   if (!VENENO) {
     secao('0. As cercas ainda apontam para o alvo');
     var nomes = Object.keys(VENENOS);
-    conf('a tabela tem os vinte venenos desta prova', nomes.length, 20);
+    conf('a tabela tem os vinte e dois venenos desta prova', nomes.length, 22);
     var fora = [];
     nomes.forEach(function (n) {
       var r = VENENOS[n];
@@ -663,7 +674,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
 
   /* A FRASE COM OS DOIS ITENS QUE JÁ ESTAVAM MARCADOS, que é o caso do print.
    * O texto do bloco traz o rótulo do botão colado no fim, e é ele que sai. */
-  const FRASE = 'O material agora tem 5 exercícios: a lista pronta 1 desafio no fim, ' +
+  const FRASE = 'O material agora tem 5 exercícios: “Lista pronta, 1 desafio no fim”, ' +
     'no lugar do que estava marcado. Mude o que quiser e toque em Gerar material.';
   if (V_FRASE) {
     conf('VENENO: a frase voltou a somar em voz alta',
@@ -744,7 +755,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
      * mede a segunda porta na seção 5b, no Desfazer. Foi por medir só uma que o
      * guarda ficou cego enquanto o defeito entrava pela outra. */
     conf('VENENO (porta da seta): o aviso sobreviveu à troca de ordem e continua afirmando a lista do pacote',
-      /a lista pronta 1 desafio no fim/.test(depoisDaSeta.texto), true);
+      /“Lista pronta, 1 desafio no fim”/.test(depoisDaSeta.texto), true);
   } else {
     conf('o aviso da lista pronta sai no primeiro toque que muda o material', depoisDaSeta.texto, '');
     conf('e a tela passa a dizer que ela mudou a lista, mesmo tendo mudado SÓ a ordem',
@@ -1173,6 +1184,8 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   conf('e não estima zero minuto', /≈ 0 min/.test(vazia.cabeca), false);
   conf('e diz o que há: nenhum exercício no material',
     /^Nenhum exercício no material/.test(vazia.cabeca), true);
+  conf('e, como foi ELA que tirou tudo, a tela diz isso', vazia.vazia, true);
+  conf('e não fala de anexo nenhum', /anexada/.test(vazia.cabeca), false);
   conf('e NÃO afirma uma ordem de um material que não existe',
     await pag.evaluate(() => !!document.querySelector('#bib-lp-mudou')), false);
 
@@ -1240,6 +1253,120 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   conf('e NÃO chama meia hora de aula nenhuma', /uma aula/.test(meiaHora), false);
   await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-limpar'); if (b) b.click(); });
   await pausa(500);
+
+  // ================================================================
+  /* DEPOIS DE ANEXAR, QUEM ESVAZIOU FOI O APLICATIVO.
+   *
+   *   Arranjo:   a lista do nível 2 carregada inteira, "Gerar e anexar" na aula
+   *              de hoje do primeiro aluno, pelo caminho da tela (botão Gerar
+   *              material, a linha da aula, o botão Gerar e anexar), e a tela
+   *              da lista pronta olhada depois que o anexo ficou gravado.
+   *   Afirmação: a tela não diz "Você tirou tudo desta lista", porque ela não
+   *              tirou nada, e diz para onde a lista foi. A seção 5e mediu o
+   *              outro lado: quando é ela que esvazia, a frase continua.
+   *
+   * O anexo gravado é conferido junto, senão uma tela que nunca anexasse e
+   * nunca mostrasse a frase passaria aqui. */
+  secao('5g. Depois de anexar, a tela diz para onde a lista foi');
+  const nomeAluno = await pag.evaluate(async h => {
+    const d = await Store.carregar();
+    d.aulas.push({ id: 'aula-b10-anexa', alunoId: d.alunos[0].id, serieId: null, destacada: false, data: h,
+      hora: '16:00', duracaoMin: 60, status: 'agendada', cobravel: true, notaTexto: '', notaPrivada: '',
+      temNota: false, anexos: [] });
+    await Store.salvar(d);
+    return d.alunos[0].nome;
+  }, (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })());
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.abrirApp(pag, amb.ORIGEM);
+  await H.irParaAba(pag, 'biblioteca');
+  await pausa(400);
+  conf('abriu o módulo das equações de novo', await tocarLinha(pag, MOD_TITULO), true);
+  await pausa(400);
+  conf('tocou na lista do nível 2', await tocarLinha(pag, 'Lista pronta, 1 desafio no fim'), true);
+  await pausa(500);
+  conf('a lista está no material, inteira', (await carrinho(pag)).itens.join('|'), IDS2.join('|'));
+  await pag.evaluate(() => document.querySelector('#bib-carrinho-gerar').click());
+  await pausa(600);
+  conf('escolheu a aula de hoje na janela de gerar', await pag.evaluate(() => {
+    const b = document.querySelector('#bib-gerar-aulas [data-aula="aula-b10-anexa"]');
+    if (!b) return false; b.click(); return true;
+  }), true);
+  await pausa(300);
+  await pag.evaluate(() => document.querySelector('#bib-gerar-anexar').click());
+  const anexou = await esperar('o anexo gravado na aula', () => pag.evaluate(() =>
+    Store.carregar().then(d => (d.aulas.find(a => a.id === 'aula-b10-anexa').anexos || []).length)), v => v > 0, 60000);
+  conf('o material ficou anexado na aula', anexou.ok, true);
+  await pausa(800);
+  const depoisDoAnexo = await pag.evaluate(() => ({
+    cabeca: (document.querySelector('#bib-lp-cabeca') || {}).innerText || '(não achei)',
+    vazia: !!document.querySelector('#bib-lp-vazia'),
+    titulo: (document.querySelector('#bib-corpo .bib-titulo') || {}).textContent || ''
+  }));
+  console.log('   depois de anexar: ' + JSON.stringify(depoisDoAnexo));
+  conf('a tela da lista pronta continua à vista', depoisDoAnexo.titulo, 'Lista pronta, 1 desafio no fim');
+  conf('e o material ficou vazio', /^Nenhum exercício no material/.test(depoisDoAnexo.cabeca), true);
+  if (V_ANEXADA) {
+    conf('VENENO: depois de anexar, a tela diz que foi ela que tirou tudo', depoisDoAnexo.vazia, true);
+    return;
+  }
+  conf('e NÃO diz que ela tirou tudo, porque quem esvaziou foi o aplicativo', depoisDoAnexo.vazia, false);
+  conf('e diz para onde a lista foi, com o aluno',
+    depoisDoAnexo.cabeca.indexOf('Lista anexada na aula de ' + nomeAluno + ' (') >= 0, true);
+  conf('e como usar de novo', /Toque na linha da lista pronta para usar de novo\./.test(depoisDoAnexo.cabeca), true);
+
+  // ================================================================
+  /* O NOME DO ANEXO NÃO ENCOSTA NO ABRIR.
+   *
+   *   Arranjo:   a aula da seção 5g aberta pela agenda, com o PDF que acabou de
+   *              ser anexado, numa janela de 800 e depois de 1280 de largura.
+   *   Afirmação: o texto do nome termina antes do botão Abrir começar, nas
+   *              duas larguras.
+   *
+   * A régua mede o TEXTO, com um Range sobre o nó, e não a caixa: a caixa do
+   * nome acaba onde o flex manda, e o texto sem ponto de quebra passa por cima
+   * do botão sem a caixa mudar um pixel. E o nome inteiro tem de estar lá: um
+   * conserto que cortasse o nome também passaria na régua da distância. */
+  secao('5h. O nome do arquivo anexado não encosta no Abrir');
+  const hojeAnexo = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+  const medidasNome = [];
+  for (const largura of [800, 1280]) {
+    await pag.setViewport({ width: largura, height: 1000, hasTouch: true });
+    await pausa(300);
+    await pag.evaluate(() => document.querySelectorAll('.modal.aberto [data-fechar]').forEach(b => b.click()));
+    await pausa(300);
+    await H.irParaAba(pag, 'agenda');
+    await pausa(500);
+    await pag.evaluate(d => {
+      const p = Array.from(document.querySelectorAll('[data-dia="' + d + '"] .pilula')).find(x => /16:00/.test(x.textContent)) ||
+        document.querySelector('[data-dia="' + d + '"] .pilula');
+      if (p) p.click();
+    }, hojeAnexo);
+    await pausa(700);
+    const m = await pag.evaluate(() => {
+      const linha = document.querySelector('#lista-anexos .item-lista');
+      if (!linha) return null;
+      const nome = linha.querySelector('.nome');
+      const abrir = Array.from(linha.querySelectorAll('button')).find(b => /Abrir/.test(b.textContent));
+      linha.scrollIntoView({ block: 'center' });
+      const r = document.createRange(); r.selectNodeContents(nome);
+      const rects = Array.from(r.getClientRects());
+      return { texto: nome.textContent, fimDoTexto: Math.round(Math.max.apply(null, rects.map(x => x.right))),
+        inicioDoAbrir: Math.round(abrir.getBoundingClientRect().left) };
+    });
+    console.log('   largura ' + largura + ': ' + JSON.stringify(m));
+    medidasNome.push(m || {});
+  }
+  await pag.setViewport({ width: 1280, height: 1000, hasTouch: true });
+  await pag.evaluate(() => document.querySelectorAll('.modal.aberto [data-fechar]').forEach(b => b.click()));
+  await pausa(300);
+  conf('a aula abriu com o anexo nas duas larguras', medidasNome.filter(m => m.texto).length, 2);
+  conf('e o nome está inteiro nas duas', medidasNome.every(m => /_biblioteca\.pdf$/.test(m.texto || '')), true);
+  const encostam = medidasNome.filter(m => !(m.fimDoTexto <= m.inicioDoAbrir - 4)).length;
+  if (V_NOME_ANEXO) {
+    conf('VENENO: o nome passa por cima do Abrir em pelo menos uma largura', encostam > 0, true);
+    return;
+  }
+  conf('o texto do nome termina antes do Abrir, com folga, nas duas larguras', encostam, 0);
 
   // ================================================================
   secao('6. Tapar na folha');

@@ -446,6 +446,8 @@ roda "biblioteca listas --envenenado-volta"         node "_teste/testa_bibliotec
 roda "biblioteca listas --envenenado-lixeira"       node "_teste/testa_biblioteca_listas.js" --envenenado-lixeira
 roda "biblioteca listas --envenenado-redesenho"     node "_teste/testa_biblioteca_listas.js" --envenenado-redesenho
 roda "biblioteca listas --envenenado-uma-aula"      node "_teste/testa_biblioteca_listas.js" --envenenado-uma-aula
+roda "biblioteca listas --envenenado-anexada"       node "_teste/testa_biblioteca_listas.js" --envenenado-anexada
+roda "biblioteca listas --envenenado-nome-anexo"    node "_teste/testa_biblioteca_listas.js" --envenenado-nome-anexo
 roda "biblioteca listas --envenenado-palma"         node "_teste/testa_biblioteca_listas.js" --envenenado-palma
 roda "biblioteca listas --envenenado-contorno"      node "_teste/testa_biblioteca_listas.js" --envenenado-contorno
 # O aparo do tapar nos TRES caminhos: criar, mover e redimensionar.

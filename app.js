@@ -11693,6 +11693,7 @@
     }
 
     var ids = bibCarrinho.itens.slice();
+    var anexada = ids.length ? null : listaAnexada();
     var daLista = ids.filter(function (id) { return lp.minutosDe[id] !== undefined; });
     var deFora = ids.length - daLista.length;
     /* "VOCÊ MUDOU ESTA LISTA" TEM DE VALER PARA A ORDEM TAMBÉM, e não só para
@@ -11735,6 +11736,8 @@
           (daLista.length && !deFora && umaAula(soma) ? ' · ' + umaAula(soma) : '') }),
       el('div', { class: 'ajuda bib-lp-minutos', texto: !daLista.length
         ? (ids.length ? 'Sem estimativa de tempo: o minuto vem da lista pronta, e nenhum exercício dela ficou aqui.'
+          : anexada ? 'Lista anexada na aula de ' + anexada.aluno + ' (' + Core.ddmmaaaa(anexada.data) +
+            '). Toque na linha da lista pronta para usar de novo.'
           : 'Toque na linha da lista pronta para carregá-la de novo.')
         : minutosEstimados(soma, true) +
           (deFora ? ', fora ' + plural(deFora, 'exercício que você acrescentou e não entra nessa conta',
@@ -11750,7 +11753,7 @@
         texto: 'Você mudou esta lista. O material sai na ordem que está aqui.' }));
     }
 
-    if (!ids.length) {
+    if (!ids.length && !anexada) {
       corpo.appendChild(el('p', { class: 'ajuda', id: 'bib-lp-vazia', texto: 'Você tirou tudo desta lista.' }));
     }
     var grade = el('div', { class: 'bib-grade bib-grade-exercicios bib-grade-lp', id: 'bib-lp-grade' });
@@ -12042,6 +12045,22 @@
    * hora, porque a tela se redesenha inteira a cada seta e a cada caixa.
    * { texto, rotulo, aoAgir, para } */
   var bibLpAviso = null;
+
+  /* QUEM ESVAZIOU A LISTA FOI O APLICATIVO, E A TELA TEM DE DIZER ISSO.
+   *
+   * Depois de "Gerar e anexar", a seleção é desmarcada (guardada no aparelho,
+   * ela entraria escondida no material do próximo aluno), e a tela da lista
+   * pronta dizia "Você tirou tudo desta lista": falso, porque ela não tirou
+   * nada. Agora o desmarcar do anexo deixa anotado para onde a lista foi, e a
+   * tela diz isso. Qualquer outra mudança de carrinho apaga a anotação, porque
+   * passa pelo `guardarCarrinho`, que é a porta única.
+   *
+   * Fica na memória, e não no aparelho: com o aplicativo reaberto o carrinho
+   * vazio não leva de volta a esta tela (tocar na linha carrega a lista de
+   * novo), então não há frase para sustentar depois do reinício. */
+  var bibLpAnexada = null;
+  function lembrarAnexada(reg) { bibLpAnexada = reg || null; }
+  function listaAnexada() { return bibLpAnexada; }
 
   /* Chamada por TODA ação da mão dela que mexe no material. Sem isto, o
    * Desfazer da faixa continuaria oferecendo voltar a uma seleção que ela já
@@ -12340,6 +12359,7 @@
    * e é por isso que ele sobrevive ao próprio nascimento. */
   function guardarCarrinho() {
     bibLpAviso = null;
+    lembrarAnexada(null);
     try { localStorage.setItem(CHAVE_CARRINHO, JSON.stringify(bibCarrinho)); } catch (e) { /* segue na memória */ }
   }
 
@@ -12447,7 +12467,7 @@
     bibLpAviso = {
       para: lp.id,
       texto: 'O material agora tem ' + plural(bibCarrinho.itens.length, 'exercício', 'exercícios') +
-        ': a lista pronta ' + comoSeChama(lp) +
+        ': “' + nomeDaListaPronta(lp) + '”' +
         (sairam ? ', no lugar do que estava marcado'
           : perdeu ? ', de volta como o pacote a trouxe' : '') +
         '. Mude o que quiser e toque em Gerar material.',
@@ -12919,11 +12939,13 @@
 
   /* Desmarca a seleção depois de um anexo (guardada no aparelho, ela entraria
    * escondida no material do próximo aluno) e devolve a função que remarca. */
-  function desmarcarDepoisDeAnexar() {
+  function desmarcarDepoisDeAnexar(aula, aluno) {
     mexeuNoMaterial();
     var usada = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
     bibCarrinho = { itens: [], paginas: [] };
     guardarCarrinho();
+    // depois do guardarCarrinho, que apaga a anotação: esta é a que vale agora
+    if (aula && aluno) lembrarAnexada({ aluno: aluno.nome, data: aula.data });
     desenharCarrinho();
     marcarCaixasDoCarrinho();
     return function () {
@@ -13031,7 +13053,7 @@
         /* A seleção é desmarcada ao anexar: guardada no aparelho, ela entraria
          * escondida no material do próximo aluno. O Desfazer do aviso devolve,
          * para ela gerar o mesmo material para outra aula. */
-        var devolver = desmarcarDepoisDeAnexar();
+        var devolver = desmarcarDepoisDeAnexar(aula, aluno);
         // o material da aula de origem foi feito: ela não fica escolhida para o próximo
         // anexado: a faixa fica para ela voltar à aula, mas a aula não vem mais escolhida no próximo material
         if (bibContexto && bibContexto.aulaId === aula.id) { bibContexto.anexado = true; desenharContextoBiblioteca(); }
@@ -13052,7 +13074,7 @@
        * duplicaria o arquivo na aula. Antes dele, a mensagem diz o que fazer, e
        * o detalhe técnico fica só no console. */
       if (anexado) {
-        var remarcar = desmarcarDepoisDeAnexar();
+        var remarcar = desmarcarDepoisDeAnexar(aula, aluno);
         avisarNaHora(etapa === 'folha'
           ? 'O material foi anexado na aula, mas a lista não abriu como folha. O PDF está na aula; não precisa gerar de novo.' + textoDosAssuntos(assuntosNovos)
           : 'O material foi anexado na aula, mas não consegui marcar os exercícios como usados. O PDF está na aula; não precisa gerar de novo.' + textoDosAssuntos(assuntosNovos),
