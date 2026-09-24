@@ -101,8 +101,8 @@ const L_ORDEM = 'var tudo = { itens: lp.ids.slice(), paginas: [] };';
 const T_ORDEM = 'var tudo = { itens: lp.ids.slice().sort(), paginas: [] };';
 const L_SETA = 'var outro = lista[j];';
 const T_SETA = 'var outro = lista[j]; return null;';
-const L_CURADORIA = "var linha = linhaBib('Lista pronta, nível ' + lp.nivel,";
-const T_CURADORIA = "var linha = linhaBib('Kit curado, nível ' + lp.nivel,";
+const L_CURADORIA = 'var linha = linhaBib(nomeDaListaPronta(lp),';
+const T_CURADORIA = "var linha = linhaBib('Kit curado, ' + comoSeChama(lp),";
 /* A quebra de linha sai do PRÓPRIO arquivo: o repositório pode estar em CRLF, e
  * âncora de várias linhas cravada com \n casa zero vezes e envenena nada. */
 const NL = DRAW_REPO.indexOf('\r\n') >= 0 ? '\r\n' : '\n';
@@ -146,6 +146,9 @@ const T_RECARREGA = '          if (false && listaProntaEmEdicao(lp)) irNaBibliot
 // o dedo volta a não cancelar o retângulo em andamento, e a palma apoiada fecha
 // o tapar que o bico tinha começado
 // o contorno de tela some, e o branco volta a ser invisível na folha branca
+// a memoria de qual lista ela mexia volta a nao atravessar o reinicio
+const L_LEMBRA = "      try { bibLpEmEdicao = localStorage.getItem(CHAVE_LP_EM_EDICAO) || null; } catch (e) { /* sem armazenamento */ }";
+const T_LEMBRA = '      bibLpEmEdicao = null;';
 // o mover volta a nao aparar, e o retangulo sai da folha ao ser arrastado
 const L_APARA = "        d.item.x = aparado(d.ix + (p.x - d.ox), 0, Math.max(0, FOLHA_L - d.item.w));";
 const T_APARA = '        d.item.x = d.ix + (p.x - d.ox);';
@@ -162,7 +165,7 @@ const T_REDESENHO = '  function redesenharListaPronta(id, qual) {' + NL_APP + ' 
 const L_LIXEIRA = '      if (mudouSelecao && this.opcoes.aoSelecionar) this.opcoes.aoSelecionar(alvo);';
 const T_LIXEIRA = '      if (false && this.opcoes.aoSelecionar) this.opcoes.aoSelecionar(alvo);';
 // o caminho de volta da lista cheia volta a levar para o módulo
-const L_VOLTA = "          bibVoltarPara = { id: lp.id, slug: l.slug, rotulo: 'Lista pronta, nível ' + lp.nivel };";
+const L_VOLTA = '          bibVoltarPara = { id: lp.id, slug: l.slug, rotulo: nomeDaListaPronta(lp) };';
 const T_VOLTA = '          bibVoltarPara = null;';
 /* A mensagem volta para a caixa flutuante do rodapé, e o bloco do fluxo não é
  * desenhado. A ÂNCORA JÁ ENVELHECEU UMA VEZ: ela casava em `if (bibLpAviso) {`
@@ -181,7 +184,7 @@ const T_FLUTUA = [
 // a frase volta a somar em voz alta, que é exatamente a que o revisor leu como conta quebrada
 const L_FRASE = [
   "      texto: 'O material agora tem ' + plural(bibCarrinho.itens.length, 'exercício', 'exercícios') +",
-  "        ': a lista pronta do nível ' + lp.nivel +",
+  "        ': a lista pronta ' + comoSeChama(lp) +",
   "        (sairam ? ', no lugar do que estava marcado'",
   "          : perdeu ? ', de volta como o pacote a trouxe' : '') +",
   "        '. Mude o que quiser e toque em Gerar material.',"].join(NL_APP);
@@ -220,7 +223,8 @@ const VENENOS = {
   'meia-aula': { arq: '/app.js', de: L_MEIA_AULA, para: T_MEIA_AULA },
   palma: { arq: '/draw.js', de: L_PALMA, para: T_PALMA },
   contorno: { arq: '/draw.js', de: L_CONTORNO, para: T_CONTORNO },
-  apara: { arq: '/draw.js', de: L_APARA, para: T_APARA }
+  apara: { arq: '/draw.js', de: L_APARA, para: T_APARA },
+  lembra: { arq: '/app.js', de: L_LEMBRA, para: T_LEMBRA }
 };
 const NOME_VENENO = Object.keys(VENENOS).filter(function (n) {
   return process.argv.indexOf('--envenenado-' + n) !== -1;
@@ -246,6 +250,7 @@ const V_MEIA_AULA = NOME_VENENO === 'meia-aula';
 const V_PALMA = NOME_VENENO === 'palma';
 const V_CONTORNO = NOME_VENENO === 'contorno';
 const V_APARA = NOME_VENENO === 'apara';
+const V_LEMBRA = NOME_VENENO === 'lembra';
 const BASE_DE = { '/app.js': APP_REPO, '/draw.js': DRAW_REPO, '/styles.css': CSS_REPO };
 const trocas = {};
 if (VENENO) trocas[RECEITA.arq] = BASE_DE[RECEITA.arq].split(RECEITA.de).join(RECEITA.para);
@@ -418,7 +423,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   if (!VENENO) {
     secao('0. As cercas ainda apontam para o alvo');
     var nomes = Object.keys(VENENOS);
-    conf('a tabela tem os dezenove venenos desta prova', nomes.length, 19);
+    conf('a tabela tem os vinte venenos desta prova', nomes.length, 20);
     var fora = [];
     nomes.forEach(function (n) {
       var r = VENENOS[n];
@@ -464,8 +469,8 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
    * rótulo certo ali seria cobrar do veneno que ele não envenenasse. O que a
    * corrida envenenada tem de medir é só se a varredura ENXERGA. */
   if (!V_CURADORIA) {
-    conf('a primeira é a do nível 2', (linhas[0] || {}).nome, 'Lista pronta, nível 2');
-    conf('a segunda é a do nível 3', (linhas[1] || {}).nome, 'Lista pronta, nível 3');
+    conf('a primeira se chama pela composição dela, no singular', (linhas[0] || {}).nome, 'Lista pronta, 1 desafio no fim');
+    conf('a segunda idem, no plural', (linhas[1] || {}).nome, 'Lista pronta, 2 desafios no fim');
   }
 
   // 1a. o número é o DAQUELA lista, e os dois pares são diferentes entre si
@@ -509,6 +514,12 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   await pausa(400);
   const linhasPit = await linhasDeListaPronta(pag);
   conf('o módulo do Teorema de Pitágoras tem a lista dele, e só ela', linhasPit.length, 1);
+  /* O TERCEIRO NOME, o de zero, que a tela promete para uma trajetória que
+   * ainda não existe. Sem esta lista no fixture ele seria um ramo que prova
+   * nenhuma alcança, e o nome só se sustenta se ele aguentar o caso de não
+   * haver nenhum item do degrau mais alto. */
+  conf('e ela se chama pela composição dela, que não tem nenhum desafio',
+    (linhasPit[0] || {}).nome, 'Lista pronta, sem desafio no fim');
   conf('e é a do módulo certo', (linhasPit[0] || {}).id, LISTA_CURTA.id);
   conf('com 24,6 min, diz um pouco MENOS de meia aula',
     /um pouco menos de meia aula/.test(((linhasPit[0] || {}).detalhe || [])[0] || ''), true);
@@ -564,7 +575,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   secao('2. Tocar carrega a lista no carrinho, NA ORDEM DELA');
   conf('a ordem da lista do nível 2 é diferente da ordem da fonte',
     IDS2.join('|') !== IDS2.slice().sort().join('|'), true);
-  conf('tocou na linha do nível 2', await tocarLinha(pag, 'Lista pronta, nível 2'), true);
+  conf('tocou na linha do nível 2', await tocarLinha(pag, 'Lista pronta, 1 desafio no fim'), true);
   await pausa(500);
   const c2 = await carrinho(pag);
   console.log('   carrinho: ' + JSON.stringify(c2.itens));
@@ -652,7 +663,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
 
   /* A FRASE COM OS DOIS ITENS QUE JÁ ESTAVAM MARCADOS, que é o caso do print.
    * O texto do bloco traz o rótulo do botão colado no fim, e é ele que sai. */
-  const FRASE = 'O material agora tem 5 exercícios: a lista pronta do nível 2, ' +
+  const FRASE = 'O material agora tem 5 exercícios: a lista pronta 1 desafio no fim, ' +
     'no lugar do que estava marcado. Mude o que quiser e toque em Gerar material.';
   if (V_FRASE) {
     conf('VENENO: a frase voltou a somar em voz alta',
@@ -733,7 +744,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
      * mede a segunda porta na seção 5b, no Desfazer. Foi por medir só uma que o
      * guarda ficou cego enquanto o defeito entrava pela outra. */
     conf('VENENO (porta da seta): o aviso sobreviveu à troca de ordem e continua afirmando a lista do pacote',
-      /a lista pronta do nível 2/.test(depoisDaSeta.texto), true);
+      /a lista pronta 1 desafio no fim/.test(depoisDaSeta.texto), true);
   } else {
     conf('o aviso da lista pronta sai no primeiro toque que muda o material', depoisDaSeta.texto, '');
     conf('e a tela passa a dizer que ela mudou a lista, mesmo tendo mudado SÓ a ordem',
@@ -840,7 +851,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
     return;
   }
   conf('o botão de voltar da lista cheia leva DE VOLTA À LISTA PRONTA',
-    rotuloVoltar, '‹ Lista pronta, nível 2');
+    rotuloVoltar, '‹ Lista pronta, 1 desafio no fim');
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
   await pausa(500);
   conf('e chegou mesmo na tela da lista pronta',
@@ -882,7 +893,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
   await pausa(400);
   conf('voltou para o módulo', await pag.evaluate(() => !!document.querySelector('[data-lista-pronta]')), true);
-  conf('tocou de novo na linha do nível 2', await tocarLinha(pag, 'Lista pronta, nível 2'), true);
+  conf('tocou de novo na linha do nível 2', await tocarLinha(pag, 'Lista pronta, 1 desafio no fim'), true);
   await pausa(500);
   const c7 = await carrinho(pag);
   console.log('   carrinho depois de tocar de novo: ' + JSON.stringify(c7.itens));
@@ -932,6 +943,14 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   conf('e em ordem DIFERENTE da do pacote',
     cPuro.itens.join('|') === IDS2.slice(0, cPuro.itens.length).join('|') ? 'igual' : 'outra', 'outra');
 
+  /* PRIMEIRO: O APARELHO FECHA E REABRE, E O TRABALHO DELA CONTINUA LÁ.
+   *
+   * O carrinho mora no localStorage e sempre sobreviveu; a memória de QUAL
+   * lista ela estava mexendo era variável de memória e não sobrevivia. Então o
+   * toque na linha caía no ramo que RECARREGA e substituía a ordem dela pela do
+   * pacote, e a promessa da linha do módulo (tocar ABRE em vez de recarregar)
+   * não valia depois de um reinício, que é a interrupção mais provável num
+   * tablet que fica aberto o dia inteiro. */
   await pag.reload({ waitUntil: 'networkidle0' });
   await H.abrirApp(pag, amb.ORIGEM);
   await H.irParaAba(pag, 'biblioteca');
@@ -940,7 +959,31 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   conf('depois do reload o carrinho continua com a ordem dela', guardado.itens.join('|'), cPuro.itens.join('|'));
   conf('abriu o módulo', await tocarLinha(pag, MOD_TITULO), true);
   await pausa(400);
-  conf('tocou na linha do nível 2', await tocarLinha(pag, 'Lista pronta, nível 2'), true);
+  conf('tocou na linha do nível 2 depois do reinício', await tocarLinha(pag, 'Lista pronta, 1 desafio no fim'), true);
+  await pausa(600);
+  const depoisDoReinicio = await carrinho(pag);
+  console.log('   depois do reinício: ' + JSON.stringify(depoisDoReinicio.itens));
+  if (V_LEMBRA) {
+    conf('VENENO: sem lembrar qual lista era, o reinício faz a linha RECARREGAR e a ordem dela some',
+      depoisDoReinicio.itens.join('|'), IDS2.join('|'));
+    return;
+  }
+  conf('a linha ABRIU, e o trabalho dela atravessou o reinício',
+    depoisDoReinicio.itens.join('|'), cPuro.itens.join('|'));
+
+  /* AGORA O CASO EM QUE A LISTA É MESMO RECARREGADA, que continua existindo: a
+   * memória de qual lista era pode não bater com o carrinho (dados do
+   * navegador limpos pela metade, cópia restaurada, outro perfil). Aqui ela é
+   * desfeita de propósito, porque é o único jeito de encenar o desencontro, e o
+   * que se mede é que nesse caso a perda NÃO é silenciosa. */
+  await pag.evaluate(() => { try { localStorage.removeItem('apoio-educacional:bib-lp-em-edicao'); } catch (e) { /* ok */ } });
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.abrirApp(pag, amb.ORIGEM);
+  await H.irParaAba(pag, 'biblioteca');
+  await pausa(400);
+  conf('abriu o módulo de novo', await tocarLinha(pag, MOD_TITULO), true);
+  await pausa(400);
+  conf('tocou na linha com a memória desfeita', await tocarLinha(pag, 'Lista pronta, 1 desafio no fim'), true);
   await pausa(600);
   const c8 = await carrinho(pag);
   const avisoReload = await aviso(pag, '#bib-lp-aviso');
@@ -1042,7 +1085,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
   await pausa(500);
   await pag.evaluate(() => { window.__redesenhos = 0; });
-  conf('tocou na linha da lista pronta', await tocarLinha(pag, 'Lista pronta, nível 2'), true);
+  conf('tocou na linha da lista pronta', await tocarLinha(pag, 'Lista pronta, 1 desafio no fim'), true);
   await pausa(700);
   const desenhosLinha = await pag.evaluate(() => window.__redesenhos);
   console.log('   desenhos ao abrir a tela pela linha: ' + desenhosLinha);

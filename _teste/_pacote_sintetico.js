@@ -306,7 +306,13 @@ const LISTAS = [
   },
   {
     /* A terceira, noutro módulo e ABAIXO da banda: é ela que mede a frase "um
-     * pouco menos de meia aula", que nenhuma das outras duas alcança. */
+     * pouco menos de meia aula", que nenhuma das outras duas alcança.
+     *
+     * E ELA É A ÚNICA SEM NENHUM ITEM DO DEGRAU MAIS ALTO, também de
+     * propósito: os quatro exercícios dela caem nos dois primeiros terços da
+     * lista da fonte. Sem ela, o nome "sem desafio no fim" seria um ramo que
+     * prova nenhuma alcança, e a tela promete esse nome para uma trajetória
+     * futura. As outras duas têm 1 e 2, que dão o singular e o plural. */
     id: MOD_PIT + ':kit:2', modulo: MOD_PIT, serie: '9ano', nivel: 2,
     /* 24,6 e não 24,0 de propósito: é o único dos três totais que arredonda
      * meio PARA CIMA (vira 25). Os outros dois, 29,4 e 35,0, arredondam para
@@ -316,8 +322,8 @@ const LISTAS = [
     degraus: [
       { n: 1, item: LISTA_PIT + ':ex:1', degrau: 1, minutos: 4.0 },
       { n: 2, item: LISTA_PIT + ':ex:2', degrau: 1, minutos: 5.0 },
-      { n: 3, item: LISTA_PIT + ':ex:4', degrau: 2, minutos: 7.5 },
-      { n: 4, item: LISTA_PIT + ':ex:5', degrau: 3, minutos: 8.1 }
+      { n: 3, item: LISTA_PIT + ':ex:3', degrau: 2, minutos: 7.5 },
+      { n: 4, item: LISTA_PIT + ':ex:4', degrau: 2, minutos: 8.1 }
     ],
     alternativas: {},
     relaxou: ['minutos']

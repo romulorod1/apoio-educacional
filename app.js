@@ -11500,7 +11500,7 @@
     if (!listas.length) return;
     corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Listas prontas' }));
     listas.forEach(function (lp) {
-      var linha = linhaBib('Lista pronta, nível ' + lp.nivel,
+      var linha = linhaBib(nomeDaListaPronta(lp),
         plural(lp.itens.length, 'exercício', 'exercícios') +
           (meiaAula(lp.minutos) ? ' · ' + meiaAula(lp.minutos) : ''),
         /* TOCAR NA LINHA DA LISTA QUE ELA JÁ ESTÁ MEXENDO ABRE, E NÃO RECARREGA.
@@ -11528,15 +11528,31 @@
      * frase promete mais do que o dado sustenta, e o olho de fora cego pegou
      * isso apontando um item de oito minutos na segunda posição. */
     corpo.appendChild(el('p', { class: 'ajuda bib-lp-ajuda', id: 'bib-lp-ajuda',
-      texto: 'Em ordem de dificuldade estimada, da mais baixa para a mais alta. ' +
-        'Tire, ponha e troque a ordem à vontade.' }));
+      texto: 'Em ordem de dificuldade estimada, da mais baixa para a mais alta; ' +
+        'desafio é exercício do topo dessa ordem. Tire, ponha e troque a ordem à vontade.' }));
   }
 
   /* A lista que ela está mexendo agora: a última carregada, enquanto ao menos
    * um exercício dela ainda estiver no carrinho. Sem a segunda metade, um
    * "Desmarcar tudo" deixaria a linha achando que ainda há trabalho a
    * preservar, e tocar nela abriria uma tela vazia em vez de carregar. */
+  /* LIDO NA PRIMEIRA PERGUNTA, E NÃO NA CARGA DO ARQUIVO. A primeira escrita
+   * deste conserto inicializava esta variável aqui mesmo, lendo
+   * `CHAVE_LP_EM_EDICAO`, que é declarada bem mais abaixo: `var` sobe a
+   * declaração e NÃO sobe o valor, então a chave seria `undefined` e a leitura
+   * devolveria null sempre. O conserto teria nascido morto, em silêncio, e
+   * nenhuma prova que não reinicia o aplicativo pegaria. O próprio arquivo já
+   * avisa disso no comentário da chave do carrinho, e eu caí mesmo assim. */
   var bibLpEmEdicao = null;
+  var bibLpEmEdicaoLido = false;
+
+  function lpEmEdicao() {
+    if (!bibLpEmEdicaoLido) {
+      bibLpEmEdicaoLido = true;
+      try { bibLpEmEdicao = localStorage.getItem(CHAVE_LP_EM_EDICAO) || null; } catch (e) { /* sem armazenamento */ }
+    }
+    return bibLpEmEdicao;
+  }
 
   /* A grade existe E está sendo exibida. `offsetParent` é nulo para elemento de
    * ancestral com `display: none`, que é como as abas se escondem aqui. */
@@ -11546,9 +11562,36 @@
   }
 
   function listaProntaEmEdicao(lp) {
-    return bibLpEmEdicao === lp.id &&
+    return lpEmEdicao() === lp.id &&
       bibCarrinho.itens.some(function (id) { return lp.minutosDe[id] !== undefined; });
   }
+
+  /* O NOME DA LISTA SAI DA COMPOSIÇÃO DELA, e não de uma escala nossa.
+   *
+   * O número do nível saiu da tela e ficou só no dado, e o motivo é medido: nas
+   * 22 listas do 9º ano, a de nível 2 TERMINA num item de degrau 3 marcado como
+   * olimpíada em 11 de 11 assuntos, e em 8 de 11 as duas listas terminam NO
+   * MESMO EXERCÍCIO. A diferença entre elas nunca foi o teto da rampa, foi a
+   * MASSA: a de nível 2 leva 1 ou 2 itens do degrau mais alto e a de nível 3
+   * leva 4 ou 5. Qualquer nome do tipo "vai até o meio" contra "vai até o fim"
+   * seria mentira conferível na primeira tela, e "básica" contra "avançada"
+   * traria de volta a classificação do ALUNO, que é justamente o que esta tela
+   * não faz.
+   *
+   * Então cada linha se chama pela própria composição, e o número é contado do
+   * campo que o diz, o `dificuldade` de cada item. Uma lista sem nenhum item do
+   * degrau mais alto se chamaria "sem desafio no fim" e entraria sem renomear
+   * nada, o que é o que faz este nome aguentar uma trajetória nova. */
+  function desafiosDe(lp) {
+    return (lp.itens || []).filter(function (it) { return it && it.dificuldade === 3; }).length;
+  }
+
+  function comoSeChama(lp) {
+    var n = desafiosDe(lp);
+    return n ? plural(n, 'desafio no fim', 'desafios no fim') : 'sem desafio no fim';
+  }
+
+  function nomeDaListaPronta(lp) { return 'Lista pronta, ' + comoSeChama(lp); }
 
   function listaProntaPorId(id) {
     var todas = bib && bib.listasPorModulo;
@@ -11627,7 +11670,7 @@
    * numa seta ou numa caixa, os dois deixam de ser a mesma coisa. */
   function desenharListaPronta(corpo, mod, lp) {
     corpo.appendChild(voltarBib(mod.titulo, function () { irNaBiblioteca({ aula: null }); }));
-    corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: 'Lista pronta, nível ' + lp.nivel }));
+    corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: nomeDaListaPronta(lp) }));
     if (bibLpAviso) {
       // capturado no desenho: o clique não pode depender de a variável ainda apontar para ele
       var av = bibLpAviso;
@@ -11782,7 +11825,7 @@
          * era a linha que recarregava a lista e jogava a ordem fora. Ela ia
          * buscar um exercício e perdia a rampa no caminho de volta. */
         aoClick: function () {
-          bibVoltarPara = { id: lp.id, slug: l.slug, rotulo: 'Lista pronta, nível ' + lp.nivel };
+          bibVoltarPara = { id: lp.id, slug: l.slug, rotulo: nomeDaListaPronta(lp) };
           irNaBiblioteca({ aula: { tipo: 'exercicios', slug: l.slug } });
         } }));
     });
@@ -12253,6 +12296,17 @@
    * reimportação cai fora sozinho. Mora na memória do aplicativo, então
    * atravessa a troca de aba; fechar o aplicativo começa de novo. */
   var CHAVE_CARRINHO = 'apoio-educacional:bib-carrinho';   // antes da leitura: var não sobe com valor
+  /* QUAL LISTA ELA ESTÁ MEXENDO SOBREVIVE AO APARELHO FECHAR, como o carrinho.
+   *
+   * Era variável de memória, e o carrinho não: fechado o aplicativo (o Android
+   * recupera memória sozinho, e ela usa o tablet o dia inteiro), o carrinho
+   * voltava com a ordem dela e a memória de qual lista era, não. Aí tocar na
+   * linha caía no ramo que RECARREGA e substituía a ordem pela do pacote. A
+   * promessa escrita na linha do módulo, de que tocar ABRE em vez de
+   * recarregar, não sobrevivia a um reinício, e reinício é a interrupção mais
+   * provável num tablet. É o mesmo defeito que esta frente já consertou duas
+   * vezes, entrando pela terceira porta. */
+  var CHAVE_LP_EM_EDICAO = 'apoio-educacional:bib-lp-em-edicao';
   var bibCarrinho = lerCarrinhoGuardado();
   var bibEtiquetas = null;          // itemId -> 1, 2 ou 3, a etiqueta dela
   var ESPACO_RESPOSTA = 100;        // pt depois de cada exercício (uns 3,5 cm), quando marcado
@@ -12347,6 +12401,8 @@
     var tudo = { itens: lp.ids.slice(), paginas: [] };
     bibCarrinho = { itens: tudo.itens.slice(), paginas: [] };
     bibLpEmEdicao = lp.id;
+    bibLpEmEdicaoLido = true;
+    try { localStorage.setItem(CHAVE_LP_EM_EDICAO, lp.id); } catch (e) { /* segue na memória */ }
     guardarCarrinho();
     var sairam = semOsDe(antes.itens, tudo.itens).length + antes.paginas.length;
     /* O CRITÉRIO É UM SÓ: O QUE ESTAVA NA TELA É DIFERENTE DO QUE O PACOTE
@@ -12390,7 +12446,7 @@
     bibLpAviso = {
       para: lp.id,
       texto: 'O material agora tem ' + plural(bibCarrinho.itens.length, 'exercício', 'exercícios') +
-        ': a lista pronta do nível ' + lp.nivel +
+        ': a lista pronta ' + comoSeChama(lp) +
         (sairam ? ', no lugar do que estava marcado'
           : perdeu ? ', de volta como o pacote a trouxe' : '') +
         '. Mude o que quiser e toque em Gerar material.',
