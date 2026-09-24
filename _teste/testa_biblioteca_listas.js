@@ -101,6 +101,9 @@
  *   --envenenado-volta    o app.js servido esquece de onde ela veio, e o botão
  *                         de voltar da lista cheia leva para o módulo em vez de
  *                         para a lista pronta.
+ *   --envenenado-lixeira  o draw.js servido volta a mudar a seleção em
+ *                         silêncio, e a lixeira nunca acende ao tocar no
+ *                         retângulo: ela cria um branco que não consegue tirar.
  */
 'use strict';
 const fs = require('fs');
@@ -124,8 +127,9 @@ const V_AVISO_VELHO = process.argv.indexOf('--envenenado-aviso-velho') !== -1;
 const V_SAIRAM = process.argv.indexOf('--envenenado-sairam') !== -1;
 const V_RECARREGA = process.argv.indexOf('--envenenado-recarrega') !== -1;
 const V_VOLTA = process.argv.indexOf('--envenenado-volta') !== -1;
+const V_LIXEIRA = process.argv.indexOf('--envenenado-lixeira') !== -1;
 const VENENO = V_ORDEM || V_SETA || V_CURADORIA || V_CAMADAS || V_COLUNA || V_FLUTUA || V_FRASE ||
-  V_DIFICULDADE || V_AGRUPA || V_AVISO_VELHO || V_SAIRAM || V_RECARREGA || V_VOLTA;
+  V_DIFICULDADE || V_AGRUPA || V_AVISO_VELHO || V_SAIRAM || V_RECARREGA || V_VOLTA || V_LIXEIRA;
 
 const APP_REPO = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const DRAW_REPO = fs.readFileSync(path.join(H.RAIZ, 'draw.js'), 'utf8');
@@ -176,6 +180,10 @@ const T_SAIRAM = "    var ordemPerdida = false && antes.itens.length === tudo.it
 // a linha do módulo volta a recarregar a lista que ela está mexendo
 const L_RECARREGA = '          if (listaProntaEmEdicao(lp)) irNaBiblioteca({ aula: { tipo: \'lista-pronta\', id: lp.id } });';
 const T_RECARREGA = '          if (false && listaProntaEmEdicao(lp)) irNaBiblioteca({ aula: { tipo: \'lista-pronta\', id: lp.id } });';
+/* a seleção volta a mudar em silêncio, e a lixeira volta a nunca aparecer ao
+ * tocar no retângulo: a ferramenta cria uma coisa que ela não consegue tirar */
+const L_LIXEIRA = '      if (mudouSelecao && this.opcoes.aoSelecionar) this.opcoes.aoSelecionar(alvo);';
+const T_LIXEIRA = '      if (false && this.opcoes.aoSelecionar) this.opcoes.aoSelecionar(alvo);';
 // o caminho de volta da lista cheia volta a levar para o módulo
 const L_VOLTA = "          bibVoltarPara = { id: lp.id, slug: l.slug, rotulo: 'Lista pronta, nível ' + lp.nivel };";
 const T_VOLTA = '          bibVoltarPara = null;';
@@ -220,6 +228,7 @@ const RECEITA = V_ORDEM ? { arq: '/app.js', de: L_ORDEM, para: T_ORDEM }
                   : V_SAIRAM ? { arq: '/app.js', de: L_SAIRAM, para: T_SAIRAM }
                     : V_RECARREGA ? { arq: '/app.js', de: L_RECARREGA, para: T_RECARREGA }
                       : V_VOLTA ? { arq: '/app.js', de: L_VOLTA, para: T_VOLTA }
+                        : V_LIXEIRA ? { arq: '/draw.js', de: L_LIXEIRA, para: T_LIXEIRA }
                         : { arq: '/app.js', de: L_ORDEM_AVISO, para: T_ORDEM_AVISO };
 const BASE_DE = { '/app.js': APP_REPO, '/draw.js': DRAW_REPO, '/styles.css': CSS_REPO };
 const trocas = {};
@@ -1013,6 +1022,111 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   conf('a seleção acha o retângulo que tapa', borracha.tipoAchado, 'tapar');
   conf('e consegue tirá-lo, que é como ela desfaz um branco no lugar errado',
     borracha.semTapar, 'imagem,texto');
+  // ================================================================
+  /* A CONTRADIÇÃO ENTRE AS DUAS RODADAS, MEDIDA EM VEZ DE ARBITRADA.
+   *
+   * A rodada anterior mediu, pela API, que a seleção alcança e remove o tapar,
+   * e concluiu que havia saída. A lente cega do PR disse que a borracha não
+   * alcança e que a lixeira depende de um caminho que a interface quase não
+   * oferece. As duas afirmações são compatíveis, e é por isso que só medir
+   * resolve: a API tinha saída e a TELA não tinha.
+   *
+   * Aqui a medição é pela interface, na folha de verdade: o dedo escolhe a
+   * ferramenta, o dedo desenha o retângulo, o dedo troca para a seleção, o dedo
+   * toca no retângulo, e então se conta quantos botões de remover existem na
+   * barra. Ferramenta que ela cria e não consegue tirar não está pronta. */
+  secao('6b. O que ela cria, ela consegue tirar, medido pela interface');
+  await pag.evaluate(async () => {
+    const d = await Store.carregar();
+    const hoje = new Date();
+    const iso = hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0') + '-' + String(hoje.getDate()).padStart(2, '0');
+    d.aulas.push({ id: 'aula-b10-tapar', alunoId: d.alunos[0].id, serieId: null, destacada: false, data: iso,
+      hora: '09:00', duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', notaPrivada: '',
+      temNota: false, anexos: [], temas: [] });
+    await Store.salvar(d);
+  });
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.abrirApp(pag, amb.ORIGEM);
+  await H.irParaAba(pag, 'agenda');
+  await pausa(700);
+  const hojeIso = new Date();
+  const ISO = hojeIso.getFullYear() + '-' + String(hojeIso.getMonth() + 1).padStart(2, '0') + '-' + String(hojeIso.getDate()).padStart(2, '0');
+  conf('abriu a aula de hoje na agenda', await pag.evaluate(d => {
+    const dia = document.querySelector('[data-dia="' + d + '"]');
+    const p = dia && dia.querySelector('.pilula');
+    if (!p) return false; p.click(); return true;
+  }, ISO), true);
+  await pausa(800);
+  conf('abriu a folha da aula', await pag.evaluate(() => {
+    const b = Array.from(document.querySelectorAll('#linha-folha button, .modal-corpo button'))
+      .find(x => /folha/i.test(x.textContent));
+    if (!b) return false; b.click(); return true;
+  }), true);
+  await pausa(1500);
+  const lixeiraSeletor = '#ferramentas-nota [title="Remover o item selecionado"]';
+  /* O dedo desenha: pointerdown, um arrasto e pointerup no canvas, que é o
+   * caminho do bico e do dedo. Nada de chamar `adicionarTapar` pela API, que é
+   * exatamente a diferença entre as duas medidas que se contradiziam. */
+  const desenhou = await pag.evaluate(async () => {
+    function tocar(el, tipo, x, y) {
+      const r = el.getBoundingClientRect();
+      el.dispatchEvent(new PointerEvent(tipo, { bubbles: true, cancelable: true, pointerId: 1,
+        pointerType: 'pen', clientX: r.left + x, clientY: r.top + y, buttons: tipo === 'pointerup' ? 0 : 1 }));
+    }
+    const b = Array.from(document.querySelectorAll('#ferramentas-nota .ferr'))
+      .find(x => x.getAttribute('title') === 'Tapar com branco');
+    if (!b) return 'sem a ferramenta';
+    b.click();
+    await new Promise(r => setTimeout(r, 200));
+    const c = document.querySelector('#tela-desenho');
+    tocar(c, 'pointerdown', 120, 120);
+    tocar(c, 'pointermove', 260, 200);
+    tocar(c, 'pointerup', 260, 200);
+    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 900));
+    const nota = await Store.lerNota('aula-b10-tapar');
+    const itens = (nota && nota.paginas && nota.paginas[0] && nota.paginas[0].itens) || [];
+    return itens.filter(i => i.t === 'tapar').length;
+  });
+  console.log('   retângulos de tapar desenhados pela interface: ' + JSON.stringify(desenhou));
+  const antesDeSelecionar = await pag.evaluate(s => document.querySelectorAll(s).length, lixeiraSeletor);
+  conf('antes de selecionar, a barra NÃO tem botão de remover', antesDeSelecionar, 0);
+  const aoSelecionar = await pag.evaluate(async (s) => {
+    function tocar(el, tipo, x, y) {
+      const r = el.getBoundingClientRect();
+      el.dispatchEvent(new PointerEvent(tipo, { bubbles: true, cancelable: true, pointerId: 2,
+        pointerType: 'pen', clientX: r.left + x, clientY: r.top + y, buttons: tipo === 'pointerup' ? 0 : 1 }));
+    }
+    const sel = Array.from(document.querySelectorAll('#ferramentas-nota .ferr'))
+      .find(x => x.getAttribute('title') === 'Mover e redimensionar');
+    if (!sel) return { erro: 'sem a ferramenta de seleção' };
+    sel.click();
+    await new Promise(r => setTimeout(r, 200));
+    const c = document.querySelector('#tela-desenho');
+    tocar(c, 'pointerdown', 180, 150);
+    tocar(c, 'pointerup', 180, 150);
+    await new Promise(r => setTimeout(r, 300));
+    return { lixeiras: document.querySelectorAll(s).length };
+  }, lixeiraSeletor);
+  console.log('   depois de tocar no retângulo: ' + JSON.stringify(aoSelecionar));
+  if (V_LIXEIRA) {
+    conf('VENENO: sem o aviso de seleção, a lixeira NÃO aparece ao tocar no retângulo',
+      aoSelecionar.lixeiras, 0);
+    return;
+  }
+  conf('tocar no retângulo com a seleção ACENDE a lixeira na barra', aoSelecionar.lixeiras, 1);
+  const sumiu = await pag.evaluate(async (s) => {
+    document.querySelector(s).click();
+    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 900));
+    const nota = await Store.lerNota('aula-b10-tapar');
+    const itens = (nota && nota.paginas && nota.paginas[0] && nota.paginas[0].itens) || [];
+    return { tapar: itens.filter(i => i.t === 'tapar').length, lixeiras: document.querySelectorAll(s).length };
+  }, lixeiraSeletor);
+  console.log('   depois da lixeira: ' + JSON.stringify(sumiu));
+  conf('e a lixeira tira o retângulo da folha', sumiu.tapar, 0);
+  conf('e some junto, porque já não há o que remover', sumiu.lixeiras, 0);
+
   // ================================================================
   secao('7. A versão sobe SILENCIOSA');
   /* O texto para a Nathália é do Romulo, e não nosso. Então a 1.27.0 não entra

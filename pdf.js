@@ -849,14 +849,37 @@
      * original do recorte, e a ordem esta escrita no Draw.ORDEM_CAMADAS, que o
      * canvas tambem segue: a folha na tela e a folha impressa tem de empilhar
      * igual, senao a tela mente sobre o que vai sair. */
-    var tapar = '';
+    /* O TAPAR É UMA PLACA BRANCA, E PLACA BRANCA PASSA PELA PORTA DAS PLACAS.
+     *
+     * Toda placa branca deste gerador passa pelo `retangulo()`, que a guarda em
+     * `pag.brancos`; é dessa lista que o `finalizar()` decide apagar a palavra
+     * da marca d'água que sairia CORTADA por ela. O tapar nascia fora dessa
+     * porta, em operador cru.
+     *
+     * E AQUI VAI A PARTE QUE A MEDIDA CORRIGIU, porque a acusação que trouxe
+     * este conserto era de um defeito que o código não tem: a página da folha
+     * nasce com `semMarca: true`, ou seja, a folha da aula NÃO TEM marca
+     * d'água para cortar, e no material da biblioteca a marca vai por cima com
+     * mistura multiplicativa, por um caminho que nem consulta `pag.brancos`.
+     * Está medido em `testa_folha_impressa_igual.js`, com o alvo ao lado: a
+     * página do resumo tem marca, a da folha não, e o delta é de uma palavra
+     * (o cabeçalho) e não de duas.
+     *
+     * A mudança fica porque placa branca se anota por REGRA deste módulo, e
+     * não por necessidade de hoje: no dia em que uma folha ganhar marca, a
+     * regra já vale. E junto vem o `q`/`Q` que faltava de verdade, esse sim:
+     * o `1 1 1 rg` cru deixava a cor de preenchimento branca no estado gráfico
+     * da página. Nada quebrava porque todo operador posterior escreve a própria
+     * cor, mas era invariante carregada e não escrita. */
+    var tapou = false;
     for (var q = 0; q < itens.length; q++) {
       var r = itens[q];
       if (r.t !== 'tapar' || !(r.w > 0) || !(r.h > 0)) continue;
-      tapar += (x0 + r.x * escala).toFixed(2) + ' ' + (y0 + altura - (r.y + r.h) * escala).toFixed(2) +
-        ' ' + (r.w * escala).toFixed(2) + ' ' + (r.h * escala).toFixed(2) + ' re ';
+      if (!tapou) { doc.op('q'); tapou = true; }
+      doc.retangulo(x0 + r.x * escala, y0 + altura - (r.y + r.h) * escala,
+        r.w * escala, r.h * escala, [1, 1, 1]);
     }
-    if (tapar) doc.op('1 1 1 rg ' + tapar + 'f');
+    if (tapou) doc.op('Q');
     for (var j = 0; j < itens.length; j++) {
       var t = itens[j];
       if (t.t !== 'texto' || !t.txt) continue;

@@ -142,6 +142,29 @@ function geraCom(arquivoPdfJs) {
   });
 }
 
+/* A MESMA ESTEIRA, com uma folha própria (ou sem folha nenhuma), para medir se
+ * a página da folha leva marca d'água. */
+function geraComTapar(arquivoPdfJs, itens) {
+  // itens null: o MESMO documento sem a folha, que é o outro lado do delta
+  const raiz = {};
+  new Function('self', fs.readFileSync(arquivoPdfJs, 'utf8') + '\nreturn self;')(raiz);
+  const Core = require(path.join(RAIZ, 'core.js'));
+  const db = {
+    alunos: [{ id: 'a1', nome: 'Aluno de Prova', valorHora: 100, cor: '#1F3A5F' }],
+    aulas: [{ id: 'x1', alunoId: 'a1', data: '2026-09-10', hora: '08:00', duracaoMin: 60,
+      status: 'realizada', cobravel: true }],
+    resumos: []
+  };
+  const f = Core.calcularFechamento(db, 'a1', '2026-09');
+  return raiz.PDFGen.gerarFechamento(f, itens === null
+    ? { incluirNotas: false, sempreResumo: true }
+    : {
+      incluirNotas: true,
+      notas: [{ data: '2026-09-24', paginas: [{ fundo: 'branco', itens: itens }] }],
+      sempreResumo: true
+    });
+}
+
 /* Todo PDF carrega a data de criação, que muda a cada corrida por construção.
  * Zerar só ela é o que separa "o desenho mudou" de "o relógio andou". */
 function semData(bytes) {
@@ -303,6 +326,61 @@ function semData(bytes) {
     conf('e o medidor sabe acusar: duas páginas diferentes dão diferença aos milhares',
       !!(controle && controle.diferentes > 1000), true);
   }
+
+  /* O TAPAR CORTA A MARCA D'ÁGUA, COMO TODA PLACA BRANCA DESTE GERADOR.
+   *
+   * Toda placa branca passa pelo `retangulo()`, que a anota em `pag.brancos`, e
+   * é dessa lista que o `finalizar()` decide apagar a palavra da marca que
+   * sairia CORTADA pela placa: é o caso em que sobra pedaço de letra do lado de
+   * fora do corte. O tapar nascia fora dessa porta, emitido em operador cru, e
+   * era a ÚNICA placa branca do aplicativo que não cortava nada. Achado pela
+   * segunda lente cega do PR #57.
+   *
+   * A medida são três documentos iguais em tudo menos no retângulo, e o terceiro
+   * é o ALVO DE CONTROLE, onde a régua NÃO pode acusar: uma placa no canto, longe
+   * da marca, tem de sair do mesmo tamanho do documento sem placa nenhuma. Sem
+   * ele, "o documento encurtou" não se distinguiria de "qualquer retângulo
+   * encurta o documento". */
+  console.log('\n=== A folha da aula não leva marca d\'água ===');
+  /* A SEGUNDA LENTE CEGA DO PR #57 APONTOU UM DEFEITO QUE O CÓDIGO NÃO TEM, e
+   * a medida é o que separa as duas coisas.
+   *
+   * A acusação: o retângulo do `tapar` era emitido em operador cru, fora do
+   * `retangulo()`, e portanto não entrava em `pag.brancos`; seria então a única
+   * placa branca do gerador que não corta a palavra da marca d'água que ela
+   * fatia, deixando pedaço de letra impresso. O raciocínio está certo e a
+   * premissa não: a página da folha nasce com `semMarca: true`, ou seja, a
+   * folha da aula NÃO TEM marca d'água para cortar. E no material da biblioteca
+   * a marca vai POR CIMA, com mistura multiplicativa, por um caminho que nem
+   * consulta `pag.brancos`.
+   *
+   * A régua conta a palavra da marca no fluxo, e o ALVO onde ela TEM de achar é
+   * o próprio documento: a página do resumo leva marca, a da folha não. Sem
+   * esse par, "zero na folha" não se distinguiria de um contador quebrado.
+   *
+   * O `tapar` passou a ir pelo `retangulo()` mesmo assim, porque placa branca
+   * se anota por regra deste módulo e não por necessidade de hoje, e porque
+   * junto vem o `q`/`Q` que faltava. Mas a conta de "conserta um defeito" não
+   * podia ficar escrita, porque o defeito não existia. */
+  /* A palavra aparece no cabeçalho de TODA página e, de novo, na marca d'água
+   * das páginas que a têm. Por isso a medida é um DELTA entre dois documentos
+   * iguais menos a folha: se a folha trouxesse marca, a palavra cresceria duas
+   * vezes (o cabeçalho e a marca) em vez de uma. */
+  function conta(buf) {
+    const s = Buffer.from(buf).toString('latin1');
+    return {
+      paginas: (s.match(/\/Type\s*\/Page[^s]/g) || []).length,
+      palavras: (s.match(/APOIO EDUCACIONAL/g) || []).length
+    };
+  }
+  const comFolha = conta(geraCom(pdfHoje));
+  const semFolha = conta(geraComTapar(pdfHoje, null));
+  console.log('   sem a folha: ' + JSON.stringify(semFolha) + ', com a folha: ' + JSON.stringify(comFolha));
+  conf('o documento sem a folha TEM marca d\'água, senão a régua não mediria nada',
+    semFolha.palavras > semFolha.paginas, true);
+  conf('a folha acrescenta exatamente uma página', comFolha.paginas - semFolha.paginas, 1);
+  conf('e acrescenta só o cabeçalho dela, e nenhuma marca d\'água',
+    comFolha.palavras - semFolha.palavras, 1);
 
   if (PROVA) {
     if (!fs.existsSync(PROVA) || !fs.statSync(PROVA).isDirectory()) {

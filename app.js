@@ -5501,6 +5501,8 @@
       midias: midiasCarregadas,
       aoMudar: function () { agendarGravacaoNota(aula.id); },
       aoTrocarFerramenta: function () { desenharFerramentas(aula); },
+      // tocar num item na tela muda a seleção, e é a seleção que acende a lixeira
+      aoSelecionar: function () { desenharFerramentas(aula); },
       aoPedirTexto: function (p) { pedirTextoDaFolha(p, aula); }
     });
 

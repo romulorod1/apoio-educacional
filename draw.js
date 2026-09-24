@@ -401,7 +401,21 @@
     }
     if (this.ferramenta === 'selecao') {
       var alvo = this.itemEm(p);
+      var mudouSelecao = this.selecionado !== alvo;
       this.selecionado = alvo;
+      /* QUEM SELECIONA PRECISA AVISAR, senão a lixeira nunca aparece.
+       *
+       * A barra de ferramentas só monta o botão de remover quando
+       * `editorAtual.selecionado` existe, e ela só se redesenha quando a
+       * ferramenta muda. Tocar num item na tela mudava a seleção e não dizia
+       * nada a ninguém: a lixeira aparecia por acidente, quando ela tocava
+       * numa cor ou numa espessura logo depois, que redesenham a barra por
+       * outro motivo. Para o TAPAR isso é grave de um jeito que não era para os
+       * outros: a borracha não alcança retângulo (ela só remove traço, de
+       * propósito, para nunca danificar a imagem), então a seleção é a ÚNICA
+       * saída, e ela estava atrás de um caminho que a interface não oferecia.
+       * Ferramenta que ela cria e não consegue tirar não está pronta. */
+      if (mudouSelecao && this.opcoes.aoSelecionar) this.opcoes.aoSelecionar(alvo);
       if (alvo) {
         var alca = this._alcaEm(p, alvo);
         this.marcarPonto();
