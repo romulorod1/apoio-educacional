@@ -27,9 +27,28 @@
  * dos dois daria o mesmo desenho.
  *
  *   node _teste/testa_folha_impressa_igual.js [--prints <pasta>]
+ *   node _teste/testa_folha_impressa_igual.js --envenenado-ordem
  *
  * Com --prints, grava as duas páginas rasterizadas na pasta, com nomes
  * neutros, para o marco visual.
+ *
+ * O ALCANCE DESTA PROVA, ESCRITO ANTES QUE ALGUÉM SE ANIME COM O VERDE:
+ *
+ * CONTRA O DIFF QUE ELA ESTREIA, ESTA PROVA É INERTE. O pdf.js só ganhou um
+ * ramo para um tipo de item (`tapar`) que folha nenhuma de antes tem; sem item
+ * desse tipo a variável `tapar` fica vazia e o `if (tapar)` não chega a emitir
+ * operador. Byte igual era o ÚNICO resultado possível. Dizer "provei que não
+ * mudou" sem dizer "e nesta versão não tinha como mudar" é o começo da régua
+ * que ninguém mais questiona.
+ *
+ * O que ela vale, então, é o DEPOIS: ela é o guarda que fica de pé para o
+ * próximo diff, quando alguém mexer na ordem de desenho por um motivo
+ * qualquer. E para isso ela precisa MORDER, o que é outra coisa de ter
+ * controle de medidor. Por isso existe o `--envenenado-ordem`: ele troca a
+ * ordem DENTRO do pdf.js de hoje, pondo o texto antes da imagem, e a prova tem
+ * de gritar com a contagem de pixels na mão. A folha foi construída para
+ * discordar exatamente nesse ponto; se ela não gritar, o fixture não é tão
+ * assimétrico quanto quem o escreveu pensa.
  */
 'use strict';
 const fs = require('fs');
@@ -41,6 +60,7 @@ const RAIZ = path.join(__dirname, '..');
 const ANTES = 'd80bb90';          // o aplicativo publicado, antes da B10
 const I_PRINTS = process.argv.indexOf('--prints');
 const PRINTS = I_PRINTS !== -1 ? process.argv[I_PRINTS + 1] : null;
+const VENENO_ORDEM = process.argv.indexOf('--envenenado-ordem') !== -1;
 
 let passes = 0, falhas = 0;
 function conf(nome, obtido, esperado) {
@@ -124,7 +144,42 @@ function semData(bytes) {
   const pdfAntes = path.join(tmp, 'pdf_antes.js');
   fs.writeFileSync(pdfAntes, execFileSync('git', ['show', ANTES + ':pdf.js'],
     { cwd: RAIZ, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }));
-  const pdfHoje = path.join(RAIZ, 'pdf.js');
+  let pdfHoje = path.join(RAIZ, 'pdf.js');
+
+  /* O VENENO DA ORDEM: no pdf.js de hoje, as imagens deixam de ser desenhadas
+   * primeiro e passam a ser desenhadas por último, depois dos textos. É
+   * exatamente a inversão que a unificação das camadas existe para impedir, e
+   * é a que a folha desta prova foi construída para denunciar: o primeiro
+   * texto dela está DENTRO do retângulo da imagem, então invertida a ordem ele
+   * some debaixo do recorte. */
+  if (VENENO_ORDEM) {
+    const fonte = fs.readFileSync(pdfHoje, 'utf8');
+    const NL = fonte.indexOf('\r\n') >= 0 ? '\r\n' : '\n';
+    const desenha = [
+      '      doc.registraImagem(it.ref, info.bytes, info.w, info.h);',
+      '      doc.desenhaImagem(it.ref, x0 + it.x * escala, y0 + altura - (it.y + it.h) * escala,',
+      '        it.w * escala, it.h * escala);'].join(NL);
+    const guarda = '      _adiadas.push(it);';
+    const marcaTracos = '    desenhaTracos(doc, itens, x0, y0, largura, altura, escala);';
+    const solta = [
+      '    _adiadas.forEach(function (it) {',
+      '      var info = imagens && imagens[it.ref];',
+      '      doc.registraImagem(it.ref, info.bytes, info.w, info.h);',
+      '      doc.desenhaImagem(it.ref, x0 + it.x * escala, y0 + altura - (it.y + it.h) * escala,',
+      '        it.w * escala, it.h * escala);',
+      '    });',
+      marcaTracos].join(NL);
+    conf('a âncora do desenho da imagem casa exatamente uma vez', fonte.split(desenha).length - 1, 1);
+    conf('a âncora dos traços casa exatamente uma vez', fonte.split(marcaTracos).length - 1, 1);
+    const envenenado = fonte
+      .split(desenha).join(guarda)
+      .split('    var itens = pagina.itens || [];').join('    var itens = pagina.itens || [];' + NL + '    var _adiadas = [];')
+      .split(marcaTracos).join(solta);
+    conf('o veneno mudou mesmo o pdf.js', envenenado !== fonte ? 'diferente' : 'IGUAL', 'diferente');
+    const alvo = path.join(tmp, 'pdf_envenenado.js');
+    fs.writeFileSync(alvo, envenenado);
+    pdfHoje = alvo;
+  }
 
   // o controle: os dois pdf.js TÊM de ser diferentes, senão a prova compara
   // um arquivo com ele mesmo e passa sem medir nada
@@ -132,6 +187,13 @@ function semData(bytes) {
   const fonteHoje = fs.readFileSync(pdfHoje, 'utf8');
   conf('o pdf.js de hoje é DIFERENTE do de ' + ANTES, fonteAntes === fonteHoje ? 'igual' : 'diferente', 'diferente');
   conf('e a diferença é a camada do tapar', /tapar/.test(fonteHoje) && !/tapar/.test(fonteAntes), true);
+  /* O ALCANCE, MEDIDO E NÃO SUPOSTO: contra este diff a prova é inerte, porque
+   * a folha de antes não tem item do tipo `tapar` e o ramo novo não chega a
+   * emitir operador nenhum. A contagem abaixo é o que transforma essa frase de
+   * opinião em número, e é ela que impede alguém de ler o verde como mais do
+   * que ele é. */
+  const comTapar = folha()[0].paginas[0].itens.filter(i => i.t === 'tapar').length;
+  conf('a folha de antes não tem nenhum item do tipo tapar', comTapar, 0);
 
   const bAntes = geraCom(pdfAntes);
   const bHoje = geraCom(pdfHoje);
@@ -150,7 +212,8 @@ function semData(bytes) {
       JSON.stringify(sa.slice(Math.max(0, i - 40), i + 40).toString('latin1')) + ' contra ' +
       JSON.stringify(sh.slice(Math.max(0, i - 40), i + 40).toString('latin1')));
   }
-  conf('e BYTE A BYTE igual, fora a data de criação', iguais, true);
+  if (VENENO_ORDEM) conf('VENENO: a folha impressa MUDOU byte a byte', iguais, false);
+  else conf('e BYTE A BYTE igual, fora a data de criação', iguais, true);
 
   // 2. pixel a pixel, rasterizando as duas com o PyMuPDF
   const pgFolha = (() => {
@@ -181,7 +244,20 @@ function semData(bytes) {
     conf('a comparação de PIXEL rodou', medida.erro, '(sem erro)');
   } else {
     conf('a folha rasterizou nas duas versões, no mesmo tamanho', !!(medida && medida.largura > 0), true);
-    conf('e PIXEL A PIXEL não há uma única diferença a 200 dpi', medida.diferentes, 0);
+    if (VENENO_ORDEM) {
+      /* A LINHA DA REPROVAÇÃO. Invertida a ordem, o texto que está dentro do
+       * retângulo da imagem some debaixo dela, e a asserção do caso normal
+       * ("zero diferentes") cai com o número na mão. */
+      console.log('   A ASSERÇÃO DO CASO NORMAL REPROVARIA ASSIM:');
+      console.log('   FALHA e PIXEL A PIXEL não há uma única diferença a 200 dpi  ' +
+        '[obtido: ' + medida.diferentes + ' | esperado: 0]');
+      conf('VENENO: a asserção MORDE, e a diferença é aos milhares',
+        medida.diferentes > 1000, true);
+      conf('VENENO: e o pior canal mostra que o desenho mudou de verdade, não por arredondamento',
+        medida.pior_canal > 100, true);
+    } else {
+      conf('e PIXEL A PIXEL não há uma única diferença a 200 dpi', medida.diferentes, 0);
+    }
     /* O CONTROLE DO MEDIDOR: ele tem de saber acusar. Comparada com a página
      * ANTERIOR do mesmo documento, a mesma medida tem de achar diferença aos
      * milhares; sem este par, "zero diferentes" não se distingue de um medidor

@@ -280,16 +280,37 @@
     return item;
   };
 
+  /* O QUE ELA PEGA É O QUE ELA VÊ, e por isso este teste de acerto percorre a
+   * MESMA ordem em que a folha é pintada, de cima para baixo: a última camada
+   * primeiro, e dentro dela o último item primeiro.
+   *
+   * Percorrer a ordem do vetor, que era o que estava aqui, passou a discordar
+   * do desenho no dia em que a pintura virou camadas. O caso que isso quebra é
+   * concreto e foi medido: um retângulo que tapa POSTO ANTES de a imagem
+   * entrar no vetor aparece POR CIMA dela na folha (a camada do tapar vem
+   * depois da imagem) e, pela ordem do vetor, a seleção agarrava a imagem que
+   * está por baixo. Ela arrastaria o recorte inteiro tentando mover o branco.
+   *
+   * Achado pela conferência de uso da orquestradora, e não por teste: a
+   * pergunta era se a borracha continuava alcançando o traço depois da mudança
+   * de ordem, e a borracha estava certa; quem estava errada era a seleção. */
   Editor.prototype.itemEm = function (p) {
     var itens = this.pagina().itens;
-    for (var i = itens.length - 1; i >= 0; i--) {
-      var it = itens[i];
-      if ((it.t === 'imagem' || it.t === 'tapar') &&
-          p.x >= it.x && p.x <= it.x + it.w && p.y >= it.y && p.y <= it.y + it.h) return it;
+    function pega(it) {
+      if (it.t === 'imagem' || it.t === 'tapar') {
+        return p.x >= it.x && p.x <= it.x + it.w && p.y >= it.y && p.y <= it.y + it.h;
+      }
       if (it.t === 'texto') {
         var alturaAprox = it.tam * 1.3;
-        var larguraAprox = it.txt.length * it.tam * 0.52;
-        if (p.x >= it.x - 6 && p.x <= it.x + larguraAprox && p.y >= it.y - 4 && p.y <= it.y + alturaAprox) return it;
+        var larguraAprox = String(it.txt).length * it.tam * 0.52;
+        return p.x >= it.x - 6 && p.x <= it.x + larguraAprox && p.y >= it.y - 4 && p.y <= it.y + alturaAprox;
+      }
+      return false;
+    }
+    for (var c = ORDEM_CAMADAS.length - 1; c >= 0; c--) {
+      for (var i = itens.length - 1; i >= 0; i--) {
+        var it = itens[i];
+        if (it && it.t === ORDEM_CAMADAS[c] && pega(it)) return it;
       }
     }
     return null;

@@ -1231,6 +1231,9 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .tag.bib-lp-min-item { background: var(--branco); border: 1px solid var(--fio); color: var(--muted);
   text-transform: none; font-weight: 600; }
 .bib-lp-acrescentar { gap: 8px; flex-wrap: wrap; margin: 12px 0 4px; }
+/* de qual lista da fonte veio o exercício: sem isto, dois cartões da mesma
+   tela podem se chamar os dois "Exercício 1" */
+.bib-lp-de-onde { margin: 2px 0 6px; font-size: 12px; }
 /* os chips do filtro de dificuldade são alvos de toque do tablet, como os do "Para mim" */
 .bib-filtro-dif .chip-filtro { min-height: 44px; min-width: 44px; padding: 10px 16px; font-size: 14px; }
 /* a dificuldade do pacote fica sem cor e em minúsculas: a colorida é a dela, no "Para mim" */

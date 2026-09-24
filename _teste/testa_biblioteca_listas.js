@@ -220,8 +220,12 @@ const desmarcar = (pag, id) => pag.evaluate(i => {
    * meia aula" fixo passaria em tudo. A primeira escrita desta prova tinha só
    * a de dentro, e foi rodando que isso apareceu. */
   conf('o nível 3, com 35,0 min, diz um pouco MAIS de meia aula', /um pouco mais de meia aula/.test(d3[0] || ''), true);
-  conf('o minuto do nível 2 vem embaixo, colado da estimativa', d2[1], '≈ 29,4 min (estimativa)');
-  conf('o minuto do nível 3 vem embaixo, colado da estimativa', d3[1], '≈ 35 min (estimativa)');
+  /* O minuto da lista vai INTEIRO, meio para cima: 29,4 vira 29 e 35,0 vira
+   * 35. A décima numa estimativa de quanto o aluno leva é precisão que não
+   * existe, e era ela que fazia "29" e "32,1" aparecerem lado a lado com
+   * formatos diferentes. */
+  conf('o minuto do nível 2 vem embaixo, inteiro, colado da estimativa', d2[1], '≈ 29 min (estimativa)');
+  conf('o minuto do nível 3 vem embaixo, inteiro, colado da estimativa', d3[1], '≈ 35 min (estimativa)');
 
   const texto = (await textoDoCorpo(pag)).toLowerCase();
   const achadas = PROIBIDAS.filter(p => texto.indexOf(p) >= 0);
@@ -246,9 +250,14 @@ const desmarcar = (pag, id) => pag.evaluate(i => {
   const linhasPit = await linhasDeListaPronta(pag);
   conf('o módulo do Teorema de Pitágoras tem a lista dele, e só ela', linhasPit.length, 1);
   conf('e é a do módulo certo', (linhasPit[0] || {}).id, LISTA_CURTA.id);
-  conf('com 24,0 min, diz um pouco MENOS de meia aula',
+  conf('com 24,6 min, diz um pouco MENOS de meia aula',
     /um pouco menos de meia aula/.test(((linhasPit[0] || {}).detalhe || [])[0] || ''), true);
-  conf('e o minuto dela é o dela', ((linhasPit[0] || {}).detalhe || [])[1], '≈ 24 min (estimativa)');
+  /* O ARREDONDAMENTO É MEIO PARA CIMA, e esta é a lista que mede isso: 24,6
+   * tem de virar 25. As outras duas têm 29,4 e 35,0, que arredondam para
+   * BAIXO e para lugar nenhum; com só elas, trocar o meio para cima por um
+   * corte simples passaria nas três asserções sem nada reclamar. */
+  conf('e o minuto dela é o dela, arredondado meio PARA CIMA (24,6 vira 25)',
+    ((linhasPit[0] || {}).detalhe || [])[1], '≈ 25 min (estimativa)');
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
   await pausa(300);
   conf('voltou e abriu de novo o módulo das equações', await tocarLinha(pag, MOD_TITULO), true);
@@ -429,6 +438,49 @@ const desmarcar = (pag, id) => pag.evaluate(i => {
     return;
   }
   conf('o texto continua visível por cima do retângulo, como no PDF', pixel > 0, true);
+
+  /* A BORRACHA CONTINUA ALCANÇANDO O TRAÇO depois da mudança de ordem.
+   *
+   * Na ORDEM_CAMADAS o traço fica POR CIMA do tapar, e isso é decisão: tapar
+   * cobre o enunciado, que é imagem, e não cobre o risco que ela mesma fez. A
+   * saída para o risco indesejado continua sendo a borracha, e ordem nova com
+   * seleção e remoção é exatamente onde algo quebra calado. Então mede-se, em
+   * vez de deduzir da leitura.
+   *
+   * São quatro medidas, e as duas últimas são o que impede a primeira de ser
+   * vácuo: a borracha tem de TIRAR o traço, tem de NÃO tirar o tapar, o texto
+   * nem a imagem (o `apagarEm` só remove `t === 'traco'`, e isso é o que faz a
+   * imagem nunca ser danificada), e a seleção tem de conseguir tirar o tapar,
+   * que é a única forma de desfazer um branco posto no lugar errado. */
+  const borracha = await pag.evaluate(() => {
+    const c = document.createElement('canvas');
+    c.width = 400; c.height = 300;
+    document.body.appendChild(c);
+    const ed = new window.Draw.Editor(c, { nota: window.Draw.notaVazia('branco') });
+    ed.adicionarTexto('texto', 200, 200, 20);
+    ed.adicionarTapar(40, 40, 200, 100);
+    ed.pagina().itens.push({ t: 'imagem', ref: 'x', x: 40, y: 40, w: 200, h: 100 });
+    ed.pagina().itens.push({ t: 'traco', cor: '#1A1C1F', pontos: [[100, 80, 4], [140, 90, 4]] });
+    const antes = ed.pagina().itens.map(i => i.t).sort().join(',');
+    const removeu = ed.apagarEm({ x: 100, y: 80 }, 10);
+    const depois = ed.pagina().itens.map(i => i.t).sort().join(',');
+    // e a seleção alcança o tapar, que é como ela desfaz um branco errado
+    ed.ferramenta = 'selecao';
+    const achou = ed.itemEm({ x: 60, y: 60 });
+    ed.selecionado = achou;
+    ed.removerSelecionado();
+    const semTapar = ed.pagina().itens.map(i => i.t).sort().join(',');
+    ed.destruir && ed.destruir();
+    c.remove();
+    return { antes, removeu, depois, tipoAchado: achou && achou.t, semTapar };
+  });
+  console.log('   borracha: ' + JSON.stringify(borracha));
+  conf('a folha começa com os quatro tipos', borracha.antes, 'imagem,tapar,texto,traco');
+  conf('a borracha alcança e remove o traço', borracha.removeu, true);
+  conf('e NÃO leva junto o tapar, o texto nem a imagem', borracha.depois, 'imagem,tapar,texto');
+  conf('a seleção acha o retângulo que tapa', borracha.tipoAchado, 'tapar');
+  conf('e consegue tirá-lo, que é como ela desfaz um branco no lugar errado',
+    borracha.semTapar, 'imagem,texto');
   // ================================================================
   secao('7. A versão sobe SILENCIOSA');
   /* O texto para a Nathália é do Romulo, e não nosso. Então a 1.27.0 não entra

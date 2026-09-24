@@ -11431,8 +11431,19 @@
     return 'cerca de meia aula';
   }
 
-  function minutosEstimados(minutos) {
-    return '≈ ' + String(minutos).replace('.', ',') + ' min (estimativa)';
+  /* O MINUTO DA LISTA VAI INTEIRO, e é assim desde o desenho: a forma escrita
+   * lá é "≈ 29 min (estimativa)". A décima de minuto numa estimativa de quanto
+   * um aluno leva numa questão é precisão que não existe, e a tela estava
+   * mostrando "29" ao lado de "32,1", que ainda por cima não parecem a mesma
+   * coisa. O olho de fora cego da B10 chegou ao mesmo lugar sozinho.
+   *
+   * O PREÇO, escrito porque ele é real: a soma dos minutos dos cartões deixa
+   * de fechar com o número do cabeçalho na conta de cabeça, por até meio
+   * minuto. O cartão continua com a décima porque ali o número é o do
+   * exercício, e não um total. Meio para cima, como o resto da casa. */
+  function minutosEstimados(minutos, inteiro) {
+    var v = inteiro ? String(Math.floor(Number(minutos) + 0.5)) : String(minutos).replace('.', ',');
+    return '≈ ' + v + ' min (estimativa)';
   }
 
   /* NENHUMA AFIRMAÇÃO DE CURADORIA, e isto não é estilo: a comparação cega de
@@ -11451,11 +11462,19 @@
       linha.classList.add('bib-lista-pronta');
       linha.setAttribute('data-lista-pronta', lp.id);
       linha.querySelector('.cresce').appendChild(
-        el('div', { class: 'detalhe bib-lp-minutos', texto: minutosEstimados(lp.minutos) }));
+        el('div', { class: 'detalhe bib-lp-minutos', texto: minutosEstimados(lp.minutos, true) }));
       corpo.appendChild(linha);
     });
+    /* A FRASE DIZ O QUE A ORDEM É, e não o que a gente gostaria que ela fosse.
+     * "Do mais simples ao mais difícil" sem adjetivo afirma um juízo de
+     * dificuldade que esta casa não faz: o que ordena a lista é a dificuldade
+     * ESTIMADA, que é a posição do exercício na lista da fonte, e é a mesma
+     * palavra que já aparece no cartão ("estimada: fácil"). Sem o adjetivo, a
+     * frase promete mais do que o dado sustenta, e o olho de fora cego pegou
+     * isso apontando um item de oito minutos na segunda posição. */
     corpo.appendChild(el('p', { class: 'ajuda bib-lp-ajuda', id: 'bib-lp-ajuda',
-      texto: 'Do mais simples ao mais difícil, dentro do tempo. Tire, ponha e troque a ordem à vontade.' }));
+      texto: 'Em ordem de dificuldade estimada, da mais baixa para a mais alta. ' +
+        'Tire, ponha e troque a ordem à vontade.' }));
   }
 
   function listaProntaPorId(id) {
@@ -11551,7 +11570,7 @@
     soma = Math.round(soma) / 10;
     var cabeca = el('div', { class: 'bib-lp-cabeca', id: 'bib-lp-cabeca' }, [
       el('div', { class: 'bib-lp-meia', texto: plural(ids.length, 'exercício', 'exercícios') + ' · ' + meiaAula(soma) }),
-      el('div', { class: 'ajuda bib-lp-minutos', texto: minutosEstimados(soma) +
+      el('div', { class: 'ajuda bib-lp-minutos', texto: minutosEstimados(soma, true) +
         (deFora ? ', fora ' + plural(deFora, 'exercício que você acrescentou', 'exercícios que você acrescentou') +
           ' e não entra nessa conta' : '') })
     ]);
@@ -11576,11 +11595,20 @@
           disabled: pos === ids.length - 1 ? 'disabled' : null, 'aria-label': 'Descer', texto: '▼',
           aoClick: function () { if (moverNoCarrinho(id, 1)) redesenharListaPronta(id, 'descer'); } })
       ]);
+      /* O NÚMERO DO EXERCÍCIO SOZINHO NÃO IDENTIFICA NADA dentro de uma lista
+       * pronta: a numeração da fonte recomeça em cada lista do módulo, e dois
+       * exercícios de listas diferentes se chamam os dois "Exercício 1". Numa
+       * tela em que ela troca a ordem, dois cartões com o mesmo nome e
+       * conteúdos diferentes deixam ela sem saber qual foi que se moveu.
+       * Achado pelo olho de fora cego da B10, que viu os dois lado a lado.
+       * A lista da fonte entra embaixo, e só quando o módulo tem mais de uma. */
+      var varias = (mod.ordemListas || []).length > 1;
       var cartao = el('button', {
         type: 'button', class: 'bib-cartao', 'data-id': it.id,
         aoClick: function () { verNaBiblioteca({ tipo: 'exercicio', lista: { titulo: mod.titulo, itens: ids.map(function (x) { return bib.itemPorId[x]; }) }, indice: pos }); }
       }, [
         el('div', { class: 'bib-rotulo bib-numero', texto: (pos + 1) + '. Exercício ' + it.numero }),
+        varias ? el('div', { class: 'ajuda bib-lp-de-onde', texto: it.aula.titulo }) : null,
         miniaturaBib(it.pacote, it.assets.enunciado, it.medidas && it.medidas.enunciado, 520),
         el('div', { class: 'bib-tags' }, [
           rotuloDificuldade(it) ? el('span', { class: 'tag bib-dif-fonte', texto: rotuloDificuldade(it) }) : null,

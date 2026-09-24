@@ -305,13 +305,16 @@ const LISTAS = [
     /* A terceira, noutro módulo e ABAIXO da banda: é ela que mede a frase "um
      * pouco menos de meia aula", que nenhuma das outras duas alcança. */
     id: MOD_PIT + ':kit:2', modulo: MOD_PIT, serie: '9ano', nivel: 2,
-    titulo: 'Teorema de Pitágoras', regra: 'listas-v1', tempo_regra: 'tempo-v1', minutos: 24.0,
+    /* 24,6 e não 24,0 de propósito: é o único dos três totais que arredonda
+     * meio PARA CIMA (vira 25). Os outros dois, 29,4 e 35,0, arredondam para
+     * baixo e para lugar nenhum, e com só eles um corte simples passaria. */
+    titulo: 'Teorema de Pitágoras', regra: 'listas-v1', tempo_regra: 'tempo-v1', minutos: 24.6,
     teoria: [],
     degraus: [
       { n: 1, item: LISTA_PIT + ':ex:1', degrau: 1, minutos: 4.0 },
       { n: 2, item: LISTA_PIT + ':ex:2', degrau: 1, minutos: 5.0 },
       { n: 3, item: LISTA_PIT + ':ex:4', degrau: 2, minutos: 7.5 },
-      { n: 4, item: LISTA_PIT + ':ex:5', degrau: 3, minutos: 7.5 }
+      { n: 4, item: LISTA_PIT + ':ex:5', degrau: 3, minutos: 8.1 }
     ],
     alternativas: {},
     relaxou: ['minutos']
