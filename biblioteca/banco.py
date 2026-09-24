@@ -317,7 +317,7 @@ def gerar(base, nivel, versao, saida, curadoria, anos=ANOS_MODELO_A, trabalho=No
     nome = 'matematica-obmep-banco-%s' % serie
     trabalho = trabalho or os.path.join(os.path.dirname(os.path.abspath(saida)), 'trabalho', '%s-v%d' % (nome, versao))
     arquivos = arquivos or arquivos_do_banco(base, anos)
-    dif_cur, apelidos, excl_cur = gerar_pacote.ler_curadoria(curadoria)
+    dif_cur, apelidos, excl_cur, _excl_meta = gerar_pacote.ler_curadoria(curadoria)
     conteudo, itens, docs_busca = {}, [], []
     relatorio = {'pacote': nome, 'versao': versao, 'serie': serie, 'pymupdf': portal.versao_pymupdf(),
                  'anos': [], 'excluidos': [], 'fora_desta_versao': [

@@ -57,6 +57,7 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
 sys.path.insert(0, AQUI)
 import portal  # noqa: E402
+import kits  # noqa: E402
 
 # ------------------------------------------------------------------ medidas
 
@@ -1545,6 +1546,10 @@ def ler_curadoria(pasta):
     # defeito DA FONTE (figura fora do lugar, frase da solucao no enunciado). O
     # recorte e fiel a pagina; o defeito e do conteudo, e so leitura pega.
     excl = {}
+    # quem e data ficam a parte, para o exclusoes.json do pacote (CONTRATO 8d)
+    # poder dizer quem tirou e quando, sem mudar o que o gerador ja fazia com o
+    # motivo: `excl` continua sendo {id: motivo} e nenhum chamador muda.
+    excl_meta = {}
     caminho = os.path.join(pasta, 'exclusoes.csv')
     if os.path.exists(caminho):
         for i, linha in enumerate(io.open(caminho, encoding='utf-8-sig')):
@@ -1552,7 +1557,14 @@ def ler_curadoria(pasta):
             if i == 0 or len(partes) < 2 or not partes[0].strip():
                 continue
             excl[partes[0].strip()] = partes[1].strip()
-    return dif, apelidos, excl
+            meta = {}
+            if len(partes) > 2 and partes[2].strip():
+                meta['quem'] = partes[2].strip()
+            if len(partes) > 3 and partes[3].strip():
+                meta['data'] = partes[3].strip()
+            if meta:
+                excl_meta[partes[0].strip()] = meta
+    return dif, apelidos, excl, excl_meta
 
 
 def montar_busca(docs):
@@ -1620,6 +1632,37 @@ def commit_do_gerador():
         return None
 
 
+RAIZ_FIXA_DO_ZIP = ['manifest.json', 'itens.json', 'teoria.json', 'busca.json', 'apelidos.json']
+
+
+def ordem_do_zip(conteudo):
+    """A ordem em que os arquivos entram no zip. Os cinco primeiros ficam onde
+    sempre estiveram (trocar a ordem troca o hash do zip dos dez pacotes
+    gravados); o que vem depois sai do PROPRIO conteudo, e nao de uma lista
+    cravada."""
+    return (RAIZ_FIXA_DO_ZIP +
+            sorted(k for k in conteudo if '/' not in k and k not in RAIZ_FIXA_DO_ZIP) +
+            sorted(k for k in conteudo if k.startswith('assets/')))
+
+
+def conferir_ordem_do_zip(ordem, conteudo):
+    """O zip tem de levar exatamente o que o manifest promete.
+
+    Isto existe por um defeito real: a `ordem` era uma lista cravada com os
+    cinco arquivos de raiz conhecidos, entao um arquivo de raiz NOVO (o
+    kits.json da B9) ia para a pasta de trabalho e para a lista do manifest e
+    NAO ia para o zip. O pacote sairia com a lista prometendo um arquivo que
+    nao esta la, e o defeito so apareceria no tablet dela, como "o pacote esta
+    incompleto". Devolve a mensagem do erro, ou None."""
+    prometido = set(conteudo) | {'manifest.json'}
+    if set(ordem) == prometido and len(ordem) == len(prometido):
+        return None
+    faltou = sorted(prometido - set(ordem))
+    sobrou = sorted(set(ordem) - prometido)
+    return ('o zip nao levaria o que o manifest promete. Faltando: %s. Sobrando: %s'
+            % (', '.join(faltou) or 'nada', ', '.join(sobrou) or 'nada'))
+
+
 def gravar_pacote(conteudo, manifest_b, nome, versao, saida, trabalho, gravar_zip=True):
     """Grava a pasta de trabalho (tudo solto) e o zip deterministico. Devolve o caminho do zip."""
     os.makedirs(trabalho, exist_ok=True)
@@ -1639,7 +1682,17 @@ def gravar_pacote(conteudo, manifest_b, nome, versao, saida, trabalho, gravar_zi
     zip_caminho = os.path.join(saida, '%s-v%d.zip' % (nome, versao))
     if gravar_zip:
         os.makedirs(saida, exist_ok=True)
-        ordem = ['manifest.json', 'itens.json', 'teoria.json', 'busca.json', 'apelidos.json'] +                 sorted(k for k in conteudo if k.startswith('assets/'))
+        # A ordem dos arquivos de raiz e fixa (foi assim nos dez pacotes
+        # gravados e trocar a ordem troca o hash do zip), mas o que vem DEPOIS
+        # dela sai do proprio conteudo, e nao de uma lista cravada. Antes saia:
+        # um arquivo de raiz novo (o kits.json da B9) ia para a pasta de
+        # trabalho e para a lista do manifest, e NAO ia para o zip, e o defeito
+        # so apareceria no tablet dela, como "o pacote esta incompleto".
+        # A conferencia logo abaixo nao deixa isso voltar calado.
+        ordem = ordem_do_zip(conteudo)
+        erro = conferir_ordem_do_zip(ordem, conteudo)
+        if erro:
+            raise SystemExit(erro)
         with zipfile.ZipFile(zip_caminho + '.tmp', 'w') as z:
             for k in ordem:
                 zi = zipfile.ZipInfo(k, date_time=(1980, 1, 1, 0, 0, 0))
@@ -1652,14 +1705,14 @@ def gravar_pacote(conteudo, manifest_b, nome, versao, saida, trabalho, gravar_zi
 
 
 def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, commit=None,
-          so_modulos=None, gravar_zip=True, anterior=None):
+          so_modulos=None, gravar_zip=True, anterior=None, com_kits=False):
     t_ini = time.time()
     nome = 'matematica-obmep-%s' % serie
     trabalho = trabalho or os.path.join(os.path.dirname(os.path.abspath(saida)), 'trabalho', '%s-v%d' % (nome, versao))
     arquivos = portal.listar(pdfs)
     if so_modulos:
         arquivos = [a for a in arquivos if a['modulo'] in so_modulos]
-    dif_cur, apelidos, excl_cur = ler_curadoria(curadoria)
+    dif_cur, apelidos, excl_cur, excl_meta = ler_curadoria(curadoria)
     conteudo = {}   # caminho no zip -> bytes
     itens, teoria, docs_busca = [], [], []
     relatorio = {'pacote': nome, 'versao': versao, 'serie': serie, 'pymupdf': portal.versao_pymupdf(),
@@ -1912,6 +1965,27 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
     conteudo['busca.json'] = json_bytes(montar_busca(docs_busca))
     conteudo['apelidos.json'] = json_bytes(apelidos)
 
+    # Os dois aditivos da secao 8d do contrato, opcionais: sem --kits o pacote
+    # sai exatamente como saia antes, e e isso que deixa provar, hash a hash,
+    # que ligar os kits nao mexeu em recorte nenhum.
+    kits_gerados = None
+    if com_kits:
+        excluidos = []
+        for e in relatorio['excluidos']:
+            linha = {'id': e['id'], 'motivo': e['motivo']}
+            linha.update(excl_meta.get(e['id'], {}))
+            excluidos.append(linha)
+        excluidos.sort(key=lambda e: e['id'])
+        conteudo['exclusoes.json'] = json_bytes(excluidos)
+        kits_gerados, sem_kit, modulos_sem_exercicio = kits.gerar(itens, teoria)
+        conteudo['kits.json'] = json_bytes(kits_gerados)
+        relatorio['kits'] = {
+            'n': len(kits_gerados),
+            'sem_kit': ['%s nivel %d' % (m, n) for m, n in sem_kit],
+            'modulos_sem_exercicio': modulos_sem_exercicio,
+            'relaxou': {k['id']: k['relaxou'] for k in kits_gerados if k['relaxou']},
+        }
+
     n_excl = len(relatorio['excluidos'])
     contagens = {
         'modulos': len(por_modulo),
@@ -1922,6 +1996,8 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
         'itens_com_solucao': sum(1 for i in itens if i['assets']['solucao']),
         'itens_excluidos': n_excl,
     }
+    if kits_gerados is not None:
+        contagens['kits'] = len(kits_gerados)
     manifest = {
         'esquema': 1, 'pacote': nome, 'versao': versao,
         'gerado_em': gerado_em or datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).replace(microsecond=0).isoformat(),
@@ -2008,13 +2084,17 @@ def principal(argv=None):
     ap.add_argument('--modulos', help='so estes modulos, separados por virgula')
     ap.add_argument('--sem-zip', action='store_true')
     ap.add_argument('--anterior', help='itens.json de uma geracao anterior, para contar as caixas que mudaram')
+    ap.add_argument('--kits', action='store_true',
+                    help='escreve tambem kits.json e exclusoes.json (CONTRATO 8d e 8e). Sem esta opcao o '
+                         'pacote sai exatamente como saia antes, e e isso que deixa provar hash a hash '
+                         'que ligar os kits nao mexeu em recorte nenhum')
     ap.add_argument('--fontes-negrito', help='pedacos de nome de fonte negrito, separados por virgula '
                     '(padrao %s)' % ','.join(FONTES_NEGRITO))
     a = ap.parse_args(argv)
     if a.fontes_negrito:
         FONTES_NEGRITO[:] = [x for x in a.fontes_negrito.split(',') if x]
     manifest, rel, trab = gerar(a.pdfs, a.serie, a.versao, a.saida, a.curadoria, a.trabalho, a.gerado_em, a.commit,
-                                a.modulos.split(',') if a.modulos else None, not a.sem_zip, a.anterior)
+                                a.modulos.split(',') if a.modulos else None, not a.sem_zip, a.anterior, a.kits)
     print(json.dumps({'contagens': manifest['contagens'], 'zip': rel['zip'], 'bytes_por_tipo': rel['bytes_por_tipo'],
                       'excluidos': len(rel['excluidos']), 'segundos': rel['segundos'], 'trabalho': trab},
                      ensure_ascii=False, indent=1))

@@ -38,6 +38,12 @@
  *     ele continuasse dizendo "importou", a afirmação da seção 3 não estaria
  *     medindo nada.
  *
+ *   node _teste/testa_biblioteca_kits.js --pacote-real <caminho do zip>
+ *     importa um pacote DE VERDADE (o 9º ano v5, com os 33 kits) em vez do de
+ *     brinquedo, e confere o que ficou gravado contra o que o manifest dele
+ *     diz. Não entra no portão porque depende de um arquivo que não está no
+ *     repositório: o pacote mora fora, e é assim que tem de ser.
+ *
  *   node _teste/testa_biblioteca_kits.js --envenenado-app-recusa --controle
  *     o mesmo veneno, com as expectativas do modo normal. Serve para mostrar a
  *     LINHA DA REPROVAÇÃO: esta corrida tem de falhar, e por isso ela não está
@@ -56,6 +62,8 @@ const { conf, secao, esperar } = H;
 
 const VENENO_APP = process.argv.indexOf('--envenenado-app-recusa') !== -1;
 const CONTROLE = process.argv.indexOf('--controle') !== -1;
+const I_REAL = process.argv.indexOf('--pacote-real');
+const PACOTE_REAL = I_REAL !== -1 ? process.argv[I_REAL + 1] : null;
 const PORTA = 8804;
 
 /* O commit em que o 1.26.0 subiu (merge do PR #55). A promessa do contrato é
@@ -147,6 +155,63 @@ async function gravado(pag) {
     conf('o veneno mudou mesmo o biblioteca.js servido', trocas['/biblioteca.js'] !== BIB_REPO ? 'diferente' : 'IGUAL', 'diferente');
     conf('e trocou exatamente uma ocorrência', BIB_REPO.split(TRECHO_OBRIGATORIOS).length - 1, 1);
     if (trocas['/biblioteca.js'] === BIB_REPO) throw Object.assign(new Error('veneno não aplicado'), { jaContado: true });
+  }
+
+  if (PACOTE_REAL) {
+    // ==============================================================
+    secao('R. O pacote de verdade, com os 33 kits, no 1.26.0');
+    const bytes = fs.statSync(PACOTE_REAL).size;
+    const zipReal = fs.readFileSync(PACOTE_REAL);
+    const manifestoReal = JSON.parse(require('zlib').inflateRawSync(
+      (() => { // lê o manifest.json do zip sem dependência nova
+        let i = 0;
+        for (;;) {
+          const assinatura = zipReal.readUInt32LE(i);
+          if (assinatura !== 0x04034b50) throw new Error('nao achei o manifest.json no comeco do zip');
+          const metodo = zipReal.readUInt16LE(i + 8);
+          const tamComp = zipReal.readUInt32LE(i + 18);
+          const nomeLen = zipReal.readUInt16LE(i + 26);
+          const extraLen = zipReal.readUInt16LE(i + 28);
+          const nome = zipReal.slice(i + 30, i + 30 + nomeLen).toString('utf8');
+          const dados = zipReal.slice(i + 30 + nomeLen + extraLen, i + 30 + nomeLen + extraLen + tamComp);
+          if (nome === 'manifest.json') return metodo === 8 ? dados : Buffer.concat([dados]);
+          i += 30 + nomeLen + extraLen + tamComp;
+        }
+      })()).toString('utf8'));
+    const c = manifestoReal.contagens;
+    console.log('   pacote: ' + path.basename(PACOTE_REAL) + ', ' + Math.round(bytes / 1048576) + ' MB, versão ' + manifestoReal.versao);
+    console.log('   contagens do manifest: ' + JSON.stringify(c));
+    conf('o pacote real diz quantos kits traz', typeof c.kits, 'number');
+    await amb.subir();
+    const pagR = await amb.pagina();
+    await H.abrirApp(pagR, amb.ORIGEM);
+    await H.irParaAba(pagR, 'ajustes');
+    const msgR = await importar(pagR, PACOTE_REAL, 'importação do pacote real');
+    console.log('   tela: ' + msgR.replace(/\n/g, ' | '));
+    conf('a tela diz que importou', /^Biblioteca importada\./.test(msgR), true);
+    const g = await gravado(pagR);
+    console.log('   gravado: ' + JSON.stringify(g));
+    conf('exercícios gravados = os do manifest', g.biblioteca_itens, c.itens);
+    conf('aulas de teoria gravadas = as do manifest', g.biblioteca_teoria, c.aulas_teoria);
+    conf('imagens gravadas = 2 por exercício mais as páginas de teoria',
+      g.biblioteca_assets, c.itens * 2 + c.paginas_teoria);
+    const regR = await pagR.evaluate(() => Store.listarPacotesBiblioteca().then(l => ({
+      kits: l[0] && l[0].manifest.contagens.kits, campos: Object.keys(l[0] || {}).sort().join(',') })));
+    conf('o manifest gravado leva contagens.kits', regR.kits, c.kits);
+    conf('e o registro não guarda kit nenhum', /(^|,)(kits|exclusoes)(,|$)/.test(regR.campos), false);
+    const depR = await pagR.evaluate(() => new Promise(r => {
+      const q = indexedDB.open('apoio-educacional');
+      q.onsuccess = () => { const n = Array.from(q.result.objectStoreNames).sort().join(','); q.result.close(); r(n); };
+    }));
+    conf('nenhum depósito biblioteca_kits no 1.26.0', depR.indexOf('biblioteca_kits') >= 0, false);
+    await H.irParaAba(pagR, 'biblioteca');
+    const listou = await esperar('a aba da biblioteca desenhou', () => pagR.evaluate(() =>
+      document.querySelector('#tela-biblioteca') ? document.querySelector('#tela-biblioteca').innerText : ''),
+    v => typeof v === 'string' && v.indexOf('Equações do Segundo Grau') >= 0, 30000);
+    conf('os módulos do 9º ano aparecem na aba da biblioteca', listou.ok, true);
+    if (pagR.errosDePagina.length) console.log('   erros de página: ' + pagR.errosDePagina.join(' | ').slice(0, 400));
+    conf('nenhum erro de JavaScript na página', pagR.errosDePagina.length, 0);
+    return;
   }
 
   // ================================================================

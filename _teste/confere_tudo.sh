@@ -402,6 +402,12 @@ roda "banco da biblioteca"                      python biblioteca/_prova_banco.p
 # tres niveis, um por campo, e `relaxou` conferido nos dois sentidos. A amostra
 # nao sai do gerador de proposito, senao um erro do gerador viraria o esperado.
 roda "kits e tempo (regra)"                     python biblioteca/_prova_kits.py
+# A comparacao pacote a pacote (determinismo e "o que mudou de uma versao para
+# a outra") rodando contra si mesma: um veneno por tipo de diferenca que ela
+# existe para achar, mais dois controles. A comparacao de verdade precisa dos
+# pacotes do Drive e por isso nao roda aqui; o que roda aqui e a prova de que
+# ela sabe reprovar, sem a qual o numero que ela imprime nao vale nada.
+roda "comparacao de pacotes"                    python biblioteca/_compara_pacotes.py --autoteste
 
 # Duas conferencias aqui, e a primeira e a que pega o defeito de verdade.
 #

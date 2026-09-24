@@ -356,6 +356,24 @@ def main():
     p.veneno('exclusoes.json ausente', confere(com(
         lambda x: x.__setitem__(4, None))), 'exclusoes.json nao esta no pacote')
 
+    # -------------------------------------------- o zip leva o que promete
+    print('\n=== o zip leva o que o manifest promete ===')
+    import gerar_pacote as GP
+    conteudo = {'itens.json': b'[]', 'teoria.json': b'[]', 'busca.json': b'{}',
+                'apelidos.json': b'{}', 'kits.json': b'[]', 'exclusoes.json': b'[]',
+                'assets/9ano/m/l/ex-01.svg': b'<svg/>'}
+    p.limpo('a ordem derivada do conteudo leva os dois arquivos novos',
+            [GP.conferir_ordem_do_zip(GP.ordem_do_zip(conteudo), conteudo)] if
+            GP.conferir_ordem_do_zip(GP.ordem_do_zip(conteudo), conteudo) else [])
+    # o veneno e a propria lista cravada que existia antes da B9: com ela, o
+    # kits.json entrava no manifest e nao entrava no zip, em silencio
+    lista_cravada = (GP.RAIZ_FIXA_DO_ZIP + sorted(k for k in conteudo if k.startswith('assets/')))
+    erro = GP.conferir_ordem_do_zip(lista_cravada, conteudo)
+    p.veneno('a lista cravada de antes da B9', [erro] if erro else [], 'Faltando: exclusoes.json, kits.json')
+    sobrando = GP.ordem_do_zip(conteudo) + ['assets/9ano/m/l/ex-99.svg']
+    erro = GP.conferir_ordem_do_zip(sobrando, conteudo)
+    p.veneno('um arquivo no zip que o manifest nao promete', [erro] if erro else [], 'Sobrando: assets/9ano/m/l/ex-99.svg')
+
     print('\n%d verificacoes passaram, %d falharam' % (p.ok, p.falhas))
     return 1 if p.falhas else 0
 
