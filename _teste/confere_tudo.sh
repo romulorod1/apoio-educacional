@@ -396,6 +396,12 @@ roda "biblioteca listas --envenenado-ordem"         node "_teste/testa_bibliotec
 roda "biblioteca listas --envenenado-seta"          node "_teste/testa_biblioteca_listas.js" --envenenado-seta
 roda "biblioteca listas --envenenado-curadoria"     node "_teste/testa_biblioteca_listas.js" --envenenado-curadoria
 roda "biblioteca listas --envenenado-camadas"       node "_teste/testa_biblioteca_listas.js" --envenenado-camadas
+# FRENTE B (B10): A FOLHA IMPRESSA NAO MUDOU. A unificacao das camadas foi pelo
+# lado da TELA de proposito, porque o papel e o que ela entrega ao aluno. A
+# prova gera a MESMA folha com o pdf.js de hoje e com o do d80bb90 e compara
+# byte a byte e pixel a pixel a 200 dpi, com controle de que o medidor sabe
+# acusar (duas paginas diferentes do mesmo PDF dao diferenca aos milhares).
+roda "folha impressa igual ao publicado"        node "_teste/testa_folha_impressa_igual.js"
 
 roda "painel de valores"                        node "_teste/testa_painel_valores.js"
 roda "painel de valores --envenenado-aberto"    node "_teste/testa_painel_valores.js" --envenenado-aberto

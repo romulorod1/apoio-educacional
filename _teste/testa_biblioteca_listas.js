@@ -429,6 +429,96 @@ const desmarcar = (pag, id) => pag.evaluate(i => {
     return;
   }
   conf('o texto continua visível por cima do retângulo, como no PDF', pixel > 0, true);
+  // ================================================================
+  secao('7. A versão sobe SILENCIOSA');
+  /* O texto para a Nathália é do Romulo, e não nosso. Então a 1.27.0 não entra
+   * no NOVIDADES e a janela não pode abrir sozinha. Medido abrindo o
+   * aplicativo com a versão anterior marcada como vista, que é exatamente o
+   * estado do tablet dela quando esta versão chegar. */
+  const versaoDoApp = /var VERSAO = '([^']+)';/.exec(APP_REPO)[1];
+  conf('o app.js NÃO tem entrada de novidades para esta versão',
+    new RegExp("versao: '" + versaoDoApp.replace(/\./g, '\\.') + "'").test(APP_REPO), false);
+  const gravado = await pag.evaluate(async () => {
+    const d = await Store.carregar();
+    d.ajustes = d.ajustes || {};
+    d.ajustes.versaoVista = '1.26.0';
+    await Store.salvar(d);
+    const lido = await Store.carregar();
+    return (lido.ajustes || {}).versaoVista;
+  });
+  conf('a versão vista do tablet ficou na 1.26.0', gravado, '1.26.0');
+  /* SEM o H.abrirApp, pelo mesmo motivo do controle logo abaixo: o auxiliar
+   * fecha a janela quando a encontra aberta, e medir depois dele mediria o
+   * clique dele e não o aplicativo. A janela do controle abre em menos de meio
+   * segundo, então quatro segundos de vigia aqui é folga de oito vezes. */
+  await pag.reload({ waitUntil: 'networkidle0' });
+  let abriuAlgumaVez = false;
+  for (let i = 0; i < 20; i++) {
+    await pausa(200);
+    if (await pag.evaluate(() => !!document.querySelector('#modal-novidades.aberto'))) { abriuAlgumaVez = true; break; }
+  }
+  const janela = await pag.evaluate(() => {
+    const m = document.querySelector('#modal-novidades');
+    return { existe: !!m };
+  });
+  console.log('   janela de novidades abriu alguma vez em 4 s: ' + abriuAlgumaVez + ', versão do app: ' + versaoDoApp);
+  conf('a janela de novidades existe no aplicativo', janela.existe, true);
+  conf('e NÃO abriu sozinha ao subir da 1.26.0 para esta versão', abriuAlgumaVez, false);
+  /* O CONTROLE: com uma versão vista bem antiga, a MESMA janela TEM de abrir.
+   * Sem este par, "não abriu" não se distingue de uma janela quebrada, que
+   * também não abriria nunca. */
+  /* O CONTROLE, e ele é um VENENO e não uma versão antiga.
+   *
+   * A primeira escrita deste controle punha `versaoVista` numa versão bem
+   * antiga e esperava a janela abrir. Não abriu, e o motivo não era a janela:
+   * era a montagem do teste correndo com o próprio `mostrarNovidades`, que
+   * grava a versão de hoje ao decidir não abrir. Um controle que depende de
+   * corrida mede a corrida.
+   *
+   * Aqui o controle serve um app.js com UMA entrada de novidades para esta
+   * versão, e mais nada. Se a janela abrir com a entrada e não abrir sem ela,
+   * então "não abriu" é consequência de não haver entrada, que é exatamente a
+   * afirmação. */
+  /* A quebra de linha sai do PRÓPRIO app.js: o repositório pode estar em CRLF,
+   * e âncora cravada com \n casa zero vezes e não envenena nada. A asserção de
+   * "trocou exatamente uma ocorrência" logo abaixo é o que transforma isso em
+   * reprovação em vez de silêncio, e foi ela que pegou o erro na primeira
+   * corrida desta seção. */
+  const NL_APP = APP_REPO.indexOf('\r\n') >= 0 ? '\r\n' : '\n';
+  const ANCORA_NOV = '  var NOVIDADES = [' + NL_APP;
+  conf('a âncora do controle casa exatamente uma vez', APP_REPO.split(ANCORA_NOV).length - 1, 1);
+  const comEntrada = APP_REPO.replace(ANCORA_NOV,
+    ANCORA_NOV + "    { versao: '" + versaoDoApp + "', itens: ['entrada de controle desta prova'] }," + NL_APP);
+  conf('o controle mudou mesmo o app.js', comEntrada !== APP_REPO ? 'diferente' : 'IGUAL', 'diferente');
+  const ambControle = H.criarAmbiente(PORTA + 1, 'perfil_bib_listas_ctrl', { '/app.js': comEntrada });
+  await ambControle.subir();
+  const pagC = await ambControle.pagina();
+  await H.abrirApp(pagC, ambControle.ORIGEM);
+  const antes = await pagC.evaluate(async () => {
+    const d = await Store.carregar();
+    d.ajustes = d.ajustes || {};
+    d.ajustes.versaoVista = '1.26.0';
+    await Store.salvar(d);
+    const lido = await Store.carregar();
+    return { vista: (lido.ajustes || {}).versaoVista, aulas: (lido.aulas || []).length };
+  });
+  console.log('   controle antes do reload: ' + JSON.stringify(antes));
+  conf('a versão vista ficou gravada antes do reload', antes.vista, '1.26.0');
+  /* O RELOAD AQUI NÃO PASSA PELO H.abrirApp, e esse é o ponto.
+   *
+   * O auxiliar de teste CLICA no "entendi" quando encontra a janela aberta, o
+   * que é o certo para os outros testes (a janela atrapalharia todos eles) e é
+   * fatal para este, que existe justamente para olhar a janela. As duas
+   * primeiras escritas deste controle falharam por isso, e o veredito era
+   * "a janela não sabe abrir" quando quem a fechava era a própria prova. */
+  await pagC.reload({ waitUntil: 'networkidle0' });
+  const r = await esperar('a janela com a entrada de controle', () => pagC.evaluate(() => {
+    const m = document.querySelector('#modal-novidades');
+    return !!(m && m.classList.contains('aberto'));
+  }), v => v === true, 12000);
+  conf('e a janela SABE abrir: com uma entrada para esta versão, ela abre', r.ok, true);
+  await ambControle.encerrar();
+
   if (pag.errosDePagina.length) console.log('   erros de página: ' + pag.errosDePagina.join(' | ').slice(0, 400));
   conf('nenhum erro de JavaScript na página', pag.errosDePagina.length, 0);
 })().then(() => H.fim(amb)(), e => H.fim(amb)(e));

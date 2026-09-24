@@ -66,10 +66,18 @@ const I_REAL = process.argv.indexOf('--pacote-real');
 const PACOTE_REAL = I_REAL !== -1 ? process.argv[I_REAL + 1] : null;
 const PORTA = 8804;
 
-/* O commit em que o 1.26.0 subiu (merge do PR #55). A promessa do contrato é
- * sobre ESTE aplicativo, então a prova compara os arquivos dele com este
- * commit, e não com a memória de quem escreve. */
-const COMMIT_1_26_0 = '2b647e6';
+/* O 1.26.0 PUBLICADO, preso pelo commit e não por referência que anda.
+ *
+ * `d80bb90` é o merge do PR #56, que é o estado publicado do aplicativo antes
+ * da B10. O 1.26.0 subiu no `2b647e6` (PR #55) e os doze arquivos do
+ * aplicativo são IDÊNTICOS nos dois (`git diff --name-only 2b647e6 d80bb90 --
+ * <os doze>` sai vazio), então prender num ou no outro serve o mesmo byte; o
+ * escolhido é o publicado.
+ *
+ * O que não pode aparecer aqui é `main`, `HEAD` ou qualquer nome que ande: era
+ * exatamente por aí que o servido voltaria a ser o aplicativo de hoje, e a
+ * prova passaria a afirmar sobre a versão errada sem uma linha mudar. */
+const COMMIT_1_26_0 = 'd80bb90';
 const ARQUIVOS_DO_APP = ['app.js', 'store.js', 'index.html', 'styles.css', 'sw.js',
   'biblioteca.js', 'zip.js', 'busca.js', 'core.js', 'pdf.js', 'draw.js', 'cartao.js'];
 
