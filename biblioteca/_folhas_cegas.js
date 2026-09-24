@@ -9,13 +9,29 @@
  * comparacao feita sobre o texto do enunciado julgaria outra coisa.
  *
  * POR QUE A FOLHA SAI EM PEDACOS, e isto e decisao de instrumento e nao de
- * arquivo. Medido nas 60 folhas desta rodada: a altura mediana e 1.492 px e a
- * maior tem 3.175 px. Imagem muito alta chega ao revisor reduzida para caber,
- * e texto de 10 pt reduzido pela metade nao se le. O revisor estaria julgando
- * o que nao consegue ler, e o registro diria que ele julgou. Entao a folha sai
- * em pedacos de no maximo ALTURA_PEDACO px, e o corte cai SEMPRE na fronteira
- * entre dois exercicios: exercicio cortado ao meio, com a figura partida,
- * seria defeito da folha virando juizo sobre a lista.
+ * arquivo. Imagem muito alta chega ao revisor reduzida para caber, e texto de
+ * 10 pt reduzido pela metade nao se le. O revisor estaria julgando o que nao
+ * consegue ler, e o registro diria que ele julgou. Entao a folha sai em
+ * pedacos de no maximo ALTURA_PEDACO px de EXERCICIO, e o corte cai SEMPRE na
+ * fronteira entre dois exercicios: exercicio cortado ao meio, com a figura
+ * partida, seria defeito da folha virando juizo sobre a lista.
+ *
+ * O QUE FOI MEDIDO, nas imagens da rodada de 24/09 que estao arquivadas em
+ * Simulacoes\biblioteca-b9 (e nao estimado a partir do dado, que foi o erro
+ * da primeira versao deste comentario, apontado pela lente 1 do PR #56):
+ * 60 folhas de conteudo distinto, 100 arquivos HTML (o braco A e escrito uma
+ * vez por revisor), 166 imagens. Altura da folha em px CSS: mediana 1.509,5
+ * por arquivo e 1.517 por conteudo distinto; a maior tem 3.199.
+ *
+ * O TETO VALE PARA O EXERCICIO, E O ULTIMO PEDACO LEVA TAMBEM O RECUO DO PE
+ * DA FOLHA. Por isso tres dos 166 pedacos daquela rodada tem 1.424 px, 1,7%
+ * acima do teto: sao os tres ultimos pedacos das suas folhas, e o excedente e
+ * o recuo de baixo, nao exercicio. Isso esta escrito aqui porque a versao
+ * anterior prometia "no maximo 1.400" sem ressalva e os quatro casos do
+ * autoteste eram montados de um jeito que nunca podia contradize-la: em todos,
+ * a soma das caixas era igual a altura total, que e a unica configuracao em
+ * que o recuo do pe nao existe. O autoteste agora tem caso com folga entre as
+ * caixas e com altura total maior que a ultima caixa.
  */
 const fs = require('fs');
 const path = require('path');
@@ -115,6 +131,37 @@ function autoteste() {
   p = pedacos(cx, 2200);
   conf('exercicio mais alto que o teto vira um pedaco inteiro', p[0].baixo, 1900);
   conf('e nada dele se perde', cobre(p, cx), true);
+
+  /* A FOLHA DE VERDADE nao e assim: ela tem um h1 no topo, 16 pt de margem
+   * entre exercicios e 24 pt de recuo no pe, entao as caixas NAO comecam em
+   * zero, NAO sao coladas, e a altura total e MAIOR que a ultima caixa. Os
+   * quatro casos acima tem soma igual a altura total, que e a unica
+   * configuracao em que o `Math.max(fim, alturaTotal)` da linha do ultimo
+   * pedaco nunca roda. A lente 1 do PR #56 mediu isso; os casos abaixo
+   * fecham o buraco. */
+  const comFolga = (alturas, topo, folga) => {
+    let y = topo;
+    return alturas.map(h => { const c = { topo: y, baixo: y + h }; y += h + folga; return c; });
+  };
+  cx = comFolga([400, 400, 400, 400], 60, 21);
+  const total = cx[cx.length - 1].baixo + 32;          // recuo do pe
+  p = pedacos(cx, total);
+  conf('folha real: nenhum exercicio parte entre pedacos', cobre(p, cx), true);
+  conf('folha real: os pedacos cobrem do topo ao pe, sem buraco',
+    [p[0].topo, p[p.length - 1].baixo], [0, total]);
+  conf('folha real: os pedacos nao se sobrepoem nem deixam vao',
+    p.every((x, i) => i === 0 || x.topo === p[i - 1].baixo), true);
+  conf('folha real: o ultimo pedaco vai ate o pe da folha, e nao ate a ultima caixa',
+    p[p.length - 1].baixo, total);
+  conf('folha real: so o ultimo pedaco pode passar do teto, e so pelo recuo',
+    p.slice(0, -1).every(x => x.baixo - x.topo <= ALTURA_PEDACO) &&
+    (p[p.length - 1].baixo - p[p.length - 1].topo) - (total - cx[cx.length - 1].baixo) <= ALTURA_PEDACO, true);
+
+  // uma folha baixa com recuo: um pedaco so, e ele termina no pe
+  cx = comFolga([200, 200], 60, 21);
+  p = pedacos(cx, cx[1].baixo + 32);
+  conf('folha baixa com recuo sai num pedaco que vai ate o pe',
+    [p.length, p[0].topo, p[0].baixo], [1, 0, cx[1].baixo + 32]);
 
   console.log(ok + ' verificacoes passaram, ' + falhas + ' falharam');
   process.exit(falhas ? 1 : 0);

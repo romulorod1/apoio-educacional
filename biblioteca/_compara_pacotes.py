@@ -175,16 +175,54 @@ def autoteste():
             falhas += 1
             print('  FALHOU  %-46s %s' % (nome, problemas or 'nao viu nada'))
 
+    def valor(nome, obtido, esperado):
+        nonlocal ok, falhas
+        if obtido == esperado:
+            ok += 1
+            print('  ok      %-46s %s' % (nome, obtido))
+        else:
+            falhas += 1
+            print('  FALHOU  %-46s obtido %s, esperado %s' % (nome, obtido, esperado))
+
     base = _pacote_de_mentira()
     caso('controle: dois pacotes iguais passam', comparar(base, _pacote_de_mentira())[0], False)
     caso('um byte diferente num SVG reprova',
          comparar(base, _pacote_de_mentira(mexer='assets/9ano/m/l/ex-01.svg'))[0], True)
     caso('um byte diferente no itens.json reprova',
          comparar(base, _pacote_de_mentira(mexer='itens.json'))[0], True)
+
+    # O CASO QUE A DOCSTRING DESCREVE, e que faltava. Nos dois venenos acima o
+    # `_pacote_de_mentira` recalcula a lista do manifest a partir dos bytes,
+    # entao quem reprovava era a lista do manifest, nao o conteudo: a lente 2
+    # do PR #56 desligou a comparacao de conteudo inteira e o autoteste
+    # continuou 9/0. Aqui o manifest do segundo pacote e copiado byte a byte
+    # do primeiro, exatamente o "manifest copiado de um lado para o outro
+    # concordaria consigo mesmo": so o sha do CONTEUDO pode pegar.
+    mentiroso = _pacote_de_mentira(mexer='assets/9ano/m/l/ex-01.svg')
+    mentiroso['manifest.json'] = base['manifest.json']
+    problemas, numeros = comparar(base, mentiroso)
+    caso('conteudo diferente com o manifest copiado reprova', problemas, True)
+    valor('e reprova PELO conteudo, nao pela lista do manifest',
+          any('conteudo diferente' in p for p in problemas), True)
+    valor('e o numero de diferentes e 1', numeros['diferentes'], 1)
+    # os numeros que vao para o registro tambem precisam de assercao: o
+    # "11.298 iguais" da prova dos dez pacotes sai daqui
+    _, n_limpo = comparar(base, _pacote_de_mentira())
+    valor('num par igual, comparados e iguais batem com o pacote',
+          (n_limpo['comparados'], n_limpo['iguais'], n_limpo['diferentes']),
+          (len(base) - 1, len(base) - 1, 0))
     sem_um = {k: v for k, v in _pacote_de_mentira().items() if k != 'assets/9ano/m/l/ex-01.svg'}
     caso('arquivo que sumiu reprova', comparar(base, sem_um)[0], True)
     com_novo = _pacote_de_mentira(extra={'kits.json': b'[]\n'})
     caso('arquivo novo NAO declarado reprova', comparar(base, com_novo)[0], True)
+    # e o mesmo caso com o manifest copiado, para quem acusa ser a conferencia
+    # de nomes e nao a lista do manifest
+    novo_calado = _pacote_de_mentira(extra={'kits.json': b'[]\n'})
+    novo_calado['manifest.json'] = base['manifest.json']
+    problemas_calado = comparar(base, novo_calado)[0]
+    caso('arquivo novo que o manifest nem menciona reprova', problemas_calado, True)
+    valor('e reprova por nome novo, nao pelo manifest',
+          any('nao foram declarados' in p for p in problemas_calado), True)
     caso('o mesmo arquivo novo, declarado, passa',
          comparar(base, com_novo, novos=('kits.json',))[0], False)
     caso('declarei um novo que nao apareceu e reprova',

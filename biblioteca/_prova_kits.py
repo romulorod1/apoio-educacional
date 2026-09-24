@@ -18,7 +18,9 @@ import copy
 import io
 import json
 import os
+import subprocess
 import sys
+import tempfile
 from fractions import Fraction
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
@@ -31,6 +33,7 @@ import confere_kits as CK
 
 MOD = '9ano:modulo-de-prova'
 CURTO = '9ano:modulo-curto'
+FRONT = '9ano:modulo-fronteira'
 
 
 def item(mod_slug, lista, n, dificuldade, altura, subitens=None, citado=None, sem_solucao=False):
@@ -59,10 +62,16 @@ def cu(n):
     return '9ano:modulo-curto:lista-c:ex:%d' % n
 
 
+def fr(n):
+    return '9ano:modulo-fronteira:lista-f:ex:%d' % n
+
+
 """Alturas escolhidas para a tempo-v1 dar numero redondo, conferido no teste
 `a tempo-v1 da o que a amostra supoe`: 139 pt da 4,5 min; 208 pt da 6,0; 41 pt
 da 2,4. Se a formula mudar, aquele teste reprova antes de qualquer veneno."""
 H45, H60, H24 = 139, 208, 41
+# e as do modulo da fronteira: 5,0 / 7,0 / 8,0 / 10,0 minutos
+H50, H70, H80, H100 = 162, 255, 301, 394
 
 
 def amostra():
@@ -88,6 +97,28 @@ def amostra():
         item('modulo-curto', 'lista-c', 3, 1, H24),
         item('modulo-curto', 'lista-c', 4, 1, H24),
         item('modulo-curto', 'lista-c', 5, 2, H24),
+        # Modulo desenhado para a FRONTEIRA do arredondamento e para a mediana
+        # par. Sem ele, `_teto` com floor no lugar de ceil e a mediana par
+        # trocada pelo valor de cima passavam sem nada reclamar: a amostra so
+        # tinha kits de n = 4, 5 e 6, e neles ceil e floor dao o mesmo numero,
+        # e os dois valores do meio eram iguais. Medido pela lente 1 do PR #56.
+        item('modulo-fronteira', 'lista-f', 1, 1, H45),
+        item('modulo-fronteira', 'lista-f', 2, 1, H45),
+        item('modulo-fronteira', 'lista-f', 3, 1, H45),
+        item('modulo-fronteira', 'lista-f', 4, 1, H45),
+        item('modulo-fronteira', 'lista-f', 5, 1, H45),
+        item('modulo-fronteira', 'lista-f', 6, 2, H45),
+        item('modulo-fronteira', 'lista-f', 7, 2, H45),
+        item('modulo-fronteira', 'lista-f', 8, 2, H45),
+        item('modulo-fronteira', 'lista-f', 9, 3, H45),
+        item('modulo-fronteira', 'lista-f', 10, 3, H45),
+        item('modulo-fronteira', 'lista-f', 11, 3, H45),
+        item('modulo-fronteira', 'lista-f', 12, 2, H80),
+        item('modulo-fronteira', 'lista-f', 13, 3, H50),
+        item('modulo-fronteira', 'lista-f', 14, 3, H70),
+        item('modulo-fronteira', 'lista-f', 15, 3, H100),
+        item('modulo-fronteira', 'lista-f', 16, 2, H45),
+        item('modulo-fronteira', 'lista-f', 17, 3, H100),
     ]
     teoria = []
     for slug, titulo in (('modulo-de-prova', 'Modulo de Prova'), ('modulo-curto', 'Modulo Curto')):
@@ -134,6 +165,13 @@ def amostra():
         kit(MOD, 2, [ex(1), ex(2), ex(5), ex(6), ex(8), ex(7)], [], {ex(5): [ex(11)]}),
         # T3: degraus 2 e 3, massa no 3, comeca no 2, termina no 3. 33,0.
         kit(MOD, 3, [ex(5), ex(6), ex(9), ex(10), ex(8), ex(7)], [], {ex(5): [ex(11)]}),
+        # Os tres da fronteira. O T2 com n = 7 e tres itens de degrau 3 e o
+        # que distingue teto de piso: ceil(7/3) = 3 admite, floor(7/3) = 2
+        # nao. O T3 tem n par com os dois valores do meio DIFERENTES (7,0 e
+        # 10,0), que e o que a mediana par precisa para poder ser medida.
+        kit(FRONT, 1, [fr(1), fr(2), fr(3), fr(4), fr(5), fr(6), fr(7)], [], {}),
+        kit(FRONT, 2, [fr(1), fr(2), fr(6), fr(7), fr(9), fr(10), fr(11)], [], {}),
+        kit(FRONT, 3, [fr(16), fr(14), fr(15), fr(17)], [], {}),
     ]
     kits.sort(key=lambda k: (k['serie'], k['modulo'], k['nivel']))
     exclusoes = [
@@ -175,6 +213,42 @@ class Placar:
             self.falhas += 1
             print('  FALHOU  veneno %-45s passou sem ver o defeito (esperava %r); achou: %s'
                   % (nome, motivo, ' | '.join(e[:80] for e in erros[:3]) or 'nada'))
+
+
+PROIBIDOS = ('kits', 'gerar_pacote', 'portal')
+
+
+def _o_que_carrega(codigo, pasta=None):
+    """Roda `codigo` num interpretador limpo e devolve quais dos PROIBIDOS
+    entraram no sys.modules. Medida, e nao leitura: pega import direto,
+    `importlib.import_module`, `__import__` e `exec`, que nenhuma varredura de
+    texto ou de arvore sintatica pega."""
+    programa = ('import sys\n'
+                'sys.path.insert(0, %r)\n' % (pasta or AQUI) +
+                codigo + '\n'
+                'print(",".join(sorted(m for m in %r if m in sys.modules)))\n' % (PROIBIDOS,))
+    r = subprocess.run([sys.executable, '-c', programa], capture_output=True, text=True)
+    if r.returncode != 0:
+        return ['o interpretador limpo nao rodou: %s' % (r.stderr.strip().splitlines() or [''])[-1]]
+    return [m for m in r.stdout.strip().split(',') if m]
+
+
+def modulos_que_a_conferencia_carrega():
+    carregou = _o_que_carrega('import confere_kits')
+    if carregou and carregou[0].startswith('o interpretador'):
+        return carregou
+    return ['a confere_kits carregou %s' % ', '.join(carregou)] if carregou else []
+
+
+def carrega_o_gerador_de_teste():
+    """O controle da trava acima: um arquivo que importa o gerador por um
+    caminho que varredura de texto nao enxerga."""
+    pasta = tempfile.mkdtemp()
+    with io.open(os.path.join(pasta, 'peca_de_controle.py'), 'w', encoding='utf-8', newline='\n') as f:
+        f.write('import importlib\n'
+                'importlib.import_module("ki" + "ts")\n')
+    carregou = _o_que_carrega('sys.path.insert(0, %r)\nimport peca_de_controle' % pasta)
+    return ['carregou %s' % ', '.join(carregou)] if carregou else []
 
 
 def confere(peca):
@@ -232,10 +306,23 @@ def main():
             [] if str(CK.minutos_do_item({'medidas': {}})) == '4.5' else ['deu %s' % CK.minutos_do_item({'medidas': {}})])
     p.limpo('a amostra inteira passa na confere_kits', confere(peca))
 
-    # a conferencia nao pode ser gemea do gerador
-    fonte = io.open(os.path.join(AQUI, 'confere_kits.py'), encoding='utf-8').read()
-    p.limpo('a confere_kits nao importa o gerador de kits',
-            ['confere_kits.py importa kits.py'] if ('import kits' in fonte or 'from kits' in fonte) else [])
+    # A CONFERENCIA NAO PODE SER GEMEA DO GERADOR, e isto se MEDE, nao se le.
+    #
+    # A primeira versao desta trava procurava o texto `import kits` no
+    # arquivo. Regua fraca, e as duas lentes do PR #56 mediram por que:
+    # comentario com a frase daria falso positivo, e `importlib.import_module`,
+    # `__import__` e `exec` passavam batido. Ler os imports pela arvore
+    # sintatica resolve os dois primeiros e ainda perde os dois ultimos.
+    #
+    # O que mede de verdade e abrir um interpretador limpo, importar SO a
+    # conferencia, e olhar o que entrou no sys.modules. Subprocesso porque
+    # este arquivo importa o gerar_pacote, que importa o kits: no processo
+    # daqui a resposta ja estaria contaminada antes da pergunta.
+    p.limpo('a confere_kits nao carrega o gerador, medido em processo limpo',
+            modulos_que_a_conferencia_carrega())
+    # o controle: o mesmo medidor, apontado para um arquivo que IMPORTA o
+    # gerador, tem de acusar. Sem isto a trava acima nao prova que sabe olhar.
+    p.veneno('um arquivo que importa o gerador', carrega_o_gerador_de_teste(), 'carregou')
 
     # ------------------------------------------------------ I1 a I7
     print('\n=== um veneno por invariante, I1 a I7 ===')
@@ -299,6 +386,26 @@ def main():
     p.veneno('T3 com o citado fora do fim', confere(com(
         lambda x: troca_itens(kit_de(x, 3), [ex(5), ex(6), ex(7), ex(9), ex(10), ex(8)], x[1]))), 'T3: ha item citado')
 
+    # ---------------------------------------- a fronteira do arredondamento
+    print('\n=== a fronteira do arredondamento e a mediana par ===')
+    # Com n = 7, a massa do T1 pede ceil(14/3) = 5 e piso daria 4. Este kit
+    # tem 4, entao ele SO reprova se o arredondamento for para cima. Trocar
+    # ceil por floor na `_teto` faz este veneno passar calado, e era o que
+    # acontecia antes do modulo-fronteira existir.
+    p.veneno('T1 com a massa um item abaixo do teto', confere(com(
+        lambda x: troca_itens(kit_de(x, 1, FRONT), [fr(1), fr(2), fr(3), fr(4), fr(6), fr(7), fr(8)], x[1]))),
+        'T1: 4 itens de degrau 1')
+    # E o T2 limpo da amostra, com n = 7 e tres itens de degrau 3, reprova se
+    # o arredondamento virar piso: e o mesmo defeito pego do outro lado, pela
+    # amostra em vez do veneno.
+    p.limpo('o T2 da fronteira, com 3 de degrau 3 em 7, passa',
+            [e for e in confere(amostra()) if 'modulo-fronteira:kit:2' in e])
+    # A mediana par: sorteados 5,0 / 7,0 / 8,0 / 10,0, a mediana e 7,5 e o
+    # primeiro item tem 8,0, entao a I4 cai. Trocando a media dos dois do meio
+    # pelo valor de cima a mediana viraria 8,0 e o veneno passaria calado.
+    p.veneno('I4 com mediana par, que so a media dos dois do meio pega', confere(com(
+        lambda x: troca_itens(kit_de(x, 3, FRONT), [fr(12), fr(13), fr(14), fr(15)], x[1]))), 'I4')
+
     # ------------------------------------------------ os campos e a forma
     print('\n=== um veneno por campo do contrato ===')
     p.veneno('minutos do item fora da tempo-v1', confere(com(
@@ -329,8 +436,52 @@ def main():
         lambda x: kit_de(x, 1)['degraus'][0].__setitem__('item', ex(99)))), 'nao esta no itens.json')
     p.veneno('kits.json fora de ordem', confere(com(
         lambda x: x[3].reverse())), 'fora de ordem')
+    # o numero do veneno sai do proprio dado: cravar 7 aqui deixou de acusar
+    # no dia em que a amostra passou a ter sete kits, e a prova reprovou
+    # sozinha em vez de calar
     p.veneno('contagens.kits fora do kits.json', confere(com(
-        lambda x: x[0]['contagens'].__setitem__('kits', 7))), 'manifest.contagens.kits')
+        lambda x: x[0]['contagens'].__setitem__('kits', len(x[3]) + 1))), 'manifest.contagens.kits')
+
+    # ------------------------------------------- a forma, campo a campo
+    # Dezesseis conferencias de forma que nao tinham veneno nenhum: a lente 2
+    # do PR #56 apagou as dezesseis, uma a uma, e a prova nao viu nenhuma.
+    print('\n=== um veneno por conferencia de forma ===')
+    p.veneno('kit sem o campo titulo', confere(com(
+        lambda x: kit_de(x, 1).pop('titulo'))), 'falta o campo titulo')
+    p.veneno('kit sem o campo alternativas', confere(com(
+        lambda x: kit_de(x, 1).pop('alternativas'))), 'falta o campo alternativas')
+    p.veneno('kit sem o campo relaxou', confere(com(
+        lambda x: kit_de(x, 1).pop('relaxou'))), 'falta o campo relaxou')
+    p.veneno('nivel fora de 1, 2 e 3', confere(com(
+        lambda x: kit_de(x, 1).__setitem__('nivel', 4))), 'e so existem 1, 2 e 3')
+    p.veneno('modulo que nao comeca pela serie', confere(com(
+        lambda x: kit_de(x, 1).__setitem__('serie', '8ano'))), 'nao comeca pela serie')
+    p.veneno('degraus[].n fora da ordem', confere(com(
+        lambda x: kit_de(x, 1)['degraus'][2].__setitem__('n', 9))), 'e a lista e ordenada de 1 em diante')
+    p.veneno('entrada de degraus sem o campo item', confere(com(
+        lambda x: kit_de(x, 1)['degraus'][0].pop('item'))), 'sem o campo item')
+    p.veneno('degraus vazio', confere(com(
+        lambda x: kit_de(x, 1).__setitem__('degraus', []))), 'degraus vazio ou fora de forma')
+    p.veneno('teoria que nao e lista', confere(com(
+        lambda x: kit_de(x, 1).__setitem__('teoria', 'p01'))), 'teoria nao e lista')
+    p.veneno('alternativas que nao e objeto', confere(com(
+        lambda x: kit_de(x, 1).__setitem__('alternativas', []))), 'alternativas nao e objeto')
+    p.veneno('alternativas com chave que nao e do kit', confere(com(
+        lambda x: kit_de(x, 1).__setitem__('alternativas', {ex(11): [ex(12)]}))), 'que nao e item deste kit')
+    p.veneno('alternativa que nao existe no itens.json', confere(com(
+        lambda x: kit_de(x, 1).__setitem__('alternativas', {ex(1): [ex(98)]}))), 'nao esta no itens.json')
+    p.veneno('id de kit repetido', confere(com(
+        lambda x: x[3].append(copy.deepcopy(x[3][1])))), 'id repetido no kits.json')
+    p.veneno('kits.json que nao e lista', confere(com(
+        lambda x: x.__setitem__(3, {}))), 'kits.json nao e uma lista')
+    p.veneno('exclusoes.json que nao e lista', confere(com(
+        lambda x: x.__setitem__(4, {}))), 'exclusoes.json nao e uma lista')
+    p.veneno('exclusoes fora de ordem de id', confere(com(
+        lambda x: x[4].reverse())), 'exclusoes.json fora de ordem')
+    p.veneno('exclusao sem id', confere(com(
+        lambda x: x[4][0].__setitem__('id', ''))), 'linha sem id')
+    p.veneno('kits.json ausente no pacote', confere(com(
+        lambda x: x.__setitem__(3, None))), 'kits.json nao esta no pacote')
 
     # ------------------------------------------------------ relaxou, nos dois sentidos
     print('\n=== relaxou: tudo o que caiu declarado, nada declarado a mais ===')
@@ -365,6 +516,17 @@ def main():
     p.limpo('a ordem derivada do conteudo leva os dois arquivos novos',
             [GP.conferir_ordem_do_zip(GP.ordem_do_zip(conteudo), conteudo)] if
             GP.conferir_ordem_do_zip(GP.ordem_do_zip(conteudo), conteudo) else [])
+    # A ORDEM E A ORDEM, e nao o conjunto. Trocar a ordem troca o sha256 do
+    # zip, que e o numero que identifica os dez pacotes gravados, e a
+    # conferencia acima compara CONJUNTOS: ela aceita a lista de cabeca para
+    # baixo. A lente 2 do PR #56 mediu isso invertendo a raiz fixa e gerando os
+    # dois zips: shas diferentes, conferencia calada. Entao a ordem inteira
+    # entra aqui, escrita a mao, na ordem.
+    esperada = ['manifest.json', 'itens.json', 'teoria.json', 'busca.json', 'apelidos.json',
+                'exclusoes.json', 'kits.json', 'assets/9ano/m/l/ex-01.svg']
+    p.limpo('a ordem do zip e exatamente esta, na ordem',
+            [] if GP.ordem_do_zip(conteudo) == esperada
+            else ['deu %s' % GP.ordem_do_zip(conteudo)])
     # o veneno e a propria lista cravada que existia antes da B9: com ela, o
     # kits.json entrava no manifest e nao entrava no zip, em silencio
     lista_cravada = (GP.RAIZ_FIXA_DO_ZIP + sorted(k for k in conteudo if k.startswith('assets/')))
@@ -373,6 +535,21 @@ def main():
     sobrando = GP.ordem_do_zip(conteudo) + ['assets/9ano/m/l/ex-99.svg']
     erro = GP.conferir_ordem_do_zip(sobrando, conteudo)
     p.veneno('um arquivo no zip que o manifest nao promete', [erro] if erro else [], 'Sobrando: assets/9ano/m/l/ex-99.svg')
+
+    # tres venenos da ORDEM, que o conjunto nao pega e o sha do zip sente
+    original = list(GP.RAIZ_FIXA_DO_ZIP)
+    try:
+        GP.RAIZ_FIXA_DO_ZIP[:] = list(reversed(original))
+        p.veneno('a raiz fixa de cabeca para baixo',
+                 [] if GP.ordem_do_zip(conteudo) == esperada else ['a ordem mudou'], 'a ordem mudou')
+    finally:
+        GP.RAIZ_FIXA_DO_ZIP[:] = original
+    fora_de_ordem = [k for k in esperada if k.startswith('assets/')] + [k for k in esperada if not k.startswith('assets/')]
+    p.veneno('os assets antes da raiz',
+             [] if fora_de_ordem == esperada else ['a ordem mudou'], 'a ordem mudou')
+    trocado = esperada[:5] + [esperada[6], esperada[5]] + esperada[7:]
+    p.veneno('dois arquivos de raiz trocados entre si',
+             [] if trocado == esperada else ['a ordem mudou'], 'a ordem mudou')
 
     print('\n%d verificacoes passaram, %d falharam' % (p.ok, p.falhas))
     return 1 if p.falhas else 0

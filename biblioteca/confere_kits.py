@@ -307,6 +307,11 @@ def confere(manifest, itens, teoria, kits, exclusoes):
             paginas_de_teoria[p['id']] = mod
 
     # ------------------------------------------------------ kits.json
+    if kits is None:
+        # ausente e uma coisa; presente e fora de forma e outra. Dizer "nao e
+        # uma lista" para um arquivo que nao esta la manda quem le procurar
+        # defeito no lugar errado.
+        return ['kits.json nao esta no pacote']
     if not isinstance(kits, list):
         return ['kits.json nao e uma lista']
     vistos = set()

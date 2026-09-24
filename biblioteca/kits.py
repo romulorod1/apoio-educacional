@@ -309,17 +309,23 @@ def ancoras_citado(candidatos, nivel):
 
 # ------------------------------------------------------ afrouxar, na ordem
 
+# A ordem em que a busca vai soltando restricoes, da mais estrita para a mais
+# frouxa. O primeiro campo e so o rotulo da TENTATIVA, para quem le o codigo:
+# ele nao vai para `relaxou` e nao pertence ao vocabulario fechado da 8e.
+# Quem escreve `relaxou` e a relaxou_do_kit, medindo o kit PRONTO, e nao o que
+# a busca teve de pedir. (Observacao da lente 1 do PR #56: a lista sugeria o
+# contrario para quem lesse rapido.)
 AFROUXAMENTOS = [
-    # (nome ou None, banda, exigir bateria, exigir citado no fim)
-    (None, BANDA, True, True),
-    ('subitens', BANDA, False, True),
-    ('citado', BANDA, True, False),
-    ('subitens+citado', BANDA, False, False),
-    ('minutos', (240, 360), True, True),
-    ('minutos+subitens', (240, 360), False, True),
-    ('minutos+citado', (240, 360), True, False),
-    ('minutos+subitens+citado', (240, 360), False, False),
-    ('minutos-larga', (200, 450), False, False),
+    # (rotulo da tentativa, banda, exigir bateria, exigir citado no fim)
+    ('estrita', BANDA, True, True),
+    ('sem bateria', BANDA, False, True),
+    ('sem citado no fim', BANDA, True, False),
+    ('sem bateria e sem citado', BANDA, False, False),
+    ('banda larga', (240, 360), True, True),
+    ('banda larga sem bateria', (240, 360), False, True),
+    ('banda larga sem citado', (240, 360), True, False),
+    ('banda larga sem os dois', (240, 360), False, False),
+    ('ultima tentativa', (200, 450), False, False),
 ]
 
 
@@ -447,8 +453,9 @@ def teoria_do_kit(paginas, itens):
     aulas_do_kit = sorted({i['aula']['slug'] for i in itens})
     escolhidas = []
     for aula_teo in paginas:
-        pareada = any(a.split(':')[-1] in aulas_do_kit or aulas_do_kit_casa(a, aulas_do_kit)
-                      for a in aula_teo['pareados']) if aula_teo['pareados'] else False
+        # as duas metades do `or` que estavam aqui eram a mesma expressao
+        # escrita de dois jeitos (lente 1 do PR #56)
+        pareada = any(a.split(':')[-1] in aulas_do_kit for a in aula_teo['pareados'])
         if not pareada:
             continue
         for p in aula_teo['paginas']:
@@ -463,10 +470,6 @@ def teoria_do_kit(paginas, itens):
                     escolhidas.append(p['id'])
                     break
     return escolhidas[:TETO_TEORIA]
-
-
-def aulas_do_kit_casa(pareado, aulas):
-    return pareado.split(':')[-1] in aulas
 
 
 # --------------------------------------------------------------------- todo

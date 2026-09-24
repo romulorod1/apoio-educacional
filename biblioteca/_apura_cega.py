@@ -136,7 +136,7 @@ def apura(gabarito, respostas):
     elif a and b and b['venceu']:
         print('O braco A nao venceu e o B venceu: a regra se simplifica para rampa mais orcamento.')
     elif a and b:
-        print('Nem A nem B venceram: e a saida da secao 8(f), desligar o kit automatico.')
+        print('Nem A nem B venceram: e a saida do DESENHO_kits.md 8(f), desligar o kit automatico.')
     else:
         print('(faltam respostas de algum braco para ler o desfecho)')
     return resumo
@@ -182,63 +182,160 @@ def autoteste():
     caso('14 de 20 nao passa de 5%', p_de_cauda(20, 14) > Fraction(1, 20), True)
     caso('25 de 40 nao passa de 5%', p_de_cauda(40, 25) > Fraction(1, 20), True)
 
-    # A ponta mais perigosa de tudo isto: o mapa de "lista A" para "regra ou
-    # sorteio". Invertido, o resultado sai ao contrario e nada mais no
-    # programa reclama. Dois pares com disposicao OPOSTA, e a mesma letra
-    # escolhida nos dois: um tem de contar para a regra e o outro para o
-    # sorteio. Se o mapa estivesse invertido, este caso daria 2 ou 0.
-    gab = {'pacote': 'x', 'semente': 1, 'revisores': 1, 'bracos': {'A': {
+    # A PONTA MAIS PERIGOSA DE TUDO ISTO: o mapa de "lista A" para "regra ou
+    # sorteio". Invertido, o resultado da comparacao cega sai ao contrario e
+    # nada mais no programa reclama.
+    #
+    # A primeira versao desta prova usava DOIS pares de disposicao OPOSTA com
+    # a MESMA letra respondida, e afirmava num comentario que o mapa invertido
+    # daria 2 ou 0. Era falso, e a lente 2 do PR #56 mediu: inverter o mapa
+    # troca os dois pares ao mesmo tempo e o placar fica em 1 de 2 nas duas
+    # versoes. Fixture simetrico NUNCA distingue inversao, por construcao.
+    #
+    # O que distingue e fixture ASSIMETRICO: um par, disposicao conhecida, e a
+    # assercao do LADO. Os quatro casos abaixo, juntos, pegam a inversao, o
+    # mapa cravado em 'regra' e o mapa cravado em 'sorteio'.
+    def um_par(lado):
+        return {'pacote': 'x', 'semente': 1, 'revisores': 1, 'bracos': {'A': {
+            'ordenado_por_degrau': True, 'descartados': [], 'pares': [
+                {'par': 1, 'kit': 'k1', 'nivel': 1, 'modulo': 'm', 'n': 4, 'minutos': '30.0',
+                 'regra': [], 'sorteio': [], 'por_revisor': {'revisor1': lado}}]}}}
+
+    def placar(gab, letra):
+        resp = [{'braco': 'A', 'revisor': 'revisor1',
+                 'respostas': [{'par': 1, 'escolha': letra, 'porque': ''}]}]
+        saida = io.StringIO()
+        antigo, sys.stdout = sys.stdout, saida
+        try:
+            r = apura(gab, resp)
+        finally:
+            sys.stdout = antigo
+        return (r['A']['regra'], r['A']['total']), saida.getvalue()
+
+    reta = {'A': 'regra', 'B': 'sorteio'}
+    virada = {'A': 'sorteio', 'B': 'regra'}
+    caso('lista A e a regra, e ela responde A: conta para a regra', placar(um_par(reta), 'A')[0], (1, 1))
+    caso('lista A e a regra, e ela responde B: conta para o sorteio', placar(um_par(reta), 'B')[0], (0, 1))
+    caso('lista A e o sorteio, e ela responde A: conta para o sorteio', placar(um_par(virada), 'A')[0], (0, 1))
+    caso('lista A e o sorteio, e ela responde B: conta para a regra', placar(um_par(virada), 'B')[0], (1, 1))
+
+    # O veredito e a leitura final tambem precisam de assercao. Sem isto,
+    # trocar `>=` por `<` na linha do `venceu`, ou trocar a frase do desfecho,
+    # passa calado: a lente 2 fez as duas coisas e a prova nao viu.
+    def muitos(n_pares, vitorias, braco='A'):
+        """n_pares com a regra sempre na lista A; as `vitorias` primeiras
+        respondidas A (regra) e o resto B (sorteio)."""
+        pares = [{'par': k, 'kit': 'k%d' % k, 'nivel': 1, 'modulo': 'm', 'n': 4, 'minutos': '30.0',
+                  'regra': [], 'sorteio': [], 'por_revisor': {'revisor1': {'A': 'regra', 'B': 'sorteio'}}}
+                 for k in range(1, n_pares + 1)]
+        gab = {'pacote': 'x', 'semente': 1, 'revisores': 1,
+               'bracos': {braco: {'ordenado_por_degrau': braco == 'A', 'descartados': [], 'pares': pares}}}
+        resp = [{'braco': braco, 'revisor': 'revisor1', 'respostas': [
+            {'par': k, 'escolha': 'A' if k <= vitorias else 'B', 'porque': ''} for k in range(1, n_pares + 1)]}]
+        saida = io.StringIO()
+        antigo, sys.stdout = sys.stdout, saida
+        try:
+            r = apura(gab, resp)
+        finally:
+            sys.stdout = antigo
+        return r, saida.getvalue()
+
+    caso('com 8 pares o limiar e 7', minimo_para_5_por_cento(8), 7)
+    r, texto = muitos(8, 8)
+    caso('8 vitorias de 8: venceu', r['A']['venceu'], True)
+    caso('e a leitura final diz que a regra fica como esta',
+         'a kits-v1 fica como esta' in texto, True)
+    r, texto = muitos(8, 7)
+    caso('7 de 8 e exatamente o limiar: venceu', r['A']['venceu'], True)
+    r, texto = muitos(8, 6)
+    caso('6 de 8 esta abaixo do limiar: nao venceu', r['A']['venceu'], False)
+    caso('e sem o braco B a leitura nao arrisca desfecho',
+         'faltam respostas' in texto, True)
+
+    # os tres desfechos da arvore, cada um com a sua frase
+    def dois_bracos(vit_a, vit_b):
+        pares = lambda n, br: [{'par': k, 'kit': 'k%d' % k, 'nivel': 1, 'modulo': 'm', 'n': 4,
+                                'minutos': '30.0', 'regra': [], 'sorteio': [],
+                                'por_revisor': {'revisor1': {'A': 'regra', 'B': 'sorteio'}}}
+                               for k in range(1, n + 1)]
+        gab = {'pacote': 'x', 'semente': 1, 'revisores': 1, 'bracos': {
+            'A': {'ordenado_por_degrau': True, 'descartados': [], 'pares': pares(8, 'A')},
+            'B': {'ordenado_por_degrau': False, 'descartados': [], 'pares': pares(8, 'B')}}}
+        resp = [{'braco': br, 'revisor': 'revisor1', 'respostas': [
+                    {'par': k, 'escolha': 'A' if k <= vit else 'B', 'porque': ''} for k in range(1, 9)]}
+                for br, vit in (('A', vit_a), ('B', vit_b))]
+        saida = io.StringIO()
+        antigo, sys.stdout = sys.stdout, saida
+        try:
+            apura(gab, resp)
+        finally:
+            sys.stdout = antigo
+        return saida.getvalue()
+
+    caso('A vence: a regra fica como esta', 'a kits-v1 fica como esta' in dois_bracos(8, 0), True)
+    caso('A nao vence e B vence: a regra se simplifica',
+         'se simplifica para rampa mais orcamento' in dois_bracos(4, 8), True)
+    caso('nem A nem B vencem: a saida do desenho',
+         'desligar o kit automatico' in dois_bracos(4, 4), True)
+
+    # a concordancia entre os dois revisores
+    def concordancia(letras1, letras2):
+        pares = [{'par': k, 'kit': 'k%d' % k, 'nivel': 1, 'modulo': 'm', 'n': 4, 'minutos': '30.0',
+                  'regra': [], 'sorteio': [],
+                  'por_revisor': {'revisor1': {'A': 'regra', 'B': 'sorteio'},
+                                  'revisor2': {'A': 'regra', 'B': 'sorteio'}}}
+                 for k in range(1, len(letras1) + 1)]
+        gab = {'pacote': 'x', 'semente': 1, 'revisores': 2,
+               'bracos': {'A': {'ordenado_por_degrau': True, 'descartados': [], 'pares': pares}}}
+        resp = [{'braco': 'A', 'revisor': 'revisor%d' % (i + 1), 'respostas': [
+                    {'par': k, 'escolha': l, 'porque': ''} for k, l in enumerate(letras, 1)]}
+                for i, letras in enumerate((letras1, letras2))]
+        saida = io.StringIO()
+        antigo, sys.stdout = sys.stdout, saida
+        try:
+            apura(gab, resp)
+        finally:
+            sys.stdout = antigo
+        return saida.getvalue()
+
+    caso('dois revisores iguais: concordancia de 4 de 4',
+         'concordancia entre os dois revisores: 4 de 4' in concordancia('AABB', 'AABB'), True)
+    caso('dois revisores opostos: concordancia de 0 de 4',
+         'concordancia entre os dois revisores: 0 de 4' in concordancia('AABB', 'BBAA'), True)
+
+    # Resposta torta tem de PARAR a apuracao, e nao virar placar menor em
+    # silencio. Um caso por ramo de RESPOSTA INVALIDA: a lente 2 apagou os
+    # quatro que nao tinham prova e nenhum foi acusado.
+    dois = {'pacote': 'x', 'semente': 1, 'revisores': 1, 'bracos': {'A': {
         'ordenado_por_degrau': True, 'descartados': [], 'pares': [
-            {'par': 1, 'kit': 'k1', 'nivel': 1, 'modulo': 'm', 'n': 4, 'minutos': '30.0',
-             'regra': [], 'sorteio': [], 'por_revisor': {'revisor1': {'A': 'regra', 'B': 'sorteio'}}},
-            {'par': 2, 'kit': 'k2', 'nivel': 2, 'modulo': 'm', 'n': 4, 'minutos': '30.0',
-             'regra': [], 'sorteio': [], 'por_revisor': {'revisor1': {'A': 'sorteio', 'B': 'regra'}}}]}}}
-    resp = [{'braco': 'A', 'revisor': 'revisor1', 'respostas': [
-        {'par': 1, 'escolha': 'A', 'porque': ''}, {'par': 2, 'escolha': 'A', 'porque': ''}]}]
-    saida = io.StringIO()
-    antigo, sys.stdout = sys.stdout, saida
-    try:
-        resumo = apura(gab, resp)
-    finally:
-        sys.stdout = antigo
-    caso('a mesma letra em disposicoes opostas conta uma para cada lado',
-         (resumo['A']['regra'], resumo['A']['total']), (1, 2))
+            {'par': k, 'kit': 'k%d' % k, 'nivel': 1, 'modulo': 'm', 'n': 4, 'minutos': '30.0',
+             'regra': [], 'sorteio': [], 'por_revisor': {'revisor1': {'A': 'regra', 'B': 'sorteio'}}}
+            for k in (1, 2)]}}}
 
-    resp_b = [{'braco': 'A', 'revisor': 'revisor1', 'respostas': [
-        {'par': 1, 'escolha': 'B', 'porque': ''}, {'par': 2, 'escolha': 'B', 'porque': ''}]}]
-    saida = io.StringIO()
-    antigo, sys.stdout = sys.stdout, saida
-    try:
-        resumo_b = apura(gab, resp_b)
-    finally:
-        sys.stdout = antigo
-    caso('trocando as duas letras, o placar tambem da uma para cada lado',
-         (resumo_b['A']['regra'], resumo_b['A']['total']), (1, 2))
+    def para(nome, respostas, revisor='revisor1'):
+        parou = False
+        saida = io.StringIO()
+        antigo, sys.stdout = sys.stdout, saida
+        try:
+            apura(dois, [{'braco': 'A', 'revisor': revisor, 'respostas': respostas}])
+        except SystemExit:
+            parou = True
+        finally:
+            sys.stdout = antigo
+        caso(nome, parou, True)
 
-    # resposta incompleta tem de PARAR a apuracao, e nao virar placar menor
-    parou = False
-    saida = io.StringIO()
-    antigo, sys.stdout = sys.stdout, saida
-    try:
-        apura(gab, [{'braco': 'A', 'revisor': 'revisor1',
-                     'respostas': [{'par': 1, 'escolha': 'A', 'porque': ''}]}])
-    except SystemExit:
-        parou = True
-    finally:
-        sys.stdout = antigo
-    caso('resposta faltando um par para a apuracao', parou, True)
-
-    parou = False
-    saida = io.StringIO()
-    antigo, sys.stdout = sys.stdout, saida
-    try:
-        apura(gab, [{'braco': 'A', 'revisor': 'revisor1', 'respostas': [
-            {'par': 1, 'escolha': 'C', 'porque': ''}, {'par': 2, 'escolha': 'A', 'porque': ''}]}])
-    except SystemExit:
-        parou = True
-    finally:
-        sys.stdout = antigo
-    caso('escolha que nao e A nem B para a apuracao', parou, True)
+    ok_1 = {'par': 1, 'escolha': 'A', 'porque': ''}
+    para('resposta faltando um par para a apuracao', [ok_1])
+    para('escolha que nao e A nem B para a apuracao',
+         [{'par': 1, 'escolha': 'C', 'porque': ''}, {'par': 2, 'escolha': 'A', 'porque': ''}])
+    para('par respondido duas vezes para a apuracao',
+         [ok_1, dict(ok_1), {'par': 2, 'escolha': 'A', 'porque': ''}])
+    para('par que nao existe neste braco para a apuracao',
+         [ok_1, {'par': 2, 'escolha': 'A', 'porque': ''}, {'par': 9, 'escolha': 'A', 'porque': ''}])
+    para('par que nao e numero inteiro para a apuracao',
+         [ok_1, {'par': 2, 'escolha': 'A', 'porque': ''}, {'par': '3', 'escolha': 'A', 'porque': ''}])
+    para('revisor que nao recebeu folha para a apuracao',
+         [ok_1, {'par': 2, 'escolha': 'A', 'porque': ''}], revisor='revisor2')
 
     print('%d verificacoes passaram, %d falharam' % (ok, falhas))
     return 1 if falhas else 0

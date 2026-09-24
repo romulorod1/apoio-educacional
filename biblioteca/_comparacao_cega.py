@@ -21,7 +21,10 @@ orquestradora em 23/09, que substitui a arvore de dois destinos do desenho):
   A ganha                  -> a regra fica como esta.
   A empata ou perde, B ganha -> a regra se simplifica para rampa mais
                              orcamento, que continua sendo kit.
-  B tambem perde           -> a saida da secao 8(f): desligar o kit automatico.
+  B tambem perde           -> a saida do DESENHO_kits.md, secao 8(f): desligar o
+                              kit automatico. (E do DESENHO, nao do CONTRATO: o
+                              CONTRATO tem 8a a 8e e nunca teve 8f. A lente 1 do
+                              PR #56 mediu a citacao errada.)
 
 O INSTRUMENTO, e ele e parte da prova:
 
