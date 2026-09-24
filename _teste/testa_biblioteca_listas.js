@@ -88,9 +88,19 @@
  *   --envenenado-agrupa   o styles.css servido iguala a folga de dentro da
  *                         célula à de fora, e a caixa "No material" volta a
  *                         ficar no meio do caminho entre dois cartões.
- *   --envenenado-aviso-velho o app.js servido deixa o aviso sobreviver à troca
- *                         de ordem, continuando a afirmar "a lista pronta do
- *                         nível 2" depois de ela ter mexido na ordem.
+ *   --envenenado-aviso-velho o app.js servido tira o apagamento do aviso da
+ *                         PORTA ÚNICA (o guardarCarrinho). Esta corrida mede as
+ *                         DUAS portas: a da seta, na seção 3, e a do Desfazer,
+ *                         na 5b, que é a que a lente cega achou aberta.
+ *   --envenenado-sairam   o app.js servido volta a ser cego para a ordem ao
+ *                         decidir se há o que desfazer, e a rampa que ela
+ *                         montou some sem Desfazer.
+ *   --envenenado-recarrega a linha do módulo volta a recarregar a lista que ela
+ *                         está mexendo, jogando fora a ordem e o que ela
+ *                         acrescentou.
+ *   --envenenado-volta    o app.js servido esquece de onde ela veio, e o botão
+ *                         de voltar da lista cheia leva para o módulo em vez de
+ *                         para a lista pronta.
  */
 'use strict';
 const fs = require('fs');
@@ -111,8 +121,11 @@ const V_FRASE = process.argv.indexOf('--envenenado-frase') !== -1;
 const V_DIFICULDADE = process.argv.indexOf('--envenenado-dificuldade') !== -1;
 const V_AGRUPA = process.argv.indexOf('--envenenado-agrupa') !== -1;
 const V_AVISO_VELHO = process.argv.indexOf('--envenenado-aviso-velho') !== -1;
+const V_SAIRAM = process.argv.indexOf('--envenenado-sairam') !== -1;
+const V_RECARREGA = process.argv.indexOf('--envenenado-recarrega') !== -1;
+const V_VOLTA = process.argv.indexOf('--envenenado-volta') !== -1;
 const VENENO = V_ORDEM || V_SETA || V_CURADORIA || V_CAMADAS || V_COLUNA || V_FLUTUA || V_FRASE ||
-  V_DIFICULDADE || V_AGRUPA || V_AVISO_VELHO;
+  V_DIFICULDADE || V_AGRUPA || V_AVISO_VELHO || V_SAIRAM || V_RECARREGA || V_VOLTA;
 
 const APP_REPO = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const DRAW_REPO = fs.readFileSync(path.join(H.RAIZ, 'draw.js'), 'utf8');
@@ -149,11 +162,23 @@ const T_COLUNA = '.bib-grade.bib-grade-lp { grid-template-columns: repeat(auto-f
 // material" volta a ficar no meio do caminho entre dois cartões
 const L_AGRUPA = '.bib-grade-lp .bib-celula { gap: 4px; }';
 const T_AGRUPA = '.bib-grade-lp .bib-celula { gap: 28px; }';
-// o aviso volta a sobreviver à troca de ordem, afirmando uma lista que já mudou
+/* O aviso volta a sobreviver a toda mudança de carrinho: a porta única deixa de
+ * apagá-lo. É o defeito que a lente cega achou, e ele aparece em DUAS portas de
+ * uma vez: a seta (que passava pelo mexeuNoMaterial) e o Desfazer (que não
+ * passava). Envenenar a porta única é o que mede as duas. */
 const L_ORDEM_AVISO = [
-  '    bibLpAviso = null;',
-  '    if (!bibTrocaDesfazer) return;'].join(NL_APP);
-const T_ORDEM_AVISO = '    if (!bibTrocaDesfazer) return;';
+  '  function guardarCarrinho() {',
+  '    bibLpAviso = null;'].join(NL_APP);
+const T_ORDEM_AVISO = '  function guardarCarrinho() {';
+// o sairam volta a ser cego para a ordem, e a ordem dela some sem Desfazer
+const L_SAIRAM = "    var ordemPerdida = antes.itens.length === tudo.itens.length &&";
+const T_SAIRAM = "    var ordemPerdida = false && antes.itens.length === tudo.itens.length &&";
+// a linha do módulo volta a recarregar a lista que ela está mexendo
+const L_RECARREGA = '          if (listaProntaEmEdicao(lp)) irNaBiblioteca({ aula: { tipo: \'lista-pronta\', id: lp.id } });';
+const T_RECARREGA = '          if (false && listaProntaEmEdicao(lp)) irNaBiblioteca({ aula: { tipo: \'lista-pronta\', id: lp.id } });';
+// o caminho de volta da lista cheia volta a levar para o módulo
+const L_VOLTA = "          bibVoltarPara = { id: lp.id, slug: l.slug, rotulo: 'Lista pronta, nível ' + lp.nivel };";
+const T_VOLTA = '          bibVoltarPara = null;';
 // a mensagem volta para a caixa flutuante do rodapé, e o bloco do fluxo não é desenhado
 const L_FLUTUA = [
   '    if (bibLpAviso) {',
@@ -192,7 +217,10 @@ const RECEITA = V_ORDEM ? { arq: '/app.js', de: L_ORDEM, para: T_ORDEM }
             : V_FRASE ? { arq: '/app.js', de: L_FRASE, para: T_FRASE }
               : V_DIFICULDADE ? { arq: '/app.js', de: L_DIFICULDADE, para: T_DIFICULDADE }
                 : V_AGRUPA ? { arq: '/styles.css', de: L_AGRUPA, para: T_AGRUPA }
-                  : { arq: '/app.js', de: L_ORDEM_AVISO, para: T_ORDEM_AVISO };
+                  : V_SAIRAM ? { arq: '/app.js', de: L_SAIRAM, para: T_SAIRAM }
+                    : V_RECARREGA ? { arq: '/app.js', de: L_RECARREGA, para: T_RECARREGA }
+                      : V_VOLTA ? { arq: '/app.js', de: L_VOLTA, para: T_VOLTA }
+                        : { arq: '/app.js', de: L_ORDEM_AVISO, para: T_ORDEM_AVISO };
 const BASE_DE = { '/app.js': APP_REPO, '/draw.js': DRAW_REPO, '/styles.css': CSS_REPO };
 const trocas = {};
 if (VENENO) trocas[RECEITA.arq] = BASE_DE[RECEITA.arq].split(RECEITA.de).join(RECEITA.para);
@@ -644,16 +672,19 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   const depoisDaSeta = await aviso(pag, '#bib-lp-aviso');
   console.log('   aviso depois da seta: ' + JSON.stringify(depoisDaSeta.texto));
   if (V_AVISO_VELHO) {
-    conf('VENENO: o aviso sobreviveu à troca de ordem e continua afirmando a lista do pacote',
+    /* A PRIMEIRA DAS DUAS PORTAS, e esta corrida NÃO para aqui: o mesmo veneno
+     * mede a segunda porta na seção 5b, no Desfazer. Foi por medir só uma que o
+     * guarda ficou cego enquanto o defeito entrava pela outra. */
+    conf('VENENO (porta da seta): o aviso sobreviveu à troca de ordem e continua afirmando a lista do pacote',
       /a lista pronta do nível 2/.test(depoisDaSeta.texto), true);
-    return;
+  } else {
+    conf('o aviso da lista pronta sai no primeiro toque que muda o material', depoisDaSeta.texto, '');
+    conf('e a tela passa a dizer que ela mudou a lista, mesmo tendo mudado SÓ a ordem',
+      await pag.evaluate(() => {
+        const m = document.querySelector('#bib-lp-mudou');
+        return m ? m.textContent.trim() : '(não achei)';
+      }), 'Você mudou esta lista. O material sai na ordem que está aqui.');
   }
-  conf('o aviso da lista pronta sai no primeiro toque que muda o material', depoisDaSeta.texto, '');
-  conf('e a tela passa a dizer que ela mudou a lista, mesmo tendo mudado SÓ a ordem',
-    await pag.evaluate(() => {
-      const m = document.querySelector('#bib-lp-mudou');
-      return m ? m.textContent.trim() : '(não achei)';
-    }), 'Você mudou esta lista. O material sai na ordem que está aqui.');
 
   const nums = await numerosDaTela(pag);
   conf('a numeração da tela acompanha', nums[0].indexOf('1. ') === 0 && nums[1].indexOf('2. ') === 0, true);
@@ -727,10 +758,159 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   await pausa(400);
   const c5 = await carrinho(pag);
   conf('ele entrou no FIM do carrinho', c5.itens[c5.itens.length - 1], novo);
+
+  /* O CAMINHO DE VOLTA, e é ele que fecha a promessa do cabeçalho desta seção.
+   *
+   * A escrita anterior parava aqui: clicava em Voltar, ia parar no MÓDULO, e
+   * conferia que o carrinho tinha o mesmo tamanho de antes do clique, que é
+   * verdade para qualquer implementação, porque clicar em Voltar não mexe no
+   * carrinho. Não existia dado neste fixture, nem em nenhum, capaz de fazer
+   * aquela linha falhar, e o nome dela afirmava um toque que o teste não dava.
+   * Foi a segunda lente cega que a pegou, e ela tinha razão: era a asserção que
+   * cobriria o defeito de a ordem ser jogada fora, e ela não cobria nada. */
+  const rotuloVoltar = await pag.evaluate(() => {
+    const b = document.querySelector('.bib-voltar');
+    return b ? b.textContent.trim() : '(não achei)';
+  });
+  console.log('   o botão de voltar da lista cheia diz: ' + JSON.stringify(rotuloVoltar));
+  if (V_VOLTA) {
+    conf('VENENO: sem a marca de volta, o botão leva para o módulo',
+      rotuloVoltar, '‹ ' + MOD_TITULO);
+    return;
+  }
+  conf('o botão de voltar da lista cheia leva DE VOLTA À LISTA PRONTA',
+    rotuloVoltar, '‹ Lista pronta, nível 2');
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
-  await pausa(300);
-  conf('voltou ao módulo e tocou de novo no nível 2 não é preciso: a lista pronta guarda o estado',
-    (await carrinho(pag)).itens.length, c5.itens.length);
+  await pausa(500);
+  conf('e chegou mesmo na tela da lista pronta',
+    await pag.evaluate(() => !!document.querySelector('#bib-lp-grade')), true);
+  const c6 = await carrinho(pag);
+  conf('com o carrinho inteiro preservado, na ordem dela', c6.itens.join('|'), c5.itens.join('|'));
+
+  /* AGORA O QUE A SEÇÃO PROMETIA E NUNCA TINHA SIDO LIDO: o exercício de fora
+   * entra no FIM, onde as setas alcançam, e a tela diz que ele fica fora da
+   * conta dos minutos. Com a tela nunca reaberta, estas duas frases existiam e
+   * nenhuma prova as tinha visto. */
+  const deFora = await pag.evaluate(i => {
+    const cel = document.querySelector('#bib-lp-grade .bib-celula:last-child');
+    const cartao = cel && cel.querySelector('.bib-cartao');
+    return {
+      ultimo: !!(cartao && cartao.dataset.id === i),
+      tag: cel ? Array.from(cel.querySelectorAll('.tag')).map(t => t.textContent.trim()).join(' | ') : '',
+      setas: cel ? cel.querySelectorAll('.bib-lp-setas button').length : 0,
+      subirAcesa: !!(cel && cel.querySelector('[data-subir]') && !cel.querySelector('[data-subir]').disabled),
+      cabeca: (document.querySelector('#bib-lp-cabeca') || {}).innerText || ''
+    };
+  }, novo);
+  console.log('   o acrescentado: ' + JSON.stringify(deFora));
+  conf('o exercício de fora é o ÚLTIMO cartão da lista pronta', deFora.ultimo, true);
+  conf('e a etiqueta dele diz que foi você quem acrescentou', deFora.tag, 'acrescentado por você');
+  conf('e as setas alcançam ele', deFora.setas, 2);
+  conf('e a de subir está acesa, porque há cartão acima', deFora.subirAcesa, true);
+  conf('e o cabeçalho diz que ele fica fora da conta dos minutos',
+    /fora 1 exercício que você acrescentou e não entram? nessa conta/.test(deFora.cabeca), true);
+
+  /* TOCAR DE NOVO NA LINHA NÃO JOGA O TRABALHO DELA FORA. Voltar ao módulo e
+   * tocar na mesma lista é o caminho mais natural do mundo, e ele apagava a
+   * ordem que ela tinha acabado de montar, sem aviso e sem Desfazer. */
+  await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
+  await pausa(400);
+  conf('voltou para o módulo', await pag.evaluate(() => !!document.querySelector('[data-lista-pronta]')), true);
+  conf('tocou de novo na linha do nível 2', await tocarLinha(pag, 'Lista pronta, nível 2'), true);
+  await pausa(500);
+  const c7 = await carrinho(pag);
+  console.log('   carrinho depois de tocar de novo: ' + JSON.stringify(c7.itens));
+  if (V_RECARREGA) {
+    conf('VENENO: a linha recarregou e jogou fora a ordem e o acrescentado',
+      c7.itens.join('|'), IDS2.join('|'));
+    return;
+  }
+  conf('a linha ABRIU a lista que ela estava mexendo, sem recarregar',
+    c7.itens.join('|'), c5.itens.join('|'));
+  conf('e a tela aberta é a da lista pronta',
+    await pag.evaluate(() => !!document.querySelector('#bib-lp-grade')), true);
+
+  /* A ORDEM DELA SOBREVIVE AO APARELHO SER FECHADO, e quando ela não sobrevive
+   * há Desfazer. Recarregada a página, a memória de "qual lista ela estava
+   * mexendo" se perde (o carrinho não, ele mora no localStorage), então o toque
+   * na linha CARREGA de novo e a ordem do pacote volta. Isso é legítimo, mas
+   * não pode ser silencioso: é trabalho dela indo embora. */
+  secao('5b. A ordem dela nunca some sem volta');
+  /* PRIMEIRO, O CASO PURO: o carrinho tem de ficar com EXATAMENTE os itens da
+   * lista, em ordem diferente da do pacote. Sem isso, o toque na linha cairia
+   * no caso "saiu item", que já tem Desfazer desde sempre, e a asserção sobre a
+   * ordem passaria por outro motivo. Monta-se pela interface: tira o
+   * acrescentado pela caixa, e devolve pelo caminho de acrescentar o exercício
+   * que a seção 4 tinha tirado, que entra no fim e portanto fora da ordem do
+   * pacote. */
+  conf('tirou o acrescentado pela caixa', await desmarcar(pag, novo), true);
+  await pausa(400);
+  const slugDaLista = IDS2[0].split(':')[2];
+  conf('abriu a lista cheia de onde veio a lista pronta', await pag.evaluate(s => {
+    const b = document.querySelector('#bib-lp-acrescentar [data-acrescentar="' + s + '"]');
+    if (!b) return false; b.click(); return true;
+  }, slugDaLista), true);
+  await pausa(500);
+  conf('devolveu o exercício que a seção 4 tinha tirado', await pag.evaluate(i => {
+    const c = document.querySelector('#bib-corpo input[data-carrinho="itens"][data-id="' + i + '"]');
+    if (!c) return false;
+    c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); return true;
+  }, esperada[2]), true);
+  await pausa(400);
+  const cPuro = await carrinho(pag);
+  console.log('   carrinho do caso puro: ' + JSON.stringify(cPuro.itens));
+  conf('o carrinho tem os MESMOS ids da lista', cPuro.itens.slice().sort().join('|'), IDS2.slice().sort().join('|'));
+  conf('e em ordem DIFERENTE da do pacote', cPuro.itens.join('|') === IDS2.join('|') ? 'igual' : 'outra', 'outra');
+
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.abrirApp(pag, amb.ORIGEM);
+  await H.irParaAba(pag, 'biblioteca');
+  await pausa(400);
+  const guardado = await carrinho(pag);
+  conf('depois do reload o carrinho continua com a ordem dela', guardado.itens.join('|'), cPuro.itens.join('|'));
+  conf('abriu o módulo', await tocarLinha(pag, MOD_TITULO), true);
+  await pausa(400);
+  conf('tocou na linha do nível 2', await tocarLinha(pag, 'Lista pronta, nível 2'), true);
+  await pausa(600);
+  const c8 = await carrinho(pag);
+  const avisoReload = await aviso(pag, '#bib-lp-aviso');
+  console.log('   depois do reload: ' + JSON.stringify(c8.itens) + ' | ' + JSON.stringify(avisoReload.texto));
+  conf('a lista voltou à ordem do pacote', c8.itens.join('|'), IDS2.join('|'));
+  if (V_SAIRAM) {
+    conf('VENENO: sem enxergar a ordem, o aviso nasce SEM Desfazer',
+      await pag.evaluate(() => !!document.querySelector('#bib-lp-aviso-acao')), false);
+    conf('VENENO: e a frase não diz que a ordem do pacote voltou',
+      /de volta à ordem do pacote/.test(avisoReload.texto), false);
+    return;
+  }
+  conf('e a tela diz que a ordem do pacote voltou',
+    /de volta à ordem do pacote/.test(avisoReload.texto), true);
+  conf('e oferece Desfazer, porque o que se perdeu foi trabalho dela',
+    await pag.evaluate(() => !!document.querySelector('#bib-lp-aviso-acao')), true);
+
+  /* O DESFAZER PASSA PELA PORTA ÚNICA, e é aqui que se mede a porta.
+   *
+   * O botão deste aviso e o "Devolver os N itens que eu tirei" da faixa do
+   * contexto chamam o MESMO `devolverSelecaoTrocada`. A primeira escrita
+   * apagava o aviso dentro do clique deste botão, então ele ficava certo e o
+   * outro ficava errado: a lente cega achou a tela se redesenhando com o bloco
+   * verde inteiro de pé, afirmando o material que acabara de ser desfeito.
+   * Agora quem apaga é o `guardarCarrinho`, por onde toda mudança passa, e o
+   * que este toque mede é a porta, não o botão. */
+  await pag.evaluate(() => { document.querySelector('#bib-lp-aviso-acao').click(); });
+  await pausa(600);
+  const c9 = await carrinho(pag);
+  const depoisDoDesfazer = await aviso(pag, '#bib-lp-aviso');
+  console.log('   depois do Desfazer: ' + JSON.stringify(c9.itens) + ' | aviso: ' + JSON.stringify(depoisDoDesfazer.texto));
+  conf('o Desfazer devolveu a ordem dela', c9.itens.join('|'), cPuro.itens.join('|'));
+  if (V_AVISO_VELHO) {
+    conf('VENENO (porta do Desfazer): o aviso sobreviveu ao próprio Desfazer e continua afirmando o material desfeito',
+      /O material agora tem/.test(depoisDoDesfazer.texto), true);
+    return;
+  }
+  conf('e o aviso morreu na porta única, junto com o material que ele afirmava',
+    depoisDoDesfazer.texto, '');
+  conf('e a caixa flutuante do rodapé continua sem abrir', depoisDoDesfazer.flutuando, false);
 
   // ================================================================
   secao('6. Tapar na folha');

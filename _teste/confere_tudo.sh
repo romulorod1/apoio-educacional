@@ -411,6 +411,13 @@ roda "biblioteca listas --envenenado-dificuldade"   node "_teste/testa_bibliotec
 # aviso sobrevivendo a troca de ordem enquanto afirma a lista do pacote.
 roda "biblioteca listas --envenenado-agrupa"        node "_teste/testa_biblioteca_listas.js" --envenenado-agrupa
 roda "biblioteca listas --envenenado-aviso-velho"   node "_teste/testa_biblioteca_listas.js" --envenenado-aviso-velho
+# E os quatro que as duas lentes cegas do PR acharam: o aviso sobrevivendo ao
+# Desfazer por uma porta que a cerca nao cobria, o sairam cego para a ordem, a
+# linha do modulo recarregando por cima do trabalho dela, e o caminho de volta
+# da lista cheia levando para o modulo em vez de para a lista pronta.
+roda "biblioteca listas --envenenado-sairam"        node "_teste/testa_biblioteca_listas.js" --envenenado-sairam
+roda "biblioteca listas --envenenado-recarrega"     node "_teste/testa_biblioteca_listas.js" --envenenado-recarrega
+roda "biblioteca listas --envenenado-volta"         node "_teste/testa_biblioteca_listas.js" --envenenado-volta
 # FRENTE B (B10): A FOLHA IMPRESSA NAO MUDOU. A unificacao das camadas foi pelo
 # lado da TELA de proposito, porque o papel e o que ela entrega ao aluno. A
 # prova gera a MESMA folha com o pdf.js de hoje e com o do d80bb90 e compara

@@ -11299,6 +11299,8 @@
     if (bibLpAviso && !(bibNav.aula && bibNav.aula.tipo === 'lista-pronta' && bibNav.aula.id === bibLpAviso.para)) {
       bibLpAviso = null;
     }
+    // a volta para a lista pronta vale só enquanto ela estiver na lista cheia que a abriu
+    if (bibVoltarPara && !(bibNav.aula && bibNav.aula.slug === bibVoltarPara.slug)) bibVoltarPara = null;
     desenharCorpoBiblioteca();
     var cont = $('.conteudo');
     if (cont) cont.scrollTop = 0;
@@ -11464,7 +11466,17 @@
     listas.forEach(function (lp) {
       var linha = linhaBib('Lista pronta, nível ' + lp.nivel,
         plural(lp.itens.length, 'exercício', 'exercícios') + ' · ' + meiaAula(lp.minutos),
-        function () { usarListaPronta(lp); });
+        /* TOCAR NA LINHA DA LISTA QUE ELA JÁ ESTÁ MEXENDO ABRE, E NÃO RECARREGA.
+         * Antes recarregava sempre, e o caminho mais natural do mundo (voltar
+         * ao módulo, tocar de novo) jogava fora a ordem que ela tinha acabado
+         * de montar. Recarregar é uma ação legítima, mas tem de ser a que ela
+         * pediu, e não a que ela atravessou. Quando a lista já está no carrinho
+         * ela volta para ela; quando não está mais (esvaziou, trocou de lista,
+         * desmarcou tudo), aí sim carrega de novo. */
+        function () {
+          if (listaProntaEmEdicao(lp)) irNaBiblioteca({ aula: { tipo: 'lista-pronta', id: lp.id } });
+          else usarListaPronta(lp);
+        });
       linha.classList.add('bib-lista-pronta');
       linha.setAttribute('data-lista-pronta', lp.id);
       linha.querySelector('.cresce').appendChild(
@@ -11481,6 +11493,17 @@
     corpo.appendChild(el('p', { class: 'ajuda bib-lp-ajuda', id: 'bib-lp-ajuda',
       texto: 'Em ordem de dificuldade estimada, da mais baixa para a mais alta. ' +
         'Tire, ponha e troque a ordem à vontade.' }));
+  }
+
+  /* A lista que ela está mexendo agora: a última carregada, enquanto ao menos
+   * um exercício dela ainda estiver no carrinho. Sem a segunda metade, um
+   * "Desmarcar tudo" deixaria a linha achando que ainda há trabalho a
+   * preservar, e tocar nela abriria uma tela vazia em vez de carregar. */
+  var bibLpEmEdicao = null;
+
+  function listaProntaEmEdicao(lp) {
+    return bibLpEmEdicao === lp.id &&
+      bibCarrinho.itens.some(function (id) { return lp.minutosDe[id] !== undefined; });
   }
 
   function listaProntaPorId(id) {
@@ -11562,11 +11585,19 @@
     corpo.appendChild(voltarBib(mod.titulo, function () { irNaBiblioteca({ aula: null }); }));
     corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: 'Lista pronta, nível ' + lp.nivel }));
     if (bibLpAviso) {
+      // capturado no desenho: o clique não pode depender de a variável ainda apontar para ele
+      var av = bibLpAviso;
       corpo.appendChild(el('div', { class: 'bib-lp-aviso', id: 'bib-lp-aviso' }, [
-        el('span', { class: 'cresce', texto: bibLpAviso.texto }),
-        bibLpAviso.aoAgir
-          ? el('button', { type: 'button', class: 'btn pequeno', id: 'bib-lp-aviso-acao', texto: bibLpAviso.rotulo,
-            aoClick: function () { var v = bibLpAviso; bibLpAviso = null; v.aoAgir(); desenharCorpoBiblioteca(); } })
+        el('span', { class: 'cresce', texto: av.texto }),
+        /* O BOTÃO NÃO APAGA O AVISO SOZINHO, e isto é de propósito: ele desfaz,
+         * e quem apaga o aviso é a porta única, o `guardarCarrinho`. Apagar
+         * aqui faria este botão ficar certo e deixaria o "Devolver os N itens
+         * que eu tirei" da faixa do contexto errado, que é exatamente o defeito
+         * que a lente cega achou: os dois chamam o MESMO
+         * `devolverSelecaoTrocada`, e só um deles tinha o remendo. */
+        av.aoAgir
+          ? el('button', { type: 'button', class: 'btn pequeno', id: 'bib-lp-aviso-acao', texto: av.rotulo,
+            aoClick: function () { av.aoAgir(); desenharCorpoBiblioteca(); } })
           : null
       ]));
     }
@@ -11672,7 +11703,15 @@
     ]);
     (mod.ordemListas || []).forEach(function (l) {
       atalhos.appendChild(el('button', { type: 'button', class: 'btn pequeno', 'data-acrescentar': l.slug,
-        texto: l.titulo, aoClick: function () { irNaBiblioteca({ aula: { tipo: 'exercicios', slug: l.slug } }); } }));
+        texto: l.titulo,
+        /* QUEM SAI DAQUI VOLTA PARA CÁ. Sem esta marca, o botão de voltar da
+         * lista cheia levava para o MÓDULO, e de lá o único caminho de volta
+         * era a linha que recarregava a lista e jogava a ordem fora. Ela ia
+         * buscar um exercício e perdia a rampa no caminho de volta. */
+        aoClick: function () {
+          bibVoltarPara = { id: lp.id, slug: l.slug, rotulo: 'Lista pronta, nível ' + lp.nivel };
+          irNaBiblioteca({ aula: { tipo: 'exercicios', slug: l.slug } });
+        } }));
     });
     if (mod.ordemListas && mod.ordemListas.length) corpo.appendChild(atalhos);
     observarMiniaturas(grade);
@@ -11692,8 +11731,24 @@
     }
   }
 
+  /* De onde ela veio para a lista cheia, quando veio de uma lista pronta. É
+   * consumido no primeiro desenho da lista cheia e some ao sair dela, porque é
+   * uma volta e não um histórico. */
+  var bibVoltarPara = null;
+
   function desenharListaDeExercicios(corpo, mod, lista) {
-    corpo.appendChild(voltarBib(mod.titulo, function () { irNaBiblioteca({ aula: null }); }));
+    /* Não se consome a volta ao desenhar: esta tela se redesenha sozinha (a
+     * etiqueta dela, o filtro de dificuldade), e uma volta consumida no
+     * primeiro desenho sumiria no segundo. Quem a apaga é a navegação que sai
+     * daqui, no `irNaBiblioteca`. */
+    var volta = bibVoltarPara && bibNav.aula && bibVoltarPara.slug === bibNav.aula.slug ? bibVoltarPara : null;
+    if (volta && listaProntaPorId(volta.id)) {
+      corpo.appendChild(voltarBib(volta.rotulo, function () {
+        irNaBiblioteca({ aula: { tipo: 'lista-pronta', id: volta.id } });
+      }));
+    } else {
+      corpo.appendChild(voltarBib(mod.titulo, function () { irNaBiblioteca({ aula: null }); }));
+    }
     corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: lista.titulo }));
     var grade = el('div', { class: 'bib-grade bib-grade-exercicios' });
     lista.itens.forEach(function (it, i) {
@@ -11869,18 +11924,14 @@
    * Desfazer da faixa continuaria oferecendo voltar a uma seleção que ela já
    * substituiu de propósito. */
   function mexeuNoMaterial() {
-    /* O AVISO DA LISTA PRONTA MORRE NO MESMO TOQUE QUE MATA O DESFAZER DA
-     * FAIXA, e pelo mesmo motivo: ele afirma um estado ("o material agora tem
-     * 6 exercícios: a lista pronta do nível 2") que deixa de ser verdade assim
-     * que ela mexe. Trocar dois de lugar já basta, porque a ORDEM é o que a
-     * lista pronta é: reordenada, ela não é mais a lista do pacote.
-     *
-     * O olho de fora cego pegou isso num print em que um exercício já tinha
-     * subido e a frase continuava dizendo "a lista pronta do nível 2". A
-     * primeira escrita deste conserto guardava o aviso nas trocas de ordem,
-     * com o argumento de que o TOTAL não mudava; o argumento estava certo
-     * sobre o número e errado sobre a frase inteira. */
-    bibLpAviso = null;
+    /* O AVISO DA LISTA PRONTA NÃO MORA MAIS AQUI, e a razão está no
+     * `guardarCarrinho`: esta função cobre as ações da MÃO dela, e o aviso
+     * precisa morrer em toda mudança de carrinho, inclusive nas que vêm de um
+     * Desfazer que não passa por aqui. O motivo original continua valendo, e
+     * era este: o aviso afirma um estado ("o material agora tem 6 exercícios:
+     * a lista pronta do nível 2") que deixa de ser verdade assim que ela mexe,
+     * e trocar dois de lugar já basta, porque a ORDEM é o que a lista pronta
+     * é. */
     if (!bibTrocaDesfazer) return;
     bibTrocaDesfazer = null;
     desenharContextoBiblioteca();
@@ -12048,9 +12099,14 @@
     if (bibTrocaDesfazer && !bibContexto.anexado) {
       caixa.appendChild(el('button', {
         type: 'button', class: 'btn pequeno', id: 'bib-desfazer-troca',
+        /* O terceiro caso não existia, e por isso este botão dizia "Devolver os
+         * 0 itens que eu tirei" quando o que se perdeu foi a ORDEM e não item
+         * nenhum. Quando nada saiu, o que há para devolver é a ordem. */
         texto: bibTrocaDesfazer.sairam === 1
           ? 'Devolver o item que eu tirei'
-          : 'Devolver os ' + bibTrocaDesfazer.sairam + ' itens que eu tirei',
+          : bibTrocaDesfazer.sairam === 0
+            ? 'Devolver a ordem que eu troquei'
+            : 'Devolver os ' + bibTrocaDesfazer.sairam + ' itens que eu tirei',
         aoClick: function () {
           var t = bibTrocaDesfazer;
           if (t) devolverSelecaoTrocada(t.antes, t.tudo);
@@ -12129,7 +12185,24 @@
     } catch (e) { /* sem armazenamento: começa vazio */ }
     return { itens: [], paginas: [] };
   }
+  /* O AVISO DA LISTA PRONTA MORRE AQUI, e é aqui de propósito.
+   *
+   * Ele já morreu uma vez no `mexeuNoMaterial`, e a primeira lente cega achou a
+   * porta que aquilo não cobria: o "Devolver os N itens que eu tirei" da faixa
+   * do contexto chama `devolverSelecaoTrocada`, que não passa pelo
+   * `mexeuNoMaterial`. A tela se redesenhava com o bloco verde inteiro de pé,
+   * afirmando "o material agora tem N exercícios: a lista pronta do nível 2"
+   * com o material já desfeito. Tela que afirma o que já não é verdade é tela
+   * mentindo, e conserto de porta em porta só adia a próxima.
+   *
+   * `guardarCarrinho` é a porta ÚNICA: toda mudança de carrinho passa por aqui,
+   * porque toda mudança precisa sobreviver ao aparelho ser fechado. O aviso
+   * fala do carrinho; mudou o carrinho, ele calou.
+   *
+   * Quem cria o aviso (`usarListaPronta`) grava o carrinho ANTES de montá-lo,
+   * e é por isso que ele sobrevive ao próprio nascimento. */
   function guardarCarrinho() {
+    bibLpAviso = null;
     try { localStorage.setItem(CHAVE_CARRINHO, JSON.stringify(bibCarrinho)); } catch (e) { /* segue na memória */ }
   }
 
@@ -12191,9 +12264,26 @@
     var antes = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
     var tudo = { itens: lp.ids.slice(), paginas: [] };
     bibCarrinho = { itens: tudo.itens.slice(), paginas: [] };
+    bibLpEmEdicao = lp.id;
     guardarCarrinho();
     var sairam = semOsDe(antes.itens, tudo.itens).length + antes.paginas.length;
-    bibTrocaDesfazer = sairam ? { antes: antes, tudo: tudo, sairam: sairam } : null;
+    /* O `sairam` É CEGO PARA A ORDEM, e isso apagava o trabalho dela em
+     * silêncio. Ele é diferença de CONJUNTO: se ela só trocou a ordem e tocou
+     * na linha de novo, `antes` e `tudo` têm os mesmos ids, `sairam` dá zero, o
+     * Desfazer não nasce, e a rampa que ela acabou de montar vai embora sem uma
+     * palavra. A primeira lente cega pegou isto, e a acusação foi justa: o
+     * raciocínio "a ORDEM é o que a lista pronta é" tinha sido aplicado ao
+     * aviso e não tinha sido aplicado aqui.
+     *
+     * `sairam` continua contando ITENS que saíram, porque é ele que escreve
+     * "Devolver os N itens que eu tirei". Quem decide se há o que desfazer é
+     * `perdeu`, que enxerga a ordem também. Perder a ordem é perder trabalho
+     * dela, e trabalho dela nunca some sem volta. */
+    var ordemPerdida = antes.itens.length === tudo.itens.length &&
+      antes.itens.some(function (id, i) { return id !== tudo.itens[i]; });
+    var perdeu = sairam > 0 || ordemPerdida;
+    bibTrocaDesfazer = perdeu
+      ? { antes: antes, tudo: tudo, sairam: sairam, ordemPerdida: ordemPerdida } : null;
     /* A FRASE DIZ O TOTAL QUE FICOU, e não a conta que levou até ele.
      *
      * A forma antiga somava em voz alta: "Tirei 2 itens que estavam marcados e
@@ -12210,10 +12300,11 @@
     bibLpAviso = {
       para: lp.id,
       texto: 'O material agora tem ' + plural(bibCarrinho.itens.length, 'exercício', 'exercícios') +
-        ': a lista pronta do nível ' + lp.nivel + (sairam ? ', no lugar do que estava marcado' : '') +
+        ': a lista pronta do nível ' + lp.nivel +
+        (sairam ? ', no lugar do que estava marcado' : ordemPerdida ? ', de volta à ordem do pacote' : '') +
         '. Mude o que quiser e toque em Gerar material.',
-      rotulo: sairam ? 'Desfazer' : null,
-      aoAgir: sairam ? function () { devolverSelecaoTrocada(antes, tudo); } : null
+      rotulo: perdeu ? 'Desfazer' : null,
+      aoAgir: perdeu ? function () { devolverSelecaoTrocada(antes, tudo); } : null
     };
     irNaBiblioteca({ aula: { tipo: 'lista-pronta', id: lp.id } });
     desenharCarrinho();
