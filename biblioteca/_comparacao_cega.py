@@ -213,10 +213,13 @@ REGRAS
 - Responda todos os pares, na ordem.
 
 OS ARQUIVOS
-As folhas do par NN sao, nesta pasta:
-    par-NN-lista-A.png
-    par-NN-lista-B.png
-Os pares vao de 01 ate %(ultimo)02d.
+Os pares vao de 01 ate %(ultimo)02d. Cada folha e alta e por isso vem em
+partes, sempre cortadas entre um exercicio e o seguinte, nunca no meio de um.
+O arquivo INDICE.txt desta pasta lista, para cada folha, as partes na ordem.
+Abra TODAS as partes de uma folha antes de julgar.
+
+    par-NN-lista-A-parte-1.png, par-NN-lista-A-parte-2.png, ...
+    par-NN-lista-B-parte-1.png, par-NN-lista-B-parte-2.png, ...
 
 A RESPOSTA
 Termine o seu relatorio final com este JSON, e nada depois dele:

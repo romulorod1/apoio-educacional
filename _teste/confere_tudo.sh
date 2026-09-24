@@ -413,6 +413,11 @@ roda "comparacao de pacotes"                    python biblioteca/_compara_pacot
 # conferencia: alem dos valores que se checam a mao, a cauda binomial e batida
 # contra uma contagem por forca bruta de todas as 2^n sequencias.
 roda "limiar da comparacao cega"                python biblioteca/_apura_cega.py --autoteste
+# O corte das folhas da comparacao cega. Exercicio partido ao meio vira defeito
+# da folha disfarcado de juizo sobre a lista, entao o corte tem prova: nenhum
+# item entre dois pedacos, nenhum pedaco passando do teto, e cobertura sem
+# buraco nem sobreposicao.
+roda "corte das folhas cegas"                  node biblioteca/_folhas_cegas.js --autoteste
 
 # Duas conferencias aqui, e a primeira e a que pega o defeito de verdade.
 #
