@@ -51,16 +51,6 @@ def ler(caminho):
         return {n: z.read(n) for n in z.namelist()}
 
 
-def manifest_sem_o_que_muda(bruto):
-    m = json.loads(bruto.decode('utf-8'))
-    for caminho in SEM_COMPARAR_NO_MANIFEST:
-        alvo = m
-        for passo in caminho[:-1]:
-            alvo = alvo.get(passo) or {}
-        alvo.pop(caminho[-1], None)
-    return json.dumps(m, ensure_ascii=False, sort_keys=True)
-
-
 def diferencas_do_manifest(bruto_a, bruto_b):
     """Em QUE o manifest mudou, campo a campo. Entre duas geracoes do mesmo
     pacote a resposta tem de ser "em nada"; entre uma versao e a seguinte ela
@@ -141,7 +131,7 @@ def comparar(a, b, novos=()):
     return problemas, numeros
 
 
-def _pacote_de_mentira(versao=4, extra=None, mexer=None):
+def _pacote_de_mentira(versao=4, extra=None, mexer=None, tirar=None):
     """Um pacote minusculo em memoria, para o autoteste. Nao toca em disco e
     nao depende do Drive, entao roda no portao."""
     arquivos = {'itens.json': b'[{"id":"9ano:m:l:ex:1"}]\n',
@@ -150,6 +140,10 @@ def _pacote_de_mentira(versao=4, extra=None, mexer=None):
     arquivos.update(extra or {})
     if mexer:
         arquivos[mexer] = arquivos[mexer] + b' '
+    # tirar de verdade: some do pacote E da lista do manifest, que e o que
+    # acontece quando um item sai por curadoria
+    if tirar:
+        arquivos.pop(tirar, None)
     manifest = {'esquema': 1, 'pacote': 'matematica-mentira', 'versao': versao,
                 'gerado_em': '2026-09-23T00:00:00-03:00',
                 'gerador': {'nome': 'x', 'commit': 'aaa', 'pymupdf': '1.27.2.3'},
@@ -229,6 +223,35 @@ def autoteste():
          comparar(base, _pacote_de_mentira(), novos=('kits.json',))[0], True)
     caso('manifest diferente reprova quando nao ha versao nova',
          comparar(base, _pacote_de_mentira(versao=5))[0], True)
+    # O TEXTO do diff do manifest tem LADO, e ninguem o lia: trocar "entraram"
+    # por "sairam", ou inverter o "vira", passava calado, e e esse texto que o
+    # registro cita para dizer que os dois arquivos novos ENTRARAM. Achado
+    # pela lente estreita do PR #56.
+    valor('o diff do manifest diz a direcao da versao',
+          comparar(base, _pacote_de_mentira(versao=5))[1]['manifest'], ['versao: 4 vira 5'])
+    valor('e diz que o arquivo novo ENTROU, e nao que saiu',
+          comparar(base, _pacote_de_mentira(extra={'kits.json': b'[]\n'}), novos=('kits.json',))[1]['manifest'],
+          ['arquivos: entraram kits.json'])
+    valor('e diz que o arquivo sumido SAIU',
+          comparar(base, _pacote_de_mentira(tirar='assets/9ano/m/l/ex-01.svg'))[1]['manifest'],
+          ['arquivos: sairam assets/9ano/m/l/ex-01.svg'])
+    valor('e nomeia o hash que mudou',
+          comparar(base, _pacote_de_mentira(mexer='itens.json'))[1]['manifest'],
+          ['arquivos: 1 hash(es) mudaram, o primeiro e itens.json'])
+    # chave que nasce e chave que some, para os rotulos "(nao existia)" e
+    # "(saiu)" nao poderem ser trocados entre si sem ninguem ver
+    def com_chave_no_manifest(**campos):
+        p = _pacote_de_mentira()
+        m = json.loads(p['manifest.json'].decode('utf-8'))
+        m.update(campos)
+        p['manifest.json'] = (json.dumps(m, ensure_ascii=False, indent=1) + '\n').encode('utf-8')
+        return p
+    valor('chave que nasce no manifest sai como "(nao existia)"',
+          comparar(base, com_chave_no_manifest(series=['9ano']))[1]['manifest'],
+          ['series: "(nao existia)" vira ["9ano"]'])
+    valor('e chave que some sai como "(saiu)"',
+          comparar(com_chave_no_manifest(series=['9ano']), base)[1]['manifest'],
+          ['series: ["9ano"] vira "(saiu)"'])
     # gerado_em e gerador.commit sao os dois campos que MUDAM de proposito
     outro_dia = _pacote_de_mentira()
     m = json.loads(outro_dia['manifest.json'].decode('utf-8'))

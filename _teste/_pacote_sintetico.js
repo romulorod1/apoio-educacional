@@ -243,10 +243,16 @@ const KITS = [
     conferido: { quem: 'olho de fora cego', data: '2026-09-23', nota: 4 }
   }
 ];
-/* Exclusões: ids que NÃO estão em itens.json, porque saíram do pacote. */
+/* Exclusões: ids que NÃO estão em itens.json, porque saíram do pacote.
+ * São TRÊS de propósito, contra DOIS kits: com os dois números iguais, trocar
+ * `contagens.kits` por `contagens.itens_excluidos` no manifest passaria em
+ * todas as quatro asserções que os comparam, porque elas confeririam 2 contra
+ * 2. Dois valores iguais onde deviam ser diferentes, achado pela lente
+ * estreita do PR #56. */
 const EXCLUSOES = [
   { id: LISTA_KIT + ':ex:9', motivo: 'a figura da solução veio da fonte fora do lugar', quem: 'curadoria', data: '2026-09-22' },
-  { id: LISTA_KIT + ':ex:10', motivo: 'o recorte do enunciado não começa pelo número' }
+  { id: LISTA_KIT + ':ex:10', motivo: 'o recorte do enunciado não começa pelo número' },
+  { id: LISTA_KIT + ':ex:11', motivo: 'a fonte numera dois enunciados com o mesmo número' }
 ];
 
 function gerar(saida, opcoes) {

@@ -115,10 +115,13 @@ def amostra():
         item('modulo-fronteira', 'lista-f', 11, 3, H45),
         item('modulo-fronteira', 'lista-f', 12, 2, H80),
         item('modulo-fronteira', 'lista-f', 13, 3, H50),
-        item('modulo-fronteira', 'lista-f', 14, 3, H70),
+        # dois citados, e nao um: com UM so, `citados[0]` e `citados[-1]` sao
+        # o mesmo elemento, e a regra do T3 ("havendo citado, o ultimo e
+        # citado") nao pode ser medida. Achado pela lente estreita do PR #56.
+        item('modulo-fronteira', 'lista-f', 14, 3, H70, citado='Extraido da Olimpiada da Fronteira'),
         item('modulo-fronteira', 'lista-f', 15, 3, H100),
         item('modulo-fronteira', 'lista-f', 16, 2, H45),
-        item('modulo-fronteira', 'lista-f', 17, 3, H100),
+        item('modulo-fronteira', 'lista-f', 17, 3, H100, citado='Adaptado da Olimpiada da Fronteira'),
     ]
     teoria = []
     for slug, titulo in (('modulo-de-prova', 'Modulo de Prova'), ('modulo-curto', 'Modulo Curto')):
@@ -181,7 +184,11 @@ def amostra():
     exclusoes.sort(key=lambda e: e['id'])
     manifest = {
         'esquema': 1, 'pacote': 'matematica-prova-9ano', 'versao': 1,
-        'contagens': {'modulos': 2, 'itens': len(itens), 'itens_excluidos': len(exclusoes), 'kits': len(kits)},
+        # modulos sai do proprio dado: cravado em 2 ele mentia desde que o
+        # modulo da fronteira entrou, e 2 era o mesmo numero de exclusoes,
+        # dois valores iguais que deviam ser diferentes (lente estreita, #56)
+        'contagens': {'modulos': len({i['modulo']['slug'] for i in itens}),
+                      'itens': len(itens), 'itens_excluidos': len(exclusoes), 'kits': len(kits)},
     }
     # lista, e nao tupla, para os venenos poderem trocar um arquivo inteiro por None
     return [manifest, itens, teoria, kits, exclusoes]

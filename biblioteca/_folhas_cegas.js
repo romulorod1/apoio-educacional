@@ -163,6 +163,17 @@ function autoteste() {
   conf('folha baixa com recuo sai num pedaco que vai ate o pe',
     [p.length, p[0].topo, p[0].baixo], [1, 0, cx[1].baixo + 32]);
 
+  /* Os dois casos de FRONTEIRA, registrados pela lente estreita do PR #56
+   * como cegos por completude: nenhuma caixa dos fixtures caia exatamente no
+   * teto, e em nenhum a ultima caixa passava da altura total. */
+  cx = caixas([700, ALTURA_PEDACO - 700, 500]);       // o corte cai exatamente no teto
+  p = pedacos(cx, 1900);
+  conf('caixa terminando EXATAMENTE no teto ainda cabe no pedaco',
+    [p.length, p[0].baixo], [2, ALTURA_PEDACO]);
+  cx = caixas([300, 300]);
+  p = pedacos(cx, 500);                                // altura total MENOR que a ultima caixa
+  conf('altura total menor que a ultima caixa nao encurta o pedaco', p[p.length - 1].baixo, 600);
+
   console.log(ok + ' verificacoes passaram, ' + falhas + ' falharam');
   process.exit(falhas ? 1 : 0);
 }

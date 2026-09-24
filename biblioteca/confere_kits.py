@@ -235,7 +235,11 @@ def confere_um_kit(kit, por_id, paginas_de_teoria, a):
 
     if nivel == 1:
         if usados - {1, 2}:
-            a.frouxo('degraus', 'T1: usa o degrau %d, e o T1 so usa 1 e 2' % max(usados - {1, 2}))
+            # a mensagem lista TODOS os degraus fora do nivel. Escolher um
+            # deles com max ou min e escolha arbitraria que nenhum fixture
+            # de um degrau proibido so consegue medir (lente estreita, #56).
+            a.frouxo('degraus', 'T1: usa o degrau %s, e o T1 so usa 1 e 2'
+                     % ', '.join(str(d) for d in sorted(usados - {1, 2})))
         if conta1 < _teto(2 * n / 3):
             a.frouxo('degraus', 'T1: %d itens de degrau 1, e a massa pede ao menos %d' % (conta1, _teto(2 * n / 3)))
         if seq[0] != 1:
@@ -259,7 +263,8 @@ def confere_um_kit(kit, por_id, paginas_de_teoria, a):
             a.frouxo('citado', 'T2: o item citado esta na posicao %d, e devia ser o ultimo' % (citados[0] + 1))
     else:
         if usados - {2, 3}:
-            a.frouxo('degraus', 'T3: usa o degrau %d, e o T3 so usa 2 e 3' % min(usados - {2, 3}))
+            a.frouxo('degraus', 'T3: usa o degrau %s, e o T3 so usa 2 e 3'
+                     % ', '.join(str(d) for d in sorted(usados - {2, 3})))
         if conta3 < _teto(2 * n / 3):
             a.frouxo('degraus', 'T3: %d itens de degrau 3, e a massa pede ao menos %d' % (conta3, _teto(2 * n / 3)))
         if seq[0] != 2:
@@ -342,9 +347,16 @@ def confere(manifest, itens, teoria, kits, exclusoes):
             if nome not in caiu:
                 erros.append('%s: relaxou diz %r, e nada de %r caiu neste kit' % (kid, nome, nome))
 
-    ordem = [(k.get('serie'), k.get('modulo'), k.get('nivel')) for k in kits]
-    if ordem != sorted(ordem, key=lambda t: (str(t[0]), str(t[1]), t[2] if isinstance(t[2], int) else 0)):
-        erros.append('kits.json fora de ordem (serie, modulo, nivel)')
+    # A ordem do contrato e serie, modulo, nivel. Aqui se compara por MODULO e
+    # NIVEL, e a serie vem junto de graca porque `modulo` comeca por
+    # `serie + ':'`, o que ja e conferido acima em todo kit. Dizer "(serie,
+    # modulo, nivel)" seria prometer uma perna que nenhum dado pode exercitar:
+    # com a serie sempre prefixo do modulo, trocar as duas nunca muda a ordem.
+    # A lente estreita do PR #56 mediu essa perna cega; em vez de inventar um
+    # fixture que nao existe, a mensagem passou a dizer o que e comparado.
+    ordem = [(k.get('modulo'), k.get('nivel')) for k in kits]
+    if ordem != sorted(ordem, key=lambda t: (str(t[0]), t[1] if isinstance(t[1], int) else 0)):
+        erros.append('kits.json fora de ordem (modulo e nivel; a serie vem junto porque o modulo comeca por ela)')
 
     cont = manifest.get('contagens') or {}
     if cont.get('kits') != len(kits):

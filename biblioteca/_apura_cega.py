@@ -272,18 +272,33 @@ def autoteste():
             sys.stdout = antigo
         return saida.getvalue()
 
+    # o rotulo de cada braco tambem vai para o registro, e ninguem o lia
+    caso('o braco A diz que o concorrente e ordenado por degrau',
+         'BRACO A (concorrente ordenado por degrau)' in dois_bracos(8, 0), True)
+    caso('o braco B diz que o sorteio e puro, inclusive a ordem',
+         'BRACO B (sorteio puro, inclusive a ordem)' in dois_bracos(8, 0), True)
     caso('A vence: a regra fica como esta', 'a kits-v1 fica como esta' in dois_bracos(8, 0), True)
     caso('A nao vence e B vence: a regra se simplifica',
          'se simplifica para rampa mais orcamento' in dois_bracos(4, 8), True)
     caso('nem A nem B vencem: a saida do desenho',
          'desligar o kit automatico' in dois_bracos(4, 4), True)
 
-    # a concordancia entre os dois revisores
-    def concordancia(letras1, letras2):
+    # A CONCORDANCIA, e ela tinha o mesmo defeito do mapa: o fixture dava aos
+    # DOIS revisores a MESMA disposicao, entao ler a folha do revisor1 para
+    # todo mundo passava 32 de 32. E `por_revisor` so existe porque a
+    # disposicao de cada um e sorteada independente. Dois valores iguais onde
+    # deviam ser diferentes, achado pela lente estreita do PR #56.
+    #
+    # Agora o fixture recebe as disposicoes dos dois, e os casos usam
+    # disposicoes OPOSTAS: ai a mesma letra nos dois vira lados diferentes, e
+    # letras diferentes viram o mesmo lado.
+    def concordancia(letras1, letras2, opostos=False):
+        reta_ = {'A': 'regra', 'B': 'sorteio'}
+        virada_ = {'A': 'sorteio', 'B': 'regra'}
         pares = [{'par': k, 'kit': 'k%d' % k, 'nivel': 1, 'modulo': 'm', 'n': 4, 'minutos': '30.0',
                   'regra': [], 'sorteio': [],
-                  'por_revisor': {'revisor1': {'A': 'regra', 'B': 'sorteio'},
-                                  'revisor2': {'A': 'regra', 'B': 'sorteio'}}}
+                  'por_revisor': {'revisor1': reta_,
+                                  'revisor2': virada_ if opostos else reta_}}
                  for k in range(1, len(letras1) + 1)]
         gab = {'pacote': 'x', 'semente': 1, 'revisores': 2,
                'bracos': {'A': {'ordenado_por_degrau': True, 'descartados': [], 'pares': pares}}}
@@ -298,10 +313,19 @@ def autoteste():
             sys.stdout = antigo
         return saida.getvalue()
 
-    caso('dois revisores iguais: concordancia de 4 de 4',
+    caso('mesma disposicao, mesmas letras: concordancia de 4 de 4',
          'concordancia entre os dois revisores: 4 de 4' in concordancia('AABB', 'AABB'), True)
-    caso('dois revisores opostos: concordancia de 0 de 4',
+    caso('mesma disposicao, letras opostas: concordancia de 0 de 4',
          'concordancia entre os dois revisores: 0 de 4' in concordancia('AABB', 'BBAA'), True)
+    # com disposicoes OPOSTAS tudo se inverte, e e isso que so a folha DE CADA
+    # UM pode dizer: quem le a folha do primeiro para os dois erra aqui
+    caso('disposicoes opostas, mesmas letras: eles escolheram listas diferentes',
+         'concordancia entre os dois revisores: 0 de 4' in concordancia('AABB', 'AABB', opostos=True), True)
+    caso('disposicoes opostas, letras opostas: eles escolheram a mesma lista',
+         'concordancia entre os dois revisores: 4 de 4' in concordancia('AABB', 'BBAA', opostos=True), True)
+    # e o placar individual do revisor2 tambem sai da folha dele
+    caso('com disposicao oposta, o revisor2 pontua pelo lado dele',
+         'revisor2: a regra venceu 0 de 4' in concordancia('AAAA', 'AAAA', opostos=True), True)
 
     # Resposta torta tem de PARAR a apuracao, e nao virar placar menor em
     # silencio. Um caso por ramo de RESPOSTA INVALIDA: a lente 2 apagou os
