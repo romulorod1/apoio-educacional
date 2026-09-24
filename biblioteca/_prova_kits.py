@@ -412,6 +412,14 @@ def main():
     # pelo valor de cima a mediana viraria 8,0 e o veneno passaria calado.
     p.veneno('I4 com mediana par, que so a media dos dois do meio pega', confere(com(
         lambda x: troca_itens(kit_de(x, 3, FRONT), [fr(12), fr(13), fr(14), fr(15)], x[1]))), 'I4')
+    # O veneno do citado do T3 la em cima tem UM citado so, entao ele nao mede
+    # o CARDINAL: enfraquecer a guarda para `len(citados) == 1` passava calado.
+    # Aqui sao DOIS citados (fr 14 e fr 17) com o ultimo NAO citado, que e o
+    # unico caso que a guarda enfraquecida deixaria passar. Segunda rodada da
+    # lente estreita, #56.
+    p.veneno('T3 com dois citados e o ultimo sem citacao', confere(com(
+        lambda x: troca_itens(kit_de(x, 3, FRONT), [fr(16), fr(14), fr(17), fr(15)], x[1]))),
+        'T3: ha item citado e o ultimo nao e citado')
 
     # ------------------------------------------------ os campos e a forma
     print('\n=== um veneno por campo do contrato ===')
@@ -442,7 +450,18 @@ def main():
     p.veneno('item que nao esta no itens.json', confere(com(
         lambda x: kit_de(x, 1)['degraus'][0].__setitem__('item', ex(99)))), 'nao esta no itens.json')
     p.veneno('kits.json fora de ordem', confere(com(
-        lambda x: x[3].reverse())), 'fora de ordem')
+        lambda x: x[3].reverse())), 'kits.json fora de ordem (modulo e nivel')
+    # O `reverse()` acima quebra a ordem dos MODULOS, entao ele nao mede a
+    # perna do NIVEL: tirar o nivel da chave passava calado. Este veneno troca
+    # dois kits do MESMO modulo, niveis 1 e 2, e e o unico que a perna do
+    # nivel pode acusar. Achado pela segunda rodada da lente estreita, #56.
+    def troca_dois_niveis_do_mesmo_modulo(x):
+        kits = x[3]
+        i = next(k for k, v in enumerate(kits) if v['modulo'] == MOD and v['nivel'] == 1)
+        j = next(k for k, v in enumerate(kits) if v['modulo'] == MOD and v['nivel'] == 2)
+        kits[i], kits[j] = kits[j], kits[i]
+    p.veneno('dois kits do mesmo modulo com os niveis trocados', confere(com(
+        troca_dois_niveis_do_mesmo_modulo)), 'kits.json fora de ordem (modulo e nivel')
     # o numero do veneno sai do proprio dado: cravar 7 aqui deixou de acusar
     # no dia em que a amostra passou a ter sete kits, e a prova reprovou
     # sozinha em vez de calar

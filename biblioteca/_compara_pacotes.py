@@ -138,8 +138,11 @@ def _pacote_de_mentira(versao=4, extra=None, mexer=None, tirar=None):
                 'teoria.json': b'[]\n', 'busca.json': b'{}\n', 'apelidos.json': b'{}\n',
                 'assets/9ano/m/l/ex-01.svg': b'<svg/>\n'}
     arquivos.update(extra or {})
-    if mexer:
-        arquivos[mexer] = arquivos[mexer] + b' '
+    # `mexer` aceita uma lista: com um arquivo so, a linha "o primeiro e X"
+    # nao consegue distinguir primeiro de ultimo, que e o mesmo defeito de
+    # `citados[0]` contra `citados[-1]` (segunda rodada da lente estreita, #56)
+    for alvo in ([mexer] if isinstance(mexer, str) else (mexer or [])):
+        arquivos[alvo] = arquivos[alvo] + b' '
     # tirar de verdade: some do pacote E da lista do manifest, que e o que
     # acontece quando um item sai por curadoria
     if tirar:
@@ -238,6 +241,22 @@ def autoteste():
     valor('e nomeia o hash que mudou',
           comparar(base, _pacote_de_mentira(mexer='itens.json'))[1]['manifest'],
           ['arquivos: 1 hash(es) mudaram, o primeiro e itens.json'])
+    # com DOIS hashes mudados, "o primeiro" tem lado: `assets/...` vem antes de
+    # `itens.json` em ordem alfabetica, entao trocar [0] por [-1] muda o texto
+    dois = _pacote_de_mentira(mexer=['itens.json', 'assets/9ano/m/l/ex-01.svg'])
+    valor('e com dois hashes mudados diz o PRIMEIRO, nao o ultimo',
+          comparar(base, dois)[1]['manifest'],
+          ['arquivos: 2 hash(es) mudaram, o primeiro e assets/9ano/m/l/ex-01.svg'])
+    # e os numeros do registro num par que NAO e identico, para `comparados`,
+    # `iguais` e `diferentes` nao poderem ser trocados entre si
+    _, n_dois = comparar(base, dois)
+    valor('num par com diferenca, comparados, iguais e diferentes se separam',
+          (n_dois['comparados'], n_dois['iguais'], n_dois['diferentes']),
+          (len(base) - 1, len(base) - 3, 2))
+    _, n_lados = comparar(_pacote_de_mentira(tirar='assets/9ano/m/l/ex-01.svg'),
+                          _pacote_de_mentira(extra={'kits.json': b'[]\n'}), novos=('kits.json',))
+    valor('e so_no_primeiro e so_no_segundo nao sao o mesmo numero',
+          (n_lados['so_no_primeiro'], n_lados['so_no_segundo']), (0, 2))
     # chave que nasce e chave que some, para os rotulos "(nao existia)" e
     # "(saiu)" nao poderem ser trocados entre si sem ninguem ver
     def com_chave_no_manifest(**campos):

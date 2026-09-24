@@ -244,15 +244,18 @@ const KITS = [
   }
 ];
 /* Exclusões: ids que NÃO estão em itens.json, porque saíram do pacote.
- * São TRÊS de propósito, contra DOIS kits: com os dois números iguais, trocar
- * `contagens.kits` por `contagens.itens_excluidos` no manifest passaria em
- * todas as quatro asserções que os comparam, porque elas confeririam 2 contra
- * 2. Dois valores iguais onde deviam ser diferentes, achado pela lente
- * estreita do PR #56. */
+ * São QUATRO de propósito. Os três números do manifest que andam juntos aqui
+ * têm de ser TODOS diferentes entre si, senão trocar um pelo outro passa em
+ * todas as asserções que os comparam: com 2 kits e 2 exclusões, trocar
+ * `contagens.kits` por `contagens.itens_excluidos` conferia 2 contra 2; com 3
+ * exclusões, o empate mudou de lugar e passou a bater com os 3 módulos. Agora
+ * são 3 módulos, 2 kits e 4 exclusões. Achado, nas duas formas, pelas duas
+ * rodadas da lente estreita do PR #56. */
 const EXCLUSOES = [
   { id: LISTA_KIT + ':ex:9', motivo: 'a figura da solução veio da fonte fora do lugar', quem: 'curadoria', data: '2026-09-22' },
   { id: LISTA_KIT + ':ex:10', motivo: 'o recorte do enunciado não começa pelo número' },
-  { id: LISTA_KIT + ':ex:11', motivo: 'a fonte numera dois enunciados com o mesmo número' }
+  { id: LISTA_KIT + ':ex:11', motivo: 'a fonte numera dois enunciados com o mesmo número' },
+  { id: LISTA_KIT + ':ex:12', motivo: 'a solução da fonte não começa pelo número do exercício' }
 ];
 
 function gerar(saida, opcoes) {

@@ -85,6 +85,11 @@ function pedacos(caixas, alturaTotal) {
  * tem prova, com os casos que a folha real produz. */
 function autoteste() {
   let ok = 0, falhas = 0;
+  /* O teto declarado e a afirmacao central do instrumento, e nenhum caso o
+   * prendia: os fixtures de fronteira sao montados A PARTIR da constante,
+   * entao acompanham qualquer valor que ela tenha. Aqui o numero e escrito
+   * a mao, para mudar o teto sem querer reprovar. Segunda rodada da lente
+   * estreita do PR #56. */
   const conf = (nome, obtido, esperado) => {
     if (JSON.stringify(obtido) === JSON.stringify(esperado)) { ok++; console.log('  ok      ' + nome); }
     else { falhas++; console.log('  FALHOU  ' + nome + '  [obtido ' + JSON.stringify(obtido) + ', esperado ' + JSON.stringify(esperado) + ']'); }
@@ -100,6 +105,8 @@ function autoteste() {
     }
     return true;
   };
+
+  conf('o teto declarado do pedaco e 1400 px', ALTURA_PEDACO, 1400);
 
   let cx = caixas([300, 300, 300]);
   conf('folha baixa sai num pedaco so', pedacos(cx, 900).length, 1);

@@ -277,6 +277,33 @@ def autoteste():
          'BRACO A (concorrente ordenado por degrau)' in dois_bracos(8, 0), True)
     caso('o braco B diz que o sorteio e puro, inclusive a ordem',
          'BRACO B (sorteio puro, inclusive a ordem)' in dois_bracos(8, 0), True)
+
+    # O rotulo tem de sair do CAMPO GRAVADO, e nao da letra do braco. Em todo
+    # fixture o campo e a letra andavam colados (A sempre ordenado), entao
+    # trocar `braco['ordenado_por_degrau']` por `nome_braco == 'A'` passava
+    # calado. Aqui o braco A e o NAO ordenado, de proposito. Segunda rodada da
+    # lente estreita, #56.
+    def rotulo_com_campo_trocado():
+        pares_ = [{'par': 1, 'kit': 'k1', 'nivel': 1, 'modulo': 'm', 'n': 4, 'minutos': '30.0',
+                   'regra': [], 'sorteio': [], 'por_revisor': {'revisor1': {'A': 'regra', 'B': 'sorteio'}}}]
+        gab = {'pacote': 'x', 'semente': 1, 'revisores': 1, 'bracos': {
+            'A': {'ordenado_por_degrau': False, 'descartados': [], 'pares': pares_},
+            'B': {'ordenado_por_degrau': True, 'descartados': [], 'pares': list(pares_)}}}
+        resp = [{'braco': br, 'revisor': 'revisor1',
+                 'respostas': [{'par': 1, 'escolha': 'A', 'porque': ''}]} for br in ('A', 'B')]
+        saida = io.StringIO()
+        antigo, sys.stdout = sys.stdout, saida
+        try:
+            apura(gab, resp)
+        finally:
+            sys.stdout = antigo
+        return saida.getvalue()
+
+    texto_trocado = rotulo_com_campo_trocado()
+    caso('com o campo trocado, o braco A passa a ser o do sorteio puro',
+         'BRACO A (sorteio puro, inclusive a ordem)' in texto_trocado, True)
+    caso('e o braco B passa a ser o ordenado por degrau',
+         'BRACO B (concorrente ordenado por degrau)' in texto_trocado, True)
     caso('A vence: a regra fica como esta', 'a kits-v1 fica como esta' in dois_bracos(8, 0), True)
     caso('A nao vence e B vence: a regra se simplifica',
          'se simplifica para rampa mais orcamento' in dois_bracos(4, 8), True)

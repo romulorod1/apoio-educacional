@@ -235,11 +235,13 @@ def confere_um_kit(kit, por_id, paginas_de_teoria, a):
 
     if nivel == 1:
         if usados - {1, 2}:
-            # a mensagem lista TODOS os degraus fora do nivel. Escolher um
-            # deles com max ou min e escolha arbitraria que nenhum fixture
-            # de um degrau proibido so consegue medir (lente estreita, #56).
-            a.frouxo('degraus', 'T1: usa o degrau %s, e o T1 so usa 1 e 2'
-                     % ', '.join(str(d) for d in sorted(usados - {1, 2})))
+            # O degrau vive em {1, 2, 3} (secao 4), entao `usados - {1, 2}`
+            # cabe em {3} e NUNCA tem mais de um elemento. Uma versao
+            # anterior trocou este `max` por 'listar todos', o que parece
+            # mais honesto e e infalsificavel: com um elemento so, max, min
+            # e join dao o mesmo byte, e nenhum dado possivel distingue os
+            # tres. Voltou a nomear o unico que existe, com o porque escrito.
+            a.frouxo('degraus', 'T1: usa o degrau %d, e o T1 so usa 1 e 2' % max(usados - {1, 2}))
         if conta1 < _teto(2 * n / 3):
             a.frouxo('degraus', 'T1: %d itens de degrau 1, e a massa pede ao menos %d' % (conta1, _teto(2 * n / 3)))
         if seq[0] != 1:
@@ -263,8 +265,7 @@ def confere_um_kit(kit, por_id, paginas_de_teoria, a):
             a.frouxo('citado', 'T2: o item citado esta na posicao %d, e devia ser o ultimo' % (citados[0] + 1))
     else:
         if usados - {2, 3}:
-            a.frouxo('degraus', 'T3: usa o degrau %s, e o T3 so usa 2 e 3'
-                     % ', '.join(str(d) for d in sorted(usados - {2, 3})))
+            a.frouxo('degraus', 'T3: usa o degrau %d, e o T3 so usa 2 e 3' % min(usados - {2, 3}))
         if conta3 < _teto(2 * n / 3):
             a.frouxo('degraus', 'T3: %d itens de degrau 3, e a massa pede ao menos %d' % (conta3, _teto(2 * n / 3)))
         if seq[0] != 2:
