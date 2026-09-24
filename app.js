@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.26.0';
+  var VERSAO = '1.26.1';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não

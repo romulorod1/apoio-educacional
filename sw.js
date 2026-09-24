@@ -70,8 +70,11 @@
  * marcado), o marcar de dentro da tela cheia, o "Marcar os N deste módulo" e o
  * Remover pacote em Ajustes (app.js, store.js, index.html e styles.css), com a
  * lista igual. Nenhum tema sai do banco: os arquivos de banco/ continuam na
- * lista e o carregarSerie continua lendo 'banco/serie-'. */
-var CACHE = 'apoio-educacional-v41';
+ * lista e o carregarSerie continua lendo 'banco/serie-'. O v43 faz o salvar
+ * só responder quando o dado está gravado de fato (store.js), com a lista
+ * igual; pula o v42 de propósito, que é o nome que a lista pronta do 9º ano
+ * usa no PR dela, para os dois nunca chegarem ao ar com o mesmo nome. */
+var CACHE = 'apoio-educacional-v43';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
