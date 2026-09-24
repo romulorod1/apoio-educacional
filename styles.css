@@ -1220,6 +1220,24 @@ button.alvo-rascunho:hover { background: var(--soft); }
    palavra estimativa. Nada aqui afirma curadoria. */
 .bib-lista-pronta .bib-lp-minutos { font-size: 13px; color: var(--muted); }
 .bib-lp-ajuda { margin: 6px 2px 10px; }
+/* A GRADE DA LISTA PRONTA TEM UMA COLUNA SÓ, e o motivo é a interação.
+   Numa grade de três, o botão de descer que ela acabou de apertar muda de
+   coluna debaixo do dedo: o cartão vai para a posição seguinte, que na fileira
+   está ao LADO e não abaixo. E como a linha da grade tem a altura do cartão
+   mais alto, entre uma fileira e a outra sobrava quase uma tela de branco, com
+   os recortes do Portal variando de 200 a 900 pt de altura. Esta tela existe
+   para reordenar; o layout não pode brigar com a interação principal.
+   O teto de 560 px é largura de leitura: sem ele, o recorte de um enunciado
+   ocuparia os 1280 px da janela. */
+.bib-grade.bib-grade-lp { grid-template-columns: minmax(0, 560px); }
+/* O AVISO DESTA TELA NÃO FLUTUA: ele entra no fluxo, empurra o conteúdo e não
+   tapa controle nenhum. O aviso de rodapé cobria as setas e a caixa dos
+   últimos cartões, que é o que esta tela existe para ela tocar. */
+.bib-lp-aviso { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin: 2px 0 10px; padding: 10px 14px; border: 1px solid var(--teal);
+  border-radius: 10px; background: var(--teal-claro); color: var(--navy); font-weight: 600; }
+.bib-lp-aviso .cresce { flex: 1; min-width: 240px; }
+.bib-lp-aviso .btn { min-height: 44px; }
 .bib-lp-cabeca { margin: 2px 0 6px; }
 .bib-lp-meia { font-weight: 700; color: var(--navy); }
 .bib-lp-cabeca .bib-lp-minutos { margin-top: 2px; }

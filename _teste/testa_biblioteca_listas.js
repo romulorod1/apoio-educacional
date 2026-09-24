@@ -42,6 +42,23 @@
  *      "editar o enunciado", o retângulo entra no vetor da folha como item
  *      branco cheio, e a ordem das camadas do canvas é A MESMA do PDF.
  *
+ *   7. OS QUATRO CONSERTOS DE TELA que o olho de fora cego pediu, e cada um
+ *      com o lugar onde a mesma régua TEM de achar o contrário, medido na
+ *      mesma rodada (seção 2, na lista cheia do módulo):
+ *
+ *      a) UMA COLUNA. A grade da lista pronta tem uma coluna só; a da lista
+ *         cheia do módulo, mais de uma. Régua: quantos valores distintos de
+ *         borda esquerda as células têm.
+ *      b) O AVISO NÃO FLUTUA. A mensagem da tela está DENTRO do corpo, em
+ *         posição estática, e a caixa flutuante do rodapé não abriu. O alvo de
+ *         controle é fabricado e é do mesmo tipo: a mesma caixa do aviso com a
+ *         classe que o `avisar()` põe nela, e aí a régua tem de acusar.
+ *      c) SEM ETIQUETA DE DIFICULDADE no cartão da lista pronta, e COM ela na
+ *         lista cheia do módulo, que é onde ela é filtro e não juízo sobre uma
+ *         trajetória. O minuto por exercício continua nos dois.
+ *      e) A FRASE DIZ O TOTAL RESULTANTE. Com dois itens marcados antes, a
+ *         mensagem diz o que o material TEM agora e não soma em voz alta.
+ *
  * Modos envenenados (cada um desliga UMA regra e sai assim que a vê cair):
  *   --envenenado-ordem    o app.js servido carrega a lista ORDENADA pelo id em
  *                         vez da ordem da lista. O carrinho continua com os
@@ -57,6 +74,17 @@
  *                         arquivo e continua saindo no PDF: o que quebra é a
  *                         tela concordar com a folha impressa, que é a parte
  *                         silenciosa.
+ *   --envenenado-coluna   o styles.css servido volta a grade da lista pronta
+ *                         para três colunas. É o único veneno que não mexe em
+ *                         JavaScript nenhum, e por isso o único que mede se a
+ *                         régua olha a TELA e não o código.
+ *   --envenenado-flutua   o app.js servido manda a mensagem para a caixa
+ *                         flutuante do rodapé, como era antes, e não desenha o
+ *                         bloco no fluxo.
+ *   --envenenado-frase    o app.js servido volta a frase que soma em voz alta
+ *                         ("Tirei 2 itens ... e marquei ...: 5 exercícios").
+ *   --envenenado-dificuldade o app.js servido devolve a etiqueta de
+ *                         dificuldade ao cartão da lista pronta.
  */
 'use strict';
 const fs = require('fs');
@@ -71,10 +99,15 @@ const V_ORDEM = process.argv.indexOf('--envenenado-ordem') !== -1;
 const V_SETA = process.argv.indexOf('--envenenado-seta') !== -1;
 const V_CURADORIA = process.argv.indexOf('--envenenado-curadoria') !== -1;
 const V_CAMADAS = process.argv.indexOf('--envenenado-camadas') !== -1;
-const VENENO = V_ORDEM || V_SETA || V_CURADORIA || V_CAMADAS;
+const V_COLUNA = process.argv.indexOf('--envenenado-coluna') !== -1;
+const V_FLUTUA = process.argv.indexOf('--envenenado-flutua') !== -1;
+const V_FRASE = process.argv.indexOf('--envenenado-frase') !== -1;
+const V_DIFICULDADE = process.argv.indexOf('--envenenado-dificuldade') !== -1;
+const VENENO = V_ORDEM || V_SETA || V_CURADORIA || V_CAMADAS || V_COLUNA || V_FLUTUA || V_FRASE || V_DIFICULDADE;
 
 const APP_REPO = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const DRAW_REPO = fs.readFileSync(path.join(H.RAIZ, 'draw.js'), 'utf8');
+const CSS_REPO = fs.readFileSync(path.join(H.RAIZ, 'styles.css'), 'utf8');
 
 /* As âncoras saem do PRÓPRIO arquivo, e a contagem de ocorrências logo abaixo
  * é o que transforma "a âncora não casou" em reprovação em vez de silêncio: um
@@ -90,6 +123,7 @@ const T_CURADORIA = "var linha = linhaBib('Kit curado, nível ' + lp.nivel,";
 /* A quebra de linha sai do PRÓPRIO arquivo: o repositório pode estar em CRLF, e
  * âncora de várias linhas cravada com \n casa zero vezes e envenena nada. */
 const NL = DRAW_REPO.indexOf('\r\n') >= 0 ? '\r\n' : '\n';
+const NL_APP = APP_REPO.indexOf('\r\n') >= 0 ? '\r\n' : '\n';
 const L_CAMADAS = [
   '    for (var c = 0; c < ORDEM_CAMADAS.length; c++) {',
   '      for (var i = 0; i < itens.length; i++) {',
@@ -99,13 +133,49 @@ const L_CAMADAS = [
 // o desenho na ordem do vetor, que é como era antes da B10
 const T_CAMADAS = '    for (var i = 0; i < itens.length; i++) this._desenharItem(ctx, itens[i]);';
 
-const ALVO = V_ORDEM ? L_ORDEM : V_SETA ? L_SETA : V_CURADORIA ? L_CURADORIA : L_CAMADAS;
-const TROCA = V_ORDEM ? T_ORDEM : V_SETA ? T_SETA : V_CURADORIA ? T_CURADORIA : T_CAMADAS;
+// a grade da lista pronta volta a três colunas, que é o defeito que o olho cego viu
+const L_COLUNA = '.bib-grade.bib-grade-lp { grid-template-columns: minmax(0, 560px); }';
+const T_COLUNA = '.bib-grade.bib-grade-lp { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }';
+// a mensagem volta para a caixa flutuante do rodapé, e o bloco do fluxo não é desenhado
+const L_FLUTUA = [
+  '    if (bibLpAviso) {',
+  "      corpo.appendChild(el('div', { class: 'bib-lp-aviso', id: 'bib-lp-aviso' }, ["].join(NL_APP);
+const T_FLUTUA = [
+  '    if (bibLpAviso) {',
+  '      avisar(bibLpAviso.texto, bibLpAviso.rotulo, bibLpAviso.aoAgir);',
+  "      if (0) corpo.appendChild(el('div', { class: 'bib-lp-aviso', id: 'bib-lp-aviso' }, ["].join(NL_APP);
+// a frase volta a somar em voz alta, que é exatamente a que o revisor leu como conta quebrada
+const L_FRASE = [
+  "      texto: 'O material agora tem ' + plural(bibCarrinho.itens.length, 'exercício', 'exercícios') +",
+  "        ': a lista pronta do nível ' + lp.nivel + (sairam ? ', no lugar do que estava marcado' : '') +",
+  "        '. Mude o que quiser e toque em Gerar material.',"].join(NL_APP);
+const T_FRASE = "      texto: (sairam ? 'Tirei ' + plural(sairam, 'item que estava marcado', 'itens que estavam marcados') +" +
+  " ' e marquei ' : 'Marquei ') + 'a lista pronta do nível ' + lp.nivel + ': ' +" +
+  " plural(lp.ids.length, 'exercício', 'exercícios') + '. Mude o que quiser e toque em Gerar material.',";
+// a etiqueta de dificuldade volta ao cartão da lista pronta
+const L_DIFICULDADE = [
+  "        el('div', { class: 'bib-tags' }, [",
+  '          lp.minutosDe[id] !== undefined'].join(NL_APP);
+const T_DIFICULDADE = [
+  "        el('div', { class: 'bib-tags' }, [",
+  "          rotuloDificuldade(it) ? el('span', { class: 'tag bib-dif-fonte', texto: rotuloDificuldade(it) }) : null,",
+  '          lp.minutosDe[id] !== undefined'].join(NL_APP);
+
+/* Uma receita por veneno: qual arquivo servido muda, e de que para quê. A
+ * tabela substituiu a cadeia de ternários quando os venenos passaram de quatro
+ * para oito, e é ela que garante que o "trocou exatamente uma ocorrência"
+ * valha para todos sem repetição. */
+const RECEITA = V_ORDEM ? { arq: '/app.js', de: L_ORDEM, para: T_ORDEM }
+  : V_SETA ? { arq: '/app.js', de: L_SETA, para: T_SETA }
+    : V_CURADORIA ? { arq: '/app.js', de: L_CURADORIA, para: T_CURADORIA }
+      : V_CAMADAS ? { arq: '/draw.js', de: L_CAMADAS, para: T_CAMADAS }
+        : V_COLUNA ? { arq: '/styles.css', de: L_COLUNA, para: T_COLUNA }
+          : V_FLUTUA ? { arq: '/app.js', de: L_FLUTUA, para: T_FLUTUA }
+            : V_FRASE ? { arq: '/app.js', de: L_FRASE, para: T_FRASE }
+              : { arq: '/app.js', de: L_DIFICULDADE, para: T_DIFICULDADE };
+const BASE_DE = { '/app.js': APP_REPO, '/draw.js': DRAW_REPO, '/styles.css': CSS_REPO };
 const trocas = {};
-if (VENENO) {
-  if (V_CAMADAS) trocas['/draw.js'] = DRAW_REPO.split(ALVO).join(TROCA);
-  else trocas['/app.js'] = APP_REPO.split(ALVO).join(TROCA);
-}
+if (VENENO) trocas[RECEITA.arq] = BASE_DE[RECEITA.arq].split(RECEITA.de).join(RECEITA.para);
 
 const amb = H.criarAmbiente(PORTA, 'perfil_bib_listas', trocas);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'b10_listas_'));
@@ -172,14 +242,70 @@ const desmarcar = (pag, id) => pag.evaluate(i => {
   if (!c) return false; c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true })); return true;
 }, id);
 
+/* A RÉGUA DAS COLUNAS mede a TELA, e não o CSS: conta quantos valores
+ * distintos de borda esquerda as células de uma grade têm. Ler
+ * `gridTemplateColumns` diria o que está escrito na folha de estilo, que é
+ * justamente o que pode estar certo enquanto a tela sai errada. */
+const gradeDe = (pag, seletor) => pag.evaluate(s => {
+  const g = document.querySelector(s);
+  if (!g) return null;
+  const celulas = Array.from(g.children).filter(c => c.getBoundingClientRect().width > 0);
+  const bordas = {};
+  celulas.forEach(c => { bordas[Math.round(c.getBoundingClientRect().left)] = 1; });
+  return { celulas: celulas.length, colunas: Object.keys(bordas).length,
+    largura: Math.round((celulas[0] || g).getBoundingClientRect().width) };
+}, seletor);
+
+/* A RÉGUA DA ETIQUETA procura por dois caminhos de propósito: a classe do
+ * elemento e a palavra no texto renderizado. Uma etiqueta que voltasse com
+ * outra classe passaria pela primeira e cairia na segunda. */
+const etiquetasDe = (pag, seletor) => pag.evaluate(s => {
+  const raiz = document.querySelector(s);
+  if (!raiz) return null;
+  const tags = Array.from(raiz.querySelectorAll('.bib-dif-fonte')).map(t => t.textContent.trim());
+  const texto = raiz.innerText || '';
+  return { tags: tags.length, exemplo: tags[0] || '(nenhuma)',
+    palavra: /estimada:|revisada:/.test(texto) ? 'tem' : 'não tem',
+    minutos: raiz.querySelectorAll('.bib-lp-min-item').length };
+}, seletor);
+
+/* A RÉGUA DO AVISO. Mede três coisas: se a caixa flutuante do rodapé está
+ * aberta, se a mensagem da tela está dentro do corpo e em posição estática (ou
+ * seja, no fluxo, empurrando o conteúdo em vez de passar por cima dele), e
+ * quantos cartões e controles da lista pronta a caixa indicada cobre. */
+const aviso = (pag, seletor) => pag.evaluate(s => {
+  const flut = document.querySelector('#aviso');
+  const dentro = document.querySelector('#bib-lp-aviso');
+  const corpo = document.querySelector('#bib-corpo');
+  const caixa = document.querySelector(s);
+  let cobre = 0;
+  if (caixa) {
+    const r = caixa.getBoundingClientRect();
+    const alvos = Array.from(document.querySelectorAll(
+      '#bib-lp-grade .bib-celula, #bib-lp-grade .bib-marcar, #bib-lp-grade .bib-lp-setas button'));
+    alvos.forEach(a => {
+      const b = a.getBoundingClientRect();
+      if (b.width > 0 && b.height > 0 && r.width > 0 &&
+        r.left < b.right && r.right > b.left && r.top < b.bottom && r.bottom > b.top) cobre++;
+    });
+  }
+  return {
+    flutuando: !!(flut && flut.classList.contains('aberto')),
+    cobertos: cobre,
+    noFluxo: !!(dentro && corpo && corpo.contains(dentro) && getComputedStyle(dentro).position === 'static'),
+    texto: dentro ? (dentro.innerText || '').trim().replace(/\s+/g, ' ') : '',
+    flutuante: flut ? (document.querySelector('#aviso-texto') || {}).textContent || '' : ''
+  };
+}, seletor);
+
 (async () => {
   if (VENENO) {
     secao('O veneno é de verdade');
-    const arq = V_CAMADAS ? '/draw.js' : '/app.js';
-    const base = V_CAMADAS ? DRAW_REPO : APP_REPO;
-    conf('o arquivo servido ficou DIFERENTE do repositório', trocas[arq] !== base ? 'diferente' : 'IGUAL', 'diferente');
-    conf('e o veneno trocou exatamente uma ocorrência', base.split(ALVO).length - 1, 1);
-    if (trocas[arq] === base) throw Object.assign(new Error('veneno não aplicado'), { jaContado: true });
+    const base = BASE_DE[RECEITA.arq];
+    conf('o arquivo ' + RECEITA.arq + ' servido ficou DIFERENTE do repositório',
+      trocas[RECEITA.arq] !== base ? 'diferente' : 'IGUAL', 'diferente');
+    conf('e o veneno trocou exatamente uma ocorrência', base.split(RECEITA.de).length - 1, 1);
+    if (trocas[RECEITA.arq] === base) throw Object.assign(new Error('veneno não aplicado'), { jaContado: true });
   }
   await amb.subir();
   const pag = await amb.pagina();
@@ -264,6 +390,43 @@ const desmarcar = (pag, id) => pag.evaluate(i => {
   await pausa(400);
 
   // ================================================================
+  /* AS RÉGUAS NOVAS APONTADAS PARA ONDE ELAS TÊM DE ACHAR.
+   *
+   * "Uma coluna" e "nenhuma etiqueta de dificuldade" são os dois resultados
+   * bons da tela da lista pronta, e por isso indistinguíveis de dois medidores
+   * cegos, que dariam o mesmo resultado limpo. O alvo de controle é a lista
+   * CHEIA do mesmo módulo, medida na mesma rodada: lá a grade TEM mais de uma
+   * coluna e os cartões TÊM etiqueta, porque ali a etiqueta é filtro e não
+   * juízo sobre uma trajetória.
+   *
+   * E aproveita para deixar DOIS exercícios marcados, que é o que faz a frase
+   * do aviso cair no caso da substituição: é exatamente esse caso que o olho
+   * de fora cego leu como aritmética quebrada. */
+  secao('1c. As réguas novas, medidas onde elas TÊM de achar');
+  conf('abriu a lista cheia do módulo', await tocarLinha(pag, 'Soma e Produto'), true);
+  await pausa(700);
+  const gradeCheia = await gradeDe(pag, '#bib-corpo .bib-grade-exercicios');
+  console.log('   grade da lista cheia: ' + JSON.stringify(gradeCheia));
+  conf('a lista cheia tem mais de um cartão', (gradeCheia || {}).celulas > 1, true);
+  conf('e a régua das colunas ACHA mais de uma coluna nela', (gradeCheia || {}).colunas > 1, true);
+  const etiqCheia = await etiquetasDe(pag, '#bib-corpo .bib-grade-exercicios');
+  console.log('   etiquetas na lista cheia: ' + JSON.stringify(etiqCheia));
+  conf('e a régua da etiqueta ACHA etiqueta de dificuldade nela', (etiqCheia || {}).tags > 0, true);
+  conf('e ACHA a palavra no texto renderizado', (etiqCheia || {}).palavra, 'tem');
+
+  const marcados = await pag.evaluate(ids => {
+    const caixas = Array.from(document.querySelectorAll('#bib-corpo input[data-carrinho="itens"]'))
+      .filter(c => ids.indexOf(c.dataset.id) < 0).slice(0, 2);
+    caixas.forEach(c => { c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); });
+    return caixas.map(c => c.dataset.id);
+  }, IDS2);
+  conf('marcou dois exercícios que NÃO são da lista pronta', marcados.length, 2);
+  await pausa(300);
+  conf('e os dois estão no carrinho', (await carrinho(pag)).itens.length, 2);
+  await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
+  await pausa(400);
+
+  // ================================================================
   secao('2. Tocar carrega a lista no carrinho, NA ORDEM DELA');
   conf('a ordem da lista do nível 2 é diferente da ordem da fonte',
     IDS2.join('|') !== IDS2.slice().sort().join('|'), true);
@@ -285,6 +448,95 @@ const desmarcar = (pag, id) => pag.evaluate(i => {
   conf('e NA ORDEM DA LISTA', c2.itens.join('|'), IDS2.join('|'));
   conf('e não levou página de teoria nenhuma', c2.paginas.length, 0);
   conf('a tela da lista abriu com os cinco', (await numerosDaTela(pag)).length, 5);
+
+  // ================================================================
+  secao('2b. Os quatro consertos de tela que o olho de fora cego pediu');
+  const gradeLp = await gradeDe(pag, '#bib-lp-grade');
+  console.log('   grade da lista pronta: ' + JSON.stringify(gradeLp));
+  conf('a tela tem mais de um cartão, senão "uma coluna" não mediria nada', (gradeLp || {}).celulas > 1, true);
+  if (V_COLUNA) {
+    /* O ÚNICO VENENO QUE NÃO MEXE EM JAVASCRIPT: só a folha de estilo muda, e
+     * o app.js continua igualzinho ao do repositório. Se a régua estivesse
+     * lendo o código em vez da tela, este veneno passaria batido. */
+    conf('VENENO: sem a regra de uma coluna, a grade volta a ter mais de uma', (gradeLp || {}).colunas > 1, true);
+    return;
+  }
+  conf('(a) a grade da lista pronta tem UMA coluna', (gradeLp || {}).colunas, 1);
+
+  const etiqLp = await etiquetasDe(pag, '#bib-lp-grade');
+  console.log('   etiquetas na lista pronta: ' + JSON.stringify(etiqLp));
+  if (V_DIFICULDADE) {
+    conf('VENENO: a etiqueta voltou ao cartão e a régua a vê pela classe', (etiqLp || {}).tags > 0, true);
+    conf('VENENO: e a vê também pela palavra no texto', (etiqLp || {}).palavra, 'tem');
+    return;
+  }
+  conf('(c) nenhuma etiqueta de dificuldade no cartão da lista pronta', (etiqLp || {}).tags, 0);
+  conf('(c) nem a palavra no texto renderizado', (etiqLp || {}).palavra, 'não tem');
+  conf('(c) e o minuto por exercício CONTINUA, um por cartão',
+    (etiqLp || {}).minutos, (gradeLp || {}).celulas);
+
+  const av = await aviso(pag, '#bib-lp-aviso');
+  console.log('   aviso: ' + JSON.stringify(av));
+  if (V_FLUTUA) {
+    conf('VENENO: a mensagem foi para a caixa flutuante do rodapé', av.flutuando, true);
+    conf('VENENO: e não sobrou bloco nenhum no fluxo da tela', av.noFluxo, false);
+    return;
+  }
+  conf('(b) a caixa flutuante do rodapé NÃO abriu', av.flutuando, false);
+  conf('(b) a mensagem está no corpo da tela e em posição estática', av.noFluxo, true);
+  conf('(b) e não cobre cartão nem controle nenhum', av.cobertos, 0);
+
+  /* A FRASE COM OS DOIS ITENS QUE JÁ ESTAVAM MARCADOS, que é o caso do print.
+   * O texto do bloco traz o rótulo do botão colado no fim, e é ele que sai. */
+  const FRASE = 'O material agora tem 5 exercícios: a lista pronta do nível 2, ' +
+    'no lugar do que estava marcado. Mude o que quiser e toque em Gerar material.';
+  if (V_FRASE) {
+    conf('VENENO: a frase voltou a somar em voz alta',
+      /^Tirei 2 itens que estavam marcados e marquei/.test(av.texto), true);
+    conf('VENENO: e deixou de dizer o total resultante',
+      av.texto.indexOf('O material agora tem') >= 0 ? 'diz' : 'não diz', 'não diz');
+    return;
+  }
+  conf('(e) a frase diz o TOTAL RESULTANTE', av.texto.replace(/ Desfazer$/, ''), FRASE);
+  conf('(e) e não soma em voz alta', /Tirei/.test(av.texto) ? 'soma' : 'não soma', 'não soma');
+  conf('(e) e o Desfazer continua à mão, porque dois itens saíram',
+    await pag.evaluate(() => !!document.querySelector('#bib-lp-aviso-acao')), true);
+  /* (d) O rótulo "No material" NÃO muda nesta rodada: é do B7, está no ar
+   * desde a 1.26.0 e não é regressão desta frente. Fica medido para que
+   * mudá-lo sem querer reprove. */
+  conf('(d) o rótulo da caixa continua "No material", intocado',
+    await pag.evaluate(() => {
+      const m = document.querySelector('#bib-lp-grade .bib-marcar span');
+      return m ? m.textContent.trim() : '(não achei)';
+    }), 'No material');
+
+  const textoLp = (await textoDoCorpo(pag)).toLowerCase();
+  conf('nenhuma palavra de curadoria na tela da lista pronta',
+    PROIBIDAS.filter(p => textoLp.indexOf(p) >= 0).join(',') || '(nenhuma)', '(nenhuma)');
+
+  /* O CONTROLE DA RÉGUA DO AVISO. "Não flutua" e "não cobre nada" são os dois
+   * resultados bons, e sem alvo não se distinguem de um medidor cego. O alvo é
+   * fabricado e é do MESMO tipo do que a régua lê de verdade: a mesma caixa do
+   * rodapé, com a mesma classe que o avisar() põe nela, e com a tela rolada
+   * até o fim, que é onde ela cobria as setas no print do marco. */
+  await pag.evaluate(() => {
+    const c = document.querySelector('.conteudo');
+    if (c) c.scrollTop = c.scrollHeight;
+    const t = document.querySelector('#aviso-texto');
+    if (t) t.textContent = 'alvo de controle desta prova';
+    document.querySelector('#aviso').classList.add('aberto');
+  });
+  await pausa(400);
+  const alvo = await aviso(pag, '#aviso');
+  console.log('   alvo de controle: ' + JSON.stringify(alvo));
+  conf('a régua ACUSA a caixa do rodapé aberta', alvo.flutuando, true);
+  conf('e ACUSA que ela cobre cartão ou controle da lista pronta', alvo.cobertos > 0, true);
+  await pag.evaluate(() => {
+    document.querySelector('#aviso').classList.remove('aberto');
+    const c = document.querySelector('.conteudo');
+    if (c) c.scrollTop = 0;
+  });
+  await pausa(300);
 
   // ================================================================
   secao('3. Subir e descer, e a ordem sobrevive até o PDF');
@@ -536,7 +788,7 @@ const desmarcar = (pag, id) => pag.evaluate(i => {
    * "trocou exatamente uma ocorrência" logo abaixo é o que transforma isso em
    * reprovação em vez de silêncio, e foi ela que pegou o erro na primeira
    * corrida desta seção. */
-  const NL_APP = APP_REPO.indexOf('\r\n') >= 0 ? '\r\n' : '\n';
+  // o NL_APP é o mesmo das âncoras dos venenos, lá em cima, e sai do próprio app.js
   const ANCORA_NOV = '  var NOVIDADES = [' + NL_APP;
   conf('a âncora do controle casa exatamente uma vez', APP_REPO.split(ANCORA_NOV).length - 1, 1);
   const comEntrada = APP_REPO.replace(ANCORA_NOV,

@@ -396,6 +396,16 @@ roda "biblioteca listas --envenenado-ordem"         node "_teste/testa_bibliotec
 roda "biblioteca listas --envenenado-seta"          node "_teste/testa_biblioteca_listas.js" --envenenado-seta
 roda "biblioteca listas --envenenado-curadoria"     node "_teste/testa_biblioteca_listas.js" --envenenado-curadoria
 roda "biblioteca listas --envenenado-camadas"       node "_teste/testa_biblioteca_listas.js" --envenenado-camadas
+# FRENTE B (B10): OS QUATRO CONSERTOS DE TELA que o olho de fora cego pediu.
+# Uma coluna na grade, o aviso no fluxo em vez de flutuando por cima das setas,
+# a frase dizendo o total resultante em vez de somar em voz alta, e o cartao
+# sem etiqueta de dificuldade. Cada regua nova e medida tambem na lista CHEIA do
+# modulo, onde ela TEM de achar o contrario. O veneno da coluna e o unico que
+# mexe so no styles.css: se a regua lesse o codigo e nao a tela, ele passaria.
+roda "biblioteca listas --envenenado-coluna"        node "_teste/testa_biblioteca_listas.js" --envenenado-coluna
+roda "biblioteca listas --envenenado-flutua"        node "_teste/testa_biblioteca_listas.js" --envenenado-flutua
+roda "biblioteca listas --envenenado-frase"         node "_teste/testa_biblioteca_listas.js" --envenenado-frase
+roda "biblioteca listas --envenenado-dificuldade"   node "_teste/testa_biblioteca_listas.js" --envenenado-dificuldade
 # FRENTE B (B10): A FOLHA IMPRESSA NAO MUDOU. A unificacao das camadas foi pelo
 # lado da TELA de proposito, porque o papel e o que ela entrega ao aluno. A
 # prova gera a MESMA folha com o pdf.js de hoje e com o do d80bb90 e compara

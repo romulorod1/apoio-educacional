@@ -11293,6 +11293,12 @@
     bibNav.modulo = nav.modulo === undefined ? bibNav.modulo : nav.modulo;
     bibNav.aula = nav.aula === undefined ? bibNav.aula : nav.aula;
     if (nav.serie) bibNav.serie = nav.serie;
+    /* O aviso da lista pronta é daquela tela e sai junto com ela. Fica de pé
+     * quando a navegação é para a própria lista a que ele se refere, que é o
+     * que acontece no toque que o criou. */
+    if (bibLpAviso && !(bibNav.aula && bibNav.aula.tipo === 'lista-pronta' && bibNav.aula.id === bibLpAviso.para)) {
+      bibLpAviso = null;
+    }
     desenharCorpoBiblioteca();
     var cont = $('.conteudo');
     if (cont) cont.scrollTop = 0;
@@ -11555,6 +11561,15 @@
   function desenharListaPronta(corpo, mod, lp) {
     corpo.appendChild(voltarBib(mod.titulo, function () { irNaBiblioteca({ aula: null }); }));
     corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: 'Lista pronta, nível ' + lp.nivel }));
+    if (bibLpAviso) {
+      corpo.appendChild(el('div', { class: 'bib-lp-aviso', id: 'bib-lp-aviso' }, [
+        el('span', { class: 'cresce', texto: bibLpAviso.texto }),
+        bibLpAviso.aoAgir
+          ? el('button', { type: 'button', class: 'btn pequeno', id: 'bib-lp-aviso-acao', texto: bibLpAviso.rotulo,
+            aoClick: function () { var v = bibLpAviso; bibLpAviso = null; v.aoAgir(); desenharCorpoBiblioteca(); } })
+          : null
+      ]));
+    }
 
     var ids = bibCarrinho.itens.slice();
     var daLista = ids.filter(function (id) { return lp.minutosDe[id] !== undefined; });
@@ -11609,9 +11624,30 @@
       }, [
         el('div', { class: 'bib-rotulo bib-numero', texto: (pos + 1) + '. Exercício ' + it.numero }),
         varias ? el('div', { class: 'ajuda bib-lp-de-onde', texto: it.aula.titulo }) : null,
-        miniaturaBib(it.pacote, it.assets.enunciado, it.medidas && it.medidas.enunciado, 520),
+        /* A MINIATURA VAI MAIOR AQUI porque o cartão vai maior: a grade desta
+         * tela tem UMA coluna, e o recorte de 520 px desenhado numa caixa de
+         * 540 e num tablet de dois pixels por ponto sairia borrado. O número é
+         * o dobro da largura da caixa, que é o que a tela de retina pede. */
+        miniaturaBib(it.pacote, it.assets.enunciado, it.medidas && it.medidas.enunciado, 1080),
+        /* A ETIQUETA DE DIFICULDADE NÃO ENTRA NESTE CARTÃO, por duas razões, e
+         * a segunda é a que manda.
+         *
+         * A primeira: ela contradiz o minuto do lado. No print do marco havia
+         * "estimada: médio · ≈ 8,4 min" ao lado de "estimada: difícil · ≈ 4,9
+         * min", e duas réguas que se contradizem no mesmo cartão ensinam a
+         * desconfiar das duas. O minuto fica, porque é o que ajuda a decidir o
+         * que tirar quando a lista passa do tempo.
+         *
+         * A segunda: `dificuldade` é `proxy.terco` em 482 de 482 itens do 9º
+         * ano, ou seja, a POSIÇÃO do exercício na lista da fonte, e não juízo
+         * nosso. Estampar "difícil" num cartão é afirmação de curadoria, que é
+         * exatamente o que esta tela não pode fazer depois da comparação cega
+         * de 24/09. A ordem já carrega a estimativa, e a frase da tela do
+         * módulo diz de onde ela vem: "em ordem de dificuldade estimada".
+         *
+         * Na lista CHEIA do módulo a etiqueta continua, e ali ela é outra
+         * coisa: lá ela é filtro e não afirmação sobre uma trajetória. */
         el('div', { class: 'bib-tags' }, [
-          rotuloDificuldade(it) ? el('span', { class: 'tag bib-dif-fonte', texto: rotuloDificuldade(it) }) : null,
           lp.minutosDe[id] !== undefined
             ? el('span', { class: 'tag bib-lp-min-item', texto: minutosEstimados(lp.minutosDe[id]) })
             : el('span', { class: 'tag bib-lp-min-item', texto: 'acrescentado por você' })
@@ -11806,6 +11842,21 @@
    * o Gerar material) o convite some, porque a partir dali a seleção já é
    * escolha dela e desfazer passaria a destruir o que ela acabou de fazer. */
   var bibTrocaDesfazer = null;   // { antes, tudo, sairam } enquanto a volta estiver de pé
+
+  /* O AVISO DA LISTA PRONTA NÃO FLUTUA, e isto foi achado olhando um print.
+   *
+   * O aviso de rodapé mora a 24 px do fim da tela e passa por cima do que
+   * estiver ali. Na tela da lista pronta o que está ali são as setas de ordem e
+   * a caixa "No material" dos últimos cartões, que é justamente o que esta tela
+   * existe para ela tocar. Controle coberto é controle que não existe, e a
+   * `pointer-events: none` do aviso não conserta isso: o toque passa, mas ela
+   * não vê o que está tocando.
+   *
+   * Então a mensagem desta tela é PARTE da tela: entra no fluxo, empurra o
+   * conteúdo para baixo e não tapa nada. Guardada aqui, e não desenhada na
+   * hora, porque a tela se redesenha inteira a cada seta e a cada caixa.
+   * { texto, rotulo, aoAgir, para } */
+  var bibLpAviso = null;
 
   /* Chamada por TODA ação da mão dela que mexe no material. Sem isto, o
    * Desfazer da faixa continuaria oferecendo voltar a uma seleção que ela já
@@ -12124,15 +12175,30 @@
     guardarCarrinho();
     var sairam = semOsDe(antes.itens, tudo.itens).length + antes.paginas.length;
     bibTrocaDesfazer = sairam ? { antes: antes, tudo: tudo, sairam: sairam } : null;
+    /* A FRASE DIZ O TOTAL QUE FICOU, e não a conta que levou até ele.
+     *
+     * A forma antiga somava em voz alta: "Tirei 2 itens que estavam marcados e
+     * marquei a lista pronta do nível 2: 6 exercícios". Com 5 marcados antes, o
+     * olho de fora cego leu 5, leu 2, leu 6 e concluiu que a aritmética estava
+     * quebrada. Ela não estava: os 2 que saíram não eram os 5 que entraram, e a
+     * lista tem o tamanho que tem. Mas uma frase que só se entende depois de
+     * explicada é uma frase errada.
+     *
+     * A REGRA DE CONTAGEM NÃO MUDOU uma vírgula: `sairam` continua sendo o que
+     * era e continua decidindo o Desfazer. O que mudou é que a tela passa a
+     * dizer o que o material TEM agora, que é o que ela precisa saber, e a
+     * substituição vira uma oração e não uma subtração. */
+    bibLpAviso = {
+      para: lp.id,
+      texto: 'O material agora tem ' + plural(bibCarrinho.itens.length, 'exercício', 'exercícios') +
+        ': a lista pronta do nível ' + lp.nivel + (sairam ? ', no lugar do que estava marcado' : '') +
+        '. Mude o que quiser e toque em Gerar material.',
+      rotulo: sairam ? 'Desfazer' : null,
+      aoAgir: sairam ? function () { devolverSelecaoTrocada(antes, tudo); } : null
+    };
     irNaBiblioteca({ aula: { tipo: 'lista-pronta', id: lp.id } });
     desenharCarrinho();
     desenharContextoBiblioteca();
-    var oQueEntrou = 'a lista pronta do nível ' + lp.nivel + ': ' +
-      plural(lp.ids.length, 'exercício', 'exercícios') + '.';
-    avisar((sairam
-      ? 'Tirei ' + plural(sairam, 'item que estava marcado', 'itens que estavam marcados') + ' e marquei ' + oQueEntrou
-      : 'Marquei ' + oQueEntrou) + ' Mude o que quiser e toque em Gerar material.',
-    sairam ? 'Desfazer' : null, sairam ? function () { devolverSelecaoTrocada(antes, tudo); } : null);
   }
 
   /* SUBIR E DESCER, e não arrastar: a lista tem miniatura, ela usa o tablet com
@@ -12164,7 +12230,14 @@
      * muda a numeração de todos os de baixo e apaga uma seta da ponta. Só
      * trocar o `checked` deixaria a tela dizendo "3." num item que virou o
      * segundo, e a seta de descer acesa no último. */
-    if (bibNav.aula && bibNav.aula.tipo === 'lista-pronta' && $('#bib-lp-grade')) desenharCorpoBiblioteca();
+    if (bibNav.aula && bibNav.aula.tipo === 'lista-pronta' && $('#bib-lp-grade')) {
+      /* E O AVISO SAI, porque ele diz um TOTAL. Marcar ou desmarcar muda esse
+       * total, e o aviso passaria a dizer 6 ao lado de um cabeçalho dizendo 5,
+       * que é a mesma doença que tirou a etiqueta de dificuldade do cartão.
+       * Mudar a ORDEM não mexe no total, e ali o aviso fica. */
+      bibLpAviso = null;
+      desenharCorpoBiblioteca();
+    }
     // o rótulo do "Marcar os N" conta o carrinho: marcar o último vira "Desmarcar"
     $$('#bib-corpo .bib-marcar-modulo').forEach(function (b) { if (b._desenha) b._desenha(); });
     // o material daquela aula já foi anexado: o que ela marca agora é para outra coisa
