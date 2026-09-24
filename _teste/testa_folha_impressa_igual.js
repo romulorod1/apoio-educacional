@@ -28,18 +28,30 @@
  *
  *   node _teste/testa_folha_impressa_igual.js [--guarda-a-prova <pasta>]
  *   node _teste/testa_folha_impressa_igual.js --envenenado-ordem
+ *   node _teste/testa_folha_impressa_igual.js --envenenado-tapar
  *
  * Com --guarda-a-prova, grava a folha do FIXTURE na pasta, com nome que diz o
  * que ela é. Ela NÃO vai para o marco visual: ver a nota da opção, embaixo.
  *
  * O ALCANCE DESTA PROVA, ESCRITO ANTES QUE ALGUÉM SE ANIME COM O VERDE:
  *
- * CONTRA O DIFF QUE ELA ESTREIA, ESTA PROVA É INERTE. O pdf.js só ganhou um
- * ramo para um tipo de item (`tapar`) que folha nenhuma de antes tem; sem item
- * desse tipo a variável `tapar` fica vazia e o `if (tapar)` não chega a emitir
- * operador. Byte igual era o ÚNICO resultado possível. Dizer "provei que não
- * mudou" sem dizer "e nesta versão não tinha como mudar" é o começo da régua
- * que ninguém mais questiona.
+ * CONTRA O DIFF QUE ELA ESTREIA, A COMPARAÇÃO BYTE A BYTE É INERTE. O pdf.js só
+ * ganhou um ramo para um tipo de item (`tapar`) que folha nenhuma de antes tem;
+ * sem item desse tipo a bandeira `tapou` fica falsa e o laço não chega a emitir
+ * operador nenhum. Byte igual era o ÚNICO resultado possível. Dizer "provei que
+ * não mudou" sem dizer "e nesta versão não tinha como mudar" é o começo da
+ * régua que ninguém mais questiona.
+ *
+ * (Este parágrafo descreveu por um tempo uma variável `tapar` e um `if (tapar)`
+ * que a implementação já não tinha. Comentário que descreve código de ontem é a
+ * mesma família da âncora de veneno que envelhece: parece conferência e não é.)
+ *
+ * E É POR ISSO QUE A MEDIDA DO RETÂNGULO EXISTE, mais abaixo. O ramo novo do
+ * pdf.js precisava de uma prova que o exercitasse, e por duas rodadas ele não
+ * teve nenhuma: havia um bloco que dizia comparar três documentos com e sem
+ * placa e que, no código, gerava a folha do fixture (que não tem `tapar`) contra
+ * um documento sem folha. Agora a folha com retângulo é gerada de verdade e o
+ * papel é medido em pixel, com o veneno `--envenenado-tapar` ao lado.
  *
  * O que ela vale, então, é o DEPOIS: ela é o guarda que fica de pé para o
  * próximo diff, quando alguém mexer na ordem de desenho por um motivo
@@ -75,6 +87,7 @@ const ANTES = 'd80bb90';          // o aplicativo publicado, antes da B10
 const I_PROVA = process.argv.indexOf('--guarda-a-prova');
 const PROVA = I_PROVA !== -1 ? process.argv[I_PROVA + 1] : null;
 const VENENO_ORDEM = process.argv.indexOf('--envenenado-ordem') !== -1;
+const VENENO_TAPAR = process.argv.indexOf('--envenenado-tapar') !== -1;
 
 let passes = 0, falhas = 0;
 function conf(nome, obtido, esperado) {
@@ -142,10 +155,10 @@ function geraCom(arquivoPdfJs) {
   });
 }
 
-/* A MESMA ESTEIRA, com uma folha própria (ou sem folha nenhuma), para medir se
- * a página da folha leva marca d'água. */
-function geraComTapar(arquivoPdfJs, itens) {
-  // itens null: o MESMO documento sem a folha, que é o outro lado do delta
+/* A MESMA ESTEIRA, com uma folha montada aqui. `itens` null gera o documento
+ * SEM folha nenhuma, que é o outro lado do delta da marca d'água; qualquer
+ * outro vetor vira a folha, e `comImagem` decide se o JPEG do fixture entra. */
+function geraComTapar(arquivoPdfJs, itens, comImagem) {
   const raiz = {};
   new Function('self', fs.readFileSync(arquivoPdfJs, 'utf8') + '\nreturn self;')(raiz);
   const Core = require(path.join(RAIZ, 'core.js'));
@@ -161,8 +174,22 @@ function geraComTapar(arquivoPdfJs, itens) {
     : {
       incluirNotas: true,
       notas: [{ data: '2026-09-24', paginas: [{ fundo: 'branco', itens: itens }] }],
+      imagens: comImagem ? { 'recorte-1': { bytes: JPEG, w: 16, h: 16 } } : {},
       sempreResumo: true
     });
+}
+
+/* Conta os pixels diferentes entre a MESMA página de dois PDFs, pelo mesmo
+ * rasterizador que a comparação principal usa. */
+function difDePixel(bytesA, bytesB, pagina, tmp, nome) {
+  const a = path.join(tmp, nome + '_a.pdf'), b = path.join(tmp, nome + '_b.pdf');
+  fs.writeFileSync(a, Buffer.from(bytesA));
+  fs.writeFileSync(b, Buffer.from(bytesB));
+  try {
+    const r = execFileSync('python', [path.join(__dirname, '_rasteriza_compara.py'), a, b, String(pagina)],
+      { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+    return JSON.parse(r.trim().split('\n').pop());
+  } catch (e) { return { erro: String((e && e.message) || e).slice(0, 200) }; }
 }
 
 /* Todo PDF carrega a data de criação, que muda a cada corrida por construção.
@@ -220,6 +247,21 @@ function semData(bytes) {
       .split(marcaTracos).join(solta);
     conf('o veneno mudou mesmo o pdf.js', envenenado !== fonte ? 'diferente' : 'IGUAL', 'diferente');
     const alvo = path.join(tmp, 'pdf_envenenado.js');
+    fs.writeFileSync(alvo, envenenado);
+    pdfHoje = alvo;
+  }
+
+  /* O VENENO DO TAPAR: o laço que emite os retângulos deixa de emitir. É o
+   * guarda da medida nova, a que prova que o ramo do tapar pinta no papel, e
+   * ele existe porque essa mudança do pdf.js entrou nesta frente sem medida
+   * nenhuma até agora. */
+  if (VENENO_TAPAR) {
+    const fonte = fs.readFileSync(pdfHoje, 'utf8');
+    const ancora = "      if (r.t !== 'tapar' || !(r.w > 0) || !(r.h > 0)) continue;";
+    conf('a âncora do laço do tapar casa exatamente uma vez', fonte.split(ancora).length - 1, 1);
+    const envenenado = fonte.split(ancora).join('      if (true) continue;');
+    conf('o veneno mudou mesmo o pdf.js', envenenado !== fonte ? 'diferente' : 'IGUAL', 'diferente');
+    const alvo = path.join(tmp, 'pdf_sem_tapar.js');
     fs.writeFileSync(alvo, envenenado);
     pdfHoje = alvo;
   }
@@ -341,6 +383,52 @@ function semData(bytes) {
    * da marca, tem de sair do mesmo tamanho do documento sem placa nenhuma. Sem
    * ele, "o documento encurtou" não se distinguiria de "qualquer retângulo
    * encurta o documento". */
+  /* O RETÂNGULO DE TAPAR SAI NO PAPEL, e até agora isto não estava medido.
+   *
+   *   Arranjo:   a MESMA folha em três versões, todas geradas pelo pdf.js de
+   *              hoje: sem imagem, com a imagem, e com a imagem mais um
+   *              retângulo de tapar exatamente em cima dela.
+   *   Afirmação: o ramo do tapar pinta o retângulo na página impressa, e o que
+   *              ele pinta APAGA o que a imagem tinha pintado ali.
+   *
+   * As duas frases falam do mesmo arranjo. A escrita anterior não falava: ela
+   * gerava a folha do fixture, que não tem item `tapar` NENHUM, e um documento
+   * sem folha, e daí afirmava coisas sobre o retângulo. O ramo do `itens !== null`
+   * era código morto e o comentário descrevia três documentos e uma placa de
+   * controle que o código não construía. A mudança do pdf.js desta frente
+   * entrava sem uma medida sequer. Foi uma lente cega que apontou.
+   *
+   * Dois alvos, e são eles que impedem o número de querer dizer outra coisa:
+   * a imagem TEM de mudar a página (senão não há o que tapar), e a página
+   * comparada com ela mesma TEM de dar zero (senão o medidor acusa sempre). */
+  console.log('\n=== O retângulo de tapar sai no papel ===');
+  const FOLHA_SO_IMAGEM = [{ t: 'imagem', ref: 'recorte-1', x: 60, y: 120, w: 600, h: 300 }];
+  const FOLHA_COM_TAPAR = FOLHA_SO_IMAGEM.concat([{ t: 'tapar', x: 60, y: 120, w: 600, h: 300 }]);
+  const bVazia = geraComTapar(pdfHoje, [], false);
+  const bImagem = geraComTapar(pdfHoje, FOLHA_SO_IMAGEM, true);
+  const bTapada = geraComTapar(pdfHoje, FOLHA_COM_TAPAR, true);
+  const pgNota = 1;   // o documento é resumo + folha, e a folha é a segunda
+  const dImagem = difDePixel(bVazia, bImagem, pgNota, tmp, 'img');
+  const dTapada = difDePixel(bVazia, bTapada, pgNota, tmp, 'tap');
+  const dMesma = difDePixel(bImagem, bImagem, pgNota, tmp, 'mesma');
+  console.log('   pixels: folha vazia contra com imagem ' + JSON.stringify(dImagem.diferentes) +
+    ', contra imagem tapada ' + JSON.stringify(dTapada.diferentes) +
+    ', contra ela mesma ' + JSON.stringify(dMesma.diferentes));
+  conf('o rasterizador mediu as três', !dImagem.erro && !dTapada.erro && !dMesma.erro, true);
+  conf('ALVO: a imagem pinta a página, senão não haveria o que tapar', dImagem.diferentes > 1000, true);
+  conf('ALVO: a página comparada com ela mesma dá zero, senão o medidor acusa sempre', dMesma.diferentes, 0);
+  if (VENENO_TAPAR) {
+    conf('VENENO: sem o laço do tapar, o retângulo não sai no papel e a página fica igual à de só imagem',
+      dTapada.diferentes, dImagem.diferentes);
+  } else if (VENENO_ORDEM) {
+    console.log('   (a corrida da ordem não julga o tapar: o veneno dela é das camadas)');
+  } else {
+    conf('o retângulo APAGA o que a imagem tinha pintado: sobra menos do que sem ele',
+      dTapada.diferentes < dImagem.diferentes, true);
+    conf('e apaga quase tudo: o que sobra é menos de um décimo do que a imagem pintou',
+      dTapada.diferentes * 10 < dImagem.diferentes, true);
+  }
+
   console.log('\n=== A folha da aula não leva marca d\'água ===');
   /* A SEGUNDA LENTE CEGA DO PR #57 APONTOU UM DEFEITO QUE O CÓDIGO NÃO TEM, e
    * a medida é o que separa as duas coisas.

@@ -11626,7 +11626,9 @@
          * `devolverSelecaoTrocada`, e só um deles tinha o remendo. */
         av.aoAgir
           ? el('button', { type: 'button', class: 'btn pequeno', id: 'bib-lp-aviso-acao', texto: av.rotulo,
-            aoClick: function () { av.aoAgir(); desenharCorpoBiblioteca(); } })
+            // sem redesenho colado: o `devolverSelecaoTrocada` chama o
+            // `desenharCarrinho`, que já redesenha esta tela
+            aoClick: function () { av.aoAgir(); } })
           : null
       ]));
     }
@@ -12368,9 +12370,15 @@
       rotulo: perdeu ? 'Desfazer' : null,
       aoAgir: perdeu ? function () { devolverSelecaoTrocada(antes, tudo); } : null
     };
-    irNaBiblioteca({ aula: { tipo: 'lista-pronta', id: lp.id } });
+    /* A ORDEM IMPORTA, E DÁ UM DESENHO EM VEZ DE DOIS. O `desenharCarrinho`
+     * redesenha a tela da lista pronta quando a grade já existe; chamado DEPOIS
+     * do `irNaBiblioteca`, que acabou de criá-la, ele desenhava a tela recém
+     * desenhada. Chamado antes, a grade ainda não existe, ele só refaz a faixa
+     * de cima, e quem desenha a tela é o `irNaBiblioteca`, uma vez. Achado por
+     * uma lente cega, que contou dois onde o commit anterior dizia um. */
     desenharCarrinho();
     desenharContextoBiblioteca();
+    irNaBiblioteca({ aula: { tipo: 'lista-pronta', id: lp.id } });
   }
 
   /* SUBIR E DESCER, e não arrastar: a lista tem miniatura, ela usa o tablet com
@@ -12425,9 +12433,19 @@
      * não existia. Aqui é o único lugar por onde toda mudança passa. */
     /* E SÓ COM A ABA À VISTA. O `#bib-lp-grade` continua no DOM depois de ela
      * sair da Biblioteca, então o guarda de existência sozinho mandava
-     * redesenhar uma tela escondida, com cinco miniaturas de 1080 px, no pior
-     * momento possível: o `desmarcarDepoisDeAnexar` roda no meio da geração do
-     * PDF do material, que é a operação mais pesada do aplicativo. */
+     * redesenhar uma tela escondida, com cinco miniaturas de 1080 px.
+     *
+     * A PRIMEIRA ESCRITA DESTE COMENTÁRIO JUSTIFICAVA O GUARDA COM UM CASO QUE
+     * NÃO EXISTE, e fica escrito para ninguém repetir: dizia que o
+     * `desmarcarDepoisDeAnexar` roda "no meio da geração do PDF". Não roda. A
+     * geração é síncrona e termina antes; o desmarcar vem num `.then()`
+     * posterior, com o material já anexado e o modal já fechado, e nesse
+     * instante a aba está à VISTA, então este guarda nem se aplica àquele
+     * caminho. Uma lente cega foi conferir e achou os dois pés errados.
+     *
+     * O guarda continua, pelo motivo geral e verdadeiro: tela escondida não se
+     * desenha. Quem sai da Biblioteca com a lista pronta aberta e mexe no
+     * material por outro caminho não paga por um desenho que ninguém vê. */
     if (bibNav.aula && bibNav.aula.tipo === 'lista-pronta' && telaDaListaProntaAVista()) {
       desenharCorpoBiblioteca();
     }

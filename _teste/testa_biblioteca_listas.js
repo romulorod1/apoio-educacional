@@ -974,8 +974,20 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
    * verde inteiro de pé, afirmando o material que acabara de ser desfeito.
    * Agora quem apaga é o `guardarCarrinho`, por onde toda mudança passa, e o
    * que este toque mede é a porta, não o botão. */
-  await pag.evaluate(() => { document.querySelector('#bib-lp-aviso-acao').click(); });
+  await pag.evaluate(() => {
+    window.__redesenhos = 0;
+    const alvo = document.querySelector('#bib-corpo');
+    if (window.__obs) window.__obs.disconnect();
+    window.__obs = new MutationObserver(recs => {
+      recs.forEach(r => { if (r.target === alvo && r.removedNodes.length > 1) window.__redesenhos++; });
+    });
+    window.__obs.observe(alvo, { childList: true });
+    document.querySelector('#bib-lp-aviso-acao').click();
+  });
   await pausa(600);
+  const desenhosDesfazer = await pag.evaluate(() => window.__redesenhos);
+  console.log('   desenhos no Desfazer do aviso: ' + desenhosDesfazer);
+  conf('o Desfazer do aviso desenha a tela UMA vez', desenhosDesfazer, 1);
   const c9 = await carrinho(pag);
   const depoisDoDesfazer = await aviso(pag, '#bib-lp-aviso');
   console.log('   depois do Desfazer: ' + JSON.stringify(c9.itens) + ' | aviso: ' + JSON.stringify(depoisDoDesfazer.texto));
@@ -994,7 +1006,22 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
    * Biblioteca é esvaziado (o `innerHTML = ''` de cada redesenho), medindo o
    * DOM e não o código. O alvo onde ela TEM de contar é o próprio toque: se ela
    * marcasse zero, não estaria medindo nada. */
-  secao('5c. Um desenho por toque, e nada de desenhar tela escondida');
+  /* O ARRANJO, ESCRITO ANTES DO CÓDIGO, E A AFIRMAÇÃO AO LADO DELE.
+   *
+   *   Arranjo:   três caminhos que mudam o carrinho com a tela da lista pronta
+   *              à vista: o toque na seta, o toque na linha que abre a tela, e
+   *              o toque no Desfazer do aviso.
+   *   Afirmação: cada um desses três desenha a tela UMA vez.
+   *
+   * A ESCRITA ANTERIOR MEDIA SÓ A SETA e a afirmação dizia "um desenho por
+   * toque", no geral. Os outros dois caminhos desenhavam DUAS vezes e ficavam
+   * verdes, e foi uma lente cega que contou. A afirmação agora nomeia os três
+   * caminhos que ela mede, e não "toque" no abstrato.
+   *
+   * E o que a régua conta, dito com precisão: quantas vezes o `#bib-corpo` é
+   * esvaziado de uma vez só. Não é "desenho" no abstrato: é a limpeza em bloco
+   * que todo redesenho desta tela faz. */
+  secao('5c. Um desenho por toque de seta, de linha e de Desfazer');
   await pag.evaluate(() => {
     window.__redesenhos = 0;
     const alvo = document.querySelector('#bib-corpo');
@@ -1015,6 +1042,21 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
     return;
   }
   conf('um toque de seta desenha a tela UMA vez', desenhos, 1);
+
+  /* OS OUTROS DOIS CAMINHOS, que a escrita anterior não media e que desenhavam
+   * duas vezes: voltar ao módulo e tocar na linha, e o Desfazer do aviso. */
+  await pag.evaluate(() => { window.__redesenhos = 0; });
+  await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
+  await pausa(500);
+  await pag.evaluate(() => { window.__redesenhos = 0; });
+  conf('tocou na linha da lista pronta', await tocarLinha(pag, 'Lista pronta, nível 2'), true);
+  await pausa(700);
+  const desenhosLinha = await pag.evaluate(() => window.__redesenhos);
+  console.log('   desenhos ao abrir a tela pela linha: ' + desenhosLinha);
+  conf('abrir a tela pela linha desenha UMA vez', desenhosLinha, 1);
+  /* O terceiro caminho, o Desfazer do aviso, é medido na 5b, que é onde o aviso
+   * nasce com Desfazer. Aqui a linha apenas ABRE a tela que ela já estava
+   * mexendo, e por isso não cria aviso nenhum. */
 
   /* E A TELA ESCONDIDA NÃO SE DESENHA. O guarda antigo era a existência do
    * `#bib-lp-grade`, que continua no DOM depois de ela trocar de aba; o novo é

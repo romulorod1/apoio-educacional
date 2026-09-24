@@ -434,6 +434,8 @@ roda "folha impressa igual ao publicado"        node "_teste/testa_folha_impress
 # sentido e ela saber MORDER no proximo diff. Se as ancoras do veneno deixarem
 # de casar, e aqui que se descobre, e nao no dia em que a folha mudar calada.
 roda "folha impressa --envenenado-ordem"        node "_teste/testa_folha_impressa_igual.js" --envenenado-ordem
+# E o guarda da medida nova: sem o laco do tapar, o retangulo nao sai no papel.
+roda "folha impressa --envenenado-tapar"        node "_teste/testa_folha_impressa_igual.js" --envenenado-tapar
 
 roda "painel de valores"                        node "_teste/testa_painel_valores.js"
 roda "painel de valores --envenenado-aberto"    node "_teste/testa_painel_valores.js" --envenenado-aberto
