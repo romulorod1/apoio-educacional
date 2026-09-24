@@ -219,7 +219,7 @@ As folhas do par NN sao, nesta pasta:
 Os pares vao de 01 ate %(ultimo)02d.
 
 A RESPOSTA
-Grave um arquivo JSON em %(resposta)s, exatamente neste formato:
+Termine o seu relatorio final com este JSON, e nada depois dele:
 
 {"braco": "%(braco)s", "revisor": "%(revisor)s", "respostas": [
   {"par": 1, "escolha": "A", "porque": "..."},
@@ -302,16 +302,25 @@ def monta(pacote, saida, semente, revisores, caminho_gabarito):
                           '_regra': nossa_lista, '_sorteio': dele})
 
         do_braco = {'pares': [], 'descartados': descartados, 'ordenado_por_degrau': ordenado}
+        # A disposicao de cada revisor e sorteada de forma independente, mas
+        # EQUILIBRADA: metade dos pares com a regra na lista A. Sorteio par a
+        # par, sem equilibrio, deixa a contagem de lados torta, e ai um revisor
+        # que so goste da folha da esquerda ja pontua acima de metade sem ter
+        # julgado nada. Medido na primeira montagem: 11 e 11 de 20, e os dois
+        # revisores vendo o mesmo lado em 14 dos 20 pares.
+        quantos_revisores = revisores if nome_braco == 'A' else 1
+        disposicao = {}
+        for rev in range(1, quantos_revisores + 1):
+            lados = [True] * (len(pares) // 2) + [False] * (len(pares) - len(pares) // 2)
+            random.Random('%s|%s|disposicao|%d' % (sem, nome_braco, rev)).shuffle(lados)
+            disposicao['revisor%d' % rev] = lados
         for n_par, par in enumerate(pares, 1):
             registro = {'par': n_par, 'kit': par['kit'], 'nivel': par['nivel'], 'modulo': par['modulo'],
                         'n': par['n'], 'minutos': par['minutos'],
                         'regra': par['regra'], 'sorteio': par['sorteio'], 'por_revisor': {}}
             # dois revisores independentes no braco A, que e o portao; um no B
-            quantos_revisores = revisores if nome_braco == 'A' else 1
             for rev in range(1, quantos_revisores + 1):
-                # a disposicao e sorteada de novo para cada revisor
-                rng_disp = random.Random('%s|%s|%d|%d' % (sem, nome_braco, n_par, rev))
-                primeiro_e_a_regra = rng_disp.random() < 0.5
+                primeiro_e_a_regra = disposicao['revisor%d' % rev][n_par - 1]
                 lado = {'A': 'regra' if primeiro_e_a_regra else 'sorteio',
                         'B': 'sorteio' if primeiro_e_a_regra else 'regra'}
                 registro['por_revisor']['revisor%d' % rev] = lado
@@ -331,8 +340,7 @@ def monta(pacote, saida, semente, revisores, caminho_gabarito):
                 continue
             io.open(os.path.join(pasta, 'PERGUNTA.txt'), 'w', encoding='utf-8', newline='\n').write(
                 PERGUNTA % {'ultimo': len(do_braco['pares']), 'braco': nome_braco,
-                            'revisor': 'revisor%d' % rev,
-                            'resposta': os.path.join(pasta, 'RESPOSTA.json')})
+                            'revisor': 'revisor%d' % rev})
         gabarito['bracos'][nome_braco] = do_braco
         print('braco %s: %d pares montados, %d descartados' % (nome_braco, len(do_braco['pares']), len(descartados)))
         for d in descartados:

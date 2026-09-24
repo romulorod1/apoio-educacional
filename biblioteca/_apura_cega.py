@@ -67,16 +67,38 @@ def apura(gabarito, respostas):
                 continue
             rev = r['revisor']
             escolhas = {}
+            problemas = []
             for item in r['respostas']:
-                par = por_par.get(item['par'])
+                num = item.get('par')
+                if not isinstance(num, int):
+                    problemas.append('par %r nao e numero inteiro' % (num,))
+                    continue
+                par = por_par.get(num)
                 if par is None:
-                    print('   AVISO: resposta para o par %s, que nao existe neste braco' % item['par'])
+                    problemas.append('resposta para o par %d, que nao existe neste braco' % num)
+                    continue
+                if num in escolhas:
+                    problemas.append('o par %d foi respondido duas vezes' % num)
                     continue
                 lado = par['por_revisor'].get(rev)
                 if lado is None:
-                    print('   AVISO: %s nao tem folha do par %d' % (rev, item['par']))
+                    problemas.append('%s nao recebeu folha do par %d' % (rev, num))
                     continue
-                escolhas[item['par']] = lado[item['escolha']]
+                escolha = item.get('escolha')
+                if escolha not in ('A', 'B'):
+                    problemas.append('o par %d veio com escolha %r, e so existem A e B' % (num, escolha))
+                    continue
+                escolhas[num] = lado[escolha]
+            faltando = sorted(set(por_par) - set(escolhas))
+            if faltando:
+                problemas.append('%s nao respondeu os pares %s' % (rev, ', '.join(str(p) for p in faltando)))
+            if problemas:
+                # A contagem sai do campo que a diz: resposta incompleta ou
+                # torta nao vira placar menor em silencio, vira parada.
+                for p in problemas:
+                    print('   RESPOSTA INVALIDA: %s' % p)
+                raise SystemExit('a apuracao para aqui: %d problema(s) nas respostas de %s no braco %s'
+                                 % (len(problemas), rev, nome_braco))
             escolhas_por_revisor[rev] = escolhas
         if not escolhas_por_revisor:
             print('   (sem respostas)')
@@ -159,6 +181,65 @@ def autoteste():
     # e o limiar e o MENOR k que passa: o de baixo tem de falhar
     caso('14 de 20 nao passa de 5%', p_de_cauda(20, 14) > Fraction(1, 20), True)
     caso('25 de 40 nao passa de 5%', p_de_cauda(40, 25) > Fraction(1, 20), True)
+
+    # A ponta mais perigosa de tudo isto: o mapa de "lista A" para "regra ou
+    # sorteio". Invertido, o resultado sai ao contrario e nada mais no
+    # programa reclama. Dois pares com disposicao OPOSTA, e a mesma letra
+    # escolhida nos dois: um tem de contar para a regra e o outro para o
+    # sorteio. Se o mapa estivesse invertido, este caso daria 2 ou 0.
+    gab = {'pacote': 'x', 'semente': 1, 'revisores': 1, 'bracos': {'A': {
+        'ordenado_por_degrau': True, 'descartados': [], 'pares': [
+            {'par': 1, 'kit': 'k1', 'nivel': 1, 'modulo': 'm', 'n': 4, 'minutos': '30.0',
+             'regra': [], 'sorteio': [], 'por_revisor': {'revisor1': {'A': 'regra', 'B': 'sorteio'}}},
+            {'par': 2, 'kit': 'k2', 'nivel': 2, 'modulo': 'm', 'n': 4, 'minutos': '30.0',
+             'regra': [], 'sorteio': [], 'por_revisor': {'revisor1': {'A': 'sorteio', 'B': 'regra'}}}]}}}
+    resp = [{'braco': 'A', 'revisor': 'revisor1', 'respostas': [
+        {'par': 1, 'escolha': 'A', 'porque': ''}, {'par': 2, 'escolha': 'A', 'porque': ''}]}]
+    saida = io.StringIO()
+    antigo, sys.stdout = sys.stdout, saida
+    try:
+        resumo = apura(gab, resp)
+    finally:
+        sys.stdout = antigo
+    caso('a mesma letra em disposicoes opostas conta uma para cada lado',
+         (resumo['A']['regra'], resumo['A']['total']), (1, 2))
+
+    resp_b = [{'braco': 'A', 'revisor': 'revisor1', 'respostas': [
+        {'par': 1, 'escolha': 'B', 'porque': ''}, {'par': 2, 'escolha': 'B', 'porque': ''}]}]
+    saida = io.StringIO()
+    antigo, sys.stdout = sys.stdout, saida
+    try:
+        resumo_b = apura(gab, resp_b)
+    finally:
+        sys.stdout = antigo
+    caso('trocando as duas letras, o placar tambem da uma para cada lado',
+         (resumo_b['A']['regra'], resumo_b['A']['total']), (1, 2))
+
+    # resposta incompleta tem de PARAR a apuracao, e nao virar placar menor
+    parou = False
+    saida = io.StringIO()
+    antigo, sys.stdout = sys.stdout, saida
+    try:
+        apura(gab, [{'braco': 'A', 'revisor': 'revisor1',
+                     'respostas': [{'par': 1, 'escolha': 'A', 'porque': ''}]}])
+    except SystemExit:
+        parou = True
+    finally:
+        sys.stdout = antigo
+    caso('resposta faltando um par para a apuracao', parou, True)
+
+    parou = False
+    saida = io.StringIO()
+    antigo, sys.stdout = sys.stdout, saida
+    try:
+        apura(gab, [{'braco': 'A', 'revisor': 'revisor1', 'respostas': [
+            {'par': 1, 'escolha': 'C', 'porque': ''}, {'par': 2, 'escolha': 'A', 'porque': ''}]}])
+    except SystemExit:
+        parou = True
+    finally:
+        sys.stdout = antigo
+    caso('escolha que nao e A nem B para a apuracao', parou, True)
+
     print('%d verificacoes passaram, %d falharam' % (ok, falhas))
     return 1 if falhas else 0
 
