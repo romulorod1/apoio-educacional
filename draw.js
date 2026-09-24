@@ -740,11 +740,26 @@
       return;
     }
     if (it.t === 'tapar') {
-      /* Branco cheio, sem borda e sem transparência: é a mesma mecânica com
-       * que o compositor já cobre o rótulo original do recorte. Borda daria
-       * um retângulo visível na folha impressa, que é o contrário do pedido. */
+      /* Branco cheio e sem transparência: é a mesma mecânica com que o
+       * compositor já cobre o rótulo original do recorte.
+       *
+       * E UM CONTORNO FINO, SÓ NA TELA. Medido: numa área vazia da folha de
+       * fundo branco o retângulo pintava ZERO pixels distinguíveis, porque o
+       * fundo já é branco puro. Numa ferramenta nova isso é armadilha de
+       * primeiro uso: ela arrasta para ver o que a ferramenta faz, não vê nada
+       * acontecer e conclui que está quebrada; e se criou sem querer, fica com
+       * um objeto que não consegue achar para tirar.
+       *
+       * O contorno NÃO alcança o papel, e não por promessa: ele mora aqui, no
+       * desenho do canvas, e o `pdf.js` não tem caminho até esta linha. No
+       * papel o branco é justamente a função, e é disso que depende a prova de
+       * que a folha impressa não mudou. */
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(it.x, it.y, it.w, it.h);
+      ctx.strokeStyle = 'rgba(31, 58, 95, 0.35)';
+      ctx.lineWidth = 1 / this.escala;
+      ctx.strokeRect(it.x + 0.5 / this.escala, it.y + 0.5 / this.escala,
+        Math.max(0, it.w - 1 / this.escala), Math.max(0, it.h - 1 / this.escala));
       return;
     }
     if (it.t === 'texto') {
@@ -795,6 +810,11 @@
     });
     itens.forEach(function (it) {
       if (it.t === 'tapar') {
+        /* A MINIATURA NÃO LEVA O CONTORNO, e é decisão e não esquecimento: o
+         * contorno existe para ela achar, na folha aberta, o branco que criou
+         * e não enxerga. A miniatura não é onde ela procura objeto para tirar,
+         * e um fio de um pixel num cartão de cem e poucos pixels de largura é
+         * sujeira, não sinal. */
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(it.x, it.y, it.w, it.h);
       } else if (it.t === 'traco' && it.pontos.length > 1) {

@@ -11,6 +11,27 @@ cd "$(dirname "$0")/.."
 
 falhou=0
 instavel=0
+
+# ONDE A SAIDA DE QUEM REPROVOU FICA GUARDADA.
+#
+# O `roda()` captura a saida do teste numa variavel e imprime so a linha de
+# resumo. Quando a segunda tentativa tambem falha, a saida inteira era
+# DESCARTADA: sobrava "15 passaram, 46 falharam" e nenhuma das 46. Em 24/09
+# isso transformou um diagnostico que devia ser leitura numa reproducao de
+# quase uma hora, e havia o caso pior a caminho, o da reprovacao que NAO
+# reproduz fora do portao, em que a evidencia some para sempre.
+#
+# Portao que joga fora a prova do proprio vermelho ensina a desconfiar do
+# vermelho, que e o comeco de ignorar alarme.
+FALHAS_EM="${FALHAS_EM:-_falhas_do_portao}"
+guarda_saida() {
+  mkdir -p "$FALHAS_EM" 2>/dev/null || return 0
+  arq="$FALHAS_EM/$(printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '_').txt"
+  printf '%s
+' "$2" > "$arq" 2>/dev/null || return 0
+  printf '          saida inteira em %s
+' "$arq"
+}
 titulo() { printf '\n=== %s ===\n' "$1"; }
 
 # Quantas verificacoes falharam na saida de um teste (vazio = nenhuma).
@@ -72,6 +93,7 @@ roda() {
   if [ "$ruim2" = "1" ]; then
     if passou_de_verdade "$saida2"; then
       printf '  FALHOU  %-24s %s\n' "$nome" "$(resumo "$saida2")"
+      guarda_saida "$nome" "$saida2"
     else
       # Sem placar nenhum na saida. Sao dois casos, e o texto vale para os dois:
       # o teste morreu antes de comecar, ou ele rodou e falou um dialeto que
@@ -86,6 +108,7 @@ roda() {
       [ -n "$motivo" ] || motivo=$(printf '%s\n' "$saida2" | grep -v '^[[:space:]]*$' | tail -1 | cut -c1-90)
       [ -n "$motivo" ] || motivo="nao imprimiu nada"
       printf '  FALHOU  %-24s nao disse que passou: %s\n' "$nome" "$motivo"
+      guarda_saida "$nome" "$saida2"
     fi
     falhou=1
   else
@@ -424,6 +447,7 @@ roda "biblioteca listas --envenenado-lixeira"       node "_teste/testa_bibliotec
 roda "biblioteca listas --envenenado-redesenho"     node "_teste/testa_biblioteca_listas.js" --envenenado-redesenho
 roda "biblioteca listas --envenenado-meia-aula"     node "_teste/testa_biblioteca_listas.js" --envenenado-meia-aula
 roda "biblioteca listas --envenenado-palma"         node "_teste/testa_biblioteca_listas.js" --envenenado-palma
+roda "biblioteca listas --envenenado-contorno"      node "_teste/testa_biblioteca_listas.js" --envenenado-contorno
 # FRENTE B (B10): A FOLHA IMPRESSA NAO MUDOU. A unificacao das camadas foi pelo
 # lado da TELA de proposito, porque o papel e o que ela entrega ao aluno. A
 # prova gera a MESMA folha com o pdf.js de hoje e com o do d80bb90 e compara
@@ -437,6 +461,8 @@ roda "folha impressa igual ao publicado"        node "_teste/testa_folha_impress
 roda "folha impressa --envenenado-ordem"        node "_teste/testa_folha_impressa_igual.js" --envenenado-ordem
 # E o guarda da medida nova: sem o laco do tapar, o retangulo nao sai no papel.
 roda "folha impressa --envenenado-tapar"        node "_teste/testa_folha_impressa_igual.js" --envenenado-tapar
+# E o guarda do TETO: um contorno desenhado no caminho do PDF estoura o teto.
+roda "folha impressa --envenenado-contorno"     node "_teste/testa_folha_impressa_igual.js" --envenenado-contorno-no-papel
 
 roda "painel de valores"                        node "_teste/testa_painel_valores.js"
 roda "painel de valores --envenenado-aberto"    node "_teste/testa_painel_valores.js" --envenenado-aberto

@@ -88,6 +88,7 @@ const I_PROVA = process.argv.indexOf('--guarda-a-prova');
 const PROVA = I_PROVA !== -1 ? process.argv[I_PROVA + 1] : null;
 const VENENO_ORDEM = process.argv.indexOf('--envenenado-ordem') !== -1;
 const VENENO_TAPAR = process.argv.indexOf('--envenenado-tapar') !== -1;
+const VENENO_CONTORNO = process.argv.indexOf('--envenenado-contorno-no-papel') !== -1;
 
 let passes = 0, falhas = 0;
 function conf(nome, obtido, esperado) {
@@ -251,6 +252,24 @@ function semData(bytes) {
     pdfHoje = alvo;
   }
 
+  /* O VENENO DO CONTORNO NO PAPEL: cada retângulo do tapar ganha um traço
+   * preto em volta, dentro do próprio pdf.js servido. É o defeito que o teto
+   * existe para pegar, e ele não existe no pdf.js de verdade: é aqui, e só sob
+   * esta bandeira, que o contorno alcança o papel. */
+  if (VENENO_CONTORNO) {
+    const fonte = fs.readFileSync(pdfHoje, 'utf8');
+    const ancora = "      if (!tapou) { doc.op('q'); tapou = true; }";
+    conf('a âncora do contorno casa exatamente uma vez', fonte.split(ancora).length - 1, 1);
+    const risca = ancora + " doc.op('0 0 0 RG 1 w ' + (x0 + r.x * escala).toFixed(2) + ' ' +" +
+      " (y0 + altura - (r.y + r.h) * escala).toFixed(2) + ' ' + (r.w * escala).toFixed(2) + ' ' +" +
+      " (r.h * escala).toFixed(2) + ' re S');";
+    const envenenado = fonte.split(ancora).join(risca);
+    conf('o veneno mudou mesmo o pdf.js', envenenado !== fonte ? 'diferente' : 'IGUAL', 'diferente');
+    const alvo = path.join(tmp, 'pdf_com_contorno.js');
+    fs.writeFileSync(alvo, envenenado);
+    pdfHoje = alvo;
+  }
+
   /* O VENENO DO TAPAR: o laço que emite os retângulos deixa de emitir. É o
    * guarda da medida nova, a que prova que o ramo do tapar pinta no papel, e
    * ele existe porque essa mudança do pdf.js entrou nesta frente sem medida
@@ -400,11 +419,17 @@ function semData(bytes) {
    *
    * Dois alvos, e são eles que impedem o número de querer dizer outra coisa:
    * a imagem TEM de mudar a página (senão não há o que tapar), e a página
-   * comparada com ela mesma TEM de dar zero (senão o medidor acusa sempre). */
+   * comparada com ela mesma TEM de dar zero (senão o medidor acusa sempre).
+   *
+   * AS TRÊS VERSÕES SÃO GERADAS DO MESMO JEITO, e a base difere das outras só
+   * na lista de itens. A primeira escrita gerava a folha de referência com o
+   * mapa de imagens ausente e as comparadas com ele presente, ou seja, a base
+   * diferia por algo além do que estava em disputa. Fixture assimétrico pelo
+   * lado errado, achado pelo conferidor cego de arranjo. */
   console.log('\n=== O retângulo de tapar sai no papel ===');
   const FOLHA_SO_IMAGEM = [{ t: 'imagem', ref: 'recorte-1', x: 60, y: 120, w: 600, h: 300 }];
   const FOLHA_COM_TAPAR = FOLHA_SO_IMAGEM.concat([{ t: 'tapar', x: 60, y: 120, w: 600, h: 300 }]);
-  const bVazia = geraComTapar(pdfHoje, [], false);
+  const bVazia = geraComTapar(pdfHoje, [], true);
   const bImagem = geraComTapar(pdfHoje, FOLHA_SO_IMAGEM, true);
   const bTapada = geraComTapar(pdfHoje, FOLHA_COM_TAPAR, true);
   const pgNota = 1;   // o documento é resumo + folha, e a folha é a segunda
@@ -417,16 +442,39 @@ function semData(bytes) {
   conf('o rasterizador mediu as três', !dImagem.erro && !dTapada.erro && !dMesma.erro, true);
   conf('ALVO: a imagem pinta a página, senão não haveria o que tapar', dImagem.diferentes > 1000, true);
   conf('ALVO: a página comparada com ela mesma dá zero, senão o medidor acusa sempre', dMesma.diferentes, 0);
+  /* O TETO, E DE ONDE ELE VEM. Esta medida imprimia o número e não cobrava
+   * nada: régua que mede e não cobra é régua que envelhece calada, e um
+   * contorno desenhado no gerador de PDF amanhã passaria por aqui sem ruído.
+   *
+   * O teto NÃO sai do resultado observado, que seria a circularidade de
+   * sempre. Ele sai de onde precisa acusar: o perímetro deste retângulo (600
+   * por 300 pontos de folha) pesa perto de um centésimo da área que ele cobre,
+   * cerca de 1.800 pixels a 200 dpi, então QUALQUER contorno empurra o
+   * resultado de 2.576 para bem acima disso. Medido com o veneno, um traço de
+   * um ponto leva a sobra a 6.455.
+   *
+   * 3.200 fica com FOLGA DE MEDIDA de 624 pixels acima do observado (24 por
+   * cento, que absorve variação de rasterização e de antisserrilhado) e com
+   * FOLGA DE ACUSAÇÃO de 3.255 pixels abaixo do que ele tem de pegar (metade do
+   * valor envenenado). As duas folgas ficam escritas aqui para que, daqui a um ano,
+   * ninguém precise adivinhar se o número é limiar ou lembrança. */
+  const TETO_SOBRA = 3200;
   if (VENENO_TAPAR) {
     conf('VENENO: sem o laço do tapar, o retângulo não sai no papel e a página fica igual à de só imagem',
       dTapada.diferentes, dImagem.diferentes);
+  } else if (VENENO_CONTORNO) {
+    conf('VENENO: com contorno desenhado no papel, a sobra estoura o teto',
+      dTapada.diferentes > TETO_SOBRA, true);
+    console.log('   A ASSERÇÃO DO CASO NORMAL REPROVARIA ASSIM:');
+    console.log('   FALHA e o que sobra fica abaixo do teto de ' + TETO_SOBRA +
+      '  [obtido: ' + dTapada.diferentes + ' | esperado: <= ' + TETO_SOBRA + ']');
   } else if (VENENO_ORDEM) {
     console.log('   (a corrida da ordem não julga o tapar: o veneno dela é das camadas)');
   } else {
     conf('o retângulo APAGA o que a imagem tinha pintado: sobra menos do que sem ele',
       dTapada.diferentes < dImagem.diferentes, true);
-    conf('e apaga quase tudo: o que sobra é menos de um décimo do que a imagem pintou',
-      dTapada.diferentes * 10 < dImagem.diferentes, true);
+    conf('e o que sobra fica abaixo do teto de ' + TETO_SOBRA,
+      dTapada.diferentes <= TETO_SOBRA, true);
   }
 
   console.log('\n=== A folha da aula não leva marca d\'água ===');

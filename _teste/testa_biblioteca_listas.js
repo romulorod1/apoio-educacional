@@ -177,6 +177,9 @@ const T_RECARREGA = '          if (false && listaProntaEmEdicao(lp)) irNaBibliot
 // "um pouco menos de meia aula" com o minuto ao lado desmentindo
 // o dedo volta a não cancelar o retângulo em andamento, e a palma apoiada fecha
 // o tapar que o bico tinha começado
+// o contorno de tela some, e o branco volta a ser invisível na folha branca
+const L_CONTORNO = "      ctx.strokeStyle = 'rgba(31, 58, 95, 0.35)';";
+const T_CONTORNO = "      ctx.strokeStyle = 'rgba(255, 255, 255, 1)';";
 const L_PALMA = '    this._cancelarTapar();';
 const T_PALMA = '    if (false) this._cancelarTapar();';
 const L_MEIA_AULA = '    if (minutos < 20 || minutos > 40) return null;';
@@ -244,7 +247,8 @@ const VENENOS = {
   lixeira: { arq: '/draw.js', de: L_LIXEIRA, para: T_LIXEIRA },
   redesenho: { arq: '/app.js', de: L_REDESENHO, para: T_REDESENHO },
   'meia-aula': { arq: '/app.js', de: L_MEIA_AULA, para: T_MEIA_AULA },
-  palma: { arq: '/draw.js', de: L_PALMA, para: T_PALMA }
+  palma: { arq: '/draw.js', de: L_PALMA, para: T_PALMA },
+  contorno: { arq: '/draw.js', de: L_CONTORNO, para: T_CONTORNO }
 };
 const NOME_VENENO = Object.keys(VENENOS).filter(function (n) {
   return process.argv.indexOf('--envenenado-' + n) !== -1;
@@ -268,6 +272,7 @@ const V_LIXEIRA = NOME_VENENO === 'lixeira';
 const V_REDESENHO = NOME_VENENO === 'redesenho';
 const V_MEIA_AULA = NOME_VENENO === 'meia-aula';
 const V_PALMA = NOME_VENENO === 'palma';
+const V_CONTORNO = NOME_VENENO === 'contorno';
 const BASE_DE = { '/app.js': APP_REPO, '/draw.js': DRAW_REPO, '/styles.css': CSS_REPO };
 const trocas = {};
 if (VENENO) trocas[RECEITA.arq] = BASE_DE[RECEITA.arq].split(RECEITA.de).join(RECEITA.para);
@@ -440,7 +445,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   if (!VENENO) {
     secao('0. As cercas ainda apontam para o alvo');
     var nomes = Object.keys(VENENOS);
-    conf('a tabela tem os dezessete venenos desta prova', nomes.length, 17);
+    conf('a tabela tem os dezoito venenos desta prova', nomes.length, 18);
     var fora = [];
     nomes.forEach(function (n) {
       var r = VENENOS[n];
@@ -1254,50 +1259,68 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   }
   conf('a palma da mão NÃO cria retângulo nenhum', palma.depoisDaPalma, 0);
 
-  /* O BRANCO NUMA FOLHA BRANCA: MEDIDO, PARA A ORQUESTRADORA DECIDIR.
+  /* O CONTORNO FINO, E ELE EXISTE PORQUE O BRANCO ERA INVISÍVEL.
    *
-   *   Arranjo:   a mesma folha de fundo branco, desenhada com e sem um
-   *              retângulo de tapar em área vazia, e depois com o retângulo
-   *              sobre um texto escuro.
-   *   Afirmação: (nenhuma; esta é uma MEDIDA, e o número vai para a decisão)
+   *   Arranjo:   uma folha de fundo branco, sem nada, desenhada no canvas duas
+   *              vezes, uma sem e outra com um retângulo de tapar em área
+   *              vazia. A leitura é da BANDA DO PERÍMETRO do retângulo.
+   *   Afirmação: naquela banda o retângulo pinta pixels que se distinguem do
+   *              papel, e numa banda longe dele não pinta nenhum.
    *
-   * A folha que este PR mais produz, a de "Abrir a lista como folha da aula",
-   * nasce com fundo branco. Um retângulo branco sem borda em área vazia não
-   * muda pixel nenhum: ela não tem como saber que criou alguma coisa nem onde
-   * tocar para tirá-la. Sobre conteúdo, ele aparece. O número diz de qual dos
-   * dois casos se está falando. */
-  const invisivel = await pag.evaluate(() => {
-    function pinta(comTapar, comTexto) {
+   * Medido antes do conserto: numa área vazia da folha branca o retângulo
+   * pintava ZERO pixels distinguíveis, porque o fundo já é branco puro. Numa
+   * ferramenta nova isso é armadilha de primeiro uso: ela arrasta para ver o
+   * que a ferramenta faz, nada acontece, e conclui que está quebrada.
+   *
+   * A afirmação NÃO diz "ela acha e tira": isso é outra cadeia, e já é medida
+   * pela interface na seção 6b, com a lixeira. A primeira escrita desta prova
+   * prometia a cadeia inteira e lia o canvas todo, aceitando diferença de um
+   * pixel em qualquer canto; o conferidor cego de arranjo reprovou antes de o
+   * código existir. */
+  const contorno = await pag.evaluate(() => {
+    const RX = 20, RY = 20, RW = 300, RH = 120, BANDA = 3;
+    function pinta(comTapar) {
       const c = document.createElement('canvas');
       c.width = 400; c.height = 300;
       document.body.appendChild(c);
       const ed = new window.Draw.Editor(c, { nota: window.Draw.notaVazia('branco') });
       ed.escala = 1; ed.deslocX = 0; ed.deslocY = 0;
-      ed.cor = '#1A1C1F';
-      if (comTexto) ed.adicionarTexto('AAAAAAAA', 40, 60, 60);
-      if (comTapar) ed.adicionarTapar(20, 20, 300, 120);
+      if (comTapar) ed.adicionarTapar(RX, RY, RW, RH);
       ed.desenhar();
       const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-      // pixel EXATAMENTE branco: é a tinta do retângulo, e o fundo da folha
-      // não é branco puro, então os dois se distinguem
-      let brancoPuro = 0;
-      for (let i = 0; i < d.length; i += 4) if (d[i] === 255 && d[i + 1] === 255 && d[i + 2] === 255) brancoPuro++;
       ed.destruir && ed.destruir();
       c.remove();
-      return brancoPuro;
+      return { d: d, w: c.width };
     }
-    return { vazia: pinta(false, false), vaziaComTapar: pinta(true, false),
-      comTexto: pinta(false, true), textoComTapar: pinta(true, true) };
+    function difNaBanda(a, b, bx, by, bw, bh) {
+      let n = 0;
+      for (let y = by - BANDA; y < by + bh + BANDA; y++) {
+        for (let x = bx - BANDA; x < bx + bw + BANDA; x++) {
+          if (x < 0 || y < 0 || x >= a.w || y >= 300) continue;
+          const dentro = x > bx + BANDA && x < bx + bw - BANDA && y > by + BANDA && y < by + bh - BANDA;
+          if (dentro) continue;               // só a moldura, não o miolo
+          const i = (y * a.w + x) * 4;
+          if (a.d[i] !== b.d[i] || a.d[i + 1] !== b.d[i + 1] || a.d[i + 2] !== b.d[i + 2]) n++;
+        }
+      }
+      return n;
+    }
+    const sem = pinta(false), com = pinta(true);
+    return {
+      naBanda: difNaBanda(sem, com, RX, RY, RW, RH),
+      longe: difNaBanda(sem, com, 40, 220, 300, 60),
+      perimetro: 2 * (RW + RH)
+    };
   });
-  console.log('   branco puro na folha (pixels 255,255,255): ' + JSON.stringify(invisivel));
-  /* O número que interessa à decisão: quantos pixels o retângulo pinta de
-   * branco PURO numa área vazia da folha. Se for zero, ela não tem como ver o
-   * que criou; se for a área do retângulo, ele se distingue do papel. */
-  const pintados = invisivel.vaziaComTapar - invisivel.vazia;
-  console.log('   MEDIDA PARA A DECISÃO: o retângulo em área vazia pinta ' + pintados +
-    ' pixels de branco puro, de 300 por 120 = 36000 que ele ocupa');
-  conf('a régua sabe contar branco puro, senão a medida não diria nada',
-    invisivel.vaziaComTapar > 0 || invisivel.vazia > 0 || pintados > 0, true);
+  console.log('   contorno na banda do perímetro: ' + JSON.stringify(contorno));
+  if (V_CONTORNO) {
+    conf('VENENO: sem o traço, a banda do perímetro não muda um pixel sequer', contorno.naBanda, 0);
+    return;
+  }
+  conf('o contorno pinta a banda do perímetro, e pinta à altura dele',
+    contorno.naBanda > contorno.perimetro / 2, true);
+  conf('ALVO: numa banda longe do retângulo não muda nada, senão a régua acusaria em qualquer lugar',
+    contorno.longe, 0);
   conf('e o bico, levantado depois dela, também não cria, porque o arrasto foi cancelado',
     palma.depoisDoBico, 0);
   conf('e um toque seco não vira retângulo', tapar.seco, true);
