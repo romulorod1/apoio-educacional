@@ -448,6 +448,8 @@ roda "biblioteca listas --envenenado-redesenho"     node "_teste/testa_bibliotec
 roda "biblioteca listas --envenenado-meia-aula"     node "_teste/testa_biblioteca_listas.js" --envenenado-meia-aula
 roda "biblioteca listas --envenenado-palma"         node "_teste/testa_biblioteca_listas.js" --envenenado-palma
 roda "biblioteca listas --envenenado-contorno"      node "_teste/testa_biblioteca_listas.js" --envenenado-contorno
+# O aparo do tapar nos TRES caminhos: criar, mover e redimensionar.
+roda "biblioteca listas --envenenado-apara"         node "_teste/testa_biblioteca_listas.js" --envenenado-apara
 # FRENTE B (B10): A FOLHA IMPRESSA NAO MUDOU. A unificacao das camadas foi pelo
 # lado da TELA de proposito, porque o papel e o que ela entrega ao aluno. A
 # prova gera a MESMA folha com o pdf.js de hoje e com o do d80bb90 e compara

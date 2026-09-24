@@ -271,17 +271,30 @@
    * como a imagem: ela precisa pôr o branco exatamente em cima do pedaço errado
    * do enunciado, e um retângulo que nasce no meio da folha obrigaria a
    * arrastar e redimensionar depois de cada toque. */
-  /* O RETÂNGULO NASCE RECORTADO À FOLHA, porque é assim que a tela o mostra.
+  /* O RETÂNGULO FICA DENTRO DA FOLHA NOS TRÊS CAMINHOS: criar, mover e
+   * redimensionar.
    *
-   * O canvas desenha dentro de um `clip()` da folha e o PDF não recorta nada:
-   * um arrasto começado fora da folha aparecia aparado na tela e saía inteiro
-   * no papel, por cima do cabeçalho "Folha de aula". A tela mentia sobre o que
-   * ia sair, que é exatamente o que a unificação das camadas existe para
-   * impedir. Recortar aqui, na entrada, faz o vetor guardar o que ela viu, e
-   * vale para os dois desenhos de uma vez. Achado por uma lente cega. */
+   * O canvas desenha dentro de um `clip()` da folha e o PDF não recorta nada,
+   * então um retângulo fora da folha aparece aparado na tela e sai INTEIRO no
+   * papel, por cima do cabeçalho "Folha de aula". A tela mente sobre o que vai
+   * sair, que é o que a unificação das camadas existe para impedir.
+   *
+   * A PRIMEIRA ESCRITA APAROU SÓ NA CRIAÇÃO, e o comentário dela afirmava que
+   * isso "vale para os dois desenhos de uma vez". Valia para um caminho de
+   * três: depois de criado, o item era livre, e bastava ela selecionar o branco
+   * e arrastá-lo para cima da borda para o defeito voltar inteiro. Duas lentes
+   * cegas acharam isso sozinhas, e a prova de então não pegava porque o arranjo
+   * dela chamava `adicionarTapar` pela API e nunca movia nada.
+   *
+   * Criar e redimensionar APARAM (o retângulo encolhe na borda, porque é o
+   * arrasto que define o tamanho); mover PRENDE (a posição para na borda e o
+   * tamanho não muda, porque encolher o que ela já dimensionou seria mudar o
+   * desenho dela sem pedir). */
+  function aparado(v, minimo, maximo) { return Math.max(minimo, Math.min(maximo, v)); }
+
   Editor.prototype.adicionarTapar = function (x, y, w, h) {
-    var x1 = Math.max(0, Math.min(FOLHA_L, x)), y1 = Math.max(0, Math.min(FOLHA_A, y));
-    var x2 = Math.max(0, Math.min(FOLHA_L, x + w)), y2 = Math.max(0, Math.min(FOLHA_A, y + h));
+    var x1 = aparado(x, 0, FOLHA_L), y1 = aparado(y, 0, FOLHA_A);
+    var x2 = aparado(x + w, 0, FOLHA_L), y2 = aparado(y + h, 0, FOLHA_A);
     x = Math.min(x1, x2); y = Math.min(y1, y2);
     w = Math.abs(x2 - x1); h = Math.abs(y2 - y1);
     if (w < TAPAR_MINIMO || h < TAPAR_MINIMO) return null;
@@ -364,7 +377,13 @@
     c.addEventListener('pointerdown', function (e) { self._aoDescer(e); }, sinal);
     c.addEventListener('pointermove', function (e) { self._aoMover(e); }, sinal);
     c.addEventListener('pointerup', function (e) { self._aoSubir(e); }, sinal);
-    c.addEventListener('pointercancel', function (e) { self._aoSubir(e); }, sinal);
+    /* CANCELAR NÃO É SOLTAR. O `pointercancel` ia para o `_aoSubir`, que
+     * COMETE o que estava em andamento: o retângulo em construção virava item
+     * na folha. Quando o sistema toma o gesto para si, e num tablet com a mão
+     * apoiada no vidro isso acontece, ela ganhava um branco que não pediu. É a
+     * mesma queixa da palma, por outra porta, e foi uma lente cega que a viu
+     * depois de a primeira estar fechada. */
+    c.addEventListener('pointercancel', function (e) { self._aoCancelarPonteiro(e); }, sinal);
     c.addEventListener('pointerleave', function (e) { self._aoSubir(e); }, sinal);
     c.addEventListener('contextmenu', function (e) { e.preventDefault(); }, sinal);
     c.addEventListener('wheel', function (e) {
@@ -511,13 +530,19 @@
         /* O retângulo que tapa não guarda proporção: o pedaço errado do
          * enunciado é largo e baixo quase sempre, e forçar proporção obrigaria
          * a tapar linha de texto vizinha para cobrir uma palavra. */
-        d.item.w = Math.max(TAPAR_MINIMO, d.iw + (p.x - d.ox));
-        d.item.h = Math.max(TAPAR_MINIMO, d.ih + (p.y - d.oy));
+        // a alça apara: o canto para na borda da folha, e não passa dela
+        d.item.w = aparado(d.iw + (p.x - d.ox), TAPAR_MINIMO, FOLHA_L - d.item.x);
+        d.item.h = aparado(d.ih + (p.y - d.oy), TAPAR_MINIMO, FOLHA_A - d.item.y);
       } else if (d.alca && d.item.t === 'imagem') {
         var nw = Math.max(40, d.iw + (p.x - d.ox));
         var proporcao = d.ih / d.iw;
         d.item.w = nw;
         d.item.h = nw * proporcao;
+      } else if (d.item.t === 'tapar') {
+        /* Mover PRENDE na borda e mantém o tamanho: o retângulo dela não
+         * encolhe por ela ter arrastado longe demais. */
+        d.item.x = aparado(d.ix + (p.x - d.ox), 0, Math.max(0, FOLHA_L - d.item.w));
+        d.item.y = aparado(d.iy + (p.y - d.oy), 0, Math.max(0, FOLHA_A - d.item.h));
       } else {
         d.item.x = d.ix + (p.x - d.ox);
         d.item.y = d.iy + (p.y - d.oy);
@@ -579,6 +604,16 @@
    * instante, criando na folha um branco que ela não pediu e não viu nascer.
    * O comentário do `moverNoCarrinho` diz que ela usa o tablet com a mão
    * apoiada, então este é o gesto normal dela. Achado por uma lente cega. */
+  /* Desiste de tudo o que estava em andamento, sem cometer nada. */
+  Editor.prototype._aoCancelarPonteiro = function (e) {
+    delete this.ponteiros[e.pointerId];
+    // o _cancelarTraco ja desiste do retangulo em andamento, na primeira linha dele
+    this._cancelarTraco();
+    if (this.arrasto) this.arrasto = null;
+    this.apagando = false;
+    this.precisaRedesenhar = true;
+  };
+
   Editor.prototype._cancelarTapar = function () {
     if (!this.tapando) return;
     this.tapando = null;

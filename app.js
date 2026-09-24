@@ -11253,7 +11253,6 @@
         nBanco ? plural(nBanco, 'problema do Banco', 'problemas do Banco') : ''
       ].filter(Boolean).join(', ');
       ligarBuscaBiblioteca();
-      desenharCarrinho();
       desenharContextoBiblioteca();
       if (!bibNav.serie || arv.listaSeries.indexOf(bibNav.serie) < 0) {
         // abre na primeira série que tem módulo do Portal, e não numa só de Banco
@@ -11261,6 +11260,16 @@
         bibNav.serie = comPortal[0] || arv.listaSeries[0] || null;
       }
       if (bibNav.modulo && !arv.modulos[bibNav.modulo]) { bibNav.modulo = null; bibNav.aula = null; }
+      /* O CARRINHO DESENHA DEPOIS DA NAVEGAÇÃO SER VALIDADA, e não antes.
+       *
+       * O `desenharCarrinho` passou a redesenhar a tela da lista pronta quando
+       * ela está à vista, e ele era chamado ANTES de `bibNav.serie` e
+       * `bibNav.modulo` serem conferidos contra a árvore nova. Voltar para a
+       * aba com a lista pronta aberta dava dois desenhos completos, e o
+       * primeiro deles com estado que a linha seguinte ainda ia corrigir.
+       * Achado por uma lente cega, e é a mesma moeda que esta frente gastou
+       * para economizar um desenho nos três caminhos que ela mediu. */
+      desenharCarrinho();
       desenharCorpoBiblioteca();
     }).catch(function () {
       corpo.innerHTML = '';
@@ -11454,6 +11463,12 @@
    * de 40 existe e vai aparecer sem a frase, que é o certo: 45 minutos numa aula
    * de 60 são três quartos, não meia. */
   function meiaAula(minutos) {
+    /* NÚMERO QUE NÃO É NÚMERO NÃO GANHA FRASE. Com `minutos` ausente, as duas
+     * comparações abaixo dão FALSO (nada é menor nem maior que `undefined`) e a
+     * função caía no `return` final, prometendo "cerca de meia aula" com base em
+     * nada, ao lado de um "≈ NaN min (estimativa)". Achado por uma lente cega,
+     * e o caminho é real: o `lerKits` não confere `minutos`. */
+    if (typeof minutos !== 'number' || !isFinite(minutos)) return null;
     if (minutos < 20 || minutos > 40) return null;
     if (minutos > 33) return 'um pouco mais de meia aula';
     if (minutos < 27) return 'um pouco menos de meia aula';
@@ -11665,7 +11680,15 @@
     var cabeca = el('div', { class: 'bib-lp-cabeca', id: 'bib-lp-cabeca' }, [
       el('div', { class: 'bib-lp-meia', texto: !ids.length ? 'Nenhum exercício no material'
         : plural(ids.length, 'exercício', 'exercícios') +
-          (daLista.length && meiaAula(soma) ? ' · ' + meiaAula(soma) : '') }),
+          /* A FRASE SÓ SAI QUANDO A CONTA COBRE TUDO O QUE ESTÁ NA LINHA. O
+           * número conta o carrinho inteiro e a `soma` conta só os exercícios
+           * que vieram da lista: com sete acrescentados do módulo, a tela dizia
+           * "12 exercícios · cerca de meia aula" enquanto estimava 29 minutos
+           * para cinco deles. É a terceira aparição desta família nesta frente,
+           * e a do caminho principal da tela, porque acrescentar do módulo é uma
+           * das três coisas que ela existe para fazer. A linha de baixo continua
+           * dizendo o minuto e quantos ficaram fora da conta. */
+          (daLista.length && !deFora && meiaAula(soma) ? ' · ' + meiaAula(soma) : '') }),
       el('div', { class: 'ajuda bib-lp-minutos', texto: !daLista.length
         ? (ids.length ? 'Sem estimativa de tempo: o minuto vem da lista pronta, e nenhum exercício dela ficou aqui.'
           : 'Toque na linha da lista pronta para carregá-la de novo.')

@@ -397,11 +397,12 @@ function semData(bytes) {
    * era a ÚNICA placa branca do aplicativo que não cortava nada. Achado pela
    * segunda lente cega do PR #57.
    *
-   * A medida são três documentos iguais em tudo menos no retângulo, e o terceiro
-   * é o ALVO DE CONTROLE, onde a régua NÃO pode acusar: uma placa no canto, longe
-   * da marca, tem de sair do mesmo tamanho do documento sem placa nenhuma. Sem
-   * ele, "o documento encurtou" não se distinguiria de "qualquer retângulo
-   * encurta o documento". */
+   * (Aqui morava um parágrafo que descrevia três documentos e uma placa de
+   * controle no canto, nenhum dos quais o código construía. Ele sobreviveu a
+   * uma reescrita porque a reescrita acrescentou o bloco novo três linhas
+   * abaixo em vez de apagar o velho, e por um tempo os dois ficaram no mesmo
+   * arquivo, um dizendo no passado que o outro era falso. Comentário que
+   * descreve o que não existe é da mesma família da âncora que envelhece.) */
   /* O RETÂNGULO DE TAPAR SAI NO PAPEL, e até agora isto não estava medido.
    *
    *   Arranjo:   a MESMA folha em três versões, todas geradas pelo pdf.js de
@@ -435,13 +436,41 @@ function semData(bytes) {
   const pgNota = 1;   // o documento é resumo + folha, e a folha é a segunda
   const dImagem = difDePixel(bVazia, bImagem, pgNota, tmp, 'img');
   const dTapada = difDePixel(bVazia, bTapada, pgNota, tmp, 'tap');
-  const dMesma = difDePixel(bImagem, bImagem, pgNota, tmp, 'mesma');
+  /* O ALVO DE VERDADE, E POR QUE O ANTERIOR ERA MENTIRA.
+   *
+   * Aqui havia `difDePixel(bImagem, bImagem)`, um buffer comparado com ELE
+   * MESMO, rotulado "ALVO". Aquilo não podia falhar para dado nenhum: media
+   * determinismo do rasterizador, nunca capacidade de acusar. E nasceu dentro
+   * da prova construída justamente para ter alvo, ou seja, a exigência foi
+   * cumprida na letra e vazia no conteúdo. Achado por uma lente cega.
+   *
+   * O alvo agora é um par de verdade, e são dois, um de cada lado:
+   *
+   *   NÃO PODE ACUSAR: a mesma folha gerada DUAS VEZES, em duas chamadas
+   *   separadas, com bytes diferentes (a data de criação muda) e desenho igual.
+   *   Se o medidor acusasse aqui, ele acusaria em qualquer lugar.
+   *
+   *   TEM DE ACUSAR, E QUANTO: um retângulo de tamanho CONHECIDO sobre a
+   *   imagem. Um tapar de 200 por 100 pontos de folha cobre um quarto da área
+   *   do de 600 por 300, então tem de apagar bem menos que o grande e bem mais
+   *   que nada. Zero aqui seria medidor cego; o valor do grande seria medidor
+   *   que não distingue tamanho. */
+  const bOutraVez = geraComTapar(pdfHoje, FOLHA_SO_IMAGEM, true);
+  const dMesma = difDePixel(bImagem, bOutraVez, pgNota, tmp, 'mesma');
+  const FOLHA_TAPAR_PEQUENO = FOLHA_SO_IMAGEM.concat([{ t: 'tapar', x: 60, y: 120, w: 200, h: 100 }]);
+  const dPequeno = difDePixel(bVazia, geraComTapar(pdfHoje, FOLHA_TAPAR_PEQUENO, true), pgNota, tmp, 'peq');
   console.log('   pixels: folha vazia contra com imagem ' + JSON.stringify(dImagem.diferentes) +
     ', contra imagem tapada ' + JSON.stringify(dTapada.diferentes) +
-    ', contra ela mesma ' + JSON.stringify(dMesma.diferentes));
-  conf('o rasterizador mediu as três', !dImagem.erro && !dTapada.erro && !dMesma.erro, true);
+    ', tapar pequeno ' + JSON.stringify(dPequeno.diferentes) +
+    ', a mesma folha gerada duas vezes ' + JSON.stringify(dMesma.diferentes));
+  conf('o rasterizador mediu as quatro', !dImagem.erro && !dTapada.erro && !dMesma.erro && !dPequeno.erro, true);
   conf('ALVO: a imagem pinta a página, senão não haveria o que tapar', dImagem.diferentes > 1000, true);
-  conf('ALVO: a página comparada com ela mesma dá zero, senão o medidor acusa sempre', dMesma.diferentes, 0);
+  conf('ALVO que NÃO pode acusar: a mesma folha gerada duas vezes dá zero pixel de diferença',
+    dMesma.diferentes, 0);
+  conf('ALVO que TEM de acusar, e quanto: um retângulo menor apaga MENOS que o grande',
+    dPequeno.diferentes > dTapada.diferentes, true);
+  conf('e apaga alguma coisa, senão o medidor não distinguiria tamanho nenhum',
+    dPequeno.diferentes < dImagem.diferentes, true);
   /* O TETO, E DE ONDE ELE VEM. Esta medida imprimia o número e não cobrava
    * nada: régua que mede e não cobra é régua que envelhece calada, e um
    * contorno desenhado no gerador de PDF amanhã passaria por aqui sem ruído.

@@ -65,8 +65,12 @@
    * de manifest e de hash como qualquer outro, então o que se confere aqui é só
    * a FORMA do que vai para a tela dela.
    *
-   * Confere pouco de propósito: só o que o aplicativo vai usar sem olhar de
-   * novo (o id, o módulo, o nível, os minutos e a ordem dos degraus). O que
+   * Confere pouco de propósito, e o que ele confere é só isto: o id, o módulo,
+   * e a ordem dos degraus. O NÍVEL E OS MINUTOS NÃO SÃO CONFERIDOS AQUI, e a
+   * frase antiga dizia que eram, o que é pior do que não conferir: recusar o
+   * pacote inteiro por causa deles seria caro demais, e quem se defende da
+   * ausência deles é a tela, que não escreve frase nenhuma com número que não é
+   * número (ver `meiaAula`, em app.js). O que
    * julga a REGRA é o biblioteca/confere_kits.py, do lado do gerador, e repetir
    * aquilo aqui seria pôr duas fontes para a mesma verdade num aparelho que não
    * tem como decidir qual das duas está certa. */

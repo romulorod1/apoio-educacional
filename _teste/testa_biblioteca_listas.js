@@ -59,57 +59,25 @@
  *      e) A FRASE DIZ O TOTAL RESULTANTE. Com dois itens marcados antes, a
  *         mensagem diz o que o material TEM agora e não soma em voz alta.
  *
- * Modos envenenados (cada um desliga UMA regra e sai assim que a vê cair):
- *   --envenenado-ordem    o app.js servido carrega a lista ORDENADA pelo id em
- *                         vez da ordem da lista. O carrinho continua com os
- *                         mesmos ids e o mesmo tamanho, e só a ORDEM muda: é o
- *                         veneno que separa "carregou os itens certos" de
- *                         "carregou na ordem certa".
- *   --envenenado-seta     o app.js servido não troca nada ao tocar na seta.
- *   --envenenado-curadoria o app.js servido escreve "Kit curado" no lugar do
- *                         rótulo da linha. A varredura de palavra proibida tem
- *                         de enxergar.
- *   --envenenado-camadas  o draw.js servido volta a desenhar o canvas na ordem
- *                         do vetor, e não em camadas. O tapar continua no
- *                         arquivo e continua saindo no PDF: o que quebra é a
- *                         tela concordar com a folha impressa, que é a parte
- *                         silenciosa.
- *   --envenenado-coluna   o styles.css servido volta a grade da lista pronta
- *                         para três colunas. É o único veneno que não mexe em
- *                         JavaScript nenhum, e por isso o único que mede se a
- *                         régua olha a TELA e não o código.
- *   --envenenado-flutua   o app.js servido manda a mensagem para a caixa
- *                         flutuante do rodapé, como era antes, e não desenha o
- *                         bloco no fluxo.
- *   --envenenado-frase    o app.js servido volta a frase que soma em voz alta
- *                         ("Tirei 2 itens ... e marquei ...: 5 exercícios").
- *   --envenenado-dificuldade o app.js servido devolve a etiqueta de
- *                         dificuldade ao cartão da lista pronta.
- *   --envenenado-agrupa   o styles.css servido iguala a folga de dentro da
- *                         célula à de fora, e a caixa "No material" volta a
- *                         ficar no meio do caminho entre dois cartões.
- *   --envenenado-aviso-velho o app.js servido tira o apagamento do aviso da
- *                         PORTA ÚNICA (o guardarCarrinho). Esta corrida mede as
- *                         DUAS portas: a da seta, na seção 3, e a do Desfazer,
- *                         na 5b, que é a que a lente cega achou aberta.
- *   --envenenado-sairam   o app.js servido volta a ser cego para a ordem ao
- *                         decidir se há o que desfazer, e a rampa que ela
- *                         montou some sem Desfazer.
- *   --envenenado-recarrega a linha do módulo volta a recarregar a lista que ela
- *                         está mexendo, jogando fora a ordem e o que ela
- *                         acrescentou.
- *   --envenenado-volta    o app.js servido esquece de onde ela veio, e o botão
- *                         de voltar da lista cheia leva para o módulo em vez de
- *                         para a lista pronta.
- *   --envenenado-lixeira  o draw.js servido volta a mudar a seleção em
- *                         silêncio, e a lixeira nunca acende ao tocar no
- *                         retângulo: ela cria um branco que não consegue tirar.
- *   --envenenado-redesenho o app.js servido volta a desenhar a tela duas vezes
- *                         por toque de seta.
- *   --envenenado-meia-aula a frase da meia aula volta a não ter piso nem teto,
- *                         e um exercício de poucos minutos vira "um pouco menos
- *                         de meia aula" com o minuto ao lado desmentindo.
- */
+ * Modos envenenados: cada um desliga UMA regra e a corrida sai assim que a vê
+ * cair. Os dezenove estão na tabela VENENOS, logo abaixo das âncoras, e o modo
+ * normal varre TODAS elas contra os arquivos de verdade (seção 0), porque
+ * veneno é código que envelhece junto com o alvo. A lista por extenso mora na
+ * tabela e não aqui, de propósito: esta lista já ficou para trás duas vezes,
+ * uma vez dizendo quinze quando eram dezoito, e comentário que conta errado é
+ * da mesma família da âncora que deixou de casar.
+ *
+ * Os que merecem nota, porque o que eles medem não se adivinha pelo nome:
+ *   --envenenado-ordem    o carrinho fica com os MESMOS ids e só a ordem muda.
+ *   --envenenado-camadas  o canvas volta à ordem do vetor; mede PIXEL, e não a
+ *                         constante exportada.
+ *   --envenenado-coluna e --envenenado-agrupa mexem SÓ no styles.css: se a
+ *                         régua lesse o código em vez da tela, passariam.
+ *   --envenenado-aviso-velho tira o apagamento da porta única, e a MESMA
+ *                         corrida mede as duas portas, a da seta e a do
+ *                         Desfazer.
+ *   --envenenado-apara    o mover deixa de aparar, e o retângulo sai da folha.
+  */
 'use strict';
 const fs = require('fs');
 const os = require('os');
@@ -178,6 +146,9 @@ const T_RECARREGA = '          if (false && listaProntaEmEdicao(lp)) irNaBibliot
 // o dedo volta a não cancelar o retângulo em andamento, e a palma apoiada fecha
 // o tapar que o bico tinha começado
 // o contorno de tela some, e o branco volta a ser invisível na folha branca
+// o mover volta a nao aparar, e o retangulo sai da folha ao ser arrastado
+const L_APARA = "        d.item.x = aparado(d.ix + (p.x - d.ox), 0, Math.max(0, FOLHA_L - d.item.w));";
+const T_APARA = '        d.item.x = d.ix + (p.x - d.ox);';
 const L_CONTORNO = "      ctx.strokeStyle = 'rgba(31, 58, 95, 0.35)';";
 const T_CONTORNO = "      ctx.strokeStyle = 'rgba(255, 255, 255, 1)';";
 const L_PALMA = '    this._cancelarTapar();';
@@ -248,7 +219,8 @@ const VENENOS = {
   redesenho: { arq: '/app.js', de: L_REDESENHO, para: T_REDESENHO },
   'meia-aula': { arq: '/app.js', de: L_MEIA_AULA, para: T_MEIA_AULA },
   palma: { arq: '/draw.js', de: L_PALMA, para: T_PALMA },
-  contorno: { arq: '/draw.js', de: L_CONTORNO, para: T_CONTORNO }
+  contorno: { arq: '/draw.js', de: L_CONTORNO, para: T_CONTORNO },
+  apara: { arq: '/draw.js', de: L_APARA, para: T_APARA }
 };
 const NOME_VENENO = Object.keys(VENENOS).filter(function (n) {
   return process.argv.indexOf('--envenenado-' + n) !== -1;
@@ -273,6 +245,7 @@ const V_REDESENHO = NOME_VENENO === 'redesenho';
 const V_MEIA_AULA = NOME_VENENO === 'meia-aula';
 const V_PALMA = NOME_VENENO === 'palma';
 const V_CONTORNO = NOME_VENENO === 'contorno';
+const V_APARA = NOME_VENENO === 'apara';
 const BASE_DE = { '/app.js': APP_REPO, '/draw.js': DRAW_REPO, '/styles.css': CSS_REPO };
 const trocas = {};
 if (VENENO) trocas[RECEITA.arq] = BASE_DE[RECEITA.arq].split(RECEITA.de).join(RECEITA.para);
@@ -445,7 +418,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   if (!VENENO) {
     secao('0. As cercas ainda apontam para o alvo');
     var nomes = Object.keys(VENENOS);
-    conf('a tabela tem os dezoito venenos desta prova', nomes.length, 18);
+    conf('a tabela tem os dezenove venenos desta prova', nomes.length, 19);
     var fora = [];
     nomes.forEach(function (n) {
       var r = VENENOS[n];
@@ -771,7 +744,11 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   }
 
   const nums = await numerosDaTela(pag);
-  conf('a numeração da tela acompanha', nums[0].indexOf('1. ') === 0 && nums[1].indexOf('2. ') === 0, true);
+  /* (Aqui havia "a numeração da tela acompanha", conferindo que o primeiro
+   * cartão começa com "1. " e o segundo com "2. ". A numeração é literalmente
+   * `(pos + 1) + '. '`, então não existe dado que quebre isso. Quem mede a
+   * renumeração de verdade é a linha seguinte, que exige que o cartão de cima
+   * seja o OUTRO exercício.) */
   conf('e o que está em primeiro agora é o outro exercício',
     nums[0], '1. Exercício ' + (Number(IDS2[1].split(':').pop())));
 
@@ -869,7 +846,12 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   conf('e chegou mesmo na tela da lista pronta',
     await pag.evaluate(() => !!document.querySelector('#bib-lp-grade')), true);
   const c6 = await carrinho(pag);
-  conf('com o carrinho inteiro preservado, na ordem dela', c6.itens.join('|'), c5.itens.join('|'));
+  /* (Aqui havia "com o carrinho inteiro preservado, na ordem dela", comparando o
+   * carrinho antes e depois de um clique em Voltar, que por construção não mexe
+   * no carrinho em implementação nenhuma. Era a mesma família que esta frente
+   * removeu da seção 5 e que sobreviveu ao lado das asserções que mordem. O que
+   * de fato mede a volta é o rótulo do botão, logo acima, e a grade estar na
+   * tela.) */
 
   /* AGORA O QUE A SEÇÃO PROMETIA E NUNCA TINHA SIDO LIDO: o exercício de fora
    * entra no FIM, onde as setas alcançam, e a tela diz que ele fica fora da
@@ -1228,6 +1210,97 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   conf('e não passa da folha pela direita nem por baixo',
     bordas.alem && (bordas.alem[0] + bordas.alem[2] <= 1000) && (bordas.alem[1] + bordas.alem[3] <= 1343), true);
 
+  /* OS TRÊS CAMINHOS DO RETÂNGULO, DIRIGIDOS POR EVENTO DE PONTEIRO.
+   *
+   *   Arranjo:   num canvas com escala 1 e sem deslocamento, o bico CRIA um
+   *              retângulo, depois o ARRASTA para muito além da borda de cima
+   *              e da esquerda, depois puxa a ALÇA para muito além da borda de
+   *              baixo e da direita. Tudo por `pointerdown`, `pointermove` e
+   *              `pointerup`, que é o caminho que a mão dela percorre.
+   *   Afirmação: nos três momentos o item gravado fica dentro da folha nos
+   *              quatro lados.
+   *
+   * A ESCRITA ANTERIOR CHAMAVA `adicionarTapar` PELA API, duas vezes, e nunca
+   * movia nem redimensionava nada, enquanto a afirmação dizia "fica dentro da
+   * folha nos quatro lados". O recorte existia só na criação, e bastava
+   * selecionar o branco e arrastá-lo para o defeito voltar inteiro: na tela
+   * aparado, no papel por cima do cabeçalho. Duas lentes cegas acharam isso
+   * sozinhas, cada uma por seu lado, e a prova de então não podia pegar porque
+   * o arranjo dela não tinha mover. */
+  const tresCaminhos = await pag.evaluate(() => {
+    const L = window.Draw.FOLHA_L, A = window.Draw.FOLHA_A;
+    const c = document.createElement('canvas');
+    c.width = 900; c.height = 900;
+    document.body.appendChild(c);
+    const ed = new window.Draw.Editor(c, { nota: window.Draw.notaVazia('branco') });
+    ed.escala = 1; ed.deslocX = 0; ed.deslocY = 0;
+    function ev(tipo, x, y, id) {
+      const r = c.getBoundingClientRect();
+      c.dispatchEvent(new PointerEvent(tipo, { bubbles: true, cancelable: true, pointerId: id || 1,
+        pointerType: 'pen', clientX: r.left + x, clientY: r.top + y,
+        buttons: tipo === 'pointerup' ? 0 : 1 }));
+    }
+    function oTapar() { return ed.pagina().itens.filter(i => i.t === 'tapar')[0] || null; }
+    function dentro(it) {
+      return !!it && it.x >= 0 && it.y >= 0 && it.x + it.w <= L && it.y + it.h <= A;
+    }
+    // 1. criar, comecando FORA da folha (acima e a esquerda)
+    ed.ferramenta = 'tapar';
+    ev('pointerdown', -150, -120);
+    ev('pointermove', 320, 260);
+    ev('pointerup', 320, 260);
+    // copia, e nao referencia: o item e mutado nos passos seguintes
+    const aoCriar = Object.assign({}, oTapar());
+    /* E ELE PRECISA SAIR DO CANTO ANTES DE SER ARRASTADO, senao "moveu" nao
+     * acontece: criado a partir de fora da folha, ele nasce encostado em 0,0, e
+     * arrastar para cima e para a esquerda dali nao muda nada. O arranjo tem de
+     * poder falhar. */
+    ed.ferramenta = 'selecao';
+    ev('pointerdown', 100, 100, 9);
+    ev('pointermove', 400, 400, 9);
+    ev('pointerup', 400, 400, 9);
+    const noMeio = Object.assign({}, oTapar());
+    // 2. mover para muito alem da borda de cima e da esquerda
+    const meio = { x: noMeio.x + noMeio.w / 2, y: noMeio.y + noMeio.h / 2 };
+    ev('pointerdown', meio.x, meio.y, 2);
+    ev('pointermove', meio.x - 800, meio.y - 800, 2);
+    ev('pointerup', meio.x - 800, meio.y - 800, 2);
+    const aoMover = Object.assign({}, oTapar());
+    // 3. puxar a alca do canto para muito alem da borda de baixo e da direita
+    const it = oTapar();
+    ev('pointerdown', it.x + it.w, it.y + it.h, 3);
+    ev('pointermove', it.x + it.w + 4000, it.y + it.h + 4000, 3);
+    ev('pointerup', it.x + it.w + 4000, it.y + it.h + 4000, 3);
+    const aoEsticar = Object.assign({}, oTapar());
+    ed.destruir && ed.destruir();
+    c.remove();
+    return {
+      folha: [L, A],
+      criar: [aoCriar.x, aoCriar.y, aoCriar.w, aoCriar.h], criarDentro: dentro(aoCriar),
+      mover: [aoMover.x, aoMover.y, aoMover.w, aoMover.h], moverDentro: dentro(aoMover),
+      esticar: [aoEsticar.x, aoEsticar.y, aoEsticar.w, aoEsticar.h], esticarDentro: dentro(aoEsticar),
+      levouParaOMeio: noMeio.x > 0 && noMeio.y > 0,
+      moveuMesmo: aoMover.x !== noMeio.x || aoMover.y !== noMeio.y,
+      esticouMesmo: aoEsticar.w !== aoMover.w || aoEsticar.h !== aoMover.h,
+      guardouTamanhoAoMover: aoMover.w === noMeio.w && aoMover.h === noMeio.h
+    };
+  });
+  console.log('   os tres caminhos: ' + JSON.stringify(tresCaminhos));
+  conf('o retangulo foi levado para o meio da folha antes, senao nao haveria de onde sair',
+    tresCaminhos.levouParaOMeio, true);
+  conf('o arrasto moveu mesmo o retangulo, senao "dentro" passaria por nao ter acontecido nada',
+    tresCaminhos.moveuMesmo, true);
+  conf('e a alca esticou mesmo, pelo mesmo motivo', tresCaminhos.esticouMesmo, true);
+  if (V_APARA) {
+    conf('VENENO: sem aparar no mover, o retangulo sai da folha ao ser arrastado',
+      tresCaminhos.moverDentro, false);
+    return;
+  }
+  conf('CRIAR: o retangulo fica dentro da folha nos quatro lados', tresCaminhos.criarDentro, true);
+  conf('MOVER: idem, e o tamanho que ela deu nao encolhe', tresCaminhos.moverDentro, true);
+  conf('e mover PRENDE na borda em vez de encolher', tresCaminhos.guardouTamanhoAoMover, true);
+  conf('REDIMENSIONAR: idem', tresCaminhos.esticarDentro, true);
+
   const palma = await pag.evaluate(() => {
     const c = document.createElement('canvas');
     c.width = 400; c.height = 500;
@@ -1452,7 +1525,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   }), true);
   await pausa(1500);
   const lixeiraSeletor = '#ferramentas-nota [title="Remover o item selecionado"]';
-  /* O dedo desenha: pointerdown, um arrasto e pointerup no canvas, que é o
+  /* O BICO desenha: pointerdown, um arrasto e pointerup no canvas, que é o
    * caminho do bico e do dedo. Nada de chamar `adicionarTapar` pela API, que é
    * exatamente a diferença entre as duas medidas que se contradiziam. */
   const desenhou = await pag.evaluate(async () => {
