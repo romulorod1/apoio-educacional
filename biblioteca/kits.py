@@ -1,9 +1,45 @@
-"""kits-v1 e tempo-v1: monta os kits de um pacote da biblioteca.
+"""kits-v1, listas-v1 e tempo-v1: monta as listas prontas de um pacote.
 
     python biblioteca/kits.py <pacote.zip ou pasta com os json> [--saida kits.json]
+                              [--regra listas-v1] [--niveis 2,3] [--sem-teoria]
 
-REGRA TESTADA E REJEITADA EM 24/09/2026. NAO GERE kits.json PARA PACOTE
-PUBLICADO.
+DUAS REGRAS. A `listas-v1` e a que se gera hoje; a `kits-v1` fica com a medida
+que a matou colada nela, logo abaixo.
+
+--------------------------------------------------------------------- listas-v1
+
+A lista pronta da B10, e o que ela afirma e so isto: e uma lista dentro do
+tempo, do mais simples ao mais dificil, para ela mudar a vontade. NAO afirma
+curadoria, e nenhum texto de tela pode dizer que afirma. O ganho dela e o
+TRABALHO POUPADO, tres toques em vez de dezoito, que nunca foi medido porque
+nunca esteve em disputa.
+
+A regra esta na secao 8f do CONTRATO_pacote_biblioteca.md. Ela herda da 8e a
+tempo-v1, a I1, a I2, a I3, a I5, a I6, a I7 e a tabela do T2, e muda tres
+coisas, cada uma nascida de um defeito que os revisores cegos da B9 nomearam e
+que a kits-v1 nao olhava:
+
+1. REFERENCIA A OUTRO EXERCICIO (referencia-v1). Item que remete a outro so
+   entra se o referido entrar junto e antes. Este gerador resolve por EXCLUSAO,
+   que e mais estrito do que a regra manda: item com referencia nao entra. O
+   conferidor e que implementa a regra inteira, e por isso ele aceita lista que
+   este gerador nunca produziria. Regra e o que se confere; gerador e um jeito
+   de satisfazer.
+2. ENUNCIADOS QUASE REPETIDOS (repetidos-v1). Dois itens com semelhanca de
+   0,45 ou mais nao entram na mesma lista. Resolvido podando o bolo antes da
+   busca: de cada grupo de quase iguais fica o de menor numero.
+3. PORTA DE ENTRADA (entrada-v2). O primeiro item e sempre um ponto de entrada,
+   inclusive no nivel 3, e por isso o T3 passou a admitir UM item de degrau 1,
+   que e o da abertura. Medido: nas 11 listas de nivel 3 da B9, 11 de 11 abriam
+   no degrau 2 porque a tabela mandava, e os revisores disseram que faltava
+   aquecimento em onze dos doze pares.
+
+As tres reguas estao escritas duas vezes de proposito, uma aqui e uma no
+confere_kits.py, as duas a partir do texto da 8f.
+
+---------------------------------------------------------------------- kits-v1
+
+REGRA TESTADA E REJEITADA EM 24/09/2026. NAO GERE kits.json COM ELA.
 
 Comparada as cegas contra um concorrente do mesmo modulo, com o mesmo numero
 de exercicios, o mesmo orcamento ao decimo e ORDENADO POR DEGRAU, sorteando so
@@ -73,13 +109,87 @@ import io
 import json
 import math
 import os
+import re
 import sys
 import zipfile
 from decimal import Decimal, ROUND_HALF_UP
 
 REGRA = 'kits-v1'
+REGRA_LISTAS = 'listas-v1'
 TEMPO_REGRA = 'tempo-v1'
 TETO_TEORIA = 8
+
+
+# ------------------------------------------- as tres reguas da listas-v1
+# Escritas da secao 8f do contrato, e NAO importadas do confere_kits.py. Se os
+# dois lados discordarem, quem manda e a conferencia.
+
+_ROTULO = re.compile(r'^\s*exerc[ií]cio\s+\d+[a-z]?\s*[.)]?\s*')
+_ANTERIOR = re.compile(r'(exerc[ií]cio|quest[aã]o|problema)\s+anterior')
+_NUMERADO = re.compile(r'(?:exerc[ií]cio|quest[aã]o|problema)s?\s+(\d+)')
+_DEMONSTRACAO = re.compile(r'^(mostre|prove|demonstre|justifique|verifique|deduza)\b')
+
+LIMIAR_REPETIDOS = 0.45
+_PARADAS = frozenset(
+    'a e o os as de da do das dos que em um uma no na nos nas por para com se '
+    'ao aos sua seu suas seus'.split())
+
+
+def sem_rotulo(item):
+    return _ROTULO.sub('', item.get('texto') or '')
+
+
+def referencia(item):
+    """O id do exercicio a que este remete, ou None. So OUTRO EXERCICIO: "item
+    anterior", "passo anterior", "modelo anterior" e "acima" ficam de fora, e a
+    8f diz por que (sao auto-referencia dentro do proprio enunciado)."""
+    texto = sem_rotulo(item)
+    base, _, _ = item['id'].rpartition(':')
+    if _ANTERIOR.search(texto):
+        anterior = (item.get('numero') or 0) - 1
+        return '%s:%d' % (base, anterior) if anterior >= 1 else None
+    achado = _NUMERADO.search(texto)
+    if achado:
+        n = int(achado.group(1))
+        if n != item.get('numero'):
+            return '%s:%d' % (base, n)
+    return None
+
+
+def pede_demonstracao(item):
+    return bool(_DEMONSTRACAO.match(sem_rotulo(item)))
+
+
+def _bigramas(item):
+    palavras = [p for p in re.findall(r'[a-z0-9]+', sem_rotulo(item)) if p not in _PARADAS]
+    return set(zip(palavras, palavras[1:])) or set((p,) for p in palavras)
+
+
+def semelhanca(a, b):
+    fa, fb = _bigramas(a), _bigramas(b)
+    if not fa or not fb:
+        return 0.0
+    return len(fa & fb) / float(len(fa | fb))
+
+
+def abre_lista(item):
+    """Se este item serve de porta de entrada, pela 8f. O degrau nao entra
+    aqui: quem escolhe o degrau e a tabela do nivel."""
+    if item.get('sem_solucao') or not (item.get('assets') or {}).get('solucao'):
+        return False
+    return not item.get('origem_citada') and not pede_demonstracao(item) and not referencia(item)
+
+
+def poda_repetidos(itens):
+    """De cada grupo de quase iguais fica um so: o de menor numero, desempate
+    pelo id. Deterministico e sem sorteio. Devolve (ficaram, podados)."""
+    ficaram, podados = [], []
+    for it in sorted(itens, key=lambda i: (i['numero'], i['id'])):
+        if any(semelhanca(it, ja) >= LIMIAR_REPETIDOS for ja in ficaram):
+            podados.append(it)
+        else:
+            ficaram.append(it)
+    return ficaram, podados
 
 # --------------------------------------------------------------- tempo-v1
 # A formula do CONTRATO 8e, escrita aqui do texto e nao importada da
@@ -123,7 +233,12 @@ TAMANHO = (4, 12)           # I6
 ALVO = 300                  # o centro da banda, para desempate
 
 
-def degraus_do_nivel(nivel):
+def degraus_do_nivel(nivel, regra=REGRA):
+    """A unica diferenca entre as duas regras esta no T3: a kits-v1 proibia o
+    degrau 1, e foi isso que deixou as onze listas de nivel 3 da B9 sem porta
+    de entrada."""
+    if regra == REGRA_LISTAS and nivel == 3:
+        return (1, 2, 3)
     return {1: (1, 2), 2: (1, 2, 3), 3: (2, 3)}[nivel]
 
 
@@ -131,9 +246,13 @@ def teto(x):
     return int(math.ceil(x))
 
 
-def composicoes(nivel, n):
+def composicoes(nivel, n, regra=REGRA, com_degrau_1=True):
     """As contagens por degrau que a tabela dos niveis admite, para este n.
-    Devolve lista de (c1, c2, c3), em ordem deterministica."""
+    Devolve lista de (c1, c2, c3), em ordem deterministica.
+
+    `com_degrau_1` so vale para o T3 da listas-v1: diz se a lista leva o item
+    de abertura de degrau 1. Quando leva, a I3 (sem salto de dois) obriga ao
+    menos um item de degrau 2, e com a massa do 3 isso so fecha com n >= 6."""
     saida = []
     if nivel == 1:
         for c1 in range(teto(2 * n / 3), n):      # c2 = n - c1 >= 1, termina no 2
@@ -142,6 +261,9 @@ def composicoes(nivel, n):
         for c3 in range(1, min(teto(n / 3), n - 2) + 1):
             for c1 in range(1, n - c3):
                 saida.append((c1, n - c3 - c1, c3))
+    elif regra == REGRA_LISTAS and com_degrau_1:
+        for c3 in range(teto(2 * n / 3), n - 1):  # c2 = n - 1 - c3 >= 1
+            saida.append((1, n - 1 - c3, c3))
     else:
         for c3 in range(teto(2 * n / 3), n):      # c2 = n - c3 >= 1, comeca no 2
             saida.append((0, n - c3, c3))
@@ -187,9 +309,11 @@ def tabela(itens, custo, max_conta, teto_soma):
     return dp
 
 
-def busca_por_nivel(nivel, pool, forcados, banda, tamanho, ultimo=None):
+def busca_por_nivel(nivel, pool, forcados, banda, tamanho, ultimo=None,
+                    primeiro=None, regra=REGRA, com_degrau_1=True):
     """A melhor escolha para este nivel, ou None. `forcados` ja entram no kit
-    (a bateria do T1 e o citado do fim), e saem dos candidatos da busca.
+    (a bateria do T1, o citado do fim e a abertura da listas-v1), e saem dos
+    candidatos da busca.
 
     Devolve a lista de itens ja na ordem da trajetoria."""
     ids_forcados = [i['id'] for i in forcados]
@@ -197,7 +321,8 @@ def busca_por_nivel(nivel, pool, forcados, banda, tamanho, ultimo=None):
     min_forcado = sum(i['_min'] for i in forcados)
     conta_forcada = collections.Counter(i['dificuldade'] for i in forcados)
 
-    por_degrau = {d: [i for i in livres if i['dificuldade'] == d] for d in degraus_do_nivel(nivel)}
+    por_degrau = {d: [i for i in livres if i['dificuldade'] == d]
+                  for d in degraus_do_nivel(nivel, regra)}
     custo = custo_de_cobertura(pool)
     teto_soma = banda[1] - min_forcado
     if teto_soma < 0:
@@ -207,7 +332,7 @@ def busca_por_nivel(nivel, pool, forcados, banda, tamanho, ultimo=None):
 
     melhor = None
     for n in range(tamanho[0], tamanho[1] + 1):
-        for (c1, c2, c3) in composicoes(nivel, n):
+        for (c1, c2, c3) in composicoes(nivel, n, regra, com_degrau_1):
             pedido = {1: c1, 2: c2, 3: c3}
             falta = {}
             viavel = True
@@ -224,7 +349,7 @@ def busca_por_nivel(nivel, pool, forcados, banda, tamanho, ultimo=None):
                 continue
             custo_total, ids, soma = combinado
             soma += min_forcado
-            escolhidos = ordena(list(ids) + ids_forcados, por_id, ultimo)
+            escolhidos = ordena(list(ids) + ids_forcados, por_id, ultimo, primeiro)
             chave = _chave(escolhidos, custo_total, soma)
             if melhor is None or chave < melhor[0]:
                 melhor = (chave, escolhidos)
@@ -293,12 +418,12 @@ def ancora_bateria(candidatos):
     return sorted(com, key=lambda i: (i['dificuldade'], i['numero'], i['id']))[0]
 
 
-def ancoras_citado(candidatos, nivel):
+def ancoras_citado(candidatos, nivel, regra=REGRA):
     """T2 e T3: os itens com origem_citada do degrau mais alto do nivel, em
     ordem de preferencia: minutos mais perto da mediana do degrau, depois
     numero. Devolve lista, para a busca tentar o segundo se o primeiro nao
     couber."""
-    alto = max(degraus_do_nivel(nivel))
+    alto = max(degraus_do_nivel(nivel, regra))
     com = [i for i in candidatos if i.get('origem_citada') and i['dificuldade'] == alto]
     if not com:
         return []
@@ -327,6 +452,185 @@ AFROUXAMENTOS = [
     ('banda larga sem os dois', (240, 360), False, False),
     ('ultima tentativa', (200, 450), False, False),
 ]
+
+
+# --------------------------------------------------- listas-v1: o montador
+
+# A ordem em que a listas-v1 vai soltando restricoes. Os dois consertos que sao
+# EXCLUSAO (referencia e repetidos) nao aparecem aqui e nunca sao soltos: eles
+# saem do bolo antes da busca.
+#
+# A ABERTURA CAI DEPOIS DA BANDA, e isso e decisao e nao descuido. A banda de
+# 27 a 33 ja e uma janela de 10% em volta de meia aula, e alargar para 24 a 36
+# continua cabendo em "cerca de meia aula", que e o que a tela diz; abrir sem
+# aquecimento e exatamente a queixa que os revisores cegos fizeram de onze dos
+# doze pares de nivel 3. Medido no 9o ano: com a ordem invertida, o modulo do
+# teorema de Pitagoras perdia o aquecimento por 0,1 minuto de estouro.
+AFROUXAMENTOS_LISTAS = [
+    # (rotulo da tentativa, banda, exigir citado no fim, exigir abertura no degrau 1)
+    ('estrita', BANDA, True, True),
+    ('sem citado no fim', BANDA, False, True),
+    ('banda larga', (240, 360), True, True),
+    ('banda larga sem citado', (240, 360), False, True),
+    ('sem abertura no degrau 1', BANDA, True, False),
+    ('sem citado e sem abertura', BANDA, False, False),
+    ('banda larga sem abertura', (240, 360), True, False),
+    ('banda larga sem os dois', (240, 360), False, False),
+    ('ultima tentativa', (200, 450), False, False),
+]
+
+# Quantos candidatos a abertura a busca tenta antes de desistir. Nao e um: o
+# melhor pela posicao na fonte pode ser longo demais para o orcamento, e no
+# modulo de conjuntos o primeiro candidato tem 11,3 minutos num modulo cujo
+# degrau 1 vai de 2,8 a 15,0. Com um so, a lista abria no degrau 2 por causa
+# dele.
+CANDIDATOS_DE_ABERTURA = 10
+
+
+def _ordem_de_abertura(itens):
+    """A preferencia entre candidatos a abertura e a POSICAO NA FONTE: o
+    primeiro exercicio da lista do Portal e o aquecimento que o proprio autor
+    escreveu, e essa e uma regua diferente da que escolheu o resto da lista
+    (degrau e minutos)."""
+    return sorted(itens, key=lambda i: ((i.get('proxy') or {}).get('posicao', 1.0),
+                                        i['_min'], i['numero'], i['id']))
+
+
+def aberturas(pool, nivel, degrau=None):
+    """Os candidatos a porta de entrada, em ordem de preferencia, e o degrau em
+    que eles estao.
+
+    O degrau de abertura nao e "o menor que existir": e o que a tabela do nivel
+    manda. O T2 abre no degrau 1 sempre; o T3 abre no 1 quando o modulo tem
+    porta de entrada ali, e no 2 quando nao tem. Sem isso, um modulo cujo unico
+    item elegivel de abertura esta no degrau 2 fazia a lista de nivel 2 abrir no
+    2 e cair para o 1 no item seguinte, que quebra a I2. Achado pela prova de
+    ida e volta contra a conferencia, e nao por leitura."""
+    elegiveis = [i for i in pool if abre_lista(i)]
+    if degrau is None:
+        if nivel == 3:
+            degrau = 1 if any(i['dificuldade'] == 1 for i in elegiveis) else 2
+        else:
+            degrau = 1
+    candidatos = [i for i in elegiveis if i['dificuldade'] == degrau]
+    if not candidatos:
+        # nenhum item do degrau de abertura serve de porta. A lista abre com o
+        # que houver ali e a entrada-v2 cai DECLARADA, porque lista com entrada
+        # declarada vale mais que modulo sem lista.
+        candidatos = [i for i in pool if i['dificuldade'] == degrau]
+    return degrau, _ordem_de_abertura(candidatos)
+
+
+def monta_lista(nivel, itens_do_modulo):
+    """Uma lista pronta da listas-v1, ou None. Os dois consertos de exclusao
+    acontecem antes de qualquer busca, e o terceiro entra como ancora."""
+    elegiveis = [i for i in itens_do_modulo
+                 if i['dificuldade'] in degraus_do_nivel(nivel, REGRA_LISTAS)
+                 and not i.get('sem_solucao') and (i.get('assets') or {}).get('solucao')]
+    # conserto 1, por exclusao
+    elegiveis = [i for i in elegiveis if not referencia(i)]
+    # conserto 2, podando o bolo
+    base, _podados = poda_repetidos(elegiveis)
+    if len(base) < TAMANHO[0]:
+        return None
+    sem_citado = [i for i in base if not i.get('origem_citada')]
+    _degrau, candidatos = aberturas(base, nivel)
+
+    for (_nome, banda, quer_citado, quer_abertura) in AFROUXAMENTOS_LISTAS:
+        entradas = candidatos[:CANDIDATOS_DE_ABERTURA]
+        if not quer_abertura and nivel == 3:
+            # a tentativa "sem abertura no degrau 1" devolve o T3 ao formato da
+            # kits-v1: abre no degrau 2
+            entradas = aberturas(base, nivel, degrau=2)[1][:CANDIDATOS_DE_ABERTURA]
+        # Quando o citado no fim cai, o bolo passa a ser o `base` inteiro, com
+        # os citados dentro. Sem isso o modulo de funcao afim ficava SEM lista
+        # de nivel 3: ele tem 36 itens elegiveis e so 12 sem origem_citada, um
+        # unico deles no degrau 3. A tabela do T3 nunca poe teto no numero de
+        # citados: ela so diz que, havendo, o ultimo e citado.
+        achados = []
+        for entrada in entradas:
+            fonte = sem_citado if quer_citado else base
+            # nada abaixo do degrau da abertura entra: a lista comeca nela, e
+            # um item de degrau menor la dentro faria a rampa cair (I2)
+            bolo = [i for i in fonte if i['id'] != entrada['id']
+                    and i['dificuldade'] >= entrada['dificuldade']]
+            achado = None
+            if quer_citado:
+                # o citado entra so como ancora do fim, e o resto do bolo nao
+                # tem citado nenhum: e isso que impede citado no meio
+                for c in ancoras_citado(base, nivel, REGRA_LISTAS)[:3]:
+                    if c['id'] == entrada['id']:
+                        continue
+                    achado = busca_por_nivel(nivel, bolo + [c, entrada], [c, entrada], banda,
+                                             TAMANHO, ultimo=c['id'], primeiro=entrada['id'],
+                                             regra=REGRA_LISTAS,
+                                             com_degrau_1=entrada['dificuldade'] == 1)
+                    if achado:
+                        break
+            if not achado:
+                # sem ancora: zero citado, que a tabela do T3 aceita sem
+                # afrouxar nada, e que no T2 tambem cabe em "no maximo um"
+                achado = busca_por_nivel(nivel, bolo + [entrada], [entrada], banda, TAMANHO,
+                                         primeiro=entrada['id'], regra=REGRA_LISTAS,
+                                         com_degrau_1=entrada['dificuldade'] == 1)
+            if achado:
+                achados.append(achado)
+        if achados:
+            # Entre as aberturas que fecham, vence a que deixa MENOS restricao
+            # afrouxada, e o desempate e a ordem dos candidatos, que ja e
+            # deterministica. Sem isto a primeira abertura viavel ganhava mesmo
+            # quando ela sozinha derrubava a clausula dos minutos da entrada-v2.
+            achados.sort(key=lambda r: len(relaxou_da_lista(nivel, r, itens_do_modulo)))
+            return achados[0]
+    return None
+
+
+def relaxou_da_lista(nivel, itens, itens_do_modulo):
+    """O que caiu NESTA lista, medido na lista pronta e nao no que a busca
+    pediu. Quem julga de verdade e o confere_kits.py, que le so o arquivo."""
+    caiu = set()
+    n = len(itens)
+    seq = [i['dificuldade'] for i in itens]
+    minutos = [i['_min'] for i in itens]
+    total = sum(minutos)
+    med = sorted(minutos)
+    mediana = med[n // 2] if n % 2 else (med[n // 2 - 1] + med[n // 2]) / 2
+    citados = [k for k, i in enumerate(itens) if i.get('origem_citada')]
+
+    if not (BANDA[0] <= total <= BANDA[1]):
+        caiu.add('minutos')
+    # entrada-v2, as quatro clausulas
+    if minutos[0] > mediana or itens[0].get('origem_citada') or pede_demonstracao(itens[0]):
+        caiu.add('entrada')
+    permitidos = degraus_do_nivel(nivel, REGRA_LISTAS)
+    if any(it['dificuldade'] in permitidos and it['dificuldade'] < seq[0] and abre_lista(it)
+           for it in itens_do_modulo):
+        caiu.add('entrada')
+    if nivel == 2:
+        if set(seq) != {1, 2, 3} or seq.count(3) > teto(n / 3) or seq[0] != 1 or seq[-1] != 3:
+            caiu.add('degraus')
+        if len(citados) > 1 or (len(citados) == 1 and citados[0] != n - 1):
+            caiu.add('citado')
+    else:
+        if seq.count(1) > 1 or (seq.count(1) == 1 and seq[0] != 1):
+            caiu.add('degraus')
+        if seq.count(3) < teto(2 * n / 3) or seq[-1] != 3:
+            caiu.add('degraus')
+        if citados and citados[-1] != n - 1:
+            caiu.add('citado')
+    # os dois consertos de exclusao, medidos na lista pronta: o gerador nunca
+    # deveria produzir nenhum dos dois, e se produzir a declaracao tem de sair
+    # junto, senao a conferencia reprova o pacote inteiro (que e o certo)
+    ids = [i['id'] for i in itens]
+    for k, it in enumerate(itens):
+        alvo = referencia(it)
+        if alvo and (alvo not in ids or ids.index(alvo) > k):
+            caiu.add('referencia')
+    for x in range(n):
+        for y in range(x + 1, n):
+            if semelhanca(itens[x], itens[y]) >= LIMIAR_REPETIDOS:
+                caiu.add('repetidos')
+    return sorted(caiu)
 
 
 def monta_kit(modulo, nivel, itens_do_modulo, paginas):
@@ -365,16 +669,26 @@ def monta_kit(modulo, nivel, itens_do_modulo, paginas):
     return None
 
 
-def ordena(ids, por_id, ultimo=None):
+def ordena(ids, por_id, ultimo=None, primeiro=None):
     """A trajetoria: degrau crescente, minutos crescentes dentro do degrau,
     desempate pelo numero. O item citado escolhido como ancora vai para o fim
-    do seu degrau, que e o degrau mais alto do kit."""
+    do seu degrau, que e o degrau mais alto do kit; a abertura escolhida pela
+    listas-v1 vai para o comeco.
+
+    `primeiro` e explicito e nao "sai de graca da ordenacao": no T2 a abertura
+    e um item de degrau 1 entre varios, e a ordem por minutos poria outro na
+    frente."""
     itens = [por_id[i] for i in ids]
     itens.sort(key=lambda i: (i['dificuldade'], i['_min'], i['numero'], i['id']))
     if ultimo:
         alvo = next(i for i in itens if i['id'] == ultimo)
         itens.remove(alvo)
         itens.append(alvo)
+    if primeiro:
+        alvo = next(i for i in itens if i['id'] == primeiro)
+        itens.remove(alvo)
+        itens.insert(0, alvo)
+        return itens
     # a entrada nao pode ser citada; troca pelo proximo do mesmo degrau
     if itens[0].get('origem_citada'):
         d0 = itens[0]['dificuldade']
@@ -428,16 +742,25 @@ def relaxou_do_kit(nivel, itens, itens_do_modulo):
 
 # ------------------------------------------------------------- alternativas
 
-def alternativas_do_kit(itens, itens_do_modulo):
+def alternativas_do_kit(itens, itens_do_modulo, regra=REGRA):
     """Por item do kit, ate tres outros do mesmo modulo, no mesmo degrau, fora
     do kit, com minutos parecidos. E o que resolve "ja usei este com o PH" sem
-    quebrar a rampa."""
+    quebrar a rampa.
+
+    Na listas-v1 a alternativa passa pelos mesmos dois consertos de exclusao:
+    oferecer como troca um item com referencia quebrada, ou quase igual a outro
+    que ja esta na lista, poria de volta pela porta da edicao o defeito que a
+    geracao tirou pela porta da frente."""
     dentro = {i['id'] for i in itens}
     saida = {}
     for it in itens:
         vizinhos = [o for o in itens_do_modulo
                     if o['id'] not in dentro and o['dificuldade'] == it['dificuldade']
                     and not o.get('sem_solucao') and (o.get('assets') or {}).get('solucao')]
+        if regra == REGRA_LISTAS:
+            vizinhos = [o for o in vizinhos if not referencia(o)
+                        and not any(semelhanca(o, d) >= LIMIAR_REPETIDOS
+                                    for d in itens if d['id'] != it['id'])]
         vizinhos.sort(key=lambda o: (abs(o['_min'] - it['_min']), o['numero'], o['id']))
         if vizinhos:
             saida[it['id']] = [o['id'] for o in vizinhos[:3]]
@@ -474,11 +797,13 @@ def teoria_do_kit(paginas, itens):
 
 # --------------------------------------------------------------------- todo
 
-def gerar(itens_de_fora, teoria):
+def gerar(itens_de_fora, teoria, regra=REGRA, niveis=(1, 2, 3), com_teoria=True):
     """Os kits de um pacote. Trabalha sobre COPIAS rasas dos itens: o gerador do
     pacote ja escreveu o itens.json quando chama isto, e um campo de trabalho
     vazando para o dado de quem chama e o tipo de coisa que so aparece muito
     depois, no hash de outro arquivo."""
+    if regra not in (REGRA, REGRA_LISTAS):
+        raise ValueError('regra desconhecida: %r' % regra)
     itens = [dict(i) for i in itens_de_fora]
     por_modulo = collections.OrderedDict()
     for it in itens:
@@ -493,22 +818,27 @@ def gerar(itens_de_fora, teoria):
     kits, sem_kit = [], []
     for mid in sorted(por_modulo):
         do_modulo = sorted(por_modulo[mid], key=lambda i: (i['aula']['n'], i['numero']))
-        for nivel in (1, 2, 3):
-            itens_kit = monta_kit(mid, nivel, do_modulo, teoria_por_modulo.get(mid, []))
+        for nivel in niveis:
+            if regra == REGRA_LISTAS:
+                itens_kit = monta_lista(nivel, do_modulo)
+            else:
+                itens_kit = monta_kit(mid, nivel, do_modulo, teoria_por_modulo.get(mid, []))
             if not itens_kit:
                 sem_kit.append((mid, nivel))
                 continue
-            caiu = relaxou_do_kit(nivel, itens_kit, do_modulo)
+            caiu = (relaxou_da_lista(nivel, itens_kit, do_modulo) if regra == REGRA_LISTAS
+                    else relaxou_do_kit(nivel, itens_kit, do_modulo))
             kits.append({
                 'id': '%s:kit:%d' % (mid, nivel), 'modulo': mid, 'serie': itens_kit[0]['serie'],
                 'nivel': nivel, 'titulo': itens_kit[0]['modulo']['titulo'],
-                'regra': REGRA, 'tempo_regra': TEMPO_REGRA,
+                'regra': regra, 'tempo_regra': TEMPO_REGRA,
                 'minutos': decimos_para_numero(sum(i['_min'] for i in itens_kit)),
-                'teoria': teoria_do_kit(teoria_por_modulo.get(mid, []), itens_kit),
+                'teoria': (teoria_do_kit(teoria_por_modulo.get(mid, []), itens_kit)
+                           if com_teoria else []),
                 'degraus': [{'n': k + 1, 'item': i['id'], 'degrau': i['dificuldade'],
                              'minutos': decimos_para_numero(i['_min'])}
                             for k, i in enumerate(itens_kit)],
-                'alternativas': alternativas_do_kit(itens_kit, do_modulo),
+                'alternativas': alternativas_do_kit(itens_kit, do_modulo, regra),
                 'relaxou': caiu or None,
             })
     modulos_sem_exercicio = sorted(set(teoria_por_modulo) - set(por_modulo))
@@ -527,9 +857,15 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('pacote')
     ap.add_argument('--saida', default=None)
+    ap.add_argument('--regra', default=REGRA_LISTAS, choices=[REGRA, REGRA_LISTAS])
+    ap.add_argument('--niveis', default='2,3',
+                    help='os niveis a gerar, separados por virgula (padrao 2,3)')
+    ap.add_argument('--sem-teoria', dest='sem_teoria', action='store_true', default=True)
+    ap.add_argument('--com-teoria', dest='sem_teoria', action='store_false')
     a = ap.parse_args(argv)
+    niveis = tuple(int(x) for x in a.niveis.split(','))
     itens, teoria = ler(a.pacote)
-    kits, sem_kit, sem_exercicio = gerar(itens, teoria)
+    kits, sem_kit, sem_exercicio = gerar(itens, teoria, a.regra, niveis, not a.sem_teoria)
     texto = json.dumps(kits, ensure_ascii=False, indent=1) + '\n'
     if a.saida:
         io.open(a.saida, 'w', encoding='utf-8', newline='\n').write(texto)

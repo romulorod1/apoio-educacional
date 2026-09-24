@@ -1,12 +1,28 @@
-"""A kits-v1 e a tempo-v1 como especificacao executavel: le um pacote e reprova.
+"""As regras dos kits e a tempo-v1 como especificacao executavel: le um pacote
+e reprova.
 
     python biblioteca/confere_kits.py <pacote.zip ou pasta>
 
-Este arquivo e a secao 8e do CONTRATO_pacote_biblioteca.md escrita em codigo.
-Ele NAO importa o gerador (biblioteca/kits.py) e nao conhece nenhuma escolha
-dele: le kits.json, itens.json, teoria.json, exclusoes.json e o manifest, e diz
-o que esta fora da regra. Regua e peca nao podem sair da mesma matriz, e por
-isso a unica coisa que os dois lados compartilham e o texto do contrato.
+Este arquivo e as secoes 8e e 8f do CONTRATO_pacote_biblioteca.md escritas em
+codigo. Ele NAO importa o gerador (biblioteca/kits.py) e nao conhece nenhuma
+escolha dele: le kits.json, itens.json, teoria.json, exclusoes.json e o
+manifest, e diz o que esta fora da regra. Regua e peca nao podem sair da mesma
+matriz, e por isso a unica coisa que os dois lados compartilham e o texto do
+contrato.
+
+DUAS REGRAS, e cada kit diz no campo `regra` qual e a dele:
+
+- `kits-v1` (secao 8e), TESTADA E REJEITADA em 24/09 como afirmacao de
+  curadoria. Continua aqui porque o texto dela continua valendo como
+  especificacao do que foi construido e medido, e porque as provas dela
+  seguram as partes que a listas-v1 herdou sem mudar.
+- `listas-v1` (secao 8f), a lista pronta da B10. Herda a tempo-v1, a I1, a I2,
+  a I3, a I5, a I6, a I7 e a tabela do T2, e muda tres coisas: referencia a
+  outro exercicio, enunciados quase repetidos e a porta de entrada.
+
+As tres reguas novas da listas-v1 (referencia, semelhanca e demonstracao) estao
+escritas DUAS VEZES de proposito, uma aqui e uma no gerador, as duas a partir do
+texto da 8f. Se os dois lados discordarem, quem manda e esta conferencia.
 
 Se alguem algum dia fizer este arquivo importar o kits.py para "nao repetir
 codigo", a conferencia deixa de conferir: passa a perguntar ao gerador se o
@@ -21,9 +37,12 @@ import io
 import json
 import math
 import os
+import re
 import sys
 import zipfile
 from decimal import Decimal, ROUND_HALF_UP
+
+REGRAS = ('kits-v1', 'listas-v1')
 
 # --------------------------------------------------------------- tempo-v1
 
@@ -73,9 +92,84 @@ def mediana(valores):
     return (v[n // 2 - 1] + v[n // 2]) / 2
 
 
+# ------------------------------------------- as tres reguas da listas-v1
+# Escritas da secao 8f do contrato. Trabalham sobre o campo `texto` do item,
+# que e o enunciado da fonte em minusculas e sem acento: o SVG do recorte tem o
+# texto em contorno e nao serve para ler nada.
+
+RE_ROTULO = re.compile(r'^\s*exerc[ií]cio\s+\d+[a-z]?\s*[.)]?\s*')
+RE_ANTERIOR = re.compile(r'(exerc[ií]cio|quest[aã]o|problema)\s+anterior')
+RE_NUMERADO = re.compile(r'(?:exerc[ií]cio|quest[aã]o|problema)s?\s+(\d+)')
+RE_DEMONSTRACAO = re.compile(r'^(mostre|prove|demonstre|justifique|verifique|deduza)\b')
+
+# Semelhanca: bigramas de palavra, palavras vazias fora, Jaccard, corte em 0,45.
+# O corte sai do censo dos 11.994 pares dentro do mesmo modulo no 9o ano v4:
+# 11 pares de 0,455 para cima, todos lidos e todos o mesmo enunciado com os
+# numeros trocados; os cinco entre 0,375 e 0,442 sao discutiveis e ficaram fora.
+LIMIAR_REPETIDOS = 0.45
+PARADAS = frozenset(
+    'a e o os as de da do das dos que em um uma no na nos nas por para com se '
+    'ao aos sua seu suas seus'.split())
+
+
+def corpo(texto):
+    """O enunciado sem o rotulo que o proprio pacote poe na frente."""
+    return RE_ROTULO.sub('', texto or '')
+
+
+def referencia(item):
+    """O id do exercicio a que este remete, ou None.
+
+    So conta referencia a OUTRO EXERCICIO. "item anterior", "itens anteriores",
+    "passo anterior", "modelo anterior" e "acima" ficam de fora de proposito:
+    medidas nos 482 itens do 9o ano, as quatro formas sao auto-referencia dentro
+    do proprio enunciado (subitens, passos, modelo resolvido ali mesmo)."""
+    texto = corpo(item.get('texto'))
+    base, _, _ = item['id'].rpartition(':')
+    if RE_ANTERIOR.search(texto):
+        anterior = (item.get('numero') or 0) - 1
+        return '%s:%d' % (base, anterior) if anterior >= 1 else None
+    achado = RE_NUMERADO.search(texto)
+    if achado:
+        n = int(achado.group(1))
+        if n != item.get('numero'):
+            return '%s:%d' % (base, n)
+    return None
+
+
+def pede_demonstracao(item):
+    return bool(RE_DEMONSTRACAO.match(corpo(item.get('texto'))))
+
+
+def bigramas(item):
+    palavras = [p for p in re.findall(r'[a-z0-9]+', corpo(item.get('texto')))
+                if p not in PARADAS]
+    # enunciado de uma palavra so nao tem bigrama; cai para a propria palavra,
+    # senao o conjunto fica vazio e a semelhanca de dois deles daria 0 por
+    # engano em vez de 1 por medida
+    return set(zip(palavras, palavras[1:])) or set((p,) for p in palavras)
+
+
+def semelhanca(a, b):
+    fa, fb = bigramas(a), bigramas(b)
+    if not fa or not fb:
+        return 0.0
+    return len(fa & fb) / float(len(fa | fb))
+
+
+def abre_lista(item):
+    """Se este item pode ser a porta de entrada de uma lista, pela 8f: tem
+    solucao, nao e olimpiada, nao abre pedindo demonstracao e nao remete a outro
+    exercicio. O degrau nao entra aqui: quem escolhe o degrau e a tabela."""
+    if item.get('sem_solucao') or not (item.get('assets') or {}).get('solucao'):
+        return False
+    return not item.get('origem_citada') and not pede_demonstracao(item) and not referencia(item)
+
+
 # ------------------------------------------------- vocabulario de `relaxou`
 
-RELAXAVEIS = ('minutos', 'entrada', 'degraus', 'citado', 'subitens')
+RELAXAVEIS = ('minutos', 'entrada', 'degraus', 'citado', 'subitens',
+              'referencia', 'repetidos')
 
 
 class Achados:
@@ -101,7 +195,16 @@ def _teto(x):
     return int(math.ceil(x))
 
 
-def confere_um_kit(kit, por_id, paginas_de_teoria, a):
+def degraus_do_nivel(nivel, regra):
+    """Os degraus que a tabela do nivel admite. A unica diferenca entre as duas
+    regras esta no T3: a kits-v1 proibia o degrau 1, e foi isso que deixou as
+    onze listas de nivel 3 da B9 sem porta de entrada."""
+    if regra == 'listas-v1' and nivel == 3:
+        return (1, 2, 3)
+    return {1: (1, 2), 2: (1, 2, 3), 3: (2, 3)}[nivel]
+
+
+def confere_um_kit(kit, por_id, paginas_de_teoria, itens_do_modulo, a):
     """Todas as travas de um kit. `a` e o Achados deste kit."""
     # ---------------------------------------------------------- a forma
     for campo in ('id', 'modulo', 'serie', 'nivel', 'titulo', 'regra', 'tempo_regra',
@@ -112,8 +215,11 @@ def confere_um_kit(kit, por_id, paginas_de_teoria, a):
         a.duro('falta o campo relaxou (use null quando nada foi afrouxado)')
     if a.duros:
         return
-    if kit['regra'] != 'kits-v1':
-        a.duro('regra e %r, e esta conferencia so conhece kits-v1' % kit['regra'])
+    if kit['regra'] not in REGRAS:
+        a.duro('regra e %r, e esta conferencia so conhece %s'
+               % (kit['regra'], ' e '.join(REGRAS)))
+        return
+    regra = kit['regra']
     if kit['tempo_regra'] != 'tempo-v1':
         a.duro('tempo_regra e %r, e esta conferencia so conhece tempo-v1' % kit['tempo_regra'])
     nivel = kit['nivel']
@@ -212,6 +318,25 @@ def confere_um_kit(kit, por_id, paginas_de_teoria, a):
         a.frouxo('entrada', 'I4: o primeiro item tem %s minutos, acima da mediana %s do kit' % (minutos[0], med))
     if itens[0].get('origem_citada'):
         a.frouxo('entrada', 'I4: o primeiro item traz origem_citada %r' % itens[0]['origem_citada'])
+    if regra == 'listas-v1':
+        # as duas cláusulas novas da entrada-v2 (8f). As duas de cima sao a I4
+        # antiga, que a entrada-v2 herda inteira.
+        if pede_demonstracao(itens[0]):
+            a.frouxo('entrada', 'entrada-v2: a lista abre pedindo demonstracao (%r)'
+                     % corpo(itens[0].get('texto'))[:40])
+        permitidos_aqui = degraus_do_nivel(nivel, regra)
+        abaixo = sorted({it['dificuldade'] for it in itens_do_modulo
+                         if it.get('dificuldade') in permitidos_aqui
+                         and it['dificuldade'] < seq[0] and abre_lista(it)})
+        if abaixo:
+            # `max` e nao "listar todos": o que a clausula 4 cobra e o degrau
+            # de abertura MAIS ALTO que ainda esta abaixo do usado, porque e
+            # ele que a lista deveria ter pegado. O conjunto chega a ter dois
+            # elementos (lista que abrisse no degrau 3 com abertura no 1 e no
+            # 2), entao `max` nao e o mesmo byte que `min` nem que a lista
+            # inteira, e a assercao mede mesmo o que diz.
+            a.frouxo('entrada', 'entrada-v2: a lista abre no degrau %d e o modulo tem item '
+                                'de abertura no degrau %d' % (seq[0], max(abaixo)))
 
     if not (Decimal(27) <= total <= Decimal(33)):
         a.frouxo('minutos', 'I5: o kit soma %s minutos, fora da banda de 27 a 33' % total)
@@ -263,7 +388,7 @@ def confere_um_kit(kit, por_id, paginas_de_teoria, a):
             a.frouxo('citado', 'T2: %d itens com origem_citada, e o T2 admite no maximo um' % len(citados))
         elif len(citados) == 1 and citados[0] != n - 1:
             a.frouxo('citado', 'T2: o item citado esta na posicao %d, e devia ser o ultimo' % (citados[0] + 1))
-    else:
+    elif regra == 'kits-v1':
         if usados - {2, 3}:
             a.frouxo('degraus', 'T3: usa o degrau %d, e o T3 so usa 2 e 3' % min(usados - {2, 3}))
         if conta3 < _teto(2 * n / 3):
@@ -275,6 +400,41 @@ def confere_um_kit(kit, por_id, paginas_de_teoria, a):
         # "preferir no fim; zero aceitavel": zero passa, e havendo citado o ultimo e citado
         if citados and citados[-1] != n - 1:
             a.frouxo('citado', 'T3: ha item citado e o ultimo nao e citado')
+    else:
+        # T3 da listas-v1 (8f): o degrau 1 entra, no maximo um, e ele e o
+        # primeiro. A massa e a chegada continuam iguais as da 8e.
+        if conta1 > 1:
+            a.frouxo('degraus', 'T3: %d itens de degrau 1, e o T3 leva no maximo um, o da abertura' % conta1)
+        # "e ele e o primeiro" NAO tem trava propria aqui, e isso e deliberado:
+        # com a I2 valendo, um unico item de degrau 1 fora da primeira posicao
+        # obriga a sequencia a cair, e quem acusa e a I2. Uma trava a mais
+        # nunca poderia reprovar sozinha, e trava que so acompanha outra da a
+        # impressao de cobrir uma regiao que ela nao cobre.
+        if conta3 < _teto(2 * n / 3):
+            a.frouxo('degraus', 'T3: %d itens de degrau 3, e a massa pede ao menos %d' % (conta3, _teto(2 * n / 3)))
+        if seq[-1] != 3:
+            a.frouxo('degraus', 'T3: termina no degrau %d, e devia terminar no 3' % seq[-1])
+        if citados and citados[-1] != n - 1:
+            a.frouxo('citado', 'T3: ha item citado e o ultimo nao e citado')
+
+    # ------------------------------------- os dois consertos que sao da lista
+    if regra == 'listas-v1':
+        for k, it in enumerate(itens):
+            alvo = referencia(it)
+            if not alvo:
+                continue
+            if alvo not in ids:
+                a.frouxo('referencia', 'referencia-v1: o item %d remete a %s, que nao esta na lista'
+                         % (k + 1, alvo))
+            elif ids.index(alvo) > k:
+                a.frouxo('referencia', 'referencia-v1: o item %d remete a %s, que vem depois dele '
+                                       '(posicao %d)' % (k + 1, alvo, ids.index(alvo) + 1))
+        for x in range(n):
+            for y in range(x + 1, n):
+                s = semelhanca(itens[x], itens[y])
+                if s >= LIMIAR_REPETIDOS:
+                    a.frouxo('repetidos', 'repetidos-v1: os itens %d e %d tem semelhanca %.3f, '
+                                          'no limiar de %.2f ou acima' % (x + 1, y + 1, s, LIMIAR_REPETIDOS))
 
     return itens
 
@@ -327,9 +487,10 @@ def confere(manifest, itens, teoria, kits, exclusoes):
             erros.append('%s: id repetido no kits.json' % kid)
         vistos.add(kid)
         a = Achados(kid)
-        itens_do_kit = confere_um_kit(kit, por_id, paginas_de_teoria, a) or []
+        do_modulo = por_modulo.get(kit.get('modulo'), [])
+        itens_do_kit = confere_um_kit(kit, por_id, paginas_de_teoria, do_modulo, a) or []
         if itens_do_kit:
-            bateria_de_subitens(kit, itens_do_kit, por_modulo.get(kit['modulo'], []), a)
+            bateria_de_subitens(kit, itens_do_kit, do_modulo, a)
         erros.extend(a.duros)
 
         # `relaxou` nos DOIS sentidos: tudo o que caiu esta declarado, e nada

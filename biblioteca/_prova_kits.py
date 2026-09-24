@@ -36,15 +36,17 @@ CURTO = '9ano:modulo-curto'
 FRONT = '9ano:modulo-fronteira'
 
 
-def item(mod_slug, lista, n, dificuldade, altura, subitens=None, citado=None, sem_solucao=False):
+def item(mod_slug, lista, n, dificuldade, altura, subitens=None, citado=None, sem_solucao=False,
+         texto=None, titulo=None):
     base = 'assets/9ano/%s/%s/ex-%02d' % (mod_slug, lista, n)
     return {
         'id': '9ano:%s:%s:ex:%d' % (mod_slug, lista, n),
         'fonte': 'obmep-portal', 'serie': '9ano',
-        'modulo': {'slug': mod_slug, 'titulo': 'Modulo de Prova' if mod_slug == 'modulo-de-prova' else 'Modulo Curto'},
+        'modulo': {'slug': mod_slug,
+                   'titulo': titulo or ('Modulo de Prova' if mod_slug == 'modulo-de-prova' else 'Modulo Curto')},
         'aula': {'slug': lista, 'titulo': 'Lista', 'n': 1},
         'numero': n, 'formato': 'aberta', 'alternativas': None, 'resposta': None,
-        'subitens': subitens or [], 'texto': 'exercicio %d' % n,
+        'subitens': subitens or [], 'texto': texto if texto is not None else 'exercicio %d' % n,
         'origem_citada': citado, 'dificuldade': dificuldade, 'dificuldade_origem': 'proxy',
         'proxy': {'posicao': 0.1, 'terco': dificuldade}, 'tema_app': None,
         'assets': {'enunciado': base + '.svg', 'solucao': None if sem_solucao else base + '-sol.svg'},
@@ -194,6 +196,167 @@ def amostra():
     return [manifest, itens, teoria, kits, exclusoes]
 
 
+# --------------------------------------------- a amostra da listas-v1 (8f)
+#
+# Amostra propria, e nao a de cima com um campo a mais, porque as tres reguas
+# da 8f leem o `texto` do enunciado e a amostra de cima tem "exercicio 1" em
+# todos: com ela, a semelhanca entre dois itens quaisquer daria o mesmo numero
+# e a regua ficaria cega por construcao.
+#
+# TRES ASSIMETRIAS ESTAO CRAVADAS AQUI DE PROPOSITO, e cada uma existe porque
+# sem ela a assercao correspondente passaria com a regra invertida:
+#
+# 1. O par 4 e 10 fica ABAIXO do limiar (0,429) e o par 5 e 14 fica ACIMA
+#    (0,667). Um so dos dois nao mede o limiar: com so o de cima, limiar zero
+#    passaria na amostra limpa; com so o de baixo, limiar 1 passaria no veneno.
+# 2. Os itens 3 e 4 do `modulo-com-referencia` tem o MESMO degrau e os MESMOS
+#    minutos, e por isso trocar os dois de lugar nao mexe em mais nada da
+#    lista: so a ordem da referencia muda de veredito. Fixture que so tira o
+#    alvo mediria "esta na lista" e nao "esta antes".
+# 3. O `modulo-sem-porta` tem itens de degrau 1 que NAO servem de abertura (um
+#    citado, um pedindo demonstracao), e a lista limpa dele abre no degrau 2.
+#    Se a clausula 4 ignorasse a elegibilidade, essa lista limpa reprovaria.
+
+MODL = '9ano:modulo-da-lista'
+MODR = '9ano:modulo-com-referencia'
+MODS = '9ano:modulo-sem-porta'
+MODF = '9ano:modulo-da-referencia-forcada'
+MODP = '9ano:modulo-do-par-repetido'
+
+
+def li(n):
+    return '9ano:modulo-da-lista:lista-l:ex:%d' % n
+
+
+def rf(n):
+    return '9ano:modulo-com-referencia:lista-r:ex:%d' % n
+
+
+def sp(n):
+    return '9ano:modulo-sem-porta:lista-s:ex:%d' % n
+
+
+def fo(n):
+    return '9ano:modulo-da-referencia-forcada:lista-o:ex:%d' % n
+
+
+def pr(n):
+    return '9ano:modulo-do-par-repetido:lista-p:ex:%d' % n
+
+
+def amostra_listas():
+    def it(slug, lista, titulo, n, d, altura, texto, citado=None):
+        return item(slug, lista, n, d, altura, citado=citado, texto=texto, titulo=titulo)
+
+    L = lambda n, d, h, t, c=None: it('modulo-da-lista', 'lista-l', 'Modulo da Lista', n, d, h, t, c)
+    R = lambda n, d, h, t, c=None: it('modulo-com-referencia', 'lista-r', 'Modulo com Referencia', n, d, h, t, c)
+    S = lambda n, d, h, t, c=None: it('modulo-sem-porta', 'lista-s', 'Modulo sem Porta', n, d, h, t, c)
+    F = lambda n, d, h, t, c=None: it('modulo-da-referencia-forcada', 'lista-o',
+                                      'Modulo da Referencia Forcada', n, d, h, t, c)
+    P_ = lambda n, d, h, t, c=None: it('modulo-do-par-repetido', 'lista-p',
+                                       'Modulo do Par Repetido', n, d, h, t, c)
+
+    itens = [
+        # --------------------------------------------------- modulo-da-lista
+        L(1, 1, H24, 'exercicio 1. determine a area do quadrado de lado 3 cm.'),
+        # degrau 1, mas pede demonstracao: nao serve de porta de entrada
+        L(2, 1, H45, 'exercicio 2. mostre que a soma dos angulos internos de um triangulo vale 180 graus.'),
+        # degrau 1, mas remete ao anterior: nao serve de porta e nao entra
+        L(3, 1, H45, 'exercicio 3. no exercicio anterior, determine tambem o angulo externo.'),
+        L(4, 2, H45, 'exercicio 4. calcule o perimetro do retangulo de lados 4 e 7.'),
+        L(5, 2, H60, 'exercicio 5. calcule a area do trapezio de bases 5 e 9 e altura 6 usando a formula da area.'),
+        L(6, 3, H60, 'exercicio 6. determine o raio da circunferencia inscrita no triangulo de lados 6, 8 e 10.'),
+        L(7, 3, H60, 'exercicio 7. um ponto interior do triangulo equilatero dista 3, 4 e 5 dos vertices.',
+          'Extraido da Olimpiada de Prova'),
+        L(8, 3, H45, 'exercicio 8. seja abcd um quadrado de lado 2 e m o ponto medio de bc.'),
+        L(9, 3, H45, 'exercicio 9. no losango de diagonais 6 e 8, determine a altura relativa ao lado.'),
+        # quase igual ao 4, mas ABAIXO do limiar: fica na lista limpa
+        L(10, 2, H45, 'exercicio 10. calcule o perimetro do retangulo de lados 5 e 9.'),
+        L(11, 1, H45, 'exercicio 11. encontre os divisores positivos do numero 36.'),
+        # quase igual ao 5, ACIMA do limiar: so entra no veneno
+        L(14, 2, H45, 'exercicio 14. calcule a area do trapezio de bases 5 e 9 e altura 4 usando a formula da area.'),
+        # ---------------------------------------------- modulo-com-referencia
+        R(1, 1, H24, 'exercicio 1. determine o dobro de cada numero abaixo.'),
+        R(2, 2, H45, 'exercicio 2. calcule a media aritmetica de 4, 8 e 12.'),
+        R(3, 3, H45, 'exercicio 3. determine o valor de x na figura do triangulo retangulo.'),
+        # remete ao 3 pelo NUMERO, e o 3 tem o mesmo degrau e os mesmos minutos
+        R(4, 3, H45, 'exercicio 4. no exercicio 3, determine tambem o valor de y.'),
+        R(5, 3, H60, 'exercicio 5. encontre a soma dos angulos internos do poligono de 12 lados.'),
+        R(6, 3, H60, 'exercicio 6. determine a razao entre as areas de dois triangulos semelhantes.'),
+        # --------------------------------------------------- modulo-sem-porta
+        S(1, 1, H45, 'exercicio 1. um tabuleiro tem 64 casas pintadas de preto e branco.',
+          'Extraido da Olimpiada sem Porta'),
+        S(2, 1, H45, 'exercicio 2. mostre que todo quadrado e um losango.'),
+        S(3, 2, H45, 'exercicio 3. calcule o lado do quadrado de area 49.'),
+        S(4, 3, H60, 'exercicio 4. determine a diagonal do cubo de aresta 5.'),
+        S(5, 3, H60, 'exercicio 5. calcule o volume do cilindro de raio 3 e altura 7.'),
+        S(6, 3, H45, 'exercicio 6. encontre o apotema do hexagono regular de lado 4.'),
+        S(7, 3, H45, 'exercicio 7. determine a area do setor circular de 60 graus e raio 6.'),
+        S(8, 2, H45, 'exercicio 8. calcule a hipotenusa do triangulo de catetos 9 e 12.'),
+        # ------------------------------------------ modulo-da-referencia-forcada
+        # Desenhado para o veneno do GERADOR, e a conta esta escrita porque e
+        # ela que faz o veneno morder: sao quatro itens de degrau 3 e o T3 de
+        # seis itens pede exatamente quatro, entao com o conserto 1 desligado
+        # o item 6, que remete a um exercicio que nao existe no pacote, NAO
+        # tem como ficar de fora. Com o conserto ligado sobram tres, o seis
+        # nunca entra, e a lista que sai e menor e declara o que caiu.
+        F(1, 1, H24, 'exercicio 1. some os numeros de 1 ate 10.'),
+        F(2, 2, H45, 'exercicio 2. calcule a raiz quadrada de 144.'),
+        F(3, 3, H60, 'exercicio 3. determine a area do triangulo de lados 13, 14 e 15.'),
+        F(4, 3, H60, 'exercicio 4. calcule o volume da piramide de base quadrada de lado 6.'),
+        F(5, 3, H60, 'exercicio 5. encontre a distancia entre os pontos medios das diagonais.'),
+        F(6, 3, H60, 'exercicio 6. no exercicio 20, use o resultado para achar o angulo.'),
+        # ------------------------------------------------ modulo-do-par-repetido
+        # A mesma ideia para o conserto 2: os itens 2 e 3 sao o par acima do
+        # limiar e sao os UNICOS dois de degrau 2. O T2 de cinco itens pede
+        # dois de degrau 2, entao com a poda desligada os dois entram juntos.
+        P_(1, 1, H45, 'exercicio 1. escreva os cinco primeiros multiplos de 7.'),
+        P_(2, 2, H60, 'exercicio 2. calcule a area do trapezio de bases 5 e 9 e altura 6 usando a formula da area.'),
+        P_(3, 2, H60, 'exercicio 3. calcule a area do trapezio de bases 5 e 9 e altura 4 usando a formula da area.'),
+        P_(4, 3, H60, 'exercicio 4. determine a soma dos n primeiros numeros impares.'),
+        P_(5, 3, H60, 'exercicio 5. encontre o resto da divisao de 7 elevado a 100 por 5.'),
+        P_(6, 3, H60, 'exercicio 6. calcule a area da regiao entre a circunferencia e o quadrado.'),
+    ]
+    por_id = {i['id']: i for i in itens}
+
+    def lista(mod, nivel, ids, relaxou=None):
+        ds = []
+        for k, i in enumerate(ids):
+            it_ = por_id[i]
+            ds.append({'n': k + 1, 'item': i, 'degrau': it_['dificuldade'],
+                       'minutos': float(CK.minutos_do_item(it_))})
+        return {
+            'id': '%s:kit:%d' % (mod, nivel), 'modulo': mod, 'serie': '9ano', 'nivel': nivel,
+            'titulo': por_id[ids[0]]['modulo']['titulo'],
+            'regra': 'listas-v1', 'tempo_regra': 'tempo-v1',
+            'minutos': round(sum(d['minutos'] for d in ds), 1),
+            'teoria': [], 'degraus': ds, 'alternativas': {}, 'relaxou': relaxou,
+        }
+
+    kits = [
+        # T2: os tres degraus, abre no 1, fecha no 3, citado no fim, e leva o
+        # par 4 e 10, que fica logo ABAIXO do limiar de repeticao. 27,9 min.
+        lista(MODL, 2, [li(1), li(11), li(4), li(10), li(6), li(7)]),
+        # T3 da listas-v1: UM item de degrau 1 na abertura, massa no 3. 27,9.
+        lista(MODL, 3, [li(1), li(4), li(8), li(9), li(6), li(7)]),
+        # T3 com a referencia RESOLVIDA: o 3 entra antes do 4. 27,9.
+        lista(MODR, 3, [rf(1), rf(2), rf(3), rf(4), rf(5), rf(6)]),
+        # T3 que abre no degrau 2 e PASSA, porque os dois itens de degrau 1
+        # deste modulo nao servem de abertura. 30,0.
+        lista(MODS, 3, [sp(3), sp(8), sp(6), sp(7), sp(4), sp(5)]),
+    ]
+    kits.sort(key=lambda k: (k['modulo'], k['nivel']))
+    exclusoes = [{'id': li(20), 'motivo': 'recorte do enunciado cortado ao meio'},
+                 {'id': rf(20), 'motivo': 'a solucao veio da fonte sem a figura'}]
+    exclusoes.sort(key=lambda e: e['id'])
+    manifest = {
+        'esquema': 1, 'pacote': 'matematica-prova-listas', 'versao': 1,
+        'contagens': {'modulos': len({i['modulo']['slug'] for i in itens}),
+                      'itens': len(itens), 'itens_excluidos': len(exclusoes), 'kits': len(kits)},
+    }
+    return [manifest, itens, [], kits, exclusoes]
+
+
 # -------------------------------------------------------------- o placar
 
 class Placar:
@@ -270,8 +433,18 @@ def com(mudanca):
     return peca
 
 
+def com_listas(mudanca):
+    peca = copy.deepcopy(amostra_listas())
+    mudanca(peca)
+    return peca
+
+
 def kit_de(peca, nivel, mod=MOD):
     return next(k for k in peca[3] if k['nivel'] == nivel and k['modulo'] == mod)
+
+
+def kit_l(peca, mod, nivel=3):
+    return next(k for k in peca[3] if k['modulo'] == mod and k['nivel'] == nivel)
 
 
 def troca_itens(kit, ids, itens):
@@ -532,6 +705,208 @@ def main():
         lambda x: x[4].append(dict(x[4][0])))), 'aparece duas vezes')
     p.veneno('exclusoes.json ausente', confere(com(
         lambda x: x.__setitem__(4, None))), 'exclusoes.json nao esta no pacote')
+
+    # ==================================================== listas-v1, secao 8f
+    print('\n=== listas-v1: a amostra limpa e as tres reguas ===')
+    peca_l = amostra_listas()
+    itens_l = {i['id']: i for i in peca_l[1]}
+    p.limpo('a amostra da listas-v1 passa inteira na confere_kits', confere(peca_l))
+
+    # AS REGUAS DAO O QUE A AMOSTRA SUPOE. Sem isto, mudar uma palavra de um
+    # enunciado moveria a semelhanca e os venenos abaixo virariam ruido: o
+    # limiar continuaria escrito e nenhum par estaria mais de um lado dele.
+    s_baixo = CK.semelhanca(itens_l[li(4)], itens_l[li(10)])
+    s_alto = CK.semelhanca(itens_l[li(5)], itens_l[li(14)])
+    p.limpo('o par 4 e 10 fica ABAIXO do limiar (%.3f < %.2f)' % (s_baixo, CK.LIMIAR_REPETIDOS),
+            [] if s_baixo < CK.LIMIAR_REPETIDOS else ['deu %.3f' % s_baixo])
+    p.limpo('o par 5 e 14 fica ACIMA do limiar (%.3f >= %.2f)' % (s_alto, CK.LIMIAR_REPETIDOS),
+            [] if s_alto >= CK.LIMIAR_REPETIDOS else ['deu %.3f' % s_alto])
+    # a regua da referencia le so o que a 8f manda ler
+    p.limpo('"no exercicio anterior" e referencia, e aponta para o numero de tras',
+            [] if CK.referencia(itens_l[li(3)]) == li(2) else ['deu %r' % CK.referencia(itens_l[li(3)])])
+    p.limpo('"no exercicio 3" e referencia, e aponta para o numero citado',
+            [] if CK.referencia(itens_l[rf(4)]) == rf(3) else ['deu %r' % CK.referencia(itens_l[rf(4)])])
+    # e NAO le o que a 8f manda deixar de fora. Sem estas quatro, alargar a
+    # expressao para pegar "item anterior" tiraria itens bons do pacote real
+    # sem nada reclamar: medidos no 9o ano, sao quatro itens em 482.
+    for frase, nome in (('nos itens anteriores, some os resultados.', 'item anterior'),
+                        ('no passo anterior, divida ao meio.', 'passo anterior'),
+                        ('seguindo o modelo anterior, resolva.', 'modelo anterior'),
+                        ('adapte o metodo acima para as dizimas abaixo.', 'acima')):
+        falso = dict(itens_l[li(4)], texto='exercicio 4. ' + frase)
+        p.limpo('%r nao e referencia a outro exercicio' % nome,
+                [] if CK.referencia(falso) is None else ['leu %r' % CK.referencia(falso)])
+
+    print('\n=== listas-v1: um veneno por regra nova ===')
+    # ---- conserto 1: referencia. Os dois modos de falhar, e o segundo so
+    # existe porque a ordem importa.
+    # cirurgico: o item 3 do modulo-da-lista remete ao 2, tem degrau 1 e os
+    # mesmos 4,5 minutos do que ele substitui, entao a lista continua dentro de
+    # TODO o resto da regra e so a referencia cai
+    p.veneno('referencia cujo alvo nao esta na lista', confere(com_listas(
+        lambda x: troca_itens(kit_l(x, MODL, 3), [li(3), li(4), li(8), li(9), li(6), li(7)], x[1]))),
+        'que nao esta na lista')
+    # O VENENO ASSIMETRICO: trocar de lugar os itens 3 e 4, que tem o mesmo
+    # degrau e os mesmos minutos. Nada mais na lista muda; so a ordem da
+    # referencia. Uma trava que so perguntasse "o alvo esta na lista?" passaria
+    # aqui 1 de 1, e e por isso que este veneno existe.
+    p.veneno('referencia cujo alvo vem DEPOIS dela', confere(com_listas(
+        lambda x: troca_itens(kit_l(x, MODR), [rf(1), rf(2), rf(4), rf(3), rf(5), rf(6)], x[1]))),
+        'vem depois dele')
+
+    # ---- conserto 2: enunciados quase repetidos
+    p.veneno('par de enunciados acima do limiar na mesma lista', confere(com_listas(
+        lambda x: troca_itens(kit_l(x, MODL, 2), [li(1), li(11), li(5), li(14), li(6), li(7)], x[1]))),
+        'repetidos-v1')
+
+    # ---- conserto 3: porta de entrada, as duas clausulas novas
+    p.veneno('a lista abre pedindo demonstracao', confere(com_listas(
+        lambda x: troca_itens(kit_l(x, MODL, 2), [li(2), li(11), li(4), li(10), li(6), li(7)], x[1]))),
+        'abre pedindo demonstracao')
+    p.veneno('nivel 3 que abre no degrau 2 tendo porta no degrau 1', confere(com_listas(
+        lambda x: troca_itens(kit_l(x, MODL, 3), [li(4), li(10), li(8), li(9), li(6), li(7)], x[1]))),
+        'tem item de abertura no degrau 1')
+    # O CONTROLE DA CLAUSULA 4, no outro sentido: a lista limpa do
+    # modulo-sem-porta abre no degrau 2 e PASSA, porque os dois itens de
+    # degrau 1 de la nao servem de abertura. Tirar o "mostre que" de um deles
+    # tem de fazer a MESMA lista reprovar. Sem este par, trocar `abre_lista`
+    # por "todo item de degrau menor conta" passaria calado.
+    p.limpo('nivel 3 que abre no degrau 2 PASSA quando o modulo nao tem porta no degrau 1',
+            [e for e in confere(peca_l) if MODS in e])
+    p.veneno('um degrau 1 do modulo-sem-porta vira porta de entrada', confere(com_listas(
+        lambda x: x[1].__setitem__(
+            next(k for k, i in enumerate(x[1]) if i['id'] == sp(2)),
+            dict(x[1][next(k for k, i in enumerate(x[1]) if i['id'] == sp(2))],
+                 texto='exercicio 2. calcule a area do losango de diagonais 6 e 8.')))),
+        'tem item de abertura no degrau 1')
+
+    # ---- a tabela do T3 da listas-v1
+    print('\n=== listas-v1: um veneno por linha da tabela do T3 ===')
+    p.veneno('T3 com dois itens de degrau 1', confere(com_listas(
+        lambda x: troca_itens(kit_l(x, MODL, 3), [li(1), li(11), li(8), li(9), li(6), li(7)], x[1]))),
+        'T3: 2 itens de degrau 1')
+    p.veneno('T3 com massa insuficiente no degrau 3', confere(com_listas(
+        lambda x: troca_itens(kit_l(x, MODL, 3), [li(1), li(4), li(10), li(8), li(6), li(7)], x[1]))),
+        'itens de degrau 3, e a massa pede ao menos')
+    p.veneno('T3 que termina no degrau 2', confere(com_listas(
+        lambda x: troca_itens(kit_l(x, MODL, 3), [li(1), li(8), li(9), li(6), li(7), li(4)], x[1]))),
+        'T3: termina no degrau')
+    # o degrau 1 fora da abertura nao tem trava propria, e a I2 e quem acusa:
+    # este veneno prova que a regiao nao ficou descoberta
+    p.veneno('T3 com o degrau 1 fora da abertura, que a I2 acusa', confere(com_listas(
+        lambda x: troca_itens(kit_l(x, MODL, 3), [li(4), li(1), li(8), li(9), li(6), li(7)], x[1]))), 'I2')
+
+    # ---- a regra declarada, e o vocabulario novo de relaxou
+    print('\n=== listas-v1: a regra declarada e o relaxou ===')
+    p.veneno('regra que nenhuma das duas conferencias conhece', confere(com_listas(
+        lambda x: x[3][0].__setitem__('regra', 'listas-v2'))), 'so conhece kits-v1 e listas-v1')
+    # uma lista que declara kits-v1 e usa o T3 da listas-v1 tem de reprovar:
+    # sem isto, o campo `regra` seria enfeite e as duas tabelas se misturariam
+    p.veneno('lista com o T3 novo declarando a regra velha', confere(com_listas(
+        lambda x: x[3][next(k for k, v in enumerate(x[3]) if v['modulo'] == MODL and v['nivel'] == 3)]
+        .__setitem__('regra', 'kits-v1'))), 'T3: usa o degrau 1')
+    p.veneno('afrouxou a referencia sem declarar', confere(com_listas(
+        lambda x: troca_itens(kit_l(x, MODR), [rf(1), rf(2), rf(4), rf(3), rf(5), rf(6)], x[1]))),
+        'nao declarado em relaxou')
+    p.veneno('declarou repetidos e nada repetiu', confere(com_listas(
+        lambda x: x[3][0].__setitem__('relaxou', ['repetidos']))), "e nada de 'repetidos'")
+
+    # ------------------------------- o gerador contra a conferencia, de ponta
+    # Aqui a peca SAI do gerador de proposito, e por isso esta secao fica
+    # separada das de cima: ela nao mede a conferencia, mede se o que o gerador
+    # produz sobrevive a uma regua que nao e a dele. O oraculo nunca e o
+    # gerador: quem reprova e o confere_kits, que nao o importa.
+    print('\n=== listas-v1: o que o gerador produz passa na conferencia ===')
+    import kits as GK
+    base_l = amostra_listas()
+
+    def gera_e_confere():
+        kits_g, _sem, _sx = GK.gerar(base_l[1], [], GK.REGRA_LISTAS, (2, 3), False)
+        manifest = copy.deepcopy(base_l[0])
+        manifest['contagens']['kits'] = len(kits_g)
+        return kits_g, CK.confere(manifest, base_l[1], [], kits_g, base_l[4])
+
+    kits_g, erros_g = gera_e_confere()
+    p.limpo('as listas que o gerador monta da amostra passam na confere_kits', erros_g)
+    # e o conserto 1 tem consequencia VISIVEL no que o gerador escolhe: o item
+    # 6 do modulo-da-referencia-forcada remete a um exercicio que nao existe, e
+    # por isso nao aparece em lista nenhuma, embora seja um dos quatro itens de
+    # degrau 3 daquele modulo.
+    onde = [k['id'] for k in kits_g if any(d['item'] == fo(6) for d in k['degraus'])]
+    p.limpo('com o conserto 1 ligado, o item que remete a outro nao entra em lista nenhuma',
+            ['o gerador pos %s em %s' % (fo(6), ', '.join(onde))] if onde else [])
+
+    # O VENENO DO GERADOR: desligar o conserto 1 dentro dele e ver a
+    # CONFERENCIA acusar o que ele passou a produzir. E o unico teste daqui em
+    # que a reprovacao atravessa os dois lados, e ele so vale porque a
+    # conferencia nao foi tocada: o oraculo nao e o gerador.
+    original = GK.referencia
+    try:
+        GK.referencia = lambda item: None
+        kits_sem, erros_sem = gera_e_confere()
+        montou = [k for k in kits_sem if k['modulo'] == MODF and k['nivel'] == 3]
+        p.veneno('gerador com o conserto 1 desligado',
+                 erros_sem if montou else ['o gerador nem chegou a montar a lista do MODF'],
+                 'referencia-v1')
+    finally:
+        GK.referencia = original
+
+    # conserto 2 desligado: a poda para de podar, e os dois enunciados quase
+    # iguais do modulo-do-par-repetido, que sao os unicos dois de degrau 2,
+    # entram juntos na lista de nivel 2.
+    onde2 = [k['id'] for k in kits_g if any(d['item'] == pr(3) for d in k['degraus'])]
+    p.limpo('com o conserto 2 ligado, o segundo do par quase igual nao entra em lista nenhuma',
+            ['o gerador pos %s em %s' % (pr(3), ', '.join(onde2))] if onde2 else [])
+    # Aqui o veneno mede a SAIDA do gerador, e nao o veredito da conferencia,
+    # e a diferenca em relacao ao conserto 1 e instrutiva: com a poda
+    # desligada o gerador leva o par E DECLARA `repetidos`, entao a
+    # conferencia aceita, corretamente. O defeito nao e a lista ficar
+    # invalida: e a lista ficar pior. Uma prova que so olhasse o veredito
+    # passaria calada, e foi o que ela fez na primeira escrita.
+    original2 = GK.poda_repetidos
+    try:
+        GK.poda_repetidos = lambda itens: (list(itens), [])
+        kits2, _e2 = gera_e_confere()
+        k2 = next(k for k in kits2 if k['modulo'] == MODP and k['nivel'] == 2)
+        dentro = [d['item'] for d in k2['degraus']]
+        piorou2 = []
+        if pr(2) in dentro and pr(3) in dentro:
+            piorou2 = ['a lista passou a levar o par quase igual (itens 2 e 3), e a declarar '
+                       'relaxou=%s' % (k2['relaxou'],)]
+        p.veneno('gerador com o conserto 2 desligado', piorou2, 'passou a levar o par')
+    finally:
+        GK.poda_repetidos = original2
+
+    # conserto 3 desligado: sem elegibilidade, todo item de degrau 1 vira porta
+    # de entrada, e o modulo-sem-porta passa a abrir a lista de nivel 3 com um
+    # exercicio de olimpiada. Aqui o veneno mede a SAIDA do gerador e nao a
+    # conferencia, porque o gerador continua declarando o que caiu e a
+    # conferencia continua aceitando: o defeito e a lista ter ficado pior, e e
+    # isso que precisa aparecer.
+    limpo3 = next(k for k in kits_g if k['modulo'] == MODS and k['nivel'] == 3)
+    p.limpo('com o conserto 3 ligado, o modulo-sem-porta abre no degrau 2 e nao declara nada',
+            [] if (limpo3['degraus'][0]['degrau'] == 2 and not limpo3['relaxou'])
+            else ['abriu no degrau %d com relaxou=%s' % (limpo3['degraus'][0]['degrau'], limpo3['relaxou'])])
+    original3 = GK.abre_lista
+    try:
+        GK.abre_lista = lambda item: True
+        kits3, _e3 = gera_e_confere()
+        k3 = next(k for k in kits3 if k['modulo'] == MODS and k['nivel'] == 3)
+        primeiro = itens_l[k3['degraus'][0]['item']]
+        piorou = []
+        if primeiro.get('origem_citada') or CK.pede_demonstracao(primeiro):
+            piorou = ['a lista passou a abrir com %s, e a declarar relaxou=%s'
+                      % (k3['degraus'][0]['item'], k3['relaxou'])]
+        p.veneno('gerador com o conserto 3 desligado', piorou, 'passou a abrir com')
+    finally:
+        GK.abre_lista = original3
+
+    # e a trava de que os tres restauros funcionaram, senao os testes seguintes
+    # rodariam com o gerador mutilado e ninguem veria
+    p.limpo('os tres consertos voltaram ao lugar depois dos venenos',
+            [] if (GK.referencia(itens_l[li(3)]) == li(2)
+                   and GK.poda_repetidos is original2 and GK.abre_lista is original3)
+            else ['alguma funcao nao voltou'])
 
     # -------------------------------------------- o zip leva o que promete
     print('\n=== o zip leva o que o manifest promete ===')
