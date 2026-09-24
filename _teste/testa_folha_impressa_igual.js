@@ -467,10 +467,33 @@ function semData(bytes) {
   conf('ALVO: a imagem pinta a página, senão não haveria o que tapar', dImagem.diferentes > 1000, true);
   conf('ALVO que NÃO pode acusar: a mesma folha gerada duas vezes dá zero pixel de diferença',
     dMesma.diferentes, 0);
-  conf('ALVO que TEM de acusar, e quanto: um retângulo menor apaga MENOS que o grande',
-    dPequeno.diferentes > dTapada.diferentes, true);
-  conf('e apaga alguma coisa, senão o medidor não distinguiria tamanho nenhum',
-    dPequeno.diferentes < dImagem.diferentes, true);
+  /* O ALVO DIZ COISA DIFERENTE EM CADA ARRANJO, e é por isso que ele sobrevive
+   * aos venenos em vez de ser calado sob eles.
+   *
+   * A primeira escrita afirmava "o menor apaga menos que o grande" e rodava sob
+   * TODOS os arranjos. Reprovou no portão nas duas corridas em que nada apaga
+   * nada: o `--envenenado-tapar` desliga o laço que desenha o retângulo, e o
+   * `--envenenado-ordem` inverte as camadas e faz a imagem ser pintada DEPOIS
+   * do retângulo, cobrindo-o. Nos dois, os três números dão 369.800, e exigir
+   * que o menor apague menos não tem como valer onde não existe retângulo.
+   *
+   * O conserto não é desligar o alvo sob veneno, que seria calá-lo justamente
+   * onde ele incomoda. É dizer o que ele afirma em cada arranjo, e a afirmação
+   * do arranjo envenenado é MAIS forte, não menos: se o grande e o pequeno
+   * apagam o mesmo NADA, isso prova que o veneno de fato desligou o desenho, o
+   * que nenhuma outra asserção desta prova estabelece. É a disciplina do
+   * arranjo aplicada ao alvo, que era a peça onde ela ainda não tinha chegado. */
+  if (VENENO_TAPAR || VENENO_ORDEM) {
+    conf('ALVO sob veneno: sem retângulo desenhado, o grande apaga o mesmo NADA que a folha sem ele',
+      dTapada.diferentes, dImagem.diferentes);
+    conf('ALVO sob veneno: e o pequeno também, que é o que prova que o veneno desligou o desenho',
+      dPequeno.diferentes, dImagem.diferentes);
+  } else {
+    conf('ALVO que TEM de acusar, e quanto: um retângulo menor apaga MENOS que o grande',
+      dPequeno.diferentes > dTapada.diferentes, true);
+    conf('e apaga alguma coisa, senão o medidor não distinguiria tamanho nenhum',
+      dPequeno.diferentes < dImagem.diferentes, true);
+  }
   /* O TETO, E DE ONDE ELE VEM. Esta medida imprimia o número e não cobrava
    * nada: régua que mede e não cobra é régua que envelhece calada, e um
    * contorno desenhado no gerador de PDF amanhã passaria por aqui sem ruído.

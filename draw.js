@@ -289,7 +289,14 @@
    * Criar e redimensionar APARAM (o retângulo encolhe na borda, porque é o
    * arrasto que define o tamanho); mover PRENDE (a posição para na borda e o
    * tamanho não muda, porque encolher o que ela já dimensionou seria mudar o
-   * desenho dela sem pedir). */
+   * desenho dela sem pedir).
+   *
+   * E NÃO, OS DOIS NÃO DEVIAM SER IGUAIS. Parece inconsistência e não é: são
+   * duas perguntas diferentes. No criar e no redimensionar é o ARRASTO que está
+   * definindo o tamanho naquele instante, então aparar é obedecer ao que a mão
+   * dela está fazendo agora. No mover o tamanho JÁ FOI decidido por ela antes,
+   * e encolher ali seria o aplicativo mudar um desenho pronto porque ela
+   * arrastou longe demais. Quem uniformizar os dois vai quebrar um dos dois. */
   function aparado(v, minimo, maximo) { return Math.max(minimo, Math.min(maximo, v)); }
 
   Editor.prototype.adicionarTapar = function (x, y, w, h) {
