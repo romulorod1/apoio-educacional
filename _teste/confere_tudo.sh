@@ -478,8 +478,11 @@ roda "biblioteca listas --envenenado-anexada"       node "_teste/testa_bibliotec
 roda "biblioteca listas --envenenado-nome-anexo"    node "_teste/testa_biblioteca_listas.js" --envenenado-nome-anexo
 roda "biblioteca listas --envenenado-gabarito-junto" node "_teste/testa_biblioteca_listas.js" --envenenado-gabarito-junto
 roda "biblioteca listas --envenenado-troca-ao-ver"  node "_teste/testa_biblioteca_listas.js" --envenenado-troca-ao-ver
-roda "biblioteca listas --envenenado-esquece-anterior" node "_teste/testa_biblioteca_listas.js" --envenenado-esquece-anterior
-roda "biblioteca listas --envenenado-sobrescreve-guarda" node "_teste/testa_biblioteca_listas.js" --envenenado-sobrescreve-guarda
+roda "biblioteca listas --envenenado-desfazer-apaga" node "_teste/testa_biblioteca_listas.js" --envenenado-desfazer-apaga
+roda "biblioteca listas --envenenado-anexar-apaga"  node "_teste/testa_biblioteca_listas.js" --envenenado-anexar-apaga
+roda "biblioteca listas --envenenado-intacta-entra" node "_teste/testa_biblioteca_listas.js" --envenenado-intacta-entra
+roda "biblioteca listas --envenenado-quarta-fica"   node "_teste/testa_biblioteca_listas.js" --envenenado-quarta-fica
+roda "biblioteca listas --envenenado-restam"        node "_teste/testa_biblioteca_listas.js" --envenenado-restam
 roda "biblioteca listas --envenenado-sem-etiqueta"  node "_teste/testa_biblioteca_listas.js" --envenenado-sem-etiqueta
 roda "biblioteca listas --envenenado-orfao"         node "_teste/testa_biblioteca_listas.js" --envenenado-orfao
 # FRENTE B (B10): o que o lerKits recusa e o que a tela descarta (lista com
@@ -488,6 +491,7 @@ roda "biblioteca listas --envenenado-orfao"         node "_teste/testa_bibliotec
 roda "biblioteca lerKits"                          node "_teste/testa_biblioteca_lerkits.js"
 roda "biblioteca lerKits --envenenado-guarda"      node "_teste/testa_biblioteca_lerkits.js" --envenenado-guarda
 roda "biblioteca lerKits --envenenado-empate"      node "_teste/testa_biblioteca_lerkits.js" --envenenado-empate
+roda "biblioteca lerKits --envenenado-ajuda"       node "_teste/testa_biblioteca_lerkits.js" --envenenado-ajuda
 # FRENTE B (B10): toda mudanca na folha avisa quem grava, inclusive o
 # cancelamento depois de a borracha ou o arrasto ja terem mudado algo, e a
 # lixeira da selecao. Um veneno para cada.

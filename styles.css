@@ -295,6 +295,8 @@ input:focus, select:focus, textarea:focus {
    passava por cima do botão. Quebra em qualquer ponto e fica inteiro, porque
    é pelo nome que ela reconhece o arquivo; os botões não encolhem. */
 #lista-anexos .item-lista .nome { overflow-wrap: break-word; word-break: normal; }
+#modal-bib-selecoes .item-lista.desligada { opacity: .55; cursor: default; }
+.bib-lp-restam { font-weight: 600; color: var(--muted); }
 .tag.bib-lp-desafio { background: var(--branco); border: 1px solid var(--fio); color: var(--navy);
   text-transform: none; font-weight: 600; }
 #lista-anexos .item-lista > .btn { flex-shrink: 0; }

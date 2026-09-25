@@ -922,21 +922,21 @@
     baixar(nome, blob);
   }
 
-  /* Vários arquivos numa entrega só: o compartilhamento do Android aceita a
-   * lista, e dois `share` seguidos não (o segundo exige outro toque). Sem
-   * compartilhamento, baixa um de cada vez. */
-  function entregarArquivos(lista, titulo) {
-    if (lista.length === 1) { entregarArquivo(lista[0].nome, lista[0].blob, titulo); return; }
-    try {
-      var arquivos = lista.map(function (a) { return new File([a.blob], a.nome, { type: a.blob.type }); });
-      if (navigator.canShare && navigator.canShare({ files: arquivos })) {
-        navigator.share({ files: arquivos, title: titulo || lista[0].nome }).catch(function () {
-          lista.forEach(function (a) { baixar(a.nome, a.blob); });
-        });
-        return;
-      }
-    } catch (e) { /* sem compartilhamento, cai para o download */ }
-    lista.forEach(function (a) { baixar(a.nome, a.blob); });
+  /* DOIS ARQUIVOS, DOIS TOQUES: "Compartilhar a lista" e "Compartilhar o
+   * gabarito", cada um chamando o compartilhamento no próprio toque (o do
+   * Android exige um toque por chamada). O que vai para o aluno é escolha
+   * dela, arquivo por arquivo. */
+  function abrirCompartilhar(arquivos, titulo) {
+    var corpo = $('#corpo-modal-bib-compartilhar');
+    corpo.innerHTML = '';
+    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0',
+      texto: 'O material saiu em dois arquivos. Mande a lista ao aluno e guarde o gabarito para você.' }));
+    corpo.appendChild(el('div', { class: 'barra' }, arquivos.map(function (a, k) {
+      return el('button', { type: 'button', class: k === 0 ? 'btn principal' : 'btn', id: 'bib-compartilhar-' + (k === 0 ? 'lista' : 'gabarito'),
+        texto: k === 0 ? 'Compartilhar a lista' : 'Compartilhar o gabarito',
+        aoClick: function () { entregarArquivo(a.nome, a.blob, titulo); } });
+    })));
+    abrirModal('modal-bib-compartilhar');
   }
 
   function baixar(nome, blob) {
@@ -11620,9 +11620,18 @@
      * o exercício do fim da lista original. "Do mais simples ao mais difícil"
      * afirmava um juízo de dificuldade que ninguém conferiu (lente do uso
      * dela no PR #57). */
+    /* A ORDEM é a do gerador (degrau e minutos), não a da OBMEP: as listas da
+     * fonte se intercalam. O que é verdade é o degrau: primeiro os exercícios
+     * do começo das listas da fonte, e por último os do fim. Quando algum
+     * desafio foi marcado pela curadoria, "do fim das listas" deixa de ser
+     * verdade, e a frase diz só o que é. */
+    var curados = listas.some(function (lp) {
+      return (lp.itens || []).some(function (it) { return it && it.dificuldade === 3 && it.dificuldade_origem === 'curadoria'; });
+    });
     corpo.appendChild(el('p', { class: 'ajuda bib-lp-ajuda', id: 'bib-lp-ajuda',
-      texto: 'Os exercícios seguem a ordem do material da OBMEP. Desafios são os do fim da lista original, ' +
-        'que costumam ser os mais difíceis. Tire, ponha e troque a ordem à vontade.' }));
+      texto: (curados ? 'Desafios são os exercícios marcados como mais difíceis.'
+        : 'Primeiro vêm os exercícios do começo das listas da OBMEP e, por último, os do fim, os desafios, ' +
+          'que costumam ser os mais difíceis.') + ' Tire, ponha e troque a ordem à vontade.' }));
   }
 
   /* A lista que ela está mexendo agora: a última carregada, enquanto ao menos
@@ -11774,48 +11783,114 @@
    * e uma tela que mostrasse a lista do pacote enquanto o material sai de outro
    * lugar seria a tela mentindo sobre o que vai sair. Depois do primeiro toque
    * numa seta ou numa caixa, os dois deixam de ser a mesma coisa. */
-  /* A SELEÇÃO DE ANTES DE TROCAR POR UMA LISTA, guardada no aparelho para
-   * atravessar a navegação e o reinício. Fica até ela trocar de novo. A chave
-   * vai escrita aqui dentro, e não numa constante do módulo, porque `var` sobe
-   * a declaração e não o valor. */
-  /* Só o que ainda existe no pacote: guarda com exercício que saiu (série
-   * removida, versão nova sem ele) não oferece recuperar o que não volta. */
-  function selecaoAnterior() {
+  /* SELEÇÕES ANTERIORES: ATÉ TRÊS, E NADA AS APAGA.
+   *
+   * A guarda de uma vaga só foi remendada porta por porta três vezes, e em cada
+   * rodada uma porta nova a apagava (o Desfazer da segunda troca, o anexar, a
+   * lista mexida sobrescrevendo a seleção feita à mão). O modelo agora é outro:
+   * o aparelho guarda até três seleções, a mais nova primeiro, cada uma com os
+   * ids em ordem, a hora e, se era uma lista pronta mexida, a lista.
+   *
+   * ENTRA uma seleção só quando o material vai ser substituído (usar uma lista,
+   * carregar uma seleção guardada), e só se ele NÃO é uma lista pronta intacta
+   * (essa se refaz do pacote) e não é igual a uma já guardada.
+   * SAI uma seleção só quando uma quarta mais nova entra: sai a mais velha.
+   * Nem Desfazer, nem anexar, nem Desmarcar tudo, nem carregar apagam nada.
+   *
+   * A chave vai escrita aqui dentro, e não numa constante do módulo, porque
+   * `var` sobe a declaração e não o valor. */
+  function selecoesAnteriores() {
     try {
-      var s = JSON.parse(localStorage.getItem('apoio-educacional:bib-selecao-anterior') || 'null');
-      if (!s || !bib) return null;
-      var itens = (s.itens || []).filter(function (id) { return !!bib.itemPorId[id]; });
-      var paginas = (s.paginas || []).filter(function (id) { return !!paginaDeTeoriaPorId(id); });
-      return itens.length || paginas.length ? { itens: itens, paginas: paginas } : null;
-    } catch (e) { return null; }
+      var l = JSON.parse(localStorage.getItem('apoio-educacional:bib-selecoes-anteriores') || '[]');
+      return Array.isArray(l) ? l.filter(function (x) { return x && ((x.itens || []).length || (x.paginas || []).length); }) : [];
+    } catch (e) { return []; }
   }
-  function guardarSelecaoAnterior(sel) {
-    try {
-      if (sel) localStorage.setItem('apoio-educacional:bib-selecao-anterior', JSON.stringify(sel));
-      else localStorage.removeItem('apoio-educacional:bib-selecao-anterior');
-    } catch (e) { /* sem armazenamento: a pergunta antes de trocar continua valendo */ }
+  function gravarSelecoesAnteriores(l) {
+    try { localStorage.setItem('apoio-educacional:bib-selecoes-anteriores', JSON.stringify(l)); }
+    catch (e) { /* sem armazenamento: a pergunta antes de trocar continua valendo */ }
   }
-  /* RECUPERAR TROCA, E NÃO APAGA: o que está marcado agora passa a ser o
-   * guardado, para nada se perder no vaivém. */
-  function recuperarSelecaoAnterior() {
-    var guardada = selecaoAnterior();
-    if (!guardada) return;
-    var agora = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
+  function mesmaLista(a, b) {
+    function igual(x, y) { return x.length === y.length && !x.some(function (id, k) { return id !== y[k]; }); }
+    return igual(a.itens || [], b.itens || []) && igual(a.paginas || [], b.paginas || []);
+  }
+  /* O material de agora entra nas seleções anteriores, pela regra de cima. */
+  function guardarNasAnteriores(sel) {
+    if (!(sel.itens.length || sel.paginas.length)) return;
+    if (ehListaPronta(sel)) return;
+    var l = selecoesAnteriores();
+    if (l.some(function (x) { return mesmaLista(x, sel); })) return;
+    var lp = lpEmEdicao() ? listaProntaPorId(lpEmEdicao()) : null;
+    var daLista = lp && sel.itens.some(function (id) { return lp.minutosDe[id] !== undefined; });
+    l.unshift({ itens: sel.itens.slice(), paginas: sel.paginas.slice(), quando: new Date().toISOString(),
+      lista: daLista ? lp.id : null });
+    gravarSelecoesAnteriores(l.slice(0, 3));
+  }
+  /* O que dela ainda existe na biblioteca: série removida ou versão nova sem o
+   * exercício não oferece carregar o que não volta. */
+  function validaDaSelecao(x) {
+    var itens = (x.itens || []).filter(function (id) { return !!(bib && bib.itemPorId[id]); });
+    var paginas = (x.paginas || []).filter(function (id) { return !!paginaDeTeoriaPorId(id); });
+    return { itens: itens, paginas: paginas, faltam: (x.itens || []).length + (x.paginas || []).length - itens.length - paginas.length };
+  }
+  function quandoDaSelecao(iso) {
+    var d = new Date(iso), hoje = new Date();
+    var ontem = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 1);
+    var mesmoDia = function (a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); };
+    var hora = Core.pad2(d.getHours()) + ':' + Core.pad2(d.getMinutes());
+    if (mesmoDia(d, hoje)) return 'hoje às ' + hora;
+    if (mesmoDia(d, ontem)) return 'ontem às ' + hora;
+    return 'em ' + Core.pad2(d.getDate()) + '/' + Core.pad2(d.getMonth() + 1) + ' às ' + hora;
+  }
+  function descricaoDaSelecao(x) {
+    var v = validaDaSelecao(x);
+    var n = (x.itens || []).length, m = (x.paginas || []).length;
+    var o_que = [n ? plural(n, 'exercício', 'exercícios') : '', m ? plural(m, 'página de teoria', 'páginas de teoria') : '']
+      .filter(Boolean).join(' e ');
+    var base = o_que + ', marcados ' + quandoDaSelecao(x.quando);
+    if (!v.itens.length && !v.paginas.length) return { texto: base + ': exercícios que não estão mais na biblioteca', vazia: true };
+    if (v.faltam) return { texto: base + ' (' + plural(v.faltam, 'não está mais na biblioteca', 'não estão mais na biblioteca') + ')', vazia: false };
+    return { texto: base, vazia: false };
+  }
+  /* Carregar uma seleção guardada: o material de agora entra pela regra, a
+   * guardada NÃO sai, e se ela era uma lista pronta mexida, o vínculo volta. */
+  function carregarSelecaoAnterior(x) {
+    var v = validaDaSelecao(x);
+    if (!v.itens.length && !v.paginas.length) return;
+    guardarNasAnteriores({ itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() });
     mexeuNoMaterial();
-    bibCarrinho = { itens: (guardada.itens || []).slice(), paginas: (guardada.paginas || []).slice() };
-    // o que voltou é a seleção dela, e não uma lista pronta em edição
-    bibLpEmEdicao = null;
+    bibCarrinho = { itens: v.itens, paginas: v.paginas };
+    var lp = x.lista ? listaProntaPorId(x.lista) : null;
+    bibLpEmEdicao = lp ? lp.id : null;
     bibLpEmEdicaoLido = true;
-    try { localStorage.removeItem(CHAVE_LP_EM_EDICAO); } catch (e) { /* segue na memória */ }
+    try {
+      if (lp) localStorage.setItem(CHAVE_LP_EM_EDICAO, lp.id); else localStorage.removeItem(CHAVE_LP_EM_EDICAO);
+    } catch (e) { /* segue na memória */ }
     guardarCarrinho();
-    /* A troca guarda o que estava marcado, a não ser que seja uma lista pronta
-     * intacta: essa se refaz do pacote, e guardá-la apagaria a guarda dela. */
-    guardarSelecaoAnterior((agora.itens.length || agora.paginas.length) && !ehListaPronta(agora) ? agora : null);
+    fecharModal('modal-bib-selecoes');
     // um desenho só: o desenharCarrinho já redesenha a tela da lista quando ela está à vista
     desenharCarrinho();
     marcarCaixasDoCarrinho();
     desenharContextoBiblioteca();
-    avisar('O material voltou a ter o que estava marcado antes.');
+    avisar('O material voltou a ter a seleção marcada ' + quandoDaSelecao(x.quando) + '.');
+  }
+  function botaoSelecoesAnteriores() {
+    return el('button', { type: 'button', class: 'btn pequeno', id: 'bib-carrinho-selecoes',
+      texto: 'Seleções anteriores (' + selecoesAnteriores().length + ')', aoClick: abrirSelecoesAnteriores });
+  }
+  function abrirSelecoesAnteriores() {
+    var corpo = $('#corpo-modal-bib-selecoes');
+    corpo.innerHTML = '';
+    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0',
+      texto: 'O que estava marcado antes de você trocar por uma lista. Tocar numa linha põe essa seleção no material.' }));
+    selecoesAnteriores().forEach(function (x, k) {
+      var d = descricaoDaSelecao(x);
+      var linha = linhaBib(d.texto, x.lista && listaProntaPorId(x.lista) ? nomeDaListaPronta(listaProntaPorId(x.lista)) + ', mexida' : '',
+        function () { if (!d.vazia) carregarSelecaoAnterior(x); });
+      linha.setAttribute('data-selecao', String(k));
+      if (d.vazia) { linha.classList.add('desligada'); linha.setAttribute('aria-disabled', 'true'); }
+      corpo.appendChild(linha);
+    });
+    abrirModal('modal-bib-selecoes');
   }
 
   function mesmaSelecao(a, lp) {
@@ -11838,13 +11913,8 @@
         : n === 1 ? 'Trocar o exercício marcado por esta lista?'
         : 'Trocar os ' + n + ' exercícios marcados por esta lista?';
       if (!confirmar(pergunta)) return;
-      /* DUAS TROCAS SEGUIDAS NÃO APAGAM O QUE ELA MARCOU À MÃO: se o material
-       * de agora é uma lista pronta intacta, ele se refaz do pacote, e a guarda
-       * continua sendo a seleção dela. Sem isto, lista 1 e depois lista 2
-       * sobrescrevia os nove dela pela lista 1. Achado pela lente de correção. */
-      if (!ehListaPronta(bibCarrinho)) {
-        guardarSelecaoAnterior({ itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() });
-      }
+      // o material de agora vai para as seleções anteriores (ver guardarNasAnteriores)
+      guardarNasAnteriores({ itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() });
     }
     usarListaPronta(lp);
   }
@@ -11861,8 +11931,8 @@
     var estado = null;
     if (bibCarrinho.itens.length || bibCarrinho.paginas.length) {
       var n = bibCarrinho.itens.length + bibCarrinho.paginas.length;
-      estado = 'O material tem ' + plural(n, 'item marcado', 'itens marcados') +
-        '. Ver esta lista não muda nada; Usar esta lista pergunta antes de trocar.';
+      estado = 'O material tem ' + (bibCarrinho.paginas.length ? plural(n, 'item marcado', 'itens marcados')
+        : plural(n, 'exercício marcado', 'exercícios marcados')) + '. Olhar esta lista não muda o que você marcou.';
     }
     var foi = bibAnexadasNaSessao[lp.id];
     if (foi) corpo.appendChild(el('p', { class: 'ajuda bib-lp-estado', id: 'bib-lp-foi', texto: 'Esta lista foi anexada na aula de ' +
@@ -11910,7 +11980,16 @@
       return;
     }
     corpo.appendChild(voltarBib(mod.titulo, function () { irNaBiblioteca({ aula: null }); }));
-    corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: nomeDaListaPronta(lp) }));
+    /* O nome conta os desafios do pacote; quando ela tira algum, a tela diz
+     * quantos ficaram, e só os que ficaram levam a etiqueta. */
+    var totalDesafios = desafiosDe(lp);
+    var ficaram = bibCarrinho.itens.filter(function (id) {
+      return lp.minutosDe[id] !== undefined && bib.itemPorId[id] && bib.itemPorId[id].dificuldade === 3;
+    }).length;
+    corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: nomeDaListaPronta(lp) }, [
+      bibCarrinho.itens.length && totalDesafios && ficaram < totalDesafios
+        ? el('span', { class: 'bib-lp-restam', id: 'bib-lp-restam', texto: ' · ' + ficaram + ' de ' + totalDesafios + ' desafios' }) : null
+    ]));
     if (bibLpAviso) {
       // capturado no desenho: o clique não pode depender de a variável ainda apontar para ele
       var av = bibLpAviso;
@@ -12674,6 +12753,8 @@
    * razão: somar deixaria um material que não é nem o de antes nem a lista. O
    * Desfazer devolve o de antes e mantém o que ela marcar depois. */
   function usarListaPronta(lp) {
+    // a lista já estava no material (em edição) antes deste toque?
+    var eraEsta = lpEmEdicao() === lp.id;
     var antes = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
     var tudo = { itens: lp.ids.slice(), paginas: [] };
     bibCarrinho = { itens: tudo.itens.slice(), paginas: [] };
@@ -12725,11 +12806,11 @@
       texto: 'O material agora tem ' + plural(bibCarrinho.itens.length, 'exercício', 'exercícios') +
         ': “' + nomeDaListaPronta(lp) + '”' +
         (sairam ? ', no lugar do que estava marcado'
-          : perdeu ? ', de volta como veio' : '') +
+          : perdeu ? (eraEsta ? ', de volta como veio' : ', no lugar do que estava marcado') : '') +
         '. Mude o que quiser e toque em Gerar material.',
       rotulo: perdeu ? 'Desfazer' : null,
-      // o Desfazer da troca devolve a seleção, e a guarda deixa de ser necessária
-      aoAgir: perdeu ? function () { guardarSelecaoAnterior(null); devolverSelecaoTrocada(antes, tudo); } : null
+      // o Desfazer só desfaz: devolve o material de antes, e as seleções guardadas ficam
+      aoAgir: perdeu ? function () { devolverSelecaoTrocada(antes, tudo); } : null
     };
     /* A ORDEM IMPORTA, E DÁ UM DESENHO EM VEZ DE DOIS. O `desenharCarrinho`
      * redesenha a tela da lista pronta quando a grade já existe; chamado DEPOIS
@@ -12819,11 +12900,10 @@
     faixa.classList.toggle('vazia', !(n || m));
     if (!(n || m)) {
       faixa.appendChild(el('span', { class: 'bib-carrinho-texto', id: 'bib-carrinho-vazio',
-        texto: 'Nada marcado ainda.' }));
-      if (selecaoAnterior()) {
+        texto: listaAnexada() ? 'Nada marcado.' : 'Nada marcado ainda.' }));
+      if (selecoesAnteriores().length) {
         faixa.appendChild(el('span', { class: 'cresce' }));
-        faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-carrinho-recuperar',
-          texto: 'Recuperar o que estava marcado', aoClick: recuperarSelecaoAnterior }));
+        faixa.appendChild(botaoSelecoesAnteriores());
       }
       return;
     }
@@ -12837,12 +12917,8 @@
         m ? plural(m, 'página de teoria', 'páginas de teoria') : ''
       ].filter(Boolean).join(', ') }));
     faixa.appendChild(el('span', { class: 'cresce' }));
-    /* O QUE ESTAVA MARCADO ANTES DE ELA TROCAR POR UMA LISTA fica à mão aqui,
-     * em qualquer tela da Biblioteca, até ela trocar de novo. */
-    if (selecaoAnterior()) {
-      faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-carrinho-recuperar',
-        texto: 'Recuperar o que estava marcado', aoClick: recuperarSelecaoAnterior }));
-    }
+    // o que estava marcado antes das trocas fica à mão aqui, em qualquer tela da Biblioteca
+    if (selecoesAnteriores().length) faixa.appendChild(botaoSelecoesAnteriores());
     faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-carrinho-limpar', texto: 'Desmarcar tudo',
       aoClick: function () {
         mexeuNoMaterial();
@@ -13016,7 +13092,7 @@
     var LISTA_CAIXAS = [
       ['teoria', 'Teoria', paginas.length > 0, !paginas.length],
       ['lista', 'Lista', itens.length > 0, !itens.length],
-      ['gabarito', 'Gabarito em folha separada', itens.length > 0, !itens.length],
+      ['gabarito', 'Gabarito em arquivo separado', itens.length > 0, !itens.length],
       ['espaco', 'Espaço para resposta', false, !itens.length],
       ['origem', 'Mostrar a origem em letra pequena', false, false],
       ['folha', 'Abrir a lista como folha da aula', false, !itens.length]
@@ -13223,8 +13299,6 @@
     var lpUsada = lpEmEdicao() ? listaProntaPorId(lpEmEdicao()) : null;
     var veioDaLista = lpUsada && usada.itens.some(function (x) { return lpUsada.minutosDe[x] !== undefined; });
     if (aula && aluno && veioDaLista) lembrarAnexada({ aluno: aluno.nome, data: aula.data, aulaId: aula.id, lista: lpUsada.id });
-    // anexou: o que estava guardado antes de uma troca deixa de ser a volta dela
-    if (aula) guardarSelecaoAnterior(null);
     desenharCarrinho();
     marcarCaixasDoCarrinho();
     return function () {
@@ -13273,6 +13347,10 @@
         teoria: teoria, itens: pecas
       };
       var nomeBase = op.titulo + (op.subtitulo ? ' ' + op.subtitulo : '');
+      /* Material de lista pronta: o nome do arquivo leva a lista
+       * ("..._lista_1_desafio.pdf"), para ela saber qual é sem abrir. */
+      var lpDoArquivo = lpEmEdicao() ? listaProntaPorId(lpEmEdicao()) : null;
+      var daLista = lpDoArquivo && listaProntaEmEdicao(lpDoArquivo) ? ' ' + comoSeChama(lpDoArquivo).replace(/^com /, '') : '';
       /* O GABARITO VAI EM ARQUIVO SEPARADO QUANDO ELA ANEXA LISTA COM GABARITO:
        * no mesmo PDF, mandar a lista ao aluno era mandar as respostas junto
        * (a página do gabarito é quase igual à da lista, e numa impressora preto
@@ -13285,8 +13363,8 @@
         var sg = PDFGen.gerarMaterialBiblioteca(Object.assign({}, base, { incluirTeoria: false, incluirLista: false, teoria: [] }));
         saida = { bytes: sl.bytes, reduzidos: { lista: sl.reduzidos.lista, gabarito: sg.reduzidos.gabarito } };
         arquivos = [
-          { nome: Core.nomeArquivo(nomeBase + ' lista') + '.pdf', blob: new Blob([sl.bytes], { type: 'application/pdf' }) },
-          { nome: Core.nomeArquivo(nomeBase + ' gabarito') + '.pdf', blob: new Blob([sg.bytes], { type: 'application/pdf' }) }
+          { nome: Core.nomeArquivo(nomeBase + ' lista' + daLista) + '.pdf', blob: new Blob([sl.bytes], { type: 'application/pdf' }) },
+          { nome: Core.nomeArquivo(nomeBase + ' gabarito' + daLista) + '.pdf', blob: new Blob([sg.bytes], { type: 'application/pdf' }) }
         ];
       } else {
         saida = PDFGen.gerarMaterialBiblioteca(base);
@@ -13294,7 +13372,8 @@
       }
       if (!aula) {
         fecharModal('modal-bib-gerar');
-        entregarArquivos(arquivos, op.titulo);
+        if (arquivos.length === 1) entregarArquivo(arquivos[0].nome, arquivos[0].blob, op.titulo);
+        else abrirCompartilhar(arquivos, op.titulo);
         return null;
       }
       /* DUAS LISTAS DO MESMO ASSUNTO NA MESMA AULA não podem sair com o mesmo

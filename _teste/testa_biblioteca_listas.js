@@ -159,13 +159,23 @@ const T_NOME_ANEXO = '      void i;';
 const L_TROCA_AO_VER = "          else irNaBiblioteca({ aula: { tipo: 'lista-pronta', id: lp.id, ver: true } });";
 const T_TROCA_AO_VER = '          else usarListaPronta(lp);';
 // a seleção de antes da troca deixa de ser guardada no aparelho
-const L_ESQUECE_ANTERIOR = "      if (sel) localStorage.setItem('apoio-educacional:bib-selecao-anterior', JSON.stringify(sel));";
-const T_ESQUECE_ANTERIOR = '      if (sel) void sel;';
 const L_GABARITO_JUNTO = '      var separa = !!(op.lista && op.gabarito && usaItens.length);';
 const T_GABARITO_JUNTO = '      var separa = false;';
-// duas trocas seguidas voltam a sobrescrever a guarda com a primeira lista
-const L_SOBRESCREVE = '      if (!ehListaPronta(bibCarrinho)) {';
-const T_SOBRESCREVE = '      if (true) {';
+// o Desfazer da troca volta a apagar as seleções guardadas
+const L_DESFAZER_APAGA = '      aoAgir: perdeu ? function () { devolverSelecaoTrocada(antes, tudo); } : null';
+const T_DESFAZER_APAGA = '      aoAgir: perdeu ? function () { gravarSelecoesAnteriores([]); devolverSelecaoTrocada(antes, tudo); } : null';
+// anexar volta a apagar as seleções guardadas
+const L_ANEXAR_APAGA = '    var veioDaLista = lpUsada && usada.itens.some(function (x) { return lpUsada.minutosDe[x] !== undefined; });';
+const T_ANEXAR_APAGA = L_ANEXAR_APAGA + ' gravarSelecoesAnteriores([]);';
+// a lista pronta intacta passa a entrar nas seleções
+const L_INTACTA_ENTRA = '    if (ehListaPronta(sel)) return;';
+const T_INTACTA_ENTRA = '    if (false) return;';
+// a quarta seleção não tira mais a mais velha
+const L_QUARTA = '    gravarSelecoesAnteriores(l.slice(0, 3));';
+const T_QUARTA = '    gravarSelecoesAnteriores(l);';
+// o "N de M desafios" some da lista em uso
+const L_RESTAM = "        ? el('span', { class: 'bib-lp-restam', id: 'bib-lp-restam', texto: ' · ' + ficaram + ' de ' + totalDesafios + ' desafios' }) : null";
+const T_RESTAM = '        ? null : null';
 // o cartão perde a etiqueta "desafio", e o nome volta a contar o que ela não vê
 const L_SEM_ETIQUETA = "    return it && it.dificuldade === 3 ? el('span', { class: 'tag bib-lp-desafio', texto: 'desafio' }) : null;";
 const T_SEM_ETIQUETA = '    return null;';
@@ -211,7 +221,7 @@ const L_FRASE = [
   "      texto: 'O material agora tem ' + plural(bibCarrinho.itens.length, 'exercício', 'exercícios') +",
   "        ': “' + nomeDaListaPronta(lp) + '”' +",
   "        (sairam ? ', no lugar do que estava marcado'",
-  "          : perdeu ? ', de volta como veio' : '') +",
+  "          : perdeu ? (eraEsta ? ', de volta como veio' : ', no lugar do que estava marcado') : '') +",
   "        '. Mude o que quiser e toque em Gerar material.',"].join(NL_APP);
 const T_FRASE = "      texto: (sairam ? 'Tirei ' + plural(sairam, 'item que estava marcado', 'itens que estavam marcados') +" +
   " ' e marquei ' : 'Marquei ') + 'a lista pronta do nível ' + lp.nivel + ': ' +" +
@@ -254,10 +264,13 @@ const VENENOS = {
   'nome-anexo': { arq: '/app.js', de: L_NOME_ANEXO, para: T_NOME_ANEXO },
   'gabarito-junto': { arq: '/app.js', de: L_GABARITO_JUNTO, para: T_GABARITO_JUNTO },
   'troca-ao-ver': { arq: '/app.js', de: L_TROCA_AO_VER, para: T_TROCA_AO_VER },
-  'sobrescreve-guarda': { arq: '/app.js', de: L_SOBRESCREVE, para: T_SOBRESCREVE },
+  'desfazer-apaga': { arq: '/app.js', de: L_DESFAZER_APAGA, para: T_DESFAZER_APAGA },
+  'anexar-apaga': { arq: '/app.js', de: L_ANEXAR_APAGA, para: T_ANEXAR_APAGA },
+  'intacta-entra': { arq: '/app.js', de: L_INTACTA_ENTRA, para: T_INTACTA_ENTRA },
+  'quarta-fica': { arq: '/app.js', de: L_QUARTA, para: T_QUARTA },
+  restam: { arq: '/app.js', de: L_RESTAM, para: T_RESTAM },
   'sem-etiqueta': { arq: '/app.js', de: L_SEM_ETIQUETA, para: T_SEM_ETIQUETA },
   orfao: { arq: '/app.js', de: L_ORFAO, para: T_ORFAO },
-  'esquece-anterior': { arq: '/app.js', de: L_ESQUECE_ANTERIOR, para: T_ESQUECE_ANTERIOR }
 };
 const NOME_VENENO = Object.keys(VENENOS).filter(function (n) {
   return process.argv.indexOf('--envenenado-' + n) !== -1;
@@ -288,8 +301,11 @@ const V_ANEXADA = NOME_VENENO === 'anexada';
 const V_NOME_ANEXO = NOME_VENENO === 'nome-anexo';
 const V_GABARITO_JUNTO = NOME_VENENO === 'gabarito-junto';
 const V_TROCA_AO_VER = NOME_VENENO === 'troca-ao-ver';
-const V_ESQUECE_ANTERIOR = NOME_VENENO === 'esquece-anterior';
-const V_SOBRESCREVE = NOME_VENENO === 'sobrescreve-guarda';
+const V_DESFAZER_APAGA = NOME_VENENO === 'desfazer-apaga';
+const V_ANEXAR_APAGA = NOME_VENENO === 'anexar-apaga';
+const V_INTACTA_ENTRA = NOME_VENENO === 'intacta-entra';
+const V_QUARTA = NOME_VENENO === 'quarta-fica';
+const V_RESTAM = NOME_VENENO === 'restam';
 const V_SEM_ETIQUETA = NOME_VENENO === 'sem-etiqueta';
 const V_ORFAO = NOME_VENENO === 'orfao';
 const BASE_DE = { '/app.js': APP_REPO, '/draw.js': DRAW_REPO, '/styles.css': CSS_REPO };
@@ -454,39 +470,58 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   };
 }, seletor);
 
+/* ---------- SELEÇÕES ANTERIORES ----------
+ * S é a seleção feita à mão; L1 e L2 as duas listas prontas do assunto; L1'
+ * a L1 mexida por ela. Em todos os caminhos, S tem de continuar recuperável,
+ * inclusive depois de fechar e abrir o aplicativo no meio. */
+const CHAVE_SEL = 'apoio-educacional:bib-selecoes-anteriores';
+const guardadas = pag => pag.evaluate(k => { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return []; } }, CHAVE_SEL);
+const temS = (lista, S) => lista.some(x => (x.itens || []).join('|') === S.join('|'));
+async function irAoAssunto(pag) {
+  await H.irParaAba(pag, 'biblioteca');
+  await pausa(300);
+  await pag.evaluate(() => { for (let k = 0; k < 6; k++) { const b = document.querySelector('.bib-voltar'); if (!b) break; const t = b.textContent; b.click(); if (/9º ano/.test(t)) break; } });
+  await pausa(300);
+  await tocarLinha(pag, MOD_TITULO);
+  await pausa(400);
+}
+async function limparTudo(pag) {
+  await pag.evaluate(k => { localStorage.removeItem(k); const b = document.querySelector('#bib-carrinho-limpar'); if (b) b.click(); }, CHAVE_SEL);
+  await pausa(300);
+}
+async function marcarAMao(pag, quantos, pular) {
+  await irAoAssunto(pag);
+  await tocarLinha(pag, 'Equações do Segundo Grau: Resultados Básicos');
+  await pausa(500);
+  await pag.evaluate((q, p) => {
+    Array.from(document.querySelectorAll('#bib-corpo input[data-carrinho="itens"]')).slice(p, p + q)
+      .forEach(c => { if (!c.checked) { c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); } });
+  }, quantos, pular || 0);
+  await pausa(300);
+  await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
+  await pausa(300);
+  return (await carrinho(pag)).itens.slice();
+}
+async function usarDoAssunto(pag, nome) {
+  await irAoAssunto(pag);
+  return usarLista(pag, nome);
+}
+async function reiniciar(pag) {
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.abrirApp(pag, amb.ORIGEM);
+  await H.irParaAba(pag, 'biblioteca');
+  await pausa(400);
+}
+
 async function cenarioVerNaoTroca(pag) {
-  secao('5i. Ver uma lista não troca o material, e o que estava marcado volta');
+  secao('5i. Ver uma lista não troca o material');
   const perguntas = [];
   pag.on('dialog', d => perguntas.push(d.message()));
-  await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-limpar'); if (b) b.click(); });
-  await pausa(400);
-  await H.irParaAba(pag, 'biblioteca');
-  await pag.evaluate(() => {
-    for (let k = 0; k < 6; k++) {
-      const b = document.querySelector('.bib-voltar');
-      if (!b) break;
-      const t = b.textContent; b.click();
-      if (/9º ano/.test(t)) break;
-    }
-  });
-  await pausa(400);
-  if (!(await tocarLinha(pag, MOD_TITULO))) await pausa(200);
-  await pausa(400);
-  conf('abriu a lista cheia', await tocarLinha(pag, 'Equações do Segundo Grau: Resultados Básicos'), true);
-  await pausa(600);
-  const nove = await pag.evaluate(() => {
-    const caixas = Array.from(document.querySelectorAll('#bib-corpo input[data-carrinho="itens"]')).slice(0, 9);
-    caixas.forEach(c => { if (!c.checked) { c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); } });
-    return caixas.map(c => c.dataset.id);
-  });
-  await pausa(300);
-  const marcadosDela = (await carrinho(pag)).itens.slice();
+  await limparTudo(pag);
+  const marcadosDela = await marcarAMao(pag, 9);
   conf('ela marcou nove exercícios', marcadosDela.length, 9);
-  await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
-  await pausa(400);
   conf('tocou para ver a primeira lista', await tocarLinha(pag, 'Lista com 1 desafio'), true);
   await pausa(400);
-  /* A ETIQUETA "desafio": o nome conta 1, e o cartão mostra qual é. */
   const etiquetas = await pag.evaluate(() => document.querySelectorAll('#bib-lp-previa .bib-lp-desafio, #bib-lp-grade .bib-lp-desafio').length);
   if (V_SEM_ETIQUETA) {
     conf('VENENO ENXERGADO: o nome diz 1 desafio e nenhum cartão mostra qual é', etiquetas, 0);
@@ -494,68 +529,130 @@ async function cenarioVerNaoTroca(pag) {
   }
   conf('o nome diz 1 desafio, e um cartão leva a etiqueta "desafio"', etiquetas, 1);
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
-  await pausa(400);
+  await pausa(300);
   conf('tocou para ver a outra', await tocarLinha(pag, 'Lista com 2 desafios'), true);
   await pausa(400);
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
-  await pausa(400);
+  await pausa(300);
   const depoisDeVer = (await carrinho(pag)).itens.slice();
   if (V_TROCA_AO_VER) {
     conf('VENENO ENXERGADO: ver trocou o material e os nove sumiram', depoisDeVer.join('|') === marcadosDela.join('|'), false);
     return false;
   }
   conf('depois de ver as duas listas, os nove continuam, na ordem', depoisDeVer.join('|'), marcadosDela.join('|'));
-  conf('tocou na outra lista e em Usar esta lista', await usarLista(pag, 'Lista com 2 desafios'), true);
-  await pausa(500);
-  console.log('   pergunta: ' + JSON.stringify(perguntas[perguntas.length - 1] || null));
+  conf('usou a lista 2', await usarLista(pag, 'Lista com 2 desafios'), true);
+  await pausa(400);
   conf('usar perguntou antes de trocar, com o número certo',
     perguntas[perguntas.length - 1] || '', 'Trocar os 9 exercícios marcados por esta lista?');
-  const LISTA3 = Sintetico.LISTAS.filter(l => l.modulo === LISTA2.modulo && l.id !== LISTA2.id)[0];
-  conf('e trocou: o material é a lista', (await carrinho(pag)).itens.join('|'), LISTA3.degraus.map(d => d.item).join('|'));
-  conf('na lista em uso, os dois desafios levam a etiqueta', await pag.evaluate(() =>
+  conf('e na lista em uso, os dois desafios levam a etiqueta', await pag.evaluate(() =>
     document.querySelectorAll('#bib-lp-grade .bib-lp-desafio').length), 2);
-  /* A SEGUNDA TROCA: da lista 2 para a lista 1. A guarda tem de continuar
-   * sendo a seleção dela, e não virar a lista 2 (bloqueante da lente de
-   * correção). */
-  await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
+
+  secao('5k. Seleções anteriores: S continua recuperável em todo caminho');
+  const LISTA3 = Sintetico.LISTAS.filter(l => l.modulo === LISTA2.modulo && l.id !== LISTA2.id)[0];
+  void LISTA3;
+
+  // (a) S, L1, L2, Desfazer, com reinício no meio
+  await limparTudo(pag);
+  let S = await marcarAMao(pag, 9);
+  await usarDoAssunto(pag, 'Lista com 1 desafio');
+  await reiniciar(pag);
+  await usarDoAssunto(pag, 'Lista com 2 desafios');
+  await pausa(300);
+  const temDesfazer = await pag.evaluate(() => { const b = document.querySelector('#bib-lp-aviso-acao'); if (!b) return false; b.click(); return true; });
   await pausa(400);
-  conf('usou a outra lista, a segunda troca seguida', await usarLista(pag, 'Lista com 1 desafio'), true);
-  await pausa(500);
-  conf('e a pergunta veio de novo, com o número da lista 2', perguntas[perguntas.length - 1] || '',
-    'Trocar os ' + LISTA3.degraus.length + ' exercícios marcados por esta lista?');
-  await pag.reload({ waitUntil: 'networkidle0' });
-  await H.abrirApp(pag, amb.ORIGEM);
-  await H.irParaAba(pag, 'biblioteca');
-  await pausa(500);
-  const temRecuperar = await pag.evaluate(() => !!document.querySelector('#bib-carrinho-recuperar'));
-  if (V_ESQUECE_ANTERIOR) {
-    conf('VENENO ENXERGADO: depois do reinício não há o que recuperar', temRecuperar, false);
+  let g = await guardadas(pag);
+  if (V_INTACTA_ENTRA) {
+    conf('VENENO ENXERGADO: a lista intacta L1 entrou nas seleções guardadas', g.length > 1, true);
     return false;
   }
-  conf('depois de fechar e abrir, a faixa oferece Recuperar o que estava marcado', temRecuperar, true);
-  await pag.evaluate(() => document.querySelector('#bib-carrinho-recuperar').click());
-  await pausa(500);
-  const recuperado = (await carrinho(pag)).itens.join('|');
-  if (V_SOBRESCREVE) {
-    conf('VENENO ENXERGADO: depois de duas trocas, o que volta é a primeira lista, e os nove dela sumiram',
-      recuperado === marcadosDela.join('|'), false);
+  if (V_DESFAZER_APAGA) {
+    conf('VENENO ENXERGADO: o Desfazer apagou S', temS(g, S), false);
     return false;
   }
-  conf('e, depois de DUAS trocas, o que estava marcado voltou inteiro e na ordem', recuperado, marcadosDela.join('|'));
-  conf('e recuperar zerou a lista em edição', await pag.evaluate(() => localStorage.getItem('apoio-educacional:bib-lp-em-edicao')), null);
-  await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-limpar'); if (b) b.click(); });
-  await pausa(400);
-  /* A GUARDA QUE NÃO EXISTE MAIS NO PACOTE não oferece recuperar nada. */
-  await pag.evaluate(() => localStorage.setItem('apoio-educacional:bib-selecao-anterior',
-    JSON.stringify({ itens: ['9ano:nao-existe:ex:1'], paginas: [] })));
-  await pag.reload({ waitUntil: 'networkidle0' });
-  await H.abrirApp(pag, amb.ORIGEM);
-  await H.irParaAba(pag, 'biblioteca');
+  conf('(a) só S foi guardada: lista pronta intacta não entra', g.length, 1);
+  conf('(a) S, L1, reinício, L2, Desfazer: S continua guardada', temDesfazer && temS(g, S), true);
+
+  // (b) S, L1, reinício, anexar
+  await limparTudo(pag);
+  S = await marcarAMao(pag, 9);
+  await usarDoAssunto(pag, 'Lista com 1 desafio');
+  await reiniciar(pag);
+  await pag.evaluate(() => document.querySelector('#bib-carrinho-gerar').click());
   await pausa(500);
-  conf('guarda com exercício que não existe mais: sem o botão Recuperar',
-    await pag.evaluate(() => !!document.querySelector('#bib-carrinho-recuperar')), false);
-  await pag.evaluate(() => localStorage.removeItem('apoio-educacional:bib-selecao-anterior'));
-  void nove;
+  await pag.evaluate(() => document.querySelector('#bib-gerar-aulas [data-aula="aula-b10-anexa"]').click());
+  await pausa(200);
+  const antesAnexo = await pag.evaluate(() => Store.carregar().then(d => (d.aulas.find(a => a.id === 'aula-b10-anexa').anexos || []).length));
+  await pag.evaluate(() => document.querySelector('#bib-gerar-anexar').click());
+  await esperar('anexou (b)', () => pag.evaluate(() => Store.carregar().then(d => (d.aulas.find(a => a.id === 'aula-b10-anexa').anexos || []).length)),
+    v => v > antesAnexo, 30000);
+  await pausa(600);
+  g = await guardadas(pag);
+  if (V_ANEXAR_APAGA) {
+    conf('VENENO ENXERGADO: anexar apagou S', temS(g, S), false);
+    return false;
+  }
+  conf('(b) S, L1, reinício, anexar: S continua guardada', temS(g, S), true);
+  await pag.evaluate(() => document.querySelectorAll('.modal.aberto [data-fechar]').forEach(b => b.click()));
+
+  // (c) S, L1', L2: a lista mexida é trabalho dela e entra, e S continua
+  await limparTudo(pag);
+  S = await marcarAMao(pag, 9);
+  await usarDoAssunto(pag, 'Lista com 1 desafio');
+  await pausa(300);
+  const tirado = (await carrinho(pag)).itens[1];
+  await desmarcar(pag, tirado);
+  await pausa(300);
+  const L1mexida = (await carrinho(pag)).itens.slice();
+  await reiniciar(pag);
+  await usarDoAssunto(pag, 'Lista com 2 desafios');
+  g = await guardadas(pag);
+  conf('(c) S, L1 mexida, reinício, L2: as duas guardadas, a mexida primeiro', g.map(x => x.itens.join('|')).join(' / '),
+    [L1mexida.join('|'), S.join('|')].join(' / '));
+  conf('(c) e a mexida lembra de qual lista era', g[0] && g[0].lista, LISTA2.id);
+
+  // (d) S, L1, carregar S pela janela, reinício, L2
+  await limparTudo(pag);
+  S = await marcarAMao(pag, 9);
+  await usarDoAssunto(pag, 'Lista com 1 desafio');
+  await pag.evaluate(() => document.querySelector('#bib-carrinho-selecoes').click());
+  await pausa(400);
+  const linhas = await pag.evaluate(() => Array.from(document.querySelectorAll('#corpo-modal-bib-selecoes [data-selecao] .nome')).map(n => n.textContent));
+  console.log('   janela: ' + JSON.stringify(linhas));
+  conf('(d) a faixa abre "Seleções anteriores" com a linha de S', /^9 exercícios, marcados hoje às \d\d:\d\d$/.test(linhas[0] || ''), true);
+  await pag.evaluate(() => document.querySelector('#corpo-modal-bib-selecoes [data-selecao="0"]').click());
+  await pausa(400);
+  conf('(d) tocar na linha põe S no material, na ordem', (await carrinho(pag)).itens.join('|'), S.join('|'));
+  await reiniciar(pag);
+  await usarDoAssunto(pag, 'Lista com 2 desafios');
+  g = await guardadas(pag);
+  conf('(d) S, L1, carregar S, reinício, L2: S continua guardada, uma vez só', g.filter(x => x.itens.join('|') === S.join('|')).length, 1);
+  conf('(d) e o botão diz quantas há', await pag.evaluate(() => (document.querySelector('#bib-carrinho-selecoes') || {}).textContent || ''),
+    'Seleções anteriores (' + g.length + ')');
+
+  // (e) a quarta tira a mais velha
+  await limparTudo(pag);
+  const primeira = await marcarAMao(pag, 2, 0);
+  for (let k = 1; k <= 4; k++) {
+    await usarDoAssunto(pag, 'Lista com 1 desafio');
+    if (k < 4) { await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-limpar'); if (b) b.click(); }); await pausa(200); await marcarAMao(pag, 2, k * 2); }
+  }
+  g = await guardadas(pag);
+  if (V_QUARTA) {
+    conf('VENENO ENXERGADO: a quarta entrou e a mais velha não saiu', g.length, 4);
+    return false;
+  }
+  conf('(e) quatro seleções: ficam três, e a mais velha saiu', g.length + ':' + temS(g, primeira), '3:false');
+
+  // (f) seleção com exercício que não existe mais aparece apagada e não carrega
+  await pag.evaluate(k => localStorage.setItem(k, JSON.stringify([{ itens: ['9ano:nao-existe:ex:1'], paginas: [], quando: new Date().toISOString() }])), CHAVE_SEL);
+  await reiniciar(pag);
+  await pag.evaluate(() => document.querySelector('#bib-carrinho-selecoes').click());
+  await pausa(300);
+  const apagada = await pag.evaluate(() => { const l = document.querySelector('#corpo-modal-bib-selecoes [data-selecao="0"]');
+    return l ? l.classList.contains('desligada') + '|' + l.querySelector('.nome').textContent : ''; });
+  conf('(f) seleção que não existe mais aparece apagada', /^true\|.*exercícios que não estão mais na biblioteca$/.test(apagada), true);
+  await pag.evaluate(() => document.querySelectorAll('.modal.aberto [data-fechar]').forEach(b => b.click()));
+  await limparTudo(pag);
   return true;
 }
 
@@ -577,7 +674,7 @@ async function cenarioVerNaoTroca(pag) {
   if (!VENENO) {
     secao('0. As cercas ainda apontam para o alvo');
     var nomes = Object.keys(VENENOS);
-    conf('a tabela tem os vinte e oito venenos desta prova', nomes.length, 28);
+    conf('a tabela tem os trinta e um venenos desta prova', nomes.length, 31);
     var fora = [];
     nomes.forEach(function (n) {
       var r = VENENOS[n];
@@ -660,7 +757,7 @@ async function cenarioVerNaoTroca(pag) {
    * e "pacote" é palavra nossa, não dela. */
   conf('a ajuda diz a ordem em palavras simples', await pag.evaluate(() =>
     (document.querySelector('#bib-lp-ajuda') || {}).textContent || ''),
-    'Os exercícios seguem a ordem do material da OBMEP. Desafios são os do fim da lista original, ' +
+    'Primeiro vêm os exercícios do começo das listas da OBMEP e, por último, os do fim, os desafios, ' +
       'que costumam ser os mais difíceis. Tire, ponha e troque a ordem à vontade.');
   conf('na tela do assunto a palavra "estimativa" não aparece', /estimativa/.test(texto), false);
   conf('nem a palavra "pacote"', /pacote/.test(texto), false);
@@ -747,7 +844,7 @@ async function cenarioVerNaoTroca(pag) {
   conf('e a tela é a de ver, com o botão Usar esta lista',
     await pag.evaluate(() => !!document.querySelector('#bib-lp-previa') && !!document.querySelector('#bib-lp-usar')), true);
   conf('e ela diz que ver não muda nada', await pag.evaluate(() =>
-    /Ver esta lista não muda nada/.test((document.querySelector('#bib-lp-estado') || {}).textContent || '')), true);
+    /Olhar esta lista não muda o que você marcou/.test((document.querySelector('#bib-lp-estado') || {}).textContent || '')), true);
   conf('usou a lista', await pag.evaluate(() => { const b = document.querySelector('#bib-lp-usar'); if (!b) return false; b.click(); return true; }), true);
   await pausa(500);
   const c2 = await carrinho(pag);
@@ -1175,11 +1272,11 @@ async function cenarioVerNaoTroca(pag) {
     conf('VENENO: sem enxergar a ordem, o aviso nasce SEM Desfazer',
       await pag.evaluate(() => !!document.querySelector('#bib-lp-aviso-acao')), false);
     conf('VENENO: e a frase não diz que a lista voltou como o pacote a trouxe',
-      /de volta como veio/.test(avisoReload.texto), false);
+      /no lugar do que estava marcado/.test(avisoReload.texto), false);
     return;
   }
   conf('e a tela diz que a lista voltou como o pacote a trouxe',
-    /de volta como veio/.test(avisoReload.texto), true);
+    /no lugar do que estava marcado/.test(avisoReload.texto), true);
   conf('e oferece Desfazer, porque o que se perdeu foi trabalho dela',
     await pag.evaluate(() => !!document.querySelector('#bib-lp-aviso-acao')), true);
 
@@ -1331,6 +1428,13 @@ async function cenarioVerNaoTroca(pag) {
   }));
   console.log('   com um exercício só: ' + JSON.stringify(soUm));
   conf('sobrou um cartão só', soUm.cartoes, 1);
+  /* O nome conta os desafios do pacote; ela tirou o único, e a tela diz. */
+  const restam = await pag.evaluate(() => (document.querySelector('#bib-lp-restam') || {}).textContent || '');
+  if (V_RESTAM) {
+    conf('VENENO ENXERGADO: ela tirou o desafio e a tela continua só com "Lista com 1 desafio"', restam, '');
+    return;
+  }
+  conf('ao lado do nome, quantos desafios ficaram', restam, ' · 0 de 1 desafios');
   conf('a tela conta o exercício', /^1 exercício/.test(soUm.cabeca), true);
   conf('e mostra o minuto dele', /≈ \d+ min \(estimativa\)/.test(soUm.cabeca), true);
   if (V_UMA_AULA) {
@@ -1488,7 +1592,8 @@ async function cenarioVerNaoTroca(pag) {
     return;
   }
   conf('dois anexos na aula: a lista e o gabarito', anexos.map(a => a.parte).join(','), 'lista,gabarito');
-  conf('com nomes que dizem o que são', /_lista\.pdf$/.test((anexos[0] || {}).nome || '') && /_gabarito\.pdf$/.test((anexos[1] || {}).nome || ''), true);
+  conf('com nomes que dizem o que são, e de qual lista', /_lista_1_desafio\.pdf$/.test((anexos[0] || {}).nome || '') &&
+    /_gabarito_1_desafio\.pdf$/.test((anexos[1] || {}).nome || ''), true);
   const avisoRodape = await pag.evaluate(() => {
     const b = document.querySelector('#aviso-acao2');
     return { texto: (document.querySelector('#aviso-texto') || {}).textContent || '',
@@ -1580,7 +1685,7 @@ async function cenarioVerNaoTroca(pag) {
   await pag.evaluate(() => document.querySelectorAll('.modal.aberto [data-fechar]').forEach(b => b.click()));
   await pausa(300);
   conf('a aula abriu com o anexo nas duas larguras', medidasNome.filter(m => m.texto).length, 2);
-  conf('e o nome está inteiro nas duas', medidasNome.every(m => /_lista\.pdf$/.test(m.texto || '')), true);
+  conf('e o nome está inteiro nas duas, com a lista no nome', medidasNome.every(m => /_lista_1_desafio\.pdf$/.test(m.texto || '')), true);
   const encostam = medidasNome.filter(m => !(m.fimDoTexto <= m.inicioDoAbrir - 4)).length;
   const noMeio = medidasNome.reduce((a, m) => a + (m.ruins || 0), 0);
   conf('o nome quebrou em pelo menos uma largura (senão a régua da quebra não mede nada)',
@@ -1710,6 +1815,12 @@ async function cenarioVerNaoTroca(pag) {
   const geracoes = await esperar('as gerações do Só gerar', () => pag.evaluate(() => (window.__geracoes || []).join(',')),
     v => (v || '').split(',').filter(Boolean).length >= 2, 30000);
   conf('Só gerar o arquivo sai em dois: a lista e o gabarito', geracoes.valor, 'lista,+gabarito');
+  const janelaComp = await esperar('a janela de compartilhar', () => pag.evaluate(() => {
+    const m = document.querySelector('#modal-bib-compartilhar');
+    return m && m.classList.contains('aberto') ? Array.from(m.querySelectorAll('button[id^="bib-compartilhar-"]')).map(b => b.textContent).join(' | ') : '';
+  }), v => !!v, 10000);
+  conf('e abre a janela com um botão para cada arquivo', janelaComp.valor, 'Compartilhar a lista | Compartilhar o gabarito');
+  await pag.evaluate(() => document.querySelectorAll('.modal.aberto [data-fechar]').forEach(b => b.click()));
 
   secao('6. Tapar na folha');
   const ferramentas = await pag.evaluate(() => {

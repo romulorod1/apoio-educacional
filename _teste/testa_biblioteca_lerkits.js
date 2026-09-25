@@ -30,12 +30,15 @@ const { conf, secao, pausa, esperar } = H;
 const PORTA = 8811;
 const VENENO = process.argv.indexOf('--envenenado-guarda') !== -1;
 const V_EMPATE = process.argv.indexOf('--envenenado-empate') !== -1;
+const V_AJUDA = process.argv.indexOf('--envenenado-ajuda') !== -1;
+const AJUDA = '    var curados = listas.some(function (lp) {';
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const GUARDA = '        if (itens.some(function (it) { return !it; })) return;';
 // o empate deixa de ser visto, e as duas listas voltam a se chamar igual
 const EMPATE = '    var empate = irmas.some(function (o) { return o.id !== lp.id && desafiosDe(o) === n; });';
 const trocas = {};
 if (VENENO) trocas['/app.js'] = APP.split(GUARDA).join('');
+if (V_AJUDA) trocas['/app.js'] = APP.split(AJUDA).join('    var curados = false && listas.some(function (lp) {');
 if (V_EMPATE) trocas['/app.js'] = APP.split(EMPATE).join('    var empate = false;');
 const amb = H.criarAmbiente(PORTA, 'perfil_bib_lerkits', trocas);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'b10_lerkits_'));
@@ -77,6 +80,35 @@ const linhasDeLista = pag => pag.evaluate(() =>
   const pag = await amb.pagina();
   await H.abrirApp(pag, amb.ORIGEM);
 
+  if (V_AJUDA || !VENENO) {
+    /* A AJUDA DIZ DE ONDE VEM O "DESAFIO", e muda quando algum desafio foi
+     * marcado pela curadoria: aí "do fim das listas" deixa de ser verdade. */
+    secao('A. A ajuda do assunto, com desafio da fonte e com desafio da curadoria');
+    conf('a âncora do veneno da ajuda casa uma vez', APP.split(AJUDA).length - 1, 1);
+    const ajudaDe = async (nome, opcoes) => {
+      const m = await importar(pag, zip(nome, opcoes));
+      conf('importou ' + nome, /^Biblioteca importada\./.test(m), true);
+      await H.irParaAba(pag, 'biblioteca');
+      await pausa(400);
+      await pag.evaluate(() => { for (let k = 0; k < 4; k++) { const b = document.querySelector('.bib-voltar'); if (!b) break; b.click(); } });
+      await pausa(300);
+      await tocarLinha(pag, 'Equações do Segundo Grau');
+      await pausa(400);
+      return pag.evaluate(() => (document.querySelector('#bib-lp-ajuda') || {}).textContent || '');
+    };
+    const daFonte = await ajudaDe('ajuda-fonte', { listas: true });
+    const daCuradoria = await ajudaDe('ajuda-curadoria', { listas: true,
+      curadoria: { [Sintetico.LISTAS[0].degraus[Sintetico.LISTAS[0].degraus.length - 1].item]: 3 } });
+    console.log('   da fonte: ' + daFonte + '\n   da curadoria: ' + daCuradoria);
+    if (V_AJUDA) {
+      conf('VENENO ENXERGADO: com desafio da curadoria, a ajuda ainda diz "do fim das listas"', /do fim|por último, os do fim/.test(daCuradoria), true);
+      return;
+    }
+    conf('desafios todos da fonte: a ajuda diz de onde eles vêm', daFonte,
+      'Primeiro vêm os exercícios do começo das listas da OBMEP e, por último, os do fim, os desafios, que costumam ser os mais difíceis. Tire, ponha e troque a ordem à vontade.');
+    conf('com desafio marcado pela curadoria: a ajuda não diz "do fim das listas"', daCuradoria,
+      'Desafios são os exercícios marcados como mais difíceis. Tire, ponha e troque a ordem à vontade.');
+  }
   if (V_EMPATE || !VENENO) {
     /* 0. O EMPATE DE NOMES (achado no 8º ano, Potenciação: 6 e 6 desafios).
      *   Arranjo:   as duas listas de um assunto com o mesmo número de desafios.
