@@ -152,8 +152,8 @@ const T_LEMBRA = '      bibLpEmEdicao = null;';
 // depois de anexar, a tela volta a dizer "Você tirou tudo desta lista", como
 // se quem esvaziou tivesse sido ela
 // o nome do arquivo anexado volta a não quebrar, e passa por cima do Abrir
-const L_NOME_ANEXO = '#lista-anexos .item-lista .nome { overflow-wrap: anywhere; word-break: break-word; }';
-const T_NOME_ANEXO = '#lista-anexos .item-lista .nome { }';
+const L_NOME_ANEXO = "      if (i < todas.length - 1) caixa.appendChild(document.createElement('wbr'));";
+const T_NOME_ANEXO = '      void i;';
 // o gabarito volta a sair dentro do mesmo PDF da lista
 // tocar para ver volta a carregar a lista por cima do que ela marcou
 const L_TROCA_AO_VER = "          else irNaBiblioteca({ aula: { tipo: 'lista-pronta', id: lp.id, ver: true } });";
@@ -161,8 +161,17 @@ const T_TROCA_AO_VER = '          else usarListaPronta(lp);';
 // a seleção de antes da troca deixa de ser guardada no aparelho
 const L_ESQUECE_ANTERIOR = "      if (sel) localStorage.setItem('apoio-educacional:bib-selecao-anterior', JSON.stringify(sel));";
 const T_ESQUECE_ANTERIOR = '      if (sel) void sel;';
-const L_GABARITO_JUNTO = '      var separa = !!(aula && op.lista && op.gabarito && usaItens.length);';
+const L_GABARITO_JUNTO = '      var separa = !!(op.lista && op.gabarito && usaItens.length);';
 const T_GABARITO_JUNTO = '      var separa = false;';
+// duas trocas seguidas voltam a sobrescrever a guarda com a primeira lista
+const L_SOBRESCREVE = '      if (!ehListaPronta(bibCarrinho)) {';
+const T_SOBRESCREVE = '      if (true) {';
+// o cartão perde a etiqueta "desafio", e o nome volta a contar o que ela não vê
+const L_SEM_ETIQUETA = "    return it && it.dificuldade === 3 ? el('span', { class: 'tag bib-lp-desafio', texto: 'desafio' }) : null;";
+const T_SEM_ETIQUETA = '    return null;';
+// o primeiro arquivo fica gravado sem aula quando o segundo falha
+const L_ORFAO = '      }, Promise.resolve()).catch(function (e) { apagarTodos(); throw e; }).then(function () {';
+const T_ORFAO = '      }, Promise.resolve()).catch(function (e) { throw e; }).then(function () {';
 const L_ANEXADA = '    var anexada = ids.length ? null : listaAnexada();';
 const T_ANEXADA = '    var anexada = null;';
 // o mover volta a nao aparar, e o retangulo sai da folha ao ser arrastado
@@ -242,9 +251,12 @@ const VENENOS = {
   apara: { arq: '/draw.js', de: L_APARA, para: T_APARA },
   lembra: { arq: '/app.js', de: L_LEMBRA, para: T_LEMBRA },
   anexada: { arq: '/app.js', de: L_ANEXADA, para: T_ANEXADA },
-  'nome-anexo': { arq: '/styles.css', de: L_NOME_ANEXO, para: T_NOME_ANEXO },
+  'nome-anexo': { arq: '/app.js', de: L_NOME_ANEXO, para: T_NOME_ANEXO },
   'gabarito-junto': { arq: '/app.js', de: L_GABARITO_JUNTO, para: T_GABARITO_JUNTO },
   'troca-ao-ver': { arq: '/app.js', de: L_TROCA_AO_VER, para: T_TROCA_AO_VER },
+  'sobrescreve-guarda': { arq: '/app.js', de: L_SOBRESCREVE, para: T_SOBRESCREVE },
+  'sem-etiqueta': { arq: '/app.js', de: L_SEM_ETIQUETA, para: T_SEM_ETIQUETA },
+  orfao: { arq: '/app.js', de: L_ORFAO, para: T_ORFAO },
   'esquece-anterior': { arq: '/app.js', de: L_ESQUECE_ANTERIOR, para: T_ESQUECE_ANTERIOR }
 };
 const NOME_VENENO = Object.keys(VENENOS).filter(function (n) {
@@ -277,6 +289,9 @@ const V_NOME_ANEXO = NOME_VENENO === 'nome-anexo';
 const V_GABARITO_JUNTO = NOME_VENENO === 'gabarito-junto';
 const V_TROCA_AO_VER = NOME_VENENO === 'troca-ao-ver';
 const V_ESQUECE_ANTERIOR = NOME_VENENO === 'esquece-anterior';
+const V_SOBRESCREVE = NOME_VENENO === 'sobrescreve-guarda';
+const V_SEM_ETIQUETA = NOME_VENENO === 'sem-etiqueta';
+const V_ORFAO = NOME_VENENO === 'orfao';
 const BASE_DE = { '/app.js': APP_REPO, '/draw.js': DRAW_REPO, '/styles.css': CSS_REPO };
 const trocas = {};
 if (VENENO) trocas[RECEITA.arq] = BASE_DE[RECEITA.arq].split(RECEITA.de).join(RECEITA.para);
@@ -471,6 +486,13 @@ async function cenarioVerNaoTroca(pag) {
   await pausa(400);
   conf('tocou para ver a primeira lista', await tocarLinha(pag, 'Lista com 1 desafio'), true);
   await pausa(400);
+  /* A ETIQUETA "desafio": o nome conta 1, e o cartão mostra qual é. */
+  const etiquetas = await pag.evaluate(() => document.querySelectorAll('#bib-lp-previa .bib-lp-desafio, #bib-lp-grade .bib-lp-desafio').length);
+  if (V_SEM_ETIQUETA) {
+    conf('VENENO ENXERGADO: o nome diz 1 desafio e nenhum cartão mostra qual é', etiquetas, 0);
+    return false;
+  }
+  conf('o nome diz 1 desafio, e um cartão leva a etiqueta "desafio"', etiquetas, 1);
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
   await pausa(400);
   conf('tocou para ver a outra', await tocarLinha(pag, 'Lista com 2 desafios'), true);
@@ -490,6 +512,17 @@ async function cenarioVerNaoTroca(pag) {
     perguntas[perguntas.length - 1] || '', 'Trocar os 9 exercícios marcados por esta lista?');
   const LISTA3 = Sintetico.LISTAS.filter(l => l.modulo === LISTA2.modulo && l.id !== LISTA2.id)[0];
   conf('e trocou: o material é a lista', (await carrinho(pag)).itens.join('|'), LISTA3.degraus.map(d => d.item).join('|'));
+  conf('na lista em uso, os dois desafios levam a etiqueta', await pag.evaluate(() =>
+    document.querySelectorAll('#bib-lp-grade .bib-lp-desafio').length), 2);
+  /* A SEGUNDA TROCA: da lista 2 para a lista 1. A guarda tem de continuar
+   * sendo a seleção dela, e não virar a lista 2 (bloqueante da lente de
+   * correção). */
+  await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
+  await pausa(400);
+  conf('usou a outra lista, a segunda troca seguida', await usarLista(pag, 'Lista com 1 desafio'), true);
+  await pausa(500);
+  conf('e a pergunta veio de novo, com o número da lista 2', perguntas[perguntas.length - 1] || '',
+    'Trocar os ' + LISTA3.degraus.length + ' exercícios marcados por esta lista?');
   await pag.reload({ waitUntil: 'networkidle0' });
   await H.abrirApp(pag, amb.ORIGEM);
   await H.irParaAba(pag, 'biblioteca');
@@ -502,9 +535,26 @@ async function cenarioVerNaoTroca(pag) {
   conf('depois de fechar e abrir, a faixa oferece Recuperar o que estava marcado', temRecuperar, true);
   await pag.evaluate(() => document.querySelector('#bib-carrinho-recuperar').click());
   await pausa(500);
-  conf('e o que estava marcado voltou inteiro e na ordem', (await carrinho(pag)).itens.join('|'), marcadosDela.join('|'));
+  const recuperado = (await carrinho(pag)).itens.join('|');
+  if (V_SOBRESCREVE) {
+    conf('VENENO ENXERGADO: depois de duas trocas, o que volta é a primeira lista, e os nove dela sumiram',
+      recuperado === marcadosDela.join('|'), false);
+    return false;
+  }
+  conf('e, depois de DUAS trocas, o que estava marcado voltou inteiro e na ordem', recuperado, marcadosDela.join('|'));
+  conf('e recuperar zerou a lista em edição', await pag.evaluate(() => localStorage.getItem('apoio-educacional:bib-lp-em-edicao')), null);
   await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-limpar'); if (b) b.click(); });
   await pausa(400);
+  /* A GUARDA QUE NÃO EXISTE MAIS NO PACOTE não oferece recuperar nada. */
+  await pag.evaluate(() => localStorage.setItem('apoio-educacional:bib-selecao-anterior',
+    JSON.stringify({ itens: ['9ano:nao-existe:ex:1'], paginas: [] })));
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.abrirApp(pag, amb.ORIGEM);
+  await H.irParaAba(pag, 'biblioteca');
+  await pausa(500);
+  conf('guarda com exercício que não existe mais: sem o botão Recuperar',
+    await pag.evaluate(() => !!document.querySelector('#bib-carrinho-recuperar')), false);
+  await pag.evaluate(() => localStorage.removeItem('apoio-educacional:bib-selecao-anterior'));
   void nove;
   return true;
 }
@@ -527,7 +577,7 @@ async function cenarioVerNaoTroca(pag) {
   if (!VENENO) {
     secao('0. As cercas ainda apontam para o alvo');
     var nomes = Object.keys(VENENOS);
-    conf('a tabela tem os vinte e cinco venenos desta prova', nomes.length, 25);
+    conf('a tabela tem os vinte e oito venenos desta prova', nomes.length, 28);
     var fora = [];
     nomes.forEach(function (n) {
       var r = VENENOS[n];
@@ -610,7 +660,8 @@ async function cenarioVerNaoTroca(pag) {
    * e "pacote" é palavra nossa, não dela. */
   conf('a ajuda diz a ordem em palavras simples', await pag.evaluate(() =>
     (document.querySelector('#bib-lp-ajuda') || {}).textContent || ''),
-    'As listas vão do mais simples ao mais difícil. Tire, ponha e troque a ordem à vontade.');
+    'Os exercícios seguem a ordem do material da OBMEP. Desafios são os do fim da lista original, ' +
+      'que costumam ser os mais difíceis. Tire, ponha e troque a ordem à vontade.');
   conf('na tela do assunto a palavra "estimativa" não aparece', /estimativa/.test(texto), false);
   conf('nem a palavra "pacote"', /pacote/.test(texto), false);
   if (V_TROCA_AO_VER) { await cenarioVerNaoTroca(pag); return; }
@@ -1331,7 +1382,7 @@ async function cenarioVerNaoTroca(pag) {
   console.log('   só com o acrescentado: ' + JSON.stringify(soDeFora));
   conf('a tela conta o exercício', /^1 exercício/.test(soDeFora), true);
   conf('e não promete aula', /uma aula/.test(soDeFora), false);
-  conf('e diz por que não há estimativa', /Sem estimativa de tempo/.test(soDeFora), true);
+  conf('e diz, em palavras dela, por que não há estimativa', /não têm tempo estimado/.test(soDeFora), true);
 
   // ================================================================
   /* MEIA HORA NÃO É UMA AULA. Desde 24/09 a lista pronta é de uma aula
@@ -1452,14 +1503,14 @@ async function cenarioVerNaoTroca(pag) {
   }));
   console.log('   depois de anexar: ' + JSON.stringify(depoisDoAnexo));
   conf('a tela da lista continua à vista', depoisDoAnexo.titulo, 'Lista com 1 desafio');
-  conf('e o material ficou vazio', /^Nenhum exercício no material/.test(depoisDoAnexo.cabeca), true);
+  conf('o título da tela é a lista anexada, e não "nenhum exercício"', /^Lista anexada na aula de Aluna de Prova/.test(depoisDoAnexo.cabeca), true);
   if (V_ANEXADA) {
     conf('VENENO: depois de anexar, a tela diz que foi ela que tirou tudo', depoisDoAnexo.vazia, true);
     return;
   }
   conf('e NÃO diz que ela tirou tudo, porque quem esvaziou foi o aplicativo', depoisDoAnexo.vazia, false);
   conf('e diz para onde a lista foi, com o aluno',
-    depoisDoAnexo.cabeca.indexOf('Esta lista foi anexada na aula de ' + nomeAluno + ' (') >= 0, true);
+    depoisDoAnexo.cabeca.indexOf('Lista anexada na aula de ' + nomeAluno) >= 0 && /Em \d\d\/\d\d\/\d{4}\./.test(depoisDoAnexo.cabeca), true);
   conf('e o que fazer para usar com outro aluno', /Para usar com outro aluno, toque em Usar esta lista\./.test(depoisDoAnexo.cabeca), true);
   conf('e a tela oferece abrir a aula', await pag.evaluate(() => !!document.querySelector('#bib-lp-abrir-aula')), true);
   await pag.evaluate(() => document.querySelector('#bib-lp-abrir-aula').click());
@@ -1507,8 +1558,20 @@ async function cenarioVerNaoTroca(pag) {
       linha.scrollIntoView({ block: 'center' });
       const r = document.createRange(); r.selectNodeContents(nome);
       const rects = Array.from(r.getClientRects());
+      /* ONDE A LINHA QUEBRA: o topo de cada caractere, e a quebra tem de cair
+       * logo depois de um "_" (ou de um espaço), nunca no meio de uma palavra. */
+      const chars = [];
+      const andar = n => { if (n.nodeType === 3) { for (let k = 0; k < n.length; k++) chars.push([n, k]); } else n.childNodes.forEach(andar); };
+      andar(nome);
+      let ruins = 0, quebras = 0, topo = null, antes = '';
+      chars.forEach(([n, k]) => {
+        const rr = document.createRange(); rr.setStart(n, k); rr.setEnd(n, k + 1);
+        const t = Math.round(rr.getBoundingClientRect().top);
+        if (topo !== null && t > topo + 2) { quebras++; if (antes !== '_' && antes !== ' ') ruins++; }
+        topo = t; antes = n.data[k];
+      });
       return { texto: nome.textContent, fimDoTexto: Math.round(Math.max.apply(null, rects.map(x => x.right))),
-        inicioDoAbrir: Math.round(abrir.getBoundingClientRect().left) };
+        inicioDoAbrir: Math.round(abrir.getBoundingClientRect().left), quebras, ruins };
     });
     console.log('   largura ' + largura + ': ' + JSON.stringify(m));
     medidasNome.push(m || {});
@@ -1519,11 +1582,15 @@ async function cenarioVerNaoTroca(pag) {
   conf('a aula abriu com o anexo nas duas larguras', medidasNome.filter(m => m.texto).length, 2);
   conf('e o nome está inteiro nas duas', medidasNome.every(m => /_lista\.pdf$/.test(m.texto || '')), true);
   const encostam = medidasNome.filter(m => !(m.fimDoTexto <= m.inicioDoAbrir - 4)).length;
+  const noMeio = medidasNome.reduce((a, m) => a + (m.ruins || 0), 0);
+  conf('o nome quebrou em pelo menos uma largura (senão a régua da quebra não mede nada)',
+    medidasNome.some(m => m.quebras > 0), true);
   if (V_NOME_ANEXO) {
-    conf('VENENO: o nome passa por cima do Abrir em pelo menos uma largura', encostam > 0, true);
+    conf('VENENO: sem os pontos de quebra, o nome quebra no meio de uma palavra', noMeio > 0, true);
     return;
   }
   conf('o texto do nome termina antes do Abrir, com folga, nas duas larguras', encostam, 0);
+  conf('e toda quebra cai logo depois de um "_"', noMeio, 0);
 
   // ================================================================
   // ================================================================
@@ -1540,6 +1607,109 @@ async function cenarioVerNaoTroca(pag) {
    * O antigo trocava tudo no primeiro toque de ver, e o Desfazer sumia no
    * passo seguinte. */
   if (!(await cenarioVerNaoTroca(pag))) return;
+
+  // ================================================================
+  /* O SEGUNDO ARQUIVO FALHA AO GRAVAR (a lista gravou, o gabarito não).
+   *   Arranjo:   a transação do segundo `salvarAnexo` aborta.
+   *   Afirmação: nada fica na aula, e o primeiro arquivo não fica órfão no
+   *              depósito de anexos; a tela diz que nada foi anexado. */
+  secao('5j. O segundo arquivo falha, e nada fica pela metade');
+  await pag.evaluate(async h => {
+    const d = await Store.carregar();
+    d.aulas.push({ id: 'aula-b10-falha', alunoId: 'aluna-prova-b10', serieId: null, destacada: false, data: h,
+      hora: '17:00', duracaoMin: 60, status: 'agendada', cobravel: true, notaTexto: '', notaPrivada: '',
+      temNota: false, anexos: [] });
+    await Store.salvar(d);
+  }, (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })());
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.abrirApp(pag, amb.ORIGEM);
+  await H.irParaAba(pag, 'biblioteca');
+  await pausa(400);
+  await pag.evaluate(() => { for (let k = 0; k < 4; k++) { const b = document.querySelector('.bib-voltar'); if (!b) break; b.click(); } });
+  await pausa(300);
+  await tocarLinha(pag, MOD_TITULO);
+  await pausa(400);
+  conf('usou a lista', await usarLista(pag, 'Lista com 1 desafio'), true);
+  await pausa(500);
+  const anexosAntes = await H.contarDeposito(pag, 'anexos');
+  await pag.evaluate(() => {
+    const original = IDBObjectStore.prototype.put;
+    let n = 0;
+    IDBObjectStore.prototype.put = function () {
+      const req = original.apply(this, arguments);
+      if (this.name === 'anexos' && ++n === 2) {
+        IDBObjectStore.prototype.put = original;
+        const t = this.transaction;
+        req.addEventListener('success', () => { try { t.abort(); } catch (e) { /* já terminou */ } });
+      }
+      return req;
+    };
+  });
+  await pag.evaluate(() => document.querySelector('#bib-carrinho-gerar').click());
+  await pausa(600);
+  await pag.evaluate(() => { document.querySelector('#bib-gerar-aulas [data-aula="aula-b10-falha"]').click();
+    document.querySelector('#aviso-texto').textContent = ''; });
+  await pausa(200);
+  await pag.evaluate(() => document.querySelector('#bib-gerar-anexar').click());
+  const avisoFalha = await esperar('o aviso da falha', () => pag.evaluate(() => document.querySelector('#aviso-texto').textContent),
+    v => /Nada foi anexado/.test(v || ''), 30000);
+  console.log('   aviso: ' + JSON.stringify(avisoFalha.valor));
+  conf('a tela diz que nada foi anexado', avisoFalha.ok, true);
+  await pausa(800);
+  conf('a aula ficou sem anexo nenhum', await pag.evaluate(() => Store.carregar().then(d =>
+    (d.aulas.find(a => a.id === 'aula-b10-falha').anexos || []).length)), 0);
+  const anexosDepois = await H.contarDeposito(pag, 'anexos');
+  if (V_ORFAO) {
+    conf('VENENO ENXERGADO: o primeiro arquivo ficou órfão no depósito', anexosDepois, anexosAntes + 1);
+    return;
+  }
+  conf('e o primeiro arquivo não ficou órfão no depósito', anexosDepois, anexosAntes);
+
+  /* DUAS VEZES A MESMA LISTA NA MESMA AULA: quatro anexos, quatro nomes. */
+  await pag.evaluate(() => document.querySelectorAll('.modal.aberto [data-fechar]').forEach(b => b.click()));
+  await pausa(300);
+  for (let vez = 0; vez < 2; vez++) {
+    if (!(await pag.evaluate(() => !!document.querySelector('#bib-carrinho-gerar')))) {
+      await H.irParaAba(pag, 'biblioteca');
+      await pausa(300);
+      await pag.evaluate(() => { const b = document.querySelector('#bib-lp-usar'); if (b) b.click(); });
+      await pausa(500);
+    }
+    await pag.evaluate(() => document.querySelector('#bib-carrinho-gerar').click());
+    await pausa(600);
+    await pag.evaluate(() => document.querySelector('#bib-gerar-aulas [data-aula="aula-b10-falha"]').click());
+    await pausa(200);
+    await pag.evaluate(() => document.querySelector('#bib-gerar-anexar').click());
+    await esperar('anexou ' + (vez + 1), () => pag.evaluate(() => Store.carregar().then(d =>
+      (d.aulas.find(a => a.id === 'aula-b10-falha').anexos || []).length)), v => v >= 2 * (vez + 1), 30000);
+    await pausa(600);
+    await pag.evaluate(() => document.querySelectorAll('.modal.aberto [data-fechar]').forEach(b => b.click()));
+    await pausa(300);
+  }
+  const nomesAula = await pag.evaluate(() => Store.carregar().then(d =>
+    (d.aulas.find(a => a.id === 'aula-b10-falha').anexos || []).map(a => a.nome)));
+  console.log('   nomes na aula: ' + JSON.stringify(nomesAula));
+  conf('quatro anexos, quatro nomes diferentes', nomesAula.length + ':' + new Set(nomesAula).size, '4:4');
+
+  /* "SÓ GERAR O ARQUIVO" COM GABARITO TAMBÉM SAI EM DOIS. */
+  await H.irParaAba(pag, 'biblioteca');
+  await pausa(300);
+  await pag.evaluate(() => { const b = document.querySelector('#bib-lp-usar'); if (b) b.click(); });
+  await pausa(500);
+  await pag.evaluate(() => {
+    const original = window.PDFGen.gerarMaterialBiblioteca;
+    window.__geracoes = [];
+    window.PDFGen.gerarMaterialBiblioteca = function (op) {
+      window.__geracoes.push((op.incluirLista ? 'lista' : '') + (op.incluirGabarito ? '+gabarito' : ''));
+      return original.apply(this, arguments);
+    };
+  });
+  await pag.evaluate(() => document.querySelector('#bib-carrinho-gerar').click());
+  await pausa(600);
+  await pag.evaluate(() => document.querySelector('#bib-gerar-baixar').click());
+  const geracoes = await esperar('as gerações do Só gerar', () => pag.evaluate(() => (window.__geracoes || []).join(',')),
+    v => (v || '').split(',').filter(Boolean).length >= 2, 30000);
+  conf('Só gerar o arquivo sai em dois: a lista e o gabarito', geracoes.valor, 'lista,+gabarito');
 
   secao('6. Tapar na folha');
   const ferramentas = await pag.evaluate(() => {

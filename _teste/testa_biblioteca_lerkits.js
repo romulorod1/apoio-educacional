@@ -120,7 +120,8 @@ const linhasDeLista = pag => pag.evaluate(() =>
       ['sem-minutos', /não diz quantos minutos leva\./],
       ['degrau-sem-minutos', /não diz quantos minutos leva a posição 3\./],
       ['id-repetido', /duas listas com o mesmo identificador/],
-      ['item-repetido', /repete o exercício/]
+      ['item-repetido', /repete o exercício/],
+      ['teoria', /traz teoria, e este aplicativo só mostra lista de exercícios/]
     ];
     for (const [v, frase] of casos) {
       const m = await importar(pag, zip('veneno-' + v, { listas: true, listasVeneno: v }));

@@ -467,6 +467,7 @@ function gerar(saida, opcoes) {
     if (v === 'sem-minutos') delete conteudoKits[0].minutos;
     if (v === 'degrau-sem-minutos') delete conteudoKits[0].degraus[2].minutos;
     if (v === 'id-repetido') conteudoKits[1].id = conteudoKits[0].id;
+    if (v === 'teoria') conteudoKits[0].teoria = ['9ano:equacoes-do-segundo-grau:teo:1'];
     if (v === 'item-repetido') conteudoKits[0].degraus[3].item = conteudoKits[0].degraus[1].item;
     /* EMPATE: a segunda lista do assunto passa a ter o MESMO número de
      * desafios da primeira (um só, o ex:7), com um exercício a menos, para o

@@ -30,14 +30,17 @@ const PORTA = 8813;
 const V_CANCELA = process.argv.indexOf('--envenenado-cancela') !== -1;
 const V_LIXEIRA = process.argv.indexOf('--envenenado-lixeira-muda') !== -1;
 const V_ALCA = process.argv.indexOf('--envenenado-alca') !== -1;
+const V_TRACO = process.argv.indexOf('--envenenado-traco-cancelado') !== -1;
 const DRAW = fs.readFileSync(path.join(H.RAIZ, 'draw.js'), 'utf8');
 const L_CANCELA = '    if (mudou) this._avisarMudanca();';
 const L_LIXEIRA = '    if (i >= 0) this._avisarMudanca();';
 const L_ALCA = '      var alvo = (this.selecionado && this._alcaEm(p, this.selecionado)) ? this.selecionado : this.itemEm(p);';
+const L_TRACO = '    var guardouTraco = this._fecharTraco();';
 const trocas = {};
 let ancoras = { cancela: DRAW.split(L_CANCELA).length - 1, lixeira: DRAW.split(L_LIXEIRA).length - 1, alca: DRAW.split(L_ALCA).length - 1 };
 if (V_CANCELA) trocas['/draw.js'] = DRAW.split(L_CANCELA).join('    void mudou;');
 if (V_LIXEIRA) trocas['/draw.js'] = DRAW.split(L_LIXEIRA).join('    void i;');
+if (V_TRACO) trocas['/draw.js'] = DRAW.split(L_TRACO).join('    this._cancelarTraco(); var guardouTraco = false;');
 if (V_ALCA) trocas['/draw.js'] = DRAW.split(L_ALCA).join('      var alvo = this.itemEm(p);');
 const amb = H.criarAmbiente(PORTA, 'perfil_folha_mudancas', trocas);
 
@@ -81,7 +84,8 @@ const zerar = pag => pag.evaluate(() => { window.__avisos = 0; });
 
 (async () => {
   conf('as três âncoras dos venenos casam uma vez cada no draw.js', ancoras.cancela + ',' + ancoras.lixeira + ',' + ancoras.alca, '1,1,1');
-  if (V_CANCELA || V_LIXEIRA || V_ALCA) conf('o veneno mudou mesmo o draw.js', trocas['/draw.js'] !== DRAW ? 'diferente' : 'IGUAL', 'diferente');
+  conf('a âncora do veneno do traço casa uma vez', DRAW.split(L_TRACO).length - 1, 1);
+  if (V_CANCELA || V_LIXEIRA || V_ALCA || V_TRACO) conf('o veneno mudou mesmo o draw.js', trocas['/draw.js'] !== DRAW ? 'diferente' : 'IGUAL', 'diferente');
   await amb.subir();
   const pag = await amb.pagina();
   await H.abrirApp(pag, amb.ORIGEM);
@@ -120,6 +124,23 @@ const zerar = pag => pag.evaluate(() => { window.__avisos = 0; });
     [window.__alca.img, window.__alca.tp].forEach(x => itens.splice(itens.indexOf(x), 1));
     window.__ed.selecionado = null;
   });
+
+  /* O TRAÇO FEITO ATÉ O CANCELAMENTO FICA: é escrita dela. */
+  secao('B. Caneta cancelada no meio do traço guarda o traço');
+  await pag.evaluate(() => { window.__ed.ferramenta = 'caneta'; });
+  const tracosAntes = (await estado(pag)).tracos;
+  await toque(pag, 'pointerdown', 200, 1100);
+  for (let k = 1; k <= 5; k++) await toque(pag, 'pointermove', 200 + k * 40, 1100 + k * 5);
+  await zerar(pag);
+  await toque(pag, 'pointercancel', 400, 1125);
+  const eb = await estado(pag);
+  if (V_TRACO) {
+    conf('VENENO ENXERGADO: o traço dela sumiu com o cancelamento', eb.tracos, tracosAntes);
+    return;
+  }
+  conf('o traço ficou na folha', eb.tracos, tracosAntes + 1);
+  conf('e quem grava foi avisado', eb.avisos > 0, true);
+  await pag.evaluate(() => { const it = window.__ed.pagina().itens; it.splice(it.length - 1, 1); });
 
   secao('0. O alvo: cancelar sem ter mudado nada NÃO avisa');
   await pag.evaluate(() => { window.__ed.ferramenta = 'borracha'; });

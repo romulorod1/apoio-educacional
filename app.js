@@ -922,6 +922,23 @@
     baixar(nome, blob);
   }
 
+  /* Vários arquivos numa entrega só: o compartilhamento do Android aceita a
+   * lista, e dois `share` seguidos não (o segundo exige outro toque). Sem
+   * compartilhamento, baixa um de cada vez. */
+  function entregarArquivos(lista, titulo) {
+    if (lista.length === 1) { entregarArquivo(lista[0].nome, lista[0].blob, titulo); return; }
+    try {
+      var arquivos = lista.map(function (a) { return new File([a.blob], a.nome, { type: a.blob.type }); });
+      if (navigator.canShare && navigator.canShare({ files: arquivos })) {
+        navigator.share({ files: arquivos, title: titulo || lista[0].nome }).catch(function () {
+          lista.forEach(function (a) { baixar(a.nome, a.blob); });
+        });
+        return;
+      }
+    } catch (e) { /* sem compartilhamento, cai para o download */ }
+    lista.forEach(function (a) { baixar(a.nome, a.blob); });
+  }
+
   function baixar(nome, blob) {
     var url = URL.createObjectURL(blob);
     var a = el('a', { href: url, download: nome });
@@ -2390,12 +2407,25 @@
     });
   }
 
+  /* O NOME DO ARQUIVO QUEBRA NO "_" (ou no espaço), e nunca no meio de uma
+   * palavra: "Equacoes_do_Segundo_Grau_gabarito.pd / f" era o que saía com a
+   * quebra em qualquer ponto. Um <wbr> depois de cada "_" dá ao navegador os
+   * pontos de quebra, e o resto do nome fica inteiro. */
+  function nomeQuebravel(nome) {
+    var caixa = el('div', { class: 'nome' });
+    String(nome || '').split('_').forEach(function (parte, i, todas) {
+      caixa.appendChild(document.createTextNode(parte + (i < todas.length - 1 ? '_' : '')));
+      if (i < todas.length - 1) caixa.appendChild(document.createElement('wbr'));
+    });
+    return caixa;
+  }
+
   function desenharAnexos(caixa, aula) {
     caixa.innerHTML = '';
     (aula.anexos || []).forEach(function (an) {
       caixa.appendChild(el('div', { class: 'item-lista' }, [
         el('div', { class: 'cresce' }, [
-          el('div', { class: 'nome', texto: an.nome }),
+          nomeQuebravel(an.nome),
           el('div', { class: 'detalhe', texto: (an.tamanho ? Math.round(an.tamanho / 1024) + ' KB' : '') })
         ]),
         el('button', {
@@ -11585,15 +11615,14 @@
         el('div', { class: 'detalhe bib-lp-minutos', texto: minutosEstimados(lp.minutos, true) }));
       corpo.appendChild(linha);
     });
-    /* A FRASE DIZ O QUE A ORDEM É, e não o que a gente gostaria que ela fosse.
-     * "Do mais simples ao mais difícil" sem adjetivo afirma um juízo de
-     * dificuldade que esta casa não faz: o que ordena a lista é a dificuldade
-     * ESTIMADA, que é a posição do exercício na lista da fonte, e é a mesma
-     * palavra que já aparece no cartão ("estimada: fácil"). Sem o adjetivo, a
-     * frase promete mais do que o dado sustenta, e o olho de fora cego pegou
-     * isso apontando um item de oito minutos na segunda posição. */
+    /* A FRASE DIZ DE ONDE VEM A ORDEM E O "DESAFIO", e não o que a gente
+     * gostaria que eles fossem: a ordem é a do material da OBMEP, e desafio é
+     * o exercício do fim da lista original. "Do mais simples ao mais difícil"
+     * afirmava um juízo de dificuldade que ninguém conferiu (lente do uso
+     * dela no PR #57). */
     corpo.appendChild(el('p', { class: 'ajuda bib-lp-ajuda', id: 'bib-lp-ajuda',
-      texto: 'As listas vão do mais simples ao mais difícil. Tire, ponha e troque a ordem à vontade.' }));
+      texto: 'Os exercícios seguem a ordem do material da OBMEP. Desafios são os do fim da lista original, ' +
+        'que costumam ser os mais difíceis. Tire, ponha e troque a ordem à vontade.' }));
   }
 
   /* A lista que ela está mexendo agora: a última carregada, enquanto ao menos
@@ -11632,19 +11661,23 @@
 
   /* O NOME DA LISTA SAI DA COMPOSIÇÃO DELA, e não de uma escala nossa.
    *
-   * O número do nível saiu da tela e ficou só no dado. Nas 22 listas do 9º ano
-   * (pacote v7, listas de uma aula), a diferença entre as duas de cada assunto
-   * não é o teto da rampa, é a MASSA do topo: a de nível 2 leva 1 ou 2 itens
-   * do degrau mais alto, e a de nível 3 leva de 4 a 8. "Básica" contra
-   * "avançada" traria de volta a classificação do ALUNO, que é o que esta tela
-   * não faz.
+   * "Desafio" é o exercício que a fonte põe no fim da lista original: o
+   * `dificuldade === 3` do pacote é o terço final da lista do Portal
+   * (`proxy.terco`), a POSIÇÃO do exercício lá, e não um juízo nosso de
+   * dificuldade. A tela diz exatamente isso, e nada além: o nome conta quantos
+   * são ("Lista com 8 desafios"), cada um leva a etiqueta "desafio" no cartão
+   * para ela ver quais são, e a ajuda do assunto explica de onde vem ("Desafios
+   * são os do fim da lista original, que costumam ser os mais difíceis").
    *
-   * Então cada linha se chama pela própria composição: "Lista com 1 desafio",
-   * "Lista com 8 desafios", "Lista sem desafio". Até 24/09 o nome dizia
-   * "desafios no fim", e o "no fim" era falso: os desafios ficam no topo da
-   * ordem, mas ela pode reordenar, e a lista de uma aula não termina sempre
-   * num deles. O número é contado do campo que o diz, o `dificuldade` de cada
-   * item. */
+   * Até 24/09 o nome dizia "desafios no fim", e o "no fim" era falso: ela pode
+   * reordenar. No empate de desafios entre as duas listas do assunto, o nome
+   * diz também os exercícios (ver `comoSeChama`). */
+  /* A ETIQUETA "desafio" no cartão: é o que o nome da lista conta, à vista,
+   * para ela saber QUAIS são. */
+  function etiquetaDesafio(it) {
+    return it && it.dificuldade === 3 ? el('span', { class: 'tag bib-lp-desafio', texto: 'desafio' }) : null;
+  }
+
   function desafiosDe(lp) {
     return (lp.itens || []).filter(function (it) { return it && it.dificuldade === 3; }).length;
   }
@@ -11745,10 +11778,15 @@
    * atravessar a navegação e o reinício. Fica até ela trocar de novo. A chave
    * vai escrita aqui dentro, e não numa constante do módulo, porque `var` sobe
    * a declaração e não o valor. */
+  /* Só o que ainda existe no pacote: guarda com exercício que saiu (série
+   * removida, versão nova sem ele) não oferece recuperar o que não volta. */
   function selecaoAnterior() {
     try {
       var s = JSON.parse(localStorage.getItem('apoio-educacional:bib-selecao-anterior') || 'null');
-      return s && ((s.itens || []).length || (s.paginas || []).length) ? s : null;
+      if (!s || !bib) return null;
+      var itens = (s.itens || []).filter(function (id) { return !!bib.itemPorId[id]; });
+      var paginas = (s.paginas || []).filter(function (id) { return !!paginaDeTeoriaPorId(id); });
+      return itens.length || paginas.length ? { itens: itens, paginas: paginas } : null;
     } catch (e) { return null; }
   }
   function guardarSelecaoAnterior(sel) {
@@ -11765,18 +11803,31 @@
     var agora = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
     mexeuNoMaterial();
     bibCarrinho = { itens: (guardada.itens || []).slice(), paginas: (guardada.paginas || []).slice() };
+    // o que voltou é a seleção dela, e não uma lista pronta em edição
+    bibLpEmEdicao = null;
+    bibLpEmEdicaoLido = true;
+    try { localStorage.removeItem(CHAVE_LP_EM_EDICAO); } catch (e) { /* segue na memória */ }
     guardarCarrinho();
-    guardarSelecaoAnterior(agora.itens.length || agora.paginas.length ? agora : null);
+    /* A troca guarda o que estava marcado, a não ser que seja uma lista pronta
+     * intacta: essa se refaz do pacote, e guardá-la apagaria a guarda dela. */
+    guardarSelecaoAnterior((agora.itens.length || agora.paginas.length) && !ehListaPronta(agora) ? agora : null);
+    // um desenho só: o desenharCarrinho já redesenha a tela da lista quando ela está à vista
     desenharCarrinho();
     marcarCaixasDoCarrinho();
     desenharContextoBiblioteca();
-    if (bibNav.aula && bibNav.aula.tipo === 'lista-pronta') desenharCorpoBiblioteca();
     avisar('O material voltou a ter o que estava marcado antes.');
   }
 
   function mesmaSelecao(a, lp) {
     return !a.paginas.length && a.itens.length === lp.ids.length &&
       !a.itens.some(function (id, i) { return id !== lp.ids[i]; });
+  }
+  /* O material é, exatamente, uma lista pronta de algum assunto? */
+  function ehListaPronta(a) {
+    var todas = (bib && bib.listasPorModulo) || {};
+    return Object.keys(todas).some(function (m) {
+      return todas[m].some(function (lp) { return mesmaSelecao(a, lp); });
+    });
   }
 
   /* "USAR ESTA LISTA" PERGUNTA ANTES DE TROCAR, e guarda o que estava marcado. */
@@ -11787,7 +11838,13 @@
         : n === 1 ? 'Trocar o exercício marcado por esta lista?'
         : 'Trocar os ' + n + ' exercícios marcados por esta lista?';
       if (!confirmar(pergunta)) return;
-      guardarSelecaoAnterior({ itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() });
+      /* DUAS TROCAS SEGUIDAS NÃO APAGAM O QUE ELA MARCOU À MÃO: se o material
+       * de agora é uma lista pronta intacta, ele se refaz do pacote, e a guarda
+       * continua sendo a seleção dela. Sem isto, lista 1 e depois lista 2
+       * sobrescrevia os nove dela pela lista 1. Achado pela lente de correção. */
+      if (!ehListaPronta(bibCarrinho)) {
+        guardarSelecaoAnterior({ itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() });
+      }
     }
     usarListaPronta(lp);
   }
@@ -11807,10 +11864,15 @@
       estado = 'O material tem ' + plural(n, 'item marcado', 'itens marcados') +
         '. Ver esta lista não muda nada; Usar esta lista pergunta antes de trocar.';
     }
+    var foi = bibAnexadasNaSessao[lp.id];
+    if (foi) corpo.appendChild(el('p', { class: 'ajuda bib-lp-estado', id: 'bib-lp-foi', texto: 'Esta lista foi anexada na aula de ' +
+      foi.aluno + ' (' + Core.ddmmaaaa(foi.data) + ').' }));
     if (estado) corpo.appendChild(el('p', { class: 'ajuda bib-lp-estado', id: 'bib-lp-estado', texto: estado }));
     corpo.appendChild(el('div', { class: 'barra bib-lp-usar' }, [
       el('button', { type: 'button', class: 'btn principal', id: 'bib-lp-usar', texto: 'Usar esta lista',
-        aoClick: function () { pedirParaUsarLista(lp); } })
+        aoClick: function () { pedirParaUsarLista(lp); } }),
+      foi ? el('button', { type: 'button', class: 'btn', id: 'bib-lp-abrir-aula', texto: 'Abrir a aula',
+        aoClick: function () { abrirAulaDoMaterial(foi.aulaId); } }) : null
     ]));
     /* Os cartões para ver, sem caixa e sem seta: nada aqui mexe no material. */
     var grade = el('div', { class: 'bib-grade bib-grade-exercicios bib-grade-lp', id: 'bib-lp-previa' });
@@ -11824,7 +11886,8 @@
         (mod.ordemListas || []).length > 1 ? el('div', { class: 'ajuda bib-lp-de-onde', texto: it.aula.titulo }) : null,
         miniaturaBib(it.pacote, it.assets.enunciado, it.medidas && it.medidas.enunciado, 1080),
         el('div', { class: 'bib-tags' }, [
-          el('span', { class: 'tag bib-lp-min-item', texto: minutosEstimados(lp.minutosDe[it.id]) })
+          el('span', { class: 'tag bib-lp-min-item', texto: minutosEstimados(lp.minutosDe[it.id]) }),
+          etiquetaDesafio(it)
         ])
       ])]));
     });
@@ -11900,7 +11963,7 @@
      * "7 exercícios · um pouco menos de meia aula · ≈ 0 min". Achado pela
      * primeira lente cega do PR #57. */
     var cabeca = el('div', { class: 'bib-lp-cabeca', id: 'bib-lp-cabeca' }, [
-      el('div', { class: 'bib-lp-meia', texto: !ids.length ? 'Nenhum exercício no material'
+      el('div', { class: 'bib-lp-meia', texto: !ids.length ? (anexada ? 'Lista anexada na aula de ' + anexada.aluno : 'Nenhum exercício no material')
         : plural(ids.length, 'exercício', 'exercícios') +
           /* A FRASE SÓ SAI QUANDO A CONTA COBRE TUDO O QUE ESTÁ NA LINHA. O
            * número conta o carrinho inteiro e a `soma` conta só os exercícios
@@ -11912,9 +11975,8 @@
            * dizendo o minuto e quantos ficaram fora da conta. */
           (daLista.length && !deFora && umaAula(soma) ? ' · ' + umaAula(soma) : '') }),
       el('div', { class: 'ajuda bib-lp-minutos', texto: !daLista.length
-        ? (ids.length ? 'Sem estimativa de tempo: o minuto vem da lista, e nenhum exercício dela ficou aqui.'
-          : anexada ? 'Esta lista foi anexada na aula de ' + anexada.aluno + ' (' + Core.ddmmaaaa(anexada.data) +
-            '). Para usar com outro aluno, toque em Usar esta lista.'
+        ? (ids.length ? 'Os exercícios que você acrescentou não têm tempo estimado.'
+          : anexada ? 'Em ' + Core.ddmmaaaa(anexada.data) + '. Para usar com outro aluno, toque em Usar esta lista.'
           : 'Para começar de novo, toque em Usar esta lista.')
         : minutosEstimados(soma, true, true) +
           (deFora ? ', fora ' + plural(deFora, 'exercício que você acrescentou e não entra nessa conta',
@@ -11985,17 +12047,18 @@
          *
          * A segunda: `dificuldade` é `proxy.terco` em 482 de 482 itens do 9º
          * ano, ou seja, a POSIÇÃO do exercício na lista da fonte, e não juízo
-         * nosso. Estampar "difícil" num cartão é afirmação de curadoria, que é
-         * exatamente o que esta tela não pode fazer depois da comparação cega
-         * de 24/09. A ordem já carrega a estimativa, e a frase da tela do
-         * módulo diz de onde ela vem: "em ordem de dificuldade estimada".
+         * nosso. Estampar "fácil" ou "difícil" num cartão seria afirmação de
+         * curadoria. O que entra é a etiqueta "desafio" nos exercícios do terço
+         * final da fonte, que é o que o nome da lista conta, e a ajuda do
+         * assunto diz de onde ela vem ("os do fim da lista original").
          *
          * Na lista CHEIA do módulo a etiqueta continua, e ali ela é outra
          * coisa: lá ela é filtro e não afirmação sobre uma trajetória. */
         el('div', { class: 'bib-tags' }, [
           lp.minutosDe[id] !== undefined
             ? el('span', { class: 'tag bib-lp-min-item', texto: minutosEstimados(lp.minutosDe[id]) })
-            : el('span', { class: 'tag bib-lp-min-item', texto: 'acrescentado por você' })
+            : el('span', { class: 'tag bib-lp-min-item', texto: 'acrescentado por você' }),
+          lp.minutosDe[id] !== undefined ? etiquetaDesafio(it) : null
         ])
       ]);
       grade.appendChild(celulaComCaixa(cartao, 'itens', it.id, setas));
@@ -12246,8 +12309,14 @@
    * vazio não leva de volta a esta tela (tocar na linha carrega a lista de
    * novo), então não há frase para sustentar depois do reinício. */
   var bibLpAnexada = null;
-  function lembrarAnexada(reg) { bibLpAnexada = reg || null; }
+  function lembrarAnexada(reg) {
+    bibLpAnexada = reg || null;
+    if (reg && reg.lista) bibAnexadasNaSessao[reg.lista] = reg;
+  }
   function listaAnexada() { return bibLpAnexada; }
+  /* ONDE CADA LISTA FOI ANEXADA NESTA SESSÃO: a informação continua à mão
+   * quando ela volta a ver aquela lista, mesmo depois de mexer no material. */
+  var bibAnexadasNaSessao = {};
 
   /* Chamada por TODA ação da mão dela que mexe no material. Sem isto, o
    * Desfazer da faixa continuaria oferecendo voltar a uma seleção que ela já
@@ -12659,7 +12728,8 @@
           : perdeu ? ', de volta como veio' : '') +
         '. Mude o que quiser e toque em Gerar material.',
       rotulo: perdeu ? 'Desfazer' : null,
-      aoAgir: perdeu ? function () { devolverSelecaoTrocada(antes, tudo); } : null
+      // o Desfazer da troca devolve a seleção, e a guarda deixa de ser necessária
+      aoAgir: perdeu ? function () { guardarSelecaoAnterior(null); devolverSelecaoTrocada(antes, tudo); } : null
     };
     /* A ORDEM IMPORTA, E DÁ UM DESENHO EM VEZ DE DOIS. O `desenharCarrinho`
      * redesenha a tela da lista pronta quando a grade já existe; chamado DEPOIS
@@ -12928,7 +12998,7 @@
 
     /* Só o que existe entra na conta ("0 páginas de teoria" era contar o que
      * não há), e a ordem diz de onde veio: da lista, ou da mão dela. */
-    var lpDoMaterial = bibLpEmEdicao ? listaProntaPorId(bibLpEmEdicao) : null;
+    var lpDoMaterial = lpEmEdicao() ? listaProntaPorId(lpEmEdicao()) : null;
     var daListaPronta = !!(lpDoMaterial && listaProntaEmEdicao(lpDoMaterial));
     corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', id: 'bib-gerar-resumo',
       texto: [itens.length ? plural(itens.length, 'exercício', 'exercícios') : '',
@@ -13150,9 +13220,11 @@
     // depois do guardarCarrinho, que apaga a anotação: esta é a que vale agora
     /* "Esta lista foi anexada" só quando o anexo veio DESTA lista: o que foi
      * anexado tem de conter exercício dela. Carrinho vazio sozinho não diz. */
-    var lpUsada = bibLpEmEdicao ? listaProntaPorId(bibLpEmEdicao) : null;
+    var lpUsada = lpEmEdicao() ? listaProntaPorId(lpEmEdicao()) : null;
     var veioDaLista = lpUsada && usada.itens.some(function (x) { return lpUsada.minutosDe[x] !== undefined; });
     if (aula && aluno && veioDaLista) lembrarAnexada({ aluno: aluno.nome, data: aula.data, aulaId: aula.id, lista: lpUsada.id });
+    // anexou: o que estava guardado antes de uma troca deixa de ser a volta dela
+    if (aula) guardarSelecaoAnterior(null);
     desenharCarrinho();
     marcarCaixasDoCarrinho();
     return function () {
@@ -13206,7 +13278,7 @@
        * (a página do gabarito é quase igual à da lista, e numa impressora preto
        * e branco a diferença some). Dois anexos na aula, "<assunto> lista" e
        * "<assunto> gabarito", e ela manda só o primeiro. */
-      var separa = !!(aula && op.lista && op.gabarito && usaItens.length);
+      var separa = !!(op.lista && op.gabarito && usaItens.length);
       var arquivos;
       if (separa) {
         var sl = PDFGen.gerarMaterialBiblioteca(Object.assign({}, base, { incluirGabarito: false }));
@@ -13222,9 +13294,18 @@
       }
       if (!aula) {
         fecharModal('modal-bib-gerar');
-        entregarArquivo(arquivos[0].nome, arquivos[0].blob, op.titulo);
+        entregarArquivos(arquivos, op.titulo);
         return null;
       }
+      /* DUAS LISTAS DO MESMO ASSUNTO NA MESMA AULA não podem sair com o mesmo
+       * nome: o segundo ganha "_2" antes do .pdf, e assim por diante. */
+      var usados = {};
+      (aula.anexos || []).forEach(function (x) { usados[x.nome] = true; });
+      arquivos.forEach(function (a) {
+        var base = a.nome.replace(/\.pdf$/, ''), k = 2;
+        while (usados[a.nome]) { a.nome = base + '_' + k + '.pdf'; k++; }
+        usados[a.nome] = true;
+      });
       arquivos.forEach(function (a) { a.id = Core.uid(); });
       var apagarTodos = function () { arquivos.forEach(function (a) { Store.apagarAnexo(a.id).catch(function () {}); }); };
       id = arquivos[0].id;

@@ -92,6 +92,10 @@
         throw Recusa('A lista ' + k.id + ' do pacote segue uma regra que este aplicativo não conhece (' + k.regra + ').');
       }
       if (!numero(k.minutos)) throw Recusa('A lista ' + k.id + ' do pacote não diz quantos minutos leva.');
+      // a tela da lista não mostra teoria: lista com teoria sairia pela metade
+      if (Array.isArray(k.teoria) ? k.teoria.length : k.teoria) {
+        throw Recusa('A lista ' + k.id + ' do pacote traz teoria, e este aplicativo só mostra lista de exercícios.');
+      }
       if (!Array.isArray(k.degraus) || !k.degraus.length) {
         throw Recusa('A lista ' + k.id + ' do pacote não traz exercício nenhum.');
       }

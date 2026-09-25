@@ -479,6 +479,9 @@ roda "biblioteca listas --envenenado-nome-anexo"    node "_teste/testa_bibliotec
 roda "biblioteca listas --envenenado-gabarito-junto" node "_teste/testa_biblioteca_listas.js" --envenenado-gabarito-junto
 roda "biblioteca listas --envenenado-troca-ao-ver"  node "_teste/testa_biblioteca_listas.js" --envenenado-troca-ao-ver
 roda "biblioteca listas --envenenado-esquece-anterior" node "_teste/testa_biblioteca_listas.js" --envenenado-esquece-anterior
+roda "biblioteca listas --envenenado-sobrescreve-guarda" node "_teste/testa_biblioteca_listas.js" --envenenado-sobrescreve-guarda
+roda "biblioteca listas --envenenado-sem-etiqueta"  node "_teste/testa_biblioteca_listas.js" --envenenado-sem-etiqueta
+roda "biblioteca listas --envenenado-orfao"         node "_teste/testa_biblioteca_listas.js" --envenenado-orfao
 # FRENTE B (B10): o que o lerKits recusa e o que a tela descarta (lista com
 # exercicio que saiu por curadoria). O veneno tira o guarda do app.js, e sem
 # ele a aba Biblioteca inteira nao abre.
@@ -492,6 +495,7 @@ roda "folha avisa mudancas"                        node "_teste/testa_folha_muda
 roda "folha --envenenado-cancela"                  node "_teste/testa_folha_mudancas.js" --envenenado-cancela
 roda "folha --envenenado-lixeira-muda"             node "_teste/testa_folha_mudancas.js" --envenenado-lixeira-muda
 roda "folha --envenenado-alca"                     node "_teste/testa_folha_mudancas.js" --envenenado-alca
+roda "folha --envenenado-traco-cancelado"          node "_teste/testa_folha_mudancas.js" --envenenado-traco-cancelado
 # FRENTE B (B10): retangulo de tapar com posicao que nao e numero nao vai
 # para o papel. Sem navegador.
 roda "tapar so com numero"                         node "_teste/testa_tapar_numeros.js"

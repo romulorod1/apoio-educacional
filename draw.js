@@ -583,19 +583,7 @@
     if (Object.keys(this.ponteiros).length < 2) this.pinca = null;
     try { this.canvas.releasePointerCapture(e.pointerId); } catch (err) { /* nada a fazer */ }
 
-    if (this.tracoAtual) {
-      if (this.tracoAtual.pontos.length < 2) {
-        // toque seco vira um ponto redondo
-        this.tracoAtual.pontos.push([
-          this.tracoAtual.pontos[0][0] + 0.6,
-          this.tracoAtual.pontos[0][1],
-          this.tracoAtual.pontos[0][2]
-        ]);
-      }
-      this.tracoAtual = null;
-      this.cacheValido = false;
-      this._avisarMudanca();
-    }
+    if (this._fecharTraco()) this._avisarMudanca();
     if (this.tapando) {
       var t = this.tapando;
       this.tapando = null;
@@ -620,16 +608,39 @@
    * O comentário do `moverNoCarrinho` diz que ela usa o tablet com a mão
    * apoiada, então este é o gesto normal dela. Achado por uma lente cega. */
   /* Desiste de tudo o que estava em andamento, sem cometer nada. */
+  /* Fecha o traço em andamento e devolve se havia um. Toque seco vira ponto. */
+  Editor.prototype._fecharTraco = function () {
+    if (!this.tracoAtual) return false;
+    if (this.tracoAtual.pontos.length < 2) {
+      // toque seco vira um ponto redondo
+      this.tracoAtual.pontos.push([
+        this.tracoAtual.pontos[0][0] + 0.6,
+        this.tracoAtual.pontos[0][1],
+        this.tracoAtual.pontos[0][2]
+      ]);
+    }
+    this.tracoAtual = null;
+    this.cacheValido = false;
+    return true;
+  };
+
   Editor.prototype._aoCancelarPonteiro = function (e) {
     delete this.ponteiros[e.pointerId];
-    // o _cancelarTraco ja desiste do retangulo em andamento, na primeira linha dele
-    this._cancelarTraco();
+    if (Object.keys(this.ponteiros).length < 2) this.pinca = null;
+    try { this.canvas.releasePointerCapture(e.pointerId); } catch (err) { /* nada a fazer */ }
+    /* O TRAÇO FEITO ATÉ O CANCELAMENTO FICA: é escrita dela, e o
+     * `pointercancel` da caneta (o sistema tomando o gesto, uma notificação)
+     * não é ela desistindo. O retângulo de tapar em andamento, esse sim, sai.
+     * O cancelamento pela PALMA é outro caminho (`_cancelarTraco`, no toque
+     * de dedo), e continua desistindo. */
+    var guardouTraco = this._fecharTraco();
+    if (this.tapando) this._cancelarTapar();
     /* O QUE JÁ MUDOU NÃO VOLTA COM O CANCELAMENTO: a borracha já tirou o traço
      * e o arrasto já moveu o item, na tela e na nota. Sem avisar, a folha
      * ficava diferente do que está gravado até o próximo gesto dela, e
      * fechada antes disso perdia a mudança. Achado pela lente de correção do
      * PR #57. */
-    var mudou = !!((this.apagando && this.apagou) || (this.arrasto && this.arrasto.moveu));
+    var mudou = guardouTraco || !!((this.apagando && this.apagou) || (this.arrasto && this.arrasto.moveu));
     if (this.arrasto) this.arrasto = null;
     this.apagando = false;
     this.apagou = false;
