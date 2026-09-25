@@ -1092,8 +1092,11 @@ async function cenarioVerNaoTroca(pag) {
   const depoisDoReinicio = await carrinho(pag);
   console.log('   depois do reinício: ' + JSON.stringify(depoisDoReinicio.itens));
   if (V_LEMBRA) {
-    conf('VENENO: sem lembrar qual lista era, o reinício faz a linha RECARREGAR e a ordem dela some',
-      depoisDoReinicio.itens.join('|'), IDS2.join('|'));
+    /* Desde que tocar MOSTRA em vez de carregar, o que se perde sem a memória
+     * não é a ordem (ver não mexe no material), é o caminho: a linha abre a
+     * tela de VER, e não a lista que ela estava mexendo. */
+    conf('VENENO: sem lembrar qual lista era, o reinício faz a linha abrir a tela de VER, e não a de mexer',
+      await pag.evaluate(() => !!document.querySelector('#bib-lp-grade')), false);
     return;
   }
   conf('a linha ABRIU, e o trabalho dela atravessou o reinício',
