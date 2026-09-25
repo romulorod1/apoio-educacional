@@ -116,6 +116,12 @@ from decimal import Decimal, ROUND_HALF_UP
 
 REGRA = 'kits-v1'
 REGRA_LISTAS = 'listas-v1'
+# A listas-v2 e a listas-v1 inteira com o orcamento de UMA AULA (60 minutos) em
+# vez de meia. Pedido do Romulo em 24/09, depois de a Nathalia olhar as 22
+# listas do 9o ano e achar curto (4 a 7 exercicios). Mudar o orcamento muda o
+# que cada numero da tela quer dizer, e regra nova pede nome novo (8f).
+REGRA_AULA = 'listas-v2'
+LISTAS = (REGRA_LISTAS, REGRA_AULA)
 TEMPO_REGRA = 'tempo-v1'
 TETO_TEORIA = 8
 
@@ -234,12 +240,32 @@ BANDA = (270, 330)          # I5, em decimos
 TAMANHO = (4, 12)           # I6
 ALVO = 300                  # o centro da banda, para desempate
 
+# O orcamento de cada regra de lista pronta, em decimos de minuto. A listas-v2
+# dobra tudo o que e tempo: a banda estrita continua sendo 10% em volta do
+# alvo (27 a 33 vira 54 a 66), a larga 20% (24 a 36 vira 48 a 72) e a ultima
+# tentativa segue a mesma proporcao (20 a 45 vira 40 a 90). O teto de
+# exercicios dobra junto (12 vira 24) para nao ser ele a encurtar a lista; o
+# piso fica em 4, que e o que ainda e lista. Medido no 9o ano: as 22 listas
+# fecham dentro de 54 a 66, com 6 a 15 exercicios, e o teto nunca pesou.
+ORCAMENTO = {
+    REGRA_LISTAS: {'banda': BANDA, 'larga': (240, 360), 'ultima': (200, 450),
+                   'tamanho': TAMANHO, 'alvo': ALVO},
+    REGRA_AULA: {'banda': (540, 660), 'larga': (480, 720), 'ultima': (400, 900),
+                 'tamanho': (4, 24), 'alvo': 600, 'resto': (0, 660)},
+}
+# O 'resto' e o passo que so a listas-v2 tem, e e o ultimo: MODULO PEQUENO. Um
+# modulo de 18 exercicios nem sempre chega a 40 minutos com a rampa do nivel,
+# e sem este passo ele ficava SEM lista, que e pior que lista curta. O pedido
+# do Romulo foi "gere o que der": a lista sai com o que couber ate 66 minutos,
+# sem repetir exercicio e sem trazer de outro modulo, e `relaxou` diz
+# "minutos". Medido na amostra das provas: sem ele, 9 das 10 listas sumiam.
+
 
 def degraus_do_nivel(nivel, regra=REGRA):
     """A unica diferenca entre as duas regras esta no T3: a kits-v1 proibia o
     degrau 1, e foi isso que deixou as onze listas de nivel 3 da B9 sem porta
     de entrada."""
-    if regra == REGRA_LISTAS and nivel == 3:
+    if regra in LISTAS and nivel == 3:
         return (1, 2, 3)
     return {1: (1, 2), 2: (1, 2, 3), 3: (2, 3)}[nivel]
 
@@ -263,7 +289,7 @@ def composicoes(nivel, n, regra=REGRA, com_degrau_1=True):
         for c3 in range(1, min(teto(n / 3), n - 2) + 1):
             for c1 in range(1, n - c3):
                 saida.append((c1, n - c3 - c1, c3))
-    elif regra == REGRA_LISTAS and com_degrau_1:
+    elif regra in LISTAS and com_degrau_1:
         for c3 in range(teto(2 * n / 3), n - 1):  # c2 = n - 1 - c3 >= 1
             saida.append((1, n - 1 - c3, c3))
     else:
@@ -312,7 +338,7 @@ def tabela(itens, custo, max_conta, teto_soma):
 
 
 def busca_por_nivel(nivel, pool, forcados, banda, tamanho, ultimo=None,
-                    primeiro=None, regra=REGRA, com_degrau_1=True):
+                    primeiro=None, regra=REGRA, com_degrau_1=True, alvo=ALVO):
     """A melhor escolha para este nivel, ou None. `forcados` ja entram no kit
     (a bateria do T1, o citado do fim e a abertura da listas-v1), e saem dos
     candidatos da busca.
@@ -346,19 +372,25 @@ def busca_por_nivel(nivel, pool, forcados, banda, tamanho, ultimo=None,
                 falta[d] = f
             if not viavel:
                 continue
-            combinado = _combina(tabelas, falta, banda[0] - min_forcado, banda[1] - min_forcado)
+            # O desempate do _combina compara a soma SEM os forcados com o alvo
+            # cheio. E assim desde a kits-v1, e as listas gravadas saem disso:
+            # descontar os forcados aqui muda 7 das 22 listas da v6 do 9o ano
+            # (medido em 24/09, B11). Fica como esta, dito, e nao consertado
+            # por baixo de uma mudanca de orcamento.
+            combinado = _combina(tabelas, falta, banda[0] - min_forcado, banda[1] - min_forcado,
+                                 alvo)
             if combinado is None:
                 continue
             custo_total, ids, soma = combinado
             soma += min_forcado
             escolhidos = ordena(list(ids) + ids_forcados, por_id, ultimo, primeiro)
-            chave = _chave(escolhidos, custo_total, soma)
+            chave = _chave(escolhidos, custo_total, soma, alvo)
             if melhor is None or chave < melhor[0]:
                 melhor = (chave, escolhidos)
     return melhor[1] if melhor else None
 
 
-def _chave(itens, custo_total, soma):
+def _chave(itens, custo_total, soma, alvo=ALVO):
     """A ordem de preferencia da regra, e ela comeca pela I4 porque entrada boa
     vale mais que cobertura: kit grande tem itens curtos, itens curtos derrubam
     a mediana, e a mediana derrubada quebra a entrada. Descoberto medindo: com
@@ -368,10 +400,10 @@ def _chave(itens, custo_total, soma):
     mediana = minutos[n // 2] if n % 2 else (minutos[n // 2 - 1] + minutos[n // 2]) / 2
     entrada_ok = 0 if (itens[0]['_min'] <= mediana and not itens[0].get('origem_citada')) else 1
     aulas = len({i['aula']['slug'] for i in itens})
-    return (entrada_ok, -aulas, abs(soma - ALVO), n, tuple(i['id'] for i in itens))
+    return (entrada_ok, -aulas, abs(soma - alvo), n, tuple(i['id'] for i in itens))
 
 
-def _combina(tabelas, falta, soma_min, soma_max):
+def _combina(tabelas, falta, soma_min, soma_max, alvo=ALVO):
     """Combina as tabelas dos degraus pedidos. Como cada nivel usa no maximo
     tres degraus e as contagens ja estao fixas, isto e uma convolucao pequena
     sobre as somas alcancaveis."""
@@ -402,7 +434,7 @@ def _combina(tabelas, falta, soma_min, soma_max):
         if not (soma_min <= s <= soma_max):
             continue
         c, ids = atual[s]
-        cand = (c, abs(s - ALVO), ids, s)
+        cand = (c, abs(s - alvo), ids, s)
         if melhor is None or cand < melhor:
             melhor = cand
     if melhor is None:
@@ -468,18 +500,26 @@ AFROUXAMENTOS = [
 # aquecimento e exatamente a queixa que os revisores cegos fizeram de onze dos
 # doze pares de nivel 3. Medido no 9o ano: com a ordem invertida, o modulo do
 # teorema de Pitagoras perdia o aquecimento por 0,1 minuto de estouro.
-AFROUXAMENTOS_LISTAS = [
-    # (rotulo da tentativa, banda, exigir citado no fim, exigir abertura no degrau 1)
-    ('estrita', BANDA, True, True),
-    ('sem citado no fim', BANDA, False, True),
-    ('banda larga', (240, 360), True, True),
-    ('banda larga sem citado', (240, 360), False, True),
-    ('sem abertura no degrau 1', BANDA, True, False),
-    ('sem citado e sem abertura', BANDA, False, False),
-    ('banda larga sem abertura', (240, 360), True, False),
-    ('banda larga sem os dois', (240, 360), False, False),
-    ('ultima tentativa', (200, 450), False, False),
-]
+def afrouxamentos_listas(regra=REGRA_LISTAS):
+    """A mesma ordem de afrouxar nas duas regras de lista; so as bandas vem
+    do orcamento da regra."""
+    o = ORCAMENTO[regra]
+    est, larga = o['banda'], o['larga']
+    return [
+        # (rotulo da tentativa, banda, exigir citado no fim, exigir abertura no degrau 1)
+        ('estrita', est, True, True),
+        ('sem citado no fim', est, False, True),
+        ('banda larga', larga, True, True),
+        ('banda larga sem citado', larga, False, True),
+        ('sem abertura no degrau 1', est, True, False),
+        ('sem citado e sem abertura', est, False, False),
+        ('banda larga sem abertura', larga, True, False),
+        ('banda larga sem os dois', larga, False, False),
+        ('ultima tentativa', o['ultima'], False, False),
+    ] + ([('o que o modulo tiver', o['resto'], False, False)] if o.get('resto') else [])
+
+
+AFROUXAMENTOS_LISTAS = afrouxamentos_listas(REGRA_LISTAS)
 
 # Quantos candidatos a abertura a busca tenta antes de desistir. Nao e um: o
 # melhor pela posicao na fonte pode ser longo demais para o orcamento, e no
@@ -523,22 +563,23 @@ def aberturas(pool, nivel, degrau=None):
     return degrau, _ordem_de_abertura(candidatos)
 
 
-def monta_lista(nivel, itens_do_modulo):
+def monta_lista(nivel, itens_do_modulo, regra=REGRA_LISTAS):
     """Uma lista pronta da listas-v1, ou None. Os dois consertos de exclusao
     acontecem antes de qualquer busca, e o terceiro entra como ancora."""
+    orc = ORCAMENTO[regra]
     elegiveis = [i for i in itens_do_modulo
-                 if i['dificuldade'] in degraus_do_nivel(nivel, REGRA_LISTAS)
+                 if i['dificuldade'] in degraus_do_nivel(nivel, regra)
                  and not i.get('sem_solucao') and (i.get('assets') or {}).get('solucao')]
     # conserto 1, por exclusao
     elegiveis = [i for i in elegiveis if not referencia(i)]
     # conserto 2, podando o bolo
     base, _podados = poda_repetidos(elegiveis)
-    if len(base) < TAMANHO[0]:
+    if len(base) < orc['tamanho'][0]:
         return None
     sem_citado = [i for i in base if not i.get('origem_citada')]
     _degrau, candidatos = aberturas(base, nivel)
 
-    for (_nome, banda, quer_citado, quer_abertura) in AFROUXAMENTOS_LISTAS:
+    for (_nome, banda, quer_citado, quer_abertura) in afrouxamentos_listas(regra):
         entradas = candidatos[:CANDIDATOS_DE_ABERTURA]
         if not quer_abertura and nivel == 3:
             # a tentativa "sem abertura no degrau 1" devolve o T3 ao formato da
@@ -560,21 +601,23 @@ def monta_lista(nivel, itens_do_modulo):
             if quer_citado:
                 # o citado entra so como ancora do fim, e o resto do bolo nao
                 # tem citado nenhum: e isso que impede citado no meio
-                for c in ancoras_citado(base, nivel, REGRA_LISTAS)[:3]:
+                for c in ancoras_citado(base, nivel, regra)[:3]:
                     if c['id'] == entrada['id']:
                         continue
                     achado = busca_por_nivel(nivel, bolo + [c, entrada], [c, entrada], banda,
-                                             TAMANHO, ultimo=c['id'], primeiro=entrada['id'],
-                                             regra=REGRA_LISTAS,
-                                             com_degrau_1=entrada['dificuldade'] == 1)
+                                             orc['tamanho'], ultimo=c['id'], primeiro=entrada['id'],
+                                             regra=regra,
+                                             com_degrau_1=entrada['dificuldade'] == 1,
+                                             alvo=orc['alvo'])
                     if achado:
                         break
             if not achado:
                 # sem ancora: zero citado, que a tabela do T3 aceita sem
                 # afrouxar nada, e que no T2 tambem cabe em "no maximo um"
-                achado = busca_por_nivel(nivel, bolo + [entrada], [entrada], banda, TAMANHO,
-                                         primeiro=entrada['id'], regra=REGRA_LISTAS,
-                                         com_degrau_1=entrada['dificuldade'] == 1)
+                achado = busca_por_nivel(nivel, bolo + [entrada], [entrada], banda, orc['tamanho'],
+                                         primeiro=entrada['id'], regra=regra,
+                                         com_degrau_1=entrada['dificuldade'] == 1,
+                                         alvo=orc['alvo'])
             if achado:
                 achados.append(achado)
         if achados:
@@ -582,12 +625,12 @@ def monta_lista(nivel, itens_do_modulo):
             # afrouxada, e o desempate e a ordem dos candidatos, que ja e
             # deterministica. Sem isto a primeira abertura viavel ganhava mesmo
             # quando ela sozinha derrubava a clausula dos minutos da entrada-v2.
-            achados.sort(key=lambda r: len(relaxou_da_lista(nivel, r, itens_do_modulo)))
+            achados.sort(key=lambda r: len(relaxou_da_lista(nivel, r, itens_do_modulo, regra)))
             return achados[0]
     return None
 
 
-def relaxou_da_lista(nivel, itens, itens_do_modulo):
+def relaxou_da_lista(nivel, itens, itens_do_modulo, regra=REGRA_LISTAS):
     """O que caiu NESTA lista, medido na lista pronta e nao no que a busca
     pediu. Quem julga de verdade e o confere_kits.py, que le so o arquivo."""
     caiu = set()
@@ -599,12 +642,13 @@ def relaxou_da_lista(nivel, itens, itens_do_modulo):
     mediana = med[n // 2] if n % 2 else (med[n // 2 - 1] + med[n // 2]) / 2
     citados = [k for k, i in enumerate(itens) if i.get('origem_citada')]
 
-    if not (BANDA[0] <= total <= BANDA[1]):
+    banda = ORCAMENTO[regra]['banda']
+    if not (banda[0] <= total <= banda[1]):
         caiu.add('minutos')
     # entrada-v2, as quatro clausulas
     if minutos[0] > mediana or itens[0].get('origem_citada') or pede_demonstracao(itens[0]):
         caiu.add('entrada')
-    permitidos = degraus_do_nivel(nivel, REGRA_LISTAS)
+    permitidos = degraus_do_nivel(nivel, regra)
     if any(it['dificuldade'] in permitidos and it['dificuldade'] < seq[0] and abre_lista(it)
            for it in itens_do_modulo):
         caiu.add('entrada')
@@ -759,7 +803,7 @@ def alternativas_do_kit(itens, itens_do_modulo, regra=REGRA):
         vizinhos = [o for o in itens_do_modulo
                     if o['id'] not in dentro and o['dificuldade'] == it['dificuldade']
                     and not o.get('sem_solucao') and (o.get('assets') or {}).get('solucao')]
-        if regra == REGRA_LISTAS:
+        if regra in LISTAS:
             vizinhos = [o for o in vizinhos if not referencia(o)
                         and not any(semelhanca(o, d) >= LIMIAR_REPETIDOS
                                     for d in itens if d['id'] != it['id'])]
@@ -804,7 +848,7 @@ def gerar(itens_de_fora, teoria, regra=REGRA, niveis=(1, 2, 3), com_teoria=True)
     pacote ja escreveu o itens.json quando chama isto, e um campo de trabalho
     vazando para o dado de quem chama e o tipo de coisa que so aparece muito
     depois, no hash de outro arquivo."""
-    if regra not in (REGRA, REGRA_LISTAS):
+    if regra not in (REGRA,) + LISTAS:
         raise ValueError('regra desconhecida: %r' % regra)
     itens = [dict(i) for i in itens_de_fora]
     por_modulo = collections.OrderedDict()
@@ -821,14 +865,14 @@ def gerar(itens_de_fora, teoria, regra=REGRA, niveis=(1, 2, 3), com_teoria=True)
     for mid in sorted(por_modulo):
         do_modulo = sorted(por_modulo[mid], key=lambda i: (i['aula']['n'], i['numero']))
         for nivel in niveis:
-            if regra == REGRA_LISTAS:
-                itens_kit = monta_lista(nivel, do_modulo)
+            if regra in LISTAS:
+                itens_kit = monta_lista(nivel, do_modulo, regra)
             else:
                 itens_kit = monta_kit(mid, nivel, do_modulo, teoria_por_modulo.get(mid, []))
             if not itens_kit:
                 sem_kit.append((mid, nivel))
                 continue
-            caiu = (relaxou_da_lista(nivel, itens_kit, do_modulo) if regra == REGRA_LISTAS
+            caiu = (relaxou_da_lista(nivel, itens_kit, do_modulo, regra) if regra in LISTAS
                     else relaxou_do_kit(nivel, itens_kit, do_modulo))
             kits.append({
                 'id': '%s:kit:%d' % (mid, nivel), 'modulo': mid, 'serie': itens_kit[0]['serie'],
@@ -859,7 +903,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('pacote')
     ap.add_argument('--saida', default=None)
-    ap.add_argument('--regra', default=REGRA_LISTAS, choices=[REGRA, REGRA_LISTAS])
+    ap.add_argument('--regra', default=REGRA_LISTAS, choices=[REGRA, REGRA_LISTAS, REGRA_AULA])
     ap.add_argument('--niveis', default='2,3',
                     help='os niveis a gerar, separados por virgula (padrao 2,3)')
     ap.add_argument('--sem-teoria', dest='sem_teoria', action='store_true', default=True)

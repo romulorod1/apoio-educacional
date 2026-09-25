@@ -42,7 +42,14 @@ import sys
 import zipfile
 from decimal import Decimal, ROUND_HALF_UP
 
-REGRAS = ('kits-v1', 'listas-v1')
+REGRAS = ('kits-v1', 'listas-v1', 'listas-v2')
+# A listas-v2 e a listas-v1 com o orcamento de UMA AULA em vez de meia (pedido
+# do Romulo em 24/09). Tudo o que nao e tempo e igual; o que muda e a banda da
+# I5 e o teto da I6, escritos aqui a partir do texto e nao lidos do gerador.
+LISTAS = ('listas-v1', 'listas-v2')
+BANDA_I5 = {'kits-v1': (Decimal(27), Decimal(33)), 'listas-v1': (Decimal(27), Decimal(33)),
+            'listas-v2': (Decimal(54), Decimal(66))}
+TAMANHO_I6 = {'kits-v1': (4, 12), 'listas-v1': (4, 12), 'listas-v2': (4, 24)}
 
 # --------------------------------------------------------------- tempo-v1
 
@@ -209,7 +216,7 @@ def degraus_do_nivel(nivel, regra):
     """Os degraus que a tabela do nivel admite. A unica diferenca entre as duas
     regras esta no T3: a kits-v1 proibia o degrau 1, e foi isso que deixou as
     onze listas de nivel 3 da B9 sem porta de entrada."""
-    if regra == 'listas-v1' and nivel == 3:
+    if regra in LISTAS and nivel == 3:
         return (1, 2, 3)
     return {1: (1, 2), 2: (1, 2, 3), 3: (2, 3)}[nivel]
 
@@ -328,7 +335,7 @@ def confere_um_kit(kit, por_id, paginas_de_teoria, itens_do_modulo, a):
         a.frouxo('entrada', 'I4: o primeiro item tem %s minutos, acima da mediana %s do kit' % (minutos[0], med))
     if itens[0].get('origem_citada'):
         a.frouxo('entrada', 'I4: o primeiro item traz origem_citada %r' % itens[0]['origem_citada'])
-    if regra == 'listas-v1':
+    if regra in LISTAS:
         # as duas cláusulas novas da entrada-v2 (8f). As duas de cima sao a I4
         # antiga, que a entrada-v2 herda inteira.
         if pede_demonstracao(itens[0]):
@@ -348,11 +355,13 @@ def confere_um_kit(kit, por_id, paginas_de_teoria, itens_do_modulo, a):
             a.frouxo('entrada', 'entrada-v2: a lista abre no degrau %d e o modulo tem item '
                                 'de abertura no degrau %d' % (seq[0], max(abaixo)))
 
-    if not (Decimal(27) <= total <= Decimal(33)):
-        a.frouxo('minutos', 'I5: o kit soma %s minutos, fora da banda de 27 a 33' % total)
+    lo, hi = BANDA_I5[regra]
+    if not (lo <= total <= hi):
+        a.frouxo('minutos', 'I5: o kit soma %s minutos, fora da banda de %s a %s' % (total, lo, hi))
 
-    if not (4 <= n <= 12):
-        a.duro('I6: o kit tem %d exercicios, fora da banda de 4 a 12' % n)
+    tmin, tmax = TAMANHO_I6[regra]
+    if not (tmin <= n <= tmax):
+        a.duro('I6: o kit tem %d exercicios, fora da banda de %d a %d' % (n, tmin, tmax))
 
     if len(set(ids)) != n:
         repetido = next(i for i in ids if ids.count(i) > 1)
@@ -428,7 +437,7 @@ def confere_um_kit(kit, por_id, paginas_de_teoria, itens_do_modulo, a):
             a.frouxo('citado', 'T3: ha item citado e o ultimo nao e citado')
 
     # ------------------------------------- os dois consertos que sao da lista
-    if regra == 'listas-v1':
+    if regra in LISTAS:
         for k, it in enumerate(itens):
             alvo = referencia(it)
             if not alvo:
