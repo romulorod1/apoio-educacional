@@ -118,26 +118,31 @@
     });
   }
 
-  /* TODA escrita passa por aqui, e só responde quando a TRANSAÇÃO confirma.
+  /* TODA escrita simples passa por aqui, e só responde quando a TRANSAÇÃO
+   * confirma.
    *
    * Antes, gravar e apagar respondiam no `onsuccess` do pedido. Esse evento diz
-   * que o pedido foi aceito, não que o dado está no disco: entre ele e o
-   * `oncomplete` da transação há uns milissegundos em que a página ainda pode
-   * morrer (aba fechada, tablet matando o aplicativo em segundo plano), e aí a
-   * transação aborta e o dado some, depois de o aplicativo já ter seguido como
-   * se estivesse salvo. Medido em 24/09: 7 perdas em 300 cortes com a resposta
-   * no pedido, 0 em 300 esperando a transação.
+   * que o pedido foi aceito, e não que a transação confirmou: entre ele e o
+   * `oncomplete` há uns milissegundos em que a página ainda pode morrer (aba
+   * fechada, tablet matando o aplicativo em segundo plano), e aí a transação
+   * aborta e a escrita some, depois de o aplicativo já ter seguido como se
+   * estivesse salvo. Medido em 24/09: 7 perdas em 300 cortes com a resposta no
+   * pedido, 0 em 300 esperando a transação confirmar.
    *
    * Por isso a promessa resolve em `t.oncomplete` e rejeita em `t.onerror` ou
    * `t.onabort`, e nunca no evento do pedido. O resultado do pedido (a chave
-   * gerada por um `add`, por exemplo) continua sendo o valor devolvido. */
+   * gerada por um `add`, por exemplo) continua sendo o valor devolvido.
+   *
+   * E A REJEIÇÃO AGORA EXISTE DE VERDADE: quem chama tem de tratar. O motivo
+   * vem primeiro da TRANSAÇÃO, porque é nela que o navegador põe o útil (falta
+   * de espaço é um QuotaExceededError da transação, e não do pedido). */
   function escrever(deposito, fazer) {
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
         var t = b.transaction(deposito, 'readwrite');
         var req = fazer(t.objectStore(deposito));
         var motivo = function (padrao) {
-          return (req && req.error) || t.error || new Error(padrao);
+          return t.error || (req && req.error) || new Error(padrao);
         };
         t.oncomplete = function () { resolve(req ? req.result : undefined); };
         t.onerror = function () { reject(motivo('A gravação falhou.')); };
@@ -532,7 +537,9 @@
 
   function importarTudo(pacote) {
     if (!pacote || pacote.formato !== 'apoio-educacional' || !pacote.dados) {
-      return Promise.reject(new Error('Arquivo de cópia inválido.'));
+      /* `invalida`: recusada antes de gravar qualquer coisa, então a tela pode
+       * dizer só isso; nas outras falhas algo pode ter sido gravado pela metade. */
+      return Promise.reject(Object.assign(new Error('Arquivo de cópia inválido.'), { invalida: true }));
     }
     return salvar(pacote.dados).then(function () {
       var passos = [];

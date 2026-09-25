@@ -847,6 +847,30 @@
 
   function salvar() { return Store.salvar(dbParaGravar()); }
 
+  /* DESDE QUE O SALVAR ESPERA A TRANSAÇÃO CONFIRMAR, ELE PODE REJEITAR, e a
+   * tela não pode ficar muda nem mostrar a mensagem técnica do navegador. A
+   * causa mais provável no tablet dela é falta de espaço, e é o que as frases
+   * dizem. Os outros cerca de 40 `salvar().then` sem `catch` ficam para um PR
+   * próprio.
+   *
+   * A MEMÓRIA VOLTA A SER O DISCO. Quando uma gravação de várias partes
+   * rejeita no meio (restaurar uma cópia, voltar a um ponto do histórico,
+   * desfazer, apagar tudo), parte pode ter ficado gravada e parte não. Se a
+   * memória continuasse com o estado que ela tinha antes, o PRÓXIMO salvar
+   * qualquer gravaria esse estado velho por cima do que ficou no disco, sem
+   * uma palavra. Então relê do disco antes de qualquer outra coisa, redesenha,
+   * e diz que não se completou. */
+  function releDoDisco(mensagem) {
+    return Store.carregar().then(function (lido) {
+      db = lido || Store.bancoVazio();
+    }).catch(function () { /* nem a leitura deu: fica o que há, e o aviso diz */ }).then(function () {
+      mapeamentoEmEdicao = null;
+      fecharTudo();
+      desenharTudo();
+      avisar(mensagem);
+    });
+  }
+
   /* Grava um ponto de retorno antes de mexer em várias aulas de uma vez,
    * e depois oferece o desfazer na barra flutuante.
    *
@@ -870,6 +894,8 @@
         Store.salvar(db).then(function () {
           desenharTudo();
           avisar('Alteração desfeita.');
+        }).catch(function () {
+          releDoDisco('Não consegui desfazer. O tablet pode estar sem espaço; a tela mostra o que ficou gravado.');
         });
       });
       return resultado;
@@ -2419,13 +2445,22 @@
         return;
       }
       var id = Core.uid();
+      var registro = null;
       Store.salvarAnexo(id, { nome: arquivo.name, tipo: arquivo.type, blob: arquivo }).then(function () {
         aula.anexos = aula.anexos || [];
-        aula.anexos.push({ id: id, nome: arquivo.name, tamanho: arquivo.size });
+        registro = { id: id, nome: arquivo.name, tamanho: arquivo.size };
+        aula.anexos.push(registro);
         return salvar();
       }).then(function () {
         desenharAnexos($('#lista-anexos'), aula);
         avisar('Arquivo anexado.');
+      }).catch(function () {
+        // não gravou: o anexo sai da memória e do depósito, senão o próximo salvar o gravaria órfão
+        if (registro) {
+          aula.anexos = (aula.anexos || []).filter(function (x) { return x !== registro; });
+          Store.apagarAnexo(id).catch(function () { /* fica para a limpeza de órfãos */ });
+        }
+        avisar('Não consegui anexar o arquivo. O tablet pode estar sem espaço.');
       });
     };
     entrada.click();
@@ -5586,6 +5621,10 @@
       if (editorAtual) { editorAtual.destruir(); editorAtual = null; }
       fecharModal('modal-nota');
       desenharAgenda();
+    }).catch(function () {
+      /* A folha fica ABERTA: fechar agora jogaria fora o que ela escreveu, que
+       * ainda está só na tela. */
+      avisar('Não consegui salvar a folha. O tablet pode estar sem espaço. A folha continua aberta.');
     });
   }
 
@@ -7177,7 +7216,10 @@
       /* A gravação falhou, então a memória volta a espelhar o disco: senão a
        * trilha ficaria só na tela e ela acharia que está guardada. */
       aluno.trilhas = (aluno.trilhas || []).filter(function (t) { return t !== trilha; });
-      avisar('Não consegui guardar a trilha. Tente de novo.');
+      // o botão foi travado no toque; sem destravar, o "tente de novo" não teria onde tocar
+      var botaoGuardar = $('#guardar-trilha');
+      if (botaoGuardar) botaoGuardar.disabled = false;
+      avisar('Não consegui guardar a trilha. O tablet pode estar sem espaço. Tente de novo.');
     });
   }
 
@@ -10401,6 +10443,8 @@
                 db = estado;
                 desenharTudo();
                 avisar('Estado restaurado.');
+              }).catch(function () {
+                releDoDisco('Não consegui voltar a este ponto. O tablet pode estar sem espaço; a tela mostra o que ficou gravado.');
               });
             }
           })
@@ -10834,7 +10878,10 @@
         db = dados;
         desenharTudo();
         avisar('Cópia restaurada.');
-      }).catch(function (e) { avisar(e.message || 'Não foi possível restaurar.'); });
+      }).catch(function (e) {
+        if (e && e.invalida) { avisar(e.message); return; }
+        releDoDisco('A cópia não foi restaurada por inteiro. O tablet pode estar sem espaço; a tela mostra o que ficou gravado.');
+      });
     };
     leitor.readAsText(arquivo);
     ev.target.value = '';
@@ -13226,6 +13273,8 @@
     }).then(function () {
       desenharTudo();
       avisar('Todos os dados foram apagados.');
+    }).catch(function () {
+      releDoDisco('Não consegui apagar tudo. O tablet pode estar sem espaço; a tela mostra o que ficou gravado.');
     });
   }
 

@@ -21,7 +21,11 @@
  *   0. CALIBRAGEM: a leitura enxerga uma perda de verdade. Três gravações
  *      abortadas de propósito têm de ler como ausentes; se lerem 2048, quem
  *      está cego é o lado da leitura e nenhum número daqui vale.
- *   1. CADA CAMINHO DE ESCRITA, interrompido no instante em que responde: o
+ *   1. OS NOVE CAMINHOS EXERCITADOS UM A UM, interrompidos no instante em que
+ *      respondem. (Os outros que passam pelo mesmo `escrever` e NÃO são
+ *      exercitados um a um: apagarNota, apagarMidia, a restauração das notas
+ *      na cópia, a poda do histórico, o desfazer e o apagarTudo. Eles ficam
+ *      cobertos pelo segundo veneno, que muda o `escrever` de todos.) O
  *      teste anota toda transação que o Store abre durante a chamada e, na
  *      microtarefa em que a promessa resolve, tenta ABORTAR as que ainda não
  *      confirmaram (é o que a página caindo faz). Com o conserto não sobra
@@ -32,6 +36,14 @@
  *   2. A RÉGUA DO CORTE: 300 ciclos de salvarAnexo com `location.reload()`
  *      chamado dentro da microtarefa da resolução, lendo o anexo depois que a
  *      página volta. Com o conserto, 0 perdas em 300.
+ *   1b. O RAMO DA REJEIÇÃO: a transação abortada DEPOIS do sucesso do pedido
+ *      (o caso em que só o `onabort` avisa) faz a promessa REJEITAR, e nada
+ *      fica gravado. Sem isto, a escrita que falha ficaria pendurada para
+ *      sempre, com a tela esperando.
+ *   4. A MEMÓRIA VOLTA A SER O DISCO: restaurar uma cópia e voltar a um ponto
+ *      do histórico, cada um rejeitando no meio (uma parte gravada, outra
+ *      não). Depois disso a tela diz que não se completou, e o PRÓXIMO salvar
+ *      do aplicativo não grava o estado velho por cima do que ficou no disco.
  *   3. nenhum erro de JavaScript na página.
  *
  * Modo envenenado:
@@ -40,8 +52,10 @@
  *     `onsuccess` do pedido. Os outros caminhos continuam consertados, de
  *     propósito: a prova tem de acusar EXATAMENTE os quatro caminhos que passam
  *     pelo `gravar` (salvar, salvarNota, salvarMidia, salvarAnexo), e deixar os
- *     outros cinco verdes. E a régua do corte tem de achar pelo menos uma perda
- *     em 300 (a taxa medida é 2,3%; a chance de zero em 300 é perto de 0,1%).
+ *     outros cinco verdes. Quem DECIDE é essa acusação da parte 1, que é
+ *     determinística. A régua do corte sob veneno só informa quantas perdas
+ *     achou: ela depende da velocidade da máquina, e numa máquina rápida pode
+ *     dar zero sem que o veneno tenha deixado de existir.
  *   node _teste/testa_store_grava_no_commit.js --envenenado-escreve-no-pedido
  *     o segundo veneno, um degrau abaixo: o `escrever` (por onde passa TODA
  *     escrita simples) volta a responder no `onsuccess` do pedido. Sem ele, as
@@ -51,6 +65,12 @@
  *     gravar ele poda o histórico com uma leitura no mesmo depósito, e a
  *     leitura espera a escrita confirmar antes de rodar, então a resposta dele
  *     já chega depois da confirmação mesmo com o `escrever` envenenado.
+ *   node _teste/testa_store_grava_no_commit.js --envenenado-nao-rejeita
+ *     o `escrever` perde o `t.onabort`: a transação abortada depois do sucesso
+ *     do pedido deixa a promessa pendurada, e a parte 1b tem de ver isso.
+ *   node _teste/testa_store_grava_no_commit.js --envenenado-nao-rele
+ *     o app.js servido não relê o disco depois de uma gravação que rejeitou no
+ *     meio: a parte 4 tem de ver o próximo salvar gravar o estado velho.
  *   node _teste/testa_store_grava_no_commit.js --envenenado-grava-no-pedido --controle
  *     o mesmo veneno com as expectativas do modo normal. TEM de reprovar: é a
  *     demonstração da linha da reprovação, e por isso não entra no portão.
@@ -68,6 +88,8 @@ const PORTA = 8812;
 const VENENO_GRAVAR = process.argv.indexOf('--envenenado-grava-no-pedido') !== -1;
 const VENENO_ESCREVER = process.argv.indexOf('--envenenado-escreve-no-pedido') !== -1;
 const VENENO = VENENO_GRAVAR || VENENO_ESCREVER;
+const VENENO_REJEITA = process.argv.indexOf('--envenenado-nao-rejeita') !== -1;
+const VENENO_RELE = process.argv.indexOf('--envenenado-nao-rele') !== -1;
 const CONTROLE = process.argv.indexOf('--controle') !== -1;
 /* O que se espera: no modo normal e no controle, o comportamento consertado.
  * Só o veneno sem controle espera ver a perda. */
@@ -97,7 +119,21 @@ if (VENENO) {
   }
 }
 
+const ONABORT = "        t.onabort = function () { reject(motivo('A gravação foi interrompida.')); };";
+const APP_REPO = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
+const RELE = '      db = lido || Store.bancoVazio();';
+let trocaNova = null;
+if (VENENO_REJEITA) {
+  trocaNova = STORE_REPO.split(ONABORT).length - 1 === 1 ? STORE_REPO.split(ONABORT).join('') : null;
+  if (trocaNova) trocas['/store.js'] = trocaNova;
+}
+if (VENENO_RELE) {
+  trocaNova = APP_REPO.split(RELE).length - 1 === 1 ? APP_REPO.split(RELE).join('      void lido;') : null;
+  if (trocaNova) trocas['/app.js'] = trocaNova;
+}
+
 const amb = H.criarAmbiente(PORTA, 'perfil_store_commit', trocas);
+const os = require('os');
 
 /* ------------------------------------------------------------------ */
 /* Instrumento da parte 1: anota as transações que o Store abre e,     */
@@ -280,6 +316,77 @@ const gravaEAborta = (pag, id) => pag.evaluate(i => new Promise((resolve, reject
   req.onerror = () => reject(req.error);
 }), id);
 
+/* Arma UMA vez: o próximo `metodo` no depósito dado aborta a transação logo
+ * depois de o pedido ter dado certo. É o caso em que só o `onabort` avisa. */
+const armarAbort = (pag, deposito, metodo) => pag.evaluate((d, m) => {
+  const original = IDBObjectStore.prototype[m];
+  IDBObjectStore.prototype[m] = function () {
+    const req = original.apply(this, arguments);
+    if (this.name === d) {
+      IDBObjectStore.prototype[m] = original;
+      const t = this.transaction;
+      req.addEventListener('success', () => { try { t.abort(); } catch (e) { /* já terminou */ } });
+    }
+    return req;
+  };
+}, deposito, metodo);
+
+const textoDoAviso = pag => pag.evaluate(() => (document.querySelector('#aviso-texto') || {}).textContent || '');
+const nomeNoDisco = pag => pag.evaluate(() => Store.carregar().then(d => d.alunos[0].nome));
+/* Um salvar comum do aplicativo, pelo botão do olho: ele grava o `db` da
+ * memória inteiro. É o "próximo salvar" que não pode gravar o estado velho. */
+const umSalvarDoApp = async pag => {
+  await pag.evaluate(() => document.querySelector('#alternar-valores').click());
+  await pausa(1200);
+};
+
+async function parteQuatro(pag) {
+  secao('4. Gravação que rejeita no meio: a memória volta a ser o disco');
+  const antes = await nomeNoDisco(pag);
+  // a) restaurar uma cópia: os dados entram, as notas abortam
+  const dados = await pag.evaluate(() => Store.carregar());
+  dados.alunos[0].nome = 'Aluna da Cópia';
+  const arq = path.join(os.tmpdir(), 'copia_prova_commit_' + process.pid + '.json');
+  fs.writeFileSync(arq, JSON.stringify({ formato: 'apoio-educacional', versao: 1, dados: dados,
+    notas: { 'nota-da-copia': { paginas: [{ itens: [] }] } } }));
+  process.on('exit', () => { try { fs.unlinkSync(arq); } catch (e) { /* ok */ } });
+  await armarAbort(pag, 'notas', 'put');
+  await (await pag.$('#arquivo-copia')).uploadFile(arq);
+  const av1 = await H.esperar('o aviso da cópia', () => textoDoAviso(pag), v => /cópia/i.test(v || ''), 15000);
+  console.log('   aviso: ' + JSON.stringify(av1.valor));
+  conf('a tela diz que a cópia não se completou', /não foi restaurada por inteiro/.test(av1.valor || ''), true);
+  conf('sem mensagem técnica do navegador', /Error|abort/i.test(av1.valor || ''), false);
+  conf('o disco ficou com os dados da cópia (a parte que gravou)', await nomeNoDisco(pag), 'Aluna da Cópia');
+  await umSalvarDoApp(pag);
+  const depoisA = await nomeNoDisco(pag);
+  console.log('   antes: ' + antes + ' | no disco depois do próximo salvar: ' + depoisA);
+  if (VENENO_RELE && !CONTROLE) {
+    conf('VENENO ENXERGADO: o próximo salvar gravou o estado velho por cima da cópia', depoisA, antes);
+    return;
+  }
+  conf('e o próximo salvar NÃO gravou o estado velho por cima', depoisA, 'Aluna da Cópia');
+
+  // b) voltar a um ponto do histórico: o estado entra, o apagar do ponto aborta
+  const estado = await pag.evaluate(() => Store.carregar());
+  estado.alunos[0].nome = 'Aluna do Ponto';
+  await pag.evaluate(e => Store.registrarHistorico('ponto de prova do commit', e), estado);
+  await H.irParaAba(pag, 'ajustes');
+  await pausa(600);
+  await armarAbort(pag, 'historico', 'delete');
+  const tocou = await pag.evaluate(() => {
+    const linha = Array.from(document.querySelectorAll('#lista-historico .item-lista'))
+      .find(l => /ponto de prova do commit/.test(l.textContent));
+    const b = linha && Array.from(linha.querySelectorAll('button')).find(x => /Voltar a este ponto/.test(x.textContent));
+    if (!b) return false; b.click(); return true;
+  });
+  conf('tocou em Voltar a este ponto', tocou, true);
+  const av2 = await H.esperar('o aviso da volta', () => textoDoAviso(pag), v => /voltar a este ponto/i.test(v || ''), 15000);
+  console.log('   aviso: ' + JSON.stringify(av2.valor));
+  conf('a tela diz que a volta não se completou', /Não consegui voltar a este ponto/.test(av2.valor || ''), true);
+  await umSalvarDoApp(pag);
+  conf('e o próximo salvar NÃO gravou o estado velho por cima do ponto', await nomeNoDisco(pag), 'Aluna do Ponto');
+}
+
 (async () => {
   console.log('MODO: ' + (VENENO_GRAVAR ? 'envenenado (gravar antigo, que responde no pedido)'
     : VENENO_ESCREVER ? 'envenenado (escrever responde no pedido)' : 'normal') +
@@ -289,7 +396,13 @@ const gravaEAborta = (pag, id) => pag.evaluate(i => new Promise((resolve, reject
     conf('achei no store.js o trecho consertado que o veneno troca', ANCORA.test(STORE_REPO), true);
     conf('o store.js servido ficou DIFERENTE do repositório', trocaFeita ? 'diferente' : 'IGUAL', 'diferente');
     if (!trocaFeita) throw Object.assign(new Error('a troca do veneno não aconteceu; nada a medir'), { jaContado: true });
+  } else if (VENENO_REJEITA || VENENO_RELE) {
+    secao('O veneno é de verdade');
+    conf('a linha que o veneno tira casa exatamente uma vez, e a troca aconteceu', !!trocaNova, true);
+    if (!trocaNova) throw Object.assign(new Error('a troca do veneno não aconteceu; nada a medir'), { jaContado: true });
   } else {
+    conf('o `onabort` do escrever existe (a âncora do veneno da rejeição)', STORE_REPO.split(ONABORT).length - 1, 1);
+    conf('a releitura do disco existe (a âncora do veneno do app)', APP_REPO.split(RELE).length - 1, 1);
     conf('o gravar do store.js passa pelo escrever (a âncora do primeiro veneno existe)', GRAVAR_CONSERTADO.test(STORE_REPO), true);
     conf('o escrever responde na transação (a âncora do segundo veneno existe)', ESCREVER_CONSERTADO.test(STORE_REPO), true);
   }
@@ -324,6 +437,32 @@ const gravaEAborta = (pag, id) => pag.evaluate(i => new Promise((resolve, reject
   await instalarEspiao(pag);
   for (const c of CAMINHOS) await rodaCaminho(pag, c);
 
+  // ---------------- 1b. o ramo da rejeição ----------------
+  secao('1b. A escrita que aborta REJEITA, e não fica pendurada');
+  await armarAbort(pag, 'anexos', 'put');
+  const rej = await pag.evaluate(() => Promise.race([
+    Store.salvarAnexo('anexo-que-aborta', { nome: 'x.pdf', tipo: 'application/pdf', blob: new Blob([new Uint8Array(64)]) })
+      .then(() => 'resolveu', e => 'rejeitou: ' + (e && (e.name || e.message))),
+    new Promise(r => setTimeout(() => r('pendurada'), 4000))
+  ]));
+  console.log('   salvarAnexo com a transação abortada depois do sucesso do pedido: ' + rej);
+  const ficou = await leAnexo(pag, 'anexo-que-aborta');
+  conf('e nada ficou gravado (o abort valeu)', ficou, -1);
+  if (VENENO_REJEITA && !CONTROLE) {
+    conf('VENENO ENXERGADO: sem o onabort, a promessa ficou pendurada', rej, 'pendurada');
+    return;
+  }
+  if (ESPERA_PERDA) {
+    /* Os dois venenos da perda respondem no pedido, e o pedido deu certo: a
+     * promessa diz "salvo" e nada ficou. É o defeito inteiro numa linha. */
+    conf('VENENO ENXERGADO: a promessa disse que salvou, e nada ficou', rej, 'resolveu');
+  } else {
+    conf('a promessa rejeitou', /^rejeitou/.test(rej), true);
+  }
+
+  if (!VENENO) await parteQuatro(pag);
+  if (VENENO_RELE) return;
+
   // ---------------- 2. a régua do corte ----------------
   secao('2. A régua do corte: ' + CICLOS + ' recargas dentro da microtarefa da resposta');
   let perdas = 0;
@@ -339,11 +478,12 @@ const gravaEAborta = (pag, id) => pag.evaluate(i => new Promise((resolve, reject
   }
   console.log('   ' + perdas + ' perdas em ' + CICLOS + ' ciclos, em ' + Math.round((Date.now() - t0) / 1000) +
     ' s; tamanhos lidos ' + JSON.stringify(tamanhos));
-  if (ESPERA_PERDA) {
-    conf('VENENO ENXERGADO pela régua do corte: pelo menos uma perda em ' + CICLOS, perdas >= 1, true);
-  } else {
-    conf('nenhuma perda em ' + CICLOS + ' cortes no instante da resposta', perdas, 0);
+  if (VENENO) {
+    // sob veneno a régua só informa: quem decide é a acusação determinística da parte 1
+    console.log('   (sob veneno, a contagem acima é informativa)');
+    if (ESPERA_PERDA) return;
   }
+  conf('nenhuma perda em ' + CICLOS + ' cortes no instante da resposta', perdas, 0);
 
   // ---------------- 3. erros ----------------
   secao('3. Sem erro de JavaScript');
