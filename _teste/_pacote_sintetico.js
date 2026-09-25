@@ -312,7 +312,7 @@ const LISTAS = [
      *
      * E ELA É A ÚNICA SEM NENHUM ITEM DO DEGRAU MAIS ALTO, também de
      * propósito: os quatro exercícios dela caem nos dois primeiros terços da
-     * lista da fonte. Sem ela, o nome "sem desafio no fim" seria um ramo que
+     * lista da fonte. Sem ela, o nome "sem desafio" seria um ramo que
      * prova nenhuma alcança, e a tela promete esse nome para uma trajetória
      * futura. As outras duas têm 1 e 2, que dão o singular e o plural. */
     id: MOD_PIT + ':kit:2', modulo: MOD_PIT, serie: '9ano', nivel: 2,
@@ -456,7 +456,28 @@ function gerar(saida, opcoes) {
    * mesmo kits.json do contrato, e nunca as duas juntas. */
   const comListas = !!opcoes.listas;
   const comKits = !!opcoes.kits || comListas;
-  const conteudoKits = comListas ? LISTAS : KITS;
+  let conteudoKits = comListas ? LISTAS : KITS;
+  /* AS LISTAS COM DEFEITO, uma por ramo de recusa do lerKits (B10), mais a
+   * lista que cita um exercício que saiu por curadoria. Cada uma é uma cópia
+   * das listas boas com UM defeito só, para a recusa ser pelo motivo certo. */
+  if (comListas && opcoes.listasVeneno) {
+    conteudoKits = JSON.parse(JSON.stringify(LISTAS));
+    const v = opcoes.listasVeneno;
+    if (v === 'regra') conteudoKits[0].regra = 'listas-v9';
+    if (v === 'sem-minutos') delete conteudoKits[0].minutos;
+    if (v === 'degrau-sem-minutos') delete conteudoKits[0].degraus[2].minutos;
+    if (v === 'id-repetido') conteudoKits[1].id = conteudoKits[0].id;
+    if (v === 'item-repetido') conteudoKits[0].degraus[3].item = conteudoKits[0].degraus[1].item;
+    /* EMPATE: a segunda lista do assunto passa a ter o MESMO número de
+     * desafios da primeira (um só, o ex:7), com um exercício a menos, para o
+     * nome precisar dizer quantos exercícios cada uma tem. */
+    if (v === 'empate') {
+      conteudoKits[1].degraus = conteudoKits[0].degraus.slice(1).map((d, i) => Object.assign({}, d, { n: i + 1 }));
+      conteudoKits[1].minutos = conteudoKits[1].degraus.reduce((a, d) => a + d.minutos, 0);
+    }
+    // um exercício que NÃO está em itens.json: saiu por curadoria
+    if (v === 'excluido') conteudoKits[0].degraus[2].item = EXCLUSOES[0].id || EXCLUSOES[0];
+  }
   if (comKits) {
     arquivos['kits.json'] = { dados: json(conteudoKits), metodo: 8 };
     arquivos['exclusoes.json'] = { dados: json(EXCLUSOES), metodo: 0 };

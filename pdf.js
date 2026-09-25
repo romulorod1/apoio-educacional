@@ -874,7 +874,9 @@
     var tapou = false;
     for (var q = 0; q < itens.length; q++) {
       var r = itens[q];
-      if (r.t !== 'tapar' || !(r.w > 0) || !(r.h > 0)) continue;
+      // número que não é número (x ou y ausente, NaN, infinito) não vira retângulo no papel
+      if (r.t !== 'tapar' || typeof r.x !== 'number' || typeof r.y !== 'number' ||
+        !isFinite(r.x) || !isFinite(r.y) || !(r.w > 0) || !(r.h > 0) || !isFinite(r.w) || !isFinite(r.h)) continue;
       if (!tapou) { doc.op('q'); tapou = true; }
       doc.retangulo(x0 + r.x * escala, y0 + altura - (r.y + r.h) * escala,
         r.w * escala, r.h * escala, [1, 1, 1]);

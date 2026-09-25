@@ -65,29 +65,45 @@
    * de manifest e de hash como qualquer outro, então o que se confere aqui é só
    * a FORMA do que vai para a tela dela.
    *
-   * Confere pouco de propósito, e o que ele confere é só isto: o id, o módulo,
-   * e a ordem dos degraus. O NÍVEL E OS MINUTOS NÃO SÃO CONFERIDOS AQUI, e a
-   * frase antiga dizia que eram, o que é pior do que não conferir: recusar o
-   * pacote inteiro por causa deles seria caro demais, e quem se defende da
-   * ausência deles é a tela, que não escreve frase nenhuma com número que não é
-   * número (ver `umaAula`, em app.js). O que
-   * julga a REGRA é o biblioteca/confere_kits.py, do lado do gerador, e repetir
-   * aquilo aqui seria pôr duas fontes para a mesma verdade num aparelho que não
-   * tem como decidir qual das duas está certa. */
+   * Confere a FORMA, e recusa com frase clara, porque cada buraco aqui virava
+   * mentira na tela dela: a regra tem de ser uma que este aplicativo conhece
+   * (listas-v1, a de meia aula, ou listas-v2, a de uma aula); o minuto tem de
+   * ser número, na lista e em cada posição (sem ele a tela escrevia "≈ NaN
+   * min"); e nenhum id de lista nem exercício dentro de uma lista pode se
+   * repetir (com exercício repetido a tela dizia "Você mudou esta lista" sem
+   * ela ter mudado nada). Achado pela lente de correção do PR #57.
+   *
+   * O que julga a REGRA em si (a rampa, o tempo, a porta de entrada) continua
+   * sendo o biblioteca/confere_kits.py, do lado do gerador. */
+  var REGRAS_DE_LISTA = ['listas-v1', 'listas-v2'];
   function lerKits(bytes) {
     if (!bytes) return [];
     var kits = json('kits.json', bytes);
     if (!Array.isArray(kits)) throw Recusa('O kits.json do pacote não é uma lista.');
+    var numero = function (x) { return typeof x === 'number' && isFinite(x) && x > 0; };
+    var idsVistos = {};
     kits.forEach(function (k) {
       if (!k || typeof k.id !== 'string' || typeof k.modulo !== 'string') {
         throw Recusa('O kits.json do pacote tem lista sem identificador ou sem módulo.');
       }
+      if (idsVistos[k.id]) throw Recusa('O kits.json do pacote tem duas listas com o mesmo identificador: ' + k.id + '.');
+      idsVistos[k.id] = true;
+      if (REGRAS_DE_LISTA.indexOf(k.regra) < 0) {
+        throw Recusa('A lista ' + k.id + ' do pacote segue uma regra que este aplicativo não conhece (' + k.regra + ').');
+      }
+      if (!numero(k.minutos)) throw Recusa('A lista ' + k.id + ' do pacote não diz quantos minutos leva.');
       if (!Array.isArray(k.degraus) || !k.degraus.length) {
         throw Recusa('A lista ' + k.id + ' do pacote não traz exercício nenhum.');
       }
+      var itensVistos = {};
       k.degraus.forEach(function (d, i) {
         if (!d || typeof d.item !== 'string') {
           throw Recusa('A lista ' + k.id + ' do pacote tem posição sem exercício.');
+        }
+        if (itensVistos[d.item]) throw Recusa('A lista ' + k.id + ' do pacote repete o exercício ' + d.item + '.');
+        itensVistos[d.item] = true;
+        if (!numero(d.minutos)) {
+          throw Recusa('A lista ' + k.id + ' do pacote não diz quantos minutos leva a posição ' + (i + 1) + '.');
         }
         /* A ORDEM É A LISTA, e é ela que vai para o material dela. Um `n` fora
          * de ordem é o único jeito de o arquivo dizer uma ordem e o vetor

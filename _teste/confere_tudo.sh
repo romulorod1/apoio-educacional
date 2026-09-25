@@ -448,6 +448,25 @@ roda "biblioteca listas --envenenado-redesenho"     node "_teste/testa_bibliotec
 roda "biblioteca listas --envenenado-uma-aula"      node "_teste/testa_biblioteca_listas.js" --envenenado-uma-aula
 roda "biblioteca listas --envenenado-anexada"       node "_teste/testa_biblioteca_listas.js" --envenenado-anexada
 roda "biblioteca listas --envenenado-nome-anexo"    node "_teste/testa_biblioteca_listas.js" --envenenado-nome-anexo
+roda "biblioteca listas --envenenado-gabarito-junto" node "_teste/testa_biblioteca_listas.js" --envenenado-gabarito-junto
+roda "biblioteca listas --envenenado-troca-ao-ver"  node "_teste/testa_biblioteca_listas.js" --envenenado-troca-ao-ver
+roda "biblioteca listas --envenenado-esquece-anterior" node "_teste/testa_biblioteca_listas.js" --envenenado-esquece-anterior
+# FRENTE B (B10): o que o lerKits recusa e o que a tela descarta (lista com
+# exercicio que saiu por curadoria). O veneno tira o guarda do app.js, e sem
+# ele a aba Biblioteca inteira nao abre.
+roda "biblioteca lerKits"                          node "_teste/testa_biblioteca_lerkits.js"
+roda "biblioteca lerKits --envenenado-guarda"      node "_teste/testa_biblioteca_lerkits.js" --envenenado-guarda
+roda "biblioteca lerKits --envenenado-empate"      node "_teste/testa_biblioteca_lerkits.js" --envenenado-empate
+# FRENTE B (B10): toda mudanca na folha avisa quem grava, inclusive o
+# cancelamento depois de a borracha ou o arrasto ja terem mudado algo, e a
+# lixeira da selecao. Um veneno para cada.
+roda "folha avisa mudancas"                        node "_teste/testa_folha_mudancas.js"
+roda "folha --envenenado-cancela"                  node "_teste/testa_folha_mudancas.js" --envenenado-cancela
+roda "folha --envenenado-lixeira-muda"             node "_teste/testa_folha_mudancas.js" --envenenado-lixeira-muda
+# FRENTE B (B10): retangulo de tapar com posicao que nao e numero nao vai
+# para o papel. Sem navegador.
+roda "tapar so com numero"                         node "_teste/testa_tapar_numeros.js"
+roda "tapar --envenenado-numeros"                  node "_teste/testa_tapar_numeros.js" --envenenado-numeros
 roda "biblioteca listas --envenenado-palma"         node "_teste/testa_biblioteca_listas.js" --envenenado-palma
 roda "biblioteca listas --envenenado-contorno"      node "_teste/testa_biblioteca_listas.js" --envenenado-contorno
 # O aparo do tapar nos TRES caminhos: criar, mover e redimensionar.

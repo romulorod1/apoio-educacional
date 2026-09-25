@@ -276,9 +276,10 @@ function semData(bytes) {
    * nenhuma até agora. */
   if (VENENO_TAPAR) {
     const fonte = fs.readFileSync(pdfHoje, 'utf8');
-    const ancora = "      if (r.t !== 'tapar' || !(r.w > 0) || !(r.h > 0)) continue;";
+    const ancora = "      if (r.t !== 'tapar' || typeof r.x !== 'number' || typeof r.y !== 'number' ||";
     conf('a âncora do laço do tapar casa exatamente uma vez', fonte.split(ancora).length - 1, 1);
-    const envenenado = fonte.split(ancora).join('      if (true) continue;');
+    // a condição ocupa duas linhas: a primeira vira "pula sempre" e abre um if inócuo para a segunda
+    const envenenado = fonte.split(ancora).join('      if (true) continue; if (false ||');
     conf('o veneno mudou mesmo o pdf.js', envenenado !== fonte ? 'diferente' : 'IGUAL', 'diferente');
     const alvo = path.join(tmp, 'pdf_sem_tapar.js');
     fs.writeFileSync(alvo, envenenado);

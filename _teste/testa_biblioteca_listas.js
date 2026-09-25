@@ -154,6 +154,15 @@ const T_LEMBRA = '      bibLpEmEdicao = null;';
 // o nome do arquivo anexado volta a não quebrar, e passa por cima do Abrir
 const L_NOME_ANEXO = '#lista-anexos .item-lista .nome { overflow-wrap: anywhere; word-break: break-word; }';
 const T_NOME_ANEXO = '#lista-anexos .item-lista .nome { }';
+// o gabarito volta a sair dentro do mesmo PDF da lista
+// tocar para ver volta a carregar a lista por cima do que ela marcou
+const L_TROCA_AO_VER = "          else irNaBiblioteca({ aula: { tipo: 'lista-pronta', id: lp.id, ver: true } });";
+const T_TROCA_AO_VER = '          else usarListaPronta(lp);';
+// a seleção de antes da troca deixa de ser guardada no aparelho
+const L_ESQUECE_ANTERIOR = "      if (sel) localStorage.setItem('apoio-educacional:bib-selecao-anterior', JSON.stringify(sel));";
+const T_ESQUECE_ANTERIOR = '      if (sel) void sel;';
+const L_GABARITO_JUNTO = '      var separa = !!(aula && op.lista && op.gabarito && usaItens.length);';
+const T_GABARITO_JUNTO = '      var separa = false;';
 const L_ANEXADA = '    var anexada = ids.length ? null : listaAnexada();';
 const T_ANEXADA = '    var anexada = null;';
 // o mover volta a nao aparar, e o retangulo sai da folha ao ser arrastado
@@ -193,7 +202,7 @@ const L_FRASE = [
   "      texto: 'O material agora tem ' + plural(bibCarrinho.itens.length, 'exercício', 'exercícios') +",
   "        ': “' + nomeDaListaPronta(lp) + '”' +",
   "        (sairam ? ', no lugar do que estava marcado'",
-  "          : perdeu ? ', de volta como o pacote a trouxe' : '') +",
+  "          : perdeu ? ', de volta como veio' : '') +",
   "        '. Mude o que quiser e toque em Gerar material.',"].join(NL_APP);
 const T_FRASE = "      texto: (sairam ? 'Tirei ' + plural(sairam, 'item que estava marcado', 'itens que estavam marcados') +" +
   " ' e marquei ' : 'Marquei ') + 'a lista pronta do nível ' + lp.nivel + ': ' +" +
@@ -233,7 +242,10 @@ const VENENOS = {
   apara: { arq: '/draw.js', de: L_APARA, para: T_APARA },
   lembra: { arq: '/app.js', de: L_LEMBRA, para: T_LEMBRA },
   anexada: { arq: '/app.js', de: L_ANEXADA, para: T_ANEXADA },
-  'nome-anexo': { arq: '/styles.css', de: L_NOME_ANEXO, para: T_NOME_ANEXO }
+  'nome-anexo': { arq: '/styles.css', de: L_NOME_ANEXO, para: T_NOME_ANEXO },
+  'gabarito-junto': { arq: '/app.js', de: L_GABARITO_JUNTO, para: T_GABARITO_JUNTO },
+  'troca-ao-ver': { arq: '/app.js', de: L_TROCA_AO_VER, para: T_TROCA_AO_VER },
+  'esquece-anterior': { arq: '/app.js', de: L_ESQUECE_ANTERIOR, para: T_ESQUECE_ANTERIOR }
 };
 const NOME_VENENO = Object.keys(VENENOS).filter(function (n) {
   return process.argv.indexOf('--envenenado-' + n) !== -1;
@@ -262,6 +274,9 @@ const V_APARA = NOME_VENENO === 'apara';
 const V_LEMBRA = NOME_VENENO === 'lembra';
 const V_ANEXADA = NOME_VENENO === 'anexada';
 const V_NOME_ANEXO = NOME_VENENO === 'nome-anexo';
+const V_GABARITO_JUNTO = NOME_VENENO === 'gabarito-junto';
+const V_TROCA_AO_VER = NOME_VENENO === 'troca-ao-ver';
+const V_ESQUECE_ANTERIOR = NOME_VENENO === 'esquece-anterior';
 const BASE_DE = { '/app.js': APP_REPO, '/draw.js': DRAW_REPO, '/styles.css': CSS_REPO };
 const trocas = {};
 if (VENENO) trocas[RECEITA.arq] = BASE_DE[RECEITA.arq].split(RECEITA.de).join(RECEITA.para);
@@ -302,6 +317,14 @@ const tocarLinha = (pag, nome) => pag.evaluate(n => {
     .find(x => x.querySelector('.nome').textContent.trim() === n);
   if (!l) return false; l.click(); return true;
 }, nome);
+
+/* TOCAR NA LINHA MOSTRA A LISTA, e quem carrega é o botão "Usar esta lista"
+ * (a pergunta de trocar, quando há, é aceita pela página de teste). */
+const usarLista = async (pag, nome) => {
+  if (!(await tocarLinha(pag, nome))) return false;
+  await pausa(400);
+  return pag.evaluate(() => { const b = document.querySelector('#bib-lp-usar'); if (!b) return false; b.click(); return true; });
+};
 
 const linhasDeListaPronta = pag => pag.evaluate(() =>
   Array.from(document.querySelectorAll('#bib-corpo [data-lista-pronta]')).map(l => ({
@@ -416,6 +439,76 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   };
 }, seletor);
 
+async function cenarioVerNaoTroca(pag) {
+  secao('5i. Ver uma lista não troca o material, e o que estava marcado volta');
+  const perguntas = [];
+  pag.on('dialog', d => perguntas.push(d.message()));
+  await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-limpar'); if (b) b.click(); });
+  await pausa(400);
+  await H.irParaAba(pag, 'biblioteca');
+  await pag.evaluate(() => {
+    for (let k = 0; k < 6; k++) {
+      const b = document.querySelector('.bib-voltar');
+      if (!b) break;
+      const t = b.textContent; b.click();
+      if (/9º ano/.test(t)) break;
+    }
+  });
+  await pausa(400);
+  if (!(await tocarLinha(pag, MOD_TITULO))) await pausa(200);
+  await pausa(400);
+  conf('abriu a lista cheia', await tocarLinha(pag, 'Equações do Segundo Grau: Resultados Básicos'), true);
+  await pausa(600);
+  const nove = await pag.evaluate(() => {
+    const caixas = Array.from(document.querySelectorAll('#bib-corpo input[data-carrinho="itens"]')).slice(0, 9);
+    caixas.forEach(c => { if (!c.checked) { c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); } });
+    return caixas.map(c => c.dataset.id);
+  });
+  await pausa(300);
+  const marcadosDela = (await carrinho(pag)).itens.slice();
+  conf('ela marcou nove exercícios', marcadosDela.length, 9);
+  await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
+  await pausa(400);
+  conf('tocou para ver a primeira lista', await tocarLinha(pag, 'Lista com 1 desafio'), true);
+  await pausa(400);
+  await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
+  await pausa(400);
+  conf('tocou para ver a outra', await tocarLinha(pag, 'Lista com 2 desafios'), true);
+  await pausa(400);
+  await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
+  await pausa(400);
+  const depoisDeVer = (await carrinho(pag)).itens.slice();
+  if (V_TROCA_AO_VER) {
+    conf('VENENO ENXERGADO: ver trocou o material e os nove sumiram', depoisDeVer.join('|') === marcadosDela.join('|'), false);
+    return false;
+  }
+  conf('depois de ver as duas listas, os nove continuam, na ordem', depoisDeVer.join('|'), marcadosDela.join('|'));
+  conf('tocou na outra lista e em Usar esta lista', await usarLista(pag, 'Lista com 2 desafios'), true);
+  await pausa(500);
+  console.log('   pergunta: ' + JSON.stringify(perguntas[perguntas.length - 1] || null));
+  conf('usar perguntou antes de trocar, com o número certo',
+    perguntas[perguntas.length - 1] || '', 'Trocar os 9 exercícios marcados por esta lista?');
+  const LISTA3 = Sintetico.LISTAS.filter(l => l.modulo === LISTA2.modulo && l.id !== LISTA2.id)[0];
+  conf('e trocou: o material é a lista', (await carrinho(pag)).itens.join('|'), LISTA3.degraus.map(d => d.item).join('|'));
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.abrirApp(pag, amb.ORIGEM);
+  await H.irParaAba(pag, 'biblioteca');
+  await pausa(500);
+  const temRecuperar = await pag.evaluate(() => !!document.querySelector('#bib-carrinho-recuperar'));
+  if (V_ESQUECE_ANTERIOR) {
+    conf('VENENO ENXERGADO: depois do reinício não há o que recuperar', temRecuperar, false);
+    return false;
+  }
+  conf('depois de fechar e abrir, a faixa oferece Recuperar o que estava marcado', temRecuperar, true);
+  await pag.evaluate(() => document.querySelector('#bib-carrinho-recuperar').click());
+  await pausa(500);
+  conf('e o que estava marcado voltou inteiro e na ordem', (await carrinho(pag)).itens.join('|'), marcadosDela.join('|'));
+  await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-limpar'); if (b) b.click(); });
+  await pausa(400);
+  void nove;
+  return true;
+}
+
 (async () => {
   /* AS CERCAS AINDA APONTAM PARA O ALVO, varridas TODAS de uma vez.
    *
@@ -434,7 +527,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   if (!VENENO) {
     secao('0. As cercas ainda apontam para o alvo');
     var nomes = Object.keys(VENENOS);
-    conf('a tabela tem os vinte e dois venenos desta prova', nomes.length, 22);
+    conf('a tabela tem os vinte e cinco venenos desta prova', nomes.length, 25);
     var fora = [];
     nomes.forEach(function (n) {
       var r = VENENOS[n];
@@ -480,8 +573,8 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
    * rótulo certo ali seria cobrar do veneno que ele não envenenasse. O que a
    * corrida envenenada tem de medir é só se a varredura ENXERGA. */
   if (!V_CURADORIA) {
-    conf('a primeira se chama pela composição dela, no singular', (linhas[0] || {}).nome, 'Lista pronta, 1 desafio no fim');
-    conf('a segunda idem, no plural', (linhas[1] || {}).nome, 'Lista pronta, 2 desafios no fim');
+    conf('a primeira se chama pela composição dela, no singular', (linhas[0] || {}).nome, 'Lista com 1 desafio');
+    conf('a segunda idem, no plural', (linhas[1] || {}).nome, 'Lista com 2 desafios');
   }
 
   // 1a. o número é o DAQUELA lista, e os dois pares são diferentes entre si
@@ -500,8 +593,8 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
    * 70. A décima numa estimativa de quanto o aluno leva é precisão que não
    * existe, e era ela que fazia "29" e "32,1" aparecerem lado a lado com
    * formatos diferentes. */
-  conf('o minuto do nível 2 vem embaixo, inteiro, colado da estimativa', d2[1], '≈ 58 min (estimativa)');
-  conf('o minuto do nível 3 vem embaixo, inteiro, colado da estimativa', d3[1], '≈ 70 min (estimativa)');
+  conf('o minuto do nível 2 vem embaixo, inteiro, colado da estimativa', d2[1], '≈ 58 min');
+  conf('o minuto do nível 3 vem embaixo, inteiro, colado da estimativa', d3[1], '≈ 70 min');
 
   const texto = (await textoDoCorpo(pag)).toLowerCase();
   const achadas = PROIBIDAS.filter(p => texto.indexOf(p) >= 0);
@@ -512,6 +605,15 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
     return;
   }
   conf('nenhuma palavra de curadoria na tela do módulo', achadas.join(',') || '(nenhuma)', '(nenhuma)');
+  /* A LÍNGUA DELA NA TELA DO ASSUNTO: a ajuda diz a ordem em palavras
+   * simples, "estimativa" fica para o cabeçalho da lista (aqui o "≈" basta),
+   * e "pacote" é palavra nossa, não dela. */
+  conf('a ajuda diz a ordem em palavras simples', await pag.evaluate(() =>
+    (document.querySelector('#bib-lp-ajuda') || {}).textContent || ''),
+    'As listas vão do mais simples ao mais difícil. Tire, ponha e troque a ordem à vontade.');
+  conf('na tela do assunto a palavra "estimativa" não aparece', /estimativa/.test(texto), false);
+  conf('nem a palavra "pacote"', /pacote/.test(texto), false);
+  if (V_TROCA_AO_VER) { await cenarioVerNaoTroca(pag); return; }
   /* O CONTROLE DA VARREDURA: ela tem de saber acusar. Sem este par, a linha
    * acima passaria igualzinho com a lista de palavras vazia, que é a família
    * de defeito que custou três dias a esta casa. */
@@ -530,7 +632,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
    * nenhuma alcança, e o nome só se sustenta se ele aguentar o caso de não
    * haver nenhum item do degrau mais alto. */
   conf('e ela se chama pela composição dela, que não tem nenhum desafio',
-    (linhasPit[0] || {}).nome, 'Lista pronta, sem desafio no fim');
+    (linhasPit[0] || {}).nome, 'Lista sem desafio');
   conf('e é a do módulo certo', (linhasPit[0] || {}).id, LISTA_CURTA.id);
   conf('com 49,6 min, diz um pouco MENOS de uma aula',
     /um pouco menos de uma aula/.test(((linhasPit[0] || {}).detalhe || [])[0] || ''), true);
@@ -539,7 +641,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
    * BAIXO e para lugar nenhum; com só elas, trocar o meio para cima por um
    * corte simples passaria nas três asserções sem nada reclamar. */
   conf('e o minuto dela é o dela, arredondado meio PARA CIMA (49,6 vira 50)',
-    ((linhasPit[0] || {}).detalhe || [])[1], '≈ 50 min (estimativa)');
+    ((linhasPit[0] || {}).detalhe || [])[1], '≈ 50 min');
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
   await pausa(300);
   conf('voltou e abriu de novo o módulo das equações', await tocarLinha(pag, MOD_TITULO), true);
@@ -586,7 +688,16 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   secao('2. Tocar carrega a lista no carrinho, NA ORDEM DELA');
   conf('a ordem da lista do nível 2 é diferente da ordem da fonte',
     IDS2.join('|') !== IDS2.slice().sort().join('|'), true);
-  conf('tocou na linha do nível 2', await tocarLinha(pag, 'Lista pronta, 1 desafio no fim'), true);
+  /* TOCAR MOSTRA E NÃO MEXE: o material continua com os dois que ela marcou
+   * na lista cheia, e a tela é a de ver, com o botão de usar. */
+  conf('tocou na linha do nível 2', await tocarLinha(pag, 'Lista com 1 desafio'), true);
+  await pausa(500);
+  conf('ver a lista NÃO mexeu no material', (await carrinho(pag)).itens.length, 2);
+  conf('e a tela é a de ver, com o botão Usar esta lista',
+    await pag.evaluate(() => !!document.querySelector('#bib-lp-previa') && !!document.querySelector('#bib-lp-usar')), true);
+  conf('e ela diz que ver não muda nada', await pag.evaluate(() =>
+    /Ver esta lista não muda nada/.test((document.querySelector('#bib-lp-estado') || {}).textContent || '')), true);
+  conf('usou a lista', await pag.evaluate(() => { const b = document.querySelector('#bib-lp-usar'); if (!b) return false; b.click(); return true; }), true);
   await pausa(500);
   const c2 = await carrinho(pag);
   console.log('   carrinho: ' + JSON.stringify(c2.itens));
@@ -604,6 +715,10 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   conf('e NA ORDEM DA LISTA', c2.itens.join('|'), IDS2.join('|'));
   conf('e não levou página de teoria nenhuma', c2.paginas.length, 0);
   conf('a tela da lista abriu com os cinco', (await numerosDaTela(pag)).length, 5);
+  const textoDaLista = await textoDoCorpo(pag);
+  conf('na tela da lista, "estimativa" aparece UMA vez, no cabeçalho',
+    (textoDaLista.match(/estimativa/g) || []).length, 1);
+  conf('e "pacote" não aparece', /pacote/i.test(textoDaLista), false);
 
   // ================================================================
   secao('2b. Os quatro consertos de tela que o olho de fora cego pediu');
@@ -674,7 +789,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
 
   /* A FRASE COM OS DOIS ITENS QUE JÁ ESTAVAM MARCADOS, que é o caso do print.
    * O texto do bloco traz o rótulo do botão colado no fim, e é ele que sai. */
-  const FRASE = 'O material agora tem 5 exercícios: “Lista pronta, 1 desafio no fim”, ' +
+  const FRASE = 'O material agora tem 5 exercícios: “Lista com 1 desafio”, ' +
     'no lugar do que estava marcado. Mude o que quiser e toque em Gerar material.';
   if (V_FRASE) {
     conf('VENENO: a frase voltou a somar em voz alta',
@@ -755,7 +870,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
      * mede a segunda porta na seção 5b, no Desfazer. Foi por medir só uma que o
      * guarda ficou cego enquanto o defeito entrava pela outra. */
     conf('VENENO (porta da seta): o aviso sobreviveu à troca de ordem e continua afirmando a lista do pacote',
-      /“Lista pronta, 1 desafio no fim”/.test(depoisDaSeta.texto), true);
+      /“Lista com 1 desafio”/.test(depoisDaSeta.texto), true);
   } else {
     conf('o aviso da lista pronta sai no primeiro toque que muda o material', depoisDaSeta.texto, '');
     conf('e a tela passa a dizer que ela mudou a lista, mesmo tendo mudado SÓ a ordem',
@@ -862,7 +977,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
     return;
   }
   conf('o botão de voltar da lista cheia leva DE VOLTA À LISTA PRONTA',
-    rotuloVoltar, '‹ Lista pronta, 1 desafio no fim');
+    rotuloVoltar, '‹ Lista com 1 desafio');
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
   await pausa(500);
   conf('e chegou mesmo na tela da lista pronta',
@@ -904,13 +1019,15 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
   await pausa(400);
   conf('voltou para o módulo', await pag.evaluate(() => !!document.querySelector('[data-lista-pronta]')), true);
-  conf('tocou de novo na linha do nível 2', await tocarLinha(pag, 'Lista pronta, 1 desafio no fim'), true);
+  conf('tocou de novo na linha do nível 2', await tocarLinha(pag, 'Lista com 1 desafio'), true);
   await pausa(500);
   const c7 = await carrinho(pag);
   console.log('   carrinho depois de tocar de novo: ' + JSON.stringify(c7.itens));
   if (V_RECARREGA) {
-    conf('VENENO: a linha recarregou e jogou fora a ordem e o acrescentado',
-      c7.itens.join('|'), IDS2.join('|'));
+    /* Sem abrir a lista que ela mexia, o toque cai na tela de VER: o trabalho
+     * dela fica guardado (ver não mexe), mas a tela de mexer não abre. */
+    conf('VENENO: a linha não abriu a lista que ela estava mexendo',
+      await pag.evaluate(() => !!document.querySelector('#bib-lp-grade')), false);
     return;
   }
   conf('a linha ABRIU a lista que ela estava mexendo, sem recarregar',
@@ -970,7 +1087,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   conf('depois do reload o carrinho continua com a ordem dela', guardado.itens.join('|'), cPuro.itens.join('|'));
   conf('abriu o módulo', await tocarLinha(pag, MOD_TITULO), true);
   await pausa(400);
-  conf('tocou na linha do nível 2 depois do reinício', await tocarLinha(pag, 'Lista pronta, 1 desafio no fim'), true);
+  conf('tocou na linha do nível 2 depois do reinício', await tocarLinha(pag, 'Lista com 1 desafio'), true);
   await pausa(600);
   const depoisDoReinicio = await carrinho(pag);
   console.log('   depois do reinício: ' + JSON.stringify(depoisDoReinicio.itens));
@@ -994,7 +1111,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   await pausa(400);
   conf('abriu o módulo de novo', await tocarLinha(pag, MOD_TITULO), true);
   await pausa(400);
-  conf('tocou na linha com a memória desfeita', await tocarLinha(pag, 'Lista pronta, 1 desafio no fim'), true);
+  conf('tocou na linha com a memória desfeita e usou a lista', await usarLista(pag, 'Lista com 1 desafio'), true);
   await pausa(600);
   const c8 = await carrinho(pag);
   const avisoReload = await aviso(pag, '#bib-lp-aviso');
@@ -1004,11 +1121,11 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
     conf('VENENO: sem enxergar a ordem, o aviso nasce SEM Desfazer',
       await pag.evaluate(() => !!document.querySelector('#bib-lp-aviso-acao')), false);
     conf('VENENO: e a frase não diz que a lista voltou como o pacote a trouxe',
-      /de volta como o pacote a trouxe/.test(avisoReload.texto), false);
+      /de volta como veio/.test(avisoReload.texto), false);
     return;
   }
   conf('e a tela diz que a lista voltou como o pacote a trouxe',
-    /de volta como o pacote a trouxe/.test(avisoReload.texto), true);
+    /de volta como veio/.test(avisoReload.texto), true);
   conf('e oferece Desfazer, porque o que se perdeu foi trabalho dela',
     await pag.evaluate(() => !!document.querySelector('#bib-lp-aviso-acao')), true);
 
@@ -1096,7 +1213,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
   await pausa(500);
   await pag.evaluate(() => { window.__redesenhos = 0; });
-  conf('tocou na linha da lista pronta', await tocarLinha(pag, 'Lista pronta, 1 desafio no fim'), true);
+  conf('tocou na linha da lista pronta', await tocarLinha(pag, 'Lista com 1 desafio'), true);
   await pausa(700);
   const desenhosLinha = await pag.evaluate(() => window.__redesenhos);
   console.log('   desenhos ao abrir a tela pela linha: ' + desenhosLinha);
@@ -1185,6 +1302,9 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   conf('e diz o que há: nenhum exercício no material',
     /^Nenhum exercício no material/.test(vazia.cabeca), true);
   conf('e, como foi ELA que tirou tudo, a tela diz isso', vazia.vazia, true);
+  conf('e diz o que ela pode fazer ali mesmo, com o botão à mão',
+    /Para começar de novo, toque em Usar esta lista\./.test(vazia.cabeca) &&
+      await pag.evaluate(() => !!document.querySelector('#bib-lp-usar')), true);
   conf('e não fala de anexo nenhum', /anexada/.test(vazia.cabeca), false);
   conf('e NÃO afirma uma ordem de um material que não existe',
     await pag.evaluate(() => !!document.querySelector('#bib-lp-mudou')), false);
@@ -1229,12 +1349,12 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   await pausa(500);
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
   await pausa(400);
-  if (!(await tocarLinha(pag, 'Lista pronta, 1 desafio no fim'))) {
+  if (!(await usarLista(pag, 'Lista com 1 desafio'))) {
     await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
     await pausa(400);
     await tocarLinha(pag, MOD_TITULO);
     await pausa(400);
-    conf('tocou na lista do nível 2 de novo', await tocarLinha(pag, 'Lista pronta, 1 desafio no fim'), true);
+    conf('tocou na lista do nível 2 de novo', await usarLista(pag, 'Lista com 1 desafio'), true);
   }
   await pausa(500);
   conf('a lista do nível 2 voltou inteira, na ordem dela', (await carrinho(pag)).itens.join('|'), IDS2.join('|'));
@@ -1268,13 +1388,15 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
    * O anexo gravado é conferido junto, senão uma tela que nunca anexasse e
    * nunca mostrasse a frase passaria aqui. */
   secao('5g. Depois de anexar, a tela diz para onde a lista foi');
+  // aluna FICTÍCIA: os nomes da carga inicial do aplicativo são de alunos de verdade
   const nomeAluno = await pag.evaluate(async h => {
     const d = await Store.carregar();
-    d.aulas.push({ id: 'aula-b10-anexa', alunoId: d.alunos[0].id, serieId: null, destacada: false, data: h,
+    d.alunos.push(Object.assign({}, d.alunos[0], { id: 'aluna-prova-b10', nome: 'Aluna de Prova' }));
+    d.aulas.push({ id: 'aula-b10-anexa', alunoId: 'aluna-prova-b10', serieId: null, destacada: false, data: h,
       hora: '16:00', duracaoMin: 60, status: 'agendada', cobravel: true, notaTexto: '', notaPrivada: '',
       temNota: false, anexos: [] });
     await Store.salvar(d);
-    return d.alunos[0].nome;
+    return 'Aluna de Prova';
   }, (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })());
   await pag.reload({ waitUntil: 'networkidle0' });
   await H.abrirApp(pag, amb.ORIGEM);
@@ -1282,11 +1404,16 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   await pausa(400);
   conf('abriu o módulo das equações de novo', await tocarLinha(pag, MOD_TITULO), true);
   await pausa(400);
-  conf('tocou na lista do nível 2', await tocarLinha(pag, 'Lista pronta, 1 desafio no fim'), true);
+  conf('tocou na lista do nível 2 e usou', await usarLista(pag, 'Lista com 1 desafio'), true);
   await pausa(500);
   conf('a lista está no material, inteira', (await carrinho(pag)).itens.join('|'), IDS2.join('|'));
   await pag.evaluate(() => document.querySelector('#bib-carrinho-gerar').click());
   await pausa(600);
+  /* A JANELA DE GERAR, vinda de lista pronta: não diz "na ordem em que você
+   * marcou" (ela não marcou, carregou) nem conta "0 páginas de teoria". */
+  const resumoGerar = await pag.evaluate(() => (document.querySelector('#bib-gerar-resumo') || {}).textContent || '');
+  console.log('   resumo da janela de gerar: ' + JSON.stringify(resumoGerar));
+  conf('a janela de gerar diz a ordem da lista', resumoGerar, '5 exercícios, na ordem da lista.');
   conf('escolheu a aula de hoje na janela de gerar', await pag.evaluate(() => {
     const b = document.querySelector('#bib-gerar-aulas [data-aula="aula-b10-anexa"]');
     if (!b) return false; b.click(); return true;
@@ -1297,13 +1424,31 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
     Store.carregar().then(d => (d.aulas.find(a => a.id === 'aula-b10-anexa').anexos || []).length)), v => v > 0, 60000);
   conf('o material ficou anexado na aula', anexou.ok, true);
   await pausa(800);
+  /* O GABARITO EM ARQUIVO SEPARADO: dois anexos, e o da lista sem gabarito
+   * dentro, para ela mandar ao aluno sem as respostas. */
+  const anexos = await pag.evaluate(() => Store.carregar().then(d => (d.aulas.find(a => a.id === 'aula-b10-anexa').anexos || [])
+    .map(a => ({ nome: a.nome, parte: a.parte || null }))));
+  console.log('   anexos da aula: ' + JSON.stringify(anexos));
+  if (V_GABARITO_JUNTO) {
+    conf('VENENO ENXERGADO: um anexo só, com o gabarito dentro', anexos.length, 1);
+    return;
+  }
+  conf('dois anexos na aula: a lista e o gabarito', anexos.map(a => a.parte).join(','), 'lista,gabarito');
+  conf('com nomes que dizem o que são', /_lista\.pdf$/.test((anexos[0] || {}).nome || '') && /_gabarito\.pdf$/.test((anexos[1] || {}).nome || ''), true);
+  const avisoRodape = await pag.evaluate(() => {
+    const b = document.querySelector('#aviso-acao2');
+    return { texto: (document.querySelector('#aviso-texto') || {}).textContent || '',
+      botao2: b && b.style.display !== 'none' ? b.textContent : null };
+  });
+  console.log('   aviso do rodapé: ' + JSON.stringify(avisoRodape));
+  conf('o aviso do rodapé oferece Abrir a aula', avisoRodape.botao2, 'Abrir a aula');
   const depoisDoAnexo = await pag.evaluate(() => ({
     cabeca: (document.querySelector('#bib-lp-cabeca') || {}).innerText || '(não achei)',
     vazia: !!document.querySelector('#bib-lp-vazia'),
     titulo: (document.querySelector('#bib-corpo .bib-titulo') || {}).textContent || ''
   }));
   console.log('   depois de anexar: ' + JSON.stringify(depoisDoAnexo));
-  conf('a tela da lista pronta continua à vista', depoisDoAnexo.titulo, 'Lista pronta, 1 desafio no fim');
+  conf('a tela da lista continua à vista', depoisDoAnexo.titulo, 'Lista com 1 desafio');
   conf('e o material ficou vazio', /^Nenhum exercício no material/.test(depoisDoAnexo.cabeca), true);
   if (V_ANEXADA) {
     conf('VENENO: depois de anexar, a tela diz que foi ela que tirou tudo', depoisDoAnexo.vazia, true);
@@ -1311,8 +1456,17 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   }
   conf('e NÃO diz que ela tirou tudo, porque quem esvaziou foi o aplicativo', depoisDoAnexo.vazia, false);
   conf('e diz para onde a lista foi, com o aluno',
-    depoisDoAnexo.cabeca.indexOf('Lista anexada na aula de ' + nomeAluno + ' (') >= 0, true);
-  conf('e como usar de novo', /Toque na linha da lista pronta para usar de novo\./.test(depoisDoAnexo.cabeca), true);
+    depoisDoAnexo.cabeca.indexOf('Esta lista foi anexada na aula de ' + nomeAluno + ' (') >= 0, true);
+  conf('e o que fazer para usar com outro aluno', /Para usar com outro aluno, toque em Usar esta lista\./.test(depoisDoAnexo.cabeca), true);
+  conf('e a tela oferece abrir a aula', await pag.evaluate(() => !!document.querySelector('#bib-lp-abrir-aula')), true);
+  await pag.evaluate(() => document.querySelector('#bib-lp-abrir-aula').click());
+  await pausa(700);
+  conf('Abrir a aula abre a aula onde o material foi', await pag.evaluate(() => {
+    const m = document.querySelector('#modal-aula');
+    return !!(m && m.classList.contains('aberto'));
+  }), true);
+  await pag.evaluate(() => document.querySelectorAll('.modal.aberto [data-fechar]').forEach(b => b.click()));
+  await pausa(300);
 
   // ================================================================
   /* O NOME DO ANEXO NÃO ENCOSTA NO ABRIR.
@@ -1360,7 +1514,7 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   await pag.evaluate(() => document.querySelectorAll('.modal.aberto [data-fechar]').forEach(b => b.click()));
   await pausa(300);
   conf('a aula abriu com o anexo nas duas larguras', medidasNome.filter(m => m.texto).length, 2);
-  conf('e o nome está inteiro nas duas', medidasNome.every(m => /_biblioteca\.pdf$/.test(m.texto || '')), true);
+  conf('e o nome está inteiro nas duas', medidasNome.every(m => /_lista\.pdf$/.test(m.texto || '')), true);
   const encostam = medidasNome.filter(m => !(m.fimDoTexto <= m.inicioDoAbrir - 4)).length;
   if (V_NOME_ANEXO) {
     conf('VENENO: o nome passa por cima do Abrir em pelo menos uma largura', encostam > 0, true);
@@ -1369,6 +1523,21 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
   conf('o texto do nome termina antes do Abrir, com folga, nas duas larguras', encostam, 0);
 
   // ================================================================
+  // ================================================================
+  /* VER NÃO TROCA O MATERIAL: o bloqueante da lente do uso dela no PR #57.
+   *
+   *   Arranjo:   ela marca nove exercícios na lista cheia; toca numa lista
+   *              pronta para ver, volta, toca na outra, volta. Depois usa uma
+   *              delas, aceita trocar, FECHA E REABRE o aplicativo, e toca em
+   *              "Recuperar o que estava marcado".
+   *   Afirmação: ver não muda nada (os nove continuam, na ordem); usar pergunta
+   *              com o número certo; e o que estava marcado volta inteiro e na
+   *              ordem depois do reinício.
+   *
+   * O antigo trocava tudo no primeiro toque de ver, e o Desfazer sumia no
+   * passo seguinte. */
+  if (!(await cenarioVerNaoTroca(pag))) return;
+
   secao('6. Tapar na folha');
   const ferramentas = await pag.evaluate(() => {
     const ed = window.Draw && window.Draw.Editor;

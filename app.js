@@ -728,7 +728,7 @@
     posicionarAviso();
   }
 
-  function avisar(texto, rotuloAcao, aoAgir) {
+  function avisar(texto, rotuloAcao, aoAgir, rotulo2, aoAgir2) {
     var caixa = $('#aviso');
     $('#aviso-texto').textContent = texto;
     var botao = $('#aviso-acao');
@@ -739,6 +739,13 @@
     } else {
       botao.style.display = 'none';
       botao.onclick = null;
+    }
+    // uma segunda ação, opcional (o "Abrir a aula" depois de anexar material)
+    var botao2 = $('#aviso-acao2');
+    if (botao2) {
+      botao2.style.display = aoAgir2 ? '' : 'none';
+      botao2.textContent = aoAgir2 ? rotulo2 : '';
+      botao2.onclick = aoAgir2 ? function () { esconderAviso(); aoAgir2(); } : null;
     }
     /* Medido no momento de mostrar: a janela pode ter mudado de altura depois
      * de aberta, e é agora que o aviso precisa caber. */
@@ -11486,9 +11493,12 @@
    * de fechar com o número do cabeçalho na conta de cabeça, por até meio
    * minuto. O cartão continua com a décima porque ali o número é o do
    * exercício, e não um total. Meio para cima, como o resto da casa. */
-  function minutosEstimados(minutos, inteiro) {
+  /* A PALAVRA "estimativa" SAI UMA VEZ SÓ, no cabeçalho da lista. Repetida na
+   * linha do assunto e em cada cartão, ela virava ruído, e o "≈" já diz que o
+   * número é aproximado. `comPalavra` só no cabeçalho. */
+  function minutosEstimados(minutos, inteiro, comPalavra) {
     var v = inteiro ? String(Math.floor(Number(minutos) + 0.5)) : String(minutos).replace('.', ',');
-    return '≈ ' + v + ' min (estimativa)';
+    return '≈ ' + v + ' min' + (comPalavra ? ' (estimativa)' : '');
   }
 
   /* NENHUMA AFIRMAÇÃO DE CURADORIA, e isto não é estilo: a comparação cega de
@@ -11511,9 +11521,16 @@
          * pediu, e não a que ela atravessou. Quando a lista já está no carrinho
          * ela volta para ela; quando não está mais (esvaziou, trocou de lista,
          * desmarcou tudo), aí sim carrega de novo. */
+        /* TOCAR MOSTRA, E NÃO TROCA O MATERIAL. Tocar para ver uma lista
+         * substituía tudo o que ela tinha marcado, e o Desfazer sumia no
+         * primeiro passo seguinte: ela marcava nove exercícios de manhã, tocava
+         * numa lista para ver, voltava, tocava na outra, e os nove iam embora
+         * sem aviso. Achado pela lente do uso dela no PR #57. Agora o toque
+         * abre a lista para VER, e quem carrega é o botão "Usar esta lista",
+         * que pergunta antes de trocar e guarda o que estava marcado. */
         function () {
           if (listaProntaEmEdicao(lp)) irNaBiblioteca({ aula: { tipo: 'lista-pronta', id: lp.id } });
-          else usarListaPronta(lp);
+          else irNaBiblioteca({ aula: { tipo: 'lista-pronta', id: lp.id, ver: true } });
         });
       linha.classList.add('bib-lista-pronta');
       linha.setAttribute('data-lista-pronta', lp.id);
@@ -11529,8 +11546,7 @@
      * frase promete mais do que o dado sustenta, e o olho de fora cego pegou
      * isso apontando um item de oito minutos na segunda posição. */
     corpo.appendChild(el('p', { class: 'ajuda bib-lp-ajuda', id: 'bib-lp-ajuda',
-      texto: 'Em ordem de dificuldade estimada, da mais baixa para a mais alta; ' +
-        'desafio é exercício do topo dessa ordem. Tire, ponha e troque a ordem à vontade.' }));
+      texto: 'As listas vão do mais simples ao mais difícil. Tire, ponha e troque a ordem à vontade.' }));
   }
 
   /* A lista que ela está mexendo agora: a última carregada, enquanto ao menos
@@ -11558,7 +11574,7 @@
   /* A grade existe E está sendo exibida. `offsetParent` é nulo para elemento de
    * ancestral com `display: none`, que é como as abas se escondem aqui. */
   function telaDaListaProntaAVista() {
-    var g = $('#bib-lp-grade');
+    var g = $('#bib-lp-grade') || $('#bib-lp-previa');
     return !!(g && g.offsetParent);
   }
 
@@ -11569,30 +11585,39 @@
 
   /* O NOME DA LISTA SAI DA COMPOSIÇÃO DELA, e não de uma escala nossa.
    *
-   * O número do nível saiu da tela e ficou só no dado, e o motivo é medido: nas
-   * 22 listas do 9º ano, a de nível 2 TERMINA num item de degrau 3 marcado como
-   * olimpíada em 11 de 11 assuntos, e em 8 de 11 as duas listas terminam NO
-   * MESMO EXERCÍCIO. A diferença entre elas nunca foi o teto da rampa, foi a
-   * MASSA: a de nível 2 leva 1 ou 2 itens do degrau mais alto e a de nível 3
-   * leva 4 ou 5. Qualquer nome do tipo "vai até o meio" contra "vai até o fim"
-   * seria mentira conferível na primeira tela, e "básica" contra "avançada"
-   * traria de volta a classificação do ALUNO, que é justamente o que esta tela
+   * O número do nível saiu da tela e ficou só no dado. Nas 22 listas do 9º ano
+   * (pacote v7, listas de uma aula), a diferença entre as duas de cada assunto
+   * não é o teto da rampa, é a MASSA do topo: a de nível 2 leva 1 ou 2 itens
+   * do degrau mais alto, e a de nível 3 leva de 4 a 8. "Básica" contra
+   * "avançada" traria de volta a classificação do ALUNO, que é o que esta tela
    * não faz.
    *
-   * Então cada linha se chama pela própria composição, e o número é contado do
-   * campo que o diz, o `dificuldade` de cada item. Uma lista sem nenhum item do
-   * degrau mais alto se chamaria "sem desafio no fim" e entraria sem renomear
-   * nada, o que é o que faz este nome aguentar uma trajetória nova. */
+   * Então cada linha se chama pela própria composição: "Lista com 1 desafio",
+   * "Lista com 8 desafios", "Lista sem desafio". Até 24/09 o nome dizia
+   * "desafios no fim", e o "no fim" era falso: os desafios ficam no topo da
+   * ordem, mas ela pode reordenar, e a lista de uma aula não termina sempre
+   * num deles. O número é contado do campo que o diz, o `dificuldade` de cada
+   * item. */
   function desafiosDe(lp) {
     return (lp.itens || []).filter(function (it) { return it && it.dificuldade === 3; }).length;
   }
 
+  /* EMPATE: quando as duas listas do assunto têm o MESMO número de desafios
+   * (no 8º ano, Potenciação tem 6 e 6), o nome sozinho não as distingue, e
+   * entra o número de exercícios: "Lista com 16 exercícios e 6 desafios" e
+   * "Lista com 9 exercícios e 6 desafios". É o nome que está no Drive. */
   function comoSeChama(lp) {
     var n = desafiosDe(lp);
-    return n ? plural(n, 'desafio no fim', 'desafios no fim') : 'sem desafio no fim';
+    var irmas = (bib && bib.listasPorModulo && bib.listasPorModulo[lp.modulo]) || [];
+    var empate = irmas.some(function (o) { return o.id !== lp.id && desafiosDe(o) === n; });
+    if (empate) {
+      return 'com ' + plural(lp.itens.length, 'exercício', 'exercícios') +
+        (n ? ' e ' + plural(n, 'desafio', 'desafios') : ', sem desafio');
+    }
+    return n ? 'com ' + plural(n, 'desafio', 'desafios') : 'sem desafio';
   }
 
-  function nomeDaListaPronta(lp) { return 'Lista pronta, ' + comoSeChama(lp); }
+  function nomeDaListaPronta(lp) { return 'Lista ' + comoSeChama(lp); }
 
   function listaProntaPorId(id) {
     var todas = bib && bib.listasPorModulo;
@@ -11669,7 +11694,111 @@
    * e uma tela que mostrasse a lista do pacote enquanto o material sai de outro
    * lugar seria a tela mentindo sobre o que vai sair. Depois do primeiro toque
    * numa seta ou numa caixa, os dois deixam de ser a mesma coisa. */
+  /* A SELEÇÃO DE ANTES DE TROCAR POR UMA LISTA, guardada no aparelho para
+   * atravessar a navegação e o reinício. Fica até ela trocar de novo. A chave
+   * vai escrita aqui dentro, e não numa constante do módulo, porque `var` sobe
+   * a declaração e não o valor. */
+  function selecaoAnterior() {
+    try {
+      var s = JSON.parse(localStorage.getItem('apoio-educacional:bib-selecao-anterior') || 'null');
+      return s && ((s.itens || []).length || (s.paginas || []).length) ? s : null;
+    } catch (e) { return null; }
+  }
+  function guardarSelecaoAnterior(sel) {
+    try {
+      if (sel) localStorage.setItem('apoio-educacional:bib-selecao-anterior', JSON.stringify(sel));
+      else localStorage.removeItem('apoio-educacional:bib-selecao-anterior');
+    } catch (e) { /* sem armazenamento: a pergunta antes de trocar continua valendo */ }
+  }
+  /* RECUPERAR TROCA, E NÃO APAGA: o que está marcado agora passa a ser o
+   * guardado, para nada se perder no vaivém. */
+  function recuperarSelecaoAnterior() {
+    var guardada = selecaoAnterior();
+    if (!guardada) return;
+    var agora = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
+    mexeuNoMaterial();
+    bibCarrinho = { itens: (guardada.itens || []).slice(), paginas: (guardada.paginas || []).slice() };
+    guardarCarrinho();
+    guardarSelecaoAnterior(agora.itens.length || agora.paginas.length ? agora : null);
+    desenharCarrinho();
+    marcarCaixasDoCarrinho();
+    desenharContextoBiblioteca();
+    if (bibNav.aula && bibNav.aula.tipo === 'lista-pronta') desenharCorpoBiblioteca();
+    avisar('O material voltou a ter o que estava marcado antes.');
+  }
+
+  function mesmaSelecao(a, lp) {
+    return !a.paginas.length && a.itens.length === lp.ids.length &&
+      !a.itens.some(function (id, i) { return id !== lp.ids[i]; });
+  }
+
+  /* "USAR ESTA LISTA" PERGUNTA ANTES DE TROCAR, e guarda o que estava marcado. */
+  function pedirParaUsarLista(lp) {
+    var n = bibCarrinho.itens.length, m = bibCarrinho.paginas.length;
+    if ((n || m) && !mesmaSelecao(bibCarrinho, lp)) {
+      var pergunta = m ? 'Trocar os ' + (n + m) + ' itens marcados por esta lista?'
+        : n === 1 ? 'Trocar o exercício marcado por esta lista?'
+        : 'Trocar os ' + n + ' exercícios marcados por esta lista?';
+      if (!confirmar(pergunta)) return;
+      guardarSelecaoAnterior({ itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() });
+    }
+    usarListaPronta(lp);
+  }
+
+  function desenharPreviaDaLista(corpo, mod, lp) {
+    corpo.appendChild(voltarBib(mod.titulo, function () { irNaBiblioteca({ aula: null }); }));
+    corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: nomeDaListaPronta(lp) }));
+    corpo.appendChild(el('div', { class: 'bib-lp-cabeca', id: 'bib-lp-previa-cabeca' }, [
+      el('div', { class: 'bib-lp-meia', texto: plural(lp.ids.length, 'exercício', 'exercícios') +
+        (umaAula(lp.minutos) ? ' · ' + umaAula(lp.minutos) : '') }),
+      el('div', { class: 'ajuda bib-lp-minutos', texto: minutosEstimados(lp.minutos, true, true) })
+    ]));
+    /* Ver não mexe em nada, e a tela diz isso quando há material marcado. */
+    var estado = null;
+    if (bibCarrinho.itens.length || bibCarrinho.paginas.length) {
+      var n = bibCarrinho.itens.length + bibCarrinho.paginas.length;
+      estado = 'O material tem ' + plural(n, 'item marcado', 'itens marcados') +
+        '. Ver esta lista não muda nada; Usar esta lista pergunta antes de trocar.';
+    }
+    if (estado) corpo.appendChild(el('p', { class: 'ajuda bib-lp-estado', id: 'bib-lp-estado', texto: estado }));
+    corpo.appendChild(el('div', { class: 'barra bib-lp-usar' }, [
+      el('button', { type: 'button', class: 'btn principal', id: 'bib-lp-usar', texto: 'Usar esta lista',
+        aoClick: function () { pedirParaUsarLista(lp); } })
+    ]));
+    /* Os cartões para ver, sem caixa e sem seta: nada aqui mexe no material. */
+    var grade = el('div', { class: 'bib-grade bib-grade-exercicios bib-grade-lp', id: 'bib-lp-previa' });
+    var itensDaLista = lp.ids.map(function (x) { return bib.itemPorId[x]; }).filter(Boolean);
+    itensDaLista.forEach(function (it, pos) {
+      grade.appendChild(el('div', { class: 'bib-celula' }, [el('button', {
+        type: 'button', class: 'bib-cartao', 'data-id': it.id,
+        aoClick: function () { verNaBiblioteca({ tipo: 'exercicio', lista: { titulo: mod.titulo, itens: itensDaLista }, indice: pos }); }
+      }, [
+        el('div', { class: 'bib-rotulo bib-numero', texto: (pos + 1) + '. Exercício ' + it.numero }),
+        (mod.ordemListas || []).length > 1 ? el('div', { class: 'ajuda bib-lp-de-onde', texto: it.aula.titulo }) : null,
+        miniaturaBib(it.pacote, it.assets.enunciado, it.medidas && it.medidas.enunciado, 1080),
+        el('div', { class: 'bib-tags' }, [
+          el('span', { class: 'tag bib-lp-min-item', texto: minutosEstimados(lp.minutosDe[it.id]) })
+        ])
+      ])]));
+    });
+    corpo.appendChild(grade);
+    observarMiniaturas(grade);
+  }
+
+  /* Vai para a aula onde o material foi anexado. */
+  function abrirAulaDoMaterial(aulaId) {
+    var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
+    if (!aula) { avisar('Essa aula não existe mais.'); return; }
+    abrirAula(aula.id);
+  }
+
   function desenharListaPronta(corpo, mod, lp) {
+    /* Para VER quando ela chegou tocando na linha de uma lista que não está no
+     * material: a tela mostra a lista e o botão de usá-la, e não mexe em nada. */
+    if (bibNav.aula && bibNav.aula.ver) {
+      desenharPreviaDaLista(corpo, mod, lp);
+      return;
+    }
     corpo.appendChild(voltarBib(mod.titulo, function () { irNaBiblioteca({ aula: null }); }));
     corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: nomeDaListaPronta(lp) }));
     if (bibLpAviso) {
@@ -11694,6 +11823,7 @@
 
     var ids = bibCarrinho.itens.slice();
     var anexada = ids.length ? null : listaAnexada();
+    if (anexada && anexada.lista !== lp.id) anexada = null;
     var daLista = ids.filter(function (id) { return lp.minutosDe[id] !== undefined; });
     var deFora = ids.length - daLista.length;
     /* "VOCÊ MUDOU ESTA LISTA" TEM DE VALER PARA A ORDEM TAMBÉM, e não só para
@@ -11735,11 +11865,11 @@
            * dizendo o minuto e quantos ficaram fora da conta. */
           (daLista.length && !deFora && umaAula(soma) ? ' · ' + umaAula(soma) : '') }),
       el('div', { class: 'ajuda bib-lp-minutos', texto: !daLista.length
-        ? (ids.length ? 'Sem estimativa de tempo: o minuto vem da lista pronta, e nenhum exercício dela ficou aqui.'
-          : anexada ? 'Lista anexada na aula de ' + anexada.aluno + ' (' + Core.ddmmaaaa(anexada.data) +
-            '). Toque na linha da lista pronta para usar de novo.'
-          : 'Toque na linha da lista pronta para carregá-la de novo.')
-        : minutosEstimados(soma, true) +
+        ? (ids.length ? 'Sem estimativa de tempo: o minuto vem da lista, e nenhum exercício dela ficou aqui.'
+          : anexada ? 'Esta lista foi anexada na aula de ' + anexada.aluno + ' (' + Core.ddmmaaaa(anexada.data) +
+            '). Para usar com outro aluno, toque em Usar esta lista.'
+          : 'Para começar de novo, toque em Usar esta lista.')
+        : minutosEstimados(soma, true, true) +
           (deFora ? ', fora ' + plural(deFora, 'exercício que você acrescentou e não entra nessa conta',
             'exercícios que você acrescentou e não entram nessa conta') : '') })
     ]);
@@ -11753,9 +11883,19 @@
         texto: 'Você mudou esta lista. O material sai na ordem que está aqui.' }));
     }
 
-    if (!ids.length && !anexada) {
-      corpo.appendChild(el('p', { class: 'ajuda', id: 'bib-lp-vazia', texto: 'Você tirou tudo desta lista.' }));
+    /* A TELA VAZIA DIZ O QUE ACONTECEU E O QUE DÁ PARA FAZER ALI MESMO. "Você
+     * tirou tudo" só quando foi ela; depois de anexar, quem esvaziou foi o
+     * aplicativo, e a tela diz para onde a lista foi e oferece abrir a aula. */
+    if (!ids.length) {
+      if (!anexada) corpo.appendChild(el('p', { class: 'ajuda', id: 'bib-lp-vazia', texto: 'Você tirou tudo desta lista.' }));
+      corpo.appendChild(el('div', { class: 'barra bib-lp-usar' }, [
+        el('button', { type: 'button', class: 'btn principal', id: 'bib-lp-usar', texto: 'Usar esta lista',
+          aoClick: function () { pedirParaUsarLista(lp); } }),
+        anexada ? el('button', { type: 'button', class: 'btn', id: 'bib-lp-abrir-aula', texto: 'Abrir a aula',
+          aoClick: function () { abrirAulaDoMaterial(anexada.aulaId); } }) : null
+      ]));
     }
+
     var grade = el('div', { class: 'bib-grade bib-grade-exercicios bib-grade-lp', id: 'bib-lp-grade' });
     ids.forEach(function (id, pos) {
       var it = bib.itemPorId[id];
@@ -12469,7 +12609,7 @@
       texto: 'O material agora tem ' + plural(bibCarrinho.itens.length, 'exercício', 'exercícios') +
         ': “' + nomeDaListaPronta(lp) + '”' +
         (sairam ? ', no lugar do que estava marcado'
-          : perdeu ? ', de volta como o pacote a trouxe' : '') +
+          : perdeu ? ', de volta como veio' : '') +
         '. Mude o que quiser e toque em Gerar material.',
       rotulo: perdeu ? 'Desfazer' : null,
       aoAgir: perdeu ? function () { devolverSelecaoTrocada(antes, tudo); } : null
@@ -12563,6 +12703,11 @@
     if (!(n || m)) {
       faixa.appendChild(el('span', { class: 'bib-carrinho-texto', id: 'bib-carrinho-vazio',
         texto: 'Nada marcado ainda.' }));
+      if (selecaoAnterior()) {
+        faixa.appendChild(el('span', { class: 'cresce' }));
+        faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-carrinho-recuperar',
+          texto: 'Recuperar o que estava marcado', aoClick: recuperarSelecaoAnterior }));
+      }
       return;
     }
     /* Só o que existe entra na conta. Contar "0 páginas de teoria" era contar o
@@ -12575,6 +12720,12 @@
         m ? plural(m, 'página de teoria', 'páginas de teoria') : ''
       ].filter(Boolean).join(', ') }));
     faixa.appendChild(el('span', { class: 'cresce' }));
+    /* O QUE ESTAVA MARCADO ANTES DE ELA TROCAR POR UMA LISTA fica à mão aqui,
+     * em qualquer tela da Biblioteca, até ela trocar de novo. */
+    if (selecaoAnterior()) {
+      faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-carrinho-recuperar',
+        texto: 'Recuperar o que estava marcado', aoClick: recuperarSelecaoAnterior }));
+    }
     faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-carrinho-limpar', texto: 'Desmarcar tudo',
       aoClick: function () {
         mexeuNoMaterial();
@@ -12728,9 +12879,14 @@
     corpo.innerHTML = '';
     rodape.innerHTML = '';
 
+    /* Só o que existe entra na conta ("0 páginas de teoria" era contar o que
+     * não há), e a ordem diz de onde veio: da lista, ou da mão dela. */
+    var lpDoMaterial = bibLpEmEdicao ? listaProntaPorId(bibLpEmEdicao) : null;
+    var daListaPronta = !!(lpDoMaterial && listaProntaEmEdicao(lpDoMaterial));
     corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', id: 'bib-gerar-resumo',
-      texto: plural(itens.length, 'exercício', 'exercícios') + ' e ' + plural(paginas.length, 'página de teoria', 'páginas de teoria') +
-        ', na ordem em que você marcou.' }));
+      texto: [itens.length ? plural(itens.length, 'exercício', 'exercícios') : '',
+        paginas.length ? plural(paginas.length, 'página de teoria', 'páginas de teoria') : ''].filter(Boolean).join(' e ') +
+        (daListaPronta ? ', na ordem da lista.' : ', na ordem em que você marcou.') }));
 
     var campoTitulo = el('input', { type: 'text', id: 'bib-gerar-titulo', value: padrao.titulo, autocomplete: 'off' });
     var campoSub = el('input', { type: 'text', id: 'bib-gerar-subtitulo', value: padrao.subtitulo, autocomplete: 'off' });
@@ -12945,7 +13101,11 @@
     bibCarrinho = { itens: [], paginas: [] };
     guardarCarrinho();
     // depois do guardarCarrinho, que apaga a anotação: esta é a que vale agora
-    if (aula && aluno) lembrarAnexada({ aluno: aluno.nome, data: aula.data });
+    /* "Esta lista foi anexada" só quando o anexo veio DESTA lista: o que foi
+     * anexado tem de conter exercício dela. Carrinho vazio sozinho não diz. */
+    var lpUsada = bibLpEmEdicao ? listaProntaPorId(bibLpEmEdicao) : null;
+    var veioDaLista = lpUsada && usada.itens.some(function (x) { return lpUsada.minutosDe[x] !== undefined; });
+    if (aula && aluno && veioDaLista) lembrarAnexada({ aluno: aluno.nome, data: aula.data, aulaId: aula.id, lista: lpUsada.id });
     desenharCarrinho();
     marcarCaixasDoCarrinho();
     return function () {
@@ -12970,9 +13130,9 @@
     var usaItens = (op.lista || op.gabarito) ? itens : [];
     var pecas, teoria, anexado = false, id = null, saida = null, etapa = 'montar', assuntosNovos = [];
     // na série, qualquer aviso final espera o Desfazer dela vencer
-    function avisarNaHora(t, r, f) {
+    function avisarNaHora(t, r, f, r2, f2) {
       var espera = Math.max(0, (op.avisoDepoisDe || 0) - Date.now());
-      if (espera) setTimeout(function () { avisar(t, r, f); }, espera); else avisar(t, r, f);
+      if (espera) setTimeout(function () { avisar(t, r, f, r2, f2); }, espera); else avisar(t, r, f, r2, f2);
     }
     return emFila(usaItens, function (it, i) { return comNomeDoExercicio(pecasDoItem(it, op.gabarito), it, i + 1); }).then(function (r) {
       pecas = r;
@@ -12986,34 +13146,59 @@
       });
     }).then(function (r) {
       teoria = r;
-      saida = PDFGen.gerarMaterialBiblioteca({
+      var base = {
         titulo: op.titulo, subtitulo: op.subtitulo, aluno: aluno ? aluno.nome : '',
         data: daCabeca ? Core.ddmmaaaa(daCabeca.data) : Core.ddmmaaaa(Core.hojeIso()),
         incluirTeoria: op.teoria, incluirLista: op.lista, incluirGabarito: op.gabarito, gabaritoSeparado: true,
         espacoParaResposta: op.espaco ? ESPACO_RESPOSTA : 0, mostrarOrigem: op.origem,
         teoria: teoria, itens: pecas
-      });
-      var nome = Core.nomeArquivo(op.titulo + (op.subtitulo ? ' ' + op.subtitulo : '')) + '_biblioteca.pdf';
-      var blob = new Blob([saida.bytes], { type: 'application/pdf' });
+      };
+      var nomeBase = op.titulo + (op.subtitulo ? ' ' + op.subtitulo : '');
+      /* O GABARITO VAI EM ARQUIVO SEPARADO QUANDO ELA ANEXA LISTA COM GABARITO:
+       * no mesmo PDF, mandar a lista ao aluno era mandar as respostas junto
+       * (a página do gabarito é quase igual à da lista, e numa impressora preto
+       * e branco a diferença some). Dois anexos na aula, "<assunto> lista" e
+       * "<assunto> gabarito", e ela manda só o primeiro. */
+      var separa = !!(aula && op.lista && op.gabarito && usaItens.length);
+      var arquivos;
+      if (separa) {
+        var sl = PDFGen.gerarMaterialBiblioteca(Object.assign({}, base, { incluirGabarito: false }));
+        var sg = PDFGen.gerarMaterialBiblioteca(Object.assign({}, base, { incluirTeoria: false, incluirLista: false, teoria: [] }));
+        saida = { bytes: sl.bytes, reduzidos: { lista: sl.reduzidos.lista, gabarito: sg.reduzidos.gabarito } };
+        arquivos = [
+          { nome: Core.nomeArquivo(nomeBase + ' lista') + '.pdf', blob: new Blob([sl.bytes], { type: 'application/pdf' }) },
+          { nome: Core.nomeArquivo(nomeBase + ' gabarito') + '.pdf', blob: new Blob([sg.bytes], { type: 'application/pdf' }) }
+        ];
+      } else {
+        saida = PDFGen.gerarMaterialBiblioteca(base);
+        arquivos = [{ nome: Core.nomeArquivo(nomeBase) + '_biblioteca.pdf', blob: new Blob([saida.bytes], { type: 'application/pdf' }) }];
+      }
       if (!aula) {
         fecharModal('modal-bib-gerar');
-        entregarArquivo(nome, blob, op.titulo);
+        entregarArquivo(arquivos[0].nome, arquivos[0].blob, op.titulo);
         return null;
       }
-      id = Core.uid();
-      return Store.salvarAnexo(id, { nome: nome, tipo: 'application/pdf', blob: blob }).then(function () {
+      arquivos.forEach(function (a) { a.id = Core.uid(); });
+      var apagarTodos = function () { arquivos.forEach(function (a) { Store.apagarAnexo(a.id).catch(function () {}); }); };
+      id = arquivos[0].id;
+      return arquivos.reduce(function (p, a) {
+        return p.then(function () { return Store.salvarAnexo(a.id, { nome: a.nome, tipo: 'application/pdf', blob: a.blob }); });
+      }, Promise.resolve()).catch(function (e) { apagarTodos(); throw e; }).then(function () {
         aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
         if (!aula) {
           // a aula foi desfeita enquanto a folha era montada: o arquivo não fica órfão
-          Store.apagarAnexo(id);
+          apagarTodos();
           var sem = new Error('aula desfeita'); sem.desfeita = true; throw sem;
         }
         aula.anexos = aula.anexos || [];
         // os módulos dos exercícios ficam anotados no anexo, como registro de onde ele veio
         var modulos = [];
         usaItens.forEach(function (it) { if (modulos.indexOf(it.modulo.titulo) < 0) modulos.push(it.modulo.titulo); });
-        var registro = { id: id, nome: nome, tamanho: blob.size, biblioteca: true, modulos: modulos };
-        aula.anexos.push(registro);
+        var registros = arquivos.map(function (a, k) {
+          return { id: a.id, nome: a.nome, tamanho: a.blob.size, biblioteca: true, modulos: modulos,
+            parte: separa ? (k === 0 ? 'lista' : 'gabarito') : undefined };
+        });
+        registros.forEach(function (r) { aula.anexos.push(r); });
         /* Cada módulo do material vira assunto da aula, no mesmo salvar do
          * anexo: sem pergunta, e só quando a aula ainda não tem assunto com o
          * mesmo título. */
@@ -13021,14 +13206,14 @@
         assuntosNovos = modulosComoAssunto(aula, modulosDoMaterial(op.teoria ? paginas : [], usaItens));
         titulosGuardados()[aula.alunoId] = { titulo: op.titulo, subtitulo: op.subtitulo };
         return salvar().catch(function (e) {
-          // não gravou: o anexo sai da memória, senão o próximo salvar o gravaria e a nova tentativa duplicaria
-          aula.anexos = aula.anexos.filter(function (x) { return x !== registro; });
+          // não gravou: os anexos saem da memória, senão o próximo salvar os gravaria e a nova tentativa duplicaria
+          aula.anexos = aula.anexos.filter(function (x) { return registros.indexOf(x) < 0; });
           if (assuntosNovos.length) {
             if (antes === undefined) delete aula.temas; else aula.temas = antes;
             if (antesTema !== undefined) aula.tema = antesTema;
             assuntosNovos = [];
           }
-          Store.apagarAnexo(id);
+          apagarTodos();
           throw e;
         });
       }).then(function () {
@@ -13064,7 +13249,9 @@
           abrirEditorNota(aula.id, indiceFolha);
           avisarNaHora('Material anexado na aula de ' + aluno.nome + ', e a lista abriu como folha.' + menor + desmarcada, 'Marcar de novo', devolver);
         } else {
-          avisarNaHora('Material anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + ').' + menor + desmarcada, 'Marcar de novo', devolver);
+          var idDaAula = aula.id;
+          avisarNaHora('Material anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + ').' + menor + desmarcada, 'Marcar de novo', devolver,
+            'Abrir a aula', function () { abrirAulaDoMaterial(idDaAula); });
         }
       });
     }).catch(function (e) {

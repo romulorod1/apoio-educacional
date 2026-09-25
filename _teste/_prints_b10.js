@@ -148,7 +148,10 @@ async function rolarTudoEEsperar(pag) {
   await tirar(pag, 2);
 
   // 03: a lista pronta do nível 2, recém carregada, com a mensagem no fluxo
-  conf('tocou na primeira lista pronta', await tocarLinha(pag, 'Lista pronta, 1 desafio no fim'), true);
+  conf('tocou na primeira lista pronta', await tocarLinha(pag, 'Lista com 1 desafio'), true);
+  await pausa(500);
+  // tocar mostra a lista; quem carrega é o "Usar esta lista"
+  await pag.evaluate(() => { const b = document.querySelector('#bib-lp-usar'); if (b) b.click(); });
   await pausa(900);
   console.log('   ' + (await rolarTudoEEsperar(pag)));
   await tirar(pag, 3);
@@ -266,7 +269,7 @@ async function rolarTudoEEsperar(pag) {
   secao('Os prints que faltam');
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
   await pausa(600);
-  conf('tocou na outra lista pronta do mesmo módulo', await tocarLinha(pag, 'Lista pronta, 4 desafios no fim'), true);
+  conf('tocou na outra lista pronta do mesmo módulo', await tocarLinha(pag, 'Lista com 4 desafios'), true);
   await pausa(900);
   console.log('   ' + (await rolarTudoEEsperar(pag)));
   await tirar(pag, 10);

@@ -265,6 +265,8 @@
     if (i >= 0) itens.splice(i, 1);
     this.selecionado = null;
     this.cacheValido = false; this.precisaRedesenhar = true;
+    // tirar pela lixeira é mudança como qualquer outra: quem grava a folha precisa saber
+    if (i >= 0) this._avisarMudanca();
   };
 
   /* O retângulo que tapa. Nasce arrastando, como o traço, e não centralizado
@@ -429,7 +431,7 @@
     if (this.ferramenta === 'borracha') {
       this.marcarPonto();
       this.apagando = true;
-      this.apagarEm(p, 14 / this.escala + 6);
+      this.apagou = this.apagarEm(p, 14 / this.escala + 6);
       return;
     }
     if (this.ferramenta === 'tapar') {
@@ -522,7 +524,7 @@
     this.ponteiros[e.pointerId] = { x: pos.x, y: pos.y, tipo: e.pointerType };
     var p = this.paraFolha(pos.x, pos.y);
 
-    if (this.apagando) { this.apagarEm(p, 14 / this.escala + 6); return; }
+    if (this.apagando) { if (this.apagarEm(p, 14 / this.escala + 6)) this.apagou = true; return; }
 
     if (this.tapando) {
       this.tapando.x = p.x;
@@ -554,6 +556,7 @@
         d.item.x = d.ix + (p.x - d.ox);
         d.item.y = d.iy + (p.y - d.oy);
       }
+      d.moveu = true;
       this.cacheValido = false; this.precisaRedesenhar = true;
       return;
     }
@@ -616,9 +619,17 @@
     delete this.ponteiros[e.pointerId];
     // o _cancelarTraco ja desiste do retangulo em andamento, na primeira linha dele
     this._cancelarTraco();
+    /* O QUE JÁ MUDOU NÃO VOLTA COM O CANCELAMENTO: a borracha já tirou o traço
+     * e o arrasto já moveu o item, na tela e na nota. Sem avisar, a folha
+     * ficava diferente do que está gravado até o próximo gesto dela, e
+     * fechada antes disso perdia a mudança. Achado pela lente de correção do
+     * PR #57. */
+    var mudou = !!((this.apagando && this.apagou) || (this.arrasto && this.arrasto.moveu));
     if (this.arrasto) this.arrasto = null;
     this.apagando = false;
+    this.apagou = false;
     this.precisaRedesenhar = true;
+    if (mudou) this._avisarMudanca();
   };
 
   Editor.prototype._cancelarTapar = function () {
