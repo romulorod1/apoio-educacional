@@ -101,13 +101,13 @@ const linhasDeLista = pag => pag.evaluate(() =>
       curadoria: { [Sintetico.LISTAS[0].degraus[Sintetico.LISTAS[0].degraus.length - 1].item]: 3 } });
     console.log('   da fonte: ' + daFonte + '\n   da curadoria: ' + daCuradoria);
     if (V_AJUDA) {
-      conf('VENENO ENXERGADO: com desafio da curadoria, a ajuda ainda diz "do fim das listas"', /do fim|por último, os do fim/.test(daCuradoria), true);
+      conf('VENENO ENXERGADO: com desafio da curadoria, a ajuda ainda diz "do fim das listas"', /os do fim/.test(daCuradoria), true);
       return;
     }
     conf('desafios todos da fonte: a ajuda diz de onde eles vêm', daFonte,
-      'Primeiro vêm os exercícios do começo das listas da OBMEP e, por último, os do fim, os desafios, que costumam ser os mais difíceis. Tire, ponha e troque a ordem à vontade.');
+      'A lista segue a posição dos exercícios nas listas da OBMEP: os que estavam mais no começo vêm antes, e os do fim, os desafios, vêm por último. Eles costumam ser os mais difíceis.');
     conf('com desafio marcado pela curadoria: a ajuda não diz "do fim das listas"', daCuradoria,
-      'Desafios são os exercícios marcados como mais difíceis. Tire, ponha e troque a ordem à vontade.');
+      'Desafios são os exercícios marcados como mais difíceis.');
   }
   if (V_EMPATE || !VENENO) {
     /* 0. O EMPATE DE NOMES (achado no 8º ano, Potenciação: 6 e 6 desafios).

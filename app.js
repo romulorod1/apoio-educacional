@@ -931,11 +931,21 @@
     corpo.innerHTML = '';
     corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0',
       texto: 'O material saiu em dois arquivos. Mande a lista ao aluno e guarde o gabarito para você.' }));
+    /* Sem compartilhamento no aparelho, o botão diz o que faz: baixa. */
+    var podeCompartilhar = false;
+    try {
+      podeCompartilhar = !!(navigator.canShare && navigator.canShare({ files: [new File([arquivos[0].blob], arquivos[0].nome, { type: 'application/pdf' })] }));
+    } catch (e) { podeCompartilhar = false; }
+    var verbo = podeCompartilhar ? 'Compartilhar' : 'Baixar';
     corpo.appendChild(el('div', { class: 'barra' }, arquivos.map(function (a, k) {
-      return el('button', { type: 'button', class: k === 0 ? 'btn principal' : 'btn', id: 'bib-compartilhar-' + (k === 0 ? 'lista' : 'gabarito'),
-        texto: k === 0 ? 'Compartilhar a lista' : 'Compartilhar o gabarito',
-        aoClick: function () { entregarArquivo(a.nome, a.blob, titulo); } });
+      return el('div', { class: 'bib-compartilhar-item' }, [
+        el('button', { type: 'button', class: k === 0 ? 'btn principal' : 'btn', id: 'bib-compartilhar-' + (k === 0 ? 'lista' : 'gabarito'),
+          texto: verbo + (k === 0 ? ' a lista' : ' o gabarito'),
+          aoClick: function () { entregarArquivo(a.nome, a.blob, titulo); } }),
+        el('div', { class: 'ajuda bib-compartilhar-nome', texto: a.nome })
+      ]);
     })));
+    esconderAviso();
     abrirModal('modal-bib-compartilhar');
   }
 
@@ -11495,12 +11505,13 @@
         aoClick: function () {
           mexeuNoMaterial();
           var marcar = !todos;
+          var itens = bibCarrinho.itens.slice();
           ids.forEach(function (id) {
-            var i = bibCarrinho.itens.indexOf(id);
-            if (marcar && i < 0) bibCarrinho.itens.push(id);
-            if (!marcar && i >= 0) bibCarrinho.itens.splice(i, 1);
+            var i = itens.indexOf(id);
+            if (marcar && i < 0) itens.push(id);
+            if (!marcar && i >= 0) itens.splice(i, 1);
           });
-          guardarCarrinho();
+          trocarMaterial({ itens: itens, paginas: bibCarrinho.paginas }, 'mexeu');
           desenharCarrinho();
           /* A tela do módulo inteira se refaz: o rótulo do botão troca e as
            * linhas passam a dizer quantos daquela aula ou lista entraram. */
@@ -11612,7 +11623,7 @@
       linha.classList.add('bib-lista-pronta');
       linha.setAttribute('data-lista-pronta', lp.id);
       linha.querySelector('.cresce').appendChild(
-        el('div', { class: 'detalhe bib-lp-minutos', texto: minutosEstimados(lp.minutos, true) }));
+        el('div', { class: 'detalhe bib-lp-minutos', texto: minutosEstimados(lp.minutos, true, true) }));
       corpo.appendChild(linha);
     });
     /* A FRASE DIZ DE ONDE VEM A ORDEM E O "DESAFIO", e não o que a gente
@@ -11620,18 +11631,20 @@
      * o exercício do fim da lista original. "Do mais simples ao mais difícil"
      * afirmava um juízo de dificuldade que ninguém conferiu (lente do uso
      * dela no PR #57). */
-    /* A ORDEM é a do gerador (degrau e minutos), não a da OBMEP: as listas da
-     * fonte se intercalam. O que é verdade é o degrau: primeiro os exercícios
-     * do começo das listas da fonte, e por último os do fim. Quando algum
-     * desafio foi marcado pela curadoria, "do fim das listas" deixa de ser
-     * verdade, e a frase diz só o que é. */
+    /* A FRASE DIZ O QUE O DADO SUSTENTA. A ordem é a do gerador (degrau e
+     * minutos), e o degrau é a posição do exercício na lista da OBMEP: os do
+     * começo antes, os do fim (os desafios) por último. As listas da fonte se
+     * intercalam, então "a ordem da OBMEP" seria falso; "a posição nas listas
+     * da OBMEP" não é. Quando algum desafio foi marcado pela curadoria, "os do
+     * fim" deixa de ser verdade, e a frase diz só o que é. O "tire, ponha e
+     * troque" mora na tela da lista em uso, onde as setas existem. */
     var curados = listas.some(function (lp) {
       return (lp.itens || []).some(function (it) { return it && it.dificuldade === 3 && it.dificuldade_origem === 'curadoria'; });
     });
     corpo.appendChild(el('p', { class: 'ajuda bib-lp-ajuda', id: 'bib-lp-ajuda',
-      texto: (curados ? 'Desafios são os exercícios marcados como mais difíceis.'
-        : 'Primeiro vêm os exercícios do começo das listas da OBMEP e, por último, os do fim, os desafios, ' +
-          'que costumam ser os mais difíceis.') + ' Tire, ponha e troque a ordem à vontade.' }));
+      texto: curados ? 'Desafios são os exercícios marcados como mais difíceis.'
+        : 'A lista segue a posição dos exercícios nas listas da OBMEP: os que estavam mais no começo vêm antes, ' +
+          'e os do fim, os desafios, vêm por último. Eles costumam ser os mais difíceis.' }));
   }
 
   /* A lista que ela está mexendo agora: a última carregada, enquanto ao menos
@@ -11799,31 +11812,57 @@
    *
    * A chave vai escrita aqui dentro, e não numa constante do módulo, porque
    * `var` sobe a declaração e não o valor. */
-  function selecoesAnteriores() {
-    try {
-      var l = JSON.parse(localStorage.getItem('apoio-educacional:bib-selecoes-anteriores') || '[]');
-      return Array.isArray(l) ? l.filter(function (x) { return x && ((x.itens || []).length || (x.paginas || []).length); }) : [];
-    } catch (e) { return []; }
+  /* LEITURA COM VALIDAÇÃO DE VERDADE: itens e páginas são listas de texto e
+   * `quando` é um número válido; o que não passar é descartado sem quebrar a
+   * janela. A chave antiga, de uma vaga só, vira uma linha e sai. */
+  function selecaoValida(x) {
+    var textos = function (a) { return Array.isArray(a) && a.every(function (id) { return typeof id === 'string'; }); };
+    return !!x && textos(x.itens) && textos(x.paginas || []) && typeof x.quando === 'number' && isFinite(x.quando) &&
+      (x.itens.length + (x.paginas || []).length) > 0;
   }
+  function selecoesAnteriores() {
+    var l = [];
+    try { l = JSON.parse(localStorage.getItem('apoio-educacional:bib-selecoes-anteriores') || '[]'); } catch (e) { l = []; }
+    if (!Array.isArray(l)) l = [];
+    try {
+      var velha = localStorage.getItem('apoio-educacional:bib-selecao-anterior');
+      if (velha !== null) {
+        var v = null;
+        try { v = JSON.parse(velha); } catch (e) { v = null; }
+        if (v) {
+          var linha = { itens: v.itens || [], paginas: v.paginas || [], quando: Date.now(), lista: null };
+          if (selecaoValida(linha) && !l.some(function (x) { return x && mesmaLista(x, linha); })) l.push(linha);
+        }
+        localStorage.removeItem('apoio-educacional:bib-selecao-anterior');
+        localStorage.setItem('apoio-educacional:bib-selecoes-anteriores', JSON.stringify(l.filter(selecaoValida).slice(0, 3)));
+      }
+    } catch (e) { /* sem armazenamento: fica a leitura */ }
+    return l.filter(selecaoValida).map(function (x) {
+      return { itens: x.itens.slice(), paginas: (x.paginas || []).slice(), quando: x.quando,
+        lista: typeof x.lista === 'string' ? x.lista : null };
+    }).slice(0, 3);
+  }
+  // devolve se gravou: quem troca o material não troca sem ter guardado
   function gravarSelecoesAnteriores(l) {
-    try { localStorage.setItem('apoio-educacional:bib-selecoes-anteriores', JSON.stringify(l)); }
-    catch (e) { /* sem armazenamento: a pergunta antes de trocar continua valendo */ }
+    try { localStorage.setItem('apoio-educacional:bib-selecoes-anteriores', JSON.stringify(l)); return true; }
+    catch (e) { return false; }
   }
   function mesmaLista(a, b) {
     function igual(x, y) { return x.length === y.length && !x.some(function (id, k) { return id !== y[k]; }); }
     return igual(a.itens || [], b.itens || []) && igual(a.paginas || [], b.paginas || []);
   }
   /* O material de agora entra nas seleções anteriores, pela regra de cima. */
+  // devolve false só se precisava gravar e não conseguiu
   function guardarNasAnteriores(sel) {
-    if (!(sel.itens.length || sel.paginas.length)) return;
-    if (ehListaPronta(sel)) return;
+    if (!(sel.itens.length || sel.paginas.length)) return true;
+    if (ehListaPronta(sel)) return true;
     var l = selecoesAnteriores();
-    if (l.some(function (x) { return mesmaLista(x, sel); })) return;
+    if (l.some(function (x) { return mesmaLista(x, sel); })) return true;
     var lp = lpEmEdicao() ? listaProntaPorId(lpEmEdicao()) : null;
     var daLista = lp && sel.itens.some(function (id) { return lp.minutosDe[id] !== undefined; });
-    l.unshift({ itens: sel.itens.slice(), paginas: sel.paginas.slice(), quando: new Date().toISOString(),
+    l.unshift({ itens: sel.itens.slice(), paginas: sel.paginas.slice(), quando: Date.now(),
       lista: daLista ? lp.id : null });
-    gravarSelecoesAnteriores(l.slice(0, 3));
+    return gravarSelecoesAnteriores(l.slice(0, 3));
   }
   /* O que dela ainda existe na biblioteca: série removida ou versão nova sem o
    * exercício não oferece carregar o que não volta. */
@@ -11832,8 +11871,8 @@
     var paginas = (x.paginas || []).filter(function (id) { return !!paginaDeTeoriaPorId(id); });
     return { itens: itens, paginas: paginas, faltam: (x.itens || []).length + (x.paginas || []).length - itens.length - paginas.length };
   }
-  function quandoDaSelecao(iso) {
-    var d = new Date(iso), hoje = new Date();
+  function quandoDaSelecao(quando) {
+    var d = new Date(quando), hoje = new Date();
     var ontem = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 1);
     var mesmoDia = function (a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); };
     var hora = Core.pad2(d.getHours()) + ':' + Core.pad2(d.getMinutes());
@@ -11846,7 +11885,7 @@
     var n = (x.itens || []).length, m = (x.paginas || []).length;
     var o_que = [n ? plural(n, 'exercício', 'exercícios') : '', m ? plural(m, 'página de teoria', 'páginas de teoria') : '']
       .filter(Boolean).join(' e ');
-    var base = o_que + ', marcados ' + quandoDaSelecao(x.quando);
+    var base = o_que + ', guardada ' + quandoDaSelecao(x.quando);
     if (!v.itens.length && !v.paginas.length) return { texto: base + ': exercícios que não estão mais na biblioteca', vazia: true };
     if (v.faltam) return { texto: base + ' (' + plural(v.faltam, 'não está mais na biblioteca', 'não estão mais na biblioteca') + ')', vazia: false };
     return { texto: base, vazia: false };
@@ -11856,22 +11895,21 @@
   function carregarSelecaoAnterior(x) {
     var v = validaDaSelecao(x);
     if (!v.itens.length && !v.paginas.length) return;
-    guardarNasAnteriores({ itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() });
     mexeuNoMaterial();
-    bibCarrinho = { itens: v.itens, paginas: v.paginas };
     var lp = x.lista ? listaProntaPorId(x.lista) : null;
-    bibLpEmEdicao = lp ? lp.id : null;
-    bibLpEmEdicaoLido = true;
-    try {
-      if (lp) localStorage.setItem(CHAVE_LP_EM_EDICAO, lp.id); else localStorage.removeItem(CHAVE_LP_EM_EDICAO);
-    } catch (e) { /* segue na memória */ }
-    guardarCarrinho();
+    if (!trocarMaterial(v, 'carregar-selecao', lp ? lp.id : null)) return;
+    /* RECÊNCIA: a que ela acabou de carregar vai para o topo, senão a mais
+     * velha carregada agora seria a primeira a sair. */
+    var l = selecoesAnteriores();
+    var k = -1;
+    l.forEach(function (y, n) { if (k < 0 && mesmaLista(y, x)) k = n; });
+    if (k > 0) { var achada = l.splice(k, 1)[0]; achada.quando = Date.now(); l.unshift(achada); gravarSelecoesAnteriores(l); }
     fecharModal('modal-bib-selecoes');
     // um desenho só: o desenharCarrinho já redesenha a tela da lista quando ela está à vista
     desenharCarrinho();
     marcarCaixasDoCarrinho();
     desenharContextoBiblioteca();
-    avisar('O material voltou a ter a seleção marcada ' + quandoDaSelecao(x.quando) + '.');
+    avisar('O material voltou a ter a seleção guardada ' + quandoDaSelecao(x.quando) + '.');
   }
   function botaoSelecoesAnteriores() {
     return el('button', { type: 'button', class: 'btn pequeno', id: 'bib-carrinho-selecoes',
@@ -11881,7 +11919,7 @@
     var corpo = $('#corpo-modal-bib-selecoes');
     corpo.innerHTML = '';
     corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0',
-      texto: 'O que estava marcado antes de você trocar por uma lista. Tocar numa linha põe essa seleção no material.' }));
+      texto: 'O que estava no material antes de ser trocado ou anexado. Tocar numa linha põe essa seleção de volta.' }));
     selecoesAnteriores().forEach(function (x, k) {
       var d = descricaoDaSelecao(x);
       var linha = linhaBib(d.texto, x.lista && listaProntaPorId(x.lista) ? nomeDaListaPronta(listaProntaPorId(x.lista)) + ', mexida' : '',
@@ -11914,7 +11952,6 @@
         : 'Trocar os ' + n + ' exercícios marcados por esta lista?';
       if (!confirmar(pergunta)) return;
       // o material de agora vai para as seleções anteriores (ver guardarNasAnteriores)
-      guardarNasAnteriores({ itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() });
     }
     usarListaPronta(lp);
   }
@@ -11936,7 +11973,7 @@
     }
     var foi = bibAnexadasNaSessao[lp.id];
     if (foi) corpo.appendChild(el('p', { class: 'ajuda bib-lp-estado', id: 'bib-lp-foi', texto: 'Esta lista foi anexada na aula de ' +
-      foi.aluno + ' (' + Core.ddmmaaaa(foi.data) + ').' }));
+      foi.aluno + ' (' + Core.ddmmaaaa(foi.data) + ').' + (foi.mexida ? ' A sua versão ficou em Seleções anteriores.' : '') }));
     if (estado) corpo.appendChild(el('p', { class: 'ajuda bib-lp-estado', id: 'bib-lp-estado', texto: estado }));
     corpo.appendChild(el('div', { class: 'barra bib-lp-usar' }, [
       el('button', { type: 'button', class: 'btn principal', id: 'bib-lp-usar', texto: 'Usar esta lista',
@@ -12055,7 +12092,8 @@
           (daLista.length && !deFora && umaAula(soma) ? ' · ' + umaAula(soma) : '') }),
       el('div', { class: 'ajuda bib-lp-minutos', texto: !daLista.length
         ? (ids.length ? 'Os exercícios que você acrescentou não têm tempo estimado.'
-          : anexada ? 'Em ' + Core.ddmmaaaa(anexada.data) + '. Para usar com outro aluno, toque em Usar esta lista.'
+          : anexada ? 'Em ' + Core.ddmmaaaa(anexada.data) + '. ' + (anexada.mexida
+            ? 'A sua versão ficou em Seleções anteriores.' : 'Para usar com outro aluno, toque em Usar esta lista.')
           : 'Para começar de novo, toque em Usar esta lista.')
         : minutosEstimados(soma, true, true) +
           (deFora ? ', fora ' + plural(deFora, 'exercício que você acrescentou e não entra nessa conta',
@@ -12084,6 +12122,8 @@
       ]));
     }
 
+    if (ids.length) corpo.appendChild(el('p', { class: 'ajuda bib-lp-ajuda-uso', id: 'bib-lp-ajuda-uso',
+      texto: 'Tire, ponha e troque a ordem à vontade.' }));
     var grade = el('div', { class: 'bib-grade bib-grade-exercicios bib-grade-lp', id: 'bib-lp-grade' });
     ids.forEach(function (id, pos) {
       var it = bib.itemPorId[id];
@@ -12426,12 +12466,12 @@
    * botão do aviso tem de continuar funcionando mesmo depois de ela marcar
    * outra coisa (é exatamente o caso que o testa_biblioteca_caminho_curto
    * exercita). Quem depende do estado é só a VISIBILIDADE do botão da faixa. */
-  function devolverSelecaoTrocada(antes, tudo) {
+  function devolverSelecaoTrocada(antes, tudo, listaAntes) {
     var dela = { itens: semOsDe(bibCarrinho.itens, tudo.itens),
       paginas: semOsDe(bibCarrinho.paginas, tudo.paginas) };
-    bibCarrinho = juntarSelecoes(antes, dela);
+    // a lista em edição volta só se o material devolvido era dela
+    if (!trocarMaterial(juntarSelecoes(antes, dela), 'volta', listaAntes || null)) return;
     bibTrocaDesfazer = null;
-    guardarCarrinho();
     desenharCarrinho();
     marcarCaixasDoCarrinho();
     desenharContextoBiblioteca();
@@ -12481,6 +12521,7 @@
       if (mod) bibNav.serie = (bib.listaSeries || []).filter(function (s) { return mod.series[s]; })[0] || mod.serie;
     }
     var antes = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
+    var listaAntes = listaDoMaterialAgora();
     var jaUsados = {};
     var espera = mod
       ? Store.usoDaBiblioteca().then(function (usos) {
@@ -12497,8 +12538,7 @@
       if (mod) {
         tudo = tudoDoModulo(mod, jaUsados);
         quantosDeFora = tudoDoModulo(mod, null).itens.length - tudo.itens.length;
-        bibCarrinho = { itens: tudo.itens.slice(), paginas: tudo.paginas.slice() };
-        guardarCarrinho();
+        if (!trocarMaterial(tudo, 'material-da-aula', null)) return;
       }
       fecharModal('modal-aula');
       var campo = $('#busca-biblioteca');
@@ -12520,7 +12560,7 @@
       var paginasQueSairam = semOsDe(antes.paginas, tudo.paginas);
       var sairam = itensQueSairam.length + paginasQueSairam.length;
       bibTrocaDesfazer = sairam
-        ? { antes: antes, tudo: tudo, sairam: sairam }
+        ? { antes: antes, tudo: tudo, sairam: sairam, listaAntes: listaAntes }
         : null;
 
       var oQueEntrou = 'o módulo inteiro: ' +
@@ -12539,7 +12579,7 @@
        * aviso continua oferecendo a mesma volta, pela mesma função, para quem
        * estiver olhando a tela na hora. */
       desenharContextoBiblioteca();
-      if (sairam) avisar(recado, 'Desfazer', function () { devolverSelecaoTrocada(antes, tudo); });
+      if (sairam) avisar(recado, 'Desfazer', function () { devolverSelecaoTrocada(antes, tudo, listaAntes); });
       else avisar(recado);
     });
   }
@@ -12589,7 +12629,7 @@
             : 'Devolver os ' + bibTrocaDesfazer.sairam + ' itens que eu tirei',
         aoClick: function () {
           var t = bibTrocaDesfazer;
-          if (t) devolverSelecaoTrocada(t.antes, t.tudo);
+          if (t) devolverSelecaoTrocada(t.antes, t.tudo, t.listaAntes);
         }
       }));
     }
@@ -12698,6 +12738,50 @@
     try { localStorage.setItem(CHAVE_CARRINHO, JSON.stringify(bibCarrinho)); } catch (e) { /* segue na memória */ }
   }
 
+  /* A PORTA ÚNICA DO MATERIAL. Todo lugar que muda o que está marcado passa
+   * por aqui, e é a ÚNICA atribuição a `bibCarrinho` do aplicativo (a prova
+   * `testa_biblioteca_listas` conta as outras e reprova se achar alguma).
+   *
+   * `motivo` diz se o conteúdo SAI do material ou só muda:
+   *   'mexeu'   a mão dela: caixa, seta, "Marcar os N". Nada sai de vez.
+   *   'limpeza' tirar do carrinho exercício que não existe mais no pacote.
+   *   qualquer outro ('usar-lista', 'carregar-selecao', 'material-da-aula',
+   *   'anexou', 'desmarcar-tudo', 'volta'): o material de agora sai, e antes
+   *   de sair passa pelas Seleções anteriores (guardarNasAnteriores decide se
+   *   entra). Se a gravação falhar, nada é trocado.
+   *
+   * Três vezes uma porta nova apagou o trabalho dela porque cada porta fazia a
+   * sua conta. Com uma porta só, a regra vale para as que ainda vão existir.
+   *
+   * `lista`: a lista pronta em edição depois da troca (id), null para nenhuma,
+   * ou undefined para deixar como está. */
+  function trocarMaterial(novo, motivo, lista) {
+    var atual = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
+    var sai = motivo !== 'mexeu' && motivo !== 'limpeza';
+    if (sai && !guardarNasAnteriores(atual)) {
+      avisar('Não consegui guardar o que está marcado; nada foi trocado.');
+      return false;
+    }
+    bibCarrinho = { itens: (novo.itens || []).slice(), paginas: (novo.paginas || []).slice() };
+    if (lista !== undefined) {
+      bibLpEmEdicao = lista || null;
+      bibLpEmEdicaoLido = true;
+      try {
+        if (lista) localStorage.setItem(CHAVE_LP_EM_EDICAO, lista); else localStorage.removeItem(CHAVE_LP_EM_EDICAO);
+      } catch (e) { /* segue na memória */ }
+    }
+    // a limpeza roda dentro do desenho, e gravar ali apagaria o aviso da tela
+    if (motivo !== 'limpeza') guardarCarrinho();
+    return true;
+  }
+
+  /* A lista em edição antes de uma troca, se o material de então era dela;
+   * é o que o Desfazer devolve junto. Seleção à mão não herda nome de lista. */
+  function listaDoMaterialAgora() {
+    var lp = lpEmEdicao() ? listaProntaPorId(lpEmEdicao()) : null;
+    return lp && listaProntaEmEdicao(lp) ? lp.id : null;
+  }
+
   function paginaDeTeoriaPorId(id) {
     var aulaId = id.replace(/:p\d+$/, '');
     var t = bib && bib.teoriaPorId[aulaId];
@@ -12708,8 +12792,11 @@
 
   function limparCarrinhoOrfao() {
     if (!bib) return;
-    bibCarrinho.itens = bibCarrinho.itens.filter(function (id) { return !!bib.itemPorId[id]; });
-    bibCarrinho.paginas = bibCarrinho.paginas.filter(function (id) { return !!paginaDeTeoriaPorId(id); });
+    var itens = bibCarrinho.itens.filter(function (id) { return !!bib.itemPorId[id]; });
+    var paginas = bibCarrinho.paginas.filter(function (id) { return !!paginaDeTeoriaPorId(id); });
+    if (itens.length !== bibCarrinho.itens.length || paginas.length !== bibCarrinho.paginas.length) {
+      trocarMaterial({ itens: itens, paginas: paginas }, 'limpeza');
+    }
   }
 
   function noCarrinho(tipo, id) { return bibCarrinho[tipo].indexOf(id) >= 0; }
@@ -12756,12 +12843,12 @@
     // a lista já estava no material (em edição) antes deste toque?
     var eraEsta = lpEmEdicao() === lp.id;
     var antes = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
+    /* O Desfazer devolve o vínculo com a lista quando o material de antes era
+     * dela: a lista em edição, ou só exercícios desta lista (mexida). */
+    var listaAntes = listaDoMaterialAgora() || (antes.itens.length && !antes.paginas.length &&
+      antes.itens.every(function (id) { return lp.minutosDe[id] !== undefined; }) ? lp.id : null);
     var tudo = { itens: lp.ids.slice(), paginas: [] };
-    bibCarrinho = { itens: tudo.itens.slice(), paginas: [] };
-    bibLpEmEdicao = lp.id;
-    bibLpEmEdicaoLido = true;
-    try { localStorage.setItem(CHAVE_LP_EM_EDICAO, lp.id); } catch (e) { /* segue na memória */ }
-    guardarCarrinho();
+    if (!trocarMaterial(tudo, 'usar-lista', lp.id)) return;
     var sairam = semOsDe(antes.itens, tudo.itens).length + antes.paginas.length;
     /* O CRITÉRIO É UM SÓ: O QUE ESTAVA NA TELA É DIFERENTE DO QUE O PACOTE
      * TRAZ, em conjunto OU em ordem, por qualquer caminho.
@@ -12787,7 +12874,7 @@
       !antes.itens.some(function (id, i) { return id !== tudo.itens[i]; });
     var tinhaAlgo = antes.itens.length > 0 || antes.paginas.length > 0;
     var perdeu = tinhaAlgo && !igualAoPacote;
-    bibTrocaDesfazer = perdeu ? { antes: antes, tudo: tudo, sairam: sairam } : null;
+    bibTrocaDesfazer = perdeu ? { antes: antes, tudo: tudo, sairam: sairam, listaAntes: listaAntes } : null;
     /* A FRASE DIZ O TOTAL QUE FICOU, e não a conta que levou até ele.
      *
      * A forma antiga somava em voz alta: "Tirei 2 itens que estavam marcados e
@@ -12810,7 +12897,7 @@
         '. Mude o que quiser e toque em Gerar material.',
       rotulo: perdeu ? 'Desfazer' : null,
       // o Desfazer só desfaz: devolve o material de antes, e as seleções guardadas ficam
-      aoAgir: perdeu ? function () { devolverSelecaoTrocada(antes, tudo); } : null
+      aoAgir: perdeu ? function () { devolverSelecaoTrocada(antes, tudo, listaAntes); } : null
     };
     /* A ORDEM IMPORTA, E DÁ UM DESENHO EM VEZ DE DOIS. O `desenharCarrinho`
      * redesenha a tela da lista pronta quando a grade já existe; chamado DEPOIS
@@ -12827,7 +12914,7 @@
    * a mão apoiada, e arrastar briga com o gesto de rolagem. Devolve o id que
    * saiu do lugar, ou null quando o item já está na ponta. */
   function moverNoCarrinho(id, direcao) {
-    var lista = bibCarrinho.itens;
+    var lista = bibCarrinho.itens.slice();
     var i = lista.indexOf(id);
     var j = i + direcao;
     if (i < 0 || j < 0 || j >= lista.length) return null;
@@ -12835,18 +12922,19 @@
     var outro = lista[j];
     lista[j] = id;
     lista[i] = outro;
-    guardarCarrinho();
+    trocarMaterial({ itens: lista, paginas: bibCarrinho.paginas }, 'mexeu');
     desenharCarrinho();
     return outro;
   }
 
   function marcarNoCarrinho(tipo, id, marcado) {
     mexeuNoMaterial();
-    var lista = bibCarrinho[tipo];
+    var novo = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
+    var lista = novo[tipo];
     var i = lista.indexOf(id);
     if (marcado && i < 0) lista.push(id);
     if (!marcado && i >= 0) lista.splice(i, 1);
-    guardarCarrinho();
+    trocarMaterial(novo, 'mexeu');
     desenharCarrinho();
     /* NA TELA DA LISTA PRONTA a caixa não é só um estado: tirar um exercício
      * muda a numeração de todos os de baixo e apaga uma seta da ponta. Só
@@ -12923,13 +13011,12 @@
       aoClick: function () {
         mexeuNoMaterial();
         var antes = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
-        bibCarrinho = { itens: [], paginas: [] };
-        guardarCarrinho();
+        var listaAntes = listaDoMaterialAgora();
+        if (!trocarMaterial({ itens: [], paginas: [] }, 'desmarcar-tudo', null)) return;
         desenharCarrinho();
         marcarCaixasDoCarrinho();
         avisar('Seleção desmarcada.', 'Desfazer', function () {
-          bibCarrinho = juntarSelecoes(antes, bibCarrinho);
-          guardarCarrinho();
+          if (!trocarMaterial(juntarSelecoes(antes, bibCarrinho), 'volta', listaAntes)) return;
           desenharCarrinho();
           marcarCaixasDoCarrinho();
         });
@@ -13291,20 +13378,20 @@
   function desmarcarDepoisDeAnexar(aula, aluno) {
     mexeuNoMaterial();
     var usada = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
-    bibCarrinho = { itens: [], paginas: [] };
-    guardarCarrinho();
+    // o anexado sai do material pela porta única: a versão mexida vai para as Seleções anteriores
+    if (!trocarMaterial({ itens: [], paginas: [] }, 'anexou')) return function () {};
     // depois do guardarCarrinho, que apaga a anotação: esta é a que vale agora
     /* "Esta lista foi anexada" só quando o anexo veio DESTA lista: o que foi
      * anexado tem de conter exercício dela. Carrinho vazio sozinho não diz. */
     var lpUsada = lpEmEdicao() ? listaProntaPorId(lpEmEdicao()) : null;
     var veioDaLista = lpUsada && usada.itens.some(function (x) { return lpUsada.minutosDe[x] !== undefined; });
-    if (aula && aluno && veioDaLista) lembrarAnexada({ aluno: aluno.nome, data: aula.data, aulaId: aula.id, lista: lpUsada.id });
+    if (aula && aluno && veioDaLista) lembrarAnexada({ aluno: aluno.nome, data: aula.data, aulaId: aula.id, lista: lpUsada.id,
+      mexida: !mesmaSelecao(usada, lpUsada) });
     desenharCarrinho();
     marcarCaixasDoCarrinho();
     return function () {
       // junta com o que ela marcou nesses segundos, em vez de apagar
-      bibCarrinho = juntarSelecoes(usada, bibCarrinho);
-      guardarCarrinho();
+      if (!trocarMaterial(juntarSelecoes(usada, bibCarrinho), 'volta')) return;
       desenharCarrinho();
       marcarCaixasDoCarrinho();
     };

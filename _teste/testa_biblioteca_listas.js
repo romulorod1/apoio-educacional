@@ -162,17 +162,37 @@ const T_TROCA_AO_VER = '          else usarListaPronta(lp);';
 const L_GABARITO_JUNTO = '      var separa = !!(op.lista && op.gabarito && usaItens.length);';
 const T_GABARITO_JUNTO = '      var separa = false;';
 // o Desfazer da troca volta a apagar as seleções guardadas
-const L_DESFAZER_APAGA = '      aoAgir: perdeu ? function () { devolverSelecaoTrocada(antes, tudo); } : null';
-const T_DESFAZER_APAGA = '      aoAgir: perdeu ? function () { gravarSelecoesAnteriores([]); devolverSelecaoTrocada(antes, tudo); } : null';
+const L_DESFAZER_APAGA = '      aoAgir: perdeu ? function () { devolverSelecaoTrocada(antes, tudo, listaAntes); } : null';
+const T_DESFAZER_APAGA = '      aoAgir: perdeu ? function () { gravarSelecoesAnteriores([]); devolverSelecaoTrocada(antes, tudo, listaAntes); } : null';
 // anexar volta a apagar as seleções guardadas
 const L_ANEXAR_APAGA = '    var veioDaLista = lpUsada && usada.itens.some(function (x) { return lpUsada.minutosDe[x] !== undefined; });';
 const T_ANEXAR_APAGA = L_ANEXAR_APAGA + ' gravarSelecoesAnteriores([]);';
 // a lista pronta intacta passa a entrar nas seleções
-const L_INTACTA_ENTRA = '    if (ehListaPronta(sel)) return;';
-const T_INTACTA_ENTRA = '    if (false) return;';
+const L_INTACTA_ENTRA = '    if (ehListaPronta(sel)) return true;';
+const T_INTACTA_ENTRA = '    if (false) return true;';
 // a quarta seleção não tira mais a mais velha
-const L_QUARTA = '    gravarSelecoesAnteriores(l.slice(0, 3));';
-const T_QUARTA = '    gravarSelecoesAnteriores(l);';
+const L_QUARTA = '    return gravarSelecoesAnteriores(l.slice(0, 3));';
+const T_QUARTA = '    return gravarSelecoesAnteriores(l);';
+// cada porta de saída do material passa a pular as Seleções anteriores
+const L_PORTA_USAR = "    if (!trocarMaterial(tudo, 'usar-lista', lp.id)) return;";
+const T_PORTA_USAR = "    if (!trocarMaterial(tudo, 'mexeu', lp.id)) return;";
+const L_PORTA_CARREGAR = "    if (!trocarMaterial(v, 'carregar-selecao', lp ? lp.id : null)) return;";
+const T_PORTA_CARREGAR = "    if (!trocarMaterial(v, 'mexeu', lp ? lp.id : null)) return;";
+const L_PORTA_AULA = "        if (!trocarMaterial(tudo, 'material-da-aula', null)) return;";
+const T_PORTA_AULA = "        if (!trocarMaterial(tudo, 'mexeu', null)) return;";
+const L_PORTA_ANEXAR = "    if (!trocarMaterial({ itens: [], paginas: [] }, 'anexou')) return function () {};";
+const T_PORTA_ANEXAR = "    if (!trocarMaterial({ itens: [], paginas: [] }, 'mexeu')) return function () {};";
+const L_PORTA_DESMARCAR = "        if (!trocarMaterial({ itens: [], paginas: [] }, 'desmarcar-tudo', null)) return;";
+const T_PORTA_DESMARCAR = "        if (!trocarMaterial({ itens: [], paginas: [] }, 'mexeu', null)) return;";
+// carregar a seleção não a leva mais ao topo
+const L_RECENCIA = '    if (k > 0) { var achada = l.splice(k, 1)[0]; achada.quando = Date.now(); l.unshift(achada); gravarSelecoesAnteriores(l); }';
+const T_RECENCIA = '    if (false) { void k; }';
+// a gravação que falha deixa de impedir a troca
+const L_GRAVA_FALHA = '    if (sai && !guardarNasAnteriores(atual)) {';
+const T_GRAVA_FALHA = '    if (sai && !guardarNasAnteriores(atual) && false) {';
+// uma porta nova, fora da porta única (é o veneno da prova estática)
+const L_ATRIBUICAO = "  function listaDoMaterialAgora() {";
+const T_ATRIBUICAO = "  function portaEsquecida() { bibCarrinho = { itens: [], paginas: [] }; }\n  function listaDoMaterialAgora() {";
 // o "N de M desafios" some da lista em uso
 const L_RESTAM = "        ? el('span', { class: 'bib-lp-restam', id: 'bib-lp-restam', texto: ' · ' + ficaram + ' de ' + totalDesafios + ' desafios' }) : null";
 const T_RESTAM = '        ? null : null';
@@ -268,6 +288,14 @@ const VENENOS = {
   'anexar-apaga': { arq: '/app.js', de: L_ANEXAR_APAGA, para: T_ANEXAR_APAGA },
   'intacta-entra': { arq: '/app.js', de: L_INTACTA_ENTRA, para: T_INTACTA_ENTRA },
   'quarta-fica': { arq: '/app.js', de: L_QUARTA, para: T_QUARTA },
+  'porta-usar': { arq: '/app.js', de: L_PORTA_USAR, para: T_PORTA_USAR },
+  'porta-carregar': { arq: '/app.js', de: L_PORTA_CARREGAR, para: T_PORTA_CARREGAR },
+  'porta-aula': { arq: '/app.js', de: L_PORTA_AULA, para: T_PORTA_AULA },
+  'porta-anexar': { arq: '/app.js', de: L_PORTA_ANEXAR, para: T_PORTA_ANEXAR },
+  'porta-desmarcar': { arq: '/app.js', de: L_PORTA_DESMARCAR, para: T_PORTA_DESMARCAR },
+  recencia: { arq: '/app.js', de: L_RECENCIA, para: T_RECENCIA },
+  'grava-falha': { arq: '/app.js', de: L_GRAVA_FALHA, para: T_GRAVA_FALHA },
+  'atribuicao-solta': { arq: '/app.js', de: L_ATRIBUICAO, para: T_ATRIBUICAO },
   restam: { arq: '/app.js', de: L_RESTAM, para: T_RESTAM },
   'sem-etiqueta': { arq: '/app.js', de: L_SEM_ETIQUETA, para: T_SEM_ETIQUETA },
   orfao: { arq: '/app.js', de: L_ORFAO, para: T_ORFAO },
@@ -306,6 +334,10 @@ const V_ANEXAR_APAGA = NOME_VENENO === 'anexar-apaga';
 const V_INTACTA_ENTRA = NOME_VENENO === 'intacta-entra';
 const V_QUARTA = NOME_VENENO === 'quarta-fica';
 const V_RESTAM = NOME_VENENO === 'restam';
+const V_PORTA = NOME_VENENO && NOME_VENENO.indexOf('porta-') === 0 ? NOME_VENENO : null;
+const V_RECENCIA = NOME_VENENO === 'recencia';
+const V_GRAVA_FALHA = NOME_VENENO === 'grava-falha';
+const V_ATRIBUICAO = NOME_VENENO === 'atribuicao-solta';
 const V_SEM_ETIQUETA = NOME_VENENO === 'sem-etiqueta';
 const V_ORFAO = NOME_VENENO === 'orfao';
 const BASE_DE = { '/app.js': APP_REPO, '/draw.js': DRAW_REPO, '/styles.css': CSS_REPO };
@@ -486,7 +518,8 @@ async function irAoAssunto(pag) {
   await pausa(400);
 }
 async function limparTudo(pag) {
-  await pag.evaluate(k => { localStorage.removeItem(k); const b = document.querySelector('#bib-carrinho-limpar'); if (b) b.click(); }, CHAVE_SEL);
+  // primeiro esvazia (Desmarcar tudo também guarda), depois apaga as guardadas
+  await pag.evaluate(k => { const b = document.querySelector('#bib-carrinho-limpar'); if (b) b.click(); localStorage.removeItem(k); }, CHAVE_SEL);
   await pausa(300);
 }
 async function marcarAMao(pag, quantos, pular) {
@@ -555,6 +588,10 @@ async function cenarioVerNaoTroca(pag) {
   await limparTudo(pag);
   let S = await marcarAMao(pag, 9);
   await usarDoAssunto(pag, 'Lista com 1 desafio');
+  if (V_PORTA === 'porta-usar') {
+    conf('VENENO ENXERGADO: usar a lista levou S sem guardar', temS(await guardadas(pag), S), false);
+    return false;
+  }
   await reiniciar(pag);
   await usarDoAssunto(pag, 'Lista com 2 desafios');
   await pausa(300);
@@ -618,7 +655,8 @@ async function cenarioVerNaoTroca(pag) {
   await pausa(400);
   const linhas = await pag.evaluate(() => Array.from(document.querySelectorAll('#corpo-modal-bib-selecoes [data-selecao] .nome')).map(n => n.textContent));
   console.log('   janela: ' + JSON.stringify(linhas));
-  conf('(d) a faixa abre "Seleções anteriores" com a linha de S', /^9 exercícios, marcados hoje às \d\d:\d\d$/.test(linhas[0] || ''), true);
+  // "hoje" ou "ontem": a prova não depende de o relógio estar longe da meia-noite
+  conf('(d) a faixa abre "Seleções anteriores" com a linha de S', /^9 exercícios, guardada (hoje|ontem) às \d\d:\d\d$/.test(linhas[0] || ''), true);
   await pag.evaluate(() => document.querySelector('#corpo-modal-bib-selecoes [data-selecao="0"]').click());
   await pausa(400);
   conf('(d) tocar na linha põe S no material, na ordem', (await carrinho(pag)).itens.join('|'), S.join('|'));
@@ -644,14 +682,211 @@ async function cenarioVerNaoTroca(pag) {
   conf('(e) quatro seleções: ficam três, e a mais velha saiu', g.length + ':' + temS(g, primeira), '3:false');
 
   // (f) seleção com exercício que não existe mais aparece apagada e não carrega
-  await pag.evaluate(k => localStorage.setItem(k, JSON.stringify([{ itens: ['9ano:nao-existe:ex:1'], paginas: [], quando: new Date().toISOString() }])), CHAVE_SEL);
+  await pag.evaluate(k => localStorage.setItem(k, JSON.stringify([{ itens: ['9ano:nao-existe:ex:1'], paginas: [], quando: Date.now() }])), CHAVE_SEL);
   await reiniciar(pag);
   await pag.evaluate(() => document.querySelector('#bib-carrinho-selecoes').click());
   await pausa(300);
   const apagada = await pag.evaluate(() => { const l = document.querySelector('#corpo-modal-bib-selecoes [data-selecao="0"]');
     return l ? l.classList.contains('desligada') + '|' + l.querySelector('.nome').textContent : ''; });
   conf('(f) seleção que não existe mais aparece apagada', /^true\|.*exercícios que não estão mais na biblioteca$/.test(apagada), true);
-  await pag.evaluate(() => document.querySelectorAll('.modal.aberto [data-fechar]').forEach(b => b.click()));
+  await pag.evaluate(() => document.querySelectorAll('.fundo-modal.aberto [data-fechar]').forEach(b => b.click()));
+  await limparTudo(pag);
+  if (!(await cenarioPortas(pag))) return false;
+  return true;
+}
+
+/* As portas por onde o material SAI, cada uma com reinício no meio. */
+async function abrirAulaDeHoje(pag, hora) {
+  await H.irParaAba(pag, 'agenda');
+  await pausa(400);
+  const hoje = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+  const ok = await pag.evaluate((h, hr) => {
+    const p = Array.from(document.querySelectorAll('[data-dia="' + h + '"] .pilula')).find(x => x.textContent.indexOf(hr) === 0);
+    if (!p) return false; p.click(); return true;
+  }, hoje, hora);
+  await esperar('aula das ' + hora, () => pag.evaluate(() => document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 8000);
+  return ok;
+}
+async function materialDaAula(pag) {
+  if (!(await abrirAulaDeHoje(pag, '18:00'))) return false;
+  const tocou = await pag.evaluate(() => {
+    const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => /Pitágoras/.test(x.textContent));
+    const b = l && Array.from(l.querySelectorAll('button')).find(x => x.textContent.trim() === 'Material');
+    if (!b) return false; b.click(); return true;
+  });
+  await esperar('a biblioteca pelo Material da aula', () => pag.evaluate(() =>
+    (document.querySelector('#abas .aba.ativa') || { dataset: {} }).dataset.tela), v => v === 'biblioteca', 10000);
+  await pausa(500);
+  return tocou;
+}
+async function carregarDaJanela(pag, predicado) {
+  await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-selecoes'); if (b) b.click(); });
+  await pausa(400);
+  const g = await guardadas(pag);
+  const k = g.findIndex(predicado);
+  if (k < 0) return false;
+  await pag.evaluate(i => document.querySelector('#corpo-modal-bib-selecoes [data-selecao="' + i + '"]').click(), k);
+  await pausa(400);
+  return true;
+}
+const listaEmEdicao = pag => pag.evaluate(() => localStorage.getItem('apoio-educacional:bib-lp-em-edicao'));
+
+async function cenarioPortas(pag) {
+  secao('5l. Uma porta só para o material sair');
+  await pag.evaluate(async h => {
+    const d = await Store.carregar();
+    if (!d.aulas.some(a => a.id === 'aula-b10-mat')) {
+      d.aulas.push({ id: 'aula-b10-mat', alunoId: 'aluna-prova-b10', serieId: null, destacada: false, data: h,
+        hora: '18:00', duracaoMin: 60, status: 'agendada', cobravel: true, notaTexto: '', notaPrivada: '',
+        temNota: false, anexos: [], temas: [{ titulo: 'Teorema de Pitágoras', fonte: 'livre' }] });
+      await Store.salvar(d);
+    }
+  }, (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })());
+  await reiniciar(pag);
+
+  // (A) 9 à mão, reinício, Material da aula: os 9 recuperáveis na ordem dela
+  await limparTudo(pag);
+  let S = await marcarAMao(pag, 9);
+  await reiniciar(pag);
+  conf('(A) o botão Material da aula levou à biblioteca', await materialDaAula(pag), true);
+  await reiniciar(pag);
+  let g = await guardadas(pag);
+  if (V_PORTA === 'porta-aula') {
+    conf('VENENO ENXERGADO: o Material da aula levou os 9 sem guardar', temS(g, S), false);
+    return false;
+  }
+  conf('(A) depois do Material da aula, os 9 estão nas Seleções anteriores', temS(g, S), true);
+  conf('(A) e voltam inteiros e na ordem', await carregarDaJanela(pag, x => x.itens.join('|') === S.join('|')) &&
+    (await carrinho(pag)).itens.join('|') === S.join('|'), true);
+
+  // (B) S, Material da aula, desmarcar um: S recuperável
+  await limparTudo(pag);
+  S = await marcarAMao(pag, 9);
+  await materialDaAula(pag);
+  const tirouUm = await pag.evaluate(() => {
+    const ls = Array.from(document.querySelectorAll('#bib-corpo .item-lista')); if (ls.length) ls[ls.length - 1].click(); return ls.length;
+  });
+  await pausa(500);
+  await pag.evaluate(() => { const c = document.querySelector('#bib-corpo input[data-carrinho="itens"]:checked');
+    if (c) { c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true })); } });
+  await pausa(300);
+  await reiniciar(pag);
+  conf('(B) S, Material da aula, desmarcar um, reinício: S continua recuperável', !!tirouUm && temS(await guardadas(pag), S), true);
+
+  // (C) L1', reinício, anexar: L1' recuperável, com o vínculo da lista
+  await limparTudo(pag);
+  await usarDoAssunto(pag, 'Lista com 1 desafio');
+  await pausa(300);
+  await desmarcar(pag, (await carrinho(pag)).itens[1]);
+  await pausa(300);
+  const L1m = (await carrinho(pag)).itens.slice();
+  await reiniciar(pag);
+  // de volta à tela da lista em uso, de onde ela anexa
+  await irAoAssunto(pag);
+  await tocarLinha(pag, 'Lista com 1 desafio');
+  await pausa(400);
+  await pag.evaluate(() => document.querySelector('#bib-carrinho-gerar').click());
+  await pausa(500);
+  await pag.evaluate(() => document.querySelector('#bib-gerar-aulas [data-aula="aula-b10-anexa"]').click());
+  await pausa(200);
+  const antesC = await pag.evaluate(() => Store.carregar().then(d => (d.aulas.find(a => a.id === 'aula-b10-anexa').anexos || []).length));
+  await pag.evaluate(() => document.querySelector('#bib-gerar-anexar').click());
+  await esperar('anexou (C)', () => pag.evaluate(() => Store.carregar().then(d => (d.aulas.find(a => a.id === 'aula-b10-anexa').anexos || []).length)),
+    v => v > antesC, 30000);
+  await pausa(700);
+  const telaC = await pag.evaluate(() => (document.querySelector('#bib-lp-cabeca') || {}).innerText || '');
+  console.log('   tela depois de anexar: ' + JSON.stringify(telaC));
+  g = await guardadas(pag);
+  if (V_PORTA === 'porta-anexar') {
+    conf('VENENO ENXERGADO: anexar levou a versão mexida sem guardar', g.some(x => x.itens.join('|') === L1m.join('|')), false);
+    return false;
+  }
+  conf('(C) a versão mexida e anexada está nas Seleções anteriores, com a lista', g.some(x => x.itens.join('|') === L1m.join('|') && x.lista === LISTA2.id), true);
+  conf('(C) e a tela diz onde ela ficou, e não "usar com outro aluno"', /A sua versão ficou em Seleções anteriores\./.test(telaC) && !/outro aluno/.test(telaC), true);
+  await pag.evaluate(() => document.querySelectorAll('.fundo-modal.aberto [data-fechar]').forEach(b => b.click()));
+  await reiniciar(pag);
+  await carregarDaJanela(pag, x => x.itens.join('|') === L1m.join('|'));
+  conf('(C) carregar L1\' devolve o vínculo com a lista', await listaEmEdicao(pag), LISTA2.id);
+
+  // (D) S, L1', reinício, carregar S: L1' guardada, e S no topo (recência)
+  await limparTudo(pag);
+  S = await marcarAMao(pag, 9);
+  await usarDoAssunto(pag, 'Lista com 1 desafio');
+  if (V_PORTA === 'porta-usar') {
+    conf('VENENO ENXERGADO: usar a lista levou S sem guardar', temS(await guardadas(pag), S), false);
+    return false;
+  }
+  await pausa(300);
+  await desmarcar(pag, (await carrinho(pag)).itens[1]);
+  await pausa(300);
+  const L1d = (await carrinho(pag)).itens.slice();
+  await reiniciar(pag);
+  await carregarDaJanela(pag, x => x.itens.join('|') === S.join('|'));
+  g = await guardadas(pag);
+  if (V_PORTA === 'porta-carregar') {
+    conf('VENENO ENXERGADO: carregar S levou L1\' sem guardar', g.some(x => x.itens.join('|') === L1d.join('|')), false);
+    return false;
+  }
+  conf('(D) carregar S guardou a L1\' que estava no material', g.some(x => x.itens.join('|') === L1d.join('|')), true);
+  if (V_RECENCIA) {
+    conf('VENENO ENXERGADO: a carregada ficou atrás, na fila para sair primeiro', (g[0] || {}).itens.join('|') === S.join('|'), false);
+    return false;
+  }
+  conf('(D) e a carregada foi para o topo', (g[0] || {}).itens.join('|'), S.join('|'));
+  conf('(D) e seleção à mão não herda nome de lista', await listaEmEdicao(pag), null);
+
+  // Desmarcar tudo é porta também
+  await limparTudo(pag);
+  S = await marcarAMao(pag, 5);
+  await pag.evaluate(() => document.querySelector('#bib-carrinho-limpar').click());
+  await pausa(300);
+  if (V_PORTA === 'porta-desmarcar') {
+    conf('VENENO ENXERGADO: Desmarcar tudo levou a seleção sem guardar', temS(await guardadas(pag), S), false);
+    return false;
+  }
+  conf('Desmarcar tudo guarda o que estava marcado', temS(await guardadas(pag), S), true);
+
+  // a gravação falha: nada é trocado
+  await limparTudo(pag);
+  S = await marcarAMao(pag, 4);
+  await irAoAssunto(pag);
+  await pag.evaluate(() => {
+    const orig = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k, v) {
+      if (k === 'apoio-educacional:bib-selecoes-anteriores') throw new Error('QuotaExceededError');
+      return orig.call(this, k, v);
+    };
+    window.__restaura = () => { Storage.prototype.setItem = orig; };
+  });
+  await pag.evaluate(() => { document.querySelector('#aviso-texto').textContent = ''; });
+  await usarLista(pag, 'Lista com 1 desafio');
+  await pausa(400);
+  const falha = await pag.evaluate(() => ({ aviso: document.querySelector('#aviso-texto').textContent }));
+  const depoisFalha = (await carrinho(pag)).itens.join('|');
+  await pag.evaluate(() => window.__restaura());
+  if (V_GRAVA_FALHA) {
+    conf('VENENO ENXERGADO: a gravação falhou e a troca aconteceu assim mesmo', depoisFalha === S.join('|'), false);
+    return false;
+  }
+  conf('gravação falhou: a troca não acontece', depoisFalha, S.join('|'));
+  conf('e ela vê por quê', falha.aviso, 'Não consegui guardar o que está marcado; nada foi trocado.');
+
+  // leitura validada e a chave antiga migrada
+  await limparTudo(pag);
+  await pag.evaluate((k, ids) => {
+    localStorage.setItem(k, JSON.stringify([{ itens: 'x' }, { itens: [1], paginas: [], quando: 1 },
+      { itens: ['a'], paginas: [], quando: 'ontem' }, { itens: ids, paginas: [], quando: Date.now() - 1000 }]));
+    localStorage.setItem('apoio-educacional:bib-selecao-anterior', JSON.stringify({ itens: ids.slice(0, 2), paginas: [] }));
+  }, CHAVE_SEL, S);
+  await reiniciar(pag);
+  await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-selecoes'); if (b) b.click(); });
+  await pausa(300);
+  const valid = await pag.evaluate(() => ({
+    linhas: document.querySelectorAll('#corpo-modal-bib-selecoes [data-selecao]').length,
+    velha: localStorage.getItem('apoio-educacional:bib-selecao-anterior')
+  }));
+  conf('só as linhas válidas aparecem, e a chave antiga virou uma delas', valid.linhas + '|' + valid.velha, '2|null');
+  await pag.evaluate(() => document.querySelectorAll('.fundo-modal.aberto [data-fechar]').forEach(b => b.click()));
   await limparTudo(pag);
   return true;
 }
@@ -671,10 +906,39 @@ async function cenarioVerNaoTroca(pag) {
    * os arquivos de verdade. Com o alvo ao lado: uma âncora inventada, do mesmo
    * feitio das outras, que TEM de casar zero vezes. Sem ela, "todas casaram uma
    * vez" não se distinguiria de um contador que devolve 1 para tudo. */
+  /* UMA PORTA SÓ, CONTADA NO CÓDIGO: fora da `trocarMaterial` não pode haver
+   * atribuição a `bibCarrinho` nem às listas dele, nem apelido que as mude em
+   * lugar. Com o alvo ao lado: um texto com uma atribuição solta tem de contar 1. */
+  if (!VENENO || V_ATRIBUICAO) {
+    secao('0b. Uma porta só para o material, contada no código');
+    const contarPortas = fonte => {
+      const i = fonte.indexOf('  function trocarMaterial(');
+      const j = i < 0 ? -1 : fonte.indexOf('\n  }\n', i);
+      const fora = i < 0 ? fonte : fonte.slice(0, i) + fonte.slice(j);
+      const achados = [];
+      fora.split(/\r?\n/).forEach((l, n) => {
+        if (/^\s*var bibCarrinho = lerCarrinhoGuardado\(\);/.test(l)) return;
+        if (/\bbibCarrinho\s*=[^=]/.test(l) || /\bbibCarrinho\.(itens|paginas)\s*=[^=]/.test(l) ||
+          /\bbibCarrinho\.(itens|paginas)\.(push|splice|unshift|pop|shift|sort|reverse)\(/.test(l) ||
+          /=\s*bibCarrinho(\.itens|\.paginas|\[\w+\])\s*;/.test(l)) achados.push((n + 1) + ': ' + l.trim());
+      });
+      return achados;
+    };
+    const fonteApp = trocas['/app.js'] || APP_REPO;
+    const portas = contarPortas(fonteApp);
+    console.log('   atribuições fora da porta: ' + JSON.stringify(portas));
+    conf('a porta única existe', fonteApp.indexOf('  function trocarMaterial(') >= 0, true);
+    if (V_ATRIBUICAO) {
+      conf('VENENO ENXERGADO: a porta esquecida foi contada', portas.length, 1);
+      return;
+    }
+    conf('nenhuma atribuição ao material fora da porta única', portas.length, 0);
+    conf('e a contagem sabe achar (alvo com uma atribuição solta)', contarPortas('function x() {\n  bibCarrinho = {};\n}\n').length, 1);
+  }
   if (!VENENO) {
     secao('0. As cercas ainda apontam para o alvo');
     var nomes = Object.keys(VENENOS);
-    conf('a tabela tem os trinta e um venenos desta prova', nomes.length, 31);
+    conf('a tabela tem os trinta e nove venenos desta prova', nomes.length, 39);
     var fora = [];
     nomes.forEach(function (n) {
       var r = VENENOS[n];
@@ -740,8 +1004,8 @@ async function cenarioVerNaoTroca(pag) {
    * 70. A décima numa estimativa de quanto o aluno leva é precisão que não
    * existe, e era ela que fazia "29" e "32,1" aparecerem lado a lado com
    * formatos diferentes. */
-  conf('o minuto do nível 2 vem embaixo, inteiro, colado da estimativa', d2[1], '≈ 58 min');
-  conf('o minuto do nível 3 vem embaixo, inteiro, colado da estimativa', d3[1], '≈ 70 min');
+  conf('o minuto do nível 2 vem embaixo, inteiro, colado da estimativa', d2[1], '≈ 58 min (estimativa)');
+  conf('o minuto do nível 3 vem embaixo, inteiro, colado da estimativa', d3[1], '≈ 70 min (estimativa)');
 
   const texto = (await textoDoCorpo(pag)).toLowerCase();
   const achadas = PROIBIDAS.filter(p => texto.indexOf(p) >= 0);
@@ -757,9 +1021,10 @@ async function cenarioVerNaoTroca(pag) {
    * e "pacote" é palavra nossa, não dela. */
   conf('a ajuda diz a ordem em palavras simples', await pag.evaluate(() =>
     (document.querySelector('#bib-lp-ajuda') || {}).textContent || ''),
-    'Primeiro vêm os exercícios do começo das listas da OBMEP e, por último, os do fim, os desafios, ' +
-      'que costumam ser os mais difíceis. Tire, ponha e troque a ordem à vontade.');
-  conf('na tela do assunto a palavra "estimativa" não aparece', /estimativa/.test(texto), false);
+    'A lista segue a posição dos exercícios nas listas da OBMEP: os que estavam mais no começo vêm antes, ' +
+      'e os do fim, os desafios, vêm por último. Eles costumam ser os mais difíceis.');
+  conf('e o "tire, ponha e troque" não mora na tela do assunto', /Tire, ponha/.test(texto), false);
+  conf('na tela do assunto, "estimativa" uma vez por lista', (texto.match(/estimativa/g) || []).length, 2);
   conf('nem a palavra "pacote"', /pacote/.test(texto), false);
   if (V_TROCA_AO_VER) { await cenarioVerNaoTroca(pag); return; }
   /* O CONTROLE DA VARREDURA: ela tem de saber acusar. Sem este par, a linha
@@ -789,7 +1054,7 @@ async function cenarioVerNaoTroca(pag) {
    * BAIXO e para lugar nenhum; com só elas, trocar o meio para cima por um
    * corte simples passaria nas três asserções sem nada reclamar. */
   conf('e o minuto dela é o dela, arredondado meio PARA CIMA (49,6 vira 50)',
-    ((linhasPit[0] || {}).detalhe || [])[1], '≈ 50 min');
+    ((linhasPit[0] || {}).detalhe || [])[1], '≈ 50 min (estimativa)');
   await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
   await pausa(300);
   conf('voltou e abriu de novo o módulo das equações', await tocarLinha(pag, MOD_TITULO), true);
@@ -867,6 +1132,7 @@ async function cenarioVerNaoTroca(pag) {
   conf('na tela da lista, "estimativa" aparece UMA vez, no cabeçalho',
     (textoDaLista.match(/estimativa/g) || []).length, 1);
   conf('e "pacote" não aparece', /pacote/i.test(textoDaLista), false);
+  conf('na lista em uso, onde as setas existem, está o "tire, ponha e troque"', /Tire, ponha e troque a ordem à vontade\./.test(textoDaLista), true);
 
   // ================================================================
   secao('2b. Os quatro consertos de tela que o olho de fora cego pediu');
@@ -1819,7 +2085,17 @@ async function cenarioVerNaoTroca(pag) {
     const m = document.querySelector('#modal-bib-compartilhar');
     return m && m.classList.contains('aberto') ? Array.from(m.querySelectorAll('button[id^="bib-compartilhar-"]')).map(b => b.textContent).join(' | ') : '';
   }), v => !!v, 10000);
-  conf('e abre a janela com um botão para cada arquivo', janelaComp.valor, 'Compartilhar a lista | Compartilhar o gabarito');
+  conf('e abre a janela com um botão para cada arquivo, com o verbo do aparelho', /^(Compartilhar|Baixar) a lista \| (Compartilhar|Baixar) o gabarito$/.test(janelaComp.valor || ''), true);
+  const extras = await pag.evaluate(() => ({
+    podia: (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [new File(['x'], 'x.pdf', { type: 'application/pdf' })] })); } catch (e) { return false; } })(),
+    rotulo: (document.querySelector('#bib-compartilhar-lista') || {}).textContent || '',
+    nomes: Array.from(document.querySelectorAll('#modal-bib-compartilhar .bib-compartilhar-nome')).map(n => n.textContent),
+    aviso: (document.querySelector('#aviso') || { classList: { contains: () => false } }).classList.contains('aberto')
+  }));
+  console.log('   janela de compartilhar: ' + JSON.stringify(extras));
+  conf('o verbo segue o aparelho: sem compartilhamento, "Baixar"', extras.rotulo, (extras.podia ? 'Compartilhar' : 'Baixar') + ' a lista');
+  conf('e cada botão mostra o nome do arquivo embaixo', extras.nomes.length === 2 && /_lista_1_desafio\.pdf$/.test(extras.nomes[0]) && /_gabarito_1_desafio\.pdf$/.test(extras.nomes[1]), true);
+  conf('e o "Montando o material" some quando a janela abre', extras.aviso, false);
   await pag.evaluate(() => document.querySelectorAll('.modal.aberto [data-fechar]').forEach(b => b.click()));
 
   secao('6. Tapar na folha');

@@ -483,6 +483,14 @@ roda "biblioteca listas --envenenado-anexar-apaga"  node "_teste/testa_bibliotec
 roda "biblioteca listas --envenenado-intacta-entra" node "_teste/testa_biblioteca_listas.js" --envenenado-intacta-entra
 roda "biblioteca listas --envenenado-quarta-fica"   node "_teste/testa_biblioteca_listas.js" --envenenado-quarta-fica
 roda "biblioteca listas --envenenado-restam"        node "_teste/testa_biblioteca_listas.js" --envenenado-restam
+roda "biblioteca listas --envenenado-porta-usar"    node "_teste/testa_biblioteca_listas.js" --envenenado-porta-usar
+roda "biblioteca listas --envenenado-porta-carregar" node "_teste/testa_biblioteca_listas.js" --envenenado-porta-carregar
+roda "biblioteca listas --envenenado-porta-aula"    node "_teste/testa_biblioteca_listas.js" --envenenado-porta-aula
+roda "biblioteca listas --envenenado-porta-anexar"  node "_teste/testa_biblioteca_listas.js" --envenenado-porta-anexar
+roda "biblioteca listas --envenenado-porta-desmarcar" node "_teste/testa_biblioteca_listas.js" --envenenado-porta-desmarcar
+roda "biblioteca listas --envenenado-recencia"      node "_teste/testa_biblioteca_listas.js" --envenenado-recencia
+roda "biblioteca listas --envenenado-grava-falha"   node "_teste/testa_biblioteca_listas.js" --envenenado-grava-falha
+roda "biblioteca listas --envenenado-atribuicao-solta" node "_teste/testa_biblioteca_listas.js" --envenenado-atribuicao-solta
 roda "biblioteca listas --envenenado-sem-etiqueta"  node "_teste/testa_biblioteca_listas.js" --envenenado-sem-etiqueta
 roda "biblioteca listas --envenenado-orfao"         node "_teste/testa_biblioteca_listas.js" --envenenado-orfao
 # FRENTE B (B10): o que o lerKits recusa e o que a tela descarta (lista com
