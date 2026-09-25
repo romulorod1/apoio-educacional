@@ -66,14 +66,40 @@ const I_REAL = process.argv.indexOf('--pacote-real');
 const PACOTE_REAL = I_REAL !== -1 ? process.argv[I_REAL + 1] : null;
 const PORTA = 8804;
 
-/* O commit em que o 1.26.0 subiu (merge do PR #55). A promessa do contrato é
- * sobre ESTE aplicativo, então a prova compara os arquivos dele com este
- * commit, e não com a memória de quem escreve. */
-const COMMIT_1_26_0 = '2b647e6';
+/* O 1.26.0 PUBLICADO, preso pelo commit e não por referência que anda.
+ *
+ * `d80bb90` é o merge do PR #56, que é o estado publicado do aplicativo antes
+ * da B10. O 1.26.0 subiu no `2b647e6` (PR #55) e os doze arquivos do
+ * aplicativo são IDÊNTICOS nos dois (`git diff --name-only 2b647e6 d80bb90 --
+ * <os doze>` sai vazio), então prender num ou no outro serve o mesmo byte; o
+ * escolhido é o publicado.
+ *
+ * O que não pode aparecer aqui é `main`, `HEAD` ou qualquer nome que ande: era
+ * exatamente por aí que o servido voltaria a ser o aplicativo de hoje, e a
+ * prova passaria a afirmar sobre a versão errada sem uma linha mudar. */
+const COMMIT_1_26_0 = 'd80bb90';
 const ARQUIVOS_DO_APP = ['app.js', 'store.js', 'index.html', 'styles.css', 'sw.js',
   'biblioteca.js', 'zip.js', 'busca.js', 'core.js', 'pdf.js', 'draw.js', 'cartao.js'];
 
-const BIB_REPO = fs.readFileSync(path.join(H.RAIZ, 'biblioteca.js'), 'utf8');
+/* O APLICATIVO SERVIDO AQUI É O 1.26.0 GRAVADO, E NÃO A ÁRVORE DE TRABALHO.
+ *
+ * Até a B9 esta prova servia o repositório e exigia que ele fosse idêntico ao
+ * commit do 1.26.0. Funcionou enquanto o aplicativo não mudou, e morreria no
+ * primeiro release seguinte: a B10 mexe no app.js, no biblioteca.js e no
+ * store.js, e com a montagem antiga esta prova passaria a reprovar por uma
+ * mudança que não tem nada a ver com o que ela afirma.
+ *
+ * A promessa do contrato é sobre AQUELE aplicativo: que um pacote com
+ * kits.json e exclusoes.json entra nele sem uma linha de código nova. Então a
+ * prova passa a SERVIR aquele aplicativo, lido do próprio git, e não o de
+ * hoje. Assim ela continua verdadeira e conferível depois de qualquer release,
+ * e deixa de depender de o repositório estar parado. */
+function doCommit(arquivo) {
+  return execFileSync('git', ['show', COMMIT_1_26_0 + ':' + arquivo],
+    { cwd: H.RAIZ, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+}
+
+const BIB_REPO = doCommit('biblioteca.js');
 /* A quebra de linha sai do PRÓPRIO arquivo, e não do teclado de quem escreveu.
  * O repositório está em CRLF, e âncora de várias linhas cravada com \n casa
  * zero vezes e envenena nada: foi assim que o escopo do carregarSerie mediu o
@@ -88,7 +114,12 @@ const RECUSA_DESCONHECIDO = [
   "      nomesZip.forEach(function (n) {",
   "        if (!/^assets\\//.test(n) && OBRIGATORIOS.indexOf(n) < 0) throw Recusa('O pacote tem arquivo que este aplicativo não conhece: ' + n + '.', 'defeito');",
   "      });", TRECHO_OBRIGATORIOS].join(NL);
+/* Todo arquivo do aplicativo é servido da versão gravada. O veneno troca por
+ * cima de UM deles, e o que ele troca é a versão gravada também: envenenar o
+ * arquivo de hoje mediria o aplicativo de hoje, que não é o que esta prova
+ * afirma. */
 const trocas = {};
+ARQUIVOS_DO_APP.forEach(function (a) { trocas['/' + a] = doCommit(a); });
 if (VENENO_APP) trocas['/biblioteca.js'] = BIB_REPO.split(TRECHO_OBRIGATORIOS).join(RECUSA_DESCONHECIDO);
 
 const amb = H.criarAmbiente(PORTA, 'perfil_bib_kits', trocas);
@@ -136,21 +167,21 @@ async function gravado(pag) {
     : 'MODO NORMAL: um pacote com kits.json e exclusoes.json importa no 1.26.0 sem uma linha de mudança no aplicativo.');
 
   // ================================================================
-  secao('0. O aplicativo servido é o publicado, e não mudou');
-  let diferentes = null;
-  try {
-    diferentes = execFileSync('git', ['diff', '--name-only', COMMIT_1_26_0, '--'].concat(ARQUIVOS_DO_APP),
-      { cwd: H.RAIZ, encoding: 'utf8' }).trim();
-  } catch (e) {
-    diferentes = 'o git não respondeu: ' + (e.message || e);
-  }
-  conf('nenhum arquivo do aplicativo difere do ' + COMMIT_1_26_0 + ' (o 1.26.0)', diferentes, '');
-  const appJs = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
-  const swJs = fs.readFileSync(path.join(H.RAIZ, 'sw.js'), 'utf8');
-  conf('a VERSAO do app.js é a 1.26.0', /var VERSAO = '1\.26\.0';/.test(appJs), true);
-  conf('o cache do sw.js é o v41', /var CACHE = 'apoio-educacional-v41';/.test(swJs), true);
-  const trocados = Object.keys(trocas);
-  conf('o servidor troca só o que o veneno pede', trocados.join(',') || '(nada)', VENENO_APP ? '/biblioteca.js' : '(nada)');
+  secao('0. O aplicativo servido é o 1.26.0 gravado, e não o de hoje');
+  const appJs = trocas['/app.js'];
+  const swJs = trocas['/sw.js'];
+  conf('o servidor entrega os ' + ARQUIVOS_DO_APP.length + ' arquivos do aplicativo, todos do ' + COMMIT_1_26_0,
+    ARQUIVOS_DO_APP.filter(a => typeof trocas['/' + a] !== 'string').join(',') || '(todos)', '(todos)');
+  conf('a VERSAO do app.js servido é a 1.26.0', /var VERSAO = '1\.26\.0';/.test(appJs), true);
+  conf('o cache do sw.js servido é o v41', /var CACHE = 'apoio-educacional-v41';/.test(swJs), true);
+  /* O CONTROLE DE QUE A SUBSTITUIÇÃO É DE VERDADE: o aplicativo de hoje tem de
+   * ser DIFERENTE do que está sendo servido. Sem este par, a prova passaria
+   * igualzinha se o `git show` devolvesse o arquivo do disco, e voltaria a
+   * medir o aplicativo de hoje sem ninguém notar. */
+  const appHoje = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
+  conf('e o app.js de hoje é DIFERENTE do servido (senão a substituição não fez nada)',
+    appHoje === appJs ? 'igual' : 'diferente', 'diferente');
+  conf('a VERSAO do app.js de hoje não é a 1.26.0', /var VERSAO = '1\.26\.0';/.test(appHoje), false);
   if (VENENO_APP) {
     conf('o veneno mudou mesmo o biblioteca.js servido', trocas['/biblioteca.js'] !== BIB_REPO ? 'diferente' : 'IGUAL', 'diferente');
     conf('e trocou exatamente uma ocorrência', BIB_REPO.split(TRECHO_OBRIGATORIOS).length - 1, 1);

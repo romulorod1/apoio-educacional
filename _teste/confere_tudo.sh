@@ -374,6 +374,34 @@ roda "caminho curto --envenenado-volta"         node "_teste/testa_biblioteca_ca
 roda "biblioteca remover pacote"                node "_teste/testa_biblioteca_remover.js"
 roda "remover pacote --envenenado-dela"         node "_teste/testa_biblioteca_remover.js" --envenenado-dela
 
+# O SALVAR SO RESPONDE QUANDO A TRANSACAO CONFIRMA. O store.js respondia no
+# onsuccess do PEDIDO, e nao no oncomplete da TRANSACAO; se a pagina morre entre
+# os dois (aba fechada, tablet matando o aplicativo), a transacao aborta e a
+# escrita some depois de o aplicativo ter seguido como se estivesse salvo.
+# Medido em 24/09: 7 perdas em 300 cortes antes, 0 em 300 depois. A prova
+# interrompe no instante exato da resposta: nove caminhos exercitados um a um
+# (salvar, salvarNota, salvarMidia, salvarAnexo, apagarAnexo, uso, etiqueta,
+# registrarHistorico e limparHistorico; os outros so passam pelo mesmo
+# escrever) tem a transacao abortada na microtarefa em que respondem
+# (deterministico), e a regua do corte recarrega a pagina 300 vezes dentro dessa
+# microtarefa. Sob veneno a regua so informa; quem decide e a parte
+# deterministica. Os venenos: --envenenado-grava-no-pedido devolve o gravar
+# antigo e tem de acusar os quatro caminhos que passam por ele; --envenenado-escreve-no-pedido
+# faz o escrever responder no pedido e tem de acusar oito dos nove (o
+# registrarHistorico poda o historico depois de gravar, e a leitura da poda
+# espera a escrita confirmar). A linha da reprovacao se ve com --controle, que
+# nao entra aqui porque tem de falhar.
+roda "salvar grava no commit"                   node "_teste/testa_store_grava_no_commit.js"
+roda "salvar --envenenado-grava-no-pedido"      node "_teste/testa_store_grava_no_commit.js" --envenenado-grava-no-pedido
+roda "salvar --envenenado-escreve-no-pedido"    node "_teste/testa_store_grava_no_commit.js" --envenenado-escreve-no-pedido
+# E o outro lado, que o conserto criou: a escrita que falha passa a REJEITAR.
+# --envenenado-nao-rejeita tira o onabort do escrever, e a transacao abortada
+# depois do sucesso do pedido tem de deixar a promessa pendurada a vista;
+# --envenenado-nao-rele tira a releitura do disco do app.js, e uma copia que
+# rejeita no meio tem de deixar o proximo salvar gravar o estado velho.
+roda "salvar --envenenado-nao-rejeita"          node "_teste/testa_store_grava_no_commit.js" --envenenado-nao-rejeita
+roda "salvar --envenenado-nao-rele"             node "_teste/testa_store_grava_no_commit.js" --envenenado-nao-rele
+
 # FRENTE B (B9): kits.json e exclusoes.json sao aditivos do esquema 1 (CONTRATO
 # 8d). A prova nao le o biblioteca.js: ela IMPORTA um pacote de brinquedo com os
 # dois arquivos no aplicativo servido do repositorio e mede o que ficou gravado,
