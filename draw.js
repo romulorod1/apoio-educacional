@@ -440,7 +440,12 @@
       return;
     }
     if (this.ferramenta === 'selecao') {
-      var alvo = this.itemEm(p);
+      /* A ALÇA DO QUE JÁ ESTÁ SELECIONADO VENCE. A alça fica no canto e tem
+       * folga de toque para fora dele; sem esta linha, o toque na alça do
+       * retângulo de tapar, caindo um pouco fora do retângulo e em cima do
+       * recorte, selecionava o RECORTE e redimensionava a imagem do
+       * enunciado. Visto nos prints do marco da B10. */
+      var alvo = (this.selecionado && this._alcaEm(p, this.selecionado)) ? this.selecionado : this.itemEm(p);
       var mudouSelecao = this.selecionado !== alvo;
       this.selecionado = alvo;
       /* QUEM SELECIONA PRECISA AVISAR, senão a lixeira nunca aparece.

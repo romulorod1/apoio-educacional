@@ -29,13 +29,16 @@ const { conf, secao, pausa } = H;
 const PORTA = 8813;
 const V_CANCELA = process.argv.indexOf('--envenenado-cancela') !== -1;
 const V_LIXEIRA = process.argv.indexOf('--envenenado-lixeira-muda') !== -1;
+const V_ALCA = process.argv.indexOf('--envenenado-alca') !== -1;
 const DRAW = fs.readFileSync(path.join(H.RAIZ, 'draw.js'), 'utf8');
 const L_CANCELA = '    if (mudou) this._avisarMudanca();';
 const L_LIXEIRA = '    if (i >= 0) this._avisarMudanca();';
+const L_ALCA = '      var alvo = (this.selecionado && this._alcaEm(p, this.selecionado)) ? this.selecionado : this.itemEm(p);';
 const trocas = {};
-let ancoras = { cancela: DRAW.split(L_CANCELA).length - 1, lixeira: DRAW.split(L_LIXEIRA).length - 1 };
+let ancoras = { cancela: DRAW.split(L_CANCELA).length - 1, lixeira: DRAW.split(L_LIXEIRA).length - 1, alca: DRAW.split(L_ALCA).length - 1 };
 if (V_CANCELA) trocas['/draw.js'] = DRAW.split(L_CANCELA).join('    void mudou;');
 if (V_LIXEIRA) trocas['/draw.js'] = DRAW.split(L_LIXEIRA).join('    void i;');
+if (V_ALCA) trocas['/draw.js'] = DRAW.split(L_ALCA).join('      var alvo = this.itemEm(p);');
 const amb = H.criarAmbiente(PORTA, 'perfil_folha_mudancas', trocas);
 
 /* Monta um Editor num canvas de 600 x 800, com um traço horizontal no meio da
@@ -77,13 +80,46 @@ const estado = pag => pag.evaluate(() => ({
 const zerar = pag => pag.evaluate(() => { window.__avisos = 0; });
 
 (async () => {
-  conf('as duas âncoras dos venenos casam uma vez cada no draw.js', ancoras.cancela + ',' + ancoras.lixeira, '1,1');
-  if (V_CANCELA || V_LIXEIRA) conf('o veneno mudou mesmo o draw.js', trocas['/draw.js'] !== DRAW ? 'diferente' : 'IGUAL', 'diferente');
+  conf('as três âncoras dos venenos casam uma vez cada no draw.js', ancoras.cancela + ',' + ancoras.lixeira + ',' + ancoras.alca, '1,1,1');
+  if (V_CANCELA || V_LIXEIRA || V_ALCA) conf('o veneno mudou mesmo o draw.js', trocas['/draw.js'] !== DRAW ? 'diferente' : 'IGUAL', 'diferente');
   await amb.subir();
   const pag = await amb.pagina();
   await H.abrirApp(pag, amb.ORIGEM);
   const geo = await preparar(pag);
   console.log('   folha na tela: ' + JSON.stringify(geo));
+
+  /* A ALÇA DO TAPAR POR CIMA DE UMA IMAGEM. O retângulo fica sobre o recorte
+   * do enunciado, que é o uso dele; o toque na alça cai um pouco FORA do
+   * retângulo (a alça tem folga) e dentro da imagem. Tem de redimensionar o
+   * retângulo, e não a imagem. */
+  secao('A. A alça do tapar selecionado vence a imagem debaixo');
+  const alca = await pag.evaluate(() => {
+    const ed = window.__ed;
+    const itens = ed.pagina().itens;
+    const img = { t: 'imagem', ref: 'nada', x: 100, y: 100, w: 700, h: 500 };
+    const tp = { t: 'tapar', x: 200, y: 200, w: 200, h: 60 };
+    itens.push(img); itens.push(tp);
+    ed.selecionado = tp; ed.ferramenta = 'selecao';
+    window.__alca = { img, tp };
+    return { img: [img.x, img.y, img.w, img.h].join(','), tpW: tp.w };
+  });
+  await toque(pag, 'pointerdown', 406, 264);   // 6 e 4 unidades fora do canto, dentro da imagem
+  await toque(pag, 'pointermove', 446, 284);
+  await toque(pag, 'pointerup', 446, 284);
+  const depoisAlca = await pag.evaluate(() => { const i = window.__alca.img;
+    return { img: [i.x, i.y, i.w, i.h].join(','), tpW: window.__alca.tp.w }; });
+  console.log('   antes ' + JSON.stringify(alca) + ' depois ' + JSON.stringify(depoisAlca));
+  if (V_ALCA) {
+    conf('VENENO ENXERGADO: o toque na alça pegou a IMAGEM, e o recorte saiu do lugar', depoisAlca.img !== alca.img, true);
+    return;
+  }
+  conf('a imagem do enunciado não se mexeu', depoisAlca.img, alca.img);
+  conf('e o retângulo cresceu', depoisAlca.tpW > alca.tpW, true);
+  await pag.evaluate(() => {
+    const itens = window.__ed.pagina().itens;
+    [window.__alca.img, window.__alca.tp].forEach(x => itens.splice(itens.indexOf(x), 1));
+    window.__ed.selecionado = null;
+  });
 
   secao('0. O alvo: cancelar sem ter mudado nada NÃO avisa');
   await pag.evaluate(() => { window.__ed.ferramenta = 'borracha'; });

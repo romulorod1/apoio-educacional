@@ -491,6 +491,7 @@ roda "biblioteca lerKits --envenenado-empate"      node "_teste/testa_biblioteca
 roda "folha avisa mudancas"                        node "_teste/testa_folha_mudancas.js"
 roda "folha --envenenado-cancela"                  node "_teste/testa_folha_mudancas.js" --envenenado-cancela
 roda "folha --envenenado-lixeira-muda"             node "_teste/testa_folha_mudancas.js" --envenenado-lixeira-muda
+roda "folha --envenenado-alca"                     node "_teste/testa_folha_mudancas.js" --envenenado-alca
 # FRENTE B (B10): retangulo de tapar com posicao que nao e numero nao vai
 # para o papel. Sem navegador.
 roda "tapar so com numero"                         node "_teste/testa_tapar_numeros.js"
