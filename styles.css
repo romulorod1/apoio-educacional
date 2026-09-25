@@ -1278,6 +1278,8 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .bib-carrinho-texto { font-weight: 700; }
 .bib-carrinho .btn:not(.principal) { background: transparent; color: var(--branco); border-color: rgba(255, 255, 255, .6); }
 .bib-carrinho .btn.principal { background: var(--branco); color: var(--navy); border-color: var(--branco); }
+/* na faixa vazia (fundo claro) o botão das seleções anteriores volta a ter tinta escura, senão some */
+.bib-carrinho.vazia .btn:not(.principal) { background: var(--branco); color: var(--navy); border-color: var(--fio); }
 .bib-gerar-rotulo { display: block; font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 5px; }
 .bib-gerar-caixas { display: flex; flex-direction: column; gap: 0; }
 #bib-gerar-aulas .item-lista.escolhida { border-color: var(--teal); background: var(--teal-claro); }
