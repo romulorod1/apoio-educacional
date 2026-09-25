@@ -139,7 +139,8 @@ const zerar = pag => pag.evaluate(() => { window.__avisos = 0; });
     return;
   }
   conf('o traço ficou na folha', eb.tracos, tracosAntes + 1);
-  conf('e quem grava foi avisado', eb.avisos > 0, true);
+  // sob o veneno do cancelamento o aviso é justamente o que falta; lá quem decide é a seção 1
+  if (!V_CANCELA) conf('e quem grava foi avisado', eb.avisos > 0, true);
   await pag.evaluate(() => { const it = window.__ed.pagina().itens; it.splice(it.length - 1, 1); });
 
   secao('0. O alvo: cancelar sem ter mudado nada NÃO avisa');

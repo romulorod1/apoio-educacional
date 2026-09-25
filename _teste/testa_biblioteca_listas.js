@@ -1503,12 +1503,12 @@ async function cenarioVerNaoTroca(pag) {
   }));
   console.log('   depois de anexar: ' + JSON.stringify(depoisDoAnexo));
   conf('a tela da lista continua à vista', depoisDoAnexo.titulo, 'Lista com 1 desafio');
-  conf('o título da tela é a lista anexada, e não "nenhum exercício"', /^Lista anexada na aula de Aluna de Prova/.test(depoisDoAnexo.cabeca), true);
   if (V_ANEXADA) {
     conf('VENENO: depois de anexar, a tela diz que foi ela que tirou tudo', depoisDoAnexo.vazia, true);
     return;
   }
   conf('e NÃO diz que ela tirou tudo, porque quem esvaziou foi o aplicativo', depoisDoAnexo.vazia, false);
+  conf('o título da tela é a lista anexada, e não "nenhum exercício"', /^Lista anexada na aula de Aluna de Prova/.test(depoisDoAnexo.cabeca), true);
   conf('e diz para onde a lista foi, com o aluno',
     depoisDoAnexo.cabeca.indexOf('Lista anexada na aula de ' + nomeAluno) >= 0 && /Em \d\d\/\d\d\/\d{4}\./.test(depoisDoAnexo.cabeca), true);
   conf('e o que fazer para usar com outro aluno', /Para usar com outro aluno, toque em Usar esta lista\./.test(depoisDoAnexo.cabeca), true);
