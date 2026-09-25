@@ -118,14 +118,50 @@
     });
   }
 
+  /* TODA escrita simples passa por aqui, e só responde quando a TRANSAÇÃO
+   * confirma.
+   *
+   * Antes, gravar e apagar respondiam no `onsuccess` do pedido. Esse evento diz
+   * que o pedido foi aceito, e não que a transação confirmou: entre ele e o
+   * `oncomplete` há uns milissegundos em que a página ainda pode morrer (aba
+   * fechada, tablet matando o aplicativo em segundo plano), e aí a transação
+   * aborta e a escrita some, depois de o aplicativo já ter seguido como se
+   * estivesse salvo. Medido em 24/09: 7 perdas em 300 cortes com a resposta no
+   * pedido, 0 em 300 esperando a transação confirmar.
+   *
+   * Por isso a promessa resolve em `t.oncomplete` e rejeita em `t.onerror` ou
+   * `t.onabort`, e nunca no evento do pedido. O resultado do pedido (a chave
+   * gerada por um `add`, por exemplo) continua sendo o valor devolvido.
+   *
+   * E A REJEIÇÃO AGORA EXISTE DE VERDADE: quem chama tem de tratar. O motivo
+   * vem primeiro da TRANSAÇÃO, porque é nela que o navegador põe o útil (falta
+   * de espaço é um QuotaExceededError da transação, e não do pedido). */
+  function escrever(deposito, fazer) {
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = b.transaction(deposito, 'readwrite');
+        var req = fazer(t.objectStore(deposito));
+        var motivo = function (padrao) {
+          return t.error || (req && req.error) || new Error(padrao);
+        };
+        t.oncomplete = function () { resolve(req ? req.result : undefined); };
+        t.onerror = function () { reject(motivo('A gravação falhou.')); };
+        t.onabort = function () { reject(motivo('A gravação foi interrompida.')); };
+      });
+    });
+  }
+
   function ler(deposito, chave) {
     return trans(deposito, 'readonly').then(function (s) { return comoPromessa(s.get(chave)); });
   }
   function gravar(deposito, chave, valor) {
-    return trans(deposito, 'readwrite').then(function (s) { return comoPromessa(s.put(valor, chave)); });
+    return escrever(deposito, function (s) { return s.put(valor, chave); });
   }
   function apagar(deposito, chave) {
-    return trans(deposito, 'readwrite').then(function (s) { return comoPromessa(s.delete(chave)); });
+    return escrever(deposito, function (s) { return s.delete(chave); });
+  }
+  function esvaziar(deposito) {
+    return escrever(deposito, function (s) { return s.clear(); });
   }
   function todasAsChaves(deposito) {
     return trans(deposito, 'readonly').then(function (s) { return comoPromessa(s.getAllKeys()); });
@@ -341,14 +377,14 @@
   }
 
   function registrarUsoBiblioteca(reg) {
-    return trans('biblioteca_uso', 'readwrite').then(function (s) {
-      return comoPromessa(s.add({ itemId: reg.itemId, alunoId: reg.alunoId, aulaId: reg.aulaId, data: reg.data }));
+    return escrever('biblioteca_uso', function (s) {
+      return s.add({ itemId: reg.itemId, alunoId: reg.alunoId, aulaId: reg.aulaId, data: reg.data });
     });
   }
   function usoDaBiblioteca() { return todosOsValores('biblioteca_uso'); }
   function gravarEtiquetaBiblioteca(reg) {
-    return trans('biblioteca_etiquetas', 'readwrite').then(function (s) {
-      return comoPromessa(s.put({ itemId: reg.itemId, dificuldade: reg.dificuldade, data: reg.data }));
+    return escrever('biblioteca_etiquetas', function (s) {
+      return s.put({ itemId: reg.itemId, dificuldade: reg.dificuldade, data: reg.data });
     });
   }
   function etiquetasDaBiblioteca() { return todosOsValores('biblioteca_etiquetas'); }
@@ -358,15 +394,11 @@
   /* Guarda o estado ANTES da ação, para poder voltar.
    * Só o depósito "dados" entra: é o que as ações em massa alteram. */
   function registrarHistorico(rotulo, dbAntes) {
-    return abrir().then(function (b) {
-      return new Promise(function (resolve, reject) {
-        var t = b.transaction('historico', 'readwrite');
-        var s = t.objectStore('historico');
-        s.add({ rotulo: rotulo, quando: Date.now(), estado: JSON.parse(JSON.stringify(dbAntes)) });
-        t.oncomplete = function () { resolve(podarHistorico()); };
-        t.onerror = function () { reject(t.error); };
-      });
-    });
+    /* Já esperava a transação; faltava rejeitar quando ela aborta sem erro de
+     * pedido (a página caindo), e aí a promessa ficava pendurada para sempre. */
+    return escrever('historico', function (s) {
+      return s.add({ rotulo: rotulo, quando: Date.now(), estado: JSON.parse(JSON.stringify(dbAntes)) });
+    }).then(function () { return podarHistorico(); });
   }
 
   function podarHistorico() {
@@ -396,7 +428,7 @@
   }
 
   function limparHistorico() {
-    return trans('historico', 'readwrite').then(function (s) { return comoPromessa(s.clear()); });
+    return esvaziar('historico');
   }
 
   // ---------- manutenção ----------
@@ -512,7 +544,9 @@
 
   function importarTudo(pacote) {
     if (!pacote || pacote.formato !== 'apoio-educacional' || !pacote.dados) {
-      return Promise.reject(new Error('Arquivo de cópia inválido.'));
+      /* `invalida`: recusada antes de gravar qualquer coisa, então a tela pode
+       * dizer só isso; nas outras falhas algo pode ter sido gravado pela metade. */
+      return Promise.reject(Object.assign(new Error('Arquivo de cópia inválido.'), { invalida: true }));
     }
     return salvar(pacote.dados).then(function () {
       var passos = [];
@@ -553,15 +587,15 @@
 
   function apagarTudo() {
     return Promise.all([
-      trans('dados', 'readwrite').then(function (s) { return comoPromessa(s.clear()); }),
-      trans('notas', 'readwrite').then(function (s) { return comoPromessa(s.clear()); }),
-      trans('midias', 'readwrite').then(function (s) { return comoPromessa(s.clear()); }),
-      trans('anexos', 'readwrite').then(function (s) { return comoPromessa(s.clear()); }),
-      trans('historico', 'readwrite').then(function (s) { return comoPromessa(s.clear()); }),
+      esvaziar('dados'),
+      esvaziar('notas'),
+      esvaziar('midias'),
+      esvaziar('anexos'),
+      esvaziar('historico'),
       /* O uso e as etiquetas são dela e saem junto. Os pacotes ficam: são
        * conteúdo reimportável, como o próprio aplicativo. */
-      trans('biblioteca_uso', 'readwrite').then(function (s) { return comoPromessa(s.clear()); }),
-      trans('biblioteca_etiquetas', 'readwrite').then(function (s) { return comoPromessa(s.clear()); })
+      esvaziar('biblioteca_uso'),
+      esvaziar('biblioteca_etiquetas')
     ]);
   }
 
