@@ -58,6 +58,68 @@
     return new TextDecoder('utf-8').decode(bytes);
   }
 
+  /* As listas prontas do pacote (kits.json, seções 8d e 8f do contrato).
+   *
+   * ADITIVO NOS DOIS SENTIDOS: pacote sem o arquivo continua válido e devolve
+   * lista vazia, e pacote com ele é lido. O arquivo já passou pela conferência
+   * de manifest e de hash como qualquer outro, então o que se confere aqui é só
+   * a FORMA do que vai para a tela dela.
+   *
+   * Confere a FORMA, e recusa com frase clara, porque cada buraco aqui virava
+   * mentira na tela dela: a regra tem de ser uma que este aplicativo conhece
+   * (listas-v1, a de meia aula, ou listas-v2, a de uma aula); o minuto tem de
+   * ser número, na lista e em cada posição (sem ele a tela escrevia "≈ NaN
+   * min"); e nenhum id de lista nem exercício dentro de uma lista pode se
+   * repetir (com exercício repetido a tela dizia "Você mudou esta lista" sem
+   * ela ter mudado nada). Achado pela lente de correção do PR #57.
+   *
+   * O que julga a REGRA em si (a rampa, o tempo, a porta de entrada) continua
+   * sendo o biblioteca/confere_kits.py, do lado do gerador. */
+  var REGRAS_DE_LISTA = ['listas-v1', 'listas-v2'];
+  function lerKits(bytes) {
+    if (!bytes) return [];
+    var kits = json('kits.json', bytes);
+    if (!Array.isArray(kits)) throw Recusa('O kits.json do pacote não é uma lista.');
+    var numero = function (x) { return typeof x === 'number' && isFinite(x) && x > 0; };
+    var idsVistos = {};
+    kits.forEach(function (k) {
+      if (!k || typeof k.id !== 'string' || typeof k.modulo !== 'string') {
+        throw Recusa('O kits.json do pacote tem lista sem identificador ou sem módulo.');
+      }
+      if (idsVistos[k.id]) throw Recusa('O kits.json do pacote tem duas listas com o mesmo identificador: ' + k.id + '.');
+      idsVistos[k.id] = true;
+      if (REGRAS_DE_LISTA.indexOf(k.regra) < 0) {
+        throw Recusa('A lista ' + k.id + ' do pacote segue uma regra que este aplicativo não conhece (' + k.regra + ').');
+      }
+      if (!numero(k.minutos)) throw Recusa('A lista ' + k.id + ' do pacote não diz quantos minutos leva.');
+      // a tela da lista não mostra teoria: lista com teoria sairia pela metade
+      if (Array.isArray(k.teoria) ? k.teoria.length : k.teoria) {
+        throw Recusa('A lista ' + k.id + ' do pacote traz teoria, e este aplicativo só mostra lista de exercícios.');
+      }
+      if (!Array.isArray(k.degraus) || !k.degraus.length) {
+        throw Recusa('A lista ' + k.id + ' do pacote não traz exercício nenhum.');
+      }
+      var itensVistos = {};
+      k.degraus.forEach(function (d, i) {
+        if (!d || typeof d.item !== 'string') {
+          throw Recusa('A lista ' + k.id + ' do pacote tem posição sem exercício.');
+        }
+        if (itensVistos[d.item]) throw Recusa('A lista ' + k.id + ' do pacote repete o exercício ' + d.item + '.');
+        itensVistos[d.item] = true;
+        if (!numero(d.minutos)) {
+          throw Recusa('A lista ' + k.id + ' do pacote não diz quantos minutos leva a posição ' + (i + 1) + '.');
+        }
+        /* A ORDEM É A LISTA, e é ela que vai para o material dela. Um `n` fora
+         * de ordem é o único jeito de o arquivo dizer uma ordem e o vetor
+         * dizer outra, e aí não há como saber qual das duas ela quis. */
+        if (d.n !== i + 1) {
+          throw Recusa('A lista ' + k.id + ' do pacote está fora de ordem na posição ' + (i + 1) + '.');
+        }
+      });
+    });
+    return kits;
+  }
+
   function json(nome, bytes) {
     try { return JSON.parse(texto(bytes)); }
     catch (e) { throw Recusa('O arquivo ' + nome + ' do pacote não pôde ser lido.', 'defeito'); }
@@ -180,6 +242,7 @@
         var teoria = json('teoria.json', extraidos['teoria.json']);
         var busca = json('busca.json', extraidos['busca.json']);
         var apelidos = json('apelidos.json', extraidos['apelidos.json']);
+        var kits = lerKits(extraidos['kits.json']);
         if (!Array.isArray(itens)) throw Recusa('O itens.json do pacote não é uma lista.');
         if (!Array.isArray(teoria)) throw Recusa('O teoria.json do pacote não é uma lista.');
         itens.forEach(function (it) {
@@ -205,7 +268,7 @@
 
         return {
           manifest: manifest, itens: itens, teoria: teoria, busca: busca, apelidos: apelidos,
-          assets: assets, bytesTotais: bytesTotais
+          kits: kits, assets: assets, bytesTotais: bytesTotais
         };
       });
     }).catch(function (e) {

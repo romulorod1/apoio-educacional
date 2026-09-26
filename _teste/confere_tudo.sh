@@ -11,6 +11,27 @@ cd "$(dirname "$0")/.."
 
 falhou=0
 instavel=0
+
+# ONDE A SAIDA DE QUEM REPROVOU FICA GUARDADA.
+#
+# O `roda()` captura a saida do teste numa variavel e imprime so a linha de
+# resumo. Quando a segunda tentativa tambem falha, a saida inteira era
+# DESCARTADA: sobrava "15 passaram, 46 falharam" e nenhuma das 46. Em 24/09
+# isso transformou um diagnostico que devia ser leitura numa reproducao de
+# quase uma hora, e havia o caso pior a caminho, o da reprovacao que NAO
+# reproduz fora do portao, em que a evidencia some para sempre.
+#
+# Portao que joga fora a prova do proprio vermelho ensina a desconfiar do
+# vermelho, que e o comeco de ignorar alarme.
+FALHAS_EM="${FALHAS_EM:-_falhas_do_portao}"
+guarda_saida() {
+  mkdir -p "$FALHAS_EM" 2>/dev/null || return 0
+  arq="$FALHAS_EM/$(printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '_').txt"
+  printf '%s
+' "$2" > "$arq" 2>/dev/null || return 0
+  printf '          saida inteira em %s
+' "$arq"
+}
 titulo() { printf '\n=== %s ===\n' "$1"; }
 
 # Quantas verificacoes falharam na saida de um teste (vazio = nenhuma).
@@ -72,6 +93,7 @@ roda() {
   if [ "$ruim2" = "1" ]; then
     if passou_de_verdade "$saida2"; then
       printf '  FALHOU  %-24s %s\n' "$nome" "$(resumo "$saida2")"
+      guarda_saida "$nome" "$saida2"
     else
       # Sem placar nenhum na saida. Sao dois casos, e o texto vale para os dois:
       # o teste morreu antes de comecar, ou ele rodou e falou um dialeto que
@@ -86,6 +108,7 @@ roda() {
       [ -n "$motivo" ] || motivo=$(printf '%s\n' "$saida2" | grep -v '^[[:space:]]*$' | tail -1 | cut -c1-90)
       [ -n "$motivo" ] || motivo="nao imprimiu nada"
       printf '  FALHOU  %-24s nao disse que passou: %s\n' "$nome" "$motivo"
+      guarda_saida "$nome" "$saida2"
     fi
     falhou=1
   else
@@ -412,6 +435,104 @@ roda "salvar --envenenado-nao-rele"             node "_teste/testa_store_grava_n
 # nao entra aqui porque tem de falhar.
 roda "biblioteca kits (aditivo)"                node "_teste/testa_biblioteca_kits.js"
 roda "biblioteca kits --envenenado-app-recusa"  node "_teste/testa_biblioteca_kits.js" --envenenado-app-recusa
+
+# FRENTE B (B10): a TELA DA LISTA PRONTA. As duas linhas no modulo com o numero
+# daquela lista, o carregamento NA ORDEM DELA, as setas de subir e descer, tirar
+# pela caixa, acrescentar do modulo, e a ferramenta de tapar na folha. Quatro
+# venenos, e o da ordem e o mais silencioso: o carrinho fica com os MESMOS ids e
+# so a ordem muda. O das camadas mede PIXEL, e nao a constante exportada: a
+# ordem pode estar escrita certa e o laco que a usa, errado.
+roda "biblioteca listas prontas"                    node "_teste/testa_biblioteca_listas.js"
+roda "biblioteca listas --envenenado-ordem"         node "_teste/testa_biblioteca_listas.js" --envenenado-ordem
+roda "biblioteca listas --envenenado-seta"          node "_teste/testa_biblioteca_listas.js" --envenenado-seta
+roda "biblioteca listas --envenenado-curadoria"     node "_teste/testa_biblioteca_listas.js" --envenenado-curadoria
+roda "biblioteca listas --envenenado-camadas"       node "_teste/testa_biblioteca_listas.js" --envenenado-camadas
+# FRENTE B (B10): OS QUATRO CONSERTOS DE TELA que o olho de fora cego pediu.
+# Uma coluna na grade, o aviso no fluxo em vez de flutuando por cima das setas,
+# a frase dizendo o total resultante em vez de somar em voz alta, e o cartao
+# sem etiqueta de dificuldade. Cada regua nova e medida tambem na lista CHEIA do
+# modulo, onde ela TEM de achar o contrario. O veneno da coluna e o unico que
+# mexe so no styles.css: se a regua lesse o codigo e nao a tela, ele passaria.
+roda "biblioteca listas --envenenado-coluna"        node "_teste/testa_biblioteca_listas.js" --envenenado-coluna
+roda "biblioteca listas --envenenado-flutua"        node "_teste/testa_biblioteca_listas.js" --envenenado-flutua
+roda "biblioteca listas --envenenado-frase"         node "_teste/testa_biblioteca_listas.js" --envenenado-frase
+roda "biblioteca listas --envenenado-dificuldade"   node "_teste/testa_biblioteca_listas.js" --envenenado-dificuldade
+# E os dois que a segunda rodada do olho de fora cego achou, ambos filhos da
+# coluna unica: a caixa "No material" no meio do caminho entre dois cartoes, e o
+# aviso sobrevivendo a troca de ordem enquanto afirma a lista do pacote.
+roda "biblioteca listas --envenenado-agrupa"        node "_teste/testa_biblioteca_listas.js" --envenenado-agrupa
+roda "biblioteca listas --envenenado-aviso-velho"   node "_teste/testa_biblioteca_listas.js" --envenenado-aviso-velho
+# E os quatro que as duas lentes cegas do PR acharam: o aviso sobrevivendo ao
+# Desfazer por uma porta que a cerca nao cobria, o sairam cego para a ordem, a
+# linha do modulo recarregando por cima do trabalho dela, e o caminho de volta
+# da lista cheia levando para o modulo em vez de para a lista pronta.
+roda "biblioteca listas --envenenado-sairam"        node "_teste/testa_biblioteca_listas.js" --envenenado-sairam
+roda "biblioteca listas --envenenado-recarrega"     node "_teste/testa_biblioteca_listas.js" --envenenado-recarrega
+roda "biblioteca listas --envenenado-volta"         node "_teste/testa_biblioteca_listas.js" --envenenado-volta
+# A lixeira do tapar: sem o aviso de selecao ela nunca acende, e a ferramenta
+# cria um branco que a professora nao consegue tirar.
+roda "biblioteca listas --envenenado-lixeira"       node "_teste/testa_biblioteca_listas.js" --envenenado-lixeira
+roda "biblioteca listas --envenenado-redesenho"     node "_teste/testa_biblioteca_listas.js" --envenenado-redesenho
+roda "biblioteca listas --envenenado-uma-aula"      node "_teste/testa_biblioteca_listas.js" --envenenado-uma-aula
+roda "biblioteca listas --envenenado-anexada"       node "_teste/testa_biblioteca_listas.js" --envenenado-anexada
+roda "biblioteca listas --envenenado-nome-anexo"    node "_teste/testa_biblioteca_listas.js" --envenenado-nome-anexo
+roda "biblioteca listas --envenenado-gabarito-junto" node "_teste/testa_biblioteca_listas.js" --envenenado-gabarito-junto
+roda "biblioteca listas --envenenado-troca-ao-ver"  node "_teste/testa_biblioteca_listas.js" --envenenado-troca-ao-ver
+roda "biblioteca listas --envenenado-desfazer-apaga" node "_teste/testa_biblioteca_listas.js" --envenenado-desfazer-apaga
+roda "biblioteca listas --envenenado-anexar-apaga"  node "_teste/testa_biblioteca_listas.js" --envenenado-anexar-apaga
+roda "biblioteca listas --envenenado-intacta-entra" node "_teste/testa_biblioteca_listas.js" --envenenado-intacta-entra
+roda "biblioteca listas --envenenado-quarta-fica"   node "_teste/testa_biblioteca_listas.js" --envenenado-quarta-fica
+roda "biblioteca listas --envenenado-restam"        node "_teste/testa_biblioteca_listas.js" --envenenado-restam
+roda "biblioteca listas --envenenado-porta-usar"    node "_teste/testa_biblioteca_listas.js" --envenenado-porta-usar
+roda "biblioteca listas --envenenado-porta-carregar" node "_teste/testa_biblioteca_listas.js" --envenenado-porta-carregar
+roda "biblioteca listas --envenenado-porta-aula"    node "_teste/testa_biblioteca_listas.js" --envenenado-porta-aula
+roda "biblioteca listas --envenenado-porta-anexar"  node "_teste/testa_biblioteca_listas.js" --envenenado-porta-anexar
+roda "biblioteca listas --envenenado-porta-desmarcar" node "_teste/testa_biblioteca_listas.js" --envenenado-porta-desmarcar
+roda "biblioteca listas --envenenado-recencia"      node "_teste/testa_biblioteca_listas.js" --envenenado-recencia
+roda "biblioteca listas --envenenado-grava-falha"   node "_teste/testa_biblioteca_listas.js" --envenenado-grava-falha
+roda "biblioteca listas --envenenado-atribuicao-solta" node "_teste/testa_biblioteca_listas.js" --envenenado-atribuicao-solta
+roda "biblioteca listas --envenenado-sem-etiqueta"  node "_teste/testa_biblioteca_listas.js" --envenenado-sem-etiqueta
+roda "biblioteca listas --envenenado-orfao"         node "_teste/testa_biblioteca_listas.js" --envenenado-orfao
+# FRENTE B (B10): o que o lerKits recusa e o que a tela descarta (lista com
+# exercicio que saiu por curadoria). O veneno tira o guarda do app.js, e sem
+# ele a aba Biblioteca inteira nao abre.
+roda "biblioteca lerKits"                          node "_teste/testa_biblioteca_lerkits.js"
+roda "biblioteca lerKits --envenenado-guarda"      node "_teste/testa_biblioteca_lerkits.js" --envenenado-guarda
+roda "biblioteca lerKits --envenenado-empate"      node "_teste/testa_biblioteca_lerkits.js" --envenenado-empate
+roda "biblioteca lerKits --envenenado-ajuda"       node "_teste/testa_biblioteca_lerkits.js" --envenenado-ajuda
+# FRENTE B (B10): toda mudanca na folha avisa quem grava, inclusive o
+# cancelamento depois de a borracha ou o arrasto ja terem mudado algo, e a
+# lixeira da selecao. Um veneno para cada.
+roda "folha avisa mudancas"                        node "_teste/testa_folha_mudancas.js"
+roda "folha --envenenado-cancela"                  node "_teste/testa_folha_mudancas.js" --envenenado-cancela
+roda "folha --envenenado-lixeira-muda"             node "_teste/testa_folha_mudancas.js" --envenenado-lixeira-muda
+roda "folha --envenenado-alca"                     node "_teste/testa_folha_mudancas.js" --envenenado-alca
+roda "folha --envenenado-traco-cancelado"          node "_teste/testa_folha_mudancas.js" --envenenado-traco-cancelado
+# FRENTE B (B10): retangulo de tapar com posicao que nao e numero nao vai
+# para o papel. Sem navegador.
+roda "tapar so com numero"                         node "_teste/testa_tapar_numeros.js"
+roda "tapar --envenenado-numeros"                  node "_teste/testa_tapar_numeros.js" --envenenado-numeros
+roda "biblioteca listas --envenenado-palma"         node "_teste/testa_biblioteca_listas.js" --envenenado-palma
+roda "biblioteca listas --envenenado-contorno"      node "_teste/testa_biblioteca_listas.js" --envenenado-contorno
+# O aparo do tapar nos TRES caminhos: criar, mover e redimensionar.
+roda "biblioteca listas --envenenado-apara"         node "_teste/testa_biblioteca_listas.js" --envenenado-apara
+# A memoria de qual lista ela mexia tem de atravessar o reinicio do aplicativo.
+roda "biblioteca listas --envenenado-lembra"        node "_teste/testa_biblioteca_listas.js" --envenenado-lembra
+# FRENTE B (B10): A FOLHA IMPRESSA NAO MUDOU. A unificacao das camadas foi pelo
+# lado da TELA de proposito, porque o papel e o que ela entrega ao aluno. A
+# prova gera a MESMA folha com o pdf.js de hoje e com o do d80bb90 e compara
+# byte a byte e pixel a pixel a 200 dpi, com controle de que o medidor sabe
+# acusar (duas paginas diferentes do mesmo PDF dao diferenca aos milhares).
+roda "folha impressa igual ao publicado"        node "_teste/testa_folha_impressa_igual.js"
+# E O VENENO DELA, que estava FORA da bateria. Guarda fora do portao nao e
+# guarda: esta prova e inerte contra o diff que a estreia, e o que lhe da
+# sentido e ela saber MORDER no proximo diff. Se as ancoras do veneno deixarem
+# de casar, e aqui que se descobre, e nao no dia em que a folha mudar calada.
+roda "folha impressa --envenenado-ordem"        node "_teste/testa_folha_impressa_igual.js" --envenenado-ordem
+# E o guarda da medida nova: sem o laco do tapar, o retangulo nao sai no papel.
+roda "folha impressa --envenenado-tapar"        node "_teste/testa_folha_impressa_igual.js" --envenenado-tapar
+# E o guarda do TETO: um contorno desenhado no caminho do PDF estoura o teto.
+roda "folha impressa --envenenado-contorno"     node "_teste/testa_folha_impressa_igual.js" --envenenado-contorno-no-papel
 
 roda "painel de valores"                        node "_teste/testa_painel_valores.js"
 roda "painel de valores --envenenado-aberto"    node "_teste/testa_painel_valores.js" --envenenado-aberto
