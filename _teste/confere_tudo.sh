@@ -482,6 +482,7 @@ roda "biblioteca listas --envenenado-desfazer-apaga" node "_teste/testa_bibliote
 roda "biblioteca listas --envenenado-anexar-apaga"  node "_teste/testa_biblioteca_listas.js" --envenenado-anexar-apaga
 roda "biblioteca listas --envenenado-intacta-entra" node "_teste/testa_biblioteca_listas.js" --envenenado-intacta-entra
 roda "biblioteca listas --envenenado-quarta-fica"   node "_teste/testa_biblioteca_listas.js" --envenenado-quarta-fica
+roda "biblioteca listas --envenenado-heranca"   node "_teste/testa_biblioteca_listas.js" --envenenado-heranca
 roda "biblioteca listas --envenenado-restam"        node "_teste/testa_biblioteca_listas.js" --envenenado-restam
 roda "biblioteca listas --envenenado-porta-usar"    node "_teste/testa_biblioteca_listas.js" --envenenado-porta-usar
 roda "biblioteca listas --envenenado-porta-carregar" node "_teste/testa_biblioteca_listas.js" --envenenado-porta-carregar

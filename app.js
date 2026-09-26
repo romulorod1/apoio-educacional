@@ -12763,6 +12763,9 @@
       return false;
     }
     bibCarrinho = { itens: (novo.itens || []).slice(), paginas: (novo.paginas || []).slice() };
+    /* Marcar à mão a partir do material vazio começa uma seleção dela: o nome
+     * da lista de antes (anexada, desmarcada) não passa para ela. */
+    if (lista === undefined && motivo === 'mexeu' && !atual.itens.length && !atual.paginas.length) lista = null;
     if (lista !== undefined) {
       bibLpEmEdicao = lista || null;
       bibLpEmEdicaoLido = true;
@@ -13378,12 +13381,12 @@
   function desmarcarDepoisDeAnexar(aula, aluno) {
     mexeuNoMaterial();
     var usada = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
-    // o anexado sai do material pela porta única: a versão mexida vai para as Seleções anteriores
-    if (!trocarMaterial({ itens: [], paginas: [] }, 'anexou')) return function () {};
-    // depois do guardarCarrinho, que apaga a anotação: esta é a que vale agora
     /* "Esta lista foi anexada" só quando o anexo veio DESTA lista: o que foi
      * anexado tem de conter exercício dela. Carrinho vazio sozinho não diz. */
     var lpUsada = lpEmEdicao() ? listaProntaPorId(lpEmEdicao()) : null;
+    // o anexado sai do material pela porta única: a versão mexida vai para as Seleções anteriores
+    if (!trocarMaterial({ itens: [], paginas: [] }, 'anexou')) return function () {};
+    // depois do guardarCarrinho, que apaga a anotação: esta é a que vale agora
     var veioDaLista = lpUsada && usada.itens.some(function (x) { return lpUsada.minutosDe[x] !== undefined; });
     if (aula && aluno && veioDaLista) lembrarAnexada({ aluno: aluno.nome, data: aula.data, aulaId: aula.id, lista: lpUsada.id,
       mexida: !mesmaSelecao(usada, lpUsada) });

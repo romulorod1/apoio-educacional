@@ -173,6 +173,8 @@ const T_INTACTA_ENTRA = '    if (false) return true;';
 // a quarta seleção não tira mais a mais velha
 const L_QUARTA = '    return gravarSelecoesAnteriores(l.slice(0, 3));';
 const T_QUARTA = '    return gravarSelecoesAnteriores(l);';
+const L_HERANCA = "    if (lista === undefined && motivo === 'mexeu' && !atual.itens.length && !atual.paginas.length) lista = null;";
+const T_HERANCA = '    // (veneno: a seleção à mão herda o nome da lista de antes)';
 // cada porta de saída do material passa a pular as Seleções anteriores
 const L_PORTA_USAR = "    if (!trocarMaterial(tudo, 'usar-lista', lp.id)) return;";
 const T_PORTA_USAR = "    if (!trocarMaterial(tudo, 'mexeu', lp.id)) return;";
@@ -288,6 +290,7 @@ const VENENOS = {
   'anexar-apaga': { arq: '/app.js', de: L_ANEXAR_APAGA, para: T_ANEXAR_APAGA },
   'intacta-entra': { arq: '/app.js', de: L_INTACTA_ENTRA, para: T_INTACTA_ENTRA },
   'quarta-fica': { arq: '/app.js', de: L_QUARTA, para: T_QUARTA },
+  'heranca': { arq: '/app.js', de: L_HERANCA, para: T_HERANCA },
   'porta-usar': { arq: '/app.js', de: L_PORTA_USAR, para: T_PORTA_USAR },
   'porta-carregar': { arq: '/app.js', de: L_PORTA_CARREGAR, para: T_PORTA_CARREGAR },
   'porta-aula': { arq: '/app.js', de: L_PORTA_AULA, para: T_PORTA_AULA },
@@ -333,6 +336,7 @@ const V_DESFAZER_APAGA = NOME_VENENO === 'desfazer-apaga';
 const V_ANEXAR_APAGA = NOME_VENENO === 'anexar-apaga';
 const V_INTACTA_ENTRA = NOME_VENENO === 'intacta-entra';
 const V_QUARTA = NOME_VENENO === 'quarta-fica';
+const V_HERANCA = NOME_VENENO === 'heranca';
 const V_RESTAM = NOME_VENENO === 'restam';
 const V_PORTA = NOME_VENENO && NOME_VENENO.indexOf('porta-') === 0 ? NOME_VENENO : null;
 const V_RECENCIA = NOME_VENENO === 'recencia';
@@ -835,6 +839,53 @@ async function cenarioPortas(pag) {
   conf('(D) e a carregada foi para o topo', (g[0] || {}).itens.join('|'), S.join('|'));
   conf('(D) e seleção à mão não herda nome de lista', await listaEmEdicao(pag), null);
 
+  // (E) L1', anexar, marcar três à mão, Material da aula: os três entram SEM nome de lista
+  await limparTudo(pag);
+  await usarDoAssunto(pag, 'Lista com 1 desafio');
+  await pausa(300);
+  await desmarcar(pag, (await carrinho(pag)).itens[1]);
+  await pausa(300);
+  const usadosE = (await carrinho(pag)).itens.slice();
+  await pag.evaluate(() => document.querySelector('#bib-carrinho-gerar').click());
+  await pausa(500);
+  await pag.evaluate(() => document.querySelector('#bib-gerar-aulas [data-aula="aula-b10-anexa"]').click());
+  await pausa(200);
+  const antesE = await pag.evaluate(() => Store.carregar().then(d => (d.aulas.find(a => a.id === 'aula-b10-anexa').anexos || []).length));
+  await pag.evaluate(() => document.querySelector('#bib-gerar-anexar').click());
+  await esperar('anexou (E)', () => pag.evaluate(() => Store.carregar().then(d => (d.aulas.find(a => a.id === 'aula-b10-anexa').anexos || []).length)),
+    v => v > antesE, 30000);
+  await pausa(600);
+  await pag.evaluate(() => document.querySelectorAll('.fundo-modal.aberto [data-fechar]').forEach(b => b.click()));
+  // três à mão, ao menos um da lista anexada: é aí que o nome poderia vazar
+  for (const linhaE of ['Soma e Produto']) {
+    await irAoAssunto(pag);
+    await tocarLinha(pag, linhaE);
+    await pausa(500);
+    const marcou = await pag.evaluate(us => {
+      const cs = Array.from(document.querySelectorAll('#bib-corpo input[data-carrinho="itens"]'));
+      const da = cs.filter(c => us.indexOf(c.getAttribute('data-id')) >= 0);
+      if (!da.length) return 0;
+      const escolha = da.slice(0, 3).concat(cs.filter(c => da.indexOf(c) < 0)).slice(0, 3);
+      escolha.forEach(c => { if (!c.checked) { c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); } });
+      return escolha.length;
+    }, usadosE);
+    await pausa(300);
+    await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
+    await pausa(300);
+    if (marcou) break;
+  }
+  const tres = (await carrinho(pag)).itens.slice();
+  conf('(E) dos três marcados, algum é da lista anexada (senão a prova não morde)',
+    tres.some(id => usadosE.indexOf(id) >= 0), true);
+  await materialDaAula(pag);
+  g = await guardadas(pag);
+  const linhaTres = g.find(x => x.itens.join('|') === tres.join('|'));
+  if (V_HERANCA) {
+    conf('VENENO ENXERGADO: os três marcados à mão entraram com o nome da lista anexada', !!(linhaTres && linhaTres.lista), true);
+    return;
+  }
+  conf('(E) os três marcados à mão depois do anexo entram sem nome de lista', !!linhaTres && linhaTres.lista, null);
+
   // Desmarcar tudo é porta também
   await limparTudo(pag);
   S = await marcarAMao(pag, 5);
@@ -938,7 +989,7 @@ async function cenarioPortas(pag) {
   if (!VENENO) {
     secao('0. As cercas ainda apontam para o alvo');
     var nomes = Object.keys(VENENOS);
-    conf('a tabela tem os trinta e nove venenos desta prova', nomes.length, 39);
+    conf('a tabela tem os quarenta venenos desta prova', nomes.length, 40);
     var fora = [];
     nomes.forEach(function (n) {
       var r = VENENOS[n];
