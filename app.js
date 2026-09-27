@@ -12749,11 +12749,7 @@
     bibLpAviso = null;
     lembrarAnexada(null);
     try {
-      if (!bibCarrinho.itens.length && !bibCarrinho.paginas.length) {
-        localStorage.removeItem(CHAVE_CARRINHO);
-      } else {
-        localStorage.setItem(CHAVE_CARRINHO, JSON.stringify(bibCarrinho));
-      }
+      localStorage.setItem(CHAVE_CARRINHO, JSON.stringify(bibCarrinho));
       return true;
     } catch (e) {
       return false;
