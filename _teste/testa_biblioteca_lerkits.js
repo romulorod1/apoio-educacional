@@ -145,6 +145,26 @@ const linhasDeLista = pag => pag.evaluate(() =>
     conf('e não aparece bloco de listas prontas', (await linhasDeLista(pag)).length, 0);
     conf('e a tela do assunto está de pé', await pag.evaluate(() => !!document.querySelector('#bib-corpo .bib-titulo, #bib-corpo h3')), true);
 
+    secao('1b. Acessibilidade por teclado das linhas da biblioteca');
+    await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
+    await pausa(300);
+    await pag.evaluate(() => {
+      const l = Array.from(document.querySelectorAll('#bib-corpo .item-lista'))
+        .find(x => { const n = x.querySelector('.nome'); return n && n.textContent.trim() === 'Equações do Segundo Grau'; });
+      if (l) l.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    });
+    await pausa(400);
+    conf('a linha abre por Enter', await pag.evaluate(() => !!document.querySelector('#bib-corpo .bib-titulo, #bib-corpo h3')), true);
+    await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
+    await pausa(300);
+    await pag.evaluate(() => {
+      const l = Array.from(document.querySelectorAll('#bib-corpo .item-lista'))
+        .find(x => { const n = x.querySelector('.nome'); return n && n.textContent.trim() === 'Equações do Segundo Grau'; });
+      if (l) l.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+    });
+    await pausa(400);
+    conf('a linha abre por Espaço', await pag.evaluate(() => !!document.querySelector('#bib-corpo .bib-titulo, #bib-corpo h3')), true);
+
     secao('2. Cada ramo de recusa do lerKits');
     const antes = await itensGravados(pag);
     const casos = [
@@ -153,7 +173,9 @@ const linhasDeLista = pag => pag.evaluate(() =>
       ['degrau-sem-minutos', /não diz quantos minutos leva a posição 3\./],
       ['id-repetido', /duas listas com o mesmo identificador/],
       ['item-repetido', /repete o exercício/],
-      ['teoria', /traz teoria, e este aplicativo só mostra lista de exercícios/]
+      ['teoria', /traz teoria, e este aplicativo só mostra lista de exercícios/],
+      ['modulo-proto', /identificador ou módulo inválido/],
+      ['modulo-invalido', /não pertence ao módulo/]
     ];
     for (const [v, frase] of casos) {
       const m = await importar(pag, zip('veneno-' + v, { listas: true, listasVeneno: v }));

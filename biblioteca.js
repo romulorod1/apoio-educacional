@@ -76,15 +76,27 @@
    * O que julga a REGRA em si (a rampa, o tempo, a porta de entrada) continua
    * sendo o biblioteca/confere_kits.py, do lado do gerador. */
   var REGRAS_DE_LISTA = ['listas-v1', 'listas-v2'];
-  function lerKits(bytes) {
+  function lerKits(bytes, itens) {
     if (!bytes) return [];
     var kits = json('kits.json', bytes);
     if (!Array.isArray(kits)) throw Recusa('O kits.json do pacote não é uma lista.');
     var numero = function (x) { return typeof x === 'number' && isFinite(x) && x > 0; };
-    var idsVistos = {};
+    var perigoso = function (k) { return k === '__proto__' || k === 'constructor' || k === 'prototype'; };
+    var idsVistos = Object.create(null);
+    var moduloPorItem = Object.create(null);
+    if (Array.isArray(itens)) {
+      itens.forEach(function (it) {
+        if (it && it.id && it.serie && it.modulo && it.modulo.slug) {
+          moduloPorItem[it.id] = it.serie + ':' + it.modulo.slug;
+        }
+      });
+    }
     kits.forEach(function (k) {
-      if (!k || typeof k.id !== 'string' || typeof k.modulo !== 'string') {
+      if (!k || typeof k.id !== 'string' || typeof k.modulo !== 'string' || !k.id.trim() || !k.modulo.trim()) {
         throw Recusa('O kits.json do pacote tem lista sem identificador ou sem módulo.');
+      }
+      if (perigoso(k.id) || perigoso(k.modulo)) {
+        throw Recusa('O kits.json do pacote tem lista com identificador ou módulo inválido.');
       }
       if (idsVistos[k.id]) throw Recusa('O kits.json do pacote tem duas listas com o mesmo identificador: ' + k.id + '.');
       idsVistos[k.id] = true;
@@ -99,15 +111,21 @@
       if (!Array.isArray(k.degraus) || !k.degraus.length) {
         throw Recusa('A lista ' + k.id + ' do pacote não traz exercício nenhum.');
       }
-      var itensVistos = {};
+      var itensVistos = Object.create(null);
       k.degraus.forEach(function (d, i) {
-        if (!d || typeof d.item !== 'string') {
+        if (!d || typeof d.item !== 'string' || !d.item.trim()) {
           throw Recusa('A lista ' + k.id + ' do pacote tem posição sem exercício.');
+        }
+        if (perigoso(d.item)) {
+          throw Recusa('A lista ' + k.id + ' do pacote tem exercício com identificador inválido.');
         }
         if (itensVistos[d.item]) throw Recusa('A lista ' + k.id + ' do pacote repete o exercício ' + d.item + '.');
         itensVistos[d.item] = true;
         if (!numero(d.minutos)) {
           throw Recusa('A lista ' + k.id + ' do pacote não diz quantos minutos leva a posição ' + (i + 1) + '.');
+        }
+        if (moduloPorItem[d.item] && moduloPorItem[d.item] !== k.modulo) {
+          throw Recusa('A lista ' + k.id + ' do pacote cita o exercício ' + d.item + ', que não pertence ao módulo ' + k.modulo + '.');
         }
         /* A ORDEM É A LISTA, e é ela que vai para o material dela. Um `n` fora
          * de ordem é o único jeito de o arquivo dizer uma ordem e o vetor
@@ -242,7 +260,7 @@
         var teoria = json('teoria.json', extraidos['teoria.json']);
         var busca = json('busca.json', extraidos['busca.json']);
         var apelidos = json('apelidos.json', extraidos['apelidos.json']);
-        var kits = lerKits(extraidos['kits.json']);
+        var kits = lerKits(extraidos['kits.json'], itens);
         if (!Array.isArray(itens)) throw Recusa('O itens.json do pacote não é uma lista.');
         if (!Array.isArray(teoria)) throw Recusa('O teoria.json do pacote não é uma lista.');
         itens.forEach(function (it) {

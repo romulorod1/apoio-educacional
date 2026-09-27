@@ -11198,7 +11198,7 @@
    * listas de exercícios; e o índice de busca de todos os pacotes juntos. */
   function montarArvoreBiblioteca(pacotes, itens, teoria) {
     var arv = { pacotes: pacotes, modulos: {}, series: {}, itemPorId: {}, teoriaPorId: {}, indice: [],
-      apelidos: {}, listasPorModulo: {} };
+      apelidos: {}, listasPorModulo: Object.create(null) };
     function modulo(chave, serie, m, banco, pacote) {
       var mod = arv.modulos[chave];
       if (!mod) {
@@ -11245,9 +11245,13 @@
        * não mostrar. Dizer o que falta é a etapa do exclusoes.json, e não é
        * desta rodada. */
       (p.kits || []).forEach(function (k) {
+        if (!k || typeof k.modulo !== 'string') return;
+        if (k.modulo === '__proto__' || k.modulo === 'constructor' || k.modulo === 'prototype') return;
         var itens = (k.degraus || []).map(function (d) { return arv.itemPorId[d.item]; });
         if (itens.some(function (it) { return !it; })) return;
-        var minutosDe = {};
+        if (!arv.modulos[k.modulo]) return;
+        if (itens.some(function (it) { return (it.serie + ':' + it.modulo.slug) !== k.modulo; })) return;
+        var minutosDe = Object.create(null);
         (k.degraus || []).forEach(function (d) { minutosDe[d.item] = d.minutos; });
         (arv.listasPorModulo[k.modulo] = arv.listasPorModulo[k.modulo] || []).push({
           id: k.id, modulo: k.modulo, nivel: k.nivel, minutos: k.minutos,
@@ -11412,7 +11416,16 @@
   }
 
   function linhaBib(titulo, detalhe, aoTocar, extra) {
-    return el('div', { class: 'item-lista clicavel', role: 'button', tabindex: '0', aoClick: aoTocar }, [
+    return el('div', {
+      class: 'item-lista clicavel', role: 'button', tabindex: '0', aoClick: aoTocar,
+      aoKeydown: function (ev) {
+        if (ev.target !== this) return;
+        if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'Spacebar' || ev.keyCode === 13 || ev.keyCode === 32) {
+          ev.preventDefault();
+          this.click();
+        }
+      }
+    }, [
       el('div', { class: 'cresce' }, [
         el('div', { class: 'nome', texto: titulo }),
         detalhe ? el('div', { class: 'detalhe', texto: detalhe }) : null
@@ -12735,7 +12748,16 @@
   function guardarCarrinho() {
     bibLpAviso = null;
     lembrarAnexada(null);
-    try { localStorage.setItem(CHAVE_CARRINHO, JSON.stringify(bibCarrinho)); } catch (e) { /* segue na memória */ }
+    try {
+      if (!bibCarrinho.itens.length && !bibCarrinho.paginas.length) {
+        localStorage.removeItem(CHAVE_CARRINHO);
+      } else {
+        localStorage.setItem(CHAVE_CARRINHO, JSON.stringify(bibCarrinho));
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   /* A PORTA ÚNICA DO MATERIAL. Todo lugar que muda o que está marcado passa
@@ -12762,6 +12784,7 @@
       avisar('Não consegui guardar o que está marcado; nada foi trocado.');
       return false;
     }
+    var listaAntes = bibLpEmEdicao;
     bibCarrinho = { itens: (novo.itens || []).slice(), paginas: (novo.paginas || []).slice() };
     /* Marcar à mão a partir do material vazio começa uma seleção dela: o nome
      * da lista de antes (anexada, desmarcada) não passa para ela. */
@@ -12774,7 +12797,18 @@
       } catch (e) { /* segue na memória */ }
     }
     // a limpeza roda dentro do desenho, e gravar ali apagaria o aviso da tela
-    if (motivo !== 'limpeza') guardarCarrinho();
+    if (motivo !== 'limpeza') {
+      if (!guardarCarrinho()) {
+        bibCarrinho = atual;
+        bibLpEmEdicao = listaAntes;
+        try {
+          if (listaAntes) localStorage.setItem(CHAVE_LP_EM_EDICAO, listaAntes);
+          else localStorage.removeItem(CHAVE_LP_EM_EDICAO);
+        } catch (e) { /* segue */ }
+        avisar('Não consegui guardar a seleção no aparelho; nada foi trocado.');
+        return false;
+      }
+    }
     return true;
   }
 
@@ -13165,7 +13199,7 @@
     /* Só o que existe entra na conta ("0 páginas de teoria" era contar o que
      * não há), e a ordem diz de onde veio: da lista, ou da mão dela. */
     var lpDoMaterial = lpEmEdicao() ? listaProntaPorId(lpEmEdicao()) : null;
-    var daListaPronta = !!(lpDoMaterial && listaProntaEmEdicao(lpDoMaterial));
+    var daListaPronta = !!(lpDoMaterial && mesmaSelecao(bibCarrinho, lpDoMaterial));
     corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', id: 'bib-gerar-resumo',
       texto: [itens.length ? plural(itens.length, 'exercício', 'exercícios') : '',
         paginas.length ? plural(paginas.length, 'página de teoria', 'páginas de teoria') : ''].filter(Boolean).join(' e ') +
@@ -13250,6 +13284,10 @@
       caixas.folha.disabled = !itens.length || !caixas.lista.checked || !(escolha.aulaId || escolha.nova);
       if (caixas.folha.disabled) caixas.folha.checked = false;
       caixas.folha.parentNode.classList.toggle('desligada', caixas.folha.disabled);
+      var rotuloGabarito = caixas.gabarito.parentNode.querySelector('span');
+      if (rotuloGabarito) {
+        rotuloGabarito.textContent = caixas.lista.checked ? 'Gabarito em arquivo separado' : 'Gabarito';
+      }
     }
     function opcoesDaTela() {
       return {
@@ -13392,12 +13430,14 @@
       mexida: !mesmaSelecao(usada, lpUsada) });
     desenharCarrinho();
     marcarCaixasDoCarrinho();
-    return function () {
+    var fn = function () {
       // junta com o que ela marcou nesses segundos, em vez de apagar
       if (!trocarMaterial(juntarSelecoes(usada, bibCarrinho), 'volta')) return;
       desenharCarrinho();
       marcarCaixasDoCarrinho();
     };
+    fn.desmarcou = true;
+    return fn;
   }
 
   function gerarEAnexar(aulaId, itens, paginas, op) {
@@ -13536,19 +13576,29 @@
          * escondida no material do próximo aluno. O Desfazer do aviso devolve,
          * para ela gerar o mesmo material para outra aula. */
         var devolver = desmarcarDepoisDeAnexar(aula, aluno);
+        var desmarcou = !!(devolver && devolver.desmarcou);
         // o material da aula de origem foi feito: ela não fica escolhida para o próximo
         // anexado: a faixa fica para ela voltar à aula, mas a aula não vem mais escolhida no próximo material
         if (bibContexto && bibContexto.aulaId === aula.id) { bibContexto.anexado = true; desenharContextoBiblioteca(); }
-        var desmarcada = textoDosAssuntos(assuntosNovos) + ' A seleção foi desmarcada.';
+        var desmarcada = textoDosAssuntos(assuntosNovos) + (desmarcou ? ' A seleção foi desmarcada.' : '');
         /* "Marcar de novo", e não "Desfazer": no app, Desfazer desfaz a ação do
          * aviso, e aqui ela acharia que tirou o anexo da aula. */
         if (indiceFolha != null) {
           abrirEditorNota(aula.id, indiceFolha);
-          avisarNaHora('Material anexado na aula de ' + aluno.nome + ', e a lista abriu como folha.' + menor + desmarcada, 'Marcar de novo', devolver);
+          if (desmarcou) {
+            avisarNaHora('Material anexado na aula de ' + aluno.nome + ', e a lista abriu como folha.' + menor + desmarcada, 'Marcar de novo', devolver);
+          } else {
+            avisarNaHora('Material anexado na aula de ' + aluno.nome + ', e a lista abriu como folha.' + menor + desmarcada);
+          }
         } else {
           var idDaAula = aula.id;
-          avisarNaHora('Material anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + ').' + menor + desmarcada, 'Marcar de novo', devolver,
-            'Abrir a aula', function () { abrirAulaDoMaterial(idDaAula); });
+          if (desmarcou) {
+            avisarNaHora('Material anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + ').' + menor + desmarcada, 'Marcar de novo', devolver,
+              'Abrir a aula', function () { abrirAulaDoMaterial(idDaAula); });
+          } else {
+            avisarNaHora('Material anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + ').' + menor + desmarcada,
+              'Abrir a aula', function () { abrirAulaDoMaterial(idDaAula); });
+          }
         }
       });
     }).catch(function (e) {
@@ -13559,10 +13609,15 @@
        * o detalhe técnico fica só no console. */
       if (anexado) {
         var remarcar = desmarcarDepoisDeAnexar(aula, aluno);
-        avisarNaHora(etapa === 'folha'
+        var desm = !!(remarcar && remarcar.desmarcou);
+        var msgRemarcar = etapa === 'folha'
           ? 'O material foi anexado na aula, mas a lista não abriu como folha. O PDF está na aula; não precisa gerar de novo.' + textoDosAssuntos(assuntosNovos)
-          : 'O material foi anexado na aula, mas não consegui marcar os exercícios como usados. O PDF está na aula; não precisa gerar de novo.' + textoDosAssuntos(assuntosNovos),
-          'Marcar de novo', remarcar);
+          : 'O material foi anexado na aula, mas não consegui marcar os exercícios como usados. O PDF está na aula; não precisa gerar de novo.' + textoDosAssuntos(assuntosNovos);
+        if (desm) {
+          avisarNaHora(msgRemarcar, 'Marcar de novo', remarcar);
+        } else {
+          avisarNaHora(msgRemarcar);
+        }
       }
       else if (e && e.exercicio) avisarNaHora(e.exercicio + ' não abriu. Desmarque esse exercício e gere de novo. Nada foi anexado.');
       else if (e && e.pagina) avisarNaHora(e.pagina + ' não abriu. Desmarque essa página e gere de novo. Nada foi anexado.');

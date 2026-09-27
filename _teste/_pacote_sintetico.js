@@ -476,6 +476,8 @@ function gerar(saida, opcoes) {
       conteudoKits[1].degraus = conteudoKits[0].degraus.slice(1).map((d, i) => Object.assign({}, d, { n: i + 1 }));
       conteudoKits[1].minutos = conteudoKits[1].degraus.reduce((a, d) => a + d.minutos, 0);
     }
+    if (v === 'modulo-proto') conteudoKits[0].modulo = '__proto__';
+    if (v === 'modulo-invalido') conteudoKits[0].degraus[0].item = LISTA_PIT + ':ex:1';
     // um exercício que NÃO está em itens.json: saiu por curadoria
     if (v === 'excluido') conteudoKits[0].degraus[2].item = EXCLUSOES[0].id || EXCLUSOES[0];
   }
