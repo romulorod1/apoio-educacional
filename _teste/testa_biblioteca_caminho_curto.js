@@ -75,7 +75,8 @@ const APP_REPO = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
  * Desfazer poder comparar com o que a marcação pôs. O portão pegou isso na
  * hora, pela asserção logo abaixo, que exige a âncora existir UMA vez: veneno
  * que deixa de envenenar sem ninguém notar é o pior defeito de uma prova. */
-const L_CHEIO = 'bibCarrinho = { itens: tudo.itens.slice(), paginas: tudo.paginas.slice() };';
+// a porta única do material (trocarMaterial) é quem enche o carrinho vindo da aula
+const L_CHEIO = "if (!trocarMaterial(tudo, 'material-da-aula', null)) return;";
 /* O worktree pode ter o app.js com CRLF (core.autocrlf): a âncora segue o
  * arquivo. Um `return` logo depois desta linha pula o marcarCaixasDoCarrinho
  * que fecha o soltarVisor, e nada mais. */
@@ -88,7 +89,7 @@ const L_MODULO = 'return ids.length > 0 && ids.every(function (id) { return noCa
 const L_VOLTA = 'if (bibTrocaDesfazer && !bibContexto.anexado) {';
 const ALVO_VENENO = V_CHEIO ? L_CHEIO : V_VISOR ? L_VISOR : V_MODULO ? L_MODULO : L_VOLTA;
 const TROCA_VENENO = V_CHEIO
-  ? 'bibCarrinho = { itens: [], paginas: [] };'
+  ? "if (!trocarMaterial({ itens: [], paginas: [] }, 'material-da-aula', null)) return;"
   : V_VISOR
     ? 'bibVezDoVisor++; return;'
     : V_MODULO

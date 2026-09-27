@@ -295,26 +295,36 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
   conf('a aula nova tem o anexo da biblioteca', anexou.ok, true);
   if (!anexou.ok) throw Object.assign(new Error('sem anexo'), { jaContado: true });
   const aulaId = anexou.valor.aulaId;
-  conf('nome termina em _biblioteca.pdf', /_biblioteca\.pdf$/.test(anexou.valor.anexo.nome), true);
-  conf('o anexo guarda os módulos dos exercícios', JSON.stringify(anexou.valor.anexo.modulos), '["Equações do Segundo Grau"]');
+  /* O GABARITO EM ARQUIVO SEPARADO (B10): anexando lista com gabarito, saem
+   * DOIS anexos, e o da lista não leva as respostas. Ela manda o primeiro ao
+   * aluno sem abrir para conferir. */
+  const daBib = (await lerDados(pag)).aulas.filter(x => x.id === aulaId)[0].anexos.filter(n => n.biblioteca);
+  conf('dois anexos da biblioteca: a lista e o gabarito', daBib.map(a => a.parte).join(','), 'lista,gabarito');
+  conf('com nomes que dizem o que são', /_lista\.pdf$/.test((daBib[0] || {}).nome || '') &&
+    /_gabarito\.pdf$/.test((daBib[1] || {}).nome || ''), true);
+  conf('o anexo guarda os módulos dos exercícios', JSON.stringify((daBib[0] || {}).modulos), '["Equações do Segundo Grau"]');
 
   // ================================================================
-  secao('5. O PDF anexado');
-  const b64 = await lerAnexo(pag, anexou.valor.anexo.id);
-  conf('o arquivo está no depósito de anexos', !!b64, true);
+  secao('5. Os PDFs anexados');
+  const b64 = await lerAnexo(pag, (daBib[0] || {}).id);
+  const b64g = await lerAnexo(pag, (daBib[1] || {}).id);
+  conf('os dois arquivos estão no depósito de anexos', !!b64 && !!b64g, true);
   const bytes = Buffer.from(b64 || '', 'base64');
-  if (SALVAR) fs.writeFileSync(path.join(SALVAR, 'material_biblioteca.pdf'), bytes);
+  const bytesG = Buffer.from(b64g || '', 'base64');
+  if (SALVAR) { fs.writeFileSync(path.join(SALVAR, 'material_lista.pdf'), bytes); fs.writeFileSync(path.join(SALVAR, 'material_gabarito.pdf'), bytesG); }
   const pags = lerPdf(bytes);
-  const N = pags.length;
-  conf('moldura em toda página', pags.every((p, i) => p.textos[p.textos.length - 1] === 'Página ' + (i + 1) + ' de ' + N), true);
-  conf('as 3 primeiras são a teoria, uma imagem cada', pags.slice(0, 3).map(p => p.imagens).join(','), '1,1,1');
+  const pagsG = lerPdf(bytesG);
+  const moldura = ps => ps.every((p, i) => p.textos[p.textos.length - 1] === 'Página ' + (i + 1) + ' de ' + ps.length);
+  conf('moldura em toda página, nos dois arquivos', moldura(pags) && moldura(pagsG), true);
+  conf('as 3 primeiras da lista são a teoria, uma imagem cada', pags.slice(0, 3).map(p => p.imagens).join(','), '1,1,1');
   conf('título e subtítulo editados na folha', pags[0].texto.indexOf('Equações do Segundo Grau') >= 0 && pags[0].texto.indexOf('Revisão de terça') >= 0, true);
-  const todo = pags.map(p => p.texto).join(' ');
-  const iGab = pags.findIndex(p => /Gabarito/.test(p.texto));
-  const lista = pags.slice(3, iGab).map(p => p.texto).join(' ');
+  const todo = pags.concat(pagsG).map(p => p.texto).join(' ');
+  const lista = pags.slice(3).map(p => p.texto).join(' ');
   conf('lista renumerada de 1 a 8', (lista.match(/Exercício \d+\./g) || []).join(' '), [1, 2, 3, 4, 5, 6, 7, 8].map(n => 'Exercício ' + n + '.').join(' '));
-  conf('gabarito em folha separada (nenhum Exercício na mesma página)', iGab > 3 && pags[iGab].texto.indexOf('Exercício') < 0, true);
-  const gab = pags.slice(iGab).map(p => p.textos).reduce((a, b) => a.concat(b), []);
+  conf('o arquivo da lista NÃO tem gabarito nenhum', pags.some(p => /Gabarito/.test(p.texto)), false);
+  conf('o arquivo do gabarito abre no Gabarito e não tem enunciado', /Gabarito/.test((pagsG[0] || {}).texto || '') &&
+    pagsG.every(p => p.texto.indexOf('Exercício') < 0), true);
+  const gab = pagsG.map(p => p.textos).reduce((a, b) => a.concat(b), []);
   conf('soluções 1. a 8. na ordem', gab.filter(t => /^\d+\.$/.test(t)).join(' '), '1. 2. 3. 4. 5. 6. 7. 8.');
   const semSol = gab.filter(t => t === 'Sem solução na fonte.').length;
   if (VENENO) {
@@ -323,8 +333,8 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
     conf('o 3 diz "Sem solução na fonte."', semSol === 1 && gab[gab.indexOf('Sem solução na fonte.') - 1] === '3.', true);
   }
   // a solução do exercício 4 (dois pedaços, 786 pt) não cabe numa folha e quebra entre os pedaços
-  conf('7 soluções com imagem, a de dois pedaços contando duas', pags.slice(iGab).reduce((s, p) => s + p.imagens, 0), 8);
-  conf('lista e gabarito: marca por cima', pags.slice(3).every(p => /\/ExtGState << \/GSm \d+ 0 R >>/.test(p.obj) && p.fluxo.indexOf('q /GSm gs') >= 0), true);
+  conf('7 soluções com imagem, a de dois pedaços contando duas', pagsG.reduce((s, p) => s + p.imagens, 0), 8);
+  conf('lista e gabarito: marca por cima', pags.slice(3).concat(pagsG).every(p => /\/ExtGState << \/GSm \d+ 0 R >>/.test(p.obj) && p.fluxo.indexOf('q /GSm gs') >= 0), true);
   conf('teoria: só o selo no rodapé, sem a marca grande', pags.slice(0, 3).every(p => p.obj.indexOf('/ExtGState') < 0 && /\(NW\) Tj/.test(p.fluxo)), true);
   conf('nenhum travessão ou meia-risca', /[–—\x96\x97]/.test(todo), false);
 

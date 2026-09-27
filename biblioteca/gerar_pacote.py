@@ -1705,7 +1705,8 @@ def gravar_pacote(conteudo, manifest_b, nome, versao, saida, trabalho, gravar_zi
 
 
 def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, commit=None,
-          so_modulos=None, gravar_zip=True, anterior=None, com_kits=False):
+          so_modulos=None, gravar_zip=True, anterior=None, com_kits=False, com_listas=False,
+          regra_listas=None):
     t_ini = time.time()
     nome = 'matematica-obmep-%s' % serie
     trabalho = trabalho or os.path.join(os.path.dirname(os.path.abspath(saida)), 'trabalho', '%s-v%d' % (nome, versao))
@@ -1965,11 +1966,19 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
     conteudo['busca.json'] = json_bytes(montar_busca(docs_busca))
     conteudo['apelidos.json'] = json_bytes(apelidos)
 
-    # Os dois aditivos da secao 8d do contrato, opcionais: sem --kits o pacote
-    # sai exatamente como saia antes, e e isso que deixa provar, hash a hash,
-    # que ligar os kits nao mexeu em recorte nenhum.
+    # Os dois aditivos da secao 8d do contrato, opcionais: sem --kits e sem
+    # --listas o pacote sai exatamente como saia antes, e e isso que deixa
+    # provar, hash a hash, que ligar os kits nao mexeu em recorte nenhum.
+    #
+    # Duas regras, uma de cada vez. `com_kits` e a kits-v1 da 8e, morta como
+    # afirmacao de curadoria e proibida em pacote publicado; `com_listas` e a
+    # listas-v1 da 8f, a lista pronta da B10: so os niveis 2 e 3 (decisao do
+    # Romulo em 24/09) e sem teoria, porque as listas desta rodada sao so de
+    # exercicios e o campo `teoria` de cada uma sai []. O formato dos dois
+    # arquivos aditivos e o mesmo nas duas regras: quem diz qual e a regra e o
+    # campo `regra` de cada lista, e nao o nome do arquivo.
     kits_gerados = None
-    if com_kits:
+    if com_kits or com_listas:
         excluidos = []
         for e in relatorio['excluidos']:
             linha = {'id': e['id'], 'motivo': e['motivo']}
@@ -1977,7 +1986,13 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
             excluidos.append(linha)
         excluidos.sort(key=lambda e: e['id'])
         conteudo['exclusoes.json'] = json_bytes(excluidos)
-        kits_gerados, sem_kit, modulos_sem_exercicio = kits.gerar(itens, teoria)
+        if com_listas:
+            # a regra da lista pronta: listas-v1 (meia aula) por padrao, ou a
+            # listas-v2 (uma aula), pedida com --listas-aula
+            kits_gerados, sem_kit, modulos_sem_exercicio = kits.gerar(
+                itens, teoria, regra_listas or kits.REGRA_LISTAS, (2, 3), False)
+        else:
+            kits_gerados, sem_kit, modulos_sem_exercicio = kits.gerar(itens, teoria)
         conteudo['kits.json'] = json_bytes(kits_gerados)
         relatorio['kits'] = {
             'n': len(kits_gerados),
@@ -2090,13 +2105,35 @@ def principal(argv=None):
                          'escolha sorteada e nao venceu (21 de 40, limiar 26), e por isso nao vai para a '
                          'professora. Sem esta opcao o pacote sai exatamente como saia antes, e e isso que '
                          'deixa provar hash a hash que ligar os kits nao mexeu em recorte nenhum')
+    ap.add_argument('--listas', action='store_true',
+                    help='escreve tambem kits.json e exclusoes.json pela regra listas-v1 (CONTRATO 8f): a lista '
+                         'pronta da B10, so os niveis 2 e 3 e sem teoria (o campo teoria de cada lista sai []). '
+                         'Esta e a opcao que vai para pacote publicado; --kits gera a kits-v1, que nao vai. '
+                         'Sem nenhuma das duas o pacote sai exatamente como saia antes')
+    ap.add_argument('--listas-aula', action='store_true',
+                    help='como --listas, mas pela regra listas-v2: a mesma lista pronta com o orcamento de uma '
+                         'aula (54 a 66 minutos) em vez de meia (pedido do Romulo em 24/09)')
     ap.add_argument('--fontes-negrito', help='pedacos de nome de fonte negrito, separados por virgula '
                     '(padrao %s)' % ','.join(FONTES_NEGRITO))
     a = ap.parse_args(argv)
+    # Uma regra por pacote. O kits.json so tem um campo `regra`, entao pedir as
+    # duas juntas nao tem resposta certa: o programa recusa em vez de escolher
+    # calado por uma delas.
+    if a.listas_aula:
+        if a.listas:
+            raise SystemExit('erro: --listas e --listas-aula nao podem vir juntas. Um pacote leva um kits.json '
+                             'so: --listas gera a listas-v1 (meia aula) e --listas-aula a listas-v2 (uma aula).')
+        a.listas = True
+    if a.kits and a.listas:
+        raise SystemExit(
+            'erro: --kits e --listas nao podem vir juntas. Um pacote leva um kits.json so, e cada lista declara '
+            'uma regra: --kits gera a kits-v1 (secao 8e, morta como afirmacao de curadoria e proibida em pacote '
+            'publicado) e --listas gera a listas-v1 (secao 8f, a lista pronta). Escolha uma.')
     if a.fontes_negrito:
         FONTES_NEGRITO[:] = [x for x in a.fontes_negrito.split(',') if x]
     manifest, rel, trab = gerar(a.pdfs, a.serie, a.versao, a.saida, a.curadoria, a.trabalho, a.gerado_em, a.commit,
-                                a.modulos.split(',') if a.modulos else None, not a.sem_zip, a.anterior, a.kits)
+                                a.modulos.split(',') if a.modulos else None, not a.sem_zip, a.anterior, a.kits,
+                                a.listas, kits.REGRA_AULA if a.listas_aula else None)
     print(json.dumps({'contagens': manifest['contagens'], 'zip': rel['zip'], 'bytes_por_tipo': rel['bytes_por_tipo'],
                       'excluidos': len(rel['excluidos']), 'segundos': rel['segundos'], 'trabalho': trab},
                      ensure_ascii=False, indent=1))

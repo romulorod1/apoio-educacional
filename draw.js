@@ -27,6 +27,23 @@
     { nome: 'Grossa', valor: 7 }
   ];
 
+  /* A ORDEM DAS CAMADAS, e ela é a mesma no canvas e no PDF.
+   *
+   * O pdf.js sempre desenhou a folha em camadas (imagem, depois texto, depois
+   * traço) enquanto o canvas desenhava na ordem do vetor. Quem manda é o PDF,
+   * porque é ele que ela imprime, e a diferença ficava invisível até existir um
+   * item cuja função é COBRIR: um retângulo que tapa no canvas e não tapa na
+   * folha impressa seria a tela mentindo sobre o que vai sair. Por isso o
+   * canvas passou a seguir a mesma ordem, e a lista está escrita num lugar só,
+   * exportada, para a prova poder comparar os dois lados em vez de acreditar.
+   *
+   * `tapar` entra logo depois da imagem: ele existe para cobrir o recorte da
+   * fonte, e nunca cobre o que ela escreveu por cima. Para tirar o que é dela
+   * existe a borracha. */
+  var ORDEM_CAMADAS = ['imagem', 'tapar', 'texto', 'traco'];
+
+  var TAPAR_MINIMO = 12;        // menor que isto é toque seco, e não retângulo
+
   function paginaVazia(fundo) {
     return { fundo: fundo || 'pautado', itens: [] };
   }
@@ -248,17 +265,86 @@
     if (i >= 0) itens.splice(i, 1);
     this.selecionado = null;
     this.cacheValido = false; this.precisaRedesenhar = true;
+    // tirar pela lixeira é mudança como qualquer outra: quem grava a folha precisa saber
+    if (i >= 0) this._avisarMudanca();
   };
 
+  /* O retângulo que tapa. Nasce arrastando, como o traço, e não centralizado
+   * como a imagem: ela precisa pôr o branco exatamente em cima do pedaço errado
+   * do enunciado, e um retângulo que nasce no meio da folha obrigaria a
+   * arrastar e redimensionar depois de cada toque. */
+  /* O RETÂNGULO FICA DENTRO DA FOLHA NOS TRÊS CAMINHOS: criar, mover e
+   * redimensionar.
+   *
+   * O canvas desenha dentro de um `clip()` da folha e o PDF não recorta nada,
+   * então um retângulo fora da folha aparece aparado na tela e sai INTEIRO no
+   * papel, por cima do cabeçalho "Folha de aula". A tela mente sobre o que vai
+   * sair, que é o que a unificação das camadas existe para impedir.
+   *
+   * A PRIMEIRA ESCRITA APAROU SÓ NA CRIAÇÃO, e o comentário dela afirmava que
+   * isso "vale para os dois desenhos de uma vez". Valia para um caminho de
+   * três: depois de criado, o item era livre, e bastava ela selecionar o branco
+   * e arrastá-lo para cima da borda para o defeito voltar inteiro. Duas lentes
+   * cegas acharam isso sozinhas, e a prova de então não pegava porque o arranjo
+   * dela chamava `adicionarTapar` pela API e nunca movia nada.
+   *
+   * Criar e redimensionar APARAM (o retângulo encolhe na borda, porque é o
+   * arrasto que define o tamanho); mover PRENDE (a posição para na borda e o
+   * tamanho não muda, porque encolher o que ela já dimensionou seria mudar o
+   * desenho dela sem pedir).
+   *
+   * E NÃO, OS DOIS NÃO DEVIAM SER IGUAIS. Parece inconsistência e não é: são
+   * duas perguntas diferentes. No criar e no redimensionar é o ARRASTO que está
+   * definindo o tamanho naquele instante, então aparar é obedecer ao que a mão
+   * dela está fazendo agora. No mover o tamanho JÁ FOI decidido por ela antes,
+   * e encolher ali seria o aplicativo mudar um desenho pronto porque ela
+   * arrastou longe demais. Quem uniformizar os dois vai quebrar um dos dois. */
+  function aparado(v, minimo, maximo) { return Math.max(minimo, Math.min(maximo, v)); }
+
+  Editor.prototype.adicionarTapar = function (x, y, w, h) {
+    var x1 = aparado(x, 0, FOLHA_L), y1 = aparado(y, 0, FOLHA_A);
+    var x2 = aparado(x + w, 0, FOLHA_L), y2 = aparado(y + h, 0, FOLHA_A);
+    x = Math.min(x1, x2); y = Math.min(y1, y2);
+    w = Math.abs(x2 - x1); h = Math.abs(y2 - y1);
+    if (w < TAPAR_MINIMO || h < TAPAR_MINIMO) return null;
+    this.marcarPonto();
+    var item = { t: 'tapar', x: x, y: y, w: w, h: h };
+    this.pagina().itens.push(item);
+    this.cacheValido = false; this.precisaRedesenhar = true;
+    return item;
+  };
+
+  /* O QUE ELA PEGA É O QUE ELA VÊ, e por isso este teste de acerto percorre a
+   * MESMA ordem em que a folha é pintada, de cima para baixo: a última camada
+   * primeiro, e dentro dela o último item primeiro.
+   *
+   * Percorrer a ordem do vetor, que era o que estava aqui, passou a discordar
+   * do desenho no dia em que a pintura virou camadas. O caso que isso quebra é
+   * concreto e foi medido: um retângulo que tapa POSTO ANTES de a imagem
+   * entrar no vetor aparece POR CIMA dela na folha (a camada do tapar vem
+   * depois da imagem) e, pela ordem do vetor, a seleção agarrava a imagem que
+   * está por baixo. Ela arrastaria o recorte inteiro tentando mover o branco.
+   *
+   * Achado pela conferência de uso da orquestradora, e não por teste: a
+   * pergunta era se a borracha continuava alcançando o traço depois da mudança
+   * de ordem, e a borracha estava certa; quem estava errada era a seleção. */
   Editor.prototype.itemEm = function (p) {
     var itens = this.pagina().itens;
-    for (var i = itens.length - 1; i >= 0; i--) {
-      var it = itens[i];
-      if (it.t === 'imagem' && p.x >= it.x && p.x <= it.x + it.w && p.y >= it.y && p.y <= it.y + it.h) return it;
+    function pega(it) {
+      if (it.t === 'imagem' || it.t === 'tapar') {
+        return p.x >= it.x && p.x <= it.x + it.w && p.y >= it.y && p.y <= it.y + it.h;
+      }
       if (it.t === 'texto') {
         var alturaAprox = it.tam * 1.3;
-        var larguraAprox = it.txt.length * it.tam * 0.52;
-        if (p.x >= it.x - 6 && p.x <= it.x + larguraAprox && p.y >= it.y - 4 && p.y <= it.y + alturaAprox) return it;
+        var larguraAprox = String(it.txt).length * it.tam * 0.52;
+        return p.x >= it.x - 6 && p.x <= it.x + larguraAprox && p.y >= it.y - 4 && p.y <= it.y + alturaAprox;
+      }
+      return false;
+    }
+    for (var c = ORDEM_CAMADAS.length - 1; c >= 0; c--) {
+      for (var i = itens.length - 1; i >= 0; i--) {
+        var it = itens[i];
+        if (it && it.t === ORDEM_CAMADAS[c] && pega(it)) return it;
       }
     }
     return null;
@@ -300,7 +386,13 @@
     c.addEventListener('pointerdown', function (e) { self._aoDescer(e); }, sinal);
     c.addEventListener('pointermove', function (e) { self._aoMover(e); }, sinal);
     c.addEventListener('pointerup', function (e) { self._aoSubir(e); }, sinal);
-    c.addEventListener('pointercancel', function (e) { self._aoSubir(e); }, sinal);
+    /* CANCELAR NÃO É SOLTAR. O `pointercancel` ia para o `_aoSubir`, que
+     * COMETE o que estava em andamento: o retângulo em construção virava item
+     * na folha. Quando o sistema toma o gesto para si, e num tablet com a mão
+     * apoiada no vidro isso acontece, ela ganhava um branco que não pediu. É a
+     * mesma queixa da palma, por outra porta, e foi uma lente cega que a viu
+     * depois de a primeira estar fechada. */
+    c.addEventListener('pointercancel', function (e) { self._aoCancelarPonteiro(e); }, sinal);
     c.addEventListener('pointerleave', function (e) { self._aoSubir(e); }, sinal);
     c.addEventListener('contextmenu', function (e) { e.preventDefault(); }, sinal);
     c.addEventListener('wheel', function (e) {
@@ -339,12 +431,36 @@
     if (this.ferramenta === 'borracha') {
       this.marcarPonto();
       this.apagando = true;
-      this.apagarEm(p, 14 / this.escala + 6);
+      this.apagou = this.apagarEm(p, 14 / this.escala + 6);
+      return;
+    }
+    if (this.ferramenta === 'tapar') {
+      this.tapando = { x0: p.x, y0: p.y, x: p.x, y: p.y };
+      this.precisaRedesenhar = true;
       return;
     }
     if (this.ferramenta === 'selecao') {
-      var alvo = this.itemEm(p);
+      /* A ALÇA DO QUE JÁ ESTÁ SELECIONADO VENCE. A alça fica no canto e tem
+       * folga de toque para fora dele; sem esta linha, o toque na alça do
+       * retângulo de tapar, caindo um pouco fora do retângulo e em cima do
+       * recorte, selecionava o RECORTE e redimensionava a imagem do
+       * enunciado. Visto nos prints do marco da B10. */
+      var alvo = (this.selecionado && this._alcaEm(p, this.selecionado)) ? this.selecionado : this.itemEm(p);
+      var mudouSelecao = this.selecionado !== alvo;
       this.selecionado = alvo;
+      /* QUEM SELECIONA PRECISA AVISAR, senão a lixeira nunca aparece.
+       *
+       * A barra de ferramentas só monta o botão de remover quando
+       * `editorAtual.selecionado` existe, e ela só se redesenha quando a
+       * ferramenta muda. Tocar num item na tela mudava a seleção e não dizia
+       * nada a ninguém: a lixeira aparecia por acidente, quando ela tocava
+       * numa cor ou numa espessura logo depois, que redesenham a barra por
+       * outro motivo. Para o TAPAR isso é grave de um jeito que não era para os
+       * outros: a borracha não alcança retângulo (ela só remove traço, de
+       * propósito, para nunca danificar a imagem), então a seleção é a ÚNICA
+       * saída, e ela estava atrás de um caminho que a interface não oferecia.
+       * Ferramenta que ela cria e não consegue tirar não está pronta. */
+      if (mudouSelecao && this.opcoes.aoSelecionar) this.opcoes.aoSelecionar(alvo);
       if (alvo) {
         var alca = this._alcaEm(p, alvo);
         this.marcarPonto();
@@ -413,19 +529,39 @@
     this.ponteiros[e.pointerId] = { x: pos.x, y: pos.y, tipo: e.pointerType };
     var p = this.paraFolha(pos.x, pos.y);
 
-    if (this.apagando) { this.apagarEm(p, 14 / this.escala + 6); return; }
+    if (this.apagando) { if (this.apagarEm(p, 14 / this.escala + 6)) this.apagou = true; return; }
+
+    if (this.tapando) {
+      this.tapando.x = p.x;
+      this.tapando.y = p.y;
+      this.precisaRedesenhar = true;
+      return;
+    }
 
     if (this.arrasto) {
       var d = this.arrasto;
-      if (d.alca && d.item.t === 'imagem') {
+      if (d.alca && d.item.t === 'tapar') {
+        /* O retângulo que tapa não guarda proporção: o pedaço errado do
+         * enunciado é largo e baixo quase sempre, e forçar proporção obrigaria
+         * a tapar linha de texto vizinha para cobrir uma palavra. */
+        // a alça apara: o canto para na borda da folha, e não passa dela
+        d.item.w = aparado(d.iw + (p.x - d.ox), TAPAR_MINIMO, FOLHA_L - d.item.x);
+        d.item.h = aparado(d.ih + (p.y - d.oy), TAPAR_MINIMO, FOLHA_A - d.item.y);
+      } else if (d.alca && d.item.t === 'imagem') {
         var nw = Math.max(40, d.iw + (p.x - d.ox));
         var proporcao = d.ih / d.iw;
         d.item.w = nw;
         d.item.h = nw * proporcao;
+      } else if (d.item.t === 'tapar') {
+        /* Mover PRENDE na borda e mantém o tamanho: o retângulo dela não
+         * encolhe por ela ter arrastado longe demais. */
+        d.item.x = aparado(d.ix + (p.x - d.ox), 0, Math.max(0, FOLHA_L - d.item.w));
+        d.item.y = aparado(d.iy + (p.y - d.oy), 0, Math.max(0, FOLHA_A - d.item.h));
       } else {
         d.item.x = d.ix + (p.x - d.ox);
         d.item.y = d.iy + (p.y - d.oy);
       }
+      d.moveu = true;
       this.cacheValido = false; this.precisaRedesenhar = true;
       return;
     }
@@ -447,25 +583,79 @@
     if (Object.keys(this.ponteiros).length < 2) this.pinca = null;
     try { this.canvas.releasePointerCapture(e.pointerId); } catch (err) { /* nada a fazer */ }
 
-    if (this.tracoAtual) {
-      if (this.tracoAtual.pontos.length < 2) {
-        // toque seco vira um ponto redondo
-        this.tracoAtual.pontos.push([
-          this.tracoAtual.pontos[0][0] + 0.6,
-          this.tracoAtual.pontos[0][1],
-          this.tracoAtual.pontos[0][2]
-        ]);
-      }
-      this.tracoAtual = null;
-      this.cacheValido = false;
-      this._avisarMudanca();
+    if (this._fecharTraco()) this._avisarMudanca();
+    if (this.tapando) {
+      var t = this.tapando;
+      this.tapando = null;
+      var novo = this.adicionarTapar(Math.min(t.x0, t.x), Math.min(t.y0, t.y),
+        Math.abs(t.x - t.x0), Math.abs(t.y - t.y0));
+      /* Toque seco não vira retângulo: um branco de dois pixels ficaria
+       * invisível na folha e aparecendo no desfazer, e ela não saberia o que
+       * tinha feito. Sem retângulo não há o que avisar. */
+      if (novo) this._avisarMudanca();
+      this.precisaRedesenhar = true;
     }
     if (this.apagando) { this.apagando = false; this._avisarMudanca(); }
     if (this.arrasto) { this.arrasto = null; this._avisarMudanca(); }
     this.precisaRedesenhar = true;
   };
 
+  /* O DEDO CANCELA O QUE O BICO ESTAVA FAZENDO, e o retângulo faltava nessa
+   * conta. `_cancelarTraco` desfazia só o traço em andamento, e o `tapando`
+   * seguia de pé: com a mão apoiada no vidro, o `pointerup` da PALMA caía no
+   * fim do arrasto e fechava o retângulo com as coordenadas do bico naquele
+   * instante, criando na folha um branco que ela não pediu e não viu nascer.
+   * O comentário do `moverNoCarrinho` diz que ela usa o tablet com a mão
+   * apoiada, então este é o gesto normal dela. Achado por uma lente cega. */
+  /* Desiste de tudo o que estava em andamento, sem cometer nada. */
+  /* Fecha o traço em andamento e devolve se havia um. Toque seco vira ponto. */
+  Editor.prototype._fecharTraco = function () {
+    if (!this.tracoAtual) return false;
+    if (this.tracoAtual.pontos.length < 2) {
+      // toque seco vira um ponto redondo
+      this.tracoAtual.pontos.push([
+        this.tracoAtual.pontos[0][0] + 0.6,
+        this.tracoAtual.pontos[0][1],
+        this.tracoAtual.pontos[0][2]
+      ]);
+    }
+    this.tracoAtual = null;
+    this.cacheValido = false;
+    return true;
+  };
+
+  Editor.prototype._aoCancelarPonteiro = function (e) {
+    delete this.ponteiros[e.pointerId];
+    if (Object.keys(this.ponteiros).length < 2) this.pinca = null;
+    try { this.canvas.releasePointerCapture(e.pointerId); } catch (err) { /* nada a fazer */ }
+    /* O TRAÇO FEITO ATÉ O CANCELAMENTO FICA: é escrita dela, e o
+     * `pointercancel` da caneta (o sistema tomando o gesto, uma notificação)
+     * não é ela desistindo. O retângulo de tapar em andamento, esse sim, sai.
+     * O cancelamento pela PALMA é outro caminho (`_cancelarTraco`, no toque
+     * de dedo), e continua desistindo. */
+    var guardouTraco = this._fecharTraco();
+    if (this.tapando) this._cancelarTapar();
+    /* O QUE JÁ MUDOU NÃO VOLTA COM O CANCELAMENTO: a borracha já tirou o traço
+     * e o arrasto já moveu o item, na tela e na nota. Sem avisar, a folha
+     * ficava diferente do que está gravado até o próximo gesto dela, e
+     * fechada antes disso perdia a mudança. Achado pela lente de correção do
+     * PR #57. */
+    var mudou = guardouTraco || !!((this.apagando && this.apagou) || (this.arrasto && this.arrasto.moveu));
+    if (this.arrasto) this.arrasto = null;
+    this.apagando = false;
+    this.apagou = false;
+    this.precisaRedesenhar = true;
+    if (mudou) this._avisarMudanca();
+  };
+
+  Editor.prototype._cancelarTapar = function () {
+    if (!this.tapando) return;
+    this.tapando = null;
+    this.cacheValido = false; this.precisaRedesenhar = true;
+  };
+
   Editor.prototype._cancelarTraco = function () {
+    this._cancelarTapar();
     if (!this.tracoAtual) return;
     var itens = this.pagina().itens;
     var i = itens.indexOf(this.tracoAtual);
@@ -476,7 +666,7 @@
   };
 
   Editor.prototype._alcaEm = function (p, item) {
-    if (item.t !== 'imagem') return null;
+    if (item.t !== 'imagem' && item.t !== 'tapar') return null;
     var tol = 22 / this.escala;
     return (Math.abs(p.x - (item.x + item.w)) < tol && Math.abs(p.y - (item.y + item.h)) < tol);
   };
@@ -535,7 +725,22 @@
     ctx.rect(0, 0, FOLHA_L, FOLHA_A);
     ctx.clip();
     var itens = this.pagina().itens;
-    for (var i = 0; i < itens.length; i++) this._desenharItem(ctx, itens[i]);
+    for (var c = 0; c < ORDEM_CAMADAS.length; c++) {
+      for (var i = 0; i < itens.length; i++) {
+        if (itens[i] && itens[i].t === ORDEM_CAMADAS[c]) this._desenharItem(ctx, itens[i]);
+      }
+    }
+    /* O retângulo que ela está arrastando agora, ainda sem existir no vetor:
+     * mostrado com contorno e sem branco, porque enquanto arrasta o que ela
+     * precisa ver é O QUE VAI SUMIR, e não o branco por cima. */
+    if (this.tapando) {
+      var t = this.tapando;
+      ctx.strokeStyle = '#2E7D6B';
+      ctx.lineWidth = 2 / this.escala;
+      ctx.setLineDash([8 / this.escala, 5 / this.escala]);
+      ctx.strokeRect(Math.min(t.x0, t.x), Math.min(t.y0, t.y), Math.abs(t.x - t.x0), Math.abs(t.y - t.y0));
+      ctx.setLineDash([]);
+    }
     ctx.restore();
 
     if (this.selecionado) this._desenharSelecao(ctx, this.selecionado);
@@ -603,6 +808,29 @@
       }
       return;
     }
+    if (it.t === 'tapar') {
+      /* Branco cheio e sem transparência: é a mesma mecânica com que o
+       * compositor já cobre o rótulo original do recorte.
+       *
+       * E UM CONTORNO FINO, SÓ NA TELA. Medido: numa área vazia da folha de
+       * fundo branco o retângulo pintava ZERO pixels distinguíveis, porque o
+       * fundo já é branco puro. Numa ferramenta nova isso é armadilha de
+       * primeiro uso: ela arrasta para ver o que a ferramenta faz, não vê nada
+       * acontecer e conclui que está quebrada; e se criou sem querer, fica com
+       * um objeto que não consegue achar para tirar.
+       *
+       * O contorno NÃO alcança o papel, e não por promessa: ele mora aqui, no
+       * desenho do canvas, e o `pdf.js` não tem caminho até esta linha. No
+       * papel o branco é justamente a função, e é disso que depende a prova de
+       * que a folha impressa não mudou. */
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(it.x, it.y, it.w, it.h);
+      ctx.strokeStyle = 'rgba(31, 58, 95, 0.35)';
+      ctx.lineWidth = 1 / this.escala;
+      ctx.strokeRect(it.x + 0.5 / this.escala, it.y + 0.5 / this.escala,
+        Math.max(0, it.w - 1 / this.escala), Math.max(0, it.h - 1 / this.escala));
+      return;
+    }
     if (it.t === 'texto') {
       ctx.fillStyle = it.cor;
       ctx.font = it.tam + 'px Helvetica, Arial, sans-serif';
@@ -616,14 +844,14 @@
 
   Editor.prototype._desenharSelecao = function (ctx, it) {
     var x = it.x, y = it.y, w, h;
-    if (it.t === 'imagem') { w = it.w; h = it.h; }
+    if (it.t === 'imagem' || it.t === 'tapar') { w = it.w; h = it.h; }
     else { w = String(it.txt).length * it.tam * 0.52; h = it.tam * 1.3 * String(it.txt).split('\n').length; }
     ctx.strokeStyle = '#2E7D6B';
     ctx.lineWidth = 2 / this.escala;
     ctx.setLineDash([8 / this.escala, 5 / this.escala]);
     ctx.strokeRect(x - 4, y - 4, w + 8, h + 8);
     ctx.setLineDash([]);
-    if (it.t === 'imagem') {
+    if (it.t === 'imagem' || it.t === 'tapar') {
       ctx.fillStyle = '#2E7D6B';
       var r = 9 / this.escala;
       ctx.beginPath();
@@ -643,9 +871,22 @@
     if (!nota || !nota.paginas || !nota.paginas.length) return c;
     var esc = largura / FOLHA_L;
     ctx.scale(esc, esc);
-    var itens = nota.paginas[0].itens || [];
+    var todos = nota.paginas[0].itens || [];
+    // a miniatura segue a mesma ordem de camadas da folha e do PDF
+    var itens = [];
+    ORDEM_CAMADAS.forEach(function (c) {
+      todos.forEach(function (it) { if (it && it.t === c) itens.push(it); });
+    });
     itens.forEach(function (it) {
-      if (it.t === 'traco' && it.pontos.length > 1) {
+      if (it.t === 'tapar') {
+        /* A MINIATURA NÃO LEVA O CONTORNO, e é decisão e não esquecimento: o
+         * contorno existe para ela achar, na folha aberta, o branco que criou
+         * e não enxerga. A miniatura não é onde ela procura objeto para tirar,
+         * e um fio de um pixel num cartão de cem e poucos pixels de largura é
+         * sujeira, não sinal. */
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(it.x, it.y, it.w, it.h);
+      } else if (it.t === 'traco' && it.pontos.length > 1) {
         ctx.strokeStyle = it.cor;
         ctx.lineCap = 'round';
         ctx.globalAlpha = it.marcatexto ? 0.32 : 1;
@@ -671,7 +912,7 @@
 
   root.Draw = {
     Editor: Editor, PALETA: PALETA, ESPESSURAS: ESPESSURAS,
-    FOLHA_L: FOLHA_L, FOLHA_A: FOLHA_A,
+    FOLHA_L: FOLHA_L, FOLHA_A: FOLHA_A, ORDEM_CAMADAS: ORDEM_CAMADAS,
     notaVazia: notaVazia, paginaVazia: paginaVazia
   };
 })(typeof self !== 'undefined' ? self : this);

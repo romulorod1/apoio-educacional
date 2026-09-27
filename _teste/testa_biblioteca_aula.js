@@ -218,7 +218,7 @@ async function anexarEm(pag, aulaId, itens, paginas, extra) {
   }, aulaId, extra || null);
   await pag.click('#bib-gerar-anexar');
   const r = await esperar('anexado na aula ' + aulaId, () => Promise.all([anexosDa(pag, aulaId),
-    pag.evaluate(() => document.querySelector('#aviso-texto').textContent)]), v => v && v[0] === antes + 1 && /^Material anexado/.test(v[1]), 30000);
+    pag.evaluate(() => document.querySelector('#aviso-texto').textContent)]), v => v && v[0] > antes && /^Material anexado/.test(v[1]), 30000);
   return r.ok ? r.valor[1] : '(não anexou)';
 }
 
@@ -555,7 +555,7 @@ async function anexarEm(pag, aulaId, itens, paginas, extra) {
   }
   await novaAulaHoje('aluno-teste-0', false);
   const avulsa = await esperar('aula avulsa com o assunto', () => lerDados(pag).then(d => d.aulas.filter(x => x.alunoId === 'aluno-teste-0')
-    .map(x => (x.temas || []).map(t => t.titulo).join(',') + '/' + (x.anexos || []).length)), v => v && v.join() === EQ + '/1', 30000);
+    .map(x => (x.temas || []).map(t => t.titulo).join(',') + '/' + (x.anexos || []).length)), v => v && v.join() === EQ + '/2', 30000);
   conf('a aula nova tem o anexo e o assunto', avulsa.ok, true);
   await pausa(600);
   await novaAulaHoje('aluno-teste-1', true);
