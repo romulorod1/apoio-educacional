@@ -963,9 +963,12 @@ async function cenarioPortas(pag) {
   if (!VENENO || V_ATRIBUICAO) {
     secao('0b. Uma porta só para o material, contada no código');
     const contarPortas = fonte => {
-      const i = fonte.indexOf('  function trocarMaterial(');
-      const j = i < 0 ? -1 : fonte.indexOf('\n  }\n', i);
-      const fora = i < 0 ? fonte : fonte.slice(0, i) + fonte.slice(j);
+      // O worktree pode estar em CRLF: localizar o fim da função sobre texto
+      // normalizado mantém o veneno fora da porta no Windows e no Unix.
+      const texto = fonte.replace(/\r\n/g, '\n');
+      const i = texto.indexOf('  function trocarMaterial(');
+      const j = i < 0 ? -1 : texto.indexOf('\n  }\n', i);
+      const fora = i < 0 ? texto : texto.slice(0, i) + texto.slice(j);
       const achados = [];
       fora.split(/\r?\n/).forEach((l, n) => {
         if (/^\s*var bibCarrinho = lerCarrinhoGuardado\(\);/.test(l)) return;
