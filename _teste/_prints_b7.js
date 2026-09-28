@@ -329,9 +329,9 @@ const tocarLinha = (pag, nome) => pag.evaluate(x => {
   const espacoDepois = await pag.evaluate(() => (document.querySelector('#info-espaco') || {}).textContent || '');
   console.log('   espaço antes: ' + espacoAntes + ' | depois: ' + espacoDepois);
 
-  // 16. a aba Biblioteca de volta ao "Em construção"
+  // 16. a aba Biblioteca de volta ao estado sem pacotes
   await H.irParaAba(pag, 'biblioteca');
-  await esperar('Em construção', () => pag.evaluate(() => !!document.querySelector('#biblioteca-em-construcao')), v => v === true, 15000);
+  await esperar('sem pacotes', () => pag.evaluate(() => !!document.querySelector('#biblioteca-sem-pacotes')), v => v === true, 15000);
   await pausa(600);
   await tirar(pag, '.conteudo');
 
