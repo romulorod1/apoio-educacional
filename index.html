@@ -219,6 +219,7 @@
       <div class="barra" style="margin-bottom:12px">
         <h2 class="titulo">Biblioteca</h2>
         <span class="cresce"></span>
+        <button class="btn pequeno" id="btn-guia-listas" type="button" style="margin-right:8px">Como usar as listas</button>
         <div id="bib-contagem" class="ajuda" style="margin:0;font-weight:600"></div>
       </div>
       <div class="cartao" id="bib-busca-cartao" style="margin-bottom:14px;padding:12px 14px;display:none">
@@ -311,8 +312,9 @@
           no lugar. Nunca é preciso desinstalar e instalar de novo.
         </p>
         <div id="estado-versao"></div>
-        <div class="barra" style="margin-bottom:0">
+        <div class="barra" style="margin-bottom:0;gap:8px">
           <button class="btn" id="procurar-atualizacao" type="button">Procurar atualização</button>
+          <button class="btn" id="ver-novidades-ajustes" type="button">Novidades e guia das listas</button>
         </div>
       </div>
     </section>
@@ -517,13 +519,16 @@
   </div>
 
   <div class="fundo-modal" id="modal-novidades">
-    <div class="modal" style="max-width:520px">
+    <div class="modal modal-novidades-carrossel" style="max-width:520px">
       <div class="modal-cabecalho">
-        <h3>Atualização: veja o que mudou</h3>
+        <h3 id="titulo-modal-novidades">Novidades</h3>
         <button class="fechar" data-fechar type="button" aria-label="Fechar">&times;</button>
       </div>
       <div class="modal-corpo" id="corpo-modal-novidades"></div>
-      <div class="modal-rodape">
+      <div class="modal-rodape" id="rodape-modal-novidades" style="display:flex;align-items:center;gap:10px">
+        <button class="btn" id="btn-carrossel-voltar" type="button" style="display:none">Voltar</button>
+        <div class="carrossel-indicadores" id="carrossel-indicadores"></div>
+        <span class="cresce"></span>
         <button class="btn principal" id="entendi-novidades" type="button">Entendi</button>
       </div>
     </div>

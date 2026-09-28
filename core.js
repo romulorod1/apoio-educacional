@@ -2861,7 +2861,10 @@
       var f = calcularFechamento(db, a.id, mesIso, hojeRef);
       if (f && f.linhas.length) out.push(f);
     });
-    out.sort(function (x, y) { return y.totalValor - x.totalValor; });
+    out.sort(function (x, y) {
+      return String(x.alunoNome || '').localeCompare(String(y.alunoNome || ''), 'pt-BR') ||
+        String(x.aluno && x.aluno.id || '').localeCompare(String(y.aluno && y.aluno.id || ''));
+    });
     return out;
   }
 
