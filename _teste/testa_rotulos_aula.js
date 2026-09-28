@@ -161,7 +161,9 @@ const fC2b = Core.calcularFechamento({
   aulas: [{ id: 'c2b', alunoId: 'aluno-c', data: amanha, hora: '10:00', duracaoMin: 60, status: 'cancelada', cobravel: true }]
 }, 'aluno-c', '2026-09', hoje);
 conf('C2b: valorFeito até hoje continua R$ 0', fC2b.valorFeito, 0);
-conf('C2b: valorPrevisto registra os R$ 100', fC2b.valorPrevisto, 100);
+conf('C2b: valorPrevisto ativo é R$ 0 (sem aulas ativas à frente)', fC2b.valorPrevisto, 0);
+conf('C2b: valorCanceladasFuturas registra os R$ 100', fC2b.valorCanceladasFuturas, 100);
+conf('C2b: totalValor do mês registra os R$ 100', fC2b.totalValor, 100);
 const mdC2b = Core.markdownFechamento(fC2b, {});
 conf('C2b: "Datas trabalhadas" não inclui a aula futura cancelada', mdC2b.indexOf('Nenhuma aula aconteceu até') > 0, true);
 conf('C2b: Total destas datas até hoje permanece R$ 0,00', mdC2b.indexOf('**Total destas datas até ' + Core.ddmm(hoje) + ':** R$ 0,00') > 0, true);
@@ -209,6 +211,25 @@ conf('C6: exatamente 1 encontro ainda marcado (cancelamento não vira 2ª aula)'
 const mdC6 = Core.markdownFechamento(fC6, {});
 conf('C6: "Ainda marcadas" tem Reposição agendada', mdC6.indexOf('| Reposição agendada |') > 0, true);
 conf('C6: "Ainda marcadas" diz 1 encontro', mdC6.indexOf('**Encontros ainda marcados:** 1') > 0, true);
+
+// C6b: Futura cancelada cobrada + Futura reposição cobrada (totais previstos isolados)
+const fC6b = Core.calcularFechamento({
+  alunos: [alunoPadrao],
+  aulas: [
+    { id: 'c2cobravel', alunoId: 'aluno-c', data: amanha, hora: '10:00', duracaoMin: 60, status: 'cancelada', cobravel: true },
+    { id: 'c5', alunoId: 'aluno-c', data: '2026-09-30', hora: '10:00', duracaoMin: 60, status: 'reposicao', cobravel: true }
+  ]
+}, 'aluno-c', '2026-09', hoje);
+conf('C6b: Total previsto ativo R$ 100 (apenas a reposição)', fC6b.valorPrevisto, 100);
+conf('C6b: Encontros ainda marcados é exatamente 1 (não conta a cancelada)', fC6b.qtdEncontrosPrevistos, 1);
+conf('C6b: Horas ainda por dar é 1:00 h', fC6b.horasPrevistas, '1:00');
+conf('C6b: Total geral do mês inclui os R$ 200 das duas aulas', fC6b.totalValor, 200);
+const mdC6b = Core.markdownFechamento(fC6b, {});
+conf('C6b: Subtotal de ainda marcadas diz 1 encontro e R$ 100', mdC6b.indexOf('**Encontros ainda marcados:** 1') > 0 && mdC6b.indexOf('**Valor destas datas:** R$ 100,00') > 0, true);
+conf('C6b: Cancelada cobrável figura em "Aulas canceladas à frente"', mdC6b.indexOf('## Aulas canceladas à frente') > 0, true);
+conf('C6b: Total do mês reflete os R$ 200', mdC6b.indexOf('R$ 200,00') > 0, true);
+const pdfC6b = PDF.gerarFechamento(fC6b, {});
+conf('C6b: PDF gerado com sucesso para cenário C6b', pdfC6b && pdfC6b.length > 0, true);
 
 // C7: Passada cancelada com cobrança explícita permitida
 const fC7 = Core.calcularFechamento({

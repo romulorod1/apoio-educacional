@@ -2677,8 +2677,12 @@
       if (cobravel) {
         totalMin += dur;
         totalValor += valor;
-        if (futura) minPrevistos += dur;
-        else { minFeitos += dur; valorFeito += valor; }
+        if (futura) {
+          if (au.status !== 'cancelada') minPrevistos += dur;
+        } else {
+          minFeitos += dur;
+          valorFeito += valor;
+        }
         if (vh !== null) {
           var k = String(vh);
           if (!faixas[k]) faixas[k] = { valorHora: vh, minutos: 0, valor: 0 };
@@ -2803,7 +2807,8 @@
      * desconfiança do aplicativo inteiro. */
     var vTotal = Math.round(totalValor * 100) / 100;
     var vFeito = Math.round(valorFeito * 100) / 100;
-    var vPrevisto = Math.round((vTotal - vFeito) * 100) / 100;
+    var valorCanceladasFuturas = Math.round(linhas.filter(function (l) { return l.futura && l.status === 'cancelada' && l.cobravel; }).reduce(function (s, l) { return s + (l.valor || 0); }, 0) * 100) / 100;
+    var vPrevisto = Math.round((vTotal - vFeito - valorCanceladasFuturas) * 100) / 100;
 
     return {
       aluno: aluno,
@@ -2829,6 +2834,7 @@
       minPrevistos: minPrevistos,
       horasPrevistas: fmtHoras(minPrevistos),
       valorPrevisto: vPrevisto,
+      valorCanceladasFuturas: valorCanceladasFuturas,
       faixas: listaFaixas,
       precoUnico: listaFaixas.length === 1 ? listaFaixas[0].valorHora : null,
       /* Os três campos abaixo são a versão "só o que já aconteceu" de faixas,
@@ -2845,7 +2851,7 @@
       areasFeitas: areasFeitas,
       qtdEncontros: linhas.filter(contaEncontro).length,
       qtdEncontrosFeitos: linhas.filter(function (l) { return contaEncontro(l) && !l.futura; }).length,
-      qtdEncontrosPrevistos: linhas.filter(function (l) { return contaEncontro(l) && l.futura; }).length
+      qtdEncontrosPrevistos: linhas.filter(function (l) { return l.futura && l.status !== 'cancelada'; }).length
     };
   }
 
@@ -2879,15 +2885,14 @@
       t.minutos += f.totalMin || 0;
       t.valor += f.totalValor || 0;
       t.minFeitos += f.minFeitos || 0;
-      t.valorFeito += f.valorFeito || 0;
       t.minPrevistos += f.minPrevistos || 0;
+      t.valorPrevisto += f.valorPrevisto || 0;
       t.minutosDadosSemCobrar += f.minutosDadosSemCobrar || 0;
       t.minutosDesmarcados += f.minutosDesmarcados || 0;
     });
     t.valor = Math.round(t.valor * 100) / 100;
     t.valorFeito = Math.round(t.valorFeito * 100) / 100;
-    /* Pela mesma razão de sempre: feito mais previsto tem que dar o total. */
-    t.valorPrevisto = Math.round((t.valor - t.valorFeito) * 100) / 100;
+    t.valorPrevisto = Math.round(t.valorPrevisto * 100) / 100;
     return t;
   }
 

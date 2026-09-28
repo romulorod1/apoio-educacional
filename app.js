@@ -1369,7 +1369,7 @@
     var hoje = Core.hojeIso();
     var doMes = db.aulas.filter(function (a) { return Core.mesDe(a.data) === mesAtual; });
     var minutos = 0, valor = 0;
-    var minFeitos = 0, valorFeito = 0, minPrevistos = 0, valorPrevisto = 0;
+    var minFeitos = 0, valorFeito = 0, minPrevistos = 0, valorPrevisto = 0, valorCanceladasFuturas = 0;
     var encontrosFeitos = 0, encontrosPrevistos = 0;
     doMes.forEach(function (a) {
       /* A aula de hoje conta como dada: só o que vem depois de hoje é previsto. */
@@ -1378,7 +1378,11 @@
       var futura = a.data > hoje;
       var contaEncontro = cobravel || a.status !== 'cancelada';
       if (contaEncontro) {
-        if (futura) encontrosPrevistos++; else encontrosFeitos++;
+        if (futura) {
+          if (a.status !== 'cancelada') encontrosPrevistos++;
+        } else {
+          encontrosFeitos++;
+        }
       }
       if (!cobravel) return;
       var dur = a.duracaoMin || 0;
@@ -1387,14 +1391,18 @@
       var v = pv ? (dur / 60) * pv.valorHora : 0;
       minutos += dur;
       valor += v;
-      if (futura) minPrevistos += dur;
-      else { minFeitos += dur; valorFeito += v; }
+      if (futura) {
+        if (a.status !== 'cancelada') minPrevistos += dur;
+        else valorCanceladasFuturas += v;
+      } else {
+        minFeitos += dur; valorFeito += v;
+      }
     });
     /* O previsto sai por diferença para que os dois números da caixa somem
      * sempre o total do mês na tela, mesmo quando a hora não divide redondo. */
     valor = Math.round(valor * 100) / 100;
     valorFeito = Math.round(valorFeito * 100) / 100;
-    valorPrevisto = Math.round((valor - valorFeito) * 100) / 100;
+    valorPrevisto = Math.round((valor - valorFeito - valorCanceladasFuturas) * 100) / 100;
 
     var alunosNoMes = {};
     doMes.forEach(function (a) { alunosNoMes[a.alunoId] = true; });
