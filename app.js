@@ -8646,6 +8646,23 @@
       return item;
     }
 
+    function linhaComDisponibilidade(titulo, detalhe, assunto, aoTocar) {
+      var item = linha(titulo, detalhe, aoTocar);
+      item._assuntoDisponibilidade = assunto;
+      item._detalheBase = detalhe;
+      return item;
+    }
+
+    function atualizarDisponibilidadeVisivel() {
+      Array.prototype.forEach.call(lista.querySelectorAll('.item-assunto'), function (item) {
+        if (!item._assuntoDisponibilidade) return;
+        var detalhe = item.querySelector('.detalhe');
+        if (!detalhe) return;
+        var disponivel = resumoDisponibilidadeDoAssunto(item._assuntoDisponibilidade);
+        detalhe.textContent = item._detalheBase + (disponivel ? ' · ' + disponivel : '');
+      });
+    }
+
     function voltarPara(rotulo, titulo, aoTocar) {
       return el('div', { class: 'barra', style: 'margin-bottom:8px' }, [
         el('button', { type: 'button', class: 'btn pequeno', texto: '‹ Voltar', aoClick: aoTocar }),
@@ -8708,12 +8725,11 @@
       if (sugestoes.length) {
         lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Sugestões para este aluno' }));
         sugestoes.forEach(function (s) {
-          var disponivel = resumoDisponibilidadeDoAssunto(s.item);
-          lista.appendChild(linha(s.item.titulo, s.detalhe +
-            (disponivel ? ' · ' + disponivel : ''), function () {
+          lista.appendChild(linhaComDisponibilidade(s.item.titulo, s.detalhe, s.item, function () {
             registrarAssunto(aula, s.item);
           }));
         });
+        atualizarDisponibilidadeVisivel();
       }
 
       // 3. Por matéria, com a matemática
@@ -8902,22 +8918,21 @@
         ]));
       }
       achados.slice(0, LIMITE).forEach(function (a) {
-        var disponivel = resumoDisponibilidadeDoAssunto(a.item);
-        lista.appendChild(linha(a.titulo, a.detalhe +
-          (disponivel ? ' · ' + disponivel : ''), function () {
+        lista.appendChild(linhaComDisponibilidade(a.titulo, a.detalhe, a.item, function () {
           registrarAssunto(aula, a.item);
         }));
       });
+      atualizarDisponibilidadeVisivel();
       if (exatos) lista.appendChild(livre);
     }
 
     desenhar();
     /* A escolha de assunto não espera a biblioteca inteira abrir. Quando o
-     * índice instalado chega, acrescenta apenas sinais positivos de material,
-     * preservando o que ela já digitou e todos os assuntos disponíveis. */
+     * índice instalado chega, atualiza só as descrições das linhas existentes:
+     * substituir o campo ativo interromperia a escrita no teclado do tablet. */
     if (temPacoteBiblioteca || (bib && bib.pacotes.length)) {
       carregarBiblioteca().then(function () {
-        if (lista.isConnected) desenhar();
+        if (lista.isConnected) atualizarDisponibilidadeVisivel();
       }).catch(function () { /* registrar assunto continua possível */ });
     }
   }
@@ -9097,7 +9112,7 @@
         var disponivel = opcoes.aoEscolher ? resumoDisponibilidadeDoAssunto({
           id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: materiaDoTemaId(t.id)
         }) : '';
-        lista.appendChild(el('div', { class: 'item-lista item-tema' }, [
+        var linhaTema = el('div', { class: 'item-lista item-tema' }, [
           el('div', { class: 'cresce' }, [
             el('div', { class: 'nome' }, [
               document.createTextNode(t.pt.titulo),
@@ -9108,7 +9123,7 @@
               rotulo ? el('span', { class: 'tag', texto: rotulo, style: 'margin-left:6px' }) : null
             ].filter(Boolean)),
             el('div', { class: 'detalhe', texto: t.pt.resumo }),
-            disponivel ? el('div', { class: 'detalhe', texto: disponivel }) : null,
+            el('div', { class: 'detalhe bib-disponibilidade-tema', hidden: !disponivel, texto: disponivel }),
             el('div', {
               class: 'detalhe',
               /* A contagem de exercícios é do MATERIAL: fora do ar o material,
@@ -9118,7 +9133,7 @@
               texto: (MATERIAL_AUTORAL_NO_AR ? t.qtd + ' exercícios · cerca de ' : 'cerca de ') +
                 t.duracaoMin + ' minutos · dificuldade ' + t.dificuldade + ' de 5'
             })
-          ].filter(Boolean)),
+          ]),
           el('button', {
             type: 'button', class: 'btn pequeno principal',
             texto: opcoes.rotuloEscolher || 'Escolher',
@@ -9128,7 +9143,23 @@
               if (MATERIAL_AUTORAL_NO_AR) abrirMontagem(t, aula, aluno, opcoes);
             }
           })
-        ]));
+        ]);
+        linhaTema._temaDisponibilidade = t;
+        lista.appendChild(linhaTema);
+      });
+    }
+
+    function atualizarDisponibilidadeVisivel() {
+      Array.prototype.forEach.call(lista.querySelectorAll('.item-tema'), function (linhaTema) {
+        var t = linhaTema._temaDisponibilidade;
+        if (!t) return;
+        var detalhe = linhaTema.querySelector('.bib-disponibilidade-tema');
+        if (!detalhe) return;
+        var disponivel = resumoDisponibilidadeDoAssunto({
+          id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: materiaDoTemaId(t.id)
+        });
+        detalhe.textContent = disponivel;
+        detalhe.hidden = !disponivel;
       });
     }
 
@@ -9142,7 +9173,7 @@
     redesenhar();
     if (opcoes.aoEscolher && (temPacoteBiblioteca || (bib && bib.pacotes.length))) {
       carregarBiblioteca().then(function () {
-        if (lista.isConnected) redesenhar();
+        if (lista.isConnected) atualizarDisponibilidadeVisivel();
       }).catch(function () { /* assuntos continuam registráveis */ });
     }
 

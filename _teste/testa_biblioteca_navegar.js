@@ -502,6 +502,47 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   conf('a série tem mais de uma aula', colou.valor && colou.valor.aulas > 1, true);
   conf('e a aula do dia recebeu a página na folha', colou.valor && colou.valor.temImagem, true);
 
+  // ================================================================
+  secao('9. Material carregando não interrompe a escrita do assunto');
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.abrirApp(pag, amb.ORIGEM);
+  await pag.evaluate(() => {
+    const ler = Store.itensDaBiblioteca;
+    Store.itensDaBiblioteca = function () {
+      return new Promise((resolve, reject) => setTimeout(() => ler.call(Store).then(v => {
+        window.__bibReadDone = true;
+        resolve(v);
+      }, reject), 700));
+    };
+  });
+  await H.irParaAba(pag, 'agenda');
+  for (let i = 0; i < 24; i++) {
+    if (await pag.evaluate(h => !!document.querySelector('[data-dia="' + h + '"]'), hojeIso)) break;
+    await pag.click(i < 12 ? '#mes-seguinte' : '#mes-anterior');
+    await pausa(100);
+  }
+  await pag.evaluate(h => document.querySelector('[data-dia="' + h + '"] .pilula').click(), hojeIso);
+  await esperar('aula para registrar assunto', () => pag.$eval('#modal-aula', e => e.classList.contains('aberto')), v => v === true, 5000);
+  await pag.evaluate(() => Array.from(document.querySelectorAll('#corpo-modal-aula button'))
+    .find(b => /assunto da aula/i.test(b.textContent)).click());
+  await esperar('campo livre pronto', () => pag.evaluate(() => !!document.querySelector('#assunto-outro')), v => v === true, 5000);
+  await pag.evaluate(() => {
+    window.__campoAssuntoAntes = document.querySelector('#assunto-outro');
+    window.__campoAssuntoAntes.focus();
+    window.__campoAssuntoAntes.value = 'Frações revisadas';
+  });
+  await esperar('biblioteca carregada em segundo plano', () => pag.evaluate(() => !!window.__bibReadDone),
+    v => v === true, 5000);
+  await pausa(50);
+  const focoAssunto = await pag.evaluate(() => ({
+    mesmoCampo: document.querySelector('#assunto-outro') === window.__campoAssuntoAntes,
+    foco: document.activeElement === window.__campoAssuntoAntes,
+    texto: window.__campoAssuntoAntes.value
+  }));
+  conf('a atualização preserva o mesmo campo', focoAssunto.mesmoCampo, true);
+  conf('a atualização preserva o foco de escrita', focoAssunto.foco, true);
+  conf('a atualização preserva o texto digitado', focoAssunto.texto, 'Frações revisadas');
+
   if (pag.errosDePagina.length) console.log('   erros de página: ' + pag.errosDePagina.join(' | ').slice(0, 400));
   conf('nenhum erro de JavaScript na página', pag.errosDePagina.length, 0);
 })().then(() => H.fim(amb)(), e => H.fim(amb)(e));
