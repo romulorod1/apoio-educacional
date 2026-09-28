@@ -37,6 +37,23 @@ async function simularAnoLegadoSoNoMapa(pag) {
     };
   }));
 }
+async function simularConflitoLegado(pag) {
+  await pag.evaluate(() => new Promise(resolve => {
+    const req = indexedDB.open('apoio-educacional');
+    req.onsuccess = () => {
+      const db = req.result;
+      const t = db.transaction('dados', 'readwrite');
+      const s = t.objectStore('dados');
+      const get = s.get('principal');
+      get.onsuccess = () => {
+        const dados = get.result;
+        dados.alunos.find(x => x.nome === 'Teste Ano Escolar').anoEscolar = '07';
+        s.put(dados, 'principal');
+      };
+      t.oncomplete = () => { db.close(); resolve(); };
+    };
+  }));
+}
 async function abrirFicha(pag) {
   await pag.evaluate(() => {
     const linha = [...document.querySelectorAll('#lista-alunos .item-lista')]
@@ -117,7 +134,7 @@ async function salvarMapa(pag) {
   secao('Ano livre e não informado');
   await abrirFicha(pag);
   await selecionar(pag, '#campo-ano-escolar', 'outro');
-  conf('campo livre aparece', await pag.$eval('#caixa-ano-escolar-outro', e => e.hidden), false);
+  conf('campo livre aparece', await pag.$eval('#caixa-ano-escolar-outro', e => getComputedStyle(e).display !== 'none'), true);
   await pag.$eval('#campo-ano-escolar-outro', e => { e.value = '1º período'; e.dispatchEvent(new Event('input', { bubbles: true })); });
   await salvarFicha(pag);
   a = await aluno(pag);
@@ -141,11 +158,49 @@ async function salvarMapa(pag) {
   await salvarFicha(pag);
   a = await aluno(pag);
   conf('edição sincroniza registro legado', a.anoEscolar + '/' + a.mapeamentos[1].anoEscolar, '09/09');
+
+  secao('Conflito legado entre ficha e mapeamento');
+  await simularConflitoLegado(pag);
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.irParaAba(pag, 'alunos');
+  await abrirFicha(pag);
+  conf('ficha dá prioridade ao mapa atual', await pag.$eval('#campo-ano-escolar', e => e.value), '09');
+  await salvarFicha(pag);
+  a = await aluno(pag);
+  conf('salvar reconcilia topo com mapa mesmo sem mudar seletor', a.anoEscolar + '/' + a.mapeamentos[1].anoEscolar, '09/09');
+  conf('mapa anterior segue preservado', a.mapeamentos[0].anoEscolar, '06');
+
+  secao('Texto livre preservado ao fazer primeiro mapeamento');
+  await pag.$eval('#novo-aluno', e => e.click());
+  await pag.$eval('#campo-nome', e => { e.value = 'Teste Ano Livre'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  conf('campo livre oculto no cadastro normal', await pag.$eval('#caixa-ano-escolar-outro', e => getComputedStyle(e).display), 'none');
+  await selecionar(pag, '#campo-ano-escolar', 'outro');
+  await pag.$eval('#campo-ano-escolar-outro', e => { e.value = '1º período'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  await salvarFicha(pag);
+  await pag.evaluate(() => [...document.querySelectorAll('#lista-alunos .item-lista')]
+    .find(e => e.textContent.includes('Teste Ano Livre')).click());
+  await pag.evaluate(() => [...document.querySelectorAll('.aba-perfil')]
+    .find(e => e.textContent.trim() === 'Mapeamento').click());
+  await pag.$eval('#mapear-aluno', e => e.click());
+  await pag.waitForSelector('#modal-mapeamento.aberto #mapa-ano');
+  conf('mapeamento lê texto livre da ficha', await pag.$eval('#mapa-ano-outro', e => e.value), '1º período');
+  await salvarMapa(pag);
+  const livre = (await banco(pag)).alunos.find(x => x.nome === 'Teste Ano Livre');
+  conf('primeiro mapa preserva texto livre', livre.anoEscolarOutro + '/' + livre.mapeamentos[0].anoEscolarOutro, '1º período/1º período');
+
   const backup = await pag.evaluate(async () => {
     const b = await Store.carregar();
     const p = await Store.exportarTudo(b);
-    return JSON.stringify(p).includes('Teste Ano Escolar') && JSON.stringify(p).includes('"anoEscolar":"09"');
+    const presente = JSON.stringify(p).includes('Teste Ano Escolar') &&
+      JSON.stringify(p).includes('"anoEscolar":"09"');
+    await Store.importarTudo(p);
+    const restaurado = await Store.carregar();
+    const a = restaurado.alunos.find(x => x.nome === 'Teste Ano Escolar');
+    const l = restaurado.alunos.find(x => x.nome === 'Teste Ano Livre');
+    return { presente, restaurado: a.anoEscolar === '09' &&
+      l.anoEscolar === 'outro' && l.anoEscolarOutro === '1º período' };
   });
-  conf('backup mantém o ano escolar', backup, true);
+  conf('backup contém ano escolar', backup.presente, true);
+  conf('restauração mantém ano comum e livre', backup.restaurado, true);
   conf('não houve erro de página', pag.errosDePagina.length, 0);
 })().then(H.fim(amb), H.fim(amb));

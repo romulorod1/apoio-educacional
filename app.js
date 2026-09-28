@@ -3123,7 +3123,7 @@
       el('span', { texto: 'Qual ano ou etapa?' }), campoAnoOutro
     ]);
     function mostrarAnoOutro() {
-      caixaAnoOutro.hidden = !Core.anoEscolarLivre(selecaoAno.value);
+      caixaAnoOutro.style.display = Core.anoEscolarLivre(selecaoAno.value) ? '' : 'none';
     }
     selecaoAno.addEventListener('change', mostrarAnoOutro);
     painel.dados.appendChild(el('label', { class: 'campo' }, [
@@ -5522,16 +5522,15 @@
     if (erros.length) { avisar(erros[0]); return; }
 
     if (alunoEmEdicao) {
-      var anoAntes = anoEscolarCadastrado(alunoEmEdicao);
-      if (anoNovo !== anoAntes.ano ||
-          (Core.anoEscolarLivre(anoNovo) && anoOutroNovo !== anoAntes.outro)) {
-        alunoEmEdicao.anoEscolar = anoNovo;
-        alunoEmEdicao.anoEscolarOutro = Core.anoEscolarLivre(anoNovo) ? anoOutroNovo : '';
-        var mapaAtual = Core.mapeamentoAtual(alunoEmEdicao);
-        if (mapaAtual) {
-          mapaAtual.anoEscolar = anoNovo;
-          mapaAtual.anoEscolarOutro = Core.anoEscolarLivre(anoNovo) ? anoOutroNovo : '';
-        }
+      /* A ficha mostra o ano do mapa atual quando há divergência legada.
+       * Ao salvar, reconcilia as duas cópias mesmo que ela não tenha tocado
+       * no seletor; mapas anteriores continuam intactos. */
+      alunoEmEdicao.anoEscolar = anoNovo;
+      alunoEmEdicao.anoEscolarOutro = Core.anoEscolarLivre(anoNovo) ? anoOutroNovo : '';
+      var mapaAtual = Core.mapeamentoAtual(alunoEmEdicao);
+      if (mapaAtual) {
+        mapaAtual.anoEscolar = anoNovo;
+        mapaAtual.anoEscolarOutro = Core.anoEscolarLivre(anoNovo) ? anoOutroNovo : '';
       }
       alunoEmEdicao.nome = nome;
       alunoEmEdicao.responsavel = $('#campo-responsavel').value.trim();
@@ -6094,6 +6093,7 @@
       placeholder: 'Escreva qual, por exemplo: 1º período de engenharia'
     });
     campoAnoLivre.value = trabalho.anoEscolarOutro || aluno.anoEscolarOutro || '';
+    trabalho.anoEscolarOutro = campoAnoLivre.value;
     campoAnoLivre.addEventListener('input', function () { trabalho.anoEscolarOutro = this.value; });
     var caixaAnoLivre = el('label', {
       class: 'campo', id: 'caixa-ano-outro', style: 'display:none'
