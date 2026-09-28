@@ -83,6 +83,7 @@
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
+  var diaComZoom = null;
   var editorAtual = null;
   var aulaEmEdicao = null;
   var alunoEmEdicao = null;
@@ -1536,7 +1537,27 @@
 
     $('#mes-anterior').addEventListener('click', function () { irParaMes(Core.mesAdjacente(mesAtual, -1)); });
     $('#mes-seguinte').addEventListener('click', function () { irParaMes(Core.mesAdjacente(mesAtual, 1)); });
-    $('#ir-para-hoje').addEventListener('click', function () { irParaMes(Core.mesDe(Core.hojeIso())); });
+    $('#ir-para-hoje').addEventListener('click', function () {
+      var hoje = Core.hojeIso();
+      var mesHoje = Core.mesDe(hoje);
+      if (mesAtual === mesHoje && diaComZoom === hoje) {
+        diaComZoom = null;
+        desenharAgenda();
+      } else {
+        irParaMes(mesHoje, hoje);
+      }
+    });
+    window.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' || ev.keyCode === 27) {
+        if (diaComZoom) {
+          var modalAberto = document.querySelector('.fundo-modal.aberto, .modal-fundo.aberto, .modal.aberto');
+          if (!modalAberto) {
+            diaComZoom = null;
+            desenharAgenda();
+          }
+        }
+      }
+    });
     $('#nova-aula').addEventListener('click', function () { abrirAula(null, Core.hojeIso()); });
     $('#novo-aluno').addEventListener('click', function () { abrirAluno(null); });
     var btnGuiaBib = $('#btn-guia-listas');
@@ -1611,8 +1632,9 @@
     });
   }
 
-  function irParaMes(mes) {
+  function irParaMes(mes, diaParaZoom) {
     mesAtual = mes;
+    diaComZoom = diaParaZoom || null;
     var criadas = Core.garantirSeriesAte(db, mes);
     var p = criadas ? salvar() : Promise.resolve();
     p.then(function () {
@@ -1655,6 +1677,151 @@
   }
 
   function palavraPlural(n, um, muitos) { return n === 1 ? um : muitos; }
+
+  function formatarDataExtensa(iso) {
+    var p = String(iso).split('-');
+    var ano = p[0];
+    var mesNum = parseInt(p[1], 10) - 1;
+    var diaNum = parseInt(p[2], 10);
+    var diaSem = Core.diaSemanaLongo(iso);
+    var semCap = diaSem ? (diaSem.charAt(0).toUpperCase() + diaSem.slice(1) + (diaSem === 'domingo' || diaSem === 'sábado' ? '' : '-feira')) : '';
+    var mesNome = Core.MESES[mesNum] ? Core.MESES[mesNum].toLowerCase() : '';
+    return (semCap ? semCap + ', ' : '') + diaNum + ' de ' + mesNome + ' de ' + ano;
+  }
+
+  function calcularHoraFim(horaInicio, duracaoMin) {
+    if (!horaInicio || typeof horaInicio !== 'string' || horaInicio.indexOf(':') < 0) return '';
+    var p = horaInicio.split(':');
+    var h = parseInt(p[0], 10);
+    var m = parseInt(p[1], 10);
+    if (isNaN(h) || isNaN(m)) return '';
+    var totalMin = h * 60 + m + (duracaoMin || 60);
+    var fh = Math.floor(totalMin / 60) % 24;
+    var fm = totalMin % 60;
+    return Core.pad2(fh) + ':' + Core.pad2(fm);
+  }
+
+  function alternarZoomDia(dia, forcarAberto) {
+    if (!forcarAberto && diaComZoom === dia) {
+      diaComZoom = null;
+    } else {
+      diaComZoom = dia;
+    }
+    desenharAgenda();
+    if (diaComZoom) {
+      var p = $('#painel-zoom-dia');
+      if (p && typeof p.scrollIntoView === 'function') {
+        p.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  }
+
+  function desenharPainelZoomDia(painel, dia) {
+    if (!painel) return;
+    if (!dia || Core.mesDe(dia) !== mesAtual) {
+      painel.style.display = 'none';
+      painel.innerHTML = '';
+      return;
+    }
+    painel.style.display = 'block';
+    painel.innerHTML = '';
+
+    var hoje = (dia === Core.hojeIso());
+    var feriado = Core.feriadoEm(dia);
+    var doDia = db.aulas.filter(function (a) { return a.data === dia; })
+      .sort(function (x, y) { return String(x.hora).localeCompare(String(y.hora)); });
+
+    var cabecalho = el('div', { class: 'zoom-dia-cabecalho' }, [
+      el('div', { class: 'zoom-dia-info' }, [
+        el('span', { class: 'zoom-dia-icone', texto: '🔍' }),
+        el('h3', { class: 'zoom-dia-titulo', texto: formatarDataExtensa(dia) }),
+        hoje ? el('span', { class: 'tag zoom-tag-hoje', texto: 'Hoje' }) : null,
+        feriado ? el('span', {
+          class: 'tag zoom-tag-feriado' + (feriado.facultativo ? ' facultativo' : ''),
+          title: feriado.nome + (feriado.ambito ? ' (' + feriado.ambito + ')' : ''),
+          texto: feriado.nome + (feriado.facultativo ? ' (facultativo)' : '')
+        }) : null
+      ].filter(Boolean)),
+      el('button', {
+        type: 'button',
+        class: 'btn pequeno zoom-btn-fechar',
+        'aria-label': 'Fechar destaque do dia',
+        texto: '✕ Fechar destaque',
+        aoClick: function () {
+          diaComZoom = null;
+          desenharAgenda();
+        }
+      })
+    ]);
+    painel.appendChild(cabecalho);
+
+    var corpo = el('div', { class: 'zoom-dia-corpo' });
+    if (doDia.length === 0) {
+      corpo.appendChild(el('div', { class: 'zoom-dia-vazio' }, [
+        el('p', { texto: 'Nenhum encontro agendado para este dia.' }),
+        el('p', { class: 'zoom-dia-vazio-dica', texto: 'Toque no botão abaixo para agendar uma nova aula.' })
+      ]));
+    } else {
+      var lista = el('div', { class: 'zoom-dia-aulas' });
+      doDia.forEach(function (a) {
+        var aluno = alunoPorId(a.alunoId);
+        var nomeAluno = aluno ? aluno.nome : 'Aluno removido';
+        var corAluno = aluno ? aluno.cor : '#9AA3AF';
+        var durMin = a.duracaoMin || 60;
+        var horaFim = calcularHoraFim(a.hora, durMin);
+        var rotuloSituacao = Core.rotuloSituacao ? Core.rotuloSituacao(a.status, a.data, Core.hojeIso())
+          : ((Core.STATUS[a.status] && Core.STATUS[a.status].rotulo) || a.status || 'Realizada');
+        var serieRotulo = aluno ? rotuloAnoEscolar(aluno) : '';
+
+        var horaTexto = a.hora ? (a.hora + (horaFim ? ' às ' + horaFim : '')) : 'Sem horário';
+        var card = el('button', {
+          type: 'button',
+          class: 'card-aula-zoom' + (a.status === 'cancelada' ? ' cancelada' : ''),
+          'data-aula-id': a.id,
+          'aria-label': 'Abrir aula de ' + nomeAluno + ' às ' + horaTexto,
+          aoClick: function () {
+            abrirAula(a.id, null);
+          }
+        }, [
+          el('div', { class: 'card-aula-zoom-faixa', style: 'background:' + corAluno }),
+          el('div', { class: 'card-aula-zoom-conteudo' }, [
+            el('div', { class: 'card-aula-zoom-topo' }, [
+              el('span', { class: 'card-aula-zoom-hora', texto: horaTexto + ' (' + durMin + ' min)' }),
+              el('span', { class: 'tag card-aula-zoom-status', texto: rotuloSituacao }),
+              a.tipo === 'mapeamento' ? el('span', { class: 'tag', texto: 'Mapeamento' }) : null,
+              a.temNota ? el('span', { class: 'tag tag-nota', texto: '✎ Com anotações' }) : null
+            ].filter(Boolean)),
+            el('div', { class: 'card-aula-zoom-aluno' }, [
+              el('span', { class: 'bolinha', style: 'background:' + corAluno }),
+              el('strong', { class: 'card-aula-zoom-nome', texto: nomeAluno }),
+              serieRotulo ? el('span', { class: 'card-aula-zoom-serie', texto: '· ' + serieRotulo }) : null
+            ].filter(Boolean)),
+            a.conteudo ? el('div', { class: 'card-aula-zoom-resumo', texto: a.conteudo }) : null
+          ]),
+          el('span', {
+            class: 'btn pequeno card-aula-zoom-btn',
+            'aria-hidden': 'true',
+            texto: 'Abrir aula ›'
+          })
+        ]);
+        lista.appendChild(card);
+      });
+      corpo.appendChild(lista);
+    }
+    painel.appendChild(corpo);
+
+    var rodape = el('div', { class: 'zoom-dia-rodape' }, [
+      el('button', {
+        type: 'button',
+        class: 'btn principal',
+        texto: '+ Nova aula neste dia',
+        aoClick: function () {
+          abrirAula(null, dia);
+        }
+      })
+    ]);
+    painel.appendChild(rodape);
+  }
 
   function desenharAgenda() {
     $('#rotulo-mes').textContent = Core.mesExtenso(mesAtual);
@@ -1732,6 +1899,11 @@
       ]));
     }
 
+    var painelZoom = $('#painel-zoom-dia');
+    if (painelZoom) {
+      desenharPainelZoomDia(painelZoom, diaComZoom);
+    }
+
     var grade = $('#grade-mes');
     grade.innerHTML = '';
     var caixa = el('div', { class: 'grade-mes' });
@@ -1757,10 +1929,24 @@
       var doDia = db.aulas.filter(function (a) { return a.data === iso; })
         .sort(function (x, y) { return String(x.hora).localeCompare(String(y.hora)); });
       var feriado = Core.feriadoEm(iso);
-      var classe = 'dia' + (iso === hoje ? ' hoje' : '') + (feriado && !feriado.facultativo ? ' feriado' : '');
-      var celula = el('div', { class: classe, 'data-dia': iso }, [
+      var ehZoom = (iso === diaComZoom);
+      var classe = 'dia' + (iso === hoje ? ' hoje' : '') +
+        (feriado && !feriado.facultativo ? ' feriado' : '') +
+        (ehZoom ? ' em-zoom' : '');
+      var celula = el('div', {
+        class: classe,
+        'data-dia': iso,
+        role: 'button',
+        tabindex: '0',
+        'aria-controls': 'painel-zoom-dia',
+        'aria-expanded': ehZoom ? 'true' : 'false',
+        'aria-label': 'Dia ' + d + (feriado ? ', ' + feriado.nome : '') + (ehZoom ? ' (em destaque)' : '')
+      }, [
         el('div', { class: 'num', texto: String(d) })
       ]);
+      if (ehZoom) {
+        celula.appendChild(el('span', { class: 'selo-zoom-celula', texto: 'Zoom' }));
+      }
       if (feriado) {
         celula.appendChild(el('div', {
           class: 'marca-feriado' + (feriado.facultativo ? ' facultativo' : ''),
@@ -1788,7 +1974,16 @@
         celula.appendChild(pil);
       });
       celula.addEventListener('click', (function (dia) {
-        return function () { abrirAula(null, dia); };
+        return function () { alternarZoomDia(dia); };
+      })(iso));
+      celula.addEventListener('keydown', (function (dia) {
+        return function (ev) {
+          if (ev.target !== celula) return;
+          if (ev.key === 'Enter' || ev.key === ' ') {
+            ev.preventDefault();
+            alternarZoomDia(dia);
+          }
+        };
       })(iso));
       caixa.appendChild(celula);
     }
