@@ -10611,7 +10611,7 @@
     rodape.appendChild(el('span', { class: 'cresce' }));
 
     rodape.appendChild(el('button', {
-      type: 'button', class: 'btn',
+      type: 'button', class: 'btn', id: 'btn-doc-familia-md',
       texto: 'Baixar texto',
       aoClick: function () {
         var md = Core.markdownFechamento(estado.f, opcoesDoDocumento({
@@ -10625,25 +10625,35 @@
       }
     }));
 
+    rodape.appendChild(el('span', {
+      class: 'ajuda', id: 'ajuda-doc-familia-folhas',
+      style: 'font-size:11px;max-width:240px;line-height:1.2;align-self:center;margin:0 4px',
+      texto: 'O PDF com folhas anexa ao final os desenhos manuscritos do mês, não exibidos nesta prévia.'
+    }));
+
     rodape.appendChild(el('button', {
-      type: 'button', class: 'btn',
+      type: 'button', class: 'btn', id: 'btn-doc-familia-pdf-folhas',
       texto: 'PDF com as folhas',
+      title: 'Gera o PDF do fechamento e anexa todas as folhas manuscritas do mês ao final',
       aoClick: function () {
         exportarAlunoEmPdf(estado.f, true, {
           exibirTemasEAreas: estado.exibirTemas,
-          incluirNotas: true,
+          incluirNotasPublicas: estado.incluirNotas,
+          incluirFolhas: true,
           mostrarNaoCobradas: estado.mostrarNaoCobradas
         });
       }
     }));
 
     rodape.appendChild(el('button', {
-      type: 'button', class: 'btn principal',
+      type: 'button', class: 'btn principal', id: 'btn-doc-familia-pdf-fechamento',
       texto: 'PDF do fechamento',
+      title: 'Gera o PDF com exatamente o que está visível na prévia ao lado',
       aoClick: function () {
         exportarAlunoEmPdf(estado.f, false, {
           exibirTemasEAreas: estado.exibirTemas,
-          incluirNotas: estado.incluirNotas,
+          incluirNotasPublicas: estado.incluirNotas,
+          incluirFolhas: false,
           mostrarNaoCobradas: estado.mostrarNaoCobradas
         });
       }
@@ -10762,6 +10772,44 @@
         ]));
       }
 
+      // Aulas canceladas à frente se existirem
+      var canceladasFuturas = (estado.f.linhas || []).filter(function (l) { return l.futura && l.status === 'cancelada'; });
+      if (canceladasFuturas.length) {
+        papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: 'Aulas canceladas à frente' }));
+        var tabCanc = el('table', { class: 'previa-tabela' });
+        var theadC = el('thead', {}, [
+          el('tr', {}, [
+            el('th', { texto: 'Data' }),
+            el('th', { texto: 'Dia' }),
+            el('th', { texto: 'Duração' }),
+            el('th', { texto: 'Situação' }),
+            el('th', { class: 'num', texto: 'Valor' })
+          ])
+        ]);
+        var tbodyC = el('tbody');
+        canceladasFuturas.forEach(function (l) {
+          tbodyC.appendChild(el('tr', {}, [
+            el('td', { texto: Core.ddmm(l.data) }),
+            el('td', { texto: l.dia }),
+            el('td', { texto: Core.fmtDuracao(l.duracaoMin) }),
+            el('td', { texto: l.statusNaFolha || l.statusRotulo }),
+            el('td', { class: 'num', texto: dinheiro(l.cobravel ? l.valor : 0) })
+          ]));
+        });
+        tabCanc.appendChild(theadC);
+        tabCanc.appendChild(tbodyC);
+        papelPrevia.appendChild(tabCanc);
+
+        if (!previstas.length && (estado.f.totalValor > 0 || estado.f.valorCanceladasFuturas > 0)) {
+          papelPrevia.appendChild(el('div', { class: 'previa-totais' }, [
+            el('div', {}, [
+              el('strong', { texto: 'Total do mês: ' }),
+              document.createTextNode(dinheiro(estado.f.totalValor) + ' (' + estado.f.qtdEncontros + ' encontro' + (estado.f.qtdEncontros === 1 ? '' : 's') + ', ' + estado.f.totalHoras + ' h)')
+            ])
+          ]));
+        }
+      }
+
       // Pix
       var chave = chavePix();
       if (chave) {
@@ -10805,9 +10853,9 @@
         texto: fbTexto ? fbTexto : '(a preencher)'
       }));
 
-      // Notas públicas das aulas (se marcado)
+      // Notas públicas das aulas (se marcado) - apenas aulas já realizadas
       if (estado.incluirNotas) {
-        var aulasComNota = (estado.f.linhas || []).filter(function (l) { return !!(l.notaTexto || '').trim(); });
+        var aulasComNota = (estado.f.linhas || []).filter(function (l) { return !l.futura && !!(l.notaTexto || '').trim(); });
         if (aulasComNota.length) {
           papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: 'Notas das aulas' }));
           aulasComNota.forEach(function (l) {
@@ -11423,11 +11471,13 @@
 
     passo.then(function (extra) {
       var gen = typeof PDFGen !== 'undefined' ? PDFGen : Pdf;
-      var opts = opcoesDoDocumento(Object.assign({
+      var baseOpts = {
+        incluirFolhas: comFolhas,
         incluirNotas: comFolhas,
         notas: extra.notas,
         imagens: extra.imagens
-      }, extraOpcoes || {}));
+      };
+      var opts = opcoesDoDocumento(Object.assign(baseOpts, extraOpcoes || {}));
       var bytes = gen.gerarFechamento(f, opts);
       entregarArquivo(nomeBase(f) + (comFolhas ? '_com_folhas' : '') + '.pdf',
         new Blob([bytes], { type: 'application/pdf' }),

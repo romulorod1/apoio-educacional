@@ -1294,8 +1294,29 @@
       doc.paragrafo(resumo || ' ', { tam: 10.5, alturaLinha: 15.5 });
     }
 
+    // notas publicas das aulas - apenas aulas realizadas
+    if (opcoes.incluirNotasPublicas) {
+      var linhasComNota = (dados.linhas || []).filter(function (l) { return !l.futura && (l.notaTexto || '').trim(); });
+      if (linhasComNota.length) {
+        doc.y -= 24;
+        doc.garanteEspaco(46);
+        doc.texto('Notas das aulas', MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
+        doc.y -= 4;
+        doc.linha(MARG_E, doc.y, MARG_E + 95, doc.y, COR.teal, 1.2);
+        doc.y -= 8;
+        for (var i = 0; i < linhasComNota.length; i++) {
+          var ln = linhasComNota[i];
+          doc.garanteEspaco(24);
+          doc.texto(ddmmL(ln.data) + ' (' + ln.dia + '):', MARG_E, doc.y, { tam: 10, bold: true, cor: COR.texto });
+          doc.y -= 14;
+          doc.paragrafo(ln.notaTexto, { tam: 10, alturaLinha: 14.5 });
+          doc.y -= 4;
+        }
+      }
+    }
+
     // folhas de aula
-    if (opcoes.incluirNotas && opcoes.notas && opcoes.notas.length) {
+    if ((opcoes.incluirFolhas || opcoes.incluirNotas) && opcoes.notas && opcoes.notas.length) {
       for (var n = 0; n < opcoes.notas.length; n++) {
         var nota = opcoes.notas[n];
         var pgs = nota.paginas || [];
