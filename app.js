@@ -12105,10 +12105,10 @@
       var pergunta = m ? 'Trocar os ' + (n + m) + ' itens marcados por esta lista?'
         : n === 1 ? 'Trocar o exercício marcado por esta lista?'
         : 'Trocar os ' + n + ' exercícios marcados por esta lista?';
-      if (!confirmar(pergunta)) return;
+      if (!confirmar(pergunta)) return false;
       // o material de agora vai para as seleções anteriores (ver guardarNasAnteriores)
     }
-    usarListaPronta(lp);
+    return usarListaPronta(lp);
   }
 
   function desenharPreviaDaLista(corpo, mod, lp) {
@@ -12131,7 +12131,9 @@
       foi.aluno + ' (' + Core.ddmmaaaa(foi.data) + ').' + (foi.mexida ? ' A sua versão ficou em Seleções anteriores.' : '') }));
     if (estado) corpo.appendChild(el('p', { class: 'ajuda bib-lp-estado', id: 'bib-lp-estado', texto: estado }));
     corpo.appendChild(el('div', { class: 'barra bib-lp-usar' }, [
-      el('button', { type: 'button', class: 'btn principal', id: 'bib-lp-usar', texto: 'Usar esta lista',
+      el('button', { type: 'button', class: 'btn principal', id: 'bib-lp-preparar', texto: 'Preparar aula com esta lista',
+        aoClick: function () { if (pedirParaUsarLista(lp)) abrirGerarMaterial(); } }),
+      el('button', { type: 'button', class: 'btn', id: 'bib-lp-usar', texto: 'Editar exercícios antes',
         aoClick: function () { pedirParaUsarLista(lp); } }),
       foi ? el('button', { type: 'button', class: 'btn', id: 'bib-lp-abrir-aula', texto: 'Abrir a aula',
         aoClick: function () { abrirAulaDoMaterial(foi.aulaId); } }) : null
@@ -12279,6 +12281,10 @@
 
     if (ids.length) corpo.appendChild(el('p', { class: 'ajuda bib-lp-ajuda-uso', id: 'bib-lp-ajuda-uso',
       texto: 'Tire, ponha e troque a ordem à vontade.' }));
+    if (ids.length) corpo.appendChild(el('div', { class: 'barra bib-lp-usar' }, [
+      el('button', { type: 'button', class: 'btn principal', id: 'bib-lp-preparar',
+        texto: 'Preparar aula com esta lista', aoClick: abrirGerarMaterial })
+    ]));
     var grade = el('div', { class: 'bib-grade bib-grade-exercicios bib-grade-lp', id: 'bib-lp-grade' });
     ids.forEach(function (id, pos) {
       var it = bib.itemPorId[id];
@@ -13083,6 +13089,7 @@
     desenharCarrinho();
     desenharContextoBiblioteca();
     irNaBiblioteca({ aula: { tipo: 'lista-pronta', id: lp.id } });
+    return true;
   }
 
   /* SUBIR E DESCER, e não arrastar: a lista tem miniatura, ela usa o tablet com

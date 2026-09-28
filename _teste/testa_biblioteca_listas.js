@@ -1162,9 +1162,24 @@ async function cenarioPortas(pag) {
   conf('ver a lista NÃO mexeu no material', (await carrinho(pag)).itens.length, 2);
   conf('e a tela é a de ver, com o botão Usar esta lista',
     await pag.evaluate(() => !!document.querySelector('#bib-lp-previa') && !!document.querySelector('#bib-lp-usar')), true);
+  conf('a lista oferece preparar aula como ação principal e editar como alternativa',
+    await pag.evaluate(() => {
+      const preparar = document.querySelector('#bib-lp-preparar');
+      const editar = document.querySelector('#bib-lp-usar');
+      return !!preparar && preparar.classList.contains('principal') && !!editar && !editar.classList.contains('principal');
+    }), true);
   conf('e ela diz que ver não muda nada', await pag.evaluate(() =>
     /Olhar esta lista não muda o que você marcou/.test((document.querySelector('#bib-lp-estado') || {}).textContent || '')), true);
-  conf('usou a lista', await pag.evaluate(() => { const b = document.querySelector('#bib-lp-usar'); if (!b) return false; b.click(); return true; }), true);
+  conf('preparar carrega a lista e abre a escolha de saída', await pag.evaluate(() => {
+    const b = document.querySelector('#bib-lp-preparar'); if (!b) return false; b.click();
+    return document.querySelector('#modal-bib-gerar').classList.contains('aberto');
+  }), true);
+  conf('sem aula de origem não inventa destinatário', await pag.evaluate(() =>
+    !document.querySelector('#bib-gerar-aulas .item-lista.escolhida') &&
+    document.querySelector('#bib-gerar-anexar').disabled &&
+    !document.querySelector('#bib-gerar-baixar').disabled), true);
+  await pag.evaluate(() => document.querySelector('#rodape-modal-bib-gerar [data-fechar]').click());
+  conf('cancelar escolha de saída não descarta seleção', (await carrinho(pag)).itens.length, IDS2.length);
   await pausa(500);
   const c2 = await carrinho(pag);
   console.log('   carrinho: ' + JSON.stringify(c2.itens));
