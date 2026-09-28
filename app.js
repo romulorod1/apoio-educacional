@@ -5786,8 +5786,8 @@
       elStatus.title = 'Gravando anotações no banco IndexedDB deste aparelho';
       elStatus.onclick = null;
     } else if (estado === 'erro') {
-      elStatus.textContent = '⚠ Não salvou (toque para tentar de novo)';
-      elStatus.title = (msg ? msg + ' · ' : '') + 'Toque para tentar gravar novamente';
+      elStatus.textContent = '⚠ Não salvou. Tentar de novo';
+      elStatus.title = (msg ? msg + ' · ' : '') + 'Toque ou pressione Enter para tentar gravar novamente';
       elStatus.onclick = function () {
         if (editorAtual && editorAtual._aulaId) {
           atualizarStatusGravacaoFolha('salvando');
