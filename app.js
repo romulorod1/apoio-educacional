@@ -8382,25 +8382,25 @@
    * ano. Core.serieParaTemas é quem sabe traduzir: cursinho lê como 3º do
    * médio, e fora da escola e outro não viram série nenhuma, e aí o seletor cai
    * no último ano que ela usou, como já caía para aluno sem ano registrado. */
+  /* O ano escolar segue a mesma precedência de Core.anoEscolarDe e da ficha T04:
+   * o mapeamento atual/mais recente tem prioridade, seguido pelo cadastro básico.
+   * Assim, o seletor de assuntos, a ficha e os relatórios nunca divergem. */
   function anoEscolarDe(aluno) {
     if (!aluno) return null;
-    var ano = aluno.anoEscolar;
-    if (!ano && aluno.mapeamentos && aluno.mapeamentos.length) {
-      var m = (typeof Core.mapeamentoAtual === 'function')
-        ? Core.mapeamentoAtual(aluno)
-        : aluno.mapeamentos[aluno.mapeamentos.length - 1];
-      if (m && m.anoEscolar) ano = m.anoEscolar;
+    if (typeof Core.anoEscolarDe === 'function') {
+      return Core.anoEscolarDe(aluno) || null;
     }
-    return Core.serieParaTemas(ano || '') || null;
+    var m = (typeof Core.mapeamentoAtual === 'function')
+      ? Core.mapeamentoAtual(aluno)
+      : (aluno.mapeamentos && aluno.mapeamentos[aluno.mapeamentos.length - 1]);
+    var ano = (m && m.anoEscolar) || (aluno && aluno.anoEscolar) || '';
+    return Core.serieParaTemas(ano) || null;
   }
-  /* Aprender por uso só se aplica quando o aluno ainda não tem ano escolar
-   * conhecido. Um aluno cadastrado no 7º ano que navega para olhar ou escolher
-   * Frações do 6º ano não deve ter seu ano rebaixado para o 6º ano. */
+  /* Navegar por um ano escolar para reforço ou consulta livre (ex.: Frações do 6º
+   * ano) não deve cadastrar nem alterar silenciosamente o ano do aluno. O cadastro
+   * do ano é feito de forma explícita na ficha ou no mapeamento. */
   function lembrarAnoEscolar(aluno, ano) {
-    if (!aluno || aluno.anoEscolar === ano) return;
-    if (anoEscolarDe(aluno)) return;
-    aluno.anoEscolar = ano;
-    salvar();
+    if (ano) ultimoAnoEscolar = ano;
   }
 
   /* ================= o assunto da aula =================

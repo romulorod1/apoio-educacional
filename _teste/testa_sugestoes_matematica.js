@@ -47,8 +47,8 @@ conf('Aluno com anoEscolar direto no cadastro (T04)', fnAnoEscolarDe(Core, aluno
 const alunoComAnoMapeado = { id: 'a2', nome: 'Clara', mapeamentos: [{ anoEscolar: '08' }] };
 conf('Aluno com anoEscolar herdado do mapeamento (legado)', fnAnoEscolarDe(Core, alunoComAnoMapeado), '08');
 
-const alunoComAnoDuplo = { id: 'a3', nome: 'Davi', anoEscolar: '09', mapeamentos: [{ anoEscolar: '08' }] };
-conf('Aluno com ano no cadastro tem prioridade sobre mapeamento antigo', fnAnoEscolarDe(Core, alunoComAnoDuplo), '09');
+const alunoComAnoDuplo = { id: 'a3', nome: 'Davi', anoEscolar: '07', mapeamentos: [{ anoEscolar: '08' }] };
+conf('Mapeamento mais recente tem prioridade sobre cadastro básico divergente', fnAnoEscolarDe(Core, alunoComAnoDuplo), '08');
 
 const alunoCursinho = { id: 'a4', nome: 'Eduarda', anoEscolar: 'cursinho' };
 conf('Aluno de cursinho mapeia para 3º do médio (em3)', fnAnoEscolarDe(Core, alunoCursinho), 'em3');
@@ -59,15 +59,16 @@ conf('Aluno sem ano retorna null', fnAnoEscolarDe(Core, alunoSemAno), null);
 conf('Aluno indefinido/null retorna null', fnAnoEscolarDe(Core, null), null);
 
 // ============================================================================
-secao('2. Não rebaixar o ano cadastrado ao navegar entre anos (lembrarAnoEscolar)');
+secao('2. Não rebaixar nem cadastrar ano silenciosamente ao navegar (lembrarAnoEscolar)');
 // ============================================================================
 
 const fnLembrarAno = new Function('Core', 'anoEscolarDe', 'aluno', 'ano', `
   var salvou = false;
+  var ultimoAnoEscolar = null;
   function salvar() { salvou = true; }
   ${extrairFuncao(appJs, 'lembrarAnoEscolar')}
   lembrarAnoEscolar(aluno, ano);
-  return { ano: aluno ? aluno.anoEscolar : null, salvou: salvou };
+  return { ano: aluno ? aluno.anoEscolar : null, ultimoAnoEscolar: ultimoAnoEscolar, salvou: salvou };
 `);
 
 // Aluno do 7º ano explorando o 6º ano para reforço de Frações
@@ -75,12 +76,14 @@ const alunoSetimo = { id: 'a7', nome: 'Gabriel', anoEscolar: '07' };
 const resSetimo = fnLembrarAno(Core, fnAnoEscolarDe.bind(null, Core), alunoSetimo, '06');
 conf('Aluno do 7º ano NÃO tem seu ano alterado para 06 ao consultar outro ano', resSetimo.ano, '07');
 conf('Não dispara gravação desnecessária para aluno com ano já fixado', resSetimo.salvou, false);
+conf('Memoriza o ano navegado na sessão para a tela', resSetimo.ultimoAnoEscolar, '06');
 
-// Aluno sem ano cadastrado que escolhe uma série pela primeira vez
+// Aluno sem ano cadastrado que explora o 6º ano
 const alunoVazio = { id: 'av', nome: 'Helena', anoEscolar: null };
 const resVazio = fnLembrarAno(Core, fnAnoEscolarDe.bind(null, Core), alunoVazio, '06');
-conf('Aluno sem ano aprende o ano escolar navegado', resVazio.ano, '06');
-conf('Dispara gravação para memorizar ano de aluno sem cadastro', resVazio.salvou, true);
+conf('Aluno sem ano NÃO tem seu cadastro alterado silenciosamente ao navegar (preserva null)', resVazio.ano, null);
+conf('Explorar ano escolar não dispara gravação no cadastro do aluno', resVazio.salvou, false);
+conf('Memoriza o ano navegado na sessão para o aluno sem cadastro', resVazio.ultimoAnoEscolar, '06');
 
 // ============================================================================
 secao('3. Separação de recentes e sugestões curriculares de Matemática');
