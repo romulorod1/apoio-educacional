@@ -8630,6 +8630,7 @@
     rodape.innerHTML = '';
 
     var busca = '';
+    var textoLivre = '';
     var nivel = { tipo: 'raiz' };
 
     var campoBusca = el('input', {
@@ -8671,6 +8672,23 @@
       return item;
     }
 
+    function linhaComDisponibilidade(titulo, detalhe, assunto, aoTocar) {
+      var item = linha(titulo, detalhe, aoTocar);
+      item._assuntoDisponibilidade = assunto;
+      item._detalheBase = detalhe;
+      return item;
+    }
+
+    function atualizarDisponibilidadeVisivel() {
+      Array.prototype.forEach.call(lista.querySelectorAll('.item-assunto'), function (item) {
+        if (!item._assuntoDisponibilidade) return;
+        var detalhe = item.querySelector('.detalhe');
+        if (!detalhe) return;
+        var disponivel = resumoDisponibilidadeDoAssunto(item._assuntoDisponibilidade);
+        detalhe.textContent = item._detalheBase + (disponivel ? ' · ' + disponivel : '');
+      });
+    }
+
     function voltarPara(rotulo, titulo, aoTocar) {
       return el('div', { class: 'barra', style: 'margin-bottom:8px' }, [
         el('button', { type: 'button', class: 'btn pequeno', texto: '‹ Voltar', aoClick: aoTocar }),
@@ -8691,6 +8709,8 @@
     }
 
     function desenhar() {
+      var campoLivreAnterior = lista.querySelector('#assunto-outro');
+      if (campoLivreAnterior) textoLivre = campoLivreAnterior.value;
       lista.innerHTML = '';
       var termo = busca.trim();
       if (termo) { desenharBusca(termo); return; }
@@ -8706,6 +8726,7 @@
         type: 'text', id: 'assunto-outro', maxlength: '70',
         placeholder: 'Com as suas palavras', style: 'flex:1;min-width:160px'
       });
+      campoOutro.value = textoLivre;
       var usar = el('button', {
         type: 'button', class: 'btn principal', id: 'usar-assunto-outro', texto: 'Usar',
         aoClick: function () {
@@ -8720,13 +8741,7 @@
       lista.appendChild(el('div', { class: 'barra', style: 'margin-bottom:12px' }, [campoOutro, usar]));
 
       function criarLinhaSugestao(s) {
-        if (typeof linhaComDisponibilidade === 'function') {
-          return linhaComDisponibilidade(s.item.titulo, s.detalhe, s.item, function () {
-            registrarAssunto(aula, s.item);
-          });
-        }
-        var disponivel = (typeof resumoDisponibilidadeDoAssunto === 'function') ? resumoDisponibilidadeDoAssunto(s.item) : '';
-        return linha(s.item.titulo, s.detalhe + (disponivel ? ' · ' + disponivel : ''), function () {
+        return linhaComDisponibilidade(s.item.titulo, s.detalhe, s.item, function () {
           registrarAssunto(aula, s.item);
         });
       }
@@ -8950,14 +8965,23 @@
         ]));
       }
       achados.slice(0, LIMITE).forEach(function (a) {
-        lista.appendChild(linha(a.titulo, a.detalhe, function () {
+        lista.appendChild(linhaComDisponibilidade(a.titulo, a.detalhe, a.item, function () {
           registrarAssunto(aula, a.item);
         }));
       });
+      atualizarDisponibilidadeVisivel();
       if (exatos) lista.appendChild(livre);
     }
 
     desenhar();
+    /* A escolha de assunto não espera a biblioteca inteira abrir. Quando o
+     * índice instalado chega, atualiza só as descrições das linhas existentes:
+     * substituir o campo ativo interromperia a escrita no teclado do tablet. */
+    if (temPacoteBiblioteca || (bib && bib.pacotes.length)) {
+      carregarBiblioteca().then(function () {
+        if (lista.isConnected) atualizarDisponibilidadeVisivel();
+      }).catch(function () { /* registrar assunto continua possível */ });
+    }
   }
 
   /* A matemática do assunto reusa a lista do material, com o mesmo filtro por
@@ -9132,7 +9156,10 @@
       filtrados.forEach(function (x) {
         var t = x.tema;
         var rotulo = typeof Busca !== 'undefined' && Busca.ROTULO ? Busca.ROTULO[x.onde] : '';
-        lista.appendChild(el('div', { class: 'item-lista item-tema' }, [
+        var disponivel = opcoes.aoEscolher ? resumoDisponibilidadeDoAssunto({
+          id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: materiaDoTemaId(t.id)
+        }) : '';
+        var linhaTema = el('div', { class: 'item-lista item-tema' }, [
           el('div', { class: 'cresce' }, [
             el('div', { class: 'nome' }, [
               document.createTextNode(t.pt.titulo),
@@ -9143,6 +9170,7 @@
               rotulo ? el('span', { class: 'tag', texto: rotulo, style: 'margin-left:6px' }) : null
             ].filter(Boolean)),
             el('div', { class: 'detalhe', texto: t.pt.resumo }),
+            el('div', { class: 'detalhe bib-disponibilidade-tema', hidden: !disponivel, texto: disponivel }),
             el('div', {
               class: 'detalhe',
               /* A contagem de exercícios é do MATERIAL: fora do ar o material,
@@ -9162,7 +9190,23 @@
               if (MATERIAL_AUTORAL_NO_AR) abrirMontagem(t, aula, aluno, opcoes);
             }
           })
-        ]));
+        ]);
+        linhaTema._temaDisponibilidade = t;
+        lista.appendChild(linhaTema);
+      });
+    }
+
+    function atualizarDisponibilidadeVisivel() {
+      Array.prototype.forEach.call(lista.querySelectorAll('.item-tema'), function (linhaTema) {
+        var t = linhaTema._temaDisponibilidade;
+        if (!t) return;
+        var detalhe = linhaTema.querySelector('.bib-disponibilidade-tema');
+        if (!detalhe) return;
+        var disponivel = resumoDisponibilidadeDoAssunto({
+          id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: materiaDoTemaId(t.id)
+        });
+        detalhe.textContent = disponivel;
+        detalhe.hidden = !disponivel;
       });
     }
 
@@ -9174,6 +9218,11 @@
     });
     campoBusca.addEventListener('input', function () { busca = this.value; redesenhar(); });
     redesenhar();
+    if (opcoes.aoEscolher && (temPacoteBiblioteca || (bib && bib.pacotes.length))) {
+      carregarBiblioteca().then(function () {
+        if (lista.isConnected) atualizarDisponibilidadeVisivel();
+      }).catch(function () { /* assuntos continuam registráveis */ });
+    }
 
     rodape.appendChild(el('button', {
       type: 'button', class: 'btn', texto: 'Cancelar',
@@ -11084,6 +11133,7 @@
       mostrarEstadoImportacao('faixa-info', ['Gravando a biblioteca no tablet...']);
       return Store.gravarPacoteBiblioteca(aberto);
     }).then(function (registro) {
+      temPacoteBiblioteca = true;
       mostrarEstadoImportacao('faixa-info',
         ['Biblioteca importada.'].concat(Biblioteca.resumo(registro.manifest, registro.bytes)));
       desenharPacotesBiblioteca();
@@ -11193,7 +11243,7 @@
        * aviso diz isso na hora, em vez de deixá-la procurar. */
       else { avisar('Série removida do tablet. Voltaram ' + espaco + '. Para usar de novo, importe o pacote do Drive.'); }
       desenharPacotesBiblioteca();
-      /* A aba se refaz do zero: sem nenhum pacote ela volta ao "Em construção".
+      /* A aba se refaz do zero: sem nenhum pacote ela volta ao estado vazio.
        * O carrinho perde sozinho o que era do pacote (limparCarrinhoOrfao). */
       bibliotecaMudou();
     }, function () {
@@ -11203,8 +11253,7 @@
 
   // ================= biblioteca: navegar =================
 
-  /* A aba Biblioteca. Sem pacote importado, mostra o mesmo "Em construção"
-   * da aba Temas de hoje: nada muda para ela até importar. Com pacote, a
+  /* A aba Biblioteca. Sem pacote importado, explica como importar. Com pacote, a
    * árvore que já existe na fonte: Série, Módulo, Aula; a teoria por página,
    * os exercícios por recorte, e uma busca só.
    *
@@ -11350,6 +11399,33 @@
     return mod.ordemListas.reduce(function (s, l) { return s + l.itens.length; }, 0);
   }
 
+  /* Disponibilidade é a do conteúdo efetivamente importado. Uma lista de
+   * exercícios da fonte não é, por si só, uma lista pronta para a aula. */
+  function disponibilidadeDoModulo(mod) {
+    var partes = [];
+    var prontas = (bib.listasPorModulo && bib.listasPorModulo[mod.chave]) || [];
+    var exercicios = contarItens(mod);
+    if (prontas.length) partes.push(plural(prontas.length, 'lista pronta', 'listas prontas'));
+    if (exercicios) partes.push(plural(exercicios, mod.banco ? 'problema' : 'exercício',
+      mod.banco ? 'problemas' : 'exercícios'));
+    if (mod.teorias.length) partes.push(plural(mod.teorias.length, 'aula de teoria', 'aulas de teoria'));
+    if (!exercicios && mod.teorias.length) partes.unshift('Só teoria');
+    if (exercicios && !prontas.length) partes.push('monte sua seleção');
+    return partes.join(' · ');
+  }
+
+  function resumoDisponibilidadeDoAssunto(assunto) {
+    if (!bib || !assunto || assunto.disciplina && assunto.disciplina !== Core.MATERIA_PADRAO) return '';
+    var achado = moduloDoAssunto(assunto);
+    var mod = achado && bib.modulos[achado.chave];
+    if (!mod) return '';
+    var partes = [];
+    if (bib.listasPorModulo && (bib.listasPorModulo[mod.chave] || []).length) partes.push('lista pronta');
+    if (contarItens(mod)) partes.push('exercícios');
+    if (mod.teorias.length) partes.push('teoria');
+    return partes.length ? 'Módulo relacionado no tablet: ' + mod.titulo + ' (' + partes.join(', ') + ')' : '';
+  }
+
   function plural(n, um, varios) { return n + ' ' + (n === 1 ? um : varios); }
 
   // ---------- a tela ----------
@@ -11365,7 +11441,7 @@
         /* SEM PACOTE, A TELA FICA INTEIRA VAZIA, e não só o miolo.
          *
          * Achado no marco visual do B7: depois de remover a última série, a
-         * aba voltava ao "Em construção" com a faixa de cima ainda dizendo
+         * aba voltava ao estado vazio com a faixa de cima ainda dizendo
          * "Material marcado: 6 exercícios" e com o "Gerar material" clicável.
          * Os seis não existiam mais, o botão não fazia nada, e a faixa da aula
          * de origem continuava oferecendo material de uma biblioteca que saiu.
@@ -11378,20 +11454,25 @@
         bibContexto = null;
         bibFiltroAluno = '';
         desenharContextoBiblioteca();
-        /* A TERCEIRA LINHA DIZ ONDE IMPORTAR, e ela é nova de propósito.
-         *
-         * "Em construção" nasceu como o estado de quem nunca importou nada.
-         * Depois que dá para REMOVER uma série, ele virou também a resposta a
-         * uma ação dela, e aí não pode ser um beco: o caminho de volta estava
-         * só no aviso do rodapé, que some sozinho em poucos segundos. A linha
-         * vale nos dois casos, porque o cartão Biblioteca de Ajustes está lá
-         * nos dois. */
+        /* O importador e seus avisos ficam em Ajustes. O botão daqui usa o
+         * mesmo controle: não há uma segunda gravação de pacotes. */
         corpo.innerHTML = '';
-        corpo.appendChild(el('div', { class: 'vazio', id: 'biblioteca-em-construcao' }, [
-          el('p', { style: 'font-size:18px;font-weight:600;color:var(--navy);margin:0 0 8px', texto: 'Em construção' }),
-          el('p', { style: 'margin:0', texto: 'Esta área está sendo preparada.' }),
+        corpo.appendChild(el('div', { class: 'vazio', id: 'biblioteca-sem-pacotes' }, [
+          el('p', { style: 'font-size:18px;font-weight:600;color:var(--navy);margin:0 0 8px',
+            texto: 'Nenhum pacote de materiais importado' }),
+          el('p', { style: 'margin:0', texto: 'Importe um pacote para consultar listas, exercícios e teoria neste tablet.' }),
           el('p', { class: 'ajuda', style: 'margin:10px 0 0', id: 'biblioteca-onde-importar',
-            texto: 'Para trazer uma biblioteca para este tablet, vá em Ajustes, no cartão Biblioteca, e toque em Importar biblioteca.' })
+            texto: 'Folhas e arquivos próprios das aulas continuam disponíveis nas respectivas aulas.' }),
+          el('button', { type: 'button', class: 'btn principal', id: 'biblioteca-importar-pacote',
+            texto: 'Importar material', style: 'margin-top:12px', aoClick: function () {
+              var ajustes = $('#abas .aba[data-tela="ajustes"]');
+              if (ajustes) ajustes.click();
+              var importar = $('#importar-biblioteca');
+              if (importar) {
+                importar.scrollIntoView({ block: 'center' });
+                importar.click();
+              }
+            } })
         ]));
         return;
       }
@@ -11511,11 +11592,7 @@
     if (mods.portal.length) {
       corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Módulos' }));
       mods.portal.forEach(function (m) {
-        var partes = [];
-        if (m.teorias.length) partes.push(plural(m.teorias.length, 'aula de teoria', 'aulas de teoria'));
-        if (m.ordemListas.length) partes.push(plural(m.ordemListas.length, 'lista', 'listas') + ', ' +
-          plural(contarItens(m), 'exercício', 'exercícios'));
-        corpo.appendChild(linhaBib(m.titulo, partes.join(' · '), function () {
+        corpo.appendChild(linhaBib(m.titulo, disponibilidadeDoModulo(m), function () {
           irNaBiblioteca({ modulo: m.chave, aula: null });
         }));
       });
@@ -11523,7 +11600,7 @@
     if (mods.banco.length) {
       corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Banco de Questões' }));
       mods.banco.forEach(function (m) {
-        corpo.appendChild(linhaBib(m.titulo, plural(contarItens(m), 'problema', 'problemas'), function () {
+        corpo.appendChild(linhaBib(m.titulo, disponibilidadeDoModulo(m), function () {
           irNaBiblioteca({ modulo: m.chave, aula: null });
         }));
       });
@@ -11801,6 +11878,7 @@
   function desenharModulo(corpo, mod) {
     corpo.appendChild(voltarBib(Biblioteca.nomeDaSerie(bibNav.serie), function () { irNaBiblioteca({ modulo: null, aula: null }); }));
     corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: mod.titulo }));
+    corpo.appendChild(el('p', { class: 'ajuda bib-disponibilidade', texto: disponibilidadeDoModulo(mod) }));
     corpo.appendChild(botaoMarcarModulo(mod));
     linhasDeListaPronta(corpo, mod);
     if (mod.teorias.length) {
