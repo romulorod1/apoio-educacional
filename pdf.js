@@ -1189,6 +1189,15 @@
       doc.y -= 6;
       cabecalhoTabela(doc);
       corpoDaTabela(canceladasFuturas);
+      if (!previstas.length && (dados.totalValor > 0 || dados.valorCanceladasFuturas > 0)) {
+        doc.y -= 14;
+        linhaTabela(doc, {
+          rotulo: 'Total do mês: ' +
+            dados.qtdEncontros + ' encontro' + (dados.qtdEncontros === 1 ? '' : 's') +
+            ', ' + dados.totalHoras + ' h',
+          valor: fmtMoedaLocal(dados.totalValor)
+        }, 0, true, COLUNAS_TOTAL_MES);
+      }
     }
 
     /* Mesma regra do markdown: a chave vem de Ajustes, e sem ela a folha não

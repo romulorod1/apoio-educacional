@@ -2885,14 +2885,17 @@
       t.minutos += f.totalMin || 0;
       t.valor += f.totalValor || 0;
       t.minFeitos += f.minFeitos || 0;
+      t.valorFeito += f.valorFeito || 0;
       t.minPrevistos += f.minPrevistos || 0;
       t.valorPrevisto += f.valorPrevisto || 0;
+      t.valorCanceladasFuturas += f.valorCanceladasFuturas || 0;
       t.minutosDadosSemCobrar += f.minutosDadosSemCobrar || 0;
       t.minutosDesmarcados += f.minutosDesmarcados || 0;
     });
     t.valor = Math.round(t.valor * 100) / 100;
     t.valorFeito = Math.round(t.valorFeito * 100) / 100;
     t.valorPrevisto = Math.round(t.valorPrevisto * 100) / 100;
+    t.valorCanceladasFuturas = Math.round(t.valorCanceladasFuturas * 100) / 100;
     return t;
   }
 
@@ -3313,6 +3316,12 @@
       L.push(CABECALHO[0]);
       L.push(CABECALHO[1]);
       canceladasFuturas.forEach(function (l) { L.push(linhaDaTabela(l)); });
+      if (!previstas.length && (f.totalValor > 0 || f.valorCanceladasFuturas > 0)) {
+        L.push('');
+        L.push('**Total do mês:** ' +
+          fmtMoeda(f.totalValor) + ' (' + f.qtdEncontros + ' encontro' +
+          (f.qtdEncontros === 1 ? '' : 's') + ', ' + f.totalHoras + ' h)');
+      }
     }
 
     /* A chave vem de Ajustes e mora só no tablet. Sem chave, o documento sai

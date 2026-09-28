@@ -1416,10 +1416,11 @@
     numeros.appendChild(numeroComRodape('Horas cobradas', Core.fmtHoras(minFeitos) + ' h', [
       minPrevistos ? 'mais ' + Core.fmtHoras(minPrevistos) + ' h à frente' : ''
     ]));
-    numeros.appendChild(numeroComRodape('A receber', dinheiro(valorFeito), [
-      valorPrevisto ? 'previsto à frente: ' + dinheiro(valorPrevisto) : '',
-      valorPrevisto ? 'mês inteiro: ' + dinheiro(valor) : ''
-    ]));
+    var rodapesReceber = [];
+    if (valorPrevisto) rodapesReceber.push('previsto à frente: ' + dinheiro(valorPrevisto));
+    if (valorCanceladasFuturas) rodapesReceber.push('cancelada cobrável: ' + dinheiro(valorCanceladasFuturas));
+    if (valorPrevisto || valorCanceladasFuturas) rodapesReceber.push('mês inteiro: ' + dinheiro(valor));
+    numeros.appendChild(numeroComRodape('A receber', dinheiro(valorFeito), rodapesReceber));
     numeros.appendChild(numeroComRodape('Alunos', String(Object.keys(alunosNoMes).length), []));
 
     var lembrete = $('#lembrete-copia');
@@ -9626,10 +9627,11 @@
     numeros.appendChild(numeroComRodape('Horas cobradas', Core.fmtHoras(t.minFeitos) + ' h', [
       t.minPrevistos ? 'mais ' + Core.fmtHoras(t.minPrevistos) + ' h à frente' : ''
     ]));
-    numeros.appendChild(numeroComRodape('Total a receber', dinheiro(t.valorFeito), [
-      t.valorPrevisto ? 'previsto à frente: ' + dinheiro(t.valorPrevisto) : '',
-      t.valorPrevisto ? 'mês inteiro: ' + dinheiro(t.valor) : ''
-    ]));
+    var rodapesReceberFech = [];
+    if (t.valorPrevisto) rodapesReceberFech.push('previsto à frente: ' + dinheiro(t.valorPrevisto));
+    if (t.valorCanceladasFuturas) rodapesReceberFech.push('canceladas à frente: ' + dinheiro(t.valorCanceladasFuturas));
+    if (t.valorPrevisto || t.valorCanceladasFuturas) rodapesReceberFech.push('mês inteiro: ' + dinheiro(t.valor));
+    numeros.appendChild(numeroComRodape('Total a receber', dinheiro(t.valorFeito), rodapesReceberFech));
 
     desenharGentilezas(numeros, t);
 
@@ -9721,11 +9723,22 @@
       /* A tabela lista o mês inteiro, e o total dela é o do mês inteiro. Quem
        * lê o número grande lá em cima vê só o que já aconteceu, então aqui fica
        * dito, uma vez, de onde vem a diferença. */
-      if (f.valorPrevisto) {
+      if (f.valorPrevisto || f.valorCanceladasFuturas) {
+        var partes = [];
+        if (f.valorFeito) partes.push(dinheiro(f.valorFeito) + ' já aconteceu');
+        if (f.valorPrevisto) partes.push(dinheiro(f.valorPrevisto) + ' está marcado para os próximos dias');
+        if (f.valorCanceladasFuturas) partes.push(dinheiro(f.valorCanceladasFuturas) + ' de cancelamento com cobrança');
+        var textoAjuda = 'Desse total, ';
+        if (partes.length === 1) {
+          textoAjuda += partes[0] + '.';
+        } else if (partes.length === 2) {
+          textoAjuda += partes[0] + ' e ' + partes[1] + '.';
+        } else if (partes.length >= 3) {
+          textoAjuda += partes[0] + ', ' + partes[1] + ' e ' + partes[2] + '.';
+        }
         cartao.appendChild(el('div', {
           class: 'ajuda', style: 'margin-top:6px',
-          texto: 'Desse total, ' + dinheiro(f.valorFeito) + ' já aconteceu e ' +
-            dinheiro(f.valorPrevisto) + ' está marcado para os próximos dias.'
+          texto: textoAjuda
         }));
       }
 

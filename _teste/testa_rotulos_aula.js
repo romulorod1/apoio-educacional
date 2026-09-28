@@ -168,8 +168,11 @@ const mdC2b = Core.markdownFechamento(fC2b, {});
 conf('C2b: "Datas trabalhadas" não inclui a aula futura cancelada', mdC2b.indexOf('Nenhuma aula aconteceu até') > 0, true);
 conf('C2b: Total destas datas até hoje permanece R$ 0,00', mdC2b.indexOf('**Total destas datas até ' + Core.ddmm(hoje) + ':** R$ 0,00') > 0, true);
 conf('C2b: Cancelada cobrada consta apenas em "Aulas canceladas à frente"', mdC2b.indexOf('## Aulas canceladas à frente') > 0, true);
+conf('C2b: Markdown exibe Total do mês explícito', mdC2b.indexOf('**Total do mês:** R$ 100,00') > 0, true);
 const pdfC2b = PDF.gerarFechamento(fC2b, {});
 conf('C2b: PDF com futura cancelada cobrável gerado com sucesso', pdfC2b && pdfC2b.length > 0, true);
+const txtPdfC2b = Buffer.from(pdfC2b).toString('latin1');
+conf('C2b: PDF exibe Total do mês explícito na faixa', txtPdfC2b.indexOf('Total do mês:') > 0 && txtPdfC2b.indexOf('R$ 100,00') > 0, true);
 
 // C3: Passada realizada (Cobrada: Não)
 const fC3 = Core.calcularFechamento({
