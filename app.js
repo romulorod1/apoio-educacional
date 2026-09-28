@@ -8436,20 +8436,25 @@
    * ano. Core.serieParaTemas é quem sabe traduzir: cursinho lê como 3º do
    * médio, e fora da escola e outro não viram série nenhuma, e aí o seletor cai
    * no último ano que ela usou, como já caía para aluno sem ano registrado. */
+  /* O ano escolar segue a mesma precedência de Core.anoEscolarDe e da ficha T04:
+   * o mapeamento atual/mais recente tem prioridade, seguido pelo cadastro básico.
+   * Assim, o seletor de assuntos, a ficha e os relatórios nunca divergem. */
   function anoEscolarDe(aluno) {
-    return Core.serieParaTemas((aluno && aluno.anoEscolar) || '') || null;
+    if (!aluno) return null;
+    if (typeof Core.anoEscolarDe === 'function') {
+      return Core.anoEscolarDe(aluno) || null;
+    }
+    var m = (typeof Core.mapeamentoAtual === 'function')
+      ? Core.mapeamentoAtual(aluno)
+      : (aluno.mapeamentos && aluno.mapeamentos[aluno.mapeamentos.length - 1]);
+    var ano = (m && m.anoEscolar) || (aluno && aluno.anoEscolar) || '';
+    return Core.serieParaTemas(ano) || null;
   }
-  /* Aprender por uso não pode apagar o que ela respondeu no mapeamento. Um
-   * aluno de cursinho abre a lista no 3º do médio, que é onde o cursinho lê; se
-   * ela navegar dali para outro ano, o que fica guardado continua sendo
-   * cursinho, e não o ano que ela foi olhar. O mesmo vale para fora da escola e
-   * para outro. Ano de série continua sendo aprendido como sempre foi. */
+  /* Navegar por um ano escolar para reforço ou consulta livre (ex.: Frações do 6º
+   * ano) não deve cadastrar nem alterar silenciosamente o ano do aluno. O cadastro
+   * do ano é feito de forma explícita na ficha ou no mapeamento. */
   function lembrarAnoEscolar(aluno, ano) {
-    if (!aluno || aluno.anoEscolar === ano) return;
-    var guardado = aluno.anoEscolar || '';
-    if (guardado && Core.serieParaTemas(guardado) !== guardado) return;
-    aluno.anoEscolar = ano;
-    salvar();
+    if (ano) ultimoAnoEscolar = ano;
   }
 
   /* ================= o assunto da aula =================
@@ -8589,7 +8594,7 @@
    * ano completo toca em Matemática ali embaixo. */
   var MAX_SUGESTOES = 8;
 
-  function sugestoesDeAssunto(aula, aluno) {
+  function sugestoesRecentesDeAssunto(aula, aluno) {
     var fora = {};
     Core.temasDaAula(aula).forEach(function (t) {
       fora[Core.chaveDeBusca(t.titulo || '')] = true;
@@ -8603,9 +8608,6 @@
       saida.push({ item: item, detalhe: detalhe });
     }
 
-    /* O próximo passo da trilha vem na frente de tudo, porque é a resposta mais
-     * provável para "o que a gente vê hoje". O cartão lá em cima é o caminho de
-     * um toque; aqui é o mesmo assunto, para quando ela já entrou no seletor. */
     Core.trilhasAtivas(aluno || {}).forEach(function (tr) {
       var p = Core.proximoPasso(tr);
       if (!p) return;
@@ -8629,17 +8631,41 @@
         });
       });
 
-    var ano = anoEscolarDe(aluno) || ultimoAnoEscolar || '06';
+    return saida;
+  }
+
+  function sugestoesDoAnoDeMatematica(aula, aluno, ano, chavesExcluidas) {
+    var fora = {};
+    Core.temasDaAula(aula).forEach(function (t) {
+      fora[Core.chaveDeBusca(t.titulo || '')] = true;
+    });
+    if (chavesExcluidas) {
+      Object.keys(chavesExcluidas).forEach(function (k) { fora[k] = true; });
+    }
+
+    var saida = [];
     (indiceTemas || []).filter(function (t) { return t.serie === ano; })
       .forEach(function (t) {
-        if (saida.length >= daTrilha + MAX_SUGESTOES) return;
-        juntar(
-          { id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: materiaDoTemaId(t.id) },
-          rotuloDisciplina(materiaDoTemaId(t.id)) + ', ' + nomeDoAno(t.serie)
-        );
+        if (saida.length >= MAX_SUGESTOES) return;
+        var chave = Core.chaveDeBusca(t.pt.titulo || '');
+        if (!chave || fora[chave]) return;
+        fora[chave] = true;
+        var detalhe = rotuloUnidade(t) + (t.duracaoMin ? ' · cerca de ' + t.duracaoMin + ' min' : '');
+        saida.push({
+          item: { id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: materiaDoTemaId(t.id) },
+          detalhe: detalhe
+        });
       });
-
     return saida;
+  }
+
+  function sugestoesDeAssunto(aula, aluno) {
+    var recentes = sugestoesRecentesDeAssunto(aula, aluno);
+    var ano = anoEscolarDe(aluno) || ultimoAnoEscolar || '06';
+    var chaves = {};
+    recentes.forEach(function (r) { chaves[Core.chaveDeBusca(r.item.titulo || '')] = true; });
+    var doAno = sugestoesDoAnoDeMatematica(aula, aluno, ano, chaves);
+    return recentes.concat(doAno);
   }
 
   /* Casa o que ela digitou com um tópico, palavra por palavra: procurar
@@ -8750,12 +8776,6 @@
     function desenharRaiz() {
       // 1. Escrever com as próprias palavras, sempre primeiro.
       lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Escrever o assunto' }));
-      /* Setenta caracteres é o limite, e ele existe porque até agora todo
-       * título vinha do banco: o mais longo da matemática tem 57 e o mais longo
-       * das outras matérias tem 63. Texto maior que isso não cabe na linha da
-       * aula nem na tabela do fechamento que a família lê, e sai cortado no
-       * meio de uma palavra. Cortar na entrada é melhor do que cortar na
-       * impressão, porque ela vê o que vai sair. */
       var campoOutro = el('input', {
         type: 'text', id: 'assunto-outro', maxlength: '70',
         placeholder: 'Com as suas palavras', style: 'flex:1;min-width:160px'
@@ -8774,38 +8794,95 @@
       });
       lista.appendChild(el('div', { class: 'barra', style: 'margin-bottom:12px' }, [campoOutro, usar]));
 
-      // 2. Sugestões, sem digitar nada.
-      var sugestoes = sugestoesDeAssunto(aula, aluno);
-      if (sugestoes.length) {
-        lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Sugestões para este aluno' }));
-        sugestoes.forEach(function (s) {
-          lista.appendChild(linhaComDisponibilidade(s.item.titulo, s.detalhe, s.item, function () {
-            registrarAssunto(aula, s.item);
-          }));
+      function criarLinhaSugestao(s) {
+        return linhaComDisponibilidade(s.item.titulo, s.detalhe, s.item, function () {
+          registrarAssunto(aula, s.item);
         });
-        atualizarDisponibilidadeVisivel();
       }
 
-      // 3. Por matéria, com a matemática
-      lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Por matéria' }));
-      /* "com material pronto" era verdade quando o tema trazia explicação e
-       * exercícios autorais. Fora do ar o material, a linha diz só o que ela
-       * é: a lista de assuntos de matemática, por ano. */
-      lista.appendChild(linha(rotuloDisciplina(Core.MATERIA_PADRAO),
-        MATERIAL_AUTORAL_NO_AR
-          ? (indiceTemas ? indiceTemas.length + ' temas, com material pronto' : 'temas com material pronto')
-          : (indiceTemas ? indiceTemas.length + ' assuntos, por ano' : 'assuntos por ano'),
-        function () { abrirMatematicaComoAssunto(aula, aluno); }, true));
+      // 2. Continuar trabalhando / Assuntos recentes deste aluno
+      var recentes = sugestoesRecentesDeAssunto(aula, aluno);
+      if (recentes.length) {
+        lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Continuar trabalhando com este aluno' }));
+        recentes.forEach(function (s) {
+          lista.appendChild(criarLinhaSugestao(s));
+        });
+      }
+
+      // 3. Matemática do ano escolar (Ponto inicial)
+      var anoInfo = typeof anoEscolarCadastrado === 'function'
+        ? anoEscolarCadastrado(aluno)
+        : { ano: (aluno && aluno.anoEscolar) || '', outro: (aluno && aluno.anoEscolarOutro) || '' };
+      var serieMapeavel = Core.anoEscolarDe(aluno);
+      var eForaOuOutro = anoInfo && (anoInfo.ano === 'fora' || Core.anoEscolarLivre(anoInfo.ano));
+
+      var chavesRecentes = {};
+      recentes.forEach(function (r) { chavesRecentes[Core.chaveDeBusca(r.item.titulo || '')] = true; });
+
+      if (serieMapeavel) {
+        var rotuloAno = nomeDoAno(serieMapeavel);
+        lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Sugestões de Matemática para o ' + rotuloAno }));
+        var temasDoAno = sugestoesDoAnoDeMatematica(aula, aluno, serieMapeavel, chavesRecentes);
+        if (temasDoAno.length) {
+          temasDoAno.forEach(function (s) { lista.appendChild(criarLinhaSugestao(s)); });
+        }
+        if (typeof atualizarDisponibilidadeVisivel === 'function') {
+          atualizarDisponibilidadeVisivel();
+        }
+        lista.appendChild(linha(
+          'Ver todos os assuntos de Matemática (' + (indiceTemas ? indiceTemas.length + ' assuntos' : 'por ano') + ')',
+          'Explorar outros anos ou a grade completa do ' + rotuloAno,
+          function () { abrirMatematicaComoAssunto(aula, aluno); },
+          true
+        ));
+      } else if (eForaOuOutro) {
+        var rotuloEtapa = Core.anoEscolarLivre(anoInfo.ano)
+          ? (anoInfo.outro || 'Outro')
+          : (Core.ANOS_ESCOLARES[anoInfo.ano] || 'Fora da escola');
+        lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Matemática (' + rotuloEtapa + ')' }));
+        lista.appendChild(el('div', {
+          class: 'ajuda', style: 'margin:-4px 0 8px',
+          texto: 'Este aluno está cadastrado como ' + rotuloEtapa + '. Você pode escrever o assunto acima, pesquisar por qualquer matéria ou abrir o catálogo completo de Matemática por ano.'
+        }));
+        lista.appendChild(linha(
+          'Abrir o catálogo de Matemática por ano (' + (indiceTemas ? indiceTemas.length + ' assuntos' : 'grade completa') + ')',
+          'Navegar pelos temas do 1º ano ao ensino médio',
+          function () { abrirMatematicaComoAssunto(aula, aluno); },
+          true
+        ));
+      } else {
+        var anoFallback = ultimoAnoEscolar || '06';
+        var rotuloAno = nomeDoAno(anoFallback);
+        lista.appendChild(el('div', {
+          class: 'bloco-exercicios',
+          texto: 'Sugestões de Matemática (' + rotuloAno + ' · ano não cadastrado)'
+        }));
+        lista.appendChild(el('div', {
+          class: 'ajuda', style: 'margin:-4px 0 8px',
+          texto: 'O ano escolar não está informado na ficha deste aluno. Você pode escolher qualquer assunto abaixo, navegar por outros anos ou buscar livremente.'
+        }));
+        var temasDoAno = sugestoesDoAnoDeMatematica(aula, aluno, anoFallback, chavesRecentes);
+        if (temasDoAno.length) {
+          temasDoAno.forEach(function (s) { lista.appendChild(criarLinhaSugestao(s)); });
+        }
+        if (typeof atualizarDisponibilidadeVisivel === 'function') {
+          atualizarDisponibilidadeVisivel();
+        }
+        lista.appendChild(linha(
+          'Ver todos os assuntos de Matemática (' + (indiceTemas ? indiceTemas.length + ' assuntos' : 'por ano') + ')',
+          'Escolher outro ano escolar ou buscar na grade de Matemática',
+          function () { abrirMatematicaComoAssunto(aula, aluno); },
+          true
+        ));
+      }
+
+      // 4. Outras matérias (registro livre)
+      lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Outras matérias' }));
       (indiceTopicos || []).forEach(function (d) {
         lista.appendChild(linha(d.nome, d.topicos + ' assuntos', function () {
           irPara({ tipo: 'disciplina', d: d });
         }, true));
       });
-      /* A faixa vale para os dois jeitos de faltar: o índice não abriu, ou ele
-       * abriu e os arquivos das disciplinas não vieram. O segundo é o mais
-       * provável, porque o índice tem 4 KB e os doze somam 95 KB, e era
-       * justamente o que passava calado: ela via as doze matérias com a
-       * contagem, entrava numa e encontrava o vazio sem explicação. */
       var semTopicos = !indiceTopicos ||
         (topicosParciais !== null && !topicosParciais.length);
       if (semTopicos) {
