@@ -130,22 +130,22 @@
         {
           etapa: 'Etapa 3 de 4 · Montagem',
           titulo: 'Montar a lista de exercícios',
-          subtitulo: 'Escolha manual ou seleção recomendada em 1 clique',
+          subtitulo: 'Use a lista pronta ou edite os exercícios',
           tipoVisual: 'montagem',
           destaques: [
-            'Toque no módulo desejado para abrir a montagem da lista de aula.',
-            'Você pode usar a seleção recomendada pronta ou marcar exercícios específicos de acordo com a necessidade do aluno.',
+            'Toque em "Preparar aula com esta lista" para usar a seleção pronta recomendada.',
+            'Se quiser alterar questões, toque em "Editar exercícios antes" para marcar e desmarcar à vontade.',
             'Escolha se quer incluir explicação teórica, lista de exercícios e gabarito com resolução detalhada.'
           ]
         },
         {
           etapa: 'Etapa 4 de 4 · Na Aula',
-          titulo: 'Pronto para a aula: tablet ou PDF',
+          titulo: 'Levar para a aula: tablet ou PDF',
           subtitulo: 'Escreva à mão com a S Pen ou imprima para a criança',
           tipoVisual: 'aula',
           destaques: [
-            'Toque em "Gerar folha" para abrir a lista na tela e resolver com a S Pen e ferramentas de desenho.',
-            'Se preferir papel físico, toque em "Baixar PDF" para imprimir a lista pronta.',
+            'Marque a opção "Abrir a lista como folha da aula" e toque em "Gerar e anexar" para resolver na tela com a S Pen e ferramentas de desenho.',
+            'Se preferir papel físico, toque em "Só gerar PDF, sem anexar" para imprimir a lista pronta.',
             'Ao anexar na aula, o assunto trabalhado fica automaticamente registrado no encontro do aluno!'
           ]
         }
@@ -606,28 +606,31 @@
     } else if (tipo === 'montagem') {
       c.innerHTML = '<div class="preview-mini-tela">' +
         '<div class="mini-barra-montagem">' +
-          '<strong>Montar lista de exercícios</strong>' +
-          '<span class="mini-tag-ouro">Pronto em 1 toque</span>' +
+          '<strong>Lista pronta &middot; 9º ano</strong>' +
+          '<span class="mini-tag-ouro">Pronta para aula</span>' +
         '</div>' +
         '<div class="mini-opcoes-montagem">' +
-          '<div class="mini-toggle-box ativo">✓ Seleção recomendada da aula</div>' +
-          '<div class="mini-toggle-box">Seleção manual questão a questão</div>' +
+          '<div class="mini-btn-acao principal">Preparar aula com esta lista</div>' +
+          '<div class="mini-btn-acao">Editar exercícios antes</div>' +
         '</div>' +
         '<div class="mini-checks-montagem">' +
-          '<div class="mini-check-label"><span class="mini-visto">✓</span> Explicar a teoria antes dos exercícios</div>' +
-          '<div class="mini-check-label"><span class="mini-visto">✓</span> Lista de exercícios selecionados (6 questões)</div>' +
+          '<div class="mini-check-label"><span class="mini-visto">✓</span> Teoria antes dos exercícios</div>' +
+          '<div class="mini-check-label"><span class="mini-visto">✓</span> Lista de exercícios selecionados</div>' +
           '<div class="mini-check-label"><span class="mini-visto">✓</span> Gabarito com resolução comentada</div>' +
         '</div>' +
       '</div>';
     } else if (tipo === 'aula') {
       c.innerHTML = '<div class="preview-mini-tela">' +
         '<div class="mini-barra-aula">' +
-          '<strong>Aula &middot; Levar para o encontro</strong>' +
-          '<span class="mini-tag-verde">Salvo no tablet</span>' +
+          '<strong>Gerar material &middot; Aula</strong>' +
+          '<span class="mini-tag-verde">Na tela ou papel</span>' +
+        '</div>' +
+        '<div class="mini-checks-montagem" style="margin-bottom:6px">' +
+          '<div class="mini-check-label"><span class="mini-visto">✓</span> Abrir a lista como folha da aula</div>' +
         '</div>' +
         '<div class="mini-acoes-aula">' +
-          '<div class="mini-btn-acao principal">✍️ Gerar folha (escrever com S Pen)</div>' +
-          '<div class="mini-btn-acao">📄 Baixar PDF para imprimir</div>' +
+          '<div class="mini-btn-acao principal">Gerar e anexar</div>' +
+          '<div class="mini-btn-acao">Só gerar PDF, sem anexar</div>' +
         '</div>' +
         '<div class="mini-folha-preview">' +
           '<div class="mini-folha-pautada">' +
