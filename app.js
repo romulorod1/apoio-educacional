@@ -1303,6 +1303,7 @@
   function cargaInicial() {
     var novo = Store.bancoVazio();
     novo.ajustes.cargaInicial = true;
+    novo.ajustes.ultimoAnoLetivoAtualizado = 2026;
 
     var marcelo = null;
     ALUNOS_INICIAIS.forEach(function (base, i) {
@@ -1393,6 +1394,7 @@
       desenharTudo();
       atualizarTemBiblioteca();
       setTimeout(mostrarNovidades, 900);
+      setTimeout(verificarViradaAnualAutomatica, 1400);
       registrarServiceWorker();
     }).catch(function (e) {
       document.body.innerHTML = '<div style="padding:32px;font-family:sans-serif">' +
@@ -3513,6 +3515,273 @@
     var atual = anoEscolarCadastrado(aluno);
     return Core.anoEscolarLivre(atual.ano) ? (atual.outro || 'Outro ano escolar') :
       (Core.ANOS_ESCOLARES[atual.ano] || '');
+  }
+
+  function formatarRotuloAnoEscolar(ano, outro) {
+    if (!ano) return 'Não informada';
+    if (Core.anoEscolarLivre(ano)) return outro ? String(outro).trim() : 'Outro ano escolar';
+    return Core.ANOS_ESCOLARES[ano] || ano;
+  }
+
+  /* Virada anual de séries com pop-up comparativo (T11).
+   *
+   * Apresenta a série anterior e a nova série sugerida para cada aluno ativo,
+   * permitindo ajuste individual no seletor ou encerramento de ciclo.
+   * O encerramento de ciclo cancela as aulas futuras a partir de 1º de janeiro
+   * e encerra a recorrência semanal, preservando 100% das aulas passadas e relatórios. */
+  function abrirModalViradaAnual(anoLetivo, opcoes) {
+    opcoes = opcoes || {};
+    var ano = Number(anoLetivo) || new Date().getFullYear();
+    var previa = Core.prepararViradaAnual(db, ano, opcoes);
+
+    if (previa.erro === 'ja-atualizado') {
+      avisar('As séries escolares já foram atualizadas para o ano letivo ' + ano + '.');
+      return;
+    }
+    if (previa.erro || !previa.linhas || !previa.linhas.length) {
+      avisar('Não há alunos ativos com séries a revisar para o ano letivo ' + ano + '.');
+      return;
+    }
+
+    var rotuloAno = $('#virada-ano-letivo');
+    if (rotuloAno) rotuloAno.textContent = String(ano);
+
+    var corpo = $('#corpo-modal-virada-anual');
+    corpo.innerHTML = '';
+
+    corpo.appendChild(el('p', {
+      class: 'ajuda', style: 'margin-top:0;margin-bottom:14px',
+      texto: 'Confira a série proposta para cada aluno no ano letivo de ' + ano +
+        '. Você pode alterar a série no seletor ou marcar "Encerrar ciclo" caso o aluno tenha concluído ou não vá mais continuar.'
+    }));
+
+    var rolagem = el('div', { class: 'rolagem', style: 'margin-bottom:12px' });
+    var tabela = el('table', { class: 'dados tabela-virada' });
+    var thead = el('thead', {}, [
+      el('tr', {}, [
+        el('th', { texto: 'Aluno' }),
+        el('th', { texto: 'Série anterior' }),
+        el('th', { texto: 'Nova série (' + ano + ')' }),
+        el('th', { texto: 'Fim do ciclo', style: 'text-align:center' })
+      ])
+    ]);
+    tabela.appendChild(thead);
+
+    var tbody = el('tbody');
+
+    previa.linhas.forEach(function (linha) {
+      var tr = el('tr', { 'data-aluno-id': linha.alunoId });
+
+      var tdNome = el('td', {}, [
+        el('strong', { class: 'nome-aluno-virada', texto: linha.nome })
+      ]);
+
+      var textoAnterior = formatarRotuloAnoEscolar(linha.anterior, linha.anteriorOutro);
+      var tdAnterior = el('td', {}, [
+        el('span', { class: 'tag-serie-anterior', texto: textoAnterior })
+      ]);
+
+      var tdNova = el('td');
+      var sel = el('select', {
+        class: 'select-virada-serie',
+        'data-aluno-id': linha.alunoId,
+        'aria-label': 'Nova série de ' + linha.nome
+      });
+
+      Core.ANOS_ESCOLARES_ORDEM.forEach(function (codigo) {
+        var opt = el('option', {
+          value: codigo,
+          texto: Core.ANOS_ESCOLARES[codigo] || codigo
+        });
+        if (codigo === linha.sugerido) opt.selected = true;
+        sel.appendChild(opt);
+      });
+
+      var inpOutro = el('input', {
+        type: 'text',
+        class: 'input-virada-outro',
+        'data-aluno-id': linha.alunoId,
+        placeholder: 'Qual a série escolar?',
+        value: linha.anteriorOutro || '',
+        style: linha.sugerido === 'outro' ? '' : 'display:none'
+      });
+
+      sel.addEventListener('change', function () {
+        if (sel.value === 'outro') {
+          inpOutro.style.display = '';
+          inpOutro.focus();
+        } else {
+          inpOutro.style.display = 'none';
+        }
+      });
+
+      tdNova.appendChild(sel);
+      tdNova.appendChild(inpOutro);
+
+      var tdEncerrar = el('td', { style: 'text-align:center' });
+      var check = el('input', {
+        type: 'checkbox',
+        class: 'check-encerrar-ciclo',
+        'data-aluno-id': linha.alunoId,
+        'aria-label': 'Encerrar ciclo de ' + linha.nome
+      });
+      var lblCheck = el('label', { class: 'rotulo-inline-virada' }, [
+        check,
+        el('span', { texto: 'Encerrar' })
+      ]);
+
+      check.addEventListener('change', function () {
+        var trPai = check.closest('tr') || tr;
+        if (check.checked) {
+          trPai.classList.add('linha-encerrada');
+          sel.disabled = true;
+          inpOutro.disabled = true;
+        } else {
+          trPai.classList.remove('linha-encerrada');
+          sel.disabled = false;
+          inpOutro.disabled = false;
+        }
+        atualizarAvisoEncerramento();
+      });
+
+      tdEncerrar.appendChild(lblCheck);
+
+      tr.appendChild(tdNome);
+      tr.appendChild(tdAnterior);
+      tr.appendChild(tdNova);
+      tr.appendChild(tdEncerrar);
+      tbody.appendChild(tr);
+    });
+
+    tabela.appendChild(tbody);
+    rolagem.appendChild(tabela);
+    corpo.appendChild(rolagem);
+
+    var avisoEncerrados = el('div', {
+      class: 'faixa-aviso',
+      id: 'aviso-virada-encerrados',
+      style: 'display:none;margin-top:10px',
+      texto: 'Atenção: alunos com ciclo encerrado não terão novas aulas geradas e as aulas futuras a partir de 01/01/' +
+        ano + ' serão canceladas. As aulas passadas e fechamentos anteriores continuam 100% preservados.'
+    });
+    corpo.appendChild(avisoEncerrados);
+
+    function atualizarAvisoEncerramento() {
+      var temEncerrado = !!corpo.querySelector('.check-encerrar-ciclo:checked');
+      avisoEncerrados.style.display = temEncerrado ? '' : 'none';
+    }
+
+    var btnLembrar = $('#virada-lembrar-depois');
+    if (btnLembrar) {
+      btnLembrar.onclick = function () {
+        fecharModal('modal-virada-anual');
+      };
+    }
+
+    var btnConfirmar = $('#virada-confirmar-series');
+    if (btnConfirmar) {
+      btnConfirmar.onclick = function () {
+        var escolhas = {};
+        var erroValidacao = null;
+
+        previa.linhas.forEach(function (linha) {
+          if (erroValidacao) return;
+          var chk = corpo.querySelector('.check-encerrar-ciclo[data-aluno-id="' + linha.alunoId + '"]');
+          if (chk && chk.checked) {
+            escolhas[linha.alunoId] = { acao: 'encerrar' };
+          } else {
+            var s = corpo.querySelector('.select-virada-serie[data-aluno-id="' + linha.alunoId + '"]');
+            var val = s ? s.value : linha.sugerido;
+            var out = '';
+            if (val === 'outro') {
+              var inp = corpo.querySelector('.input-virada-outro[data-aluno-id="' + linha.alunoId + '"]');
+              out = inp ? inp.value.trim() : '';
+              if (!out) {
+                erroValidacao = 'Por favor, informe a série de ' + linha.nome + '.';
+                return;
+              }
+            }
+            escolhas[linha.alunoId] = {
+              acao: val === linha.anterior ? 'manter' : 'atualizar',
+              anoEscolar: val,
+              anoEscolarOutro: out
+            };
+          }
+        });
+
+        if (erroValidacao) {
+          avisar(erroValidacao);
+          return;
+        }
+
+        var res = Core.aplicarViradaAnual(db, ano, escolhas, opcoes);
+        if (res.erro) {
+          avisar('Não foi possível aplicar a virada anual: ' + res.erro);
+          return;
+        }
+
+        var novoDb = res.db;
+        var encerrados = res.encerrados || [];
+
+        if (encerrados.length) {
+          var dataCorte = ano + '-01-01';
+          var idsEncerrados = {};
+          encerrados.forEach(function (id) { idsEncerrados[id] = true; });
+
+          novoDb.series = (novoDb.series || []).filter(function (s) {
+            return !idsEncerrados[s.alunoId];
+          });
+
+          novoDb.aulas = (novoDb.aulas || []).map(function (a) {
+            if (idsEncerrados[a.alunoId] && a.data >= dataCorte && a.status !== 'realizada') {
+              return Object.assign({}, a, {
+                status: 'cancelada',
+                cobravel: false,
+                motivoCancelamento: 'Fim de ciclo pedagógico'
+              });
+            }
+            return a;
+          });
+        }
+
+        db = novoDb;
+        salvar().then(function () {
+          fecharModal('modal-virada-anual');
+          desenharTudo();
+          avisar('Séries atualizadas para o ano letivo de ' + ano + ' com sucesso!');
+        }).catch(function (e) {
+          avisar('Erro ao salvar as novas séries: ' + (e && e.message || e));
+        });
+      };
+    }
+
+    abrirModal('modal-virada-anual');
+  }
+
+  function verificarViradaAnualAutomatica() {
+    if (!db || !db.alunos || !db.alunos.length) return;
+    var modalNov = $('#modal-novidades');
+    var carrosselNov = $('.modal-novidades-carrossel');
+    if ((modalNov && modalNov.classList.contains('aberto')) || (carrosselNov && carrosselNov.classList.contains('aberto'))) {
+      setTimeout(verificarViradaAnualAutomatica, 1500);
+      return;
+    }
+    var anoAtual = new Date().getFullYear();
+    db.ajustes = db.ajustes || {};
+    var ultimoAtualizado = Number(db.ajustes.ultimoAnoLetivoAtualizado || 0);
+
+    if (!ultimoAtualizado) {
+      db.ajustes.ultimoAnoLetivoAtualizado = anoAtual;
+      salvar();
+      return;
+    }
+
+    if (ultimoAtualizado >= anoAtual) return;
+
+    var previa = Core.prepararViradaAnual(db, anoAtual);
+    if (!previa.erro && previa.linhas && previa.linhas.length) {
+      abrirModalViradaAnual(anoAtual);
+    }
   }
 
   function desenharAlunos() {
@@ -11977,6 +12246,32 @@
 
   // ================= ajustes =================
 
+  function desenharAjustesAnoLetivo() {
+    var info = $('#info-ano-letivo');
+    if (info) {
+      info.innerHTML = '';
+      var ultimo = Number(db.ajustes && db.ajustes.ultimoAnoLetivoAtualizado || 0);
+      if (ultimo > 0) {
+        info.appendChild(el('span', {
+          texto: 'Último ano letivo revisado: ' + ultimo + '.'
+        }));
+      } else {
+        info.appendChild(el('span', {
+          texto: 'Nenhuma virada anual de séries registrada ainda neste aparelho.'
+        }));
+      }
+    }
+    var btn = $('#btn-revisar-virada-anual');
+    if (btn) {
+      btn.onclick = function () {
+        var anoBase = new Date().getFullYear();
+        var ultimoAno = Number(db.ajustes && db.ajustes.ultimoAnoLetivoAtualizado || 0);
+        var anoSugerido = ultimoAno >= anoBase ? (ultimoAno + 1) : anoBase;
+        abrirModalViradaAnual(anoSugerido, { forcar: true });
+      };
+    }
+  }
+
   function desenharAjustes() {
     var lista = $('#lista-historico');
     Store.listarHistorico().then(function (registros) {
@@ -12089,6 +12384,7 @@
 
     desenharAjustesDoFechamento();
     desenharAjustesDeReajuste();
+    desenharAjustesAnoLetivo();
     mostrarCartaoBiblioteca();
     desenharPacotesBiblioteca();
 

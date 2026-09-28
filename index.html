@@ -252,6 +252,18 @@
         </div>
       </div>
 
+      <h3 class="subtitulo">Ano letivo e progressão escolar</h3>
+      <div class="cartao">
+        <p class="ajuda" style="margin-top:0">
+          Atualize as séries dos alunos para o novo ano letivo ou encerre ciclos pedagógicos.
+          O histórico dos anos anteriores e relatórios passados permanecem 100% preservados.
+        </p>
+        <div id="info-ano-letivo" class="ajuda" style="margin-bottom:8px"></div>
+        <div class="barra" style="margin-bottom:0">
+          <button class="btn" id="btn-revisar-virada-anual" type="button">Revisar anos escolares / Virada de ciclo</button>
+        </div>
+      </div>
+
       <h3 class="subtitulo">Desfazer</h3>
       <div class="cartao">
         <p class="ajuda" style="margin-top:0">
@@ -639,6 +651,20 @@
       </div>
       <div class="modal-corpo" id="corpo-modal-mes"></div>
       <div class="modal-rodape" id="rodape-modal-mes"></div>
+    </div>
+  </div>
+
+  <div class="fundo-modal" id="modal-virada-anual">
+    <div class="modal" style="max-width:760px;width:95vw;max-height:92vh;display:flex;flex-direction:column">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-virada-anual">Virada de Séries · Ano Letivo <span id="virada-ano-letivo"></span></h3>
+        <button class="fechar" id="fechar-modal-virada-anual" data-fechar type="button" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-virada-anual" style="padding:16px;overflow-y:auto"></div>
+      <div class="modal-rodape">
+        <button class="btn" id="virada-lembrar-depois" type="button">Lembrar mais tarde</button>
+        <button class="btn principal" id="virada-confirmar-series" type="button">Confirmar atualização de séries</button>
+      </div>
     </div>
   </div>
 

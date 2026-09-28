@@ -1432,6 +1432,121 @@
 
   function anoEscolarLivre(ano) { return String(ano || '') === 'outro'; }
 
+  /* A virada anual começa por uma proposta, não por uma alteração no cadastro.
+   * Códigos fora da escada escolar não permitem presumir aprovação; o 3º ano
+   * do médio requer uma decisão de conclusão, nunca uma série inexistente. */
+  function sugerirAnoEscolarSeguinte(ano) {
+    var atual = String(ano || '');
+    var escada = ['02', '03', '04', '05', '06', '07', '08', '09', 'em1', 'em2', 'em3'];
+    var pos = escada.indexOf(atual);
+    if (pos < 0) return { anterior: atual, sugerido: atual, acao: 'revisar' };
+    if (pos === escada.length - 1) return { anterior: atual, sugerido: atual, acao: 'concluir-ou-revisar' };
+    return { anterior: atual, sugerido: escada[pos + 1], acao: 'avancar' };
+  }
+
+  /* A prévia é derivada do cadastro em memória e não altera aluno, mapeamento,
+   * aula, recorrência ou marcador de ano. O código chamador só pode persistir
+   * depois de apresentar cada linha à professora e receber confirmação. */
+  function prepararViradaAnual(db, anoLetivo, opcoes) {
+    var ano = Number(anoLetivo);
+    if (!Number.isInteger(ano) || ano < 2000 || ano > 2100) return { erro: 'ano-invalido', linhas: [] };
+    var ultimo = Number(db && db.ajustes && db.ajustes.ultimoAnoLetivoAtualizado);
+    var forcar = !!(opcoes && opcoes.forcar);
+    if (!forcar && Number.isInteger(ultimo) && ultimo >= ano) return { erro: 'ja-atualizado', linhas: [] };
+    var linhas = ((db && db.alunos) || []).filter(function (aluno) {
+      return aluno && aluno.ativo !== false;
+    }).map(function (aluno) {
+      var mapa = mapeamentoAtual(aluno);
+      var anterior = (mapa && mapa.anoEscolar) || aluno.anoEscolar || '';
+      var sugestao = sugerirAnoEscolarSeguinte(anterior);
+      return {
+        alunoId: aluno.id, nome: aluno.nome || '', anterior: anterior,
+        anteriorOutro: (mapa && mapa.anoEscolarOutro) || aluno.anoEscolarOutro || '',
+        sugerido: sugestao.sugerido, acao: sugestao.acao
+      };
+    }).sort(function (a, b) {
+      return a.nome.localeCompare(b.nome, 'pt-BR') || String(a.alunoId).localeCompare(String(b.alunoId));
+    });
+    return { anoLetivo: ano, linhas: linhas };
+  }
+
+  /* Produz um novo banco para persistência atômica, mantendo o original intacto
+   * se houver validação ou erro de armazenamento. A política de recorrências e
+   * aulas futuras no encerramento será aplicada pelo chamador conforme a
+   * escolha explícita da professora; esta função nunca as apaga. */
+  function aplicarViradaAnual(db, anoLetivo, escolhas, opcoes) {
+    var previa = prepararViradaAnual(db, anoLetivo, opcoes);
+    if (previa.erro) return { erro: previa.erro };
+    var mapaEscolhas = escolhas || {};
+    var mudancas = {};
+    for (var i = 0; i < previa.linhas.length; i++) {
+      var linha = previa.linhas[i];
+      var escolha = mapaEscolhas[linha.alunoId];
+      if (!escolha || (escolha.acao !== 'manter' && escolha.acao !== 'atualizar' &&
+          escolha.acao !== 'encerrar')) return { erro: 'escolha-pendente', alunoId: linha.alunoId };
+      var novoAno = escolha.acao === 'atualizar' ? String(escolha.anoEscolar || '') : linha.anterior;
+      if (novoAno && !ANOS_ESCOLARES[novoAno]) {
+        return { erro: 'serie-invalida', alunoId: linha.alunoId };
+      }
+      if (escolha.acao === 'atualizar' && !novoAno) return { erro: 'serie-invalida', alunoId: linha.alunoId };
+      mudancas[linha.alunoId] = {
+        acao: escolha.acao,
+        anoEscolar: novoAno,
+        anoEscolarOutro: escolha.acao === 'atualizar'
+          ? (novoAno === 'outro' ? String(escolha.anoEscolarOutro || '').trim() : '')
+          : linha.anteriorOutro
+      };
+      if (mudancas[linha.alunoId].anoEscolar === 'outro' && !mudancas[linha.alunoId].anoEscolarOutro) {
+        return { erro: 'serie-livre-vazia', alunoId: linha.alunoId };
+      }
+    }
+    var novosAlunos = (db.alunos || []).map(function (aluno) {
+      var escolha = mudancas[aluno.id];
+      if (!escolha) return aluno;
+      var copia = Object.assign({}, aluno);
+      var historico = (aluno.historicoAnoEscolar || []).map(function (r) { return Object.assign({}, r); });
+      if (linhaDoAno(historico, Number(anoLetivo) - 1) < 0 && linhaAnteriorDaPrevia(previa, aluno.id)) {
+        var anterior = linhaAnteriorDaPrevia(previa, aluno.id);
+        historico.push({ anoLetivo: Number(anoLetivo) - 1, anoEscolar: anterior.anterior,
+          anoEscolarOutro: anterior.anteriorOutro });
+      }
+      var posAtual = linhaDoAno(historico, Number(anoLetivo));
+      var registroAtual = { anoLetivo: Number(anoLetivo), anoEscolar: escolha.anoEscolar,
+        anoEscolarOutro: escolha.anoEscolarOutro };
+      if (posAtual >= 0) historico[posAtual] = registroAtual;
+      else historico.push(registroAtual);
+      historico.sort(function (a, b) { return Number(a.anoLetivo) - Number(b.anoLetivo); });
+      copia.historicoAnoEscolar = historico;
+      copia.anoEscolar = escolha.anoEscolar;
+      copia.anoEscolarOutro = escolha.anoEscolarOutro;
+      if (escolha.acao === 'encerrar') {
+        copia.ativo = false;
+        copia.encerradoAnoLetivo = Number(anoLetivo);
+      }
+      var mapa = mapeamentoAtual(aluno);
+      if (mapa && escolha.acao !== 'encerrar') {
+        var posMapa = (aluno.mapeamentos || []).indexOf(mapa);
+        copia.mapeamentos = (aluno.mapeamentos || []).slice();
+        copia.mapeamentos[posMapa] = Object.assign({}, mapa, {
+          anoEscolar: escolha.anoEscolar, anoEscolarOutro: escolha.anoEscolarOutro
+        });
+      }
+      return copia;
+    });
+    return { db: Object.assign({}, db, {
+      alunos: novosAlunos,
+      ajustes: Object.assign({}, db.ajustes || {}, { ultimoAnoLetivoAtualizado: Number(anoLetivo) })
+    }), encerrados: Object.keys(mudancas).filter(function (id) { return mudancas[id].acao === 'encerrar'; }) };
+  }
+
+  function linhaDoAno(historico, ano) {
+    return historico.findIndex(function (r) { return Number(r.anoLetivo) === ano; });
+  }
+
+  function linhaAnteriorDaPrevia(previa, alunoId) {
+    return previa.linhas.filter(function (r) { return r.alunoId === alunoId; })[0] || null;
+  }
+
   /* A série que o banco de temas entende, a partir do que ela registrou.
    *
    * O banco vai do 1º ano ao 3º do médio e não conhece cursinho. Cursinho lê
@@ -1447,12 +1562,28 @@
 
   /* Ano escolar e colégio, para o fechamento situar quem lê. Só aparece quando
    * a informação existe: nada de linha em branco no documento da família. */
-  function contextoEscolarDe(aluno) {
+  /* O histórico anual é criado na primeira virada. Para meses anteriores ao
+   * primeiro registro, a série de referência é a que existia antes da virada;
+   * dados legados não permitem reconstruir séries de anos ainda mais antigos. */
+  function anoEscolarRegistradoEm(aluno, referencia) {
+    var anoRef = parseInt(String(referencia || '').slice(0, 4), 10);
+    var registros = ((aluno && aluno.historicoAnoEscolar) || []).filter(function (r) {
+      return r && Number.isInteger(Number(r.anoLetivo)) && String(r.anoEscolar || '');
+    }).slice().sort(function (a, b) { return Number(a.anoLetivo) - Number(b.anoLetivo); });
+    if (!Number.isInteger(anoRef) || !registros.length) return null;
+    var escolhido = registros[0];
+    registros.forEach(function (r) { if (Number(r.anoLetivo) <= anoRef) escolhido = r; });
+    return escolhido;
+  }
+
+  function contextoEscolarDe(aluno, referencia) {
     var m = mapeamentoAtual(aluno);
-    var ano = (m && m.anoEscolar) || (aluno && aluno.anoEscolar) || '';
+    var registro = anoEscolarRegistradoEm(aluno, referencia);
+    var ano = (registro && registro.anoEscolar) || (m && m.anoEscolar) || (aluno && aluno.anoEscolar) || '';
     var partes = [];
     if (anoEscolarLivre(ano)) {
-      var livre = ((m && m.anoEscolarOutro) || (aluno && aluno.anoEscolarOutro) || '').trim();
+      var livre = (registro ? String(registro.anoEscolarOutro || '') :
+        String((m && m.anoEscolarOutro) || (aluno && aluno.anoEscolarOutro) || '')).trim();
       if (livre) partes.push(livre);
     } else if (ANOS_ESCOLARES[ano]) {
       partes.push(ANOS_ESCOLARES[ano]);
@@ -2844,7 +2975,7 @@
       precoUnicoFeito: listaFaixasFeitas.length === 1 ? listaFaixasFeitas[0].valorHora : null,
       semPreco: semPreco,
       resumoTexto: resumo ? (resumo.texto || '') : '',
-      contextoEscolar: contextoEscolarDe(aluno),
+      contextoEscolar: contextoEscolarDe(aluno, mesIso),
       temasDoMes: temasDoMes,
       areasDoMes: areasDoMes,
       temasFeitos: temasFeitos,
@@ -3838,8 +3969,12 @@
     rotuloEtapa: rotuloEtapa, etapasDe: etapasDe, registrosDaFrente: registrosDaFrente,
     etapaAtual: etapaAtual, quadroDeEtapas: quadroDeEtapas, registrarEtapa: registrarEtapa,
     lembreteDoMapeamento: lembreteDoMapeamento, textoDoLembrete: textoDoLembrete,
-    contextoEscolarDe: contextoEscolarDe, ANOS_ESCOLARES: ANOS_ESCOLARES,
+    contextoEscolarDe: contextoEscolarDe, anoEscolarRegistradoEm: anoEscolarRegistradoEm,
+    ANOS_ESCOLARES: ANOS_ESCOLARES,
     ANOS_ESCOLARES_ORDEM: ANOS_ESCOLARES_ORDEM, anoEscolarLivre: anoEscolarLivre,
+    sugerirAnoEscolarSeguinte: sugerirAnoEscolarSeguinte,
+    prepararViradaAnual: prepararViradaAnual,
+    aplicarViradaAnual: aplicarViradaAnual,
     serieParaTemas: serieParaTemas,
     conflitosDe: conflitosDe, minutosDaHora: minutosDaHora,
     dividirAula: dividirAula, desfazerDivisao: desfazerDivisao,
