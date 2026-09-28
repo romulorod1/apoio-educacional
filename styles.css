@@ -2176,3 +2176,83 @@ button.alvo-rascunho:hover { background: var(--soft); }
   flex-wrap: wrap;
 }
 
+/* ---------- virada anual de series ---------- */
+
+.tabela-virada {
+  width: 100%;
+}
+
+.tabela-virada th {
+  white-space: nowrap;
+}
+
+.tabela-virada tr.linha-encerrada td {
+  background: #FFF5F5 !important;
+  color: var(--muted);
+}
+
+.tabela-virada tr.linha-encerrada .nome-aluno-virada {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.select-virada-serie {
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: 6px;
+  border: 1px solid var(--fio);
+  background: var(--branco);
+  color: var(--navy);
+  font-family: inherit;
+  max-width: 220px;
+  width: 100%;
+}
+
+.select-virada-serie:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: var(--soft);
+}
+
+.input-virada-outro {
+  margin-top: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: 6px;
+  border: 1px solid var(--fio);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.input-virada-outro:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rotulo-inline-virada {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vermelho);
+  user-select: none;
+}
+
+.rotulo-inline-virada input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+
+.tag-serie-anterior {
+  display: inline-block;
+  padding: 3px 8px;
+  background: var(--soft-2);
+  color: var(--navy);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+

@@ -1447,11 +1447,12 @@
   /* A prévia é derivada do cadastro em memória e não altera aluno, mapeamento,
    * aula, recorrência ou marcador de ano. O código chamador só pode persistir
    * depois de apresentar cada linha à professora e receber confirmação. */
-  function prepararViradaAnual(db, anoLetivo) {
+  function prepararViradaAnual(db, anoLetivo, opcoes) {
     var ano = Number(anoLetivo);
     if (!Number.isInteger(ano) || ano < 2000 || ano > 2100) return { erro: 'ano-invalido', linhas: [] };
     var ultimo = Number(db && db.ajustes && db.ajustes.ultimoAnoLetivoAtualizado);
-    if (Number.isInteger(ultimo) && ultimo >= ano) return { erro: 'ja-atualizado', linhas: [] };
+    var forcar = !!(opcoes && opcoes.forcar);
+    if (!forcar && Number.isInteger(ultimo) && ultimo >= ano) return { erro: 'ja-atualizado', linhas: [] };
     var linhas = ((db && db.alunos) || []).filter(function (aluno) {
       return aluno && aluno.ativo !== false;
     }).map(function (aluno) {
@@ -1473,8 +1474,8 @@
    * se houver validação ou erro de armazenamento. A política de recorrências e
    * aulas futuras no encerramento será aplicada pelo chamador conforme a
    * escolha explícita da professora; esta função nunca as apaga. */
-  function aplicarViradaAnual(db, anoLetivo, escolhas) {
-    var previa = prepararViradaAnual(db, anoLetivo);
+  function aplicarViradaAnual(db, anoLetivo, escolhas, opcoes) {
+    var previa = prepararViradaAnual(db, anoLetivo, opcoes);
     if (previa.erro) return { erro: previa.erro };
     var mapaEscolhas = escolhas || {};
     var mudancas = {};

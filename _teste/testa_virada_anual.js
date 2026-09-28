@@ -62,6 +62,7 @@ assert.deepEqual(previa.linhas.map(x => x.sugerido), ['em3', 'em1', '']);
 assert.deepEqual(previa.linhas.map(x => x.acao), ['concluir-ou-revisar', 'avancar', 'revisar']);
 assert.equal(JSON.stringify(previaDb), antesDaPrevia, 'a prévia não modifica o banco');
 assert.equal(Core.prepararViradaAnual(previaDb, 2026).erro, 'ja-atualizado');
+assert.equal(Core.prepararViradaAnual(previaDb, 2026, { forcar: true }).erro, undefined);
 assert.equal(Core.prepararViradaAnual(previaDb, 'ano errado').erro, 'ano-invalido');
 
 const escolhas = {
