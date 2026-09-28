@@ -8813,41 +8813,71 @@
       }
 
       // 3. Matemática do ano escolar (Ponto inicial)
-      var anoCadastrado = anoEscolarDe(aluno);
-      var ano = anoCadastrado || ultimoAnoEscolar || '06';
-      var rotuloAno = nomeDoAno(ano);
-      var tituloMatematica = anoCadastrado
-        ? 'Sugestões de Matemática para o ' + rotuloAno
-        : 'Sugestões de Matemática (' + rotuloAno + ' · ano não cadastrado)';
-
-      lista.appendChild(el('div', { class: 'bloco-exercicios', texto: tituloMatematica }));
-
-      if (!anoCadastrado) {
-        lista.appendChild(el('div', { class: 'ajuda', style: 'margin:-4px 0 8px',
-          texto: 'O ano escolar não está informado na ficha deste aluno. Você pode escolher qualquer assunto abaixo, navegar por outros anos ou buscar livremente.' }));
-      }
+      var anoInfo = typeof anoEscolarCadastrado === 'function'
+        ? anoEscolarCadastrado(aluno)
+        : { ano: (aluno && aluno.anoEscolar) || '', outro: (aluno && aluno.anoEscolarOutro) || '' };
+      var serieMapeavel = Core.anoEscolarDe(aluno);
+      var eForaOuOutro = anoInfo && (anoInfo.ano === 'fora' || Core.anoEscolarLivre(anoInfo.ano));
 
       var chavesRecentes = {};
       recentes.forEach(function (r) { chavesRecentes[Core.chaveDeBusca(r.item.titulo || '')] = true; });
-      var temasDoAno = sugestoesDoAnoDeMatematica(aula, aluno, ano, chavesRecentes);
-      if (temasDoAno.length) {
-        temasDoAno.forEach(function (s) {
-          lista.appendChild(criarLinhaSugestao(s));
-        });
-      }
-      if (typeof atualizarDisponibilidadeVisivel === 'function') {
-        atualizarDisponibilidadeVisivel();
-      }
 
-      // Atalho para ver a grade completa de matemática ou outros anos
-      lista.appendChild(linha(
-        'Ver todos os assuntos de Matemática (' + (indiceTemas ? indiceTemas.length + ' assuntos' : 'por ano') + ')',
-        anoCadastrado
-          ? 'Explorar outros anos ou a grade completa do ' + rotuloAno
-          : 'Escolher outro ano escolar ou buscar na grade de Matemática',
-        function () { abrirMatematicaComoAssunto(aula, aluno); },
-        true
-      ));
+      if (serieMapeavel) {
+        var rotuloAno = nomeDoAno(serieMapeavel);
+        lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Sugestões de Matemática para o ' + rotuloAno }));
+        var temasDoAno = sugestoesDoAnoDeMatematica(aula, aluno, serieMapeavel, chavesRecentes);
+        if (temasDoAno.length) {
+          temasDoAno.forEach(function (s) { lista.appendChild(criarLinhaSugestao(s)); });
+        }
+        if (typeof atualizarDisponibilidadeVisivel === 'function') {
+          atualizarDisponibilidadeVisivel();
+        }
+        lista.appendChild(linha(
+          'Ver todos os assuntos de Matemática (' + (indiceTemas ? indiceTemas.length + ' assuntos' : 'por ano') + ')',
+          'Explorar outros anos ou a grade completa do ' + rotuloAno,
+          function () { abrirMatematicaComoAssunto(aula, aluno); },
+          true
+        ));
+      } else if (eForaOuOutro) {
+        var rotuloEtapa = Core.anoEscolarLivre(anoInfo.ano)
+          ? (anoInfo.outro || 'Outro')
+          : (Core.ANOS_ESCOLARES[anoInfo.ano] || 'Fora da escola');
+        lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Matemática (' + rotuloEtapa + ')' }));
+        lista.appendChild(el('div', {
+          class: 'ajuda', style: 'margin:-4px 0 8px',
+          texto: 'Este aluno está cadastrado como ' + rotuloEtapa + '. Você pode escrever o assunto acima, pesquisar por qualquer matéria ou abrir o catálogo completo de Matemática por ano.'
+        }));
+        lista.appendChild(linha(
+          'Abrir o catálogo de Matemática por ano (' + (indiceTemas ? indiceTemas.length + ' assuntos' : 'grade completa') + ')',
+          'Navegar pelos temas do 1º ano ao ensino médio',
+          function () { abrirMatematicaComoAssunto(aula, aluno); },
+          true
+        ));
+      } else {
+        var anoFallback = ultimoAnoEscolar || '06';
+        var rotuloAno = nomeDoAno(anoFallback);
+        lista.appendChild(el('div', {
+          class: 'bloco-exercicios',
+          texto: 'Sugestões de Matemática (' + rotuloAno + ' · ano não cadastrado)'
+        }));
+        lista.appendChild(el('div', {
+          class: 'ajuda', style: 'margin:-4px 0 8px',
+          texto: 'O ano escolar não está informado na ficha deste aluno. Você pode escolher qualquer assunto abaixo, navegar por outros anos ou buscar livremente.'
+        }));
+        var temasDoAno = sugestoesDoAnoDeMatematica(aula, aluno, anoFallback, chavesRecentes);
+        if (temasDoAno.length) {
+          temasDoAno.forEach(function (s) { lista.appendChild(criarLinhaSugestao(s)); });
+        }
+        if (typeof atualizarDisponibilidadeVisivel === 'function') {
+          atualizarDisponibilidadeVisivel();
+        }
+        lista.appendChild(linha(
+          'Ver todos os assuntos de Matemática (' + (indiceTemas ? indiceTemas.length + ' assuntos' : 'por ano') + ')',
+          'Escolher outro ano escolar ou buscar na grade de Matemática',
+          function () { abrirMatematicaComoAssunto(aula, aluno); },
+          true
+        ));
+      }
 
       // 4. Outras matérias (registro livre)
       lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Outras matérias' }));
