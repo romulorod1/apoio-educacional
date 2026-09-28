@@ -281,6 +281,11 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   await pag.click('#bib-solucao');
   await esperar('solução', () => pag.$eval('#titulo-modal-biblioteca', e => e.textContent), v => /solução$/.test(v || ''), 5000);
   conf('Ver solução troca para a solução', await pag.$eval('#bib-solucao', e => e.textContent), 'Ver enunciado');
+  await pag.click('#bib-como-folha');
+  conf('solução não abre escolha de aula para folha do aluno',
+    await pag.$eval('#modal-bib-folha', e => e.classList.contains('aberto')), false);
+  conf('orientação pede voltar ao enunciado',
+    /Ver enunciado/.test(await pag.$eval('#aviso-texto', e => e.textContent)), true);
   await pag.click('#bib-proxima');
   await esperar('próxima', () => pag.$eval('#titulo-modal-biblioteca', e => e.textContent), v => /exercício 4 \(4 de 40\)$/.test(v || ''), 5000);
   conf('Próxima vai para o exercício 4, no enunciado', await pag.$eval('#titulo-modal-biblioteca', e => e.textContent),

@@ -623,6 +623,9 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
 .contador-pagina { font-size: 14px; color: var(--muted); font-weight: 600; padding: 0 4px; }
 
 .status-gravacao {
+  border: 0;
+  background: transparent;
+  padding: 4px;
   font-size: 13px;
   font-weight: 600;
   color: #2E7D6B;
@@ -633,6 +636,8 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   gap: 6px;
   user-select: none;
 }
+.status-gravacao:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.status-gravacao:disabled { opacity: 1; cursor: default; }
 .status-gravacao.salvando {
   color: #627D98;
 }
