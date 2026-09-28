@@ -10579,7 +10579,8 @@
       aoClick: function () {
         exportarAlunoEmPdf(estado.f, true, {
           exibirTemasEAreas: estado.exibirTemas,
-          incluirNotas: true,
+          incluirNotasPublicas: estado.incluirNotas,
+          incluirFolhas: true,
           mostrarNaoCobradas: estado.mostrarNaoCobradas
         });
       }
@@ -10591,7 +10592,8 @@
       aoClick: function () {
         exportarAlunoEmPdf(estado.f, false, {
           exibirTemasEAreas: estado.exibirTemas,
-          incluirNotas: estado.incluirNotas,
+          incluirNotasPublicas: estado.incluirNotas,
+          incluirFolhas: false,
           mostrarNaoCobradas: estado.mostrarNaoCobradas
         });
       }
@@ -11371,11 +11373,13 @@
 
     passo.then(function (extra) {
       var gen = typeof PDFGen !== 'undefined' ? PDFGen : Pdf;
-      var opts = opcoesDoDocumento(Object.assign({
+      var baseOpts = {
+        incluirFolhas: comFolhas,
         incluirNotas: comFolhas,
         notas: extra.notas,
         imagens: extra.imagens
-      }, extraOpcoes || {}));
+      };
+      var opts = opcoesDoDocumento(Object.assign(baseOpts, extraOpcoes || {}));
       var bytes = gen.gerarFechamento(f, opts);
       entregarArquivo(nomeBase(f) + (comFolhas ? '_com_folhas' : '') + '.pdf',
         new Blob([bytes], { type: 'application/pdf' }),
