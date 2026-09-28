@@ -1589,11 +1589,20 @@
     });
 
     var selStatus = el('select', { id: 'campo-status' });
-    Object.keys(Core.STATUS).forEach(function (k) {
-      var o = el('option', { value: k, texto: Core.STATUS[k].rotulo });
-      if (aulaEmEdicao && aulaEmEdicao.status === k) o.selected = true;
-      selStatus.appendChild(o);
-    });
+    function atualizarOpcoesStatus() {
+      var campoData = $('#campo-data');
+      var dataAtual = campoData ? campoData.value : (dataVal || Core.hojeIso());
+      var hoje = Core.hojeIso();
+      var valorAtual = selStatus.value || (aulaEmEdicao ? (aulaEmEdicao.status || 'realizada') : 'realizada');
+      selStatus.innerHTML = '';
+      Object.keys(Core.STATUS).forEach(function (k) {
+        var textoRotulo = Core.rotuloSituacao ? Core.rotuloSituacao(k, dataAtual, hoje) : Core.STATUS[k].rotulo;
+        var o = el('option', { value: k, texto: textoRotulo });
+        if (k === valorAtual) o.selected = true;
+        selStatus.appendChild(o);
+      });
+    }
+    atualizarOpcoesStatus();
 
     blocoQuando.appendChild(el('div', { class: 'linha' }, [
       el('label', { class: 'campo' }, [el('span', { texto: 'Duração' }), selDur]),
@@ -1610,6 +1619,10 @@
     ]));
     selStatus.addEventListener('change', function () {
       chkCobrar.checked = (Core.STATUS[this.value] || Core.STATUS.realizada).cobravelPadrao;
+      atualizarPrevisao();
+    });
+    chkCobrar.addEventListener('change', function () {
+      atualizarPrevisao();
     });
 
     // lembrete de feriado, sem impedir a marcação
@@ -1662,10 +1675,13 @@
       var aluno = alunoPorId($('#campo-aluno').value);
       var data = $('#campo-data').value;
       var dur = parseInt($('#campo-duracao').value, 10) || 0;
+      var cobrar = chkCobrar ? chkCobrar.checked : true;
       var pv = aluno ? Core.precoVigente(aluno, data) : null;
       if (!pv) {
         previsao.innerHTML = '<strong style="color:#B4453C">Sem valor por hora vigente nesta data.</strong> ' +
           'Cadastre o valor na ficha do aluno.';
+      } else if (!cobrar) {
+        previsao.textContent = 'Não será cobrada (tarifa de referência: ' + dinheiro(pv.valorHora) + ' por hora).';
       } else {
         previsao.textContent = 'Valor previsto: ' + dinheiro((dur / 60) * pv.valorHora) +
           ' (' + dinheiro(pv.valorHora) + ' por hora).';
@@ -1674,8 +1690,14 @@
     selAluno.addEventListener('change', atualizarPrevisao);
     selDur.addEventListener('change', atualizarPrevisao);
     selStatus.addEventListener('change', atualizarPrevisao);
-    $('#campo-data').addEventListener('change', atualizarPrevisao);
-    $('#campo-data').addEventListener('input', atualizarPrevisao);
+    $('#campo-data').addEventListener('change', function () {
+      atualizarOpcoesStatus();
+      atualizarPrevisao();
+    });
+    $('#campo-data').addEventListener('input', function () {
+      atualizarOpcoesStatus();
+      atualizarPrevisao();
+    });
     $('#campo-hora').addEventListener('change', atualizarPrevisao);
     $('#campo-hora').addEventListener('input', atualizarPrevisao);
 
@@ -5430,15 +5452,18 @@
   }
 
   function linhasDeAula(caixa, aulas) {
+    var hoje = Core.hojeIso();
     aulas.forEach(function (a) {
       var st = Core.STATUS[a.status] || Core.STATUS.realizada;
+      var rotulo = Core.rotuloSituacao ? Core.rotuloSituacao(a.status, a.data, hoje) : st.rotulo;
       var cobravel = (typeof a.cobravel === 'boolean') ? a.cobravel : st.cobravelPadrao;
       var anotacao = (a.notaTexto || '').trim();
+      var futura = a.data > hoje;
 
       var detalhes = [Core.diaSemanaCurto(a.data)];
       if (a.hora) detalhes.push(a.hora);
       detalhes.push(Core.fmtDuracao(a.duracaoMin));
-      if (a.status !== 'realizada') detalhes.push(st.rotulo);
+      if (a.status !== 'realizada' || futura) detalhes.push(rotulo);
       if (!cobravel) detalhes.push('não cobrada');
 
       var linha = el('div', { class: 'item-lista linha-historico' }, [
@@ -9547,8 +9572,7 @@
           el('td', { texto: l.dia }),
           el('td', { texto: Core.fmtDuracao(l.duracaoMin) }),
           el('td', {
-            texto: l.statusRotulo + (l.cobravel ? '' : ' (não cobrada)') +
-              (l.futura ? ' · ainda vai acontecer' : '')
+            texto: l.statusRotulo + (l.cobravel ? '' : ' (não cobrada)')
           }),
           el('td', { texto: dinheiro(l.cobravel ? l.valor : 0) })
         ]));
@@ -10132,14 +10156,10 @@
        * O rótulo é o mesmo do PDF que a família recebe, para a tela e o
        * documento nunca contarem histórias diferentes. */
       if (l.status !== 'realizada') detalhe.push(l.statusRotulo);
-      /* A aula que ainda não chegou saía desenhada igual à que já aconteceu:
-       * mesma borda, mesma letra, nenhuma marca. Quem está lendo do outro lado
-       * da mesa não tem como saber que aquele dia é o mês que vem. */
-      if (l.futura) detalhe.push('ainda vai acontecer');
+      else if (l.futura) detalhe.push(l.statusRotulo);
     } else {
       if (l.hora) detalhe.push(l.hora);
       detalhe.push(l.statusRotulo + (l.cobravel ? '' : ' (não cobrada)'));
-      if (l.futura) detalhe.push('ainda vai acontecer');
     }
     cabeca.appendChild(el('span', { class: 'detalhe-dia', texto: detalhe.join(' · ') }));
 

@@ -98,6 +98,27 @@
     return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
   }
 
+  /* Rótulo de exibição da situação da aula, considerando se a aula é futura.
+   *
+   * No banco, o campo status aceita 'realizada', 'reposicao', 'falta' e
+   * 'cancelada' (VERSAO_BANCO = 2). Quando a aula está marcada para data posterior
+   * à de referência (hoje), chamar de 'Realizada' afirma que ela já aconteceu.
+   * No futuro, o status normal é exibido como 'Agendada' e reposição como
+   * 'Reposição agendada'. Cancelamento nunca afirma realização futura.
+   */
+  function rotuloSituacao(status, data, hoje) {
+    var s = status || 'realizada';
+    var st = STATUS[s] || STATUS.realizada;
+    var ref = hoje || hojeIso();
+    var futura = data ? data > ref : false;
+    if (futura) {
+      if (s === 'realizada') return 'Agendada';
+      if (s === 'reposicao') return 'Reposição agendada';
+      return st.rotulo;
+    }
+    return st.rotulo;
+  }
+
   // ---------- formatacao pt-BR ----------
 
   function fmtMoeda(v) {
@@ -2683,6 +2704,7 @@
         else if (!futura) minDadosSemCobrar += dur;
       }
 
+      var rotulo = rotuloSituacao(au.status, au.data, hoje);
       linhas.push({
         id: au.id,
         data: au.data,
@@ -2691,17 +2713,14 @@
         duracaoMin: dur,
         futura: futura,
         status: au.status || 'realizada',
-        statusRotulo: st.rotulo,
+        statusRotulo: rotulo,
         /* O mesmo rótulo, escrito para um documento.
          *
-         * A aula nasce como realizada, inclusive a que está lá na frente no
-         * calendário, e chamar de "Realizada" uma aula do dia 23 num documento
-         * impresso no dia 3 é dizer à família que ela aconteceu. Na tela dela o
-         * rótulo continua o de sempre: lá o dia da aula está à vista, e quem lê
-         * é quem marcou. */
-        statusNaFolha: (futura && (st === STATUS.realizada || st === STATUS.reposicao))
-          ? (st === STATUS.reposicao ? 'Reposição marcada' : 'Marcada')
-          : st.rotulo,
+         * A aula nasce como agendada no futuro e realizada no passado. Chamar
+         * de "Realizada" uma aula que ainda não aconteceu num documento impresso
+         * é dizer à família que ela aconteceu. Rótulos futuros usam 'Agendada'
+         * ou 'Reposição agendada', e cancelada não diz que vai acontecer. */
+        statusNaFolha: rotulo,
         cobravel: cobravel,
         valorHora: vh,
         valor: valor,
@@ -3736,6 +3755,7 @@
 
   return {
     MESES: MESES, DIAS_CURTO: DIAS_CURTO, DIAS_LONGO: DIAS_LONGO, STATUS: STATUS,
+    rotuloSituacao: rotuloSituacao,
     pad2: pad2, partesData: partesData, dataLocal: dataLocal, isoDe: isoDe, hojeIso: hojeIso,
     diaSemana: diaSemana, diaSemanaCurto: diaSemanaCurto, diaSemanaLongo: diaSemanaLongo,
     ddmm: ddmm, ddmmaaaa: ddmmaaaa, diaEMes: diaEMes, mesExtenso: mesExtenso, mesDe: mesDe,
