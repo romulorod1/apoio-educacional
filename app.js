@@ -8724,7 +8724,8 @@
       if (recentes.length) {
         lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Continuar trabalhando com este aluno' }));
         recentes.forEach(function (s) {
-          lista.appendChild(linha(s.item.titulo, s.detalhe, function () {
+          var disponivel = (typeof resumoDisponibilidadeDoAssunto === 'function') ? resumoDisponibilidadeDoAssunto(s.item) : '';
+          lista.appendChild(linha(s.item.titulo, s.detalhe + (disponivel ? ' · ' + disponivel : ''), function () {
             registrarAssunto(aula, s.item);
           }));
         });
@@ -8750,7 +8751,8 @@
       var temasDoAno = sugestoesDoAnoDeMatematica(aula, aluno, ano, chavesRecentes);
       if (temasDoAno.length) {
         temasDoAno.forEach(function (s) {
-          lista.appendChild(linha(s.item.titulo, s.detalhe, function () {
+          var disponivel = (typeof resumoDisponibilidadeDoAssunto === 'function') ? resumoDisponibilidadeDoAssunto(s.item) : '';
+          lista.appendChild(linha(s.item.titulo, s.detalhe + (disponivel ? ' · ' + disponivel : ''), function () {
             registrarAssunto(aula, s.item);
           }));
         });
