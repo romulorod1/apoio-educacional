@@ -98,6 +98,27 @@
     return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
   }
 
+  /* Rótulo de exibição da situação da aula, considerando se a aula é futura.
+   *
+   * No banco, o campo status aceita 'realizada', 'reposicao', 'falta' e
+   * 'cancelada' (VERSAO_BANCO = 2). Quando a aula está marcada para data posterior
+   * à de referência (hoje), chamar de 'Realizada' afirma que ela já aconteceu.
+   * No futuro, o status normal é exibido como 'Agendada' e reposição como
+   * 'Reposição agendada'. Cancelamento nunca afirma realização futura.
+   */
+  function rotuloSituacao(status, data, hoje) {
+    var s = status || 'realizada';
+    var st = STATUS[s] || STATUS.realizada;
+    var ref = hoje || hojeIso();
+    var futura = data ? data > ref : false;
+    if (futura) {
+      if (s === 'realizada') return 'Agendada';
+      if (s === 'reposicao') return 'Reposição agendada';
+      return st.rotulo;
+    }
+    return st.rotulo;
+  }
+
   // ---------- formatacao pt-BR ----------
 
   function fmtMoeda(v) {
@@ -2656,8 +2677,12 @@
       if (cobravel) {
         totalMin += dur;
         totalValor += valor;
-        if (futura) minPrevistos += dur;
-        else { minFeitos += dur; valorFeito += valor; }
+        if (futura) {
+          if (au.status !== 'cancelada') minPrevistos += dur;
+        } else {
+          minFeitos += dur;
+          valorFeito += valor;
+        }
         if (vh !== null) {
           var k = String(vh);
           if (!faixas[k]) faixas[k] = { valorHora: vh, minutos: 0, valor: 0 };
@@ -2683,6 +2708,7 @@
         else if (!futura) minDadosSemCobrar += dur;
       }
 
+      var rotulo = rotuloSituacao(au.status, au.data, hoje);
       linhas.push({
         id: au.id,
         data: au.data,
@@ -2691,17 +2717,14 @@
         duracaoMin: dur,
         futura: futura,
         status: au.status || 'realizada',
-        statusRotulo: st.rotulo,
+        statusRotulo: rotulo,
         /* O mesmo rótulo, escrito para um documento.
          *
-         * A aula nasce como realizada, inclusive a que está lá na frente no
-         * calendário, e chamar de "Realizada" uma aula do dia 23 num documento
-         * impresso no dia 3 é dizer à família que ela aconteceu. Na tela dela o
-         * rótulo continua o de sempre: lá o dia da aula está à vista, e quem lê
-         * é quem marcou. */
-        statusNaFolha: (futura && (st === STATUS.realizada || st === STATUS.reposicao))
-          ? (st === STATUS.reposicao ? 'Reposição marcada' : 'Marcada')
-          : st.rotulo,
+         * A aula nasce como agendada no futuro e realizada no passado. Chamar
+         * de "Realizada" uma aula que ainda não aconteceu num documento impresso
+         * é dizer à família que ela aconteceu. Rótulos futuros usam 'Agendada'
+         * ou 'Reposição agendada', e cancelada não diz que vai acontecer. */
+        statusNaFolha: rotulo,
         cobravel: cobravel,
         valorHora: vh,
         valor: valor,
@@ -2784,7 +2807,8 @@
      * desconfiança do aplicativo inteiro. */
     var vTotal = Math.round(totalValor * 100) / 100;
     var vFeito = Math.round(valorFeito * 100) / 100;
-    var vPrevisto = Math.round((vTotal - vFeito) * 100) / 100;
+    var valorCanceladasFuturas = Math.round(linhas.filter(function (l) { return l.futura && l.status === 'cancelada' && l.cobravel; }).reduce(function (s, l) { return s + (l.valor || 0); }, 0) * 100) / 100;
+    var vPrevisto = Math.round((vTotal - vFeito - valorCanceladasFuturas) * 100) / 100;
 
     return {
       aluno: aluno,
@@ -2810,6 +2834,7 @@
       minPrevistos: minPrevistos,
       horasPrevistas: fmtHoras(minPrevistos),
       valorPrevisto: vPrevisto,
+      valorCanceladasFuturas: valorCanceladasFuturas,
       faixas: listaFaixas,
       precoUnico: listaFaixas.length === 1 ? listaFaixas[0].valorHora : null,
       /* Os três campos abaixo são a versão "só o que já aconteceu" de faixas,
@@ -2826,7 +2851,7 @@
       areasFeitas: areasFeitas,
       qtdEncontros: linhas.filter(contaEncontro).length,
       qtdEncontrosFeitos: linhas.filter(function (l) { return contaEncontro(l) && !l.futura; }).length,
-      qtdEncontrosPrevistos: linhas.filter(function (l) { return contaEncontro(l) && l.futura; }).length
+      qtdEncontrosPrevistos: linhas.filter(function (l) { return l.futura && l.status !== 'cancelada'; }).length
     };
   }
 
@@ -2849,6 +2874,7 @@
       minutos: 0, valor: 0,
       minFeitos: 0, valorFeito: 0,
       minPrevistos: 0, valorPrevisto: 0,
+      valorCanceladasFuturas: 0,
       minutosDadosSemCobrar: 0, minutosDesmarcados: 0
     };
     (fechs || []).forEach(function (f) {
@@ -2862,13 +2888,15 @@
       t.minFeitos += f.minFeitos || 0;
       t.valorFeito += f.valorFeito || 0;
       t.minPrevistos += f.minPrevistos || 0;
+      t.valorPrevisto += f.valorPrevisto || 0;
+      t.valorCanceladasFuturas += f.valorCanceladasFuturas || 0;
       t.minutosDadosSemCobrar += f.minutosDadosSemCobrar || 0;
       t.minutosDesmarcados += f.minutosDesmarcados || 0;
     });
     t.valor = Math.round(t.valor * 100) / 100;
     t.valorFeito = Math.round(t.valorFeito * 100) / 100;
-    /* Pela mesma razão de sempre: feito mais previsto tem que dar o total. */
-    t.valorPrevisto = Math.round((t.valor - t.valorFeito) * 100) / 100;
+    t.valorPrevisto = Math.round(t.valorPrevisto * 100) / 100;
+    t.valorCanceladasFuturas = Math.round(t.valorCanceladasFuturas * 100) / 100;
     return t;
   }
 
@@ -3163,17 +3191,19 @@
      * Com o mês vencido não há nada à frente, e aí sai exatamente o documento
      * de sempre, palavra por palavra: é assim que o fechamento fechado não
      * mudou de forma. */
-    var previstas = (f.linhas || []).filter(function (l) { return l.futura; });
-    var feitas = previstas.length
+    var canceladasFuturas = (f.linhas || []).filter(function (l) { return l.futura && l.status === 'cancelada'; });
+    var previstas = (f.linhas || []).filter(function (l) { return l.futura && l.status !== 'cancelada'; });
+    var temFuturas = (f.linhas || []).some(function (l) { return l.futura; });
+    var feitas = temFuturas
       ? f.linhas.filter(function (l) { return !l.futura; })
       : (f.linhas || []);
-    var ate = previstas.length ? ' até ' + ddmm(f.hoje) : '';
-    var minCobrados = previstas.length ? f.minFeitos : f.totalMin;
-    var horasCobradas = previstas.length ? f.horasFeitas : f.totalHoras;
-    var valorACobrar = previstas.length ? f.valorFeito : f.totalValor;
-    var faixasACobrar = (previstas.length ? f.faixasFeitas : f.faixas) || f.faixas || [];
-    var temasNoTexto = (previstas.length ? f.temasFeitos : f.temasDoMes) || f.temasDoMes || [];
-    var areasNoTexto = (previstas.length ? f.areasFeitas : f.areasDoMes) || f.areasDoMes || [];
+    var ate = temFuturas ? ' até ' + ddmm(f.hoje) : '';
+    var minCobrados = temFuturas ? f.minFeitos : f.totalMin;
+    var horasCobradas = temFuturas ? f.horasFeitas : f.totalHoras;
+    var valorACobrar = temFuturas ? f.valorFeito : f.totalValor;
+    var faixasACobrar = (temFuturas ? f.faixasFeitas : f.faixas) || f.faixas || [];
+    var temasNoTexto = (temFuturas ? f.temasFeitos : f.temasDoMes) || f.temasDoMes || [];
+    var areasNoTexto = (temFuturas ? f.areasFeitas : f.areasDoMes) || f.areasDoMes || [];
 
     var CABECALHO = ['| Data | Dia | Horário | Duração | Situação | Cobrada | R$/h | Valor |',
       '|---|---|---|---|---|---|---:|---:|'];
@@ -3191,7 +3221,7 @@
     L.push('');
     L.push('## Datas trabalhadas');
     L.push('');
-    if (feitas.length || !previstas.length) {
+    if (feitas.length || !temFuturas) {
       /* Sem nada marcado à frente, a tabela sai como sempre saiu, inclusive
        * vazia no mês sem aula nenhuma. */
       L.push(CABECALHO[0]);
@@ -3210,8 +3240,8 @@
      * Há um argumento dos dois lados, e por isso a escolha é dela: mostrar dá
      * valor ao que ela deu de graça, e mostrar também transforma gentileza em
      * dívida na cabeça de quem lê. */
-    if (f.minutosNaoCobrados > 0 && (!opcoes || opcoes.mostrarNaoCobradas !== false)) {
-      L.push('**Horas não cobradas:** ' + fmtHoras(f.minutosNaoCobrados) + ' h');
+    if (f.minutosDadosSemCobrar > 0 && (!opcoes || opcoes.mostrarNaoCobradas !== false)) {
+      L.push('**Horas não cobradas:** ' + fmtHoras(f.minutosDadosSemCobrar) + ' h');
     }
     if (faixasACobrar.length > 1) {
       L.push('');
@@ -3252,7 +3282,7 @@
      * Mês vencido não tem nada à frente nem total embaixo, e por isso não muda
      * uma letra: sai o "**Total a cobrar:**" de sempre, palavra por palavra, que
      * é o documento de todas as famílias já mandadas. */
-    L.push(previstas.length
+    L.push(temFuturas
       ? '**Total destas datas' + ate + ':** ' + fmtMoeda(valorACobrar)
       : '**Total a cobrar:** ' + fmtMoeda(valorACobrar));
     if (f.semPreco.length) {
@@ -3278,6 +3308,21 @@
       L.push('**Total do mês, já contando as datas ainda marcadas:** ' +
         fmtMoeda(f.totalValor) + ' (' + f.qtdEncontros + ' encontro' +
         (f.qtdEncontros === 1 ? '' : 's') + ', ' + f.totalHoras + ' h)');
+    }
+
+    if (canceladasFuturas.length) {
+      L.push('');
+      L.push('## Aulas canceladas à frente');
+      L.push('');
+      L.push(CABECALHO[0]);
+      L.push(CABECALHO[1]);
+      canceladasFuturas.forEach(function (l) { L.push(linhaDaTabela(l)); });
+      if (!previstas.length && (f.totalValor > 0 || f.valorCanceladasFuturas > 0)) {
+        L.push('');
+        L.push('**Total do mês:** ' +
+          fmtMoeda(f.totalValor) + ' (' + f.qtdEncontros + ' encontro' +
+          (f.qtdEncontros === 1 ? '' : 's') + ', ' + f.totalHoras + ' h)');
+      }
     }
 
     /* A chave vem de Ajustes e mora só no tablet. Sem chave, o documento sai
@@ -3736,6 +3781,7 @@
 
   return {
     MESES: MESES, DIAS_CURTO: DIAS_CURTO, DIAS_LONGO: DIAS_LONGO, STATUS: STATUS,
+    rotuloSituacao: rotuloSituacao,
     pad2: pad2, partesData: partesData, dataLocal: dataLocal, isoDe: isoDe, hojeIso: hojeIso,
     diaSemana: diaSemana, diaSemanaCurto: diaSemanaCurto, diaSemanaLongo: diaSemanaLongo,
     ddmm: ddmm, ddmmaaaa: ddmmaaaa, diaEMes: diaEMes, mesExtenso: mesExtenso, mesDe: mesDe,

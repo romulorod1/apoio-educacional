@@ -1108,7 +1108,6 @@
       valoresOcultos = !!(db.ajustes && db.ajustes.valoresOcultos);
       ligarEventos();
       atualizarBotaoOlho();
-      window.abrirAula = abrirAula;
       desenharTudo();
       atualizarTemBiblioteca();
       setTimeout(mostrarNovidades, 900);
@@ -1370,14 +1369,21 @@
     var hoje = Core.hojeIso();
     var doMes = db.aulas.filter(function (a) { return Core.mesDe(a.data) === mesAtual; });
     var minutos = 0, valor = 0;
-    var minFeitos = 0, valorFeito = 0, minPrevistos = 0, valorPrevisto = 0;
+    var minFeitos = 0, valorFeito = 0, minPrevistos = 0, valorPrevisto = 0, valorCanceladasFuturas = 0;
     var encontrosFeitos = 0, encontrosPrevistos = 0;
     doMes.forEach(function (a) {
       /* A aula de hoje conta como dada: só o que vem depois de hoje é previsto. */
-      var futura = a.data > hoje;
-      if (futura) encontrosPrevistos++; else encontrosFeitos++;
       var st = Core.STATUS[a.status] || Core.STATUS.realizada;
       var cobravel = (typeof a.cobravel === 'boolean') ? a.cobravel : st.cobravelPadrao;
+      var futura = a.data > hoje;
+      var contaEncontro = cobravel || a.status !== 'cancelada';
+      if (contaEncontro) {
+        if (futura) {
+          if (a.status !== 'cancelada') encontrosPrevistos++;
+        } else {
+          encontrosFeitos++;
+        }
+      }
       if (!cobravel) return;
       var dur = a.duracaoMin || 0;
       var aluno = alunoPorId(a.alunoId);
@@ -1385,14 +1391,18 @@
       var v = pv ? (dur / 60) * pv.valorHora : 0;
       minutos += dur;
       valor += v;
-      if (futura) minPrevistos += dur;
-      else { minFeitos += dur; valorFeito += v; }
+      if (futura) {
+        if (a.status !== 'cancelada') minPrevistos += dur;
+        else valorCanceladasFuturas += v;
+      } else {
+        minFeitos += dur; valorFeito += v;
+      }
     });
     /* O previsto sai por diferença para que os dois números da caixa somem
      * sempre o total do mês na tela, mesmo quando a hora não divide redondo. */
     valor = Math.round(valor * 100) / 100;
     valorFeito = Math.round(valorFeito * 100) / 100;
-    valorPrevisto = Math.round((valor - valorFeito) * 100) / 100;
+    valorPrevisto = Math.round((valor - valorFeito - valorCanceladasFuturas) * 100) / 100;
 
     var alunosNoMes = {};
     doMes.forEach(function (a) { alunosNoMes[a.alunoId] = true; });
@@ -1406,10 +1416,11 @@
     numeros.appendChild(numeroComRodape('Horas cobradas', Core.fmtHoras(minFeitos) + ' h', [
       minPrevistos ? 'mais ' + Core.fmtHoras(minPrevistos) + ' h à frente' : ''
     ]));
-    numeros.appendChild(numeroComRodape('A receber', dinheiro(valorFeito), [
-      valorPrevisto ? 'previsto à frente: ' + dinheiro(valorPrevisto) : '',
-      valorPrevisto ? 'mês inteiro: ' + dinheiro(valor) : ''
-    ]));
+    var rodapesReceber = [];
+    if (valorPrevisto) rodapesReceber.push('previsto à frente: ' + dinheiro(valorPrevisto));
+    if (valorCanceladasFuturas) rodapesReceber.push('cancelada cobrável: ' + dinheiro(valorCanceladasFuturas));
+    if (valorPrevisto || valorCanceladasFuturas) rodapesReceber.push('mês inteiro: ' + dinheiro(valor));
+    numeros.appendChild(numeroComRodape('A receber', dinheiro(valorFeito), rodapesReceber));
     numeros.appendChild(numeroComRodape('Alunos', String(Object.keys(alunosNoMes).length), []));
 
     var lembrete = $('#lembrete-copia');
@@ -1471,6 +1482,7 @@
           (a.temNota ? ' tem-nota' : '') + (a.tipo === 'mapeamento' ? ' mapeamento' : '');
         var pil = el('div', {
           class: cls,
+          'data-aula-id': a.id,
           style: 'background:' + (aluno ? aluno.cor : '#9AA3AF'),
           // O encontro de mapeamento se distingue na agenda: nao e aula comum.
           texto: (a.hora ? a.hora + ' ' : '') + nome +
@@ -1547,11 +1559,20 @@
     });
 
     var selStatus = el('select', { id: 'campo-status' });
-    Object.keys(Core.STATUS).forEach(function (k) {
-      var o = el('option', { value: k, texto: Core.STATUS[k].rotulo });
-      if (aulaEmEdicao && aulaEmEdicao.status === k) o.selected = true;
-      selStatus.appendChild(o);
-    });
+    function atualizarOpcoesStatus() {
+      var campoData = $('#campo-data');
+      var dataAtual = campoData ? campoData.value : (dataVal || Core.hojeIso());
+      var hoje = Core.hojeIso();
+      var valorAtual = selStatus.value || (aulaEmEdicao ? (aulaEmEdicao.status || 'realizada') : 'realizada');
+      selStatus.innerHTML = '';
+      Object.keys(Core.STATUS).forEach(function (k) {
+        var textoRotulo = Core.rotuloSituacao ? Core.rotuloSituacao(k, dataAtual, hoje) : Core.STATUS[k].rotulo;
+        var o = el('option', { value: k, texto: textoRotulo });
+        if (k === valorAtual) o.selected = true;
+        selStatus.appendChild(o);
+      });
+    }
+    atualizarOpcoesStatus();
 
     var stAtual = aulaEmEdicao ? (Core.STATUS[aulaEmEdicao.status] || Core.STATUS.realizada) : Core.STATUS.realizada;
     var cobravelVal = aulaEmEdicao && typeof aulaEmEdicao.cobravel === 'boolean'
@@ -1561,6 +1582,10 @@
 
     selStatus.addEventListener('change', function () {
       chkCobrar.checked = (Core.STATUS[this.value] || Core.STATUS.realizada).cobravelPadrao;
+      atualizarPrevisao();
+    });
+    chkCobrar.addEventListener('change', function () {
+      atualizarPrevisao();
     });
 
     var avisoFeriado = el('div', { id: 'aviso-feriado' });
@@ -1605,9 +1630,13 @@
       var aluno = alunoPorId($('#campo-aluno') ? $('#campo-aluno').value : (aulaEmEdicao ? aulaEmEdicao.alunoId : ''));
       var d = $('#campo-data') ? $('#campo-data').value : dataVal;
       var dur = parseInt($('#campo-duracao') ? $('#campo-duracao').value : duracaoVal, 10) || 0;
+      var cobrar = chkCobrar ? chkCobrar.checked : true;
       var pv = aluno ? Core.precoVigente(aluno, d) : null;
       if (!pv) {
-        previsao.innerHTML = '<strong style="color:#B4453C">Sem valor por hora vigente nesta data.</strong> Cadastre o valor na ficha do aluno.';
+        previsao.innerHTML = '<strong style="color:#B4453C">Sem valor por hora vigente nesta data.</strong> ' +
+          'Cadastre o valor na ficha do aluno.';
+      } else if (!cobrar) {
+        previsao.textContent = 'Não será cobrada (tarifa de referência: ' + dinheiro(pv.valorHora) + ' por hora).';
       } else {
         previsao.textContent = 'Valor previsto: ' + dinheiro((dur / 60) * pv.valorHora) +
           ' (' + dinheiro(pv.valorHora) + ' por hora).';
@@ -1617,8 +1646,14 @@
     selAluno.addEventListener('change', atualizarPrevisao);
     selDur.addEventListener('change', atualizarPrevisao);
     selStatus.addEventListener('change', atualizarPrevisao);
-    campoData.addEventListener('change', atualizarPrevisao);
-    campoData.addEventListener('input', atualizarPrevisao);
+    campoData.addEventListener('change', function () {
+      atualizarOpcoesStatus();
+      atualizarPrevisao();
+    });
+    campoData.addEventListener('input', function () {
+      atualizarOpcoesStatus();
+      atualizarPrevisao();
+    });
     campoHora.addEventListener('change', atualizarPrevisao);
     campoHora.addEventListener('input', atualizarPrevisao);
 
@@ -1712,9 +1747,20 @@
       el('span', { class: 'tag-etapa', texto: '1' }),
       el('div', { class: 'titulos-grupo' }, [
         el('h4', { class: 'titulo-grupo', texto: 'Preparar a aula' }),
-        el('span', { class: 'sub-grupo', texto: 'Horário, contexto anterior, assunto e folha' })
+        el('span', { class: 'sub-grupo', texto: 'Contexto anterior, horário, assunto e folha' })
       ])
     ]));
+
+    // Memória do último encontro e trilha pedagógica no topo visível (primeira dobra)
+    desenharUltimoEncontro(grupoPreparar, aulaEmEdicao);
+
+    if (aulaEmEdicao.tipo === 'mapeamento' && alunoDaAula) {
+      desenharEncontroDeMapeamento(grupoPreparar, alunoDaAula, aulaEmEdicao);
+    } else if (alunoDaAula && Core.mapeado(alunoDaAula)) {
+      desenharLembrete(grupoPreparar, alunoDaAula, aulaEmEdicao);
+    }
+
+    grupoPreparar.appendChild(el('div', { id: 'cartao-trilha' }));
 
     if (serie) {
       grupoPreparar.appendChild(el('div', { class: 'faixa-info', style: 'margin-bottom:10px' }, [
@@ -1736,16 +1782,6 @@
     ]));
     blocoQuando.appendChild(avisoFeriado);
     blocoQuando.appendChild(avisoChoque);
-
-    desenharUltimoEncontro(grupoPreparar, aulaEmEdicao);
-
-    if (aulaEmEdicao.tipo === 'mapeamento' && alunoDaAula) {
-      desenharEncontroDeMapeamento(grupoPreparar, alunoDaAula, aulaEmEdicao);
-    } else if (alunoDaAula && Core.mapeado(alunoDaAula)) {
-      desenharLembrete(grupoPreparar, alunoDaAula, aulaEmEdicao);
-    }
-
-    grupoPreparar.appendChild(el('div', { id: 'cartao-trilha' }));
 
     grupoPreparar.appendChild(el('h3', { class: 'subtitulo', texto: 'Conteúdo da aula' }));
 
@@ -1814,10 +1850,22 @@
         document.createTextNode('preencha esta seção após o encontro acontecer.')
       ]));
     } else if (!aulaEmEdicao.notaTexto && (!aulaEmEdicao.areas || !aulaEmEdicao.areas.length)) {
-      grupoRegistro.appendChild(el('div', { class: 'faixa-aviso', style: 'margin-bottom:12px' }, [
-        el('strong', { texto: 'Aula concluída: ' }),
-        document.createTextNode('confirme a situação e registre o relato do encontro.')
-      ]));
+      if (aulaEmEdicao.status === 'cancelada') {
+        grupoRegistro.appendChild(el('div', { class: 'faixa-info', style: 'margin-bottom:12px' }, [
+          el('strong', { texto: 'Aula cancelada: ' }),
+          document.createTextNode('este encontro foi marcado como cancelado.')
+        ]));
+      } else if (aulaEmEdicao.status === 'falta') {
+        grupoRegistro.appendChild(el('div', { class: 'faixa-aviso', style: 'margin-bottom:12px' }, [
+          el('strong', { texto: 'Falta sem aviso: ' }),
+          document.createTextNode('este encontro foi marcado como falta.')
+        ]));
+      } else {
+        grupoRegistro.appendChild(el('div', { class: 'faixa-aviso', style: 'margin-bottom:12px' }, [
+          el('strong', { texto: 'Aula realizada: ' }),
+          document.createTextNode('confirme a situação e registre o relato do encontro.')
+        ]));
+      }
     }
 
     grupoRegistro.appendChild(el('div', { class: 'linha' }, [
@@ -2706,14 +2754,17 @@
           desenharTudo();
           /* Veio do "Abrir como folha" e ela marcou Repetir: a página vai para
            * a primeira aula da série, a do dia escolhido. */
+          var doDia = db.aulas.filter(function (a) { return a.alunoId === alunoId && a.data === data; });
+          var primeira = doDia.filter(function (a) { return a.serieId; })[0] || doDia[0];
           if (daBibliotecaNaSerie) {
             /* A da série nova primeiro; se já havia uma aula avulsa nesse dia, a
              * série pulou a data e a página vai para essa, em página nova. */
-            var doDia = db.aulas.filter(function (a) { return a.alunoId === alunoId && a.data === data; });
-            var primeira = doDia.filter(function (a) { return a.serieId; })[0] || doDia[0];
             if (primeira && daBibliotecaNaSerie.aoCriar) daBibliotecaNaSerie.aoCriar(primeira.id, { serie: true });
             else if (primeira) colarNaFolhaDaAula(primeira.id, daBibliotecaNaSerie);
             else avisar('As aulas foram criadas, mas nenhuma cai no dia escolhido; a página não foi colada.');
+          } else if (querPreparar && primeira) {
+            abrirAula(primeira.id);
+            avisar('Aulas repetidas criadas. Prepare a primeira aula abaixo.');
           }
         });
         return;
@@ -5474,6 +5525,8 @@
     var hoje = Core.hojeIso();
     var passadas = aulas.filter(function (a) { return a.data <= hoje; });
     var futuras = aulas.filter(function (a) { return a.data > hoje; });
+    var futurasAtivas = futuras.filter(function (a) { return a.status !== 'cancelada'; });
+    var futurasCanceladas = futuras.filter(function (a) { return a.status === 'cancelada'; });
 
     var minutos = 0, cobradas = 0;
     passadas.forEach(function (a) {
@@ -5489,7 +5542,7 @@
     [['Encontros', String(cobradas)],
     ['Horas somadas', Core.fmtHoras(minutos) + ' h'],
     ['Aluno desde', desde ? Core.ddmmaaaa(desde) : 'sem data'],
-    ['Aulas marcadas', String(futuras.length)]].forEach(function (par) {
+    ['Aulas marcadas', String(futurasAtivas.length)]].forEach(function (par) {
       resumo.appendChild(el('div', { class: 'numero' }, [
         el('div', { class: 'rotulo', texto: par[0] }),
         el('div', { class: 'valor', style: 'font-size:19px', texto: par[1] })
@@ -5497,9 +5550,13 @@
     });
     caixa.appendChild(resumo);
 
-    if (futuras.length) {
+    if (futurasAtivas.length) {
       caixa.appendChild(el('h3', { class: 'subtitulo', texto: 'Próximas aulas' }));
-      linhasDeAula(caixa, futuras.slice().reverse().slice(0, 5));
+      linhasDeAula(caixa, futurasAtivas.slice().reverse().slice(0, 5));
+    }
+    if (futurasCanceladas.length) {
+      caixa.appendChild(el('h3', { class: 'subtitulo', texto: 'Aulas canceladas à frente' }));
+      linhasDeAula(caixa, futurasCanceladas.slice().reverse().slice(0, 5));
     }
 
     caixa.appendChild(el('h3', { class: 'subtitulo', texto: 'Aulas já dadas' }));
@@ -5525,15 +5582,18 @@
   }
 
   function linhasDeAula(caixa, aulas) {
+    var hoje = Core.hojeIso();
     aulas.forEach(function (a) {
       var st = Core.STATUS[a.status] || Core.STATUS.realizada;
+      var rotulo = Core.rotuloSituacao ? Core.rotuloSituacao(a.status, a.data, hoje) : st.rotulo;
       var cobravel = (typeof a.cobravel === 'boolean') ? a.cobravel : st.cobravelPadrao;
       var anotacao = (a.notaTexto || '').trim();
+      var futura = a.data > hoje;
 
       var detalhes = [Core.diaSemanaCurto(a.data)];
       if (a.hora) detalhes.push(a.hora);
       detalhes.push(Core.fmtDuracao(a.duracaoMin));
-      if (a.status !== 'realizada') detalhes.push(st.rotulo);
+      if (a.status !== 'realizada' || futura) detalhes.push(rotulo);
       if (!cobravel) detalhes.push('não cobrada');
 
       var linha = el('div', { class: 'item-lista linha-historico' }, [
@@ -9712,10 +9772,11 @@
     numeros.appendChild(numeroComRodape('Horas cobradas', Core.fmtHoras(t.minFeitos) + ' h', [
       t.minPrevistos ? 'mais ' + Core.fmtHoras(t.minPrevistos) + ' h à frente' : ''
     ]));
-    numeros.appendChild(numeroComRodape('Total a receber', dinheiro(t.valorFeito), [
-      t.valorPrevisto ? 'previsto à frente: ' + dinheiro(t.valorPrevisto) : '',
-      t.valorPrevisto ? 'mês inteiro: ' + dinheiro(t.valor) : ''
-    ]));
+    var rodapesReceberFech = [];
+    if (t.valorPrevisto) rodapesReceberFech.push('previsto à frente: ' + dinheiro(t.valorPrevisto));
+    if (t.valorCanceladasFuturas) rodapesReceberFech.push('canceladas à frente: ' + dinheiro(t.valorCanceladasFuturas));
+    if (t.valorPrevisto || t.valorCanceladasFuturas) rodapesReceberFech.push('mês inteiro: ' + dinheiro(t.valor));
+    numeros.appendChild(numeroComRodape('Total a receber', dinheiro(t.valorFeito), rodapesReceberFech));
 
     desenharGentilezas(numeros, t);
 
@@ -9788,8 +9849,7 @@
           el('td', { texto: l.dia }),
           el('td', { texto: Core.fmtDuracao(l.duracaoMin) }),
           el('td', {
-            texto: l.statusRotulo + (l.cobravel ? '' : ' (não cobrada)') +
-              (l.futura ? ' · ainda vai acontecer' : '')
+            texto: l.statusRotulo + (l.cobravel ? '' : ' (não cobrada)')
           }),
           el('td', { texto: dinheiro(l.cobravel ? l.valor : 0) })
         ]));
@@ -9808,11 +9868,22 @@
       /* A tabela lista o mês inteiro, e o total dela é o do mês inteiro. Quem
        * lê o número grande lá em cima vê só o que já aconteceu, então aqui fica
        * dito, uma vez, de onde vem a diferença. */
-      if (f.valorPrevisto) {
+      if (f.valorPrevisto || f.valorCanceladasFuturas) {
+        var partes = [];
+        if (f.valorFeito) partes.push(dinheiro(f.valorFeito) + ' já aconteceu');
+        if (f.valorPrevisto) partes.push(dinheiro(f.valorPrevisto) + ' está marcado para os próximos dias');
+        if (f.valorCanceladasFuturas) partes.push(dinheiro(f.valorCanceladasFuturas) + ' de cancelamento com cobrança');
+        var textoAjuda = 'Desse total, ';
+        if (partes.length === 1) {
+          textoAjuda += partes[0] + '.';
+        } else if (partes.length === 2) {
+          textoAjuda += partes[0] + ' e ' + partes[1] + '.';
+        } else if (partes.length >= 3) {
+          textoAjuda += partes[0] + ', ' + partes[1] + ' e ' + partes[2] + '.';
+        }
         cartao.appendChild(el('div', {
           class: 'ajuda', style: 'margin-top:6px',
-          texto: 'Desse total, ' + dinheiro(f.valorFeito) + ' já aconteceu e ' +
-            dinheiro(f.valorPrevisto) + ' está marcado para os próximos dias.'
+          texto: textoAjuda
         }));
       }
 
@@ -10373,14 +10444,10 @@
        * O rótulo é o mesmo do PDF que a família recebe, para a tela e o
        * documento nunca contarem histórias diferentes. */
       if (l.status !== 'realizada') detalhe.push(l.statusRotulo);
-      /* A aula que ainda não chegou saía desenhada igual à que já aconteceu:
-       * mesma borda, mesma letra, nenhuma marca. Quem está lendo do outro lado
-       * da mesa não tem como saber que aquele dia é o mês que vem. */
-      if (l.futura) detalhe.push('ainda vai acontecer');
+      else if (l.futura) detalhe.push(l.statusRotulo);
     } else {
       if (l.hora) detalhe.push(l.hora);
       detalhe.push(l.statusRotulo + (l.cobravel ? '' : ' (não cobrada)'));
-      if (l.futura) detalhe.push('ainda vai acontecer');
     }
     cabeca.appendChild(el('span', { class: 'detalhe-dia', texto: detalhe.join(' · ') }));
 
@@ -10451,12 +10518,17 @@
        * e ele é o total do mês, como sempre foi; enquanto o mês corre, o número
        * é só o que já aconteceu, e dizer "total do mês" ali seria a mesma
        * mentira de antes, agora do lado do dinheiro. */
+      var rodapesMesNumaTela = [];
+      if (f.faixas.length > 1) rodapesMesNumaTela.push('houve reajuste no mês');
+      if (f.valorPrevisto) rodapesMesNumaTela.push('previsto à frente: ' + dinheiro(f.valorPrevisto));
+      if (f.valorCanceladasFuturas) rodapesMesNumaTela.push('canceladas à frente: ' + dinheiro(f.valorCanceladasFuturas));
+      if (f.valorPrevisto || f.valorCanceladasFuturas || (f.totalValor > f.valorFeito)) {
+        rodapesMesNumaTela.push('mês inteiro: ' + dinheiro(f.totalValor));
+      }
+      var temFuturaCobravel = (c.previstos > 0) || (f.valorPrevisto > 0) || (f.valorCanceladasFuturas > 0) || (f.totalValor > f.valorFeito);
       numeros.appendChild(numeroComRodape(
-        c.previstos ? 'Total até aqui' : 'Total do mês', dinheiro(f.valorFeito), [
-          f.faixas.length > 1 ? 'houve reajuste no mês' : '',
-          f.valorPrevisto ? 'previsto à frente: ' + dinheiro(f.valorPrevisto) : '',
-          f.valorPrevisto ? 'mês inteiro: ' + dinheiro(f.totalValor) : ''
-        ]));
+        temFuturaCobravel ? 'Total até aqui' : 'Total do mês', dinheiro(f.valorFeito), rodapesMesNumaTela
+      ));
     }
     corpo.appendChild(numeros);
 
@@ -12233,10 +12305,10 @@
       var pergunta = m ? 'Trocar os ' + (n + m) + ' itens marcados por esta lista?'
         : n === 1 ? 'Trocar o exercício marcado por esta lista?'
         : 'Trocar os ' + n + ' exercícios marcados por esta lista?';
-      if (!confirmar(pergunta)) return;
+      if (!confirmar(pergunta)) return false;
       // o material de agora vai para as seleções anteriores (ver guardarNasAnteriores)
     }
-    usarListaPronta(lp);
+    return usarListaPronta(lp);
   }
 
   function desenharPreviaDaLista(corpo, mod, lp) {
@@ -12259,7 +12331,9 @@
       foi.aluno + ' (' + Core.ddmmaaaa(foi.data) + ').' + (foi.mexida ? ' A sua versão ficou em Seleções anteriores.' : '') }));
     if (estado) corpo.appendChild(el('p', { class: 'ajuda bib-lp-estado', id: 'bib-lp-estado', texto: estado }));
     corpo.appendChild(el('div', { class: 'barra bib-lp-usar' }, [
-      el('button', { type: 'button', class: 'btn principal', id: 'bib-lp-usar', texto: 'Usar esta lista',
+      el('button', { type: 'button', class: 'btn principal', id: 'bib-lp-preparar', texto: 'Preparar aula com esta lista',
+        aoClick: function () { if (pedirParaUsarLista(lp)) abrirGerarMaterial(); } }),
+      el('button', { type: 'button', class: 'btn', id: 'bib-lp-usar', texto: 'Editar exercícios antes',
         aoClick: function () { pedirParaUsarLista(lp); } }),
       foi ? el('button', { type: 'button', class: 'btn', id: 'bib-lp-abrir-aula', texto: 'Abrir a aula',
         aoClick: function () { abrirAulaDoMaterial(foi.aulaId); } }) : null
@@ -12407,6 +12481,10 @@
 
     if (ids.length) corpo.appendChild(el('p', { class: 'ajuda bib-lp-ajuda-uso', id: 'bib-lp-ajuda-uso',
       texto: 'Tire, ponha e troque a ordem à vontade.' }));
+    if (ids.length) corpo.appendChild(el('div', { class: 'barra bib-lp-usar' }, [
+      el('button', { type: 'button', class: 'btn principal', id: 'bib-lp-preparar',
+        texto: 'Preparar aula com esta lista', aoClick: abrirGerarMaterial })
+    ]));
     var grade = el('div', { class: 'bib-grade bib-grade-exercicios bib-grade-lp', id: 'bib-lp-grade' });
     ids.forEach(function (id, pos) {
       var it = bib.itemPorId[id];
@@ -13211,6 +13289,7 @@
     desenharCarrinho();
     desenharContextoBiblioteca();
     irNaBiblioteca({ aula: { tipo: 'lista-pronta', id: lp.id } });
+    return true;
   }
 
   /* SUBIR E DESCER, e não arrastar: a lista tem miniatura, ela usa o tablet com
@@ -13456,7 +13535,7 @@
     var paginas = bibCarrinho.paginas.map(paginaDeTeoriaPorId);
     if (!itens.length && !paginas.length) return;
     var padrao = tituloPadraoDoCarrinho(itens, paginas);
-    var escolha = { aulaId: null, nova: false };
+    var escolha = { aulaId: null, nova: false, botao: null };
     var corpo = $('#corpo-modal-bib-gerar');
     var rodape = $('#rodape-modal-bib-gerar');
     corpo.innerHTML = '';
@@ -13496,13 +13575,16 @@
       grade.appendChild(el('label', { class: 'bib-marcar' + (c[3] ? ' desligada' : '') }, [chk, el('span', { texto: c[1] })]));
     });
     corpo.appendChild(el('div', { class: 'campo' }, [el('span', { class: 'bib-gerar-rotulo', texto: 'O que entra' }), grade]));
+    corpo.appendChild(el('p', { class: 'ajuda', id: 'bib-gerar-saidas',
+      texto: 'Ao anexar, os PDFs ficam na aula escolhida; marcar Folha também abre a lista para escrever nela. ' +
+        'Só gerar PDF não altera nenhuma aula. Nada é enviado à família automaticamente.' }));
     caixas.lista.addEventListener('change', function () { atualizarRodape(); });
 
     // para qual aula
     var aulas = aulasParaMaterial();
     var listaAulas = el('div', { id: 'bib-gerar-aulas' });
     function marcarAula(botao, aulaId, nova) {
-      escolha.aulaId = aulaId; escolha.nova = nova;
+      escolha.aulaId = aulaId; escolha.nova = nova; escolha.botao = botao;
       $$('#bib-gerar-aulas .item-lista').forEach(function (b) { b.classList.remove('escolhida'); b.setAttribute('aria-pressed', 'false'); });
       botao.classList.add('escolhida');
       botao.setAttribute('aria-pressed', 'true');
@@ -13537,11 +13619,39 @@
       listaAulas.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Outras aulas perto de hoje' }));
       aulas.perto.forEach(function (a) { listaAulas.appendChild(linhaAula(a)); });
     }
+    /* A lista curta acelera o dia a dia, mas não pode impedir preparar uma
+     * aula futura mais distante. A data consulta aulas já cadastradas, sem
+     * criar ou modificar nenhuma aula por escolher o destino. */
+    var dataOutra = el('input', { type: 'date', id: 'bib-gerar-outra-data' });
+    var resultadoOutraData = el('div', { id: 'bib-gerar-resultado-data' });
+    function procurarOutraData() {
+      if (escolha.botao && resultadoOutraData.contains(escolha.botao)) {
+        escolha.aulaId = null; escolha.nova = false; escolha.botao = null;
+        ultimo.innerHTML = '';
+      }
+      resultadoOutraData.innerHTML = '';
+      if (dataOutra.value) {
+        var encontradas = db.aulas.filter(function (a) {
+          return a.data === dataOutra.value && !!alunoPorId(a.alunoId);
+        }).sort(function (a, b) { return String(a.hora || '').localeCompare(String(b.hora || '')); });
+        if (encontradas.length) encontradas.forEach(function (a) {
+          resultadoOutraData.appendChild(linhaAula(a));
+        });
+        else resultadoOutraData.appendChild(el('p', { class: 'ajuda',
+          texto: 'Nenhuma aula marcada nessa data. Agende pela Agenda e volte para anexar.' }));
+      }
+      atualizarRodape();
+    }
+    dataOutra.addEventListener('change', procurarOutraData);
+    listaAulas.appendChild(el('label', { class: 'campo' }, [
+      el('span', { texto: 'Procurar aula em outra data' }), dataOutra
+    ]));
+    listaAulas.appendChild(resultadoOutraData);
     corpo.appendChild(el('div', { class: 'campo' }, [el('span', { class: 'bib-gerar-rotulo', texto: 'Anexar em qual aula' }), listaAulas]));
 
     var botaoGerar = el('button', { type: 'button', class: 'btn principal', id: 'bib-gerar-anexar', texto: 'Gerar e anexar' });
     var dica = el('p', { class: 'ajuda bib-gerar-dica', id: 'bib-gerar-dica', texto: 'Escolha a aula acima para anexar o material.' });
-    var botaoBaixar = el('button', { type: 'button', class: 'btn', id: 'bib-gerar-baixar', texto: 'Só gerar o arquivo' });
+    var botaoBaixar = el('button', { type: 'button', class: 'btn', id: 'bib-gerar-baixar', texto: 'Só gerar PDF, sem anexar' });
     function atualizarRodape() {
       if (gerandoMaterial) return;
       botaoGerar.disabled = !(escolha.aulaId || escolha.nova);
@@ -13852,9 +13962,9 @@
         if (indiceFolha != null) {
           abrirEditorNota(aula.id, indiceFolha);
           if (desmarcou) {
-            avisarNaHora('Material anexado na aula de ' + aluno.nome + ', e a lista abriu como folha.' + menor + desmarcada, 'Marcar de novo', devolver);
+            avisarNaHora('Material anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + '), e a lista abriu como folha.' + menor + desmarcada, 'Marcar de novo', devolver);
           } else {
-            avisarNaHora('Material anexado na aula de ' + aluno.nome + ', e a lista abriu como folha.' + menor + desmarcada);
+            avisarNaHora('Material anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + '), e a lista abriu como folha.' + menor + desmarcada);
           }
         } else {
           var idDaAula = aula.id;
@@ -13877,8 +13987,8 @@
         var remarcar = desmarcarDepoisDeAnexar(aula, aluno);
         var desm = !!(remarcar && remarcar.desmarcou);
         var msgRemarcar = etapa === 'folha'
-          ? 'O material foi anexado na aula, mas a lista não abriu como folha. O PDF está na aula; não precisa gerar de novo.' + textoDosAssuntos(assuntosNovos)
-          : 'O material foi anexado na aula, mas não consegui marcar os exercícios como usados. O PDF está na aula; não precisa gerar de novo.' + textoDosAssuntos(assuntosNovos);
+          ? 'O material foi anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + '), mas a lista não abriu como folha. O PDF está na aula; não precisa gerar de novo.' + textoDosAssuntos(assuntosNovos)
+          : 'O material foi anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + '), mas não consegui marcar os exercícios como usados. O PDF está na aula; não precisa gerar de novo.' + textoDosAssuntos(assuntosNovos);
         if (desm) {
           avisarNaHora(msgRemarcar, 'Marcar de novo', remarcar);
         } else {

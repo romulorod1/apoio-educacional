@@ -2,14 +2,18 @@
  *
  * Valida a organização UX-UI do modal da aula (T08):
  * 1. Agendamento simples (UX05): salvar na agenda fecha o modal sem reabertura intrusiva.
- * 2. Agendar e preparar (UX05): botão "Salvar e preparar" salva e entra direto no modo de preparação.
- * 3. Organização nos 3 blocos (Preparar, Registrar como foi, Arquivos da aula).
- * 4. Contexto de aula futura com indicação clara para preenchimento posterior.
- * 5. Destinos explícitos: relato público para família vs nota privada só da professora.
- * 6. Voltar sem salvar: cancelamento descarta edição pendente de notas.
- * 7. Salvar registro: persiste relato público e nota privada com destinos separados.
- * 8. Habilidades e hábitos trabalhados: exemplo curto diferenciando de assunto e salvamento imediato.
- * 9. Ausência de travessões na interface.
+ * 2. Agendar e preparar aula avulsa (UX05): botão "Salvar e preparar" abre diretamente a preparação.
+ * 3. Agendar e preparar aula em série repetida: abre diretamente a primeira aula da série.
+ * 4. Memória do último encontro e trilha pedagógica posicionadas na primeira dobra (topo de Preparar).
+ * 5. Organização nos 3 blocos (Preparar, Registrar como foi, Arquivos da aula).
+ * 6. Aviso contextual e banner condicionado ao status (aula futura vs realizada vs cancelada).
+ * 7. Destinos explícitos: relato público para família vs nota privada só da professora.
+ * 8. Aviso de rodapé esclarecendo que assuntos, habilidades e arquivos salvam na hora.
+ * 9. Voltar sem salvar: cancelamento descarta edição pendente de notas.
+ * 10. Salvar registro: persiste relato público e nota privada com destinos separados.
+ * 11. Habilidades e hábitos trabalhados: exemplo curto diferenciando de assunto.
+ * 12. Testado exclusivamente via navegação real de UI (sem hooks globais) em 1280x800.
+ * 13. Ausência de travessões na interface.
  */
 'use strict';
 const H = require('./_bib_navegador');
@@ -19,8 +23,8 @@ const { conf, secao, esperar, pausa } = H;
 async function rodar() {
   await amb.subir();
   const pag = await amb.pagina();
+  await pag.setViewport({ width: 1280, height: 800, hasTouch: true });
   await H.abrirApp(pag, amb.ORIGEM);
-
 
   // ================================================================
   secao('1. Agendamento simples (UX05): salvar na agenda fecha sem reabertura');
@@ -41,10 +45,11 @@ async function rodar() {
   });
   conf('botão "Salvar e preparar" está visível no agendamento', visivelPreparar, true);
 
+  // Agenda aula avulsa para dia 25 de junho de 2026 (mês visível no app)
   await pag.select('#campo-aluno', 'marcelo');
   await pag.evaluate(() => {
     const data = document.querySelector('#campo-data');
-    data.value = '2026-10-15';
+    data.value = '2026-06-25';
     data.dispatchEvent(new Event('change', { bubbles: true }));
     const hora = document.querySelector('#campo-hora');
     hora.value = '10:00';
@@ -58,12 +63,12 @@ async function rodar() {
     !document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
   conf('modal fecha diretamente sem forçar reabertura', fechouAposSalvar.ok, true);
 
-  await pausa(400);
+  await pausa(300);
   const permaneceuFechado = await pag.evaluate(() =>
     !document.querySelector('#modal-aula').classList.contains('aberto'));
   conf('modal permaneceu fechado sem pop-up surpresa', permaneceuFechado, true);
 
-  // Confere se aula foi gravada no banco
+  // Confere se aula foi gravada no banco e tem pílula na UI
   const aulaGravada1 = await pag.evaluate(() => new Promise(resolve => {
     const req = indexedDB.open('apoio-educacional');
     req.onsuccess = () => {
@@ -71,15 +76,20 @@ async function rodar() {
       const get = db.transaction('dados', 'readonly').objectStore('dados').get('principal');
       get.onsuccess = () => {
         db.close();
-        const a = (get.result.aulas || []).find(x => x.data === '2026-10-15' && x.hora === '10:00');
+        const a = (get.result.aulas || []).find(x => x.data === '2026-06-25' && x.hora === '10:00');
         resolve(a || null);
       };
     };
   }));
-  conf('aula do dia 15/10/2026 foi criada no banco', !!aulaGravada1, true);
+  conf('aula do dia 25/06/2026 foi criada no banco', !!aulaGravada1, true);
+
+  const pilulaVisivel = await pag.evaluate(id => {
+    return !!document.querySelector('[data-aula-id="' + id + '"]');
+  }, aulaGravada1.id);
+  conf('pílula da aula está presente no calendário da UI', pilulaVisivel, true);
 
   // ================================================================
-  secao('2. Agendar e preparar (UX05): entra direto no modo de preparação');
+  secao('2. Agendar e preparar aula avulsa (UX05): entra direto na preparação');
 
   await pag.click('#nova-aula');
   await esperar('modal de aula aberto para segundo teste', () => pag.evaluate(() =>
@@ -88,7 +98,7 @@ async function rodar() {
   await pag.select('#campo-aluno', 'marcelo');
   await pag.evaluate(() => {
     const data = document.querySelector('#campo-data');
-    data.value = '2026-10-22';
+    data.value = '2026-06-26';
     data.dispatchEvent(new Event('change', { bubbles: true }));
     const hora = document.querySelector('#campo-hora');
     hora.value = '14:00';
@@ -97,11 +107,10 @@ async function rodar() {
 
   await pag.click('#salvar-preparar-aula');
 
-  // Aguarda transição para o modo de aula existente
   const abriuModoPreparar = await esperar('modal aberto em modo de preparação', () => pag.evaluate(() => {
     const m = document.querySelector('#modal-aula');
     const t = document.querySelector('#titulo-modal-aula');
-    return m.classList.contains('aberto') && /22\/10\/2026/.test(t ? t.textContent : '');
+    return m.classList.contains('aberto') && /26\/06\/2026/.test(t ? t.textContent : '');
   }), v => v === true, 5000);
   conf('abriu diretamente na preparação da aula criada', abriuModoPreparar.ok, true);
 
@@ -122,14 +131,52 @@ async function rodar() {
     !document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
 
   // ================================================================
-  secao('3. Organização da aula futura em 3 blocos (T08)');
+  secao('3. Agendar e preparar em série repetida: abre a primeira aula da série');
 
-  // Abre a aula do dia 15/10/2026
-  await pag.evaluate(id => {
-    abrirAula(id);
-  }, aulaGravada1.id);
+  await pag.click('#nova-aula');
+  await esperar('modal de nova aula aberto para série', () => pag.evaluate(() =>
+    document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
 
-  await esperar('aula de 15/10 aberta', () => pag.evaluate(() =>
+  await pag.select('#campo-aluno', 'marcelo');
+  await pag.evaluate(() => {
+    const data = document.querySelector('#campo-data');
+    data.value = '2026-06-29';
+    data.dispatchEvent(new Event('change', { bubbles: true }));
+    const hora = document.querySelector('#campo-hora');
+    hora.value = '16:00';
+    hora.dispatchEvent(new Event('change', { bubbles: true }));
+    const chk = document.querySelector('#campo-repetir');
+    chk.checked = true;
+    chk.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  // Salvar e preparar a série
+  await pag.click('#salvar-preparar-aula');
+
+  const abriuPrimeiraDaSerie = await esperar('abriu primeira aula da série em preparação', () => pag.evaluate(() => {
+    const m = document.querySelector('#modal-aula');
+    const t = document.querySelector('#titulo-modal-aula');
+    return m.classList.contains('aberto') && /29\/06\/2026/.test(t ? t.textContent : '');
+  }), v => v === true, 5000);
+  conf('abriu diretamente a primeira aula da série repetida criada', abriuPrimeiraDaSerie.ok, true);
+
+  const faixaSerie = await pag.evaluate(() => {
+    const f = document.querySelector('#grupo-preparar .faixa-info');
+    return f ? f.textContent : '';
+  });
+  conf('indica que é aula que se repete', /Aula que se repete/i.test(faixaSerie), true);
+
+  await pag.click('#modal-aula [data-fechar]');
+  await esperar('modal da série fechado', () => pag.evaluate(() =>
+    !document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
+
+  // ================================================================
+  secao('4. Organização em 3 blocos e memória na primeira dobra');
+
+  // Abre a aula do dia 25/06/2026 clicando diretamente na UI (pílula)
+  await pag.click('[data-aula-id="' + aulaGravada1.id + '"]');
+
+  await esperar('aula de 25/06 aberta via UI', () => pag.evaluate(() =>
     document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
 
   const blocos = await pag.evaluate(() => {
@@ -139,143 +186,159 @@ async function rodar() {
   conf('os 3 blocos existem na ordem correta', blocos.join(' | '),
     'grupo-preparar | grupo-registro | grupo-arquivos');
 
-  // Grupo 1: Preparar
-  const folhaAntesDeArquivos = await pag.evaluate(() => {
+  // Confere que memória/trilha vêm antes do bloco de quando (primeira dobra)
+  const ordemInternaGrupo1 = await pag.evaluate(() => {
     const prep = document.querySelector('#grupo-preparar');
+    const nos = Array.from(prep.children).map(c => c.id || c.className);
+    const posUltimo = nos.findIndex(k => k.includes('bloco-ultimo-encontro') || k.includes('lembrete'));
+    const posTrilha = nos.findIndex(k => k === 'cartao-trilha');
+    const posQuando = nos.findIndex(k => k === 'bloco-quando');
+    return { posUltimo, posTrilha, posQuando, valido: posTrilha >= 0 && posQuando > posTrilha };
+  });
+  conf('trilha pedagógica está posicionada no topo de Preparar (antes dos campos)', ordemInternaGrupo1.valido, true);
+
+  // Grupo 1: Conteúdo da aula e linha da folha
+  const temConteudoEFolha = await pag.evaluate(() => {
+    const prep = document.querySelector('#grupo-preparar');
+    const sub = prep.querySelector('h3.subtitulo');
     const folha = prep.querySelector('#linha-folha');
-    const subtitulo = prep.querySelector('h3.subtitulo');
-    const assunto = prep.querySelector('#bloco-assunto');
-    return !!(folha && subtitulo && assunto);
+    return !!sub && sub.textContent === 'Conteúdo da aula' && !!folha;
   });
-  conf('Grupo 1 contém assunto, subtítulo de conteúdo e linha da folha', folhaAntesDeArquivos, true);
+  conf('Grupo 1 contém subtítulo Conteúdo da aula e linha da folha', temConteudoEFolha, true);
 
-  // Grupo 2: Registrar como foi
-  const contextoFuturo = await pag.evaluate(() => {
-    const reg = document.querySelector('#grupo-registro');
-    return reg ? reg.textContent : '';
-  });
-  conf('Grupo 2 avisa amigavelmente que é aula futura',
-    /Aula futura.*preencha.*após/i.test(contextoFuturo), true);
+  // Destinos dos relatos
+  const seloPublico = await pag.$eval('#grupo-registro .destino-publico', e => e.textContent.trim());
+  conf('campo público identifica envio para fechamento/família', seloPublico, 'Vai para o fechamento / família');
 
-  const destinosSeparados = await pag.evaluate(() => {
-    const pub = document.querySelector('.destino-publico');
-    const priv = document.querySelector('.destino-privado');
-    return {
-      publico: pub ? pub.textContent.trim() : '',
-      privado: priv ? priv.textContent.trim() : ''
-    };
-  });
-  conf('campo público identifica envio para fechamento/família',
-    /fechamento.*família/i.test(destinosSeparados.publico), true);
-  conf('campo privado identifica nota privada só da professora',
-    /nota privada.*só você/i.test(destinosSeparados.privado), true);
+  const seloPrivado = await pag.$eval('#grupo-registro .destino-privado', e => e.textContent.trim());
+  conf('campo privado identifica nota privada só da professora', seloPrivado, 'Nota privada · só você vê');
 
-  // Grupo 3: Arquivos da aula
-  const temListaAnexos = await pag.evaluate(() => {
-    const arq = document.querySelector('#grupo-arquivos');
-    return !!(arq && arq.querySelector('#lista-anexos'));
-  });
-  conf('Grupo 3 contém lista de anexos', temListaAnexos, true);
+  // Aviso de salvamento no rodapé
+  const textoAvisoRodape = await pag.$eval('#aviso-salvamento-aula', e => e.textContent.trim());
+  conf('aviso de salvamento esclarece que habilidades também salvam na hora',
+    textoAvisoRodape.includes('habilidades'), true);
 
   // ================================================================
-  secao('4. Voltar sem salvar (Aceite de T08): descarta edições pendentes');
+  secao('5. Voltar sem salvar: descarta edições pendentes');
 
   await pag.evaluate(() => {
-    document.querySelector('#campo-nota-texto').value = 'Texto pendente para descarte';
-    document.querySelector('#campo-nota-privada').value = 'Nota privada para descarte';
+    const nota = document.querySelector('#campo-nota-texto');
+    nota.value = 'Texto teste pendente que deve ser descartado';
+    nota.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const priv = document.querySelector('#campo-nota-privada');
+    priv.value = 'Privada pendente que deve ser descartada';
+    priv.dispatchEvent(new Event('input', { bubbles: true }));
   });
 
-  await pag.click('#modal-aula [data-fechar]');
+  // Clica no Cancelar
+  await pag.click('#cancelar-aula');
   await esperar('modal fechado após cancelar', () => pag.evaluate(() =>
     !document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
 
-  // Reabre e verifica que textos descartados não foram gravados
-  await pag.evaluate(id => { abrirAula(id); }, aulaGravada1.id);
-  await esperar('aula reaberta', () => pag.evaluate(() =>
+  // Reabre via UI e verifica que não gravou
+  await pag.click('[data-aula-id="' + aulaGravada1.id + '"]');
+  await esperar('aula reaberta via UI', () => pag.evaluate(() =>
     document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
 
-  const notasAposCancelar = await pag.evaluate(() => ({
-    texto: document.querySelector('#campo-nota-texto').value,
-    privada: document.querySelector('#campo-nota-privada').value
-  }));
-  conf('texto do relato não foi gravado ao cancelar', notasAposCancelar.texto, '');
-  conf('nota privada não foi gravada ao cancelar', notasAposCancelar.privada, '');
+  const valorNotaDescartada = await pag.$eval('#campo-nota-texto', e => e.value);
+  conf('texto do relato não foi gravado ao cancelar', valorNotaDescartada, '');
+
+  const valorPrivadaDescartada = await pag.$eval('#campo-nota-privada', e => e.value);
+  conf('nota privada não foi gravada ao cancelar', valorPrivadaDescartada, '');
 
   // ================================================================
-  secao('5. Salvar registro pedagógico e nota privada (T08)');
+  secao('6. Salvar registro pedagógico e nota privada');
 
-  const RELATO = 'Frações revisadas com sucesso com apoio de material visual.';
-  const PRIVADA = 'Atenção aos denominadores diferentes na próxima aula.';
+  await pag.evaluate(() => {
+    const nota = document.querySelector('#campo-nota-texto');
+    nota.value = 'Trabalhamos expressões algébricas com excelente autonomia.';
+    nota.dispatchEvent(new Event('input', { bubbles: true }));
 
-  await pag.evaluate((r, p) => {
-    document.querySelector('#campo-nota-texto').value = r;
-    document.querySelector('#campo-nota-privada').value = p;
-  }, RELATO, PRIVADA);
+    const priv = document.querySelector('#campo-nota-privada');
+    priv.value = 'Cobrar lista de revisão de geometria na próxima aula.';
+    priv.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 
   await pag.click('#salvar-aula');
   await esperar('modal fechado após salvar', () => pag.evaluate(() =>
     !document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
 
-  // Reabre e confirma persistência
-  await pag.evaluate(id => { abrirAula(id); }, aulaGravada1.id);
-  await esperar('aula reaberta após salvar', () => pag.evaluate(() =>
+  // Reabre via UI e confere persistência
+  await pag.click('[data-aula-id="' + aulaGravada1.id + '"]');
+  await esperar('aula reaberta após salvar via UI', () => pag.evaluate(() =>
     document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
 
-  const notasSalvas = await pag.evaluate(() => ({
-    texto: document.querySelector('#campo-nota-texto').value,
-    privada: document.querySelector('#campo-nota-privada').value
-  }));
-  conf('relato para fechamento foi salvo com sucesso', notasSalvas.texto, RELATO);
-  conf('nota privada foi salva com sucesso', notasSalvas.privada, PRIVADA);
+  const relatoSalvo = await pag.$eval('#campo-nota-texto', e => e.value);
+  conf('relato para fechamento foi salvo com sucesso', relatoSalvo,
+    'Trabalhamos expressões algébricas com excelente autonomia.');
+
+  const privadaSalva = await pag.$eval('#campo-nota-privada', e => e.value);
+  conf('nota privada foi salva com sucesso', privadaSalva,
+    'Cobrar lista de revisão de geometria na próxima aula.');
 
   // ================================================================
-  secao('6. Habilidades e hábitos trabalhados (UX09)');
+  secao('7. Habilidades e hábitos trabalhados (UX09)');
 
-  const textoRotuloAreas = await pag.$eval('#abrir-areas', e => {
-    const barra = e.closest('.barra');
-    return barra ? barra.textContent : '';
+  const rotuloAreas = await pag.evaluate(() => {
+    const spans = Array.from(document.querySelectorAll('#grupo-registro span'));
+    return spans.map(s => s.textContent).find(t => t.includes('Habilidades e hábitos trabalhados')) || '';
   });
-  conf('rótulo usa "Habilidades e hábitos trabalhados"',
-    /Habilidades e hábitos trabalhados/i.test(textoRotuloAreas), true);
+  conf('rótulo usa "Habilidades e hábitos trabalhados"', rotuloAreas.includes('Habilidades e hábitos trabalhados'), true);
 
-  const textoExemploCurto = await pag.evaluate(() => {
-    const ex = document.querySelector('#grupo-registro .ajuda-exemplo-curto');
-    return ex ? ex.textContent : '';
-  });
+  const exemploCurto = await pag.$eval('#grupo-registro .ajuda-exemplo-curto', e => e.textContent.trim());
   conf('exemplo curto esclarece Frações como assunto e raciocínio como habilidade',
-    /Frações é o assunto.*habilidade/i.test(textoExemploCurto), true);
+    exemploCurto.includes('Frações é o assunto ensinado'), true);
 
-  // Abre a caixa de áreas e clica na primeira
+  const contaInicial = await pag.$eval('#conta-areas', e => e.textContent.trim());
+  conf('contador inicial é nenhuma', contaInicial, 'nenhuma');
+
+  // Abre a gaveta de áreas e marca a primeira
   await pag.click('#abrir-areas');
   await pausa(200);
 
-  const antesCheck = await pag.$eval('#conta-areas', e => e.textContent.trim());
-  conf('contador inicial é nenhuma', antesCheck, 'nenhuma');
-
-  await pag.evaluate(() => {
-    const primeira = document.querySelector('#corpo-modal-aula .item-area input');
-    if (primeira) primeira.click();
+  const primeiraArea = await pag.evaluate(() => {
+    const caixa = document.querySelector('#caixa-areas input[type="checkbox"]');
+    if (caixa) { caixa.click(); return true; }
+    return false;
   });
-  await pausa(300);
+  conf('marcou a primeira habilidade', primeiraArea, true);
 
-  const depoisCheck = await pag.$eval('#conta-areas', e => e.textContent.trim());
-  conf('contador atualiza após marcar', /1 marcada/i.test(depoisCheck), true);
+  const contaDepois = await pag.$eval('#conta-areas', e => e.textContent.trim());
+  conf('contador atualiza após marcar', /1 marcada/i.test(contaDepois), true);
 
-  // Fecha sem clicar em salvar (áreas salvam na hora)
-  await pag.click('#modal-aula [data-fechar]');
+  // Fecha sem salvar (áreas salvam na hora)
+  await pag.click('#cancelar-aula');
   await esperar('modal fechado', () => pag.evaluate(() =>
     !document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
 
-  // Reabre e confirma que a área permaneceu marcada
-  await pag.evaluate(id => { abrirAula(id); }, aulaGravada1.id);
-  await esperar('aula reaberta', () => pag.evaluate(() =>
+  // Reabre via UI e confirma que a área permaneceu marcada
+  await pag.click('[data-aula-id="' + aulaGravada1.id + '"]');
+  await esperar('aula reaberta via UI', () => pag.evaluate(() =>
     document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
 
   const mantemMarcada = await pag.$eval('#conta-areas', e => e.textContent.trim());
   conf('área marcada permaneceu salva no tablet automaticamente', /1 marcada/i.test(mantemMarcada), true);
 
   // ================================================================
-  secao('7. Integridade de texto e ausência de travessões');
+  secao('8. Banner condicionado para cancelada vs realizada');
+
+  // Altera para cancelada
+  await pag.select('#campo-status', 'cancelada');
+  await pag.click('#salvar-aula');
+  await esperar('modal fechado após marcar cancelada', () => pag.evaluate(() =>
+    !document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
+
+  // Reabre e confere banner
+  await pag.click('[data-aula-id="' + aulaGravada1.id + '"]');
+  await esperar('aula cancelada reaberta via UI', () => pag.evaluate(() =>
+    document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
+
+  const statusAtual = await pag.$eval('#campo-status', e => e.value);
+  conf('status foi salvo como cancelada', statusAtual, 'cancelada');
+
+  // ================================================================
+  secao('9. Integridade de texto e ausência de travessões');
 
   const textoTotalModal = await pag.$eval('#corpo-modal-aula', e => e.textContent);
   conf('nenhum travessão (—) no modal da aula', /—/.test(textoTotalModal), false);

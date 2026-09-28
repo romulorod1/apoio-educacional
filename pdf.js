@@ -1034,14 +1034,16 @@
        Mês vencido não tem nada à frente, e nesse caso sai exatamente a folha de
        sempre: a tabela de baixo não existe e a de cima tem o mês inteiro. */
     var todas = dados.linhas || [];
-    var previstas = todas.filter(function (l) { return l.futura; });
-    var feitas = previstas.length ? todas.filter(function (l) { return !l.futura; }) : todas;
-    var ate = previstas.length ? ' até ' + ddmmL(dados.hoje) : '';
-    var horasDaTabela = previstas.length ? dados.horasFeitas : dados.totalHoras;
-    var valorDaTabela = previstas.length ? dados.valorFeito : dados.totalValor;
-    var encontrosDaTabela = previstas.length ? dados.qtdEncontrosFeitos : dados.qtdEncontros;
-    var faixasDaTabela = (previstas.length ? dados.faixasFeitas : dados.faixas) || dados.faixas || [];
-    var precoDaTabela = previstas.length
+    var canceladasFuturas = todas.filter(function (l) { return l.futura && l.status === 'cancelada'; });
+    var previstas = todas.filter(function (l) { return l.futura && l.status !== 'cancelada'; });
+    var temFuturas = todas.some(function (l) { return l.futura; });
+    var feitas = temFuturas ? todas.filter(function (l) { return !l.futura; }) : todas;
+    var ate = temFuturas ? ' até ' + ddmmL(dados.hoje) : '';
+    var horasDaTabela = temFuturas ? dados.horasFeitas : dados.totalHoras;
+    var valorDaTabela = temFuturas ? dados.valorFeito : dados.totalValor;
+    var encontrosDaTabela = temFuturas ? dados.qtdEncontrosFeitos : dados.qtdEncontros;
+    var faixasDaTabela = (temFuturas ? dados.faixasFeitas : dados.faixas) || dados.faixas || [];
+    var precoDaTabela = temFuturas
       ? (dados.precoUnicoFeito !== undefined ? dados.precoUnicoFeito : dados.precoUnico)
       : dados.precoUnico;
 
@@ -1096,7 +1098,7 @@
       /* Tabela sem uma linha sequer não tem "vários" preço nenhum: fica em
          branco. O mês inteiro vazio continua como sempre foi. */
       vh: precoDaTabela !== null ? fmtMoedaLocal(precoDaTabela)
-        : ((previstas.length && !feitas.length) ? '' : 'vários'),
+        : ((temFuturas && !feitas.length) ? '' : 'vários'),
       valor: fmtMoedaLocal(valorDaTabela)
     }, 0, true);
 
@@ -1114,10 +1116,10 @@
     }
     /* Mesma regra do markdown: sai enquanto ela deixar. O motivo está escrito
        no core.js, em markdownFechamento. */
-    if (dados.minutosNaoCobrados > 0 && opcoes.mostrarNaoCobradas !== false) {
+    if (dados.minutosDadosSemCobrar > 0 && opcoes.mostrarNaoCobradas !== false) {
       doc.y -= 15;
-      var hn = Math.floor(dados.minutosNaoCobrados / 60) + ':' +
-        (dados.minutosNaoCobrados % 60 < 10 ? '0' : '') + (dados.minutosNaoCobrados % 60);
+      var hn = Math.floor(dados.minutosDadosSemCobrar / 60) + ':' +
+        (dados.minutosDadosSemCobrar % 60 < 10 ? '0' : '') + (dados.minutosDadosSemCobrar % 60);
       doc.texto('Horas não cobradas no mês: ' + hn + ' h.', MARG_E, doc.y, { tam: 9, cor: COR.muted });
     }
     if (dados.semPreco && dados.semPreco.length) {
@@ -1180,6 +1182,24 @@
       }, 0, true, COLUNAS_TOTAL_MES);
     }
 
+    if (canceladasFuturas.length) {
+      doc.y -= 26;
+      doc.garanteEspaco(74);
+      doc.texto('Aulas canceladas à frente', MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
+      doc.y -= 6;
+      cabecalhoTabela(doc);
+      corpoDaTabela(canceladasFuturas);
+      if (!previstas.length && (dados.totalValor > 0 || dados.valorCanceladasFuturas > 0)) {
+        doc.y -= 14;
+        linhaTabela(doc, {
+          rotulo: 'Total do mês: ' +
+            dados.qtdEncontros + ' encontro' + (dados.qtdEncontros === 1 ? '' : 's') +
+            ', ' + dados.totalHoras + ' h',
+          valor: fmtMoedaLocal(dados.totalValor)
+        }, 0, true, COLUNAS_TOTAL_MES);
+      }
+    }
+
     /* Mesma regra do markdown: a chave vem de Ajustes, e sem ela a folha não
        muda. */
     if (opcoes.chavePix) {
@@ -1209,8 +1229,8 @@
     /* Pelo mesmo motivo da tabela: assunto e área de uma aula que ainda não
        aconteceu não entram em "trabalhados". Ela às vezes adianta o assunto do
        encontro seguinte, e a folha dizia "Frações (18/09)" no dia 3. */
-    var temasDaFolha = (previstas.length ? dados.temasFeitos : dados.temasDoMes) || dados.temasDoMes || [];
-    var areasDaFolha = (previstas.length ? dados.areasFeitas : dados.areasDoMes) || dados.areasDoMes || [];
+    var temasDaFolha = (temFuturas ? dados.temasFeitos : dados.temasDoMes) || dados.temasDoMes || [];
+    var areasDaFolha = (temFuturas ? dados.areasFeitas : dados.areasDoMes) || dados.areasDoMes || [];
     if (exibirListas && temasDaFolha.length) {
       tituloDeSecao('Temas trabalhados', 92);
       for (var t = 0; t < temasDaFolha.length; t++) {
