@@ -264,33 +264,63 @@ async function rodar() {
     const f = Core.calcularFechamento(dados, 'aluno_alfa_t10', '2026-06');
     const gen = typeof PDFGen !== 'undefined' ? PDFGen : Pdf;
 
-    // 1. PDF padrao
-    const bytesPadrao = gen.gerarFechamento(f, { incluirNotas: false, exibirTemasEAreas: true });
-    let strPadrao = '';
-    for (let i = 0; i < bytesPadrao.length; i++) strPadrao += String.fromCharCode(bytesPadrao[i]);
+    // 1. PDF padrao sem notas publicas
+    const bytesSemNotas = gen.gerarFechamento(f, { incluirNotasPublicas: false, exibirTemasEAreas: true });
+    let strSemNotas = '';
+    for (let i = 0; i < bytesSemNotas.length; i++) strSemNotas += String.fromCharCode(bytesSemNotas[i]);
 
-    // 2. PDF com folhas
-    const bytesFolhas = gen.gerarFechamento(f, { incluirNotas: true, notas: [], exibirTemasEAreas: true });
-    let strFolhas = '';
-    for (let i = 0; i < bytesFolhas.length; i++) strFolhas += String.fromCharCode(bytesFolhas[i]);
+    // 2. PDF padrao com notas publicas
+    const bytesComNotas = gen.gerarFechamento(f, { incluirNotasPublicas: true, exibirTemasEAreas: true });
+    let strComNotas = '';
+    for (let i = 0; i < bytesComNotas.length; i++) strComNotas += String.fromCharCode(bytesComNotas[i]);
+
+    // 3. PDF com folhas sem notas publicas
+    const bytesFolhasSemNotas = gen.gerarFechamento(f, { incluirFolhas: true, incluirNotasPublicas: false, notas: [], exibirTemasEAreas: true });
+    let strFolhasSemNotas = '';
+    for (let i = 0; i < bytesFolhasSemNotas.length; i++) strFolhasSemNotas += String.fromCharCode(bytesFolhasSemNotas[i]);
+
+    // 4. PDF com folhas com notas publicas
+    const bytesFolhasComNotas = gen.gerarFechamento(f, { incluirFolhas: true, incluirNotasPublicas: true, notas: [], exibirTemasEAreas: true });
+    let strFolhasComNotas = '';
+    for (let i = 0; i < bytesFolhasComNotas.length; i++) strFolhasComNotas += String.fromCharCode(bytesFolhasComNotas[i]);
 
     return {
-      padrao: {
-        temPrivado: strPadrao.includes(priv),
-        temFeedback: strPadrao.includes(fb)
+      semNotas: {
+        temPrivado: strSemNotas.includes(priv),
+        temFeedback: strSemNotas.includes(fb),
+        temPublico: strSemNotas.includes(pub)
       },
-      folhas: {
-        temPrivado: strFolhas.includes(priv),
-        temFeedback: strFolhas.includes(fb)
+      comNotas: {
+        temPrivado: strComNotas.includes(priv),
+        temFeedback: strComNotas.includes(fb),
+        temPublico: strComNotas.includes(pub)
+      },
+      folhasSemNotas: {
+        temPrivado: strFolhasSemNotas.includes(priv),
+        temFeedback: strFolhasSemNotas.includes(fb),
+        temPublico: strFolhasSemNotas.includes(pub)
+      },
+      folhasComNotas: {
+        temPrivado: strFolhasComNotas.includes(priv),
+        temFeedback: strFolhasComNotas.includes(fb),
+        temPublico: strFolhasComNotas.includes(pub)
       }
     };
   }, PUBLICO_AULA_ALFA, PRIVADO_ALFA_NAO_EXPORTAR, FEEDBACK_FAMILIA_ALFA);
 
-  conf('PDF fechamento: PRIVADO tem 0 ocorrencias', resultadoPdf.padrao.temPrivado, false);
-  conf('PDF fechamento: FEEDBACK esta presente no documento', resultadoPdf.padrao.temFeedback, true);
+  conf('PDF fechamento sem notas: PRIVADO tem 0 ocorrencias', resultadoPdf.semNotas.temPrivado, false);
+  conf('PDF fechamento sem notas: FEEDBACK esta presente no documento', resultadoPdf.semNotas.temFeedback, true);
+  conf('PDF fechamento sem notas: PUBLICO esta ausente do documento', resultadoPdf.semNotas.temPublico, false);
 
-  conf('PDF com folhas: PRIVADO tem 0 ocorrencias', resultadoPdf.folhas.temPrivado, false);
-  conf('PDF com folhas: FEEDBACK esta presente no documento', resultadoPdf.folhas.temFeedback, true);
+  conf('PDF fechamento com notas: PRIVADO tem 0 ocorrencias', resultadoPdf.comNotas.temPrivado, false);
+  conf('PDF fechamento com notas: FEEDBACK esta presente no documento', resultadoPdf.comNotas.temFeedback, true);
+  conf('PDF fechamento com notas: PUBLICO esta presente no documento', resultadoPdf.comNotas.temPublico, true);
+
+  conf('PDF com folhas sem notas: PRIVADO tem 0 ocorrencias', resultadoPdf.folhasSemNotas.temPrivado, false);
+  conf('PDF com folhas sem notas: PUBLICO esta ausente', resultadoPdf.folhasSemNotas.temPublico, false);
+
+  conf('PDF com folhas com notas: PRIVADO tem 0 ocorrencias', resultadoPdf.folhasComNotas.temPrivado, false);
+  conf('PDF com folhas com notas: PUBLICO esta presente', resultadoPdf.folhasComNotas.temPublico, true);
 
   // ================================================================
   secao('7. Teste de privacidade no Cartao do Mes e Modo Familia (O mes numa tela)');
