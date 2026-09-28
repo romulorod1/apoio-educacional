@@ -1111,6 +1111,7 @@
       valoresOcultos = !!(db.ajustes && db.ajustes.valoresOcultos);
       ligarEventos();
       atualizarBotaoOlho();
+      window.abrirAula = abrirAula;
       desenharTudo();
       atualizarTemBiblioteca();
       setTimeout(mostrarNovidades, 900);
@@ -1274,7 +1275,10 @@
       if (gerarDaAbaProposta) gerarDaAbaProposta();
     });
 
-    $('#salvar-aula').addEventListener('click', salvarAula);
+    $('#salvar-aula').addEventListener('click', function (e) { salvarAula(e, false); });
+    if ($('#salvar-preparar-aula')) {
+      $('#salvar-preparar-aula').addEventListener('click', function (e) { salvarAula(e, true); });
+    }
     $('#excluir-aula').addEventListener('click', excluirAulaAtual);
     $('#salvar-aluno').addEventListener('click', salvarAluno);
     $('#excluir-aluno').addEventListener('click', excluirAlunoAtual);
@@ -1513,47 +1517,13 @@
 
     $('#titulo-modal-aula').textContent = novo ? 'Nova aula' : 'Aula de ' + Core.ddmmaaaa(aulaEmEdicao.data);
     $('#excluir-aula').style.display = novo ? 'none' : '';
+    if ($('#aviso-salvamento-aula')) $('#aviso-salvamento-aula').style.display = novo ? 'none' : '';
+    if ($('#salvar-preparar-aula')) $('#salvar-preparar-aula').style.display = novo ? '' : 'none';
+    $('#salvar-aula').textContent = novo ? 'Salvar na agenda' : 'Salvar';
+    if ($('#cancelar-aula')) $('#cancelar-aula').textContent = 'Cancelar';
 
     var corpo = $('#corpo-modal-aula');
     corpo.innerHTML = '';
-
-    /* Onde os dois pararam vem antes de tudo.
-     *
-     * Para lembrar do último encontro ela precisava fechar esta janela, achar a
-     * aula anterior no calendário e abrir. Agora o assunto, as áreas, o que
-     * rendeu e o que ela anotou só para ela abrem a janela, num bloco de altura
-     * fixa e curta, que não empurra nada para fora da tela.
-     *
-     * Ele fica ACIMA do cartão da trilha de propósito: memória primeiro, ação
-     * logo em seguida. O que a rodada da trilha exigia continua valendo, e é o
-     * que os prints das duas orientações conferem: o cartão da trilha aparece
-     * inteiro sem rolagem, e não depois de oito campos da aula. */
-    if (!novo) {
-      desenharUltimoEncontro(corpo, aulaEmEdicao);
-      /* O próximo passo da trilha. Quem o preenche é o desenharAssuntos, que
-       * sabe quando redesenhar. */
-      corpo.appendChild(el('div', { id: 'cartao-trilha' }));
-    }
-
-    if (serie) {
-      corpo.appendChild(el('div', { class: 'faixa-info' }, [
-        el('strong', { texto: 'Aula que se repete. ' }),
-        document.createTextNode(Core.descreveSerie(serie)),
-        aulaEmEdicao.destacada ? el('div', { style: 'margin-top:6px' }, [
-          el('span', { class: 'tag excecao', texto: 'alterada só neste dia' })
-        ]) : null
-      ]));
-    }
-
-    /* Quando a aula é, quanto dura, como terminou e se é cobrada.
-     *
-     * Numa aula que já existe isto tudo já está preenchido e quase nunca muda:
-     * é o bloco que ela olha e passa. Fica num contêiner só porque, com a aula
-     * aberta, ele é MOVIDO para depois dos dois campos de anotação. Ver o
-     * comentário do move, mais abaixo. Numa aula nova ele continua no alto,
-     * onde tem que estar: aula nova é exatamente escolher dia e horário. */
-    var blocoQuando = el('div', { id: 'bloco-quando' });
-    corpo.appendChild(blocoQuando);
 
     var selAluno = el('select', { id: 'campo-aluno' });
     db.alunos.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome); }).forEach(function (a) {
@@ -1561,22 +1531,13 @@
       if (aulaEmEdicao ? a.id === aulaEmEdicao.alunoId : false) o.selected = true;
       selAluno.appendChild(o);
     });
-    blocoQuando.appendChild(el('label', { class: 'campo' }, [el('span', { texto: 'Aluno' }), selAluno]));
     if (!novo) selAluno.disabled = true;
 
     var dataVal = aulaEmEdicao ? aulaEmEdicao.data : (dataSugerida || Core.hojeIso());
     var horaVal = aulaEmEdicao ? (aulaEmEdicao.hora || '') : '15:30';
 
-    blocoQuando.appendChild(el('div', { class: 'linha' }, [
-      el('label', { class: 'campo' }, [
-        el('span', { texto: 'Data' }),
-        el('input', { type: 'date', id: 'campo-data', value: dataVal })
-      ]),
-      el('label', { class: 'campo' }, [
-        el('span', { texto: 'Horário' }),
-        el('input', { type: 'time', id: 'campo-hora', value: horaVal })
-      ])
-    ]));
+    var campoData = el('input', { type: 'date', id: 'campo-data', value: dataVal });
+    var campoHora = el('input', { type: 'time', id: 'campo-hora', value: horaVal });
 
     var duracaoVal = aulaEmEdicao ? aulaEmEdicao.duracaoMin : 60;
     var selDur = el('select', { id: 'campo-duracao' });
@@ -1595,40 +1556,28 @@
       selStatus.appendChild(o);
     });
 
-    blocoQuando.appendChild(el('div', { class: 'linha' }, [
-      el('label', { class: 'campo' }, [el('span', { texto: 'Duração' }), selDur]),
-      el('label', { class: 'campo' }, [el('span', { texto: 'Situação' }), selStatus])
-    ]));
-
     var stAtual = aulaEmEdicao ? (Core.STATUS[aulaEmEdicao.status] || Core.STATUS.realizada) : Core.STATUS.realizada;
     var cobravelVal = aulaEmEdicao && typeof aulaEmEdicao.cobravel === 'boolean'
       ? aulaEmEdicao.cobravel : stAtual.cobravelPadrao;
     var chkCobrar = el('input', { type: 'checkbox', id: 'campo-cobrar', style: 'width:auto;min-height:auto' });
     chkCobrar.checked = cobravelVal;
-    blocoQuando.appendChild(el('label', { class: 'campo', style: 'display:flex;align-items:center;gap:10px' }, [
-      chkCobrar, el('span', { texto: 'Cobrar esta aula', style: 'margin:0' })
-    ]));
+
     selStatus.addEventListener('change', function () {
       chkCobrar.checked = (Core.STATUS[this.value] || Core.STATUS.realizada).cobravelPadrao;
     });
 
-    // lembrete de feriado, sem impedir a marcação
     var avisoFeriado = el('div', { id: 'aviso-feriado' });
-    blocoQuando.appendChild(avisoFeriado);
-
-    /* Choque de horário. Duas aulas ao mesmo tempo quase sempre são lançamento
-       repetido, ou a aula desmarcada que ficou para trás. O aviso aparece, mas
-       nada é bloqueado: irmãos na mesma sala existem. */
     var avisoChoque = el('div', { id: 'aviso-choque' });
-    blocoQuando.appendChild(avisoChoque);
+    var previsao = el('div', { class: 'ajuda', id: 'previsao-valor' });
+
     function atualizarChoque() {
       avisoChoque.innerHTML = '';
       var provisoria = {
         id: aulaEmEdicao ? aulaEmEdicao.id : null,
-        data: $('#campo-data').value,
-        hora: $('#campo-hora').value,
-        duracaoMin: parseInt($('#campo-duracao').value, 10) || 60,
-        status: $('#campo-status').value
+        data: $('#campo-data') ? $('#campo-data').value : dataVal,
+        hora: $('#campo-hora') ? $('#campo-hora').value : horaVal,
+        duracaoMin: (parseInt($('#campo-duracao') ? $('#campo-duracao').value : duracaoVal, 10)) || 60,
+        status: $('#campo-status') ? $('#campo-status').value : 'realizada'
       };
       var choques = Core.conflitosDe(db, provisoria);
       if (!choques.length) return;
@@ -1638,13 +1587,13 @@
       });
       avisoChoque.appendChild(el('div', { class: 'faixa-aviso' }, [
         el('strong', { texto: 'Já há aula neste horário: ' }),
-        document.createTextNode(nomes.join(', ') + '. Confira se não é lançamento repetido. ' +
-          'Se for mesmo assim, pode salvar.')
+        document.createTextNode(nomes.join(', ') + '. Confira se não é lançamento repetido. Se for mesmo assim, pode salvar.')
       ]));
     }
+
     function atualizarFeriado() {
-      var data = $('#campo-data').value;
-      var f = data ? Core.feriadoEm(data) : null;
+      var d = $('#campo-data') ? $('#campo-data').value : dataVal;
+      var f = d ? Core.feriadoEm(d) : null;
       avisoFeriado.innerHTML = '';
       if (!f) return;
       avisoFeriado.appendChild(el('div', { class: 'faixa-aviso' }, [
@@ -1653,34 +1602,58 @@
       ]));
     }
 
-    // valor previsto
-    var previsao = el('div', { class: 'ajuda', id: 'previsao-valor' });
-    blocoQuando.appendChild(previsao);
     function atualizarPrevisao() {
       atualizarFeriado();
       atualizarChoque();
-      var aluno = alunoPorId($('#campo-aluno').value);
-      var data = $('#campo-data').value;
-      var dur = parseInt($('#campo-duracao').value, 10) || 0;
-      var pv = aluno ? Core.precoVigente(aluno, data) : null;
+      var aluno = alunoPorId($('#campo-aluno') ? $('#campo-aluno').value : (aulaEmEdicao ? aulaEmEdicao.alunoId : ''));
+      var d = $('#campo-data') ? $('#campo-data').value : dataVal;
+      var dur = parseInt($('#campo-duracao') ? $('#campo-duracao').value : duracaoVal, 10) || 0;
+      var pv = aluno ? Core.precoVigente(aluno, d) : null;
       if (!pv) {
-        previsao.innerHTML = '<strong style="color:#B4453C">Sem valor por hora vigente nesta data.</strong> ' +
-          'Cadastre o valor na ficha do aluno.';
+        previsao.innerHTML = '<strong style="color:#B4453C">Sem valor por hora vigente nesta data.</strong> Cadastre o valor na ficha do aluno.';
       } else {
         previsao.textContent = 'Valor previsto: ' + dinheiro((dur / 60) * pv.valorHora) +
           ' (' + dinheiro(pv.valorHora) + ' por hora).';
       }
     }
+
     selAluno.addEventListener('change', atualizarPrevisao);
     selDur.addEventListener('change', atualizarPrevisao);
     selStatus.addEventListener('change', atualizarPrevisao);
-    $('#campo-data').addEventListener('change', atualizarPrevisao);
-    $('#campo-data').addEventListener('input', atualizarPrevisao);
-    $('#campo-hora').addEventListener('change', atualizarPrevisao);
-    $('#campo-hora').addEventListener('input', atualizarPrevisao);
+    campoData.addEventListener('change', atualizarPrevisao);
+    campoData.addEventListener('input', atualizarPrevisao);
+    campoHora.addEventListener('change', atualizarPrevisao);
+    campoHora.addEventListener('input', atualizarPrevisao);
 
-    // recorrência, só ao criar
     if (novo) {
+      var blocoQuandoNovo = el('div', { id: 'bloco-quando' });
+      corpo.appendChild(blocoQuandoNovo);
+
+      blocoQuandoNovo.appendChild(el('div', { class: 'faixa-info', style: 'margin-bottom:12px' }, [
+        el('strong', { texto: 'Agendamento: ' }),
+        document.createTextNode('defina o aluno, a data e o horário do encontro.')
+      ]));
+
+      blocoQuandoNovo.appendChild(el('label', { class: 'campo' }, [el('span', { texto: 'Aluno' }), selAluno]));
+
+      blocoQuandoNovo.appendChild(el('div', { class: 'linha' }, [
+        el('label', { class: 'campo' }, [el('span', { texto: 'Data' }), campoData]),
+        el('label', { class: 'campo' }, [el('span', { texto: 'Horário' }), campoHora])
+      ]));
+
+      blocoQuandoNovo.appendChild(el('div', { class: 'linha' }, [
+        el('label', { class: 'campo' }, [el('span', { texto: 'Duração' }), selDur]),
+        el('label', { class: 'campo' }, [el('span', { texto: 'Situação' }), selStatus])
+      ]));
+
+      blocoQuandoNovo.appendChild(el('label', { class: 'campo', style: 'display:flex;align-items:center;gap:10px' }, [
+        chkCobrar, el('span', { texto: 'Cobrar esta aula', style: 'margin:0' })
+      ]));
+
+      blocoQuandoNovo.appendChild(avisoFeriado);
+      blocoQuandoNovo.appendChild(avisoChoque);
+      blocoQuandoNovo.appendChild(previsao);
+
       var chkRepetir = el('input', { type: 'checkbox', id: 'campo-repetir', style: 'width:auto;min-height:auto' });
       corpo.appendChild(el('label', { class: 'campo', style: 'display:flex;align-items:center;gap:10px;margin-top:6px' }, [
         chkRepetir, el('span', { texto: 'Repetir toda semana', style: 'margin:0' })
@@ -1719,162 +1692,235 @@
           if (botao && !botao.dataset.marcado) { botao.classList.add('principal'); botao.dataset.marcado = '1'; }
         }
       });
-    }
 
-    /* A aula nova ainda não existe, então não tem onde guardar folha, material
-     * nem anexo. Em vez de deixar ela procurando por botões que não estão ali,
-     * o aviso diz o que vem depois de salvar. */
-    if (novo) {
       corpo.appendChild(el('div', {
         class: 'ajuda', id: 'ajuda-aula-nova',
-        texto: 'Ao salvar, a aula abre de novo já com a folha, o material de aula, os anexos e ' +
-          'as áreas trabalhadas.'
+        texto: 'Para salvar rapidamente na agenda, use "Salvar na agenda". Para já definir assunto e abrir a folha, use "Salvar e preparar".'
       }));
+
+      atualizarPrevisao();
+      abrirModal('modal-aula');
+      return;
     }
 
-    // folha de aula e anexos, só depois que a aula existe
-    if (!novo) {
-      var alunoDaAula = alunoPorId(aulaEmEdicao.alunoId);
-      if (aulaEmEdicao.tipo === 'mapeamento' && alunoDaAula) {
-        desenharEncontroDeMapeamento(corpo, alunoDaAula, aulaEmEdicao);
-      } else if (alunoDaAula && Core.mapeado(alunoDaAula)) {
-        desenharLembrete(corpo, alunoDaAula, aulaEmEdicao);
-      }
+    var alunoDaAula = alunoPorId(aulaEmEdicao.alunoId);
 
-      corpo.appendChild(el('h3', { class: 'subtitulo', texto: 'Conteúdo da aula' }));
+    // ----------------------------------------------------
+    // GRUPO 1: PREPARAR A AULA
+    // ----------------------------------------------------
+    var grupoPreparar = el('div', { class: 'bloco-grupo-aula', id: 'grupo-preparar' });
+    corpo.appendChild(grupoPreparar);
 
-      desenharAssuntos(corpo, aulaEmEdicao, alunoDaAula);
+    grupoPreparar.appendChild(el('div', { class: 'cabecalho-grupo-aula' }, [
+      el('span', { class: 'tag-etapa', texto: '1' }),
+      el('div', { class: 'titulos-grupo' }, [
+        el('h4', { class: 'titulo-grupo', texto: 'Preparar a aula' }),
+        el('span', { class: 'sub-grupo', texto: 'Horário, contexto anterior, assunto e folha' })
+      ])
+    ]));
 
-      /* A anotação virou duas.
-       *
-       * Existia uma só, e o que ela escrevesse ali podia acabar saindo no
-       * arquivo que a família recebe: o fechamento com notas leva o notaTexto
-       * inteiro. Então ela escrevia pensando em quem lê, e o que era só dela
-       * não tinha onde morar.
-       *
-       * O campo de sempre continua sendo o de sempre, com o mesmo texto dentro
-       * e o mesmo destino: é ele que vai para o fechamento. O que muda é o nome,
-       * que agora diz para onde vai. O campo novo nasce vazio e não sai em lugar
-       * nenhum: nem no Markdown, nem no PDF, nem no documento do mês. */
-      var areaNota = el('textarea', {
-        id: 'campo-nota-texto',
-        placeholder: 'O que foi trabalhado nesta aula. Este texto entra no fechamento quando você pedir.'
-      });
-      areaNota.value = aulaEmEdicao.notaTexto || '';
-      corpo.appendChild(el('label', { class: 'campo' }, [
-        el('span', { texto: 'O que rendeu hoje' }), areaNota
+    if (serie) {
+      grupoPreparar.appendChild(el('div', { class: 'faixa-info', style: 'margin-bottom:10px' }, [
+        el('strong', { texto: 'Aula que se repete. ' }),
+        document.createTextNode(Core.descreveSerie(serie)),
+        aulaEmEdicao.destacada ? el('div', { style: 'margin-top:6px' }, [
+          el('span', { class: 'tag excecao', texto: 'alterada só neste dia' })
+        ]) : null
       ]));
-      corpo.appendChild(el('div', {
-        class: 'ajuda', style: 'margin-top:-6px',
-        texto: 'Este é o texto que pode sair no arquivo que a família recebe.'
-      }));
+    }
 
-      var areaPrivada = el('textarea', {
-        id: 'campo-nota-privada', style: 'min-height:64px',
-        placeholder: 'O que você não diria à família. Fica só aqui.'
-      });
-      areaPrivada.value = aulaEmEdicao.notaPrivada || '';
-      corpo.appendChild(el('label', { class: 'campo' }, [
-        el('span', { texto: 'Só minha' }), areaPrivada
-      ]));
-      corpo.appendChild(el('div', {
-        class: 'ajuda', style: 'margin-top:-6px',
-        texto: 'Não entra no fechamento, no PDF nem em nenhum documento que sai daqui. ' +
-          'Aparece para você no alto da próxima aula deste aluno.'
-      }));
+    var blocoQuando = el('div', { id: 'bloco-quando' });
+    grupoPreparar.appendChild(blocoQuando);
 
-      /* Aqui o bloco de data, horário, duração e situação desce.
-       *
-       * Ele estava acima do conteúdo, e com isso o que ela abre a aula para
-       * escrever caía abaixo da dobra em paisagem: medindo em 1280 por 800, o
-       * título "Conteúdo da aula" ficava em 552 e o campo "O que rendeu hoje"
-       * em 752, num corpo de 600. Ela precisava rolar para achar o campo em que
-       * escreve toda aula, e não precisava rolar nenhum pixel para achar a data,
-       * que já está certa e ela não vai mexer.
-       *
-       * appendChild MOVE o bloco, que já está no documento desde o começo desta
-       * função: os campos precisam existir antes, porque os avisos de feriado e
-       * de choque de horário e a previsão de valor são ligados por $('#campo-...')
-       * logo depois de criados. */
-      corpo.appendChild(blocoQuando);
+    blocoQuando.appendChild(el('label', { class: 'campo' }, [el('span', { texto: 'Aluno' }), selAluno]));
+    blocoQuando.appendChild(el('div', { class: 'linha' }, [
+      el('label', { class: 'campo' }, [el('span', { texto: 'Data' }), campoData]),
+      el('label', { class: 'campo' }, [el('span', { texto: 'Horário' }), campoHora])
+    ]));
+    blocoQuando.appendChild(avisoFeriado);
+    blocoQuando.appendChild(avisoChoque);
 
-      var linhaFolha = el('div', { id: 'linha-folha', class: 'barra', style: 'margin-bottom:6px' });
-      linhaFolha.appendChild(el('button', {
-        type: 'button', class: 'btn destaque',
-        texto: aulaEmEdicao.temNota ? 'Abrir folha de aula' : 'Escrever à mão na folha',
-        aoClick: function () { abrirEditorNota(aulaEmEdicao.id); }
-      }));
-      if (MATERIAL_AUTORAL_NO_AR) {
-        linhaFolha.appendChild(el('button', {
-          type: 'button', class: 'btn',
-          texto: 'Material de aula',
-          aoClick: function () { abrirTemas(aulaEmEdicao.id); }
-        }));
-      }
+    desenharUltimoEncontro(grupoPreparar, aulaEmEdicao);
+
+    if (aulaEmEdicao.tipo === 'mapeamento' && alunoDaAula) {
+      desenharEncontroDeMapeamento(grupoPreparar, alunoDaAula, aulaEmEdicao);
+    } else if (alunoDaAula && Core.mapeado(alunoDaAula)) {
+      desenharLembrete(grupoPreparar, alunoDaAula, aulaEmEdicao);
+    }
+
+    grupoPreparar.appendChild(el('div', { id: 'cartao-trilha' }));
+
+    grupoPreparar.appendChild(el('h3', { class: 'subtitulo', texto: 'Conteúdo da aula' }));
+
+    desenharAssuntos(grupoPreparar, aulaEmEdicao, alunoDaAula);
+
+    var linhaFolha = el('div', { id: 'linha-folha', class: 'barra', style: 'margin-bottom:6px' });
+    linhaFolha.appendChild(el('button', {
+      type: 'button', class: 'btn destaque',
+      texto: aulaEmEdicao.temNota ? 'Abrir folha de aula' : 'Escrever à mão na folha',
+      aoClick: function () { abrirEditorNota(aulaEmEdicao.id); }
+    }));
+    if (MATERIAL_AUTORAL_NO_AR) {
       linhaFolha.appendChild(el('button', {
         type: 'button', class: 'btn',
-        texto: 'Anexar PDF',
-        aoClick: function () { anexarArquivo(aulaEmEdicao.id, 'documento'); }
+        texto: 'Material de aula',
+        aoClick: function () { abrirTemas(aulaEmEdicao.id); }
       }));
-      linhaFolha.appendChild(el('button', {
-        type: 'button', class: 'btn',
-        texto: 'Anexar foto',
-        aoClick: function () { anexarArquivo(aulaEmEdicao.id, 'foto'); }
-      }));
-      corpo.appendChild(linhaFolha);
-      corpo.appendChild(el('div', { id: 'ajuda-folha', class: 'ajuda' }, [
-        el('strong', { texto: 'A folha em branco é sempre o começo: ' }),
-        document.createTextNode('ela aceita escrita com a S Pen, imagem colada e texto digitado, ' +
-          'e serve para você planejar a aula do jeito que quiser. '),
-        MATERIAL_AUTORAL_NO_AR ? el('strong', { texto: 'Material de aula ' }) : null,
-        MATERIAL_AUTORAL_NO_AR ? document.createTextNode(
-          'é um atalho opcional, para quando quiser puxar explicação e ' +
-          'exercícios prontos de um tema. ') : null,
-        el('strong', { texto: 'Para trazer uma aula do Samsung Notes: ' }),
-        document.createTextNode('lá dentro toque em Compartilhar, escolha PDF, e depois use "Anexar PDF" aqui. ' +
-          'O arquivo fica guardado junto da aula e você abre ou compartilha quando quiser. ' +
-          'Ele não entra dentro do PDF do fechamento, que leva só as folhas escritas aqui.'),
-        el('strong', { texto: ' O assunto da aula ' }),
-        document.createTextNode('fica logo acima e vale sozinho: registrar o assunto não obriga ' +
-          'a gerar material nenhum.')
+    }
+    linhaFolha.appendChild(el('button', {
+      type: 'button', class: 'btn',
+      texto: 'Anexar PDF',
+      aoClick: function () { anexarArquivo(aulaEmEdicao.id, 'documento'); }
+    }));
+    linhaFolha.appendChild(el('button', {
+      type: 'button', class: 'btn',
+      texto: 'Anexar foto',
+      aoClick: function () { anexarArquivo(aulaEmEdicao.id, 'foto'); }
+    }));
+    grupoPreparar.appendChild(linhaFolha);
+
+    grupoPreparar.appendChild(el('div', { id: 'ajuda-folha', class: 'ajuda' }, [
+      el('strong', { texto: 'A folha em branco é sempre o começo: ' }),
+      document.createTextNode('ela aceita escrita com a S Pen, imagem colada e texto digitado, ' +
+        'e serve para você planejar a aula do jeito que quiser. '),
+      MATERIAL_AUTORAL_NO_AR ? el('strong', { texto: 'Material de aula ' }) : null,
+      MATERIAL_AUTORAL_NO_AR ? document.createTextNode(
+        'é um atalho opcional, para quando quiser puxar explicação e ' +
+        'exercícios prontos de um tema. ') : null,
+      el('strong', { texto: 'Para trazer uma aula do Samsung Notes: ' }),
+      document.createTextNode('lá dentro toque em Compartilhar, escolha PDF, e depois use "Anexar PDF" aqui. ' +
+        'O arquivo fica guardado junto da aula e você abre ou compartilha quando quiser. ' +
+        'Ele não entra dentro do PDF do fechamento, que leva só as folhas escritas aqui.'),
+      el('strong', { texto: ' O assunto da aula ' }),
+      document.createTextNode('fica logo acima e vale sozinho: registrar o assunto não obriga ' +
+        'a gerar material nenhum.')
+    ]));
+
+    // ----------------------------------------------------
+    // GRUPO 2: REGISTRAR COMO FOI
+    // ----------------------------------------------------
+    var grupoRegistro = el('div', { class: 'bloco-grupo-aula', id: 'grupo-registro' });
+    corpo.appendChild(grupoRegistro);
+
+    grupoRegistro.appendChild(el('div', { class: 'cabecalho-grupo-aula' }, [
+      el('span', { class: 'tag-etapa', texto: '2' }),
+      el('div', { class: 'titulos-grupo' }, [
+        el('h4', { class: 'titulo-grupo', texto: 'Registrar como foi' }),
+        el('span', { class: 'sub-grupo', texto: 'Situação, relato para a família e habilidades' })
+      ])
+    ]));
+
+    var eFutura = aulaEmEdicao.data > Core.hojeIso();
+    if (eFutura) {
+      grupoRegistro.appendChild(el('div', { class: 'faixa-info', style: 'margin-bottom:12px' }, [
+        el('strong', { texto: 'Aula futura: ' }),
+        document.createTextNode('preencha esta seção após o encontro acontecer.')
       ]));
+    } else if (!aulaEmEdicao.notaTexto && (!aulaEmEdicao.areas || !aulaEmEdicao.areas.length)) {
+      grupoRegistro.appendChild(el('div', { class: 'faixa-aviso', style: 'margin-bottom:12px' }, [
+        el('strong', { texto: 'Aula concluída: ' }),
+        document.createTextNode('confirme a situação e registre o relato do encontro.')
+      ]));
+    }
 
-      var listaAnexos = el('div', { id: 'lista-anexos' });
-      corpo.appendChild(listaAnexos);
-      desenharAnexos(listaAnexos, aulaEmEdicao);
+    grupoRegistro.appendChild(el('div', { class: 'linha' }, [
+      el('label', { class: 'campo' }, [el('span', { texto: 'Duração efetiva' }), selDur]),
+      el('label', { class: 'campo' }, [el('span', { texto: 'Situação da aula' }), selStatus])
+    ]));
 
-      desenharAreas(corpo, aulaEmEdicao);
+    grupoRegistro.appendChild(el('label', { class: 'campo', style: 'display:flex;align-items:center;gap:10px;margin-bottom:6px' }, [
+      chkCobrar, el('span', { texto: 'Cobrar esta aula', style: 'margin:0' })
+    ]));
 
-      corpo.appendChild(el('div', { class: 'barra', style: 'margin:14px 0 4px' }, [
+    grupoRegistro.appendChild(previsao);
+
+    var areaNota = el('textarea', {
+      id: 'campo-nota-texto',
+      placeholder: 'O que foi trabalhado nesta aula. Este texto entra no fechamento quando você pedir.'
+    });
+    areaNota.value = aulaEmEdicao.notaTexto || '';
+    grupoRegistro.appendChild(el('label', { class: 'campo', style: 'margin-top:10px' }, [
+      el('div', { class: 'campo-titulo-com-destino' }, [
+        el('span', { texto: 'O que rendeu hoje', style: 'font-weight:700' }),
+        el('span', { class: 'destino-publico', texto: 'Vai para o fechamento / família' })
+      ]),
+      areaNota
+    ]));
+    grupoRegistro.appendChild(el('div', {
+      class: 'ajuda', style: 'margin-top:-6px;margin-bottom:10px',
+      texto: 'Este é o relato pedagógico que pode sair no arquivo e resumo enviados à família.'
+    }));
+
+    var areaPrivada = el('textarea', {
+      id: 'campo-nota-privada', style: 'min-height:64px',
+      placeholder: 'Anotações particulares, impressões ou pontos de atenção para você. Fica só aqui.'
+    });
+    areaPrivada.value = aulaEmEdicao.notaPrivada || '';
+    grupoRegistro.appendChild(el('label', { class: 'campo' }, [
+      el('div', { class: 'campo-titulo-com-destino' }, [
+        el('span', { texto: 'Só minha', style: 'font-weight:700' }),
+        el('span', { class: 'destino-privado', texto: 'Nota privada · só você vê' })
+      ]),
+      areaPrivada
+    ]));
+    grupoRegistro.appendChild(el('div', {
+      class: 'ajuda', style: 'margin-top:-6px;margin-bottom:12px',
+      texto: 'Fica salva somente neste tablet. Não entra no fechamento nem vai para a família. ' +
+        'Aparece para você no alto da próxima aula deste aluno.'
+    }));
+
+    desenharAreas(grupoRegistro, aulaEmEdicao);
+
+    // ----------------------------------------------------
+    // GRUPO 3: ARQUIVOS DA AULA
+    // ----------------------------------------------------
+    var grupoArquivos = el('div', { class: 'bloco-grupo-aula', id: 'grupo-arquivos' });
+    corpo.appendChild(grupoArquivos);
+
+    grupoArquivos.appendChild(el('div', { class: 'cabecalho-grupo-aula' }, [
+      el('span', { class: 'tag-etapa', texto: '3' }),
+      el('div', { class: 'titulos-grupo' }, [
+        el('h4', { class: 'titulo-grupo', texto: 'Arquivos da aula' }),
+        el('span', { class: 'sub-grupo', texto: 'PDFs, fotos e materiais anexados' })
+      ])
+    ]));
+
+    var listaAnexos = el('div', { id: 'lista-anexos' });
+    grupoArquivos.appendChild(listaAnexos);
+    desenharAnexos(listaAnexos, aulaEmEdicao);
+
+    grupoArquivos.appendChild(el('div', { class: 'ajuda', style: 'margin-top:8px' }, [
+      el('strong', { texto: 'Arquivos salvos neste tablet: ' }),
+      document.createTextNode('PDFs gerados e fotos anexadas ficam guardados nesta aula. ' +
+        'Para trazer do Samsung Notes, exporte como PDF lá e anexe na folha acima.')
+    ]));
+
+    var podeDiv = Core.podeDividir(aulaEmEdicao);
+    var acoesAvancadas = el('div', { class: 'bloco-acoes-avancadas' }, [
+      el('div', { class: 'barra', style: 'margin:0 0 6px' }, [
         el('button', {
-          type: 'button', class: 'btn',
+          type: 'button', class: 'btn pequeno',
           texto: 'Repetir para trás',
           aoClick: function () { abrirRetroativo(aulaEmEdicao.id); }
         }),
-        Core.podeDividir(aulaEmEdicao) ? el('button', {
-          type: 'button', class: 'btn', id: 'dividir-aula',
+        podeDiv ? el('button', {
+          type: 'button', class: 'btn pequeno', id: 'dividir-aula',
           texto: 'Dividir em duas aulas de ' + rotuloMetades(aulaEmEdicao),
           aoClick: function () { dividirAulaEmDuas(aulaEmEdicao.id); }
         }) : null
-      ].filter(Boolean)));
-      corpo.appendChild(el('div', { class: 'ajuda' }, [
-        el('strong', { texto: 'Repetir para trás: ' }),
-        document.createTextNode('use quando as aulas já aconteciam antes de você cadastrar o aluno. ' +
-          'O aplicativo cria as datas passadas com este mesmo horário e duração. '),
-        Core.podeDividir(aulaEmEdicao) ? el('strong', { texto: 'Dividir em duas: ' }) : null,
-        Core.podeDividir(aulaEmEdicao) ? document.createTextNode(
-          'raramente é preciso. Um encontro que passou por vários assuntos continua sendo ' +
-          'uma aula só, e pode receber quantos temas você quiser: assim o fechamento do mês ' +
-          'mostra a lista de temas em vez de se partir em vários blocos curtos. ' +
-          'Divida apenas quando foram mesmo dois encontros separados no dia.') : null
-      ].filter(Boolean)));
-    }
+      ].filter(Boolean)),
+      el('div', { class: 'ajuda', style: 'margin:0' }, [
+        el('strong', { texto: 'Ações da agenda: ' }),
+        document.createTextNode('Repetir para trás cria as datas anteriores caso as aulas já acontecessem antes do cadastro.')
+      ])
+    ]);
+    grupoArquivos.appendChild(acoesAvancadas);
 
     atualizarPrevisao();
     abrirModal('modal-aula');
   }
 
-  /* Áreas trabalhadas.
+  /* Áreas trabalhadas / Habilidades e hábitos trabalhados.
    *
    * Fica recolhido por padrão: no meio de uma aula ela não quer rolar por vinte
    * e quatro caixas para chegar ao anexo. Aberto, é só clicar. */
@@ -1901,7 +1947,7 @@
 
     corpo.appendChild(el('div', { class: 'barra', style: 'margin:10px 0 4px' }, [
       el('span', {
-        texto: 'Áreas trabalhadas na aula',
+        texto: 'Habilidades e hábitos trabalhados',
         style: 'font-size:13px;font-weight:700;color:#1F3A5F'
       }),
       contador,
@@ -1909,10 +1955,11 @@
       botao
     ]));
 
-    /* As áreas só de uma matéria (cálculo mental, linguagem matemática) não
-     * aparecem para quem não tem aquela matéria no mapeamento. O que já está
-     * marcado nesta aula fica visível de qualquer jeito: esconder caixa
-     * marcada seria deixá-la sem como desmarcar. Sem mapeamento, todas. */
+    corpo.appendChild(el('div', {
+      class: 'ajuda-exemplo-curto',
+      texto: 'Exemplo: Frações é o assunto ensinado; organização na resolução ou cálculo mental é a habilidade.'
+    }));
+
     var alunoDasAreas = alunoPorId(aula.alunoId);
     var mapaDasAreas = alunoDasAreas ? Core.mapeamentoAtual(alunoDasAreas) : null;
     var materiasDasAreas = mapaDasAreas ? Core.materiasDoMapeamento(mapaDasAreas) : null;
@@ -2625,7 +2672,7 @@
     return texto;
   }
 
-  function salvarAula() {
+  function salvarAula(e, abrirParaPreparar) {
     var alunoId = $('#campo-aluno').value;
     var data = $('#campo-data').value;
     var hora = $('#campo-hora').value;
@@ -2634,6 +2681,11 @@
     var cobrar = $('#campo-cobrar').checked;
 
     if (!data) { avisar('Informe a data da aula.'); return; }
+
+    var botaoClicado = (e && e.target) ? e.target.id : '';
+    var querPreparar = (typeof abrirParaPreparar === 'boolean')
+      ? abrirParaPreparar
+      : (botaoClicado === 'salvar-preparar-aula');
 
     // criação
     if (!aulaEmEdicao) {
@@ -2684,10 +2736,12 @@
          * da aula recém-criada, e a folha abre no lugar da janela da aula. */
         if (daBiblioteca && daBiblioteca.aoCriar) { daBiblioteca.aoCriar(nova.id); return; }
         if (daBiblioteca) { colarNaFolhaDaAula(nova.id, daBiblioteca); return; }
-        // Reabre para ela já poder escrever na folha ou puxar o material. Numa
-        // repetição não faz sentido: seriam muitas aulas criadas de uma vez.
-        abrirAula(nova.id);
-        avisar('Aula criada.');
+        if (querPreparar) {
+          abrirAula(nova.id);
+          avisar('Aula agendada. Prepare o material ou a folha abaixo.');
+        } else {
+          avisar('Aula agendada neste tablet.');
+        }
       });
       return;
     }

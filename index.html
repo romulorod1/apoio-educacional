@@ -328,9 +328,13 @@
         <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
       </div>
       <div class="modal-corpo" id="corpo-modal-aula"></div>
-      <div class="modal-rodape">
+      <div class="modal-rodape" id="rodape-modal-aula">
         <button class="btn perigo esquerda" id="excluir-aula" type="button">Excluir</button>
-        <button class="btn" data-fechar type="button">Cancelar</button>
+        <span class="ajuda-salvamento" id="aviso-salvamento-aula" style="display:none">
+          Assuntos e arquivos salvam na hora neste tablet. Horário, situação e relatos gravam ao clicar em Salvar.
+        </span>
+        <button class="btn" data-fechar type="button" id="cancelar-aula">Cancelar</button>
+        <button class="btn destaque" id="salvar-preparar-aula" type="button" style="display:none">Salvar e preparar</button>
         <button class="btn principal" id="salvar-aula" type="button">Salvar</button>
       </div>
     </div>
