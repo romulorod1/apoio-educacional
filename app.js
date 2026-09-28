@@ -13501,6 +13501,7 @@
     function procurarOutraData() {
       if (escolha.botao && resultadoOutraData.contains(escolha.botao)) {
         escolha.aulaId = null; escolha.nova = false; escolha.botao = null;
+        ultimo.innerHTML = '';
       }
       resultadoOutraData.innerHTML = '';
       if (dataOutra.value) {

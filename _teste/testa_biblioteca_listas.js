@@ -1898,6 +1898,9 @@ async function cenarioPortas(pag) {
     d.aulas.push({ id: 'aula-b10-futura', alunoId: 'aluna-prova-b10', serieId: null, destacada: false, data: futuro,
       hora: '16:00', duracaoMin: 60, status: 'agendada', cobravel: true, notaTexto: '', notaPrivada: '',
       temNota: false, anexos: [] });
+    d.ajustes = d.ajustes || {};
+    d.ajustes.bibliotecaTitulos = d.ajustes.bibliotecaTitulos || {};
+    d.ajustes.bibliotecaTitulos['aluna-prova-b10'] = { titulo: 'Título da aluna de prova', subtitulo: '' };
     await Store.salvar(d);
     return 'Aluna de Prova';
   }, (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })(), diaFuturo);
@@ -1927,11 +1930,15 @@ async function cenarioPortas(pag) {
   conf('aula futura distante pode ser escolhida', await pag.evaluate(() =>
     !!document.querySelector('#bib-gerar-resultado-data [data-aula="aula-b10-futura"].escolhida') &&
     !document.querySelector('#bib-gerar-anexar').disabled), true);
+  conf('sugestão do último título é deste aluno escolhido', await pag.evaluate(() =>
+    /Título da aluna de prova/.test((document.querySelector('#bib-gerar-ultimo') || {}).textContent || '')), true);
   await pag.$eval('#bib-gerar-outra-data', e => { e.value = '2032-01-01';
     e.dispatchEvent(new Event('change', { bubbles: true })); });
   conf('trocar data não deixa destino invisível selecionado', await pag.evaluate(() =>
     !document.querySelector('#bib-gerar-resultado-data .escolhida') &&
     document.querySelector('#bib-gerar-anexar').disabled), true);
+  conf('trocar data limpa sugestão de título do destino anterior', await pag.evaluate(() =>
+    !(document.querySelector('#bib-gerar-ultimo') || {}).textContent), true);
   conf('escolheu a aula de hoje na janela de gerar', await pag.evaluate(() => {
     const b = document.querySelector('#bib-gerar-aulas [data-aula="aula-b10-anexa"]');
     if (!b) return false; b.click(); return true;
