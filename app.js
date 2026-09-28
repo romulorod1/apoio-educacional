@@ -5780,6 +5780,7 @@
     var elStatus = $('#status-gravacao-folha');
     if (!elStatus) return;
     elStatus.className = 'status-gravacao' + (estado ? ' ' + estado : '');
+    elStatus.disabled = estado !== 'erro';
     if (estado === 'salvando') {
       elStatus.textContent = 'Salvando no tablet...';
       elStatus.title = 'Gravando anotações no banco IndexedDB deste aparelho';
@@ -5790,7 +5791,7 @@
       elStatus.onclick = function () {
         if (editorAtual && editorAtual._aulaId) {
           atualizarStatusGravacaoFolha('salvando');
-          gravarNota(editorAtual._aulaId);
+          gravarNota(editorAtual._aulaId).catch(function () { /* o botão permanece disponível */ });
         }
       };
     } else {
@@ -5819,10 +5820,16 @@
   }
 
   var gravacaoPendente = null;
+  var versaoMudancaNota = 0;
+  var filaGravacaoNota = Promise.resolve();
   function agendarGravacaoNota(aulaId) {
+    versaoMudancaNota++;
     atualizarStatusGravacaoFolha('salvando');
     clearTimeout(gravacaoPendente);
-    gravacaoPendente = setTimeout(function () { gravarNota(aulaId); }, 400);
+    gravacaoPendente = setTimeout(function () {
+      gravacaoPendente = null;
+      gravarNota(aulaId).catch(function () { /* o status de erro oferece nova tentativa */ });
+    }, 400);
   }
 
   /* Se o tablet for bloqueado ou o aplicativo for para segundo plano no meio da
@@ -5831,7 +5838,8 @@
     if (document.visibilityState !== 'hidden') return;
     if (editorAtual && editorAtual._aulaId) {
       clearTimeout(gravacaoPendente);
-      gravarNota(editorAtual._aulaId);
+      gravacaoPendente = null;
+      gravarNota(editorAtual._aulaId).catch(function () { /* folha continua aberta */ });
     }
     /* A folha de compartilhamento do Android esconde o aplicativo: é
      * exatamente aqui que a proposta que ela acabou de escrever precisa estar
@@ -5841,34 +5849,63 @@
   window.addEventListener('pagehide', function () {
     if (editorAtual && editorAtual._aulaId) {
       clearTimeout(gravacaoPendente);
-      gravarNota(editorAtual._aulaId);
+      gravacaoPendente = null;
+      gravarNota(editorAtual._aulaId).catch(function () { /* indicador registra o erro */ });
     }
     gravarRascunhoAgora();
   });
 
   function gravarNota(aulaId) {
     if (!editorAtual) return Promise.resolve();
-    var nota = editorAtual.nota;
-    var temConteudo = nota.paginas.some(function (p) { return (p.itens || []).length; });
-    var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
     atualizarStatusGravacaoFolha('salvando');
-    return Store.salvarNota(aulaId, temConteudo ? nota : null).then(function () {
-      if (aula && aula.temNota !== temConteudo) {
-        aula.temNota = temConteudo;
-        return salvar();
-      }
-    }).then(function () {
-      atualizarStatusGravacaoFolha('salvo');
-    }).catch(function (err) {
-      atualizarStatusGravacaoFolha('erro', err && err.message);
-      throw err;
+    /* Serializar evita que uma gravacao antiga termine depois da mais nova e
+     * sobrescreva a folha. A versao impede mostrar "Salvo" enquanto ha outra
+     * alteracao no debounce ou na fila. */
+    var tarefa = filaGravacaoNota.then(function () {
+      if (!editorAtual || editorAtual._aulaId !== aulaId) return;
+      var versao = versaoMudancaNota;
+      var nota = JSON.parse(JSON.stringify(editorAtual.nota));
+      var temConteudo = nota.paginas.some(function (p) { return (p.itens || []).length; });
+      var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
+      return Store.salvarNota(aulaId, temConteudo ? nota : null).then(function () {
+        if (aula && aula.temNota !== temConteudo) {
+          var antes = aula.temNota;
+          aula.temNota = temConteudo;
+          return salvar().catch(function (err) {
+            aula.temNota = antes;
+            throw err;
+          });
+        }
+      }).then(function () {
+        if (versao === versaoMudancaNota && !gravacaoPendente) atualizarStatusGravacaoFolha('salvo');
+      }).catch(function (err) {
+        if (versao === versaoMudancaNota && !gravacaoPendente) {
+          atualizarStatusGravacaoFolha('erro', err && err.message);
+        }
+        throw err;
+      });
     });
+    filaGravacaoNota = tarefa.catch(function () { /* nova tentativa continua na fila */ });
+    return tarefa;
   }
 
+  var fechandoEditorNota = false;
   function fecharEditorNota() {
-    clearTimeout(gravacaoPendente);
-    var p = editorAtual ? gravarNota(editorAtual._aulaId) : Promise.resolve();
-    p.then(function () {
+    if (fechandoEditorNota) return;
+    fechandoEditorNota = true;
+    var aulaId = editorAtual && editorAtual._aulaId;
+    function gravarAteEstavel() {
+      clearTimeout(gravacaoPendente);
+      gravacaoPendente = null;
+      var versao = versaoMudancaNota;
+      return (aulaId ? gravarNota(aulaId) : Promise.resolve()).then(function () {
+        /* A professora ainda pode terminar um traco enquanto a primeira
+         * transacao fecha. Nesse caso, a nova versao precisa ir ao banco ANTES
+         * de destruir o editor e fechar a janela. */
+        if (versao !== versaoMudancaNota || gravacaoPendente) return gravarAteEstavel();
+      });
+    }
+    gravarAteEstavel().then(function () {
       if (editorAtual) { editorAtual.destruir(); editorAtual = null; }
       fecharModal('modal-nota');
       desenharAgenda();
@@ -5876,6 +5913,8 @@
       /* A folha fica ABERTA: fechar agora jogaria fora o que ela escreveu, que
        * ainda está só na tela. */
       avisar('Não consegui salvar a folha. O tablet pode estar sem espaço. A folha continua aberta.');
+    }).then(function () {
+      fechandoEditorNota = false;
     });
   }
 
@@ -5932,7 +5971,7 @@
     var itens = [
       {
         titulo: 'Caneta',
-        desc: 'Escreve e desenha com a ponta fina. Pode apoiar a mão na tela com naturalidade (somente a caneta risca).'
+        desc: 'Escreve e desenha com a ponta fina. O comportamento da palma depende do tablet: confira um traço curto antes da aula.'
       },
       {
         titulo: 'Marca-texto',
@@ -6159,11 +6198,24 @@
         avisar('Gerador de PDF não disponível.');
         return;
       }
+      var refs = {};
+      nota.paginas.forEach(function (p) {
+        (p.itens || []).forEach(function (it) { if (it.t === 'imagem' && it.ref) refs[it.ref] = true; });
+      });
+      if (Object.keys(refs).length && !confirmar(
+        'O PDF inclui todas as imagens desta folha. Se você colou uma solução ou gabarito, ele também aparecerá. Confira o PDF antes de enviar ao aluno. Continuar?'
+      )) return;
+      var imagens = {};
+      Object.keys(refs).forEach(function (ref) {
+        var midia = midiasCarregadas[ref];
+        if (!midia || !midia.dataUrl) throw new Error('Imagem da folha não encontrada: ' + ref);
+        imagens[ref] = { bytes: bytesDeDataUrl(midia.dataUrl), w: midia.w, h: midia.h };
+      });
       var bytes = gerador.gerarFolhaAula({
         alunoNome: nomeAluno,
         data: aula.data,
         nota: nota,
-        imagens: midiasCarregadas
+        imagens: imagens
       });
       var slug = Core.nomeArquivo(nomeAluno || 'aula');
       var nomeArquivo = 'Folha_com_anotacoes_' + slug + '_' + aula.data + '.pdf';
@@ -15224,6 +15276,10 @@
 
   function escolherAulaParaFolha() {
     if (!bibVendo) return;
+    if (bibVendo.tipo === 'exercicio' && bibVendo.solucao) {
+      avisar('Esta é a solução. Toque em "Ver enunciado" antes de abrir como folha para o aluno.');
+      return;
+    }
     var peca = pecaVista();
     var alvo = { pacote: peca.pacote, caminho: peca.caminho, medidas: peca.medidas, forma: peca.forma, titulo: peca.titulo };
     var corpo = $('#corpo-modal-bib-folha');

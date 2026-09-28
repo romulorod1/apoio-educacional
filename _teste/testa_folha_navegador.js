@@ -18,6 +18,10 @@
  */
 'use strict';
 const H = require('./_bib_navegador');
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+const { execFileSync } = require('child_process');
 const amb = H.criarAmbiente(8849, 'nath_t09_folha');
 const { conf, secao, esperar, pausa } = H;
 
@@ -307,6 +311,61 @@ async function rodar() {
   conf('nome do arquivo comeca com Folha_com_anotacoes_', interceptacaoPdf.nome.startsWith('Folha_com_anotacoes_'), true);
   conf('nome do arquivo identifica o aluno Marcelo', interceptacaoPdf.nome.includes('Marcelo'), true);
   conf('assinatura valida de documento PDF (%PDF)', interceptacaoPdf.header, '%PDF-');
+
+  // O caso que faltava no T09: imagem colada de exercicio. O PDF recebe bytes
+  // JPEG, nao o dataUrl usado para desenhar na tela.
+  secao('6b. PDF da folha com imagem e alerta de possivel gabarito');
+  const seletorReal = await pag.evaluate(() => {
+    const b = Array.from(document.querySelectorAll('button')).find(x =>
+      x.textContent.trim() === 'Imagem' && x.closest('#modal-nota'));
+    return b ? b.parentElement.id : '';
+  });
+  conf('botao de imagem existe no editor', !!seletorReal, true);
+  const [escolhaArquivo] = await Promise.all([
+    pag.waitForFileChooser(),
+    pag.evaluate(() => {
+      const b = Array.from(document.querySelectorAll('#modal-nota button')).find(x => x.textContent.trim() === 'Imagem');
+      b.click();
+    })
+  ]);
+  await escolhaArquivo.accept([path.join(__dirname, '..', 'icons', 'icon-192.png')]);
+  await esperar('imagem inserida na folha', () => pag.evaluate(async () => {
+    const nota = await Store.lerNota(document.querySelector('[data-aula-id]').getAttribute('data-aula-id'));
+    return !!(nota && nota.paginas.some(p => p.itens.some(it => it.t === 'imagem')));
+  }), v => v === true, 5000);
+  const pdfComImagem = await pag.evaluate(() => new Promise(resolve => {
+    let pergunta = '';
+    let arquivo = null;
+    const confirmarAntes = window.confirm;
+    const criarAntes = URL.createObjectURL;
+    const compartilharAntes = navigator.share;
+    window.confirm = msg => { pergunta = msg; return true; };
+    navigator.share = async data => { arquivo = data.files && data.files[0]; };
+    URL.createObjectURL = blob => { arquivo = blob; return criarAntes.call(URL, blob); };
+    document.querySelector('#btn-pdf-folha').click();
+    setTimeout(async () => {
+      window.confirm = confirmarAntes;
+      URL.createObjectURL = criarAntes;
+      navigator.share = compartilharAntes;
+      const bytes = arquivo ? new Uint8Array(await arquivo.arrayBuffer()) : [];
+      resolve({ pergunta, inicio: String.fromCharCode(...bytes.slice(0, 5)), bytes: Array.from(bytes) });
+    }, 1500);
+  }));
+  conf('alerta esclarece que imagens podem incluir gabarito', /solu[cç][aã]o ou gabarito/i.test(pdfComImagem.pergunta), true);
+  conf('PDF com imagem tem assinatura valida', pdfComImagem.inicio, '%PDF-');
+  conf('PDF com imagem nao ficou vazio', pdfComImagem.bytes.length > 2000, true);
+  const arquivoPdf = path.join(os.tmpdir(), 'folha_t09_imagem_' + process.pid + '.pdf');
+  fs.writeFileSync(arquivoPdf, Buffer.from(pdfComImagem.bytes));
+  try {
+    const saidaRaster = execFileSync('python', ['-c',
+      'import fitz,json,sys; d=fitz.open(sys.argv[1]); p=d[0]; pix=p.get_pixmap(matrix=fitz.Matrix(1,1)); print(json.dumps({"paginas":len(d),"imagens":len(p.get_images()),"largura":pix.width,"altura":pix.height}))',
+      arquivoPdf], { encoding: 'utf8' });
+    const prova = JSON.parse(saidaRaster.trim().split(/\r?\n/).filter(l => l.startsWith('{')).pop());
+    conf('PDF com imagem foi rasterizado', prova.largura > 0 && prova.altura > 0, true);
+    conf('pagina do PDF contem imagem embutida', prova.imagens > 0, true);
+  } finally {
+    fs.unlinkSync(arquivoPdf);
+  }
 
 
   // ================================================================
