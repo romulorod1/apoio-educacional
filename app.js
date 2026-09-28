@@ -12179,10 +12179,10 @@
       var pergunta = m ? 'Trocar os ' + (n + m) + ' itens marcados por esta lista?'
         : n === 1 ? 'Trocar o exercício marcado por esta lista?'
         : 'Trocar os ' + n + ' exercícios marcados por esta lista?';
-      if (!confirmar(pergunta)) return;
+      if (!confirmar(pergunta)) return false;
       // o material de agora vai para as seleções anteriores (ver guardarNasAnteriores)
     }
-    usarListaPronta(lp);
+    return usarListaPronta(lp);
   }
 
   function desenharPreviaDaLista(corpo, mod, lp) {
@@ -12205,7 +12205,9 @@
       foi.aluno + ' (' + Core.ddmmaaaa(foi.data) + ').' + (foi.mexida ? ' A sua versão ficou em Seleções anteriores.' : '') }));
     if (estado) corpo.appendChild(el('p', { class: 'ajuda bib-lp-estado', id: 'bib-lp-estado', texto: estado }));
     corpo.appendChild(el('div', { class: 'barra bib-lp-usar' }, [
-      el('button', { type: 'button', class: 'btn principal', id: 'bib-lp-usar', texto: 'Usar esta lista',
+      el('button', { type: 'button', class: 'btn principal', id: 'bib-lp-preparar', texto: 'Preparar aula com esta lista',
+        aoClick: function () { if (pedirParaUsarLista(lp)) abrirGerarMaterial(); } }),
+      el('button', { type: 'button', class: 'btn', id: 'bib-lp-usar', texto: 'Editar exercícios antes',
         aoClick: function () { pedirParaUsarLista(lp); } }),
       foi ? el('button', { type: 'button', class: 'btn', id: 'bib-lp-abrir-aula', texto: 'Abrir a aula',
         aoClick: function () { abrirAulaDoMaterial(foi.aulaId); } }) : null
@@ -12353,6 +12355,10 @@
 
     if (ids.length) corpo.appendChild(el('p', { class: 'ajuda bib-lp-ajuda-uso', id: 'bib-lp-ajuda-uso',
       texto: 'Tire, ponha e troque a ordem à vontade.' }));
+    if (ids.length) corpo.appendChild(el('div', { class: 'barra bib-lp-usar' }, [
+      el('button', { type: 'button', class: 'btn principal', id: 'bib-lp-preparar',
+        texto: 'Preparar aula com esta lista', aoClick: abrirGerarMaterial })
+    ]));
     var grade = el('div', { class: 'bib-grade bib-grade-exercicios bib-grade-lp', id: 'bib-lp-grade' });
     ids.forEach(function (id, pos) {
       var it = bib.itemPorId[id];
@@ -13157,6 +13163,7 @@
     desenharCarrinho();
     desenharContextoBiblioteca();
     irNaBiblioteca({ aula: { tipo: 'lista-pronta', id: lp.id } });
+    return true;
   }
 
   /* SUBIR E DESCER, e não arrastar: a lista tem miniatura, ela usa o tablet com
@@ -13402,7 +13409,7 @@
     var paginas = bibCarrinho.paginas.map(paginaDeTeoriaPorId);
     if (!itens.length && !paginas.length) return;
     var padrao = tituloPadraoDoCarrinho(itens, paginas);
-    var escolha = { aulaId: null, nova: false };
+    var escolha = { aulaId: null, nova: false, botao: null };
     var corpo = $('#corpo-modal-bib-gerar');
     var rodape = $('#rodape-modal-bib-gerar');
     corpo.innerHTML = '';
@@ -13442,13 +13449,16 @@
       grade.appendChild(el('label', { class: 'bib-marcar' + (c[3] ? ' desligada' : '') }, [chk, el('span', { texto: c[1] })]));
     });
     corpo.appendChild(el('div', { class: 'campo' }, [el('span', { class: 'bib-gerar-rotulo', texto: 'O que entra' }), grade]));
+    corpo.appendChild(el('p', { class: 'ajuda', id: 'bib-gerar-saidas',
+      texto: 'Ao anexar, os PDFs ficam na aula escolhida; marcar Folha também abre a lista para escrever nela. ' +
+        'Só gerar PDF não altera nenhuma aula. Nada é enviado à família automaticamente.' }));
     caixas.lista.addEventListener('change', function () { atualizarRodape(); });
 
     // para qual aula
     var aulas = aulasParaMaterial();
     var listaAulas = el('div', { id: 'bib-gerar-aulas' });
     function marcarAula(botao, aulaId, nova) {
-      escolha.aulaId = aulaId; escolha.nova = nova;
+      escolha.aulaId = aulaId; escolha.nova = nova; escolha.botao = botao;
       $$('#bib-gerar-aulas .item-lista').forEach(function (b) { b.classList.remove('escolhida'); b.setAttribute('aria-pressed', 'false'); });
       botao.classList.add('escolhida');
       botao.setAttribute('aria-pressed', 'true');
@@ -13483,11 +13493,39 @@
       listaAulas.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Outras aulas perto de hoje' }));
       aulas.perto.forEach(function (a) { listaAulas.appendChild(linhaAula(a)); });
     }
+    /* A lista curta acelera o dia a dia, mas não pode impedir preparar uma
+     * aula futura mais distante. A data consulta aulas já cadastradas, sem
+     * criar ou modificar nenhuma aula por escolher o destino. */
+    var dataOutra = el('input', { type: 'date', id: 'bib-gerar-outra-data' });
+    var resultadoOutraData = el('div', { id: 'bib-gerar-resultado-data' });
+    function procurarOutraData() {
+      if (escolha.botao && resultadoOutraData.contains(escolha.botao)) {
+        escolha.aulaId = null; escolha.nova = false; escolha.botao = null;
+        ultimo.innerHTML = '';
+      }
+      resultadoOutraData.innerHTML = '';
+      if (dataOutra.value) {
+        var encontradas = db.aulas.filter(function (a) {
+          return a.data === dataOutra.value && !!alunoPorId(a.alunoId);
+        }).sort(function (a, b) { return String(a.hora || '').localeCompare(String(b.hora || '')); });
+        if (encontradas.length) encontradas.forEach(function (a) {
+          resultadoOutraData.appendChild(linhaAula(a));
+        });
+        else resultadoOutraData.appendChild(el('p', { class: 'ajuda',
+          texto: 'Nenhuma aula marcada nessa data. Agende pela Agenda e volte para anexar.' }));
+      }
+      atualizarRodape();
+    }
+    dataOutra.addEventListener('change', procurarOutraData);
+    listaAulas.appendChild(el('label', { class: 'campo' }, [
+      el('span', { texto: 'Procurar aula em outra data' }), dataOutra
+    ]));
+    listaAulas.appendChild(resultadoOutraData);
     corpo.appendChild(el('div', { class: 'campo' }, [el('span', { class: 'bib-gerar-rotulo', texto: 'Anexar em qual aula' }), listaAulas]));
 
     var botaoGerar = el('button', { type: 'button', class: 'btn principal', id: 'bib-gerar-anexar', texto: 'Gerar e anexar' });
     var dica = el('p', { class: 'ajuda bib-gerar-dica', id: 'bib-gerar-dica', texto: 'Escolha a aula acima para anexar o material.' });
-    var botaoBaixar = el('button', { type: 'button', class: 'btn', id: 'bib-gerar-baixar', texto: 'Só gerar o arquivo' });
+    var botaoBaixar = el('button', { type: 'button', class: 'btn', id: 'bib-gerar-baixar', texto: 'Só gerar PDF, sem anexar' });
     function atualizarRodape() {
       if (gerandoMaterial) return;
       botaoGerar.disabled = !(escolha.aulaId || escolha.nova);
@@ -13798,9 +13836,9 @@
         if (indiceFolha != null) {
           abrirEditorNota(aula.id, indiceFolha);
           if (desmarcou) {
-            avisarNaHora('Material anexado na aula de ' + aluno.nome + ', e a lista abriu como folha.' + menor + desmarcada, 'Marcar de novo', devolver);
+            avisarNaHora('Material anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + '), e a lista abriu como folha.' + menor + desmarcada, 'Marcar de novo', devolver);
           } else {
-            avisarNaHora('Material anexado na aula de ' + aluno.nome + ', e a lista abriu como folha.' + menor + desmarcada);
+            avisarNaHora('Material anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + '), e a lista abriu como folha.' + menor + desmarcada);
           }
         } else {
           var idDaAula = aula.id;
@@ -13823,8 +13861,8 @@
         var remarcar = desmarcarDepoisDeAnexar(aula, aluno);
         var desm = !!(remarcar && remarcar.desmarcou);
         var msgRemarcar = etapa === 'folha'
-          ? 'O material foi anexado na aula, mas a lista não abriu como folha. O PDF está na aula; não precisa gerar de novo.' + textoDosAssuntos(assuntosNovos)
-          : 'O material foi anexado na aula, mas não consegui marcar os exercícios como usados. O PDF está na aula; não precisa gerar de novo.' + textoDosAssuntos(assuntosNovos);
+          ? 'O material foi anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + '), mas a lista não abriu como folha. O PDF está na aula; não precisa gerar de novo.' + textoDosAssuntos(assuntosNovos)
+          : 'O material foi anexado na aula de ' + aluno.nome + ' (' + Core.ddmmaaaa(aula.data) + '), mas não consegui marcar os exercícios como usados. O PDF está na aula; não precisa gerar de novo.' + textoDosAssuntos(assuntosNovos);
         if (desm) {
           avisarNaHora(msgRemarcar, 'Marcar de novo', remarcar);
         } else {
