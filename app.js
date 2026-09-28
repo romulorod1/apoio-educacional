@@ -10066,7 +10066,16 @@
             + 'Marque quando quiser que a lista de assuntos e a de áreas entrem também.'
       }));
 
-      cartao.appendChild(el('div', { class: 'barra', style: 'margin:12px 0 0' }, [
+      cartao.appendChild(el('div', { class: 'acoes-doc-familia' }, [
+        el('button', {
+          type: 'button', class: 'btn principal destaque btn-preparar-doc',
+          style: 'font-weight:700;padding:10px 16px',
+          texto: 'Preparar documento para a família',
+          aoClick: function () { abrirDocumentoFamilia(f.aluno.id, mesAtual); }
+        })
+      ]));
+
+      cartao.appendChild(el('div', { class: 'barra', style: 'margin:8px 0 0' }, [
         el('button', {
           type: 'button', class: 'btn' + (temResumo ? '' : ' destaque'),
           texto: temResumo ? 'Editar o feedback' : 'Escrever o feedback',
@@ -10322,6 +10331,445 @@
      * pior do que não ter mexido, porque manda quem for depurar consumo de
      * dados procurar no lugar errado. */
     if (aberto && tela.classList.contains('ativa')) setTimeout(talvezAtualizarIndices, 1200);
+  }
+
+  // ================= T10: Preparar documento para a família =================
+
+  var docFamiliaContexto = null;
+
+  function abrirDocumentoFamilia(alunoId, mes) {
+    var f = Core.calcularFechamento(db, alunoId, mes);
+    if (!f) {
+      avisar('Não há aulas para este aluno neste mês.');
+      return;
+    }
+
+    var estado = {
+      alunoId: alunoId,
+      mes: mes,
+      f: f,
+      exibirTemas: exibirTemasEAreas(),
+      incluirNotas: false,
+      mostrarNaoCobradas: mostrarNaoCobradas(),
+      feedbackTexto: (f.resumoTexto || '')
+    };
+    docFamiliaContexto = estado;
+
+    var subtitulo = $('#subtitulo-modal-doc-familia');
+    if (subtitulo) subtitulo.textContent = f.alunoNome + ' · ' + f.mesExtenso;
+
+    var corpo = $('#corpo-modal-doc-familia');
+    corpo.innerHTML = '';
+
+    var layout = el('div', { class: 'layout-documento-familia' });
+
+    // Coluna 1: Painel de configurações e opções
+    var painelConfig = el('div', { class: 'painel-doc-config' });
+
+    // 1. Edição de feedback
+    painelConfig.appendChild(el('div', { class: 'campo', style: 'margin:0' }, [
+      el('label', {
+        for: 'doc-feedback-texto',
+        texto: 'Feedback do mês para a família',
+        style: 'font-weight:700;color:var(--navy);margin-bottom:4px;display:block'
+      }),
+      el('div', {
+        class: 'ajuda', style: 'margin:0 0 6px',
+        texto: 'O que você quer contar sobre o rendimento e a evolução do aluno.'
+      })
+    ]));
+
+    var areaFeedback = el('textarea', {
+      id: 'doc-feedback-texto',
+      style: 'min-height:120px;resize:vertical',
+      placeholder: 'Como foi o mês, conquistas pedagógicas, pontos de atenção e próximos passos...'
+    });
+    areaFeedback.value = estado.feedbackTexto;
+
+    areaFeedback.addEventListener('input', function () {
+      estado.feedbackTexto = areaFeedback.value;
+      estado.f.resumoTexto = areaFeedback.value;
+      var reg = db.resumos.filter(function (r) {
+        return r.alunoId === alunoId && r.mes === mes;
+      })[0];
+      if (reg) {
+        reg.texto = areaFeedback.value;
+      } else {
+        db.resumos.push({
+          id: Core.uid ? Core.uid() : ('r' + Date.now()),
+          alunoId: alunoId,
+          mes: mes,
+          texto: areaFeedback.value
+        });
+      }
+      salvar();
+      desenharPrevia();
+    });
+
+    painelConfig.appendChild(areaFeedback);
+
+    // 2. Opções de conteúdo
+    painelConfig.appendChild(el('div', {
+      style: 'font-size:12px;font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:0.05em;margin-top:6px'
+    }, [document.createTextNode('Opções de conteúdo')]));
+
+    // Checkbox temas e áreas
+    var chkTemas = el('input', {
+      type: 'checkbox', id: 'doc-chk-temas', style: 'width:auto;min-height:auto'
+    });
+    chkTemas.checked = estado.exibirTemas;
+    chkTemas.addEventListener('change', function () {
+      estado.exibirTemas = chkTemas.checked;
+      db.ajustes = db.ajustes || {};
+      db.ajustes.exibirTemasEAreas = chkTemas.checked;
+      salvar();
+      desenharPrevia();
+    });
+
+    painelConfig.appendChild(el('label', {
+      class: 'campo', style: 'display:flex;align-items:flex-start;gap:8px;margin:0;cursor:pointer'
+    }, [
+      chkTemas,
+      el('span', { style: 'font-size:13px;line-height:1.3' }, [
+        el('strong', { texto: 'Exibir temas e áreas trabalhadas' }),
+        el('span', { class: 'ajuda', style: 'display:block;margin:2px 0 0', texto: 'Inclui os assuntos e áreas vistos no mês (escopo global).' })
+      ])
+    ]));
+
+    // Checkbox notas públicas
+    var chkNotas = el('input', {
+      type: 'checkbox', id: 'doc-chk-notas', style: 'width:auto;min-height:auto'
+    });
+    chkNotas.checked = estado.incluirNotas;
+    chkNotas.addEventListener('change', function () {
+      estado.incluirNotas = chkNotas.checked;
+      desenharPrevia();
+    });
+
+    painelConfig.appendChild(el('label', {
+      class: 'campo', style: 'display:flex;align-items:flex-start;gap:8px;margin:0;cursor:pointer'
+    }, [
+      chkNotas,
+      el('span', { style: 'font-size:13px;line-height:1.3' }, [
+        el('strong', { texto: 'Incluir notas públicas das aulas' }),
+        el('span', { class: 'ajuda', style: 'display:block;margin:2px 0 0', texto: 'Mostra o resumo do que rendeu em cada aula. Notas particulares nunca entram.' })
+      ])
+    ]));
+
+    // Checkbox horas sem cobrar
+    var chkNaoCobradas = el('input', {
+      type: 'checkbox', id: 'doc-chk-nao-cobradas', style: 'width:auto;min-height:auto'
+    });
+    chkNaoCobradas.checked = estado.mostrarNaoCobradas;
+    chkNaoCobradas.addEventListener('change', function () {
+      estado.mostrarNaoCobradas = chkNaoCobradas.checked;
+      db.ajustes = db.ajustes || {};
+      db.ajustes.esconderNaoCobradas = !chkNaoCobradas.checked;
+      salvar();
+      desenharPrevia();
+    });
+
+    painelConfig.appendChild(el('label', {
+      class: 'campo', style: 'display:flex;align-items:flex-start;gap:8px;margin:0;cursor:pointer'
+    }, [
+      chkNaoCobradas,
+      el('span', { style: 'font-size:13px;line-height:1.3' }, [
+        el('strong', { texto: 'Mostrar horas dadas sem cobrar' }),
+        el('span', { class: 'ajuda', style: 'display:block;margin:2px 0 0', texto: 'Apresenta a gentileza de horas concedidas sem cobrança no resumo.' })
+      ])
+    ]));
+
+    // 3. Garantia de Privacidade
+    painelConfig.appendChild(el('div', { class: 'faixa-privacidade-garantida' }, [
+      el('span', { style: 'font-size:16px;line-height:1' }, [document.createTextNode('🔒')]),
+      el('div', {}, [
+        el('strong', { texto: 'Garantia de privacidade: ' }),
+        el('span', { texto: 'Observações confidenciais ("Só minha") nunca são exportadas em PDF, texto, cartão ou documento da família.' })
+      ])
+    ]));
+
+    // 4. Outras saídas do mês
+    painelConfig.appendChild(el('div', {
+      style: 'font-size:12px;font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:0.05em;margin-top:6px'
+    }, [document.createTextNode('Outras saídas')]));
+
+    var barraOutras = el('div', { style: 'display:flex;flex-wrap:wrap;gap:8px' }, [
+      el('button', {
+        type: 'button', class: 'btn',
+        texto: 'Cartão do mês',
+        aoClick: function () {
+          fecharModal('modal-documento-familia');
+          abrirCartaoDoMes(alunoId, mes);
+        }
+      }),
+      el('button', {
+        type: 'button', class: 'btn',
+        texto: 'O mês numa tela',
+        aoClick: function () {
+          fecharModal('modal-documento-familia');
+          abrirMesNumaTela(alunoId, mes);
+        }
+      }),
+      el('button', {
+        type: 'button', class: 'btn',
+        texto: 'Copiar texto',
+        aoClick: function () {
+          var md = Core.markdownFechamento(estado.f, opcoesDoDocumento({
+            exibirTemasEAreas: estado.exibirTemas,
+            incluirNotas: estado.incluirNotas,
+            mostrarNaoCobradas: estado.mostrarNaoCobradas
+          }));
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(md).then(function () {
+              avisar('Texto copiado para a área de transferência.');
+            }).catch(function () {
+              avisar('Não foi possível copiar o texto automaticamente.');
+            });
+          } else {
+            avisar('Área de transferência indisponível neste navegador.');
+          }
+        }
+      })
+    ]);
+    painelConfig.appendChild(barraOutras);
+
+    layout.appendChild(painelConfig);
+
+    // Coluna 2: Prévia em tempo real
+    var containerPrevia = el('div', { class: 'previa-doc-container' });
+    var papelPrevia = el('div', { class: 'previa-doc-papel', id: 'conteudo-previa-doc-familia' });
+    containerPrevia.appendChild(papelPrevia);
+    layout.appendChild(containerPrevia);
+
+    corpo.appendChild(layout);
+
+    // Rodapé do modal
+    var rodape = $('#rodape-modal-doc-familia');
+    rodape.innerHTML = '';
+
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn',
+      texto: 'Fechar',
+      aoClick: function () {
+        fecharModal('modal-documento-familia');
+        desenharFechamento();
+      }
+    }));
+
+    rodape.appendChild(el('span', { class: 'cresce' }));
+
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn',
+      texto: 'Baixar texto',
+      aoClick: function () {
+        var md = Core.markdownFechamento(estado.f, opcoesDoDocumento({
+          exibirTemasEAreas: estado.exibirTemas,
+          incluirNotas: estado.incluirNotas,
+          mostrarNaoCobradas: estado.mostrarNaoCobradas
+        }));
+        entregarArquivo(nomeBase(estado.f) + '.md',
+          new Blob([md], { type: 'text/markdown;charset=utf-8' }),
+          'Fechamento de ' + estado.f.alunoNome);
+      }
+    }));
+
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn',
+      texto: 'PDF com as folhas',
+      aoClick: function () {
+        exportarAlunoEmPdf(estado.f, true, {
+          exibirTemasEAreas: estado.exibirTemas,
+          incluirNotas: true,
+          mostrarNaoCobradas: estado.mostrarNaoCobradas
+        });
+      }
+    }));
+
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn principal',
+      texto: 'PDF do fechamento',
+      aoClick: function () {
+        exportarAlunoEmPdf(estado.f, false, {
+          exibirTemasEAreas: estado.exibirTemas,
+          incluirNotas: estado.incluirNotas,
+          mostrarNaoCobradas: estado.mostrarNaoCobradas
+        });
+      }
+    }));
+
+    function desenharPrevia() {
+      papelPrevia.innerHTML = '';
+
+      var cabecalho = el('div', { class: 'previa-doc-cabecalho' }, [
+        el('div', { class: 'previa-doc-titulo', texto: 'Controle de Aulas' }),
+        el('div', { class: 'previa-doc-meta' }, [
+          el('div', {}, [el('strong', { texto: 'Aluno: ' }), document.createTextNode(estado.f.alunoNome)]),
+          estado.f.responsavel ? el('div', {}, [el('strong', { texto: 'Responsável: ' }), document.createTextNode(estado.f.responsavel)]) : null,
+          el('div', {}, [el('strong', { texto: 'Mês: ' }), document.createTextNode(estado.f.mesExtenso)]),
+          estado.f.grade ? el('div', {}, [el('strong', { texto: 'Dias e horário: ' }), document.createTextNode(estado.f.grade)]) : null
+        ].filter(Boolean))
+      ]);
+      papelPrevia.appendChild(cabecalho);
+
+      var temFuturas = (estado.f.linhas || []).some(function (l) { return l.futura; });
+      var feitas = temFuturas
+        ? estado.f.linhas.filter(function (l) { return !l.futura; })
+        : (estado.f.linhas || []);
+      var previstas = (estado.f.linhas || []).filter(function (l) { return l.futura && l.status !== 'cancelada'; });
+
+      // Seção: Datas trabalhadas
+      papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: 'Datas trabalhadas' }));
+
+      if (feitas.length || !temFuturas) {
+        var tabFeitas = el('table', { class: 'previa-tabela' });
+        var thead = el('thead', {}, [
+          el('tr', {}, [
+            el('th', { texto: 'Data' }),
+            el('th', { texto: 'Dia' }),
+            el('th', { texto: 'Duração' }),
+            el('th', { texto: 'Situação' }),
+            el('th', { class: 'num', texto: 'Valor' })
+          ])
+        ]);
+        var tbody = el('tbody');
+        feitas.forEach(function (l) {
+          tbody.appendChild(el('tr', {}, [
+            el('td', { texto: Core.ddmm(l.data) }),
+            el('td', { texto: l.dia }),
+            el('td', { texto: Core.fmtDuracao(l.duracaoMin) }),
+            el('td', { texto: l.statusNaFolha || l.statusRotulo }),
+            el('td', { class: 'num', texto: dinheiro(l.cobravel ? l.valor : 0) })
+          ]));
+        });
+        tabFeitas.appendChild(thead);
+        tabFeitas.appendChild(tbody);
+        papelPrevia.appendChild(tabFeitas);
+      } else {
+        papelPrevia.appendChild(el('div', {
+          class: 'ajuda',
+          texto: 'Nenhuma aula aconteceu até ' + Core.ddmmaaaa(estado.f.hoje) + '.'
+        }));
+      }
+
+      // Totais de datas trabalhadas
+      var minCobrados = temFuturas ? estado.f.minFeitos : estado.f.totalMin;
+      var horasCobradas = temFuturas ? estado.f.horasFeitas : estado.f.totalHoras;
+      var valorACobrar = temFuturas ? estado.f.valorFeito : estado.f.totalValor;
+      var ate = temFuturas ? ' até ' + Core.ddmm(estado.f.hoje) : '';
+
+      var totaisBox = el('div', { class: 'previa-totais' }, [
+        el('div', {}, [
+          el('strong', { texto: 'Total de horas cobradas' + ate + ': ' }),
+          document.createTextNode(horasCobradas + ' h (' + Core.fmtHorasDecimal(minCobrados) + ' horas)')
+        ]),
+        (estado.mostrarNaoCobradas && estado.f.minutosDadosSemCobrar > 0)
+          ? el('div', {}, [
+              el('strong', { texto: 'Horas não cobradas: ' }),
+              document.createTextNode(Core.fmtHoras(estado.f.minutosDadosSemCobrar) + ' h')
+            ])
+          : null,
+        el('div', { style: 'font-size:14px;margin-top:4px' }, [
+          el('strong', { texto: temFuturas ? 'Total destas datas' + ate + ': ' : 'Total a cobrar: ' }),
+          document.createTextNode(dinheiro(valorACobrar))
+        ])
+      ].filter(Boolean));
+      papelPrevia.appendChild(totaisBox);
+
+      // Datas futuras se existirem
+      if (previstas.length) {
+        papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: 'Ainda marcadas neste mês' }));
+        var tabPrev = el('table', { class: 'previa-tabela' });
+        var theadP = el('thead', {}, [
+          el('tr', {}, [
+            el('th', { texto: 'Data' }),
+            el('th', { texto: 'Dia' }),
+            el('th', { texto: 'Duração' }),
+            el('th', { texto: 'Situação' }),
+            el('th', { class: 'num', texto: 'Valor' })
+          ])
+        ]);
+        var tbodyP = el('tbody');
+        previstas.forEach(function (l) {
+          tbodyP.appendChild(el('tr', {}, [
+            el('td', { texto: Core.ddmm(l.data) }),
+            el('td', { texto: l.dia }),
+            el('td', { texto: Core.fmtDuracao(l.duracaoMin) }),
+            el('td', { texto: l.statusNaFolha || l.statusRotulo }),
+            el('td', { class: 'num', texto: dinheiro(l.cobravel ? l.valor : 0) })
+          ]));
+        });
+        tabPrev.appendChild(theadP);
+        tabPrev.appendChild(tbodyP);
+        papelPrevia.appendChild(tabPrev);
+
+        papelPrevia.appendChild(el('div', { class: 'previa-totais' }, [
+          el('div', {}, [
+            el('strong', { texto: 'Total do mês, já contando as datas ainda marcadas: ' }),
+            document.createTextNode(dinheiro(estado.f.totalValor) + ' (' + estado.f.qtdEncontros + ' encontros, ' + estado.f.totalHoras + ' h)')
+          ])
+        ]));
+      }
+
+      // Pix
+      var chave = chavePix();
+      if (chave) {
+        papelPrevia.appendChild(el('div', { class: 'ajuda', style: 'margin:8px 0;font-size:12px' }, [
+          el('strong', { texto: 'Chave Pix para pagamento: ' }),
+          document.createTextNode(chave)
+        ]));
+      }
+
+      // Temas trabalhados
+      var temasNoTexto = (temFuturas ? estado.f.temasFeitos : estado.f.temasDoMes) || estado.f.temasDoMes || [];
+      if (estado.exibirTemas && temasNoTexto.length) {
+        papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: 'Temas trabalhados' }));
+        var ulTemas = el('ul', { style: 'margin:4px 0 12px 20px;padding:0;font-size:12px' });
+        temasNoTexto.forEach(function (t) {
+          ulTemas.appendChild(el('li', {
+            texto: t.titulo + ' (' + t.datas.map(Core.ddmm).join(', ') + ')'
+          }));
+        });
+        papelPrevia.appendChild(ulTemas);
+      }
+
+      // Áreas trabalhadas
+      var areasNoTexto = (temFuturas ? estado.f.areasFeitas : estado.f.areasDoMes) || estado.f.areasDoMes || [];
+      if (estado.exibirTemas && areasNoTexto.length) {
+        papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: 'Áreas trabalhadas' }));
+        var ulAreas = el('ul', { style: 'margin:4px 0 12px 20px;padding:0;font-size:12px' });
+        areasNoTexto.forEach(function (a) {
+          ulAreas.appendChild(el('li', {
+            texto: a.rotulo + (a.vezes > 1 ? ' (' + a.vezes + ' aulas)' : '')
+          }));
+        });
+        papelPrevia.appendChild(ulAreas);
+      }
+
+      // Feedback
+      papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: 'Feedback' }));
+      var fbTexto = (estado.feedbackTexto || '').trim();
+      papelPrevia.appendChild(el('div', {
+        class: 'previa-feedback-box',
+        texto: fbTexto ? fbTexto : '(a preencher)'
+      }));
+
+      // Notas públicas das aulas (se marcado)
+      if (estado.incluirNotas) {
+        var aulasComNota = (estado.f.linhas || []).filter(function (l) { return !!(l.notaTexto || '').trim(); });
+        if (aulasComNota.length) {
+          papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: 'Notas das aulas' }));
+          aulasComNota.forEach(function (l) {
+            papelPrevia.appendChild(el('div', { class: 'previa-notas-aula-item' }, [
+              el('strong', { texto: Core.ddmm(l.data) + ' (' + l.dia + ')' }),
+              el('div', { texto: l.notaTexto })
+            ]));
+          });
+        }
+      }
+    }
+
+    desenharPrevia();
+    abrirModal('modal-documento-familia');
   }
 
   function abrirResumo(alunoId, mes) {
@@ -10857,10 +11305,10 @@
   }
 
   function opcoesDoDocumento(extra) {
-    var o = extra || {};
-    o.exibirTemasEAreas = exibirTemasEAreas();
-    o.mostrarNaoCobradas = mostrarNaoCobradas();
-    o.chavePix = chavePix();
+    var o = Object.assign({}, extra || {});
+    if (o.exibirTemasEAreas === undefined) o.exibirTemasEAreas = exibirTemasEAreas();
+    if (o.mostrarNaoCobradas === undefined) o.mostrarNaoCobradas = mostrarNaoCobradas();
+    if (o.chavePix === undefined) o.chavePix = chavePix();
     return o;
   }
 
@@ -10886,7 +11334,7 @@
       new Blob([bytes], { type: 'application/pdf' }), 'Fechamento do mês');
   }
 
-  function exportarAlunoEmPdf(f, comFolhas) {
+  function exportarAlunoEmPdf(f, comFolhas, extraOpcoes) {
     /* Feedback em branco não sai no PDF, nem o título dele. Ela confirma antes,
      * porque esquecer de escrever é mais comum do que decidir mandar sem. */
     if (!(f.resumoTexto || '').trim() &&
@@ -10922,11 +11370,13 @@
     }
 
     passo.then(function (extra) {
-      var bytes = PDFGen.gerarFechamento(f, opcoesDoDocumento({
+      var gen = typeof PDFGen !== 'undefined' ? PDFGen : Pdf;
+      var opts = opcoesDoDocumento(Object.assign({
         incluirNotas: comFolhas,
         notas: extra.notas,
         imagens: extra.imagens
-      }));
+      }, extraOpcoes || {}));
+      var bytes = gen.gerarFechamento(f, opts);
       entregarArquivo(nomeBase(f) + (comFolhas ? '_com_folhas' : '') + '.pdf',
         new Blob([bytes], { type: 'application/pdf' }),
         'Fechamento de ' + f.alunoNome);
