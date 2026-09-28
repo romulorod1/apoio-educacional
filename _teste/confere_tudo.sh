@@ -294,6 +294,7 @@ for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento 
          testa_biblioteca_offline \
          testa_exclusoes testa_feriados testa_mover testa_retroativo testa_series \
          testa_assunto testa_aluno testa_familia testa_proposta_tela \
+         testa_novidades_navegador \
          testa_tabela_no_app; do
   roda "$t" node "_teste/$t.js"
 done
