@@ -16,7 +16,7 @@
  *   3. O PONTO DELICADO: biblioteca_etiquetas (a dificuldade que ela deu) e
  *      biblioteca_uso (que exercício foi para que aluno, em que aula) ficam
  *      INTACTOS, registro por registro. Os dois são dela, não do pacote;
- *   4. depois de remover, a aba Biblioteca volta ao "Em construção", e o cartão
+ *   4. depois de remover, a aba Biblioteca volta ao estado sem pacotes, e o cartão
  *      de Ajustes fica sem pacote nenhum;
  *   5. a aula com material anexado continua abrindo o anexo, porque o anexo é
  *      arquivo gravado e não depende do pacote;
@@ -210,7 +210,7 @@ const cartoesDePacote = pag => pag.evaluate(() => Array.from(document.querySelec
   conf('e registro por registro, nada mudou', delaDepois, delaAntes);
 
   // ================================================================
-  secao('4. A aba volta ao "Em construção" e Ajustes fica sem pacote');
+  secao('4. A aba volta ao estado sem pacotes e Ajustes fica sem pacote');
   conf('nenhum cartão de pacote sobrou em Ajustes', (await cartoesDePacote(pag)).length, 0);
   conf('o botão de exportar etiquetas se esconde',
     await pag.evaluate(() => document.querySelector('#exportar-etiquetas').hidden), true);
@@ -221,15 +221,15 @@ const cartoesDePacote = pag => pag.evaluate(() => Array.from(document.querySelec
     { itens: [EX + '1', EX + '2', EX + '3'], paginas: [] });
   await H.irParaAba(pag, 'agenda');
   await H.irParaAba(pag, 'biblioteca');
-  const vazia = await esperar('Em construção', () => pag.evaluate(() =>
-    (document.querySelector('#biblioteca-em-construcao') || {}).textContent || ''), v => !!v, 15000);
-  conf('a aba Biblioteca volta ao "Em construção"',
-    (vazia.valor || '').indexOf('Em construçãoEsta área está sendo preparada.'), 0);
+  const vazia = await esperar('sem pacotes', () => pag.evaluate(() =>
+    (document.querySelector('#biblioteca-sem-pacotes') || {}).textContent || ''), v => !!v, 15000);
+  conf('a aba Biblioteca explica a ausência de pacotes',
+    (vazia.valor || '').indexOf('Nenhum pacote de materiais importado'), 0);
   /* O caminho de volta não pode viver só no aviso, que some em segundos: ela
    * pode chegar nesta tela minutos depois e precisa saber o que fazer. */
-  conf('e a tela diz onde importar de novo, sem depender do aviso',
-    await pag.evaluate(() => (document.querySelector('#biblioteca-onde-importar') || {}).textContent || ''),
-    'Para trazer uma biblioteca para este tablet, vá em Ajustes, no cartão Biblioteca, e toque em Importar biblioteca.');
+  conf('e a tela oferece importação de novo, sem depender do aviso',
+    await pag.evaluate(() => (document.querySelector('#biblioteca-importar-pacote') || {}).textContent || ''),
+    'Importar material');
   const semFantasma = await pag.evaluate(() => ({
     faixa: document.querySelector('#bib-carrinho').hidden,
     texto: document.querySelector('#bib-carrinho').textContent.trim(),
