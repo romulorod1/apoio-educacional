@@ -3184,16 +3184,17 @@
      * mudou de forma. */
     var canceladasFuturas = (f.linhas || []).filter(function (l) { return l.futura && l.status === 'cancelada'; });
     var previstas = (f.linhas || []).filter(function (l) { return l.futura && l.status !== 'cancelada'; });
-    var feitas = previstas.length
+    var temFuturas = (f.linhas || []).some(function (l) { return l.futura; });
+    var feitas = temFuturas
       ? f.linhas.filter(function (l) { return !l.futura; })
       : (f.linhas || []);
-    var ate = previstas.length ? ' até ' + ddmm(f.hoje) : '';
-    var minCobrados = previstas.length ? f.minFeitos : f.totalMin;
-    var horasCobradas = previstas.length ? f.horasFeitas : f.totalHoras;
-    var valorACobrar = previstas.length ? f.valorFeito : f.totalValor;
-    var faixasACobrar = (previstas.length ? f.faixasFeitas : f.faixas) || f.faixas || [];
-    var temasNoTexto = (previstas.length ? f.temasFeitos : f.temasDoMes) || f.temasDoMes || [];
-    var areasNoTexto = (previstas.length ? f.areasFeitas : f.areasDoMes) || f.areasDoMes || [];
+    var ate = temFuturas ? ' até ' + ddmm(f.hoje) : '';
+    var minCobrados = temFuturas ? f.minFeitos : f.totalMin;
+    var horasCobradas = temFuturas ? f.horasFeitas : f.totalHoras;
+    var valorACobrar = temFuturas ? f.valorFeito : f.totalValor;
+    var faixasACobrar = (temFuturas ? f.faixasFeitas : f.faixas) || f.faixas || [];
+    var temasNoTexto = (temFuturas ? f.temasFeitos : f.temasDoMes) || f.temasDoMes || [];
+    var areasNoTexto = (temFuturas ? f.areasFeitas : f.areasDoMes) || f.areasDoMes || [];
 
     var CABECALHO = ['| Data | Dia | Horário | Duração | Situação | Cobrada | R$/h | Valor |',
       '|---|---|---|---|---|---|---:|---:|'];
@@ -3211,7 +3212,7 @@
     L.push('');
     L.push('## Datas trabalhadas');
     L.push('');
-    if (feitas.length || !previstas.length) {
+    if (feitas.length || !temFuturas) {
       /* Sem nada marcado à frente, a tabela sai como sempre saiu, inclusive
        * vazia no mês sem aula nenhuma. */
       L.push(CABECALHO[0]);
@@ -3272,7 +3273,7 @@
      * Mês vencido não tem nada à frente nem total embaixo, e por isso não muda
      * uma letra: sai o "**Total a cobrar:**" de sempre, palavra por palavra, que
      * é o documento de todas as famílias já mandadas. */
-    L.push(previstas.length
+    L.push(temFuturas
       ? '**Total destas datas' + ate + ':** ' + fmtMoeda(valorACobrar)
       : '**Total a cobrar:** ' + fmtMoeda(valorACobrar));
     if (f.semPreco.length) {

@@ -9,6 +9,7 @@
  * 6. Regra financeira preservada (valores e cobranças intactos).
  */
 const Core = require('../core.js');
+const PDF = require('../pdf.js');
 
 let passes = 0, falhas = 0;
 function conf(rotulo, obtido, esperado) {
@@ -148,6 +149,25 @@ conf('C2: R$ 0 previstos', fC2.valorPrevisto, 0);
 conf('C2: 0 horas dadas sem cobrar (não virou trabalho gratuito)', fC2.minutosDadosSemCobrar, 0);
 const mdC2 = Core.markdownFechamento(fC2, {});
 conf('C2: não entra em "Ainda marcadas neste mês"', mdC2.indexOf('## Ainda marcadas neste mês'), -1);
+conf('C2: "Datas trabalhadas" informa ausência de aulas até a data', mdC2.indexOf('Nenhuma aula aconteceu até') > 0, true);
+conf('C2: Total destas datas até hoje é R$ 0,00', mdC2.indexOf('**Total destas datas até ' + Core.ddmm(hoje) + ':** R$ 0,00') > 0, true);
+conf('C2: Cancelada futura sai na seção dedicada "Aulas canceladas à frente"', mdC2.indexOf('## Aulas canceladas à frente') > 0, true);
+const pdfC2 = PDF.gerarFechamento(fC2, {});
+conf('C2: PDF gerado com sucesso sem incluir futura nas trabalhadas', pdfC2 && pdfC2.length > 0, true);
+
+// C2b: Futura cancelada com cobrança explícita (Cobrada: Sim)
+const fC2b = Core.calcularFechamento({
+  alunos: [alunoPadrao],
+  aulas: [{ id: 'c2b', alunoId: 'aluno-c', data: amanha, hora: '10:00', duracaoMin: 60, status: 'cancelada', cobravel: true }]
+}, 'aluno-c', '2026-09', hoje);
+conf('C2b: valorFeito até hoje continua R$ 0', fC2b.valorFeito, 0);
+conf('C2b: valorPrevisto registra os R$ 100', fC2b.valorPrevisto, 100);
+const mdC2b = Core.markdownFechamento(fC2b, {});
+conf('C2b: "Datas trabalhadas" não inclui a aula futura cancelada', mdC2b.indexOf('Nenhuma aula aconteceu até') > 0, true);
+conf('C2b: Total destas datas até hoje permanece R$ 0,00', mdC2b.indexOf('**Total destas datas até ' + Core.ddmm(hoje) + ':** R$ 0,00') > 0, true);
+conf('C2b: Cancelada cobrada consta apenas em "Aulas canceladas à frente"', mdC2b.indexOf('## Aulas canceladas à frente') > 0, true);
+const pdfC2b = PDF.gerarFechamento(fC2b, {});
+conf('C2b: PDF com futura cancelada cobrável gerado com sucesso', pdfC2b && pdfC2b.length > 0, true);
 
 // C3: Passada realizada (Cobrada: Não)
 const fC3 = Core.calcularFechamento({
