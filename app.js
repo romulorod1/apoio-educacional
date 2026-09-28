@@ -1373,10 +1373,13 @@
     var encontrosFeitos = 0, encontrosPrevistos = 0;
     doMes.forEach(function (a) {
       /* A aula de hoje conta como dada: só o que vem depois de hoje é previsto. */
-      var futura = a.data > hoje;
-      if (futura) encontrosPrevistos++; else encontrosFeitos++;
       var st = Core.STATUS[a.status] || Core.STATUS.realizada;
       var cobravel = (typeof a.cobravel === 'boolean') ? a.cobravel : st.cobravelPadrao;
+      var futura = a.data > hoje;
+      var contaEncontro = cobravel || a.status !== 'cancelada';
+      if (contaEncontro) {
+        if (futura) encontrosPrevistos++; else encontrosFeitos++;
+      }
       if (!cobravel) return;
       var dur = a.duracaoMin || 0;
       var aluno = alunoPorId(a.alunoId);
@@ -5401,6 +5404,8 @@
     var hoje = Core.hojeIso();
     var passadas = aulas.filter(function (a) { return a.data <= hoje; });
     var futuras = aulas.filter(function (a) { return a.data > hoje; });
+    var futurasAtivas = futuras.filter(function (a) { return a.status !== 'cancelada'; });
+    var futurasCanceladas = futuras.filter(function (a) { return a.status === 'cancelada'; });
 
     var minutos = 0, cobradas = 0;
     passadas.forEach(function (a) {
@@ -5416,7 +5421,7 @@
     [['Encontros', String(cobradas)],
     ['Horas somadas', Core.fmtHoras(minutos) + ' h'],
     ['Aluno desde', desde ? Core.ddmmaaaa(desde) : 'sem data'],
-    ['Aulas marcadas', String(futuras.length)]].forEach(function (par) {
+    ['Aulas marcadas', String(futurasAtivas.length)]].forEach(function (par) {
       resumo.appendChild(el('div', { class: 'numero' }, [
         el('div', { class: 'rotulo', texto: par[0] }),
         el('div', { class: 'valor', style: 'font-size:19px', texto: par[1] })
@@ -5424,9 +5429,13 @@
     });
     caixa.appendChild(resumo);
 
-    if (futuras.length) {
+    if (futurasAtivas.length) {
       caixa.appendChild(el('h3', { class: 'subtitulo', texto: 'Próximas aulas' }));
-      linhasDeAula(caixa, futuras.slice().reverse().slice(0, 5));
+      linhasDeAula(caixa, futurasAtivas.slice().reverse().slice(0, 5));
+    }
+    if (futurasCanceladas.length) {
+      caixa.appendChild(el('h3', { class: 'subtitulo', texto: 'Aulas canceladas à frente' }));
+      linhasDeAula(caixa, futurasCanceladas.slice().reverse().slice(0, 5));
     }
 
     caixa.appendChild(el('h3', { class: 'subtitulo', texto: 'Aulas já dadas' }));

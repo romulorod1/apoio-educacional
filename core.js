@@ -3182,7 +3182,8 @@
      * Com o mês vencido não há nada à frente, e aí sai exatamente o documento
      * de sempre, palavra por palavra: é assim que o fechamento fechado não
      * mudou de forma. */
-    var previstas = (f.linhas || []).filter(function (l) { return l.futura; });
+    var canceladasFuturas = (f.linhas || []).filter(function (l) { return l.futura && l.status === 'cancelada'; });
+    var previstas = (f.linhas || []).filter(function (l) { return l.futura && l.status !== 'cancelada'; });
     var feitas = previstas.length
       ? f.linhas.filter(function (l) { return !l.futura; })
       : (f.linhas || []);
@@ -3229,8 +3230,8 @@
      * Há um argumento dos dois lados, e por isso a escolha é dela: mostrar dá
      * valor ao que ela deu de graça, e mostrar também transforma gentileza em
      * dívida na cabeça de quem lê. */
-    if (f.minutosNaoCobrados > 0 && (!opcoes || opcoes.mostrarNaoCobradas !== false)) {
-      L.push('**Horas não cobradas:** ' + fmtHoras(f.minutosNaoCobrados) + ' h');
+    if (f.minutosDadosSemCobrar > 0 && (!opcoes || opcoes.mostrarNaoCobradas !== false)) {
+      L.push('**Horas não cobradas:** ' + fmtHoras(f.minutosDadosSemCobrar) + ' h');
     }
     if (faixasACobrar.length > 1) {
       L.push('');
@@ -3297,6 +3298,15 @@
       L.push('**Total do mês, já contando as datas ainda marcadas:** ' +
         fmtMoeda(f.totalValor) + ' (' + f.qtdEncontros + ' encontro' +
         (f.qtdEncontros === 1 ? '' : 's') + ', ' + f.totalHoras + ' h)');
+    }
+
+    if (canceladasFuturas.length) {
+      L.push('');
+      L.push('## Aulas canceladas à frente');
+      L.push('');
+      L.push(CABECALHO[0]);
+      L.push(CABECALHO[1]);
+      canceladasFuturas.forEach(function (l) { L.push(linhaDaTabela(l)); });
     }
 
     /* A chave vem de Ajustes e mora só no tablet. Sem chave, o documento sai

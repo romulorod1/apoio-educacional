@@ -125,6 +125,89 @@ conf('app.js não tem mais "· ainda vai acontecer" na tabela de fechamento',
 conf('app.js não tem mais "ainda vai acontecer" em blocoDaAula',
   appJs.includes("if (l.futura) detalhe.push('ainda vai acontecer');"), false);
 
+secao('6. Casos de referência C1 a C8 do Guia UX-UI (T02)');
+
+const alunoPadrao = { id: 'aluno-c', nome: 'Aluno Referência', precos: [{ inicio: '2026-01-01', fim: null, valorHora: 100 }] };
+
+// C1: Futura marcada (Cobrada: Sim)
+const fC1 = Core.calcularFechamento({
+  alunos: [alunoPadrao],
+  aulas: [{ id: 'c1', alunoId: 'aluno-c', data: amanha, hora: '10:00', duracaoMin: 60, status: 'realizada', cobravel: true }]
+}, 'aluno-c', '2026-09', hoje);
+conf('C1: 1 encontro futuro ativo', fC1.qtdEncontrosPrevistos, 1);
+conf('C1: R$ 100 previstos', fC1.valorPrevisto, 100);
+conf('C1: 0 horas dadas sem cobrar', fC1.minutosDadosSemCobrar, 0);
+
+// C2: Futura cancelada (Cobrada: Não)
+const fC2 = Core.calcularFechamento({
+  alunos: [alunoPadrao],
+  aulas: [{ id: 'c2', alunoId: 'aluno-c', data: amanha, hora: '10:00', duracaoMin: 60, status: 'cancelada', cobravel: false }]
+}, 'aluno-c', '2026-09', hoje);
+conf('C2: 0 encontros futuros marcados', fC2.qtdEncontrosPrevistos, 0);
+conf('C2: R$ 0 previstos', fC2.valorPrevisto, 0);
+conf('C2: 0 horas dadas sem cobrar (não virou trabalho gratuito)', fC2.minutosDadosSemCobrar, 0);
+const mdC2 = Core.markdownFechamento(fC2, {});
+conf('C2: não entra em "Ainda marcadas neste mês"', mdC2.indexOf('## Ainda marcadas neste mês'), -1);
+
+// C3: Passada realizada (Cobrada: Não)
+const fC3 = Core.calcularFechamento({
+  alunos: [alunoPadrao],
+  aulas: [{ id: 'c3', alunoId: 'aluno-c', data: ontem, hora: '10:00', duracaoMin: 60, status: 'realizada', cobravel: false }]
+}, 'aluno-c', '2026-09', hoje);
+conf('C3: 1 hora dada sem cobrar', fC3.minutosDadosSemCobrar, 60);
+conf('C3: R$ 0 de valor a cobrar', fC3.totalValor, 0);
+const mdC3 = Core.markdownFechamento(fC3, {});
+conf('C3: markdown apresenta horas não cobradas', mdC3.indexOf('**Horas não cobradas:** 1:00 h') > 0, true);
+
+// C4: Passada realizada (Cobrada: Sim)
+const fC4 = Core.calcularFechamento({
+  alunos: [alunoPadrao],
+  aulas: [{ id: 'c4', alunoId: 'aluno-c', data: ontem, hora: '10:00', duracaoMin: 60, status: 'realizada', cobravel: true }]
+}, 'aluno-c', '2026-09', hoje);
+conf('C4: 1h cobrada R$ 100', fC4.totalValor, 100);
+conf('C4: 0 horas gratuitas', fC4.minutosDadosSemCobrar, 0);
+
+// C5: Futura reposição marcada (Cobrada: Sim)
+const fC5 = Core.calcularFechamento({
+  alunos: [alunoPadrao],
+  aulas: [{ id: 'c5', alunoId: 'aluno-c', data: amanha, hora: '10:00', duracaoMin: 60, status: 'reposicao', cobravel: true }]
+}, 'aluno-c', '2026-09', hoje);
+conf('C5: 1h/R$ 100 previstos', fC5.valorPrevisto, 100);
+conf('C5: 1 encontro futuro previsto', fC5.qtdEncontrosPrevistos, 1);
+conf('C5: rótulo é Reposição agendada', fC5.linhas[0].statusNaFolha, 'Reposição agendada');
+
+// C6: C2 + C5 (Futura cancelada não cobrada + Futura reposição cobrada)
+const fC6 = Core.calcularFechamento({
+  alunos: [alunoPadrao],
+  aulas: [
+    { id: 'c2', alunoId: 'aluno-c', data: amanha, hora: '10:00', duracaoMin: 60, status: 'cancelada', cobravel: false },
+    { id: 'c5', alunoId: 'aluno-c', data: '2026-09-30', hora: '10:00', duracaoMin: 60, status: 'reposicao', cobravel: true }
+  ]
+}, 'aluno-c', '2026-09', hoje);
+conf('C6: Total previsto R$ 100', fC6.valorPrevisto, 100);
+conf('C6: exatamente 1 encontro ainda marcado (cancelamento não vira 2ª aula)', fC6.qtdEncontrosPrevistos, 1);
+const mdC6 = Core.markdownFechamento(fC6, {});
+conf('C6: "Ainda marcadas" tem Reposição agendada', mdC6.indexOf('| Reposição agendada |') > 0, true);
+conf('C6: "Ainda marcadas" diz 1 encontro', mdC6.indexOf('**Encontros ainda marcados:** 1') > 0, true);
+
+// C7: Passada cancelada com cobrança explícita permitida
+const fC7 = Core.calcularFechamento({
+  alunos: [alunoPadrao],
+  aulas: [{ id: 'c7', alunoId: 'aluno-c', data: ontem, hora: '10:00', duracaoMin: 60, status: 'cancelada', cobravel: true }]
+}, 'aluno-c', '2026-09', hoje);
+conf('C7: Preserva a cobrança de R$ 100', fC7.totalValor, 100);
+conf('C7: Não apresenta aula gratuita', fC7.minutosDadosSemCobrar, 0);
+conf('C7: 0 compromissos futuros', fC7.qtdEncontrosPrevistos, 0);
+
+// C8: Passada com falta sem aviso cobrada
+const fC8 = Core.calcularFechamento({
+  alunos: [alunoPadrao],
+  aulas: [{ id: 'c8', alunoId: 'aluno-c', data: ontem, hora: '10:00', duracaoMin: 60, status: 'falta', cobravel: true }]
+}, 'aluno-c', '2026-09', hoje);
+conf('C8: Preserva os R$ 100 de cobrança da falta', fC8.totalValor, 100);
+conf('C8: Não confunde falta com gratuidade', fC8.minutosDadosSemCobrar, 0);
+conf('C8: Identifica rótulo como Falta sem aviso', fC8.linhas[0].statusNaFolha, 'Falta sem aviso');
+
 console.log('\n============================================================');
 console.log(passes + ' verificações passaram, ' + falhas + ' falharam.');
 console.log('============================================================\n');

@@ -1034,7 +1034,8 @@
        Mês vencido não tem nada à frente, e nesse caso sai exatamente a folha de
        sempre: a tabela de baixo não existe e a de cima tem o mês inteiro. */
     var todas = dados.linhas || [];
-    var previstas = todas.filter(function (l) { return l.futura; });
+    var canceladasFuturas = todas.filter(function (l) { return l.futura && l.status === 'cancelada'; });
+    var previstas = todas.filter(function (l) { return l.futura && l.status !== 'cancelada'; });
     var feitas = previstas.length ? todas.filter(function (l) { return !l.futura; }) : todas;
     var ate = previstas.length ? ' até ' + ddmmL(dados.hoje) : '';
     var horasDaTabela = previstas.length ? dados.horasFeitas : dados.totalHoras;
@@ -1114,10 +1115,10 @@
     }
     /* Mesma regra do markdown: sai enquanto ela deixar. O motivo está escrito
        no core.js, em markdownFechamento. */
-    if (dados.minutosNaoCobrados > 0 && opcoes.mostrarNaoCobradas !== false) {
+    if (dados.minutosDadosSemCobrar > 0 && opcoes.mostrarNaoCobradas !== false) {
       doc.y -= 15;
-      var hn = Math.floor(dados.minutosNaoCobrados / 60) + ':' +
-        (dados.minutosNaoCobrados % 60 < 10 ? '0' : '') + (dados.minutosNaoCobrados % 60);
+      var hn = Math.floor(dados.minutosDadosSemCobrar / 60) + ':' +
+        (dados.minutosDadosSemCobrar % 60 < 10 ? '0' : '') + (dados.minutosDadosSemCobrar % 60);
       doc.texto('Horas não cobradas no mês: ' + hn + ' h.', MARG_E, doc.y, { tam: 9, cor: COR.muted });
     }
     if (dados.semPreco && dados.semPreco.length) {
@@ -1178,6 +1179,15 @@
           ', ' + dados.totalHoras + ' h',
         valor: fmtMoedaLocal(dados.totalValor)
       }, 0, true, COLUNAS_TOTAL_MES);
+    }
+
+    if (canceladasFuturas.length) {
+      doc.y -= 26;
+      doc.garanteEspaco(74);
+      doc.texto('Aulas canceladas à frente', MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
+      doc.y -= 6;
+      cabecalhoTabela(doc);
+      corpoDaTabela(canceladasFuturas);
     }
 
     /* Mesma regra do markdown: a chave vem de Ajustes, e sem ela a folha não
