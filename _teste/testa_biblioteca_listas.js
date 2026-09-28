@@ -1178,6 +1178,11 @@ async function cenarioPortas(pag) {
     !document.querySelector('#bib-gerar-aulas .item-lista.escolhida') &&
     document.querySelector('#bib-gerar-anexar').disabled &&
     !document.querySelector('#bib-gerar-baixar').disabled), true);
+  conf('a saída explica folha, PDFs e ausência de envio automático', await pag.evaluate(() => {
+    const ajuda = document.querySelector('#bib-gerar-saidas').textContent;
+    return /Folha/.test(ajuda) && /PDFs/.test(ajuda) && /Nada é enviado/.test(ajuda) &&
+      /Só gerar PDF, sem anexar/.test(document.querySelector('#bib-gerar-baixar').textContent);
+  }), true);
   await pag.evaluate(() => document.querySelector('#rodape-modal-bib-gerar [data-fechar]').click());
   conf('cancelar escolha de saída não descarta seleção', (await carrinho(pag)).itens.length, IDS2.length);
   await pausa(500);
@@ -1882,15 +1887,20 @@ async function cenarioPortas(pag) {
    * nunca mostrasse a frase passaria aqui. */
   secao('5g. Depois de anexar, a tela diz para onde a lista foi');
   // aluna FICTÍCIA: os nomes da carga inicial do aplicativo são de alunos de verdade
-  const nomeAluno = await pag.evaluate(async h => {
+  const diaFuturo = (() => { const d = new Date(); d.setDate(d.getDate() + 45);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+  const nomeAluno = await pag.evaluate(async (h, futuro) => {
     const d = await Store.carregar();
     d.alunos.push(Object.assign({}, d.alunos[0], { id: 'aluna-prova-b10', nome: 'Aluna de Prova' }));
     d.aulas.push({ id: 'aula-b10-anexa', alunoId: 'aluna-prova-b10', serieId: null, destacada: false, data: h,
       hora: '16:00', duracaoMin: 60, status: 'agendada', cobravel: true, notaTexto: '', notaPrivada: '',
       temNota: false, anexos: [] });
+    d.aulas.push({ id: 'aula-b10-futura', alunoId: 'aluna-prova-b10', serieId: null, destacada: false, data: futuro,
+      hora: '16:00', duracaoMin: 60, status: 'agendada', cobravel: true, notaTexto: '', notaPrivada: '',
+      temNota: false, anexos: [] });
     await Store.salvar(d);
     return 'Aluna de Prova';
-  }, (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })());
+  }, (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })(), diaFuturo);
   await pag.reload({ waitUntil: 'networkidle0' });
   await H.abrirApp(pag, amb.ORIGEM);
   await H.irParaAba(pag, 'biblioteca');
@@ -1907,6 +1917,21 @@ async function cenarioPortas(pag) {
   const resumoGerar = await pag.evaluate(() => (document.querySelector('#bib-gerar-resumo') || {}).textContent || '');
   console.log('   resumo da janela de gerar: ' + JSON.stringify(resumoGerar));
   conf('a janela de gerar diz a ordem da lista', resumoGerar, '5 exercícios, na ordem da lista.');
+  conf('aula a 45 dias não aparece indevidamente como próxima', await pag.evaluate(() =>
+    !document.querySelector('#bib-gerar-aulas [data-aula="aula-b10-futura"]')), true);
+  await pag.$eval('#bib-gerar-outra-data', (e, data) => { e.value = data;
+    e.dispatchEvent(new Event('change', { bubbles: true })); }, diaFuturo);
+  conf('a busca por data encontra aula futura distante', await pag.evaluate(() =>
+    !!document.querySelector('#bib-gerar-resultado-data [data-aula="aula-b10-futura"]')), true);
+  await pag.$eval('#bib-gerar-resultado-data [data-aula="aula-b10-futura"]', e => e.click());
+  conf('aula futura distante pode ser escolhida', await pag.evaluate(() =>
+    !!document.querySelector('#bib-gerar-resultado-data [data-aula="aula-b10-futura"].escolhida') &&
+    !document.querySelector('#bib-gerar-anexar').disabled), true);
+  await pag.$eval('#bib-gerar-outra-data', e => { e.value = '2032-01-01';
+    e.dispatchEvent(new Event('change', { bubbles: true })); });
+  conf('trocar data não deixa destino invisível selecionado', await pag.evaluate(() =>
+    !document.querySelector('#bib-gerar-resultado-data .escolhida') &&
+    document.querySelector('#bib-gerar-anexar').disabled), true);
   conf('escolheu a aula de hoje na janela de gerar', await pag.evaluate(() => {
     const b = document.querySelector('#bib-gerar-aulas [data-aula="aula-b10-anexa"]');
     if (!b) return false; b.click(); return true;
