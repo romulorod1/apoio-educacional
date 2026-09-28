@@ -505,27 +505,24 @@
     var vista = db.ajustes.versaoVista;
     if (vista === VERSAO) return;
 
-    var primeiraVez = !vista && !db.aulas.length;
-    var novas;
-    if (vista) {
-      novas = NOVIDADES.filter(function (n) { return compararVersao(n.versao, vista) > 0; });
-    } else {
-      /* Quem nunca viu a janela nao tem versao de referencia, entao o recorte e por
-       * quantidade. Era "as duas ultimas versoes", e isso encolheu junto com o
-       * ritmo: duas correcoes seguidas de um item cada abriam a janela com dois
-       * marcadores, que nao paga o incomodo de interromper quem abriu o aplicativo
-       * para dar aula. Agora junta versoes ate somar tres itens, e para em quatro
-       * versoes para nao virar historico. */
-      novas = [];
-      var itens = 0;
-      for (var i = 0; i < NOVIDADES.length && novas.length < 4; i++) {
-        novas.push(NOVIDADES[i]);
-        itens += (NOVIDADES[i].itens || []).length;
-        if (itens >= 3) break;
-      }
+    /* Quem abre o aplicativo pela primeira vez ou sem versão anterior registrada
+     * não recebe pop-up de novidades: não faz sentido contar novidades para quem
+     * está começando ou importando um perfil. Registra a versão atual e encerra. */
+    if (!vista) {
+      db.ajustes.versaoVista = VERSAO;
+      salvar();
+      return;
     }
 
-    if (primeiraVez || !novas.length) {
+    /* Só mostra novidades da versão ATUAL (se houver anúncio formal para ela)
+     * e se a professora ainda não tiver visto essa versão. Notícias de versões
+     * intermediárias anteriores (como 1.18.0 de Português) nunca são requentadas
+     * como novidade da versão atual. Se a versão atual não tiver novidades
+     * cadastradas (lançamento silencioso), apenas atualiza versaoVista. */
+    var novas = NOVIDADES.filter(function (n) {
+      return n.versao === VERSAO && compararVersao(n.versao, vista) > 0;
+    });
+    if (!novas.length) {
       db.ajustes.versaoVista = VERSAO;
       salvar();
       return;
@@ -1361,7 +1358,7 @@
     return el('div', { class: 'numero' }, filhos);
   }
 
-  function plural(n, um, muitos) { return n === 1 ? um : muitos; }
+  function palavraPlural(n, um, muitos) { return n === 1 ? um : muitos; }
 
   function desenharAgenda() {
     $('#rotulo-mes').textContent = Core.mesExtenso(mesAtual);
@@ -1400,7 +1397,7 @@
     numeros.innerHTML = '';
     numeros.appendChild(numeroComRodape('Encontros', String(encontrosFeitos), [
       encontrosPrevistos ? 'mais ' + encontrosPrevistos + ' ' +
-        plural(encontrosPrevistos, 'marcado à frente', 'marcados à frente') : ''
+        palavraPlural(encontrosPrevistos, 'marcado à frente', 'marcados à frente') : ''
     ]));
     numeros.appendChild(numeroComRodape('Horas cobradas', Core.fmtHoras(minFeitos) + ' h', [
       minPrevistos ? 'mais ' + Core.fmtHoras(minPrevistos) + ' h à frente' : ''
@@ -9579,7 +9576,7 @@
     numeros.appendChild(numeroComRodape('Alunos no mês', String(t.alunos), []));
     numeros.appendChild(numeroComRodape('Encontros', String(t.encontrosFeitos), [
       t.encontrosPrevistos ? 'mais ' + t.encontrosPrevistos + ' ' +
-        plural(t.encontrosPrevistos, 'marcado à frente', 'marcados à frente') : ''
+        palavraPlural(t.encontrosPrevistos, 'marcado à frente', 'marcados à frente') : ''
     ]));
     numeros.appendChild(numeroComRodape('Horas cobradas', Core.fmtHoras(t.minFeitos) + ' h', [
       t.minPrevistos ? 'mais ' + Core.fmtHoras(t.minPrevistos) + ' h à frente' : ''
@@ -9619,7 +9616,7 @@
           ' · ' + f.horasFeitas + ' h cobradas' +
           (f.qtdEncontrosPrevistos
             ? ' · mais ' + f.qtdEncontrosPrevistos + ' ' +
-              plural(f.qtdEncontrosPrevistos, 'marcado à frente', 'marcados à frente') +
+              palavraPlural(f.qtdEncontrosPrevistos, 'marcado à frente', 'marcados à frente') +
               ', ' + dinheiro(f.valorPrevisto)
             : '') +
           (f.faixas.length > 1 ? ' · houve reajuste no mês' : '')
@@ -9814,12 +9811,12 @@
       partes.push('estuda com você desde ' + Core.ddmmaaaa(l.desde) +
         (typeof l.mesesEstudando === 'number'
           ? ' (' + (l.mesesEstudando < 1 ? 'menos de um mês'
-            : l.mesesEstudando + ' ' + plural(l.mesesEstudando, 'mês', 'meses')) + ')'
+            : l.mesesEstudando + ' ' + palavraPlural(l.mesesEstudando, 'mês', 'meses')) + ')'
           : ''));
     }
     if (l.valorHora !== null && typeof l.mesesNoValor === 'number') {
       partes.push('neste valor há ' + (l.mesesNoValor < 1 ? 'menos de um mês'
-        : l.mesesNoValor + ' ' + plural(l.mesesNoValor, 'mês', 'meses')));
+        : l.mesesNoValor + ' ' + palavraPlural(l.mesesNoValor, 'mês', 'meses')));
     }
     if (l.valorNoMes > 0) {
       partes.push(dinheiro(l.valorNoMes) + ' no mês, ' +
@@ -10313,7 +10310,7 @@
     var numeros = el('div', { class: 'numeros' });
     numeros.appendChild(numeroComRodape('Encontros', String(c.feitos), [
       c.previstos ? 'mais ' + c.previstos + ' ' +
-        plural(c.previstos, 'marcado à frente', 'marcados à frente') : ''
+        palavraPlural(c.previstos, 'marcado à frente', 'marcados à frente') : ''
     ]));
     numeros.appendChild(numeroComRodape('Horas', Core.fmtHoras(c.minFeitos) + ' h', [
       c.minPrevistos ? 'mais ' + Core.fmtHoras(c.minPrevistos) + ' h à frente' : ''
