@@ -448,9 +448,26 @@ async function anexarEm(pag, aulaId, itens, paginas, extra) {
 
   // ================================================================
   secao('10. Material de dois módulos: dois assuntos, na ordem do material');
+  const estadoAantesDeB = await pag.evaluate(async () => {
+    const a = (await Store.carregar()).aulas.find(x => x.id === 'aula-bib-teste');
+    return JSON.stringify({ anexos: a.anexos, temas: a.temas, temNota: a.temNota });
+  });
   const aviso10 = await anexarEm(pag, 'aula-vazia', [SP + 1], [TEO_PIT]);
   conf('a teoria vem primeiro no material, e o assunto também', await titulosDe(pag, 'aula-vazia'), 'Teorema de Pitágoras | ' + EQ);
   conf('o aviso diz quantos (os nomes estão na aula)', aviso10.indexOf('. 2 assuntos registrados na aula. A seleção foi desmarcada.') >= 0, true);
+  const alunosSeparados = await pag.evaluate(async () => {
+    const d = await Store.carregar();
+    const a = d.aulas.find(x => x.id === 'aula-bib-teste');
+    const b = d.aulas.find(x => x.id === 'aula-vazia');
+    return a.alunoId !== b.alunoId && b.anexos.length > 0;
+  });
+  conf('reutilizar em B anexa na aula de outro aluno', alunosSeparados, true);
+  await pag.reload({ waitUntil: 'networkidle0' });
+  const estadoAdepoisDeB = await pag.evaluate(async () => {
+    const a = (await Store.carregar()).aulas.find(x => x.id === 'aula-bib-teste');
+    return JSON.stringify({ anexos: a.anexos, temas: a.temas, temNota: a.temNota });
+  });
+  conf('voltar a A após reabrir não altera seus anexos, assuntos nem folha', estadoAdepoisDeB, estadoAantesDeB);
   if (SALVAR) await pag.screenshot({ path: path.join(SALVAR, 'aula_5_aviso_dois_assuntos.png') });
 
   // ================================================================
