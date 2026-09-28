@@ -2907,6 +2907,21 @@
 
   // ================= alunos =================
 
+  /* O ano que a ficha e o mapeamento atual mostram é o mesmo. Mapeamentos
+   * anteriores são retratos datados e não entram nesta edição. */
+  function anoEscolarCadastrado(aluno) {
+    var m = Core.mapeamentoAtual(aluno);
+    var ano = (m && m.anoEscolar) || (aluno && aluno.anoEscolar) || '';
+    var outro = ((m && m.anoEscolarOutro) || (aluno && aluno.anoEscolarOutro) || '').trim();
+    return { ano: ano, outro: outro };
+  }
+
+  function rotuloAnoEscolar(aluno) {
+    var atual = anoEscolarCadastrado(aluno);
+    return Core.anoEscolarLivre(atual.ano) ? (atual.outro || 'Outro ano escolar') :
+      (Core.ANOS_ESCOLARES[atual.ano] || '');
+  }
+
   function desenharAlunos() {
     var caixa = $('#lista-alunos');
     caixa.innerHTML = '';
@@ -2961,6 +2976,7 @@
     }
     db.alunos.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome); }).forEach(function (a) {
       var pv = Core.precoVigente(a, Core.hojeIso());
+      var anoNaLista = rotuloAnoEscolar(a);
       var series = (db.series || []).filter(function (s) { return s.alunoId === a.id; });
       var qtd = db.aulas.filter(function (x) { return x.alunoId === a.id; }).length;
       // A linha inteira abre a ficha: mirar no botao pequeno com o dedo, no
@@ -2974,7 +2990,8 @@
           ]),
           el('div', {
             class: 'detalhe',
-            texto: (pv ? dinheiro(pv.valorHora) + ' por hora' : 'sem valor cadastrado') +
+            texto: (anoNaLista ? anoNaLista + ' · ' : '') +
+              (pv ? dinheiro(pv.valorHora) + ' por hora' : 'sem valor cadastrado') +
               ' · ' + qtd + ' aula' + (qtd === 1 ? '' : 's') +
               (series.length ? ' · ' + Core.descreveSerie(series[0]) : '')
           })
@@ -3086,6 +3103,33 @@
         })
       ])
     ]));
+
+    var anoDaFicha = novo ? { ano: '', outro: '' } : anoEscolarCadastrado(alunoEmEdicao);
+    var selecaoAno = el('select', { id: 'campo-ano-escolar' });
+    selecaoAno.appendChild(el('option', { value: '', texto: 'Não informado' }));
+    Core.ANOS_ESCOLARES_ORDEM.forEach(function (id) {
+      var opcao = el('option', { value: id, texto: Core.ANOS_ESCOLARES[id] });
+      if (id === anoDaFicha.ano) opcao.selected = true;
+      selecaoAno.appendChild(opcao);
+    });
+    var campoAnoOutro = el('input', {
+      type: 'text', id: 'campo-ano-escolar-outro', value: anoDaFicha.outro,
+      placeholder: 'Escreva o ano ou etapa'
+    });
+    var caixaAnoOutro = el('label', { class: 'campo', id: 'caixa-ano-escolar-outro' }, [
+      el('span', { texto: 'Qual ano ou etapa?' }), campoAnoOutro
+    ]);
+    function mostrarAnoOutro() {
+      caixaAnoOutro.style.display = Core.anoEscolarLivre(selecaoAno.value) ? '' : 'none';
+    }
+    selecaoAno.addEventListener('change', mostrarAnoOutro);
+    painel.dados.appendChild(el('label', { class: 'campo' }, [
+      el('span', { texto: 'Ano escolar atual' }), selecaoAno
+    ]));
+    painel.dados.appendChild(caixaAnoOutro);
+    painel.dados.appendChild(el('p', { class: 'ajuda', style: 'margin-top:-4px',
+      texto: 'Ajuda a sugerir assuntos. Você pode mudar depois; aulas antigas não são alteradas.' }));
+    mostrarAnoOutro();
 
     var cores = el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' });
     var corEscolhida = novo ? CORES_ALUNO[db.alunos.length % CORES_ALUNO.length] : alunoEmEdicao.cor;
@@ -5466,6 +5510,8 @@
     if (!nome) { avisar('Informe o nome do aluno.'); return; }
     var corpo = $('#corpo-modal-aluno');
     var precos = corpo._precos();
+    var anoNovo = $('#campo-ano-escolar').value;
+    var anoOutroNovo = $('#campo-ano-escolar-outro').value.trim();
 
     var encontroCriado = null;
     var provisorio = { precos: precos };
@@ -5473,6 +5519,16 @@
     if (erros.length) { avisar(erros[0]); return; }
 
     if (alunoEmEdicao) {
+      /* A ficha mostra o ano do mapa atual quando há divergência legada.
+       * Ao salvar, reconcilia as duas cópias mesmo que ela não tenha tocado
+       * no seletor; mapas anteriores continuam intactos. */
+      alunoEmEdicao.anoEscolar = anoNovo;
+      alunoEmEdicao.anoEscolarOutro = Core.anoEscolarLivre(anoNovo) ? anoOutroNovo : '';
+      var mapaAtual = Core.mapeamentoAtual(alunoEmEdicao);
+      if (mapaAtual) {
+        mapaAtual.anoEscolar = anoNovo;
+        mapaAtual.anoEscolarOutro = Core.anoEscolarLivre(anoNovo) ? anoOutroNovo : '';
+      }
       alunoEmEdicao.nome = nome;
       alunoEmEdicao.responsavel = $('#campo-responsavel').value.trim();
       alunoEmEdicao.cor = corpo._cor();
@@ -5483,6 +5539,7 @@
     } else {
       var criado = {
         id: Core.uid(), nome: nome,
+        anoEscolar: anoNovo, anoEscolarOutro: Core.anoEscolarLivre(anoNovo) ? anoOutroNovo : '',
         responsavel: $('#campo-responsavel').value.trim(),
         cor: corpo._cor(), ativo: true, precos: precos,
         obs: $('#campo-obs').value.trim(),
@@ -6033,6 +6090,7 @@
       placeholder: 'Escreva qual, por exemplo: 1º período de engenharia'
     });
     campoAnoLivre.value = trabalho.anoEscolarOutro || aluno.anoEscolarOutro || '';
+    trabalho.anoEscolarOutro = campoAnoLivre.value;
     campoAnoLivre.addEventListener('input', function () { trabalho.anoEscolarOutro = this.value; });
     var caixaAnoLivre = el('label', {
       class: 'campo', id: 'caixa-ano-outro', style: 'display:none'
@@ -6348,10 +6406,9 @@
           delete trabalho._novo;
           aluno.mapeamentos.push(trabalho);
         }
-        if (trabalho.anoEscolar) aluno.anoEscolar = trabalho.anoEscolar;
-        if (Core.anoEscolarLivre(trabalho.anoEscolar)) {
-          aluno.anoEscolarOutro = trabalho.anoEscolarOutro || '';
-        }
+        aluno.anoEscolar = trabalho.anoEscolar || '';
+        aluno.anoEscolarOutro = Core.anoEscolarLivre(trabalho.anoEscolar)
+          ? (trabalho.anoEscolarOutro || '') : '';
         /* Este é o toque que autoriza a gravação: a foto do disco deixa de
          * valer AQUI, antes do salvar(), senão dbParaGravar() devolveria o
          * registro antigo e o botão não gravaria nada. */
