@@ -1550,7 +1550,7 @@
     window.addEventListener('keydown', function (ev) {
       if (ev.key === 'Escape' || ev.keyCode === 27) {
         if (diaComZoom) {
-          var modalAberto = document.querySelector('.modal.aberto');
+          var modalAberto = document.querySelector('.fundo-modal.aberto, .modal-fundo.aberto, .modal.aberto');
           if (!modalAberto) {
             diaComZoom = null;
             desenharAgenda();
@@ -1771,23 +1771,16 @@
         var horaFim = calcularHoraFim(a.hora, durMin);
         var rotuloSituacao = Core.rotuloSituacao ? Core.rotuloSituacao(a.status, a.data, Core.hojeIso())
           : ((Core.STATUS[a.status] && Core.STATUS[a.status].rotulo) || a.status || 'Realizada');
-        var serieRotulo = aluno ? (Core.anoEscolarRotulo ? Core.anoEscolarRotulo(aluno.anoEscolar || aluno.serie) : (aluno.anoEscolar || aluno.serie || '')) : '';
+        var serieRotulo = aluno ? rotuloAnoEscolar(aluno) : '';
 
         var horaTexto = a.hora ? (a.hora + (horaFim ? ' às ' + horaFim : '')) : 'Sem horário';
-        var card = el('div', {
+        var card = el('button', {
+          type: 'button',
           class: 'card-aula-zoom' + (a.status === 'cancelada' ? ' cancelada' : ''),
           'data-aula-id': a.id,
-          'role': 'button',
-          'tabindex': '0',
           'aria-label': 'Abrir aula de ' + nomeAluno + ' às ' + horaTexto,
           aoClick: function () {
             abrirAula(a.id, null);
-          },
-          aoKeydown: function (ev) {
-            if (ev.key === 'Enter' || ev.key === ' ') {
-              ev.preventDefault();
-              abrirAula(a.id, null);
-            }
           }
         }, [
           el('div', { class: 'card-aula-zoom-faixa', style: 'background:' + corAluno }),
@@ -1805,14 +1798,10 @@
             ].filter(Boolean)),
             a.conteudo ? el('div', { class: 'card-aula-zoom-resumo', texto: a.conteudo }) : null
           ]),
-          el('button', {
-            type: 'button',
+          el('span', {
             class: 'btn pequeno card-aula-zoom-btn',
-            texto: 'Abrir aula ›',
-            aoClick: function (ev) {
-              ev.stopPropagation();
-              abrirAula(a.id, null);
-            }
+            'aria-hidden': 'true',
+            texto: 'Abrir aula ›'
           })
         ]);
         lista.appendChild(card);
@@ -1949,13 +1938,14 @@
         'data-dia': iso,
         role: 'button',
         tabindex: '0',
+        'aria-controls': 'painel-zoom-dia',
+        'aria-expanded': ehZoom ? 'true' : 'false',
         'aria-label': 'Dia ' + d + (feriado ? ', ' + feriado.nome : '') + (ehZoom ? ' (em destaque)' : '')
       }, [
         el('div', { class: 'num', texto: String(d) })
       ]);
       if (ehZoom) {
         celula.appendChild(el('span', { class: 'selo-zoom-celula', texto: 'Zoom' }));
-        celula.setAttribute('aria-expanded', 'true');
       }
       if (feriado) {
         celula.appendChild(el('div', {
@@ -1985,12 +1975,6 @@
       });
       celula.addEventListener('click', (function (dia) {
         return function () { alternarZoomDia(dia); };
-      })(iso));
-      celula.addEventListener('dblclick', (function (dia) {
-        return function (ev) {
-          ev.stopPropagation();
-          abrirAula(null, dia);
-        };
       })(iso));
       celula.addEventListener('keydown', (function (dia) {
         return function (ev) {

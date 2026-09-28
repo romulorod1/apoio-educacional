@@ -402,12 +402,21 @@ input:focus, select:focus, textarea:focus {
   transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
   position: relative;
   overflow: hidden;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
 }
 
 .card-aula-zoom:hover {
   border-color: var(--teal);
   background: var(--branco);
   box-shadow: 0 2px 8px rgba(31, 58, 95, 0.08);
+}
+
+.card-aula-zoom:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 1px;
 }
 
 .card-aula-zoom.cancelada {
@@ -477,6 +486,10 @@ input:focus, select:focus, textarea:focus {
 
 .card-aula-zoom-btn {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }
 
 .zoom-dia-rodape {

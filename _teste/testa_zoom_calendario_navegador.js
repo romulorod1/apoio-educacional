@@ -77,6 +77,18 @@ async function rodar() {
   }, celulaComAula);
   conf('celula clicada recebe classe .em-zoom', celulaDestacada, true);
 
+  const ariaExpandedZoom = await pag.evaluate((iso) => {
+    const cel = document.querySelector('.dia[data-dia="' + iso + '"]');
+    return cel ? cel.getAttribute('aria-expanded') : null;
+  }, celulaComAula);
+  conf('celula em zoom tem aria-expanded="true"', ariaExpandedZoom, 'true');
+
+  const ariaControls = await pag.evaluate((iso) => {
+    const cel = document.querySelector('.dia[data-dia="' + iso + '"]');
+    return cel ? cel.getAttribute('aria-controls') : null;
+  }, celulaComAula);
+  conf('celula possui aria-controls="painel-zoom-dia"', ariaControls, 'painel-zoom-dia');
+
   const temSeloZoom = await pag.evaluate((iso) => {
     const cel = document.querySelector('.dia[data-dia="' + iso + '"] .selo-zoom-celula');
     return cel && cel.textContent.trim() === 'Zoom';
@@ -84,13 +96,32 @@ async function rodar() {
   conf('celula exibe indicador visual de zoom', temSeloZoom, true);
 
   // ================================================================
-  secao('4. Conteudo detalhado no painel de zoom');
+  secao('4. Conteudo detalhado no painel de zoom e semantica acessivel');
 
   const tituloZoom = await pag.$eval('#painel-zoom-dia .zoom-dia-titulo', e => e.textContent.trim());
   conf('titulo do zoom traz data por extenso legivel', tituloZoom.length > 5, true);
 
   const qtdCardsZoom = await pag.$$eval('#painel-zoom-dia .card-aula-zoom', es => es.length);
   conf('cards detalhados de aulas foram renderizados no zoom', qtdCardsZoom >= 1, true);
+
+  const cardEhBotaoUnico = await pag.evaluate(() => {
+    const card = document.querySelector('#painel-zoom-dia .card-aula-zoom');
+    if (!card || card.tagName !== 'BUTTON') return false;
+    const botoesFilhos = card.querySelectorAll('button');
+    return botoesFilhos.length === 0;
+  });
+  conf('card-aula-zoom e um button nativo sem botoes aninhados', cardEhBotaoUnico, true);
+
+  const textoSerieZoom = await pag.evaluate(() => {
+    const s = document.querySelector('#painel-zoom-dia .card-aula-zoom-serie');
+    return s ? s.textContent.trim() : '';
+  });
+  if (textoSerieZoom) {
+    const ehCodigoCru = /^[·\s]*(0[1-9]|em[1-3])$/.test(textoSerieZoom);
+    conf('serie escolar exibida por extenso e nao como codigo cru', !ehCodigoCru, true);
+  } else {
+    conf('serie escolar checada', true, true);
+  }
 
   const temBotaoNovaAulaNoZoom = await pag.evaluate(() => {
     const btn = document.querySelector('#painel-zoom-dia .zoom-dia-rodape .btn.principal');
@@ -275,7 +306,7 @@ async function rodar() {
   }), v => v === true, 5000);
 
   // ================================================================
-  secao('12. Tecla Escape fecha o zoom do dia');
+  secao('12. Tecla Escape respeita modais e fecha o zoom do dia');
 
   const zoomAbertoAntesEsc = await pag.evaluate(() => {
     const p = document.querySelector('#painel-zoom-dia');
@@ -283,8 +314,37 @@ async function rodar() {
   });
   conf('zoom estava aberto antes do Escape', zoomAbertoAntesEsc, true);
 
+  // Abre modal de aula para testar Escape com modal aberto
+  await pag.click('#nova-aula');
+  await esperar('modal aberto para teste de Escape', () => pag.evaluate(() => {
+    const m = document.querySelector('#modal-aula');
+    return m && m.classList.contains('aberto');
+  }), v => v === true, 5000);
+
+  // Pressiona Escape com modal aberto
   await pag.keyboard.press('Escape');
-  await esperar('zoom fechado via tecla Escape', () => pag.evaluate(() => {
+  await pausa(200);
+
+  // Zoom DEVE permanecer aberto porque havia modal aberto
+  const zoomContinuaAberto = await pag.evaluate(() => {
+    const p = document.querySelector('#painel-zoom-dia');
+    return p && getComputedStyle(p).display !== 'none';
+  });
+  conf('Escape com modal aberto nao fecha o zoom do dia', zoomContinuaAberto, true);
+
+  // Fecha o modal pelo botao de fechar se ainda aberto
+  await pag.evaluate(() => {
+    const m = document.querySelector('#modal-aula');
+    if (m && m.classList.contains('aberto')) {
+      const btn = m.querySelector('[data-fechar]');
+      if (btn) btn.click();
+    }
+  });
+  await pausa(200);
+
+  // Agora sem modal aberto, pressiona Escape: deve fechar o zoom
+  await pag.keyboard.press('Escape');
+  await esperar('zoom fechado via tecla Escape sem modal', () => pag.evaluate(() => {
     const p = document.querySelector('#painel-zoom-dia');
     return !p || getComputedStyle(p).display === 'none';
   }), v => v === true, 5000);
