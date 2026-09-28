@@ -514,10 +514,14 @@
       return;
     }
 
-    /* Só mostra novidades que forem estritamente posteriores à versão que ela viu.
-     * Se não houver itens para a versão atual ou posteriores, não abre o modal e
-     * apenas atualiza a versão vista. */
-    var novas = NOVIDADES.filter(function (n) { return compararVersao(n.versao, vista) > 0; });
+    /* Só mostra novidades da versão ATUAL (se houver anúncio formal para ela)
+     * e se a professora ainda não tiver visto essa versão. Notícias de versões
+     * intermediárias anteriores (como 1.18.0 de Português) nunca são requentadas
+     * como novidade da versão atual. Se a versão atual não tiver novidades
+     * cadastradas (lançamento silencioso), apenas atualiza versaoVista. */
+    var novas = NOVIDADES.filter(function (n) {
+      return n.versao === VERSAO && compararVersao(n.versao, vista) > 0;
+    });
     if (!novas.length) {
       db.ajustes.versaoVista = VERSAO;
       salvar();

@@ -116,7 +116,9 @@ function simularMostrarNovidades(dbSim, novidadesLista) {
     dbSim.ajustes.versaoVista = VERSAO;
     return { abriu: false, motivo: 'primeira_vez_silenciosa', versaoGravada: dbSim.ajustes.versaoVista };
   }
-  var novas = (novidadesLista || []).filter(function (n) { return compararVersao(n.versao, vista) > 0; });
+  var novas = (novidadesLista || []).filter(function (n) {
+    return n.versao === VERSAO && compararVersao(n.versao, vista) > 0;
+  });
   if (!novas.length) {
     dbSim.ajustes.versaoVista = VERSAO;
     return { abriu: false, motivo: 'sem_novidades_para_versao', versaoGravada: dbSim.ajustes.versaoVista };
@@ -150,6 +152,22 @@ conf('atualização com itens novos abre modal', resComNovas.abriu, true);
 conf('modal contém apenas a versão mais recente', resComNovas.novas.length, 1);
 conf('modal exibe a versão correta', resComNovas.novas[0].versao, '1.27.0');
 conf('modal NÃO contém a versão antiga de português 1.18.0', resComNovas.novas.some(n => n.versao === '1.18.0'), false);
+
+// Caso E: Perfil com versão antiga gravada (ex: 1.17.0) sem novidades cadastradas para a versão atual
+const resAntigoSemNovas = simularMostrarNovidades({ ajustes: { versaoVista: '1.17.0' } }, [
+  { versao: '1.18.0', itens: ['português histórico'] }
+]);
+conf('perfil antigo (1.17.0) não abre novidade intermediária de português (1.18.0)', resAntigoSemNovas.abriu, false);
+conf('perfil antigo atualiza versaoVista silenciosamente para a versão atual', resAntigoSemNovas.versaoGravada, VERSAO);
+
+// Caso F: Perfil com versão antiga gravada (ex: 1.17.0) quando existe novidade para a versão atual
+const resAntigoComNovas = simularMostrarNovidades({ ajustes: { versaoVista: '1.17.0' } }, [
+  { versao: '1.27.0', itens: ['novidade 1.27.0'] },
+  { versao: '1.18.0', itens: ['português histórico'] }
+]);
+conf('perfil antigo abre novidade apenas da versão atual', resAntigoComNovas.abriu, true);
+conf('perfil antigo não recebe notícias intermediárias antigas', resAntigoComNovas.novas.length, 1);
+conf('perfil antigo recebe estritamente a versão 1.27.0', resAntigoComNovas.novas[0].versao, '1.27.0');
 
 // ============================================================================
 secao('5. Preservação de dados e carga inicial (UX11)');
