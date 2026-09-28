@@ -8719,15 +8719,24 @@
       });
       lista.appendChild(el('div', { class: 'barra', style: 'margin-bottom:12px' }, [campoOutro, usar]));
 
+      function criarLinhaSugestao(s) {
+        if (typeof linhaComDisponibilidade === 'function') {
+          return linhaComDisponibilidade(s.item.titulo, s.detalhe, s.item, function () {
+            registrarAssunto(aula, s.item);
+          });
+        }
+        var disponivel = (typeof resumoDisponibilidadeDoAssunto === 'function') ? resumoDisponibilidadeDoAssunto(s.item) : '';
+        return linha(s.item.titulo, s.detalhe + (disponivel ? ' · ' + disponivel : ''), function () {
+          registrarAssunto(aula, s.item);
+        });
+      }
+
       // 2. Continuar trabalhando / Assuntos recentes deste aluno
       var recentes = sugestoesRecentesDeAssunto(aula, aluno);
       if (recentes.length) {
         lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Continuar trabalhando com este aluno' }));
         recentes.forEach(function (s) {
-          var disponivel = (typeof resumoDisponibilidadeDoAssunto === 'function') ? resumoDisponibilidadeDoAssunto(s.item) : '';
-          lista.appendChild(linha(s.item.titulo, s.detalhe + (disponivel ? ' · ' + disponivel : ''), function () {
-            registrarAssunto(aula, s.item);
-          }));
+          lista.appendChild(criarLinhaSugestao(s));
         });
       }
 
@@ -8751,11 +8760,11 @@
       var temasDoAno = sugestoesDoAnoDeMatematica(aula, aluno, ano, chavesRecentes);
       if (temasDoAno.length) {
         temasDoAno.forEach(function (s) {
-          var disponivel = (typeof resumoDisponibilidadeDoAssunto === 'function') ? resumoDisponibilidadeDoAssunto(s.item) : '';
-          lista.appendChild(linha(s.item.titulo, s.detalhe + (disponivel ? ' · ' + disponivel : ''), function () {
-            registrarAssunto(aula, s.item);
-          }));
+          lista.appendChild(criarLinhaSugestao(s));
         });
+      }
+      if (typeof atualizarDisponibilidadeVisivel === 'function') {
+        atualizarDisponibilidadeVisivel();
       }
 
       // Atalho para ver a grade completa de matemática ou outros anos
