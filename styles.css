@@ -1445,3 +1445,150 @@ button.alvo-rascunho:hover { background: var(--soft); }
   padding-top: 10px;
   border-top: 1px dashed var(--fio);
 }
+
+/* T10: Preparar documento para a familia */
+.layout-documento-familia {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 840px) {
+  .layout-documento-familia {
+    grid-template-columns: 1fr;
+  }
+}
+
+.painel-doc-config {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--soft);
+  padding: 16px;
+  border-radius: var(--raio);
+  border: 1px solid var(--fio);
+}
+
+.faixa-privacidade-garantida {
+  background: #E8F5E9;
+  border: 1px solid #C8E6C9;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #1B5E20;
+  line-height: 1.4;
+}
+
+.faixa-privacidade-garantida strong {
+  color: #0A3D0A;
+}
+
+.previa-doc-container {
+  background: var(--branco);
+  border: 1px solid var(--fio);
+  border-radius: var(--raio);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 24px;
+  font-family: inherit;
+  color: var(--texto);
+  min-height: 400px;
+}
+
+.previa-doc-papel {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.previa-doc-cabecalho {
+  border-bottom: 2px solid var(--navy);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.previa-doc-titulo {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--navy);
+  margin: 0 0 6px 0;
+}
+
+.previa-doc-meta {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.previa-doc-secao-titulo {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  margin: 16px 0 8px 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--teal);
+}
+
+.previa-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.previa-tabela th, .previa-tabela td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--fio);
+}
+
+.previa-tabela th {
+  background: var(--soft);
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.previa-tabela .num {
+  text-align: right;
+}
+
+.previa-totais {
+  font-size: 13px;
+  margin: 12px 0;
+  padding: 10px;
+  background: var(--soft);
+  border-radius: 6px;
+  line-height: 1.5;
+}
+
+.previa-feedback-box {
+  background: #F8F9FA;
+  border-left: 3px solid var(--teal);
+  padding: 10px 14px;
+  margin: 10px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: var(--texto);
+}
+
+.previa-notas-aula-item {
+  margin-bottom: 8px;
+  font-size: 12px;
+  padding: 8px 10px;
+  background: var(--soft);
+  border-radius: 4px;
+}
+
+.previa-notas-aula-item strong {
+  color: var(--navy);
+  display: block;
+  margin-bottom: 2px;
+}
+
+.acoes-doc-familia {
+  margin: 12px 0 6px;
+  gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+}
+
