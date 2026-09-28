@@ -1294,9 +1294,9 @@
       doc.paragrafo(resumo || ' ', { tam: 10.5, alturaLinha: 15.5 });
     }
 
-    // notas publicas das aulas
+    // notas publicas das aulas - apenas aulas realizadas
     if (opcoes.incluirNotasPublicas) {
-      var linhasComNota = (dados.linhas || []).filter(function (l) { return (l.notaTexto || '').trim(); });
+      var linhasComNota = (dados.linhas || []).filter(function (l) { return !l.futura && (l.notaTexto || '').trim(); });
       if (linhasComNota.length) {
         doc.y -= 24;
         doc.garanteEspaco(46);
