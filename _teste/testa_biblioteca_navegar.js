@@ -5,7 +5,7 @@
  * Drive nunca entra aqui.
  *
  * O que prova:
- *   1. sem pacote, a aba se chama Biblioteca e mostra "Em construção", sem
+ *   1. sem pacote, a Biblioteca explica a ausência e abre a importação, sem
  *      campo de busca; a aba Temas não existe mais na barra;
  *   2. com os dois pacotes: séries, módulos do Portal e do Banco separados,
  *      módulo com Teoria e Exercícios, aula de teoria com uma miniatura por
@@ -135,24 +135,32 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   await H.abrirApp(pag, amb.ORIGEM);
 
   // ================================================================
-  secao('1. Sem pacote: Biblioteca em construção');
+  secao('1. Sem pacote: Biblioteca oferece importação');
   const abas = await pag.evaluate(() => Array.from(document.querySelectorAll('#abas .aba')).map(b => b.textContent.trim() + ':' + b.dataset.tela));
   conf('a barra tem a aba Biblioteca no lugar de Temas', abas.join(','), 'Agenda:agenda,Alunos:alunos,Fechamento:fechamento,Biblioteca:biblioteca,Ajustes:ajustes');
   await H.irParaAba(pag, 'biblioteca');
   const vazia = await esperar('aba vazia desenhada', () => pag.evaluate(() => {
-    const v = document.querySelector('#biblioteca-em-construcao');
+    const v = document.querySelector('#biblioteca-sem-pacotes');
     return v ? { texto: Array.from(v.querySelectorAll('p')).map(p => p.textContent.trim()).join('\n'), busca: getComputedStyle(document.querySelector('#bib-busca-cartao')).display,
       titulo: document.querySelector('#tela-biblioteca h2').textContent.trim(), visivel: !!v.offsetParent } : null;
   }), v => !!v, 10000);
-  /* A terceira linha entrou no B7, de propósito: depois que dá para REMOVER
-   * uma série, este estado virou também a resposta a uma ação dela, e sem o
-   * caminho de volta ele seria um beco. As duas primeiras não mudaram. */
-  conf('mostra "Em construção" e "Esta área está sendo preparada."',
-    vazia.valor && vazia.valor.texto, 'Em construção\nEsta área está sendo preparada.\n' +
-    'Para trazer uma biblioteca para este tablet, vá em Ajustes, no cartão Biblioteca, e toque em Importar biblioteca.');
+  conf('explica que falta importar um pacote, sem negar arquivos próprios',
+    vazia.valor && vazia.valor.texto, 'Nenhum pacote de materiais importado\n' +
+    'Importe um pacote para consultar listas, exercícios e teoria neste tablet.\n' +
+    'Folhas e arquivos próprios das aulas continuam disponíveis nas respectivas aulas.');
   conf('visível', vazia.valor && vazia.valor.visivel, true);
   conf('sem o campo de busca', vazia.valor && vazia.valor.busca, 'none');
   conf('título Biblioteca', vazia.valor && vazia.valor.titulo, 'Biblioteca');
+  conf('há ação direta para importar', await pag.evaluate(() =>
+    (document.querySelector('#biblioteca-importar-pacote') || {}).textContent.trim()), 'Importar material');
+  await pag.evaluate(() => {
+    const entrada = document.querySelector('#arquivo-biblioteca');
+    entrada.click = function () { this.dataset.abertoPelaBiblioteca = 'sim'; };
+    document.querySelector('#biblioteca-importar-pacote').click();
+  });
+  conf('a ação abre Ajustes e o seletor existente', await pag.evaluate(() =>
+    (document.querySelector('#abas .aba.ativa') || {}).dataset.tela + ':' +
+    (document.querySelector('#arquivo-biblioteca') || {}).dataset.abertoPelaBiblioteca), 'ajustes:sim');
 
   // ================================================================
   secao('2. Com os pacotes do 9º ano e do Banco');
@@ -171,7 +179,8 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   conf('módulos do Portal, em ordem alfabética', corpo.blocos[0].linhas.join(' | '),
     'Equações do Segundo Grau | Produtos Notáveis e Fatoração | Teorema de Pitágoras');
   conf('módulos do Banco', corpo.blocos[1].linhas.join(' | '), 'Banco de Questões 2019 | Banco de Questões 2020');
-  conf('detalhe do módulo com acento certo', corpo.texto.indexOf('4 aulas de teoria · 2 listas, 48 exercícios') >= 0, true);
+  conf('sem lista pronta, distingue exercícios para montar seleção e teoria',
+    corpo.texto.indexOf('48 exercícios · 4 aulas de teoria · monte sua seleção') >= 0, true);
   await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo .chip-filtro')).find(c => c.textContent === '8º ano').click());
   await pausa(150);
   corpo = await lerCorpo(pag);
@@ -492,6 +501,47 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   }), outroAluno, hojeIso), v => v && v.temImagem, 10000);
   conf('a série tem mais de uma aula', colou.valor && colou.valor.aulas > 1, true);
   conf('e a aula do dia recebeu a página na folha', colou.valor && colou.valor.temImagem, true);
+
+  // ================================================================
+  secao('9. Material carregando não interrompe a escrita do assunto');
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.abrirApp(pag, amb.ORIGEM);
+  await pag.evaluate(() => {
+    const ler = Store.itensDaBiblioteca;
+    Store.itensDaBiblioteca = function () {
+      return new Promise((resolve, reject) => setTimeout(() => ler.call(Store).then(v => {
+        window.__bibReadDone = true;
+        resolve(v);
+      }, reject), 700));
+    };
+  });
+  await H.irParaAba(pag, 'agenda');
+  for (let i = 0; i < 24; i++) {
+    if (await pag.evaluate(h => !!document.querySelector('[data-dia="' + h + '"]'), hojeIso)) break;
+    await pag.click(i < 12 ? '#mes-seguinte' : '#mes-anterior');
+    await pausa(100);
+  }
+  await pag.evaluate(h => document.querySelector('[data-dia="' + h + '"] .pilula').click(), hojeIso);
+  await esperar('aula para registrar assunto', () => pag.$eval('#modal-aula', e => e.classList.contains('aberto')), v => v === true, 5000);
+  await pag.evaluate(() => Array.from(document.querySelectorAll('#corpo-modal-aula button'))
+    .find(b => /assunto da aula/i.test(b.textContent)).click());
+  await esperar('campo livre pronto', () => pag.evaluate(() => !!document.querySelector('#assunto-outro')), v => v === true, 5000);
+  await pag.evaluate(() => {
+    window.__campoAssuntoAntes = document.querySelector('#assunto-outro');
+    window.__campoAssuntoAntes.focus();
+    window.__campoAssuntoAntes.value = 'Frações revisadas';
+  });
+  await esperar('biblioteca carregada em segundo plano', () => pag.evaluate(() => !!window.__bibReadDone),
+    v => v === true, 5000);
+  await pausa(50);
+  const focoAssunto = await pag.evaluate(() => ({
+    mesmoCampo: document.querySelector('#assunto-outro') === window.__campoAssuntoAntes,
+    foco: document.activeElement === window.__campoAssuntoAntes,
+    texto: window.__campoAssuntoAntes.value
+  }));
+  conf('a atualização preserva o mesmo campo', focoAssunto.mesmoCampo, true);
+  conf('a atualização preserva o foco de escrita', focoAssunto.foco, true);
+  conf('a atualização preserva o texto digitado', focoAssunto.texto, 'Frações revisadas');
 
   if (pag.errosDePagina.length) console.log('   erros de página: ' + pag.errosDePagina.join(' | ').slice(0, 400));
   conf('nenhum erro de JavaScript na página', pag.errosDePagina.length, 0);
