@@ -403,7 +403,144 @@ async function rodar() {
   await pausa(200);
 
   // ================================================================
-  secao('8. Verificacao de ausencia de travessoes e hifens duplos na interface');
+  secao('9. Saneamento complementar T10: canceladas futuras na previa, filtro de notas futuras e distincao visual');
+
+  // 1. Distincao visual dos botoes e legenda de folhas no modal atual (2026-06)
+  await pag.evaluate(() => {
+    const cards = Array.from(document.querySelectorAll('#lista-fechamento .cartao'));
+    const cAlfa = cards.find(c => c.textContent.includes('Aluno Alfa Teste'));
+    if (cAlfa) {
+      const b = cAlfa.querySelector('.btn-preparar-doc');
+      if (b) b.click();
+    }
+  });
+  await pausa(300);
+
+  const botoesModal = await pag.evaluate(() => {
+    const btnFolhas = document.querySelector('#btn-doc-familia-pdf-folhas');
+    const btnFechamento = document.querySelector('#btn-doc-familia-pdf-fechamento');
+    const ajuda = document.querySelector('#ajuda-doc-familia-folhas');
+    return {
+      folhasExiste: !!btnFolhas,
+      fechamentoExiste: !!btnFechamento,
+      ajudaExiste: !!ajuda,
+      ajudaTexto: ajuda ? ajuda.textContent : '',
+      folhasTitle: btnFolhas ? btnFolhas.getAttribute('title') : ''
+    };
+  });
+  conf('botao PDF com as folhas tem ID especifico', botoesModal.folhasExiste, true);
+  conf('botao PDF do fechamento tem ID especifico', botoesModal.fechamentoExiste, true);
+  conf('legenda explicativa para PDF com folhas visivel no modal', botoesModal.ajudaExiste, true);
+  conf('legenda esclarece que desenhos manuscritos nao saem na previa', botoesModal.ajudaTexto.includes('desenhos manuscritos'), true);
+
+  // Fechar modal atual para atualizar dados
+  await pag.evaluate(() => {
+    const btnFechar = Array.from(document.querySelectorAll('#rodape-modal-doc-familia button')).find(b => b.textContent.includes('Fechar'));
+    if (btnFechar) btnFechar.click();
+  });
+  await pausa(300);
+
+  // 2. Injetar aula futura cancelada e aula futura com nota para testar previa, markdown e PDF
+  await pag.evaluate(async () => {
+    const dados = await Store.carregar();
+    // Injetar no mes seguinte (2026-10), onde as datas sao estritamente futuras em relacao a hoje (2026-09)
+    dados.aulas.push({
+      id: 'aula_alfa_futura_cancelada',
+      alunoId: 'aluno_alfa_t10',
+      data: '2026-10-10',
+      hora: '14:00',
+      duracaoMin: 60,
+      status: 'cancelada',
+      cobravel: true,
+      valor: 100,
+      notaTexto: 'Nota de aula futura cancelada'
+    });
+    dados.aulas.push({
+      id: 'aula_alfa_futura_agendada',
+      alunoId: 'aluno_alfa_t10',
+      data: '2026-10-12',
+      hora: '15:00',
+      duracaoMin: 60,
+      status: 'realizada',
+      cobravel: true,
+      valor: 100,
+      temNota: true,
+      notaTexto: 'Planejamento confidencial que nao deve sair em notas realizadas'
+    });
+    await Store.salvar(dados);
+  });
+
+  // Recarregar app para inicializar db com as novas aulas
+  await H.abrirApp(pag, amb.ORIGEM);
+
+  // Navegar para aba Fechamento e selecionar mes 2026-10
+  await pag.evaluate(() => {
+    const abaFech = document.querySelector('#abas .aba[data-tela="fechamento"]');
+    if (abaFech) abaFech.click();
+    const sel = document.querySelector('#mes-fechamento');
+    if (sel) {
+      sel.value = '2026-10';
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
+  await pausa(400);
+
+  // Abrir modal da familia para Aluno Alfa em 2026-10
+  await pag.evaluate(() => {
+    const cards = Array.from(document.querySelectorAll('#lista-fechamento .cartao'));
+    const cAlfa = cards.find(c => c.textContent.includes('Aluno Alfa Teste'));
+    if (cAlfa) {
+      const b = cAlfa.querySelector('.btn-preparar-doc');
+      if (b) b.click();
+    }
+  });
+  await pausa(400);
+
+  const resultadoFuturas = await pag.evaluate(async () => {
+    // Marcar chkNotas
+    const chkNotas = document.querySelector('#doc-chk-notas');
+    if (chkNotas && !chkNotas.checked) chkNotas.click();
+
+    const previa = document.querySelector('#conteudo-previa-doc-familia');
+    const textoPrevia = previa ? previa.textContent : '';
+
+    const dados = await Store.carregar();
+    const f = Core.calcularFechamento(dados, 'aluno_alfa_t10', '2026-10');
+    const md = Core.markdownFechamento(f, { incluirNotas: true, exibirTemasEAreas: true });
+
+    let pdfTexto = '';
+    try {
+      const bytes = PDFGen.gerarFechamento(f, {
+        exibirTemasEAreas: true,
+        incluirNotasPublicas: true,
+        incluirFolhas: false
+      });
+      pdfTexto = new TextDecoder('latin1').decode(bytes);
+    } catch (e) {
+      pdfTexto = 'ERRO: ' + e.message;
+    }
+
+    return {
+      previaTemAulasCanceladasAFrente: textoPrevia.includes('Aulas canceladas à frente'),
+      previaTemDataCancelada: textoPrevia.includes('10/10'),
+      previaTemNotaFutura: textoPrevia.includes('Planejamento confidencial'),
+      mdTemAulasCanceladasAFrente: md.includes('## Aulas canceladas à frente'),
+      mdTemNotaFutura: md.includes('Planejamento confidencial'),
+      pdfTemAulasCanceladasAFrente: pdfTexto.includes('Aulas canceladas'),
+      pdfTemNotaFutura: pdfTexto.includes('Planejamento confidencial')
+    };
+  });
+
+  conf('previa exibe secao "Aulas canceladas a frente"', resultadoFuturas.previaTemAulasCanceladasAFrente, true);
+  conf('previa exibe data da cancelada futura (10/10)', resultadoFuturas.previaTemDataCancelada, true);
+  conf('previa NUNCA exibe notas de aulas futuras', resultadoFuturas.previaTemNotaFutura, false);
+  conf('Markdown exibe secao "Aulas canceladas a frente"', resultadoFuturas.mdTemAulasCanceladasAFrente, true);
+  conf('Markdown NUNCA exibe notas de aulas futuras', resultadoFuturas.mdTemNotaFutura, false);
+  conf('PDF exibe secao de canceladas a frente', resultadoFuturas.pdfTemAulasCanceladasAFrente, true);
+  conf('PDF NUNCA exibe notas de aulas futuras', resultadoFuturas.pdfTemNotaFutura, false);
+
+  // ================================================================
+  secao('10. Verificacao de ausencia de travessoes e hifens duplos na interface');
 
   const textoGeralApp = await pag.evaluate(() => {
     return document.body.innerText;

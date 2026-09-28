@@ -3356,7 +3356,7 @@
     L.push(f.resumoTexto ? f.resumoTexto : '(a preencher)');
 
     if (opcoes.incluirNotas) {
-      var comNota = f.linhas.filter(function (l) { return l.temNota; });
+      var comNota = f.linhas.filter(function (l) { return !l.futura && l.temNota; });
       if (comNota.length) {
         L.push('');
         L.push('## Notas das aulas');
