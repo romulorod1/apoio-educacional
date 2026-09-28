@@ -124,7 +124,7 @@
           destaques: [
             'Na aba Biblioteca, filtre por série (do 6º ano ao Ensino Médio) para ver os módulos disponíveis.',
             'Use o campo de busca para encontrar assuntos, fórmulas e nomes em segundos.',
-            'Todo o material fica guardado no tablet e funciona perfeitamente sem internet na casa das famílias.'
+            'Materiais já importados podem ser consultados no tablet mesmo sem internet.'
           ]
         },
         {
@@ -146,7 +146,7 @@
           destaques: [
             'Toque em "Gerar folha" para abrir a lista na tela e resolver com a S Pen e ferramentas de desenho.',
             'Se preferir papel físico, toque em "Baixar PDF" para imprimir a lista pronta.',
-            'O assunto trabalhado fica automaticamente registrado no encontro do aluno!'
+            'Ao anexar na aula, o assunto trabalhado fica automaticamente registrado no encontro do aluno!'
           ]
         }
       ]
