@@ -10451,8 +10451,10 @@
       if (f.faixas.length > 1) rodapesMesNumaTela.push('houve reajuste no mês');
       if (f.valorPrevisto) rodapesMesNumaTela.push('previsto à frente: ' + dinheiro(f.valorPrevisto));
       if (f.valorCanceladasFuturas) rodapesMesNumaTela.push('canceladas à frente: ' + dinheiro(f.valorCanceladasFuturas));
-      if (f.valorPrevisto || f.valorCanceladasFuturas) rodapesMesNumaTela.push('mês inteiro: ' + dinheiro(f.totalValor));
-      var temFuturaCobravel = c.previstos || (f.valorCanceladasFuturas > 0);
+      if (f.valorPrevisto || f.valorCanceladasFuturas || (f.totalValor > f.valorFeito)) {
+        rodapesMesNumaTela.push('mês inteiro: ' + dinheiro(f.totalValor));
+      }
+      var temFuturaCobravel = (c.previstos > 0) || (f.valorPrevisto > 0) || (f.valorCanceladasFuturas > 0) || (f.totalValor > f.valorFeito);
       numeros.appendChild(numeroComRodape(
         temFuturaCobravel ? 'Total até aqui' : 'Total do mês', dinheiro(f.valorFeito), rodapesMesNumaTela
       ));

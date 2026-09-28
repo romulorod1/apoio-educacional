@@ -125,6 +125,8 @@ conf('app.js não tem mais "· ainda vai acontecer" na tabela de fechamento',
   appJs.includes('(l.futura ? \' · ainda vai acontecer\' : \'\')'), false);
 conf('app.js não tem mais "ainda vai acontecer" em blocoDaAula',
   appJs.includes("if (l.futura) detalhe.push('ainda vai acontecer');"), false);
+conf('app.js condiciona Total até aqui a valorPrevisto e totalValor > valorFeito',
+  appJs.includes('var temFuturaCobravel = (c.previstos > 0) || (f.valorPrevisto > 0) || (f.valorCanceladasFuturas > 0) || (f.totalValor > f.valorFeito);'), true);
 
 secao('6. Casos de referência C1 a C8 do Guia UX-UI (T02)');
 
@@ -251,6 +253,23 @@ const fC8 = Core.calcularFechamento({
 conf('C8: Preserva os R$ 100 de cobrança da falta', fC8.totalValor, 100);
 conf('C8: Não confunde falta com gratuidade', fC8.minutosDadosSemCobrar, 0);
 conf('C8: Identifica rótulo como Falta sem aviso', fC8.linhas[0].statusNaFolha, 'Falta sem aviso');
+
+// C8-futuro: Futura com falta sem aviso cobrada (não pode rotular valorFeito=0 como Total do mês)
+const fC8Futuro = Core.calcularFechamento({
+  alunos: [alunoPadrao],
+  aulas: [{ id: 'c8-fut', alunoId: 'aluno-c', data: amanha, hora: '10:00', duracaoMin: 60, status: 'falta', cobravel: true }]
+}, 'aluno-c', '2026-09', hoje);
+conf('C8-futuro: Preserva total do mês R$ 100', fC8Futuro.totalValor, 100);
+conf('C8-futuro: valorFeito até hoje é R$ 0', fC8Futuro.valorFeito, 0);
+conf('C8-futuro: valorPrevisto registra os R$ 100 à frente', fC8Futuro.valorPrevisto, 100);
+conf('C8-futuro: Identifica rótulo como Falta sem aviso', fC8Futuro.linhas[0].statusNaFolha, 'Falta sem aviso');
+
+// Na contagem de encontros do modal (contaDeEncontros em app.js), falta futura
+// não é encontro futuro a realizar (houveEncontro é false, c.previstos = 0)
+const cC8Fut = { previstos: 0, minPrevistos: 0, feitos: 0, minFeitos: 0 };
+const temFuturaCobravelC8 = (cC8Fut.previstos > 0) || (fC8Futuro.valorPrevisto > 0) || (fC8Futuro.valorCanceladasFuturas > 0) || (fC8Futuro.totalValor > fC8Futuro.valorFeito);
+const rotuloCardC8 = temFuturaCobravelC8 ? 'Total até aqui' : 'Total do mês';
+conf('C8-futuro: modal rotula valorFeito=0 como "Total até aqui" (e não como Total do mês)', rotuloCardC8, 'Total até aqui');
 
 console.log('\n============================================================');
 console.log(passes + ' verificações passaram, ' + falhas + ' falharam.');
