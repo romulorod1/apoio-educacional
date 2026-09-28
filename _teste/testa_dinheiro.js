@@ -245,6 +245,20 @@ conf('as gentilezas somadas', Core.fmtHoras(t.minutosDadosSemCobrar), '1:30');
 conf('e os horários desmarcados somados', Core.fmtHoras(t.minutosDesmarcados), '1:30');
 conf('lista vazia devolve tudo zero', Core.totaisDoMes([]).valor, 0);
 conf('e lista sem nada dentro também não quebra', Core.totaisDoMes(null).alunos, 0);
+conf('totaisDoMes com lista vazia não tem NaN em valorCanceladasFuturas', isNaN(Core.totaisDoMes([]).valorCanceladasFuturas), false);
+conf('totaisDoMes com mês sem canceladas tem valorCanceladasFuturas zero', t.valorCanceladasFuturas, 0);
+const dbC2bTot = {
+  alunos: [{ id: 'a1', nome: 'Ana', precos: [{ id: 'p', inicio: '2026-01-01', fim: null, valorHora: 100 }] }],
+  aulas: [
+    { id: 'c2b', alunoId: 'a1', data: '2026-09-20', duracaoMin: 60, status: 'cancelada', cobravel: true }
+  ],
+  resumos: []
+};
+const fechC2bTot = Core.calcularFechamento(dbC2bTot, 'a1', '2026-09', HOJE);
+conf('totaisDoMes com cancelada futura cobrável isolada (C2b) acumula valorCanceladasFuturas',
+  Core.totaisDoMes([fechC2bTot]).valorCanceladasFuturas, 100);
+conf('e valorPrevisto continua zero quando não há aulas ativas previstas',
+  Core.totaisDoMes([fechC2bTot]).valorPrevisto, 0);
 
 /* Um centavo que não fecha na tela do dinheiro dela vira desconfiança do
  * aplicativo inteiro. Aulas de 20 minutos a R$ 100 por hora dão R$ 33,333: o

@@ -2874,6 +2874,7 @@
       minutos: 0, valor: 0,
       minFeitos: 0, valorFeito: 0,
       minPrevistos: 0, valorPrevisto: 0,
+      valorCanceladasFuturas: 0,
       minutosDadosSemCobrar: 0, minutosDesmarcados: 0
     };
     (fechs || []).forEach(function (f) {

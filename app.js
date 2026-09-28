@@ -10373,12 +10373,15 @@
        * e ele é o total do mês, como sempre foi; enquanto o mês corre, o número
        * é só o que já aconteceu, e dizer "total do mês" ali seria a mesma
        * mentira de antes, agora do lado do dinheiro. */
+      var rodapesMesNumaTela = [];
+      if (f.faixas.length > 1) rodapesMesNumaTela.push('houve reajuste no mês');
+      if (f.valorPrevisto) rodapesMesNumaTela.push('previsto à frente: ' + dinheiro(f.valorPrevisto));
+      if (f.valorCanceladasFuturas) rodapesMesNumaTela.push('canceladas à frente: ' + dinheiro(f.valorCanceladasFuturas));
+      if (f.valorPrevisto || f.valorCanceladasFuturas) rodapesMesNumaTela.push('mês inteiro: ' + dinheiro(f.totalValor));
+      var temFuturaCobravel = c.previstos || (f.valorCanceladasFuturas > 0);
       numeros.appendChild(numeroComRodape(
-        c.previstos ? 'Total até aqui' : 'Total do mês', dinheiro(f.valorFeito), [
-          f.faixas.length > 1 ? 'houve reajuste no mês' : '',
-          f.valorPrevisto ? 'previsto à frente: ' + dinheiro(f.valorPrevisto) : '',
-          f.valorPrevisto ? 'mês inteiro: ' + dinheiro(f.totalValor) : ''
-        ]));
+        temFuturaCobravel ? 'Total até aqui' : 'Total do mês', dinheiro(f.valorFeito), rodapesMesNumaTela
+      ));
     }
     corpo.appendChild(numeros);
 
