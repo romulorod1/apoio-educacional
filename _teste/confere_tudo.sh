@@ -153,6 +153,7 @@ roda "trilha (motor)" node _teste/testa_trilha.js
 roda "dinheiro"      node _teste/testa_dinheiro.js
 roda "cartao do mes" node _teste/testa_cartao.js
 roda "proposta"      node _teste/testa_proposta.js
+roda "textos e novidades" node _teste/testa_textos_e_novidades.js
 # A tabela de materias e uma so (core.js) e as copias tem que bater com ela:
 # a do cartao.js, a do pdf.js, o banco/topicos/indice.json e a exportada para
 # o Python. Foi a divergencia entre quatro vocabularios de materia que deixou
