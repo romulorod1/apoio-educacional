@@ -528,6 +528,330 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
 .lista-novidades li { margin-bottom: 7px; line-height: 1.45; }
 .lista-novidades li:last-child { margin-bottom: 0; }
 
+/* Carrossel de novidades e guia das listas */
+.modal-novidades-carrossel {
+  width: 95%;
+  max-width: 520px;
+}
+.carrossel-novidades {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.carrossel-slide {
+  display: none;
+}
+.carrossel-slide.ativo {
+  display: flex;
+  flex-direction: column;
+  animation: surgimentoSuave 0.2s ease-in-out;
+}
+@keyframes surgimentoSuave {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.carrossel-topo {
+  margin-bottom: 6px;
+}
+.carrossel-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #854D0E;
+  background: #FEF3C7;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  margin-bottom: 6px;
+  border: 1px solid #F59E0B;
+}
+.carrossel-titulo {
+  font-family: Georgia, 'Playfair Display', serif;
+  font-size: 19px;
+  color: #162846;
+  margin: 0 0 4px 0;
+  line-height: 1.25;
+}
+.carrossel-subtitulo {
+  font-size: 12px;
+  color: #4B5563;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+.carrossel-visual {
+  background: #F8FAFC;
+  border: 1px solid #CBD5E1;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+}
+.preview-mini-tela {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 11px;
+}
+.mini-barra-fech, .mini-barra-bib, .mini-barra-montagem, .mini-barra-aula {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #E2E8F0;
+  font-size: 11.5px;
+  color: #1E293B;
+}
+.mini-tag-verde {
+  background: #DEF7EC;
+  color: #03543F;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9.5px;
+}
+.mini-tag-azul {
+  background: #EFF6FF;
+  color: #1E40AF;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9.5px;
+}
+.mini-tag-ouro {
+  background: #FEF3C7;
+  color: #92400E;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9.5px;
+}
+.mini-lista-alunos {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.mini-item-aluno {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+.mini-item-aluno.ativo {
+  border-color: #2563EB;
+  background: #F0F7FF;
+}
+.mini-letra {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #2563EB;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 10px;
+}
+.mini-aluno-dados {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.mini-aluno-dados span {
+  font-size: 9.5px;
+  color: #64748B;
+}
+.mini-badge-ok {
+  font-size: 9px;
+  color: #16A34A;
+  font-weight: 600;
+}
+.mini-chips-serie {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.mini-chip {
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 9.5px;
+  color: #475569;
+}
+.mini-chip.ativo {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #2563EB;
+  font-weight: 600;
+}
+.mini-busca-caixa {
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  padding: 5px 8px;
+  color: #64748B;
+  font-size: 10px;
+}
+.mini-modulos-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.mini-modulo-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+}
+.mini-modulo-card strong {
+  font-size: 10.5px;
+  color: #1E293B;
+}
+.mini-modulo-card span {
+  font-size: 9px;
+  color: #64748B;
+}
+.mini-opcoes-montagem {
+  display: flex;
+  gap: 6px;
+}
+.mini-toggle-box {
+  flex: 1;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  padding: 6px;
+  text-align: center;
+  font-size: 10px;
+  color: #475569;
+}
+.mini-toggle-box.ativo {
+  border-color: #16A34A;
+  background: #F0FDF4;
+  color: #166534;
+  font-weight: 600;
+}
+.mini-checks-montagem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+.mini-check-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: #334155;
+}
+.mini-visto {
+  color: #16A34A;
+  font-weight: 700;
+}
+.mini-acoes-aula {
+  display: flex;
+  gap: 6px;
+}
+.mini-btn-acao {
+  flex: 1;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  padding: 6px;
+  text-align: center;
+  font-size: 10px;
+  color: #334155;
+}
+.mini-btn-acao.principal {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #2563EB;
+  font-weight: 600;
+}
+.mini-folha-preview {
+  position: relative;
+  background: #FFFDF9;
+  border: 1px solid #E5E7EB;
+  border-radius: 6px;
+  padding: 8px;
+  min-height: 55px;
+}
+.mini-folha-pautada {
+  font-size: 10px;
+  color: #374151;
+  line-height: 1.5;
+}
+.mini-traco-caneta {
+  color: #1E3A8A;
+  font-style: italic;
+  font-family: Georgia, serif;
+  font-size: 11px;
+}
+.mini-ferramentas-flutuantes {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  background: rgba(255,255,255,0.94);
+  border: 1px solid #D1D5DB;
+  border-radius: 12px;
+  padding: 2px 6px;
+  display: flex;
+  gap: 6px;
+  font-size: 9px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.carrossel-destaques {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.carrossel-destaques li {
+  position: relative;
+  padding-left: 14px;
+  margin-bottom: 5px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #374151;
+}
+.carrossel-destaques li::before {
+  content: "•";
+  position: absolute;
+  left: 2px;
+  color: #2563EB;
+  font-size: 14px;
+  line-height: 1;
+}
+.carrossel-indicadores {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.carrossel-ponto {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #CBD5E1;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s ease;
+}
+.carrossel-ponto.ativo {
+  background: #2563EB;
+  width: 20px;
+  border-radius: 5px;
+}
+
 .linha-historico { align-items: flex-start; }
 .anotacao-historico {
   font-size: 13px;

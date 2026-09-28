@@ -78,13 +78,12 @@ async function conteudoModal(pag) {
 
     const bancoNovo = await obterBanco(pag);
     conf('perfil novo gravou versaoVista no banco', !!(bancoNovo && bancoNovo.ajustes && bancoNovo.ajustes.versaoVista), true);
-    conf('versaoVista do perfil novo é a versão atual', bancoNovo.ajustes.versaoVista, '1.27.0');
+    conf('versaoVista do perfil novo é a versão atual', bancoNovo.ajustes.versaoVista, '1.28.0');
 
-    secao('2. Perfil legado com versão antiga (versaoVista = 1.17.0)');
-    // Simula perfil existente com versão anterior à introdução de Português (1.18.0)
-    await gravarVersaoVista(pag, '1.17.0');
+    secao('2. Perfil atualizando de versão anterior (versaoVista = 1.27.0)');
+    await gravarVersaoVista(pag, '1.27.0');
     const bancoAntes = await obterBanco(pag);
-    conf('banco configurado com versaoVista legada 1.17.0', bancoAntes.ajustes.versaoVista, '1.17.0');
+    conf('banco configurado com versaoVista anterior 1.27.0', bancoAntes.ajustes.versaoVista, '1.27.0');
 
     // Recarrega o aplicativo para disparar inicialização real
     await pag.reload({ waitUntil: 'networkidle0' });
@@ -95,22 +94,58 @@ async function conteudoModal(pag) {
     // Aguarda a rotina de novidades
     await pausa(1500);
 
-    const abertoLegado = await modalAberto(pag);
-    conf('perfil legado 1.17.0 NÃO abre modal de novidades', abertoLegado, false);
+    const abertoAtualizacao = await modalAberto(pag);
+    conf('perfil atualizando para 1.28.0 abre carrossel de novidades', abertoAtualizacao, true);
 
     const textoModal = await conteudoModal(pag);
     conf('modal não contém novidade requentada de Português (1.18.0)', textoModal.indexOf('Português') === -1, true);
+    conf('modal contém novidade de 1.28.0 sobre fechamento e listas',
+      textoModal.indexOf('alfabética') !== -1 || textoModal.indexOf('Fechamento') !== -1, true);
+
+    // Navega no carrossel: avança slide
+    await pag.click('#entendi-novidades');
+    await pausa(300);
+    const textoBotaoVoltar = await pag.evaluate(() => {
+      const b = document.querySelector('#btn-carrossel-voltar');
+      return b ? window.getComputedStyle(b).display : 'none';
+    });
+    conf('botão Voltar fica visível a partir do slide 2', textoBotaoVoltar !== 'none', true);
+
+    // Fecha o modal pelo botão de fechar do cabeçalho
+    await pag.click('#modal-novidades [data-fechar]');
+    await pausa(400);
+    const abertoAposFechar = await modalAberto(pag);
+    conf('modal fechou com sucesso', abertoAposFechar, false);
 
     const bancoDepois = await obterBanco(pag);
-    conf('versaoVista foi atualizada silenciosamente para 1.27.0', bancoDepois.ajustes.versaoVista, '1.27.0');
+    conf('versaoVista foi atualizada para 1.28.0 no banco', bancoDepois.ajustes.versaoVista, '1.28.0');
 
-    secao('3. Perfil já na versão atual (versaoVista = 1.27.0)');
+    secao('3. Perfil já na versão atual (versaoVista = 1.28.0)');
     await pag.reload({ waitUntil: 'networkidle0' });
     await pausa(1500);
     const abertoAtual = await modalAberto(pag);
     conf('perfil na versão atual não abre modal de novidades', abertoAtual, false);
 
-    secao('4. Interface e concordância sem duplicar contagens (UX12)');
+    secao('4. Reabertura sob demanda do Guia e Novidades');
+    // Reabertura pelo botão da Biblioteca
+    await pag.click('.aba[data-tela="biblioteca"]');
+    await pausa(400);
+    await pag.click('#btn-guia-listas');
+    await pausa(400);
+    conf('guia de listas abre sob demanda ao clicar em Como usar listas', await modalAberto(pag), true);
+    await pag.click('#modal-novidades [data-fechar]');
+    await pausa(400);
+
+    // Reabertura pelo botão de Ajustes
+    await pag.click('.aba[data-tela="ajustes"]');
+    await pausa(400);
+    await pag.click('#ver-novidades-ajustes');
+    await pausa(400);
+    conf('novidades abrem sob demanda ao clicar em Ver o que mudou', await modalAberto(pag), true);
+    await pag.click('#modal-novidades [data-fechar]');
+    await pausa(400);
+
+    secao('5. Interface e concordância sem duplicar contagens (UX12)');
     const duplicacaoEncontrada = await pag.evaluate(() => {
       const textoGeral = document.body.innerText;
       // Procura padrões como "1 1 marcado", "2 2 marcados", "12 12 meses"

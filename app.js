@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.27.0';
+  var VERSAO = '1.28.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -97,6 +97,60 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.28.0',
+      titulo: 'Novidades do seu aplicativo',
+      itens: [
+        'No Fechamento, a lista de alunos agora aparece sempre em ordem alfabética para facilitar a localização de cada um.',
+        'Guia prático em 4 etapas ensinando a usar as listas da Biblioteca de Apoio e levá-las para a aula no tablet ou em PDF.'
+      ],
+      slides: [
+        {
+          etapa: 'Etapa 1 de 4 · Fechamento',
+          titulo: 'Alunos em ordem alfabética',
+          subtitulo: 'Encontre qualquer estudante de A a Z com rapidez',
+          tipoVisual: 'fechamento',
+          destaques: [
+            'No Fechamento, os cartões agora seguem a ordem alfabética do nome de cada aluno.',
+            'Ficou muito mais fácil localizar a família na hora de conferir as aulas e enviar os relatórios no fim do mês.',
+            'O total do mês e os valores continuam sendo calculados com a mesma precisão de sempre.'
+          ]
+        },
+        {
+          etapa: 'Etapa 2 de 4 · Biblioteca',
+          titulo: 'Escolher a série e o assunto',
+          subtitulo: 'Acervo de Matemática da OBMEP sempre à mão no tablet',
+          tipoVisual: 'biblioteca',
+          destaques: [
+            'Na aba Biblioteca, filtre por série (do 6º ano ao Ensino Médio) para ver os módulos disponíveis.',
+            'Use o campo de busca para encontrar assuntos, fórmulas e nomes em segundos.',
+            'Todo o material fica guardado no tablet e funciona perfeitamente sem internet na casa das famílias.'
+          ]
+        },
+        {
+          etapa: 'Etapa 3 de 4 · Montagem',
+          titulo: 'Montar a lista de exercícios',
+          subtitulo: 'Escolha manual ou seleção recomendada em 1 clique',
+          tipoVisual: 'montagem',
+          destaques: [
+            'Toque no módulo desejado para abrir a montagem da lista de aula.',
+            'Você pode usar a seleção recomendada pronta ou marcar exercícios específicos de acordo com a necessidade do aluno.',
+            'Escolha se quer incluir explicação teórica, lista de exercícios e gabarito com resolução detalhada.'
+          ]
+        },
+        {
+          etapa: 'Etapa 4 de 4 · Na Aula',
+          titulo: 'Pronto para a aula: tablet ou PDF',
+          subtitulo: 'Escreva à mão com a S Pen ou imprima para a criança',
+          tipoVisual: 'aula',
+          destaques: [
+            'Toque em "Gerar folha" para abrir a lista na tela e resolver com a S Pen e ferramentas de desenho.',
+            'Se preferir papel físico, toque em "Baixar PDF" para imprimir a lista pronta.',
+            'O assunto trabalhado fica automaticamente registrado no encontro do aluno!'
+          ]
+        }
+      ]
+    },
     {
       versao: '1.19.1',
       itens: [
@@ -497,6 +551,218 @@
     return 0;
   }
 
+  /* Visual esquemático e acolhedor para cada etapa do carrossel */
+  function desenharVisualSlide(tipo) {
+    var c = el('div', { class: 'carrossel-visual visual-' + tipo });
+    if (tipo === 'fechamento') {
+      c.innerHTML = '<div class="preview-mini-tela">' +
+        '<div class="mini-barra-fech">' +
+          '<strong>Fechamento &middot; Junho de 2026</strong>' +
+          '<span class="mini-tag-verde">A &rarr; Z Alfabética</span>' +
+        '</div>' +
+        '<div class="mini-lista-alunos">' +
+          '<div class="mini-item-aluno ativo">' +
+            '<span class="mini-letra">A</span>' +
+            '<div class="mini-aluno-dados"><strong>Aluno Alfa (Teste)</strong><span>3 encontros &middot; R$ 350,00</span></div>' +
+            '<span class="mini-badge-ok">Pronto</span>' +
+          '</div>' +
+          '<div class="mini-item-aluno">' +
+            '<span class="mini-letra">B</span>' +
+            '<div class="mini-aluno-dados"><strong>Aluno Beta (Teste)</strong><span>2 encontros &middot; R$ 220,00</span></div>' +
+            '<span class="mini-badge-ok">Pronto</span>' +
+          '</div>' +
+          '<div class="mini-item-aluno">' +
+            '<span class="mini-letra">G</span>' +
+            '<div class="mini-aluno-dados"><strong>Aluno Gama (Teste)</strong><span>4 encontros &middot; R$ 480,00</span></div>' +
+            '<span class="mini-badge-ok">Pronto</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    } else if (tipo === 'biblioteca') {
+      c.innerHTML = '<div class="preview-mini-tela">' +
+        '<div class="mini-barra-bib">' +
+          '<strong>Biblioteca &middot; Acervo de Matemática</strong>' +
+          '<span class="mini-tag-azul">OBMEP Offline</span>' +
+        '</div>' +
+        '<div class="mini-chips-serie">' +
+          '<span class="mini-chip">6º ano</span>' +
+          '<span class="mini-chip">7º ano</span>' +
+          '<span class="mini-chip">8º ano</span>' +
+          '<span class="mini-chip ativo">9º ano</span>' +
+          '<span class="mini-chip">Ensino Médio</span>' +
+        '</div>' +
+        '<div class="mini-busca-caixa">🔍 Equações e Sistemas do 1º Grau</div>' +
+        '<div class="mini-modulos-grid">' +
+          '<div class="mini-modulo-card">' +
+            '<strong>Álgebra &middot; Equações</strong>' +
+            '<span>6 assuntos organizados</span>' +
+          '</div>' +
+          '<div class="mini-modulo-card">' +
+            '<strong>Geometria &middot; Áreas</strong>' +
+            '<span>8 assuntos organizados</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    } else if (tipo === 'montagem') {
+      c.innerHTML = '<div class="preview-mini-tela">' +
+        '<div class="mini-barra-montagem">' +
+          '<strong>Montar lista de exercícios</strong>' +
+          '<span class="mini-tag-ouro">Pronto em 1 toque</span>' +
+        '</div>' +
+        '<div class="mini-opcoes-montagem">' +
+          '<div class="mini-toggle-box ativo">✓ Seleção recomendada da aula</div>' +
+          '<div class="mini-toggle-box">Seleção manual questão a questão</div>' +
+        '</div>' +
+        '<div class="mini-checks-montagem">' +
+          '<div class="mini-check-label"><span class="mini-visto">✓</span> Explicar a teoria antes dos exercícios</div>' +
+          '<div class="mini-check-label"><span class="mini-visto">✓</span> Lista de exercícios selecionados (6 questões)</div>' +
+          '<div class="mini-check-label"><span class="mini-visto">✓</span> Gabarito com resolução comentada</div>' +
+        '</div>' +
+      '</div>';
+    } else if (tipo === 'aula') {
+      c.innerHTML = '<div class="preview-mini-tela">' +
+        '<div class="mini-barra-aula">' +
+          '<strong>Aula &middot; Levar para o encontro</strong>' +
+          '<span class="mini-tag-verde">Salvo no tablet</span>' +
+        '</div>' +
+        '<div class="mini-acoes-aula">' +
+          '<div class="mini-btn-acao principal">✍️ Gerar folha (escrever com S Pen)</div>' +
+          '<div class="mini-btn-acao">📄 Baixar PDF para imprimir</div>' +
+        '</div>' +
+        '<div class="mini-folha-preview">' +
+          '<div class="mini-folha-pautada">' +
+            '<div class="mini-linha-pauta">1. Resolva a equação: 2x + 4 = 10</div>' +
+            '<div class="mini-traco-caneta">2x = 6 &rarr; x = 3</div>' +
+          '</div>' +
+          '<div class="mini-ferramentas-flutuantes">' +
+            '<span>✏️ Caneta</span><span>🖍️ Marca-texto</span><span>🧹 Borracha</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }
+    return c;
+  }
+
+  function abrirCarrosselNovidades(slides, salvarAoFechar, slideInicial) {
+    var corpo = $('#corpo-modal-novidades');
+    if (!corpo) return;
+    corpo.innerHTML = '';
+
+    var idxAtual = slideInicial || 0;
+    var total = slides.length;
+
+    var tituloModal = $('#titulo-modal-novidades');
+    if (tituloModal) tituloModal.textContent = 'Novidades do seu aplicativo';
+
+    var container = el('div', { class: 'carrossel-novidades' });
+
+    slides.forEach(function (s, i) {
+      var slideEl = el('div', {
+        class: 'carrossel-slide' + (i === idxAtual ? ' ativo' : ''),
+        'data-slide-index': String(i)
+      });
+
+      var topo = el('div', { class: 'carrossel-topo' }, [
+        el('span', { class: 'carrossel-badge', texto: s.etapa }),
+        el('h4', { class: 'carrossel-titulo', texto: s.titulo }),
+        el('p', { class: 'carrossel-subtitulo', texto: s.subtitulo })
+      ]);
+      slideEl.appendChild(topo);
+
+      var visual = desenharVisualSlide(s.tipoVisual);
+      if (visual) slideEl.appendChild(visual);
+
+      if (s.destaques && s.destaques.length) {
+        var ul = el('ul', { class: 'carrossel-destaques' });
+        s.destaques.forEach(function (d) {
+          ul.appendChild(el('li', { texto: d }));
+        });
+        slideEl.appendChild(ul);
+      }
+
+      container.appendChild(slideEl);
+    });
+
+    corpo.appendChild(container);
+
+    var btnVoltar = $('#btn-carrossel-voltar');
+    var btnAvancar = $('#entendi-novidades');
+    var indContainer = $('#carrossel-indicadores');
+
+    function atualizarEstado(idx) {
+      idxAtual = idx;
+      var todosSlides = container.querySelectorAll('.carrossel-slide');
+      todosSlides.forEach(function (elSlide, i) {
+        if (i === idxAtual) elSlide.classList.add('ativo');
+        else elSlide.classList.remove('ativo');
+      });
+
+      if (indContainer) {
+        indContainer.innerHTML = '';
+        for (var p = 0; p < total; p++) {
+          (function (pontoIdx) {
+            var ponto = el('button', {
+              type: 'button',
+              class: 'carrossel-ponto' + (pontoIdx === idxAtual ? ' ativo' : ''),
+              'aria-label': 'Ir para etapa ' + (pontoIdx + 1),
+              aoClick: function () { atualizarEstado(pontoIdx); }
+            });
+            indContainer.appendChild(ponto);
+          })(p);
+        }
+      }
+
+      if (btnVoltar) {
+        if (idxAtual > 0) {
+          btnVoltar.style.display = 'inline-block';
+        } else {
+          btnVoltar.style.display = 'none';
+        }
+      }
+
+      if (btnAvancar) {
+        if (idxAtual === total - 1) {
+          btnAvancar.textContent = 'Entendi e começar a usar';
+          btnAvancar.classList.add('destaque');
+        } else {
+          btnAvancar.textContent = 'Avançar →';
+          btnAvancar.classList.remove('destaque');
+        }
+      }
+    }
+
+    if (btnVoltar) {
+      btnVoltar.onclick = function () {
+        if (idxAtual > 0) atualizarEstado(idxAtual - 1);
+      };
+    }
+
+    if (btnAvancar) {
+      btnAvancar.onclick = function () {
+        if (idxAtual < total - 1) {
+          atualizarEstado(idxAtual + 1);
+        } else {
+          fecharModal('modal-novidades');
+          if (salvarAoFechar) {
+            db.ajustes = db.ajustes || {};
+            db.ajustes.versaoVista = VERSAO;
+            salvar();
+          }
+        }
+      };
+    }
+
+    atualizarEstado(idxAtual);
+    abrirModal('modal-novidades');
+  }
+
+  function abrirGuiaListasENovidades(slideInicial) {
+    var item128 = NOVIDADES.filter(function (n) { return n.versao === '1.28.0'; })[0];
+    if (item128 && item128.slides) {
+      abrirCarrosselNovidades(item128.slides, false, slideInicial || 0);
+    }
+  }
+
   /* Mostra o que mudou desde a última versão que ela viu.
    * Quem abre o aplicativo pela primeira vez não recebe nada: não faz sentido
    * contar novidades para quem nunca viu o que veio antes. */
@@ -525,6 +791,12 @@
     if (!novas.length) {
       db.ajustes.versaoVista = VERSAO;
       salvar();
+      return;
+    }
+
+    var nAtual = novas[0];
+    if (nAtual.slides && nAtual.slides.length) {
+      abrirCarrosselNovidades(nAtual.slides, true, 0);
       return;
     }
 
@@ -721,6 +993,12 @@
     /* O visor da biblioteca, fechado pelo × ou tocando fora: solta a imagem
      * em tela cheia da memória, como o botão Fechar. */
     if (id === 'modal-biblioteca') soltarVisor();
+    if (id === 'modal-novidades') {
+      if (db && db.ajustes && db.ajustes.versaoVista !== VERSAO) {
+        db.ajustes.versaoVista = VERSAO;
+        salvar();
+      }
+    }
     if (!$$('.fundo-modal.aberto').length) degrauModal = 50;
     posicionarAviso();
   }
@@ -1258,6 +1536,18 @@
     $('#ir-para-hoje').addEventListener('click', function () { irParaMes(Core.mesDe(Core.hojeIso())); });
     $('#nova-aula').addEventListener('click', function () { abrirAula(null, Core.hojeIso()); });
     $('#novo-aluno').addEventListener('click', function () { abrirAluno(null); });
+    var btnGuiaBib = $('#btn-guia-listas');
+    if (btnGuiaBib) {
+      btnGuiaBib.addEventListener('click', function () {
+        abrirGuiaListasENovidades(1);
+      });
+    }
+    var btnNovidadesAj = $('#ver-novidades-ajustes');
+    if (btnNovidadesAj) {
+      btnNovidadesAj.addEventListener('click', function () {
+        abrirGuiaListasENovidades(0);
+      });
+    }
     /* Sem passar o evento adiante: abrirPropostaAvulsa recebe o id do rascunho
      * a abrir, e um objeto de evento no lugar dele não seria id nenhum. */
     $('#proposta-nova').addEventListener('click', function () { abrirPropostaAvulsa(); });

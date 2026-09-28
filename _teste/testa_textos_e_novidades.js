@@ -101,9 +101,9 @@ function compararVersao(a, b) {
   return 0;
 }
 
-conf('compararVersao 1.27.0 vs 1.26.0 > 0', compararVersao('1.27.0', '1.26.0') > 0, true);
-conf('compararVersao 1.27.0 vs 1.27.0 === 0', compararVersao('1.27.0', '1.27.0'), 0);
-conf('compararVersao 1.18.0 vs 1.27.0 < 0', compararVersao('1.18.0', '1.27.0') < 0, true);
+conf('compararVersao ' + VERSAO + ' vs 1.27.0 > 0', compararVersao(VERSAO, '1.27.0') > 0, true);
+conf('compararVersao ' + VERSAO + ' vs ' + VERSAO + ' === 0', compararVersao(VERSAO, VERSAO), 0);
+conf('compararVersao 1.18.0 vs ' + VERSAO + ' < 0', compararVersao('1.18.0', VERSAO) < 0, true);
 
 // Simulação de mostrarNovidades
 function simularMostrarNovidades(dbSim, novidadesLista) {
@@ -135,8 +135,8 @@ conf('perfil novo grava versaoVista silenciosamente', resNovo.versaoGravada, VER
 const resAtual = simularMostrarNovidades({ ajustes: { versaoVista: VERSAO } }, []);
 conf('perfil na versão atual não abre modal', resAtual.abriu, false);
 
-// Caso C: Atualização a partir de 1.26.0 sem entradas novas no array
-const resSemNovas = simularMostrarNovidades({ ajustes: { versaoVista: '1.26.0' } }, [
+// Caso C: Atualização a partir de versão anterior sem entradas novas no array
+const resSemNovas = simularMostrarNovidades({ ajustes: { versaoVista: '1.27.0' } }, [
   { versao: '1.19.1', itens: ['item antigo'] },
   { versao: '1.18.0', itens: ['portugues'] }
 ]);
@@ -144,13 +144,13 @@ conf('atualização sem itens novos não abre modal', resSemNovas.abriu, false);
 conf('atualização sem itens novos atualiza versaoVista', resSemNovas.versaoGravada, VERSAO);
 
 // Caso D: Atualização com nova entrada específica para a versão
-const resComNovas = simularMostrarNovidades({ ajustes: { versaoVista: '1.26.0' } }, [
-  { versao: '1.27.0', itens: ['melhoria específica de 1.27.0'] },
+const resComNovas = simularMostrarNovidades({ ajustes: { versaoVista: '1.27.0' } }, [
+  { versao: VERSAO, itens: ['melhoria específica de ' + VERSAO] },
   { versao: '1.18.0', itens: ['portugues'] }
 ]);
 conf('atualização com itens novos abre modal', resComNovas.abriu, true);
 conf('modal contém apenas a versão mais recente', resComNovas.novas.length, 1);
-conf('modal exibe a versão correta', resComNovas.novas[0].versao, '1.27.0');
+conf('modal exibe a versão correta', resComNovas.novas[0].versao, VERSAO);
 conf('modal NÃO contém a versão antiga de português 1.18.0', resComNovas.novas.some(n => n.versao === '1.18.0'), false);
 
 // Caso E: Perfil com versão antiga gravada (ex: 1.17.0) sem novidades cadastradas para a versão atual
@@ -162,12 +162,12 @@ conf('perfil antigo atualiza versaoVista silenciosamente para a versão atual', 
 
 // Caso F: Perfil com versão antiga gravada (ex: 1.17.0) quando existe novidade para a versão atual
 const resAntigoComNovas = simularMostrarNovidades({ ajustes: { versaoVista: '1.17.0' } }, [
-  { versao: '1.27.0', itens: ['novidade 1.27.0'] },
+  { versao: VERSAO, itens: ['novidade ' + VERSAO] },
   { versao: '1.18.0', itens: ['português histórico'] }
 ]);
 conf('perfil antigo abre novidade apenas da versão atual', resAntigoComNovas.abriu, true);
 conf('perfil antigo não recebe notícias intermediárias antigas', resAntigoComNovas.novas.length, 1);
-conf('perfil antigo recebe estritamente a versão 1.27.0', resAntigoComNovas.novas[0].versao, '1.27.0');
+conf('perfil antigo recebe estritamente a versão ' + VERSAO, resAntigoComNovas.novas[0].versao, VERSAO);
 
 // ============================================================================
 secao('5. Preservação de dados e carga inicial (UX11)');

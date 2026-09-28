@@ -75,8 +75,10 @@
  * igual; pula o v42 de propósito, que era o nome que a lista pronta do 9º ano
  * usava no PR dela, para os dois nunca chegarem ao ar com o mesmo nome. O v44
  * traz a lista pronta do 9º ano (app.js, biblioteca.js, draw.js, pdf.js,
- * index.html e styles.css), com a lista igual. */
-var CACHE = 'apoio-educacional-v44';
+ * index.html e styles.css), com a lista igual. O v45 traz a ordenação
+ * alfabética dos alunos no Fechamento e o carrossel de novidades e guia de
+ * listas (app.js, core.js, index.html e styles.css), com a lista igual. */
+var CACHE = 'apoio-educacional-v45';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
