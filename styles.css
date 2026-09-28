@@ -276,6 +276,248 @@ input:focus, select:focus, textarea:focus {
 .pilula.cancelada { opacity: .5; text-decoration: line-through; }
 .pilula.tem-nota::after { content: " ✎"; }
 
+/* ---------- zoom do dia no calendario (T12) ---------- */
+
+.painel-zoom-dia {
+  background: var(--branco);
+  border: 2px solid var(--navy);
+  border-radius: var(--raio);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 16px rgba(31, 58, 95, 0.12);
+  animation: zoomDiaEntrada 0.18s ease-out;
+}
+
+@keyframes zoomDiaEntrada {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.zoom-dia-cabecalho {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--soft-2);
+  margin-bottom: 12px;
+}
+
+.zoom-dia-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.zoom-dia-icone {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.zoom-dia-titulo {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.zoom-tag-hoje {
+  background: #FFF7E6;
+  border: 1px solid var(--gold);
+  color: #8C6D1F;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.zoom-tag-feriado {
+  background: #FDFBF4;
+  border: 1px solid #E5D5A5;
+  color: #8A6D2F;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.zoom-tag-feriado.facultativo {
+  color: var(--muted);
+  border-color: var(--soft-2);
+}
+
+.zoom-btn-fechar {
+  background: var(--soft);
+  color: var(--navy);
+  border: 1px solid var(--fio);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.zoom-btn-fechar:hover {
+  background: var(--soft-2);
+}
+
+.zoom-dia-vazio {
+  padding: 16px 8px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.zoom-dia-vazio p {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.zoom-dia-vazio-dica {
+  font-size: 13px;
+  color: var(--muted);
+  opacity: 0.85;
+}
+
+.zoom-dia-aulas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.card-aula-zoom {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--ivory);
+  border: 1px solid var(--soft-2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-aula-zoom:hover {
+  border-color: var(--teal);
+  background: var(--branco);
+  box-shadow: 0 2px 8px rgba(31, 58, 95, 0.08);
+}
+
+.card-aula-zoom.cancelada {
+  opacity: 0.6;
+}
+
+.card-aula-zoom-faixa {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+}
+
+.card-aula-zoom-conteudo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card-aula-zoom-topo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.card-aula-zoom-hora {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.card-aula-zoom-status {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.card-aula-zoom-aluno {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+
+.card-aula-zoom-nome {
+  color: var(--navy);
+}
+
+.card-aula-zoom-serie {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.card-aula-zoom-resumo {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-aula-zoom-btn {
+  flex-shrink: 0;
+}
+
+.zoom-dia-rodape {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--soft-2);
+}
+
+/* Destaque da celula na grade mensal */
+.dia.em-zoom {
+  border-color: var(--navy);
+  box-shadow: inset 0 0 0 2px var(--navy), 0 3px 10px rgba(31, 58, 95, 0.18);
+  background: #F4F7FC;
+  position: relative;
+  z-index: 2;
+}
+
+.dia.em-zoom .num {
+  color: var(--navy);
+  font-weight: 800;
+}
+
+.selo-zoom-celula {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--branco);
+  background: var(--navy);
+  padding: 1px 4px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
 /* ---------- listas ---------- */
 
 .item-lista {
