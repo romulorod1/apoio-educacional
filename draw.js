@@ -123,6 +123,16 @@
     this.precisaRedesenhar = true;
   };
 
+  Editor.prototype.ajustarNaLargura = function () {
+    this.zoomManual = true;
+    var margem = 8;
+    this.escala = Math.max(0.15, Math.min(6, (this.larguraVista - margem * 2) / FOLHA_L));
+    this.deslocX = (this.larguraVista - FOLHA_L * this.escala) / 2;
+    this.deslocY = margem;
+    this.cacheValido = false;
+    this.precisaRedesenhar = true;
+  };
+
   Editor.prototype.zoom = function (fator, cx, cy) {
     this.zoomManual = true;
     var antes = this.escala;

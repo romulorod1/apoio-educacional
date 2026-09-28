@@ -4150,6 +4150,38 @@
     return { bytes: doc.finalizar(), total: doc.paginas.length, paginas: mapa, reduzidos: reduzidos };
   }
 
+  /* Gera o PDF de uma folha de aula (todas as suas paginas com tracos, imagens e notas).
+   * opcoes = {
+   *   alunoNome: string,
+   *   data: string (AAAA-MM-DD),
+   *   nota: { paginas: [...] },
+   *   imagens: { ref: { bytes, w, h } }
+   * }
+   */
+  function gerarFolhaAula(opcoes) {
+    var doc = new Doc();
+    var nota = (opcoes && opcoes.nota) || { paginas: [] };
+    var pgs = nota.paginas || [];
+    var tituloBase = 'Folha de aula';
+    if (opcoes && opcoes.alunoNome) tituloBase += ' · ' + opcoes.alunoNome;
+    if (opcoes && opcoes.data) tituloBase += ' · ' + ddmmL(opcoes.data);
+
+    if (!pgs.length) {
+      doc.novaPagina({ semMarca: true });
+      doc.texto(tituloBase, MARG_E, doc.y + 12, { tam: 9.5, bold: true, cor: COR.teal });
+      return doc.finalizar();
+    }
+
+    for (var p = 0; p < pgs.length; p++) {
+      doc.novaPagina({ semMarca: true });
+      var rotulo = tituloBase + (pgs.length > 1 ? ' (' + (p + 1) + '/' + pgs.length + ')' : '');
+      doc.texto(rotulo, MARG_E, doc.y + 12, { tam: 9.5, bold: true, cor: COR.teal });
+      doc.y -= 6;
+      desenhaNota(doc, pgs[p], (opcoes && opcoes.imagens) || {});
+    }
+    return doc.finalizar();
+  }
+
   return {
     Doc: Doc, COR: COR, medir: medir, medirRico: medirRico, paraWinAnsi: paraWinAnsi,
     SIMBOLOS: SIMBOLOS, caracteresQueNaoDesenha: caracteresQueNaoDesenha,
@@ -4158,6 +4190,7 @@
     gerarMaterialTema: gerarMaterialTema, gerarFichaMapeamento: gerarFichaMapeamento,
     gerarMaterialBiblioteca: gerarMaterialBiblioteca,
     gerarProposta: gerarProposta,
+    gerarFolhaAula: gerarFolhaAula,
     NOTA_L: NOTA_L, NOTA_A: NOTA_A,
     PAGINA_L: PAGINA_L, PAGINA_A: PAGINA_A, MARG_E: MARG_E, MARG_D: MARG_D, UTIL: UTIL,
     /* O figuras/base.js precisa saber onde o conteúdo começa e onde acaba, para

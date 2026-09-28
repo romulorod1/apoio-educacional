@@ -5771,6 +5771,33 @@
     desenharFerramentas(aula);
     desenharRodapeNota(aula);
     ligarColagem();
+    atualizarStatusGravacaoFolha('salvo');
+  }
+
+  var painelAjudaFolhaAberto = false;
+
+  function atualizarStatusGravacaoFolha(estado, msg) {
+    var elStatus = $('#status-gravacao-folha');
+    if (!elStatus) return;
+    elStatus.className = 'status-gravacao' + (estado ? ' ' + estado : '');
+    if (estado === 'salvando') {
+      elStatus.textContent = 'Salvando no tablet...';
+      elStatus.title = 'Gravando anotações no banco IndexedDB deste aparelho';
+      elStatus.onclick = null;
+    } else if (estado === 'erro') {
+      elStatus.textContent = '⚠ Não salvou (toque para tentar de novo)';
+      elStatus.title = (msg ? msg + ' · ' : '') + 'Toque para tentar gravar novamente';
+      elStatus.onclick = function () {
+        if (editorAtual && editorAtual._aulaId) {
+          atualizarStatusGravacaoFolha('salvando');
+          gravarNota(editorAtual._aulaId);
+        }
+      };
+    } else {
+      elStatus.textContent = '✓ Salvo neste tablet';
+      elStatus.title = 'Todas as anotações estão guardadas no tablet';
+      elStatus.onclick = null;
+    }
   }
 
   /* Painel de texto da folha. Antes isso era a janela do navegador, que no
@@ -5793,6 +5820,7 @@
 
   var gravacaoPendente = null;
   function agendarGravacaoNota(aulaId) {
+    atualizarStatusGravacaoFolha('salvando');
     clearTimeout(gravacaoPendente);
     gravacaoPendente = setTimeout(function () { gravarNota(aulaId); }, 400);
   }
@@ -5823,11 +5851,17 @@
     var nota = editorAtual.nota;
     var temConteudo = nota.paginas.some(function (p) { return (p.itens || []).length; });
     var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
+    atualizarStatusGravacaoFolha('salvando');
     return Store.salvarNota(aulaId, temConteudo ? nota : null).then(function () {
       if (aula && aula.temNota !== temConteudo) {
         aula.temNota = temConteudo;
         return salvar();
       }
+    }).then(function () {
+      atualizarStatusGravacaoFolha('salvo');
+    }).catch(function (err) {
+      atualizarStatusGravacaoFolha('erro', err && err.message);
+      throw err;
     });
   }
 
@@ -5876,6 +5910,71 @@
       '<path d="M12 3l-2.6 2.6M12 3l2.6 2.6M12 21l-2.6-2.6M12 21l2.6-2.6"/>' +
       '<path d="M3 12l2.6-2.6M3 12l2.6 2.6M21 12l-2.6-2.6M21 12l2.6 2.6"/>')
   };
+
+  function alternarAjudaFolha(aula) {
+    painelAjudaFolhaAberto = !painelAjudaFolhaAberto;
+    desenharPainelAjudaFolha(aula);
+    desenharFerramentas(aula);
+  }
+
+  function desenharPainelAjudaFolha(aula) {
+    var painel = $('#ajuda-folha-painel');
+    if (!painel) return;
+    if (!painelAjudaFolhaAberto) {
+      painel.style.display = 'none';
+      painel.innerHTML = '';
+      return;
+    }
+    painel.style.display = 'block';
+    painel.innerHTML = '';
+
+    var grid = el('div', { class: 'ajuda-folha-grid' });
+    var itens = [
+      {
+        titulo: 'Caneta',
+        desc: 'Escreve e desenha com a ponta fina. Pode apoiar a mão na tela com naturalidade (somente a caneta risca).'
+      },
+      {
+        titulo: 'Marca-texto',
+        desc: 'Destaca passagens e cálculos com traço translúcido e largo.'
+      },
+      {
+        titulo: 'Borracha',
+        desc: 'Apaga os traços feitos com a caneta ou marca-texto. Não apaga enunciados de exercícios nem figuras coladas.'
+      },
+      {
+        titulo: 'Tapar com branco',
+        desc: 'Cria uma placa branca para cobrir partes do enunciado ou respostas. Para remover a placa depois, use Mover e a lixeira.'
+      },
+      {
+        titulo: 'Mover e redimensionar',
+        desc: 'Toca em caixas de texto, figuras ou placas brancas para reposicionar, redimensionar pelas bordas ou apagar na lixeira.'
+      },
+      {
+        titulo: 'Gestos de navegação',
+        desc: 'Com o dedo, arraste para rolar a página. Com dois dedos em pinça, aproxime ou afaste o zoom à vontade.'
+      }
+    ];
+
+    itens.forEach(function (it) {
+      grid.appendChild(el('div', { class: 'ajuda-folha-item' }, [
+        el('div', { class: 'ajuda-folha-texto' }, [
+          el('strong', { texto: it.titulo }),
+          el('span', { texto: it.desc })
+        ])
+      ]));
+    });
+    painel.appendChild(grid);
+
+    var rodapeAjuda = el('div', { class: 'ajuda-folha-rodape' }, [
+      el('span', { class: 'ajuda', texto: 'A folha salva automaticamente cada traço no tablet.' }),
+      el('button', {
+        type: 'button', class: 'btn pequeno principal', texto: 'Entendi',
+        aoClick: function () { alternarAjudaFolha(aula); }
+      })
+    ]);
+    painel.appendChild(rodapeAjuda);
+  }
 
   function desenharFerramentas(aula) {
     if (!editorAtual) return;
@@ -5967,6 +6066,14 @@
     barra.appendChild(el('span', { class: 'cresce' }));
 
     barra.appendChild(el('button', {
+      type: 'button', class: 'btn pequeno' + (painelAjudaFolhaAberto ? ' ativa' : ''),
+      id: 'btn-ajuda-folha',
+      title: 'Como usar as ferramentas e gestos da folha',
+      texto: '? Como usar',
+      aoClick: function () { alternarAjudaFolha(aula); }
+    }));
+
+    barra.appendChild(el('button', {
       type: 'button', class: 'btn pequeno', texto: 'Imagem',
       aoClick: function () { inserirImagem(); }
     }));
@@ -6016,12 +6123,55 @@
 
     rodape.appendChild(el('button', {
       type: 'button', class: 'btn pequeno', texto: 'Ajustar à tela',
+      title: 'Encaixa a folha inteira na área visível',
       aoClick: function () { editorAtual.ajustarNaTela(); }
+    }));
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn pequeno', texto: 'Ajustar à largura',
+      title: 'Aproxima o exercício ocupando a largura da tela',
+      aoClick: function () { editorAtual.ajustarNaLargura(); }
+    }));
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn pequeno', texto: 'PDF da folha',
+      id: 'btn-pdf-folha',
+      title: 'Exportar esta folha com todas as anotações para PDF',
+      aoClick: function () { exportarPdfFolha(aula); }
     }));
     rodape.appendChild(el('button', {
       type: 'button', class: 'btn principal pequeno', texto: 'Concluir',
       aoClick: fecharEditorNota
     }));
+  }
+
+  function exportarPdfFolha(aula) {
+    if (!editorAtual) return;
+    gravarNota(aula.id).then(function () {
+      var aluno = alunoPorId(aula.alunoId);
+      var nomeAluno = aluno ? aluno.nome : '';
+      var nota = editorAtual.nota;
+      var temItens = nota.paginas.some(function (p) { return (p.itens || []).length > 0; });
+      if (!temItens) {
+        avisar('A folha está vazia. Não há anotações para exportar.');
+        return;
+      }
+      var gerador = (typeof PDFGen !== 'undefined') ? PDFGen : (typeof Pdf !== 'undefined' ? Pdf : null);
+      if (!gerador || !gerador.gerarFolhaAula) {
+        avisar('Gerador de PDF não disponível.');
+        return;
+      }
+      var bytes = gerador.gerarFolhaAula({
+        alunoNome: nomeAluno,
+        data: aula.data,
+        nota: nota,
+        imagens: midiasCarregadas
+      });
+      var slug = Core.nomeArquivo(nomeAluno || 'aula');
+      var nomeArquivo = 'Folha_com_anotacoes_' + slug + '_' + aula.data + '.pdf';
+      entregarArquivo(nomeArquivo, new Blob([bytes], { type: 'application/pdf' }), 'Folha de aula de ' + (nomeAluno || 'aula'));
+      avisar('PDF da folha pronto para salvar ou compartilhar.');
+    }).catch(function () {
+      avisar('Não foi possível gerar o PDF da folha.');
+    });
   }
 
   function inserirImagem() {
