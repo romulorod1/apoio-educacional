@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.29.0';
+  var VERSAO = '1.29.1';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -63,6 +63,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.29.1',
+      itens: [
+        'Se um dia o tablet não conseguir guardar o que você fez (por exemplo, sem espaço), ' +
+          'aparece um aviso no alto da tela com "Tentar de novo agora". O que você fez continua ' +
+          'na tela, e o aplicativo tenta guardar de novo sozinho.'
+      ]
+    },
     {
       versao: '1.29.0',
       itens: [
@@ -971,7 +979,12 @@
     db.ajustes = db.ajustes || {};
     db.ajustes.valoresOcultos = valoresOcultos;
     atualizarBotaoOlho();
-    salvar().then(desenharTudo);
+    /* NA HORA, e não depois de gravar (B3). Ela liga o olho com a família ou o
+     * aluno ao lado: se a gravação falhasse, os valores continuariam à mostra,
+     * e a falha vazaria o que ela mandou esconder. A tela segue a memória; a
+     * faixa do salvar() avisa se não deu para guardar. */
+    desenharTudo();
+    salvar();
   }
 
   function atualizarBotaoOlho() {
@@ -1079,6 +1092,21 @@
     return p;
   }
 
+  /* O QUE É SÓ TELA ACONTECE MESMO QUANDO A GRAVAÇÃO FALHA. A memória já é a
+   * verdade e a faixa avisa que falta guardar; então fechar a janela,
+   * redesenhar e soltar uma trava não podem ficar presos ao disco. Antes, a
+   * falha deixava a janela aberta com o trabalho feito, a tela desatualizada
+   * e, num caso, a trava de guardar trilha presa para sempre. O `depois`
+   * recebe `true` quando gravou, para só então dizer "salvo". A promessa
+   * devolvida continua sendo a do salvar(). Quem DEPENDE do disco (desfaz na
+   * memória quando a gravação falha) continua com salvar().then e o catch
+   * próprio. */
+  function salvarEDepois(depois) {
+    var p = salvar();
+    p.then(function () { depois(true); }, function () { depois(false); });
+    return p;
+  }
+
   function gravacaoConfirmada() {
     if (!gravacaoPendente) return;
     gravacaoPendente = false;
@@ -1152,20 +1180,30 @@
    * memória continuasse com o estado que ela tinha antes, o PRÓXIMO salvar
    * qualquer gravaria esse estado velho por cima do que ficou no disco, sem
    * uma palavra. Então relê do disco antes de qualquer outra coisa, redesenha,
-   * e diz que não se completou. */
+   * e diz que não se completou.
+   *
+   * MAS NUNCA POR CIMA DE UMA MUDANÇA PENDENTE (B3). Se uma gravação anterior
+   * falhou e a faixa está no alto, a memória tem uma mudança que o disco não
+   * tem; reler o disco a jogaria fora calada, e a faixa sumiria junto. Então,
+   * com pendência, grava a memória primeiro: dando certo, a releitura não
+   * perde nada; não dando, a memória e a faixa ficam, a tela não é trocada pelo
+   * disco, e a frase diz que a última mudança ainda não está guardada. */
   function releDoDisco(mensagem) {
-    return Store.carregar().then(function (lido) {
-      db = lido || Store.bancoVazio();
-      /* A memória voltou a ser o disco: não há mais mudança pendente para a
-       * faixa prometer guardar. */
-      gravacaoPendente = false;
-      clearTimeout(tempoNovaTentativa);
-      esconderFaixaGravacao();
-    }).catch(function () { /* nem a leitura deu: fica o que há, e o aviso diz */ }).then(function () {
+    var antes = gravacaoPendente ? salvar() : Promise.resolve();
+    return antes.then(function () {
+      return Store.carregar().then(function (lido) {
+        db = lido || Store.bancoVazio();
+      }).catch(function () { /* nem a leitura deu: fica o que há, e o aviso diz */ }).then(function () {
+        mapeamentoEmEdicao = null;
+        fecharTudo();
+        desenharTudo();
+        avisar(mensagem);
+      });
+    }, function () {
       mapeamentoEmEdicao = null;
       fecharTudo();
       desenharTudo();
-      avisar(mensagem);
+      avisar(mensagem + ' A última mudança ainda não está guardada; a faixa no alto avisa quando der certo.');
     });
   }
 
@@ -1637,10 +1675,12 @@
     diaComZoom = diaParaZoom || null;
     var criadas = Core.garantirSeriesAte(db, mes);
     var p = criadas ? salvar() : Promise.resolve();
-    p.then(function () {
+    // o mês aparece mesmo se a gravação das aulas novas falhar (B3: a faixa avisa)
+    var desenhar = function () {
       desenharAgenda();
       desenharFechamento();
-    });
+    };
+    p.then(desenhar, desenhar);
   }
 
   // ================= agenda =================
@@ -2899,7 +2939,7 @@
              * amarrado a uma aula que não registra mais aquele assunto: a
              * trilha andava com uma prova que ela mesma acabou de apagar. */
             var mexeu = revisarTrilhasDoAluno(aula.alunoId);
-            salvar().then(function () {
+            salvarEDepois(function (gravou) {
               if (!atualizarBlocoAssunto(aula.id)) desenharTemasDaAula(caixa, aula, aluno);
               if ($('#lista-anexos')) desenharAnexos($('#lista-anexos'), aula);
               atualizarPainelTrilhas(aula.alunoId);
@@ -2916,7 +2956,7 @@
                 delete aula.tema;
                 /* Devolver o assunto devolve o passo, com a data da aula. */
                 var voltou = revisarTrilhasDoAluno(aula.alunoId);
-                salvar().then(function () {
+                salvarEDepois(function (gravou) {
                   if (!atualizarBlocoAssunto(aula.id)) desenharTemasDaAula(caixa, aula, aluno);
                   atualizarPainelTrilhas(aula.alunoId);
                   desenharAgenda();
@@ -2938,7 +2978,7 @@
   function dividirAulaEmDuas(aulaId) {
     var marca = Core.dividirAula(db, aulaId);
     if (!marca) { avisar('Esta aula é curta demais para dividir.'); return; }
-    salvar().then(function () {
+    salvarEDepois(function (gravou) {
       fecharModal('modal-aula');
       desenharTudo();
       avisar('Aula dividida em ' + marca.partes[0] + ' e ' + marca.partes[1] + ' minutos.',
@@ -2947,7 +2987,7 @@
             avisar('A segunda aula já tem conteúdo, então ela ficou como está.');
             return;
           }
-          salvar().then(function () { desenharTudo(); avisar('Divisão desfeita.'); });
+          salvarEDepois(function (gravou) { desenharTudo(); avisar('Divisão desfeita.'); });
         });
     });
   }
@@ -3001,7 +3041,7 @@
               delete t.partes;
               delete t.exercicios;
             });
-            salvar().then(function () {
+            salvarEDepois(function (gravou) {
               desenharAnexos(caixa, aula);
               if (!atualizarBlocoAssunto(aula.id) && $('#lista-temas-aula')) {
                 desenharTemasDaAula($('#lista-temas-aula'), aula, alunoPorId(aula.alunoId));
@@ -3220,7 +3260,7 @@
       db.aulas.push(nova);
       var daBiblioteca = folhaPendenteDaBiblioteca;
       folhaPendenteDaBiblioteca = null;
-      salvar().then(function () {
+      salvarEDepois(function (gravou) {
         fecharModal('modal-aula');
         desenharTudo();
         /* Veio do "Abrir como folha" da biblioteca: a página vai para a folha
@@ -3263,7 +3303,7 @@
         };
         if (escopo === 'esta') {
           acao();
-          salvar().then(function () {
+          salvarEDepois(function (gravou) {
             fecharModal('modal-aula');
             desenharTudo();
             avisar(rotulos[escopo] + textoDeTrilha(mexeu));
@@ -3285,10 +3325,10 @@
 
     Core.aplicarEdicaoAula(db, aulaEmEdicao.id, mudancas, 'esta');
     var mexeuAqui = revisarTrilhasDoAluno(aulaEmEdicao.alunoId);
-    salvar().then(function () {
+    salvarEDepois(function (gravou) {
       fecharModal('modal-aula');
       desenharTudo();
-      avisar('Aula salva.' + textoDeTrilha(mexeuAqui));
+      if (gravou) avisar('Aula salva.' + textoDeTrilha(mexeuAqui));
     });
   }
 
@@ -3698,12 +3738,11 @@
         }
 
         db = novoDb;
-        salvar().then(function () {
+        // sem mensagem técnica na falha: a faixa do salvar() já diz o que houve (B3)
+        salvarEDepois(function (gravou) {
           fecharModal('modal-virada-anual');
           desenharTudo();
-          avisar('Séries atualizadas para o ano letivo de ' + ano + ' com sucesso!');
-        }).catch(function (e) {
-          avisar('Erro ao salvar as novas séries: ' + (e && e.message || e));
+          if (gravou) avisar('Séries atualizadas para o ano letivo de ' + ano + ' com sucesso!');
         });
       };
     }
@@ -4760,7 +4799,7 @@
     tirarRascunhoDaLista(id);
     if (eraAberta) abrirPropostaAvulsa();
     else if (redesenharTopoDaProposta) redesenharTopoDaProposta();
-    salvar().then(function () {
+    salvarEDepois(function (gravou) {
       avisar('A proposta de ' + (nome || 'sem nome') + ' foi apagada.');
     });
   }
@@ -5233,8 +5272,8 @@
           var g = db.ajustes.propostaPadrao || {};
           g[chave] = JSON.parse(JSON.stringify(itens() || []));
           db.ajustes.propostaPadrao = g;
-          salvar().then(function () {
-            avisar('Pronto: estes textos passam a nascer em toda proposta nova.');
+          salvarEDepois(function (gravou) {
+            if (gravou) avisar('Pronto: estes textos passam a nascer em toda proposta nova.');
           });
         }
       });
@@ -6088,11 +6127,11 @@
      * oferecer a ela um rascunho que já tem dono. */
     tirarRascunhoDaLista(p.id);
 
-    salvar().then(function () {
+    salvarEDepois(function (gravou) {
       desenharTudo();
       var vig = vigenciaOferecida(aluno, p);
       if (vig) { oferecerVigencia(aluno, vig, nome + ' entrou na lista de alunos.'); return; }
-      avisar(nome + ' entrou na lista de alunos, com a proposta guardada na ficha.');
+      if (gravou) avisar(nome + ' entrou na lista de alunos, com a proposta guardada na ficha.');
     });
   }
 
@@ -6197,7 +6236,7 @@
        * dois: o caminho que sobrava para a segunda família da tarde era apagar
        * campo por campo. */
       if (redesenharTopoDaProposta) redesenharTopoDaProposta();
-      salvar().then(function () {
+      salvarEDepois(function (gravou) {
         avisar('Proposta de ' + nome + ' gerada. Cadastrar como aluno?', 'Cadastrar',
           function () { cadastrarDoRascunho(p); });
       });
@@ -6209,12 +6248,12 @@
     lista.forEach(function (x, k) { if (x.id === p.id) i = k; });
     if (i >= 0) lista[i] = p; else lista.push(p);
 
-    salvar().then(function () {
+    salvarEDepois(function (gravou) {
       desenharAlunos();
       if (aoTerminar) aoTerminar();
       var vig = vigenciaOferecida(ctx.aluno, p);
       if (vig) { oferecerVigencia(ctx.aluno, vig, 'Proposta gerada e guardada na ficha.'); return; }
-      avisar('Proposta gerada e guardada na ficha de ' + nome + '.');
+      if (gravou) avisar('Proposta gerada e guardada na ficha de ' + nome + '.');
     });
   }
 
@@ -6390,17 +6429,19 @@
         if (!criado.desde) criado.desde = dataEncontro;
       }
     }
-    salvar().then(function () {
+    salvarEDepois(function (gravou) {
       fecharModal('modal-aluno');
       desenharTudo();
       if (encontroCriado) {
         irParaMes(Core.mesDe(encontroCriado.data));
         abrirAula(encontroCriado.id);
-        avisar('Aluno salvo e encontro de mapeamento marcado para ' +
-          Core.ddmmaaaa(encontroCriado.data) + '.');
+        if (gravou) {
+          avisar('Aluno salvo e encontro de mapeamento marcado para ' +
+            Core.ddmmaaaa(encontroCriado.data) + '.');
+        }
         return;
       }
-      avisar('Aluno salvo.');
+      if (gravou) avisar('Aluno salvo.');
     });
   }
 
@@ -7432,13 +7473,13 @@
          * valer AQUI, antes do salvar(), senão dbParaGravar() devolveria o
          * registro antigo e o botão não gravaria nada. */
         mapeamentoEmEdicao = null;
-        salvar().then(function () {
+        salvarEDepois(function (gravou) {
           fecharModal('modal-mapeamento');
           if ($('#modal-aula').classList.contains('aberto') && aulaEmEdicao) {
             abrirAula(aulaEmEdicao.id);
           }
           desenharTudo();
-          avisar('Mapeamento salvo.');
+          if (gravou) avisar('Mapeamento salvo.');
         });
       }
     }));
@@ -7971,7 +8012,7 @@
     function mudar(acao, aviso) {
       acao();
       if (proposta) { desenharTrilha(trilha, aluno, opcoes); return; }
-      salvar().then(function () {
+      salvarEDepois(function (gravou) {
         desenharTrilha(trilha, aluno, opcoes);
         atualizarPainelTrilhas(aluno.id);
         if (aulaEmEdicao) atualizarBlocoAssunto(aulaEmEdicao.id);
@@ -8288,14 +8329,14 @@
     if (aluno.trilhas.indexOf(trilha) >= 0) return;
     guardandoTrilha = true;
     aluno.trilhas.push(trilha);
-    salvar().then(function () {
+    salvarEDepois(function (gravou) {
       guardandoTrilha = false;
       propostaDeTrilha = null;
       fecharModal('modal-trilha');
       atualizarPainelTrilhas(aluno.id);
       if (aulaEmEdicao) atualizarBlocoAssunto(aulaEmEdicao.id);
       desenharAgenda();
-      avisar('Trilha guardada: ' + resumoDaTrilha(trilha, aluno));
+      if (gravou) avisar('Trilha guardada: ' + resumoDaTrilha(trilha, aluno));
     }).catch(function () {
       guardandoTrilha = false;
       /* A gravação falhou, então a memória volta a espelhar o disco: senão a
@@ -8643,7 +8684,7 @@
          * assunto foi dado. */
         if (this.checked) {
           remarcarPasso(p, null);
-          salvar().then(function () {
+          salvarEDepois(function (gravou) {
             redesenhar();
             if (aulaEmEdicao) atualizarBlocoAssunto(aulaEmEdicao.id);
             desenharAgenda();
@@ -8833,10 +8874,10 @@
 
     if (campoNota) aulaEmEdicao.notaTexto = campoNota.value;
     if (campoPriv) aulaEmEdicao.notaPrivada = campoPriv.value;
-    salvar().then(function () {
+    salvarEDepois(function (gravou) {
       fecharModal('modal-aula');
       desenharTudo();
-      avisar('Sua anotação foi salva antes de abrir o outro encontro.');
+      if (gravou) avisar('Sua anotação foi salva antes de abrir o outro encontro.');
       setTimeout(function () { abrirAula(aulaId, null); }, 120);
     });
   }
@@ -9457,7 +9498,7 @@
       delete andou.passo.soltoAMao;
     }
 
-    salvar().then(function () {
+    salvarEDepois(function (gravou) {
       fecharModal('modal-tema');
       if ($('#modal-aula').classList.contains('aberto') && aulaEmEdicao &&
           aulaEmEdicao.id === aula.id) {
@@ -10315,7 +10356,7 @@
       chkListas.addEventListener('change', function () {
         db.ajustes = db.ajustes || {};
         db.ajustes.exibirTemasEAreas = chkListas.checked;
-        salvar().then(function () { desenharFechamento(); });
+        salvarEDepois(function (gravou) { desenharFechamento(); });
       });
       cartao.appendChild(el('label', {
         class: 'campo', style: 'display:flex;align-items:center;gap:10px;margin:12px 0 0'
@@ -11117,13 +11158,13 @@
     })[0];
     if (registro) registro.texto = texto;
     else db.resumos.push({ alunoId: corpo._alunoId, mes: corpo._mes, texto: texto });
-    salvar().then(function () {
+    salvarEDepois(function (gravou) {
       fecharModal('modal-resumo');
       desenharFechamento();
       /* A tela do mês pode estar aberta por baixo, e é de lá que ela costuma
        * escrever o feedback: sem isto o texto novo só apareceria ao reabrir. */
       atualizarMesNumaTela();
-      avisar('Resumo salvo.');
+      if (gravou) avisar('Resumo salvo.');
     });
   }
 
@@ -11957,7 +11998,7 @@
     chk.addEventListener('change', function () {
       db.ajustes = db.ajustes || {};
       db.ajustes.esconderNaoCobradas = !chk.checked;
-      salvar().then(function () { desenharAjustesDoFechamento(); });
+      salvarEDepois(function (gravou) { desenharAjustesDoFechamento(); });
     });
     cartao.appendChild(el('label', {
       class: 'campo', style: 'display:flex;align-items:center;gap:10px;margin:0'
@@ -12100,7 +12141,7 @@
       if (novo < 0) novo = 0;
       if (novo > 20) novo = 20;
       db.ajustes.reajusteAcimaDaInflacao = novo;
-      salvar().then(function () {
+      salvarEDepois(function (gravou) {
         mostra.textContent = Core.pctBR(Core.margemDeReajuste(db));
         desenharFechamento();
       });

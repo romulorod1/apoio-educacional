@@ -391,6 +391,11 @@ roda "salvar --envenenado-nao-rele"             node "_teste/testa_store_grava_n
 # ligacao do tratamento central, e a falha tem de voltar a ser calada.
 roda "falha de gravacao"                        node "_teste/testa_falha_de_gravacao.js"
 roda "falha --envenenado-sem-tratamento"        node "_teste/testa_falha_de_gravacao.js" --envenenado-sem-tratamento
+# O olho esconde os valores na hora, mesmo quando a gravacao falha (ela o liga
+# com a familia ao lado); e o releDoDisco nao rele o disco por cima de uma
+# mudanca pendente. Um veneno para cada regra.
+roda "falha --envenenado-olho-espera"           node "_teste/testa_falha_de_gravacao.js" --envenenado-olho-espera
+roda "falha --envenenado-rele-descarta"         node "_teste/testa_falha_de_gravacao.js" --envenenado-rele-descarta
 
 # FRENTE B (B9): kits.json e exclusoes.json sao aditivos do esquema 1 (CONTRATO
 # 8d). A prova nao le o biblioteca.js: ela IMPORTA um pacote de brinquedo com os
