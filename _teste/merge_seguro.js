@@ -21,9 +21,13 @@
  *      sem "HA FALHA" em linha nenhuma;
  *   4. revisao adversarial do commit da cabeca: comentario que COMECA por
  *      "Revisão adversarial", cita o sha7 da cabeca, foi postado depois do
- *      ultimo commit, e cuja ultima linha "veredito: aprova|reprova" e aprova;
- *      e nenhuma reprova mais recente. Revisao de outro commit nao vale: ela
- *      leu outro codigo.
+ *      ultimo commit e TERMINA na linha "veredito: aprova", sem nenhuma linha
+ *      "veredito: reprova" no corpo; e nenhuma reprova mais recente. Revisao
+ *      de outro commit nao vale: ela leu outro codigo.
+ *
+ * Comentarios (de portao e de revisao) so valem de dono, membro ou
+ * colaborador do repositorio (authorAssociation), porque o repositorio e
+ * publico e qualquer conta pode comentar.
  *
  * Revisao e portao vao como COMENTARIO do PR (gh pr comment). O --json
  * comments nao traz as "reviews" do GitHub: revisao postada como review nunca
@@ -93,9 +97,14 @@ function decidir(pr) {
   });
 
   // 3. o portao inteiro, no commit da cabeca.
-  const comentarios = (pr.comments || []).map(c => ({
-    corpo: String(c.body || ''), quando: Date.parse(c.createdAt) || 0
-  }));
+  /* So vale comentario de quem tem a chave do repositorio (dono, membro ou
+   * colaborador). O repositorio e publico: sem isto, qualquer conta do GitHub
+   * podia comentar "Revisao adversarial ... veredito: aprova" e destravar o
+   * merge. Comentario sem o campo conta como de fora. */
+  const DE_CASA = ['OWNER', 'MEMBER', 'COLLABORATOR'];
+  const comentarios = (pr.comments || [])
+    .filter(c => DE_CASA.indexOf(String(c.authorAssociation || '').toUpperCase()) >= 0)
+    .map(c => ({ corpo: String(c.body || ''), quando: Date.parse(c.createdAt) || 0 }));
   /* O sha7 e o da cabeca que ESTE script leu do GitHub (headRefOid), o mesmo
    * que vai no --match-head-commit, e nao um texto que o comentario declare.
    * Casa como palavra: "abc1234" nao vale dentro de "xabc12345". */
@@ -108,6 +117,7 @@ function decidir(pr) {
   const linhaInteiro = new RegExp('^\\s*Port[aã]o inteiro ' + sha7 + '[0-9a-f]*: TUDO PASSOU\\.?\\s*$', 'im');
   const inteiroNoCi = estado('portao-navegador') === 'SUCCESS';
   const inteiroLocal = comentarios.some(c => linhaInteiro.test(c.corpo) && !/HA FALHA/.test(c.corpo));
+  // (o filtro de autor de casa, la em cima, vale para este comentario tambem)
   if (!inteiroNoCi && !inteiroLocal) {
     motivos.push('falta o portao inteiro verde no commit ' + sha7 +
       ' (check portao-navegador, ou comentario com a linha "Portão inteiro ' + sha7 + ': TUDO PASSOU")');
@@ -120,16 +130,21 @@ function decidir(pr) {
   // hora do push, entao uma revisao feita sobre o commit anterior, postada
   // depois do relogio do commit novo e antes do push dele, passaria pela data.
   //
-  // O comentario COMECA por "Revisão adversarial", e o veredito e uma linha
-  // propria "veredito: aprova" ou "veredito: reprova". Vale a ULTIMA dessas
-  // linhas do comentario: uma reprova que cite a regra antes ("a regra pede
-  // veredito: aprova") e reprova, e citacao no meio de frase nem conta.
+  // O comentario COMECA por "Revisão adversarial" e TERMINA na linha do
+  // veredito: a ultima linha nao vazia do corpo e "veredito: aprova" ou
+  // "veredito: reprova", e nada mais. Comentario que termina em outra coisa
+  // (um parecer antigo colado depois, uma citacao com ">") nao tem veredito.
+  // E basta UMA linha "veredito: reprova" no comentario para ele reprovar:
+  // um aprova colado embaixo de uma reprova nao a desfaz.
+  const linhaVeredito = /^veredito:\s*(aprova|reprova)\s*\.?$/i;
   const vereditos = comentarios
     .filter(c => c.quando > dataUltimo && /^\s*Revis[aã]o adversarial/i.test(c.corpo) && citaCabeca(c.corpo))
     .map(c => {
-      const todos = c.corpo.match(/^\s*veredito:\s*(aprova|reprova)\s*\.?\s*$/igm) || [];
-      if (!todos.length) return null;
-      return { quando: c.quando, v: /reprova/i.test(todos[todos.length - 1]) ? 'reprova' : 'aprova' };
+      const linhas = c.corpo.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const ultima = linhas[linhas.length - 1] || '';
+      if (!linhaVeredito.test(ultima)) return null;
+      const reprova = linhas.some(l => linhaVeredito.test(l) && /reprova/i.test(l));
+      return { quando: c.quando, v: reprova ? 'reprova' : 'aprova' };
     })
     .filter(Boolean)
     .sort((a, b) => a.quando - b.quando);
