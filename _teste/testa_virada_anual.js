@@ -99,3 +99,7 @@ assert.equal(avancado.db.series[0].fim, null, 'avanço não interrompe recorrên
 assert.equal(JSON.stringify(comMapa), antesComMapa, 'mapas e séries de origem permanecem intactos');
 
 console.log('16 sugestões, 9 contextos, 6 invariantes da prévia e 14 da aplicação verificados.');
+// A linha que o portao le. So chega aqui quem passou por todos os assert: o
+// primeiro que falha lanca e o processo morre antes, sem placar, e o portao
+// reprova por "nao disse que passou".
+console.log('45 verificações passaram, 0 falharam.');

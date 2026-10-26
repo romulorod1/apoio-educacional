@@ -8,9 +8,10 @@
 const puppeteer = require('puppeteer-core');
 const fs = require('fs');
 const path = require('path');
+const { irParaMes } = require('./_ir_para_mes.js');
 const http = require('http');
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const PASTA = path.join(__dirname, 'sim_v1');
 const RAIZ = path.join(__dirname, '..');
 const PORTA = 8778;
@@ -269,13 +270,8 @@ const VERSAO_NOVA = (fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8
     Array.from(abas).find(b => b.dataset.tela === 'agenda').click();
   });
   await espera(400);
+  await irParaMes(pag, 2026, 9, 60);
   const abriuFolha = await pag.evaluate(async (id) => {
-    const app = document.querySelector('#grade-mes');
-    let g = 0;
-    while (document.querySelector('#rotulo-mes').textContent !== 'Setembro de 2026' && g++ < 30) {
-      document.querySelector('#mes-seguinte').click();
-      await new Promise(r => setTimeout(r, 60));
-    }
     const pil = document.querySelector('.pilula');
     if (!pil) return 'sem aula visivel';
     pil.click();

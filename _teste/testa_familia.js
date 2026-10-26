@@ -24,7 +24,7 @@
  */
 const puppeteer = require('puppeteer-core');
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const URL_APP = 'http://127.0.0.1:8777/index.html';
 
 const SO_MINHA = 'Chegou disperso e sem o material. Falar com a mae antes do proximo mes.';
@@ -470,8 +470,12 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   /* O caso comum de quem começou agora: nenhum feedback escrito, nenhuma frase
    * para escolher. O cartão sai assim mesmo, com o nome, o mês e a contagem, e a
    * janela diz onde escrever a frase. */
+  /* O outro aluno pelo NOME, e nao pela posicao: desde que o fechamento passou a
+   * vir em ordem alfabetica (ece2b95), o segundo cartao deixou de ser ele e o
+   * teste abria o cartao do aluno COM feedback. */
   await pag.evaluate(() => {
-    const outro = document.querySelectorAll('#lista-fechamento .cartao')[1];
+    const outro = Array.from(document.querySelectorAll('#lista-fechamento .cartao'))
+      .find(c => !/Marcelo/.test(c.querySelector('h3').textContent));
     Array.from(outro.querySelectorAll('button'))
       .find(b => b.textContent.trim() === 'Cartão do mês').click();
   });

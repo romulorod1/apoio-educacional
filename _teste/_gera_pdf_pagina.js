@@ -9,7 +9,7 @@ const destino = process.argv[3];
 
 (async () => {
   const nav = await puppeteer.launch({
-    executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    executablePath: (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe'),
     headless: 'new', args: ['--no-sandbox']
   });
   const pag = await nav.newPage();

@@ -441,13 +441,19 @@ async function rodar() {
   await pausa(300);
 
   // 2. Injetar aula futura cancelada e aula futura com nota para testar previa, markdown e PDF
-  await pag.evaluate(async () => {
+  /* O mes SEGUINTE ao do relogio, e nao um mes escrito. O teste nasceu em
+   * setembro de 2026 com '2026-10' fixo, que era futuro; em outubro virou o mes
+   * corrente, as aulas de 10 e 12 viraram passado, e seis conferencias
+   * reprovaram sem nenhuma linha do aplicativo ter mudado. */
+  const proximo = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
+  const MES_FUTURO = proximo.getFullYear() + '-' + String(proximo.getMonth() + 1).padStart(2, '0');
+  const DIA_CANCELADA = '10/' + MES_FUTURO.slice(5);
+  await pag.evaluate(async (MES_FUTURO) => {
     const dados = await Store.carregar();
-    // Injetar no mes seguinte (2026-10), onde as datas sao estritamente futuras em relacao a hoje (2026-09)
     dados.aulas.push({
       id: 'aula_alfa_futura_cancelada',
       alunoId: 'aluno_alfa_t10',
-      data: '2026-10-10',
+      data: MES_FUTURO + '-10',
       hora: '14:00',
       duracaoMin: 60,
       status: 'cancelada',
@@ -458,7 +464,7 @@ async function rodar() {
     dados.aulas.push({
       id: 'aula_alfa_futura_agendada',
       alunoId: 'aluno_alfa_t10',
-      data: '2026-10-12',
+      data: MES_FUTURO + '-12',
       hora: '15:00',
       duracaoMin: 60,
       status: 'realizada',
@@ -468,24 +474,24 @@ async function rodar() {
       notaTexto: 'Planejamento confidencial que nao deve sair em notas realizadas'
     });
     await Store.salvar(dados);
-  });
+  }, MES_FUTURO);
 
   // Recarregar app para inicializar db com as novas aulas
   await H.abrirApp(pag, amb.ORIGEM);
 
-  // Navegar para aba Fechamento e selecionar mes 2026-10
-  await pag.evaluate(() => {
+  // Navegar para aba Fechamento e selecionar o mes seguinte
+  await pag.evaluate((MES_FUTURO) => {
     const abaFech = document.querySelector('#abas .aba[data-tela="fechamento"]');
     if (abaFech) abaFech.click();
     const sel = document.querySelector('#mes-fechamento');
     if (sel) {
-      sel.value = '2026-10';
+      sel.value = MES_FUTURO;
       sel.dispatchEvent(new Event('change', { bubbles: true }));
     }
-  });
+  }, MES_FUTURO);
   await pausa(400);
 
-  // Abrir modal da familia para Aluno Alfa em 2026-10
+  // Abrir modal da familia para Aluno Alfa no mes seguinte
   await pag.evaluate(() => {
     const cards = Array.from(document.querySelectorAll('#lista-fechamento .cartao'));
     const cAlfa = cards.find(c => c.textContent.includes('Aluno Alfa Teste'));
@@ -496,7 +502,7 @@ async function rodar() {
   });
   await pausa(400);
 
-  const resultadoFuturas = await pag.evaluate(async () => {
+  const resultadoFuturas = await pag.evaluate(async (MES_FUTURO, DIA_CANCELADA) => {
     // Marcar chkNotas
     const chkNotas = document.querySelector('#doc-chk-notas');
     if (chkNotas && !chkNotas.checked) chkNotas.click();
@@ -505,7 +511,7 @@ async function rodar() {
     const textoPrevia = previa ? previa.textContent : '';
 
     const dados = await Store.carregar();
-    const f = Core.calcularFechamento(dados, 'aluno_alfa_t10', '2026-10');
+    const f = Core.calcularFechamento(dados, 'aluno_alfa_t10', MES_FUTURO);
     const md = Core.markdownFechamento(f, { incluirNotas: true, exibirTemasEAreas: true });
 
     let pdfTexto = '';
@@ -522,17 +528,17 @@ async function rodar() {
 
     return {
       previaTemAulasCanceladasAFrente: textoPrevia.includes('Aulas canceladas à frente'),
-      previaTemDataCancelada: textoPrevia.includes('10/10'),
+      previaTemDataCancelada: textoPrevia.includes(DIA_CANCELADA),
       previaTemNotaFutura: textoPrevia.includes('Planejamento confidencial'),
       mdTemAulasCanceladasAFrente: md.includes('## Aulas canceladas à frente'),
       mdTemNotaFutura: md.includes('Planejamento confidencial'),
       pdfTemAulasCanceladasAFrente: pdfTexto.includes('Aulas canceladas'),
       pdfTemNotaFutura: pdfTexto.includes('Planejamento confidencial')
     };
-  });
+  }, MES_FUTURO, DIA_CANCELADA);
 
   conf('previa exibe secao "Aulas canceladas a frente"', resultadoFuturas.previaTemAulasCanceladasAFrente, true);
-  conf('previa exibe data da cancelada futura (10/10)', resultadoFuturas.previaTemDataCancelada, true);
+  conf('previa exibe data da cancelada futura (' + DIA_CANCELADA + ')', resultadoFuturas.previaTemDataCancelada, true);
   conf('previa NUNCA exibe notas de aulas futuras', resultadoFuturas.previaTemNotaFutura, false);
   conf('Markdown exibe secao "Aulas canceladas a frente"', resultadoFuturas.mdTemAulasCanceladasAFrente, true);
   conf('Markdown NUNCA exibe notas de aulas futuras', resultadoFuturas.mdTemNotaFutura, false);
@@ -550,7 +556,9 @@ async function rodar() {
 
   // ================================================================
   secao('Fim da execucao');
-  console.log('\nPlacar final: ' + placar.passes + ' aprovados, ' + placar.falhas + ' falhas.');
+  // No dialeto dos irmaos, que e o unico que o portao le: "N aprovados, M
+  // falhas" saia la como "nao disse que passou" mesmo com tudo verde.
+  console.log('\n' + placar.passes + ' passaram, ' + placar.falhas + ' falharam.');
   await amb.encerrar();
   process.exit(placar.falhas === 0 ? 0 : 1);
 }

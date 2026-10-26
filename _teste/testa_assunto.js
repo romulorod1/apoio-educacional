@@ -28,7 +28,7 @@ const puppeteer = require('puppeteer-core');
 const path = require('path');
 const fs = require('fs');
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const URL_APP = 'http://127.0.0.1:8777/index.html';
 
 /* ---- o assunto de outra matéria, tirado do banco ---- */

@@ -38,7 +38,7 @@ const path = require('path');
 const http = require('http');
 const crypto = require('crypto');
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const RAIZ = path.join(__dirname, '..');
 /* Começa com sim_ como as pastas dos irmãos: é uma cópia do repositório, e o
  * app.js carrega o primeiro nome do aluno do exemplo. Some no fim e no catch. */

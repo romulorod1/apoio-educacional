@@ -11,7 +11,7 @@ const http = require('http');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const PASTA = path.join(__dirname, 'sim_real');
 const RAIZ = path.join(__dirname, '..');
 const PORTA = 8779;

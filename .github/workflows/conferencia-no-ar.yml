@@ -1,0 +1,38 @@
+# Conferencia pos-deploy: o que esta no ar e o que a main diz?
+#
+# Merge verde nao prova que a Nathalia recebe o codigo novo: o GitHub Pages
+# publica por conta propria, minutos depois, e ja houve release em que o
+# tablet seguiu com o cache antigo. Este job abre o site publicado e compara,
+# byte a byte (sha256), os arquivos que decidem a atualizacao (sw.js, app.js,
+# index.html) com os do commit que acabou de entrar. Imprime a VERSAO do
+# app.js e o nome do cache do sw.js que estao no ar.
+#
+# Espera ate 15 minutos, porque o Pages demora. Se outro push chegar antes, o
+# concurrency cancela esta rodada: a conferencia que vale e a do commit mais
+# novo, e comparar o site com um commit que ja foi ultrapassado reprovaria
+# sem defeito nenhum.
+#
+# SITE muda no B4 (origem propria no Cloudflare Pages); e a unica linha a
+# trocar aqui.
+name: conferencia-no-ar
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: conferencia-no-ar
+  cancel-in-progress: true
+
+env:
+  SITE: https://romulorod1.github.io/apoio-educacional
+
+jobs:
+  no-ar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: O site publicado bate com o commit
+        run: sh _teste/confere_no_ar.sh "$SITE" 900

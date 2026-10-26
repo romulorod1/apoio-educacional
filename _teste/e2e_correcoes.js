@@ -4,7 +4,7 @@ const puppeteer = require('puppeteer-core');
 const fs = require('fs');
 const path = require('path');
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const URL_APP = 'http://127.0.0.1:8777/index.html';
 const VERSAO_ESPERADA = (fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8')
   .match(/var VERSAO = '([^']+)'/) || [])[1];

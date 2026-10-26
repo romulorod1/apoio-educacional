@@ -7,7 +7,7 @@ const c = (r, v, e) => { const p = String(v) === String(e); p ? ok++ : mau++;
   console.log((p ? '  OK   ' : '  FALHA') + ' ' + r + (p ? '' : '  [' + v + ' != ' + e + ']')); };
 (async () => {
   const nav = await puppeteer.launch({
-    executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    executablePath: (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe'),
     headless: 'new', args: ['--no-sandbox'], defaultViewport: { width: 1200, height: 900 } });
   const pag = await nav.newPage();
   const erros = [];

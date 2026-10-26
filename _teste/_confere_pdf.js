@@ -2,7 +2,7 @@ const puppeteer = require('puppeteer-core');
 const path = require('path');
 (async () => {
   const nav = await puppeteer.launch({
-    executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    executablePath: (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe'),
     headless: 'new', args: ['--no-sandbox'], defaultViewport: { width: 1100, height: 1400 }
   });
   const pag = await nav.newPage();

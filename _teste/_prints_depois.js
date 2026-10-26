@@ -1,7 +1,7 @@
 const puppeteer = require('puppeteer-core');
 const fs = require('fs');
 const path = require('path');
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const SAIDA = path.join(__dirname, 'prints');
 const ALVOS = [
   ['depois-registro',       '#m-registro'],

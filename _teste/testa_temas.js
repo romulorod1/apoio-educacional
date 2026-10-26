@@ -15,7 +15,7 @@
 const puppeteer = require('puppeteer-core');
 const path = require('path');
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const URL_APP = 'http://127.0.0.1:8777/index.html';
 
 let falhas = 0, passes = 0;
@@ -127,9 +127,13 @@ const porValor = (sel, valor) => `(() => {
     await clicarTexto('#corpo-modal-aula button', 'assunto');
     await espera(1600);
     await pag.evaluate(() => {
+      // Desde o T05 (5b8a98f) a linha e "Ver todos os assuntos de Matematica
+      // (N assuntos)", ou "Abrir o catalogo de Matematica por ano" para aluno
+      // fora da escola, e nao mais so "Matematica".
       const l = Array.from(document.querySelectorAll('#corpo-modal-tema .item-lista'))
-        .find(x => x.querySelector('.nome') && x.querySelector('.nome').textContent.trim() === 'Matemática');
-      if (!l) throw new Error('nao achei a linha Matematica em "Por materia"');
+        .find(x => x.querySelector('.nome') &&
+          /^(Ver todos os assuntos|Abrir o catálogo) de Matemática/.test(x.querySelector('.nome').textContent.trim()));
+      if (!l) throw new Error('nao achei a linha que abre a grade de Matematica');
       l.click();
     });
     await espera(1600);
@@ -218,10 +222,17 @@ const porValor = (sel, valor) => `(() => {
   await espera(400);
 
   // ================================================================
-  secao('3. O ano escolhido fica lembrado no aluno');
+  secao('3. Trocar o ano na lista NÃO cadastra o ano do aluno');
 
-  /* Ler de volta o valor que o próprio teste acabou de escrever no select não
+  /* Até o T05 (5b8a98f) trocar o ano aqui gravava o ano escolar no aluno. Hoje
+   * a regra é a contrária, escrita em lembrarAnoEscolar no app.js: navegar por
+   * um ano para reforço ou consulta não altera o cadastro calado; o ano se
+   * cadastra na ficha ou no mapeamento. A lista só lembra o ano enquanto o
+   * aplicativo está aberto.
+   *
+   * Ler de volta o valor que o próprio teste acabou de escrever no select não
    * afirma nada. O que prova que o ano trocou é a LISTA ter trocado. */
+  const anoAntes = ((await bd()).alunos.find(a => /Marcelo/i.test(a.nome)) || {}).anoEscolar;
   const temas06 = await pag.$$eval('#lista-temas .item-tema .nome', es => es.map(e => e.textContent));
   await pag.select('#corpo-modal-tema select', '08');
   await espera(900);
@@ -230,7 +241,8 @@ const porValor = (sel, valor) => `(() => {
   let banco = await bd();
   const marcelo = banco.alunos.find(a => /Marcelo/i.test(a.nome));
   conf('o aluno da aula é o Marcelo', !!marcelo, true);
-  conf('e o ano escolar dele fica gravado', marcelo.anoEscolar, '08');
+  conf('o ano da lista é outro que o do cadastro', String(anoAntes || '') !== '08', true);
+  conf('e o ano escolar dele continua o do cadastro', String(marcelo.anoEscolar || ''), String(anoAntes || ''));
 
   // ================================================================
   secao('4. Escolher um tema REGISTRA o assunto, e não monta PDF');
@@ -390,14 +402,16 @@ const porValor = (sel, valor) => `(() => {
   banco = await bd();
   const aula3 = banco.aulas.find(a => a.data === '2026-06-10' && a.alunoId === marcelo.id);
   conf('o assunto continua depois de recarregar', (aula3.temas || []).length, 1);
-  conf('e o ano escolar também',
-    banco.alunos.find(a => /Marcelo/i.test(a.nome)).anoEscolar, '08');
+  conf('e o ano escolar continua o do cadastro',
+    String(banco.alunos.find(a => /Marcelo/i.test(a.nome)).anoEscolar || ''), String(anoAntes || ''));
 
   await irParaJunho();
   await abrirAulaDoDia10();
   await abrirListaDeTemas();
-  conf('a lista reabre no ano escolar do aluno',
-    await pag.$eval('#corpo-modal-tema select', e => e.value), '08');
+  // Sem ano cadastrado e com o aplicativo reaberto, a lista volta ao 6º ano:
+  // o 8º escolhido na seção 3 era navegação, e não cadastro.
+  conf('a lista reabre no ano do cadastro, e não no da navegação',
+    await pag.$eval('#corpo-modal-tema select', e => e.value), '06');
   await clicarTexto('#rodape-modal-tema button', 'Cancelar');
   await espera(400);
   conf('cancelar fecha sem registrar nada', await visivel('#modal-tema'), false);
