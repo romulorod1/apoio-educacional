@@ -204,6 +204,9 @@ roda "fechamento em ordem"   node _teste/testa_fechamento_ordem_alfabetica.js
 roda "rotulos da aula"       node _teste/testa_rotulos_aula.js
 roda "sugestoes matematica"  node _teste/testa_sugestoes_matematica.js
 roda "virada anual"          node _teste/testa_virada_anual.js
+# A regra do merge na main (_teste/merge_seguro.sh), que segura o processo
+# quando a protecao de branch do GitHub sumir com o repositorio privado.
+roda "merge seguro"          node _teste/testa_merge_seguro.js
 
 # As provas do kit de figuras nao rodavam aqui. Duas delas estavam falhando
 # desde o commit que as criou, algumas horas antes (_base_prova_travas, 34 de
