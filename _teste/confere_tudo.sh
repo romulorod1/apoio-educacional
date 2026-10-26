@@ -5,12 +5,36 @@
 # esquecer um. Sai com codigo diferente de zero se qualquer coisa falhar, entao
 # serve tanto para olhar quanto para travar.
 #
-#   sh _teste/confere_tudo.sh
+#   sh _teste/confere_tudo.sh            o portao inteiro, com Chrome
+#   sh _teste/confere_tudo.sh --rapido   tudo menos o que abre navegador
+#
+# O --rapido e o que o GitHub roda em todo PR (.github/workflows/portao.yml),
+# porque o inteiro passa de dez minutos e quase todo esse tempo e Chrome. Ele
+# NAO substitui o inteiro antes do merge: no fim ele diz que as provas de
+# navegador nao rodaram, em vez de "TUDO PASSOU".
 set -e
 cd "$(dirname "$0")/.."
 
 falhou=0
 instavel=0
+rapido=0
+if [ "${1:-}" = "--rapido" ]; then
+  rapido=1
+fi
+
+# O CAMINHO DE CADA PROVA QUE O PORTAO CHAMOU, uma por linha.
+#
+# E a lista que a conferencia "toda prova no portao", no fim, compara com os
+# arquivos de prova que existem no repositorio. Ela sai de quem RODA, e nao de
+# um grep neste arquivo: um nome citado num comentario daqui passaria por
+# "esta no portao" sem rodar nunca.
+chamadas=""
+anota() { chamadas="$chamadas
+$1"; }
+# Na secao de navegador, o --rapido anota a prova sem rodar: ela continua
+# contando como "esta no portao", porque esta, e o inteiro a roda.
+na_secao_navegador=0
+pulados=0
 
 # ONDE A SAIDA DE QUEM REPROVOU FICA GUARDADA.
 #
@@ -65,6 +89,15 @@ passou_de_verdade() {
 }
 roda() {
   nome="$1"; shift
+  # $1 e o interpretador (node, python, sh) e $2 o arquivo da prova.
+  anota "${2:-}"
+  if [ "$rapido" = "1" ] && [ "$na_secao_navegador" = "1" ]; then
+    # Dito pelo nome, um por um: pular calado fazia o --rapido parecer que
+    # rodou o que nao rodou.
+    printf '  pulado  %-24s abre navegador; so o portao inteiro roda\n' "$nome"
+    pulados=$((pulados + 1))
+    return
+  fi
   saida=$("$@" 2>&1) || true
   n=$(quantas_falhas "$saida")
   ruim=0
@@ -170,6 +203,22 @@ roda "ids de topicos" node _teste/testa_topicos_ids.js
 # Cada veneno (corrompido deflate e stored, hash, sobrando, faltando, asset
 # citado, esquema) tem de ser recusado pelo motivo certo.
 roda "biblioteca (zip)" node _teste/testa_biblioteca_zip.js
+# Os quatro sem navegador que as frentes de UX (T01 a T12) escreveram e nao
+# puseram aqui. Passavam sozinhos; ninguem os rodava antes do merge.
+roda "fechamento em ordem"   node _teste/testa_fechamento_ordem_alfabetica.js
+roda "rotulos da aula"       node _teste/testa_rotulos_aula.js
+roda "sugestoes matematica"  node _teste/testa_sugestoes_matematica.js
+roda "virada anual"          node _teste/testa_virada_anual.js
+# A regra do merge na main (_teste/merge_seguro.sh), que segura o processo
+# quando a protecao de branch do GitHub sumir com o repositorio privado.
+roda "merge seguro"          node _teste/testa_merge_seguro.js
+# Oito que moravam no laco "com navegador" sem abrir navegador nenhum (nem
+# puppeteer, nem a porta 8777). La, o --rapido os pulava; aqui o GitHub os roda
+# em todo PR.
+for t in testa_registro testa_mapeamento testa_exclusoes testa_feriados \
+         testa_mover testa_retroativo testa_series testa_aluno; do
+  roda "$t" node "_teste/$t.js"
+done
 
 # As provas do kit de figuras nao rodavam aqui. Duas delas estavam falhando
 # desde o commit que as criou, algumas horas antes (_base_prova_travas, 34 de
@@ -228,6 +277,7 @@ roda "piloto MATEM2-03" node figuras/_piloto_MATEM2-03.js
 roda "piloto MATEM2-11" node figuras/_piloto_MATEM2-11.js
 roda "piloto MATEM2-12" node figuras/_piloto_MATEM2-12.js
 roda "varredura banco"  node figuras/_varredura_banco.js
+anota figuras/_prova_desenho.js
 saida=$(node figuras/_prova_desenho.js 2>&1) || true
 if printf '%s\n' "$saida" | grep -qE "^avisos: 0$" && printf '%s\n' "$saida" | grep -qE "^vazamentos de estado: 0$"; then
   printf '  ok      %-24s %s\n' "desenho" "$(printf '%s\n' "$saida" | grep -E '^figuras:' | head -1)"
@@ -262,7 +312,10 @@ fi
 # servidor proprio ali continua com o dele.
 servidor_pid=""
 porta_responde() { curl -s -o /dev/null -m 2 "http://127.0.0.1:8777/index.html" 2>/dev/null; }
-if porta_responde; then
+na_secao_navegador=1
+if [ "$rapido" = "1" ]; then
+  printf '\n  (--rapido: a secao de navegador e anotada e nao roda; o portao inteiro a roda)\n'
+elif porta_responde; then
   printf '\n  (servidor ja estava no ar em 127.0.0.1:8777)\n'
 else
   python -m http.server 8777 --bind 127.0.0.1 >/dev/null 2>&1 &
@@ -289,17 +342,21 @@ limpa_servidor() {
 trap limpa_servidor EXIT INT TERM
 
 titulo "com navegador"
-for t in testa_temas testa_registro testa_busca testa_mapa_e2e testa_mapeamento \
+for t in testa_temas testa_busca testa_mapa_e2e \
          testa_perfil testa_olho testa_atualizacao testa_atualizacao_real \
          testa_biblioteca_offline \
-         testa_exclusoes testa_feriados testa_mover testa_retroativo testa_series \
-         testa_assunto testa_aluno testa_familia testa_proposta_tela \
+         testa_assunto testa_familia testa_proposta_tela \
          testa_novidades_navegador \
          testa_modal_aula_navegador \
          testa_folha_navegador \
          testa_folha_resiliencia_navegador \
          testa_documento_familia_navegador \
-         testa_tabela_no_app; do
+         testa_tabela_no_app \
+         testa_ano_cadastro \
+         testa_sugestoes_matematica_navegador \
+         testa_virada_anual_navegador \
+         testa_zoom_calendario_navegador \
+         e2e e2e_correcoes; do
   roda "$t" node "_teste/$t.js"
 done
 # O mesmo teste duas vezes de proposito. Sem argumento ele prova que a serie
@@ -347,7 +404,9 @@ roda "biblioteca navegar --envenenado-apelidos" node "_teste/testa_biblioteca_na
 # No navegador, caixas, carrinho, gerar, anexar, uso, etiqueta e lista como folha;
 # o modo envenenado serve um pdf.js que nao escreve "Sem solucao na fonte.", e o
 # teste tem que enxergar o numero vazio no gabarito.
+na_secao_navegador=0  # sem Chrome: o --rapido roda (conferido com CHROME envenenado)
 roda "biblioteca compor (pdf)"                 node "_teste/testa_biblioteca_compor.js"
+na_secao_navegador=1
 roda "biblioteca compor"                       node "_teste/testa_biblioteca_compor_tela.js"
 roda "biblioteca compor --envenenado-sem-solucao" node "_teste/testa_biblioteca_compor_tela.js" --envenenado-sem-solucao
 # FRENTE B: a biblioteca a partir da aula (botao Material do assunto, filtro
@@ -373,7 +432,7 @@ roda "limpeza do acervo --envenenado-lista"     node "_teste/testa_limpeza_acerv
 # a janela da aula sem o botao, o assunto do banco como assunto comum, o material
 # ja anexado numa aula antiga ainda abrindo, e a trilha sem "Ver os temas
 # soltos". O veneno religa a chave no app.js servido e percorre o MESMO caminho
-# do modo normal do comeco ao fim, conferindo no balanco final as SETE ausencias
+# do modo normal do comeco ao fim, conferindo no balanco final as ausencias (eram SETE; a sexta perdeu o par no T05)
 # virando presenca: o botao da folha, o "atalho opcional" da ajuda, o botao
 # Material da linha do assunto, o "material pronto" da ajuda do assunto, o "Ver
 # os temas soltos" e a ajuda do fim da trilha, o "material pronto" da escolha de
@@ -517,8 +576,10 @@ roda "folha --envenenado-alca"                     node "_teste/testa_folha_muda
 roda "folha --envenenado-traco-cancelado"          node "_teste/testa_folha_mudancas.js" --envenenado-traco-cancelado
 # FRENTE B (B10): retangulo de tapar com posicao que nao e numero nao vai
 # para o papel. Sem navegador.
+na_secao_navegador=0  # sem Chrome: o --rapido roda
 roda "tapar so com numero"                         node "_teste/testa_tapar_numeros.js"
 roda "tapar --envenenado-numeros"                  node "_teste/testa_tapar_numeros.js" --envenenado-numeros
+na_secao_navegador=1
 roda "biblioteca listas --envenenado-palma"         node "_teste/testa_biblioteca_listas.js" --envenenado-palma
 roda "biblioteca listas --envenenado-contorno"      node "_teste/testa_biblioteca_listas.js" --envenenado-contorno
 # O aparo do tapar nos TRES caminhos: criar, mover e redimensionar.
@@ -530,6 +591,7 @@ roda "biblioteca listas --envenenado-lembra"        node "_teste/testa_bibliotec
 # prova gera a MESMA folha com o pdf.js de hoje e com o do d80bb90 e compara
 # byte a byte e pixel a pixel a 200 dpi, com controle de que o medidor sabe
 # acusar (duas paginas diferentes do mesmo PDF dao diferenca aos milhares).
+na_secao_navegador=0  # sem Chrome (rasteriza pelo Python): o --rapido roda os quatro
 roda "folha impressa igual ao publicado"        node "_teste/testa_folha_impressa_igual.js"
 # E O VENENO DELA, que estava FORA da bateria. Guarda fora do portao nao e
 # guarda: esta prova e inerte contra o diff que a estreia, e o que lhe da
@@ -540,6 +602,7 @@ roda "folha impressa --envenenado-ordem"        node "_teste/testa_folha_impress
 roda "folha impressa --envenenado-tapar"        node "_teste/testa_folha_impressa_igual.js" --envenenado-tapar
 # E o guarda do TETO: um contorno desenhado no caminho do PDF estoura o teto.
 roda "folha impressa --envenenado-contorno"     node "_teste/testa_folha_impressa_igual.js" --envenenado-contorno-no-papel
+na_secao_navegador=1
 
 roda "painel de valores"                        node "_teste/testa_painel_valores.js"
 roda "painel de valores --envenenado-aberto"    node "_teste/testa_painel_valores.js" --envenenado-aberto
@@ -553,6 +616,10 @@ roda "painel de valores --envenenado-esquece"   node "_teste/testa_painel_valore
 roda "gerador da biblioteca"                    python biblioteca/_prova_gerador.py
 # O Banco de Questoes (2016 a 2020), sobre um volume sintetico do mesmo modelo.
 roda "banco da biblioteca"                      python biblioteca/_prova_banco.py
+# Daqui ate o fim da secao, nada abre Chrome (conferido com CHROME envenenado
+# em 26/10): o --rapido roda. O _prova_banco acima fica no navegador porque a
+# trava de fidelidade dele renderiza no Chrome.
+na_secao_navegador=0
 # A kits-v1 e a tempo-v1 (CONTRATO 8e), sobre uma amostra escrita a mao na
 # propria prova: um veneno por invariante de I1 a I7, um por linha da tabela dos
 # tres niveis, um por campo, e `relaxou` conferido nos dois sentidos. A amostra
@@ -574,6 +641,7 @@ roda "limiar da comparacao cega"                python biblioteca/_apura_cega.py
 # item entre dois pedacos, nenhum pedaco passando do teto, e cobertura sem
 # buraco nem sobreposicao.
 roda "corte das folhas cegas"                  node biblioteca/_folhas_cegas.js --autoteste
+na_secao_navegador=0
 
 # Duas conferencias aqui, e a primeira e a que pega o defeito de verdade.
 #
@@ -917,9 +985,108 @@ if [ "$codigo" = "2" ]; then
   instavel=1
 fi
 
+# TODA PROVA ESTA NO PORTAO, ou na lista de fora com o motivo escrito.
+#
+# Em 26/10/2026 havia dez provas de _teste/ que nenhum portao rodava: as frentes
+# de UX as escreveram, elas passavam sozinhas no dia do PR, e quatro delas ja
+# reprovavam sem ninguem saber (duas presas ao relogio). Prova fora do portao
+# nao e guarda: so roda quando alguem lembra.
+#
+# O que se compara: os arquivos que casam os padroes de prova do repositorio
+# contra a lista de caminhos que o `roda` (e o `anota`) recebeu NESTA rodada.
+# Quem fica de fora de proposito vai em FORA_DO_PORTAO, uma linha por arquivo,
+# com o motivo depois de dois-pontos. Tres reprovas: prova esquecida, entrada
+# da lista de fora que nao existe mais (a lista apodrece calada), e arquivo que
+# esta nos dois lugares (a lista mente sobre ele).
+FORA_DO_PORTAO='
+figuras/_prova_desenho_auditor.js: auditoria de tinta para olhar, imprime avisos e nunca reprova; sai no B14 com o material autoral
+figuras/_prova_formula.js: gera o PDF da formula para olhar, sem placar; a prova com placar e figuras/testa_formula.js
+figuras/_prova_marcas_bloco.js: folha de marcas para olhar, imprime "nenhuma reprova" e sai sempre zero; sai no B14
+figuras/_prova_marcas_travas.js: travas das marcas num dialeto sem placar ("todos os resultados como esperado"); sai no B14
+figuras/_piloto_base.js: biblioteca dos pilotos, nao e prova; quem a prova e figuras/_prova_piloto_base.js
+figuras/_audita_desenho.js: relatorio de espessura e contraste para olhar, sem veredito; sai no B14
+figuras/_audita_receitas.js: relatorio de medidas das receitas, sem veredito; sai no B14
+figuras/_audita_receitas_cor.js: relatorio de avisos de cor, sem veredito; sai no B14
+figuras/_audita_receitas_gab.js: reprova na main desde que nasceu (dois arcos rotulados com angulo diferente do que varrem); sai no B14
+figuras/_prova_receitas_auditor.py: prova de verdade no modo --conferir (0 paginas fora em 26/10), mas le o PDF que o _prova_receitas.js deixa e fala outro dialeto; fica fora porque sai no B14 com as receitas
+figuras/_prova_receitas_circulo_png.py: renderiza o PDF da prova em PNG para olhar; nao confere nada; sai no B14
+figuras/_prova_receitas_solidos_render.py: renderiza o PDF da prova em PNG para olhar; nao confere nada; sai no B14
+figuras/_prova_solidos_render.py: renderiza o PDF da prova em PNG para olhar; nao confere nada; sai no B14
+'
+# $1 = arquivos de prova achados, $2 = chamadas, $3 = lista de fora (so os caminhos)
+esquecidas_de() {
+  printf '%s\n' "$1" | while IFS= read -r a; do
+    [ -n "$a" ] || continue
+    printf '%s\n' "$2" | grep -Fqx -- "$a" && continue
+    printf '%s\n' "$3" | grep -Fqx -- "$a" && continue
+    printf '%s\n' "$a"
+  done
+}
+# A PROVA DA CONFERENCIA VEM ANTES DELA, com os dois lados: um arquivo que nao
+# foi chamado nem esta na lista TEM de sair esquecido, e os que foram chamados
+# ou estao na lista NAO podem sair.
+p_cob=0; f_cob=0
+afere_cob() {
+  obtido=$(esquecidas_de "$1" "$2" "$3" | tr '\n' ' ')
+  if [ "$obtido" = "$4" ]; then p_cob=$((p_cob + 1)); else
+    f_cob=$((f_cob + 1))
+    printf '    prova da cobertura: deu [%s], esperado [%s]\n' "$obtido" "$4"
+  fi
+}
+afere_cob "_teste/testa_a.js
+_teste/testa_b.js
+_teste/testa_c.js" "_teste/testa_a.js" "_teste/testa_c.js" "_teste/testa_b.js "
+afere_cob "_teste/testa_a.js" "_teste/testa_a.js" "" ""
+afere_cob "_teste/testa_a.js" "" "" "_teste/testa_a.js "
+# Nome que so COMECA igual nao vale: testa_a.js chamado nao cobre testa_a.js.bak.
+afere_cob "_teste/testa_a.js.bak" "_teste/testa_a.js" "" "_teste/testa_a.js.bak "
+
+titulo "toda prova no portao"
+achadas=$(ls _teste/testa_*.js _teste/e2e*.js figuras/_prova_*.js figuras/_prova_*.py figuras/_piloto_*.js \
+            figuras/_audita_*.js figuras/_base_prova_*.js figuras/testa_*.js \
+            temas/_ferramentas/testa_*.py biblioteca/_prova_*.py 2>/dev/null | sort -u || true)
+fora_caminhos=$(printf '%s\n' "$FORA_DO_PORTAO" | sed -n 's/^\([^:]*\):.*/\1/p')
+n_achadas=$(printf '%s\n' "$achadas" | grep -c . || true)
+if [ "$f_cob" != "0" ]; then
+  printf '  FALHOU  %-24s a prova da conferencia nao passou: %s de 4\n' "cobertura" "$p_cob"
+  falhou=1
+elif [ "$n_achadas" -lt 50 ]; then
+  # Controle de que o instrumento ve: a listagem que volta quase vazia (rodando
+  # da pasta errada, padrao quebrado) faria "nenhuma esquecida" por nao olhar.
+  printf '  FALHOU  %-24s so achei %s arquivos de prova; esperava passar de 50\n' "cobertura" "$n_achadas"
+  falhou=1
+else
+  esquecidas=$(esquecidas_de "$achadas" "$chamadas" "$fora_caminhos" | tr '\n' ' ')
+  podres=""
+  duplas=""
+  for a in $fora_caminhos; do
+    [ -f "$a" ] || podres="$podres $a"
+    if printf '%s\n' "$chamadas" | grep -Fqx -- "$a"; then duplas="$duplas $a"; fi
+  done
+  if [ -n "$esquecidas" ] || [ -n "$podres" ] || [ -n "$duplas" ]; then
+    printf '  FALHOU  %-24s uma prova esta fora do portao sem motivo escrito, ou a lista de fora mente\n' "cobertura"
+    if [ -n "$esquecidas" ]; then
+      printf '            fora do portao e fora da lista FORA_DO_PORTAO: %s\n' "$esquecidas"
+    fi
+    if [ -n "$podres" ]; then
+      printf '            na lista de fora, mas nao existe mais:%s\n' "$podres"
+    fi
+    if [ -n "$duplas" ]; then
+      printf '            na lista de fora E chamado pelo portao:%s\n' "$duplas"
+    fi
+    falhou=1
+  else
+    n_fora=$(printf '%s\n' "$fora_caminhos" | grep -c . || true)
+    printf '  ok      %-24s %s arquivos de prova: %s chamados, %s fora com motivo\n' "cobertura" \
+      "$n_achadas" "$((n_achadas - n_fora))" "$n_fora"
+  fi
+fi
+
 printf '\n'
 if [ "$falhou" != "0" ]; then
   printf 'HA FALHA. Nao faca o merge antes de resolver.\n'
+elif [ "$rapido" = "1" ]; then
+  printf 'PORTAO RAPIDO PASSOU. As %s provas de navegador (pulado, acima) NAO rodaram aqui: o merge ainda pede o portao inteiro.\n' "$pulados"
 elif [ "$instavel" != "0" ]; then
   printf 'TUDO PASSOU, mas algum teste so passou na segunda vez (INSTAVEL acima).\n'
   printf 'Nao e impedimento de merge; e aviso de que aquele teste depende de tempo.\n'

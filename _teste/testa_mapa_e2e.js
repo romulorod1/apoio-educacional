@@ -4,8 +4,9 @@
  */
 const puppeteer = require('puppeteer-core');
 const path = require('path');
+const { irParaMes } = require('./_ir_para_mes.js');
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const URL_APP = 'http://127.0.0.1:8777/index.html';
 
 let falhas = 0, passes = 0;
@@ -230,13 +231,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
     Array.from(document.querySelectorAll('#abas .aba')).find(b => b.dataset.tela === 'agenda').click();
   });
   await espera(500);
-  await pag.evaluate(async () => {
-    let guarda = 0;
-    while (document.querySelector('#rotulo-mes').textContent !== 'Setembro de 2026' && guarda++ < 40) {
-      document.querySelector('#mes-seguinte').click();
-      await new Promise(r => setTimeout(r, 40));
-    }
-  });
+  await irParaMes(pag, 2026, 9, 40);
   await espera(700);
 
   conf('o encontro aparece marcado na agenda',
@@ -245,8 +240,14 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
     await pag.$eval('.pilula.mapeamento', e => /mapeamento/.test(e.textContent)), true);
 
   // cria uma aula comum para a Helena e confere o lembrete
+  // Desde o T12 o toque no dia abre o zoom do dia; a aula nova sai do botao
+  // "+ Nova aula neste dia" do painel.
   await pag.evaluate(() => {
     document.querySelector('[data-dia="2026-09-09"]').click();
+  });
+  await espera(300);
+  await pag.evaluate(() => {
+    document.querySelector('#painel-zoom-dia .zoom-dia-rodape .btn.principal').click();
   });
   await espera(600);
   await pag.evaluate((id) => {
@@ -256,7 +257,10 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   }, helena.id);
   await espera(300);
   conf('a aula nova avisa o que vem depois de salvar',
-    await pag.$eval('#ajuda-aula-nova', e => /ao salvar/i.test(e.textContent)), true);
+    // Desde o T08 (88a7df8) a ajuda explica os dois botoes de salvar, em vez
+    // de "ao salvar, ...".
+    await pag.$eval('#ajuda-aula-nova', e => /Salvar na agenda/.test(e.textContent) &&
+      /Salvar e preparar/.test(e.textContent)), true);
 
   await clicarTexto('#modal-aula .modal-rodape button', 'Salvar');
   await espera(1600);

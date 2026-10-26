@@ -46,8 +46,9 @@
  * Modo envenenado:
  *   node _teste/testa_sem_material_autoral.js --envenenado-liga
  *     o app.js servido volta com MATERIAL_AUTORAL_NO_AR = true, o percurso é o
- *     MESMO do modo normal do começo ao fim, e no fim o teste confere as SETE
- *     ausências virando presença: o botão "Material de aula" na janela da
+ *     MESMO do modo normal do começo ao fim, e no fim o teste confere as
+ *     ausências virando presença (eram sete; a sexta, a da escolha de assunto,
+ *     perdeu o par no T05 e está explicada no balanço): o botão "Material de aula" na janela da
  *     aula, o "atalho opcional" na ajuda da folha, o botão Material na linha
  *     do assunto, o "material pronto" na ajuda do assunto, o "Ver os temas
  *     soltos" dentro da trilha E a ajuda do fim dela, o "material pronto" na
@@ -573,11 +574,12 @@ const ASSUNTO_COM_MATERIAL = {
   await H.irParaAba(pag, 'agenda');
   await abrirAulaDe('09:00');
   await pag.evaluate(() => { const b = document.querySelector('#escolher-assunto'); if (b) b.click(); });
+  // Desde o T05 (5b8a98f) o cabecalho "Por matéria" e "Outras matérias".
   const escolha = await esperar('escolha de assunto aberta', () => pag.evaluate(() => {
     const m = document.querySelector('#modal-tema.aberto');
-    return m && /Por matéria/i.test(m.textContent) ? m.textContent : '';
+    return m && /Outras matérias/i.test(m.textContent) ? m.textContent : '';
   }), v => !!v, 12000);
-  conf('a escolha abriu com "Por matéria"', escolha.ok, true);
+  conf('a escolha abriu com a lista de matérias', escolha.ok, true);
   conf('a matemática continua na lista', /Matemática/.test(escolha.valor || ''), true);
   venenoVisto.escolhaDeAssunto = escolha.valor || '';
   ausencia('e nenhuma linha promete "material pronto"', /material pronto/i.test(escolha.valor || ''), false);
@@ -586,7 +588,7 @@ const ASSUNTO_COM_MATERIAL = {
 
   // ================================================================
   if (VENENO) {
-    secao('VENENO: com a chave ligada, as SETE ausências viram presenças');
+    secao('VENENO: com a chave ligada, as ausências viram presenças (a sexta perdeu o par no T05)');
     /* Cada uma destas é o par de uma ausência conferida no modo normal, no
      * mesmo ponto do mesmo percurso. Se alguma deixar de virar presença, a
      * ausência correspondente lá em cima passou a valer por outro motivo que
@@ -610,8 +612,13 @@ const ASSUNTO_COM_MATERIAL = {
      * sendo capturado e nunca era lido. */
     conf('5b. e a AJUDA do fim da trilha volta a falar em temas soltos',
       /temas soltos/i.test(venenoVisto.ajudasDaTrilha || ''), true);
-    conf('6. a escolha de assunto volta a prometer "material pronto"',
-      /material pronto/i.test(venenoVisto.escolhaDeAssunto || ''), true);
+    /* A SEXTA PERDEU O PAR no T05 (5b8a98f), que reescreveu a raiz da escolha
+     * de assunto e tirou a frase "temas, com material pronto" da linha da
+     * matemática, com chave ligada ou não. A chave já não devolve essa frase,
+     * e cobrar a presença aqui seria reprovar por um defeito que não é da
+     * chave. A ausência no modo normal (seção 8) continua conferida. A chave
+     * inteira sai no B14 (onda 0); até lá, "trocar false por true devolve
+     * tudo" vale menos esta frase, e isso está escrito no livro de execução. */
     /* A SÉTIMA, que mora no index.html e por isso não enxerga a constante.
      * Com a chave ligada, o arranque reescreve o título padrão da janela de
      * tema para o texto da base. É o pedaço que faltava para "trocar false por

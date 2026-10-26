@@ -46,7 +46,7 @@ const path = require('path');
 const fs = require('fs');
 const Core = require('../core.js');
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const ORIGEM = 'http://127.0.0.1:8777/';
 const URL_APP = ORIGEM + 'index.html';
 const RAIZ = path.join(__dirname, '..');
@@ -167,6 +167,16 @@ async function esperarControle(p) {
 async function abrirComBanco(p, mexer) {
   await p.goto(URL_APP, { waitUntil: 'networkidle0' });
   await esperarControle(p);
+  /* Na primeira abertura o app grava o banco de novo 900 ms depois de desenhar
+   * (mostrarNovidades registra a versao do perfil novo, T03), com o banco que
+   * ELE tem na memoria. Gravar o banco de prova antes disso e perder a corrida:
+   * a gravacao do app chega depois e apaga os itens antigos, e o teste reprova
+   * por "temas" indefinido numa rodada e passa na outra. Espera por condicao,
+   * e nao por relogio: a versao gravada no banco. */
+  const arranque = await esperar('o app terminou de gravar o arranque',
+    () => bd(p).then(b => !!(b && b.ajustes && b.ajustes.versaoVista)), v => v === true, 15000);
+  // Expirar e seguir seria voltar a corrida de antes, calada.
+  if (!arranque.ok) throw new Error('o app não gravou a versão no arranque em 15 s');
   const banco = await bd(p);
   if (!banco) throw new Error('o banco de exemplo não foi criado');
   mexer(banco);
@@ -205,8 +215,10 @@ async function abrirPicker(p) {
     return true;
   });
   if (!clicou) throw new Error('sem botão de assunto na aula');
+  // Desde o T05 (5b8a98f) o cabecalho "Por materia" virou "Outras matérias",
+  // abaixo das sugestoes de Matematica do ano.
   return esperar('a janela do assunto com a lista por matéria',
-    () => p.$eval('#lista-assuntos', e => e.textContent), v => /Por matéria/.test(v || ''), 30000);
+    () => p.$eval('#lista-assuntos', e => e.textContent), v => /Outras matérias/.test(v || ''), 30000);
 }
 async function fecharPicker(p) {
   await p.evaluate(() => {
@@ -261,10 +273,20 @@ const temasNaTela = p => p.$$eval('#lista-temas .item-tema', es => es.map(e => {
  * Ela morava atrás do botão "Material de aula", que saiu junto com o material
  * autoral. A lista é a mesma (desenharEscolhaTema), com o mesmo seletor de ano
  * e as mesmas etiquetas de unidade, e hoje se chega a ela por Escolher o
- * assunto da aula, "Por matéria", Matemática. */
+ * assunto da aula e a linha "Ver todos os assuntos de Matemática (N assuntos)"
+ * do T05 (5b8a98f), que antes se chamava so "Matemática". */
 async function abrirMaterial(p) {
   await abrirPicker(p);
-  await tocarLinha(p, 'Matemática');
+  const linha = await p.evaluate(() => {
+    const l = Array.from(document.querySelectorAll('#lista-assuntos .item-assunto'))
+      .filter(x => /^(Ver todos os assuntos|Abrir o catálogo) de Matemática/
+        .test(((x.querySelector('.nome') || {}).textContent || '').trim()))[0];
+    if (!l) return '';
+    l.scrollIntoView({ block: 'center' });
+    l.click();
+    return l.querySelector('.nome').textContent.trim();
+  });
+  if (!linha) throw new Error('não achei a linha que abre a grade de Matemática');
   return esperar('a lista de temas', () => p.$$eval('#lista-temas .item-tema', es => es.length), v => v > 0, 30000);
 }
 async function escolherSerie(p, serie) {

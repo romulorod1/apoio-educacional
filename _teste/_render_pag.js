@@ -4,7 +4,7 @@ const arquivo = process.argv[2], saida = process.argv[3], pagina = parseInt(proc
 const url = 'file:///' + path.resolve(arquivo).split(String.fromCharCode(92)).join('/') + '#page=' + pagina;
 (async () => {
   const nav = await puppeteer.launch({
-    executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    executablePath: (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe'),
     headless: 'new', args: ['--no-sandbox'], defaultViewport: { width: 1000, height: 1300 }
   });
   const pag = await nav.newPage();

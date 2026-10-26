@@ -4,8 +4,9 @@
 const puppeteer = require('puppeteer-core');
 const path = require('path');
 const dados = require('./_prints_dados.js');
+const { irParaMes } = require('./_ir_para_mes.js');
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const URL_APP = 'http://127.0.0.1:8777/index.html';
 const espera = ms => new Promise(r => setTimeout(r, ms));
 
@@ -59,14 +60,7 @@ function secao(t) { console.log('\n=== ' + t + ' ==='); }
   const quantos = () => pag.$$eval('#lista-temas .item-tema', es => es.length);
 
   // abre o seletor de temas a partir de uma aula
-  await pag.evaluate(async () => {
-    let g = 0;
-    while (document.querySelector('#rotulo-mes').textContent !== 'Setembro de 2026' && g++ < 40) {
-      const alvo = document.querySelector('#rotulo-mes').textContent;
-      document.querySelector(alvo > 'Setembro de 2026' ? '#mes-anterior' : '#mes-seguinte').click();
-      await new Promise(r => setTimeout(r, 45));
-    }
-  });
+  await irParaMes(pag, 2026, 9);
   await espera(700);
   await pag.evaluate(() => {
     document.querySelector('[data-dia="2026-09-02"]').querySelector('.pilula').click();
@@ -77,13 +71,17 @@ function secao(t) { console.log('\n=== ' + t + ' ==='); }
    * Ela morava atrás do botão "Material de aula", que saiu junto com o material
    * autoral. A lista em si não saiu: é a mesma `desenharEscolhaTema`, com o
    * mesmo campo de busca e a mesma anotação de busca sem resultado, e hoje se
-   * chega a ela por Escolher o assunto da aula, "Por matéria", Matemática. */
+   * chega a ela por Escolher o assunto da aula e a linha que abre a grade de
+   * Matemática. Desde o T05 (5b8a98f) essa linha não se chama mais só
+   * "Matemática": é "Ver todos os assuntos de Matemática (N assuntos)", ou
+   * "Abrir o catálogo de Matemática por ano" para aluno fora da escola. */
   await pag.evaluate(() => { document.querySelector('#escolher-assunto').click(); });
   await espera(1800);
   await pag.evaluate(() => {
     const l = Array.from(document.querySelectorAll('#corpo-modal-tema .item-lista'))
-      .find(x => x.querySelector('.nome') && x.querySelector('.nome').textContent.trim() === 'Matemática');
-    if (!l) throw new Error('não achei a linha Matemática em "Por matéria"');
+      .find(x => x.querySelector('.nome') &&
+        /^(Ver todos os assuntos|Abrir o catálogo) de Matemática/.test(x.querySelector('.nome').textContent.trim()));
+    if (!l) throw new Error('não achei a linha que abre a grade de Matemática');
     l.click();
   });
   await espera(2200);

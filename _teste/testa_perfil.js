@@ -10,7 +10,7 @@ const esp = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {
   const b = await puppeteer.launch({
-    executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    executablePath: (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe'),
     headless: 'new', args: ['--no-sandbox'], defaultViewport: { width: 1280, height: 1000 }
   });
   const pag = await b.newPage();
@@ -48,20 +48,15 @@ const esp = ms => new Promise(r => setTimeout(r, ms));
     await esp(350);
   }
 
-  console.log('\n=== a janela de novidades aparece ===');
-  conf('a janela abriu sozinha', await visivel('#modal-novidades'), true);
-  const nov = await pag.$eval('#corpo-modal-novidades', e => e.textContent);
-  conf('diz a versão nova', /vers[aã]o [0-9]+\.[0-9]+\.[0-9]+/i.test(nov), true);
-  conf('tranquiliza sobre os dados', nov.includes('Nada do que você já tinha foi alterado'), true);
-  // Nao amarrar a um texto de versao: a janela mostra sempre as novidades mais
-  // recentes, e cravar uma frase aqui quebraria o teste a cada publicacao.
-  conf('lista o que mudou',
-    await pag.$$eval('#corpo-modal-novidades li', es => es.length) >= 3, true);
-  await pag.$eval('#entendi-novidades', e => e.click());
-  await esp(600);
-  conf('fecha ao confirmar', await visivel('#modal-novidades'), false);
+  /* Este perfil e NOVO (Chrome sem dados), e desde o 2e68a3e (T03) perfil novo nao recebe
+   * a janela de novidades: nao ha "o que mudou" para quem nunca viu o antes. A
+   * versao fica registrada calada. O caminho de quem ATUALIZA (janela abrindo,
+   * carrossel, fechar e gravar) e do testa_novidades_navegador; aqui fica so a
+   * metade que pertence a primeira abertura. */
+  console.log('\n=== a janela de novidades no primeiro uso ===');
+  conf('perfil novo não recebe a janela', await visivel('#modal-novidades'), false);
   let banco = await bd();
-  conf('guarda que ela já viu', /^[0-9]+\.[0-9]+\.[0-9]+$/.test(banco.ajustes.versaoVista), true);
+  conf('guarda a versão em que começou', /^[0-9]+\.[0-9]+\.[0-9]+$/.test(banco.ajustes.versaoVista), true);
 
   await pag.reload({ waitUntil: 'networkidle0' });
   await esp(2200);

@@ -5,7 +5,7 @@ const saida = process.argv[3] || '_render.png';
 const url = 'file:///' + path.resolve(arquivo).split(String.fromCharCode(92)).join('/');
 (async () => {
   const nav = await puppeteer.launch({
-    executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    executablePath: (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe'),
     headless: 'new', args: ['--no-sandbox'],
     defaultViewport: { width: 1000, height: 1400 }
   });

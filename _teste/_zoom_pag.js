@@ -8,7 +8,7 @@ const url = 'file:///' + path.resolve(arquivo).split(String.fromCharCode(92)).jo
   '#page=' + pagina + '&zoom=' + zoom;
 (async () => {
   const nav = await puppeteer.launch({
-    executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    executablePath: (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe'),
     headless: 'new', args: ['--no-sandbox'], defaultViewport: { width: 1250, height: alt }
   });
   const pag = await nav.newPage();

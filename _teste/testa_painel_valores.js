@@ -40,7 +40,7 @@ const os = require('os');
 const path = require('path');
 const http = require('http');
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const RAIZ = path.join(__dirname, '..');
 
 /* Porta própria, diferente da 8777 do portão e da 8783 do irmão

@@ -40,7 +40,7 @@ const puppeteer = require('puppeteer-core');
 const path = require('path');
 const Core = require('../core.js');
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const URL_APP = 'http://127.0.0.1:8777/index.html';
 
 const ALUNA = 'Antonella Vasques';

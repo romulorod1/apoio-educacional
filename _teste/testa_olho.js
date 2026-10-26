@@ -11,7 +11,7 @@ const esp = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {
   const b = await puppeteer.launch({
-    executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    executablePath: (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe'),
     headless: 'new', args: ['--no-sandbox'], defaultViewport: { width: 1280, height: 1000 }
   });
   const pag = await b.newPage();

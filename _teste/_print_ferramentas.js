@@ -6,7 +6,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {
   const nav = await puppeteer.launch({
-    executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    executablePath: (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe'),
     headless: 'new', args: ['--no-sandbox', '--force-device-scale-factor=2'],
     defaultViewport: { width: 1180, height: 900, deviceScaleFactor: 2, hasTouch: true }
   });

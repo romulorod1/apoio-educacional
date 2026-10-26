@@ -11,6 +11,7 @@
  */
 'use strict';
 const H = require('./_bib_navegador');
+const { irParaMes } = require('./_ir_para_mes.js');
 const amb = H.criarAmbiente(8839, 'nath_t05_matematica');
 const { conf, secao, esperar, pausa } = H;
 
@@ -95,6 +96,12 @@ async function fecharModalTemaEAula(pag) {
 
     await configurarDadosTeste(pag);
     await pag.reload({ waitUntil: 'networkidle0' });
+    // As aulas sao de setembro de 2026 e a Agenda abre no mes do relogio: sem
+    // ir ate la, o teste so passava enquanto o relogio estivesse em setembro.
+    await esperar('a agenda desenhou', () => pag.evaluate(() =>
+      /de \d{4}$/.test(document.querySelector('#rotulo-mes').textContent)
+    ), v => v === true, 30000);
+    await irParaMes(pag, 2026, 9);
     await esperar('aplicativo recarregou com as pílulas de aula', () => pag.evaluate(() =>
       document.querySelectorAll('.pilula').length >= 4
     ), v => v === true, 30000);

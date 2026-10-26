@@ -18,7 +18,7 @@ const os = require('os');
 const path = require('path');
 const http = require('http');
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const RAIZ = path.join(__dirname, '..');
 const TIPOS = {
   '.html': 'text/html; charset=utf-8', '.js': 'application/javascript; charset=utf-8',

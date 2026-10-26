@@ -6,7 +6,7 @@ const puppeteer = require('puppeteer-core');
 const fs = require('fs');
 const path = require('path');
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const URL_APP = 'http://127.0.0.1:8777/index.html';
 const PASTA_DOWNLOAD = path.join(__dirname, 'baixados');
 
@@ -92,6 +92,21 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
     }
     await el.evaluate(e => { e.scrollIntoView({block:'center'}); e.click(); });
     await espera(260);
+  }
+
+  /* O cartao do Marcelo no fechamento, pelo nome. Desde que o fechamento vem
+     em ordem alfabetica (ece2b95), o primeiro cartao e o da aluna cadastrada
+     na secao 3, e os seletores "o primeiro cartao" passaram a medir ela. A
+     marca e posta de novo a cada chamada porque a tela se redesenha. */
+  async function cartaoDoMarcelo() {
+    const achou = await pag.evaluate(() => {
+      const c = Array.from(document.querySelectorAll('#lista-fechamento .cartao'))
+        .find(x => /Marcelo/.test((x.querySelector('h3') || {}).textContent || ''));
+      if (c) c.setAttribute('data-e2e', 'marcelo');
+      return !!c;
+    });
+    if (!achou) throw new Error('não achei o cartão do Marcelo no fechamento');
+    return '#lista-fechamento .cartao[data-e2e="marcelo"]';
   }
 
   /* Clique direto no elemento: no modo sem janela a rolagem às vezes deixa o
@@ -367,7 +382,11 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   conf('o de Niterói é municipal', tituloNiteroi, 'Aniversário de Niterói (municipal)');
 
   // marcar aula em feriado deve ser permitido, com aviso
+  // Desde o T12 o toque no dia abre o zoom do dia; a aula nova sai do botao
+  // "+ Nova aula neste dia" do painel.
   await pag.evaluate(() => document.querySelector('[data-dia="2026-11-20"]').click());
+  await espera(300);
+  await clicar('#painel-zoom-dia .zoom-dia-rodape .btn.principal');
   await espera(400);
   const avisoFer = await $texto('#aviso-feriado');
   conf('o modal avisa do feriado', avisoFer.includes('Feriado: Consciência Negra'), true);
@@ -489,11 +508,11 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   // ================================================================
   secao('12. Gerar os arquivos do fechamento');
 
-  await clicarTexto('#lista-fechamento button', 'PDF do fechamento');
+  await clicarTexto((await cartaoDoMarcelo()) + ' button', 'PDF do fechamento');
   await espera(1600);
-  await clicarTexto('#lista-fechamento button', 'PDF com as folhas');
+  await clicarTexto((await cartaoDoMarcelo()) + ' button', 'PDF com as folhas');
   await espera(2200);
-  await clicarTexto('#lista-fechamento button', 'Texto');
+  await clicarTexto((await cartaoDoMarcelo()) + ' button', 'Texto');
   await espera(1200);
   await clicar('#exportar-md-mes');
   await espera(1400);
@@ -558,11 +577,11 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 
   await aba('fechamento');
   await espera(500);
-  const detalheMarcelo = await pag.$eval('#lista-fechamento .cartao .ajuda', e => e.textContent);
+  const detalheMarcelo = await pag.$eval((await cartaoDoMarcelo()) + ' .ajuda', e => e.textContent);
   conf('o fechamento avisa que houve reajuste', detalheMarcelo.includes('houve reajuste no mês'), true);
   // 01,05,08 a 100 (3h) + 10 a 100 (1h30) = 4h30 a 100 = 450
   // 15,17,19,22,24,26 a 130 (6h) = 780  => total 1230
-  const novoTotal = await pag.$eval('#lista-fechamento tr.total td:last-child', e => e.textContent);
+  const novoTotal = await pag.$eval((await cartaoDoMarcelo()) + ' tr.total td:last-child', e => e.textContent);
   conf('o total considera as duas faixas', novoTotal, 'R$ 1.230,00');
 
   // ================================================================
@@ -640,7 +659,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   // total do mês inteiro: Marcelo com o reajuste, mais a Cecília
   const totalAposReabrir = await pag.$eval('#numeros-fechamento .numero:last-child .valor', e => e.textContent);
   conf('com o total do mês preservado', totalAposReabrir, 'R$ 1.950,00');
-  const totalMarcelo = await pag.$eval('#lista-fechamento .cartao tr.total td:last-child', e => e.textContent);
+  const totalMarcelo = await pag.$eval((await cartaoDoMarcelo()) + ' tr.total td:last-child', e => e.textContent);
   conf('e o total do Marcelo preservado', totalMarcelo, 'R$ 1.230,00');
 
   // ================================================================

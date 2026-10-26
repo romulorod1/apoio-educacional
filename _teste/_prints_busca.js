@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const dados = require('./_prints_dados.js');
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const URL_APP = 'http://127.0.0.1:8777/index.html';
 const SAIDA = path.join(__dirname, 'prints');
 const MES = '2026-09';
