@@ -1082,7 +1082,7 @@
    * de uma gravação de várias partes) continua com o próprio catch e o
    * releDoDisco, que também limpa a pendência. */
   var falhasAvisadas = (typeof WeakSet === 'function') ? new WeakSet() : null;
-  var gravacaoPendente = false;
+  var mudancaNaoGuardada = false;
   var ATRASOS_NOVA_TENTATIVA = [15000, 60000];
   var tempoNovaTentativa = null;
 
@@ -1108,8 +1108,8 @@
   }
 
   function gravacaoConfirmada() {
-    if (!gravacaoPendente) return;
-    gravacaoPendente = false;
+    if (!mudancaNaoGuardada) return;
+    mudancaNaoGuardada = false;
     clearTimeout(tempoNovaTentativa);
     esconderFaixaGravacao();
   }
@@ -1118,19 +1118,23 @@
     if (erro && typeof erro === 'object' && falhasAvisadas) {
       try { falhasAvisadas.add(erro); } catch (e) { /* objeto que não aceita: o ouvinte avisa de novo, e só */ }
     }
-    var primeira = !gravacaoPendente;
-    gravacaoPendente = true;
+    var primeira = !mudancaNaoGuardada;
+    mudancaNaoGuardada = true;
     mostrarFaixaGravacao();
     if (primeira) agendarNovaTentativa(0);
   }
 
+  /* Depois da última espera da lista, repete a última (um minuto) enquanto
+   * houver pendência: a faixa diz "eu tento guardar de novo sozinho", e isso
+   * tem de continuar verdade. Uma gravação por minuto é o que qualquer toque
+   * dela já custa. */
   function agendarNovaTentativa(i) {
     clearTimeout(tempoNovaTentativa);
-    if (i >= ATRASOS_NOVA_TENTATIVA.length) return;
+    var k = Math.min(i, ATRASOS_NOVA_TENTATIVA.length - 1);
     tempoNovaTentativa = setTimeout(function () {
-      if (!gravacaoPendente) return;
-      salvar().then(null, function () { agendarNovaTentativa(i + 1); });
-    }, ATRASOS_NOVA_TENTATIVA[i]);
+      if (!mudancaNaoGuardada) return;
+      salvar().then(null, function () { agendarNovaTentativa(k + 1); });
+    }, ATRASOS_NOVA_TENTATIVA[k]);
   }
 
   function mostrarFaixaGravacao() {
@@ -1144,7 +1148,10 @@
           aoClick: function () { salvar().then(null, function () { /* a faixa continua */ }); }
         })
       ]);
-      document.body.appendChild(faixa);
+      // no fluxo, logo abaixo do cabeçalho: não cobre as abas nem o olho
+      var cabecalho = $('.cabecalho');
+      if (cabecalho) cabecalho.insertAdjacentElement('afterend', faixa);
+      else document.body.insertBefore(faixa, document.body.firstChild);
     }
     faixa.hidden = false;
   }
@@ -1176,35 +1183,49 @@
    *
    * A MEMÓRIA VOLTA A SER O DISCO. Quando uma gravação de várias partes
    * rejeita no meio (restaurar uma cópia, voltar a um ponto do histórico,
-   * desfazer, apagar tudo), parte pode ter ficado gravada e parte não. Se a
-   * memória continuasse com o estado que ela tinha antes, o PRÓXIMO salvar
-   * qualquer gravaria esse estado velho por cima do que ficou no disco, sem
-   * uma palavra. Então relê do disco antes de qualquer outra coisa, redesenha,
-   * e diz que não se completou.
+   * apagar tudo), parte pode ter ficado gravada e parte não. Se a memória
+   * continuasse com o estado que ela tinha antes, o PRÓXIMO salvar qualquer
+   * gravaria esse estado velho por cima do que ficou no disco, sem uma
+   * palavra. Então relê do disco antes de qualquer outra coisa, redesenha, e
+   * diz que não se completou.
    *
-   * MAS NUNCA POR CIMA DE UMA MUDANÇA PENDENTE (B3). Se uma gravação anterior
-   * falhou e a faixa está no alto, a memória tem uma mudança que o disco não
-   * tem; reler o disco a jogaria fora calada, e a faixa sumiria junto. Então,
-   * com pendência, grava a memória primeiro: dando certo, a releitura não
-   * perde nada; não dando, a memória e a faixa ficam, a tela não é trocada pelo
-   * disco, e a frase diz que a última mudança ainda não está guardada. */
+   * COM MUDANÇA PENDENTE (B3), O DISCO VENCE E A FRASE DIZ. Os três que chamam
+   * aqui são substituições inteiras que ela confirmou ("os dados atuais serão
+   * substituídos"), e a mudança que a faixa ainda não tinha guardado é parte
+   * desses dados atuais. Gravar a memória antes de reler, como uma primeira
+   * versão deste PR fazia, punha o estado velho por cima da cópia restaurada
+   * ou do ponto escolhido que JÁ estavam no disco (a revisão adversarial
+   * mostrou os dois casos), e depois a nova tentativa faria o mesmo, calada.
+   * Então a pendência sai junto com a faixa, e a frase conta que ela saiu,
+   * para nada sumir em silêncio. Se nem a leitura der, nada é trocado: a
+   * memória e a faixa ficam. O Desfazer da barra flutuante não passa mais por
+   * aqui: ele é uma mudança como outra qualquer, pelo salvar(). */
   function releDoDisco(mensagem) {
-    var antes = gravacaoPendente ? salvar() : Promise.resolve();
-    return antes.then(function () {
-      return Store.carregar().then(function (lido) {
-        db = lido || Store.bancoVazio();
-      }).catch(function () { /* nem a leitura deu: fica o que há, e o aviso diz */ }).then(function () {
-        mapeamentoEmEdicao = null;
-        fecharTudo();
-        desenharTudo();
-        avisar(mensagem);
-      });
-    }, function () {
+    return Store.carregar().then(function (lido) {
+      db = lido || Store.bancoVazio();
+      return memoriaSubstituida();
+    }).catch(function () { /* nem a leitura deu: fica o que há, e o aviso diz */ return ''; }).then(function (frase) {
       mapeamentoEmEdicao = null;
       fecharTudo();
       desenharTudo();
-      avisar(mensagem + ' A última mudança ainda não está guardada; a faixa no alto avisa quando der certo.');
+      avisar(mensagem + frase);
     });
+  }
+
+  /* A memória inteira acabou de ser trocada por uma substituição que ela
+   * confirmou (dando certo ou pelo releDoDisco). Chamar ANTES de redesenhar:
+   * - o olho volta a seguir o banco novo, como na abertura do aplicativo
+   *   (antes, a tela continuava com o olho de antes da troca);
+   * - a pendência sai e a faixa some, e a frase devolvida conta isso, para o
+   *   aviso dizer. Vazia quando não havia pendência. */
+  function memoriaSubstituida() {
+    valoresOcultos = !!(db.ajustes && db.ajustes.valoresOcultos);
+    atualizarBotaoOlho();
+    var havia = mudancaNaoGuardada;
+    mudancaNaoGuardada = false;
+    clearTimeout(tempoNovaTentativa);
+    esconderFaixaGravacao();
+    return havia ? ' A última mudança, que o tablet ainda não tinha conseguido guardar, também saiu.' : '';
   }
 
   /* Grava um ponto de retorno antes de mexer em várias aulas de uma vez,
@@ -1214,28 +1235,43 @@
    * de a ação rodar: quantos passos da trilha voltaram para a fila só se sabe
    * depois de mexer nas aulas, e esse número precisa aparecer no MESMO aviso
    * que oferece o Desfazer. */
+  /* NA FALHA (B3), A PROMESSA DEVOLVIDA CUMPRE do mesmo jeito, com o mesmo
+   * resultado: o que os treze chamadores fazem depois (fechar a janela,
+   * redesenhar) é só tela, e a mudança já está na memória, que é a verdade; a
+   * faixa do salvar() avisa que falta guardar. Antes, a falha deixava a janela
+   * aberta com a aula já excluída da memória.
+   *
+   * O ponto de retorno é a PRIMEIRA gravação e, num tablet cheio, a primeira
+   * a falhar. Ela não segura a mudança: se não deu para guardar o ponto, a
+   * mudança é gravada mesmo assim (passando pela faixa, se também falhar), e o
+   * aviso sai sem o Desfazer, porque não há para onde voltar. Antes, essa
+   * falha pulava a gravação da mudança e caía no ouvinte global, com a memória
+   * já alterada e nenhuma faixa. */
   function comDesfazer(rotulo, acao) {
     var antes = JSON.parse(JSON.stringify(dbParaGravar()));
     var resultado = acao();
     var texto = (typeof rotulo === 'function') ? rotulo() : rotulo;
-    return Store.registrarHistorico(texto, antes).then(function () {
-      return salvar();
-    }).then(function () {
-      avisar(texto, 'Desfazer', function () {
-        db = antes;
-        // Um painel aberto ainda aponta para o registro antigo, que sai do ar
-        // ao voltar o estado. Fecha tudo e limpa as referências.
-        mapeamentoEmEdicao = null;
-        fecharTudo();
-        Store.salvar(db).then(function () {
-          desenharTudo();
-          avisar('Alteração desfeita.');
-        }).catch(function () {
-          releDoDisco('Não consegui desfazer. O tablet pode estar sem espaço; a tela mostra o que ficou gravado.');
-        });
+    return Store.registrarHistorico(texto, antes).then(function () { return true; }, function () { return false; })
+      .then(function (comPonto) {
+        return salvar().then(function () {
+          if (!comPonto) { avisar(texto); return resultado; }
+          avisar(texto, 'Desfazer', function () {
+            db = antes;
+            // Um painel aberto ainda aponta para o registro antigo, que sai do ar
+            // ao voltar o estado. Fecha tudo e limpa as referências.
+            mapeamentoEmEdicao = null;
+            fecharTudo();
+            /* Desfazer é uma mudança como outra qualquer: na falha, a memória
+             * desfeita fica e a faixa avisa (B3). Antes ia direto ao disco e,
+             * na falha, relia o disco por cima da escolha dela. */
+            salvarEDepois(function (gravou) {
+              desenharTudo();
+              if (gravou) avisar('Alteração desfeita.');
+            });
+          });
+          return resultado;
+        }, function () { return resultado; });
       });
-      return resultado;
-    });
   }
 
   // ================= arquivos =================
@@ -8329,14 +8365,14 @@
     if (aluno.trilhas.indexOf(trilha) >= 0) return;
     guardandoTrilha = true;
     aluno.trilhas.push(trilha);
-    salvarEDepois(function (gravou) {
+    salvar().then(function () {
       guardandoTrilha = false;
       propostaDeTrilha = null;
       fecharModal('modal-trilha');
       atualizarPainelTrilhas(aluno.id);
       if (aulaEmEdicao) atualizarBlocoAssunto(aulaEmEdicao.id);
       desenharAgenda();
-      if (gravou) avisar('Trilha guardada: ' + resumoDaTrilha(trilha, aluno));
+      avisar('Trilha guardada: ' + resumoDaTrilha(trilha, aluno));
     }).catch(function () {
       guardandoTrilha = false;
       /* A gravação falhou, então a memória volta a espelhar o disco: senão a
@@ -9498,7 +9534,7 @@
       delete andou.passo.soltoAMao;
     }
 
-    salvarEDepois(function (gravou) {
+    salvar().then(function () {
       fecharModal('modal-tema');
       if ($('#modal-aula').classList.contains('aberto') && aulaEmEdicao &&
           aulaEmEdicao.id === aula.id) {
@@ -11797,8 +11833,9 @@
               Store.desfazer(r.id).then(function (estado) {
                 if (!estado) return;
                 db = estado;
+                var frase = memoriaSubstituida();
                 desenharTudo();
-                avisar('Estado restaurado.');
+                avisar('Estado restaurado.' + frase);
               }).catch(function () {
                 releDoDisco('Não consegui voltar a este ponto. O tablet pode estar sem espaço; a tela mostra o que ficou gravado.');
               });
@@ -12233,8 +12270,9 @@
       catch (e) { avisar('O arquivo não é uma cópia válida.'); return; }
       Store.importarTudo(pacote).then(function (dados) {
         db = dados;
+        var frase = memoriaSubstituida();
         desenharTudo();
-        avisar('Cópia restaurada.');
+        avisar('Cópia restaurada.' + frase);
       }).catch(function (e) {
         if (e && e.invalida) { avisar(e.message); return; }
         releDoDisco('A cópia não foi restaurada por inteiro. O tablet pode estar sem espaço; a tela mostra o que ficou gravado.');
@@ -15752,6 +15790,7 @@
       db = Store.bancoVazio();
       return Store.salvar(db);
     }).then(function () {
+      memoriaSubstituida(); // apagou tudo: da pendência não há o que dizer além disso
       desenharTudo();
       avisar('Todos os dados foram apagados.');
     }).catch(function () {
