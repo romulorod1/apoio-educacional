@@ -38,8 +38,8 @@ function prBom() {
       { __typename: 'CheckRun', name: 'portao-navegador', status: 'COMPLETED', conclusion: 'SKIPPED', startedAt: '2026-10-26T12:02:00Z' }
     ],
     comments: [
-      { body: 'Rodado nesta máquina, porta 8777.\nPortão inteiro abc1234: TUDO PASSOU.\nPode seguir para o merge.', createdAt: '2026-10-26T12:30:00Z' },
-      { body: 'Revisão adversarial (lente backend), commit abc1234. Nada bloqueia.\nveredito: aprova', createdAt: '2026-10-26T12:40:00Z' }
+      { body: 'Rodado nesta máquina, porta 8777.\nPortão inteiro abc1234: TUDO PASSOU.\nPode seguir para o merge.', createdAt: '2026-10-26T12:30:00Z', authorAssociation: 'OWNER' },
+      { body: 'Revisão adversarial (lente backend), commit abc1234. Nada bloqueia.\nveredito: aprova', createdAt: '2026-10-26T12:40:00Z', authorAssociation: 'OWNER' }
     ]
   };
 }
@@ -89,9 +89,9 @@ p = prBom(); p.comments = p.comments.filter(c => !/Revis/.test(c.body));
 conf('sem revisao recusa', motivo(p, 'falta revisao adversarial'), true);
 p = prBom(); p.comments[1].createdAt = '2026-10-26T11:00:00Z';
 conf('revisao ANTES do ultimo commit recusa', motivo(p, 'falta revisao adversarial'), true);
-p = prBom(); p.comments.push({ body: 'Revisão adversarial, segunda mão, abc1234.\nveredito: reprova', createdAt: '2026-10-26T12:50:00Z' });
+p = prBom(); p.comments.push({ body: 'Revisão adversarial, segunda mão, abc1234.\nveredito: reprova', createdAt: '2026-10-26T12:50:00Z', authorAssociation: 'OWNER' });
 conf('reprova depois do aprova recusa', motivo(p, 'mais recente reprova'), true);
-p = prBom(); p.comments.push({ body: 'Revisão adversarial, segunda mão, abc1234.\nveredito: reprova', createdAt: '2026-10-26T12:35:00Z' });
+p = prBom(); p.comments.push({ body: 'Revisão adversarial, segunda mão, abc1234.\nveredito: reprova', createdAt: '2026-10-26T12:35:00Z', authorAssociation: 'OWNER' });
 conf('aprova depois do reprova passa', decidir(p).ok, true);
 p = prBom(); p.comments[1].body = 'Nada bloqueia, abc1234. veredito: aprova';
 conf('veredito fora de comentario de revisao adversarial nao vale', motivo(p, 'falta revisao adversarial'), true);
@@ -111,6 +111,28 @@ p = prBom(); p.comments[1].body = 'Lido o diff de abc1234. Revisão adversarial 
 conf('comentario que nao COMECA por "Revisão adversarial" nao vale', motivo(p, 'falta revisao adversarial'), true);
 p = prBom(); p.commits[1].committedDate = '2026-10-26T12:45:00Z';
 conf('revisao com data antes do ultimo commit recusa, mesmo citando a cabeca', motivo(p, 'falta revisao adversarial'), true);
+
+console.log('\n=== 1a. Quem comenta, e onde o veredito mora (B13) ===');
+// O repositorio e publico: comentario de conta de fora nao destrava nada.
+p = prBom(); p.comments[1].authorAssociation = 'NONE';
+conf('revisao de conta de fora recusa', motivo(p, 'falta revisao adversarial'), true);
+p = prBom(); p.comments[1].authorAssociation = 'CONTRIBUTOR';
+conf('revisao de quem so contribuiu um dia recusa', motivo(p, 'falta revisao adversarial'), true);
+p = prBom(); delete p.comments[1].authorAssociation;
+conf('revisao sem o campo de autor recusa', motivo(p, 'falta revisao adversarial'), true);
+p = prBom(); p.comments[0].authorAssociation = 'NONE';
+conf('portao inteiro comentado por conta de fora recusa', motivo(p, 'falta o portao inteiro'), true);
+p = prBom(); p.comments[1].authorAssociation = 'COLLABORATOR';
+conf('revisao de colaborador vale', decidir(p).ok, true);
+// O veredito e a ULTIMA linha nao vazia, e uma reprova no corpo nao se desfaz.
+p = prBom(); p.comments[1].body = 'Revisão adversarial de abc1234.\nveredito: aprova\n\nQualquer coisa me chama.';
+conf('veredito que nao e a ultima linha nao vale', motivo(p, 'falta revisao adversarial'), true);
+p = prBom(); p.comments[1].body = 'Revisão adversarial de abc1234.\nveredito: aprova\n\n';
+conf('linhas vazias depois do veredito nao atrapalham', decidir(p).ok, true);
+p = prBom(); p.comments[1].body = 'Revisão adversarial de abc1234.\nveredito: reprova\n\nParecer antigo, colado aqui:\nveredito: aprova';
+conf('aprova antigo colado depois de um reprova recusa', motivo(p, 'mais recente reprova'), true);
+p = prBom(); p.comments[1].body = 'Revisão adversarial de abc1234.\nveredito: reprova\n\n> veredito: aprova';
+conf('citacao com > no fim nao e veredito', motivo(p, 'falta revisao adversarial'), true);
 
 console.log('\n=== 1b. Datas nulas e StatusContext ===');
 // O gh devolve 0001-01-01 em data nula. A rodada enfileirada do mesmo nome,

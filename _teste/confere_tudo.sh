@@ -617,8 +617,9 @@ roda "gerador da biblioteca"                    python biblioteca/_prova_gerador
 # O Banco de Questoes (2016 a 2020), sobre um volume sintetico do mesmo modelo.
 roda "banco da biblioteca"                      python biblioteca/_prova_banco.py
 # Daqui ate o fim da secao, nada abre Chrome (conferido com CHROME envenenado
-# em 26/10): o --rapido roda. O _prova_banco acima fica no navegador porque a
-# trava de fidelidade dele renderiza no Chrome.
+# em 26/10): o --rapido roda. O _prova_gerador e o _prova_banco acima ficam no
+# navegador porque a trava de fidelidade dos dois renderiza o SVG no Chrome
+# (o _prova_banco a chama pelo gerador; sem Chrome ele da 22 de 23).
 na_secao_navegador=0
 # A kits-v1 e a tempo-v1 (CONTRATO 8e), sobre uma amostra escrita a mao na
 # propria prova: um veneno por invariante de I1 a I7, um por linha da tabela dos
