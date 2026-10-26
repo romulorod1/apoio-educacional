@@ -82,7 +82,8 @@ INDICE_TOPICOS.disciplinas.forEach(d => { NOME[d.chave] = d.nome; });
 const GRUPO_ROTULO = (disciplina, grupo) => PLANOS.filter(p => p.disciplina === disciplina && p.grupo === grupo)[0].grupoRotulo;
 
 /* O índice de matemática, para saber a unidade de cada tema pelo título. */
-const INDICE_MAT = JSON.parse(fs.readFileSync(path.join(RAIZ, 'banco', 'indice.json'), 'utf8')).temas;
+// o índice de assuntos de matemática, desde o B14 (era banco/indice.json)
+const INDICE_MAT = JSON.parse(fs.readFileSync(path.join(RAIZ, 'banco', 'topicos', 'matematica.json'), 'utf8')).temas;
 /* A tabela que existia à mão no app.js (UNIDADES_NOMES) até esta versão, e
  * saiu. Fica congelada aqui como o ANTES: a etiqueta da tela tem que continuar
  * igual a ela para os 148 temas, agora saindo de Core.MATERIAS. */

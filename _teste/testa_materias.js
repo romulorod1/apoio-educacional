@@ -68,13 +68,9 @@ conf('LITEM2-03 é da literatura', (Core.materiaDoTema('LITEM2-03') || {}).id, '
 conf('identificador de tópico (com -T) nunca é tema', Core.materiaDoTema('POR07-T12'), null);
 conf('lixo não é de ninguém', Core.materiaDoTema('xyz'), null);
 
-secao('3. A cópia para o Python é gerada, e bate');
-const { execFileSync } = require('child_process');
-let confere = '';
-try {
-  confere = execFileSync(process.execPath, [path.join(RAIZ, 'temas', '_ferramentas', 'exporta_materias.js'), '--confere'], { encoding: 'utf8' });
-} catch (e) { confere = (e.stdout || '') + (e.stderr || ''); }
-conf('materias.json bate com o core.js (senão: node temas/_ferramentas/exporta_materias.js)', /bate com o core\.js/.test(confere) && !/NAO bate/.test(confere), true);
+/* A seção 3 (a cópia da tabela para o Python, temas/_ferramentas/materias.json)
+ * saiu no B14, 26/10/2026, com o material autoral: quem a lia era o
+ * verificador e o gerador do banco de temas, apagados junto. */
 
 secao('4. O catálogo de tópicos aponta para matérias da tabela');
 const indice = JSON.parse(le('banco/topicos/indice.json'));
@@ -115,8 +111,9 @@ conf('cartão conhece toda matéria com tópicos ou temas (ou a chave composta d
   precisamEstar.filter(id => !(cartao[id] || (porId[id].topicos && cartao[porId[id].topicos]))), []);
 conf('folha conhece toda matéria com tópicos ou temas', precisamEstar.filter(id => !pdf[id]), []);
 
-secao('6. O banco gerado não contradiz a tabela');
-const bancoIndice = JSON.parse(le('banco/indice.json'));
+secao('6. O índice de assuntos de matemática não contradiz a tabela');
+// desde o B14 é banco/topicos/matematica.json, e não mais o banco/indice.json gerado
+const bancoIndice = JSON.parse(le('banco/topicos/matematica.json'));
 conf('todo tema do índice de matemática é MAT e, se declarar matéria, é matematica',
   bancoIndice.temas.filter(t => !/^MAT/.test(t.id) || (t.materia && t.materia !== 'matematica')).map(t => t.id), []);
 conf('toda unidade do índice existe na tabela da matemática',

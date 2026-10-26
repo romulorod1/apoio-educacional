@@ -116,6 +116,10 @@
   var VAZIAS = {
     de: 1, da: 1, do: 1, das: 1, dos: 1, e: 1, o: 1, a: 1, os: 1, as: 1,
     em: 1, no: 1, na: 1, nos: 1, nas: 1, com: 1, por: 1, para: 1, um: 1, uma: 1,
+    /* O "para" falado. Até o B14 o conteúdo dos temas tinha "pra" o bastante
+     * para a palavra casar em algum lugar; com o índice de título e
+     * palavras-chave, exigir "pra" esvaziava a tela ("conta pra achar o x"). */
+    pra: 1, pro: 1, pras: 1, pros: 1,
     que: 1, se: 1, ao: 1, aos: 1, ou: 1, sem: 1,
     exercicio: 1, exercicios: 1, questao: 1, questoes: 1, problema: 1, problemas: 1,
     lista: 1, atividade: 1, atividades: 1, conteudo: 1, aula: 1, aulas: 1,
@@ -236,8 +240,28 @@
     return c;
   }
 
+  /* O índice de busca do aplicativo, a partir do índice de assuntos de
+   * matemática (banco/topicos/matematica.json), desde o B14. O título vira a
+   * lista t, como sempre; as listas r e d chegam prontas no campo `chaves` de
+   * cada assunto (radicais soltos, guardados do índice de 09/2026, quando
+   * vinham do resumo e do conteúdo dos temas, que saíram). Sem elas, a régua
+   * das buscas reais caía de 75 para 58 acertos no topo e de 0 para 17 telas
+   * vazias; com elas, 74 e 5. É a mesma função no app e nos testes, para os
+   * dois medirem a mesma busca. */
+  function indiceDoCatalogo(temas) {
+    var base = montarIndice(temas.map(function (t) {
+      return { id: t.id, serie: t.serie, titulo: t.pt.titulo, resumo: '', enunciados: '', explicacao: '' };
+    }));
+    return base.map(function (r, i) {
+      var c = temas[i].chaves || {};
+      r.r = c.r || '';
+      r.d = c.d || '';
+      return r;
+    });
+  }
+
   /* Constrói o índice a partir dos temas inteiros. Usado pelo gerador do banco
-   * e pelos testes, nunca pelo aplicativo em uso. */
+   * e pelos testes, e pelo indiceDoCatalogo para a lista do título. */
   function montarIndice(temas) {
     return temas.map(function (t) {
       var usado = {};
@@ -668,17 +692,21 @@
 
   /* Rótulo que a tela mostra ao lado do resultado, para ela entender por que
    * aquele tema apareceu. Título não leva rótulo: é o caso esperado. */
+  /* Desde o B14 os exercícios saíram, e as palavras de destaque ficaram só
+   * como palavras-chave do assunto: o acerto nelas diz "sobre este assunto",
+   * como o do resumo, e não promete exercício que não existe mais. Enunciado e
+   * explicação ficam na tabela para o índice antigo, que não é mais servido. */
   var ROTULO = {
     titulo: '',
     resumo: 'sobre este assunto',
-    destaque: 'tratado nos exercícios',
+    destaque: 'sobre este assunto',
     enunciado: 'aparece nos exercícios',
     explicacao: 'aparece na explicação'
   };
 
   return {
     semAcento: semAcento, raiz: raiz, aoSingular: aoSingular, semVerbo: semVerbo,
-    palavrasDe: palavrasDe, montarIndice: montarIndice, procurar: procurar,
+    palavrasDe: palavrasDe, montarIndice: montarIndice, indiceDoCatalogo: indiceDoCatalogo, procurar: procurar,
     ondeAparece: ondeAparece, lerBusca: lerBusca, medirRaridade: medirRaridade,
     umaLetraDeDiferenca: umaLetraDeDiferenca,
     PESO: PESO, ROTULO: ROTULO, VAZIAS: VAZIAS, APELIDOS: APELIDOS, ANOS: ANOS

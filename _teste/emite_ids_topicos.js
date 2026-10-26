@@ -32,8 +32,8 @@
  * EXATO. Trocar a grafia de um título é aposentar um tópico e criar outro, de
  * propósito: o tablet guardou a grafia antiga nas aulas.
  *
- *   node temas/_ferramentas/emite_ids_topicos.js             emite e grava
- *   node temas/_ferramentas/emite_ids_topicos.js --confere   só compara; sai 1 se houver
+ *   node _teste/emite_ids_topicos.js             emite e grava
+ *   node _teste/emite_ids_topicos.js --confere   só compara; sai 1 se houver
  *                                                            título sem id ou desalinhamento
  *   ... --pasta <dir>   usa outra pasta no lugar de banco/topicos (é como as
  *                       provas de _teste/testa_topicos_ids.js envenenam uma cópia)
@@ -41,7 +41,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const RAIZ = path.join(__dirname, '..', '..');
+const RAIZ = path.join(__dirname, '..');
 const Core = require(path.join(RAIZ, 'core.js'));
 
 const args = process.argv.slice(2);
@@ -50,7 +50,7 @@ const iPasta = args.indexOf('--pasta');
 const PASTA = (iPasta !== -1 && args[iPasta + 1]) ? path.resolve(args[iPasta + 1]) : path.join(RAIZ, 'banco', 'topicos');
 const REGISTRO = path.join(PASTA, '_ids.json');
 const FORMATO_REGISTRO = 'registro-de-ids-de-topicos';
-const AVISO_REGISTRO = 'Gerado por temas/_ferramentas/emite_ids_topicos.js. Id emitido nunca e reusado nem renumerado; ' +
+const AVISO_REGISTRO = 'Gerado por _teste/emite_ids_topicos.js. Id emitido nunca e reusado nem renumerado; ' +
   'titulo que sai da lista fica aposentado e o numero dele nao volta. Nao edite a mao.';
 
 const inicio = process.hrtime();
@@ -133,7 +133,7 @@ if (fs.existsSync(REGISTRO)) {
 } else if (algumComIds) {
   falha(rel(REGISTRO) + ' não existe, mas há arquivo com ids emitidos. Restaure o registro do git; emitir sem ele renumeraria os tópicos');
 } else if (CONFERE) {
-  falha(rel(REGISTRO) + ' não existe e nenhum tópico tem id: rode node temas/_ferramentas/emite_ids_topicos.js');
+  falha(rel(REGISTRO) + ' não existe e nenhum tópico tem id: rode node _teste/emite_ids_topicos.js');
 }
 
 /* 4. O cálculo: cada título casa com o registro ou ganha o próximo número
@@ -299,7 +299,7 @@ if (CONFERE) {
   problemas.forEach(function (p) { console.log('  ' + p); });
   const totalIds = Object.keys(registroNovo).length;
   if (problemas.length) {
-    console.log('REPROVADO: ' + problemas.length + ' problema(s) em ' + rel(PASTA) + '; rode node temas/_ferramentas/emite_ids_topicos.js e revise o diff (' + segundos() + ')');
+    console.log('REPROVADO: ' + problemas.length + ' problema(s) em ' + rel(PASTA) + '; rode node _teste/emite_ids_topicos.js e revise o diff (' + segundos() + ')');
     process.exit(1);
   }
   console.log('tudo confere: ' + totalIds + ' ids no registro, ' + Object.keys(vistos).length + ' títulos nos ' + disciplinas.length +

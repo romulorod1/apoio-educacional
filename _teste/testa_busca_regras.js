@@ -5,8 +5,14 @@
  * devolvia a tela vazia ou a lista errada.
  */
 const B = require('../busca.js');
-const ix = require('../banco/busca.json').temas;
-const banco = require('../temas/banco.json');
+/* Desde o B14 (26/10/2026) o índice de busca é montado no aparelho a partir
+ * do índice de assuntos (Busca.indiceDoCatalogo): o título mais as
+ * palavras-chave guardadas de cada assunto (as listas r e d do antigo
+ * banco/busca.json, radicais soltos). Saíram as listas e e x, que vinham dos
+ * enunciados e da explicação dos temas. Este teste monta o índice pela MESMA
+ * função do app, para medir a busca que ela tem de verdade. */
+const banco = require('../banco/topicos/matematica.json');
+const ix = B.indiceDoCatalogo(banco.temas);
 
 const tit = {}, serieDe = {};
 banco.temas.forEach(t => { tit[t.id] = t.pt.titulo; serieDe[t.id] = t.serie; });
@@ -111,14 +117,23 @@ conf('"equações com duas incógnitas" acha o tema certo',
 
 // letra solta e número solto não podem ser exigência
 conf('"regra d tres" acha regra de três', primeiro('regra d tres'), 'Regra de três simples');
+/* Era "devolve mais de um": com os enunciados no índice, os números soltos
+ * casavam por acaso em vários temas. Desde o B14 a resposta é uma só e é a
+ * certa; o que prova que número solto não é exigência é ela não vir vazia. */
 conf('"angulos notaveis 30 45 60" acha trigonometria',
-  achar('angulos notaveis 30 45 60').length > 1, true);
+  /[Tt]rigonometria/.test(primeiro('angulos notaveis 30 45 60')), true);
 
 // ================================================================
 secao('6. Palavra rara pesa mais que palavra comum');
 
 const peso = B.medirRaridade(ix);
-conf('"exemplo" está em todo tema e vale quase nada', peso['exemplo'] < 0.05, true);
+/* Era "está em todo tema e vale menos de 0,05": com os enunciados e a
+ * explicação no índice, "exemplo" aparecia em todos. Desde o B14 ficam as
+ * palavras-chave, e ele está em 128 dos 148 (peso 0,055). O que a seção prova
+ * é a RELAÇÃO, que continua na terceira linha: a rara vale mais de dez vezes a
+ * comum. Esta linha confere só que "exemplo" ainda é comum. */
+const emQuantos = w => ix.filter(r => ['t', 'r', 'd'].some(c => (' ' + (r[c] || '') + ' ').indexOf(' ' + w + ' ') >= 0)).length;
+conf('"exemplo" está em mais de 80% dos assuntos', emQuantos('exemplo') > 0.8 * ix.length, true);
 conf('"hipotenusa" é rara e vale muito', peso['hipotenusa'] > 0.7, true);
 conf('e a rara vale mais que a comum', peso['hipotenusa'] > peso['exemplo'] * 10, true);
 
@@ -176,6 +191,14 @@ conf('"lista de exercicios de porcentagem" também',
   primeiro('lista de exercicios de porcentagem'), primeiro('porcentagem'));
 conf('"prova de trigonometria" acha trigonometria',
   /[Tt]rigonometria/.test(primeiro('prova de trigonometria')), true);
+/* O "pra" falado (B14). Sem ele nas palavras vazias, as duas buscas reais
+ * abaixo, do jeito que ela fala, voltavam tela vazia com o índice de título e
+ * palavras-chave; o par sem o "pra" prova que é o "pra" que decide. */
+conf('"media pra passar de ano" acha a mesma coisa que "media passar de ano"',
+  primeiro('media pra passar de ano'), primeiro('media passar de ano'));
+conf('e não volta vazio', primeiro('media pra passar de ano') !== '(vazio)', true);
+conf('"parábola pra cima ou pra baixo" acha Função quadrática',
+  primeiro('parábola pra cima ou pra baixo'), 'Função quadrática');
 
 // ================================================================
 secao('12. Sem busca não há tela vazia sem motivo');

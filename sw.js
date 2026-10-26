@@ -5,9 +5,10 @@
 
 /* São dois caches, e é essa divisão que faz a atualização sair barata:
  * CACHE guarda os ARQUIVOS do aplicativo e muda de nome a cada mudança da lista;
- * BAIXADOS guarda o que só entra durante o uso, que hoje são as séries de temas
- * (banco/serie-*.json, uma por vez, na primeira vez que a série é aberta), tem
- * nome fixo, e o activate nunca o apaga.
+ * BAIXADOS guarda o que só entra durante o uso (até o B14, as séries de temas,
+ * banco/serie-*.json, que saíram com o material autoral e ficam esquecidas lá
+ * nos tablets que já as baixaram; o próximo inquilino previsto é o leitor de
+ * PDF do C14), tem nome fixo, e o activate nunca o apaga.
  *
  * Antes havia um cache só e o activate apagava todo cache cujo nome não fosse o
  * novo. As séries moram ali e não estão em ARQUIVOS de propósito, então o
@@ -77,8 +78,12 @@
  * traz a lista pronta do 9º ano (app.js, biblioteca.js, draw.js, pdf.js,
  * index.html e styles.css), com a lista igual. O v45 traz a ordenação
  * alfabética dos alunos no Fechamento e o carrossel de novidades e guia de
- * listas (app.js, core.js, index.html e styles.css), com a lista igual. */
-var CACHE = 'apoio-educacional-v45';
+ * listas (app.js, core.js, index.html e styles.css), com a lista igual. O v46
+ * (B14) tira o material autoral: saem da lista os seis arquivos de figuras/, o
+ * banco/indice.json, o banco/busca.json e o banco/portugues/indice.json, e
+ * entra o banco/topicos/matematica.json, o índice de assuntos que ficou
+ * (app.js e index.html). */
+var CACHE = 'apoio-educacional-v46';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -88,15 +93,6 @@ var ARQUIVOS = [
   './core.js',
   './busca.js',
   './pdf.js',
-  /* Os SEIS arquivos do kit de figuras. Faltando um, a figura sai sem marca
-   * nenhuma e sem erro, e ela dá aula na casa das famílias, muitas vezes sem
-   * sinal: o que não estiver aqui não existe quando falta rede. */
-  './figuras/base.js',
-  './figuras/desenho.js',
-  './figuras/marcas.js',
-  './figuras/receitas.js',
-  './figuras/formula.js',
-  './figuras/solidos.js',
   './store.js',
   './draw.js',
   /* O leitor de zip e a conferência do pacote da biblioteca. O pacote em si
@@ -113,34 +109,21 @@ var ARQUIVOS = [
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
   './icons/favicon.png',
-  // o índice dos temas entra no pacote inicial para a lista abrir sem internet.
-  // o conteúdo de cada série é guardado sozinho, na primeira vez que for usado.
-  './banco/indice.json',
-  // o índice de busca acompanha o de temas: é ele que faz o campo de assunto
-  // achar por conteúdo, e não só por título.
-  './banco/busca.json',
-  /* O índice dos temas de português, ao lado dos outros dois e por um motivo a
-   * mais: o índice de uma matéria que não é a padrão é procurado no CACHE, e
-   * não na rede (app.js, carregarOutrosIndices, que pergunta ao cache para um
-   * 404 não virar linha de erro no console a cada sessão; a rede só sobra para
-   * o navegador sem service worker). Fora desta lista o português não existe
-   * para o aplicativo nem com sinal.
-   *
-   * Só o índice, e os outros dois arquivos de banco/portugues/ ficam de fora de
-   * propósito. O serie-07.json são 156 KB e é série: séries moram no BAIXADOS e
-   * entram sozinhas na primeira vez que a série for aberta, como as onze da
-   * matemática. O busca.json de português ninguém lê: a busca por conteúdo pede
-   * 'banco/busca.json' por extenso, e as outras matérias procuram em título e
-   * resumo do próprio índice. Cada linha daqui é uma chance a mais de a
-   * instalação falhar inteira numa conexão ruim. */
-  './banco/portugues/indice.json',
+  /* O índice de assuntos de matemática (B14): id, título, ano, unidade,
+   * duração, dificuldade e pré-requisitos dos 148 assuntos, sem material.
+   * Até a 1.28 aqui ficavam o banco/indice.json, o banco/busca.json e o
+   * banco/portugues/indice.json, gerados do material autoral, que saiu; a busca
+   * passou a ser montada no aparelho a partir dos títulos (app.js,
+   * carregarIndiceDeBusca). As séries (banco/serie-*.json) que o tablet já
+   * baixou ficam esquecidas no BAIXADOS: ninguém as pede mais. */
+  './banco/topicos/matematica.json',
   /* Os TREZE arquivos dos assuntos das outras matérias. O assunto da aula é
    * registro, e não atalho para material: ela precisa poder escolher o assunto
    * na casa da família, sem sinal, do mesmo jeito que abre a lista de temas.
-   * Somam 99 KB, menos que os 240 KB do banco/busca.json que já está aqui.
+   * Somam 99 KB.
    *
-   * Ficam no CACHE, e não no BAIXADOS: BAIXADOS é para os banco/serie-*.json,
-   * que pesam de 130 a 280 KB cada e só entram quando a série é aberta.
+   * Ficam no CACHE, e não no BAIXADOS: BAIXADOS é para o que só entra durante
+   * o uso (até o B14, as séries de temas, que saíram com o material autoral).
    *
    * São treze chances novas de a instalação falhar numa conexão ruim, porque a
    * instalação falha inteira de propósito quando um arquivo não baixa (veja o
@@ -170,8 +153,13 @@ function doPacote(endereco) { return ENDERECOS.indexOf(endereco) !== -1; }
 /* Arquivos que já foram do pacote e saíram dele. O resgate abaixo guarda no
  * BAIXADOS tudo o que não é do pacote, e o BAIXADOS nunca se apaga: sem esta
  * lista, o acervo de 14/09 (2,4 MB, fora do pacote desde o v38) iria para lá
- * como se ela o tivesse baixado, e ficaria no tablet para sempre. */
-var APOSENTADOS = ['./banco/acervo.json', './banco/acervo_indice.json']
+ * como se ela o tivesse baixado, e ficaria no tablet para sempre. O v46 (B14)
+ * aposenta o índice, a busca e o índice de português dos temas autorais e os
+ * seis arquivos do kit de figuras, que saíram do pacote. */
+var APOSENTADOS = ['./banco/acervo.json', './banco/acervo_indice.json',
+  './banco/indice.json', './banco/busca.json', './banco/portugues/indice.json',
+  './figuras/base.js', './figuras/desenho.js', './figuras/marcas.js',
+  './figuras/receitas.js', './figuras/formula.js', './figuras/solidos.js']
   .map(function (u) { return new URL(u, self.location.href).href; });
 function aposentado(endereco) { return APOSENTADOS.indexOf(endereco) !== -1; }
 

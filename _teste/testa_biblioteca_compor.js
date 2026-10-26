@@ -188,13 +188,9 @@ if (antigo) {
   // página crua com marca no fundo
   const cru = G => { const d = new G.Doc(); d.novaPagina(); d.texto('Folha comum', 40, 700); return d.finalizar(); };
   conf('página crua (marca no fundo) byte a byte igual', igual(cru(PDFGen), cru(antigo)), true);
-  const banco = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'temas', 'banco.json'), 'utf8'));
-  ['MAT06-05', 'MAT09-06', 'MATEM3-12'].forEach(id => {
-    const tema = banco.temas.find(t => t.id === id);
-    if (!tema) { conf('tema ' + id + ' no banco', false, true); return; }
-    const op = { tema, lingua: 'pt', incluirMaterial: true, incluirLista: true, incluirGabarito: true, aluno: 'A', data: '01/09/2026' };
-    conf('material do tema ' + id + ' byte a byte igual', igual(PDFGen.gerarMaterialTema(op), antigo.gerarMaterialTema(op)), true);
-  });
+  /* A comparação do material de três temas (MAT06-05, MAT09-06, MATEM3-12)
+   * saiu no B14 com o material autoral: o banco dos temas não existe mais e o
+   * gerarMaterialTema ficou sem chamador. */
   const al = { id: 'a1', nome: 'Aluno Teste', responsavel: 'Resp', ativo: true,
     precos: [{ id: 'p1', inicio: '2026-01-01', fim: null, valorHora: 130 }] };
   const db = { alunos: [al], series: [], aulas: [], resumos: [] };

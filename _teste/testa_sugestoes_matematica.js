@@ -110,8 +110,8 @@ conf('Bloco "Outras matérias" presente', appJs.includes("texto: 'Outras matéri
 secao('5. Verificação da base de temas e tópicos');
 // ============================================================================
 
-const indicePath = path.join(__dirname, '..', 'banco', 'indice.json');
-conf('Banco de temas de Matemática (indice.json) existe', fs.existsSync(indicePath), true);
+const indicePath = path.join(__dirname, '..', 'banco', 'topicos', 'matematica.json');  // o índice de assuntos, desde o B14
+conf('Índice de assuntos de Matemática (banco/topicos/matematica.json) existe', fs.existsSync(indicePath), true);
 if (fs.existsSync(indicePath)) {
   const indiceData = JSON.parse(fs.readFileSync(indicePath, 'utf8'));
   const temas = Array.isArray(indiceData) ? indiceData : (indiceData.temas || []);

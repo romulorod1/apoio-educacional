@@ -13,8 +13,11 @@
  * considera vazias.
  */
 const Core = require('../core.js');
-const indice = require('../banco/indice.json');
-const banco = require('../temas/banco.json');
+/* Desde o B14 (26/10/2026) a fonte do grafo é o índice de assuntos de
+ * matemática, banco/topicos/matematica.json: o banco dos temas autorais
+ * (temas/banco.json), de onde o índice antigo era gerado, saiu com o material,
+ * e o índice novo é ele mesmo a fonte. */
+const indice = require('../banco/topicos/matematica.json');
 
 let passes = 0, falhas = 0;
 const erros = [];
@@ -27,28 +30,27 @@ function conf(rotulo, obtido, esperado) {
 function secao(t) { console.log('\n=== ' + t + ' ==='); }
 
 const temasIx = indice.temas || indice;
-const temasBanco = banco.temas || banco;
 
 // ================================================================
 secao('1. O pré-requisito viaja no índice');
 
-conf('o índice tem os 148 temas', temasIx.length, temasBanco.length);
+conf('o índice tem os 148 assuntos', temasIx.length, 148);
+conf('os ids são únicos', new Set(temasIx.map(t => t.id)).size, temasIx.length);
+conf('todo id tem a forma dos temas de sempre (MAT<ano>-<nn>)',
+  temasIx.every(t => /^MAT(0[2-9]|EM[1-3])-\d{2}$/.test(t.id)), true);
 
 const comPre = temasIx.filter(t => t.prerequisitos && t.prerequisitos.length);
-console.log('       ' + comPre.length + ' de ' + temasIx.length + ' temas declaram pré-requisito');
-conf('mais de cem temas declaram pré-requisito', comPre.length > 100, true);
+console.log('       ' + comPre.length + ' de ' + temasIx.length + ' assuntos declaram pré-requisito');
+conf('mais de cem assuntos declaram pré-requisito', comPre.length > 100, true);
 
-/* Sem esta, montar uma trilha que atravessa anos exigiria baixar até onze
- * arquivos de série, 2,4 MB, na casa da família e muitas vezes sem sinal. */
-conf('nenhum registro traz a chave vazia',
-  temasIx.some(t => 'prerequisitos' in t && !(t.prerequisitos || []).length), false);
-
-// O índice e a fonte precisam contar a mesma história.
-const preDoIndice = {}, preDoBanco = {};
-temasIx.forEach(t => { preDoIndice[t.id] = (t.prerequisitos || []).join(','); });
-temasBanco.forEach(t => { preDoBanco[t.id] = (t.prerequisitos || []).join(','); });
-const divergem = Object.keys(preDoBanco).filter(id => preDoIndice[id] !== preDoBanco[id]);
-conf('o grafo do índice é igual ao da fonte', divergem.join(' ') || 'nenhum', 'nenhum');
+/* O campo existe em todo registro, vazio ou não: é o lugar que o C7 preenche
+ * com o grafo revisado. A origem do grafo de hoje vem dita uma vez, no
+ * cabeçalho, para nenhuma tela o apresentar como curado. */
+conf('todo registro traz a lista de pré-requisitos',
+  temasIx.every(t => Array.isArray(t.prerequisitos)), true);
+conf('o cabeçalho diz de onde vem o grafo', /a revisar no C7/.test(indice.prerequisitos_origem || ''), true);
+conf('nenhum registro traz conteúdo (resumo, inglês, exercícios)',
+  temasIx.some(t => (t.pt && t.pt.resumo) || t.en || t.qtd != null || t.exercicios), false);
 
 // ================================================================
 secao('2. O grafo é sadio');

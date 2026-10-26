@@ -1,65 +1,41 @@
 /* testa_sem_material_autoral.js
  *
- * O material autoral saiu do ar (item 1 do B7). Os 148 temas de matemática
- * traziam explicação, exercícios autorais e gabarito; a Nathália deu retorno
- * negativo desse material, e com a biblioteca da OBMEP importada o caminho bom
- * passou a ser o da biblioteca.
+ * O material autoral saiu do REPOSITÓRIO (B14, 26/10/2026, decisão D8 do
+ * dono). Desde a 1.26 ele estava fora do ar atrás de uma chave; no B14 a chave
+ * saiu, e com ela os 148 temas (temas/), as séries do banco, o kit de figuras
+ * e as fontes de português, com cópia no Drive. Ficou o ÍNDICE de assuntos de
+ * matemática, banco/topicos/matematica.json, com os mesmos ids.
  *
- * O que este arquivo prova, e o que ele NÃO deixa acontecer:
+ * O que este arquivo prova:
  *
  * Sem navegador:
- *   1. a chave MATERIAL_AUTORAL_NO_AR existe no app.js e está DESLIGADA;
- *   2. nada foi apagado: os 148 temas continuam no banco, as onze séries de
- *      matemática continuam no repositório, o carregarSerie continua produzindo
- *      o literal 'banco/serie-' (a trava do portão depende dele) e o
- *      PDFGen.gerarMaterialTema continua no pdf.js;
- *   3. GUARDA PERMANENTE do motor e do grafo. O teste AFIRMA que o core.js e o
- *      banco/indice.json estão idênticos byte a byte à base do merge, e só
- *      depois compara, para os 148 temas como alvo, a sequência do
- *      Core.trilhaDerivada da base com a de hoje. Enquanto a primeira asserção
- *      disser "idêntico", a comparação é tautologia DECLARADA e não prova nada
- *      sobre este PR; no dia em que alguém encostar no motor ou no grafo, ela
- *      reprova primeiro e a comparação passa a valer. A seção 3 explica isso
- *      por extenso, porque a primeira versão deste arquivo vendeu a tautologia
- *      como se fosse a prova do brief.
+ *   1. a chave saiu do app.js, e com ela as funções que só ela alcançava;
+ *   2. o material saiu do repositório e do pacote do service worker, e o índice
+ *      de assuntos ficou, com os 148 ids de sempre e sem conteúdo;
+ *   3. a MIGRAÇÃO não mudou trilha nenhuma: enquanto a base do merge ainda
+ *      tiver o banco/indice.json antigo, a escada de cada um dos 148 assuntos
+ *      como alvo é calculada com o motor e o índice de antes e com os de hoje,
+ *      e as duas têm de ser iguais. Depois do merge do B14 a base não tem mais
+ *      o índice antigo, e a seção diz isso com todas as letras, sem fingir que
+ *      comparou.
  *
  * No Chrome, sem pacote da biblioteca importado:
- *   4. a janela da aula não tem mais o botão "Material de aula", e a ajuda da
- *      folha não promete mais "atalho opcional" nenhum;
- *   5. um assunto de matemática do banco gravado numa aula fica como assunto
+ *   4. a janela da aula não tem o botão "Material de aula", e a ajuda da folha
+ *      não promete "atalho opcional" nenhum;
+ *   5. um assunto de matemática do índice gravado numa aula fica como assunto
  *      comum: sem botão Material (a biblioteca é que o dá, e não há pacote), e
- *      com a etiqueta do ano, que é grafo e não material;
+ *      com a etiqueta do ano, que é do índice;
  *   6. MATERIAL JÁ ANEXADO NUMA AULA ANTIGA CONTINUA ABRINDO: o anexo é arquivo
  *      gravado, a linha diz "com material pronto" e o Abrir entrega o arquivo;
- *   7. O QUE DE FATO PROTEGE A TRILHA NESTE PR, junto com o fato do git da
- *      seção 3: uma trilha de verdade é gravada no banco, o aplicativo é
- *      RECARREGADO, os passos são LIDOS DE VOLTA do IndexedDB e conferidos, a
- *      ficha do aluno abre a trilha guardada e a tela mostra os mesmos passos
- *      na mesma ordem. A ordem da escada ainda é conferida por uma régua que
- *      não é o motor: todo pré-requisito de um passo que esteja na mesma
- *      escada vem antes dele, calculado a partir do índice cru. E o "Ver os
- *      temas soltos", que só levava ao material autoral, saiu;
- *   8. a escolha de assunto continua abrindo, com a matemática na lista, e sem
- *      prometer "material pronto";
+ *   7. uma trilha de verdade é gravada, o aplicativo é RECARREGADO, os passos
+ *      são lidos de volta do IndexedDB e a tela mostra os mesmos passos na
+ *      mesma ordem, sem "Ver os temas soltos";
+ *   8. a escolha de assunto continua abrindo, com a matemática na lista;
  *   9. nenhum erro de JavaScript e nenhum pedido que dê 404.
  *
- * Modo envenenado:
- *   node _teste/testa_sem_material_autoral.js --envenenado-liga
- *     o app.js servido volta com MATERIAL_AUTORAL_NO_AR = true, o percurso é o
- *     MESMO do modo normal do começo ao fim, e no fim o teste confere as
- *     ausências virando presença (eram sete; a sexta, a da escolha de assunto,
- *     perdeu o par no T05 e está explicada no balanço): o botão "Material de aula" na janela da
- *     aula, o "atalho opcional" na ajuda da folha, o botão Material na linha
- *     do assunto, o "material pronto" na ajuda do assunto, o "Ver os temas
- *     soltos" dentro da trilha E a ajuda do fim dela, o "material pronto" na
- *     escolha de assunto, e o título padrão da janela de tema, que mora no
- *     index.html e é reescrito pelo iniciar() quando a chave está ligada.
- *
- *     Uma ausência sem par não prova nada sobre a chave: ela passaria igual
- *     num app.js em que aquele pedaço de tela nunca fosse desenhado por outro
- *     motivo, um seletor errado por exemplo. Por isso são seis, e por isso o
- *     balanço sai junto no fim, em vez de o primeiro achado encerrar a corrida
- *     e deixar os outros cinco sem conferência.
+ * O modo --envenenado-liga, que religava a chave no app.js servido e conferia
+ * as ausências virando presença, saiu junto com a chave: não há mais o que
+ * religar. As ausências do modo normal ficam como conferências comuns.
  */
 'use strict';
 const fs = require('fs');
@@ -70,115 +46,55 @@ const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
 const PORTA = 8799;
-const VENENO = process.argv.indexOf('--envenenado-liga') !== -1;
 const RAIZ = H.RAIZ;
 const ler = f => fs.readFileSync(path.join(RAIZ, f), 'utf8');
+const existe = f => fs.existsSync(path.join(RAIZ, f));
 const APP = ler('app.js');
-
-const DESLIGADA = 'var MATERIAL_AUTORAL_NO_AR = false;';
-const LIGADA = 'var MATERIAL_AUTORAL_NO_AR = true;';
 const trocas = {};
-if (VENENO) trocas['/app.js'] = APP.split(DESLIGADA).join(LIGADA);
 
-/* O VENENO COBRE AS SEIS AUSÊNCIAS, E NÃO UMA.
- *
- * A primeira versão deste modo conferia o botão da folha e saía num throw ali
- * mesmo. As outras cinco ausências que a chave governa ficavam sem par: elas
- * passariam igual num app.js em que aquele pedaço de tela nunca fosse
- * desenhado por outro motivo, e o cabeçalho do arquivo prometia uma cobertura
- * que o modo não dava.
- *
- * Agora o percurso é o MESMO nos dois modos, do começo ao fim. Cada ausência
- * passa por aqui: no modo normal ela é conferida na hora; no modo envenenado
- * ela é só ANOTADA, e a conferência das seis sai junta no fim, para que uma
- * que deixe de virar presença apareça ao lado das outras cinco em vez de
- * esconder as seguintes atrás de um throw. */
+/* Sem veneno, cada ausência é uma conferência comum. O nome fica para o
+ * percurso de baixo continuar lendo do mesmo jeito. */
 const venenoVisto = {};
-function ausencia(rotulo, obtido, esperadoSemVeneno) {
-  if (VENENO) return;                 // no veneno quem confere é o balanço final
-  conf(rotulo, obtido, esperadoSemVeneno);
+function ausencia(rotulo, obtido, esperado) {
+  conf(rotulo, obtido, esperado);
 }
 
 // ---------------------------------------------------------------- 1 (Node)
-secao('1. A chave existe e está desligada');
-conf('o app.js tem a chave MATERIAL_AUTORAL_NO_AR', APP.indexOf('MATERIAL_AUTORAL_NO_AR') >= 0, true);
-conf('e ela aparece uma vez só como declaração, desligada', APP.split(DESLIGADA).length - 1, 1);
-conf('e não há nenhuma declaração ligada', APP.indexOf(LIGADA) < 0, true);
+secao('1. A chave saiu, e com ela o que só ela alcançava');
+/* O nome da chave é montado em pedaços, para o aceite do B14 ("grep do nome
+ * da chave no repositório volta vazio") valer ao pé da letra também para
+ * este arquivo, que é quem confere. */
+const NOME_DA_CHAVE = 'MATERIAL_' + 'AUTORAL_NO_AR';
+conf('o app.js não cita mais a chave do material autoral', APP.indexOf(NOME_DA_CHAVE) >= 0, false);
+['function carregarSerie(', 'function abrirMontagem(', 'function desenharMontagem(',
+  'function gerarMaterialDoTema(', 'function abrirTemas(', 'function botaoTemasSoltos(',
+  'function comNotacao('].forEach(f => {
+  conf('o app.js não tem mais ' + f.replace('function ', '').replace('(', ''), APP.indexOf(f) < 0, true);
+});
+conf('o index.html não carrega mais o kit de figuras', /src="figuras\//.test(ler('index.html')), false);
 
 // ---------------------------------------------------------------- 2 (Node)
-secao('2. Nada foi apagado');
-const banco = JSON.parse(ler('temas/banco.json'));
-conf('temas/banco.json continua com os 148 temas', banco.temas.length, 148);
-const indice = JSON.parse(ler('banco/indice.json'));
-const temasHoje = indice.temas || indice;
-conf('banco/indice.json continua com os 148 temas', temasHoje.length, 148);
+secao('2. O material saiu, e o índice de assuntos ficou');
+['temas', 'figuras', 'fontes', 'banco/portugues', 'banco/indice.json', 'banco/busca.json'].forEach(f => {
+  conf(f + ' saiu do repositório', existe(f), false);
+});
 const series = fs.readdirSync(path.join(RAIZ, 'banco')).filter(n => /^serie-.*\.json$/.test(n));
-conf('as séries de matemática continuam no repositório', series.length >= 11, true);
-/* A MESMA linha que o portão confere, e pelo mesmo caminho: o literal tem de
- * estar no CÓDIGO de carregarSerie, e não num comentário. Sem material autoral
- * ninguém mais chama carregarSerie pela tela, e é justamente por isso que a
- * conferência fica aqui: o dia em que alguém a apagar por parecer morta, esta
- * linha e a trava do portão reprovam juntas.
- *
- * CRLF. Este checkout tem core.autocrlf=true e nenhum .gitattributes, então o
- * app.js chega com \r\n e um delimitador escrito com \n NÃO CASA. A primeira
- * versão desta trava cortava por '\n  }\n' e o "corpo" virava todo o resto do
- * arquivo, 234.865 caracteres, sem nenhum sinal: a asserção passava porque o
- * literal estava em ALGUM lugar do app.js, não porque estivesse no código
- * desta função. Normalizar antes de cortar resolve, e as duas asserções de
- * escopo abaixo impedem que o corte volte a inchar calado. O comentário logo
- * acima da função (app.js:8009) também contém o literal, e é justamente dele
- * que o escopo precisa se defender. */
-const APP_LF = APP.replace(/\r\n/g, '\n');
-const depoisDaAssinatura = APP_LF.split('function carregarSerie(')[1] || '';
-const corpoBruto = depoisDaAssinatura.split('\n  }\n')[0];
-const corpoCarregarSerie = corpoBruto
-  .split('\n').filter(l => !/^\s*(\/\*|\*|\/\/)/.test(l)).join('\n');
-conf('achei a assinatura de carregarSerie no app.js', depoisDaAssinatura.length > 0, true);
-conf('e o corte parou no fim da função, em vez de levar o resto do arquivo',
-  corpoBruto.length > 0 && corpoBruto.length < 3000, true);
-/* A SEGUNDA METADE TEM DE PODER FALHAR.
- *
- * A primeira versão desta linha perguntava se o corpo contém
- * 'function carregarSerie(' e afirmava que não. Isso é verdade por
- * CONSTRUÇÃO: corpoBruto nasce de um split por essa mesma string, e
- * String.split nunca deixa o delimitador nas partes. Era -1 sempre, e o
- * rótulo prometia "não tem a próxima função" sem medir nada disso.
- *
- * A pergunta certa é por uma função IRMÃ, no mesmo nível da IIFE: dois espaços
- * de indentação depois de uma quebra de linha. Dentro do corpo de verdade não
- * existe nenhuma (a única `function` de lá é a `function (r)` do `.then`, na
- * mesma linha do fetch), e a primeira apareceria no instante em que o corte
- * passasse do fim da função, que é exatamente o defeito a pegar. */
-conf('o escopo é mesmo o desta função (tem a linha da url e não invade a função seguinte)',
-  /var url = /.test(corpoBruto) && corpoBruto.indexOf('\n  function ') < 0, true);
-conf('carregarSerie continua produzindo o literal banco/serie-', /'banco\/serie-'\s*\+/.test(corpoCarregarSerie), true);
-conf('o pdf.js continua com o gerarMaterialTema', ler('pdf.js').indexOf('function gerarMaterialTema(') >= 0, true);
-conf('o sw.js continua listando o índice dos temas', ler('sw.js').indexOf("'./banco/indice.json'") >= 0, true);
+conf('nenhuma série do banco ficou', series.join(', ') || 'nenhuma', 'nenhuma');
+const indice = JSON.parse(ler('banco/topicos/matematica.json'));
+const temasHoje = indice.temas;
+conf('o índice de assuntos tem os 148 de matemática', temasHoje.length, 148);
+conf('sem conteúdo nenhum (resumo, inglês, exercícios)',
+  temasHoje.some(t => (t.pt && t.pt.resumo) || t.en || t.qtd != null || t.exercicios), false);
+const SW = ler('sw.js');
+const listaSw = (SW.split('var ARQUIVOS = [')[1] || '').split('];')[0];
+// só as ENTRADAS da lista (caminho entre aspas): o comentário da lista cita os
+// mesmos nomes para contar o que saiu, e ler o trecho inteiro acusaria o comentário
+conf('o pacote do service worker não lista mais figuras nem o banco autoral',
+  /'\.\/(figuras\/|banco\/indice\.json|banco\/busca\.json|banco\/portugues)/.test(listaSw), false);
+conf('e lista o índice de assuntos de matemática', listaSw.indexOf("'./banco/topicos/matematica.json'") >= 0, true);
 
 // ---------------------------------------------------------------- 3 (Node)
-secao('3. Guarda permanente: o motor e o grafo da trilha não foram tocados');
-
-/* O QUE ESTA SEÇÃO É, E O QUE ELA NÃO É.
- *
- * Ela NÃO é a evidência de que este PR preservou a trilha. Não pode ser: neste
- * PR o core.js e o banco/indice.json estão idênticos byte a byte à base do
- * merge, então a comparação dos 148 temas roda o MESMO programa sobre o MESMO
- * dado dos dois lados e não tem como reprovar. Comparar f(x) com f(x) e chamar
- * isso de prova é enfeite, e foi assim que a primeira versão deste arquivo
- * vendeu a seção.
- *
- * O que ela É: uma guarda PERMANENTE, que dorme enquanto os dois arquivos não
- * mudarem e acorda sozinha no dia em que mudarem. Por isso a identidade byte a
- * byte é AFIRMADA aqui embaixo, e não suposta: enquanto as duas primeiras
- * asserções disserem "idêntico", a comparação abaixo é tautologia declarada;
- * no primeiro PR que encostar no motor ou no grafo, elas reprovam, o leitor é
- * mandado para cá, e a comparação dos 148 passa a valer de verdade.
- *
- * O que protege a trilha NESTE PR é outra coisa, e está em dois lugares: o
- * fato do git, que as duas asserções abaixo medem, e a seção 7, que abre no
- * Chrome uma trilha de verdade GRAVADA no banco e confere os passos que a tela
- * mostra contra o motor. */
+secao('3. A migração não mudou trilha nenhuma');
 
 function baseDoMerge() {
   const tentativas = ['git merge-base HEAD origin/main', 'git merge-base HEAD main',
@@ -192,57 +108,33 @@ function baseDoMerge() {
   return '';
 }
 function doGit(base, arquivo) {
-  return execSync('git show ' + base + ':' + arquivo, { cwd: RAIZ, stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 }).toString();
+  try {
+    return execSync('git show ' + base + ':' + arquivo, { cwd: RAIZ, stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 }).toString();
+  } catch (e) { return null; }
 }
 
 const base = baseDoMerge();
-conf('achei a base do merge para comparar', base ? 'achei' : 'nenhuma', 'achei');
-
-const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'b7_trilha_'));
-process.on('exit', () => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { /* ok */ } });
-
-/* O motor de ANTES sai do git, e não de uma cópia guardada à mão: cópia
- * guardada à mão envelhece calada e a comparação vira o arquivo consigo mesmo. */
-let CoreAntes = null, temasAntes = null;
-if (base) {
-  const caminhoCore = path.join(TMP, 'core_antes.js');
-  fs.writeFileSync(caminhoCore, doGit(base, 'core.js'));
-  CoreAntes = require(caminhoCore);
-  const bruto = JSON.parse(doGit(base, 'banco/indice.json'));
-  temasAntes = bruto.temas || bruto;
-}
+conf('achei a base do merge', base ? 'achei' : 'nenhuma', 'achei');
+const indiceAntigoBruto = base ? doGit(base, 'banco/indice.json') : null;
 const CoreHoje = require('../core.js');
 
-if (base) {
-  /* A IDENTIDADE É AFIRMADA, NÃO SUPOSTA.
-   *
-   * Sem estas duas asserções, a comparação dos 148 logo abaixo é uma tautologia
-   * silenciosa: o leitor vê "nenhuma trilha mudou" e acredita que alguma coisa
-   * foi medida. Com elas, o arquivo diz em voz alta o que está acontecendo. Se
-   * um PR futuro encostar no core.js ou no banco/indice.json, estas duas
-   * reprovam PRIMEIRO, com a mensagem mandando ler o comentário da seção, e a
-   * comparação dos 148 deixa de ser tautologia e passa a ser a prova de que a
-   * mexida não mudou nenhuma das 148 escadas.
-   *
-   * A conta é do próprio git, contra a ÁRVORE DE TRABALHO e não contra o
-   * último commit, para que mudança ainda não commitada também apareça. É o
-   * git que resolve o CRLF, pelos filtros dele; comparar os textos na mão aqui
-   * acusaria diferença em todo arquivo do checkout. */
-  const mexidos = (() => {
-    try {
-      return execSync('git diff --name-only ' + base + ' -- core.js banco/indice.json',
-        { cwd: RAIZ, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-    } catch (e) { return 'NAO CONSEGUI MEDIR'; }
-  })();
-  conf('o core.js e o banco/indice.json estão idênticos byte a byte à base do merge, ' +
-    'então a comparação abaixo é tautologia DECLARADA; no dia em que esta asserção ' +
-    'reprovar, ela passa a valer de verdade e o motivo está no comentário da seção 3',
-    mexidos || 'nenhum', 'nenhum');
-  conf('o banco/indice.json de hoje é o mesmo da base', JSON.stringify(temasAntes) === JSON.stringify(temasHoje), true);
-  /* Os 148 temas como alvo, e não uma amostra: é barato, e a lacuna que a
-   * Nathália marcar amanhã pode cair em qualquer um deles. O máximo é o mesmo
-   * que a tela usa (6), e os cortados entram na comparação porque é deles que
-   * sai o "Puxar mais de trás". */
+if (!indiceAntigoBruto) {
+  /* Depois do merge do B14: a base não tem mais o índice antigo, e a
+   * comparação de migração já foi feita no PR dele. Dito, e não fingido. */
+  console.log('   a base do merge não tem mais o banco/indice.json: a comparação da migração ' +
+    'foi feita no PR do B14 e não se repete. As guardas do grafo daqui em diante são o ' +
+    'testa_trilha_dados e o testa_trilha.');
+} else {
+  const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'b14_trilha_'));
+  process.on('exit', () => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { /* ok */ } });
+  const caminhoCore = path.join(TMP, 'core_antes.js');
+  fs.writeFileSync(caminhoCore, doGit(base, 'core.js'));
+  const CoreAntes = require(caminhoCore);
+  const temasAntes = JSON.parse(indiceAntigoBruto).temas;
+  conf('os ids de antes e de hoje são os mesmos, na mesma ordem',
+    temasAntes.map(t => t.id).join(',') === temasHoje.map(t => t.id).join(','), true);
+  /* Os 148 como alvo, com o máximo que a tela usa (6); os cortados entram,
+   * porque é deles que sai o "Puxar mais de trás". */
   const sequencia = (Core, temas, alvo) => {
     const d = Core.trilhaDerivada(temas, alvo, { maximo: 6 });
     return d.passos.map(p => p.temaId + '@' + p.serie + '/' + p.duracaoMin).join('>') +
@@ -256,20 +148,16 @@ if (base) {
     if (antes !== depois) diferentes.push(t.id);
     if (depois.indexOf('>') >= 0) comPasso++;
   });
-  conf('os 148 temas entraram na comparação', temasHoje.length, 148);
-  conf('e a maioria tem escada de verdade (mais de um passo)', comPasso > 100, true);
-  conf('nenhuma trilha mudou de sequência entre a base e hoje',
+  conf('a maioria tem escada de verdade (mais de um passo)', comPasso > 100, true);
+  conf('nenhuma das 148 trilhas mudou de sequência entre o índice antigo e o novo',
     diferentes.length ? diferentes.slice(0, 5).join(', ') : 'nenhuma mudou', 'nenhuma mudou');
-
-  /* A COMPARAÇÃO SABE REPROVAR. Sem este par, "nenhuma mudou" seria verdade
-   * também se sequencia() devolvesse sempre a mesma string. Um tema com um
-   * pré-requisito a menos tem de sair com sequência diferente. */
+  /* A comparação sabe reprovar: um pré-requisito a menos muda a sequência. */
   const temasMexidos = JSON.parse(JSON.stringify(temasHoje));
   const alvoMexido = temasMexidos.filter(t => (t.prerequisitos || []).length)[0];
-  conf('achei um tema com pré-requisito para envenenar a comparação', !!alvoMexido, true);
+  conf('achei um assunto com pré-requisito para envenenar a comparação', !!alvoMexido, true);
   if (alvoMexido) {
     alvoMexido.prerequisitos = [];
-    conf('tirando um pré-requisito, a sequência daquele tema MUDA',
+    conf('tirando um pré-requisito, a sequência daquele assunto MUDA',
       sequencia(CoreHoje, temasHoje, alvoMexido.id) !== sequencia(CoreHoje, temasMexidos, alvoMexido.id), true);
   }
 }
@@ -278,9 +166,9 @@ if (base) {
 const amb = H.criarAmbiente(PORTA, 'perfil_sem_autoral', trocas);
 const hojeIso = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
 
-/* Dois assuntos de matemática do banco, os dois com registro no índice: um
- * limpo (é ele que não pode ganhar botão Material) e um com PDF anexado de
- * antes (é ele que tem de continuar abrindo). */
+/* Dois assuntos de matemática do índice: um limpo (é ele que não pode ganhar
+ * botão Material) e um com PDF anexado de antes (é ele que tem de continuar
+ * abrindo). */
 const ALVO = temasHoje.filter(t => t.serie === '08')[0] || temasHoje[0];
 const ASSUNTO_LIMPO = { id: ALVO.id, titulo: ALVO.pt.titulo, fonte: 'banco', disciplina: 'matematica' };
 const OUTRO = temasHoje.filter(t => t.id !== ALVO.id)[0];
@@ -291,11 +179,6 @@ const ASSUNTO_COM_MATERIAL = {
 };
 
 (async () => {
-  if (VENENO) {
-    secao('O veneno é de verdade');
-    conf('o app.js servido ficou DIFERENTE do repositório', trocas['/app.js'] !== APP ? 'diferente' : 'IGUAL', 'diferente');
-    conf('e o veneno ligou a chave', trocas['/app.js'].indexOf(LIGADA) >= 0, true);
-  }
   await amb.subir();
   const pag = await amb.pagina();
   await H.abrirApp(pag, amb.ORIGEM);
@@ -372,19 +255,15 @@ const ASSUNTO_COM_MATERIAL = {
    *
    * A linha é desenhada duas vezes: uma antes de o índice dos temas chegar, em
    * que `registro` ainda é nulo, e outra depois, quando a etiqueta do ano
-   * aparece. O botão Material da linha depende de `registro`
-   * (`temAutoral = MATERIAL_AUTORAL_NO_AR && !!registro`), então ele só existe
-   * no SEGUNDO desenho.
+   * aparece. Até o B14, o botão Material da linha também dependia de
+   * `registro`, e só existia no SEGUNDO desenho.
    *
    * Com o predicado "a linha existe", a leitura podia pegar o primeiro
-   * desenho. No modo normal isso nunca aparecia, porque o esperado é "Tirar",
-   * que vale nos dois momentos; no modo envenenado o esperado é
-   * "Material,Tirar", e o veneno reprovava de vez em quando. Foi o INSTAVEL do
-   * portão das 11:33, e é a mesma família de defeito que este PR conserta: a
-   * asserção amostrava um estado transitório.
+   * desenho. Foi o INSTAVEL do portão das 11:33 de setembro: a asserção
+   * amostrava um estado transitório.
    *
    * A etiqueta do ano é a condição exata do assentamento, porque ela vem do
-   * mesmo `registro`, e vale nos DOIS modos. */
+   * mesmo `registro`. */
   const linhaLimpa = await esperar('linha do assunto limpo, já com a etiqueta do ano', () => pag.evaluate(t => {
     const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => x.textContent.indexOf(t) >= 0);
     return l ? {
@@ -479,7 +358,7 @@ const ASSUNTO_COM_MATERIAL = {
 
   const daTela = await pag.evaluate(alvo => new Promise(r => {
     // o motor que ESTÁ NA PÁGINA, lendo o índice que a página baixou
-    fetch('banco/indice.json').then(x => x.json()).then(j => {
+    fetch('banco/topicos/matematica.json').then(x => x.json()).then(j => {
       const temas = j.temas || j;
       r(Core.trilhaDerivada(temas, alvo, { maximo: 6 }).passos.map(p => p.titulo).join(' > '));
     });
@@ -490,7 +369,7 @@ const ASSUNTO_COM_MATERIAL = {
    * o "Ver os temas soltos" morava, e a ausência só prova alguma coisa com a
    * janela da trilha ABERTA. */
   const gravada = await pag.evaluate(alvo => new Promise(r => {
-    fetch('banco/indice.json').then(x => x.json()).then(async j => {
+    fetch('banco/topicos/matematica.json').then(x => x.json()).then(async j => {
       const temas = j.temas || j;
       const d = await Store.carregar();
       const aluno = d.alunos[0];
@@ -586,50 +465,9 @@ const ASSUNTO_COM_MATERIAL = {
   await pag.evaluate(() => { const f = document.querySelector('#modal-tema .fechar'); if (f) f.click(); });
   await pausa(200);
 
-  // ================================================================
-  if (VENENO) {
-    secao('VENENO: com a chave ligada, as ausências viram presenças (a sexta perdeu o par no T05)');
-    /* Cada uma destas é o par de uma ausência conferida no modo normal, no
-     * mesmo ponto do mesmo percurso. Se alguma deixar de virar presença, a
-     * ausência correspondente lá em cima passou a valer por outro motivo que
-     * não a chave, e é isso que este balanço existe para pegar. */
-    conf('1. o botão "Material de aula" volta à janela da aula',
-      venenoVisto.botoesDaFolha, 'Escrever à mão na folha | Material de aula | Anexar PDF | Anexar foto');
-    conf('2. a ajuda da folha volta a prometer o atalho opcional',
-      /atalho opcional/i.test(venenoVisto.ajudaDaFolha || ''), true);
-    conf('3. a linha do assunto volta a ter o botão Material',
-      venenoVisto.botoesDoAssunto, 'Material,Tirar');
-    conf('4. a ajuda do assunto volta a dizer que o material sai dali',
-      /material pronto/i.test(venenoVisto.ajudaDoAssunto || ''), true);
-    conf('5. o "Ver os temas soltos" volta para dentro da trilha',
-      venenoVisto.soltosNaTrilha, true);
-    /* O BOTÃO E A AJUDA SÃO DOIS RAMOS DIFERENTES, governados pela mesma chave
-     * mas escritos em lugares distintos do app.js: o botão em `if
-     * (MATERIAL_AUTORAL_NO_AR) barraDoFim.push(...)` e a ajuda no ternário do
-     * `ajudaDoFim`, logo abaixo. Sem este par, a ausência do texto lá em cima
-     * era a única das oito sem contraparte, e passaria verde se o ajudaDoFim
-     * deixasse de ser desenhado por qualquer outro motivo. O valor já estava
-     * sendo capturado e nunca era lido. */
-    conf('5b. e a AJUDA do fim da trilha volta a falar em temas soltos',
-      /temas soltos/i.test(venenoVisto.ajudasDaTrilha || ''), true);
-    /* A SEXTA PERDEU O PAR no T05 (5b8a98f), que reescreveu a raiz da escolha
-     * de assunto e tirou a frase "temas, com material pronto" da linha da
-     * matemática, com chave ligada ou não. A chave já não devolve essa frase,
-     * e cobrar a presença aqui seria reprovar por um defeito que não é da
-     * chave. A ausência no modo normal (seção 8) continua conferida. A chave
-     * inteira sai no B14 (onda 0); até lá, "trocar false por true devolve
-     * tudo" vale menos esta frase, e isso está escrito no livro de execução. */
-    /* A SÉTIMA, que mora no index.html e por isso não enxerga a constante.
-     * Com a chave ligada, o arranque reescreve o título padrão da janela de
-     * tema para o texto da base. É o pedaço que faltava para "trocar false por
-     * true devolve tudo" ser literal, e não quase. */
-    conf('7. o título padrão da janela de tema volta a ser o da base',
-      venenoVisto.tituloPadraoDoTema, 'Material de aula');
-    throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
-  }
 
   // ================================================================
   secao('9. Nenhum erro');
   conf('nenhum erro de JavaScript', pag.errosDePagina.join(' | '), '');
   conf('nenhum pedido deu 404', amb.quatrocentos.join(', '), '');
-})().then(() => H.fim(amb)(), e => (e && e.fimDoVeneno ? H.fim(amb)() : H.fim(amb)(e)));
+})().then(() => H.fim(amb)(), e => H.fim(amb)(e));

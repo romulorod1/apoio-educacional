@@ -150,34 +150,11 @@ roda() {
   fi
 }
 
-titulo "banco de temas"
-saida=$(python temas/_ferramentas/verificar.py 2>&1) || true
-rep=$(printf '%s\n' "$saida" | grep -c "REPROVADO" || true)
-ok=$(printf '%s\n' "$saida" | grep -cE "^  ok" || true)
-printf '  %s     verificar.py             %s temas ok, %s reprovados\n' \
-  "$([ "$rep" = "0" ] && echo 'ok    ' || echo 'FALHOU')" "$ok" "$rep"
-[ "$rep" = "0" ] || falhou=1
-
-# QUEM CONFERE O CONFERENTE.
-#
-# O verificar.py acima diz que os 148 temas estao bons. Ele so vale se ele
-# souber reprovar: um verificador que aprova tudo tambem imprime "0 reprovados".
-# O testa_verificador.py estraga um tema saudavel de 11 formas diferentes e
-# exige que cada defeito seja pego, mais 14 frases e 6 decisoes do ambiente
-# simbolico. Ele existia desde o comeco e o portao nunca o rodou, entao a linha
-# acima vinha sendo uma afirmacao sobre um instrumento que ninguem aferia.
-roda "provas do verificador" python temas/_ferramentas/testa_verificador.py
-
-# FRENTE 2 (portugues e literatura). A colecao fontes/ tem travas proprias (dominio
-# publico pela conta da Lei 9.610/98, largura de linha medida pelo pdf.js, cabecalho),
-# provadas nos dois sentidos pelo testa_fontes.py: par envenenado por trava, com o ano
-# fixo em 2026 e um segundo par em 2027 provando que a conta so afrouxa.
-roda "provas das fontes"    python temas/_ferramentas/testa_fontes.py
-
+# A secao do banco de temas (o verificar.py dos 148 temas, a prova do
+# verificador e a das fontes de portugues) saiu no B14 com o material autoral.
 titulo "sem navegador"
 roda "notacao"        node _teste/testa_notacao.js
 roda "busca (regras)" node _teste/testa_busca_regras.js
-roda "material (PDF)" node _teste/testa_material.js
 # FRENTE 2: bloco de citacao com numero de linha, fio e credito, italico por F4/F5,
 # alternativas e gabarito em criterio, e a folha legada byte a byte igual a base do merge.
 roda "citacao (PDF)"  node _teste/testa_citacao_pdf.js
@@ -220,71 +197,8 @@ for t in testa_registro testa_mapeamento testa_exclusoes testa_feriados \
   roda "$t" node "_teste/$t.js"
 done
 
-# As provas do kit de figuras nao rodavam aqui. Duas delas estavam falhando
-# desde o commit que as criou, algumas horas antes (_base_prova_travas, 34 de
-# 36: ce5d842 as 17:56 e o conserto as 01:42 do dia seguinte, 7h46), e ninguem
-# viu, porque so o verificar.py e as suites de _teste entravam no portao.
-# Regressao no kit passaria pelo merge. Cada prova imprime "N passaram, M
-# falharam"; a _prova_desenho imprime so "avisos: N", e e conferida por esse
-# token. Nem todas as provas de figuras/ entram: as que dizem "nenhuma reprova"
-# ou "todos os resultados como esperado" o `roda` nao sabe ler, e o
-# _audita_receitas_gab reprova hoje (dois arcos rotulados com angulo diferente
-# do que varrem, na main tambem). Entram as que imprimem contagem.
-titulo "kit de figuras"
-roda "fundacao"         node figuras/_prova_fundacao.js
-roda "marcas"           node figuras/_prova_marcas.js
-roda "receitas"         node figuras/_prova_receitas.js
-roda "receitas circ."   node figuras/_prova_receitas_circulo.js
-roda "curvas"           node figuras/_prova_desenho_curvas.js
-roda "solidos"          node figuras/_prova_solidos.js
-roda "travas do base"   node figuras/_base_prova_travas.js
-roda "travas de hoje"   node figuras/_prova_base_travas_hoje.js
-roda "formula"          node figuras/testa_formula.js
-roda "piloto MAT07-12"  node figuras/_piloto_MAT07-12.js
-roda "receitas sol."    node figuras/_prova_receitas_solidos.js
-roda "piloto MAT08-13"  node figuras/_piloto_MAT08-13.js
-roda "piloto MATEM3-04" node figuras/_piloto_MATEM3-04.js
-roda "tinta"            node figuras/_prova_desenho_tinta.js
-# A prova da @eq dentro do exercicio (frente 3, 08/09/2026). Ela nasceu sonda,
-# mediu o defeito (a diretiva saindo impressa como LaTeX cru no meio da folha da
-# crianca, sem aviso nenhum) e virou prova com placar. Entra AQUI porque
-# conferencia que so roda quando alguem lembra nao e conferencia: as travas dela
-# cobrem os seis caminhos que escrevem texto do autor do tema, e a maior parte
-# delas existe justamente porque um deles tinha ficado sem caso.
-roda "@eq no exercicio"  node figuras/_sonda_eq_no_exercicio.js
-# Frente 3 (figuras), 07/09/2026. Os dois pilotos novos rodam SEM argumento, ou
-# seja, contra o temas/banco.json, que e como os outros tres ja rodam aqui: o
-# retrato figuras/_tema_<ID>.json e gitignored e serve so a autoria. O
-# _varredura_banco nao prova receita nenhuma, prova o BANCO: e o verificador do
-# criterio de pronto desta frente (nenhum exercicio manda olhar uma figura que a
-# folha nao tem), e por isso ele fica aqui e nao no piloto de um tema.
-roda "prova do piloto"  node figuras/_prova_piloto_base.js
-roda "receitas plano"   node figuras/_prova_receitas_plano.js
-roda "piloto MATEM3-12" node figuras/_piloto_MATEM3-12.js
-roda "piloto MATEM3-03" node figuras/_piloto_MATEM3-03.js
-# Lote 1 da varredura (frente 3), 08/09/2026: os quatro primeiros temas que
-# ganharam figura. Rodam sem argumento, contra o temas/banco.json, como os
-# outros pilotos desta secao.
-roda "piloto MATEM1-14" node figuras/_piloto_MATEM1-14.js
-roda "piloto MAT08-12"  node figuras/_piloto_MAT08-12.js
-roda "piloto MAT03-07"  node figuras/_piloto_MAT03-07.js
-roda "piloto MAT09-09"  node figuras/_piloto_MAT09-09.js
-# Lote 2 da varredura (frente 3), 08/09/2026: os quatro temas de geometria que
-# faltavam ao alcance do kit. Com o lote 1 eles fecham a geometria que o kit de
-# hoje cobre. Rodam sem argumento, contra o temas/banco.json.
-roda "piloto MAT09-07"  node figuras/_piloto_MAT09-07.js
-roda "piloto MATEM2-03" node figuras/_piloto_MATEM2-03.js
-roda "piloto MATEM2-11" node figuras/_piloto_MATEM2-11.js
-roda "piloto MATEM2-12" node figuras/_piloto_MATEM2-12.js
-roda "varredura banco"  node figuras/_varredura_banco.js
-anota figuras/_prova_desenho.js
-saida=$(node figuras/_prova_desenho.js 2>&1) || true
-if printf '%s\n' "$saida" | grep -qE "^avisos: 0$" && printf '%s\n' "$saida" | grep -qE "^vazamentos de estado: 0$"; then
-  printf '  ok      %-24s %s\n' "desenho" "$(printf '%s\n' "$saida" | grep -E '^figuras:' | head -1)"
-else
-  printf '  FALHOU  %-24s %s\n' "desenho" "$(printf '%s\n' "$saida" | grep -E 'avisos|vazamentos' | tr '\n' ' ')"
-  falhou=1
-fi
+# A secao do kit de figuras (31 provas de figuras/) saiu no B14 com o material
+# autoral: o kit so servia aos temas.
 
 # O testa_atualizacao_real entra aqui porque e o UNICO que percorre uma transicao
 # de versao de verdade, com os cabecalhos reais do GitHub Pages (max-age=600 e
@@ -344,7 +258,6 @@ trap limpa_servidor EXIT INT TERM
 titulo "com navegador"
 for t in testa_temas testa_busca testa_mapa_e2e \
          testa_perfil testa_olho testa_atualizacao testa_atualizacao_real \
-         testa_biblioteca_offline \
          testa_assunto testa_familia testa_proposta_tela \
          testa_novidades_navegador \
          testa_modal_aula_navegador \
@@ -359,19 +272,6 @@ for t in testa_temas testa_busca testa_mapa_e2e \
          e2e e2e_correcoes; do
   roda "$t" node "_teste/$t.js"
 done
-# O mesmo teste duas vezes de proposito. Sem argumento ele prova que a serie
-# de temas baixada sobrevive a uma atualizacao feita sem sinal; com
-# --envenenado a versao publicada troca o caminho das series no app.js e ele
-# tem que ENXERGAR a perda. Se o segundo passar sem o defeito aparecer, o
-# primeiro nao esta provando nada. Fica fora do laco porque o laco nao passa
-# argumento.
-roda "testa_biblioteca_offline --envenenado" node "_teste/testa_biblioteca_offline.js" --envenenado
-# E uma terceira vez, com o veneno do incidente real de sw.js:12-16: o activate
-# publicado deixa de poupar o BAIXADOS e apaga a biblioteca. O primeiro veneno
-# nunca faz as duas asserções de cache falharem; este faz. Sem ele, um activate
-# que apagasse o BAIXADOS passaria pelas duas sem ninguem ter provado que elas
-# sabem reprovar.
-roda "testa_biblioteca_offline --envenenado-activate" node "_teste/testa_biblioteca_offline.js" --envenenado-activate
 
 # O painel "Cada aluno, desde quando e por quanto" nasce recolhido no
 # Fechamento. Esta trava guarda quatro coisas: ele nasce fechado, o botao
@@ -426,20 +326,15 @@ roda "biblioteca dificuldade --envenenado-etiqueta" node "_teste/testa_bibliotec
 # que nao existe a lista do sw.js, e o service worker nao pode instalar.
 roda "limpeza do acervo"                        node "_teste/testa_limpeza_acervo.js"
 roda "limpeza do acervo --envenenado-lista"     node "_teste/testa_limpeza_acervo.js" --envenenado-lista
-# FRENTE B (B7): o material autoral saiu do ar. Sem navegador, a chave desligada,
-# nada apagado do banco e a TRILHA ANTES E DEPOIS (os 148 temas como alvo, a
-# sequencia de passos do motor da base do merge contra a de hoje). No navegador,
-# a janela da aula sem o botao, o assunto do banco como assunto comum, o material
-# ja anexado numa aula antiga ainda abrindo, e a trilha sem "Ver os temas
-# soltos". O veneno religa a chave no app.js servido e percorre o MESMO caminho
-# do modo normal do comeco ao fim, conferindo no balanco final as ausencias (eram SETE; a sexta perdeu o par no T05)
-# virando presenca: o botao da folha, o "atalho opcional" da ajuda, o botao
-# Material da linha do assunto, o "material pronto" da ajuda do assunto, o "Ver
-# os temas soltos" e a ajuda do fim da trilha, o "material pronto" da escolha de
-# assunto, e o titulo padrao da janela de tema. Ausencia sem par passaria por
-# qualquer motivo, inclusive por um seletor errado.
+# B14: o material autoral saiu do repositorio. Sem navegador, a chave fora do
+# app.js, o material fora do repositorio e do pacote do service worker, o indice
+# de assuntos com os 148 ids, e a TRILHA ANTES E DEPOIS da migracao (os 148
+# assuntos como alvo, com o motor e o indice de antes contra os de hoje, enquanto
+# a base do merge ainda tiver o indice antigo). No navegador, a janela da aula
+# sem o botao, o assunto do indice como assunto comum, o material ja anexado
+# numa aula antiga ainda abrindo, e a trilha sem "Ver os temas soltos". O veneno
+# --envenenado-liga, que religava a chave, saiu junto com ela.
 roda "sem material autoral"                     node "_teste/testa_sem_material_autoral.js"
-roda "sem autoral --envenenado-liga"            node "_teste/testa_sem_material_autoral.js" --envenenado-liga
 # FRENTE B (B7): o caminho curto da aula ate o material da biblioteca. Da aula,
 # o modulo inteiro ja marcado (menos o que ela ja usou com aquele aluno); marcar
 # de dentro da tela cheia, com selo e com as caixas da lista de acordo ao fechar;
@@ -646,14 +541,14 @@ na_secao_navegador=0
 
 # Duas conferencias aqui, e a primeira e a que pega o defeito de verdade.
 #
-# 1) O pacote offline tem DUAS listas que precisam bater: os <script src=
-# "figuras/*.js"> do index.html e a lista ARQUIVOS do sw.js. Ela da aula na casa
-# das familias, muitas vezes sem sinal: arquivo que o index.html carrega e o
-# cache nao guarda vira 503 quando falta rede, e some calado, porque cada modulo
-# de figuras procura o global do vizinho e, nao achando, desiste sem erro. A
-# figura sai sem marca nenhuma e so se descobre na folha impressa. Por isso a
-# conferencia sai dos DOIS arquivos de HOJE. A versao anterior comparava o sw.js
-# com o sw.js e nunca olhou o index.html: nao veria isso nunca.
+# 1) O pacote offline tem DUAS listas que precisam bater: os <script src=...>
+# do index.html e a lista ARQUIVOS do sw.js. Ela da aula na casa das familias,
+# muitas vezes sem sinal: arquivo que o index.html carrega e o cache nao guarda
+# vira 503 quando falta rede. Por isso a conferencia sai dos DOIS arquivos de
+# HOJE. A versao anterior comparava o sw.js com o sw.js e nunca olhou o
+# index.html: nao veria isso nunca. Ate o B14 ela olhava so os scripts de
+# figuras/ (o kit, que degradava calado); com o kit fora, ela passou a olhar
+# TODO script local do index.html, que e a mesma protecao, maior.
 #
 # 2) O nome do cache tem que mudar quando a lista muda. Nos dez commits que
 # mexeram no sw.js a constante CACHE foi promovida toda vez (v1 ate v11); depois
@@ -679,22 +574,23 @@ entradas_sw() { printf '%s\n' "$1" | sed -n "s|^ *'\(\./\)\{0,1\}\([^']*\)' *,\{
 
 sw_agora=$(tr -d '\r' < sw.js 2>/dev/null || true)
 lista_agora=$(entradas_sw "$(lista_sw "$sw_agora")")
-figs_html=$(grep -oE 'src="figuras/[A-Za-z0-9_.-]+\.js"' index.html 2>/dev/null \
-  | sed 's|.*figuras/||; s|"$||' | sort -u)
-if [ -z "$lista_agora" ] || [ -z "$figs_html" ]; then
-  printf '  FALHOU  %-24s nao achei a lista ARQUIVOS no sw.js ou os scripts de figuras no index.html\n' \
-    "kit no cache"
+# So script LOCAL: endereco com "//" (de fora) nao e do pacote.
+scripts_html=$(tr -d '\r' < index.html 2>/dev/null | grep -oE '<script src="[^"]+"' \
+  | sed 's|<script src="||; s|"$||; s|^\./||' | grep -v '//' | sort -u)
+if [ -z "$lista_agora" ] || [ -z "$scripts_html" ]; then
+  printf '  FALHOU  %-24s nao achei a lista ARQUIVOS no sw.js ou os scripts no index.html\n' \
+    "scripts no cache"
   falhou=1
 else
   fora=""
-  for f in $figs_html; do
-    printf '%s\n' "$lista_agora" | grep -Fqx "figuras/$f" || fora="$fora $f"
+  for f in $scripts_html; do
+    if ! printf '%s\n' "$lista_agora" | grep -Fqx "$f"; then fora="$fora $f"; fi
   done
   if [ -z "$fora" ]; then
-    printf '  ok      %-24s os %s arquivos de figuras do index.html estao na lista do sw.js\n' \
-      "kit no cache" "$(printf '%s\n' "$figs_html" | wc -l | tr -d ' ')"
+    printf '  ok      %-24s os %s scripts do index.html estao na lista do sw.js\n' \
+      "scripts no cache" "$(printf '%s\n' "$scripts_html" | wc -l | tr -d ' ')"
   else
-    printf '  FALHOU  %-24s o index.html carrega e o sw.js nao guarda:%s\n' "kit no cache" "$fora"
+    printf '  FALHOU  %-24s o index.html carrega e o sw.js nao guarda:%s\n' "scripts no cache" "$fora"
     falhou=1
   fi
 fi
@@ -898,66 +794,9 @@ else
   fi
 fi
 
-# A LINHA DE carregarSerie QUE MONTA O CAMINHO DAS SERIES DA MATEMATICA.
-#
-# O app.js le a tabela de materias (Core.MATERIAS) para saber de que raiz vem
-# cada serie, e a raiz da matematica e 'banco/' por legado: a chave no cache
-# BAIXADOS dos tablets e a URL que o app pediu no dia em que a serie foi
-# baixada, e nao ha codigo que renomeie chave. Se a linha de codigo de
-# carregarSerie deixar de produzir o literal 'banco/serie-', toda serie que ela
-# ja baixou some sem sinal, na casa da familia (o incidente de sw.js:12-16). O
-# testa_biblioteca_offline prova isso no navegador, em tres minutos; esta e a
-# versao de um segundo, sem Chrome e sem servidor.
-#
-# Casa a LINHA de codigo dentro da funcao, e nao o arquivo inteiro: o proprio
-# comentario de carregarSerie cita o literal, e um grep no arquivo passaria com
-# a linha de codigo trocada. E a prova vem antes da conferencia: dois venenos
-# tem que dar zero. O primeiro e o mesmo do testa_biblioteca_offline (o literal
-# trocado por 'banco/matematica/serie-'); o segundo tira o literal da linha de
-# codigo e o deixa so no comentario, que e o buraco de casar o arquivo.
-linhas_serie_mat() {
-  printf '%s\n' "$1" | sed -n '/^  function carregarSerie(/,/^  }$/p' \
-    | grep -vE '^[[:space:]]*(/\*|\*|//)' | grep -cE "'banco/serie-'[[:space:]]*\+" || true
-}
-app_agora=$(tr -d '\r' < app.js 2>/dev/null || true)
-veneno_troca=$(printf '%s\n' "$app_agora" | sed "s|'banco/serie-'|'banco/matematica/serie-'|g")
-veneno_some=$(printf '%s\n' "$app_agora" \
-  | sed "/^  function carregarSerie(/,/^  }$/{ /^[[:space:]]*var url = /s|'banco/serie-'[[:space:]]*+[[:space:]]*serie|raiz + 'serie-' + serie|; }")
-n_agora=$(linhas_serie_mat "$app_agora"); [ -n "$n_agora" ] || n_agora=0
-n_troca=$(linhas_serie_mat "$veneno_troca"); [ -n "$n_troca" ] || n_troca=0
-n_some=$(linhas_serie_mat "$veneno_some"); [ -n "$n_some" ] || n_some=0
-#
-# A ORDEM DESTES TESTES E O CONSERTO, e nao detalhe de estilo.
-#
-# Antes, a pergunta "algum veneno deixou de mudar o app.js?" vinha ANTES de
-# "o codigo de hoje ainda produz o literal?". Isso da o diagnostico trocado
-# justamente no caso que a trava existe para pegar: quando alguem tira o literal
-# da linha de codigo de carregarSerie, o sed do veneno_some nao acha mais o que
-# substituir, o texto sai igual ao original, e o portao reprovava dizendo "um dos
-# venenos nao mudou o app.js: a prova da trava nao prova nada". Quem lia ia
-# conferir a prova da trava, que estava boa, em vez de olhar o app.js, que estava
-# quebrado. Reprovar certo pelo motivo errado custa a hora de quem procura.
-#
-# Perguntando n_agora primeiro, o defeito real e nomeado pelo nome, e a queixa
-# sobre o veneno so aparece quando o codigo de hoje esta bom e a prova e que
-# apodreceu.
-if [ -z "$app_agora" ]; then
-  printf '  FALHOU  %-24s nao consegui ler o app.js\n' "serie da matematica"
-  falhou=1
-elif [ "$n_agora" = "0" ]; then
-  printf '  FALHOU  %-24s a linha de carregarSerie nao produz mais o literal banco/serie- para a matematica\n' "serie da matematica"
-  falhou=1
-elif [ "$veneno_troca" = "$app_agora" ] || [ "$veneno_some" = "$app_agora" ]; then
-  printf '  FALHOU  %-24s um dos venenos nao mudou o app.js: a prova da trava nao prova nada\n' "serie da matematica"
-  falhou=1
-elif [ "$n_troca" != "0" ] || [ "$n_some" != "0" ]; then
-  printf '  FALHOU  %-24s a trava nao enxerga o veneno (literal trocado: %s linha, literal so no comentario: %s linha)\n' \
-    "serie da matematica" "$n_troca" "$n_some"
-  falhou=1
-else
-  printf '  ok      %-24s carregarSerie produz banco/serie- para a matematica (%s linha), e a trava pega os dois venenos\n' \
-    "serie da matematica" "$n_agora"
-fi
+# A trava da LINHA DE carregarSerie (o literal 'banco/serie-' das series da
+# matematica) saiu no B14: o carregarSerie e as series sairam com o material
+# autoral, e nao ha mais chave de cache de serie que um app novo possa perder.
 
 # A PROVA VEM ANTES DA CONFERENCIA que ela prova.
 #
@@ -1000,20 +839,10 @@ fi
 # da lista de fora que nao existe mais (a lista apodrece calada), e arquivo que
 # esta nos dois lugares (a lista mente sobre ele).
 FORA_DO_PORTAO='
-figuras/_prova_desenho_auditor.js: auditoria de tinta para olhar, imprime avisos e nunca reprova; sai no B14 com o material autoral
-figuras/_prova_formula.js: gera o PDF da formula para olhar, sem placar; a prova com placar e figuras/testa_formula.js
-figuras/_prova_marcas_bloco.js: folha de marcas para olhar, imprime "nenhuma reprova" e sai sempre zero; sai no B14
-figuras/_prova_marcas_travas.js: travas das marcas num dialeto sem placar ("todos os resultados como esperado"); sai no B14
-figuras/_piloto_base.js: biblioteca dos pilotos, nao e prova; quem a prova e figuras/_prova_piloto_base.js
-figuras/_audita_desenho.js: relatorio de espessura e contraste para olhar, sem veredito; sai no B14
-figuras/_audita_receitas.js: relatorio de medidas das receitas, sem veredito; sai no B14
-figuras/_audita_receitas_cor.js: relatorio de avisos de cor, sem veredito; sai no B14
-figuras/_audita_receitas_gab.js: reprova na main desde que nasceu (dois arcos rotulados com angulo diferente do que varrem); sai no B14
-figuras/_prova_receitas_auditor.py: prova de verdade no modo --conferir (0 paginas fora em 26/10), mas le o PDF que o _prova_receitas.js deixa e fala outro dialeto; fica fora porque sai no B14 com as receitas
-figuras/_prova_receitas_circulo_png.py: renderiza o PDF da prova em PNG para olhar; nao confere nada; sai no B14
-figuras/_prova_receitas_solidos_render.py: renderiza o PDF da prova em PNG para olhar; nao confere nada; sai no B14
-figuras/_prova_solidos_render.py: renderiza o PDF da prova em PNG para olhar; nao confere nada; sai no B14
 '
+# A lista ficou vazia no B14: as treze entradas eram de figuras/, que saiu com o
+# material autoral. Prova nova que ficar fora do portao entra aqui, uma linha
+# por arquivo, com o motivo depois de dois-pontos.
 # $1 = arquivos de prova achados, $2 = chamadas, $3 = lista de fora (so os caminhos)
 esquecidas_de() {
   printf '%s\n' "$1" | while IFS= read -r a; do
@@ -1043,9 +872,8 @@ afere_cob "_teste/testa_a.js" "" "" "_teste/testa_a.js "
 afere_cob "_teste/testa_a.js.bak" "_teste/testa_a.js" "" "_teste/testa_a.js.bak "
 
 titulo "toda prova no portao"
-achadas=$(ls _teste/testa_*.js _teste/e2e*.js figuras/_prova_*.js figuras/_prova_*.py figuras/_piloto_*.js \
-            figuras/_audita_*.js figuras/_base_prova_*.js figuras/testa_*.js \
-            temas/_ferramentas/testa_*.py biblioteca/_prova_*.py 2>/dev/null | sort -u || true)
+# figuras/ e temas/_ferramentas/ sairam no B14 com o material autoral.
+achadas=$(ls _teste/testa_*.js _teste/e2e*.js biblioteca/_prova_*.py 2>/dev/null | sort -u || true)
 fora_caminhos=$(printf '%s\n' "$FORA_DO_PORTAO" | sed -n 's/^\([^:]*\):.*/\1/p')
 n_achadas=$(printf '%s\n' "$achadas" | grep -c . || true)
 if [ "$f_cob" != "0" ]; then
