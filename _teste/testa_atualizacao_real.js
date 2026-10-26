@@ -64,7 +64,9 @@ function reporVersaoAntiga() {
   fs.rmSync(PASTA, { recursive: true, force: true });
   fs.mkdirSync(PASTA, { recursive: true });
   execSync('git archive ' + COMMIT_V1 + ' | tar -x -C "' + PASTA.split(BARRA).join('/') + '"',
-    { cwd: RAIZ, shell: 'C:/Program Files/Git/bin/bash.exe' });
+    // O pipe para o tar pede um shell POSIX: o Git Bash no Windows, o /bin/sh
+    // no runner Linux do GitHub.
+    { cwd: RAIZ, shell: process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : '/bin/sh' });
 }
 function publicarVersaoNova() {
   ['index.html', 'styles.css', 'core.js', 'pdf.js', 'store.js', 'draw.js', 'app.js', 'sw.js', 'manifest.webmanifest']

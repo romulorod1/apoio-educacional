@@ -60,7 +60,9 @@ function prepararVersaoAntiga() {
   fs.rmSync(PASTA, { recursive: true, force: true });
   fs.mkdirSync(PASTA, { recursive: true });
   execSync('git archive ' + COMMIT_V1 + ' | tar -x -C "' + PASTA.replace(/\\/g, '/') + '"',
-    { cwd: RAIZ, shell: 'C:/Program Files/Git/bin/bash.exe' });
+    // O pipe para o tar pede um shell POSIX: o Git Bash no Windows, o /bin/sh
+    // no runner Linux do GitHub.
+    { cwd: RAIZ, shell: process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : '/bin/sh' });
   const versao = fs.readFileSync(path.join(PASTA, 'app.js'), 'utf8').match(/var VERSAO = '([^']+)'/);
   return versao ? versao[1] : '?';
 }

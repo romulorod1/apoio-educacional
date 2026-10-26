@@ -432,7 +432,7 @@ roda "limpeza do acervo --envenenado-lista"     node "_teste/testa_limpeza_acerv
 # a janela da aula sem o botao, o assunto do banco como assunto comum, o material
 # ja anexado numa aula antiga ainda abrindo, e a trilha sem "Ver os temas
 # soltos". O veneno religa a chave no app.js servido e percorre o MESMO caminho
-# do modo normal do comeco ao fim, conferindo no balanco final as SETE ausencias
+# do modo normal do comeco ao fim, conferindo no balanco final as ausencias (eram SETE; a sexta perdeu o par no T05)
 # virando presenca: o botao da folha, o "atalho opcional" da ajuda, o botao
 # Material da linha do assunto, o "material pronto" da ajuda do assunto, o "Ver
 # os temas soltos" e a ajuda do fim da trilha, o "material pronto" da escolha de

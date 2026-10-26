@@ -150,9 +150,10 @@ const ASSUNTO_ACERVO = { id: 'acervo-mat-funcoes', titulo: 'Funções: domínio 
   conf('o botão de escolher assunto existe', !!abriuEscolha, true);
   const escolha = await esperar('escolha de assunto aberta', () => pag.evaluate(() => {
     const m = document.querySelector('#modal-tema.aberto');
-    return m && /Por matéria/i.test(m.textContent) ? m.textContent : '';
+    // Desde o T05 (5b8a98f) o cabecalho "Por matéria" e "Outras matérias".
+    return m && /Outras matérias/i.test(m.textContent) ? m.textContent : '';
   }), v => !!v, 10000);
-  conf('a escolha abriu com "Por matéria"', escolha.ok, true);
+  conf('a escolha abriu com a lista de matérias', escolha.ok, true);
   conf('sem "Temas do Acervo Educacional"', (escolha.valor || '').indexOf('Acervo') < 0, true);
   if (process.env.SALVAR_PRINTS) await pag.screenshot({ path: path.join(process.env.SALVAR_PRINTS, 'b5f_5_escolha_assunto.png') });
 
