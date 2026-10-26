@@ -27,15 +27,27 @@ function navegar(ano, mes, meses, pausaMs) {
     return i < 0 ? null : Number(m[2]) * 12 + i;
   }
   const alvo = ano * 12 + (mes - 1);
+  const rotulo = () => (document.querySelector('#rotulo-mes') || {}).textContent;
   return (async () => {
+    // A Agenda pode ainda nao ter desenhado ("." no index.html). Espera ate dez
+    // segundos pelo rotulo legivel e, se nao vier, GRITA: sair calado deixava o
+    // chamador falhar depois, com um erro que nao aponta para ca.
+    for (let espera = 0; posicao(rotulo()) === null && espera < 100; espera++) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+    if (posicao(rotulo()) === null) {
+      throw new Error('irParaMes: o rótulo do mês não ficou legível: "' + rotulo() + '"');
+    }
     for (let guarda = 0; guarda < 120; guarda++) {
-      const agora = posicao(document.querySelector('#rotulo-mes').textContent);
-      if (agora === null) break;
+      const agora = posicao(rotulo());
       if (agora === alvo) break;
       document.querySelector(agora > alvo ? '#mes-anterior' : '#mes-seguinte').click();
       await new Promise(r => setTimeout(r, pausaMs));
     }
-    return document.querySelector('#rotulo-mes').textContent;
+    if (posicao(rotulo()) !== alvo) {
+      throw new Error('irParaMes: não cheguei ao mês pedido; parei em "' + rotulo() + '"');
+    }
+    return rotulo();
   })();
 }
 

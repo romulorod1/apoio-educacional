@@ -5,9 +5,11 @@
 #
 #   portao-rapido     todo PR e todo push na main. Roda o confere_tudo.sh com
 #                     --rapido: tudo que nao abre navegador (suites Node e
-#                     Python, kit de figuras, trava do nome do cache, serie da
-#                     matematica, toda prova no portao, privacidade). E o check
-#                     que a protecao da main exige.
+#                     Python, kit de figuras, provas da biblioteca sem Chrome,
+#                     trava do nome do cache, serie da matematica, toda prova
+#                     no portao, privacidade). O que ele pula sai na saida,
+#                     uma linha "pulado" por prova. E o check que a protecao
+#                     da main exige.
 #   portao-navegador  o portao inteiro, com Chrome. Roda no push na main, quando
 #                     alguem pede a mao (workflow_dispatch) e no PR que tiver o
 #                     rotulo "navegador". O portao local continua obrigatorio
@@ -17,6 +19,12 @@
 # fetch-depth 0 nas duas: a trava do cache compara com a BASE DO MERGE
 # (git merge-base HEAD origin/main), e com o clone raso de um commit so nao ha
 # base nenhuma e a trava sairia INSTAVEL em todo PR.
+#
+# A trava do cache so AFIRMA alguma coisa no PR: ali o HEAD e o commit de
+# merge e a base e a ponta da main. No push na main o HEAD e a propria main,
+# a base e ele mesmo, e as duas travas do cache dizem ok sem comparar nada.
+# Nao e furo, porque o mesmo commit ja passou por elas no PR; mas o ok do
+# push na main nao vale como conferencia do cache.
 name: portao
 
 on:
@@ -42,7 +50,7 @@ jobs:
         run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '24.14.1'
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
@@ -50,7 +58,7 @@ jobs:
         run: pip install -r _teste/requirements.txt
       - name: Dependencias Node
         working-directory: _teste
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Portao rapido
         run: sh _teste/confere_tudo.sh --rapido
       - name: Saida de quem reprovou
@@ -77,7 +85,7 @@ jobs:
         run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '24.14.1'
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
@@ -85,7 +93,7 @@ jobs:
         run: pip install -r _teste/requirements.txt
       - name: Dependencias Node
         working-directory: _teste
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Chrome do runner
         run: $CHROME --version
       - name: Portao inteiro

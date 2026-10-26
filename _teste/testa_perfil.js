@@ -48,7 +48,7 @@ const esp = ms => new Promise(r => setTimeout(r, ms));
     await esp(350);
   }
 
-  /* Este perfil e NOVO (Chrome sem dados), e desde o T03 perfil novo nao recebe
+  /* Este perfil e NOVO (Chrome sem dados), e desde o 2e68a3e (T03) perfil novo nao recebe
    * a janela de novidades: nao ha "o que mudou" para quem nunca viu o antes. A
    * versao fica registrada calada. O caminho de quem ATUALIZA (janela abrindo,
    * carrossel, fechar e gravar) e do testa_novidades_navegador; aqui fica so a

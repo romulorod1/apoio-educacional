@@ -17,11 +17,17 @@
  *      (de cada nome vale a rodada mais nova: abrir e rotular o PR disparam
  *      duas, e a mais velha sai cancelada);
  *   3. o portao inteiro verde: o check portao-navegador verde, OU um comentario
- *      "Portao inteiro" (com ou sem til) que cite o commit da cabeca e diga
- *      "TUDO PASSOU";
- *   4. revisao adversarial registrada em comentario DEPOIS do ultimo commit,
- *      com "veredito: aprova", e nenhum "veredito: reprova" depois do ultimo
- *      aprova. Revisao de antes do ultimo commit nao vale: ela leu outro codigo.
+ *      com a linha propria "Portão inteiro <sha7 da cabeca>: TUDO PASSOU" e
+ *      sem "HA FALHA" em linha nenhuma;
+ *   4. revisao adversarial do commit da cabeca: comentario que COMECA por
+ *      "Revisão adversarial", cita o sha7 da cabeca, foi postado depois do
+ *      ultimo commit, e cuja ultima linha "veredito: aprova|reprova" e aprova;
+ *      e nenhuma reprova mais recente. Revisao de outro commit nao vale: ela
+ *      leu outro codigo.
+ *
+ * Revisao e portao vao como COMENTARIO do PR (gh pr comment). O --json
+ * comments nao traz as "reviews" do GitHub: revisao postada como review nunca
+ * e vista por este script.
  *
  * O merge vai com --match-head-commit: se alguem empurrar um commit entre a
  * conferencia e o merge, o GitHub recusa, em vez de mergear o que ninguem
@@ -54,10 +60,18 @@ function decidir(pr) {
   if (!Number.isFinite(dataUltimo)) motivos.push('nao consegui ler a data do ultimo commit');
 
   // 2. checks: de cada nome, a rodada mais nova.
+  //
+  // O gh devolve "0001-01-01T00:00:00Z" em data nula, e Date.parse aceita.
+  // Data antes de 2000 conta como sem data, e rodada sem data que nao terminou
+  // (enfileirada) e a MAIS NOVA: senao a verde antiga do mesmo nome venceria a
+  // rodada que ainda nem comecou.
+  const valida = s => { const t = Date.parse(s || ''); return t > Date.UTC(2000, 0, 1) ? t : null; };
   const porNome = {};
   (pr.statusCheckRollup || []).forEach(c => {
     const nome = c.name || c.context || '?';
-    const quando = Date.parse(c.startedAt || c.completedAt || '') || 0;
+    const terminou = c.__typename === 'StatusContext' ? !/PENDING|EXPECTED/i.test(c.state || '') : c.status === 'COMPLETED';
+    let quando = valida(c.startedAt) || valida(c.createdAt) || valida(c.completedAt);
+    if (quando === null) quando = terminou ? 0 : Infinity;
     if (!porNome[nome] || quando >= porNome[nome].quando) porNome[nome] = { quando, c };
   });
   const estado = nome => {
@@ -82,26 +96,46 @@ function decidir(pr) {
   const comentarios = (pr.comments || []).map(c => ({
     corpo: String(c.body || ''), quando: Date.parse(c.createdAt) || 0
   }));
+  /* O sha7 e o da cabeca que ESTE script leu do GitHub (headRefOid), o mesmo
+   * que vai no --match-head-commit, e nao um texto que o comentario declare.
+   * Casa como palavra: "abc1234" nao vale dentro de "xabc12345". */
   const sha7 = cabeca.slice(0, 7);
+  const citaCabeca = corpo => new RegExp('(^|[^0-9a-f])' + sha7 + '([^0-9a-f]|$)', 'i').test(corpo);
+  /* Formato fixo, em linha propria: "Portão inteiro <sha>: TUDO PASSOU" (o sha
+   * pode vir com mais de sete caracteres). Tres pedacos soltos no comentario
+   * eram satisfeitos por um texto que so cite a regra. E o comentario nao pode
+   * dizer HA FALHA em linha nenhuma. */
+  const linhaInteiro = new RegExp('^\\s*Port[aã]o inteiro ' + sha7 + '[0-9a-f]*: TUDO PASSOU\\.?\\s*$', 'im');
   const inteiroNoCi = estado('portao-navegador') === 'SUCCESS';
-  const inteiroLocal = comentarios.some(c =>
-    /Port[aã]o inteiro/i.test(c.corpo) && c.corpo.indexOf(sha7) >= 0 && /TUDO PASSOU/.test(c.corpo));
+  const inteiroLocal = comentarios.some(c => linhaInteiro.test(c.corpo) && !/HA FALHA/.test(c.corpo));
   if (!inteiroNoCi && !inteiroLocal) {
     motivos.push('falta o portao inteiro verde no commit ' + sha7 +
-      ' (check portao-navegador, ou comentario "Portao inteiro" citando ' + sha7 + ' com "TUDO PASSOU")');
+      ' (check portao-navegador, ou comentario com a linha "Portão inteiro ' + sha7 + ': TUDO PASSOU")');
   }
 
-  // 4. revisao adversarial depois do ultimo commit.
+  // 4. revisao adversarial do commit da cabeca.
+  //
+  // O que prova que a revisao leu ESTE commit e ela citar o sha7 dele. A data
+  // fica so de reforco: committedDate e o relogio de quem commitou, e nao a
+  // hora do push, entao uma revisao feita sobre o commit anterior, postada
+  // depois do relogio do commit novo e antes do push dele, passaria pela data.
+  //
+  // O comentario COMECA por "Revisão adversarial", e o veredito e uma linha
+  // propria "veredito: aprova" ou "veredito: reprova". Vale a ULTIMA dessas
+  // linhas do comentario: uma reprova que cite a regra antes ("a regra pede
+  // veredito: aprova") e reprova, e citacao no meio de frase nem conta.
   const vereditos = comentarios
-    .filter(c => c.quando > dataUltimo && /revis[aã]o adversarial/i.test(c.corpo))
+    .filter(c => c.quando > dataUltimo && /^\s*Revis[aã]o adversarial/i.test(c.corpo) && citaCabeca(c.corpo))
     .map(c => {
-      const m = /veredito:\s*(aprova|reprova)/i.exec(c.corpo);
-      return m ? { quando: c.quando, v: m[1].toLowerCase() } : null;
+      const todos = c.corpo.match(/^\s*veredito:\s*(aprova|reprova)\s*\.?\s*$/igm) || [];
+      if (!todos.length) return null;
+      return { quando: c.quando, v: /reprova/i.test(todos[todos.length - 1]) ? 'reprova' : 'aprova' };
     })
     .filter(Boolean)
     .sort((a, b) => a.quando - b.quando);
   if (!vereditos.length) {
-    motivos.push('falta revisao adversarial registrada depois do ultimo commit (comentario com "veredito: aprova")');
+    motivos.push('falta revisao adversarial do commit ' + sha7 +
+      ' (comentario que cite ' + sha7 + ' e diga "veredito: aprova", depois do ultimo commit)');
   } else if (vereditos[vereditos.length - 1].v !== 'aprova') {
     motivos.push('a revisao adversarial mais recente reprova');
   }

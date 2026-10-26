@@ -38,8 +38,8 @@ function prBom() {
       { __typename: 'CheckRun', name: 'portao-navegador', status: 'COMPLETED', conclusion: 'SKIPPED', startedAt: '2026-10-26T12:02:00Z' }
     ],
     comments: [
-      { body: 'Portão inteiro local em abc1234: TUDO PASSOU. Pode seguir para o merge.', createdAt: '2026-10-26T12:30:00Z' },
-      { body: 'Revisão adversarial (lente backend). Nada bloqueia.\nveredito: aprova', createdAt: '2026-10-26T12:40:00Z' }
+      { body: 'Rodado nesta máquina, porta 8777.\nPortão inteiro abc1234: TUDO PASSOU.\nPode seguir para o merge.', createdAt: '2026-10-26T12:30:00Z' },
+      { body: 'Revisão adversarial (lente backend), commit abc1234. Nada bloqueia.\nveredito: aprova', createdAt: '2026-10-26T12:40:00Z' }
     ]
   };
 }
@@ -67,10 +67,20 @@ conf('check em andamento recusa', motivo(p, 'portao-navegador esta EM_ANDAMENTO'
 
 p = prBom(); p.comments = p.comments.filter(c => !/Port/.test(c.body));
 conf('sem portao inteiro recusa', motivo(p, 'falta o portao inteiro'), true);
-p = prBom(); p.comments[0].body = 'Portão inteiro local em 9999999: TUDO PASSOU.';
+p = prBom(); p.comments[0].body = 'Portão inteiro 9999999: TUDO PASSOU.';
 conf('portao inteiro de OUTRO commit recusa', motivo(p, 'falta o portao inteiro'), true);
-p = prBom(); p.comments[0].body = 'Portão inteiro local em abc1234: HA FALHA.';
+p = prBom(); p.comments[0].body = 'Portão inteiro abc1234: HA FALHA.';
 conf('portao inteiro vermelho recusa', motivo(p, 'falta o portao inteiro'), true);
+// Venenos das duas revisoes de 26/10: os dois textos no mesmo comentario, e o
+// comentario que so CITA a regra no meio de uma frase.
+p = prBom(); p.comments[0].body = 'Portão inteiro abc1234: TUDO PASSOU.\nHA FALHA no testa_x na segunda rodada.';
+conf('portao com HA FALHA e TUDO PASSOU juntos recusa', motivo(p, 'falta o portao inteiro'), true);
+p = prBom(); p.comments[0].body = 'Falta a linha Portão inteiro abc1234: TUDO PASSOU neste PR.';
+conf('comentario que so cita o formato recusa', motivo(p, 'falta o portao inteiro'), true);
+p = prBom(); p.comments[0].body = 'Portão inteiro xabc12345: TUDO PASSOU.';
+conf('sha7 dentro de outro hexadecimal nao vale', motivo(p, 'falta o portao inteiro'), true);
+p = prBom(); p.comments[0].body = 'Portão inteiro abc1234def5678: TUDO PASSOU';
+conf('sha mais longo que sete caracteres vale', decidir(p).ok, true);
 p = prBom(); p.comments = p.comments.filter(c => !/Port/.test(c.body));
 p.statusCheckRollup[2].conclusion = 'SUCCESS';
 conf('portao-navegador verde no CI basta sem o comentario', decidir(p).ok, true);
@@ -79,12 +89,39 @@ p = prBom(); p.comments = p.comments.filter(c => !/Revis/.test(c.body));
 conf('sem revisao recusa', motivo(p, 'falta revisao adversarial'), true);
 p = prBom(); p.comments[1].createdAt = '2026-10-26T11:00:00Z';
 conf('revisao ANTES do ultimo commit recusa', motivo(p, 'falta revisao adversarial'), true);
-p = prBom(); p.comments.push({ body: 'Revisão adversarial, segunda mão.\nveredito: reprova', createdAt: '2026-10-26T12:50:00Z' });
+p = prBom(); p.comments.push({ body: 'Revisão adversarial, segunda mão, abc1234.\nveredito: reprova', createdAt: '2026-10-26T12:50:00Z' });
 conf('reprova depois do aprova recusa', motivo(p, 'mais recente reprova'), true);
-p = prBom(); p.comments.push({ body: 'Revisão adversarial, segunda mão.\nveredito: reprova', createdAt: '2026-10-26T12:35:00Z' });
+p = prBom(); p.comments.push({ body: 'Revisão adversarial, segunda mão, abc1234.\nveredito: reprova', createdAt: '2026-10-26T12:35:00Z' });
 conf('aprova depois do reprova passa', decidir(p).ok, true);
-p = prBom(); p.comments[1].body = 'Nada bloqueia. veredito: aprova';
+p = prBom(); p.comments[1].body = 'Nada bloqueia, abc1234. veredito: aprova';
 conf('veredito fora de comentario de revisao adversarial nao vale', motivo(p, 'falta revisao adversarial'), true);
+// Os dois furos que a revisao de 26/10 achou, como venenos.
+// V1: revisao feita sobre o commit ANTERIOR, com data posterior ao relogio do
+// commit novo (committedDate e a hora de quem commitou, nao a do push).
+p = prBom(); p.comments[1].body = 'Revisão adversarial (lente backend), commit 9f9f9f9.\nveredito: aprova';
+conf('revisao que cita outro commit recusa, mesmo com data depois', motivo(p, 'falta revisao adversarial'), true);
+p = prBom(); p.comments[1].body = 'Revisão adversarial (lente backend). Nada bloqueia.\nveredito: aprova';
+conf('revisao que nao cita commit nenhum recusa', motivo(p, 'falta revisao adversarial'), true);
+// V2: a reprova que cita a regra antes de dar o veredito.
+p = prBom(); p.comments[1].body = 'Revisão adversarial de abc1234. A regra pede "veredito: aprova"; não é o caso.\nveredito: reprova';
+conf('vale o ULTIMO veredito do comentario', motivo(p, 'mais recente reprova'), true);
+p = prBom(); p.comments[1].body = 'Revisão adversarial de abc1234. Por ora: veredito: aprova, falta conferir o resto.';
+conf('veredito no meio de frase nao conta', motivo(p, 'falta revisao adversarial'), true);
+p = prBom(); p.comments[1].body = 'Lido o diff de abc1234. Revisão adversarial feita.\nveredito: aprova';
+conf('comentario que nao COMECA por "Revisão adversarial" nao vale', motivo(p, 'falta revisao adversarial'), true);
+p = prBom(); p.commits[1].committedDate = '2026-10-26T12:45:00Z';
+conf('revisao com data antes do ultimo commit recusa, mesmo citando a cabeca', motivo(p, 'falta revisao adversarial'), true);
+
+console.log('\n=== 1b. Datas nulas e StatusContext ===');
+// O gh devolve 0001-01-01 em data nula. A rodada enfileirada do mesmo nome,
+// sem data, e a mais nova: nao pode perder para a verde antiga.
+p = prBom(); p.statusCheckRollup.push({ __typename: 'CheckRun', name: 'portao-rapido', status: 'QUEUED',
+  conclusion: '', startedAt: '0001-01-01T00:00:00Z', completedAt: '0001-01-01T00:00:00Z' });
+conf('rodada enfileirada com data zero vence a verde antiga', motivo(p, 'portao-rapido nao esta verde (EM_ANDAMENTO)'), true);
+p = prBom(); p.statusCheckRollup.push({ __typename: 'StatusContext', context: 'outro-ci', state: 'PENDING', createdAt: '2026-10-26T12:03:00Z' });
+conf('StatusContext pendente recusa', motivo(p, 'outro-ci esta PENDING'), true);
+p = prBom(); p.statusCheckRollup.push({ __typename: 'StatusContext', context: 'outro-ci', state: 'SUCCESS', createdAt: '2026-10-26T12:03:00Z' });
+conf('StatusContext verde passa', decidir(p).ok, true);
 
 console.log('\n=== 2. Ponta a ponta com gh falso ===');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'merge_seguro_'));

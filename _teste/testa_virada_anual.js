@@ -1,6 +1,16 @@
 /* Proposta de série da T11: nenhuma alteração de cadastro nesta etapa. */
 'use strict';
-const assert = require('node:assert/strict');
+/* O assert conta cada verificacao que fez, para o placar do fim dizer o numero
+ * de verdade, e nao uma constante escrita a mao. */
+const assertReal = require('node:assert/strict');
+let verificadas = 0;
+const assert = new Proxy(assertReal, {
+  get(alvo, nome) {
+    const v = alvo[nome];
+    return typeof v === 'function' ? (...a) => { verificadas++; return v.apply(alvo, a); } : v;
+  },
+  apply(alvo, isto, a) { verificadas++; return alvo.apply(isto, a); }
+});
 const Core = require('../core');
 
 const escada = ['02', '03', '04', '05', '06', '07', '08', '09', 'em1', 'em2', 'em3'];
@@ -102,4 +112,4 @@ console.log('16 sugestões, 9 contextos, 6 invariantes da prévia e 14 da aplica
 // A linha que o portao le. So chega aqui quem passou por todos os assert: o
 // primeiro que falha lanca e o processo morre antes, sem placar, e o portao
 // reprova por "nao disse que passou".
-console.log('45 verificações passaram, 0 falharam.');
+console.log(verificadas + ' verificações passaram, 0 falharam.');

@@ -173,8 +173,10 @@ async function abrirComBanco(p, mexer) {
    * a gravacao do app chega depois e apaga os itens antigos, e o teste reprova
    * por "temas" indefinido numa rodada e passa na outra. Espera por condicao,
    * e nao por relogio: a versao gravada no banco. */
-  await esperar('o app terminou de gravar o arranque',
+  const arranque = await esperar('o app terminou de gravar o arranque',
     () => bd(p).then(b => !!(b && b.ajustes && b.ajustes.versaoVista)), v => v === true, 15000);
+  // Expirar e seguir seria voltar a corrida de antes, calada.
+  if (!arranque.ok) throw new Error('o app não gravou a versão no arranque em 15 s');
   const banco = await bd(p);
   if (!banco) throw new Error('o banco de exemplo não foi criado');
   mexer(banco);

@@ -224,7 +224,7 @@ const porValor = (sel, valor) => `(() => {
   // ================================================================
   secao('3. Trocar o ano na lista NÃO cadastra o ano do aluno');
 
-  /* Até o T05 (5b8a98f) trocar o ano aqui gravava o ano escolar no aluno. Hoje
+  /* Até o 34496d8 (T05) trocar o ano aqui gravava o ano escolar no aluno. Hoje
    * a regra é a contrária, escrita em lembrarAnoEscolar no app.js: navegar por
    * um ano para reforço ou consulta não altera o cadastro calado; o ano se
    * cadastra na ficha ou no mapeamento. A lista só lembra o ano enquanto o
@@ -418,6 +418,36 @@ const porValor = (sel, valor) => `(() => {
   banco = await bd();
   conf('e a aula continua com um assunto só',
     (banco.aulas.find(a => a.data === '2026-06-10' && a.alunoId === marcelo.id).temas || []).length, 1);
+
+  /* O outro lado da regra da seção 3: com o ano CADASTRADO (ficha ou
+   * mapeamento), a lista abre nesse ano. Sem isto, o '06' acima só provava o
+   * caminho do aluno sem ano, e o ramo anoEscolarDe(aluno) do
+   * desenharEscolhaTema ficava sem prova nenhuma no portão. */
+  await pag.evaluate((id) => new Promise((res) => {
+    const req = indexedDB.open('apoio-educacional');
+    req.onsuccess = () => {
+      const t = req.result.transaction('dados', 'readwrite');
+      const s = t.objectStore('dados');
+      const g = s.get('principal');
+      g.onsuccess = () => {
+        const d = g.result;
+        const a = d.alunos.find(x => x.id === id);
+        a.anoEscolar = '08';
+        (a.mapeamentos || []).forEach(m => { m.anoEscolar = '08'; });
+        s.put(d, 'principal');
+      };
+      t.oncomplete = () => res();
+    };
+  }), marcelo.id);
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await espera(1600);
+  await irParaJunho();
+  await abrirAulaDoDia10();
+  await abrirListaDeTemas();
+  conf('com o ano cadastrado, a lista abre nesse ano',
+    await pag.$eval('#corpo-modal-tema select', e => e.value), '08');
+  await clicarTexto('#rodape-modal-tema button', 'Cancelar');
+  await espera(400);
 
   // ================================================================
   secao('10. Erros de página');
