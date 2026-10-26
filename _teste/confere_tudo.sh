@@ -402,6 +402,9 @@ roda "falha --envenenado-rele-grava"            node "_teste/testa_falha_de_grav
 roda "falha --envenenado-rele-calado"           node "_teste/testa_falha_de_gravacao.js" --envenenado-rele-calado
 roda "falha --envenenado-desfazer-trava"        node "_teste/testa_falha_de_gravacao.js" --envenenado-desfazer-trava
 roda "falha --envenenado-ponto-segura"          node "_teste/testa_falha_de_gravacao.js" --envenenado-ponto-segura
+# e a pergunta de confirmacao das tres substituicoes ja avisa que a mudanca
+# pendente vai se perder, antes de ela decidir
+roda "falha --envenenado-confirma-calado"       node "_teste/testa_falha_de_gravacao.js" --envenenado-confirma-calado
 
 # FRENTE B (B9): kits.json e exclusoes.json sao aditivos do esquema 1 (CONTRATO
 # 8d). A prova nao le o biblioteca.js: ela IMPORTA um pacote de brinquedo com os

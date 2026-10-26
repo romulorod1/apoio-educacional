@@ -21,7 +21,8 @@
  *   4. sem tocar em nada, a nova tentativa automática de 15 s grava sozinha;
  *   5. "Voltar a este ponto" que grava o ponto e falha depois: o disco fica
  *      com o ponto que ela escolheu (a memória velha não é gravada por cima),
- *      e a mudança pendente que saiu é dita na frase, não some calada;
+ *      e a mudança pendente que sai é dita ANTES, na pergunta de confirmação,
+ *      e depois, na frase; não some calada;
  *   6. Excluir aula (comDesfazer) com o tablet sem espaço: a janela fecha, a
  *      agenda redesenha e a faixa aparece;
  *   7. Excluir aula quando só o ponto de retorno não cabe: a exclusão é
@@ -45,6 +46,8 @@
  *   --envenenado-desfazer-trava   o comDesfazer volta a rejeitar na falha.
  *   --envenenado-ponto-segura     a falha do ponto de retorno volta a segurar
  *                                 a gravação da mudança.
+ *   --envenenado-confirma-calado  a pergunta de confirmação não avisa que a
+ *                                 mudança pendente vai se perder.
  */
 'use strict';
 const fs = require('fs');
@@ -54,7 +57,8 @@ const { conf, secao, pausa, esperar } = H;
 
 const PORTA = 8873;
 const MODOS = ['--envenenado-sem-tratamento', '--envenenado-olho-espera', '--envenenado-faixa-por-cima',
-  '--envenenado-rele-grava', '--envenenado-rele-calado', '--envenenado-desfazer-trava', '--envenenado-ponto-segura'];
+  '--envenenado-rele-grava', '--envenenado-rele-calado', '--envenenado-desfazer-trava', '--envenenado-ponto-segura',
+  '--envenenado-confirma-calado'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const CSS = fs.readFileSync(path.join(H.RAIZ, 'styles.css'), 'utf8');
@@ -65,6 +69,7 @@ const RELE_INICIO = /(  function releDoDisco\(mensagem\) \{\r?\n)/;
 const FRASE_SAIU = "' A última mudança, que o tablet ainda não tinha conseguido guardar, também saiu.'";
 const DESFAZER_CUMPRE = '}, function () { return resultado; });';
 const PONTO_NAO_SEGURA = '.then(function () { return true; }, function () { return false; })';
+const AVISO_NA_CONFIRMACAO = "'\\n\\nAtenção: a última mudança, que o tablet ainda não conseguiu guardar, vai se perder.'";
 const FAIXA_NO_FLUXO = /\.faixa-gravacao \{(\r?\n)  flex-shrink: 0;\r?\n  margin: 8px 12px 0;/;
 
 /* Cada âncora existe exatamente uma vez, senão o veneno trocaria a coisa
@@ -81,6 +86,7 @@ if (MODO === '--envenenado-rele-grava') trocas['/app.js'] = APP.replace(RELE_INI
 if (MODO === '--envenenado-rele-calado') trocas['/app.js'] = APP.split(FRASE_SAIU).join("''");
 if (MODO === '--envenenado-desfazer-trava') trocas['/app.js'] = APP.split(DESFAZER_CUMPRE).join('});');
 if (MODO === '--envenenado-ponto-segura') trocas['/app.js'] = APP.split(PONTO_NAO_SEGURA).join('.then(function () { return true; })');
+if (MODO === '--envenenado-confirma-calado') trocas['/app.js'] = APP.split(AVISO_NA_CONFIRMACAO).join("''");
 if (MODO === '--envenenado-faixa-por-cima') {
   trocas['/styles.css'] = CSS.replace(FAIXA_NO_FLUXO, '.faixa-gravacao {$1  position: fixed;$1  top: 12px;$1  left: 12px;$1  right: 12px;$1  z-index: 90;');
 }
@@ -115,9 +121,12 @@ conf('controle: a busca de nomes repetidos enxerga um var a mais',
 const corpoRele = (APP.split('  function releDoDisco(mensagem) {')[1] || '').split(/\r?\n  \}\r?\n/)[0];
 conf('o corpo do releDoDisco foi achado', corpoRele.length > 50, true);
 conf('o releDoDisco não grava a memória', /salvar\(/.test(corpoRele), false);
+// as três substituições inteiras perguntam já dizendo o que a pendência perde
+conf('as três confirmações levam o aviso da pendência', (APP.match(/avisoDePendenciaNaConfirmacao\(\)\)/g) || []).length, 3);
 [['ligação do tratamento', APP, LIGACAO], ['olho na hora', APP, OLHO_NA_HORA], ['início do releDoDisco', APP, RELE_INICIO],
   ['frase da pendência que saiu', APP, FRASE_SAIU], ['comDesfazer cumpre na falha', APP, DESFAZER_CUMPRE],
-  ['ponto de retorno não segura', APP, PONTO_NAO_SEGURA], ['faixa no fluxo', CSS, FAIXA_NO_FLUXO]
+  ['ponto de retorno não segura', APP, PONTO_NAO_SEGURA], ['aviso na confirmação', APP, AVISO_NA_CONFIRMACAO],
+  ['faixa no fluxo', CSS, FAIXA_NO_FLUXO]
 ].forEach(([nome, texto, ancora]) => conf('âncora de veneno uma vez só: ' + nome, umaVez(texto, ancora), true));
 
 const amb = H.criarAmbiente(PORTA, 'perfil_falha_gravacao', trocas);
@@ -160,6 +169,9 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   }
   await amb.subir();
   const pag = await amb.pagina();
+  // o arnês aceita toda pergunta; aqui só se guarda o texto de cada uma
+  const dialogos = [];
+  pag.on('dialog', d => { dialogos.push(d.message()); });
   await H.abrirApp(pag, amb.ORIGEM);
   await pausa(1500);
 
@@ -310,6 +322,14 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   const frase5 = await esperar('o aviso da volta que não se completou', () => aviso(pag),
     a => a.aberto && /Não consegui voltar a este ponto/.test(a.texto), 5000);
   const texto5 = (frase5.valor && frase5.valor.texto) || '';
+  const pergunta5 = dialogos.filter(m => /Voltar ao estado anterior/.test(m)).pop() || '';
+  if (MODO === '--envenenado-confirma-calado') {
+    secao('VENENO: a confirmação não diz que a mudança pendente vai se perder');
+    conf('a pergunta de confirmação apareceu', pergunta5.length > 0, true);
+    conf('envenenado: a pergunta não avisa (defeito enxergado)', /vai se perder/.test(pergunta5), false);
+    throw fim();
+  }
+  conf('a pergunta de confirmação já avisa que a mudança pendente vai se perder', /vai se perder/.test(pergunta5), true);
   await sem(pag, { historicoDelete: false });
   /* O disco depois de um tempo maior que a primeira nova tentativa: se a
    * memória velha fosse gravada (agora ou pela tentativa), os valores

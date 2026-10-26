@@ -1218,6 +1218,16 @@
    *   (antes, a tela continuava com o olho de antes da troca);
    * - a pendência sai e a faixa some, e a frase devolvida conta isso, para o
    *   aviso dizer. Vazia quando não havia pendência. */
+  /* O mesmo aviso, ANTES: na pergunta de confirmação das três substituições
+   * inteiras (voltar a um ponto, restaurar cópia, apagar tudo), para ela
+   * decidir sabendo que a mudança que a faixa ainda não guardou vai sair junto.
+   * Vazio quando não há pendência. */
+  function avisoDePendenciaNaConfirmacao() {
+    return mudancaNaoGuardada
+      ? '\n\nAtenção: a última mudança, que o tablet ainda não conseguiu guardar, vai se perder.'
+      : '';
+  }
+
   function memoriaSubstituida() {
     valoresOcultos = !!(db.ajustes && db.ajustes.valoresOcultos);
     atualizarBotaoOlho();
@@ -11829,7 +11839,7 @@
           el('button', {
             type: 'button', class: 'btn pequeno', texto: 'Voltar a este ponto',
             aoClick: function () {
-              if (!confirmar('Voltar ao estado anterior a "' + r.rotulo + '"?')) return;
+              if (!confirmar('Voltar ao estado anterior a "' + r.rotulo + '"?' + avisoDePendenciaNaConfirmacao())) return;
               Store.desfazer(r.id).then(function (estado) {
                 if (!estado) return;
                 db = estado;
@@ -12259,7 +12269,7 @@
   function restaurarCopia(ev) {
     var arquivo = ev.target.files && ev.target.files[0];
     if (!arquivo) return;
-    if (!confirmar('Restaurar esta cópia? Os dados atuais deste tablet serão substituídos.')) {
+    if (!confirmar('Restaurar esta cópia? Os dados atuais deste tablet serão substituídos.' + avisoDePendenciaNaConfirmacao())) {
       ev.target.value = '';
       return;
     }
@@ -15784,7 +15794,7 @@
   }
 
   function apagarTudo() {
-    if (!confirmar('Apagar TODOS os dados deste tablet? Faça uma cópia de segurança antes.')) return;
+    if (!confirmar('Apagar TODOS os dados deste tablet? Faça uma cópia de segurança antes.' + avisoDePendenciaNaConfirmacao())) return;
     if (!confirmar('Confirma mesmo? Esta ação apaga alunos, aulas, folhas e anexos.')) return;
     Store.apagarTudo().then(function () {
       db = Store.bancoVazio();
