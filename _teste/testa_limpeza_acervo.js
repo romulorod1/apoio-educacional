@@ -54,9 +54,13 @@ conf('o index.html não tem a seção da aba Temas', ler('index.html').indexOf('
 conf('o styles.css não tem as regras do acervo', /tema-acervo|mapa-mental/.test(ler('styles.css')), false);
 conf('e os chips de filtro da Biblioteca continuam no styles.css', /\.chips-filtro \{[\s\S]*\.chip-filtro\.ativo \{/.test(ler('styles.css')), true);
 
-secao('2. Os temas autorais continuam');
-const banco = JSON.parse(ler('temas/banco.json'));
-conf('temas/banco.json com os 148 temas de matemática', banco.temas.length, 148);
+/* Era "os temas autorais continuam": a limpeza do acervo de 14/09 não podia
+ * levar os 148 temas junto. No B14 os temas saíram de propósito, com o
+ * material autoral; o que tem de continuar é o índice de assuntos, com os
+ * mesmos 148. */
+secao('2. O índice de assuntos de matemática continua');
+const banco = JSON.parse(ler('banco/topicos/matematica.json'));
+conf('banco/topicos/matematica.json com os 148 assuntos de matemática', banco.temas.length, 148);
 
 // ---------------------------------------------------------------- navegador
 const amb = H.criarAmbiente(PORTA, 'perfil_limpeza_acervo', trocas);

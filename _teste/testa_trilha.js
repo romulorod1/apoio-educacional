@@ -8,7 +8,7 @@
  * sai certa, para todas as lacunas e em anos escolares diferentes.
  */
 const Core = require('../core.js');
-const indice = require('../banco/indice.json');
+const indice = require('../banco/topicos/matematica.json');  // o índice de assuntos, desde o B14
 const temas = indice.temas || indice;
 
 let passes = 0, falhas = 0;

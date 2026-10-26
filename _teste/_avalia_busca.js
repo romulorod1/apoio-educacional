@@ -7,8 +7,11 @@
  *   node _teste/_avalia_busca.js -v         mostra o que errou
  */
 const B = require('../busca.js');
-const ix = require('../banco/busca.json').temas;
-const banco = require('../temas/banco.json');
+/* Desde o B14 (26/10/2026) o índice é montado do índice de assuntos pela
+ * mesma função do app (Busca.indiceDoCatalogo): o banco/busca.json, que
+ * trazia também o conteúdo dos temas, saiu com o material autoral. */
+const banco = require('../banco/topicos/matematica.json');
+const ix = B.indiceDoCatalogo(banco.temas);
 const corpus = require('./_buscas_reais.json').buscas;
 
 const tit = {}, serie = {};

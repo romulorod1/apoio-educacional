@@ -726,24 +726,18 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   conf('e nenhuma linha dela carrega a marca',
     naMatematica.filter(x => /com material pronto/.test(x.detalhe)).length, 0);
 
+  /* Até o B14 havia aqui o par "Conto de mistério": o tema de português do
+   * banco autoral (banco/portugues/) e o homônimo do catálogo de tópicos, e a
+   * marca "com material pronto" existia para desempatar os dois. O banco de
+   * português saiu com o material, e sobra o tópico do catálogo: uma linha só,
+   * sem marca, sem homônimo para confundir. */
   const noPortugues = await detalhesDaBusca('misterio');
   const doBanco = noPortugues.filter(x => /pistas, suspeitos/.test(x.nome))[0];
   const doCatalogo = noPortugues.filter(x => x.nome.trim() === 'Conto de mistério')[0];
-  if (doBanco && doCatalogo) {
-    /* A marca "com material pronto" existia para desempatar o tema do banco e
-     * o homônimo do catálogo quando só um deles tinha material. Sem material
-     * autoral não há o que desempatar: os dois são assuntos iguais, e nenhuma
-     * das duas linhas promete nada. */
-    conf('a linha do banco não promete mais material',
-      /com material pronto/.test(doBanco.detalhe), false);
-    conf('e a linha do catálogo continua sem dizer',
-      /com material pronto/.test(doCatalogo.detalhe), false);
-  } else {
-    /* Sem os dois na tela não há dúvida para medir, e afirmar qualquer coisa
-     * aqui seria afirmar por ausência. Reprova, para a falta aparecer. */
-    conf('as duas linhas de "Conto de mistério" estão na busca',
-      (doBanco ? 'banco ' : '') + (doCatalogo ? 'catalogo' : ''), 'banco catalogo');
-  }
+  conf('o tópico "Conto de mistério" do catálogo está na busca', !!doCatalogo, true);
+  conf('o tema de português do banco autoral não está mais', !!doBanco, false);
+  conf('e nenhuma linha da busca promete material',
+    noPortugues.filter(x => /com material pronto/.test(x.detalhe)).length, 0);
   await pag.evaluate(() => {
     const b = document.querySelector('#modal-tema [data-fechar]');
     if (b) b.click();

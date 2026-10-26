@@ -77,8 +77,12 @@
  * traz a lista pronta do 9º ano (app.js, biblioteca.js, draw.js, pdf.js,
  * index.html e styles.css), com a lista igual. O v45 traz a ordenação
  * alfabética dos alunos no Fechamento e o carrossel de novidades e guia de
- * listas (app.js, core.js, index.html e styles.css), com a lista igual. */
-var CACHE = 'apoio-educacional-v45';
+ * listas (app.js, core.js, index.html e styles.css), com a lista igual. O v46
+ * (B14) tira o material autoral: saem da lista os seis arquivos de figuras/, o
+ * banco/indice.json, o banco/busca.json e o banco/portugues/indice.json, e
+ * entra o banco/topicos/matematica.json, o índice de assuntos que ficou
+ * (app.js e index.html). */
+var CACHE = 'apoio-educacional-v46';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -88,15 +92,6 @@ var ARQUIVOS = [
   './core.js',
   './busca.js',
   './pdf.js',
-  /* Os SEIS arquivos do kit de figuras. Faltando um, a figura sai sem marca
-   * nenhuma e sem erro, e ela dá aula na casa das famílias, muitas vezes sem
-   * sinal: o que não estiver aqui não existe quando falta rede. */
-  './figuras/base.js',
-  './figuras/desenho.js',
-  './figuras/marcas.js',
-  './figuras/receitas.js',
-  './figuras/formula.js',
-  './figuras/solidos.js',
   './store.js',
   './draw.js',
   /* O leitor de zip e a conferência do pacote da biblioteca. O pacote em si
@@ -113,27 +108,14 @@ var ARQUIVOS = [
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
   './icons/favicon.png',
-  // o índice dos temas entra no pacote inicial para a lista abrir sem internet.
-  // o conteúdo de cada série é guardado sozinho, na primeira vez que for usado.
-  './banco/indice.json',
-  // o índice de busca acompanha o de temas: é ele que faz o campo de assunto
-  // achar por conteúdo, e não só por título.
-  './banco/busca.json',
-  /* O índice dos temas de português, ao lado dos outros dois e por um motivo a
-   * mais: o índice de uma matéria que não é a padrão é procurado no CACHE, e
-   * não na rede (app.js, carregarOutrosIndices, que pergunta ao cache para um
-   * 404 não virar linha de erro no console a cada sessão; a rede só sobra para
-   * o navegador sem service worker). Fora desta lista o português não existe
-   * para o aplicativo nem com sinal.
-   *
-   * Só o índice, e os outros dois arquivos de banco/portugues/ ficam de fora de
-   * propósito. O serie-07.json são 156 KB e é série: séries moram no BAIXADOS e
-   * entram sozinhas na primeira vez que a série for aberta, como as onze da
-   * matemática. O busca.json de português ninguém lê: a busca por conteúdo pede
-   * 'banco/busca.json' por extenso, e as outras matérias procuram em título e
-   * resumo do próprio índice. Cada linha daqui é uma chance a mais de a
-   * instalação falhar inteira numa conexão ruim. */
-  './banco/portugues/indice.json',
+  /* O índice de assuntos de matemática (B14): id, título, ano, unidade,
+   * duração, dificuldade e pré-requisitos dos 148 assuntos, sem material.
+   * Até a 1.28 aqui ficavam o banco/indice.json, o banco/busca.json e o
+   * banco/portugues/indice.json, gerados do material autoral, que saiu; a busca
+   * passou a ser montada no aparelho a partir dos títulos (app.js,
+   * carregarIndiceDeBusca). As séries (banco/serie-*.json) que o tablet já
+   * baixou ficam esquecidas no BAIXADOS: ninguém as pede mais. */
+  './banco/topicos/matematica.json',
   /* Os TREZE arquivos dos assuntos das outras matérias. O assunto da aula é
    * registro, e não atalho para material: ela precisa poder escolher o assunto
    * na casa da família, sem sinal, do mesmo jeito que abre a lista de temas.
@@ -170,8 +152,13 @@ function doPacote(endereco) { return ENDERECOS.indexOf(endereco) !== -1; }
 /* Arquivos que já foram do pacote e saíram dele. O resgate abaixo guarda no
  * BAIXADOS tudo o que não é do pacote, e o BAIXADOS nunca se apaga: sem esta
  * lista, o acervo de 14/09 (2,4 MB, fora do pacote desde o v38) iria para lá
- * como se ela o tivesse baixado, e ficaria no tablet para sempre. */
-var APOSENTADOS = ['./banco/acervo.json', './banco/acervo_indice.json']
+ * como se ela o tivesse baixado, e ficaria no tablet para sempre. O v46 (B14)
+ * aposenta o índice, a busca e o índice de português dos temas autorais e os
+ * seis arquivos do kit de figuras, que saíram do pacote. */
+var APOSENTADOS = ['./banco/acervo.json', './banco/acervo_indice.json',
+  './banco/indice.json', './banco/busca.json', './banco/portugues/indice.json',
+  './figuras/base.js', './figuras/desenho.js', './figuras/marcas.js',
+  './figuras/receitas.js', './figuras/formula.js', './figuras/solidos.js']
   .map(function (u) { return new URL(u, self.location.href).href; });
 function aposentado(endereco) { return APOSENTADOS.indexOf(endereco) !== -1; }
 

@@ -1,6 +1,6 @@
-# O que as provas em Python do portao importam (temas/_ferramentas e
-# biblioteca/). Versoes iguais as da maquina em que o portao local roda, em
-# 26/10/2026, para o GitHub e a maquina dela medirem com o mesmo instrumento.
+# O que as provas em Python do portao importam (biblioteca/). Versoes iguais
+# as da maquina em que o portao local roda, em 26/10/2026, para o GitHub e a
+# maquina dela medirem com o mesmo instrumento. O sympy saiu no B14: so o
+# verificador dos temas autorais o usava, e ele saiu com o material.
 pymupdf==1.28.2
 numpy==2.4.4
-sympy==1.14.0

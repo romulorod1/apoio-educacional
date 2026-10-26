@@ -41,7 +41,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const RAIZ = path.join(__dirname, '..', '..');
+const RAIZ = path.join(__dirname, '..');
 const Core = require(path.join(RAIZ, 'core.js'));
 
 const args = process.argv.slice(2);

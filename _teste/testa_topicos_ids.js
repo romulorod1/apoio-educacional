@@ -2,7 +2,7 @@
  *
  * Cada bloco de banco/topicos/<disciplina>.json carrega uma lista 'ids'
  * paralela a 'topicos', e banco/topicos/_ids.json é a memória do que já foi
- * emitido (temas/_ferramentas/emite_ids_topicos.js). O risco real não é id
+ * emitido (_teste/emite_ids_topicos.js). O risco real não é id
  * faltando: é DESALINHAMENTO. Um título inserido no meio de um bloco sem id
  * deslocaria todos os seguintes em silêncio, e o tema de português que aponta
  * para POR07-T12 passaria a apontar para o vizinho. Por isso este teste casa
@@ -23,7 +23,7 @@ const { spawnSync } = require('child_process');
 
 const RAIZ = path.join(__dirname, '..');
 const DIR = path.join(RAIZ, 'banco', 'topicos');
-const EMISSOR = path.join(RAIZ, 'temas', '_ferramentas', 'emite_ids_topicos.js');
+const EMISSOR = path.join(RAIZ, '_teste', 'emite_ids_topicos.js');  // era temas/_ferramentas/, até o B14
 const Core = require(path.join(RAIZ, 'core.js'));
 
 let passaram = 0, falharam = 0;
@@ -296,7 +296,7 @@ conf('nenhum travessão em título de tópico, bloco, grupo ou disciplina (se ho
 conf('nenhum travessão nos rótulos do índice', disciplinas.filter(function (d) {
   return TRAVESSAO.test(d.nome) || d.grupos.some(function (g) { return TRAVESSAO.test(g.rotulo); });
 }).map(function (d) { return d.chave; }), []);
-['banco/topicos/_ids.json', 'banco/topicos/LEIA-ME.md', 'temas/_ferramentas/emite_ids_topicos.js', '_teste/testa_topicos_ids.js'].forEach(function (rel) {
+['banco/topicos/_ids.json', 'banco/topicos/LEIA-ME.md', '_teste/emite_ids_topicos.js', '_teste/testa_topicos_ids.js'].forEach(function (rel) {
   const p = path.join(RAIZ, rel);
   conf('nenhum travessão em ' + rel, fs.existsSync(p) && !TRAVESSAO.test(fs.readFileSync(p, 'utf8')), true);
 });

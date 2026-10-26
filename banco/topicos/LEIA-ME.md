@@ -11,6 +11,24 @@ Esquema de cada disciplina:
 {disciplina, chave, eixo, grupos: [{chave, rotulo, blocos: [{titulo, topicos: [string], ids: [string]}]}]}
 ```
 
+## Matemática: `matematica.json`, um formato à parte
+
+A matemática não está no `indice.json` nem segue o esquema acima. O
+`matematica.json` é o índice de assuntos de matemática que sobrou dos 148 temas
+autorais quando o material saiu do repositório (B14, 26/10/2026): uma lista
+`temas` em que cada assunto tem `id` (os mesmos `MAT<ano>-<nn>` de sempre, que
+as aulas gravadas citam e que nunca mudam), `serie` (o ano), `unidade`,
+`duracaoMin`, `dificuldade`, `pt.titulo`, `prerequisitos` (lista de ids, vazia
+ou não) e `chaves` (as palavras-chave da busca, radicais soltos e sem frase).
+Nada de resumo, explicação ou exercício.
+
+O cabeçalho diz de onde vêm os pré-requisitos (`prerequisitos_origem`: o grafo
+autoral de 09/2026, a revisar no item C7) e as palavras-chave (`chaves_origem`).
+O aplicativo o lê em `carregarIndice` (app.js), e a busca de matemática é
+montada dele por `Busca.indiceDoCatalogo` (busca.js). Ele fica fora do
+`indice.json` de propósito: a lista "Outras matérias" da escolha de assunto
+percorre o `indice.json`, e a matemática tem a grade própria.
+
 `_ids.json` é o registro congelado dos identificadores. `_relacionados_rascunho/`
 é outra frente, parada de propósito; o LEIA-ME de lá explica.
 
@@ -38,7 +56,7 @@ Em cada bloco, `ids` é uma lista PARALELA a `topicos`: `ids[i]` é o id de
 ## Como emitir id para tópico novo
 
 1. Escreva o título no lugar certo da lista `topicos` do bloco. Não mexa em `ids`.
-2. Rode `node temas/_ferramentas/emite_ids_topicos.js`.
+2. Rode `node _teste/emite_ids_topicos.js`.
 3. Atualize o número de assuntos da disciplina no `indice.json` (o teste avisa
    se esquecer).
 4. Rode `node _teste/testa_topicos_ids.js` e olhe o diff: só o novo id deve ter

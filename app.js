@@ -11,55 +11,20 @@
    * acontece. Ligada na 1.21.0, com a aba Biblioteca. */
   var BIBLIOTECA_NO_AR = true;
 
-  /* O MATERIAL AUTORAL SAI DO AR (1.26.0).
+  /* O MATERIAL AUTORAL SAIU DO REPOSITÓRIO (B14, 26/10/2026, decisão D8 do dono).
    *
-   * EM UMA LINHA: esta chave desliga o material autoral dos temas do banco (o
-   * botão "Material de aula" e a montagem do PDF com explicação, exercícios e
-   * gabarito). Ela NÃO é ajuste da usuária, não aparece em tela nenhuma e não
-   * se lê de dado gravado: é uma constante deste arquivo. Trocar false por
-   * true aqui devolve tudo, exatamente como era, sem migração nenhuma.
+   * Até a 1.28 havia aqui a chave do material autoral, desligada desde a
+   * 1.26, que escondia o material dos 148 temas (o botão "Material de aula" e a
+   * montagem do PDF com explicação, exercícios e gabarito). O material foi
+   * apagado do repositório, com cópia no Drive (old\material-autoral-2026-10),
+   * e a chave saiu junto com todo caminho que ela governava.
    *
-   * Os 148 temas de matemática traziam explicação, exercícios autorais e
-   * gabarito, oferecidos pelo botão "Material de aula" da janela da aula. A
-   * Nathália deu retorno negativo desse material, e com a biblioteca da OBMEP
-   * importada o caminho bom passou a ser o da biblioteca. Esta chave desliga o
-   * OFERECIMENTO: some o botão da janela da aula, some a montagem do PDF
-   * autoral, e o botão "Material" da linha do assunto deixa de ter bifurcação
-   * (ou a biblioteca tem o assunto e ele a abre, ou ele não aparece).
-   *
-   * O QUE ELA NÃO FAZ, de propósito:
-   *   - não apaga tema nenhum. O tema é duas coisas no mesmo registro: material,
-   *     que sai daqui, e GRAFO (id, título, ano, dificuldade, prerequisitos),
-   *     que fica e sustenta a trilha de aprendizado, a lacuna e o mapeamento
-   *     (Core.trilhaDerivada ordena topologicamente os prerequisitos);
-   *   - não mexe em material já anexado numa aula: o anexo é arquivo gravado
-   *     (t.anexoId) e continua abrindo;
-   *   - não apaga o banco nem o leitor de série (carregarSerie), porque o
-   *     destino final dos 148 temas é decisão à parte.
-   *
-   * LIGAR DE VOLTA é trocar false por true aqui, e nada mais: não há migração,
-   * dado gravado nem ajuste de tela envolvido, e o único pedaço que morava
-   * fora do alcance desta constante (o título padrão da janela de tema, que
-   * está no index.html) é reescrito pelo iniciar() quando ela está ligada.
-   *
-   * O QUE ESTÁ MEDIDO, E O QUE NÃO ESTÁ. Rótulo honesto vale mais do que
-   * rótulo bonito, então: o testa_sem_material_autoral, no modo
-   * --envenenado-liga, confere SETE superfícies voltando (o botão da folha, o
-   * "atalho opcional" da ajuda, o botão Material da linha do assunto, o
-   * "material pronto" da ajuda do assunto, o "Ver os temas soltos" e a ajuda
-   * do fim da trilha, o "material pronto" da escolha de assunto, e o título
-   * padrão da janela de tema), e o testa_biblioteca_offline serve a árvore com
-   * a chave ligada e chega até a montagem abrir com exercícios.
-   *
-   * NÃO estão medidos, hoje, os passos de DENTRO da montagem: marcar e
-   * desmarcar exercícios, a contagem do rodapé, o botão de gerar travado com
-   * lista vazia, a troca de idioma preservando a marcação, a escolha das três
-   * partes, e o "Gerar e anexar à aula" gravando o PDF. O bloco de asserções
-   * que cobria isso saiu junto com o caminho de tela (testa_temas, seções 3 a
-   * 6 da versão anterior) e está listado para voltar, dentro do modo
-   * envenenado, no PR de endurecimento. Até lá, este comentário é o registro
-   * de que a volta está provada nas bordas e não no miolo. */
-  var MATERIAL_AUTORAL_NO_AR = false;
+   * O que ficou dos temas é o ÍNDICE de assuntos de matemática,
+   * banco/topicos/matematica.json: id (os mesmos de sempre, porque as aulas
+   * gravadas apontam para eles), título, ano, unidade, duração, dificuldade e
+   * pré-requisitos. Ele sustenta a escolha de assunto, as sugestões do ano, a
+   * trilha e a lacuna do mapeamento. Material que ela já anexou numa aula é
+   * arquivo gravado (t.anexoId) e continua abrindo. */
 
   /* A versão 1.20.0 sobe o banco do tablet para a versão 2 (store.js). Se
    * outra janela do aplicativo, ainda na versão antiga, estiver aberta, a
@@ -858,68 +823,6 @@
     return e;
   }
 
-  /* Os enunciados do banco escrevem expoente e índice como x^{2} e a_{1}, que
-   * é a marcação que o gerador de PDF entende. Na tela isso apareceria cru, e
-   * ela leria "Calcule 2^{5}" em vez de "Calcule 2 elevado a 5". Aqui a mesma
-   * marcação vira sobrescrito e subscrito de verdade, que o navegador desenha
-   * melhor do que o PDF.
-   *
-   * O *assim* vira itálico na mesma passada. É o enunciado de português que
-   * pede: citar a palavra dentro da pergunta ("o *que* da linha 12") é o que a
-   * folha já sabe imprimir, e o asterisco cru na tela pareceria erro de
-   * digitação. A sintaxe é a MESMA do pdf.js (partirEstilo),
-   * e não uma segunda: lá "***" inverte negrito e itálico juntos, "**" inverte
-   * o negrito e "*" sozinho inverte o itálico, casando sempre o mais longo
-   * primeiro. Aqui só o itálico tem desenho, então o "**" é reconhecido para
-   * ser DEIXADO como veio, e nunca lido como um par de itálicos.
-   *
-   * O que não casa sai literal, e essa é a diferença deliberada para o pdf.js,
-   * que engole o asterisco sem par e vira o estado até o fim da linha. Na folha
-   * o verificador do banco já reprova a linha desparelhada antes de imprimir;
-   * entre o banco e o olho dela, na tela, não há verificador nenhum, e sumir
-   * com um caractere do enunciado é pior do que mostrá-lo. Medido em
-   * 08/09/2026 nos doze banco/serie-*.json publicados: 5143 enunciados, zero
-   * asteriscos, matemática e português. Então nada muda de aparência hoje: os
-   * 7860 "**" do banco vivem na `explicacao` de cada tema, que só o PDF lê, e
-   * o app.js não mostra explicacao em lugar nenhum. A regra existe para o dia
-   * em que um enunciado citar a palavra em itálico, e é o testa_notacao que
-   * segura a medida (seção 16), para esse dia não chegar calado. */
-  function comNotacao(texto) {
-    var partes = [];
-    var resto = String(texto == null ? '' : texto);
-    /* Um laço só, com as três possibilidades na mesma expressão, para uma não
-     * estragar a outra: o "**" tem alternativa própria, que o consome inteiro e
-     * impede meio negrito de virar itálico, e o miolo do itálico é [^*]+, que
-     * não atravessa o asterisco seguinte.
-     *
-     * A chave protege o "*" que estiver dentro dela SÓ quando o casamento
-     * começa na chave: "x^{*}" sai com o asterisco no expoente. Um itálico
-     * aberto ANTES da chave atravessa e ganha, porque a alternância só desempata
-     * o que começa na mesma posição, e aí a chave sai literal. Medido:
-     * "*veja 2^{*}*" sai "<i>veja 2^{</i>}*". Nenhum caractere some em caso
-     * nenhum, e é isso que a seção 16 do testa_notacao trava, com este caso
-     * dentro. Hoje não morde: os enunciados publicados têm zero asteriscos. */
-    var re = /([\^_])\{([^}]*)\}|\*\*|\*(?!\*)([^*]+)\*(?!\*)/;
-    var m;
-    while ((m = re.exec(resto))) {
-      if (m.index) partes.push(document.createTextNode(resto.slice(0, m.index)));
-      if (m[1]) {
-        partes.push(el(m[1] === '^' ? 'sup' : 'sub', { texto: m[2] }));
-      } else if (m[3] !== undefined) {
-        /* Um degrau de recursão, e no máximo um: o miolo casado não tem
-         * asterisco nenhum, então ele nunca volta a entrar pelo itálico. É o
-         * que faz "*x^{2}*" sair em itálico COM o 2 em cima. */
-        partes.push(el('em', null, comNotacao(m[3])));
-      } else {
-        // "**" reconhecido só para sair inteiro, do jeito que entrou.
-        partes.push(document.createTextNode(m[0]));
-      }
-      resto = resto.slice(m.index + m[0].length);
-    }
-    if (resto) partes.push(document.createTextNode(resto));
-    return partes;
-  }
-
   /* Janela sobre janela.
    *
    * Todos os fundos nascem no mesmo nível no styles.css, então quem pinta por
@@ -1359,20 +1262,6 @@
   // ================= início =================
 
   function iniciar() {
-    /* O ÚLTIMO PEDAÇO DO MATERIAL AUTORAL QUE VIVIA FORA DO ALCANCE DA CHAVE.
-     *
-     * O título padrão da janela de tema está escrito no index.html, que é
-     * HTML e não enxerga esta constante: ele era "Material de aula" e passou a
-     * ser "Assunto da aula". Na prática os quatro caminhos que abrem aquela
-     * janela escrevem o título antes de mostrá-la, então o padrão do HTML
-     * quase nunca aparece. Mas "trocar false por true devolve tudo" é uma
-     * promessa absoluta, e a chave existe para ser volta de emergência: chave
-     * que devolve quase tudo não serve. Uma linha no arranque fecha o buraco e
-     * a frase passa a ser literal. */
-    if (MATERIAL_AUTORAL_NO_AR) {
-      var tituloTema = $('#titulo-modal-tema');
-      if (tituloTema) tituloTema.textContent = 'Material de aula';
-    }
     Store.tornarPersistente();
     Store.carregar().then(function (carregado) {
       if (carregado && (carregado.alunos.length || carregado.aulas.length)) {
@@ -2283,13 +2172,6 @@
       texto: aulaEmEdicao.temNota ? 'Abrir folha de aula' : 'Escrever à mão na folha',
       aoClick: function () { abrirEditorNota(aulaEmEdicao.id); }
     }));
-    if (MATERIAL_AUTORAL_NO_AR) {
-      linhaFolha.appendChild(el('button', {
-        type: 'button', class: 'btn',
-        texto: 'Material de aula',
-        aoClick: function () { abrirTemas(aulaEmEdicao.id); }
-      }));
-    }
     linhaFolha.appendChild(el('button', {
       type: 'button', class: 'btn',
       texto: 'Anexar PDF',
@@ -2306,10 +2188,6 @@
       el('strong', { texto: 'A folha em branco é sempre o começo: ' }),
       document.createTextNode('ela aceita escrita com a S Pen, imagem colada e texto digitado, ' +
         'e serve para você planejar a aula do jeito que quiser. '),
-      MATERIAL_AUTORAL_NO_AR ? el('strong', { texto: 'Material de aula ' }) : null,
-      MATERIAL_AUTORAL_NO_AR ? document.createTextNode(
-        'é um atalho opcional, para quando quiser puxar explicação e ' +
-        'exercícios prontos de um tema. ') : null,
       el('strong', { texto: 'Para trazer uma aula do Samsung Notes: ' }),
       document.createTextNode('lá dentro toque em Compartilhar, escolha PDF, e depois use "Anexar PDF" aqui. ' +
         'O arquivo fica guardado junto da aula e você abre ou compartilha quando quiser. ' +
@@ -2580,15 +2458,12 @@
       ]));
       if (!quantos) {
         /* A segunda frase promete material, então ela só aparece quando há
-         * material para oferecer: o autoral, enquanto estiver no ar, ou a
-         * biblioteca, quando há pacote importado. Sem nenhum dos dois o
-         * assunto vale sozinho, e é só isso que a linha diz. */
+         * material para oferecer: a biblioteca, quando há pacote importado.
+         * Sem ela o assunto vale sozinho, e é só isso que a linha diz. */
         bloco.appendChild(el('div', {
           class: 'ajuda', style: 'margin-top:4px',
           texto: 'O assunto entra no fechamento do mês.' +
-            (MATERIAL_AUTORAL_NO_AR
-              ? ' Se quiser material pronto, ele sai daqui mesmo.'
-              : (temPacoteBiblioteca ? ' O material da biblioteca sai daqui mesmo.' : ''))
+            (temPacoteBiblioteca ? ' O material da biblioteca sai daqui mesmo.' : '')
         }));
       }
     }
@@ -2823,39 +2698,23 @@
         detalhe = rotuloDisciplina(disciplina) + (nomeGrupo ? ', ' + nomeGrupo : '');
       }
 
-      /* SEM MATERIAL AUTORAL, O BOTÃO NÃO TEM MAIS BIFURCAÇÃO: ou a biblioteca
-       * tem o assunto, e ele a abre, ou ele não aparece.
+      /* O BOTÃO MATERIAL É DA BIBLIOTECA E DE MAIS NINGUÉM: ou ela tem o
+       * assunto, e ele a abre, ou ele não aparece.
        *
-       * Um tema do banco passa a se comportar como um assunto do acervo de
-       * 14/09 já se comporta: assunto comum, sem material próprio. O registro
-       * do índice continua sendo lido, porque dele saem a etiqueta do ano e a
-       * matéria, que são grafo e não material.
+       * Um assunto do índice de matemática é assunto comum, sem material
+       * próprio (o material autoral saiu no B14). O registro do índice
+       * continua sendo lido, porque dele saem a etiqueta do ano e a matéria.
+       *
+       * Enquanto o índice da biblioteca não abriu não se sabe se ela tem o
+       * assunto, e a linha nasce sem o botão e o ganha no redesenho (o
+       * carregarBiblioteca logo acima). Mostrar antes de saber seria prometer
+       * o que pode não existir.
        *
        * Material já anexado numa aula antiga (comMaterial) não passa por aqui:
        * ele abre pelo anexo, como sempre. */
       var bibliotecaPodeTer = !comMaterial && temPacoteBiblioteca && disciplina === Core.MATERIA_PADRAO;
       var pelaBiblioteca = bibliotecaPodeTer && !!bib && !!moduloDoAssunto(t);
-      function materialDeSempre() {
-        if (registro && MATERIAL_AUTORAL_NO_AR) {
-          $('#titulo-modal-tema').textContent = 'Material de aula' +
-            (aluno ? ', ' + aluno.nome : '');
-          abrirModal('modal-tema');
-          abrirMontagem(registro, aula, aluno, {
-            itemExistente: t,
-            rotuloVoltar: '‹ Voltar para a aula',
-            voltar: function () { fecharModal('modal-tema'); }
-          });
-          return true;
-        }
-        return false;
-      }
-      /* O autoral só conta para o botão enquanto estiver no ar. Desligado, o
-       * botão é da biblioteca e de mais ninguém: enquanto o índice da
-       * biblioteca não abriu não se sabe se ela tem o assunto, e a linha nasce
-       * sem o botão e o ganha no redesenho (o carregarBiblioteca logo acima).
-       * Mostrar antes de saber seria prometer o que pode não existir. */
-      var temAutoral = MATERIAL_AUTORAL_NO_AR && !!registro;
-      var podeMaterial = !comMaterial && (pelaBiblioteca || temAutoral);
+      var podeMaterial = !comMaterial && pelaBiblioteca;
 
       caixa.appendChild(el('div', { class: 'item-lista item-assunto-aula' }, [
         el('div', { class: 'cresce' }, [
@@ -2871,13 +2730,12 @@
           type: 'button', class: 'btn pequeno', texto: 'Material',
           aoClick: function (ev) {
             /* A biblioteca só toma o toque quando tem o assunto (um módulo que
-             * casa todas as palavras do título). Senão: o material autoral,
-             * enquanto ele estiver no ar; e, se não houver, um aviso, sem
-             * tirá-la da aula para uma busca vazia. A primeira consulta abre o
-             * índice da biblioteca, então o botão avisa que está abrindo. */
+             * casa todas as palavras do título). Senão, um aviso, sem tirá-la
+             * da aula para uma busca vazia. A primeira consulta abre o índice
+             * da biblioteca, então o botão avisa que está abrindo. */
             var botao = ev && ev.currentTarget;
             // o índice da biblioteca ainda abrindo não decide por ela: o toque espera por ele
-            if (!pelaBiblioteca && !(bibliotecaPodeTer && !bib)) { materialDeSempre(); return; }
+            if (!pelaBiblioteca && !(bibliotecaPodeTer && !bib)) return;
             if (botao) { botao.disabled = true; botao.textContent = 'Abrindo...'; }
             // o pacote pode ter mudado desde que a linha foi desenhada: confere de novo
             carregarBiblioteca().then(function () { return moduloDoAssunto(t); }).catch(function () { return null; }).then(function (achado) {
@@ -2885,31 +2743,17 @@
               // ela pode ter saído da aula enquanto a biblioteca abria: aí não a leva embora
               if (!$('#modal-aula').classList.contains('aberto') || !aulaEmEdicao || aulaEmEdicao.id !== aula.id) return;
               if (achado === null) {
-                if (materialDeSempre()) return;
                 avisar('Não consegui abrir a biblioteca agora. Tente de novo daqui a pouco.');
                 return;
               }
               if (achado) {
                 /* Caminho curto (item 2 do B7): um toque cai DENTRO do módulo,
-                 * com o material montado inteiro e já marcado.
-                 *
-                 * Com o material autoral no ar era diferente, e de propósito:
-                 * o achado por TÍTULO (direto: false) é um palpite da busca, e
-                 * saltar para dentro de um módulo palpitado enquanto o material
-                 * do tema ainda era um destino possível seria escolher no lugar
-                 * dela. Então só o achado DIRETO entrava no módulo; o por
-                 * título abria a biblioteca. Sem material autoral não há
-                 * segundo destino, e o caminho curto vale para os dois casos.
-                 * A chave devolve o comportamento de antes, inteiro. */
-                abrirBibliotecaDoAssunto(t, aula,
-                  (MATERIAL_AUTORAL_NO_AR && !achado.direto) ? null : achado.chave);
-                if (MATERIAL_AUTORAL_NO_AR && registro && !avisouMaterialAutoral) {
-                  avisouMaterialAutoral = true;   // uma vez por uso do aplicativo
-                  avisar('Abri a biblioteca da OBMEP. O seu material deste assunto continua em "Material de aula", na janela da aula.');
-                }
+                 * com o material montado inteiro e já marcado, tanto no achado
+                 * direto quanto no achado por título: sem material autoral não
+                 * há segundo destino para disputar com o palpite da busca. */
+                abrirBibliotecaDoAssunto(t, aula, achado.chave);
                 return;
               }
-              if (materialDeSempre()) return;
               avisar('A biblioteca não tem "' + t.titulo + '". Procure por outra palavra na aba Biblioteca, ou navegue pela série.');
             });
           }
@@ -7037,14 +6881,7 @@
       'O que ele acha que sabe e o que acha que não sabe. Vale mais o que ele diz ' +
       'do que a nota do boletim.'],
     ['Sondagem escrita, 25 minutos',
-      /* Atrás da chave como todo o resto: com o material autoral no ar, o
-       * roteiro mandava para "Material de aula", e é para lá que ele volta a
-       * mandar se a chave voltar. Roteiro que aponta para um botão que não
-       * existe é pior do que roteiro nenhum, e chave que devolve "quase tudo"
-       * não serve de volta de emergência. */
-      (MATERIAL_AUTORAL_NO_AR
-        ? 'Use "Material de aula" e monte uma lista curta com exercícios de anos anteriores. '
-        : 'Monte uma lista curta com exercícios de anos anteriores, na aba Biblioteca. ') +
+      'Monte uma lista curta com exercícios de anos anteriores, na aba Biblioteca. ' +
       'Não é prova: é para ver onde ele trava e como ele pensa.'],
     ['Preencher o mapeamento, 10 minutos',
       'Marque pontos fortes, pontos de atenção e lacunas, e escreva o plano inicial.'],
@@ -7749,12 +7586,6 @@
     corpo.scrollTop = 0;
   }
 
-  /* Abre o banco de temas já filtrado por uma lacuna, sem aula nenhuma por
-   * trás: aqui ela está olhando material, não montando uma aula. */
-  function abrirTemasPorBusca(busca, aluno) {
-    abrirTemas(null, { busca: busca, aluno: aluno });
-  }
-
   /* ===================== a trilha da lacuna =====================
    *
    * Marcar "Frações" no mapeamento levava a uma busca que devolve dezoito temas
@@ -7855,22 +7686,6 @@
     delete p.jaEra;
   }
 
-  /* O caminho de hoje, guardado inteiro um nível abaixo da trilha. Para trilha
-   * criada do zero não existe lacuna, e aí a busca é o próprio título do alvo. */
-  function buscaSoltaDaTrilha(trilha) {
-    var item = trilha.lacunaId ? Core.itemDaLacuna(trilha.lacunaId) : null;
-    return (item && item.busca) || trilha.titulo || '';
-  }
-
-  function botaoTemasSoltos(trilha, aluno) {
-    return el('button', {
-      type: 'button', class: 'btn', id: 'trilha-temas-soltos', texto: 'Ver os temas soltos',
-      title: 'Abre a lista de temas de sempre, sem ordem nenhuma',
-      style: 'min-height:44px',
-      aoClick: function () { abrirTemasPorBusca(buscaSoltaDaTrilha(trilha), aluno); }
-    });
-  }
-
   /* ---------- passo 1: onde ele precisa chegar ---------- */
 
   function abrirTrilhaDaLacuna(aluno, item) {
@@ -7891,11 +7706,6 @@
        * uma tela vazia. Hoje as vinte e duas têm alvo, mas o dado pode mudar
        * sem que este arquivo mude junto. */
       if (!r.candidatos.length) {
-        if (MATERIAL_AUTORAL_NO_AR) {
-          fecharModal('modal-trilha');
-          abrirTemasPorBusca(item.busca, aluno);
-          return;
-        }
         /* Sem material autoral não há lista solta para onde desviar. Hoje as
          * vinte e duas lacunas têm alvo curado, então este ramo não acontece;
          * ele existe porque o dado pode mudar sem este arquivo mudar junto, e
@@ -7986,15 +7796,6 @@
         'acrescentar o que faltar antes de guardar.'
     }));
 
-    /* Mesmo id da versão que fica dentro da trilha montada: as duas telas nunca
-     * existem ao mesmo tempo, e assim o caminho antigo tem um só endereço. */
-    if (MATERIAL_AUTORAL_NO_AR) {
-      rodape.appendChild(el('button', {
-        type: 'button', class: 'btn esquerda', id: 'trilha-temas-soltos',
-        texto: 'Ver os temas soltos', style: 'min-height:44px',
-        aoClick: function () { abrirTemasPorBusca(item.busca, aluno); }
-      }));
-    }
     rodape.appendChild(el('button', {
       type: 'button', class: 'btn', texto: 'Cancelar', style: 'min-height:44px',
       aoClick: function () { fecharModal('modal-trilha'); }
@@ -8311,24 +8112,14 @@
         }
       }));
     }
-    /* "Ver os temas soltos" existe para abrir o material autoral fora de
-     * ordem. Sem o material, o botão levaria a uma lista que não gera nada:
-     * ele sai junto, e a trilha fica com os passos, que é o que ela usa. */
-    if (MATERIAL_AUTORAL_NO_AR) barraDoFim.push(botaoTemasSoltos(trilha, aluno));
-    /* Barra vazia não nasce: numa trilha encerrada, com o material fora do ar,
-     * não sobra botão nenhum aqui, e uma faixa vazia deixaria um vão na tela. */
+    /* Barra vazia não nasce: numa trilha encerrada não sobra botão nenhum
+     * aqui, e uma faixa vazia deixaria um vão na tela. */
     if (barraDoFim.length) {
       corpo.appendChild(el('div', { class: 'barra', style: 'margin:12px 0 4px' }, barraDoFim));
     }
-    var ajudaDoFim = !MATERIAL_AUTORAL_NO_AR
-      ? (encerrada
-        ? ''
-        : 'Acrescentar passo abre o banco de matemática para escolher o assunto do passo.')
-      : (encerrada
-        ? 'Ver os temas soltos abre a lista de sempre, para quando você quiser rever o material ' +
-          'que esta trilha usou.'
-        : 'Acrescentar passo abre o banco de matemática. Ver os temas soltos abre a mesma ' +
-          'lista de sempre, sem ordem nenhuma, para quando você quiser só olhar o material.');
+    var ajudaDoFim = encerrada
+      ? ''
+      : 'Acrescentar passo abre o banco de matemática para escolher o assunto do passo.';
     if (ajudaDoFim) corpo.appendChild(el('div', { class: 'ajuda', texto: ajudaDoFim }));
 
     // ---- rodapé ----
@@ -9110,16 +8901,12 @@
     }));
   }
 
-  // ================= banco de temas =================
+  // ================= índice de assuntos de matemática =================
   //
-  // O tema é sempre opcional. A folha em branco continua sendo o caminho
-  // principal, e existe para ela planejar a aula do jeito que quiser.
-  //
-  // Com MATERIAL_AUTORAL_NO_AR desligado, o que sobra daqui é o GRAFO: o índice
-  // alimenta a etiqueta do ano na linha do assunto, a escolha do assunto por
-  // matéria, o alvo da trilha e a lacuna do mapeamento. A montagem do PDF
-  // autoral (abrirTemas, abrirMontagem, desenharMontagem, gerarMaterialDoTema)
-  // continua escrita e sem nenhuma porta de entrada na tela.
+  // O que sobrou dos temas autorais é o ÍNDICE (banco/topicos/matematica.json):
+  // ele alimenta a etiqueta do ano na linha do assunto, a escolha do assunto
+  // por matéria, as sugestões do ano, o alvo da trilha e a lacuna do
+  // mapeamento. O material (montagem e PDF dos temas) saiu no B14.
 
   var SERIES_NOMES = [
     ['02', '2º ano'], ['03', '3º ano'], ['04', '4º ano'], ['05', '5º ano'],
@@ -9195,122 +8982,65 @@
     return serie;
   }
 
-  /* O texto em que a busca simples procura. O bloco `en` só existe nas
-   * matérias cuja tabela declara inglês (matemática); ler t.en.titulo num tema
-   * de português quebraria a lista inteira. */
+  /* O texto em que a busca simples procura. Desde o B14 o índice guarda só o
+   * título (resumo e versão em inglês eram conteúdo do material autoral); os
+   * outros dois entram se existirem, para não ler "undefined" de índice
+   * antigo ou de outra matéria. */
   function textoDeBusca(t) {
-    return t.pt.titulo + ' ' + t.pt.resumo + (t.en ? ' ' + t.en.titulo : '');
+    return t.pt.titulo + (t.pt.resumo ? ' ' + t.pt.resumo : '') + (t.en ? ' ' + t.en.titulo : '');
   }
 
   /* indiceTemas é o índice da MATÉRIA PADRÃO (matemática), na forma de sempre:
-   * é o que a lista de material, a trilha e o mapeamento recebem, e nada disso
-   * mudou de forma. indicesPorMateria guarda esse e os das outras matérias com
-   * banco, pela chave da matéria, para resumoDe e para a busca "em qualquer
-   * matéria" atravessarem todos. */
+   * é o que a grade de assuntos, a trilha e o mapeamento recebem.
+   * indicesPorMateria guarda esse pela chave da matéria, para resumoDe e para
+   * a busca "em qualquer matéria". Até o B14 guardava também o índice dos
+   * temas autorais de português (banco/portugues/), que saiu com o material;
+   * as outras matérias vêm do catálogo de tópicos. */
   var indiceTemas = null;
   var indicesPorMateria = null;
-  var seriesCarregadas = {};
   var ultimoAnoEscolar = null;
   var indiceTemasFalhou = false;
 
-  /* O índice de busca vem separado, e a falta dele não impede nada: sem ele a
-   * busca volta a comparar título e resumo, que é o comportamento antigo. */
+  /* O índice de busca da matemática, montado dos títulos. A falta dele não
+   * impede nada: sem ele a busca compara o título direto. */
   var indiceDeBusca = null;
+
+  /* O índice de assuntos de matemática (B14). Era banco/indice.json, gerado
+   * dos temas autorais; hoje é um arquivo do catálogo de tópicos, com os
+   * mesmos ids, só com campos de índice. */
+  var INDICE_MATEMATICA = 'banco/topicos/matematica.json';
 
   function carregarIndice() {
     if (indiceTemas) return Promise.resolve(indiceTemas);
     var padrao = Core.materiaPorId(Core.MATERIA_PADRAO);
-    return fetch(padrao.temas.raiz + 'indice.json').then(function (r) {
+    return fetch(INDICE_MATEMATICA).then(function (r) {
       if (!r.ok) throw new Error('indice indisponivel');
       return r.json();
     }).then(function (d) {
       var temas = d.temas || [];
-      return carregarOutrosIndices(padrao).then(function (outros) {
-        indicesPorMateria = {};
-        indicesPorMateria[padrao.id] = temas;
-        outros.forEach(function (o) { if (o) indicesPorMateria[o.id] = o.temas; });
-        indiceTemas = temas;
-        carregarIndiceDeBusca();
-        return indiceTemas;
-      });
+      indicesPorMateria = {};
+      indicesPorMateria[padrao.id] = temas;
+      indiceTemas = temas;
+      carregarIndiceDeBusca();
+      return indiceTemas;
     });
   }
 
-  /* Os índices das outras matérias com banco (Core.materiasComTemas), cada um
-   * em <raiz>indice.json, SE existir. Português já existe
-   * (banco/portugues/indice.json, na lista ARQUIVOS do sw.js desde o cache
-   * v22); literatura está declarada na tabela e o arquivo dela ainda não foi
-   * publicado.
-   *
-   * "Se existir" é decidido pelo PACOTE, e não por um pedido à rede. Medido em
-   * 07/09/2026: um fetch de banco/portugues/indice.json que volta 404 aparece
-   * no console do navegador como erro ("Failed to load resource: 404") a cada
-   * sessão, sem o aplicativo ter escrito nada, e os testes de navegador contam
-   * essa linha como erro. O pacote é a lista ARQUIVOS do sw.js, que ganha
-   * banco/<id>/indice.json quando o banco existe; então o índice de uma
-   * matéria está no cache exatamente quando ela tem banco neste aparelho. Sem
-   * a API de caches (sem service worker) cai no fetch, e aí 404 é "não
-   * existe", em silêncio: nunca é erro nem aviso na tela.
-   *
-   * Custo medido na abertura da tela de temas: zero pedidos de rede a mais,
-   * duas consultas ao cache (português e literatura), uma vez por sessão. */
-  function carregarOutrosIndices(padrao) {
-    var outras = Core.materiasComTemas().filter(function (m) {
-      return m.id !== padrao.id && m.temas.raiz !== padrao.temas.raiz;
-    });
-    return Promise.all(outras.map(function (m) {
-      var url = m.temas.raiz + 'indice.json';
-      var achar = (typeof caches !== 'undefined' && caches && caches.match)
-        ? caches.match(url).then(function (r) { return r || null; })
-        : fetch(url).then(function (r) { return r.ok ? r : null; });
-      return achar.then(function (r) {
-        if (!r) return null;
-        return r.json().then(function (d) { return { id: m.id, temas: d.temas || [] }; });
-      }).catch(function () { return null; });
-    }));
-  }
-
+  /* O índice de busca da matemática é montado AQUI, a partir do índice de
+   * assuntos (Busca.indiceDoCatalogo: o título mais as palavras-chave
+   * guardadas em cada assunto). Até o B14 ele vinha pronto em banco/busca.json,
+   * gerado também do conteúdo dos temas, que saiu; montar 148 registros no
+   * aparelho é instantâneo. O motor (busca.js) é o mesmo, então a busca
+   * continua com relevância, singular e plural, aproximação e filtro por ano. */
   function carregarIndiceDeBusca() {
     if (indiceDeBusca) return Promise.resolve(indiceDeBusca);
-    return fetch('banco/busca.json').then(function (r) {
-      if (!r.ok) throw new Error('sem indice de busca');
-      return r.json();
-    }).then(function (d) {
-      indiceDeBusca = d.temas || [];
-      return indiceDeBusca;
-    }).catch(function () {
+    if (!indiceTemas || typeof Busca === 'undefined') return Promise.resolve(null);
+    try {
+      indiceDeBusca = Busca.indiceDoCatalogo(indiceTemas);
+    } catch (e) {
       indiceDeBusca = null;
-      return null;
-    });
-  }
-
-  /* Recebe o REGISTRO do índice (nunca o item da aula): o id diz de que
-   * matéria o tema é, e a série diz o arquivo. A URL é a raiz da matéria, na
-   * tabela, mais 'serie-' + serie + '.json'.
-   *
-   * A da matéria padrão fica escrita POR EXTENSO, 'banco/serie-', de propósito
-   * e para sempre: é a chave no cache BAIXADOS dos tablets, guardada na
-   * primeira vez que cada série foi aberta, e não há código que renomeie
-   * chave. Trocar este literal faz sumir, sem sinal, toda série que ela já
-   * baixou (o incidente narrado em sw.js:12-16). Duas travas seguram a linha:
-   * a estática do portão (confere_tudo.sh, bloco 'cache do aplicativo') e o
-   * modo --envenenado do testa_biblioteca_offline, que troca o literal e tem
-   * que enxergar a perda. Matéria ausente ou desconhecida também cai aqui,
-   * porque 'banco/' é o único caminho que já existe nos tablets. */
-  function carregarSerie(registro) {
-    var serie = registro.serie;
-    var padrao = Core.materiaPorId(Core.MATERIA_PADRAO).temas.raiz;
-    var mat = Core.materiaDoTema(registro.id);
-    var raiz = mat ? mat.temas.raiz : padrao;
-    var url = raiz === padrao ? 'banco/serie-' + serie + '.json' : raiz + 'serie-' + serie + '.json';
-    if (seriesCarregadas[url]) return Promise.resolve(seriesCarregadas[url]);
-    return fetch(url).then(function (r) {
-      if (!r.ok) throw new Error('serie indisponivel');
-      return r.json();
-    }).then(function (d) {
-      seriesCarregadas[url] = d.temas || [];
-      return seriesCarregadas[url];
-    });
+    }
+    return Promise.resolve(indiceDeBusca);
   }
 
   /* ---------- os assuntos das outras matérias ----------
@@ -10016,9 +9746,8 @@
         var porId = {};
         temasDaMateria.forEach(function (t) { porId[t.id] = t; });
         var itens, completa = true;
-        /* O índice de busca (banco/busca.json) é só da matéria padrão. As
-         * outras procuram em título e resumo, como a matemática fazia antes de
-         * ter índice. */
+        /* O índice de busca (montado dos títulos, carregarIndiceDeBusca) é só
+         * da matéria padrão. Sem ele, a busca compara o título direto. */
         if (materiaId === Core.MATERIA_PADRAO && indiceDeBusca && typeof Busca !== 'undefined') {
           var r = Busca.procurar(indiceDeBusca, termo) || { itens: [] };
           itens = r.itens || [];
@@ -10028,7 +9757,7 @@
           completa = r.completa !== false;
         } else {
           itens = temasDaMateria.filter(function (t) {
-            return Core.casaBusca(t.pt.titulo + ' ' + t.pt.resumo, termo);
+            return Core.casaBusca(textoDeBusca(t), termo);
           }).map(function (t) { return { id: t.id }; });
         }
         var nomeDaMateria = rotuloDisciplina(materiaId);
@@ -10056,41 +9785,6 @@
         });
       });
 
-      /* "com material pronto" só sai quando há dúvida para responder.
-       *
-       * A dúvida é esta, medida no navegador quando o banco de português entrou.
-       * Procurando "mistério" saem duas linhas:
-       *   "Conto de mistério: pistas, suspeitos e dedução"  Português, 7º ano
-       *   "Conto de mistério"                               Português, 7º ano · Leitura e gêneros
-       * A primeira é o tema do banco, com dezessete exercícios; a segunda é o
-       * homônimo do catálogo de tópicos, sem material nenhum. Havia distinção na
-       * tela, pelo título mais longo e pelo rótulo do grupo, e nenhuma das duas
-       * dizia qual delas tinha material. Escolhida a segunda, o assunto grava do
-       * mesmo jeito e o botão Material não aparece na linha da aula.
-       *
-       * Marcar TODO achado de banco foi a primeira tentativa, e saiu pior:
-       * numa busca de matemática eram nove linhas seguidas terminando na mesma
-       * frase, que não responde pergunta nenhuma e ainda atrapalha achar o ano.
-       * A matemática nunca tem o par, porque não está no catálogo de tópicos.
-       *
-       * Então a marca é resposta, e não etiqueta: sai só na matéria em que ESTA
-       * busca devolveu os dois tipos de linha. A frase é a mesma que a lista de
-       * matérias já usa, de propósito.
-       *
-       * Com o material autoral fora do ar não há material pronto para prometer,
-       * e a marca sai inteira: o tema do banco e o homônimo do catálogo passam
-       * a ser dois assuntos iguais, que é o que eles são agora. */
-      if (MATERIAL_AUTORAL_NO_AR) {
-        var temTopicoNaMateria = {};
-        achados.forEach(function (a) {
-          if (!a.doBanco) temTopicoNaMateria[a.materia] = true;
-        });
-        achados.forEach(function (a) {
-          if (a.doBanco && temTopicoNaMateria[a.materia]) {
-            a.detalhe += ' · com material pronto';
-          }
-        });
-      }
 
       var livre = linha('Usar "' + termo + '" assim mesmo',
         'grava exatamente o que você escreveu', function () {
@@ -10158,41 +9852,9 @@
     });
   }
 
-  /* Passo 1: escolher o tema. */
-  function abrirTemas(aulaId, opcoes) {
-    opcoes = opcoes || {};
-    var aula = aulaId ? db.aulas.filter(function (a) { return a.id === aulaId; })[0] : null;
-    if (aulaId && !aula) return;
-    // Sem aula por tras, ela esta so consultando material: o botao final entrega
-    // o arquivo em vez de anexar em lugar nenhum.
-    var aluno = aula ? alunoPorId(aula.alunoId) : (opcoes.aluno || null);
-    $('#titulo-modal-tema').textContent = (aula ? 'Material de aula' : 'Consultar temas') +
-      (aluno ? ', ' + aluno.nome : '');
-
-    var corpo = $('#corpo-modal-tema');
-    var rodape = $('#rodape-modal-tema');
-    corpo.innerHTML = '';
-    rodape.innerHTML = '';
-    corpo.appendChild(el('div', { class: 'ajuda', style: 'margin-top:0', texto: 'Carregando os temas...' }));
-    abrirModal('modal-tema');
-
-    carregarIndice().then(function (temas) {
-      desenharEscolhaTema(temas, aula, aluno, opcoes.busca || '');
-    }).catch(function () {
-      corpo.innerHTML = '';
-      corpo.appendChild(el('div', { class: 'faixa-aviso' }, [
-        el('strong', { texto: 'Não consegui abrir o banco de temas. ' }),
-        document.createTextNode('Se for a primeira vez, abra o aplicativo uma vez com internet. ' +
-          'De qualquer jeito, a folha em branco continua funcionando normalmente.')
-      ]));
-    });
-  }
-
-  /* opcoes existe para esta mesma lista servir a dois caminhos sem virar duas
-   * funções: pelo botão "Material de aula" ela leva à montagem do PDF, que é o
-   * padrão e não muda em nada; pelo assunto da aula ela só registra o tema.
-   * O que vier aqui viaja junto até o botão "‹ Outro tema" da montagem, senão
-   * voltar de lá cairia no caminho errado. */
+  /* A grade de matemática por ano, com busca. Ela só registra o assunto
+   * (opcoes.aoEscolher); a montagem de material que este mesmo desenho servia
+   * saiu com o material autoral (B14). */
   function desenharEscolhaTema(temas, aula, aluno, buscaInicial, opcoes) {
     opcoes = opcoes || {};
     var corpo = $('#corpo-modal-tema');
@@ -10326,25 +9988,23 @@
                 : null,
               rotulo ? el('span', { class: 'tag', texto: rotulo, style: 'margin-left:6px' }) : null
             ].filter(Boolean)),
-            el('div', { class: 'detalhe', texto: t.pt.resumo }),
+            /* O resumo de uma linha saiu com o material autoral (B14): o
+             * índice de assuntos guarda título, ano, unidade, duração e
+             * dificuldade, e nada que seja conteúdo. */
             el('div', { class: 'detalhe bib-disponibilidade-tema', hidden: !disponivel, texto: disponivel }),
             el('div', {
               class: 'detalhe',
-              /* A contagem de exercícios é do MATERIAL: fora do ar o material,
-               * ela viraria uma promessa que a tela não cumpre. Duração e
-               * dificuldade ficam, porque são grafo e é com elas que a trilha
+              /* Duração e dificuldade são do índice, e é com elas que a trilha
                * estima os encontros. */
-              texto: (MATERIAL_AUTORAL_NO_AR ? t.qtd + ' exercícios · cerca de ' : 'cerca de ') +
-                t.duracaoMin + ' minutos · dificuldade ' + t.dificuldade + ' de 5'
+              texto: 'cerca de ' + t.duracaoMin + ' minutos · dificuldade ' + t.dificuldade + ' de 5'
             })
           ]),
           el('button', {
             type: 'button', class: 'btn pequeno principal',
             texto: opcoes.rotuloEscolher || 'Escolher',
             aoClick: function () {
-              if (opcoes.aoEscolher) { opcoes.aoEscolher(t); return; }
-              // sem material autoral não há montagem para abrir: esta lista só registra
-              if (MATERIAL_AUTORAL_NO_AR) abrirMontagem(t, aula, aluno, opcoes);
+              // esta lista só registra o assunto: não há montagem de material
+              if (opcoes.aoEscolher) opcoes.aoEscolher(t);
             }
           })
         ]);
@@ -10387,316 +10047,6 @@
     }));
   }
 
-  /* Passo 2: montar o material, escolhendo o que entra e quais exercícios. */
-  function abrirMontagem(resumoTema, aula, aluno, opcoes) {
-    var corpo = $('#corpo-modal-tema');
-    var rodape = $('#rodape-modal-tema');
-    corpo.innerHTML = '';
-    rodape.innerHTML = '';
-    corpo.appendChild(el('div', { class: 'ajuda', texto: 'Carregando o tema...' }));
-
-    /* O REGISTRO inteiro vai para carregarSerie, e não só a série: é pelo id
-     * que ela descobre de que matéria é o tema e em que raiz a série mora.
-     * Passar só a série já aconteceu, na primeira rodada desta mudança, e o
-     * pedido saía para banco/serie-undefined.json: a faixa "Não consegui abrir
-     * este tema" aparecia até com internet (testa_biblioteca_offline, 5
-     * asserções). Quem chama aqui passa sempre um registro do índice: a lista
-     * de temas (o próprio t) e a linha do assunto na aula (resumoDe(t.id)). */
-    carregarSerie(resumoTema).then(function (temas) {
-      var tema = temas.filter(function (t) { return t.id === resumoTema.id; })[0];
-      if (!tema) throw new Error('tema nao encontrado');
-      desenharMontagem(tema, aula, aluno, opcoes);
-    }).catch(function () {
-      corpo.innerHTML = '';
-      corpo.appendChild(el('div', { class: 'faixa-aviso' }, [
-        document.createTextNode('Não consegui abrir este tema. Abra o aplicativo uma vez com ' +
-          'internet para ele ficar guardado no tablet.')
-      ]));
-    });
-  }
-
-  /* O título do texto de apoio de um exercício, ou '' quando não há.
-   *
-   * O caminho é o do dado real (banco/portugues/serie-07.json): ex.texto é o
-   * ÍNDICE dentro de tema[lingua].textos, cada texto traz a chave `fonte`, e o
-   * nome está em tema.fontes[chave].titulo. Toda lacuna devolve '' e a linha
-   * nem nasce: exercício sem texto de apoio (toda a matemática, onde ex.texto
-   * simplesmente não existe), índice que não aponta para texto nenhum, fonte
-   * que o tema não declara e fonte declarada sem título. Nenhuma delas pode
-   * virar um vão em branco embaixo do enunciado nem um "undefined" na tela
-   * dela. */
-  function tituloDoTextoDeApoio(tema, dados, ex) {
-    if (!ex || typeof ex.texto !== 'number') return '';
-    var texto = ((dados && dados.textos) || [])[ex.texto];
-    if (!texto) return '';
-    var fonte = ((tema && tema.fontes) || {})[texto.fonte];
-    return fonte && fonte.titulo ? String(fonte.titulo) : '';
-  }
-
-  function desenharMontagem(tema, aula, aluno, opcoes) {
-    opcoes = opcoes || {};
-    var corpo = $('#corpo-modal-tema');
-    var rodape = $('#rodape-modal-tema');
-    corpo.innerHTML = '';
-    rodape.innerHTML = '';
-
-    var lingua = 'pt';
-    var incluir = { material: true, lista: true, gabarito: false };
-    var marcados = {};
-    tema.pt.exercicios.forEach(function (e) { marcados[e.n] = true; });
-
-    corpo.appendChild(el('div', { class: 'barra', style: 'margin-bottom:8px' }, [
-      el('button', {
-        type: 'button', class: 'btn pequeno',
-        texto: opcoes.rotuloVoltar || '‹ Outro tema',
-        aoClick: function () {
-          if (opcoes.voltar) opcoes.voltar();
-          else desenharEscolhaTema(indiceTemas, aula, aluno, '', opcoes);
-        }
-      }),
-      el('h3', { class: 'titulo', style: 'font-size:17px', texto: tema.pt.titulo })
-    ]));
-
-    /* Idioma. O botão só existe quando a matéria do tema declara inglês na
-     * tabela (linguas inclui 'en') e o tema traz o bloco: oferecer English num
-     * tema só em português geraria material vazio. */
-    var materiaDoTema = Core.materiaDoTema(tema.id);
-    var linguasDoTema = materiaDoTema ? materiaDoTema.temas.linguas : ['pt'];
-    if (linguasDoTema.indexOf('en') !== -1 && tema.en) {
-      var linhaIdioma = el('div', { class: 'barra', style: 'margin-bottom:10px' });
-      [['pt', 'Português'], ['en', 'English']].forEach(function (par) {
-        var b = el('button', {
-          type: 'button', class: 'btn pequeno' + (par[0] === lingua ? ' principal' : ''),
-          texto: par[1], 'data-lingua': par[0]
-        });
-        b.addEventListener('click', function () {
-          lingua = par[0];
-          linhaIdioma.querySelectorAll('[data-lingua]').forEach(function (x) { x.classList.remove('principal'); });
-          b.classList.add('principal');
-          desenharExercicios();
-        });
-        linhaIdioma.appendChild(b);
-      });
-      corpo.appendChild(el('div', { class: 'campo' }, [
-        el('span', { texto: 'Idioma do material', style: 'display:block;font-size:13px;font-weight:700;color:#1F3A5F;margin-bottom:5px' }),
-        linhaIdioma
-      ]));
-    }
-
-    // o que entra
-    var caixaPartes = el('div', { style: 'display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px' });
-    [['material', 'Material explicativo'], ['lista', 'Lista de exercícios'], ['gabarito', 'Gabarito']]
-      .forEach(function (par) {
-        var chk = el('input', { type: 'checkbox', style: 'width:auto;min-height:auto' });
-        chk.checked = incluir[par[0]];
-        chk.addEventListener('change', function () {
-          incluir[par[0]] = this.checked;
-          caixaExercicios.style.display = incluir.lista || incluir.gabarito ? '' : 'none';
-          atualizarRodape();
-        });
-        caixaPartes.appendChild(el('label', {
-          style: 'display:flex;align-items:center;gap:7px;font-size:15px;cursor:pointer'
-        }, [chk, el('span', { texto: par[1] })]));
-      });
-    corpo.appendChild(el('div', { class: 'campo' }, [
-      el('span', { texto: 'O que incluir', style: 'display:block;font-size:13px;font-weight:700;color:#1F3A5F;margin-bottom:5px' }),
-      caixaPartes
-    ]));
-    corpo.appendChild(el('div', {
-      class: 'ajuda',
-      texto: 'O gabarito sai numa folha separada, para a lista poder ser entregue sem ele.'
-    }));
-
-    // exercícios
-    var caixaExercicios = el('div');
-    corpo.appendChild(caixaExercicios);
-
-    function contarMarcados() {
-      return Object.keys(marcados).filter(function (k) { return marcados[k]; }).length;
-    }
-
-    function desenharExercicios() {
-      caixaExercicios.innerHTML = '';
-      var dados = tema[lingua];
-      caixaExercicios.appendChild(el('div', { class: 'barra', style: 'margin:14px 0 8px' }, [
-        el('h3', { class: 'subtitulo', style: 'margin:0;border:none', texto: 'Quais exercícios' }),
-        el('span', { class: 'cresce' }),
-        el('button', {
-          type: 'button', class: 'btn pequeno', texto: 'Marcar todos',
-          aoClick: function () {
-            dados.exercicios.forEach(function (e) { marcados[e.n] = true; });
-            desenharExercicios();
-          }
-        }),
-        el('button', {
-          type: 'button', class: 'btn pequeno', texto: 'Desmarcar todos',
-          aoClick: function () {
-            dados.exercicios.forEach(function (e) { marcados[e.n] = false; });
-            desenharExercicios();
-          }
-        })
-      ]));
-
-      var blocoAtual = null;
-      dados.exercicios.forEach(function (ex) {
-        if (ex.bloco && ex.bloco !== blocoAtual) {
-          blocoAtual = ex.bloco;
-          caixaExercicios.appendChild(el('div', { class: 'bloco-exercicios', texto: blocoAtual }));
-        }
-        var chk = el('input', { type: 'checkbox', style: 'width:auto;min-height:auto;margin-top:3px' });
-        chk.checked = !!marcados[ex.n];
-        chk.addEventListener('change', function () {
-          marcados[ex.n] = this.checked;
-          atualizarRodape();
-        });
-        var corpoDoItem = el('div', { class: 'cresce' }, [
-          el('div', { class: 'texto-exercicio' }, comNotacao(ex.enunciado))
-        ]);
-        /* De que texto a pergunta fala. Em português a folha pode trazer mais
-         * de um texto de apoio (o POR07-04 tem dois: a notícia e a reportagem
-         * sobre o mesmo fato), e a pergunta só se entende colada ao texto de
-         * onde saiu. Sem esta linha as questões dos dois chegam misturadas na
-         * mesma lista, sem nada dizendo qual é de qual: ela marca de um e de
-         * outro sem perceber, e a folha sai com os dois textos inteiros
-         * (o pdf.js imprime cada texto que tenha questão marcada) quando ela
-         * queria trabalhar um só. */
-        var apoio = tituloDoTextoDeApoio(tema, dados, ex);
-        if (apoio) {
-          corpoDoItem.appendChild(el('div', {
-            texto: 'Texto de apoio: ' + apoio,
-            style: 'font-size:12px;color:var(--muted);margin-top:3px;line-height:1.35'
-          }));
-        }
-        caixaExercicios.appendChild(el('label', { class: 'item-exercicio' }, [chk, corpoDoItem]));
-      });
-      atualizarRodape();
-    }
-
-    function atualizarRodape() {
-      rodape.innerHTML = '';
-      var quantos = contarMarcados();
-      var precisaExercicio = incluir.lista || incluir.gabarito;
-      var nada = !incluir.material && !precisaExercicio;
-      var semExercicio = precisaExercicio && quantos === 0;
-
-      rodape.appendChild(el('span', {
-        class: 'esquerda ajuda', style: 'margin:0;align-self:center',
-        texto: precisaExercicio
-          ? quantos + ' de ' + tema.pt.exercicios.length + ' exercícios marcados'
-          : 'só o material explicativo'
-      }));
-      rodape.appendChild(el('button', {
-        type: 'button', class: 'btn', texto: 'Cancelar',
-        aoClick: function () { fecharModal('modal-tema'); }
-      }));
-      var botao = el('button', {
-        type: 'button', class: 'btn principal',
-        texto: aula ? 'Gerar e anexar à aula' : 'Gerar material',
-        aoClick: function () {
-          gerarMaterialDoTema(tema, lingua, incluir, marcados, aula, aluno, opcoes.itemExistente);
-        }
-      });
-      if (nada || semExercicio) botao.disabled = true;
-      rodape.appendChild(botao);
-    }
-
-    desenharExercicios();
-  }
-
-  /* Passo 3: gerar o PDF e anexar à aula.
-   *
-   * itemExistente vem quando o material foi pedido a partir de um assunto que
-   * já está registrado na aula. Aí o PDF entra naquele item, e não num segundo:
-   * sem isso, tocar em "Material" numa linha de assunto criaria uma linha
-   * repetida do mesmo assunto no fechamento do mês. */
-  function gerarMaterialDoTema(tema, lingua, incluir, marcados, aula, aluno, itemExistente) {
-    var escolhidos = tema[lingua].exercicios
-      .map(function (e) { return e.n; })
-      .filter(function (n) { return marcados[n]; });
-
-    var partes = [];
-    if (incluir.material) partes.push('material');
-    if (incluir.lista) partes.push('lista');
-    if (incluir.gabarito) partes.push('gabarito');
-
-    /* A montagem do PDF é síncrona e acontece no toque do botão, com a janela
-     * aberta na frente dela. O pdf.js passou a LANÇAR erro quando um tema cita
-     * uma fonte sem metadados (metadadosDaFonte), em vez de imprimir o
-     * identificador entre colchetes no rodapé do trecho: é a escolha certa para
-     * a folha, e sem este try seria a tela caindo calada no meio da aula, na
-     * casa da família, com o toque dela sem resposta nenhuma. Hoje o
-     * verificador do banco recusa o tema com fonte sem metadados antes de
-     * publicar, então isto é defesa e não caminho.
-     *
-     * A janela fica aberta: ela troca a escolha e tenta de novo sem refazer o
-     * caminho todo. Nada foi salvo até esta linha, então não há o que desfazer. */
-    var bytes;
-    try {
-      bytes = PDFGen.gerarMaterialTema({
-        tema: tema, lingua: lingua,
-        incluirMaterial: incluir.material,
-        incluirLista: incluir.lista,
-        incluirGabarito: incluir.gabarito,
-        escolhidos: escolhidos,
-        aluno: aluno ? aluno.nome : '',
-        data: aula ? Core.ddmmaaaa(aula.data) : Core.ddmmaaaa(Core.hojeIso()),
-        espacoParaResposta: incluir.lista && !incluir.gabarito ? 24 : 0
-      });
-    } catch (erro) {
-      avisar('Não deu para montar a folha deste tema. Escolha outro tema, ou siga a aula sem ' +
-        'ela: nada do que você já anotou mudou.');
-      return;
-    }
-
-    var nome = Core.nomeArquivo(tema[lingua].titulo) + '_' + tema.id + '.pdf';
-    var blob = new Blob([bytes], { type: 'application/pdf' });
-    var id = Core.uid();
-
-    // Consultando material, sem aula: entrega o arquivo e pronto.
-    if (!aula) {
-      fecharModal('modal-tema');
-      entregarArquivo(nome, blob, tema[lingua].titulo);
-      return;
-    }
-
-    Store.salvarAnexo(id, { nome: nome, tipo: 'application/pdf', blob: blob }).then(function () {
-      aula.anexos = aula.anexos || [];
-      aula.anexos.push({ id: id, nome: nome, tamanho: blob.size });
-      // Uma aula pode tratar mais de um assunto: os temas se somam.
-      aula.temas = Core.temasDaAula(aula);
-      var jaEsta = itemExistente ? aula.temas.indexOf(itemExistente) : -1;
-      if (jaEsta >= 0) {
-        itemExistente.id = tema.id;
-        itemExistente.titulo = itemExistente.titulo || tema[lingua].titulo;
-        itemExistente.lingua = lingua;
-        itemExistente.partes = partes;
-        itemExistente.exercicios = escolhidos.length;
-        itemExistente.anexoId = id;
-      } else {
-        aula.temas.push({
-          id: tema.id, titulo: tema[lingua].titulo, lingua: lingua,
-          partes: partes, exercicios: escolhidos.length, anexoId: id
-        });
-      }
-      delete aula.tema;
-      return salvar();
-    }).then(function () {
-      fecharModal('modal-tema');
-      if ($('#modal-aula').classList.contains('aberto') && aulaEmEdicao &&
-          aulaEmEdicao.id === aula.id) {
-        if (!atualizarBlocoAssunto(aula.id) && $('#lista-temas-aula')) {
-          desenharTemasDaAula($('#lista-temas-aula'), aula, aluno);
-        }
-        if ($('#lista-anexos')) desenharAnexos($('#lista-anexos'), aula);
-      }
-      desenharAgenda();
-      avisar('Material anexado à aula.', 'Abrir', function () {
-        entregarArquivo(nome, blob, tema[lingua].titulo);
-      });
-    }).catch(function () {
-      avisar('Não foi possível gerar o material.');
-    });
-  }
 
   // ================= fechamento =================
 
@@ -14222,8 +13572,6 @@
     }
     return memo[k];
   }
-
-  var avisouMaterialAutoral = false;
 
   var bibVindoDoMaterial = false;
 

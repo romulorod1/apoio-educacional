@@ -5,8 +5,13 @@
  * devolvia a tela vazia ou a lista errada.
  */
 const B = require('../busca.js');
-const ix = require('../banco/busca.json').temas;
-const banco = require('../temas/banco.json');
+/* Desde o B14 (26/10/2026) o índice de busca é montado no aparelho a partir
+ * do índice de assuntos (Busca.indiceDoCatalogo: título mais as palavras-chave
+ * guardadas), porque o banco/busca.json, gerado também do conteúdo dos temas,
+ * saiu com o material. Este teste monta o índice pela MESMA função do app,
+ * para medir a busca que ela tem de verdade. */
+const banco = require('../banco/topicos/matematica.json');
+const ix = B.indiceDoCatalogo(banco.temas);
 
 const tit = {}, serieDe = {};
 banco.temas.forEach(t => { tit[t.id] = t.pt.titulo; serieDe[t.id] = t.serie; });
@@ -111,16 +116,25 @@ conf('"equações com duas incógnitas" acha o tema certo',
 
 // letra solta e número solto não podem ser exigência
 conf('"regra d tres" acha regra de três', primeiro('regra d tres'), 'Regra de três simples');
+/* Era "devolve mais de um": com o conteúdo inteiro no índice, os números
+ * soltos casavam por acaso em vários temas. Desde o B14 a resposta é uma só e
+ * é a certa; o que prova que número solto não é exigência é ela não vir
+ * vazia, porque nenhum título tem 30, 45 e 60. */
 conf('"angulos notaveis 30 45 60" acha trigonometria',
-  achar('angulos notaveis 30 45 60').length > 1, true);
+  /[Tt]rigonometria/.test(primeiro('angulos notaveis 30 45 60')), true);
 
 // ================================================================
 secao('6. Palavra rara pesa mais que palavra comum');
 
+/* Com o índice só de títulos (B14) nenhuma palavra está em todo tema, então a
+ * comparação é entre uma palavra que aparece em vários títulos ("equação") e
+ * uma que aparece em um só ("Pitágoras"). */
 const peso = B.medirRaridade(ix);
-conf('"exemplo" está em todo tema e vale quase nada', peso['exemplo'] < 0.05, true);
-conf('"hipotenusa" é rara e vale muito', peso['hipotenusa'] > 0.7, true);
-conf('e a rara vale mais que a comum', peso['hipotenusa'] > peso['exemplo'] * 10, true);
+const emQuantos = w => ix.filter(r => (' ' + r.t + ' ').indexOf(' ' + w + ' ') >= 0).length;
+conf('"equacao" está em vários títulos', emQuantos('equacao') >= 5, true);
+conf('"pitagora" está em um título só', emQuantos('pitagora'), 1);
+conf('e a rara vale mais que a comum', peso['pitagora'] > peso['equacao'], true);
+conf('"hipotenusa" acha Pitágoras pela tradução', contem('hipotenusa', 'Teorema de Pitágoras'), true);
 
 // ================================================================
 secao('7. Erro de digitação de uma letra');
@@ -147,9 +161,13 @@ conf('letra sozinha não vira busca por prefixo', achar('x').length < 20, true);
 // ================================================================
 secao('9. O ano escolar vira filtro, e não palavra procurada');
 
-conf('"fracao 7 ano" só devolve do 7º',
-  achar('fracao 7 ano').every(x => serieDe[x.id] === '07'), true);
-conf('e devolve alguma coisa', achar('fracao 7 ano').length > 0, true);
+/* Era "fracao 7 ano": o conteúdo dos temas do 7º falava de fração. Com o
+ * índice só de títulos (B14), nenhum título do 7º diz fração, e a regra certa
+ * é a de baixo (procurar no banco todo); o filtro se prova com um assunto que
+ * o título do 7º tem. */
+conf('"equacao 7 ano" só devolve do 7º',
+  achar('equacao 7 ano').every(x => serieDe[x.id] === '07'), true);
+conf('e devolve alguma coisa', achar('equacao 7 ano').length > 0, true);
 conf('"9 ano" sozinho devolve o ano inteiro',
   achar('9 ano').length > 5 && achar('9 ano').every(x => serieDe[x.id] === '09'), true);
 conf('"nono ano" também', achar('nono ano').every(x => serieDe[x.id] === '09'), true);

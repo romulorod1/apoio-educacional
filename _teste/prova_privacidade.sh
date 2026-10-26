@@ -58,7 +58,7 @@ conf "passa por conteudo" "$(printf '%s\n' "$saida" | grep -c 'ok      nenhum ar
 conf "codigo de saida"    "$(codigo_de)" "0"
 
 printf '\n=== 2. nome dentro de arquivo novo: tem que REPROVAR ===\n'
-alvo="figuras/_prova_privacidade_tmp.js"
+alvo="biblioteca/_prova_privacidade_tmp.js"
 sujeira="$sujeira $alvo"
 printf '/* comentario com %s no meio, como ja aconteceu de verdade */\n' "$NOME_FALSO" > "$alvo"
 saida=$(roda)
@@ -68,7 +68,7 @@ conf "codigo de saida reprova" "$(codigo_de)" "1"
 rm -f "$alvo"; sujeira=""
 
 printf '\n=== 3. nome no NOME do arquivo: tem que REPROVAR ===\n'
-alvo="figuras/_${NOME_FALSO}_tmp.js"
+alvo="biblioteca/_${NOME_FALSO}_tmp.js"
 sujeira="$sujeira $alvo"
 printf '/* sem nome nenhum por dentro */\n' > "$alvo"
 saida=$(roda)
@@ -78,7 +78,7 @@ rm -f "$alvo"; sujeira=""
 
 printf '\n=== 4. a linha aprovada continua liberada ===\n'
 # Mesma forma da lista de alunos-semente do app.js, que e publica e aprovada.
-alvo="figuras/_prova_aprovada_tmp.js"
+alvo="biblioteca/_prova_aprovada_tmp.js"
 sujeira="$sujeira $alvo"
 printf "    { nome: '%s', horasJulho: 2, nota: '' },\n" "$NOME_FALSO" > "$alvo"
 saida=$(roda)

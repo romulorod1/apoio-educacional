@@ -145,9 +145,12 @@
     ['ao cubo', [['cubo', 'potencia', 'expoente']]],
     ['dividido por', [['divisao']]],
 
-    // fórmula do 2º grau: o banco fala em delta e discriminante
-    ['bhaskara', [['discriminante', 'delta']]],
-    ['baskara', [['discriminante', 'delta']]],
+    /* Fórmula do 2º grau. O banco falava em delta e discriminante no conteúdo
+     * dos temas; desde o B14 (26/10/2026) o índice de busca tem só os títulos,
+     * e o título é "Equação do 2º grau". A segunda exigência aceita o número
+     * do grau e o nome da função, para "bhaskara" não trazer a de 1º grau. */
+    ['bhaskara', [['equacao', 'quadratica'], ['2', 'quadratica']]],
+    ['baskara', [['equacao', 'quadratica'], ['2', 'quadratica']]],
 
     // o colégio diz análise combinatória, o banco quebrou em três temas
     ['analise combinatoria', [['arranjo', 'permutacao', 'combinacao', 'contagem']]],
@@ -162,8 +165,9 @@
      * entao "sen(a+b)" nao chegava ao tema de identidades. */
     ['fog', [['composta']]],
     ['sen', [['seno']]],
-    ['mmc', [['minimo'], ['multiplo']]],
-    ['mdc', [['maximo'], ['divisor']]],
+    // o título do tema escreve a sigla: "Múltiplos, divisores, MMC e MDC"
+    ['mmc', [['mmc', 'multiplo']]],
+    ['mdc', [['mdc', 'divisor']]],
 
     // nome de sala contra nome de livro
     ['funcao do 1 grau', [['funcao'], ['afim']]],
@@ -186,6 +190,10 @@
     ['soma pela diferenca', [['produto'], ['notavel']]],
 
     ['teorema de tales', [['tales']]],
+    /* Hipotenusa e cateto moravam no conteúdo; nos títulos, o assunto se
+     * chama Teorema de Pitágoras e triângulo retângulo (B14). */
+    ['hipotenusa', [['pitagora', 'retangulo']]],
+    ['cateto', [['pitagora', 'retangulo']]],
     ['regra de 3', [['regra'], ['tres']]],
     ['raiz quadrada', [['raiz']]],
     ['numero negativo', [['inteiro', 'negativo']]],
@@ -236,8 +244,28 @@
     return c;
   }
 
+  /* O índice de busca do aplicativo, a partir do índice de assuntos de
+   * matemática (banco/topicos/matematica.json), desde o B14. O título vira a
+   * lista t, como sempre; as listas r e d chegam prontas no campo `chaves` de
+   * cada assunto (radicais soltos, guardados do índice de 09/2026, quando
+   * vinham do resumo e do conteúdo dos temas, que saíram). Sem elas, a régua
+   * das buscas reais caía de 75 para 58 acertos no topo e de 0 para 17 telas
+   * vazias; com elas, 74 e 5. É a mesma função no app e nos testes, para os
+   * dois medirem a mesma busca. */
+  function indiceDoCatalogo(temas) {
+    var base = montarIndice(temas.map(function (t) {
+      return { id: t.id, serie: t.serie, titulo: t.pt.titulo, resumo: '', enunciados: '', explicacao: '' };
+    }));
+    return base.map(function (r, i) {
+      var c = temas[i].chaves || {};
+      r.r = c.r || '';
+      r.d = c.d || '';
+      return r;
+    });
+  }
+
   /* Constrói o índice a partir dos temas inteiros. Usado pelo gerador do banco
-   * e pelos testes, nunca pelo aplicativo em uso. */
+   * e pelos testes, e pelo indiceDoCatalogo para a lista do título. */
   function montarIndice(temas) {
     return temas.map(function (t) {
       var usado = {};
@@ -678,7 +706,7 @@
 
   return {
     semAcento: semAcento, raiz: raiz, aoSingular: aoSingular, semVerbo: semVerbo,
-    palavrasDe: palavrasDe, montarIndice: montarIndice, procurar: procurar,
+    palavrasDe: palavrasDe, montarIndice: montarIndice, indiceDoCatalogo: indiceDoCatalogo, procurar: procurar,
     ondeAparece: ondeAparece, lerBusca: lerBusca, medirRaridade: medirRaridade,
     umaLetraDeDiferenca: umaLetraDeDiferenca,
     PESO: PESO, ROTULO: ROTULO, VAZIAS: VAZIAS, APELIDOS: APELIDOS, ANOS: ANOS
