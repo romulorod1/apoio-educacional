@@ -384,6 +384,13 @@ roda "salvar --envenenado-escreve-no-pedido"    node "_teste/testa_store_grava_n
 # rejeita no meio tem de deixar o proximo salvar gravar o estado velho.
 roda "salvar --envenenado-nao-rejeita"          node "_teste/testa_store_grava_no_commit.js" --envenenado-nao-rejeita
 roda "salvar --envenenado-nao-rele"             node "_teste/testa_store_grava_no_commit.js" --envenenado-nao-rele
+# B3: e a rejeicao que o salvar devolve e tratada num lugar so. O tablet sem
+# espaco e simulado abortando a transacao de gravacao no IndexedDB: a faixa
+# aparece, a mudanca fica na memoria, "Tentar de novo agora" e a nova tentativa
+# de 15 s gravam, e a rejeicao avisada nao vira erro de pagina. O veneno tira a
+# ligacao do tratamento central, e a falha tem de voltar a ser calada.
+roda "falha de gravacao"                        node "_teste/testa_falha_de_gravacao.js"
+roda "falha --envenenado-sem-tratamento"        node "_teste/testa_falha_de_gravacao.js" --envenenado-sem-tratamento
 
 # FRENTE B (B9): kits.json e exclusoes.json sao aditivos do esquema 1 (CONTRATO
 # 8d). A prova nao le o biblioteca.js: ela IMPORTA um pacote de brinquedo com os

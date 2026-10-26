@@ -1045,13 +1045,106 @@
     return saida;
   }
 
-  function salvar() { return Store.salvar(dbParaGravar()); }
+  /* A FALHA DE GRAVAÇÃO TRATADA NUM LUGAR SÓ (B3).
+   *
+   * Desde que o Store.salvar espera a transação confirmar, ele rejeita de
+   * verdade quando o tablet não consegue gravar (o caso mais provável é falta
+   * de espaço, um QuotaExceededError). Cerca de 40 chamadas faziam
+   * `salvar().then(...)` sem tratar a rejeição: a falha passava calada, e o
+   * que estava na tela não estava no disco.
+   *
+   * Agora o próprio salvar() trata a falha, então toda chamada fica coberta
+   * por construção, sem depender de cada uma lembrar do catch:
+   *   - a promessa devolvida continua REJEITANDO, para quem chama não seguir
+   *     como se tivesse gravado (o "Aula salva." de quem chama não aparece);
+   *   - o dado fica na memória: uma gravação do documento inteiro que falha
+   *     não grava pedaço nenhum, então a memória é a versão mais nova, e é ela
+   *     que a nova tentativa grava;
+   *   - uma faixa fica no alto da tela até uma gravação dar certo, com
+   *     "Tentar de novo agora", e o aplicativo tenta sozinho depois de 15 s e
+   *     de 1 min;
+   *   - a rejeição fica marcada como avisada, e o ouvinte global de promessa
+   *     rejeitada (mais abaixo) não avisa de novo.
+   * Quem precisa de outra coisa na falha (voltar a memória para o disco depois
+   * de uma gravação de várias partes) continua com o próprio catch e o
+   * releDoDisco, que também limpa a pendência. */
+  var falhasAvisadas = (typeof WeakSet === 'function') ? new WeakSet() : null;
+  var gravacaoPendente = false;
+  var ATRASOS_NOVA_TENTATIVA = [15000, 60000];
+  var tempoNovaTentativa = null;
+
+  function salvar() {
+    var p = Store.salvar(dbParaGravar());
+    p.then(gravacaoConfirmada, falhaDeGravacao);
+    return p;
+  }
+
+  function gravacaoConfirmada() {
+    if (!gravacaoPendente) return;
+    gravacaoPendente = false;
+    clearTimeout(tempoNovaTentativa);
+    esconderFaixaGravacao();
+  }
+
+  function falhaDeGravacao(erro) {
+    if (erro && typeof erro === 'object' && falhasAvisadas) {
+      try { falhasAvisadas.add(erro); } catch (e) { /* objeto que não aceita: o ouvinte avisa de novo, e só */ }
+    }
+    var primeira = !gravacaoPendente;
+    gravacaoPendente = true;
+    mostrarFaixaGravacao();
+    if (primeira) agendarNovaTentativa(0);
+  }
+
+  function agendarNovaTentativa(i) {
+    clearTimeout(tempoNovaTentativa);
+    if (i >= ATRASOS_NOVA_TENTATIVA.length) return;
+    tempoNovaTentativa = setTimeout(function () {
+      if (!gravacaoPendente) return;
+      salvar().then(null, function () { agendarNovaTentativa(i + 1); });
+    }, ATRASOS_NOVA_TENTATIVA[i]);
+  }
+
+  function mostrarFaixaGravacao() {
+    var faixa = $('#faixa-gravacao');
+    if (!faixa) {
+      faixa = el('div', { id: 'faixa-gravacao', class: 'faixa-gravacao', role: 'alert' }, [
+        el('span', { class: 'cresce', texto: 'Não consegui guardar a última mudança no tablet. ' +
+          'Ele pode estar sem espaço. O que você fez continua na tela, e eu tento guardar de novo sozinho.' }),
+        el('button', {
+          type: 'button', class: 'btn pequeno', id: 'faixa-gravacao-tentar', texto: 'Tentar de novo agora',
+          aoClick: function () { salvar().then(null, function () { /* a faixa continua */ }); }
+        })
+      ]);
+      document.body.appendChild(faixa);
+    }
+    faixa.hidden = false;
+  }
+
+  function esconderFaixaGravacao() {
+    var faixa = $('#faixa-gravacao');
+    if (faixa) faixa.hidden = true;
+  }
+
+  /* O OUVINTE GLOBAL. A rejeição que o salvar() já avisou passa calada aqui
+   * (preventDefault), porque a faixa já está na tela. Qualquer outra promessa
+   * rejeitada sem tratamento vira uma frase para ela e uma linha no console, e
+   * o evento NÃO é cancelado: os testes de navegador contam esses erros, e
+   * cancelar esconderia deles um defeito de verdade. */
+  window.addEventListener('unhandledrejection', function (ev) {
+    var r = ev.reason;
+    if (r && typeof r === 'object' && falhasAvisadas && falhasAvisadas.has(r)) {
+      ev.preventDefault();
+      return;
+    }
+    if (typeof console !== 'undefined' && console.error) console.error('promessa rejeitada sem tratamento', r);
+    avisar('Uma ação não terminou como devia. Se o que você fez não aparecer, tente de novo.');
+  });
 
   /* DESDE QUE O SALVAR ESPERA A TRANSAÇÃO CONFIRMAR, ELE PODE REJEITAR, e a
    * tela não pode ficar muda nem mostrar a mensagem técnica do navegador. A
    * causa mais provável no tablet dela é falta de espaço, e é o que as frases
-   * dizem. Os outros cerca de 40 `salvar().then` sem `catch` ficam para um PR
-   * próprio.
+   * dizem.
    *
    * A MEMÓRIA VOLTA A SER O DISCO. Quando uma gravação de várias partes
    * rejeita no meio (restaurar uma cópia, voltar a um ponto do histórico,
@@ -1063,6 +1156,11 @@
   function releDoDisco(mensagem) {
     return Store.carregar().then(function (lido) {
       db = lido || Store.bancoVazio();
+      /* A memória voltou a ser o disco: não há mais mudança pendente para a
+       * faixa prometer guardar. */
+      gravacaoPendente = false;
+      clearTimeout(tempoNovaTentativa);
+      esconderFaixaGravacao();
     }).catch(function () { /* nem a leitura deu: fica o que há, e o aviso diz */ }).then(function () {
       mapeamentoEmEdicao = null;
       fecharTudo();

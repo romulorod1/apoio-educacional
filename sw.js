@@ -82,8 +82,10 @@
  * (B14) tira o material autoral: saem da lista os seis arquivos de figuras/, o
  * banco/indice.json, o banco/busca.json e o banco/portugues/indice.json, e
  * entra o banco/topicos/matematica.json, o índice de assuntos que ficou
- * (app.js e index.html). */
-var CACHE = 'apoio-educacional-v46';
+ * (app.js e index.html). O v47 (B3) trata a falha de gravação num lugar só:
+ * a faixa no alto quando o tablet não consegue guardar e a nova tentativa
+ * (app.js e styles.css), com a lista igual. */
+var CACHE = 'apoio-educacional-v47';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
