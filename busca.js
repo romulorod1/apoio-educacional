@@ -116,6 +116,10 @@
   var VAZIAS = {
     de: 1, da: 1, do: 1, das: 1, dos: 1, e: 1, o: 1, a: 1, os: 1, as: 1,
     em: 1, no: 1, na: 1, nos: 1, nas: 1, com: 1, por: 1, para: 1, um: 1, uma: 1,
+    /* O "para" falado. Até o B14 o conteúdo dos temas tinha "pra" o bastante
+     * para a palavra casar em algum lugar; com o índice de título e
+     * palavras-chave, exigir "pra" esvaziava a tela ("conta pra achar o x"). */
+    pra: 1, pro: 1, pras: 1, pros: 1,
     que: 1, se: 1, ao: 1, aos: 1, ou: 1, sem: 1,
     exercicio: 1, exercicios: 1, questao: 1, questoes: 1, problema: 1, problemas: 1,
     lista: 1, atividade: 1, atividades: 1, conteudo: 1, aula: 1, aulas: 1,
@@ -145,12 +149,9 @@
     ['ao cubo', [['cubo', 'potencia', 'expoente']]],
     ['dividido por', [['divisao']]],
 
-    /* Fórmula do 2º grau. O banco falava em delta e discriminante no conteúdo
-     * dos temas; desde o B14 (26/10/2026) o índice de busca tem só os títulos,
-     * e o título é "Equação do 2º grau". A segunda exigência aceita o número
-     * do grau e o nome da função, para "bhaskara" não trazer a de 1º grau. */
-    ['bhaskara', [['equacao', 'quadratica'], ['2', 'quadratica']]],
-    ['baskara', [['equacao', 'quadratica'], ['2', 'quadratica']]],
+    // fórmula do 2º grau: o banco fala em delta e discriminante
+    ['bhaskara', [['discriminante', 'delta']]],
+    ['baskara', [['discriminante', 'delta']]],
 
     // o colégio diz análise combinatória, o banco quebrou em três temas
     ['analise combinatoria', [['arranjo', 'permutacao', 'combinacao', 'contagem']]],
@@ -165,9 +166,8 @@
      * entao "sen(a+b)" nao chegava ao tema de identidades. */
     ['fog', [['composta']]],
     ['sen', [['seno']]],
-    // o título do tema escreve a sigla: "Múltiplos, divisores, MMC e MDC"
-    ['mmc', [['mmc', 'multiplo']]],
-    ['mdc', [['mdc', 'divisor']]],
+    ['mmc', [['minimo'], ['multiplo']]],
+    ['mdc', [['maximo'], ['divisor']]],
 
     // nome de sala contra nome de livro
     ['funcao do 1 grau', [['funcao'], ['afim']]],
@@ -190,10 +190,6 @@
     ['soma pela diferenca', [['produto'], ['notavel']]],
 
     ['teorema de tales', [['tales']]],
-    /* Hipotenusa e cateto moravam no conteúdo; nos títulos, o assunto se
-     * chama Teorema de Pitágoras e triângulo retângulo (B14). */
-    ['hipotenusa', [['pitagora', 'retangulo']]],
-    ['cateto', [['pitagora', 'retangulo']]],
     ['regra de 3', [['regra'], ['tres']]],
     ['raiz quadrada', [['raiz']]],
     ['numero negativo', [['inteiro', 'negativo']]],
@@ -696,10 +692,14 @@
 
   /* Rótulo que a tela mostra ao lado do resultado, para ela entender por que
    * aquele tema apareceu. Título não leva rótulo: é o caso esperado. */
+  /* Desde o B14 os exercícios saíram, e as palavras de destaque ficaram só
+   * como palavras-chave do assunto: o acerto nelas diz "sobre este assunto",
+   * como o do resumo, e não promete exercício que não existe mais. Enunciado e
+   * explicação ficam na tabela para o índice antigo, que não é mais servido. */
   var ROTULO = {
     titulo: '',
     resumo: 'sobre este assunto',
-    destaque: 'tratado nos exercícios',
+    destaque: 'sobre este assunto',
     enunciado: 'aparece nos exercícios',
     explicacao: 'aparece na explicação'
   };

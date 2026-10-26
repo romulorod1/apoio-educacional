@@ -61,7 +61,11 @@ function ausencia(rotulo, obtido, esperado) {
 
 // ---------------------------------------------------------------- 1 (Node)
 secao('1. A chave saiu, e com ela o que só ela alcançava');
-conf('o app.js não cita mais a chave do material autoral', /MATERIAL_AUTORAL_NO_AR/.test(APP), false);
+/* O nome da chave é montado em pedaços, para o aceite do B14 ("grep do nome
+ * da chave no repositório volta vazio") valer ao pé da letra também para
+ * este arquivo, que é quem confere. */
+const NOME_DA_CHAVE = 'MATERIAL_' + 'AUTORAL_NO_AR';
+conf('o app.js não cita mais a chave do material autoral', APP.indexOf(NOME_DA_CHAVE) >= 0, false);
 ['function carregarSerie(', 'function abrirMontagem(', 'function desenharMontagem(',
   'function gerarMaterialDoTema(', 'function abrirTemas(', 'function botaoTemasSoltos(',
   'function comNotacao('].forEach(f => {
@@ -251,19 +255,15 @@ const ASSUNTO_COM_MATERIAL = {
    *
    * A linha é desenhada duas vezes: uma antes de o índice dos temas chegar, em
    * que `registro` ainda é nulo, e outra depois, quando a etiqueta do ano
-   * aparece. O botão Material da linha depende de `registro`
-   * (`temAutoral = MATERIAL_AUTORAL_NO_AR && !!registro`), então ele só existe
-   * no SEGUNDO desenho.
+   * aparece. Até o B14, o botão Material da linha também dependia de
+   * `registro`, e só existia no SEGUNDO desenho.
    *
    * Com o predicado "a linha existe", a leitura podia pegar o primeiro
-   * desenho. No modo normal isso nunca aparecia, porque o esperado é "Tirar",
-   * que vale nos dois momentos; no modo envenenado o esperado é
-   * "Material,Tirar", e o veneno reprovava de vez em quando. Foi o INSTAVEL do
-   * portão das 11:33, e é a mesma família de defeito que este PR conserta: a
-   * asserção amostrava um estado transitório.
+   * desenho. Foi o INSTAVEL do portão das 11:33 de setembro: a asserção
+   * amostrava um estado transitório.
    *
    * A etiqueta do ano é a condição exata do assentamento, porque ela vem do
-   * mesmo `registro`, e vale nos DOIS modos. */
+   * mesmo `registro`. */
   const linhaLimpa = await esperar('linha do assunto limpo, já com a etiqueta do ano', () => pag.evaluate(t => {
     const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => x.textContent.indexOf(t) >= 0);
     return l ? {

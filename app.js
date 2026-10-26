@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.28.0';
+  var VERSAO = '1.29.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -63,6 +63,17 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.29.0',
+      itens: [
+        'Ao escolher o assunto da aula, a lista de Matemática ficou mais enxuta: cada assunto ' +
+          'mostra o título, o ano, a duração e a dificuldade. O material antigo dos temas, que já ' +
+          'não aparecia desde setembro, saiu do aplicativo. O material que você já anexou a uma ' +
+          'aula continua abrindo normalmente.',
+        'A busca de assuntos passou a entender o jeito falado: "parábola pra cima ou pra baixo" ' +
+          'acha a função quadrática.'
+      ]
+    },
     {
       versao: '1.28.0',
       titulo: 'Novidades do seu aplicativo',
@@ -7076,8 +7087,8 @@
         var filhos = [chk, el('span', { class: 'cresce', texto: item.rotulo })];
         /* A lacuna monta a trilha: a sequência de assuntos que precisa vir
          * antes daquele em que o aluno travou, na ordem. Continua sendo UM
-         * botão por lacuna, e o caminho antigo não some: dentro da trilha há
-         * "Ver os temas soltos", que abre a mesma lista de sempre. */
+         * botão por lacuna. (O "Ver os temas soltos" de dentro da trilha saiu
+         * no B14, com o material autoral a que ele levava.) */
         if (item.busca || (item.alvos && item.alvos.length)) {
           filhos.push(el('button', {
             type: 'button', class: 'btn pequeno', texto: 'trilha',
@@ -7936,8 +7947,7 @@
         el('strong', { texto: 'Este assunto não depende de nenhum outro no banco. ' }),
         document.createTextNode('Não há escada para montar até ele, e inventar uma seria pior ' +
           'do que não oferecer nenhuma. Dá para atacar direto: guardando assim mesmo, ele ' +
-          'aparece como próximo passo ao abrir a aula. Se preferir escolher à mão, veja os ' +
-          'temas soltos aqui embaixo.')
+          'aparece como próximo passo ao abrir a aula.')
       ]));
     }
 

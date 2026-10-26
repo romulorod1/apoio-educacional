@@ -13,6 +13,20 @@ const H = require('./_bib_navegador');
 const amb = H.criarAmbiente(8829, 'nath_t03_novidades');
 const { conf, secao, esperar, pausa } = H;
 
+/* A versão e a entrada de NOVIDADES dela saem do próprio app.js, e não de
+ * um número escrito aqui: cravar '1.28.0' fazia este teste reprovar a cada
+ * release (aconteceu na 1.29.0, B14). */
+const APP_TEXTO = require('fs').readFileSync(require('path').join(H.RAIZ, 'app.js'), 'utf8');
+const VERSAO = (APP_TEXTO.match(/var VERSAO = '([^']+)'/) || [])[1];
+const ENTRADA = (() => {
+  const i = APP_TEXTO.indexOf("versao: '" + VERSAO + "'");
+  return i < 0 ? '' : APP_TEXTO.slice(i, APP_TEXTO.indexOf('\n    }', i));
+})();
+const ENTRADA_TEM_SLIDES = /slides:\s*\[/.test(ENTRADA);
+/* Um pedaço do primeiro item, para conferir que a janela mostra a entrada
+ * da versão atual: as primeiras palavras do primeiro texto entre aspas. */
+const TRECHO_DA_ENTRADA = ((ENTRADA.match(/'([^'\n]{20,})'/) || [])[1] || '').slice(0, 30);
+
 async function obterBanco(pag) {
   return pag.evaluate(() => new Promise(resolve => {
     const req = indexedDB.open('apoio-educacional');
@@ -78,7 +92,8 @@ async function conteudoModal(pag) {
 
     const bancoNovo = await obterBanco(pag);
     conf('perfil novo gravou versaoVista no banco', !!(bancoNovo && bancoNovo.ajustes && bancoNovo.ajustes.versaoVista), true);
-    conf('versaoVista do perfil novo é a versão atual', bancoNovo.ajustes.versaoVista, '1.28.0');
+    conf('li a versão e a entrada dela no app.js', !!VERSAO && !!ENTRADA && TRECHO_DA_ENTRADA.length >= 20, true);
+    conf('versaoVista do perfil novo é a versão atual', bancoNovo.ajustes.versaoVista, VERSAO);
 
     secao('2. Perfil atualizando de versão anterior (versaoVista = 1.27.0)');
     await gravarVersaoVista(pag, '1.27.0');
@@ -95,32 +110,34 @@ async function conteudoModal(pag) {
     await pausa(1500);
 
     const abertoAtualizacao = await modalAberto(pag);
-    conf('perfil atualizando para 1.28.0 abre carrossel de novidades', abertoAtualizacao, true);
+    conf('perfil atualizando para ' + VERSAO + ' abre a janela de novidades', abertoAtualizacao, true);
 
     const textoModal = await conteudoModal(pag);
     conf('modal não contém novidade requentada de Português (1.18.0)', textoModal.indexOf('Português') === -1, true);
-    conf('modal contém novidade de 1.28.0 sobre fechamento e listas',
-      textoModal.indexOf('alfabética') !== -1 || textoModal.indexOf('Fechamento') !== -1, true);
+    conf('modal contém a novidade de ' + VERSAO, textoModal.indexOf(TRECHO_DA_ENTRADA) !== -1, true);
 
-    // Navega no carrossel: avança slide
-    await pag.click('#entendi-novidades');
-    await pausa(300);
-    const textoBotaoVoltar = await pag.evaluate(() => {
-      const b = document.querySelector('#btn-carrossel-voltar');
-      return b ? window.getComputedStyle(b).display : 'none';
-    });
-    conf('botão Voltar fica visível a partir do slide 2', textoBotaoVoltar !== 'none', true);
-
-    // Fecha o modal pelo botão de fechar do cabeçalho
-    await pag.click('#modal-novidades [data-fechar]');
+    if (ENTRADA_TEM_SLIDES) {
+      // Carrossel: o Entendi avança, e o Voltar aparece a partir do slide 2
+      await pag.click('#entendi-novidades');
+      await pausa(300);
+      const textoBotaoVoltar = await pag.evaluate(() => {
+        const b = document.querySelector('#btn-carrossel-voltar');
+        return b ? window.getComputedStyle(b).display : 'none';
+      });
+      conf('botão Voltar fica visível a partir do slide 2', textoBotaoVoltar !== 'none', true);
+      await pag.click('#modal-novidades [data-fechar]');
+    } else {
+      // Lista: o Entendi fecha e grava a versão vista
+      await pag.click('#entendi-novidades');
+    }
     await pausa(400);
     const abertoAposFechar = await modalAberto(pag);
     conf('modal fechou com sucesso', abertoAposFechar, false);
 
     const bancoDepois = await obterBanco(pag);
-    conf('versaoVista foi atualizada para 1.28.0 no banco', bancoDepois.ajustes.versaoVista, '1.28.0');
+    conf('versaoVista foi atualizada para ' + VERSAO + ' no banco', bancoDepois.ajustes.versaoVista, VERSAO);
 
-    secao('3. Perfil já na versão atual (versaoVista = 1.28.0)');
+    secao('3. Perfil já na versão atual (versaoVista = ' + VERSAO + ')');
     await pag.reload({ waitUntil: 'networkidle0' });
     await pausa(1500);
     const abertoAtual = await modalAberto(pag);

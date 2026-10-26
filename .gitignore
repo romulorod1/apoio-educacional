@@ -22,24 +22,12 @@ _teste/_modelo.html
 # por e-mail ou Drive, e ela anexa na aula pelo proprio aplicativo.
 _experimento/
 
-# retrato do banco antes da reescrita da notacao, para poder comparar e voltar
-temas/_antes/
-_teste/_pdf_antes.js
-
 # cache do Python
 __pycache__/
 *.pyc
 
 # retratos de seguranca dos arquivos criticos, so locais
 .retratos/
-
-# evidencia gerada pelas provas do kit de figuras: pesada, regeravel, e nao e codigo
-figuras/*.pdf
-figuras/*.png
-figuras/*_clips.json
-figuras/_tema_*.json
-# PDF de prova gerado na raiz pelo testa_formula
-/_prova_formula.pdf
 
 # a saida dos testes que reprovaram no portao: evidencia local, nunca commit
 _falhas_do_portao/

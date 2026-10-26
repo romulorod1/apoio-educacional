@@ -5,9 +5,10 @@
 
 /* São dois caches, e é essa divisão que faz a atualização sair barata:
  * CACHE guarda os ARQUIVOS do aplicativo e muda de nome a cada mudança da lista;
- * BAIXADOS guarda o que só entra durante o uso, que hoje são as séries de temas
- * (banco/serie-*.json, uma por vez, na primeira vez que a série é aberta), tem
- * nome fixo, e o activate nunca o apaga.
+ * BAIXADOS guarda o que só entra durante o uso (até o B14, as séries de temas,
+ * banco/serie-*.json, que saíram com o material autoral e ficam esquecidas lá
+ * nos tablets que já as baixaram; o próximo inquilino previsto é o leitor de
+ * PDF do C14), tem nome fixo, e o activate nunca o apaga.
  *
  * Antes havia um cache só e o activate apagava todo cache cujo nome não fosse o
  * novo. As séries moram ali e não estão em ARQUIVOS de propósito, então o
@@ -119,10 +120,10 @@ var ARQUIVOS = [
   /* Os TREZE arquivos dos assuntos das outras matérias. O assunto da aula é
    * registro, e não atalho para material: ela precisa poder escolher o assunto
    * na casa da família, sem sinal, do mesmo jeito que abre a lista de temas.
-   * Somam 99 KB, menos que os 240 KB do banco/busca.json que já está aqui.
+   * Somam 99 KB.
    *
-   * Ficam no CACHE, e não no BAIXADOS: BAIXADOS é para os banco/serie-*.json,
-   * que pesam de 130 a 280 KB cada e só entram quando a série é aberta.
+   * Ficam no CACHE, e não no BAIXADOS: BAIXADOS é para o que só entra durante
+   * o uso (até o B14, as séries de temas, que saíram com o material autoral).
    *
    * São treze chances novas de a instalação falhar numa conexão ruim, porque a
    * instalação falha inteira de propósito quando um arquivo não baixa (veja o

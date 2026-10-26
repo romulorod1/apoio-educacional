@@ -1,7 +1,7 @@
 {
   "formato": "registro-de-ids-de-topicos",
   "versao": 1,
-  "aviso": "Gerado por temas/_ferramentas/emite_ids_topicos.js. Id emitido nunca e reusado nem renumerado; titulo que sai da lista fica aposentado e o numero dele nao volta. Nao edite a mao.",
+  "aviso": "Gerado por _teste/emite_ids_topicos.js. Id emitido nunca e reusado nem renumerado; titulo que sai da lista fica aposentado e o numero dele nao volta. Nao edite a mao.",
   "ids": {
     "POR02-T01": {"disciplina":"portugues","grupo":"02","titulo":"Sílabas simples"},
     "POR02-T02": {"disciplina":"portugues","grupo":"02","titulo":"Sílabas complexas"},

@@ -153,9 +153,8 @@ alunos fica em zero e um aviso aparece na tela de alunos.
 | `busca.js` | Busca de assunto, sem acento e sem caixa |
 | `app.js` | Interface e ligação entre as partes |
 | `sw.js` | Modo offline |
-| `banco/` | Índice de assuntos (`banco/topicos/`) e banco de temas em JSON |
+| `banco/topicos/` | Índice de assuntos: um arquivo por matéria, e o `matematica.json` com os 148 assuntos de matemática (o LEIA-ME da pasta explica os dois formatos) |
 | `biblioteca/` | Gerador dos pacotes da biblioteca (Python); os pacotes moram no Drive, nunca aqui |
-| `temas/`, `figuras/`, `fontes/` | Material autoral gerado e as ferramentas dele; saem no item B14 |
 | `_teste/` | Testes, portão e ferramentas do processo |
 
 `core.js` e `pdf.js` não dependem de navegador, então rodam no Node e são testados direto.
