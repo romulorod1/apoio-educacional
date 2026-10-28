@@ -84,8 +84,10 @@
  * entra o banco/topicos/matematica.json, o índice de assuntos que ficou
  * (app.js e index.html). O v47 (B3) trata a falha de gravação num lugar só:
  * a faixa no alto quando o tablet não consegue guardar e a nova tentativa
- * (app.js e styles.css), com a lista igual. */
-var CACHE = 'apoio-educacional-v47';
+ * (app.js e styles.css), com a lista igual. O v48 (B3, segunda parte) não deixa
+ * o Atualizar nem uma troca de dados que não gravou nada levarem o que a faixa
+ * ainda não guardou (app.js e store.js), com a lista igual. */
+var CACHE = 'apoio-educacional-v48';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
