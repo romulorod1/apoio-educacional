@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.29.2';
+  var VERSAO = '1.30.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -35,6 +35,21 @@
     var faixa = document.querySelector('#aviso-banco-bloqueado');
     if (faixa) faixa.remove();
   };
+  /* A OUTRA PONTA (C2a): esta janela estava aberta quando outra, com uma
+   * versão mais nova, subiu o banco. A conexão desta foi fechada para não
+   * travar a outra, e o código desta é de antes: ela avisa e não deixa
+   * trabalhar em cima de um banco que não abre mais. */
+  self.aoBancoTrocado = function () {
+    if (document.querySelector('#aviso-banco-trocado')) return;
+    var faixa = document.createElement('div');
+    faixa.id = 'aviso-banco-trocado';
+    faixa.className = 'faixa-aviso';
+    faixa.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;padding:32px;' +
+      'background:rgba(255,255,255,0.97);font-size:18px';
+    faixa.textContent = 'O aplicativo foi atualizado em outra janela. Feche esta janela e abra o aplicativo de novo. ' +
+      'O que já estava guardado continua lá.';
+    (document.body || document.documentElement).appendChild(faixa);
+  };
   self.aoBancoBloqueado = function () {
     if (document.querySelector('#aviso-banco-bloqueado')) return;
     var faixa = document.createElement('div');
@@ -63,6 +78,17 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.30.0',
+      itens: [
+        'Minhas listas: no fim do Preparar aula, toque em "Salvar esta seleção como lista", dê um nome e, ' +
+          'se quiser, um nível (Base, Regular ou Aprofundamento).',
+        'Na Biblioteca, a aba Minhas listas mostra cada lista com o assunto, o tempo e com quem você já usou. ' +
+          'Dá para preparar a aula com ela, editar, duplicar e apagar.',
+        'O que o aplicativo guardava sozinho quando você trocava o material agora aparece ali também, em ' +
+          '"Guardadas pelo aplicativo". Dê um nome para guardar de vez.'
+      ]
+    },
     {
       versao: '1.29.2',
       itens: [
@@ -1530,6 +1556,15 @@
       setTimeout(verificarViradaAnualAutomatica, 1400);
       registrarServiceWorker();
     }).catch(function (e) {
+      /* O banco é de uma versão mais nova do aplicativo (C2a): a frase diz o
+       * que fazer, e que nada foi perdido, em vez da mensagem técnica. */
+      if (e && e.versaoNova) {
+        document.body.innerHTML = '<div style="padding:32px;font-family:sans-serif" id="aviso-versao-nova">' +
+          '<h2>Esta janela está com uma versão anterior do aplicativo</h2>' +
+          '<p>Os seus dados já foram abertos por uma versão mais nova. Feche o aplicativo e abra de novo ' +
+          'para atualizar. Nada foi perdido.</p></div>';
+        return;
+      }
       document.body.innerHTML = '<div style="padding:32px;font-family:sans-serif">' +
         '<h2>Não foi possível abrir os dados</h2><p>' + String(e && e.message || e) + '</p></div>';
     });
@@ -12594,7 +12629,8 @@
    * caminho, para a próxima visita não desenhar de novo. */
   var bib = null;
   var bibPromessa = null;
-  var bibNav = { serie: null, modulo: null, aula: null };
+  // minhas: null na navegação por série; {} na aba Minhas listas; { editar: id } no editor (C2a)
+  var bibNav = { serie: null, modulo: null, aula: null, minhas: null };
   var bibTermo = '';
   var bibObservador = null;
   var bibFila = [];
@@ -12829,8 +12865,11 @@
        * primeiro deles com estado que a linha seguinte ainda ia corrigir.
        * Achado por uma lente cega, e é a mesma moeda que esta frente gastou
        * para economizar um desenho nos três caminhos que ela mediu. */
-      desenharCarrinho();
-      desenharCorpoBiblioteca();
+      // Minhas listas (C2a) são lidas uma vez, antes do primeiro desenho
+      return (minhasListasLidas ? Promise.resolve() : carregarMinhasListas()).then(function () {
+        desenharCarrinho();
+        desenharCorpoBiblioteca();
+      });
     }).catch(function () {
       corpo.innerHTML = '';
       corpo.appendChild(el('div', { class: 'faixa-aviso', texto: 'Não consegui abrir a biblioteca guardada no tablet. Feche e abra o aplicativo.' }));
@@ -12842,6 +12881,7 @@
     pararMiniaturas();
     corpo.innerHTML = '';
     if (bibTermo.trim()) { desenharBuscaBiblioteca(corpo, bibTermo.trim()); return; }
+    if (bibNav.minhas) { desenharMinhasListas(corpo); return; }
     var mod = bibNav.modulo ? bib.modulos[bibNav.modulo] : null;
     if (mod && bibNav.aula) {
       if (bibNav.aula.tipo === 'teoria') {
@@ -12861,6 +12901,9 @@
   }
 
   function irNaBiblioteca(nav) {
+    // entrar num módulo ou numa série sai de Minhas listas
+    if (nav.minhas !== undefined) bibNav.minhas = nav.minhas;
+    else if (nav.modulo || nav.serie) bibNav.minhas = null;
     bibNav.modulo = nav.modulo === undefined ? bibNav.modulo : nav.modulo;
     bibNav.aula = nav.aula === undefined ? bibNav.aula : nav.aula;
     if (nav.serie) bibNav.serie = nav.serie;
@@ -12902,6 +12945,7 @@
   }
 
   function desenharModulosDaSerie(corpo) {
+    corpo.appendChild(abasDaBiblioteca('serie'));
     if (bib.listaSeries.length > 1) {
       var chips = el('div', { class: 'chips-filtro bib-series', role: 'tablist' });
       bib.listaSeries.forEach(function (s) {
@@ -13330,11 +13374,16 @@
     if (ehListaPronta(sel)) return true;
     var l = selecoesAnteriores();
     if (l.some(function (x) { return mesmaLista(x, sel); })) return true;
+    // já é uma das Minhas listas (C2a): não há o que guardar de novo
+    if (minhasListas.some(function (x) { return mesmaLista(x, sel); })) return true;
     var lp = lpEmEdicao() ? listaProntaPorId(lpEmEdicao()) : null;
     var daLista = lp && sel.itens.some(function (id) { return lp.minutosDe[id] !== undefined; });
     l.unshift({ itens: sel.itens.slice(), paginas: sel.paginas.slice(), quando: Date.now(),
       lista: daLista ? lp.id : null });
-    return gravarSelecoesAnteriores(l.slice(0, 3));
+    if (!gravarSelecoesAnteriores(l.slice(0, 3))) return false;
+    // guardado no diário; a cópia para Minhas listas vem logo depois
+    espelharAnteriores();
+    return true;
   }
   /* O que dela ainda existe na biblioteca: série removida ou versão nova sem o
    * exercício não oferece carregar o que não volta. */
@@ -13352,55 +13401,463 @@
     if (mesmoDia(d, ontem)) return 'ontem às ' + hora;
     return 'em ' + Core.pad2(d.getDate()) + '/' + Core.pad2(d.getMonth() + 1) + ' às ' + hora;
   }
-  function descricaoDaSelecao(x) {
-    var v = validaDaSelecao(x);
-    var n = (x.itens || []).length, m = (x.paginas || []).length;
-    var o_que = [n ? plural(n, 'exercício', 'exercícios') : '', m ? plural(m, 'página de teoria', 'páginas de teoria') : '']
-      .filter(Boolean).join(' e ');
-    var base = o_que + ', guardada ' + quandoDaSelecao(x.quando);
-    if (!v.itens.length && !v.paginas.length) return { texto: base + ': exercícios que não estão mais na biblioteca', vazia: true };
-    if (v.faltam) return { texto: base + ' (' + plural(v.faltam, 'não está mais na biblioteca', 'não estão mais na biblioteca') + ')', vazia: false };
-    return { texto: base, vazia: false };
+  /* ================= Minhas listas (C2a) =================
+   *
+   * O pedido dela de 23/09: montar uma vez ("quadriláteros, alunos PH"),
+   * guardar com nome e reusar com outro aluno, sem montar a cada aula. As
+   * listas dela moram no depósito biblioteca_listas (store.js), entram na
+   * cópia de segurança e saem no "apagar tudo".
+   *
+   * DOIS JEITOS DE UMA LISTA NASCER, e a tela separa os dois:
+   * - ela dá nome ("Salvar esta seleção como lista", no Preparar aula, ou
+   *   "Dar nome" numa guardada pelo aplicativo): fica até ela apagar;
+   * - o aplicativo guarda sozinho o que estava marcado quando o material é
+   *   trocado (o que antes se chamava "Seleções anteriores"): ficam as três
+   *   mais novas, sem nome, e a quarta empurra a mais velha para fora.
+   *
+   * A GUARDA AO TROCAR CONTINUA SÍNCRONA. "Quem troca o material não troca sem
+   * ter guardado" foi conquistado porta por porta, e o IndexedDB responde
+   * depois. Então o `guardarNasAnteriores` continua escrevendo primeiro no
+   * localStorage, que agora é um DIÁRIO: logo depois, `espelharAnteriores`
+   * copia cada entrada para o depósito como lista guardada pelo aplicativo, e
+   * só tira do diário o que já está no depósito. O mesmo espelho, na abertura
+   * da Biblioteca, é a migração das seleções que o tablet já tinha. Enquanto
+   * uma entrada não foi espelhada, a tela a mostra do diário mesmo. */
+  var minhasListas = [];
+  var minhasListasLidas = false;
+  var usoDasListas = null;
+  var filaEspelho = Promise.resolve();
+  var MAX_AUTOMATICAS = 3;
+  var NIVEIS_DA_LISTA = [['base', 'Base'], ['regular', 'Regular'], ['aprofundamento', 'Aprofundamento']];
+  var minhaEmEdicao = null;
+
+  function listaMinhaValida(x) {
+    return !!x && typeof x.id === 'string' && x.id.length > 0 &&
+      selecaoValida({ itens: x.itens, paginas: x.paginas || [], quando: x.criadaEm });
   }
-  /* Carregar uma seleção guardada: o material de agora entra pela regra, a
-   * guardada NÃO sai, e se ela era uma lista pronta mexida, o vínculo volta. */
-  function carregarSelecaoAnterior(x) {
-    var v = validaDaSelecao(x);
-    if (!v.itens.length && !v.paginas.length) return;
+  function nomeDoNivel(nivel) {
+    var n = NIVEIS_DA_LISTA.filter(function (x) { return x[0] === nivel; })[0];
+    return n ? n[1] : '';
+  }
+  function maisNovaPrimeiro(a, b) { return (b.editadaEm || b.criadaEm || 0) - (a.editadaEm || a.criadaEm || 0); }
+  function novoIdDeLista() { return 'lista-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7); }
+
+  function carregarMinhasListas() {
+    return Store.listasDaBiblioteca().then(function (l) {
+      minhasListas = (l || []).filter(listaMinhaValida);
+    }).catch(function () { /* fica o que há na memória; o diário continua de pé */ }).then(function () {
+      minhasListasLidas = true;
+      return espelharAnteriores();
+    });
+  }
+
+  function espelharAnteriores() {
+    filaEspelho = filaEspelho.then(espelharUmaVez, espelharUmaVez);
+    return filaEspelho;
+  }
+  function espelharUmaVez() {
+    if (!minhasListasLidas) return null;
+    var novas = selecoesAnteriores().filter(function (x) {
+      return !minhasListas.some(function (l) { return mesmaLista(l, x); });
+    }).map(function (x) {
+      return { id: 'auto-' + x.quando, titulo: null, nivel: null, itens: x.itens.slice(), paginas: x.paginas.slice(),
+        origem: x.lista, automatica: true, criadaEm: x.quando, editadaEm: x.quando };
+    });
+    if (!novas.length) return null;
+    return Promise.all(novas.map(Store.gravarListaBiblioteca)).then(function () {
+      novas.forEach(function (n) { minhasListas.push(n); });
+      var sobram = minhasListas.filter(function (l) { return l.automatica; }).sort(maisNovaPrimeiro).slice(MAX_AUTOMATICAS);
+      return Promise.all(sobram.map(function (l) { return Store.apagarListaBiblioteca(l.id); })).then(function () {
+        minhasListas = minhasListas.filter(function (l) { return sobram.indexOf(l) < 0; });
+      });
+    }).then(function () {
+      // só sai do diário o que já está no depósito
+      gravarSelecoesAnteriores(selecoesAnteriores().filter(function (x) {
+        return !minhasListas.some(function (l) { return mesmaLista(l, x); });
+      }));
+    }).catch(function () { /* fica no diário; a próxima abertura tenta de novo */ });
+  }
+
+  /* O que a tela mostra: as do depósito e as do diário ainda não espelhadas.
+   * As dela pela mais recente mexida; as do aplicativo, as três mais novas. */
+  function listasParaMostrar() {
+    var doDiario = selecoesAnteriores().filter(function (x) {
+      return !minhasListas.some(function (l) { return mesmaLista(l, x); });
+    }).map(function (x) {
+      return { id: 'auto-' + x.quando, titulo: null, nivel: null, itens: x.itens, paginas: x.paginas,
+        origem: x.lista, automatica: true, criadaEm: x.quando, editadaEm: x.quando, soNoDiario: true };
+    });
+    var todas = minhasListas.concat(doDiario);
+    return {
+      dela: todas.filter(function (l) { return !l.automatica; }).sort(maisNovaPrimeiro),
+      doAplicativo: todas.filter(function (l) { return l.automatica; }).sort(maisNovaPrimeiro).slice(0, MAX_AUTOMATICAS)
+    };
+  }
+  function quantasMinhasListas() {
+    var t = listasParaMostrar();
+    return t.dela.length + t.doAplicativo.length;
+  }
+  /* A lista dela que é, exatamente, o material de agora (mesmos itens e
+   * páginas, na mesma ordem). É por ela que o uso registra com quem foi. */
+  function minhaListaDoMaterial() {
+    var t = listasParaMostrar();
+    var achada = t.dela.concat(t.doAplicativo).filter(function (l) { return mesmaLista(l, bibCarrinho); })[0];
+    return achada ? achada.id : null;
+  }
+
+  function gravarMinhaLista(registro) {
+    return Store.gravarListaBiblioteca(registro).then(function () {
+      minhasListas = minhasListas.filter(function (l) { return l.id !== registro.id; }).concat([registro]);
+      // a do diário com o mesmo conteúdo sai dele: agora é dela
+      gravarSelecoesAnteriores(selecoesAnteriores().filter(function (x) { return !mesmaLista(x, registro); }));
+      return registro;
+    });
+  }
+  function apagarMinhaLista(l) {
+    var apaga = l.soNoDiario ? Promise.resolve() : Store.apagarListaBiblioteca(l.id);
+    return apaga.then(function () {
+      minhasListas = minhasListas.filter(function (x) { return x.id !== l.id; });
+      if (l.soNoDiario) gravarSelecoesAnteriores(selecoesAnteriores().filter(function (x) { return !mesmaLista(x, l); }));
+    });
+  }
+
+  function carregarUsoDasListas() {
+    return Store.usoDaBiblioteca().then(function (regs) {
+      var mapa = {};
+      (regs || []).forEach(function (r) {
+        if (!r || !r.listaId) return;
+        var u = mapa[r.listaId] = mapa[r.listaId] || { alunos: [], ultima: '' };
+        if (r.alunoId && u.alunos.indexOf(r.alunoId) < 0) u.alunos.push(r.alunoId);
+        if (r.data && r.data > u.ultima) u.ultima = r.data;
+      });
+      usoDasListas = mapa;
+    }).catch(function () { usoDasListas = {}; });
+  }
+
+  /* Os minutos que o app sabe são os do PACOTE, por exercício de lista pronta.
+   * Exercício que não está em lista pronta nenhuma não tem conta, e a tela diz
+   * quantos ficaram sem conta em vez de inventar. */
+  function minutosDaMinhaLista(ids) {
+    var porItem = Object.create(null);
+    var todas = (bib && bib.listasPorModulo) || {};
+    Object.keys(todas).forEach(function (m) {
+      todas[m].forEach(function (lp) {
+        Object.keys(lp.minutosDe).forEach(function (id) { if (porItem[id] === undefined) porItem[id] = lp.minutosDe[id]; });
+      });
+    });
+    var soma = 0, semConta = 0;
+    ids.forEach(function (id) { if (porItem[id] === undefined) semConta++; else soma += porItem[id]; });
+    return { minutos: Math.round(soma), semConta: semConta };
+  }
+
+  function nomeDaMinhaLista(l) {
+    return l.automatica ? 'Guardada ' + quandoDaSelecao(l.criadaEm) : l.titulo;
+  }
+  function rotuloDoItemDaLista(id) {
+    var it = bib && bib.itemPorId[id];
+    if (!it) return 'Exercício que não está mais na biblioteca';
+    return it.modulo.titulo + ', ' + (eDoBanco(it) ? 'problema ' : 'exercício ') + it.numero;
+  }
+  function rotuloDaPaginaDaLista(id) {
+    var p = paginaDeTeoriaPorId(id);
+    if (!p) return 'Página de teoria que não está mais na biblioteca';
+    return p.aula.aula.titulo + ', ' + (p.pagina.capa ? 'capa' : 'página ' + p.pagina.n);
+  }
+
+  /* Carregar uma lista dela no material: o material de agora entra pela regra
+   * da guarda, e se a lista nasceu de uma lista pronta, o vínculo volta. */
+  function usarMinhaLista(l) {
+    var v = validaDaSelecao(l);
+    if (!v.itens.length && !v.paginas.length) return false;
     mexeuNoMaterial();
-    var lp = x.lista ? listaProntaPorId(x.lista) : null;
-    if (!trocarMaterial(v, 'carregar-selecao', lp ? lp.id : null)) return;
-    /* RECÊNCIA: a que ela acabou de carregar vai para o topo, senão a mais
-     * velha carregada agora seria a primeira a sair. */
-    var l = selecoesAnteriores();
-    var k = -1;
-    l.forEach(function (y, n) { if (k < 0 && mesmaLista(y, x)) k = n; });
-    if (k > 0) { var achada = l.splice(k, 1)[0]; achada.quando = Date.now(); l.unshift(achada); gravarSelecoesAnteriores(l); }
-    fecharModal('modal-bib-selecoes');
-    // um desenho só: o desenharCarrinho já redesenha a tela da lista quando ela está à vista
+    var lp = l.origem ? listaProntaPorId(l.origem) : null;
+    if (!trocarMaterial(v, 'carregar-selecao', lp ? lp.id : null)) return false;
+    /* RECÊNCIA, como antes: a guardada pelo aplicativo que ela acabou de usar
+     * vai para o topo, senão seria a primeira a sair. */
+    if (l.automatica && !l.soNoDiario) {
+      var copia = Object.assign({}, l, { criadaEm: Date.now(), editadaEm: Date.now() });
+      gravarMinhaLista(copia).catch(function () { /* fica onde estava */ });
+    }
     desenharCarrinho();
     marcarCaixasDoCarrinho();
     desenharContextoBiblioteca();
-    avisar('O material voltou a ter a seleção guardada ' + quandoDaSelecao(x.quando) + '.');
+    return true;
   }
-  function botaoSelecoesAnteriores() {
-    return el('button', { type: 'button', class: 'btn pequeno', id: 'bib-carrinho-selecoes',
-      texto: 'Seleções anteriores (' + selecoesAnteriores().length + ')', aoClick: abrirSelecoesAnteriores });
+
+  function botaoMinhasListas() {
+    return el('button', { type: 'button', class: 'btn pequeno', id: 'bib-carrinho-minhas',
+      texto: 'Minhas listas (' + quantasMinhasListas() + ')',
+      aoClick: function () { irNaBiblioteca({ minhas: {} }); } });
   }
-  function abrirSelecoesAnteriores() {
-    var corpo = $('#corpo-modal-bib-selecoes');
-    corpo.innerHTML = '';
-    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0',
-      texto: 'O que estava no material antes de ser trocado ou anexado. Tocar numa linha põe essa seleção de volta.' }));
-    selecoesAnteriores().forEach(function (x, k) {
-      var d = descricaoDaSelecao(x);
-      var linha = linhaBib(d.texto, x.lista && listaProntaPorId(x.lista) ? nomeDaListaPronta(listaProntaPorId(x.lista)) + ', mexida' : '',
-        function () { if (!d.vazia) carregarSelecaoAnterior(x); });
-      linha.setAttribute('data-selecao', String(k));
-      if (d.vazia) { linha.classList.add('desligada'); linha.setAttribute('aria-disabled', 'true'); }
-      corpo.appendChild(linha);
+
+  /* A aba: "Por série" ou "Minhas listas", no alto da Biblioteca. */
+  function abasDaBiblioteca(qual) {
+    var abas = el('div', { class: 'chips-filtro bib-abas', role: 'tablist', id: 'bib-abas' });
+    [['serie', 'Por série'], ['minhas', 'Minhas listas (' + quantasMinhasListas() + ')']].forEach(function (a) {
+      abas.appendChild(el('button', {
+        type: 'button', class: 'chip-filtro' + (a[0] === qual ? ' ativo' : ''), texto: a[1], 'data-aba': a[0],
+        'aria-selected': a[0] === qual ? 'true' : 'false',
+        aoClick: function () {
+          if (a[0] === 'minhas') irNaBiblioteca({ minhas: {} });
+          else irNaBiblioteca({ minhas: null, modulo: null, aula: null });
+        }
+      }));
     });
-    abrirModal('modal-bib-selecoes');
+    return abas;
+  }
+
+  function desenharMinhasListas(corpo) {
+    if (bibNav.minhas && bibNav.minhas.editar) { desenharEditorDeMinhaLista(corpo, bibNav.minhas.editar); return; }
+    corpo.appendChild(abasDaBiblioteca('minhas'));
+    if (usoDasListas === null) {
+      carregarUsoDasListas().then(function () { if (bibNav.minhas && !bibNav.minhas.editar) desenharCorpoBiblioteca(); });
+    }
+    var t = listasParaMostrar();
+    if (!t.dela.length && !t.doAplicativo.length) {
+      corpo.appendChild(el('div', { class: 'vazio', id: 'bib-minhas-vazio' }, [
+        el('p', { style: 'margin:0', texto: 'Você ainda não guardou nenhuma lista.' }),
+        el('p', { class: 'ajuda', style: 'margin:8px 0 0',
+          texto: 'Marque os exercícios, toque em Gerar material e, no fim da janela, em "Salvar esta seleção como lista".' })
+      ]));
+      return;
+    }
+    if (t.dela.length) {
+      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Suas listas' }));
+      t.dela.forEach(function (l) { corpo.appendChild(cartaoDeMinhaLista(l)); });
+    }
+    if (t.doAplicativo.length) {
+      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Guardadas pelo aplicativo' }));
+      corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', id: 'bib-minhas-automaticas-ajuda',
+        texto: 'Quando o material é trocado, o que estava marcado fica guardado aqui (as três últimas). ' +
+          'Dê um nome para guardar de vez.' }));
+      t.doAplicativo.forEach(function (l) { corpo.appendChild(cartaoDeMinhaLista(l)); });
+    }
+  }
+
+  function cartaoDeMinhaLista(l) {
+    var v = validaDaSelecao(l);
+    var itens = v.itens.map(function (id) { return bib.itemPorId[id]; });
+    var paginas = v.paginas.map(paginaDeTeoriaPorId);
+    var assuntos = modulosDoMaterial(paginas, itens).map(function (m) { return m.titulo; });
+    var conta = [itens.length ? plural(itens.length, 'exercício', 'exercícios') : '',
+      paginas.length ? plural(paginas.length, 'página de teoria', 'páginas de teoria') : ''].filter(Boolean).join(' e ');
+    var vazia = !v.itens.length && !v.paginas.length;
+    if (vazia) conta = 'Os exercícios desta lista não estão mais na biblioteca.';
+    else if (v.faltam) conta += ' (' + plural(v.faltam, 'não está mais na biblioteca', 'não estão mais na biblioteca') + ')';
+    var tempo = minutosDaMinhaLista(v.itens);
+    var textoTempo = tempo.minutos
+      ? 'Cerca de ' + tempo.minutos + ' minutos (estimativa)' +
+        (tempo.semConta ? ', sem contar ' + plural(tempo.semConta, 'exercício', 'exercícios') + ' fora das listas prontas' : '')
+      : '';
+    var uso = usoDasListas && usoDasListas[l.id];
+    var textoUso = uso && uso.alunos.length
+      ? 'Usada com ' + uso.alunos.map(function (id) { var a = alunoPorId(id); return a ? a.nome : 'aluno apagado'; }).join(', ') +
+        (uso.ultima ? '. Última vez em ' + Core.ddmmaaaa(uso.ultima) + '.' : '.')
+      : (usoDasListas ? 'Ainda não usada com nenhum aluno.' : '');
+    var cartao = el('div', { class: 'cartao bib-minha-lista' + (vazia ? ' desligada' : ''), 'data-lista': l.id }, [
+      el('div', { class: 'bib-minha-topo' }, [
+        el('strong', { class: 'bib-minha-nome', texto: nomeDaMinhaLista(l) }),
+        l.nivel ? el('span', { class: 'bib-minha-nivel', texto: nomeDoNivel(l.nivel) }) : null
+      ]),
+      assuntos.length ? el('div', { class: 'ajuda bib-minha-assunto', texto: assuntos.join(', ') }) : null,
+      el('div', { class: 'ajuda bib-minha-conta', texto: conta }),
+      textoTempo ? el('div', { class: 'ajuda bib-minha-tempo', texto: textoTempo }) : null,
+      textoUso ? el('div', { class: 'ajuda bib-minha-uso', texto: textoUso }) : null,
+      el('div', { class: 'barra bib-minha-acoes' }, [
+        el('button', { type: 'button', class: 'btn principal pequeno', 'data-acao': 'preparar',
+          texto: 'Preparar aula com esta lista', disabled: vazia ? 'disabled' : null,
+          aoClick: function () { if (usarMinhaLista(l)) abrirGerarMaterial(); } }),
+        el('button', { type: 'button', class: 'btn pequeno', 'data-acao': 'editar',
+          texto: l.automatica ? 'Dar nome' : 'Editar',
+          aoClick: function () { minhaEmEdicao = null; irNaBiblioteca({ minhas: { editar: l.id } }); } }),
+        l.automatica ? null : el('button', { type: 'button', class: 'btn pequeno', 'data-acao': 'duplicar', texto: 'Duplicar',
+          aoClick: function () { duplicarMinhaLista(l); } }),
+        el('button', { type: 'button', class: 'btn pequeno', 'data-acao': 'apagar', texto: 'Apagar',
+          aoClick: function () { pedirParaApagarMinhaLista(l); } })
+      ])
+    ]);
+    return cartao;
+  }
+
+  function duplicarMinhaLista(l) {
+    var agora = Date.now();
+    var copia = { id: novoIdDeLista(), titulo: l.titulo + ' (cópia)', nivel: l.nivel || null,
+      itens: l.itens.slice(), paginas: (l.paginas || []).slice(), origem: l.origem || null,
+      automatica: false, criadaEm: agora, editadaEm: agora };
+    gravarMinhaLista(copia).then(function () {
+      desenharCorpoBiblioteca();
+      avisar('Lista duplicada: ' + copia.titulo + '.');
+    }, function () {
+      avisar('Não consegui duplicar a lista. O tablet pode estar sem espaço.');
+    });
+  }
+
+  function pedirParaApagarMinhaLista(l) {
+    if (!confirmar('Apagar a lista "' + nomeDaMinhaLista(l) + '"? Os exercícios continuam na biblioteca.')) return;
+    var copia = Object.assign({}, l);
+    delete copia.soNoDiario;
+    apagarMinhaLista(l).then(function () {
+      desenharCorpoBiblioteca();
+      avisar('Lista apagada.', 'Desfazer', function () {
+        gravarMinhaLista(copia).then(function () { desenharCorpoBiblioteca(); },
+          function () { avisar('Não consegui devolver a lista. O tablet pode estar sem espaço.'); });
+      });
+    }, function () {
+      avisar('Não consegui apagar a lista. O tablet pode estar sem espaço.');
+    });
+  }
+
+  /* EDITAR é mexer num RASCUNHO da lista, e só o "Guardar" grava: nome, nível,
+   * tirar, subir e descer, e pôr o que está marcado na biblioteca. Para pôr
+   * exercício novo, ela marca na biblioteca como sempre e volta aqui; o botão
+   * diz quantos marcados ainda não estão na lista. */
+  function desenharEditorDeMinhaLista(corpo, id) {
+    var t = listasParaMostrar();
+    var original = t.dela.concat(t.doAplicativo).filter(function (l) { return l.id === id; })[0];
+    if (!original) { bibNav.minhas = {}; desenharMinhasListas(corpo); return; }
+    if (!minhaEmEdicao || minhaEmEdicao.id !== id) {
+      minhaEmEdicao = { id: id, titulo: original.titulo || '', nivel: original.nivel || null,
+        itens: original.itens.slice(), paginas: (original.paginas || []).slice() };
+    }
+    var r = minhaEmEdicao;
+    var mudou = function () {
+      return r.titulo !== (original.titulo || '') || r.nivel !== (original.nivel || null) || !mesmaLista(r, original);
+    };
+    corpo.appendChild(voltarBib('Minhas listas', function () {
+      if (mudou() && !confirmar('Sair sem guardar as mudanças desta lista?')) return;
+      minhaEmEdicao = null;
+      irNaBiblioteca({ minhas: {} });
+    }));
+    corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: original.automatica ? 'Dar nome à lista' : 'Editar a lista' }));
+    var campo = el('input', { type: 'text', id: 'bib-minha-nome', value: r.titulo, autocomplete: 'off', maxlength: '80' });
+    campo.addEventListener('input', function () { r.titulo = campo.value; });
+    corpo.appendChild(el('label', { class: 'campo' }, [el('span', { texto: 'Nome' }), campo]));
+    var niveis = el('div', { class: 'chips-filtro', id: 'bib-minha-nivel', role: 'group' });
+    NIVEIS_DA_LISTA.forEach(function (n) {
+      niveis.appendChild(el('button', {
+        type: 'button', class: 'chip-filtro' + (r.nivel === n[0] ? ' ativo' : ''), texto: n[1], 'data-nivel': n[0],
+        'aria-pressed': r.nivel === n[0] ? 'true' : 'false',
+        // tocar no nível que já está escolhido tira o nível
+        aoClick: function () { r.nivel = r.nivel === n[0] ? null : n[0]; desenharCorpoBiblioteca(); }
+      }));
+    });
+    corpo.appendChild(el('div', { class: 'campo' }, [el('span', { class: 'bib-gerar-rotulo', texto: 'Nível' }), niveis]));
+
+    var lista = el('ol', { class: 'bib-minha-itens', id: 'bib-minha-itens' });
+    function linha(tipo, chave, k, total) {
+      var vetor = r[tipo];
+      return el('li', { class: 'bib-minha-item', 'data-id': chave }, [
+        el('span', { class: 'cresce', texto: tipo === 'itens' ? rotuloDoItemDaLista(chave) : rotuloDaPaginaDaLista(chave) }),
+        el('button', { type: 'button', class: 'btn pequeno', 'aria-label': 'Subir', texto: '▲', 'data-acao': 'subir',
+          disabled: k === 0 ? 'disabled' : null,
+          aoClick: function () { vetor.splice(k - 1, 0, vetor.splice(k, 1)[0]); desenharCorpoBiblioteca(); } }),
+        el('button', { type: 'button', class: 'btn pequeno', 'aria-label': 'Descer', texto: '▼', 'data-acao': 'descer',
+          disabled: k === total - 1 ? 'disabled' : null,
+          aoClick: function () { vetor.splice(k + 1, 0, vetor.splice(k, 1)[0]); desenharCorpoBiblioteca(); } }),
+        el('button', { type: 'button', class: 'btn pequeno', texto: 'Tirar', 'data-acao': 'tirar',
+          aoClick: function () { vetor.splice(k, 1); desenharCorpoBiblioteca(); } })
+      ]);
+    }
+    if (r.paginas.length) {
+      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Teoria' }));
+      var ol = el('ol', { class: 'bib-minha-itens', id: 'bib-minha-paginas' });
+      r.paginas.forEach(function (p, k) { ol.appendChild(linha('paginas', p, k, r.paginas.length)); });
+      corpo.appendChild(ol);
+    }
+    corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Exercícios, na ordem da lista' }));
+    r.itens.forEach(function (it, k) { lista.appendChild(linha('itens', it, k, r.itens.length)); });
+    if (!r.itens.length) corpo.appendChild(el('p', { class: 'ajuda', texto: 'Nenhum exercício na lista.' }));
+    else corpo.appendChild(lista);
+
+    var marcadosFora = {
+      itens: bibCarrinho.itens.filter(function (x) { return r.itens.indexOf(x) < 0; }),
+      paginas: bibCarrinho.paginas.filter(function (x) { return r.paginas.indexOf(x) < 0; })
+    };
+    var nFora = marcadosFora.itens.length + marcadosFora.paginas.length;
+    corpo.appendChild(el('p', { class: 'ajuda', id: 'bib-minha-por-ajuda',
+      texto: nFora ? 'Há ' + plural(nFora, 'item marcado', 'itens marcados') + ' na biblioteca que não ' +
+        (nFora === 1 ? 'está' : 'estão') + ' nesta lista.'
+        : 'Para pôr mais exercícios, marque-os na biblioteca e volte aqui: o botão de pôr aparece.' }));
+    if (nFora) {
+      corpo.appendChild(el('button', { type: 'button', class: 'btn', id: 'bib-minha-por',
+        texto: 'Pôr ' + (nFora === 1 ? 'o marcado' : 'os ' + nFora + ' marcados') + ' no fim da lista',
+        aoClick: function () {
+          r.itens = r.itens.concat(marcadosFora.itens);
+          r.paginas = r.paginas.concat(marcadosFora.paginas);
+          desenharCorpoBiblioteca();
+        } }));
+    }
+    corpo.appendChild(el('div', { class: 'barra', style: 'margin-top:16px' }, [
+      el('span', { class: 'cresce' }),
+      el('button', { type: 'button', class: 'btn', id: 'bib-minha-cancelar', texto: 'Cancelar',
+        aoClick: function () { minhaEmEdicao = null; irNaBiblioteca({ minhas: {} }); } }),
+      el('button', { type: 'button', class: 'btn principal', id: 'bib-minha-guardar', texto: 'Guardar',
+        aoClick: function () { guardarEdicaoDeMinhaLista(original); } })
+    ]));
+  }
+
+  function guardarEdicaoDeMinhaLista(original) {
+    var r = minhaEmEdicao;
+    var titulo = String(r.titulo || '').trim().replace(/\s+/g, ' ');
+    if (!titulo) { avisar('Dê um nome à lista.'); return; }
+    if (!r.itens.length && !r.paginas.length) { avisar('A lista ficou vazia. Para tirar a lista, use Apagar.'); return; }
+    var registro = Object.assign({}, original, { titulo: titulo, nivel: r.nivel || null,
+      itens: r.itens.slice(), paginas: r.paginas.slice(), automatica: false, editadaEm: Date.now() });
+    delete registro.soNoDiario;
+    gravarMinhaLista(registro).then(function () {
+      minhaEmEdicao = null;
+      irNaBiblioteca({ minhas: {} });
+      avisar('Lista guardada: ' + titulo + '.');
+    }, function () {
+      avisar('Não consegui guardar a lista. O tablet pode estar sem espaço.');
+    });
+  }
+
+  /* NO FIM DO PREPARAR AULA: guardar o material de agora como lista dela. Se
+   * ele já é uma lista dela (com nome), a janela diz qual, em vez de oferecer
+   * guardar de novo. */
+  function blocoSalvarComoLista(sugestao) {
+    var bloco = el('div', { class: 'campo bib-salvar-lista', id: 'bib-salvar-lista' });
+    var ja = listasParaMostrar().dela.filter(function (l) { return mesmaLista(l, bibCarrinho); })[0];
+    if (ja) {
+      bloco.appendChild(el('p', { class: 'ajuda', id: 'bib-salvar-lista-ja', texto: 'Esta seleção está em Minhas listas: ' + ja.titulo + '.' }));
+      return bloco;
+    }
+    var escolha = { nivel: null };
+    var campo = el('input', { type: 'text', id: 'bib-salvar-lista-nome', value: sugestao || '', autocomplete: 'off', maxlength: '80' });
+    var niveis = el('div', { class: 'chips-filtro', id: 'bib-salvar-lista-nivel', role: 'group' });
+    function desenhaNiveis() {
+      niveis.innerHTML = '';
+      NIVEIS_DA_LISTA.forEach(function (n) {
+        niveis.appendChild(el('button', {
+          type: 'button', class: 'chip-filtro' + (escolha.nivel === n[0] ? ' ativo' : ''), texto: n[1], 'data-nivel': n[0],
+          'aria-pressed': escolha.nivel === n[0] ? 'true' : 'false',
+          aoClick: function () { escolha.nivel = escolha.nivel === n[0] ? null : n[0]; desenhaNiveis(); }
+        }));
+      });
+    }
+    desenhaNiveis();
+    bloco.appendChild(el('span', { class: 'bib-gerar-rotulo', texto: 'Salvar esta seleção como lista' }));
+    bloco.appendChild(el('label', { class: 'campo' }, [el('span', { texto: 'Nome da lista' }), campo]));
+    bloco.appendChild(el('div', { class: 'campo' }, [el('span', { texto: 'Nível' }), niveis]));
+    bloco.appendChild(el('button', { type: 'button', class: 'btn', id: 'bib-salvar-lista-guardar', texto: 'Salvar como lista',
+      aoClick: function () {
+        var titulo = String(campo.value || '').trim().replace(/\s+/g, ' ');
+        if (!titulo) { avisar('Dê um nome à lista.'); return; }
+        var agora = Date.now();
+        var lp = lpEmEdicao() ? listaProntaPorId(lpEmEdicao()) : null;
+        var registro = { id: novoIdDeLista(), titulo: titulo, nivel: escolha.nivel, itens: bibCarrinho.itens.slice(),
+          paginas: bibCarrinho.paginas.slice(), origem: lp ? lp.id : null, automatica: false, criadaEm: agora, editadaEm: agora };
+        gravarMinhaLista(registro).then(function () {
+          bloco.innerHTML = '';
+          bloco.appendChild(el('p', { class: 'ajuda', id: 'bib-salvar-lista-ja', texto: 'Esta seleção está em Minhas listas: ' + titulo + '.' }));
+          desenharCarrinho();
+          avisar('Lista guardada em Minhas listas: ' + titulo + '.');
+        }, function () {
+          avisar('Não consegui guardar a lista. O tablet pode estar sem espaço.');
+        });
+      } }));
+    return bloco;
   }
 
   function mesmaSelecao(a, lp) {
@@ -13445,7 +13902,7 @@
     }
     var foi = bibAnexadasNaSessao[lp.id];
     if (foi) corpo.appendChild(el('p', { class: 'ajuda bib-lp-estado', id: 'bib-lp-foi', texto: 'Esta lista foi anexada na aula de ' +
-      foi.aluno + ' (' + Core.ddmmaaaa(foi.data) + ').' + (foi.mexida ? ' A sua versão ficou em Seleções anteriores.' : '') }));
+      foi.aluno + ' (' + Core.ddmmaaaa(foi.data) + ').' + (foi.mexida ? ' A sua versão ficou em Minhas listas.' : '') }));
     if (estado) corpo.appendChild(el('p', { class: 'ajuda bib-lp-estado', id: 'bib-lp-estado', texto: estado }));
     corpo.appendChild(el('div', { class: 'barra bib-lp-usar' }, [
       el('button', { type: 'button', class: 'btn principal', id: 'bib-lp-preparar', texto: 'Preparar aula com esta lista',
@@ -13567,7 +14024,7 @@
       el('div', { class: 'ajuda bib-lp-minutos', texto: !daLista.length
         ? (ids.length ? 'Os exercícios que você acrescentou não têm tempo estimado.'
           : anexada ? 'Em ' + Core.ddmmaaaa(anexada.data) + '. ' + (anexada.mexida
-            ? 'A sua versão ficou em Seleções anteriores.' : 'Para usar com outro aluno, toque em Usar esta lista.')
+            ? 'A sua versão ficou em Minhas listas.' : 'Para usar com outro aluno, toque em Usar esta lista.')
           : 'Para começar de novo, toque em Usar esta lista.')
         : minutosEstimados(soma, true, true) +
           (deFora ? ', fora ' + plural(deFora, 'exercício que você acrescentou e não entra nessa conta',
@@ -14486,9 +14943,9 @@
     if (!(n || m)) {
       faixa.appendChild(el('span', { class: 'bib-carrinho-texto', id: 'bib-carrinho-vazio',
         texto: listaAnexada() ? 'Nada marcado.' : 'Nada marcado ainda.' }));
-      if (selecoesAnteriores().length) {
+      if (quantasMinhasListas()) {
         faixa.appendChild(el('span', { class: 'cresce' }));
-        faixa.appendChild(botaoSelecoesAnteriores());
+        faixa.appendChild(botaoMinhasListas());
       }
       return;
     }
@@ -14503,7 +14960,7 @@
       ].filter(Boolean).join(', ') }));
     faixa.appendChild(el('span', { class: 'cresce' }));
     // o que estava marcado antes das trocas fica à mão aqui, em qualquer tela da Biblioteca
-    if (selecoesAnteriores().length) faixa.appendChild(botaoSelecoesAnteriores());
+    if (quantasMinhasListas()) faixa.appendChild(botaoMinhasListas());
     faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'bib-carrinho-limpar', texto: 'Desmarcar tudo',
       aoClick: function () {
         mexeuNoMaterial();
@@ -14763,6 +15220,8 @@
     ]));
     listaAulas.appendChild(resultadoOutraData);
     corpo.appendChild(el('div', { class: 'campo' }, [el('span', { class: 'bib-gerar-rotulo', texto: 'Anexar em qual aula' }), listaAulas]));
+    // no fim da janela, guardar o material como lista dela (C2a)
+    corpo.appendChild(blocoSalvarComoLista(padrao.titulo));
 
     var botaoGerar = el('button', { type: 'button', class: 'btn principal', id: 'bib-gerar-anexar', texto: 'Gerar e anexar' });
     var dica = el('p', { class: 'ajuda bib-gerar-dica', id: 'bib-gerar-dica', texto: 'Escolha a aula acima para anexar o material.' });
@@ -14942,6 +15401,8 @@
     if (botao) botao.textContent = 'Montando...';
     if (!op.semAvisoDeMontagem) avisar('Montando o material. Isso leva alguns segundos.');
     var usaItens = (op.lista || op.gabarito) ? itens : [];
+    // o material é, exatamente, uma das Minhas listas? o uso guarda qual (C2a)
+    var listaId = minhaListaDoMaterial();
     var pecas, teoria, anexado = false, id = null, saida = null, etapa = 'montar', assuntosNovos = [];
     // na série, qualquer aviso final espera o Desfazer dela vencer
     function avisarNaHora(t, r, f, r2, f2) {
@@ -15052,8 +15513,9 @@
          * ainda existe (um Desfazer pode ter caído entre o salvar e aqui). */
         if (!db.aulas.some(function (a) { return a.id === aulaId; })) return null;
         return emFila(usaItens, function (it) {
-          return Store.registrarUsoBiblioteca({ itemId: it.id, alunoId: aula.alunoId, aulaId: aula.id, data: aula.data });
-        }, 1);
+          return Store.registrarUsoBiblioteca({ itemId: it.id, alunoId: aula.alunoId, aulaId: aula.id, data: aula.data,
+            listaId: listaId });
+        }, 1).then(function (r) { usoDasListas = null; return r; });
       }).then(function () {
         etapa = 'folha';
         if (op.folha && op.lista) return listaComoFolha(aula.id, usaItens, pecas);

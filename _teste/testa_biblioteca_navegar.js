@@ -171,7 +171,7 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   await H.irParaAba(pag, 'biblioteca');
   await esperar('lista de módulos', () => pag.evaluate(() => document.querySelectorAll('#bib-corpo .item-lista').length), v => v > 0, 10000);
   let corpo = await lerCorpo(pag);
-  const chips = await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo .chip-filtro')).map(c => c.textContent + (c.classList.contains('ativo') ? '*' : '')));
+  const chips = await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo .bib-series .chip-filtro')).map(c => c.textContent + (c.classList.contains('ativo') ? '*' : '')));
   conf('séries: 8º (só Banco) e 9º, abrindo no 9º', chips.join(','), '8º ano,9º ano*');
   conf('contagem no alto', await pag.$eval('#bib-contagem', e => e.textContent), '7 aulas de teoria, 60 exercícios, 12 problemas do Banco');
   conf('campo de busca visível', await pag.$eval('#bib-busca-cartao', e => getComputedStyle(e).display !== 'none'), true);
@@ -181,11 +181,11 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   conf('módulos do Banco', corpo.blocos[1].linhas.join(' | '), 'Banco de Questões 2019 | Banco de Questões 2020');
   conf('sem lista pronta, distingue exercícios para montar seleção e teoria',
     corpo.texto.indexOf('48 exercícios · 4 aulas de teoria · monte sua seleção') >= 0, true);
-  await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo .chip-filtro')).find(c => c.textContent === '8º ano').click());
+  await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo .bib-series .chip-filtro')).find(c => c.textContent === '8º ano').click());
   await pausa(150);
   corpo = await lerCorpo(pag);
   conf('no 8º ano só aparece o Banco', corpo.blocos.map(b => b.titulo + ':' + b.linhas.length).join(','), 'Banco de Questões:2');
-  await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo .chip-filtro')).find(c => c.textContent === '9º ano').click());
+  await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo .bib-series .chip-filtro')).find(c => c.textContent === '9º ano').click());
   await pausa(150);
 
   await tocarLinha(pag, 'Equações do Segundo Grau');

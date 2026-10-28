@@ -161,25 +161,31 @@ const T_TROCA_AO_VER = '          else usarListaPronta(lp);';
 // a seleção de antes da troca deixa de ser guardada no aparelho
 const L_GABARITO_JUNTO = '      var separa = !!(op.lista && op.gabarito && usaItens.length);';
 const T_GABARITO_JUNTO = '      var separa = false;';
+/* Desde o C2a as guardadas moram no diário E no depósito (Minhas listas
+ * guardadas pelo aplicativo), e o diário se esvazia logo depois da cópia:
+ * apagar só o diário já não apaga nada. O veneno apaga dos dois lugares, que
+ * é o defeito que a regra proíbe. */
+const T_APAGA_GUARDADAS = 'gravarSelecoesAnteriores([]); minhasListas.filter(function (x) { return x.automatica; })' +
+  '.forEach(function (x) { apagarMinhaLista(x); });';
 // o Desfazer da troca volta a apagar as seleções guardadas
 const L_DESFAZER_APAGA = '      aoAgir: perdeu ? function () { devolverSelecaoTrocada(antes, tudo, listaAntes); } : null';
-const T_DESFAZER_APAGA = '      aoAgir: perdeu ? function () { gravarSelecoesAnteriores([]); devolverSelecaoTrocada(antes, tudo, listaAntes); } : null';
+const T_DESFAZER_APAGA = '      aoAgir: perdeu ? function () { ' + T_APAGA_GUARDADAS + ' devolverSelecaoTrocada(antes, tudo, listaAntes); } : null';
 // anexar volta a apagar as seleções guardadas
 const L_ANEXAR_APAGA = '    var veioDaLista = lpUsada && usada.itens.some(function (x) { return lpUsada.minutosDe[x] !== undefined; });';
-const T_ANEXAR_APAGA = L_ANEXAR_APAGA + ' gravarSelecoesAnteriores([]);';
+const T_ANEXAR_APAGA = L_ANEXAR_APAGA + ' ' + T_APAGA_GUARDADAS;
 // a lista pronta intacta passa a entrar nas seleções
 const L_INTACTA_ENTRA = '    if (ehListaPronta(sel)) return true;';
 const T_INTACTA_ENTRA = '    if (false) return true;';
-// a quarta seleção não tira mais a mais velha
-const L_QUARTA = '    return gravarSelecoesAnteriores(l.slice(0, 3));';
-const T_QUARTA = '    return gravarSelecoesAnteriores(l);';
+// a quarta seleção não tira mais a mais velha (o corte mora no espelho para Minhas listas, C2a)
+const L_QUARTA = '.sort(maisNovaPrimeiro).slice(MAX_AUTOMATICAS);';
+const T_QUARTA = '.sort(maisNovaPrimeiro).slice(99);';
 const L_HERANCA = "    if (lista === undefined && motivo === 'mexeu' && !atual.itens.length && !atual.paginas.length) lista = null;";
 const T_HERANCA = '    // (veneno: a seleção à mão herda o nome da lista de antes)';
-// cada porta de saída do material passa a pular as Seleções anteriores
+// cada porta de saída do material passa a pular a guarda das Minhas listas
 const L_PORTA_USAR = "    if (!trocarMaterial(tudo, 'usar-lista', lp.id)) return;";
 const T_PORTA_USAR = "    if (!trocarMaterial(tudo, 'mexeu', lp.id)) return;";
-const L_PORTA_CARREGAR = "    if (!trocarMaterial(v, 'carregar-selecao', lp ? lp.id : null)) return;";
-const T_PORTA_CARREGAR = "    if (!trocarMaterial(v, 'mexeu', lp ? lp.id : null)) return;";
+const L_PORTA_CARREGAR = "    if (!trocarMaterial(v, 'carregar-selecao', lp ? lp.id : null)) return false;";
+const T_PORTA_CARREGAR = "    if (!trocarMaterial(v, 'mexeu', lp ? lp.id : null)) return false;";
 const L_PORTA_AULA = "        if (!trocarMaterial(tudo, 'material-da-aula', null)) return;";
 const T_PORTA_AULA = "        if (!trocarMaterial(tudo, 'mexeu', null)) return;";
 const L_PORTA_ANEXAR = "    if (!trocarMaterial({ itens: [], paginas: [] }, 'anexou')) return function () {};";
@@ -187,8 +193,8 @@ const T_PORTA_ANEXAR = "    if (!trocarMaterial({ itens: [], paginas: [] }, 'mex
 const L_PORTA_DESMARCAR = "        if (!trocarMaterial({ itens: [], paginas: [] }, 'desmarcar-tudo', null)) return;";
 const T_PORTA_DESMARCAR = "        if (!trocarMaterial({ itens: [], paginas: [] }, 'mexeu', null)) return;";
 // carregar a seleção não a leva mais ao topo
-const L_RECENCIA = '    if (k > 0) { var achada = l.splice(k, 1)[0]; achada.quando = Date.now(); l.unshift(achada); gravarSelecoesAnteriores(l); }';
-const T_RECENCIA = '    if (false) { void k; }';
+const L_RECENCIA = '    if (l.automatica && !l.soNoDiario) {';
+const T_RECENCIA = '    if (false) {';
 // a gravação que falha deixa de impedir a troca
 const L_GRAVA_FALHA = '    if (sai && !guardarNasAnteriores(atual)) {';
 const T_GRAVA_FALHA = '    if (sai && !guardarNasAnteriores(atual) && false) {';
@@ -511,7 +517,25 @@ const aviso = (pag, seletor) => pag.evaluate(s => {
  * a L1 mexida por ela. Em todos os caminhos, S tem de continuar recuperável,
  * inclusive depois de fechar e abrir o aplicativo no meio. */
 const CHAVE_SEL = 'apoio-educacional:bib-selecoes-anteriores';
-const guardadas = pag => pag.evaluate(k => { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return []; } }, CHAVE_SEL);
+/* DESDE O C2a, as guardadas moram em dois lugares: o diário (localStorage),
+ * escrito na hora da troca, e as Minhas listas guardadas pelo aplicativo
+ * (depósito biblioteca_listas), para onde o diário é copiado logo depois. A
+ * prova lê os dois juntos, sem repetir, a mais recente primeiro. A pausa é a
+ * da cópia, que é assíncrona. */
+const guardadas = async pag => {
+  await pausa(400);
+  return pag.evaluate(async k => {
+    let diario = [];
+    try { diario = JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { diario = []; }
+    if (!Array.isArray(diario)) diario = [];
+    const dep = (await Store.listasDaBiblioteca()).filter(x => x.automatica).map(x => ({ id: x.id, itens: x.itens,
+      paginas: x.paginas || [], quando: x.editadaEm || x.criadaEm, lista: x.origem || null }));
+    const igual = (a, b) => a.itens.join('|') === b.itens.join('|') && (a.paginas || []).join('|') === (b.paginas || []).join('|');
+    const doDiario = diario.filter(x => x && Array.isArray(x.itens) && !dep.some(d => igual(d, x)))
+      .map(x => ({ id: 'auto-' + x.quando, itens: x.itens, paginas: x.paginas || [], quando: x.quando, lista: x.lista || null }));
+    return dep.concat(doDiario).sort((a, b) => b.quando - a.quando);
+  }, CHAVE_SEL);
+};
 const temS = (lista, S) => lista.some(x => (x.itens || []).join('|') === S.join('|'));
 async function irAoAssunto(pag) {
   await H.irParaAba(pag, 'biblioteca');
@@ -523,8 +547,16 @@ async function irAoAssunto(pag) {
 }
 async function limparTudo(pag) {
   // primeiro esvazia (Desmarcar tudo também guarda), depois apaga as guardadas
-  await pag.evaluate(k => { const b = document.querySelector('#bib-carrinho-limpar'); if (b) b.click(); localStorage.removeItem(k); }, CHAVE_SEL);
-  await pausa(300);
+  await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-limpar'); if (b) b.click(); });
+  await pausa(600);
+  /* As guardadas pelo aplicativo saem do diário E do depósito (C2a); e a
+   * página recarrega, porque o aplicativo guarda as listas na memória também. */
+  await pag.evaluate(async k => {
+    localStorage.removeItem(k);
+    const l = await Store.listasDaBiblioteca();
+    for (const x of l) if (x.automatica) await Store.apagarListaBiblioteca(x.id);
+  }, CHAVE_SEL);
+  await reiniciar(pag);
 }
 async function marcarAMao(pag, quantos, pular) {
   await irAoAssunto(pag);
@@ -584,7 +616,7 @@ async function cenarioVerNaoTroca(pag) {
   conf('e na lista em uso, os dois desafios levam a etiqueta', await pag.evaluate(() =>
     document.querySelectorAll('#bib-lp-grade .bib-lp-desafio').length), 2);
 
-  secao('5k. Seleções anteriores: S continua recuperável em todo caminho');
+  secao('5k. Guardadas pelo aplicativo (Minhas listas): S continua recuperável em todo caminho');
   const LISTA3 = Sintetico.LISTAS.filter(l => l.modulo === LISTA2.modulo && l.id !== LISTA2.id)[0];
   void LISTA3;
 
@@ -651,25 +683,29 @@ async function cenarioVerNaoTroca(pag) {
     [L1mexida.join('|'), S.join('|')].join(' / '));
   conf('(c) e a mexida lembra de qual lista era', g[0] && g[0].lista, LISTA2.id);
 
-  // (d) S, L1, carregar S pela janela, reinício, L2
+  // (d) S, L1, carregar S pelas Minhas listas, reinício, L2
   await limparTudo(pag);
   S = await marcarAMao(pag, 9);
   await usarDoAssunto(pag, 'Lista com 1 desafio');
-  await pag.evaluate(() => document.querySelector('#bib-carrinho-selecoes').click());
-  await pausa(400);
-  const linhas = await pag.evaluate(() => Array.from(document.querySelectorAll('#corpo-modal-bib-selecoes [data-selecao] .nome')).map(n => n.textContent));
-  console.log('   janela: ' + JSON.stringify(linhas));
+  await pag.evaluate(() => document.querySelector('#bib-carrinho-minhas').click());
+  await pausa(600);
+  const linhas = await pag.evaluate(() => Array.from(document.querySelectorAll('.bib-minha-lista')).map(c =>
+    c.querySelector('.bib-minha-nome').textContent + ' | ' + c.querySelector('.bib-minha-conta').textContent));
+  console.log('   Minhas listas: ' + JSON.stringify(linhas));
   // "hoje" ou "ontem": a prova não depende de o relógio estar longe da meia-noite
-  conf('(d) a faixa abre "Seleções anteriores" com a linha de S', /^9 exercícios, guardada (hoje|ontem) às \d\d:\d\d$/.test(linhas[0] || ''), true);
-  await pag.evaluate(() => document.querySelector('#corpo-modal-bib-selecoes [data-selecao="0"]').click());
-  await pausa(400);
-  conf('(d) tocar na linha põe S no material, na ordem', (await carrinho(pag)).itens.join('|'), S.join('|'));
+  conf('(d) a faixa abre Minhas listas com S, guardada pelo aplicativo',
+    /^Guardada (hoje|ontem) às \d\d:\d\d \| 9 exercícios$/.test(linhas[0] || ''), true);
+  await pag.evaluate(() => document.querySelector('.bib-minha-lista [data-acao="preparar"]').click());
+  await pausa(500);
+  await pag.evaluate(() => document.querySelectorAll('.fundo-modal.aberto [data-fechar]').forEach(b => b.click()));
+  await pausa(300);
+  conf('(d) Preparar aula com ela põe S no material, na ordem', (await carrinho(pag)).itens.join('|'), S.join('|'));
   await reiniciar(pag);
   await usarDoAssunto(pag, 'Lista com 2 desafios');
   g = await guardadas(pag);
   conf('(d) S, L1, carregar S, reinício, L2: S continua guardada, uma vez só', g.filter(x => x.itens.join('|') === S.join('|')).length, 1);
-  conf('(d) e o botão diz quantas há', await pag.evaluate(() => (document.querySelector('#bib-carrinho-selecoes') || {}).textContent || ''),
-    'Seleções anteriores (' + g.length + ')');
+  conf('(d) e o botão diz quantas há', await pag.evaluate(() => (document.querySelector('#bib-carrinho-minhas') || {}).textContent || ''),
+    'Minhas listas (' + g.length + ')');
 
   // (e) a quarta tira a mais velha
   await limparTudo(pag);
@@ -686,14 +722,15 @@ async function cenarioVerNaoTroca(pag) {
   conf('(e) quatro seleções: ficam três, e a mais velha saiu', g.length + ':' + temS(g, primeira), '3:false');
 
   // (f) seleção com exercício que não existe mais aparece apagada e não carrega
+  await limparTudo(pag);
   await pag.evaluate(k => localStorage.setItem(k, JSON.stringify([{ itens: ['9ano:nao-existe:ex:1'], paginas: [], quando: Date.now() }])), CHAVE_SEL);
   await reiniciar(pag);
-  await pag.evaluate(() => document.querySelector('#bib-carrinho-selecoes').click());
-  await pausa(300);
-  const apagada = await pag.evaluate(() => { const l = document.querySelector('#corpo-modal-bib-selecoes [data-selecao="0"]');
-    return l ? l.classList.contains('desligada') + '|' + l.querySelector('.nome').textContent : ''; });
-  conf('(f) seleção que não existe mais aparece apagada', /^true\|.*exercícios que não estão mais na biblioteca$/.test(apagada), true);
-  await pag.evaluate(() => document.querySelectorAll('.fundo-modal.aberto [data-fechar]').forEach(b => b.click()));
+  await pag.evaluate(() => document.querySelector('#bib-carrinho-minhas').click());
+  await pausa(500);
+  const apagada = await pag.evaluate(() => { const c = document.querySelector('.bib-minha-lista');
+    return c ? c.classList.contains('desligada') + '|' + c.querySelector('[data-acao="preparar"]').disabled + '|' +
+      c.querySelector('.bib-minha-conta').textContent : ''; });
+  conf('(f) lista que não existe mais aparece apagada e não carrega', /^true\|true\|.*não estão mais na biblioteca/.test(apagada), true);
   await limparTudo(pag);
   if (!(await cenarioPortas(pag))) return false;
   return true;
@@ -724,14 +761,21 @@ async function materialDaAula(pag) {
   return tocou;
 }
 async function carregarDaJanela(pag, predicado) {
-  await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-selecoes'); if (b) b.click(); });
-  await pausa(400);
   const g = await guardadas(pag);
-  const k = g.findIndex(predicado);
-  if (k < 0) return false;
-  await pag.evaluate(i => document.querySelector('#corpo-modal-bib-selecoes [data-selecao="' + i + '"]').click(), k);
-  await pausa(400);
-  return true;
+  const alvo = g.find(predicado);
+  if (!alvo) return false;
+  await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-minhas'); if (b) b.click(); });
+  await pausa(500);
+  const ok = await pag.evaluate(id => {
+    const c = document.querySelector('.bib-minha-lista[data-lista="' + id + '"]');
+    if (!c) return false;
+    c.querySelector('[data-acao="preparar"]').click();
+    return true;
+  }, alvo.id);
+  await pausa(500);
+  await pag.evaluate(() => document.querySelectorAll('.fundo-modal.aberto [data-fechar]').forEach(b => b.click()));
+  await pausa(300);
+  return ok;
 }
 const listaEmEdicao = pag => pag.evaluate(() => localStorage.getItem('apoio-educacional:bib-lp-em-edicao'));
 
@@ -759,7 +803,7 @@ async function cenarioPortas(pag) {
     conf('VENENO ENXERGADO: o Material da aula levou os 9 sem guardar', temS(g, S), false);
     return false;
   }
-  conf('(A) depois do Material da aula, os 9 estão nas Seleções anteriores', temS(g, S), true);
+  conf('(A) depois do Material da aula, os 9 estão nas Minhas listas', temS(g, S), true);
   conf('(A) e voltam inteiros e na ordem', await carregarDaJanela(pag, x => x.itens.join('|') === S.join('|')) &&
     (await carrinho(pag)).itens.join('|') === S.join('|'), true);
 
@@ -805,8 +849,8 @@ async function cenarioPortas(pag) {
     conf('VENENO ENXERGADO: anexar levou a versão mexida sem guardar', g.some(x => x.itens.join('|') === L1m.join('|')), false);
     return false;
   }
-  conf('(C) a versão mexida e anexada está nas Seleções anteriores, com a lista', g.some(x => x.itens.join('|') === L1m.join('|') && x.lista === LISTA2.id), true);
-  conf('(C) e a tela diz onde ela ficou, e não "usar com outro aluno"', /A sua versão ficou em Seleções anteriores\./.test(telaC) && !/outro aluno/.test(telaC), true);
+  conf('(C) a versão mexida e anexada está nas Minhas listas, com a lista', g.some(x => x.itens.join('|') === L1m.join('|') && x.lista === LISTA2.id), true);
+  conf('(C) e a tela diz onde ela ficou, e não "usar com outro aluno"', /A sua versão ficou em Minhas listas\./.test(telaC) && !/outro aluno/.test(telaC), true);
   await pag.evaluate(() => document.querySelectorAll('.fundo-modal.aberto [data-fechar]').forEach(b => b.click()));
   await reiniciar(pag);
   await carregarDaJanela(pag, x => x.itens.join('|') === L1m.join('|'));
@@ -930,14 +974,13 @@ async function cenarioPortas(pag) {
     localStorage.setItem('apoio-educacional:bib-selecao-anterior', JSON.stringify({ itens: ids.slice(0, 2), paginas: [] }));
   }, CHAVE_SEL, S);
   await reiniciar(pag);
-  await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-selecoes'); if (b) b.click(); });
-  await pausa(300);
+  await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-minhas'); if (b) b.click(); });
+  await pausa(500);
   const valid = await pag.evaluate(() => ({
-    linhas: document.querySelectorAll('#corpo-modal-bib-selecoes [data-selecao]').length,
+    linhas: document.querySelectorAll('.bib-minha-lista').length,
     velha: localStorage.getItem('apoio-educacional:bib-selecao-anterior')
   }));
-  conf('só as linhas válidas aparecem, e a chave antiga virou uma delas', valid.linhas + '|' + valid.velha, '2|null');
-  await pag.evaluate(() => document.querySelectorAll('.fundo-modal.aberto [data-fechar]').forEach(b => b.click()));
+  conf('só as listas válidas aparecem, e a chave antiga virou uma delas', valid.linhas + '|' + valid.velha, '2|null');
   await limparTudo(pag);
   return true;
 }

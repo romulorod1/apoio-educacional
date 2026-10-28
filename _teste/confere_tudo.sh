@@ -483,6 +483,20 @@ roda "biblioteca listas --envenenado-grava-falha"   node "_teste/testa_bibliotec
 roda "biblioteca listas --envenenado-atribuicao-solta" node "_teste/testa_biblioteca_listas.js" --envenenado-atribuicao-solta
 roda "biblioteca listas --envenenado-sem-etiqueta"  node "_teste/testa_biblioteca_listas.js" --envenenado-sem-etiqueta
 roda "biblioteca listas --envenenado-orfao"         node "_teste/testa_biblioteca_listas.js" --envenenado-orfao
+# C2a: Minhas listas. Criar no Preparar aula, cartao, duplicar, editar, usar,
+# usada com, apagar com Desfazer, copia de seguranca de ida e volta, as tres
+# guardadas pelo aplicativo, e a migracao do diario do localStorage. Um veneno
+# por regra.
+roda "minhas listas"                              node "_teste/testa_minhas_listas.js"
+roda "minhas listas --envenenado-sem-espelho"     node "_teste/testa_minhas_listas.js" --envenenado-sem-espelho
+roda "minhas listas --envenenado-copia-sem-listas" node "_teste/testa_minhas_listas.js" --envenenado-copia-sem-listas
+roda "minhas listas --envenenado-uso-sem-lista"   node "_teste/testa_minhas_listas.js" --envenenado-uso-sem-lista
+roda "minhas listas --envenenado-ordem-velha"     node "_teste/testa_minhas_listas.js" --envenenado-ordem-velha
+# C2a: o banco sobe de 2 para 3. A subida nao perde nada; codigo mais velho que
+# o banco diz o que fazer; a janela antiga larga o banco e avisa.
+roda "banco v3"                                   node "_teste/testa_banco_v3.js"
+roda "banco v3 --envenenado-versao-tecnica"       node "_teste/testa_banco_v3.js" --envenenado-versao-tecnica
+roda "banco v3 --envenenado-troca-calada"         node "_teste/testa_banco_v3.js" --envenenado-troca-calada
 # FRENTE B (B10): o que o lerKits recusa e o que a tela descarta (lista com
 # exercicio que saiu por curadoria). O veneno tira o guarda do app.js, e sem
 # ele a aba Biblioteca inteira nao abre.

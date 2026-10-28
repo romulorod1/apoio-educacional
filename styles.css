@@ -1952,6 +1952,21 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .bib-gerar-caixas { display: flex; flex-direction: column; gap: 0; }
 #bib-gerar-aulas .item-lista.escolhida { border-color: var(--teal); background: var(--teal-claro); }
 
+/* ---------- Minhas listas (C2a) ---------- */
+.bib-abas { margin-bottom: 12px; }
+.bib-minha-lista { margin-bottom: 12px; padding: 14px 16px; }
+.bib-minha-topo { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.bib-minha-nome { color: var(--navy); font-size: 16px; }
+.bib-minha-nivel { font-size: 12px; font-weight: 700; color: var(--teal); background: var(--teal-claro);
+  border-radius: 999px; padding: 2px 10px; }
+.bib-minha-lista .ajuda { margin: 4px 0 0; }
+.bib-minha-acoes { margin: 12px 0 0; flex-wrap: wrap; gap: 8px; }
+.bib-minha-acoes .btn { min-height: 44px; }
+.bib-minha-itens { margin: 0 0 12px; padding-left: 24px; }
+.bib-minha-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--fio); }
+.bib-minha-item .btn { min-height: 44px; min-width: 44px; }
+.bib-salvar-lista { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--fio); }
+
 /* ---------- organizacao da aula em preparacao, registro e arquivos (T08) ---------- */
 
 .bloco-grupo-aula {

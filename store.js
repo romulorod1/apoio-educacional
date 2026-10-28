@@ -18,8 +18,10 @@
  *   biblioteca_assets   : os SVG (Blob), por pacote e caminho.
  *   biblioteca_uso      : que exercício foi para que aluno, em que aula.
  *   biblioteca_etiquetas: a dificuldade que ela deu a um exercício.
+ *   biblioteca_listas   : as listas dela ("Minhas listas", versão 3 do banco):
+ *                         nome, nível e os exercícios e páginas, em ordem.
  * Os quatro primeiros vêm do pacote e se refazem importando de novo; por isso
- * a cópia de segurança leva só uso e etiquetas, que são dela.
+ * a cópia de segurança leva só uso, etiquetas e listas, que são dela.
  *
  * Nada sai daqui sem a Nathália mandar. Não há servidor nem envio automático.
  */
@@ -32,8 +34,12 @@
    *
    * O número NUNCA desce. Um app.js antigo que pedisse a versão 1 a um banco
    * já na 2 receberia VersionError e não abriria os dados dela: desfazer este
-   * release é republicar o código antigo COM VERSAO_BANCO = 2. */
-  var VERSAO_BANCO = 2;
+   * release é republicar o código antigo COM VERSAO_BANCO = 2.
+   *
+   * Versão 3 (C2a, Minhas listas): de novo só CRIA o que falta, o depósito
+   * biblioteca_listas. Desfazer este release é republicar o código antigo COM
+   * VERSAO_BANCO = 3. */
+  var VERSAO_BANCO = 3;
   var MAX_HISTORICO = 25;
 
   /* Chave das miniaturas da biblioteca dentro de 'midias'. Elas são cache
@@ -78,6 +84,9 @@
     if (!b.objectStoreNames.contains('biblioteca_etiquetas')) {
       b.createObjectStore('biblioteca_etiquetas', { keyPath: 'itemId' });
     }
+    if (!b.objectStoreNames.contains('biblioteca_listas')) {
+      b.createObjectStore('biblioteca_listas', { keyPath: 'id' });
+    }
   }
 
   function abrir() {
@@ -97,11 +106,26 @@
         conexao.onversionchange = function () {
           conexao.close();
           if (bancoAberto === conexao) bancoAberto = null;
+          /* E AVISA (C2a): esta janela fica com o código de antes, e a próxima
+           * gravação dela abriria o banco numa versão que não existe mais. */
+          if (typeof root.aoBancoTrocado === 'function') root.aoBancoTrocado();
         };
         if (typeof root.aoBancoLiberado === 'function') root.aoBancoLiberado();
         resolve(conexao);
       };
-      req.onerror = function () { reject(req.error); };
+      /* CÓDIGO MAIS VELHO QUE O BANCO (C2a): o banco já está numa versão maior
+       * que a deste código (outra janela, ou um aparelho que voltou a uma
+       * versão anterior pelo cache). O navegador recusa com VersionError, e a
+       * tela tem de dizer o que fazer, e não mostrar a mensagem técnica. */
+      req.onerror = function () {
+        var e = req.error;
+        if (e && e.name === 'VersionError') {
+          reject(Object.assign(new Error('O banco do aparelho é de uma versão mais nova do aplicativo.'),
+            { versaoNova: true, causa: e }));
+          return;
+        }
+        reject(e);
+      };
     });
   }
 
@@ -376,9 +400,14 @@
     return PREFIXO_MINIATURA + pacote + '@' + versao + ':' + caminho;
   }
 
+  /* `listaId` (C2a) é aditivo: vem quando o material anexado era, exatamente,
+   * uma das listas dela, e é por ele que o cartão diz com quem ela já usou a
+   * lista. Registro antigo fica sem, e a conta só enxerga o que tem. */
   function registrarUsoBiblioteca(reg) {
+    var registro = { itemId: reg.itemId, alunoId: reg.alunoId, aulaId: reg.aulaId, data: reg.data };
+    if (reg.listaId) registro.listaId = reg.listaId;
     return escrever('biblioteca_uso', function (s) {
-      return s.add({ itemId: reg.itemId, alunoId: reg.alunoId, aulaId: reg.aulaId, data: reg.data });
+      return s.add(registro);
     });
   }
   function usoDaBiblioteca() { return todosOsValores('biblioteca_uso'); }
@@ -388,6 +417,20 @@
     });
   }
   function etiquetasDaBiblioteca() { return todosOsValores('biblioteca_etiquetas'); }
+
+  /* Minhas listas (C2a). Um registro por lista, pelo id:
+   *   { id, titulo, nivel: null | 'base' | 'regular' | 'aprofundamento',
+   *     itens: [id de exercício...], paginas: [id de página de teoria...],
+   *     origem: id da lista pronta de onde nasceu | null,
+   *     automatica: true quando foi o aplicativo que guardou (ao trocar o
+   *       material), sem nome dado por ela,
+   *     criadaEm, editadaEm: milissegundos }
+   * `itens` e `paginas` são ordenados: a ordem é a dela. */
+  function gravarListaBiblioteca(registro) {
+    return escrever('biblioteca_listas', function (s) { return s.put(registro); });
+  }
+  function apagarListaBiblioteca(id) { return apagar('biblioteca_listas', id); }
+  function listasDaBiblioteca() { return todosOsValores('biblioteca_listas'); }
 
   // ---------- histórico de desfazer ----------
 
@@ -543,9 +586,9 @@
     }).then(function () {
       /* Da biblioteca vão só o uso e as etiquetas, que são dela. Os pacotes,
        * os exercícios e as imagens voltam importando o pacote de novo. */
-      return Promise.all([usoDaBiblioteca(), etiquetasDaBiblioteca()]);
+      return Promise.all([usoDaBiblioteca(), etiquetasDaBiblioteca(), listasDaBiblioteca()]);
     }).then(function (bib) {
-      pacote.biblioteca = { uso: bib[0] || [], etiquetas: bib[1] || [] };
+      pacote.biblioteca = { uso: bib[0] || [], etiquetas: bib[1] || [], listas: bib[2] || [] };
       return pacote;
     });
   }
@@ -578,15 +621,26 @@
     }).then(function () { return pacote.dados; });
   }
 
+  /* As listas dela (C2a) entram na mesma transação, para a cópia voltar
+   * inteira ou não voltar. Cópia feita antes delas não tem o campo `listas`:
+   * aí as listas que o tablet já tem ficam como estão, como o uso e as
+   * etiquetas numa cópia feita antes da biblioteca. */
   function restaurarBiblioteca(bib) {
+    var comListas = Array.isArray(bib.listas);
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = b.transaction(['biblioteca_uso', 'biblioteca_etiquetas'], 'readwrite');
+        var nomes = ['biblioteca_uso', 'biblioteca_etiquetas'].concat(comListas ? ['biblioteca_listas'] : []);
+        var t = b.transaction(nomes, 'readwrite');
         var uso = t.objectStore('biblioteca_uso');
         var etq = t.objectStore('biblioteca_etiquetas');
         uso.clear(); etq.clear();
         (bib.uso || []).forEach(function (r) { if (r && r.itemId) uso.put(r); });
         (bib.etiquetas || []).forEach(function (r) { if (r && r.itemId) etq.put(r); });
+        if (comListas) {
+          var lis = t.objectStore('biblioteca_listas');
+          lis.clear();
+          bib.listas.forEach(function (r) { if (r && r.id && Array.isArray(r.itens)) lis.put(r); });
+        }
         t.oncomplete = function () { resolve(); };
         t.onabort = function () { reject(t.error); };
       });
@@ -603,7 +657,8 @@
       /* O uso e as etiquetas são dela e saem junto. Os pacotes ficam: são
        * conteúdo reimportável, como o próprio aplicativo. */
       esvaziar('biblioteca_uso'),
-      esvaziar('biblioteca_etiquetas')
+      esvaziar('biblioteca_etiquetas'),
+      esvaziar('biblioteca_listas')
     ]);
   }
 
@@ -622,6 +677,8 @@
     itensDaBiblioteca: itensDaBiblioteca, teoriaDaBiblioteca: teoriaDaBiblioteca,
     lerAssetBiblioteca: lerAssetBiblioteca, chaveMiniatura: chaveMiniatura,
     registrarUsoBiblioteca: registrarUsoBiblioteca, usoDaBiblioteca: usoDaBiblioteca,
-    gravarEtiquetaBiblioteca: gravarEtiquetaBiblioteca, etiquetasDaBiblioteca: etiquetasDaBiblioteca
+    gravarEtiquetaBiblioteca: gravarEtiquetaBiblioteca, etiquetasDaBiblioteca: etiquetasDaBiblioteca,
+    gravarListaBiblioteca: gravarListaBiblioteca, apagarListaBiblioteca: apagarListaBiblioteca,
+    listasDaBiblioteca: listasDaBiblioteca
   };
 })(typeof self !== 'undefined' ? self : this);
