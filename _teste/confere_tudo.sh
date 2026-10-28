@@ -405,6 +405,14 @@ roda "falha --envenenado-ponto-segura"          node "_teste/testa_falha_de_grav
 # e a pergunta de confirmacao das tres substituicoes ja avisa que a mudanca
 # pendente vai se perder, antes de ela decidir
 roda "falha --envenenado-confirma-calado"       node "_teste/testa_falha_de_gravacao.js" --envenenado-confirma-calado
+# e, quando a substituicao nao grava nada, a memoria e a faixa ficam
+roda "falha --envenenado-nada-descarta"         node "_teste/testa_falha_de_gravacao.js" --envenenado-nada-descarta
+# o Atualizar grava antes ou pergunta, e nunca recarrega calado com pendencia
+roda "falha --envenenado-atualiza-calado"       node "_teste/testa_falha_de_gravacao.js" --envenenado-atualiza-calado
+# quem desfaz a mudanca na memoria tira a faixa so quando ela era so daquela
+# mudanca: um veneno de cada lado
+roda "falha --envenenado-desfeita-calada"       node "_teste/testa_falha_de_gravacao.js" --envenenado-desfeita-calada
+roda "falha --envenenado-desfeita-apaga"        node "_teste/testa_falha_de_gravacao.js" --envenenado-desfeita-apaga
 
 # FRENTE B (B9): kits.json e exclusoes.json sao aditivos do esquema 1 (CONTRATO
 # 8d). A prova nao le o biblioteca.js: ela IMPORTA um pacote de brinquedo com os

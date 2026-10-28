@@ -415,11 +415,19 @@
     });
   }
 
+  /* `nadaGravado`: a PRIMEIRA gravação de uma substituição inteira falhou, e
+   * ela é uma transação só do documento principal, então o disco ficou como
+   * estava. Quem chama pode manter a memória, que aí é melhor que o disco (B3);
+   * nas outras falhas, algo pode ter ficado gravado pela metade. */
+  function nadaGravado(e) {
+    return Object.assign(new Error('Nada foi gravado.'), { nadaGravado: true, causa: e });
+  }
+
   /* Volta ao estado guardado e descarta esse ponto do histórico. */
   function desfazer(id) {
     return ler('historico', id).then(function (registro) {
       if (!registro) return null;
-      return salvar(registro.estado).then(function () {
+      return salvar(registro.estado).then(null, function (e) { throw nadaGravado(e); }).then(function () {
         return apagar('historico', id);
       }).then(function () {
         return registro.estado;
@@ -548,7 +556,7 @@
        * dizer só isso; nas outras falhas algo pode ter sido gravado pela metade. */
       return Promise.reject(Object.assign(new Error('Arquivo de cópia inválido.'), { invalida: true }));
     }
-    return salvar(pacote.dados).then(function () {
+    return salvar(pacote.dados).then(null, function (e) { throw nadaGravado(e); }).then(function () {
       var passos = [];
       Object.keys(pacote.notas || {}).forEach(function (k) { passos.push(gravar('notas', k, pacote.notas[k])); });
       Object.keys(pacote.midias || {}).forEach(function (k) { passos.push(salvarMidia(k, pacote.midias[k])); });

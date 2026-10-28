@@ -23,11 +23,19 @@
  *      com o ponto que ela escolheu (a memória velha não é gravada por cima),
  *      e a mudança pendente que sai é dita ANTES, na pergunta de confirmação,
  *      e depois, na frase; não some calada;
+ *  5b. "Voltar a este ponto" cuja primeira gravação falha (nada gravado): a
+ *      memória, com a mudança pendente, e a faixa ficam, e a frase diz que
+ *      nada foi trocado;
  *   6. Excluir aula (comDesfazer) com o tablet sem espaço: a janela fecha, a
- *      agenda redesenha e a faixa aparece;
+ *      agenda redesenha, o aviso diz o que aconteceu e a faixa aparece;
  *   7. Excluir aula quando só o ponto de retorno não cabe: a exclusão é
  *      gravada mesmo assim, o aviso sai sem Desfazer, e nada cai no ouvinte
  *      global;
+ *  11. "Atualizar" com mudança pendente: grava antes; não dando, pergunta com
+ *      o aviso, e com um não a página não recarrega; com espaço, grava e
+ *      recarrega sem perguntar (uma versão nova de verdade, pelo sw.js servido);
+ *  12. quem desfaz a mudança na memória (registrar assunto) tira a faixa só
+ *      quando a pendência era só daquela mudança; com pendência anterior, fica;
  *   8. uma promessa rejeitada sem tratamento que NÃO veio do salvar vira uma
  *      frase na tela, e continua aparecendo como erro para os testes;
  *  10. sem navegador: o Store.salvar só é chamado direto nos três lugares
@@ -48,6 +56,11 @@
  *                                 a gravação da mudança.
  *   --envenenado-confirma-calado  a pergunta de confirmação não avisa que a
  *                                 mudança pendente vai se perder.
+ *   --envenenado-nada-descarta    quando nada foi gravado, a memória é trocada
+ *                                 pelo disco do mesmo jeito.
+ *   --envenenado-atualiza-calado  o Atualizar recarrega sem gravar nem perguntar.
+ *   --envenenado-desfeita-calada  o caminho desfaz na memória e a faixa fica.
+ *   --envenenado-desfeita-apaga   a faixa sai mesmo com pendência anterior.
  */
 'use strict';
 const fs = require('fs');
@@ -58,18 +71,25 @@ const { conf, secao, pausa, esperar } = H;
 const PORTA = 8873;
 const MODOS = ['--envenenado-sem-tratamento', '--envenenado-olho-espera', '--envenenado-faixa-por-cima',
   '--envenenado-rele-grava', '--envenenado-rele-calado', '--envenenado-desfazer-trava', '--envenenado-ponto-segura',
-  '--envenenado-confirma-calado'];
+  '--envenenado-confirma-calado', '--envenenado-nada-descarta', '--envenenado-atualiza-calado',
+  '--envenenado-desfeita-calada', '--envenenado-desfeita-apaga'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const CSS = fs.readFileSync(path.join(H.RAIZ, 'styles.css'), 'utf8');
+const SW = fs.readFileSync(path.join(H.RAIZ, 'sw.js'), 'utf8');
+const ATUALIZA_CONFERE = 'prontoParaRecarregar().then(';
+const DESFEITA_INICIO = 'function mudancaDesfeitaNaMemoria(erro) {';
+const DESFEITA_CONDICAO = ' || !erro || erro !== erroQueAbriuPendencia || falhasDesdeQueAbriu !== 1';
 
 const LIGACAO = 'p.then(gravacaoConfirmada, falhaDeGravacao);';
 const OLHO_NA_HORA = /desenharTudo\(\);(\r?\n)    salvar\(\);(\r?\n)  \}/;
-const RELE_INICIO = /(  function releDoDisco\(mensagem\) \{\r?\n)/;
-const FRASE_SAIU = "' A última mudança, que o tablet ainda não tinha conseguido guardar, também saiu.'";
-const DESFAZER_CUMPRE = '}, function () { return resultado; });';
+const RELE_ASSINATURA = '  function releDoDisco(erro, inicio, inicioSeNada) {';
+const RELE_INICIO = /(  function releDoDisco\(erro, inicio, inicioSeNada\) \{\r?\n)/;
+const NADA_FICA = 'if (erro && erro.nadaGravado) {';
+const FRASE_SAIU = "' As mudanças que o tablet ainda não tinha conseguido guardar também saíram.'";
+const DESFAZER_CUMPRE = /\}, function \(\) \{\r?\n {10}\/\/ o que aconteceu[^\n]*\r?\n {10}avisar\(texto\);\r?\n {10}return resultado;\r?\n {8}\}\);/;
 const PONTO_NAO_SEGURA = '.then(function () { return true; }, function () { return false; })';
-const AVISO_NA_CONFIRMACAO = "'\\n\\nAtenção: a última mudança, que o tablet ainda não conseguiu guardar, vai se perder.'";
+const AVISO_NA_CONFIRMACAO = "'\\n\\nAtenção: as mudanças que o tablet ainda não conseguiu guardar vão se perder.'";
 const FAIXA_NO_FLUXO = /\.faixa-gravacao \{(\r?\n)  flex-shrink: 0;\r?\n  margin: 8px 12px 0;/;
 
 /* Cada âncora existe exatamente uma vez, senão o veneno trocaria a coisa
@@ -84,7 +104,11 @@ if (MODO === '--envenenado-sem-tratamento') trocas['/app.js'] = APP.split(LIGACA
 if (MODO === '--envenenado-olho-espera') trocas['/app.js'] = APP.replace(OLHO_NA_HORA, 'salvar().then(desenharTudo);$1  }');
 if (MODO === '--envenenado-rele-grava') trocas['/app.js'] = APP.replace(RELE_INICIO, '$1    salvar();\n');
 if (MODO === '--envenenado-rele-calado') trocas['/app.js'] = APP.split(FRASE_SAIU).join("''");
-if (MODO === '--envenenado-desfazer-trava') trocas['/app.js'] = APP.split(DESFAZER_CUMPRE).join('});');
+if (MODO === '--envenenado-desfazer-trava') trocas['/app.js'] = APP.replace(DESFAZER_CUMPRE, '});');
+if (MODO === '--envenenado-nada-descarta') trocas['/app.js'] = APP.split(NADA_FICA).join('if (false) {');
+if (MODO === '--envenenado-atualiza-calado') trocas['/app.js'] = APP.split(ATUALIZA_CONFERE).join('Promise.resolve(true).then(');
+if (MODO === '--envenenado-desfeita-calada') trocas['/app.js'] = APP.split(DESFEITA_INICIO).join(DESFEITA_INICIO + ' return;');
+if (MODO === '--envenenado-desfeita-apaga') trocas['/app.js'] = APP.split(DESFEITA_CONDICAO).join('');
 if (MODO === '--envenenado-ponto-segura') trocas['/app.js'] = APP.split(PONTO_NAO_SEGURA).join('.then(function () { return true; })');
 if (MODO === '--envenenado-confirma-calado') trocas['/app.js'] = APP.split(AVISO_NA_CONFIRMACAO).join("''");
 if (MODO === '--envenenado-faixa-por-cima') {
@@ -118,14 +142,17 @@ conf('existe o ouvinte global de promessa rejeitada', /addEventListener\('unhand
 conf('nenhum nome declarado duas vezes no nível do módulo', nomesRepetidos(APP).join(', '), '');
 conf('controle: a busca de nomes repetidos enxerga um var a mais',
   nomesRepetidos(APP + '\n  var mudancaNaoGuardada = null;\n').join(', '), 'mudancaNaoGuardada');
-const corpoRele = (APP.split('  function releDoDisco(mensagem) {')[1] || '').split(/\r?\n  \}\r?\n/)[0];
+const corpoRele = (APP.split(RELE_ASSINATURA)[1] || '').split(/\r?\n  \}\r?\n/)[0];
 conf('o corpo do releDoDisco foi achado', corpoRele.length > 50, true);
 conf('o releDoDisco não grava a memória', /salvar\(/.test(corpoRele), false);
-// as três substituições inteiras perguntam já dizendo o que a pendência perde
-conf('as três confirmações levam o aviso da pendência', (APP.match(/avisoDePendenciaNaConfirmacao\(\)\)/g) || []).length, 3);
+// as três substituições inteiras e o Atualizar perguntam já dizendo o que a pendência perde
+conf('as quatro perguntas (três substituições e o Atualizar) levam o aviso da pendência',
+  (APP.match(/avisoDePendenciaNaConfirmacao\(\)\)/g) || []).length, 4);
 [['ligação do tratamento', APP, LIGACAO], ['olho na hora', APP, OLHO_NA_HORA], ['início do releDoDisco', APP, RELE_INICIO],
   ['frase da pendência que saiu', APP, FRASE_SAIU], ['comDesfazer cumpre na falha', APP, DESFAZER_CUMPRE],
   ['ponto de retorno não segura', APP, PONTO_NAO_SEGURA], ['aviso na confirmação', APP, AVISO_NA_CONFIRMACAO],
+  ['nada gravado, memória fica', APP, NADA_FICA], ['atualizar confere antes', APP, ATUALIZA_CONFERE],
+  ['desfeita na memória: início', APP, DESFEITA_INICIO], ['desfeita na memória: condição', APP, DESFEITA_CONDICAO],
   ['faixa no fluxo', CSS, FAIXA_NO_FLUXO]
 ].forEach(([nome, texto, ancora]) => conf('âncora de veneno uma vez só: ' + nome, umaVez(texto, ancora), true));
 
@@ -203,8 +230,8 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   await pausa(1500);
 
   /* O tablet sem espaço: com a chave ligada, a gravação faz o pedido e aborta
-   * a transação logo em seguida. */
-  await pag.evaluate(() => {
+   * a transação logo em seguida. De novo a cada recarga da página. */
+  const instalarSemEspaco = () => pag.evaluate(() => {
     window.__semEspaco = { dados: false, historicoAdd: false, historicoDelete: false };
     const embrulha = (metodo, deposito, chave) => {
       const orig = IDBObjectStore.prototype[metodo];
@@ -218,6 +245,7 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
     embrulha('add', 'historico', 'historicoAdd');
     embrulha('delete', 'historico', 'historicoDelete');
   });
+  await instalarSemEspaco();
 
   // ================================================================
   secao('1. A gravação que falha avisa, a mudança fica na memória, e o olho esconde na hora');
@@ -326,10 +354,10 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   if (MODO === '--envenenado-confirma-calado') {
     secao('VENENO: a confirmação não diz que a mudança pendente vai se perder');
     conf('a pergunta de confirmação apareceu', pergunta5.length > 0, true);
-    conf('envenenado: a pergunta não avisa (defeito enxergado)', /vai se perder/.test(pergunta5), false);
+    conf('envenenado: a pergunta não avisa (defeito enxergado)', /vão se perder/.test(pergunta5), false);
     throw fim();
   }
-  conf('a pergunta de confirmação já avisa que a mudança pendente vai se perder', /vai se perder/.test(pergunta5), true);
+  conf('a pergunta de confirmação já avisa que a mudança pendente vai se perder', /vão se perder/.test(pergunta5), true);
   await sem(pag, { historicoDelete: false });
   /* O disco depois de um tempo maior que a primeira nova tentativa: se a
    * memória velha fosse gravada (agora ou pela tentativa), os valores
@@ -343,14 +371,50 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   }
   if (MODO === '--envenenado-rele-calado') {
     secao('VENENO: a mudança pendente sai sem uma palavra');
-    conf('envenenado: a frase não conta o que saiu (defeito enxergado)', /também saiu/.test(texto5), false);
+    conf('envenenado: a frase não conta o que saiu (defeito enxergado)', /também saíram/.test(texto5), false);
     throw fim();
   }
   conf('o aviso diz que não se completou', frase5.ok, true);
-  conf('e conta que a mudança que não estava guardada também saiu', /também saiu/.test(texto5), true);
+  conf('e conta que a mudança que não estava guardada também saiu', /também saíram/.test(texto5), true);
   conf('o disco ficou com o ponto escolhido, e nada o regravou depois', discoDepois, false);
   conf('a faixa sumiu, porque não há mais pendência', await faixaVisivel(pag), false);
   conf('e o olho da tela voltou a seguir o banco', await olhoLigado(pag), false);
+
+  // ================================================================
+  secao('5b. "Voltar a este ponto" que não grava nada: a memória e a faixa ficam');
+  /* Num tablet cheio, o caso mais provável é a PRIMEIRA gravação da volta
+   * falhar: o disco fica como estava, e a memória, com a mudança pendente, é
+   * melhor que ele. O ponto da seção 5 continua na lista (a limpeza dele
+   * abortou). O aviso anterior é apagado antes, para a espera não achar ele. */
+  await sem(pag, { dados: true });
+  await pag.click('#alternar-valores');
+  await pausa(800);
+  conf('há mudança pendente de novo: olho ligado e faixa', (await olhoLigado(pag)) && (await faixaVisivel(pag)), true);
+  await pag.evaluate(() => { document.querySelector('#aviso-texto').textContent = ''; });
+  const botao5b = await esperar('o "Voltar a este ponto" na lista', () => pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#lista-historico button')).some(b => b.textContent.trim() === 'Voltar a este ponto')),
+  v => v === true, 5000);
+  conf('o ponto de prova continua em Ajustes', botao5b.ok, true);
+  await pag.evaluate(() => {
+    Array.from(document.querySelectorAll('#lista-historico button'))
+      .find(b => b.textContent.trim() === 'Voltar a este ponto').click();
+  });
+  const frase5b = await esperar('o aviso da volta que não gravou nada', () => aviso(pag),
+    a => a.aberto && /Não consegui voltar a este ponto/.test(a.texto), 5000);
+  const ficou = await olhoLigado(pag);
+  if (MODO === '--envenenado-nada-descarta') {
+    secao('VENENO: nada foi gravado, e mesmo assim a memória é trocada pelo disco');
+    conf('envenenado: a mudança pendente sumiu da tela (defeito enxergado)', ficou, false);
+    throw fim();
+  }
+  conf('o aviso diz que nada foi trocado', /nada foi trocado/.test((frase5b.valor && frase5b.valor.texto) || ''), true);
+  conf('a mudança pendente continua na tela (o olho continua ligado)', ficou, true);
+  conf('a faixa continua', await faixaVisivel(pag), true);
+  conf('e o disco ficou como estava', await noDisco(pag), false);
+  await sem(pag, { dados: false });
+  await pag.click('#faixa-gravacao-tentar');
+  const guardou5b = await esperar('a mudança que ficou chegar ao disco', () => noDisco(pag), v => v === true, 5000);
+  conf('com espaço de volta, a mudança que ficou chega ao disco', guardou5b.ok, true);
 
   // ================================================================
   secao('6. Excluir aula com o tablet sem espaço: a janela fecha, a agenda redesenha, a faixa aparece');
@@ -372,6 +436,7 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   conf('a janela fechou', fechou.ok, true);
   conf('a aula saiu da agenda', await pag.evaluate(() => !document.querySelector('[data-aula-id="a1"]')), true);
   conf('a faixa aparece', await faixaVisivel(pag), true);
+  conf('e o aviso diz o que aconteceu, sem Desfazer', await aviso(pag).then(a => /Aula excluída/.test(a.texto) && !a.acao), true);
   conf('e o disco ainda tem a aula', (await principal(pag)).aulas, 'a1,a2');
   await sem(pag, { dados: false });
   await pag.click('#faixa-gravacao-tentar');
@@ -399,6 +464,194 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   conf('e sai sem Desfazer, porque não há ponto para onde voltar', av7.acao, false);
   conf('nenhuma faixa (o que importava foi gravado)', await faixaVisivel(pag), false);
   conf('e nada caiu no ouvinte global', pag.errosDePagina.length, errosAntes7);
+
+  // ================================================================
+  secao('11. "Atualizar" com mudança não guardada: grava antes, ou pergunta, e nunca recarrega calado');
+  /* Uma versão nova de verdade: o sw.js servido passa a ser outro, e o
+   * aplicativo a procura pelo botão de Ajustes, como no tablet. A pergunta é
+   * respondida por um confirm trocado na página, que guarda o texto no
+   * sessionStorage, que atravessa o recarregamento; a marca na janela some
+   * quando a página recarrega. */
+  await pag.evaluate(() => {
+    window.__marca = 'pagina-antes';
+    sessionStorage.setItem('perguntas', '[]');
+    window.__resposta = false;
+    window.confirm = m => {
+      const l = JSON.parse(sessionStorage.getItem('perguntas') || '[]');
+      l.push(m);
+      sessionStorage.setItem('perguntas', JSON.stringify(l));
+      return window.__resposta;
+    };
+  });
+  const perguntas = () => pag.evaluate(() => JSON.parse(sessionStorage.getItem('perguntas') || '[]'));
+  const marca = () => pag.evaluate(() => window.__marca || '');
+  trocas['/sw.js'] = SW + '\n// versão de prova do B3\n';
+  await H.irParaAba(pag, 'ajustes');
+  await pag.click('#procurar-atualizacao');
+  const esperando = await esperar('a versão nova esperando', () => pag.evaluate(() =>
+    navigator.serviceWorker.getRegistration().then(r => !!(r && r.waiting))), v => v === true, 30000);
+  conf('há uma versão nova esperando', esperando.ok, true);
+  /* O "Procurar atualização" mostra o aviso da versão nova 1,4 s depois de
+   * achar; espera esse aviso chegar, senão ele cobre o aviso que se confere
+   * abaixo. Se a espera for curta, o erro é uma falha falsa, nunca um passe. */
+  await esperar('o aviso da versão nova', () => aviso(pag), a => /versão nova/.test(a.texto), 5000);
+  await pausa(1800);
+  const temBotao = () => pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#estado-versao button')).some(x => /Atualizar agora/.test(x.textContent)));
+  const tocarAtualizar = () => pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#estado-versao button')).find(x => /Atualizar agora/.test(x.textContent)).click());
+  conf('Ajustes oferece "Atualizar agora"', (await esperar('o botão Atualizar agora', temBotao, v => v === true, 5000)).ok, true);
+  await sem(pag, { dados: true });
+  await pag.click('#alternar-valores');
+  await pausa(800);
+  conf('há mudança pendente: faixa', await faixaVisivel(pag), true);
+  const discoAntes11 = await noDisco(pag);
+  await tocarAtualizar();
+  await pausa(2500);
+  const ficouNaPagina = (await marca().catch(() => '')) === 'pagina-antes';
+  if (MODO === '--envenenado-atualiza-calado') {
+    secao('VENENO: o "Atualizar" recarrega sem gravar nem perguntar');
+    conf('envenenado: a página recarregou com a mudança pendente (defeito enxergado)', ficouNaPagina, false);
+    conf('envenenado: e ninguém perguntou nada', (await perguntas()).length, 0);
+    throw fim();
+  }
+  const p11 = await perguntas();
+  conf('sem conseguir gravar, ela é perguntada uma vez', p11.length, 1);
+  conf('e a pergunta avisa que as mudanças vão se perder', /vão se perder/.test(p11[0] || ''), true);
+  conf('ela disse não: a página não recarregou', ficouNaPagina, true);
+  conf('a faixa continua', await faixaVisivel(pag), true);
+  const av11 = await aviso(pag);
+  console.log('   aviso: ' + JSON.stringify(av11));
+  conf('e o aviso diz que a atualização ficou para depois', /ficou para depois/.test(av11.texto), true);
+  /* Com espaço de volta, o "Atualizar" grava primeiro e recarrega sem
+   * perguntar; a mudança que estava pendente está no disco depois. */
+  await sem(pag, { dados: false });
+  await tocarAtualizar();
+  const recarregou = await esperar('a página recarregar', () => marca().catch(() => 'navegando'),
+    v => v === '', 15000);
+  conf('com espaço, o "Atualizar" recarrega', recarregou.ok, true);
+  await pausa(2500);
+  conf('sem perguntar de novo', (await perguntas()).length, 1);
+  conf('e a mudança que estava pendente foi gravada antes', await noDisco(pag), !discoAntes11);
+
+  // ================================================================
+  secao('12. Quem desfaz a mudança na memória tira a faixa só quando ela era só dessa mudança');
+  /* Registrar assunto desfaz o assunto na memória quando a gravação falha, e
+   * avisa "Não foi possível registrar o assunto. Tente de novo." A faixa ao
+   * lado dizendo "o que você fez continua na tela" contradiria isso. Dois
+   * lados: sem pendência antes, a pendência era só desse assunto e sai; com
+   * uma pendência anterior (o olho), a faixa fica, porque a memória ainda tem
+   * o olho que o disco não tem. Uma aula nova é posta no disco, por fora, e o
+   * aplicativo é reaberto com ela. */
+  await pag.evaluate(() => new Promise(res => {
+    const r = indexedDB.open('apoio-educacional');
+    r.onsuccess = () => {
+      const t = r.result.transaction('dados', 'readwrite');
+      const s = t.objectStore('dados');
+      const g = s.get('principal');
+      g.onsuccess = () => {
+        const d = g.result;
+        d.aulas.push({ id: 'a3', alunoId: 'alfa', data: new Date().toISOString().slice(0, 10), hora: '18:00',
+          duracaoMin: 60, status: 'realizada', cobravel: true, temas: [], areas: [], anexos: [] });
+        s.put(d, 'principal');
+      };
+      t.oncomplete = () => res();
+    };
+  }));
+  await H.abrirApp(pag, amb.ORIGEM);
+  await pausa(1500);
+  await instalarSemEspaco();
+  const fecharJanelas = () => pag.evaluate(() => {
+    document.querySelectorAll('.fundo-modal.aberto [data-fechar]').forEach(b => b.click());
+  });
+  const registrarLivre = async texto => {
+    // o aviso anterior é apagado, senão a espera do fim acharia o velho e seguiria antes da gravação terminar
+    await pag.evaluate(() => { document.querySelector('#aviso-texto').textContent = ''; });
+    await H.irParaAba(pag, 'agenda');
+    await pag.click('[data-aula-id="a3"]');
+    await esperar('a janela da aula abriu', () => pag.evaluate(() =>
+      document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
+    // o elemento visível mais fundo com o texto, como na testa_assunto
+    const tocou = await pag.evaluate(() => {
+      const raiz = document.querySelector('#modal-aula');
+      const limpo = e => e.textContent.replace(/\s+/g, ' ').trim();
+      const cand = Array.from(raiz.querySelectorAll('*')).filter(e => e.getClientRects().length > 0 &&
+        /^(Escolher o assunto da aula|Mais um assunto)$/.test(limpo(e)));
+      const fundo = e => { let n = 0, x = e; while (x && x !== raiz) { n++; x = x.parentElement; } return n; };
+      cand.sort((a, b) => fundo(b) - fundo(a));
+      if (!cand.length) return false;
+      cand[0].click();
+      return true;
+    });
+    conf('achou onde escolher o assunto na aula', tocou, true);
+    const temUsar = () => pag.evaluate(() => Array.from(document.querySelectorAll('#modal-tema button'))
+      .some(b => b.textContent.replace(/\s+/g, ' ').trim() === 'Usar'));
+    await esperar('a janela do assunto abriu', temUsar, v => v === true, 5000);
+    // o campo ao lado do botão Usar, como no usarOutro da testa_assunto
+    const usou = await pag.evaluate(txt => {
+      const botao = Array.from(document.querySelectorAll('#modal-tema button'))
+        .find(b => b.textContent.replace(/\s+/g, ' ').trim() === 'Usar');
+      let no = botao, campo = null;
+      for (let i = 0; i < 5 && no && !campo; i++) {
+        no = no.parentElement;
+        if (no) campo = no.querySelector('input[type=text], input:not([type])');
+      }
+      if (!campo) return false;
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(campo, txt);
+      campo.dispatchEvent(new Event('input', { bubbles: true }));
+      botao.click();
+      return true;
+    }, texto);
+    conf('escreveu o assunto e tocou em Usar', usou, true);
+    return esperar('o aviso do assunto que não gravou', () => aviso(pag),
+      a => /Não foi possível registrar o assunto/.test(a.texto), 5000);
+  };
+  // a) sem pendência antes
+  conf('não há pendência antes', await faixaVisivel(pag), false);
+  await sem(pag, { dados: true });
+  const av12a = await registrarLivre('Assunto de prova A');
+  conf('o aviso próprio diz que não registrou', av12a.ok, true);
+  const faixa12a = await faixaVisivel(pag);
+  if (MODO === '--envenenado-desfeita-calada') {
+    secao('VENENO: o caminho desfaz na memória e a faixa continua dizendo "continua na tela"');
+    conf('envenenado: a faixa ficou ao lado do aviso contrário (defeito enxergado)', faixa12a, true);
+    throw fim();
+  }
+  conf('a faixa não fica ao lado, porque a memória voltou a ser o disco', faixa12a, false);
+  // b) com uma pendência anterior
+  await fecharJanelas();
+  await pausa(400);
+  await pag.click('#alternar-valores');
+  await pausa(800);
+  conf('há uma pendência anterior (o olho): faixa', await faixaVisivel(pag), true);
+  /* A propriedade é "a faixa NUNCA se esconde enquanto o olho não foi
+   * guardado", e não "está à vista no instante da conferência": uma gravação
+   * seguinte que também falha a reabriria, e um retrato só não veria o sumiço.
+   * Um observador conta cada vez que ela se esconde. */
+  /* Conta pelo VALOR ANTIGO de cada registro (sem o atributo = estava à
+   * vista), e não por `f.hidden` na hora do retorno: o retorno é assíncrono, e
+   * uma faixa escondida e reaberta no mesmo instante já estaria à vista
+   * quando ele rodasse. */
+  await pag.evaluate(() => {
+    window.__faixaEscondeu = 0;
+    const f = document.querySelector('#faixa-gravacao');
+    new MutationObserver(registros => {
+      registros.forEach(r => { if (r.oldValue === null) window.__faixaEscondeu++; });
+    }).observe(f, { attributes: true, attributeFilter: ['hidden'], attributeOldValue: true });
+  });
+  const av12b = await registrarLivre('Assunto de prova B');
+  conf('o aviso próprio diz que não registrou', av12b.ok, true);
+  const faixa12b = (await faixaVisivel(pag)) && (await pag.evaluate(() => window.__faixaEscondeu)) === 0;
+  if (MODO === '--envenenado-desfeita-apaga') {
+    secao('VENENO: a faixa sai mesmo com a pendência anterior');
+    conf('envenenado: a faixa sumiu com o olho ainda por guardar (defeito enxergado)', faixa12b, false);
+    throw fim();
+  }
+  conf('a faixa fica, e não se escondeu nenhuma vez, porque o olho ainda não foi guardado', faixa12b, true);
+  await fecharJanelas();
+  await sem(pag, { dados: false });
+  await pag.click('#faixa-gravacao-tentar');
+  conf('com espaço de volta, a faixa sai', (await esperar('a faixa sair', () => faixaVisivel(pag), v => v === false, 5000)).ok, true);
 
   // ================================================================
   secao('8. Rejeição que não veio do salvar vira frase, e continua sendo erro');
