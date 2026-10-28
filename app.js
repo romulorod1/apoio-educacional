@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.29.0';
+  var VERSAO = '1.29.1';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -63,6 +63,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.29.1',
+      itens: [
+        'Se um dia o tablet não conseguir guardar o que você fez (por exemplo, sem espaço), ' +
+          'aparece um aviso no alto da tela com "Tentar de novo agora". O que você fez continua ' +
+          'na tela, e o aplicativo tenta guardar de novo sozinho.'
+      ]
+    },
     {
       versao: '1.29.0',
       itens: [
@@ -971,7 +979,12 @@
     db.ajustes = db.ajustes || {};
     db.ajustes.valoresOcultos = valoresOcultos;
     atualizarBotaoOlho();
-    salvar().then(desenharTudo);
+    /* NA HORA, e não depois de gravar (B3). Ela liga o olho com a família ou o
+     * aluno ao lado: se a gravação falhasse, os valores continuariam à mostra,
+     * e a falha vazaria o que ela mandou esconder. A tela segue a memória; a
+     * faixa do salvar() avisa se não deu para guardar. */
+    desenharTudo();
+    salvar();
   }
 
   function atualizarBotaoOlho() {
@@ -1045,30 +1058,184 @@
     return saida;
   }
 
-  function salvar() { return Store.salvar(dbParaGravar()); }
+  /* A FALHA DE GRAVAÇÃO TRATADA NUM LUGAR SÓ (B3).
+   *
+   * Desde que o Store.salvar espera a transação confirmar, ele rejeita de
+   * verdade quando o tablet não consegue gravar (o caso mais provável é falta
+   * de espaço, um QuotaExceededError). Cerca de 40 chamadas faziam
+   * `salvar().then(...)` sem tratar a rejeição: a falha passava calada, e o
+   * que estava na tela não estava no disco.
+   *
+   * Agora o próprio salvar() trata a falha, então toda chamada fica coberta
+   * por construção, sem depender de cada uma lembrar do catch:
+   *   - a promessa devolvida continua REJEITANDO, para quem chama não seguir
+   *     como se tivesse gravado (o "Aula salva." de quem chama não aparece);
+   *   - o dado fica na memória: uma gravação do documento inteiro que falha
+   *     não grava pedaço nenhum, então a memória é a versão mais nova, e é ela
+   *     que a nova tentativa grava;
+   *   - uma faixa fica no alto da tela até uma gravação dar certo, com
+   *     "Tentar de novo agora", e o aplicativo tenta sozinho depois de 15 s e
+   *     de 1 min;
+   *   - a rejeição fica marcada como avisada, e o ouvinte global de promessa
+   *     rejeitada (mais abaixo) não avisa de novo.
+   * Quem precisa de outra coisa na falha (voltar a memória para o disco depois
+   * de uma gravação de várias partes) continua com o próprio catch e o
+   * releDoDisco, que também limpa a pendência. */
+  var falhasAvisadas = (typeof WeakSet === 'function') ? new WeakSet() : null;
+  var mudancaNaoGuardada = false;
+  var ATRASOS_NOVA_TENTATIVA = [15000, 60000];
+  var tempoNovaTentativa = null;
+
+  function salvar() {
+    var p = Store.salvar(dbParaGravar());
+    p.then(gravacaoConfirmada, falhaDeGravacao);
+    return p;
+  }
+
+  /* O QUE É SÓ TELA ACONTECE MESMO QUANDO A GRAVAÇÃO FALHA. A memória já é a
+   * verdade e a faixa avisa que falta guardar; então fechar a janela,
+   * redesenhar e soltar uma trava não podem ficar presos ao disco. Antes, a
+   * falha deixava a janela aberta com o trabalho feito, a tela desatualizada
+   * e, num caso, a trava de guardar trilha presa para sempre. O `depois`
+   * recebe `true` quando gravou, para só então dizer "salvo". A promessa
+   * devolvida continua sendo a do salvar(). Quem DEPENDE do disco (desfaz na
+   * memória quando a gravação falha) continua com salvar().then e o catch
+   * próprio. */
+  function salvarEDepois(depois) {
+    var p = salvar();
+    p.then(function () { depois(true); }, function () { depois(false); });
+    return p;
+  }
+
+  function gravacaoConfirmada() {
+    if (!mudancaNaoGuardada) return;
+    mudancaNaoGuardada = false;
+    clearTimeout(tempoNovaTentativa);
+    esconderFaixaGravacao();
+  }
+
+  function falhaDeGravacao(erro) {
+    if (erro && typeof erro === 'object' && falhasAvisadas) {
+      try { falhasAvisadas.add(erro); } catch (e) { /* objeto que não aceita: o ouvinte avisa de novo, e só */ }
+    }
+    var primeira = !mudancaNaoGuardada;
+    mudancaNaoGuardada = true;
+    mostrarFaixaGravacao();
+    if (primeira) agendarNovaTentativa(0);
+  }
+
+  /* Depois da última espera da lista, repete a última (um minuto) enquanto
+   * houver pendência: a faixa diz "eu tento guardar de novo sozinho", e isso
+   * tem de continuar verdade. Uma gravação por minuto é o que qualquer toque
+   * dela já custa. */
+  function agendarNovaTentativa(i) {
+    clearTimeout(tempoNovaTentativa);
+    var k = Math.min(i, ATRASOS_NOVA_TENTATIVA.length - 1);
+    tempoNovaTentativa = setTimeout(function () {
+      if (!mudancaNaoGuardada) return;
+      salvar().then(null, function () { agendarNovaTentativa(k + 1); });
+    }, ATRASOS_NOVA_TENTATIVA[k]);
+  }
+
+  function mostrarFaixaGravacao() {
+    var faixa = $('#faixa-gravacao');
+    if (!faixa) {
+      faixa = el('div', { id: 'faixa-gravacao', class: 'faixa-gravacao', role: 'alert' }, [
+        el('span', { class: 'cresce', texto: 'Não consegui guardar a última mudança no tablet. ' +
+          'Ele pode estar sem espaço. O que você fez continua na tela, e eu tento guardar de novo sozinho.' }),
+        el('button', {
+          type: 'button', class: 'btn pequeno', id: 'faixa-gravacao-tentar', texto: 'Tentar de novo agora',
+          aoClick: function () { salvar().then(null, function () { /* a faixa continua */ }); }
+        })
+      ]);
+      // no fluxo, logo abaixo do cabeçalho: não cobre as abas nem o olho
+      var cabecalho = $('.cabecalho');
+      if (cabecalho) cabecalho.insertAdjacentElement('afterend', faixa);
+      else document.body.insertBefore(faixa, document.body.firstChild);
+    }
+    faixa.hidden = false;
+  }
+
+  function esconderFaixaGravacao() {
+    var faixa = $('#faixa-gravacao');
+    if (faixa) faixa.hidden = true;
+  }
+
+  /* O OUVINTE GLOBAL. A rejeição que o salvar() já avisou passa calada aqui
+   * (preventDefault), porque a faixa já está na tela. Qualquer outra promessa
+   * rejeitada sem tratamento vira uma frase para ela e uma linha no console, e
+   * o evento NÃO é cancelado: os testes de navegador contam esses erros, e
+   * cancelar esconderia deles um defeito de verdade. */
+  window.addEventListener('unhandledrejection', function (ev) {
+    var r = ev.reason;
+    if (r && typeof r === 'object' && falhasAvisadas && falhasAvisadas.has(r)) {
+      ev.preventDefault();
+      return;
+    }
+    if (typeof console !== 'undefined' && console.error) console.error('promessa rejeitada sem tratamento', r);
+    avisar('Uma ação não terminou como devia. Se o que você fez não aparecer, tente de novo.');
+  });
 
   /* DESDE QUE O SALVAR ESPERA A TRANSAÇÃO CONFIRMAR, ELE PODE REJEITAR, e a
    * tela não pode ficar muda nem mostrar a mensagem técnica do navegador. A
    * causa mais provável no tablet dela é falta de espaço, e é o que as frases
-   * dizem. Os outros cerca de 40 `salvar().then` sem `catch` ficam para um PR
-   * próprio.
+   * dizem.
    *
    * A MEMÓRIA VOLTA A SER O DISCO. Quando uma gravação de várias partes
    * rejeita no meio (restaurar uma cópia, voltar a um ponto do histórico,
-   * desfazer, apagar tudo), parte pode ter ficado gravada e parte não. Se a
-   * memória continuasse com o estado que ela tinha antes, o PRÓXIMO salvar
-   * qualquer gravaria esse estado velho por cima do que ficou no disco, sem
-   * uma palavra. Então relê do disco antes de qualquer outra coisa, redesenha,
-   * e diz que não se completou. */
+   * apagar tudo), parte pode ter ficado gravada e parte não. Se a memória
+   * continuasse com o estado que ela tinha antes, o PRÓXIMO salvar qualquer
+   * gravaria esse estado velho por cima do que ficou no disco, sem uma
+   * palavra. Então relê do disco antes de qualquer outra coisa, redesenha, e
+   * diz que não se completou.
+   *
+   * COM MUDANÇA PENDENTE (B3), O DISCO VENCE E A FRASE DIZ. Os três que chamam
+   * aqui são substituições inteiras que ela confirmou ("os dados atuais serão
+   * substituídos"), e a mudança que a faixa ainda não tinha guardado é parte
+   * desses dados atuais. Gravar a memória antes de reler, como uma primeira
+   * versão deste PR fazia, punha o estado velho por cima da cópia restaurada
+   * ou do ponto escolhido que JÁ estavam no disco (a revisão adversarial
+   * mostrou os dois casos), e depois a nova tentativa faria o mesmo, calada.
+   * Então a pendência sai junto com a faixa, e a frase conta que ela saiu,
+   * para nada sumir em silêncio. Se nem a leitura der, nada é trocado: a
+   * memória e a faixa ficam. O Desfazer da barra flutuante não passa mais por
+   * aqui: ele é uma mudança como outra qualquer, pelo salvar(). */
   function releDoDisco(mensagem) {
     return Store.carregar().then(function (lido) {
       db = lido || Store.bancoVazio();
-    }).catch(function () { /* nem a leitura deu: fica o que há, e o aviso diz */ }).then(function () {
+      return memoriaSubstituida();
+    }).catch(function () { /* nem a leitura deu: fica o que há, e o aviso diz */ return ''; }).then(function (frase) {
       mapeamentoEmEdicao = null;
       fecharTudo();
       desenharTudo();
-      avisar(mensagem);
+      avisar(mensagem + frase);
     });
+  }
+
+  /* A memória inteira acabou de ser trocada por uma substituição que ela
+   * confirmou (dando certo ou pelo releDoDisco). Chamar ANTES de redesenhar:
+   * - o olho volta a seguir o banco novo, como na abertura do aplicativo
+   *   (antes, a tela continuava com o olho de antes da troca);
+   * - a pendência sai e a faixa some, e a frase devolvida conta isso, para o
+   *   aviso dizer. Vazia quando não havia pendência. */
+  /* O mesmo aviso, ANTES: na pergunta de confirmação das três substituições
+   * inteiras (voltar a um ponto, restaurar cópia, apagar tudo), para ela
+   * decidir sabendo que a mudança que a faixa ainda não guardou vai sair junto.
+   * Vazio quando não há pendência. */
+  function avisoDePendenciaNaConfirmacao() {
+    return mudancaNaoGuardada
+      ? '\n\nAtenção: a última mudança, que o tablet ainda não conseguiu guardar, vai se perder.'
+      : '';
+  }
+
+  function memoriaSubstituida() {
+    valoresOcultos = !!(db.ajustes && db.ajustes.valoresOcultos);
+    atualizarBotaoOlho();
+    var havia = mudancaNaoGuardada;
+    mudancaNaoGuardada = false;
+    clearTimeout(tempoNovaTentativa);
+    esconderFaixaGravacao();
+    return havia ? ' A última mudança, que o tablet ainda não tinha conseguido guardar, também saiu.' : '';
   }
 
   /* Grava um ponto de retorno antes de mexer em várias aulas de uma vez,
@@ -1078,28 +1245,43 @@
    * de a ação rodar: quantos passos da trilha voltaram para a fila só se sabe
    * depois de mexer nas aulas, e esse número precisa aparecer no MESMO aviso
    * que oferece o Desfazer. */
+  /* NA FALHA (B3), A PROMESSA DEVOLVIDA CUMPRE do mesmo jeito, com o mesmo
+   * resultado: o que os treze chamadores fazem depois (fechar a janela,
+   * redesenhar) é só tela, e a mudança já está na memória, que é a verdade; a
+   * faixa do salvar() avisa que falta guardar. Antes, a falha deixava a janela
+   * aberta com a aula já excluída da memória.
+   *
+   * O ponto de retorno é a PRIMEIRA gravação e, num tablet cheio, a primeira
+   * a falhar. Ela não segura a mudança: se não deu para guardar o ponto, a
+   * mudança é gravada mesmo assim (passando pela faixa, se também falhar), e o
+   * aviso sai sem o Desfazer, porque não há para onde voltar. Antes, essa
+   * falha pulava a gravação da mudança e caía no ouvinte global, com a memória
+   * já alterada e nenhuma faixa. */
   function comDesfazer(rotulo, acao) {
     var antes = JSON.parse(JSON.stringify(dbParaGravar()));
     var resultado = acao();
     var texto = (typeof rotulo === 'function') ? rotulo() : rotulo;
-    return Store.registrarHistorico(texto, antes).then(function () {
-      return salvar();
-    }).then(function () {
-      avisar(texto, 'Desfazer', function () {
-        db = antes;
-        // Um painel aberto ainda aponta para o registro antigo, que sai do ar
-        // ao voltar o estado. Fecha tudo e limpa as referências.
-        mapeamentoEmEdicao = null;
-        fecharTudo();
-        Store.salvar(db).then(function () {
-          desenharTudo();
-          avisar('Alteração desfeita.');
-        }).catch(function () {
-          releDoDisco('Não consegui desfazer. O tablet pode estar sem espaço; a tela mostra o que ficou gravado.');
-        });
+    return Store.registrarHistorico(texto, antes).then(function () { return true; }, function () { return false; })
+      .then(function (comPonto) {
+        return salvar().then(function () {
+          if (!comPonto) { avisar(texto); return resultado; }
+          avisar(texto, 'Desfazer', function () {
+            db = antes;
+            // Um painel aberto ainda aponta para o registro antigo, que sai do ar
+            // ao voltar o estado. Fecha tudo e limpa as referências.
+            mapeamentoEmEdicao = null;
+            fecharTudo();
+            /* Desfazer é uma mudança como outra qualquer: na falha, a memória
+             * desfeita fica e a faixa avisa (B3). Antes ia direto ao disco e,
+             * na falha, relia o disco por cima da escolha dela. */
+            salvarEDepois(function (gravou) {
+              desenharTudo();
+              if (gravou) avisar('Alteração desfeita.');
+            });
+          });
+          return resultado;
+        }, function () { return resultado; });
       });
-      return resultado;
-    });
   }
 
   // ================= arquivos =================
@@ -1539,10 +1721,12 @@
     diaComZoom = diaParaZoom || null;
     var criadas = Core.garantirSeriesAte(db, mes);
     var p = criadas ? salvar() : Promise.resolve();
-    p.then(function () {
+    // o mês aparece mesmo se a gravação das aulas novas falhar (B3: a faixa avisa)
+    var desenhar = function () {
       desenharAgenda();
       desenharFechamento();
-    });
+    };
+    p.then(desenhar, desenhar);
   }
 
   // ================= agenda =================
@@ -2801,7 +2985,7 @@
              * amarrado a uma aula que não registra mais aquele assunto: a
              * trilha andava com uma prova que ela mesma acabou de apagar. */
             var mexeu = revisarTrilhasDoAluno(aula.alunoId);
-            salvar().then(function () {
+            salvarEDepois(function (gravou) {
               if (!atualizarBlocoAssunto(aula.id)) desenharTemasDaAula(caixa, aula, aluno);
               if ($('#lista-anexos')) desenharAnexos($('#lista-anexos'), aula);
               atualizarPainelTrilhas(aula.alunoId);
@@ -2818,7 +3002,7 @@
                 delete aula.tema;
                 /* Devolver o assunto devolve o passo, com a data da aula. */
                 var voltou = revisarTrilhasDoAluno(aula.alunoId);
-                salvar().then(function () {
+                salvarEDepois(function (gravou) {
                   if (!atualizarBlocoAssunto(aula.id)) desenharTemasDaAula(caixa, aula, aluno);
                   atualizarPainelTrilhas(aula.alunoId);
                   desenharAgenda();
@@ -2840,7 +3024,7 @@
   function dividirAulaEmDuas(aulaId) {
     var marca = Core.dividirAula(db, aulaId);
     if (!marca) { avisar('Esta aula é curta demais para dividir.'); return; }
-    salvar().then(function () {
+    salvarEDepois(function (gravou) {
       fecharModal('modal-aula');
       desenharTudo();
       avisar('Aula dividida em ' + marca.partes[0] + ' e ' + marca.partes[1] + ' minutos.',
@@ -2849,7 +3033,7 @@
             avisar('A segunda aula já tem conteúdo, então ela ficou como está.');
             return;
           }
-          salvar().then(function () { desenharTudo(); avisar('Divisão desfeita.'); });
+          salvarEDepois(function (gravou) { desenharTudo(); avisar('Divisão desfeita.'); });
         });
     });
   }
@@ -2903,7 +3087,7 @@
               delete t.partes;
               delete t.exercicios;
             });
-            salvar().then(function () {
+            salvarEDepois(function (gravou) {
               desenharAnexos(caixa, aula);
               if (!atualizarBlocoAssunto(aula.id) && $('#lista-temas-aula')) {
                 desenharTemasDaAula($('#lista-temas-aula'), aula, alunoPorId(aula.alunoId));
@@ -3122,7 +3306,7 @@
       db.aulas.push(nova);
       var daBiblioteca = folhaPendenteDaBiblioteca;
       folhaPendenteDaBiblioteca = null;
-      salvar().then(function () {
+      salvarEDepois(function (gravou) {
         fecharModal('modal-aula');
         desenharTudo();
         /* Veio do "Abrir como folha" da biblioteca: a página vai para a folha
@@ -3165,7 +3349,7 @@
         };
         if (escopo === 'esta') {
           acao();
-          salvar().then(function () {
+          salvarEDepois(function (gravou) {
             fecharModal('modal-aula');
             desenharTudo();
             avisar(rotulos[escopo] + textoDeTrilha(mexeu));
@@ -3187,10 +3371,10 @@
 
     Core.aplicarEdicaoAula(db, aulaEmEdicao.id, mudancas, 'esta');
     var mexeuAqui = revisarTrilhasDoAluno(aulaEmEdicao.alunoId);
-    salvar().then(function () {
+    salvarEDepois(function (gravou) {
       fecharModal('modal-aula');
       desenharTudo();
-      avisar('Aula salva.' + textoDeTrilha(mexeuAqui));
+      if (gravou) avisar('Aula salva.' + textoDeTrilha(mexeuAqui));
     });
   }
 
@@ -3600,12 +3784,11 @@
         }
 
         db = novoDb;
-        salvar().then(function () {
+        // sem mensagem técnica na falha: a faixa do salvar() já diz o que houve (B3)
+        salvarEDepois(function (gravou) {
           fecharModal('modal-virada-anual');
           desenharTudo();
-          avisar('Séries atualizadas para o ano letivo de ' + ano + ' com sucesso!');
-        }).catch(function (e) {
-          avisar('Erro ao salvar as novas séries: ' + (e && e.message || e));
+          if (gravou) avisar('Séries atualizadas para o ano letivo de ' + ano + ' com sucesso!');
         });
       };
     }
@@ -4662,7 +4845,7 @@
     tirarRascunhoDaLista(id);
     if (eraAberta) abrirPropostaAvulsa();
     else if (redesenharTopoDaProposta) redesenharTopoDaProposta();
-    salvar().then(function () {
+    salvarEDepois(function (gravou) {
       avisar('A proposta de ' + (nome || 'sem nome') + ' foi apagada.');
     });
   }
@@ -5135,8 +5318,8 @@
           var g = db.ajustes.propostaPadrao || {};
           g[chave] = JSON.parse(JSON.stringify(itens() || []));
           db.ajustes.propostaPadrao = g;
-          salvar().then(function () {
-            avisar('Pronto: estes textos passam a nascer em toda proposta nova.');
+          salvarEDepois(function (gravou) {
+            if (gravou) avisar('Pronto: estes textos passam a nascer em toda proposta nova.');
           });
         }
       });
@@ -5990,11 +6173,11 @@
      * oferecer a ela um rascunho que já tem dono. */
     tirarRascunhoDaLista(p.id);
 
-    salvar().then(function () {
+    salvarEDepois(function (gravou) {
       desenharTudo();
       var vig = vigenciaOferecida(aluno, p);
       if (vig) { oferecerVigencia(aluno, vig, nome + ' entrou na lista de alunos.'); return; }
-      avisar(nome + ' entrou na lista de alunos, com a proposta guardada na ficha.');
+      if (gravou) avisar(nome + ' entrou na lista de alunos, com a proposta guardada na ficha.');
     });
   }
 
@@ -6099,7 +6282,7 @@
        * dois: o caminho que sobrava para a segunda família da tarde era apagar
        * campo por campo. */
       if (redesenharTopoDaProposta) redesenharTopoDaProposta();
-      salvar().then(function () {
+      salvarEDepois(function (gravou) {
         avisar('Proposta de ' + nome + ' gerada. Cadastrar como aluno?', 'Cadastrar',
           function () { cadastrarDoRascunho(p); });
       });
@@ -6111,12 +6294,12 @@
     lista.forEach(function (x, k) { if (x.id === p.id) i = k; });
     if (i >= 0) lista[i] = p; else lista.push(p);
 
-    salvar().then(function () {
+    salvarEDepois(function (gravou) {
       desenharAlunos();
       if (aoTerminar) aoTerminar();
       var vig = vigenciaOferecida(ctx.aluno, p);
       if (vig) { oferecerVigencia(ctx.aluno, vig, 'Proposta gerada e guardada na ficha.'); return; }
-      avisar('Proposta gerada e guardada na ficha de ' + nome + '.');
+      if (gravou) avisar('Proposta gerada e guardada na ficha de ' + nome + '.');
     });
   }
 
@@ -6292,17 +6475,19 @@
         if (!criado.desde) criado.desde = dataEncontro;
       }
     }
-    salvar().then(function () {
+    salvarEDepois(function (gravou) {
       fecharModal('modal-aluno');
       desenharTudo();
       if (encontroCriado) {
         irParaMes(Core.mesDe(encontroCriado.data));
         abrirAula(encontroCriado.id);
-        avisar('Aluno salvo e encontro de mapeamento marcado para ' +
-          Core.ddmmaaaa(encontroCriado.data) + '.');
+        if (gravou) {
+          avisar('Aluno salvo e encontro de mapeamento marcado para ' +
+            Core.ddmmaaaa(encontroCriado.data) + '.');
+        }
         return;
       }
-      avisar('Aluno salvo.');
+      if (gravou) avisar('Aluno salvo.');
     });
   }
 
@@ -7334,13 +7519,13 @@
          * valer AQUI, antes do salvar(), senão dbParaGravar() devolveria o
          * registro antigo e o botão não gravaria nada. */
         mapeamentoEmEdicao = null;
-        salvar().then(function () {
+        salvarEDepois(function (gravou) {
           fecharModal('modal-mapeamento');
           if ($('#modal-aula').classList.contains('aberto') && aulaEmEdicao) {
             abrirAula(aulaEmEdicao.id);
           }
           desenharTudo();
-          avisar('Mapeamento salvo.');
+          if (gravou) avisar('Mapeamento salvo.');
         });
       }
     }));
@@ -7873,7 +8058,7 @@
     function mudar(acao, aviso) {
       acao();
       if (proposta) { desenharTrilha(trilha, aluno, opcoes); return; }
-      salvar().then(function () {
+      salvarEDepois(function (gravou) {
         desenharTrilha(trilha, aluno, opcoes);
         atualizarPainelTrilhas(aluno.id);
         if (aulaEmEdicao) atualizarBlocoAssunto(aulaEmEdicao.id);
@@ -8545,7 +8730,7 @@
          * assunto foi dado. */
         if (this.checked) {
           remarcarPasso(p, null);
-          salvar().then(function () {
+          salvarEDepois(function (gravou) {
             redesenhar();
             if (aulaEmEdicao) atualizarBlocoAssunto(aulaEmEdicao.id);
             desenharAgenda();
@@ -8735,10 +8920,10 @@
 
     if (campoNota) aulaEmEdicao.notaTexto = campoNota.value;
     if (campoPriv) aulaEmEdicao.notaPrivada = campoPriv.value;
-    salvar().then(function () {
+    salvarEDepois(function (gravou) {
       fecharModal('modal-aula');
       desenharTudo();
-      avisar('Sua anotação foi salva antes de abrir o outro encontro.');
+      if (gravou) avisar('Sua anotação foi salva antes de abrir o outro encontro.');
       setTimeout(function () { abrirAula(aulaId, null); }, 120);
     });
   }
@@ -10217,7 +10402,7 @@
       chkListas.addEventListener('change', function () {
         db.ajustes = db.ajustes || {};
         db.ajustes.exibirTemasEAreas = chkListas.checked;
-        salvar().then(function () { desenharFechamento(); });
+        salvarEDepois(function (gravou) { desenharFechamento(); });
       });
       cartao.appendChild(el('label', {
         class: 'campo', style: 'display:flex;align-items:center;gap:10px;margin:12px 0 0'
@@ -11019,13 +11204,13 @@
     })[0];
     if (registro) registro.texto = texto;
     else db.resumos.push({ alunoId: corpo._alunoId, mes: corpo._mes, texto: texto });
-    salvar().then(function () {
+    salvarEDepois(function (gravou) {
       fecharModal('modal-resumo');
       desenharFechamento();
       /* A tela do mês pode estar aberta por baixo, e é de lá que ela costuma
        * escrever o feedback: sem isto o texto novo só apareceria ao reabrir. */
       atualizarMesNumaTela();
-      avisar('Resumo salvo.');
+      if (gravou) avisar('Resumo salvo.');
     });
   }
 
@@ -11654,12 +11839,13 @@
           el('button', {
             type: 'button', class: 'btn pequeno', texto: 'Voltar a este ponto',
             aoClick: function () {
-              if (!confirmar('Voltar ao estado anterior a "' + r.rotulo + '"?')) return;
+              if (!confirmar('Voltar ao estado anterior a "' + r.rotulo + '"?' + avisoDePendenciaNaConfirmacao())) return;
               Store.desfazer(r.id).then(function (estado) {
                 if (!estado) return;
                 db = estado;
+                var frase = memoriaSubstituida();
                 desenharTudo();
-                avisar('Estado restaurado.');
+                avisar('Estado restaurado.' + frase);
               }).catch(function () {
                 releDoDisco('Não consegui voltar a este ponto. O tablet pode estar sem espaço; a tela mostra o que ficou gravado.');
               });
@@ -11859,7 +12045,7 @@
     chk.addEventListener('change', function () {
       db.ajustes = db.ajustes || {};
       db.ajustes.esconderNaoCobradas = !chk.checked;
-      salvar().then(function () { desenharAjustesDoFechamento(); });
+      salvarEDepois(function (gravou) { desenharAjustesDoFechamento(); });
     });
     cartao.appendChild(el('label', {
       class: 'campo', style: 'display:flex;align-items:center;gap:10px;margin:0'
@@ -12002,7 +12188,7 @@
       if (novo < 0) novo = 0;
       if (novo > 20) novo = 20;
       db.ajustes.reajusteAcimaDaInflacao = novo;
-      salvar().then(function () {
+      salvarEDepois(function (gravou) {
         mostra.textContent = Core.pctBR(Core.margemDeReajuste(db));
         desenharFechamento();
       });
@@ -12083,7 +12269,7 @@
   function restaurarCopia(ev) {
     var arquivo = ev.target.files && ev.target.files[0];
     if (!arquivo) return;
-    if (!confirmar('Restaurar esta cópia? Os dados atuais deste tablet serão substituídos.')) {
+    if (!confirmar('Restaurar esta cópia? Os dados atuais deste tablet serão substituídos.' + avisoDePendenciaNaConfirmacao())) {
       ev.target.value = '';
       return;
     }
@@ -12094,8 +12280,9 @@
       catch (e) { avisar('O arquivo não é uma cópia válida.'); return; }
       Store.importarTudo(pacote).then(function (dados) {
         db = dados;
+        var frase = memoriaSubstituida();
         desenharTudo();
-        avisar('Cópia restaurada.');
+        avisar('Cópia restaurada.' + frase);
       }).catch(function (e) {
         if (e && e.invalida) { avisar(e.message); return; }
         releDoDisco('A cópia não foi restaurada por inteiro. O tablet pode estar sem espaço; a tela mostra o que ficou gravado.');
@@ -15607,12 +15794,13 @@
   }
 
   function apagarTudo() {
-    if (!confirmar('Apagar TODOS os dados deste tablet? Faça uma cópia de segurança antes.')) return;
+    if (!confirmar('Apagar TODOS os dados deste tablet? Faça uma cópia de segurança antes.' + avisoDePendenciaNaConfirmacao())) return;
     if (!confirmar('Confirma mesmo? Esta ação apaga alunos, aulas, folhas e anexos.')) return;
     Store.apagarTudo().then(function () {
       db = Store.bancoVazio();
       return Store.salvar(db);
     }).then(function () {
+      memoriaSubstituida(); // apagou tudo: da pendência não há o que dizer além disso
       desenharTudo();
       avisar('Todos os dados foram apagados.');
     }).catch(function () {

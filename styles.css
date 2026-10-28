@@ -1325,6 +1325,29 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   font-size: 14px;
   margin-bottom: 12px;
 }
+/* A gravação que falhou (B3): no alto, por cima de tudo, até uma gravação dar
+ * certo. Mesmas cores da faixa de aviso. Com display flex o atributo hidden
+ * sozinho não esconde, daí a segunda regra. */
+/* No fluxo, entre o cabeçalho e o conteúdo, e não flutuando por cima: fixa no
+ * alto, ela cobria as abas e o olho enquanto houvesse pendência, e num tablet
+ * sem espaço de verdade ela não chegaria a Ajustes para liberar espaço. O
+ * conteúdo encolhe. Janela aberta fica por cima dela, como fica por cima de
+ * todo o resto; ao fechar, a faixa está lá. */
+.faixa-gravacao {
+  flex-shrink: 0;
+  margin: 8px 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #FBF3E3;
+  border: 1px solid #E8D5A8;
+  color: #7A5F22;
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-size: 15px;
+  box-shadow: var(--sombra-forte);
+}
+.faixa-gravacao[hidden] { display: none; }
 .faixa-info {
   background: var(--teal-claro);
   border: 1px solid #BFE0D7;
@@ -1546,6 +1569,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
 body.modo-familia > .cabecalho,
 body.modo-familia > .conteudo,
 body.modo-familia > .aviso,
+body.modo-familia > .faixa-gravacao,
 body.modo-familia > .fundo-modal:not(#modal-mes) { display: none !important; }
 
 body.modo-familia #modal-mes { padding: 0; background: var(--ivory); }

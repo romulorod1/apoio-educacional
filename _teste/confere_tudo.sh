@@ -384,6 +384,27 @@ roda "salvar --envenenado-escreve-no-pedido"    node "_teste/testa_store_grava_n
 # rejeita no meio tem de deixar o proximo salvar gravar o estado velho.
 roda "salvar --envenenado-nao-rejeita"          node "_teste/testa_store_grava_no_commit.js" --envenenado-nao-rejeita
 roda "salvar --envenenado-nao-rele"             node "_teste/testa_store_grava_no_commit.js" --envenenado-nao-rele
+# B3: e a rejeicao que o salvar devolve e tratada num lugar so. O tablet sem
+# espaco e simulado abortando a transacao de gravacao no IndexedDB: a faixa
+# aparece, a mudanca fica na memoria, "Tentar de novo agora" e a nova tentativa
+# de 15 s gravam, e a rejeicao avisada nao vira erro de pagina. O veneno tira a
+# ligacao do tratamento central, e a falha tem de voltar a ser calada.
+roda "falha de gravacao"                        node "_teste/testa_falha_de_gravacao.js"
+roda "falha --envenenado-sem-tratamento"        node "_teste/testa_falha_de_gravacao.js" --envenenado-sem-tratamento
+# Um veneno para cada regra: o olho esconde na hora mesmo quando a gravacao
+# falha; a faixa nao cobre as abas nem o olho; o releDoDisco nao grava a
+# memoria velha por cima do que ela escolheu substituir, e diz quando uma
+# mudanca pendente saiu; o comDesfazer fecha a janela na falha; e o ponto de
+# retorno que nao cabe nao segura a gravacao da mudanca.
+roda "falha --envenenado-olho-espera"           node "_teste/testa_falha_de_gravacao.js" --envenenado-olho-espera
+roda "falha --envenenado-faixa-por-cima"        node "_teste/testa_falha_de_gravacao.js" --envenenado-faixa-por-cima
+roda "falha --envenenado-rele-grava"            node "_teste/testa_falha_de_gravacao.js" --envenenado-rele-grava
+roda "falha --envenenado-rele-calado"           node "_teste/testa_falha_de_gravacao.js" --envenenado-rele-calado
+roda "falha --envenenado-desfazer-trava"        node "_teste/testa_falha_de_gravacao.js" --envenenado-desfazer-trava
+roda "falha --envenenado-ponto-segura"          node "_teste/testa_falha_de_gravacao.js" --envenenado-ponto-segura
+# e a pergunta de confirmacao das tres substituicoes ja avisa que a mudanca
+# pendente vai se perder, antes de ela decidir
+roda "falha --envenenado-confirma-calado"       node "_teste/testa_falha_de_gravacao.js" --envenenado-confirma-calado
 
 # FRENTE B (B9): kits.json e exclusoes.json sao aditivos do esquema 1 (CONTRATO
 # 8d). A prova nao le o biblioteca.js: ela IMPORTA um pacote de brinquedo com os
