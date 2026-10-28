@@ -122,7 +122,7 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   conf('a frase está na tela', frase.length > 0, true);
   conf('e diz posição na fonte', /começo de cada lista da OBMEP/.test(frase) && /posição/.test(frase), true);
   conf('sem as palavras que a tela não pode dizer', PROIBIDAS.filter(p => frase.toLowerCase().indexOf(p) >= 0).join(','), '');
-  conf('sem travessão', /[–—]/.test(frase), false);
+  conf('sem travessão', /[\u2013\u2014]/.test(frase), false);
   if (process.env.SALVAR_PRINTS) {
     await pag.screenshot({ path: path.join(process.env.SALVAR_PRINTS, 'depois_listas_do_modulo.png') });
   }
