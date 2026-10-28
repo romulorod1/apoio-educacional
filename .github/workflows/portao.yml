@@ -122,12 +122,13 @@ jobs:
           if-no-files-found: ignore
 
   # O portao inteiro, com o nome que o merge_seguro le: verde so com as quatro
-  # fatias verdes. `always()` para ele rodar e dizer vermelho quando uma fatia
-  # falha (sem isso, ele seria pulado, e pulado nao e verde nem vermelho); e a
-  # mesma condicao das fatias para ele ser pulado onde elas sao puladas.
+  # fatias verdes. `!cancelled()` para ele rodar e dizer vermelho quando uma
+  # fatia falha (sem isso, ele seria pulado, e pulado nao e verde nem vermelho)
+  # e ficar cancelado quando a rodada for cancelada; e a mesma condicao das
+  # fatias para ele ser pulado onde elas sao puladas.
   portao-navegador:
     if: >-
-      always() && (
+      !cancelled() && (
       github.event_name != 'pull_request' ||
       contains(github.event.pull_request.labels.*.name, 'navegador'))
     needs: portao-navegador-fatia

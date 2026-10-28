@@ -72,10 +72,19 @@ conf('as quatro fatias do CI ficam do mesmo tamanho, com diferença de no máxim
   Math.max.apply(null, quatro) - Math.min.apply(null, quatro) <= 1, true);
 
 console.log('\n=== 3. Fatia inválida é recusada, e não vira fatia vazia verde ===');
-['5/4', '0/4', 'x/4', '4', ''].forEach(f => {
+/* "1/" e "/4" passavam pela primeira validação, que testava as duas metades
+ * juntas, e viravam o portão inteiro (achado da revisão adversarial); "01/4" e
+ * "1/010" porque a conta do shell lê zero à esquerda como octal. */
+['5/4', '0/4', 'x/4', '4', '', '1/', '/4', '01/4', '1/010', '1/4/4'].forEach(f => {
   const r = listar(PORTAO, ['--pedaco', f]);
   conf('--pedaco "' + f + '" recusa com saída 2', r.status, 2);
 });
+// a fatia e o rápido não combinam: o rápido pula o navegador, e a fatia diria que rodou o que pulou
+let rapidoComFatia = 0;
+try {
+  execFileSync('sh', [PORTAO, '--rapido', '--pedaco', '1/4'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+} catch (e) { rapidoComFatia = e.status; }
+conf('--rapido com --pedaco recusa com saída 2', rapidoComFatia, 2);
 
 console.log('\n=== 4. Controle: a conta da fatia errada reprova a partição ===');
 /* A cópia mora ao lado do original, porque o portão faz cd para a pasta acima

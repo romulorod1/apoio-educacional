@@ -33,7 +33,7 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --rapido) rapido=1 ;;
     --listar) listar=1 ;;
-    --pedaco) pedaco_dado=1; pedaco="${2:-}"; [ "$#" -gt 1 ] && shift ;;
+    --pedaco) pedaco_dado=1; pedaco="${2:-}"; if [ "$#" -gt 1 ]; then shift; fi ;;
     *) printf 'opcao desconhecida: %s\n' "$1"; exit 2 ;;
   esac
   shift
@@ -51,8 +51,16 @@ if [ "${pedaco_dado:-0}" = "1" ]; then
   # sem barra ("4") ou vazio nao e fatia: viraria o 4/4 ou o portao inteiro, calado
   case "$pedaco" in */*) ;; *) printf 'fatia invalida: "%s" (use K/N)\n' "$pedaco"; exit 2 ;; esac
   pk="${pedaco%/*}"; pn="${pedaco#*/}"
-  case "$pk$pn" in *[!0-9]*|"") printf 'fatia invalida: %s (use K/N)\n' "$pedaco"; exit 2 ;; esac
-  if [ "$pk" -lt 1 ] || [ "$pk" -gt "$pn" ]; then printf 'fatia invalida: %s (K de 1 a N)\n' "$pedaco"; exit 2; fi
+  # Cada metade por si: na concatenacao, "1/" e "/4" passavam (uma metade vazia,
+  # a outra numerica) e viravam o portao inteiro, calado. Zero a esquerda
+  # tambem sai: a conta do shell le "010" como octal e o teste como decimal.
+  for metade in "$pk" "$pn"; do
+    case "$metade" in ''|0*|*[!0-9]*) printf 'fatia invalida: %s (use K/N, de 1 a N)\n' "$pedaco"; exit 2 ;; esac
+  done
+  if [ "$pk" -gt "$pn" ]; then printf 'fatia invalida: %s (K de 1 a N)\n' "$pedaco"; exit 2; fi
+  # Fatia e o portao rapido nao combinam: o rapido pula o navegador, e a fatia
+  # diria que rodou as provas que so pulou.
+  if [ "$rapido" = "1" ]; then printf 'o --rapido nao roda navegador; nao combina com --pedaco\n'; exit 2; fi
 fi
 numero_navegador=0
 rodadas_aqui=0
@@ -1041,7 +1049,7 @@ elif [ -n "$pn" ]; then
   # job portao-navegador do CI, que so fica verde com todas as fatias verdes.
   printf 'FATIA %s DE %s PASSOU: %s das %s provas de navegador rodaram aqui; as outras ficam com as outras fatias.\n' \
     "$pk" "$pn" "$rodadas_aqui" "$numero_navegador"
-  [ "$instavel" != "0" ] && printf 'Algum teste so passou na segunda vez (INSTAVEL acima).\n'
+  if [ "$instavel" != "0" ]; then printf 'Algum teste so passou na segunda vez (INSTAVEL acima).\n'; fi
 elif [ "$rapido" = "1" ]; then
   printf 'PORTAO RAPIDO PASSOU. As %s provas de navegador (pulado, acima) NAO rodaram aqui: o merge ainda pede o portao inteiro.\n' "$pulados"
 elif [ "$instavel" != "0" ]; then
