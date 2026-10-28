@@ -7,6 +7,15 @@
 #
 #   sh _teste/confere_tudo.sh            o portao inteiro, com Chrome
 #   sh _teste/confere_tudo.sh --rapido   tudo menos o que abre navegador
+#   sh _teste/confere_tudo.sh --pedaco 2/4
+#                                        so as provas de navegador da fatia 2
+#                                        de 4 (o CI roda as fatias em maquinas
+#                                        paralelas; o que nao abre navegador
+#                                        fica com o --rapido)
+#   sh _teste/confere_tudo.sh --listar [--pedaco K/N]
+#                                        nao roda nada: diz, uma por linha, que
+#                                        prova de navegador rodaria (a prova das
+#                                        fatias e o testa_pedacos_do_portao)
 #
 # O --rapido e o que o GitHub roda em todo PR (.github/workflows/portao.yml),
 # porque o inteiro passa de dez minutos e quase todo esse tempo e Chrome. Ele
@@ -18,9 +27,35 @@ cd "$(dirname "$0")/.."
 falhou=0
 instavel=0
 rapido=0
-if [ "${1:-}" = "--rapido" ]; then
-  rapido=1
+listar=0
+pedaco=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --rapido) rapido=1 ;;
+    --listar) listar=1 ;;
+    --pedaco) pedaco_dado=1; pedaco="${2:-}"; [ "$#" -gt 1 ] && shift ;;
+    *) printf 'opcao desconhecida: %s\n' "$1"; exit 2 ;;
+  esac
+  shift
+done
+
+# AS FATIAS DO PORTAO INTEIRO. O inteiro passou de oitenta minutos numa maquina
+# so, e quase todo esse tempo e Chrome, uma prova depois da outra. No CI ele
+# roda em N maquinas paralelas, cada uma com a sua fatia: a prova de navegador
+# de numero i (na ordem em que este arquivo as chama, contando de 1) vai para a
+# fatia ((i - 1) mod N) + 1. A ordem e a mesma em toda maquina, porque o arquivo
+# e o mesmo, entao as fatias nao se cruzam e juntas cobrem todas; quem prova
+# isso e o testa_pedacos_do_portao, sem navegador, no --rapido.
+pk=""; pn=""
+if [ "${pedaco_dado:-0}" = "1" ]; then
+  # sem barra ("4") ou vazio nao e fatia: viraria o 4/4 ou o portao inteiro, calado
+  case "$pedaco" in */*) ;; *) printf 'fatia invalida: "%s" (use K/N)\n' "$pedaco"; exit 2 ;; esac
+  pk="${pedaco%/*}"; pn="${pedaco#*/}"
+  case "$pk$pn" in *[!0-9]*|"") printf 'fatia invalida: %s (use K/N)\n' "$pedaco"; exit 2 ;; esac
+  if [ "$pk" -lt 1 ] || [ "$pk" -gt "$pn" ]; then printf 'fatia invalida: %s (K de 1 a N)\n' "$pedaco"; exit 2; fi
 fi
+numero_navegador=0
+rodadas_aqui=0
 
 # O CAMINHO DE CADA PROVA QUE O PORTAO CHAMOU, uma por linha.
 #
@@ -91,6 +126,24 @@ roda() {
   nome="$1"; shift
   # $1 e o interpretador (node, python, sh) e $2 o arquivo da prova.
   anota "${2:-}"
+  # Fatia e listagem: o numero conta toda prova de navegador, rode ela aqui ou
+  # nao, para a conta ser a mesma em todas as maquinas.
+  # (return 0 sempre explicito: com o set -e, um `return` que herdasse o status
+  # de um teste falso derrubaria o portao inteiro na primeira prova)
+  if [ "$na_secao_navegador" = "1" ]; then
+    numero_navegador=$((numero_navegador + 1))
+    if [ -n "$pn" ] && [ $(( (numero_navegador - 1) % pn + 1 )) -ne "$pk" ]; then
+      return 0
+    fi
+  elif [ -n "$pn" ]; then
+    # o que nao abre navegador roda no portao-rapido, em todo PR
+    return 0
+  fi
+  if [ "$listar" = "1" ]; then
+    if [ "$na_secao_navegador" = "1" ]; then printf '  vai     %s %s\n' "$numero_navegador" "$nome"; fi
+    return 0
+  fi
+  if [ "$na_secao_navegador" = "1" ]; then rodadas_aqui=$((rodadas_aqui + 1)); fi
   if [ "$rapido" = "1" ] && [ "$na_secao_navegador" = "1" ]; then
     # Dito pelo nome, um por um: pular calado fazia o --rapido parecer que
     # rodou o que nao rodou.
@@ -189,6 +242,9 @@ roda "virada anual"          node _teste/testa_virada_anual.js
 # A regra do merge na main (_teste/merge_seguro.sh), que segura o processo
 # quando a protecao de branch do GitHub sumir com o repositorio privado.
 roda "merge seguro"          node _teste/testa_merge_seguro.js
+# As fatias do portao inteiro no CI: toda prova de navegador em exatamente uma
+# fatia, para qualquer numero de fatias, com controle que reprova.
+roda "fatias do portao"      node _teste/testa_pedacos_do_portao.js
 # Oito que moravam no laco "com navegador" sem abrir navegador nenhum (nem
 # puppeteer, nem a porta 8777). La, o --rapido os pulava; aqui o GitHub os roda
 # em todo PR.
@@ -229,6 +285,8 @@ porta_responde() { curl -s -o /dev/null -m 2 "http://127.0.0.1:8777/index.html" 
 na_secao_navegador=1
 if [ "$rapido" = "1" ]; then
   printf '\n  (--rapido: a secao de navegador e anotada e nao roda; o portao inteiro a roda)\n'
+elif [ "$listar" = "1" ]; then
+  printf '\n  (--listar: nada roda, e nenhum servidor sobe)\n'
 elif porta_responde; then
   printf '\n  (servidor ja estava no ar em 127.0.0.1:8777)\n'
 else
@@ -615,6 +673,14 @@ na_secao_navegador=0
 # arvore por construcao: a versao anterior comparava o arquivo consigo mesmo e
 # imprimia ok sem ter afirmado nada. Sem base (copia do repo sem historico) sai
 # INSTAVEL, nunca ok silencioso.
+# A listagem para aqui: daqui para baixo nao ha prova de navegador, so as
+# conferencias do repositorio, que o --rapido ja roda em todo PR.
+if [ "$listar" = "1" ]; then
+  printf '\nLISTAGEM: %s provas de navegador no portao%s. Nada rodou.\n' "$numero_navegador" \
+    "${pn:+, as acima sao as da fatia $pk de $pn}"
+  exit 0
+fi
+
 titulo "cache do aplicativo"
 lista_sw() { printf '%s\n' "$1" | sed -n '/^var ARQUIVOS = \[/,/^\];/p'; }
 nome_sw()  { printf '%s\n' "$1" | sed -n "s/^var CACHE = '\(.*\)';.*/\1/p" | head -1; }
@@ -963,8 +1029,19 @@ else
 fi
 
 printf '\n'
+if [ -n "$pn" ] && [ "$rodadas_aqui" = "0" ] && [ "$falhou" = "0" ]; then
+  # fatia vazia nao e fatia verde: com mais fatias que provas, a conta esta errada
+  printf 'HA FALHA. A fatia %s de %s nao rodou prova nenhuma.\n' "$pk" "$pn"
+  exit 1
+fi
 if [ "$falhou" != "0" ]; then
   printf 'HA FALHA. Nao faca o merge antes de resolver.\n'
+elif [ -n "$pn" ]; then
+  # So a fatia: o verde dela nao e o portao inteiro, e diz isso. O inteiro e o
+  # job portao-navegador do CI, que so fica verde com todas as fatias verdes.
+  printf 'FATIA %s DE %s PASSOU: %s das %s provas de navegador rodaram aqui; as outras ficam com as outras fatias.\n' \
+    "$pk" "$pn" "$rodadas_aqui" "$numero_navegador"
+  [ "$instavel" != "0" ] && printf 'Algum teste so passou na segunda vez (INSTAVEL acima).\n'
 elif [ "$rapido" = "1" ]; then
   printf 'PORTAO RAPIDO PASSOU. As %s provas de navegador (pulado, acima) NAO rodaram aqui: o merge ainda pede o portao inteiro.\n' "$pulados"
 elif [ "$instavel" != "0" ]; then
