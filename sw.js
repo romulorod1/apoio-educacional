@@ -86,8 +86,10 @@
  * a faixa no alto quando o tablet não consegue guardar e a nova tentativa
  * (app.js e styles.css), com a lista igual. O v48 (B3, segunda parte) não deixa
  * o Atualizar nem uma troca de dados que não gravou nada levarem o que a faixa
- * ainda não guardou (app.js e store.js), com a lista igual. */
-var CACHE = 'apoio-educacional-v48';
+ * ainda não guardou (app.js e store.js), com a lista igual. O v49 (C2a) traz
+ * Minhas listas e o banco na versão 3 (app.js, store.js, index.html e
+ * styles.css), com a lista igual. */
+var CACHE = 'apoio-educacional-v49';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

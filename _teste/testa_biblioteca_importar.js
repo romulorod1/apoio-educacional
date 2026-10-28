@@ -108,7 +108,7 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
   });
 
   // ================================================================
-  secao('1. O banco que ela já tem sobe para a versão 2 sem perder nada');
+  secao('1. O banco que ela já tem sobe de versão sem perder nada');
   await pag.goto(amb.ORIGEM + '/vazio.html', { waitUntil: 'load' });
   const semeou = await pag.evaluate(() => new Promise((resolve, reject) => {
     const q = indexedDB.open('apoio-educacional', 1);
@@ -145,9 +145,12 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
         aulas: d.result && d.result.aulas.length, nota: !!n.result, midia: !!m.result }); };
     };
   }));
-  conf('o banco agora está na versão 2', depois.v, 2);
-  conf('com os onze depósitos', depois.nomes.join(','),
-    'anexos,biblioteca_assets,biblioteca_etiquetas,biblioteca_itens,biblioteca_pacotes,biblioteca_teoria,biblioteca_uso,dados,historico,midias,notas');
+  /* Desde o C2a o código atual sobe direto para a versão 3: os seis depósitos
+   * da biblioteca (versão 2) e o das Minhas listas (versão 3) nascem juntos,
+   * e nada da versão 1 se perde, como antes. */
+  conf('o banco agora está na versão 3', depois.v, 3);
+  conf('com os doze depósitos', depois.nomes.join(','),
+    'anexos,biblioteca_assets,biblioteca_etiquetas,biblioteca_itens,biblioteca_listas,biblioteca_pacotes,biblioteca_teoria,biblioteca_uso,dados,historico,midias,notas');
   conf('a aluna continua lá', depois.aluno, 'Aluna da Migração');
   conf('a aula continua lá', depois.aulas, 1);
   conf('a folha continua lá', depois.nota, true);
