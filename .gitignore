@@ -31,3 +31,5 @@ __pycache__/
 
 # a saida dos testes que reprovaram no portao: evidencia local, nunca commit
 _falhas_do_portao/
+# copia de controle da prova das fatias; o finally apaga, mas morte dura deixa
+_teste/_confere_tudo_controle_tmp.sh

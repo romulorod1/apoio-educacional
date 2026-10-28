@@ -16,6 +16,14 @@
 #                     antes do merge (regra F2); este e a segunda opiniao, numa
 #                     maquina limpa, sem servidor esquecido nem cache quente.
 #
+# AS PROVAS DE NAVEGADOR RODAM EM QUATRO FATIAS PARALELAS. Numa maquina so, uma
+# depois da outra, o inteiro passou de oitenta minutos (118 provas em 10/2026,
+# e crescendo). Cada fatia e uma maquina do GitHub com `confere_tudo.sh
+# --pedaco K/4`; o testa_pedacos_do_portao prova que toda prova cai em
+# exatamente uma fatia. O job portao-navegador, com o nome de sempre, so junta:
+# fica verde quando as quatro fatias ficam verdes, e e ele que o merge_seguro
+# le. Nada disso roda na maquina de quem trabalha.
+#
 # fetch-depth 0 nas duas: a trava do cache compara com a BASE DO MERGE
 # (git merge-base HEAD origin/main), e com o clone raso de um commit so nao ha
 # base nenhuma e a trava sairia INSTAVEL em todo PR.
@@ -69,12 +77,19 @@ jobs:
           path: _falhas_do_portao/
           if-no-files-found: ignore
 
-  portao-navegador:
+  portao-navegador-fatia:
     if: >-
       github.event_name != 'pull_request' ||
       contains(github.event.pull_request.labels.*.name, 'navegador')
+    name: portao-navegador (fatia ${{ matrix.fatia }} de 4)
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 60
+    strategy:
+      # uma fatia vermelha nao derruba as outras: o merge espera todas, e a
+      # saida de cada uma e o que diz onde esta o defeito
+      fail-fast: false
+      matrix:
+        fatia: [1, 2, 3, 4]
     env:
       CHROME: /usr/bin/google-chrome
     steps:
@@ -96,12 +111,31 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Chrome do runner
         run: $CHROME --version
-      - name: Portao inteiro
-        run: sh _teste/confere_tudo.sh
+      - name: Fatia do portao inteiro
+        run: sh _teste/confere_tudo.sh --pedaco ${{ matrix.fatia }}/4
       - name: Saida de quem reprovou
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: falhas-do-portao-navegador
+          name: falhas-do-portao-navegador-fatia-${{ matrix.fatia }}
           path: _falhas_do_portao/
           if-no-files-found: ignore
+
+  # O portao inteiro, com o nome que o merge_seguro le: verde so com as quatro
+  # fatias verdes. `!cancelled()` para ele rodar e dizer vermelho quando uma
+  # fatia falha (sem isso, ele seria pulado, e pulado nao e verde nem vermelho)
+  # e ficar cancelado quando a rodada for cancelada; e a mesma condicao das
+  # fatias para ele ser pulado onde elas sao puladas.
+  portao-navegador:
+    if: >-
+      !cancelled() && (
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'navegador'))
+    needs: portao-navegador-fatia
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: As quatro fatias
+        run: |
+          echo "resultado das fatias: ${{ needs.portao-navegador-fatia.result }}"
+          test "${{ needs.portao-navegador-fatia.result }}" = "success"
