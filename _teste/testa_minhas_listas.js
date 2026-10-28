@@ -45,7 +45,8 @@ const { conf, secao, pausa, esperar } = H;
 
 const PORTA = 8840;
 const MODOS = ['--envenenado-sem-espelho', '--envenenado-copia-sem-listas', '--envenenado-uso-sem-lista',
-  '--envenenado-ordem-velha'];
+  '--envenenado-ordem-velha', '--envenenado-diario-antes', '--envenenado-memoria-velha',
+  '--envenenado-uso-por-conteudo', '--envenenado-nomear-duplica'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const STORE = fs.readFileSync(path.join(H.RAIZ, 'store.js'), 'utf8');
@@ -55,6 +56,12 @@ const ESPELHO_NA_ABERTURA = '      return espelharAnteriores();';
 const COPIA_LEVA = 'listas: bib[2] || []';
 const USO_LEVA = 'listaId: listaId });';
 const ORDEM_DA_TELA = 'itens: r.itens.slice(), paginas: r.paginas.slice(), automatica: false';
+// os achados da revisão adversarial de 547c3c7 e da coordenação, um veneno cada
+const DIARIO_DEPOIS = 'return Promise.all(novas.map(Store.gravarListaBiblioteca)).then(function () {';
+const ESQUECE = 'esquecerMinhasListas();';
+const CARREGADA = 'listaMinhaCarregada = l.id;';
+const MAIS_VELHA = '|| (a.criadaEm || 0) - (b.criadaEm || 0);';
+const NOMEAR_LIMPA = 'if (registro.automatica) return registro;';
 
 function umaVez(texto, ancora) { return texto.split(ancora).length === 2; }
 const trocas = {};
@@ -62,6 +69,16 @@ if (MODO === '--envenenado-sem-espelho') trocas['/app.js'] = APP.split(ESPELHO_N
 if (MODO === '--envenenado-copia-sem-listas') trocas['/store.js'] = STORE.split(COPIA_LEVA).join('nada: 0');
 if (MODO === '--envenenado-uso-sem-lista') trocas['/app.js'] = APP.split(USO_LEVA).join('listaId: null });');
 if (MODO === '--envenenado-ordem-velha') trocas['/app.js'] = APP.split(ORDEM_DA_TELA).join('itens: original.itens.slice(), paginas: r.paginas.slice(), automatica: false');
+// o diário é esvaziado ANTES de a gravação no depósito confirmar
+if (MODO === '--envenenado-diario-antes') trocas['/app.js'] = APP.split(DIARIO_DEPOIS).join('gravarSelecoesAnteriores([]); ' + DIARIO_DEPOIS);
+// a memória das listas não é esquecida numa substituição inteira
+if (MODO === '--envenenado-memoria-velha') trocas['/app.js'] = APP.split(ESQUECE).join('');
+// o uso volta a ser reconhecido só pelo conteúdo, a mais nova primeiro (o defeito relatado)
+if (MODO === '--envenenado-uso-por-conteudo') {
+  trocas['/app.js'] = APP.split(CARREGADA).join('').split(MAIS_VELHA).join('|| (b.criadaEm || 0) - (a.criadaEm || 0);');
+}
+// dar nome pelo "Salvar como lista" volta a deixar a guardada pelo aplicativo
+if (MODO === '--envenenado-nomear-duplica') trocas['/app.js'] = APP.split(NOMEAR_LIMPA).join('return registro;');
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'c2a_listas_'));
 process.on('exit', () => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { /* ok */ } });
@@ -80,7 +97,9 @@ conf('a cópia de segurança leva as listas', STORE.indexOf(COPIA_LEVA) >= 0, tr
 conf('a restauração repõe as listas', /lis\.put\(r\)/.test(STORE), true);
 conf('o apagar tudo leva as listas', STORE.indexOf("esvaziar('biblioteca_listas')") >= 0, true);
 [['espelho na abertura', APP, ESPELHO_NA_ABERTURA], ['a cópia leva', STORE, COPIA_LEVA],
-  ['o uso leva o id', APP, USO_LEVA], ['ordem da tela', APP, ORDEM_DA_TELA]]
+  ['o uso leva o id', APP, USO_LEVA], ['ordem da tela', APP, ORDEM_DA_TELA], ['diário depois', APP, DIARIO_DEPOIS],
+  ['esquece a memória', APP, ESQUECE], ['lista carregada', APP, CARREGADA], ['a mais velha', APP, MAIS_VELHA],
+  ['nomear limpa a guardada', APP, NOMEAR_LIMPA]]
   .forEach(([n, t, a]) => conf('âncora de veneno uma vez só: ' + n, umaVez(t, a), true));
 
 const amb = H.criarAmbiente(PORTA, 'perfil_minhas_listas', trocas);
@@ -174,6 +193,42 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   conf('sem "Seleções anteriores" na tela', /Seleções anteriores/.test(await pag.evaluate(() => document.body.innerText)), false);
 
   // ================================================================
+  secao('1b. Só sai do diário o que já está no depósito');
+  /* A gravação no depósito falha (a transação do biblioteca_listas aborta, que
+   * é o caminho do tablet sem espaço): a seleção tem de continuar no diário,
+   * senão ela some sem ter chegado a lugar nenhum. */
+  const SEL_C = { itens: [IDS2[4], IDS2[3]], paginas: [], quando: Date.now() - 30000, lista: null };
+  await pag.evaluate((k, l) => localStorage.setItem(k, JSON.stringify(l)), CHAVE_SEL, [SEL_C]);
+  await H.abrirApp(pag, amb.ORIGEM);
+  await pag.evaluate(() => {
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function () {
+      const req = put.apply(this, arguments);
+      if (window.__depositoCheio && this.name === 'biblioteca_listas') this.transaction.abort();
+      return req;
+    };
+    window.__depositoCheio = true;
+  });
+  await irParaMinhas(pag);
+  await pausa(800);
+  const diario1b = await diario(pag);
+  const temC = l => l.some(x => x.itens.join('|') === SEL_C.itens.join('|'));
+  if (MODO === '--envenenado-diario-antes') {
+    secao('VENENO: o diário é esvaziado antes de a gravação confirmar');
+    conf('envenenado: a seleção sumiu do diário sem chegar ao depósito (defeito enxergado)', diario1b.length, 0);
+    throw fim();
+  }
+  conf('a gravação no depósito falhou: a seleção não está lá', temC(await doDeposito(pag)), false);
+  conf('e continua no diário', diario1b.length, 1);
+  conf('e na tela, entre as guardadas pelo aplicativo', /Minhas listas \(3\)/.test(await textoDaTela(pag)), true);
+  // com o depósito de volta (a página recarrega sem o defeito), a abertura copia e esvazia o diário
+  await H.abrirApp(pag, amb.ORIGEM);
+  await irParaMinhas(pag);
+  const assentou = await esperar('a seleção chegar ao depósito', () => doDeposito(pag), l => Array.isArray(l) && temC(l), 5000);
+  conf('na abertura seguinte, a seleção chega ao depósito', assentou.ok, true);
+  conf('e só então sai do diário', (await diario(pag)).length, 0);
+
+  // ================================================================
   secao('2. Criar: "Salvar esta seleção como lista" no fim do Preparar aula');
   /* O material com a lista pronta inteira, posto por fora (é preparação):
    * o carrinho do aparelho, e a página recarregada. */
@@ -206,13 +261,27 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   const c3 = (await cartoes(pag)).filter(c => c.id === L1.id)[0] || { texto: '' };
   conf('o cartão está na tela', !!c3.id, true);
   conf('com o nome', c3.texto.indexOf('Equações, alunos de prova') === 0, true);
-  conf('o nível', /Regular/.test(c3.texto), true);
+  // a etiqueta diz que é nível: "Regular" sozinho não dizia de quê (revisão cega)
+  conf('o nível, dito como nível', /Nível Regular/.test(c3.texto), true);
   conf('o assunto', c3.texto.indexOf(MOD_TITULO) >= 0, true);
-  conf('quantos exercícios', /5 exercícios/.test(c3.texto), true);
   const minutos = Math.round(LISTA2.degraus.reduce((s, d) => s + d.minutos, 0));
-  conf('e o tempo estimado, dos minutos do pacote', c3.texto.indexOf('Cerca de ' + minutos + ' minutos (estimativa)') >= 0, true);
+  conf('quantos exercícios e o tempo estimado, na mesma linha',
+    c3.texto.indexOf('5 exercícios, cerca de ' + minutos + ' minutos (estimativa)') >= 0, true);
+  // os números dos exercícios, na ordem da lista: é o que distingue duas guardadas iguais na aparência
+  const numeros = LISTA2.degraus.map(d => d.item.split(':').pop());
+  conf('os números dos exercícios, na ordem da lista',
+    c3.texto.indexOf('Exercícios ' + numeros.slice(0, -1).join(', ') + ' e ' + numeros[numeros.length - 1]) >= 0, true);
   conf('e ainda não foi usada', /Ainda não usada com nenhum aluno/.test(c3.texto), true);
+  // dentro da aba, a faixa não repete o caminho para ela; fora da aba, repete
+  conf('dentro da aba, a faixa não mostra o botão Minhas listas', await pag.evaluate(() => !!document.querySelector('#bib-carrinho-minhas')), false);
+  await pag.evaluate(() => document.querySelector('#bib-abas [data-aba="serie"]').click());
+  await pausa(300);
+  conf('na aba Por série, mostra', await pag.evaluate(() => !!document.querySelector('#bib-carrinho-minhas')), true);
+  await pag.evaluate(() => document.querySelector('#bib-abas [data-aba="minhas"]').click());
+  await pausa(300);
   if (process.env.SALVAR_PRINTS && !MODO) {
+    // o print espera o aviso passageiro sumir, para ele não cobrir um cartão
+    await esperar('o aviso sumir', () => pag.evaluate(() => document.querySelector('#aviso').classList.contains('aberto')), v => v === false, 12000);
     await pag.screenshot({ path: path.join(process.env.SALVAR_PRINTS, 'depois_minhas_listas.png') });
   }
 
@@ -277,8 +346,9 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   await pag.evaluate(() => { const b = document.querySelector('#bib-gerar-aulas [data-aula="aula-alfa"]'); if (b) b.click(); });
   await pausa(200);
   await pag.click('#bib-gerar-anexar');
+  // espera TODOS os registros do anexo, e não só o primeiro, para a contagem abaixo não pegar a gravação no meio
   const usou = await esperar('o uso registrado', () => pag.evaluate(() => Store.usoDaBiblioteca()),
-    l => Array.isArray(l) && l.some(r => r.aulaId === 'aula-alfa'), 60000);
+    l => Array.isArray(l) && l.filter(r => r.aulaId === 'aula-alfa').length >= esperadaComPor.length, 60000);
   conf('o anexo registrou o uso', usou.ok, true);
   const comLista = (usou.valor || []).filter(r => r.aulaId === 'aula-alfa' && r.listaId === L2.id).length;
   await pausa(800);
@@ -295,6 +365,37 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   conf('o cartão diz com quem foi', /Usada com Aluna Alfa Teste/.test(c6.texto), true);
   const [aa, mm, dd] = hoje.split('-');
   conf('e quando foi a última vez', c6.texto.indexOf('Última vez em ' + dd + '/' + mm + '/' + aa) >= 0, true);
+
+  // ================================================================
+  secao('6b. Duplicar e usar a original: o uso fica com a original, e não com a cópia');
+  /* O defeito relatado pela revisão adversarial: o uso era reconhecido só pelo
+   * conteúdo, a mais nova primeiro, e Duplicar cria exatamente duas listas
+   * iguais; a cópia, nunca usada, ficava com o uso da original. */
+  await tocarNoCartao(pag, 'Equações, aprofundamento', 'duplicar');
+  const dup6 = await esperar('a cópia no depósito', () => doDeposito(pag),
+    l => Array.isArray(l) && l.some(x => x.titulo === 'Equações, aprofundamento (cópia)'), 5000);
+  const L2c = ((dup6.valor || []).filter(x => x.titulo === 'Equações, aprofundamento (cópia)')[0]) || {};
+  await pausa(300);
+  const usosAntes = (await pag.evaluate(() => Store.usoDaBiblioteca())).length;
+  await tocarNoCartao(pag, 'Equações, aprofundamento', 'preparar');
+  await esperar('o Preparar aula abriu', () => pag.evaluate(() => !!document.querySelector('#bib-gerar-anexar')), v => v === true, 5000);
+  const janela6b = await pag.evaluate(() => (document.querySelector('#bib-salvar-lista-ja') || {}).textContent || '');
+  await pag.evaluate(() => { const b = document.querySelector('#bib-gerar-aulas [data-aula="aula-alfa"]'); if (b) b.click(); });
+  await pausa(200);
+  await pag.click('#bib-gerar-anexar');
+  const usou6b = await esperar('os usos novos', () => pag.evaluate(() => Store.usoDaBiblioteca()),
+    l => Array.isArray(l) && l.length >= usosAntes + esperadaComPor.length, 60000);
+  const novos6b = (usou6b.valor || []).slice(usosAntes);
+  await pausa(600);
+  await pag.evaluate(() => document.querySelectorAll('.fundo-modal.aberto [data-fechar]').forEach(b => b.click()));
+  if (MODO === '--envenenado-uso-por-conteudo') {
+    secao('VENENO: o uso volta a ser reconhecido só pelo conteúdo');
+    conf('envenenado: os usos novos foram para a cópia (defeito enxergado)', novos6b.every(r => r.listaId === L2.id), false);
+    throw fim();
+  }
+  conf('a janela diz que é a original', janela6b, 'Esta seleção está em Minhas listas: Equações, aprofundamento.');
+  conf('os usos novos levam o id da original', novos6b.filter(r => r.listaId === L2.id).length, esperadaComPor.length);
+  conf('e nenhum leva o da cópia', novos6b.some(r => r.listaId === L2c.id), false);
 
   // ================================================================
   secao('7. Apagar, e o Desfazer devolve');
@@ -347,7 +448,78 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   conf('ficam três guardadas pelo aplicativo', tres.ok, true);
   conf('as três mais novas', (tres.valor || []).filter(x => x.automatica).map(x => x.itens[0]).sort().join('|'),
     [IDS2[0], IDS2[1], IDS2[2]].sort().join('|'));
-  conf('e as dela continuam', (tres.valor || []).filter(x => !x.automatica).length, 2);
+  conf('e as dela continuam', (tres.valor || []).filter(x => !x.automatica).length, 3);
+
+  // ================================================================
+  secao('9b. Dar nome a uma guardada pelo "Salvar como lista" não deixa as duas');
+  /* O caminho natural: "Preparar aula com esta lista" numa guardada e, na
+   * janela, "Salvar esta seleção como lista". Antes ficavam as duas, uma em
+   * cada seção (achado da revisão adversarial). */
+  const auto9 = (tres.valor || []).filter(x => x.automatica)[0];
+  const mesmoConteudo = l => l.filter(x => x.itens.join('|') === auto9.itens.join('|') && (x.paginas || []).join('|') === (auto9.paginas || []).join('|'));
+  await pag.evaluate(id => document.querySelector('.bib-minha-lista[data-lista="' + id + '"] [data-acao="preparar"]').click(), auto9.id);
+  await esperar('o Preparar aula abriu', () => pag.evaluate(() => !!document.querySelector('#bib-salvar-lista-nome')), v => v === true, 5000);
+  await pag.evaluate(() => { document.querySelector('#bib-salvar-lista-nome').value = ''; });
+  await pag.type('#bib-salvar-lista-nome', 'Guardada com nome');
+  await pag.click('#bib-salvar-lista-guardar');
+  await esperar('a lista com nome no depósito', () => doDeposito(pag),
+    l => Array.isArray(l) && l.some(x => x.titulo === 'Guardada com nome'), 5000);
+  await pausa(500);
+  const iguais9b = mesmoConteudo(await doDeposito(pag));
+  await pag.evaluate(() => document.querySelectorAll('.fundo-modal.aberto [data-fechar]').forEach(b => b.click()));
+  if (MODO === '--envenenado-nomear-duplica') {
+    secao('VENENO: a guardada pelo aplicativo fica ao lado da que ganhou nome');
+    conf('envenenado: ficaram duas listas com o mesmo conteúdo (defeito enxergado)', iguais9b.length, 2);
+    throw fim();
+  }
+  conf('fica uma só lista com esse conteúdo', iguais9b.length, 1);
+  conf('e é a com nome', iguais9b[0] && iguais9b[0].titulo, 'Guardada com nome');
+
+  // ================================================================
+  secao('11. Restaurar a cópia pela tela, com a aba aberta: a aba mostra o que a cópia tem');
+  /* Pelo campo de Ajustes, como ela faz, e com a aba Minhas listas desenhada:
+   * a memória das listas tem de seguir o depósito restaurado. Antes, a aba
+   * continuava com as listas de antes, e Editar e Guardar regravava uma lista
+   * que a cópia não tem (achado das duas revisões). */
+  await irParaMinhas(pag);
+  const arq11 = path.join(TMP, 'copia11.json');
+  fs.writeFileSync(arq11, await pag.evaluate(async () => JSON.stringify(await Store.exportarTudo(await Store.carregar()))));
+  const daCopia = (await doDeposito(pag)).map(x => x.id).sort().join(',');
+  await tocarNoCartao(pag, 'Equações, alunos de prova', 'duplicar');
+  await esperar('a lista nova só no tablet', () => doDeposito(pag),
+    l => Array.isArray(l) && l.some(x => x.titulo === 'Equações, alunos de prova (cópia)'), 5000);
+  await pausa(300);
+  await pag.evaluate(() => { document.querySelector('#aviso-texto').textContent = ''; });
+  await (await pag.$('#arquivo-copia')).uploadFile(arq11); // o confirm é aceito pelo arnês
+  const restaurou = await esperar('a cópia restaurada', () => aviso(pag), t => /Cópia restaurada/.test(t || ''), 20000);
+  conf('a cópia foi restaurada pela tela', restaurou.ok, true);
+  await pausa(800);
+  const naTela11 = (await cartoes(pag)).map(c => c.id).sort().join(',');
+  if (MODO === '--envenenado-memoria-velha') {
+    secao('VENENO: a memória das listas não segue a cópia restaurada');
+    conf('envenenado: a aba mostra uma lista que a cópia não tem (defeito enxergado)', naTela11 === daCopia, false);
+    throw fim();
+  }
+  conf('a aba mostra exatamente as listas da cópia, sem a criada depois', naTela11, daCopia);
+  await tocarNoCartao(pag, 'Equações, alunos de prova', 'editar');
+  await esperar('o editor abriu', () => pag.evaluate(() => !!document.querySelector('#bib-minha-guardar')), v => v === true, 5000);
+  await pag.click('#bib-minha-guardar');
+  await pausa(800);
+  conf('e Editar e Guardar não devolve ao depósito a lista que a cópia não tem',
+    (await doDeposito(pag)).map(x => x.id).sort().join(','), daCopia);
+
+  // ================================================================
+  secao('12. Apagar todos os dados pela tela, com a aba aberta: a aba fica vazia');
+  await irParaMinhas(pag);
+  await pag.evaluate(() => { document.querySelector('#aviso-texto').textContent = ''; });
+  await pag.evaluate(() => document.querySelector('#apagar-tudo').click()); // os dois confirm são aceitos pelo arnês
+  const apagouTudo = await esperar('apagou tudo', () => aviso(pag), t => /Todos os dados foram apagados/.test(t || ''), 20000);
+  conf('apagou tudo pela tela', apagouTudo.ok, true);
+  await pausa(800);
+  conf('o depósito ficou sem listas', (await doDeposito(pag)).length, 0);
+  conf('e a aba também', (await cartoes(pag)).length, 0);
+  conf('e ela diz que não há lista guardada', await pag.evaluate(() => !!document.querySelector('#bib-minhas-vazio')), true);
+  conf('e o diário ficou vazio', (await diario(pag)).length, 0);
 
   secao('10. Nenhum erro');
   conf('nenhum erro de página', pag.errosDePagina.join(' | '), '');

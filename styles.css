@@ -1954,6 +1954,8 @@ button.alvo-rascunho:hover { background: var(--soft); }
 
 /* ---------- Minhas listas (C2a) ---------- */
 .bib-abas { margin-bottom: 12px; }
+/* as abas são alvo de toque: 44 px, como os outros botões do tablet */
+.bib-abas .chip-filtro { min-height: 44px; }
 .bib-minha-lista { margin-bottom: 12px; padding: 14px 16px; }
 .bib-minha-topo { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .bib-minha-nome { color: var(--navy); font-size: 16px; }

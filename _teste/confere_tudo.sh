@@ -492,6 +492,14 @@ roda "minhas listas --envenenado-sem-espelho"     node "_teste/testa_minhas_list
 roda "minhas listas --envenenado-copia-sem-listas" node "_teste/testa_minhas_listas.js" --envenenado-copia-sem-listas
 roda "minhas listas --envenenado-uso-sem-lista"   node "_teste/testa_minhas_listas.js" --envenenado-uso-sem-lista
 roda "minhas listas --envenenado-ordem-velha"     node "_teste/testa_minhas_listas.js" --envenenado-ordem-velha
+# os achados das revisoes de 547c3c7: so sai do diario o que esta no deposito;
+# a memoria das listas segue uma restauracao e um apagar tudo feitos pela tela;
+# o uso fica com a lista carregada, e nao com a copia de mesmo conteudo; dar
+# nome pelo "Salvar como lista" nao deixa a guardada pelo aplicativo ao lado
+roda "minhas listas --envenenado-diario-antes"    node "_teste/testa_minhas_listas.js" --envenenado-diario-antes
+roda "minhas listas --envenenado-memoria-velha"   node "_teste/testa_minhas_listas.js" --envenenado-memoria-velha
+roda "minhas listas --envenenado-uso-por-conteudo" node "_teste/testa_minhas_listas.js" --envenenado-uso-por-conteudo
+roda "minhas listas --envenenado-nomear-duplica"  node "_teste/testa_minhas_listas.js" --envenenado-nomear-duplica
 # C2a: o banco sobe de 2 para 3. A subida nao perde nada; codigo mais velho que
 # o banco diz o que fazer; a janela antiga larga o banco e avisa.
 roda "banco v3"                                   node "_teste/testa_banco_v3.js"
