@@ -67,7 +67,8 @@
    *
    * Confere a FORMA, e recusa com frase clara, porque cada buraco aqui virava
    * mentira na tela dela: a regra tem de ser uma que este aplicativo conhece
-   * (listas-v1, a de meia aula, ou listas-v2, a de uma aula); o minuto tem de
+   * (listas-v1, a de meia aula, listas-v2, a de uma aula, ou base-v1, a lista
+   * de base do C2b, uma aula com o começo de cada lista da fonte); o minuto tem de
    * ser número, na lista e em cada posição (sem ele a tela escrevia "≈ NaN
    * min"); e nenhum id de lista nem exercício dentro de uma lista pode se
    * repetir (com exercício repetido a tela dizia "Você mudou esta lista" sem
@@ -75,7 +76,7 @@
    *
    * O que julga a REGRA em si (a rampa, o tempo, a porta de entrada) continua
    * sendo o biblioteca/confere_kits.py, do lado do gerador. */
-  var REGRAS_DE_LISTA = ['listas-v1', 'listas-v2'];
+  var REGRAS_DE_LISTA = ['listas-v1', 'listas-v2', 'base-v1'];
   function lerKits(bytes, itens) {
     if (!bytes) return [];
     var kits = json('kits.json', bytes);

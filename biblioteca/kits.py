@@ -122,6 +122,12 @@ REGRA_LISTAS = 'listas-v1'
 # que cada numero da tela quer dizer, e regra nova pede nome novo (8f).
 REGRA_AULA = 'listas-v2'
 LISTAS = (REGRA_LISTAS, REGRA_AULA)
+# A base-v1 e a LISTA DE BASE (C2b, decisoes D13 e D14 do dono em 26/10): a
+# terceira lista pronta por assunto, de UMA AULA (60 minutos), montada so com
+# exercicios do PRIMEIRO TERCO de cada lista de origem. Ela afirma POSICAO, e
+# nao curadoria: o comeco de cada lista da fonte, que e onde a fonte poe o que
+# abre o assunto. A tela diz isso com essas letras. Nivel 1, etiqueta "Base".
+REGRA_BASE = 'base-v1'
 TEMPO_REGRA = 'tempo-v1'
 TETO_TEORIA = 8
 
@@ -843,7 +849,70 @@ def teoria_do_kit(paginas, itens):
 
 # --------------------------------------------------------------------- todo
 
-def gerar(itens_de_fora, teoria, regra=REGRA, niveis=(1, 2, 3), com_teoria=True):
+# ------------------------------------------------------------------ base-v1
+# COMO A LISTA DE BASE ESCOLHE, e isto e a regra inteira:
+#
+# 1. O PRIMEIRO TERCO DE CADA LISTA DE ORIGEM. Os exercicios do modulo sao
+#    agrupados pela lista da fonte de onde vieram (`aula.n`) e ordenados pelo
+#    numero; de cada lista entram os ceil(n/3) primeiros, onde n e quantos
+#    exercicios o PACOTE traz daquela lista (os excluidos pela curadoria ja nao
+#    estao aqui). E posicao na fonte, e nada mais.
+# 2. As mesmas guardas da listas-v1 contra o que a revisao cega reprovou: so
+#    item com solucao, sem remeter a outro exercicio (referencia-v1) e sem
+#    quase-repetido na mesma lista (repetidos-v1, a mesma poda).
+# 3. A ORDEM E A DA FONTE, revezando as listas: o primeiro do terco da lista 1,
+#    o primeiro da lista 2, e assim por diante, depois os segundos. Assim a
+#    lista cobre o modulo em vez de virar o comeco de uma lista so.
+# 4. O ORCAMENTO E O DA listas-v2: a soma fica entre 54 e 66 minutos, e o teto
+#    e 24 exercicios. Entra, na ordem do passo 3, todo item que ainda cabe ate
+#    66; para quando a soma passa de 54. Se o terco do modulo inteiro nao chega
+#    a 54, a lista sai com o que tem e `relaxou` diz "minutos". Sem candidato
+#    nenhum, o modulo fica sem lista de base, e o relatorio diz.
+#
+# Deterministico: ordem so por (aula.n, numero, id), sem conjunto de texto.
+
+ORCAMENTO_BASE = {'banda': (540, 660), 'tamanho': (1, 24)}
+
+
+def terco_de_cada_lista(itens_do_modulo):
+    """Os candidatos da base-v1, em ordem de revezamento entre as listas de
+    origem (passos 1 a 3)."""
+    por_lista = collections.OrderedDict()
+    for it in sorted(itens_do_modulo, key=lambda i: (i['aula']['n'], i['numero'], i['id'])):
+        por_lista.setdefault(it['aula']['n'], []).append(it)
+    tercos = []
+    for n in sorted(por_lista):
+        da_lista = por_lista[n]
+        primeiros = da_lista[:int(math.ceil(len(da_lista) / 3.0))]
+        aptos = [i for i in primeiros
+                 if not i.get('sem_solucao') and (i.get('assets') or {}).get('solucao') and not referencia(i)]
+        ficaram, _ = poda_repetidos(aptos)
+        tercos.append(sorted(ficaram, key=lambda i: (i['numero'], i['id'])))
+    ordem, k = [], 0
+    while any(k < len(t) for t in tercos):
+        for t in tercos:
+            if k < len(t):
+                ordem.append(t[k])
+        k += 1
+    return ordem
+
+
+def monta_base(itens_do_modulo):
+    """A lista de base de um modulo (passo 4). Devolve (itens, relaxou)."""
+    piso, teto_soma = ORCAMENTO_BASE['banda']
+    escolhidos, soma = [], 0
+    for it in terco_de_cada_lista(itens_do_modulo):
+        if len(escolhidos) >= ORCAMENTO_BASE['tamanho'][1] or soma >= piso:
+            break
+        if soma + it['_min'] <= teto_soma:
+            escolhidos.append(it)
+            soma += it['_min']
+    if not escolhidos:
+        return [], None
+    return escolhidos, (['minutos'] if soma < piso else None)
+
+
+def gerar(itens_de_fora, teoria, regra=REGRA, niveis=(1, 2, 3), com_teoria=True, com_base=False):
     """Os kits de um pacote. Trabalha sobre COPIAS rasas dos itens: o gerador do
     pacote ja escreveu o itens.json quando chama isto, e um campo de trabalho
     vazando para o dado de quem chama e o tipo de coisa que so aparece muito
@@ -864,6 +933,24 @@ def gerar(itens_de_fora, teoria, regra=REGRA, niveis=(1, 2, 3), com_teoria=True)
     kits, sem_kit = [], []
     for mid in sorted(por_modulo):
         do_modulo = sorted(por_modulo[mid], key=lambda i: (i['aula']['n'], i['numero']))
+        # a lista de base (base-v1) vem antes das outras, como nivel 1
+        if com_base:
+            itens_base, caiu_base = monta_base(do_modulo)
+            if not itens_base:
+                sem_kit.append((mid, 1))
+            else:
+                kits.append({
+                    'id': '%s:kit:1' % mid, 'modulo': mid, 'serie': itens_base[0]['serie'],
+                    'nivel': 1, 'titulo': itens_base[0]['modulo']['titulo'],
+                    'regra': REGRA_BASE, 'tempo_regra': TEMPO_REGRA,
+                    'minutos': decimos_para_numero(sum(i['_min'] for i in itens_base)),
+                    'teoria': [],
+                    'degraus': [{'n': k + 1, 'item': i['id'], 'degrau': i['dificuldade'],
+                                 'minutos': decimos_para_numero(i['_min'])}
+                                for k, i in enumerate(itens_base)],
+                    'alternativas': {},
+                    'relaxou': caiu_base,
+                })
         for nivel in niveis:
             if regra in LISTAS:
                 itens_kit = monta_lista(nivel, do_modulo, regra)
@@ -908,10 +995,12 @@ def main(argv=None):
                     help='os niveis a gerar, separados por virgula (padrao 2,3)')
     ap.add_argument('--sem-teoria', dest='sem_teoria', action='store_true', default=True)
     ap.add_argument('--com-teoria', dest='sem_teoria', action='store_false')
+    ap.add_argument('--com-base', action='store_true',
+                    help='acrescenta a lista de base (base-v1, nivel 1) a cada modulo')
     a = ap.parse_args(argv)
     niveis = tuple(int(x) for x in a.niveis.split(','))
     itens, teoria = ler(a.pacote)
-    kits, sem_kit, sem_exercicio = gerar(itens, teoria, a.regra, niveis, not a.sem_teoria)
+    kits, sem_kit, sem_exercicio = gerar(itens, teoria, a.regra, niveis, not a.sem_teoria, a.com_base)
     texto = json.dumps(kits, ensure_ascii=False, indent=1) + '\n'
     if a.saida:
         io.open(a.saida, 'w', encoding='utf-8', newline='\n').write(texto)

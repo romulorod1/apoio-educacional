@@ -1706,7 +1706,7 @@ def gravar_pacote(conteudo, manifest_b, nome, versao, saida, trabalho, gravar_zi
 
 def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, commit=None,
           so_modulos=None, gravar_zip=True, anterior=None, com_kits=False, com_listas=False,
-          regra_listas=None):
+          regra_listas=None, com_base=False):
     t_ini = time.time()
     nome = 'matematica-obmep-%s' % serie
     trabalho = trabalho or os.path.join(os.path.dirname(os.path.abspath(saida)), 'trabalho', '%s-v%d' % (nome, versao))
@@ -1990,7 +1990,7 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
             # a regra da lista pronta: listas-v1 (meia aula) por padrao, ou a
             # listas-v2 (uma aula), pedida com --listas-aula
             kits_gerados, sem_kit, modulos_sem_exercicio = kits.gerar(
-                itens, teoria, regra_listas or kits.REGRA_LISTAS, (2, 3), False)
+                itens, teoria, regra_listas or kits.REGRA_LISTAS, (2, 3), False, com_base)
         else:
             kits_gerados, sem_kit, modulos_sem_exercicio = kits.gerar(itens, teoria)
         conteudo['kits.json'] = json_bytes(kits_gerados)
@@ -2113,6 +2113,10 @@ def principal(argv=None):
     ap.add_argument('--listas-aula', action='store_true',
                     help='como --listas, mas pela regra listas-v2: a mesma lista pronta com o orcamento de uma '
                          'aula (54 a 66 minutos) em vez de meia (pedido do Romulo em 24/09)')
+    ap.add_argument('--lista-de-base', action='store_true',
+                    help='com --listas-aula: acrescenta a cada modulo a LISTA DE BASE (regra base-v1, nivel 1, '
+                         'C2b): uma aula montada so com o primeiro terco de cada lista de origem. Afirma posicao '
+                         'na fonte, e nao curadoria')
     ap.add_argument('--fontes-negrito', help='pedacos de nome de fonte negrito, separados por virgula '
                     '(padrao %s)' % ','.join(FONTES_NEGRITO))
     a = ap.parse_args(argv)
@@ -2124,6 +2128,9 @@ def principal(argv=None):
             raise SystemExit('erro: --listas e --listas-aula nao podem vir juntas. Um pacote leva um kits.json '
                              'so: --listas gera a listas-v1 (meia aula) e --listas-aula a listas-v2 (uma aula).')
         a.listas = True
+    if a.lista_de_base and not a.listas_aula:
+        raise SystemExit('erro: --lista-de-base vai com --listas-aula: a lista de base e de uma aula, como a '
+                         'listas-v2, e nao faz sentido ao lado da listas-v1 de meia aula nem dos kits.')
     if a.kits and a.listas:
         raise SystemExit(
             'erro: --kits e --listas nao podem vir juntas. Um pacote leva um kits.json so, e cada lista declara '
@@ -2133,7 +2140,7 @@ def principal(argv=None):
         FONTES_NEGRITO[:] = [x for x in a.fontes_negrito.split(',') if x]
     manifest, rel, trab = gerar(a.pdfs, a.serie, a.versao, a.saida, a.curadoria, a.trabalho, a.gerado_em, a.commit,
                                 a.modulos.split(',') if a.modulos else None, not a.sem_zip, a.anterior, a.kits,
-                                a.listas, kits.REGRA_AULA if a.listas_aula else None)
+                                a.listas, kits.REGRA_AULA if a.listas_aula else None, a.lista_de_base)
     print(json.dumps({'contagens': manifest['contagens'], 'zip': rel['zip'], 'bytes_por_tipo': rel['bytes_por_tipo'],
                       'excluidos': len(rel['excluidos']), 'segundos': rel['segundos'], 'trabalho': trab},
                      ensure_ascii=False, indent=1))

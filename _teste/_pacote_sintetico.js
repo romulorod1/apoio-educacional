@@ -347,6 +347,23 @@ const EXCLUSOES = [
   { id: LISTA_KIT + ':ex:12', motivo: 'a solução da fonte não começa pelo número do exercício' }
 ];
 
+/* A LISTA DE BASE (base-v1, C2b), do módulo das equações: o começo da lista
+ * de origem, na ordem da fonte. Curta de propósito (relaxou "minutos"): o
+ * aplicativo não julga a regra, só a forma, e quem julga a regra é o
+ * confere_kits do lado do gerador. */
+const LISTA_BASE = {
+  id: MOD_KIT + ':kit:1', modulo: MOD_KIT, serie: '9ano', nivel: 1,
+  titulo: 'Equações do Segundo Grau', regra: 'base-v1', tempo_regra: 'tempo-v1', minutos: 15.3,
+  teoria: [],
+  degraus: [
+    { n: 1, item: LISTA_KIT + ':ex:1', degrau: 1, minutos: 4.7 },
+    { n: 2, item: LISTA_KIT + ':ex:2', degrau: 1, minutos: 5.1 },
+    { n: 3, item: LISTA_KIT + ':ex:3', degrau: 1, minutos: 5.5 }
+  ],
+  alternativas: {},
+  relaxou: ['minutos']
+};
+
 function gerar(saida, opcoes) {
   opcoes = opcoes || {};
   const veneno = opcoes.veneno || null;
@@ -457,6 +474,8 @@ function gerar(saida, opcoes) {
   const comListas = !!opcoes.listas;
   const comKits = !!opcoes.kits || comListas;
   let conteudoKits = comListas ? LISTAS : KITS;
+  // C2b: a lista de base, opcional, para as provas de antes continuarem com o pacote de sempre
+  if (comListas && opcoes.base) conteudoKits = [LISTA_BASE].concat(LISTAS);
   /* AS LISTAS COM DEFEITO, uma por ramo de recusa do lerKits (B10), mais a
    * lista que cita um exercício que saiu por curadoria. Cada uma é uma cópia
    * das listas boas com UM defeito só, para a recusa ser pelo motivo certo. */
@@ -583,7 +602,7 @@ function gerarBanco(saida, opcoes) {
 
 const VENENOS = ['corrompido-deflate', 'corrompido-stored', 'hash', 'sobrando', 'faltando', 'asset-citado', 'esquema', 'asset-fora'];
 
-module.exports = { gerar, gerarBanco, montarZip, crc32, VENENOS, MODULOS, KITS, LISTAS, EXCLUSOES };
+module.exports = { gerar, gerarBanco, montarZip, crc32, VENENOS, MODULOS, KITS, LISTAS, LISTA_BASE, EXCLUSOES };
 
 if (require.main === module) {
   const saida = process.argv[2];

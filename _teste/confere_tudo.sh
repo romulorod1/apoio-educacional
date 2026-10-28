@@ -505,6 +505,12 @@ roda "minhas listas --envenenado-nomear-duplica"  node "_teste/testa_minhas_list
 roda "banco v3"                                   node "_teste/testa_banco_v3.js"
 roda "banco v3 --envenenado-versao-tecnica"       node "_teste/testa_banco_v3.js" --envenenado-versao-tecnica
 roda "banco v3 --envenenado-troca-calada"         node "_teste/testa_banco_v3.js" --envenenado-troca-calada
+# C2b: a lista de base (base-v1) importa, vem primeiro com o nome dela e a
+# frase de posicao na fonte; as tres listas com a etiqueta de nivel. A regra
+# em si e do biblioteca/_prova_kits.py (sem navegador).
+roda "lista de base"                              node "_teste/testa_lista_de_base.js"
+roda "lista de base --envenenado-base-recusada"   node "_teste/testa_lista_de_base.js" --envenenado-base-recusada
+roda "lista de base --envenenado-sem-etiqueta"    node "_teste/testa_lista_de_base.js" --envenenado-sem-etiqueta
 # FRENTE B (B10): o que o lerKits recusa e o que a tela descarta (lista com
 # exercicio que saiu por curadoria). O veneno tira o guarda do app.js, e sem
 # ele a aba Biblioteca inteira nao abre.

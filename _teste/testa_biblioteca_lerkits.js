@@ -35,7 +35,8 @@ const AJUDA = '    var curados = listas.some(function (lp) {';
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const GUARDA = '        if (itens.some(function (it) { return !it; })) return;';
 // o empate deixa de ser visto, e as duas listas voltam a se chamar igual
-const EMPATE = '    var empate = irmas.some(function (o) { return o.id !== lp.id && desafiosDe(o) === n; });';
+// (desde o C2b, a lista de base fica fora do desempate)
+const EMPATE = "    var empate = irmas.some(function (o) { return o.id !== lp.id && o.regra !== 'base-v1' && desafiosDe(o) === n; });";
 const trocas = {};
 if (VENENO) trocas['/app.js'] = APP.split(GUARDA).join('');
 if (V_AJUDA) trocas['/app.js'] = APP.split(AJUDA).join('    var curados = false && listas.some(function (lp) {');
