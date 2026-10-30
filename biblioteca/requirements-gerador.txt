@@ -13,3 +13,6 @@
 #   python -m venv .venv-gerador
 #   .venv-gerador/Scripts/python -m pip install -r biblioteca/requirements-gerador.txt
 pymupdf==1.27.2.3
+# o recorte pela tinta do Banco (banco.py) e das provas (provas.py, C12) le o
+# pixmap como matriz; o numpy nao muda o SVG, so acha a caixa
+numpy==2.5.4

@@ -2022,7 +2022,11 @@ def trava_fidelidade(p, sorteio, temp):
         tmp = pymupdf.open()
         tmp.insert_pdf(p.doc(it['origem']['arquivo']), from_page=pz['pagina'] - 1, to_page=pz['pagina'] - 1)
         b = pz['bbox']
-        tmp[0].set_cropbox(pymupdf.Rect(*b))
+        # o cropbox novo e em coordenadas da mediabox (ver gerar_pacote.svg_do_pedaco):
+        # sem o deslocamento, a referencia mostrava o mesmo pedaco errado do SVG e
+        # a fidelidade passava com os dois errados (ENEM de 2015, C12)
+        cb = tmp[0].cropbox_position
+        tmp[0].set_cropbox(pymupdf.Rect(*b) + (cb.x, cb.y, cb.x, cb.y))
         ref = tmp[0].get_pixmap(dpi=DPI_FIDELIDADE, colorspace=pymupdf.csGRAY)
         cro = pymupdf.Pixmap(pymupdf.csGRAY, pymupdf.Pixmap(png))
         # o asset empilhado tem a largura do pedaco mais largo: o pedaco fica
