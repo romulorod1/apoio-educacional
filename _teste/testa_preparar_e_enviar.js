@@ -138,7 +138,9 @@ function arquivosNovos(pag) {
   for (const c of cartoes) {
     conf(c.nome + ': o botão principal é "Preparar e enviar"', c.principal, 'Preparar e enviar');
     conf(c.nome + ': e tem a cara de principal', c.principalEhPrincipal, true);
-    conf(c.nome + ': no cartão só ele e o do feedback', c.botoes.join(' | '), 'Preparar e enviar | Editar o feedback');
+    // C4: no pé do cartão, a linha do pagamento, que não é formato do documento
+    conf(c.nome + ': no cartão só ele, o do feedback e o do pagamento', c.botoes.join(' | '),
+      'Preparar e enviar | Editar o feedback | Marcar como pago');
     conf(c.nome + ': nenhum dos cinco formatos no cartão', CINCO.filter(x => c.botoes.includes(x)).join(','), '');
   }
   conf('no alto, o "Enviar para todas as famílias"', await pag.$eval('#enviar-todas-familias', e => e.textContent.trim()),

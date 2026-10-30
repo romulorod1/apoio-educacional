@@ -718,7 +718,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
 .passo-roteiro .nome { font-size: 14px; font-weight: 700; color: #1F3A5F; }
 .passo-roteiro .detalhe { font-size: 13px; margin-top: 2px; }
 
-.item-area .btn.pequeno { padding: 2px 8px; font-size: 12px; }
+.item-area .btn.pequeno { padding: 2px 10px; font-size: 13px; min-height: 44px; }
 
 /* ---------- areas trabalhadas ---------- */
 
@@ -1872,6 +1872,20 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-pdf-zoom { display: inline-flex; gap: 8px; margin-left: auto; }
 .leitor-pdf-quadrado { min-width: 44px; padding: 10px 0; font-size: 20px; line-height: 1; }
 .leitor-pdf-corpo { background: #DDE3EA; overflow: auto; padding: 18px; }
+/* A frase do C3 ("Escolha a página e toque em...") fica colada embaixo da
+   barra, de ponta a ponta, sem rolar junto com a página. */
+.leitor-pdf-dica { flex-shrink: 0; margin: 0; border-radius: 0; border-width: 0 0 1px; }
+/* "Abrir como folha para escrever em cima" (C3), embaixo do nome do anexo. */
+#lista-anexos .anexo-como-folha { margin-top: 8px; min-height: 44px; }
+/* "Preparando a folha..." (C3): cobre a tela inteira, por cima das janelas,
+   para nenhum toque chegar atrás enquanto a folha é montada. As janelas sobem
+   de 2 em 2 a partir de 50 (abrirModal); o aviso (z 80)
+   continua por cima, porque é por ele que a falha é dita. */
+.preparando-folha { display: none; position: fixed; inset: 0; z-index: 79; align-items: center;
+  justify-content: center; background: rgba(15, 30, 50, .28); }
+.preparando-folha.aberto { display: flex; }
+.preparando-folha-caixa { background: var(--branco); color: var(--navy); font-weight: 700; font-size: 16px;
+  padding: 18px 26px; border-radius: 12px; box-shadow: var(--sombra-forte); }
 .leitor-pdf-corpo canvas { display: block; margin: 0 auto; background: #FFFFFF; box-shadow: var(--sombra); }
 .leitor-pdf-aviso { max-width: 520px; margin: 24px auto; padding: 18px; background: var(--branco);
   border-radius: 12px; box-shadow: var(--sombra); }
@@ -2322,3 +2336,12 @@ button.alvo-rascunho:hover { background: var(--soft); }
   font-weight: 500;
 }
 
+/* ---------- sondagem por ano de entrada (C5) ---------- */
+
+/* Alvos de toque de 44 px, como o resto do aplicativo: Certo, Meio certo e
+ * Errado, e os botões de editar a sondagem, são tocados com o dedo, um por
+ * exercício (painel cego do C5a mediu 32 px). */
+#modal-sondagem .btn.pequeno { min-height: 44px; }
+.opcao-correcao { min-width: 92px; }
+/* A evidência da lacuna, no tamanho do texto de ajuda, e não menor. */
+.evidencia-lacuna { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }

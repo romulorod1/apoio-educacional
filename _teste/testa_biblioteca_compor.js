@@ -24,7 +24,9 @@
  *      recorte alto de um pedaço só;
  *  11. recorte reduzido logo abaixo do título fica na página do título;
  *  12. rótulo em caixa estreita demais (corpo abaixo de 7 pt): o número sai numa
- *      linha própria, acima do recorte.
+ *      linha própria, acima do recorte;
+ *  13. prova sem solução com a letra do gabarito (ENEM, C12): "Resposta: C" no
+ *      lugar da solução, e o item sem letra continua "Sem solução na fonte.".
  */
 'use strict';
 const fs = require('fs');
@@ -271,6 +273,15 @@ const mTd = pe.paginas[0].fluxo.match(/\/F2 ([\d.]+) Tf ([\d.]+) ([\d.]+) Td \(E
 conf('"Exercício 1." em corpo legível, na margem', mTd ? (+mTd[1] >= 7) + ',' + mTd[2] : 'não achei', 'true,40.00');
 const imE = pe.paginas[0].imagens[0];
 conf('e acima do recorte', mTd ? +mTd[3] > imE.y + imE.a : false, true);
+
+secao('13. prova sem solução com a letra do gabarito (ENEM, C12): a resposta sai no gabarito');
+const enem = PDFGen.gerarMaterialBiblioteca(Object.assign({}, BASE, { incluirTeoria: false,
+  itens: [{ id: 'enem:2099:136', enunciado: peca(120), solucao: null, semSolucao: true, resposta: 'C' },
+    { id: 'x:2', enunciado: peca(80), solucao: null, semSolucao: true }] }));
+const pen = lerPdf(enem.bytes);
+const gabE = enem.paginas.gabarito.map(i => pen.paginas[i].textos).reduce((a, b) => a.concat(b), []);
+conf('"Resposta: C" logo depois do 1.', gabE[gabE.indexOf('Resposta: C') - 1], '1.');
+conf('e o item sem letra continua "Sem solução na fonte."', gabE[gabE.indexOf('Sem solução na fonte.') - 1], '2.');
 
 // ---------------------------------------------------------------- 8
 secao('8. texto sem travessão nem meia-risca');

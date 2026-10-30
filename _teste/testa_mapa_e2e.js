@@ -182,12 +182,18 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
     await pag.$$eval('[data-item^="lacunas:"] button', es => es.length) >= 20, true);
   conf('e os outros grupos não têm, porque não são conteúdo',
     await pag.$$eval('[data-item^="atencao:"] button', es => es.length), 0);
+  /* C5 (lente da pedagoga, P06): os estilos por modalidade saem da oferta
+   * num mapeamento novo, e entram as práticas com evidência. */
+  conf('"Vendo o desenho" não é mais oferecido num mapeamento novo',
+    await pag.$$eval('[data-item="aprende:visual"]', es => es.length), 0);
+  conf('e "Ver um exemplo resolvido" é',
+    await pag.$$eval('[data-item="aprende:exemplo-resolvido"]', es => es.length), 1);
 
   await pag.evaluate(() => {
     ['fortes:raciocinio-ok', 'fortes:gosta',
       'atencao:sinal', 'atencao:vespera', 'atencao:ansiedade-prova',
       'lacunas:fracoes', 'lacunas:eq1',
-      'rotina:agenda-cheia', 'aprende:visual'].forEach(k => {
+      'rotina:agenda-cheia', 'aprende:exemplo-resolvido'].forEach(k => {
         document.querySelector('[data-item="' + k + '"] input').click();
       });
   });
@@ -275,7 +281,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   conf('com as prioridades', /Fechar frações até outubro/.test(lembrete), true);
   conf('com as lacunas', /Frações/.test(lembrete), true);
   conf('com os pontos de atenção', /Erros de sinal/.test(lembrete), true);
-  conf('e com o jeito de aprender', /Vendo o desenho/.test(lembrete), true);
+  conf('e com o que costuma funcionar', /Costuma funcionar.*Ver um exemplo resolvido/.test(lembrete), true);
 
   await pag.$eval('#usar-lembrete', e => e.click());
   await espera(700);

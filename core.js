@@ -951,7 +951,7 @@
        * que nunca receberiam uma marcação sequer. */
       soEmEscada: true,
       /* O grupo inteiro é sobre a matéria: cada item aqui herda isso, e não
-       * precisa repetir `sobre` vinte e duas vezes. */
+       * precisa repetir `sobre` em cada um dos vinte e sete. */
       sobre: 'materia',
       ajuda: 'O que ficou para trás e atrapalha o conteúdo de agora. ' +
         'Cada lacuna marcada monta a trilha dos assuntos que precisam vir antes, ' +
@@ -967,30 +967,96 @@
        * incluindo matrizes e polinômios; e "primeiro grau" e "segundo grau" não
        * casam com título nenhum, ou seja as duas lacunas de equação não tinham
        * alvo nenhum. Quem confirma o alvo é ela, com um toque, ao montar a
-       * trilha: um toque por trilha, nunca por aula. */
+       * trilha: um toque por trilha, nunca por aula.
+       *
+       * `obmep` é a REGRA DE ESCOLHA da sondagem por ano de entrada (C5): o
+       * começo do identificador dos exercícios da OBMEP que medem a lacuna,
+       * "série:módulo" ou "série:módulo:lista", da série mais baixa para a mais
+       * alta. Nenhum enunciado mora aqui nem no repositório: quem escolhe os
+       * itens é o aplicativo, no degrau 1 das listas dos pacotes que ela já
+       * importou no tablet. Os nomes saem dos pacotes de 2026 (módulos e listas
+       * do Portal da OBMEP); a lista aponta a LISTA quando o módulo mistura
+       * assuntos (Operações Básicas tem naturais e decimais, Dízimas tem
+       * expressões e notação científica) e o MÓDULO quando ele é o assunto
+       * inteiro. Tabuada e divisão ficam sem: são dos anos iniciais, e o
+       * material delas vem com os pacotes da OBMEP Mirim, numa rodada própria.
+       *
+       * As cinco últimas nasceram da lente da pedagoga (P08): divisibilidade e
+       * MMC, ordem das operações, ângulos, notação científica e conjuntos
+       * travam muita criança e, sem lugar para marcar, viravam "Outro" ou
+       * sumiam. Ids novos, e os antigos intocados: o que ela já marcou continua
+       * lido do mesmo jeito. */
       itens: [
-        { id: 'naturais', rotulo: 'Operações com números naturais', busca: 'operações', alvos: ['MAT04-02', 'MAT05-02', 'MAT06-02'] },
+        { id: 'naturais', rotulo: 'Operações com números naturais', busca: 'operações', alvos: ['MAT04-02', 'MAT05-02', 'MAT06-02'],
+          obmep: ['6ano:numeros-naturais-representacao-e-operacoes-basicas', '6ano:operacoes-basicas:operacoes-com-numeros-naturais',
+            '6ano:resolucao-de-exercicios:operacoes-com-numeros-naturais'] },
         { id: 'tabuada', rotulo: 'Tabuada e multiplicação', busca: 'multiplicação', alvos: ['MAT03-04', 'MAT04-03'] },
         { id: 'divisao', rotulo: 'Divisão', busca: 'divisão', alvos: ['MAT03-05', 'MAT04-04'] },
-        { id: 'fracoes', rotulo: 'Frações', busca: 'fração', alvos: ['MAT04-05', 'MAT05-03', 'MAT06-05', 'MAT06-06'] },
-        { id: 'decimais', rotulo: 'Números decimais', busca: 'decimais', alvos: ['MAT04-06', 'MAT05-05', 'MAT06-07'] },
-        { id: 'porcentagem', rotulo: 'Porcentagem', busca: 'porcentagem', alvos: ['MAT05-06', 'MAT06-08', 'MAT07-07'] },
-        { id: 'inteiros', rotulo: 'Números negativos', busca: 'inteiros', alvos: ['MAT07-01', 'MAT07-02'] },
-        { id: 'potencias', rotulo: 'Potenciação e raiz', busca: 'potência', alvos: ['MAT08-01', 'MAT09-02'] },
-        { id: 'medidas', rotulo: 'Unidades de medida', busca: 'medida', alvos: ['MAT04-10', 'MAT05-10', 'MAT06-12'] },
-        { id: 'algebrica', rotulo: 'Expressões algébricas', busca: 'algébric', alvos: ['MAT07-09', 'MAT08-05'] },
-        { id: 'eq1', rotulo: 'Equação do primeiro grau', busca: 'primeiro grau', alvos: ['MAT07-10'] },
-        { id: 'sistemas', rotulo: 'Sistemas de equações', busca: 'sistema', alvos: ['MAT08-10', 'MATEM2-06'] },
-        { id: 'fatoracao', rotulo: 'Produtos notáveis e fatoração', busca: 'fatoração', alvos: ['MAT08-06', 'MAT08-07'] },
-        { id: 'eq2', rotulo: 'Equação do segundo grau', busca: 'segundo grau', alvos: ['MAT09-04', 'MAT09-05'] },
-        { id: 'proporcao', rotulo: 'Razão, proporção e regra de três', busca: 'proporção', alvos: ['MAT07-05', 'MAT07-06'] },
-        { id: 'area', rotulo: 'Perímetro, área e volume', busca: 'área', alvos: ['MAT04-09', 'MAT05-09', 'MAT06-11', 'MAT07-13'] },
-        { id: 'pitagoras', rotulo: 'Teorema de Pitágoras', busca: 'Pitágoras', alvos: ['MAT09-07'] },
-        { id: 'semelhanca', rotulo: 'Semelhança e escala', busca: 'semelhança', alvos: ['MAT09-08'] },
-        { id: 'trigonometria', rotulo: 'Trigonometria no triângulo retângulo', busca: 'trigonometria', alvos: ['MAT09-09', 'MATEM1-14'] },
-        { id: 'funcoes', rotulo: 'Funções', busca: 'função', alvos: ['MAT09-10', 'MATEM1-03'] },
-        { id: 'graficos', rotulo: 'Leitura de gráficos e estatística', busca: 'gráfico', alvos: ['MAT04-12', 'MAT05-12', 'MAT06-14', 'MATEM3-14'] },
-        { id: 'probabilidade', rotulo: 'Probabilidade', busca: 'probabilidade', alvos: ['MAT07-14', 'MAT08-14', 'MAT09-14', 'MATEM2-10'] }
+        { id: 'fracoes', rotulo: 'Frações', busca: 'fração', alvos: ['MAT04-05', 'MAT05-03', 'MAT06-05', 'MAT06-06'],
+          obmep: ['6ano:fracoes-o-primeiro-contato', '6ano:resolucao-de-exercicios:fracoes',
+            '7ano:numeros-inteiros-e-numeros-racionais:numeros-racionais-e-exercicios'] },
+        { id: 'decimais', rotulo: 'Números decimais', busca: 'decimais', alvos: ['MAT04-06', 'MAT05-05', 'MAT06-07'],
+          obmep: ['6ano:operacoes-basicas:operacoes-com-numeros-na-forma-decimal'] },
+        { id: 'porcentagem', rotulo: 'Porcentagem', busca: 'porcentagem', alvos: ['MAT05-06', 'MAT06-08', 'MAT07-07'],
+          obmep: ['6ano:fracao-como-porcentagem-e-como-probabilidade:fracao-como-porcentagem', '7ano:porcentagem-e-juros:introdu-cao-a-porcentagem',
+            '8ano:porcentagem', '1em:matematica-financeira:introducao-porcentagem-aumentos-e-descontos'] },
+        { id: 'inteiros', rotulo: 'Números negativos', busca: 'inteiros', alvos: ['MAT07-01', 'MAT07-02'],
+          obmep: ['7ano:numeros-inteiros-e-numeros-racionais:numeros-inteiros-e-suas-operacoes',
+            '7ano:numeros-inteiros-e-numeros-racionais:exercicios-sobre-operacoes-com-numeros-inteiros'] },
+        { id: 'potencias', rotulo: 'Potenciação e raiz', busca: 'potência', alvos: ['MAT08-01', 'MAT09-02'],
+          obmep: ['8ano:potenciacao', '8ano:dizimas-periodicas-e-numeros-reais:numeros-irracionais-e-reais'] },
+        { id: 'medidas', rotulo: 'Unidades de medida', busca: 'medida', alvos: ['MAT04-10', 'MAT05-10', 'MAT06-12'],
+          obmep: ['6ano:sistemas-de-medidas-e-medidas-de-tempo',
+            '6ano:unidades-de-medida-de-comprimento-e-de-areas:unidades-de-medida-de-comprimento-e-primeiros-exercicios',
+            '6ano:unidades-de-medida-de-volume'] },
+        { id: 'algebrica', rotulo: 'Expressões algébricas', busca: 'algébric', alvos: ['MAT07-09', 'MAT08-05'],
+          obmep: ['7ano:notacao-algebrica-e-introducao-as-equacoes', '8ano:expressoes-algebricas-e-polinomios'] },
+        { id: 'eq1', rotulo: 'Equação do primeiro grau', busca: 'primeiro grau', alvos: ['MAT07-10'],
+          obmep: ['7ano:equacoes-e-inequacoes-do-primeiro-grau:equacoes-do-primeiro-grau-a-uma-variavel',
+            '7ano:equacoes-e-inequacoes-do-primeiro-grau:exercicios-sobre-equacoes'] },
+        { id: 'sistemas', rotulo: 'Sistemas de equações', busca: 'sistema', alvos: ['MAT08-10', 'MATEM2-06'],
+          obmep: ['7ano:o-plano-cartesiano-e-sistemas-de-equacoes:sistemas-de-equacoes-do-primeiro-grau-com-duas-incognitas',
+            '7ano:o-plano-cartesiano-e-sistemas-de-equacoes:exercicios-de-sistemas-de-equacoes', '8ano:sistemas-de-equacoes-do-primeiro-grau'] },
+        { id: 'fatoracao', rotulo: 'Produtos notáveis e fatoração', busca: 'fatoração', alvos: ['MAT08-06', 'MAT08-07'],
+          obmep: ['8ano:produtos-notaveis-e-fatoracao-de-expressoes-algebr'] },
+        { id: 'eq2', rotulo: 'Equação do segundo grau', busca: 'segundo grau', alvos: ['MAT09-04', 'MAT09-05'],
+          obmep: ['9ano:equacoes-do-segundo-grau'] },
+        { id: 'proporcao', rotulo: 'Razão, proporção e regra de três', busca: 'proporção', alvos: ['MAT07-05', 'MAT07-06'],
+          obmep: ['7ano:razoes-e-proporcoes'] },
+        { id: 'area', rotulo: 'Perímetro, área e volume', busca: 'área', alvos: ['MAT04-09', 'MAT05-09', 'MAT06-11', 'MAT07-13'],
+          obmep: ['6ano:unidades-de-medida-de-comprimento-e-de-areas:areas-de-outras-figuras-basicas-e-primeiros-exercicios',
+            '6ano:unidades-de-medida-de-comprimento-e-de-areas:exercicios-diversos-de-areas-de-figuras',
+            '9ano:areas-de-figuras-planas', '9ano:problemas-envolvendo-areas'] },
+        { id: 'pitagoras', rotulo: 'Teorema de Pitágoras', busca: 'Pitágoras', alvos: ['MAT09-07'],
+          obmep: ['9ano:teorema-de-pitagoras-e-aplicacoes'] },
+        { id: 'semelhanca', rotulo: 'Semelhança e escala', busca: 'semelhança', alvos: ['MAT09-08'],
+          obmep: ['9ano:semelhanca-de-triangulos-e-teorema-de-tales'] },
+        { id: 'trigonometria', rotulo: 'Trigonometria no triângulo retângulo', busca: 'trigonometria', alvos: ['MAT09-09', 'MATEM1-14'],
+          obmep: ['9ano:triangulo-retangulo-lei-dos-senos-e-cossenos-polig:razoes-trigonometricas-no-triangulo-retangulo-seno-cosseno-e',
+            '1em:leis-dos-senos-e-dos-cossenos:razoes-trigonometricas-no-triangulo-retangulo'] },
+        { id: 'funcoes', rotulo: 'Funções', busca: 'função', alvos: ['MAT09-10', 'MATEM1-03'],
+          obmep: ['9ano:funcoes-nocoes-basicas', '9ano:funcao-afim', '1em:funcao-quadratica'] },
+        { id: 'graficos', rotulo: 'Leitura de gráficos e estatística', busca: 'gráfico', alvos: ['MAT04-12', 'MAT05-12', 'MAT06-14', 'MATEM3-14'],
+          obmep: ['7ano:nocoes-basicas-de-estatistica', '1em:estatistica-basica-i'] },
+        { id: 'probabilidade', rotulo: 'Probabilidade', busca: 'probabilidade', alvos: ['MAT07-14', 'MAT08-14', 'MAT09-14', 'MATEM2-10'],
+          obmep: ['6ano:fracao-como-porcentagem-e-como-probabilidade:fracao-como-probabilidade', '2em:introducao-a-probabilidade'] },
+        { id: 'divisibilidade', rotulo: 'Divisibilidade, MMC e MDC', busca: 'divisores', alvos: ['MAT05-07', 'MAT06-03'],
+          obmep: ['6ano:divisibilidade', '6ano:resolucao-de-exercicios:maximo-divisor-comum-e-minimo-multiplo-comum',
+            '8ano:numeros-naturais-contagem-divisibilidade-e-teorema:divisibilidade-e-teorema-da-divisao-euclidiana'] },
+        /* Nenhum tema do índice tem "expressão numérica" no título: a ordem
+         * das operações mora dentro das quatro operações do 5º e do 6º ano, e é
+         * para lá que a trilha leva. Na OBMEP, ela é uma lista do 8º ano. */
+        { id: 'expressoes', rotulo: 'Expressões numéricas e ordem das operações', busca: 'quatro operações', alvos: ['MAT05-02', 'MAT06-02'],
+          obmep: ['8ano:dizimas-periodicas-e-numeros-reais:expressoes-numericas'] },
+        { id: 'angulos', rotulo: 'Ângulos e figuras planas', busca: 'ângulos', alvos: ['MAT04-07', 'MAT06-09', 'MAT06-10', 'MAT07-11', 'MAT07-12'],
+          obmep: ['8ano:elementos-basicos-de-geometria-plana-parte-1:angulos', '8ano:elementos-basicos-de-geometria-plana-parte-1:triangulos',
+            '8ano:elementos-basicos-de-geometria-plana-parte-1:conceitos-geometricos-basicos'] },
+        { id: 'notacao-cientifica', rotulo: 'Notação científica', busca: 'notação científica', alvos: ['MAT08-02'],
+          obmep: ['8ano:dizimas-periodicas-e-numeros-reais:notacao-cientifica'] },
+        /* "Intervalos" é o jeito do médio de escrever conjunto, e quem trava
+         * ali trava na inequação: por isso o alvo de cima é a inequação. */
+        { id: 'conjuntos', rotulo: 'Conjuntos e intervalos', busca: 'conjuntos', alvos: ['MAT09-01', 'MATEM1-01', 'MATEM1-05'],
+          obmep: ['9ano:conjuntos', '1em:inequacoes-produto-e-quociente-de-primeiro-grau:introducao-as-inequacoes-do-primeiro-grau'] }
       ]
     },
     {
@@ -1017,18 +1083,36 @@
     },
     {
       chave: 'aprende',
-      titulo: 'Como aprende melhor',
+      /* Era "Como aprende melhor", e misturava preferência observável com
+       * "estilo de aprendizagem" por modalidade ("Vendo", "Ouvindo"), ideia que
+       * a pesquisa não sustenta: ajustar a aula ao sentido preferido não faz
+       * aprender mais, e o rótulo vira profecia ("ele é visual") e a aula
+       * deixa de variar. Lente da pedagoga, P06.
+       *
+       * O grupo fica como registro do que ela VIU funcionar, e ganha quatro
+       * práticas com evidência (exemplo resolvido, recuperação, espaçamento e
+       * explicar em voz alta). Os dois de modalidade saem da OFERTA com
+       * `oferta: false`: continuam aqui para o que ela já marcou ser lido, e a
+       * tela mostra a caixa enquanto estiver marcada, para poder desmarcar
+       * (itensOferecidos, o mesmo desenho do `manter` de areasPara). Os ids
+       * não mudam. */
+      titulo: 'O que costuma funcionar com este aluno',
       sobre: 'aluno',
-      ajuda: 'O caminho que costuma funcionar com este aluno.',
+      ajuda: 'É preferência que você observou nas aulas, e não diagnóstico nem estilo de aprendizagem. ' +
+        'Serve para começar por onde costuma dar certo, sem deixar de variar.',
       itens: [
-        { id: 'visual', rotulo: 'Vendo o desenho ou o gráfico' },
+        { id: 'visual', rotulo: 'Vendo o desenho ou o gráfico', oferta: false },
         { id: 'fazendo', rotulo: 'Fazendo muitos exercícios' },
-        { id: 'ouvindo', rotulo: 'Ouvindo a explicação passo a passo' },
+        { id: 'ouvindo', rotulo: 'Ouvindo a explicação passo a passo', oferta: false },
         { id: 'explicando', rotulo: 'Explicando para outra pessoa' },
         { id: 'exemplo-regra', rotulo: 'Do exemplo para a regra' },
         { id: 'regra-exemplo', rotulo: 'Da regra para o exemplo' },
         { id: 'aplicado', rotulo: 'Com aplicação prática do dia a dia' },
-        { id: 'devagar', rotulo: 'Com ritmo mais devagar e mais repetição' }
+        { id: 'devagar', rotulo: 'Com ritmo mais devagar e mais repetição' },
+        { id: 'exemplo-resolvido', rotulo: 'Ver um exemplo resolvido antes de praticar' },
+        { id: 'lembrar-antes', rotulo: 'Tentar lembrar de memória antes de rever a matéria' },
+        { id: 'dias-separados', rotulo: 'Revisar em dias separados, e não tudo de uma vez' },
+        { id: 'voz-alta', rotulo: 'Explicar o raciocínio em voz alta' }
       ]
     }
   ];
@@ -2655,7 +2739,7 @@
     if (l.prioridades) L.push('Prioridades: ' + l.prioridades.replace(/\s*\n\s*/g, '; '));
     if (l.lacunas.length) L.push('Lacunas: ' + l.lacunas.join(', ') + '.');
     if (l.atencao.length) L.push('Atenção: ' + l.atencao.join(', ') + '.');
-    if (l.aprende.length) L.push('Aprende melhor: ' + l.aprende.join(' e ') + '.');
+    if (l.aprende.length) L.push('Costuma funcionar: ' + l.aprende.join(' e ') + '.');
     return L.join(' ');
   }
 
@@ -3045,6 +3129,187 @@
     t.valorPrevisto = Math.round(t.valorPrevisto * 100) / 100;
     t.valorCanceladasFuturas = Math.round(t.valorCanceladasFuturas * 100) / 100;
     return t;
+  }
+
+  // ---------- pagamentos: "pago em" (C4) ----------
+
+  /* Quem já pagou o quê. Só dela: nada daqui entra em documento que a família
+   * recebe (texto, PDF, cartão), e por isso nenhuma função de documento lê
+   * db.pagamentos.
+   *
+   * Mora em db.pagamentos, uma lista no documento principal, ao lado de
+   * alunos, aulas e resumos. Não dentro do aluno, porque o resumo do mês, que
+   * é a coisa mais parecida, também é uma lista solta por aluno e mês; e não em
+   * db.ajustes, que é de preferências. Assim a cópia de segurança, o "Voltar a
+   * este ponto" e a sincronização da nuvem levam os pagamentos pelo mesmo
+   * caminho do resto do documento, sem caso especial.
+   *
+   *   { id, alunoId, mes: 'AAAA-MM', pagoEm: 'AAAA-MM-DD', valor }
+   *
+   * Um registro por aluno e mês. Desmarcar apaga o registro.
+   *
+   * O VALOR é guardado em reais, número com no máximo duas casas (150.5 é
+   * R$ 150,50), e já nasce arredondado ao centavo: o texto que ela digita é
+   * lido como centavos inteiros (lerReais), sem passar por conta com vírgula
+   * flutuante. Toda comparação de dinheiro aqui é feita em centavos inteiros,
+   * porque 0,1 + 0,2 não é 0,3 e um centavo que sobra viraria "pendente". */
+  function centavos(v) { return Math.round(Number(v || 0) * 100); }
+
+  /* Lê o valor que ela digitou, do jeito que se escreve no Brasil: "150",
+   * "150,5", "1.250,00", "R$ 90,00". Vírgula é sempre o decimal. Sem vírgula,
+   * um ponto seguido de uma ou duas casas também é decimal ("150.50", que é o
+   * que o teclado numérico às vezes põe); com três casas é milhar ("1.500").
+   * Devolve reais com até duas casas, ou null quando o texto não é um valor. */
+  function lerReais(texto) {
+    var s = String(texto === null || texto === undefined ? '' : texto)
+      .replace(/R\$/i, '').replace(/\s+/g, '');
+    if (!s) return null;
+    var inteiro, frac, m;
+    if (s.indexOf(',') >= 0) {
+      m = s.match(/^(\d{1,3}(?:\.\d{3})+|\d+),(\d{0,2})$/);
+      if (!m) return null;
+      inteiro = m[1].replace(/\./g, ''); frac = m[2];
+    } else if ((m = s.match(/^(\d+)\.(\d{1,2})$/))) {
+      inteiro = m[1]; frac = m[2];
+    } else if ((m = s.match(/^(\d{1,3}(?:\.\d{3})+|\d+)$/))) {
+      inteiro = m[1].replace(/\./g, ''); frac = '';
+    } else {
+      return null;
+    }
+    return (Number(inteiro) * 100 + Number((frac + '00').slice(0, 2))) / 100;
+  }
+
+  /* O valor a cobrar do mês é o MESMO que o documento da família cobra: com
+   * aula marcada à frente, só o que já aconteceu (valorFeito); com o mês
+   * vencido, o mês inteiro (totalValor). É a mesma escolha do
+   * markdownFechamento e do PDF, e fica aqui para o "pago em" nunca propor nem
+   * cobrar um número diferente do que a família leu. */
+  function valorACobrarDoMes(f) {
+    if (!f) return 0;
+    var temFuturas = (f.linhas || []).some(function (l) { return l.futura; });
+    return temFuturas ? (f.valorFeito || 0) : (f.totalValor || 0);
+  }
+
+  function pagamentoDe(db, alunoId, mesIso) {
+    return ((db && db.pagamentos) || []).filter(function (p) {
+      return p && p.alunoId === alunoId && p.mes === mesIso;
+    })[0] || null;
+  }
+
+  /* Marca (ou troca) o pagamento de um aluno num mês. Devolve o registro, ou
+   * null quando algo não confere: mês, data ou valor (zero não é pagamento;
+   * para tirar a marca existe o desmarcar). O registro que já existia é
+   * reaproveitado, com o mesmo id: trocar o valor não cria um segundo. */
+  function marcarPagamento(db, alunoId, mesIso, pagoEm, valor) {
+    if (!db || !alunoId || !/^\d{4}-\d{2}$/.test(String(mesIso || ''))) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(pagoEm || '')) || deBR(ddmmaaaa(pagoEm)) !== pagoEm) return null;
+    var cent = centavos(valor);
+    if (!isFinite(cent) || cent <= 0) return null;
+    if (!Array.isArray(db.pagamentos)) db.pagamentos = [];
+    var reg = pagamentoDe(db, alunoId, mesIso);
+    if (!reg) {
+      reg = { id: uid(), alunoId: alunoId, mes: mesIso };
+      db.pagamentos.push(reg);
+    }
+    reg.pagoEm = pagoEm;
+    reg.valor = cent / 100;
+    return reg;
+  }
+
+  function desmarcarPagamento(db, alunoId, mesIso) {
+    var reg = pagamentoDe(db, alunoId, mesIso);
+    if (!reg) return null;
+    db.pagamentos = db.pagamentos.filter(function (p) { return p !== reg; });
+    return reg;
+  }
+
+  /* A situação do mês de um aluno, a partir do fechamento já calculado.
+   * `falta` é o que ainda não foi pago: pago a MENOS fica como falta, com a
+   * diferença, e não some só porque existe uma marca de pagamento. Pago a mais
+   * (ela recebeu adiantado o mês inteiro, por exemplo) não falta nada. */
+  function situacaoDoPagamento(db, f) {
+    var devidoCent = centavos(valorACobrarDoMes(f));
+    var registro = f ? pagamentoDe(db, f.aluno.id, f.mes) : null;
+    var pagoCent = registro ? centavos(registro.valor) : 0;
+    var faltaCent = Math.max(0, devidoCent - pagoCent);
+    return {
+      registro: registro,
+      devido: devidoCent / 100,
+      pago: pagoCent / 100,
+      falta: faltaCent / 100
+    };
+  }
+
+  /* Desde que mês ela controla os pagamentos: db.ajustes.pagamentosDesde,
+   * 'AAAA-MM'. O app grava o mês corrente na primeira vez que desenha o
+   * Fechamento sem o campo, e ela muda quando quiser.
+   *
+   * Existe porque, sem ele, a primeira abertura do "pago em" transformaria em
+   * pendência todo mês anterior com aula, inclusive os que as famílias já
+   * pagaram antes de existir onde marcar: a lista nasceria enorme e falsa.
+   * Sem o campo (ou com ele mal escrito), vale o mês de hoje, que é o que o
+   * app vai gravar: nada fica pendente antes de ela dizer desde quando. */
+  function corteDosPagamentos(db, hojeRef) {
+    var c = db && db.ajustes && db.ajustes.pagamentosDesde;
+    return /^\d{4}-\d{2}$/.test(String(c || '')) ? c : mesDe(hojeRef || hojeIso());
+  }
+
+  /* Quem ainda não pagou o quê, mês a mês.
+   *
+   * Pendente é o mês JÁ TERMINADO, a partir do corte, com valor a cobrar
+   * maior que zero e sem pagamento que o cubra (pago a menos entra, com a
+   * diferença). O mês corrente não entra: ele só vira cobrança depois que
+   * fecha, e listar o que ainda está acontecendo seria cobrar antes da hora.
+   * Mês futuro, pelo mesmo motivo, também não. Mês antes do corte nunca é
+   * pendente; um pagamento marcado nele continua no cartão do aluno, porque é
+   * dado dela, só não vira pendência.
+   *
+   * hojeRef existe para o teste poder fixar o dia. Ordem: do mês mais antigo
+   * para o mais novo (o que está esperando há mais tempo vem primeiro) e, no
+   * mesmo mês, pelo nome. */
+  function pendentesDePagamento(db, hojeRef) {
+    var hoje = hojeRef || hojeIso();
+    var mesHoje = mesDe(hoje);
+    var corte = corteDosPagamentos(db, hoje);
+    var mesesDoAluno = Object.create(null);
+    ((db && db.aulas) || []).forEach(function (a) {
+      if (!a || !a.data || !a.alunoId) return;
+      var m = mesDe(a.data);
+      if (m >= mesHoje) return;   // mês corrente e futuro: ainda não fechou
+      if (m < corte) return;      // antes do corte: ela não controlava ainda
+      (mesesDoAluno[a.alunoId] = mesesDoAluno[a.alunoId] || Object.create(null))[m] = true;
+    });
+    var saida = [];
+    ((db && db.alunos) || []).forEach(function (al) {
+      Object.keys(mesesDoAluno[al.id] || {}).forEach(function (m) {
+        var f = calcularFechamento(db, al.id, m, hoje);
+        var s = situacaoDoPagamento(db, f);
+        if (centavos(s.falta) <= 0) return;
+        saida.push({
+          alunoId: al.id, alunoNome: al.nome || '', mes: m, mesExtenso: mesExtenso(m),
+          devido: s.devido, pago: s.pago, falta: s.falta,
+          pagoEm: s.registro ? s.registro.pagoEm : null,
+          aMenos: !!s.registro
+        });
+      });
+    });
+    saida.sort(function (x, y) {
+      return (x.mes < y.mes ? -1 : x.mes > y.mes ? 1 : 0) ||
+        String(x.alunoNome).localeCompare(String(y.alunoNome), 'pt-BR') ||
+        String(x.alunoId).localeCompare(String(y.alunoId));
+    });
+    return saida;
+  }
+
+  /* A soma da lista de pendentes, em centavos inteiros e devolvida em reais. */
+  function somaDosPendentes(lista) {
+    var cent = 0, meses = Object.create(null), alunos = Object.create(null);
+    (lista || []).forEach(function (p) {
+      cent += centavos(p.falta);
+      meses[p.mes] = true;
+      alunos[p.alunoId] = true;
+    });
+    return { falta: cent / 100, itens: (lista || []).length, meses: Object.keys(meses).length, alunos: Object.keys(alunos).length };
   }
 
   // ---------- cada aluno, desde quando e por quanto ----------
@@ -3727,6 +3992,298 @@
     return { candidatos: candidatos, sugerido: sugerido, rotulo: item.rotulo };
   }
 
+  // ---------- sondagem por ano de entrada (C5) ----------
+
+  /* O mapeamento de um aluno novo não tinha instrumento: o roteiro mandava
+   * "montar uma lista curta com exercícios de anos anteriores", e a lacuna
+   * acabava marcada por impressão e conversa. Dois alunos iguais saíam com
+   * mapas diferentes. Lente da pedagoga, P03.
+   *
+   * A sondagem é pronta por ANO DE ENTRADA: as lacunas prováveis daquele ano,
+   * dois exercícios por lacuna, e a correção marca a lacuna no mapeamento com
+   * a evidência escrita. Tudo aqui é função pura, que roda no teste sem
+   * navegador; a tela só monta e grava.
+   *
+   * AS LACUNAS PROVÁVEIS DE CADA ANO são o conteúdo dos dois anos anteriores
+   * que trava o ano de agora, tirado da lista de lacunas e da série em que
+   * cada uma é ensinada (os `alvos` de cada item dizem a série). Entre cinco e
+   * sete por ano, para a folha caber em 25 minutos com dois itens cada:
+   *   6º  naturais, divisibilidade, frações, decimais, medidas, área (o 4º e o
+   *       5º ano; tabuada e divisão ficam para os pacotes da OBMEP Mirim);
+   *   7º  o 6º ano: expressões, divisibilidade, frações, decimais,
+   *       porcentagem, medidas, área;
+   *   8º  o 7º: frações (racionais), negativos, proporção, porcentagem,
+   *       expressões algébricas, equação do 1º grau, ângulos;
+   *   9º  o 8º: negativos, equação do 1º grau, sistemas, potências, notação
+   *       científica, fatoração, ângulos;
+   *   1º médio  o 9º: fatoração, equação do 2º grau, Pitágoras, semelhança,
+   *       trigonometria, funções, conjuntos;
+   *   2º médio  o 1º médio e a base dele: fatoração, 2º grau, funções,
+   *       conjuntos e intervalos, trigonometria, porcentagem (a financeira),
+   *       gráficos e estatística;
+   *   3º médio  o 2º médio e a base dele: 2º grau, funções, conjuntos,
+   *       trigonometria, área, gráficos, probabilidade.
+   * Cursinho lê como 3º médio, como no resto do aplicativo (serieParaTemas).
+   * Do 2º ao 5º ano fica para depois: depende dos pacotes da OBMEP Mirim. */
+  var LACUNAS_PROVAVEIS = {
+    '06': ['naturais', 'divisibilidade', 'fracoes', 'decimais', 'medidas', 'area'],
+    '07': ['expressoes', 'divisibilidade', 'fracoes', 'decimais', 'porcentagem', 'medidas', 'area'],
+    '08': ['fracoes', 'inteiros', 'proporcao', 'porcentagem', 'algebrica', 'eq1', 'angulos'],
+    '09': ['inteiros', 'eq1', 'sistemas', 'potencias', 'notacao-cientifica', 'fatoracao', 'angulos'],
+    em1: ['fatoracao', 'eq2', 'pitagoras', 'semelhanca', 'trigonometria', 'funcoes', 'conjuntos'],
+    em2: ['fatoracao', 'eq2', 'funcoes', 'conjuntos', 'trigonometria', 'porcentagem', 'graficos'],
+    em3: ['eq2', 'funcoes', 'conjuntos', 'trigonometria', 'area', 'graficos', 'probabilidade']
+  };
+
+  /* A série do pacote da OBMEP ("6ano", "1em") no vocabulário do aplicativo. */
+  var SERIE_DA_OBMEP = { '6ano': '06', '7ano': '07', '8ano': '08', '9ano': '09', '1em': 'em1', '2em': 'em2', '3em': 'em3' };
+
+  function lacunasProvaveis(anoEscolar) {
+    return (LACUNAS_PROVAVEIS[serieParaTemas(anoEscolar)] || []).slice();
+  }
+
+  /* Os prefixos da lacuna (o `obmep` do item), na ordem em que são tentados
+   * para um ano de entrada. Primeiro os de série ANTERIOR ao ano, do mais
+   * perto para o mais longe: a lacuna é de ano anterior, e o ano logo antes é
+   * o que ele acabou de ver. Depois os da própria série ou acima, do mais
+   * baixo para o mais alto, como recurso: no 6º ano não há pacote antes (seria
+   * a OBMEP Mirim), e o degrau 1 do 6º é o mais perto que existe. */
+  function prefixosDaSondagem(lacunaId, anoEscolar) {
+    var item = itemDaLacuna(lacunaId);
+    var teto = posDaSerie(serieParaTemas(anoEscolar));
+    var lista = ((item && item.obmep) || []).map(function (p, i) {
+      return { p: p, i: i, pos: posDaSerie(SERIE_DA_OBMEP[String(p).split(':')[0]]) };
+    });
+    var antes = lista.filter(function (x) { return x.pos < teto; })
+      .sort(function (a, b) { return b.pos - a.pos || a.i - b.i; });
+    var depois = lista.filter(function (x) { return x.pos >= teto; })
+      .sort(function (a, b) { return a.pos - b.pos || a.i - b.i; });
+    return antes.concat(depois).map(function (x) { return x.p; });
+  }
+
+  /* Os exercícios que podem medir a lacuna, em ordem de preferência.
+   *
+   * `listas` são as listas prontas dos pacotes importados (o kits.json, já
+   * filtrado pela tela: só lista cujos exercícios todos existem no tablet),
+   * cada uma { modulo, nivel, degraus: [{ item, degrau }] }. Entra só o
+   * DEGRAU 1, que é a porta de entrada da lista: sondagem não é prova, é para
+   * ver onde ele trava, e o exercício difícil mede a olimpíada, e não a base.
+   * As listas vão do nível mais baixo para o mais alto, e dentro de cada uma
+   * na ordem dela.
+   *
+   * `faltam` são as séries da lacuna cujo pacote não está no tablet, para a
+   * tela dizer qual importar quando não sobrar exercício nenhum. */
+  function candidatosDaSondagem(lacunaId, anoEscolar, listas, seriesImportadas) {
+    var prefixos = prefixosDaSondagem(lacunaId, anoEscolar);
+    var ordenadas = (listas || []).map(function (l, i) { return { l: l, i: i }; })
+      .sort(function (a, b) { return ((a.l.nivel || 0) - (b.l.nivel || 0)) || a.i - b.i; })
+      .map(function (x) { return x.l; });
+    var candidatos = [];
+    prefixos.forEach(function (p) {
+      var comeco = p + ':';
+      ordenadas.forEach(function (l) {
+        ((l && l.degraus) || []).forEach(function (d) {
+          if (!d || d.degrau !== 1 || typeof d.item !== 'string') return;
+          if (d.item.indexOf(comeco) !== 0 || candidatos.indexOf(d.item) >= 0) return;
+          candidatos.push(d.item);
+        });
+      });
+    });
+    var tem = {};
+    (seriesImportadas || []).forEach(function (s) { tem[s] = true; });
+    var faltam = [];
+    prefixos.forEach(function (p) {
+      var s = String(p).split(':')[0];
+      if (!tem[s] && faltam.indexOf(s) < 0) faltam.push(s);
+    });
+    return { candidatos: candidatos, faltam: faltam };
+  }
+
+  /* A lista de onde o exercício saiu ("série:módulo:lista"). */
+  function listaDoExercicio(id) { return String(id).split(':').slice(0, 3).join(':'); }
+
+  /* Escolhe `quantos` exercícios (dois, por padrão) dos candidatos, pulando os
+   * `usados` (os de outra lacuna da mesma sondagem, e os que ela já trocou).
+   * Um por LISTA primeiro: dois exercícios da mesma lista costumam medir a
+   * mesma coisa duas vezes, e dois de listas diferentes cobrem mais da
+   * lacuna. Só repete lista quando não há outra. A ordem dos candidatos é
+   * respeitada. */
+  function escolherItensDaSondagem(candidatos, usados, quantos) {
+    var n = quantos == null ? 2 : quantos;
+    var fora = usados || [];
+    var livres = (candidatos || []).filter(function (c) { return fora.indexOf(c) < 0; });
+    var escolhidos = [];
+    livres.forEach(function (c) {
+      if (escolhidos.length >= n) return;
+      var mesma = escolhidos.some(function (e) { return listaDoExercicio(e) === listaDoExercicio(c); });
+      if (!mesma) escolhidos.push(c);
+    });
+    livres.forEach(function (c) {
+      if (escolhidos.length < n && escolhidos.indexOf(c) < 0) escolhidos.push(c);
+    });
+    return escolhidos;
+  }
+
+  /* A sondagem montada para um ano: um bloco por lacuna provável, com os
+   * itens escolhidos, todos os candidatos (para trocar e pôr) e as séries que
+   * faltam. Nenhum exercício se repete entre lacunas. Ano fora da tabela
+   * (2º ao 5º, fora da escola, outro) devolve blocos vazios, e a tela diz. */
+  function montarSondagem(anoEscolar, listas, seriesImportadas) {
+    var ano = serieParaTemas(anoEscolar);
+    var usados = [];
+    var blocos = lacunasProvaveis(ano).map(function (id) {
+      var c = candidatosDaSondagem(id, ano, listas, seriesImportadas);
+      var itens = escolherItensDaSondagem(c.candidatos, usados, 2);
+      usados = usados.concat(itens);
+      var it = itemDaLacuna(id);
+      return { lacuna: id, rotulo: it ? it.rotulo : id, itens: itens, candidatos: c.candidatos, faltam: c.faltam };
+    });
+    return { ano: ano, blocos: blocos };
+  }
+
+  /* As três respostas da correção, na ordem da tela. */
+  var RESPOSTAS_SONDAGEM = [
+    { id: 'certo', rotulo: 'Certo' },
+    { id: 'meio', rotulo: 'Meio certo' },
+    { id: 'errado', rotulo: 'Errado' }
+  ];
+
+  /* A REGRA QUE MARCA A LACUNA, e é ela que grava no mapeamento.
+   *
+   * Marca quando NENHUM item da lacuna saiu certo e os errados são pelo menos
+   * tantos quanto os meio certos. Um acerto só já basta para NÃO marcar: com
+   * dois itens, acertar um e errar o outro é sinal misto, e lacuna marcada
+   * vira trilha de várias semanas; ela pode marcar à mão se viu mais do que a
+   * folha mostra. Dois meio certos também não marcam (ele chega lá, com
+   * deslize). Item sem correção deixa a lacuna sem decisão, e aí nada é
+   * marcado: só decide quem foi corrigido inteiro.
+   *
+   * `c` é { total, certos, meios, errados, corrigidos }. */
+  function sondagemMarcaLacuna(c) {
+    return c.total > 0 && c.corrigidos === c.total && c.certos === 0 && c.errados >= c.meios;
+  }
+
+  function primeiraMinuscula(s) {
+    s = String(s || '');
+    return s.charAt(0).toLowerCase() + s.slice(1);
+  }
+
+  /* A frase que fica escrita junto da lacuna, no mapeamento:
+   * "errou 2 de 2 itens de frações na sondagem de 30/10". */
+  function evidenciaDaSondagem(c, rotulo, dataIso) {
+    var t = 'errou ' + c.errados + ' de ' + c.total + (c.total === 1 ? ' item' : ' itens') + ' de ' +
+      primeiraMinuscula(rotulo) + ' na sondagem de ' + ddmm(dataIso);
+    if (c.meios) t += ', e ' + c.meios + (c.meios === 1 ? ' saiu meio certo' : ' saíram meio certos');
+    return t;
+  }
+
+  /* O resultado da correção por lacuna, na ordem em que as lacunas aparecem
+   * na sondagem. `sondagem` é o registro guardado no aluno:
+   * { id, data, itens: [{ item, lacuna, resposta }] }. */
+  function lacunasDaCorrecao(sondagem) {
+    var ordem = [], por = {};
+    ((sondagem && sondagem.itens) || []).forEach(function (x) {
+      if (!x || !x.lacuna) return;
+      if (!por[x.lacuna]) { por[x.lacuna] = { total: 0, certos: 0, meios: 0, errados: 0, corrigidos: 0 }; ordem.push(x.lacuna); }
+      var c = por[x.lacuna];
+      c.total++;
+      if (x.resposta === 'certo') { c.certos++; c.corrigidos++; }
+      else if (x.resposta === 'meio') { c.meios++; c.corrigidos++; }
+      else if (x.resposta === 'errado') { c.errados++; c.corrigidos++; }
+    });
+    return ordem.map(function (id) {
+      var c = por[id];
+      var it = itemDaLacuna(id);
+      var rotulo = it ? it.rotulo : id;
+      var marca = sondagemMarcaLacuna(c);
+      return {
+        lacuna: id, rotulo: rotulo, total: c.total, certos: c.certos, meios: c.meios, errados: c.errados,
+        decidida: c.corrigidos === c.total, marca: marca,
+        evidencia: marca ? evidenciaDaSondagem(c, rotulo, sondagem.data || hojeIso()) : ''
+      };
+    });
+  }
+
+  /* Leva a correção para o mapeamento `m`, em matemática, que é onde a lista
+   * de lacunas mora. SÓ ACRESCENTA: lacuna que ela já tinha marcado continua
+   * marcada, lacuna que a sondagem não marca não é desmarcada, e a evidência
+   * de outra sondagem continua lá. A evidência desta sondagem substitui a
+   * dela mesma, para corrigir de novo não empilhar a mesma frase.
+   *
+   * As evidências moram em m.evidencias.lacunas[lacunaId], uma lista de
+   * { sondagem, data, texto }: campo novo, que nasce ausente em todo
+   * mapeamento antigo. Devolve as lacunas novas e as que já estavam.
+   *
+   * CORRIGIR DE NOVO NÃO DEIXA FRASE FALSA. Antes de escrever, a evidência
+   * DESTA sondagem sai de TODAS as lacunas, e só a correção de agora volta a
+   * escrever. Sem isso, frações corrigida "errado, errado" e depois "certo,
+   * errado" ficava com "errou 2 de 2" escrito para sempre, sem tela que a
+   * apagasse, e a frase aparecia até com a caixa desmarcada (achado da revisão
+   * do C5a). A MARCA da lacuna fica, pela mesma regra de sempre: nada que já
+   * está marcado é apagado pela sondagem; desmarcar é decisão dela. */
+  function aplicarSondagemNoMapeamento(m, sondagem) {
+    var res = lacunasDaCorrecao(sondagem);
+    var novas = [], jaMarcadas = [];
+    tirarEvidenciasDaSondagem(m, sondagem.id);
+    res.filter(function (r) { return r.marca; }).forEach(function (r) {
+      var ja = marcadosDaMateria(m, MATERIA_PADRAO).lacunas.indexOf(r.lacuna) >= 0;
+      marcarNaMateria(m, MATERIA_PADRAO, 'lacunas', r.lacuna, true);
+      (ja ? jaMarcadas : novas).push(r.lacuna);
+      m.evidencias = m.evidencias || {};
+      var ev = m.evidencias.lacunas = m.evidencias.lacunas || {};
+      ev[r.lacuna] = (ev[r.lacuna] || []).filter(function (e) { return e && e.sondagem !== sondagem.id; })
+        .concat([{ sondagem: sondagem.id, data: sondagem.data || hojeIso(), texto: r.evidencia }]);
+    });
+    return { novas: novas, jaMarcadas: jaMarcadas, resultado: res };
+  }
+
+  /* Tira de todas as lacunas a evidência escrita por uma sondagem; a lista
+   * que fica vazia sai, para o mapeamento não guardar casca. */
+  function tirarEvidenciasDaSondagem(m, sondagemId) {
+    var ev = m && m.evidencias && m.evidencias.lacunas;
+    if (!ev) return;
+    Object.keys(ev).forEach(function (id) {
+      var resto = (ev[id] || []).filter(function (e) { return e && e.sondagem !== sondagemId; });
+      if (resto.length) ev[id] = resto; else delete ev[id];
+    });
+  }
+
+  /* Os exercícios da sondagem trocados por `itens` ([{ item, lacuna }]), na
+   * hora de gerar a folha de novo. A resposta de quem continua fica. Se o
+   * CONJUNTO de exercícios mudou, a sondagem volta a "não corrigida": a
+   * correção de antes era de outra folha, e o resumo "corrigida em" com as
+   * lacunas de antes mentiria sobre esta. O mapeamento já gravado não é
+   * tocado; a próxima correção refaz a evidência desta sondagem. */
+  function refazerItensDaSondagem(reg, itens) {
+    var antes = {}, chave = function (x) { return x.lacuna + '|' + x.item; };
+    (reg.itens || []).forEach(function (x) { antes[chave(x)] = x.resposta || ''; });
+    var mesmo = (reg.itens || []).length === itens.length &&
+      itens.every(function (x) { return Object.prototype.hasOwnProperty.call(antes, chave(x)); });
+    reg.itens = itens.map(function (x) {
+      return { item: x.item, lacuna: x.lacuna, resposta: antes[chave(x)] || '' };
+    });
+    if (!mesmo) {
+      delete reg.corrigidaEm;
+      delete reg.aplicadaEm;
+      delete reg.lacunasMarcadas;
+    }
+    return reg;
+  }
+
+  /* As frases de evidência de uma lacuna, da mais antiga para a mais nova. */
+  function evidenciasDaLacuna(m, lacunaId) {
+    var ev = m && m.evidencias && m.evidencias.lacunas && m.evidencias.lacunas[lacunaId];
+    return (ev || []).map(function (e) { return e && e.texto; }).filter(Boolean);
+  }
+
+  /* Os itens de um grupo do mapa que a tela OFERECE: sai o que tem
+   * `oferta: false`, a menos que já esteja marcado, porque caixa marcada e
+   * escondida não tem como ser desmarcada (o `manter` de areasPara). */
+  function itensOferecidos(itens, marcados) {
+    var fixos = marcados || [];
+    return (itens || []).filter(function (i) { return i.oferta !== false || fixos.indexOf(i.id) >= 0; });
+  }
+
   /* O título do tema, seja ele do formato do banco (pt.titulo) ou do índice
    * enxuto que o aplicativo baixa. */
   function tituloDoTema(t) {
@@ -3877,16 +4434,18 @@
     return ((trilha && trilha.passos) || []).filter(function (p) { return p.feitoEm; }).length;
   }
 
-  /* Passo que o aluno já viu em alguma aula anterior nasce marcado, com a data
-   * daquela aula. É aqui que as duas frentes se encostam: o registro de assunto
-   * alimenta a trilha antes mesmo de ela existir. */
+  /* Passo que o aluno já DOMINAVA em alguma aula anterior nasce marcado, com a
+   * data daquela aula. É aqui que as duas frentes se encostam: o registro da
+   * aula alimenta a trilha antes mesmo de ela existir.
+   *
+   * Desde o C1 a pergunta é a mesma do passo que fecha na aula
+   * (dominioFechaPasso): assunto só dado, sem "Domina", não nasce marcado. */
   function marcarOQueJaFoiDado(db, alunoId, passos) {
     var quando = {};
     ((db && db.aulas) || []).forEach(function (a) {
       if (a.alunoId !== alunoId) return;
-      if (a.status && a.status !== 'realizada' && a.status !== 'reposicao') return;
       temasDaAula(a).forEach(function (t) {
-        if (!t.id) return;
+        if (!t || !t.id || !dominioFechaPasso(a, t.id)) return;
         if (!quando[t.id] || a.data > quando[t.id].data) quando[t.id] = { data: a.data, id: a.id };
       });
     });
@@ -3896,6 +4455,7 @@
       p.feitoEm = q.data;
       p.aulaId = q.id;
       p.jaEra = true;
+      p.porDominio = true;
     });
     return passos;
   }
@@ -3940,18 +4500,149 @@
     return true;
   }
 
-  /* O assunto registrado numa aula faz a trilha andar sozinha.
+  // ---------- domínio por assunto (C1) ----------
+
+  /* Os três estados do domínio de um assunto, na ordem em que o aluno anda.
    *
-   * Marca só o passo cujo tema é aquele, nunca os anteriores: pular etapa é
-   * decisão dela, não do aplicativo. E carimba a data DA AULA, não a de hoje,
-   * porque ela lança aula atrasada e usa repetir para trás.
+   * O estado mora no ITEM do assunto dentro da aula (aula.temas[i].dominio),
+   * e não num mapa à parte na aula, por três razões que o código já dava:
+   *   - o item já carrega o que é dele naquela aula (o anexo, a língua, o
+   *     passoDe); o domínio é registro daquele assunto naquela aula;
+   *   - "Tirar" leva o item inteiro e o "Desfazer" o devolve inteiro, então a
+   *     marca vai e volta junto, sem chave órfã num mapa;
+   *   - assunto escrito à mão e assunto da biblioteca não têm id de tema, e o
+   *     item existe do mesmo jeito.
+   * Item sem o campo (toda aula de antes do C1, toda cópia antiga) é "nada
+   * marcado". O fechamento, o cartão e o PDF leem só o título do item, e por
+   * isso o domínio não chega à família por construção. */
+  var DOMINIO = [
+    { id: 'nao', rotulo: 'Ainda não' },
+    { id: 'andamento', rotulo: 'Em andamento' },
+    { id: 'domina', rotulo: 'Domina' }
+  ];
+
+  function estadoDeDominio(item) {
+    if (!item) return '';
+    for (var i = 0; i < DOMINIO.length; i++) if (DOMINIO[i].id === item.dominio) return item.dominio;
+    return '';
+  }
+
+  function rotuloDominio(estado) {
+    for (var i = 0; i < DOMINIO.length; i++) if (DOMINIO[i].id === estado) return DOMINIO[i].rotulo;
+    return '';
+  }
+
+  /* Um toque marca; tocar de novo no que já está marcado desmarca. Marcar é
+   * opcional, então "nada" é um estado de verdade, e o campo sai do item em vez
+   * de ficar vazio. Devolve o estado que ficou. */
+  function marcarDominio(item, estado) {
+    if (!item) return '';
+    if (!rotuloDominio(estado) || item.dominio === estado) {
+      delete item.dominio;
+      return '';
+    }
+    item.dominio = estado;
+    return estado;
+  }
+
+  /* Aula que conta para o registro pedagógico: realizada ou reposição. Falta
+   * sem aviso é aula que não aconteceu, e cancelada também. */
+  function aulaAconteceu(aula) {
+    var st = (aula && aula.status) || 'realizada';
+    return st === 'realizada' || st === 'reposicao';
+  }
+
+  /* A mesma chave para o mesmo assunto em aulas diferentes: o id do tema
+   * quando há, senão o título sem acento e sem caixa (assunto escrito à mão,
+   * assunto da biblioteca). */
+  function chaveDoDominio(item) {
+    if (!item) return '';
+    if (item.id) return item.id;
+    var k = chaveDeBusca(String(item.titulo || '').trim().replace(/\s+/g, ' '));
+    return k ? 'titulo:' + k : '';
+  }
+
+  /* O quadro "Domínio por assunto" da ficha, DERIVADO das aulas: para cada
+   * assunto, o último estado marcado e a data da última aula em que foi
+   * marcado, mais o histórico das marcas (da mais antiga para a mais nova).
+   * Só entra aula que aconteceu. A lista sai da marca mais recente para a mais
+   * antiga, que é a ordem em que ela pergunta "e agora, como ele está?". */
+  function dominioPorAssunto(db, alunoId) {
+    var porChave = {};
+    var lista = [];
+    ((db && db.aulas) || []).filter(function (a) {
+      return a.alunoId === alunoId && aulaAconteceu(a);
+    }).sort(ordenarAulas).forEach(function (a) {
+      temasDaAula(a).forEach(function (t) {
+        var estado = estadoDeDominio(t);
+        var chave = chaveDoDominio(t);
+        if (!estado || !chave) return;
+        var linha = porChave[chave];
+        if (!linha) {
+          linha = porChave[chave] = { chave: chave, temaId: t.id || null, titulo: t.titulo || t.id || '', historico: [] };
+          lista.push(linha);
+        }
+        linha.historico.push({ estado: estado, data: a.data, aulaId: a.id });
+        linha.estado = estado;
+        linha.data = a.data;
+        linha.aulaId = a.id;
+        if (t.titulo) linha.titulo = t.titulo;
+      });
+    });
+    return lista.sort(function (x, y) {
+      if (x.data !== y.data) return x.data < y.data ? 1 : -1;
+      return String(x.titulo).localeCompare(String(y.titulo));
+    });
+  }
+
+  /* A REGRA QUE FECHA UM PASSO DA TRILHA (C1).
    *
-   * Só conta em aula realizada ou reposição. Falta sem aviso é aula que não
-   * aconteceu, e cancelada também. */
+   * Um passo fecha quando o aluno DOMINA o assunto do passo, e não mais só
+   * porque o assunto foi dado: aula dada é presença, domínio é aprendizado, e
+   * a trilha existe para dizer o que ele já sabe. Fecha nesta aula quando ela
+   * aconteceu (realizada ou reposição), registra o assunto do passo e o
+   * assunto está marcado "Domina". "Em andamento" e "Ainda não" não fecham.
+   *
+   * É a ÚNICA definição da regra: o toque no domínio, a varredura que remarca
+   * (revisarTrilhasDoAluno, no app.js), o passo que nasce marcado
+   * (marcarOQueJaFoiDado) e quem vier depois (o C7) perguntam aqui. */
+  function dominioFechaPasso(aula, temaId) {
+    if (!aula || !temaId || !aulaAconteceu(aula)) return false;
+    return temasDaAula(aula).some(function (t) {
+      return t && t.id === temaId && estadoDeDominio(t) === 'domina';
+    });
+  }
+
+  /* A marca de um passo ainda tem lastro na aula que a fez?
+   *
+   * Passo fechado pela regra do C1 (porDominio) vale enquanto aquela aula
+   * ainda fecha o passo pela regra: tirar o "Domina" solta o passo. Passo
+   * fechado ANTES do C1, pela regra antiga de aula dada, não tem porDominio e
+   * continua valendo enquanto a aula registrar o assunto, como sempre valeu: o
+   * que estava fechado continua fechado, e ninguém vai repassar aula antiga
+   * marcando domínio para a trilha não andar para trás. Passo marcado à mão,
+   * sem aula, não depende de aula nenhuma.
+   *
+   * A situação da aula (cancelada, falta) é o revisarPassosDaAula quem olha. */
+  function marcaDoPassoValeAinda(passo, aula) {
+    if (!passo || !passo.feitoEm) return false;
+    if (!passo.aulaId) return true;
+    if (!aula || aula.id !== passo.aulaId) return false;
+    if (passo.porDominio) return dominioFechaPasso(aula, passo.temaId);
+    if (!passo.temaId) return true;
+    return temasDaAula(aula).some(function (t) { return t && t.id === passo.temaId; });
+  }
+
+  /* O domínio marcado numa aula faz a trilha andar sozinha.
+   *
+   * Até o C1 bastava registrar o assunto; agora o passo só fecha quando
+   * dominioFechaPasso diz que sim. Marca só o passo cujo tema é aquele, nunca
+   * os anteriores: pular etapa é decisão dela, não do aplicativo. E carimba a
+   * data DA AULA, não a de hoje, porque ela lança aula atrasada e usa repetir
+   * para trás. O nome ficou, porque o assunto continua sendo a chave. */
   function marcarPassoPorAssunto(aluno, aula, item) {
     if (!aluno || !aula || !item || !item.id) return null;
-    var st = aula.status || 'realizada';
-    if (st !== 'realizada' && st !== 'reposicao') return null;
+    if (!dominioFechaPasso(aula, item.id)) return null;
     var marcado = null;
     trilhasAtivas(aluno).forEach(function (tr) {
       if (marcado) return;
@@ -3959,11 +4650,47 @@
         if (marcado || p.feitoEm || p.temaId !== item.id) return;
         p.feitoEm = aula.data;
         p.aulaId = aula.id;
+        p.porDominio = true;
+        delete p.aulaDada;
         marcado = { trilha: tr, passo: p };
       });
     });
     if (marcado) item.passoDe = marcado.trilha.id;
     return marcado;
+  }
+
+  /* Saiu o "Domina" de um assunto numa aula (o toque em outro estado, ou o
+   * toque que desmarca): solta o passo que ESTA aula tinha fechado por
+   * domínio, e só nas trilhas ATIVAS. Trilha encerrada é registro, e um toque
+   * de domínio numa aula não reescreve registro fechado: antes, Domina,
+   * encerrar e depois "Em andamento" na mesma aula soltava o passo da trilha
+   * encerrada, sem Desfazer, e nenhum Domina o devolvia.
+   *
+   * Se outra aula do aluno ainda fecha aquele passo pela regra, o passo fica
+   * fechado por ela (a mais antiga), como a varredura faria. Devolve quantos
+   * passos ficaram mesmo soltos e quantos passaram a outra aula. */
+  function revisarDominioNaAula(db, aluno, aula, temaId) {
+    var r = { soltos: 0, remarcados: 0 };
+    if (!aluno || !aula || !temaId || dominioFechaPasso(aula, temaId)) return r;
+    var outras = ((db && db.aulas) || []).filter(function (a) {
+      return a.alunoId === aluno.id && a.id !== aula.id && dominioFechaPasso(a, temaId);
+    }).sort(ordenarAulas);
+    trilhasAtivas(aluno).forEach(function (tr) {
+      (tr.passos || []).forEach(function (p) {
+        if (p.aulaId !== aula.id || !p.porDominio || p.temaId !== temaId) return;
+        soltarPassoPelaAula(p);
+        delete p.jaEra;
+        if (outras.length) {
+          p.feitoEm = outras[0].data;
+          p.aulaId = outras[0].id;
+          p.porDominio = true;
+          r.remarcados++;
+        } else {
+          r.soltos++;
+        }
+      });
+    });
+    return r;
   }
 
   /* Aula que deixou de acontecer desmarca os passos que ela tinha fechado. Sem
@@ -3977,12 +4704,39 @@
     trilhasDe(aluno).forEach(function (tr) {
       (tr.passos || []).forEach(function (p) {
         if (p.aulaId !== aula.id) return;
-        p.feitoEm = null;
-        p.aulaId = null;
+        soltarPassoPelaAula(p);
         n++;
       });
     });
     return n;
+  }
+
+  /* Solta um passo porque a aula que o fechou deixou de sustentá-lo (mudou de
+   * situação, perdeu o assunto ou o "Domina").
+   *
+   * Passo fechado pela regra ANTIGA, de aula dada (sem porDominio), guarda a
+   * aula de origem em `aulaDada`. Sem isso, cancelar a aula e voltá-la para
+   * realizada perdia o passo para sempre: a varredura de hoje só remarca com
+   * "Domina", e o passo antigo nunca teve marca de domínio. Com a aula
+   * guardada, a mesma aula, de volta e com o assunto, devolve o passo
+   * (aulaDevolvePassoAntigo). Passo do C1 não guarda nada: volta só por
+   * Domina. */
+  function soltarPassoPelaAula(p) {
+    if (!p) return;
+    if (p.aulaId && !p.porDominio) p.aulaDada = p.aulaId;
+    else delete p.aulaDada;
+    p.feitoEm = null;
+    p.aulaId = null;
+    delete p.porDominio;
+  }
+
+  /* A aula de origem de um passo da regra antiga voltou a sustentá-lo: é a
+   * MESMA aula, ela aconteceu e registra o assunto do passo. Só isso devolve
+   * um passo antigo; passo novo continua fechando só por dominioFechaPasso. */
+  function aulaDevolvePassoAntigo(passo, aula) {
+    if (!passo || !aula || !passo.aulaDada || passo.aulaDada !== aula.id) return false;
+    if (!aulaAconteceu(aula)) return false;
+    return temasDaAula(aula).some(function (t) { return t && t.id === passo.temaId; });
   }
 
   return {
@@ -4004,6 +4758,11 @@
     repetirParaTras: repetirParaTras, preverRetroativo: preverRetroativo, temConteudo: temConteudo,
     calcularFechamento: calcularFechamento, calcularMesInteiro: calcularMesInteiro,
     totaisDoMes: totaisDoMes, panoramaDeValores: panoramaDeValores,
+    lerReais: lerReais, valorACobrarDoMes: valorACobrarDoMes, pagamentoDe: pagamentoDe,
+    marcarPagamento: marcarPagamento, desmarcarPagamento: desmarcarPagamento,
+    situacaoDoPagamento: situacaoDoPagamento, pendentesDePagamento: pendentesDePagamento,
+    corteDosPagamentos: corteDosPagamentos,
+    somaDosPendentes: somaDosPendentes,
     indicesDeReajuste: indicesDeReajuste, margemDeReajuste: margemDeReajuste,
     sugestaoDeReajuste: sugestaoDeReajuste, lerIndicesDoIbge: lerIndicesDoIbge,
     desdeQuandoEstuda: desdeQuandoEstuda, mesesEntre: mesesEntre, pctBR: pctBR,
@@ -4061,8 +4820,21 @@
     passosFeitos: passosFeitos, marcarOQueJaFoiDado: marcarOQueJaFoiDado,
     criarTrilha: criarTrilha, moverPasso: moverPasso, removerPasso: removerPasso,
     encerrarTrilha: encerrarTrilha, marcarPassoPorAssunto: marcarPassoPorAssunto,
+    DOMINIO: DOMINIO, estadoDeDominio: estadoDeDominio, rotuloDominio: rotuloDominio,
+    marcarDominio: marcarDominio, aulaAconteceu: aulaAconteceu, chaveDoDominio: chaveDoDominio,
+    dominioPorAssunto: dominioPorAssunto, dominioFechaPasso: dominioFechaPasso,
+    marcaDoPassoValeAinda: marcaDoPassoValeAinda,
+    soltarPassoPelaAula: soltarPassoPelaAula, aulaDevolvePassoAntigo: aulaDevolvePassoAntigo,
+    revisarDominioNaAula: revisarDominioNaAula,
     revisarPassosDaAula: revisarPassosDaAula, anoEscolarDe: anoEscolarDe,
     itemDaLacuna: itemDaLacuna,
+    LACUNAS_PROVAVEIS: LACUNAS_PROVAVEIS, SERIE_DA_OBMEP: SERIE_DA_OBMEP, lacunasProvaveis: lacunasProvaveis,
+    prefixosDaSondagem: prefixosDaSondagem, candidatosDaSondagem: candidatosDaSondagem,
+    escolherItensDaSondagem: escolherItensDaSondagem, montarSondagem: montarSondagem,
+    RESPOSTAS_SONDAGEM: RESPOSTAS_SONDAGEM, sondagemMarcaLacuna: sondagemMarcaLacuna,
+    lacunasDaCorrecao: lacunasDaCorrecao, aplicarSondagemNoMapeamento: aplicarSondagemNoMapeamento,
+    evidenciasDaLacuna: evidenciasDaLacuna, itensOferecidos: itensOferecidos,
+    tirarEvidenciasDaSondagem: tirarEvidenciasDaSondagem, refazerItensDaSondagem: refazerItensDaSondagem,
     exibeListas: exibeListas
   };
 });

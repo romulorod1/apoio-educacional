@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.35.0';
+  var VERSAO = '1.36.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,21 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.36.0',
+      itens: [
+        'Foto ou PDF anexado à aula: "Abrir como folha para escrever em cima" leva para a folha da mesma aula, e você escreve com a caneta.',
+        'No Fechamento, "Marcar como pago" em cada aluno, com o valor e a data, e a lista "Pagamentos pendentes" no alto da aba. ' +
+          'Ela conta a partir deste mês; para olhar meses anteriores, toque em "Mudar".',
+        'Em "Registrar como foi", cada assunto pode ser marcado "Ainda não", "Em andamento" ou "Domina". A ficha do aluno junta isso, ' +
+          'e o passo da trilha fecha quando ele domina o assunto.',
+        'No mapeamento, a sondagem por ano de entrada (do 6º ano ao 3º do médio): exercícios de anos anteriores, que você edita, viram ' +
+          'folha; depois da correção, as lacunas ficam marcadas com a evidência. "Como aprende melhor" virou "O que costuma funcionar".',
+        'A Biblioteca agora vai do 2º ano ao 3º do médio: provas da OBMEP Mirim para o 2º ao 5º ano, e questões de Matemática do ENEM ' +
+          'para o 3º do médio, com a resposta do gabarito. Os pacotes novos se importam em Ajustes, como os outros.',
+        'Trilha encerrada fica como está: mexer no domínio de uma aula antiga não reabre passo nenhum dela.'
+      ]
+    },
     {
       versao: '1.35.0',
       itens: [
@@ -1021,6 +1036,8 @@
     if (id === 'modal-biblioteca') soltarVisor();
     // o leitor de PDF, fechado por qualquer caminho, para de desenhar e solta o canvas
     if (id === 'modal-leitor-pdf') soltarLeitorPdf();
+    // as miniaturas da sondagem (C5) são do tablet: soltas ao fechar, por qualquer caminho
+    if (id === 'modal-sondagem') soltarImagensDaSondagem();
     if (id === 'modal-novidades') {
       if (db && db.ajustes && db.ajustes.versaoVista !== VERSAO) {
         db.ajustes.versaoVista = VERSAO;
@@ -2670,6 +2687,8 @@
         'Aparece para você no alto da próxima aula deste aluno.'
     }));
 
+    desenharDominio(grupoRegistro, aulaEmEdicao, eFutura);
+
     desenharAreas(grupoRegistro, aulaEmEdicao);
 
     // ----------------------------------------------------
@@ -2725,6 +2744,127 @@
    *
    * Fica recolhido por padrão: no meio de uma aula ela não quer rolar por vinte
    * e quatro caixas para chegar ao anexo. Aberto, é só clicar. */
+  /* Domínio por assunto (C1), em Registrar como foi.
+   *
+   * Abaixo de cada assunto da aula, três botões: "Ainda não", "Em andamento" e
+   * "Domina". Um toque marca, outro toque no marcado desmarca, e nada é
+   * obrigatório. Grava na hora, como as habilidades aqui embaixo, porque é
+   * registro de um toque e não pede o botão Salvar.
+   *
+   * É dela e só dela: não vai para o fechamento, o PDF, o cartão nem a
+   * proposta. O selo "Só você vê" diz isso no lugar em que ela marca.
+   *
+   * Marcar "Domina" fecha o passo da trilha daquele assunto, com a data desta
+   * aula; tirar o "Domina" solta o passo que esta aula tinha fechado. A regra
+   * é uma só e mora no core (dominioFechaPasso). */
+  var blocoDominioAtivo = null;
+
+  function desenharDominio(corpo, aula, eFutura) {
+    var bloco = el('div', { id: 'bloco-dominio', style: 'margin:12px 0 4px' });
+    corpo.appendChild(bloco);
+
+    function desenhar() {
+      bloco.innerHTML = '';
+      var temas = Core.temasDaAula(aula);
+      bloco.appendChild(el('div', { class: 'campo-titulo-com-destino' }, [
+        el('span', { texto: 'Domínio por assunto', style: 'font-weight:700' }),
+        el('span', { class: 'destino-privado', texto: 'Só você vê' })
+      ]));
+      if (!temas.length) {
+        bloco.appendChild(el('div', { class: 'ajuda', style: 'margin-top:2px',
+          texto: 'Registre o assunto da aula, acima, para marcar como o aluno está nele.' }));
+        return;
+      }
+      if (eFutura) {
+        bloco.appendChild(el('div', { class: 'ajuda', style: 'margin-top:2px',
+          texto: 'Marque depois que a aula acontecer.' }));
+        return;
+      }
+      temas.forEach(function (t) {
+        var atual = Core.estadoDeDominio(t);
+        var botoes = el('div', { class: 'segmentado opcoes-dominio', role: 'group',
+          'aria-label': 'Domínio de ' + (t.titulo || t.id) });
+        Core.DOMINIO.forEach(function (op) {
+          var b = el('button', {
+            type: 'button', class: 'opcao-seg opcao-dominio' + (atual === op.id ? ' ativa' : ''),
+            'data-estado': op.id, 'aria-pressed': atual === op.id ? 'true' : 'false',
+            texto: op.rotulo,
+            aoClick: function () { marcarDominioNaAula(aula, t, op.id); }
+          });
+          botoes.appendChild(b);
+        });
+        bloco.appendChild(el('div', { class: 'item-dominio', 'data-chave': Core.chaveDoDominio(t),
+          style: 'margin:8px 0 10px' }, [
+          el('div', { class: 'nome', style: 'font-size:14px;font-weight:600;color:#1F3A5F;margin-bottom:6px',
+            texto: t.titulo || t.id }),
+          botoes
+        ]));
+      });
+      bloco.appendChild(el('div', { class: 'ajuda', style: 'margin-top:-2px',
+        texto: 'Opcional. Toque de novo no marcado para desmarcar. Domina fecha o passo da trilha ' +
+          'daquele assunto. Não vai para a família.' }));
+    }
+
+    blocoDominioAtivo = { aulaId: aula.id, desenhar: desenhar };
+    desenhar();
+  }
+
+  function atualizarBlocoDominio(aulaId) {
+    if (!blocoDominioAtivo || blocoDominioAtivo.aulaId !== aulaId) return false;
+    if (!$('#bloco-dominio')) return false;
+    blocoDominioAtivo.desenhar();
+    return true;
+  }
+
+  /* O toque no domínio. Marcar "Domina" fecha o passo aberto daquele assunto
+   * com a data desta aula; sair do "Domina" passa pela revisão das trilhas,
+   * que solta o passo que só esta aula sustentava. Sem desfazer na memória
+   * quando a gravação falha, do mesmo jeito que as habilidades: a faixa de
+   * gravação avisa e tenta de novo sozinha. */
+  function marcarDominioNaAula(aula, item, estado) {
+    var antes = Core.estadoDeDominio(item);
+    var agora = Core.marcarDominio(item, estado);
+    var aluno = alunoPorId(aula.alunoId);
+    var andou = null, mexeu = null;
+    if (aluno && agora === 'domina') {
+      andou = Core.marcarPassoPorAssunto(aluno, aula, item);
+      /* Fechado NESTA aula: não é anterior à trilha, e a marca de solto à mão
+       * sai, porque ela acabou de dizer o contrário marcando Domina. */
+      if (andou) {
+        delete andou.passo.jaEra;
+        delete andou.passo.marcaAnterior;
+        delete andou.passo.soltoAMao;
+      }
+    } else if (aluno && antes === 'domina') {
+      /* Só as trilhas ATIVAS, e só o passo que esta aula fechou: a revisão
+       * inteira (revisarTrilhasDoAluno) passa também pelas encerradas, e um
+       * toque de domínio não reescreve trilha encerrada. */
+      mexeu = Core.revisarDominioNaAula(db, aluno, aula, item.id);
+    }
+    atualizarBlocoDominio(aula.id);
+    salvarEDepois(function () {
+      if (andou || (mexeu && (mexeu.soltos || mexeu.remarcados))) {
+        atualizarPainelTrilhas(aula.alunoId);
+        if (!atualizarBlocoAssunto(aula.id) && $('#lista-temas-aula')) {
+          desenharTemasDaAula($('#lista-temas-aula'), aula, aluno);
+        }
+      }
+      if (andou) {
+        var feitos = Core.passosFeitos(andou.trilha);
+        var total = (andou.trilha.passos || []).length;
+        avisar('Domina marcado, e a trilha andou: ' + feitos + ' de ' + total + ' passos.');
+        return;
+      }
+      /* O textoDeTrilha fala de aula que deixou de contar, e aqui a aula
+       * continua contando: o que mudou foi o domínio. */
+      if (mexeu && mexeu.soltos) {
+        avisar((agora ? Core.rotuloDominio(agora) + ' marcado.' : 'Domínio desmarcado.') +
+          (mexeu.soltos === 1 ? ' O passo da trilha voltou para a fila.'
+            : ' ' + mexeu.soltos + ' passos da trilha voltaram para a fila.'));
+      }
+    });
+  }
+
   function desenharAreas(corpo, aula) {
     aula.areas = aula.areas || [];
 
@@ -2864,6 +3004,9 @@
    * Tirar um assunto ou registrar um novo muda também o rótulo do botão, e
    * redesenhar só a lista deixaria a tela mentindo. */
   function atualizarBlocoAssunto(aulaId) {
+    /* Registrar ou tirar assunto muda também a lista de domínio, lá embaixo em
+     * Registrar como foi: cada assunto tem a sua linha. */
+    atualizarBlocoDominio(aulaId);
     if (!blocoAssuntoAtivo || blocoAssuntoAtivo.aulaId !== aulaId) return false;
     if (!$('#bloco-assunto')) return false;
     blocoAssuntoAtivo.desenhar();
@@ -2915,6 +3058,12 @@
         style: 'font-size:14px;font-weight:700;color:#1F3A5F',
         texto: 'Próximo passo já registrado nesta aula: ' + passo.titulo
       }));
+      /* Registrado não é fechado (C1): o passo só fecha com "Domina". Sem esta
+       * linha ela veria o passo registrado e a trilha parada, sem saber por quê. */
+      dentro.push(el('div', {
+        class: 'ajuda', id: 'passo-fecha-com-dominio', style: 'margin:6px 0 0',
+        texto: 'O passo fecha quando você marcar Domina neste assunto, em Registrar como foi.'
+      }));
     } else {
       dentro.push(el('button', {
         type: 'button', class: 'btn destaque', id: 'usar-proximo-passo',
@@ -2930,8 +3079,9 @@
       dentro.push(el('div', {
         class: 'ajuda', style: 'margin:6px 0 0',
         texto: contaAgora
-          ? 'Um toque registra o assunto da aula e marca o passo como dado, com a data desta aula.'
-          : 'Um toque registra o assunto. O passo só é marcado em aula realizada ou reposição, e ' +
+          ? 'Um toque registra o assunto da aula. O passo fecha quando você marcar Domina nele, ' +
+            'em Registrar como foi, com a data desta aula.'
+          : 'Um toque registra o assunto. O passo só fecha em aula realizada ou reposição, e ' +
             'esta está como ' + (Core.STATUS[st] ? Core.STATUS[st].rotulo.toLowerCase() : st) + '.'
       }));
     }
@@ -3247,10 +3397,19 @@
   function desenharAnexos(caixa, aula) {
     caixa.innerHTML = '';
     (aula.anexos || []).forEach(function (an) {
+      var viraFolha = anexoViraFolha(an);
       caixa.appendChild(el('div', { class: 'item-lista' }, [
         el('div', { class: 'cresce' }, [
           nomeQuebravel(an.nome),
-          el('div', { class: 'detalhe', texto: (an.tamanho ? Math.round(an.tamanho / 1024) + ' KB' : '') })
+          el('div', { class: 'detalhe', texto: (an.tamanho ? Math.round(an.tamanho / 1024) + ' KB' : '') }),
+          /* A ação mora embaixo do nome, e não ao lado do Abrir: o texto é
+           * longo de propósito (diz o que acontece), e na fileira dos botões
+           * ele espremeria o nome do arquivo numa coluna de poucas letras. */
+          viraFolha ? el('button', {
+            type: 'button', class: 'btn pequeno anexo-como-folha', 'data-anexo': an.id,
+            texto: 'Abrir como folha para escrever em cima',
+            aoClick: function () { anexoComoFolha(an, aula, viraFolha); }
+          }) : null
         ]),
         el('button', {
           type: 'button', class: 'btn pequeno', texto: 'Abrir',
@@ -3298,6 +3457,109 @@
           }
         })
       ]));
+    });
+  }
+
+  /* ANEXO COMO FOLHA (C3): a lista de exercícios da escola chega como foto ou
+   * PDF, e ela quer resolver com o aluno escrevendo por cima, na folha da aula.
+   *
+   * Quem pode virar folha se decide pelo nome do arquivo: o registro do anexo
+   * na aula guarda nome e tamanho, e o tipo só está no depósito de anexos, que
+   * pedir para cada linha atrasaria a lista. A foto que ela tira pelo
+   * "Anexar foto" costuma chegar com .jpg no nome (a câmera do Android dá esse
+   * nome); se o nome vier sem extensão, a foto fica sem a ação. O HEIC fica de fora porque o Chrome
+   * do tablet não o desenha; Word e o resto não têm o que desenhar. */
+  function anexoViraFolha(an) {
+    var nome = String((an && an.nome) || '');
+    if (/\.pdf$/i.test(nome)) return 'pdf';
+    if (/\.(png|jpe?g|webp|gif|bmp)$/i.test(nome)) return 'foto';
+    return '';
+  }
+
+  /* A folha nasce na própria aula do anexo, sem perguntar qual: ela tocou no
+   * anexo desta aula. O anexo continua lá, intacto; a folha ganha uma CÓPIA
+   * em 'midias', como no "Abrir como folha" da biblioteca. */
+  function anexoComoFolha(an, aula, tipo) {
+    prepararFolha(function () { return Store.lerAnexo(an.id).then(function (r) {
+      if (!r || !r.blob) { avisar('Não achei este arquivo no tablet.'); return; }
+      /* O tipo guardado tem a última palavra sobre o nome, quando existe: um
+       * .jpg que na verdade é PDF vai para o leitor, e não para o desenho. */
+      var guardado = r.tipo || r.blob.type || '';
+      if (guardado === 'application/pdf') tipo = 'pdf';
+      else if (/^image\//.test(guardado)) tipo = 'foto';
+      if (tipo === 'pdf') {
+        /* O PDF passa pelo leitor do C14, já na página 1: a lista da escola
+         * costuma ter várias páginas, e quem sabe qual vai ser trabalhada hoje
+         * é ela. A frase no alto aponta o botão que faz a página virar folha. */
+        abrirLeitorPdf(r.blob, { titulo: an.nome, nome: an.nome, pagina: 1, aulaId: aula.id,
+          dica: 'Escolha a página e toque em "Abrir esta página como folha": ela entra na folha desta aula para escrever em cima.' });
+        return;
+      }
+      return fotoComoFolha(r.blob, an.nome, aula.id);
+    }).catch(function () {
+      avisar('Não consegui abrir este arquivo como folha. Tente de novo.');
+    }); });
+  }
+
+  /* DO TOQUE ATÉ A FOLHA ABRIR, UMA COISA SÓ. Ler o anexo e decodificar a foto
+   * leva segundos no tablet, antes ainda do colarNaFolhaDaAula ligar a guarda
+   * dele. Nessa janela, sem retorno nenhum, ela tocava de novo (duas páginas)
+   * ou abria "Escrever à mão na folha" e riscava: o colar, ao terminar, abria
+   * o editor por cima e o traço dos últimos 400 ms se perdia, e um traço
+   * gravado entre o lerNota e o salvarNota do colar era sobrescrito.
+   *
+   * A guarda liga no toque, e a camada "Preparando a folha..." cobre a tela
+   * inteira até o trabalho acabar (a folha aberta, ou o aviso de falha): ela
+   * vê que o toque pegou, e nada atrás recebe dedo nem caneta. */
+  var preparandoFolha = false;
+
+  function prepararFolha(trabalho) {
+    if (preparandoFolha || colandoNaFolha) {
+      avisar('Ainda estou preparando a folha. Espere um instante.');
+      return Promise.resolve();
+    }
+    preparandoFolha = true;
+    $('#preparando-folha').classList.add('aberto');
+    var feito;
+    try { feito = Promise.resolve(trabalho()); } catch (e) { feito = Promise.reject(e); }
+    return feito.catch(function () {
+      avisar('Não consegui preparar a folha. Tente de novo.');
+    }).then(function () {
+      preparandoFolha = false;
+      $('#preparando-folha').classList.remove('aberto');
+    });
+  }
+
+  /* A foto vai direto para a folha, sem o leitor: é uma página só. Entra pelo
+   * mesmo colarNaFolhaDaAula da biblioteca e do PDF, com a foto inteira no
+   * lugar da página (forma 'pagina', encaixada na folha com a margem pequena).
+   * As medidas são as da foto em pixels: o colar só usa a proporção. */
+  function fotoComoFolha(blob, titulo, aulaId) {
+    var url = URL.createObjectURL(blob);
+    var img = new Image();
+    return new Promise(function (pronta, falhou) {
+      img.onload = pronta;
+      img.onerror = falhou;
+      img.src = url;
+    }).then(function () {
+      return colarNaFolhaDaAula(aulaId, {
+        forma: 'pagina', titulo: titulo, origem: 'Da foto',
+        medidas: { largura_pt: img.naturalWidth, altura_pt: img.naturalHeight },
+        desenhar: function (largura, altura) {
+          var c = document.createElement('canvas');
+          c.width = largura; c.height = altura;
+          var ctx = c.getContext('2d');
+          // vai virar JPEG, e o transparente de um PNG viraria preto
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, largura, altura);
+          ctx.drawImage(img, 0, 0, largura, altura);
+          return Promise.resolve(c);
+        }
+      });
+    }, function () {
+      avisar('Não consegui ler esta foto. Tente anexar de novo, tirada pela câmera do tablet.');
+    }).then(function () {
+      URL.revokeObjectURL(url);
     });
   }
 
@@ -3360,6 +3622,11 @@
    *      para realizada NÃO devolvia o passo, mesmo com o assunto ainda
    *      registrado ali. Aqui ele volta com a data e a aula daquele encontro.
    *
+   * Desde o C1 o passo fecha por DOMÍNIO e não por aula dada: a varredura do 4
+   * remarca só onde Core.dominioFechaPasso diz que sim, e o lastro do 2 é o
+   * Core.marcaDoPassoValeAinda, que solta o passo fechado por domínio quando o
+   * "Domina" sai e deixa como está o passo fechado pela regra antiga.
+   *
    * Duas coisas a varredura do 4 NÃO faz, de propósito:
    *
    *   - não toca em passo que ELA soltou à mão. "Trazer de volta" e desmarcar a
@@ -3369,51 +3636,62 @@
    *   - não escreve em trilha encerrada. Registro fechado não ganha passo novo
    *     por efeito colateral de uma aula editada hoje.
    *
+   * E NENHUM dos quatro mexe em trilha encerrada: nem solta, nem fecha. O 1 e
+   * o 2 passavam por todas as trilhas, e o 4 só pelas ativas, então um passo
+   * de trilha encerrada que o 2 soltava (a aula perdeu o "Domina" e ela
+   * salvou) nunca mais voltava, e a data de fechamento se perdia. A trilha
+   * encerrada é o registro do que foi feito até ali, e fica como foi
+   * encerrada; o toque no domínio já seguia esta regra (revisarDominioNaAula).
+   *
    * Devolve quantos passos ficaram mesmo para trás, já descontando os que a
    * varredura devolveu, e quantos voltaram a contar. */
   function revisarTrilhasDoAluno(alunoId) {
     var aluno = alunoPorId(alunoId);
     if (!aluno || !Core.trilhasDe(aluno).length) return { soltos: 0, remarcados: 0 };
 
+    // só as ativas, nos quatro passos: a encerrada não entra em nenhum
+    var ativas = Core.trilhasAtivas(aluno);
     var todos = [];
-    Core.trilhasDe(aluno).forEach(function (tr) {
+    ativas.forEach(function (tr) {
       (tr.passos || []).forEach(function (p) { todos.push(p); });
     });
     var tinha = todos.map(function (p) { return !!p.feitoEm; });
 
     var minhasAulas = db.aulas.filter(function (a) { return a.alunoId === alunoId; });
-    minhasAulas.forEach(function (a) { Core.revisarPassosDaAula(aluno, a); });
+    var soAsAtivas = { id: aluno.id, trilhas: ativas };
+    minhasAulas.forEach(function (a) { Core.revisarPassosDaAula(soAsAtivas, a); });
 
-    // 2. o lastro de cada marca: a aula existe e ainda registra aquele assunto?
-    var registra = {};
-    db.aulas.forEach(function (a) {
-      var mapa = {};
-      Core.temasDaAula(a).forEach(function (t) { if (t && t.id) mapa[t.id] = true; });
-      registra[a.id] = mapa;
-    });
+    // 2. o lastro de cada marca: a aula existe e ainda sustenta aquele passo?
+    var aulaPorId = {};
+    db.aulas.forEach(function (a) { aulaPorId[a.id] = a; });
     todos.forEach(function (p) {
-      if (p.aulaId && (!registra[p.aulaId] || (p.temaId && !registra[p.aulaId][p.temaId]))) {
-        p.feitoEm = null;
-        p.aulaId = null;
+      if (p.aulaId && !Core.marcaDoPassoValeAinda(p, aulaPorId[p.aulaId])) {
+        Core.soltarPassoPelaAula(p);   // o passo da regra antiga lembra a aula de origem
       }
-      if (!p.feitoEm) delete p.jaEra;   // 3.
+      if (!p.feitoEm) { delete p.jaEra; delete p.porDominio; }   // 3.
     });
 
     // 4. a volta, pelas aulas que contam, da mais antiga para a mais nova
     minhasAulas.slice()
       .sort(function (a, b) { return String(a.data).localeCompare(String(b.data)); })
       .forEach(function (a) {
-        var st = a.status || 'realizada';
-        if (st !== 'realizada' && st !== 'reposicao') return;
+        if (!Core.aulaAconteceu(a)) return;
         Core.temasDaAula(a).forEach(function (t) {
           if (!t || !t.id) return;
+          /* Fecha por domínio (a regra do C1), ou devolve o passo da regra
+           * antiga à MESMA aula que o fechou, quando ela volta a acontecer com
+           * o assunto: o que estava fechado continua fechado. */
+          var porDominio = Core.dominioFechaPasso(a, t.id);
           var achou = false;
           Core.trilhasAtivas(aluno).forEach(function (tr) {
             if (achou) return;
             (tr.passos || []).forEach(function (p) {
               if (achou || p.feitoEm || p.soltoAMao || p.temaId !== t.id) return;
+              if (!porDominio && !Core.aulaDevolvePassoAntigo(p, a)) return;
               p.feitoEm = a.data;
               p.aulaId = a.id;
+              if (porDominio) p.porDominio = true; else delete p.porDominio;
+              delete p.aulaDada;
               delete p.jaEra;
               delete p.marcaAnterior;
               t.passoDe = tr.id;
@@ -6548,6 +6826,8 @@
     });
     caixa.appendChild(resumo);
 
+    desenharQuadroDeDominio(caixa, aluno);
+
     if (futurasAtivas.length) {
       caixa.appendChild(el('h3', { class: 'subtitulo', texto: 'Próximas aulas' }));
       linhasDeAula(caixa, futurasAtivas.slice().reverse().slice(0, 5));
@@ -6577,6 +6857,42 @@
       }
     }
     redesenhar();
+  }
+
+  /* "Domínio por assunto" na ficha (C1): cada assunto com o último estado
+   * marcado e a data da última aula em que foi marcado. O quadro é DERIVADO
+   * das aulas (Core.dominioPorAssunto), então não há o que manter em dia: a
+   * aula é o registro, e a ficha só lê. As marcas anteriores, quando há, vão
+   * numa linha pequena embaixo, porque já estão na mão e custam uma linha.
+   *
+   * Sem nenhuma marca o quadro não aparece: aluno de antes do C1 não ganha
+   * uma caixa vazia dizendo que não há nada. */
+  function desenharQuadroDeDominio(caixa, aluno) {
+    var linhas = Core.dominioPorAssunto(db, aluno.id);
+    if (!linhas.length) return;
+    var quadro = el('div', { id: 'quadro-dominio', style: 'margin-bottom:12px' });
+    quadro.appendChild(el('div', { class: 'campo-titulo-com-destino' }, [
+      el('h3', { class: 'subtitulo', texto: 'Domínio por assunto', style: 'margin:0' }),
+      el('span', { class: 'destino-privado', texto: 'Só você vê' })
+    ]));
+    var COR = { nao: '#8A6D2F', andamento: '#1F3A5F', domina: '#1F5A4C' };
+    var FUNDO = { nao: '#FBF3E3', andamento: '#E8EEF6', domina: '#E3F1EC' };
+    linhas.forEach(function (l) {
+      var antes = l.historico.slice(0, -1).reverse().slice(0, 4).map(function (h) {
+        return Core.rotuloDominio(h.estado) + ' em ' + Core.ddmm(h.data);
+      });
+      quadro.appendChild(el('div', { class: 'item-lista linha-dominio', 'data-chave': l.chave,
+        'data-estado': l.estado }, [
+        el('div', { class: 'cresce' }, [
+          el('div', { class: 'nome', texto: l.titulo }),
+          el('div', { class: 'detalhe', texto: 'Marcado em ' + Core.ddmmaaaa(l.data) +
+            (antes.length ? ' · antes: ' + antes.join(', ') : '') })
+        ]),
+        el('span', { class: 'tag estado-dominio', texto: Core.rotuloDominio(l.estado),
+          style: 'background:' + FUNDO[l.estado] + ';color:' + COR[l.estado] + ';border-color:' + FUNDO[l.estado] })
+      ]));
+    });
+    caixa.appendChild(quadro);
   }
 
   function linhasDeAula(caixa, aulas) {
@@ -6704,6 +7020,8 @@
       db.aulas = db.aulas.filter(function (a) { return a.alunoId !== id; });
       db.series = (db.series || []).filter(function (s) { return s.alunoId !== id; });
       db.resumos = db.resumos.filter(function (r) { return r.alunoId !== id; });
+      // os pagamentos dele saem junto, como os resumos; o Desfazer devolve os dois
+      db.pagamentos = (db.pagamentos || []).filter(function (p) { return p.alunoId !== id; });
     }).then(function () {
       fecharModal('modal-aluno');
       desenharTudo();
@@ -7280,8 +7598,12 @@
     ['Conversa com o aluno, 10 minutos',
       'O que ele acha que sabe e o que acha que não sabe. Vale mais o que ele diz ' +
       'do que a nota do boletim.'],
+    /* Era "monte uma lista curta com exercícios de anos anteriores", sem
+     * instrumento: a lacuna saía da impressão. Agora a sondagem do ano está
+     * pronta logo acima do roteiro (C5, lente da pedagoga P03). */
     ['Sondagem escrita, 25 minutos',
-      'Monte uma lista curta com exercícios de anos anteriores, na aba Biblioteca. ' +
+      'Use a sondagem do ano, logo acima: dois exercícios por lacuna provável, que viram a folha da aula. ' +
+      'Na correção, a lacuna que travou vai para o mapeamento com a evidência escrita. ' +
       'Não é prova: é para ver onde ele trava e como ele pensa.'],
     ['Preencher o mapeamento, 10 minutos',
       'Marque pontos fortes, pontos de atenção e lacunas, e escreva o plano inicial.'],
@@ -7473,7 +7795,14 @@
         var chk = el('input', { type: 'checkbox', style: 'width:auto;min-height:auto' });
         chk.checked = marcados.indexOf(item.id) >= 0;
         chk.addEventListener('change', function () { aoMudar(item, this.checked); });
-        var filhos = [chk, el('span', { class: 'cresce', texto: item.rotulo })];
+        /* A lacuna marcada pela sondagem (C5) traz a evidência escrita logo
+         * abaixo do nome: "errou 2 de 2 itens de frações na sondagem de
+         * 30/10". É o que separa a marca por evidência da marca por impressão. */
+        var provas = item.chaveDoGrupo === 'lacunas' ? Core.evidenciasDaLacuna(trabalho, item.id) : [];
+        var filhos = [chk, el('span', { class: 'cresce' }, [item.rotulo].concat(provas.length ? [
+          el('span', { class: 'evidencia-lacuna',
+            texto: provas[provas.length - 1] + (provas.length > 1 ? ' (e mais ' + (provas.length - 1) + ' antes)' : '') })
+        ] : []))];
         /* A lacuna monta a trilha: a sequência de assuntos que precisa vir
          * antes daquele em que o aluno travou, na ordem. Continua sendo UM
          * botão por lacuna. (O "Ver os temas soltos" de dentro da trilha saiu
@@ -7627,13 +7956,17 @@
     }));
 
     Core.gruposDoAluno().forEach(function (grupo) {
-      var itens = Core.itensDoAluno(grupo.chave).map(function (i) {
+      var marcados = trabalho.marcados[grupo.chave];
+      /* O item fora da oferta (os "estilos" Vendo e Ouvindo, lente da
+       * pedagoga P06) só aparece se já estiver marcado, para poder ser
+       * desmarcado; a lista é tirada UMA vez, ao abrir, e por isso a caixa não
+       * some no meio do toque que a desmarca. */
+      var itens = Core.itensOferecidos(Core.itensDoAluno(grupo.chave), marcados).map(function (i) {
         var copia = {};
         Object.keys(i).forEach(function (k) { copia[k] = i[k]; });
         copia.chaveDoGrupo = grupo.chave;
         return copia;
       });
-      var marcados = trabalho.marcados[grupo.chave];
       /* Os grupos que são inteiros sobre o aluno mantêm o data-grupo, e por isso
        * rotina e aprende continuam aparecendo aqui, na ordem de sempre. Pontos
        * fortes e Pontos de atenção têm itens dos dois lados: a metade da matéria
@@ -8058,16 +8391,31 @@
    * anterior à trilha para sempre, mesmo depois de dado numa aula de verdade. */
   function desmarcarPasso(p) {
     if (!p) return;
+    /* O porDominio vai junto na marca guardada: sem ele, remarcar devolveria
+     * um passo fechado por domínio como se fosse da regra antiga, e tirar o
+     * "Domina" daquela aula depois não o soltaria mais (C1). */
     if (p.feitoEm || p.aulaId) {
-      p.marcaAnterior = { feitoEm: p.feitoEm || null, aulaId: p.aulaId || null, jaEra: !!p.jaEra };
+      p.marcaAnterior = { feitoEm: p.feitoEm || null, aulaId: p.aulaId || null, jaEra: !!p.jaEra,
+        porDominio: !!p.porDominio };
     }
     p.feitoEm = null;
     p.aulaId = null;
     delete p.jaEra;
+    delete p.porDominio;
+    delete p.aulaDada;   // a decisão dela vale mais que a lembrança da aula antiga
     /* Quem soltou foi ELA, e não a revisão automática. A varredura que remarca
      * pelo assunto respeita esta marca: sem ela, soltar um passo cujo assunto
      * está registrado numa aula duraria só até a próxima aula salva. */
     p.soltoAMao = true;
+  }
+
+  /* Como o passo fechou, no começo da linha dele. Desde o C1 o passo fechado
+   * por aula diz "dominado em"; o "dado em" fica para o que fechou antes, pela
+   * regra antiga de aula dada, que continua fechado e continua dizendo isso. */
+  function comoOPassoFechou(p) {
+    if (p.jaEra) return p.porDominio ? 'já dominava em ' : 'já trabalhado em ';
+    if (p.aulaId) return p.porDominio ? 'dominado em ' : 'dado em ';
+    return 'marcado por você em ';
   }
 
   function remarcarPasso(p, marca) {
@@ -8075,15 +8423,18 @@
     var m = marca || p.marcaAnterior;
     delete p.marcaAnterior;
     delete p.soltoAMao;
+    delete p.aulaDada;
     if (m && m.feitoEm) {
       p.feitoEm = m.feitoEm;
       p.aulaId = m.aulaId || null;
       if (m.jaEra) p.jaEra = true; else delete p.jaEra;
+      if (m.porDominio && p.aulaId) p.porDominio = true; else delete p.porDominio;
       return;
     }
     p.feitoEm = Core.hojeIso();
     p.aulaId = null;
     delete p.jaEra;
+    delete p.porDominio;
   }
 
   /* ---------- passo 1: onde ele precisa chegar ---------- */
@@ -8398,8 +8749,7 @@
        * que são coisas diferentes. */
       var detalhe = nomeDoAno(p.serie) + ' · cerca de ' + duracaoPorExtenso(p.duracaoMin || 60);
       if (feito) {
-        detalhe = (p.jaEra ? 'já trabalhado em ' : (p.aulaId ? 'dado em ' : 'marcado por você em ')) +
-          Core.ddmm(p.feitoEm) + ' · ' + detalhe;
+        detalhe = comoOPassoFechou(p) + Core.ddmm(p.feitoEm) + ' · ' + detalhe;
       }
 
       /* Alvo de toque de 44 px, que é o que a mão dela pede em pé, na casa da
@@ -8414,7 +8764,7 @@
           title: 'Volta a contar como passo a dar',
           style: ALVO + 'padding:11px 14px;font-size:13px',
           aoClick: function () {
-            var marca = { feitoEm: p.feitoEm, aulaId: p.aulaId, jaEra: p.jaEra };
+            var marca = { feitoEm: p.feitoEm, aulaId: p.aulaId, jaEra: p.jaEra, porDominio: p.porDominio };
             mudarComDesfazer('Passo de volta na fila.', function () {
               desmarcarPasso(p);
             }, function () { remarcarPasso(p, marca); });
@@ -8817,8 +9167,8 @@
       painel.appendChild(el('div', {
         class: 'ajuda', style: 'margin-top:0',
         texto: 'A trilha é a sequência de assuntos que precisa vir antes daquele em que ele ' +
-          'travou, na ordem. Ela anda sozinha: quando você registra o assunto da aula, o passo ' +
-          'daquele assunto fica marcado com a data da aula.'
+          'travou, na ordem. Ela anda sozinha: quando você marca Domina no assunto da aula, em ' +
+          'Registrar como foi, o passo daquele assunto fecha com a data da aula.'
       }));
 
       painel.appendChild(el('div', { class: 'barra', style: 'margin:10px 0' }, [
@@ -8953,8 +9303,7 @@
 
       var quando = '';
       if (feito) {
-        quando = (p.jaEra ? 'já trabalhado em ' : (p.aulaId ? 'dado em ' : 'marcado por você em ')) +
-          Core.ddmm(p.feitoEm);
+        quando = comoOPassoFechou(p) + Core.ddmm(p.feitoEm);
       }
 
       /* Um <div>, e não um <label>: o rótulo do <label> repassava o toque para
@@ -9178,7 +9527,7 @@
     var apr = Core.rotulosDoMapa('aprende', todas.aprende).slice(0, 2);
     if (lac.length) L.push('Lacunas: ' + lac.join(', ') + '.');
     if (ate.length) L.push('Atenção: ' + ate.join(', ') + '.');
-    if (apr.length) L.push('Aprende melhor: ' + apr.join(' e ') + '.');
+    if (apr.length) L.push('Costuma funcionar: ' + apr.join(' e ') + '.');
     return L.join(' ');
   }
 
@@ -9235,7 +9584,7 @@
     }
     linha('Lacunas', l.lacunas, l.totalLacunas);
     linha('Atenção', l.atencao, l.totalAtencao);
-    linha('Aprende melhor', l.aprende, l.aprende.length);
+    linha('Costuma funcionar', l.aprende, l.aprende.length);
 
     var caixa = el('div', { class: 'lembrete', id: 'lembrete-mapeamento' }, [
       el('div', { class: 'barra', style: 'margin-bottom:6px' }, [
@@ -9286,6 +9635,8 @@
       })
     ]));
 
+    desenharBlocoDaSondagem(corpo, aluno, aula);
+
     var roteiro = el('div', { id: 'roteiro-mapeamento' });
     ROTEIRO_MAPEAMENTO.forEach(function (par) {
       roteiro.appendChild(el('div', { class: 'passo-roteiro' }, [
@@ -9299,6 +9650,471 @@
       class: 'ajuda',
       texto: 'É sugestão, não regra. Cada família chega de um jeito.'
     }));
+  }
+
+  // ================= sondagem por ano de entrada (C5) =================
+  //
+  // O encontro de mapeamento ganhou instrumento. A sondagem nasce do ano
+  // escolar do aluno (as lacunas prováveis, uma tabela do core.js) e dos
+  // pacotes da biblioteca que estão no tablet: dois exercícios do degrau 1 por
+  // lacuna. O repositório guarda só a REGRA; os exercícios são os do tablet.
+  //
+  // O registro mora no aluno, em `aluno.sondagens`, uma lista de
+  //   { id, aulaId, data, anoEscolar, criadaEm, folhaEm, corrigidaEm,
+  //     aplicadaEm, mapeamentoId, lacunasMarcadas,
+  //     itens: [{ item, lacuna, resposta }] }
+  // e viaja na cópia de segurança com o resto do documento, sem caminho
+  // próprio. `resposta` é 'certo', 'meio', 'errado' ou '' (sem correção).
+
+  /* "3 exercícios", "1 lacuna". A contagem da biblioteca mora mais abaixo, e
+   * fora dela a regra da casa é a palavraPlural (testa_textos_e_novidades). */
+  function contagemDaSondagem(n, um, varios) { return n + ' ' + palavraPlural(n, um, varios); }
+
+  function sondagensDe(aluno) { return (aluno && aluno.sondagens) || []; }
+
+  function sondagemDaAula(aluno, aulaId) {
+    var lista = sondagensDe(aluno).filter(function (s) { return s.aulaId === aulaId; });
+    return lista.length ? lista[lista.length - 1] : null;
+  }
+
+  function nomeDoAnoDaSondagem(ano) {
+    return Core.ANOS_ESCOLARES[ano] || 'ano não registrado';
+  }
+
+  /* As listas prontas do tablet no formato que o Core.montarSondagem lê. Só
+   * entra a lista cujos exercícios todos existem (o montarArvoreBiblioteca já
+   * filtra), então todo exercício escolhido abre na folha. */
+  function listasDoTablet() {
+    var out = [];
+    Object.keys((bib && bib.listasPorModulo) || {}).forEach(function (m) {
+      bib.listasPorModulo[m].forEach(function (l) {
+        out.push({ modulo: l.modulo, nivel: l.nivel, degraus: l.degraus || [] });
+      });
+    });
+    return out;
+  }
+
+  /* As séries do Portal que estão no tablet. O Banco de Questões fica de fora:
+   * o nível dele equivale a séries, mas não traz as listas por assunto. */
+  function seriesDoTablet() {
+    var s = [];
+    ((bib && bib.pacotes) || []).forEach(function (p) {
+      ((p.manifest && p.manifest.series) || []).forEach(function (x) {
+        if (!/^n\d$/.test(x) && s.indexOf(x) < 0) s.push(x);
+      });
+    });
+    return s;
+  }
+
+  function rotuloDaLacuna(id) {
+    var it = Core.itemDaLacuna(id);
+    return it ? it.rotulo : id;
+  }
+
+  /* O bloco dentro do encontro de mapeamento. */
+  function desenharBlocoDaSondagem(corpo, aluno, aula) {
+    var ano = Core.anoEscolarDe(aluno);
+    var feita = sondagemDaAula(aluno, aula.id);
+    var bloco = el('div', { id: 'bloco-sondagem', class: 'lembrete', style: 'margin:10px 0' });
+    bloco.appendChild(el('div', { class: 'nome', style: 'font-weight:700', texto: 'Sondagem escrita' }));
+    if (feita) {
+      var lacunas = [];
+      feita.itens.forEach(function (x) { if (lacunas.indexOf(x.lacuna) < 0) lacunas.push(x.lacuna); });
+      var estado = feita.aplicadaEm
+        ? 'corrigida em ' + Core.ddmmaaaa(feita.aplicadaEm) + ', ' +
+          contagemDaSondagem((feita.lacunasMarcadas || []).length, 'lacuna marcada', 'lacunas marcadas') + ' no mapeamento'
+        : 'falta corrigir';
+      bloco.appendChild(el('div', { class: 'detalhe', id: 'resumo-sondagem',
+        texto: 'Sondagem do ' + nomeDoAnoDaSondagem(feita.anoEscolar) + ': ' +
+          contagemDaSondagem(feita.itens.length, 'exercício', 'exercícios') + ' de ' +
+          contagemDaSondagem(lacunas.length, 'lacuna', 'lacunas') + '; ' + estado + '.' }));
+      bloco.appendChild(el('div', { class: 'barra', style: 'margin-top:8px' }, [
+        el('button', { type: 'button', class: 'btn pequeno', id: 'abrir-sondagem', texto: 'Abrir a sondagem',
+          aoClick: function () { abrirSondagem(aluno.id, aula.id); } }),
+        el('button', { type: 'button', class: 'btn pequeno destaque', id: 'corrigir-sondagem', texto: 'Corrigir',
+          aoClick: function () { abrirCorrecaoDaSondagem(aluno.id, aula.id); } })
+      ]));
+    } else if (Core.lacunasProvaveis(ano).length) {
+      bloco.appendChild(el('div', { class: 'detalhe',
+        texto: 'Pronta para o ' + nomeDoAnoDaSondagem(ano) + ': dois exercícios por lacuna provável do ano, ' +
+          'do degrau 1 das listas da OBMEP que estão no tablet. Você tira, troca e põe antes de usar.' }));
+      bloco.appendChild(el('div', { class: 'barra', style: 'margin-top:8px' }, [
+        el('button', { type: 'button', class: 'btn pequeno destaque', id: 'montar-sondagem',
+          texto: 'Montar a sondagem do ' + nomeDoAnoDaSondagem(ano),
+          aoClick: function () { abrirSondagem(aluno.id, aula.id); } })
+      ]));
+    } else {
+      var mirim = ['02', '03', '04', '05'].indexOf(ano) >= 0;
+      bloco.appendChild(el('div', { class: 'detalhe', id: 'sondagem-sem-ano',
+        texto: mirim
+          ? 'Do 2º ao 5º ano, a sondagem pronta depende dos pacotes da OBMEP Mirim, que ainda não chegaram ao aplicativo.'
+          : 'A sondagem pronta vai do 6º ano ao 3º do médio. Registre o ano escolar no mapeamento para montar.' }));
+    }
+    corpo.appendChild(bloco);
+  }
+
+  /* O que está aberto na janela da sondagem. */
+  var sondagemAberta = null;
+  var urlsDaSondagem = [];
+
+  function soltarImagensDaSondagem() {
+    urlsDaSondagem.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) { /* já solta */ } });
+    urlsDaSondagem = [];
+  }
+
+  /* O enunciado do exercício, do próprio tablet, em miniatura: tirar e trocar
+   * sem ver o exercício seria escolher pelo nome da lista. */
+  function miniaturaDoExercicio(it) {
+    var img = el('img', { class: 'miniatura-sondagem', alt: 'Enunciado', style: 'display:block;max-width:100%;max-height:150px;margin:4px 0;background:#fff' });
+    if (it && it.assets && it.assets.enunciado) {
+      Store.lerAssetBiblioteca(it.pacote, it.assets.enunciado).then(function (b) {
+        if (!b) return;
+        var u = URL.createObjectURL(b);
+        urlsDaSondagem.push(u);
+        img.src = u;
+      }, function () { img.remove(); });
+    }
+    return img;
+  }
+
+  function descricaoDoExercicio(id) {
+    var it = bib && bib.itemPorId[id];
+    if (!it) return { nome: id, detalhe: 'Este exercício não está mais no tablet.' };
+    return { nome: it.modulo.titulo, detalhe: it.aula.titulo + ', exercício ' + it.numero, it: it };
+  }
+
+  function abrirSondagem(alunoId, aulaId) {
+    var aluno = alunoPorId(alunoId);
+    var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
+    if (!aluno || !aula) return;
+    $('#titulo-modal-sondagem').textContent = 'Sondagem de ' + aluno.nome;
+    var corpo = $('#corpo-modal-sondagem');
+    $('#rodape-modal-sondagem').innerHTML = '';
+    corpo.innerHTML = '';
+    corpo.appendChild(el('p', { class: 'ajuda', texto: 'Abrindo a biblioteca do tablet...' }));
+    abrirModal('modal-sondagem');
+    carregarBiblioteca().then(function () {
+      var feita = sondagemDaAula(aluno, aulaId);
+      var ano = feita ? (feita.anoEscolar || Core.anoEscolarDe(aluno)) : Core.anoEscolarDe(aluno);
+      var listas = listasDoTablet(), series = seriesDoTablet();
+      var blocos;
+      if (feita) {
+        /* A guardada manda: as lacunas dela, na ordem, com os exercícios
+         * dela. Os candidatos são refeitos do tablet, para trocar e pôr. */
+        var ordem = [];
+        feita.itens.forEach(function (x) { if (ordem.indexOf(x.lacuna) < 0) ordem.push(x.lacuna); });
+        blocos = ordem.map(function (id) {
+          var c = Core.candidatosDaSondagem(id, ano, listas, series);
+          return { lacuna: id, rotulo: rotuloDaLacuna(id), candidatos: c.candidatos, faltam: c.faltam, descartados: [],
+            itens: feita.itens.filter(function (x) { return x.lacuna === id; }).map(function (x) { return x.item; }) };
+        });
+      } else {
+        blocos = Core.montarSondagem(ano, listas, series).blocos.map(function (b) {
+          b.descartados = [];
+          return b;
+        });
+      }
+      sondagemAberta = { alunoId: alunoId, aulaId: aulaId, ano: ano, blocos: blocos, listas: listas, series: series,
+        semPacote: !series.length };
+      desenharSondagemParaEditar();
+    }, function () {
+      corpo.innerHTML = '';
+      corpo.appendChild(el('div', { class: 'faixa-aviso', texto: 'Não consegui ler a biblioteca do tablet. Feche e tente de novo.' }));
+    });
+  }
+
+  function itensDaSondagemAberta() {
+    var out = [];
+    (sondagemAberta ? sondagemAberta.blocos : []).forEach(function (b) {
+      b.itens.forEach(function (id) { out.push({ item: id, lacuna: b.lacuna }); });
+    });
+    return out;
+  }
+
+  /* O próximo exercício da lacuna que não está na sondagem nem foi tirado
+   * por ela nesta edição. */
+  function proximoDaLacuna(b) {
+    var usados = itensDaSondagemAberta().map(function (x) { return x.item; }).concat(b.descartados);
+    return Core.escolherItensDaSondagem(b.candidatos, usados, 1)[0] || null;
+  }
+
+  function desenharSondagemParaEditar() {
+    var s = sondagemAberta;
+    if (!s) return;
+    soltarImagensDaSondagem();
+    var corpo = $('#corpo-modal-sondagem');
+    var rodape = $('#rodape-modal-sondagem');
+    var rolagem = corpo.scrollTop;
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', id: 'sondagem-explica',
+      texto: 'Sondagem do ' + nomeDoAnoDaSondagem(s.ano) + ': dois exercícios por lacuna provável do ano, do degrau 1 ' +
+        'das listas da OBMEP que estão no tablet. Tire, troque ou ponha exercício antes de gerar a folha. ' +
+        'Não é prova: é para ver onde a base falha.' }));
+    if (s.semPacote) {
+      corpo.appendChild(el('div', { class: 'faixa-aviso', id: 'sondagem-sem-pacote',
+        texto: 'Nenhum pacote da biblioteca está no tablet. Importe os pacotes da OBMEP em Ajustes, na Biblioteca.' }));
+    }
+    s.blocos.forEach(function (b, bi) {
+      var caixa = el('div', { class: 'bloco-sondagem', 'data-lacuna': b.lacuna, style: 'margin:14px 0' });
+      var proximo = proximoDaLacuna(b);
+      caixa.appendChild(el('div', { class: 'barra' }, [
+        el('h3', { class: 'subtitulo', style: 'margin:0;border:none', texto: b.rotulo }),
+        el('span', { class: 'tag' + (b.itens.length ? ' cheia' : ''), texto: contagemDaSondagem(b.itens.length, 'exercício', 'exercícios') }),
+        el('span', { class: 'cresce' }),
+        el('button', { type: 'button', class: 'btn pequeno por-sondagem', texto: 'Pôr mais um', disabled: proximo ? null : 'disabled',
+          aoClick: function () { var n = proximoDaLacuna(b); if (n) { b.itens.push(n); desenharSondagemParaEditar(); } } }),
+        el('button', { type: 'button', class: 'btn pequeno tirar-lacuna-sondagem', texto: 'Tirar a lacuna',
+          aoClick: function () { s.blocos.splice(bi, 1); desenharSondagemParaEditar(); } })
+      ]));
+      if (!b.candidatos.length) {
+        caixa.appendChild(el('div', { class: 'faixa-aviso sondagem-sem-exercicio', texto: b.faltam.length
+          ? 'Sem exercício para esta lacuna: falta importar o pacote do ' +
+            b.faltam.map(Biblioteca.nomeDaSerie).join(' ou o do ') + ' da OBMEP, em Ajustes.'
+          : 'Os pacotes do tablet não têm exercício de degrau 1 para esta lacuna.' }));
+      }
+      b.itens.forEach(function (id, k) {
+        var d = descricaoDoExercicio(id);
+        caixa.appendChild(el('div', { class: 'item-lista item-sondagem', 'data-item': id }, [
+          el('div', { class: 'cresce' }, [
+            el('div', { class: 'nome', texto: d.nome }),
+            el('div', { class: 'detalhe', texto: d.detalhe }),
+            d.it ? miniaturaDoExercicio(d.it) : null
+          ]),
+          el('button', { type: 'button', class: 'btn pequeno trocar-sondagem', texto: 'Trocar',
+            aoClick: function () {
+              var n = proximoDaLacuna(b);
+              if (!n) { avisar('Não há outro exercício de degrau 1 para ' + b.rotulo + ' nos pacotes do tablet.'); return; }
+              b.descartados.push(id);
+              b.itens[k] = n;
+              desenharSondagemParaEditar();
+            } }),
+          el('button', { type: 'button', class: 'btn pequeno tirar-sondagem', texto: 'Tirar',
+            aoClick: function () { b.descartados.push(id); b.itens.splice(k, 1); desenharSondagemParaEditar(); } })
+        ]));
+      });
+      corpo.appendChild(caixa);
+    });
+
+    // pôr uma lacuna que a tabela do ano não trouxe
+    var jaTem = s.blocos.map(function (b) { return b.lacuna; });
+    var outras = Core.itensDaMateria('lacunas', Core.MATERIA_PADRAO).filter(function (i) {
+      return i.obmep && i.obmep.length && jaTem.indexOf(i.id) < 0;
+    });
+    if (outras.length) {
+      var sel = el('select', { id: 'sondagem-outra-lacuna' });
+      outras.forEach(function (i) { sel.appendChild(el('option', { value: i.id, texto: i.rotulo })); });
+      corpo.appendChild(el('div', { class: 'campo', style: 'margin-top:18px' }, [
+        el('span', { texto: 'Pôr outra lacuna' }),
+        el('div', { class: 'barra' }, [sel, el('button', { type: 'button', class: 'btn pequeno', id: 'sondagem-por-lacuna', texto: 'Pôr',
+          aoClick: function () {
+            var id = sel.value;
+            var c = Core.candidatosDaSondagem(id, s.ano, s.listas, s.series);
+            var usados = itensDaSondagemAberta().map(function (x) { return x.item; });
+            s.blocos.push({ lacuna: id, rotulo: rotuloDaLacuna(id), candidatos: c.candidatos, faltam: c.faltam, descartados: [],
+              itens: Core.escolherItensDaSondagem(c.candidatos, usados, 2) });
+            desenharSondagemParaEditar();
+          } })])
+      ]));
+    }
+
+    var total = itensDaSondagemAberta().length;
+    var aluno = alunoPorId(s.alunoId);
+    var feita = aluno ? sondagemDaAula(aluno, s.aulaId) : null;
+    rodape.appendChild(el('span', { class: 'esquerda ajuda', id: 'sondagem-total', style: 'margin:0;align-self:center',
+      texto: contagemDaSondagem(total, 'exercício', 'exercícios') + ' na sondagem' }));
+    rodape.appendChild(el('button', { type: 'button', class: 'btn', texto: 'Cancelar',
+      aoClick: function () { fecharModal('modal-sondagem'); } }));
+    if (feita) {
+      rodape.appendChild(el('button', { type: 'button', class: 'btn', id: 'sondagem-ir-corrigir', texto: 'Corrigir',
+        aoClick: function () { abrirCorrecaoDaSondagem(s.alunoId, s.aulaId); } }));
+    }
+    rodape.appendChild(el('button', { type: 'button', class: 'btn principal', id: 'sondagem-gerar', texto: 'Gerar a folha',
+      disabled: total ? null : 'disabled', aoClick: gerarFolhaDaSondagem }));
+    corpo.scrollTop = rolagem;
+  }
+
+  /* Guarda a sondagem no aluno e manda os exercícios pelo caminho que a
+   * biblioteca já usa para "Abrir a lista como folha da aula": o material
+   * passa pela porta única (trocarMaterial, e o que estava marcado vai para as
+   * Seleções anteriores), e a janela Gerar material abre com a aula do
+   * mapeamento escolhida e a Folha marcada. */
+  function gerarFolhaDaSondagem() {
+    var s = sondagemAberta;
+    var aluno = s && alunoPorId(s.alunoId);
+    var aula = s && db.aulas.filter(function (a) { return a.id === s.aulaId; })[0];
+    if (!aluno || !aula) return;
+    var itens = itensDaSondagemAberta();
+    if (!itens.length) { avisar('A sondagem está sem exercício.'); return; }
+    var reg = sondagemDaAula(aluno, aula.id);
+    if (!reg) {
+      reg = { id: Core.uid(), aulaId: aula.id, data: aula.data, anoEscolar: s.ano, criadaEm: Core.hojeIso(), itens: [] };
+      aluno.sondagens = sondagensDe(aluno).concat([reg]);
+    }
+    /* A resposta de quem continua não se perde; se os exercícios mudaram,
+     * ela volta a "falta corrigir" (Core.refazerItensDaSondagem). */
+    Core.refazerItensDaSondagem(reg, itens);
+    reg.folhaEm = Core.hojeIso();
+    var ids = itens.map(function (x) { return x.item; });
+    salvarEDepois(function () {
+      fecharModal('modal-sondagem');
+      soltarImagensDaSondagem();
+      if (!trocarMaterial({ itens: ids, paginas: [] }, 'sondagem', null)) return;
+      // como no botão Material: a janela da aula fecha, e a folha abre depois de anexar
+      fecharModal('modal-aula');
+      abrirGerarMaterial({ daSondagem: true, aulaId: aula.id, titulo: 'Sondagem',
+        subtitulo: nomeDoAnoDaSondagem(s.ano), folha: true });
+    });
+  }
+
+  /* A correção: para cada exercício, certo, meio certo ou errado. Nada é
+   * gravado aqui; a gravação é no passo seguinte, depois de ela ver o que vai
+   * para o mapeamento. */
+  var correcaoAberta = null;
+
+  function abrirCorrecaoDaSondagem(alunoId, aulaId) {
+    var aluno = alunoPorId(alunoId);
+    var feita = aluno ? sondagemDaAula(aluno, aulaId) : null;
+    if (!feita) { avisar('Esta aula ainda não tem sondagem.'); return; }
+    $('#titulo-modal-sondagem').textContent = 'Correção da sondagem de ' + aluno.nome;
+    abrirModal('modal-sondagem');
+    carregarBiblioteca().then(null, function () { return null; }).then(function () {
+      correcaoAberta = { alunoId: alunoId, aulaId: aulaId, id: feita.id,
+        respostas: feita.itens.map(function (x) { return x.resposta || ''; }) };
+      desenharCorrecaoDaSondagem();
+    });
+  }
+
+  function desenharCorrecaoDaSondagem() {
+    var c = correcaoAberta;
+    var aluno = c && alunoPorId(c.alunoId);
+    var feita = aluno && sondagemDaAula(aluno, c.aulaId);
+    if (!feita) return;
+    soltarImagensDaSondagem();
+    var corpo = $('#corpo-modal-sondagem');
+    var rodape = $('#rodape-modal-sondagem');
+    var rolagem = corpo.scrollTop;
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0',
+      texto: 'Para cada exercício, marque como saiu. A lacuna só vai para o mapeamento quando nenhum exercício dela ' +
+        'saiu certo, e nada é gravado antes de você confirmar.' }));
+    var lacunaAntes = null;
+    feita.itens.forEach(function (x, k) {
+      if (x.lacuna !== lacunaAntes) {
+        corpo.appendChild(el('h3', { class: 'subtitulo', texto: rotuloDaLacuna(x.lacuna) }));
+        lacunaAntes = x.lacuna;
+      }
+      var d = descricaoDoExercicio(x.item);
+      var botoes = Core.RESPOSTAS_SONDAGEM.map(function (r) {
+        var ativa = c.respostas[k] === r.id;
+        return el('button', { type: 'button', class: 'btn pequeno opcao-correcao' + (ativa ? ' destaque ativa' : ''),
+          'data-resposta': r.id, 'aria-pressed': ativa ? 'true' : 'false', texto: r.rotulo,
+          aoClick: function () {
+            // tocar de novo na marcada desmarca: ela pode deixar para depois
+            c.respostas[k] = c.respostas[k] === r.id ? '' : r.id;
+            desenharCorrecaoDaSondagem();
+          } });
+      });
+      corpo.appendChild(el('div', { class: 'item-lista item-correcao', 'data-item': x.item, 'data-lacuna': x.lacuna }, [
+        el('div', { class: 'cresce' }, [
+          el('div', { class: 'nome', texto: (k + 1) + '. ' + d.nome }),
+          el('div', { class: 'detalhe', texto: d.detalhe }),
+          d.it ? miniaturaDoExercicio(d.it) : null
+        ]),
+        el('div', { class: 'barra' }, botoes)
+      ]));
+    });
+    var feitos = c.respostas.filter(Boolean).length;
+    rodape.appendChild(el('span', { class: 'esquerda ajuda', id: 'sondagem-corrigidos', style: 'margin:0;align-self:center',
+      texto: feitos + ' de ' + feita.itens.length + ' corrigidos' }));
+    rodape.appendChild(el('button', { type: 'button', class: 'btn', texto: 'Cancelar',
+      aoClick: function () { fecharModal('modal-sondagem'); } }));
+    rodape.appendChild(el('button', { type: 'button', class: 'btn principal', id: 'sondagem-ver-resultado',
+      texto: 'Ver o que vai para o mapeamento', aoClick: desenharConfirmacaoDaSondagem }));
+    corpo.scrollTop = rolagem;
+  }
+
+  /* A sondagem com as respostas da tela, sem tocar na guardada. */
+  function sondagemComRespostas() {
+    var c = correcaoAberta;
+    var aluno = c && alunoPorId(c.alunoId);
+    var feita = aluno && sondagemDaAula(aluno, c.aulaId);
+    if (!feita) return null;
+    return { id: feita.id, data: feita.data, itens: feita.itens.map(function (x, k) {
+      return { item: x.item, lacuna: x.lacuna, resposta: c.respostas[k] || '' };
+    }) };
+  }
+
+  function desenharConfirmacaoDaSondagem() {
+    var c = correcaoAberta;
+    var aluno = c && alunoPorId(c.alunoId);
+    var tmp = sondagemComRespostas();
+    if (!tmp) return;
+    var corpo = $('#corpo-modal-sondagem');
+    var rodape = $('#rodape-modal-sondagem');
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    var m = Core.mapeamentoAtual(aluno);
+    var marcadas = m ? Core.marcadosDaMateria(m, Core.MATERIA_PADRAO).lacunas : [];
+    var res = Core.lacunasDaCorrecao(tmp);
+    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', texto: m
+      ? 'Isto vai para o mapeamento de ' + Core.ddmmaaaa(m.data) + '. O que você já marcou lá continua como está.'
+      : 'Ainda não há mapeamento: um novo nasce com estas lacunas, ligado a esta aula.' }));
+    var lista = el('div', { id: 'sondagem-confirmacao' });
+    res.forEach(function (r) {
+      var texto;
+      if (!r.decidida) texto = 'falta corrigir ' + contagemDaSondagem(r.total - r.certos - r.meios - r.errados, 'exercício', 'exercícios') + '; nada muda';
+      else if (r.marca) texto = (marcadas.indexOf(r.lacuna) >= 0 ? 'já estava marcada; a evidência entra junto: ' : 'marca a lacuna: ') + r.evidencia;
+      else texto = 'não marca (' + (r.certos ? 'acertou ' + r.certos + ' de ' + r.total : 'saiu meio certo') + ')';
+      lista.appendChild(el('div', { class: 'item-lista linha-confirmacao' + (r.marca ? ' marca' : ''), 'data-lacuna': r.lacuna }, [
+        el('div', { class: 'cresce' }, [
+          el('div', { class: 'nome', texto: r.rotulo }),
+          el('div', { class: 'detalhe', texto: texto })
+        ])
+      ]));
+    });
+    corpo.appendChild(lista);
+    rodape.appendChild(el('button', { type: 'button', class: 'btn', id: 'sondagem-voltar-correcao', texto: 'Voltar à correção',
+      aoClick: desenharCorrecaoDaSondagem }));
+    rodape.appendChild(el('button', { type: 'button', class: 'btn principal', id: 'sondagem-gravar', texto: 'Confirmar e gravar',
+      aoClick: gravarCorrecaoDaSondagem }));
+  }
+
+  function gravarCorrecaoDaSondagem() {
+    var c = correcaoAberta;
+    var aluno = c && alunoPorId(c.alunoId);
+    var feita = aluno && sondagemDaAula(aluno, c.aulaId);
+    var aula = db.aulas.filter(function (a) { return a.id === (c && c.aulaId); })[0];
+    if (!feita) return;
+    // o mapeamento aberto noutra janela não pode virar disco por tabela
+    if (mapeamentoEmEdicao && mapeamentoEmEdicao.alunoId === aluno.id) descartarMapeamentoEmEdicao();
+    feita.itens.forEach(function (x, k) { x.resposta = c.respostas[k] || ''; });
+    feita.corrigidaEm = Core.hojeIso();
+    var m = Core.mapeamentoAtual(aluno);
+    if (!m) {
+      m = Core.mapeamentoNovo();
+      m.aulaId = aula ? aula.id : null;
+      m.anoEscolar = aluno.anoEscolar || feita.anoEscolar || '';
+      m.anoEscolarOutro = aluno.anoEscolarOutro || '';
+      aluno.mapeamentos = (aluno.mapeamentos || []).concat([m]);
+    }
+    var r = Core.aplicarSondagemNoMapeamento(m, feita);
+    feita.aplicadaEm = Core.hojeIso();
+    feita.mapeamentoId = m.id;
+    feita.lacunasMarcadas = r.novas.concat(r.jaMarcadas);
+    var n = feita.lacunasMarcadas.length;
+    salvarEDepois(function (gravou) {
+      fecharModal('modal-sondagem');
+      soltarImagensDaSondagem();
+      correcaoAberta = null;
+      if ($('#modal-aula').classList.contains('aberto') && aulaEmEdicao) abrirAula(aulaEmEdicao.id);
+      desenharTudo();
+      if (gravou) {
+        avisar('Correção gravada. ' + (n ? contagemDaSondagem(n, 'lacuna marcada', 'lacunas marcadas') + ' no mapeamento, com a evidência.'
+          : 'Nenhuma lacuna marcada.'));
+      }
+    });
   }
 
   // ================= índice de assuntos de matemática =================
@@ -9733,21 +10549,14 @@
     aula.temas.push(item);
     delete aula.tema;
 
-    /* A trilha anda de graça: o mesmo toque que registra o assunto marca o
-     * passo daquele assunto, com a data DA AULA e não a de hoje, porque ela
-     * lança aula atrasada e usa Repetir para trás. Só marca o passo que ainda
-     * não foi dado, e nunca os anteriores: pular etapa é decisão dela. */
+    /* Registrar o assunto NÃO fecha mais o passo da trilha (C1): o passo fecha
+     * quando ela marca "Domina" no assunto, em Registrar como foi
+     * (marcarDominioNaAula). Aqui só se descobre se o assunto é passo aberto
+     * de alguma trilha, para o aviso dizer o que falta. */
     var alunoDaAula = alunoPorId(aula.alunoId);
-    var andou = alunoDaAula ? Core.marcarPassoPorAssunto(alunoDaAula, aula, item) : null;
-    /* Este passo foi dado NESTA aula, então não é anterior à trilha. Um jaEra
-     * que tivesse sobrado de uma desmarcação faria a ficha dizer "já trabalhado
-     * em", como se a aula de hoje não contasse. E a marca de solto à mão sai
-     * junto: ela acabou de dizer o contrário, registrando o assunto. */
-    if (andou) {
-      delete andou.passo.jaEra;
-      delete andou.passo.marcaAnterior;
-      delete andou.passo.soltoAMao;
-    }
+    var ehPassoAberto = !!(alunoDaAula && item.id && Core.trilhasAtivas(alunoDaAula).some(function (tr) {
+      return (tr.passos || []).some(function (p) { return !p.feitoEm && p.temaId === item.id; });
+    }));
 
     salvar().then(function () {
       fecharModal('modal-tema');
@@ -9758,23 +10567,14 @@
         }
         if ($('#lista-anexos')) desenharAnexos($('#lista-anexos'), aula);
       }
-      if (andou) atualizarPainelTrilhas(aula.alunoId);
       desenharAgenda();
-      if (andou) {
-        var feitos = Core.passosFeitos(andou.trilha);
-        var total = (andou.trilha.passos || []).length;
-        avisar('Assunto registrado, e a trilha andou: ' + feitos + ' de ' + total + ' passos.');
+      if (ehPassoAberto) {
+        avisar('Assunto registrado: ' + item.titulo + '. O passo da trilha fecha quando você ' +
+          'marcar Domina, em Registrar como foi.');
         return;
       }
       avisar('Assunto registrado: ' + item.titulo + '.');
     }).catch(function (e) {
-      /* O passo também volta atrás: trilha que anda sem a aula ter sido gravada
-       * contaria como dado o que não ficou registrado em lugar nenhum. */
-      if (andou) {
-        andou.passo.feitoEm = null;
-        andou.passo.aulaId = null;
-        delete item.passoDe;
-      }
       /* A gravação falhou, então a memória tem que voltar a espelhar o disco.
        *
        * Sem desfazer, o assunto ficava só na memória e a guarda de duplicata
@@ -10489,6 +11289,8 @@
     numeros.appendChild(numeroComRodape('Total a receber', dinheiro(t.valorFeito), rodapesReceberFech));
 
     desenharGentilezas(numeros, t);
+    // antes do "mês sem aula": o que ficou por pagar de outro mês continua à vista
+    desenharPendentesDePagamento();
 
     var lista = $('#lista-fechamento');
     lista.innerHTML = '';
@@ -10653,10 +11455,264 @@
         }));
       }
 
+      cartao.appendChild(linhaDePagamento(f));
+
       lista.appendChild(cartao);
     });
 
     desenharPanoramaDeValores();
+  }
+
+  // ================= pago em (C4) =================
+
+  /* A linha do pagamento no cartão do aluno, no pé do cartão: o documento sai
+   * primeiro e o dinheiro chega depois, então a ordem do cartão é a ordem do
+   * mês dela. É só dela, como o resto desta tela: nenhum documento da família
+   * lê db.pagamentos (a regra e o porquê estão no core.js, em "pago em").
+   *
+   * Marcar, trocar o valor e desmarcar redesenham SÓ esta linha e a lista de
+   * pendentes, e não o Fechamento inteiro: ela está no pé do cartão, rolada
+   * até ali, e redesenhar tudo jogaria a rolagem de volta para o topo. */
+  function linhaDePagamento(f) {
+    var caixa = el('div', {
+      class: 'linha-pagamento', 'data-aluno': f.aluno.id,
+      style: 'margin-top:12px;padding-top:10px;border-top:1px solid var(--fio)'
+    });
+    desenharLinhaDePagamento(caixa, f, false);
+    return caixa;
+  }
+
+  // "1.250,00": o número como ela escreve, sem o R$, para o campo de digitar
+  function valorNoCampo(v) { return Core.fmtMoeda(v).replace(/^R\$\s*/, ''); }
+
+  function desenharLinhaDePagamento(caixa, f, editando) {
+    caixa.innerHTML = '';
+    var s = Core.situacaoDoPagamento(db, f);
+    var reg = s.registro;
+
+    if (editando) {
+      /* O proposto é o total do MÊS INTEIRO (f.totalValor), já contando as
+       * datas ainda marcadas, e não o "até hoje". Com aula à frente, o
+       * documento da família imprime as duas somas, e a família que paga
+       * adiantado paga a do mês inteiro ("Total do mês, já contando as datas
+       * ainda marcadas"). Propor o "até hoje" fazia ela aceitar um número
+       * menor e, quando o mês fechasse, o cartão dizer "faltam" sem a família
+       * dever nada. Com o mês vencido as duas somas são a mesma. Ela troca
+       * quando a família pagou outro valor. */
+      var proposto = reg ? reg.valor : (f.totalValor || 0);
+      var comMarcadas = (f.linhas || []).some(function (l) { return l.futura && l.status !== 'cancelada'; });
+      var campoValor = el('input', {
+        type: 'text', inputmode: 'decimal', autocomplete: 'off', class: 'pagamento-valor',
+        value: proposto > 0 ? valorNoCampo(proposto) : '', style: 'max-width:150px'
+      });
+      var campoData = el('input', {
+        type: 'date', class: 'pagamento-data', value: reg ? reg.pagoEm : Core.hojeIso(), style: 'max-width:180px'
+      });
+      var gravarPagamento = function () {
+        var valor = Core.lerReais(campoValor.value);
+        if (valor === null || valor <= 0) { avisar('Escreva o valor pago, por exemplo 150,00.'); return; }
+        if (!Core.marcarPagamento(db, f.aluno.id, f.mes, campoData.value, valor)) {
+          avisar('Confira a data do pagamento.');
+          return;
+        }
+        // a memória é a verdade; a faixa do salvar() avisa se não deu para guardar
+        salvar();
+        desenharLinhaDePagamento(caixa, f, false);
+        desenharPendentesDePagamento();
+      };
+      caixa.appendChild(el('div', { class: 'barra', style: 'gap:10px;align-items:flex-end;flex-wrap:wrap;margin:0' }, [
+        el('label', { class: 'campo', style: 'margin:0' }, [el('span', { texto: 'Valor pago (R$)' }), campoValor]),
+        el('label', { class: 'campo', style: 'margin:0' }, [el('span', { texto: 'Pago em' }), campoData]),
+        el('button', { type: 'button', class: 'btn principal btn-confirmar-pagamento', texto: 'Confirmar', aoClick: gravarPagamento }),
+        el('button', {
+          type: 'button', class: 'btn btn-cancelar-pagamento', texto: 'Cancelar',
+          aoClick: function () { desenharLinhaDePagamento(caixa, f, false); }
+        })
+      ]));
+      caixa.appendChild(el('div', {
+        class: 'ajuda ajuda-proposto', style: 'margin:6px 0 0',
+        texto: (reg ? 'O campo traz o valor que você marcou.'
+          : comMarcadas
+            ? 'O valor proposto é o total do mês, já contando as datas ainda marcadas, como no documento da família.'
+            : 'O valor proposto é o total do mês, como no documento da família.') +
+          ' Troque se a família pagou outro valor.'
+      }));
+      return;
+    }
+
+    if (reg) {
+      var filhos = [el('strong', { class: 'pagamento-feito', texto: 'Pago em ' + Core.ddmm(reg.pagoEm) + ' · ' + dinheiro(reg.valor) })];
+      /* Pago a menos fica dito, com a diferença: esconder a diferença porque
+       * existe uma marca de pagamento seria a lista dizer que está tudo certo. */
+      if (s.falta > 0) {
+        filhos.push(el('span', { class: 'pagamento-falta', style: 'color:var(--vermelho)', texto: 'faltam ' + dinheiro(s.falta) }));
+      }
+      filhos.push(el('span', { class: 'cresce' }));
+      filhos.push(el('button', {
+        type: 'button', class: 'btn pequeno btn-alterar-pagamento', texto: 'Alterar',
+        aoClick: function () { desenharLinhaDePagamento(caixa, f, true); }
+      }));
+      filhos.push(el('button', {
+        type: 'button', class: 'btn pequeno btn-desmarcar-pagamento', texto: 'Desmarcar',
+        aoClick: function () {
+          if (!confirmar('Desmarcar o pagamento de ' + f.alunoNome + ' em ' + f.mesExtenso + '?')) return;
+          Core.desmarcarPagamento(db, f.aluno.id, f.mes);
+          salvar();
+          desenharLinhaDePagamento(caixa, f, false);
+          desenharPendentesDePagamento();
+        }
+      }));
+      caixa.appendChild(el('div', { class: 'barra', style: 'gap:10px;margin:0;flex-wrap:wrap' }, filhos));
+      return;
+    }
+
+    caixa.appendChild(el('div', { class: 'barra', style: 'margin:0' }, [
+      el('button', {
+        type: 'button', class: 'btn btn-marcar-pago', texto: 'Marcar como pago',
+        aoClick: function () { desenharLinhaDePagamento(caixa, f, true); }
+      })
+    ]));
+  }
+
+  /* Quem ainda não pagou o quê, mês a mês, no alto do Fechamento.
+   *
+   * Nasce RECOLHIDA a cada abertura do aplicativo: fica à vista só o cabeçalho,
+   * com quantas pendências e quanto falta, e a lista abre quando ela pede. A
+   * escolha não é guardada no banco: abrir e fechar uma lista não é dado dela,
+   * e gravar a cada toque seria gravação à toa. Abrir e fechar alternam o
+   * display no lugar, sem redesenhar a tela, pelo mesmo motivo do painel de
+   * valores: não jogar a rolagem dela para o topo. */
+  var pendentesAbertos = false;
+
+  /* O corte (db.ajustes.pagamentosDesde) nasce na primeira vez que o
+   * Fechamento é desenhado sem ele, com o mês corrente do relógio. Sem isto,
+   * na primeira abertura todo mês anterior com aula viraria pendência,
+   * inclusive os que as famílias já pagaram antes de existir onde marcar, e a
+   * lista dela nasceria enorme e falsa. Ela muda pelo "Mudar" da lista. */
+  function garantirCorteDosPagamentos() {
+    db.ajustes = db.ajustes || {};
+    if (/^\d{4}-\d{2}$/.test(String(db.ajustes.pagamentosDesde || ''))) return;
+    db.ajustes.pagamentosDesde = Core.mesDe(Core.hojeIso());
+    salvar();
+  }
+
+  /* Os meses que o seletor do corte oferece: do mês da aula mais antiga (ou do
+   * corte, se for antes) até o mês corrente, o mais novo primeiro, como o
+   * seletor de mês do Fechamento. Depois do mês corrente não faz sentido: o
+   * mês que não fechou nunca é pendente. */
+  function mesesDoCorte(corte) {
+    var hoje = Core.mesDe(Core.hojeIso());
+    var primeiro = corte < hoje ? corte : hoje;
+    db.aulas.forEach(function (a) { var m = Core.mesDe(a.data); if (a.data && m < primeiro) primeiro = m; });
+    var meses = [];
+    for (var m = hoje; m >= primeiro && meses.length < 240; m = Core.mesAdjacente(m, -1)) meses.push(m);
+    return meses;
+  }
+
+  function linhaDoCorte(escolhendo) {
+    var corte = Core.corteDosPagamentos(db);
+    var caixa = el('div', { class: 'barra linha-corte-pagamentos', style: 'gap:10px;margin:0 0 6px;flex-wrap:wrap' });
+    if (!escolhendo) {
+      caixa.appendChild(el('span', { class: 'texto-corte', texto: 'Controlando a partir de ' + Core.mesExtenso(corte) }));
+      caixa.appendChild(el('button', {
+        type: 'button', class: 'btn pequeno', id: 'mudar-corte-pagamentos', texto: 'Mudar',
+        aoClick: function () { caixa.parentNode.replaceChild(linhaDoCorte(true), caixa); }
+      }));
+      return caixa;
+    }
+    var sel = el('select', { id: 'corte-pagamentos', style: 'max-width:210px' });
+    mesesDoCorte(corte).forEach(function (m) {
+      var o = el('option', { value: m, texto: Core.mesExtenso(m) });
+      if (m === corte) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', function () {
+      db.ajustes = db.ajustes || {};
+      db.ajustes.pagamentosDesde = sel.value;
+      salvar();
+      desenharPendentesDePagamento();
+    });
+    caixa.appendChild(el('span', { texto: 'Controlar a partir de' }));
+    caixa.appendChild(sel);
+    caixa.appendChild(el('button', {
+      type: 'button', class: 'btn pequeno', texto: 'Cancelar',
+      aoClick: function () { caixa.parentNode.replaceChild(linhaDoCorte(false), caixa); }
+    }));
+    return caixa;
+  }
+
+  function desenharPendentesDePagamento() {
+    var caixa = $('#pendentes-pagamento');
+    if (!caixa) return;
+    caixa.innerHTML = '';
+    garantirCorteDosPagamentos();
+    var lista = Core.pendentesDePagamento(db);
+    var soma = Core.somaDosPendentes(lista);
+
+    var corpo = el('div', { class: 'cartao', id: 'lista-pendentes', style: pendentesAbertos ? '' : 'display:none' });
+    corpo.appendChild(linhaDoCorte(false));
+    corpo.appendChild(el('div', {
+      class: 'ajuda', style: 'margin-top:0',
+      texto: 'Só para você. Nada daqui entra no documento que a família recebe. ' +
+        'Conta só mês que já terminou, e quem pagou a menos aparece com a diferença.'
+    }));
+    if (!lista.length) {
+      corpo.appendChild(el('div', { class: 'ajuda', id: 'pendentes-vazio', style: 'margin:8px 0 0', texto: 'Nada pendente.' }));
+    }
+    var mesDaVez = null;
+    lista.forEach(function (p) {
+      if (p.mes !== mesDaVez) {
+        mesDaVez = p.mes;
+        corpo.appendChild(el('div', {
+          class: 'pendentes-mes', style: 'margin:12px 0 6px;font-weight:700;color:var(--navy)',
+          texto: p.mesExtenso
+        }));
+      }
+      var detalhe = p.aMenos
+        ? 'Pagou ' + dinheiro(p.pago) + ' em ' + Core.ddmm(p.pagoEm) + ', de ' + dinheiro(p.devido) + '.'
+        : 'Sem pagamento marcado.';
+      corpo.appendChild(el('div', { class: 'item-lista pendente-pagamento', 'data-aluno': p.alunoId, 'data-mes': p.mes }, [
+        el('div', { class: 'cresce' }, [
+          el('div', { class: 'nome', texto: p.alunoNome }),
+          el('div', { class: 'detalhe', texto: detalhe })
+        ]),
+        el('strong', { class: 'pendente-falta', texto: (p.aMenos ? 'faltam ' : '') + dinheiro(p.falta) }),
+        p.mes === mesAtual ? null : el('button', {
+          type: 'button', class: 'btn pequeno', texto: 'Ver o mês',
+          aoClick: function () { mesAtual = p.mes; desenharAgenda(); desenharFechamento(); }
+        })
+      ]));
+    });
+
+    var botao = el('button', {
+      type: 'button', class: 'btn pequeno', id: 'abrir-pendentes-pagamento',
+      texto: pendentesAbertos ? 'Esconder' : 'Mostrar',
+      'aria-expanded': pendentesAbertos ? 'true' : 'false'
+    });
+    botao.addEventListener('click', function () {
+      pendentesAbertos = corpo.style.display === 'none';
+      corpo.style.display = pendentesAbertos ? '' : 'none';
+      botao.textContent = pendentesAbertos ? 'Esconder' : 'Mostrar';
+      botao.setAttribute('aria-expanded', pendentesAbertos ? 'true' : 'false');
+    });
+
+    caixa.appendChild(el('div', {
+      class: 'barra',
+      style: 'margin:4px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--fio)'
+    }, [
+      el('h3', {
+        class: 'subtitulo', style: 'margin:0;padding-bottom:0;border-bottom:none',
+        texto: 'Pagamentos pendentes'
+      }),
+      el('span', {
+        class: 'tag cheia', id: 'resumo-pendentes',
+        texto: !soma.itens ? 'nada pendente'
+          : (soma.itens === 1 ? '1 pendência' : soma.itens + ' pendências') + ' · ' + dinheiro(soma.falta)
+      }),
+      el('span', { class: 'cresce' }),
+      botao
+    ]));
+    caixa.appendChild(corpo);
   }
 
   /* O que ela deu e não cobrou no mês.
@@ -12963,7 +14019,8 @@
   var bibFila = [];
   var bibDesenhando = 0;
   var MAX_MINIATURAS_JUNTAS = 3;
-  var ORDEM_SERIES = ['6ano', '7ano', '8ano', '9ano', '1em', '2em', '3em'];
+  // do 2º ao 5º ano vêm os pacotes da OBMEP Mirim (C12)
+  var ORDEM_SERIES = ['2ano', '3ano', '4ano', '5ano', '6ano', '7ano', '8ano', '9ano', '1em', '2em', '3em'];
   var NOME_DIFICULDADE = { 1: 'Fácil', 2: 'Médio', 3: 'Difícil' };
 
   /* Há pacote importado? O botão Material da linha do assunto depende disto, e
@@ -13011,7 +14068,10 @@
       arv.itemPorId[it.id] = it;
       var banco = eDoBanco(it);
       var mod = modulo(it.serie + ':' + it.modulo.slug, it.serie, it.modulo, banco, it.pacote);
-      var series = banco && it.series_equivalentes && it.series_equivalentes.length ? it.series_equivalentes : [it.serie];
+      /* O item de nível (o "n2" do Banco, o "m1" da Mirim) aparece nas séries a
+       * que o nível equivale. Era só para o Banco; a Mirim (C12) é o segundo
+       * pacote por nível, e o nível em si não vira aba de série. */
+      var series = it.series_equivalentes && it.series_equivalentes.length ? it.series_equivalentes : [it.serie];
       series.forEach(function (s) { mod.series[s] = true; arv.series[s] = true; });
       var lista = mod.listas[it.aula.slug];
       if (!lista) {
@@ -13048,7 +14108,9 @@
         (k.degraus || []).forEach(function (d) { minutosDe[d.item] = d.minutos; });
         (arv.listasPorModulo[k.modulo] = arv.listasPorModulo[k.modulo] || []).push({
           id: k.id, modulo: k.modulo, nivel: k.nivel, minutos: k.minutos, regra: k.regra,
-          itens: itens, ids: itens.map(function (it) { return it.id; }), minutosDe: minutosDe
+          itens: itens, ids: itens.map(function (it) { return it.id; }), minutosDe: minutosDe,
+          // o degrau de cada posição: a sondagem (C5) escolhe só o degrau 1
+          degraus: (k.degraus || []).map(function (d) { return { item: d.item, degrau: d.degrau }; })
         });
       });
     });
@@ -15518,13 +16580,19 @@
   var gerandoMaterial = false;
   function abrirModalGerar() { /* guarda o atualizar() da janela aberta */ }
 
-  function abrirGerarMaterial() {
+  /* `opcoes` só vale com `daSondagem` (C5): os botões da biblioteca chamam
+   * esta função direto do clique, e o evento chega aqui no lugar dela. A
+   * sondagem traz o título, a aula do encontro de mapeamento já escolhida, a
+   * Folha marcada e `semAssuntos` (ver gerarEAnexar). */
+  function abrirGerarMaterial(opcoes) {
+    var daSondagem = opcoes && opcoes.daSondagem ? opcoes : null;
     if (!bib) return;
     limparCarrinhoOrfao();
     var itens = bibCarrinho.itens.map(function (id) { return bib.itemPorId[id]; });
     var paginas = bibCarrinho.paginas.map(paginaDeTeoriaPorId);
     if (!itens.length && !paginas.length) return;
     var padrao = tituloPadraoDoCarrinho(itens, paginas);
+    if (daSondagem) padrao = { titulo: daSondagem.titulo || padrao.titulo, subtitulo: daSondagem.subtitulo || '' };
     var escolha = { aulaId: null, nova: false, botao: null };
     var corpo = $('#corpo-modal-bib-gerar');
     var rodape = $('#rodape-modal-bib-gerar');
@@ -15687,7 +16755,8 @@
       return {
         titulo: campoTitulo.value.trim() || padrao.titulo, subtitulo: campoSub.value.trim(),
         teoria: caixas.teoria.checked, lista: caixas.lista.checked, gabarito: caixas.gabarito.checked,
-        espaco: caixas.espaco.checked, origem: caixas.origem.checked, folha: caixas.folha.checked && !caixas.folha.disabled
+        espaco: caixas.espaco.checked, origem: caixas.origem.checked, folha: caixas.folha.checked && !caixas.folha.disabled,
+        semAssuntos: !!daSondagem
       };
     }
     botaoGerar.addEventListener('click', function () {
@@ -15747,6 +16816,23 @@
       }
       if (daAula) marcarAula(daAula, bibContexto.aulaId, false);
     }
+    /* A sondagem vem do encontro de mapeamento: a aula já foi escolhida lá,
+     * como no botão Material, e a Folha nasce marcada, porque a sondagem é
+     * feita na tela, com a caneta. Ela pode desmarcar. */
+    if (daSondagem && daSondagem.aulaId) {
+      var daSond = listaAulas.querySelector('[data-aula="' + daSondagem.aulaId + '"]');
+      if (!daSond) {
+        var aulaSond = db.aulas.filter(function (a) { return a.id === daSondagem.aulaId; })[0];
+        if (aulaSond && alunoPorId(aulaSond.alunoId)) {
+          listaAulas.insertBefore(el('div', { class: 'bloco-exercicios', texto: 'Aula do mapeamento' }), listaAulas.firstChild);
+          daSond = linhaAula(aulaSond);
+          listaAulas.insertBefore(daSond, listaAulas.children[1]);
+        }
+      }
+      if (daSond) marcarAula(daSond, daSondagem.aulaId, false);
+      atualizarRodape();
+      if (daSondagem.folha && !caixas.folha.disabled) caixas.folha.checked = true;
+    }
     atualizarRodape();
     abrirModal('modal-bib-gerar');
   }
@@ -15777,8 +16863,23 @@
       });
     return Promise.all([enun, sol]).then(function (r) {
       return { id: it.id, origem: origemCurta(it), enunciado: r[0], solucao: r[1],
-        semSolucao: !!(it.sem_solucao || !it.assets.solucao) };
+        semSolucao: !!(it.sem_solucao || !it.assets.solucao), resposta: respostaSemSolucao(it) };
     });
+  }
+
+  /* A letra do gabarito de um item SEM solução (o ENEM, C12, só tem o gabarito
+   * oficial): é ela que sai no gabarito do material e na tela cheia. Item com
+   * solução mostra a solução, e a letra fica dentro dela. */
+  function respostaSemSolucao(it) {
+    return it && !it.assets.solucao && it.formato === 'objetiva' && /^[A-E]$/.test(it.resposta || '') ? it.resposta : null;
+  }
+
+  /* Módulo de prova que não é assunto do aplicativo ("Diversos", C12) não vira
+   * assunto da aula: na prova, o módulo é assunto só quando tem tema_app. */
+  var FONTES_DE_PROVA = { 'obmep-mirim': true, enem: true };
+  function moduloEAssunto(it) {
+    if (eDoBanco(it)) return false;
+    return FONTES_DE_PROVA[it.fonte] ? !!it.tema_app : true;
   }
 
   /* No máximo DUAS imagens desenhando ao mesmo tempo, como as miniaturas: cada
@@ -15936,7 +17037,12 @@
          * anexo: sem pergunta, e só quando a aula ainda não tem assunto com o
          * mesmo título. */
         var antes = aula.temas, antesTema = aula.tema;
-        assuntosNovos = modulosComoAssunto(aula, modulosDoMaterial(op.teoria ? paginas : [], usaItens));
+        /* A SONDAGEM NÃO VIRA ASSUNTO (C5). Ela passa por seis ou sete
+         * módulos em 25 minutos para ver onde o aluno trava, e não é aula de
+         * nenhum deles: virar assunto poria "Frações, Divisibilidade, Áreas..."
+         * no registro da aula e no documento da família, como se tivessem sido
+         * ensinados. O anexo continua anotando os módulos, como registro. */
+        assuntosNovos = op.semAssuntos ? [] : modulosComoAssunto(aula, modulosDoMaterial(op.teoria ? paginas : [], usaItens));
         titulosGuardados()[aula.alunoId] = { titulo: op.titulo, subtitulo: op.subtitulo };
         return salvar().catch(function (e) {
           // não gravou: os anexos saem da memória, senão o próximo salvar os gravaria e a nova tentativa duplicaria
@@ -16030,7 +17136,8 @@
   /* Os módulos do material, na ordem em que aparecem nele: primeiro os das
    * páginas de teoria, depois os dos exercícios. O módulo do Banco não entra:
    * "Banco de Questões 2018" é o nome da fonte, não um tema, e iria para o
-   * fechamento da família (decisão da orquestradora, 22/09). */
+   * fechamento da família (decisão da orquestradora, 22/09). Nem o "Diversos"
+   * das provas (C12): é o que sobrou sem assunto, e não um assunto. */
   function modulosDoMaterial(paginas, itens) {
     var saida = [], vistos = {};
     function guarda(serie, m) {
@@ -16040,7 +17147,7 @@
       saida.push({ titulo: m.titulo, modulo: chave });
     }
     paginas.forEach(function (p) { guarda(p.aula.serie, p.aula.modulo); });
-    itens.forEach(function (it) { if (!eDoBanco(it)) guarda(it.serie, it.modulo); });
+    itens.forEach(function (it) { if (moduloEAssunto(it)) guarda(it.serie, it.modulo); });
     return saida;
   }
 
@@ -16579,6 +17686,13 @@
     if (peca.item && peca.item.origem_citada) {
       corpo.appendChild(el('div', { class: 'bib-origem', style: 'text-align:center', texto: peca.item.origem_citada }));
     }
+    // sem solução e com a letra do gabarito (ENEM): o "Ver resposta" mostra a letra
+    var resposta = bibVendo.tipo === 'exercicio' ? respostaSemSolucao(peca.item) : null;
+    if (resposta && bibVendo.solucao) {
+      corpo.appendChild(el('div', { id: 'bib-resposta', class: 'bib-resposta',
+        style: 'text-align:center;font-size:18px;font-weight:700;color:var(--navy);margin-top:10px',
+        texto: 'Resposta: ' + resposta }));
+    }
     var vez = ++bibVezDoVisor;
     Store.lerAssetBiblioteca(peca.pacote, peca.caminho).then(function (blob) {
       // ela pode ter andado para outra página enquanto esta era lida
@@ -16592,6 +17706,9 @@
     if (bibVendo.tipo === 'exercicio' && peca.item.assets.solucao) {
       sol.style.display = '';
       sol.textContent = bibVendo.solucao ? 'Ver enunciado' : 'Ver solução';
+    } else if (resposta) {
+      sol.style.display = '';
+      sol.textContent = bibVendo.solucao ? 'Esconder a resposta' : 'Ver resposta';
     } else {
       sol.style.display = 'none';
     }
@@ -16646,7 +17763,8 @@
 
   function escolherAulaParaFolha() {
     if (!bibVendo) return;
-    if (bibVendo.tipo === 'exercicio' && bibVendo.solucao) {
+    // com a resposta do ENEM à vista, a imagem ainda é o enunciado: a folha sai
+    if (bibVendo.tipo === 'exercicio' && bibVendo.solucao && pecaVista().item.assets.solucao) {
       avisar('Esta é a solução. Toque em "Ver enunciado" antes de abrir como folha para o aluno.');
       return;
     }
@@ -16917,6 +18035,8 @@
    *   opcoes.aulaId        com ele, "Abrir esta página como folha" cola direto
    *                        na folha dessa aula; sem ele, pergunta em qual aula
    *   opcoes.comoFolha     false esconde o "Abrir esta página como folha"
+   *   opcoes.dica          uma frase no alto, entre a barra e a página (o C3
+   *                        a usa para apontar o "Abrir esta página como folha")
    *   opcoes.abrirFora     function () que troca o caminho de fora (padrão:
    *                        compartilhar ou baixar, como o anexo fazia antes)
    *   opcoes.prazoCarga    ms até desistir de carregar o leitor (padrão: 15 s)
@@ -16933,6 +18053,7 @@
     var estado = leitor;
     $('#titulo-modal-leitor-pdf').textContent = opcoes.titulo || nome;
     $('#leitor-como-folha').style.display = opcoes.comoFolha === false ? 'none' : '';
+    mostrarDicaDoLeitor(opcoes.comoFolha === false ? '' : opcoes.dica);
     var corpo = $('#corpo-modal-leitor-pdf');
     corpo.innerHTML = '';
     delete corpo.dataset.paginaDesenhada;
@@ -16984,7 +18105,16 @@
     pdf: 'Não consegui abrir este PDF dentro do aplicativo.'
   };
 
+  // sem frase, a faixa some: o leitor aberto pelo "Abrir" de sempre não a tem
+  function mostrarDicaDoLeitor(texto) {
+    var dica = $('#leitor-dica');
+    dica.textContent = texto || '';
+    dica.hidden = !texto;
+  }
+
   function mostrarFalhaDoLeitor(motivo) {
+    // o PDF não abriu: apontar o botão de virar folha, que está desligado, confundiria
+    mostrarDicaDoLeitor('');
     var corpo = $('#corpo-modal-leitor-pdf');
     corpo.innerHTML = '';
     corpo.appendChild(el('div', { class: 'leitor-pdf-aviso', id: 'leitor-pdf-falha', 'data-motivo': motivo }, [
@@ -17102,7 +18232,8 @@
     if (!leitor || !leitor.doc) return;
     var doc = leitor.doc, n = leitor.pagina, op = leitor.opcoes;
     var titulo = (op.titulo || leitor.nome) + ', página ' + n;
-    doc.getPage(n).then(function (pagina) {
+    // a mesma camada da foto do anexo (C3): desenhar a página também leva segundos
+    prepararFolha(function () { return doc.getPage(n).then(function (pagina) {
       var base = pagina.getViewport({ scale: 1 });
       var alvo = {
         forma: 'pagina', titulo: titulo, origem: 'Do PDF', doc: doc,
@@ -17110,11 +18241,12 @@
         desenhar: function (largura, altura) { return desenharPaginaPdfEmCanvas(doc, n, largura, altura); }
       };
       var daAula = op.aulaId && db.aulas.some(function (a) { return a.id === op.aulaId; });
-      if (daAula) colarNaFolhaDaAula(op.aulaId, alvo);
-      else mostrarAulasParaFolha(alvo);
+      // a camada fica até a folha abrir; a escolha de aula é janela dela, e a camada sai antes
+      if (daAula) return colarNaFolhaDaAula(op.aulaId, alvo);
+      mostrarAulasParaFolha(alvo);
     }).catch(function () {
       avisar('Não consegui preparar esta página. Tente de novo.');
-    });
+    }); });
   }
 
   function soltarLeitorPdf() {

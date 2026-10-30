@@ -192,6 +192,11 @@
 
       <div class="numeros" id="numeros-fechamento"></div>
 
+      <!-- C4: quem ainda não pagou o quê, mês a mês. Nasce recolhido: o
+           cabeçalho diz quanto falta, e a lista abre quando ela pede. Só dela;
+           nada daqui vai para o documento da família. -->
+      <div id="pendentes-pagamento"></div>
+
       <div class="barra">
         <!-- C10b: percorre os alunos do mês, uma família por toque. -->
         <button class="btn principal" id="enviar-todas-familias" type="button">Enviar para todas as famílias</button>
@@ -348,7 +353,7 @@
       <div class="modal-rodape" id="rodape-modal-aula">
         <button class="btn perigo esquerda" id="excluir-aula" type="button">Excluir</button>
         <span class="ajuda-salvamento" id="aviso-salvamento-aula" style="display:none">
-          Assuntos, habilidades e arquivos salvam na hora neste tablet. Horário, situação e relatos gravam ao clicar em Salvar.
+          Assuntos, domínio, habilidades e arquivos salvam na hora neste tablet. Horário, situação e relatos gravam ao clicar em Salvar.
         </span>
         <button class="btn" data-fechar type="button" id="cancelar-aula">Cancelar</button>
         <button class="btn destaque" id="salvar-preparar-aula" type="button" style="display:none">Salvar e preparar</button>
@@ -464,6 +469,9 @@
           <button class="btn" id="leitor-largura" type="button">Ajustar à largura</button>
         </span>
       </div>
+      <!-- C3: a frase que aponta o "Abrir esta página como folha" quando ela
+           veio do "Abrir como folha para escrever em cima" do anexo -->
+      <p class="faixa-info leitor-pdf-dica" id="leitor-dica" hidden></p>
       <div class="modal-corpo leitor-pdf-corpo" id="corpo-modal-leitor-pdf"></div>
       <div class="modal-rodape">
         <button class="btn" data-fechar type="button">Fechar</button>
@@ -531,6 +539,18 @@
       </div>
       <div class="modal-corpo" id="corpo-modal-mapeamento"></div>
       <div class="modal-rodape" id="rodape-modal-mapeamento"></div>
+    </div>
+  </div>
+
+  <!-- a sondagem por ano de entrada (C5): montar, gerar a folha e corrigir -->
+  <div class="fundo-modal" id="modal-sondagem">
+    <div class="modal largo">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-sondagem">Sondagem</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-sondagem"></div>
+      <div class="modal-rodape" id="rodape-modal-sondagem"></div>
     </div>
   </div>
 
@@ -698,6 +718,12 @@
         <button class="btn principal" id="virada-confirmar-series" type="button">Confirmar atualização de séries</button>
       </div>
     </div>
+  </div>
+
+  <!-- C3: do toque em "Abrir como folha" até a folha abrir, nada atrás
+       recebe toque (prepararFolha, no app.js, diz por quê) -->
+  <div class="preparando-folha" id="preparando-folha" role="status" aria-live="polite">
+    <div class="preparando-folha-caixa">Preparando a folha...</div>
   </div>
 
   <div class="aviso" id="aviso">

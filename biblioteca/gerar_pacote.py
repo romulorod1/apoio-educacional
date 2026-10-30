@@ -1079,8 +1079,15 @@ def resumo_de_lista(doc):
 # ------------------------------------------------------------------ recorte
 
 def svg_do_pedaco(doc, pno, rect, imagens=pymupdf.PDF_REDACT_IMAGE_REMOVE, folga=FOLGAS_REDACAO[0],
-                  desenhos=pymupdf.PDF_REDACT_LINE_ART_REMOVE_IF_TOUCHED):
-    """SVG so com o conteudo do retangulo, e a diferenca de pixels contra a pagina original."""
+                  desenhos=pymupdf.PDF_REDACT_LINE_ART_REMOVE_IF_TOUCHED, cmyk_para_rgb=False):
+    """SVG so com o conteudo do retangulo, e a diferenca de pixels contra a pagina original.
+
+    cmyk_para_rgb (so as provas do C12 pedem; o Portal e o Banco saem como
+    sempre): a imagem JPEG em CMYK vai para o SVG como esta, e o Chrome a
+    desenha preta (o Nivel A de 2018 e o ENEM de 2024 tem figuras assim; a
+    fidelidade media 58% de pixels diferentes). Convertida para RGB antes do
+    SVG, sai como na pagina.
+    """
     r = pymupdf.Rect(rect)
     tmp = pymupdf.open()
     tmp.insert_pdf(doc, from_page=pno, to_page=pno)
@@ -1102,13 +1109,26 @@ def svg_do_pedaco(doc, pno, rect, imagens=pymupdf.PDF_REDACT_IMAGE_REMOVE, folga
     b = pg.get_pixmap(dpi=DPI_CONFERENCIA, colorspace=pymupdf.csGRAY, clip=r)
     sa, sb = a.samples, b.samples
     dif = sum(1 for i in range(len(sa)) if abs(sa[i] - sb[i]) > 32) / float(max(1, len(sa)))
-    pg.set_cropbox(r)
+    # o cropbox novo vai em coordenadas da mediabox, e o recorte esta nas da
+    # pagina (as do cropbox atual). No Portal as duas coincidem (deslocamento
+    # zero, o SVG sai igual); no ENEM de 2015, 2017, 2018, 2024 e 2025 o cropbox
+    # comeca 23,5 ou 34 pt para dentro, e sem somar isso o SVG mostrava outro
+    # pedaco da pagina (achado pela trava dos glifos do C12)
+    cb = pg.cropbox_position
+    pg.set_cropbox(r + (cb.x, cb.y, cb.x, cb.y))
+    if cmyk_para_rgb:
+        for img in pg.get_images(full=True):
+            if 'CMYK' in (img[5] or ''):
+                pix = pymupdf.Pixmap(tmp, img[0])
+                if pix.colorspace and pix.colorspace.n == 4:
+                    pix = pymupdf.Pixmap(pymupdf.csRGB, pix)
+                pg.replace_image(img[0], pixmap=pix)
     svg = limpar_svg(pg.get_svg_image(text_as_path=True))
     tmp.close()
     return svg, dif
 
 
-def svg_redigido(doc, pno, rect):
+def svg_redigido(doc, pno, rect, cmyk_para_rgb=False):
     """Apaga o de fora com a menor folga que deixa o recorte identico ao original.
 
     Se nenhuma folga basta tirando as imagens de fora, tenta mantendo as imagens.
@@ -1125,7 +1145,7 @@ def svg_redigido(doc, pno, rect):
         for desenhos, obs_d in ((pymupdf.PDF_REDACT_LINE_ART_REMOVE_IF_TOUCHED, None),
                                 (pymupdf.PDF_REDACT_LINE_ART_REMOVE_IF_COVERED, 'desenho que encosta mantido')):
             for folga in FOLGAS_REDACAO:
-                svg, dif = svg_do_pedaco(doc, pno, rect, imagens, folga, desenhos)
+                svg, dif = svg_do_pedaco(doc, pno, rect, imagens, folga, desenhos, cmyk_para_rgb)
                 notas = [x for x in (obs_i, obs_d, None if folga == FOLGAS_REDACAO[0] else 'folga de %g pt' % folga) if x]
                 nota = ', '.join(notas) or None
                 if melhor is None or dif < melhor[1]:
@@ -2103,11 +2123,25 @@ def confere_versao_do_pymupdf(versao=None):
             'biblioteca/requirements-gerador.txt' % (versao, PYMUPDF_DO_GERADOR))
 
 
+# O TIPO DE FONTE decide quem acha o item no PDF; o resto (recorte em SVG,
+# empilhamento, busca, curadoria, manifest, zip deterministico) e deste
+# arquivo, para todos. "portal" e o de sempre (gerar, acima); "mirim" e "enem"
+# sao provas (biblioteca/provas.py, item C12). O Banco de Questoes ainda tem
+# linha de comando propria (banco.py), anterior a esta escolha; o pacote de
+# livros (C15) entra aqui como mais um tipo.
+TIPOS_DE_FONTE = ('portal', 'mirim', 'enem')
+
+
 def principal(argv=None):
     recusa = confere_versao_do_pymupdf()
     if recusa:
         raise SystemExit(recusa)
-    ap = argparse.ArgumentParser(description='Gera o pacote de biblioteca de uma serie do Portal da OBMEP.')
+    ap = argparse.ArgumentParser(description='Gera o pacote de biblioteca de uma serie (Portal da OBMEP, OBMEP Mirim '
+                                             'ou ENEM).')
+    ap.add_argument('--fonte', default='portal', choices=TIPOS_DE_FONTE,
+                    help='tipo de fonte: portal (padrao, a pasta de uma serie do Portal), mirim (a pasta '
+                         'PDF/matematica/obmep-mirim, com --serie m1 ou m2) ou enem (a pasta PDF/provas/enem, com '
+                         '--serie 3em)')
     ap.add_argument('--pdfs', required=True)
     ap.add_argument('--serie', required=True)
     ap.add_argument('--versao', type=int, required=True)
@@ -2140,6 +2174,22 @@ def principal(argv=None):
     ap.add_argument('--fontes-negrito', help='pedacos de nome de fonte negrito, separados por virgula '
                     '(padrao %s)' % ','.join(FONTES_NEGRITO))
     a = ap.parse_args(argv)
+    if a.fonte != 'portal':
+        # as opcoes de lista pronta, de modulos e de fonte em negrito sao do
+        # detector do Portal; numa prova elas nao teriam efeito, e efeito
+        # calado e pior que recusa
+        extras = [o for o, v in (('--kits', a.kits), ('--listas', a.listas), ('--listas-aula', a.listas_aula),
+                                 ('--lista-de-base', a.lista_de_base), ('--modulos', a.modulos),
+                                 ('--anterior', a.anterior), ('--fontes-negrito', a.fontes_negrito)) if v]
+        if extras:
+            raise SystemExit('erro: %s so vale com --fonte portal' % ', '.join(extras))
+        import provas
+        manifest, rel, trab = provas.gerar(a.pdfs, a.serie, a.versao, a.saida, a.curadoria, a.trabalho, a.gerado_em,
+                                           a.commit, not a.sem_zip)
+        print(json.dumps({'contagens': manifest['contagens'], 'zip': rel['zip'], 'bytes_por_tipo': rel['bytes_por_tipo'],
+                          'excluidos': len(rel['excluidos']), 'segundos': rel['segundos'], 'trabalho': trab},
+                         ensure_ascii=False, indent=1))
+        return
     # Uma regra por pacote. O kits.json so tem um campo `regra`, entao pedir as
     # duas juntas nao tem resposta certa: o programa recusa em vez de escolher
     # calado por uma delas.

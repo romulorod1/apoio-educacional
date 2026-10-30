@@ -2069,7 +2069,7 @@ async function cenarioPortas(pag) {
       const linha = document.querySelector('#lista-anexos .item-lista');
       if (!linha) return null;
       const nome = linha.querySelector('.nome');
-      const abrir = Array.from(linha.querySelectorAll('button')).find(b => /Abrir/.test(b.textContent));
+      const abrir = Array.from(linha.querySelectorAll('button')).find(b => b.textContent.trim() === 'Abrir'); // o botao Abrir exato: desde o C3 ha tambem "Abrir como folha..."
       linha.scrollIntoView({ block: 'center' });
       const r = document.createRange(); r.selectNodeContents(nome);
       const rects = Array.from(r.getClientRects());

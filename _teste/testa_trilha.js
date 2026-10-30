@@ -27,7 +27,9 @@ temas.forEach(t => { porId[t.id] = t; });
 const LACUNAS = ['naturais', 'tabuada', 'divisao', 'fracoes', 'decimais', 'porcentagem',
   'inteiros', 'potencias', 'medidas', 'algebrica', 'eq1', 'sistemas', 'fatoracao', 'eq2',
   'proporcao', 'area', 'pitagoras', 'semelhanca', 'trigonometria', 'funcoes', 'graficos',
-  'probabilidade'];
+  'probabilidade',
+  // as cinco da lente da pedagoga (P08, C5)
+  'divisibilidade', 'expressoes', 'angulos', 'notacao-cientifica', 'conjuntos'];
 const ANOS = ['05', '08', 'em2'];
 
 // ================================================================
@@ -38,7 +40,7 @@ LACUNAS.forEach(l => {
   const r = Core.alvosDaLacuna(temas, l, '08');
   if (!r.candidatos.length) semAlvo.push(l);
 });
-conf('as 22 lacunas têm alvo', semAlvo.join(' ') || 'nenhuma sem alvo', 'nenhuma sem alvo');
+conf('as 27 lacunas têm alvo', semAlvo.join(' ') || 'nenhuma sem alvo', 'nenhuma sem alvo');
 
 /* As duas de equação eram as que não tinham: nenhum tema do banco casa com
  * "primeiro grau" nem com "segundo grau" por título. */
@@ -61,8 +63,8 @@ conf('e no 3º ano do médio propõe o mais alto que existe',
 // ================================================================
 secao('2. A ordem nunca põe um tema antes de um pré-requisito dele');
 
-/* Esta é a conferência que dá sentido à trilha inteira. Ela roda para as 22
- * lacunas em três anos escolares, ou seja 66 trilhas. */
+/* Esta é a conferência que dá sentido à trilha inteira. Ela roda para as 27
+ * lacunas em três anos escolares, ou seja 81 trilhas. */
 let violacoes = [];
 let comCorte = [];
 let deUmPasso = [];
@@ -86,7 +88,7 @@ LACUNAS.forEach(l => {
     }
   });
 });
-conf('nenhuma das 66 trilhas inverte um pré-requisito', violacoes.slice(0, 3).join(' ; ') || 'nenhuma', 'nenhuma');
+conf('nenhuma das 81 trilhas inverte um pré-requisito', violacoes.slice(0, 3).join(' ; ') || 'nenhuma', 'nenhuma');
 conf('e o alvo é sempre o último passo', violacoes.filter(v => /último/.test(v)).length, 0);
 
 /* Ordenar por ano e número daria certo em quase tudo, e é por causa destes dois
@@ -102,7 +104,7 @@ conf('MATEM1-09 sai depois de MATEM1-15',
 // ================================================================
 secao('3. O corte é regra, e não exceção');
 
-console.log('       trilhas com corte: ' + comCorte.length + ' de 66');
+console.log('       trilhas com corte: ' + comCorte.length + ' de 81');
 conf('o corte dispara em várias lacunas', comCorte.length > 5, true);
 
 /* Quando corta, o que sobra é o mais perto do alvo, e o cortado volta na
@@ -121,7 +123,7 @@ secao('4. Alvo que não depende de ninguém não vira escada');
 /* Vinte e dois temas não têm pré-requisito, e alguns são alvo natural de
  * lacuna. Uma escada de um degrau é pior do que não oferecer, então quem chama
  * precisa saber distinguir, e o número de passos é o que diz. */
-console.log('       trilhas de um passo só: ' + deUmPasso.length + ' de 66');
+console.log('       trilhas de um passo só: ' + deUmPasso.length + ' de 81');
 conf('frações no 4º ano tem um passo só',
   Core.trilhaDerivada(temas, 'MAT04-05').passos.length, 1);
 conf('trigonometria no médio também',
@@ -161,7 +163,7 @@ conf('em encontros de 1h30 dá menos', Core.encontrosPrevistos(fr, 90) < Core.en
 conf('nunca zero encontros', Core.encontrosPrevistos([], 60), 1);
 
 // ================================================================
-secao('6. O assunto da aula faz a trilha andar sozinha');
+secao('6. O domínio do assunto faz a trilha andar sozinha (C1)');
 
 function trilhaDeProva() {
   const d = Core.trilhaDerivada(temas, 'MAT06-06');
@@ -175,12 +177,21 @@ const aluno = { id: 'a1', nome: 'Aluna', trilhas: [trilhaDeProva()] };
 const primeiro = Core.proximoPasso(aluno.trilhas[0]);
 conf('o próximo passo é o primeiro da escada', primeiro.temaId, aluno.trilhas[0].passos[0].temaId);
 
-/* Carimba a data DA AULA, e não a de hoje: ela lança aula atrasada e usa
+/* Desde o C1 o assunto só registrado não fecha o passo: fecha quando o aluno
+ * DOMINA. A regra mora no Core.dominioFechaPasso, e a prova dela, com veneno,
+ * é o testa_dominio.js; aqui fica o motor da trilha com a regra nova.
+ *
+ * Carimba a data DA AULA, e não a de hoje: ela lança aula atrasada e usa
  * repetir para trás. */
-const aula = { id: 'l9', alunoId: 'a1', data: '2026-06-05', status: 'realizada' };
 const item = { id: primeiro.temaId, titulo: primeiro.titulo };
+const aula = { id: 'l9', alunoId: 'a1', data: '2026-06-05', status: 'realizada', temas: [item] };
+conf('só registrar o assunto não marca o passo', Core.marcarPassoPorAssunto(aluno, aula, item), null);
+item.dominio = 'andamento';
+conf('nem com "Em andamento"', Core.marcarPassoPorAssunto(aluno, aula, item), null);
+item.dominio = 'domina';
 const marcou = Core.marcarPassoPorAssunto(aluno, aula, item);
-conf('registrar o assunto marca o passo', !!marcou, true);
+conf('com "Domina", marca o passo', !!marcou, true);
+conf('e diz que fechou por domínio', aluno.trilhas[0].passos[0].porDominio, true);
 conf('com a data da aula, não a de hoje', aluno.trilhas[0].passos[0].feitoEm, '2026-06-05');
 conf('e guarda qual aula fechou o passo', aluno.trilhas[0].passos[0].aulaId, 'l9');
 conf('o item da aula passa a saber de que trilha veio', item.passoDe, aluno.trilhas[0].id);
@@ -193,8 +204,10 @@ conf('e o próximo passo anda', Core.proximoPasso(aluno.trilhas[0]).temaId,
  * não marca os anteriores. */
 const aluno2 = { id: 'a1', trilhas: [trilhaDeProva()] };
 const terceiro = aluno2.trilhas[0].passos[2];
-Core.marcarPassoPorAssunto(aluno2, { id: 'l1', data: '2026-06-05', status: 'realizada' },
-  { id: terceiro.temaId });
+const itemTerceiro = { id: terceiro.temaId, dominio: 'domina' };
+Core.marcarPassoPorAssunto(aluno2, { id: 'l1', data: '2026-06-05', status: 'realizada', temas: [itemTerceiro] },
+  itemTerceiro);
+conf('o terceiro, dominado, foi marcado', !!aluno2.trilhas[0].passos[2].feitoEm, true);
 conf('marcar o terceiro não marca os dois primeiros',
   aluno2.trilhas[0].passos.slice(0, 2).filter(p => p.feitoEm).length, 0);
 
@@ -204,7 +217,8 @@ secao('7. Aula que não aconteceu não faz a trilha andar');
 ['falta', 'cancelada'].forEach(st => {
   const a = { id: 'a1', trilhas: [trilhaDeProva()] };
   const p = Core.proximoPasso(a.trilhas[0]);
-  Core.marcarPassoPorAssunto(a, { id: 'lx', data: '2026-06-05', status: st }, { id: p.temaId });
+  const it = { id: p.temaId, dominio: 'domina' };
+  Core.marcarPassoPorAssunto(a, { id: 'lx', data: '2026-06-05', status: st, temas: [it] }, it);
   conf('aula com status ' + st + ' não marca passo',
     a.trilhas[0].passos.filter(x => x.feitoEm).length, 0);
 });
@@ -213,35 +227,39 @@ secao('7. Aula que não aconteceu não faz a trilha andar');
  * pior tipo de erro o que fica calado: a trilha contaria como andado o que não
  * foi dado. */
 const a3 = { id: 'a1', trilhas: [trilhaDeProva()] };
-const aulaViva = { id: 'l7', data: '2026-06-05', status: 'realizada' };
-Core.marcarPassoPorAssunto(a3, aulaViva, { id: Core.proximoPasso(a3.trilhas[0]).temaId });
+const itemVivo = { id: Core.proximoPasso(a3.trilhas[0]).temaId, dominio: 'domina' };
+const aulaViva = { id: 'l7', data: '2026-06-05', status: 'realizada', temas: [itemVivo] };
+Core.marcarPassoPorAssunto(a3, aulaViva, itemVivo);
 conf('o passo ficou marcado', a3.trilhas[0].passos.filter(p => p.feitoEm).length, 1);
 aulaViva.status = 'cancelada';
 conf('cancelar a aula desmarca um passo', Core.revisarPassosDaAula(a3, aulaViva), 1);
 conf('e a trilha volta ao começo', a3.trilhas[0].passos.filter(p => p.feitoEm).length, 0);
 
 // ================================================================
-secao('8. O que o aluno já viu nasce marcado');
+secao('8. O que o aluno já dominava nasce marcado');
 
-/* É aqui que as duas frentes se encostam: o registro de assunto alimenta a
- * trilha antes mesmo de ela existir. */
+/* É aqui que as duas frentes se encostam: o registro da aula alimenta a
+ * trilha antes mesmo de ela existir. Desde o C1, o que conta é o domínio. */
 const dbHist = {
   aulas: [
     { id: 'v1', alunoId: 'a1', data: '2026-05-12', status: 'realizada',
-      temas: [{ id: 'MAT06-01', titulo: 'Sistema de numeração decimal' }] },
+      temas: [{ id: 'MAT06-01', titulo: 'Sistema de numeração decimal', dominio: 'domina' }] },
     { id: 'v2', alunoId: 'a1', data: '2026-05-19', status: 'cancelada',
-      temas: [{ id: 'MAT06-02', titulo: 'Operações com números naturais' }] },
+      temas: [{ id: 'MAT06-02', titulo: 'Operações com números naturais', dominio: 'domina' }] },
     { id: 'v3', alunoId: 'a2', data: '2026-05-20', status: 'realizada',
-      temas: [{ id: 'MAT06-03', titulo: 'Múltiplos e divisores' }] }
+      temas: [{ id: 'MAT06-03', titulo: 'Múltiplos e divisores', dominio: 'domina' }] },
+    { id: 'v4', alunoId: 'a1', data: '2026-05-21', status: 'realizada',
+      temas: [{ id: 'MAT06-05', titulo: 'Frações: o que são e como comparar', dominio: 'andamento' }] }
   ]
 };
 const passos = Core.marcarOQueJaFoiDado(dbHist, 'a1', Core.trilhaDerivada(temas, 'MAT06-06').passos);
 const feitos = passos.filter(p => p.feitoEm);
-conf('o passo já dado nasce marcado', feitos.length, 1);
-conf('com a data da aula em que foi dado', feitos[0].feitoEm, '2026-05-12');
+conf('o passo já dominado nasce marcado', feitos.length, 1);
+conf('com a data da aula em que foi marcado Domina', feitos[0].feitoEm, '2026-05-12');
 conf('e marcado como já era', feitos[0].jaEra, true);
 conf('aula cancelada não conta', passos.filter(p => p.temaId === 'MAT06-02' && p.feitoEm).length, 0);
 conf('aula de outro aluno não conta', passos.filter(p => p.temaId === 'MAT06-03' && p.feitoEm).length, 0);
+conf('"Em andamento" não nasce marcado', passos.filter(p => p.temaId === 'MAT06-05' && p.feitoEm).length, 0);
 
 // ================================================================
 secao('9. Ela governa a trilha');

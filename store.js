@@ -197,19 +197,27 @@
   // ---------- dados principais ----------
 
   function bancoVazio() {
-    return { versao: 1, alunos: [], series: [], aulas: [], resumos: [], ajustes: {} };
+    return { versao: 1, alunos: [], series: [], aulas: [], resumos: [], ajustes: {}, pagamentos: [] };
+  }
+
+  /* Completa campos que possam faltar em bases antigas. Vale para o que vem do
+   * disco e também para o que vem de uma cópia de segurança e do "Voltar a este
+   * ponto": cópia feita antes do "pago em" (C4) não tem `pagamentos`, e lê como
+   * lista vazia em vez de quebrar a tela do Fechamento. */
+  function completar(d) {
+    d.alunos = d.alunos || [];
+    d.series = d.series || [];
+    d.aulas = d.aulas || [];
+    d.resumos = d.resumos || [];
+    d.ajustes = d.ajustes || {};
+    if (!Array.isArray(d.pagamentos)) d.pagamentos = [];
+    return d;
   }
 
   function carregar() {
     return ler('dados', 'principal').then(function (d) {
       if (!d) return null;
-      // completa campos que possam faltar em bases antigas
-      d.alunos = d.alunos || [];
-      d.series = d.series || [];
-      d.aulas = d.aulas || [];
-      d.resumos = d.resumos || [];
-      d.ajustes = d.ajustes || {};
-      return d;
+      return completar(d);
     });
   }
 
@@ -473,7 +481,7 @@
       return salvar(registro.estado).then(null, function (e) { throw nadaGravado(e); }).then(function () {
         return apagar('historico', id);
       }).then(function () {
-        return registro.estado;
+        return completar(registro.estado);
       });
     });
   }
@@ -618,7 +626,7 @@
        * tem de uso e etiquetas fica como está. */
       if (!pacote.biblioteca) return null;
       return restaurarBiblioteca(pacote.biblioteca);
-    }).then(function () { return pacote.dados; });
+    }).then(function () { return completar(pacote.dados); });
   }
 
   /* As listas dela (C2a) entram na mesma transação, para a cópia voltar

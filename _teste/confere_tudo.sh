@@ -264,7 +264,7 @@ roda "fatias do portao"      node _teste/testa_pedacos_do_portao.js
 # em todo PR.
 for t in testa_registro testa_mapeamento testa_exclusoes testa_feriados \
          testa_mover testa_retroativo testa_series testa_aluno testa_rotulos_de_familia \
-         testa_vocabulario; do
+         testa_vocabulario testa_dominio testa_sondagem testa_pagamentos; do
   roda "$t" node "_teste/$t.js"
 done
 
@@ -342,6 +342,8 @@ for t in testa_temas testa_busca testa_mapa_e2e \
          testa_sugestoes_matematica_navegador \
          testa_virada_anual_navegador \
          testa_zoom_calendario_navegador \
+         testa_dominio_navegador \
+         testa_sondagem_navegador \
          e2e e2e_correcoes; do
   roda "$t" node "_teste/$t.js"
 done
@@ -371,6 +373,14 @@ roda "biblioteca importar --envenenado-hash"    node "_teste/testa_biblioteca_im
 # que ignora os apelidos do pacote, e "bhaskara" tem de perder as listas.
 roda "biblioteca navegar"                       node "_teste/testa_biblioteca_navegar.js"
 roda "biblioteca navegar --envenenado-apelidos" node "_teste/testa_biblioteca_navegar.js" --envenenado-apelidos
+# C12: os pacotes de provas (OBMEP Mirim por nivel e ENEM) importam, as abas vao
+# do 2o ao 5o ano e os assuntos do aplicativo aparecem como modulos. O modo
+# envenenado serve o app.js que so espalhava o Banco pelas series equivalentes.
+roda "biblioteca mirim"                         node "_teste/testa_biblioteca_mirim.js"
+roda "biblioteca mirim --envenenado-equivalentes" node "_teste/testa_biblioteca_mirim.js" --envenenado-equivalentes
+# e o "Diversos" das provas nao vira assunto da aula: o veneno trata todo modulo
+# de prova como assunto
+roda "biblioteca mirim --envenenado-diversos"   node "_teste/testa_biblioteca_mirim.js" --envenenado-diversos
 # FRENTE B: selecionar e compor. Sem navegador, o compositor do pdf.js (lista
 # renumerada, gabarito separado, sem solucao escrito, quebra entre pedacos, marca
 # por cima so nesta folha e os outros documentos byte a byte iguais aos de main).
@@ -592,6 +602,14 @@ roda "preparar e enviar"                          node "_teste/testa_preparar_e_
 # pre-cache), pagina e zoom, a pagina vira folha com o traco salvo, e a segunda
 # abertura funciona com a rede cortada.
 roda "leitor de pdf"                              node "_teste/testa_leitor_pdf.js"
+# C3: a foto e o PDF anexados viram folha da MESMA aula, sem perguntar qual
+# (a foto direto, o PDF pelo leitor na pagina escolhida), com o traco salvo;
+# o .docx nao ganha a acao, e os tres anexos ficam byte a byte iguais.
+roda "anexo como folha"                           node "_teste/testa_anexo_como_folha.js"
+# C4: "pago em" no cartao do Fechamento (marcar, trocar o valor, desmarcar), a
+# lista de pendentes, recarregar, a copia de seguranca de ida e volta, e o
+# documento da familia (janela, PDF e texto) sem citar pagamento.
+roda "pago em"                                    node "_teste/testa_pago_em.js"
 # FRENTE B (B10): o que o lerKits recusa e o que a tela descarta (lista com
 # exercicio que saiu por curadoria). O veneno tira o guarda do app.js, e sem
 # ele a aba Biblioteca inteira nao abre.
@@ -649,6 +667,9 @@ roda "painel de valores --envenenado-esquece"   node "_teste/testa_painel_valore
 roda "gerador da biblioteca"                    python biblioteca/_prova_gerador.py
 # O Banco de Questoes (2016 a 2020), sobre um volume sintetico do mesmo modelo.
 roda "banco da biblioteca"                      python biblioteca/_prova_banco.py
+# C12: o tipo de fonte provas (OBMEP Mirim e ENEM), sobre provas sinteticas dos
+# dois formatos, com um veneno por regra do detector. A fidelidade e no Chrome.
+roda "provas da biblioteca"                     python biblioteca/_prova_provas.py
 # Daqui ate o fim da secao, nada abre Chrome (conferido com CHROME envenenado
 # em 26/10): o --rapido roda. O _prova_gerador e o _prova_banco acima ficam no
 # navegador porque a trava de fidelidade dos dois renderiza o SVG no Chrome
