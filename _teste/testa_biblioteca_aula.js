@@ -99,7 +99,12 @@ function mesmoDocumento(fa, fb) {
 const SO_PRIMEIRO = { 2: [PRIMEIRO], 9: [PRIMEIRO], 16: [PRIMEIRO] };
 const fSem = fech(banco(SO_PRIMEIRO));
 const fSemM = CoreM.calcularFechamento(banco(SO_PRIMEIRO), 'a1', '2026-06');
-[{}, { exibirTemasEAreas: true }].forEach(op => {
+[{}, { exibirTemasEAreas: true }].forEach(op0 => {
+  /* Os dois lados recebem os MESMOS títulos de seção (C10a). A conferência é
+   * "a biblioteca não muda o mês sem biblioteca", e não "os títulos nunca
+   * mudam": desde o C11 eles são dela e vêm por opcoes.titulos, que a main
+   * também lê. O resto do documento continua comparado byte a byte. */
+  const op = Object.assign({ titulos: CoreN.titulosDoFechamento() }, op0);
   const rot = op.exibirTemasEAreas ? ' (exibindo temas)' : '';
   conf('mês sem biblioteca: PDF igual a main' + rot, igual(PDFN.gerarFechamento(fSem, Object.assign({ sempreResumo: true }, op)),
     PDFM.gerarFechamento(fSemM, Object.assign({ sempreResumo: true }, op))), true);
