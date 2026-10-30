@@ -24,7 +24,11 @@ const TIPOS = {
   '.html': 'text/html; charset=utf-8', '.js': 'application/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml',
   '.json': 'application/json; charset=utf-8', '.woff2': 'font/woff2',
-  '.webmanifest': 'application/manifest+json; charset=utf-8'
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  /* O leitor de PDF (C14) é módulo e WebAssembly: o navegador recusa módulo
+   * servido como application/octet-stream, e o GitHub Pages manda os dois
+   * com o tipo certo. */
+  '.mjs': 'text/javascript; charset=utf-8', '.wasm': 'application/wasm'
 };
 
 const placar = { passes: 0, falhas: 0 };
@@ -67,6 +71,10 @@ function criarAmbiente(porta, nomePerfil, trocas) {
   const servidor = http.createServer((req, res) => {
     let rel = decodeURIComponent(req.url.split('?')[0]);
     if (rel === '/') rel = '/index.html';
+    /* Rede cortada de verdade: o setOfflineMode da página não alcança o
+     * service worker, que busca pela rede dele. Com amb.cortado, toda conexão
+     * cai sem resposta, e amb.cortados conta quem tentou passar. */
+    if (amb.cortado) { amb.cortados.push(rel); req.socket.destroy(); return; }
     if (extras[rel]) {
       res.writeHead(200, { 'Content-Type': extras[rel].tipo, 'Cache-Control': 'no-store' });
       res.end(extras[rel].corpo);
@@ -112,7 +120,7 @@ function criarAmbiente(porta, nomePerfil, trocas) {
 
   let nav = null;
   const amb = {
-    ORIGEM, PERFIL, quatrocentos, extras,
+    ORIGEM, PERFIL, quatrocentos, extras, cortado: false, cortados: [],
     async subir() {
       if (await portaOcupada()) {
         conf('a porta 127.0.0.1:' + porta + ' está livre antes de subir o servidor', 'ocupada', 'livre');

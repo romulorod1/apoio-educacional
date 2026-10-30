@@ -588,6 +588,10 @@ roda "titulos e roteiro do fechamento"            node "_teste/testa_titulos_e_r
 # C10b: um botao principal por aluno no Fechamento, os formatos em "Mais formatos"
 # (cada um entrega o arquivo) e o envio as familias em sequencia, sem gravar nada.
 roda "preparar e enviar"                          node "_teste/testa_preparar_e_enviar.js"
+# C14: o PDF anexado abre no leitor do aplicativo (PDF.js em vendor/, fora do
+# pre-cache), pagina e zoom, a pagina vira folha com o traco salvo, e a segunda
+# abertura funciona com a rede cortada.
+roda "leitor de pdf"                              node "_teste/testa_leitor_pdf.js"
 # FRENTE B (B10): o que o lerKits recusa e o que a tela descarta (lista com
 # exercicio que saiu por curadoria). O veneno tira o guarda do app.js, e sem
 # ele a aba Biblioteca inteira nao abre.
