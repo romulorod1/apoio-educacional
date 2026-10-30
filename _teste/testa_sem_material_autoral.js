@@ -314,7 +314,7 @@ const ASSUNTO_COM_MATERIAL = {
     return l ? { nome: l.querySelector('.nome').textContent.trim(), botoes: Array.from(l.querySelectorAll('button')).map(b => b.textContent.trim()).join(',') } : null;
   });
   conf('o anexo está listado na aula', anexoNaTela && anexoNaTela.nome, 'material-antigo.pdf');
-  conf('com os botões Abrir e Remover', anexoNaTela && anexoNaTela.botoes, 'Abrir,Remover');
+  conf('com os botões Abrir e Remover, e o do C3 (PDF vira folha)', anexoNaTela && anexoNaTela.botoes, 'Abrir como folha para escrever em cima,Abrir,Remover');
   const abriuAnexo = await pag.evaluate(id => Store.lerAnexo(id).then(r => (r && r.blob ? r.blob.size : -1)), ANEXO_ID);
   conf('e o arquivo continua gravado, com os bytes dele', abriuAnexo, 2048);
   await pag.evaluate(() => {
