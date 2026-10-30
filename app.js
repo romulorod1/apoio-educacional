@@ -3239,10 +3239,19 @@
   function desenharAnexos(caixa, aula) {
     caixa.innerHTML = '';
     (aula.anexos || []).forEach(function (an) {
+      var viraFolha = anexoViraFolha(an);
       caixa.appendChild(el('div', { class: 'item-lista' }, [
         el('div', { class: 'cresce' }, [
           nomeQuebravel(an.nome),
-          el('div', { class: 'detalhe', texto: (an.tamanho ? Math.round(an.tamanho / 1024) + ' KB' : '') })
+          el('div', { class: 'detalhe', texto: (an.tamanho ? Math.round(an.tamanho / 1024) + ' KB' : '') }),
+          /* A ação mora embaixo do nome, e não ao lado do Abrir: o texto é
+           * longo de propósito (diz o que acontece), e na fileira dos botões
+           * ele espremeria o nome do arquivo numa coluna de poucas letras. */
+          viraFolha ? el('button', {
+            type: 'button', class: 'btn pequeno anexo-como-folha', 'data-anexo': an.id,
+            texto: 'Abrir como folha para escrever em cima',
+            aoClick: function () { anexoComoFolha(an, aula, viraFolha); }
+          }) : null
         ]),
         el('button', {
           type: 'button', class: 'btn pequeno', texto: 'Abrir',
@@ -3290,6 +3299,80 @@
           }
         })
       ]));
+    });
+  }
+
+  /* ANEXO COMO FOLHA (C3): a lista de exercícios da escola chega como foto ou
+   * PDF, e ela quer resolver com o aluno escrevendo por cima, na folha da aula.
+   *
+   * Quem pode virar folha se decide pelo nome do arquivo: o registro do anexo
+   * na aula guarda nome e tamanho, e o tipo só está no depósito de anexos, que
+   * pedir para cada linha atrasaria a lista. A foto que ela tira pelo
+   * "Anexar foto" costuma chegar com .jpg no nome (a câmera do Android dá esse
+   * nome); se o nome vier sem extensão, a foto fica sem a ação. O HEIC fica de fora porque o Chrome
+   * do tablet não o desenha; Word e o resto não têm o que desenhar. */
+  function anexoViraFolha(an) {
+    var nome = String((an && an.nome) || '');
+    if (/\.pdf$/i.test(nome)) return 'pdf';
+    if (/\.(png|jpe?g|webp|gif|bmp)$/i.test(nome)) return 'foto';
+    return '';
+  }
+
+  /* A folha nasce na própria aula do anexo, sem perguntar qual: ela tocou no
+   * anexo desta aula. O anexo continua lá, intacto; a folha ganha uma CÓPIA
+   * em 'midias', como no "Abrir como folha" da biblioteca. */
+  function anexoComoFolha(an, aula, tipo) {
+    Store.lerAnexo(an.id).then(function (r) {
+      if (!r || !r.blob) { avisar('Não achei este arquivo no tablet.'); return; }
+      /* O tipo guardado tem a última palavra sobre o nome, quando existe: um
+       * .jpg que na verdade é PDF vai para o leitor, e não para o desenho. */
+      var guardado = r.tipo || r.blob.type || '';
+      if (guardado === 'application/pdf') tipo = 'pdf';
+      else if (/^image\//.test(guardado)) tipo = 'foto';
+      if (tipo === 'pdf') {
+        /* O PDF passa pelo leitor do C14, já na página 1: a lista da escola
+         * costuma ter várias páginas, e quem sabe qual vai ser trabalhada hoje
+         * é ela. A frase no alto aponta o botão que faz a página virar folha. */
+        abrirLeitorPdf(r.blob, { titulo: an.nome, nome: an.nome, pagina: 1, aulaId: aula.id,
+          dica: 'Escolha a página e toque em "Abrir esta página como folha": ela entra na folha desta aula para escrever em cima.' });
+        return;
+      }
+      return fotoComoFolha(r.blob, an.nome, aula.id);
+    }).catch(function () {
+      avisar('Não consegui abrir este arquivo como folha. Tente de novo.');
+    });
+  }
+
+  /* A foto vai direto para a folha, sem o leitor: é uma página só. Entra pelo
+   * mesmo colarNaFolhaDaAula da biblioteca e do PDF, com a foto inteira no
+   * lugar da página (forma 'pagina', encaixada na folha com a margem pequena).
+   * As medidas são as da foto em pixels: o colar só usa a proporção. */
+  function fotoComoFolha(blob, titulo, aulaId) {
+    var url = URL.createObjectURL(blob);
+    var img = new Image();
+    return new Promise(function (pronta, falhou) {
+      img.onload = pronta;
+      img.onerror = falhou;
+      img.src = url;
+    }).then(function () {
+      return colarNaFolhaDaAula(aulaId, {
+        forma: 'pagina', titulo: titulo, origem: 'Da foto',
+        medidas: { largura_pt: img.naturalWidth, altura_pt: img.naturalHeight },
+        desenhar: function (largura, altura) {
+          var c = document.createElement('canvas');
+          c.width = largura; c.height = altura;
+          var ctx = c.getContext('2d');
+          // vai virar JPEG, e o transparente de um PNG viraria preto
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, largura, altura);
+          ctx.drawImage(img, 0, 0, largura, altura);
+          return Promise.resolve(c);
+        }
+      });
+    }, function () {
+      avisar('Não consegui ler esta foto. Tente anexar de novo, tirada pela câmera do tablet.');
+    }).then(function () {
+      URL.revokeObjectURL(url);
     });
   }
 
@@ -16909,6 +16992,8 @@
    *   opcoes.aulaId        com ele, "Abrir esta página como folha" cola direto
    *                        na folha dessa aula; sem ele, pergunta em qual aula
    *   opcoes.comoFolha     false esconde o "Abrir esta página como folha"
+   *   opcoes.dica          uma frase no alto, entre a barra e a página (o C3
+   *                        a usa para apontar o "Abrir esta página como folha")
    *   opcoes.abrirFora     function () que troca o caminho de fora (padrão:
    *                        compartilhar ou baixar, como o anexo fazia antes)
    *   opcoes.prazoCarga    ms até desistir de carregar o leitor (padrão: 15 s)
@@ -16925,6 +17010,7 @@
     var estado = leitor;
     $('#titulo-modal-leitor-pdf').textContent = opcoes.titulo || nome;
     $('#leitor-como-folha').style.display = opcoes.comoFolha === false ? 'none' : '';
+    mostrarDicaDoLeitor(opcoes.comoFolha === false ? '' : opcoes.dica);
     var corpo = $('#corpo-modal-leitor-pdf');
     corpo.innerHTML = '';
     delete corpo.dataset.paginaDesenhada;
@@ -16976,7 +17062,16 @@
     pdf: 'Não consegui abrir este PDF dentro do aplicativo.'
   };
 
+  // sem frase, a faixa some: o leitor aberto pelo "Abrir" de sempre não a tem
+  function mostrarDicaDoLeitor(texto) {
+    var dica = $('#leitor-dica');
+    dica.textContent = texto || '';
+    dica.hidden = !texto;
+  }
+
   function mostrarFalhaDoLeitor(motivo) {
+    // o PDF não abriu: apontar o botão de virar folha, que está desligado, confundiria
+    mostrarDicaDoLeitor('');
     var corpo = $('#corpo-modal-leitor-pdf');
     corpo.innerHTML = '';
     corpo.appendChild(el('div', { class: 'leitor-pdf-aviso', id: 'leitor-pdf-falha', 'data-motivo': motivo }, [
