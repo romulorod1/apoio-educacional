@@ -10,10 +10,13 @@
  * nos tablets que já as baixaram; desde o C14, o leitor de PDF de
  * vendor/pdfjs-<versão>/, que chega na primeira vez que ela abre um PDF e daí
  * em diante abre sem sinal), tem nome fixo, e o activate nunca o apaga. O
- * leitor não precisou de lógica nova aqui: é do mesmo endereço e não é do
- * pacote, então o fetch abaixo já o põe no BAIXADOS. Trocar a versão do leitor
- * troca a pasta, e a pasta velha fica no BAIXADOS do tablet (2,3 MB), como as
- * séries.
+ * leitor é do mesmo endereço e não é do pacote, então o fetch abaixo o põe no
+ * BAIXADOS; e é servido do cache ANTES da rede (veja o fetch). No BAIXADOS
+ * ficam o leitor e o trabalhador (1,8 MB), que vêm na primeira abertura, e os
+ * três decodificadores .wasm (0,45 MB), que o app busca logo depois, sem
+ * segurar o PDF: o PDF.js só os pede quando um PDF escaneado precisa, e esse
+ * pedido podia cair num dia sem sinal. Trocar a versão do leitor troca a
+ * pasta, e a pasta velha fica no BAIXADOS do tablet, como as séries.
  *
  * Antes havia um cache só e o activate apagava todo cache cujo nome não fosse o
  * novo. As séries moram ali e não estão em ARQUIVOS de propósito, então o
@@ -243,11 +246,36 @@ self.addEventListener('activate', function (e) {
 });
 
 /* Busca na rede primeiro para pegar atualizações, e cai no cache quando
- * não há sinal. É o comportamento certo para quem dá aula na casa das famílias. */
+ * não há sinal. É o comportamento certo para quem dá aula na casa das famílias.
+ * A exceção é o leitor de PDF, que tem o caminho versionado: cache primeiro. */
 self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
   var url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
+
+  /* O leitor de PDF (C14) vem do cache ANTES da rede. O caminho leva a versão
+   * (vendor/pdfjs-6.4.299/), então o arquivo de um caminho nunca muda, e não
+   * há atualização a perguntar ao servidor. Com a rede primeiro, o tablet
+   * conectado mas sem tráfego (o sinal de uma barrinha na casa da família)
+   * esperava a rede sem prazo, com o leitor guardado ali do lado: a janela
+   * ficava em "Abrindo o PDF..." e não saía. */
+  if (/\/vendor\/pdfjs-[^\/]+\//.test(url.pathname)) {
+    e.respondWith(caches.open(BAIXADOS).then(function (baixados) {
+      return baixados.match(e.request).then(function (achado) {
+        if (achado) return achado;
+        return fetch(e.request).then(function (resposta) {
+          if (resposta && resposta.status === 200 && resposta.type === 'basic') {
+            var copia = resposta.clone();
+            baixados.put(e.request, copia);
+          }
+          return resposta;
+        });
+      });
+    }).catch(function () {
+      return new Response('Sem conexão.', { status: 503, statusText: 'Sem conexão' });
+    }));
+    return;
+  }
 
   /* Pergunta ao servidor se o arquivo mudou, em vez de aceitar o que estiver
    * guardado no cache do navegador. O GitHub Pages manda guardar por dez
