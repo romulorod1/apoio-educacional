@@ -87,7 +87,10 @@
         'Em "Registrar como foi", cada assunto pode ser marcado "Ainda não", "Em andamento" ou "Domina". A ficha do aluno junta isso, ' +
           'e o passo da trilha fecha quando ele domina o assunto.',
         'No mapeamento, a sondagem por ano de entrada (do 6º ano ao 3º do médio): exercícios de anos anteriores, que você edita, viram ' +
-          'folha; depois da correção, as lacunas ficam marcadas com a evidência. "Como aprende melhor" virou "O que costuma funcionar".'
+          'folha; depois da correção, as lacunas ficam marcadas com a evidência. "Como aprende melhor" virou "O que costuma funcionar".',
+        'A Biblioteca agora vai do 2º ano ao 3º do médio: provas da OBMEP Mirim para o 2º ao 5º ano, e questões de Matemática do ENEM ' +
+          'para o 3º do médio, com a resposta do gabarito. Os pacotes novos se importam em Ajustes, como os outros.',
+        'Trilha encerrada fica como está: mexer no domínio de uma aula antiga não reabre passo nenhum dela.'
       ]
     },
     {
