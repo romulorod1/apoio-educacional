@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.36.0';
+  var VERSAO = '1.36.1';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.36.1',
+      itens: [
+        'A sondagem por ano de entrada agora vai também do 2º ao 5º ano, com questões das provas da OBMEP Mirim ' +
+          '(importe os pacotes Mirim 1 e Mirim 2 em Ajustes). Entraram lacunas dos anos iniciais, como valor posicional, ' +
+          'conta com reagrupamento e frações simples.'
+      ]
+    },
     {
       versao: '1.36.0',
       itens: [
