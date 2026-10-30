@@ -3312,12 +3312,14 @@
     feedback: 'Feedback',
     notas: 'Notas das aulas'
   };
-  var TITULO_MAXIMO = 60;
+  /* O título do documento sai em 19 pt, centrado: acima de uns 40 caracteres
+   * ele passa das margens da folha. Os das seções, em 11,5 pt, cabem em 60. */
+  function tituloMaximo(chave) { return chave === 'documento' ? 40 : 60; }
 
   function titulosDoFechamento(dela) {
     var t = {};
     Object.keys(TITULOS_FECHAMENTO).forEach(function (k) {
-      var v = dela && typeof dela[k] === 'string' ? dela[k].replace(/\s+/g, ' ').trim().slice(0, TITULO_MAXIMO) : '';
+      var v = dela && typeof dela[k] === 'string' ? dela[k].replace(/\s+/g, ' ').trim().slice(0, tituloMaximo(k)) : '';
       t[k] = v || TITULOS_FECHAMENTO[k];
     });
     return t;
@@ -3994,7 +3996,7 @@
     desdeQuandoEstuda: desdeQuandoEstuda, mesesEntre: mesesEntre, pctBR: pctBR,
     IBGE_URL: IBGE_URL, IBGE_ESCRITO: IBGE_ESCRITO,
     markdownFechamento: markdownFechamento, markdownMesInteiro: markdownMesInteiro,
-    TITULOS_FECHAMENTO: TITULOS_FECHAMENTO, titulosDoFechamento: titulosDoFechamento,
+    TITULOS_FECHAMENTO: TITULOS_FECHAMENTO, titulosDoFechamento: titulosDoFechamento, tituloMaximo: tituloMaximo,
     PERGUNTAS_DO_ROTEIRO: PERGUNTAS_DO_ROTEIRO, perguntasDoRoteiro: perguntasDoRoteiro, textoDoRoteiro: textoDoRoteiro,
     AREAS: AREAS, rotuloArea: rotuloArea, areasPara: areasPara, temasDaAula: temasDaAula,
     ultimoEncontro: ultimoEncontro,

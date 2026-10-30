@@ -206,6 +206,22 @@ async function ajustes(pag) {
   conf('reaberta, a janela traz a pergunta dela', await pag.$eval('#roteiro-pergunta-0', e => e.value), 'O que ela fez sozinha?');
 
   // ================================================================
+  secao('7b. Resposta escrita e salva sem montar não some');
+  await pag.evaluate(() => {
+    document.querySelector('#roteiro-resposta-1').value = 'Frações.';
+    document.querySelector('#salvar-resumo').click();
+  });
+  await pausa(600);
+  await H.abrirApp(pag, amb.ORIGEM);
+  const semMontar = await pag.evaluate(async (ALUNO) => {
+    const d = await Store.carregar();
+    const r = d.resumos.find(x => x.alunoId === ALUNO && x.mes === '2026-06');
+    return r ? r.texto : '';
+  }, ALUNO);
+  conf('o texto de antes ficou, e a resposta foi para o fim', semMontar,
+    'O que ela fez sozinha?\nResolveu as equações.\n\nO que vem no próximo mês?\nSistemas.\nObrigada!\n\nOnde ainda precisa de mim?\nFrações.');
+
+  // ================================================================
   secao('8. Nenhum erro');
   conf('nenhum erro de página', pag.errosDePagina.join(' | '), '');
 })().then(() => H.fim(amb)(), e => H.fim(amb)(e));

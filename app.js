@@ -10996,7 +10996,7 @@
     Object.keys(Core.TITULOS_FECHAMENTO).forEach(function (k) {
       var dela = (db.ajustes && db.ajustes.titulosFechamento) || {};
       var campo = el('input', {
-        type: 'text', id: 'doc-titulo-' + k, maxlength: '60', autocomplete: 'off',
+        type: 'text', id: 'doc-titulo-' + k, maxlength: String(Core.tituloMaximo(k)), autocomplete: 'off',
         placeholder: Core.TITULOS_FECHAMENTO[k]
       });
       campo.value = typeof dela[k] === 'string' ? dela[k] : '';
@@ -11390,6 +11390,12 @@
   function salvarResumo() {
     var corpo = $('#corpo-modal-resumo');
     var texto = $('#campo-resumo').value;
+    // respostas do roteiro que ela não montou vão para o fim do texto, e não para o lixo (C11)
+    var pendente = corpo._roteiro ? corpo._roteiro.respostasNaoMontadas() : '';
+    if (pendente) {
+      texto = texto.trim() ? texto.replace(/\s+$/, '') + '\n\n' + pendente : pendente;
+      $('#campo-resumo').value = texto;
+    }
     var registro = db.resumos.filter(function (r) {
       return r.alunoId === corpo._alunoId && r.mes === corpo._mes;
     })[0];
@@ -11403,7 +11409,7 @@
       /* A tela do mês pode estar aberta por baixo, e é de lá que ela costuma
        * escrever o feedback: sem isto o texto novo só apareceria ao reabrir. */
       atualizarMesNumaTela();
-      if (gravou) avisar('Resumo salvo.');
+      if (gravou) avisar(pendente ? 'Resumo salvo, com as respostas do roteiro no fim do texto.' : 'Resumo salvo.');
     });
   }
 
@@ -11756,7 +11762,8 @@
 
     var texto = (f.resumoTexto || '').trim();
     if (texto || !modoFamilia) {
-      corpo.appendChild(el('h3', { class: 'subtitulo', texto: 'Feedback do mês' }));
+      // no modo família, o título é o dela (C11); na tela dela, o de sempre
+      corpo.appendChild(el('h3', { class: 'subtitulo', texto: modoFamilia ? titulosDoDocumento().feedback : 'Feedback do mês' }));
       corpo.appendChild(texto
         ? el('div', { class: 'texto-rendeu', style: 'margin-top:0', texto: texto })
         : el('div', {
@@ -12354,6 +12361,15 @@
     function perguntasDaTela() {
       return Core.perguntasDoRoteiro(camposP.map(function (c) { return c.value; }));
     }
+    function respostasDaTela() { return camposR.map(function (c) { return c.value.trim(); }); }
+    var ultimoMontado = JSON.stringify(['', '', '']);
+    /* Resposta escrita e não montada não pode sumir no Salvar (revisão do
+     * C11): devolve o texto montado do que ainda não foi para o feedback. */
+    bloco.respostasNaoMontadas = function () {
+      var r = respostasDaTela();
+      if (JSON.stringify(r) === ultimoMontado) return '';
+      return Core.textoDoRoteiro(perguntasDaTela(), r);
+    };
     bloco.guardarPerguntas = function () {
       var novas = camposP.map(function (c, i) {
         var v = c.value.replace(/\s+/g, ' ').trim();
@@ -12372,6 +12388,7 @@
         if (!texto) { avisar('Responda pelo menos uma pergunta.'); return; }
         var anterior = area.value;
         area.value = texto;
+        ultimoMontado = JSON.stringify(respostasDaTela());
         if (aoMontar) aoMontar();
         if (anterior.trim()) {
           avisar('Texto montado com as respostas.', 'Desfazer', function () {
