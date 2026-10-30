@@ -41,6 +41,18 @@ function conf(rotulo, obtido, esperado) {
 function secao(t) { console.log('\n=== ' + t + ' ==='); }
 const espera = ms => new Promise(r => setTimeout(r, ms));
 
+/* C10b: os formatos saíram do cartão e moram em "Mais formatos", na janela do
+ * documento. Abre a janela do aluno pelo botão principal do cartão e toca lá. */
+async function tocarFormato(pag, ehDoAluno, texto) {
+  await pag.evaluate((ehDoAluno, texto) => {
+    const cartao = Array.from(document.querySelectorAll('#lista-fechamento .cartao'))
+      .find(c => new RegExp(ehDoAluno.re).test(c.querySelector('h3').textContent) === ehDoAluno.sim);
+    cartao.querySelector('.btn-preparar-doc').click();
+    Array.from(document.querySelectorAll('#doc-mais-formatos button'))
+      .find(b => b.textContent.trim() === texto).click();
+  }, ehDoAluno, texto);
+}
+
 (async () => {
   const navegador = await puppeteer.launch({
     executablePath: CHROME, headless: 'new',
@@ -169,16 +181,18 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   // ================================================================
   secao('1. A tela como ela vê: o mês inteiro, sem abrir aula por aula');
 
-  conf('o botão novo está ao lado dos que já existem',
-    await pag.evaluate(() => Array.from(document.querySelectorAll('#lista-fechamento button'))
-      .some(b => b.textContent.trim() === 'O mês numa tela')), true);
-
+  // C10b: o botão mora em "Mais formatos", na janela do documento
   await pag.evaluate(() => {
     const cartao = Array.from(document.querySelectorAll('#lista-fechamento .cartao'))
       .find(c => /Marcelo/.test(c.querySelector('h3').textContent));
-    Array.from(cartao.querySelectorAll('button'))
-      .find(b => b.textContent.trim() === 'O mês numa tela').click();
+    cartao.querySelector('.btn-preparar-doc').click();
   });
+  await espera(300);
+  conf('o botão novo está ao lado dos que já existem',
+    await pag.evaluate(() => Array.from(document.querySelectorAll('#modal-documento-familia button'))
+      .some(b => b.textContent.trim() === 'O mês numa tela')), true);
+
+  await tocarFormato(pag, { re: 'Marcelo', sim: true }, 'O mês numa tela');
   await espera(600);
 
   const aberta = () => pag.$eval('#modal-mes', e => e.classList.contains('aberto'));
@@ -379,12 +393,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   // ================================================================
   secao('5. O cartão do mês: ela escolhe a frase e vê antes de mandar');
 
-  await pag.evaluate(() => {
-    const cartao = Array.from(document.querySelectorAll('#lista-fechamento .cartao'))
-      .find(c => /Marcelo/.test(c.querySelector('h3').textContent));
-    Array.from(cartao.querySelectorAll('button'))
-      .find(b => b.textContent.trim() === 'Cartão do mês').click();
-  });
+  await tocarFormato(pag, { re: 'Marcelo', sim: true }, 'Cartão do mês');
   await espera(700);
 
   conf('a janela do cartão abriu',
@@ -473,12 +482,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   /* O outro aluno pelo NOME, e nao pela posicao: desde que o fechamento passou a
    * vir em ordem alfabetica (ece2b95), o segundo cartao deixou de ser ele e o
    * teste abria o cartao do aluno COM feedback. */
-  await pag.evaluate(() => {
-    const outro = Array.from(document.querySelectorAll('#lista-fechamento .cartao'))
-      .find(c => !/Marcelo/.test(c.querySelector('h3').textContent));
-    Array.from(outro.querySelectorAll('button'))
-      .find(b => b.textContent.trim() === 'Cartão do mês').click();
-  });
+  await tocarFormato(pag, { re: 'Marcelo', sim: false }, 'Cartão do mês');
   await espera(700);
   conf('a janela abre igual',
     await pag.$eval('#modal-cartao', e => e.classList.contains('aberto')), true);
@@ -499,9 +503,14 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   conf('o fechamento continua mostrando os dois alunos',
     fech.includes('Marcelo') && fech.includes('Cecília'), true);
   conf('e continua mostrando o dinheiro', fech.includes('R$ 1.050,00'), true);
+  // C10b: o feedback continua no cartão; os outros, na janela do documento
+  await pag.evaluate(() => document.querySelector('#lista-fechamento .btn-preparar-doc').click());
+  await espera(300);
   conf('os botões antigos continuam lá',
     await pag.evaluate(() => {
-      const t = Array.from(document.querySelectorAll('#lista-fechamento button')).map(b => b.textContent.trim());
+      const t = Array.from(document.querySelectorAll('#lista-fechamento button, #modal-documento-familia button'))
+        .map(b => b.textContent.trim());
+      document.querySelector('#modal-documento-familia [data-fechar]').click();
       return ['Editar o feedback', 'Texto', 'PDF do fechamento', 'PDF com as folhas']
         .every(x => t.indexOf(x) >= 0);
     }), true);

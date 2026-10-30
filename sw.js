@@ -92,8 +92,10 @@
  * etiqueta de nível nas listas prontas (app.js e biblioteca.js), com a lista
  * igual. O v54 (C10a) põe na tela as palavras dela: Página, Relato da aula,
  * Nota só minha, Habilidades e hábitos, Novo ano letivo e aula (app.js,
- * core.js, pdf.js e index.html), com a lista igual. */
-var CACHE = 'apoio-educacional-v54';
+ * core.js, pdf.js e index.html), com a lista igual. O v55 (C10b) deixa um
+ * botão por aluno no Fechamento, os outros formatos dentro da janela e o envio
+ * às famílias em sequência (app.js e index.html), com a lista igual. */
+var CACHE = 'apoio-educacional-v55';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

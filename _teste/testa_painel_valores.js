@@ -236,8 +236,8 @@ const lerPainel = pag => pag.evaluate(() => {
  * para o número não depender de onde a página está no momento da medida. */
 const alturaDoBotaoPDF = pag => pag.evaluate(() => {
   const cont = document.querySelector('.conteudo');
-  const b = Array.from(document.querySelectorAll('#lista-fechamento button'))
-    .find(x => x.textContent.trim() === 'PDF do fechamento');
+  // C10b: o PDF foi para dentro da janela; o botão do cartão que leva a ele é o "Preparar e enviar"
+  const b = document.querySelector('#lista-fechamento .btn-preparar-doc');
   if (!cont || !b) return null;
   return Math.round(b.getBoundingClientRect().top - cont.getBoundingClientRect().top + cont.scrollTop);
 });
