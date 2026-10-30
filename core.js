@@ -3295,10 +3295,69 @@
     return !!(opcoes && opcoes.exibirTemasEAreas);
   }
 
+  /* OS TÍTULOS DO FECHAMENTO SÃO DELA (C11, pedido escrito de 02/09: "todo
+   * título, subtítulo, etc, do material pudesse ser editável"). O padrão mora
+   * aqui, uma vez; o que ela troca mora em db.ajustes.titulosFechamento, só as
+   * chaves que ela mudou, e viaja na cópia de segurança com o resto dos
+   * ajustes. Título apagado (vazio ou só espaço) volta ao padrão: documento
+   * para a família não sai com seção sem nome. A prévia, o PDF e o texto
+   * recebem o mesmo objeto já mesclado. */
+  var TITULOS_FECHAMENTO = {
+    documento: 'Controle de aulas',
+    datas: 'Datas trabalhadas',
+    marcadas: 'Ainda marcadas neste mês',
+    canceladas: 'Aulas canceladas à frente',
+    temas: 'Temas trabalhados',
+    areas: 'Áreas trabalhadas',
+    feedback: 'Feedback',
+    notas: 'Notas das aulas'
+  };
+  /* O título do documento sai em 19 pt, centrado: acima de uns 40 caracteres
+   * ele passa das margens da folha. Os das seções, em 11,5 pt, cabem em 60. */
+  function tituloMaximo(chave) { return chave === 'documento' ? 40 : 60; }
+
+  function titulosDoFechamento(dela) {
+    var t = {};
+    Object.keys(TITULOS_FECHAMENTO).forEach(function (k) {
+      var v = dela && typeof dela[k] === 'string' ? dela[k].replace(/\s+/g, ' ').trim().slice(0, tituloMaximo(k)) : '';
+      t[k] = v || TITULOS_FECHAMENTO[k];
+    });
+    return t;
+  }
+
+  /* O roteiro de três perguntas do feedback (C11), desligado por padrão. As
+   * perguntas são dela também: o que ela reescreve mora em
+   * db.ajustes.roteiroFeedback.perguntas, e pergunta apagada volta à padrão. */
+  var PERGUNTAS_DO_ROTEIRO = [
+    'O que ele conseguiu fazer sozinho neste mês?',
+    'Onde ainda precisa de mim?',
+    'O que vem no próximo mês?'
+  ];
+
+  function perguntasDoRoteiro(dela) {
+    return PERGUNTAS_DO_ROTEIRO.map(function (padrao, i) {
+      var v = dela && typeof dela[i] === 'string' ? dela[i].replace(/\s+/g, ' ').trim().slice(0, 200) : '';
+      return v || padrao;
+    });
+  }
+
+  /* O texto montado das respostas: cada pergunta respondida vira um parágrafo,
+   * a pergunta numa linha e a resposta na seguinte. Pergunta sem resposta não
+   * entra. É ponto de partida: o texto continua editável depois. */
+  function textoDoRoteiro(perguntas, respostas) {
+    var partes = [];
+    perguntas.forEach(function (p, i) {
+      var r = String((respostas && respostas[i]) || '').trim();
+      if (r) partes.push(p + '\n' + r);
+    });
+    return partes.join('\n\n');
+  }
+
   function markdownFechamento(f, opcoes) {
     opcoes = opcoes || {};
+    var T = titulosDoFechamento(opcoes.titulos);
     var L = [];
-    L.push('# Controle de aulas');
+    L.push('# ' + T.documento);
     L.push('');
     L.push('**Aluno:** ' + f.alunoNome);
     if (f.responsavel) L.push('**Responsável:** ' + f.responsavel);
@@ -3353,7 +3412,7 @@
     }
 
     L.push('');
-    L.push('## Datas trabalhadas');
+    L.push('## ' + T.datas);
     L.push('');
     if (feitas.length || !temFuturas) {
       /* Sem nada marcado à frente, a tabela sai como sempre saiu, inclusive
@@ -3426,7 +3485,7 @@
 
     if (previstas.length) {
       L.push('');
-      L.push('## Ainda marcadas neste mês');
+      L.push('## ' + T.marcadas);
       L.push('');
       L.push(CABECALHO[0]);
       L.push(CABECALHO[1]);
@@ -3446,7 +3505,7 @@
 
     if (canceladasFuturas.length) {
       L.push('');
-      L.push('## Aulas canceladas à frente');
+      L.push('## ' + T.canceladas);
       L.push('');
       L.push(CABECALHO[0]);
       L.push(CABECALHO[1]);
@@ -3468,7 +3527,7 @@
 
     if (exibeListas(opcoes) && temasNoTexto.length) {
       L.push('');
-      L.push('## Temas trabalhados');
+      L.push('## ' + T.temas);
       L.push('');
       temasNoTexto.forEach(function (t) {
         L.push('- ' + t.titulo + ' (' + t.datas.map(ddmm).join(', ') + ')');
@@ -3477,7 +3536,7 @@
 
     if (exibeListas(opcoes) && areasNoTexto.length) {
       L.push('');
-      L.push('## Áreas trabalhadas');
+      L.push('## ' + T.areas);
       L.push('');
       areasNoTexto.forEach(function (a) {
         L.push('- ' + a.rotulo + (a.vezes > 1 ? ' (' + a.vezes + ' aulas)' : ''));
@@ -3485,7 +3544,7 @@
     }
 
     L.push('');
-    L.push('## Feedback');
+    L.push('## ' + T.feedback);
     L.push('');
     L.push(f.resumoTexto ? f.resumoTexto : '(a preencher)');
 
@@ -3493,7 +3552,7 @@
       var comNota = f.linhas.filter(function (l) { return !l.futura && l.temNota; });
       if (comNota.length) {
         L.push('');
-        L.push('## Notas das aulas');
+        L.push('## ' + T.notas);
         comNota.forEach(function (l) {
           L.push('');
           L.push('### ' + ddmm(l.data) + ' (' + l.dia + ')');
@@ -3937,6 +3996,8 @@
     desdeQuandoEstuda: desdeQuandoEstuda, mesesEntre: mesesEntre, pctBR: pctBR,
     IBGE_URL: IBGE_URL, IBGE_ESCRITO: IBGE_ESCRITO,
     markdownFechamento: markdownFechamento, markdownMesInteiro: markdownMesInteiro,
+    TITULOS_FECHAMENTO: TITULOS_FECHAMENTO, titulosDoFechamento: titulosDoFechamento, tituloMaximo: tituloMaximo,
+    PERGUNTAS_DO_ROTEIRO: PERGUNTAS_DO_ROTEIRO, perguntasDoRoteiro: perguntasDoRoteiro, textoDoRoteiro: textoDoRoteiro,
     AREAS: AREAS, rotuloArea: rotuloArea, areasPara: areasPara, temasDaAula: temasDaAula,
     ultimoEncontro: ultimoEncontro,
     MAPA: MAPA, NIVEIS: NIVEIS, itemDoMapa: itemDoMapa, rotulosDoMapa: rotulosDoMapa,
