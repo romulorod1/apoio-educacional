@@ -445,6 +445,33 @@
     </div>
   </div>
 
+  <!-- O leitor de PDF (C14): o anexo da aula abre aqui, sem sair do aplicativo.
+       Páginas e zoom ficam numa barra no alto, perto do dedo que lê; o rodapé
+       fica com o que encerra a leitura, como no visor da biblioteca. -->
+  <div class="fundo-modal" id="modal-leitor-pdf">
+    <div class="modal largo">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-leitor-pdf">PDF</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+      </div>
+      <div class="leitor-pdf-barra" id="barra-leitor-pdf">
+        <button class="btn" id="leitor-anterior" type="button">‹ Anterior</button>
+        <span class="leitor-pdf-contador" id="leitor-contador" aria-live="polite"></span>
+        <button class="btn" id="leitor-proxima" type="button">Próxima ›</button>
+        <span class="leitor-pdf-zoom">
+          <button class="btn leitor-pdf-quadrado" id="leitor-menos" type="button" aria-label="Diminuir">&minus;</button>
+          <button class="btn leitor-pdf-quadrado" id="leitor-mais" type="button" aria-label="Aumentar">+</button>
+          <button class="btn" id="leitor-largura" type="button">Ajustar à largura</button>
+        </span>
+      </div>
+      <div class="modal-corpo leitor-pdf-corpo" id="corpo-modal-leitor-pdf"></div>
+      <div class="modal-rodape">
+        <button class="btn" data-fechar type="button">Fechar</button>
+        <button class="btn principal" id="leitor-como-folha" type="button">Abrir esta página como folha</button>
+      </div>
+    </div>
+  </div>
+
   <!-- biblioteca: montar o material marcado e anexar na aula -->
   <div class="fundo-modal" id="modal-bib-gerar">
     <div class="modal">
