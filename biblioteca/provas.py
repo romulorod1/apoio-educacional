@@ -397,8 +397,10 @@ def decoracoes(doc, ignorar):
             # do ENEM 2022 sobem 2 pt e entravam no recorte); o circulo da
             # alternativa no pe nunca fica abaixo de todo o texto, e a regra do
             # corpo, adiante, o deixa de fora
+            # So traco fino: o desenho miudo de area (as plaquinhas das
+            # alternativas no pe da Mirim 2 de 2022, 2a fase) continua de fora
             H_ = pg.rect.height
-            na_borda = r.y1 <= H_ * BANDA_TOPO or r.y0 >= H_ * (1 - BANDA_PE)
+            na_borda = (r.y1 <= H_ * BANDA_TOPO or r.y0 >= H_ * (1 - BANDA_PE)) and min(r.width, r.height) < 1.5
             if r.x1 <= r.x0 and r.y1 <= r.y0 or (r.width < DESENHO_MIN and r.height < DESENHO_MIN and not na_borda):
                 continue
             els.append((chave_decoracao('d', r, '%d' % round(r.width)), (r.x0, r.y0, r.x1, r.y1)))
