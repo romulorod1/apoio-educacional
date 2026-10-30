@@ -1254,7 +1254,7 @@
     }
 
     if (exibirListas && areasDaFolha.length) {
-      tituloDeSecao(T('areas', 'Áreas trabalhadas'), 92);
+      tituloDeSecao(T('areas', 'Habilidades e hábitos'), 92);
       /* Em duas colunas: a lista costuma ser longa, e uma coluna só empurraria
          o resumo para a página seguinte sem necessidade. */
       var meio = Math.ceil(areasDaFolha.length / 2);

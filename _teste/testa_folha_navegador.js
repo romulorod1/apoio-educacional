@@ -197,18 +197,18 @@ async function rodar() {
   secao('5. Navegacao rapida entre paginas (+ Folha, ‹, ›, Apagar folha)');
 
   const contadorInicial = await pag.$eval('.contador-pagina', e => e.textContent.trim());
-  conf('contador inicial indica Folha 1 de 1', contadorInicial, 'Folha 1 de 1');
+  conf('contador inicial indica Folha 1 de 1', contadorInicial, 'Página 1 de 1');
 
   // Adiciona nova pagina
   await pag.evaluate(() => {
     const btns = Array.from(document.querySelectorAll('#rodape-nota button'));
-    const btnMais = btns.find(b => b.textContent.includes('+ Folha'));
+    const btnMais = btns.find(b => b.textContent.includes('+ Página'));
     if (btnMais) btnMais.click();
   });
   await pausa(100);
 
   const contadorPag2 = await pag.$eval('.contador-pagina', e => e.textContent.trim());
-  conf('apos + Folha, contador indica Folha 2 de 2', contadorPag2, 'Folha 2 de 2');
+  conf('apos + Folha, contador indica Folha 2 de 2', contadorPag2, 'Página 2 de 2');
 
   // Volta para pagina 1 com "‹"
   await pag.evaluate(() => {
@@ -219,7 +219,7 @@ async function rodar() {
   await pausa(100);
 
   const contadorPag1 = await pag.$eval('.contador-pagina', e => e.textContent.trim());
-  conf('clicar em ‹ retorna para Folha 1 de 2', contadorPag1, 'Folha 1 de 2');
+  conf('clicar em ‹ retorna para Folha 1 de 2', contadorPag1, 'Página 1 de 2');
 
   // Avanca para pagina 2 com "›"
   await pag.evaluate(() => {
@@ -230,21 +230,21 @@ async function rodar() {
   await pausa(100);
 
   const contadorVoltaPag2 = await pag.$eval('.contador-pagina', e => e.textContent.trim());
-  conf('clicar em › retorna para Folha 2 de 2', contadorVoltaPag2, 'Folha 2 de 2');
+  conf('clicar em › retorna para Folha 2 de 2', contadorVoltaPag2, 'Página 2 de 2');
 
   // Apaga a pagina 2 (vazia) aceitando a confirmacao
   await pag.evaluate(() => {
     const antConfirm = window.confirm;
     window.confirm = () => true;
     const btns = Array.from(document.querySelectorAll('#rodape-nota button'));
-    const btnApagar = btns.find(b => b.textContent.includes('Apagar folha'));
+    const btnApagar = btns.find(b => b.textContent.includes('Apagar página'));
     if (btnApagar) btnApagar.click();
     window.confirm = antConfirm;
   });
   await pausa(100);
 
   const contadorAposApagar = await pag.$eval('.contador-pagina', e => e.textContent.trim());
-  conf('apagar folha vazia retorna com seguranca para Folha 1 de 1', contadorAposApagar, 'Folha 1 de 1');
+  conf('apagar folha vazia retorna com seguranca para Folha 1 de 1', contadorAposApagar, 'Página 1 de 1');
 
   // ================================================================
   secao('6. Exportacao da folha para PDF com nome honesto');

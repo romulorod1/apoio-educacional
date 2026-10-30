@@ -44,7 +44,7 @@ async function rodar() {
     };
   });
   conf('botao de virada anual presente em Ajustes', cartaoAnoLetivo.temBotao, true);
-  conf('rotulo claro do botao', cartaoAnoLetivo.textoBotao, 'Revisar anos escolares / Virada de ciclo');
+  conf('rotulo claro do botao', cartaoAnoLetivo.textoBotao, 'Novo ano letivo');
   conf('bloco de informacao de ano letivo presente', cartaoAnoLetivo.temInfo, true);
 
   // ================================================================

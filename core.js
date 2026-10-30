@@ -3321,7 +3321,7 @@
     marcadas: 'Ainda marcadas neste mês',
     canceladas: 'Aulas canceladas à frente',
     temas: 'Temas trabalhados',
-    areas: 'Áreas trabalhadas',
+    areas: 'Habilidades e hábitos',
     feedback: 'Feedback',
     notas: 'Notas das aulas'
   };

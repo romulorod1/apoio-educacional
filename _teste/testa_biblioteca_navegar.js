@@ -95,7 +95,7 @@ const pixelsDaPagina = pag => pag.evaluate(() => {
   return n;
 });
 const rodapeDaFolha = pag => pag.evaluate(() => ({
-  contador: (document.querySelector('#rodape-nota').innerText.match(/Folha \d+ de \d+/) || [''])[0],
+  contador: (document.querySelector('#rodape-nota').innerText.match(/Página \d+ de \d+/) || [''])[0],
   fundo: (document.querySelector('#rodape-nota select') || {}).value
 }));
 const chavesDeMiniatura = (pag, filtro) => pag.evaluate(f => new Promise(r => {
@@ -463,7 +463,7 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   await esperar('editor aberto na página colada', () => pag.$eval('#modal-nota', e => e.classList.contains('aberto')), v => v === true, 10000);
   await pausa(600);
   const rod = await rodapeDaFolha(pag);
-  conf('o rodapé mostra a página colada, e não a primeira', rod.contador, 'Folha 2 de 2');
+  conf('o rodapé mostra a página colada, e não a primeira', rod.contador, 'Página 2 de 2');
   conf('e o fundo mostrado é o da página colada (sem pauta)', rod.fundo, 'branco');
   conf('dois toques colaram uma página só', (await lerNotaDeHoje()).paginas, 2);
   conf('e gravaram uma imagem só em midias', (await chavesDeMiniatura(pag, '^(?!bib:)')) - imagensAntes, 1);
