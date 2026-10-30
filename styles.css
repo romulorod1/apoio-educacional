@@ -1877,6 +1877,15 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-pdf-dica { flex-shrink: 0; margin: 0; border-radius: 0; border-width: 0 0 1px; }
 /* "Abrir como folha para escrever em cima" (C3), embaixo do nome do anexo. */
 #lista-anexos .anexo-como-folha { margin-top: 8px; min-height: 44px; }
+/* "Preparando a folha..." (C3): cobre a tela inteira, por cima das janelas,
+   para nenhum toque chegar atrás enquanto a folha é montada. As janelas sobem
+   de 2 em 2 a partir de 50 (abrirModal); o aviso (z 80)
+   continua por cima, porque é por ele que a falha é dita. */
+.preparando-folha { display: none; position: fixed; inset: 0; z-index: 79; align-items: center;
+  justify-content: center; background: rgba(15, 30, 50, .28); }
+.preparando-folha.aberto { display: flex; }
+.preparando-folha-caixa { background: var(--branco); color: var(--navy); font-weight: 700; font-size: 16px;
+  padding: 18px 26px; border-radius: 12px; box-shadow: var(--sombra-forte); }
 .leitor-pdf-corpo canvas { display: block; margin: 0 auto; background: #FFFFFF; box-shadow: var(--sombra); }
 .leitor-pdf-aviso { max-width: 520px; margin: 24px auto; padding: 18px; background: var(--branco);
   border-radius: 12px; box-shadow: var(--sombra); }

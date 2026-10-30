@@ -3322,7 +3322,7 @@
    * anexo desta aula. O anexo continua lá, intacto; a folha ganha uma CÓPIA
    * em 'midias', como no "Abrir como folha" da biblioteca. */
   function anexoComoFolha(an, aula, tipo) {
-    Store.lerAnexo(an.id).then(function (r) {
+    prepararFolha(function () { return Store.lerAnexo(an.id).then(function (r) {
       if (!r || !r.blob) { avisar('Não achei este arquivo no tablet.'); return; }
       /* O tipo guardado tem a última palavra sobre o nome, quando existe: um
        * .jpg que na verdade é PDF vai para o leitor, e não para o desenho. */
@@ -3340,6 +3340,35 @@
       return fotoComoFolha(r.blob, an.nome, aula.id);
     }).catch(function () {
       avisar('Não consegui abrir este arquivo como folha. Tente de novo.');
+    }); });
+  }
+
+  /* DO TOQUE ATÉ A FOLHA ABRIR, UMA COISA SÓ. Ler o anexo e decodificar a foto
+   * leva segundos no tablet, antes ainda do colarNaFolhaDaAula ligar a guarda
+   * dele. Nessa janela, sem retorno nenhum, ela tocava de novo (duas páginas)
+   * ou abria "Escrever à mão na folha" e riscava: o colar, ao terminar, abria
+   * o editor por cima e o traço dos últimos 400 ms se perdia, e um traço
+   * gravado entre o lerNota e o salvarNota do colar era sobrescrito.
+   *
+   * A guarda liga no toque, e a camada "Preparando a folha..." cobre a tela
+   * inteira até o trabalho acabar (a folha aberta, ou o aviso de falha): ela
+   * vê que o toque pegou, e nada atrás recebe dedo nem caneta. */
+  var preparandoFolha = false;
+
+  function prepararFolha(trabalho) {
+    if (preparandoFolha || colandoNaFolha) {
+      avisar('Ainda estou preparando a folha. Espere um instante.');
+      return Promise.resolve();
+    }
+    preparandoFolha = true;
+    $('#preparando-folha').classList.add('aberto');
+    var feito;
+    try { feito = Promise.resolve(trabalho()); } catch (e) { feito = Promise.reject(e); }
+    return feito.catch(function () {
+      avisar('Não consegui preparar a folha. Tente de novo.');
+    }).then(function () {
+      preparandoFolha = false;
+      $('#preparando-folha').classList.remove('aberto');
     });
   }
 
@@ -17189,7 +17218,8 @@
     if (!leitor || !leitor.doc) return;
     var doc = leitor.doc, n = leitor.pagina, op = leitor.opcoes;
     var titulo = (op.titulo || leitor.nome) + ', página ' + n;
-    doc.getPage(n).then(function (pagina) {
+    // a mesma camada da foto do anexo (C3): desenhar a página também leva segundos
+    prepararFolha(function () { return doc.getPage(n).then(function (pagina) {
       var base = pagina.getViewport({ scale: 1 });
       var alvo = {
         forma: 'pagina', titulo: titulo, origem: 'Do PDF', doc: doc,
@@ -17197,11 +17227,12 @@
         desenhar: function (largura, altura) { return desenharPaginaPdfEmCanvas(doc, n, largura, altura); }
       };
       var daAula = op.aulaId && db.aulas.some(function (a) { return a.id === op.aulaId; });
-      if (daAula) colarNaFolhaDaAula(op.aulaId, alvo);
-      else mostrarAulasParaFolha(alvo);
+      // a camada fica até a folha abrir; a escolha de aula é janela dela, e a camada sai antes
+      if (daAula) return colarNaFolhaDaAula(op.aulaId, alvo);
+      mostrarAulasParaFolha(alvo);
     }).catch(function () {
       avisar('Não consegui preparar esta página. Tente de novo.');
-    });
+    }); });
   }
 
   function soltarLeitorPdf() {

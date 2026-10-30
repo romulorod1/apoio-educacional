@@ -10,7 +10,8 @@
  *      .docx não;
  *   2. a foto vira folha da mesma aula direto, sem o leitor e sem a escolha
  *      de aula, com a foto de fundo; um traço por cima fica salvo depois de
- *      recarregar;
+ *      recarregar; logo depois do toque a camada "Preparando a folha..."
+ *      cobre a tela, e um segundo toque não faz segunda página;
  *   3. o PDF abre o leitor do C14 na página 1, com a frase que aponta o
  *      "Abrir esta página como folha"; a página 2 vira folha da mesma aula
  *      (página nova, a da foto continua), com um traço salvo;
@@ -244,8 +245,30 @@ const perguntou = pag => pag.evaluate(() => window.__perguntou);
   // ================================================================
   secao('2. A foto vira folha da mesma aula, direto');
   await vigiarEscolhaDeAula(pag);
-  conf('tocou na ação da foto', await tocarNoAnexo(pag, FOTO.nome, ACAO), true);
+  /* Dois toques seguidos, no mesmo instante: logo depois do primeiro, a
+   * camada "Preparando a folha..." já cobre a tela (o dedo no mesmo ponto cai
+   * nela, e não no botão), e o segundo, que chega ao botão por baixo dela,
+   * não faz segunda página (conferido abaixo: a folha tem uma página só). */
+  const toque = await pag.evaluate((n, t) => {
+    const linha = Array.from(document.querySelectorAll('#lista-anexos .item-lista')).find(l => l.textContent.indexOf(n) >= 0);
+    const b = linha && Array.from(linha.querySelectorAll('button')).find(x => x.textContent.trim() === t);
+    if (!b) return null;
+    b.scrollIntoView({ block: 'center' });
+    const r = b.getBoundingClientRect();
+    b.click();
+    const camada = document.querySelector('#preparando-folha');
+    const cobre = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    const visto = { aberta: camada.classList.contains('aberto') && camada.getBoundingClientRect().width > 0,
+      texto: camada.textContent.trim(), cobreOBotao: !!cobre && camada.contains(cobre) };
+    b.click();
+    return visto;
+  }, FOTO.nome, ACAO);
+  conf('tocou na ação da foto', !!toque, true);
+  conf('logo depois do toque, a camada "Preparando a folha..." aparece', toque && (toque.aberta + ' ' + toque.texto), 'true Preparando a folha...');
+  conf('e cobre o botão: um segundo toque de dedo cai nela', toque && toque.cobreOBotao, true);
   const ed1 = await esperar('a folha da foto abriu', () => editorAberto(pag), v => v === true, 15000);
+  const saiu = await esperar('a camada saiu', () => pag.$eval('#preparando-folha', e => e.classList.contains('aberto')), v => v === false, 8000);
+  conf('com a folha aberta, a camada sai', saiu.ok, true);
   conf('o editor da folha abriu', ed1.ok, true);
   conf('sem passar pelo leitor', (await estadoLeitor(pag)).aberto, false);
   conf('e sem perguntar a aula', await perguntou(pag), 0);
@@ -262,7 +285,7 @@ const perguntou = pag => pag.evaluate(() => window.__perguntou);
   });
   let folha = await lerFolha(pag);
   conf('a aula tem folha', folha.temNota, true);
-  conf('uma página: a foto e o traço por cima', folha.paginas.map(p => p.tipos).join(' / '), 'imagem,traco');
+  conf('uma página só (o segundo toque não fez outra): a foto e o traço por cima', folha.paginas.map(p => p.tipos).join(' / '), 'imagem,traco');
   conf('a foto está guardada como JPEG', folha.paginas[0] && folha.paginas[0].jpeg, 'data:image/jpeg;base64,');
   conf('a foto ocupa a largura da folha', folha.paginas[0] && folha.paginas[0].largura > 700, true);
   const refFoto = folha.paginas[0] && folha.paginas[0].ref;
@@ -288,8 +311,12 @@ const perguntou = pag => pag.evaluate(() => window.__perguntou);
   await pag.click('#leitor-proxima');
   const p2 = await esperar('a página 2 desenhada', () => estadoLeitor(pag), v => v && v.desenhada === '2', 15000);
   conf('Próxima leva à página 2', p2.valor && p2.valor.contador, 'Página 2 de 2');
-  await pag.click('#leitor-como-folha');
+  conf('no PDF, logo depois do toque, a mesma camada aparece', await pag.evaluate(() => {
+    document.querySelector('#leitor-como-folha').click();
+    return document.querySelector('#preparando-folha').classList.contains('aberto');
+  }), true);
   const ed2 = await esperar('a folha da página 2 abriu', () => editorAberto(pag), v => v === true, 15000);
+  await esperar('a camada saiu', () => pag.$eval('#preparando-folha', e => e.classList.contains('aberto')), v => v === false, 8000);
   conf('o editor da folha abriu', ed2.ok, true);
   conf('o leitor fechou', (await estadoLeitor(pag)).aberto, false);
   conf('sem perguntar a aula', await perguntou(pag), 0);
