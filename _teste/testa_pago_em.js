@@ -461,6 +461,57 @@ function citaPagamento(texto) {
   await pausa(300);
 
   // ================================================================
-  secao('10. Nenhum erro');
-  conf('nenhum erro de página', pag.errosDePagina.join(' | '), '');
+  secao('10. Mês com aula à frente: o proposto é o total do mês, como no PDF');
+  /* O relógio da página é fixado em 08/06/2026: junho do Alfa fica com uma
+   * aula dada (03/06) e uma marcada à frente (10/06), 100 até hoje e 200 no
+   * mês. Página nova, para o relógio falso valer desde o carregamento; a
+   * antiga sai para não haver duas abas no mesmo banco. */
+  const errosDaPrimeira = pag.errosDePagina.slice();
+  await pag.close();
+  const pag2 = await amb.pagina();
+  await pag2.setViewport({ width: 1280, height: 800, hasTouch: true });
+  await pag2.evaluateOnNewDocument((fixo) => {
+    const Real = Date;
+    const base = new Real(fixo).getTime();
+    const inicio = Real.now();
+    class Falso extends Real {
+      constructor(...a) { if (a.length) super(...a); else super(base + (Real.now() - inicio)); }
+      static now() { return base + (Real.now() - inicio); }
+    }
+    window.Date = Falso;
+  }, '2026-06-08T12:00:00');
+  await H.abrirApp(pag2, amb.ORIGEM);
+  conf('o relógio da página está em 08/06/2026', await pag2.evaluate(() => Core.hojeIso()), '2026-06-08');
+  await pag2.evaluate(async () => { const d = await Store.carregar(); d.pagamentos = []; await Store.salvar(d); });
+  await H.abrirApp(pag2, amb.ORIGEM);
+  await irAoFechamento(pag2);
+  const contas = await pag2.evaluate(async (id) => {
+    const x = Core.calcularFechamento(await Store.carregar(), id, '2026-06');
+    return [x.valorFeito, x.totalValor];
+  }, ALFA);
+  conf('junho do Alfa: 100 até hoje, 200 no mês', contas, [100, 200]);
+  const pdfDiz = await pag2.evaluate(async (id) => {
+    const x = Core.calcularFechamento(await Store.carregar(), id, '2026-06');
+    return Core.markdownFechamento(x).indexOf('Total do mês, já contando as datas ainda marcadas:** ') >= 0 &&
+      Core.markdownFechamento(x).indexOf(Core.fmtMoeda(200)) >= 0;
+  }, ALFA);
+  conf('o documento da família diz o total do mês com as datas marcadas, R$ 200,00', pdfDiz, true);
+  conf('tocou em "Marcar como pago" do Alfa', await tocarNaLinha(pag2, ALFA, '.btn-marcar-pago'), true);
+  la = await linha(pag2, ALFA);
+  conf('o proposto é o total do mês (200,00), e não o até hoje (100,00)', la.valor, '200,00');
+  conf('a ajuda diz de onde vem o valor', await pag2.$eval('#lista-fechamento .linha-pagamento[data-aluno="' + ALFA + '"] .ajuda-proposto', e => e.textContent),
+    'O valor proposto é o total do mês, já contando as datas ainda marcadas, como no documento da família. Troque se a família pagou outro valor.');
+  await preencherEConfirmar(pag2, ALFA, null, null);
+  la = await linha(pag2, ALFA);
+  conf('aceitar o proposto não deixa "faltam" no cartão', [la.feito, la.falta], ['Pago em 08/06 · R$ 200,00', '']);
+  conf('Beta (junho sem nada à frente): proposto o total do mês, com a frase sem as datas marcadas', await (async () => {
+    await tocarNaLinha(pag2, BETA, '.btn-marcar-pago');
+    const lb2 = await linha(pag2, BETA);
+    const aj = await pag2.$eval('#lista-fechamento .linha-pagamento[data-aluno="' + BETA + '"] .ajuda-proposto', e => e.textContent);
+    return [lb2.valor, aj];
+  })(), ['180,00', 'O valor proposto é o total do mês, como no documento da família. Troque se a família pagou outro valor.']);
+
+  // ================================================================
+  secao('11. Nenhum erro');
+  conf('nenhum erro de página', errosDaPrimeira.concat(pag2.errosDePagina).join(' | '), '');
 })().then(() => H.fim(amb)(), e => H.fim(amb)(e));

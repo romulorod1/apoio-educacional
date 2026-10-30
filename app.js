@@ -11466,11 +11466,16 @@
     var reg = s.registro;
 
     if (editando) {
-      /* O proposto é o total a cobrar do mês, o MESMO do documento da família
-       * (Core.valorACobrarDoMes). Num mês que ainda não tem nada dado, a
-       * família que paga adiantado paga o mês inteiro, e é ele que vem. Ela
-       * troca quando a família pagou outro valor. */
-      var proposto = reg ? reg.valor : (s.devido > 0 ? s.devido : (f.totalValor || 0));
+      /* O proposto é o total do MÊS INTEIRO (f.totalValor), já contando as
+       * datas ainda marcadas, e não o "até hoje". Com aula à frente, o
+       * documento da família imprime as duas somas, e a família que paga
+       * adiantado paga a do mês inteiro ("Total do mês, já contando as datas
+       * ainda marcadas"). Propor o "até hoje" fazia ela aceitar um número
+       * menor e, quando o mês fechasse, o cartão dizer "faltam" sem a família
+       * dever nada. Com o mês vencido as duas somas são a mesma. Ela troca
+       * quando a família pagou outro valor. */
+      var proposto = reg ? reg.valor : (f.totalValor || 0);
+      var comMarcadas = (f.linhas || []).some(function (l) { return l.futura && l.status !== 'cancelada'; });
       var campoValor = el('input', {
         type: 'text', inputmode: 'decimal', autocomplete: 'off', class: 'pagamento-valor',
         value: proposto > 0 ? valorNoCampo(proposto) : '', style: 'max-width:150px'
@@ -11500,8 +11505,12 @@
         })
       ]));
       caixa.appendChild(el('div', {
-        class: 'ajuda', style: 'margin:6px 0 0',
-        texto: 'O valor proposto é o total a cobrar do mês. Troque se a família pagou outro valor.'
+        class: 'ajuda ajuda-proposto', style: 'margin:6px 0 0',
+        texto: (reg ? 'O campo traz o valor que você marcou.'
+          : comMarcadas
+            ? 'O valor proposto é o total do mês, já contando as datas ainda marcadas, como no documento da família.'
+            : 'O valor proposto é o total do mês, como no documento da família.') +
+          ' Troque se a família pagou outro valor.'
       }));
       return;
     }
