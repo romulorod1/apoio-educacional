@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.34.0';
+  var VERSAO = '1.35.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.35.0',
+      itens: [
+        'O PDF anexado à aula agora abre dentro do aplicativo, num leitor com páginas e zoom, sem sair para outro programa.',
+        'No leitor, "Abrir esta página como folha" leva a página para a folha da aula, e você escreve por cima com a caneta.',
+        'Na primeira vez, o leitor precisa de internet para chegar ao tablet; depois funciona sem sinal.'
+      ]
+    },
     {
       versao: '1.34.0',
       itens: [

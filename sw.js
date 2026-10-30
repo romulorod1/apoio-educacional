@@ -103,7 +103,7 @@
  * core.js, pdf.js e index.html), com a lista igual. O v55 (C10b) deixa um
  * botão por aluno no Fechamento, os outros formatos dentro da janela e o envio
  * às famílias em sequência (app.js e index.html), com a lista igual. */
-var CACHE = 'apoio-educacional-v55';
+var CACHE = 'apoio-educacional-v56';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
