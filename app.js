@@ -1021,6 +1021,8 @@
     if (id === 'modal-biblioteca') soltarVisor();
     // o leitor de PDF, fechado por qualquer caminho, para de desenhar e solta o canvas
     if (id === 'modal-leitor-pdf') soltarLeitorPdf();
+    // as miniaturas da sondagem (C5) são do tablet: soltas ao fechar, por qualquer caminho
+    if (id === 'modal-sondagem') soltarImagensDaSondagem();
     if (id === 'modal-novidades') {
       if (db && db.ajustes && db.ajustes.versaoVista !== VERSAO) {
         db.ajustes.versaoVista = VERSAO;
@@ -7569,8 +7571,12 @@
     ['Conversa com o aluno, 10 minutos',
       'O que ele acha que sabe e o que acha que não sabe. Vale mais o que ele diz ' +
       'do que a nota do boletim.'],
+    /* Era "monte uma lista curta com exercícios de anos anteriores", sem
+     * instrumento: a lacuna saía da impressão. Agora a sondagem do ano está
+     * pronta logo acima do roteiro (C5, lente da pedagoga P03). */
     ['Sondagem escrita, 25 minutos',
-      'Monte uma lista curta com exercícios de anos anteriores, na aba Biblioteca. ' +
+      'Use a sondagem do ano, logo acima: dois exercícios por lacuna provável, que viram a folha da aula. ' +
+      'Na correção, a lacuna que travou vai para o mapeamento com a evidência escrita. ' +
       'Não é prova: é para ver onde ele trava e como ele pensa.'],
     ['Preencher o mapeamento, 10 minutos',
       'Marque pontos fortes, pontos de atenção e lacunas, e escreva o plano inicial.'],
@@ -7762,7 +7768,14 @@
         var chk = el('input', { type: 'checkbox', style: 'width:auto;min-height:auto' });
         chk.checked = marcados.indexOf(item.id) >= 0;
         chk.addEventListener('change', function () { aoMudar(item, this.checked); });
-        var filhos = [chk, el('span', { class: 'cresce', texto: item.rotulo })];
+        /* A lacuna marcada pela sondagem (C5) traz a evidência escrita logo
+         * abaixo do nome: "errou 2 de 2 itens de frações na sondagem de
+         * 30/10". É o que separa a marca por evidência da marca por impressão. */
+        var provas = item.chaveDoGrupo === 'lacunas' ? Core.evidenciasDaLacuna(trabalho, item.id) : [];
+        var filhos = [chk, el('span', { class: 'cresce' }, [item.rotulo].concat(provas.length ? [
+          el('span', { class: 'evidencia-lacuna', style: 'display:block;font-size:12px;color:#5b6570',
+            texto: provas[provas.length - 1] + (provas.length > 1 ? ' (e mais ' + (provas.length - 1) + ' antes)' : '') })
+        ] : []))];
         /* A lacuna monta a trilha: a sequência de assuntos que precisa vir
          * antes daquele em que o aluno travou, na ordem. Continua sendo UM
          * botão por lacuna. (O "Ver os temas soltos" de dentro da trilha saiu
@@ -7916,13 +7929,17 @@
     }));
 
     Core.gruposDoAluno().forEach(function (grupo) {
-      var itens = Core.itensDoAluno(grupo.chave).map(function (i) {
+      var marcados = trabalho.marcados[grupo.chave];
+      /* O item fora da oferta (os "estilos" Vendo e Ouvindo, lente da
+       * pedagoga P06) só aparece se já estiver marcado, para poder ser
+       * desmarcado; a lista é tirada UMA vez, ao abrir, e por isso a caixa não
+       * some no meio do toque que a desmarca. */
+      var itens = Core.itensOferecidos(Core.itensDoAluno(grupo.chave), marcados).map(function (i) {
         var copia = {};
         Object.keys(i).forEach(function (k) { copia[k] = i[k]; });
         copia.chaveDoGrupo = grupo.chave;
         return copia;
       });
-      var marcados = trabalho.marcados[grupo.chave];
       /* Os grupos que são inteiros sobre o aluno mantêm o data-grupo, e por isso
        * rotina e aprende continuam aparecendo aqui, na ordem de sempre. Pontos
        * fortes e Pontos de atenção têm itens dos dois lados: a metade da matéria
@@ -9483,7 +9500,7 @@
     var apr = Core.rotulosDoMapa('aprende', todas.aprende).slice(0, 2);
     if (lac.length) L.push('Lacunas: ' + lac.join(', ') + '.');
     if (ate.length) L.push('Atenção: ' + ate.join(', ') + '.');
-    if (apr.length) L.push('Aprende melhor: ' + apr.join(' e ') + '.');
+    if (apr.length) L.push('Costuma funcionar: ' + apr.join(' e ') + '.');
     return L.join(' ');
   }
 
@@ -9540,7 +9557,7 @@
     }
     linha('Lacunas', l.lacunas, l.totalLacunas);
     linha('Atenção', l.atencao, l.totalAtencao);
-    linha('Aprende melhor', l.aprende, l.aprende.length);
+    linha('Costuma funcionar', l.aprende, l.aprende.length);
 
     var caixa = el('div', { class: 'lembrete', id: 'lembrete-mapeamento' }, [
       el('div', { class: 'barra', style: 'margin-bottom:6px' }, [
@@ -9591,6 +9608,8 @@
       })
     ]));
 
+    desenharBlocoDaSondagem(corpo, aluno, aula);
+
     var roteiro = el('div', { id: 'roteiro-mapeamento' });
     ROTEIRO_MAPEAMENTO.forEach(function (par) {
       roteiro.appendChild(el('div', { class: 'passo-roteiro' }, [
@@ -9604,6 +9623,472 @@
       class: 'ajuda',
       texto: 'É sugestão, não regra. Cada família chega de um jeito.'
     }));
+  }
+
+  // ================= sondagem por ano de entrada (C5) =================
+  //
+  // O encontro de mapeamento ganhou instrumento. A sondagem nasce do ano
+  // escolar do aluno (as lacunas prováveis, uma tabela do core.js) e dos
+  // pacotes da biblioteca que estão no tablet: dois exercícios do degrau 1 por
+  // lacuna. O repositório guarda só a REGRA; os exercícios são os do tablet.
+  //
+  // O registro mora no aluno, em `aluno.sondagens`, uma lista de
+  //   { id, aulaId, data, anoEscolar, criadaEm, folhaEm, corrigidaEm,
+  //     aplicadaEm, mapeamentoId, lacunasMarcadas,
+  //     itens: [{ item, lacuna, resposta }] }
+  // e viaja na cópia de segurança com o resto do documento, sem caminho
+  // próprio. `resposta` é 'certo', 'meio', 'errado' ou '' (sem correção).
+
+  /* "3 exercícios", "1 lacuna". A contagem da biblioteca mora mais abaixo, e
+   * fora dela a regra da casa é a palavraPlural (testa_textos_e_novidades). */
+  function contagemDaSondagem(n, um, varios) { return n + ' ' + palavraPlural(n, um, varios); }
+
+  function sondagensDe(aluno) { return (aluno && aluno.sondagens) || []; }
+
+  function sondagemDaAula(aluno, aulaId) {
+    var lista = sondagensDe(aluno).filter(function (s) { return s.aulaId === aulaId; });
+    return lista.length ? lista[lista.length - 1] : null;
+  }
+
+  function nomeDoAnoDaSondagem(ano) {
+    return Core.ANOS_ESCOLARES[ano] || 'ano não registrado';
+  }
+
+  /* As listas prontas do tablet no formato que o Core.montarSondagem lê. Só
+   * entra a lista cujos exercícios todos existem (o montarArvoreBiblioteca já
+   * filtra), então todo exercício escolhido abre na folha. */
+  function listasDoTablet() {
+    var out = [];
+    Object.keys((bib && bib.listasPorModulo) || {}).forEach(function (m) {
+      bib.listasPorModulo[m].forEach(function (l) {
+        out.push({ modulo: l.modulo, nivel: l.nivel, degraus: l.degraus || [] });
+      });
+    });
+    return out;
+  }
+
+  /* As séries do Portal que estão no tablet. O Banco de Questões fica de fora:
+   * o nível dele equivale a séries, mas não traz as listas por assunto. */
+  function seriesDoTablet() {
+    var s = [];
+    ((bib && bib.pacotes) || []).forEach(function (p) {
+      ((p.manifest && p.manifest.series) || []).forEach(function (x) {
+        if (!/^n\d$/.test(x) && s.indexOf(x) < 0) s.push(x);
+      });
+    });
+    return s;
+  }
+
+  function rotuloDaLacuna(id) {
+    var it = Core.itemDaLacuna(id);
+    return it ? it.rotulo : id;
+  }
+
+  /* O bloco dentro do encontro de mapeamento. */
+  function desenharBlocoDaSondagem(corpo, aluno, aula) {
+    var ano = Core.anoEscolarDe(aluno);
+    var feita = sondagemDaAula(aluno, aula.id);
+    var bloco = el('div', { id: 'bloco-sondagem', class: 'lembrete', style: 'margin:10px 0' });
+    bloco.appendChild(el('div', { class: 'nome', style: 'font-weight:700', texto: 'Sondagem escrita' }));
+    if (feita) {
+      var lacunas = [];
+      feita.itens.forEach(function (x) { if (lacunas.indexOf(x.lacuna) < 0) lacunas.push(x.lacuna); });
+      var estado = feita.aplicadaEm
+        ? 'corrigida em ' + Core.ddmmaaaa(feita.aplicadaEm) + ', ' +
+          contagemDaSondagem((feita.lacunasMarcadas || []).length, 'lacuna marcada', 'lacunas marcadas') + ' no mapeamento'
+        : 'falta corrigir';
+      bloco.appendChild(el('div', { class: 'detalhe', id: 'resumo-sondagem',
+        texto: 'Sondagem do ' + nomeDoAnoDaSondagem(feita.anoEscolar) + ': ' +
+          contagemDaSondagem(feita.itens.length, 'exercício', 'exercícios') + ' de ' +
+          contagemDaSondagem(lacunas.length, 'lacuna', 'lacunas') + '; ' + estado + '.' }));
+      bloco.appendChild(el('div', { class: 'barra', style: 'margin-top:8px' }, [
+        el('button', { type: 'button', class: 'btn pequeno', id: 'abrir-sondagem', texto: 'Abrir a sondagem',
+          aoClick: function () { abrirSondagem(aluno.id, aula.id); } }),
+        el('button', { type: 'button', class: 'btn pequeno destaque', id: 'corrigir-sondagem', texto: 'Corrigir',
+          aoClick: function () { abrirCorrecaoDaSondagem(aluno.id, aula.id); } })
+      ]));
+    } else if (Core.lacunasProvaveis(ano).length) {
+      bloco.appendChild(el('div', { class: 'detalhe',
+        texto: 'Pronta para o ' + nomeDoAnoDaSondagem(ano) + ': dois exercícios por lacuna provável do ano, ' +
+          'do degrau 1 das listas da OBMEP que estão no tablet. Você tira, troca e põe antes de usar.' }));
+      bloco.appendChild(el('div', { class: 'barra', style: 'margin-top:8px' }, [
+        el('button', { type: 'button', class: 'btn pequeno destaque', id: 'montar-sondagem',
+          texto: 'Montar a sondagem do ' + nomeDoAnoDaSondagem(ano),
+          aoClick: function () { abrirSondagem(aluno.id, aula.id); } })
+      ]));
+    } else {
+      var mirim = ['02', '03', '04', '05'].indexOf(ano) >= 0;
+      bloco.appendChild(el('div', { class: 'detalhe', id: 'sondagem-sem-ano',
+        texto: mirim
+          ? 'Do 2º ao 5º ano, a sondagem pronta depende dos pacotes da OBMEP Mirim, que ainda não chegaram ao aplicativo.'
+          : 'A sondagem pronta vai do 6º ano ao 3º do médio. Registre o ano escolar no mapeamento para montar.' }));
+    }
+    corpo.appendChild(bloco);
+  }
+
+  /* O que está aberto na janela da sondagem. */
+  var sondagemAberta = null;
+  var urlsDaSondagem = [];
+
+  function soltarImagensDaSondagem() {
+    urlsDaSondagem.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) { /* já solta */ } });
+    urlsDaSondagem = [];
+  }
+
+  /* O enunciado do exercício, do próprio tablet, em miniatura: tirar e trocar
+   * sem ver o exercício seria escolher pelo nome da lista. */
+  function miniaturaDoExercicio(it) {
+    var img = el('img', { class: 'miniatura-sondagem', alt: 'Enunciado', style: 'display:block;max-width:100%;max-height:150px;margin:4px 0;background:#fff' });
+    if (it && it.assets && it.assets.enunciado) {
+      Store.lerAssetBiblioteca(it.pacote, it.assets.enunciado).then(function (b) {
+        if (!b) return;
+        var u = URL.createObjectURL(b);
+        urlsDaSondagem.push(u);
+        img.src = u;
+      }, function () { img.remove(); });
+    }
+    return img;
+  }
+
+  function descricaoDoExercicio(id) {
+    var it = bib && bib.itemPorId[id];
+    if (!it) return { nome: id, detalhe: 'Este exercício não está mais no tablet.' };
+    return { nome: it.modulo.titulo, detalhe: it.aula.titulo + ', exercício ' + it.numero, it: it };
+  }
+
+  function abrirSondagem(alunoId, aulaId) {
+    var aluno = alunoPorId(alunoId);
+    var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
+    if (!aluno || !aula) return;
+    $('#titulo-modal-sondagem').textContent = 'Sondagem de ' + aluno.nome;
+    var corpo = $('#corpo-modal-sondagem');
+    $('#rodape-modal-sondagem').innerHTML = '';
+    corpo.innerHTML = '';
+    corpo.appendChild(el('p', { class: 'ajuda', texto: 'Abrindo a biblioteca do tablet...' }));
+    abrirModal('modal-sondagem');
+    carregarBiblioteca().then(function () {
+      var feita = sondagemDaAula(aluno, aulaId);
+      var ano = feita ? (feita.anoEscolar || Core.anoEscolarDe(aluno)) : Core.anoEscolarDe(aluno);
+      var listas = listasDoTablet(), series = seriesDoTablet();
+      var blocos;
+      if (feita) {
+        /* A guardada manda: as lacunas dela, na ordem, com os exercícios
+         * dela. Os candidatos são refeitos do tablet, para trocar e pôr. */
+        var ordem = [];
+        feita.itens.forEach(function (x) { if (ordem.indexOf(x.lacuna) < 0) ordem.push(x.lacuna); });
+        blocos = ordem.map(function (id) {
+          var c = Core.candidatosDaSondagem(id, ano, listas, series);
+          return { lacuna: id, rotulo: rotuloDaLacuna(id), candidatos: c.candidatos, faltam: c.faltam, descartados: [],
+            itens: feita.itens.filter(function (x) { return x.lacuna === id; }).map(function (x) { return x.item; }) };
+        });
+      } else {
+        blocos = Core.montarSondagem(ano, listas, series).blocos.map(function (b) {
+          b.descartados = [];
+          return b;
+        });
+      }
+      sondagemAberta = { alunoId: alunoId, aulaId: aulaId, ano: ano, blocos: blocos, listas: listas, series: series,
+        semPacote: !series.length };
+      desenharSondagemParaEditar();
+    }, function () {
+      corpo.innerHTML = '';
+      corpo.appendChild(el('div', { class: 'faixa-aviso', texto: 'Não consegui ler a biblioteca do tablet. Feche e tente de novo.' }));
+    });
+  }
+
+  function itensDaSondagemAberta() {
+    var out = [];
+    (sondagemAberta ? sondagemAberta.blocos : []).forEach(function (b) {
+      b.itens.forEach(function (id) { out.push({ item: id, lacuna: b.lacuna }); });
+    });
+    return out;
+  }
+
+  /* O próximo exercício da lacuna que não está na sondagem nem foi tirado
+   * por ela nesta edição. */
+  function proximoDaLacuna(b) {
+    var usados = itensDaSondagemAberta().map(function (x) { return x.item; }).concat(b.descartados);
+    return Core.escolherItensDaSondagem(b.candidatos, usados, 1)[0] || null;
+  }
+
+  function desenharSondagemParaEditar() {
+    var s = sondagemAberta;
+    if (!s) return;
+    soltarImagensDaSondagem();
+    var corpo = $('#corpo-modal-sondagem');
+    var rodape = $('#rodape-modal-sondagem');
+    var rolagem = corpo.scrollTop;
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', id: 'sondagem-explica',
+      texto: 'Sondagem do ' + nomeDoAnoDaSondagem(s.ano) + ': dois exercícios por lacuna provável do ano, do degrau 1 ' +
+        'das listas da OBMEP que estão no tablet. Tire, troque ou ponha exercício antes de gerar a folha. ' +
+        'Não é prova: é para ver onde a base falha.' }));
+    if (s.semPacote) {
+      corpo.appendChild(el('div', { class: 'faixa-aviso', id: 'sondagem-sem-pacote',
+        texto: 'Nenhum pacote da biblioteca está no tablet. Importe os pacotes da OBMEP em Ajustes, na Biblioteca.' }));
+    }
+    s.blocos.forEach(function (b, bi) {
+      var caixa = el('div', { class: 'bloco-sondagem', 'data-lacuna': b.lacuna, style: 'margin:14px 0' });
+      var proximo = proximoDaLacuna(b);
+      caixa.appendChild(el('div', { class: 'barra' }, [
+        el('h3', { class: 'subtitulo', style: 'margin:0;border:none', texto: b.rotulo }),
+        el('span', { class: 'tag' + (b.itens.length ? ' cheia' : ''), texto: contagemDaSondagem(b.itens.length, 'exercício', 'exercícios') }),
+        el('span', { class: 'cresce' }),
+        el('button', { type: 'button', class: 'btn pequeno por-sondagem', texto: 'Pôr mais um', disabled: proximo ? null : 'disabled',
+          aoClick: function () { var n = proximoDaLacuna(b); if (n) { b.itens.push(n); desenharSondagemParaEditar(); } } }),
+        el('button', { type: 'button', class: 'btn pequeno tirar-lacuna-sondagem', texto: 'Tirar a lacuna',
+          aoClick: function () { s.blocos.splice(bi, 1); desenharSondagemParaEditar(); } })
+      ]));
+      if (!b.candidatos.length) {
+        caixa.appendChild(el('div', { class: 'faixa-aviso sondagem-sem-exercicio', texto: b.faltam.length
+          ? 'Sem exercício para esta lacuna: falta importar o pacote do ' +
+            b.faltam.map(Biblioteca.nomeDaSerie).join(' ou o do ') + ' da OBMEP, em Ajustes.'
+          : 'Os pacotes do tablet não têm exercício de degrau 1 para esta lacuna.' }));
+      }
+      b.itens.forEach(function (id, k) {
+        var d = descricaoDoExercicio(id);
+        caixa.appendChild(el('div', { class: 'item-lista item-sondagem', 'data-item': id }, [
+          el('div', { class: 'cresce' }, [
+            el('div', { class: 'nome', texto: d.nome }),
+            el('div', { class: 'detalhe', texto: d.detalhe }),
+            d.it ? miniaturaDoExercicio(d.it) : null
+          ]),
+          el('button', { type: 'button', class: 'btn pequeno trocar-sondagem', texto: 'Trocar',
+            aoClick: function () {
+              var n = proximoDaLacuna(b);
+              if (!n) { avisar('Não há outro exercício de degrau 1 para ' + b.rotulo + ' nos pacotes do tablet.'); return; }
+              b.descartados.push(id);
+              b.itens[k] = n;
+              desenharSondagemParaEditar();
+            } }),
+          el('button', { type: 'button', class: 'btn pequeno tirar-sondagem', texto: 'Tirar',
+            aoClick: function () { b.descartados.push(id); b.itens.splice(k, 1); desenharSondagemParaEditar(); } })
+        ]));
+      });
+      corpo.appendChild(caixa);
+    });
+
+    // pôr uma lacuna que a tabela do ano não trouxe
+    var jaTem = s.blocos.map(function (b) { return b.lacuna; });
+    var outras = Core.itensDaMateria('lacunas', Core.MATERIA_PADRAO).filter(function (i) {
+      return i.obmep && i.obmep.length && jaTem.indexOf(i.id) < 0;
+    });
+    if (outras.length) {
+      var sel = el('select', { id: 'sondagem-outra-lacuna' });
+      outras.forEach(function (i) { sel.appendChild(el('option', { value: i.id, texto: i.rotulo })); });
+      corpo.appendChild(el('div', { class: 'campo', style: 'margin-top:18px' }, [
+        el('span', { texto: 'Pôr outra lacuna' }),
+        el('div', { class: 'barra' }, [sel, el('button', { type: 'button', class: 'btn pequeno', id: 'sondagem-por-lacuna', texto: 'Pôr',
+          aoClick: function () {
+            var id = sel.value;
+            var c = Core.candidatosDaSondagem(id, s.ano, s.listas, s.series);
+            var usados = itensDaSondagemAberta().map(function (x) { return x.item; });
+            s.blocos.push({ lacuna: id, rotulo: rotuloDaLacuna(id), candidatos: c.candidatos, faltam: c.faltam, descartados: [],
+              itens: Core.escolherItensDaSondagem(c.candidatos, usados, 2) });
+            desenharSondagemParaEditar();
+          } })])
+      ]));
+    }
+
+    var total = itensDaSondagemAberta().length;
+    var aluno = alunoPorId(s.alunoId);
+    var feita = aluno ? sondagemDaAula(aluno, s.aulaId) : null;
+    rodape.appendChild(el('span', { class: 'esquerda ajuda', id: 'sondagem-total', style: 'margin:0;align-self:center',
+      texto: contagemDaSondagem(total, 'exercício', 'exercícios') + ' na sondagem' }));
+    rodape.appendChild(el('button', { type: 'button', class: 'btn', texto: 'Cancelar',
+      aoClick: function () { fecharModal('modal-sondagem'); } }));
+    if (feita) {
+      rodape.appendChild(el('button', { type: 'button', class: 'btn', id: 'sondagem-ir-corrigir', texto: 'Corrigir',
+        aoClick: function () { abrirCorrecaoDaSondagem(s.alunoId, s.aulaId); } }));
+    }
+    rodape.appendChild(el('button', { type: 'button', class: 'btn principal', id: 'sondagem-gerar', texto: 'Gerar a folha',
+      disabled: total ? null : 'disabled', aoClick: gerarFolhaDaSondagem }));
+    corpo.scrollTop = rolagem;
+  }
+
+  /* Guarda a sondagem no aluno e manda os exercícios pelo caminho que a
+   * biblioteca já usa para "Abrir a lista como folha da aula": o material
+   * passa pela porta única (trocarMaterial, e o que estava marcado vai para as
+   * Seleções anteriores), e a janela Gerar material abre com a aula do
+   * mapeamento escolhida e a Folha marcada. */
+  function gerarFolhaDaSondagem() {
+    var s = sondagemAberta;
+    var aluno = s && alunoPorId(s.alunoId);
+    var aula = s && db.aulas.filter(function (a) { return a.id === s.aulaId; })[0];
+    if (!aluno || !aula) return;
+    var itens = itensDaSondagemAberta();
+    if (!itens.length) { avisar('A sondagem está sem exercício.'); return; }
+    var reg = sondagemDaAula(aluno, aula.id);
+    if (!reg) {
+      reg = { id: Core.uid(), aulaId: aula.id, data: aula.data, anoEscolar: s.ano, criadaEm: Core.hojeIso(), itens: [] };
+      aluno.sondagens = sondagensDe(aluno).concat([reg]);
+    }
+    // a correção de um exercício que continua na sondagem não se perde
+    var respostas = {};
+    reg.itens.forEach(function (x) { respostas[x.item] = x.resposta || ''; });
+    reg.itens = itens.map(function (x) { return { item: x.item, lacuna: x.lacuna, resposta: respostas[x.item] || '' }; });
+    reg.folhaEm = Core.hojeIso();
+    var ids = itens.map(function (x) { return x.item; });
+    salvarEDepois(function () {
+      fecharModal('modal-sondagem');
+      soltarImagensDaSondagem();
+      if (!trocarMaterial({ itens: ids, paginas: [] }, 'sondagem', null)) return;
+      // como no botão Material: a janela da aula fecha, e a folha abre depois de anexar
+      fecharModal('modal-aula');
+      abrirGerarMaterial({ daSondagem: true, aulaId: aula.id, titulo: 'Sondagem',
+        subtitulo: nomeDoAnoDaSondagem(s.ano), folha: true });
+    });
+  }
+
+  /* A correção: para cada exercício, certo, meio certo ou errado. Nada é
+   * gravado aqui; a gravação é no passo seguinte, depois de ela ver o que vai
+   * para o mapeamento. */
+  var correcaoAberta = null;
+
+  function abrirCorrecaoDaSondagem(alunoId, aulaId) {
+    var aluno = alunoPorId(alunoId);
+    var feita = aluno ? sondagemDaAula(aluno, aulaId) : null;
+    if (!feita) { avisar('Esta aula ainda não tem sondagem.'); return; }
+    $('#titulo-modal-sondagem').textContent = 'Correção da sondagem de ' + aluno.nome;
+    abrirModal('modal-sondagem');
+    carregarBiblioteca().then(null, function () { return null; }).then(function () {
+      correcaoAberta = { alunoId: alunoId, aulaId: aulaId, id: feita.id,
+        respostas: feita.itens.map(function (x) { return x.resposta || ''; }) };
+      desenharCorrecaoDaSondagem();
+    });
+  }
+
+  function desenharCorrecaoDaSondagem() {
+    var c = correcaoAberta;
+    var aluno = c && alunoPorId(c.alunoId);
+    var feita = aluno && sondagemDaAula(aluno, c.aulaId);
+    if (!feita) return;
+    soltarImagensDaSondagem();
+    var corpo = $('#corpo-modal-sondagem');
+    var rodape = $('#rodape-modal-sondagem');
+    var rolagem = corpo.scrollTop;
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0',
+      texto: 'Para cada exercício, marque como saiu. A lacuna só vai para o mapeamento quando nenhum exercício dela ' +
+        'saiu certo, e nada é gravado antes de você confirmar.' }));
+    var lacunaAntes = null;
+    feita.itens.forEach(function (x, k) {
+      if (x.lacuna !== lacunaAntes) {
+        corpo.appendChild(el('h3', { class: 'subtitulo', texto: rotuloDaLacuna(x.lacuna) }));
+        lacunaAntes = x.lacuna;
+      }
+      var d = descricaoDoExercicio(x.item);
+      var botoes = Core.RESPOSTAS_SONDAGEM.map(function (r) {
+        var ativa = c.respostas[k] === r.id;
+        return el('button', { type: 'button', class: 'btn pequeno opcao-correcao' + (ativa ? ' destaque ativa' : ''),
+          'data-resposta': r.id, 'aria-pressed': ativa ? 'true' : 'false', texto: r.rotulo,
+          aoClick: function () {
+            // tocar de novo na marcada desmarca: ela pode deixar para depois
+            c.respostas[k] = c.respostas[k] === r.id ? '' : r.id;
+            desenharCorrecaoDaSondagem();
+          } });
+      });
+      corpo.appendChild(el('div', { class: 'item-lista item-correcao', 'data-item': x.item, 'data-lacuna': x.lacuna }, [
+        el('div', { class: 'cresce' }, [
+          el('div', { class: 'nome', texto: (k + 1) + '. ' + d.nome }),
+          el('div', { class: 'detalhe', texto: d.detalhe }),
+          d.it ? miniaturaDoExercicio(d.it) : null
+        ]),
+        el('div', { class: 'barra' }, botoes)
+      ]));
+    });
+    var feitos = c.respostas.filter(Boolean).length;
+    rodape.appendChild(el('span', { class: 'esquerda ajuda', style: 'margin:0;align-self:center',
+      texto: feitos + ' de ' + feita.itens.length + ' corrigidos' }));
+    rodape.appendChild(el('button', { type: 'button', class: 'btn', texto: 'Cancelar',
+      aoClick: function () { fecharModal('modal-sondagem'); } }));
+    rodape.appendChild(el('button', { type: 'button', class: 'btn principal', id: 'sondagem-ver-resultado',
+      texto: 'Ver o que vai para o mapeamento', aoClick: desenharConfirmacaoDaSondagem }));
+    corpo.scrollTop = rolagem;
+  }
+
+  /* A sondagem com as respostas da tela, sem tocar na guardada. */
+  function sondagemComRespostas() {
+    var c = correcaoAberta;
+    var aluno = c && alunoPorId(c.alunoId);
+    var feita = aluno && sondagemDaAula(aluno, c.aulaId);
+    if (!feita) return null;
+    return { id: feita.id, data: feita.data, itens: feita.itens.map(function (x, k) {
+      return { item: x.item, lacuna: x.lacuna, resposta: c.respostas[k] || '' };
+    }) };
+  }
+
+  function desenharConfirmacaoDaSondagem() {
+    var c = correcaoAberta;
+    var aluno = c && alunoPorId(c.alunoId);
+    var tmp = sondagemComRespostas();
+    if (!tmp) return;
+    var corpo = $('#corpo-modal-sondagem');
+    var rodape = $('#rodape-modal-sondagem');
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    var m = Core.mapeamentoAtual(aluno);
+    var marcadas = m ? Core.marcadosDaMateria(m, Core.MATERIA_PADRAO).lacunas : [];
+    var res = Core.lacunasDaCorrecao(tmp);
+    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', texto: m
+      ? 'Isto vai para o mapeamento de ' + Core.ddmmaaaa(m.data) + '. O que você já marcou lá continua como está.'
+      : 'Ainda não há mapeamento: um novo nasce com estas lacunas, ligado a esta aula.' }));
+    var lista = el('div', { id: 'sondagem-confirmacao' });
+    res.forEach(function (r) {
+      var texto;
+      if (!r.decidida) texto = 'falta corrigir ' + contagemDaSondagem(r.total - r.certos - r.meios - r.errados, 'exercício', 'exercícios') + '; nada muda';
+      else if (r.marca) texto = (marcadas.indexOf(r.lacuna) >= 0 ? 'já estava marcada; a evidência entra junto: ' : 'marca a lacuna: ') + r.evidencia;
+      else texto = 'não marca (' + (r.certos ? 'acertou ' + r.certos + ' de ' + r.total : 'saiu meio certo') + ')';
+      lista.appendChild(el('div', { class: 'item-lista linha-confirmacao' + (r.marca ? ' marca' : ''), 'data-lacuna': r.lacuna }, [
+        el('div', { class: 'cresce' }, [
+          el('div', { class: 'nome', texto: r.rotulo }),
+          el('div', { class: 'detalhe', texto: texto })
+        ])
+      ]));
+    });
+    corpo.appendChild(lista);
+    rodape.appendChild(el('button', { type: 'button', class: 'btn', id: 'sondagem-voltar-correcao', texto: 'Voltar à correção',
+      aoClick: desenharCorrecaoDaSondagem }));
+    rodape.appendChild(el('button', { type: 'button', class: 'btn principal', id: 'sondagem-gravar', texto: 'Confirmar e gravar',
+      aoClick: gravarCorrecaoDaSondagem }));
+  }
+
+  function gravarCorrecaoDaSondagem() {
+    var c = correcaoAberta;
+    var aluno = c && alunoPorId(c.alunoId);
+    var feita = aluno && sondagemDaAula(aluno, c.aulaId);
+    var aula = db.aulas.filter(function (a) { return a.id === (c && c.aulaId); })[0];
+    if (!feita) return;
+    // o mapeamento aberto noutra janela não pode virar disco por tabela
+    if (mapeamentoEmEdicao && mapeamentoEmEdicao.alunoId === aluno.id) descartarMapeamentoEmEdicao();
+    feita.itens.forEach(function (x, k) { x.resposta = c.respostas[k] || ''; });
+    feita.corrigidaEm = Core.hojeIso();
+    var m = Core.mapeamentoAtual(aluno);
+    if (!m) {
+      m = Core.mapeamentoNovo();
+      m.aulaId = aula ? aula.id : null;
+      m.anoEscolar = aluno.anoEscolar || feita.anoEscolar || '';
+      m.anoEscolarOutro = aluno.anoEscolarOutro || '';
+      aluno.mapeamentos = (aluno.mapeamentos || []).concat([m]);
+    }
+    var r = Core.aplicarSondagemNoMapeamento(m, feita);
+    feita.aplicadaEm = Core.hojeIso();
+    feita.mapeamentoId = m.id;
+    feita.lacunasMarcadas = r.novas.concat(r.jaMarcadas);
+    var n = feita.lacunasMarcadas.length;
+    salvarEDepois(function (gravou) {
+      fecharModal('modal-sondagem');
+      soltarImagensDaSondagem();
+      correcaoAberta = null;
+      if ($('#modal-aula').classList.contains('aberto') && aulaEmEdicao) abrirAula(aulaEmEdicao.id);
+      desenharTudo();
+      if (gravou) {
+        avisar('Correção gravada. ' + (n ? contagemDaSondagem(n, 'lacuna marcada', 'lacunas marcadas') + ' no mapeamento, com a evidência.'
+          : 'Nenhuma lacuna marcada.'));
+      }
+    });
   }
 
   // ================= índice de assuntos de matemática =================
@@ -13337,7 +13822,9 @@
         (k.degraus || []).forEach(function (d) { minutosDe[d.item] = d.minutos; });
         (arv.listasPorModulo[k.modulo] = arv.listasPorModulo[k.modulo] || []).push({
           id: k.id, modulo: k.modulo, nivel: k.nivel, minutos: k.minutos, regra: k.regra,
-          itens: itens, ids: itens.map(function (it) { return it.id; }), minutosDe: minutosDe
+          itens: itens, ids: itens.map(function (it) { return it.id; }), minutosDe: minutosDe,
+          // o degrau de cada posição: a sondagem (C5) escolhe só o degrau 1
+          degraus: (k.degraus || []).map(function (d) { return { item: d.item, degrau: d.degrau }; })
         });
       });
     });
@@ -15807,13 +16294,19 @@
   var gerandoMaterial = false;
   function abrirModalGerar() { /* guarda o atualizar() da janela aberta */ }
 
-  function abrirGerarMaterial() {
+  /* `opcoes` só vale com `daSondagem` (C5): os botões da biblioteca chamam
+   * esta função direto do clique, e o evento chega aqui no lugar dela. A
+   * sondagem traz o título, a aula do encontro de mapeamento já escolhida, a
+   * Folha marcada e `semAssuntos` (ver gerarEAnexar). */
+  function abrirGerarMaterial(opcoes) {
+    var daSondagem = opcoes && opcoes.daSondagem ? opcoes : null;
     if (!bib) return;
     limparCarrinhoOrfao();
     var itens = bibCarrinho.itens.map(function (id) { return bib.itemPorId[id]; });
     var paginas = bibCarrinho.paginas.map(paginaDeTeoriaPorId);
     if (!itens.length && !paginas.length) return;
     var padrao = tituloPadraoDoCarrinho(itens, paginas);
+    if (daSondagem) padrao = { titulo: daSondagem.titulo || padrao.titulo, subtitulo: daSondagem.subtitulo || '' };
     var escolha = { aulaId: null, nova: false, botao: null };
     var corpo = $('#corpo-modal-bib-gerar');
     var rodape = $('#rodape-modal-bib-gerar');
@@ -15976,7 +16469,8 @@
       return {
         titulo: campoTitulo.value.trim() || padrao.titulo, subtitulo: campoSub.value.trim(),
         teoria: caixas.teoria.checked, lista: caixas.lista.checked, gabarito: caixas.gabarito.checked,
-        espaco: caixas.espaco.checked, origem: caixas.origem.checked, folha: caixas.folha.checked && !caixas.folha.disabled
+        espaco: caixas.espaco.checked, origem: caixas.origem.checked, folha: caixas.folha.checked && !caixas.folha.disabled,
+        semAssuntos: !!daSondagem
       };
     }
     botaoGerar.addEventListener('click', function () {
@@ -16035,6 +16529,23 @@
         }
       }
       if (daAula) marcarAula(daAula, bibContexto.aulaId, false);
+    }
+    /* A sondagem vem do encontro de mapeamento: a aula já foi escolhida lá,
+     * como no botão Material, e a Folha nasce marcada, porque a sondagem é
+     * feita na tela, com a caneta. Ela pode desmarcar. */
+    if (daSondagem && daSondagem.aulaId) {
+      var daSond = listaAulas.querySelector('[data-aula="' + daSondagem.aulaId + '"]');
+      if (!daSond) {
+        var aulaSond = db.aulas.filter(function (a) { return a.id === daSondagem.aulaId; })[0];
+        if (aulaSond && alunoPorId(aulaSond.alunoId)) {
+          listaAulas.insertBefore(el('div', { class: 'bloco-exercicios', texto: 'Aula do mapeamento' }), listaAulas.firstChild);
+          daSond = linhaAula(aulaSond);
+          listaAulas.insertBefore(daSond, listaAulas.children[1]);
+        }
+      }
+      if (daSond) marcarAula(daSond, daSondagem.aulaId, false);
+      atualizarRodape();
+      if (daSondagem.folha && !caixas.folha.disabled) caixas.folha.checked = true;
     }
     atualizarRodape();
     abrirModal('modal-bib-gerar');
@@ -16225,7 +16736,12 @@
          * anexo: sem pergunta, e só quando a aula ainda não tem assunto com o
          * mesmo título. */
         var antes = aula.temas, antesTema = aula.tema;
-        assuntosNovos = modulosComoAssunto(aula, modulosDoMaterial(op.teoria ? paginas : [], usaItens));
+        /* A SONDAGEM NÃO VIRA ASSUNTO (C5). Ela passa por seis ou sete
+         * módulos em 25 minutos para ver onde o aluno trava, e não é aula de
+         * nenhum deles: virar assunto poria "Frações, Divisibilidade, Áreas..."
+         * no registro da aula e no documento da família, como se tivessem sido
+         * ensinados. O anexo continua anotando os módulos, como registro. */
+        assuntosNovos = op.semAssuntos ? [] : modulosComoAssunto(aula, modulosDoMaterial(op.teoria ? paginas : [], usaItens));
         titulosGuardados()[aula.alunoId] = { titulo: op.titulo, subtitulo: op.subtitulo };
         return salvar().catch(function (e) {
           // não gravou: os anexos saem da memória, senão o próximo salvar os gravaria e a nova tentativa duplicaria

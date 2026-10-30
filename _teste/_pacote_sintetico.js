@@ -600,9 +600,99 @@ function gerarBanco(saida, opcoes) {
   return { zip, manifest, itens, arquivos };
 }
 
+/* Pacote sintético da SONDAGEM (C5), para o testa_sondagem_navegador.
+ *
+ * A regra de escolha da sondagem mora no core.js como prefixo de id
+ * ("9ano:conjuntos", "9ano:<módulo>:<lista>"), com os nomes de módulo e de
+ * lista dos pacotes de verdade. Para a prova exercitar a regra de verdade, e
+ * não uma cópia dela, este pacote usa os MESMOS nomes de módulo e de lista do
+ * 9º ano; o resto é sintético como no pacote de sempre: títulos escritos aqui
+ * e recortes de retângulos, sem texto e sem enunciado de ninguém.
+ *
+ * Cada módulo tem duas listas da fonte com três exercícios cada, e uma lista
+ * pronta (base-v1, nível 1) com QUATRO exercícios de degrau 1 e um de degrau
+ * 2: há candidato sobrando para trocar e pôr, e um que a sondagem nunca pode
+ * escolher. Só o 9º ano: o 8º fica de fora de propósito, para a sondagem do
+ * 1º médio mostrar o aviso de pacote que falta (fatoração). */
+const MODULOS_SONDAGEM = [
+  { slug: 'equacoes-do-segundo-grau', titulo: 'Equações do Segundo Grau (sintético)', listas: ['resultados-basicos', 'relacoes-entre-coeficientes-e-raizes'] },
+  { slug: 'teorema-de-pitagoras-e-aplicacoes', titulo: 'Teorema de Pitágoras (sintético)', listas: ['teorema-de-pitagoras-e-aplicacoes', 'mais-aplicacoes'] },
+  { slug: 'semelhanca-de-triangulos-e-teorema-de-tales', titulo: 'Semelhança (sintético)', listas: ['teorema-de-tales', 'semelhancas-entre-figuras'] },
+  { slug: 'triangulo-retangulo-lei-dos-senos-e-cossenos-polig', titulo: 'Triângulo Retângulo (sintético)',
+    listas: ['razoes-trigonometricas-no-triangulo-retangulo-seno-cosseno-e', 'lei-dos-cossenos-e-lei-dos-senos'] },
+  { slug: 'funcoes-nocoes-basicas', titulo: 'Funções (sintético)', listas: ['funcoes-nocoes-basicas', 'resolucao-de-exercicios'] },
+  { slug: 'conjuntos', titulo: 'Conjuntos (sintético)', listas: ['nocoes-basicas', 'conjuntos-numericos'] }
+];
+const CORES_SONDAGEM = ['#1F3A5F', '#2E7D6B', '#B4453C', '#7C3AED', '#C9A961', '#3B6EA8'];
+
+function gerarSondagem(saida, opcoes) {
+  opcoes = opcoes || {};
+  const serie = '9ano';
+  const arquivos = {}, itens = [], docs = [], kits = [];
+  MODULOS_SONDAGEM.forEach((m, mi) => {
+    const cor = CORES_SONDAGEM[mi % CORES_SONDAGEM.length];
+    const porLista = [];
+    m.listas.forEach((ls, li) => {
+      const ids = [];
+      for (let n = 1; n <= 3; n++) {
+        const id = `${serie}:${m.slug}:${ls}:ex:${n}`;
+        const base = `assets/${serie}/${m.slug}/${ls}/ex-${dd(n)}`;
+        const alt = 80 + n * 15;
+        arquivos[base + '.svg'] = { dados: Buffer.from(svgRecorte(262, alt, n + li * 3 + mi, cor)), metodo: 8 };
+        arquivos[base + '-sol.svg'] = { dados: Buffer.from(svgRecorte(262, alt + 40, n + 5, '#C9A961')), metodo: 8 };
+        const texto = `exercicio sintetico ${n} da lista ${li + 1} do modulo ${mi + 1}`;
+        itens.push({
+          id, fonte: 'obmep-portal', serie, modulo: { slug: m.slug, titulo: m.titulo },
+          aula: { slug: ls, titulo: 'Lista sintética ' + (li + 1), n: li + 1 },
+          numero: n, formato: 'aberta', alternativas: null, resposta: null, subitens: [], texto, origem_citada: null,
+          dificuldade: n === 3 ? 2 : 1, dificuldade_origem: 'proxy', proxy: { posicao: (n - 1) / 3, terco: n === 3 ? 2 : 1 }, tema_app: null,
+          assets: { enunciado: base + '.svg', solucao: base + '-sol.svg' },
+          medidas: { enunciado: { largura_pt: 262, altura_pt: alt }, solucao: { largura_pt: 262, altura_pt: alt + 40 } },
+          origem: { arquivo: `PDF/matematica/sintetico/${serie}/${m.slug}__exercicios-${ls}.pdf`,
+            enunciado: { pagina: 1, coluna: 1, bbox: [33, 100, 295, 100 + alt] },
+            solucao: { pagina: 5, coluna: 1, bbox: [33, 100, 295, 140 + alt] } }
+        });
+        docs.push({ id, tipo: 'exercicio', titulo: '', resumo: m.titulo, texto });
+        ids.push(id);
+      }
+      porLista.push(ids);
+    });
+    docs.push({ id: `${serie}:${m.slug}`, tipo: 'modulo', titulo: m.titulo, resumo: m.listas.join(' '), texto: '' });
+    // a lista pronta: degrau 1 alternando as duas listas da fonte, e o terceiro de cada uma no degrau 2
+    const ordem = [[porLista[0][0], 1], [porLista[1][0], 1], [porLista[0][1], 1], [porLista[1][1], 1], [porLista[0][2], 2]];
+    kits.push({ id: `${serie}:${m.slug}:kit:1`, modulo: `${serie}:${m.slug}`, serie, nivel: 1, titulo: m.titulo,
+      regra: 'base-v1', tempo_regra: 'tempo-v1', minutos: 25,
+      teoria: [], degraus: ordem.map((o, i) => ({ n: i + 1, item: o[0], degrau: o[1], minutos: 5 })),
+      alternativas: {}, relaxou: ['minutos'] });
+  });
+  docs.sort((a, b) => a.id < b.id ? -1 : 1);
+  const indice = Busca.montarIndice(docs.map(d => ({ id: d.id, serie: '09', titulo: d.titulo, resumo: d.resumo, explicacao: '', enunciados: d.texto })));
+  const tipos = {}; docs.forEach(d => { tipos[d.id] = d.tipo; });
+  indice.forEach(r => { r.k = tipos[r.i]; });
+  arquivos['itens.json'] = { dados: json(itens), metodo: 8 };
+  arquivos['teoria.json'] = { dados: json([]), metodo: 8 };
+  arquivos['busca.json'] = { dados: json({ formato: 'indice-de-busca', versao: 1, tipos: { k: 'modulo, teoria ou exercicio' }, temas: indice }), metodo: 8 };
+  arquivos['apelidos.json'] = { dados: json({}), metodo: 0 };
+  arquivos['kits.json'] = { dados: json(kits), metodo: 8 };
+  const nomes = Object.keys(arquivos).sort();
+  const lista = {};
+  nomes.forEach(n => { lista[n] = sha(arquivos[n].dados); });
+  const manifest = { esquema: 1, pacote: 'matematica-sintetico-sondagem-9ano', versao: opcoes.versao || 1,
+    gerado_em: '2026-10-30T10:00:00-03:00', gerador: { nome: '_teste/_pacote_sintetico.js', commit: null }, materia: 'matematica',
+    fonte: { id: 'obmep-portal', nome: 'Pacote sintético da sondagem', url: 'https://example.invalid/', licenca: 'gerado para teste' },
+    series: [serie],
+    contagens: { modulos: MODULOS_SONDAGEM.length, aulas_teoria: 0, paginas_teoria: 0, aulas_exercicios: MODULOS_SONDAGEM.length * 2,
+      itens: itens.length, itens_com_solucao: itens.length, itens_excluidos: 0, kits: kits.length },
+    arquivos: lista };
+  const zip = montarZip([{ nome: 'manifest.json', dados: json(manifest), metodo: 8 }]
+    .concat(nomes.map(n => ({ nome: n, dados: arquivos[n].dados, metodo: arquivos[n].metodo }))));
+  if (saida) fs.writeFileSync(saida, zip);
+  return { zip, manifest, itens, kits };
+}
+
 const VENENOS = ['corrompido-deflate', 'corrompido-stored', 'hash', 'sobrando', 'faltando', 'asset-citado', 'esquema', 'asset-fora'];
 
-module.exports = { gerar, gerarBanco, montarZip, crc32, VENENOS, MODULOS, KITS, LISTAS, LISTA_BASE, EXCLUSOES };
+module.exports = { gerar, gerarBanco, gerarSondagem, montarZip, crc32, VENENOS, MODULOS, MODULOS_SONDAGEM, KITS, LISTAS, LISTA_BASE, EXCLUSOES };
 
 if (require.main === module) {
   const saida = process.argv[2];
