@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.35.0';
+  var VERSAO = '1.36.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,18 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.36.0',
+      itens: [
+        'Foto ou PDF anexado à aula: "Abrir como folha para escrever em cima" leva para a folha da mesma aula, e você escreve com a caneta.',
+        'No Fechamento, "Marcar como pago" em cada aluno, com o valor e a data, e a lista "Pagamentos pendentes" no alto da aba. ' +
+          'Ela conta a partir deste mês; para olhar meses anteriores, toque em "Mudar".',
+        'Em "Registrar como foi", cada assunto pode ser marcado "Ainda não", "Em andamento" ou "Domina". A ficha do aluno junta isso, ' +
+          'e o passo da trilha fecha quando ele domina o assunto.',
+        'No mapeamento, a sondagem por ano de entrada (do 6º ano ao 3º do médio): exercícios de anos anteriores, que você edita, viram ' +
+          'folha; depois da correção, as lacunas ficam marcadas com a evidência. "Como aprende melhor" virou "O que costuma funcionar".'
+      ]
+    },
     {
       versao: '1.35.0',
       itens: [
