@@ -82,7 +82,8 @@ console.log('\n=== 3. Fatia inválida é recusada, e não vira fatia vazia verde
 // a fatia e o rápido não combinam: o rápido pula o navegador, e a fatia diria que rodou o que pulou
 let rapidoComFatia = 0;
 try {
-  execFileSync('sh', [PORTAO, '--rapido', '--pedaco', '1/4'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  // com --listar: se a recusa sumir, a prova falha em um segundo, em vez de rodar o --rapido inteiro antes (A4c)
+  execFileSync('sh', [PORTAO, '--listar', '--rapido', '--pedaco', '1/4'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 } catch (e) { rapidoComFatia = e.status; }
 conf('--rapido com --pedaco recusa com saída 2', rapidoComFatia, 2);
 
