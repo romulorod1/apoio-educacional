@@ -6995,6 +6995,8 @@
       db.aulas = db.aulas.filter(function (a) { return a.alunoId !== id; });
       db.series = (db.series || []).filter(function (s) { return s.alunoId !== id; });
       db.resumos = db.resumos.filter(function (r) { return r.alunoId !== id; });
+      // os pagamentos dele saem junto, como os resumos; o Desfazer devolve os dois
+      db.pagamentos = (db.pagamentos || []).filter(function (p) { return p.alunoId !== id; });
     }).then(function () {
       fecharModal('modal-aluno');
       desenharTudo();
@@ -11262,6 +11264,8 @@
     numeros.appendChild(numeroComRodape('Total a receber', dinheiro(t.valorFeito), rodapesReceberFech));
 
     desenharGentilezas(numeros, t);
+    // antes do "mês sem aula": o que ficou por pagar de outro mês continua à vista
+    desenharPendentesDePagamento();
 
     var lista = $('#lista-fechamento');
     lista.innerHTML = '';
@@ -11426,10 +11430,196 @@
         }));
       }
 
+      cartao.appendChild(linhaDePagamento(f));
+
       lista.appendChild(cartao);
     });
 
     desenharPanoramaDeValores();
+  }
+
+  // ================= pago em (C4) =================
+
+  /* A linha do pagamento no cartão do aluno, no pé do cartão: o documento sai
+   * primeiro e o dinheiro chega depois, então a ordem do cartão é a ordem do
+   * mês dela. É só dela, como o resto desta tela: nenhum documento da família
+   * lê db.pagamentos (a regra e o porquê estão no core.js, em "pago em").
+   *
+   * Marcar, trocar o valor e desmarcar redesenham SÓ esta linha e a lista de
+   * pendentes, e não o Fechamento inteiro: ela está no pé do cartão, rolada
+   * até ali, e redesenhar tudo jogaria a rolagem de volta para o topo. */
+  function linhaDePagamento(f) {
+    var caixa = el('div', {
+      class: 'linha-pagamento', 'data-aluno': f.aluno.id,
+      style: 'margin-top:12px;padding-top:10px;border-top:1px solid var(--fio)'
+    });
+    desenharLinhaDePagamento(caixa, f, false);
+    return caixa;
+  }
+
+  // "1.250,00": o número como ela escreve, sem o R$, para o campo de digitar
+  function valorNoCampo(v) { return Core.fmtMoeda(v).replace(/^R\$\s*/, ''); }
+
+  function desenharLinhaDePagamento(caixa, f, editando) {
+    caixa.innerHTML = '';
+    var s = Core.situacaoDoPagamento(db, f);
+    var reg = s.registro;
+
+    if (editando) {
+      /* O proposto é o total a cobrar do mês, o MESMO do documento da família
+       * (Core.valorACobrarDoMes). Num mês que ainda não tem nada dado, a
+       * família que paga adiantado paga o mês inteiro, e é ele que vem. Ela
+       * troca quando a família pagou outro valor. */
+      var proposto = reg ? reg.valor : (s.devido > 0 ? s.devido : (f.totalValor || 0));
+      var campoValor = el('input', {
+        type: 'text', inputmode: 'decimal', autocomplete: 'off', class: 'pagamento-valor',
+        value: proposto > 0 ? valorNoCampo(proposto) : '', style: 'max-width:150px'
+      });
+      var campoData = el('input', {
+        type: 'date', class: 'pagamento-data', value: reg ? reg.pagoEm : Core.hojeIso(), style: 'max-width:180px'
+      });
+      var gravarPagamento = function () {
+        var valor = Core.lerReais(campoValor.value);
+        if (valor === null || valor <= 0) { avisar('Escreva o valor pago, por exemplo 150,00.'); return; }
+        if (!Core.marcarPagamento(db, f.aluno.id, f.mes, campoData.value, valor)) {
+          avisar('Confira a data do pagamento.');
+          return;
+        }
+        // a memória é a verdade; a faixa do salvar() avisa se não deu para guardar
+        salvar();
+        desenharLinhaDePagamento(caixa, f, false);
+        desenharPendentesDePagamento();
+      };
+      caixa.appendChild(el('div', { class: 'barra', style: 'gap:10px;align-items:flex-end;flex-wrap:wrap;margin:0' }, [
+        el('label', { class: 'campo', style: 'margin:0' }, [el('span', { texto: 'Valor pago (R$)' }), campoValor]),
+        el('label', { class: 'campo', style: 'margin:0' }, [el('span', { texto: 'Pago em' }), campoData]),
+        el('button', { type: 'button', class: 'btn principal btn-confirmar-pagamento', texto: 'Confirmar', aoClick: gravarPagamento }),
+        el('button', {
+          type: 'button', class: 'btn btn-cancelar-pagamento', texto: 'Cancelar',
+          aoClick: function () { desenharLinhaDePagamento(caixa, f, false); }
+        })
+      ]));
+      caixa.appendChild(el('div', {
+        class: 'ajuda', style: 'margin:6px 0 0',
+        texto: 'O valor proposto é o total a cobrar do mês. Troque se a família pagou outro valor.'
+      }));
+      return;
+    }
+
+    if (reg) {
+      var filhos = [el('strong', { class: 'pagamento-feito', texto: 'Pago em ' + Core.ddmm(reg.pagoEm) + ' · ' + dinheiro(reg.valor) })];
+      /* Pago a menos fica dito, com a diferença: esconder a diferença porque
+       * existe uma marca de pagamento seria a lista dizer que está tudo certo. */
+      if (s.falta > 0) {
+        filhos.push(el('span', { class: 'pagamento-falta', style: 'color:var(--vermelho)', texto: 'faltam ' + dinheiro(s.falta) }));
+      }
+      filhos.push(el('span', { class: 'cresce' }));
+      filhos.push(el('button', {
+        type: 'button', class: 'btn pequeno btn-alterar-pagamento', texto: 'Alterar',
+        aoClick: function () { desenharLinhaDePagamento(caixa, f, true); }
+      }));
+      filhos.push(el('button', {
+        type: 'button', class: 'btn pequeno btn-desmarcar-pagamento', texto: 'Desmarcar',
+        aoClick: function () {
+          if (!confirmar('Desmarcar o pagamento de ' + f.alunoNome + ' em ' + f.mesExtenso + '?')) return;
+          Core.desmarcarPagamento(db, f.aluno.id, f.mes);
+          salvar();
+          desenharLinhaDePagamento(caixa, f, false);
+          desenharPendentesDePagamento();
+        }
+      }));
+      caixa.appendChild(el('div', { class: 'barra', style: 'gap:10px;margin:0;flex-wrap:wrap' }, filhos));
+      return;
+    }
+
+    caixa.appendChild(el('div', { class: 'barra', style: 'margin:0' }, [
+      el('button', {
+        type: 'button', class: 'btn btn-marcar-pago', texto: 'Marcar como pago',
+        aoClick: function () { desenharLinhaDePagamento(caixa, f, true); }
+      })
+    ]));
+  }
+
+  /* Quem ainda não pagou o quê, mês a mês, no alto do Fechamento.
+   *
+   * Nasce RECOLHIDA a cada abertura do aplicativo: fica à vista só o cabeçalho,
+   * com quantas pendências e quanto falta, e a lista abre quando ela pede. A
+   * escolha não é guardada no banco: abrir e fechar uma lista não é dado dela,
+   * e gravar a cada toque seria gravação à toa. Abrir e fechar alternam o
+   * display no lugar, sem redesenhar a tela, pelo mesmo motivo do painel de
+   * valores: não jogar a rolagem dela para o topo. */
+  var pendentesAbertos = false;
+
+  function desenharPendentesDePagamento() {
+    var caixa = $('#pendentes-pagamento');
+    if (!caixa) return;
+    caixa.innerHTML = '';
+    var lista = Core.pendentesDePagamento(db);
+    if (!lista.length) {
+      caixa.appendChild(el('div', { class: 'ajuda', id: 'pendentes-vazio', style: 'margin:0 0 12px', texto: 'Pagamentos: nada pendente até hoje.' }));
+      return;
+    }
+    var soma = Core.somaDosPendentes(lista);
+
+    var corpo = el('div', { class: 'cartao', id: 'lista-pendentes', style: pendentesAbertos ? '' : 'display:none' });
+    corpo.appendChild(el('div', {
+      class: 'ajuda', style: 'margin-top:0',
+      texto: 'Só para você. Nada daqui entra no documento que a família recebe. ' +
+        'Quem pagou a menos aparece com a diferença.'
+    }));
+    var mesDaVez = null;
+    lista.forEach(function (p) {
+      if (p.mes !== mesDaVez) {
+        mesDaVez = p.mes;
+        corpo.appendChild(el('div', {
+          class: 'pendentes-mes', style: 'margin:12px 0 6px;font-weight:700;color:var(--navy)',
+          texto: p.mesExtenso + (p.emAndamento ? ' (em andamento, até hoje)' : '')
+        }));
+      }
+      var detalhe = p.aMenos
+        ? 'Pagou ' + dinheiro(p.pago) + ' em ' + Core.ddmm(p.pagoEm) + ', de ' + dinheiro(p.devido) + '.'
+        : 'Sem pagamento marcado.';
+      corpo.appendChild(el('div', { class: 'item-lista pendente-pagamento', 'data-aluno': p.alunoId, 'data-mes': p.mes }, [
+        el('div', { class: 'cresce' }, [
+          el('div', { class: 'nome', texto: p.alunoNome }),
+          el('div', { class: 'detalhe', texto: detalhe })
+        ]),
+        el('strong', { class: 'pendente-falta', texto: (p.aMenos ? 'faltam ' : '') + dinheiro(p.falta) }),
+        p.mes === mesAtual ? null : el('button', {
+          type: 'button', class: 'btn pequeno', texto: 'Ver o mês',
+          aoClick: function () { mesAtual = p.mes; desenharAgenda(); desenharFechamento(); }
+        })
+      ]));
+    });
+
+    var botao = el('button', {
+      type: 'button', class: 'btn pequeno', id: 'abrir-pendentes-pagamento',
+      texto: pendentesAbertos ? 'Esconder' : 'Mostrar',
+      'aria-expanded': pendentesAbertos ? 'true' : 'false'
+    });
+    botao.addEventListener('click', function () {
+      pendentesAbertos = corpo.style.display === 'none';
+      corpo.style.display = pendentesAbertos ? '' : 'none';
+      botao.textContent = pendentesAbertos ? 'Esconder' : 'Mostrar';
+      botao.setAttribute('aria-expanded', pendentesAbertos ? 'true' : 'false');
+    });
+
+    caixa.appendChild(el('div', {
+      class: 'barra',
+      style: 'margin:4px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--fio)'
+    }, [
+      el('h3', {
+        class: 'subtitulo', style: 'margin:0;padding-bottom:0;border-bottom:none',
+        texto: 'Pagamentos pendentes'
+      }),
+      el('span', {
+        class: 'tag cheia', id: 'resumo-pendentes',
+        texto: (soma.itens === 1 ? '1 pendência' : soma.itens + ' pendências') + ' · ' + dinheiro(soma.falta)
+      }),
+      el('span', { class: 'cresce' }),
+      botao
+    ]));
+    caixa.appendChild(corpo);
   }
 
   /* O que ela deu e não cobrou no mês.

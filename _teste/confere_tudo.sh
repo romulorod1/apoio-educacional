@@ -264,7 +264,7 @@ roda "fatias do portao"      node _teste/testa_pedacos_do_portao.js
 # em todo PR.
 for t in testa_registro testa_mapeamento testa_exclusoes testa_feriados \
          testa_mover testa_retroativo testa_series testa_aluno testa_rotulos_de_familia \
-         testa_vocabulario testa_dominio testa_sondagem; do
+         testa_vocabulario testa_dominio testa_sondagem testa_pagamentos; do
   roda "$t" node "_teste/$t.js"
 done
 
@@ -598,6 +598,10 @@ roda "leitor de pdf"                              node "_teste/testa_leitor_pdf.
 # (a foto direto, o PDF pelo leitor na pagina escolhida), com o traco salvo;
 # o .docx nao ganha a acao, e os tres anexos ficam byte a byte iguais.
 roda "anexo como folha"                           node "_teste/testa_anexo_como_folha.js"
+# C4: "pago em" no cartao do Fechamento (marcar, trocar o valor, desmarcar), a
+# lista de pendentes, recarregar, a copia de seguranca de ida e volta, e o
+# documento da familia (janela, PDF e texto) sem citar pagamento.
+roda "pago em"                                    node "_teste/testa_pago_em.js"
 # FRENTE B (B10): o que o lerKits recusa e o que a tela descarta (lista com
 # exercicio que saiu por curadoria). O veneno tira o guarda do app.js, e sem
 # ele a aba Biblioteca inteira nao abre.
