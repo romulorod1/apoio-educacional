@@ -21,6 +21,21 @@
  *      evidência;
  *   7. VENENO: cópias do core.js com a regra da marcação trocada TÊM de
  *      reprovar; a principal é a que marca a lacuna com um acerto só.
+ *
+ * C5b, do 2º ao 5º ano, com as provas da OBMEP Mirim:
+ *   1b. as cinco lacunas dos anos iniciais (ids novos, depois das 27) e a
+ *      regra `mirim` (assuntos do índice, do 2º ao 5º ano, nunca o misto
+ *      "Dobro, metade e triplo");
+ *   3b. a tabela do 2º ao 5º ano: 5 a 7 lacunas, cada uma com assunto que
+ *      não passa do ano;
+ *   4b. a escolha nas provas (um conjunto sintético, com número da questão,
+ *      terço e tema_app, embaralhado): pela ordem da prova, o ano anterior
+ *      mais perto primeiro, um por prova antes de repetir, nunca Diversos,
+ *      nunca o terço final, nunca prova nem assunto acima do ano, e o pacote
+ *      que falta dito;
+ *   7b. VENENO: a cópia que escolhe de Diversos, a que escolhe fora da ordem
+ *      da prova, a que deixa o terço final entrar e a que aceita assunto de
+ *      ano acima TÊM de reprovar.
  */
 'use strict';
 const fs = require('fs');
@@ -54,9 +69,11 @@ const ANTIGAS = ['naturais', 'tabuada', 'divisao', 'fracoes', 'decimais', 'porce
   'medidas', 'algebrica', 'eq1', 'sistemas', 'fatoracao', 'eq2', 'proporcao', 'area', 'pitagoras', 'semelhanca',
   'trigonometria', 'funcoes', 'graficos', 'probabilidade'];
 const NOVAS = ['divisibilidade', 'expressoes', 'angulos', 'notacao-cientifica', 'conjuntos'];
+const INICIAIS = ['valor-posicional', 'reagrupamento', 'fracoes-simples', 'tempo', 'problemas'];
 const ids = LAC.itens.map(i => i.id);
 conf('as 22 antigas continuam, na mesma ordem, com os mesmos ids', ids.slice(0, 22), ANTIGAS);
-conf('as cinco novas entram depois delas', ids.slice(22), NOVAS);
+conf('as cinco novas entram depois delas', ids.slice(22, 27), NOVAS);
+conf('e as cinco dos anos iniciais (C5b) depois das 27', ids.slice(27), INICIAIS);
 conf('nenhum id repetido', new Set(ids).size, ids.length);
 conf('o rótulo antigo de frações não mudou (o que ela marcou é lido igual)', Core.rotulosDoMapa('lacunas', ['fracoes']), ['Frações']);
 conf('as novas no rótulo', Core.rotulosDoMapa('lacunas', NOVAS), ['Divisibilidade, MMC e MDC',
@@ -73,12 +90,41 @@ LAC.itens.forEach(i => (i.obmep || []).forEach(p => {
   if (!/^(6ano|7ano|8ano|9ano|1em|2em|3em):[a-z0-9-]+(:[a-z0-9-]+)?$/.test(p)) foraDoFormato.push(i.id + ':' + p);
 }));
 conf('todo prefixo da OBMEP tem o formato série:módulo ou série:módulo:lista', foraDoFormato, []);
-conf('só tabuada e divisão ficam sem regra de escolha (anos iniciais, OBMEP Mirim)',
-  LAC.itens.filter(i => !(i.obmep && i.obmep.length)).map(i => i.id), ['tabuada', 'divisao']);
+conf('sem regra do Portal ficam só as dos anos iniciais (tabuada, divisão e as cinco do C5b)',
+  LAC.itens.filter(i => !(i.obmep && i.obmep.length)).map(i => i.id), ['tabuada', 'divisao'].concat(INICIAIS));
+conf('e toda lacuna tem alguma regra de escolha, do Portal ou da Mirim',
+  LAC.itens.filter(i => !(i.obmep && i.obmep.length) && !(i.mirim && i.mirim.length)).map(i => i.id), []);
 conf('nenhum travessão nas lacunas', TRAVESSAO.test(JSON.stringify(LAC)), false);
 conf('as novas aparecem para matemática, e não para história',
   [NOVAS.every(id => Core.itensDaMateria('lacunas', 'matematica').some(i => i.id === id)),
     Core.itensDaMateria('lacunas', 'historia').length], [true, 0]);
+
+// ================================================================
+secao('1b. As lacunas dos anos iniciais e a regra da Mirim (C5b)');
+
+conf('os rótulos das cinco dos anos iniciais', Core.rotulosDoMapa('lacunas', INICIAIS), ['Sistema de numeração e valor posicional',
+  'Adição e subtração com reagrupamento', 'Frações simples: metade, terço e quarto', 'Horas, relógio e calendário',
+  'Leitura e interpretação de problemas']);
+conf('os rótulos de tabuada e divisão não mudaram', Core.rotulosDoMapa('lacunas', ['tabuada', 'divisao']), ['Tabuada e multiplicação', 'Divisão']);
+const mirimForaDoFormato = [];
+LAC.itens.forEach(i => (i.mirim || []).forEach(t => {
+  const tema = temaPorId[t];
+  if (!/^MAT0[2-5]-\d\d$/.test(t) || !tema || ['02', '03', '04', '05'].indexOf(tema.serie) < 0) mirimForaDoFormato.push(i.id + ':' + t);
+}));
+conf('todo assunto da regra da Mirim existe no índice e é do 2º ao 5º ano', mirimForaDoFormato, []);
+conf('a regra da Mirim vai do ano mais baixo para o mais alto, em toda lacuna',
+  LAC.itens.filter(i => (i.mirim || []).some((t, k, l) => k > 0 && t < l[k - 1])).map(i => i.id), []);
+conf('"Dobro, metade e triplo" (misto) não entra em lacuna nenhuma',
+  LAC.itens.filter(i => (i.mirim || []).indexOf('MAT02-04') >= 0).map(i => i.id), []);
+conf('nenhum assunto da Mirim em duas lacunas (a evidência diria a lacuna errada)', (() => {
+  const visto = {}, dois = [];
+  LAC.itens.forEach(i => (i.mirim || []).forEach(t => { if (visto[t]) dois.push(t); visto[t] = true; }));
+  return dois;
+})(), []);
+conf('toda lacuna dos anos iniciais tem alvo, e a trilha do 3º ano acha o proposto',
+  INICIAIS.map(id => !!Core.alvosDaLacuna(temas, id, '03').sugerido), [true, true, true, true, true]);
+conf('e o proposto no 3º ano não passa do 3º ano', INICIAIS.map(id => temaPorId[Core.alvosDaLacuna(temas, id, '03').sugerido].serie <= '03'),
+  [true, true, true, true, true]);
 
 // ================================================================
 secao('2. O que costuma funcionar com este aluno');
@@ -113,7 +159,8 @@ conf('nenhum travessão no grupo', TRAVESSAO.test(JSON.stringify(APR)), false);
 secao('3. As lacunas prováveis de cada ano');
 
 const ANOS = ['06', '07', '08', '09', 'em1', 'em2', 'em3'];
-conf('a tabela cobre do 6º ano ao 3º do médio', Object.keys(Core.LACUNAS_PROVAVEIS).sort(), ANOS.slice().sort());
+const ANOS_MIRIM = ['02', '03', '04', '05'];
+conf('a tabela cobre do 2º ano ao 3º do médio', Object.keys(Core.LACUNAS_PROVAVEIS).sort(), ANOS_MIRIM.concat(ANOS).sort());
 ANOS.forEach(ano => {
   const l = Core.lacunasProvaveis(ano);
   const fora = l.filter(id => { const it = Core.itemDaLacuna(id); return !it || !it.obmep || !it.obmep.length; });
@@ -126,8 +173,31 @@ ANOS.forEach(ano => {
   conf(ano + ': todas têm tema de série anterior ao ano', deAgora, []);
 });
 conf('cursinho lê como 3º do médio', Core.lacunasProvaveis('cursinho'), Core.lacunasProvaveis('em3'));
-conf('2º ao 5º, fora da escola, outro e sem ano: nada (OBMEP Mirim fica para depois)',
-  ['02', '05', 'fora', 'outro', ''].map(a => Core.lacunasProvaveis(a).length), [0, 0, 0, 0, 0]);
+conf('fora da escola, outro e sem ano: nada',
+  ['fora', 'outro', ''].map(a => Core.lacunasProvaveis(a).length), [0, 0, 0]);
+
+secao('3b. As lacunas prováveis do 2º ao 5º ano (C5b)');
+const TABELA_MIRIM = {
+  '02': ['valor-posicional', 'reagrupamento', 'medidas', 'tempo', 'problemas'],
+  '03': ['valor-posicional', 'reagrupamento', 'tabuada', 'fracoes-simples', 'medidas', 'tempo', 'problemas'],
+  '04': ['valor-posicional', 'reagrupamento', 'tabuada', 'divisao', 'fracoes-simples', 'medidas', 'tempo'],
+  '05': ['valor-posicional', 'reagrupamento', 'tabuada', 'divisao', 'fracoes', 'decimais', 'medidas']
+};
+ANOS_MIRIM.forEach(ano => {
+  const l = Core.lacunasProvaveis(ano);
+  conf(ano + ': a tabela', l, TABELA_MIRIM[ano]);
+  conf(ano + ': de 5 a 7 lacunas, sem repetir', [l.length >= 5 && l.length <= 7, new Set(l).size === l.length], [true, true]);
+  /* O conteúdo dos anos anteriores E do próprio ano: todo assunto que a
+   * sondagem tenta é do ano de entrada ou de antes, e toda lacuna tem pelo
+   * menos um. */
+  conf(ano + ': toda lacuna tem assunto da Mirim que não passa do ano',
+    l.filter(id => !Core.temasDaSondagemMirim(id, ano).length), []);
+  conf(ano + ': e nenhum assunto tentado passa do ano',
+    [].concat.apply([], l.map(id => Core.temasDaSondagemMirim(id, ano))).filter(t => temaPorId[t].serie > ano), []);
+});
+conf('do 3º ao 5º, a maioria das lacunas tem assunto do ano anterior (é lacuna, e não matéria nova)',
+  ['03', '04', '05'].map(ano => Core.lacunasProvaveis(ano).filter(id =>
+    Core.temasDaSondagemMirim(id, ano).some(t => temaPorId[t].serie < ano)).length >= 4), [true, true, true]);
 conf('a lista devolvida é cópia: mexer nela não muda a tabela',
   (() => { const l = Core.lacunasProvaveis('09'); l.push('x'); return Core.lacunasProvaveis('09').indexOf('x'); })(), -1);
 
@@ -206,6 +276,111 @@ conf('e diz qual pacote falta', fat.faltam, ['8ano']);
 conf('as lacunas do 9º ano vêm completas', so9.blocos.filter(b => b.lacuna !== 'fatoracao').every(b => b.itens.length === 2), true);
 conf('sem pacote nenhum, toda lacuna diz o que falta',
   Core.montarSondagem('09', [], []).blocos.every(b => !b.itens.length && b.faltam.length > 0), true);
+
+// ================================================================
+secao('4b. A escolha nas provas da OBMEP Mirim (C5b)');
+
+/* Um conjunto SINTÉTICO de questões no formato do contrato (seção 8i): ids
+ * inventados ("mirim:2091:f1:m1:2"), número da questão, terço (dificuldade),
+ * tema_app e módulo, sem enunciado nenhum. Quatro provas: duas da Mirim 1,
+ * uma da Mirim 2 e uma do Nível A (que é Mirim 2). Diversos aparece como a
+ * PRIMEIRA questão de quase toda prova, para a cópia que o deixa entrar ser
+ * vista na hora; e há uma questão com tema_app num módulo Diversos.
+ * O terço vem do número: 1 a 5 é o primeiro, 6 a 10 o segundo, 11 em diante
+ * o último. */
+const DIV = { slug: 'mirim-diversos', titulo: 'Diversos' };
+const Q = (prova, n, tema, modulo) => ({
+  id: prova + ':' + n, serie: /:m1$/.test(prova) ? 'm1' : 'm2', numero: n, dificuldade: n <= 5 ? 1 : n <= 10 ? 2 : 3,
+  tema_app: tema, modulo: modulo || (tema ? { slug: 'mirim-assunto-' + tema.toLowerCase(), titulo: 'Assunto ' + tema } : DIV)
+});
+const P1 = 'mirim:2091:f1:m1', P2 = 'mirim:2092:f2:m1', PA = 'mirim:2090:a', P3 = 'mirim:2091:f1:m2';
+const PROVAS_SINTETICAS = [
+  Q(P1, 1, null), Q(P1, 2, 'MAT02-02'), Q(P1, 3, 'MAT02-01'), Q(P1, 4, 'MAT02-09'),
+  Q(P1, 5, 'MAT02-02', DIV),   // tema_app num módulo Diversos: não entra
+  Q(P1, 6, 'MAT03-04'), Q(P1, 7, 'MAT02-02'), Q(P1, 8, 'MAT02-03'), Q(P1, 12, 'MAT02-01'), Q(P1, 13, 'MAT03-04'),
+  Q(P2, 1, null), Q(P2, 2, 'MAT02-09'), Q(P2, 3, 'MAT02-02'), Q(P2, 5, 'MAT03-01'), Q(P2, 9, 'MAT03-04'),
+  Q(P2, 10, 'MAT02-01'), Q(P2, 14, 'MAT02-02'),
+  Q(PA, 1, 'MAT02-02'), Q(PA, 2, 'MAT04-01'), Q(PA, 3, 'MAT04-03'), Q(PA, 4, null), Q(PA, 6, 'MAT04-04'),
+  Q(P3, 1, null), Q(P3, 2, 'MAT04-03'), Q(P3, 3, 'MAT04-02'), Q(P3, 7, 'MAT04-04'), Q(P3, 11, 'MAT04-04')
+];
+/* Embaralhado de um jeito fixo: a ordem do arquivo não pode ser a da prova,
+ * senão a cópia que esquece de ordenar passaria. */
+const embaralhar = l => l.map((x, i) => ({ x, k: (i * 7919) % 31 })).sort((a, b) => a.k - b.k).map(o => o.x);
+const MISTURADAS = embaralhar(PROVAS_SINTETICAS);
+const DIVERSOS_SINTETICOS = PROVAS_SINTETICAS.filter(q => !q.tema_app || q.modulo === DIV).map(q => q.id);
+
+/* As provas da escolha. Recebe o Core por parâmetro para rodar igual contra
+ * o core.js de verdade e contra cada veneno (7b). */
+function provasDaMirim(C, conferir) {
+  const ambas = ['m1', 'm2'];
+  const blocos = (ano, provas, series) => {
+    const r = {};
+    C.montarSondagem(ano, [], series || ambas, provas || MISTURADAS).blocos.forEach(b => { r[b.lacuna] = b; });
+    return r;
+  };
+  const s3 = blocos('03');
+  conferir('3º: a lacuna de ano anterior vem primeiro (valor posicional: o 2º ano, depois o 3º)',
+    s3['valor-posicional'].candidatos, [P1 + ':3', P2 + ':10', P2 + ':5']);
+  conferir('3º: escolhe pela ordem da prova, uma de cada prova', s3['valor-posicional'].itens, [P1 + ':3', P2 + ':10']);
+  conferir('3º: reagrupamento pela ordem da prova, sem Diversos, sem o terço final e sem a prova da Mirim 2',
+    s3.reagrupamento.candidatos, [P1 + ':2', P2 + ':3', P1 + ':7', P1 + ':8']);
+  conferir('3º: as duas primeiras de provas diferentes', s3.reagrupamento.itens, [P1 + ':2', P2 + ':3']);
+  conferir('3º: tabuada só do 3º ano (assunto do 4º não entra)', s3.tabuada.itens, [P1 + ':6', P2 + ':9']);
+  conferir('3º: os assuntos tentados para tabuada', C.temasDaSondagemMirim('tabuada', '03'), ['MAT03-04']);
+  conferir('3º: tempo pela ordem da prova, mesmo vindo de outra prova', s3.tempo.itens, [P2 + ':2', P1 + ':4']);
+  conferir('3º: lacuna sem questão fica vazia, sem pacote faltando (a tela diz que as provas não têm)',
+    [s3['fracoes-simples'].itens, s3['fracoes-simples'].faltam, s3.problemas.itens], [[], [], []]);
+  const todos3 = [].concat.apply([], Object.keys(s3).map(k => s3[k].itens));
+  conferir('3º: oito questões, nenhuma repetida', [todos3.length, new Set(todos3).size], [8, 8]);
+
+  const s5 = blocos('05');
+  conferir('5º: valor posicional do 4º, depois do 3º, depois do 2º',
+    s5['valor-posicional'].candidatos, [PA + ':2', P2 + ':5', P1 + ':3', P2 + ':10']);
+  conferir('5º: a prova da Mirim 2 vale, e a questão 1 dela vem antes da 2 da Mirim 1',
+    s5.reagrupamento.candidatos, [P3 + ':3', PA + ':1', P1 + ':2', P2 + ':3', P1 + ':7', P1 + ':8']);
+  conferir('5º: tabuada do 4º ano primeiro, pela ordem da prova', s5.tabuada.itens, [P3 + ':2', PA + ':3']);
+  conferir('5º: divisão sem a questão do terço final', s5.divisao.candidatos, [PA + ':6', P3 + ':7']);
+
+  // nunca Diversos, em ano nenhum, nem entre os candidatos de trocar e pôr
+  const tudo = [];
+  ANOS_MIRIM.forEach(ano => {
+    const b = blocos(ano);
+    Object.keys(b).forEach(k => { tudo.push.apply(tudo, b[k].itens.concat(b[k].candidatos)); });
+  });
+  conferir('do 2º ao 5º, nenhuma questão de Diversos entre os escolhidos e os candidatos',
+    tudo.filter(id => DIVERSOS_SINTETICOS.indexOf(id) >= 0), []);
+  conferir('e nenhuma do terço final', tudo.filter(id => /:1[1-9]$/.test(id)), []);
+
+  // o pacote que falta
+  const soM1 = MISTURADAS.filter(q => q.serie === 'm1');
+  const s4 = blocos('04', soM1, ['m1']);
+  conferir('4º só com a Mirim 1: divisão fica sem questão e diz que falta a Mirim 2', [s4.divisao.itens, s4.divisao.faltam], [[], ['m2']]);
+  conferir('e valor posicional sai da Mirim 1', s4['valor-posicional'].itens, [P2 + ':5', P1 + ':3']);
+  const nada = blocos('03', [], []);
+  conferir('sem pacote nenhum, toda lacuna do 3º diz que falta a Mirim 1',
+    Object.keys(nada).map(k => [nada[k].itens.length, nada[k].faltam.join()]).filter(x => x[0] !== 0 || x[1] !== 'm1'), []);
+
+  // a mesma biblioteca em outra ordem dá a mesma sondagem
+  const outra = blocos('05', PROVAS_SINTETICAS.slice().reverse());
+  conferir('a ordem do arquivo não muda a sondagem', Object.keys(outra).map(k => outra[k].itens),
+    Object.keys(s5).map(k => s5[k].itens));
+}
+provasDaMirim(Core, conf);
+
+conf('um por prova: no Nível A, a prova é o id sem o número',
+  Core.escolherItensDaSondagem(['mirim:2090:a:2', 'mirim:2090:a:5', 'mirim:2091:f1:m2:3'], []), ['mirim:2090:a:2', 'mirim:2091:f1:m2:3']);
+conf('a Mirim 1 e a Mirim 2 da mesma fase são provas diferentes',
+  Core.escolherItensDaSondagem(['mirim:2091:f1:m1:2', 'mirim:2091:f1:m1:4', 'mirim:2091:f1:m2:3'], []), ['mirim:2091:f1:m1:2', 'mirim:2091:f1:m2:3']);
+conf('o Portal continua um por lista', Core.escolherItensDaSondagem(cand, []), [L('a', 1), L('b', 1)]);
+conf('"Pôr outra lacuna": no 3º ano, a regra é a da Mirim', ['tabuada', 'tempo', 'pitagoras', 'naturais'].map(id => Core.lacunaTemRegraNoAno(id, '03')),
+  [true, true, false, false]);
+conf('e no 9º, a do Portal', ['tabuada', 'tempo', 'pitagoras', 'naturais'].map(id => Core.lacunaTemRegraNoAno(id, '09')),
+  [false, false, true, true]);
+conf('no 3º ano, lacuna só com assunto do 4º não tem regra', Core.lacunaTemRegraNoAno('decimais', '03'), false);
+conf('o 6º ano continua no Portal, sem tocar nas provas da Mirim',
+  Core.montarSondagem('06', bibCheia, TODAS, MISTURADAS).blocos.every(b => b.itens.every(id => !/^mirim:/.test(id))), true);
+conf('Diversos: sem tema, ou no módulo Diversos', [Core.eDiversos(Q(P1, 1, null)), Core.eDiversos(Q(P1, 5, 'MAT02-02', DIV)),
+  Core.eDiversos(Q(P1, 2, 'MAT02-02'))], [true, true, false]);
 
 // ================================================================
 /* A seção da REGRA. Recebe o Core por parâmetro para rodar igual contra o
@@ -361,6 +536,64 @@ Object.keys(VENENOS).forEach(nome => {
   let n;
   try { n = contarFalhas(carregar(fonte, 'core_' + nome + '.js')); } catch (e) { n = 'erro: ' + e.message; }
   console.log('       veneno ' + nome + ': ' + n + ' prova(s) da regra reprovaram');
+  conf('veneno ' + nome + ': reprova (veneno visto)', typeof n === 'number' && n > 0, true);
+});
+
+// ================================================================
+secao('7b. VENENO: cópias do core.js com a escolha da Mirim trocada TÊM de reprovar (C5b)');
+
+/* Troca trechos EXATOS do core.js; cada um tem de existir uma vez só, senão
+ * o veneno não foi aplicado e a prova diz isso, em vez de passar calada. */
+function trocarTrechos(pares) {
+  let fonte = FONTE;
+  for (const [de, para] of pares) {
+    const i = fonte.indexOf(de);
+    if (i < 0 || fonte.indexOf(de, i + 1) >= 0) return null;
+    fonte = fonte.slice(0, i) + para + fonte.slice(i + de.length);
+  }
+  return fonte;
+}
+function contarFalhasDaMirim(C) {
+  let n = 0;
+  provasDaMirim(C, (rotulo, obtido, esperado) => { if (JSON.stringify(obtido) !== JSON.stringify(esperado)) n++; });
+  return n;
+}
+let controleMirim;
+try { controleMirim = contarFalhasDaMirim(carregar(FONTE, 'core_de_verdade.js')); } catch (e) { controleMirim = 'erro: ' + e.message; }
+conf('controle: o core.js de verdade, pelo carregador dos venenos, passa na escolha da Mirim', controleMirim, 0);
+
+const FILTRO = "      if (!q || typeof q.id !== 'string' || typeof q.numero !== 'number' || eDiversos(q)) return false;\n";
+const VENENOS_MIRIM = {
+  // o principal: Diversos entra como curinga, quando a questão não tem assunto
+  'escolhe-diversos': [
+    [FILTRO, "      if (!q || typeof q.id !== 'string' || typeof q.numero !== 'number') return false;\n"],
+    ['validas.filter(function (q) { return p.temas.indexOf(q.tema_app) >= 0; })',
+      'validas.filter(function (q) { return !q.tema_app || p.temas.indexOf(q.tema_app) >= 0; })']],
+  // Diversos só pelo tema: a questão com tema_app num módulo Diversos passa
+  'diversos-so-pelo-tema': [
+    ["    var m = q.modulo || {};\n    return /(^|-)diversos$/.test(String(m.slug || '')) || String(m.titulo || '') === 'Diversos';",
+      '    return false;']],
+  // fora da ordem da prova: na ordem em que o arquivo trouxe
+  'fora-da-ordem': [
+    ['        .sort(function (a, b) { return (a.numero - b.numero) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0); })\n', '']],
+  // a ordem invertida: a última questão primeiro
+  'ordem-invertida': [
+    ['return (a.numero - b.numero) || (a.id < b.id', 'return (b.numero - a.numero) || (a.id < b.id']],
+  // o terço final da prova entra
+  'terco-final-entra': [['      if (q.dificuldade === 3) return false;\n', '']],
+  // assunto de ano acima do de entrada entra, como o recurso do Portal
+  'ano-acima-entra': [['    var doAno = lista.filter(function (x) { return x.pos === teto; });',
+    '    var doAno = lista.filter(function (x) { return x.pos >= teto; });']],
+  // a prova de nível acima entra (Mirim 2 para quem entra no 3º)
+  'prova-acima-entra': [['      return !!piso && posDaSerie(piso) <= teto;', '      return !!piso;']]
+};
+Object.keys(VENENOS_MIRIM).forEach(nome => {
+  const fonte = trocarTrechos(VENENOS_MIRIM[nome]);
+  conf('veneno ' + nome + ': a troca foi aplicada', fonte !== null && fonte !== FONTE, true);
+  if (!fonte) return;
+  let n;
+  try { n = contarFalhasDaMirim(carregar(fonte, 'core_' + nome + '.js')); } catch (e) { n = 'erro: ' + e.message; }
+  console.log('       veneno ' + nome + ': ' + n + ' prova(s) da escolha reprovaram');
   conf('veneno ' + nome + ': reprova (veneno visto)', typeof n === 'number' && n > 0, true);
 });
 

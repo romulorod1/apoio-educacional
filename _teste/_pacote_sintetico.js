@@ -626,7 +626,12 @@ function gerarProva(saida, opcoes) {
   const arquivos = {}, itens = [], docs = [];
   const aula = enem ? { slug: 'enem-2099', titulo: 'ENEM 2099', n: 1 } : { slug: 'mirim-2099-fase-1', titulo: 'OBMEP Mirim 2099, 1ª fase', n: 1 };
   const assuntos = ASSUNTOS_PROVA[serie];
-  for (let k = 0; k < 6; k++) {
+  /* `quantas` questões (seis, por padrão). A sondagem do 3º ano (C5b) pede
+   * doze, para sobrar questão de trocar; o terço da posição vale para
+   * qualquer número, e com seis dá o 1, 1, 2, 2, 3, 3 de sempre. */
+  const quantas = opcoes.quantas || 6;
+  const terco = k => 1 + Math.floor(3 * k / quantas);
+  for (let k = 0; k < quantas; k++) {
     const n = enem ? 136 + k : k + 1;
     const [tema, titulo, slug] = assuntos[k % assuntos.length];
     const id = enem ? `enem:2099:${n}` : `mirim:2099:f1:${serie}:${n}`;
@@ -639,7 +644,7 @@ function gerarProva(saida, opcoes) {
     Object.assign(it, { modulo: { slug, titulo }, aula, numero: n, titulo: null, formato: 'objetiva',
       alternativas: ['A', 'B', 'C', 'D', 'E'], resposta: 'ABCDE'[k % 5], subitens: [],
       texto: 'questao sintetica ' + n + ' de ' + titulo.toLowerCase(), origem_citada: null,
-      dificuldade: enem ? 2 : 1 + Math.floor(k / 2), dificuldade_origem: 'proxy', proxy: enem ? { neutro: true } : { terco: 1 + Math.floor(k / 2) },
+      dificuldade: enem ? 2 : terco(k), dificuldade_origem: 'proxy', proxy: enem ? { neutro: true } : { terco: terco(k) },
       tema_app: tema,
       assets: { enunciado: base + '.svg', solucao: enem ? null : base + '-sol.svg' },
       medidas: { enunciado: { largura_pt: 262, altura_pt: alt, rotulo: null },
