@@ -44,7 +44,20 @@ function coreEnvenenado() {
   return fonte.slice(0, i) + ini + '\n    if (!aula || !temaId || !aulaAconteceu(aula)) return false;\n' +
     '    return temasDaAula(aula).some(function (t) { return t && t.id === temaId; });' + fonte.slice(fim);
 }
-const amb = H.criarAmbiente(8860, 'nath_c1_dominio', VENENO ? { '/core.js': coreEnvenenado() } : {});
+/* --envenenado-encerrada serve um app.js em que o toque no domínio volta a
+ * passar pela revisão inteira (que mexe nas encerradas): a seção 7b TEM de
+ * reprovar. Também fora do portão. */
+const VENENO_ENCERRADA = process.argv.indexOf('--envenenado-encerrada') >= 0;
+function appEnvenenado() {
+  const fonte = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+  const de = 'mexeu = Core.revisarDominioNaAula(db, aluno, aula, item.id);';
+  if (fonte.split(de).length !== 2) throw new Error('veneno não aplicado: o toque no domínio não foi achado no app.js');
+  return fonte.replace(de, 'mexeu = revisarTrilhasDoAluno(aula.alunoId);');
+}
+const trocas = {};
+if (VENENO) trocas['/core.js'] = coreEnvenenado();
+if (VENENO_ENCERRADA) trocas['/app.js'] = appEnvenenado();
+const amb = H.criarAmbiente(8860, 'nath_c1_dominio', trocas);
 const { secao, esperar, pausa } = H;
 /* O conf do ajudante compara por String(), e objeto vira "[object Object]"
  * dos dois lados: passaria calado. Aqui compara por JSON, no mesmo placar. */
@@ -117,7 +130,7 @@ const doBanco = pag => pag.evaluate(async (a) => {
   const passo = id => { const p = tr && tr.passos.find(x => x.temaId === id); return p ? { feitoEm: p.feitoEm || null, porDominio: !!p.porDominio } : null; };
   const dom = {};
   (aula ? aula.temas || [] : []).forEach(t => { dom[t.id] = t.dominio === undefined ? '(sem campo)' : t.dominio; });
-  return { dom, p1: passo(a.T1), p2: passo(a.T2) };
+  return { dom, p1: passo(a.T1), p2: passo(a.T2), encerrada: !!(tr && tr.encerradaEm) };
 }, { AULA, ALUNO, T1, T2 });
 
 // o que a TELA mostra marcado, por assunto
@@ -411,6 +424,35 @@ async function printDe(pag, seletor, nome, folga) {
     conf(nome + ': nenhuma palavra do domínio', achou ? achou[0] : null, null);
   });
   conf('controle: a varredura acusa quando a palavra está lá', !!(PREFIXO + ' Domina').match(PROIBIDAS), true);
+
+  // ================================================================
+  secao('7b. O toque no domínio não mexe em trilha encerrada');
+  /* Domina fechou o passo; a trilha é encerrada pelo botão de verdade; depois,
+   * "Em andamento" na mesma aula. Antes do conserto, o passo da trilha
+   * encerrada soltava com "voltou para a fila", sem Desfazer. */
+  await abrirFicha(pag, 'Mapeamento');
+  await esperar('o painel de trilhas', () => pag.evaluate(() => !!document.querySelector('#painel-trilhas .item-trilha-ativa .abrir-trilha')), v => v === true, 8000);
+  await pag.evaluate(() => document.querySelector('#painel-trilhas .item-trilha-ativa .abrir-trilha').click());
+  await esperar('a janela da trilha', () => pag.evaluate(() => !!document.querySelector('#modal-trilha.aberto #encerrar-trilha')), v => v === true, 8000);
+  await pag.evaluate(() => document.querySelector('#encerrar-trilha').click());
+  await esperar('a tela de encerrar', () => pag.evaluate(() => !!document.querySelector('#confirmar-encerramento')), v => v === true, 5000);
+  await pag.evaluate(() => document.querySelector('#confirmar-encerramento').click());
+  g = await esperar('trilha encerrada no banco', () => doBanco(pag), v => v.encerrada === true, 8000);
+  conf('a trilha foi encerrada pelo botão, com o passo fechado por domínio', [g.valor.encerrada, g.valor.p1.feitoEm], [true, HOJE]);
+  await fecharModais(pag);
+  conf('a aula de hoje abre', await abrirAulaDeHoje(pag), true);
+  await pag.evaluate(() => { document.querySelector('#aviso-texto').textContent = ''; });
+  await tocar(pag, T1, 'andamento');
+  g = await esperar('Em andamento gravado', () => doBanco(pag), v => v.dom[T1] === 'andamento', 5000);
+  await pausa(300);
+  g = await doBanco(pag);
+  conf('"Em andamento" na aula NÃO solta o passo da trilha encerrada', [g.dom[T1], g.p1.feitoEm, g.p1.porDominio], ['andamento', HOJE, true]);
+  conf('e o aviso não diz que o passo voltou para a fila',
+    /voltou para a fila/.test(await pag.evaluate(() => document.querySelector('#aviso-texto').textContent)), false);
+  await tocar(pag, T1, 'domina');
+  g = await esperar('Domina gravado', () => doBanco(pag), v => v.dom[T1] === 'domina', 5000);
+  conf('Domina de novo: a trilha encerrada segue como estava', [g.valor.p1.feitoEm, g.valor.encerrada], [HOJE, true]);
+  await fecharModais(pag);
 
   // ================================================================
   secao('8. Nenhum erro');

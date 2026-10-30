@@ -2811,7 +2811,10 @@
         delete andou.passo.soltoAMao;
       }
     } else if (aluno && antes === 'domina') {
-      mexeu = revisarTrilhasDoAluno(aula.alunoId);
+      /* Só as trilhas ATIVAS, e só o passo que esta aula fechou: a revisão
+       * inteira (revisarTrilhasDoAluno) passa também pelas encerradas, e um
+       * toque de domínio não reescreve trilha encerrada. */
+      mexeu = Core.revisarDominioNaAula(db, aluno, aula, item.id);
     }
     atualizarBlocoDominio(aula.id);
     salvarEDepois(function () {
@@ -3628,8 +3631,7 @@
     db.aulas.forEach(function (a) { aulaPorId[a.id] = a; });
     todos.forEach(function (p) {
       if (p.aulaId && !Core.marcaDoPassoValeAinda(p, aulaPorId[p.aulaId])) {
-        p.feitoEm = null;
-        p.aulaId = null;
+        Core.soltarPassoPelaAula(p);   // o passo da regra antiga lembra a aula de origem
       }
       if (!p.feitoEm) { delete p.jaEra; delete p.porDominio; }   // 3.
     });
@@ -3640,15 +3642,21 @@
       .forEach(function (a) {
         if (!Core.aulaAconteceu(a)) return;
         Core.temasDaAula(a).forEach(function (t) {
-          if (!t || !t.id || !Core.dominioFechaPasso(a, t.id)) return;
+          if (!t || !t.id) return;
+          /* Fecha por domínio (a regra do C1), ou devolve o passo da regra
+           * antiga à MESMA aula que o fechou, quando ela volta a acontecer com
+           * o assunto: o que estava fechado continua fechado. */
+          var porDominio = Core.dominioFechaPasso(a, t.id);
           var achou = false;
           Core.trilhasAtivas(aluno).forEach(function (tr) {
             if (achou) return;
             (tr.passos || []).forEach(function (p) {
               if (achou || p.feitoEm || p.soltoAMao || p.temaId !== t.id) return;
+              if (!porDominio && !Core.aulaDevolvePassoAntigo(p, a)) return;
               p.feitoEm = a.data;
               p.aulaId = a.id;
-              p.porDominio = true;
+              if (porDominio) p.porDominio = true; else delete p.porDominio;
+              delete p.aulaDada;
               delete p.jaEra;
               delete p.marcaAnterior;
               t.passoDe = tr.id;
@@ -8342,6 +8350,7 @@
     p.aulaId = null;
     delete p.jaEra;
     delete p.porDominio;
+    delete p.aulaDada;   // a decisão dela vale mais que a lembrança da aula antiga
     /* Quem soltou foi ELA, e não a revisão automática. A varredura que remarca
      * pelo assunto respeita esta marca: sem ela, soltar um passo cujo assunto
      * está registrado numa aula duraria só até a próxima aula salva. */
@@ -8362,6 +8371,7 @@
     var m = marca || p.marcaAnterior;
     delete p.marcaAnterior;
     delete p.soltoAMao;
+    delete p.aulaDada;
     if (m && m.feitoEm) {
       p.feitoEm = m.feitoEm;
       p.aulaId = m.aulaId || null;

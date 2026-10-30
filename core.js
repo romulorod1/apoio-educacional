@@ -4094,11 +4094,46 @@
         p.feitoEm = aula.data;
         p.aulaId = aula.id;
         p.porDominio = true;
+        delete p.aulaDada;
         marcado = { trilha: tr, passo: p };
       });
     });
     if (marcado) item.passoDe = marcado.trilha.id;
     return marcado;
+  }
+
+  /* Saiu o "Domina" de um assunto numa aula (o toque em outro estado, ou o
+   * toque que desmarca): solta o passo que ESTA aula tinha fechado por
+   * domínio, e só nas trilhas ATIVAS. Trilha encerrada é registro, e um toque
+   * de domínio numa aula não reescreve registro fechado: antes, Domina,
+   * encerrar e depois "Em andamento" na mesma aula soltava o passo da trilha
+   * encerrada, sem Desfazer, e nenhum Domina o devolvia.
+   *
+   * Se outra aula do aluno ainda fecha aquele passo pela regra, o passo fica
+   * fechado por ela (a mais antiga), como a varredura faria. Devolve quantos
+   * passos ficaram mesmo soltos e quantos passaram a outra aula. */
+  function revisarDominioNaAula(db, aluno, aula, temaId) {
+    var r = { soltos: 0, remarcados: 0 };
+    if (!aluno || !aula || !temaId || dominioFechaPasso(aula, temaId)) return r;
+    var outras = ((db && db.aulas) || []).filter(function (a) {
+      return a.alunoId === aluno.id && a.id !== aula.id && dominioFechaPasso(a, temaId);
+    }).sort(ordenarAulas);
+    trilhasAtivas(aluno).forEach(function (tr) {
+      (tr.passos || []).forEach(function (p) {
+        if (p.aulaId !== aula.id || !p.porDominio || p.temaId !== temaId) return;
+        soltarPassoPelaAula(p);
+        delete p.jaEra;
+        if (outras.length) {
+          p.feitoEm = outras[0].data;
+          p.aulaId = outras[0].id;
+          p.porDominio = true;
+          r.remarcados++;
+        } else {
+          r.soltos++;
+        }
+      });
+    });
+    return r;
   }
 
   /* Aula que deixou de acontecer desmarca os passos que ela tinha fechado. Sem
@@ -4112,13 +4147,39 @@
     trilhasDe(aluno).forEach(function (tr) {
       (tr.passos || []).forEach(function (p) {
         if (p.aulaId !== aula.id) return;
-        p.feitoEm = null;
-        p.aulaId = null;
-        delete p.porDominio;
+        soltarPassoPelaAula(p);
         n++;
       });
     });
     return n;
+  }
+
+  /* Solta um passo porque a aula que o fechou deixou de sustentá-lo (mudou de
+   * situação, perdeu o assunto ou o "Domina").
+   *
+   * Passo fechado pela regra ANTIGA, de aula dada (sem porDominio), guarda a
+   * aula de origem em `aulaDada`. Sem isso, cancelar a aula e voltá-la para
+   * realizada perdia o passo para sempre: a varredura de hoje só remarca com
+   * "Domina", e o passo antigo nunca teve marca de domínio. Com a aula
+   * guardada, a mesma aula, de volta e com o assunto, devolve o passo
+   * (aulaDevolvePassoAntigo). Passo do C1 não guarda nada: volta só por
+   * Domina. */
+  function soltarPassoPelaAula(p) {
+    if (!p) return;
+    if (p.aulaId && !p.porDominio) p.aulaDada = p.aulaId;
+    else delete p.aulaDada;
+    p.feitoEm = null;
+    p.aulaId = null;
+    delete p.porDominio;
+  }
+
+  /* A aula de origem de um passo da regra antiga voltou a sustentá-lo: é a
+   * MESMA aula, ela aconteceu e registra o assunto do passo. Só isso devolve
+   * um passo antigo; passo novo continua fechando só por dominioFechaPasso. */
+  function aulaDevolvePassoAntigo(passo, aula) {
+    if (!passo || !aula || !passo.aulaDada || passo.aulaDada !== aula.id) return false;
+    if (!aulaAconteceu(aula)) return false;
+    return temasDaAula(aula).some(function (t) { return t && t.id === passo.temaId; });
   }
 
   return {
@@ -4201,6 +4262,8 @@
     marcarDominio: marcarDominio, aulaAconteceu: aulaAconteceu, chaveDoDominio: chaveDoDominio,
     dominioPorAssunto: dominioPorAssunto, dominioFechaPasso: dominioFechaPasso,
     marcaDoPassoValeAinda: marcaDoPassoValeAinda,
+    soltarPassoPelaAula: soltarPassoPelaAula, aulaDevolvePassoAntigo: aulaDevolvePassoAntigo,
+    revisarDominioNaAula: revisarDominioNaAula,
     revisarPassosDaAula: revisarPassosDaAula, anoEscolarDe: anoEscolarDe,
     itemDaLacuna: itemDaLacuna,
     exibeListas: exibeListas
