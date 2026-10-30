@@ -119,7 +119,7 @@ const esp = ms => new Promise(r => setTimeout(r, ms));
   await abrirAluno('Marcelo');
   await aba('Histórico');
   const hist = await pag.$eval('#corpo-modal-aluno', e => e.textContent);
-  conf('mostra quantos encontros', hist.includes('Encontros'), true);
+  conf('mostra quantos encontros', hist.includes('Aulas'), true);
   conf('mostra as horas somadas', hist.includes('10:30 h'), true);
   conf('mostra desde quando', hist.includes('02/03/2026'), true);
   const linhas = await pag.$$eval('.linha-historico', es => es.length);

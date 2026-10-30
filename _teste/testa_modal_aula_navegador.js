@@ -211,7 +211,7 @@ async function rodar() {
   conf('campo público identifica envio para fechamento/família', seloPublico, 'Vai para o fechamento / família');
 
   const seloPrivado = await pag.$eval('#grupo-registro .destino-privado', e => e.textContent.trim());
-  conf('campo privado identifica nota privada só da professora', seloPrivado, 'Nota privada · só você vê');
+  conf('campo privado identifica nota privada só da professora', seloPrivado, 'Só você vê');
 
   // Aviso de salvamento no rodapé
   const textoAvisoRodape = await pag.$eval('#aviso-salvamento-aula', e => e.textContent.trim());

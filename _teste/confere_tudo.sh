@@ -263,7 +263,8 @@ roda "fatias do portao"      node _teste/testa_pedacos_do_portao.js
 # puppeteer, nem a porta 8777). La, o --rapido os pulava; aqui o GitHub os roda
 # em todo PR.
 for t in testa_registro testa_mapeamento testa_exclusoes testa_feriados \
-         testa_mover testa_retroativo testa_series testa_aluno testa_rotulos_de_familia; do
+         testa_mover testa_retroativo testa_series testa_aluno testa_rotulos_de_familia \
+         testa_vocabulario; do
   roda "$t" node "_teste/$t.js"
 done
 
