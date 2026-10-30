@@ -12019,8 +12019,9 @@
   var envioFamilias = null;
 
   function abrirEnvioParaTodas() {
-    var fechs = Core.calcularMesInteiro(db, mesAtual);
-    if (!fechs.length) { avisar('Não há aulas neste mês.'); return; }
+    // só quem teve aula dada no mês: aluno só com aula marcada à frente daria um PDF vazio (revisão do C10b)
+    var fechs = Core.calcularMesInteiro(db, mesAtual).filter(function (f) { return f.qtdEncontrosFeitos > 0; });
+    if (!fechs.length) { avisar('Não há aulas dadas neste mês.'); return; }
     envioFamilias = {
       mes: mesAtual,
       ids: fechs.map(function (f) { return f.aluno.id; }),
@@ -12089,7 +12090,7 @@
     }));
 
     rodape.appendChild(el('button', {
-      type: 'button', class: 'btn', id: 'envio-parar', texto: 'Parar',
+      type: 'button', class: 'btn', id: 'envio-parar', texto: 'Parar o envio',
       aoClick: function () {
         if (e.gerando) return;
         e.parou = true; desenharEtapaDeEnvio();
@@ -12097,7 +12098,7 @@
     }));
     rodape.appendChild(el('span', { class: 'cresce' }));
     rodape.appendChild(el('button', {
-      type: 'button', class: 'btn', id: 'envio-pular', texto: 'Pular',
+      type: 'button', class: 'btn', id: 'envio-pular', texto: 'Pular esta família',
       aoClick: function () {
         if (e.gerando) return;
         e.puladas++; e.i++; desenharEtapaDeEnvio();
