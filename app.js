@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.31.0';
+  var VERSAO = '1.31.1';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,13 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.31.1',
+      itens: [
+        'No assunto da Biblioteca, as listas prontas vêm primeiro; o "Marcar os exercícios deste módulo" ficou logo abaixo delas.',
+        'Na janela Gerar material, quando uma caixa está cinza, uma frase diz por quê e o que falta para ela ligar.'
+      ]
+    },
     {
       versao: '1.31.0',
       itens: [
@@ -13285,8 +13292,11 @@
     corpo.appendChild(voltarBib(Biblioteca.nomeDaSerie(bibNav.serie), function () { irNaBiblioteca({ modulo: null, aula: null }); }));
     corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: mod.titulo }));
     corpo.appendChild(el('p', { class: 'ajuda bib-disponibilidade', texto: disponibilidadeDoModulo(mod) }));
-    corpo.appendChild(botaoMarcarModulo(mod));
+    /* AS LISTAS PRONTAS VÊM ANTES DO "MARCAR OS N" (UX07, C13). A lista de uma
+     * aula é o caminho do dia a dia; marcar o módulo inteiro (dezenas de
+     * exercícios) é a ação em lote, e vinha primeiro, na altura do polegar. */
     linhasDeListaPronta(corpo, mod);
+    corpo.appendChild(botaoMarcarModulo(mod));
     if (mod.teorias.length) {
       corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Teoria' }));
       mod.teorias.forEach(function (t) {
@@ -15247,6 +15257,24 @@
       grade.appendChild(el('label', { class: 'bib-marcar' + (c[3] ? ' desligada' : '') }, [chk, el('span', { texto: c[1] })]));
     });
     corpo.appendChild(el('div', { class: 'campo' }, [el('span', { class: 'bib-gerar-rotulo', texto: 'O que entra' }), grade]));
+    /* CAIXA DESLIGADA DIZ POR QUÊ (UX08, C13). Uma caixa cinza sem motivo
+     * parece defeito; a frase diz o que falta para ela ligar. No tablet não há
+     * passar o mouse, então o motivo fica escrito, e não num title. */
+    var porQueDesligadas = el('p', { class: 'ajuda', id: 'bib-gerar-desligadas' });
+    corpo.appendChild(porQueDesligadas);
+    function explicarDesligadas() {
+      var frases = [];
+      if (!paginas.length) frases.push('Teoria fica desligada porque nenhuma página de teoria foi marcada.');
+      if (!itens.length) {
+        frases.push('Lista, Gabarito, Espaço e Folha ficam desligados porque nenhum exercício foi marcado.');
+      } else if (caixas.folha.disabled) {
+        frases.push(!caixas.lista.checked
+          ? 'Folha da aula liga quando a Lista está marcada.'
+          : 'Folha da aula liga quando você escolhe a aula, logo abaixo.');
+      }
+      porQueDesligadas.textContent = frases.join(' ');
+      porQueDesligadas.hidden = !frases.length;
+    }
     corpo.appendChild(el('p', { class: 'ajuda', id: 'bib-gerar-saidas',
       texto: 'Ao anexar, os PDFs ficam na aula escolhida; marcar Folha também abre a lista para escrever nela. ' +
         'Só gerar PDF não altera nenhuma aula. Nada é enviado à família automaticamente.' }));
@@ -15334,6 +15362,7 @@
       caixas.folha.disabled = !itens.length || !caixas.lista.checked || !(escolha.aulaId || escolha.nova);
       if (caixas.folha.disabled) caixas.folha.checked = false;
       caixas.folha.parentNode.classList.toggle('desligada', caixas.folha.disabled);
+      explicarDesligadas();
       var rotuloGabarito = caixas.gabarito.parentNode.querySelector('span');
       if (rotuloGabarito) {
         rotuloGabarito.textContent = caixas.lista.checked ? 'Gabarito em arquivo separado' : 'Gabarito';

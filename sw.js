@@ -91,7 +91,7 @@
  * styles.css), com a lista igual. O v50 (C2b) traz a lista de base e a
  * etiqueta de nível nas listas prontas (app.js e biblioteca.js), com a lista
  * igual. */
-var CACHE = 'apoio-educacional-v50';
+var CACHE = 'apoio-educacional-v51';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
