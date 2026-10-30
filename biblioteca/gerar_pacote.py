@@ -2086,7 +2086,27 @@ def comparar_com_anterior(itens, caminho):
             'com_caixa_diferente': len(mudou), 'ids_com_caixa_diferente': mudou}
 
 
+# A versao do PyMuPDF que gera os pacotes publicados (biblioteca/requirements-gerador.txt).
+PYMUPDF_DO_GERADOR = '1.27.2.3'
+
+
+def confere_versao_do_pymupdf(versao=None):
+    """None se a versao instalada e a do gerador; senao, a frase de recusa.
+    Outra versao redesenha os SVG de recortes iguais (291 no 9o ano com a
+    1.28.2), e o pacote deixaria de ser comparavel com o anterior."""
+    versao = versao or pymupdf.VersionBind
+    if versao == PYMUPDF_DO_GERADOR:
+        return None
+    return ('erro: este Python tem o PyMuPDF %s, e o gerador so roda com o %s, a versao de todos os pacotes '
+            'publicados (outra versao redesenha os SVG de recortes iguais). Instale num ambiente separado: '
+            'python -m venv .venv-gerador e depois .venv-gerador/Scripts/python -m pip install -r '
+            'biblioteca/requirements-gerador.txt' % (versao, PYMUPDF_DO_GERADOR))
+
+
 def principal(argv=None):
+    recusa = confere_versao_do_pymupdf()
+    if recusa:
+        raise SystemExit(recusa)
     ap = argparse.ArgumentParser(description='Gera o pacote de biblioteca de uma serie do Portal da OBMEP.')
     ap.add_argument('--pdfs', required=True)
     ap.add_argument('--serie', required=True)

@@ -1077,6 +1077,21 @@ def main():
     p.veneno('dois arquivos de raiz trocados entre si',
              [] if trocado == esperada else ['a ordem mudou'], 'a ordem mudou')
 
+    # ----------------------- a versao do PyMuPDF que o gerador aceita (C2b)
+    # Outra versao redesenha os SVG de recortes iguais (291 no 9o ano com a
+    # 1.28.2). A linha de comando do gerador recusa com a frase que diz o que
+    # instalar; aqui se confere a regra sem depender do PyMuPDF desta maquina.
+    print('\n=== a versao do PyMuPDF do gerador ===')
+    p.limpo('a versao fixada no requirements-gerador e a que o gerador aceita',
+            [] if GP.PYMUPDF_DO_GERADOR in open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                             'requirements-gerador.txt'), encoding='utf-8').read()
+            else ['o requirements-gerador nao fixa %s' % GP.PYMUPDF_DO_GERADOR])
+    p.limpo('com a versao fixada, o gerador roda', [GP.confere_versao_do_pymupdf(GP.PYMUPDF_DO_GERADOR)]
+            if GP.confere_versao_do_pymupdf(GP.PYMUPDF_DO_GERADOR) else [])
+    recusa = GP.confere_versao_do_pymupdf('1.28.2') or ''
+    p.veneno('com outra versao, o gerador recusa e diz qual instalar',
+             [recusa] if recusa else [], 'requirements-gerador.txt')
+
     # ---------------------------------- base-v1: o gerador contra a conferencia
     # O mesmo desenho da secao da listas-v1: a lista de base que o GERADOR
     # monta da amostra passa na conferencia, que nao o importa, e e a que a
