@@ -16,6 +16,8 @@
  *   4. o módulo sem lista de base não ganha a frase;
  *   5. a tela da lista de base tem o nome e a etiqueta, e "Editar exercícios antes"
  *      põe os exercícios no material, na ordem dela.
+ *   C13: no módulo, as listas prontas vêm antes do "Marcar os N" (UX07); na
+ *      janela Gerar material, a caixa desligada tem a frase do porquê (UX08).
  *
  * Modos envenenados:
  *   --envenenado-base-recusada  o aplicativo não conhece a base-v1 e recusa o
@@ -114,6 +116,13 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
     'Lista com 1 desafio | Lista com 2 desafios');
   conf('cada uma com a etiqueta do nível', linhas.map(l => l.nivel).join(' | '),
     'Nível Base | Nível Regular | Nível Aprofundamento');
+  // C13 (UX07): as listas prontas vêm antes do "Marcar os N deste módulo"
+  conf('as listas prontas vêm antes do "Marcar os N"', await pag.evaluate(() => {
+    const bloco = Array.from(document.querySelectorAll('#bib-corpo .bloco-exercicios'))
+      .find(b => b.textContent.trim() === 'Listas prontas');
+    const marcar = document.querySelector('#bib-marcar-modulo');
+    return !!(bloco && marcar && (bloco.compareDocumentPosition(marcar) & Node.DOCUMENT_POSITION_FOLLOWING));
+  }), true);
 
   // ================================================================
   secao('3. A frase da lista de base: posição na fonte, e não avaliação');
@@ -160,6 +169,28 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   const material = await pag.evaluate(() => JSON.parse(localStorage.getItem('apoio-educacional:bib-carrinho') || 'null'));
   conf('o material é a lista de base, na ordem dela', ((material || {}).itens || []).join('|'), BASE_IDS.join('|'));
 
+  // ================================================================
+  secao('5b. C13 (UX08): a caixa desligada diz por quê');
+  await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-gerar'); if (b) b.click(); });
+  await esperar('janela Gerar material', () => pag.$eval('#modal-bib-gerar', e => e.classList.contains('aberto')), v => v === true, 8000);
+  const porQue = () => pag.evaluate(() => {
+    const m = k => { const s = document.querySelector('#bib-gerar-motivo-' + k); return s && !s.hidden ? s.textContent : ''; };
+    return {
+      teoria: document.querySelector('#bib-gerar-teoria').disabled + ' ' + m('teoria'),
+      lista: m('lista'),
+      folha: document.querySelector('#bib-gerar-folha').disabled + ' ' + m('folha')
+    };
+  });
+  let pq = await porQue();
+  conf('Teoria desligada diz por quê, na própria linha', pq.teoria, 'true (nenhuma página de teoria foi marcada)');
+  conf('a Lista, ligada, não ganha motivo', pq.lista, '');
+  conf('Folha desligada pede a aula', pq.folha, 'true (liga quando você escolher a aula, logo abaixo)');
+  await pag.evaluate(() => document.querySelector('#bib-gerar-lista').click());
+  pq = await porQue();
+  conf('sem a Lista e sem aula, a Folha pede as duas coisas', pq.folha,
+    'true (liga quando a Lista estiver marcada e você escolher a aula, logo abaixo)');
+
+  // ================================================================
   secao('6. Nenhum erro');
   conf('nenhum erro de página', pag.errosDePagina.join(' | '), '');
   conf('nenhum pedido deu 404', amb.quatrocentos.join(', '), '');

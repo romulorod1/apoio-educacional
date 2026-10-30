@@ -1870,6 +1870,9 @@ button.alvo-rascunho:hover { background: var(--soft); }
   font-size: 14px; font-weight: 600; color: var(--navy); cursor: pointer; }
 .bib-marcar input { width: 22px; height: 22px; min-height: 0; margin: 0; accent-color: var(--teal); }
 .bib-marcar.desligada { color: var(--muted); cursor: default; }
+/* o motivo da caixa desligada, logo abaixo dela, alinhado ao texto da caixa (C13, UX08) */
+.bib-motivo { display: block; margin: -8px 0 6px 34px; font-size: 13px; color: var(--muted); }
+.bib-motivo[hidden] { display: none; }
 .bib-etiqueta { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .bib-etiqueta-rotulo { font-size: 13px; color: var(--navy); margin-right: 2px; }
 .bib-etiqueta-botao { min-height: 44px; min-width: 44px; padding: 0 10px; border: 1px solid var(--fio);

@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.31.0';
+  var VERSAO = '1.31.1';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,13 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.31.1',
+      itens: [
+        'No assunto da Biblioteca, as listas prontas vêm primeiro; o "Marcar os exercícios deste módulo" ficou logo abaixo delas.',
+        'Na janela Gerar material, quando uma caixa está cinza, logo abaixo dela aparece o motivo e o que falta para ela ligar.'
+      ]
+    },
     {
       versao: '1.31.0',
       itens: [
@@ -13285,8 +13292,11 @@
     corpo.appendChild(voltarBib(Biblioteca.nomeDaSerie(bibNav.serie), function () { irNaBiblioteca({ modulo: null, aula: null }); }));
     corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: mod.titulo }));
     corpo.appendChild(el('p', { class: 'ajuda bib-disponibilidade', texto: disponibilidadeDoModulo(mod) }));
-    corpo.appendChild(botaoMarcarModulo(mod));
+    /* AS LISTAS PRONTAS VÊM ANTES DO "MARCAR OS N" (UX07, C13). A lista de uma
+     * aula é o caminho do dia a dia; marcar o módulo inteiro (dezenas de
+     * exercícios) é a ação em lote, e vinha primeiro, na altura do polegar. */
     linhasDeListaPronta(corpo, mod);
+    corpo.appendChild(botaoMarcarModulo(mod));
     if (mod.teorias.length) {
       corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Teoria' }));
       mod.teorias.forEach(function (t) {
@@ -15238,15 +15248,40 @@
       ['origem', 'Mostrar a origem em letra pequena', false, false],
       ['folha', 'Abrir a lista como folha da aula', false, !itens.length]
     ];
+    /* CAIXA DESLIGADA DIZ POR QUÊ (UX08, C13), ao lado dela. Uma caixa cinza
+     * sem motivo parece defeito. No tablet não há passar o mouse, então o
+     * motivo fica escrito, e não num title; e fica na própria linha, porque
+     * uma frase única embaixo da grade ficava longe da Teoria (painel cego). */
+    var motivos = {};
     var grade = el('div', { class: 'bib-gerar-caixas' });
     LISTA_CAIXAS.forEach(function (c) {
       var chk = el('input', { type: 'checkbox', id: 'bib-gerar-' + c[0] });
       chk.checked = c[2];
       chk.disabled = c[3];
       caixas[c[0]] = chk;
+      motivos[c[0]] = el('span', { class: 'bib-motivo', id: 'bib-gerar-motivo-' + c[0] });
       grade.appendChild(el('label', { class: 'bib-marcar' + (c[3] ? ' desligada' : '') }, [chk, el('span', { texto: c[1] })]));
+      grade.appendChild(motivos[c[0]]);
     });
     corpo.appendChild(el('div', { class: 'campo' }, [el('span', { class: 'bib-gerar-rotulo', texto: 'O que entra' }), grade]));
+    function explicarDesligadas() {
+      var semExercicio = !itens.length ? 'nenhum exercício foi marcado' : '';
+      var falta = [];
+      if (!caixas.lista.checked) falta.push('a Lista estiver marcada');
+      if (!(escolha.aulaId || escolha.nova)) falta.push('você escolher a aula, logo abaixo');
+      var texto = {
+        teoria: !paginas.length ? 'nenhuma página de teoria foi marcada' : '',
+        lista: semExercicio,
+        gabarito: semExercicio,
+        espaco: semExercicio,
+        origem: '',
+        folha: semExercicio || (caixas.folha.disabled && falta.length ? 'liga quando ' + falta.join(' e ') : '')
+      };
+      Object.keys(motivos).forEach(function (k) {
+        motivos[k].textContent = texto[k] ? '(' + texto[k] + ')' : '';
+        motivos[k].hidden = !texto[k];
+      });
+    }
     corpo.appendChild(el('p', { class: 'ajuda', id: 'bib-gerar-saidas',
       texto: 'Ao anexar, os PDFs ficam na aula escolhida; marcar Folha também abre a lista para escrever nela. ' +
         'Só gerar PDF não altera nenhuma aula. Nada é enviado à família automaticamente.' }));
@@ -15334,6 +15369,7 @@
       caixas.folha.disabled = !itens.length || !caixas.lista.checked || !(escolha.aulaId || escolha.nova);
       if (caixas.folha.disabled) caixas.folha.checked = false;
       caixas.folha.parentNode.classList.toggle('desligada', caixas.folha.disabled);
+      explicarDesligadas();
       var rotuloGabarito = caixas.gabarito.parentNode.querySelector('span');
       if (rotuloGabarito) {
         rotuloGabarito.textContent = caixas.lista.checked ? 'Gabarito em arquivo separado' : 'Gabarito';
