@@ -18,6 +18,10 @@
  *   7. com a rede cortada de verdade (a página E o servidor), a SEGUNDA
  *      abertura funciona, servida pelo BAIXADOS do sw.js;
  *   8. o anexo que não é PDF continua saindo como antes.
+ * E a rede fraca (o servidor segura a resposta sem responder): sem o leitor
+ * guardado, o prazo de 15 s leva ao "Abrir fora" e o Abrir seguinte tenta de
+ * novo (2b); com o leitor guardado, abre do cache sem esperar a rede (6b). E
+ * os três decodificadores .wasm entram no BAIXADOS já na primeira abertura.
  */
 'use strict';
 const fs = require('fs');
@@ -208,7 +212,29 @@ async function cortarRede(pag, cortar) {
   await pag.evaluate(() => { window.__saidas = []; });
 
   // ================================================================
-  secao('3. Com sinal, abre sem sair do aplicativo');
+  secao('2b. Rede que não responde, sem o leitor guardado: o prazo leva ao "Abrir fora"');
+  /* O tablet conectado mas sem tráfego: o pedido não falha, fica esperando.
+   * Sem prazo, a janela ficava em "Abrindo o PDF..." para sempre. */
+  amb.segurar = '/vendor/';
+  amb.segurados.length = 0;
+  conf('tocou em Abrir no PDF', await tocarAbrir(pag, 'lista_alfa_teste.pdf'), true);
+  const inicioDoPrazo = Date.now();
+  await pausa(3000);
+  const esperando = await estadoLeitor(pag);
+  conf('enquanto a rede segura, a janela espera', esperando.aberto + '|' + esperando.falha + '|' + esperando.desenhada, 'true||');
+  conf('os pedidos do leitor chegaram ao servidor e ficaram sem resposta', amb.segurados.length > 0, true);
+  const venceu = await esperar('o prazo vencer', () => estadoLeitor(pag), v => v && v.falha !== '', 25000);
+  const levou = Date.now() - inicioDoPrazo;
+  console.log('   o "Abrir fora" apareceu em ' + levou + ' ms');
+  conf('passado o prazo, a frase de sem sinal', /^leitor: .*sem sinal/.test(venceu.valor ? venceu.valor.falha : ''), true);
+  conf('e o "Abrir fora do aplicativo"', await pag.evaluate(() => !!document.querySelector('#leitor-abrir-fora')), true);
+  conf('no prazo de 15 s, e não antes', levou >= 14000 && levou < 25000, true);
+  await pag.evaluate(() => document.querySelector('#modal-leitor-pdf [data-fechar]').click());
+  amb.soltarSegurados();
+  await pausa(300);
+
+  // ================================================================
+  secao('3. Com sinal, o Abrir seguinte tenta de novo e abre sem sair do aplicativo');
   const urlAntes = pag.url();
   const abasAntes = (await navegador.pages()).length;
   let navegacoes = 0;
@@ -229,6 +255,14 @@ async function cortarRede(pag, cortar) {
   conf('nenhuma aba nova', alvosNovos + '/' + ((await navegador.pages()).length - abasAntes), '0/0');
   conf('nenhuma navegação', navegacoes + ' ' + pag.url(), '0 ' + urlAntes);
   conf('nada foi compartilhado nem baixado', await saidas(pag), '');
+  /* O PDF de teste não tem imagem: o PDF.js nunca pediria um decodificador.
+   * Se eles estão no BAIXADOS, foi a busca de fundo do app que os trouxe. */
+  const decod = await esperar('os três decodificadores no BAIXADOS', () => pag.evaluate(async () => {
+    const c = await caches.open('apoio-educacional-baixados');
+    return (await c.keys()).filter(r => /\/vendor\/pdfjs-6\.4\.299\/wasm\/[a-z0-9_]+\.wasm$/.test(r.url))
+      .map(r => r.url.split('/').pop()).sort().join(',');
+  }), v => v === 'jbig2.wasm,openjpeg.wasm,qcms_bg.wasm', 15000);
+  conf('depois da primeira abertura, os três .wasm estão no BAIXADOS', decod.valor, 'jbig2.wasm,openjpeg.wasm,qcms_bg.wasm');
 
   // ================================================================
   secao('4. Próxima: a página 2');
@@ -304,6 +338,19 @@ async function cortarRede(pag, cortar) {
   conf('depois de recarregar, a imagem e o traço continuam', folha.tipos, 'imagem,traco');
 
   // ================================================================
+  secao('6b. Rede que não responde, com o leitor guardado: abre do cache');
+  amb.segurar = '/vendor/';
+  amb.segurados.length = 0;
+  await H.abrirApp(pag, amb.ORIGEM);   // sessão nova: o leitor carrega de novo
+  conf('a aula abriu', await abrirAulaDeHoje(pag), true);
+  conf('tocou em Abrir no PDF', await tocarAbrir(pag, 'lista_alfa_teste.pdf'), true);
+  const fraca = await esperar('a página 1 com a rede segurando', () => estadoLeitor(pag), v => v && (v.desenhada === '1' || v.falha !== ''), 12000);
+  conf('com a rede segurando, o PDF abriu do cache', fraca.valor && (fraca.valor.desenhada + '|' + fraca.valor.falha), '1|');
+  conf('nenhum pedido do leitor ficou esperando a rede', amb.segurados.map(s => s.rel).join(', '), '');
+  await pag.evaluate(() => document.querySelector('#modal-leitor-pdf [data-fechar]').click());
+  amb.soltarSegurados();
+
+  // ================================================================
   secao('7. Rede cortada: a SEGUNDA abertura funciona');
   await cortarRede(pag, true);
   amb.cortados.length = 0;
@@ -319,12 +366,12 @@ async function cortarRede(pag, cortar) {
   conf('sem rede, o PDF abriu', off.valor && (off.valor.desenhada + '|' + off.valor.falha), '1|');
   conf('com a cor da página 1', (await pixelsDaCor(pag, CANVAS, RGB[0])) > 200, true);
   conf('o leitor foi pedido de novo (e veio do cache)', pedidosDoLeitor.length > 0, true);
-  /* O sw.js busca na rede primeiro, e o setOfflineMode da página não alcança
-   * a rede dele (medido: o servidor recebe os pedidos). Por isso o corte do
-   * lado do servidor: os pedidos do leitor chegaram, foram derrubados sem
-   * resposta, e mesmo assim a página abriu, do cache. */
-  conf('o sw.js tentou a rede para o leitor e o servidor cortado derrubou',
-    amb.cortados.filter(c => c.indexOf('/vendor/pdfjs-6.4.299/') === 0).length > 0, true);
+  /* O setOfflineMode da página não alcança a rede do sw.js (medido: o
+   * servidor recebe os pedidos dele). Por isso o corte do lado do servidor.
+   * Controle: o resto do aplicativo, que o sw.js busca na rede primeiro,
+   * tentou o servidor cortado; o leitor, que vem do cache antes, não. */
+  conf('controle: o aplicativo tentou a rede e o servidor cortado derrubou', amb.cortados.indexOf('/app.js') >= 0, true);
+  conf('o leitor nem tentou a rede (cache primeiro)', amb.cortados.filter(c => c.indexOf('/vendor/') === 0).join(', '), '');
   conf('o leitor está no BAIXADOS, e não no pré-cache', await pag.evaluate(async () => {
     const nomes = await caches.keys();
     const onde = [];

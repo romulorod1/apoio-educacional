@@ -16786,7 +16786,8 @@
    * Não está na lista ARQUIVOS do sw.js de propósito: são 2,3 MB (o leitor, o
    * trabalhador e os decodificadores de imagem) que pesariam a instalação de
    * toda versão. Vem na PRIMEIRA vez que ela abre um PDF, e daí em diante abre
-   * sem sinal, do BAIXADOS, que o activate nunca apaga.
+   * sem sinal, do BAIXADOS, que o activate nunca apaga. Os decodificadores
+   * vêm logo depois do leitor, sem segurar o PDF (veja buscarDecodificadores).
    *
    * A build legacy, e não a moderna, porque o tablet dela não é novo e a
    * moderna exige um Chrome recente; a diferença é de 140 KB. */
@@ -16795,8 +16796,8 @@
 
   function enderecoNoApp(relativo) { return new URL(relativo, location.href).href; }
 
-  function baixarParte(endereco) {
-    return fetch(endereco).then(function (r) {
+  function baixarParte(endereco, sinal) {
+    return fetch(endereco, sinal ? { signal: sinal } : undefined).then(function (r) {
       // sem sinal e sem cópia guardada, o sw.js responde 503 "Sem conexão"
       if (!r.ok) throw new Error('não baixou ' + endereco + ' (' + r.status + ')');
       return r.blob();
@@ -16812,12 +16813,21 @@
    * fetch não guarda fracasso, e passa pelo sw.js, que guarda o acerto no
    * BAIXADOS. O trabalhador é baixado antes pelo mesmo motivo: se ele faltar,
    * a frase certa é "o leitor não carregou", e não "este PDF não abre". */
-  function carregarPdfJs() {
+  /* O prazo do carregamento. Com o tablet conectado mas sem tráfego, o fetch
+   * não falha: fica esperando, e a janela ficava em "Abrindo o PDF..." sem
+   * saída, e todo "Abrir" seguinte da sessão pegava a mesma espera. Passado o
+   * prazo, os pedidos são abortados, a janela dá a frase de sem sinal com o
+   * "Abrir fora do aplicativo", e o próximo "Abrir" tenta do zero. */
+  var PRAZO_DO_LEITOR_MS = 15000;
+
+  function carregarPdfJs(prazoMs) {
     if (pdfjsCarregando) return pdfjsCarregando;
     var trabalhador = enderecoNoApp(PDFJS_PASTA + 'pdf.worker.min.mjs');
-    pdfjsCarregando = Promise.all([
-      baixarParte(enderecoNoApp(PDFJS_PASTA + 'pdf.min.mjs')),
-      baixarParte(trabalhador)
+    var parar = typeof AbortController === 'function' ? new AbortController() : null;
+    var sinal = parar ? parar.signal : null;
+    var carga = Promise.all([
+      baixarParte(enderecoNoApp(PDFJS_PASTA + 'pdf.min.mjs'), sinal),
+      baixarParte(trabalhador, sinal)
     ]).then(function (partes) {
       var url = URL.createObjectURL(new Blob([partes[0]], { type: 'text/javascript' }));
       return import(url).then(function (lib) {
@@ -16826,9 +16836,37 @@
         return lib;
       }, function (e) { URL.revokeObjectURL(url); throw e; });
     });
+    var prazo = prazoMs || PRAZO_DO_LEITOR_MS;
+    pdfjsCarregando = new Promise(function (resolve, reject) {
+      var relogio = setTimeout(function () {
+        if (parar) parar.abort();
+        reject(new Error('o leitor não chegou em ' + prazo + ' ms'));
+      }, prazo);
+      carga.then(function (lib) { clearTimeout(relogio); resolve(lib); },
+        function (e) { clearTimeout(relogio); reject(e); });
+    });
     // falhou: a próxima abertura tenta de novo, em vez de repetir o fracasso
-    pdfjsCarregando.catch(function () { pdfjsCarregando = null; });
+    pdfjsCarregando.then(buscarDecodificadores, function () { pdfjsCarregando = null; });
     return pdfjsCarregando;
+  }
+
+  /* Os três decodificadores (.wasm) que o PDF.js só pede quando um PDF
+   * precisa deles: JBIG2 e JPEG 2000, que são as imagens de PDF escaneado, e
+   * a cor ICC. Pedidos só na hora, eles faltavam no dia sem sinal: o primeiro
+   * PDF, aberto com sinal, não tinha digitalização, e o escaneado aberto
+   * depois, sem sinal, saía com a página em branco, e como folha virava folha
+   * branca. Aqui eles vêm logo depois do leitor, de fundo, sem segurar o PDF
+   * que ela abriu, e o sw.js os guarda no BAIXADOS. Falhar não diz nada: a
+   * próxima abertura tenta de novo, e o que já está guardado sai do cache. */
+  var DECODIFICADORES = ['jbig2.wasm', 'openjpeg.wasm', 'qcms_bg.wasm'];
+  var decodificadoresPedidos = false;
+  function buscarDecodificadores() {
+    if (decodificadoresPedidos) return;
+    decodificadoresPedidos = true;
+    var faltou = false;
+    Promise.all(DECODIFICADORES.map(function (nome) {
+      return baixarParte(enderecoNoApp(PDFJS_PASTA + 'wasm/' + nome)).catch(function () { faltou = true; });
+    })).then(function () { if (faltou) decodificadoresPedidos = false; });
   }
 
   function ehPdf(tipo, nome) {
@@ -16873,6 +16911,7 @@
    *   opcoes.comoFolha     false esconde o "Abrir esta página como folha"
    *   opcoes.abrirFora     function () que troca o caminho de fora (padrão:
    *                        compartilhar ou baixar, como o anexo fazia antes)
+   *   opcoes.prazoCarga    ms até desistir de carregar o leitor (padrão: 15 s)
    *
    * Devolve uma promessa: true quando a primeira página está desenhada, false
    * quando não abriu (a janela já disse por quê e ofereceu o caminho de fora). */
@@ -16895,7 +16934,7 @@
 
     var falha = null;
     return Promise.all([
-      carregarPdfJs().catch(function (e) { falha = 'leitor'; throw e; }),
+      carregarPdfJs(opcoes.prazoCarga).catch(function (e) { falha = 'leitor'; throw e; }),
       bytesDoPdf(fonte).catch(function (e) { falha = 'pdf'; throw e; })
     ]).then(function (r) {
       if (vez !== leitorVez) return null;
@@ -16932,7 +16971,7 @@
   }
 
   var FALHAS_DO_LEITOR = {
-    leitor: 'O leitor de PDF vem da internet na primeira vez, e agora o tablet está sem sinal.',
+    leitor: 'O leitor de PDF vem da internet na primeira vez, e agora o tablet está sem sinal, ou com sinal fraco demais.',
     senha: 'Este PDF tem senha, e o leitor do aplicativo não abre PDF com senha.',
     pdf: 'Não consegui abrir este PDF dentro do aplicativo.'
   };

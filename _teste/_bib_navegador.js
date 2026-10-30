@@ -75,6 +75,10 @@ function criarAmbiente(porta, nomePerfil, trocas) {
      * service worker, que busca pela rede dele. Com amb.cortado, toda conexão
      * cai sem resposta, e amb.cortados conta quem tentou passar. */
     if (amb.cortado) { amb.cortados.push(rel); req.socket.destroy(); return; }
+    /* Rede fraca: com amb.segurar = '/prefixo/', o pedido chega e fica sem
+     * resposta, como no tablet conectado mas sem tráfego. amb.soltarSegurados()
+     * derruba os que ficaram pendurados. */
+    if (amb.segurar && rel.indexOf(amb.segurar) === 0) { amb.segurados.push({ rel, req }); return; }
     if (extras[rel]) {
       res.writeHead(200, { 'Content-Type': extras[rel].tipo, 'Cache-Control': 'no-store' });
       res.end(extras[rel].corpo);
@@ -120,7 +124,11 @@ function criarAmbiente(porta, nomePerfil, trocas) {
 
   let nav = null;
   const amb = {
-    ORIGEM, PERFIL, quatrocentos, extras, cortado: false, cortados: [],
+    ORIGEM, PERFIL, quatrocentos, extras, cortado: false, cortados: [], segurar: null, segurados: [],
+    soltarSegurados() {
+      amb.segurados.forEach(s => { try { s.req.socket.destroy(); } catch (e) { /* já caiu */ } });
+      amb.segurar = null;
+    },
     async subir() {
       if (await portaOcupada()) {
         conf('a porta 127.0.0.1:' + porta + ' está livre antes de subir o servidor', 'ocupada', 'livre');
