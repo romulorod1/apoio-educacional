@@ -173,18 +173,22 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   secao('5b. C13 (UX08): a caixa desligada diz por quê');
   await pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-gerar'); if (b) b.click(); });
   await esperar('janela Gerar material', () => pag.$eval('#modal-bib-gerar', e => e.classList.contains('aberto')), v => v === true, 8000);
-  const porQue = await pag.evaluate(() => {
-    const p = document.querySelector('#bib-gerar-desligadas');
+  const porQue = () => pag.evaluate(() => {
+    const m = k => { const s = document.querySelector('#bib-gerar-motivo-' + k); return s && !s.hidden ? s.textContent : ''; };
     return {
-      texto: p && !p.hidden ? p.textContent : '',
-      teoria: document.querySelector('#bib-gerar-teoria').disabled,
-      folha: document.querySelector('#bib-gerar-folha').disabled
+      teoria: document.querySelector('#bib-gerar-teoria').disabled + ' ' + m('teoria'),
+      lista: m('lista'),
+      folha: document.querySelector('#bib-gerar-folha').disabled + ' ' + m('folha')
     };
   });
-  conf('sem teoria e sem aula escolhida, Teoria e Folha ficam desligadas', porQue.teoria + ' ' + porQue.folha, 'true true');
-  conf('e a frase diz por quê', porQue.texto,
-    'Teoria fica desligada porque nenhuma página de teoria foi marcada. ' +
-    'Folha da aula liga quando você escolhe a aula, logo abaixo.');
+  let pq = await porQue();
+  conf('Teoria desligada diz por quê, na própria linha', pq.teoria, 'true (nenhuma página de teoria foi marcada)');
+  conf('a Lista, ligada, não ganha motivo', pq.lista, '');
+  conf('Folha desligada pede a aula', pq.folha, 'true (liga quando você escolher a aula, logo abaixo)');
+  await pag.evaluate(() => document.querySelector('#bib-gerar-lista').click());
+  pq = await porQue();
+  conf('sem a Lista e sem aula, a Folha pede as duas coisas', pq.folha,
+    'true (liga quando a Lista estiver marcada e você escolher a aula, logo abaixo)');
 
   // ================================================================
   secao('6. Nenhum erro');
