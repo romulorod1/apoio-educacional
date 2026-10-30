@@ -986,12 +986,15 @@
    * opcoes = { incluirNotas: bool, notas: [{data, paginas:[...]}], imagens: {ref:{bytes,w,h}} } */
   function gerarFechamento(dados, opcoes) {
     opcoes = opcoes || {};
+    /* os títulos dela (C11): o app manda o objeto já mesclado pelo
+     * Core.titulosDoFechamento; o literal é a reserva de quem chama sem ele */
+    function T(chave, padrao) { return (opcoes.titulos && opcoes.titulos[chave]) || padrao; }
     var doc = new Doc();
     doc.novaPagina();
 
     // titulo, medido pelo fio do cabecalho e nao pelo cursor
     doc.y = baseDoTitulo(19);
-    doc.texto('Controle de aulas', PAGINA_L / 2, doc.y, { tam: 19, bold: true, cor: COR.navy, align: 'centro' });
+    doc.texto(T('documento', 'Controle de aulas'), PAGINA_L / 2, doc.y, { tam: 19, bold: true, cor: COR.navy, align: 'centro' });
     doc.y -= 12;
     doc.texto(dados.mesExtenso, PAGINA_L / 2, doc.y, { tam: 10, cor: COR.teal, align: 'centro', tracking: 1.1 });
 
@@ -1064,7 +1067,7 @@
 
     // tabela
     doc.y -= 24;
-    doc.texto('Datas trabalhadas', MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
+    doc.texto(T('datas', 'Datas trabalhadas'), MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
     doc.y -= 6;
     cabecalhoTabela(doc);
 
@@ -1134,7 +1137,7 @@
     if (previstas.length) {
       doc.y -= 26;
       doc.garanteEspaco(74);
-      doc.texto('Ainda marcadas neste mês', MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
+      doc.texto(T('marcadas', 'Ainda marcadas neste mês'), MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
       doc.y -= 6;
       cabecalhoTabela(doc);
       corpoDaTabela(previstas);
@@ -1185,7 +1188,7 @@
     if (canceladasFuturas.length) {
       doc.y -= 26;
       doc.garanteEspaco(74);
-      doc.texto('Aulas canceladas à frente', MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
+      doc.texto(T('canceladas', 'Aulas canceladas à frente'), MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
       doc.y -= 6;
       cabecalhoTabela(doc);
       corpoDaTabela(canceladasFuturas);
@@ -1232,7 +1235,7 @@
     var temasDaFolha = (temFuturas ? dados.temasFeitos : dados.temasDoMes) || dados.temasDoMes || [];
     var areasDaFolha = (temFuturas ? dados.areasFeitas : dados.areasDoMes) || dados.areasDoMes || [];
     if (exibirListas && temasDaFolha.length) {
-      tituloDeSecao('Temas trabalhados', 92);
+      tituloDeSecao(T('temas', 'Temas trabalhados'), 92);
       for (var t = 0; t < temasDaFolha.length; t++) {
         var tm = temasDaFolha[t];
         doc.garanteEspaco(16);
@@ -1251,7 +1254,7 @@
     }
 
     if (exibirListas && areasDaFolha.length) {
-      tituloDeSecao('Áreas trabalhadas', 92);
+      tituloDeSecao(T('areas', 'Áreas trabalhadas'), 92);
       /* Em duas colunas: a lista costuma ser longa, e uma coluna só empurraria
          o resumo para a página seguinte sem necessidade. */
       var meio = Math.ceil(areasDaFolha.length / 2);
@@ -1287,7 +1290,7 @@
       var sobra = doc.y - Y_LIMITE;
       if (alturaResumo > sobra && alturaResumo <= (Y_TOPO - Y_LIMITE)) doc.novaPagina();
 
-      doc.texto('Feedback', MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
+      doc.texto(T('feedback', 'Feedback'), MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
       doc.y -= 4;
       doc.linha(MARG_E, doc.y, MARG_E + 70, doc.y, COR.teal, 1.2);
       doc.y -= 8;
@@ -1300,7 +1303,7 @@
       if (linhasComNota.length) {
         doc.y -= 24;
         doc.garanteEspaco(46);
-        doc.texto('Notas das aulas', MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
+        doc.texto(T('notas', 'Notas das aulas'), MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
         doc.y -= 4;
         doc.linha(MARG_E, doc.y, MARG_E + 95, doc.y, COR.teal, 1.2);
         doc.y -= 8;

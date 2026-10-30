@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.31.1';
+  var VERSAO = '1.32.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,15 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.32.0',
+      itens: [
+        'No "Preparar documento para a família", a nova parte "Títulos do documento" deixa você mudar o nome de cada ' +
+          'seção do fechamento (por exemplo, "Feedback"). Vale para todos os alunos e os próximos meses; em branco, volta ao de sempre.',
+        'Em Ajustes, "Usar roteiro de perguntas no feedback": ligado, a janela do Feedback mostra três perguntas para ' +
+          'responder e monta o texto com as respostas. As perguntas também podem ser reescritas. Desligado, nada muda.'
+      ]
+    },
     {
       versao: '1.31.1',
       itens: [
@@ -10971,6 +10980,40 @@
       ])
     ]));
 
+    /* 2b. Os títulos do documento, dela (C11). Fechado por padrão, para a
+     * janela de sempre não mudar; o que ela digita vale na hora na prévia e
+     * fica guardado para os próximos meses e os outros alunos. */
+    var titulosAbertos = el('details', { id: 'doc-titulos', class: 'doc-titulos' });
+    titulosAbertos.appendChild(el('summary', { texto: 'Títulos do documento' }));
+    titulosAbertos.appendChild(el('div', {
+      class: 'ajuda', style: 'margin:4px 0 8px',
+      texto: 'Mude o nome de cada parte do documento. Vale para todos os alunos e os próximos meses. Deixe em branco para voltar ao de sempre.'
+    }));
+    var ROTULOS_DOS_TITULOS = {
+      documento: 'Título do documento', datas: 'Tabela das aulas', marcadas: 'Aulas ainda marcadas',
+      canceladas: 'Aulas canceladas à frente', temas: 'Temas', areas: 'Áreas', feedback: 'Feedback', notas: 'Notas das aulas'
+    };
+    Object.keys(Core.TITULOS_FECHAMENTO).forEach(function (k) {
+      var dela = (db.ajustes && db.ajustes.titulosFechamento) || {};
+      var campo = el('input', {
+        type: 'text', id: 'doc-titulo-' + k, maxlength: '60', autocomplete: 'off',
+        placeholder: Core.TITULOS_FECHAMENTO[k]
+      });
+      campo.value = typeof dela[k] === 'string' ? dela[k] : '';
+      campo.addEventListener('input', function () {
+        db.ajustes = db.ajustes || {};
+        var t = Object.assign({}, db.ajustes.titulosFechamento || {});
+        if (campo.value.trim()) t[k] = campo.value; else delete t[k];
+        db.ajustes.titulosFechamento = t;
+        salvar();
+        desenharPrevia();
+      });
+      titulosAbertos.appendChild(el('label', { class: 'campo', style: 'margin:0 0 6px' }, [
+        el('span', { texto: ROTULOS_DOS_TITULOS[k] }), campo
+      ]));
+    });
+    painelConfig.appendChild(titulosAbertos);
+
     // 3. Garantia de Privacidade
     painelConfig.appendChild(el('div', { class: 'faixa-privacidade-garantida' }, [
       el('span', { style: 'font-size:16px;line-height:1' }, [document.createTextNode('🔒')]),
@@ -11101,9 +11144,10 @@
 
     function desenharPrevia() {
       papelPrevia.innerHTML = '';
+      var TP = titulosDoDocumento();
 
       var cabecalho = el('div', { class: 'previa-doc-cabecalho' }, [
-        el('div', { class: 'previa-doc-titulo', texto: 'Controle de Aulas' }),
+        el('div', { class: 'previa-doc-titulo', texto: TP.documento }),
         el('div', { class: 'previa-doc-meta' }, [
           el('div', {}, [el('strong', { texto: 'Aluno: ' }), document.createTextNode(estado.f.alunoNome)]),
           estado.f.responsavel ? el('div', {}, [el('strong', { texto: 'Responsável: ' }), document.createTextNode(estado.f.responsavel)]) : null,
@@ -11120,7 +11164,7 @@
       var previstas = (estado.f.linhas || []).filter(function (l) { return l.futura && l.status !== 'cancelada'; });
 
       // Seção: Datas trabalhadas
-      papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: 'Datas trabalhadas' }));
+      papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: TP.datas }));
 
       if (feitas.length || !temFuturas) {
         var tabFeitas = el('table', { class: 'previa-tabela' });
@@ -11179,7 +11223,7 @@
 
       // Datas futuras se existirem
       if (previstas.length) {
-        papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: 'Ainda marcadas neste mês' }));
+        papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: TP.marcadas }));
         var tabPrev = el('table', { class: 'previa-tabela' });
         var theadP = el('thead', {}, [
           el('tr', {}, [
@@ -11215,7 +11259,7 @@
       // Aulas canceladas à frente se existirem
       var canceladasFuturas = (estado.f.linhas || []).filter(function (l) { return l.futura && l.status === 'cancelada'; });
       if (canceladasFuturas.length) {
-        papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: 'Aulas canceladas à frente' }));
+        papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: TP.canceladas }));
         var tabCanc = el('table', { class: 'previa-tabela' });
         var theadC = el('thead', {}, [
           el('tr', {}, [
@@ -11262,7 +11306,7 @@
       // Temas trabalhados
       var temasNoTexto = (temFuturas ? estado.f.temasFeitos : estado.f.temasDoMes) || estado.f.temasDoMes || [];
       if (estado.exibirTemas && temasNoTexto.length) {
-        papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: 'Temas trabalhados' }));
+        papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: TP.temas }));
         var ulTemas = el('ul', { style: 'margin:4px 0 12px 20px;padding:0;font-size:12px' });
         temasNoTexto.forEach(function (t) {
           ulTemas.appendChild(el('li', {
@@ -11275,7 +11319,7 @@
       // Áreas trabalhadas
       var areasNoTexto = (temFuturas ? estado.f.areasFeitas : estado.f.areasDoMes) || estado.f.areasDoMes || [];
       if (estado.exibirTemas && areasNoTexto.length) {
-        papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: 'Áreas trabalhadas' }));
+        papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: TP.areas }));
         var ulAreas = el('ul', { style: 'margin:4px 0 12px 20px;padding:0;font-size:12px' });
         areasNoTexto.forEach(function (a) {
           ulAreas.appendChild(el('li', {
@@ -11286,7 +11330,7 @@
       }
 
       // Feedback
-      papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: 'Feedback' }));
+      papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: TP.feedback }));
       var fbTexto = (estado.feedbackTexto || '').trim();
       papelPrevia.appendChild(el('div', {
         class: 'previa-feedback-box',
@@ -11297,7 +11341,7 @@
       if (estado.incluirNotas) {
         var aulasComNota = (estado.f.linhas || []).filter(function (l) { return !l.futura && !!(l.notaTexto || '').trim(); });
         if (aulasComNota.length) {
-          papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: 'Notas das aulas' }));
+          papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: TP.notas }));
           aulasComNota.forEach(function (l) {
             papelPrevia.appendChild(el('div', { class: 'previa-notas-aula-item' }, [
               el('strong', { texto: Core.ddmm(l.data) + ' (' + l.dia + ')' }),
@@ -11327,6 +11371,15 @@
       placeholder: 'Como foi o mês, o que evoluiu, o que merece atenção e o que vem a seguir.'
     });
     area.value = registro ? registro.texto : '';
+    corpo._roteiro = null;
+    if (roteiroLigado()) {
+      corpo.appendChild(el('div', {
+        class: 'ajuda', style: 'margin:0 0 6px',
+        texto: 'Roteiro: responda o que quiser e toque em "Montar o texto". As perguntas também podem ser reescritas.'
+      }));
+      corpo._roteiro = blocoDoRoteiro(area);
+      corpo.appendChild(corpo._roteiro);
+    }
     corpo.appendChild(area);
     corpo._alunoId = alunoId;
     corpo._mes = mes;
@@ -11342,6 +11395,8 @@
     })[0];
     if (registro) registro.texto = texto;
     else db.resumos.push({ alunoId: corpo._alunoId, mes: corpo._mes, texto: texto });
+    // as perguntas que ela reescreveu ficam para os próximos meses (C11)
+    if (corpo._roteiro) corpo._roteiro.guardarPerguntas();
     salvarEDepois(function (gravou) {
       fecharModal('modal-resumo');
       desenharFechamento();
@@ -11844,8 +11899,14 @@
     return String((db.ajustes && db.ajustes.chavePix) || '').trim();
   }
 
+  /* Os títulos do fechamento, os dela por cima dos de sempre (C11). */
+  function titulosDoDocumento() {
+    return Core.titulosDoFechamento(db.ajustes && db.ajustes.titulosFechamento);
+  }
+
   function opcoesDoDocumento(extra) {
     var o = Object.assign({}, extra || {});
+    if (o.titulos === undefined) o.titulos = titulosDoDocumento();
     if (o.exibirTemasEAreas === undefined) o.exibirTemasEAreas = exibirTemasEAreas();
     if (o.mostrarNaoCobradas === undefined) o.mostrarNaoCobradas = mostrarNaoCobradas();
     if (o.chavePix === undefined) o.chavePix = chavePix();
@@ -12241,6 +12302,86 @@
         + 'total. Com o campo vazio, o fechamento continua como sempre foi.'
     }));
     caixa.appendChild(cartaoPix);
+
+    /* O roteiro de três perguntas do feedback (C11): desligado por padrão, e
+     * a chave mora aqui para a janela do Feedback continuar a de sempre. */
+    var cartaoRoteiro = el('div', { class: 'cartao' });
+    var chkRoteiro = el('input', { type: 'checkbox', id: 'chk-roteiro-feedback', style: 'width:auto;min-height:auto' });
+    chkRoteiro.checked = roteiroLigado();
+    chkRoteiro.addEventListener('change', function () {
+      db.ajustes = db.ajustes || {};
+      db.ajustes.roteiroFeedback = Object.assign({}, db.ajustes.roteiroFeedback || {}, { ligado: chkRoteiro.checked });
+      salvarEDepois(function (gravou) { desenharAjustesDoFechamento(); });
+    });
+    cartaoRoteiro.appendChild(el('label', {
+      class: 'campo', style: 'display:flex;align-items:center;gap:10px;margin:0'
+    }, [chkRoteiro, el('span', { texto: 'Usar roteiro de perguntas no feedback', style: 'margin:0' })]));
+    cartaoRoteiro.appendChild(el('p', {
+      class: 'ajuda', style: 'margin:8px 0 0',
+      texto: roteiroLigado()
+        ? 'A janela do Feedback mostra três perguntas para responder. O texto sai montado das respostas e você '
+          + 'continua podendo mudar tudo. As perguntas também são suas: dá para reescrever cada uma lá mesmo.'
+        : 'Com a caixa desmarcada, o Feedback é o campo único de sempre.'
+    }));
+    caixa.appendChild(cartaoRoteiro);
+  }
+
+  function roteiroLigado() {
+    return !!(db.ajustes && db.ajustes.roteiroFeedback && db.ajustes.roteiroFeedback.ligado);
+  }
+
+  /* O bloco do roteiro, para a janela do Feedback (C11). Cada pergunta é um
+   * campo que ela pode reescrever (fica guardado para os próximos meses), com
+   * a resposta embaixo. "Montar o texto" escreve as respostas no campo do
+   * feedback, que continua editável; o texto anterior volta pelo Desfazer. */
+  function blocoDoRoteiro(area, aoMontar) {
+    var bloco = el('div', { class: 'roteiro-feedback', id: 'roteiro-feedback' });
+    var guardadas = (db.ajustes.roteiroFeedback && db.ajustes.roteiroFeedback.perguntas) || [];
+    var perguntas = Core.perguntasDoRoteiro(guardadas);
+    var camposP = [];
+    var camposR = [];
+    perguntas.forEach(function (p, i) {
+      var campoP = el('input', { type: 'text', class: 'roteiro-pergunta', id: 'roteiro-pergunta-' + i, maxlength: '200', autocomplete: 'off',
+        placeholder: Core.PERGUNTAS_DO_ROTEIRO[i], 'aria-label': 'Pergunta ' + (i + 1) });
+      campoP.value = p;
+      var campoR = el('textarea', { class: 'roteiro-resposta', id: 'roteiro-resposta-' + i, style: 'min-height:64px',
+        'aria-label': 'Resposta ' + (i + 1) });
+      camposP.push(campoP);
+      camposR.push(campoR);
+      bloco.appendChild(campoP);
+      bloco.appendChild(campoR);
+    });
+    function perguntasDaTela() {
+      return Core.perguntasDoRoteiro(camposP.map(function (c) { return c.value; }));
+    }
+    bloco.guardarPerguntas = function () {
+      var novas = camposP.map(function (c, i) {
+        var v = c.value.replace(/\s+/g, ' ').trim();
+        return v === Core.PERGUNTAS_DO_ROTEIRO[i] ? '' : v;
+      });
+      var antes = JSON.stringify(guardadas.map(function (v) { return v || ''; }).concat(['', '', '']).slice(0, 3));
+      if (JSON.stringify(novas) === antes) return false;
+      db.ajustes.roteiroFeedback = Object.assign({}, db.ajustes.roteiroFeedback || {},
+        { perguntas: novas.some(Boolean) ? novas : [] });
+      return true;
+    };
+    bloco.appendChild(el('button', {
+      type: 'button', class: 'btn', id: 'roteiro-montar', texto: 'Montar o texto com as respostas',
+      aoClick: function () {
+        var texto = Core.textoDoRoteiro(perguntasDaTela(), camposR.map(function (c) { return c.value; }));
+        if (!texto) { avisar('Responda pelo menos uma pergunta.'); return; }
+        var anterior = area.value;
+        area.value = texto;
+        if (aoMontar) aoMontar();
+        if (anterior.trim()) {
+          avisar('Texto montado com as respostas.', 'Desfazer', function () {
+            area.value = anterior;
+            if (aoMontar) aoMontar();
+          });
+        }
+      }
+    }));
+    return bloco;
   }
 
   function desenharAjustesDeReajuste() {

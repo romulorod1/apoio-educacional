@@ -2098,6 +2098,15 @@ button.alvo-rascunho:hover { background: var(--soft); }
   border: 1px solid var(--fio);
 }
 
+/* C11: os títulos do documento (fechado por padrão) e o roteiro do feedback */
+.doc-titulos { margin: 4px 0 0; }
+.doc-titulos summary { min-height: 44px; line-height: 44px; cursor: pointer;
+  font-size: 13px; font-weight: 700; color: var(--navy); }
+.roteiro-feedback { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; }
+.roteiro-feedback .roteiro-pergunta { font-weight: 700; color: var(--navy); }
+.roteiro-feedback .roteiro-resposta { margin-bottom: 6px; }
+.roteiro-feedback #roteiro-montar { align-self: flex-start; }
+
 .faixa-privacidade-garantida {
   background: #E8F5E9;
   border: 1px solid #C8E6C9;
