@@ -3633,20 +3633,30 @@
    *   - não escreve em trilha encerrada. Registro fechado não ganha passo novo
    *     por efeito colateral de uma aula editada hoje.
    *
+   * E NENHUM dos quatro mexe em trilha encerrada: nem solta, nem fecha. O 1 e
+   * o 2 passavam por todas as trilhas, e o 4 só pelas ativas, então um passo
+   * de trilha encerrada que o 2 soltava (a aula perdeu o "Domina" e ela
+   * salvou) nunca mais voltava, e a data de fechamento se perdia. A trilha
+   * encerrada é o registro do que foi feito até ali, e fica como foi
+   * encerrada; o toque no domínio já seguia esta regra (revisarDominioNaAula).
+   *
    * Devolve quantos passos ficaram mesmo para trás, já descontando os que a
    * varredura devolveu, e quantos voltaram a contar. */
   function revisarTrilhasDoAluno(alunoId) {
     var aluno = alunoPorId(alunoId);
     if (!aluno || !Core.trilhasDe(aluno).length) return { soltos: 0, remarcados: 0 };
 
+    // só as ativas, nos quatro passos: a encerrada não entra em nenhum
+    var ativas = Core.trilhasAtivas(aluno);
     var todos = [];
-    Core.trilhasDe(aluno).forEach(function (tr) {
+    ativas.forEach(function (tr) {
       (tr.passos || []).forEach(function (p) { todos.push(p); });
     });
     var tinha = todos.map(function (p) { return !!p.feitoEm; });
 
     var minhasAulas = db.aulas.filter(function (a) { return a.alunoId === alunoId; });
-    minhasAulas.forEach(function (a) { Core.revisarPassosDaAula(aluno, a); });
+    var soAsAtivas = { id: aluno.id, trilhas: ativas };
+    minhasAulas.forEach(function (a) { Core.revisarPassosDaAula(soAsAtivas, a); });
 
     // 2. o lastro de cada marca: a aula existe e ainda sustenta aquele passo?
     var aulaPorId = {};
