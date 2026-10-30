@@ -3240,12 +3240,29 @@
     };
   }
 
+  /* Desde que mês ela controla os pagamentos: db.ajustes.pagamentosDesde,
+   * 'AAAA-MM'. O app grava o mês corrente na primeira vez que desenha o
+   * Fechamento sem o campo, e ela muda quando quiser.
+   *
+   * Existe porque, sem ele, a primeira abertura do "pago em" transformaria em
+   * pendência todo mês anterior com aula, inclusive os que as famílias já
+   * pagaram antes de existir onde marcar: a lista nasceria enorme e falsa.
+   * Sem o campo (ou com ele mal escrito), vale o mês de hoje, que é o que o
+   * app vai gravar: nada fica pendente antes de ela dizer desde quando. */
+  function corteDosPagamentos(db, hojeRef) {
+    var c = db && db.ajustes && db.ajustes.pagamentosDesde;
+    return /^\d{4}-\d{2}$/.test(String(c || '')) ? c : mesDe(hojeRef || hojeIso());
+  }
+
   /* Quem ainda não pagou o quê, mês a mês.
    *
-   * Pendente é o mês com valor a cobrar maior que zero e sem pagamento que o
-   * cubra. Mês futuro não entra: não dá para dever o que ainda não aconteceu.
-   * O mês de hoje entra, com o que já aconteceu até hoje, e vem marcado como
-   * em andamento, para ela não confundir com dívida de mês fechado.
+   * Pendente é o mês JÁ TERMINADO, a partir do corte, com valor a cobrar
+   * maior que zero e sem pagamento que o cubra (pago a menos entra, com a
+   * diferença). O mês corrente não entra: ele só vira cobrança depois que
+   * fecha, e listar o que ainda está acontecendo seria cobrar antes da hora.
+   * Mês futuro, pelo mesmo motivo, também não. Mês antes do corte nunca é
+   * pendente; um pagamento marcado nele continua no cartão do aluno, porque é
+   * dado dela, só não vira pendência.
    *
    * hojeRef existe para o teste poder fixar o dia. Ordem: do mês mais antigo
    * para o mais novo (o que está esperando há mais tempo vem primeiro) e, no
@@ -3253,11 +3270,13 @@
   function pendentesDePagamento(db, hojeRef) {
     var hoje = hojeRef || hojeIso();
     var mesHoje = mesDe(hoje);
+    var corte = corteDosPagamentos(db, hoje);
     var mesesDoAluno = Object.create(null);
     ((db && db.aulas) || []).forEach(function (a) {
       if (!a || !a.data || !a.alunoId) return;
       var m = mesDe(a.data);
-      if (m > mesHoje) return;
+      if (m >= mesHoje) return;   // mês corrente e futuro: ainda não fechou
+      if (m < corte) return;      // antes do corte: ela não controlava ainda
       (mesesDoAluno[a.alunoId] = mesesDoAluno[a.alunoId] || Object.create(null))[m] = true;
     });
     var saida = [];
@@ -3270,8 +3289,7 @@
           alunoId: al.id, alunoNome: al.nome || '', mes: m, mesExtenso: mesExtenso(m),
           devido: s.devido, pago: s.pago, falta: s.falta,
           pagoEm: s.registro ? s.registro.pagoEm : null,
-          aMenos: !!s.registro,
-          emAndamento: m === mesHoje
+          aMenos: !!s.registro
         });
       });
     });
@@ -4743,6 +4761,7 @@
     lerReais: lerReais, valorACobrarDoMes: valorACobrarDoMes, pagamentoDe: pagamentoDe,
     marcarPagamento: marcarPagamento, desmarcarPagamento: desmarcarPagamento,
     situacaoDoPagamento: situacaoDoPagamento, pendentesDePagamento: pendentesDePagamento,
+    corteDosPagamentos: corteDosPagamentos,
     somaDosPendentes: somaDosPendentes,
     indicesDeReajuste: indicesDeReajuste, margemDeReajuste: margemDeReajuste,
     sugestaoDeReajuste: sugestaoDeReajuste, lerIndicesDoIbge: lerIndicesDoIbge,

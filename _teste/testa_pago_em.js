@@ -6,7 +6,10 @@
  *
  * O que se prova, pela tela:
  *   1. o cartão oferece "Marcar como pago", e a lista de pendentes nasce
- *      recolhida, com quantas pendências e quanto falta no cabeçalho;
+ *      recolhida, com quantas pendências e quanto falta no cabeçalho; abrir o
+ *      Fechamento sem db.ajustes.pagamentosDesde grava o corte no mês
+ *      corrente (nada pendente), e "Mudar" para um mês anterior faz aparecer
+ *      o pendente daquele mês;
  *   2. marcar propõe o total a cobrar do mês e a data de hoje, e grava;
  *   3. trocar o valor ao marcar (pago a menos): a diferença aparece no cartão
  *      e continua na lista de pendentes;
@@ -193,8 +196,43 @@ function citaPagamento(texto) {
   conf('Alfa: só o botão "Marcar como pago"', la && la.botoes.join(' | '), 'Marcar como pago');
   conf('Alfa: nada de "Pago em" ainda', la && la.texto.includes('Pago em'), false);
   let pe = await pendentes(pag);
-  conf('pendentes: três (Alfa em junho, Beta em maio e em junho), R$ 500,00', pe.resumo, '3 pendências · R$ 500,00');
   conf('pendentes: nasce recolhida', pe.aberta, false);
+
+  // o corte: abrir o Fechamento sem o campo grava o mês corrente, e aí nada é pendente
+  const mesHoje = hoje.slice(0, 7);
+  const corteGravado = () => pag.evaluate(async () => ((await Store.carregar()).ajustes || {}).pagamentosDesde || null);
+  conf('abrir o Fechamento sem o campo gravou o corte no mês corrente', await corteGravado(), mesHoje);
+  conf('com o corte no mês corrente, nada pendente (maio e junho já pagos antes do app)', pe.resumo, 'nada pendente');
+  const abrirLista = () => pag.evaluate(() => {
+    const l = document.querySelector('#lista-pendentes');
+    if (l && l.style.display === 'none') document.querySelector('#abrir-pendentes-pagamento').click();
+  });
+  await abrirLista();
+  const textoDoCorte = () => pag.evaluate(() => (document.querySelector('#lista-pendentes .texto-corte') || {}).textContent || '');
+  conf('a lista diz desde quando controla', await textoDoCorte(),
+    'Controlando a partir de ' + await pag.evaluate(m => Core.mesExtenso(m), mesHoje));
+  const mudarCorte = async (mes) => {
+    const ok = await pag.evaluate(() => { const b = document.querySelector('#mudar-corte-pagamentos'); if (!b) return false; b.click(); return true; });
+    const temMes = await pag.evaluate((mes) => {
+      const sel = document.querySelector('#corte-pagamentos');
+      if (!sel || !Array.from(sel.options).some(o => o.value === mes)) return false;
+      sel.value = mes;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }, mes);
+    await pausa(300);
+    return ok && temMes;
+  };
+  conf('"Mudar" para junho', await mudarCorte('2026-06'), true);
+  pe = await pendentes(pag);
+  conf('junho passa a ter pendência; maio, antes do corte, não', pe.resumo, '2 pendências · R$ 380,00');
+  conf('e o corte foi gravado', await corteGravado(), '2026-06');
+  conf('a linha do corte acompanha', await textoDoCorte(), 'Controlando a partir de Junho de 2026');
+  conf('"Mudar" para maio', await mudarCorte('2026-05'), true);
+  pe = await pendentes(pag);
+  conf('pendentes: três (Alfa em junho, Beta em maio e em junho), R$ 500,00', pe.resumo, '3 pendências · R$ 500,00');
+  await pag.evaluate(() => document.querySelector('#abrir-pendentes-pagamento').click());
+  conf('Esconder recolhe de novo', (await pendentes(pag)).aberta, false);
   conf('pendentes: do mês mais antigo para o mais novo', pe.itens.map(i => i.split(' | ').slice(0, 3).join(' | ')), [
     'Aluno Beta Teste | 2026-05 | R$ 120,00',
     'Aluno Alfa Teste | 2026-06 | R$ 200,00',
@@ -283,6 +321,7 @@ function citaPagamento(texto) {
   conf('Beta depois de recarregar', (await linha(pag, BETA)).feito, 'Pago em 07/07 · R$ 180,00');
   pe = await pendentes(pag);
   conf('pendentes depois de recarregar (e a lista nasce recolhida de novo)', [pe.resumo, pe.aberta], ['2 pendências · R$ 132,65', false]);
+  conf('o corte escolhido sobrevive a recarregar', await corteGravado(), '2026-05');
 
   // ================================================================
   secao('7. A cópia de segurança leva os pagamentos, e restaurar traz de volta');

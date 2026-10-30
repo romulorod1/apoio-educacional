@@ -7,18 +7,20 @@
  *      reais com duas casas, sem resto de vírgula flutuante;
  *   2. o valor proposto é o mesmo que o documento da família cobra;
  *   3. marcar, trocar o valor e desmarcar: um registro por aluno e mês;
- *   4. os pendentes: mês sem pagamento, pago a MENOS com a diferença, pago a
- *      mais e pago exato fora, mês de hoje marcado como em andamento, mês
- *      futuro fora, mês sem nada a cobrar fora;
+ *   4. os pendentes: mês terminado sem pagamento, pago a MENOS com a
+ *      diferença, pago a mais e pago exato fora, mês corrente NUNCA (só vira
+ *      cobrança depois que fecha), mês futuro fora, mês sem nada a cobrar
+ *      fora, e o corte (db.ajustes.pagamentosDesde): antes dele nunca é
+ *      pendente, a partir dele sim, sem ele nada é;
  *   5. base antiga, sem o campo, lê como lista vazia e não quebra;
  *   6. o documento da família (texto e PDF) sai igual com e sem pagamentos.
  *
- * E os VENENOS, porque esta regra grava e decide: duas cópias do core.js com a
+ * E os VENENOS, porque esta regra grava e decide: três cópias do core.js com a
  * regra estragada rodam as MESMAS provas da seção 4, e cada uma TEM de
  * reprovar. A primeira esquece o "pago a menos" (qualquer marca conta como
- * pago inteiro); a segunda cobra o que ainda não aconteceu (mês inteiro e mês
- * futuro). Se a troca não achar o trecho no core.js, isso é falha também:
- * veneno que não pegou não prova nada.
+ * pago inteiro); a segunda cobra o mês que ainda não fechou; a terceira
+ * ignora o corte. Se a troca não achar o trecho no core.js, isso é falha
+ * também: veneno que não pegou não prova nada.
  *
  * Dados fictícios.
  */
@@ -77,16 +79,20 @@ function banco() {
       aula('g1', GAMA, '2026-08-11', 60), aula('g2', GAMA, '2026-08-12', 60), aula('g3', GAMA, '2026-08-13', 60) // 99,99
     ],
     resumos: [{ alunoId: ALFA, mes: '2026-08', texto: 'Bom mês para o Alfa.' }],
-    ajustes: {},
+    // ela controla desde julho; junho do Alfa (abaixo) fica antes do corte
+    ajustes: { pagamentosDesde: '2026-07' },
     pagamentos: []
   };
 }
+// junho do Alfa: 100 a cobrar, sem pagamento, ANTES do corte
+const AULA_ANTES_DO_CORTE = aula('a0', ALFA, '2026-06-10', 60);
+function bancoComJunho() { const db = banco(); db.aulas.push(AULA_ANTES_DO_CORTE); return db; }
 
 /* Os pagamentos do cenário: julho do Alfa exato, agosto do Alfa A MENOS
  * (60 de 100), agosto do Beta a MAIS (200 de 180), agosto do Gama exato pelo
  * texto "99,99". Setembro do Alfa sem pagamento. */
 function bancoComPagamentos(C) {
-  const db = banco();
+  const db = bancoComJunho();
   C.marcarPagamento(db, ALFA, '2026-07', '2026-08-02', 200);
   C.marcarPagamento(db, ALFA, '2026-08', '2026-09-03', 60);
   C.marcarPagamento(db, BETA, '2026-08', '2026-09-04', 200);
@@ -94,8 +100,7 @@ function bancoComPagamentos(C) {
   return db;
 }
 
-const chave = p => p.alunoNome + ' | ' + p.mes + ' | falta ' + p.falta + (p.aMenos ? ' | a menos, pagou ' + p.pago : '') +
-  (p.emAndamento ? ' | em andamento' : '');
+const chave = p => p.alunoNome + ' | ' + p.mes + ' | falta ' + p.falta + (p.aMenos ? ' | a menos, pagou ' + p.pago : '');
 
 /* As provas da regra de pendente. Rodam no core de verdade e nos venenos;
  * devolvem quantas falharam, sem mexer no placar quando é veneno. */
@@ -104,16 +109,16 @@ function provasDosPendentes(C, contar) {
   const c = contar ? conf : (r, o, e) => { if (JSON.stringify(o) !== JSON.stringify(e)) { f++; console.log('  (veneno reprovou) ' + r); } };
   const db = bancoComPagamentos(C);
   const lista = C.pendentesDePagamento(db, HOJE);
-  c('pendentes: exatamente agosto do Alfa (a menos) e setembro do Alfa (em andamento)', lista.map(chave), [
-    'Aluno Alfa Teste | 2026-08 | falta 40 | a menos, pagou 60',
-    'Aluno Alfa Teste | 2026-09 | falta 100 | em andamento'
+  c('pendentes: exatamente agosto do Alfa (a menos)', lista.map(chave), [
+    'Aluno Alfa Teste | 2026-08 | falta 40 | a menos, pagou 60'
   ]);
   const aMenos = lista.filter(p => p.alunoId === ALFA && p.mes === '2026-08')[0];
   c('pago a menos: continua pendente, com a diferença', aMenos ? [aMenos.devido, aMenos.pago, aMenos.falta, aMenos.pagoEm] : null,
     [100, 60, 40, '2026-09-03']);
-  c('mês de hoje: só o que já aconteceu (100, não 200)', (lista.filter(p => p.mes === '2026-09')[0] || {}).falta, 100);
+  c('mês corrente (setembro, 100 já dados e sem pagamento) não é pendente', lista.some(p => p.mes === '2026-09'), false);
   c('mês futuro (outubro) não é pendente', lista.some(p => p.mes === '2026-10'), false);
-  c('a soma dos pendentes', C.somaDosPendentes(lista), { falta: 140, itens: 2, meses: 2, alunos: 1 });
+  c('antes do corte (junho do Alfa, sem pagamento) não é pendente', lista.some(p => p.mes === '2026-06'), false);
+  c('a soma dos pendentes', C.somaDosPendentes(lista), { falta: 40, itens: 1, meses: 1, alunos: 1 });
   const sit = C.situacaoDoPagamento(db, C.calcularFechamento(db, ALFA, '2026-08', HOJE));
   c('situação do agosto do Alfa', [sit.devido, sit.pago, sit.falta], [100, 60, 40]);
   return f;
@@ -177,15 +182,40 @@ secao('3. Marcar, trocar o valor e desmarcar');
 secao('4. Os pendentes (o core de verdade)');
 provasDosPendentes(Core, true);
 {
-  const db = banco();
+  const db = bancoComJunho();
   const lista = Core.pendentesDePagamento(db, HOJE);
-  conf('sem pagamento nenhum: todo mês com valor a cobrar, até hoje', lista.map(chave), [
+  conf('sem pagamento nenhum: todo mês terminado com valor a cobrar, a partir do corte', lista.map(chave), [
     'Aluno Alfa Teste | 2026-07 | falta 200',
     'Aluno Alfa Teste | 2026-08 | falta 100',
     'Aluno Beta Teste | 2026-08 | falta 180',
-    'Aluno Gama Teste | 2026-08 | falta 99.99',
-    'Aluno Alfa Teste | 2026-09 | falta 100 | em andamento'
+    'Aluno Gama Teste | 2026-08 | falta 99.99'
   ]);
+  const comCorte = (c) => { const d = bancoComJunho(); d.ajustes.pagamentosDesde = c; return Core.pendentesDePagamento(d, HOJE); };
+  const mesesDoAlfa = l => l.filter(p => p.alunoId === ALFA).map(p => p.mes);
+  conf('corte em agosto: julho do Alfa fica antes e não é pendente; agosto é', mesesDoAlfa(comCorte('2026-08')), ['2026-08']);
+  conf('corte em junho: junho do Alfa passa a ser pendente', mesesDoAlfa(comCorte('2026-06')), ['2026-06', '2026-07', '2026-08']);
+  conf('corte no mês corrente: nada pendente', comCorte('2026-09').length, 0);
+  conf('corte mal escrito vale o mês de hoje: nada pendente', comCorte('2026-7').length, 0);
+  conf('sem o campo: vale o mês de hoje, nada pendente', (() => {
+    const d = bancoComJunho(); delete d.ajustes.pagamentosDesde; return Core.pendentesDePagamento(d, HOJE).length;
+  })(), 0);
+  conf('corteDosPagamentos: o gravado, ou o mês de hoje', [Core.corteDosPagamentos(banco(), HOJE), Core.corteDosPagamentos({ ajustes: {} }, HOJE)],
+    ['2026-07', '2026-09']);
+  {
+    // pagamento marcado ANTES do corte: continua no cartão (é dado dela), mas não vira pendência
+    const d = bancoComJunho();
+    d.ajustes.pagamentosDesde = '2026-08';
+    Core.marcarPagamento(d, ALFA, '2026-07', '2026-08-02', 150);
+    const s = Core.situacaoDoPagamento(d, Core.calcularFechamento(d, ALFA, '2026-07', HOJE));
+    conf('pago a menos antes do corte: o cartão lê o registro e a diferença', [!!s.registro, s.pago, s.falta], [true, 150, 50]);
+    conf('mas não é pendência', Core.pendentesDePagamento(d, HOJE).some(p => p.mes === '2026-07'), false);
+  }
+  {
+    // mês corrente pago a menos: ainda não fechou, não é pendência
+    const d = bancoComJunho();
+    Core.marcarPagamento(d, ALFA, '2026-09', '2026-09-10', 30);
+    conf('mês corrente pago a menos também não é pendente', Core.pendentesDePagamento(d, HOJE).some(p => p.mes === '2026-09'), false);
+  }
   conf('julho do Beta (só cancelada sem cobrança) não é pendente', lista.some(p => p.alunoId === BETA && p.mes === '2026-07'), false);
   conf('pago exato pelo texto "99,99" fecha o mês do Gama', Core.pendentesDePagamento(bancoComPagamentos(Core), HOJE)
     .some(p => p.alunoId === GAMA), false);
@@ -199,7 +229,7 @@ secao('5. Base antiga, sem o campo');
   const velho = banco();
   delete velho.pagamentos;
   conf('pagamentoDe não quebra', Core.pagamentoDe(velho, ALFA, '2026-08'), null);
-  conf('pendentes lê como lista vazia de pagamentos', Core.pendentesDePagamento(velho, HOJE).length, 5);
+  conf('pendentes lê como lista vazia de pagamentos', Core.pendentesDePagamento(velho, HOJE).length, 4);
   conf('marcar cria a lista', !!Core.marcarPagamento(velho, ALFA, '2026-08', '2026-09-03', 100) && velho.pagamentos.length, 1);
   conf('o store.js completa o campo ao ler, ao restaurar e ao voltar a um ponto',
     (() => {
@@ -258,16 +288,26 @@ function coreEnvenenado(nome, trocas) {
     conf('e a lista dele perde justamente o agosto do Alfa',
       C1.pendentesDePagamento(bancoComPagamentos(C1), HOJE).some(p => p.alunoId === ALFA && p.mes === '2026-08'), false);
   }
-  // cobra o que ainda não aconteceu: o mês inteiro, e o mês futuro junto
-  const C2 = coreEnvenenado('cobra-o-futuro', [
+  // cobra o mês que ainda não fechou: o corrente inteiro, e o futuro junto
+  const C2 = coreEnvenenado('cobra-o-mes-aberto', [
     ['var devidoCent = centavos(valorACobrarDoMes(f));', 'var devidoCent = centavos(f ? f.totalValor : 0);'],
-    ['if (m > mesHoje) return;', '']
+    ['if (m >= mesHoje) return;', '']
   ]);
   if (C2) {
     const f2 = provasDosPendentes(C2, false);
-    conf('veneno "cobra o futuro": as provas reprovam', f2 > 0, true);
-    conf('e a lista dele traz outubro, que ainda não aconteceu',
-      C2.pendentesDePagamento(bancoComPagamentos(C2), HOJE).some(p => p.mes === '2026-10'), true);
+    conf('veneno "cobra o mês aberto": as provas reprovam', f2 > 0, true);
+    conf('e a lista dele traz setembro, que ainda não fechou',
+      C2.pendentesDePagamento(bancoComPagamentos(C2), HOJE).some(p => p.mes === '2026-09'), true);
+  }
+  // ignora o corte: todo mês anterior com aula vira pendência
+  const C3 = coreEnvenenado('ignora-o-corte', [
+    ['if (m < corte) return;', '']
+  ]);
+  if (C3) {
+    const f3 = provasDosPendentes(C3, false);
+    conf('veneno "ignora o corte": as provas reprovam', f3 > 0, true);
+    conf('e a lista dele traz junho, que é antes do corte',
+      C3.pendentesDePagamento(bancoComPagamentos(C3), HOJE).some(p => p.mes === '2026-06'), true);
   }
 }
 

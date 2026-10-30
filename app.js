@@ -11550,30 +11550,88 @@
    * valores: não jogar a rolagem dela para o topo. */
   var pendentesAbertos = false;
 
+  /* O corte (db.ajustes.pagamentosDesde) nasce na primeira vez que o
+   * Fechamento é desenhado sem ele, com o mês corrente do relógio. Sem isto,
+   * na primeira abertura todo mês anterior com aula viraria pendência,
+   * inclusive os que as famílias já pagaram antes de existir onde marcar, e a
+   * lista dela nasceria enorme e falsa. Ela muda pelo "Mudar" da lista. */
+  function garantirCorteDosPagamentos() {
+    db.ajustes = db.ajustes || {};
+    if (/^\d{4}-\d{2}$/.test(String(db.ajustes.pagamentosDesde || ''))) return;
+    db.ajustes.pagamentosDesde = Core.mesDe(Core.hojeIso());
+    salvar();
+  }
+
+  /* Os meses que o seletor do corte oferece: do mês da aula mais antiga (ou do
+   * corte, se for antes) até o mês corrente, o mais novo primeiro, como o
+   * seletor de mês do Fechamento. Depois do mês corrente não faz sentido: o
+   * mês que não fechou nunca é pendente. */
+  function mesesDoCorte(corte) {
+    var hoje = Core.mesDe(Core.hojeIso());
+    var primeiro = corte < hoje ? corte : hoje;
+    db.aulas.forEach(function (a) { var m = Core.mesDe(a.data); if (a.data && m < primeiro) primeiro = m; });
+    var meses = [];
+    for (var m = hoje; m >= primeiro && meses.length < 240; m = Core.mesAdjacente(m, -1)) meses.push(m);
+    return meses;
+  }
+
+  function linhaDoCorte(escolhendo) {
+    var corte = Core.corteDosPagamentos(db);
+    var caixa = el('div', { class: 'barra linha-corte-pagamentos', style: 'gap:10px;margin:0 0 6px;flex-wrap:wrap' });
+    if (!escolhendo) {
+      caixa.appendChild(el('span', { class: 'texto-corte', texto: 'Controlando a partir de ' + Core.mesExtenso(corte) }));
+      caixa.appendChild(el('button', {
+        type: 'button', class: 'btn pequeno', id: 'mudar-corte-pagamentos', texto: 'Mudar',
+        aoClick: function () { caixa.parentNode.replaceChild(linhaDoCorte(true), caixa); }
+      }));
+      return caixa;
+    }
+    var sel = el('select', { id: 'corte-pagamentos', style: 'max-width:210px' });
+    mesesDoCorte(corte).forEach(function (m) {
+      var o = el('option', { value: m, texto: Core.mesExtenso(m) });
+      if (m === corte) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', function () {
+      db.ajustes = db.ajustes || {};
+      db.ajustes.pagamentosDesde = sel.value;
+      salvar();
+      desenharPendentesDePagamento();
+    });
+    caixa.appendChild(el('span', { texto: 'Controlar a partir de' }));
+    caixa.appendChild(sel);
+    caixa.appendChild(el('button', {
+      type: 'button', class: 'btn pequeno', texto: 'Cancelar',
+      aoClick: function () { caixa.parentNode.replaceChild(linhaDoCorte(false), caixa); }
+    }));
+    return caixa;
+  }
+
   function desenharPendentesDePagamento() {
     var caixa = $('#pendentes-pagamento');
     if (!caixa) return;
     caixa.innerHTML = '';
+    garantirCorteDosPagamentos();
     var lista = Core.pendentesDePagamento(db);
-    if (!lista.length) {
-      caixa.appendChild(el('div', { class: 'ajuda', id: 'pendentes-vazio', style: 'margin:0 0 12px', texto: 'Pagamentos: nada pendente até hoje.' }));
-      return;
-    }
     var soma = Core.somaDosPendentes(lista);
 
     var corpo = el('div', { class: 'cartao', id: 'lista-pendentes', style: pendentesAbertos ? '' : 'display:none' });
+    corpo.appendChild(linhaDoCorte(false));
     corpo.appendChild(el('div', {
       class: 'ajuda', style: 'margin-top:0',
       texto: 'Só para você. Nada daqui entra no documento que a família recebe. ' +
-        'Quem pagou a menos aparece com a diferença.'
+        'Conta só mês que já terminou, e quem pagou a menos aparece com a diferença.'
     }));
+    if (!lista.length) {
+      corpo.appendChild(el('div', { class: 'ajuda', id: 'pendentes-vazio', style: 'margin:8px 0 0', texto: 'Nada pendente.' }));
+    }
     var mesDaVez = null;
     lista.forEach(function (p) {
       if (p.mes !== mesDaVez) {
         mesDaVez = p.mes;
         corpo.appendChild(el('div', {
           class: 'pendentes-mes', style: 'margin:12px 0 6px;font-weight:700;color:var(--navy)',
-          texto: p.mesExtenso + (p.emAndamento ? ' (em andamento, até hoje)' : '')
+          texto: p.mesExtenso
         }));
       }
       var detalhe = p.aMenos
@@ -11614,7 +11672,8 @@
       }),
       el('span', {
         class: 'tag cheia', id: 'resumo-pendentes',
-        texto: (soma.itens === 1 ? '1 pendência' : soma.itens + ' pendências') + ' · ' + dinheiro(soma.falta)
+        texto: !soma.itens ? 'nada pendente'
+          : (soma.itens === 1 ? '1 pendência' : soma.itens + ' pendências') + ' · ' + dinheiro(soma.falta)
       }),
       el('span', { class: 'cresce' }),
       botao
