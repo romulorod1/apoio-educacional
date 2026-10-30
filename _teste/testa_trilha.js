@@ -27,7 +27,9 @@ temas.forEach(t => { porId[t.id] = t; });
 const LACUNAS = ['naturais', 'tabuada', 'divisao', 'fracoes', 'decimais', 'porcentagem',
   'inteiros', 'potencias', 'medidas', 'algebrica', 'eq1', 'sistemas', 'fatoracao', 'eq2',
   'proporcao', 'area', 'pitagoras', 'semelhanca', 'trigonometria', 'funcoes', 'graficos',
-  'probabilidade'];
+  'probabilidade',
+  // as cinco da lente da pedagoga (P08, C5)
+  'divisibilidade', 'expressoes', 'angulos', 'notacao-cientifica', 'conjuntos'];
 const ANOS = ['05', '08', 'em2'];
 
 // ================================================================
@@ -38,7 +40,7 @@ LACUNAS.forEach(l => {
   const r = Core.alvosDaLacuna(temas, l, '08');
   if (!r.candidatos.length) semAlvo.push(l);
 });
-conf('as 22 lacunas têm alvo', semAlvo.join(' ') || 'nenhuma sem alvo', 'nenhuma sem alvo');
+conf('as 27 lacunas têm alvo', semAlvo.join(' ') || 'nenhuma sem alvo', 'nenhuma sem alvo');
 
 /* As duas de equação eram as que não tinham: nenhum tema do banco casa com
  * "primeiro grau" nem com "segundo grau" por título. */
@@ -61,8 +63,8 @@ conf('e no 3º ano do médio propõe o mais alto que existe',
 // ================================================================
 secao('2. A ordem nunca põe um tema antes de um pré-requisito dele');
 
-/* Esta é a conferência que dá sentido à trilha inteira. Ela roda para as 22
- * lacunas em três anos escolares, ou seja 66 trilhas. */
+/* Esta é a conferência que dá sentido à trilha inteira. Ela roda para as 27
+ * lacunas em três anos escolares, ou seja 81 trilhas. */
 let violacoes = [];
 let comCorte = [];
 let deUmPasso = [];
@@ -86,7 +88,7 @@ LACUNAS.forEach(l => {
     }
   });
 });
-conf('nenhuma das 66 trilhas inverte um pré-requisito', violacoes.slice(0, 3).join(' ; ') || 'nenhuma', 'nenhuma');
+conf('nenhuma das 81 trilhas inverte um pré-requisito', violacoes.slice(0, 3).join(' ; ') || 'nenhuma', 'nenhuma');
 conf('e o alvo é sempre o último passo', violacoes.filter(v => /último/.test(v)).length, 0);
 
 /* Ordenar por ano e número daria certo em quase tudo, e é por causa destes dois
@@ -102,7 +104,7 @@ conf('MATEM1-09 sai depois de MATEM1-15',
 // ================================================================
 secao('3. O corte é regra, e não exceção');
 
-console.log('       trilhas com corte: ' + comCorte.length + ' de 66');
+console.log('       trilhas com corte: ' + comCorte.length + ' de 81');
 conf('o corte dispara em várias lacunas', comCorte.length > 5, true);
 
 /* Quando corta, o que sobra é o mais perto do alvo, e o cortado volta na
@@ -121,7 +123,7 @@ secao('4. Alvo que não depende de ninguém não vira escada');
 /* Vinte e dois temas não têm pré-requisito, e alguns são alvo natural de
  * lacuna. Uma escada de um degrau é pior do que não oferecer, então quem chama
  * precisa saber distinguir, e o número de passos é o que diz. */
-console.log('       trilhas de um passo só: ' + deUmPasso.length + ' de 66');
+console.log('       trilhas de um passo só: ' + deUmPasso.length + ' de 81');
 conf('frações no 4º ano tem um passo só',
   Core.trilhaDerivada(temas, 'MAT04-05').passos.length, 1);
 conf('trigonometria no médio também',

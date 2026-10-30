@@ -129,7 +129,7 @@ conf('começa pelas prioridades', txt.indexOf('Prioridades:'), 0);
 conf('a quebra de linha vira ponto e vírgula', txt.indexOf('frações; Criar') > 0, true);
 conf('cita as lacunas', txt.indexOf('Lacunas: Frações.') > 0, true);
 conf('cita os pontos de atenção', txt.indexOf('Erros de sinal') > 0, true);
-conf('e como ele aprende', txt.indexOf('Aprende melhor: Vendo') > 0, true);
+conf('e como ele aprende', txt.indexOf('Costuma funcionar: Vendo') > 0, true);
 conf('nenhum travessão no texto gerado', /[–—]/.test(txt), false);
 conf('é uma linha só, para colar na anotação', txt.indexOf('\n'), -1);
 

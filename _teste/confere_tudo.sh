@@ -258,7 +258,7 @@ roda "fatias do portao"      node _teste/testa_pedacos_do_portao.js
 # em todo PR.
 for t in testa_registro testa_mapeamento testa_exclusoes testa_feriados \
          testa_mover testa_retroativo testa_series testa_aluno testa_rotulos_de_familia \
-         testa_vocabulario testa_dominio; do
+         testa_vocabulario testa_dominio testa_sondagem; do
   roda "$t" node "_teste/$t.js"
 done
 
@@ -337,6 +337,7 @@ for t in testa_temas testa_busca testa_mapa_e2e \
          testa_virada_anual_navegador \
          testa_zoom_calendario_navegador \
          testa_dominio_navegador \
+         testa_sondagem_navegador \
          e2e e2e_correcoes; do
   roda "$t" node "_teste/$t.js"
 done
