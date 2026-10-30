@@ -169,7 +169,7 @@ async function ajustes(pag) {
   await esperar('janela do Feedback', () => pag.$eval('#modal-resumo', e => e.classList.contains('aberto')), v => v === true, 5000);
   conf('as três perguntas de sempre', await pag.evaluate(() =>
     [0, 1, 2].map(i => document.querySelector('#roteiro-pergunta-' + i).value).join(' | ')),
-    'O que ele conseguiu fazer sozinho neste mês? | Onde ainda precisa de mim? | O que vem no próximo mês?');
+    'O que já consegue fazer sem ajuda neste mês? | Onde ainda precisa de apoio? | O que vem no próximo mês?');
   await printar(pag, 'feedback_com_roteiro');
 
   // ================================================================
@@ -219,7 +219,7 @@ async function ajustes(pag) {
     return r ? r.texto : '';
   }, ALUNO);
   conf('o texto de antes ficou, e a resposta foi para o fim', semMontar,
-    'O que ela fez sozinha?\nResolveu as equações.\n\nO que vem no próximo mês?\nSistemas.\nObrigada!\n\nOnde ainda precisa de mim?\nFrações.');
+    'O que ela fez sozinha?\nResolveu as equações.\n\nO que vem no próximo mês?\nSistemas.\nObrigada!\n\nOnde ainda precisa de apoio?\nFrações.');
 
   // ================================================================
   secao('8. Nenhum erro');

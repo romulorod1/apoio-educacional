@@ -112,8 +112,8 @@ conf('tem a seção de temas', md.indexOf('## Temas trabalhados') >= 0, true);
 conf('com o tema e as datas', md.indexOf('- Equações do primeiro grau (01/06, 03/06)') >= 0, true);
 conf('tem a seção de áreas', md.indexOf('## Áreas trabalhadas') >= 0, true);
 conf('marca quantas aulas quando repete', md.indexOf('(2 aulas)') >= 0, true);
-conf('e não marca quando foi uma só', md.indexOf('Ansiedade ou medo de prova\n') >= 0 ||
-  md.indexOf('- Ansiedade ou medo de prova') >= 0, true);
+conf('e não marca quando foi uma só', md.indexOf('Preparação emocional para a prova\n') >= 0 ||
+  md.indexOf('- Preparação emocional para a prova') >= 0, true);
 conf('o feedback continua depois disso',
   md.indexOf('## Áreas trabalhadas') < md.indexOf('## Feedback'), true);
 conf('nenhum travessão no fechamento', /[–—]/.test(md), false);
