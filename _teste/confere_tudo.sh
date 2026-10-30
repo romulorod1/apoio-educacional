@@ -26,6 +26,12 @@ cd "$(dirname "$0")/.."
 
 falhou=0
 instavel=0
+# CONFERENCIA PULADA nao e teste instavel (A4c). `instavel` e o teste que
+# so passou na segunda vez; `pulada` e a conferencia que nao pode rodar aqui
+# (sem a lista de nomes, sem base de merge). No CI a lista de nomes nao
+# existe, e cada fatia dizia "algum teste so passou na segunda vez" sem
+# nenhum ter falhado.
+pulada=0
 rapido=0
 listar=0
 pedaco=""
@@ -735,7 +741,7 @@ if [ -n "$base" ]; then
 fi
 if [ -z "$sw_antes" ] || [ -z "$sw_agora" ]; then
   printf '  INSTAVEL %-23s sem base de merge com sw.js para comparar\n' "nome do cache"
-  instavel=1
+  pulada=1
 elif [ "$lista_agora" = "$(entradas_sw "$(lista_sw "$sw_antes")")" ]; then
   printf '  ok      %-24s a lista nao mudou desde a base do merge\n' "nome do cache"
 elif [ "$(nome_sw "$sw_agora")" != "$(nome_sw "$sw_antes")" ]; then
@@ -806,7 +812,7 @@ elif [ -z "$base" ] || [ -z "$sw_antes" ] || [ -z "$sw_agora" ]; then
   # A MESMA guarda da trava vizinha, de proposito. Com base presente e sw.js
   # ausente na base, a vizinha dizia INSTAVEL e esta dizia ok verde.
   printf '  INSTAVEL %-23s sem base de merge com sw.js para comparar o conteudo\n' "conteudo no cache"
-  instavel=1
+  pulada=1
 else
   # A entrada './' e a raiz e sai como linha VAZIA da extracao, porque o grupo
   # opcional come o './' e o resto casa nada. Quem a remove e este grep -v '^$'.
@@ -953,7 +959,7 @@ if [ "$codigo" = "1" ]; then
   falhou=1
 fi
 if [ "$codigo" = "2" ]; then
-  instavel=1
+  pulada=1
 fi
 
 # TODA PROVA ESTA NO PORTAO, ou na lista de fora com o motivo escrito.
@@ -1056,11 +1062,17 @@ elif [ -n "$pn" ]; then
   printf 'FATIA %s DE %s PASSOU: %s das %s provas de navegador rodaram aqui; as outras ficam com as outras fatias.\n' \
     "$pk" "$pn" "$rodadas_aqui" "$numero_navegador"
   if [ "$instavel" != "0" ]; then printf 'Algum teste so passou na segunda vez (INSTAVEL acima).\n'; fi
+  if [ "$pulada" != "0" ]; then printf 'Alguma conferencia foi pulada aqui (INSTAVEL acima): nao e teste que falhou.\n'; fi
 elif [ "$rapido" = "1" ]; then
   printf 'PORTAO RAPIDO PASSOU. As %s provas de navegador (pulado, acima) NAO rodaram aqui: o merge ainda pede o portao inteiro.\n' "$pulados"
-elif [ "$instavel" != "0" ]; then
-  printf 'TUDO PASSOU, mas algum teste so passou na segunda vez (INSTAVEL acima).\n'
-  printf 'Nao e impedimento de merge; e aviso de que aquele teste depende de tempo.\n'
+elif [ "$instavel" != "0" ] || [ "$pulada" != "0" ]; then
+  if [ "$instavel" != "0" ]; then
+    printf 'TUDO PASSOU, mas algum teste so passou na segunda vez (INSTAVEL acima).\n'
+    printf 'Nao e impedimento de merge; e aviso de que aquele teste depende de tempo.\n'
+  fi
+  if [ "$pulada" != "0" ]; then
+    printf 'TUDO O QUE RODOU PASSOU, mas alguma conferencia foi pulada (INSTAVEL acima).\n'
+  fi
 else
   printf 'TUDO PASSOU. Pode seguir para o merge.\n'
 fi

@@ -84,6 +84,16 @@ conf('sha mais longo que sete caracteres vale', decidir(p).ok, true);
 p = prBom(); p.comments = p.comments.filter(c => !/Port/.test(c.body));
 p.statusCheckRollup[2].conclusion = 'SUCCESS';
 conf('portao-navegador verde no CI basta sem o comentario', decidir(p).ok, true);
+// O portao em fatias (A4b, PR #80), os dois casos que faltavam (A4c):
+// uma fatia vermelha recusa, mesmo com a juncao verde por engano;
+p = prBom(); p.comments = p.comments.filter(c => !/Port/.test(c.body));
+p.statusCheckRollup[2].conclusion = 'SUCCESS';
+p.statusCheckRollup.push({ __typename: 'CheckRun', name: 'portao-navegador (fatia 2 de 4)', status: 'COMPLETED', conclusion: 'FAILURE', startedAt: '2026-10-26T12:02:00Z' });
+conf('uma fatia vermelha recusa', motivo(p, 'portao-navegador (fatia 2 de 4)'), true);
+// e a juncao PULADA (o job que junta nao rodou) nao e portao verde.
+p = prBom(); p.comments = p.comments.filter(c => !/Port/.test(c.body));
+p.statusCheckRollup[2].conclusion = 'SKIPPED';
+conf('juncao pulada, sem o comentario, recusa', motivo(p, 'falta o portao inteiro'), true);
 
 p = prBom(); p.comments = p.comments.filter(c => !/Revis/.test(c.body));
 conf('sem revisao recusa', motivo(p, 'falta revisao adversarial'), true);
