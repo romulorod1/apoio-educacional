@@ -232,7 +232,9 @@ ASSUNTOS = {
     'MATEM3-05': ({'numero complexo': 2, 'numeros complexos': 2, 'unidade imaginaria': 2}, None),
     'MATEM3-07': ({'polinomio': 2}, None),
     'MATEM3-08': ({'raizes da equacao': 2, 'equacao polinomial': 2}, None),
-    'MATEM3-09': ({'limite': 2, 'continuidade': 2}, None),
+    # MATEM3-09 (limite e continuidade) fica sem palavra: no ENEM "limite" e o
+    # do sentido comum ("limite de velocidade"), e a regra inventaria o assunto
+    # (o LACUNAS de 22/09 ja registrava isso nos PDFs gratuitos)
 }
 SOMA_MIN = 2
 
