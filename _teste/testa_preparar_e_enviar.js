@@ -228,9 +228,9 @@ function arquivosNovos(pag) {
   const rodapeDoEnvio = () => pag.evaluate(() =>
     Array.from(document.querySelectorAll('#rodape-modal-envio-familias button')).map(b => b.textContent.trim()).join(' | '));
   conf('primeira etapa', await etapa(), 'Família 1 de 2: Aluno Alfa Teste');
-  conf('com Parar, Pular e Enviar o PDF', await rodapeDoEnvio(), 'Parar | Pular | Enviar o PDF');
+  conf('com Parar, Pular e Enviar o PDF', await rodapeDoEnvio(), 'Parar o envio | Pular esta família | Enviar o PDF');
   await printar(pag, 'depois_envio_etapa');
-  conf('tocou em Pular', await tocar(pag, '#rodape-modal-envio-familias button', 'Pular'), true);
+  conf('tocou em Pular', await tocar(pag, '#rodape-modal-envio-familias button', 'Pular esta família'), true);
   await pausa(200);
   conf('pular não gera arquivo', (await arquivosNovos(pag)).length, 0);
   conf('segunda etapa', await etapa(), 'Família 2 de 2: Aluno Beta Teste');
@@ -256,7 +256,7 @@ function arquivosNovos(pag) {
   await pag.evaluate(() => document.querySelector('#enviar-todas-familias').click());
   await esperar('a janela do envio', () => aberta(pag, 'modal-envio-familias'), v => v === true, 5000);
   conf('recomeça da primeira', await etapa(), 'Família 1 de 2: Aluno Alfa Teste');
-  conf('tocou em Parar', await tocar(pag, '#rodape-modal-envio-familias button', 'Parar'), true);
+  conf('tocou em Parar', await tocar(pag, '#rodape-modal-envio-familias button', 'Parar o envio'), true);
   await pausa(200);
   conf('o resumo: nenhuma enviada', await pag.$eval('#envio-enviadas', e => e.textContent.trim()), 'Enviadas: 0');
   conf('o resumo: nenhuma pulada', await pag.$eval('#envio-puladas', e => e.textContent.trim()), 'Puladas: 0');
