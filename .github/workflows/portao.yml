@@ -35,9 +35,15 @@
 # push na main nao vale como conferencia do cache.
 name: portao
 
+# SEM o evento "labeled" (A4d, 30/10). O PR nasce com o rotulo
+# (`gh pr create --label navegador`), e o GitHub dispara "opened" e "labeled"
+# juntos: duas rodadas no mesmo grupo de concorrencia, e uma cancelava a outra.
+# O check CANCELLED ficava mais novo que o verde do mesmo commit, e a protecao
+# da main e o merge_seguro recusavam o merge (#87). Rotulo posto depois de o PR
+# nascer: feche e reabra o PR (evento "reopened") ou empurre um commit.
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened]
   push:
     branches: [main]
   workflow_dispatch:
