@@ -16860,8 +16860,23 @@
       });
     return Promise.all([enun, sol]).then(function (r) {
       return { id: it.id, origem: origemCurta(it), enunciado: r[0], solucao: r[1],
-        semSolucao: !!(it.sem_solucao || !it.assets.solucao) };
+        semSolucao: !!(it.sem_solucao || !it.assets.solucao), resposta: respostaSemSolucao(it) };
     });
+  }
+
+  /* A letra do gabarito de um item SEM solução (o ENEM, C12, só tem o gabarito
+   * oficial): é ela que sai no gabarito do material e na tela cheia. Item com
+   * solução mostra a solução, e a letra fica dentro dela. */
+  function respostaSemSolucao(it) {
+    return it && !it.assets.solucao && it.formato === 'objetiva' && /^[A-E]$/.test(it.resposta || '') ? it.resposta : null;
+  }
+
+  /* Módulo de prova que não é assunto do aplicativo ("Diversos", C12) não vira
+   * assunto da aula: na prova, o módulo é assunto só quando tem tema_app. */
+  var FONTES_DE_PROVA = { 'obmep-mirim': true, enem: true };
+  function moduloEAssunto(it) {
+    if (eDoBanco(it)) return false;
+    return FONTES_DE_PROVA[it.fonte] ? !!it.tema_app : true;
   }
 
   /* No máximo DUAS imagens desenhando ao mesmo tempo, como as miniaturas: cada
@@ -17118,7 +17133,8 @@
   /* Os módulos do material, na ordem em que aparecem nele: primeiro os das
    * páginas de teoria, depois os dos exercícios. O módulo do Banco não entra:
    * "Banco de Questões 2018" é o nome da fonte, não um tema, e iria para o
-   * fechamento da família (decisão da orquestradora, 22/09). */
+   * fechamento da família (decisão da orquestradora, 22/09). Nem o "Diversos"
+   * das provas (C12): é o que sobrou sem assunto, e não um assunto. */
   function modulosDoMaterial(paginas, itens) {
     var saida = [], vistos = {};
     function guarda(serie, m) {
@@ -17128,7 +17144,7 @@
       saida.push({ titulo: m.titulo, modulo: chave });
     }
     paginas.forEach(function (p) { guarda(p.aula.serie, p.aula.modulo); });
-    itens.forEach(function (it) { if (!eDoBanco(it)) guarda(it.serie, it.modulo); });
+    itens.forEach(function (it) { if (moduloEAssunto(it)) guarda(it.serie, it.modulo); });
     return saida;
   }
 
@@ -17667,6 +17683,13 @@
     if (peca.item && peca.item.origem_citada) {
       corpo.appendChild(el('div', { class: 'bib-origem', style: 'text-align:center', texto: peca.item.origem_citada }));
     }
+    // sem solução e com a letra do gabarito (ENEM): o "Ver resposta" mostra a letra
+    var resposta = bibVendo.tipo === 'exercicio' ? respostaSemSolucao(peca.item) : null;
+    if (resposta && bibVendo.solucao) {
+      corpo.appendChild(el('div', { id: 'bib-resposta', class: 'bib-resposta',
+        style: 'text-align:center;font-size:18px;font-weight:700;color:var(--navy);margin-top:10px',
+        texto: 'Resposta: ' + resposta }));
+    }
     var vez = ++bibVezDoVisor;
     Store.lerAssetBiblioteca(peca.pacote, peca.caminho).then(function (blob) {
       // ela pode ter andado para outra página enquanto esta era lida
@@ -17680,6 +17703,9 @@
     if (bibVendo.tipo === 'exercicio' && peca.item.assets.solucao) {
       sol.style.display = '';
       sol.textContent = bibVendo.solucao ? 'Ver enunciado' : 'Ver solução';
+    } else if (resposta) {
+      sol.style.display = '';
+      sol.textContent = bibVendo.solucao ? 'Esconder a resposta' : 'Ver resposta';
     } else {
       sol.style.display = 'none';
     }
@@ -17734,7 +17760,8 @@
 
   function escolherAulaParaFolha() {
     if (!bibVendo) return;
-    if (bibVendo.tipo === 'exercicio' && bibVendo.solucao) {
+    // com a resposta do ENEM à vista, a imagem ainda é o enunciado: a folha sai
+    if (bibVendo.tipo === 'exercicio' && bibVendo.solucao && pecaVista().item.assets.solucao) {
       avisar('Esta é a solução. Toque em "Ver enunciado" antes de abrir como folha para o aluno.');
       return;
     }

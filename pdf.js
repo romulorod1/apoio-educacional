@@ -3979,7 +3979,7 @@
    *   incluirTeoria, incluirLista, incluirGabarito, gabaritoSeparado,
    *   espacoParaResposta (pt), mostrarOrigem,
    *   teoria: [{ img: {bytes, wPx, hPx}, larguraPt, alturaPt }],
-   *   itens: [{ id, origem, semSolucao,
+   *   itens: [{ id, origem, semSolucao, resposta (letra, só sem solução),
    *             enunciado: Peca, solucao: Peca | null }]
    * }
    * Peca = { larguraPt, alturaPt, rotulo: [x0,y0,x1,y1] | null,
@@ -4147,7 +4147,10 @@
         doc.garanteEspaco(24);
         doc.y -= 14;
         doc.texto(String(i + 1) + '.', MARG_E, doc.y, { tam: 10, bold: true, cor: COR.navy });
-        doc.texto('Sem solução na fonte.', MARG_E + 20, doc.y, { tam: 9.5, italic: true, cor: COR.muted });
+        /* A prova sem solução e com a letra do gabarito oficial (ENEM, C12):
+         * a resposta sai onde sairia a solução, e o gabarito não fica vazio. */
+        if (it.resposta) doc.texto('Resposta: ' + it.resposta, MARG_E + 20, doc.y, { tam: 10, bold: true, cor: COR.navy });
+        else doc.texto('Sem solução na fonte.', MARG_E + 20, doc.y, { tam: 9.5, italic: true, cor: COR.muted });
         doc.y -= 8;
         anota('gabarito');
       });

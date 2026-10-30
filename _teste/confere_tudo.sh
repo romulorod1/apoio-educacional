@@ -378,6 +378,9 @@ roda "biblioteca navegar --envenenado-apelidos" node "_teste/testa_biblioteca_na
 # envenenado serve o app.js que so espalhava o Banco pelas series equivalentes.
 roda "biblioteca mirim"                         node "_teste/testa_biblioteca_mirim.js"
 roda "biblioteca mirim --envenenado-equivalentes" node "_teste/testa_biblioteca_mirim.js" --envenenado-equivalentes
+# e o "Diversos" das provas nao vira assunto da aula: o veneno trata todo modulo
+# de prova como assunto
+roda "biblioteca mirim --envenenado-diversos"   node "_teste/testa_biblioteca_mirim.js" --envenenado-diversos
 # FRENTE B: selecionar e compor. Sem navegador, o compositor do pdf.js (lista
 # renumerada, gabarito separado, sem solucao escrito, quebra entre pedacos, marca
 # por cima so nesta folha e os outros documentos byte a byte iguais aos de main).
