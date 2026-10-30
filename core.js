@@ -3131,6 +3131,169 @@
     return t;
   }
 
+  // ---------- pagamentos: "pago em" (C4) ----------
+
+  /* Quem já pagou o quê. Só dela: nada daqui entra em documento que a família
+   * recebe (texto, PDF, cartão), e por isso nenhuma função de documento lê
+   * db.pagamentos.
+   *
+   * Mora em db.pagamentos, uma lista no documento principal, ao lado de
+   * alunos, aulas e resumos. Não dentro do aluno, porque o resumo do mês, que
+   * é a coisa mais parecida, também é uma lista solta por aluno e mês; e não em
+   * db.ajustes, que é de preferências. Assim a cópia de segurança, o "Voltar a
+   * este ponto" e a sincronização da nuvem levam os pagamentos pelo mesmo
+   * caminho do resto do documento, sem caso especial.
+   *
+   *   { id, alunoId, mes: 'AAAA-MM', pagoEm: 'AAAA-MM-DD', valor }
+   *
+   * Um registro por aluno e mês. Desmarcar apaga o registro.
+   *
+   * O VALOR é guardado em reais, número com no máximo duas casas (150.5 é
+   * R$ 150,50), e já nasce arredondado ao centavo: o texto que ela digita é
+   * lido como centavos inteiros (lerReais), sem passar por conta com vírgula
+   * flutuante. Toda comparação de dinheiro aqui é feita em centavos inteiros,
+   * porque 0,1 + 0,2 não é 0,3 e um centavo que sobra viraria "pendente". */
+  function centavos(v) { return Math.round(Number(v || 0) * 100); }
+
+  /* Lê o valor que ela digitou, do jeito que se escreve no Brasil: "150",
+   * "150,5", "1.250,00", "R$ 90,00". Vírgula é sempre o decimal. Sem vírgula,
+   * um ponto seguido de uma ou duas casas também é decimal ("150.50", que é o
+   * que o teclado numérico às vezes põe); com três casas é milhar ("1.500").
+   * Devolve reais com até duas casas, ou null quando o texto não é um valor. */
+  function lerReais(texto) {
+    var s = String(texto === null || texto === undefined ? '' : texto)
+      .replace(/R\$/i, '').replace(/\s+/g, '');
+    if (!s) return null;
+    var inteiro, frac, m;
+    if (s.indexOf(',') >= 0) {
+      m = s.match(/^(\d{1,3}(?:\.\d{3})+|\d+),(\d{0,2})$/);
+      if (!m) return null;
+      inteiro = m[1].replace(/\./g, ''); frac = m[2];
+    } else if ((m = s.match(/^(\d+)\.(\d{1,2})$/))) {
+      inteiro = m[1]; frac = m[2];
+    } else if ((m = s.match(/^(\d{1,3}(?:\.\d{3})+|\d+)$/))) {
+      inteiro = m[1].replace(/\./g, ''); frac = '';
+    } else {
+      return null;
+    }
+    return (Number(inteiro) * 100 + Number((frac + '00').slice(0, 2))) / 100;
+  }
+
+  /* O valor a cobrar do mês é o MESMO que o documento da família cobra: com
+   * aula marcada à frente, só o que já aconteceu (valorFeito); com o mês
+   * vencido, o mês inteiro (totalValor). É a mesma escolha do
+   * markdownFechamento e do PDF, e fica aqui para o "pago em" nunca propor nem
+   * cobrar um número diferente do que a família leu. */
+  function valorACobrarDoMes(f) {
+    if (!f) return 0;
+    var temFuturas = (f.linhas || []).some(function (l) { return l.futura; });
+    return temFuturas ? (f.valorFeito || 0) : (f.totalValor || 0);
+  }
+
+  function pagamentoDe(db, alunoId, mesIso) {
+    return ((db && db.pagamentos) || []).filter(function (p) {
+      return p && p.alunoId === alunoId && p.mes === mesIso;
+    })[0] || null;
+  }
+
+  /* Marca (ou troca) o pagamento de um aluno num mês. Devolve o registro, ou
+   * null quando algo não confere: mês, data ou valor (zero não é pagamento;
+   * para tirar a marca existe o desmarcar). O registro que já existia é
+   * reaproveitado, com o mesmo id: trocar o valor não cria um segundo. */
+  function marcarPagamento(db, alunoId, mesIso, pagoEm, valor) {
+    if (!db || !alunoId || !/^\d{4}-\d{2}$/.test(String(mesIso || ''))) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(pagoEm || '')) || deBR(ddmmaaaa(pagoEm)) !== pagoEm) return null;
+    var cent = centavos(valor);
+    if (!isFinite(cent) || cent <= 0) return null;
+    if (!Array.isArray(db.pagamentos)) db.pagamentos = [];
+    var reg = pagamentoDe(db, alunoId, mesIso);
+    if (!reg) {
+      reg = { id: uid(), alunoId: alunoId, mes: mesIso };
+      db.pagamentos.push(reg);
+    }
+    reg.pagoEm = pagoEm;
+    reg.valor = cent / 100;
+    return reg;
+  }
+
+  function desmarcarPagamento(db, alunoId, mesIso) {
+    var reg = pagamentoDe(db, alunoId, mesIso);
+    if (!reg) return null;
+    db.pagamentos = db.pagamentos.filter(function (p) { return p !== reg; });
+    return reg;
+  }
+
+  /* A situação do mês de um aluno, a partir do fechamento já calculado.
+   * `falta` é o que ainda não foi pago: pago a MENOS fica como falta, com a
+   * diferença, e não some só porque existe uma marca de pagamento. Pago a mais
+   * (ela recebeu adiantado o mês inteiro, por exemplo) não falta nada. */
+  function situacaoDoPagamento(db, f) {
+    var devidoCent = centavos(valorACobrarDoMes(f));
+    var registro = f ? pagamentoDe(db, f.aluno.id, f.mes) : null;
+    var pagoCent = registro ? centavos(registro.valor) : 0;
+    var faltaCent = Math.max(0, devidoCent - pagoCent);
+    return {
+      registro: registro,
+      devido: devidoCent / 100,
+      pago: pagoCent / 100,
+      falta: faltaCent / 100
+    };
+  }
+
+  /* Quem ainda não pagou o quê, mês a mês.
+   *
+   * Pendente é o mês com valor a cobrar maior que zero e sem pagamento que o
+   * cubra. Mês futuro não entra: não dá para dever o que ainda não aconteceu.
+   * O mês de hoje entra, com o que já aconteceu até hoje, e vem marcado como
+   * em andamento, para ela não confundir com dívida de mês fechado.
+   *
+   * hojeRef existe para o teste poder fixar o dia. Ordem: do mês mais antigo
+   * para o mais novo (o que está esperando há mais tempo vem primeiro) e, no
+   * mesmo mês, pelo nome. */
+  function pendentesDePagamento(db, hojeRef) {
+    var hoje = hojeRef || hojeIso();
+    var mesHoje = mesDe(hoje);
+    var mesesDoAluno = Object.create(null);
+    ((db && db.aulas) || []).forEach(function (a) {
+      if (!a || !a.data || !a.alunoId) return;
+      var m = mesDe(a.data);
+      if (m > mesHoje) return;
+      (mesesDoAluno[a.alunoId] = mesesDoAluno[a.alunoId] || Object.create(null))[m] = true;
+    });
+    var saida = [];
+    ((db && db.alunos) || []).forEach(function (al) {
+      Object.keys(mesesDoAluno[al.id] || {}).forEach(function (m) {
+        var f = calcularFechamento(db, al.id, m, hoje);
+        var s = situacaoDoPagamento(db, f);
+        if (centavos(s.falta) <= 0) return;
+        saida.push({
+          alunoId: al.id, alunoNome: al.nome || '', mes: m, mesExtenso: mesExtenso(m),
+          devido: s.devido, pago: s.pago, falta: s.falta,
+          pagoEm: s.registro ? s.registro.pagoEm : null,
+          aMenos: !!s.registro,
+          emAndamento: m === mesHoje
+        });
+      });
+    });
+    saida.sort(function (x, y) {
+      return (x.mes < y.mes ? -1 : x.mes > y.mes ? 1 : 0) ||
+        String(x.alunoNome).localeCompare(String(y.alunoNome), 'pt-BR') ||
+        String(x.alunoId).localeCompare(String(y.alunoId));
+    });
+    return saida;
+  }
+
+  /* A soma da lista de pendentes, em centavos inteiros e devolvida em reais. */
+  function somaDosPendentes(lista) {
+    var cent = 0, meses = Object.create(null), alunos = Object.create(null);
+    (lista || []).forEach(function (p) {
+      cent += centavos(p.falta);
+      meses[p.mes] = true;
+      alunos[p.alunoId] = true;
+    });
+    return { falta: cent / 100, itens: (lista || []).length, meses: Object.keys(meses).length, alunos: Object.keys(alunos).length };
+  }
+
   // ---------- cada aluno, desde quando e por quanto ----------
 
   /* Esta parte é só dela. Não entra em documento nenhum que a família receba.
@@ -4577,6 +4740,10 @@
     repetirParaTras: repetirParaTras, preverRetroativo: preverRetroativo, temConteudo: temConteudo,
     calcularFechamento: calcularFechamento, calcularMesInteiro: calcularMesInteiro,
     totaisDoMes: totaisDoMes, panoramaDeValores: panoramaDeValores,
+    lerReais: lerReais, valorACobrarDoMes: valorACobrarDoMes, pagamentoDe: pagamentoDe,
+    marcarPagamento: marcarPagamento, desmarcarPagamento: desmarcarPagamento,
+    situacaoDoPagamento: situacaoDoPagamento, pendentesDePagamento: pendentesDePagamento,
+    somaDosPendentes: somaDosPendentes,
     indicesDeReajuste: indicesDeReajuste, margemDeReajuste: margemDeReajuste,
     sugestaoDeReajuste: sugestaoDeReajuste, lerIndicesDoIbge: lerIndicesDoIbge,
     desdeQuandoEstuda: desdeQuandoEstuda, mesesEntre: mesesEntre, pctBR: pctBR,
