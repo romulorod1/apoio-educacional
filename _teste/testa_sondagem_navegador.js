@@ -223,7 +223,9 @@ async function printDe(pag, seletor, nome, folga) {
   conf('as miniaturas vêm do tablet', await esperar('miniaturas', () => pag.evaluate(() =>
     Array.from(document.querySelectorAll('#corpo-modal-sondagem .miniatura-sondagem')).filter(i => i.complete && i.naturalWidth > 0).length),
   v => v === 12, 10000).then(r => r.valor), 12);
-  await printDe(pag, '#modal-sondagem .modal', '01_sondagem_aberta.png', 0);
+  conf('os botões de editar têm alvo de toque de 44 px', await pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#corpo-modal-sondagem .trocar-sondagem, #corpo-modal-sondagem .tirar-sondagem'))
+      .every(b => b.getBoundingClientRect().height >= 44)), true);
 
   // ================================================================
   secao('2. Editar: tirar um exercício e trocar outro');
@@ -239,6 +241,13 @@ async function printDe(pag, seletor, nome, folga) {
   conf('o trocado veio da mesma lacuna, degrau 1', /^9ano:teorema-de-pitagoras-e-aplicacoes:.*:ex:[12]$/.test(agora[2].itens[0]), true);
   conf('nada gravado antes de gerar a folha', (await doBanco(pag)).nSondagens, 0);
   const itensFinais = [].concat.apply([], agora.map(b => b.itens));
+  /* O print é DEPOIS de tirar e trocar: é a mesma sondagem que a correção e o
+   * mapeamento mostram (11 exercícios), e não a montada antes da edição. */
+  await pag.evaluate(() => { document.querySelector('#corpo-modal-sondagem').scrollTop = 0; });
+  await esperar('miniaturas depois de editar', () => pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#corpo-modal-sondagem .miniatura-sondagem')).filter(i => i.complete && i.naturalWidth > 0).length),
+  v => v === 11, 10000);
+  await printDe(pag, '#modal-sondagem .modal', '01_sondagem_aberta.png', 0);
 
   // ================================================================
   secao('3. Gerar a folha pelo caminho da biblioteca');
@@ -276,7 +285,29 @@ async function printDe(pag, seletor, nome, folga) {
   conf('três opções por exercício, na ordem', await pag.evaluate(() =>
     Array.from(document.querySelector('#corpo-modal-sondagem .item-correcao').querySelectorAll('.opcao-correcao')).map(b => b.textContent)),
   ['Certo', 'Meio certo', 'Errado']);
+  /* Todo item nasce SEM marca (painel cego do C5a: o print parecia trazer
+   * "Errado" pré-marcado), e o contador conta só o que ela tocou. */
+  conf('nenhuma opção nasce marcada', await pag.evaluate(() =>
+    document.querySelectorAll('#corpo-modal-sondagem .opcao-correcao.ativa, #corpo-modal-sondagem .opcao-correcao[aria-pressed="true"]').length), 0);
+  conf('e o contador começa em zero', await pag.$eval('#sondagem-corrigidos', e => e.textContent), '0 de 11 corrigidos');
+  conf('Certo, Meio certo e Errado com alvo de toque de 44 px', await pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#corpo-modal-sondagem .opcao-correcao')).every(b => b.getBoundingClientRect().height >= 44)), true);
+  // um toque só: a confirmação marca só o que esse item decide
   await responder(pag, 'eq2', ['errado']);
+  conf('um toque, e o contador diz 1', await pag.$eval('#sondagem-corrigidos', e => e.textContent), '1 de 11 corrigidos');
+  await pag.click('#sondagem-ver-resultado');
+  const soUm = await esperar('a confirmação com um toque', () => pag.evaluate(() => {
+    const r = {};
+    document.querySelectorAll('#sondagem-confirmacao .linha-confirmacao').forEach(l => { r[l.dataset.lacuna] = l.querySelector('.detalhe').textContent; });
+    return r;
+  }), v => v && Object.keys(v).length === 6, 5000);
+  const u = soUm.valor || {};
+  conf('com um toque, só a lacuna desse item marca', Object.keys(u).filter(k => /^marca a lacuna|^já estava marcada/.test(u[k])), ['eq2']);
+  conf('as outras dizem que falta corrigir e nada muda', Object.keys(u).filter(k => k !== 'eq2').every(k => /^falta corrigir .*; nada muda$/.test(u[k])), true);
+  conf('Pitágoras sem correção não ganha evidência', /^falta corrigir 2 exercícios; nada muda$/.test(u.pitagoras || ''), true);
+  await pag.click('#sondagem-voltar-correcao');
+  await esperar('de volta à correção', () => pag.evaluate(() => document.querySelectorAll('#corpo-modal-sondagem .item-correcao').length), v => v === 11, 5000);
+  conf('a marca feita continua ao voltar', await pag.$eval('#sondagem-corrigidos', e => e.textContent), '1 de 11 corrigidos');
   await responder(pag, 'pitagoras', ['errado', 'errado']);
   await responder(pag, 'semelhanca', ['certo', 'errado']);
   await responder(pag, 'trigonometria', ['errado', 'meio']);
@@ -284,6 +315,15 @@ async function printDe(pag, seletor, nome, folga) {
   await responder(pag, 'conjuntos', ['meio', 'meio']);
   conf('a marca aparece no botão', await pag.evaluate(() =>
     document.querySelector('#corpo-modal-sondagem .item-correcao[data-lacuna="eq2"] .opcao-correcao.ativa').getAttribute('aria-pressed')), 'true');
+  conf('com tudo corrigido, o contador diz 11', await pag.$eval('#sondagem-corrigidos', e => e.textContent), '11 de 11 corrigidos');
+  /* O print mostra as lacunas de respostas MISTAS (semelhança: certo e
+   * errado; trigonometria: errado e meio certo), para nenhuma leitura tomar
+   * a marca dela por padrão da tela. */
+  await pag.evaluate(() => {
+    const h = Array.from(document.querySelectorAll('#corpo-modal-sondagem h3')).find(x => /Semelhança/.test(x.textContent));
+    const corpo = document.querySelector('#corpo-modal-sondagem');
+    if (h) corpo.scrollTop += h.getBoundingClientRect().top - corpo.getBoundingClientRect().top - 8;
+  });
   await printDe(pag, '#modal-sondagem .modal', '02_correcao_da_sondagem.png', 0);
   await pag.click('#sondagem-ver-resultado');
   const conf1 = await esperar('a confirmação', () => pag.evaluate(() => {
@@ -326,9 +366,14 @@ async function printDe(pag, seletor, nome, folga) {
       tituloAprende: titulo,
       visual: !!document.querySelector('[data-item="aprende:visual"] input:checked'),
       ouvindo: !!document.querySelector('[data-item="aprende:ouvindo"]'),
-      voz: !!document.querySelector('[data-item="aprende:voz-alta"]')
+      voz: !!document.querySelector('[data-item="aprende:voz-alta"]'),
+      trilha44: Array.from(document.querySelectorAll('[data-item^="lacunas:"] button')).every(b => b.getBoundingClientRect().height >= 44),
+      fonteEvidencia: getComputedStyle(document.querySelector('[data-item="lacunas:eq2"] .evidencia-lacuna')).fontSize,
+      fonteAjuda: getComputedStyle(document.querySelector('#corpo-modal-mapeamento .ajuda')).fontSize
     };
   });
+  conf('o chip "trilha" tem alvo de toque de 44 px', mapa.trilha44, true);
+  conf('a evidência no tamanho do texto de ajuda', [mapa.fonteEvidencia, mapa.fonteEvidencia === mapa.fonteAjuda], ['13px', true]);
   conf('a lacuna nova aparece marcada', mapa.eq2 && mapa.eq2.marcada, true);
   conf('com a evidência escrita embaixo', mapa.eq2 && mapa.eq2.evidencia, 'errou 1 de 1 item de equação do segundo grau na sondagem de ' + ddmm(HOJE));
   conf('Pitágoras continua marcada, agora com evidência', [mapa.pit.marcada, /^errou 2 de 2 itens de teorema de Pitágoras/.test(mapa.pit.evidencia)], [true, true]);

@@ -718,7 +718,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
 .passo-roteiro .nome { font-size: 14px; font-weight: 700; color: #1F3A5F; }
 .passo-roteiro .detalhe { font-size: 13px; margin-top: 2px; }
 
-.item-area .btn.pequeno { padding: 2px 8px; font-size: 12px; }
+.item-area .btn.pequeno { padding: 2px 10px; font-size: 13px; min-height: 44px; }
 
 /* ---------- areas trabalhadas ---------- */
 
@@ -2336,3 +2336,12 @@ button.alvo-rascunho:hover { background: var(--soft); }
   font-weight: 500;
 }
 
+/* ---------- sondagem por ano de entrada (C5) ---------- */
+
+/* Alvos de toque de 44 px, como o resto do aplicativo: Certo, Meio certo e
+ * Errado, e os botões de editar a sondagem, são tocados com o dedo, um por
+ * exercício (painel cego do C5a mediu 32 px). */
+#modal-sondagem .btn.pequeno { min-height: 44px; }
+.opcao-correcao { min-width: 92px; }
+/* A evidência da lacuna, no tamanho do texto de ajuda, e não menor. */
+.evidencia-lacuna { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }

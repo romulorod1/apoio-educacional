@@ -252,8 +252,52 @@ function provasDaRegra(C, conferir) {
     ['errou 2 de 2 itens de frações na sondagem de 30/10', 'errou 1 de 2 itens de frações na sondagem de 02/03, e 1 saiu meio certo']);
 }
 
+/* CORRIGIR DE NOVO não deixa frase falsa (revisão do C5a): a evidência da
+ * sondagem sai de todas as lacunas antes de a correção nova escrever. A marca
+ * da lacuna fica: nada que já está marcado é apagado pela sondagem. */
+function provasDaCorrecaoRefeita(C, conferir) {
+  const m = C.mapeamentoNovo();
+  const s = (fr, pit) => ({ id: 'sond_refeita', data: '2026-10-30', itens: [
+    { item: 'f1', lacuna: 'fracoes', resposta: fr[0] }, { item: 'f2', lacuna: 'fracoes', resposta: fr[1] },
+    { item: 'p1', lacuna: 'pitagoras', resposta: pit[0] }, { item: 'p2', lacuna: 'pitagoras', resposta: pit[1] }] });
+  C.aplicarSondagemNoMapeamento(m, { id: 'sond_outra', data: '2026-09-01', itens: [
+    { item: 'o1', lacuna: 'fracoes', resposta: 'errado' }] });
+  C.aplicarSondagemNoMapeamento(m, s(['errado', 'errado'], ['errado', 'errado']));
+  conferir('primeira correção: as duas lacunas com a frase desta sondagem',
+    [C.evidenciasDaLacuna(m, 'fracoes').length, C.evidenciasDaLacuna(m, 'pitagoras').length], [2, 1]);
+  const r = C.aplicarSondagemNoMapeamento(m, s(['certo', 'errado'], ['errado', 'meio']));
+  conferir('refeita, frações com um acerto: a frase "errou 2 de 2" desta sondagem SAI',
+    C.evidenciasDaLacuna(m, 'fracoes'), ['errou 1 de 1 item de frações na sondagem de 01/09']);
+  conferir('e a de outra sondagem fica', C.evidenciasDaLacuna(m, 'fracoes').length, 1);
+  conferir('Pitágoras, ainda marcada pela correção nova, ganha a frase nova e só ela',
+    C.evidenciasDaLacuna(m, 'pitagoras'), ['errou 1 de 2 itens de teorema de Pitágoras na sondagem de 30/10, e 1 saiu meio certo']);
+  conferir('a marca de frações fica (nada marcado é apagado pela sondagem)',
+    C.marcadosDaMateria(m, 'matematica').lacunas.indexOf('fracoes') >= 0, true);
+  conferir('e a correção nova não a conta como marcada por ela', r.novas.concat(r.jaMarcadas), ['pitagoras']);
+  C.aplicarSondagemNoMapeamento(m, s(['certo', 'certo'], ['certo', 'certo']));
+  // lido com cuidado: um veneno pode nem criar o campo, e a prova conta, não quebra
+  const ev = (m.evidencias && m.evidencias.lacunas) || {};
+  conferir('refeita toda certa: nenhuma frase desta sondagem sobra em lacuna nenhuma',
+    Object.keys(ev).reduce((n, k) => n + ev[k].filter(e => e.sondagem === 'sond_refeita').length, 0), 0);
+  conferir('e a lista que ficou vazia sai, e a de outra sondagem fica', [Object.prototype.hasOwnProperty.call(ev, 'pitagoras'),
+    (ev.fracoes || []).map(e => e.sondagem)], [false, ['sond_outra']]);
+}
+
 secao('5. A marcação da lacuna, com a evidência');
 provasDaRegra(Core, conf);
+provasDaCorrecaoRefeita(Core, conf);
+
+secao('5b. Gerar a folha de novo com outros exercícios: a sondagem volta a "falta corrigir"');
+const regBase = () => ({ id: 's', corrigidaEm: '2026-10-30', aplicadaEm: '2026-10-30', lacunasMarcadas: ['fracoes'], itens: [
+  { item: 'a', lacuna: 'fracoes', resposta: 'errado' }, { item: 'b', lacuna: 'fracoes', resposta: 'meio' }] });
+const mesmos = Core.refazerItensDaSondagem(regBase(), [{ item: 'a', lacuna: 'fracoes' }, { item: 'b', lacuna: 'fracoes' }]);
+conf('os mesmos exercícios: continua corrigida, com as respostas', [mesmos.aplicadaEm, mesmos.lacunasMarcadas, mesmos.itens.map(x => x.resposta)],
+  ['2026-10-30', ['fracoes'], ['errado', 'meio']]);
+const outros = Core.refazerItensDaSondagem(regBase(), [{ item: 'a', lacuna: 'fracoes' }, { item: 'c', lacuna: 'fracoes' }]);
+conf('um exercício trocado: volta a não corrigida', [outros.corrigidaEm, outros.aplicadaEm, outros.lacunasMarcadas], [undefined, undefined, undefined]);
+conf('o que ficou guarda a resposta, o novo nasce sem', outros.itens.map(x => x.resposta), ['errado', '']);
+const menos = Core.refazerItensDaSondagem(regBase(), [{ item: 'a', lacuna: 'fracoes' }]);
+conf('um exercício tirado também volta a não corrigida', menos.aplicadaEm, undefined);
 
 // ================================================================
 secao('6. A cópia de segurança leva a sondagem e a evidência');
@@ -272,7 +316,7 @@ conf('e a evidência volta lida', Core.evidenciasDaLacuna(Core.mapeamentoAtual(v
 conf('mapeamento antigo, sem o campo de evidência, não quebra', Core.evidenciasDaLacuna({ marcados: { lacunas: ['fracoes'] } }, 'fracoes'), []);
 
 // ================================================================
-secao('7. VENENO: cópias do core.js com a regra da marcação trocada TÊM de reprovar');
+secao('7. VENENO: cópias do core.js com a regra da marcação ou a limpeza trocada TÊM de reprovar');
 
 const FONTE = fs.readFileSync(path.join(__dirname, '..', 'core.js'), 'utf8').replace(/\r\n/g, '\n');
 function carregar(fonte, nome) {
@@ -280,17 +324,20 @@ function carregar(fonte, nome) {
   vm.runInNewContext(fonte, { module: m, console: console }, { filename: nome });
   return m.exports;
 }
-const INICIO = 'function sondagemMarcaLacuna(c) {';
-function envenenar(corpo) {
-  const i = FONTE.indexOf(INICIO);
-  if (i < 0 || FONTE.indexOf(INICIO, i + 1) >= 0) return null;
+const REGRA = 'function sondagemMarcaLacuna(c) {';
+const LIMPEZA = 'function tirarEvidenciasDaSondagem(m, sondagemId) {';
+function envenenar(inicio, corpo) {
+  const i = FONTE.indexOf(inicio);
+  if (i < 0 || FONTE.indexOf(inicio, i + 1) >= 0) return null;
   const fim = FONTE.indexOf('\n  }\n', i);
   if (fim < 0) return null;
-  return FONTE.slice(0, i) + INICIO + '\n' + corpo + FONTE.slice(fim);
+  return FONTE.slice(0, i) + inicio + '\n' + corpo + FONTE.slice(fim);
 }
 function contarFalhas(C) {
   let n = 0;
-  provasDaRegra(C, (rotulo, obtido, esperado) => { if (JSON.stringify(obtido) !== JSON.stringify(esperado)) n++; });
+  const contar = (rotulo, obtido, esperado) => { if (JSON.stringify(obtido) !== JSON.stringify(esperado)) n++; };
+  provasDaRegra(C, contar);
+  provasDaCorrecaoRefeita(C, contar);
   return n;
 }
 let controle;
@@ -299,14 +346,16 @@ conf('controle: o core.js de verdade, pelo carregador dos venenos, passa em tudo
 
 const VENENOS = {
   // o principal: marca a lacuna mesmo com um acerto
-  'um-acerto-marca': '    return c.total > 0 && c.corrigidos === c.total && c.certos <= 1 && c.errados >= 1;',
+  'um-acerto-marca': [REGRA, '    return c.total > 0 && c.corrigidos === c.total && c.certos <= 1 && c.errados >= 1;'],
   // marca sem esperar a correção inteira
-  'sem-correcao-marca': '    return c.total > 0 && c.certos === 0 && c.errados >= c.meios && c.errados > 0;',
+  'sem-correcao-marca': [REGRA, '    return c.total > 0 && c.certos === 0 && c.errados >= c.meios && c.errados > 0;'],
   // o outro extremo, que nenhuma prova de "não marca" pegaria
-  'nunca-marca': '    return false;'
+  'nunca-marca': [REGRA, '    return false;'],
+  // corrigir de novo sem limpar: a frase velha fica escrita (revisão do C5a)
+  'nao-limpa': [LIMPEZA, '    return;']
 };
 Object.keys(VENENOS).forEach(nome => {
-  const fonte = envenenar(VENENOS[nome]);
+  const fonte = envenenar(VENENOS[nome][0], VENENOS[nome][1]);
   conf('veneno ' + nome + ': a troca da regra foi aplicada', fonte !== null && fonte !== FONTE, true);
   if (!fonte) return;
   let n;
