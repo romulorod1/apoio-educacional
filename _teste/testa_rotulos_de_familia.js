@@ -47,11 +47,14 @@ function varrer(nome, texto) {
   conf(nome + ': nenhum rótulo interno aparece', internos, []);
 }
 
+// o meia-risca e o travessão, pelo código: o arquivo não carrega o caractere
+const TRAVESSOES = new RegExp('[' + String.fromCharCode(0x2013, 0x2014) + ']');
+
 secao('0. As âncoras');
 conf('há áreas com rótulo de família próprio', TROCADAS.length >= 6, true);
 conf('a de ansiedade é "Preparação emocional para a prova"', Core.rotuloAreaFamilia('ansiedade'), 'Preparação emocional para a prova');
 conf('na tela dela, o rótulo dela continua', Core.rotuloArea('ansiedade'), 'Ansiedade ou medo de prova');
-conf('rótulo de família sem travessão', TODAS.filter(i => /[–—]/.test(i.familia || '')).length, 0);
+conf('rótulo de família sem travessão', TODAS.filter(i => TRAVESSOES.test(i.familia || '')).length, 0);
 
 // um mês com todas as áreas marcadas
 const db = {
