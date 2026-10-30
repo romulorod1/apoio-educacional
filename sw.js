@@ -7,8 +7,13 @@
  * CACHE guarda os ARQUIVOS do aplicativo e muda de nome a cada mudança da lista;
  * BAIXADOS guarda o que só entra durante o uso (até o B14, as séries de temas,
  * banco/serie-*.json, que saíram com o material autoral e ficam esquecidas lá
- * nos tablets que já as baixaram; o próximo inquilino previsto é o leitor de
- * PDF do C14), tem nome fixo, e o activate nunca o apaga.
+ * nos tablets que já as baixaram; desde o C14, o leitor de PDF de
+ * vendor/pdfjs-<versão>/, que chega na primeira vez que ela abre um PDF e daí
+ * em diante abre sem sinal), tem nome fixo, e o activate nunca o apaga. O
+ * leitor não precisou de lógica nova aqui: é do mesmo endereço e não é do
+ * pacote, então o fetch abaixo já o põe no BAIXADOS. Trocar a versão do leitor
+ * troca a pasta, e a pasta velha fica no BAIXADOS do tablet (2,3 MB), como as
+ * séries.
  *
  * Antes havia um cache só e o activate apagava todo cache cujo nome não fosse o
  * novo. As séries moram ali e não estão em ARQUIVOS de propósito, então o

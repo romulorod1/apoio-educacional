@@ -1011,6 +1011,8 @@
     /* O visor da biblioteca, fechado pelo × ou tocando fora: solta a imagem
      * em tela cheia da memória, como o botão Fechar. */
     if (id === 'modal-biblioteca') soltarVisor();
+    // o leitor de PDF, fechado por qualquer caminho, para de desenhar e solta o canvas
+    if (id === 'modal-leitor-pdf') soltarLeitorPdf();
     if (id === 'modal-novidades') {
       if (db && db.ajustes && db.ajustes.versaoVista !== VERSAO) {
         db.ajustes.versaoVista = VERSAO;
@@ -1878,6 +1880,12 @@
     $('#bib-marcar-visor').addEventListener('click', alternarMarcaNoVisor);
     $('#bib-como-folha').addEventListener('click', escolherAulaParaFolha);
     $('#bib-fechar-visor').addEventListener('click', fecharVisor);
+    $('#leitor-anterior').addEventListener('click', function () { andarNoLeitorPdf(-1); });
+    $('#leitor-proxima').addEventListener('click', function () { andarNoLeitorPdf(1); });
+    $('#leitor-menos').addEventListener('click', function () { zoomDoLeitorPdf(1 / 1.25); });
+    $('#leitor-mais').addEventListener('click', function () { zoomDoLeitorPdf(1.25); });
+    $('#leitor-largura').addEventListener('click', function () { zoomDoLeitorPdf(0); });
+    $('#leitor-como-folha').addEventListener('click', paginaDoLeitorComoFolha);
     $('#limpar-orfaos').addEventListener('click', liberarEspaco);
     $('#apagar-exemplo').addEventListener('click', apagarExemplo);
     $('#apagar-tudo').addEventListener('click', apagarTudo);
@@ -3240,7 +3248,16 @@
           type: 'button', class: 'btn pequeno', texto: 'Abrir',
           aoClick: function () {
             Store.lerAnexo(an.id).then(function (r) {
-              if (r && r.blob) entregarArquivo(an.nome, r.blob, an.nome);
+              if (!r || !r.blob) return;
+              /* PDF abre no leitor do próprio aplicativo (C14). Antes ia para o
+               * compartilhar do Android, que tira ela do aplicativo no meio da
+               * aula e entrega o arquivo a outro programa, de onde a folha da
+               * aula não se alcança. O resto (foto, Word) segue saindo. */
+              if (ehPdf(r.tipo, an.nome)) {
+                abrirLeitorPdf(r.blob, { titulo: an.nome, nome: an.nome, aulaId: aula.id });
+                return;
+              }
+              entregarArquivo(an.nome, r.blob, an.nome);
             });
           }
         }),
@@ -16626,10 +16643,17 @@
       return;
     }
     var peca = pecaVista();
-    var alvo = { pacote: peca.pacote, caminho: peca.caminho, medidas: peca.medidas, forma: peca.forma, titulo: peca.titulo };
+    mostrarAulasParaFolha({ pacote: peca.pacote, caminho: peca.caminho, medidas: peca.medidas, forma: peca.forma, titulo: peca.titulo });
+  }
+
+  /* A escolha da aula, separada de quem pediu: a biblioteca e o leitor de PDF
+   * (C14) chegam aqui com o alvo pronto. O alvo leva o título, as medidas, a
+   * forma e o jeito de desenhar (o pacote e o caminho da biblioteca, ou a
+   * função desenhar do leitor). */
+  function mostrarAulasParaFolha(alvo) {
     var corpo = $('#corpo-modal-bib-folha');
     corpo.innerHTML = '';
-    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', texto: peca.titulo }));
+    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', texto: alvo.titulo }));
     var hoje = Core.hojeIso();
     var aulas = db.aulas.filter(function (a) { return alunoPorId(a.alunoId); });
     var doDia = aulas.filter(function (a) { return a.data === hoje; })
@@ -16650,6 +16674,7 @@
         if (!db.alunos.length) { avisar('Cadastre um aluno antes de marcar a primeira aula.'); return; }
         fecharModal('modal-bib-folha');
         fecharVisor();
+        fecharLeitorSeAberto();
         abrirAula(null, hoje);
         folhaPendenteDaBiblioteca = alvo;
         // nesse caminho, depois de salvar abre a folha, e não a janela da aula
@@ -16658,7 +16683,8 @@
         var corpoAula = $('#corpo-modal-aula');
         if (corpoAula) {
           corpoAula.insertBefore(el('div', { class: 'faixa-info', id: 'aviso-folha-da-biblioteca' }, [
-            el('strong', { texto: 'Da biblioteca: ' }),
+            // o leitor de PDF diz de onde veio a página; a biblioteca é a de sempre
+            el('strong', { texto: (alvo.origem || 'Da biblioteca') + ': ' }),
             document.createTextNode('ao salvar, "' + alvo.titulo + '" vai para a folha desta aula.')
           ]), corpoAula.firstChild);
         }
@@ -16705,7 +16731,13 @@
     var lpx = Math.round(pos.w * escalaPx), apx = Math.round(pos.h * escalaPx);
     var ref = Core.uid();
     var indice = 0;
-    return desenharAssetBib(alvo.pacote, alvo.caminho, lpx, apx).then(function (c) {
+    /* A página do leitor de PDF (C14) traz o próprio desenho: o resto do
+     * caminho, da mídia em JPEG à folha que abre, é o mesmo da biblioteca. */
+    var desenho;
+    try {
+      desenho = alvo.desenhar ? alvo.desenhar(lpx, apx) : desenharAssetBib(alvo.pacote, alvo.caminho, lpx, apx);
+    } catch (e) { desenho = Promise.reject(e); }
+    return desenho.then(function (c) {
       /* Enquanto a página desenhava ela pode ter tocado Desfazer (a série
        * recém-criada, por exemplo): sem a aula, nada é gravado. */
       aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
@@ -16726,6 +16758,7 @@
     }).then(function () {
       fecharModal('modal-bib-folha');
       fecharVisor();
+      fecharLeitorSeAberto();
       desenharAgenda();
       abrirEditorNota(aulaId, indice);
       avisar('Colado na folha da aula (página ' + (indice + 1) + ').');
@@ -16736,6 +16769,330 @@
       colandoNaFolha = false;
     });
   }
+
+  // ---------- leitor de PDF (C14) ----------
+
+  /* O PDF.js da Mozilla (pdfjs-dist 6.4.299, build legacy), em vendor/. NÃO é
+   * o pdf.js da raiz: aquele é o GERADOR de PDF do aplicativo (o fechamento, o
+   * material da biblioteca), e este só LÊ.
+   *
+   * Mora no repositório, e não num CDN, por três motivos. O sw.js só guarda o
+   * que é do mesmo endereço do aplicativo (o fetch dele ignora outra origem), e
+   * daqui o leitor entra no BAIXADOS sozinho, sem lógica nova; de um CDN seria
+   * preciso ensinar o sw.js a guardar resposta de terceiro. A versão fica
+   * presa no próprio caminho, e trocar de versão é um commit que se lê. E o
+   * teste roda sem internet, que é a condição em que ela mais usa o leitor.
+   *
+   * Não está na lista ARQUIVOS do sw.js de propósito: são 2,3 MB (o leitor, o
+   * trabalhador e os decodificadores de imagem) que pesariam a instalação de
+   * toda versão. Vem na PRIMEIRA vez que ela abre um PDF, e daí em diante abre
+   * sem sinal, do BAIXADOS, que o activate nunca apaga.
+   *
+   * A build legacy, e não a moderna, porque o tablet dela não é novo e a
+   * moderna exige um Chrome recente; a diferença é de 140 KB. */
+  var PDFJS_PASTA = 'vendor/pdfjs-6.4.299/';
+  var pdfjsCarregando = null;
+
+  function enderecoNoApp(relativo) { return new URL(relativo, location.href).href; }
+
+  function baixarParte(endereco) {
+    return fetch(endereco).then(function (r) {
+      // sem sinal e sem cópia guardada, o sw.js responde 503 "Sem conexão"
+      if (!r.ok) throw new Error('não baixou ' + endereco + ' (' + r.status + ')');
+      return r.blob();
+    });
+  }
+
+  /* Carrega o PDF.js uma vez por sessão, e só quando ela abre o primeiro PDF.
+   *
+   * O módulo vem por fetch e entra por um endereço blob, e não por um import()
+   * direto do arquivo, porque o navegador guarda o FRACASSO de um import() no
+   * mapa de módulos da página: sem sinal na primeira tentativa, o leitor não
+   * abriria mais até ela fechar o aplicativo, mesmo com o sinal de volta. O
+   * fetch não guarda fracasso, e passa pelo sw.js, que guarda o acerto no
+   * BAIXADOS. O trabalhador é baixado antes pelo mesmo motivo: se ele faltar,
+   * a frase certa é "o leitor não carregou", e não "este PDF não abre". */
+  function carregarPdfJs() {
+    if (pdfjsCarregando) return pdfjsCarregando;
+    var trabalhador = enderecoNoApp(PDFJS_PASTA + 'pdf.worker.min.mjs');
+    pdfjsCarregando = Promise.all([
+      baixarParte(enderecoNoApp(PDFJS_PASTA + 'pdf.min.mjs')),
+      baixarParte(trabalhador)
+    ]).then(function (partes) {
+      var url = URL.createObjectURL(new Blob([partes[0]], { type: 'text/javascript' }));
+      return import(url).then(function (lib) {
+        URL.revokeObjectURL(url);
+        lib.GlobalWorkerOptions.workerSrc = trabalhador;
+        return lib;
+      }, function (e) { URL.revokeObjectURL(url); throw e; });
+    });
+    // falhou: a próxima abertura tenta de novo, em vez de repetir o fracasso
+    pdfjsCarregando.catch(function () { pdfjsCarregando = null; });
+    return pdfjsCarregando;
+  }
+
+  function ehPdf(tipo, nome) {
+    return tipo === 'application/pdf' || /\.pdf$/i.test(String(nome || ''));
+  }
+
+  /* O estado do leitor aberto. leitorVez cresce a cada abertura e a cada
+   * fechamento: um PDF que termina de carregar depois de ela ter fechado ou
+   * aberto outro não pinta por cima. leitorDesenho faz o mesmo com cada página
+   * desenhada (o toque rápido em Próxima, Próxima). */
+  var leitor = null;
+  var leitorVez = 0;
+  var leitorDesenho = 0;
+  var leitorTarefa = null;
+  // o documento fica vivo depois de fechar: a "Nova aula hoje" desenha a página só depois de salvar a aula
+  var leitorDoc = null;
+  var LEITOR_ZOOM_MIN = 0.5, LEITOR_ZOOM_MAX = 4;
+  // teto de pixels do canvas: com zoom alto num tablet de tela densa a página passaria de 40 milhões
+  var LEITOR_MAX_PIXELS = 12000000;
+
+  function bytesDoPdf(fonte) {
+    if (fonte instanceof Blob) return fonte.arrayBuffer().then(function (b) { return new Uint8Array(b); });
+    // cópia: o PDF.js entrega os bytes ao trabalhador e o original de quem chamou ficaria vazio
+    if (fonte instanceof ArrayBuffer) return Promise.resolve(new Uint8Array(fonte.slice(0)));
+    if (fonte instanceof Uint8Array) return Promise.resolve(fonte.slice());
+    return Promise.reject(new Error('o leitor recebe Blob, ArrayBuffer ou Uint8Array'));
+  }
+
+  /* abrirLeitorPdf(fonte, opcoes)
+   *
+   * Abre um PDF no leitor do aplicativo, sem sair dele. É o componente que o
+   * anexo da aula usa hoje e que o anexo da escola como folha (C3) e os livros
+   * (C15) vão usar: não sabe de anexo nem de aula, a não ser pelo que vem nas
+   * opções.
+   *
+   *   fonte                Blob, ArrayBuffer ou Uint8Array com o PDF
+   *   opcoes.titulo        o que vai no alto da janela (padrão: o nome)
+   *   opcoes.nome          o nome do arquivo, para o "abrir fora do aplicativo"
+   *   opcoes.pagina        a página em que abre (padrão: 1)
+   *   opcoes.aulaId        com ele, "Abrir esta página como folha" cola direto
+   *                        na folha dessa aula; sem ele, pergunta em qual aula
+   *   opcoes.comoFolha     false esconde o "Abrir esta página como folha"
+   *   opcoes.abrirFora     function () que troca o caminho de fora (padrão:
+   *                        compartilhar ou baixar, como o anexo fazia antes)
+   *
+   * Devolve uma promessa: true quando a primeira página está desenhada, false
+   * quando não abriu (a janela já disse por quê e ofereceu o caminho de fora). */
+  function abrirLeitorPdf(fonte, opcoes) {
+    opcoes = opcoes || {};
+    if (leitor) soltarLeitorPdf();
+    var vez = ++leitorVez;
+    var nome = opcoes.nome || opcoes.titulo || 'documento.pdf';
+    leitor = { doc: null, pagina: Math.max(1, parseInt(opcoes.pagina, 10) || 1), total: 0, zoom: 1,
+      opcoes: opcoes, nome: nome, fonte: fonte };
+    var estado = leitor;
+    $('#titulo-modal-leitor-pdf').textContent = opcoes.titulo || nome;
+    $('#leitor-como-folha').style.display = opcoes.comoFolha === false ? 'none' : '';
+    var corpo = $('#corpo-modal-leitor-pdf');
+    corpo.innerHTML = '';
+    delete corpo.dataset.paginaDesenhada;
+    corpo.appendChild(el('p', { class: 'ajuda leitor-pdf-aviso', texto: 'Abrindo o PDF...' }));
+    atualizarBarraDoLeitor();
+    abrirModal('modal-leitor-pdf');
+
+    var falha = null;
+    return Promise.all([
+      carregarPdfJs().catch(function (e) { falha = 'leitor'; throw e; }),
+      bytesDoPdf(fonte).catch(function (e) { falha = 'pdf'; throw e; })
+    ]).then(function (r) {
+      if (vez !== leitorVez) return null;
+      return r[0].getDocument({
+        data: r[1],
+        // nada de código vindo de dentro do PDF: o arquivo pode ser de qualquer um
+        isEvalSupported: false, enableXfa: false,
+        wasmUrl: enderecoNoApp(PDFJS_PASTA + 'wasm/')
+      }).promise.catch(function (e) { falha = e && e.name === 'PasswordException' ? 'senha' : 'pdf'; throw e; });
+    }).then(function (doc) {
+      if (!doc) return false;
+      if (vez !== leitorVez) { doc.destroy(); return false; }
+      trocarDocDoLeitor(doc);
+      estado.doc = doc;
+      estado.total = doc.numPages;
+      estado.pagina = Math.min(estado.pagina, estado.total);
+      return desenharPaginaDoLeitor(true);
+    }).catch(function () {
+      if (vez !== leitorVez) return false;
+      mostrarFalhaDoLeitor(falha || 'pdf');
+      return false;
+    });
+  }
+
+  /* O documento anterior sai da memória quando outro entra, e não ao fechar:
+   * a página que ela mandou para uma aula nova é desenhada depois, quando a
+   * aula é salva. Se ainda há uma colagem esperando por ele, ele fica. */
+  function trocarDocDoLeitor(doc) {
+    var velho = leitorDoc;
+    leitorDoc = doc;
+    if (!velho || velho === doc) return;
+    if (folhaPendenteDaBiblioteca && folhaPendenteDaBiblioteca.doc === velho) return;
+    velho.destroy();
+  }
+
+  var FALHAS_DO_LEITOR = {
+    leitor: 'O leitor de PDF vem da internet na primeira vez, e agora o tablet está sem sinal.',
+    senha: 'Este PDF tem senha, e o leitor do aplicativo não abre PDF com senha.',
+    pdf: 'Não consegui abrir este PDF dentro do aplicativo.'
+  };
+
+  function mostrarFalhaDoLeitor(motivo) {
+    var corpo = $('#corpo-modal-leitor-pdf');
+    corpo.innerHTML = '';
+    corpo.appendChild(el('div', { class: 'leitor-pdf-aviso', id: 'leitor-pdf-falha', 'data-motivo': motivo }, [
+      el('p', { texto: FALHAS_DO_LEITOR[motivo] || FALHAS_DO_LEITOR.pdf }),
+      el('button', { type: 'button', class: 'btn principal', id: 'leitor-abrir-fora',
+        texto: 'Abrir fora do aplicativo', aoClick: abrirLeitorFora })
+    ]));
+    atualizarBarraDoLeitor();
+  }
+
+  // o caminho de antes do C14: o compartilhar do Android, ou baixar
+  function abrirLeitorFora() {
+    if (!leitor) return;
+    var op = leitor.opcoes, nome = leitor.nome, fonte = leitor.fonte;
+    fecharModal('modal-leitor-pdf');
+    if (op.abrirFora) { op.abrirFora(); return; }
+    var blob = fonte instanceof Blob ? fonte : new Blob([fonte], { type: 'application/pdf' });
+    entregarArquivo(nome, blob, op.titulo || nome);
+  }
+
+  function atualizarBarraDoLeitor() {
+    var tem = !!(leitor && leitor.doc);
+    $('#leitor-contador').textContent = tem ? 'Página ' + leitor.pagina + ' de ' + leitor.total : '';
+    $('#leitor-anterior').disabled = !tem || leitor.pagina <= 1;
+    $('#leitor-proxima').disabled = !tem || leitor.pagina >= leitor.total;
+    $('#leitor-menos').disabled = !tem || leitor.zoom <= LEITOR_ZOOM_MIN;
+    $('#leitor-mais').disabled = !tem || leitor.zoom >= LEITOR_ZOOM_MAX;
+    $('#leitor-largura').disabled = !tem;
+    $('#leitor-como-folha').disabled = !tem;
+  }
+
+  /* Desenha a página atual num canvas NOVO e só então troca: a página de antes
+   * fica na tela até a nova estar pronta, sem piscar em branco a cada toque.
+   *
+   * A largura vem da janela (zoom 1 é "Ajustar à largura"), e o canvas tem a
+   * densidade da tela, senão a letra sai borrada no tablet. paraOAlto leva a
+   * rolagem ao começo da página, na troca de página; no zoom ela fica. */
+  function desenharPaginaDoLeitor(paraOAlto) {
+    var estado = leitor;
+    if (!estado || !estado.doc) return Promise.resolve(false);
+    var vez = ++leitorDesenho;
+    var n = estado.pagina;
+    if (leitorTarefa) { leitorTarefa.cancel(); leitorTarefa = null; }
+    atualizarBarraDoLeitor();
+    var atual = function () { return estado === leitor && vez === leitorDesenho; };
+    return estado.doc.getPage(n).then(function (pagina) {
+      if (!atual()) return false;
+      var corpo = $('#corpo-modal-leitor-pdf');
+      var base = pagina.getViewport({ scale: 1 });
+      var disponivel = Math.max(160, corpo.clientWidth - 36);
+      var vp = pagina.getViewport({ scale: disponivel / base.width * estado.zoom });
+      var densidade = Math.min(window.devicePixelRatio || 1, Math.sqrt(LEITOR_MAX_PIXELS / (vp.width * vp.height)));
+      var c = document.createElement('canvas');
+      c.width = Math.max(1, Math.floor(vp.width * densidade));
+      c.height = Math.max(1, Math.floor(vp.height * densidade));
+      c.style.width = Math.floor(vp.width) + 'px';
+      c.style.height = Math.floor(vp.height) + 'px';
+      c.setAttribute('aria-label', 'Página ' + n + ' de ' + estado.total);
+      var tarefa = pagina.render({ canvasContext: c.getContext('2d'), canvas: c, viewport: vp,
+        transform: densidade !== 1 ? [densidade, 0, 0, densidade, 0, 0] : null });
+      leitorTarefa = tarefa;
+      return tarefa.promise.then(function () {
+        if (leitorTarefa === tarefa) leitorTarefa = null;
+        if (!atual()) return false;
+        corpo.innerHTML = '';
+        corpo.appendChild(c);
+        if (paraOAlto) { corpo.scrollTop = 0; corpo.scrollLeft = 0; }
+        corpo.dataset.paginaDesenhada = String(n);
+        return true;
+      });
+    }).catch(function (e) {
+      // cancelada por um toque mais novo: quem desenha agora é ele
+      if ((e && e.name === 'RenderingCancelledException') || !atual()) return false;
+      mostrarFalhaDoLeitor('pdf');
+      return false;
+    });
+  }
+
+  function andarNoLeitorPdf(passo) {
+    if (!leitor || !leitor.doc) return;
+    var nova = leitor.pagina + passo;
+    if (nova < 1 || nova > leitor.total) return;
+    leitor.pagina = nova;
+    desenharPaginaDoLeitor(true);
+  }
+
+  // fator 0 é "Ajustar à largura"; os outros multiplicam, dentro dos limites
+  function zoomDoLeitorPdf(fator) {
+    if (!leitor || !leitor.doc) return;
+    var z = fator ? Math.round(leitor.zoom * fator * 100) / 100 : 1;
+    leitor.zoom = Math.min(LEITOR_ZOOM_MAX, Math.max(LEITOR_ZOOM_MIN, z));
+    desenharPaginaDoLeitor(false);
+  }
+
+  /* A página num canvas do tamanho que a folha pede, com fundo branco: vai
+   * virar JPEG, e o transparente do JPEG é preto. */
+  function desenharPaginaPdfEmCanvas(doc, n, largura, altura) {
+    return doc.getPage(n).then(function (pagina) {
+      var base = pagina.getViewport({ scale: 1 });
+      var vp = pagina.getViewport({ scale: largura / base.width });
+      var c = document.createElement('canvas');
+      c.width = largura; c.height = altura;
+      var ctx = c.getContext('2d');
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, largura, altura);
+      return pagina.render({ canvasContext: ctx, canvas: c, viewport: vp }).promise.then(function () { return c; });
+    });
+  }
+
+  /* "Abrir esta página como folha": o MESMO caminho do "Abrir como folha" da
+   * biblioteca (colarNaFolhaDaAula), com a página do PDF no lugar da página do
+   * pacote. Ela vira imagem numa página nova da folha, e a caneta escreve por
+   * cima. Veio de uma aula: cola nela. Veio de fora de aula: pergunta qual. */
+  function paginaDoLeitorComoFolha() {
+    if (!leitor || !leitor.doc) return;
+    var doc = leitor.doc, n = leitor.pagina, op = leitor.opcoes;
+    var titulo = (op.titulo || leitor.nome) + ', página ' + n;
+    doc.getPage(n).then(function (pagina) {
+      var base = pagina.getViewport({ scale: 1 });
+      var alvo = {
+        forma: 'pagina', titulo: titulo, origem: 'Do PDF', doc: doc,
+        medidas: { largura_pt: base.width, altura_pt: base.height },
+        desenhar: function (largura, altura) { return desenharPaginaPdfEmCanvas(doc, n, largura, altura); }
+      };
+      var daAula = op.aulaId && db.aulas.some(function (a) { return a.id === op.aulaId; });
+      if (daAula) colarNaFolhaDaAula(op.aulaId, alvo);
+      else mostrarAulasParaFolha(alvo);
+    }).catch(function () {
+      avisar('Não consegui preparar esta página. Tente de novo.');
+    });
+  }
+
+  function soltarLeitorPdf() {
+    leitorVez++;
+    leitorDesenho++;
+    if (leitorTarefa) { leitorTarefa.cancel(); leitorTarefa = null; }
+    leitor = null;
+    // o canvas de uma página com zoom passa de 40 MB: sai da tela e da memória
+    var corpo = $('#corpo-modal-leitor-pdf');
+    if (corpo) { corpo.innerHTML = ''; delete corpo.dataset.paginaDesenhada; }
+  }
+
+  function fecharLeitorSeAberto() {
+    var m = $('#modal-leitor-pdf');
+    if (m && m.classList.contains('aberto')) fecharModal('modal-leitor-pdf');
+  }
+
+  /* Ela gira o tablet com o PDF aberto: a largura da janela muda, e "ajustar à
+   * largura" passa a ser outra conta. Espera o giro assentar antes de redesenhar. */
+  var leitorGiro = null;
+  window.addEventListener('resize', function () {
+    if (!leitor || !leitor.doc) return;
+    clearTimeout(leitorGiro);
+    leitorGiro = setTimeout(function () { desenharPaginaDoLeitor(false); }, 250);
+  });
 
   function liberarEspaco() {
     Store.limparOrfaos(db).then(function (r) {
