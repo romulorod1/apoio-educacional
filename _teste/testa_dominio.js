@@ -201,10 +201,10 @@ const REVISAR = (() => {
   const fim = ini < 0 ? -1 : APP.indexOf('\n  }\n', ini);
   return ini < 0 || fim < 0 ? '' : APP.slice(ini, fim + 4);
 })();
-function revisarDoApp(C, ctx) {
+function revisarDoApp(C, ctx, fonte) {
   return new Function('Core', 'ctx',
     'function alunoPorId(id) { return (ctx.db.alunos || []).filter(function (a) { return a.id === id; })[0]; }\n' +
-    'return function (alunoId) { var db = ctx.db;\n' + REVISAR + '\n  return revisarTrilhasDoAluno(alunoId); };')(C, ctx);
+    'return function (alunoId) { var db = ctx.db;\n' + (fonte || REVISAR) + '\n  return revisarTrilhasDoAluno(alunoId); };')(C, ctx);
 }
 
 /* Caso 1 da revisão: o passo fechado pela regra ANTIGA (aula dada, sem
@@ -304,6 +304,62 @@ secao('3c. O toque no domínio não mexe em trilha encerrada');
   conf('tirar o Domina de A9 com A8 ainda em Domina: o passo fica, por A8', [ativa.passos[2].aulaId, r2.soltos, r2.remarcados], ['A8', 0, 1]);
   conf('Domina ainda marcado na aula: nada muda', Core.revisarDominioNaAula(db, al, a8, t9.id), { soltos: 0, remarcados: 0 });
 })();
+
+// ================================================================
+/* Seguimento do C1 (revisão do PR #90): o SALVAR da aula roda a varredura
+ * inteira (revisarTrilhasDoAluno), e ela não pode mexer em trilha encerrada,
+ * nem para soltar nem para fechar passo. Recebe a fonte da varredura para
+ * rodar igual contra a de verdade e contra o veneno. */
+function provasDaEncerradaNoSalvar(fonte, conferir) {
+  const ctx = { db: null };
+  const revisar = revisarDoApp(Core, ctx, fonte);
+  function banco() {
+    const enc = trilha(Core);
+    enc.passos[0].feitoEm = '2026-06-09'; enc.passos[0].aulaId = 'A9'; enc.passos[0].porDominio = true;   // fechado por domínio
+    enc.passos[1].feitoEm = '2026-05-01'; enc.passos[1].aulaId = 'A1';                                   // regra antiga
+    Core.encerrarTrilha(enc, '2026-06-10', 'fechou');
+    return {
+      alunos: [{ id: ALUNO, nome: 'Aluno Alfa Teste', trilhas: [enc] }],
+      aulas: [
+        aula('A9', '2026-06-09', [item(T1, 'domina')]),
+        aula('A1', '2026-05-01', [item(T2)]),
+        aula('A5', '2026-06-20', [item(T3, 'domina')])   // fecharia o passo 3, se a trilha estivesse ativa
+      ]
+    };
+  }
+  const p = (db, i) => db.alunos[0].trilhas[0].passos[i];
+  const a = (db, id) => db.aulas.filter(x => x.id === id)[0];
+  const marcas = db => [0, 1, 2].map(i => (p(db, i).feitoEm || null) + '/' + (p(db, i).aulaId || '-'));
+  const ESPERADO = ['2026-06-09/A9', '2026-05-01/A1', 'null/-'];
+
+  let db = ctx.db = banco();
+  delete a(db, 'A9').temas[0].dominio;   // ela tira o Domina da aula e salva
+  revisar(ALUNO);
+  conferir('Salvar sem o Domina: o passo da encerrada continua fechado, com a data', marcas(db), ESPERADO);
+  conferir('e continua dizendo que fechou por domínio', !!p(db, 0).porDominio, true);
+
+  db = ctx.db = banco();
+  a(db, 'A9').temas[0].dominio = 'andamento';
+  revisar(ALUNO);
+  conferir('Salvar com Em andamento no lugar do Domina: idem', marcas(db), ESPERADO);
+
+  db = ctx.db = banco();
+  a(db, 'A9').status = 'cancelada'; a(db, 'A1').status = 'falta';
+  revisar(ALUNO);
+  conferir('Salvar com as aulas canceladas ou em falta: a encerrada fica como foi encerrada', marcas(db), ESPERADO);
+
+  db = ctx.db = banco();
+  db.aulas = db.aulas.filter(x => x.id !== 'A1');
+  revisar(ALUNO);
+  conferir('Salvar depois de excluir a aula: idem', marcas(db), ESPERADO);
+
+  db = ctx.db = banco();
+  revisar(ALUNO);
+  conferir('o Domina em outra aula não fecha passo novo na encerrada', p(db, 2).feitoEm, null);
+}
+
+secao('3d. O Salvar da aula não mexe em trilha encerrada');
+provasDaEncerradaNoSalvar(null, conf);
 
 // ================================================================
 secao('4. A cópia de segurança leva o domínio');
@@ -424,6 +480,22 @@ if (esquece) {
   try { n = contarFalhasAntigo(carregar(esquece, 'core_esquece.js')); } catch (e) { n = 'erro: ' + e.message; }
   console.log('       veneno esquece-a-aula: ' + n + ' prova(s) do passo antigo reprovaram');
   conf('veneno esquece-a-aula: reprova (veneno visto)', typeof n === 'number' && n > 0, true);
+}
+
+/* O veneno da encerrada no Salvar: a varredura que volta a passar por TODAS
+ * as trilhas (o PR #90) TEM de reprovar na seção 3d. */
+const DE_ATIVAS = '    var ativas = Core.trilhasAtivas(aluno);\n';
+const varreTodas = REVISAR.split(DE_ATIVAS).length === 2 ? REVISAR.replace(DE_ATIVAS, '    var ativas = Core.trilhasDe(aluno);\n') : null;
+conf('veneno varre-encerrada: a troca foi aplicada', varreTodas !== null, true);
+if (varreTodas) {
+  let n = 0;
+  try {
+    provasDaEncerradaNoSalvar(varreTodas, (rotulo, obtido, esperado) => {
+      if (JSON.stringify(obtido) !== JSON.stringify(esperado)) n++;
+    });
+  } catch (e) { n = 'erro: ' + e.message; }
+  console.log('       veneno varre-encerrada: ' + n + ' prova(s) da encerrada no Salvar reprovaram');
+  conf('veneno varre-encerrada: reprova (veneno visto)', typeof n === 'number' && n > 0, true);
 }
 
 // ================================================================

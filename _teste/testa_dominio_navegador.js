@@ -54,9 +54,20 @@ function appEnvenenado() {
   if (fonte.split(de).length !== 2) throw new Error('veneno não aplicado: o toque no domínio não foi achado no app.js');
   return fonte.replace(de, 'mexeu = revisarTrilhasDoAluno(aula.alunoId);');
 }
+/* --envenenado-salvar serve um app.js cuja varredura do Salvar volta a passar
+ * por todas as trilhas, encerradas inclusive (o PR #90): o caso do Salvar na
+ * seção 7b TEM de reprovar. Também fora do portão. */
+const VENENO_SALVAR = process.argv.indexOf('--envenenado-salvar') >= 0;
+function appVarreEncerrada() {
+  const fonte = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8').replace(/\r\n/g, '\n');
+  const de = '// só as ativas, nos quatro passos: a encerrada não entra em nenhum\n    var ativas = Core.trilhasAtivas(aluno);';
+  if (fonte.split(de).length !== 2) throw new Error('veneno não aplicado: a varredura não foi achada no app.js');
+  return fonte.replace(de, 'var ativas = Core.trilhasDe(aluno);');
+}
 const trocas = {};
 if (VENENO) trocas['/core.js'] = coreEnvenenado();
 if (VENENO_ENCERRADA) trocas['/app.js'] = appEnvenenado();
+if (VENENO_SALVAR) trocas['/app.js'] = appVarreEncerrada();
 const amb = H.criarAmbiente(8860, 'nath_c1_dominio', trocas);
 const { secao, esperar, pausa } = H;
 /* O conf do ajudante compara por String(), e objeto vira "[object Object]"
@@ -452,6 +463,23 @@ async function printDe(pag, seletor, nome, folga) {
   await tocar(pag, T1, 'domina');
   g = await esperar('Domina gravado', () => doBanco(pag), v => v.dom[T1] === 'domina', 5000);
   conf('Domina de novo: a trilha encerrada segue como estava', [g.valor.p1.feitoEm, g.valor.encerrada], [HOJE, true]);
+  /* E pelo Salvar (revisão do PR #90): o Salvar da aula roda a varredura
+   * inteira, que soltava o passo da encerrada quando a aula perdia o Domina,
+   * e a data de fechamento se perdia. */
+  await tocar(pag, T1, 'domina');
+  g = await esperar('Domina tirado', () => doBanco(pag), v => v.dom[T1] === '(sem campo)', 5000);
+  conf('tirado o Domina da aula', g.valor.dom[T1], '(sem campo)');
+  await pag.click('#salvar-aula');
+  await esperar('aula salva e fechada', () => pag.evaluate(() => !document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
+  await pausa(400);
+  g = await doBanco(pag);
+  conf('Salvar: o passo da trilha encerrada continua fechado, com a data', [g.p1.feitoEm, g.p1.porDominio, g.encerrada], [HOJE, true, true]);
+  const avisoSalvar = await pag.evaluate(() => document.querySelector('#aviso-texto').textContent);
+  conf('e o aviso do Salvar não diz que passo voltou para a fila', /voltou para a fila|voltaram para a fila/.test(avisoSalvar), false);
+  await pag.reload({ waitUntil: 'networkidle0' });
+  await H.abrirApp(pag, amb.ORIGEM);
+  g = await doBanco(pag);
+  conf('e depois de recarregar também', g.p1.feitoEm, HOJE);
   await fecharModais(pag);
 
   // ================================================================
