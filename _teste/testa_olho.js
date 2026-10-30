@@ -62,8 +62,11 @@ const esp = ms => new Promise(r => setTimeout(r, ms));
   conf('mas as horas continuam à vista', fech.includes('10:30 h'), true);
 
   console.log('\n=== o PDF continua com os números, que é o que a família recebe ===');
+  // C10b: o PDF do fechamento mora no rodapé da janela que o "Preparar e enviar" abre
+  await pag.evaluate(() => document.querySelector('#lista-fechamento .btn-preparar-doc').click());
+  await esp(300);
   await pag.evaluate(() => {
-    const b = Array.from(document.querySelectorAll('#lista-fechamento button')).find(x => x.textContent.trim() === 'PDF do fechamento');
+    const b = Array.from(document.querySelectorAll('#modal-documento-familia button')).find(x => x.textContent.trim() === 'PDF do fechamento');
     b.scrollIntoView({ block: 'center' }); b.click();
   });
   await esp(2000);

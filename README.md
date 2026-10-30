@@ -100,12 +100,16 @@ tanto por hora. Ao reajustar, encerre o valor antigo e crie o novo. Cada aula é
 que valia na data dela, então reajuste no meio do mês sai certo sozinho.
 
 **Fechamento.** Escreva o feedback do mês e gere o PDF, já com o cabeçalho, o rodapé, a marca d'água
-e, se você configurou em *Ajustes*, a chave Pix. Para cada aluno há também:
-- **Preparar documento para a família**, com a prévia na tela e a escolha do que entra (as notas
-  das aulas, os temas e as áreas);
+e, se você configurou em *Ajustes*, a chave Pix. Cada aluno tem um botão principal, **Preparar e
+enviar**, que abre a prévia na tela com a escolha do que entra (as notas das aulas, os temas e as
+áreas) e o PDF do fechamento no rodapé. Na mesma janela, em **Mais formatos**:
 - **O mês numa tela**, para mostrar o mês à família sem os outros alunos;
 - **Cartão do mês**, uma imagem quadrada para mandar na conversa com a família;
-- o arquivo de texto e o PDF com as folhas de aula anexadas.
+- o PDF com as folhas de aula anexadas, o arquivo de texto e o texto copiado.
+
+No alto do Fechamento, **Enviar para todas as famílias** passa pelos alunos do mês um por um: um
+toque em *Enviar o PDF* por família, com *Pular* e *Parar*. O aplicativo não marca nada como
+enviado.
 
 **Esconder os valores.** O botão redondo no cabeçalho apaga da tela tudo que é dinheiro. As horas
 continuam à vista. Serve para quando o tablet está aberto na casa da família. O PDF e o arquivo de

@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.33.0';
+  var VERSAO = '1.34.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,16 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.34.0',
+      itens: [
+        'No Fechamento, cada aluno tem um botão só: "Preparar e enviar". Ele abre o documento da família, ' +
+          'e o PDF do fechamento sai pelo botão principal lá embaixo.',
+        'O mês numa tela, o Cartão do mês, o PDF com as folhas e o Texto ficaram dentro dessa janela, em "Mais formatos".',
+        'No alto do Fechamento, "Enviar para todas as famílias" passa aluno por aluno: você toca em Enviar o PDF, ' +
+          'escolhe a conversa da família e o aplicativo já mostra a próxima. Dá para pular uma família ou parar quando quiser.'
+      ]
+    },
     {
       versao: '1.33.0',
       itens: [
@@ -1848,6 +1858,7 @@
       desenharAgenda();
       desenharFechamento();
     });
+    $('#enviar-todas-familias').addEventListener('click', abrirEnvioParaTodas);
     $('#exportar-md-mes').addEventListener('click', exportarMesEmTexto);
     $('#exportar-pdf-mes').addEventListener('click', exportarResumoDoMesEmPdf);
 
@@ -10590,11 +10601,13 @@
             + 'Marque quando quiser que a lista de assuntos e a de habilidades e hábitos entrem também.'
       }));
 
+      /* Um botão principal por aluno (C10b): os outros formatos moram dentro da
+       * janela, em "Mais formatos", e o cartão fica com uma decisão só. */
       cartao.appendChild(el('div', { class: 'acoes-doc-familia' }, [
         el('button', {
           type: 'button', class: 'btn principal destaque btn-preparar-doc',
           style: 'font-weight:700;padding:10px 16px',
-          texto: 'Preparar documento para a família',
+          texto: 'Preparar e enviar',
           aoClick: function () { abrirDocumentoFamilia(f.aluno.id, mesAtual); }
         })
       ]));
@@ -10604,27 +10617,6 @@
           type: 'button', class: 'btn' + (temResumo ? '' : ' destaque'),
           texto: temResumo ? 'Editar o feedback' : 'Escrever o feedback',
           aoClick: function () { abrirResumo(f.aluno.id, mesAtual); }
-        }),
-        el('button', {
-          type: 'button', class: 'btn', texto: 'O mês numa tela',
-          aoClick: function () { abrirMesNumaTela(f.aluno.id, mesAtual); }
-        }),
-        el('span', { class: 'cresce' }),
-        el('button', {
-          type: 'button', class: 'btn', texto: 'Texto',
-          aoClick: function () { exportarAlunoEmTexto(f); }
-        }),
-        el('button', {
-          type: 'button', class: 'btn principal', texto: 'PDF do fechamento',
-          aoClick: function () { exportarAlunoEmPdf(f, false); }
-        }),
-        el('button', {
-          type: 'button', class: 'btn', texto: 'Cartão do mês',
-          aoClick: function () { abrirCartaoDoMes(f.aluno.id, mesAtual); }
-        }),
-        el('button', {
-          type: 'button', class: 'btn', texto: 'PDF com as folhas',
-          aoClick: function () { exportarAlunoEmPdf(f, true); }
         })
       ]));
 
@@ -11046,12 +11038,23 @@
       ])
     ]));
 
-    // 4. Outras saídas do mês
+    /* 4. Mais formatos (C10b). Junta o que morava no cartão, as "Outras saídas"
+     * e os botões de texto e de folhas do rodapé, um botão por formato. O PDF do
+     * fechamento fica só no rodapé, que é a ação principal desta janela. */
     painelConfig.appendChild(el('div', {
+      id: 'doc-mais-formatos-titulo',
       style: 'font-size:12px;font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:0.05em;margin-top:6px'
-    }, [document.createTextNode('Outras saídas')]));
+    }, [document.createTextNode('Mais formatos')]));
 
-    var barraOutras = el('div', { style: 'display:flex;flex-wrap:wrap;gap:8px' }, [
+    var barraOutras = el('div', { id: 'doc-mais-formatos', style: 'display:flex;flex-wrap:wrap;gap:8px' }, [
+      el('button', {
+        type: 'button', class: 'btn',
+        texto: 'O mês numa tela',
+        aoClick: function () {
+          fecharModal('modal-documento-familia');
+          abrirMesNumaTela(alunoId, mes);
+        }
+      }),
       el('button', {
         type: 'button', class: 'btn',
         texto: 'Cartão do mês',
@@ -11061,11 +11064,30 @@
         }
       }),
       el('button', {
-        type: 'button', class: 'btn',
-        texto: 'O mês numa tela',
+        type: 'button', class: 'btn', id: 'btn-doc-familia-pdf-folhas',
+        texto: 'PDF com as folhas',
+        title: 'Gera o PDF do fechamento e anexa todas as folhas manuscritas do mês ao final',
         aoClick: function () {
-          fecharModal('modal-documento-familia');
-          abrirMesNumaTela(alunoId, mes);
+          exportarAlunoEmPdf(estado.f, true, {
+            exibirTemasEAreas: estado.exibirTemas,
+            incluirNotasPublicas: estado.incluirNotas,
+            incluirFolhas: true,
+            mostrarNaoCobradas: estado.mostrarNaoCobradas
+          });
+        }
+      }),
+      el('button', {
+        type: 'button', class: 'btn', id: 'btn-doc-familia-md',
+        texto: 'Texto',
+        aoClick: function () {
+          var md = Core.markdownFechamento(estado.f, opcoesDoDocumento({
+            exibirTemasEAreas: estado.exibirTemas,
+            incluirNotas: estado.incluirNotas,
+            mostrarNaoCobradas: estado.mostrarNaoCobradas
+          }));
+          entregarArquivo(nomeBase(estado.f) + '.md',
+            new Blob([md], { type: 'text/markdown;charset=utf-8' }),
+            'Fechamento de ' + estado.f.alunoNome);
         }
       }),
       el('button', {
@@ -11090,6 +11112,11 @@
       })
     ]);
     painelConfig.appendChild(barraOutras);
+    painelConfig.appendChild(el('div', {
+      class: 'ajuda', id: 'ajuda-doc-familia-folhas', style: 'margin:0',
+      texto: 'O PDF com as folhas anexa ao final os desenhos manuscritos do mês, não exibidos nesta prévia. ' +
+        'O PDF do fechamento, o que a família recebe, fica no botão principal aqui embaixo.'
+    }));
 
     layout.appendChild(painelConfig);
 
@@ -11116,41 +11143,7 @@
 
     rodape.appendChild(el('span', { class: 'cresce' }));
 
-    rodape.appendChild(el('button', {
-      type: 'button', class: 'btn', id: 'btn-doc-familia-md',
-      texto: 'Baixar texto',
-      aoClick: function () {
-        var md = Core.markdownFechamento(estado.f, opcoesDoDocumento({
-          exibirTemasEAreas: estado.exibirTemas,
-          incluirNotas: estado.incluirNotas,
-          mostrarNaoCobradas: estado.mostrarNaoCobradas
-        }));
-        entregarArquivo(nomeBase(estado.f) + '.md',
-          new Blob([md], { type: 'text/markdown;charset=utf-8' }),
-          'Fechamento de ' + estado.f.alunoNome);
-      }
-    }));
-
-    rodape.appendChild(el('span', {
-      class: 'ajuda', id: 'ajuda-doc-familia-folhas',
-      style: 'font-size:11px;max-width:240px;line-height:1.2;align-self:center;margin:0 4px',
-      texto: 'O PDF com folhas anexa ao final os desenhos manuscritos do mês, não exibidos nesta prévia.'
-    }));
-
-    rodape.appendChild(el('button', {
-      type: 'button', class: 'btn', id: 'btn-doc-familia-pdf-folhas',
-      texto: 'PDF com as folhas',
-      title: 'Gera o PDF do fechamento e anexa todas as folhas manuscritas do mês ao final',
-      aoClick: function () {
-        exportarAlunoEmPdf(estado.f, true, {
-          exibirTemasEAreas: estado.exibirTemas,
-          incluirNotasPublicas: estado.incluirNotas,
-          incluirFolhas: true,
-          mostrarNaoCobradas: estado.mostrarNaoCobradas
-        });
-      }
-    }));
-
+    // o texto e o PDF com as folhas foram para "Mais formatos": aqui fica só o principal
     rodape.appendChild(el('button', {
       type: 'button', class: 'btn principal', id: 'btn-doc-familia-pdf-fechamento',
       texto: 'PDF do fechamento',
@@ -11945,12 +11938,6 @@
     return o;
   }
 
-  function exportarAlunoEmTexto(f) {
-    var md = Core.markdownFechamento(f, opcoesDoDocumento({ incluirNotas: true }));
-    entregarArquivo(nomeBase(f) + '.md', new Blob([md], { type: 'text/markdown;charset=utf-8' }),
-      'Fechamento de ' + f.alunoNome);
-  }
-
   function exportarMesEmTexto() {
     var fechs = Core.calcularMesInteiro(db, mesAtual);
     if (!fechs.length) { avisar('Não há aulas neste mês.'); return; }
@@ -11970,9 +11957,11 @@
   function exportarAlunoEmPdf(f, comFolhas, extraOpcoes) {
     /* Feedback em branco não sai no PDF, nem o título dele. Ela confirma antes,
      * porque esquecer de escrever é mais comum do que decidir mandar sem. */
+    /* Devolve uma promessa de verdadeiro quando o PDF saiu para o compartilhar,
+     * e falso quando não saiu: o "Enviar para todas as famílias" só avança assim. */
     if (!(f.resumoTexto || '').trim() &&
         !confirmar('O feedback de ' + f.alunoNome + ' (' + f.mesExtenso + ') está em branco. ' +
-          'Gerar o PDF sem o feedback?')) return;
+          'Gerar o PDF sem o feedback?')) return Promise.resolve(false);
     var aulasComNota = f.linhas.filter(function (l) { return l.temNota; });
     var passo = Promise.resolve({ notas: [], imagens: {} });
 
@@ -12002,7 +11991,7 @@
       });
     }
 
-    passo.then(function (extra) {
+    return passo.then(function (extra) {
       var gen = typeof PDFGen !== 'undefined' ? PDFGen : Pdf;
       var baseOpts = {
         incluirFolhas: comFolhas,
@@ -12015,9 +12004,119 @@
       entregarArquivo(nomeBase(f) + (comFolhas ? '_com_folhas' : '') + '.pdf',
         new Blob([bytes], { type: 'application/pdf' }),
         'Fechamento de ' + f.alunoNome);
+      return true;
     }).catch(function (e) {
       avisar('Não foi possível gerar o PDF.');
+      return false;
     });
+  }
+
+  /* Enviar para todas as famílias (C10b): uma etapa por aluno do mês, em
+   * sequência. O Android só abre o compartilhar dentro de um toque dela, então
+   * é um toque por família. Nada é gravado: é só a fila de toques, e a marca de
+   * "enviado" não existe no banco de propósito, porque o compartilhar não diz
+   * se a mensagem chegou. */
+  var envioFamilias = null;
+
+  function abrirEnvioParaTodas() {
+    var fechs = Core.calcularMesInteiro(db, mesAtual);
+    if (!fechs.length) { avisar('Não há aulas neste mês.'); return; }
+    envioFamilias = {
+      mes: mesAtual,
+      ids: fechs.map(function (f) { return f.aluno.id; }),
+      nomes: fechs.map(function (f) { return f.alunoNome; }),
+      i: 0, enviadas: 0, puladas: 0, parou: false, gerando: false
+    };
+    desenharEtapaDeEnvio();
+    esconderAviso();
+    abrirModal('modal-envio-familias');
+  }
+
+  function desenharEtapaDeEnvio() {
+    var e = envioFamilias;
+    var corpo = $('#corpo-modal-envio-familias');
+    var rodape = $('#rodape-modal-envio-familias');
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    var total = e.ids.length;
+
+    if (e.parou || e.i >= total) {
+      $('#titulo-modal-envio-familias').textContent = 'Envio do mês';
+      var faltaram = total - e.enviadas - e.puladas;
+      corpo.appendChild(el('div', { id: 'envio-resumo' }, [
+        el('p', { id: 'envio-enviadas', style: 'margin:0 0 4px;font-weight:700', texto: 'Enviadas: ' + e.enviadas }),
+        el('p', { id: 'envio-puladas', style: 'margin:0 0 4px;font-weight:700', texto: 'Puladas: ' + e.puladas }),
+        faltaram > 0
+          ? el('p', { id: 'envio-faltaram', style: 'margin:0 0 4px', texto: 'Ficaram para depois: ' + faltaram })
+          : null
+      ].filter(Boolean)));
+      corpo.appendChild(el('div', {
+        class: 'ajuda', style: 'margin:8px 0 0',
+        texto: 'Enviada quer dizer que o PDF foi para o compartilhar do tablet. ' +
+          'O aplicativo não marca nada como enviado: confira na conversa de cada família.'
+      }));
+      rodape.appendChild(el('span', { class: 'cresce' }));
+      rodape.appendChild(el('button', {
+        type: 'button', class: 'btn principal', id: 'envio-fechar', texto: 'Fechar',
+        aoClick: function () { fecharModal('modal-envio-familias'); }
+      }));
+      return;
+    }
+
+    var alunoId = e.ids[e.i];
+    var f = Core.calcularFechamento(db, alunoId, e.mes);
+    var nome = f ? f.alunoNome : e.nomes[e.i];
+    $('#titulo-modal-envio-familias').textContent = 'Enviar para todas as famílias';
+    corpo.appendChild(el('h4', {
+      id: 'envio-etapa', style: 'margin:0 0 6px;font-size:18px;color:var(--navy)',
+      texto: 'Família ' + (e.i + 1) + ' de ' + total + ': ' + nome
+    }));
+    if (f) {
+      corpo.appendChild(el('div', {
+        class: 'ajuda', style: 'margin:0 0 6px',
+        texto: f.qtdEncontrosFeitos + ' ' + palavraPlural(f.qtdEncontrosFeitos, 'aula', 'aulas') +
+          ' · ' + dinheiro(f.valorFeito) + ' · ' + f.mesExtenso
+      }));
+      if (!(f.resumoTexto || '').trim()) {
+        corpo.appendChild(el('div', {
+          class: 'faixa-aviso', texto: 'O feedback deste mês está em branco. O PDF sai sem ele.'
+        }));
+      }
+    }
+    corpo.appendChild(el('div', {
+      class: 'ajuda', style: 'margin:8px 0 0',
+      texto: 'Toque em Enviar o PDF e escolha a conversa da família. Depois o aplicativo passa para a próxima.'
+    }));
+
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn', id: 'envio-parar', texto: 'Parar',
+      aoClick: function () {
+        if (e.gerando) return;
+        e.parou = true; desenharEtapaDeEnvio();
+      }
+    }));
+    rodape.appendChild(el('span', { class: 'cresce' }));
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn', id: 'envio-pular', texto: 'Pular',
+      aoClick: function () {
+        if (e.gerando) return;
+        e.puladas++; e.i++; desenharEtapaDeEnvio();
+      }
+    }));
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn principal', id: 'envio-enviar', texto: 'Enviar o PDF',
+      aoClick: function () {
+        if (e.gerando || !f) return;
+        // o mesmo caminho do botão "PDF do fechamento" de antes, com as opções de sempre
+        e.gerando = true;
+        exportarAlunoEmPdf(f, false).then(function (saiu) {
+          e.gerando = false;
+          if (envioFamilias !== e || e.parou) return;
+          if (saiu) { e.enviadas++; e.i++; }
+          desenharEtapaDeEnvio();
+        });
+      }
+    }));
   }
 
   // ================= ajustes =================

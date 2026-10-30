@@ -508,12 +508,19 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   // ================================================================
   secao('12. Gerar os arquivos do fechamento');
 
-  await clicarTexto((await cartaoDoMarcelo()) + ' button', 'PDF do fechamento');
+  /* C10b: os três saíram do cartão. O cartão abre a janela do documento pelo
+   * "Preparar e enviar", e lá o PDF do fechamento é o rodapé e os outros dois
+   * estão em "Mais formatos". */
+  await clicar((await cartaoDoMarcelo()) + ' .btn-preparar-doc');
+  await espera(500);
+  await clicarTexto('#modal-documento-familia button', 'PDF do fechamento');
   await espera(1600);
-  await clicarTexto((await cartaoDoMarcelo()) + ' button', 'PDF com as folhas');
+  await clicarTexto('#doc-mais-formatos button', 'PDF com as folhas');
   await espera(2200);
-  await clicarTexto((await cartaoDoMarcelo()) + ' button', 'Texto');
+  await clicarTexto('#doc-mais-formatos button', 'Texto');
   await espera(1200);
+  await clicar('#modal-documento-familia [data-fechar]');
+  await espera(300);
   await clicar('#exportar-md-mes');
   await espera(1400);
   await clicar('#exportar-pdf-mes');
