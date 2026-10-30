@@ -1079,8 +1079,15 @@ def resumo_de_lista(doc):
 # ------------------------------------------------------------------ recorte
 
 def svg_do_pedaco(doc, pno, rect, imagens=pymupdf.PDF_REDACT_IMAGE_REMOVE, folga=FOLGAS_REDACAO[0],
-                  desenhos=pymupdf.PDF_REDACT_LINE_ART_REMOVE_IF_TOUCHED):
-    """SVG so com o conteudo do retangulo, e a diferenca de pixels contra a pagina original."""
+                  desenhos=pymupdf.PDF_REDACT_LINE_ART_REMOVE_IF_TOUCHED, cmyk_para_rgb=False):
+    """SVG so com o conteudo do retangulo, e a diferenca de pixels contra a pagina original.
+
+    cmyk_para_rgb (so as provas do C12 pedem; o Portal e o Banco saem como
+    sempre): a imagem JPEG em CMYK vai para o SVG como esta, e o Chrome a
+    desenha preta (o Nivel A de 2018 e o ENEM de 2024 tem figuras assim; a
+    fidelidade media 58% de pixels diferentes). Convertida para RGB antes do
+    SVG, sai como na pagina.
+    """
     r = pymupdf.Rect(rect)
     tmp = pymupdf.open()
     tmp.insert_pdf(doc, from_page=pno, to_page=pno)
@@ -1109,12 +1116,19 @@ def svg_do_pedaco(doc, pno, rect, imagens=pymupdf.PDF_REDACT_IMAGE_REMOVE, folga
     # pedaco da pagina (achado pela trava dos glifos do C12)
     cb = pg.cropbox_position
     pg.set_cropbox(r + (cb.x, cb.y, cb.x, cb.y))
+    if cmyk_para_rgb:
+        for img in pg.get_images(full=True):
+            if 'CMYK' in (img[5] or ''):
+                pix = pymupdf.Pixmap(tmp, img[0])
+                if pix.colorspace and pix.colorspace.n == 4:
+                    pix = pymupdf.Pixmap(pymupdf.csRGB, pix)
+                pg.replace_image(img[0], pixmap=pix)
     svg = limpar_svg(pg.get_svg_image(text_as_path=True))
     tmp.close()
     return svg, dif
 
 
-def svg_redigido(doc, pno, rect):
+def svg_redigido(doc, pno, rect, cmyk_para_rgb=False):
     """Apaga o de fora com a menor folga que deixa o recorte identico ao original.
 
     Se nenhuma folga basta tirando as imagens de fora, tenta mantendo as imagens.
@@ -1131,7 +1145,7 @@ def svg_redigido(doc, pno, rect):
         for desenhos, obs_d in ((pymupdf.PDF_REDACT_LINE_ART_REMOVE_IF_TOUCHED, None),
                                 (pymupdf.PDF_REDACT_LINE_ART_REMOVE_IF_COVERED, 'desenho que encosta mantido')):
             for folga in FOLGAS_REDACAO:
-                svg, dif = svg_do_pedaco(doc, pno, rect, imagens, folga, desenhos)
+                svg, dif = svg_do_pedaco(doc, pno, rect, imagens, folga, desenhos, cmyk_para_rgb)
                 notas = [x for x in (obs_i, obs_d, None if folga == FOLGAS_REDACAO[0] else 'folga de %g pt' % folga) if x]
                 nota = ', '.join(notas) or None
                 if melhor is None or dif < melhor[1]:

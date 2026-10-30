@@ -1239,7 +1239,7 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                     continue
                 svgs, meds = [], []
                 for p in ps:
-                    svg, dif, obs = gerar_pacote.svg_redigido(d, p['pno'], p['rect'])
+                    svg, dif, obs = gerar_pacote.svg_redigido(d, p['pno'], p['rect'], cmyk_para_rgb=True)
                     if dif > gerar_pacote.LIMITE_REDACAO:
                         falhou = '%s: apagar o de fora mudou %.2f%% dos pixels do recorte' % (tipo, 100 * dif)
                     if obs:
