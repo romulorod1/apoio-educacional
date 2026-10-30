@@ -13728,7 +13728,8 @@
   var bibFila = [];
   var bibDesenhando = 0;
   var MAX_MINIATURAS_JUNTAS = 3;
-  var ORDEM_SERIES = ['6ano', '7ano', '8ano', '9ano', '1em', '2em', '3em'];
+  // do 2º ao 5º ano vêm os pacotes da OBMEP Mirim (C12)
+  var ORDEM_SERIES = ['2ano', '3ano', '4ano', '5ano', '6ano', '7ano', '8ano', '9ano', '1em', '2em', '3em'];
   var NOME_DIFICULDADE = { 1: 'Fácil', 2: 'Médio', 3: 'Difícil' };
 
   /* Há pacote importado? O botão Material da linha do assunto depende disto, e
@@ -13776,7 +13777,10 @@
       arv.itemPorId[it.id] = it;
       var banco = eDoBanco(it);
       var mod = modulo(it.serie + ':' + it.modulo.slug, it.serie, it.modulo, banco, it.pacote);
-      var series = banco && it.series_equivalentes && it.series_equivalentes.length ? it.series_equivalentes : [it.serie];
+      /* O item de nível (o "n2" do Banco, o "m1" da Mirim) aparece nas séries a
+       * que o nível equivale. Era só para o Banco; a Mirim (C12) é o segundo
+       * pacote por nível, e o nível em si não vira aba de série. */
+      var series = it.series_equivalentes && it.series_equivalentes.length ? it.series_equivalentes : [it.serie];
       series.forEach(function (s) { mod.series[s] = true; arv.series[s] = true; });
       var lista = mod.listas[it.aula.slug];
       if (!lista) {
