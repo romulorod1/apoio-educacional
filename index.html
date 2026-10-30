@@ -193,6 +193,8 @@
       <div class="numeros" id="numeros-fechamento"></div>
 
       <div class="barra">
+        <!-- C10b: percorre os alunos do mês, uma família por toque. -->
+        <button class="btn principal" id="enviar-todas-familias" type="button">Enviar para todas as famílias</button>
         <button class="btn" id="exportar-md-mes" type="button">Exportar o mês em texto</button>
         <button class="btn" id="exportar-pdf-mes" type="button">PDF do resumo do mês</button>
       </div>
@@ -625,6 +627,19 @@
       </div>
       <div class="modal-corpo" id="corpo-modal-doc-familia"></div>
       <div class="modal-rodape" id="rodape-modal-doc-familia"></div>
+    </div>
+  </div>
+
+  <!-- Enviar para todas as famílias (C10b). Uma etapa por aluno do mês; o
+       corpo e o rodapé são montados no app.js, a cada etapa. -->
+  <div class="fundo-modal" id="modal-envio-familias">
+    <div class="modal">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-envio-familias">Enviar para todas as famílias</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-envio-familias"></div>
+      <div class="modal-rodape" id="rodape-modal-envio-familias"></div>
     </div>
   </div>
 

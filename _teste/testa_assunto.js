@@ -506,16 +506,21 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   await pag.select('#mes-fechamento', '2026-06');
   await espera(800);
 
-  const achouCartao = await pag.evaluate((nome) => {
+  /* C10b: o "Texto" saiu do cartão e mora em "Mais formatos", na janela que o
+   * "Preparar e enviar" abre. O caminho abre a janela, toca e fecha. */
+  const tocarTextoNaJanela = (nome) => pag.evaluate((nome) => {
     const cartoes = Array.from(document.querySelectorAll('#lista-fechamento .cartao'));
     const meu = cartoes.filter(c => c.textContent.indexOf(nome) >= 0)[0];
     if (!meu) return false;
-    const bt = Array.from(meu.querySelectorAll('button'))
+    meu.querySelector('.btn-preparar-doc').click();
+    const bt = Array.from(document.querySelectorAll('#doc-mais-formatos button'))
       .filter(b => b.textContent.trim() === 'Texto')[0];
     if (!bt) return false;
     bt.click();
+    document.querySelector('#modal-documento-familia [data-fechar]').click();
     return true;
-  }, marcelo.nome);
+  }, nome);
+  const achouCartao = await tocarTextoNaJanela(marcelo.nome);
   conf('o fechamento do aluno abriu para exportar', achouCartao, true);
   await espera(900);
 
@@ -528,15 +533,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
     if (cx && !cx.checked) cx.click();
   });
   await espera(800);
-  await pag.evaluate((nome) => {
-    const cartoes = Array.from(document.querySelectorAll('#lista-fechamento .cartao'));
-    const c = cartoes.filter(x => x.textContent.indexOf(nome) >= 0)[0];
-    if (!c) return false;
-    const b = Array.from(c.querySelectorAll('button'))
-      .filter(x => x.textContent.trim() === 'Texto')[0];
-    if (b) b.click();
-    return !!b;
-  }, marcelo.nome);
+  await tocarTextoNaJanela(marcelo.nome);
   await espera(900);
 
   const md = await pag.evaluate(() => (window.__ultimoBlob ? window.__ultimoBlob.text() : null));

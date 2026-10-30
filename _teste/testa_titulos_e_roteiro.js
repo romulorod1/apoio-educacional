@@ -7,7 +7,7 @@
  *   1. desligado, a janela do Feedback é a de sempre (sem roteiro), e o
  *      editor de títulos nasce fechado, com os títulos de sempre na prévia;
  *   2. o título que ela troca vale na prévia, fica guardado depois de
- *      recarregar e sai no texto e no PDF de verdade (pelos botões do cartão);
+ *      recarregar e sai no texto e no PDF de verdade (pelos botões da janela);
  *   3. o título apagado volta ao de sempre;
  *   4. ligado em Ajustes, o roteiro aparece com as três perguntas, a opção
  *      fica guardada, a pergunta reescrita fica guardada, e o texto sai
@@ -46,6 +46,16 @@ function botaoDoCartao(pag, trecho) {
     b.click();
     return true;
   }, trecho);
+}
+
+// o botão da janela do documento pelo texto exato (o "Texto" não pode casar com "Copiar texto")
+function botaoDaJanela(pag, texto) {
+  return pag.evaluate((texto) => {
+    const b = Array.from(document.querySelectorAll('#modal-documento-familia button')).find(x => x.textContent.trim() === texto);
+    if (!b) return false;
+    b.click();
+    return true;
+  }, texto);
 }
 
 async function ajustes(pag) {
@@ -91,7 +101,7 @@ async function ajustes(pag) {
 
   // ================================================================
   secao('2. Os títulos: fechados por padrão, os de sempre na prévia');
-  conf('abriu o documento da família', await botaoDoCartao(pag, 'Preparar documento'), true);
+  conf('abriu o documento da família', await botaoDoCartao(pag, 'Preparar e enviar'), true);
   await esperar('janela do documento', () => pag.$eval('#modal-documento-familia', e => e.classList.contains('aberto')), v => v === true, 5000);
   const titulosDaPrevia = () => pag.evaluate(() =>
     Array.from(document.querySelectorAll('#modal-documento-familia .previa-doc-secao-titulo')).map(e => e.textContent));
@@ -125,10 +135,15 @@ async function ajustes(pag) {
     URL.createObjectURL = (b) => { window.__blobs.push(b); return orig(b); };
   });
   await irAoFechamento(pag);
-  conf('tocou em Texto', await botaoDoCartao(pag, 'Texto'), true);
+  // C10b: o texto e o PDF saíram do cartão e moram na janela do documento
+  await botaoDoCartao(pag, 'Preparar e enviar');
+  await esperar('janela do documento', () => pag.$eval('#modal-documento-familia', e => e.classList.contains('aberto')), v => v === true, 5000);
+  conf('tocou em Texto', await botaoDaJanela(pag, 'Texto'), true);
   await pausa(600);
-  conf('tocou em PDF do fechamento', await botaoDoCartao(pag, 'PDF do fechamento'), true);
+  conf('tocou em PDF do fechamento', await botaoDaJanela(pag, 'PDF do fechamento'), true);
   await esperar('dois arquivos', () => pag.evaluate(() => window.__blobs.length), v => v >= 2, 15000);
+  await pag.evaluate(() => document.querySelector('#modal-documento-familia [data-fechar]').click());
+  await pausa(300);
   const saidas = await pag.evaluate(async () => {
     const t = [];
     for (const b of window.__blobs) t.push(new TextDecoder('latin1').decode(new Uint8Array(await b.arrayBuffer())));
@@ -140,7 +155,7 @@ async function ajustes(pag) {
 
   // ================================================================
   secao('5. Título apagado volta ao de sempre');
-  conf('abriu o documento de novo', await botaoDoCartao(pag, 'Preparar documento'), true);
+  conf('abriu o documento de novo', await botaoDoCartao(pag, 'Preparar e enviar'), true);
   await esperar('janela do documento', () => pag.$eval('#modal-documento-familia', e => e.classList.contains('aberto')), v => v === true, 5000);
   conf('o campo mostra o título dela', await pag.$eval('#doc-titulo-feedback', e => e.value), TITULO_NOVO);
   await pag.evaluate(() => {

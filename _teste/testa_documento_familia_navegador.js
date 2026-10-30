@@ -1,7 +1,7 @@
 /* testa_documento_familia_navegador.js
  *
  * Validacao UX-UI e teste assimetrico de privacidade para T10:
- * - Entrada clara: botao "Preparar documento para a familia" com previa e opcoes compreensiveis.
+ * - Entrada clara: botao "Preparar e enviar" (antes "Preparar documento para a familia") com previa e opcoes compreensiveis.
  * - Preservacao de todas as saidas oferecidas (PDF fechamento, PDF com folhas, Texto, Cartao, Mes numa tela).
  * - Previa interativa em tempo real com atualizacao instantanea de feedback e opcoes.
  * - Teste assimetrico de privacidade:
@@ -109,19 +109,24 @@ async function rodar() {
     const cAlfa = cards.find(c => c.textContent.includes('Aluno Alfa Teste'));
     if (!cAlfa) return false;
     const b = cAlfa.querySelector('.btn-preparar-doc');
-    return b && b.textContent.includes('Preparar documento para a família');
+    // C10b: o botão principal do cartão passou a se chamar "Preparar e enviar"
+    return b && b.textContent.includes('Preparar e enviar');
   });
-  conf('botao "Preparar documento para a familia" visivel no cartao', botaoPrepararExiste, true);
+  conf('botao "Preparar e enviar" visivel no cartao', botaoPrepararExiste, true);
 
-  // Verificar preservacao das saidas e atalhos existentes (nao eliminadas)
+  /* Verificar preservacao das saidas e atalhos existentes (nao eliminadas).
+   * C10b: o feedback continua no cartao; os formatos moram na janela do
+   * documento, que e aberta aqui so para ler os botoes e fechada em seguida. */
   const botoesExistentesPreservados = await pag.evaluate(() => {
     const cards = Array.from(document.querySelectorAll('#lista-fechamento .cartao'));
     const cAlfa = cards.find(c => c.textContent.includes('Aluno Alfa Teste'));
     if (!cAlfa) return {};
-    const botoes = Array.from(cAlfa.querySelectorAll('.barra button'));
-    const textos = botoes.map(b => b.textContent.trim());
+    const doCartao = Array.from(cAlfa.querySelectorAll('.barra button')).map(b => b.textContent.trim());
+    cAlfa.querySelector('.btn-preparar-doc').click();
+    const textos = Array.from(document.querySelectorAll('#modal-documento-familia button')).map(b => b.textContent.trim());
+    document.querySelector('#modal-documento-familia [data-fechar]').click();
     return {
-      temFeedback: textos.some(t => t.includes('feedback')),
+      temFeedback: doCartao.some(t => t.includes('feedback')),
       temMesNaTela: textos.includes('O mês numa tela'),
       temTexto: textos.includes('Texto'),
       temPdfFechamento: textos.includes('PDF do fechamento'),
@@ -332,15 +337,23 @@ async function rodar() {
   });
   await pausa(300);
 
+  /* C10b: o Cartao do mes e O mes numa tela moram em "Mais formatos", na
+   * janela do documento. O caminho abre a janela e toca la dentro. */
+  async function tocarEmMaisFormatos(trecho) {
+    await pag.evaluate(() => {
+      const cards = Array.from(document.querySelectorAll('#lista-fechamento .cartao'));
+      const cAlfa = cards.find(c => c.textContent.includes('Aluno Alfa Teste'));
+      if (cAlfa) cAlfa.querySelector('.btn-preparar-doc').click();
+    });
+    await pausa(300);
+    await pag.evaluate((trecho) => {
+      const b = Array.from(document.querySelectorAll('#doc-mais-formatos button')).find(x => x.textContent.includes(trecho));
+      if (b) b.click();
+    }, trecho);
+  }
+
   // Abrir Cartao do mes para Aluno Alfa
-  await pag.evaluate(() => {
-    const cards = Array.from(document.querySelectorAll('#lista-fechamento .cartao'));
-    const cAlfa = cards.find(c => c.textContent.includes('Aluno Alfa Teste'));
-    if (cAlfa) {
-      const bCartao = Array.from(cAlfa.querySelectorAll('button')).find(b => b.textContent.includes('Cartão'));
-      if (bCartao) bCartao.click();
-    }
-  });
+  await tocarEmMaisFormatos('Cartão');
   await pausa(300);
 
   const cartaoTexto = await pag.evaluate(() => {
@@ -356,14 +369,7 @@ async function rodar() {
   await pausa(200);
 
   // Abrir "O mes numa tela"
-  await pag.evaluate(() => {
-    const cards = Array.from(document.querySelectorAll('#lista-fechamento .cartao'));
-    const cAlfa = cards.find(c => c.textContent.includes('Aluno Alfa Teste'));
-    if (cAlfa) {
-      const bMes = Array.from(cAlfa.querySelectorAll('button')).find(b => b.textContent.includes('O mês numa tela'));
-      if (bMes) bMes.click();
-    }
-  });
+  await tocarEmMaisFormatos('O mês numa tela');
   await pausa(400);
 
   // No modo normal (professora), nota privada aparece em .so-minha

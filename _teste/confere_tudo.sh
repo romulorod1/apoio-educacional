@@ -585,6 +585,9 @@ roda "lista de base"                              node "_teste/testa_lista_de_ba
 roda "lista de base --envenenado-base-recusada"   node "_teste/testa_lista_de_base.js" --envenenado-base-recusada
 roda "lista de base --envenenado-sem-etiqueta"    node "_teste/testa_lista_de_base.js" --envenenado-sem-etiqueta
 roda "titulos e roteiro do fechamento"            node "_teste/testa_titulos_e_roteiro.js"
+# C10b: um botao principal por aluno no Fechamento, os formatos em "Mais formatos"
+# (cada um entrega o arquivo) e o envio as familias em sequencia, sem gravar nada.
+roda "preparar e enviar"                          node "_teste/testa_preparar_e_enviar.js"
 # FRENTE B (B10): o que o lerKits recusa e o que a tela descarta (lista com
 # exercicio que saiu por curadoria). O veneno tira o guarda do app.js, e sem
 # ele a aba Biblioteca inteira nao abre.
