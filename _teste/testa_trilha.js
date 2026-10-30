@@ -161,7 +161,7 @@ conf('em encontros de 1h30 dá menos', Core.encontrosPrevistos(fr, 90) < Core.en
 conf('nunca zero encontros', Core.encontrosPrevistos([], 60), 1);
 
 // ================================================================
-secao('6. O assunto da aula faz a trilha andar sozinha');
+secao('6. O domínio do assunto faz a trilha andar sozinha (C1)');
 
 function trilhaDeProva() {
   const d = Core.trilhaDerivada(temas, 'MAT06-06');
@@ -175,12 +175,21 @@ const aluno = { id: 'a1', nome: 'Aluna', trilhas: [trilhaDeProva()] };
 const primeiro = Core.proximoPasso(aluno.trilhas[0]);
 conf('o próximo passo é o primeiro da escada', primeiro.temaId, aluno.trilhas[0].passos[0].temaId);
 
-/* Carimba a data DA AULA, e não a de hoje: ela lança aula atrasada e usa
+/* Desde o C1 o assunto só registrado não fecha o passo: fecha quando o aluno
+ * DOMINA. A regra mora no Core.dominioFechaPasso, e a prova dela, com veneno,
+ * é o testa_dominio.js; aqui fica o motor da trilha com a regra nova.
+ *
+ * Carimba a data DA AULA, e não a de hoje: ela lança aula atrasada e usa
  * repetir para trás. */
-const aula = { id: 'l9', alunoId: 'a1', data: '2026-06-05', status: 'realizada' };
 const item = { id: primeiro.temaId, titulo: primeiro.titulo };
+const aula = { id: 'l9', alunoId: 'a1', data: '2026-06-05', status: 'realizada', temas: [item] };
+conf('só registrar o assunto não marca o passo', Core.marcarPassoPorAssunto(aluno, aula, item), null);
+item.dominio = 'andamento';
+conf('nem com "Em andamento"', Core.marcarPassoPorAssunto(aluno, aula, item), null);
+item.dominio = 'domina';
 const marcou = Core.marcarPassoPorAssunto(aluno, aula, item);
-conf('registrar o assunto marca o passo', !!marcou, true);
+conf('com "Domina", marca o passo', !!marcou, true);
+conf('e diz que fechou por domínio', aluno.trilhas[0].passos[0].porDominio, true);
 conf('com a data da aula, não a de hoje', aluno.trilhas[0].passos[0].feitoEm, '2026-06-05');
 conf('e guarda qual aula fechou o passo', aluno.trilhas[0].passos[0].aulaId, 'l9');
 conf('o item da aula passa a saber de que trilha veio', item.passoDe, aluno.trilhas[0].id);
@@ -193,8 +202,10 @@ conf('e o próximo passo anda', Core.proximoPasso(aluno.trilhas[0]).temaId,
  * não marca os anteriores. */
 const aluno2 = { id: 'a1', trilhas: [trilhaDeProva()] };
 const terceiro = aluno2.trilhas[0].passos[2];
-Core.marcarPassoPorAssunto(aluno2, { id: 'l1', data: '2026-06-05', status: 'realizada' },
-  { id: terceiro.temaId });
+const itemTerceiro = { id: terceiro.temaId, dominio: 'domina' };
+Core.marcarPassoPorAssunto(aluno2, { id: 'l1', data: '2026-06-05', status: 'realizada', temas: [itemTerceiro] },
+  itemTerceiro);
+conf('o terceiro, dominado, foi marcado', !!aluno2.trilhas[0].passos[2].feitoEm, true);
 conf('marcar o terceiro não marca os dois primeiros',
   aluno2.trilhas[0].passos.slice(0, 2).filter(p => p.feitoEm).length, 0);
 
@@ -204,7 +215,8 @@ secao('7. Aula que não aconteceu não faz a trilha andar');
 ['falta', 'cancelada'].forEach(st => {
   const a = { id: 'a1', trilhas: [trilhaDeProva()] };
   const p = Core.proximoPasso(a.trilhas[0]);
-  Core.marcarPassoPorAssunto(a, { id: 'lx', data: '2026-06-05', status: st }, { id: p.temaId });
+  const it = { id: p.temaId, dominio: 'domina' };
+  Core.marcarPassoPorAssunto(a, { id: 'lx', data: '2026-06-05', status: st, temas: [it] }, it);
   conf('aula com status ' + st + ' não marca passo',
     a.trilhas[0].passos.filter(x => x.feitoEm).length, 0);
 });
@@ -213,35 +225,39 @@ secao('7. Aula que não aconteceu não faz a trilha andar');
  * pior tipo de erro o que fica calado: a trilha contaria como andado o que não
  * foi dado. */
 const a3 = { id: 'a1', trilhas: [trilhaDeProva()] };
-const aulaViva = { id: 'l7', data: '2026-06-05', status: 'realizada' };
-Core.marcarPassoPorAssunto(a3, aulaViva, { id: Core.proximoPasso(a3.trilhas[0]).temaId });
+const itemVivo = { id: Core.proximoPasso(a3.trilhas[0]).temaId, dominio: 'domina' };
+const aulaViva = { id: 'l7', data: '2026-06-05', status: 'realizada', temas: [itemVivo] };
+Core.marcarPassoPorAssunto(a3, aulaViva, itemVivo);
 conf('o passo ficou marcado', a3.trilhas[0].passos.filter(p => p.feitoEm).length, 1);
 aulaViva.status = 'cancelada';
 conf('cancelar a aula desmarca um passo', Core.revisarPassosDaAula(a3, aulaViva), 1);
 conf('e a trilha volta ao começo', a3.trilhas[0].passos.filter(p => p.feitoEm).length, 0);
 
 // ================================================================
-secao('8. O que o aluno já viu nasce marcado');
+secao('8. O que o aluno já dominava nasce marcado');
 
-/* É aqui que as duas frentes se encostam: o registro de assunto alimenta a
- * trilha antes mesmo de ela existir. */
+/* É aqui que as duas frentes se encostam: o registro da aula alimenta a
+ * trilha antes mesmo de ela existir. Desde o C1, o que conta é o domínio. */
 const dbHist = {
   aulas: [
     { id: 'v1', alunoId: 'a1', data: '2026-05-12', status: 'realizada',
-      temas: [{ id: 'MAT06-01', titulo: 'Sistema de numeração decimal' }] },
+      temas: [{ id: 'MAT06-01', titulo: 'Sistema de numeração decimal', dominio: 'domina' }] },
     { id: 'v2', alunoId: 'a1', data: '2026-05-19', status: 'cancelada',
-      temas: [{ id: 'MAT06-02', titulo: 'Operações com números naturais' }] },
+      temas: [{ id: 'MAT06-02', titulo: 'Operações com números naturais', dominio: 'domina' }] },
     { id: 'v3', alunoId: 'a2', data: '2026-05-20', status: 'realizada',
-      temas: [{ id: 'MAT06-03', titulo: 'Múltiplos e divisores' }] }
+      temas: [{ id: 'MAT06-03', titulo: 'Múltiplos e divisores', dominio: 'domina' }] },
+    { id: 'v4', alunoId: 'a1', data: '2026-05-21', status: 'realizada',
+      temas: [{ id: 'MAT06-05', titulo: 'Frações: o que são e como comparar', dominio: 'andamento' }] }
   ]
 };
 const passos = Core.marcarOQueJaFoiDado(dbHist, 'a1', Core.trilhaDerivada(temas, 'MAT06-06').passos);
 const feitos = passos.filter(p => p.feitoEm);
-conf('o passo já dado nasce marcado', feitos.length, 1);
-conf('com a data da aula em que foi dado', feitos[0].feitoEm, '2026-05-12');
+conf('o passo já dominado nasce marcado', feitos.length, 1);
+conf('com a data da aula em que foi marcado Domina', feitos[0].feitoEm, '2026-05-12');
 conf('e marcado como já era', feitos[0].jaEra, true);
 conf('aula cancelada não conta', passos.filter(p => p.temaId === 'MAT06-02' && p.feitoEm).length, 0);
 conf('aula de outro aluno não conta', passos.filter(p => p.temaId === 'MAT06-03' && p.feitoEm).length, 0);
+conf('"Em andamento" não nasce marcado', passos.filter(p => p.temaId === 'MAT06-05' && p.feitoEm).length, 0);
 
 // ================================================================
 secao('9. Ela governa a trilha');

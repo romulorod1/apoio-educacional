@@ -2670,6 +2670,8 @@
         'Aparece para você no alto da próxima aula deste aluno.'
     }));
 
+    desenharDominio(grupoRegistro, aulaEmEdicao, eFutura);
+
     desenharAreas(grupoRegistro, aulaEmEdicao);
 
     // ----------------------------------------------------
@@ -2725,6 +2727,124 @@
    *
    * Fica recolhido por padrão: no meio de uma aula ela não quer rolar por vinte
    * e quatro caixas para chegar ao anexo. Aberto, é só clicar. */
+  /* Domínio por assunto (C1), em Registrar como foi.
+   *
+   * Abaixo de cada assunto da aula, três botões: "Ainda não", "Em andamento" e
+   * "Domina". Um toque marca, outro toque no marcado desmarca, e nada é
+   * obrigatório. Grava na hora, como as habilidades aqui embaixo, porque é
+   * registro de um toque e não pede o botão Salvar.
+   *
+   * É dela e só dela: não vai para o fechamento, o PDF, o cartão nem a
+   * proposta. O selo "Só você vê" diz isso no lugar em que ela marca.
+   *
+   * Marcar "Domina" fecha o passo da trilha daquele assunto, com a data desta
+   * aula; tirar o "Domina" solta o passo que esta aula tinha fechado. A regra
+   * é uma só e mora no core (dominioFechaPasso). */
+  var blocoDominioAtivo = null;
+
+  function desenharDominio(corpo, aula, eFutura) {
+    var bloco = el('div', { id: 'bloco-dominio', style: 'margin:12px 0 4px' });
+    corpo.appendChild(bloco);
+
+    function desenhar() {
+      bloco.innerHTML = '';
+      var temas = Core.temasDaAula(aula);
+      bloco.appendChild(el('div', { class: 'campo-titulo-com-destino' }, [
+        el('span', { texto: 'Domínio por assunto', style: 'font-weight:700' }),
+        el('span', { class: 'destino-privado', texto: 'Só você vê' })
+      ]));
+      if (!temas.length) {
+        bloco.appendChild(el('div', { class: 'ajuda', style: 'margin-top:2px',
+          texto: 'Registre o assunto da aula, acima, para marcar como o aluno está nele.' }));
+        return;
+      }
+      if (eFutura) {
+        bloco.appendChild(el('div', { class: 'ajuda', style: 'margin-top:2px',
+          texto: 'Marque depois que a aula acontecer.' }));
+        return;
+      }
+      temas.forEach(function (t) {
+        var atual = Core.estadoDeDominio(t);
+        var botoes = el('div', { class: 'segmentado opcoes-dominio', role: 'group',
+          'aria-label': 'Domínio de ' + (t.titulo || t.id) });
+        Core.DOMINIO.forEach(function (op) {
+          var b = el('button', {
+            type: 'button', class: 'opcao-seg opcao-dominio' + (atual === op.id ? ' ativa' : ''),
+            'data-estado': op.id, 'aria-pressed': atual === op.id ? 'true' : 'false',
+            texto: op.rotulo,
+            aoClick: function () { marcarDominioNaAula(aula, t, op.id); }
+          });
+          botoes.appendChild(b);
+        });
+        bloco.appendChild(el('div', { class: 'item-dominio', 'data-chave': Core.chaveDoDominio(t),
+          style: 'margin:8px 0 10px' }, [
+          el('div', { class: 'nome', style: 'font-size:14px;font-weight:600;color:#1F3A5F;margin-bottom:6px',
+            texto: t.titulo || t.id }),
+          botoes
+        ]));
+      });
+      bloco.appendChild(el('div', { class: 'ajuda', style: 'margin-top:-2px',
+        texto: 'Opcional. Toque de novo no marcado para desmarcar. Domina fecha o passo da trilha ' +
+          'daquele assunto. Não vai para a família.' }));
+    }
+
+    blocoDominioAtivo = { aulaId: aula.id, desenhar: desenhar };
+    desenhar();
+  }
+
+  function atualizarBlocoDominio(aulaId) {
+    if (!blocoDominioAtivo || blocoDominioAtivo.aulaId !== aulaId) return false;
+    if (!$('#bloco-dominio')) return false;
+    blocoDominioAtivo.desenhar();
+    return true;
+  }
+
+  /* O toque no domínio. Marcar "Domina" fecha o passo aberto daquele assunto
+   * com a data desta aula; sair do "Domina" passa pela revisão das trilhas,
+   * que solta o passo que só esta aula sustentava. Sem desfazer na memória
+   * quando a gravação falha, do mesmo jeito que as habilidades: a faixa de
+   * gravação avisa e tenta de novo sozinha. */
+  function marcarDominioNaAula(aula, item, estado) {
+    var antes = Core.estadoDeDominio(item);
+    var agora = Core.marcarDominio(item, estado);
+    var aluno = alunoPorId(aula.alunoId);
+    var andou = null, mexeu = null;
+    if (aluno && agora === 'domina') {
+      andou = Core.marcarPassoPorAssunto(aluno, aula, item);
+      /* Fechado NESTA aula: não é anterior à trilha, e a marca de solto à mão
+       * sai, porque ela acabou de dizer o contrário marcando Domina. */
+      if (andou) {
+        delete andou.passo.jaEra;
+        delete andou.passo.marcaAnterior;
+        delete andou.passo.soltoAMao;
+      }
+    } else if (aluno && antes === 'domina') {
+      mexeu = revisarTrilhasDoAluno(aula.alunoId);
+    }
+    atualizarBlocoDominio(aula.id);
+    salvarEDepois(function () {
+      if (andou || (mexeu && (mexeu.soltos || mexeu.remarcados))) {
+        atualizarPainelTrilhas(aula.alunoId);
+        if (!atualizarBlocoAssunto(aula.id) && $('#lista-temas-aula')) {
+          desenharTemasDaAula($('#lista-temas-aula'), aula, aluno);
+        }
+      }
+      if (andou) {
+        var feitos = Core.passosFeitos(andou.trilha);
+        var total = (andou.trilha.passos || []).length;
+        avisar('Domina marcado, e a trilha andou: ' + feitos + ' de ' + total + ' passos.');
+        return;
+      }
+      /* O textoDeTrilha fala de aula que deixou de contar, e aqui a aula
+       * continua contando: o que mudou foi o domínio. */
+      if (mexeu && mexeu.soltos) {
+        avisar((agora ? Core.rotuloDominio(agora) + ' marcado.' : 'Domínio desmarcado.') +
+          (mexeu.soltos === 1 ? ' O passo da trilha voltou para a fila.'
+            : ' ' + mexeu.soltos + ' passos da trilha voltaram para a fila.'));
+      }
+    });
+  }
+
   function desenharAreas(corpo, aula) {
     aula.areas = aula.areas || [];
 
@@ -2864,6 +2984,9 @@
    * Tirar um assunto ou registrar um novo muda também o rótulo do botão, e
    * redesenhar só a lista deixaria a tela mentindo. */
   function atualizarBlocoAssunto(aulaId) {
+    /* Registrar ou tirar assunto muda também a lista de domínio, lá embaixo em
+     * Registrar como foi: cada assunto tem a sua linha. */
+    atualizarBlocoDominio(aulaId);
     if (!blocoAssuntoAtivo || blocoAssuntoAtivo.aulaId !== aulaId) return false;
     if (!$('#bloco-assunto')) return false;
     blocoAssuntoAtivo.desenhar();
@@ -2915,6 +3038,12 @@
         style: 'font-size:14px;font-weight:700;color:#1F3A5F',
         texto: 'Próximo passo já registrado nesta aula: ' + passo.titulo
       }));
+      /* Registrado não é fechado (C1): o passo só fecha com "Domina". Sem esta
+       * linha ela veria o passo registrado e a trilha parada, sem saber por quê. */
+      dentro.push(el('div', {
+        class: 'ajuda', id: 'passo-fecha-com-dominio', style: 'margin:6px 0 0',
+        texto: 'O passo fecha quando você marcar Domina neste assunto, em Registrar como foi.'
+      }));
     } else {
       dentro.push(el('button', {
         type: 'button', class: 'btn destaque', id: 'usar-proximo-passo',
@@ -2930,8 +3059,9 @@
       dentro.push(el('div', {
         class: 'ajuda', style: 'margin:6px 0 0',
         texto: contaAgora
-          ? 'Um toque registra o assunto da aula e marca o passo como dado, com a data desta aula.'
-          : 'Um toque registra o assunto. O passo só é marcado em aula realizada ou reposição, e ' +
+          ? 'Um toque registra o assunto da aula. O passo fecha quando você marcar Domina nele, ' +
+            'em Registrar como foi, com a data desta aula.'
+          : 'Um toque registra o assunto. O passo só fecha em aula realizada ou reposição, e ' +
             'esta está como ' + (Core.STATUS[st] ? Core.STATUS[st].rotulo.toLowerCase() : st) + '.'
       }));
     }
@@ -3472,6 +3602,11 @@
    *      para realizada NÃO devolvia o passo, mesmo com o assunto ainda
    *      registrado ali. Aqui ele volta com a data e a aula daquele encontro.
    *
+   * Desde o C1 o passo fecha por DOMÍNIO e não por aula dada: a varredura do 4
+   * remarca só onde Core.dominioFechaPasso diz que sim, e o lastro do 2 é o
+   * Core.marcaDoPassoValeAinda, que solta o passo fechado por domínio quando o
+   * "Domina" sai e deixa como está o passo fechado pela regra antiga.
+   *
    * Duas coisas a varredura do 4 NÃO faz, de propósito:
    *
    *   - não toca em passo que ELA soltou à mão. "Trazer de volta" e desmarcar a
@@ -3496,29 +3631,24 @@
     var minhasAulas = db.aulas.filter(function (a) { return a.alunoId === alunoId; });
     minhasAulas.forEach(function (a) { Core.revisarPassosDaAula(aluno, a); });
 
-    // 2. o lastro de cada marca: a aula existe e ainda registra aquele assunto?
-    var registra = {};
-    db.aulas.forEach(function (a) {
-      var mapa = {};
-      Core.temasDaAula(a).forEach(function (t) { if (t && t.id) mapa[t.id] = true; });
-      registra[a.id] = mapa;
-    });
+    // 2. o lastro de cada marca: a aula existe e ainda sustenta aquele passo?
+    var aulaPorId = {};
+    db.aulas.forEach(function (a) { aulaPorId[a.id] = a; });
     todos.forEach(function (p) {
-      if (p.aulaId && (!registra[p.aulaId] || (p.temaId && !registra[p.aulaId][p.temaId]))) {
+      if (p.aulaId && !Core.marcaDoPassoValeAinda(p, aulaPorId[p.aulaId])) {
         p.feitoEm = null;
         p.aulaId = null;
       }
-      if (!p.feitoEm) delete p.jaEra;   // 3.
+      if (!p.feitoEm) { delete p.jaEra; delete p.porDominio; }   // 3.
     });
 
     // 4. a volta, pelas aulas que contam, da mais antiga para a mais nova
     minhasAulas.slice()
       .sort(function (a, b) { return String(a.data).localeCompare(String(b.data)); })
       .forEach(function (a) {
-        var st = a.status || 'realizada';
-        if (st !== 'realizada' && st !== 'reposicao') return;
+        if (!Core.aulaAconteceu(a)) return;
         Core.temasDaAula(a).forEach(function (t) {
-          if (!t || !t.id) return;
+          if (!t || !t.id || !Core.dominioFechaPasso(a, t.id)) return;
           var achou = false;
           Core.trilhasAtivas(aluno).forEach(function (tr) {
             if (achou) return;
@@ -3526,6 +3656,7 @@
               if (achou || p.feitoEm || p.soltoAMao || p.temaId !== t.id) return;
               p.feitoEm = a.data;
               p.aulaId = a.id;
+              p.porDominio = true;
               delete p.jaEra;
               delete p.marcaAnterior;
               t.passoDe = tr.id;
@@ -6660,6 +6791,8 @@
     });
     caixa.appendChild(resumo);
 
+    desenharQuadroDeDominio(caixa, aluno);
+
     if (futurasAtivas.length) {
       caixa.appendChild(el('h3', { class: 'subtitulo', texto: 'Próximas aulas' }));
       linhasDeAula(caixa, futurasAtivas.slice().reverse().slice(0, 5));
@@ -6689,6 +6822,42 @@
       }
     }
     redesenhar();
+  }
+
+  /* "Domínio por assunto" na ficha (C1): cada assunto com o último estado
+   * marcado e a data da última aula em que foi marcado. O quadro é DERIVADO
+   * das aulas (Core.dominioPorAssunto), então não há o que manter em dia: a
+   * aula é o registro, e a ficha só lê. As marcas anteriores, quando há, vão
+   * numa linha pequena embaixo, porque já estão na mão e custam uma linha.
+   *
+   * Sem nenhuma marca o quadro não aparece: aluno de antes do C1 não ganha
+   * uma caixa vazia dizendo que não há nada. */
+  function desenharQuadroDeDominio(caixa, aluno) {
+    var linhas = Core.dominioPorAssunto(db, aluno.id);
+    if (!linhas.length) return;
+    var quadro = el('div', { id: 'quadro-dominio', style: 'margin-bottom:12px' });
+    quadro.appendChild(el('div', { class: 'campo-titulo-com-destino' }, [
+      el('h3', { class: 'subtitulo', texto: 'Domínio por assunto', style: 'margin:0' }),
+      el('span', { class: 'destino-privado', texto: 'Só você vê' })
+    ]));
+    var COR = { nao: '#8A6D2F', andamento: '#1F3A5F', domina: '#1F5A4C' };
+    var FUNDO = { nao: '#FBF3E3', andamento: '#E8EEF6', domina: '#E3F1EC' };
+    linhas.forEach(function (l) {
+      var antes = l.historico.slice(0, -1).reverse().slice(0, 4).map(function (h) {
+        return Core.rotuloDominio(h.estado) + ' em ' + Core.ddmm(h.data);
+      });
+      quadro.appendChild(el('div', { class: 'item-lista linha-dominio', 'data-chave': l.chave,
+        'data-estado': l.estado }, [
+        el('div', { class: 'cresce' }, [
+          el('div', { class: 'nome', texto: l.titulo }),
+          el('div', { class: 'detalhe', texto: 'Marcado em ' + Core.ddmmaaaa(l.data) +
+            (antes.length ? ' · antes: ' + antes.join(', ') : '') })
+        ]),
+        el('span', { class: 'tag estado-dominio', texto: Core.rotuloDominio(l.estado),
+          style: 'background:' + FUNDO[l.estado] + ';color:' + COR[l.estado] + ';border-color:' + FUNDO[l.estado] })
+      ]));
+    });
+    caixa.appendChild(quadro);
   }
 
   function linhasDeAula(caixa, aulas) {
@@ -8170,16 +8339,30 @@
    * anterior à trilha para sempre, mesmo depois de dado numa aula de verdade. */
   function desmarcarPasso(p) {
     if (!p) return;
+    /* O porDominio vai junto na marca guardada: sem ele, remarcar devolveria
+     * um passo fechado por domínio como se fosse da regra antiga, e tirar o
+     * "Domina" daquela aula depois não o soltaria mais (C1). */
     if (p.feitoEm || p.aulaId) {
-      p.marcaAnterior = { feitoEm: p.feitoEm || null, aulaId: p.aulaId || null, jaEra: !!p.jaEra };
+      p.marcaAnterior = { feitoEm: p.feitoEm || null, aulaId: p.aulaId || null, jaEra: !!p.jaEra,
+        porDominio: !!p.porDominio };
     }
     p.feitoEm = null;
     p.aulaId = null;
     delete p.jaEra;
+    delete p.porDominio;
     /* Quem soltou foi ELA, e não a revisão automática. A varredura que remarca
      * pelo assunto respeita esta marca: sem ela, soltar um passo cujo assunto
      * está registrado numa aula duraria só até a próxima aula salva. */
     p.soltoAMao = true;
+  }
+
+  /* Como o passo fechou, no começo da linha dele. Desde o C1 o passo fechado
+   * por aula diz "dominado em"; o "dado em" fica para o que fechou antes, pela
+   * regra antiga de aula dada, que continua fechado e continua dizendo isso. */
+  function comoOPassoFechou(p) {
+    if (p.jaEra) return p.porDominio ? 'já dominava em ' : 'já trabalhado em ';
+    if (p.aulaId) return p.porDominio ? 'dominado em ' : 'dado em ';
+    return 'marcado por você em ';
   }
 
   function remarcarPasso(p, marca) {
@@ -8191,11 +8374,13 @@
       p.feitoEm = m.feitoEm;
       p.aulaId = m.aulaId || null;
       if (m.jaEra) p.jaEra = true; else delete p.jaEra;
+      if (m.porDominio && p.aulaId) p.porDominio = true; else delete p.porDominio;
       return;
     }
     p.feitoEm = Core.hojeIso();
     p.aulaId = null;
     delete p.jaEra;
+    delete p.porDominio;
   }
 
   /* ---------- passo 1: onde ele precisa chegar ---------- */
@@ -8510,8 +8695,7 @@
        * que são coisas diferentes. */
       var detalhe = nomeDoAno(p.serie) + ' · cerca de ' + duracaoPorExtenso(p.duracaoMin || 60);
       if (feito) {
-        detalhe = (p.jaEra ? 'já trabalhado em ' : (p.aulaId ? 'dado em ' : 'marcado por você em ')) +
-          Core.ddmm(p.feitoEm) + ' · ' + detalhe;
+        detalhe = comoOPassoFechou(p) + Core.ddmm(p.feitoEm) + ' · ' + detalhe;
       }
 
       /* Alvo de toque de 44 px, que é o que a mão dela pede em pé, na casa da
@@ -8526,7 +8710,7 @@
           title: 'Volta a contar como passo a dar',
           style: ALVO + 'padding:11px 14px;font-size:13px',
           aoClick: function () {
-            var marca = { feitoEm: p.feitoEm, aulaId: p.aulaId, jaEra: p.jaEra };
+            var marca = { feitoEm: p.feitoEm, aulaId: p.aulaId, jaEra: p.jaEra, porDominio: p.porDominio };
             mudarComDesfazer('Passo de volta na fila.', function () {
               desmarcarPasso(p);
             }, function () { remarcarPasso(p, marca); });
@@ -8929,8 +9113,8 @@
       painel.appendChild(el('div', {
         class: 'ajuda', style: 'margin-top:0',
         texto: 'A trilha é a sequência de assuntos que precisa vir antes daquele em que ele ' +
-          'travou, na ordem. Ela anda sozinha: quando você registra o assunto da aula, o passo ' +
-          'daquele assunto fica marcado com a data da aula.'
+          'travou, na ordem. Ela anda sozinha: quando você marca Domina no assunto da aula, em ' +
+          'Registrar como foi, o passo daquele assunto fecha com a data da aula.'
       }));
 
       painel.appendChild(el('div', { class: 'barra', style: 'margin:10px 0' }, [
@@ -9065,8 +9249,7 @@
 
       var quando = '';
       if (feito) {
-        quando = (p.jaEra ? 'já trabalhado em ' : (p.aulaId ? 'dado em ' : 'marcado por você em ')) +
-          Core.ddmm(p.feitoEm);
+        quando = comoOPassoFechou(p) + Core.ddmm(p.feitoEm);
       }
 
       /* Um <div>, e não um <label>: o rótulo do <label> repassava o toque para
@@ -9845,21 +10028,14 @@
     aula.temas.push(item);
     delete aula.tema;
 
-    /* A trilha anda de graça: o mesmo toque que registra o assunto marca o
-     * passo daquele assunto, com a data DA AULA e não a de hoje, porque ela
-     * lança aula atrasada e usa Repetir para trás. Só marca o passo que ainda
-     * não foi dado, e nunca os anteriores: pular etapa é decisão dela. */
+    /* Registrar o assunto NÃO fecha mais o passo da trilha (C1): o passo fecha
+     * quando ela marca "Domina" no assunto, em Registrar como foi
+     * (marcarDominioNaAula). Aqui só se descobre se o assunto é passo aberto
+     * de alguma trilha, para o aviso dizer o que falta. */
     var alunoDaAula = alunoPorId(aula.alunoId);
-    var andou = alunoDaAula ? Core.marcarPassoPorAssunto(alunoDaAula, aula, item) : null;
-    /* Este passo foi dado NESTA aula, então não é anterior à trilha. Um jaEra
-     * que tivesse sobrado de uma desmarcação faria a ficha dizer "já trabalhado
-     * em", como se a aula de hoje não contasse. E a marca de solto à mão sai
-     * junto: ela acabou de dizer o contrário, registrando o assunto. */
-    if (andou) {
-      delete andou.passo.jaEra;
-      delete andou.passo.marcaAnterior;
-      delete andou.passo.soltoAMao;
-    }
+    var ehPassoAberto = !!(alunoDaAula && item.id && Core.trilhasAtivas(alunoDaAula).some(function (tr) {
+      return (tr.passos || []).some(function (p) { return !p.feitoEm && p.temaId === item.id; });
+    }));
 
     salvar().then(function () {
       fecharModal('modal-tema');
@@ -9870,23 +10046,14 @@
         }
         if ($('#lista-anexos')) desenharAnexos($('#lista-anexos'), aula);
       }
-      if (andou) atualizarPainelTrilhas(aula.alunoId);
       desenharAgenda();
-      if (andou) {
-        var feitos = Core.passosFeitos(andou.trilha);
-        var total = (andou.trilha.passos || []).length;
-        avisar('Assunto registrado, e a trilha andou: ' + feitos + ' de ' + total + ' passos.');
+      if (ehPassoAberto) {
+        avisar('Assunto registrado: ' + item.titulo + '. O passo da trilha fecha quando você ' +
+          'marcar Domina, em Registrar como foi.');
         return;
       }
       avisar('Assunto registrado: ' + item.titulo + '.');
     }).catch(function (e) {
-      /* O passo também volta atrás: trilha que anda sem a aula ter sido gravada
-       * contaria como dado o que não ficou registrado em lugar nenhum. */
-      if (andou) {
-        andou.passo.feitoEm = null;
-        andou.passo.aulaId = null;
-        delete item.passoDe;
-      }
       /* A gravação falhou, então a memória tem que voltar a espelhar o disco.
        *
        * Sem desfazer, o assunto ficava só na memória e a guarda de duplicata

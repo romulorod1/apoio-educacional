@@ -3877,16 +3877,18 @@
     return ((trilha && trilha.passos) || []).filter(function (p) { return p.feitoEm; }).length;
   }
 
-  /* Passo que o aluno já viu em alguma aula anterior nasce marcado, com a data
-   * daquela aula. É aqui que as duas frentes se encostam: o registro de assunto
-   * alimenta a trilha antes mesmo de ela existir. */
+  /* Passo que o aluno já DOMINAVA em alguma aula anterior nasce marcado, com a
+   * data daquela aula. É aqui que as duas frentes se encostam: o registro da
+   * aula alimenta a trilha antes mesmo de ela existir.
+   *
+   * Desde o C1 a pergunta é a mesma do passo que fecha na aula
+   * (dominioFechaPasso): assunto só dado, sem "Domina", não nasce marcado. */
   function marcarOQueJaFoiDado(db, alunoId, passos) {
     var quando = {};
     ((db && db.aulas) || []).forEach(function (a) {
       if (a.alunoId !== alunoId) return;
-      if (a.status && a.status !== 'realizada' && a.status !== 'reposicao') return;
       temasDaAula(a).forEach(function (t) {
-        if (!t.id) return;
+        if (!t || !t.id || !dominioFechaPasso(a, t.id)) return;
         if (!quando[t.id] || a.data > quando[t.id].data) quando[t.id] = { data: a.data, id: a.id };
       });
     });
@@ -3896,6 +3898,7 @@
       p.feitoEm = q.data;
       p.aulaId = q.id;
       p.jaEra = true;
+      p.porDominio = true;
     });
     return passos;
   }
@@ -3940,18 +3943,149 @@
     return true;
   }
 
-  /* O assunto registrado numa aula faz a trilha andar sozinha.
+  // ---------- domínio por assunto (C1) ----------
+
+  /* Os três estados do domínio de um assunto, na ordem em que o aluno anda.
    *
-   * Marca só o passo cujo tema é aquele, nunca os anteriores: pular etapa é
-   * decisão dela, não do aplicativo. E carimba a data DA AULA, não a de hoje,
-   * porque ela lança aula atrasada e usa repetir para trás.
+   * O estado mora no ITEM do assunto dentro da aula (aula.temas[i].dominio),
+   * e não num mapa à parte na aula, por três razões que o código já dava:
+   *   - o item já carrega o que é dele naquela aula (o anexo, a língua, o
+   *     passoDe); o domínio é registro daquele assunto naquela aula;
+   *   - "Tirar" leva o item inteiro e o "Desfazer" o devolve inteiro, então a
+   *     marca vai e volta junto, sem chave órfã num mapa;
+   *   - assunto escrito à mão e assunto da biblioteca não têm id de tema, e o
+   *     item existe do mesmo jeito.
+   * Item sem o campo (toda aula de antes do C1, toda cópia antiga) é "nada
+   * marcado". O fechamento, o cartão e o PDF leem só o título do item, e por
+   * isso o domínio não chega à família por construção. */
+  var DOMINIO = [
+    { id: 'nao', rotulo: 'Ainda não' },
+    { id: 'andamento', rotulo: 'Em andamento' },
+    { id: 'domina', rotulo: 'Domina' }
+  ];
+
+  function estadoDeDominio(item) {
+    if (!item) return '';
+    for (var i = 0; i < DOMINIO.length; i++) if (DOMINIO[i].id === item.dominio) return item.dominio;
+    return '';
+  }
+
+  function rotuloDominio(estado) {
+    for (var i = 0; i < DOMINIO.length; i++) if (DOMINIO[i].id === estado) return DOMINIO[i].rotulo;
+    return '';
+  }
+
+  /* Um toque marca; tocar de novo no que já está marcado desmarca. Marcar é
+   * opcional, então "nada" é um estado de verdade, e o campo sai do item em vez
+   * de ficar vazio. Devolve o estado que ficou. */
+  function marcarDominio(item, estado) {
+    if (!item) return '';
+    if (!rotuloDominio(estado) || item.dominio === estado) {
+      delete item.dominio;
+      return '';
+    }
+    item.dominio = estado;
+    return estado;
+  }
+
+  /* Aula que conta para o registro pedagógico: realizada ou reposição. Falta
+   * sem aviso é aula que não aconteceu, e cancelada também. */
+  function aulaAconteceu(aula) {
+    var st = (aula && aula.status) || 'realizada';
+    return st === 'realizada' || st === 'reposicao';
+  }
+
+  /* A mesma chave para o mesmo assunto em aulas diferentes: o id do tema
+   * quando há, senão o título sem acento e sem caixa (assunto escrito à mão,
+   * assunto da biblioteca). */
+  function chaveDoDominio(item) {
+    if (!item) return '';
+    if (item.id) return item.id;
+    var k = chaveDeBusca(String(item.titulo || '').trim().replace(/\s+/g, ' '));
+    return k ? 'titulo:' + k : '';
+  }
+
+  /* O quadro "Domínio por assunto" da ficha, DERIVADO das aulas: para cada
+   * assunto, o último estado marcado e a data da última aula em que foi
+   * marcado, mais o histórico das marcas (da mais antiga para a mais nova).
+   * Só entra aula que aconteceu. A lista sai da marca mais recente para a mais
+   * antiga, que é a ordem em que ela pergunta "e agora, como ele está?". */
+  function dominioPorAssunto(db, alunoId) {
+    var porChave = {};
+    var lista = [];
+    ((db && db.aulas) || []).filter(function (a) {
+      return a.alunoId === alunoId && aulaAconteceu(a);
+    }).sort(ordenarAulas).forEach(function (a) {
+      temasDaAula(a).forEach(function (t) {
+        var estado = estadoDeDominio(t);
+        var chave = chaveDoDominio(t);
+        if (!estado || !chave) return;
+        var linha = porChave[chave];
+        if (!linha) {
+          linha = porChave[chave] = { chave: chave, temaId: t.id || null, titulo: t.titulo || t.id || '', historico: [] };
+          lista.push(linha);
+        }
+        linha.historico.push({ estado: estado, data: a.data, aulaId: a.id });
+        linha.estado = estado;
+        linha.data = a.data;
+        linha.aulaId = a.id;
+        if (t.titulo) linha.titulo = t.titulo;
+      });
+    });
+    return lista.sort(function (x, y) {
+      if (x.data !== y.data) return x.data < y.data ? 1 : -1;
+      return String(x.titulo).localeCompare(String(y.titulo));
+    });
+  }
+
+  /* A REGRA QUE FECHA UM PASSO DA TRILHA (C1).
    *
-   * Só conta em aula realizada ou reposição. Falta sem aviso é aula que não
-   * aconteceu, e cancelada também. */
+   * Um passo fecha quando o aluno DOMINA o assunto do passo, e não mais só
+   * porque o assunto foi dado: aula dada é presença, domínio é aprendizado, e
+   * a trilha existe para dizer o que ele já sabe. Fecha nesta aula quando ela
+   * aconteceu (realizada ou reposição), registra o assunto do passo e o
+   * assunto está marcado "Domina". "Em andamento" e "Ainda não" não fecham.
+   *
+   * É a ÚNICA definição da regra: o toque no domínio, a varredura que remarca
+   * (revisarTrilhasDoAluno, no app.js), o passo que nasce marcado
+   * (marcarOQueJaFoiDado) e quem vier depois (o C7) perguntam aqui. */
+  function dominioFechaPasso(aula, temaId) {
+    if (!aula || !temaId || !aulaAconteceu(aula)) return false;
+    return temasDaAula(aula).some(function (t) {
+      return t && t.id === temaId && estadoDeDominio(t) === 'domina';
+    });
+  }
+
+  /* A marca de um passo ainda tem lastro na aula que a fez?
+   *
+   * Passo fechado pela regra do C1 (porDominio) vale enquanto aquela aula
+   * ainda fecha o passo pela regra: tirar o "Domina" solta o passo. Passo
+   * fechado ANTES do C1, pela regra antiga de aula dada, não tem porDominio e
+   * continua valendo enquanto a aula registrar o assunto, como sempre valeu: o
+   * que estava fechado continua fechado, e ninguém vai repassar aula antiga
+   * marcando domínio para a trilha não andar para trás. Passo marcado à mão,
+   * sem aula, não depende de aula nenhuma.
+   *
+   * A situação da aula (cancelada, falta) é o revisarPassosDaAula quem olha. */
+  function marcaDoPassoValeAinda(passo, aula) {
+    if (!passo || !passo.feitoEm) return false;
+    if (!passo.aulaId) return true;
+    if (!aula || aula.id !== passo.aulaId) return false;
+    if (passo.porDominio) return dominioFechaPasso(aula, passo.temaId);
+    if (!passo.temaId) return true;
+    return temasDaAula(aula).some(function (t) { return t && t.id === passo.temaId; });
+  }
+
+  /* O domínio marcado numa aula faz a trilha andar sozinha.
+   *
+   * Até o C1 bastava registrar o assunto; agora o passo só fecha quando
+   * dominioFechaPasso diz que sim. Marca só o passo cujo tema é aquele, nunca
+   * os anteriores: pular etapa é decisão dela, não do aplicativo. E carimba a
+   * data DA AULA, não a de hoje, porque ela lança aula atrasada e usa repetir
+   * para trás. O nome ficou, porque o assunto continua sendo a chave. */
   function marcarPassoPorAssunto(aluno, aula, item) {
     if (!aluno || !aula || !item || !item.id) return null;
-    var st = aula.status || 'realizada';
-    if (st !== 'realizada' && st !== 'reposicao') return null;
+    if (!dominioFechaPasso(aula, item.id)) return null;
     var marcado = null;
     trilhasAtivas(aluno).forEach(function (tr) {
       if (marcado) return;
@@ -3959,6 +4093,7 @@
         if (marcado || p.feitoEm || p.temaId !== item.id) return;
         p.feitoEm = aula.data;
         p.aulaId = aula.id;
+        p.porDominio = true;
         marcado = { trilha: tr, passo: p };
       });
     });
@@ -3979,6 +4114,7 @@
         if (p.aulaId !== aula.id) return;
         p.feitoEm = null;
         p.aulaId = null;
+        delete p.porDominio;
         n++;
       });
     });
@@ -4061,6 +4197,10 @@
     passosFeitos: passosFeitos, marcarOQueJaFoiDado: marcarOQueJaFoiDado,
     criarTrilha: criarTrilha, moverPasso: moverPasso, removerPasso: removerPasso,
     encerrarTrilha: encerrarTrilha, marcarPassoPorAssunto: marcarPassoPorAssunto,
+    DOMINIO: DOMINIO, estadoDeDominio: estadoDeDominio, rotuloDominio: rotuloDominio,
+    marcarDominio: marcarDominio, aulaAconteceu: aulaAconteceu, chaveDoDominio: chaveDoDominio,
+    dominioPorAssunto: dominioPorAssunto, dominioFechaPasso: dominioFechaPasso,
+    marcaDoPassoValeAinda: marcaDoPassoValeAinda,
     revisarPassosDaAula: revisarPassosDaAula, anoEscolarDe: anoEscolarDe,
     itemDaLacuna: itemDaLacuna,
     exibeListas: exibeListas
