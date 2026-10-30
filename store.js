@@ -23,6 +23,18 @@
  * Os quatro primeiros vêm do pacote e se refazem importando de novo; por isso
  * a cópia de segurança leva só uso, etiquetas e listas, que são dela.
  *
+ * E os dos livros de referência (versão 4 do banco, C15.1):
+ *   livros          : um livro por registro (PDF ou EPUB, como Blob), pelo id
+ *                     do pacote de livros, com o manifest do livro (título,
+ *                     autoria, sumário) e o pacote e a versão de onde veio.
+ *   livros_posicoes : onde ela parou em cada livro (página do PDF; capítulo e
+ *                     rolagem do EPUB), para o livro abrir no mesmo lugar.
+ * OS DOIS SÃO SÓ DESTE TABLET: ficam FORA da cópia de segurança (o
+ * exportarTudo não os lê) e FORA da nuvem. Livro é material de terceiro, pesa
+ * dezenas de MB, e volta importando o pacote do Drive; a cópia que ela manda
+ * para o Drive continua do tamanho de antes. A fase 1 da nuvem (N1, agora
+ * versão 5 do banco) tem de respeitar a lista SO_DESTE_TABLET, lá embaixo.
+ *
  * Nada sai daqui sem a Nathália mandar. Não há servidor nem envio automático.
  */
 (function (root) {
@@ -38,8 +50,16 @@
    *
    * Versão 3 (C2a, Minhas listas): de novo só CRIA o que falta, o depósito
    * biblioteca_listas. Desfazer este release é republicar o código antigo COM
-   * VERSAO_BANCO = 3. */
-  var VERSAO_BANCO = 3;
+   * VERSAO_BANCO = 3.
+   *
+   * Versão 4 (C15.1, livros): de novo só CRIA o que falta, os depósitos livros
+   * e livros_posicoes. A fase 1 da nuvem (N1), que estava marcada para a
+   * versão 4, passa a ser a 5. Desfazer este release é republicar o código
+   * antigo COM VERSAO_BANCO = 4. */
+  var VERSAO_BANCO = 4;
+  /* Depósitos que nunca saem do tablet: nem na cópia de segurança nem na
+   * nuvem. Quem for copiar ou sincronizar depósitos lê esta lista. */
+  var SO_DESTE_TABLET = ['livros', 'livros_posicoes'];
   var MAX_HISTORICO = 25;
 
   /* Chave das miniaturas da biblioteca dentro de 'midias'. Elas são cache
@@ -86,6 +106,13 @@
     }
     if (!b.objectStoreNames.contains('biblioteca_listas')) {
       b.createObjectStore('biblioteca_listas', { keyPath: 'id' });
+    }
+    if (!b.objectStoreNames.contains('livros')) {
+      s = b.createObjectStore('livros', { keyPath: 'id' });
+      s.createIndex('pacote', 'pacote');
+    }
+    if (!b.objectStoreNames.contains('livros_posicoes')) {
+      b.createObjectStore('livros_posicoes', { keyPath: 'id' });
     }
   }
 
@@ -440,6 +467,103 @@
   function apagarListaBiblioteca(id) { return apagar('biblioteca_listas', id); }
   function listasDaBiblioteca() { return todosOsValores('biblioteca_listas'); }
 
+  // ---------- livros de referência (C15.1) ----------
+
+  /* Grava os livros de um pacote já aberto e conferido (biblioteca.js), numa
+   * transação só: ou entra tudo, ou nada muda.
+   *
+   * A comparação é LIVRO A LIVRO, e não pelo pacote inteiro como nos
+   * exercícios, porque ela pode remover um livro e querer de volta: importar
+   * o mesmo pacote outra vez devolve o que falta e não mexe no que está.
+   *   livro que não está no tablet      entra (novos)
+   *   o mesmo livro, de versão menor    é substituído (atualizados)
+   *   o mesmo livro, de versão igual    fica como está (iguais)
+   *   livro deste pacote, de versão menor, que saiu do pacote novo: sai do
+   *     tablet, com a posição dele (removidos)
+   *   o mesmo id vindo de OUTRO pacote: fica o que está (deOutroPacote), para
+   *     um pacote não tomar o livro do outro calado.
+   * Devolve as contas, para a tela dizer o que aconteceu. */
+  function gravarLivros(aberto) {
+    var m = aberto.manifest;
+    var chave = m.pacote, versao = m.versao;
+    var agora = new Date().toISOString();
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = b.transaction(['livros', 'livros_posicoes'], 'readwrite');
+        var dep = t.objectStore('livros');
+        var contas = { novos: 0, atualizados: 0, iguais: 0, removidos: 0, deOutroPacote: [], bytes: 0 };
+        var noPacote = {};
+        aberto.livros.forEach(function (l) {
+          noPacote[l.meta.id] = true;
+          var req = dep.get(l.meta.id);
+          req.onsuccess = function () {
+            var atual = req.result;
+            if (atual && atual.pacote !== chave) { contas.deOutroPacote.push(l.meta.id); return; }
+            if (atual && atual.versao >= versao) { contas.iguais++; return; }
+            if (atual) contas.atualizados++; else contas.novos++;
+            contas.bytes += l.blob.size;
+            dep.put({ id: l.meta.id, pacote: chave, versao: versao, meta: l.meta, blob: l.blob,
+              bytes: l.blob.size, importadoEm: agora });
+          };
+        });
+        var cur = dep.index('pacote').openCursor(IDBKeyRange.only(chave));
+        cur.onsuccess = function (e) {
+          var c = e.target.result;
+          if (!c) return;
+          if (!noPacote[c.value.id] && c.value.versao < versao) {
+            contas.removidos++;
+            t.objectStore('livros_posicoes').delete(c.value.id);
+            c.delete();
+          }
+          c.continue();
+        };
+        t.oncomplete = function () { resolve(contas); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
+
+  /* Os livros guardados, em ordem de título. O registro traz o Blob, mas o
+   * Blob do IndexedDB é só uma referência: listar não lê os livros. */
+  function listarLivros() {
+    return todosOsValores('livros').then(function (l) {
+      return (l || []).sort(function (a, b) {
+        return String(a.meta && a.meta.titulo || a.id).localeCompare(String(b.meta && b.meta.titulo || b.id), 'pt-BR') ||
+          (a.id < b.id ? -1 : 1);
+      });
+    });
+  }
+  function lerLivro(id) { return ler('livros', id); }
+
+  /* Tira um livro do tablet, com a posição guardada dele. Devolve o que saiu. */
+  function removerLivro(id) {
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = b.transaction(['livros', 'livros_posicoes'], 'readwrite');
+        var contas = { achou: false, bytes: 0 };
+        var req = t.objectStore('livros').get(id);
+        req.onsuccess = function () {
+          if (!req.result) return;
+          contas.achou = true;
+          contas.bytes = req.result.bytes || 0;
+          t.objectStore('livros').delete(id);
+          t.objectStore('livros_posicoes').delete(id);
+        };
+        t.oncomplete = function () { resolve(contas); };
+        t.onabort = function () { reject(t.error || new Error('A remoção foi interrompida.')); };
+      });
+    });
+  }
+
+  /* { id, pagina } no PDF; { id, capitulo, fracao } no EPUB. */
+  function lerPosicaoLivro(id) { return ler('livros_posicoes', id); }
+  function gravarPosicaoLivro(reg) {
+    var r = { id: reg.id, quando: Date.now() };
+    if (reg.pagina != null) r.pagina = reg.pagina;
+    if (reg.capitulo != null) { r.capitulo = reg.capitulo; r.fracao = reg.fracao || 0; }
+    return escrever('livros_posicoes', function (s) { return s.put(r); });
+  }
+
   // ---------- histórico de desfazer ----------
 
   /* Guarda o estado ANTES da ação, para poder voltar.
@@ -593,7 +717,9 @@
       }));
     }).then(function () {
       /* Da biblioteca vão só o uso e as etiquetas, que são dela. Os pacotes,
-       * os exercícios e as imagens voltam importando o pacote de novo. */
+       * os exercícios e as imagens voltam importando o pacote de novo. Os
+       * livros (SO_DESTE_TABLET) não entram, nem a posição de leitura: o
+       * aceite do C15.1 mede que a cópia não cresce ao importar livros. */
       return Promise.all([usoDaBiblioteca(), etiquetasDaBiblioteca(), listasDaBiblioteca()]);
     }).then(function (bib) {
       pacote.biblioteca = { uso: bib[0] || [], etiquetas: bib[1] || [], listas: bib[2] || [] };
@@ -663,7 +789,8 @@
       esvaziar('anexos'),
       esvaziar('historico'),
       /* O uso e as etiquetas são dela e saem junto. Os pacotes ficam: são
-       * conteúdo reimportável, como o próprio aplicativo. */
+       * conteúdo reimportável, como o próprio aplicativo. Os livros também
+       * ficam, pelo mesmo motivo (e saem um a um em Ajustes). */
       esvaziar('biblioteca_uso'),
       esvaziar('biblioteca_etiquetas'),
       esvaziar('biblioteca_listas')
@@ -687,6 +814,9 @@
     registrarUsoBiblioteca: registrarUsoBiblioteca, usoDaBiblioteca: usoDaBiblioteca,
     gravarEtiquetaBiblioteca: gravarEtiquetaBiblioteca, etiquetasDaBiblioteca: etiquetasDaBiblioteca,
     gravarListaBiblioteca: gravarListaBiblioteca, apagarListaBiblioteca: apagarListaBiblioteca,
-    listasDaBiblioteca: listasDaBiblioteca
+    listasDaBiblioteca: listasDaBiblioteca,
+    gravarLivros: gravarLivros, listarLivros: listarLivros, lerLivro: lerLivro, removerLivro: removerLivro,
+    lerPosicaoLivro: lerPosicaoLivro, gravarPosicaoLivro: gravarPosicaoLivro,
+    SO_DESTE_TABLET: SO_DESTE_TABLET.slice()
   };
 })(typeof self !== 'undefined' ? self : this);

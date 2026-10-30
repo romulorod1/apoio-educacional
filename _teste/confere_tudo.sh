@@ -588,6 +588,15 @@ roda "minhas listas --envenenado-nomear-duplica"  node "_teste/testa_minhas_list
 roda "banco v3"                                   node "_teste/testa_banco_v3.js"
 roda "banco v3 --envenenado-versao-tecnica"       node "_teste/testa_banco_v3.js" --envenenado-versao-tecnica
 roda "banco v3 --envenenado-troca-calada"         node "_teste/testa_banco_v3.js" --envenenado-troca-calada
+# C15.1: o banco sobe de 3 para 4 sem perder nada; o pacote de livros sintetico
+# importa por Ajustes; a copia de seguranca nao cresce com 1,2 MB de livro no
+# tablet; o PDF abre pelo sumario no capitulo 2 e reabre onde parou; o EPUB abre
+# numa caixa sem scripts e troca de capitulo; remover derruba o total. Um veneno
+# por aceite: copia com os livros, caixa com scripts, PDF sem posicao.
+roda "livros"                                     node "_teste/testa_livros.js"
+roda "livros --envenenado-copia-com-livros"       node "_teste/testa_livros.js" --envenenado-copia-com-livros
+roda "livros --envenenado-epub-com-scripts"       node "_teste/testa_livros.js" --envenenado-epub-com-scripts
+roda "livros --envenenado-sem-posicao"            node "_teste/testa_livros.js" --envenenado-sem-posicao
 # C2b: a lista de base (base-v1) importa, vem primeiro com o nome dela e a
 # frase de posicao na fonte; as tres listas com a etiqueta de nivel. A regra
 # em si e do biblioteca/_prova_kits.py (sem navegador).
@@ -680,6 +689,12 @@ na_secao_navegador=0
 # tres niveis, um por campo, e `relaxou` conferido nos dois sentidos. A amostra
 # nao sai do gerador de proposito, senao um erro do gerador viraria o esperado.
 roda "kits e tempo (regra)"                     python biblioteca/_prova_kits.py
+# C15.1: o tipo de fonte livros, sobre livros sinteticos (tres PDF, um EPUB e um
+# arquivo de 41 MB): o teto de 40 MB nos dois lados da fronteira (o grande
+# recusado, listado no relatorio e nunca aberto), o manifesto (zip e lista nos
+# dois sentidos, hash, campos, sumario dentro do livro), a origem do sumario
+# (marcadores, mapa, nenhum, nav do EPUB) e o determinismo. Sem Chrome.
+roda "livros (gerador)"                         python biblioteca/_prova_livros.py
 # A comparacao pacote a pacote (determinismo e "o que mudou de uma versao para
 # a outra") rodando contra si mesma: um veneno por tipo de diferenca que ela
 # existe para achar, mais dois controles. A comparacao de verdade precisa dos

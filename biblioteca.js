@@ -156,6 +156,74 @@
     return null;
   }
 
+  /* ------------------------------------------------------------- livros */
+
+  /* O pacote de livros (C15.1, CONTRATO seção 8j). O mesmo zip e o mesmo
+   * manifest com hash de todo arquivo, mas sem itens, teoria, busca nem
+   * apelidos: `conteudo: "livros"` no manifest, a lista dos livros nele, e
+   * cada livro em livros/<id>.pdf ou livros/<id>.epub. Quem grava é o
+   * store.js, num depósito só dos livros, fora da cópia de segurança. */
+  var FORMATOS_DE_LIVRO = { pdf: 'application/pdf', epub: 'application/epub+zip' };
+  var ID_DE_LIVRO = /^[a-z0-9][a-z0-9-]*$/;
+
+  function inteiro(x) { return typeof x === 'number' && isFinite(x) && Math.floor(x) === x; }
+
+  /* Confere a FORMA do que vai para a tela e para o leitor: id, formato, o
+   * arquivo que existe no zip com o mesmo hash da lista, e o sumário dentro
+   * do livro (página de 1 ao total no PDF, capítulo da espinha no EPUB). Um
+   * sumário que aponta para fora do livro levaria o toque a lugar nenhum. */
+  function lerLivros(manifest, blobs, lista) {
+    var livros = manifest.livros;
+    if (!Array.isArray(livros) || !livros.length) throw Recusa('O pacote de livros não traz livro nenhum.', 'defeito');
+    var vistos = Object.create(null), citados = Object.create(null);
+    var saida = livros.map(function (l) {
+      if (!l || typeof l.id !== 'string' || !ID_DE_LIVRO.test(l.id)) {
+        throw Recusa('O pacote de livros tem livro sem identificador válido.', 'defeito');
+      }
+      if (vistos[l.id]) throw Recusa('O pacote de livros repete o livro ' + l.id + '.', 'defeito');
+      vistos[l.id] = true;
+      if (!FORMATOS_DE_LIVRO[l.formato]) throw Recusa('O livro ' + l.id + ' tem um formato que o aplicativo não lê.', 'defeito');
+      if (l.arquivo !== 'livros/' + l.id + '.' + l.formato || !blobs[l.arquivo]) {
+        throw Recusa('O livro ' + l.id + ' cita um arquivo que não está no pacote.', 'defeito');
+      }
+      if (lista[l.arquivo] !== l.hash) throw Recusa('O livro ' + l.id + ' não confere com o manifest.', 'defeito');
+      citados[l.arquivo] = true;
+      if (typeof l.titulo !== 'string' || !l.titulo.trim()) throw Recusa('O livro ' + l.id + ' não tem título.', 'defeito');
+      if (!Array.isArray(l.sumario)) throw Recusa('O livro ' + l.id + ' não traz o sumário.', 'defeito');
+      var espinha = l.formato === 'epub' ? ((l.epub && l.epub.espinha) || []) : null;
+      if (espinha && (!Array.isArray(espinha) || !espinha.length || espinha.some(function (c) { return !caminhoValido(c); }))) {
+        throw Recusa('O EPUB ' + l.id + ' não diz onde estão os capítulos.', 'defeito');
+      }
+      l.sumario.forEach(function (e, i) {
+        var ok = e && typeof e.titulo === 'string' && e.titulo.trim();
+        if (ok && l.formato === 'pdf') ok = inteiro(e.pagina) && e.pagina >= 1 && (!inteiro(l.paginas) || e.pagina <= l.paginas);
+        if (ok && espinha) ok = inteiro(e.capitulo) && e.capitulo >= 1 && e.capitulo <= espinha.length;
+        if (!ok) throw Recusa('O sumário do livro ' + l.id + ' aponta para fora dele na entrada ' + (i + 1) + '.', 'defeito');
+      });
+      return { meta: l, blob: blobs[l.arquivo] };
+    });
+    Object.keys(blobs).forEach(function (n) {
+      if (!citados[n]) throw Recusa('O pacote de livros tem um arquivo que nenhum livro cita: ' + n + '.', 'defeito');
+    });
+    return saida;
+  }
+
+  /* As linhas que a tela mostra depois de importar livros. */
+  function resumoDeLivros(contas) {
+    var linhas = [];
+    var partes = [];
+    if (contas.novos) partes.push(contas.novos + (contas.novos === 1 ? ' livro novo' : ' livros novos'));
+    if (contas.atualizados) partes.push(contas.atualizados + (contas.atualizados === 1 ? ' atualizado' : ' atualizados'));
+    if (contas.iguais) partes.push(contas.iguais + (contas.iguais === 1 ? ' já estava no tablet' : ' já estavam no tablet'));
+    if (contas.removidos) partes.push(contas.removidos + (contas.removidos === 1 ? ' saiu do pacote e do tablet' : ' saíram do pacote e do tablet'));
+    linhas.push(partes.join(', ') || 'Nenhum livro mudou.');
+    if (contas.deOutroPacote && contas.deOutroPacote.length) {
+      linhas.push(contas.deOutroPacote.length + (contas.deOutroPacote.length === 1 ? ' livro ficou' : ' livros ficaram') +
+        ' como estava, porque já veio de outro pacote.');
+    }
+    return linhas;
+  }
+
   /* Todo caminho de asset citado por itens.json e teoria.json. */
   function assetsCitados(itens, teoria) {
     var lista = [];
@@ -207,6 +275,8 @@
       }
       var lista = manifest.arquivos;
       if (!lista || typeof lista !== 'object') throw Recusa('O manifest.json do pacote não lista os arquivos.');
+      // o pacote de livros (C15.1) não tem itens nem teoria: só livros/
+      var deLivros = manifest.conteudo === 'livros';
 
       // 2. o zip e a lista, nos dois sentidos
       var nomesZip = zip.entradas.map(function (en) { return en.nome; })
@@ -223,15 +293,24 @@
       nomesZip.forEach(function (n) {
         if (!caminhoValido(n)) throw Recusa('O pacote tem um caminho de arquivo inválido: ' + n + '.');
       });
-      OBRIGATORIOS.forEach(function (n) {
-        if (!porNome[n]) throw Recusa('O pacote está incompleto: falta ' + n + '.', 'defeito');
-      });
+      if (deLivros) {
+        nomesZip.forEach(function (n) {
+          if (!/^livros\/[a-z0-9][a-z0-9-]*\.(pdf|epub)$/.test(n)) {
+            throw Recusa('O pacote de livros tem arquivo fora da pasta dos livros: ' + n + '.', 'defeito');
+          }
+        });
+      } else {
+        OBRIGATORIOS.forEach(function (n) {
+          if (!porNome[n]) throw Recusa('O pacote está incompleto: falta ' + n + '.', 'defeito');
+        });
+      }
 
       /* Extrai e confere o hash, um arquivo por vez. A imagem vira Blob logo
        * depois do hash e os bytes inflados são soltos: com milhares de SVG, o
        * pacote não fica duas vezes na memória do tablet. */
       var extraidos = Object.create(null);
       var imagens = [];
+      var blobsDeLivros = Object.create(null);
       var bytesTotais = 0;
       var i = 0;
       function proximo() {
@@ -244,7 +323,10 @@
           return sha256(bytes).then(function (h) {
             if (h !== m[1]) throw Recusa('O arquivo ' + nome + ' do pacote não confere com o manifest.', 'defeito');
             bytesTotais += bytes.length;
-            if (/^assets\//.test(nome)) {
+            if (deLivros) {
+              // o livro vira Blob logo depois do hash, como as imagens: um livro por vez na memória
+              blobsDeLivros[nome] = new Blob([bytes], { type: FORMATOS_DE_LIVRO[nome.split('.').pop()] });
+            } else if (/^assets\//.test(nome)) {
               var tipo = tipoDoAsset(nome) || 'application/octet-stream';
               imagens.push({ caminho: nome, tipo: tipo, blob: new Blob([bytes], { type: tipo }) });
               extraidos[nome] = true;
@@ -257,6 +339,9 @@
         });
       }
       return proximo().then(function () {
+        if (deLivros) {
+          return { manifest: manifest, livros: lerLivros(manifest, blobsDeLivros, lista), bytesTotais: bytesTotais };
+        }
         var itens = json('itens.json', extraidos['itens.json']);
         var teoria = json('teoria.json', extraidos['teoria.json']);
         var busca = json('busca.json', extraidos['busca.json']);
@@ -439,7 +524,7 @@
 
   return {
     ESQUEMA: ESQUEMA, SEM_NAVEGADOR: SEM_NAVEGADOR,
-    abrirPacote: abrirPacote, resumo: resumo, nomeDaSerie: nomeDaSerie, mb: mb,
+    abrirPacote: abrirPacote, resumo: resumo, nomeDaSerie: nomeDaSerie, mb: mb, resumoDeLivros: resumoDeLivros,
     sha256: sha256, tipoDoAsset: tipoDoAsset,
     rasterizarRecorte: rasterizarRecorte, rasterizarPagina: rasterizarPagina,
     alturasDosPedacos: alturasDosPedacos
