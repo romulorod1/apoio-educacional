@@ -592,6 +592,10 @@ roda "preparar e enviar"                          node "_teste/testa_preparar_e_
 # pre-cache), pagina e zoom, a pagina vira folha com o traco salvo, e a segunda
 # abertura funciona com a rede cortada.
 roda "leitor de pdf"                              node "_teste/testa_leitor_pdf.js"
+# C3: a foto e o PDF anexados viram folha da MESMA aula, sem perguntar qual
+# (a foto direto, o PDF pelo leitor na pagina escolhida), com o traco salvo;
+# o .docx nao ganha a acao, e os tres anexos ficam byte a byte iguais.
+roda "anexo como folha"                           node "_teste/testa_anexo_como_folha.js"
 # FRENTE B (B10): o que o lerKits recusa e o que a tela descarta (lista com
 # exercicio que saiu por curadoria). O veneno tira o guarda do app.js, e sem
 # ele a aba Biblioteca inteira nao abre.

@@ -1872,6 +1872,11 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-pdf-zoom { display: inline-flex; gap: 8px; margin-left: auto; }
 .leitor-pdf-quadrado { min-width: 44px; padding: 10px 0; font-size: 20px; line-height: 1; }
 .leitor-pdf-corpo { background: #DDE3EA; overflow: auto; padding: 18px; }
+/* A frase do C3 ("Escolha a página e toque em...") fica colada embaixo da
+   barra, de ponta a ponta, sem rolar junto com a página. */
+.leitor-pdf-dica { flex-shrink: 0; margin: 0; border-radius: 0; border-width: 0 0 1px; }
+/* "Abrir como folha para escrever em cima" (C3), embaixo do nome do anexo. */
+#lista-anexos .anexo-como-folha { margin-top: 8px; min-height: 44px; }
 .leitor-pdf-corpo canvas { display: block; margin: 0 auto; background: #FFFFFF; box-shadow: var(--sombra); }
 .leitor-pdf-aviso { max-width: 520px; margin: 24px auto; padding: 18px; background: var(--branco);
   border-radius: 12px; box-shadow: var(--sombra); }
