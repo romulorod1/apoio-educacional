@@ -7773,7 +7773,7 @@
          * 30/10". É o que separa a marca por evidência da marca por impressão. */
         var provas = item.chaveDoGrupo === 'lacunas' ? Core.evidenciasDaLacuna(trabalho, item.id) : [];
         var filhos = [chk, el('span', { class: 'cresce' }, [item.rotulo].concat(provas.length ? [
-          el('span', { class: 'evidencia-lacuna', style: 'display:block;font-size:12px;color:#5b6570',
+          el('span', { class: 'evidencia-lacuna',
             texto: provas[provas.length - 1] + (provas.length > 1 ? ' (e mais ' + (provas.length - 1) + ' antes)' : '') })
         ] : []))];
         /* A lacuna monta a trilha: a sequência de assuntos que precisa vir
@@ -9924,10 +9924,9 @@
       reg = { id: Core.uid(), aulaId: aula.id, data: aula.data, anoEscolar: s.ano, criadaEm: Core.hojeIso(), itens: [] };
       aluno.sondagens = sondagensDe(aluno).concat([reg]);
     }
-    // a correção de um exercício que continua na sondagem não se perde
-    var respostas = {};
-    reg.itens.forEach(function (x) { respostas[x.item] = x.resposta || ''; });
-    reg.itens = itens.map(function (x) { return { item: x.item, lacuna: x.lacuna, resposta: respostas[x.item] || '' }; });
+    /* A resposta de quem continua não se perde; se os exercícios mudaram,
+     * ela volta a "falta corrigir" (Core.refazerItensDaSondagem). */
+    Core.refazerItensDaSondagem(reg, itens);
     reg.folhaEm = Core.hojeIso();
     var ids = itens.map(function (x) { return x.item; });
     salvarEDepois(function () {
@@ -10000,7 +9999,7 @@
       ]));
     });
     var feitos = c.respostas.filter(Boolean).length;
-    rodape.appendChild(el('span', { class: 'esquerda ajuda', style: 'margin:0;align-self:center',
+    rodape.appendChild(el('span', { class: 'esquerda ajuda', id: 'sondagem-corrigidos', style: 'margin:0;align-self:center',
       texto: feitos + ' de ' + feita.itens.length + ' corrigidos' }));
     rodape.appendChild(el('button', { type: 'button', class: 'btn', texto: 'Cancelar',
       aoClick: function () { fecharModal('modal-sondagem'); } }));

@@ -4031,10 +4031,19 @@
    *
    * As evidências moram em m.evidencias.lacunas[lacunaId], uma lista de
    * { sondagem, data, texto }: campo novo, que nasce ausente em todo
-   * mapeamento antigo. Devolve as lacunas novas e as que já estavam. */
+   * mapeamento antigo. Devolve as lacunas novas e as que já estavam.
+   *
+   * CORRIGIR DE NOVO NÃO DEIXA FRASE FALSA. Antes de escrever, a evidência
+   * DESTA sondagem sai de TODAS as lacunas, e só a correção de agora volta a
+   * escrever. Sem isso, frações corrigida "errado, errado" e depois "certo,
+   * errado" ficava com "errou 2 de 2" escrito para sempre, sem tela que a
+   * apagasse, e a frase aparecia até com a caixa desmarcada (achado da revisão
+   * do C5a). A MARCA da lacuna fica, pela mesma regra de sempre: nada que já
+   * está marcado é apagado pela sondagem; desmarcar é decisão dela. */
   function aplicarSondagemNoMapeamento(m, sondagem) {
     var res = lacunasDaCorrecao(sondagem);
     var novas = [], jaMarcadas = [];
+    tirarEvidenciasDaSondagem(m, sondagem.id);
     res.filter(function (r) { return r.marca; }).forEach(function (r) {
       var ja = marcadosDaMateria(m, MATERIA_PADRAO).lacunas.indexOf(r.lacuna) >= 0;
       marcarNaMateria(m, MATERIA_PADRAO, 'lacunas', r.lacuna, true);
@@ -4045,6 +4054,39 @@
         .concat([{ sondagem: sondagem.id, data: sondagem.data || hojeIso(), texto: r.evidencia }]);
     });
     return { novas: novas, jaMarcadas: jaMarcadas, resultado: res };
+  }
+
+  /* Tira de todas as lacunas a evidência escrita por uma sondagem; a lista
+   * que fica vazia sai, para o mapeamento não guardar casca. */
+  function tirarEvidenciasDaSondagem(m, sondagemId) {
+    var ev = m && m.evidencias && m.evidencias.lacunas;
+    if (!ev) return;
+    Object.keys(ev).forEach(function (id) {
+      var resto = (ev[id] || []).filter(function (e) { return e && e.sondagem !== sondagemId; });
+      if (resto.length) ev[id] = resto; else delete ev[id];
+    });
+  }
+
+  /* Os exercícios da sondagem trocados por `itens` ([{ item, lacuna }]), na
+   * hora de gerar a folha de novo. A resposta de quem continua fica. Se o
+   * CONJUNTO de exercícios mudou, a sondagem volta a "não corrigida": a
+   * correção de antes era de outra folha, e o resumo "corrigida em" com as
+   * lacunas de antes mentiria sobre esta. O mapeamento já gravado não é
+   * tocado; a próxima correção refaz a evidência desta sondagem. */
+  function refazerItensDaSondagem(reg, itens) {
+    var antes = {}, chave = function (x) { return x.lacuna + '|' + x.item; };
+    (reg.itens || []).forEach(function (x) { antes[chave(x)] = x.resposta || ''; });
+    var mesmo = (reg.itens || []).length === itens.length &&
+      itens.every(function (x) { return Object.prototype.hasOwnProperty.call(antes, chave(x)); });
+    reg.itens = itens.map(function (x) {
+      return { item: x.item, lacuna: x.lacuna, resposta: antes[chave(x)] || '' };
+    });
+    if (!mesmo) {
+      delete reg.corrigidaEm;
+      delete reg.aplicadaEm;
+      delete reg.lacunasMarcadas;
+    }
+    return reg;
   }
 
   /* As frases de evidência de uma lacuna, da mais antiga para a mais nova. */
@@ -4606,6 +4648,7 @@
     RESPOSTAS_SONDAGEM: RESPOSTAS_SONDAGEM, sondagemMarcaLacuna: sondagemMarcaLacuna,
     lacunasDaCorrecao: lacunasDaCorrecao, aplicarSondagemNoMapeamento: aplicarSondagemNoMapeamento,
     evidenciasDaLacuna: evidenciasDaLacuna, itensOferecidos: itensOferecidos,
+    tirarEvidenciasDaSondagem: tirarEvidenciasDaSondagem, refazerItensDaSondagem: refazerItensDaSondagem,
     exibeListas: exibeListas
   };
 });
