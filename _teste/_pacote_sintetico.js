@@ -600,6 +600,82 @@ function gerarBanco(saida, opcoes) {
   return { zip, manifest, itens, arquivos };
 }
 
+/* Pacote sintético de PROVAS (C12), no formato do tipo de fonte provas
+ * (biblioteca/provas.py): um nível da OBMEP Mirim ou o ENEM.
+ *
+ * Mirim: serie "m1" (2º e 3º ano) ou "m2" (4º e 5º), com series_equivalentes
+ * como o Banco; o módulo é o ASSUNTO do aplicativo (título igual ao do
+ * banco/topicos/matematica.json, tema_app com o id) ou "Diversos"; a aula é a
+ * prova. ENEM: serie "3em", sem solução (sem_solucao), resposta do gabarito.
+ * Recortes de retângulos, como o resto deste arquivo: nenhum texto de prova. */
+const ASSUNTOS_PROVA = {
+  m1: [['MAT02-02', 'Adição até 100', 'mirim-adicao-ate-100'], ['MAT03-04', 'Multiplicação: a ideia e a tabuada', 'mirim-multiplicacao-a-ideia-e-a-tabuada'],
+    [null, 'Diversos', 'mirim-diversos']],
+  m2: [['MAT04-09', 'Perímetro e área', 'mirim-perimetro-e-area'], ['MAT05-07', 'Múltiplos e divisores', 'mirim-multiplos-e-divisores'],
+    [null, 'Diversos', 'mirim-diversos']],
+  '3em': [['MATEM3-11', 'Revisão: contagem e probabilidade', 'enem-revisao-contagem-e-probabilidade'], [null, 'Diversos', 'enem-diversos']]
+};
+const EQUIVALENTES_PROVA = { m1: ['2ano', '3ano'], m2: ['4ano', '5ano'], '3em': null };
+
+function gerarProva(saida, opcoes) {
+  opcoes = opcoes || {};
+  const serie = opcoes.serie || 'm1';
+  const versao = opcoes.versao || 1;
+  const enem = serie === '3em';
+  const equivalentes = EQUIVALENTES_PROVA[serie];
+  const arquivos = {}, itens = [], docs = [];
+  const aula = enem ? { slug: 'enem-2099', titulo: 'ENEM 2099', n: 1 } : { slug: 'mirim-2099-fase-1', titulo: 'OBMEP Mirim 2099, 1ª fase', n: 1 };
+  const assuntos = ASSUNTOS_PROVA[serie];
+  for (let k = 0; k < 6; k++) {
+    const n = enem ? 136 + k : k + 1;
+    const [tema, titulo, slug] = assuntos[k % assuntos.length];
+    const id = enem ? `enem:2099:${n}` : `mirim:2099:f1:${serie}:${n}`;
+    const base = `assets/${serie}/${slug}/${aula.slug}/ex-${enem ? n : dd(n)}`;
+    const alt = 90 + k * 12;
+    arquivos[base + '.svg'] = { dados: Buffer.from(svgRecorte(262, alt, n, '#2E7D6B')), metodo: 8 };
+    if (!enem) arquivos[base + '-sol.svg'] = { dados: Buffer.from(svgRecorte(262, alt + 30, n + 1, '#C9A961')), metodo: 8 };
+    const it = { id, fonte: enem ? 'enem' : 'obmep-mirim', serie };
+    if (equivalentes) it.series_equivalentes = equivalentes;
+    Object.assign(it, { modulo: { slug, titulo }, aula, numero: n, titulo: null, formato: 'objetiva',
+      alternativas: ['A', 'B', 'C', 'D', 'E'], resposta: 'ABCDE'[k % 5], subitens: [],
+      texto: 'questao sintetica ' + n + ' de ' + titulo.toLowerCase(), origem_citada: null,
+      dificuldade: enem ? 2 : 1 + Math.floor(k / 2), dificuldade_origem: 'proxy', proxy: enem ? { neutro: true } : { terco: 1 + Math.floor(k / 2) },
+      tema_app: tema,
+      assets: { enunciado: base + '.svg', solucao: enem ? null : base + '-sol.svg' },
+      medidas: { enunciado: { largura_pt: 262, altura_pt: alt, rotulo: null },
+        solucao: enem ? null : { largura_pt: 262, altura_pt: alt + 30, rotulo: null } } });
+    if (enem) it.sem_solucao = true;
+    it.origem = { arquivo: `PDF/sintetico/${serie}/prova.pdf`, enunciado: { pagina: 2, coluna: 1, bbox: [22, 60, 284, 60 + alt] } };
+    if (!enem) it.origem.solucao = { pagina: 1, coluna: 1, bbox: [40, 100, 302, 130 + alt], arquivo: `PDF/sintetico/${serie}/solucao.pdf` };
+    itens.push(it);
+    docs.push({ id, tipo: 'exercicio', titulo: aula.titulo + ', questão ' + n, resumo: titulo + ' ' + aula.titulo, texto: it.texto });
+  }
+  assuntos.forEach(([, titulo, slug]) => docs.push({ id: serie + ':' + slug, tipo: 'modulo', titulo, resumo: aula.titulo, texto: '' }));
+  docs.sort((a, b) => a.id < b.id ? -1 : 1);
+  const indice = Busca.montarIndice(docs.map(d => ({ id: d.id, serie: '09', titulo: d.titulo, resumo: d.resumo, explicacao: '', enunciados: d.texto })));
+  const tipos = {}; docs.forEach(d => { tipos[d.id] = d.tipo; });
+  indice.forEach(r => { r.k = tipos[r.i]; });
+  arquivos['itens.json'] = { dados: json(itens), metodo: 8 };
+  arquivos['teoria.json'] = { dados: json([]), metodo: 8 };
+  arquivos['busca.json'] = { dados: json({ formato: 'indice-de-busca', versao: 1, tipos: { k: 'modulo, teoria ou exercicio' }, temas: indice }), metodo: 8 };
+  arquivos['apelidos.json'] = { dados: json({}), metodo: 0 };
+  const nomes = Object.keys(arquivos).sort();
+  const lista = {};
+  nomes.forEach(n => { lista[n] = sha(arquivos[n].dados); });
+  const manifest = { esquema: 1, pacote: enem ? 'matematica-sintetico-enem-3em' : 'matematica-sintetico-mirim-' + serie, versao,
+    gerado_em: '2026-10-30T12:00:00-03:00', gerador: { nome: '_teste/_pacote_sintetico.js', commit: null }, materia: 'matematica',
+    fonte: { id: enem ? 'enem' : 'obmep-mirim', nome: enem ? 'ENEM sintético' : 'OBMEP Mirim sintética', url: 'https://example.invalid/', licenca: 'gerado para teste' },
+    series: [serie] };
+  if (equivalentes) manifest.series_equivalentes = { [serie]: equivalentes };
+  manifest.contagens = { modulos: assuntos.length, aulas_teoria: 0, paginas_teoria: 0, aulas_exercicios: assuntos.length, itens: itens.length,
+    itens_com_solucao: enem ? 0 : itens.length, itens_excluidos: 0 };
+  manifest.arquivos = lista;
+  const zip = montarZip([{ nome: 'manifest.json', dados: json(manifest), metodo: 8 }]
+    .concat(nomes.map(n => ({ nome: n, dados: arquivos[n].dados, metodo: arquivos[n].metodo }))));
+  if (saida) fs.writeFileSync(saida, zip);
+  return { zip, manifest, itens, arquivos };
+}
+
 /* Pacote sintético da SONDAGEM (C5), para o testa_sondagem_navegador.
  *
  * A regra de escolha da sondagem mora no core.js como prefixo de id
@@ -692,7 +768,7 @@ function gerarSondagem(saida, opcoes) {
 
 const VENENOS = ['corrompido-deflate', 'corrompido-stored', 'hash', 'sobrando', 'faltando', 'asset-citado', 'esquema', 'asset-fora'];
 
-module.exports = { gerar, gerarBanco, gerarSondagem, montarZip, crc32, VENENOS, MODULOS, MODULOS_SONDAGEM, KITS, LISTAS, LISTA_BASE, EXCLUSOES };
+module.exports = { gerar, gerarBanco, gerarProva, ASSUNTOS_PROVA, gerarSondagem, montarZip, crc32, VENENOS, MODULOS, MODULOS_SONDAGEM, KITS, LISTAS, LISTA_BASE, EXCLUSOES };
 
 if (require.main === module) {
   const saida = process.argv[2];

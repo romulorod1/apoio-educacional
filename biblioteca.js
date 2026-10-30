@@ -303,9 +303,12 @@
   /* ------------------------------------------------------------- resumo */
 
   var NOME_SERIE = {
+    '2ano': '2º ano', '3ano': '3º ano', '4ano': '4º ano', '5ano': '5º ano',
     '6ano': '6º ano', '7ano': '7º ano', '8ano': '8º ano', '9ano': '9º ano',
     '1em': '1ª série do médio', '2em': '2ª série do médio', '3em': '3ª série do médio',
-    n1: 'nível 1', n2: 'nível 2', n3: 'nível 3'
+    n1: 'nível 1', n2: 'nível 2', n3: 'nível 3',
+    // os níveis da OBMEP Mirim (C12): Mirim 1 é o 2º e o 3º ano, Mirim 2 o 4º e o 5º
+    m1: 'Mirim 1', m2: 'Mirim 2'
   };
   var NOME_MATERIA = { matematica: 'Matemática' };
 

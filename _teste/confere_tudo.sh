@@ -373,6 +373,11 @@ roda "biblioteca importar --envenenado-hash"    node "_teste/testa_biblioteca_im
 # que ignora os apelidos do pacote, e "bhaskara" tem de perder as listas.
 roda "biblioteca navegar"                       node "_teste/testa_biblioteca_navegar.js"
 roda "biblioteca navegar --envenenado-apelidos" node "_teste/testa_biblioteca_navegar.js" --envenenado-apelidos
+# C12: os pacotes de provas (OBMEP Mirim por nivel e ENEM) importam, as abas vao
+# do 2o ao 5o ano e os assuntos do aplicativo aparecem como modulos. O modo
+# envenenado serve o app.js que so espalhava o Banco pelas series equivalentes.
+roda "biblioteca mirim"                         node "_teste/testa_biblioteca_mirim.js"
+roda "biblioteca mirim --envenenado-equivalentes" node "_teste/testa_biblioteca_mirim.js" --envenenado-equivalentes
 # FRENTE B: selecionar e compor. Sem navegador, o compositor do pdf.js (lista
 # renumerada, gabarito separado, sem solucao escrito, quebra entre pedacos, marca
 # por cima so nesta folha e os outros documentos byte a byte iguais aos de main).
@@ -659,6 +664,9 @@ roda "painel de valores --envenenado-esquece"   node "_teste/testa_painel_valore
 roda "gerador da biblioteca"                    python biblioteca/_prova_gerador.py
 # O Banco de Questoes (2016 a 2020), sobre um volume sintetico do mesmo modelo.
 roda "banco da biblioteca"                      python biblioteca/_prova_banco.py
+# C12: o tipo de fonte provas (OBMEP Mirim e ENEM), sobre provas sinteticas dos
+# dois formatos, com um veneno por regra do detector. A fidelidade e no Chrome.
+roda "provas da biblioteca"                     python biblioteca/_prova_provas.py
 # Daqui ate o fim da secao, nada abre Chrome (conferido com CHROME envenenado
 # em 26/10): o --rapido roda. O _prova_gerador e o _prova_banco acima ficam no
 # navegador porque a trava de fidelidade dos dois renderiza o SVG no Chrome
