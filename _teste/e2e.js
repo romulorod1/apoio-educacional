@@ -187,7 +187,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 
   const numerosAgenda = await pag.$$eval('#numeros-mes .numero', es =>
     es.map(e => e.querySelector('.rotulo').textContent + '=' + e.querySelector('.valor').textContent));
-  conf('encontros no mês', numerosAgenda[0], 'Encontros=10');
+  conf('encontros no mês', numerosAgenda[0], 'Aulas=10');
   conf('horas cobradas no mês', numerosAgenda[1], 'Horas cobradas=10:30 h');
   conf('valor a receber no mês', numerosAgenda[2], 'A receber=R$ 1.050,00');
   conf('um aluno no mês', numerosAgenda[3], 'Alunos=1');
@@ -466,9 +466,9 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   // troca de fundo e nova folha
   await escolher('#rodape-nota select', 'pontilhado');
   await espera(250);
-  await clicarTexto('#rodape-nota button', '+ Folha');
+  await clicarTexto('#rodape-nota button', '+ Página');
   await espera(300);
-  conf('agora são duas folhas', await $texto('.contador-pagina'), 'Folha 2 de 2');
+  conf('agora são duas folhas', await $texto('.contador-pagina'), 'Página 2 de 2');
   await desenhar([[200, 400], [300, 450], [420, 420]]);
   await espera(900);
 

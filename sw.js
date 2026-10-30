@@ -90,8 +90,10 @@
  * Minhas listas e o banco na versão 3 (app.js, store.js, index.html e
  * styles.css), com a lista igual. O v50 (C2b) traz a lista de base e a
  * etiqueta de nível nas listas prontas (app.js e biblioteca.js), com a lista
- * igual. */
-var CACHE = 'apoio-educacional-v53';
+ * igual. O v54 (C10a) põe na tela as palavras dela: Página, Relato da aula,
+ * Nota só minha, Habilidades e hábitos, Novo ano letivo e aula (app.js,
+ * core.js, pdf.js e index.html), com a lista igual. */
+var CACHE = 'apoio-educacional-v54';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

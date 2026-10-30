@@ -152,7 +152,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   secao('2. A janela do encontro é diferente da aula comum');
 
   conf('avisa que é encontro de mapeamento',
-    await pag.$eval('#corpo-modal-aula .faixa-info', e => /Encontro de mapeamento/.test(e.textContent)), true);
+    await pag.$eval('#corpo-modal-aula .faixa-info', e => /Aula de mapeamento/.test(e.textContent)), true);
   conf('traz o roteiro sugerido',
     await pag.$$eval('#roteiro-mapeamento .passo-roteiro', es => es.length) >= 4, true);
   conf('o roteiro fala da conversa com o responsável',
@@ -172,7 +172,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   await espera(900);
   conf('a janela de mapeamento abriu', await visivel('#modal-mapeamento'), true);
   conf('diz que está ligada ao encontro de hoje',
-    await pag.$eval('#corpo-modal-mapeamento', e => /ligado ao encontro/.test(e.textContent)), true);
+    await pag.$eval('#corpo-modal-mapeamento', e => /ligado à aula/.test(e.textContent)), true);
 
   const grupos = await pag.$$eval('#corpo-modal-mapeamento [data-grupo]', es => es.map(e => e.dataset.grupo));
   conf('os cinco grupos estão na tela', grupos.join(','), 'fortes,atencao,lacunas,rotina,aprende');
@@ -322,7 +322,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   conf('a janela de mapeamento abriu para o aluno antigo',
     await visivel('#modal-mapeamento'), true);
   conf('e não fala em encontro de hoje, porque não veio de um',
-    await pag.$eval('#corpo-modal-mapeamento', e => /ligado ao encontro/.test(e.textContent)), false);
+    await pag.$eval('#corpo-modal-mapeamento', e => /ligado à aula/.test(e.textContent)), false);
 
   await pag.evaluate(() => {
     ['atencao:dispersa', 'lacunas:proporcao'].forEach(k => {

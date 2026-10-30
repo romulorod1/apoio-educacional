@@ -290,7 +290,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   conf('e não existe na tela da família nem escondida',
     varredura.janela.includes(SO_MINHA), false);
   conf('nem o bloco onde ela morava', varredura.blocosPrivados, 0);
-  conf('nem o rótulo "Só minha"', varredura.janela.includes('Só minha'), false);
+  conf('nem o rótulo "Nota só minha"', varredura.janela.includes('Nota só minha'), false);
   conf('nem a conta do que ela deu sem cobrar',
     /sem cobrar|desmarcad/i.test(varredura.janela), false);
   conf('nem a palavra que fala de cobrança', /cobrad|cobrar/i.test(varredura.janela), false);

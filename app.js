@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.32.1';
+  var VERSAO = '1.33.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,18 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.33.0',
+      itens: [
+        'A tela passou a usar as suas palavras. Na aula, o texto que vai para a família se chama Relato da aula, ' +
+          'e o que fica só com você se chama Nota só minha.',
+        'Na folha de aula, cada página tem o seu nome: "Página 1 de 2", "+ Página" e "Apagar página". O todo continua sendo a folha de aula.',
+        'A seção de áreas virou Habilidades e hábitos, na aula, no fechamento e no PDF. Se você já tinha trocado esse título, o seu continua.',
+        'Na agenda e no fechamento, o que era encontro agora é aula. No que vai para a família, continua encontro.',
+        'Na agenda, o valor da aula à frente que foi desmarcada e é cobrada aparece como "desmarcada em cima da hora, cobrada", e em Ajustes a ' +
+          'revisão das séries no começo do ano se chama Novo ano letivo.'
+      ]
+    },
     {
       versao: '1.32.1',
       itens: [
@@ -343,9 +355,9 @@
           'dois modos: um com tudo, para você escrever o fechamento sem abrir aula por aula, e ' +
           'outro sem valores, sem as suas anotações e sem nenhum outro aluno, para virar o ' +
           'tablet e mostrar.',
-        'A janela da aula mudou de ordem. A primeira coisa que você vê é o que aconteceu no ' +
-          'último encontro com aquele aluno, para não precisar procurar no calendário. E a ' +
-          'anotação virou duas: o que rendeu hoje, que entra no fechamento, e só minha, que não ' +
+        'A janela da aula mudou de ordem. A primeira coisa que você vê é o que aconteceu na ' +
+          'última aula com aquele aluno, para não precisar procurar no calendário. E a ' +
+          'anotação virou duas: o relato da aula, que entra no fechamento, e a nota só minha, que não ' +
           'sai em lugar nenhum. O que você já tinha escrito continua sendo a primeira.',
         'O mapeamento agora sabe que nem toda matéria é matemática. A parte que é sobre o ' +
           'aluno, como a rotina de estudo e o jeito de aprender, você responde uma vez só. A ' +
@@ -403,8 +415,8 @@
       versao: '1.11.1',
       itens: [
         'O documento que a família recebe voltou a ser o que era: a tabela de aulas, o total ' +
-          'e o seu feedback. As listas de temas e de áreas trabalhadas ficam de fora até você ' +
-          'marcar a caixa Exibir os temas e as áreas trabalhadas, que fica logo acima dos ' +
+          'e o seu feedback. As listas de temas e de habilidades e hábitos ficam de fora até você ' +
+          'marcar a caixa Exibir os temas e as habilidades e hábitos, que fica logo acima dos ' +
           'botões de exportar. Marque quando o registro estiver do jeito que você quer; o ' +
           'aplicativo lembra.'
       ]
@@ -560,7 +572,7 @@
         'A aba Histórico mostra as últimas aulas daquele aluno, com a anotação de cada uma, ' +
         'sem precisar abrir o calendário e procurar uma por uma.',
         'Na aba Dados dá para registrar desde quando o aluno estuda com você, e guardar ' +
-        'observações pedagógicas separadas das observações gerais.',
+        'a nota só minha separada das observações gerais.',
         'Esta janela de novidades, que aparece sozinha quando o aplicativo é atualizado.'
       ]
     },
@@ -618,17 +630,17 @@
         '<div class="mini-lista-alunos">' +
           '<div class="mini-item-aluno ativo">' +
             '<span class="mini-letra">A</span>' +
-            '<div class="mini-aluno-dados"><strong>Aluno Alfa (Teste)</strong><span>3 encontros &middot; R$ 350,00</span></div>' +
+            '<div class="mini-aluno-dados"><strong>Aluno Alfa (Teste)</strong><span>3 aulas &middot; R$ 350,00</span></div>' +
             '<span class="mini-badge-ok">Pronto</span>' +
           '</div>' +
           '<div class="mini-item-aluno">' +
             '<span class="mini-letra">B</span>' +
-            '<div class="mini-aluno-dados"><strong>Aluno Beta (Teste)</strong><span>2 encontros &middot; R$ 220,00</span></div>' +
+            '<div class="mini-aluno-dados"><strong>Aluno Beta (Teste)</strong><span>2 aulas &middot; R$ 220,00</span></div>' +
             '<span class="mini-badge-ok">Pronto</span>' +
           '</div>' +
           '<div class="mini-item-aluno">' +
             '<span class="mini-letra">G</span>' +
-            '<div class="mini-aluno-dados"><strong>Aluno Gama (Teste)</strong><span>4 encontros &middot; R$ 480,00</span></div>' +
+            '<div class="mini-aluno-dados"><strong>Aluno Gama (Teste)</strong><span>4 aulas &middot; R$ 480,00</span></div>' +
             '<span class="mini-badge-ok">Pronto</span>' +
           '</div>' +
         '</div>' +
@@ -1998,7 +2010,7 @@
     var corpo = el('div', { class: 'zoom-dia-corpo' });
     if (doDia.length === 0) {
       corpo.appendChild(el('div', { class: 'zoom-dia-vazio' }, [
-        el('p', { texto: 'Nenhum encontro agendado para este dia.' }),
+        el('p', { texto: 'Nenhuma aula agendada para este dia.' }),
         el('p', { class: 'zoom-dia-vazio-dica', texto: 'Toque no botão abaixo para agendar uma nova aula.' })
       ]));
     } else {
@@ -2109,16 +2121,16 @@
 
     var numeros = $('#numeros-mes');
     numeros.innerHTML = '';
-    numeros.appendChild(numeroComRodape('Encontros', String(encontrosFeitos), [
+    numeros.appendChild(numeroComRodape('Aulas', String(encontrosFeitos), [
       encontrosPrevistos ? 'mais ' + encontrosPrevistos + ' ' +
-        palavraPlural(encontrosPrevistos, 'marcado à frente', 'marcados à frente') : ''
+        palavraPlural(encontrosPrevistos, 'marcada à frente', 'marcadas à frente') : ''
     ]));
     numeros.appendChild(numeroComRodape('Horas cobradas', Core.fmtHoras(minFeitos) + ' h', [
       minPrevistos ? 'mais ' + Core.fmtHoras(minPrevistos) + ' h à frente' : ''
     ]));
     var rodapesReceber = [];
     if (valorPrevisto) rodapesReceber.push('previsto à frente: ' + dinheiro(valorPrevisto));
-    if (valorCanceladasFuturas) rodapesReceber.push('cancelada cobrável: ' + dinheiro(valorCanceladasFuturas));
+    if (valorCanceladasFuturas) rodapesReceber.push('desmarcada em cima da hora, cobrada: ' + dinheiro(valorCanceladasFuturas));
     if (valorPrevisto || valorCanceladasFuturas) rodapesReceber.push('mês inteiro: ' + dinheiro(valor));
     numeros.appendChild(numeroComRodape('A receber', dinheiro(valorFeito), rodapesReceber));
     numeros.appendChild(numeroComRodape('Alunos', String(Object.keys(alunosNoMes).length), []));
@@ -2391,7 +2403,7 @@
 
       blocoQuandoNovo.appendChild(el('div', { class: 'faixa-info', style: 'margin-bottom:12px' }, [
         el('strong', { texto: 'Agendamento: ' }),
-        document.createTextNode('defina o aluno, a data e o horário do encontro.')
+        document.createTextNode('defina o aluno, a data e o horário da aula.')
       ]));
 
       blocoQuandoNovo.appendChild(el('label', { class: 'campo' }, [el('span', { texto: 'Aluno' }), selAluno]));
@@ -2564,23 +2576,23 @@
     if (eFutura) {
       grupoRegistro.appendChild(el('div', { class: 'faixa-info', style: 'margin-bottom:12px' }, [
         el('strong', { texto: 'Aula futura: ' }),
-        document.createTextNode('preencha esta seção após o encontro acontecer.')
+        document.createTextNode('preencha esta seção depois que a aula acontecer.')
       ]));
     } else if (!aulaEmEdicao.notaTexto && (!aulaEmEdicao.areas || !aulaEmEdicao.areas.length)) {
       if (aulaEmEdicao.status === 'cancelada') {
         grupoRegistro.appendChild(el('div', { class: 'faixa-info', style: 'margin-bottom:12px' }, [
           el('strong', { texto: 'Aula cancelada: ' }),
-          document.createTextNode('este encontro foi marcado como cancelado.')
+          document.createTextNode('esta aula foi marcada como cancelada.')
         ]));
       } else if (aulaEmEdicao.status === 'falta') {
         grupoRegistro.appendChild(el('div', { class: 'faixa-aviso', style: 'margin-bottom:12px' }, [
           el('strong', { texto: 'Falta sem aviso: ' }),
-          document.createTextNode('este encontro foi marcado como falta.')
+          document.createTextNode('esta aula foi marcada como falta.')
         ]));
       } else {
         grupoRegistro.appendChild(el('div', { class: 'faixa-aviso', style: 'margin-bottom:12px' }, [
           el('strong', { texto: 'Aula realizada: ' }),
-          document.createTextNode('confirme a situação e registre o relato do encontro.')
+          document.createTextNode('confirme a situação e registre o relato da aula.')
         ]));
       }
     }
@@ -2603,7 +2615,7 @@
     areaNota.value = aulaEmEdicao.notaTexto || '';
     grupoRegistro.appendChild(el('label', { class: 'campo', style: 'margin-top:10px' }, [
       el('div', { class: 'campo-titulo-com-destino' }, [
-        el('span', { texto: 'O que rendeu hoje', style: 'font-weight:700' }),
+        el('span', { texto: 'Relato da aula', style: 'font-weight:700' }),
         el('span', { class: 'destino-publico', texto: 'Vai para o fechamento / família' })
       ]),
       areaNota
@@ -2620,8 +2632,8 @@
     areaPrivada.value = aulaEmEdicao.notaPrivada || '';
     grupoRegistro.appendChild(el('label', { class: 'campo' }, [
       el('div', { class: 'campo-titulo-com-destino' }, [
-        el('span', { texto: 'Só minha', style: 'font-weight:700' }),
-        el('span', { class: 'destino-privado', texto: 'Nota privada · só você vê' })
+        el('span', { texto: 'Nota só minha', style: 'font-weight:700' }),
+        el('span', { class: 'destino-privado', texto: 'Só você vê' })
       ]),
       areaPrivada
     ]));
@@ -3910,7 +3922,7 @@
 
         var res = Core.aplicarViradaAnual(db, ano, escolhas, opcoes);
         if (res.erro) {
-          avisar('Não foi possível aplicar a virada anual: ' + res.erro);
+          avisar('Não foi possível aplicar o novo ano letivo: ' + res.erro);
           return;
         }
 
@@ -4218,7 +4230,7 @@
     ]));
 
     painel.dados.appendChild(el('label', { class: 'campo' }, [
-      el('span', { texto: 'Observações pedagógicas' }),
+      el('span', { texto: 'Nota só minha' }),
       (function () {
         var t = el('textarea', {
           id: 'campo-obs-pedagogicas', style: 'min-height:88px',
@@ -4239,13 +4251,13 @@
       var marcarEncontro = el('input', { type: 'checkbox', id: 'campo-agendar-mapeamento' });
       var caixaEncontro = el('div', { id: 'caixa-mapeamento-novo', style: 'display:none' });
 
-      painel.dados.appendChild(el('h3', { class: 'subtitulo', texto: 'Primeiro encontro' }));
+      painel.dados.appendChild(el('h3', { class: 'subtitulo', texto: 'Primeira aula' }));
       painel.dados.appendChild(el('label', {
         style: 'display:flex;align-items:center;gap:9px;cursor:pointer;margin-bottom:6px'
-      }, [marcarEncontro, el('span', { texto: 'Agendar encontro de mapeamento' })]));
+      }, [marcarEncontro, el('span', { texto: 'Agendar aula de mapeamento' })]));
       painel.dados.appendChild(el('div', {
         class: 'ajuda', style: 'margin-top:0',
-        texto: 'Um primeiro encontro de sondagem, para entender de onde o aluno parte antes de ' +
+        texto: 'Uma primeira aula de sondagem, para entender de onde o aluno parte antes de ' +
           'montar o plano. Abre com roteiro e com a ficha de mapeamento para preencher na hora. ' +
           'Conta como aula normal no fechamento.'
       }));
@@ -4364,7 +4376,7 @@
               el('div', {
                 class: 'detalhe',
                 texto: 'Começou em ' + Core.ddmmaaaa(se.inicio) + ', ' +
-                  Core.fmtDuracao(se.duracaoMin) + ' por encontro'
+                  Core.fmtDuracao(se.duracaoMin) + ' por aula'
               })
             ]),
             el('button', {
@@ -6489,7 +6501,7 @@
 
     var desde = aluno.desde || (aulas.length ? aulas[aulas.length - 1].data : null);
     var resumo = el('div', { class: 'numeros', style: 'margin-bottom:12px' });
-    [['Encontros', String(cobradas)],
+    [['Aulas', String(cobradas)],
     ['Horas somadas', Core.fmtHoras(minutos) + ' h'],
     ['Aluno desde', desde ? Core.ddmmaaaa(desde) : 'sem data'],
     ['Aulas marcadas', String(futurasAtivas.length)]].forEach(function (par) {
@@ -6616,7 +6628,7 @@
       var marcar = $('#campo-agendar-mapeamento');
       if (marcar && marcar.checked) {
         var dataEncontro = $('#campo-mapa-data').value;
-        if (!dataEncontro) { avisar('Informe a data do encontro de mapeamento.'); return; }
+        if (!dataEncontro) { avisar('Informe a data da aula de mapeamento.'); return; }
         encontroCriado = {
           id: Core.uid(), alunoId: criado.id, serieId: null, destacada: false,
           tipo: 'mapeamento',
@@ -6637,7 +6649,7 @@
         irParaMes(Core.mesDe(encontroCriado.data));
         abrirAula(encontroCriado.id);
         if (gravou) {
-          avisar('Aluno salvo e encontro de mapeamento marcado para ' +
+          avisar('Aluno salvo e aula de mapeamento marcada para ' +
             Core.ddmmaaaa(encontroCriado.data) + '.');
         }
         return;
@@ -7092,20 +7104,20 @@
     }));
     rodape.appendChild(el('span', {
       class: 'contador-pagina',
-      texto: 'Folha ' + (editorAtual.indicePagina + 1) + ' de ' + editorAtual.nota.paginas.length
+      texto: 'Página ' + (editorAtual.indicePagina + 1) + ' de ' + editorAtual.nota.paginas.length
     }));
     rodape.appendChild(el('button', {
       type: 'button', class: 'btn pequeno', texto: '›',
       aoClick: function () { editorAtual.irParaPagina(editorAtual.indicePagina + 1); desenharRodapeNota(aula); }
     }));
     rodape.appendChild(el('button', {
-      type: 'button', class: 'btn pequeno', texto: '+ Folha',
+      type: 'button', class: 'btn pequeno', texto: '+ Página',
       aoClick: function () { editorAtual.novaPagina(); desenharRodapeNota(aula); }
     }));
     rodape.appendChild(el('button', {
-      type: 'button', class: 'btn pequeno perigo', texto: 'Apagar folha',
+      type: 'button', class: 'btn pequeno perigo', texto: 'Apagar página',
       aoClick: function () {
-        if (!confirmar('Apagar esta folha?')) return;
+        if (!confirmar('Apagar esta página?')) return;
         editorAtual.removerPagina();
         desenharRodapeNota(aula);
       }
@@ -7115,7 +7127,7 @@
 
     rodape.appendChild(el('button', {
       type: 'button', class: 'btn pequeno', texto: 'Ajustar à tela',
-      title: 'Encaixa a folha inteira na área visível',
+      title: 'Encaixa a página inteira na área visível',
       aoClick: function () { editorAtual.ajustarNaTela(); }
     }));
     rodape.appendChild(el('button', {
@@ -7322,7 +7334,7 @@
     if (opcoes.aulaId) {
       corpo.appendChild(el('div', {
         class: 'ajuda', style: 'margin-top:0',
-        texto: 'Este mapeamento fica ligado ao encontro de hoje.'
+        texto: 'Este mapeamento fica ligado à aula de hoje.'
       }));
     }
 
@@ -7628,7 +7640,7 @@
       return el('label', { class: 'campo', 'data-campo': chave }, [el('span', { texto: rotulo }), t]);
     }
 
-    corpo.appendChild(campoLongo('prioridades', 'Prioridades para os próximos encontros',
+    corpo.appendChild(campoLongo('prioridades', 'Prioridades para as próximas aulas',
       'Duas ou três, no máximo. É isto que vai aparecer ao abrir cada aula dele.', 72));
     corpo.appendChild(campoLongo('plano', 'Diagnóstico e plano inicial',
       'O que você entendeu do aluno e como pretende trabalhar nos próximos dois meses.', 96));
@@ -7982,7 +7994,7 @@
     if (!faltam.length) return texto + '. Trilha inteira percorrida.';
     var enc = Core.encontrosPrevistos(faltam, dur);
     return texto + (feitos ? '. Faltam cerca de ' : ', cerca de ') + enc +
-      (enc === 1 ? ' encontro' : ' encontros') + ' de ' + duracaoPorExtenso(dur) + '.';
+      (enc === 1 ? ' aula' : ' aulas') + ' de ' + duracaoPorExtenso(dur) + '.';
   }
 
   /* O que uma trilha encerrada tem para dizer é o que foi feito, e até quando.
@@ -8970,15 +8982,15 @@
     linha('Assunto', u.assuntos.join('; '));
     var areas = u.areas.slice(0, 4).join(', ') +
       (u.areas.length > 4 ? ' e mais ' + (u.areas.length - 4) : '');
-    linha('Áreas', u.areas.length ? areas : '');
-    linha('O que rendeu', u.oQueRendeu);
+    linha('Habilidades e hábitos', u.areas.length ? areas : '');
+    linha('Relato da aula', u.oQueRendeu);
 
     var sinais = [];
     if (u.temFolha) sinais.push('folha escrita');
     if (u.qtdAnexos) sinais.push(u.qtdAnexos === 1 ? '1 anexo' : u.qtdAnexos + ' anexos');
     if (sinais.length) {
       linhas.push(el('div', { class: 'linha-ultimo ajuda', style: 'margin:2px 0 0',
-        texto: 'Esse encontro tem ' + sinais.join(' e ') + '.' }));
+        texto: 'Essa aula tem ' + sinais.join(' e ') + '.' }));
     }
 
     /* A anotação particular do encontro anterior sai por último e fechada.
@@ -8993,7 +9005,7 @@
       var texto = el('div', {
         class: 'linha-ultimo so-minha-anterior', id: 'so-minha-anterior', style: 'display:none'
       }, [
-        el('strong', { texto: 'Só minha: ' }),
+        el('strong', { texto: 'Nota só minha: ' }),
         document.createTextNode(u.soMinha)
       ]);
       var botao = el('button', {
@@ -9019,7 +9031,7 @@
       el('div', { class: 'barra', style: 'margin-bottom:6px' }, [
         el('span', {
           class: 'rotulo-ultimo',
-          texto: 'No último encontro, ' + Core.ddmmaaaa(u.data) + ', ' + u.diaSemana
+          texto: 'Na última aula, ' + Core.ddmmaaaa(u.data) + ', ' + u.diaSemana
         }),
         el('span', { class: 'cresce' }),
         el('button', {
@@ -9066,7 +9078,7 @@
 
     if (mexeuNoResto && !confirmar(
       'Você mudou a data, o horário, a duração, a situação ou a cobrança desta aula ' +
-      'e ainda não salvou. Abrir o outro encontro agora perde essa mudança. Abrir mesmo assim?'
+      'e ainda não salvou. Abrir a outra aula agora perde essa mudança. Abrir mesmo assim?'
     )) return;
 
     var campoNota = $('#campo-nota-texto');
@@ -9080,7 +9092,7 @@
     salvarEDepois(function (gravou) {
       fecharModal('modal-aula');
       desenharTudo();
-      if (gravou) avisar('Sua anotação foi salva antes de abrir o outro encontro.');
+      if (gravou) avisar('Sua anotação foi salva antes de abrir a outra aula.');
       setTimeout(function () { abrirAula(aulaId, null); }, 120);
     });
   }
@@ -9224,9 +9236,9 @@
   /* Roteiro do encontro de mapeamento, dentro da própria aula. */
   function desenharEncontroDeMapeamento(corpo, aluno, aula) {
     corpo.appendChild(el('div', { class: 'faixa-info' }, [
-      el('strong', { texto: 'Encontro de mapeamento. ' }),
-      document.createTextNode('Este primeiro encontro é de sondagem: entender de onde o aluno ' +
-        'parte antes de montar qualquer plano. Ele conta como aula normal no fechamento.')
+      el('strong', { texto: 'Aula de mapeamento. ' }),
+      document.createTextNode('Esta primeira aula é de sondagem: entender de onde o aluno ' +
+        'parte antes de montar qualquer plano. Ela conta como aula normal no fechamento.')
     ]));
 
     var jaTem = Core.mapeado(aluno);
@@ -10427,9 +10439,9 @@
     var numeros = $('#numeros-fechamento');
     numeros.innerHTML = '';
     numeros.appendChild(numeroComRodape('Alunos no mês', String(t.alunos), []));
-    numeros.appendChild(numeroComRodape('Encontros', String(t.encontrosFeitos), [
+    numeros.appendChild(numeroComRodape('Aulas', String(t.encontrosFeitos), [
       t.encontrosPrevistos ? 'mais ' + t.encontrosPrevistos + ' ' +
-        palavraPlural(t.encontrosPrevistos, 'marcado à frente', 'marcados à frente') : ''
+        palavraPlural(t.encontrosPrevistos, 'marcada à frente', 'marcadas à frente') : ''
     ]));
     numeros.appendChild(numeroComRodape('Horas cobradas', Core.fmtHoras(t.minFeitos) + ' h', [
       t.minPrevistos ? 'mais ' + Core.fmtHoras(t.minPrevistos) + ' h à frente' : ''
@@ -10465,12 +10477,12 @@
         class: 'ajuda', style: 'margin-top:0',
         /* Num mês já vencido nada está à frente, e a frase fica igual à de
          * sempre. O "até aqui" só aparece quando existe algo depois de hoje. */
-        texto: f.qtdEncontrosFeitos + ' encontro' + (f.qtdEncontrosFeitos === 1 ? '' : 's') +
+        texto: f.qtdEncontrosFeitos + ' aula' + (f.qtdEncontrosFeitos === 1 ? '' : 's') +
           (f.qtdEncontrosPrevistos ? ' até aqui' : '') +
           ' · ' + f.horasFeitas + ' h cobradas' +
           (f.qtdEncontrosPrevistos
             ? ' · mais ' + f.qtdEncontrosPrevistos + ' ' +
-              palavraPlural(f.qtdEncontrosPrevistos, 'marcado à frente', 'marcados à frente') +
+              palavraPlural(f.qtdEncontrosPrevistos, 'marcada à frente', 'marcadas à frente') +
               ', ' + dinheiro(f.valorPrevisto)
             : '') +
           (f.faixas.length > 1 ? ' · houve reajuste no mês' : '')
@@ -10567,15 +10579,15 @@
       }, [
         chkListas,
         el('span', {
-          texto: 'Exibir os temas e as áreas trabalhadas no documento', style: 'margin:0'
+          texto: 'Exibir os temas e as habilidades e hábitos no documento', style: 'margin:0'
         })
       ]));
       cartao.appendChild(el('div', {
         class: 'ajuda', style: 'margin:2px 0 0',
         texto: exibirTemasEAreas()
-          ? 'A família vai ver a lista de assuntos e a de áreas, com as datas de cada um.'
+          ? 'A família vai ver a lista de assuntos e a de habilidades e hábitos, com as datas de cada um.'
           : 'Por enquanto o documento leva a tabela de aulas, o total e o seu feedback. '
-            + 'Marque quando quiser que a lista de assuntos e a de áreas entrem também.'
+            + 'Marque quando quiser que a lista de assuntos e a de habilidades e hábitos entrem também.'
       }));
 
       cartao.appendChild(el('div', { class: 'acoes-doc-familia' }, [
@@ -10943,8 +10955,8 @@
     }, [
       chkTemas,
       el('span', { style: 'font-size:13px;line-height:1.3' }, [
-        el('strong', { texto: 'Exibir temas e áreas trabalhadas' }),
-        el('span', { class: 'ajuda', style: 'display:block;margin:2px 0 0', texto: 'Inclui os assuntos e áreas vistos no mês (escopo global).' })
+        el('strong', { texto: 'Exibir temas, habilidades e hábitos' }),
+        el('span', { class: 'ajuda', style: 'display:block;margin:2px 0 0', texto: 'Inclui os assuntos, as habilidades e os hábitos vistos no mês (escopo global).' })
       ])
     ]));
 
@@ -10963,8 +10975,8 @@
     }, [
       chkNotas,
       el('span', { style: 'font-size:13px;line-height:1.3' }, [
-        el('strong', { texto: 'Incluir notas públicas das aulas' }),
-        el('span', { class: 'ajuda', style: 'display:block;margin:2px 0 0', texto: 'Mostra o resumo do que rendeu em cada aula. Notas particulares nunca entram.' })
+        el('strong', { texto: 'Incluir o relato de cada aula' }),
+        el('span', { class: 'ajuda', style: 'display:block;margin:2px 0 0', texto: 'Mostra o relato de cada aula. A nota só minha nunca entra.' })
       ])
     ]));
 
@@ -11002,7 +11014,7 @@
     }));
     var ROTULOS_DOS_TITULOS = {
       documento: 'Título do documento', datas: 'Tabela das aulas', marcadas: 'Aulas ainda marcadas',
-      canceladas: 'Aulas canceladas à frente', temas: 'Temas', areas: 'Áreas', feedback: 'Feedback', notas: 'Notas das aulas'
+      canceladas: 'Aulas canceladas à frente', temas: 'Temas', areas: 'Habilidades e hábitos', feedback: 'Feedback', notas: 'Relato das aulas'
     };
     Object.keys(Core.TITULOS_FECHAMENTO).forEach(function (k) {
       var dela = (db.ajustes && db.ajustes.titulosFechamento) || {};
@@ -11030,7 +11042,7 @@
       el('span', { style: 'font-size:16px;line-height:1' }, [document.createTextNode('🔒')]),
       el('div', {}, [
         el('strong', { texto: 'Garantia de privacidade: ' }),
-        el('span', { texto: 'Observações confidenciais ("Só minha") nunca são exportadas em PDF, texto, cartão ou documento da família.' })
+        el('span', { texto: 'A nota só minha nunca é exportada em PDF, texto, cartão ou documento da família.' })
       ])
     ]));
 
@@ -11688,7 +11700,7 @@
       var so = au ? (au.notaPrivada || '').trim() : '';
       if (so) {
         bloco.appendChild(el('div', { class: 'so-minha' }, [
-          el('span', { class: 'rotulo-so-minha', texto: 'Só minha' }),
+          el('span', { class: 'rotulo-so-minha', texto: 'Nota só minha' }),
           document.createTextNode(so)
         ]));
       }
@@ -11716,9 +11728,11 @@
 
     var c = contaDeEncontros(f.linhas);
     var numeros = el('div', { class: 'numeros' });
-    numeros.appendChild(numeroComRodape('Encontros', String(c.feitos), [
-      c.previstos ? 'mais ' + c.previstos + ' ' +
-        palavraPlural(c.previstos, 'marcado à frente', 'marcados à frente') : ''
+    // a mesma janela é mostrada à família: lá continua encontro
+    numeros.appendChild(numeroComRodape(modoFamilia ? 'Encontros' : 'Aulas', String(c.feitos), [
+      c.previstos ? 'mais ' + c.previstos + ' ' + (modoFamilia
+        ? palavraPlural(c.previstos, 'marcado à frente', 'marcados à frente')
+        : palavraPlural(c.previstos, 'marcada à frente', 'marcadas à frente')) : ''
     ]));
     numeros.appendChild(numeroComRodape('Horas', Core.fmtHoras(c.minFeitos) + ' h', [
       c.minPrevistos ? 'mais ' + Core.fmtHoras(c.minPrevistos) + ' h à frente' : ''
@@ -11756,7 +11770,7 @@
 
     if (!f.linhas.length) {
       corpo.appendChild(el('div', { class: 'vazio' }, [
-        el('p', { texto: 'Nenhum encontro registrado neste mês.' })
+        el('p', { texto: modoFamilia ? 'Nenhum encontro registrado neste mês.' : 'Nenhuma aula registrada neste mês.' })
       ]));
     } else {
       f.linhas.forEach(function (l) { corpo.appendChild(blocoDaAula(l)); });
@@ -12019,7 +12033,7 @@
         }));
       } else {
         info.appendChild(el('span', {
-          texto: 'Nenhuma virada anual de séries registrada ainda neste aparelho.'
+          texto: 'Nenhum novo ano letivo registrado ainda neste aparelho.'
         }));
       }
     }
@@ -16614,7 +16628,7 @@
       fecharVisor();
       desenharAgenda();
       abrirEditorNota(aulaId, indice);
-      avisar('Colado na folha da aula (folha ' + (indice + 1) + ').');
+      avisar('Colado na folha da aula (página ' + (indice + 1) + ').');
     }).catch(function (e) {
       if (e && e.desfeita) return;
       avisar('Não consegui colar na folha. Tente de novo.');

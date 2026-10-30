@@ -110,19 +110,19 @@ secao('4. O fechamento em Markdown');
 const md = Core.markdownFechamento(f, { incluirNotas: false, exibirTemasEAreas: true });
 conf('tem a seção de temas', md.indexOf('## Temas trabalhados') >= 0, true);
 conf('com o tema e as datas', md.indexOf('- Equações do primeiro grau (01/06, 03/06)') >= 0, true);
-conf('tem a seção de áreas', md.indexOf('## Áreas trabalhadas') >= 0, true);
+conf('tem a seção de áreas', md.indexOf('## Habilidades e hábitos') >= 0, true);
 conf('marca quantas aulas quando repete', md.indexOf('(2 aulas)') >= 0, true);
 conf('e não marca quando foi uma só', md.indexOf('Preparação emocional para a prova\n') >= 0 ||
   md.indexOf('- Preparação emocional para a prova') >= 0, true);
 conf('o feedback continua depois disso',
-  md.indexOf('## Áreas trabalhadas') < md.indexOf('## Feedback'), true);
+  md.indexOf('## Habilidades e hábitos') < md.indexOf('## Feedback'), true);
 conf('nenhum travessão no fechamento', /[–—]/.test(md), false);
 
 const dbVazio = bancoDeProva();
 dbVazio.aulas.forEach(a => { delete a.temas; delete a.areas; });
 const mdVazio = Core.markdownFechamento(Core.calcularFechamento(dbVazio, 'al1', '2026-06'), {});
 conf('sem temas, a seção não aparece', mdVazio.indexOf('## Temas trabalhados') >= 0, false);
-conf('sem áreas, a seção não aparece', mdVazio.indexOf('## Áreas trabalhadas') >= 0, false);
+conf('sem áreas, a seção não aparece', mdVazio.indexOf('## Habilidades e hábitos') >= 0, false);
 conf('e o fechamento continua completo', mdVazio.indexOf('## Feedback') >= 0, true);
 
 // ================================================================
@@ -134,11 +134,11 @@ secao('4b. Por padrão o documento não leva as duas listas');
  * antes de o registro de assunto existir. */
 const mdPadrao = Core.markdownFechamento(f, { incluirNotas: false });
 conf('sem pedir, a seção de temas não sai', mdPadrao.indexOf('## Temas trabalhados') >= 0, false);
-conf('sem pedir, a seção de áreas não sai', mdPadrao.indexOf('## Áreas trabalhadas') >= 0, false);
+conf('sem pedir, a seção de áreas não sai', mdPadrao.indexOf('## Habilidades e hábitos') >= 0, false);
 conf('mas o feedback continua saindo', mdPadrao.indexOf('## Feedback') >= 0, true);
 conf('e a tabela de aulas também', mdPadrao.indexOf('**Aluno:**') >= 0, true);
 conf('pedindo, as duas voltam',
-  md.indexOf('## Temas trabalhados') >= 0 && md.indexOf('## Áreas trabalhadas') >= 0, true);
+  md.indexOf('## Temas trabalhados') >= 0 && md.indexOf('## Habilidades e hábitos') >= 0, true);
 
 // ================================================================
 secao('5. Dividir a aula em duas');
