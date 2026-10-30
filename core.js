@@ -699,7 +699,7 @@
         { id: 'horarios', rotulo: 'Organização dos horários' },
         { id: 'cronograma', rotulo: 'Montagem do cronograma' },
         { id: 'priorizacao', rotulo: 'Priorização do que estudar' },
-        { id: 'disciplina', rotulo: 'Disciplina e constância' },
+        { id: 'disciplina', rotulo: 'Disciplina e constância', familia: 'Rotina e constância nos estudos' },
         { id: 'metodo', rotulo: 'Método de estudo (resumo, mapa, ficha)' },
         { id: 'material', rotulo: 'Organização do material e do caderno' },
         { id: 'tempo', rotulo: 'Uso do tempo e foco' }
@@ -718,18 +718,18 @@
     {
       grupo: 'Postura e emocional',
       itens: [
-        { id: 'frustracao', rotulo: 'Lidar com frustrações' },
-        { id: 'ansiedade', rotulo: 'Ansiedade ou medo de prova' },
-        { id: 'confianca', rotulo: 'Confiança e autoestima' },
-        { id: 'persistencia', rotulo: 'Persistir na questão difícil' },
-        { id: 'pedir-ajuda', rotulo: 'Pedir ajuda e tirar dúvida' },
+        { id: 'frustracao', rotulo: 'Lidar com frustrações', familia: 'Como lidar com erro e frustração' },
+        { id: 'ansiedade', rotulo: 'Ansiedade ou medo de prova', familia: 'Preparação emocional para a prova' },
+        { id: 'confianca', rotulo: 'Confiança e autoestima', familia: 'Confiança nos estudos' },
+        { id: 'persistencia', rotulo: 'Persistir na questão difícil', familia: 'Persistência na questão difícil' },
+        { id: 'pedir-ajuda', rotulo: 'Pedir ajuda e tirar dúvida', familia: 'Como tirar dúvidas' },
         { id: 'concentracao', rotulo: 'Concentração' }
       ]
     },
     {
       grupo: 'Conteúdo e raciocínio',
       itens: [
-        { id: 'base', rotulo: 'Retomada de base de anos anteriores' },
+        { id: 'base', rotulo: 'Retomada de base de anos anteriores', familia: 'Base de anos anteriores' },
         { id: 'raciocinio', rotulo: 'Raciocínio lógico' },
         { id: 'argumentacao', rotulo: 'Argumentação e justificativa escrita' },
         /* `so` copia o padrão do MAPA: a área que só existe numa matéria diz
@@ -741,12 +741,22 @@
     }
   ];
 
+  /* O RÓTULO DE FAMÍLIA (C6, lente da pedagoga P07). O rótulo dela é o
+   * registro de trabalho, e pode ser duro ("Ansiedade ou medo de prova"); a
+   * família lê o fechamento dentro de um documento de cobrança, e a criança
+   * pode ler também. Por isso o que sai para fora descreve o TRABALHO feito, e
+   * não a condição da criança. Sem `familia`, o rótulo já serve para os dois. */
   var ROTULO_AREA = {};
+  var ROTULO_AREA_FAMILIA = {};
   AREAS.forEach(function (g) {
-    g.itens.forEach(function (i) { ROTULO_AREA[i.id] = i.rotulo; });
+    g.itens.forEach(function (i) {
+      ROTULO_AREA[i.id] = i.rotulo;
+      ROTULO_AREA_FAMILIA[i.id] = i.familia || i.rotulo;
+    });
   });
 
   function rotuloArea(id) { return ROTULO_AREA[id] || ''; }
+  function rotuloAreaFamilia(id) { return ROTULO_AREA_FAMILIA[id] || ''; }
 
   /* As áreas que fazem sentido oferecer para um conjunto de matérias.
    *
@@ -919,8 +929,8 @@
         { id: 'nao-revisa', rotulo: 'Não revisa a prova depois de corrigida', sobre: 'aluno' },
         { id: 'vespera', rotulo: 'Estuda só na véspera', sobre: 'aluno' },
         { id: 'caderno-fraco', rotulo: 'Caderno incompleto', sobre: 'aluno' },
-        { id: 'dispersa', rotulo: 'Dispersa com facilidade', sobre: 'aluno' },
-        { id: 'depende', rotulo: 'Depende de ajuda para começar', sobre: 'aluno' },
+        { id: 'dispersa', rotulo: 'Perde o foco na tarefa longa', sobre: 'aluno' },
+        { id: 'depende', rotulo: 'Precisa de impulso para começar', sobre: 'aluno' },
         { id: 'fora-do-modelo', rotulo: 'Trava quando a questão foge do modelo', sobre: 'materia' },
         { id: 'ansiedade-prova', rotulo: 'Ansiedade perto da prova', sobre: 'aluno' },
         { id: 'conteudo-atrasado', rotulo: 'Está atrás do conteúdo que a turma está vendo', sobre: 'materia' },
@@ -2100,7 +2110,7 @@
    * inteira escondia o defeito numa seção e o devolvia quatro centímetros
    * abaixo com outro rótulo: medido no mapeamento de dez pontos de atenção, a
    * proposta saía com zero pontos de atenção impressos e oito áreas marcadas,
-   * entre elas "Concentração", que é "Dispersa com facilidade", e "Ansiedade
+   * entre elas "Concentração", que é "Perde o foco na tarefa longa", e "Ansiedade
    * ou medo de prova", que é "Ansiedade perto da prova". A área só nasce
    * marcada quando o ponto de atenção que a gerou está marcado, e como os
    * pontos de atenção nascem desmarcados, as áreas nascem vazias e ela marca
@@ -2404,7 +2414,7 @@
     AREAS.forEach(function (g) {
       var itens = g.itens
         .filter(function (i) { return (p.areas || []).indexOf(i.id) >= 0; })
-        .map(function (i) { return i.rotulo; });
+        .map(function (i) { return i.familia || i.rotulo; }); // a proposta vai à família: rótulo de família (C6)
       if (itens.length) areasPorGrupo.push({ grupo: g.grupo, itens: itens });
     });
 
@@ -2911,9 +2921,12 @@
         if (!l.futura) contagemFeitas[id] = (contagemFeitas[id] || 0) + 1;
       });
     });
+    /* O fechamento é o documento da família: o `rotulo` das áreas dele é o de
+     * família (C6). O texto, o PDF, a prévia, o cartão e "O mês numa tela"
+     * leem daqui, então nenhum deles carrega o rótulo interno. */
     function listaDeAreas(cont) {
       return Object.keys(cont).map(function (id) {
-        return { id: id, rotulo: rotuloArea(id), vezes: cont[id] };
+        return { id: id, rotulo: rotuloAreaFamilia(id), vezes: cont[id] };
       }).filter(function (a) { return a.rotulo; })
         .sort(function (a, b) { return b.vezes - a.vezes || a.rotulo.localeCompare(b.rotulo); });
     }
@@ -3329,8 +3342,8 @@
    * perguntas são dela também: o que ela reescreve mora em
    * db.ajustes.roteiroFeedback.perguntas, e pergunta apagada volta à padrão. */
   var PERGUNTAS_DO_ROTEIRO = [
-    'O que ele conseguiu fazer sozinho neste mês?',
-    'Onde ainda precisa de mim?',
+    'O que já consegue fazer sem ajuda neste mês?',
+    'Onde ainda precisa de apoio?',
     'O que vem no próximo mês?'
   ];
 
@@ -3998,7 +4011,7 @@
     markdownFechamento: markdownFechamento, markdownMesInteiro: markdownMesInteiro,
     TITULOS_FECHAMENTO: TITULOS_FECHAMENTO, titulosDoFechamento: titulosDoFechamento, tituloMaximo: tituloMaximo,
     PERGUNTAS_DO_ROTEIRO: PERGUNTAS_DO_ROTEIRO, perguntasDoRoteiro: perguntasDoRoteiro, textoDoRoteiro: textoDoRoteiro,
-    AREAS: AREAS, rotuloArea: rotuloArea, areasPara: areasPara, temasDaAula: temasDaAula,
+    AREAS: AREAS, rotuloArea: rotuloArea, rotuloAreaFamilia: rotuloAreaFamilia, areasPara: areasPara, temasDaAula: temasDaAula,
     ultimoEncontro: ultimoEncontro,
     MAPA: MAPA, NIVEIS: NIVEIS, itemDoMapa: itemDoMapa, rotulosDoMapa: rotulosDoMapa,
     rotuloNivel: rotuloNivel, mapeamentoNovo: mapeamentoNovo, mapeamentosDe: mapeamentosDe,
