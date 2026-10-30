@@ -191,6 +191,121 @@ secao('3. A regra que fecha o passo da trilha, e quem a usa');
 provasDaRegra(Core, conf);
 
 // ================================================================
+/* O revisarTrilhasDoAluno de VERDADE, tirado do app.js e posto para rodar
+ * aqui com o Core que se quiser: é ele que a tela chama ao salvar a aula, e a
+ * prova do passo antigo tem de passar pelo caminho real. A extração grita
+ * quando não acha a função, porque prova vazia passa. */
+const APP = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8').replace(/\r\n/g, '\n');
+const REVISAR = (() => {
+  const ini = APP.indexOf('  function revisarTrilhasDoAluno(alunoId) {');
+  const fim = ini < 0 ? -1 : APP.indexOf('\n  }\n', ini);
+  return ini < 0 || fim < 0 ? '' : APP.slice(ini, fim + 4);
+})();
+function revisarDoApp(C, ctx) {
+  return new Function('Core', 'ctx',
+    'function alunoPorId(id) { return (ctx.db.alunos || []).filter(function (a) { return a.id === id; })[0]; }\n' +
+    'return function (alunoId) { var db = ctx.db;\n' + REVISAR + '\n  return revisarTrilhasDoAluno(alunoId); };')(C, ctx);
+}
+
+/* Caso 1 da revisão: o passo fechado pela regra ANTIGA (aula dada, sem
+ * porDominio) solta quando a aula vira falta ou cancelada, e volta quando a
+ * MESMA aula volta a realizada com o assunto. Passo novo volta só por Domina. */
+function provasDoPassoAntigo(C, conferir) {
+  const ctx = { db: null };
+  const revisar = revisarDoApp(C, ctx);
+  function banco() {
+    return {
+      alunos: [{ id: ALUNO, nome: 'Aluno Alfa Teste', trilhas: [C.criarTrilha({
+        alunoId: ALUNO, titulo: 'Operações com frações', alvoId: 'MAT06-06', criadaEm: '2026-04-01',
+        passos: [
+          { temaId: T1.id, titulo: T1.titulo, feitoEm: '2026-05-01', aulaId: 'A1' },                    // regra antiga
+          { temaId: T2.id, titulo: T2.titulo, feitoEm: '2026-05-02', aulaId: 'A2', porDominio: true },  // regra nova
+          { temaId: T3.id, titulo: T3.titulo, feitoEm: null, aulaId: null }
+        ] })] }],
+      aulas: [
+        aula('A1', '2026-05-01', [item(T1)]),
+        aula('A2', '2026-05-02', [item(T2, 'domina')]),
+        aula('A3', '2026-05-03', [item(T1), item(T3)])   // outra aula com o assunto do passo antigo, sem marca
+      ]
+    };
+  }
+  const p = (db, i) => db.alunos[0].trilhas[0].passos[i];
+  const a = (db, id) => db.aulas.filter(x => x.id === id)[0];
+
+  let db = ctx.db = banco();
+  conferir('a revisão do app foi extraída (o caminho real roda aqui)', REVISAR.split('\n').length > 30, true);
+  conferir('sem mexida, a revisão não muda passo nenhum', revisar(ALUNO), { soltos: 0, remarcados: 0 });
+  conferir('o passo antigo continua fechado sem marca de domínio', p(db, 0).feitoEm, '2026-05-01');
+  conferir('e o assunto dado em A3, sem marca, não fecha o passo aberto', p(db, 2).feitoEm, null);
+
+  ['falta', 'cancelada'].forEach(st => {
+    db = ctx.db = banco();
+    a(db, 'A1').status = st;
+    conferir('passo antigo: A1 vira ' + st + ', o passo solta', [revisar(ALUNO).soltos, p(db, 0).feitoEm], [1, null]);
+    a(db, 'A1').status = 'realizada';
+    const volta = revisar(ALUNO);
+    conferir('passo antigo: A1 volta a realizada com o assunto, o passo volta', [p(db, 0).feitoEm, p(db, 0).aulaId], ['2026-05-01', 'A1']);
+    conferir('e o aviso tem o que contar: um passo voltou', volta.remarcados, 1);
+    conferir('continua da regra antiga, sem porDominio', !!p(db, 0).porDominio, false);
+  });
+
+  db = ctx.db = banco();
+  a(db, 'A1').status = 'cancelada'; revisar(ALUNO);
+  a(db, 'A1').temas = []; a(db, 'A1').status = 'realizada'; revisar(ALUNO);
+  conferir('passo antigo: A1 de volta, mas SEM o assunto, não devolve', p(db, 0).feitoEm, null);
+  conferir('e outra aula com o mesmo assunto, sem Domina, também não (só a aula de origem)', p(db, 0).aulaId, null);
+
+  db = ctx.db = banco();
+  a(db, 'A1').temas = []; revisar(ALUNO);
+  conferir('passo antigo: tirar o assunto de A1 solta', p(db, 0).feitoEm, null);
+  a(db, 'A1').temas = [item(T1)]; revisar(ALUNO);
+  conferir('e devolver o assunto (Desfazer) devolve o passo', p(db, 0).feitoEm, '2026-05-01');
+
+  db = ctx.db = banco();
+  a(db, 'A2').status = 'cancelada'; revisar(ALUNO);
+  conferir('passo novo: A2 cancelada solta', p(db, 1).feitoEm, null);
+  delete a(db, 'A2').temas[0].dominio;
+  a(db, 'A2').status = 'realizada'; revisar(ALUNO);
+  conferir('passo novo: A2 de volta sem Domina não devolve (só por Domina)', p(db, 1).feitoEm, null);
+  a(db, 'A2').temas[0].dominio = 'domina'; revisar(ALUNO);
+  conferir('passo novo: com Domina, volta', [p(db, 1).feitoEm, p(db, 1).porDominio], ['2026-05-02', true]);
+}
+
+secao('3b. Passo da regra antiga: a ida e volta de situação da aula');
+provasDoPassoAntigo(Core, conf);
+
+// ================================================================
+secao('3c. O toque no domínio não mexe em trilha encerrada');
+
+(function () {
+  const t9 = { id: 'MAT06-03', titulo: T3.titulo };
+  const ativa = trilha(Core);
+  const encerrada = trilha(Core);
+  const a9 = aula('A9', '2026-06-09', [item(t9, 'domina')]);
+  const al = { id: ALUNO, trilhas: [ativa, encerrada] };
+  const db = { alunos: [al], aulas: [a9] };
+  Core.marcarPassoPorAssunto(al, a9, a9.temas[0]);
+  conf('Domina em A9 fecha o passo da trilha ativa', ativa.passos[2].feitoEm, '2026-06-09');
+  // a segunda trilha fecha o mesmo passo e é encerrada
+  encerrada.passos[2].feitoEm = '2026-06-09'; encerrada.passos[2].aulaId = 'A9'; encerrada.passos[2].porDominio = true;
+  Core.encerrarTrilha(encerrada, '2026-06-10', 'fechou');
+  Core.marcarDominio(a9.temas[0], 'andamento');
+  const r = Core.revisarDominioNaAula(db, al, a9, t9.id);
+  conf('"Em andamento" em A9 solta o passo da ativa', [ativa.passos[2].feitoEm, r.soltos], [null, 1]);
+  conf('e NÃO mexe no passo da trilha encerrada', [encerrada.passos[2].feitoEm, encerrada.passos[2].aulaId], ['2026-06-09', 'A9']);
+  Core.marcarDominio(a9.temas[0], 'domina');
+  Core.marcarPassoPorAssunto(al, a9, a9.temas[0]);
+  conf('Domina de novo fecha a ativa de novo', ativa.passos[2].feitoEm, '2026-06-09');
+  // outra aula que ainda fecha o passo segura a marca
+  const a8 = aula('A8', '2026-06-02', [item(t9, 'domina')]);
+  db.aulas.push(a8);
+  Core.marcarDominio(a9.temas[0], '');
+  const r2 = Core.revisarDominioNaAula(db, al, a9, t9.id);
+  conf('tirar o Domina de A9 com A8 ainda em Domina: o passo fica, por A8', [ativa.passos[2].aulaId, r2.soltos, r2.remarcados], ['A8', 0, 1]);
+  conf('Domina ainda marcado na aula: nada muda', Core.revisarDominioNaAula(db, al, a8, t9.id), { soltos: 0, remarcados: 0 });
+})();
+
+// ================================================================
 secao('4. A cópia de segurança leva o domínio');
 
 /* A cópia (Store.exportarTudo) leva `dados: db` inteiro em JSON, e restaurar
@@ -286,6 +401,30 @@ Object.keys(VENENOS).forEach(nome => {
   console.log('       veneno ' + nome + ': ' + n + ' prova(s) da regra reprovaram');
   conf('veneno ' + nome + ': reprova (veneno visto)', typeof n === 'number' && n > 0, true);
 });
+
+/* O veneno do passo antigo: uma cópia que ESQUECE a aula de origem ao soltar
+ * (o comportamento do primeiro C1, que a revisão reprovou). A prova da seção
+ * 3b roda contra ela, com o revisarTrilhasDoAluno de verdade, e TEM de
+ * reprovar; antes, o core.js de verdade pelo mesmo carregador passa. */
+function contarFalhasAntigo(C) {
+  let n = 0;
+  provasDoPassoAntigo(C, (rotulo, obtido, esperado) => {
+    if (JSON.stringify(obtido) !== JSON.stringify(esperado)) n++;
+  });
+  return n;
+}
+let controleAntigo;
+try { controleAntigo = contarFalhasAntigo(carregar(FONTE, 'core_de_verdade_antigo.js')); } catch (e) { controleAntigo = 'erro: ' + e.message; }
+conf('controle: a prova do passo antigo passa com o core.js de verdade pelo carregador', controleAntigo, 0);
+const LEMBRA = '    if (p.aulaId && !p.porDominio) p.aulaDada = p.aulaId;\n    else delete p.aulaDada;\n';
+const esquece = FONTE.split(LEMBRA).length === 2 ? FONTE.replace(LEMBRA, '    delete p.aulaDada;\n') : null;
+conf('veneno esquece-a-aula: a troca foi aplicada', esquece !== null, true);
+if (esquece) {
+  let n;
+  try { n = contarFalhasAntigo(carregar(esquece, 'core_esquece.js')); } catch (e) { n = 'erro: ' + e.message; }
+  console.log('       veneno esquece-a-aula: ' + n + ' prova(s) do passo antigo reprovaram');
+  conf('veneno esquece-a-aula: reprova (veneno visto)', typeof n === 'number' && n > 0, true);
+}
 
 // ================================================================
 console.log('\n' + '='.repeat(60));
