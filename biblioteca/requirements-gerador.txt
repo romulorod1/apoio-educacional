@@ -1,0 +1,15 @@
+# O que o GERADOR de pacotes (biblioteca/gerar_pacote.py) usa, na versao exata.
+#
+# A versao do PyMuPDF muda o SVG de um mesmo recorte: gerada com a 1.28.2, a
+# versao 8 do 9o ano saiu com 291 imagens diferentes da 7, sem nenhum recorte
+# ter mudado. Todos os pacotes publicados ate a v8 sairam da 1.27.2.3, e o
+# gerador recusa rodar com outra (a frase diz qual instalar). Trocar de versao
+# e decisao de pacote novo, com a fidelidade medida de novo, e nao detalhe de
+# maquina.
+#
+# Diferente do _teste/requirements.txt, que e o das PROVAS do portao (elas
+# chamam as funcoes do gerador e conferem forma e regra, nao o SVG gravado).
+#
+#   python -m venv .venv-gerador
+#   .venv-gerador/Scripts/python -m pip install -r biblioteca/requirements-gerador.txt
+pymupdf==1.27.2.3

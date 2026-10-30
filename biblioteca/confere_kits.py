@@ -42,7 +42,7 @@ import sys
 import zipfile
 from decimal import Decimal, ROUND_HALF_UP
 
-REGRAS = ('kits-v1', 'listas-v1', 'listas-v2')
+REGRAS = ('kits-v1', 'listas-v1', 'listas-v2', 'base-v1')
 # A listas-v2 e a listas-v1 com o orcamento de UMA AULA em vez de meia (pedido
 # do Romulo em 24/09). Tudo o que nao e tempo e igual; o que muda e a banda da
 # I5 e o teto da I6, escritos aqui a partir do texto e nao lidos do gerador.
@@ -323,6 +323,12 @@ def confere_um_kit(kit, por_id, paginas_de_teoria, itens_do_modulo, a):
     if fora:
         a.duro('I1: %s nao e do modulo %s' % (fora[0], kit['modulo']))
 
+    # A LISTA DE BASE (base-v1) tem regra propria, e as invariantes de rampa (I2
+    # a I7) nao sao dela: ela afirma posicao na fonte, e nao degrau.
+    if regra == 'base-v1':
+        confere_base(kit, itens, itens_do_modulo, a)
+        return
+
     seq = [d['degrau'] for d in degraus]
     for k in range(len(seq) - 1):
         if seq[k + 1] < seq[k]:
@@ -456,6 +462,78 @@ def confere_um_kit(kit, por_id, paginas_de_teoria, itens_do_modulo, a):
                                           'no limiar de %.2f ou acima' % (x + 1, y + 1, s, LIMIAR_REPETIDOS))
 
     return itens
+
+
+# ------------------------------------------------------------------ base-v1
+# A LISTA DE BASE, escrita do texto da regra (CONTRATO, secao 8h) e NAO
+# importada do kits.py: duas implementacoes que concordam sao a prova; uma que
+# pergunta a outra nao prova nada.
+#   B1 so item do primeiro terco (ceil(n/3)) da sua lista de origem, contando
+#      os exercicios que o pacote traz daquela lista, ordenados pelo numero;
+#   B2 so item com solucao e que nao remete a outro exercicio; sem dois quase
+#      iguais (semelhanca 0,45 ou mais) entre os candidatos de uma lista;
+#   B3 a ordem e a da fonte revezando as listas, e a lista e EXATAMENTE o que a
+#      regra escolhe: na ordem, entra todo item que ainda cabe ate 66 minutos,
+#      ate a soma passar de 54 ou chegar a 24 itens;
+#   B4 nivel 1, sem teoria e sem alternativas; `relaxou` e ["minutos"] quando, e
+#      so quando, a soma fica abaixo de 54.
+
+def candidatos_da_base(itens_do_modulo):
+    listas = {}
+    for it in itens_do_modulo:
+        listas.setdefault(it['aula']['n'], []).append(it)
+    por_lista = []
+    for n in sorted(listas):
+        da_lista = sorted(listas[n], key=lambda i: (i['numero'], i['id']))
+        corte = -(-len(da_lista) // 3)
+        aptos = [i for i in da_lista[:corte]
+                 if not i.get('sem_solucao') and (i.get('assets') or {}).get('solucao') and not referencia(i)]
+        ficam = []
+        for it in aptos:
+            if all(semelhanca(it, outro) < 0.45 for outro in ficam):
+                ficam.append(it)
+        por_lista.append(ficam)
+    ordem = []
+    for k in range(max([len(p) for p in por_lista] or [0])):
+        for p in por_lista:
+            if k < len(p):
+                ordem.append(p[k])
+    return ordem
+
+
+def confere_base(kit, itens, itens_do_modulo, a):
+    if kit['nivel'] != 1:
+        a.duro('B4: a lista de base e o nivel 1, e veio %r' % kit['nivel'])
+    if kit['teoria']:
+        a.duro('B4: a lista de base nao leva teoria')
+    if kit['alternativas']:
+        a.duro('B4: a lista de base nao leva alternativas')
+    terco = {}
+    for it in itens_do_modulo:
+        terco.setdefault(it['aula']['n'], []).append(it)
+    for it in itens:
+        da_lista = sorted(terco[it['aula']['n']], key=lambda i: (i['numero'], i['id']))
+        corte = -(-len(da_lista) // 3)
+        if it['id'] not in [i['id'] for i in da_lista[:corte]]:
+            a.duro('B1: %s nao esta no primeiro terco da lista de origem %s' % (it['id'], it['aula']['n']))
+        if referencia(it):
+            a.duro('B2: %s remete a outro exercicio' % it['id'])
+    escolhidos, soma = [], Decimal(0)
+    for it in candidatos_da_base(itens_do_modulo):
+        if len(escolhidos) >= 24 or soma >= Decimal(54):
+            break
+        m = minutos_do_item(it)
+        if soma + m <= Decimal(66):
+            escolhidos.append(it['id'])
+            soma += m
+    if [i['id'] for i in itens] != escolhidos:
+        a.duro('B3: a lista nao e a que a regra escolhe (veio %d itens, a regra da %d)' % (len(itens), len(escolhidos)))
+    # o afrouxamento e registrado como o das outras listas: a conferencia geral
+    # de `relaxou` cobra os dois sentidos (o que caiu esta declarado, e nada
+    # declarado deixou de cair)
+    total = sum((minutos_do_item(it) for it in itens), Decimal(0))
+    if total < Decimal(54):
+        a.frouxo('minutos', 'B4: a lista de base soma %s minutos, abaixo de 54 (o primeiro terco do modulo nao chega)' % total)
 
 
 def bateria_de_subitens(kit, itens_do_kit, itens_do_modulo, a):

@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.30.0';
+  var VERSAO = '1.31.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,16 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.31.0',
+      itens: [
+        'Cada assunto da Biblioteca passa a ter também a "Lista de base": uma aula com os exercícios do começo ' +
+          'de cada lista da OBMEP, na ordem em que aparecem lá. Ela aparece quando você importar a versão nova ' +
+          'dos pacotes de exercícios.',
+        'As listas prontas mostram o nível: Base, Regular ou Aprofundamento, as mesmas palavras do nível que ' +
+          'você dá às suas listas.'
+      ]
+    },
     {
       versao: '1.30.0',
       itens: [
@@ -12722,7 +12732,7 @@
         var minutosDe = Object.create(null);
         (k.degraus || []).forEach(function (d) { minutosDe[d.item] = d.minutos; });
         (arv.listasPorModulo[k.modulo] = arv.listasPorModulo[k.modulo] || []).push({
-          id: k.id, modulo: k.modulo, nivel: k.nivel, minutos: k.minutos,
+          id: k.id, modulo: k.modulo, nivel: k.nivel, minutos: k.minutos, regra: k.regra,
           itens: itens, ids: itens.map(function (it) { return it.id; }), minutosDe: minutosDe
         });
       });
@@ -13144,6 +13154,9 @@
       linha.setAttribute('data-lista-pronta', lp.id);
       linha.querySelector('.cresce').appendChild(
         el('div', { class: 'detalhe bib-lp-minutos', texto: minutosEstimados(lp.minutos, true, true) }));
+      // a etiqueta fica fora do .nome: o nome da linha continua sendo só o nome
+      var etiqueta = etiquetaDeNivel(lp);
+      if (etiqueta) linha.querySelector('.cresce').appendChild(el('div', { class: 'detalhe bib-lp-nivel-linha' }, [etiqueta]));
       corpo.appendChild(linha);
     });
     /* A FRASE DIZ DE ONDE VEM A ORDEM E O "DESAFIO", e não o que a gente
@@ -13165,6 +13178,14 @@
       texto: curados ? 'Desafios são os exercícios marcados como mais difíceis.'
         : 'A lista segue a posição dos exercícios nas listas da OBMEP: os que estavam mais no começo vêm antes, ' +
           'e os do fim, os desafios, vêm por último. Eles costumam ser os mais difíceis.' }));
+    /* A LISTA DE BASE AFIRMA POSIÇÃO, e a frase diz isso com essas letras: ela
+     * junta o começo de cada lista da fonte, e ninguém avaliou exercício por
+     * exercício. */
+    if (listas.some(function (lp) { return lp.regra === 'base-v1'; })) {
+      corpo.appendChild(el('p', { class: 'ajuda bib-lp-ajuda-base', id: 'bib-lp-ajuda-base',
+        texto: 'A lista de base junta, para uma aula, os exercícios do começo de cada lista da OBMEP, na ordem em ' +
+          'que aparecem lá. É a posição deles na fonte, e não uma avaliação de cada exercício.' }));
+    }
   }
 
   /* A lista que ela está mexendo agora: a última carregada, enquanto ao menos
@@ -13231,7 +13252,7 @@
   function comoSeChama(lp) {
     var n = desafiosDe(lp);
     var irmas = (bib && bib.listasPorModulo && bib.listasPorModulo[lp.modulo]) || [];
-    var empate = irmas.some(function (o) { return o.id !== lp.id && desafiosDe(o) === n; });
+    var empate = irmas.some(function (o) { return o.id !== lp.id && o.regra !== 'base-v1' && desafiosDe(o) === n; });
     if (empate) {
       return 'com ' + plural(lp.itens.length, 'exercício', 'exercícios') +
         (n ? ' e ' + plural(n, 'desafio', 'desafios') : ', sem desafio');
@@ -13239,7 +13260,16 @@
     return n ? 'com ' + plural(n, 'desafio', 'desafios') : 'sem desafio';
   }
 
-  function nomeDaListaPronta(lp) { return 'Lista ' + comoSeChama(lp); }
+  /* A LISTA DE BASE (C2b) se chama pelo que é. As outras seguem chamadas pelos
+   * desafios, e o desempate entre irmãs não conta a de base, que não é rampa. */
+  function nomeDaListaPronta(lp) { return lp.regra === 'base-v1' ? 'Lista de base' : 'Lista ' + comoSeChama(lp); }
+  /* A etiqueta de nível das listas prontas (D14 do dono): Base, Regular e
+   * Aprofundamento, as mesmas palavras do nível que ela dá às listas dela. */
+  var ETIQUETA_DO_NIVEL = { 1: 'Base', 2: 'Regular', 3: 'Aprofundamento' };
+  function etiquetaDeNivel(lp) {
+    var nome = ETIQUETA_DO_NIVEL[lp.nivel];
+    return nome ? el('span', { class: 'bib-minha-nivel bib-lp-nivel', texto: 'Nível ' + nome }) : null;
+  }
 
   function listaProntaPorId(id) {
     var todas = bib && bib.listasPorModulo;
@@ -13955,6 +13985,8 @@
   function desenharPreviaDaLista(corpo, mod, lp) {
     corpo.appendChild(voltarBib(mod.titulo, function () { irNaBiblioteca({ aula: null }); }));
     corpo.appendChild(el('h3', { class: 'subtitulo bib-titulo', texto: nomeDaListaPronta(lp) }));
+    // a etiqueta de nível fica FORA do título: o título é o nome, e quem lê o nome lê só o nome
+    if (etiquetaDeNivel(lp)) corpo.appendChild(el('div', { class: 'bib-lp-nivel-titulo' }, [etiquetaDeNivel(lp)]));
     corpo.appendChild(el('div', { class: 'bib-lp-cabeca', id: 'bib-lp-previa-cabeca' }, [
       el('div', { class: 'bib-lp-meia', texto: plural(lp.ids.length, 'exercício', 'exercícios') +
         (umaAula(lp.minutos) ? ' · ' + umaAula(lp.minutos) : '') }),
@@ -14025,6 +14057,7 @@
       bibCarrinho.itens.length && totalDesafios && ficaram < totalDesafios
         ? el('span', { class: 'bib-lp-restam', id: 'bib-lp-restam', texto: ' · ' + ficaram + ' de ' + totalDesafios + ' desafios' }) : null
     ]));
+    if (etiquetaDeNivel(lp)) corpo.appendChild(el('div', { class: 'bib-lp-nivel-titulo' }, [etiquetaDeNivel(lp)]));
     if (bibLpAviso) {
       // capturado no desenho: o clique não pode depender de a variável ainda apontar para ele
       var av = bibLpAviso;

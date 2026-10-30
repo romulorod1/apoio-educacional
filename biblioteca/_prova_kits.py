@@ -338,7 +338,18 @@ def amostra_listas():
             'teoria': [], 'degraus': ds, 'alternativas': {}, 'relaxou': relaxou,
         }
 
+    def base(mod, ids, relaxou=None):
+        k = lista(mod, 1, ids, relaxou)
+        k['regra'] = 'base-v1'
+        return k
+
     kits = [
+        # LISTA DE BASE (base-v1): o modulo da lista tem 13 itens numa lista de
+        # origem so, entao o primeiro terco sao os cinco primeiros; o 3 remete
+        # ao anterior e sai. Sobram 1, 2, 4 e 5, na ordem da fonte, 17,4 min:
+        # abaixo de 54, entao `relaxou` diz "minutos". O 2 pede demonstracao e
+        # FICA: a base afirma posicao, e nao porta de entrada.
+        base(MODL, [li(1), li(2), li(4), li(5)], ['minutos']),
         # T2: os tres degraus, abre no 1, fecha no 3, citado no fim, e leva o
         # par 4 e 10, que fica logo ABAIXO do limiar de repeticao. 27,9 min.
         lista(MODL, 2, [li(1), li(11), li(4), li(10), li(6), li(7)]),
@@ -759,6 +770,28 @@ def main():
         p.limpo('%r nao e referencia a outro exercicio' % nome,
                 [] if CK.referencia(falso) is None else ['leu %r' % CK.referencia(falso)])
 
+    print('\n=== base-v1, a lista de base: um veneno por regra ===')
+    # troca_itens zera alternativas e recalcula minutos; o relaxou fica o da
+    # amostra, e por isso cada veneno abaixo e de UMA regra so
+    p.veneno('B1: item do segundo terco da lista de origem', confere(com_listas(
+        lambda x: troca_itens(kit_l(x, MODL, 1), [li(1), li(2), li(4), li(6)], x[1]))),
+        'B1')
+    p.veneno('B2: item que remete a outro exercicio', confere(com_listas(
+        lambda x: troca_itens(kit_l(x, MODL, 1), [li(1), li(2), li(3), li(5)], x[1]))),
+        'B2')
+    p.veneno('B3: os mesmos itens fora da ordem da fonte', confere(com_listas(
+        lambda x: troca_itens(kit_l(x, MODL, 1), [li(2), li(1), li(4), li(5)], x[1]))),
+        'B3')
+    p.veneno('B3: um item a menos do que a regra escolhe', confere(com_listas(
+        lambda x: troca_itens(kit_l(x, MODL, 1), [li(1), li(2), li(4)], x[1]))),
+        'B3')
+    p.veneno('B4: lista curta sem declarar "minutos" em relaxou', confere(com_listas(
+        lambda x: kit_l(x, MODL, 1).update({'relaxou': None}))),
+        'nao declarado em relaxou')
+    p.veneno('B4: lista de base com teoria', confere(com_listas(
+        lambda x: kit_l(x, MODL, 1).update({'teoria': [x[1][0]['id']]}))),
+        'B4')
+
     print('\n=== listas-v1: um veneno por regra nova ===')
     # ---- conserto 1: referencia. Os dois modos de falhar, e o segundo so
     # existe porque a ordem importa.
@@ -1043,6 +1076,50 @@ def main():
     trocado = esperada[:5] + [esperada[6], esperada[5]] + esperada[7:]
     p.veneno('dois arquivos de raiz trocados entre si',
              [] if trocado == esperada else ['a ordem mudou'], 'a ordem mudou')
+
+    # ----------------------- a versao do PyMuPDF que o gerador aceita (C2b)
+    # Outra versao redesenha os SVG de recortes iguais (291 no 9o ano com a
+    # 1.28.2). A linha de comando do gerador recusa com a frase que diz o que
+    # instalar; aqui se confere a regra sem depender do PyMuPDF desta maquina.
+    print('\n=== a versao do PyMuPDF do gerador ===')
+    p.limpo('a versao fixada no requirements-gerador e a que o gerador aceita',
+            [] if GP.PYMUPDF_DO_GERADOR in open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                             'requirements-gerador.txt'), encoding='utf-8').read()
+            else ['o requirements-gerador nao fixa %s' % GP.PYMUPDF_DO_GERADOR])
+    p.limpo('com a versao fixada, o gerador roda', [GP.confere_versao_do_pymupdf(GP.PYMUPDF_DO_GERADOR)]
+            if GP.confere_versao_do_pymupdf(GP.PYMUPDF_DO_GERADOR) else [])
+    recusa = GP.confere_versao_do_pymupdf('1.28.2') or ''
+    p.veneno('com outra versao, o gerador recusa e diz qual instalar',
+             [recusa] if recusa else [], 'requirements-gerador.txt')
+
+    # ---------------------------------- base-v1: o gerador contra a conferencia
+    # O mesmo desenho da secao da listas-v1: a lista de base que o GERADOR
+    # monta da amostra passa na conferencia, que nao o importa, e e a que a
+    # amostra escreveu a mao; e desligar uma guarda dentro do gerador faz a
+    # CONFERENCIA acusar.
+    print('\n=== base-v1: o que o gerador produz passa na conferencia ===')
+    base_b = amostra_listas()
+
+    def gera_base_e_confere():
+        kits_b, _s, _x = GK.gerar(base_b[1], [], GK.REGRA_AULA, (2, 3), False, True)
+        manifest = copy.deepcopy(base_b[0])
+        manifest['contagens']['kits'] = len(kits_b)
+        return kits_b, CK.confere(manifest, base_b[1], [], kits_b, base_b[4])
+
+    kits_b, erros_b = gera_base_e_confere()
+    p.limpo('as listas de base e de uma aula que o gerador monta passam na confere_kits', erros_b)
+    da_lista = next((k for k in kits_b if k['modulo'] == MODL and k['nivel'] == 1), None)
+    p.limpo('a lista de base do modulo da lista e a escrita a mao: 1, 2, 4 e 5, curta',
+            [] if da_lista and [d['item'] for d in da_lista['degraus']] == [li(1), li(2), li(4), li(5)]
+            and da_lista['relaxou'] == ['minutos'] and da_lista['regra'] == 'base-v1'
+            else ['o gerador deu %r' % (da_lista and [d['item'] for d in da_lista['degraus']])])
+    original_ref = GK.referencia
+    try:
+        GK.referencia = lambda item: None
+        kits_v, erros_v = gera_base_e_confere()
+    finally:
+        GK.referencia = original_ref
+    p.veneno('gerador sem a guarda de referencia na lista de base', erros_v, 'B2')
 
     print('\n%d verificacoes passaram, %d falharam' % (p.ok, p.falhas))
     return 1 if p.falhas else 0
