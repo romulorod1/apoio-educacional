@@ -289,8 +289,84 @@
     });
   }
 
+  /* Monta um ZIP sem zip64. Cada entrada é preparada separadamente e o Blob
+   * final reaproveita suas partes, sem concatenar a cópia inteira na memória. */
+  function escrever(arquivos) {
+    if (!Array.isArray(arquivos) || !arquivos.length || arquivos.length > 65534) {
+      return Promise.reject(ErroZip('A cópia não tem arquivos válidos.'));
+    }
+    var encoder = new TextEncoder();
+    var partes = [], diretorio = [], nomes = {};
+    var posicao = 0;
+    function numero(v, p, n, valor) {
+      if (valor > 0xFFFFFFFF) throw ErroZip('A cópia excede o limite do formato ZIP.');
+      if (n === 2) v.setUint16(p, valor, true);
+      else v.setUint32(p, valor, true);
+    }
+    function bytesDe(conteudo) {
+      if (conteudo instanceof Uint8Array) return Promise.resolve(conteudo);
+      if (conteudo instanceof ArrayBuffer) return Promise.resolve(new Uint8Array(conteudo));
+      if (conteudo instanceof Blob) return conteudo.arrayBuffer().then(function (b) { return new Uint8Array(b); });
+      if (typeof conteudo === 'string') return Promise.resolve(encoder.encode(conteudo));
+      return Promise.reject(ErroZip('Um arquivo da cópia tem conteúdo inválido.'));
+    }
+    function comprimir(bytes) {
+      if (typeof CompressionStream !== 'function') return Promise.resolve(null);
+      try {
+        var fluxo = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+        return new Response(fluxo).arrayBuffer().then(function (b) { return new Uint8Array(b); });
+      } catch (e) { return Promise.resolve(null); }
+    }
+    var sequencia = Promise.resolve();
+    arquivos.forEach(function (arquivo) {
+      sequencia = sequencia.then(function () {
+        var nome = arquivo && arquivo.nome;
+        if (typeof nome !== 'string' || !nome || nome.indexOf('..') >= 0 || nome[0] === '/' ||
+            nome.indexOf('\\') >= 0 || nomes[nome]) throw ErroZip('Nome inválido ou repetido na cópia.');
+        nomes[nome] = true;
+        var nomeBytes = encoder.encode(nome);
+        if (nomeBytes.length > 65535) throw ErroZip('Nome de arquivo longo demais na cópia.');
+        return bytesDe(arquivo.conteudo).then(function (original) {
+          return (arquivo.comprimir ? comprimir(original) : Promise.resolve(null)).then(function (compactado) {
+            var usaDeflate = !!(compactado && compactado.length < original.length);
+            var dados = usaDeflate ? compactado : original;
+            if (dados.length > 0xFFFFFFFF || original.length > 0xFFFFFFFF || posicao > 0xFFFFFFFF) {
+              throw ErroZip('A cópia excede o limite do formato ZIP.');
+            }
+            var crc = crc32(original), metodo = usaDeflate ? 8 : 0;
+            var local = new Uint8Array(30 + nomeBytes.length), vl = new DataView(local.buffer);
+            vl.setUint32(0, SIG_LOCAL, true); vl.setUint16(4, 20, true);
+            vl.setUint16(6, 0x0800, true); vl.setUint16(8, metodo, true);
+            vl.setUint16(12, 33, true); vl.setUint32(14, crc, true);
+            numero(vl, 18, 4, dados.length); numero(vl, 22, 4, original.length);
+            vl.setUint16(26, nomeBytes.length, true); local.set(nomeBytes, 30);
+            var central = new Uint8Array(46 + nomeBytes.length), vc = new DataView(central.buffer);
+            vc.setUint32(0, SIG_CENTRAL, true); vc.setUint16(4, 20, true);
+            vc.setUint16(6, 20, true); vc.setUint16(8, 0x0800, true);
+            vc.setUint16(10, metodo, true); vc.setUint16(14, 33, true);
+            vc.setUint32(16, crc, true); numero(vc, 20, 4, dados.length);
+            numero(vc, 24, 4, original.length); vc.setUint16(28, nomeBytes.length, true);
+            numero(vc, 42, 4, posicao); central.set(nomeBytes, 46);
+            partes.push(local, dados); diretorio.push(central);
+            posicao += local.length + dados.length;
+          });
+        });
+      });
+    });
+    return sequencia.then(function () {
+      var tamanhoDir = diretorio.reduce(function (n, d) { return n + d.length; }, 0);
+      if (posicao + tamanhoDir + 22 > 0xFFFFFFFF) throw ErroZip('A cópia excede o limite do formato ZIP.');
+      var fim = new Uint8Array(22), v = new DataView(fim.buffer);
+      v.setUint32(0, SIG_FIM, true);
+      v.setUint16(8, diretorio.length, true); v.setUint16(10, diretorio.length, true);
+      v.setUint32(12, tamanhoDir, true); v.setUint32(16, posicao, true);
+      return new Blob(partes.concat(diretorio, [fim]), { type: 'application/zip' });
+    });
+  }
+
   return {
     suportado: suportado, ler: ler, extrair: extrair, crc32: crc32,
-    lerDoArquivo: lerDoArquivo, extrairDoArquivo: extrairDoArquivo, fatiaDoArquivo: fatiaDoArquivo
+    lerDoArquivo: lerDoArquivo, extrairDoArquivo: extrairDoArquivo, fatiaDoArquivo: fatiaDoArquivo,
+    escrever: escrever
   };
 });
