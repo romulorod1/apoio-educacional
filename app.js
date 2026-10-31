@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.38.0';
+  var VERSAO = '1.39.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,16 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.39.0',
+      itens: [
+        'Na ficha do aluno, aba Histórico, "Documento do ciclo": um documento de três meses para a família, com quatro perguntas ' +
+          '(o que aconteceu, o que isso significa, o que ainda pede atenção, próximo ciclo). O aplicativo sugere um rascunho, e ' +
+          'você muda tudo. Só sai ponto de atenção que você marcar. Use quando quiser; nada aparece sozinho.',
+        'A ordem dos assuntos de matemática, do 2º ano ao 3º do médio, foi revista: cada assunto diz o que precisa vir antes. ' +
+          'As trilhas passam a seguir essa ordem.'
+      ]
+    },
     {
       versao: '1.38.0',
       itens: [
@@ -6907,6 +6917,16 @@
     });
     caixa.appendChild(resumo);
 
+    /* A entrada do documento do ciclo (C9): um botão comum, sem cor, sem
+     * selo e sem contagem de dias. "Não force o uso, deixe que ela explore":
+     * nada no aplicativo lembra, avisa ou abre este documento sozinho. */
+    caixa.appendChild(el('div', { class: 'barra', style: 'margin:-4px 0 12px' }, [
+      el('button', {
+        type: 'button', class: 'btn pequeno', id: 'abrir-documento-ciclo', texto: 'Documento do ciclo',
+        aoClick: function () { abrirDocumentoDoCiclo(aluno.id); }
+      })
+    ]));
+
     desenharQuadroDeDominio(caixa, aluno);
 
     if (futurasAtivas.length) {
@@ -13093,6 +13113,299 @@
     caixa.appendChild(botao);
     caixa.appendChild(dica);
     return caixa;
+  }
+
+  // ================= C9: o documento do ciclo =================
+
+  /* O documento do ciclo, para a família: quatro seções com o texto dela, um
+   * rascunho de cada montado dos dados (Core.rascunhoDoCiclo), prévia ao lado
+   * e saída em PDF (PDFGen.gerarCiclo) e em texto (Core.markdownCiclo). Os
+   * três leem o mesmo Core.documentoDoCiclo, então o que a prévia mostra é o
+   * que sai.
+   *
+   * O texto dela mora em aluno.ciclos (o porquê está no core.js, no alto de
+   * SECOES_DO_CICLO). O ciclo novo nasce só na memória: abrir a janela e
+   * fechar sem mexer não grava nada. A primeira mudança (texto, período,
+   * ponto marcado) ou a primeira saída põe o ciclo no aluno, e daí em diante
+   * cada mudança é gravada na hora, como o feedback do mês. */
+  var cicloEmEdicao = null;
+
+  function abrirDocumentoDoCiclo(alunoId) {
+    var aluno = alunoPorId(alunoId);
+    if (!aluno) return;
+    var lista = Core.ciclosDe(aluno);
+    cicloEmEdicao = lista.length
+      ? { alunoId: alunoId, ciclo: lista[lista.length - 1], guardado: true }
+      : { alunoId: alunoId, ciclo: Core.cicloNovo(db, aluno), guardado: false };
+    // aberta antes de desenhar: a caixa de texto só mede a altura visível
+    abrirModal('modal-documento-ciclo');
+    desenharDocumentoDoCiclo();
+  }
+
+  /* O rascunho da primeira seção passa de dez linhas: a caixa cresce com o
+   * texto, até um teto, para ela ler o que vai mandar sem rolar dentro dela. */
+  function ajustarAlturaDoTexto(area) {
+    if (!area.offsetParent) return;
+    area.style.height = 'auto';
+    area.style.height = Math.min(Math.max(area.scrollHeight + 2, 110), 360) + 'px';
+  }
+
+  /* `e` é o estado da janela que fez a mudança, e não o da janela de agora:
+   * o Desfazer do "Refazer o rascunho" chega depois, e ela pode ter começado
+   * outro ciclo no meio. Sem `e`, é o ciclo que está na tela. */
+  function guardarCiclo(e) {
+    e = e || cicloEmEdicao;
+    var aluno = e && alunoPorId(e.alunoId);
+    if (!aluno) return null;
+    if (!e.guardado) {
+      aluno.ciclos = (aluno.ciclos || []).concat([e.ciclo]);
+      e.guardado = true;
+    }
+    e.ciclo.alteradoEm = Core.hojeIso();
+    return salvar();
+  }
+
+  function nomeDoCiclo(doc) {
+    return 'Ciclo_' + Core.nomeArquivo(doc.alunoNome) + '_' + doc.inicio + '_a_' + doc.fim;
+  }
+
+  function desenharDocumentoDoCiclo() {
+    var e = cicloEmEdicao;
+    var aluno = alunoPorId(e.alunoId);
+    var ciclo = e.ciclo;
+    ciclo.textos = ciclo.textos || {};
+    ciclo.atencaoQueSai = ciclo.atencaoQueSai || [];
+
+    $('#subtitulo-modal-doc-ciclo').textContent = aluno.nome;
+    var corpo = $('#corpo-modal-doc-ciclo');
+    corpo.innerHTML = '';
+    var layout = el('div', { class: 'layout-documento-familia' });
+    var painel = el('div', { class: 'painel-doc-config', id: 'editor-ciclo' });
+
+    // os ciclos já guardados, e começar outro
+    var guardados = Core.ciclosDe(aluno);
+    if (guardados.length) {
+      var escolha = el('select', { id: 'ciclo-escolha' });
+      guardados.forEach(function (c) {
+        var op = el('option', { value: c.id, texto: Core.ddmmaaaa(c.inicio) + ' a ' + Core.ddmmaaaa(c.fim) });
+        if (c.id === ciclo.id) op.selected = true;
+        escolha.appendChild(op);
+      });
+      if (!e.guardado) escolha.appendChild(el('option', { value: ciclo.id, texto: 'Ciclo novo', selected: true }));
+      escolha.addEventListener('change', function () {
+        var achado = Core.ciclosDe(aluno).filter(function (c) { return c.id === escolha.value; })[0];
+        if (!achado) return;
+        cicloEmEdicao = { alunoId: e.alunoId, ciclo: achado, guardado: true };
+        desenharDocumentoDoCiclo();
+      });
+      painel.appendChild(el('div', { class: 'campo', style: 'margin:0' }, [
+        el('label', { for: 'ciclo-escolha', texto: 'Ciclo' }),
+        el('div', { class: 'barra' }, [
+          escolha,
+          e.guardado ? el('button', {
+            type: 'button', class: 'btn pequeno', id: 'ciclo-novo', texto: 'Começar outro ciclo',
+            aoClick: function () {
+              cicloEmEdicao = { alunoId: e.alunoId, ciclo: Core.cicloNovo(db, aluno), guardado: false };
+              desenharDocumentoDoCiclo();
+            }
+          }) : null
+        ].filter(Boolean))
+      ]));
+    }
+
+    /* O período. Trocar a data refaz o rascunho só das seções que ela ainda
+     * não mexeu (o texto igual ao rascunho do período de antes); o que ela
+     * escreveu fica. */
+    var campoInicio = el('input', { type: 'date', id: 'ciclo-inicio', value: ciclo.inicio });
+    var campoFim = el('input', { type: 'date', id: 'ciclo-fim', value: ciclo.fim });
+    function trocarPeriodo() {
+      var ini = campoInicio.value, fim = campoFim.value;
+      if (!Core.dataValida(ini) || !Core.dataValida(fim) || ini > fim) {
+        campoInicio.value = ciclo.inicio;
+        campoFim.value = ciclo.fim;
+        avisar(!Core.dataValida(ini) || !Core.dataValida(fim)
+          ? 'Escolha as duas datas do período. As datas voltaram às de antes.'
+          : 'O período termina antes de começar. As datas voltaram às de antes.');
+        return;
+      }
+      var antes = Core.rascunhoDoCiclo(Core.dadosDoCiclo(db, aluno.id, ciclo.inicio, ciclo.fim));
+      var depois = Core.rascunhoDoCiclo(Core.dadosDoCiclo(db, aluno.id, ini, fim));
+      Core.SECOES_DO_CICLO.forEach(function (s) {
+        if (String(ciclo.textos[s.chave] || '') === antes[s.chave]) ciclo.textos[s.chave] = depois[s.chave];
+      });
+      ciclo.inicio = ini;
+      ciclo.fim = fim;
+      guardarCiclo(e);
+      desenharDocumentoDoCiclo();
+    }
+    campoInicio.addEventListener('change', trocarPeriodo);
+    campoFim.addEventListener('change', trocarPeriodo);
+    painel.appendChild(el('div', { class: 'linha' }, [
+      el('label', { class: 'campo', style: 'margin:0' }, [el('span', { texto: 'De' }), campoInicio]),
+      el('label', { class: 'campo', style: 'margin:0' }, [el('span', { texto: 'Até' }), campoFim])
+    ]));
+
+    // as quatro seções, cada uma com o texto dela
+    Core.SECOES_DO_CICLO.forEach(function (s) {
+      var area = el('textarea', {
+        id: 'ciclo-texto-' + s.chave, class: 'ciclo-texto', 'data-secao': s.chave,
+        style: 'min-height:110px;resize:vertical',
+        placeholder: 'Escreva aqui. Seção em branco não sai no documento.'
+      });
+      area.value = ciclo.textos[s.chave] || '';
+      area.addEventListener('input', function () {
+        ajustarAlturaDoTexto(area);
+        ciclo.textos[s.chave] = area.value;
+        guardarCiclo(e);
+        desenharPrevia();
+      });
+      var refazer = el('button', {
+        type: 'button', class: 'btn pequeno', id: 'ciclo-refazer-' + s.chave, texto: 'Refazer o rascunho',
+        aoClick: function () {
+          var anterior = ciclo.textos[s.chave] || '';
+          var novo = Core.rascunhoDoCiclo(Core.dadosDoCiclo(db, aluno.id, ciclo.inicio, ciclo.fim))[s.chave];
+          ciclo.textos[s.chave] = novo;
+          area.value = novo;
+          ajustarAlturaDoTexto(area);
+          guardarCiclo(e);
+          desenharPrevia();
+          /* O Desfazer devolve o texto ao ciclo e à caixa que ELE guardou.
+           * Se a tela mudou no meio (outro ciclo, outro período), a caixa
+           * guardada já saiu da tela: o texto volta ao ciclo dele, e a tela
+           * só é redesenhada se ainda for a desse ciclo. */
+          avisar('Rascunho refeito com os dados do período.', 'Desfazer', function () {
+            ciclo.textos[s.chave] = anterior;
+            guardarCiclo(e);
+            if (area.isConnected) {
+              area.value = anterior;
+              ajustarAlturaDoTexto(area);
+              desenharPrevia();
+            } else if (cicloEmEdicao && cicloEmEdicao.ciclo === ciclo &&
+              $('#modal-documento-ciclo').classList.contains('aberto')) {
+              desenharDocumentoDoCiclo();
+            }
+          });
+        }
+      });
+      var bloco = el('div', { class: 'campo secao-ciclo', 'data-secao': s.chave, style: 'margin:0' }, [
+        el('div', { class: 'campo-titulo-com-destino' }, [
+          el('label', { for: 'ciclo-texto-' + s.chave, texto: s.titulo, style: 'font-weight:700;color:var(--navy)' }),
+          el('span', { class: 'destino-publico', texto: 'Vai para a família' })
+        ]),
+        area,
+        el('div', { class: 'barra', style: 'margin-top:4px' }, [refazer])
+      ]);
+      if (s.chave === 'atencao') desenharPontosDoCiclo(bloco, aluno, e, desenharPrevia);
+      painel.appendChild(bloco);
+    });
+
+    painel.appendChild(el('div', { class: 'faixa-privacidade-garantida' }, [
+      el('div', {}, [
+        el('strong', { texto: 'Não vão para a família: ' }),
+        el('span', { texto: 'as notas das aulas, a nota só minha, o nome interno das áreas, ponto de atenção sem marca e valores em dinheiro.' })
+      ])
+    ]));
+
+    layout.appendChild(painel);
+    var container = el('div', { class: 'previa-doc-container' });
+    var papel = el('div', { class: 'previa-doc-papel', id: 'conteudo-previa-doc-ciclo' });
+    container.appendChild(papel);
+    layout.appendChild(container);
+    corpo.appendChild(layout);
+
+    function desenharPrevia() {
+      var doc = Core.documentoDoCiclo(db, aluno, ciclo);
+      papel.innerHTML = '';
+      papel.appendChild(el('div', { class: 'previa-doc-cabecalho' }, [
+        el('div', { class: 'previa-doc-titulo', texto: doc.titulo }),
+        el('div', { class: 'previa-doc-meta' }, [
+          el('div', {}, [el('strong', { texto: 'Aluno: ' }), document.createTextNode(doc.alunoNome)]),
+          doc.responsavel ? el('div', {}, [el('strong', { texto: 'Responsável: ' }), document.createTextNode(doc.responsavel)]) : null,
+          doc.contextoEscolar ? el('div', {}, [el('strong', { texto: 'Escola: ' }), document.createTextNode(doc.contextoEscolar)]) : null,
+          el('div', {}, [el('strong', { texto: 'Período: ' }), document.createTextNode(doc.periodo)])
+        ].filter(Boolean))
+      ]));
+      doc.secoes.forEach(function (sec) {
+        papel.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: sec.titulo }));
+        sec.texto.split(/\n{2,}/).forEach(function (par) {
+          if (par.trim()) papel.appendChild(el('p', { style: 'margin:0 0 8px;white-space:pre-wrap;font-size:13px', texto: par }));
+        });
+        if (sec.itens.length) {
+          papel.appendChild(el('ul', { style: 'margin:0 0 8px 18px;padding:0;font-size:13px' },
+            sec.itens.map(function (i) { return el('li', { texto: i }); })));
+        }
+      });
+      if (!doc.secoes.length) {
+        papel.appendChild(el('div', { class: 'ajuda', texto: 'As quatro seções estão em branco.' }));
+      }
+    }
+    desenharPrevia();
+    $$('#editor-ciclo .ciclo-texto').forEach(ajustarAlturaDoTexto);
+
+    var rodape = $('#rodape-modal-doc-ciclo');
+    rodape.innerHTML = '';
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn', texto: 'Fechar',
+      aoClick: function () { fecharModal('modal-documento-ciclo'); }
+    }));
+    rodape.appendChild(el('span', { class: 'cresce' }));
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn', id: 'ciclo-baixar-texto', texto: 'Texto',
+      aoClick: function () {
+        var doc = Core.documentoDoCiclo(db, aluno, ciclo);
+        guardarCiclo(e);
+        entregarArquivo(nomeDoCiclo(doc) + '.md',
+          new Blob([Core.markdownCiclo(doc)], { type: 'text/markdown;charset=utf-8' }),
+          'Ciclo de ' + doc.alunoNome);
+      }
+    }));
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn principal', id: 'ciclo-baixar-pdf', texto: 'PDF do ciclo',
+      aoClick: function () {
+        var doc = Core.documentoDoCiclo(db, aluno, ciclo);
+        guardarCiclo(e);
+        try {
+          var bytes = PDFGen.gerarCiclo(doc);
+          entregarArquivo(nomeDoCiclo(doc) + '.pdf', new Blob([bytes], { type: 'application/pdf' }),
+            'Ciclo de ' + doc.alunoNome);
+        } catch (err) {
+          avisar('Não foi possível gerar o PDF.');
+        }
+      }
+    }));
+  }
+
+  /* Os pontos de atenção do mapeamento, cada um com a caixa de "sai no
+   * documento". Todos nascem desmarcados, como na proposta: a ficha é
+   * interna e pode ser dura, e o documento é o que a família (e a criança)
+   * lê. Sem mapeamento ou sem ponto marcado nele, não aparece nada. */
+  function desenharPontosDoCiclo(bloco, aluno, e, desenharPrevia) {
+    var ciclo = e.ciclo;
+    var pontos = Core.pontosDeAtencaoDoCiclo(aluno);
+    if (!pontos.length) return;
+    var caixa = el('div', { id: 'ciclo-pontos', style: 'margin-top:8px' }, [
+      el('div', { class: 'campo-titulo-com-destino' }, [
+        el('span', { texto: 'Pontos de atenção do mapeamento', style: 'font-size:13px;font-weight:700' }),
+        el('span', { class: 'destino-privado', texto: 'Só sai o que você marcar' })
+      ]),
+      el('div', { class: 'ajuda', id: 'ciclo-pontos-ajuda', style: 'margin:2px 0 4px',
+        texto: 'Cada ponto marcado sai em lista, logo abaixo do texto de "O que ainda pede atenção".' })
+    ]);
+    pontos.forEach(function (p) {
+      var chk = el('input', { type: 'checkbox', class: 'ciclo-ponto', 'data-ponto': p.id, style: 'width:auto;min-height:auto' });
+      chk.checked = ciclo.atencaoQueSai.indexOf(p.id) >= 0;
+      chk.addEventListener('change', function () {
+        var l = ciclo.atencaoQueSai.filter(function (x) { return x !== p.id; });
+        if (chk.checked) l.push(p.id);
+        ciclo.atencaoQueSai = l;
+        guardarCiclo(e);
+        desenharPrevia();
+      });
+      caixa.appendChild(el('label', {
+        class: 'campo', style: 'display:flex;align-items:center;gap:8px;margin:4px 0 0;cursor:pointer;font-size:13px'
+      }, [chk, el('span', { texto: p.rotulo })]));
+    });
+    bloco.appendChild(caixa);
   }
 
   // ================= exportação =================

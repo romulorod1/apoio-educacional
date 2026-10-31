@@ -84,8 +84,19 @@ const SALVAR = process.env.SALVAR_PRINTS || '';
 const ALUNO = 'aluno_c1_alfa';
 const AULA = 'aula_c1_hoje';
 const AULA_ANTES = 'aula_c1_antes';
-const T1 = 'MAT06-01';
-const T2 = 'MAT06-02';
+/* Os dois assuntos da aula são os DOIS PRIMEIROS PASSOS da trilha derivada
+ * até o alvo, lidos do motor e do índice de verdade, e não ids fixos: a forma
+ * do grafo muda (no C7.1 o MAT06-01 ganhou um pré-requisito do 5º ano) e a
+ * prova é sobre o domínio fechar o passo, não sobre a ordem do grafo. */
+const ALVO = 'MAT06-06';
+const DERIVADA = (() => {
+  const CoreNode = require('../core.js');
+  const ix = require('../banco/topicos/matematica.json');
+  return CoreNode.trilhaDerivada(ix.temas || ix, ALVO).passos.map(p => p.temaId);
+})();
+if (DERIVADA.length < 3) throw new Error('a trilha até ' + ALVO + ' tem menos de três passos: a prova precisa de dois passos e um alvo à frente');
+const T1 = DERIVADA[0];
+const T2 = DERIVADA[1];
 function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 const HOJE = iso(new Date());
 const SEMANA_PASSADA = (() => { const d = new Date(); d.setDate(d.getDate() - 7); return iso(d); })();
@@ -107,13 +118,13 @@ async function semear(pag) {
   return pag.evaluate(async (d0) => {
     const j = await fetch('banco/topicos/matematica.json').then(x => x.json());
     const temas = j.temas || j;
-    const der = Core.trilhaDerivada(temas, 'MAT06-06');
+    const der = Core.trilhaDerivada(temas, d0.ALVO);
     const d = await Store.carregar();
     d.alunos = (d.alunos || []).filter(a => a.id !== d0.ALUNO);
     const aluno = { id: d0.ALUNO, nome: 'Aluno Alfa Teste', ano: '06', anoEscolar: '6º ano do Ensino Fundamental',
       responsavel: 'Responsavel Alfa', ativo: true, cor: '#2E7D6B',
       precos: [{ id: 'p_c1', inicio: '2026-01-01', fim: null, valorHora: 100 }] };
-    aluno.trilhas = [Core.criarTrilha({ alunoId: d0.ALUNO, titulo: 'Operações com frações', alvoId: 'MAT06-06',
+    aluno.trilhas = [Core.criarTrilha({ alunoId: d0.ALUNO, titulo: 'Operações com frações', alvoId: d0.ALVO,
       materia: 'matematica', criadaEm: d0.SEMANA_PASSADA, passos: der.passos })];
     d.alunos.push(aluno);
     const titulo = id => temas.find(t => t.id === id).pt.titulo;
@@ -129,7 +140,7 @@ async function semear(pag) {
     d.ajustes.ultimaCopia = d0.HOJE;
     await Store.salvar(d);
     return { passos: der.passos.map(p => p.temaId), t1: titulo(d0.T1), t2: titulo(d0.T2) };
-  }, { ALUNO, AULA, AULA_ANTES, T1, T2, HOJE, SEMANA_PASSADA });
+  }, { ALUNO, AULA, AULA_ANTES, T1, T2, HOJE, SEMANA_PASSADA, ALVO });
 }
 
 // o que está GRAVADO, lido do IndexedDB
@@ -427,8 +438,12 @@ async function printDe(pag, seletor, nome, folga) {
     'texto': md.valor ? Buffer.from(md.valor.base64, 'base64').toString('utf8') : '',
     'PDF': pdf.valor ? textoDoPdf(pdf.valor.base64) : ''
   };
-  // o título no PDF pode vir com o acento escapado: o começo dele, sem acento, basta
-  const PREFIXO = semente.t1.slice(0, 17);
+  /* O título no PDF pode vir com o acento escapado: o maior trecho sem acento
+   * dele basta ("ltiplos e divisores" de "Múltiplos e divisores"). Trecho curto
+   * demais grita, porque casaria com qualquer coisa. */
+  const PREFIXO = (semente.t1.match(/[\x20-\x7e]+/g) || []).map(s => s.trim())
+    .sort((a, b) => b.length - a.length)[0] || '';
+  if (PREFIXO.length < 8) throw new Error('o título do assunto não tem trecho sem acento para procurar: "' + semente.t1 + '"');
   Object.keys(saidas).forEach(nome => {
     conf(nome + ': o assunto da aula está lá (controle positivo: o instrumento vê)', saidas[nome].indexOf(PREFIXO) >= 0, true);
     const achou = saidas[nome].match(PROIBIDAS);
