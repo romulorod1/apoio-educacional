@@ -117,6 +117,34 @@ const { conf, secao, esperar } = H;
   const fichaManual = await esperar('Voltar após fechar filha manualmente', () => pag.$eval('#modal-aluno', e => !e.classList.contains('aberto')), Boolean, 5000);
   conf('fechamento manual não deixa histórico fantasma', fichaManual.ok, true);
 
+  secao('Voltar mantém a folha aberta quando o disco falha');
+  await H.irParaAba(pag, 'agenda');
+  await pag.click('[data-aula-id="a5_aula"]');
+  await pag.click('#linha-folha button:first-child');
+  const folhaAbriu = await esperar('editor de folha aberto', () =>
+    pag.$eval('#modal-nota', e => e.classList.contains('aberto')), Boolean, 5000);
+  conf('editor de folha abriu sobre aula', folhaAbriu.ok, true);
+  const estadoFolha = await pag.evaluate(() => history.state && history.state.apoioModal);
+  await pag.evaluate(token => {
+    window.__estadoFolhaA5 = token;
+    window.__salvarNotaOriginalA5 = Store.salvarNota;
+    Store.salvarNota = () => Promise.reject(new Error('falha simulada na folha'));
+    history.back();
+  }, estadoFolha);
+  const folhaProtegida = await esperar('falha mantém folha e estado de Voltar', () =>
+    pag.evaluate(() => document.querySelector('#modal-nota').classList.contains('aberto') &&
+      /Não consegui salvar a folha/.test(document.body.textContent) &&
+      history.state && history.state.apoioModal === window.__estadoFolhaA5), Boolean, 5000);
+  conf('falha no Voltar não deixa folha aberta sem proteção', folhaProtegida.ok, true);
+  await pag.evaluate(() => { Store.salvarNota = window.__salvarNotaOriginalA5; });
+  await pag.evaluate(() => {
+    Array.from(document.querySelectorAll('#rodape-nota button'))
+      .find(b => b.textContent.trim() === 'Concluir').click();
+  });
+  await esperar('folha fechada após gravação', () =>
+    pag.$eval('#modal-nota', e => !e.classList.contains('aberto')), Boolean, 5000);
+  await pag.click('#modal-aula .fechar');
+
   secao('falha de gravação mantém o rascunho');
   await H.irParaAba(pag, 'agenda');
   await pag.click('[data-aula-id="a5_aula"]');
