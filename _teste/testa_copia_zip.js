@@ -62,4 +62,35 @@ const { conf, secao } = H;
     JSON.stringify(resultado.depoisSucesso),
     JSON.stringify({ aluno: 'beta', notaAntiga: false, notaNova: true,
       anexoAntigo: false, anexoNovo: 'beta', listas: 0, historico: 0 }));
+
+  secao('ZIP é conferido antes de substituir os dados');
+  const zip = await pag.evaluate(async () => {
+    const gamma = Store.bancoVazio();
+    gamma.alunos = [{ id: 'gamma', nome: 'Aluna Gama Teste' }];
+    const anexos = { 'anexo-gamma': { nome: 'gamma.bin', tipo: 'application/octet-stream',
+      arquivo: 'anexos/0.bin' } };
+    const arquivos = [
+      ['manifest.json', { formato: 'apoio-educacional-zip', versao: 2 }],
+      ['dados.json', gamma], ['notas.json', {}], ['midias.json', {}],
+      ['anexos.json', anexos], ['biblioteca_uso.json', []],
+      ['biblioteca_etiquetas.json', []], ['biblioteca_listas.json', []]
+    ].map(([nome, conteudo]) => ({ nome, conteudo: JSON.stringify(conteudo), comprimir: true }));
+    arquivos.push({ nome: 'anexos/0.bin', conteudo: new Uint8Array([0, 1, 2, 255]) });
+    const blob = await Zip.escrever(arquivos);
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const aberto = await Zip.lerDoArquivo(blob);
+    const entrada = aberto.entradas.find(e => e.nome === 'dados.json');
+    bytes[entrada.local + 30 + entrada.nome.length] ^= 1;
+    let rejeitou = false;
+    try { await Store.importarZip(new Blob([bytes])); } catch (e) { rejeitou = true; }
+    const depoisFalha = (await Store.carregar()).alunos[0].id;
+    await Store.importarZip(blob);
+    const reg = await Store.lerAnexo('anexo-gamma');
+    return { rejeitou, depoisFalha,
+      depoisSucesso: (await Store.carregar()).alunos[0].id,
+      anexo: Array.from(new Uint8Array(await reg.blob.arrayBuffer())) };
+  });
+  conf('ZIP corrompido não modifica o banco', zip.rejeitou && zip.depoisFalha === 'beta', true);
+  conf('ZIP íntegro restaura dados e anexo binário', JSON.stringify([zip.depoisSucesso, zip.anexo]),
+    JSON.stringify(['gamma', [0, 1, 2, 255]]));
 })().then(() => H.fim(amb)(), e => H.fim(amb)(e));

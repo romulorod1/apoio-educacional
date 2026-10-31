@@ -934,6 +934,56 @@
     });
   }
 
+  /* Lê e confere cada entrada antes de abrir a transação de restauração. O ZIP
+   * pode vir cortado ou com CRC errado; nesse caso, nada do tablet muda. */
+  async function importarZip(arquivo) {
+    var zip = await root.Zip.lerDoArquivo(arquivo);
+    var entradas = {};
+    zip.entradas.forEach(function (e) { entradas[e.nome] = e; });
+    var fixos = ['manifest.json', 'dados.json', 'notas.json', 'midias.json', 'anexos.json',
+      'biblioteca_uso.json', 'biblioteca_etiquetas.json', 'biblioteca_listas.json'];
+    var invalida = function () {
+      return Object.assign(new Error('Arquivo de cópia inválido.'), { invalida: true });
+    };
+    if (fixos.some(function (n) { return !entradas[n]; }) ||
+        Object.keys(entradas).some(function (n) {
+          return fixos.indexOf(n) < 0 && !/^anexos\/[0-9]+\.bin$/.test(n);
+        })) throw invalida();
+    async function lerJson(nome) {
+      try {
+        var bytes = await root.Zip.extrairDoArquivo(zip, entradas[nome]);
+        return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+      } catch (e) { throw invalida(); }
+    }
+    var manifest = await lerJson('manifest.json');
+    if (!manifest || manifest.formato !== 'apoio-educacional-zip' || manifest.versao !== 2) throw invalida();
+    var dados = await lerJson('dados.json');
+    var notas = await lerJson('notas.json');
+    var midias = await lerJson('midias.json');
+    var anexosMeta = await lerJson('anexos.json');
+    var uso = await lerJson('biblioteca_uso.json');
+    var etiquetas = await lerJson('biblioteca_etiquetas.json');
+    var listas = await lerJson('biblioteca_listas.json');
+    if (!anexosMeta || typeof anexosMeta !== 'object' || Array.isArray(anexosMeta)) throw invalida();
+    var anexos = {}, usados = {};
+    for (var id of Object.keys(anexosMeta)) {
+      var reg = anexosMeta[id];
+      if (!reg || typeof reg !== 'object' || typeof reg.arquivo !== 'string' ||
+          !entradas[reg.arquivo] || usados[reg.arquivo] ||
+          !/^anexos\/[0-9]+\.bin$/.test(reg.arquivo)) throw invalida();
+      usados[reg.arquivo] = true;
+      var bytes = await root.Zip.extrairDoArquivo(zip, entradas[reg.arquivo]);
+      anexos[id] = { nome: reg.nome, tipo: reg.tipo,
+        blob: new Blob([bytes], { type: reg.tipo || 'application/octet-stream' }) };
+    }
+    if (Object.keys(entradas).some(function (n) {
+      return /^anexos\/[0-9]+\.bin$/.test(n) && !usados[n];
+    })) throw invalida();
+    return importarTudo({ formato: 'apoio-educacional', dados: dados, notas: notas,
+      midias: midias, anexos: anexos,
+      biblioteca: { uso: uso, etiquetas: etiquetas, listas: listas } });
+  }
+
   function apagarTudo() {
     return Promise.all([
       esvaziar('dados'),
@@ -962,7 +1012,8 @@
     registrarHistorico: registrarHistorico, listarHistorico: listarHistorico,
     desfazer: desfazer, limparHistorico: limparHistorico,
     limparOrfaos: limparOrfaos, estimarEspaco: estimarEspaco, tornarPersistente: tornarPersistente,
-    exportarTudo: exportarTudo, importarTudo: importarTudo, apagarTudo: apagarTudo,
+    exportarTudo: exportarTudo, importarTudo: importarTudo, importarZip: importarZip,
+    apagarTudo: apagarTudo,
     gravarPacoteBiblioteca: gravarPacoteBiblioteca, removerPacoteBiblioteca: removerPacoteBiblioteca,
     listarPacotesBiblioteca: listarPacotesBiblioteca,
     itensDaBiblioteca: itensDaBiblioteca, teoriaDaBiblioteca: teoriaDaBiblioteca,
