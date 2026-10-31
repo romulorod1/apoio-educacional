@@ -661,6 +661,7 @@ roda "pago em"                                    node "_teste/testa_pago_em.js"
 # A2a: a cópia preparada e o compartilhamento cancelado não atualizam a data;
 # download pede confirmação, e share resolvido marca a data.
 roda "copia confirmada"                           node "_teste/testa_copia_confirmada.js"
+roda "exclusao de aluno em cascata"                node "_teste/testa_exclusao_aluno_cascata.js"
 # C9: o documento do ciclo na tela. A contagem do que abre sozinho (janelas,
 # aviso, faixas, dialogos) no codigo da origin/main e no de hoje, igual, com
 # controle de que o contador ve; a entrada discreta na ficha; editar, recarregar

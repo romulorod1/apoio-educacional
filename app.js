@@ -1943,6 +1943,7 @@
     $('#excluir-aula').addEventListener('click', excluirAulaAtual);
     $('#salvar-aluno').addEventListener('click', salvarAluno);
     $('#excluir-aluno').addEventListener('click', excluirAlunoAtual);
+    $('#confirmar-excluir-aluno').addEventListener('click', confirmarExclusaoAluno);
 
     $('#mes-fechamento').addEventListener('change', function () {
       mesAtual = this.value;
@@ -7130,22 +7131,49 @@
     });
   }
 
+  var alunoParaExcluirId = null;
+
   function excluirAlunoAtual() {
     if (!alunoEmEdicao) return;
-    var qtd = db.aulas.filter(function (a) { return a.alunoId === alunoEmEdicao.id; }).length;
-    if (!confirmar('Excluir ' + alunoEmEdicao.nome + ' e as ' + qtd + ' aulas registradas?')) return;
     var id = alunoEmEdicao.id;
-    comDesfazer('Aluno excluído.', function () {
-      db.alunos = db.alunos.filter(function (a) { return a.id !== id; });
-      db.aulas = db.aulas.filter(function (a) { return a.alunoId !== id; });
-      db.series = (db.series || []).filter(function (s) { return s.alunoId !== id; });
-      db.resumos = db.resumos.filter(function (r) { return r.alunoId !== id; });
-      // os pagamentos dele saem junto, como os resumos; o Desfazer devolve os dois
-      db.pagamentos = (db.pagamentos || []).filter(function (p) { return p.alunoId !== id; });
-    }).then(function () {
+    var aulas = (db.aulas || []).filter(function (a) { return a.alunoId === id; });
+    var series = (db.series || []).filter(function (s) { return s.alunoId === id; });
+    var resumos = (db.resumos || []).filter(function (r) { return r.alunoId === id; });
+    var pagamentos = (db.pagamentos || []).filter(function (p) { return p.alunoId === id; });
+    var anexos = 0;
+    aulas.forEach(function (a) { anexos += (a.anexos || []).length; });
+    alunoParaExcluirId = id;
+    var corpo = $('#resumo-excluir-aluno');
+    corpo.innerHTML = '';
+    corpo.appendChild(el('p', { texto: 'Ao excluir ' + alunoEmEdicao.nome + ', também sairão:' }));
+    corpo.appendChild(el('ul', {}, [
+      el('li', { texto: plural(aulas.length, 'aula', 'aulas') + ' e suas folhas e imagens' }),
+      el('li', { texto: plural(series.length, 'repetição', 'repetições') }),
+      el('li', { texto: plural(resumos.length, 'resumo', 'resumos') + ' e ' + plural(pagamentos.length, 'pagamento', 'pagamentos') }),
+      el('li', { texto: plural(anexos, 'anexo', 'anexos') + ', inclusive PDF guardado no tablet' }),
+      el('li', { texto: 'uso da biblioteca e indicações "Usada com" nas listas' })
+    ]));
+    corpo.appendChild(el('p', { class: 'faixa-aviso', texto: 'Esta exclusão não tem Desfazer. Faça uma cópia de segurança antes, se quiser guardar esses dados.' }));
+    abrirModal('modal-excluir-aluno');
+  }
+
+  function confirmarExclusaoAluno() {
+    var id = alunoParaExcluirId;
+    if (!id || !alunoEmEdicao || alunoEmEdicao.id !== id) return;
+    var botao = $('#confirmar-excluir-aluno');
+    botao.disabled = true;
+    Store.excluirAlunoEmCascata(db, id).then(function (novo) {
+      db = novo;
+      copiaPronta = null;
+      alunoParaExcluirId = null;
+      alunoEmEdicao = null;
+      fecharModal('modal-excluir-aluno');
       fecharModal('modal-aluno');
       desenharTudo();
-    });
+      avisar('Aluno e dados associados excluídos. Esta ação não tem Desfazer.');
+    }).catch(function () {
+      avisar('Não foi possível excluir. Os dados foram mantidos; tente de novo.');
+    }).then(function () { botao.disabled = false; });
   }
 
   // ================= editor da folha de aula =================

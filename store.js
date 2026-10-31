@@ -252,6 +252,76 @@
     return gravar('dados', 'principal', db);
   }
 
+  /* Excluir um aluno é uma única transação: o documento, as folhas, os arquivos
+   * dele, o uso da biblioteca e o histórico mudam juntos ou ficam como estavam.
+   * A folha de outra aula pode citar a mesma imagem; nesse caso ela permanece. */
+  function excluirAlunoEmCascata(db, alunoId) {
+    if (!alunoId || !(db.alunos || []).some(function (a) { return a.id === alunoId; })) {
+      return Promise.reject(new Error('Aluno não encontrado.'));
+    }
+    var aulasExcluidas = {}, anexosExcluidos = {}, anexosMantidos = {};
+    (db.aulas || []).forEach(function (a) {
+      if (a.alunoId === alunoId) aulasExcluidas[a.id] = true;
+      (a.anexos || []).forEach(function (an) {
+        (a.alunoId === alunoId ? anexosExcluidos : anexosMantidos)[an.id || an] = true;
+      });
+    });
+    var novo = Object.assign({}, db, {
+      alunos: db.alunos.filter(function (a) { return a.id !== alunoId; }),
+      aulas: (db.aulas || []).filter(function (a) { return a.alunoId !== alunoId; }),
+      series: (db.series || []).filter(function (s) { return s.alunoId !== alunoId; }),
+      resumos: (db.resumos || []).filter(function (r) { return r.alunoId !== alunoId; }),
+      pagamentos: (db.pagamentos || []).filter(function (p) { return p.alunoId !== alunoId; })
+    });
+    novo.ajustes = Object.assign({}, db.ajustes || {});
+    if (novo.ajustes.bibliotecaTitulos) {
+      novo.ajustes.bibliotecaTitulos = Object.assign({}, novo.ajustes.bibliotecaTitulos);
+      delete novo.ajustes.bibliotecaTitulos[alunoId];
+    }
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = b.transaction(['dados', 'notas', 'midias', 'anexos',
+          'biblioteca_uso', 'historico', 'livros_posicoes'], 'readwrite');
+        var notas = t.objectStore('notas');
+        var midiasExcluidas = {}, midiasMantidas = {};
+        var cursorNotas = notas.openCursor();
+        cursorNotas.onsuccess = function (e) {
+          var c = e.target.result;
+          if (c) {
+            var refs = aulasExcluidas[c.key] ? midiasExcluidas : midiasMantidas;
+            (c.value.paginas || []).forEach(function (p) {
+              (p.itens || []).forEach(function (it) {
+                if (it.t === 'imagem' && it.ref) refs[it.ref] = true;
+              });
+            });
+            if (aulasExcluidas[c.key]) c.delete();
+            c.continue();
+            return;
+          }
+          Object.keys(midiasExcluidas).forEach(function (id) {
+            if (!midiasMantidas[id]) t.objectStore('midias').delete(id);
+          });
+          Object.keys(anexosExcluidos).forEach(function (id) {
+            if (anexosMantidos[id]) return;
+            t.objectStore('anexos').delete(id);
+            t.objectStore('livros_posicoes').delete(PREFIXO_EXPORTADO + id);
+          });
+          var cursorUso = t.objectStore('biblioteca_uso').openCursor();
+          cursorUso.onsuccess = function (evento) {
+            var uso = evento.target.result;
+            if (!uso) return;
+            if (uso.value.alunoId === alunoId || aulasExcluidas[uso.value.aulaId]) uso.delete();
+            uso.continue();
+          };
+          t.objectStore('historico').clear();
+          t.objectStore('dados').put(novo, 'principal');
+        };
+        t.oncomplete = function () { resolve(novo); };
+        t.onabort = function () { reject(t.error || new Error('Exclusão interrompida.')); };
+      });
+    });
+  }
+
   // ---------- notas manuscritas ----------
 
   function lerNota(aulaId) {
@@ -743,13 +813,29 @@
 
   function exportarTudo(db) {
     var pacote = { formato: 'apoio-educacional', versao: 1, quando: new Date().toISOString(), dados: db };
+    var idsAulas = {}, idsAlunos = {}, anexosUsados = {}, midiasUsadas = {};
+    (db.alunos || []).forEach(function (a) { idsAlunos[a.id] = true; });
+    (db.aulas || []).forEach(function (a) {
+      if (!idsAlunos[a.alunoId]) return;
+      idsAulas[a.id] = true;
+      (a.anexos || []).forEach(function (an) { anexosUsados[an.id || an] = true; });
+    });
     return todasAsNotas().then(function (notas) {
-      pacote.notas = notas;
+      pacote.notas = {};
+      Object.keys(notas).forEach(function (id) {
+        if (!idsAulas[id]) return;
+        pacote.notas[id] = notas[id];
+        (notas[id].paginas || []).forEach(function (p) {
+          (p.itens || []).forEach(function (it) {
+            if (it.t === 'imagem' && it.ref) midiasUsadas[it.ref] = true;
+          });
+        });
+      });
       return todasAsChaves('midias');
     }).then(function (chaves) {
       // miniatura da biblioteca é cache refeito do pacote: não vai para a cópia
       return Promise.all((chaves || []).filter(function (k) {
-        return String(k).indexOf(PREFIXO_MINIATURA) !== 0;
+        return midiasUsadas[k] && String(k).indexOf(PREFIXO_MINIATURA) !== 0;
       }).map(function (k) {
         return lerMidia(k).then(function (v) { return { id: k, valor: v }; });
       }));
@@ -758,7 +844,7 @@
       midias.forEach(function (m) { if (m.valor) pacote.midias[m.id] = m.valor; });
       return todasAsChaves('anexos');
     }).then(function (chaves) {
-      return Promise.all((chaves || []).map(function (k) {
+      return Promise.all((chaves || []).filter(function (k) { return anexosUsados[k]; }).map(function (k) {
         return lerAnexo(k).then(function (v) { return { id: k, valor: v }; });
       }));
     }).then(function (anexos) {
@@ -779,7 +865,9 @@
        * aceite do C15.1 mede que a cópia não cresce ao importar livros. */
       return Promise.all([usoDaBiblioteca(), etiquetasDaBiblioteca(), listasDaBiblioteca()]);
     }).then(function (bib) {
-      pacote.biblioteca = { uso: bib[0] || [], etiquetas: bib[1] || [], listas: bib[2] || [] };
+      pacote.biblioteca = { uso: (bib[0] || []).filter(function (r) {
+        return idsAlunos[r.alunoId] && idsAulas[r.aulaId];
+      }), etiquetas: bib[1] || [], listas: bib[2] || [] };
       return pacote;
     });
   }
@@ -858,7 +946,7 @@
 
   root.Store = {
     bancoVazio: bancoVazio,
-    carregar: carregar, salvar: salvar,
+    carregar: carregar, salvar: salvar, excluirAlunoEmCascata: excluirAlunoEmCascata,
     lerNota: lerNota, salvarNota: salvarNota, apagarNota: apagarNota, todasAsNotas: todasAsNotas,
     salvarMidia: salvarMidia, lerMidia: lerMidia, apagarMidia: apagarMidia,
     salvarAnexo: salvarAnexo, lerAnexo: lerAnexo, apagarAnexo: apagarAnexo,
