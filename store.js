@@ -873,55 +873,63 @@
   }
 
   function importarTudo(pacote) {
-    if (!pacote || pacote.formato !== 'apoio-educacional' || !pacote.dados) {
-      /* `invalida`: recusada antes de gravar qualquer coisa, então a tela pode
-       * dizer só isso; nas outras falhas algo pode ter sido gravado pela metade. */
-      return Promise.reject(Object.assign(new Error('Arquivo de cópia inválido.'), { invalida: true }));
-    }
-    return salvar(pacote.dados).then(null, function (e) { throw nadaGravado(e); }).then(function () {
-      var passos = [];
-      Object.keys(pacote.notas || {}).forEach(function (k) { passos.push(gravar('notas', k, pacote.notas[k])); });
-      Object.keys(pacote.midias || {}).forEach(function (k) { passos.push(salvarMidia(k, pacote.midias[k])); });
+    function objeto(v) { return v && typeof v === 'object' && !Array.isArray(v); }
+    function invalida() { return Object.assign(new Error('Arquivo de cópia inválido.'), { invalida: true }); }
+    if (!pacote || pacote.formato !== 'apoio-educacional' || !objeto(pacote.dados) ||
+        ['alunos', 'aulas', 'series', 'resumos', 'pagamentos'].some(function (k) {
+          return pacote.dados[k] != null && !Array.isArray(pacote.dados[k]);
+        }) ||
+        (pacote.notas != null && !objeto(pacote.notas)) ||
+        (pacote.midias != null && !objeto(pacote.midias)) ||
+        (pacote.anexos != null && !objeto(pacote.anexos))) return Promise.reject(invalida());
+    var bib = pacote.biblioteca;
+    if (bib && (!objeto(bib) || (bib.uso != null && !Array.isArray(bib.uso)) ||
+        (bib.etiquetas != null && !Array.isArray(bib.etiquetas)) ||
+        (bib.listas != null && !Array.isArray(bib.listas)))) return Promise.reject(invalida());
+
+    // Converter toda a cópia ANTES de abrir a transação. Erro de base64 ou de
+    // formato não pode deixar o banco com metade dos depósitos substituídos.
+    var anexos = {};
+    try {
       Object.keys(pacote.anexos || {}).forEach(function (k) {
         var reg = pacote.anexos[k];
-        // cópias antigas podiam trazer o anexo já como Blob
-        if (reg && reg.conteudo) {
-          passos.push(salvarAnexo(k, { nome: reg.nome, tipo: reg.tipo, blob: textoParaBlob(reg.conteudo, reg.tipo) }));
-        } else if (reg && reg.blob) {
-          passos.push(salvarAnexo(k, reg));
-        }
+        if (!objeto(reg)) throw invalida();
+        if (reg.conteudo) anexos[k] = { nome: reg.nome, tipo: reg.tipo,
+          blob: textoParaBlob(reg.conteudo, reg.tipo) };
+        else if (reg.blob instanceof Blob) anexos[k] = reg;
       });
-      return Promise.all(passos);
-    }).then(function () {
-      /* Cópia feita antes da biblioteca não tem o campo: aí o que o tablet já
-       * tem de uso e etiquetas fica como está. */
-      if (!pacote.biblioteca) return null;
-      return restaurarBiblioteca(pacote.biblioteca);
-    }).then(function () { return completar(pacote.dados); });
-  }
+    } catch (e) { return Promise.reject(e && e.invalida ? e : invalida()); }
 
-  /* As listas dela (C2a) entram na mesma transação, para a cópia voltar
-   * inteira ou não voltar. Cópia feita antes delas não tem o campo `listas`:
-   * aí as listas que o tablet já tem ficam como estão, como o uso e as
-   * etiquetas numa cópia feita antes da biblioteca. */
-  function restaurarBiblioteca(bib) {
-    var comListas = Array.isArray(bib.listas);
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var nomes = ['biblioteca_uso', 'biblioteca_etiquetas'].concat(comListas ? ['biblioteca_listas'] : []);
+        var nomes = ['dados', 'notas', 'midias', 'anexos', 'historico'];
+        if (bib) nomes.push('biblioteca_uso', 'biblioteca_etiquetas');
+        if (bib && Array.isArray(bib.listas)) nomes.push('biblioteca_listas');
         var t = b.transaction(nomes, 'readwrite');
-        var uso = t.objectStore('biblioteca_uso');
-        var etq = t.objectStore('biblioteca_etiquetas');
-        uso.clear(); etq.clear();
-        (bib.uso || []).forEach(function (r) { if (r && r.itemId) uso.put(r); });
-        (bib.etiquetas || []).forEach(function (r) { if (r && r.itemId) etq.put(r); });
-        if (comListas) {
-          var lis = t.objectStore('biblioteca_listas');
-          lis.clear();
-          bib.listas.forEach(function (r) { if (r && r.id && Array.isArray(r.itens)) lis.put(r); });
-        }
-        t.oncomplete = function () { resolve(); };
-        t.onabort = function () { reject(t.error); };
+        var erro = null;
+        try {
+          function trocar(nome, registros, chaveExterna) {
+            var s = t.objectStore(nome);
+            s.clear();
+            if (chaveExterna) Object.keys(registros || {}).forEach(function (k) { s.put(registros[k], k); });
+            else (registros || []).forEach(function (r) { s.put(r); });
+          }
+          trocar('dados', { principal: completar(pacote.dados) }, true);
+          trocar('notas', pacote.notas, true);
+          trocar('midias', pacote.midias, true);
+          trocar('anexos', anexos, true);
+          t.objectStore('historico').clear();
+          if (bib) {
+            trocar('biblioteca_uso', (bib.uso || []).filter(function (r) { return r && r.itemId; }), false);
+            trocar('biblioteca_etiquetas', (bib.etiquetas || []).filter(function (r) { return r && r.itemId; }), false);
+            if (Array.isArray(bib.listas)) trocar('biblioteca_listas', bib.listas.filter(function (r) {
+              return r && r.id && Array.isArray(r.itens);
+            }), false);
+          }
+        } catch (e) { erro = e; t.abort(); }
+        t.oncomplete = function () { resolve(completar(pacote.dados)); };
+        t.onabort = function () { reject(erro || t.error || new Error('A restauração foi interrompida.')); };
+        t.onerror = function () { /* onabort informa o motivo e resolve a promessa */ };
       });
     });
   }
