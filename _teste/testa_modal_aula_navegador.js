@@ -233,6 +233,10 @@ async function rodar() {
 
   // Clica no Cancelar
   await pag.click('#cancelar-aula');
+  await pag.evaluate(() => {
+    const b = document.querySelector('#descartar-relato');
+    if (b && document.querySelector('#modal-sair-relato.aberto')) b.click();
+  });
   await esperar('modal fechado após cancelar', () => pag.evaluate(() =>
     !document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
 

@@ -1075,14 +1075,26 @@
     fechandoPorVoltar = false;
   });
 
+  var MODAIS_HISTORICO = {
+    'modal-aula': true,
+    'modal-sair-relato': true,
+    'modal-aluno': true,
+    'modal-excluir-aluno': true,
+    'modal-nota': true,
+    'modal-proposta': true,
+    'modal-virada-anual': true
+  };
+
   function abrirModal(id) {
     var e = $('#' + id);
     if (!e.classList.contains('aberto')) {
       degrauModal += 2;
       e.style.zIndex = String(degrauModal);
-      var token = ++proximoModalHistorico;
-      history.pushState({ apoioModal: token }, '');
-      pilhaModalHistorico.push({ id: id, token: token });
+      if (MODAIS_HISTORICO[id]) {
+        var token = ++proximoModalHistorico;
+        history.pushState({ apoioModal: token }, '');
+        pilhaModalHistorico.push({ id: id, token: token });
+      }
     }
     e.classList.add('aberto');
     posicionarAviso();
@@ -1129,9 +1141,9 @@
     if (id === 'modal-excluir-aluno' && exclusaoAlunoPendente) return;
     var e = $('#' + id);
     var estavaAberto = e.classList.contains('aberto');
-    if (estavaAberto && !fechandoPorVoltar) {
+    if (estavaAberto && !fechandoPorVoltar && MODAIS_HISTORICO[id]) {
       var topo = pilhaModalHistorico[pilhaModalHistorico.length - 1];
-      if (topo && topo.id === id) {
+      if (topo && topo.id === id && history.state && history.state.apoioModal) {
         pilhaModalHistorico.pop();
         retornoProgramado = depoisDoHistorico || true;
         history.back();
@@ -1256,7 +1268,7 @@
     $$('.fundo-modal').forEach(function (m) { fecharModal(m.id); });
     fechandoPorVoltar = false;
     pilhaModalHistorico = [];
-    if (quantosEstados) {
+    if (quantosEstados && history.state && history.state.apoioModal) {
       retornoProgramado = true;
       history.go(-quantosEstados);
     }
@@ -4048,13 +4060,13 @@
             inicio: data, fim: ate
           });
         }).then(function () {
-          fecharModal('modal-aula');
           desenharTudo();
           /* Veio do "Abrir como folha" e ela marcou Repetir: a página vai para
            * a primeira aula da série, a do dia escolhido. */
           var doDia = db.aulas.filter(function (a) { return a.alunoId === alunoId && a.data === data; });
           var primeira = doDia.filter(function (a) { return a.serieId; })[0] || doDia[0];
           if (daBibliotecaNaSerie) {
+            fecharModal('modal-aula');
             /* A da série nova primeiro; se já havia uma aula avulsa nesse dia, a
              * série pulou a data e a página vai para essa, em página nova. */
             if (primeira && daBibliotecaNaSerie.aoCriar) daBibliotecaNaSerie.aoCriar(primeira.id, { serie: true });
@@ -4063,6 +4075,8 @@
           } else if (querPreparar && primeira) {
             abrirAula(primeira.id);
             avisar('Aulas repetidas criadas. Prepare a primeira aula abaixo.');
+          } else {
+            fecharModal('modal-aula');
           }
         });
         return;
@@ -4076,16 +4090,27 @@
       var daBiblioteca = folhaPendenteDaBiblioteca;
       folhaPendenteDaBiblioteca = null;
       salvarEDepois(function (gravou) {
-        fecharModal('modal-aula');
-        desenharTudo();
         /* Veio do "Abrir como folha" da biblioteca: a página vai para a folha
          * da aula recém-criada, e a folha abre no lugar da janela da aula. */
-        if (daBiblioteca && daBiblioteca.aoCriar) { daBiblioteca.aoCriar(nova.id); return; }
-        if (daBiblioteca) { colarNaFolhaDaAula(nova.id, daBiblioteca); return; }
+        if (daBiblioteca && daBiblioteca.aoCriar) {
+          fecharModal('modal-aula');
+          desenharTudo();
+          daBiblioteca.aoCriar(nova.id);
+          return;
+        }
+        if (daBiblioteca) {
+          fecharModal('modal-aula');
+          desenharTudo();
+          colarNaFolhaDaAula(nova.id, daBiblioteca);
+          return;
+        }
         if (querPreparar) {
+          desenharTudo();
           abrirAula(nova.id);
           avisar('Aula agendada. Prepare o material ou a folha abaixo.');
         } else {
+          fecharModal('modal-aula');
+          desenharTudo();
           avisar('Aula agendada neste tablet.');
         }
       });
