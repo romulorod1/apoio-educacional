@@ -63,7 +63,22 @@ const { conf, secao, esperar } = H;
   if (process.env.A2C_PRINT) await pag.screenshot({ path: process.env.A2C_PRINT });
   conf('abrir a janela ainda não exclui', await pag.evaluate(async () =>
     (await Store.carregar()).alunos.length), 2);
+  await pag.evaluate(() => {
+    const orig = Store.excluirAlunoEmCascata;
+    Store.excluirAlunoEmCascata = function () {
+      return new Promise(res => setTimeout(() => orig.apply(this, arguments).then(res), 500));
+    };
+  });
   await pag.click('#confirmar-excluir-aluno');
+  const durante = await pag.evaluate(() => {
+    const modal = document.querySelector('#modal-excluir-aluno');
+    const btnManter = modal.querySelector('[data-fechar]');
+    btnManter.click();
+    return [modal.classList.contains('aberto'), btnManter.disabled,
+      document.querySelector('#confirmar-excluir-aluno').textContent];
+  });
+  conf('durante a transação: janela aberta, botões desabilitados e aviso Excluindo...', durante,
+    [true, true, 'Excluindo...']);
   const fechou = await esperar('exclusão concluída', () =>
     pag.$eval('#modal-excluir-aluno', e => !e.classList.contains('aberto')), Boolean, 8000);
   conf('janela fecha após confirmar', fechou.ok, true);
