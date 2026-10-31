@@ -198,10 +198,18 @@ def fazer(pasta, grande=False):
     mapa = os.path.join(livros, 'mapa')
     os.makedirs(mapa, exist_ok=True)
     with open(os.path.join(mapa, 'mapa_capitulos_prova.json'), 'w', encoding='utf-8', newline='') as f:
+        # C15.2: os assuntos do mapa, um deles com um id que o indice nao tem
+        # (tem de ficar de fora, dito na nota)
         f.write('[{"livro": "sm4", "arquivo": "livro-sem-marcadores.pdf", "serie": "06", "deslocamento": 0, '
                 '"capitulos": [{"n": 1, "titulo": "Unidade do mapa A", "pag_impressa": 1, "pag_arquivo_inicio": 1, '
-                '"pag_arquivo_fim": 2, "assuntos": []}, {"n": 2, "titulo": "Unidade do mapa B", "pag_impressa": 3, '
-                '"pag_arquivo_inicio": 3, "pag_arquivo_fim": 4, "assuntos": []}]}]\n')
+                '"pag_arquivo_fim": 2, "assuntos": [{"id": "MAT06-05", "confianca": "alta"}, '
+                '{"id": "MAT99-99", "confianca": "alta"}]}, {"n": 2, "titulo": "Unidade do mapa B", "pag_impressa": 3, '
+                '"pag_arquivo_inicio": 3, "pag_arquivo_fim": 4, "assuntos": [{"id": "MAT06-09", "confianca": "media"}]}]}]\n')
+    # o mapa de obras (literatura): o assunto e do EPUB inteiro
+    with open(os.path.join(mapa, 'mapa_obras_prova.json'), 'w', encoding='utf-8', newline='') as f:
+        f.write('{"formato": "mapa de obra para assunto (prova)", "obras": [{"obra": "Livro de prova", '
+                '"arquivo": "livro-de-prova.epub", "serie": "em2", '
+                '"assuntos": [{"id": "LITEM2-T02", "confianca": "alta"}]}]}\n')
     linhas = [
         linha('matematica', 'Livro com marcadores', 'matematica/livro-com-marcadores.pdf', Volume='Volume 1'),
         linha('matematica', 'Livro sem marcadores', 'matematica/livro-sem-marcadores.pdf'),

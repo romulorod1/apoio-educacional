@@ -34,6 +34,21 @@ segmento, sumario e hash) e o hash de cada arquivo em `arquivos`. Os livros
 vao "stored" (sem compressao): PDF e EPUB ja sao comprimidos, e assim o
 tablet le cada livro direto do zip, sem inflar.
 
+O MAPA capitulo para assunto (C15.2), em `mapa` de cada livro: capitulo,
+paginas (ou a posicao na espinha, no EPUB) e os ids de assunto do indice de
+banco/topicos/, sem uma linha do conteudo do livro. A fonte, por ordem:
+  - o mapa da orquestradora (Livros/mapa/mapa_capitulos_*.json, pelo nome do
+    arquivo): os capitulos com as paginas do arquivo e os assuntos dela;
+  - o mapa de obras (mapa_obras_*.json, literatura): o assunto e da obra
+    inteira, e o mapa tem uma entrada so, do comeco ao fim do livro;
+  - sem os dois, um PRIMEIRO PASSE AUTOMATICO: o titulo de cada capitulo do
+    sumario contra os titulos dos assuntos da materia, por semelhanca, so
+    entre os assuntos do ANO do livro (o `serie` do mapa, ou o segmento da
+    planilha). Cada assunto achado assim vai marcado `auto`, e a tela pede
+    que ela confirme ou corrija. Sem ano, sem materia no indice ou sem
+    sumario, o mapa sai vazio, e `mapa_nota` diz por que.
+O mapa do pacote nao muda depois: a correcao dela mora no aplicativo, por cima.
+
 Nenhum livro entra no repositorio: o pacote sai em --saida, fora dele. A prova
 (biblioteca/_prova_livros.py) roda sobre livros sinteticos.
 """
@@ -236,7 +251,11 @@ def ler_pdf(caminho, mapas):
 
 
 def ler_mapas(pasta):
-    """{nome do arquivo do livro: (nome do mapa, livro do mapa)}, de todo mapa_*.json da pasta."""
+    """{nome do arquivo do livro: (nome do mapa, livro do mapa)}, de todo mapa_*.json da pasta.
+
+    Dois formatos: a lista de livros com `capitulos` (os mapas de capitulo) e
+    o objeto com `obras` (o de literatura, assunto da obra inteira). No
+    segundo, o livro do mapa nao tem `capitulos`, e sim `obra` e `assuntos`."""
     por_arquivo = {}
     if not pasta or not os.path.isdir(pasta):
         return por_arquivo
@@ -248,12 +267,242 @@ def ler_mapas(pasta):
                 dados = json.load(f)
         except (OSError, ValueError):
             continue
+        if isinstance(dados, dict) and isinstance(dados.get('obras'), list):
+            for obra in dados['obras']:
+                if isinstance(obra, dict) and obra.get('arquivo') and isinstance(obra.get('assuntos'), list):
+                    por_arquivo.setdefault(chave_de_arquivo(obra['arquivo']), (nome, obra))
+            continue
         if not isinstance(dados, list):
             continue
         for livro in dados:
             if isinstance(livro, dict) and livro.get('arquivo') and isinstance(livro.get('capitulos'), list):
                 por_arquivo.setdefault(chave_de_arquivo(livro['arquivo']), (nome, livro))
     return por_arquivo
+
+
+# ------------------------------------------------------------------ o mapa (C15.2)
+
+TOPICOS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'banco', 'topicos')
+# A materia da planilha (materia_id) e a disciplina do indice quando os nomes diferem.
+DISCIPLINA_DA_MATERIA = {'filosofia': 'filosofia-sociologia', 'sociologia': 'filosofia-sociologia'}
+# O ano do livro quando o mapa nao diz: o segmento da planilha. "Formacao da
+# professora" nao e ano de aluno nenhum, e fica sem ano (e sem passe automatico).
+ORDEM_DAS_SERIES = ['02', '03', '04', '05', '06', '07', '08', '09', 'em1', 'em2', 'em3']
+SERIES_DO_SEGMENTO = (('anos iniciais', ORDEM_DAS_SERIES[0:4]), ('anos finais', ORDEM_DAS_SERIES[4:8]),
+                      ('ensino medio', ORDEM_DAS_SERIES[8:]), ('vestibular', ORDEM_DAS_SERIES[8:]),
+                      ('ime/ita', ORDEM_DAS_SERIES[8:]), ('olimpiadas', ORDEM_DAS_SERIES[8:]))
+# A semelhanca minima do passe automatico (Dice das palavras, de 0 a 1): metade
+# das palavras de um lado e do outro em comum. Abaixo disso o capitulo fica sem
+# assunto, em vez de ganhar um palpite que ela teria de desmanchar.
+LIMIAR_AUTO = 0.5
+PALAVRAS_VAZIAS = set(('a o as os e de da do das dos em no na nos nas um uma uns umas com para por pelo pela '
+                       'pelos pelas ao aos que se sua seu suas seus como sao ou entre sobre sem mais '
+                       'cap capitulo unidade parte topico secao licao modulo volume livro tema').split())
+CONFIANCAS = {'alta': 'alta', 'media': 'média', 'média': 'média', 'baixa': 'baixa'}
+
+
+def sem_acento(t):
+    t = unicodedata.normalize('NFKD', str(t or ''))
+    return ''.join(c for c in t if not unicodedata.combining(c)).lower()
+
+
+def radical(p):
+    """O radical de uma palavra, para "fração" e "frações" serem a mesma: o
+    plural desfeito e seis letras. Grosso de proposito; quem decide e ela."""
+    for fim, troca in (('oes', 'ao'), ('aes', 'ao'), ('ais', 'al'), ('eis', 'el'), ('ois', 'ol'), ('ns', 'm'), ('s', '')):
+        if len(p) > 3 and p.endswith(fim):
+            p = p[:-len(fim)] + troca
+            break
+    return p[:6]
+
+
+def palavras(titulo):
+    return {radical(p) for p in re.split(r'[^a-z0-9]+', sem_acento(titulo))
+            if len(p) > 2 and not p.isdigit() and p not in PALAVRAS_VAZIAS}
+
+
+def semelhanca(a, b):
+    """Dice das palavras: 2 x comuns / (palavras de um + palavras do outro)."""
+    if not a or not b:
+        return 0.0
+    return 2.0 * len(a & b) / (len(a) + len(b))
+
+
+def series_do_segmento(segmento):
+    s = sem_acento(segmento)
+    achadas = set()
+    for chave, series in SERIES_DO_SEGMENTO:
+        if chave in s:
+            achadas.update(series)
+    return [x for x in ORDEM_DAS_SERIES if x in achadas]
+
+
+def ler_catalogo(pasta=None):
+    """{disciplina: {'eixo', 'assuntos': [{id, titulo, serie, palavras}]}} do indice de banco/topicos/.
+
+    A matematica tem o formato proprio (temas com serie); as outras, grupos e
+    blocos com a lista `ids` paralela a `topicos`. `serie` e a chave do grupo,
+    que so e ano escolar quando o eixo da disciplina e "ano"."""
+    pasta = pasta or TOPICOS
+    catalogo = {}
+    with open(os.path.join(pasta, 'matematica.json'), encoding='utf-8') as f:
+        mat = json.load(f)
+    catalogo['matematica'] = {'eixo': 'ano', 'assuntos': [
+        {'id': t['id'], 'titulo': t['pt']['titulo'], 'serie': t['serie'], 'palavras': palavras(t['pt']['titulo'])}
+        for t in mat.get('temas') or []]}
+    with open(os.path.join(pasta, 'indice.json'), encoding='utf-8') as f:
+        indice = json.load(f)
+    for d in indice.get('disciplinas') or []:
+        with open(os.path.join(pasta, d['chave'] + '.json'), encoding='utf-8') as f:
+            arq = json.load(f)
+        assuntos = []
+        for g in arq.get('grupos') or []:
+            for b in g.get('blocos') or []:
+                for i, titulo in enumerate(b.get('topicos') or []):
+                    ids = b.get('ids') or []
+                    if i < len(ids) and ids[i]:
+                        assuntos.append({'id': ids[i], 'titulo': titulo, 'serie': g['chave'], 'palavras': palavras(titulo)})
+        catalogo[d['chave']] = {'eixo': d.get('eixo'), 'assuntos': assuntos}
+    return catalogo
+
+
+def no_ano_do_livro(assunto, series, eixo):
+    """A REGRA do filtro de ano: o assunto entra no passe automatico so se for
+    de um ano do livro. Disciplina que nao se divide por ano (redacao, ingles,
+    metodo de estudo) nao tem o que filtrar."""
+    return eixo != 'ano' or assunto['serie'] in series
+
+
+def palpite(titulo, disciplina, series):
+    """O assunto mais parecido com o titulo, entre os do ano do livro, ou None."""
+    melhor, nota = None, 0.0
+    alvo = palavras(titulo)
+    for a in disciplina['assuntos']:
+        if not no_ano_do_livro(a, series, disciplina['eixo']):
+            continue
+        s = semelhanca(alvo, a['palavras'])
+        if s > nota:     # empate fica com o primeiro do indice: a ordem do indice e estavel
+            melhor, nota = a, s
+    if melhor is None or nota < LIMIAR_AUTO:
+        return None
+    return {'id': melhor['id'], 'confianca': 'auto', 'semelhanca': round(nota, 2)}
+
+
+def nivel_dos_capitulos(sumario):
+    """O nivel do sumario que e capitulo: o mais alto com duas entradas ou mais."""
+    niveis = sorted({e['nivel'] for e in sumario})
+    for n in niveis:
+        if sum(1 for e in sumario if e['nivel'] == n) >= 2:
+            return n
+    return niveis[0] if niveis else None
+
+
+def assuntos_do_mapa(lista, ids_validos):
+    """Os assuntos de uma entrada do mapa da orquestradora, so com id do indice. Devolve (assuntos, fora)."""
+    saida, fora = [], 0
+    for a in lista or []:
+        aid = a.get('id') if isinstance(a, dict) else None
+        if aid not in ids_validos:
+            fora += 1
+            continue
+        if any(x['id'] == aid for x in saida):
+            continue
+        item = {'id': aid, 'confianca': CONFIANCAS.get(str(a.get('confianca') or '').lower(), 'alta')}
+        if a.get('serie_vizinha'):
+            item['serie_vizinha'] = True
+        saida.append(item)
+    return saida, fora
+
+
+def montar_mapa(livro, info, achado, catalogo):
+    """O mapa do livro (lista), a origem, o ano e a nota. Nao abre o livro:
+    trabalha so com o sumario, as paginas e o mapa da orquestradora."""
+    formato = livro['formato']
+    nome_mapa, do_mapa = achado if achado else (None, None)
+    disciplina_id = DISCIPLINA_DA_MATERIA.get(livro.get('materia'), livro.get('materia'))
+    disciplina = catalogo.get(disciplina_id)
+    ids_validos = {a['id'] for d in catalogo.values() for a in d['assuntos']}
+    serie_mapa = str((do_mapa or {}).get('serie') or '').strip()
+    if serie_mapa in ORDEM_DAS_SERIES:
+        series, series_origem = [serie_mapa], 'mapa'
+    else:
+        series = series_do_segmento(livro.get('segmento'))
+        series_origem = 'segmento' if series else 'nenhuma'
+    saida = {'series': series, 'series_origem': series_origem, 'mapa_disciplina': disciplina_id if disciplina else None}
+    total = info.get('paginas')
+    espinha = len((info.get('epub') or {}).get('espinha') or [])
+
+    # 1. o mapa de obra (literatura): uma entrada, o livro inteiro
+    if do_mapa is not None and 'capitulos' not in do_mapa:
+        assuntos, fora = assuntos_do_mapa(do_mapa.get('assuntos'), ids_validos)
+        e = {'n': 1, 'titulo': limpar_texto(do_mapa.get('obra') or livro['titulo']), 'obra_inteira': True,
+             'assuntos': assuntos, 'origem': 'mapa'}
+        if formato == 'pdf':
+            e.update(pagina=1, pagina_fim=total)
+        else:
+            e.update(capitulo=1, capitulo_fim=espinha)
+        nota = 'Assunto da obra inteira, do mapa de obras da orquestradora (%s).' % nome_mapa
+        if fora:
+            nota += ' %d assunto(s) fora do índice ficaram de fora.' % fora
+        saida.update(mapa=[e], mapa_origem='mapa', mapa_nota=nota)
+        return saida
+
+    # 2. o mapa de capitulos da orquestradora (PDF: as paginas do arquivo)
+    if do_mapa is not None and formato == 'pdf':
+        entradas, fora_pag, fora_id = [], 0, 0
+        for cap in do_mapa.get('capitulos') or []:
+            try:
+                ini = int(cap.get('pag_arquivo_inicio'))
+                fim = int(cap.get('pag_arquivo_fim'))
+            except (TypeError, ValueError):
+                fora_pag += 1
+                continue
+            t = limpar_texto(cap.get('titulo'))
+            if not t or not (1 <= ini <= total):
+                fora_pag += 1
+                continue
+            assuntos, fora = assuntos_do_mapa(cap.get('assuntos'), ids_validos)
+            fora_id += fora
+            entradas.append({'titulo': t, 'pagina': ini, 'pagina_fim': min(total, max(ini, fim)),
+                             'capitulo_do_livro': cap.get('n'), 'assuntos': assuntos, 'origem': 'mapa'})
+        entradas.sort(key=lambda e: e['pagina'])
+        nota = 'Do mapa de capítulos da orquestradora (%s, livro %s).' % (nome_mapa, do_mapa.get('livro'))
+        if fora_pag:
+            nota += ' %d capítulo(s) fora das páginas do arquivo ficaram de fora.' % fora_pag
+        if fora_id:
+            nota += ' %d assunto(s) fora do índice ficaram de fora.' % fora_id
+        saida.update(mapa=[dict(n=i + 1, **e) for i, e in enumerate(entradas)], mapa_origem='mapa', mapa_nota=nota)
+        return saida
+
+    # 3. o primeiro passe automatico, pelo sumario
+    sumario = info.get('sumario') or []
+    if not sumario or not disciplina or not series:
+        motivo = ('o livro não tem sumário' if not sumario else
+                  'a matéria do livro não está no índice de assuntos' if not disciplina else
+                  'não se sabe o ano do livro (nem o mapa nem o segmento dizem)')
+        saida.update(mapa=[], mapa_origem='nenhum', mapa_nota='Sem mapa de capítulos: %s.' % motivo)
+        return saida
+    nivel = nivel_dos_capitulos(sumario)
+    caps = [e for e in sumario if e['nivel'] == nivel]
+    entradas = []
+    for i, e in enumerate(caps):
+        p = palpite(e['titulo'], disciplina, series)
+        m = {'n': i + 1, 'titulo': e['titulo'], 'assuntos': [p] if p else [], 'origem': 'auto'}
+        if formato == 'pdf':
+            m.update(pagina=e['pagina'], pagina_fim=e['pagina_fim'])
+        else:
+            prox = caps[i + 1]['capitulo'] if i + 1 < len(caps) else espinha + 1
+            m['capitulo'] = e['capitulo']
+            m['capitulo_fim'] = max(e['capitulo'], prox - 1)
+            if e.get('ancora'):
+                m['ancora'] = e['ancora']
+        entradas.append(m)
+    achados = sum(1 for m in entradas if m['assuntos'])
+    saida.update(mapa=entradas, mapa_origem='auto',
+                 mapa_nota='Primeiro passe automático: o título de cada capítulo contra os assuntos do índice '
+                           '(%s), só do ano do livro (%s, pelo %s); %d de %d capítulos com assunto, a confirmar na tela.'
+                           % (disciplina_id, ', '.join(series), series_origem, achados, len(entradas)))
+    return saida
 
 
 # ------------------------------------------------------------------ EPUB
@@ -462,9 +711,12 @@ def relatorio_md(manifest, rel):
               '- Recusados por outro motivo: %d.' % (c['recusados'] - c['recusados_teto']),
               '- Linhas sem arquivo na planilha: %d.' % c['sem_arquivo'], '']
     partes += ['## No pacote', '', tabela_md(
-        ['Livro', 'Formato', 'MB', 'Sumário'],
+        ['Livro', 'Formato', 'MB', 'Sumário', 'Mapa'],
         [[l['titulo'] + (' (%s)' % l['volume'] if l.get('volume') else ''), l['formato'].upper(), mb(l['bytes']),
-          '%d entradas (%s)' % (len(l['sumario']), l['sumario_origem'])] for l in manifest['livros']]), '']
+          '%d entradas (%s)' % (len(l['sumario']), l['sumario_origem']),
+          '%d de %d capítulos com assunto (%s)' % (sum(1 for e in l.get('mapa') or [] if e['assuntos']),
+                                                    len(l.get('mapa') or []), l.get('mapa_origem'))]
+         for l in manifest['livros']]), '']
     teto = [r for r in rel['recusados'] if r.get('teto')]
     outros = [r for r in rel['recusados'] if not r.get('teto')]
     partes += ['## Recusados pelo teto de %d MB (item E7)' % TETO_MB, '']
@@ -480,7 +732,7 @@ def relatorio_md(manifest, rel):
 
 
 def gerar(planilha, rotulo, versao, saida, pasta_livros=None, materia=None, mapas=None, trabalho=None,
-          gerado_em=None, commit=None, gravar=True):
+          gerado_em=None, commit=None, gravar=True, topicos=None):
     """Gera o pacote livros-<rotulo>. Devolve (manifest, relatorio, pasta de trabalho)."""
     t0 = time.time()
     if not re.fullmatch(r'[a-z0-9][a-z0-9-]*', rotulo or ''):
@@ -489,6 +741,7 @@ def gerar(planilha, rotulo, versao, saida, pasta_livros=None, materia=None, mapa
     base = pasta_livros or os.path.dirname(os.path.abspath(planilha))
     trabalho = trabalho or os.path.join(os.path.dirname(os.path.abspath(saida)), 'trabalho', '%s-v%d' % (nome, versao))
     por_mapa = ler_mapas(mapas)
+    catalogo = ler_catalogo(topicos)
     livros, arquivos, recusados, sem_arquivo, ids = [], {}, [], [], set()
     for i, l in enumerate(ler_planilha(planilha), start=2):   # linha 1 e o cabecalho
         if materia and (l.get('materia_id') or '').strip() != materia:
@@ -541,6 +794,7 @@ def gerar(planilha, rotulo, versao, saida, pasta_livros=None, materia=None, mapa
         if formato == 'epub':
             livro['capitulos'] = info['capitulos']
             livro['epub'] = info['epub']
+        livro.update(montar_mapa(livro, info, por_mapa.get(chave_de_arquivo(caminho)), catalogo))
         livros.append(livro)
         arquivos[no_zip] = caminho
     livros.sort(key=lambda x: x['id'])
