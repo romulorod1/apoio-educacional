@@ -4980,13 +4980,29 @@
   }
 
   /* O período que o documento propõe: os três meses que terminam hoje,
-   * contados do dia primeiro de dois meses atrás. Com um ciclo anterior, o
-   * novo começa no dia seguinte ao fim dele, para os dois não se cruzarem. */
-  function periodoPadraoDoCiclo(hojeRef, anterior) {
+   * contados do dia primeiro de dois meses atrás. Com ciclos anteriores, o
+   * novo começa no dia seguinte ao FIM MAIS RECENTE entre eles, e não ao fim
+   * do último criado: ela pode criar um ciclo de agosto depois de um de
+   * outubro, e partir do de agosto repetiria setembro e outubro. Se o fim
+   * mais recente já chega a hoje (ou passa), o novo são os três meses depois
+   * dele: começar no dia seguinte e terminar hoje daria um período ao
+   * contrário, e o padrão de três meses repetiria o mesmo período. Assim o
+   * período proposto nunca é igual ao de um ciclo que já existe.
+   * `anteriores` é a lista de ciclos (ou um ciclo só). */
+  function periodoPadraoDoCiclo(hojeRef, anteriores) {
     var hoje = hojeRef || hojeIso();
-    var inicio = mesAdjacente(mesDe(hoje), -2) + '-01';
-    if (anterior && dataValida(anterior.fim) && anterior.fim < hoje) inicio = somarDias(anterior.fim, 1);
-    return { inicio: inicio, fim: hoje };
+    var lista = Array.isArray(anteriores) ? anteriores : (anteriores ? [anteriores] : []);
+    var ultimoFim = '';
+    lista.forEach(function (c) {
+      if (c && dataValida(c.fim) && c.fim > ultimoFim) ultimoFim = c.fim;
+    });
+    if (!ultimoFim) return { inicio: mesAdjacente(mesDe(hoje), -2) + '-01', fim: hoje };
+    var inicio = somarDias(ultimoFim, 1);
+    if (inicio <= hoje) return { inicio: inicio, fim: hoje };
+    var d = dataLocal(inicio);
+    d.setMonth(d.getMonth() + 3);
+    d.setDate(d.getDate() - 1);
+    return { inicio: inicio, fim: isoDe(d) };
   }
 
   function ciclosDe(aluno) {
@@ -5081,17 +5097,20 @@
     });
     passou.sort(function (a, b) { return a.data < b.data ? -1 : (a.data > b.data ? 1 : 0); });
 
-    /* As etapas (as três frentes): cada mudança registrada no período, com a
-     * etapa de onde saiu. */
+    /* As etapas (as três frentes): onde cada frente estava no começo do
+     * período e onde terminou, só nas que mudaram dentro dele. Saem os ids, e
+     * não os rótulos: "Apoio parcial" e "Supervisão" são o vocabulário dela,
+     * e o rascunho escreve para a família o que o aluno faz (FRASE_DA_ETAPA). */
     var etapas = [];
     FRENTES_ETAPA.forEach(function (f) {
-      var de = null;
+      var de = '', para = '', data = '';
       registrosDaFrente(aluno, f.id).forEach(function (r) {
         if (r.desde < inicio) { de = r.etapa; return; }
         if (r.desde > ate) return;
-        etapas.push({ frente: f.rotulo, de: de ? rotuloEtapa(de) : '', para: rotuloEtapa(r.etapa), data: r.desde });
-        de = r.etapa;
+        para = r.etapa;
+        data = r.desde;
       });
+      if (para && para !== de) etapas.push({ frente: f.id, de: de, para: para, data: data });
     });
 
     // o ponto de partida: o mapeamento que vale, se já existia no fim do período
@@ -5132,6 +5151,21 @@
     };
   }
 
+  /* As etapas, escritas para a família: o que o aluno FAZ, no presente e no
+   * passado, e não o nome da etapa. "Apoio parcial" e "Supervisão" são o
+   * vocabulário dela, e na folha da família soam como laudo (revisão do C9). */
+  var FRASE_DA_ETAPA = {
+    'apoio-total': { agora: 'precisa de acompanhamento lado a lado', antes: 'precisava de acompanhamento lado a lado' },
+    'apoio-parcial': { agora: 'começa sem ajuda e pede apoio no meio do caminho', antes: 'começava sem ajuda e pedia apoio no meio do caminho' },
+    'supervisao': { agora: 'faz sem ajuda, com uma conferência depois', antes: 'fazia sem ajuda, com uma conferência depois' },
+    'autonomia': { agora: 'faz e confere sem ajuda', antes: 'fazia e conferia sem ajuda' }
+  };
+  var FRASE_DA_FRENTE = {
+    conteudo: 'Na matéria',
+    autonomia: 'Para estudar e se organizar',
+    confianca: 'Na confiança diante da aula e da prova'
+  };
+
   /* O rascunho de cada seção, escrito a partir dos dados. É ponto de partida:
    * ela reescreve o que quiser, e o que ela escreve é o que sai. Nenhum ponto
    * de atenção entra aqui, marcado ou não: os marcados saem em lista própria,
@@ -5154,29 +5188,32 @@
       })) + '.');
     }
     if (d.passouADominar.length) {
-      A.push((d.passouADominar.length === 1 ? 'Passou a ser dominado: ' : 'Passaram a ser dominados: ') +
-        emProsa(d.passouADominar.map(function (x) { return x.titulo + ' (' + ddmm(x.data) + ')'; })) + '.');
+      A.push('Agora resolve com segurança: ' +
+        emProsa(d.passouADominar.map(function (x) { return x.titulo + ' (desde ' + ddmm(x.data) + ')'; })) + '.');
     }
     if (d.partida) {
-      A.push('O ponto de partida foi o mapeamento de ' + ddmmaaaa(d.partida.data) +
-        (d.partida.lacunas.length ? ', que apontou a base de anos anteriores a retomar: ' + emProsa(d.partida.lacunas) + '.' : '.'));
+      A.push('Partimos da avaliação inicial de ' + ddmmaaaa(d.partida.data) +
+        (d.partida.lacunas.length ? ', que mostrou que valia retomar conteúdos de anos anteriores: ' + emProsa(d.partida.lacunas) + '.' : '.'));
     }
     r.aconteceu = A.join('\n\n');
 
     var S = [];
     d.etapas.forEach(function (e) {
-      S.push(e.frente + ': ' + (e.de ? 'passou de ' + e.de + ' para ' + e.para : 'chegou a ' + e.para) + ' em ' + ddmm(e.data) + '.');
+      var frase = FRASE_DA_ETAPA[e.para], antes = FRASE_DA_ETAPA[e.de];
+      if (!frase || !FRASE_DA_FRENTE[e.frente]) return;
+      S.push(FRASE_DA_FRENTE[e.frente] + ', hoje ' + frase.agora +
+        (antes ? '; no começo do período, ' + antes.antes : '') + '.');
     });
     /* As três partes somam o total, para a conta fechar na frente da família:
-     * o que passou a ser dominado, o que segue em construção e o que já era
-     * dominado e continuou. */
+     * o que passou a sair com segurança, o que ainda está sendo construído e o
+     * que já estava firme e continuou. */
     if (d.comMarcaDeDominio) {
       var partes = [];
       var np = d.passouADominar.length, nc = d.pedePratica.length, nm = d.seguiuDominado;
-      if (np) partes.push(np === 1 ? '1 passou a ser dominado' : np + ' passaram a ser dominados');
-      if (nc) partes.push(nc === 1 ? '1 segue em construção' : nc + ' seguem em construção');
-      if (nm) partes.push(nm === 1 ? '1 já era dominado e continua' : nm + ' já eram dominados e continuam');
-      S.push('Dos assuntos acompanhados de perto neste período (' + d.comMarcaDeDominio + '), ' + emProsa(partes) + '.');
+      if (np) partes.push(np === 1 ? '1 passou a sair com segurança' : np + ' passaram a sair com segurança');
+      if (nc) partes.push(nc === 1 ? '1 ainda está sendo construído' : nc + ' ainda estão sendo construídos');
+      if (nm) partes.push(nm === 1 ? '1 já estava firme e continua' : nm + ' já estavam firmes e continuam');
+      S.push('Dos assuntos que acompanhamos de perto neste período (' + d.comMarcaDeDominio + '), ' + emProsa(partes) + '.');
     }
     r.significa = S.join('\n\n');
 
@@ -5187,14 +5224,16 @@
 
     var P = [];
     d.proximos.forEach(function (x) {
-      P.push((x.trilha ? x.trilha + ': o' : 'O') + ' próximo passo é ' + x.passo + '.');
+      P.push(x.trilha
+        ? 'No próximo ciclo, seguimos em ' + x.trilha + ', começando por ' + x.passo + '.'
+        : 'No próximo ciclo, começamos por ' + x.passo + '.');
     });
     // o assunto que já é o próximo passo de uma trilha não se repete aqui
     var nosPassos = d.proximos.map(function (x) { return chaveDeBusca(x.passo); });
     var emAndamento = d.pedePratica.filter(function (x) {
       return x.estado === 'andamento' && nosPassos.indexOf(chaveDeBusca(x.titulo)) < 0;
     });
-    if (emAndamento.length) P.push('Seguimos com ' + emProsa(titulos(emAndamento)) + '.');
+    if (emAndamento.length) P.push('Continuamos praticando ' + emProsa(titulos(emAndamento)) + '.');
     r.proximo = P.join('\n\n');
     return r;
   }
@@ -5203,7 +5242,7 @@
    * no aluno sozinho: quem guarda é a tela, quando ela muda alguma coisa. */
   function cicloNovo(db, aluno, hojeRef) {
     var lista = ciclosDe(aluno);
-    var per = periodoPadraoDoCiclo(hojeRef, lista.length ? lista[lista.length - 1] : null);
+    var per = periodoPadraoDoCiclo(hojeRef, lista);
     var d = dadosDoCiclo(db, aluno && aluno.id, per.inicio, per.fim, hojeRef);
     return {
       id: uid(), inicio: per.inicio, fim: per.fim,

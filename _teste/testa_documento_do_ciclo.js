@@ -142,9 +142,9 @@ function provas(C, conf) {
   conf('as três partes somam o total acompanhado', d.passouADominar.length + d.pedePratica.length + d.seguiuDominado, d.comMarcaDeDominio);
 
   // 3. etapas, partida, próximo passo
-  conf('as etapas que mudaram no período, com a de onde saiu', d.etapas,
-    [{ frente: 'Autonomia', de: 'Apoio parcial', para: 'Supervisão', data: '2026-09-20' },
-      { frente: 'Confiança', de: '', para: 'Apoio total', data: '2026-08-15' }]);
+  conf('as etapas que mudaram no período: de onde saiu e onde terminou, por frente', d.etapas,
+    [{ frente: 'autonomia', de: 'apoio-parcial', para: 'supervisao', data: '2026-09-20' },
+      { frente: 'confianca', de: '', para: 'apoio-total', data: '2026-08-15' }]);
   conf('o ponto de partida: o mapeamento e as lacunas', d.partida, { data: '2026-08-03', lacunas: ['Frações'] });
   conf('o próximo passo da trilha ativa', d.proximos, [{ trilha: 'Operações com frações', passo: 'Soma de frações' }]);
 
@@ -153,18 +153,23 @@ function provas(C, conf) {
   conf('rascunho: as quatro seções têm texto', Object.keys(r).filter(k => r[k]).length, 4);
   conf('rascunho, o que aconteceu: período e aulas', r.aconteceu.indexOf('Entre 01/08/2026 e 30/10/2026, foram 9 aulas.') === 0, true);
   conf('rascunho, o que aconteceu: os assuntos', r.aconteceu.indexOf('Assuntos trabalhados (5): ') >= 0, true);
-  conf('rascunho, o que aconteceu: o que passou a ser dominado, com a data', r.aconteceu.indexOf('Passou a ser dominado: frações equivalentes (25/08).') >= 0, true);
-  conf('rascunho, o que significa: a etapa e a conta do domínio', [
-    r.significa.indexOf('Autonomia: passou de Apoio parcial para Supervisão em 20/09.') >= 0,
-    r.significa.indexOf('(4), 1 passou a ser dominado, 2 seguem em construção e 1 já era dominado e continua.') >= 0], [true, true]);
+  conf('rascunho, o que aconteceu: o que passou a sair com segurança, com a data', r.aconteceu.indexOf('Agora resolve com segurança: frações equivalentes (desde 25/08).') >= 0, true);
+  conf('rascunho, o que significa: o que o aluno faz em cada frente que mudou, e a conta do domínio', [
+    r.significa.indexOf('Para estudar e se organizar, hoje faz sem ajuda, com uma conferência depois; no começo do período, começava sem ajuda e pedia apoio no meio do caminho.') >= 0,
+    r.significa.indexOf('Na confiança diante da aula e da prova, hoje precisa de acompanhamento lado a lado.') >= 0,
+    r.significa.indexOf('(4), 1 passou a sair com segurança, 2 ainda estão sendo construídos e 1 já estava firme e continua.') >= 0], [true, true, true]);
   conf('rascunho, o que pede atenção: os assuntos em construção', r.atencao, 'Ainda pedem prática: Porcentagem e Soma de frações.');
   conf('rascunho, próximo ciclo: o passo da trilha, sem repetir o assunto', r.proximo,
-    'Operações com frações: o próximo passo é Soma de frações.\n\nSeguimos com Porcentagem.');
+    'No próximo ciclo, seguimos em Operações com frações, começando por Soma de frações.\n\nContinuamos praticando Porcentagem.');
   const pontos = C.pontosDeAtencaoDoCiclo(aluno);
   conf('o mapeamento oferece os quatro pontos (do aluno e da matéria)', pontos.map(p => p.id), ['vespera', 'chuta', 'ansiedade-prova', 'sinal']);
   const todoRascunho = Object.keys(r).map(k => r[k]).join('\n');
   conf('o rascunho não cita ponto de atenção nenhum, marcado ou não',
     pontos.filter(p => todoRascunho.indexOf(p.rotulo) >= 0).map(p => p.rotulo), []);
+  /* Tom de família (revisão do C9): nem o nome das etapas nem o "domina"
+   * do domínio, que na folha soam como laudo. */
+  conf('o rascunho não usa o vocabulário interno (etapas e domínio)',
+    vocabularioInterno(C, todoRascunho), []);
 
   // 5. só os pontos marcados
   const ciclo = C.cicloNovo(db, aluno, HOJE);
@@ -198,7 +203,17 @@ function provas(C, conf) {
     conf(nome + ': nenhum ponto não marcado', NAO_MARCADOS.filter(p => t.indexOf(p) >= 0), []);
     conf(nome + ': nada interno (notas, observações, evidência, dinheiro)', SENTINELAS.filter(s => t.indexOf(s) >= 0), []);
     conf(nome + ': sem travessão', TRAVESSOES.test(t), false);
+    conf(nome + ': sem o vocabulário interno (etapas e domínio)', vocabularioInterno(C, t), []);
   });
+}
+
+/* O nome das etapas, com a caixa dela ("Apoio parcial", "Supervisão"), e
+ * qualquer forma de "domin". */
+function vocabularioInterno(C, texto) {
+  const achados = C.ETAPAS.map(e => e.rotulo).filter(r => texto.indexOf(r) >= 0);
+  const m = texto.match(/domin/i);
+  if (m) achados.push(m[0]);
+  return achados;
 }
 
 secao('0. As âncoras');
@@ -230,6 +245,23 @@ secao('7. O texto dela fica guardado e viaja na cópia');
   // o próximo ciclo começa no dia seguinte ao fim do anterior
   aluno.ciclos[0].fim = '2026-07-31';
   conf('o ciclo seguinte começa no dia seguinte ao anterior', Core.periodoPadraoDoCiclo(HOJE, aluno.ciclos[0]), { inicio: INICIO, fim: HOJE });
+  /* O período padrão parte do FIM MAIS RECENTE, e não do último criado, e
+   * nunca repete um período que já existe. */
+  const out = { id: 'c-out', inicio: '2026-09-01', fim: '2026-10-15' };
+  const ago = { id: 'c-ago', inicio: '2026-08-01', fim: '2026-08-31' };   // criado depois, termina antes
+  conf('parte do fim mais recente, não do último criado', Core.periodoPadraoDoCiclo(HOJE, [out, ago]), { inicio: '2026-10-16', fim: HOJE });
+  aluno.ciclos = [out, ago];
+  const novo = Core.cicloNovo(db, aluno, HOJE);
+  conf('o ciclo novo da tela usa a mesma regra', [novo.inicio, novo.fim], ['2026-10-16', HOJE]);
+  const ateHoje = { id: 'c-hoje', inicio: '2026-08-01', fim: HOJE };
+  const p1 = Core.periodoPadraoDoCiclo(HOJE, [ateHoje]);
+  conf('ciclo que termina hoje: o novo são os três meses depois dele', p1, { inicio: '2026-10-31', fim: '2027-01-30' });
+  const alem = { id: 'c-alem', inicio: '2026-10-01', fim: '2026-12-31' };
+  const p2 = Core.periodoPadraoDoCiclo(HOJE, [ateHoje, alem]);
+  conf('ciclo que termina depois de hoje: idem, depois do fim mais recente', p2, { inicio: '2027-01-01', fim: '2027-03-31' });
+  conf('o período proposto nunca é o de um ciclo que já existe', [p1, p2].filter(p =>
+    [out, ago, ateHoje, alem].some(c => c.inicio === p.inicio && c.fim === p.fim)).length, 0);
+  conf('e nunca começa depois de terminar', [p1, p2].every(p => p.inicio <= p.fim), true);
 }
 
 secao('8. VENENO: cópias do core.js TÊM de reprovar');

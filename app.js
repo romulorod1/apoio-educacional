@@ -13140,8 +13140,11 @@
     area.style.height = Math.min(Math.max(area.scrollHeight + 2, 110), 360) + 'px';
   }
 
-  function guardarCiclo() {
-    var e = cicloEmEdicao;
+  /* `e` é o estado da janela que fez a mudança, e não o da janela de agora:
+   * o Desfazer do "Refazer o rascunho" chega depois, e ela pode ter começado
+   * outro ciclo no meio. Sem `e`, é o ciclo que está na tela. */
+  function guardarCiclo(e) {
+    e = e || cicloEmEdicao;
     var aluno = e && alunoPorId(e.alunoId);
     if (!aluno) return null;
     if (!e.guardado) {
@@ -13210,7 +13213,9 @@
       if (!Core.dataValida(ini) || !Core.dataValida(fim) || ini > fim) {
         campoInicio.value = ciclo.inicio;
         campoFim.value = ciclo.fim;
-        avisar('O período começa antes de terminar. As datas voltaram às de antes.');
+        avisar(!Core.dataValida(ini) || !Core.dataValida(fim)
+          ? 'Escolha as duas datas do período. As datas voltaram às de antes.'
+          : 'O período termina antes de começar. As datas voltaram às de antes.');
         return;
       }
       var antes = Core.rascunhoDoCiclo(Core.dadosDoCiclo(db, aluno.id, ciclo.inicio, ciclo.fim));
@@ -13220,7 +13225,7 @@
       });
       ciclo.inicio = ini;
       ciclo.fim = fim;
-      guardarCiclo();
+      guardarCiclo(e);
       desenharDocumentoDoCiclo();
     }
     campoInicio.addEventListener('change', trocarPeriodo);
@@ -13241,7 +13246,7 @@
       area.addEventListener('input', function () {
         ajustarAlturaDoTexto(area);
         ciclo.textos[s.chave] = area.value;
-        guardarCiclo();
+        guardarCiclo(e);
         desenharPrevia();
       });
       var refazer = el('button', {
@@ -13252,13 +13257,23 @@
           ciclo.textos[s.chave] = novo;
           area.value = novo;
           ajustarAlturaDoTexto(area);
-          guardarCiclo();
+          guardarCiclo(e);
           desenharPrevia();
+          /* O Desfazer devolve o texto ao ciclo e à caixa que ELE guardou.
+           * Se a tela mudou no meio (outro ciclo, outro período), a caixa
+           * guardada já saiu da tela: o texto volta ao ciclo dele, e a tela
+           * só é redesenhada se ainda for a desse ciclo. */
           avisar('Rascunho refeito com os dados do período.', 'Desfazer', function () {
             ciclo.textos[s.chave] = anterior;
-            area.value = anterior;
-            guardarCiclo();
-            desenharPrevia();
+            guardarCiclo(e);
+            if (area.isConnected) {
+              area.value = anterior;
+              ajustarAlturaDoTexto(area);
+              desenharPrevia();
+            } else if (cicloEmEdicao && cicloEmEdicao.ciclo === ciclo &&
+              $('#modal-documento-ciclo').classList.contains('aberto')) {
+              desenharDocumentoDoCiclo();
+            }
           });
         }
       });
@@ -13270,7 +13285,7 @@
         area,
         el('div', { class: 'barra', style: 'margin-top:4px' }, [refazer])
       ]);
-      if (s.chave === 'atencao') desenharPontosDoCiclo(bloco, aluno, ciclo, desenharPrevia);
+      if (s.chave === 'atencao') desenharPontosDoCiclo(bloco, aluno, e, desenharPrevia);
       painel.appendChild(bloco);
     });
 
@@ -13328,7 +13343,7 @@
       type: 'button', class: 'btn', id: 'ciclo-baixar-texto', texto: 'Texto',
       aoClick: function () {
         var doc = Core.documentoDoCiclo(db, aluno, ciclo);
-        guardarCiclo();
+        guardarCiclo(e);
         entregarArquivo(nomeDoCiclo(doc) + '.md',
           new Blob([Core.markdownCiclo(doc)], { type: 'text/markdown;charset=utf-8' }),
           'Ciclo de ' + doc.alunoNome);
@@ -13338,7 +13353,7 @@
       type: 'button', class: 'btn principal', id: 'ciclo-baixar-pdf', texto: 'PDF do ciclo',
       aoClick: function () {
         var doc = Core.documentoDoCiclo(db, aluno, ciclo);
-        guardarCiclo();
+        guardarCiclo(e);
         try {
           var bytes = PDFGen.gerarCiclo(doc);
           entregarArquivo(nomeDoCiclo(doc) + '.pdf', new Blob([bytes], { type: 'application/pdf' }),
@@ -13354,14 +13369,17 @@
    * documento". Todos nascem desmarcados, como na proposta: a ficha é
    * interna e pode ser dura, e o documento é o que a família (e a criança)
    * lê. Sem mapeamento ou sem ponto marcado nele, não aparece nada. */
-  function desenharPontosDoCiclo(bloco, aluno, ciclo, desenharPrevia) {
+  function desenharPontosDoCiclo(bloco, aluno, e, desenharPrevia) {
+    var ciclo = e.ciclo;
     var pontos = Core.pontosDeAtencaoDoCiclo(aluno);
     if (!pontos.length) return;
     var caixa = el('div', { id: 'ciclo-pontos', style: 'margin-top:8px' }, [
       el('div', { class: 'campo-titulo-com-destino' }, [
         el('span', { texto: 'Pontos de atenção do mapeamento', style: 'font-size:13px;font-weight:700' }),
         el('span', { class: 'destino-privado', texto: 'Só sai o que você marcar' })
-      ])
+      ]),
+      el('div', { class: 'ajuda', id: 'ciclo-pontos-ajuda', style: 'margin:2px 0 4px',
+        texto: 'Cada ponto marcado sai em lista, logo abaixo do texto de "O que ainda pede atenção".' })
     ]);
     pontos.forEach(function (p) {
       var chk = el('input', { type: 'checkbox', class: 'ciclo-ponto', 'data-ponto': p.id, style: 'width:auto;min-height:auto' });
@@ -13370,7 +13388,7 @@
         var l = ciclo.atencaoQueSai.filter(function (x) { return x !== p.id; });
         if (chk.checked) l.push(p.id);
         ciclo.atencaoQueSai = l;
-        guardarCiclo();
+        guardarCiclo(e);
         desenharPrevia();
       });
       caixa.appendChild(el('label', {

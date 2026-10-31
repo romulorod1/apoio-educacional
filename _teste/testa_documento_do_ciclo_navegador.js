@@ -23,8 +23,14 @@
  *   8. depois de tudo, abrir de novo não abre nada sozinho; nenhum diálogo
  *      nativo na rodada inteira; nenhum erro de página.
  *
- * SALVAR_PRINTS=<pasta> guarda três prints: a entrada na ficha, o editor das
- * quatro seções e a primeira página do PDF (rasterizada pelo PyMuPDF).
+ * SALVAR_PRINTS=<pasta> guarda três prints, todos do MESMO estado final (o
+ * texto dela numa seção e um ponto marcado, os outros dois desmarcados): o
+ * editor das quatro seções, a primeira página do PDF gerado pelo botão
+ * naquele momento (rasterizada pelo PyMuPDF) e a entrada na ficha. Na revisão
+ * do C9, o print do editor era do começo do roteiro (nada marcado) e o do PDF
+ * do fim (ponto marcado, texto dela), e o painel cego leu isso, com razão,
+ * como o PDF mostrando um ponto desmarcado. Por isso a seção 6 também confere
+ * que o PDF e o texto batem com o editor no momento do botão.
  */
 'use strict';
 const fs = require('fs');
@@ -71,6 +77,16 @@ const FAMILIA = AREAS.map(id => Core.rotuloAreaFamilia(id));
 const INTERNOS = AREAS.map(id => Core.rotuloArea(id));
 const PONTOS = { vespera: 'Estuda só na véspera', chuta: 'Chuta sem tentar', sinal: 'Erros de sinal' };
 const TEXTO_DELA = 'Neste ciclo ele ganhou segurança para começar a questão sem esperar ajuda.';
+
+const normal = s => String(s || '').replace(/\s+/g, ' ').trim();
+/* O nome das etapas, com a caixa dela ("Apoio parcial", "Supervisão"), e
+ * qualquer forma de "domin": o vocabulário dela, que na folha soa como laudo. */
+function vocabularioInterno(texto) {
+  const achados = Core.ETAPAS.map(e => e.rotulo).filter(r => texto.indexOf(r) >= 0);
+  const m = texto.match(/domin/i);
+  if (m) achados.push(m[0]);
+  return achados;
+}
 
 function textoDoPdf(base64) {
   const bruto = Buffer.from(base64, 'base64').toString('latin1');
@@ -251,7 +267,6 @@ async function printDe(pag, seletor, nome, folga) {
   });
   conf('a entrada: o botão "Documento do ciclo", na ficha, visível na aba Histórico', botao && [botao.texto, botao.naAba, botao.visivel], ['Documento do ciclo', true, true]);
   conf('discreta: botão comum, sem a cor de ação principal', botao && botao.classe, 'btn pequeno');
-  await printDe(pag, '#modal-aluno .modal', '01_entrada_na_ficha.png', 0);
 
   // ================================================================
   secao('3. A janela: o rascunho das quatro seções');
@@ -266,7 +281,8 @@ async function printDe(pag, seletor, nome, folga) {
   const aconteceu = tela.secoes[0].texto;
   conf('o rascunho conta as aulas do período', aconteceu.indexOf('foram ' + DATAS.length + ' aulas.') >= 0, true);
   conf('e traz as habilidades e hábitos com o rótulo de família', FAMILIA.filter(f => aconteceu.indexOf(f) < 0), []);
-  conf('e o que passou a ser dominado', aconteceu.indexOf('Passou a ser dominado: Frações equivalentes') >= 0, true);
+  conf('e o que passou a sair com segurança, em linguagem de família', aconteceu.indexOf('Agora resolve com segurança: Frações equivalentes') >= 0, true);
+  conf('o rascunho não usa o vocabulário interno (etapas e domínio)', vocabularioInterno(tela.secoes.map(s => s.texto).join('\n')), []);
   conf('a prévia mostra as quatro', tela.previa, ['O que aconteceu', 'O que isso significa', 'O que ainda pede atenção', 'Próximo ciclo']);
   conf('os três pontos de atenção, todos desmarcados', tela.pontos, [{ id: 'vespera', marcado: false }, { id: 'chuta', marcado: false }, { id: 'sinal', marcado: false }]);
   conf('a prévia não mostra ponto nenhum', await pag.evaluate(p => {
@@ -274,13 +290,8 @@ async function printDe(pag, seletor, nome, folga) {
     return p.filter(x => t.indexOf(x) >= 0);
   }, Object.values(PONTOS)), []);
   conf('abrir sem mexer não grava nada', await doBanco(pag), null);
-  if (SALVAR) {
-    // a janela inteira, com as quatro seções e os pontos, numa tela alta
-    await pag.setViewport({ width: 1280, height: 2100, hasTouch: true });
-    await pausa(300);
-    await printDe(pag, '#modal-documento-ciclo .modal', '02_editor_das_quatro_secoes.png', 0);
-    await pag.setViewport({ width: 1280, height: 1000, hasTouch: true });
-  }
+  conf('a caixa dos pontos diz onde o marcado sai', await pag.evaluate(() =>
+    (document.querySelector('#ciclo-pontos-ajuda') || {}).textContent || ''), 'Cada ponto marcado sai em lista, logo abaixo do texto de "O que ainda pede atenção".');
 
   // ================================================================
   secao('4. Editar uma seção e marcar um ponto');
@@ -313,7 +324,23 @@ async function printDe(pag, seletor, nome, folga) {
     document.querySelector('#ciclo-pontos .ciclo-ponto[data-ponto="vespera"]').checked]), [TEXTO_DELA, true, false]);
 
   // ================================================================
-  secao('6. O texto e o PDF, pelos botões');
+  secao('6. O texto e o PDF, pelos botões, batendo com o editor');
+  // o editor NO MOMENTO do botão: o texto de cada seção e cada caixa
+  const editor = await pag.evaluate(() => ({
+    textos: Array.from(document.querySelectorAll('#editor-ciclo .ciclo-texto')).map(t => ({ chave: t.dataset.secao, texto: t.value })),
+    pontos: Array.from(document.querySelectorAll('#ciclo-pontos .ciclo-ponto')).map(c => ({
+      rotulo: c.parentNode.textContent.trim(), marcado: c.checked }))
+  }));
+  conf('o estado final no editor: um ponto marcado, dois desmarcados', editor.pontos,
+    [{ rotulo: PONTOS.vespera, marcado: false }, { rotulo: PONTOS.chuta, marcado: true }, { rotulo: PONTOS.sinal, marcado: false }]);
+  if (SALVAR) {
+    // a janela inteira, com as quatro seções e os pontos, numa tela alta
+    await pag.setViewport({ width: 1280, height: 2100, hasTouch: true });
+    await pausa(300);
+    await printDe(pag, '#modal-documento-ciclo .modal', '02_editor_das_quatro_secoes.png', 0);
+    await pag.setViewport({ width: 1280, height: 1000, hasTouch: true });
+    await pausa(300);
+  }
   await pag.evaluate(() => { window.__gerados = []; document.querySelector('#ciclo-baixar-texto').click(); });
   const md = await esperar('o texto', () => pag.evaluate(() => (window.__gerados || []).find(x => /\.md$/.test(x.nome)) || null), v => !!v, 8000);
   await pag.evaluate(() => { document.querySelector('#ciclo-baixar-pdf').click(); });
@@ -335,7 +362,16 @@ async function printDe(pag, seletor, nome, folga) {
     conf(nome + ': nenhum ponto não marcado', [PONTOS.vespera, PONTOS.sinal].filter(p => t.indexOf(p) >= 0), []);
     conf(nome + ': nada de nota, observação ou dinheiro', SENTINELAS.filter(s => t.indexOf(s) >= 0), []);
     conf(nome + ': sem travessão', TRAVESSOES.test(t), false);
+    conf(nome + ': sem o vocabulário interno (etapas e domínio)', vocabularioInterno(t), []);
+    // bate com o editor: o texto de cada seção, e as caixas
+    const tn = normal(t);
+    conf(nome + ': o texto de cada seção é o do editor naquele momento',
+      editor.textos.filter(s => normal(s.texto) && tn.indexOf(normal(s.texto)) < 0).map(s => s.chave), []);
+    conf(nome + ': ponto desmarcado no editor não sai; o marcado sai',
+      editor.pontos.filter(p => (t.indexOf(p.rotulo) >= 0) !== p.marcado).map(p => p.rotulo), []);
   });
+  conf('controle: a comparação com o editor acusa um texto que não está na saída',
+    normal(saidas.PDF).indexOf(normal(editor.textos[1].texto + ' (mudado)')) < 0, true);
   conf('controle: a varredura acusa o rótulo interno quando ele está lá',
     INTERNOS.filter(i => FAMILIA.indexOf(i) < 0 && (saidas.texto + ' ' + INTERNOS[0]).indexOf(i) >= 0).length > 0, true);
   if (SALVAR && pdf.valor) {
@@ -346,6 +382,10 @@ async function printDe(pag, seletor, nome, folga) {
     execFileSync('python', ['-c', 'import sys, fitz; d = fitz.open(sys.argv[1]); d[0].get_pixmap(dpi=110).save(sys.argv[2])', arq, png]);
     console.log('       print: ' + png);
     try { fs.unlinkSync(arq); } catch (e) { /* já saiu */ }
+    // a entrada na ficha, no mesmo estado: a janela do ciclo fecha e a ficha está embaixo
+    await pag.evaluate(() => document.querySelector('#modal-documento-ciclo [data-fechar]').click());
+    await pausa(300);
+    await printDe(pag, '#modal-aluno .modal', '01_entrada_na_ficha.png', 0);
   }
 
   // ================================================================
