@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.38.0';
+  var VERSAO = '1.39.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,16 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.39.0',
+      itens: [
+        'Na ficha do aluno, aba Histórico, "Documento do ciclo": um documento de três meses para a família, com quatro perguntas ' +
+          '(o que aconteceu, o que isso significa, o que ainda pede atenção, próximo ciclo). O aplicativo sugere um rascunho, e ' +
+          'você muda tudo. Só sai ponto de atenção que você marcar. Use quando quiser; nada aparece sozinho.',
+        'A ordem dos assuntos de matemática, do 2º ano ao 3º do médio, foi revista: cada assunto diz o que precisa vir antes. ' +
+          'As trilhas passam a seguir essa ordem.'
+      ]
+    },
     {
       versao: '1.38.0',
       itens: [

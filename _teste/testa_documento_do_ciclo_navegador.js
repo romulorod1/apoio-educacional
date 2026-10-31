@@ -143,7 +143,10 @@ const doBanco = pag => pag.evaluate(async (id) => {
 const abertosSozinhos = pag => pag.evaluate(() => {
   const visivel = e => !!(e.offsetParent || e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
   return {
-    janelas: Array.from(document.querySelectorAll('.fundo-modal.aberto')).map(m => m.id).sort(),
+    // a janela de Novidades abre sozinha a cada versão nova, de propósito; ela não é do C9 e
+    // muda só porque o ramo sobe a VERSAO, enquanto a main de comparação não sobe
+    janelas: Array.from(document.querySelectorAll('.fundo-modal.aberto')).map(m => m.id)
+      .filter(id => id !== 'modal-novidades').sort(),
     aviso: !!document.querySelector('#aviso.aberto'),
     faixas: Array.from(document.querySelectorAll('[class*="faixa"], [id*="faixa"]'))
       .filter(e => !e.closest('.fundo-modal') && visivel(e) && e.textContent.trim())
