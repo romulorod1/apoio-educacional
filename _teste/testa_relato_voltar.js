@@ -37,6 +37,7 @@ const { conf, secao, esperar } = H;
   conf('fechar abre escolha sem fechar aula', await pag.evaluate(() =>
     document.querySelector('#modal-aula').classList.contains('aberto') &&
     document.querySelector('#modal-sair-relato').classList.contains('aberto')), true);
+  if (process.env.A5_PRINT_DEPOIS) await pag.screenshot({ path: process.env.A5_PRINT_DEPOIS });
   await pag.click('#continuar-relato');
   const voltou = await esperar('continuar volta à aula', () => pag.evaluate(() =>
     !document.querySelector('#modal-sair-relato').classList.contains('aberto') &&
