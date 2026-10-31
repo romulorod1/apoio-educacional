@@ -22,8 +22,15 @@ as aulas gravadas citam e que nunca mudam), `serie` (o ano), `unidade`,
 ou não) e `chaves` (as palavras-chave da busca, radicais soltos e sem frase).
 Nada de resumo, explicação ou exercício.
 
-O cabeçalho diz de onde vêm os pré-requisitos (`prerequisitos_origem`: o grafo
-autoral de 09/2026, a revisar no item C7) e as palavras-chave (`chaves_origem`).
+O cabeçalho diz de onde vêm os pré-requisitos (`prerequisitos_origem`: revisado
+no C7 em 30/10/2026, assunto por assunto, sobre o grafo autoral de 09/2026) e as
+palavras-chave (`chaves_origem`). Cada assunto lista só os pré-requisitos
+IMEDIATOS; a cadeia sai da transitividade. As regras do grafo (todo id existe,
+sem ciclo, nenhum pré-requisito de ano posterior, nenhuma aresta redundante,
+raízes só no 2º ano, ids e títulos congelados) são provadas por
+`_teste/testa_grafo.js`, com veneno. Cada aresta acrescentada ou tirada na
+revisão tem uma linha de motivo em `_grafo_c7_mudancas.md`, que também anota os
+assuntos que faltam na lista (sugestões; nada foi criado).
 O aplicativo o lê em `carregarIndice` (app.js), e a busca de matemática é
 montada dele por `Busca.indiceDoCatalogo` (busca.js). Ele fica fora do
 `indice.json` de propósito: a lista "Outras matérias" da escolha de assunto

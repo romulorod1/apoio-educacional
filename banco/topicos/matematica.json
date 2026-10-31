@@ -2,7 +2,7 @@
  "formato": "indice-de-assuntos-matematica",
  "versao": 1,
  "aviso": "Indice de assuntos, sem material: id, serie (ano), unidade, duracao, dificuldade, titulo, pre-requisitos e as palavras-chave da busca. Os ids sao os dos temas autorais de 09/2026 e nunca mudam: aulas gravadas apontam para eles.",
- "prerequisitos_origem": "grafo autoral de 09/2026, a revisar no C7",
+ "prerequisitos_origem": "revisado no C7 em 30/10/2026: pre-requisitos imediatos, cadeia pela transitividade; mudancas e motivos em banco/topicos/_grafo_c7_mudancas.md",
  "chaves_origem": "radicais de palavra-chave do banco/busca.json de 09/2026 (r: do resumo, d: destaques do conteudo), soltos e em ordem alfabetica, sem frase; so a busca le",
  "temas": [
   {
@@ -147,7 +147,7 @@
     "titulo": "Horas, dias e meses"
    },
    "prerequisitos": [
-    "MAT02-02"
+    "MAT02-01"
    ],
    "chaves": {
     "r": "60 a calendario contar entender falta ler minuto o para quanto que relogio tem tempo usar",
@@ -198,7 +198,6 @@
     "titulo": "Problemas do dia a dia"
    },
    "prerequisitos": [
-    "MAT02-02",
     "MAT02-03"
    ],
    "chaves": {
@@ -233,7 +232,8 @@
     "titulo": "Adição com reagrupamento"
    },
    "prerequisitos": [
-    "MAT03-01"
+    "MAT03-01",
+    "MAT02-02"
    ],
    "chaves": {
     "r": "a algarismo casa de dois e entendendo excesso numero o para passa por que seguinte somar tres uma",
@@ -250,7 +250,8 @@
     "titulo": "Subtração com reagrupamento"
    },
    "prerequisitos": [
-    "MAT03-02"
+    "MAT03-02",
+    "MAT02-03"
    ],
    "chaves": {
     "r": "algarismo aparece casa da de dois e inclusive meio no numero quando subtrair tres trocando uma unidade vizinha zero",
@@ -267,7 +268,8 @@
     "titulo": "Multiplicação: a ideia e a tabuada"
    },
    "prerequisitos": [
-    "MAT03-02"
+    "MAT03-02",
+    "MAT02-04"
    ],
    "chaves": {
     "r": "como conhecido de decorar em entender fato fileira grupo igual montar para solto usar vez",
@@ -317,7 +319,9 @@
    "pt": {
     "titulo": "Figuras planas e seus lados"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT02-06"
+   ],
    "chaves": {
     "r": "calcular contorno de las nomea numero o pelo reconhecer vertice",
     "d": "cada canto celula centimetro contar dele dois exemplo fechada igual mais mede nome numa pentagono quadrado quadrilatero quantidade quanto quatro recebe retangulo reto todo triangulo"
@@ -333,7 +337,8 @@
     "titulo": "Metro e centímetro"
    },
    "prerequisitos": [
-    "MAT03-05"
+    "MAT02-08",
+    "MAT03-01"
    ],
    "chaves": {
     "r": "a com comparar comprimento converter de diferente escrita forma medida medir outra para uma unidade",
@@ -367,7 +372,8 @@
     "titulo": "Dinheiro e troco"
    },
    "prerequisitos": [
-    "MAT03-05"
+    "MAT02-10",
+    "MAT03-03"
    ],
    "chaves": {
     "r": "a barata calcular com compor compra comprar de decidir forma mais moeda nota qual somar valor",
@@ -384,7 +390,8 @@
     "titulo": "Relógio e calendário"
    },
    "prerequisitos": [
-    "MAT03-05"
+    "MAT02-09",
+    "MAT03-04"
    ],
    "chaves": {
     "r": "calcular dia dois entre hora horario ler localizar minuto o para passou quanto semana tempo usar",
@@ -401,7 +408,8 @@
     "titulo": "Gráficos de barras"
    },
    "prerequisitos": [
-    "MAT03-02"
+    "MAT02-11",
+    "MAT03-01"
    ],
    "chaves": {
     "r": "a atencao comparar dado e escala exigem informacao ler num os ou pergunta que responder somar subtrair",
@@ -417,7 +425,9 @@
    "pt": {
     "titulo": "Números até 10.000 e valor posicional"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT03-01"
+   ],
    "chaves": {
     "r": "algarismo arredondar comparar de decide decompor dele do entendendo escrever ler lugar o quatro que",
     "d": "cada casa centena dezena diferente dois maior mais menor milhar qual quanto quem unidade vale zero"
@@ -433,7 +443,8 @@
     "titulo": "Adição e subtração com números grandes"
    },
    "prerequisitos": [
-    "MAT04-01"
+    "MAT04-01",
+    "MAT03-03"
    ],
    "chaves": {
     "r": "a algarismo ante ate conferir de estimar inversa o operacao pela quatro reagrupamento resposta resultado somar subtrair",
@@ -450,7 +461,8 @@
     "titulo": "Multiplicação por dois algarismos"
    },
    "prerequisitos": [
-    "MAT04-02"
+    "MAT04-02",
+    "MAT03-04"
    ],
    "chaves": {
     "r": "2 anda ante calcular casa de decompondo dezena e em entender estimar fator multiplicar o parcial produto que uma unidade",
@@ -467,7 +479,8 @@
     "titulo": "Divisão com resto"
    },
    "prerequisitos": [
-    "MAT04-03"
+    "MAT04-03",
+    "MAT03-05"
    ],
    "chaves": {
     "r": "a conferir conforme decidir dividir do e fazer o pela pergunta principalmente problema prova que real",
@@ -483,7 +496,9 @@
    "pt": {
     "titulo": "Frações: comparar e encontrar equivalentes"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT03-06"
+   ],
    "chaves": {
     "r": "a calcular da de denominador metade numerador o ou quantidade reconhecer referencia simplificar uma usando",
     "d": "aluno barra comeu compare comum crescente diferente dividido dois duas exemplo fatia igual maior mais menor mesma mesmo numero oculo ordem parte pelo pizza qual quando quanta quanto simple usam"
@@ -499,7 +514,9 @@
     "titulo": "Números decimais com dinheiro e medidas"
    },
    "prerequisitos": [
-    "MAT04-05"
+    "MAT04-05",
+    "MAT03-10",
+    "MAT03-08"
    ],
    "chaves": {
     "r": "ao as centesimo comparar de decimo ler ligando somar subtrair unidade",
@@ -515,7 +532,9 @@
    "pt": {
     "titulo": "Retas, ângulos e giros"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT03-07"
+   ],
    "chaves": {
     "r": "como entendendo medir o paralela perpendicular reconhecer um",
     "d": "anti cada completa cruzam dele depois dois duas exemplo fico formam gira grau hora horario junto lado leste maior mais mede mesmo minuto norte oeste outro ponteiro ponto quando quanto raso reto segmento sentido soma tres virado voce volta"
@@ -548,7 +567,9 @@
     "titulo": "Perímetro e área"
    },
    "prerequisitos": [
-    "MAT04-03"
+    "MAT04-03",
+    "MAT03-08",
+    "MAT03-07"
    ],
    "chaves": {
     "r": "calcular composta contorno de distinguir figura igual nao perceber que retangulo significa superficie",
@@ -565,7 +586,8 @@
     "titulo": "Unidades de medida e transformações"
    },
    "prerequisitos": [
-    "MAT04-06"
+    "MAT04-06",
+    "MAT03-09"
    ],
    "chaves": {
     "r": "a adequada capacidade comprimento conta da errar escolher massa o sem sentido tempo transformar",
@@ -581,7 +603,9 @@
    "pt": {
     "titulo": "Possível, impossível e provável"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT03-12"
+   ],
    "chaves": {
     "r": "acontecimento caso certo chance classificar comparar contando em favoravel os",
     "d": "acontece acontecer amarela azul bala bola cada caixa cara como comum coroa dado duas exemplo face igualmente lancar maior mais menos mesmo moeda morango muito nenhuma numa numero pode porque qual saco sair tirar toda verde vermelha"
@@ -597,7 +621,8 @@
     "titulo": "Gráficos e média simples"
    },
    "prerequisitos": [
-    "MAT04-02"
+    "MAT03-12",
+    "MAT04-04"
    ],
    "chaves": {
     "r": "a barra calcular conjunto de ler linha pictograma tabela um valor",
@@ -613,7 +638,9 @@
    "pt": {
     "titulo": "Números até 100.000 e o sistema decimal"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT04-01"
+   ],
    "chaves": {
     "r": "algarismo arredondar comparar da de decompor do entendendo escrever ler lugar que seis seu valor",
     "d": "arredondado cada casa centena cinco classe dezena direita dois escreva esta exemplo maior mais menor milhar ordem outro porque proximo qual quanto tres unidade vale zero"
@@ -629,7 +656,8 @@
     "titulo": "As quatro operações com naturais"
    },
    "prerequisitos": [
-    "MAT05-01"
+    "MAT05-01",
+    "MAT04-04"
    ],
    "chaves": {
     "r": "a certa conferir dividir e em escolher inversa multiplicar numero o pela problema resultado seguranca somar subtrair um",
@@ -646,7 +674,7 @@
     "titulo": "Frações com o mesmo denominador"
    },
    "prerequisitos": [
-    "MAT05-02"
+    "MAT04-05"
    ],
    "chaves": {
     "r": "a calcular comparar de decorar e quantidade que regra sem somar subtrair tem uma",
@@ -663,7 +691,8 @@
     "titulo": "Frações e decimais: a mesma ideia"
    },
    "prerequisitos": [
-    "MAT05-03"
+    "MAT04-06",
+    "MAT05-01"
    ],
    "chaves": {
     "r": "10 100 1000 as com de denominador duas entender entre escrita forma jeito numero ou outro que seguranca transitar um uma",
@@ -680,7 +709,8 @@
     "titulo": "Operações com decimais"
    },
    "prerequisitos": [
-    "MAT05-04"
+    "MAT05-04",
+    "MAT05-02"
    ],
    "chaves": {
     "r": "a cada conferir dividir e em entendendo estimativa faz multiplicar numero o por que resultado somar subtrair virgula",
@@ -730,7 +760,10 @@
    "pt": {
     "titulo": "Sólidos e suas planificações"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT02-07",
+    "MAT04-08"
+   ],
    "chaves": {
     "r": "a aresta cada contar corpo face ligar piramide prisma reconhecer redondo vertice",
     "d": "base como cone cubo dele duas exemplo hexagonal igual lado lateral mais numero plana poliedro quadrado qual quanta quanto sendo superficie triangular triangulo"
@@ -746,7 +779,9 @@
     "titulo": "Perímetro, área e volume"
    },
    "prerequisitos": [
-    "MAT05-02"
+    "MAT04-09",
+    "MAT05-02",
+    "MAT05-08"
    ],
    "chaves": {
     "r": "bloco cada calcular composta contorno dele distinguir em espaco figura ocupado retangulo superficie um",
@@ -763,7 +798,8 @@
     "titulo": "Transformando unidades de medida"
    },
    "prerequisitos": [
-    "MAT05-05"
+    "MAT05-05",
+    "MAT04-10"
    ],
    "chaves": {
     "r": "capacidade comprimento dividir e em massa multiplicar outra para passar quando sabendo tempo uma",
@@ -779,7 +815,9 @@
    "pt": {
     "titulo": "Localização e plano cartesiano"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT04-07"
+   ],
    "chaves": {
     "r": "alinhado com coordenada distancia dos entre figura localizar medir ordenado par pela ponto reconhecer vertice",
     "d": "andar area como dela direita dois eixo entao esta exemplo fica horizontal igual lado mesmo numero onde ordem origem paralelo perimetro qual retangulo unidade vertical"
@@ -795,7 +833,8 @@
     "titulo": "Média, tabelas e gráficos"
    },
    "prerequisitos": [
-    "MAT05-06"
+    "MAT04-12",
+    "MAT05-02"
    ],
    "chaves": {
     "r": "a ao calcular contrario dado descobrir em falta la organizar para que um usa valor",
@@ -811,7 +850,9 @@
    "pt": {
     "titulo": "Sistema de numeração decimal"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT05-01"
+   ],
    "chaves": {
     "r": "a algarismo arredondar comparar decide decompor e entender grande isso ler numero o para por posicao que seu um usar valor",
     "d": "cada centena cinco classe como dezena direita entao escreva escrever esquerda exemplo fica maior mais menor milhar natural ordem posicional proximo qual quanto seis soma tres unidade vale zero"
@@ -827,7 +868,8 @@
     "titulo": "Operações com números naturais"
    },
    "prerequisitos": [
-    "MAT06-01"
+    "MAT06-01",
+    "MAT05-02"
    ],
    "chaves": {
     "r": "a as correta divisao dominar e entender expressao na numerica ordem potenciacao quatro resolver resto",
@@ -844,7 +886,8 @@
     "titulo": "Múltiplos, divisores, MMC e MDC"
    },
    "prerequisitos": [
-    "MAT06-02"
+    "MAT06-02",
+    "MAT05-07"
    ],
    "chaves": {
     "r": "comum criterio de decidir divisibilidade maximo minimo o os ou pede problema quando reconhecer um usar",
@@ -878,7 +921,8 @@
     "titulo": "Frações: o que são e como comparar"
    },
    "prerequisitos": [
-    "MAT06-03"
+    "MAT06-03",
+    "MAT05-03"
    ],
    "chaves": {
     "r": "a de decimal depender divisao entender parte razao sem",
@@ -912,7 +956,8 @@
     "titulo": "Números decimais e suas operações"
    },
    "prerequisitos": [
-    "MAT06-06"
+    "MAT06-06",
+    "MAT05-05"
    ],
    "chaves": {
     "r": "000 1 10 100 apena com comparar de denominador ele entendendo escrita fracao ler operar ou outra para que sao",
@@ -929,8 +974,8 @@
     "titulo": "Porcentagem no dia a dia"
    },
    "prerequisitos": [
-    "MAT06-05",
-    "MAT06-07"
+    "MAT06-07",
+    "MAT05-06"
    ],
    "chaves": {
     "r": "acrescimo calcular cem como de descobrir desconto e fracao ler o parte partir total uma",
@@ -947,7 +992,7 @@
     "titulo": "Ângulos e retas"
    },
    "prerequisitos": [
-    "MAT06-02"
+    "MAT04-07"
    ],
    "chaves": {
     "r": "aparecem as classificar complemento corta duas medir paralela quando que reconhecer relacao suplemento transversal uma usar",
@@ -964,7 +1009,8 @@
     "titulo": "Polígonos e sua classificação"
    },
    "prerequisitos": [
-    "MAT06-09"
+    "MAT06-09",
+    "MAT04-08"
    ],
    "chaves": {
     "r": "angulo calcular contar de diagonal elemento externo interno pelo reconhecer seu soma",
@@ -981,7 +1027,8 @@
     "titulo": "Perímetro e área de figuras planas"
    },
    "prerequisitos": [
-    "MAT06-10"
+    "MAT06-10",
+    "MAT05-09"
    ],
    "chaves": {
     "r": "basica calcular composta contorno das distinguir resolver superficie",
@@ -998,7 +1045,8 @@
     "titulo": "Volume e unidades de medida"
    },
    "prerequisitos": [
-    "MAT06-11"
+    "MAT06-11",
+    "MAT05-10"
    ],
    "chaves": {
     "r": "bloco calcular centimetro cubico do entre espaco litro medir metro o ocupado por retangular solido transitar um",
@@ -1015,7 +1063,7 @@
     "titulo": "Plano cartesiano"
    },
    "prerequisitos": [
-    "MAT06-11"
+    "MAT05-11"
    ],
    "chaves": {
     "r": "coordenada distancia e estudar figura localizar medir nomear ordenado par para ponto por um usar",
@@ -1032,6 +1080,7 @@
     "titulo": "Tabelas, gráficos e média"
    },
    "prerequisitos": [
+    "MAT05-12",
     "MAT06-08"
    ],
    "chaves": {
@@ -1048,7 +1097,9 @@
    "pt": {
     "titulo": "Números inteiros e a reta numérica"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT06-02"
+   ],
    "chaves": {
     "r": "com comparar entender localiza los modulo na negativo oposto os para que seguranca servem usar",
     "d": "andar conta contar dele distancia dois entre esquerda esta exemplo existem grau isso lado maior mais meio menor menos mesmo ordem pode qual quanto sinal subiu temperatura todo unidade valor variacao zero"
@@ -1081,8 +1132,8 @@
     "titulo": "Números racionais e suas formas"
    },
    "prerequisitos": [
-    "MAT07-02",
-    "MAT06-05"
+    "MAT07-01",
+    "MAT06-07"
    ],
    "chaves": {
     "r": "de decimal diferente do fracao mesmo outra para porcentagem que reconhecer roupa saber sao trocar uma",
@@ -1099,7 +1150,8 @@
     "titulo": "Operações com racionais"
    },
    "prerequisitos": [
-    "MAT07-03"
+    "MAT07-03",
+    "MAT07-02"
    ],
    "chaves": {
     "r": "a conta curta decimal deixa dividir e escolhendo forma fracao mais multiplicar potenciar que sinal somar subtrair",
@@ -1116,7 +1168,7 @@
     "titulo": "Razão e proporção"
    },
    "prerequisitos": [
-    "MAT07-04"
+    "MAT06-07"
    ],
    "chaves": {
     "r": "a comparar descobrir divisao duas falta grandeza igual igualdade o para por quando que reconhecer sao usar valor",
@@ -1150,8 +1202,8 @@
     "titulo": "Porcentagem e juros simples"
    },
    "prerequisitos": [
-    "MAT07-04",
-    "MAT07-05"
+    "MAT06-08",
+    "MAT07-06"
    ],
    "chaves": {
     "r": "aplicar aumento calcular desconto do dois em nos o original para parte resultado sentido valor voltar",
@@ -1168,7 +1220,8 @@
     "titulo": "Sequências e regularidades"
    },
    "prerequisitos": [
-    "MAT07-02"
+    "MAT07-02",
+    "MAT02-05"
    ],
    "chaves": {
     "r": "a ao da descobrir direto em escrever essa funcao gera para pedido posicao que regra saltar termo uma",
@@ -1185,7 +1238,8 @@
     "titulo": "Linguagem algébrica e expressões"
    },
    "prerequisitos": [
-    "MAT07-08"
+    "MAT07-08",
+    "MAT07-04"
    ],
    "chaves": {
     "r": "calcular com dela letra o para reduzir sem semelhante sinal situacao termo traduzir trocar valor",
@@ -1218,7 +1272,9 @@
    "pt": {
     "titulo": "Ângulos: medir, somar e classificar"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT06-09"
+   ],
    "chaves": {
     "r": "a abertura as classifica dada de descobrir entre foram la medida nao para que reconhecer relacao um usar",
     "d": "bissetriz cada como complemento consecutivo dele determine divide dois duas exemplo formam grau hora lado mede medem menor mesmo minuto oposto parte pelo porque quanto quatro raso relogio reta semirreta somam suplemento todo tres vale vertice"
@@ -1234,7 +1290,8 @@
     "titulo": "Triângulos e quadriláteros"
    },
    "prerequisitos": [
-    "MAT07-11"
+    "MAT07-11",
+    "MAT06-10"
    ],
    "chaves": {
     "r": "a angulo classificar dos formam interno medida mesmo quando saber soma tres um usar",
@@ -1251,6 +1308,7 @@
     "titulo": "Área e perímetro de figuras compostas"
    },
    "prerequisitos": [
+    "MAT06-11",
     "MAT07-12"
    ],
    "chaves": {
@@ -1268,7 +1326,8 @@
     "titulo": "Média, moda, mediana e probabilidade"
    },
    "prerequisitos": [
-    "MAT07-04"
+    "MAT06-14",
+    "MAT04-11"
    ],
    "chaves": {
     "r": "a cada calcular certa chance com conjunto dado de evento medida para resumir simple situacao um",
@@ -1336,7 +1395,7 @@
     "titulo": "Dízimas periódicas e fração geratriz"
    },
    "prerequisitos": [
-    "MAT07-03"
+    "MAT07-10"
    ],
    "chaves": {
     "r": "a da gerou identificar o para periodo quando que reconhecer uma vira voltar",
@@ -1353,7 +1412,8 @@
     "titulo": "Expressões algébricas e monômios"
    },
    "prerequisitos": [
-    "MAT07-09"
+    "MAT07-09",
+    "MAT08-01"
    ],
    "chaves": {
     "r": "calcular com confundir escrever ler letra numerico operar sem semelhante termo valor",
@@ -1421,7 +1481,8 @@
     "titulo": "Equações com duas incógnitas"
    },
    "prerequisitos": [
-    "MAT07-10"
+    "MAT07-10",
+    "MAT06-13"
    ],
    "chaves": {
     "r": "1 as do e entender escolher fazem grau infinita las lista no problema que saber sentido solucao tem uma",
@@ -1472,7 +1533,8 @@
     "titulo": "Congruência de triângulos"
    },
    "prerequisitos": [
-    "MAT08-11"
+    "MAT08-11",
+    "MAT07-12"
    ],
    "chaves": {
     "r": "bastam caso construcao dois e garantir identico informacao justificar os para propriedade qual que saber sao usar",
@@ -1489,7 +1551,8 @@
     "titulo": "Círculo: comprimento e área"
    },
    "prerequisitos": [
-    "MAT06-11"
+    "MAT06-11",
+    "MAT06-07"
    ],
    "chaves": {
     "r": "calcular circunferencia coroa de do entender numero o onde para pi raio resultado setor vem voltar",
@@ -1522,7 +1585,10 @@
    "pt": {
     "titulo": "Números reais e irracionais"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT08-03",
+    "MAT08-04"
+   ],
    "chaves": {
     "r": "dizima em fracao na numerica ou periodica quando racional raiz reconhecer reta situar transformar um",
     "d": "algarismo bloco como decimal dois entre escreva esta exato exemplo inteiro irredutivel justifique mais perfeito periodo quadrado qual repetindo sempre soma todo valor"
@@ -1538,7 +1604,7 @@
     "titulo": "Potências com expoente negativo e fracionário"
    },
    "prerequisitos": [
-    "MAT09-01"
+    "MAT08-03"
    ],
    "chaves": {
     "r": "as cientifica das em equacao estender exponencial isso notacao para propriedade simple usar",
@@ -1573,7 +1639,8 @@
     "titulo": "Equação do 2º grau: como resolver"
    },
    "prerequisitos": [
-    "MAT09-03"
+    "MAT09-03",
+    "MAT08-07"
    ],
    "chaves": {
     "r": "a ante calcular caminho curto de discriminante e entre escolher fatoracao forma formula geral ler mais o reconhecer resolutiva",
@@ -1607,7 +1674,8 @@
     "titulo": "Relações métricas no triângulo retângulo"
    },
    "prerequisitos": [
-    "MAT09-07"
+    "MAT09-07",
+    "MAT09-08"
    ],
    "chaves": {
     "r": "a altura as calcular cateto do dos e hipotenusa medida para projecao qualquer relativa usar",
@@ -1624,7 +1692,8 @@
     "titulo": "Teorema de Pitágoras"
    },
    "prerequisitos": [
-    "MAT09-03"
+    "MAT09-03",
+    "MAT07-12"
    ],
    "chaves": {
     "r": "calcular da distancia do e isso lado medir nao os para que relacionar retangulo tres triangulo usar",
@@ -1641,7 +1710,9 @@
     "titulo": "Semelhança e Teorema de Tales"
    },
    "prerequisitos": [
-    "MAT09-03"
+    "MAT07-05",
+    "MAT08-11",
+    "MAT07-12"
    ],
    "chaves": {
     "r": "achar aplicar correspondente entre feixe figura inacessivel lado medida o para paralela proporcao reconhecer semelhante usar",
@@ -1676,6 +1747,7 @@
     "titulo": "Funções: a ideia e o gráfico"
    },
    "prerequisitos": [
+    "MAT08-09",
     "MAT09-04"
    ],
    "chaves": {
@@ -1693,7 +1765,8 @@
     "titulo": "Circunferência: ângulos e arcos"
    },
    "prerequisitos": [
-    "MAT09-07"
+    "MAT08-13",
+    "MAT07-12"
    ],
    "chaves": {
     "r": "central com comprimento ele em enxergam excentrico grau inscrito medir os que relacionar",
@@ -1710,7 +1783,8 @@
     "titulo": "Volume de cilindros e outros sólidos"
    },
    "prerequisitos": [
-    "MAT09-07"
+    "MAT08-13",
+    "MAT06-12"
    ],
    "chaves": {
     "r": "calcular composto cone converter esfera litro o para piramide prisma resolver",
@@ -1726,7 +1800,9 @@
    "pt": {
     "titulo": "Medidas de tendência e de dispersão"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT08-14"
+   ],
    "chaves": {
     "r": "afastam amplitude centro conjunto dado desvio do media mediana medio medir moda o os pela pelo quanto resumir se um valor",
     "d": "aluno apareceu cada calcular calcule central determine distancia dois duas exemplo isso maior mais menor mesma mesmo nota numero onde quantidade soma todo turma"
@@ -1741,7 +1817,9 @@
    "pt": {
     "titulo": "Probabilidade de eventos sucessivos"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT08-14"
+   ],
    "chaves": {
     "r": "a acontecimento calcular caso com distinguindo do dois em mais o ou reposicao sem sequencia",
     "d": "azul bola branca cada caminho cara carta comum dado depois duas etapa exemplo favoravel fracao honesta lancada lancado menos moeda numero pelo preta produto qual quando resultado retirada sair serem tres urna vale vermelha"
@@ -1756,7 +1834,9 @@
    "pt": {
     "titulo": "Conjuntos numéricos"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT09-01"
+   ],
    "chaves": {
     "r": "como de decimal e escrever fracao inteiro intervalo irracional natural para passar racional real reconhecer",
     "d": "assim cada dentro determine diante dizima dois elemento entra escreva esta exemplo extremo fora forma igual infinita interseccao mesmo numero porque qual resultado reta sempre soma todo valor"
@@ -1772,7 +1852,8 @@
     "titulo": "Função: domínio, contradomínio e imagem"
    },
    "prerequisitos": [
-    "MATEM1-01"
+    "MATEM1-01",
+    "MAT09-10"
    ],
    "chaves": {
     "r": "achar de distinguir entender expressao faz o que real relacao uma",
@@ -1823,7 +1904,6 @@
     "titulo": "Inequações do 1º e do 2º grau"
    },
    "prerequisitos": [
-    "MATEM1-03",
     "MATEM1-04"
    ],
    "chaves": {
@@ -1841,7 +1921,6 @@
     "titulo": "Função modular"
    },
    "prerequisitos": [
-    "MATEM1-02",
     "MATEM1-03"
    ],
    "chaves": {
@@ -1945,7 +2024,6 @@
     "titulo": "Sequências e recorrência"
    },
    "prerequisitos": [
-    "MATEM1-10",
     "MATEM1-11"
    ],
    "chaves": {
@@ -1962,7 +2040,9 @@
    "pt": {
     "titulo": "Estatística descritiva"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT09-13"
+   ],
    "chaves": {
     "r": "amplitude com dado desvio e espalhamento media mediana medir moda numa o organizar padrao resumir tabela",
     "d": "aluno cada calcular calcule categoria central centro cinco conjunto dois entao erro essa exemplo frequencia grafico grupo irmao maior mais medida menor muito nota numero onde pela peso ponderada populacao quadrado qual quando quantidade quantitativa quanto quatro real responderam resultado salario soma somam todo total tres turma unidade valor variancia"
@@ -1977,7 +2057,9 @@
    "pt": {
     "titulo": "Trigonometria no triângulo retângulo"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT09-09"
+   ],
    "chaves": {
     "r": "achar altura angulo cosseno de distancia dominar e lado notavel os para problema resolver seno tangente usar",
     "d": "adjacente agudo base calcule cateto chamando chao como dois duas entre esta exemplo figura forma hipotenusa horizontal isso linha maior mede mesmo metro oposto outro parede ponto qual razao relacao reta sempre topo torre vale valor visto"
@@ -2010,7 +2092,8 @@
     "titulo": "Ciclo trigonométrico"
    },
    "prerequisitos": [
-    "MATEM1-14"
+    "MATEM1-14",
+    "MAT09-11"
    ],
    "chaves": {
     "r": "a arco cosseno dele e em grau ler localizar medir no partir qualquer radiano seno tangente",
@@ -2027,7 +2110,8 @@
     "titulo": "Funções trigonométricas"
    },
    "prerequisitos": [
-    "MATEM2-01"
+    "MATEM2-01",
+    "MATEM1-02"
    ],
    "chaves": {
     "r": "cosseno das descrever deslocamento e fenomeno imagem las para periodo que reconhecer repetem se seno tangente usa",
@@ -2060,7 +2144,9 @@
    "pt": {
     "titulo": "Matrizes e suas operações"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT07-04"
+   ],
    "chaves": {
     "r": "com dado de ela em multiplicando numero operar organizar por somando tabela",
     "d": "cada coluna cuja determine duas elemento exemplo existe identidade igual indice inversa linha loja mesmo multiplicar multiplique nessa ordem pela posicao produto quadrada quando resultado soma somar tamanho todo transposta"
@@ -2093,7 +2179,8 @@
     "titulo": "Sistemas lineares"
    },
    "prerequisitos": [
-    "MATEM2-05"
+    "MATEM2-05",
+    "MAT08-10"
    ],
    "chaves": {
     "r": "1 a adicao classifica de discutir do e em equacao escalonamento funcao grau los parametro por resolver solucao substituicao um",
@@ -2109,7 +2196,9 @@
    "pt": {
     "titulo": "Princípio fundamental da contagem"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MAT09-14"
+   ],
    "chaves": {
     "r": "a as cada caso configuracao contar de e etapa existem listar multiplicando possibilidade quanta restricao sem separado tratando uma",
     "d": "algarismo calca camisa como decisao diferente distinto duas escolhido exemplo formado letra menos modo numero opcao outra placa pode podem posicao quando quanto repetir total usando"
@@ -2142,7 +2231,8 @@
     "titulo": "Binômio de Newton"
    },
    "prerequisitos": [
-    "MATEM2-08"
+    "MATEM2-08",
+    "MAT08-06"
    ],
    "chaves": {
     "r": "a achar binomial coeficiente com desenvolver e escrever especifico expansao geral inteira o para potencia sem termo um usar",
@@ -2176,6 +2266,7 @@
     "titulo": "Prismas e pirâmides"
    },
    "prerequisitos": [
+    "MAT09-12",
     "MAT09-07"
    ],
    "chaves": {
@@ -2210,7 +2301,8 @@
     "titulo": "Juros compostos"
    },
    "prerequisitos": [
-    "MATEM1-11"
+    "MAT07-07",
+    "MATEM1-07"
    ],
    "chaves": {
     "r": "calcular capital deixam e ele em enxergar montante os para por prazo que simple taxa tra",
@@ -2226,7 +2318,9 @@
    "pt": {
     "titulo": "Distribuições e dispersão"
    },
-   "prerequisitos": [],
+   "prerequisitos": [
+    "MATEM1-13"
+   ],
    "chaves": {
     "r": "amplitude com conjunto dado de desvio espalham media mediana medir moda o os padrao por quanto resumir se um valor variancia",
     "d": "apareceu cada calcular calcule central determine dois entao exemplo formado frequencia isso mais medida mesma muito nota numero onde pela quadrado quantidade soma somar todo"
@@ -2242,7 +2336,7 @@
     "titulo": "Identidades trigonométricas: adição de arcos e arco duplo"
    },
    "prerequisitos": [
-    "MATEM2-02"
+    "MATEM2-01"
    ],
    "chaves": {
     "r": "calcular cosseno da diferenca do dois equacao essa exato formula metade obter para resolver seno soma tangente usar valor",
@@ -2259,7 +2353,8 @@
     "titulo": "Geometria analítica: ponto e distância"
    },
    "prerequisitos": [
-    "MATEM1-02"
+    "MAT09-07",
+    "MAT06-13"
    ],
    "chaves": {
     "r": "achar alinhamento area baricentro calcular coordenada de desenhar medio medir nada para poligono sem testar usar",
@@ -2276,7 +2371,8 @@
     "titulo": "Geometria analítica: a reta"
    },
    "prerequisitos": [
-    "MATEM3-01"
+    "MATEM3-01",
+    "MATEM1-03"
    ],
    "chaves": {
     "r": "angular coeficiente de distancia e equacao escrever jeito medir os paralelismo pelo perpendicularidade ponto reconhecer todo um uma",
@@ -2327,7 +2423,7 @@
     "titulo": "Números complexos: forma algébrica"
    },
    "prerequisitos": [
-    "MATEM1-04"
+    "MAT09-04"
    ],
    "chaves": {
     "r": "a calcular com de dividir e equacao i imaginaria multiplicar na nao operar potencia que raiz real resolver somar tem unidade",
@@ -2362,7 +2458,7 @@
     "titulo": "Polinômios: operações e divisão"
    },
    "prerequisitos": [
-    "MATEM1-04"
+    "MAT08-08"
    ],
    "chaves": {
     "r": "a algoritmo briot chave com da de descobrir dispositivo dividir do fator fazer o operar para pelo raiz resto ruffini sem teorema usar",
@@ -2379,7 +2475,8 @@
     "titulo": "Equações polinomiais e raízes"
    },
    "prerequisitos": [
-    "MATEM3-07"
+    "MATEM3-07",
+    "MATEM3-05"
    ],
    "chaves": {
     "r": "achar as coeficiente de entre fatoracao racional relacao toda uma usando",
@@ -2396,7 +2493,8 @@
     "titulo": "Noção de limite e continuidade"
    },
    "prerequisitos": [
-    "MATEM3-08"
+    "MATEM1-12",
+    "MATEM1-09"
    ],
    "chaves": {
     "r": "continua entender fatoracao funcao indeterminacao levantar onde para por reconhecer tende uma",
@@ -2413,8 +2511,10 @@
     "titulo": "Revisão: funções e gráficos"
    },
    "prerequisitos": [
-    "MATEM3-09",
-    "MATEM1-15"
+    "MATEM1-05",
+    "MATEM1-06",
+    "MATEM1-09",
+    "MATEM2-02"
    ],
    "chaves": {
     "r": "a as cada certa de do em ensino escolher familia ferramenta medio pelo problema reconhecer retomar uma",
@@ -2431,7 +2531,7 @@
     "titulo": "Revisão: contagem e probabilidade"
    },
    "prerequisitos": [
-    "MATEM3-10"
+    "MATEM2-10"
    ],
    "chaves": {
     "r": "a calcular certa combinacao entre escolher multiplicativo para permutacao principio usar",
@@ -2448,7 +2548,9 @@
     "titulo": "Revisão: geometria plana e espacial"
    },
    "prerequisitos": [
-    "MATEM3-04"
+    "MATEM2-12",
+    "MATEM2-03",
+    "MAT09-06"
    ],
    "chaves": {
     "r": "area calcular cobrado do dos las mais para plano relacao retomar solido superficie usa volume",
@@ -2465,7 +2567,8 @@
     "titulo": "Matemática financeira aplicada"
    },
    "prerequisitos": [
-    "MATEM3-10"
+    "MATEM2-13",
+    "MATEM1-08"
    ],
    "chaves": {
     "r": "aumento comparar composto de desconto e fator juro pagamento para presente proposta simple usar valor",
@@ -2482,7 +2585,7 @@
     "titulo": "Interpretação de dados e gráficos"
    },
    "prerequisitos": [
-    "MATEM3-11"
+    "MATEM2-14"
    ],
    "chaves": {
     "r": "adequada com conclusao conjunto julgar medida qual realmente resumir sustenta um",

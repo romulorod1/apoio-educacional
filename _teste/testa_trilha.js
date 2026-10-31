@@ -123,14 +123,20 @@ conf('sem corte, a trilha inteira aparece',
 // ================================================================
 secao('4. Alvo que não depende de ninguém não vira escada');
 
-/* Vinte e dois temas não têm pré-requisito, e alguns são alvo natural de
- * lacuna. Uma escada de um degrau é pior do que não oferecer, então quem chama
- * precisa saber distinguir, e o número de passos é o que diz. */
+/* Desde o grafo do C7 (30/10/2026) só dois assuntos não têm pré-requisito, os
+ * dois no começo do 2º ano: números até 100 e figuras planas. Uma escada de um
+ * degrau é pior do que não oferecer, então quem chama precisa saber distinguir,
+ * e o número de passos é o que diz. Frações no 4º ano e trigonometria no médio,
+ * que antes eram raiz, agora têm escada de verdade. */
 console.log('       trilhas de um passo só: ' + deUmPasso.length + ' de ' + LACUNAS.length * ANOS.length);
-conf('frações no 4º ano tem um passo só',
-  Core.trilhaDerivada(temas, 'MAT04-05').passos.length, 1);
+conf('números até 100 tem um passo só',
+  Core.trilhaDerivada(temas, 'MAT02-01').passos.length, 1);
+conf('figuras planas do 2º ano também',
+  Core.trilhaDerivada(temas, 'MAT02-06').passos.length, 1);
+conf('frações no 4º ano tem escada de verdade',
+  Core.trilhaDerivada(temas, 'MAT04-05').passos.length > 3, true);
 conf('trigonometria no médio também',
-  Core.trilhaDerivada(temas, 'MATEM1-14').passos.length, 1);
+  Core.trilhaDerivada(temas, 'MATEM1-14').passos.length > 3, true);
 conf('e frações no 6º ano tem escada de verdade',
   Core.trilhaDerivada(temas, 'MAT06-06').passos.length > 3, true);
 
