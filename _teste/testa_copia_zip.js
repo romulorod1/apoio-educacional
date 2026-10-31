@@ -25,6 +25,7 @@ const { conf, secao, esperar } = H;
 
     const novo = Store.bancoVazio();
     novo.alunos = [{ id: 'beta', nome: 'Aluno Beta Teste' }];
+    delete novo.pagamentos;
     const pacote = { formato: 'apoio-educacional', versao: 1, dados: novo,
       notas: { 'aula-beta': { paginas: [{ itens: [] }] } },
       midias: { 'midia-beta': function () {} },
@@ -50,7 +51,8 @@ const { conf, secao, esperar } = H;
       anexoAntigo: !!(await Store.lerAnexo('anexo-alfa')),
       anexoNovo: await (await Store.lerAnexo('anexo-beta')).blob.text(),
       listas: (await Store.listasDaBiblioteca()).length,
-      historico: (await Store.listarHistorico()).length
+      historico: (await Store.listarHistorico()).length,
+      pagamentos: Array.isArray((await Store.carregar()).pagamentos)
     };
     return { rejeitou, depoisFalha, depoisSucesso };
   });
@@ -61,7 +63,8 @@ const { conf, secao, esperar } = H;
   conf('restauração válida substitui todos os depósitos e limpa histórico',
     JSON.stringify(resultado.depoisSucesso),
     JSON.stringify({ aluno: 'beta', notaAntiga: false, notaNova: true,
-      anexoAntigo: false, anexoNovo: 'beta', listas: 0, historico: 0 }));
+      anexoAntigo: false, anexoNovo: 'beta', listas: 0, historico: 0,
+      pagamentos: true }));
 
   secao('ZIP é conferido antes de substituir os dados');
   const zip = await pag.evaluate(async () => {

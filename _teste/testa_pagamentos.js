@@ -231,16 +231,15 @@ secao('5. Base antiga, sem o campo');
   conf('pagamentoDe não quebra', Core.pagamentoDe(velho, ALFA, '2026-08'), null);
   conf('pendentes lê como lista vazia de pagamentos', Core.pendentesDePagamento(velho, HOJE).length, 4);
   conf('marcar cria a lista', !!Core.marcarPagamento(velho, ALFA, '2026-08', '2026-09-03', 100) && velho.pagamentos.length, 1);
-  conf('o store.js completa o campo ao ler, ao restaurar e ao voltar a um ponto',
+  conf('o store.js completa o campo ao ler e ao voltar a um ponto',
     (() => {
       const fonte = fs.readFileSync(path.join(__dirname, '..', 'store.js'), 'utf8');
       return [
         /if \(!Array\.isArray\(d\.pagamentos\)\) d\.pagamentos = \[\];/.test(fonte),
         /return completar\(d\);/.test(fonte),
-        /return completar\(pacote\.dados\);/.test(fonte),
         /return completar\(registro\.estado\);/.test(fonte)
       ];
-    })(), [true, true, true, true]);
+    })(), [true, true, true]);
 }
 
 // ================================================================
