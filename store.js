@@ -596,6 +596,24 @@
     return escrever('livros_posicoes', function (s) { return s.put(r); });
   }
 
+  /* O PDF EXPORTADO DE UM LIVRO (C15.4), anexado a uma aula. É material de
+   * terceiro (as páginas do livro) e pesa MB, e se refaz a partir do livro do
+   * tablet: por isso NÃO mora em 'anexos', que a cópia de segurança leva em
+   * base64 (um capítulo de 40 páginas com o gabarito passaria de 20 MB a cada
+   * exportação), e sim em 'livros_posicoes', que é SO_DESTE_TABLET, com a
+   * chave começando por PREFIXO_EXPORTADO, sem subir o banco para a versão 5.
+   * O registro em aula.anexos (com `exportado: true` e de onde veio) vai na
+   * cópia; o arquivo, não. Ninguém lê 'livros_posicoes' inteiro: a posição de
+   * cada livro é lida e apagada pelo id do livro, que nunca tem o prefixo.
+   * "Apagar todos os dados" esvazia o depósito, e o PDF sai junto com as aulas. */
+  var PREFIXO_EXPORTADO = 'exportado:';
+  function salvarExportado(id, registro) {
+    var r = { id: PREFIXO_EXPORTADO + id, nome: registro.nome, tipo: registro.tipo, blob: registro.blob, quando: Date.now() };
+    return escrever('livros_posicoes', function (s) { return s.put(r); });
+  }
+  function lerExportado(id) { return ler('livros_posicoes', PREFIXO_EXPORTADO + id); }
+  function apagarExportado(id) { return apagar('livros_posicoes', PREFIXO_EXPORTADO + id); }
+
   // ---------- histórico de desfazer ----------
 
   /* Guarda o estado ANTES da ação, para poder voltar.
@@ -680,6 +698,13 @@
     }).then(function (chaves) {
       return Promise.all((chaves || []).filter(function (k) { return !anexosUsados[k]; })
         .map(function (k) { relatorio.anexos++; return apagarAnexo(k); }));
+    }).then(function () {
+      // o PDF exportado de livro (C15.4) que nenhuma aula cita mais: conta como anexo
+      return todasAsChaves('livros_posicoes');
+    }).then(function (chaves) {
+      return Promise.all((chaves || []).filter(function (k) {
+        return String(k).indexOf(PREFIXO_EXPORTADO) === 0 && !anexosUsados[String(k).slice(PREFIXO_EXPORTADO.length)];
+      }).map(function (k) { relatorio.anexos++; return apagar('livros_posicoes', k); }));
     }).then(function () { return relatorio; });
   }
 
@@ -837,6 +862,7 @@
     lerNota: lerNota, salvarNota: salvarNota, apagarNota: apagarNota, todasAsNotas: todasAsNotas,
     salvarMidia: salvarMidia, lerMidia: lerMidia, apagarMidia: apagarMidia,
     salvarAnexo: salvarAnexo, lerAnexo: lerAnexo, apagarAnexo: apagarAnexo,
+    salvarExportado: salvarExportado, lerExportado: lerExportado, apagarExportado: apagarExportado,
     registrarHistorico: registrarHistorico, listarHistorico: listarHistorico,
     desfazer: desfazer, limparHistorico: limparHistorico,
     limparOrfaos: limparOrfaos, estimarEspaco: estimarEspaco, tornarPersistente: tornarPersistente,

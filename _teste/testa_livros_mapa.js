@@ -33,6 +33,10 @@
  *   --envenenado-sem-ano-na-tela         o "Abrir no livro" da aula não passa
  *                                        o ano do aluno: o aluno do 7º ganha o
  *                                        botão de um livro do 6º.
+ *   --envenenado-faixa-refeita           a faixa é refeita a cada desenho da
+ *                                        página (o código de antes de 31/10):
+ *                                        o desenho de novo apaga a lista do
+ *                                        Corrigir aberta.
  *
  *   --prints <pasta>   grava três prints (o capítulo com "Este capítulo
  *                      cobre", a escolha do Corrigir, o "Abrir no livro").
@@ -46,7 +50,7 @@ const H = require('./_bib_navegador');
 const { conf, secao, esperar, pausa } = H;
 
 const PORTA = 8863;
-const VENENOS = ['--envenenado-correcao-so-na-memoria', '--envenenado-sem-ano-na-tela'];
+const VENENOS = ['--envenenado-correcao-so-na-memoria', '--envenenado-sem-ano-na-tela', '--envenenado-faixa-refeita'];
 const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const iPrints = process.argv.indexOf('--prints');
 const PRINTS = iPrints > 0 ? process.argv[iPrints + 1] : null;
@@ -60,6 +64,9 @@ if (MODO === '--envenenado-correcao-so-na-memoria') APP_SERVIDO = APP.split(GUAR
 if (MODO === '--envenenado-sem-ano-na-tela') {
   APP_SERVIDO = APP.split(ANO_DA_AULA).join('Biblioteca.livrosComAssunto(livrosDoTablet, correcoesDosLivros(), t.id, null)');
 }
+// o código de antes de 31/10: a faixa refeita a cada desenho da página
+const FAIXA_IGUAL = 'if (!caixa.hidden && caixa.dataset.livro === reg.id && caixa.dataset.capitulo === String(e.n) &&';
+if (MODO === '--envenenado-faixa-refeita') APP_SERVIDO = APP.split(FAIXA_IGUAL).join('if (false && caixa.dataset.livro === reg.id && caixa.dataset.capitulo === String(e.n) &&');
 const trocas = {};
 if (APP_SERVIDO !== APP) trocas['/app.js'] = APP_SERVIDO;
 const amb = H.criarAmbiente(PORTA, 'nath_c15b_mapa', trocas);
@@ -121,6 +128,17 @@ async function fecharModal(pag, id) {
   }, id);
   await esperar('a janela ' + id + ' fechou', () => pag.evaluate(i => !document.querySelector('#' + i + '.aberto'), id), v => v, 5000);
 }
+/* Faz `acao` e espera o leitor de PDF trocar o canvas: cada desenho de página
+ * nasce num canvas NOVO (desenharPaginaDoLeitor), então o antigo marcado some
+ * quando o desenho pedido termina, mesmo que a página seja a mesma. */
+async function novoDesenho(pag, acao, rotulo) {
+  await pag.evaluate(() => { const c = document.querySelector('#corpo-modal-leitor-pdf canvas'); if (c) c.dataset.velho = '1'; });
+  await acao();
+  return esperar(rotulo, () => pag.evaluate(() => {
+    const c = document.querySelector('#corpo-modal-leitor-pdf canvas');
+    return !!c && !c.dataset.velho;
+  }), v => v === true, 15000);
+}
 async function irAoCapitulo(pag, rotulo) {
   await pag.evaluate(() => document.querySelector('#leitor-sumario').click());
   await pag.evaluate(r => Array.from(document.querySelectorAll('#leitor-sumario-lista [data-entrada]'))
@@ -163,6 +181,7 @@ async function printar(pag, nome) {
   secao('0. As âncoras dos venenos e o pacote');
   conf('a correção entra no db num lugar só', APP.split(GUARDA_CORRECAO).length, 2);
   conf('o ano da aula vai para os livros num lugar só', APP.split(ANO_DA_AULA).length, 2);
+  conf('a faixa igual à da tela é reconhecida num lugar só', APP.split(FAIXA_IGUAL).length, 2);
   if (MODO) conf('o app.js servido ficou diferente do repositório (' + MODO + ')', APP_SERVIDO !== APP, true);
   const ZIP = gerarPacote();
   conf('o gerador fez o pacote de prova, com o mapa', !!ZIP, true);
@@ -247,13 +266,22 @@ async function printar(pag, nome) {
     conf('um toque na escolha grava: "Operações com frações", "corrigido por você"',
       !!c2b && c2b.assuntos === 'MAT06-06' && /Operações com frações/.test(c2b.texto) && /corrigido por você/.test(c2b.texto), true);
   }
-  await pausa(400);
+  // espera a correção NO DISCO, e não um tempo, antes de recarregar
+  if (!soNaMemoria) {
+    await esperar('a correção gravada no banco', () => p.evaluate(() => Store.carregar().then(d =>
+      JSON.stringify((((d.ajustes || {}).mapaDosLivros || {})['livro-com-marcadores'] || {})['2'] || {}))),
+    v => /MAT06-06/.test(v || ''), 10000);
+  }
   await fecharModal(p, 'modal-leitor-pdf');
   await H.abrirApp(p, amb.ORIGEM);
   await abrirPelaEstante(p, 'livro-com-marcadores');
   await esperar('o livro reaberto', () => paginaDesenhada(p), v => /^\d+$/.test(v || ''), 30000);
-  await irAoCapitulo(p, 'Capítulo 2');
-  await esperar('a página 3 de novo', () => paginaDesenhada(p), v => v === '3', 15000);
+  /* O livro reabre onde ela parou, que JÁ É a página 3: esperar "página 3"
+   * depois do toque no sumário passava na hora, com o desenho do toque ainda
+   * por vir, e ele chegava no meio do passo seguinte (a causa da rodada em dez
+   * que falhava). A espera é pelo canvas NOVO, o do toque. */
+  await novoDesenho(p, () => irAoCapitulo(p, 'Capítulo 2'), 'a página 3 desenhada pelo toque no sumário');
+  conf('o livro reabriu no capítulo 2, na página 3', await paginaDesenhada(p), '3');
   const c2c = (await esperar('a faixa do capítulo 2 depois de recarregar', () => cobre(p, 'pdf'), v => !!v && v.capitulo === '2', 10000)).valor;
   console.log('   capítulo 2 depois de recarregar: ' + JSON.stringify(c2c));
   const guardado = await p.evaluate(() => Store.carregar().then(d => (d.ajustes || {}).mapaDosLivros || null));
@@ -266,9 +294,22 @@ async function printar(pag, nome) {
     throw Object.assign(new Error('fim'), { fimDoVeneno: true });
   }
   conf('depois de recarregar o aplicativo, o capítulo 2 continua corrigido', !!c2c && c2c.estado === 'corrigido' && c2c.assuntos === 'MAT06-06', true);
+  await esperar('o nome do assunto na faixa', () => cobre(p, 'pdf'), v => !!v && /Operações com frações/.test(v.texto), 10000);
   await p.evaluate(() => document.querySelector('#cobre-corrigir').click());
   await esperar('a lista do Corrigir de novo', () => p.evaluate(() => document.querySelectorAll('#leitor-cobre .cobre-escolha [data-assunto]').length), v => v > 3, 10000);
   conf('o Corrigir agora marca a escolha dela', await marcados(p), 'MAT06-06 ✓');
+  /* A página desenhada de novo com a lista aberta (o sumário levando à página
+   * onde ela já está; o zoom faz o mesmo) não pode apagar a lista: até 31/10
+   * a faixa era refeita a cada desenho. Com o canvas novo à vista, a lista
+   * tem de continuar lá, com a marca. */
+  conf('a página foi mesmo desenhada de novo (canvas novo)', (await novoDesenho(p, () => irAoCapitulo(p, 'Capítulo 2'), 'a mesma página desenhada de novo, com a lista aberta')).ok, true);
+  const depoisDoDesenho = await marcados(p);
+  if (MODO === '--envenenado-faixa-refeita') {
+    secao('VENENO: a faixa refeita a cada desenho');
+    conf('envenenado: o desenho de novo apagou a lista aberta (defeito enxergado)', depoisDoDesenho, '');
+    throw Object.assign(new Error('fim'), { fimDoVeneno: true });
+  }
+  conf('a página desenhada de novo não apaga a lista aberta', depoisDoDesenho, 'MAT06-06 ✓');
   await p.evaluate(() => document.querySelector('#cobre-corrigir').click());
   conf('e o segundo toque em Corrigir fecha a lista e a linha da rolagem',
     await p.evaluate(() => !document.querySelector('#leitor-cobre .cobre-escolha') && !document.querySelector('#leitor-cobre .cobre-rolagem')), true);
@@ -327,7 +368,12 @@ async function printar(pag, nome) {
   await fecharModal(p, 'modal-aula');
 
   conf('a aula do 7º abriu', await abrirAulaDeHoje(p, '10:00'), true);
-  await pausa(600);
+  /* A AUSÊNCIA do botão só vale com a linha do assunto já desenhada e com a
+   * lista dos livros já lida (a mesma da aula do 6º, que mostrou o botão):
+   * espera pela linha, e não por um tempo. */
+  await esperar('a linha do assunto da aula do 7º', () => p.evaluate(() =>
+    Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula .nome')).map(n => n.textContent).join('|')),
+  v => /Ângulos e retas/.test(v || ''), 10000);
   const b7 = await botoesDoLivro(p);
   if (MODO === '--envenenado-sem-ano-na-tela') {
     secao('VENENO: a aula não passa o ano do aluno');

@@ -282,7 +282,9 @@ def trava_sumario(manifest):
 
 
 CHAVES_DO_MAPA = {'n', 'titulo', 'pagina', 'pagina_fim', 'capitulo', 'capitulo_fim', 'ancora', 'capitulo_do_livro',
-                  'assuntos', 'origem', 'obra_inteira'}
+                  'assuntos', 'origem', 'obra_inteira',
+                  # C15.5: as paginas do gabarito do capitulo (a forma, em _prova_gabaritos.py)
+                  'gabarito'}
 
 
 def conferir_mapa(manifest, catalogo):

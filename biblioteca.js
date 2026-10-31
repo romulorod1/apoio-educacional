@@ -273,6 +273,8 @@
       saida.push({
         n: e.n, titulo: e.titulo, pagina: e.pagina, pagina_fim: e.pagina_fim, capitulo: e.capitulo,
         capitulo_fim: e.capitulo_fim, ancora: e.ancora || null, obraInteira: !!e.obra_inteira,
+        // o gabarito do capítulo (C15.5), do gerador; a correção dela não mexe nele
+        gabarito: gabaritoDaEntrada(meta, e),
         assuntos: vale ? c.assuntos.filter(function (id) { return typeof id === 'string' && id; }) : ids,
         origem: e.origem === 'auto' ? 'auto' : 'mapa',
         estado: vale ? (c.acao === 'corrigiu' ? 'corrigido' : 'confirmado') : (e.origem === 'auto' ? 'a_confirmar' : 'do_mapa')
@@ -324,6 +326,149 @@
       return String(a.meta.titulo || '').localeCompare(String(b.meta.titulo || ''), 'pt-BR') ||
         (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) || a.entrada.n - b.entrada.n;
     });
+  }
+
+  /* ------------------------------ exportar o capítulo (C15.4) e o gabarito (C15.5) */
+
+  // Teto de páginas num PDF exportado: cada página vira um JPEG de algumas
+  // centenas de KB, e o tablet monta o PDF inteiro na memória.
+  var TETO_DE_PAGINAS_EXPORTADAS = 120;
+
+  /* O tamanho estimado do PDF exportado, para a janela dizer antes de gerar.
+   * Página de livro didático a 150 pontos por polegada: entre 350 e 650 KB
+   * (a foto colorida pesa mais); a conta usa 500 KB. O EPUB é texto remontado
+   * e pesa bem menos por parte. Acima de 20 MB, a janela avisa. */
+  var KB_POR_PAGINA_EXPORTADA = 500;
+  var KB_POR_PARTE_EXPORTADA = 150;
+  var AVISO_DE_TAMANHO_EXPORTADO = 20 * 1024 * 1024;
+  function estimarPdfExportado(formato, unidades) {
+    return unidades * (formato === 'epub' ? KB_POR_PARTE_EXPORTADA : KB_POR_PAGINA_EXPORTADA) * 1024;
+  }
+
+  // o limite do livro: as páginas no PDF, as partes da espinha no EPUB
+  function limiteDoLivro(meta) {
+    if (!meta) return 0;
+    if (meta.formato === 'epub') return ((meta.epub && meta.epub.espinha) || []).length;
+    return inteiro(meta.paginas) ? meta.paginas : 0;
+  }
+
+  // [[a, b], ...] só com faixas inteiras, em ordem, dentro do livro
+  function faixasValidas(fs, limite) {
+    return (Array.isArray(fs) ? fs : []).filter(function (f) {
+      return Array.isArray(f) && f.length === 2 && inteiro(f[0]) && inteiro(f[1]) && f[0] >= 1 && f[0] <= f[1] && f[1] <= limite;
+    }).map(function (f) { return [f[0], f[1]]; });
+  }
+
+  function unidadesDe(fs) {
+    var saida = [];
+    fs.forEach(function (f) { for (var u = f[0]; u <= f[1]; u++) if (saida.indexOf(u) < 0) saida.push(u); });
+    return saida.sort(function (a, b) { return a - b; });
+  }
+
+  /* O gabarito de uma entrada do mapa, como o gerador o deixou: { faixas,
+   * certeza, como, soImpares }, ou null. Faixa fora do livro não entra: o
+   * gabarito errado é pior que nenhum. */
+  function gabaritoDaEntrada(meta, e) {
+    var g = e && e.gabarito;
+    if (!g || typeof g !== 'object') return null;
+    var fs = faixasValidas(meta && meta.formato === 'epub' ? g.partes : g.paginas, limiteDoLivro(meta));
+    if (!fs.length) return null;
+    return { faixas: fs, certeza: g.certeza || '', como: g.como || '', soImpares: !!g.so_impares };
+  }
+
+  // o livro tem gabarito localizado em algum capítulo?
+  function livroTemGabarito(meta) {
+    if (!meta || meta.gabarito_origem !== 'auto') return false;
+    return (Array.isArray(meta.mapa) ? meta.mapa : []).some(function (e) { return !!gabaritoDaEntrada(meta, e); });
+  }
+
+  /* O que vai no PDF exportado de um capítulo do mapa, em páginas (PDF) ou
+   * partes (EPUB) do livro:
+   *   capitulo  as do capítulo, SEM as páginas de respostas do livro
+   *             (gabarito_secoes): a resposta que mora no fim do capítulo não
+   *             vai para o aluno sem ela pedir. Se o capítulo é só respostas
+   *             (o "Respostas" do sumário), ele vai como está;
+   *   gabarito  com o gabarito pedido e localizado, as páginas do gabarito
+   *             DAQUELE capítulo, depois das do capítulo, no mesmo arquivo.
+   * Devolve { capitulo: [n], gabarito: [n] }. */
+  function partesDoCapitulo(meta, entrada, comGabarito) {
+    var epub = meta && meta.formato === 'epub';
+    var ini = epub ? entrada.capitulo : entrada.pagina;
+    var fim = epub ? entrada.capitulo_fim : entrada.pagina_fim;
+    var limite = limiteDoLivro(meta);
+    if (!inteiro(ini) || !inteiro(fim) || ini < 1 || ini > fim || fim > limite) return { capitulo: [], gabarito: [] };
+    var todas = unidadesDe([[ini, fim]]);
+    var respostas = unidadesDe(faixasValidas(meta.gabarito_secoes, limite));
+    // a entrada vem do mapaDoLivro (o gabarito já conferido) ou crua do manifest
+    var g = entrada.gabarito && entrada.gabarito.faixas ? entrada.gabarito : gabaritoDaEntrada(meta, entrada);
+    /* O gabarito do FIM DO CAPÍTULO nunca tira página do capítulo: ele foi
+     * achado só pelo lugar, e uma página de exercício resolvido tomada por
+     * gabarito sumiria do capítulo exportado (revisão do C15.5). O capítulo vai
+     * inteiro, e o gabarito só acrescenta. Vale também para o pacote antigo,
+     * que punha essas páginas em gabarito_secoes. */
+    var doFim = g && g.como === 'fim_do_capitulo' ? unidadesDe(g.faixas) : [];
+    var doLivro = g && g.como !== 'fim_do_capitulo' ? g.faixas : [];
+    respostas = unidadesDe(respostas.map(function (u) { return [u, u]; }).concat(doLivro))
+      .filter(function (u) { return doFim.indexOf(u) < 0; });
+    var semRespostas = todas.filter(function (u) { return respostas.indexOf(u) < 0; });
+    return {
+      capitulo: semRespostas.length ? semRespostas : todas,
+      gabarito: comGabarito && g ? unidadesDe(g.faixas) : []
+    };
+  }
+
+  /* As páginas que ela escreveu ("3-5, 8", "10 a 12"), dentro do livro, em
+   * ordem e sem repetir. Devolve { paginas } ou { erro } com a frase da tela. */
+  function paginasEscolhidas(texto, total) {
+    var t = String(texto || '').trim();
+    if (!t) return { erro: 'Escreva as páginas, por exemplo 3-5, 8.' };
+    var partes = t.split(/[,;]+|\s+e\s+/);
+    var saida = [];
+    for (var i = 0; i < partes.length; i++) {
+      var p = partes[i].trim();
+      if (!p) continue;
+      var m = /^(\d{1,5})(?:\s*(?:-|a|até)\s*(\d{1,5}))?$/.exec(p);
+      if (!m) return { erro: 'Não entendi "' + p + '". Escreva as páginas assim: 3-5, 8.' };
+      var a = parseInt(m[1], 10), b = m[2] ? parseInt(m[2], 10) : a;
+      if (a > b) { var x = a; a = b; b = x; }
+      if (a < 1 || b > total) return { erro: 'O livro vai da página 1 à ' + total + '.' };
+      for (var u = a; u <= b; u++) if (saida.indexOf(u) < 0) saida.push(u);
+      if (saida.length > TETO_DE_PAGINAS_EXPORTADAS) return { erro: 'No máximo ' + TETO_DE_PAGINAS_EXPORTADAS + ' páginas por PDF.' };
+    }
+    if (!saida.length) return { erro: 'Escreva as páginas, por exemplo 3-5, 8.' };
+    return { paginas: saida.sort(function (a, b) { return a - b; }) };
+  }
+
+  // "páginas 3 a 5 e 8", "página 9", "partes 2 a 3"
+  function descreverUnidades(lista, nome) {
+    var fs = [];
+    (lista || []).forEach(function (u) {
+      if (fs.length && u === fs[fs.length - 1][1] + 1) fs[fs.length - 1][1] = u;
+      else fs.push([u, u]);
+    });
+    if (!fs.length) return '';
+    var textos = fs.map(function (f) { return f[0] === f[1] ? String(f[0]) : f[0] + ' a ' + f[1]; });
+    var junta = textos.length > 1 ? textos.slice(0, -1).join(', ') + ' e ' + textos[textos.length - 1] : textos[0];
+    var um = fs.length === 1 && fs[0][0] === fs[0][1];
+    return (um ? nome : nome + 's') + ' ' + junta;
+  }
+
+  // sem travessão nem meia-risca no que vai para o PDF (a regra da casa)
+  var RE_TRACOS = new RegExp('[' + String.fromCharCode(0x2013, 0x2014) + ']', 'g');
+  function semTracos(t) {
+    return String(t == null ? '' : t).replace(RE_TRACOS, '-');
+  }
+
+  /* O rodapé de fonte do PDF exportado: "Fonte: título, autoria, editora,
+   * ano, capítulo, páginas". O capítulo é o título do mapa, ou nada (páginas
+   * escolhidas fora de capítulo); o gabarito, quando vai, diz as dele. */
+  function fonteDoLivro(meta, capitulo, unidades, gabarito) {
+    var m = meta || {};
+    var nome = m.formato === 'epub' ? 'parte' : 'página';
+    var partes = [m.titulo, m.volume, m.autoria, m.editora, m.ano, capitulo, descreverUnidades(unidades, nome)]
+      .filter(function (x) { return x !== null && x !== undefined && String(x).trim(); }).map(function (x) { return String(x).trim(); });
+    var g = gabarito && gabarito.length ? '; gabarito: ' + descreverUnidades(gabarito, nome) : '';
+    return semTracos('Fonte: ' + partes.join(', ') + g);
   }
 
   /* Todo caminho de asset citado por itens.json e teoria.json. */
@@ -840,6 +985,10 @@
     TETO_POR_LIVRO: TETO_POR_LIVRO, sha256PorPartes: sha256PorPartes, resumo: resumo, nomeDaSerie: nomeDaSerie, mb: mb, resumoDeLivros: resumoDeLivros,
     sha256: sha256, tipoDoAsset: tipoDoAsset,
     mapaDoLivro: mapaDoLivro, entradaDoMapa: entradaDoMapa, livroDoAno: livroDoAno, livrosComAssunto: livrosComAssunto,
+    TETO_DE_PAGINAS_EXPORTADAS: TETO_DE_PAGINAS_EXPORTADAS, livroTemGabarito: livroTemGabarito,
+    estimarPdfExportado: estimarPdfExportado, AVISO_DE_TAMANHO_EXPORTADO: AVISO_DE_TAMANHO_EXPORTADO,
+    partesDoCapitulo: partesDoCapitulo, paginasEscolhidas: paginasEscolhidas, descreverUnidades: descreverUnidades,
+    fonteDoLivro: fonteDoLivro, semTracos: semTracos,
     rasterizarRecorte: rasterizarRecorte, rasterizarPagina: rasterizarPagina,
     alturasDosPedacos: alturasDosPedacos
   };
