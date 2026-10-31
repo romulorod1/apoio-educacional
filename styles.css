@@ -1903,6 +1903,16 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-epub-corpo { padding: 0; background: #DDE3EA; overflow: hidden; display: flex; }
 .leitor-epub-corpo iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #FFFFFF; }
 .leitor-epub-corpo .leitor-pdf-aviso { align-self: flex-start; }
+/* C15.2: "Este capítulo cobre", uma faixa baixa embaixo da barra do leitor,
+   com os dois botões a um toque; a escolha do assunto rola por dentro. */
+.leitor-cobre { flex-shrink: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 8px 18px; border-bottom: 1px solid var(--fio); background: var(--soft); font-size: 15px; color: var(--navy); }
+.leitor-cobre .cobre-texto { flex: 1 1 260px; }
+.leitor-cobre .tag { margin-left: 6px; }
+.leitor-cobre .cobre-escolha { flex: 1 1 100%; max-height: 34vh; overflow: auto; background: var(--branco);
+  border: 1px solid var(--fio); border-radius: 8px; }
+.leitor-cobre .cobre-escolha button { display: block; width: 100%; text-align: left; min-height: 44px; padding: 8px 12px;
+  border: 0; border-bottom: 1px solid var(--fio); background: none; font-size: 15px; color: var(--navy); cursor: pointer; }
 .livro-linha .detalhe { margin-top: 2px; }
 #lista-livros-biblioteca .livros-total { font-weight: 600; margin: 4px 0 8px; }
 /* material desta aula: a caixa fica ao lado do cartão, e o alvo de toque tem 44 px */

@@ -29,8 +29,9 @@ Travas:
                orquestradora, nenhum (com a nota dizendo isso) e o nav do EPUB.
   mapa         (C15.2) o mapa capitulo para assunto de cada livro da amostra:
                o da orquestradora (com o id fora do indice tirado e dito na
-               nota), o de obra inteira do EPUB, o passe automatico (marcado
-               auto) e o vazio do livro sem sumario; e a forma em todos: so
+               nota), o passe automatico no PDF e no EPUB (marcado auto), o
+               vazio do livro sem sumario e, a parte, o de obra inteira
+               (literatura) no EPUB e no PDF; e a forma em todos: so
                titulo, paginas e ids, dentro do livro, todo id no indice, todo
                assunto auto de um ano do livro. Venenos: o filtro de ano
                desligado (o "Geometria plana" ganha um assunto do 3o do medio)
@@ -344,10 +345,13 @@ def trava_mapa(manifest, catalogo):
         erros.append('o mapa da orquestradora: %r %r %r' % (s.get('mapa_origem'), ids(s), s.get('series')))
     if 'fora do índice' not in (s.get('mapa_nota') or ''):
         erros.append('a nota não diz que o id fora do índice ficou de fora')
+    # o EPUB: passe automatico pelo nav, so os capitulos (o nivel 2 fica de fora),
+    # cada um com a parte da espinha onde comeca e onde acaba
     e = por.get('livro-de-prova', {})
-    obra = (e.get('mapa') or [{}])[0]
-    if (ids(e), obra.get('obra_inteira'), obra.get('capitulo'), obra.get('capitulo_fim')) != ([['LITEM2-T02']], True, 1, 3):
-        erros.append('o mapa de obra do EPUB: %r' % e.get('mapa'))
+    if (e.get('mapa_origem'), ids(e), e.get('series')) != ('auto', [[], ['LITEM2-T05'], []], ['em1', 'em2', 'em3']):
+        erros.append('o passe automatico do EPUB: %r %r %r' % (e.get('mapa_origem'), ids(e), e.get('series')))
+    if [(x.get('capitulo'), x.get('capitulo_fim')) for x in e.get('mapa') or []] != [(1, 1), (2, 2), (3, 3)]:
+        erros.append('as partes do mapa do EPUB: %r' % e.get('mapa'))
     n = por.get('livro-sem-sumario', {})
     if (n.get('mapa'), n.get('mapa_origem')) != ([], 'nenhum') or 'sumário' not in (n.get('mapa_nota') or ''):
         erros.append('o livro sem sumário: %r %r' % (n.get('mapa_origem'), n.get('mapa_nota')))
@@ -538,6 +542,28 @@ def amostra_rodada(temp, placar):
         finally:
             livros.no_ano_do_livro = regra
         placar.conferir('livros: ' + rot, trava_mapa(mv, catalogo), deve_reprovar=True)
+    # o mapa de obras (literatura): lido do formato com `obras`, e o livro
+    # inteiro numa entrada so, no PDF (paginas) e no EPUB (partes da espinha)
+    obras = livros.ler_mapas(c['mapas'])
+    achado = obras.get(livros.chave_de_arquivo('obra-de-prova.epub'))
+    erros_obra = [] if achado else ['o mapa de obras nao foi lido']
+    if achado:
+        livro_obra = {'formato': 'epub', 'titulo': 'Obra', 'materia': 'literatura', 'segmento': ''}
+        mo = livros.montar_mapa(livro_obra, {'paginas': None, 'epub': {'espinha': ['a', 'b', 'c', 'd']}, 'sumario': []},
+                                achado, catalogo)
+        e = (mo['mapa'] or [{}])[0]
+        if (mo['mapa_origem'], mo['series'], len(mo['mapa']), e.get('obra_inteira'), e.get('capitulo'), e.get('capitulo_fim'),
+                [a['id'] for a in e.get('assuntos') or []], [a['confianca'] for a in e.get('assuntos') or []]) != \
+                ('mapa', ['em2'], 1, True, 1, 4, ['LITEM2-T02'], ['média']):
+            erros_obra.append('o mapa de obra no EPUB: %r' % mo)
+        if 'fora do índice' not in mo['mapa_nota']:
+            erros_obra.append('a nota nao diz do id fora do indice: %r' % mo['mapa_nota'])
+        mp = livros.montar_mapa(dict(livro_obra, formato='pdf'), {'paginas': 9, 'sumario': []}, achado, catalogo)
+        if [(x.get('pagina'), x.get('pagina_fim')) for x in mp['mapa']] != [(1, 9)]:
+            erros_obra.append('o mapa de obra no PDF: %r' % mp['mapa'])
+        erros_obra += conferir_mapa({'livros': [dict(livro_obra, id='obra', paginas=None, epub={'espinha': ['a', 'b', 'c', 'd']}, **mo)]},
+                                    catalogo)
+    placar.conferir('livros: mapa de obra inteira (literatura), no EPUB e no PDF', erros_obra)
     v = copy.deepcopy(m1)
     for e in next(x for x in v['livros'] if x['id'] == 'livro-sem-marcadores')['mapa']:
         e['assuntos'] = []
@@ -546,7 +572,7 @@ def amostra_rodada(temp, placar):
     v['livros'][0]['mapa'][0]['texto'] = 'um trecho do livro'
     placar.conferir('livros: conteudo do livro dentro do mapa', conferir_mapa(v, catalogo), deve_reprovar=True)
     v = copy.deepcopy(m1)
-    next(x for x in v['livros'] if x['formato'] == 'epub')['mapa'][0]['capitulo_fim'] = 9
+    next(x for x in v['livros'] if x['formato'] == 'epub')['mapa'][-1]['capitulo_fim'] = 9
     placar.conferir('livros: mapa do EPUB alem dos capitulos', conferir_mapa(v, catalogo), deve_reprovar=True)
 
     placar.conferir('livros: nada de travessao ou meia-risca no manifest', trava_tracos(m1))

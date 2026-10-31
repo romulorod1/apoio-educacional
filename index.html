@@ -478,6 +478,8 @@
       <!-- C3: a frase que aponta o "Abrir esta página como folha" quando ela
            veio do "Abrir como folha para escrever em cima" do anexo -->
       <p class="faixa-info leitor-pdf-dica" id="leitor-dica" hidden></p>
+      <!-- C15.2: "Este capítulo cobre", com Confirmar e Corrigir; só no livro -->
+      <div class="leitor-cobre" id="leitor-cobre" hidden></div>
       <div class="leitor-sumario" id="leitor-sumario-lista" hidden></div>
       <div class="modal-corpo leitor-pdf-corpo" id="corpo-modal-leitor-pdf"></div>
       <div class="modal-rodape">
@@ -492,7 +494,7 @@
   <div class="fundo-modal" id="modal-livros">
     <div class="modal">
       <div class="modal-cabecalho">
-        <h3>Livros</h3>
+        <h3 id="titulo-modal-livros">Livros</h3>
         <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
       </div>
       <div class="modal-corpo" id="corpo-modal-livros"></div>
@@ -516,6 +518,7 @@
         <button class="btn" id="epub-proximo" type="button">Próximo ›</button>
         <button class="btn" id="epub-sumario" type="button" aria-expanded="false">Sumário</button>
       </div>
+      <div class="leitor-cobre" id="epub-cobre" hidden></div>
       <div class="leitor-sumario" id="epub-sumario-lista" hidden></div>
       <div class="modal-corpo leitor-epub-corpo" id="corpo-modal-leitor-epub"></div>
       <div class="modal-rodape">

@@ -241,6 +241,91 @@
     return linhas;
   }
 
+  /* ------------------------------------- o mapa dos livros (C15.2 e C15.3) */
+
+  /* O mapa capitulo para assunto de um livro, como vale para ela: o do pacote
+   * (meta.mapa, do gerador: o da orquestradora, o de obra inteira ou o passe
+   * automático) com a CORREÇÃO DELA por cima. O mapa do pacote nunca muda; a
+   * correção mora no aplicativo (app.js, db.ajustes.mapaDosLivros) e vai na
+   * cópia de segurança.
+   *
+   * `correcoes` é { <n do capítulo>: { titulo, assuntos: [ids], acao, quando } }
+   * de UM livro. A correção só vale para o capítulo de mesmo número E mesmo
+   * título: se um pacote novo renumerar o sumário, a correção velha não cai
+   * calada no capítulo vizinho.
+   *
+   * Devolve uma lista de { n, titulo, pagina, pagina_fim, capitulo,
+   * capitulo_fim, ancora, assuntos: [ids], origem, estado }, com estado
+   *   'a_confirmar' do passe automático, sem palavra dela ainda;
+   *   'do_mapa'     do mapa da orquestradora, sem palavra dela;
+   *   'confirmado'  ela confirmou o que o mapa dizia;
+   *   'corrigido'   ela escolheu outro assunto (ou nenhum). */
+  function mapaDoLivro(meta, correcoes) {
+    var mapa = meta && Array.isArray(meta.mapa) ? meta.mapa : [];
+    correcoes = correcoes || {};
+    var saida = [];
+    mapa.forEach(function (e) {
+      if (!e || !inteiro(e.n) || typeof e.titulo !== 'string') return;
+      var ids = (Array.isArray(e.assuntos) ? e.assuntos : []).map(function (a) { return a && a.id; })
+        .filter(function (id) { return typeof id === 'string' && id; });
+      var c = Object.prototype.hasOwnProperty.call(correcoes, String(e.n)) ? correcoes[String(e.n)] : null;
+      var vale = !!c && c.titulo === e.titulo && Array.isArray(c.assuntos);
+      saida.push({
+        n: e.n, titulo: e.titulo, pagina: e.pagina, pagina_fim: e.pagina_fim, capitulo: e.capitulo,
+        capitulo_fim: e.capitulo_fim, ancora: e.ancora || null, obraInteira: !!e.obra_inteira,
+        assuntos: vale ? c.assuntos.filter(function (id) { return typeof id === 'string' && id; }) : ids,
+        origem: e.origem === 'auto' ? 'auto' : 'mapa',
+        estado: vale ? (c.acao === 'corrigiu' ? 'corrigido' : 'confirmado') : (e.origem === 'auto' ? 'a_confirmar' : 'do_mapa')
+      });
+    });
+    return saida;
+  }
+
+  /* A entrada do mapa onde a leitura está: no PDF, a que tem a página entre o
+   * começo e o fim; no EPUB, a que tem a parte (posição na espinha). Com duas
+   * (capítulos que se cruzam), a que começa mais perto. */
+  function entradaDoMapa(mapa, formato, valor) {
+    var achada = null;
+    (mapa || []).forEach(function (e) {
+      var ini = formato === 'epub' ? e.capitulo : e.pagina;
+      var fim = formato === 'epub' ? e.capitulo_fim : e.pagina_fim;
+      if (!inteiro(ini) || !inteiro(fim) || valor < ini || valor > fim) return;
+      var iniAchada = achada ? (formato === 'epub' ? achada.capitulo : achada.pagina) : -1;
+      if (ini >= iniAchada) achada = e;
+    });
+    return achada;
+  }
+
+  /* O ano do livro serve ao "Abrir no livro" (C15.3): REGRA de quem entra. O
+   * livro entra se for do ano pedido (meta.series, do gerador: o ano do mapa
+   * ou o segmento da planilha). Sem ano pedido (aluno sem ano e assunto sem
+   * ano), não há o que filtrar. Livro sem ano nenhum não é "do ano" de aluno
+   * nenhum. */
+  function livroDoAno(meta, ano) {
+    if (!ano) return true;
+    return Array.isArray(meta && meta.series) && meta.series.indexOf(ano) >= 0;
+  }
+
+  /* Os livros do ano com um capítulo mapeado para o assunto (o mapa do
+   * pacote com as correções dela). `livros`: [{ id, meta }] (os registros do
+   * depósito servem); `correcoesPorLivro`: { <id do livro>: correções }.
+   * Devolve [{ id, meta, entrada }], um por capítulo, em ordem de título do
+   * livro e de capítulo. */
+  function livrosComAssunto(livros, correcoesPorLivro, assuntoId, ano) {
+    var saida = [];
+    if (!assuntoId) return saida;
+    (livros || []).forEach(function (l) {
+      if (!l || !l.meta || !livroDoAno(l.meta, ano)) return;
+      mapaDoLivro(l.meta, (correcoesPorLivro || {})[l.id]).forEach(function (e) {
+        if (e.assuntos.indexOf(assuntoId) >= 0) saida.push({ id: l.id, meta: l.meta, entrada: e });
+      });
+    });
+    return saida.sort(function (a, b) {
+      return String(a.meta.titulo || '').localeCompare(String(b.meta.titulo || ''), 'pt-BR') ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) || a.entrada.n - b.entrada.n;
+    });
+  }
+
   /* Todo caminho de asset citado por itens.json e teoria.json. */
   function assetsCitados(itens, teoria) {
     var lista = [];
@@ -754,6 +839,7 @@
     abrirPacote: abrirPacote, espiarPacote: espiarPacote, abrirLivrosDoArquivo: abrirLivrosDoArquivo,
     TETO_POR_LIVRO: TETO_POR_LIVRO, sha256PorPartes: sha256PorPartes, resumo: resumo, nomeDaSerie: nomeDaSerie, mb: mb, resumoDeLivros: resumoDeLivros,
     sha256: sha256, tipoDoAsset: tipoDoAsset,
+    mapaDoLivro: mapaDoLivro, entradaDoMapa: entradaDoMapa, livroDoAno: livroDoAno, livrosComAssunto: livrosComAssunto,
     rasterizarRecorte: rasterizarRecorte, rasterizarPagina: rasterizarPagina,
     alturasDosPedacos: alturasDosPedacos
   };

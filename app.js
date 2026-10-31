@@ -3224,6 +3224,15 @@
         if (caixa.parentNode) desenharTemasDaAula(caixa, aula, aluno);
       }, function () {});
     }
+    /* O "Abrir no livro" (C15.3) depende da lista dos livros do tablet, que o
+     * aplicativo lê ao abrir. Se ela ainda não chegou, a linha nasce sem o
+     * botão e é redesenhada quando chegar, uma vez só. */
+    if (livrosDoTablet === null && !livrosDoTabletPedidos) {
+      livrosDoTabletPedidos = true;
+      desenharLivrosAjustes().then(function () {
+        if (caixa.parentNode) desenharTemasDaAula(caixa, aula, aluno);
+      });
+    }
     if (faltaIndice || faltaTopicos) {
       /* Sem sinal os dois podem não vir. A falha fica anotada para a lista não
        * ficar buscando de novo a cada redesenho: sem material a linha aparece
@@ -3281,6 +3290,11 @@
       var bibliotecaPodeTer = !comMaterial && temPacoteBiblioteca && disciplina === Core.MATERIA_PADRAO;
       var pelaBiblioteca = bibliotecaPodeTer && !!bib && !!moduloDoAssunto(t);
       var podeMaterial = !comMaterial && pelaBiblioteca;
+      /* "Abrir no livro" (C15.3): os livros do ano do aluno com um capítulo
+       * mapeado para o assunto (o mapa do pacote com as correções dela). Sem
+       * livro assim, o botão não aparece, como o Material sem biblioteca. */
+      var nosLivros = t.id && livrosDoTablet && livrosDoTablet.length
+        ? Biblioteca.livrosComAssunto(livrosDoTablet, correcoesDosLivros(), t.id, anoParaOsLivros(aluno, t)) : [];
 
       caixa.appendChild(el('div', { class: 'item-lista item-assunto-aula' }, [
         el('div', { class: 'cresce' }, [
@@ -3323,6 +3337,11 @@
               avisar('A biblioteca não tem "' + t.titulo + '". Procure por outra palavra na aba Biblioteca, ou navegue pela série.');
             });
           }
+        }) : null,
+        nosLivros.length ? el('button', {
+          type: 'button', class: 'btn pequeno', texto: 'Abrir no livro', 'data-abrir-no-livro': t.id,
+          style: podeMaterial ? 'margin-left:8px' : '',
+          aoClick: function () { abrirLivrosDoAssunto(t, nosLivros); }
         }) : null,
         /* A folga sai dos 12 px da linha para 32: Tirar apaga, Material não, e
          * os dois ficavam a um dedo de distância um do outro numa tela que ela
@@ -14112,6 +14131,61 @@
    *     de baixo, os dois com sumário e com a posição guardada por livro. */
   var LIVROS_IMPORTADOS = { livrosImportados: true };
   var quantosLivros = 0;
+  /* Os livros do tablet, só com o manifest de cada um (o Blob do IndexedDB é
+   * referência, e listar não lê livro nenhum): é daqui que o "Abrir no livro"
+   * da aula (C15.3) sabe na hora que livro tem o assunto. null: ainda não lido. */
+  var livrosDoTablet = null;
+  var livrosDoTabletPedidos = false;
+
+  /* A CORREÇÃO DELA ao mapa capítulo para assunto (C15.2) é dado dela, e mora
+   * em db.ajustes.mapaDosLivros:
+   *   { <id do livro>: { <n do capítulo>: { titulo, assuntos: [ids], acao, quando } } }
+   * Por que ali, e não num depósito ao lado dos livros: os livros e a posição
+   * de leitura são SO_DESTE_TABLET (material de terceiro, que volta importando
+   * o pacote do Drive), e a correção não volta de lugar nenhum se for perdida.
+   * No db ela vai na cópia de segurança (o exportarTudo leva `dados` inteiro) e
+   * volta com ela, sai com o "Apagar todos os dados", como o resto do que é
+   * dela, e não pede depósito novo nem a versão 5 do banco (que é a da nuvem).
+   * São poucos bytes por capítulo. O mapa do pacote fica como veio: a correção
+   * vale por cima dele (Biblioteca.mapaDoLivro). */
+  function correcoesDosLivros() {
+    return (db && db.ajustes && db.ajustes.mapaDosLivros) || {};
+  }
+
+  function gravarCorrecaoDoMapa(livroId, entrada, assuntos, acao) {
+    db.ajustes = db.ajustes || {};
+    var todas = db.ajustes.mapaDosLivros = db.ajustes.mapaDosLivros || {};
+    var doLivro = todas[livroId] = todas[livroId] || {};
+    doLivro[String(entrada.n)] = { titulo: entrada.titulo, assuntos: assuntos.slice(), acao: acao, quando: new Date().toISOString() };
+    // a aula aberta embaixo do leitor (veio pelo "Abrir no livro"): o botão dela passa a ver a correção
+    if (aulaEmEdicao && $('#modal-aula').classList.contains('aberto')) atualizarBlocoAssunto(aulaEmEdicao.id);
+    return salvar();
+  }
+
+  /* Os assuntos do índice (banco/topicos/), pelo id, para o mapa dizer o nome
+   * e a escolha do Corrigir listar os da matéria e do ano do livro. Memoriza
+   * só quando os dois índices vieram inteiros. */
+  var assuntosDosLivros = null;
+  function carregarAssuntosDosLivros() {
+    if (assuntosDosLivros) return Promise.resolve(assuntosDosLivros);
+    var nada = function () { return null; };
+    return Promise.all([carregarIndice().catch(nada), carregarTopicos().catch(nada), carregarIndiceTopicos().catch(nada)]).then(function (r) {
+      var porId = Object.create(null), lista = [], eixo = {};
+      (r[2] || []).forEach(function (d) { eixo[d.chave] = d.eixo; });
+      (r[0] || []).forEach(function (t) {
+        var a = { id: t.id, titulo: (t.pt && t.pt.titulo) || t.id, serie: t.serie, disciplina: Core.MATERIA_PADRAO, eixo: 'ano' };
+        porId[a.id] = a; lista.push(a);
+      });
+      (r[1] || []).forEach(function (p) {
+        if (!p.id) return;
+        var a = { id: p.id, titulo: p.titulo, serie: p.grupo, disciplina: p.disciplina, eixo: eixo[p.disciplina] || '' };
+        porId[a.id] = a; lista.push(a);
+      });
+      var v = { porId: porId, lista: lista };
+      if (r[0] && topicosPlanos) assuntosDosLivros = v;
+      return v;
+    });
+  }
 
   function importarLivros(aberto) {
     return Store.estimarEspaco().then(function (espaco) {
@@ -14153,6 +14227,7 @@
     var caixa = $('#lista-livros-biblioteca');
     return Store.listarLivros().then(function (lista) {
       quantosLivros = lista.length;
+      livrosDoTablet = lista.map(function (l) { return { id: l.id, meta: l.meta }; });
       atualizarBotaoLivros();
       if (!caixa) return;
       caixa.innerHTML = '';
@@ -14178,7 +14253,7 @@
           texto: 'Os livros ficam só neste tablet: a cópia de segurança não os leva. Para usar num tablet novo, ' +
             'importe o pacote de livros de novo do Drive.' })
       ].concat(linhas)));
-    }).catch(function () { quantosLivros = 0; atualizarBotaoLivros(); if (caixa) caixa.innerHTML = ''; });
+    }).catch(function () { quantosLivros = 0; livrosDoTablet = []; atualizarBotaoLivros(); if (caixa) caixa.innerHTML = ''; });
   }
 
   function removerLivroDoTablet(l) {
@@ -14214,6 +14289,7 @@
 
   function abrirEstanteDeLivros() {
     var corpo = $('#corpo-modal-livros');
+    $('#titulo-modal-livros').textContent = 'Livros';
     corpo.innerHTML = '';
     abrirModal('modal-livros');
     return Store.listarLivros().then(function (lista) {
@@ -14238,25 +14314,159 @@
 
   /* Abre o livro onde ela parou: o PDF no leitor do C14, com o sumário; o
    * EPUB no leitor próprio. A posição é gravada a cada página desenhada (PDF)
-   * ou a cada segundo de rolagem e a cada troca de capítulo (EPUB). */
-  function abrirLivro(id) {
+   * ou a cada segundo de rolagem e a cada troca de capítulo (EPUB).
+   *
+   * `destino` (C15.3, o "Abrir no livro" da aula): { pagina } no PDF ou
+   * { capitulo, ancora } no EPUB, no lugar de onde ela parou. */
+  function abrirLivro(id, destino) {
     return Promise.all([Store.lerLivro(id), Store.lerPosicaoLivro(id).catch(function () { return null; })]).then(function (r) {
       var reg = r[0], pos = r[1];
       if (!reg || !reg.blob) { avisar('Este livro já não está no tablet.'); return false; }
-      if (reg.meta.formato === 'epub') return abrirLeitorEpub(reg, pos);
+      if (reg.meta.formato === 'epub') {
+        return abrirLeitorEpub(reg, destino && destino.capitulo ? { capitulo: destino.capitulo, fracao: 0, ancora: destino.ancora || null } : pos);
+      }
       var sumario = reg.meta.sumario || [];
       return abrirLeitorPdf(reg.blob, {
-        titulo: tituloDoLivro(reg.meta), nome: reg.id + '.pdf', pagina: (pos && pos.pagina) || 1,
+        titulo: tituloDoLivro(reg.meta), nome: reg.id + '.pdf', pagina: (destino && destino.pagina) || (pos && pos.pagina) || 1,
         sumario: sumario,
         dica: sumario.length ? '' : 'Este livro não tem sumário: use Anterior e Próxima.',
         aoMudarPagina: function (n) {
           Store.gravarPosicaoLivro({ id: id, pagina: n }).catch(function () { /* a leitura segue; só a posição não fica */ });
+          mostrarCobre('pdf', reg, n);
         }
       });
     }).catch(function () {
       avisar('Não consegui abrir este livro agora. Tente de novo.');
       return false;
     });
+  }
+
+  /* ---------------------------------- "Este capítulo cobre" (C15.2) */
+
+  /* A faixa embaixo da barra dos dois leitores: o assunto do capítulo à vista,
+   * pelo mapa do pacote com a correção dela por cima, e os dois botões.
+   *   Confirmar  (só no que veio do passe automático e ela ainda não viu):
+   *              um toque, e o palpite vira dela;
+   *   Corrigir   abre a lista dos assuntos da matéria e do ano do livro, mais
+   *              "Nenhum assunto do índice"; um toque na escolha grava.
+   * Livro sem mapa, ou página fora de todo capítulo do mapa: a faixa some. */
+  var ESTADOS_DO_MAPA = { a_confirmar: 'sugestão automática', confirmado: 'confirmado por você', corrigido: 'corrigido por você' };
+
+  function caixaDoCobre(formato) { return $(formato === 'epub' ? '#epub-cobre' : '#leitor-cobre'); }
+
+  function esconderCobre(formato) {
+    var caixa = caixaDoCobre(formato);
+    if (!caixa) return;
+    caixa.hidden = true;
+    caixa.innerHTML = '';
+    ['livro', 'capitulo', 'estado', 'assuntos'].forEach(function (k) { delete caixa.dataset[k]; });
+  }
+
+  function mostrarCobre(formato, reg, valor) {
+    var caixa = caixaDoCobre(formato);
+    if (!caixa || !reg || !reg.meta) return;
+    var mapa = Biblioteca.mapaDoLivro(reg.meta, correcoesDosLivros()[reg.id]);
+    var e = Biblioteca.entradaDoMapa(mapa, formato, valor);
+    if (!e) { esconderCobre(formato); return; }
+    var redesenhar = function () { mostrarCobre(formato, reg, valor); };
+    desenharCobre(caixa, reg, e, assuntosDosLivros, redesenhar);
+    if (!assuntosDosLivros) {
+      carregarAssuntosDosLivros().then(function (nomes) {
+        // ela pode ter mudado de capítulo enquanto o índice abria
+        if (caixa.dataset.livro === reg.id && caixa.dataset.capitulo === String(e.n)) desenharCobre(caixa, reg, e, nomes, redesenhar);
+      }, function () { /* sem índice a faixa fica com os ids, e o Corrigir avisa */ });
+    }
+  }
+
+  function desenharCobre(caixa, reg, e, nomes, redesenhar) {
+    caixa.innerHTML = '';
+    caixa.hidden = false;
+    caixa.dataset.livro = reg.id;
+    caixa.dataset.capitulo = String(e.n);
+    caixa.dataset.estado = e.estado;
+    caixa.dataset.assuntos = e.assuntos.join(',');
+    var nome = function (id) { var a = nomes && nomes.porId[id]; return a ? a.titulo : id; };
+    var quais = !nomes && e.assuntos.length ? 'abrindo o índice de assuntos...'
+      : e.assuntos.length ? e.assuntos.map(nome).join('; ') : 'nenhum assunto do índice';
+    caixa.appendChild(el('div', { class: 'cobre-texto' }, [
+      document.createTextNode((e.obraInteira ? 'Este livro cobre: ' : 'Este capítulo cobre: ')),
+      el('strong', { class: 'cobre-assuntos', texto: quais }),
+      ESTADOS_DO_MAPA[e.estado] ? el('span', { class: 'tag', texto: ESTADOS_DO_MAPA[e.estado] }) : null
+    ].filter(Boolean)));
+    if (e.estado === 'a_confirmar') {
+      caixa.appendChild(el('button', { type: 'button', class: 'btn pequeno principal', id: 'cobre-confirmar', texto: 'Confirmar',
+        aoClick: function () { gravarCorrecaoDoMapa(reg.id, e, e.assuntos, 'confirmou').then(redesenhar, redesenhar); } }));
+    }
+    caixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'cobre-corrigir', texto: 'Corrigir',
+      aoClick: function () {
+        carregarAssuntosDosLivros().then(function (v) { desenharEscolhaDoCobre(caixa, reg, e, v, redesenhar); }, function () {
+          avisar('Não consegui abrir o índice de assuntos agora. Tente de novo daqui a pouco.');
+        });
+      } }));
+  }
+
+  /* Os assuntos que ela pode escolher: os da matéria do livro e do ano dele
+   * (o mesmo filtro do passe automático), na ordem do índice. */
+  function desenharEscolhaDoCobre(caixa, reg, e, nomes, redesenhar) {
+    var velha = caixa.querySelector('.cobre-escolha');
+    if (velha) { velha.remove(); return; }
+    var series = Array.isArray(reg.meta.series) ? reg.meta.series : [];
+    var disciplina = reg.meta.mapa_disciplina;
+    var opcoes = (nomes.lista || []).filter(function (a) {
+      return a.disciplina === disciplina && (a.eixo !== 'ano' || !series.length || series.indexOf(a.serie) >= 0);
+    });
+    var escolher = function (ids) {
+      gravarCorrecaoDoMapa(reg.id, e, ids, 'corrigiu').then(redesenhar, redesenhar);
+    };
+    var lista = el('div', { class: 'cobre-escolha', role: 'list' });
+    if (!opcoes.length) {
+      lista.appendChild(el('p', { class: 'ajuda', style: 'margin:8px 12px',
+        texto: 'A matéria deste livro não tem assuntos no índice; dá para marcar só que o capítulo não cobre nenhum.' }));
+    }
+    opcoes.forEach(function (a) {
+      lista.appendChild(el('button', { type: 'button', 'data-assunto': a.id,
+        class: e.assuntos.indexOf(a.id) >= 0 ? 'atual' : '',
+        texto: a.titulo + (a.eixo === 'ano' && series.length > 1 ? ' (' + nomeDoAno(a.serie) + ')' : ''),
+        aoClick: function () { escolher([a.id]); } }));
+    });
+    lista.appendChild(el('button', { type: 'button', 'data-assunto': '', texto: 'Nenhum assunto do índice',
+      aoClick: function () { escolher([]); } }));
+    caixa.appendChild(lista);
+  }
+
+  /* --------------------------------------- "Abrir no livro" (C15.3) */
+
+  /* O ano que escolhe os livros: o do aluno; sem ele, o do próprio assunto
+   * (o registro do índice de matemática, ou o grupo do tópico quando o grupo é
+   * ano escolar). Sem os dois, nenhum filtro de ano. */
+  function anoParaOsLivros(aluno, t) {
+    var registro = resumoDe(t.id);
+    return anoEscolarDe(aluno) || Core.serieParaTemas((registro && registro.serie) || t.grupo || '') || null;
+  }
+
+  /* A lista dos livros com o assunto, na janela dos livros, por cima da aula.
+   * Um toque abre o leitor no começo do capítulo: o PDF na página, o EPUB no
+   * capítulo. A obra inteira (literatura) abre onde ela parou. */
+  function abrirLivrosDoAssunto(t, achados) {
+    var corpo = $('#corpo-modal-livros');
+    $('#titulo-modal-livros').textContent = 'Abrir no livro';
+    corpo.innerHTML = '';
+    corpo.appendChild(el('p', { class: 'ajuda', id: 'livros-do-assunto',
+      texto: 'Os livros do ano com um capítulo de "' + (t.titulo || t.id) + '". O toque abre o livro no começo do capítulo.' }));
+    achados.forEach(function (a) {
+      var e = a.entrada;
+      var epub = a.meta.formato === 'epub';
+      var onde = e.obraInteira ? 'O livro inteiro trata deste assunto' :
+        'Capítulo: ' + e.titulo + (epub ? '' : ', página ' + e.pagina);
+      var linha = linhaBib(tituloDoLivro(a.meta), onde, function () {
+        fecharModal('modal-livros');
+        abrirLivro(a.id, e.obraInteira ? null : (epub ? { capitulo: e.capitulo, ancora: e.ancora } : { pagina: e.pagina }));
+      });
+      linha.setAttribute('data-livro', a.id);
+      linha.setAttribute('data-capitulo', String(e.n));
+      corpo.appendChild(linha);
+    });
+    abrirModal('modal-livros');
   }
 
   /* --------------------------------------------------- o leitor de EPUB */
@@ -14402,6 +14612,7 @@
     $('#titulo-modal-leitor-epub').textContent = tituloDoLivro(meta);
     $('#epub-sumario').hidden = !(meta.sumario && meta.sumario.length);
     fecharSumarioEpub();
+    esconderCobre('epub');
     var corpo = $('#corpo-modal-leitor-epub');
     corpo.innerHTML = '';
     delete corpo.dataset.capituloAberto;
@@ -14416,7 +14627,8 @@
       ep.zip.entradas.forEach(function (en) { ep.porNome[en.nome] = en; });
       ep.relogio = setInterval(guardarPosicaoEpub, 1000);
       var cap = posicao && posicao.capitulo ? posicao.capitulo - 1 : 0;
-      return mostrarCapituloEpub(cap, posicao && posicao.capitulo ? posicao.fracao || 0 : 0, null);
+      // a âncora vem do "Abrir no livro" (C15.3), que leva ao começo do capítulo do mapa
+      return mostrarCapituloEpub(cap, posicao && posicao.capitulo ? posicao.fracao || 0 : 0, (posicao && posicao.ancora) || null);
     }).catch(function () {
       if (vez === epubVez) mostrarFalhaDoEpub();
       return false;
@@ -14520,6 +14732,7 @@
           } catch (e) { /* a caixa sem acesso: o texto continua à vista */ }
           ep.mostrado = i;
           corpo.dataset.capituloAberto = String(i + 1);
+          mostrarCobre('epub', { id: ep.id, meta: ep.meta }, i + 1);
           guardarPosicaoEpub();
           ok(true);
         }, { once: true });
@@ -14595,6 +14808,7 @@
     Object.keys(ep.urlPor).forEach(function (k) { URL.revokeObjectURL(ep.urlPor[k]); });
     leitorEpub = null;
     fecharSumarioEpub();
+    esconderCobre('epub');
     var corpo = $('#corpo-modal-leitor-epub');
     if (corpo) { corpo.innerHTML = ''; delete corpo.dataset.capituloAberto; }
   }
@@ -18665,6 +18879,8 @@
     // o botão Sumário só existe para quem traz sumário (o livro); o anexo da aula fica como era
     $('#leitor-sumario').hidden = !(opcoes.sumario && opcoes.sumario.length);
     fecharSumarioDoLeitor();
+    // "Este capítulo cobre" (C15.2) nasce escondido: só o livro o mostra, a cada página
+    esconderCobre('pdf');
     var corpo = $('#corpo-modal-leitor-pdf');
     corpo.innerHTML = '';
     delete corpo.dataset.paginaDesenhada;
@@ -18904,6 +19120,7 @@
     if (leitorTarefa) { leitorTarefa.cancel(); leitorTarefa = null; }
     leitor = null;
     fecharSumarioDoLeitor();
+    esconderCobre('pdf');
     // o canvas de uma página com zoom passa de 40 MB: sai da tela e da memória
     var corpo = $('#corpo-modal-leitor-pdf');
     if (corpo) { corpo.innerHTML = ''; delete corpo.dataset.paginaDesenhada; }

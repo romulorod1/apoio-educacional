@@ -10,11 +10,21 @@
  *   2. o teto do aplicativo é 160 MB por livro, dos dois lados da fronteira, e
  *      a frase da recusa não manda trocar por versão mais leve.
  *
+ * C15.2 e C15.3 (biblioteca.js, sem tela):
+ *   3. o mapa que vale é o do pacote com a correção dela por cima, só no
+ *      capítulo de mesmo número e título; o capítulo de cada página;
+ *   4. "Abrir no livro": só os livros do ano com o assunto no mapa (com as
+ *      correções), um por capítulo; sem ano, nenhum filtro.
+ *
  * Modos envenenados (cada um tem de reprovar a trava dele):
  *   --envenenado-cortado-le-tudo  a espiada volta a engolir o erro do pacote
  *                                 cortado (devolve null), e o caminho de
  *                                 sempre leria o arquivo inteiro.
  *   --envenenado-teto-antigo      o teto do aplicativo de volta a 40 MB.
+ *   --envenenado-sem-ano          o "Abrir no livro" ignora o ano do livro.
+ *   --envenenado-correcao-ignorada  a correção dela não vale.
+ *   --envenenado-correcao-sem-titulo  a correção vale sem conferir o título
+ *                                 (a velha cai no capítulo renumerado).
  *
  *   node _teste/testa_livros_regras.js [--envenenado-...]
  */
@@ -25,7 +35,8 @@ const Module = require('module');
 const Sintetico = require('./_pacote_sintetico.js');
 
 const RAIZ = path.join(__dirname, '..');
-const VENENOS = ['--envenenado-cortado-le-tudo', '--envenenado-teto-antigo'];
+const VENENOS = ['--envenenado-cortado-le-tudo', '--envenenado-teto-antigo', '--envenenado-sem-ano',
+  '--envenenado-correcao-ignorada', '--envenenado-correcao-sem-titulo'];
 const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 
 let passes = 0, falhas = 0;
@@ -57,8 +68,16 @@ function carregar(nome, troca) {
 
 const RELANCA_CORTADO = "if (e && e.cortado) throw Recusa(e.message, 'download');";
 const TETO = 'var TETO_POR_LIVRO = 160 * 1024 * 1024;';
-const troca = MODO === '--envenenado-cortado-le-tudo' ? [RELANCA_CORTADO, '']
-  : MODO === '--envenenado-teto-antigo' ? [TETO, 'var TETO_POR_LIVRO = 40 * 1024 * 1024;'] : null;
+const FILTRO_DE_ANO = 'if (!ano) return true;';
+const CORRECAO_VALE = 'var vale = !!c && c.titulo === e.titulo && Array.isArray(c.assuntos);';
+const TROCAS = {
+  '--envenenado-cortado-le-tudo': [RELANCA_CORTADO, ''],
+  '--envenenado-teto-antigo': [TETO, 'var TETO_POR_LIVRO = 40 * 1024 * 1024;'],
+  '--envenenado-sem-ano': [FILTRO_DE_ANO, 'return true;'],
+  '--envenenado-correcao-ignorada': [CORRECAO_VALE, 'var vale = false;'],
+  '--envenenado-correcao-sem-titulo': [CORRECAO_VALE, 'var vale = !!c && Array.isArray(c.assuntos);']
+};
+const troca = TROCAS[MODO] || null;
 const Biblioteca = carregar('biblioteca.js', troca);
 
 (async () => {
@@ -130,6 +149,73 @@ const Biblioteca = carregar('biblioteca.js', troca);
     conf('o livro de 160 MB exatos passa do teto (a falha, se houver, é outra)', doTeto(noTeto), false);
     conf('e o de 100 MB também', doTeto(doTamanhoAntigo), false);
     conf('o teto exportado é 160 MB', Biblioteca.TETO_POR_LIVRO, 160 * MB);
+  }
+
+  // ------------------------------------------------------------------
+  secao('3. O mapa (C15.2): o do pacote com a correção dela por cima');
+  const pdf = (series, mapa) => ({ formato: 'pdf', titulo: 'x', series: series, mapa: mapa });
+  const cap = (n, titulo, ini, fim, ids, origem) => ({ n, titulo, pagina: ini, pagina_fim: fim,
+    assuntos: ids.map(id => ({ id, confianca: origem === 'auto' ? 'auto' : 'alta' })), origem: origem || 'mapa' });
+  const metaD = pdf(['06'], [cap(1, 'Frações', 1, 10, ['MAT06-05'], 'auto'), cap(2, 'Decimais', 11, 20, ['MAT06-07'], 'auto'),
+    cap(3, 'Geometria plana', 21, 30, [], 'auto')]);
+  const correcoesD = {
+    1: { titulo: 'Frações', assuntos: ['MAT06-06'], acao: 'corrigiu' },
+    2: { titulo: 'Decimais', assuntos: ['MAT06-07'], acao: 'confirmou' },
+    // correção velha, de um sumário em que o capítulo 3 tinha outro título: não vale
+    3: { titulo: 'Capítulo que mudou de nome', assuntos: ['MAT06-11'], acao: 'corrigiu' }
+  };
+  const mD = Biblioteca.mapaDoLivro(metaD, correcoesD);
+  const resumo = m => m.map(e => e.n + ':' + e.assuntos.join('+') + ':' + e.estado).join(' ');
+  console.log('   mapa com as correções: ' + resumo(mD));
+  conf('sem correção, o passe automático fica a confirmar', resumo(Biblioteca.mapaDoLivro(metaD, {})),
+    '1:MAT06-05:a_confirmar 2:MAT06-07:a_confirmar 3::a_confirmar');
+  // nos venenos da correção, quem diz que o defeito foi enxergado é a seção 4
+  if (!/correcao/.test(MODO)) {
+    conf('a correção dela vale por cima do mapa, a confirmação também, e a de título velho não',
+      resumo(mD), '1:MAT06-06:corrigido 2:MAT06-07:confirmado 3::a_confirmar');
+  }
+  conf('o mapa do pacote não mudou', metaD.mapa[0].assuntos.map(a => a.id).join(','), 'MAT06-05');
+  const metaOrq = pdf(['06'], [cap(1, 'Unidade A', 1, 2, ['MAT06-05'])]);
+  conf('o mapa da orquestradora sem palavra dela fica "do mapa"', resumo(Biblioteca.mapaDoLivro(metaOrq, null)), '1:MAT06-05:do_mapa');
+  conf('o capítulo da página 10 é o 1, o da 11 é o 2, a 31 fica fora',
+    [10, 11, 31].map(p => (Biblioteca.entradaDoMapa(mD, 'pdf', p) || { n: '-' }).n).join(','), '1,2,-');
+  const epubMapa = Biblioteca.mapaDoLivro({ formato: 'epub', mapa: [{ n: 1, titulo: 'Obra', capitulo: 1, capitulo_fim: 3,
+    obra_inteira: true, assuntos: [{ id: 'LITEM2-T02' }], origem: 'mapa' }] }, {});
+  conf('no EPUB, a parte 3 está na obra inteira (1 a 3), a 4 não',
+    [3, 4].map(c => (Biblioteca.entradaDoMapa(epubMapa, 'epub', c) || { n: '-' }).n).join(','), '1,-');
+
+  secao('4. "Abrir no livro" (C15.3): os livros do ano com o assunto');
+  const livros = [
+    { id: 'a-sexto', meta: Object.assign(pdf(['06'], [cap(1, 'Frações', 1, 9, ['MAT06-05'])]), { titulo: 'A do sexto' }) },
+    { id: 'b-setimo', meta: Object.assign(pdf(['07'], [cap(1, 'Revisão de frações', 1, 9, ['MAT06-05'])]), { titulo: 'B do sétimo' }) },
+    { id: 'c-sem-ano', meta: Object.assign(pdf([], [cap(1, 'Frações', 1, 9, ['MAT06-05'])]), { titulo: 'C sem ano' }) },
+    { id: 'd-corrigido', meta: Object.assign(metaD, { titulo: 'D corrigido' }) },
+    { id: 'e-dois', meta: Object.assign(pdf(['06'], [cap(1, 'Frações I', 1, 9, ['MAT06-05']), cap(2, 'Frações II', 10, 19, ['MAT06-05'])]), { titulo: 'E dois capítulos' }) }
+  ];
+  const correcoes = { 'd-corrigido': correcoesD };
+  const quem = (id, ano) => Biblioteca.livrosComAssunto(livros, correcoes, id, ano).map(a => a.id + '#' + a.entrada.n).join(' ');
+  const do6 = quem('MAT06-05', '06');
+  console.log('   MAT06-05 no 6º ano: ' + do6);
+  if (MODO === '--envenenado-sem-ano') {
+    secao('VENENO: o "Abrir no livro" que ignora o ano');
+    conf('envenenado: o livro do 7º e o sem ano aparecem para o aluno do 6º (defeito enxergado)',
+      /b-setimo/.test(do6) && /c-sem-ano/.test(do6), true);
+  } else if (MODO === '--envenenado-correcao-ignorada') {
+    secao('VENENO: a correção dela ignorada');
+    conf('envenenado: o livro corrigido continua aparecendo pelo mapa velho (defeito enxergado)', /d-corrigido/.test(do6), true);
+  } else if (MODO === '--envenenado-correcao-sem-titulo') {
+    secao('VENENO: a correção vale sem conferir o título do capítulo');
+    conf('envenenado: a correção velha do capítulo 3 tomou o capítulo novo (defeito enxergado)',
+      resumo(Biblioteca.mapaDoLivro(metaD, correcoesD)).indexOf('3:MAT06-11:corrigido') >= 0, true);
+  } else {
+    conf('para o aluno do 6º: só os livros do 6º com o assunto, um por capítulo, sem o corrigido',
+      do6, 'a-sexto#1 e-dois#1 e-dois#2');
+    conf('o livro do 7º (série vizinha) aparece para o aluno do 7º', quem('MAT06-05', '07'), 'b-setimo#1');
+    conf('a correção dela leva o livro para o assunto escolhido', quem('MAT06-06', '06'), 'd-corrigido#1');
+    conf('e o capítulo confirmado continua', quem('MAT06-07', '06'), 'd-corrigido#2');
+    conf('sem ano nenhum, não há o que filtrar', quem('MAT06-05', null), 'a-sexto#1 b-setimo#1 c-sem-ano#1 e-dois#1 e-dois#2');
+    conf('assunto que nenhum livro tem: lista vazia (o botão não aparece)', quem('MAT06-13', '06'), '');
+    conf('a entrada leva a página do começo do capítulo', Biblioteca.livrosComAssunto(livros, correcoes, 'MAT06-05', '06')[2].entrada.pagina, 10);
   }
 
   console.log('\n' + passes + ' passaram, ' + falhas + ' falharam.');

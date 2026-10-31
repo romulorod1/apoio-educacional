@@ -604,6 +604,13 @@ roda "livros --envenenado-zip-inteiro"            node "_teste/testa_livros.js" 
 # A revisao do C15.1 pela orquestradora: o mesmo pacote com dois PDFs trocados
 # (mesmo id, mesma versao) atualiza pelo hash; o veneno compara so o id.
 roda "livros --envenenado-so-id"                  node "_teste/testa_livros.js" --envenenado-so-id
+# C15.2 e C15.3: "Este capitulo cobre" no leitor, Confirmar e Corrigir (so a
+# materia e o ano do livro), a correcao depois de recarregar e na copia de
+# seguranca (os livros nao), e o "Abrir no livro" da aula na pagina do PDF e no
+# capitulo do EPUB, so com livro do ano do aluno. Porta 8863.
+roda "livros mapa"                                node "_teste/testa_livros_mapa.js"
+roda "livros mapa --envenenado-correcao-so-na-memoria" node "_teste/testa_livros_mapa.js" --envenenado-correcao-so-na-memoria
+roda "livros mapa --envenenado-sem-ano-na-tela"   node "_teste/testa_livros_mapa.js" --envenenado-sem-ano-na-tela
 # C2b: a lista de base (base-v1) importa, vem primeiro com o nome dela e a
 # frase de posicao na fonte; as tres listas com a etiqueta de nivel. A regra
 # em si e do biblioteca/_prova_kits.py (sem navegador).
@@ -708,6 +715,12 @@ roda "livros (gerador)"                         python biblioteca/_prova_livros.
 roda "livros (regras)"                          node "_teste/testa_livros_regras.js"
 roda "livros (regras) --envenenado-cortado-le-tudo" node "_teste/testa_livros_regras.js" --envenenado-cortado-le-tudo
 roda "livros (regras) --envenenado-teto-antigo" node "_teste/testa_livros_regras.js" --envenenado-teto-antigo
+# C15.2 e C15.3: o mapa que vale (o do pacote com a correcao dela, so no
+# capitulo de mesmo titulo) e os livros do "Abrir no livro" (so os do ano do
+# aluno com o assunto). Um veneno pela regra do ano e dois pela correcao.
+roda "livros (regras) --envenenado-sem-ano"     node "_teste/testa_livros_regras.js" --envenenado-sem-ano
+roda "livros (regras) --envenenado-correcao-ignorada" node "_teste/testa_livros_regras.js" --envenenado-correcao-ignorada
+roda "livros (regras) --envenenado-correcao-sem-titulo" node "_teste/testa_livros_regras.js" --envenenado-correcao-sem-titulo
 # A comparacao pacote a pacote (determinismo e "o que mudou de uma versao para
 # a outra") rodando contra si mesma: um veneno por tipo de diferenca que ela
 # existe para achar, mais dois controles. A comparacao de verdade precisa dos

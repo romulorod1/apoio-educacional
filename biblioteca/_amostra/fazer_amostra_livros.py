@@ -215,16 +215,21 @@ def fazer(pasta, grande=False):
                 '"pag_arquivo_fim": 2, "assuntos": [{"id": "MAT06-05", "confianca": "alta"}, '
                 '{"id": "MAT99-99", "confianca": "alta"}]}, {"n": 2, "titulo": "Unidade do mapa B", "pag_impressa": 3, '
                 '"pag_arquivo_inicio": 3, "pag_arquivo_fim": 4, "assuntos": [{"id": "MAT06-09", "confianca": "media"}]}]}]\n')
-    # o mapa de obras (literatura): o assunto e do EPUB inteiro
+    # o mapa de obras (literatura), de uma obra que NAO esta na planilha: a
+    # prova le o formato (ler_mapas) e monta o mapa de obra inteira a parte. O
+    # EPUB da planilha fica com o passe automatico, para o teste de navegador
+    # ter um capitulo de EPUB mapeado (o "Capitulo 2: O meio" casa com
+    # "Determinismo e forca do meio", da 2a serie: grosso, e por isso a tela
+    # pede confirmacao)
     with open(os.path.join(mapa, 'mapa_obras_prova.json'), 'w', encoding='utf-8', newline='') as f:
-        f.write('{"formato": "mapa de obra para assunto (prova)", "obras": [{"obra": "Livro de prova", '
-                '"arquivo": "livro-de-prova.epub", "serie": "em2", '
-                '"assuntos": [{"id": "LITEM2-T02", "confianca": "alta"}]}]}\n')
+        f.write('{"formato": "mapa de obra para assunto (prova)", "obras": [{"obra": "Obra de prova", '
+                '"arquivo": "obra-de-prova.epub", "serie": "em2", '
+                '"assuntos": [{"id": "LITEM2-T02", "confianca": "media"}, {"id": "LITXX-T99", "confianca": "alta"}]}]}\n')
     linhas = [
         linha('matematica', 'Livro com marcadores', 'matematica/livro-com-marcadores.pdf', Volume='Volume 1'),
         linha('matematica', 'Livro sem marcadores', 'matematica/livro-sem-marcadores.pdf'),
         linha('matematica', 'Livro sem sumário', 'matematica/livro-sem-sumario.pdf'),
-        linha('literatura', 'Livro de prova em EPUB', 'literatura/livro-de-prova.epub'),
+        linha('literatura', 'Livro de prova em EPUB', 'literatura/livro-de-prova.epub', Segmento='Ensino médio'),
         linha('matematica', 'Livro que ela ainda não tem', ''),
         linha('matematica', 'Livro com arquivo sumido', 'matematica/nao-existe.pdf'),
     ]
