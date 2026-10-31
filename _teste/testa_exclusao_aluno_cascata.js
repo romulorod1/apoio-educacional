@@ -65,8 +65,9 @@ const { conf, secao, esperar } = H;
     (await Store.carregar()).alunos.length), 2);
   await pag.evaluate(() => {
     const orig = Store.excluirAlunoEmCascata;
+    window._origExcluirAluno = orig;
     Store.excluirAlunoEmCascata = function () {
-      return new Promise(res => setTimeout(() => orig.apply(this, arguments).then(res), 500));
+      return new Promise((res, rej) => setTimeout(() => orig.apply(this, arguments).then(res, rej), 500));
     };
   });
   await pag.click('#confirmar-excluir-aluno');
@@ -82,6 +83,9 @@ const { conf, secao, esperar } = H;
   const fechou = await esperar('exclusão concluída', () =>
     pag.$eval('#modal-excluir-aluno', e => !e.classList.contains('aberto')), Boolean, 8000);
   conf('janela fecha após confirmar', fechou.ok, true);
+  await pag.evaluate(() => {
+    if (window._origExcluirAluno) Store.excluirAlunoEmCascata = window._origExcluirAluno;
+  });
 
   secao('cascata e preservação do outro aluno');
   const depois = await pag.evaluate(async () => {
