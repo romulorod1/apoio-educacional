@@ -951,7 +951,7 @@
        * que nunca receberiam uma marcação sequer. */
       soEmEscada: true,
       /* O grupo inteiro é sobre a matéria: cada item aqui herda isso, e não
-       * precisa repetir `sobre` em cada um dos vinte e sete. */
+       * precisa repetir `sobre` em cada um dos trinta e dois. */
       sobre: 'materia',
       ajuda: 'O que ficou para trás e atrapalha o conteúdo de agora. ' +
         'Cada lacuna marcada monta a trilha dos assuntos que precisam vir antes, ' +
@@ -979,27 +979,41 @@
        * assuntos (Operações Básicas tem naturais e decimais, Dízimas tem
        * expressões e notação científica) e o MÓDULO quando ele é o assunto
        * inteiro. Tabuada e divisão ficam sem: são dos anos iniciais, e o
-       * material delas vem com os pacotes da OBMEP Mirim, numa rodada própria.
+       * material delas vem com os pacotes da OBMEP Mirim (o `mirim`, abaixo).
+       *
+       * `mirim` é a mesma regra para o 2º ao 5º ano (C5b), nos pacotes da
+       * OBMEP Mirim: os ids dos ASSUNTOS do índice ("MAT03-04") que medem a
+       * lacuna, do mais baixo para o mais alto. A prova da Mirim não tem
+       * lista nem degrau; cada questão traz o assunto do aplicativo no
+       * `tema_app` (contrato, seção 8i), e é por ele que o aplicativo acha a
+       * questão. "Dobro, metade e triplo" (MAT02-04) não entra em lacuna
+       * nenhuma: o assunto mistura multiplicação e fração, e a questão dele
+       * mediria a lacuna errada metade das vezes.
        *
        * As cinco últimas nasceram da lente da pedagoga (P08): divisibilidade e
        * MMC, ordem das operações, ângulos, notação científica e conjuntos
        * travam muita criança e, sem lugar para marcar, viravam "Outro" ou
        * sumiam. Ids novos, e os antigos intocados: o que ela já marcou continua
-       * lido do mesmo jeito. */
+       * lido do mesmo jeito. Depois delas, as cinco dos anos iniciais (C5b). */
       itens: [
         { id: 'naturais', rotulo: 'Operações com números naturais', busca: 'operações', alvos: ['MAT04-02', 'MAT05-02', 'MAT06-02'],
           obmep: ['6ano:numeros-naturais-representacao-e-operacoes-basicas', '6ano:operacoes-basicas:operacoes-com-numeros-naturais',
             '6ano:resolucao-de-exercicios:operacoes-com-numeros-naturais'] },
-        { id: 'tabuada', rotulo: 'Tabuada e multiplicação', busca: 'multiplicação', alvos: ['MAT03-04', 'MAT04-03'] },
-        { id: 'divisao', rotulo: 'Divisão', busca: 'divisão', alvos: ['MAT03-05', 'MAT04-04'] },
+        { id: 'tabuada', rotulo: 'Tabuada e multiplicação', busca: 'multiplicação', alvos: ['MAT03-04', 'MAT04-03'],
+          mirim: ['MAT03-04', 'MAT04-03'] },
+        { id: 'divisao', rotulo: 'Divisão', busca: 'divisão', alvos: ['MAT03-05', 'MAT04-04'],
+          mirim: ['MAT03-05', 'MAT04-04'] },
         { id: 'fracoes', rotulo: 'Frações', busca: 'fração', alvos: ['MAT04-05', 'MAT05-03', 'MAT06-05', 'MAT06-06'],
           obmep: ['6ano:fracoes-o-primeiro-contato', '6ano:resolucao-de-exercicios:fracoes',
-            '7ano:numeros-inteiros-e-numeros-racionais:numeros-racionais-e-exercicios'] },
+            '7ano:numeros-inteiros-e-numeros-racionais:numeros-racionais-e-exercicios'],
+          mirim: ['MAT04-05', 'MAT05-03'] },
         { id: 'decimais', rotulo: 'Números decimais', busca: 'decimais', alvos: ['MAT04-06', 'MAT05-05', 'MAT06-07'],
-          obmep: ['6ano:operacoes-basicas:operacoes-com-numeros-na-forma-decimal'] },
+          obmep: ['6ano:operacoes-basicas:operacoes-com-numeros-na-forma-decimal'],
+          mirim: ['MAT04-06', 'MAT05-05'] },
         { id: 'porcentagem', rotulo: 'Porcentagem', busca: 'porcentagem', alvos: ['MAT05-06', 'MAT06-08', 'MAT07-07'],
           obmep: ['6ano:fracao-como-porcentagem-e-como-probabilidade:fracao-como-porcentagem', '7ano:porcentagem-e-juros:introdu-cao-a-porcentagem',
-            '8ano:porcentagem', '1em:matematica-financeira:introducao-porcentagem-aumentos-e-descontos'] },
+            '8ano:porcentagem', '1em:matematica-financeira:introducao-porcentagem-aumentos-e-descontos'],
+          mirim: ['MAT05-06'] },
         { id: 'inteiros', rotulo: 'Números negativos', busca: 'inteiros', alvos: ['MAT07-01', 'MAT07-02'],
           obmep: ['7ano:numeros-inteiros-e-numeros-racionais:numeros-inteiros-e-suas-operacoes',
             '7ano:numeros-inteiros-e-numeros-racionais:exercicios-sobre-operacoes-com-numeros-inteiros'] },
@@ -1008,7 +1022,9 @@
         { id: 'medidas', rotulo: 'Unidades de medida', busca: 'medida', alvos: ['MAT04-10', 'MAT05-10', 'MAT06-12'],
           obmep: ['6ano:sistemas-de-medidas-e-medidas-de-tempo',
             '6ano:unidades-de-medida-de-comprimento-e-de-areas:unidades-de-medida-de-comprimento-e-primeiros-exercicios',
-            '6ano:unidades-de-medida-de-volume'] },
+            '6ano:unidades-de-medida-de-volume'],
+          // horas e calendário ficam na lacuna de tempo, que tem trilha própria
+          mirim: ['MAT02-08', 'MAT03-08', 'MAT03-09', 'MAT04-10', 'MAT05-10'] },
         { id: 'algebrica', rotulo: 'Expressões algébricas', busca: 'algébric', alvos: ['MAT07-09', 'MAT08-05'],
           obmep: ['7ano:notacao-algebrica-e-introducao-as-equacoes', '8ano:expressoes-algebricas-e-polinomios'] },
         { id: 'eq1', rotulo: 'Equação do primeiro grau', busca: 'primeiro grau', alvos: ['MAT07-10'],
@@ -1026,7 +1042,8 @@
         { id: 'area', rotulo: 'Perímetro, área e volume', busca: 'área', alvos: ['MAT04-09', 'MAT05-09', 'MAT06-11', 'MAT07-13'],
           obmep: ['6ano:unidades-de-medida-de-comprimento-e-de-areas:areas-de-outras-figuras-basicas-e-primeiros-exercicios',
             '6ano:unidades-de-medida-de-comprimento-e-de-areas:exercicios-diversos-de-areas-de-figuras',
-            '9ano:areas-de-figuras-planas', '9ano:problemas-envolvendo-areas'] },
+            '9ano:areas-de-figuras-planas', '9ano:problemas-envolvendo-areas'],
+          mirim: ['MAT04-09', 'MAT05-09'] },
         { id: 'pitagoras', rotulo: 'Teorema de Pitágoras', busca: 'Pitágoras', alvos: ['MAT09-07'],
           obmep: ['9ano:teorema-de-pitagoras-e-aplicacoes'] },
         { id: 'semelhanca', rotulo: 'Semelhança e escala', busca: 'semelhança', alvos: ['MAT09-08'],
@@ -1037,12 +1054,15 @@
         { id: 'funcoes', rotulo: 'Funções', busca: 'função', alvos: ['MAT09-10', 'MATEM1-03'],
           obmep: ['9ano:funcoes-nocoes-basicas', '9ano:funcao-afim', '1em:funcao-quadratica'] },
         { id: 'graficos', rotulo: 'Leitura de gráficos e estatística', busca: 'gráfico', alvos: ['MAT04-12', 'MAT05-12', 'MAT06-14', 'MATEM3-14'],
-          obmep: ['7ano:nocoes-basicas-de-estatistica', '1em:estatistica-basica-i'] },
+          obmep: ['7ano:nocoes-basicas-de-estatistica', '1em:estatistica-basica-i'],
+          mirim: ['MAT02-11', 'MAT03-12', 'MAT04-12', 'MAT05-12'] },
         { id: 'probabilidade', rotulo: 'Probabilidade', busca: 'probabilidade', alvos: ['MAT07-14', 'MAT08-14', 'MAT09-14', 'MATEM2-10'],
-          obmep: ['6ano:fracao-como-porcentagem-e-como-probabilidade:fracao-como-probabilidade', '2em:introducao-a-probabilidade'] },
+          obmep: ['6ano:fracao-como-porcentagem-e-como-probabilidade:fracao-como-probabilidade', '2em:introducao-a-probabilidade'],
+          mirim: ['MAT04-11'] },
         { id: 'divisibilidade', rotulo: 'Divisibilidade, MMC e MDC', busca: 'divisores', alvos: ['MAT05-07', 'MAT06-03'],
           obmep: ['6ano:divisibilidade', '6ano:resolucao-de-exercicios:maximo-divisor-comum-e-minimo-multiplo-comum',
-            '8ano:numeros-naturais-contagem-divisibilidade-e-teorema:divisibilidade-e-teorema-da-divisao-euclidiana'] },
+            '8ano:numeros-naturais-contagem-divisibilidade-e-teorema:divisibilidade-e-teorema-da-divisao-euclidiana'],
+          mirim: ['MAT05-07'] },
         /* Nenhum tema do índice tem "expressão numérica" no título: a ordem
          * das operações mora dentro das quatro operações do 5º e do 6º ano, e é
          * para lá que a trilha leva. Na OBMEP, ela é uma lista do 8º ano. */
@@ -1050,13 +1070,35 @@
           obmep: ['8ano:dizimas-periodicas-e-numeros-reais:expressoes-numericas'] },
         { id: 'angulos', rotulo: 'Ângulos e figuras planas', busca: 'ângulos', alvos: ['MAT04-07', 'MAT06-09', 'MAT06-10', 'MAT07-11', 'MAT07-12'],
           obmep: ['8ano:elementos-basicos-de-geometria-plana-parte-1:angulos', '8ano:elementos-basicos-de-geometria-plana-parte-1:triangulos',
-            '8ano:elementos-basicos-de-geometria-plana-parte-1:conceitos-geometricos-basicos'] },
+            '8ano:elementos-basicos-de-geometria-plana-parte-1:conceitos-geometricos-basicos'],
+          mirim: ['MAT02-06', 'MAT03-07', 'MAT04-07', 'MAT04-08'] },
         { id: 'notacao-cientifica', rotulo: 'Notação científica', busca: 'notação científica', alvos: ['MAT08-02'],
           obmep: ['8ano:dizimas-periodicas-e-numeros-reais:notacao-cientifica'] },
         /* "Intervalos" é o jeito do médio de escrever conjunto, e quem trava
          * ali trava na inequação: por isso o alvo de cima é a inequação. */
         { id: 'conjuntos', rotulo: 'Conjuntos e intervalos', busca: 'conjuntos', alvos: ['MAT09-01', 'MATEM1-01', 'MATEM1-05'],
-          obmep: ['9ano:conjuntos', '1em:inequacoes-produto-e-quociente-de-primeiro-grau:introducao-as-inequacoes-do-primeiro-grau'] }
+          obmep: ['9ano:conjuntos', '1em:inequacoes-produto-e-quociente-de-primeiro-grau:introducao-as-inequacoes-do-primeiro-grau'] },
+        /* As cinco dos anos iniciais (C5b). Do 2º ao 5º ano, o que trava a
+         * conta e o problema não cabia em nenhuma das de cima, que começam no
+         * 4º ano: quem não lê 304 como "três centenas e quatro unidades" erra
+         * a conta armada pelo valor do algarismo, e não pela conta; o "vai um"
+         * e o "empresta" são o que separa a adição até 100 da conta com número
+         * grande; metade, terço e quarto são a porta das frações do 4º ano, e
+         * "Frações" leva a trilha direto para lá; hora e calendário são a
+         * medida que mais trava no 2º e no 3º ano, e "Unidades de medida"
+         * começa no 4º; e ler o problema e escolher a conta é o que mais
+         * separa quem sabe a conta de quem acerta a questão. Ids novos, depois
+         * das 27: o que ela já marcou continua lido igual. */
+        { id: 'valor-posicional', rotulo: 'Sistema de numeração e valor posicional', busca: 'valor posicional',
+          alvos: ['MAT02-01', 'MAT03-01', 'MAT04-01', 'MAT05-01'], mirim: ['MAT02-01', 'MAT03-01', 'MAT04-01', 'MAT05-01'] },
+        { id: 'reagrupamento', rotulo: 'Adição e subtração com reagrupamento', busca: 'reagrupamento',
+          alvos: ['MAT02-02', 'MAT02-03', 'MAT03-02', 'MAT03-03', 'MAT04-02'], mirim: ['MAT02-02', 'MAT02-03', 'MAT03-02', 'MAT03-03', 'MAT04-02'] },
+        { id: 'fracoes-simples', rotulo: 'Frações simples: metade, terço e quarto', busca: 'metade',
+          alvos: ['MAT02-04', 'MAT03-06'], mirim: ['MAT03-06'] },
+        { id: 'tempo', rotulo: 'Horas, relógio e calendário', busca: 'relógio', alvos: ['MAT02-09', 'MAT03-11'],
+          mirim: ['MAT02-09', 'MAT03-11'] },
+        { id: 'problemas', rotulo: 'Leitura e interpretação de problemas', busca: 'problemas', alvos: ['MAT02-12'],
+          mirim: ['MAT02-12'] }
       ]
     },
     {
@@ -4024,8 +4066,25 @@
    *   3º médio  o 2º médio e a base dele: 2º grau, funções, conjuntos,
    *       trigonometria, área, gráficos, probabilidade.
    * Cursinho lê como 3º médio, como no resto do aplicativo (serieParaTemas).
-   * Do 2º ao 5º ano fica para depois: depende dos pacotes da OBMEP Mirim. */
+   *
+   * DO 2º AO 5º ANO (C5b), com os pacotes da OBMEP Mirim. Aqui a tabela leva
+   * o conteúdo dos anos anteriores E o do próprio ano: o índice começa no 2º
+   * ano (o 1º não tem tema), a Mirim junta dois anos por prova, e muita
+   * criança chega no meio do ano. O ano anterior vem primeiro na escolha
+   * (temasDaSondagemMirim), e o do próprio ano fica de recurso:
+   *   2º  valor posicional, adição e subtração, medidas, tempo, problemas
+   *       (o próprio 2º ano: números até 100, contas, comprimento, horas);
+   *   3º  o 2º e o 3º: valor posicional, reagrupamento, tabuada, metade e
+   *       quarto, medidas, tempo, problemas;
+   *   4º  o 2º, o 3º e o 4º: valor posicional, reagrupamento, tabuada,
+   *       divisão, frações simples, medidas, tempo;
+   *   5º  o 3º, o 4º e o 5º: valor posicional, reagrupamento, tabuada,
+   *       divisão, frações, decimais, medidas. */
   var LACUNAS_PROVAVEIS = {
+    '02': ['valor-posicional', 'reagrupamento', 'medidas', 'tempo', 'problemas'],
+    '03': ['valor-posicional', 'reagrupamento', 'tabuada', 'fracoes-simples', 'medidas', 'tempo', 'problemas'],
+    '04': ['valor-posicional', 'reagrupamento', 'tabuada', 'divisao', 'fracoes-simples', 'medidas', 'tempo'],
+    '05': ['valor-posicional', 'reagrupamento', 'tabuada', 'divisao', 'fracoes', 'decimais', 'medidas'],
     '06': ['naturais', 'divisibilidade', 'fracoes', 'decimais', 'medidas', 'area'],
     '07': ['expressoes', 'divisibilidade', 'fracoes', 'decimais', 'porcentagem', 'medidas', 'area'],
     '08': ['fracoes', 'inteiros', 'proporcao', 'porcentagem', 'algebrica', 'eq1', 'angulos'],
@@ -4072,8 +4131,13 @@
    * na ordem dela.
    *
    * `faltam` são as séries da lacuna cujo pacote não está no tablet, para a
-   * tela dizer qual importar quando não sobrar exercício nenhum. */
-  function candidatosDaSondagem(lacunaId, anoEscolar, listas, seriesImportadas) {
+   * tela dizer qual importar quando não sobrar exercício nenhum.
+   *
+   * Do 2º ao 5º ano a escolha é outra (candidatosDaMirim): `provas` são as
+   * questões das provas da OBMEP Mirim que estão no tablet, e `listas` não
+   * entra. */
+  function candidatosDaSondagem(lacunaId, anoEscolar, listas, seriesImportadas, provas) {
+    if (eAnoDaMirim(anoEscolar)) return candidatosDaMirim(lacunaId, anoEscolar, provas, seriesImportadas);
     var prefixos = prefixosDaSondagem(lacunaId, anoEscolar);
     var ordenadas = (listas || []).map(function (l, i) { return { l: l, i: i }; })
       .sort(function (a, b) { return ((a.l.nivel || 0) - (b.l.nivel || 0)) || a.i - b.i; })
@@ -4099,8 +4163,129 @@
     return { candidatos: candidatos, faltam: faltam };
   }
 
-  /* A lista de onde o exercício saiu ("série:módulo:lista"). */
-  function listaDoExercicio(id) { return String(id).split(':').slice(0, 3).join(':'); }
+  // ---------- a sondagem do 2º ao 5º ano, nas provas da OBMEP Mirim (C5b) ----------
+
+  var ANOS_DA_MIRIM = ['02', '03', '04', '05'];
+
+  function eAnoDaMirim(anoEscolar) { return ANOS_DA_MIRIM.indexOf(serieParaTemas(anoEscolar)) >= 0; }
+
+  /* O nível da Mirim que traz o assunto de cada ano, e o ano mais baixo de
+   * cada nível (contrato, seção 8i: Mirim 1 é o 2º e o 3º ano, Mirim 2 o 4º e
+   * o 5º). */
+  var NIVEL_DA_MIRIM = { '02': 'm1', '03': 'm1', '04': 'm2', '05': 'm2' };
+  var PISO_DO_NIVEL = { m1: '02', m2: '04' };
+
+  /* O ano do assunto do índice: "MAT03-04" é do 3º ano. */
+  function serieDoTema(id) {
+    var m = /^MAT(\d\d)-\d\d$/.exec(String(id || ''));
+    return m ? m[1] : '';
+  }
+
+  /* Os assuntos da lacuna (o `mirim` do item), na ordem em que são tentados
+   * para um ano de entrada. Primeiro os de ano ANTERIOR, do mais perto para o
+   * mais longe, como no prefixosDaSondagem; depois os do próprio ano, como
+   * recurso. Assunto de ano ACIMA do de entrada não entra: no Portal ele era o
+   * recurso do 6º ano, que não tinha pacote antes, mas aqui seria pôr conta do
+   * 4º ano na folha de quem entra no 3º, e o erro mediria o adiantado, e não a
+   * lacuna. */
+  function temasDaSondagemMirim(lacunaId, anoEscolar) {
+    var item = itemDaLacuna(lacunaId);
+    var teto = posDaSerie(serieParaTemas(anoEscolar));
+    var lista = ((item && item.mirim) || []).map(function (t, i) {
+      return { t: t, i: i, pos: posDaSerie(serieDoTema(t)) };
+    });
+    var antes = lista.filter(function (x) { return x.pos < teto; })
+      .sort(function (a, b) { return b.pos - a.pos || a.i - b.i; });
+    var doAno = lista.filter(function (x) { return x.pos === teto; });
+    return antes.concat(doAno).map(function (x) { return x.t; });
+  }
+
+  /* "Diversos" não é assunto (contrato, seção 8i): é onde a regra de palavras
+   * do gerador põe a questão que ela não soube classificar, e ali cabe de
+   * lógica a geometria. A questão sem `tema_app`, ou do módulo Diversos, nunca
+   * entra na sondagem: a evidência diria "errou 2 de 2 de tabuada" sobre uma
+   * questão que não é de tabuada. As duas condições, e não só a primeira: um
+   * pacote que trouxesse tema_app num módulo Diversos não passa. */
+  function eDiversos(q) {
+    if (!q || !q.tema_app) return true;
+    var m = q.modulo || {};
+    return /(^|-)diversos$/.test(String(m.slug || '')) || String(m.titulo || '') === 'Diversos';
+  }
+
+  /* As questões da Mirim que podem medir a lacuna, em ordem de preferência.
+   *
+   * `provas` são as questões dos pacotes da Mirim importados, cada uma
+   * { id, serie ('m1' ou 'm2'), numero, dificuldade, tema_app, modulo }. A prova não tem
+   * lista pronta nem degrau, e quem faz o papel do degrau 1 é a ORDEM DA
+   * PROVA: a OBMEP põe as questões da mais fácil para a mais difícil, e as
+   * primeiras são a porta de entrada, que é o que a sondagem quer ver. Por
+   * isso, dentro de cada ano dos assuntos (temasDaSondagemMirim), as questões
+   * vão pelo número na prova, da primeira para a última, e o empate vai pelo
+   * id, para a mesma biblioteca dar sempre a mesma sondagem. O assunto é o
+   * `tema_app`, e Diversos nunca entra (eDiversos).
+   *
+   * O TERÇO FINAL da prova não entra (`dificuldade` 3, que na Mirim é o terço
+   * da posição: contrato, seção 8i), pelo mesmo motivo do degrau 2 no Portal:
+   * a última questão mede a olimpíada, e errar ela não diz que falta a base.
+   * Sem a cerca, a ordem sozinha punha a 15ª questão quando ela é a única do
+   * assunto (decimais, no pacote de 2026).
+   *
+   * A prova de nível ACIMA do ano não entra, mesmo com assunto de ano baixo:
+   * a questão de adição da Mirim 2 é de 4º e 5º ano, e não mede a lacuna de
+   * quem entra no 3º.
+   *
+   * `faltam` são os níveis da Mirim que trariam os assuntos da lacuna e não
+   * estão no tablet, para a tela dizer qual pacote importar. */
+  function candidatosDaMirim(lacunaId, anoEscolar, provas, seriesImportadas) {
+    var teto = posDaSerie(serieParaTemas(anoEscolar));
+    var temas = temasDaSondagemMirim(lacunaId, anoEscolar);
+    var validas = (provas || []).filter(function (q) {
+      if (!q || typeof q.id !== 'string' || typeof q.numero !== 'number' || eDiversos(q)) return false;
+      if (q.dificuldade === 3) return false;
+      var piso = PISO_DO_NIVEL[q.serie];
+      return !!piso && posDaSerie(piso) <= teto;
+    });
+    // os assuntos do mesmo ano andam juntos, pela ordem da prova
+    var passos = [];
+    temas.forEach(function (t) {
+      var s = serieDoTema(t);
+      var ultimo = passos[passos.length - 1];
+      if (ultimo && ultimo.serie === s) ultimo.temas.push(t);
+      else passos.push({ serie: s, temas: [t] });
+    });
+    var candidatos = [];
+    passos.forEach(function (p) {
+      validas.filter(function (q) { return p.temas.indexOf(q.tema_app) >= 0; })
+        .sort(function (a, b) { return (a.numero - b.numero) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0); })
+        .forEach(function (q) { if (candidatos.indexOf(q.id) < 0) candidatos.push(q.id); });
+    });
+    var tem = {};
+    (seriesImportadas || []).forEach(function (s) { tem[s] = true; });
+    var faltam = [];
+    temas.forEach(function (t) {
+      var n = NIVEL_DA_MIRIM[serieDoTema(t)];
+      if (n && !tem[n] && faltam.indexOf(n) < 0) faltam.push(n);
+    });
+    return { candidatos: candidatos, faltam: faltam };
+  }
+
+  /* A lacuna tem regra de escolha para este ano? É o que a tela pergunta
+   * para oferecer "Pôr outra lacuna": do 2º ao 5º ano, um assunto da Mirim
+   * que não passe do ano; do 6º em diante, um prefixo do Portal. */
+  function lacunaTemRegraNoAno(lacunaId, anoEscolar) {
+    if (eAnoDaMirim(anoEscolar)) return temasDaSondagemMirim(lacunaId, anoEscolar).length > 0;
+    var item = itemDaLacuna(lacunaId);
+    return !!(item && item.obmep && item.obmep.length);
+  }
+
+  /* A lista de onde o exercício saiu ("série:módulo:lista"). Na Mirim, a
+   * PROVA: o id sem o número da questão ("mirim:2023:f1:m1", "mirim:2018:a"),
+   * e assim o "um por lista primeiro" vira um por prova. */
+  function listaDoExercicio(id) {
+    var partes = String(id).split(':');
+    if (partes[0] === 'mirim') return partes.slice(0, -1).join(':');
+    return partes.slice(0, 3).join(':');
+  }
 
   /* Escolhe `quantos` exercícios (dois, por padrão) dos candidatos, pulando os
    * `usados` (os de outra lacuna da mesma sondagem, e os que ela já trocou).
@@ -4127,12 +4312,13 @@
   /* A sondagem montada para um ano: um bloco por lacuna provável, com os
    * itens escolhidos, todos os candidatos (para trocar e pôr) e as séries que
    * faltam. Nenhum exercício se repete entre lacunas. Ano fora da tabela
-   * (2º ao 5º, fora da escola, outro) devolve blocos vazios, e a tela diz. */
-  function montarSondagem(anoEscolar, listas, seriesImportadas) {
+   * (fora da escola, outro, sem ano) devolve blocos vazios, e a tela diz.
+   * `provas` são as questões da Mirim, que valem do 2º ao 5º ano (C5b). */
+  function montarSondagem(anoEscolar, listas, seriesImportadas, provas) {
     var ano = serieParaTemas(anoEscolar);
     var usados = [];
     var blocos = lacunasProvaveis(ano).map(function (id) {
-      var c = candidatosDaSondagem(id, ano, listas, seriesImportadas);
+      var c = candidatosDaSondagem(id, ano, listas, seriesImportadas, provas);
       var itens = escolherItensDaSondagem(c.candidatos, usados, 2);
       usados = usados.concat(itens);
       var it = itemDaLacuna(id);
@@ -4831,6 +5017,8 @@
     LACUNAS_PROVAVEIS: LACUNAS_PROVAVEIS, SERIE_DA_OBMEP: SERIE_DA_OBMEP, lacunasProvaveis: lacunasProvaveis,
     prefixosDaSondagem: prefixosDaSondagem, candidatosDaSondagem: candidatosDaSondagem,
     escolherItensDaSondagem: escolherItensDaSondagem, montarSondagem: montarSondagem,
+    eAnoDaMirim: eAnoDaMirim, temasDaSondagemMirim: temasDaSondagemMirim, candidatosDaMirim: candidatosDaMirim,
+    eDiversos: eDiversos, lacunaTemRegraNoAno: lacunaTemRegraNoAno,
     RESPOSTAS_SONDAGEM: RESPOSTAS_SONDAGEM, sondagemMarcaLacuna: sondagemMarcaLacuna,
     lacunasDaCorrecao: lacunasDaCorrecao, aplicarSondagemNoMapeamento: aplicarSondagemNoMapeamento,
     evidenciasDaLacuna: evidenciasDaLacuna, itensOferecidos: itensOferecidos,

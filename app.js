@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.36.0';
+  var VERSAO = '1.36.1';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.36.1',
+      itens: [
+        'A sondagem por ano de entrada agora vai também do 2º ao 5º ano, com questões das provas da OBMEP Mirim ' +
+          '(importe os pacotes Mirim 1 e Mirim 2 em Ajustes). Entraram lacunas dos anos iniciais, como valor posicional, ' +
+          'conta com reagrupamento e frações simples.'
+      ]
+    },
     {
       versao: '1.36.0',
       itens: [
@@ -9658,6 +9666,8 @@
   // escolar do aluno (as lacunas prováveis, uma tabela do core.js) e dos
   // pacotes da biblioteca que estão no tablet: dois exercícios do degrau 1 por
   // lacuna. O repositório guarda só a REGRA; os exercícios são os do tablet.
+  // Do 2º ao 5º ano (C5b), as questões vêm das provas da OBMEP Mirim, pela
+  // ordem da prova e pelo assunto (provasDoTablet e Core.candidatosDaMirim).
   //
   // O registro mora no aluno, em `aluno.sondagens`, uma lista de
   //   { id, aulaId, data, anoEscolar, criadaEm, folhaEm, corrigidaEm,
@@ -9706,6 +9716,21 @@
     return s;
   }
 
+  /* As questões das provas da OBMEP Mirim que estão no tablet (C5b), no
+   * formato que o Core.candidatosDaMirim lê. A prova não tem lista pronta:
+   * quem escolhe, pela ordem da prova e pelo assunto, e sem Diversos, é o
+   * Core; aqui só se junta o que veio dos pacotes. */
+  function provasDoTablet() {
+    var out = [];
+    Object.keys((bib && bib.itemPorId) || {}).forEach(function (id) {
+      var it = bib.itemPorId[id];
+      if (it && it.fonte === 'obmep-mirim') {
+        out.push({ id: it.id, serie: it.serie, numero: it.numero, dificuldade: it.dificuldade, tema_app: it.tema_app, modulo: it.modulo });
+      }
+    });
+    return out;
+  }
+
   function rotuloDaLacuna(id) {
     var it = Core.itemDaLacuna(id);
     return it ? it.rotulo : id;
@@ -9735,22 +9760,28 @@
           aoClick: function () { abrirCorrecaoDaSondagem(aluno.id, aula.id); } })
       ]));
     } else if (Core.lacunasProvaveis(ano).length) {
-      bloco.appendChild(el('div', { class: 'detalhe',
+      bloco.appendChild(el('div', { class: 'detalhe', id: 'sondagem-pronta',
         texto: 'Pronta para o ' + nomeDoAnoDaSondagem(ano) + ': dois exercícios por lacuna provável do ano, ' +
-          'do degrau 1 das listas da OBMEP que estão no tablet. Você tira, troca e põe antes de usar.' }));
+          origemDaSondagem(ano) + '. Você tira, troca e põe antes de usar.' }));
       bloco.appendChild(el('div', { class: 'barra', style: 'margin-top:8px' }, [
         el('button', { type: 'button', class: 'btn pequeno destaque', id: 'montar-sondagem',
           texto: 'Montar a sondagem do ' + nomeDoAnoDaSondagem(ano),
           aoClick: function () { abrirSondagem(aluno.id, aula.id); } })
       ]));
     } else {
-      var mirim = ['02', '03', '04', '05'].indexOf(ano) >= 0;
       bloco.appendChild(el('div', { class: 'detalhe', id: 'sondagem-sem-ano',
-        texto: mirim
-          ? 'Do 2º ao 5º ano, a sondagem pronta depende dos pacotes da OBMEP Mirim, que ainda não chegaram ao aplicativo.'
-          : 'A sondagem pronta vai do 6º ano ao 3º do médio. Registre o ano escolar no mapeamento para montar.' }));
+        texto: 'A sondagem pronta vai do 2º ano ao 3º do médio. Registre o ano escolar no mapeamento para montar.' }));
     }
     corpo.appendChild(bloco);
+  }
+
+  /* De onde vêm os exercícios, dito na tela: do 2º ao 5º ano, as primeiras
+   * questões das provas da OBMEP Mirim (C5b); do 6º em diante, o degrau 1
+   * das listas do Portal. */
+  function origemDaSondagem(ano) {
+    return Core.eAnoDaMirim(ano)
+      ? 'das primeiras questões das provas da OBMEP Mirim que estão no tablet'
+      : 'do degrau 1 das listas da OBMEP que estão no tablet';
   }
 
   /* O que está aberto na janela da sondagem. */
@@ -9780,7 +9811,9 @@
   function descricaoDoExercicio(id) {
     var it = bib && bib.itemPorId[id];
     if (!it) return { nome: id, detalhe: 'Este exercício não está mais no tablet.' };
-    return { nome: it.modulo.titulo, detalhe: it.aula.titulo + ', exercício ' + it.numero, it: it };
+    // na prova é "questão", que é como a prova chama (C5b)
+    var palavra = it.fonte === 'obmep-mirim' ? ', questão ' : ', exercício ';
+    return { nome: it.modulo.titulo, detalhe: it.aula.titulo + palavra + it.numero, it: it };
   }
 
   function abrirSondagem(alunoId, aulaId) {
@@ -9796,7 +9829,7 @@
     carregarBiblioteca().then(function () {
       var feita = sondagemDaAula(aluno, aulaId);
       var ano = feita ? (feita.anoEscolar || Core.anoEscolarDe(aluno)) : Core.anoEscolarDe(aluno);
-      var listas = listasDoTablet(), series = seriesDoTablet();
+      var listas = listasDoTablet(), series = seriesDoTablet(), provas = provasDoTablet();
       var blocos;
       if (feita) {
         /* A guardada manda: as lacunas dela, na ordem, com os exercícios
@@ -9804,18 +9837,22 @@
         var ordem = [];
         feita.itens.forEach(function (x) { if (ordem.indexOf(x.lacuna) < 0) ordem.push(x.lacuna); });
         blocos = ordem.map(function (id) {
-          var c = Core.candidatosDaSondagem(id, ano, listas, series);
+          var c = Core.candidatosDaSondagem(id, ano, listas, series, provas);
           return { lacuna: id, rotulo: rotuloDaLacuna(id), candidatos: c.candidatos, faltam: c.faltam, descartados: [],
             itens: feita.itens.filter(function (x) { return x.lacuna === id; }).map(function (x) { return x.item; }) };
         });
       } else {
-        blocos = Core.montarSondagem(ano, listas, series).blocos.map(function (b) {
+        blocos = Core.montarSondagem(ano, listas, series, provas).blocos.map(function (b) {
           b.descartados = [];
           return b;
         });
       }
+      /* "Sem pacote" do 2º ao 5º ano é sem pacote da Mirim: o do 6º ano no
+       * tablet não serve a quem entra no 3º (C5b). */
+      var mirim = Core.eAnoDaMirim(ano);
       sondagemAberta = { alunoId: alunoId, aulaId: aulaId, ano: ano, blocos: blocos, listas: listas, series: series,
-        semPacote: !series.length };
+        provas: provas, mirim: mirim,
+        semPacote: mirim ? !series.some(function (x) { return /^m\d$/.test(x); }) : !series.length };
       desenharSondagemParaEditar();
     }, function () {
       corpo.innerHTML = '';
@@ -9848,12 +9885,15 @@
     corpo.innerHTML = '';
     rodape.innerHTML = '';
     corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', id: 'sondagem-explica',
-      texto: 'Sondagem do ' + nomeDoAnoDaSondagem(s.ano) + ': dois exercícios por lacuna provável do ano, do degrau 1 ' +
-        'das listas da OBMEP que estão no tablet. Tire, troque ou ponha exercício antes de gerar a folha. ' +
+      texto: 'Sondagem do ' + nomeDoAnoDaSondagem(s.ano) + ': dois exercícios por lacuna provável do ano, ' +
+        origemDaSondagem(s.ano) + '. Tire, troque ou ponha exercício antes de gerar a folha. ' +
         'Não é prova: é para ver onde a base falha.' }));
     if (s.semPacote) {
       corpo.appendChild(el('div', { class: 'faixa-aviso', id: 'sondagem-sem-pacote',
-        texto: 'Nenhum pacote da biblioteca está no tablet. Importe os pacotes da OBMEP em Ajustes, na Biblioteca.' }));
+        texto: s.mirim
+          ? 'Nenhum pacote da OBMEP Mirim está no tablet. Importe o da Mirim 1 (2º e 3º ano) ou o da Mirim 2 ' +
+            '(4º e 5º ano) em Ajustes, na Biblioteca.'
+          : 'Nenhum pacote da biblioteca está no tablet. Importe os pacotes da OBMEP em Ajustes, na Biblioteca.' }));
     }
     s.blocos.forEach(function (b, bi) {
       var caixa = el('div', { class: 'bloco-sondagem', 'data-lacuna': b.lacuna, style: 'margin:14px 0' });
@@ -9868,10 +9908,19 @@
           aoClick: function () { s.blocos.splice(bi, 1); desenharSondagemParaEditar(); } })
       ]));
       if (!b.candidatos.length) {
-        caixa.appendChild(el('div', { class: 'faixa-aviso sondagem-sem-exercicio', texto: b.faltam.length
-          ? 'Sem exercício para esta lacuna: falta importar o pacote do ' +
-            b.faltam.map(Biblioteca.nomeDaSerie).join(' ou o do ') + ' da OBMEP, em Ajustes.'
-          : 'Os pacotes do tablet não têm exercício de degrau 1 para esta lacuna.' }));
+        var semExercicio;
+        if (s.mirim) {
+          semExercicio = b.faltam.length
+            ? 'Sem exercício para esta lacuna: falta importar o pacote da OBMEP ' +
+              b.faltam.map(Biblioteca.nomeDaSerie).join(' ou o da OBMEP ') + ', em Ajustes.'
+            : 'As provas da OBMEP Mirim do tablet não têm questão do assunto desta lacuna. As de Diversos não entram.';
+        } else {
+          semExercicio = b.faltam.length
+            ? 'Sem exercício para esta lacuna: falta importar o pacote do ' +
+              b.faltam.map(Biblioteca.nomeDaSerie).join(' ou o do ') + ' da OBMEP, em Ajustes.'
+            : 'Os pacotes do tablet não têm exercício de degrau 1 para esta lacuna.';
+        }
+        caixa.appendChild(el('div', { class: 'faixa-aviso sondagem-sem-exercicio', texto: semExercicio }));
       }
       b.itens.forEach(function (id, k) {
         var d = descricaoDoExercicio(id);
@@ -9884,7 +9933,11 @@
           el('button', { type: 'button', class: 'btn pequeno trocar-sondagem', texto: 'Trocar',
             aoClick: function () {
               var n = proximoDaLacuna(b);
-              if (!n) { avisar('Não há outro exercício de degrau 1 para ' + b.rotulo + ' nos pacotes do tablet.'); return; }
+              if (!n) {
+                avisar(s.mirim ? 'Não há outra questão de ' + b.rotulo + ' nas provas da OBMEP Mirim do tablet.'
+                  : 'Não há outro exercício de degrau 1 para ' + b.rotulo + ' nos pacotes do tablet.');
+                return;
+              }
               b.descartados.push(id);
               b.itens[k] = n;
               desenharSondagemParaEditar();
@@ -9898,8 +9951,9 @@
 
     // pôr uma lacuna que a tabela do ano não trouxe
     var jaTem = s.blocos.map(function (b) { return b.lacuna; });
+    // só a que tem regra de escolha para o ano: do 2º ao 5º, assunto da Mirim (C5b)
     var outras = Core.itensDaMateria('lacunas', Core.MATERIA_PADRAO).filter(function (i) {
-      return i.obmep && i.obmep.length && jaTem.indexOf(i.id) < 0;
+      return Core.lacunaTemRegraNoAno(i.id, s.ano) && jaTem.indexOf(i.id) < 0;
     });
     if (outras.length) {
       var sel = el('select', { id: 'sondagem-outra-lacuna' });
@@ -9909,7 +9963,7 @@
         el('div', { class: 'barra' }, [sel, el('button', { type: 'button', class: 'btn pequeno', id: 'sondagem-por-lacuna', texto: 'Pôr',
           aoClick: function () {
             var id = sel.value;
-            var c = Core.candidatosDaSondagem(id, s.ano, s.listas, s.series);
+            var c = Core.candidatosDaSondagem(id, s.ano, s.listas, s.series, s.provas);
             var usados = itensDaSondagemAberta().map(function (x) { return x.item; });
             s.blocos.push({ lacuna: id, rotulo: rotuloDaLacuna(id), candidatos: c.candidatos, faltam: c.faltam, descartados: [],
               itens: Core.escolherItensDaSondagem(c.candidatos, usados, 2) });

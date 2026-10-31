@@ -24,10 +24,16 @@
  *   6. recarregar: banco e tela iguais;
  *   7. a cópia de segurança, pelos botões de Ajustes, leva a sondagem e a
  *      evidência: o banco perde as duas, a cópia volta, e elas voltam;
- *   8. nenhum erro de página.
+ *   8. o 3º ano (C5b), com outra criança ("Aluna Beta Teste") e um pacote
+ *      sintético no formato da OBMEP Mirim (o gerarProva do
+ *      testa_biblioteca_mirim, com doze questões): sem a Mirim, a tela diz
+ *      qual pacote importar; com ela, as lacunas do 3º ano, dois por lacuna
+ *      pela ordem da prova, nunca Diversos nem o terço final, trocar, a folha
+ *      sem virar assunto, e a correção que marca a lacuna com a evidência;
+ *   9. nenhum erro de página.
  *
- * SALVAR_PRINTS=<pasta> guarda três prints: a sondagem aberta, a correção e
- * a lacuna marcada no mapeamento.
+ * SALVAR_PRINTS=<pasta> guarda quatro prints: a sondagem aberta, a correção,
+ * a lacuna marcada no mapeamento e a sondagem do 3º ano aberta.
  */
 'use strict';
 const fs = require('fs');
@@ -54,6 +60,11 @@ const HOJE = iso(new Date());
 const MES_PASSADO = (() => { const d = new Date(); d.setDate(d.getDate() - 30); return iso(d); })();
 const ddmm = s => s.slice(8, 10) + '/' + s.slice(5, 7);
 const LACUNAS_EM1 = ['fatoracao', 'eq2', 'pitagoras', 'semelhanca', 'trigonometria', 'funcoes', 'conjuntos'];
+// o 3º ano (C5b): outra criança, outro encontro de mapeamento no mesmo dia
+const BETA = 'aluno_c5b_beta';
+const AULA_BETA = 'aula_c5b_mapeamento';
+const LACUNAS_03 = ['valor-posicional', 'reagrupamento', 'tabuada', 'fracoes-simples', 'medidas', 'tempo', 'problemas'];
+const MIRIM = n => 'mirim:2099:f1:m1:' + n;
 
 async function semear(pag) {
   return pag.evaluate(async (d0) => {
@@ -71,13 +82,21 @@ async function semear(pag) {
     d.aulas.push({ id: d0.AULA, alunoId: d0.ALUNO, serieId: null, destacada: false, data: d0.HOJE, hora: '10:00',
       duracaoMin: 60, status: 'realizada', cobravel: true, tipo: 'mapeamento', notaTexto: '', notaPrivada: '',
       temNota: false, anexos: [], areas: [], temas: [] });
+    // o 3º ano (C5b): sem mapeamento antes, que a correção cria
+    d.alunos = d.alunos.filter(a => a.id !== d0.BETA);
+    d.alunos.push({ id: d0.BETA, nome: 'Aluna Beta Teste', anoEscolar: '03', responsavel: 'Responsavel Beta',
+      ativo: true, cor: '#7C3AED', precos: [{ id: 'p_c5b', inicio: '2026-01-01', fim: null, valorHora: 100 }], mapeamentos: [] });
+    d.aulas = d.aulas.filter(a => a.alunoId !== d0.BETA);
+    d.aulas.push({ id: d0.AULA_BETA, alunoId: d0.BETA, serieId: null, destacada: false, data: d0.HOJE, hora: '14:00',
+      duracaoMin: 60, status: 'realizada', cobravel: true, tipo: 'mapeamento', notaTexto: '', notaPrivada: '',
+      temNota: false, anexos: [], areas: [], temas: [] });
     d.ajustes = d.ajustes || {};
     d.ajustes.ultimaCopia = d0.HOJE;
     await Store.salvar(d);
-  }, { ALUNO, AULA, HOJE, MES_PASSADO });
+  }, { ALUNO, AULA, HOJE, MES_PASSADO, BETA, AULA_BETA });
 }
 
-const doBanco = pag => pag.evaluate(async (a) => {
+const doBanco = (pag, alunoId, aulaId) => pag.evaluate(async (a) => {
   const d = await Store.carregar();
   const aluno = (d.alunos || []).find(x => x.id === a.ALUNO) || {};
   const aula = (d.aulas || []).find(x => x.id === a.AULA) || {};
@@ -90,7 +109,7 @@ const doBanco = pag => pag.evaluate(async (a) => {
     nMapeamentos: (aluno.mapeamentos || []).length,
     anexos: (aula.anexos || []).map(x => x.nome), temas: (aula.temas || []).map(t => t.titulo), temNota: !!aula.temNota
   };
-}, { ALUNO, AULA });
+}, { ALUNO: alunoId || ALUNO, AULA: aulaId || AULA });
 
 async function importar(pag, arquivo) {
   await H.irParaAba(pag, 'ajustes');
@@ -102,17 +121,17 @@ async function importar(pag, arquivo) {
   return r.valor || '';
 }
 
-async function abrirAulaDeHoje(pag) {
+async function abrirAulaDeHoje(pag, hora) {
   await H.irParaAba(pag, 'agenda');
   for (let i = 0; i < 24; i++) {
     if (await pag.evaluate(h => !!document.querySelector('[data-dia="' + h + '"]'), HOJE)) break;
     await pag.click(i < 12 ? '#mes-seguinte' : '#mes-anterior');
     await pausa(120);
   }
-  const ok = await pag.evaluate(h => {
-    const alvo = Array.from(document.querySelectorAll('[data-dia="' + h + '"] .pilula')).find(p => p.textContent.indexOf('10:00') === 0);
+  const ok = await pag.evaluate((h, hh) => {
+    const alvo = Array.from(document.querySelectorAll('[data-dia="' + h + '"] .pilula')).find(p => p.textContent.indexOf(hh) === 0);
     if (!alvo) return false; alvo.click(); return true;
-  }, HOJE);
+  }, HOJE, hora || '10:00');
   const r = await esperar('encontro de mapeamento aberto', () => pag.evaluate(() =>
     document.querySelector('#modal-aula').classList.contains('aberto') && !!document.querySelector('#bloco-sondagem')), v => v === true, 8000);
   return ok && r.ok;
@@ -436,6 +455,108 @@ async function printDe(pag, seletor, nome, folga) {
   try { fs.unlinkSync(arquivo); } catch (e) { /* já saiu */ }
 
   // ================================================================
-  secao('8. Nenhum erro de página');
+  secao('8. O 3º ano (C5b): sem a Mirim no tablet, a tela diz qual importar');
+  conf('o encontro de mapeamento do 3º ano abriu', await abrirAulaDeHoje(pag, '14:00'), true);
+  conf('o botão diz o 3º ano', await pag.evaluate(() => { const b = document.querySelector('#montar-sondagem'); return b ? b.textContent : ''; }),
+    'Montar a sondagem do 3º ano');
+  conf('e diz de onde vêm as questões', /primeiras questões das provas da OBMEP Mirim/.test(await pag.$eval('#sondagem-pronta', e => e.textContent)), true);
+  await pag.click('#montar-sondagem');
+  const semMirim = await esperar('a sondagem do 3º ano sem a Mirim', () => naSondagem(pag), v => Array.isArray(v) && v.length === 7, 15000);
+  conf('as sete lacunas prováveis do 3º ano, na ordem da tabela', (semMirim.valor || []).map(b => b.lacuna), LACUNAS_03);
+  conf('nenhuma questão, porque o pacote do 9º ano não serve ao 3º', (semMirim.valor || []).map(b => b.itens.length), [0, 0, 0, 0, 0, 0, 0]);
+  conf('cada lacuna diz que falta a Mirim 1', (semMirim.valor || []).every(b => /falta importar o pacote da OBMEP Mirim 1, em Ajustes/.test(b.aviso)), true);
+  conf('e o aviso de cima fala da Mirim', /Nenhum pacote da OBMEP Mirim está no tablet/.test(await pag.$eval('#sondagem-sem-pacote', e => e.textContent)), true);
+  conf('sem exercício, a folha não sai', await pag.$eval('#sondagem-gerar', e => e.disabled), true);
+  await fecharModais(pag);
+
+  secao('8b. Com a Mirim 1: dois por lacuna, pela ordem da prova, sem Diversos');
+  /* O pacote sintético da Mirim 1 (o mesmo gerador do testa_biblioteca_mirim),
+   * com doze questões de uma prova: adição até 100 nas questões 1, 4, 7 e 10,
+   * tabuada na 2, 5, 8 e 11, e Diversos na 3, 6, 9 e 12. O terço final é da 9
+   * à 12. */
+  const zipMirim = path.join(os.tmpdir(), 'c5b_mirim_' + process.pid + '.zip');
+  Sintetico.gerarProva(zipMirim, { serie: 'm1', quantas: 12 });
+  conf('o pacote sintético da Mirim 1 foi importado', /^Biblioteca importada\./.test(await importar(pag, zipMirim)), true);
+  try { fs.unlinkSync(zipMirim); } catch (e) { /* já saiu */ }
+  conf('o encontro do 3º ano reabre', await abrirAulaDeHoje(pag, '14:00'), true);
+  await pag.click('#montar-sondagem');
+  const comMirim = await esperar('a sondagem do 3º ano com a Mirim', () => naSondagem(pag),
+    v => Array.isArray(v) && v.length === 7 && v[1].itens.length === 2, 15000);
+  const b3 = {};
+  (comMirim.valor || []).forEach(b => { b3[b.lacuna] = b; });
+  conf('reagrupamento: as duas primeiras de adição, pela ordem da prova', (b3.reagrupamento || {}).itens, [MIRIM(1), MIRIM(4)]);
+  conf('tabuada: as duas primeiras de tabuada', (b3.tabuada || {}).itens, [MIRIM(2), MIRIM(5)]);
+  const escolhidas3 = [].concat.apply([], (comMirim.valor || []).map(b => b.itens));
+  conf('nenhuma de Diversos, nem do terço final', escolhidas3.filter(id => /:(3|6|9|10|11|12)$/.test(id)), []);
+  conf('o total no rodapé', await pag.$eval('#sondagem-total', e => e.textContent), '4 exercícios na sondagem');
+  conf('a lacuna sem assunto na prova diz que as provas não têm, e não pede pacote',
+    ['valor-posicional', 'fracoes-simples', 'medidas', 'tempo', 'problemas'].every(l => /^As provas da OBMEP Mirim do tablet não têm questão do assunto desta lacuna/.test((b3[l] || {}).aviso || '')), true);
+  conf('cada questão diz a prova e o número', await pag.evaluate(id =>
+    document.querySelector('#corpo-modal-sondagem .item-sondagem[data-item="' + id + '"] .detalhe').textContent, MIRIM(1)),
+  'OBMEP Mirim 2099, 1ª fase, questão 1');
+  conf('as miniaturas vêm do tablet', await esperar('miniaturas do 3º ano', () => pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#corpo-modal-sondagem .miniatura-sondagem')).filter(i => i.complete && i.naturalWidth > 0).length),
+  v => v === 4, 10000).then(r => r.valor), 4);
+  const opcoes = await pag.evaluate(() => Array.from(document.querySelectorAll('#sondagem-outra-lacuna option')).map(o => o.value));
+  conf('"Pôr outra lacuna" oferece as de regra da Mirim (divisão), e não as do médio (Pitágoras)',
+    [opcoes.indexOf('divisao') >= 0, opcoes.indexOf('pitagoras') >= 0, opcoes.indexOf('reagrupamento') >= 0], [true, false, false]);
+  // trocar: a questão 7 é a única de adição que sobra (a 10 é do terço final)
+  await tocarNoItem(pag, 'reagrupamento', 0, 'trocar-sondagem');
+  let agora3 = await naSondagem(pag);
+  conf('trocar: a primeira vira a 7, a próxima de adição pela ordem', agora3[1].itens, [MIRIM(7), MIRIM(4)]);
+  conf('e não sobra outra para pôr (a 10 é do terço final)', await pag.evaluate(() =>
+    document.querySelector('#corpo-modal-sondagem .bloco-sondagem[data-lacuna="reagrupamento"] .por-sondagem').disabled), true);
+  conf('nada gravado antes de gerar a folha', (await doBanco(pag, BETA, AULA_BETA)).nSondagens, 0);
+  const itens3 = [].concat.apply([], agora3.map(b => b.itens));
+  await pag.evaluate(() => { document.querySelector('#corpo-modal-sondagem').scrollTop = 0; });
+  await esperar('miniaturas depois de trocar', () => pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#corpo-modal-sondagem .miniatura-sondagem')).filter(i => i.complete && i.naturalWidth > 0).length),
+  v => v === 4, 10000);
+  await printDe(pag, '#modal-sondagem .modal', '04_sondagem_3ano_aberta.png', 0);
+
+  secao('8c. A folha do 3º ano, e a correção que marca a lacuna');
+  await pag.click('#sondagem-gerar');
+  await esperar('janela Gerar material do 3º ano', () => pag.$eval('#modal-bib-gerar', e => e.classList.contains('aberto')), v => v === true, 8000);
+  const gerar3 = await pag.evaluate(a => ({
+    aula: !!document.querySelector('#bib-gerar-aulas [data-aula="' + a + '"].escolhida'),
+    folha: document.querySelector('#bib-gerar-folha').checked,
+    resumo: document.querySelector('#bib-gerar-resumo').textContent
+  }), AULA_BETA);
+  conf('a aula do mapeamento do 3º ano vem escolhida, com a Folha marcada', [gerar3.aula, gerar3.folha], [true, true]);
+  conf('com as 4 questões', /^4 exercícios/.test(gerar3.resumo), true);
+  let g3 = await doBanco(pag, BETA, AULA_BETA);
+  conf('a sondagem foi guardada na criança, com o ano e os itens editados',
+    [g3.sondagem && g3.sondagem.anoEscolar, g3.sondagem && g3.sondagem.itens.map(x => x.item)], ['03', itens3]);
+  await pag.click('#bib-gerar-anexar');
+  const anexou3 = await esperar('anexado e folha aberta', () => Promise.all([doBanco(pag, BETA, AULA_BETA),
+    pag.evaluate(() => document.querySelector('#modal-nota').classList.contains('aberto'))]),
+  v => v && v[0].anexos.length > 0 && v[0].temNota && v[1] === true, 40000);
+  conf('o PDF da sondagem foi anexado na aula do 3º ano', anexou3.ok && anexou3.valor[0].anexos.some(n => /^Sondagem/.test(n)), true);
+  conf('e a sondagem NÃO virou assunto (nem "Adição até 100" nem tabuada)', anexou3.valor ? anexou3.valor[0].temas : null, []);
+  await pag.evaluate(() => document.querySelector('#modal-nota [data-fechar]').click());
+  await esperar('folha fechada', () => pag.evaluate(() => !document.querySelector('#modal-nota').classList.contains('aberto')), v => v === true, 10000);
+  conf('o encontro do 3º ano reabre', await abrirAulaDeHoje(pag, '14:00'), true);
+  await pag.click('#corrigir-sondagem');
+  await esperar('a correção do 3º ano', () => pag.evaluate(() => document.querySelectorAll('#corpo-modal-sondagem .item-correcao').length), v => v === 4, 10000);
+  await responder(pag, 'reagrupamento', ['errado', 'errado']);
+  await responder(pag, 'tabuada', ['certo', 'errado']);
+  await pag.click('#sondagem-ver-resultado');
+  const c3 = (await esperar('a confirmação do 3º ano', () => pag.evaluate(() => {
+    const r = {};
+    document.querySelectorAll('#sondagem-confirmacao .linha-confirmacao').forEach(l => { r[l.dataset.lacuna] = l.querySelector('.detalhe').textContent; });
+    return r;
+  }), v => v && Object.keys(v).length === 2, 5000)).valor || {};
+  conf('reagrupamento: marca, com a evidência', c3.reagrupamento,
+    'marca a lacuna: errou 2 de 2 itens de adição e subtração com reagrupamento na sondagem de ' + ddmm(HOJE));
+  conf('tabuada, com um acerto: não marca', c3.tabuada, 'não marca (acertou 1 de 2)');
+  await pag.click('#sondagem-gravar');
+  g3 = (await esperar('gravado no 3º ano', () => doBanco(pag, BETA, AULA_BETA), v => v.lacunas && v.lacunas.length === 1, 8000)).valor || {};
+  conf('o mapeamento nasce com a lacuna marcada', [g3.nMapeamentos, g3.lacunas], [1, ['reagrupamento']]);
+  conf('e a evidência escrita nela', ((g3.evidencias || {}).reagrupamento || []).map(e => e.texto),
+    ['errou 2 de 2 itens de adição e subtração com reagrupamento na sondagem de ' + ddmm(HOJE)]);
+  conf('a sondagem do 1º médio não foi tocada', (await doBanco(pag)).lacunas, ['eq2', 'pitagoras', 'trigonometria']);
+
+  // ================================================================
+  secao('9. Nenhum erro de página');
   conf('nenhum erro de página', pag.errosDePagina, []);
 })().then(() => H.fim(amb)(), e => H.fim(amb)(e));
