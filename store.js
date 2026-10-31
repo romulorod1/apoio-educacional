@@ -811,7 +811,25 @@
     return new Blob([arr], { type: tipo || 'application/octet-stream' });
   }
 
-  function exportarTudo(db) {
+  function arredondarTracosDaCopia(nota) {
+    var copia = JSON.parse(JSON.stringify(nota));
+    (copia.paginas || []).forEach(function (p) {
+      (p.itens || []).forEach(function (it) {
+        if (it.t !== 'traco' || !Array.isArray(it.pontos)) return;
+        it.pontos.forEach(function (ponto) {
+          if (!Array.isArray(ponto)) return;
+          for (var i = 0; i < ponto.length; i++) {
+            if (typeof ponto[i] === 'number' && isFinite(ponto[i])) {
+              ponto[i] = Math.round(ponto[i] * 10) / 10;
+            }
+          }
+        });
+      });
+    });
+    return copia;
+  }
+
+  function exportarTudo(db, opcoes) {
     var pacote = { formato: 'apoio-educacional', versao: 1, quando: new Date().toISOString(), dados: db };
     var idsAulas = {}, idsAlunos = {}, anexosUsados = {}, midiasUsadas = {};
     (db.alunos || []).forEach(function (a) { idsAlunos[a.id] = true; });
@@ -824,7 +842,9 @@
       pacote.notas = {};
       Object.keys(notas).forEach(function (id) {
         if (!idsAulas[id]) return;
-        pacote.notas[id] = notas[id];
+        pacote.notas[id] = (opcoes && opcoes.arredondarTracos)
+          ? arredondarTracosDaCopia(notas[id])
+          : notas[id];
         (notas[id].paginas || []).forEach(function (p) {
           (p.itens || []).forEach(function (it) {
             if (it.t === 'imagem' && it.ref) midiasUsadas[it.ref] = true;
@@ -853,6 +873,11 @@
         if (!a.valor) return null;
         var registro = { nome: a.valor.nome, tipo: a.valor.tipo };
         if (!a.valor.blob) { pacote.anexos[a.id] = registro; return null; }
+        if (opcoes && opcoes.anexosBinarios) {
+          registro.blob = a.valor.blob;
+          pacote.anexos[a.id] = registro;
+          return null;
+        }
         return blobParaTexto(a.valor.blob).then(function (texto) {
           registro.conteudo = texto;
           pacote.anexos[a.id] = registro;
@@ -869,6 +894,30 @@
         return idsAlunos[r.alunoId] && idsAulas[r.aulaId];
       }), etiquetas: bib[1] || [], listas: bib[2] || [] };
       return pacote;
+    });
+  }
+
+  function exportarTudoZip(db) {
+    return exportarTudo(db, { anexosBinarios: true, arredondarTracos: true }).then(function (pacote) {
+      var meta = {}, arquivos = [
+        { nome: 'manifest.json', conteudo: JSON.stringify({
+          formato: 'apoio-educacional-zip', versao: 2, quando: pacote.quando
+        }), comprimir: true },
+        { nome: 'dados.json', conteudo: JSON.stringify(pacote.dados), comprimir: true },
+        { nome: 'notas.json', conteudo: JSON.stringify(pacote.notas), comprimir: true },
+        { nome: 'midias.json', conteudo: JSON.stringify(pacote.midias), comprimir: true },
+        { nome: 'biblioteca_uso.json', conteudo: JSON.stringify(pacote.biblioteca.uso), comprimir: true },
+        { nome: 'biblioteca_etiquetas.json', conteudo: JSON.stringify(pacote.biblioteca.etiquetas), comprimir: true },
+        { nome: 'biblioteca_listas.json', conteudo: JSON.stringify(pacote.biblioteca.listas), comprimir: true }
+      ];
+      Object.keys(pacote.anexos).forEach(function (id, i) {
+        var reg = pacote.anexos[id];
+        var caminho = 'anexos/' + i + '.bin';
+        meta[id] = { nome: reg.nome, tipo: reg.tipo, arquivo: caminho };
+        arquivos.push({ nome: caminho, conteudo: reg.blob || new Blob([]) });
+      });
+      arquivos.push({ nome: 'anexos.json', conteudo: JSON.stringify(meta), comprimir: true });
+      return root.Zip.escrever(arquivos);
     });
   }
 
@@ -1012,7 +1061,8 @@
     registrarHistorico: registrarHistorico, listarHistorico: listarHistorico,
     desfazer: desfazer, limparHistorico: limparHistorico,
     limparOrfaos: limparOrfaos, estimarEspaco: estimarEspaco, tornarPersistente: tornarPersistente,
-    exportarTudo: exportarTudo, importarTudo: importarTudo, importarZip: importarZip,
+    exportarTudo: exportarTudo, exportarTudoZip: exportarTudoZip,
+    importarTudo: importarTudo, importarZip: importarZip,
     apagarTudo: apagarTudo,
     gravarPacoteBiblioteca: gravarPacoteBiblioteca, removerPacoteBiblioteca: removerPacoteBiblioteca,
     listarPacotesBiblioteca: listarPacotesBiblioteca,

@@ -14486,13 +14486,13 @@
   /* Por que a cópia ia parar sempre nos downloads, e nunca no Drive.
    *
    * O Android só deixa abrir a folha de compartilhamento logo depois de um toque.
-   * Montar a cópia demora segundos, porque cada folha escrita e cada anexo viram
-   * texto, e quando terminava a permissão do toque já tinha vencido: o
+   * Montar a cópia demora segundos, porque cada folha e anexo são reunidos,
+   * e quando terminava a permissão do toque já tinha vencido: o
    * compartilhamento era recusado em silêncio e o arquivo caía no download.
    *
    * A correção é separar em dois tempos. Primeiro o aplicativo monta a cópia e
    * avisa que ficou pronta. O toque em "Enviar" é um toque novo, e aí a folha de
-   * compartilhamento abre, com Drive, e-mail e o que mais ela tiver. */
+   * compartilhamento abre com os destinos que ela tiver. */
   var copiaPronta = null;
 
   function redesenharEstadoDaCopia() {
@@ -14504,7 +14504,7 @@
     var aviso = el('div', { class: 'faixa-aviso', id: destino.id === 'estado-copia' ? 'copia-pronta-ajustes' : 'copia-pronta-agenda' });
     aviso.appendChild(el('strong', { texto: copiaPronta.baixada
       ? 'O arquivo foi baixado. Confirme depois de guardá-lo. '
-      : 'Cópia montada. Toque em Enviar para guardar no Drive. ' }));
+      : 'Cópia montada. Toque em Enviar para guardar em local seguro. ' }));
     aviso.appendChild(el('div', { class: 'barra', style: 'margin-top:8px' }, [
       el('button', {
         type: 'button', class: 'btn principal pequeno',
@@ -14550,16 +14550,16 @@
     var rotuloCopia = botao ? botao.textContent : '';
     if (botao) { botao.disabled = true; botao.textContent = 'Montando a cópia...'; }
 
-    Store.exportarTudo(db).then(function (pacote) {
+    Store.exportarTudoZip(db).then(function (arquivoZip) {
       var hoje = Core.hojeIso();
       copiaPronta = {
-        nome: 'Copia_Apoio_Educacional_' + hoje + '.json',
-        blob: new Blob([JSON.stringify(pacote)], { type: 'application/json' }),
+        nome: 'Copia_Apoio_Educacional_' + hoje + '.zip',
+        blob: arquivoZip,
         baixada: false, enviando: false
       };
       if (botao) { botao.disabled = false; botao.textContent = rotuloCopia; }
       redesenharEstadoDaCopia();
-      avisar('Cópia pronta, ' + Math.round(copiaPronta.blob.size / 1024) + ' KB. Envie para o Drive.',
+      avisar('Cópia pronta, ' + Math.round(copiaPronta.blob.size / 1024) + ' KB. Guarde em local seguro.',
         'Enviar', enviarCopiaPronta);
     }).catch(function () {
       if (botao) { botao.disabled = false; botao.textContent = rotuloCopia; }
@@ -14626,23 +14626,26 @@
       ev.target.value = '';
       return;
     }
-    var leitor = new FileReader();
-    leitor.onload = function () {
-      var pacote;
-      try { pacote = JSON.parse(leitor.result); }
-      catch (e) { avisar('O arquivo não é uma cópia válida.'); return; }
-      Store.importarTudo(pacote).then(function (dados) {
+    ev.target.value = '';
+    arquivo.slice(0, 4).arrayBuffer().then(function (cabecalho) {
+      var b = new Uint8Array(cabecalho);
+      var zip = b.length === 4 && b[0] === 0x50 && b[1] === 0x4b && b[2] === 3 && b[3] === 4;
+      if (zip) return Store.importarZip(arquivo);
+      return arquivo.text().then(function (texto) {
+        var pacote;
+        try { pacote = JSON.parse(texto); }
+        catch (e) { throw Object.assign(new Error('O arquivo não é uma cópia válida.'), { invalida: true }); }
+        return Store.importarTudo(pacote);
+      });
+    }).then(function (dados) {
         db = dados;
         var frase = memoriaSubstituida();
         desenharTudo();
         avisar('Cópia restaurada.' + frase);
-      }).catch(function (e) {
-        if (e && e.invalida) { avisar(e.message); return; }
-        releDoDisco(e, 'A cópia não foi restaurada por inteiro.', 'A cópia não foi restaurada.');
-      });
-    };
-    leitor.readAsText(arquivo);
-    ev.target.value = '';
+    }).catch(function (e) {
+      if (e && e.invalida) { avisar(e.message); return; }
+      avisar('Não foi possível restaurar a cópia. Os dados atuais foram mantidos.');
+    });
   }
 
   // ================= biblioteca: importar pacote =================
