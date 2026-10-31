@@ -59,7 +59,7 @@
         TABELA_CRC[n] = c >>> 0;
       }
     }
-    var crc = anterior ? (anterior ^ 0xFFFFFFFF) >>> 0 : 0xFFFFFFFF;
+    var crc = anterior !== undefined ? (anterior ^ 0xFFFFFFFF) >>> 0 : 0xFFFFFFFF;
     for (var i = 0; i < bytes.length; i++) crc = TABELA_CRC[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
     return (crc ^ 0xFFFFFFFF) >>> 0;
   }
@@ -317,6 +317,28 @@
         return new Response(fluxo).arrayBuffer().then(function (b) { return new Uint8Array(b); });
       } catch (e) { return Promise.resolve(null); }
     }
+    function preparar(arquivo) {
+      if (arquivo.conteudo instanceof Blob && !arquivo.comprimir) {
+        // Anexo PDF/foto: calcular o CRC em pedaços e manter uma fatia do Blob
+        // original no ZIP, sem criar uma cópia inteira em Uint8Array.
+        var blob = arquivo.conteudo, leitor = blob.stream().getReader(), crc = 0;
+        function proximo() {
+          return leitor.read().then(function (parte) {
+            if (parte.done) return { dados: blob, tamanho: blob.size, crc: crc, metodo: 0 };
+            crc = crc32(parte.value, crc);
+            return proximo();
+          });
+        }
+        return proximo();
+      }
+      return bytesDe(arquivo.conteudo).then(function (original) {
+        return (arquivo.comprimir ? comprimir(original) : Promise.resolve(null)).then(function (compactado) {
+          var usaDeflate = !!(compactado && compactado.length < original.length);
+          return { dados: usaDeflate ? compactado : original, tamanho: original.length,
+            crc: crc32(original), metodo: usaDeflate ? 8 : 0 };
+        });
+      });
+    }
     var sequencia = Promise.resolve();
     arquivos.forEach(function (arquivo) {
       sequencia = sequencia.then(function () {
@@ -326,30 +348,28 @@
         nomes[nome] = true;
         var nomeBytes = encoder.encode(nome);
         if (nomeBytes.length > 65535) throw ErroZip('Nome de arquivo longo demais na cópia.');
-        return bytesDe(arquivo.conteudo).then(function (original) {
-          return (arquivo.comprimir ? comprimir(original) : Promise.resolve(null)).then(function (compactado) {
-            var usaDeflate = !!(compactado && compactado.length < original.length);
-            var dados = usaDeflate ? compactado : original;
-            if (dados.length > 0xFFFFFFFF || original.length > 0xFFFFFFFF || posicao > 0xFFFFFFFF) {
+        return preparar(arquivo).then(function (pronto) {
+            var dados = pronto.dados;
+            var tamanhoDados = dados instanceof Blob ? dados.size : dados.length;
+            if (tamanhoDados > 0xFFFFFFFF || pronto.tamanho > 0xFFFFFFFF || posicao > 0xFFFFFFFF) {
               throw ErroZip('A cópia excede o limite do formato ZIP.');
             }
-            var crc = crc32(original), metodo = usaDeflate ? 8 : 0;
+            var crc = pronto.crc, metodo = pronto.metodo;
             var local = new Uint8Array(30 + nomeBytes.length), vl = new DataView(local.buffer);
             vl.setUint32(0, SIG_LOCAL, true); vl.setUint16(4, 20, true);
             vl.setUint16(6, 0x0800, true); vl.setUint16(8, metodo, true);
             vl.setUint16(12, 33, true); vl.setUint32(14, crc, true);
-            numero(vl, 18, 4, dados.length); numero(vl, 22, 4, original.length);
+            numero(vl, 18, 4, tamanhoDados); numero(vl, 22, 4, pronto.tamanho);
             vl.setUint16(26, nomeBytes.length, true); local.set(nomeBytes, 30);
             var central = new Uint8Array(46 + nomeBytes.length), vc = new DataView(central.buffer);
             vc.setUint32(0, SIG_CENTRAL, true); vc.setUint16(4, 20, true);
             vc.setUint16(6, 20, true); vc.setUint16(8, 0x0800, true);
             vc.setUint16(10, metodo, true); vc.setUint16(14, 33, true);
-            vc.setUint32(16, crc, true); numero(vc, 20, 4, dados.length);
-            numero(vc, 24, 4, original.length); vc.setUint16(28, nomeBytes.length, true);
+            vc.setUint32(16, crc, true); numero(vc, 20, 4, tamanhoDados);
+            numero(vc, 24, 4, pronto.tamanho); vc.setUint16(28, nomeBytes.length, true);
             numero(vc, 42, 4, posicao); central.set(nomeBytes, 46);
             partes.push(local, dados); diretorio.push(central);
-            posicao += local.length + dados.length;
-          });
+            posicao += local.length + tamanhoDados;
         });
       });
     });
