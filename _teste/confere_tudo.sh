@@ -601,6 +601,9 @@ roda "livros --envenenado-sem-posicao"            node "_teste/testa_livros.js" 
 # pacote lido livro a livro, sem o arquivo inteiro na memoria.
 roda "livros --envenenado-destroy"                node "_teste/testa_livros.js" --envenenado-destroy
 roda "livros --envenenado-zip-inteiro"            node "_teste/testa_livros.js" --envenenado-zip-inteiro
+# A revisao do C15.1 pela orquestradora: o mesmo pacote com dois PDFs trocados
+# (mesmo id, mesma versao) atualiza pelo hash; o veneno compara so o id.
+roda "livros --envenenado-so-id"                  node "_teste/testa_livros.js" --envenenado-so-id
 # C2b: a lista de base (base-v1) importa, vem primeiro com o nome dela e a
 # frase de posicao na fonte; as tres listas com a etiqueta de nivel. A regra
 # em si e do biblioteca/_prova_kits.py (sem navegador).
@@ -694,11 +697,17 @@ na_secao_navegador=0
 # nao sai do gerador de proposito, senao um erro do gerador viraria o esperado.
 roda "kits e tempo (regra)"                     python biblioteca/_prova_kits.py
 # C15.1: o tipo de fonte livros, sobre livros sinteticos (tres PDF, um EPUB e um
-# arquivo de 41 MB): o teto de 40 MB nos dois lados da fronteira (o grande
-# recusado, listado no relatorio e nunca aberto), o manifesto (zip e lista nos
-# dois sentidos, hash, campos, sumario dentro do livro), a origem do sumario
-# (marcadores, mapa, nenhum, nav do EPUB) e o determinismo. Sem Chrome.
+# arquivo de 161 MB): o teto de 160 MB nos dois lados da fronteira (o grande
+# recusado, listado no relatorio e nunca aberto) e igual ao do aplicativo, o
+# manifesto (zip e lista nos dois sentidos, hash, campos, sumario dentro do
+# livro), a origem do sumario (marcadores, mapa, nenhum, nav do EPUB) e o
+# determinismo. Sem Chrome.
 roda "livros (gerador)"                         python biblioteca/_prova_livros.py
+# A revisao do C15.1: o pacote cortado recusado ja na espiada, sem ler o
+# arquivo inteiro, e o teto de 160 MB do aplicativo. Sem Chrome.
+roda "livros (regras)"                          node "_teste/testa_livros_regras.js"
+roda "livros (regras) --envenenado-cortado-le-tudo" node "_teste/testa_livros_regras.js" --envenenado-cortado-le-tudo
+roda "livros (regras) --envenenado-teto-antigo" node "_teste/testa_livros_regras.js" --envenenado-teto-antigo
 # A comparacao pacote a pacote (determinismo e "o que mudou de uma versao para
 # a outra") rodando contra si mesma: um veneno por tipo de diferenca que ela
 # existe para achar, mais dois controles. A comparacao de verdade precisa dos

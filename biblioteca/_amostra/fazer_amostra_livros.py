@@ -12,6 +12,14 @@
         dez livros de 4 MB e o pacote livros-prova-varios-v1.zip (40 MB), para
         a prova de memoria do testa_livros.js
 
+    python biblioteca/_amostra/fazer_amostra_livros.py <pasta> --trocado
+        o MESMO pacote livros-prova-v1.zip (mesmo nome, mesma versao, mesmos
+        ids), em <pasta>/Trocado/pacotes, com dois PDFs trocados: o livro sem
+        sumario com uma pagina a mais (hash novo, sumario igual) e o livro com
+        marcadores com uma pagina a mais no fim (hash novo, sumario diferente,
+        porque o ultimo capitulo vai ate a pagina 7). E a prova de que
+        reimportar compara pelo hash, e nao so pelo id.
+
 Conteudo proprio, escrito aqui: nenhum livro comercial entra no repositorio
 nem no portao (C15.1, item 5). Texto conhecido, para a prova e o teste saberem
 o que procurar:
@@ -29,8 +37,8 @@ o que procurar:
   <script>, um atributo onerror e um link para fora: o leitor do aplicativo
   nao pode executar nada disso (conteudo de terceiro).
 - Na planilha, alem desses: uma linha sem arquivo (livro que ela nao tem), uma
-  com arquivo que nao existe e, com --grande, grande/livro-grande.pdf com 41
-  MB, acima do teto de 40 MB (recusado antes de ser aberto, e por isso basta
+  com arquivo que nao existe e, com --grande, grande/livro-grande.pdf com 161
+  MB, acima do teto de 160 MB (recusado antes de ser aberto, e por isso basta
   ser um arquivo do tamanho certo).
 """
 import csv
@@ -52,7 +60,7 @@ CAPITULOS_EPUB = ['Capítulo 1: O começo', 'Capítulo 2: O meio', 'Capítulo 3:
 CABECALHO = ['Matéria', 'Kit', 'Título', 'Volume', 'Autoria', 'Editora', 'Edição', 'Ano', 'ISBN', 'Segmento',
              'Relevância (1 a 5)', 'Uso', 'Fonte do ISBN', 'Formato digital', 'Onde comprar ou assinar', 'ISBN digital',
              'Fonte digital', 'Arquivo', 'Tamanho (KB)', 'EPUB convertido (caminho a partir de Livros)', 'materia_id']
-GRANDE_BYTES = 41 * 1024 * 1024
+GRANDE_BYTES = 161 * 1024 * 1024
 LADO_RUIDO = 640     # 640 x 640 x 3 bytes: a figura de ruido tem 1,2 MB
 
 
@@ -72,7 +80,7 @@ def pagina(doc, cor, linhas):
     return pg
 
 
-def pdf_com_marcadores(caminho):
+def pdf_com_marcadores(caminho, pagina_a_mais=False):
     doc = pymupdf.open()
     toc = []
     for c, titulo in enumerate(CAPITULOS_PDF):
@@ -88,6 +96,8 @@ def pdf_com_marcadores(caminho):
     sorteio = random.Random(15)
     pix = pymupdf.Pixmap(pymupdf.csRGB, LADO_RUIDO, LADO_RUIDO, sorteio.randbytes(LADO_RUIDO * LADO_RUIDO * 3), False)
     doc[-1].insert_image(pymupdf.Rect(72, 720, 172, 820), pixmap=pix)
+    if pagina_a_mais:
+        pagina(doc, CORES[2], [CAPITULOS_PDF[2], 'Página a mais, da versão trocada.'])
     return salvar(doc, caminho)
 
 
@@ -267,6 +277,18 @@ def principal():
                                         trabalho=os.path.join(pasta, 'trabalho-varios'),
                                         gerado_em='2026-10-30T10:00:00-03:00', commit='prova')
         print('%d livros no pacote, %d bytes' % (manifest['contagens']['livros'], manifest['contagens']['bytes']))
+        print(rel['zip']['caminho'])
+        return
+    if '--trocado' in sys.argv:
+        import livros
+        raiz = os.path.join(pasta, 'Trocado')
+        c = fazer(raiz)
+        pdf_sem_marcadores(os.path.join(c['livros'], 'matematica', 'livro-sem-sumario.pdf'), 3)
+        pdf_com_marcadores(os.path.join(c['livros'], 'matematica', 'livro-com-marcadores.pdf'), pagina_a_mais=True)
+        manifest, rel, _ = livros.gerar(c['planilha'], 'prova', 1, os.path.join(raiz, 'pacotes'),
+                                        mapas=c['mapas'], trabalho=os.path.join(raiz, 'trabalho'),
+                                        gerado_em='2026-10-30T10:00:00-03:00', commit='prova')
+        print('%d livros no pacote trocado' % manifest['contagens']['livros'])
         print(rel['zip']['caminho'])
         return
     c = fazer(pasta, grande='--grande' in sys.argv)

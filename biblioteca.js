@@ -168,10 +168,13 @@
 
   function inteiro(x) { return typeof x === 'number' && isFinite(x) && Math.floor(x) === x; }
 
-  /* O teto por livro do gerador (biblioteca/livros.py). O aplicativo confere
-   * de novo: um livro maior que isto, num pacote feito à mão ou por outro
-   * gerador, é recusado com a frase dele, antes de qualquer leitura. */
-  var TETO_POR_LIVRO = 40 * 1024 * 1024;
+  /* O teto por livro do gerador (biblioteca/livros.py, TETO_MB). O aplicativo
+   * confere de novo: um livro maior que isto, num pacote feito à mão ou por
+   * outro gerador, é recusado com a frase dele, antes de qualquer leitura. Era
+   * 40 MB no C15.1; o dono decidiu depois que nada perde qualidade (o tablet
+   * tem 200 GB livres), e a leitura livro a livro segura o pico de memória
+   * perto de um livro. A prova do gerador confere os dois tetos juntos. */
+  var TETO_POR_LIVRO = 160 * 1024 * 1024;
 
   /* Confere a FORMA do que vai para a tela e para o leitor: id, formato, o
    * arquivo que existe no zip com o mesmo hash da lista, e o sumário dentro
@@ -221,11 +224,19 @@
     if (contas.novos) partes.push(contas.novos + (contas.novos === 1 ? ' livro novo' : ' livros novos'));
     if (contas.atualizados) partes.push(contas.atualizados + (contas.atualizados === 1 ? ' atualizado' : ' atualizados'));
     if (contas.iguais) partes.push(contas.iguais + (contas.iguais === 1 ? ' já estava no tablet' : ' já estavam no tablet'));
+    if (contas.maisNovos) {
+      partes.push(contas.maisNovos + (contas.maisNovos === 1 ? ' ficou como estava, porque o do tablet é mais novo'
+        : ' ficaram como estavam, porque os do tablet são mais novos'));
+    }
     if (contas.removidos) partes.push(contas.removidos + (contas.removidos === 1 ? ' saiu do pacote e do tablet' : ' saíram do pacote e do tablet'));
     linhas.push(partes.join(', ') || 'Nenhum livro mudou.');
     if (contas.deOutroPacote && contas.deOutroPacote.length) {
       linhas.push(contas.deOutroPacote.length + (contas.deOutroPacote.length === 1 ? ' livro ficou' : ' livros ficaram') +
         ' como estava, porque já veio de outro pacote.');
+    }
+    if (contas.posicoesSoltas) {
+      linhas.push(contas.posicoesSoltas + (contas.posicoesSoltas === 1 ? ' livro atualizado mudou' : ' livros atualizados mudaram') +
+        ' de sumário e vai abrir no começo.');
     }
     return linhas;
   }
@@ -407,7 +418,12 @@
 
   /* A primeira olhada no arquivo, SEM lê-lo inteiro: só o diretório central
    * do zip e o manifest. Devolve { zip, manifest } ou null quando não dá (aí
-   * o caminho de sempre lê o arquivo e diz o motivo com as frases dele). */
+   * o caminho de sempre lê o arquivo e diz o motivo com as frases dele).
+   *
+   * A exceção é o pacote CORTADO (começa como zip e não tem o fim, o download
+   * que parou no meio): esse é recusado aqui mesmo, com a frase do download.
+   * Antes ele caía no caminho de sempre, que lia o arquivo inteiro (centenas
+   * de MB, no pacote de livros) só para dizer a mesma coisa. */
   function espiarPacote(arquivo) {
     if (!Zip.suportado() || !arquivo || typeof arquivo.slice !== 'function' || typeof Zip.lerDoArquivo !== 'function') {
       return Promise.resolve(null);
@@ -419,7 +435,10 @@
         var manifest = JSON.parse(texto(bytes));
         return manifest && typeof manifest === 'object' ? { zip: zipArq, manifest: manifest } : null;
       });
-    }).catch(function () { return null; });
+    }).catch(function (e) {
+      if (e && e.cortado) throw Recusa(e.message, 'download');
+      return null;
+    });
   }
 
   /* O pacote de livros (C15.1), LIVRO A LIVRO, direto do arquivo escolhido.
@@ -429,7 +448,7 @@
    * zip o pico passava de 800 MB, e a aba caía no tablet. Agora:
    *   - o zip nunca é lido inteiro: só o diretório central (espiarPacote);
    *   - a forma de todos os livros é conferida antes de ler qualquer um, e um
-   *     livro acima de 40 MB recusa o pacote ali mesmo;
+   *     livro acima de 160 MB recusa o pacote ali mesmo;
    *   - cada livro é lido sozinho, por fatia do arquivo, para o CRC e o hash,
    *     e os bytes são soltos antes do próximo: o pico é perto de UM livro;
    *   - o que vai para a gravação é a fatia do próprio arquivo (o livro vem
@@ -454,8 +473,8 @@
       livros.forEach(function (l) {
         var en = porNome[l.meta.arquivo];
         if (en.tamanho > TETO_POR_LIVRO) {
-          throw Recusa('O livro "' + l.meta.titulo + '" tem ' + mb(en.tamanho) + ', acima do teto de 40 MB por livro, ' +
-            'e o pacote não foi importado. É preciso uma versão mais leve do livro.', 'defeito');
+          throw Recusa('O livro "' + l.meta.titulo + '" tem ' + mb(en.tamanho) + ', acima do teto de 160 MB por livro, ' +
+            'e o pacote não foi importado.', 'defeito');
         }
         if (en.metodo !== 0) {
           throw Recusa('O livro "' + l.meta.titulo + '" veio comprimido no pacote, e o aplicativo só lê livro sem compressão.', 'defeito');

@@ -2,7 +2,7 @@
 
     python biblioteca/_prova_livros.py
         sobre os livros sinteticos de biblioteca/_amostra/fazer_amostra_livros.py
-        (tres PDF, um EPUB, um arquivo de 41 MB, uma linha sem arquivo e uma
+        (tres PDF, um EPUB, um arquivo de 161 MB, uma linha sem arquivo e uma
         com arquivo sumido), o pacote gerado DUAS vezes.
 
     python biblioteca/_prova_livros.py --zip <pacote.zip>
@@ -10,10 +10,13 @@
         exemplo), sem gerar nada.
 
 Travas:
-  teto         o livro de 41 MB e recusado PELO TETO, listado no relatorio
+  teto         o livro de 161 MB e recusado PELO TETO, listado no relatorio
                (relatorio.json e relatorio.md, na secao do item E7) e nunca
-               aberto; e a fronteira dos dois lados: 40 MB exatos cabem, um
-               byte a mais nao. Veneno: com o teto desligado, a trava reprova.
+               aberto, sem a frase antiga de "versao mais leve"; e a fronteira
+               dos dois lados: 160 MB exatos cabem, um byte a mais nao; e o
+               teto do aplicativo (biblioteca.js) e o mesmo do gerador.
+               Veneno: com o teto desligado, a trava reprova; e o teto do
+               aplicativo no valor antigo (40 MB) tambem.
   contas       todo livro da planilha com arquivo esta no pacote ou recusado
                com motivo; linha sem arquivo fica em "sem arquivo", e nada alem.
   manifesto    esquema 1, conteudo "livros", o zip e a lista `arquivos` nos
@@ -105,15 +108,18 @@ def trava_teto(rel, md, abertos, grande):
     erros = []
     teto = [r for r in rel['recusados'] if r.get('teto')]
     if not any(r['arquivo'] == 'grande/livro-grande.pdf' for r in teto):
-        erros.append('o livro de 41 MB nao saiu recusado pelo teto')
+        erros.append('o livro de 161 MB nao saiu recusado pelo teto')
     for r in teto:
         if not r.get('bytes') or r['bytes'] <= livros.TETO_BYTES:
             erros.append('recusado pelo teto sem passar do teto: %s (%s bytes)' % (r['arquivo'], r.get('bytes')))
-        if '40 MB' not in r.get('motivo', '') or 'E7' not in r.get('motivo', ''):
+        if '160 MB' not in r.get('motivo', '') or 'E7' not in r.get('motivo', ''):
             erros.append('o motivo nao diz o teto e o item E7: %r' % r.get('motivo'))
     secao = md.split('## Recusados pelo teto', 1)[-1].split('##', 1)[0] if '## Recusados pelo teto' in md else ''
     if 'grande/livro-grande.pdf' not in secao:
         erros.append('o relatorio.md nao lista o livro grande na secao do teto')
+    # a decisao do dono (30/10): nada de mandar trocar por versao mais leve
+    if 'mais leve' in md or any('mais leve' in r.get('motivo', '') for r in rel['recusados']):
+        erros.append('o relatorio ainda manda trocar por uma versao mais leve')
     if any(os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(grande)) for a in abertos):
         erros.append('o livro acima do teto foi aberto antes de ser recusado')
     return erros
@@ -122,10 +128,30 @@ def trava_teto(rel, md, abertos, grande):
 def trava_fronteira(f=None):
     f = f or livros.motivo_do_teto
     erros = []
-    if f(livros.TETO_BYTES) is not None:
-        erros.append('40 MB exatos foram recusados')
-    if f(livros.TETO_BYTES + 1) is None:
-        erros.append('40 MB e um byte passaram')
+    um = 160 * 1024 * 1024     # o teto do dono, escrito aqui e nao lido do gerador
+    if f(um) is not None:
+        erros.append('160 MB exatos foram recusados')
+    if f(um + 1) is None:
+        erros.append('160 MB e um byte passaram')
+    return erros
+
+
+TETO_DO_APP = re.compile(r'var TETO_POR_LIVRO = (\d+) \* 1024 \* 1024;')
+
+
+def trava_teto_do_app(texto):
+    """O teto do aplicativo (biblioteca.js) e o do gerador sao o mesmo, e a
+    frase da recusa na tela nao manda trocar por versao mais leve."""
+    erros = []
+    achados = TETO_DO_APP.findall(texto)
+    if len(achados) != 1:
+        erros.append('o TETO_POR_LIVRO do biblioteca.js aparece %d vezes' % len(achados))
+    elif int(achados[0]) != livros.TETO_MB:
+        erros.append('o aplicativo tem teto de %s MB e o gerador de %d MB' % (achados[0], livros.TETO_MB))
+    if 'mais leve' in texto:
+        erros.append('a tela ainda manda trocar por uma versao mais leve')
+    if 'acima do teto de %d MB por livro' % livros.TETO_MB not in texto:
+        erros.append('a frase da recusa do aplicativo nao diz o teto de %d MB' % livros.TETO_MB)
     return erros
 
 
@@ -388,8 +414,18 @@ def amostra_rodada(temp, placar):
     # o espiao enxerga: sem isto, "nunca aberto" passaria tambem com o espiao cego
     placar.conferir('livros: o espiao ve o PDF que entra sendo aberto',
                     [] if any(str(x).endswith('livro-com-marcadores.pdf') for x in abertos) else ['espiao cego: %r' % abertos])
-    placar.conferir('livros: teto de 40 MB (o de 41 MB recusado, listado e nunca aberto)', trava_teto(r1, md, abertos, grande))
-    placar.conferir('livros: fronteira do teto (40 MB cabem, 40 MB e um byte nao)', trava_fronteira())
+    placar.conferir('livros: teto de 160 MB (o de 161 MB recusado, listado e nunca aberto)', trava_teto(r1, md, abertos, grande))
+    placar.conferir('livros: fronteira do teto (160 MB cabem, 160 MB e um byte nao)', trava_fronteira())
+    placar.conferir('livros: fronteira com o teto antigo de 40 MB',
+                    trava_fronteira(lambda n: 'x' if n > 40 * 1024 * 1024 else None), deve_reprovar=True)
+    with open(os.path.join(os.path.dirname(AQUI), 'biblioteca.js'), encoding='utf-8') as f:
+        texto_app = f.read()
+    placar.conferir('livros: o aplicativo tem o mesmo teto por livro, e a tela sem "versao mais leve"',
+                    trava_teto_do_app(texto_app))
+    placar.conferir('livros: o aplicativo com o teto antigo de 40 MB',
+                    trava_teto_do_app(TETO_DO_APP.sub('var TETO_POR_LIVRO = 40 * 1024 * 1024;', texto_app)), deve_reprovar=True)
+    placar.conferir('livros: a tela de volta com a frase da versao mais leve',
+                    trava_teto_do_app(texto_app + '\n// É preciso uma versão mais leve do livro.'), deve_reprovar=True)
     # veneno: o teto desligado. O livro grande deixa de sair pelo teto (sai como PDF que nao abre).
     guarda = livros.TETO_BYTES
     livros.TETO_BYTES = 10 ** 12
@@ -400,24 +436,33 @@ def amostra_rodada(temp, placar):
         placar.conferir('livros: teto desligado', trava_teto(rv, mdv, [], grande), deve_reprovar=True)
     finally:
         livros.TETO_BYTES = guarda
-    placar.conferir('livros: fronteira com o teto em ">=" (40 MB exatos recusados)',
+    placar.conferir('livros: fronteira com o teto em ">=" (160 MB exatos recusados)',
                     trava_fronteira(lambda n: 'x' if n >= livros.TETO_BYTES else None), deve_reprovar=True)
-    placar.conferir('livros: fronteira com o teto em 41 MB',
+    placar.conferir('livros: fronteira com o teto em 161 MB',
                     trava_fronteira(lambda n: 'x' if n > livros.TETO_BYTES + 1024 * 1024 else None), deve_reprovar=True)
 
-    # o teto por pacote (300 MB), dos dois lados, e o veneno de um teto que nao recusa nada
-    def fronteira_do_pacote(f):
+    # o teto por pacote (480 MB), dos dois lados; cabe pelo menos um livro no
+    # teto (um pacote de um livro de 160 MB passa); e o veneno de um teto que
+    # nao recusa nada e o de um teto menor que um livro
+    def fronteira_do_pacote(f, teto=None):
+        teto = teto or livros.TETO_DO_PACOTE
         e = []
-        if f(livros.TETO_DO_PACOTE) is not None:
-            e.append('300 MB exatos recusados')
-        if f(livros.TETO_DO_PACOTE + 1) is None:
-            e.append('300 MB e um byte passaram')
-        elif 'materia' not in f(livros.TETO_DO_PACOTE + 1):
+        if f(teto) is not None:
+            e.append('o teto exato recusado')
+        if f(teto + 1) is None:
+            e.append('o teto e um byte passaram')
+        elif 'materia' not in f(teto + 1):
             e.append('a recusa nao manda separar por materia')
+        if f(160 * 1024 * 1024) is not None:
+            e.append('um pacote com um livro de 160 MB nao cabe')
         return e
-    placar.conferir('livros: teto por pacote (300 MB cabem, um byte a mais nao; manda separar por materia)',
-                    fronteira_do_pacote(livros.motivo_do_pacote))
+    placar.conferir('livros: teto por pacote (480 MB cabem, um byte a mais nao; um livro de 160 MB cabe)',
+                    fronteira_do_pacote(livros.motivo_do_pacote) +
+                    ([] if livros.TETO_DO_PACOTE == 480 * 1024 * 1024 else ['teto por pacote de %d bytes' % livros.TETO_DO_PACOTE]))
     placar.conferir('livros: teto por pacote desligado', fronteira_do_pacote(lambda n: None), deve_reprovar=True)
+    pequeno = 150 * 1024 * 1024
+    placar.conferir('livros: teto por pacote menor que um livro no teto',
+                    fronteira_do_pacote(lambda n: 'materia' if n > pequeno else None, pequeno), deve_reprovar=True)
 
     placar.conferir('livros: contas (no pacote, recusado com motivo ou sem arquivo)', trava_contas(m1, r1, c['planilha']))
     sumiu = copy.deepcopy(r1)

@@ -475,9 +475,23 @@
    * A comparação é LIVRO A LIVRO, e não pelo pacote inteiro como nos
    * exercícios, porque ela pode remover um livro e querer de volta: importar
    * o mesmo pacote outra vez devolve o que falta e não mexe no que está.
-   *   livro que não está no tablet      entra (novos)
-   *   o mesmo livro, de versão menor    é substituído (atualizados)
-   *   o mesmo livro, de versão igual    fica como está (iguais)
+   *
+   * O MESMO LIVRO é o mesmo id E o mesmo hash (o sha256 do arquivo, que o
+   * manifest traz). Só o id deixava passar calado um PDF trocado com o mesmo
+   * nome num pacote de versão igual: o tablet ficava com o arquivo velho e
+   * dizia "já estava". Escolha da revisão do C15.1: o hash entra na conta, em
+   * vez de exigir versão nova do pacote, porque quem troca um arquivo no Drive
+   * e gera de novo esquece de subir a versão, e o hash não esquece.
+   *   livro que não está no tablet                 entra (novos)
+   *   mesmo id, hash diferente, versão igual ou maior: é substituído
+   *     (atualizados). A posição de leitura fica se o sumário for o mesmo
+   *     (a página 40 continua a página 40 do mesmo capítulo); com sumário
+   *     diferente, ela sai, para o livro não abrir num lugar que mudou
+   *   mesmo id, hash diferente, de versão MENOR que a do tablet: fica o do
+   *     tablet, que é mais novo (maisNovos)
+   *   mesmo id e mesmo hash                         fica como está (iguais);
+   *     de versão maior, só a versão e o manifest do livro são renovados,
+   *     sem regravar o arquivo
    *   livro deste pacote, de versão menor, que saiu do pacote novo: sai do
    *     tablet, com a posição dele (removidos)
    *   o mesmo id vindo de OUTRO pacote: fica o que está (deOutroPacote), para
@@ -491,7 +505,8 @@
       return new Promise(function (resolve, reject) {
         var t = b.transaction(['livros', 'livros_posicoes'], 'readwrite');
         var dep = t.objectStore('livros');
-        var contas = { novos: 0, atualizados: 0, iguais: 0, removidos: 0, deOutroPacote: [], bytes: 0 };
+        var contas = { novos: 0, atualizados: 0, iguais: 0, maisNovos: 0, removidos: 0, posicoesSoltas: 0,
+          deOutroPacote: [], bytes: 0 };
         var noPacote = {};
         aberto.livros.forEach(function (l) {
           noPacote[l.meta.id] = true;
@@ -499,8 +514,25 @@
           req.onsuccess = function () {
             var atual = req.result;
             if (atual && atual.pacote !== chave) { contas.deOutroPacote.push(l.meta.id); return; }
-            if (atual && atual.versao >= versao) { contas.iguais++; return; }
-            if (atual) contas.atualizados++; else contas.novos++;
+            var mesmoArquivo = !!atual && !!atual.meta && atual.meta.hash === l.meta.hash;
+            if (mesmoArquivo) {
+              contas.iguais++;
+              if (versao > atual.versao) {
+                dep.put({ id: atual.id, pacote: chave, versao: versao, meta: l.meta, blob: atual.blob,
+                  bytes: atual.bytes, importadoEm: atual.importadoEm });
+              }
+              return;
+            }
+            if (atual && atual.versao > versao) { contas.maisNovos++; return; }
+            if (atual) {
+              contas.atualizados++;
+              if (JSON.stringify(atual.meta && atual.meta.sumario || []) !== JSON.stringify(l.meta.sumario || [])) {
+                contas.posicoesSoltas++;
+                t.objectStore('livros_posicoes').delete(l.meta.id);
+              }
+            } else {
+              contas.novos++;
+            }
             contas.bytes += l.blob.size;
             dep.put({ id: l.meta.id, pacote: chave, versao: versao, meta: l.meta, blob: l.blob,
               bytes: l.blob.size, importadoEm: agora });

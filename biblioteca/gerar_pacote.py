@@ -2129,7 +2129,7 @@ def confere_versao_do_pymupdf(versao=None):
 # sao provas (biblioteca/provas.py, item C12). O Banco de Questoes ainda tem
 # linha de comando propria (banco.py), anterior a esta escolha. "livros" (C15.1,
 # biblioteca/livros.py) nao recorta nada: le a planilha dos livros, aplica o
-# teto de 40 MB por livro e monta o pacote com o sumario de cada um, no mesmo
+# teto de 160 MB por livro e monta o pacote com o sumario de cada um, no mesmo
 # contrato (manifest com hash de todo arquivo, zip deterministico, secao 8j).
 TIPOS_DE_FONTE = ('portal', 'mirim', 'enem', 'livros')
 # o que cada tipo exige; o resto da linha de comando vale para todos

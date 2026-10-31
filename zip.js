@@ -178,7 +178,20 @@
       for (var p = cauda.length - 22; p >= 0; p--) {
         if (v.getUint32(p, true) === SIG_FIM) { fim = p; break; }
       }
-      if (fim < 0) throw ErroZip('O arquivo escolhido não é um pacote (.zip).');
+      if (fim < 0) {
+        /* Começa como zip e não tem o fim: o download parou no meio. Quem lê
+         * daqui (espiarPacote) recusa na hora, pela marca `cortado`, em vez de
+         * ler o arquivo inteiro para descobrir a mesma coisa. Só os 4 bytes do
+         * começo são lidos. */
+        return lerFatia(arquivo, 0, 4).then(function (cab) {
+          var vc = new DataView(cab.buffer, cab.byteOffset, cab.byteLength);
+          if (cab.length === 4 && vc.getUint32(0, true) === SIG_LOCAL) {
+            throw Object.assign(ErroZip('O pacote chegou cortado: o arquivo termina antes do fim, como num download que parou no meio.'),
+              { cortado: true });
+          }
+          throw ErroZip('O arquivo escolhido não é um pacote (.zip).');
+        });
+      }
       var disco = v.getUint16(fim + 4, true);
       var discoDir = v.getUint16(fim + 6, true);
       var totalAqui = v.getUint16(fim + 8, true);

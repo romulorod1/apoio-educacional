@@ -10,10 +10,10 @@ que e relativa a pasta da planilha (ou a --pdfs). Linha sem arquivo e livro
 que a professora ainda nao tem: fica no relatorio como "sem arquivo", e nao e
 recusa.
 
-O TETO: 40 MB por livro. Acima disso o livro nao entra, e o relatorio o lista
-para o dono trocar por uma versao mais leve (item E7 do livro de execucao). O
-teto e conferido pelo tamanho no disco ANTES de abrir o arquivo: um PDF de 120
-MB nao chega a ser lido, e a maquina tem pouca memoria. E 300 MB por pacote
+O TETO: 160 MB por livro (era 40 MB no C15.1; o dono decidiu depois que nada
+perde qualidade, e o tablet tem 200 GB livres). Acima disso o livro nao entra,
+e o relatorio o lista (item E7). O teto e conferido pelo tamanho no disco ANTES
+de abrir o arquivo: um PDF de 500 MB nao chega a ser lido. E 480 MB por pacote
 (ver TETO_DO_PACOTE): um pacote por materia.
 
 O SUMARIO, por ordem de preferencia:
@@ -71,25 +71,26 @@ import pymupdf
 import gerar_pacote
 import portal
 
-TETO_MB = 40
+# O teto por livro e o mesmo do aplicativo (TETO_POR_LIVRO, em biblioteca.js);
+# a prova confere os dois juntos.
+TETO_MB = 160
 TETO_BYTES = TETO_MB * 1024 * 1024
-# O TETO POR PACOTE: 300 MB, e a recomendacao e um pacote por materia (--materia).
+# O TETO POR PACOTE: 480 MB, e a recomendacao e um pacote por materia (--materia).
 # Desde a revisao do C15.1 o app le o pacote de livros livro a livro, direto do
-# arquivo, e a memoria do tablet nao depende mais do tamanho do pacote (o pico
-# e perto de um livro, ate 40 MB). O que ainda cresce com o pacote: o espaco
-# no tablet, que no dia da importacao guarda o zip baixado do Drive E a copia
-# no banco (duas vezes o pacote); a gravacao, que e UMA transacao (tudo ou
-# nada), mais longa quanto maior o pacote; e o download pelo Drive. 300 MB sao
-# sete livros no teto ou dezenas dos comuns (a matematica inteira da planilha
-# tem 9,8 MB), e cabem com folga num tablet com 2 GB livres. Acima disso o
-# gerador recusa e manda separar por materia, em vez de fazer um pacote que
-# so falha no tablet.
-TETO_DO_PACOTE_MB = 300
+# arquivo, e a memoria do tablet nao depende do tamanho do pacote (o pico e
+# perto de um livro, ate 160 MB). O que ainda cresce com o pacote: o espaco no
+# tablet, que no dia da importacao guarda o zip baixado do Drive E a copia no
+# banco (duas vezes o pacote, nada para 200 GB livres); a gravacao, que e UMA
+# transacao (tudo ou nada), mais longa quanto maior o pacote; e o download pelo
+# Drive, que pela metade e o caso do pacote cortado. 480 MB sao tres livros no
+# teto, ou dezenas dos comuns (a matematica inteira da planilha tem 9,8 MB).
+# Acima disso o gerador recusa e manda separar por materia.
+TETO_DO_PACOTE_MB = 480
 TETO_DO_PACOTE = TETO_DO_PACOTE_MB * 1024 * 1024
 
 
 def motivo_do_pacote(total):
-    """None se o pacote cabe no teto de 300 MB; senao, a frase da recusa."""
+    """None se o pacote cabe no teto de 480 MB; senao, a frase da recusa."""
     if total > TETO_DO_PACOTE:
         return ('erro: o pacote teria %s MB, acima do teto de %d MB por pacote. Gere um pacote por materia '
                 '(--materia), e, se uma materia passar sozinha, separe a planilha em duas'
@@ -119,9 +120,9 @@ def mb(n):
 
 
 def motivo_do_teto(n):
-    """None se o livro cabe no teto de 40 MB; senao, a frase do relatorio."""
+    """None se o livro cabe no teto de 160 MB; senao, a frase do relatorio."""
     if n > TETO_BYTES:
-        return ('tem %s MB, acima do teto de %d MB por livro: trocar por uma versão mais leve (item E7)'
+        return ('tem %s MB, acima do teto de %d MB por livro, e ficou fora do pacote (item E7)'
                 % (mb(n), TETO_MB))
     return None
 
@@ -707,7 +708,7 @@ def relatorio_md(manifest, rel):
               'Gerado de %s%s.' % (manifest['fonte']['planilha'],
                                    ' (matéria: %s)' % manifest['materia'] if manifest.get('materia') else ''), '',
               '- Livros no pacote: %d (%d PDF, %d EPUB), %s MB.' % (c['livros'], c['pdf'], c['epub'], mb(c['bytes'])),
-              '- Recusados pelo teto de %d MB: %d (trocar por versão mais leve, item E7).' % (TETO_MB, c['recusados_teto']),
+              '- Recusados pelo teto de %d MB por livro: %d (item E7).' % (TETO_MB, c['recusados_teto']),
               '- Recusados por outro motivo: %d.' % (c['recusados'] - c['recusados_teto']),
               '- Linhas sem arquivo na planilha: %d.' % c['sem_arquivo'], '']
     partes += ['## No pacote', '', tabela_md(

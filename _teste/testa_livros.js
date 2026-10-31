@@ -27,7 +27,10 @@
  *      capítulo, o link de dentro do livro leva ao capítulo 3, o Sumário leva
  *      ao meio do capítulo 2, e reabrir volta ao mesmo capítulo e rolagem;
  *   6. Remover um livro em Ajustes: o total cai exatamente o tamanho dele, e
- *      importar o mesmo pacote de novo devolve só o que faltava;
+ *      importar o mesmo pacote de novo devolve só o que faltava; e (revisão
+ *      do C15.1) o mesmo pacote com dois PDFs trocados, mesmo id e mesma
+ *      versão, atualiza os dois pelo hash, guarda a posição do que tem o
+ *      mesmo sumário e solta a do que mudou de sumário;
  *   7. memória (revisão do C15.1): um pacote de dez livros de 4 MB é lido
  *      livro a livro, em trechos; nenhuma leitura passa de um livro, e a
  *      memória dos processos do navegador não sobe o pacote inteiro;
@@ -48,6 +51,9 @@
  *   --envenenado-zip-inteiro       o arquivo do pacote lido inteiro antes de
  *                                  abrir: a maior leitura tem de ser o pacote
  *                                  e a memória tem de subir mais que ele.
+ *   --envenenado-so-id             reimportar compara só o id e a versão (a
+ *                                  conta do C15.1): o PDF trocado com o mesmo
+ *                                  id tem de ficar velho no tablet.
  *
  *   --prints <pasta>   grava três prints (a gestão em Ajustes, o PDF com o
  *                      sumário aberto, o EPUB aberto).
@@ -62,7 +68,7 @@ const { conf, secao, esperar, pausa } = H;
 
 const PORTA = 8862;
 const VENENOS = ['--envenenado-copia-com-livros', '--envenenado-epub-com-scripts', '--envenenado-sem-posicao',
-  '--envenenado-destroy', '--envenenado-zip-inteiro'];
+  '--envenenado-destroy', '--envenenado-zip-inteiro', '--envenenado-so-id'];
 const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const iPrints = process.argv.indexOf('--prints');
 const PRINTS = iPrints > 0 ? process.argv[iPrints + 1] : null;
@@ -81,10 +87,14 @@ const COPIA_COM_LIVROS = "pacote.biblioteca = { uso: bib[0] || [], etiquetas: bi
 const SANDBOX = "quadro.setAttribute('sandbox', 'allow-same-origin');";
 const GUARDA_PAGINA = "Store.gravarPosicaoLivro({ id: id, pagina: n })";
 
+// a revisão do C15.1: o mesmo livro é o mesmo id E o mesmo hash; o veneno volta à conta só pelo id e pela versão
+const MESMO_ARQUIVO = 'var mesmoArquivo = !!atual && !!atual.meta && atual.meta.hash === l.meta.hash;';
+
 const STORE_V3 = STORE.replace(V4, V3).replace(CRIA_LIVROS, '');
 const trocas = {};
 let APP_SERVIDO = APP, STORE_SERVIDO = STORE;
 if (MODO === '--envenenado-copia-com-livros') STORE_SERVIDO = STORE.replace(COPIA_FECHA, COPIA_COM_LIVROS);
+if (MODO === '--envenenado-so-id') STORE_SERVIDO = STORE.split(MESMO_ARQUIVO).join('var mesmoArquivo = !!atual && atual.versao >= versao;');
 /* A caixa do EPUB tem duas travas contra script: o sandbox sem allow-scripts
  * e a CSP sem script-src. O veneno solta as DUAS, para provar que o teste vê
  * um script rodando quando ele roda; cada trava sozinha é conferida no modo
@@ -224,6 +234,7 @@ async function printar(pag, nome) {
   conf('a página do PDF é guardada num lugar só', APP.split(GUARDA_PAGINA).length, 2);
   conf('o documento velho do PDF é solto num lugar só', APP.split(SOLTA_DOC).length, 2);
   conf('o pacote é espiado num lugar só', APP.split(ESPIA).length, 2);
+  conf('o mesmo arquivo é decidido num lugar só', STORE.split(MESMO_ARQUIVO).length, 2);
   if (MODO) {
     conf('um arquivo servido ficou diferente do repositório (' + MODO + ')',
       (APP_SERVIDO !== APP ? 1 : 0) + (STORE_SERVIDO !== STORE ? 1 : 0), 1);
@@ -478,6 +489,43 @@ async function printar(pag, nome) {
   conf('importar de novo devolve só o que faltava', /1 livro novo/.test(de_novo) && /3 já estavam no tablet/.test(de_novo), true);
   conf('e são quatro de novo', await H.contarDeposito(p, 'livros'), 4);
   conf('a posição do PDF continua lá', ((await p.evaluate(() => Store.lerPosicaoLivro('livro-com-marcadores'))) || {}).pagina, 4);
+
+  // ================================================================
+  secao('6b. O mesmo pacote com dois PDFs trocados: o hash decide, não só o id');
+  /* Mesmo nome, mesma versão e mesmos ids; o livro sem sumário ganhou uma
+   * página (hash novo, sumário igual) e o com marcadores também (hash novo,
+   * sumário diferente: o último capítulo vai até a 7). Comparando só o id, o
+   * tablet dizia "já estavam" e ficava com os arquivos velhos. */
+  const ZIP_TROCADO = gerarPacote('--trocado');
+  conf('o gerador fez o pacote trocado', !!ZIP_TROCADO, true);
+  if (!ZIP_TROCADO) throw Object.assign(new Error('sem pacote'), { jaContado: true });
+  const zipT = Zip.ler(fs.readFileSync(ZIP_TROCADO));
+  const manT = JSON.parse(Buffer.from(await Zip.extrair(zipT, zipT.entradas.find(e => e.nome === 'manifest.json'))).toString('utf8'));
+  const hashT = {};
+  manT.livros.forEach(l => { hashT[l.id] = l.hash; });
+  conf('o pacote trocado tem o mesmo nome e a mesma versão', manT.pacote + ' v' + manT.versao, manifest.pacote + ' v' + manifest.versao);
+  conf('e só os dois PDFs com hash diferente', manifest.livros.filter(l => hashT[l.id] !== l.hash).map(l => l.id).sort().join(','),
+    'livro-com-marcadores,livro-sem-sumario');
+  await p.evaluate(() => Store.gravarPosicaoLivro({ id: 'livro-sem-sumario', pagina: 2 }));
+  const trocado = await importar(p, ZIP_TROCADO, 'a importação do pacote trocado');
+  console.log('   estado: ' + JSON.stringify(trocado));
+  const guardados = await p.evaluate(() => Store.listarLivros().then(ls => ls.map(l => ({ id: l.id, hash: l.meta.hash, bytes: l.blob.size }))));
+  const hashGuardado = {};
+  guardados.forEach(l => { hashGuardado[l.id] = l.hash; });
+  if (MODO === '--envenenado-so-id') {
+    secao('VENENO: a comparação só pelo id e pela versão');
+    conf('envenenado: o tablet ficou com o arquivo velho do livro trocado (defeito enxergado)',
+      hashGuardado['livro-sem-sumario'] !== hashT['livro-sem-sumario'], true);
+    throw Object.assign(new Error('fim'), { fimDoVeneno: true });
+  }
+  conf('a tela diz que dois foram atualizados e dois já estavam', /2 atualizados/.test(trocado) && /2 já estavam no tablet/.test(trocado), true);
+  conf('e que um mudou de sumário e abre no começo', /1 livro atualizado mudou de sumário/.test(trocado), true);
+  conf('o tablet ficou com os arquivos novos (o hash de cada livro é o do pacote trocado)',
+    guardados.every(l => l.hash === hashT[l.id]), true);
+  conf('o livro com o mesmo sumário guarda a página onde ela parou', ((await p.evaluate(() => Store.lerPosicaoLivro('livro-sem-sumario'))) || {}).pagina, 2);
+  conf('o de sumário diferente perde a posição', await p.evaluate(() => Store.lerPosicaoLivro('livro-com-marcadores')), undefined);
+  const deNovoT = await importar(p, ZIP_TROCADO, 'o pacote trocado de novo');
+  conf('importar o trocado outra vez não muda nada', /4 já estavam no tablet/.test(deNovoT) && !/atualizad/.test(deNovoT), true);
 
   // ================================================================
   secao('7. Memória: um pacote de dez livros de 4 MB é lido livro a livro');
