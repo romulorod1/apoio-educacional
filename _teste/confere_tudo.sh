@@ -267,6 +267,11 @@ for t in testa_registro testa_mapeamento testa_exclusoes testa_feriados \
          testa_vocabulario testa_dominio testa_sondagem testa_pagamentos; do
   roda "$t" node "_teste/$t.js"
 done
+# C9: o documento do ciclo. Os numeros do periodo, o dominio, o rascunho das
+# quatro secoes, so os pontos de atencao marcados, o texto e o PDF sem nada
+# interno; e dois venenos (ponto nao marcado, rotulo interno) que TEM de
+# reprovar, com o controle pelo mesmo carregador.
+roda "documento do ciclo"    node _teste/testa_documento_do_ciclo.js
 
 # A secao do kit de figuras (31 provas de figuras/) saiu no B14 com o material
 # autoral: o kit so servia aos temas.
@@ -649,6 +654,12 @@ roda "anexo como folha"                           node "_teste/testa_anexo_como_
 # lista de pendentes, recarregar, a copia de seguranca de ida e volta, e o
 # documento da familia (janela, PDF e texto) sem citar pagamento.
 roda "pago em"                                    node "_teste/testa_pago_em.js"
+# C9: o documento do ciclo na tela. A contagem do que abre sozinho (janelas,
+# aviso, faixas, dialogos) no codigo da origin/main e no de hoje, igual, com
+# controle de que o contador ve; a entrada discreta na ficha; editar, recarregar
+# e ver o texto guardado; o texto e o PDF pelos botoes, sem rotulo interno; a
+# copia de seguranca leva o ciclo. Porta 8865.
+roda "documento do ciclo (tela)"                  node "_teste/testa_documento_do_ciclo_navegador.js"
 # FRENTE B (B10): o que o lerKits recusa e o que a tela descarta (lista com
 # exercicio que saiu por curadoria). O veneno tira o guarda do app.js, e sem
 # ele a aba Biblioteca inteira nao abre.
