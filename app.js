@@ -14409,7 +14409,12 @@
    * (o mesmo filtro do passe automático), na ordem do índice. */
   function desenharEscolhaDoCobre(caixa, reg, e, nomes, redesenhar) {
     var velha = caixa.querySelector('.cobre-escolha');
-    if (velha) { velha.remove(); return; }
+    if (velha) {
+      velha.remove();
+      var linha = caixa.querySelector('.cobre-rolagem');
+      if (linha) linha.remove();
+      return;
+    }
     var series = Array.isArray(reg.meta.series) ? reg.meta.series : [];
     var disciplina = reg.meta.mapa_disciplina;
     var opcoes = (nomes.lista || []).filter(function (a) {
@@ -14423,15 +14428,29 @@
       lista.appendChild(el('p', { class: 'ajuda', style: 'margin:8px 12px',
         texto: 'A matéria deste livro não tem assuntos no índice; dá para marcar só que o capítulo não cobre nenhum.' }));
     }
+    /* O assunto de agora vem marcado (o visto, negrito e fundo), para ela ver
+     * de relance qual está antes de trocar; "Nenhum" é o atual quando o
+     * capítulo não tem assunto. */
+    var botao = function (id, texto) {
+      var atual = id ? e.assuntos.indexOf(id) >= 0 : !e.assuntos.length;
+      var b = el('button', { type: 'button', 'data-assunto': id, class: atual ? 'atual' : '',
+        texto: (atual ? '✓ ' : '') + texto, aoClick: function () { escolher(id ? [id] : []); } });
+      if (atual) b.setAttribute('aria-current', 'true');
+      return b;
+    };
     opcoes.forEach(function (a) {
-      lista.appendChild(el('button', { type: 'button', 'data-assunto': a.id,
-        class: e.assuntos.indexOf(a.id) >= 0 ? 'atual' : '',
-        texto: a.titulo + (a.eixo === 'ano' && series.length > 1 ? ' (' + nomeDoAno(a.serie) + ')' : ''),
-        aoClick: function () { escolher([a.id]); } }));
+      lista.appendChild(botao(a.id, a.titulo + (a.eixo === 'ano' && series.length > 1 ? ' (' + nomeDoAno(a.serie) + ')' : '')));
     });
-    lista.appendChild(el('button', { type: 'button', 'data-assunto': '', texto: 'Nenhum assunto do índice',
-      aoClick: function () { escolher([]); } }));
+    lista.appendChild(botao('', 'Nenhum assunto do índice'));
     caixa.appendChild(lista);
+    /* Lista maior que a caixa: a sombra embaixo (CSS) e esta linha dizem que há
+     * mais para rolar, e a lista abre já com o atual à vista. */
+    if (lista.scrollHeight > lista.clientHeight + 1) {
+      caixa.appendChild(el('div', { class: 'ajuda cobre-rolagem',
+        texto: 'Role a lista para ver todos: são ' + (opcoes.length + 1) + ' opções.' }));
+      var marcado = lista.querySelector('.atual');
+      if (marcado) lista.scrollTop = Math.max(0, marcado.offsetTop - lista.clientHeight / 2);
+    }
   }
 
   /* --------------------------------------- "Abrir no livro" (C15.3) */

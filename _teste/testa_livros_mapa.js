@@ -16,7 +16,8 @@
  *      com o nome do índice; o do passe automático vem marcado e com
  *      Confirmar; um toque confirma;
  *   2. Corrigir lista só os assuntos da matéria e do ano do livro (e "Nenhum
- *      assunto do índice"); um toque grava a correção, e ela continua lá
+ *      assunto do índice"), com o atual marcado e à vista, e a linha que diz
+ *      que a lista rola; um toque grava a correção, e ela continua lá
  *      depois de recarregar o aplicativo; o mapa do pacote não muda;
  *   3. a correção vai na cópia de segurança (em dados.ajustes.mapaDosLivros),
  *      os livros não, e restaurar a cópia devolve a correção;
@@ -140,6 +141,9 @@ async function abrirAulaDeHoje(pag, hora) {
   await esperar('aula das ' + hora + ' aberta', () => pag.evaluate(() => document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
   return ok;
 }
+// as opções marcadas como atuais na lista do Corrigir: id e o visto do começo do texto
+const marcados = pag => pag.evaluate(() => Array.from(document.querySelectorAll('#leitor-cobre .cobre-escolha [aria-current="true"]'))
+  .map(b => b.getAttribute('data-assunto') + ' ' + (b.classList.contains('atual') ? b.textContent.charAt(0) : '?')).join(' | '));
 // os botões "Abrir no livro" da aula aberta, pelo id do assunto
 const botoesDoLivro = pag => pag.evaluate(() => Array.from(document.querySelectorAll('#corpo-modal-aula [data-abrir-no-livro]'))
   .map(b => b.getAttribute('data-abrir-no-livro')).join(','));
@@ -224,6 +228,17 @@ async function printar(pag, nome) {
   conf('as opções são só de matemática do 6º ao 9º ano (o ano do livro)',
     opcoes.filter(x => x).every(x => /^MAT0[6-9]-/.test(x)), true);
   conf('com os 56 assuntos desses anos, e "Nenhum assunto do índice"', opcoes.filter(x => x).length + '+' + opcoes.filter(x => !x).length, '56+1');
+  conf('o assunto atual do capítulo vem marcado na lista, e só ele', await marcados(p), 'MAT06-05 ✓');
+  const rolagem = await p.evaluate(() => {
+    const l = document.querySelector('#leitor-cobre .cobre-escolha');
+    const r = document.querySelector('#leitor-cobre .cobre-rolagem');
+    const m = l.querySelector('.atual');
+    return { rola: l.scrollHeight > l.clientHeight, linha: r && !r.hidden ? r.textContent : '',
+      atualAVista: !!m && m.offsetTop >= l.scrollTop && m.offsetTop + m.offsetHeight <= l.scrollTop + l.clientHeight };
+  });
+  console.log('   rolagem: ' + JSON.stringify(rolagem));
+  conf('a lista rola, e o fim dela diz isso ("Role a lista ... 57 opções")', rolagem.rola && /Role a lista.*57 opções/.test(rolagem.linha), true);
+  conf('e abre com o assunto atual à vista', rolagem.atualAVista, true);
   await p.evaluate(() => document.querySelector('#leitor-cobre .cobre-escolha').scrollIntoView({ block: 'center' }));
   await printar(p, 'c15b_corrigir.png');
   await p.evaluate(() => document.querySelector('#leitor-cobre .cobre-escolha [data-assunto="MAT06-06"]').click());
@@ -251,6 +266,12 @@ async function printar(pag, nome) {
     throw Object.assign(new Error('fim'), { fimDoVeneno: true });
   }
   conf('depois de recarregar o aplicativo, o capítulo 2 continua corrigido', !!c2c && c2c.estado === 'corrigido' && c2c.assuntos === 'MAT06-06', true);
+  await p.evaluate(() => document.querySelector('#cobre-corrigir').click());
+  await esperar('a lista do Corrigir de novo', () => p.evaluate(() => document.querySelectorAll('#leitor-cobre .cobre-escolha [data-assunto]').length), v => v > 3, 10000);
+  conf('o Corrigir agora marca a escolha dela', await marcados(p), 'MAT06-06 ✓');
+  await p.evaluate(() => document.querySelector('#cobre-corrigir').click());
+  conf('e o segundo toque em Corrigir fecha a lista e a linha da rolagem',
+    await p.evaluate(() => !document.querySelector('#leitor-cobre .cobre-escolha') && !document.querySelector('#leitor-cobre .cobre-rolagem')), true);
   const doLivro = (guardado || {})['livro-com-marcadores'] || {};
   conf('a correção mora em db.ajustes.mapaDosLivros, por capítulo, com o título',
     [doLivro['1'] && doLivro['1'].acao + ':' + doLivro['1'].assuntos.join('+'), doLivro['2'] && doLivro['2'].acao + ':' + doLivro['2'].assuntos.join('+') + ':' + doLivro['2'].titulo].join(' | '),
