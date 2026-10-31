@@ -322,6 +322,20 @@ def amostra_rodada(temp, placar):
     placar.conferir('livros: fronteira com o teto em 41 MB',
                     trava_fronteira(lambda n: 'x' if n > livros.TETO_BYTES + 1024 * 1024 else None), deve_reprovar=True)
 
+    # o teto por pacote (300 MB), dos dois lados, e o veneno de um teto que nao recusa nada
+    def fronteira_do_pacote(f):
+        e = []
+        if f(livros.TETO_DO_PACOTE) is not None:
+            e.append('300 MB exatos recusados')
+        if f(livros.TETO_DO_PACOTE + 1) is None:
+            e.append('300 MB e um byte passaram')
+        elif 'materia' not in f(livros.TETO_DO_PACOTE + 1):
+            e.append('a recusa nao manda separar por materia')
+        return e
+    placar.conferir('livros: teto por pacote (300 MB cabem, um byte a mais nao; manda separar por materia)',
+                    fronteira_do_pacote(livros.motivo_do_pacote))
+    placar.conferir('livros: teto por pacote desligado', fronteira_do_pacote(lambda n: None), deve_reprovar=True)
+
     placar.conferir('livros: contas (no pacote, recusado com motivo ou sem arquivo)', trava_contas(m1, r1, c['planilha']))
     sumiu = copy.deepcopy(r1)
     sumiu['recusados'] = sumiu['recusados'][1:]

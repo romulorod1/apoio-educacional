@@ -597,6 +597,10 @@ roda "livros"                                     node "_teste/testa_livros.js"
 roda "livros --envenenado-copia-com-livros"       node "_teste/testa_livros.js" --envenenado-copia-com-livros
 roda "livros --envenenado-epub-com-scripts"       node "_teste/testa_livros.js" --envenenado-epub-com-scripts
 roda "livros --envenenado-sem-posicao"            node "_teste/testa_livros.js" --envenenado-sem-posicao
+# A revisao do C15.1: o segundo PDF da sessao (o doc.destroy() do C14) e o
+# pacote lido livro a livro, sem o arquivo inteiro na memoria.
+roda "livros --envenenado-destroy"                node "_teste/testa_livros.js" --envenenado-destroy
+roda "livros --envenenado-zip-inteiro"            node "_teste/testa_livros.js" --envenenado-zip-inteiro
 # C2b: a lista de base (base-v1) importa, vem primeiro com o nome dela e a
 # frase de posicao na fonte; as tres listas com a etiqueta de nivel. A regra
 # em si e do biblioteca/_prova_kits.py (sem navegador).

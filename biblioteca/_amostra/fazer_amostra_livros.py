@@ -8,6 +8,10 @@
         navegador _teste/testa_livros.js chama assim e le o caminho do zip na
         ultima linha da saida)
 
+    python biblioteca/_amostra/fazer_amostra_livros.py <pasta> --varios
+        dez livros de 4 MB e o pacote livros-prova-varios-v1.zip (40 MB), para
+        a prova de memoria do testa_livros.js
+
 Conteudo proprio, escrito aqui: nenhum livro comercial entra no repositorio
 nem no portao (C15.1, item 5). Texto conhecido, para a prova e o teste saberem
 o que procurar:
@@ -220,11 +224,43 @@ def fazer(pasta, grande=False):
     return {'livros': livros, 'planilha': planilha, 'mapas': mapa}
 
 
+def fazer_varios(pasta, n=10, lado=1150):
+    """Varios livros pesados (cada um com uma figura de ruido de lado x lado x 3
+    bytes, 4 MB com o padrao), e a planilha deles, em <pasta>/Varios. E o
+    pacote da prova de memoria: o pico na importacao tem de ficar perto de UM
+    livro, e nao do pacote."""
+    raiz = os.path.join(pasta, 'Varios')
+    linhas = []
+    for k in range(n):
+        doc = pymupdf.open()
+        pagina(doc, CORES[k % 3], ['Livro pesado %d' % (k + 1), 'Uma página só, com uma figura de ruído.'])
+        sorteio = random.Random(100 + k)
+        pix = pymupdf.Pixmap(pymupdf.csRGB, lado, lado, sorteio.randbytes(lado * lado * 3), False)
+        doc[0].insert_image(pymupdf.Rect(72, 720, 172, 820), pixmap=pix)
+        salvar(doc, os.path.join(raiz, 'pesados', 'livro-pesado-%02d.pdf' % (k + 1)))
+        linhas.append(linha('matematica', 'Livro pesado %d' % (k + 1), 'pesados/livro-pesado-%02d.pdf' % (k + 1)))
+    planilha = os.path.join(raiz, 'livros_varios.csv')
+    with open(planilha, 'w', encoding='utf-8-sig', newline='') as f:
+        w = csv.DictWriter(f, fieldnames=CABECALHO)
+        w.writeheader()
+        w.writerows(linhas)
+    return {'livros': raiz, 'planilha': planilha}
+
+
 def principal():
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     if len(args) != 1:
         raise SystemExit(__doc__)
     pasta = os.path.abspath(args[0])
+    if '--varios' in sys.argv:
+        import livros
+        c = fazer_varios(pasta)
+        manifest, rel, _ = livros.gerar(c['planilha'], 'prova-varios', 1, os.path.join(pasta, 'pacotes'),
+                                        trabalho=os.path.join(pasta, 'trabalho-varios'),
+                                        gerado_em='2026-10-30T10:00:00-03:00', commit='prova')
+        print('%d livros no pacote, %d bytes' % (manifest['contagens']['livros'], manifest['contagens']['bytes']))
+        print(rel['zip']['caminho'])
+        return
     c = fazer(pasta, grande='--grande' in sys.argv)
     if '--pacote' in sys.argv:
         import livros

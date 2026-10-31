@@ -13,7 +13,8 @@ recusa.
 O TETO: 40 MB por livro. Acima disso o livro nao entra, e o relatorio o lista
 para o dono trocar por uma versao mais leve (item E7 do livro de execucao). O
 teto e conferido pelo tamanho no disco ANTES de abrir o arquivo: um PDF de 120
-MB nao chega a ser lido, e a maquina tem pouca memoria.
+MB nao chega a ser lido, e a maquina tem pouca memoria. E 300 MB por pacote
+(ver TETO_DO_PACOTE): um pacote por materia.
 
 O SUMARIO, por ordem de preferencia:
   - PDF: os marcadores do proprio PDF (get_toc), com nivel, titulo, pagina e a
@@ -57,8 +58,28 @@ import portal
 
 TETO_MB = 40
 TETO_BYTES = TETO_MB * 1024 * 1024
-# o zip vai sem zip64 (contrato, secao 1): o pacote inteiro fica abaixo de 2 GB
-TETO_DO_PACOTE = 2 * 1024 * 1024 * 1024 - 64 * 1024 * 1024
+# O TETO POR PACOTE: 300 MB, e a recomendacao e um pacote por materia (--materia).
+# Desde a revisao do C15.1 o app le o pacote de livros livro a livro, direto do
+# arquivo, e a memoria do tablet nao depende mais do tamanho do pacote (o pico
+# e perto de um livro, ate 40 MB). O que ainda cresce com o pacote: o espaco
+# no tablet, que no dia da importacao guarda o zip baixado do Drive E a copia
+# no banco (duas vezes o pacote); a gravacao, que e UMA transacao (tudo ou
+# nada), mais longa quanto maior o pacote; e o download pelo Drive. 300 MB sao
+# sete livros no teto ou dezenas dos comuns (a matematica inteira da planilha
+# tem 9,8 MB), e cabem com folga num tablet com 2 GB livres. Acima disso o
+# gerador recusa e manda separar por materia, em vez de fazer um pacote que
+# so falha no tablet.
+TETO_DO_PACOTE_MB = 300
+TETO_DO_PACOTE = TETO_DO_PACOTE_MB * 1024 * 1024
+
+
+def motivo_do_pacote(total):
+    """None se o pacote cabe no teto de 300 MB; senao, a frase da recusa."""
+    if total > TETO_DO_PACOTE:
+        return ('erro: o pacote teria %s MB, acima do teto de %d MB por pacote. Gere um pacote por materia '
+                '(--materia), e, se uma materia passar sozinha, separe a planilha em duas'
+                % (mb(total), TETO_DO_PACOTE_MB))
+    return None
 FORMATOS = {'.pdf': 'pdf', '.epub': 'epub'}
 
 NS = {
@@ -524,8 +545,9 @@ def gerar(planilha, rotulo, versao, saida, pasta_livros=None, materia=None, mapa
         arquivos[no_zip] = caminho
     livros.sort(key=lambda x: x['id'])
     total = sum(x['bytes'] for x in livros)
-    if total > TETO_DO_PACOTE:
-        raise SystemExit('erro: o pacote passaria de 2 GB (%s MB); separe por --materia' % mb(total))
+    recusa_do_pacote = motivo_do_pacote(total)
+    if recusa_do_pacote:
+        raise SystemExit(recusa_do_pacote)
     contagens = {'livros': len(livros), 'pdf': sum(1 for x in livros if x['formato'] == 'pdf'),
                  'epub': sum(1 for x in livros if x['formato'] == 'epub'), 'bytes': total,
                  'recusados': len(recusados), 'recusados_teto': sum(1 for r in recusados if r['teto']),
@@ -540,7 +562,7 @@ def gerar(planilha, rotulo, versao, saida, pasta_livros=None, materia=None, mapa
                   'planilha': os.path.basename(planilha),
                   'licenca': 'livros de uso pessoal da professora: ficam só no tablet, fora do repositório, '
                              'da cópia de segurança e da nuvem'},
-        'teto_mb_por_livro': TETO_MB,
+        'teto_mb_por_livro': TETO_MB, 'teto_mb_por_pacote': TETO_DO_PACOTE_MB,
         'contagens': contagens,
         'livros': livros,
         'arquivos': {k: next(x['hash'] for x in livros if x['arquivo'] == k) for k in sorted(arquivos)},

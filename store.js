@@ -790,10 +790,12 @@
       esvaziar('historico'),
       /* O uso e as etiquetas são dela e saem junto. Os pacotes ficam: são
        * conteúdo reimportável, como o próprio aplicativo. Os livros também
-       * ficam, pelo mesmo motivo (e saem um a um em Ajustes). */
+       * ficam, pelo mesmo motivo (e saem um a um em Ajustes); a POSIÇÃO de
+       * leitura em cada livro é dado dela, e sai junto. */
       esvaziar('biblioteca_uso'),
       esvaziar('biblioteca_etiquetas'),
-      esvaziar('biblioteca_listas')
+      esvaziar('biblioteca_listas'),
+      esvaziar('livros_posicoes')
     ]);
   }
 

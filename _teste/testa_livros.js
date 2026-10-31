@@ -28,7 +28,12 @@
  *      ao meio do capítulo 2, e reabrir volta ao mesmo capítulo e rolagem;
  *   6. Remover um livro em Ajustes: o total cai exatamente o tamanho dele, e
  *      importar o mesmo pacote de novo devolve só o que faltava;
- *   7. nenhum erro de página.
+ *   7. memória (revisão do C15.1): um pacote de dez livros de 4 MB é lido
+ *      livro a livro, em trechos; nenhuma leitura passa de um livro, e a
+ *      memória dos processos do navegador não sobe o pacote inteiro;
+ *   8. Apagar tudo: os livros ficam, a posição de leitura sai, e a pergunta
+ *      diz que os livros ficam;
+ *   9. nenhum erro de página.
  *
  * Modos envenenados:
  *   --envenenado-copia-com-livros  o store.js servido põe os livros na cópia
@@ -38,6 +43,11 @@
  *                                  dentro dela tem de rodar.
  *   --envenenado-sem-posicao       o PDF não guarda a página: reabrir tem de
  *                                  voltar à página 1.
+ *   --envenenado-destroy           o doc.destroy() do C14 de volta: o segundo
+ *                                  PDF da sessão tem de falhar.
+ *   --envenenado-zip-inteiro       o arquivo do pacote lido inteiro antes de
+ *                                  abrir: a maior leitura tem de ser o pacote
+ *                                  e a memória tem de subir mais que ele.
  *
  *   --prints <pasta>   grava três prints (a gestão em Ajustes, o PDF com o
  *                      sumário aberto, o EPUB aberto).
@@ -51,7 +61,8 @@ const H = require('./_bib_navegador');
 const { conf, secao, esperar, pausa } = H;
 
 const PORTA = 8862;
-const VENENOS = ['--envenenado-copia-com-livros', '--envenenado-epub-com-scripts', '--envenenado-sem-posicao'];
+const VENENOS = ['--envenenado-copia-com-livros', '--envenenado-epub-com-scripts', '--envenenado-sem-posicao',
+  '--envenenado-destroy', '--envenenado-zip-inteiro'];
 const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const iPrints = process.argv.indexOf('--prints');
 const PRINTS = iPrints > 0 ? process.argv[iPrints + 1] : null;
@@ -84,14 +95,22 @@ if (MODO === '--envenenado-epub-com-scripts') {
     .split(CSP_DO_EPUB).join("var EPUB_CSP = \"default-src 'none'; script-src 'unsafe-inline'; img-src");
 }
 if (MODO === '--envenenado-sem-posicao') APP_SERVIDO = APP.split(GUARDA_PAGINA).join('Promise.resolve()');
+// o C14 chamava doc.destroy(), que o PDF.js 6 não tem: o segundo PDF da sessão caía
+const SOLTA_DOC = '    soltarDocPdf(velho);';
+if (MODO === '--envenenado-destroy') APP_SERVIDO = APP.split(SOLTA_DOC).join('    velho.destroy();');
+// a revisão do C15.1: o arquivo inteiro na memória antes de abrir o pacote
+const ESPIA = 'Biblioteca.espiarPacote(arquivo).then(';
+if (MODO === '--envenenado-zip-inteiro') {
+  APP_SERVIDO = APP.split(ESPIA).join('arquivo.arrayBuffer().then(function (b) { return Biblioteca.espiarPacote(new Blob([b])); }).then(');
+}
 const amb = H.criarAmbiente(PORTA, 'nath_c15_livros', trocas);
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'c15_livros_'));
 process.on('exit', () => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { /* ok */ } });
 
-function gerarPacote() {
-  const r = spawnSync(PYTHON, ['-X', 'utf8', path.join(H.RAIZ, 'biblioteca', '_amostra', 'fazer_amostra_livros.py'), TMP, '--pacote'],
-    { encoding: 'utf8' });
+function gerarPacote(opcao) {
+  const r = spawnSync(PYTHON, ['-X', 'utf8', path.join(H.RAIZ, 'biblioteca', '_amostra', 'fazer_amostra_livros.py'), TMP,
+    opcao || '--pacote'], { encoding: 'utf8' });
   const linhas = String(r.stdout || '').trim().split(/\r?\n/);
   const zip = linhas[linhas.length - 1];
   if (r.status !== 0 || !zip || !fs.existsSync(zip)) {
@@ -203,6 +222,8 @@ async function printar(pag, nome) {
   conf('a caixa do EPUB nasce num lugar só', APP.split(SANDBOX).length, 2);
   conf('e a CSP dela também', APP.split(CSP_DO_EPUB).length, 2);
   conf('a página do PDF é guardada num lugar só', APP.split(GUARDA_PAGINA).length, 2);
+  conf('o documento velho do PDF é solto num lugar só', APP.split(SOLTA_DOC).length, 2);
+  conf('o pacote é espiado num lugar só', APP.split(ESPIA).length, 2);
   if (MODO) {
     conf('um arquivo servido ficou diferente do repositório (' + MODO + ')',
       (APP_SERVIDO !== APP ? 1 : 0) + (STORE_SERVIDO !== STORE ? 1 : 0), 1);
@@ -327,6 +348,11 @@ async function printar(pag, nome) {
   await fecharModal(p, 'modal-leitor-pdf');
   await abrirPelaEstante(p, 'livro-com-marcadores');
   const reaberto = await esperar('a página reaberta', () => paginaDesenhada(p), v => /^\d+$/.test(v || ''), 30000);
+  if (MODO === '--envenenado-destroy') {
+    secao('VENENO: o doc.destroy() do C14 de volta');
+    conf('envenenado: o segundo PDF da sessão não abre (defeito enxergado)', reaberto.ok, false);
+    throw Object.assign(new Error('fim'), { fimDoVeneno: true });
+  }
   if (MODO === '--envenenado-sem-posicao') {
     secao('VENENO: o PDF não guarda a página');
     conf('envenenado: reabre na página 1 (defeito enxergado)', reaberto.valor, '1');
@@ -453,6 +479,103 @@ async function printar(pag, nome) {
   conf('e são quatro de novo', await H.contarDeposito(p, 'livros'), 4);
   conf('a posição do PDF continua lá', ((await p.evaluate(() => Store.lerPosicaoLivro('livro-com-marcadores'))) || {}).pagina, 4);
 
-  secao('7. Nenhum erro de página');
+  // ================================================================
+  secao('7. Memória: um pacote de dez livros de 4 MB é lido livro a livro');
+  /* Dois instrumentos. O page.metrics() e o performance.memory medem só a
+   * pilha do JavaScript e NÃO enxergam ArrayBuffer (conferido em 30/10: 100 MB
+   * alocados, os dois continuaram em 2 e 4 MB). Por isso:
+   *   - a MAIOR LEITURA de uma vez, contada em toda chamada de arrayBuffer()
+   *     de Blob e de File da página: é a causa, e é exata;
+   *   - a memória do processo da página (renderer), no sistema, amostrada a
+   *     cada 100 ms durante a importação: é o efeito, e tem ruído. */
+  const ZIP_VARIOS = gerarPacote('--varios');
+  conf('o gerador fez o pacote de vários livros', !!ZIP_VARIOS, true);
+  if (!ZIP_VARIOS) throw Object.assign(new Error('sem pacote'), { jaContado: true });
+  const zipV = Zip.ler(fs.readFileSync(ZIP_VARIOS));
+  const manV = JSON.parse(Buffer.from(await Zip.extrair(zipV, zipV.entradas.find(e => e.nome === 'manifest.json'))).toString('utf8'));
+  const maiorLivro = Math.max.apply(null, manV.livros.map(l => l.bytes));
+  const tamPacote = fs.statSync(ZIP_VARIOS).size;
+  console.log('   pacote: ' + manV.livros.length + ' livros, ' + tamPacote + ' bytes; maior livro ' + maiorLivro + ' bytes');
+  conf('o pacote tem pelo menos cinco vezes o maior livro', tamPacote > 5 * maiorLivro, true);
+  await p.evaluate(() => {
+    window.__maiorLeitura = 0;
+    const ab = Blob.prototype.arrayBuffer;
+    Blob.prototype.arrayBuffer = function () { window.__maiorLeitura = Math.max(window.__maiorLeitura, this.size); return ab.call(this); };
+    const fr = FileReader.prototype.readAsArrayBuffer;
+    FileReader.prototype.readAsArrayBuffer = function (b) { window.__maiorLeitura = Math.max(window.__maiorLeitura, b.size); return fr.call(this, b); };
+    // o leitor "byob" lê o livro em trechos para dentro de um buffer só: conta o tamanho de cada trecho
+    if (typeof ReadableStreamBYOBReader === 'function') {
+      const rd = ReadableStreamBYOBReader.prototype.read;
+      ReadableStreamBYOBReader.prototype.read = function (v) {
+        window.__maiorLeitura = Math.max(window.__maiorLeitura, (v && v.byteLength) || 0);
+        window.__trechosByob = (window.__trechosByob || 0) + 1;
+        return rd.apply(this, arguments);
+      };
+    }
+  });
+  const sessao = await p.browser().target().createCDPSession();
+  const processos = (await sessao.send('SystemInfo.getProcessInfo')).processInfo.map(x => x.id);   // todos: o Blob em memória mora no processo do navegador
+  const memoriaDoNavegador = () => {
+    if (process.platform === 'win32') {
+      const r = spawnSync('tasklist', ['/FO', 'CSV', '/NH'], { encoding: 'utf8' });
+      let soma = 0;
+      String(r.stdout || '').split(/\r?\n/).forEach(l => {
+        const c = l.split('","').map(x => x.replace(/"/g, ''));
+        if (c.length >= 5 && processos.indexOf(Number(c[1])) >= 0) soma += Number(c[4].replace(/\D/g, '')) * 1024;
+      });
+      return soma;
+    }
+    return processos.reduce((s, id) => {
+      try { return s + Number((/VmRSS:\s*(\d+)/.exec(fs.readFileSync('/proc/' + id + '/status', 'utf8')) || [0, 0])[1]) * 1024; }
+      catch (e) { return s; }
+    }, 0);
+  };
+  const base = memoriaDoNavegador();
+  let pico = base, amostrando = true;
+  const amostras = (async () => { while (amostrando) { pico = Math.max(pico, memoriaDoNavegador()); await pausa(50); } })();
+  const estV = await importar(p, ZIP_VARIOS, 'a importação dos dez livros');
+  amostrando = false;
+  await amostras;
+  const maiorLeitura = await p.evaluate(() => window.__maiorLeitura);
+  const MB = x => (x / 1048576).toFixed(1) + ' MB';
+  console.log('   estado: ' + JSON.stringify(estV));
+  console.log('   maior leitura de uma vez: ' + MB(maiorLeitura) + ' (maior livro ' + MB(maiorLivro) + ', pacote ' + MB(tamPacote) + ')');
+  console.log('   memória dos processos do navegador: ' + MB(base) + ' antes, pico ' + MB(pico) + ' (+' + MB(pico - base) + ')' +
+    (processos.length ? '' : ' [sem processo de página achado]'));
+  if (MODO === '--envenenado-zip-inteiro') {
+    secao('VENENO: o arquivo inteiro na memória');
+    conf('envenenado: a maior leitura é o pacote inteiro (defeito enxergado)', maiorLeitura >= tamPacote, true);
+    if (processos.length && base > 0) {
+      conf('envenenado: e a memória do navegador sobe mais que o pacote (defeito enxergado)', pico - base >= tamPacote, true);
+    }
+    throw Object.assign(new Error('fim'), { fimDoVeneno: true });
+  }
+  conf('os dez entraram', /10 livros novos/.test(estV), true);
+  // o contador enxerga: os livros passaram por ele, em trechos (sem isto, "nada grande" passaria com o contador cego)
+  conf('o contador viu os livros sendo lidos (trechos ou fatias)', (await p.evaluate(() => window.__trechosByob || 0)) >= 10 ||
+    maiorLeitura >= 1024 * 1024, true);
+  conf('nenhuma leitura passou de um livro (mais a cauda do zip)', maiorLeitura <= maiorLivro + 65557, true);
+  conf('e a maior leitura não é o pacote', maiorLeitura < tamPacote / 2, true);
+  /* O efeito, com margem larga de propósito (a memória do processo tem
+   * ruído): o código de antes subia 2 a 2,5 vezes o pacote (medido em 30/10:
+   * +103 MB com este pacote de 38 MB), e o de agora sobe menos que meio. */
+  if (processos.length && base > 0) {
+    conf('a memória do navegador não sobe o pacote inteiro (pico ' + MB(pico - base) + ' acima da base)', pico - base < tamPacote, true);
+  }
+
+  // ================================================================
+  secao('8. Apagar tudo: os livros ficam, a posição de leitura sai');
+  const mensagens = [];
+  p.on('dialog', d => mensagens.push(d.message()));
+  await H.irParaAba(p, 'ajustes');
+  const livrosAntes = await H.contarDeposito(p, 'livros');
+  conf('há posição de leitura guardada antes', (await H.contarDeposito(p, 'livros_posicoes')) > 0, true);
+  await p.evaluate(() => document.querySelector('#apagar-tudo').click());
+  await esperar('as posições apagadas', () => H.contarDeposito(p, 'livros_posicoes'), v => v === 0, 10000);
+  conf('as posições de leitura saíram', await H.contarDeposito(p, 'livros_posicoes'), 0);
+  conf('os livros ficaram', await H.contarDeposito(p, 'livros'), livrosAntes);
+  conf('e a pergunta disse que os livros ficam', /Os livros importados ficam no tablet/.test(mensagens[0] || ''), true);
+
+  secao('9. Nenhum erro de página');
   conf('nenhum erro', p.errosDePagina.join(' | '), '');
 })().then(() => H.fim(amb)(), e => (e && e.fimDoVeneno ? H.fim(amb)() : H.fim(amb)(e)));

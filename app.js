@@ -13892,12 +13892,24 @@
     if (botao) botao.disabled = true;
     mostrarEstadoImportacao('faixa-info', ['Conferindo o pacote ' + arquivo.name + '...']);
     var aberto = null;
-    arquivo.arrayBuffer().then(function (conteudo) {
-      return Biblioteca.abrirPacote(conteudo, function (feitos, total) {
-        if (feitos % 50 === 0 || feitos === total) {
+    /* O pacote de livros (C15.1) NUNCA é lido inteiro: a espiada lê só o
+     * diretório do zip e o manifest, e os livros vêm um por vez, direto do
+     * arquivo (Biblioteca.abrirLivrosDoArquivo). O de exercícios segue como
+     * sempre, inteiro, porque são milhares de SVG pequenos. */
+    Biblioteca.espiarPacote(arquivo).then(function (espiado) {
+      if (espiado && espiado.manifest.conteudo === 'livros') {
+        return Biblioteca.abrirLivrosDoArquivo(espiado, function (feitos, total) {
           mostrarEstadoImportacao('faixa-info', ['Conferindo o pacote ' + arquivo.name + '...',
-            feitos + ' de ' + total + ' arquivos conferidos.']);
-        }
+            feitos + ' de ' + total + ' livros conferidos.']);
+        });
+      }
+      return arquivo.arrayBuffer().then(function (conteudo) {
+        return Biblioteca.abrirPacote(conteudo, function (feitos, total) {
+          if (feitos % 50 === 0 || feitos === total) {
+            mostrarEstadoImportacao('faixa-info', ['Conferindo o pacote ' + arquivo.name + '...',
+              feitos + ' de ' + total + ' arquivos conferidos.']);
+          }
+        });
       });
     }).then(function (a) {
       aberto = a;
@@ -13990,6 +14002,11 @@
       linhas.push(e.message);
     } else if (e && e.name === 'QuotaExceededError') {
       linhas.push('O tablet ficou sem espaço no meio da gravação.');
+    } else if (e && (e.name === 'RangeError' || /allocation failed|out of memory/i.test(String(e.message || '')))) {
+      /* Falta de memória ao ler o arquivo não é download pela metade: a frase
+       * de "espere o download terminar" mandava esperar o que não ia mudar. */
+      linhas.push('O tablet ficou sem memória para abrir este pacote. Feche os outros aplicativos e tente de novo; ' +
+        'se continuar, peça o pacote dividido em partes menores (um por matéria).');
     } else if (e && (e.name === 'NotReadableError' || e.name === 'NotFoundError')) {
       linhas.push('Não consegui ler o arquivo. Se ele está no Drive, espere o download terminar e tente de novo.');
     } else {
@@ -18920,7 +18937,11 @@
   }
 
   function apagarTudo() {
-    if (!confirmar('Apagar TODOS os dados deste tablet? Faça uma cópia de segurança antes.' + avisoDePendenciaNaConfirmacao())) return;
+    /* Os livros importados ficam (são conteúdo, e voltam do Drive): a frase
+     * diz isso, para ela não pensar que vai perder ou que precisa reimportar. */
+    if (!confirmar('Apagar TODOS os dados deste tablet? Faça uma cópia de segurança antes.' +
+        (quantosLivros ? ' Os livros importados ficam no tablet; só o lugar onde você parou em cada um é apagado.' : '') +
+        avisoDePendenciaNaConfirmacao())) return;
     if (!confirmar('Confirma mesmo? Esta ação apaga alunos, aulas, folhas e anexos.')) return;
     Store.apagarTudo().then(function () {
       db = Store.bancoVazio();
