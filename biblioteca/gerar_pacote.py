@@ -2157,6 +2157,8 @@ def principal(argv=None):
     ap.add_argument('--rotulo', help='com --fonte livros: o pacote sai livros-<rotulo> (por exemplo matematica)')
     ap.add_argument('--materia', help='com --fonte livros: so as linhas desta materia_id')
     ap.add_argument('--mapas', help='com --fonte livros: a pasta Livros/mapa, para o sumario do PDF sem marcadores')
+    ap.add_argument('--conferencia', help='com --fonte livros: a pasta das planilhas de conferencia do gabarito '
+                    '(C15.5), uma por livro; padrao: <trabalho>/gabaritos')
     ap.add_argument('--trabalho')
     ap.add_argument('--gerado-em')
     ap.add_argument('--commit')
@@ -2188,7 +2190,7 @@ def principal(argv=None):
     if faltam:
         ap.error('com --fonte %s, faltam: %s' % (a.fonte, ', '.join(faltam)))
     so_livros = [o for o, v in (('--planilha', a.planilha), ('--rotulo', a.rotulo), ('--materia', a.materia),
-                                ('--mapas', a.mapas)) if v]
+                                ('--mapas', a.mapas), ('--conferencia', a.conferencia)) if v]
     if a.fonte != 'livros' and so_livros:
         raise SystemExit('erro: %s so vale com --fonte livros' % ', '.join(so_livros))
     if a.fonte == 'livros':
@@ -2202,7 +2204,7 @@ def principal(argv=None):
             raise SystemExit('erro: %s nao vale com --fonte livros' % ', '.join(extras))
         import livros
         manifest, rel, trab = livros.gerar(a.planilha, a.rotulo, a.versao, a.saida, a.pdfs, a.materia, a.mapas,
-                                           a.trabalho, a.gerado_em, a.commit, not a.sem_zip)
+                                           a.trabalho, a.gerado_em, a.commit, not a.sem_zip, conferencia=a.conferencia)
         print(json.dumps({'contagens': manifest['contagens'], 'zip': rel['zip'],
                           'recusados': [{'linha': r['linha'], 'titulo': r['titulo'], 'motivo': r['motivo']}
                                         for r in rel['recusados']],

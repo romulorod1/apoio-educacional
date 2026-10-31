@@ -49,6 +49,18 @@ banco/topicos/, sem uma linha do conteudo do livro. A fonte, por ordem:
     sumario, o mapa sai vazio, e `mapa_nota` diz por que.
 O mapa do pacote nao muda depois: a correcao dela mora no aplicativo, por cima.
 
+O GABARITO de cada capitulo (C15.5), em `gabarito` da entrada do mapa: as
+paginas (ou as partes, no EPUB) das respostas daquele capitulo, quando um passe
+SEMIAUTOMATICO as localiza. O passe le o texto de cada pagina, acha os titulos
+"Respostas", "Gabarito" e "Resolucoes" e os numeros de capitulo dentro da secao
+de respostas, e propoe; a planilha de conferencia (uma por livro, fora do
+repositorio) diz o que achou e o grau de certeza, para a sessao conferir por
+amostragem. As variacoes: respostas no fim de cada capitulo, no fim do livro
+por capitulo, so das impares, ou so no manual do professor (fora do livro: o
+campo fica vazio). PDF sem camada de texto nao tem o que ler: fica vazio e
+marcado como menos confiavel. Nunca se inventa: sem gabarito localizado, a
+entrada nao ganha `gabarito`, e a tela diz "sem gabarito localizado neste livro".
+
 Nenhum livro entra no repositorio: o pacote sai em --saida, fora dele. A prova
 (biblioteca/_prova_livros.py) roda sobre livros sinteticos.
 """
@@ -506,6 +518,422 @@ def montar_mapa(livro, info, achado, catalogo):
     return saida
 
 
+# ------------------------------------------------------------------ o gabarito (C15.5)
+
+# O titulo de uma secao de respostas, numa linha so: "Respostas", "Respostas
+# dos exercicios", "Gabarito", "Resolucoes das atividades". A preposicao e
+# obrigatoria depois da palavra: "Resposta pessoal" e "Respostas possiveis",
+# que aparecem no meio de qualquer capitulo, nao sao titulo.
+TITULO_DE_RESPOSTAS = re.compile(r'^(respostas?|gabaritos?|resolucoes|resolucao|solucoes)'
+                                 r'( (dos|das|de|do|da|e|para) [a-z0-9 ,/]{0,60})?$')
+# O numero do capitulo dentro das respostas: "Capitulo 2", "Cap. 2", "CAPITULO II".
+MARCA_DE_CAPITULO = re.compile(r'^(capitulo|cap\.?) ?([0-9]{1,3}|[ivxlc]{1,7})\b')
+MARCA_DE_UNIDADE = re.compile(r'^(unidade) ?([0-9]{1,3}|[ivxlc]{1,7})\b')
+# O numero no titulo do capitulo do sumario ou do mapa: "Capitulo 2: Fracoes", "2. Fracoes".
+NUMERO_NO_TITULO = re.compile(r'^(?:(?:capitulo|cap\.?) ?([0-9]{1,3}|[ivxlc]{1,7})\b|([0-9]{1,3})[.)] )')
+SO_IMPARES = re.compile(r'\bimpar(es)?\b')
+NO_MANUAL = re.compile(r'(respostas?|resolucoes|gabarito)[^.]{0,40}\bmanual do professor\b')
+# Quantas linhas do alto da pagina valem como titulo (o cabecalho corrido do
+# livro, o numero da pagina e o titulo da secao cabem nelas).
+LINHAS_DO_ALTO = 6
+# A marca de capitulo no ALTO da pagina abre o capitulo ali: a pagina e so
+# dele, e nao tambem do anterior. "No alto" e nas primeiras linhas e sem
+# nenhuma linha de resposta antes dela (so o cabecalho corrido, o titulo da
+# secao e a unidade). Marca no meio da pagina divide a pagina entre os dois.
+LINHAS_ATE_A_MARCA = 6
+PARECE_RESPOSTA = re.compile(r'^([0-9]{1,3}[.)]|[a-h]\))')
+
+
+# A parte das linhas de uma secao de respostas que parece resposta ("1. 40",
+# "b) 97"). Nas secoes de verdade da amostra real passa de um terco; no quadro
+# "RESPOSTAS" do manual do professor, ao lado da pagina do aluno, fica perto de
+# um decimo.
+DENSIDADE_MINIMA = 0.2
+
+
+def marca_no_alto(ls, k):
+    return k < LINHAS_ATE_A_MARCA and not any(PARECE_RESPOSTA.match(l) for l in ls[:k])
+CERTEZAS = ('alta', 'média', 'baixa')
+ROMANOS = {'i': 1, 'v': 5, 'x': 10, 'l': 50, 'c': 100}
+
+
+def numero_de(t):
+    """'12' ou 'xii' para 12; None se nao for numero."""
+    if t is None:
+        return None
+    t = str(t).strip().lower()
+    if t.isdigit():
+        return int(t)
+    if not t or any(c not in ROMANOS for c in t):
+        return None
+    total = 0
+    for i, c in enumerate(t):
+        v = ROMANOS[c]
+        total += -v if i + 1 < len(t) and ROMANOS[t[i + 1]] > v else v
+    return total or None
+
+
+def linha_normal(l):
+    """A linha como o passe a compara: sem acento, minuscula, espacos simples,
+    sem pontuacao nas pontas."""
+    t = re.sub(r'\s+', ' ', sem_acento(l)).strip()
+    return t.strip(' .:;-_|*')
+
+
+def linhas_de(texto):
+    """As linhas com conteudo, sem as que sao so o numero da pagina."""
+    saida = []
+    for l in str(texto or '').splitlines():
+        n = linha_normal(l)
+        if n and not n.isdigit():
+            saida.append(n)
+    return saida
+
+
+def numero_do_capitulo(entrada):
+    """O numero do capitulo NO LIVRO: o do mapa da orquestradora
+    (capitulo_do_livro) ou o que o titulo diz. None quando nenhum dos dois diz."""
+    n = entrada.get('capitulo_do_livro')
+    if isinstance(n, int) and not isinstance(n, bool):
+        return n
+    m = NUMERO_NO_TITULO.match(linha_normal(entrada.get('titulo') or ''))
+    if m:
+        return numero_de(m.group(1) or m.group(2))
+    return None
+
+
+def casar_numero(numero, capitulos):
+    """A REGRA de casar o numero das respostas com o capitulo: pelo numero do
+    capitulo no livro (o do mapa, ou o do titulo), e so ele. Devolve
+    (capitulo, como casou) ou (None, motivo). Quando NENHUM capitulo diz o
+    proprio numero, vale a ordem do mapa (o n-esimo capitulo), com certeza
+    menor; quando algum diz, a ordem nao vale, porque um volume que comeca no
+    capitulo 7 tem o "Capitulo 7" das respostas no PRIMEIRO capitulo do mapa."""
+    com_numero = [c for c in capitulos if c.get('numero') is not None]
+    if com_numero:
+        achados = [c for c in com_numero if c['numero'] == numero]
+        if len(achados) == 1:
+            return achados[0], 'numero'
+        if len(achados) > 1:
+            return None, 'dois capítulos do mapa com o número %d' % numero
+        return None, 'o mapa não tem o capítulo %d' % numero
+    achados = [c for c in capitulos if c['n'] == numero]
+    if achados:
+        return achados[0], 'ordem'
+    return None, 'o mapa não tem o %dº capítulo' % numero
+
+
+def faixas(unidades):
+    """[3, 4, 5, 9] para [[3, 5], [9, 9]]."""
+    saida = []
+    for u in sorted(set(unidades)):
+        if saida and u == saida[-1][1] + 1:
+            saida[-1][1] = u
+        else:
+            saida.append([u, u])
+    return saida
+
+
+def descrever(fs, formato):
+    nome = 'página' if formato == 'pdf' else 'parte'
+    partes = []
+    for a, b in fs:
+        partes.append('%s %d' % (nome, a) if a == b else '%ss %d a %d' % (nome, a, b))
+    return ', '.join(partes)
+
+
+def propor_gabaritos(textos, capitulos, formato='pdf'):
+    """O passe semiautomatico, sem abrir livro: `textos` e o texto de cada
+    unidade (pagina do PDF ou parte do EPUB), a primeira e a unidade 1;
+    `capitulos` e a lista de {n, titulo, ini, fim, numero} (o mapa do livro).
+
+    Devolve {'por_capitulo': {n: {'faixas', 'certeza', 'como', 'so_impares'}},
+             'secoes': [[a, b]], 'linhas': [linha da planilha], 'nota', 'texto'}.
+    `texto` diz quanto do livro tem camada de texto: 'sim', 'parcial' ou 'nao'.
+    """
+    total = len(textos)
+    linhas = [linhas_de(t) for t in textos]
+    sem_texto = [i + 1 for i, t in enumerate(textos) if len(re.sub(r'\s+', '', str(t or ''))) < 20]
+    nome = 'página' if formato == 'pdf' else 'parte'
+    saida = {'por_capitulo': {}, 'secoes': [], 'linhas': [], 'nota': '', 'texto': 'sim'}
+    if total == 0 or len(sem_texto) * 2 > total:
+        saida['texto'] = 'nao'
+        saida['nota'] = ('Sem camada de texto em %d de %d %ss: o passe não tem o que ler (precisa de OCR antes), '
+                         'e o livro fica sem gabarito localizado, marcado como menos confiável.' % (len(sem_texto), total, nome))
+        saida['linhas'].append({'tipo': 'livro', 'certeza': 'baixa', 'achado': 'sem camada de texto',
+                                'observacao': saida['nota']})
+        return saida
+    if sem_texto:
+        saida['texto'] = 'parcial'
+
+    # 1. as unidades com titulo de respostas: no PDF, no alto da pagina (o
+    # cabecalho corrido da secao); no EPUB, em qualquer ponto da parte, porque
+    # a conversao junta paginas numa parte so
+    titulo_em = {}
+    for i, ls in enumerate(linhas):
+        alvo = ls[:LINHAS_DO_ALTO] if formato == 'pdf' else ls
+        for k, l in enumerate(alvo):
+            if TITULO_DE_RESPOSTAS.match(l):
+                titulo_em[i + 1] = (k / max(1, len(ls)), l)
+                break
+    manual = [i + 1 for i, t in enumerate(textos) if NO_MANUAL.search(' '.join(linhas[i]))]
+
+    # 2. as secoes: unidades seguidas com o titulo
+    secoes = faixas(titulo_em)
+    usadas = set()
+
+    def capitulo_de(u):
+        for c in capitulos:
+            if c['ini'] <= u <= c['fim']:
+                return c
+        return None
+
+    for a, b in secoes:
+        # as marcas de capitulo dentro da secao, na ordem: (unidade, numero, no alto)
+        def marcas_de(regra):
+            achadas = []
+            for u in range(a, b + 1):
+                ls = linhas[u - 1]
+                # no EPUB, a secao pode comecar no meio da parte: o que vem antes do titulo nao e resposta
+                k0 = int(round(titulo_em[u][0] * len(ls))) if formato == 'epub' and u == a else 0
+                for k in range(k0, len(ls)):
+                    m = regra.match(ls[k])
+                    if m and numero_de(m.group(2)):
+                        achadas.append((u, numero_de(m.group(2)), marca_no_alto(ls[k0:], k - k0)))
+            return achadas
+        marcas = marcas_de(MARCA_DE_CAPITULO) or marcas_de(MARCA_DE_UNIDADE)
+        # a mesma marca repetida em seguida (o cabecalho corrido) e uma so
+        limpas = []
+        for x in marcas:
+            if limpas and limpas[-1][1] == x[1]:
+                continue
+            limpas.append(x)
+        impares = any(SO_IMPARES.search(l) for u in range(a, b + 1) for l in linhas[u - 1][:LINHAS_DO_ALTO + 2])
+        evidencia = '"%s" (%s %d)' % (titulo_em[a][1], nome, a)
+        numeros = [x[1] for x in limpas]
+        # sem texto perto da secao (dentro dela ou colada nela), pode faltar resposta: a certeza baixa
+        perto_sem_texto = any(a - 1 <= u <= b + 1 for u in sem_texto)
+
+        def menos(certeza):
+            return CERTEZAS[min(len(CERTEZAS) - 1, CERTEZAS.index(certeza) + 1)] if perto_sem_texto else certeza
+        # a secao de respostas e feita de respostas: no manual do professor, o
+        # quadro "RESPOSTAS" ao lado da pagina do aluno e prosa
+        corpo = [l for u in range(a, b + 1)
+                 for l in linhas[u - 1][(int(round(titulo_em[u][0] * len(linhas[u - 1]))) if formato == 'epub' and u == a else 0):]]
+        densidade = sum(1 for l in corpo if PARECE_RESPOSTA.match(l)) / max(1, len(corpo))
+        if densidade < DENSIDADE_MINIMA:
+            saida['linhas'].append({'tipo': 'descartado', 'gabarito': [[a, b]], 'certeza': 'baixa', 'achado': evidencia,
+                                    'observacao': 'título de respostas, mas só %d%% das linhas parecem resposta (o mínimo é %d%%): '
+                                                  'quadro do manual ou texto corrido; ignorado'
+                                                  % (round(densidade * 100), round(DENSIDADE_MINIMA * 100))})
+            continue
+        if len(limpas) == 1:
+            # uma marca so: e o fim de um capitulo (3b), e a marca tem de ser a dele
+            cap = capitulo_de(a)
+            if cap and cap['numero'] is not None and cap['numero'] != limpas[0][1]:
+                saida['linhas'].append({'tipo': 'descartado', 'gabarito': [[a, b]], 'certeza': 'baixa', 'achado': evidencia,
+                                        'observacao': 'respostas do capítulo %d dentro do capítulo %d (%s): não fecha; ignorado'
+                                                      % (limpas[0][1], cap['numero'], cap['titulo'])})
+                continue
+            limpas = []
+        if limpas and len(set(numeros)) != len(numeros):
+            saida['linhas'].append({'tipo': 'descartado', 'gabarito': [[a, b]], 'certeza': 'baixa', 'achado': evidencia,
+                                    'observacao': 'a numeração dos capítulos recomeça dentro das respostas (%s): '
+                                                  'não dá para casar sem ler; ficou sem gabarito' % ', '.join(map(str, numeros))})
+            saida['secoes'].append([a, b])
+            continue
+        if limpas:
+            # 3a. respostas por capitulo (no fim do livro, ou no fim de uma unidade)
+            saida['secoes'].append([a, b])
+            for j, (u, num, _) in enumerate(limpas):
+                if j + 1 < len(limpas):
+                    prox_u, _, prox_no_alto = limpas[j + 1]
+                    fim = prox_u - 1 if prox_no_alto else prox_u
+                else:
+                    fim = b
+                fim = max(u, fim)
+                cap, como = casar_numero(num, capitulos)
+                linha = {'tipo': 'capitulo', 'numero_nas_respostas': num, 'gabarito': [[u, fim]], 'achado': evidencia}
+                # no EPUB o gabarito vai por parte inteira: parte com as
+                # respostas de dois capitulos levaria as do outro junto
+                divide = formato == 'epub' and any(u <= x[0] <= fim for x in limpas if x[1] != num)
+                if cap is not None and divide:
+                    cap, como = None, ('a parte traz as respostas de mais de um capítulo, e no EPUB o gabarito vai '
+                                       'por parte inteira')
+                if cap is None:
+                    linha.update(tipo='nao_fechou', certeza='baixa', observacao='não fechou: %s; ficou sem gabarito' % como)
+                    saida['linhas'].append(linha)
+                    continue
+                certeza = menos('alta' if como == 'numero' else 'média')
+                ja = saida['por_capitulo'].get(cap['n'])
+                if ja:
+                    ja['faixas'] = faixas([x for f in ja['faixas'] for x in range(f[0], f[1] + 1)] + list(range(u, fim + 1)))
+                else:
+                    saida['por_capitulo'][cap['n']] = {'faixas': [[u, fim]], 'certeza': certeza, 'como': 'fim_do_livro',
+                                                       'so_impares': impares}
+                usadas.add(cap['n'])
+                linha.update(capitulo=cap['n'], titulo=cap['titulo'], certeza=certeza,
+                             observacao='casado pelo %s' % ('número do capítulo no livro' if como == 'numero' else
+                                                            'lugar na ordem do mapa (o mapa não numera os capítulos)') +
+                             ('; só as ímpares' if impares else ''))
+                saida['linhas'].append(linha)
+            continue
+        # 3b. sem numero de capitulo: so vale no FIM de um capitulo, dentro dele
+        cap = capitulo_de(a)
+        if cap and capitulo_de(b) is cap and b >= cap['fim'] - 1 and a > cap['ini'] and cap['n'] not in usadas:
+            certeza = menos('média')
+            saida['por_capitulo'][cap['n']] = {'faixas': [[a, b]], 'certeza': certeza, 'como': 'fim_do_capitulo',
+                                               'so_impares': impares}
+            usadas.add(cap['n'])
+            saida['secoes'].append([a, b])
+            saida['linhas'].append({'tipo': 'capitulo', 'capitulo': cap['n'], 'titulo': cap['titulo'], 'gabarito': [[a, b]],
+                                    'certeza': certeza, 'achado': evidencia,
+                                    'observacao': 'no fim do próprio capítulo, sem número: casado pelo lugar' +
+                                                  ('; só as ímpares' if impares else '')})
+            continue
+        onde = ('no meio do capítulo %d (%s)' % (cap['n'], cap['titulo'])) if cap else 'fora dos capítulos do mapa'
+        saida['linhas'].append({'tipo': 'descartado', 'gabarito': [[a, b]], 'certeza': 'baixa', 'achado': evidencia,
+                                'observacao': 'título de respostas sem número de capítulo, %s: ignorado '
+                                              '(quadro de resposta do manual, ou respostas do livro inteiro)' % onde})
+
+    achados = len(saida['por_capitulo'])
+    partes = []
+    if not capitulos:
+        partes.append('O livro não tem capítulos no mapa: não há a que prender o gabarito.')
+    if achados:
+        partes.append('Gabarito localizado em %d de %d capítulos, pelo passe semiautomático (a conferir na planilha).'
+                      % (achados, len(capitulos)))
+    elif secoes:
+        partes.append('Há títulos de respostas (%s), mas nenhum fechou com um capítulo.' % descrever(secoes, formato))
+    else:
+        partes.append('Nenhum título de respostas ou de gabarito no texto do livro.')
+    if manual:
+        partes.append('O livro diz que respostas estão no Manual do Professor (%s %d).' % (nome, manual[0]))
+    if saida['texto'] == 'parcial':
+        perto = [u for u in sem_texto if any(a - 1 <= u <= b + 1 for a, b in saida['secoes'])]
+        partes.append('%d %s(s) sem camada de texto (%s): o que estiver nelas não foi lido%s.'
+                      % (len(sem_texto), nome, ', '.join(map(str, sem_texto[:6])) + (', ...' if len(sem_texto) > 6 else ''),
+                         ', e a certeza do gabarito ao lado delas baixou' if perto else ''))
+    saida['nota'] = ' '.join(partes)
+    return saida
+
+
+def capitulos_do_mapa(livro):
+    """Os capitulos do mapa como o passe os ve: {n, titulo, ini, fim, numero}."""
+    saida = []
+    for e in livro.get('mapa') or []:
+        if e.get('obra_inteira'):
+            continue
+        ini, fim = (e.get('pagina'), e.get('pagina_fim')) if livro['formato'] == 'pdf' else (e.get('capitulo'), e.get('capitulo_fim'))
+        if isinstance(ini, int) and isinstance(fim, int):
+            saida.append({'n': e['n'], 'titulo': e['titulo'], 'ini': ini, 'fim': fim, 'numero': numero_do_capitulo(e)})
+    return saida
+
+
+def textos_do_pdf(caminho):
+    doc = pymupdf.open(caminho)
+    try:
+        return [p.get_text() for p in doc]
+    finally:
+        doc.close()
+
+
+BLOCO_DE_HTML = re.compile(r'<(?:/?(?:p|div|h[1-6]|li|tr|td|th|br|section|blockquote|dt|dd|table|caption|figcaption))\b[^>]*>', re.I)
+
+
+def textos_do_epub(caminho, espinha):
+    """O texto de cada parte da espinha, uma linha por bloco do HTML."""
+    saida = []
+    with zipfile.ZipFile(caminho) as z:
+        for c in espinha:
+            try:
+                h = z.read(c).decode('utf-8', 'replace')
+            except KeyError:
+                saida.append('')
+                continue
+            h = re.sub(r'(?is)<(script|style|head)\b.*?</\1>', ' ', h)
+            h = BLOCO_DE_HTML.sub('\n', h)
+            h = re.sub(r'<[^>]+>', ' ', h)
+            h = re.sub(r'&nbsp;|&#160;', ' ', h).replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+            saida.append(h)
+    return saida
+
+
+def localizar_gabarito(caminho, livro):
+    """Le o texto do livro e grava o gabarito no mapa (a entrada ganha
+    `gabarito`) e no livro (`gabarito_origem`, `gabarito_nota`,
+    `gabarito_secoes`). Devolve as linhas da planilha de conferencia."""
+    formato = livro['formato']
+    textos = textos_do_pdf(caminho) if formato == 'pdf' else textos_do_epub(caminho, (livro.get('epub') or {}).get('espinha') or [])
+    r = propor_gabaritos(textos, capitulos_do_mapa(livro), formato)
+    chave = 'paginas' if formato == 'pdf' else 'partes'
+    for e in livro.get('mapa') or []:
+        g = r['por_capitulo'].get(e['n'])
+        if g:
+            e['gabarito'] = {chave: g['faixas'], 'certeza': g['certeza'], 'como': g['como']}
+            if g['so_impares']:
+                e['gabarito']['so_impares'] = True
+    livro['gabarito_origem'] = 'auto' if r['por_capitulo'] else 'nenhum'
+    livro['gabarito_nota'] = limpar_texto(r['nota'])
+    livro['gabarito_secoes'] = r['secoes']
+    livro['gabarito_texto'] = r['texto']
+    return r['linhas']
+
+
+COLUNAS_DA_CONFERENCIA = ['livro', 'formato', 'tipo', 'capitulo', 'titulo do capitulo', 'capitulo no livro',
+                          'paginas do capitulo', 'gabarito proposto', 'numero nas respostas', 'certeza', 'achado',
+                          'observacao', 'conferido (sim ou nao)', 'comentario']
+# As colunas de quem confere: regerar a planilha guarda o que ja foi escrito nelas.
+COLUNAS_DE_QUEM_CONFERE = ('conferido (sim ou nao)', 'comentario')
+
+
+def gravar_conferencia(pasta, livro, linhas):
+    """A planilha de conferencia do livro: <pasta>/<id>.csv, uma linha por
+    capitulo do mapa e uma por achado que nao fechou. Regerar guarda o que a
+    sessao ja escreveu nas duas ultimas colunas (pela chave tipo, capitulo e
+    gabarito proposto)."""
+    os.makedirs(pasta, exist_ok=True)
+    caminho = os.path.join(pasta, livro['id'] + '.csv')
+    antes = {}
+    if os.path.isfile(caminho):
+        with open(caminho, encoding='utf-8-sig', newline='') as f:
+            for l in csv.DictReader(f):
+                antes[(l.get('tipo'), l.get('capitulo'), l.get('gabarito proposto'))] = l
+    formato = livro['formato']
+    por_n = {l.get('capitulo'): l for l in linhas if l.get('tipo') == 'capitulo'}
+    saida = []
+    for e in livro.get('mapa') or []:
+        l = por_n.get(e['n'], {})
+        g = e.get('gabarito') or {}
+        fs = g.get('paginas') or g.get('partes') or []
+        saida.append({'tipo': 'capitulo', 'capitulo': e['n'], 'titulo do capitulo': e['titulo'],
+                      'capitulo no livro': numero_do_capitulo(e) or '',
+                      'paginas do capitulo': descrever([[e.get('pagina') or e.get('capitulo'),
+                                                            e.get('pagina_fim') or e.get('capitulo_fim')]], formato),
+                      'gabarito proposto': descrever(fs, formato) if fs else 'sem gabarito localizado',
+                      'numero nas respostas': l.get('numero_nas_respostas', ''),
+                      'certeza': g.get('certeza', ''), 'achado': l.get('achado', ''), 'observacao': l.get('observacao', '')})
+    for l in linhas:
+        if l.get('tipo') == 'capitulo' and l.get('capitulo') in [e['n'] for e in livro.get('mapa') or []]:
+            continue
+        saida.append({'tipo': l.get('tipo'), 'capitulo': l.get('capitulo', ''), 'titulo do capitulo': l.get('titulo', ''),
+                      'gabarito proposto': descrever(l['gabarito'], formato) if l.get('gabarito') else '',
+                      'numero nas respostas': l.get('numero_nas_respostas', ''), 'certeza': l.get('certeza', ''),
+                      'achado': l.get('achado', ''), 'observacao': l.get('observacao', '')})
+    saida.append({'tipo': 'livro', 'certeza': '', 'observacao': livro.get('gabarito_nota', '')})
+    with open(caminho, 'w', encoding='utf-8-sig', newline='') as f:
+        w = csv.DictWriter(f, fieldnames=COLUNAS_DA_CONFERENCIA)
+        w.writeheader()
+        for l in saida:
+            l = {k: limpar_texto(v) if isinstance(v, str) else v for k, v in l.items()}
+            l.update(livro=livro['titulo'] + (' (%s)' % livro['volume'] if livro.get('volume') else ''), formato=formato.upper())
+            velho = antes.get((str(l.get('tipo')), str(l.get('capitulo', '')), str(l.get('gabarito proposto', ''))))
+            for k in COLUNAS_DE_QUEM_CONFERE:
+                l[k] = (velho or {}).get(k, '')
+            w.writerow(l)
+    return caminho
+
+
 # ------------------------------------------------------------------ EPUB
 
 def junta(base, href):
@@ -712,11 +1140,13 @@ def relatorio_md(manifest, rel):
               '- Recusados por outro motivo: %d.' % (c['recusados'] - c['recusados_teto']),
               '- Linhas sem arquivo na planilha: %d.' % c['sem_arquivo'], '']
     partes += ['## No pacote', '', tabela_md(
-        ['Livro', 'Formato', 'MB', 'Sumário', 'Mapa'],
+        ['Livro', 'Formato', 'MB', 'Sumário', 'Mapa', 'Gabarito'],
         [[l['titulo'] + (' (%s)' % l['volume'] if l.get('volume') else ''), l['formato'].upper(), mb(l['bytes']),
           '%d entradas (%s)' % (len(l['sumario']), l['sumario_origem']),
           '%d de %d capítulos com assunto (%s)' % (sum(1 for e in l.get('mapa') or [] if e['assuntos']),
-                                                    len(l.get('mapa') or []), l.get('mapa_origem'))]
+                                                    len(l.get('mapa') or []), l.get('mapa_origem')),
+          '%d de %d capítulos' % (sum(1 for e in l.get('mapa') or [] if e.get('gabarito')), len(l.get('mapa') or []))
+          if l.get('gabarito_origem') == 'auto' else 'sem gabarito localizado']
          for l in manifest['livros']]), '']
     teto = [r for r in rel['recusados'] if r.get('teto')]
     outros = [r for r in rel['recusados'] if not r.get('teto')]
@@ -733,8 +1163,11 @@ def relatorio_md(manifest, rel):
 
 
 def gerar(planilha, rotulo, versao, saida, pasta_livros=None, materia=None, mapas=None, trabalho=None,
-          gerado_em=None, commit=None, gravar=True, topicos=None):
-    """Gera o pacote livros-<rotulo>. Devolve (manifest, relatorio, pasta de trabalho)."""
+          gerado_em=None, commit=None, gravar=True, topicos=None, conferencia=None):
+    """Gera o pacote livros-<rotulo>. Devolve (manifest, relatorio, pasta de trabalho).
+
+    `conferencia`: a pasta das planilhas de conferencia do gabarito (C15.5),
+    uma por livro; sem ela, <trabalho>/gabaritos."""
     t0 = time.time()
     if not re.fullmatch(r'[a-z0-9][a-z0-9-]*', rotulo or ''):
         raise SystemExit('erro: --rotulo tem de ser minusculo, sem acento nem espaco (por exemplo matematica-6ano)')
@@ -743,7 +1176,7 @@ def gerar(planilha, rotulo, versao, saida, pasta_livros=None, materia=None, mapa
     trabalho = trabalho or os.path.join(os.path.dirname(os.path.abspath(saida)), 'trabalho', '%s-v%d' % (nome, versao))
     por_mapa = ler_mapas(mapas)
     catalogo = ler_catalogo(topicos)
-    livros, arquivos, recusados, sem_arquivo, ids = [], {}, [], [], set()
+    livros, arquivos, recusados, sem_arquivo, ids, conferencias = [], {}, [], [], set(), []
     for i, l in enumerate(ler_planilha(planilha), start=2):   # linha 1 e o cabecalho
         if materia and (l.get('materia_id') or '').strip() != materia:
             continue
@@ -796,6 +1229,16 @@ def gerar(planilha, rotulo, versao, saida, pasta_livros=None, materia=None, mapa
             livro['capitulos'] = info['capitulos']
             livro['epub'] = info['epub']
         livro.update(montar_mapa(livro, info, por_mapa.get(chave_de_arquivo(caminho)), catalogo))
+        # C15.5: o gabarito de cada capitulo, e a planilha de conferencia do livro
+        try:
+            linhas_conf = localizar_gabarito(caminho, livro)
+        except Exception as e:  # noqa: BLE001 (o texto que nao se le nao recusa o livro: fica dito)
+            for x in livro.get('mapa') or []:
+                x.pop('gabarito', None)
+            livro.update(gabarito_origem='nenhum', gabarito_secoes=[], gabarito_texto='nao',
+                         gabarito_nota=limpar_texto('Não consegui ler o texto do livro para achar o gabarito (%s).' % str(e)[:120]))
+            linhas_conf = [{'tipo': 'livro', 'certeza': 'baixa', 'observacao': livro['gabarito_nota']}]
+        conferencias.append(gravar_conferencia(conferencia or os.path.join(trabalho, 'gabaritos'), livro, linhas_conf))
         livros.append(livro)
         arquivos[no_zip] = caminho
     livros.sort(key=lambda x: x['id'])
@@ -830,7 +1273,8 @@ def gerar(planilha, rotulo, versao, saida, pasta_livros=None, materia=None, mapa
            'recusados': recusados, 'sem_arquivo': sem_arquivo,
            'zip': {'caminho': zip_caminho if gravar else None,
                    'bytes': os.path.getsize(zip_caminho) if gravar else None},
-           'hash_manifest': gerar_pacote.sha(manifest_b), 'segundos': round(time.time() - t0, 1)}
+           'hash_manifest': gerar_pacote.sha(manifest_b), 'segundos': round(time.time() - t0, 1),
+           'conferencias': conferencias}
     os.makedirs(trabalho, exist_ok=True)
     with open(os.path.join(trabalho, 'manifest.json'), 'wb') as f:
         f.write(manifest_b)

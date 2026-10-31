@@ -12,6 +12,12 @@
         dez livros de 4 MB e o pacote livros-prova-varios-v1.zip (40 MB), para
         a prova de memoria do testa_livros.js
 
+    python biblioteca/_amostra/fazer_amostra_livros.py <pasta> --gabarito
+        o pacote livros-prova-gabarito-v1.zip (C15.5), em <pasta>/pacotes: um
+        PDF com tres capitulos e a secao "Respostas dos exercicios" no fim, uma
+        pagina por capitulo; o mesmo PDF sem respostas; e o EPUB de prova. E o
+        pacote do teste de navegador _teste/testa_livros_exportar.js
+
     python biblioteca/_amostra/fazer_amostra_livros.py <pasta> --trocado
         o MESMO pacote livros-prova-v1.zip (mesmo nome, mesma versao, mesmos
         ids), em <pasta>/Trocado/pacotes, com dois PDFs trocados: o livro sem
@@ -247,6 +253,58 @@ def fazer(pasta, grande=False):
     return {'livros': livros, 'planilha': planilha, 'mapas': mapa}
 
 
+# C15.5: o livro com a secao de respostas no fim, por capitulo. O texto de
+# cada resposta e conhecido, para o teste de navegador conferir no PDF
+# exportado que veio o gabarito do capitulo 2, e nao o do 1. O capitulo 2 traz
+# um travessao de proposito: no PDF exportado ele tem de sair hifen.
+RESPOSTAS = ['Resposta conhecida do capítulo %d: %s.' % (i + 1, r) for i, r in enumerate(('quarenta e dois', 'três quartos', 'noventa graus'))]
+
+
+def pdf_com_gabarito(caminho, com_respostas=True):
+    doc = pymupdf.open()
+    toc = []
+    for c, titulo in enumerate(CAPITULOS_PDF):
+        toc.append([1, titulo, doc.page_count + 1])
+        for k in range(2):
+            linhas = [titulo, 'Livro com gabarito, página %d.' % (doc.page_count + 1),
+                      'Texto conhecido do capítulo %d, parte %d.' % (c + 1, k + 1)]
+            if k == 1:
+                linhas.append('Exercícios do capítulo %d: confira as respostas no final do livro.' % (c + 1))
+            pg = pagina(doc, CORES[c], linhas)
+            if c == 1 and k == 0:
+                # a Helvetica do PyMuPDF nao escreve o travessao; a fonte embutida dele escreve
+                tw = pymupdf.TextWriter(pg.rect)
+                tw.append((72, 90 + 26 * len(linhas)), 'Frações ' + chr(0x2014) + ' a parte e o todo.',
+                          font=pymupdf.Font('cjk'), fontsize=12)
+                tw.write_text(pg)
+    if com_respostas:
+        toc.append([1, 'Respostas', doc.page_count + 1])
+        for c, r in enumerate(RESPOSTAS):
+            pg = doc.new_page(width=W, height=H)
+            for i, t in enumerate(['Respostas dos exercícios', 'Capítulo %d' % (c + 1), r, '1. a) 12   b) 15', '2. 7']):
+                pg.insert_text((72, 90 + 26 * i), t, fontname='helv', fontsize=16 if i < 2 else 12)
+    doc.set_toc(toc)
+    return salvar(doc, caminho)
+
+
+def fazer_gabarito(pasta):
+    """<pasta>/Gabarito: o livro com a secao de respostas no fim (PDF), o mesmo
+    livro sem respostas e o EPUB de prova, e a planilha deles."""
+    raiz = os.path.join(pasta, 'Gabarito')
+    pdf_com_gabarito(os.path.join(raiz, 'matematica', 'livro-com-gabarito.pdf'))
+    pdf_com_gabarito(os.path.join(raiz, 'matematica', 'livro-sem-gabarito.pdf'), com_respostas=False)
+    epub(os.path.join(raiz, 'literatura', 'livro-de-prova.epub'))
+    linhas = [linha('matematica', 'Livro com gabarito', 'matematica/livro-com-gabarito.pdf', Volume='Volume 2'),
+              linha('matematica', 'Livro sem gabarito', 'matematica/livro-sem-gabarito.pdf'),
+              linha('literatura', 'Livro de prova em EPUB', 'literatura/livro-de-prova.epub', Segmento='Ensino médio')]
+    planilha = os.path.join(raiz, 'livros_gabarito.csv')
+    with open(planilha, 'w', encoding='utf-8-sig', newline='') as f:
+        w = csv.DictWriter(f, fieldnames=CABECALHO)
+        w.writeheader()
+        w.writerows(linhas)
+    return {'livros': raiz, 'planilha': planilha}
+
+
 def fazer_varios(pasta, n=10, lado=1150):
     """Varios livros pesados (cada um com uma figura de ruido de lado x lado x 3
     bytes, 4 MB com o padrao), e a planilha deles, em <pasta>/Varios. E o
@@ -282,6 +340,15 @@ def principal():
                                         trabalho=os.path.join(pasta, 'trabalho-varios'),
                                         gerado_em='2026-10-30T10:00:00-03:00', commit='prova')
         print('%d livros no pacote, %d bytes' % (manifest['contagens']['livros'], manifest['contagens']['bytes']))
+        print(rel['zip']['caminho'])
+        return
+    if '--gabarito' in sys.argv:
+        import livros
+        c = fazer_gabarito(pasta)
+        manifest, rel, _ = livros.gerar(c['planilha'], 'prova-gabarito', 1, os.path.join(pasta, 'pacotes'),
+                                        trabalho=os.path.join(pasta, 'trabalho-gabarito'),
+                                        gerado_em='2026-10-30T10:00:00-03:00', commit='prova')
+        print('%d livros no pacote do gabarito' % manifest['contagens']['livros'])
         print(rel['zip']['caminho'])
         return
     if '--trocado' in sys.argv:
