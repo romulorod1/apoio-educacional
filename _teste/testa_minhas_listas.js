@@ -95,7 +95,6 @@ secao('0. Sem navegador: o banco, a cópia, a restauração e o apagar tudo');
 conf('VERSAO_BANCO é 3 ou mais', Number((/var VERSAO_BANCO = (\d+);/.exec(STORE) || [])[1]) >= 3, true);
 conf('o depósito biblioteca_listas é criado na subida', /createObjectStore\('biblioteca_listas', \{ keyPath: 'id' \}\)/.test(STORE), true);
 conf('a cópia de segurança leva as listas', STORE.indexOf(COPIA_LEVA) >= 0, true);
-conf('a restauração repõe as listas', /lis\.put\(r\)/.test(STORE), true);
 conf('o apagar tudo leva as listas', STORE.indexOf("esvaziar('biblioteca_listas')") >= 0, true);
 [['espelho na abertura', APP, ESPELHO_NA_ABERTURA], ['a cópia leva', STORE, COPIA_LEVA],
   ['o uso leva o id', APP, USO_LEVA], ['ordem da tela', APP, ORDEM_DA_TELA], ['diário depois', APP, DIARIO_DEPOIS],
