@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.36.1';
+  var VERSAO = '1.37.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,15 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.37.0',
+      itens: [
+        'Seus livros dentro do aplicativo: o pacote de livros se importa em Ajustes, como os outros, e na Biblioteca o botão ' +
+          '"Livros" abre cada um. O PDF tem sumário; o EPUB abre num leitor simples. Os dois voltam onde você parou.',
+        'Os livros ficam só neste tablet: não entram na cópia de segurança, que continua pequena. Em Ajustes você vê quanto ' +
+          'espaço cada livro ocupa e pode remover.'
+      ]
+    },
     {
       versao: '1.36.1',
       itens: [
