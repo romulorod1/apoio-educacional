@@ -80,7 +80,7 @@ const V3 = 'var VERSAO_BANCO = 3;';
 const V4 = 'var VERSAO_BANCO = 4;';
 const CRIA_LIVROS = /    if \(!b\.objectStoreNames\.contains\('livros'\)\) \{\r?\n      s = b\.createObjectStore\('livros', \{ keyPath: 'id' \}\);\r?\n      s\.createIndex\('pacote', 'pacote'\);\r?\n    \}\r?\n    if \(!b\.objectStoreNames\.contains\('livros_posicoes'\)\) \{\r?\n      b\.createObjectStore\('livros_posicoes', \{ keyPath: 'id' \}\);\r?\n    \}\r?\n/;
 // os pontos que os venenos trocam, cada um tem de existir exatamente uma vez
-const COPIA_FECHA = /pacote\.biblioteca = \{ uso: bib\[0\] \|\| \[\], etiquetas: bib\[1\] \|\| \[\], listas: bib\[2\] \|\| \[\] \};\r?\n      return pacote;/;
+const COPIA_FECHA = /pacote\.biblioteca = \{ uso: \(bib\[0\] \|\| \[\]\)\.filter\(function \(r\) \{\r?\n        return idsAlunos\[r\.alunoId\] && idsAulas\[r\.aulaId\];\r?\n      \}\), etiquetas: bib\[1\] \|\| \[\], listas: bib\[2\] \|\| \[\] \};\r?\n      return pacote;/;
 const COPIA_COM_LIVROS = "pacote.biblioteca = { uso: bib[0] || [], etiquetas: bib[1] || [], listas: bib[2] || [] };\n" +
   "      return todosOsValores('livros').then(function (ls) { return Promise.all(ls.map(function (l) { return blobParaTexto(l.blob); })); })" +
   ".then(function (t) { pacote.livros = t; return pacote; });";

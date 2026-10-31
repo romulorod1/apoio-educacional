@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.40.0';
+  var VERSAO = '1.40.1';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.40.1',
+      itens: [
+        'Ao excluir um aluno, o aplicativo agora resume o que sairá junto ' +
+          '(aulas, repetições, resumos, pagamentos, anexos e uso da biblioteca) e avisa que a ação não tem Desfazer.',
+        'A exclusão dos dados e arquivos associados acontece numa operação única, e a cópia de segurança ignora arquivos órfãos.'
+      ]
+    },
     {
       versao: '1.40.0',
       itens: [
@@ -1068,6 +1076,7 @@
   window.addEventListener('resize', posicionarAviso);
 
   function fecharModal(id) {
+    if (id === 'modal-excluir-aluno' && exclusaoAlunoPendente) return;
     var e = $('#' + id);
     /* O EPUB guarda a rolagem ANTES de a janela sumir: escondida, a caixa do
      * capítulo diz rolagem 0, e o livro reabriria no começo do capítulo. */
@@ -1857,6 +1866,7 @@
         var m = b.closest('.fundo-modal');
         if (m) {
           if (presaNoModoFamilia(m.id)) return;
+          if (m.id === 'modal-excluir-aluno' && exclusaoAlunoPendente) return;
           if (m.id === 'modal-nota') fecharEditorNota();
           else fecharModal(m.id);
         }
@@ -1881,6 +1891,7 @@
         if (e.target !== m || !comecouNoFundo) return;
         comecouNoFundo = false;
         if (presaNoModoFamilia(m.id)) return;
+        if (m.id === 'modal-excluir-aluno' && exclusaoAlunoPendente) return;
         if (m.id === 'modal-nota') fecharEditorNota();
         else fecharModal(m.id);
       });
@@ -1943,6 +1954,7 @@
     $('#excluir-aula').addEventListener('click', excluirAulaAtual);
     $('#salvar-aluno').addEventListener('click', salvarAluno);
     $('#excluir-aluno').addEventListener('click', excluirAlunoAtual);
+    $('#confirmar-excluir-aluno').addEventListener('click', confirmarExclusaoAluno);
 
     $('#mes-fechamento').addEventListener('change', function () {
       mesAtual = this.value;
@@ -7130,21 +7142,62 @@
     });
   }
 
+  var alunoParaExcluirId = null;
+  var exclusaoAlunoPendente = false;
+
   function excluirAlunoAtual() {
-    if (!alunoEmEdicao) return;
-    var qtd = db.aulas.filter(function (a) { return a.alunoId === alunoEmEdicao.id; }).length;
-    if (!confirmar('Excluir ' + alunoEmEdicao.nome + ' e as ' + qtd + ' aulas registradas?')) return;
+    if (!alunoEmEdicao || exclusaoAlunoPendente) return;
     var id = alunoEmEdicao.id;
-    comDesfazer('Aluno excluído.', function () {
-      db.alunos = db.alunos.filter(function (a) { return a.id !== id; });
-      db.aulas = db.aulas.filter(function (a) { return a.alunoId !== id; });
-      db.series = (db.series || []).filter(function (s) { return s.alunoId !== id; });
-      db.resumos = db.resumos.filter(function (r) { return r.alunoId !== id; });
-      // os pagamentos dele saem junto, como os resumos; o Desfazer devolve os dois
-      db.pagamentos = (db.pagamentos || []).filter(function (p) { return p.alunoId !== id; });
+    var aulas = (db.aulas || []).filter(function (a) { return a.alunoId === id; });
+    var series = (db.series || []).filter(function (s) { return s.alunoId === id; });
+    var resumos = (db.resumos || []).filter(function (r) { return r.alunoId === id; });
+    var pagamentos = (db.pagamentos || []).filter(function (p) { return p.alunoId === id; });
+    var anexos = 0;
+    aulas.forEach(function (a) { anexos += (a.anexos || []).length; });
+    alunoParaExcluirId = id;
+    var corpo = $('#resumo-excluir-aluno');
+    corpo.innerHTML = '';
+    corpo.appendChild(el('p', { texto: 'Ao excluir ' + alunoEmEdicao.nome + ', também sairão:' }));
+    corpo.appendChild(el('ul', {}, [
+      el('li', { texto: aulas.length + ' ' + palavraPlural(aulas.length, 'aula', 'aulas') + ' e suas folhas e imagens' }),
+      el('li', { texto: series.length + ' ' + palavraPlural(series.length, 'repetição', 'repetições') }),
+      el('li', { texto: resumos.length + ' ' + palavraPlural(resumos.length, 'resumo', 'resumos') + ' e ' + pagamentos.length + ' ' + palavraPlural(pagamentos.length, 'pagamento', 'pagamentos') }),
+      el('li', { texto: anexos + ' ' + palavraPlural(anexos, 'anexo', 'anexos') + ', inclusive PDF guardado no tablet' }),
+      el('li', { texto: 'uso da biblioteca e indicações "Usada com" nas listas' })
+    ]));
+    corpo.appendChild(el('p', { class: 'faixa-aviso', texto: 'Esta exclusão não tem Desfazer. Faça uma cópia de segurança antes, se quiser guardar esses dados.' }));
+    abrirModal('modal-excluir-aluno');
+  }
+
+  function confirmarExclusaoAluno() {
+    var id = alunoParaExcluirId;
+    if (!id || !alunoEmEdicao || alunoEmEdicao.id !== id || exclusaoAlunoPendente) return;
+    exclusaoAlunoPendente = true;
+    var botao = $('#confirmar-excluir-aluno');
+    var botoesModal = $$('#modal-excluir-aluno button');
+    botoesModal.forEach(function (b) { b.disabled = true; });
+    var textoOriginal = botao.textContent;
+    botao.textContent = 'Excluindo...';
+    Store.excluirAlunoEmCascata(db, id).then(function (novo) {
+      db = novo;
+      copiaPronta = null;
+      alunoParaExcluirId = null;
+      if (alunoEmEdicao && alunoEmEdicao.id === id) {
+        alunoEmEdicao = null;
+        fecharModal('modal-aluno');
+      }
+      return carregarUsoDasListas().then(function () {
+        exclusaoAlunoPendente = false;
+        fecharModal('modal-excluir-aluno');
+        desenharTudo();
+        avisar('Aluno e dados associados excluídos. Esta ação não tem Desfazer.');
+      });
+    }).catch(function () {
+      exclusaoAlunoPendente = false;
+      avisar('Não foi possível excluir. Os dados foram mantidos; tente de novo.');
     }).then(function () {
-      fecharModal('modal-aluno');
-      desenharTudo();
+      botoesModal.forEach(function (b) { b.disabled = false; });
+      botao.textContent = textoOriginal || 'Excluir definitivamente';
     });
   }
 
