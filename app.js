@@ -3450,10 +3450,26 @@
     caixa.innerHTML = '';
     (aula.anexos || []).forEach(function (an) {
       var viraFolha = anexoViraFolha(an);
-      caixa.appendChild(el('div', { class: 'item-lista' }, [
+      /* O PDF exportado de livro (C15.4) diz de onde veio; o arquivo dele não
+       * vai na cópia de segurança, e, quando falta neste tablet (a cópia
+       * restaurada noutro), a linha ganha "Gerar de novo" (gerarDeNovoOExportado). */
+      var deLivro = an.exportado ? el('div', { class: 'detalhe anexo-de-livro', texto: origemDoExportado(an) }) : null;
+      var falta = an.exportado ? el('div', { class: 'anexo-falta', hidden: true }) : null;
+      if (an.exportado) {
+        lerArquivoDoAnexo(an).then(function (r) {
+          if (r && r.blob) return;
+          falta.hidden = false;
+          falta.innerHTML = '';
+          falta.appendChild(el('p', { class: 'ajuda', style: 'margin:4px 0', texto: 'O arquivo não está neste tablet (o PDF de livro não vai na cópia de segurança).' }));
+          falta.appendChild(el('button', { type: 'button', class: 'btn pequeno principal', 'data-gerar-de-novo': an.id, texto: 'Gerar de novo',
+            aoClick: function () { gerarDeNovoOExportado(an, aula, function () { desenharAnexos(caixa, aula); }); } }));
+        }, function () { /* sem leitura, a linha fica como está */ });
+      }
+      caixa.appendChild(el('div', { class: 'item-lista', 'data-anexo-id': an.id }, [
         el('div', { class: 'cresce' }, [
           nomeQuebravel(an.nome),
           el('div', { class: 'detalhe', texto: (an.tamanho ? Math.round(an.tamanho / 1024) + ' KB' : '') }),
+          deLivro, falta,
           /* A ação mora embaixo do nome, e não ao lado do Abrir: o texto é
            * longo de propósito (diz o que acontece), e na fileira dos botões
            * ele espremeria o nome do arquivo numa coluna de poucas letras. */
@@ -3466,8 +3482,11 @@
         el('button', {
           type: 'button', class: 'btn pequeno', texto: 'Abrir',
           aoClick: function () {
-            Store.lerAnexo(an.id).then(function (r) {
-              if (!r || !r.blob) return;
+            lerArquivoDoAnexo(an).then(function (r) {
+              if (!r || !r.blob) {
+                if (an.exportado) avisar('O arquivo não está neste tablet. Toque em "Gerar de novo", logo abaixo do nome.');
+                return;
+              }
               /* PDF abre no leitor do próprio aplicativo (C14). Antes ia para o
                * compartilhar do Android, que tira ela do aplicativo no meio da
                * aula e entrega o arquivo a outro programa, de onde a folha da
@@ -3484,7 +3503,7 @@
           type: 'button', class: 'btn pequeno perigo', texto: 'Remover',
           aoClick: function () {
             aula.anexos = (aula.anexos || []).filter(function (x) { return x.id !== an.id; });
-            Store.apagarAnexo(an.id);
+            apagarArquivoDoAnexo(an);
             /* O assunto que carregava este PDF volta a ser só registro.
              *
              * Sem isto o item continuava com o anexoId de um arquivo que já não
@@ -3532,7 +3551,7 @@
    * anexo desta aula. O anexo continua lá, intacto; a folha ganha uma CÓPIA
    * em 'midias', como no "Abrir como folha" da biblioteca. */
   function anexoComoFolha(an, aula, tipo) {
-    prepararFolha(function () { return Store.lerAnexo(an.id).then(function (r) {
+    prepararFolha(function () { return lerArquivoDoAnexo(an).then(function (r) {
       if (!r || !r.blob) { avisar('Não achei este arquivo no tablet.'); return; }
       /* O tipo guardado tem a última palavra sobre o nome, quando existe: um
        * .jpg que na verdade é PDF vai para o leitor, e não para o desenho. */
@@ -14954,11 +14973,33 @@
       caixaGab.parentNode.classList.toggle('desligada', caixaGab.disabled);
       motivoGab.textContent = '(' + texto + ')';
       motivoGab.dataset.estado = !temGabarito ? 'sem_no_livro' : doCapitulo ? 'tem' : 'sem_no_capitulo';
+      // o campo das páginas só vale com "Páginas escolhidas" marcada (painel cego)
+      campoPag.disabled = !radioPag.checked;
+      atualizarTamanho();
+    }
+    /* O TAMANHO ESTIMADO, antes de gerar: cada página do livro vira uma imagem
+     * de algumas centenas de KB. Acima de 20 MB, a janela avisa (o PDF pesa no
+     * tablet e no envio à família). */
+    var tamanho = el('p', { class: 'ajuda', id: 'livro-exportar-tamanho' });
+    var avisoTamanho = el('p', { class: 'faixa-aviso', id: 'livro-exportar-aviso-tamanho', hidden: true });
+    corpo.appendChild(tamanho);
+    corpo.appendChild(avisoTamanho);
+    function atualizarTamanho() {
+      var p = pedido();
+      if (p.erro) { tamanho.textContent = ''; avisoTamanho.hidden = true; delete tamanho.dataset.bytes; return; }
+      var bytes = estimarPdfDoLivro(origem.formato, p.capitulo.length + p.gabarito.length);
+      tamanho.dataset.bytes = String(bytes);
+      tamanho.textContent = 'Tamanho estimado do PDF: ' + textoDeMb(bytes) + ' (' + (p.capitulo.length + p.gabarito.length) +
+        (epub ? ' partes do livro).' : ' páginas do livro).');
+      avisoTamanho.hidden = bytes <= AVISO_DE_TAMANHO_EXPORTADO;
+      avisoTamanho.textContent = 'Passa de 20 MB: o PDF ocupa esse espaço no tablet e pode não ir por WhatsApp ou e-mail. ' +
+        'Se for mandar, prefira menos páginas.';
     }
     caixaGab.disabled = true;
     radioCap.addEventListener('change', atualizarGabarito);
     radioPag.addEventListener('change', atualizarGabarito);
-    campoPag.addEventListener('focus', function () { radioPag.checked = true; atualizarGabarito(); });
+    caixaGab.addEventListener('change', atualizarTamanho);
+    campoPag.addEventListener('input', atualizarTamanho);
     atualizarGabarito();
 
     if (epub) {
@@ -15145,16 +15186,30 @@
     });
   }
 
-  /* Monta o PDF e, com aulaId, anexa; sem, entrega o arquivo. */
-  function exportarLivro(origem, p, aulaId, estado) {
-    if (exportandoLivro) { avisar('Ainda estou montando o PDF anterior. Espere um instante.'); return Promise.resolve(); }
-    exportandoLivro = true;
+  // o tamanho estimado do PDF exportado (a conta mora no biblioteca.js, que a prova sem navegador lê)
+  var AVISO_DE_TAMANHO_EXPORTADO = Biblioteca.AVISO_DE_TAMANHO_EXPORTADO;
+  var estimarPdfDoLivro = Biblioteca.estimarPdfExportado;
+  function textoDeMb(bytes) {
+    var mb = bytes / (1024 * 1024);
+    return mb < 1 ? 'menos de 1 MB' : 'cerca de ' + String(Math.round(mb * 10) / 10).replace('.', ',') + ' MB';
+  }
+
+  // a falta de espaço no tablet, pelo nome do erro do IndexedDB
+  function ehFaltaDeEspaco(e) {
+    return !!e && (e.semEspaco || /quota/i.test(String(e.name || '')) || /quota/i.test(String(e.message || '')) ||
+      (e.inner && /quota/i.test(String(e.inner.name || ''))));
+  }
+  function fraseDeFaltaDeEspaco(bytes) {
+    return 'O tablet está sem espaço para guardar este PDF (' + textoDeMb(bytes) + '). Libere espaço no tablet ' +
+      '(em Ajustes, "Liberar espaço de folhas descartadas", ou removendo livros que não usa) e tente de novo. Nada foi anexado.';
+  }
+
+  /* Monta o PDF do livro, sem anexar: { nome, blob, paginas }. `aoProgredir`
+   * recebe (feitas, total). O "Gerar de novo" do anexo usa o mesmo caminho. */
+  function montarPdfDoLivro(origem, p, aula, aoProgredir) {
     var meta = origem.reg.meta || {};
     var epub = origem.formato === 'epub';
-    $$('#rodape-modal-livro-exportar button').forEach(function (b) { b.disabled = true; });
     var total = p.capitulo.length + p.gabarito.length, feitas = 0;
-    var progresso = function () { estado.textContent = 'Montando o PDF: ' + feitas + ' de ' + total + (epub ? ' partes.' : ' páginas.'); };
-    progresso();
     var docPdf = null, soltarDepois = false, zipEpub = null, porNome = null;
     var pronto;
     if (epub) {
@@ -15175,15 +15230,14 @@
       return lista.reduce(function (pr, u) {
         return pr.then(function (acc) {
           var vez = epub ? blocosDaParteEpub(zipEpub, porNome, espinha[u - 1]) : paginaDoLivroParaPdf(docPdf, u);
-          return vez.then(function (r) { feitas++; progresso(); acc.push(r); return acc; });
+          return vez.then(function (r) { feitas++; if (aoProgredir) aoProgredir(feitas, total); acc.push(r); return acc; });
         });
       }, Promise.resolve([]));
     }
-    var arquivo = null, registro = null;
-    return pronto.then(function () { return parte(p.capitulo); }).then(function (cap) {
+    if (aoProgredir) aoProgredir(0, total);
+    var feito = pronto.then(function () { return parte(p.capitulo); }).then(function (cap) {
       return parte(p.gabarito).then(function (gab) { return [cap, gab]; });
     }).then(function (r) {
-      var aula = aulaId ? db.aulas.filter(function (a) { return a.id === aulaId; })[0] : null;
       var aluno = aula ? alunoPorId(aula.alunoId) : null;
       var achata = function (lista) { return lista.reduce(function (a, b) { return a.concat(b); }, []); };
       var partes = [{ nome: 'Capítulo', titulo: p.titulo }];
@@ -15200,14 +15254,46 @@
         partes: partes
       });
       var nome = Core.nomeArquivo(tituloDoLivro(meta) + ' ' + p.titulo + (p.gabarito.length ? ' com gabarito' : '')) + '.pdf';
-      arquivo = { nome: nome, blob: new Blob([saida.bytes], { type: 'application/pdf' }), paginas: saida.paginas };
+      return { nome: nome, blob: new Blob([saida.bytes], { type: 'application/pdf' }), paginas: saida.paginas };
+    });
+    var soltar = function () { if (soltarDepois && docPdf) soltarDocPdf(docPdf); };
+    feito.then(soltar, soltar);
+    return feito;
+  }
+
+  /* Confere, antes de montar, se o tablet tem espaço para o PDF estimado (com
+   * folga); o navegador que não diz quanto há deixa passar, e a gravação
+   * recusada dá a mesma frase. */
+  function conferirEspacoParaPdf(bytes) {
+    return Store.estimarEspaco().then(function (espaco) {
+      if (espaco && espaco.quota && espaco.quota - (espaco.usage || 0) < bytes * 1.5) {
+        throw Object.assign(new Error('sem espaço'), { semEspaco: true });
+      }
+    }, function () { /* sem a estimativa, segue */ });
+  }
+
+  /* Monta o PDF e, com aulaId, anexa; sem, entrega o arquivo. */
+  function exportarLivro(origem, p, aulaId, estado) {
+    if (exportandoLivro) { avisar('Ainda estou montando o PDF anterior. Espere um instante.'); return Promise.resolve(); }
+    exportandoLivro = true;
+    var epub = origem.formato === 'epub';
+    var estimado = estimarPdfDoLivro(origem.formato, p.capitulo.length + p.gabarito.length);
+    $$('#rodape-modal-livro-exportar button').forEach(function (b) { b.disabled = true; });
+    var progresso = function (feitas, total) { estado.textContent = 'Montando o PDF: ' + feitas + ' de ' + total + (epub ? ' partes.' : ' páginas.'); };
+    var aula0 = aulaId ? db.aulas.filter(function (a) { return a.id === aulaId; })[0] : null;
+    var registro = null;
+    return conferirEspacoParaPdf(estimado).then(function () {
+      return montarPdfDoLivro(origem, p, aula0, progresso);
+    }).then(function (arquivo) {
       if (!aulaId) {
         fecharModal('modal-livro-exportar');
         entregarArquivo(arquivo.nome, arquivo.blob, p.titulo);
         return null;
       }
-      return anexarPdfDoLivro(aulaId, arquivo, { id: origem.reg.id, capitulo: p.entrada ? p.entrada.n : null,
-        unidades: p.capitulo, gabarito: p.gabarito }).then(function (reg) { registro = reg; });
+      return anexarPdfDoLivro(aulaId, arquivo, {
+        id: origem.reg.id, titulo: tituloDoLivro(origem.reg.meta), formato: origem.formato,
+        capitulo: p.entrada ? p.entrada.n : null, capituloTitulo: p.titulo, unidades: p.capitulo, gabarito: p.gabarito
+      }).then(function (reg) { registro = reg; });
     }).then(function () {
       if (!registro) return;
       var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
@@ -15222,6 +15308,7 @@
     }).catch(function (e) {
       if (window.console) console.warn('livros, exportar:', e);
       if (e && e.desfeita) return;
+      if (ehFaltaDeEspaco(e)) { avisar(fraseDeFaltaDeEspaco(estimado)); return; }
       avisar('Não consegui montar o PDF agora. Nada foi anexado. Tente de novo.');
     }).then(function () {
       exportandoLivro = false;
@@ -15229,13 +15316,16 @@
       $$('#rodape-modal-livro-exportar button').forEach(function (b) { b.disabled = false; });
       var anexar = $('#livro-exportar-anexar');
       if (anexar && !$('#livro-exportar-aulas .escolhida')) anexar.disabled = true;
-      if (soltarDepois && docPdf) soltarDocPdf(docPdf);
     });
   }
 
-  /* O MESMO caminho do "Gerar e anexar" da biblioteca: o PDF no depósito de
-   * anexos, o registro em aula.anexos e um salvar; se o salvar falhar, nada
-   * fica pela metade (o registro sai da memória e o arquivo do depósito). */
+  /* O caminho do "Gerar e anexar" da biblioteca (o registro em aula.anexos e
+   * um salvar; se o salvar falhar, nada fica pela metade), com uma diferença:
+   * o ARQUIVO mora no depósito dos exportados (Store.salvarExportado), que a
+   * cópia de segurança não leva, porque é material de terceiro e se refaz do
+   * livro do tablet. O registro leva `exportado: true` e de onde veio (o livro,
+   * o capítulo, as páginas e as do gabarito): é com isso que o "Gerar de novo"
+   * refaz o PDF numa cópia restaurada noutro tablet. */
   function anexarPdfDoLivro(aulaId, arquivo, deOnde) {
     var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
     if (!aula) return Promise.reject(new Error('aula sumiu'));
@@ -15244,22 +15334,75 @@
     var base = arquivo.nome.replace(/\.pdf$/, ''), k = 2;
     while (usados[arquivo.nome]) { arquivo.nome = base + '_' + k + '.pdf'; k++; }
     var id = Core.uid();
-    return Store.salvarAnexo(id, { nome: arquivo.nome, tipo: 'application/pdf', blob: arquivo.blob }).then(function () {
+    return Store.salvarExportado(id, { nome: arquivo.nome, tipo: 'application/pdf', blob: arquivo.blob }).then(function () {
       aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
       if (!aula) {
-        Store.apagarAnexo(id).catch(function () {});
+        Store.apagarExportado(id).catch(function () {});
         var sem = new Error('aula desfeita'); sem.desfeita = true; throw sem;
       }
       aula.anexos = aula.anexos || [];
-      var registro = { id: id, nome: arquivo.nome, tamanho: arquivo.blob.size, biblioteca: true,
-        livro: { id: deOnde.id, capitulo: deOnde.capitulo, paginas: deOnde.unidades, gabarito: deOnde.gabarito } };
+      var registro = { id: id, nome: arquivo.nome, tamanho: arquivo.blob.size, biblioteca: true, exportado: true,
+        livro: { id: deOnde.id, titulo: deOnde.titulo, formato: deOnde.formato, capitulo: deOnde.capitulo,
+          capituloTitulo: deOnde.capituloTitulo, paginas: deOnde.unidades, gabarito: deOnde.gabarito } };
       aula.anexos.push(registro);
       return salvar().then(function () { return registro; }, function (e) {
         aula.anexos = aula.anexos.filter(function (x) { return x !== registro; });
-        Store.apagarAnexo(id).catch(function () {});
+        Store.apagarExportado(id).catch(function () {});
         mudancaDesfeitaNaMemoria(e);
         throw e;
       });
+    });
+  }
+
+  /* O arquivo de um anexo da aula: o PDF exportado de livro mora no depósito
+   * dos exportados, o resto no de anexos. */
+  function lerArquivoDoAnexo(an) {
+    return an && an.exportado ? Store.lerExportado(an.id) : Store.lerAnexo(an.id);
+  }
+  function apagarArquivoDoAnexo(an) {
+    return an && an.exportado ? Store.apagarExportado(an.id) : Store.apagarAnexo(an.id);
+  }
+
+  // "Exportado do livro <título>, capítulo X"
+  function origemDoExportado(an) {
+    var l = an.livro || {};
+    return 'Exportado do livro ' + (l.titulo || l.id || '') + (l.capituloTitulo ? ', ' + l.capituloTitulo : '') +
+      (l.gabarito && l.gabarito.length ? ', com o gabarito' : '');
+  }
+
+  /* "GERAR DE NOVO": o PDF exportado não vai na cópia de segurança, então,
+   * numa cópia restaurada noutro tablet (ou se o arquivo faltar), ele é refeito
+   * do livro do tablet, com as mesmas páginas e o mesmo nome, no mesmo anexo.
+   * Sem o livro no tablet, a frase diz que falta o livro. */
+  function gerarDeNovoOExportado(an, aula, depois) {
+    var l = an.livro || {};
+    if (exportandoLivro) { avisar('Ainda estou montando outro PDF. Espere um instante.'); return Promise.resolve(false); }
+    return Store.lerLivro(l.id).then(function (reg) {
+      if (!reg || !reg.blob) {
+        avisar('Falta o livro "' + (l.titulo || l.id) + '" neste tablet. Importe o pacote de livros em Ajustes e toque em Gerar de novo.');
+        return false;
+      }
+      exportandoLivro = true;
+      var p = { capitulo: (l.paginas || []).slice(), gabarito: (l.gabarito || []).slice(), titulo: l.capituloTitulo || 'Livro',
+        entrada: l.capitulo != null ? { n: l.capitulo, titulo: l.capituloTitulo } : null };
+      var estimado = estimarPdfDoLivro(reg.meta.formato, p.capitulo.length + p.gabarito.length);
+      avisar('Gerando o PDF de novo, do livro do tablet. Isso leva alguns segundos.');
+      return conferirEspacoParaPdf(estimado).then(function () {
+        return montarPdfDoLivro({ reg: reg, formato: reg.meta.formato }, p, aula, null);
+      }).then(function (arquivo) {
+        return Store.salvarExportado(an.id, { nome: an.nome, tipo: 'application/pdf', blob: arquivo.blob }).then(function () {
+          an.tamanho = arquivo.blob.size;
+          return salvar().catch(function () { /* o tamanho é só informação; o arquivo já está no tablet */ });
+        });
+      }).then(function () {
+        avisar('PDF gerado de novo: "' + an.nome + '".');
+        if (depois) depois();
+        return true;
+      }, function (e) {
+        if (window.console) console.warn('livros, gerar de novo:', e);
+        avisar(ehFaltaDeEspaco(e) ? fraseDeFaltaDeEspaco(estimado) : 'Não consegui gerar o PDF de novo agora. Tente de novo.');
+        return false;
+      }).then(function (r) { exportandoLivro = false; return r; });
     });
   }
 

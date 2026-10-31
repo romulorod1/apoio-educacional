@@ -623,6 +623,10 @@ roda "livros exportar"                            node "_teste/testa_livros_expo
 roda "livros exportar --envenenado-gabarito-do-outro" node "_teste/testa_livros_exportar.js" --envenenado-gabarito-do-outro
 roda "livros exportar --envenenado-sem-fonte"     node "_teste/testa_livros_exportar.js" --envenenado-sem-fonte
 roda "livros exportar --envenenado-travessao"     node "_teste/testa_livros_exportar.js" --envenenado-travessao
+# Revisao do C15.4: o PDF exportado mora fora da copia de seguranca (a copia
+# cresce so o registro), e "Gerar de novo" o refaz depois de restaurar. O
+# veneno guarda o PDF no deposito de anexos, que a copia leva.
+roda "livros exportar --envenenado-pdf-na-copia"  node "_teste/testa_livros_exportar.js" --envenenado-pdf-na-copia
 # C2b: a lista de base (base-v1) importa, vem primeiro com o nome dela e a
 # frase de posicao na fonte; as tres listas com a etiqueta de nivel. A regra
 # em si e do biblioteca/_prova_kits.py (sem navegador).
@@ -737,6 +741,9 @@ roda "livros (regras) --envenenado-correcao-sem-titulo" node "_teste/testa_livro
 # livro, e o gabarito daquele capitulo depois, so quando pedido), as paginas
 # escolhidas e o rodape de fonte. O veneno deixa as respostas no capitulo.
 roda "livros (regras) --envenenado-respostas-no-capitulo" node "_teste/testa_livros_regras.js" --envenenado-respostas-no-capitulo
+# Revisao do C15.5: o gabarito do fim do capitulo (achado so pelo lugar) nunca
+# tira pagina do capitulo exportado. O veneno volta a regra antiga.
+roda "livros (regras) --envenenado-fim-do-capitulo-tira" node "_teste/testa_livros_regras.js" --envenenado-fim-do-capitulo-tira
 # C15.5: o passe semiautomatico do gabarito (titulos de respostas, numero do
 # capitulo, o fim do capitulo, so as impares, manual do professor, sem texto),
 # a trava do casamento medida pelo texto e os venenos dentro da prova (casar

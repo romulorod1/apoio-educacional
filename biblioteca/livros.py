@@ -521,11 +521,15 @@ def montar_mapa(livro, info, achado, catalogo):
 # ------------------------------------------------------------------ o gabarito (C15.5)
 
 # O titulo de uma secao de respostas, numa linha so: "Respostas", "Respostas
-# dos exercicios", "Gabarito", "Resolucoes das atividades". A preposicao e
-# obrigatoria depois da palavra: "Resposta pessoal" e "Respostas possiveis",
-# que aparecem no meio de qualquer capitulo, nao sao titulo.
-TITULO_DE_RESPOSTAS = re.compile(r'^(respostas?|gabaritos?|resolucoes|resolucao|solucoes)'
-                                 r'( (dos|das|de|do|da|e|para) [a-z0-9 ,/]{0,60})?$')
+# dos exercicios", "Gabarito", "Resolucoes das atividades". Depois da palavra,
+# so preposicao: "Resposta pessoal" e "Respostas possiveis", que aparecem no
+# meio de qualquer capitulo, nao sao titulo. No SINGULAR ("Resposta",
+# "Resolucao", "Solucao"), so com "dos" ou "das": "Resolucao" sozinha, ou
+# "Resolucao do problema", e o exercicio resolvido do livro, e nao o gabarito
+# (revisao do C15.5).
+TITULO_DE_RESPOSTAS = re.compile(r'^(?:(?:respostas|resolucoes|solucoes|gabaritos?)'
+                                 r'(?: (?:dos|das|de|do|da|e|para) [a-z0-9 ,/]{0,60})?'
+                                 r'|(?:resposta|resolucao|solucao) (?:dos|das) [a-z0-9 ,/]{1,60})$')
 # O numero do capitulo dentro das respostas: "Capitulo 2", "Cap. 2", "CAPITULO II".
 MARCA_DE_CAPITULO = re.compile(r'^(capitulo|cap\.?) ?([0-9]{1,3}|[ivxlc]{1,7})\b')
 MARCA_DE_UNIDADE = re.compile(r'^(unidade) ?([0-9]{1,3}|[ivxlc]{1,7})\b')
@@ -785,7 +789,9 @@ def propor_gabaritos(textos, capitulos, formato='pdf'):
             saida['por_capitulo'][cap['n']] = {'faixas': [[a, b]], 'certeza': certeza, 'como': 'fim_do_capitulo',
                                                'so_impares': impares}
             usadas.add(cap['n'])
-            saida['secoes'].append([a, b])
+            # NAO entra em `secoes`: as secoes saem do capitulo exportado, e a
+            # pagina do fim do capitulo continua dele (revisao do C15.5: uma
+            # pagina de exercicio resolvido tomada por gabarito sumiria do capitulo)
             saida['linhas'].append({'tipo': 'capitulo', 'capitulo': cap['n'], 'titulo': cap['titulo'], 'gabarito': [[a, b]],
                                     'certeza': certeza, 'achado': evidencia,
                                     'observacao': 'no fim do próprio capítulo, sem número: casado pelo lugar' +

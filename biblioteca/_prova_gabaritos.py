@@ -96,8 +96,11 @@ def trava_casamento(r, textos, capitulos, formato='pdf'):
                          % (n, num, primeira, marcas))
         for a, b in g['faixas']:
             for u in range(a, b + 1):
-                if u not in secao:
+                # o do fim do capitulo nao entra nas secoes: as secoes saem do capitulo exportado
+                if u not in secao and g['como'] == 'fim_do_livro':
                     erros.append('o capítulo %d ganhou a %d, fora da seção de respostas' % (n, u))
+                if u in secao and g['como'] == 'fim_do_capitulo':
+                    erros.append('o gabarito do fim do capítulo %d (a %d) entrou nas seções, e sairia do capítulo exportado' % (n, u))
             if g['como'] == 'fim_do_capitulo' and not (c['ini'] < a and b <= c['fim']):
                 erros.append('o capítulo %d ganhou o gabarito de fim de capítulo %r fora dele (%d a %d)' % (n, [a, b], c['ini'], c['fim']))
     return erros
@@ -146,7 +149,7 @@ def casos(placar):
     placar.conferir('gabarito: no fim do próprio capítulo, sem número, casa pelo lugar',
                     trava_casamento(r, fim_cap, caps((1, 4), (5, 7))) + esperado(r, {1: [[4, 4]], 2: [[7, 7]]}) +
                     ([] if all(g['como'] == 'fim_do_capitulo' for g in r['por_capitulo'].values()) else ['como %r' % r['por_capitulo']]))
-    meio = [pag('Capítulo 1', CONTEUDO), pag('RESPOSTA', '1. a)  Resposta possível: traça-se uma reta'),
+    meio = [pag('Capítulo 1', CONTEUDO), pag('RESPOSTAS', '1. a)  Resposta possível: traça-se uma reta'),
             pag('Capítulo 1', CONTEUDO), pag('Capítulo 1', CONTEUDO), pag('Capítulo 1', CONTEUDO)]
     r = livros.propor_gabaritos(meio, caps((1, 5)))
     placar.conferir('gabarito: quadro de respostas no MEIO do capítulo (manual do professor) é ignorado',
@@ -225,7 +228,7 @@ def casos(placar):
                     else ['certezas %r' % r['por_capitulo']])
 
     # o quadro "RESPOSTAS" do manual do professor no fim do capitulo: prosa, nao respostas
-    quadro = [pag('Capítulo 1', CONTEUDO)] * 3 + [pag('RESOLUÇÃO DO PROBLEMA', CONTEUDO, CONTEUDO, CONTEUDO, CONTEUDO)]
+    quadro = [pag('Capítulo 1', CONTEUDO)] * 3 + [pag('RESPOSTAS', CONTEUDO, CONTEUDO, CONTEUDO, CONTEUDO)]
     r = livros.propor_gabaritos(quadro, caps((1, 4)))
     placar.conferir('gabarito: quadro de resolução em prosa no fim do capítulo não é gabarito',
                     esperado(r, {}) + ([] if any('parecem resposta' in l.get('observacao', '') for l in r['linhas']) else ['planilha %r' % r['linhas']]))
@@ -240,6 +243,33 @@ def casos(placar):
     alheia = [pag('Capítulo 5', CONTEUDO)] * 3 + [pag('Respostas', 'Capítulo 6', '1. 3', '2. 4')]
     r = livros.propor_gabaritos(alheia, caps((1, 4), numeros=[5]))
     placar.conferir('gabarito: as respostas do capítulo 6 no fim do capítulo 5 não viram gabarito do 5', esperado(r, {}))
+
+    # revisao do C15.5: "Resolucao" sozinha (o exercicio resolvido) no alto da
+    # penultima e da ultima pagina do capitulo nao e gabarito, no PDF e no EPUB.
+    # Denso de respostas de proposito: quem segura e so a regra do titulo.
+    resolvido = [pag('Capítulo 1', CONTEUDO)] * 2 + [pag('Resolução', '1. 12', '2. 15'), pag('RESOLUÇÃO DO PROBLEMA', '1. 3', '2. 4')]
+    erros = []
+    for formato in ('pdf', 'epub'):
+        r = livros.propor_gabaritos(resolvido, caps((1, 4)), formato)
+        erros += ['%s: %s' % (formato, x) for x in esperado(r, {}) + ([] if not r['secoes'] else ['seções %r' % r['secoes']])]
+    placar.conferir('gabarito: "Resolução" sozinha no fim do capítulo é exercício resolvido, não gabarito (PDF e EPUB)', erros)
+    # o outro lado: o plural, e o singular com "dos exercícios", continuam título
+    lado = [livros.TITULO_DE_RESPOSTAS.match(livros.linha_normal(t)) is not None
+            for t in ('Resoluções', 'Resolução dos exercícios', 'Respostas', 'Gabarito', 'Resposta das atividades',
+                      'Resolução', 'Resolução do problema', 'Resposta', 'Resposta pessoal')]
+    placar.conferir('gabarito: "Resoluções", "Resolução dos exercícios", "Respostas" e "Gabarito" continuam título; '
+                    '"Resolução", "Resolução do problema" e "Resposta" sozinha não',
+                    [] if lado == [True] * 5 + [False] * 4 else ['%r' % lado])
+    titulo = livros.TITULO_DE_RESPOSTAS
+    livros.TITULO_DE_RESPOSTAS = __import__('re').compile(r'^(respostas?|gabaritos?|resolucoes|resolucao|solucoes)'
+                                                          r'( (dos|das|de|do|da|e|para) [a-z0-9 ,/]{0,60})?$')
+    try:
+        erros = []
+        for formato in ('pdf', 'epub'):
+            erros += esperado(livros.propor_gabaritos(resolvido, caps((1, 4)), formato), {})
+    finally:
+        livros.TITULO_DE_RESPOSTAS = titulo
+    placar.conferir('gabarito: a regra antiga ("Resolução" sozinha como título)', erros, deve_reprovar=True)
 
 
 def conferir_gabarito(manifest):
@@ -261,8 +291,11 @@ def conferir_gabarito(manifest):
             for f in fs:
                 if not (isinstance(f, list) and len(f) == 2 and all(isinstance(x, int) for x in f) and 1 <= f[0] <= f[1] <= (limite or 0)):
                     erros.append('livro %s, capítulo %d, gabarito fora do livro: %r' % (l.get('id'), e['n'], f))
-                elif any(u not in secao for u in range(f[0], f[1] + 1)):
+                elif g.get('como') == 'fim_do_livro' and any(u not in secao for u in range(f[0], f[1] + 1)):
                     erros.append('livro %s, capítulo %d, gabarito fora das seções de respostas: %r' % (l.get('id'), e['n'], f))
+                elif g.get('como') == 'fim_do_capitulo' and any(u in secao for u in range(f[0], f[1] + 1)):
+                    erros.append('livro %s, capítulo %d, gabarito do fim do capítulo dentro das seções (sairia do capítulo): %r'
+                                 % (l.get('id'), e['n'], f))
     return erros
 
 

@@ -334,6 +334,17 @@
   // centenas de KB, e o tablet monta o PDF inteiro na memória.
   var TETO_DE_PAGINAS_EXPORTADAS = 120;
 
+  /* O tamanho estimado do PDF exportado, para a janela dizer antes de gerar.
+   * Página de livro didático a 150 pontos por polegada: entre 350 e 650 KB
+   * (a foto colorida pesa mais); a conta usa 500 KB. O EPUB é texto remontado
+   * e pesa bem menos por parte. Acima de 20 MB, a janela avisa. */
+  var KB_POR_PAGINA_EXPORTADA = 500;
+  var KB_POR_PARTE_EXPORTADA = 150;
+  var AVISO_DE_TAMANHO_EXPORTADO = 20 * 1024 * 1024;
+  function estimarPdfExportado(formato, unidades) {
+    return unidades * (formato === 'epub' ? KB_POR_PARTE_EXPORTADA : KB_POR_PAGINA_EXPORTADA) * 1024;
+  }
+
   // o limite do livro: as páginas no PDF, as partes da espinha no EPUB
   function limiteDoLivro(meta) {
     if (!meta) return 0;
@@ -390,7 +401,15 @@
     var respostas = unidadesDe(faixasValidas(meta.gabarito_secoes, limite));
     // a entrada vem do mapaDoLivro (o gabarito já conferido) ou crua do manifest
     var g = entrada.gabarito && entrada.gabarito.faixas ? entrada.gabarito : gabaritoDaEntrada(meta, entrada);
-    respostas =unidadesDe(respostas.map(function (u) { return [u, u]; }).concat(g ? g.faixas : []));
+    /* O gabarito do FIM DO CAPÍTULO nunca tira página do capítulo: ele foi
+     * achado só pelo lugar, e uma página de exercício resolvido tomada por
+     * gabarito sumiria do capítulo exportado (revisão do C15.5). O capítulo vai
+     * inteiro, e o gabarito só acrescenta. Vale também para o pacote antigo,
+     * que punha essas páginas em gabarito_secoes. */
+    var doFim = g && g.como === 'fim_do_capitulo' ? unidadesDe(g.faixas) : [];
+    var doLivro = g && g.como !== 'fim_do_capitulo' ? g.faixas : [];
+    respostas = unidadesDe(respostas.map(function (u) { return [u, u]; }).concat(doLivro))
+      .filter(function (u) { return doFim.indexOf(u) < 0; });
     var semRespostas = todas.filter(function (u) { return respostas.indexOf(u) < 0; });
     return {
       capitulo: semRespostas.length ? semRespostas : todas,
@@ -967,6 +986,7 @@
     sha256: sha256, tipoDoAsset: tipoDoAsset,
     mapaDoLivro: mapaDoLivro, entradaDoMapa: entradaDoMapa, livroDoAno: livroDoAno, livrosComAssunto: livrosComAssunto,
     TETO_DE_PAGINAS_EXPORTADAS: TETO_DE_PAGINAS_EXPORTADAS, livroTemGabarito: livroTemGabarito,
+    estimarPdfExportado: estimarPdfExportado, AVISO_DE_TAMANHO_EXPORTADO: AVISO_DE_TAMANHO_EXPORTADO,
     partesDoCapitulo: partesDoCapitulo, paginasEscolhidas: paginasEscolhidas, descreverUnidades: descreverUnidades,
     fonteDoLivro: fonteDoLivro, semTracos: semTracos,
     rasterizarRecorte: rasterizarRecorte, rasterizarPagina: rasterizarPagina,

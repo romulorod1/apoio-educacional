@@ -33,6 +33,18 @@
  *                                   do capítulo 2 sai com a resposta do 1.
  *   --envenenado-sem-fonte          o pdf.js servido não escreve o rodapé de fonte.
  *   --envenenado-travessao          o pdf.js servido deixa o travessão do livro passar.
+ *   --envenenado-pdf-na-copia       o app.js servido guarda o PDF exportado no
+ *                                   depósito de anexos, que a cópia de segurança
+ *                                   leva: a cópia cresce o tamanho do PDF.
+ *
+ * Revisão do C15.4 (o PDF exportado mora FORA da cópia de segurança):
+ *   8. a cópia antes e depois de exportar o capítulo cresce só alguns KB (o
+ *      registro do anexo, sem o arquivo);
+ *   9. a janela mostra o tamanho estimado; sem espaço no tablet, a frase
+ *      própria, e nada anexado;
+ *  10. a cópia restaurada (o PDF não vem): o anexo diz "Exportado do livro
+ *      ..." com "Gerar de novo", que refaz o PDF (o capítulo 2 e o gabarito
+ *      dele); sem o livro no tablet, a frase diz que falta o livro.
  *
  *   --prints <pasta>   grava três prints: a janela de exportar, a primeira
  *                      página do PDF gerado e a página do gabarito, as duas
@@ -47,7 +59,7 @@ const H = require('./_bib_navegador');
 const { conf, secao, esperar, pausa } = H;
 
 const PORTA = 8864;
-const VENENOS = ['--envenenado-gabarito-do-outro', '--envenenado-sem-fonte', '--envenenado-travessao'];
+const VENENOS = ['--envenenado-gabarito-do-outro', '--envenenado-sem-fonte', '--envenenado-travessao', '--envenenado-pdf-na-copia'];
 const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const iPrints = process.argv.indexOf('--prints');
 const PRINTS = iPrints > 0 ? process.argv[iPrints + 1] : null;
@@ -62,6 +74,9 @@ const trocas = {};
 if (MODO === '--envenenado-gabarito-do-outro') trocas['/biblioteca.js'] = BIB.split(GAB_DA_ENTRADA).join('var g = gabaritoDaEntrada(meta, meta.mapa[0]);');
 if (MODO === '--envenenado-sem-fonte') trocas['/pdf.js'] = PDF.split(FONTE).join("var fonte = '';");
 if (MODO === '--envenenado-travessao') trocas['/pdf.js'] = PDF.split(TROCA_TRACO).join('');
+const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
+const GUARDA_FORA = "return Store.salvarExportado(id, { nome: arquivo.nome, tipo: 'application/pdf', blob: arquivo.blob })";
+if (MODO === '--envenenado-pdf-na-copia') trocas['/app.js'] = APP.split(GUARDA_FORA).join(GUARDA_FORA.replace('salvarExportado', 'salvarAnexo'));
 const amb = H.criarAmbiente(PORTA, 'nath_c15c_exportar', trocas);
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'c15c_exportar_'));
@@ -114,6 +129,21 @@ async function irAoCapitulo(pag, rotulo) {
   await pag.evaluate(r => Array.from(document.querySelectorAll('#leitor-sumario-lista [data-entrada]'))
     .find(b => b.textContent.indexOf(r) >= 0).click(), rotulo);
 }
+/* Abre a aula de hoje daquela hora pela agenda (o mesmo do testa_livros_mapa.js). */
+async function abrirAulaDeHoje(pag, hora) {
+  await H.irParaAba(pag, 'agenda');
+  for (let i = 0; i < 24; i++) {
+    if (await pag.evaluate(h => !!document.querySelector('[data-dia="' + h + '"]'), hojeIso)) break;
+    await pag.click(i < 12 ? '#mes-seguinte' : '#mes-anterior');
+    await pausa(120);
+  }
+  const ok = await pag.evaluate((h, hr) => {
+    const alvo = Array.from(document.querySelectorAll('[data-dia="' + h + '"] .pilula')).find(x => x.textContent.indexOf(hr) === 0);
+    if (!alvo) return false; alvo.click(); return true;
+  }, hojeIso, hora);
+  await esperar('aula das ' + hora + ' aberta', () => pag.evaluate(() => document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
+  return ok;
+}
 // a janela de exportar, como ela a vê
 const janela = pag => pag.evaluate(() => {
   const m = document.querySelector('#modal-livro-exportar');
@@ -140,8 +170,8 @@ async function anexarNaAula(pag, antes) {
   await esperar('a janela fechou', () => pag.evaluate(() => !document.querySelector('#modal-livro-exportar.aberto')), v => v, 5000);
   return (r.valor || [])[antes] || null;
 }
-// o anexo guardado, em base64, para o Node ler
-const lerAnexo = (pag, id) => pag.evaluate(i => Store.lerAnexo(i).then(r => r && r.blob ? r.blob.arrayBuffer() : null).then(buf => {
+// o PDF exportado, guardado FORA da cópia (Store.lerExportado), em base64, para o Node ler
+const lerAnexo = (pag, id) => pag.evaluate(i => Store.lerExportado(i).then(r => r && r.blob ? r.blob.arrayBuffer() : null).then(buf => {
   if (!buf) return null;
   let s = ''; const b = new Uint8Array(buf);
   for (let k = 0; k < b.length; k += 0x8000) s += String.fromCharCode.apply(null, b.subarray(k, k + 0x8000));
@@ -195,6 +225,7 @@ function printarPdf(bytes, indice, nome) {
   conf('o gabarito do capítulo é lido num lugar só', BIB.split(GAB_DA_ENTRADA).length, 2);
   conf('o rodapé de fonte entra num lugar só', PDF.split(FONTE).length, 2);
   conf('a troca do travessão do livro mora num lugar só', PDF.split(TROCA_TRACO).length, 2);
+  conf('o PDF exportado é guardado fora da cópia num lugar só', APP.split(GUARDA_FORA).length, 2);
   if (MODO) conf('o arquivo servido ficou diferente do repositório (' + MODO + ')', Object.keys(trocas).length, 1);
   const ZIP = gerarPacote();
   conf('o gerador fez o pacote de prova, com o gabarito', !!ZIP, true);
@@ -230,12 +261,41 @@ function printarPdf(bytes, indice, nome) {
   // no veneno do gabarito do outro, quem diz que o defeito foi enxergado é o PDF, na seção 2
   const doOutro = MODO === '--envenenado-gabarito-do-outro';
   if (!doOutro) conf('e diz onde está o gabarito do capítulo 2', j1 && j1.motivo, '(gabarito: página 8, no fim do livro)');
+  // o tamanho estimado (3 páginas a 500 KB), sem o aviso de 20 MB
+  const tam = await p.evaluate(() => [document.querySelector('#livro-exportar-tamanho').textContent,
+    document.querySelector('#livro-exportar-aviso-tamanho').hidden]);
+  conf('a janela mostra o tamanho estimado, sem o aviso de 20 MB', tam.join(' | '),
+    'Tamanho estimado do PDF: cerca de 1,5 MB (3 páginas do livro). | true');
+  conf('com "O capítulo" marcado, o campo das páginas fica desligado', await p.evaluate(() => document.querySelector('#livro-exportar-quais').disabled), true);
   await p.evaluate(() => document.querySelector('#livro-exportar-aulas [data-aula="au1"]').click());
   await printar(p, 'c15c_janela_exportar.png');
 
+  // sem espaço no tablet: a frase própria, e nada anexado
+  await p.evaluate(() => { window.__estimarDeVerdade = navigator.storage.estimate.bind(navigator.storage);
+    navigator.storage.estimate = () => Promise.resolve({ quota: 1000000, usage: 999000 }); });
+  await p.evaluate(() => document.querySelector('#livro-exportar-anexar').click());
+  const semEspaco = (await esperar('o aviso de falta de espaço', () => p.evaluate(() => document.querySelector('#aviso').textContent),
+    v => /sem espaço/.test(v || ''), 10000)).valor || '';
+  console.log('   aviso: ' + semEspaco);
+  conf('sem espaço: a frase própria, sem "não consegui montar o PDF", e nada anexado',
+    /O tablet está sem espaço para guardar este PDF \(cerca de 1,5 MB\)/.test(semEspaco) + ' | ' + /Não consegui montar/.test(semEspaco) +
+    ' | ' + (await anexosDoLivro(p)).length, 'true | false | 0');
+  await p.evaluate(() => { navigator.storage.estimate = window.__estimarDeVerdade; });
+
   // ================================================================
   secao('2. Gerar e anexar: o capítulo e o gabarito dele, num PDF só, na aula');
+  const tamanhoDaCopia = () => p.evaluate(() => Store.carregar().then(d => Store.exportarTudo(d)).then(x => JSON.stringify(x).length));
+  const copiaAntes = await tamanhoDaCopia();
   const an1 = await anexarNaAula(p, 0);
+  const copiaDepois = await tamanhoDaCopia();
+  console.log('   cópia de segurança: ' + copiaAntes + ' caracteres antes, ' + copiaDepois + ' depois (+' + (copiaDepois - copiaAntes) + ')');
+  if (MODO === '--envenenado-pdf-na-copia') {
+    secao('VENENO: o PDF exportado no depósito de anexos');
+    conf('envenenado: a cópia cresceu o tamanho do PDF (defeito enxergado)', copiaDepois - copiaAntes > 100000, true);
+    throw Object.assign(new Error('fim'), { fimDoVeneno: true });
+  }
+  conf('a cópia de segurança cresce só alguns KB (o registro do anexo, sem o PDF)', copiaDepois - copiaAntes < 4096, true);
+  conf('e o PDF não está no depósito de anexos', await p.evaluate(i => Store.lerAnexo(i).then(r => !!r), an1 && an1.id), false);
   console.log('   anexo: ' + JSON.stringify(an1));
   if (!doOutro) {
     conf('um anexo só na aula, do livro, com as páginas do capítulo e as do gabarito',
@@ -338,6 +398,45 @@ function printarPdf(bytes, indice, nome) {
     'true | true | true');
   conf('e nada do capítulo 2', /do capítulo 2/.test(tudo6), false);
   await fecharModal(p, 'modal-leitor-epub');
+
+  // ================================================================
+  secao('8. A cópia restaurada noutro tablet: "Gerar de novo"');
+  const copia = await p.evaluate(() => Store.carregar().then(d => Store.exportarTudo(d)));
+  // "Apagar todos os dados" leva os PDFs exportados e fica com os livros: é o tablet novo com o pacote importado
+  await p.evaluate(async c => { await Store.apagarTudo(); await Store.importarTudo(c); }, copia);
+  conf('depois de restaurar, o PDF do capítulo 2 não está no tablet', await p.evaluate(i => Store.lerExportado(i).then(r => !!r), an1.id), false);
+  await H.abrirApp(p, amb.ORIGEM);
+  conf('a aula abriu', await abrirAulaDeHoje(p, '09:00'), true);
+  const linha = (await esperar('o anexo com "Gerar de novo"', () => p.evaluate(i => {
+    const l = document.querySelector('#lista-anexos [data-anexo-id="' + i + '"]');
+    const b = l && l.querySelector('[data-gerar-de-novo]');
+    return l && b && !b.closest('[hidden]') ? l.innerText.replace(/\s+/g, ' ') : '';
+  }, an1.id), v => !!v, 10000)).valor || '';
+  console.log('   linha: ' + linha);
+  conf('o anexo diz de onde veio e oferece "Gerar de novo"',
+    /Exportado do livro Livro com gabarito, Volume 2, Capítulo 2: Frações, com o gabarito/.test(linha) && /Gerar de novo/.test(linha), true);
+  await p.evaluate(i => document.querySelector('#lista-anexos [data-gerar-de-novo="' + i + '"]').click(), an1.id);
+  const refeito = (await esperar('o PDF gerado de novo', () => lerAnexo(p, an1.id), v => !!v, 60000)).valor;
+  const pg8 = refeito ? lerPdf(Buffer.from(refeito, 'base64')) : [];
+  const tudo8 = pg8.map(x => x.texto).join(' ');
+  conf('o "Gerar de novo" refez o capítulo 2 e o gabarito dele, no mesmo anexo',
+    pg8.length + ' | ' + (tudo8.indexOf('Texto conhecido do capítulo 2, parte 1.') >= 0) + ' | ' +
+    (tudo8.indexOf('Resposta conhecida do capítulo 2') > tudo8.indexOf('parte 2.')) + ' | ' + /capítulo [13]:/.test(tudo8), '3 | true | true | false');
+  await esperar('a linha sem o "Gerar de novo"', () => p.evaluate(i => {
+    const l = document.querySelector('#lista-anexos [data-anexo-id="' + i + '"]');
+    return !!l && !l.querySelector('[data-gerar-de-novo]');
+  }, an1.id), v => v, 5000);
+  // sem o livro no tablet: a frase diz que falta o livro
+  await p.evaluate(async i => { await Store.apagarExportado(i); await Store.removerLivro('livro-com-gabarito'); }, an1.id);
+  await fecharModal(p, 'modal-aula');
+  await H.abrirApp(p, amb.ORIGEM);
+  await abrirAulaDeHoje(p, '09:00');
+  await esperar('o "Gerar de novo" de novo', () => p.evaluate(i => !!document.querySelector('#lista-anexos [data-gerar-de-novo="' + i + '"]'), an1.id), v => v, 10000);
+  await p.evaluate(i => document.querySelector('#lista-anexos [data-gerar-de-novo="' + i + '"]').click(), an1.id);
+  const falta = (await esperar('a frase do livro que falta', () => p.evaluate(() => document.querySelector('#aviso').textContent),
+    v => /Falta o livro/.test(v || ''), 10000)).valor || '';
+  conf('sem o livro, a frase diz que falta o livro', falta.indexOf('Falta o livro "Livro com gabarito, Volume 2" neste tablet.') >= 0, true);
+  await fecharModal(p, 'modal-aula');
 
   secao('7. Nenhum erro de página');
   conf('nenhum erro', p.errosDePagina.join(' | '), '');
