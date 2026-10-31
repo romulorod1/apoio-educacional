@@ -249,7 +249,42 @@ conf('quatro aulas em abril de 2027', aulasAbrilCodex.length, 4);
 conf('todas as aulas de abril de 2027 nascem às 18:00 (e não 17:00)',
   aulasAbrilCodex.every(a => a.hora === '18:00'), true);
 
+secao('9. Exclusões de filhas superadas são unificadas e nunca ressuscitam');
+db = baseNova();
+const sExclP = Core.criarSerie(db, {
+  alunoId: 'a1', dias: [1], hora: '14:00', duracaoMin: 60,
+  inicio: '2026-06-01', fim: null
+});
+// 1. "seguintes" em 15/06 para 16:00
+const ae15 = db.aulas.find(a => a.data === '2026-06-15');
+Core.aplicarEdicaoAula(db, ae15.id, { hora: '16:00' }, 'seguintes');
+
+// 2. "seguintes" em 13/07 para 17:00
+Core.garantirSeriesAte(db, '2026-07');
+const ae13 = db.aulas.find(a => a.data === '2026-07-13');
+Core.aplicarEdicaoAula(db, ae13.id, { hora: '17:00' }, 'seguintes');
+
+// 3. Exclui aula futura de 05/04/2027 na série filha de 13/07
+Core.garantirSeriesAte(db, '2027-04');
+const ae0504 = db.aulas.find(a => a.data === '2027-04-05');
+conf('aula de 05/04/2027 existia antes', !!ae0504, true);
+Core.excluirAulas(db, ae0504.id, 'esta');
+conf('aula de 05/04/2027 foi excluída', db.aulas.some(a => a.data === '2027-04-05'), false);
+
+// 4. Edita em 22/06 para 18:00 com "seguintes" (superando a filha de 13/07)
+const ae22 = db.aulas.find(a => a.data === '2026-06-22');
+Core.aplicarEdicaoAula(db, ae22.id, { hora: '18:00' }, 'seguintes');
+
+// 5. Re-materializar até 2027-04 não pode ressuscitar 05/04/2027
+Core.garantirSeriesAte(db, '2027-04');
+conf('aula de 05/04/2027 NÃO ressuscitou', db.aulas.some(a => a.data === '2027-04-05'), false);
+const aulasAbrilRestantes = db.aulas.filter(a => a.alunoId === 'a1' && Core.mesDe(a.data) === '2027-04');
+conf('abril de 2027 tem exatamente 3 aulas restantes (12, 19, 26)', aulasAbrilRestantes.length, 3);
+conf('todas as aulas restantes de abril têm horário 18:00',
+  aulasAbrilRestantes.every(a => a.hora === '18:00'), true);
+
 console.log('\n' + ok + ' verificações passaram, ' + falhas + ' falharam.');
 process.exit(falhas ? 1 : 0);
+
 
 

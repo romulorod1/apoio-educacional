@@ -507,6 +507,15 @@
             if (mudancas.status !== undefined) s.status = mudancas.status;
             if (mudancas.cobravel !== undefined) s.cobravel = mudancas.cobravel;
             s.fim = fimAntigo;
+            (db.series || []).forEach(function (x) {
+              if (x.id !== s.id && x.serieOrigemId === raizId && x.inicio >= aula.data) {
+                (x.exclusoes || []).forEach(function (d) {
+                  s.exclusoes = s.exclusoes || [];
+                  if (d >= aula.data && s.exclusoes.indexOf(d) < 0) s.exclusoes.push(d);
+                });
+              }
+            });
+            if (s.exclusoes) s.exclusoes.sort();
             db.series = (db.series || []).filter(function (x) {
               return x.id === s.id || !(x.serieOrigemId === raizId && x.inicio >= aula.data);
             });
@@ -514,6 +523,17 @@
             var dt = dataLocal(aula.data);
             dt.setDate(dt.getDate() - 1);
             s.fim = isoDe(dt);
+            var exclusoesUnificadas = (s.exclusoes || []).filter(function (d) { return d >= aula.data; });
+            (db.series || []).forEach(function (x) {
+              if (x.serieOrigemId === raizId && x.inicio >= aula.data) {
+                (x.exclusoes || []).forEach(function (d) {
+                  if (d >= aula.data && exclusoesUnificadas.indexOf(d) < 0) {
+                    exclusoesUnificadas.push(d);
+                  }
+                });
+              }
+            });
+            exclusoesUnificadas.sort();
             var novaSerie = {
               id: uid(),
               serieOrigemId: raizId,
@@ -525,7 +545,7 @@
               duracaoMin: mudancas.duracaoMin !== undefined ? mudancas.duracaoMin : s.duracaoMin,
               status: mudancas.status !== undefined ? mudancas.status : (s.status || 'realizada'),
               cobravel: mudancas.cobravel !== undefined ? mudancas.cobravel : (s.cobravel !== undefined ? s.cobravel : true),
-              exclusoes: (s.exclusoes || []).filter(function (d) { return d >= aula.data; }),
+              exclusoes: exclusoesUnificadas,
               materializadoAte: s.materializadoAte
             };
             s.exclusoes = (s.exclusoes || []).filter(function (d) { return d < aula.data; });
