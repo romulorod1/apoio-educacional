@@ -44,20 +44,31 @@ const V3 = 'var VERSAO_BANCO = 3;';
 const CRIA_LISTAS = /    if \(!b\.objectStoreNames\.contains\('biblioteca_listas'\)\) \{\r?\n      b\.createObjectStore\('biblioteca_listas', \{ keyPath: 'id' \}\);\r?\n    \}\r?\n/;
 const RAMO_VERSAO = 'if (e && e.versaoNova) {';
 const AVISA_TROCA = "if (typeof root.aoBancoTrocado === 'function') root.aoBancoTrocado();";
+/* O C15.1 subiu o banco para 4 (os livros). Esta prova continua sendo a da
+ * subida de 2 para 3, com o código deste commit: o "código da versão 3" é o
+ * store.js de agora sem os dois depósitos dos livros e com o número 3. A
+ * subida de 3 para 4 é do _teste/testa_livros.js, no mesmo modelo. */
+const V4 = 'var VERSAO_BANCO = 4;';
+const CRIA_LIVROS = /    if \(!b\.objectStoreNames\.contains\('livros'\)\) \{\r?\n      s = b\.createObjectStore\('livros', \{ keyPath: 'id' \}\);\r?\n      s\.createIndex\('pacote', 'pacote'\);\r?\n    \}\r?\n    if \(!b\.objectStoreNames\.contains\('livros_posicoes'\)\) \{\r?\n      b\.createObjectStore\('livros_posicoes', \{ keyPath: 'id' \}\);\r?\n    \}\r?\n/;
 
 secao('0. As âncoras');
-conf('o store.js está na versão 3', STORE.split(V3).length, 2);
+conf('o store.js está na versão 4', STORE.split(V4).length, 2);
+conf('o store.js cria os depósitos dos livros uma vez', (STORE.match(new RegExp(CRIA_LIVROS.source, 'g')) || []).length, 1);
 conf('o store.js cria o depósito das listas uma vez', (STORE.match(new RegExp(CRIA_LISTAS.source, 'g')) || []).length, 1);
 conf('o app.js tem o ramo da versão mais nova uma vez', APP.split(RAMO_VERSAO).length, 2);
 conf('o store.js avisa a troca uma vez', STORE.split(AVISA_TROCA).length, 2);
 
-const STORE_V2 = STORE.replace(V3, 'var VERSAO_BANCO = 2;').replace(CRIA_LISTAS, '');
-const STORE_V4 = STORE.replace(V3, 'var VERSAO_BANCO = 4;');
+const STORE_V3 = STORE.replace(V4, V3).replace(CRIA_LIVROS, '');
+conf('o código da versão 3 ficou sem os livros e com o número 3',
+  STORE_V3.indexOf("createObjectStore('livros'") < 0 && STORE_V3.split(V3).length === 2, true);
+const STORE_V2 = STORE_V3.replace(V3, 'var VERSAO_BANCO = 2;').replace(CRIA_LISTAS, '');
+const STORE_V4 = STORE_V3.replace(V3, V4);
 const trocas = {};
 const APP_SERVIDO = MODO === '--envenenado-versao-tecnica' ? APP.split(RAMO_VERSAO).join('if (false) {') : APP;
-const STORE_SERVIDO = MODO === '--envenenado-troca-calada' ? STORE.split(AVISA_TROCA).join('') : STORE;
+const STORE_SERVIDO = MODO === '--envenenado-troca-calada' ? STORE_V3.split(AVISA_TROCA).join('') : STORE_V3;
 if (APP_SERVIDO !== APP) trocas['/app.js'] = APP_SERVIDO;
-if (STORE_SERVIDO !== STORE) trocas['/store.js'] = STORE_SERVIDO;
+trocas['/store.js'] = STORE_SERVIDO;
+const envenenados = (APP_SERVIDO !== APP ? 1 : 0) + (STORE_SERVIDO !== STORE_V3 ? 1 : 0);
 const amb = H.criarAmbiente(PORTA, 'perfil_banco_v3', trocas);
 
 const versaoEDepositos = pag => pag.evaluate(() => new Promise(r => {
@@ -84,7 +95,7 @@ const contagens = pag => pag.evaluate(() => new Promise(r => {
 (async () => {
   if (MODO) {
     secao('O veneno é de verdade');
-    conf('um arquivo servido ficou diferente do repositório (' + MODO + ')', Object.keys(trocas).length, 1);
+    conf('um arquivo servido ficou diferente do código da versão 3 (' + MODO + ')', envenenados, 1);
   }
   await amb.subir();
 
@@ -115,9 +126,8 @@ const contagens = pag => pag.evaluate(() => new Promise(r => {
   });
   const antes = await contagens(pag);
   await pag.close();
-  // o código deste commit, na versão 3
-  delete trocas['/store.js'];
-  if (STORE_SERVIDO !== STORE) trocas['/store.js'] = STORE_SERVIDO;
+  // o código deste commit, na versão 3 (sem os livros do C15.1)
+  trocas['/store.js'] = STORE_SERVIDO;
   const pag2 = await amb.pagina();
   await pag2.setBypassServiceWorker(true);
   await H.abrirApp(pag2, amb.ORIGEM);

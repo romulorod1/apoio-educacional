@@ -48,7 +48,9 @@
   /* ---------------------------------------------------------------- CRC-32 */
 
   var TABELA_CRC = null;
-  function crc32(bytes) {
+  /* `anterior` (opcional) continua a conta de um trecho anterior: o CRC de um
+   * arquivo lido em pedaços é crc32(p2, crc32(p1)), igual ao de uma vez. */
+  function crc32(bytes, anterior) {
     if (!TABELA_CRC) {
       TABELA_CRC = new Uint32Array(256);
       for (var n = 0; n < 256; n++) {
@@ -57,7 +59,7 @@
         TABELA_CRC[n] = c >>> 0;
       }
     }
-    var crc = 0xFFFFFFFF;
+    var crc = anterior ? (anterior ^ 0xFFFFFFFF) >>> 0 : 0xFFFFFFFF;
     for (var i = 0; i < bytes.length; i++) crc = TABELA_CRC[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
     return (crc ^ 0xFFFFFFFF) >>> 0;
   }
@@ -99,11 +101,30 @@
     }
     if (inicioDir + tamDir > fim) throw ErroZip('O pacote está incompleto ou corrompido.');
 
+    var entradas = lerDiretorio(b, v, inicioDir, fim, total).map(function (e) {
+      var local = e.local;
+      if (local + 30 > b.length || v.getUint32(local, true) !== SIG_LOCAL) {
+        throw ErroZip('O pacote está incompleto ou corrompido.');
+      }
+      var dados = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+      if (dados + e.comprimido > b.length) throw ErroZip('O pacote está incompleto ou corrompido.');
+      return {
+        nome: e.nome, metodo: e.metodo, crc: e.crc,
+        comprimido: e.comprimido, tamanho: e.tamanho, inicio: dados
+      };
+    });
+    return { bytes: b, entradas: entradas };
+  }
+
+  /* As entradas do diretório central, que começa em `q` dentro de `b` e vai
+   * até `limite`. Não toca no cabeçalho local: quem lê o zip inteiro confere
+   * aqui mesmo (ler), e quem lê do arquivo confere entrada por entrada, na
+   * hora de ler cada uma (lerDoArquivo). */
+  function lerDiretorio(b, v, q, limite, total) {
     var entradas = [];
     var vistos = Object.create(null);
-    var q = inicioDir;
     for (var i = 0; i < total; i++) {
-      if (q + 46 > fim || v.getUint32(q, true) !== SIG_CENTRAL) {
+      if (q + 46 > limite || v.getUint32(q, true) !== SIG_CENTRAL) {
         throw ErroZip('O pacote está incompleto ou corrompido.');
       }
       var flags = v.getUint16(q + 8, true);
@@ -128,20 +149,108 @@
       }
       if (vistos[nome]) throw ErroZip('O pacote tem o arquivo ' + nome + ' repetido.');
       vistos[nome] = true;
-
-      if (local + 30 > b.length || v.getUint32(local, true) !== SIG_LOCAL) {
-        throw ErroZip('O pacote está incompleto ou corrompido.');
-      }
-      var dados = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
-      if (dados + comprimido > b.length) throw ErroZip('O pacote está incompleto ou corrompido.');
       if (metodo === 0 && comprimido !== tamanho) throw ErroZip('O pacote está incompleto ou corrompido.');
-
-      entradas.push({
-        nome: nome, metodo: metodo, crc: crc,
-        comprimido: comprimido, tamanho: tamanho, inicio: dados
-      });
+      entradas.push({ nome: nome, metodo: metodo, crc: crc, comprimido: comprimido, tamanho: tamanho, local: local });
     }
-    return { bytes: b, entradas: entradas };
+    return entradas;
+  }
+
+  /* ------------------------------------------- ler do arquivo, por fatia */
+
+  /* O pacote de livros (C15.1) pode ter centenas de MB. Ler o arquivo
+   * inteiro (arrayBuffer) punha o zip todo na memória do tablet, e cada livro
+   * mais uma vez num Blob: com 400 MB de zip, a aba caía. Aqui só o fim do
+   * arquivo (o diretório central) é lido; cada entrada é lida depois, sozinha,
+   * por fatia (Blob.slice), e solta quando quem chamou terminar com ela. Uma
+   * entrada "stored" pode até virar Blob sem ser lida: a fatia do próprio
+   * arquivo (fatiaDoArquivo), que o navegador copia do disco. */
+  function lerFatia(arquivo, de, ate) {
+    return arquivo.slice(de, ate).arrayBuffer().then(function (ab) { return new Uint8Array(ab); });
+  }
+
+  function lerDoArquivo(arquivo) {
+    var tam = arquivo && typeof arquivo.size === 'number' ? arquivo.size : -1;
+    if (tam < 22) return Promise.reject(ErroZip('O arquivo escolhido não é um pacote (.zip).'));
+    var de = Math.max(0, tam - 22 - 65535);
+    return lerFatia(arquivo, de, tam).then(function (cauda) {
+      var v = new DataView(cauda.buffer, cauda.byteOffset, cauda.byteLength);
+      var fim = -1;
+      for (var p = cauda.length - 22; p >= 0; p--) {
+        if (v.getUint32(p, true) === SIG_FIM) { fim = p; break; }
+      }
+      if (fim < 0) {
+        /* Começa como zip e não tem o fim: o download parou no meio. Quem lê
+         * daqui (espiarPacote) recusa na hora, pela marca `cortado`, em vez de
+         * ler o arquivo inteiro para descobrir a mesma coisa. Só os 4 bytes do
+         * começo são lidos. */
+        return lerFatia(arquivo, 0, 4).then(function (cab) {
+          var vc = new DataView(cab.buffer, cab.byteOffset, cab.byteLength);
+          if (cab.length === 4 && vc.getUint32(0, true) === SIG_LOCAL) {
+            throw Object.assign(ErroZip('O pacote chegou cortado: o arquivo termina antes do fim, como num download que parou no meio.'),
+              { cortado: true });
+          }
+          throw ErroZip('O arquivo escolhido não é um pacote (.zip).');
+        });
+      }
+      var disco = v.getUint16(fim + 4, true);
+      var discoDir = v.getUint16(fim + 6, true);
+      var totalAqui = v.getUint16(fim + 8, true);
+      var total = v.getUint16(fim + 10, true);
+      var tamDir = v.getUint32(fim + 12, true);
+      var inicioDir = v.getUint32(fim + 16, true);
+      if (total === 0xFFFF || tamDir === 0xFFFFFFFF || inicioDir === 0xFFFFFFFF) {
+        throw ErroZip('Pacote em formato zip64, que o aplicativo não lê.');
+      }
+      if (disco !== 0 || discoDir !== 0 || totalAqui !== total) {
+        throw ErroZip('Pacote dividido em partes, que o aplicativo não lê.');
+      }
+      if (inicioDir + tamDir > de + fim) throw ErroZip('O pacote está incompleto ou corrompido.');
+      return lerFatia(arquivo, inicioDir, inicioDir + tamDir).then(function (dir) {
+        var vd = new DataView(dir.buffer, dir.byteOffset, dir.byteLength);
+        return { arquivo: arquivo, entradas: lerDiretorio(dir, vd, 0, dir.length, total) };
+      });
+    });
+  }
+
+  // onde começam os dados da entrada: lê só o cabeçalho local dela
+  function inicioNoArquivo(zipArq, entrada) {
+    if (entrada.inicio != null) return Promise.resolve(entrada.inicio);
+    var a = zipArq.arquivo;
+    return lerFatia(a, entrada.local, entrada.local + 30).then(function (h) {
+      var v = new DataView(h.buffer, h.byteOffset, h.byteLength);
+      if (h.length < 30 || v.getUint32(0, true) !== SIG_LOCAL) throw ErroZip('O pacote está incompleto ou corrompido.');
+      var inicio = entrada.local + 30 + v.getUint16(26, true) + v.getUint16(28, true);
+      if (inicio + entrada.comprimido > a.size) throw ErroZip('O pacote está incompleto ou corrompido.');
+      entrada.inicio = inicio;
+      return inicio;
+    });
+  }
+
+  /* Os bytes de UMA entrada, lidos do arquivo e conferidos (tamanho e CRC),
+   * como o extrair do zip inteiro. */
+  function extrairDoArquivo(zipArq, entrada) {
+    return inicioNoArquivo(zipArq, entrada).then(function (inicio) {
+      return lerFatia(zipArq.arquivo, inicio, inicio + entrada.comprimido);
+    }).then(function (cru) {
+      if (entrada.metodo === 0) return cru;
+      if (!suportado()) throw ErroZip('SEM_DESCOMPRESSAO');
+      return inflar(cru).catch(function () {
+        throw ErroZip('O arquivo ' + entrada.nome + ' do pacote está corrompido.');
+      });
+    }).then(function (saida) {
+      if (saida.length !== entrada.tamanho || crc32(saida) !== entrada.crc) {
+        throw ErroZip('O arquivo ' + entrada.nome + ' do pacote está corrompido.');
+      }
+      return saida;
+    });
+  }
+
+  /* Uma entrada "stored" como Blob, sem ler nada: a fatia do próprio arquivo. */
+  function fatiaDoArquivo(zipArq, entrada, tipo) {
+    if (entrada.metodo !== 0) return Promise.reject(ErroZip('O arquivo ' + entrada.nome + ' do pacote veio comprimido.'));
+    return inicioNoArquivo(zipArq, entrada).then(function (inicio) {
+      return zipArq.arquivo.slice(inicio, inicio + entrada.tamanho, tipo || '');
+    });
   }
 
   function nomeDe(bytes) {
@@ -180,5 +289,8 @@
     });
   }
 
-  return { suportado: suportado, ler: ler, extrair: extrair, crc32: crc32 };
+  return {
+    suportado: suportado, ler: ler, extrair: extrair, crc32: crc32,
+    lerDoArquivo: lerDoArquivo, extrairDoArquivo: extrairDoArquivo, fatiaDoArquivo: fatiaDoArquivo
+  };
 });

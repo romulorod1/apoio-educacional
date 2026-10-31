@@ -91,7 +91,8 @@ const CHAVE_CARRINHO = 'apoio-educacional:bib-carrinho';
 
 // ---------------------------------------------------------------- 0 (Node)
 secao('0. Sem navegador: o banco, a cópia, a restauração e o apagar tudo');
-conf('VERSAO_BANCO subiu para 3', /var VERSAO_BANCO = 3;/.test(STORE), true);
+// subiu para 3 no C2a e para 4 no C15.1 (livros); o número nunca desce
+conf('VERSAO_BANCO é 3 ou mais', Number((/var VERSAO_BANCO = (\d+);/.exec(STORE) || [])[1]) >= 3, true);
 conf('o depósito biblioteca_listas é criado na subida', /createObjectStore\('biblioteca_listas', \{ keyPath: 'id' \}\)/.test(STORE), true);
 conf('a cópia de segurança leva as listas', STORE.indexOf(COPIA_LEVA) >= 0, true);
 conf('a restauração repõe as listas', /lis\.put\(r\)/.test(STORE), true);

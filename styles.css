@@ -1890,6 +1890,43 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-pdf-aviso { max-width: 520px; margin: 24px auto; padding: 18px; background: var(--branco);
   border-radius: 12px; box-shadow: var(--sombra); }
 .leitor-pdf-aviso p { margin: 0 0 14px; }
+/* Livros (C15.1). O sumário abre embaixo da barra, sem cobrir a página
+   inteira, e rola sozinho quando o livro tem muitos capítulos. */
+.leitor-sumario { flex-shrink: 0; max-height: 42vh; overflow: auto; padding: 6px 18px 10px;
+  border-bottom: 1px solid var(--fio); background: var(--branco); }
+.leitor-sumario button { display: block; width: 100%; text-align: left; min-height: 44px; padding: 8px 10px;
+  border: 0; border-bottom: 1px solid var(--fio); background: none; font-size: 15px; color: var(--navy); cursor: pointer; }
+.leitor-sumario button.atual { font-weight: 700; background: var(--soft); }
+.leitor-sumario .pagina-do-sumario { float: right; opacity: .7; font-weight: 400; margin-left: 12px; }
+.leitor-sumario .vazio-do-sumario { margin: 8px 0; }
+/* O capítulo do EPUB rola dentro da caixa isolada, que ocupa o corpo todo. */
+.leitor-epub-corpo { padding: 0; background: #DDE3EA; overflow: hidden; display: flex; }
+.leitor-epub-corpo iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #FFFFFF; }
+.leitor-epub-corpo .leitor-pdf-aviso { align-self: flex-start; }
+/* C15.2: "Este capítulo cobre", uma faixa baixa embaixo da barra do leitor,
+   com os dois botões a um toque; a escolha do assunto rola por dentro. */
+.leitor-cobre { flex-shrink: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 8px 18px; border-bottom: 1px solid var(--fio); background: var(--soft); font-size: 15px; color: var(--navy); }
+.leitor-cobre .cobre-texto { flex: 1 1 260px; }
+.leitor-cobre .tag { margin-left: 6px; }
+/* A sombra de rolagem: as duas primeiras camadas andam com o conteúdo e
+   tapam a sombra nas pontas; as duas últimas ficam paradas. Sobra sombra
+   embaixo enquanto há lista para rolar, e em cima depois de rolar. */
+.leitor-cobre .cobre-escolha { position: relative; flex: 1 1 100%; max-height: 34vh; overflow: auto;
+  border: 1px solid var(--fio); border-radius: 8px; background-color: var(--branco);
+  background-image: linear-gradient(var(--branco) 30%, rgba(255, 255, 255, 0)),
+    linear-gradient(rgba(255, 255, 255, 0), var(--branco) 70%),
+    radial-gradient(farthest-side at 50% 0, rgba(27, 42, 58, .22), rgba(27, 42, 58, 0)),
+    radial-gradient(farthest-side at 50% 100%, rgba(27, 42, 58, .22), rgba(27, 42, 58, 0));
+  background-position: top, bottom, top, bottom; background-repeat: no-repeat;
+  background-size: 100% 28px, 100% 28px, 100% 12px, 100% 12px;
+  background-attachment: local, local, scroll, scroll; }
+.leitor-cobre .cobre-escolha button { display: block; width: 100%; text-align: left; min-height: 44px; padding: 8px 12px;
+  border: 0; border-bottom: 1px solid var(--fio); background: none; font-size: 15px; color: var(--navy); cursor: pointer; }
+.leitor-cobre .cobre-escolha button.atual { font-weight: 700; background: var(--soft); }
+.leitor-cobre .cobre-rolagem { flex: 1 1 100%; margin: 0; }
+.livro-linha .detalhe { margin-top: 2px; }
+#lista-livros-biblioteca .livros-total { font-weight: 600; margin: 4px 0 8px; }
 /* material desta aula: a caixa fica ao lado do cartão, e o alvo de toque tem 44 px */
 .bib-celula { display: flex; flex-direction: column; gap: 12px; }
 .bib-acoes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

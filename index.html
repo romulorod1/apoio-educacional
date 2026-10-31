@@ -288,6 +288,10 @@
           A cópia de segurança não leva os pacotes: num tablet novo, importe de novo do Drive.
         </p>
         <div id="lista-pacotes-biblioteca"></div>
+        <!-- C15.1: os livros de referência, com o tamanho de cada um e o total.
+             Ficam aqui, ao lado dos pacotes e do Importar, e não na aba
+             Biblioteca, que é de leitura: remover é decisão de espaço. -->
+        <div id="lista-livros-biblioteca"></div>
         <div id="estado-importacao-biblioteca"></div>
         <div class="barra" style="margin-bottom:0">
           <button class="btn" id="importar-biblioteca" type="button">Importar biblioteca</button>
@@ -463,6 +467,8 @@
         <button class="btn" id="leitor-anterior" type="button">‹ Anterior</button>
         <span class="leitor-pdf-contador" id="leitor-contador" aria-live="polite"></span>
         <button class="btn" id="leitor-proxima" type="button">Próxima ›</button>
+        <!-- C15.1: o sumário do livro; some no anexo da aula, que não tem -->
+        <button class="btn" id="leitor-sumario" type="button" hidden aria-expanded="false">Sumário</button>
         <span class="leitor-pdf-zoom">
           <button class="btn leitor-pdf-quadrado" id="leitor-menos" type="button" aria-label="Diminuir">&minus;</button>
           <button class="btn leitor-pdf-quadrado" id="leitor-mais" type="button" aria-label="Aumentar">+</button>
@@ -472,10 +478,51 @@
       <!-- C3: a frase que aponta o "Abrir esta página como folha" quando ela
            veio do "Abrir como folha para escrever em cima" do anexo -->
       <p class="faixa-info leitor-pdf-dica" id="leitor-dica" hidden></p>
+      <!-- C15.2: "Este capítulo cobre", com Confirmar e Corrigir; só no livro -->
+      <div class="leitor-cobre" id="leitor-cobre" hidden></div>
+      <div class="leitor-sumario" id="leitor-sumario-lista" hidden></div>
       <div class="modal-corpo leitor-pdf-corpo" id="corpo-modal-leitor-pdf"></div>
       <div class="modal-rodape">
         <button class="btn" data-fechar type="button">Fechar</button>
         <button class="btn principal" id="leitor-como-folha" type="button">Abrir esta página como folha</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- C15.1: os livros do tablet, para abrir. A gestão (tamanho e Remover)
+       fica em Ajustes; aqui só se lê. -->
+  <div class="fundo-modal" id="modal-livros">
+    <div class="modal">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-livros">Livros</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-livros"></div>
+      <div class="modal-rodape">
+        <button class="btn" data-fechar type="button">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- C15.1: o leitor de EPUB, só leitura. O capítulo é HTML de terceiro e
+       vai numa caixa isolada (iframe com sandbox, sem scripts). -->
+  <div class="fundo-modal" id="modal-leitor-epub">
+    <div class="modal largo">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-leitor-epub">Livro</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+      </div>
+      <div class="leitor-pdf-barra" id="barra-leitor-epub">
+        <button class="btn" id="epub-anterior" type="button">‹ Anterior</button>
+        <span class="leitor-pdf-contador" id="epub-contador" aria-live="polite"></span>
+        <button class="btn" id="epub-proximo" type="button">Próximo ›</button>
+        <button class="btn" id="epub-sumario" type="button" aria-expanded="false">Sumário</button>
+      </div>
+      <div class="leitor-cobre" id="epub-cobre" hidden></div>
+      <div class="leitor-sumario" id="epub-sumario-lista" hidden></div>
+      <div class="modal-corpo leitor-epub-corpo" id="corpo-modal-leitor-epub"></div>
+      <div class="modal-rodape">
+        <button class="btn" data-fechar type="button">Fechar</button>
       </div>
     </div>
   </div>

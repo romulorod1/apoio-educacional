@@ -156,6 +156,176 @@
     return null;
   }
 
+  /* ------------------------------------------------------------- livros */
+
+  /* O pacote de livros (C15.1, CONTRATO seção 8j). O mesmo zip e o mesmo
+   * manifest com hash de todo arquivo, mas sem itens, teoria, busca nem
+   * apelidos: `conteudo: "livros"` no manifest, a lista dos livros nele, e
+   * cada livro em livros/<id>.pdf ou livros/<id>.epub. Quem grava é o
+   * store.js, num depósito só dos livros, fora da cópia de segurança. */
+  var FORMATOS_DE_LIVRO = { pdf: 'application/pdf', epub: 'application/epub+zip' };
+  var ID_DE_LIVRO = /^[a-z0-9][a-z0-9-]*$/;
+
+  function inteiro(x) { return typeof x === 'number' && isFinite(x) && Math.floor(x) === x; }
+
+  /* O teto por livro do gerador (biblioteca/livros.py, TETO_MB). O aplicativo
+   * confere de novo: um livro maior que isto, num pacote feito à mão ou por
+   * outro gerador, é recusado com a frase dele, antes de qualquer leitura. Era
+   * 40 MB no C15.1; o dono decidiu depois que nada perde qualidade (o tablet
+   * tem 200 GB livres), e a leitura livro a livro segura o pico de memória
+   * perto de um livro. A prova do gerador confere os dois tetos juntos. */
+  var TETO_POR_LIVRO = 160 * 1024 * 1024;
+
+  /* Confere a FORMA do que vai para a tela e para o leitor: id, formato, o
+   * arquivo que existe no zip com o mesmo hash da lista, e o sumário dentro
+   * do livro (página de 1 ao total no PDF, capítulo da espinha no EPUB). Um
+   * sumário que aponta para fora do livro levaria o toque a lugar nenhum.
+   * Não lê livro nenhum: `noZip` é o nome de cada arquivo do zip. */
+  function lerLivros(manifest, noZip, lista) {
+    var livros = manifest.livros;
+    if (!Array.isArray(livros) || !livros.length) throw Recusa('O pacote de livros não traz livro nenhum.', 'defeito');
+    var vistos = Object.create(null), citados = Object.create(null);
+    var saida = livros.map(function (l) {
+      if (!l || typeof l.id !== 'string' || !ID_DE_LIVRO.test(l.id)) {
+        throw Recusa('O pacote de livros tem livro sem identificador válido.', 'defeito');
+      }
+      if (vistos[l.id]) throw Recusa('O pacote de livros repete o livro ' + l.id + '.', 'defeito');
+      vistos[l.id] = true;
+      if (!FORMATOS_DE_LIVRO[l.formato]) throw Recusa('O livro ' + l.id + ' tem um formato que o aplicativo não lê.', 'defeito');
+      if (l.arquivo !== 'livros/' + l.id + '.' + l.formato || !noZip[l.arquivo]) {
+        throw Recusa('O livro ' + l.id + ' cita um arquivo que não está no pacote.', 'defeito');
+      }
+      if (lista[l.arquivo] !== l.hash) throw Recusa('O livro ' + l.id + ' não confere com o manifest.', 'defeito');
+      citados[l.arquivo] = true;
+      if (typeof l.titulo !== 'string' || !l.titulo.trim()) throw Recusa('O livro ' + l.id + ' não tem título.', 'defeito');
+      if (!Array.isArray(l.sumario)) throw Recusa('O livro ' + l.id + ' não traz o sumário.', 'defeito');
+      var espinha = l.formato === 'epub' ? ((l.epub && l.epub.espinha) || []) : null;
+      if (espinha && (!Array.isArray(espinha) || !espinha.length || espinha.some(function (c) { return !caminhoValido(c); }))) {
+        throw Recusa('O EPUB ' + l.id + ' não diz onde estão os capítulos.', 'defeito');
+      }
+      l.sumario.forEach(function (e, i) {
+        var ok = e && typeof e.titulo === 'string' && e.titulo.trim();
+        if (ok && l.formato === 'pdf') ok = inteiro(e.pagina) && e.pagina >= 1 && (!inteiro(l.paginas) || e.pagina <= l.paginas);
+        if (ok && espinha) ok = inteiro(e.capitulo) && e.capitulo >= 1 && e.capitulo <= espinha.length;
+        if (!ok) throw Recusa('O sumário do livro ' + l.id + ' aponta para fora dele na entrada ' + (i + 1) + '.', 'defeito');
+      });
+      return { meta: l };
+    });
+    Object.keys(noZip).forEach(function (n) {
+      if (!citados[n]) throw Recusa('O pacote de livros tem um arquivo que nenhum livro cita: ' + n + '.', 'defeito');
+    });
+    return saida;
+  }
+
+  /* As linhas que a tela mostra depois de importar livros. */
+  function resumoDeLivros(contas) {
+    var linhas = [];
+    var partes = [];
+    if (contas.novos) partes.push(contas.novos + (contas.novos === 1 ? ' livro novo' : ' livros novos'));
+    if (contas.atualizados) partes.push(contas.atualizados + (contas.atualizados === 1 ? ' atualizado' : ' atualizados'));
+    if (contas.iguais) partes.push(contas.iguais + (contas.iguais === 1 ? ' já estava no tablet' : ' já estavam no tablet'));
+    if (contas.maisNovos) {
+      partes.push(contas.maisNovos + (contas.maisNovos === 1 ? ' ficou como estava, porque o do tablet é mais novo'
+        : ' ficaram como estavam, porque os do tablet são mais novos'));
+    }
+    if (contas.removidos) partes.push(contas.removidos + (contas.removidos === 1 ? ' saiu do pacote e do tablet' : ' saíram do pacote e do tablet'));
+    linhas.push(partes.join(', ') || 'Nenhum livro mudou.');
+    if (contas.deOutroPacote && contas.deOutroPacote.length) {
+      linhas.push(contas.deOutroPacote.length + (contas.deOutroPacote.length === 1 ? ' livro ficou' : ' livros ficaram') +
+        ' como estava, porque já veio de outro pacote.');
+    }
+    if (contas.posicoesSoltas) {
+      linhas.push(contas.posicoesSoltas + (contas.posicoesSoltas === 1 ? ' livro atualizado mudou' : ' livros atualizados mudaram') +
+        ' de sumário e vai abrir no começo.');
+    }
+    return linhas;
+  }
+
+  /* ------------------------------------- o mapa dos livros (C15.2 e C15.3) */
+
+  /* O mapa capitulo para assunto de um livro, como vale para ela: o do pacote
+   * (meta.mapa, do gerador: o da orquestradora, o de obra inteira ou o passe
+   * automático) com a CORREÇÃO DELA por cima. O mapa do pacote nunca muda; a
+   * correção mora no aplicativo (app.js, db.ajustes.mapaDosLivros) e vai na
+   * cópia de segurança.
+   *
+   * `correcoes` é { <n do capítulo>: { titulo, assuntos: [ids], acao, quando } }
+   * de UM livro. A correção só vale para o capítulo de mesmo número E mesmo
+   * título: se um pacote novo renumerar o sumário, a correção velha não cai
+   * calada no capítulo vizinho.
+   *
+   * Devolve uma lista de { n, titulo, pagina, pagina_fim, capitulo,
+   * capitulo_fim, ancora, assuntos: [ids], origem, estado }, com estado
+   *   'a_confirmar' do passe automático, sem palavra dela ainda;
+   *   'do_mapa'     do mapa da orquestradora, sem palavra dela;
+   *   'confirmado'  ela confirmou o que o mapa dizia;
+   *   'corrigido'   ela escolheu outro assunto (ou nenhum). */
+  function mapaDoLivro(meta, correcoes) {
+    var mapa = meta && Array.isArray(meta.mapa) ? meta.mapa : [];
+    correcoes = correcoes || {};
+    var saida = [];
+    mapa.forEach(function (e) {
+      if (!e || !inteiro(e.n) || typeof e.titulo !== 'string') return;
+      var ids = (Array.isArray(e.assuntos) ? e.assuntos : []).map(function (a) { return a && a.id; })
+        .filter(function (id) { return typeof id === 'string' && id; });
+      var c = Object.prototype.hasOwnProperty.call(correcoes, String(e.n)) ? correcoes[String(e.n)] : null;
+      var vale = !!c && c.titulo === e.titulo && Array.isArray(c.assuntos);
+      saida.push({
+        n: e.n, titulo: e.titulo, pagina: e.pagina, pagina_fim: e.pagina_fim, capitulo: e.capitulo,
+        capitulo_fim: e.capitulo_fim, ancora: e.ancora || null, obraInteira: !!e.obra_inteira,
+        assuntos: vale ? c.assuntos.filter(function (id) { return typeof id === 'string' && id; }) : ids,
+        origem: e.origem === 'auto' ? 'auto' : 'mapa',
+        estado: vale ? (c.acao === 'corrigiu' ? 'corrigido' : 'confirmado') : (e.origem === 'auto' ? 'a_confirmar' : 'do_mapa')
+      });
+    });
+    return saida;
+  }
+
+  /* A entrada do mapa onde a leitura está: no PDF, a que tem a página entre o
+   * começo e o fim; no EPUB, a que tem a parte (posição na espinha). Com duas
+   * (capítulos que se cruzam), a que começa mais perto. */
+  function entradaDoMapa(mapa, formato, valor) {
+    var achada = null;
+    (mapa || []).forEach(function (e) {
+      var ini = formato === 'epub' ? e.capitulo : e.pagina;
+      var fim = formato === 'epub' ? e.capitulo_fim : e.pagina_fim;
+      if (!inteiro(ini) || !inteiro(fim) || valor < ini || valor > fim) return;
+      var iniAchada = achada ? (formato === 'epub' ? achada.capitulo : achada.pagina) : -1;
+      if (ini >= iniAchada) achada = e;
+    });
+    return achada;
+  }
+
+  /* O ano do livro serve ao "Abrir no livro" (C15.3): REGRA de quem entra. O
+   * livro entra se for do ano pedido (meta.series, do gerador: o ano do mapa
+   * ou o segmento da planilha). Sem ano pedido (aluno sem ano e assunto sem
+   * ano), não há o que filtrar. Livro sem ano nenhum não é "do ano" de aluno
+   * nenhum. */
+  function livroDoAno(meta, ano) {
+    if (!ano) return true;
+    return Array.isArray(meta && meta.series) && meta.series.indexOf(ano) >= 0;
+  }
+
+  /* Os livros do ano com um capítulo mapeado para o assunto (o mapa do
+   * pacote com as correções dela). `livros`: [{ id, meta }] (os registros do
+   * depósito servem); `correcoesPorLivro`: { <id do livro>: correções }.
+   * Devolve [{ id, meta, entrada }], um por capítulo, em ordem de título do
+   * livro e de capítulo. */
+  function livrosComAssunto(livros, correcoesPorLivro, assuntoId, ano) {
+    var saida = [];
+    if (!assuntoId) return saida;
+    (livros || []).forEach(function (l) {
+      if (!l || !l.meta || !livroDoAno(l.meta, ano)) return;
+      mapaDoLivro(l.meta, (correcoesPorLivro || {})[l.id]).forEach(function (e) {
+        if (e.assuntos.indexOf(assuntoId) >= 0) saida.push({ id: l.id, meta: l.meta, entrada: e });
+      });
+    });
+    return saida.sort(function (a, b) {
+      return String(a.meta.titulo || '').localeCompare(String(b.meta.titulo || ''), 'pt-BR') ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) || a.entrada.n - b.entrada.n;
+    });
+  }
+
   /* Todo caminho de asset citado por itens.json e teoria.json. */
   function assetsCitados(itens, teoria) {
     var lista = [];
@@ -171,6 +341,253 @@
       });
     });
     return lista;
+  }
+
+  /* O manifest: esquema, nome, versão e a lista dos arquivos. Recusa com a
+   * frase de cada falta. */
+  function conferirManifest(manifest) {
+    if (!manifest || typeof manifest !== 'object') throw Recusa('O manifest.json do pacote não pôde ser lido.', 'defeito');
+    if (manifest.esquema !== ESQUEMA) {
+      if (typeof manifest.esquema === 'number' && manifest.esquema > ESQUEMA) {
+        throw Recusa('O pacote é do esquema ' + manifest.esquema + ' e este aplicativo lê o esquema ' + ESQUEMA + '.', 'atualizar');
+      }
+      throw Recusa('O manifest.json não informa um esquema válido.', 'defeito');
+    }
+    if (typeof manifest.pacote !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(manifest.pacote)) {
+      throw Recusa('O manifest.json do pacote não diz o nome do pacote.');
+    }
+    if (typeof manifest.versao !== 'number' || manifest.versao < 1 || Math.floor(manifest.versao) !== manifest.versao) {
+      throw Recusa('O manifest.json do pacote não diz a versão.');
+    }
+    var lista = manifest.arquivos;
+    if (!lista || typeof lista !== 'object') throw Recusa('O manifest.json do pacote não lista os arquivos.');
+  }
+
+  /* O zip e a lista do manifest, nos dois sentidos, e os caminhos. Devolve os
+   * nomes do zip, menos o manifest. */
+  function conferirZipELista(entradas, porNome, lista) {
+    var nomesZip = entradas.map(function (en) { return en.nome; })
+      .filter(function (n) { return n !== 'manifest.json'; });
+    var sobrando = nomesZip.filter(function (n) { return !Object.prototype.hasOwnProperty.call(lista, n); });
+    var faltando = Object.keys(lista).filter(function (n) { return n !== 'manifest.json' && !porNome[n]; });
+    if (faltando.length) {
+      throw Recusa('O pacote está incompleto: falta ' + faltando[0] +
+        (faltando.length > 1 ? ' e mais ' + (faltando.length - 1) + ' arquivo(s)' : '') + '.', 'defeito');
+    }
+    if (sobrando.length) {
+      throw Recusa('O pacote tem arquivo fora da lista do manifest: ' + sobrando[0] + '.');
+    }
+    nomesZip.forEach(function (n) {
+      if (!caminhoValido(n)) throw Recusa('O pacote tem um caminho de arquivo inválido: ' + n + '.');
+    });
+    return nomesZip;
+  }
+
+  /* SHA-256 por partes, para o livro (C15.1).
+   *
+   * O crypto.subtle só calcula o hash de uma vez, com o livro inteiro na
+   * memória, e copia os bytes antes de calcular. Medido na revisão: lendo um
+   * livro inteiro por vez, a memória da página crescia com o pacote (cada
+   * livro lido ficava esperando a coleta de lixo). Aqui o livro passa por
+   * trechos de 1 MB, e o hash e o CRC vão sendo somados trecho a trecho:
+   * nunca há mais que um trecho na mão. Conferido contra o crypto.subtle no
+   * _teste/testa_livros.js, com cortes de trecho em todo lugar do bloco. */
+  var K_SHA = new Uint32Array([
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2]);
+
+  function Sha256() {
+    this.h = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]);
+    this.bloco = new Uint8Array(64);
+    this.n = 0;
+    this.total = 0;
+    this.w = new Uint32Array(64);
+  }
+  Sha256.prototype.comprimir = function (b, o) {
+    var w = this.w, h = this.h, t, x, y;
+    for (t = 0; t < 16; t++) {
+      w[t] = (b[o + 4 * t] << 24 | b[o + 4 * t + 1] << 16 | b[o + 4 * t + 2] << 8 | b[o + 4 * t + 3]) >>> 0;
+    }
+    for (t = 16; t < 64; t++) {
+      x = w[t - 15]; y = w[t - 2];
+      w[t] = (w[t - 16] + (((x >>> 7) | (x << 25)) ^ ((x >>> 18) | (x << 14)) ^ (x >>> 3)) + w[t - 7] +
+        (((y >>> 17) | (y << 15)) ^ ((y >>> 19) | (y << 13)) ^ (y >>> 10))) >>> 0;
+    }
+    var a = h[0], bb = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], hh = h[7];
+    for (t = 0; t < 64; t++) {
+      var t1 = (hh + (((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7))) +
+        ((e & f) ^ (~e & g)) + K_SHA[t] + w[t]) | 0;
+      var t2 = ((((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10))) +
+        ((a & bb) ^ (a & c) ^ (bb & c))) | 0;
+      hh = g; g = f; f = e; e = (d + t1) | 0; d = c; c = bb; bb = a; a = (t1 + t2) | 0;
+    }
+    h[0] += a; h[1] += bb; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += hh;
+  };
+  Sha256.prototype.atualizar = function (dados) {
+    var i = 0, n = dados.length;
+    this.total += n;
+    if (this.n) {
+      var k = Math.min(64 - this.n, n);
+      this.bloco.set(dados.subarray(0, k), this.n);
+      this.n += k;
+      i = k;
+      if (this.n < 64) return;
+      this.comprimir(this.bloco, 0);
+      this.n = 0;
+    }
+    for (; i + 64 <= n; i += 64) this.comprimir(dados, i);
+    if (i < n) { this.bloco.set(dados.subarray(i), 0); this.n = n - i; }
+  };
+  Sha256.prototype.fim = function () {
+    var bits = this.total * 8;
+    var fecho = new Uint8Array(this.n < 56 ? 64 - this.n : 128 - this.n);
+    fecho[0] = 0x80;
+    var v = new DataView(fecho.buffer);
+    v.setUint32(fecho.length - 8, Math.floor(bits / 0x100000000));
+    v.setUint32(fecho.length - 4, bits >>> 0);
+    this.atualizar(fecho);
+    var s = '';
+    for (var i = 0; i < 8; i++) s += ('0000000' + this.h[i].toString(16)).slice(-8);
+    return s;
+  };
+  function sha256PorPartes(trechos) {
+    var s = new Sha256();
+    trechos.forEach(function (t) { s.atualizar(t); });
+    return s.fim();
+  }
+
+  /* Confere um livro lido em trechos de 1 MB: tamanho, CRC do zip e hash do
+   * manifest. Nenhum trecho fica para o próximo. */
+  var TRECHO = 1024 * 1024;
+  function conferirLivroPorTrechos(blob, entrada, shaHex) {
+    var sha = new Sha256(), crc = 0, pos = 0, total = blob.size;
+    function somar(b) { crc = Zip.crc32(b, crc); sha.atualizar(b); }
+    /* Com leitor "byob", os trechos caem sempre no MESMO buffer de 1 MB: nada
+     * fica esperando a coleta de lixo. Navegador sem ele lê fatias de 1 MB,
+     * que a coleta de lixo solta depois. */
+    var leitor = null;
+    try { leitor = typeof blob.stream === 'function' ? blob.stream().getReader({ mode: 'byob' }) : null; }
+    catch (e) { leitor = null; }
+    function porByob(buf) {
+      return leitor.read(new Uint8Array(buf, 0, TRECHO)).then(function (r) {
+        if (r.done) return;
+        somar(r.value);
+        pos += r.value.length;
+        return porByob(r.value.buffer);
+      });
+    }
+    function porFatias() {
+      if (pos >= total) return Promise.resolve();
+      var ate = Math.min(total, pos + TRECHO);
+      return blob.slice(pos, ate).arrayBuffer().then(function (ab) {
+        somar(new Uint8Array(ab));
+        pos = ate;
+        return porFatias();
+      });
+    }
+    var leitura = leitor ? porByob(new ArrayBuffer(TRECHO)) : porFatias();
+    return leitura.then(function () {
+      if (pos !== total) throw Recusa('O arquivo ' + entrada.nome + ' do pacote está corrompido.');
+      if (total !== entrada.tamanho || crc !== entrada.crc) {
+        throw Recusa('O arquivo ' + entrada.nome + ' do pacote está corrompido.');
+      }
+      if (sha.fim() !== shaHex) throw Recusa('O arquivo ' + entrada.nome + ' do pacote não confere com o manifest.', 'defeito');
+    });
+  }
+
+  /* A primeira olhada no arquivo, SEM lê-lo inteiro: só o diretório central
+   * do zip e o manifest. Devolve { zip, manifest } ou null quando não dá (aí
+   * o caminho de sempre lê o arquivo e diz o motivo com as frases dele).
+   *
+   * A exceção é o pacote CORTADO (começa como zip e não tem o fim, o download
+   * que parou no meio): esse é recusado aqui mesmo, com a frase do download.
+   * Antes ele caía no caminho de sempre, que lia o arquivo inteiro (centenas
+   * de MB, no pacote de livros) só para dizer a mesma coisa. */
+  function espiarPacote(arquivo) {
+    if (!Zip.suportado() || !arquivo || typeof arquivo.slice !== 'function' || typeof Zip.lerDoArquivo !== 'function') {
+      return Promise.resolve(null);
+    }
+    return Zip.lerDoArquivo(arquivo).then(function (zipArq) {
+      var en = zipArq.entradas.filter(function (e) { return e.nome === 'manifest.json'; })[0];
+      if (!en) return null;
+      return Zip.extrairDoArquivo(zipArq, en).then(function (bytes) {
+        var manifest = JSON.parse(texto(bytes));
+        return manifest && typeof manifest === 'object' ? { zip: zipArq, manifest: manifest } : null;
+      });
+    }).catch(function (e) {
+      if (e && e.cortado) throw Recusa(e.message, 'download');
+      return null;
+    });
+  }
+
+  /* O pacote de livros (C15.1), LIVRO A LIVRO, direto do arquivo escolhido.
+   *
+   * Antes, o arquivo inteiro ia para a memória (arrayBuffer), e cada livro
+   * mais uma vez num Blob, todos seguros até o fim da gravação: com 400 MB de
+   * zip o pico passava de 800 MB, e a aba caía no tablet. Agora:
+   *   - o zip nunca é lido inteiro: só o diretório central (espiarPacote);
+   *   - a forma de todos os livros é conferida antes de ler qualquer um, e um
+   *     livro acima de 160 MB recusa o pacote ali mesmo;
+   *   - cada livro é lido sozinho, por fatia do arquivo, para o CRC e o hash,
+   *     e os bytes são soltos antes do próximo: o pico é perto de UM livro;
+   *   - o que vai para a gravação é a fatia do próprio arquivo (o livro vem
+   *     sem compressão), que o navegador copia do disco para o banco.
+   * Devolve { manifest, livros: [{ meta, blob }], bytesTotais }. */
+  function abrirLivrosDoArquivo(espiado, aoProgredir) {
+    var zipArq = espiado.zip, manifest = espiado.manifest;
+    return Promise.resolve().then(function () {
+      conferirManifest(manifest);
+      var lista = manifest.arquivos;
+      var porNome = Object.create(null);
+      zipArq.entradas.forEach(function (en) { porNome[en.nome] = en; });
+      var nomesZip = conferirZipELista(zipArq.entradas, porNome, lista);
+      var noZip = Object.create(null);
+      nomesZip.forEach(function (n) {
+        if (!/^livros\/[a-z0-9][a-z0-9-]*\.(pdf|epub)$/.test(n)) {
+          throw Recusa('O pacote de livros tem arquivo fora da pasta dos livros: ' + n + '.', 'defeito');
+        }
+        noZip[n] = true;
+      });
+      var livros = lerLivros(manifest, noZip, lista);
+      livros.forEach(function (l) {
+        var en = porNome[l.meta.arquivo];
+        if (en.tamanho > TETO_POR_LIVRO) {
+          throw Recusa('O livro "' + l.meta.titulo + '" tem ' + mb(en.tamanho) + ', acima do teto de 160 MB por livro, ' +
+            'e o pacote não foi importado.', 'defeito');
+        }
+        if (en.metodo !== 0) {
+          throw Recusa('O livro "' + l.meta.titulo + '" veio comprimido no pacote, e o aplicativo só lê livro sem compressão.', 'defeito');
+        }
+      });
+      var i = 0, bytesTotais = 0;
+      function proximo() {
+        if (i >= livros.length) return Promise.resolve();
+        var l = livros[i++];
+        var en = porNome[l.meta.arquivo];
+        var m = /^sha256:([0-9a-f]{64})$/.exec(String(lista[l.meta.arquivo] || ''));
+        if (!m) return Promise.reject(Recusa('O manifest.json não traz o hash de ' + l.meta.arquivo + '.'));
+        // a fatia do próprio arquivo: conferida por trechos e, depois, gravada como está
+        return Zip.fatiaDoArquivo(zipArq, en, FORMATOS_DE_LIVRO[l.meta.formato]).then(function (blob) {
+          return conferirLivroPorTrechos(blob, en, m[1]).then(function () { return blob; });
+        }).then(function (blob) {
+          bytesTotais += blob.size;
+          l.blob = blob;
+          if (aoProgredir) aoProgredir(i, livros.length);
+          return proximo();
+        });
+      }
+      return proximo().then(function () { return { manifest: manifest, livros: livros, bytesTotais: bytesTotais }; });
+    }).catch(function (e) {
+      if (e && e.message === 'SEM_DESCOMPRESSAO') throw Recusa(SEM_NAVEGADOR);
+      if (e && e.zip) throw Recusa(e.message || 'O pacote não pôde ser aberto.');
+      throw e;
+    });
   }
 
   /* Abre o zip, confere tudo e devolve o pacote pronto para gravar:
@@ -192,37 +609,17 @@
     }
     return Zip.extrair(zip, porNome['manifest.json']).then(function (bytes) {
       var manifest = json('manifest.json', bytes);
-      if (!manifest || typeof manifest !== 'object') throw Recusa('O manifest.json do pacote não pôde ser lido.', 'defeito');
-      if (manifest.esquema !== ESQUEMA) {
-        if (typeof manifest.esquema === 'number' && manifest.esquema > ESQUEMA) {
-          throw Recusa('O pacote é do esquema ' + manifest.esquema + ' e este aplicativo lê o esquema ' + ESQUEMA + '.', 'atualizar');
-        }
-        throw Recusa('O manifest.json não informa um esquema válido.', 'defeito');
-      }
-      if (typeof manifest.pacote !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(manifest.pacote)) {
-        throw Recusa('O manifest.json do pacote não diz o nome do pacote.');
-      }
-      if (typeof manifest.versao !== 'number' || manifest.versao < 1 || Math.floor(manifest.versao) !== manifest.versao) {
-        throw Recusa('O manifest.json do pacote não diz a versão.');
-      }
+      conferirManifest(manifest);
       var lista = manifest.arquivos;
-      if (!lista || typeof lista !== 'object') throw Recusa('O manifest.json do pacote não lista os arquivos.');
+      /* O pacote de livros (C15.1) é lido livro a livro, direto do arquivo
+       * (abrirLivrosDoArquivo), e nunca inteiro na memória. Chegar aqui é a
+       * espiada do arquivo ter falhado: a frase não culpa o pacote. */
+      if (manifest.conteudo === 'livros') {
+        throw Recusa('Este pacote de livros não pôde ser lido livro a livro. Feche e abra o aplicativo e tente de novo.', 'download');
+      }
 
       // 2. o zip e a lista, nos dois sentidos
-      var nomesZip = zip.entradas.map(function (en) { return en.nome; })
-        .filter(function (n) { return n !== 'manifest.json'; });
-      var sobrando = nomesZip.filter(function (n) { return !Object.prototype.hasOwnProperty.call(lista, n); });
-      var faltando = Object.keys(lista).filter(function (n) { return n !== 'manifest.json' && !porNome[n]; });
-      if (faltando.length) {
-        throw Recusa('O pacote está incompleto: falta ' + faltando[0] +
-          (faltando.length > 1 ? ' e mais ' + (faltando.length - 1) + ' arquivo(s)' : '') + '.', 'defeito');
-      }
-      if (sobrando.length) {
-        throw Recusa('O pacote tem arquivo fora da lista do manifest: ' + sobrando[0] + '.');
-      }
-      nomesZip.forEach(function (n) {
-        if (!caminhoValido(n)) throw Recusa('O pacote tem um caminho de arquivo inválido: ' + n + '.');
-      });
+      var nomesZip = conferirZipELista(zip.entradas, porNome, lista);
       OBRIGATORIOS.forEach(function (n) {
         if (!porNome[n]) throw Recusa('O pacote está incompleto: falta ' + n + '.', 'defeito');
       });
@@ -439,8 +836,10 @@
 
   return {
     ESQUEMA: ESQUEMA, SEM_NAVEGADOR: SEM_NAVEGADOR,
-    abrirPacote: abrirPacote, resumo: resumo, nomeDaSerie: nomeDaSerie, mb: mb,
+    abrirPacote: abrirPacote, espiarPacote: espiarPacote, abrirLivrosDoArquivo: abrirLivrosDoArquivo,
+    TETO_POR_LIVRO: TETO_POR_LIVRO, sha256PorPartes: sha256PorPartes, resumo: resumo, nomeDaSerie: nomeDaSerie, mb: mb, resumoDeLivros: resumoDeLivros,
     sha256: sha256, tipoDoAsset: tipoDoAsset,
+    mapaDoLivro: mapaDoLivro, entradaDoMapa: entradaDoMapa, livroDoAno: livroDoAno, livrosComAssunto: livrosComAssunto,
     rasterizarRecorte: rasterizarRecorte, rasterizarPagina: rasterizarPagina,
     alturasDosPedacos: alturasDosPedacos
   };

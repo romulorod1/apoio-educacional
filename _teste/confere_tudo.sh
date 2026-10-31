@@ -588,6 +588,29 @@ roda "minhas listas --envenenado-nomear-duplica"  node "_teste/testa_minhas_list
 roda "banco v3"                                   node "_teste/testa_banco_v3.js"
 roda "banco v3 --envenenado-versao-tecnica"       node "_teste/testa_banco_v3.js" --envenenado-versao-tecnica
 roda "banco v3 --envenenado-troca-calada"         node "_teste/testa_banco_v3.js" --envenenado-troca-calada
+# C15.1: o banco sobe de 3 para 4 sem perder nada; o pacote de livros sintetico
+# importa por Ajustes; a copia de seguranca nao cresce com 1,2 MB de livro no
+# tablet; o PDF abre pelo sumario no capitulo 2 e reabre onde parou; o EPUB abre
+# numa caixa sem scripts e troca de capitulo; remover derruba o total. Um veneno
+# por aceite: copia com os livros, caixa com scripts, PDF sem posicao.
+roda "livros"                                     node "_teste/testa_livros.js"
+roda "livros --envenenado-copia-com-livros"       node "_teste/testa_livros.js" --envenenado-copia-com-livros
+roda "livros --envenenado-epub-com-scripts"       node "_teste/testa_livros.js" --envenenado-epub-com-scripts
+roda "livros --envenenado-sem-posicao"            node "_teste/testa_livros.js" --envenenado-sem-posicao
+# A revisao do C15.1: o segundo PDF da sessao (o doc.destroy() do C14) e o
+# pacote lido livro a livro, sem o arquivo inteiro na memoria.
+roda "livros --envenenado-destroy"                node "_teste/testa_livros.js" --envenenado-destroy
+roda "livros --envenenado-zip-inteiro"            node "_teste/testa_livros.js" --envenenado-zip-inteiro
+# A revisao do C15.1 pela orquestradora: o mesmo pacote com dois PDFs trocados
+# (mesmo id, mesma versao) atualiza pelo hash; o veneno compara so o id.
+roda "livros --envenenado-so-id"                  node "_teste/testa_livros.js" --envenenado-so-id
+# C15.2 e C15.3: "Este capitulo cobre" no leitor, Confirmar e Corrigir (so a
+# materia e o ano do livro), a correcao depois de recarregar e na copia de
+# seguranca (os livros nao), e o "Abrir no livro" da aula na pagina do PDF e no
+# capitulo do EPUB, so com livro do ano do aluno. Porta 8863.
+roda "livros mapa"                                node "_teste/testa_livros_mapa.js"
+roda "livros mapa --envenenado-correcao-so-na-memoria" node "_teste/testa_livros_mapa.js" --envenenado-correcao-so-na-memoria
+roda "livros mapa --envenenado-sem-ano-na-tela"   node "_teste/testa_livros_mapa.js" --envenenado-sem-ano-na-tela
 # C2b: a lista de base (base-v1) importa, vem primeiro com o nome dela e a
 # frase de posicao na fonte; as tres listas com a etiqueta de nivel. A regra
 # em si e do biblioteca/_prova_kits.py (sem navegador).
@@ -680,6 +703,24 @@ na_secao_navegador=0
 # tres niveis, um por campo, e `relaxou` conferido nos dois sentidos. A amostra
 # nao sai do gerador de proposito, senao um erro do gerador viraria o esperado.
 roda "kits e tempo (regra)"                     python biblioteca/_prova_kits.py
+# C15.1: o tipo de fonte livros, sobre livros sinteticos (tres PDF, um EPUB e um
+# arquivo de 161 MB): o teto de 160 MB nos dois lados da fronteira (o grande
+# recusado, listado no relatorio e nunca aberto) e igual ao do aplicativo, o
+# manifesto (zip e lista nos dois sentidos, hash, campos, sumario dentro do
+# livro), a origem do sumario (marcadores, mapa, nenhum, nav do EPUB) e o
+# determinismo. Sem Chrome.
+roda "livros (gerador)"                         python biblioteca/_prova_livros.py
+# A revisao do C15.1: o pacote cortado recusado ja na espiada, sem ler o
+# arquivo inteiro, e o teto de 160 MB do aplicativo. Sem Chrome.
+roda "livros (regras)"                          node "_teste/testa_livros_regras.js"
+roda "livros (regras) --envenenado-cortado-le-tudo" node "_teste/testa_livros_regras.js" --envenenado-cortado-le-tudo
+roda "livros (regras) --envenenado-teto-antigo" node "_teste/testa_livros_regras.js" --envenenado-teto-antigo
+# C15.2 e C15.3: o mapa que vale (o do pacote com a correcao dela, so no
+# capitulo de mesmo titulo) e os livros do "Abrir no livro" (so os do ano do
+# aluno com o assunto). Um veneno pela regra do ano e dois pela correcao.
+roda "livros (regras) --envenenado-sem-ano"     node "_teste/testa_livros_regras.js" --envenenado-sem-ano
+roda "livros (regras) --envenenado-correcao-ignorada" node "_teste/testa_livros_regras.js" --envenenado-correcao-ignorada
+roda "livros (regras) --envenenado-correcao-sem-titulo" node "_teste/testa_livros_regras.js" --envenenado-correcao-sem-titulo
 # A comparacao pacote a pacote (determinismo e "o que mudou de uma versao para
 # a outra") rodando contra si mesma: um veneno por tipo de diferenca que ela
 # existe para achar, mais dois controles. A comparacao de verdade precisa dos
