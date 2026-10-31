@@ -516,8 +516,17 @@
               }
             });
             if (s.exclusoes) s.exclusoes.sort();
+            var cadeiaIds = {};
+            (db.series || []).forEach(function (x) {
+              if (x.id === raizId || x.serieOrigemId === raizId) cadeiaIds[x.id] = true;
+            });
             db.series = (db.series || []).filter(function (x) {
               return x.id === s.id || !(x.serieOrigemId === raizId && x.inicio >= aula.data);
+            });
+            (db.aulas || []).forEach(function (a) {
+              if (cadeiaIds[a.serieId] && a.data >= aula.data) {
+                a.serieId = s.id;
+              }
             });
           } else {
             var dt = dataLocal(aula.data);

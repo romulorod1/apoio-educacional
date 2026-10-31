@@ -283,8 +283,37 @@ conf('abril de 2027 tem exatamente 3 aulas restantes (12, 19, 26)', aulasAbrilRe
 conf('todas as aulas restantes de abril têm horário 18:00',
   aulasAbrilRestantes.every(a => a.hora === '18:00'), true);
 
+secao('10. Reatribuição de aulas criadas no ramo aula.data <= s.inicio');
+db = baseNova();
+const sReat = Core.criarSerie(db, {
+  alunoId: 'a1', dias: [1], hora: '14:00', duracaoMin: 60,
+  inicio: '2026-06-01', fim: null
+});
+// 1. "seguintes" em 15/06 para 16:00
+const ar15 = db.aulas.find(a => a.data === '2026-06-15');
+Core.aplicarEdicaoAula(db, ar15.id, { hora: '16:00' }, 'seguintes');
+
+// 2. "seguintes" em 13/07 para 17:00
+Core.garantirSeriesAte(db, '2026-07');
+const ar13 = db.aulas.find(a => a.data === '2026-07-13');
+Core.aplicarEdicaoAula(db, ar13.id, { hora: '17:00' }, 'seguintes');
+
+// 3. Nova edição da aula de 15/06 (início da série filha 1) com "seguintes" para 19:00
+// Isso cai no ramo aula.data <= s.inicio da série criada em 15/06
+const ar15_2 = db.aulas.find(a => a.data === '2026-06-15');
+Core.aplicarEdicaoAula(db, ar15_2.id, { hora: '19:00' }, 'seguintes');
+
+// 4. Conferir que as aulas de julho (13, 20, 27/07) NÃO ficaram com serieId órfão
+const aulasJulho = db.aulas.filter(a => a.alunoId === 'a1' && Core.mesDe(a.data) === '2026-07');
+conf('aulas de julho existem', aulasJulho.length, 4);
+conf('todas as aulas de julho têm molde válido (Core.serieDe existe)',
+  aulasJulho.every(a => !!Core.serieDe(db, a)), true);
+conf('todas as aulas de julho apontam para o molde atual de 15/06',
+  aulasJulho.every(a => Core.serieDe(db, a).hora === '19:00'), true);
+
 console.log('\n' + ok + ' verificações passaram, ' + falhas + ' falharam.');
 process.exit(falhas ? 1 : 0);
+
 
 
 
