@@ -658,6 +658,9 @@ roda "anexo como folha"                           node "_teste/testa_anexo_como_
 # lista de pendentes, recarregar, a copia de seguranca de ida e volta, e o
 # documento da familia (janela, PDF e texto) sem citar pagamento.
 roda "pago em"                                    node "_teste/testa_pago_em.js"
+# A2a: a cópia preparada e o compartilhamento cancelado não atualizam a data;
+# download pede confirmação, e share resolvido marca a data.
+roda "copia confirmada"                           node "_teste/testa_copia_confirmada.js"
 # C9: o documento do ciclo na tela. A contagem do que abre sozinho (janelas,
 # aviso, faixas, dialogos) no codigo da origin/main e no de hoje, igual, com
 # controle de que o contador ve; a entrada discreta na ficha; editar, recarregar
