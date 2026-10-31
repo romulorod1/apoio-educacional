@@ -4925,7 +4925,390 @@
     return temasDaAula(aula).some(function (t) { return t && t.id === passo.temaId; });
   }
 
+  // ---------- o documento do ciclo (C9) ----------
+
+  /* O DOCUMENTO DO CICLO (C9, lente da pedagoga P02 e P07). O fechamento prova
+   * que houve trabalho; este documento conta, a cada três meses (ou no período
+   * que ela escolher), o que mudou. O roteiro é o de quatro perguntas que a
+   * simulação do dossiê já usava, e cada pergunta é uma seção com o texto DELA:
+   * o aplicativo monta um rascunho de cada uma a partir dos dados, e ela edita
+   * tudo.
+   *
+   * Observação do dono: "não force o uso, deixe que ela explore; ela vê mais
+   * valor no fechamento mensal por enquanto". Por isso nada aqui chama a
+   * atenção: não há aviso, lembrete nem data que dispare o documento. Ele só
+   * existe quando ela abre a ficha e toca em "Documento do ciclo".
+   *
+   * O texto que ela escreve é dado dela, e mora em aluno.ciclos, uma lista de
+   * { id, inicio, fim, textos: { aconteceu, significa, atencao, proximo },
+   * atencaoQueSai: [ids], criadoEm, alteradoEm }. Mora no ALUNO, como os
+   * mapeamentos e as propostas, porque é o registro daquele aluno: viaja na
+   * cópia de segurança (que leva o banco inteiro) e sai junto quando o aluno é
+   * excluído. Campo novo, ausente em todo aluno de antes: lê como lista vazia.
+   *
+   * O QUE VAI À FAMÍLIA, e o que não vai:
+   *   - as áreas saem pelo rótulo de família (C6), nunca pelo dela;
+   *   - nenhuma nota de aula entra, nem a "só minha" nem o relato: o documento
+   *     é feito de contagens, títulos de assunto e do texto que ela escreve
+   *     aqui;
+   *   - ponto de atenção do mapeamento só sai se ela marcar cada um para sair,
+   *     a mesma regra da proposta (preencherProposta): todos nascem
+   *     desmarcados, e o rascunho nunca os cita;
+   *   - a frase de evidência da sondagem ("errou 2 de 2 itens") não sai: é
+   *     diagnóstico sobre a criança, o caso exato do P07;
+   *   - dinheiro nenhum, nem como opção. O ciclo é o documento que responde
+   *     "ele melhorou?", e o valor já vai todo mês no fechamento; pôr reais
+   *     aqui transformaria a evidência em cobrança, que é o que a pedagoga
+   *     aponta no P07 ("um laudo dentro de um documento de cobrança"). Se um
+   *     dia ela quiser, escreve no próprio texto. */
+  var SECOES_DO_CICLO = [
+    { chave: 'aconteceu', titulo: 'O que aconteceu' },
+    { chave: 'significa', titulo: 'O que isso significa' },
+    { chave: 'atencao', titulo: 'O que ainda pede atenção' },
+    { chave: 'proximo', titulo: 'Próximo ciclo' }
+  ];
+  var TITULO_DO_CICLO = 'Acompanhamento do ciclo';
+
+  function somarDias(iso, n) {
+    var d = dataLocal(iso);
+    d.setDate(d.getDate() + n);
+    return isoDe(d);
+  }
+
+  function dataValida(iso) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(iso || '')) && isoDe(dataLocal(iso)) === iso;
+  }
+
+  /* O período que o documento propõe: os três meses que terminam hoje,
+   * contados do dia primeiro de dois meses atrás. Com ciclos anteriores, o
+   * novo começa no dia seguinte ao FIM MAIS RECENTE entre eles, e não ao fim
+   * do último criado: ela pode criar um ciclo de agosto depois de um de
+   * outubro, e partir do de agosto repetiria setembro e outubro. Se o fim
+   * mais recente já chega a hoje (ou passa), o novo são os três meses depois
+   * dele: começar no dia seguinte e terminar hoje daria um período ao
+   * contrário, e o padrão de três meses repetiria o mesmo período. Assim o
+   * período proposto nunca é igual ao de um ciclo que já existe.
+   * `anteriores` é a lista de ciclos (ou um ciclo só). */
+  function periodoPadraoDoCiclo(hojeRef, anteriores) {
+    var hoje = hojeRef || hojeIso();
+    var lista = Array.isArray(anteriores) ? anteriores : (anteriores ? [anteriores] : []);
+    var ultimoFim = '';
+    lista.forEach(function (c) {
+      if (c && dataValida(c.fim) && c.fim > ultimoFim) ultimoFim = c.fim;
+    });
+    if (!ultimoFim) return { inicio: mesAdjacente(mesDe(hoje), -2) + '-01', fim: hoje };
+    var inicio = somarDias(ultimoFim, 1);
+    if (inicio <= hoje) return { inicio: inicio, fim: hoje };
+    var d = dataLocal(inicio);
+    d.setMonth(d.getMonth() + 3);
+    d.setDate(d.getDate() - 1);
+    return { inicio: inicio, fim: isoDe(d) };
+  }
+
+  function ciclosDe(aluno) {
+    return ((aluno && aluno.ciclos) || []).filter(function (c) { return c && c.id; });
+  }
+
+  /* Uma lista em prosa: "A, B e C". */
+  function emProsa(lista) {
+    var l = (lista || []).filter(Boolean);
+    if (l.length < 2) return l.join('');
+    return l.slice(0, -1).join(', ') + ' e ' + l[l.length - 1];
+  }
+
+  function plural(n, um, varios) { return n + ' ' + (n === 1 ? um : varios); }
+
+  /* Os pontos de atenção marcados no mapeamento que vale hoje, do aluno e de
+   * cada matéria, sem repetir. São os que a tela OFERECE para sair, um por um;
+   * o documento só leva os que ela marcou (pontosQueSaem). */
+  function pontosDeAtencaoDoCiclo(aluno) {
+    var m = mapeamentoAtual(aluno);
+    if (!m) return [];
+    var ids = marcadosDoAluno(m).atencao.slice();
+    materiasDoMapeamento(m).forEach(function (mat) {
+      marcadosDaMateria(m, mat).atencao.forEach(function (id) { if (ids.indexOf(id) < 0) ids.push(id); });
+    });
+    return ids.map(function (id) {
+      var it = itemDoMapa('atencao', id);
+      return it ? { id: id, rotulo: it.rotulo } : null;
+    }).filter(Boolean);
+  }
+
+  /* Os rótulos que saem: os que ela marcou E que o mapeamento ainda oferece.
+   * Marca que ficou para trás (o ponto saiu do mapeamento) não sai: caixa que
+   * a tela não mostra não tem como ser desmarcada. */
+  function pontosQueSaem(aluno, ciclo) {
+    var marcados = (ciclo && ciclo.atencaoQueSai) || [];
+    return pontosDeAtencaoDoCiclo(aluno).filter(function (p) {
+      return marcados.indexOf(p.id) >= 0;
+    }).map(function (p) { return p.rotulo; });
+  }
+
+  /* Os dados do período, lidos do que já existe: as aulas que aconteceram, os
+   * assuntos e as áreas delas, o domínio por assunto (C1), as etapas e o
+   * mapeamento. Aula marcada depois de hoje não conta, como no fechamento.
+   * Nada aqui grava. */
+  function dadosDoCiclo(db, alunoId, inicio, fim, hojeRef) {
+    var aluno = ((db && db.alunos) || []).filter(function (a) { return a.id === alunoId; })[0];
+    if (!aluno) return null;
+    var hoje = hojeRef || hojeIso();
+    var ate = fim && fim < hoje ? fim : hoje;
+
+    var aulas = ((db && db.aulas) || []).filter(function (a) {
+      return a.alunoId === alunoId && aulaAconteceu(a) && a.data >= inicio && a.data <= ate;
+    }).sort(ordenarAulas);
+
+    var vistos = Object.create(null), assuntos = [];
+    var cont = {};
+    aulas.forEach(function (a) {
+      temasDaAula(a).forEach(function (t) {
+        var chave = chaveDeBusca(String((t && t.titulo) || '').trim().replace(/\s+/g, ' '));
+        if (!chave) return;
+        if (!vistos[chave]) { vistos[chave] = { titulo: t.titulo, chave: chave, datas: [] }; assuntos.push(vistos[chave]); }
+        if (vistos[chave].datas.indexOf(a.data) < 0) vistos[chave].datas.push(a.data);
+      });
+      (a.areas || []).forEach(function (id) { cont[id] = (cont[id] || 0) + 1; });
+    });
+    // o rótulo é SEMPRE o de família: este documento só existe para sair
+    var areas = Object.keys(cont).map(function (id) {
+      return { id: id, rotulo: rotuloAreaFamilia(id), vezes: cont[id] };
+    }).filter(function (a) { return a.rotulo; })
+      .sort(function (a, b) { return b.vezes - a.vezes || a.rotulo.localeCompare(b.rotulo); });
+
+    /* O domínio no período: o estado no fim (a última marca até `ate`) e no
+     * começo (a última marca antes de `inicio`). "Passou a ser dominado" é o
+     * assunto que termina em Domina sem ter começado em Domina, com a data da
+     * marca que o pôs lá. */
+    var passou = [], pedePratica = [], comMarca = 0, seguiu = 0;
+    dominioPorAssunto(db, alunoId).forEach(function (l) {
+      var noFim = '', antes = '', desde = '', marcouNoPeriodo = false;
+      l.historico.forEach(function (h) {
+        if (h.data < inicio) { antes = h.estado; noFim = h.estado; desde = h.estado === 'domina' ? h.data : ''; return; }
+        if (h.data > ate) return;
+        marcouNoPeriodo = true;
+        if (h.estado === 'domina' && noFim !== 'domina') desde = h.data;
+        noFim = h.estado;
+      });
+      if (!marcouNoPeriodo) return;
+      comMarca++;
+      if (noFim === 'domina' && antes !== 'domina') passou.push({ titulo: l.titulo, data: desde });
+      else if (noFim === 'domina') seguiu++;
+      else pedePratica.push({ titulo: l.titulo, estado: noFim });
+    });
+    passou.sort(function (a, b) { return a.data < b.data ? -1 : (a.data > b.data ? 1 : 0); });
+
+    /* As etapas (as três frentes): onde cada frente estava no começo do
+     * período e onde terminou, só nas que mudaram dentro dele. Saem os ids, e
+     * não os rótulos: "Apoio parcial" e "Supervisão" são o vocabulário dela,
+     * e o rascunho escreve para a família o que o aluno faz (FRASE_DA_ETAPA). */
+    var etapas = [];
+    FRENTES_ETAPA.forEach(function (f) {
+      var de = '', para = '', data = '';
+      registrosDaFrente(aluno, f.id).forEach(function (r) {
+        if (r.desde < inicio) { de = r.etapa; return; }
+        if (r.desde > ate) return;
+        para = r.etapa;
+        data = r.desde;
+      });
+      if (para && para !== de) etapas.push({ frente: f.id, de: de, para: para, data: data });
+    });
+
+    // o ponto de partida: o mapeamento que vale, se já existia no fim do período
+    var m = mapeamentoAtual(aluno);
+    var partida = null;
+    if (m && m.data && m.data <= ate) {
+      partida = {
+        data: m.data,
+        lacunas: temLacunaDeAnoAnterior(MATERIA_PADRAO)
+          ? rotulosDoMapa('lacunas', marcadosDaMateria(m, MATERIA_PADRAO).lacunas) : []
+      };
+    }
+
+    var proximos = [];
+    trilhasAtivas(aluno).forEach(function (tr) {
+      var p = proximoPasso(tr);
+      if (p && p.titulo) proximos.push({ trilha: tr.titulo || '', passo: p.titulo });
+    });
+
+    return {
+      aluno: aluno,
+      alunoNome: aluno.nome,
+      responsavel: aluno.responsavel || '',
+      contextoEscolar: contextoEscolarDe(aluno, ate),
+      inicio: inicio,
+      fim: fim,
+      ate: ate,
+      qtdAulas: aulas.length,
+      assuntos: assuntos,
+      areas: areas,
+      passouADominar: passou,
+      pedePratica: pedePratica,
+      comMarcaDeDominio: comMarca,
+      seguiuDominado: seguiu,
+      etapas: etapas,
+      partida: partida,
+      proximos: proximos
+    };
+  }
+
+  /* As etapas, escritas para a família: o que o aluno FAZ, no presente e no
+   * passado, e não o nome da etapa. "Apoio parcial" e "Supervisão" são o
+   * vocabulário dela, e na folha da família soam como laudo (revisão do C9). */
+  var FRASE_DA_ETAPA = {
+    'apoio-total': { agora: 'precisa de acompanhamento lado a lado', antes: 'precisava de acompanhamento lado a lado' },
+    'apoio-parcial': { agora: 'começa sem ajuda e pede apoio no meio do caminho', antes: 'começava sem ajuda e pedia apoio no meio do caminho' },
+    'supervisao': { agora: 'faz sem ajuda, com uma conferência depois', antes: 'fazia sem ajuda, com uma conferência depois' },
+    'autonomia': { agora: 'faz e confere sem ajuda', antes: 'fazia e conferia sem ajuda' }
+  };
+  var FRASE_DA_FRENTE = {
+    conteudo: 'Na matéria',
+    autonomia: 'Para estudar e se organizar',
+    confianca: 'Na confiança diante da aula e da prova'
+  };
+
+  /* O rascunho de cada seção, escrito a partir dos dados. É ponto de partida:
+   * ela reescreve o que quiser, e o que ela escreve é o que sai. Nenhum ponto
+   * de atenção entra aqui, marcado ou não: os marcados saem em lista própria,
+   * embaixo do texto da terceira seção, e assim o rascunho nunca carrega um
+   * ponto que ela não escolheu. */
+  function rascunhoDoCiclo(d) {
+    var r = { aconteceu: '', significa: '', atencao: '', proximo: '' };
+    if (!d) return r;
+    var titulos = function (lista) { return lista.map(function (x) { return x.titulo; }); };
+
+    var A = [];
+    A.push('Entre ' + ddmmaaaa(d.inicio) + ' e ' + ddmmaaaa(d.ate) + ', ' +
+      (d.qtdAulas ? (d.qtdAulas === 1 ? 'foi 1 aula.' : 'foram ' + d.qtdAulas + ' aulas.') : 'não houve aula.'));
+    if (d.assuntos.length) {
+      A.push('Assuntos trabalhados (' + d.assuntos.length + '): ' + emProsa(titulos(d.assuntos)) + '.');
+    }
+    if (d.areas.length) {
+      A.push('Habilidades e hábitos: ' + emProsa(d.areas.map(function (a) {
+        return a.rotulo + ' (' + plural(a.vezes, 'aula', 'aulas') + ')';
+      })) + '.');
+    }
+    if (d.passouADominar.length) {
+      A.push('Agora resolve com segurança: ' +
+        emProsa(d.passouADominar.map(function (x) { return x.titulo + ' (desde ' + ddmm(x.data) + ')'; })) + '.');
+    }
+    if (d.partida) {
+      A.push('Partimos da avaliação inicial de ' + ddmmaaaa(d.partida.data) +
+        (d.partida.lacunas.length ? ', que mostrou que valia retomar conteúdos de anos anteriores: ' + emProsa(d.partida.lacunas) + '.' : '.'));
+    }
+    r.aconteceu = A.join('\n\n');
+
+    var S = [];
+    d.etapas.forEach(function (e) {
+      var frase = FRASE_DA_ETAPA[e.para], antes = FRASE_DA_ETAPA[e.de];
+      if (!frase || !FRASE_DA_FRENTE[e.frente]) return;
+      S.push(FRASE_DA_FRENTE[e.frente] + ', hoje ' + frase.agora +
+        (antes ? '; no começo do período, ' + antes.antes : '') + '.');
+    });
+    /* As três partes somam o total, para a conta fechar na frente da família:
+     * o que passou a sair com segurança, o que ainda está sendo construído e o
+     * que já estava firme e continuou. */
+    if (d.comMarcaDeDominio) {
+      var partes = [];
+      var np = d.passouADominar.length, nc = d.pedePratica.length, nm = d.seguiuDominado;
+      if (np) partes.push(np === 1 ? '1 passou a sair com segurança' : np + ' passaram a sair com segurança');
+      if (nc) partes.push(nc === 1 ? '1 ainda está sendo construído' : nc + ' ainda estão sendo construídos');
+      if (nm) partes.push(nm === 1 ? '1 já estava firme e continua' : nm + ' já estavam firmes e continuam');
+      S.push('Dos assuntos que acompanhamos de perto neste período (' + d.comMarcaDeDominio + '), ' + emProsa(partes) + '.');
+    }
+    r.significa = S.join('\n\n');
+
+    if (d.pedePratica.length) {
+      r.atencao = (d.pedePratica.length === 1 ? 'Ainda pede prática: ' : 'Ainda pedem prática: ') +
+        emProsa(titulos(d.pedePratica)) + '.';
+    }
+
+    var P = [];
+    d.proximos.forEach(function (x) {
+      P.push(x.trilha
+        ? 'No próximo ciclo, seguimos em ' + x.trilha + ', começando por ' + x.passo + '.'
+        : 'No próximo ciclo, começamos por ' + x.passo + '.');
+    });
+    // o assunto que já é o próximo passo de uma trilha não se repete aqui
+    var nosPassos = d.proximos.map(function (x) { return chaveDeBusca(x.passo); });
+    var emAndamento = d.pedePratica.filter(function (x) {
+      return x.estado === 'andamento' && nosPassos.indexOf(chaveDeBusca(x.titulo)) < 0;
+    });
+    if (emAndamento.length) P.push('Continuamos praticando ' + emProsa(titulos(emAndamento)) + '.');
+    r.proximo = P.join('\n\n');
+    return r;
+  }
+
+  /* Um ciclo novo, com o período padrão e o rascunho de cada seção. Não entra
+   * no aluno sozinho: quem guarda é a tela, quando ela muda alguma coisa. */
+  function cicloNovo(db, aluno, hojeRef) {
+    var lista = ciclosDe(aluno);
+    var per = periodoPadraoDoCiclo(hojeRef, lista);
+    var d = dadosDoCiclo(db, aluno && aluno.id, per.inicio, per.fim, hojeRef);
+    return {
+      id: uid(), inicio: per.inicio, fim: per.fim,
+      textos: rascunhoDoCiclo(d),
+      atencaoQueSai: [],
+      criadoEm: hojeRef || hojeIso()
+    };
+  }
+
+  /* O documento que sai, num formato só, lido pela prévia, pelo texto e pelo
+   * PDF (PDFGen.gerarCiclo): os três mostram a mesma coisa porque nenhum deles
+   * monta nada sozinho. Seção sem texto e sem item não sai: documento para a
+   * família não leva título sem conteúdo. */
+  function documentoDoCiclo(db, aluno, ciclo, hojeRef) {
+    if (!aluno || !ciclo) return null;
+    var d = dadosDoCiclo(db, aluno.id, ciclo.inicio, ciclo.fim, hojeRef);
+    var textos = ciclo.textos || {};
+    var pontos = pontosQueSaem(aluno, ciclo);
+    var secoes = SECOES_DO_CICLO.map(function (s) {
+      return {
+        chave: s.chave,
+        titulo: s.titulo,
+        texto: String(textos[s.chave] || '').replace(/\r\n?/g, '\n').trim(),
+        itens: s.chave === 'atencao' ? pontos.slice() : []
+      };
+    }).filter(function (s) { return s.texto || s.itens.length; });
+    return {
+      titulo: TITULO_DO_CICLO,
+      alunoNome: aluno.nome,
+      responsavel: aluno.responsavel || '',
+      contextoEscolar: d ? d.contextoEscolar : '',
+      inicio: ciclo.inicio,
+      fim: ciclo.fim,
+      periodo: ddmmaaaa(ciclo.inicio) + ' a ' + ddmmaaaa(ciclo.fim),
+      secoes: secoes
+    };
+  }
+
+  function markdownCiclo(doc) {
+    if (!doc) return '';
+    var L = [];
+    L.push('# ' + doc.titulo);
+    L.push('');
+    L.push('**Aluno:** ' + doc.alunoNome);
+    if (doc.responsavel) L.push('**Responsável:** ' + doc.responsavel);
+    if (doc.contextoEscolar) L.push('**Escola:** ' + doc.contextoEscolar);
+    L.push('**Período:** ' + doc.periodo);
+    doc.secoes.forEach(function (s) {
+      L.push('');
+      L.push('## ' + s.titulo);
+      if (s.texto) { L.push(''); L.push(s.texto); }
+      if (s.itens.length) {
+        L.push('');
+        s.itens.forEach(function (i) { L.push('- ' + i); });
+      }
+    });
+    L.push('');
+    return L.join('\n');
+  }
+
   return {
+    SECOES_DO_CICLO: SECOES_DO_CICLO, TITULO_DO_CICLO: TITULO_DO_CICLO,
+    periodoPadraoDoCiclo: periodoPadraoDoCiclo, ciclosDe: ciclosDe, dataValida: dataValida,
+    pontosDeAtencaoDoCiclo: pontosDeAtencaoDoCiclo, pontosQueSaem: pontosQueSaem,
+    dadosDoCiclo: dadosDoCiclo, rascunhoDoCiclo: rascunhoDoCiclo, cicloNovo: cicloNovo,
+    documentoDoCiclo: documentoDoCiclo, markdownCiclo: markdownCiclo,
     MESES: MESES, DIAS_CURTO: DIAS_CURTO, DIAS_LONGO: DIAS_LONGO, STATUS: STATUS,
     rotuloSituacao: rotuloSituacao,
     pad2: pad2, partesData: partesData, dataLocal: dataLocal, isoDe: isoDe, hojeIso: hojeIso,

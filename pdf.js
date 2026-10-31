@@ -1337,6 +1337,66 @@
     return doc.finalizar();
   }
 
+  /* O documento do ciclo (C9). `doc` sai de Core.documentoDoCiclo, o mesmo
+     objeto que a prévia e o texto leem: aqui dentro tudo já é o que a família
+     pode ler (rótulo de família, só os pontos de atenção que ela marcou, nada
+     de dinheiro), e este gerador não busca nada fora dele. O modelo é o do
+     fechamento: título centrado sobre o fio, o período em teal, o bloco de
+     identificação e as seções com o fio curto embaixo do título. */
+  function gerarCiclo(dados) {
+    var doc = new Doc();
+    doc.novaPagina();
+
+    doc.y = baseDoTitulo(19);
+    doc.texto(dados.titulo || 'Acompanhamento do ciclo', PAGINA_L / 2, doc.y, { tam: 19, bold: true, cor: COR.navy, align: 'centro' });
+    /* 16, e não os 12 do fechamento: "Acompanhamento" desce abaixo da linha
+       (o p), e com 12 o período encostava na perna da letra. O título do
+       fechamento, "Controle de aulas", não tem letra que desça. */
+    doc.y -= 16;
+    doc.texto(dados.periodo || '', PAGINA_L / 2, doc.y, { tam: 10, cor: COR.teal, align: 'centro', tracking: 1.1 });
+
+    doc.y -= 22;
+    var linhasId = [['Aluno', dados.alunoNome || '']];
+    if (dados.responsavel) linhasId.push(['Responsável', dados.responsavel]);
+    if (dados.contextoEscolar) linhasId.push(['Escola', dados.contextoEscolar]);
+    var alturaBloco = 14 + linhasId.length * 15;
+    doc.y -= alturaBloco;
+    doc.retangulo(MARG_E, doc.y, UTIL, alturaBloco, COR.soft);
+    doc.retangulo(MARG_E, doc.y, 3, alturaBloco, COR.teal);
+    var yy = doc.y + alturaBloco - 15;
+    for (var i = 0; i < linhasId.length; i++) {
+      doc.texto(linhasId[i][0] + ':', MARG_E + 14, yy, { tam: 9.5, bold: true, cor: COR.navy });
+      doc.texto(linhasId[i][1], MARG_E + 96, yy, { tam: 9.5, cor: COR.texto });
+      yy -= 15;
+    }
+
+    var secoes = dados.secoes || [];
+    for (var s = 0; s < secoes.length; s++) {
+      var sec = secoes[s];
+      doc.y -= 28;
+      /* O título não fica sozinho no pé da página: ele e as duas primeiras
+         linhas do texto viajam juntos. */
+      doc.garanteEspaco(46 + 2 * 15.5);
+      doc.texto(sec.titulo, MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
+      doc.y -= 4;
+      doc.linha(MARG_E, doc.y, MARG_E + 70, doc.y, COR.teal, 1.2);
+      doc.y -= 6;
+      if (sec.texto) doc.paragrafo(sec.texto, { tam: 10.5, alturaLinha: 15.5 });
+      var itens = sec.itens || [];
+      if (itens.length) doc.y -= 4;
+      for (var k = 0; k < itens.length; k++) {
+        var linhas = doc.quebrar(itens[k], UTIL - 16, 10.5, false);
+        for (var j = 0; j < linhas.length; j++) {
+          doc.garanteEspaco(15.5);
+          doc.y -= 15.5;
+          if (j === 0) doc.texto('•', MARG_E + 3, doc.y, { tam: 10.5, cor: COR.teal });
+          doc.texto(linhas[j], MARG_E + 16, doc.y, { tam: 10.5, cor: COR.texto });
+        }
+      }
+    }
+    return doc.finalizar();
+  }
+
   /* Resumo do mes inteiro, uma pagina com todos os alunos. */
   function gerarResumoMes(fechs, mesExtenso) {
     var doc = new Doc();
@@ -4372,7 +4432,7 @@
     Doc: Doc, COR: COR, medir: medir, medirRico: medirRico, paraWinAnsi: paraWinAnsi,
     SIMBOLOS: SIMBOLOS, caracteresQueNaoDesenha: caracteresQueNaoDesenha,
     marcacaoQueSobrou: marcacaoQueSobrou,
-    gerarFechamento: gerarFechamento, gerarResumoMes: gerarResumoMes,
+    gerarFechamento: gerarFechamento, gerarResumoMes: gerarResumoMes, gerarCiclo: gerarCiclo,
     gerarMaterialTema: gerarMaterialTema, gerarFichaMapeamento: gerarFichaMapeamento,
     gerarMaterialBiblioteca: gerarMaterialBiblioteca,
     gerarLivroExportado: gerarLivroExportado,

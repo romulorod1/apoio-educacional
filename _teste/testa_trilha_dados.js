@@ -43,12 +43,13 @@ const comPre = temasIx.filter(t => t.prerequisitos && t.prerequisitos.length);
 console.log('       ' + comPre.length + ' de ' + temasIx.length + ' assuntos declaram pré-requisito');
 conf('mais de cem assuntos declaram pré-requisito', comPre.length > 100, true);
 
-/* O campo existe em todo registro, vazio ou não: é o lugar que o C7 preenche
- * com o grafo revisado. A origem do grafo de hoje vem dita uma vez, no
- * cabeçalho, para nenhuma tela o apresentar como curado. */
+/* O campo existe em todo registro, vazio ou não. Desde o C7 (30/10/2026) ele
+ * traz o grafo revisado, assunto por assunto, e a origem vem dita uma vez, no
+ * cabeçalho. As regras do grafo em si (ciclo, ano, redundância, raízes) são
+ * provadas pelo testa_grafo.js, com veneno. */
 conf('todo registro traz a lista de pré-requisitos',
   temasIx.every(t => Array.isArray(t.prerequisitos)), true);
-conf('o cabeçalho diz de onde vem o grafo', /a revisar no C7/.test(indice.prerequisitos_origem || ''), true);
+conf('o cabeçalho diz de onde vem o grafo', /revisado no C7/.test(indice.prerequisitos_origem || ''), true);
 conf('nenhum registro traz conteúdo (resumo, inglês, exercícios)',
   temasIx.some(t => (t.pt && t.pt.resumo) || t.en || t.qtd != null || t.exercicios), false);
 
@@ -79,7 +80,10 @@ function visita(id, caminho) {
 temasIx.forEach(t => visita(t.id, []));
 conf('nenhum ciclo de pré-requisito', ciclo || 'nenhum', 'nenhum');
 
-/* Profundidade: é ela que decide se a trilha cabe na tela. */
+/* Profundidade: com o grafo do C7 a cadeia vai do 2º ano ao 3º do médio sem
+ * raiz no meio, e a escada mais funda tem 25 níveis. Quem protege a tela é o
+ * corte de seis passos do trilhaDerivada (os cortados voltam na resposta), e
+ * não a profundidade; o teto aqui é só para pegar uma cadeia disparatada. */
 const prof = {};
 function profundidade(id) {
   if (prof[id] != null) return prof[id];
@@ -92,7 +96,7 @@ function profundidade(id) {
 const profundidades = temasIx.map(t => profundidade(t.id));
 const maisFundo = Math.max.apply(null, profundidades);
 console.log('       profundidade máxima da escada: ' + maisFundo + ' níveis');
-conf('a escada mais funda cabe em dez níveis', maisFundo <= 10, true);
+conf('a escada mais funda atravessa os onze anos (entre 11 e 40 níveis)', maisFundo >= 11 && maisFundo <= 40, true);
 
 // ================================================================
 secao('3. A aula cujo único registro é o assunto não é aula vazia');
