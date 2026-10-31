@@ -15001,7 +15001,7 @@
       tamanho.dataset.bytes = String(bytes);
       tamanho.textContent = 'Tamanho estimado do PDF: ' + textoDeMb(bytes) + ' (' + (p.capitulo.length + p.gabarito.length) +
         (epub ? ' partes do livro).' : ' páginas do livro).');
-      avisoTamanho.hidden = bytes <= AVISO_DE_TAMANHO_EXPORTADO;
+      avisoTamanho.hidden = bytes <= avisoDeTamanhoExportado();
       avisoTamanho.textContent = 'Passa de 20 MB: o PDF ocupa esse espaço no tablet e pode não ir por WhatsApp ou e-mail. ' +
         'Se for mandar, prefira menos páginas.';
     }
@@ -15196,9 +15196,13 @@
     });
   }
 
-  // o tamanho estimado do PDF exportado (a conta mora no biblioteca.js, que a prova sem navegador lê)
-  var AVISO_DE_TAMANHO_EXPORTADO = Biblioteca.AVISO_DE_TAMANHO_EXPORTADO;
-  var estimarPdfDoLivro = Biblioteca.estimarPdfExportado;
+  /* O tamanho estimado do PDF exportado (a conta mora no biblioteca.js, que a
+   * prova sem navegador lê). Lido na HORA, e nunca na carga do app.js: o
+   * Biblioteca lido na carga derrubava o aplicativo inteiro (ReferenceError)
+   * quando o biblioteca.js não chegava junto, que é o que a prova da
+   * atualização (testa_atualizacao) reproduz ao trocar só os arquivos de base. */
+  function avisoDeTamanhoExportado() { return Biblioteca.AVISO_DE_TAMANHO_EXPORTADO; }
+  function estimarPdfDoLivro(formato, unidades) { return Biblioteca.estimarPdfExportado(formato, unidades); }
   function textoDeMb(bytes) {
     var mb = bytes / (1024 * 1024);
     return mb < 1 ? 'menos de 1 MB' : 'cerca de ' + String(Math.round(mb * 10) / 10).replace('.', ',') + ' MB';
