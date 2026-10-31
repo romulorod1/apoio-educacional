@@ -226,6 +226,10 @@ roda "busca (regras)" node _teste/testa_busca_regras.js
 # alternativas e gabarito em criterio, e a folha legada byte a byte igual a base do merge.
 roda "citacao (PDF)"  node _teste/testa_citacao_pdf.js
 roda "trilha (dados)" node _teste/testa_trilha_dados.js
+# C7 (entrega 1): o grafo de pre-requisitos imediatos dos 148 assuntos de
+# matematica. Sem ciclo, sem aresta para ano posterior, sem redundancia pela
+# transitividade, raizes so no 2o ano, ids e titulos congelados; com veneno.
+roda "grafo (C7)"     node _teste/testa_grafo.js
 roda "trilha (motor)" node _teste/testa_trilha.js
 roda "dinheiro"      node _teste/testa_dinheiro.js
 roda "cartao do mes" node _teste/testa_cartao.js
