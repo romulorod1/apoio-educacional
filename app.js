@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.37.0';
+  var VERSAO = '1.38.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,16 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.38.0',
+      itens: [
+        'No leitor do livro, "Exportar em PDF" leva o capítulo (ou as páginas que você escolher) para o seu modelo, com a fonte ' +
+          'no rodapé, e anexa à aula.',
+        'Quando o livro tem gabarito, as respostas daquele capítulo vêm no mesmo PDF, logo depois do capítulo. Livro sem gabarito ' +
+          'localizado diz isso na janela.',
+        'O PDF exportado do livro fica só neste tablet e não pesa na cópia de segurança; se faltar, a aula oferece "Gerar de novo".'
+      ]
+    },
     {
       versao: '1.37.0',
       itens: [
