@@ -103,6 +103,8 @@ const { conf, secao, esperar } = H;
     d.aulas.push({ id: 'a-falha', alunoId: 'falha', data: '2026-06-03', anexos: [] });
     await Store.salvar(d);
     await Store.salvarNota('a-falha', { paginas: [{ itens: [] }] });
+    await Store.registrarUsoBiblioteca({ itemId: 'item-falha', alunoId: 'falha', aulaId: 'a-falha', data: '2026-06-03' });
+    await Store.registrarHistorico('antes da tentativa', d);
     const original = IDBObjectStore.prototype.put;
     IDBObjectStore.prototype.put = function () {
       const pedido = original.apply(this, arguments);
@@ -115,7 +117,9 @@ const { conf, secao, esperar } = H;
     finally { IDBObjectStore.prototype.put = original; }
     const atual = await Store.carregar();
     return [rejeitou, atual.alunos.some(x => x.id === 'falha'),
-      atual.aulas.some(x => x.id === 'a-falha'), !!(await Store.lerNota('a-falha'))];
+      atual.aulas.some(x => x.id === 'a-falha'), !!(await Store.lerNota('a-falha')),
+      (await Store.usoDaBiblioteca()).some(x => x.alunoId === 'falha'),
+      (await Store.listarHistorico()).length];
   });
-  conf('aborto preserva o documento e a folha', abortou, [true, true, true, true]);
+  conf('aborto preserva documento, folha, uso e histórico', abortou, [true, true, true, true, true, 1]);
 })().then(() => H.fim(amb)(), e => H.fim(amb)(e));

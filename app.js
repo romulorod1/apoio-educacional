@@ -7167,10 +7167,12 @@
       copiaPronta = null;
       alunoParaExcluirId = null;
       alunoEmEdicao = null;
-      fecharModal('modal-excluir-aluno');
-      fecharModal('modal-aluno');
-      desenharTudo();
-      avisar('Aluno e dados associados excluídos. Esta ação não tem Desfazer.');
+      return carregarUsoDasListas().then(function () {
+        fecharModal('modal-excluir-aluno');
+        fecharModal('modal-aluno');
+        desenharTudo();
+        avisar('Aluno e dados associados excluídos. Esta ação não tem Desfazer.');
+      });
     }).catch(function () {
       avisar('Não foi possível excluir. Os dados foram mantidos; tente de novo.');
     }).then(function () { botao.disabled = false; });
