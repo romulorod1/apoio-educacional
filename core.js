@@ -492,22 +492,25 @@
           });
         } else if (escopo === 'seguintes') {
           var raizId = s.serieOrigemId || s.id;
-          var fimCadeia = s.fim;
+          var temSemFim = !s.fim;
+          var maiorFim = s.fim;
           (db.series || []).forEach(function (x) {
             if ((x.id === raizId || x.serieOrigemId === raizId) && x.inicio >= aula.data) {
-              if (x.fim && (!fimCadeia || x.fim > fimCadeia)) fimCadeia = x.fim;
+              if (!x.fim) temSemFim = true;
+              else if (!maiorFim || x.fim > maiorFim) maiorFim = x.fim;
             }
           });
+          var fimAntigo = temSemFim ? null : maiorFim;
           if (aula.data <= s.inicio) {
             if (mudancas.hora !== undefined) s.hora = mudancas.hora;
             if (mudancas.duracaoMin !== undefined) s.duracaoMin = mudancas.duracaoMin;
             if (mudancas.status !== undefined) s.status = mudancas.status;
             if (mudancas.cobravel !== undefined) s.cobravel = mudancas.cobravel;
+            s.fim = fimAntigo;
             db.series = (db.series || []).filter(function (x) {
               return x.id === s.id || !(x.serieOrigemId === raizId && x.inicio >= aula.data);
             });
           } else {
-            var fimAntigo = s.fim || fimCadeia;
             var dt = dataLocal(aula.data);
             dt.setDate(dt.getDate() - 1);
             s.fim = isoDe(dt);

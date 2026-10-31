@@ -222,6 +222,34 @@ const aulasJan27 = db.aulas.filter(a => a.alunoId === 'a1' && Core.mesDe(a.data)
 conf('janeiro de 2027 gerado com 18:00', aulasJan27.every(a => a.hora === '18:00'), true);
 conf('janeiro de 2027 gerado com 120 min', aulasJan27.every(a => a.duracaoMin === 120), true);
 
+secao('8. Caso exato da revisão Codex (15/06 -> 13/07 -> 22/06)');
+db = baseNova();
+// Repetição às 14:00 a partir de 01/06/2026
+const sCodex = Core.criarSerie(db, {
+  alunoId: 'a1', dias: [1], hora: '14:00', duracaoMin: 60,
+  inicio: '2026-06-01', fim: null
+});
+// 1. "seguintes" em 15/06 para 16:00
+const ac15 = db.aulas.find(a => a.data === '2026-06-15');
+Core.aplicarEdicaoAula(db, ac15.id, { hora: '16:00' }, 'seguintes');
+
+// 2. "seguintes" em 13/07 para 17:00
+Core.garantirSeriesAte(db, '2026-07');
+const ac13 = db.aulas.find(a => a.data === '2026-07-13');
+Core.aplicarEdicaoAula(db, ac13.id, { hora: '17:00' }, 'seguintes');
+
+// 3. "seguintes" em 22/06 para 18:00 (entre 15/06 e 13/07)
+const ac22 = db.aulas.find(a => a.data === '2026-06-22');
+Core.aplicarEdicaoAula(db, ac22.id, { hora: '18:00' }, 'seguintes');
+
+// Materializar abril de 2027
+Core.garantirSeriesAte(db, '2027-04');
+const aulasAbrilCodex = db.aulas.filter(a => a.alunoId === 'a1' && Core.mesDe(a.data) === '2027-04');
+conf('quatro aulas em abril de 2027', aulasAbrilCodex.length, 4);
+conf('todas as aulas de abril de 2027 nascem às 18:00 (e não 17:00)',
+  aulasAbrilCodex.every(a => a.hora === '18:00'), true);
+
 console.log('\n' + ok + ' verificações passaram, ' + falhas + ' falharam.');
 process.exit(falhas ? 1 : 0);
+
 
