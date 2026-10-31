@@ -5,7 +5,7 @@
  * atenção e uma trilha ativa. Porta 8865.
  *
  * O que se prova:
- *   1. ANTES (o código da origin/main, servido no lugar do de hoje, com os
+ *   1. ANTES (o código anterior ao merge do C9, servido no lugar do de hoje, com os
  *      mesmos dados): quantas janelas, avisos, faixas e diálogos abrem
  *      sozinhos ao abrir o aplicativo e ao abrir a ficha; e que o botão novo
  *      não existe lá (o "antes" é mesmo o código de antes);
@@ -41,13 +41,13 @@ const H = require('./_bib_navegador');
 const Core = require('../core.js');
 
 const RAIZ = path.join(__dirname, '..');
-/* O código de antes, lido da origin/main. Os arquivos que esta mudança toca
- * são servidos de lá; o resto é o mesmo nos dois lados. */
-function daMain(arquivo) {
-  return execFileSync('git', ['-C', RAIZ, 'show', 'origin/main:' + arquivo], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+/* A main já contém o C9 desde o #94. O controle de antes precisa permanecer
+ * no primeiro pai daquele merge para continuar provando que o botão era novo. */
+function antesDoC9(arquivo) {
+  return execFileSync('git', ['-C', RAIZ, 'show', '6f4fb40^1:' + arquivo], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 }
 const ANTES = {};
-['app.js', 'core.js', 'pdf.js', 'index.html', 'styles.css'].forEach(a => { ANTES['/' + a] = daMain(a); });
+['app.js', 'core.js', 'pdf.js', 'index.html', 'styles.css'].forEach(a => { ANTES['/' + a] = antesDoC9(a); });
 const trocas = {};
 const amb = H.criarAmbiente(8865, 'nath_c9_ciclo', trocas);
 const { secao, esperar, pausa } = H;
@@ -241,7 +241,7 @@ async function printDe(pag, seletor, nome, folga) {
   });
 
   // ================================================================
-  secao('1. ANTES: o código da origin/main, com os mesmos dados');
+  secao('1. ANTES: o código anterior ao C9, com os mesmos dados');
   Object.assign(trocas, ANTES);
   await abrirSemAjuda(pag);
   conf('três meses de aulas semeados (uma por semana)', await semear(pag), DATAS.length);
