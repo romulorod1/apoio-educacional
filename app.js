@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.40.1';
+  var VERSAO = '1.40.2';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.40.2',
+      itens: [
+        'O relato da aula agora guarda rascunho automatico a cada pausa, permitindo recuperar o texto caso a janela seja fechada antes de salvar.',
+        'Ao tentar sair de uma aula com relato nao salvo, o aplicativo pergunta se deseja Salvar, Descartar ou Continuar editando.',
+        'O botao Voltar do Android agora fecha uma janela ou confirmacao por vez, sem sair do aplicativo inesperadamente.'
+      ]
+    },
     {
       versao: '1.40.1',
       itens: [
@@ -1027,12 +1035,66 @@
    * seletor de dentro dela. Aqui cada abertura sobe um degrau e cada fechamento
    * devolve o degrau, então a de cima é sempre a última que ela abriu. */
   var degrauModal = 50;
+  var pilhaModalHistorico = [];
+  var proximoModalHistorico = 0;
+  var fechandoPorVoltar = false;
+  var retornoProgramado = null;
+
+  window.addEventListener('popstate', function () {
+    if (retornoProgramado) {
+      var depois = retornoProgramado;
+      retornoProgramado = null;
+      if (depois !== true) depois();
+      return;
+    }
+    var topo = pilhaModalHistorico[pilhaModalHistorico.length - 1];
+    if (!topo) return;
+    if (topo.id === 'modal-aula' && relatoEmEdicaoAlterado()) {
+      // A confirmação precisa de seu próprio Voltar. Repor a entrada da aula
+      // evita que Continuar escrevendo deixe a janela sem proteção do Android.
+      history.pushState({ apoioModal: topo.token }, '');
+      solicitarFecharModal('modal-aula');
+      return;
+    }
+    if (topo.id === 'modal-excluir-aluno' && exclusaoAlunoPendente) {
+      // A exclusão em andamento não se cancela pelo Voltar: a janela fica, e a
+      // entrada volta, para a pilha continuar casando com o que está aberto.
+      history.pushState({ apoioModal: topo.token }, '');
+      return;
+    }
+    if (topo.id === 'modal-nota') {
+      // A folha só pode sair depois de gravar. Se o disco falhar, o editor
+      // permanece aberto e precisa conservar seu estado de Voltar.
+      history.pushState({ apoioModal: topo.token }, '');
+      fecharEditorNota();
+      return;
+    }
+    pilhaModalHistorico.pop();
+    fechandoPorVoltar = true;
+    fecharModal(topo.id);
+    fechandoPorVoltar = false;
+  });
+
+  var MODAIS_HISTORICO = {
+    'modal-aula': true,
+    'modal-sair-relato': true,
+    'modal-aluno': true,
+    'modal-excluir-aluno': true,
+    'modal-nota': true,
+    'modal-proposta': true,
+    'modal-virada-anual': true
+  };
 
   function abrirModal(id) {
     var e = $('#' + id);
     if (!e.classList.contains('aberto')) {
       degrauModal += 2;
       e.style.zIndex = String(degrauModal);
+      if (MODAIS_HISTORICO[id]) {
+        var token = ++proximoModalHistorico;
+        history.pushState({ apoioModal: token }, '');
+        pilhaModalHistorico.push({ id: id, token: token });
+      }
     }
     e.classList.add('aberto');
     posicionarAviso();
@@ -1075,9 +1137,23 @@
    * cair em cima do rodapé. Medir de novo custa duas leituras de geometria. */
   window.addEventListener('resize', posicionarAviso);
 
-  function fecharModal(id) {
+  function fecharModal(id, depoisDoHistorico) {
     if (id === 'modal-excluir-aluno' && exclusaoAlunoPendente) return;
     var e = $('#' + id);
+    var estavaAberto = e.classList.contains('aberto');
+    if (estavaAberto && !fechandoPorVoltar && MODAIS_HISTORICO[id]) {
+      var topo = pilhaModalHistorico[pilhaModalHistorico.length - 1];
+      if (topo && topo.id === id && history.state && history.state.apoioModal) {
+        pilhaModalHistorico.pop();
+        retornoProgramado = depoisDoHistorico || true;
+        history.back();
+      } else {
+        pilhaModalHistorico = pilhaModalHistorico.filter(function (x) { return x.id !== id; });
+        if (depoisDoHistorico) setTimeout(depoisDoHistorico, 0);
+      }
+    } else if (depoisDoHistorico) {
+      setTimeout(depoisDoHistorico, 0);
+    }
     /* O EPUB guarda a rolagem ANTES de a janela sumir: escondida, a caixa do
      * capítulo diz rolagem 0, e o livro reabriria no começo do capítulo. */
     if (id === 'modal-leitor-epub') guardarPosicaoEpub();
@@ -1187,7 +1263,15 @@
    * inteiro é trocado, para nada continuar apontando para registro que sumiu. */
   function fecharTudo() {
     if (editorAtual) { editorAtual.destruir(); editorAtual = null; }
+    var quantosEstados = pilhaModalHistorico.length;
+    fechandoPorVoltar = true;
     $$('.fundo-modal').forEach(function (m) { fecharModal(m.id); });
+    fechandoPorVoltar = false;
+    pilhaModalHistorico = [];
+    if (quantosEstados && history.state && history.state.apoioModal) {
+      retornoProgramado = true;
+      history.go(-quantosEstados);
+    }
     aulaEmEdicao = null;
     alunoEmEdicao = null;
     /* O painel de trilhas guarda o aluno e a função que o redesenha. Deixá-lo
@@ -1459,6 +1543,7 @@
     // Uma cópia montada do banco anterior não pode ser enviada depois de restaurar
     // outra cópia ou apagar os dados deste aparelho.
     copiaPronta = null;
+    limparTodosRascunhosRelato();
     valoresOcultos = !!(db.ajustes && db.ajustes.valoresOcultos);
     atualizarBotaoOlho();
     // Minhas listas (C2a): a memória delas também era o banco de antes
@@ -1868,7 +1953,7 @@
           if (presaNoModoFamilia(m.id)) return;
           if (m.id === 'modal-excluir-aluno' && exclusaoAlunoPendente) return;
           if (m.id === 'modal-nota') fecharEditorNota();
-          else fecharModal(m.id);
+          else solicitarFecharModal(m.id);
         }
       });
     });
@@ -1893,7 +1978,7 @@
         if (presaNoModoFamilia(m.id)) return;
         if (m.id === 'modal-excluir-aluno' && exclusaoAlunoPendente) return;
         if (m.id === 'modal-nota') fecharEditorNota();
-        else fecharModal(m.id);
+        else solicitarFecharModal(m.id);
       });
     });
 
@@ -1955,6 +2040,14 @@
     $('#salvar-aluno').addEventListener('click', salvarAluno);
     $('#excluir-aluno').addEventListener('click', excluirAlunoAtual);
     $('#confirmar-excluir-aluno').addEventListener('click', confirmarExclusaoAluno);
+    $('#continuar-relato').addEventListener('click', function () { fecharModal('modal-sair-relato'); });
+    $('#descartar-relato').addEventListener('click', function () {
+      if (aulaEmEdicao) limparRascunhoRelato(aulaEmEdicao.id);
+      fecharModal('modal-sair-relato', function () { fecharModal('modal-aula'); });
+    });
+    $('#salvar-sair-relato').addEventListener('click', function () {
+      fecharModal('modal-sair-relato', function () { $('#salvar-aula').click(); });
+    });
 
     $('#mes-fechamento').addEventListener('change', function () {
       mesAtual = this.value;
@@ -2379,6 +2472,71 @@
   // ================= modal de aula =================
 
   var DURACOES = [30, 45, 60, 90, 120, 150, 180];
+  var esperaRascunhoRelato = null;
+
+  function chaveRascunhoRelato(id) { return 'rascunho-relato-aula:' + id; }
+
+  function lerRascunhoRelato(aula) {
+    if (!aula) return null;
+    try {
+      var r = JSON.parse(localStorage.getItem(chaveRascunhoRelato(aula.id)) || 'null');
+      if (!r || typeof r.notaTexto !== 'string' || typeof r.notaPrivada !== 'string') return null;
+      // Outro aparelho ou uma restauração pode ter mudado a aula desde o rascunho.
+      if (r.baseTexto !== (aula.notaTexto || '') || r.basePrivada !== (aula.notaPrivada || '')) return null;
+      return r;
+    } catch (e) { return null; }
+  }
+
+  function guardarRascunhoRelato(aula, campoTexto, campoPrivado) {
+    if (!aula || !campoTexto || !campoPrivado) return;
+    try {
+      var chave = chaveRascunhoRelato(aula.id);
+      if (campoTexto.value === (aula.notaTexto || '') && campoPrivado.value === (aula.notaPrivada || '')) {
+        localStorage.removeItem(chave);
+        return;
+      }
+      localStorage.setItem(chave, JSON.stringify({
+        notaTexto: campoTexto.value, notaPrivada: campoPrivado.value,
+        baseTexto: aula.notaTexto || '', basePrivada: aula.notaPrivada || '', quando: Date.now()
+      }));
+    } catch (e) { /* a confirmação de saída ainda protege o texto em memória */ }
+  }
+
+  function limparRascunhoRelato(id) {
+    clearTimeout(esperaRascunhoRelato);
+    esperaRascunhoRelato = null;
+    if (!id) return;
+    try { localStorage.removeItem(chaveRascunhoRelato(id)); } catch (e) { /* sem armazenamento */ }
+  }
+
+  function limparTodosRascunhosRelato() {
+    clearTimeout(esperaRascunhoRelato);
+    esperaRascunhoRelato = null;
+    try {
+      var chaves = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var chave = localStorage.key(i);
+        if (chave && chave.indexOf('rascunho-relato-aula:') === 0) chaves.push(chave);
+      }
+      chaves.forEach(function (chave) { localStorage.removeItem(chave); });
+    } catch (e) { /* sem armazenamento */ }
+  }
+
+  function relatoEmEdicaoAlterado() {
+    if (!aulaEmEdicao || !$('#modal-aula').classList.contains('aberto')) return false;
+    var texto = $('#campo-nota-texto'), privado = $('#campo-nota-privada');
+    return !!((texto && texto.value !== (aulaEmEdicao.notaTexto || '')) ||
+      (privado && privado.value !== (aulaEmEdicao.notaPrivada || '')));
+  }
+
+  function solicitarFecharModal(id) {
+    if (id === 'modal-aula' && relatoEmEdicaoAlterado()) {
+      guardarRascunhoRelato(aulaEmEdicao, $('#campo-nota-texto'), $('#campo-nota-privada'));
+      abrirModal('modal-sair-relato');
+      return;
+    }
+    fecharModal(id);
+  }
 
   function abrirAula(aulaId, dataSugerida) {
     /* A página da biblioteca à espera de uma aula nova só vale para a janela
@@ -2758,6 +2916,20 @@
       placeholder: 'Anotações particulares, impressões ou pontos de atenção para você. Fica só aqui.'
     });
     areaPrivada.value = aulaEmEdicao.notaPrivada || '';
+    var aulaDoRascunho = aulaEmEdicao;
+    var rascunho = lerRascunhoRelato(aulaDoRascunho);
+    if (rascunho) {
+      areaNota.value = rascunho.notaTexto;
+      areaPrivada.value = rascunho.notaPrivada;
+    }
+    [areaNota, areaPrivada].forEach(function (campo) {
+      campo.addEventListener('input', function () {
+        clearTimeout(esperaRascunhoRelato);
+        esperaRascunhoRelato = setTimeout(function () {
+          guardarRascunhoRelato(aulaDoRascunho, areaNota, areaPrivada);
+        }, 600);
+      });
+    });
     grupoRegistro.appendChild(el('label', { class: 'campo' }, [
       el('div', { class: 'campo-titulo-com-destino' }, [
         el('span', { texto: 'Nota só minha', style: 'font-weight:700' }),
@@ -2769,6 +2941,12 @@
       class: 'ajuda', style: 'margin-top:-6px;margin-bottom:12px',
       texto: 'Fica salva somente neste tablet. Não entra no fechamento nem vai para a família. ' +
         'Aparece para você no alto da próxima aula deste aluno.'
+    }));
+    if (rascunho) grupoRegistro.appendChild(el('div', {
+      class: 'faixa-info', id: 'aviso-rascunho-relato',
+      texto: 'Rascunho recuperado às ' + new Date(rascunho.quando).toLocaleTimeString('pt-BR', {
+        hour: '2-digit', minute: '2-digit'
+      }) + '. Toque em Salvar para guardar na aula.'
     }));
 
     desenharDominio(grupoRegistro, aulaEmEdicao, eFutura);
@@ -3882,13 +4060,13 @@
             inicio: data, fim: ate
           });
         }).then(function () {
-          fecharModal('modal-aula');
           desenharTudo();
           /* Veio do "Abrir como folha" e ela marcou Repetir: a página vai para
            * a primeira aula da série, a do dia escolhido. */
           var doDia = db.aulas.filter(function (a) { return a.alunoId === alunoId && a.data === data; });
           var primeira = doDia.filter(function (a) { return a.serieId; })[0] || doDia[0];
           if (daBibliotecaNaSerie) {
+            fecharModal('modal-aula');
             /* A da série nova primeiro; se já havia uma aula avulsa nesse dia, a
              * série pulou a data e a página vai para essa, em página nova. */
             if (primeira && daBibliotecaNaSerie.aoCriar) daBibliotecaNaSerie.aoCriar(primeira.id, { serie: true });
@@ -3897,6 +4075,8 @@
           } else if (querPreparar && primeira) {
             abrirAula(primeira.id);
             avisar('Aulas repetidas criadas. Prepare a primeira aula abaixo.');
+          } else {
+            fecharModal('modal-aula');
           }
         });
         return;
@@ -3910,16 +4090,27 @@
       var daBiblioteca = folhaPendenteDaBiblioteca;
       folhaPendenteDaBiblioteca = null;
       salvarEDepois(function (gravou) {
-        fecharModal('modal-aula');
-        desenharTudo();
         /* Veio do "Abrir como folha" da biblioteca: a página vai para a folha
          * da aula recém-criada, e a folha abre no lugar da janela da aula. */
-        if (daBiblioteca && daBiblioteca.aoCriar) { daBiblioteca.aoCriar(nova.id); return; }
-        if (daBiblioteca) { colarNaFolhaDaAula(nova.id, daBiblioteca); return; }
+        if (daBiblioteca && daBiblioteca.aoCriar) {
+          fecharModal('modal-aula');
+          desenharTudo();
+          daBiblioteca.aoCriar(nova.id);
+          return;
+        }
+        if (daBiblioteca) {
+          fecharModal('modal-aula');
+          desenharTudo();
+          colarNaFolhaDaAula(nova.id, daBiblioteca);
+          return;
+        }
         if (querPreparar) {
+          desenharTudo();
           abrirAula(nova.id);
           avisar('Aula agendada. Prepare o material ou a folha abaixo.');
         } else {
+          fecharModal('modal-aula');
+          desenharTudo();
           avisar('Aula agendada neste tablet.');
         }
       });
@@ -3953,6 +4144,7 @@
         if (escopo === 'esta') {
           acao();
           salvarEDepois(function (gravou) {
+            if (gravou) limparRascunhoRelato(aulaEmEdicao.id);
             fecharModal('modal-aula');
             desenharTudo();
             avisar(rotulos[escopo] + textoDeTrilha(mexeu));
@@ -3964,6 +4156,7 @@
            * trás em silêncio: o aviso saía sem contar nada. */
           comDesfazer(function () { return rotulos[escopo] + textoDeTrilha(mexeu); }, acao)
             .then(function () {
+              if (!mudancaNaoGuardada) limparRascunhoRelato(aulaEmEdicao.id);
               fecharModal('modal-aula');
               desenharTudo();
             });
@@ -3975,6 +4168,7 @@
     Core.aplicarEdicaoAula(db, aulaEmEdicao.id, mudancas, 'esta');
     var mexeuAqui = revisarTrilhasDoAluno(aulaEmEdicao.alunoId);
     salvarEDepois(function (gravou) {
+      if (gravou) limparRascunhoRelato(aulaEmEdicao.id);
       fecharModal('modal-aula');
       desenharTudo();
       if (gravou) avisar('Aula salva.' + textoDeTrilha(mexeuAqui));
@@ -7173,6 +7367,8 @@
     var id = alunoParaExcluirId;
     if (!id || !alunoEmEdicao || alunoEmEdicao.id !== id || exclusaoAlunoPendente) return;
     exclusaoAlunoPendente = true;
+    var aulasExcluidas = (db.aulas || []).filter(function (a) { return a.alunoId === id; })
+      .map(function (a) { return a.id; });
     var botao = $('#confirmar-excluir-aluno');
     var botoesModal = $$('#modal-excluir-aluno button');
     botoesModal.forEach(function (b) { b.disabled = true; });
@@ -7181,14 +7377,19 @@
     Store.excluirAlunoEmCascata(db, id).then(function (novo) {
       db = novo;
       copiaPronta = null;
+      aulasExcluidas.forEach(limparRascunhoRelato);
       alunoParaExcluirId = null;
-      if (alunoEmEdicao && alunoEmEdicao.id === id) {
-        alunoEmEdicao = null;
-        fecharModal('modal-aluno');
-      }
+      var fecharFicha = !!(alunoEmEdicao && alunoEmEdicao.id === id);
+      if (fecharFicha) alunoEmEdicao = null;
       return carregarUsoDasListas().then(function () {
         exclusaoAlunoPendente = false;
-        fecharModal('modal-excluir-aluno');
+        /* A confirmação está no topo da pilha do Voltar: ela fecha primeiro, e
+         * a ficha só depois do history.back dela. Na ordem inversa a ficha
+         * sairia da pilha sem voltar o histórico e sobraria uma entrada
+         * fantasma, que pediria um Voltar a mais. */
+        fecharModal('modal-excluir-aluno', function () {
+          if (fecharFicha) fecharModal('modal-aluno');
+        });
         desenharTudo();
         avisar('Aluno e dados associados excluídos. Esta ação não tem Desfazer.');
       });
@@ -9648,6 +9849,7 @@
     if (campoNota) aulaEmEdicao.notaTexto = campoNota.value;
     if (campoPriv) aulaEmEdicao.notaPrivada = campoPriv.value;
     salvarEDepois(function (gravou) {
+      if (gravou) limparRascunhoRelato(aulaEmEdicao.id);
       fecharModal('modal-aula');
       desenharTudo();
       if (gravou) avisar('Sua anotação foi salva antes de abrir a outra aula.');

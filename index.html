@@ -357,11 +357,25 @@
       <div class="modal-rodape" id="rodape-modal-aula">
         <button class="btn perigo esquerda" id="excluir-aula" type="button">Excluir</button>
         <span class="ajuda-salvamento" id="aviso-salvamento-aula" style="display:none">
-          Assuntos, domínio, habilidades e arquivos salvam na hora neste tablet. Horário, situação e relatos gravam ao clicar em Salvar.
+          Assuntos, domínio, habilidades e arquivos salvam na hora neste tablet. Horário e situação gravam ao clicar em Salvar. O relato tem rascunho automático e entra na aula quando você salva.
         </span>
         <button class="btn" data-fechar type="button" id="cancelar-aula">Cancelar</button>
         <button class="btn destaque" id="salvar-preparar-aula" type="button" style="display:none">Salvar e preparar</button>
         <button class="btn principal" id="salvar-aula" type="button">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="fundo-modal" id="modal-sair-relato">
+    <div class="modal">
+      <div class="modal-cabecalho"><h3>Sair sem salvar o relato?</h3></div>
+      <div class="modal-corpo">
+        <p>O que você escreveu nesta aula ainda não foi salvo.</p>
+      </div>
+      <div class="modal-rodape">
+        <button class="btn" id="continuar-relato" type="button">Continuar escrevendo</button>
+        <button class="btn perigo" id="descartar-relato" type="button">Descartar</button>
+        <button class="btn principal" id="salvar-sair-relato" type="button">Salvar e sair</button>
       </div>
     </div>
   </div>
