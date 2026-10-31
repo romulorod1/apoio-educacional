@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.40.1';
+  var VERSAO = '1.40.2';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.40.2',
+      itens: [
+        'O relato da aula agora guarda rascunho automatico a cada pausa, permitindo recuperar o texto caso a janela seja fechada antes de salvar.',
+        'Ao tentar sair de uma aula com relato nao salvo, o aplicativo pergunta se deseja Salvar, Descartar ou Continuar editando.',
+        'O botao Voltar do Android agora fecha uma janela ou confirmacao por vez, sem sair do aplicativo inesperadamente.'
+      ]
+    },
     {
       versao: '1.40.1',
       itens: [
