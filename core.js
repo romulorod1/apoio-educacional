@@ -332,9 +332,10 @@
     return out;
   }
 
-  function achaAula(db, alunoId, dataIso) {
+  function achaAula(db, alunoId, dataIso, hora) {
     return (db.aulas || []).filter(function (a) {
-      return a.alunoId === alunoId && a.data === dataIso;
+      return a.alunoId === alunoId && a.data === dataIso &&
+        (hora === undefined || (a.hora || '') === (hora || ''));
     })[0] || null;
   }
 
@@ -346,7 +347,10 @@
     var apagadas = serie.exclusoes || [];
     datasDaSerieNoMes(serie, mesIso).forEach(function (iso) {
       if (apagadas.indexOf(iso) >= 0) return;
-      if (achaAula(db, serie.alunoId, iso)) return;
+      var jaTem = (db.aulas || []).some(function (a) {
+        return a.serieId === serie.id && a.data === iso;
+      });
+      if (jaTem) return;
       db.aulas.push({
         id: uid(),
         alunoId: serie.alunoId,
@@ -355,8 +359,8 @@
         data: iso,
         hora: serie.hora || '',
         duracaoMin: serie.duracaoMin || 60,
-        status: 'realizada',
-        cobravel: true,
+        status: serie.status || 'realizada',
+        cobravel: (serie.cobravel !== undefined) ? serie.cobravel : true,
         notaTexto: '',
         notaPrivada: '',
         nota: null,
@@ -419,8 +423,15 @@
    * escopo: 'esta' | 'seguintes' | 'todas' */
   function alvosDoEscopo(db, aula, escopo) {
     if (escopo === 'esta' || !aula.serieId) return [aula];
-    var irmas = aulasDaSerie(db, aula.serieId).filter(function (a) {
-      return a.id === aula.id || !a.destacada;
+    var s = (db.series || []).filter(function (x) { return x.id === aula.serieId; })[0];
+    var raizId = s ? (s.serieOrigemId || s.id) : aula.serieId;
+    var seriesIds = {};
+    (db.series || []).forEach(function (x) {
+      if (x.id === raizId || x.serieOrigemId === raizId) seriesIds[x.id] = true;
+    });
+    seriesIds[aula.serieId] = true;
+    var irmas = (db.aulas || []).filter(function (a) {
+      return seriesIds[a.serieId] && (a.id === aula.id || !a.destacada);
     });
     if (escopo === 'seguintes') {
       return irmas.filter(function (a) { return a.data >= aula.data; });
@@ -463,6 +474,107 @@
         }
       }
     }
+
+    if (aula.serieId && (mudancas.hora !== undefined || mudancas.duracaoMin !== undefined ||
+        mudancas.status !== undefined || mudancas.cobravel !== undefined)) {
+      var s = (db.series || []).filter(function (x) { return x.id === aula.serieId; })[0];
+      if (s) {
+        if (escopo === 'todas') {
+          var raizId = s.serieOrigemId || s.id;
+          (db.series || []).forEach(function (ser) {
+            if (ser.id === raizId || ser.serieOrigemId === raizId) {
+              if (mudancas.hora !== undefined) ser.hora = mudancas.hora;
+              if (mudancas.duracaoMin !== undefined) ser.duracaoMin = mudancas.duracaoMin;
+              if (mudancas.status !== undefined) ser.status = mudancas.status;
+              if (mudancas.cobravel !== undefined) ser.cobravel = mudancas.cobravel;
+            }
+          });
+        } else if (escopo === 'seguintes') {
+          var raizId = s.serieOrigemId || s.id;
+          var temSemFim = !s.fim;
+          var maiorFim = s.fim;
+          (db.series || []).forEach(function (x) {
+            if ((x.id === raizId || x.serieOrigemId === raizId) && x.inicio >= aula.data) {
+              if (!x.fim) temSemFim = true;
+              else if (!maiorFim || x.fim > maiorFim) maiorFim = x.fim;
+            }
+          });
+          var fimAntigo = temSemFim ? null : maiorFim;
+          if (aula.data <= s.inicio) {
+            if (mudancas.hora !== undefined) s.hora = mudancas.hora;
+            if (mudancas.duracaoMin !== undefined) s.duracaoMin = mudancas.duracaoMin;
+            if (mudancas.status !== undefined) s.status = mudancas.status;
+            if (mudancas.cobravel !== undefined) s.cobravel = mudancas.cobravel;
+            s.fim = fimAntigo;
+            (db.series || []).forEach(function (x) {
+              if (x.id !== s.id && x.serieOrigemId === raizId && x.inicio >= aula.data) {
+                (x.exclusoes || []).forEach(function (d) {
+                  s.exclusoes = s.exclusoes || [];
+                  if (d >= aula.data && s.exclusoes.indexOf(d) < 0) s.exclusoes.push(d);
+                });
+              }
+            });
+            if (s.exclusoes) s.exclusoes.sort();
+            var cadeiaIds = {};
+            (db.series || []).forEach(function (x) {
+              if (x.id === raizId || x.serieOrigemId === raizId) cadeiaIds[x.id] = true;
+            });
+            db.series = (db.series || []).filter(function (x) {
+              return x.id === s.id || !(x.serieOrigemId === raizId && x.inicio >= aula.data);
+            });
+            (db.aulas || []).forEach(function (a) {
+              if (cadeiaIds[a.serieId] && a.data >= aula.data) {
+                a.serieId = s.id;
+              }
+            });
+          } else {
+            var dt = dataLocal(aula.data);
+            dt.setDate(dt.getDate() - 1);
+            s.fim = isoDe(dt);
+            var exclusoesUnificadas = (s.exclusoes || []).filter(function (d) { return d >= aula.data; });
+            (db.series || []).forEach(function (x) {
+              if (x.serieOrigemId === raizId && x.inicio >= aula.data) {
+                (x.exclusoes || []).forEach(function (d) {
+                  if (d >= aula.data && exclusoesUnificadas.indexOf(d) < 0) {
+                    exclusoesUnificadas.push(d);
+                  }
+                });
+              }
+            });
+            exclusoesUnificadas.sort();
+            var novaSerie = {
+              id: uid(),
+              serieOrigemId: raizId,
+              alunoId: s.alunoId,
+              dias: (s.dias || []).slice(),
+              inicio: aula.data,
+              fim: fimAntigo,
+              hora: mudancas.hora !== undefined ? mudancas.hora : s.hora,
+              duracaoMin: mudancas.duracaoMin !== undefined ? mudancas.duracaoMin : s.duracaoMin,
+              status: mudancas.status !== undefined ? mudancas.status : (s.status || 'realizada'),
+              cobravel: mudancas.cobravel !== undefined ? mudancas.cobravel : (s.cobravel !== undefined ? s.cobravel : true),
+              exclusoes: exclusoesUnificadas,
+              materializadoAte: s.materializadoAte
+            };
+            s.exclusoes = (s.exclusoes || []).filter(function (d) { return d < aula.data; });
+            var cadeiaIds = {};
+            cadeiaIds[s.id] = true;
+            (db.series || []).forEach(function (x) {
+              if (x.id === raizId || x.serieOrigemId === raizId) cadeiaIds[x.id] = true;
+            });
+            db.series = (db.series || []).filter(function (x) {
+              return !(x.serieOrigemId === raizId && x.inicio >= aula.data);
+            });
+            db.series.push(novaSerie);
+            (db.aulas || []).forEach(function (a) {
+              if (cadeiaIds[a.serieId] && a.data >= aula.data) {
+                a.serieId = novaSerie.id;
+              }
+            });
+          }
+        }
+      }
+    }
     return alvos.length;
   }
 
@@ -487,13 +599,21 @@
 
     db.aulas = (db.aulas || []).filter(function (a) { return !ids[a.id]; });
     if (escopo === 'todas' && aula.serieId) {
-      db.series = (db.series || []).filter(function (s) { return s.id !== aula.serieId; });
+      var sExcl = (db.series || []).filter(function (x) { return x.id === aula.serieId; })[0];
+      var raizExcl = sExcl ? (sExcl.serieOrigemId || sExcl.id) : aula.serieId;
+      db.series = (db.series || []).filter(function (s) {
+        return s.id !== raizExcl && s.serieOrigemId !== raizExcl && s.id !== aula.serieId;
+      });
     } else if (escopo === 'seguintes' && aula.serieId) {
       var s = (db.series || []).filter(function (x) { return x.id === aula.serieId; })[0];
       if (s) {
         var dt = dataLocal(aula.data); dt.setDate(dt.getDate() - 1);
         s.fim = isoDe(dt);
-        if (s.fim < s.inicio) db.series = db.series.filter(function (x) { return x.id !== s.id; });
+        var raizExcl = s.serieOrigemId || s.id;
+        db.series = (db.series || []).filter(function (x) {
+          if (x.id === s.id) return s.fim >= s.inicio;
+          return !(x.serieOrigemId === raizExcl && x.inicio >= aula.data);
+        });
       }
     }
     return alvos.length;
@@ -606,7 +726,7 @@
     var guarda = 0;
     while (dt >= limite && guarda++ < 4000) {
       var iso = isoDe(dt);
-      if (listaDias.indexOf(dt.getDay()) >= 0 && !achaAula(db, aula.alunoId, iso)) datas.push(iso);
+      if (listaDias.indexOf(dt.getDay()) >= 0 && !achaAula(db, aula.alunoId, iso, aula.hora)) datas.push(iso);
       dt.setDate(dt.getDate() - 1);
     }
     datas.sort();
@@ -652,7 +772,7 @@
     var guarda = 0;
     while (dt >= limite && guarda++ < 4000) {
       var iso = isoDe(dt);
-      if (listaDias.indexOf(dt.getDay()) >= 0 && !achaAula(db, aula.alunoId, iso)) datas.push(iso);
+      if (listaDias.indexOf(dt.getDay()) >= 0 && !achaAula(db, aula.alunoId, iso, aula.hora)) datas.push(iso);
       dt.setDate(dt.getDate() - 1);
     }
     return datas.sort();
