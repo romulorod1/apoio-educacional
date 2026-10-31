@@ -14373,6 +14373,17 @@
     var mapa = Biblioteca.mapaDoLivro(reg.meta, correcoesDosLivros()[reg.id]);
     var e = Biblioteca.entradaDoMapa(mapa, formato, valor);
     if (!e) { esconderCobre(formato); return; }
+    /* O mesmo capítulo, com o mesmo estado e os mesmos assuntos, já à vista:
+     * nada a redesenhar. A página é desenhada de novo no zoom, no "Ajustar à
+     * largura" e no toque do sumário que leva à página onde ela já está, e
+     * cada vez a faixa era refeita, apagando a lista do Corrigir aberta
+     * debaixo do dedo dela (achado em 31/10: uma rodada em dez do
+     * testa_livros_mapa.js, o sumário levando à página já aberta). */
+    if (!caixa.hidden && caixa.dataset.livro === reg.id && caixa.dataset.capitulo === String(e.n) &&
+        caixa.dataset.estado === e.estado && caixa.dataset.assuntos === e.assuntos.join(',') &&
+        (assuntosDosLivros || !e.assuntos.length) && !/abrindo o índice/.test(caixa.textContent)) {
+      return;
+    }
     var redesenhar = function () { mostrarCobre(formato, reg, valor); };
     desenharCobre(caixa, reg, e, assuntosDosLivros, redesenhar);
     if (!assuntosDosLivros) {

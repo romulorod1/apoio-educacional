@@ -611,6 +611,10 @@ roda "livros --envenenado-so-id"                  node "_teste/testa_livros.js" 
 roda "livros mapa"                                node "_teste/testa_livros_mapa.js"
 roda "livros mapa --envenenado-correcao-so-na-memoria" node "_teste/testa_livros_mapa.js" --envenenado-correcao-so-na-memoria
 roda "livros mapa --envenenado-sem-ano-na-tela"   node "_teste/testa_livros_mapa.js" --envenenado-sem-ano-na-tela
+# 31/10: a pagina desenhada de novo (sumario na mesma pagina, zoom) refazia a
+# faixa e apagava a lista do Corrigir aberta; a prova esperava pela pagina que
+# ja estava a vista e falhava uma vez em dez. O veneno volta a refazer a faixa.
+roda "livros mapa --envenenado-faixa-refeita"     node "_teste/testa_livros_mapa.js" --envenenado-faixa-refeita
 # C15.4 e C15.5: "Exportar em PDF" do capitulo 2 com o gabarito dele no mesmo
 # arquivo, anexado na aula: o texto do capitulo e DEPOIS o do gabarito do 2 (e
 # nao o do 1), o rodape de fonte, nenhum travessao; sem o gabarito; paginas
