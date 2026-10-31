@@ -11,11 +11,14 @@ de B e B precisa de C, A não lista C. Um pré-requisito está no mesmo ano ou e
 ano anterior, nunca em ano posterior. Raízes (sem pré-requisito) só no começo
 do 2º ano. A prova é `_teste/testa_grafo.js`, no portão rápido.
 
-Números: 138 arestas antes, 221 depois; 122 acrescentadas, 39 tiradas, 99
-mantidas. Raízes: MAT02-01 (números até 100) e MAT02-06 (figuras planas).
-Profundidade máxima da cadeia: 27 níveis (MATEM3-09, limite e continuidade).
-Nenhuma aresta redundante deixada de propósito (a lista de exceções do teste
-está vazia).
+Números da primeira passada: 138 arestas antes, 221 depois; 122 acrescentadas,
+39 tiradas, 99 mantidas. Depois da leitura cega (seção no fim): 233 arestas.
+Raízes: MAT02-01 (números até 100) e MAT02-06 (figuras planas). Profundidade
+máxima da cadeia: 25 níveis. Nenhuma aresta redundante deixada de propósito (a
+lista de exceções do teste está vazia).
+
+As tabelas por ano abaixo são o registro da primeira passada; a seção "Leitura
+cega de 30/10" diz o que mudou depois e vence onde discordar delas.
 
 Notação: `A <- B` quer dizer "A tem B como pré-requisito". "Acrescentada" e
 "Tirada" dizem o que mudou em relação ao grafo de 09/2026. Quando uma aresta
@@ -259,3 +262,47 @@ montar as cadeias e ficam como sugestão para quem decidir ampliar a lista:
    aponta para "função composta" (MATEM1-15) por falta de um assunto de inversa.
 7. Geometria de posição (retas e planos no espaço) na 2ª série, antes de
    prismas e pirâmides.
+8. Álgebra dos anos iniciais e do 6º ano (igualdade, sequências com regra,
+   propriedades da igualdade: BNCC EF05MA10, EF05MA11, EF06MA14, EF06MA15).
+   Hoje a álgebra salta de "sequências e padrões" (2º) para o 7º ano.
+9. Potenciação e radiciação de naturais no 6º ano (BNCC EF06MA03). Hoje
+   quadrado e cubo só aparecem no 8º (MAT08-01); no 6º eles vivem dentro de
+   "operações com números naturais" (MAT06-02).
+
+## Leitura cega de 30/10
+
+Um segundo leitor (lente da pedagoga), sem ver as justificativas acima, leu o
+grafo e apontou arestas erradas e arestas que faltam. Veredito ponto a ponto,
+como dono do conteúdo. Saldo: 21 arestas acrescentadas e 9 tiradas; 221 para
+233 arestas; profundidade de 27 para 25. A cadeia foi conferida inteira depois
+de cada mudança pelo `testa_grafo.js` (ciclo, ano, redundância, raízes).
+
+### Arestas que ele acha erradas
+
+| Ponto | Veredito | O que mudou | Motivo |
+| --- | --- | --- | --- |
+| 1. MAT09-07 Pitágoras <- MAT09-03 Radicais | Aceito | Tirada MAT09-07 <- MAT09-03; acrescentada MAT09-07 <- MAT08-03; acrescentada MAT09-09 <- MAT09-03 | O teorema pede raiz quadrada (8º). Simplificar e racionalizar radicais é usado de fato nos valores notáveis de seno, cosseno e tangente, então a aresta desce para MAT09-09, onde é imediata. |
+| 2. MAT09-10 Funções (a ideia) <- MAT09-04 Equação do 2º grau | Aceito | Tirada MAT09-10 <- MAT09-04; acrescentadas MATEM1-04 <- MAT09-04, MATEM1-07 <- MAT09-02, MATEM3-03 <- MAT08-07 | A ideia de função não pede resolver equação do 2º grau. Três assuntos só alcançavam o que usam por essa aresta, e passam a pedir direto: a função quadrática pede as raízes, a exponencial pede o expoente fracionário e negativo (o aviso do leitor), e a circunferência analítica pede completar quadrados. |
+| 3. MATEM2-07 Contagem <- MAT09-14 Eventos sucessivos | Aceito | Tirada MATEM2-07 <- MAT09-14; acrescentada MATEM2-07 <- MAT06-02; acrescentada MATEM2-10 <- MAT09-14 | O sentido estava invertido (contar vem antes de calcular probabilidade). O princípio multiplicativo pede multiplicar naturais; a probabilidade da 2ª série volta a pedir a do 9º, que antes vinha pela cadeia. A falta é de ASSUNTO (contagem no 8º), e fica como sugestão 1. |
+| 4. MATEM1-09 Logarítmica <- MATEM1-15 Função composta | Aceito | Tirada MATEM1-09 <- MATEM1-15; acrescentada MATEM3-10 <- MATEM1-15 | O que a logarítmica pede é função inversa, que não existe na lista (sugestão 6). A composta não é pré-requisito dela; a revisão de funções passa a cobrir a composta direto. |
+| 5. MATEM3-09 Limite <- MATEM1-09 Logarítmica | Aceito, com troca | Tirada MATEM3-09 <- MATEM1-09; acrescentada MATEM3-09 <- MATEM1-04 | A logarítmica não é necessária. Mas limite pede mais do que sequências: a indeterminação 0/0 fatora quadráticas, e o comportamento no infinito se estuda primeiro na parábola; a função quadrática é o imediato. |
+| 6a. MAT04-11 Possível e provável <- MAT03-12 Gráficos de barras | Recusado | Nada | Raiz fora do 2º ano é proibida, e nos anos iniciais a estimativa de chance (EF03MA25) vive na unidade de probabilidade e estatística junto com registrar resultados em tabela e gráfico (EF03MA26 a EF03MA28): é o único antecedente do tema no catálogo. Sem alternativa melhor, a aresta fica. |
+| 6b. MAT03-09 Massa e capacidade <- MAT03-08 Metro e centímetro | Aceito | Tirada MAT03-09 <- MAT03-08; acrescentadas MAT03-09 <- MAT03-01 e MAT03-09 <- MAT02-08 | Comprimento não é pré-requisito de massa; o que se usa é a ideia de medir com uma unidade (2º ano) e números até 1000 (1 kg = 1000 g, 1 L = 1000 mL). |
+| 6c. MAT03-11 Relógio e calendário <- MAT03-04 Tabuada | Aceito, com troca | Tirada MAT03-11 <- MAT03-04; acrescentada MAT03-11 <- MAT02-05 | Ler minutos no relógio de ponteiros conta de 5 em 5, e isso é contagem em sequência (2º ano), não tabuada. |
+
+### Arestas que faltam
+
+| Ponto | Veredito | O que mudou | Motivo |
+| --- | --- | --- | --- |
+| 1. Dispersão [09] e [em2] sem radiciação e potenciação | Aceito | Acrescentada MAT09-13 <- MAT08-03 | Variância e desvio padrão elevam ao quadrado e tiram raiz; MATEM2-14 herda por MATEM1-13. |
+| 2. Função afim [em1] sem razão e proporção e regra de três | Aceito em parte | Acrescentada MAT09-10 <- MAT07-05 | A proporcionalidade é a porta de entrada da ideia de função no 9º ano (EF09MA08), então a aresta entra em MAT09-10 e a afim herda. Regra de três não é usada na afim. |
+| 3. Semelhança e Tales [09] sem regra de três e equação do 1º grau | Aceito | Tirada MAT09-08 <- MAT07-05; acrescentadas MAT09-08 <- MAT07-06 e MAT09-08 <- MAT07-10 | A proporção com incógnita se resolve por regra de três (que traz razão e proporção) e, com expressões, por equação. |
+| 4. Círculo [08] e volume de cilindros [09] sem razão e potenciação | Aceito | Acrescentadas MAT08-13 <- MAT07-05 e MAT08-13 <- MAT08-01; tirada MAT08-13 <- MAT06-07 | Pi é a razão entre comprimento e diâmetro, e a área é pi vezes r ao quadrado. Os decimais passam a vir pela cadeia da potenciação, e a aresta direta virou redundante. MAT09-12 herda por MAT08-13. |
+| 5. Primos, área e volume [06] sem potência | Recusado | Nada (sugestão 9) | Não há assunto de potenciação no 6º ano para apontar: no catálogo quadrado e cubo de naturais vivem em MAT06-02 (operações com naturais), que MAT06-04 já pede e que MAT06-11 e MAT06-12 passam a alcançar pelo ponto 6. Criar assunto não cabe nesta entrega. |
+| 6. Área de figuras planas [06] sem decimais | Aceito | Acrescentada MAT06-11 <- MAT06-07 | Medidas com vírgula entram no cálculo de área e perímetro do 6º ano. |
+| 7. Complexos [em3] sem conjuntos numéricos [em1] | Aceito | Acrescentada MATEM3-05 <- MATEM1-01 | C estende R; a organização dos conjuntos numéricos é o que se amplia. |
+| 8. Reta analítica [em3] sem sistemas [08] | Aceito | Acrescentada MATEM3-02 <- MAT08-10 | Interseção de retas é sistema 2x2. |
+
+Grandes linhas: a álgebra salta do 2º para o 7º ano e a contagem só aparece na
+2ª série do médio. As duas são falta de assunto, não de aresta; estão nas
+sugestões 1 e 8, nada foi criado.

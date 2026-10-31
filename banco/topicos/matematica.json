@@ -355,7 +355,8 @@
     "titulo": "Massa e capacidade"
    },
    "prerequisitos": [
-    "MAT03-08"
+    "MAT03-01",
+    "MAT02-08"
    ],
    "chaves": {
     "r": "compra converter de ele entre grama litro mililitro quilograma receita resolver situacao usar",
@@ -391,7 +392,7 @@
    },
    "prerequisitos": [
     "MAT02-09",
-    "MAT03-04"
+    "MAT02-05"
    ],
    "chaves": {
     "r": "calcular dia dois entre hora horario ler localizar minuto o para passou quanto semana tempo usar",
@@ -1028,7 +1029,8 @@
    },
    "prerequisitos": [
     "MAT06-10",
-    "MAT05-09"
+    "MAT05-09",
+    "MAT06-07"
    ],
    "chaves": {
     "r": "basica calcular composta contorno das distinguir resolver superficie",
@@ -1552,7 +1554,8 @@
    },
    "prerequisitos": [
     "MAT06-11",
-    "MAT06-07"
+    "MAT07-05",
+    "MAT08-01"
    ],
    "chaves": {
     "r": "calcular circunferencia coroa de do entender numero o onde para pi raio resultado setor vem voltar",
@@ -1692,8 +1695,8 @@
     "titulo": "Teorema de Pitágoras"
    },
    "prerequisitos": [
-    "MAT09-03",
-    "MAT07-12"
+    "MAT07-12",
+    "MAT08-03"
    ],
    "chaves": {
     "r": "calcular da distancia do e isso lado medir nao os para que relacionar retangulo tres triangulo usar",
@@ -1710,9 +1713,10 @@
     "titulo": "Semelhança e Teorema de Tales"
    },
    "prerequisitos": [
-    "MAT07-05",
     "MAT08-11",
-    "MAT07-12"
+    "MAT07-12",
+    "MAT07-06",
+    "MAT07-10"
    ],
    "chaves": {
     "r": "achar aplicar correspondente entre feixe figura inacessivel lado medida o para paralela proporcao reconhecer semelhante usar",
@@ -1730,7 +1734,8 @@
    },
    "prerequisitos": [
     "MAT09-07",
-    "MAT09-08"
+    "MAT09-08",
+    "MAT09-03"
    ],
    "chaves": {
     "r": "achar altura as da do lado medir nao para que razao retangulo triangulo trigonometrica usar",
@@ -1748,7 +1753,7 @@
    },
    "prerequisitos": [
     "MAT08-09",
-    "MAT09-04"
+    "MAT07-05"
    ],
    "chaves": {
     "r": "associa cada como entender entrada essa formula ler na no que regra saida tabela uma unica",
@@ -1801,7 +1806,8 @@
     "titulo": "Medidas de tendência e de dispersão"
    },
    "prerequisitos": [
-    "MAT08-14"
+    "MAT08-14",
+    "MAT08-03"
    ],
    "chaves": {
     "r": "afastam amplitude centro conjunto dado desvio do media mediana medio medir moda o os pela pelo quanto resumir se um valor",
@@ -1887,7 +1893,8 @@
     "titulo": "Função quadrática"
    },
    "prerequisitos": [
-    "MATEM1-03"
+    "MATEM1-03",
+    "MAT09-04"
    ],
    "chaves": {
     "r": "a achar coeficiente de e ler maximo minimo o para parabola pelo problema raiz resolver usar vertice",
@@ -1938,7 +1945,8 @@
     "titulo": "Função exponencial"
    },
    "prerequisitos": [
-    "MATEM1-02"
+    "MATEM1-02",
+    "MAT09-02"
    ],
    "chaves": {
     "r": "a base crescimento de decaimento e em equacao expoente fixa inequacao modelo o reconhecer resolver usar variavel",
@@ -1972,8 +1980,7 @@
     "titulo": "Função logarítmica"
    },
    "prerequisitos": [
-    "MATEM1-08",
-    "MATEM1-15"
+    "MATEM1-08"
    ],
    "chaves": {
     "r": "a base condicao crescimento de desfaz dominio e entender equacao esquecer existencia exponencial inequacao ler pela que resolver sem seu",
@@ -2197,7 +2204,7 @@
     "titulo": "Princípio fundamental da contagem"
    },
    "prerequisitos": [
-    "MAT09-14"
+    "MAT06-02"
    ],
    "chaves": {
     "r": "a as cada caso configuracao contar de e etapa existem listar multiplicando possibilidade quanta restricao sem separado tratando uma",
@@ -2249,7 +2256,8 @@
     "titulo": "Probabilidade"
    },
    "prerequisitos": [
-    "MATEM2-08"
+    "MATEM2-08",
+    "MAT09-14"
    ],
    "chaves": {
     "r": "a calcular caso chance complementar condicional contagem contando de direta e evento favoravel possivel quando ruim um uniao usar",
@@ -2372,7 +2380,8 @@
    },
    "prerequisitos": [
     "MATEM3-01",
-    "MATEM1-03"
+    "MATEM1-03",
+    "MAT08-10"
    ],
    "chaves": {
     "r": "angular coeficiente de distancia e equacao escrever jeito medir os paralelismo pelo perpendicularidade ponto reconhecer todo um uma",
@@ -2389,7 +2398,8 @@
     "titulo": "Geometria analítica: a circunferência"
    },
    "prerequisitos": [
-    "MATEM3-02"
+    "MATEM3-02",
+    "MAT08-07"
    ],
    "chaves": {
     "r": "ao centro completando da de decidir distancia e em equacao geral ou para passar pela ponto posicao quadrado reduzida relacao reta um uma volta",
@@ -2423,7 +2433,8 @@
     "titulo": "Números complexos: forma algébrica"
    },
    "prerequisitos": [
-    "MAT09-04"
+    "MAT09-04",
+    "MATEM1-01"
    ],
    "chaves": {
     "r": "a calcular com de dividir e equacao i imaginaria multiplicar na nao operar potencia que raiz real resolver somar tem unidade",
@@ -2494,7 +2505,7 @@
    },
    "prerequisitos": [
     "MATEM1-12",
-    "MATEM1-09"
+    "MATEM1-04"
    ],
    "chaves": {
     "r": "continua entender fatoracao funcao indeterminacao levantar onde para por reconhecer tende uma",
@@ -2514,7 +2525,8 @@
     "MATEM1-05",
     "MATEM1-06",
     "MATEM1-09",
-    "MATEM2-02"
+    "MATEM2-02",
+    "MATEM1-15"
    ],
    "chaves": {
     "r": "a as cada certa de do em ensino escolher familia ferramenta medio pelo problema reconhecer retomar uma",

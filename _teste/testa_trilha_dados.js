@@ -81,7 +81,7 @@ temasIx.forEach(t => visita(t.id, []));
 conf('nenhum ciclo de pré-requisito', ciclo || 'nenhum', 'nenhum');
 
 /* Profundidade: com o grafo do C7 a cadeia vai do 2º ano ao 3º do médio sem
- * raiz no meio, e a escada mais funda tem 27 níveis. Quem protege a tela é o
+ * raiz no meio, e a escada mais funda tem 25 níveis. Quem protege a tela é o
  * corte de seis passos do trilhaDerivada (os cortados voltam na resposta), e
  * não a profundidade; o teto aqui é só para pegar uma cadeia disparatada. */
 const prof = {};
