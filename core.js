@@ -491,19 +491,29 @@
             }
           });
         } else if (escopo === 'seguintes') {
+          var raizId = s.serieOrigemId || s.id;
+          var fimCadeia = s.fim;
+          (db.series || []).forEach(function (x) {
+            if ((x.id === raizId || x.serieOrigemId === raizId) && x.inicio >= aula.data) {
+              if (x.fim && (!fimCadeia || x.fim > fimCadeia)) fimCadeia = x.fim;
+            }
+          });
           if (aula.data <= s.inicio) {
             if (mudancas.hora !== undefined) s.hora = mudancas.hora;
             if (mudancas.duracaoMin !== undefined) s.duracaoMin = mudancas.duracaoMin;
             if (mudancas.status !== undefined) s.status = mudancas.status;
             if (mudancas.cobravel !== undefined) s.cobravel = mudancas.cobravel;
+            db.series = (db.series || []).filter(function (x) {
+              return x.id === s.id || !(x.serieOrigemId === raizId && x.inicio >= aula.data);
+            });
           } else {
-            var fimAntigo = s.fim;
+            var fimAntigo = s.fim || fimCadeia;
             var dt = dataLocal(aula.data);
             dt.setDate(dt.getDate() - 1);
             s.fim = isoDe(dt);
             var novaSerie = {
               id: uid(),
-              serieOrigemId: s.serieOrigemId || s.id,
+              serieOrigemId: raizId,
               alunoId: s.alunoId,
               dias: (s.dias || []).slice(),
               inicio: aula.data,
@@ -516,9 +526,17 @@
               materializadoAte: s.materializadoAte
             };
             s.exclusoes = (s.exclusoes || []).filter(function (d) { return d < aula.data; });
+            var cadeiaIds = {};
+            cadeiaIds[s.id] = true;
+            (db.series || []).forEach(function (x) {
+              if (x.id === raizId || x.serieOrigemId === raizId) cadeiaIds[x.id] = true;
+            });
+            db.series = (db.series || []).filter(function (x) {
+              return !(x.serieOrigemId === raizId && x.inicio >= aula.data);
+            });
             db.series.push(novaSerie);
             (db.aulas || []).forEach(function (a) {
-              if (a.serieId === s.id && a.data >= aula.data) {
+              if (cadeiaIds[a.serieId] && a.data >= aula.data) {
                 a.serieId = novaSerie.id;
               }
             });

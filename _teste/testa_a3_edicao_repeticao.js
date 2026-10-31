@@ -195,5 +195,33 @@ Core.garantirSeriesAte(db, '2026-08');
 conf('nenhuma aula criada em julho de 2026', db.aulas.filter(a => Core.mesDe(a.data) === '2026-07').length, 0);
 conf('nenhuma aula criada em agosto de 2026', db.aulas.filter(a => Core.mesDe(a.data) === '2026-08').length, 0);
 
+secao('7. Cortes encadeados: edição anterior sobrescreve corte posterior');
+db = baseNova();
+const sEnc2 = Core.criarSerie(db, {
+  alunoId: 'a1', dias: [1], hora: '14:00', duracaoMin: 60,
+  inicio: '2026-06-01', fim: null
+});
+// Primeiro corte em 22/06: muda para 16:00, 90 min
+const a22 = db.aulas.find(a => a.data === '2026-06-22');
+Core.aplicarEdicaoAula(db, a22.id, { hora: '16:00', duracaoMin: 90 }, 'seguintes');
+
+// Segundo corte em 08/06 (anterior ao primeiro corte): muda para 18:00, 120 min
+const a08 = db.aulas.find(a => a.data === '2026-06-08');
+Core.aplicarEdicaoAula(db, a08.id, { hora: '18:00', duracaoMin: 120 }, 'seguintes');
+
+// Verifica que a série filha intermediária foi superada
+conf('apenas duas séries ativas na cadeia (origem e corte de 08/06)', db.series.length, 2);
+const sAtiva = db.series.find(s => s.inicio === '2026-06-08');
+conf('série ativa inicia em 08/06', !!sAtiva, true);
+conf('série ativa tem 18:00', sAtiva ? sAtiva.hora : '', '18:00');
+conf('série ativa tem 120 min', sAtiva ? sAtiva.duracaoMin : 0, 120);
+
+// Navegar para 2027-01
+Core.garantirSeriesAte(db, '2027-01');
+const aulasJan27 = db.aulas.filter(a => a.alunoId === 'a1' && Core.mesDe(a.data) === '2027-01');
+conf('janeiro de 2027 gerado com 18:00', aulasJan27.every(a => a.hora === '18:00'), true);
+conf('janeiro de 2027 gerado com 120 min', aulasJan27.every(a => a.duracaoMin === 120), true);
+
 console.log('\n' + ok + ' verificações passaram, ' + falhas + ' falharam.');
 process.exit(falhas ? 1 : 0);
+
