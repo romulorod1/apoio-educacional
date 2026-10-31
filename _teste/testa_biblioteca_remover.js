@@ -51,7 +51,8 @@ const EOL = STORE_REPO.indexOf('\r\n') >= 0 ? '\r\n' : '\n';
 const DEPOSITOS_HOJE = "var DEPOSITOS = ['biblioteca_pacotes', 'biblioteca_itens', 'biblioteca_teoria', 'biblioteca_assets', 'midias'];";
 const L_DEPOSITOS = DEPOSITOS_HOJE + EOL + '    return abrir()';
 const DEPOSITOS_VENENO = "var DEPOSITOS = ['biblioteca_pacotes', 'biblioteca_itens', 'biblioteca_teoria', 'biblioteca_assets', 'midias', 'biblioteca_etiquetas', 'biblioteca_uso'];";
-const L_ACHOU = 'contas.achou = true;';
+// a linha de baixo deixa a âncora única: desde o C15.1 a remoção de LIVRO também tem "contas.achou = true;"
+const L_ACHOU = 'contas.achou = true;' + EOL + '          contas.bytes = atual.bytes || 0;';
 const trocas = {};
 if (VENENO) {
   trocas['/store.js'] = STORE_REPO
