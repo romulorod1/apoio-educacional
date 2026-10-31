@@ -84,7 +84,10 @@
         'Seus livros dentro do aplicativo: o pacote de livros se importa em Ajustes, como os outros, e na Biblioteca o botão ' +
           '"Livros" abre cada um. O PDF tem sumário; o EPUB abre num leitor simples. Os dois voltam onde você parou.',
         'Os livros ficam só neste tablet: não entram na cópia de segurança, que continua pequena. Em Ajustes você vê quanto ' +
-          'espaço cada livro ocupa e pode remover.'
+          'espaço cada livro ocupa e pode remover.',
+        'Ao abrir um capítulo, o aplicativo mostra "Este capítulo cobre:" com o assunto. Confirme ou corrija com um toque; ' +
+          'a sua correção fica guardada e vai na cópia de segurança.',
+        'No assunto da aula, "Abrir no livro" lista os livros do ano do aluno que têm aquele assunto e abre o capítulo certo.'
       ]
     },
     {
