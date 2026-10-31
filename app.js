@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.39.0';
+  var VERSAO = '1.39.1';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,13 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.39.1',
+      itens: [
+        'A data da última cópia agora só muda depois que você envia o arquivo ou confirma que guardou o download. ' +
+          'Enquanto a cópia estiver pronta, o aviso com Enviar fica na Agenda e em Ajustes. Se desistir, toque em Agora não.'
+      ]
+    },
     {
       versao: '1.39.0',
       itens: [
@@ -1433,6 +1440,9 @@
    * - a pendência sai e a faixa some, e a frase devolvida conta isso, para o
    *   aviso dizer. Vazia quando não havia pendência. */
   function memoriaSubstituida() {
+    // Uma cópia montada do banco anterior não pode ser enviada depois de restaurar
+    // outra cópia ou apagar os dados deste aparelho.
+    copiaPronta = null;
     valoresOcultos = !!(db.ajustes && db.ajustes.valoresOcultos);
     atualizarBotaoOlho();
     // Minhas listas (C2a): a memória delas também era o banco de antes
@@ -2234,7 +2244,9 @@
 
     var lembrete = $('#lembrete-copia');
     lembrete.innerHTML = '';
-    if (precisaLembrarDaCopia()) {
+    if (copiaPronta) {
+      desenharCopiaPronta(lembrete);
+    } else if (precisaLembrarDaCopia()) {
       var dias = diasDesdeACopia();
       lembrete.appendChild(el('div', { class: 'faixa-aviso' }, [
         el('strong', { texto: dias === null ? 'Você ainda não salvou uma cópia de segurança. '
@@ -13712,15 +13724,16 @@
       var d = diasDesdeACopia();
       estadoCopia.innerHTML = '';
       if (d === null) {
-        estadoCopia.appendChild(el('div', { class: 'faixa-aviso', texto: 'Nenhuma cópia foi salva ainda por este aplicativo.' }));
+        estadoCopia.appendChild(el('div', { class: 'faixa-aviso', texto: 'Nenhuma cópia foi confirmada ainda por este aplicativo.' }));
       } else {
         estadoCopia.appendChild(el('div', {
           class: d >= 14 ? 'faixa-aviso' : 'faixa-info',
-          texto: d === 0 ? 'Última cópia salva hoje.'
-            : 'Última cópia salva há ' + d + ' dia' + (d === 1 ? '' : 's') + ', em ' +
+          texto: d === 0 ? 'Última cópia confirmada hoje.'
+            : 'Última cópia confirmada há ' + d + ' dia' + (d === 1 ? '' : 's') + ', em ' +
               Core.ddmmaaaa(db.ajustes.ultimaCopia) + '.'
         }));
       }
+      if (copiaPronta) desenharCopiaPronta(estadoCopia);
     }
 
     /* O que ela procurou e não achou. Fica em Ajustes porque é conversa nossa,
@@ -14163,6 +14176,56 @@
    * compartilhamento abre, com Drive, e-mail e o que mais ela tiver. */
   var copiaPronta = null;
 
+  function redesenharEstadoDaCopia() {
+    desenharAjustes();
+    desenharAgenda();
+  }
+
+  function desenharCopiaPronta(destino) {
+    var aviso = el('div', { class: 'faixa-aviso', id: destino.id === 'estado-copia' ? 'copia-pronta-ajustes' : 'copia-pronta-agenda' });
+    aviso.appendChild(el('strong', { texto: copiaPronta.baixada
+      ? 'O arquivo foi baixado. Confirme depois de guardá-lo. '
+      : 'Cópia montada. Toque em Enviar para guardar no Drive. ' }));
+    aviso.appendChild(el('div', { class: 'barra', style: 'margin-top:8px' }, [
+      el('button', {
+        type: 'button', class: 'btn principal pequeno',
+        texto: copiaPronta.baixada ? 'Já guardei o arquivo' : 'Enviar',
+        disabled: copiaPronta.enviando,
+        aoClick: copiaPronta.baixada ? confirmarDownloadDaCopia : enviarCopiaPronta
+      }),
+      copiaPronta.baixada ? el('button', {
+        type: 'button', class: 'btn pequeno', texto: 'Enviar de novo',
+        aoClick: function () { copiaPronta.baixada = false; enviarCopiaPronta(); }
+      }) : null,
+      el('button', {
+        type: 'button', class: 'btn pequeno', texto: 'Agora não',
+        disabled: copiaPronta.enviando,
+        aoClick: function () { copiaPronta = null; redesenharEstadoDaCopia(); }
+      })
+    ].filter(Boolean)));
+    destino.appendChild(aviso);
+  }
+
+  function confirmarCopiaEnviada(copia) {
+    if (copiaPronta !== copia) return;
+    db.ajustes = db.ajustes || {};
+    db.ajustes.ultimaCopia = Core.hojeIso();
+    copiaPronta = null;
+    var gravacao = salvar();
+    gravacao.then(function () {
+      redesenharEstadoDaCopia();
+      avisar('Cópia confirmada pelo aparelho. Guarde o arquivo em um lugar seguro.');
+    }, function () {
+      redesenharEstadoDaCopia();
+      avisar('O arquivo saiu, mas o tablet ainda precisa guardar a data. Tente de novo.');
+    });
+  }
+
+  function confirmarDownloadDaCopia() {
+    if (!copiaPronta || !copiaPronta.baixada) return;
+    confirmarCopiaEnviada(copiaPronta);
+  }
+
   function baixarCopia() {
     var botao = $('#baixar-copia');
     var rotuloCopia = botao ? botao.textContent : '';
@@ -14172,15 +14235,11 @@
       var hoje = Core.hojeIso();
       copiaPronta = {
         nome: 'Copia_Apoio_Educacional_' + hoje + '.json',
-        blob: new Blob([JSON.stringify(pacote)], { type: 'application/json' })
+        blob: new Blob([JSON.stringify(pacote)], { type: 'application/json' }),
+        baixada: false, enviando: false
       };
-      db.ajustes = db.ajustes || {};
-      db.ajustes.ultimaCopia = hoje;
-      return salvar();
-    }).then(function () {
       if (botao) { botao.disabled = false; botao.textContent = rotuloCopia; }
-      desenharAjustes();
-      desenharAgenda();
+      redesenharEstadoDaCopia();
       avisar('Cópia pronta, ' + Math.round(copiaPronta.blob.size / 1024) + ' KB. Envie para o Drive.',
         'Enviar', enviarCopiaPronta);
     }).catch(function () {
@@ -14191,8 +14250,40 @@
 
   /* Chamada a partir do toque dela, com a permissão do Android ainda valendo. */
   function enviarCopiaPronta() {
-    if (!copiaPronta) return;
-    entregarArquivo(copiaPronta.nome, copiaPronta.blob, 'Cópia de segurança');
+    var copia = copiaPronta;
+    if (!copia || copia.enviando) return;
+    var arquivo = null, podeCompartilhar = false;
+    try {
+      arquivo = new File([copia.blob], copia.nome, { type: copia.blob.type });
+      podeCompartilhar = !!(navigator.share && navigator.canShare &&
+        navigator.canShare({ files: [arquivo] }));
+    } catch (e) { /* sem compartilhamento, o download pede confirmação */ }
+    if (podeCompartilhar) {
+      copia.enviando = true;
+      var envio;
+      try { envio = navigator.share({ files: [arquivo], title: 'Cópia de segurança' }); }
+      catch (e) {
+        copia.enviando = false;
+        avisar('Não consegui abrir o envio. A cópia continua pronta.');
+        return;
+      }
+      redesenharEstadoDaCopia();
+      envio.then(function () {
+        copia.enviando = false;
+        confirmarCopiaEnviada(copia);
+      }).catch(function () {
+        copia.enviando = false;
+        if (copiaPronta === copia) redesenharEstadoDaCopia();
+        avisar('Envio cancelado. A cópia continua pronta para enviar.');
+      });
+      return;
+    }
+    // O clique em download não informa se o arquivo foi guardado. A confirmação
+    // da usuária é um segundo toque, depois de mover o arquivo para um lugar seguro.
+    baixar(copia.nome, copia.blob);
+    copia.baixada = true;
+    redesenharEstadoDaCopia();
+    avisar('Arquivo baixado. Confirme depois de guardá-lo.');
   }
 
   /* Há quantos dias a última cópia foi salva. Devolve null se nunca houve. */
