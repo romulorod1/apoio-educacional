@@ -484,6 +484,8 @@
       <div class="modal-corpo leitor-pdf-corpo" id="corpo-modal-leitor-pdf"></div>
       <div class="modal-rodape">
         <button class="btn" data-fechar type="button">Fechar</button>
+        <!-- C15.4: só no livro; o anexo da aula não exporta -->
+        <button class="btn" id="leitor-exportar" type="button" hidden>Exportar em PDF</button>
         <button class="btn principal" id="leitor-como-folha" type="button">Abrir esta página como folha</button>
       </div>
     </div>
@@ -523,7 +525,21 @@
       <div class="modal-corpo leitor-epub-corpo" id="corpo-modal-leitor-epub"></div>
       <div class="modal-rodape">
         <button class="btn" data-fechar type="button">Fechar</button>
+        <button class="btn principal" id="epub-exportar" type="button">Exportar em PDF</button>
       </div>
+    </div>
+  </div>
+
+  <!-- C15.4 e C15.5: o capítulo do livro (ou páginas escolhidas) num PDF no
+       modelo dela, com o gabarito do capítulo no mesmo arquivo, anexado na aula -->
+  <div class="fundo-modal" id="modal-livro-exportar">
+    <div class="modal">
+      <div class="modal-cabecalho">
+        <h3>Exportar em PDF</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-livro-exportar"></div>
+      <div class="modal-rodape" id="rodape-modal-livro-exportar"></div>
     </div>
   </div>
 

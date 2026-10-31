@@ -1942,6 +1942,8 @@
     $('#epub-anterior').addEventListener('click', function () { andarNoEpub(-1); });
     $('#epub-proximo').addEventListener('click', function () { andarNoEpub(1); });
     $('#epub-sumario').addEventListener('click', alternarSumarioEpub);
+    $('#leitor-exportar').addEventListener('click', exportarDoLeitorPdf);
+    $('#epub-exportar').addEventListener('click', exportarDoLeitorEpub);
     $('#limpar-orfaos').addEventListener('click', liberarEspaco);
     $('#apagar-exemplo').addEventListener('click', apagarExemplo);
     $('#apagar-tudo').addEventListener('click', apagarTudo);
@@ -14331,7 +14333,7 @@
       var sumario = reg.meta.sumario || [];
       return abrirLeitorPdf(reg.blob, {
         titulo: tituloDoLivro(reg.meta), nome: reg.id + '.pdf', pagina: (destino && destino.pagina) || (pos && pos.pagina) || 1,
-        sumario: sumario,
+        sumario: sumario, livro: reg,
         dica: sumario.length ? '' : 'Este livro não tem sumário: use Anterior e Próxima.',
         aoMudarPagina: function (n) {
           Store.gravarPosicaoLivro({ id: id, pagina: n }).catch(function () { /* a leitura segue; só a posição não fica */ });
@@ -14679,6 +14681,7 @@
     $('#epub-anterior').disabled = !tem || ep.capitulo <= 0;
     $('#epub-proximo').disabled = !tem || ep.capitulo >= n - 1;
     $('#epub-sumario').disabled = !tem;
+    $('#epub-exportar').disabled = !tem;
   }
 
   // a fração rolada do capítulo à vista, de 0 a 1; null se não há capítulo à vista
@@ -14833,6 +14836,420 @@
     esconderCobre('epub');
     var corpo = $('#corpo-modal-leitor-epub');
     if (corpo) { corpo.innerHTML = ''; delete corpo.dataset.capituloAberto; }
+  }
+
+  /* ---------------------------------- "Exportar em PDF" (C15.4 e C15.5) */
+
+  /* Do leitor, o capítulo à vista (ou páginas escolhidas, no PDF) vira um PDF
+   * no modelo dela, pelo gerador próprio (PDFGen.gerarLivroExportado), com o
+   * rodapé de fonte em toda página, e se anexa à aula pelo mesmo caminho do
+   * "Gerar e anexar" da biblioteca: o arquivo no depósito de anexos, o
+   * registro em aula.anexos e um salvar só (anexarPdfDoLivro).
+   *
+   * O GABARITO (C15.5): quando o pacote localizou o gabarito do capítulo, a
+   * caixa "Com o gabarito" vem marcada, e as páginas dele vão DEPOIS das do
+   * capítulo, no mesmo arquivo (pedido do dono: nunca dois arquivos). Livro
+   * sem gabarito localizado diz isso na janela, e a caixa fica desligada: um
+   * gabarito errado seria pior que nenhum.
+   *
+   * No PDF, cada página é desenhada pelo leitor do C14 (o mesmo PDF.js) num
+   * canvas a 150 pontos por polegada, como a teoria do material da
+   * biblioteca, e vai como JPEG com o texto da página por cima, invisível.
+   * No EPUB, o texto e as figuras são remontados, e a janela avisa que as
+   * fórmulas podem sair diferentes. */
+  var DPI_DO_LIVRO_EXPORTADO = 150;
+  // teto de pixels por página: um livro de página enorme não estoura a memória do tablet
+  var PIXELS_DA_PAGINA_EXPORTADA = 4000000;
+  var exportandoLivro = false;
+
+  function exportarDoLeitorPdf() {
+    if (!leitor || !leitor.doc || !leitor.opcoes.livro) return;
+    abrirExportarLivro({ reg: leitor.opcoes.livro, formato: 'pdf', doc: leitor.doc, pagina: leitor.pagina });
+  }
+
+  function exportarDoLeitorEpub() {
+    var ep = leitorEpub;
+    if (!ep || !ep.zip) return;
+    abrirExportarLivro({ reg: { id: ep.id, meta: ep.meta, blob: ep.blob }, formato: 'epub', ep: ep, parte: ep.capitulo + 1 });
+  }
+
+  // a aula aberta embaixo do leitor (ela veio pelo "Abrir no livro"): é para ela que o PDF vai
+  function aulaDeBaixo() {
+    var m = $('#modal-aula');
+    return aulaEmEdicao && m && m.classList.contains('aberto') && db.aulas.some(function (a) { return a.id === aulaEmEdicao.id; })
+      ? aulaEmEdicao.id : null;
+  }
+
+  function abrirExportarLivro(origem) {
+    var meta = origem.reg.meta || {};
+    var epub = origem.formato === 'epub';
+    var mapa = Biblioteca.mapaDoLivro(meta, correcoesDosLivros()[origem.reg.id]);
+    var entrada = Biblioteca.entradaDoMapa(mapa, origem.formato, epub ? origem.parte : origem.pagina);
+    if (entrada && entrada.obraInteira) entrada = null;
+    // no EPUB sem capítulo no mapa, o capítulo é a parte à vista
+    if (!entrada && epub) entrada = { n: null, titulo: 'Parte ' + origem.parte, capitulo: origem.parte, capitulo_fim: origem.parte, gabarito: null };
+    var temGabarito = Biblioteca.livroTemGabarito(meta);
+    var nomeUnidade = epub ? 'parte' : 'página';
+    var escolha = { aulaId: aulaDeBaixo() };
+    var corpo = $('#corpo-modal-livro-exportar');
+    var rodape = $('#rodape-modal-livro-exportar');
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    corpo.dataset.livro = origem.reg.id;
+    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', id: 'livro-exportar-livro', texto: tituloDoLivro(meta) }));
+
+    // o que exportar: o capítulo à vista, ou (no PDF) as páginas que ela escrever
+    var radioCap = el('input', { type: 'radio', name: 'livro-exportar-o-que', id: 'livro-exportar-capitulo', value: 'capitulo' });
+    var radioPag = el('input', { type: 'radio', name: 'livro-exportar-o-que', id: 'livro-exportar-paginas', value: 'paginas' });
+    var campoPag = el('input', { type: 'text', id: 'livro-exportar-quais', autocomplete: 'off', inputmode: 'numeric',
+      value: epub ? '' : String(origem.pagina || 1), placeholder: 'por exemplo 3-5, 8' });
+    var opcoes = el('div', { class: 'livro-exportar-opcoes' });
+    var partesDoCap = entrada ? Biblioteca.partesDoCapitulo(meta, entrada, false).capitulo : [];
+    if (entrada && partesDoCap.length) {
+      opcoes.appendChild(el('label', { class: 'bib-marcar' }, [radioCap,
+        el('span', { texto: 'O capítulo: ' + entrada.titulo + ' (' + Biblioteca.descreverUnidades(partesDoCap, nomeUnidade) + ')' })]));
+    }
+    if (!epub) {
+      opcoes.appendChild(el('label', { class: 'bib-marcar' }, [radioPag, el('span', { texto: 'Páginas escolhidas' })]));
+      opcoes.appendChild(el('label', { class: 'campo livro-exportar-quais' }, [
+        el('span', { texto: 'Quais páginas (o livro vai da 1 à ' + (meta.paginas || '?') + ')' }), campoPag]));
+    }
+    if (entrada && partesDoCap.length) radioCap.checked = true; else radioPag.checked = true;
+    corpo.appendChild(el('div', { class: 'campo' }, [el('span', { class: 'bib-gerar-rotulo', texto: 'O que exportar' }), opcoes]));
+
+    // o gabarito do capítulo, no mesmo PDF
+    var caixaGab = el('input', { type: 'checkbox', id: 'livro-exportar-gabarito' });
+    var motivoGab = el('span', { class: 'bib-motivo', id: 'livro-exportar-motivo-gabarito' });
+    corpo.appendChild(el('div', { class: 'campo' }, [el('span', { class: 'bib-gerar-rotulo', texto: 'Gabarito' }),
+      el('label', { class: 'bib-marcar', id: 'livro-exportar-linha-gabarito' }, [caixaGab, el('span', { texto: 'Com o gabarito do capítulo, no mesmo PDF' })]),
+      motivoGab]));
+    function atualizarGabarito() {
+      var doCapitulo = radioCap.checked && entrada && entrada.gabarito;
+      var texto = '';
+      if (!temGabarito) texto = 'sem gabarito localizado neste livro';
+      else if (!radioCap.checked) texto = 'o gabarito acompanha o capítulo inteiro';
+      else if (!doCapitulo) texto = 'sem gabarito localizado para este capítulo';
+      else {
+        var g = entrada.gabarito;
+        texto = 'gabarito: ' + Biblioteca.descreverUnidades(Biblioteca.partesDoCapitulo(meta, entrada, true).gabarito, nomeUnidade) +
+          (g.como === 'fim_do_capitulo' ? ', no fim do capítulo' : ', no fim do livro') +
+          (g.soImpares ? '; só as ímpares' : '') +
+          (g.certeza && g.certeza !== 'alta' ? '; localizado automaticamente, confira no PDF' : '');
+      }
+      var antes = caixaGab.disabled;
+      caixaGab.disabled = !doCapitulo;
+      if (!doCapitulo) caixaGab.checked = false;
+      else if (antes) caixaGab.checked = true;     // vem marcada quando há gabarito
+      caixaGab.parentNode.classList.toggle('desligada', caixaGab.disabled);
+      motivoGab.textContent = '(' + texto + ')';
+      motivoGab.dataset.estado = !temGabarito ? 'sem_no_livro' : doCapitulo ? 'tem' : 'sem_no_capitulo';
+    }
+    caixaGab.disabled = true;
+    radioCap.addEventListener('change', atualizarGabarito);
+    radioPag.addEventListener('change', atualizarGabarito);
+    campoPag.addEventListener('focus', function () { radioPag.checked = true; atualizarGabarito(); });
+    atualizarGabarito();
+
+    if (epub) {
+      corpo.appendChild(el('p', { class: 'faixa-aviso', id: 'livro-exportar-aviso-epub',
+        texto: 'No EPUB, o texto e as figuras são remontados no PDF: as fórmulas podem sair diferentes do original. Confira antes de mandar.' }));
+    }
+
+    // para qual aula: a de baixo vem escolhida; senão, as de hoje e as de perto
+    var listaAulas = el('div', { id: 'livro-exportar-aulas' });
+    var botaoAnexar = el('button', { type: 'button', class: 'btn principal', id: 'livro-exportar-anexar', texto: 'Gerar e anexar' });
+    function marcar(botao, aulaId) {
+      escolha.aulaId = aulaId;
+      $$('#livro-exportar-aulas .item-lista').forEach(function (b) { b.classList.remove('escolhida'); b.setAttribute('aria-pressed', 'false'); });
+      botao.classList.add('escolhida');
+      botao.setAttribute('aria-pressed', 'true');
+      botaoAnexar.disabled = exportandoLivro || !escolha.aulaId;
+    }
+    function linhaAula(a) {
+      var aluno = alunoPorId(a.alunoId);
+      var b = linhaBib(aluno.nome, Core.ddmmaaaa(a.data) + (a.hora ? ', ' + a.hora : ''), function () { marcar(b, a.id); });
+      b.setAttribute('data-aula', a.id);
+      b.setAttribute('aria-pressed', 'false');
+      var seta = b.querySelector('.bib-seta');
+      if (seta) seta.remove();
+      return b;
+    }
+    var aulas = aulasParaMaterial();
+    var deBaixo = escolha.aulaId ? db.aulas.filter(function (a) { return a.id === escolha.aulaId; })[0] : null;
+    if (deBaixo && alunoPorId(deBaixo.alunoId)) {
+      listaAulas.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Aula de onde você veio' }));
+      listaAulas.appendChild(linhaAula(deBaixo));
+    }
+    listaAulas.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Aulas de hoje' }));
+    var hoje = aulas.hoje.filter(function (a) { return !deBaixo || a.id !== deBaixo.id; });
+    if (hoje.length) hoje.forEach(function (a) { listaAulas.appendChild(linhaAula(a)); });
+    else listaAulas.appendChild(el('p', { class: 'ajuda', texto: 'Nenhuma outra aula marcada para hoje.' }));
+    var perto = aulas.perto.filter(function (a) { return !deBaixo || a.id !== deBaixo.id; });
+    if (perto.length) {
+      listaAulas.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Outras aulas perto de hoje' }));
+      perto.forEach(function (a) { listaAulas.appendChild(linhaAula(a)); });
+    }
+    corpo.appendChild(el('div', { class: 'campo' }, [el('span', { class: 'bib-gerar-rotulo', texto: 'Anexar em qual aula' }), listaAulas]));
+    corpo.appendChild(el('p', { class: 'ajuda', id: 'livro-exportar-saidas',
+      texto: 'Ao anexar, o PDF fica na aula escolhida. Só gerar PDF não altera nenhuma aula. Nada é enviado à família automaticamente.' }));
+    var estado = el('p', { class: 'ajuda', id: 'livro-exportar-estado', 'aria-live': 'polite' });
+    corpo.appendChild(estado);
+
+    function pedido() {
+      var comoCap = radioCap.checked && entrada;
+      if (comoCap) {
+        var p = Biblioteca.partesDoCapitulo(meta, entrada, caixaGab.checked && !caixaGab.disabled);
+        return { capitulo: p.capitulo, gabarito: p.gabarito, titulo: entrada.titulo, entrada: entrada };
+      }
+      var r = Biblioteca.paginasEscolhidas(campoPag.value, meta.paginas || 0);
+      if (r.erro) return { erro: r.erro };
+      var e1 = Biblioteca.entradaDoMapa(mapa, 'pdf', r.paginas[0]);
+      // as páginas escolhidas, todas de um capítulo só, levam o nome dele no rodapé
+      var mesmo = e1 && r.paginas.every(function (u) { return Biblioteca.entradaDoMapa(mapa, 'pdf', u) === e1; });
+      return { capitulo: r.paginas, gabarito: [], titulo: mesmo ? e1.titulo : 'Páginas ' + Biblioteca.descreverUnidades(r.paginas, 'página').replace(/^páginas? /, ''), entrada: mesmo ? e1 : null };
+    }
+    function gerar(aulaId) {
+      var p = pedido();
+      if (p.erro) { avisar(p.erro); return; }
+      if (p.capitulo.length + p.gabarito.length > Biblioteca.TETO_DE_PAGINAS_EXPORTADAS) {
+        avisar('São ' + (p.capitulo.length + p.gabarito.length) + ' ' + (epub ? 'partes' : 'páginas') + ': no máximo ' +
+          Biblioteca.TETO_DE_PAGINAS_EXPORTADAS + ' por PDF. Escolha menos páginas.');
+        return;
+      }
+      exportarLivro(origem, p, aulaId, estado);
+    }
+    botaoAnexar.disabled = !escolha.aulaId;
+    botaoAnexar.addEventListener('click', function () { if (escolha.aulaId) gerar(escolha.aulaId); });
+    rodape.appendChild(el('button', { type: 'button', class: 'btn', 'data-fechar': '', texto: 'Cancelar',
+      aoClick: function () { fecharModal('modal-livro-exportar'); } }));
+    rodape.appendChild(el('button', { type: 'button', class: 'btn', id: 'livro-exportar-baixar', texto: 'Só gerar PDF, sem anexar',
+      aoClick: function () { gerar(null); } }));
+    rodape.appendChild(botaoAnexar);
+    if (deBaixo) {
+      var b0 = listaAulas.querySelector('[data-aula="' + deBaixo.id + '"]');
+      if (b0) marcar(b0, deBaixo.id);
+    }
+    abrirModal('modal-livro-exportar');
+  }
+
+  function jpegDoCanvas(c) {
+    return new Promise(function (ok, falha) {
+      c.toBlob(function (b) {
+        if (!b) { falha(new Error('a página não virou imagem')); return; }
+        b.arrayBuffer().then(function (buf) { ok({ bytes: new Uint8Array(buf), wPx: c.width, hPx: c.height }); }, falha);
+      }, 'image/jpeg', 0.88);
+    });
+  }
+
+  /* Uma página do PDF do livro: a imagem (desenhada pelo PDF.js do leitor) e
+   * o texto, com a posição de cada trecho em pontos a partir do canto de
+   * baixo, como o gerador escreve. */
+  function paginaDoLivroParaPdf(doc, n) {
+    return doc.getPage(n).then(function (pagina) {
+      var base = pagina.getViewport({ scale: 1 });
+      var k = DPI_DO_LIVRO_EXPORTADO / 72;
+      k = Math.min(k, Math.sqrt(PIXELS_DA_PAGINA_EXPORTADA / (base.width * base.height)));
+      var w = Math.max(1, Math.round(base.width * k)), h = Math.max(1, Math.round(base.height * k));
+      return desenharPaginaPdfEmCanvas(doc, n, w, h).then(function (c) {
+        return Promise.all([jpegDoCanvas(c), pagina.getTextContent().catch(function () { return { items: [] }; })]).then(function (r) {
+          c.width = 0; c.height = 0;     // o canvas sai da memória antes da próxima página
+          var vista = pagina.view || [0, 0, base.width, base.height];
+          var textos = (r[1].items || []).filter(function (it) { return it && it.str && it.transform; }).map(function (it) {
+            var t = it.transform;
+            return { str: it.str, x: t[4] - vista[0], y: t[5] - vista[1], tam: Math.hypot(t[2], t[3]) || Math.abs(t[3]) || 10, largura: it.width || 0 };
+          });
+          return { img: r[0], larguraPt: base.width, alturaPt: base.height, textos: textos };
+        });
+      });
+    });
+  }
+
+  /* O texto e as figuras de uma parte do EPUB, em blocos, na ordem do livro. */
+  var EPUB_BLOCOS = { p: 1, li: 1, blockquote: 1, dt: 1, dd: 1, pre: 1, figcaption: 1, caption: 1, tr: 1, address: 1 };
+  function blocosDaParteEpub(zip, porNome, caminho) {
+    if (!porNome[caminho]) return Promise.resolve([]);
+    return Zip.extrair(zip, porNome[caminho]).then(function (bytes) {
+      var texto = new TextDecoder('utf-8').decode(bytes);
+      var d = new DOMParser().parseFromString(texto, 'application/xhtml+xml');
+      if (d.getElementsByTagName('parsererror').length || !d.getElementsByTagName('body').length) d = new DOMParser().parseFromString(texto, 'text/html');
+      var corpo = d.body || d.getElementsByTagName('body')[0];
+      var blocos = [], figuras = [];
+      function figura(n) {
+        var xl = 'http://www.w3.org/1999/xlink';
+        var src = n.getAttribute('src') || n.getAttribute('href') || n.getAttributeNS(xl, 'href');
+        var cam = src && !/^data:/i.test(src) ? caminhoNoEpub(caminho, src) : null;
+        if (!cam || !porNome[cam]) return;
+        var b = { tipo: 'figura', caminho: cam };
+        blocos.push(b);
+        figuras.push(b);
+      }
+      function andar(n) {
+        Array.prototype.forEach.call(n.childNodes, function (f) {
+          if (f.nodeType !== 1) return;
+          var nome = (f.localName || '').toLowerCase();
+          if (nome === 'script' || nome === 'style' || nome === 'head') return;
+          if (/^h[1-6]$/.test(nome)) { blocos.push({ tipo: 'titulo', texto: f.textContent, nivel: parseInt(nome.charAt(1), 10) }); return; }
+          if (nome === 'img' || nome === 'image') { figura(f); return; }
+          if (EPUB_BLOCOS[nome]) {
+            var t = nome === 'tr' ? Array.prototype.map.call(f.children, function (c) { return c.textContent.trim(); }).join(' | ') : f.textContent;
+            blocos.push({ tipo: 'texto', texto: t });
+            Array.prototype.forEach.call(f.querySelectorAll('img, image'), figura);
+            return;
+          }
+          andar(f);
+        });
+      }
+      if (corpo) andar(corpo);
+      return Promise.all(figuras.map(function (b) {
+        return Zip.extrair(zip, porNome[b.caminho]).then(function (bytes) {
+          var tipo = /\.png$/i.test(b.caminho) ? 'image/png' : /\.gif$/i.test(b.caminho) ? 'image/gif' : /\.svg$/i.test(b.caminho) ? 'image/svg+xml' :
+            /\.webp$/i.test(b.caminho) ? 'image/webp' : 'image/jpeg';
+          return imagemParaJpeg(new Blob([bytes], { type: tipo })).then(function (r) {
+            b.img = r.img; b.larguraPt = r.larguraPt; b.alturaPt = r.alturaPt;
+          });
+        }).catch(function () { b.tipo = 'texto'; b.texto = '[figura que não abriu]'; });
+      })).then(function () { return blocos; });
+    });
+  }
+
+  // uma figura do EPUB virando JPEG em fundo branco; o tamanho em pontos é o de 96 pixels por polegada
+  function imagemParaJpeg(blob) {
+    return new Promise(function (ok, falha) {
+      var url = URL.createObjectURL(blob);
+      var im = new Image();
+      im.onload = function () {
+        URL.revokeObjectURL(url);
+        var w = im.naturalWidth || 1, h = im.naturalHeight || 1;
+        var k = Math.min(1, Math.sqrt(PIXELS_DA_PAGINA_EXPORTADA / (w * h)));
+        var c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+        var cx = c.getContext('2d');
+        cx.fillStyle = '#FFFFFF';
+        cx.fillRect(0, 0, c.width, c.height);
+        cx.drawImage(im, 0, 0, c.width, c.height);
+        jpegDoCanvas(c).then(function (img) { ok({ img: img, larguraPt: w * 0.75, alturaPt: h * 0.75 }); }, falha);
+      };
+      im.onerror = function () { URL.revokeObjectURL(url); falha(new Error('a figura não abriu')); };
+      im.src = url;
+    });
+  }
+
+  /* Monta o PDF e, com aulaId, anexa; sem, entrega o arquivo. */
+  function exportarLivro(origem, p, aulaId, estado) {
+    if (exportandoLivro) { avisar('Ainda estou montando o PDF anterior. Espere um instante.'); return Promise.resolve(); }
+    exportandoLivro = true;
+    var meta = origem.reg.meta || {};
+    var epub = origem.formato === 'epub';
+    $$('#rodape-modal-livro-exportar button').forEach(function (b) { b.disabled = true; });
+    var total = p.capitulo.length + p.gabarito.length, feitas = 0;
+    var progresso = function () { estado.textContent = 'Montando o PDF: ' + feitas + ' de ' + total + (epub ? ' partes.' : ' páginas.'); };
+    progresso();
+    var docPdf = null, soltarDepois = false, zipEpub = null, porNome = null;
+    var pronto;
+    if (epub) {
+      pronto = (origem.ep && origem.ep.zip ? Promise.resolve(origem.ep.zip) : origem.reg.blob.arrayBuffer().then(function (b) { return Zip.ler(b); }))
+        .then(function (z) { zipEpub = z; porNome = Object.create(null); z.entradas.forEach(function (en) { porNome[en.nome] = en; }); });
+    } else if (origem.doc) {
+      docPdf = origem.doc;
+      pronto = Promise.resolve();
+    } else {
+      soltarDepois = true;
+      pronto = Promise.all([carregarPdfJs(), bytesDoPdf(origem.reg.blob)]).then(function (r) {
+        return r[0].getDocument({ data: r[1], isEvalSupported: false, enableXfa: false, wasmUrl: enderecoNoApp(PDFJS_PASTA + 'wasm/') }).promise;
+      }).then(function (d) { docPdf = d; });
+    }
+    var espinha = (meta.epub && meta.epub.espinha) || [];
+    function parte(lista) {
+      // uma de cada vez: cada página desenhada é um canvas de alguns MB
+      return lista.reduce(function (pr, u) {
+        return pr.then(function (acc) {
+          var vez = epub ? blocosDaParteEpub(zipEpub, porNome, espinha[u - 1]) : paginaDoLivroParaPdf(docPdf, u);
+          return vez.then(function (r) { feitas++; progresso(); acc.push(r); return acc; });
+        });
+      }, Promise.resolve([]));
+    }
+    var arquivo = null, registro = null;
+    return pronto.then(function () { return parte(p.capitulo); }).then(function (cap) {
+      return parte(p.gabarito).then(function (gab) { return [cap, gab]; });
+    }).then(function (r) {
+      var aula = aulaId ? db.aulas.filter(function (a) { return a.id === aulaId; })[0] : null;
+      var aluno = aula ? alunoPorId(aula.alunoId) : null;
+      var achata = function (lista) { return lista.reduce(function (a, b) { return a.concat(b); }, []); };
+      var partes = [{ nome: 'Capítulo', titulo: p.titulo }];
+      partes[0][epub ? 'blocos' : 'paginas'] = epub ? achata(r[0]) : r[0];
+      if (p.gabarito.length) {
+        var g = { nome: 'Gabarito', titulo: 'Gabarito: ' + p.titulo };
+        g[epub ? 'blocos' : 'paginas'] = epub ? achata(r[1]) : r[1];
+        partes.push(g);
+      }
+      var saida = PDFGen.gerarLivroExportado({
+        titulo: p.titulo, subtitulo: tituloDoLivro(meta), aluno: aluno ? aluno.nome : '',
+        data: aula ? Core.ddmmaaaa(aula.data) : '',
+        fonte: Biblioteca.fonteDoLivro(meta, p.entrada ? p.entrada.titulo : '', p.capitulo, p.gabarito),
+        partes: partes
+      });
+      var nome = Core.nomeArquivo(tituloDoLivro(meta) + ' ' + p.titulo + (p.gabarito.length ? ' com gabarito' : '')) + '.pdf';
+      arquivo = { nome: nome, blob: new Blob([saida.bytes], { type: 'application/pdf' }), paginas: saida.paginas };
+      if (!aulaId) {
+        fecharModal('modal-livro-exportar');
+        entregarArquivo(arquivo.nome, arquivo.blob, p.titulo);
+        return null;
+      }
+      return anexarPdfDoLivro(aulaId, arquivo, { id: origem.reg.id, capitulo: p.entrada ? p.entrada.n : null,
+        unidades: p.capitulo, gabarito: p.gabarito }).then(function (reg) { registro = reg; });
+    }).then(function () {
+      if (!registro) return;
+      var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
+      var aluno = aula ? alunoPorId(aula.alunoId) : null;
+      fecharModal('modal-livro-exportar');
+      desenharAgenda();
+      // a aula aberta embaixo (veio pelo "Abrir no livro") já mostra o anexo novo
+      if (aula && aulaEmEdicao && aulaEmEdicao.id === aula.id && $('#lista-anexos')) desenharAnexos($('#lista-anexos'), aula);
+      avisar('PDF anexado na aula de ' + (aluno ? aluno.nome : 'aula') + ' (' + Core.ddmmaaaa(aula.data) + ')' +
+        (p.gabarito.length ? ', com o gabarito do capítulo no fim.' : '.'),
+        'Abrir a aula', function () { abrirAulaDoMaterial(aulaId); });
+    }).catch(function (e) {
+      if (window.console) console.warn('livros, exportar:', e);
+      if (e && e.desfeita) return;
+      avisar('Não consegui montar o PDF agora. Nada foi anexado. Tente de novo.');
+    }).then(function () {
+      exportandoLivro = false;
+      estado.textContent = '';
+      $$('#rodape-modal-livro-exportar button').forEach(function (b) { b.disabled = false; });
+      var anexar = $('#livro-exportar-anexar');
+      if (anexar && !$('#livro-exportar-aulas .escolhida')) anexar.disabled = true;
+      if (soltarDepois && docPdf) soltarDocPdf(docPdf);
+    });
+  }
+
+  /* O MESMO caminho do "Gerar e anexar" da biblioteca: o PDF no depósito de
+   * anexos, o registro em aula.anexos e um salvar; se o salvar falhar, nada
+   * fica pela metade (o registro sai da memória e o arquivo do depósito). */
+  function anexarPdfDoLivro(aulaId, arquivo, deOnde) {
+    var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
+    if (!aula) return Promise.reject(new Error('aula sumiu'));
+    var usados = {};
+    (aula.anexos || []).forEach(function (x) { usados[x.nome] = true; });
+    var base = arquivo.nome.replace(/\.pdf$/, ''), k = 2;
+    while (usados[arquivo.nome]) { arquivo.nome = base + '_' + k + '.pdf'; k++; }
+    var id = Core.uid();
+    return Store.salvarAnexo(id, { nome: arquivo.nome, tipo: 'application/pdf', blob: arquivo.blob }).then(function () {
+      aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
+      if (!aula) {
+        Store.apagarAnexo(id).catch(function () {});
+        var sem = new Error('aula desfeita'); sem.desfeita = true; throw sem;
+      }
+      aula.anexos = aula.anexos || [];
+      var registro = { id: id, nome: arquivo.nome, tamanho: arquivo.blob.size, biblioteca: true,
+        livro: { id: deOnde.id, capitulo: deOnde.capitulo, paginas: deOnde.unidades, gabarito: deOnde.gabarito } };
+      aula.anexos.push(registro);
+      return salvar().then(function () { return registro; }, function (e) {
+        aula.anexos = aula.anexos.filter(function (x) { return x !== registro; });
+        Store.apagarAnexo(id).catch(function () {});
+        mudancaDesfeitaNaMemoria(e);
+        throw e;
+      });
+    });
   }
 
   // ================= biblioteca: navegar =================
@@ -18884,6 +19301,8 @@
    *                        leva à página dela
    *   opcoes.aoMudarPagina function (n) chamada a cada página desenhada (o
    *                        livro guarda onde ela parou)
+   *   opcoes.livro         o registro do livro (C15.4): com ele aparece o
+   *                        "Exportar em PDF"
    *
    * Devolve uma promessa: true quando a primeira página está desenhada, false
    * quando não abriu (a janela já disse por quê e ofereceu o caminho de fora). */
@@ -18900,6 +19319,8 @@
     mostrarDicaDoLeitor(opcoes.comoFolha === false ? '' : opcoes.dica);
     // o botão Sumário só existe para quem traz sumário (o livro); o anexo da aula fica como era
     $('#leitor-sumario').hidden = !(opcoes.sumario && opcoes.sumario.length);
+    // "Exportar em PDF" (C15.4) só no livro
+    $('#leitor-exportar').hidden = !opcoes.livro;
     fecharSumarioDoLeitor();
     // "Este capítulo cobre" (C15.2) nasce escondido: só o livro o mostra, a cada página
     esconderCobre('pdf');
@@ -19006,6 +19427,7 @@
     $('#leitor-largura').disabled = !tem;
     $('#leitor-como-folha').disabled = !tem;
     $('#leitor-sumario').disabled = !tem;
+    $('#leitor-exportar').disabled = !tem;
   }
 
   function fecharSumarioDoLeitor() {

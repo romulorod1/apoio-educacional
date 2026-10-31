@@ -1927,6 +1927,10 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-cobre .cobre-rolagem { flex: 1 1 100%; margin: 0; }
 .livro-linha .detalhe { margin-top: 2px; }
 #lista-livros-biblioteca .livros-total { font-weight: 600; margin: 4px 0 8px; }
+/* C15.4: exportar o capítulo; uma opção por linha, e o campo das páginas logo abaixo da dele */
+.livro-exportar-opcoes { display: flex; flex-direction: column; align-items: flex-start; }
+.livro-exportar-opcoes .livro-exportar-quais { margin: 0 0 4px 34px; width: calc(100% - 34px); }
+#modal-livro-exportar .bib-motivo { margin-top: -4px; }
 /* material desta aula: a caixa fica ao lado do cartão, e o alvo de toque tem 44 px */
 .bib-celula { display: flex; flex-direction: column; gap: 12px; }
 .bib-acoes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

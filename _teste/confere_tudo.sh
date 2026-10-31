@@ -611,6 +611,14 @@ roda "livros --envenenado-so-id"                  node "_teste/testa_livros.js" 
 roda "livros mapa"                                node "_teste/testa_livros_mapa.js"
 roda "livros mapa --envenenado-correcao-so-na-memoria" node "_teste/testa_livros_mapa.js" --envenenado-correcao-so-na-memoria
 roda "livros mapa --envenenado-sem-ano-na-tela"   node "_teste/testa_livros_mapa.js" --envenenado-sem-ano-na-tela
+# C15.4 e C15.5: "Exportar em PDF" do capitulo 2 com o gabarito dele no mesmo
+# arquivo, anexado na aula: o texto do capitulo e DEPOIS o do gabarito do 2 (e
+# nao o do 1), o rodape de fonte, nenhum travessao; sem o gabarito; paginas
+# escolhidas; o livro sem gabarito diz isso; o EPUB com o aviso. Porta 8864.
+roda "livros exportar"                            node "_teste/testa_livros_exportar.js"
+roda "livros exportar --envenenado-gabarito-do-outro" node "_teste/testa_livros_exportar.js" --envenenado-gabarito-do-outro
+roda "livros exportar --envenenado-sem-fonte"     node "_teste/testa_livros_exportar.js" --envenenado-sem-fonte
+roda "livros exportar --envenenado-travessao"     node "_teste/testa_livros_exportar.js" --envenenado-travessao
 # C2b: a lista de base (base-v1) importa, vem primeiro com o nome dela e a
 # frase de posicao na fonte; as tres listas com a etiqueta de nivel. A regra
 # em si e do biblioteca/_prova_kits.py (sem navegador).
@@ -721,6 +729,16 @@ roda "livros (regras) --envenenado-teto-antigo" node "_teste/testa_livros_regras
 roda "livros (regras) --envenenado-sem-ano"     node "_teste/testa_livros_regras.js" --envenenado-sem-ano
 roda "livros (regras) --envenenado-correcao-ignorada" node "_teste/testa_livros_regras.js" --envenenado-correcao-ignorada
 roda "livros (regras) --envenenado-correcao-sem-titulo" node "_teste/testa_livros_regras.js" --envenenado-correcao-sem-titulo
+# C15.4 e C15.5: o que vai no PDF exportado (o capitulo sem as respostas do
+# livro, e o gabarito daquele capitulo depois, so quando pedido), as paginas
+# escolhidas e o rodape de fonte. O veneno deixa as respostas no capitulo.
+roda "livros (regras) --envenenado-respostas-no-capitulo" node "_teste/testa_livros_regras.js" --envenenado-respostas-no-capitulo
+# C15.5: o passe semiautomatico do gabarito (titulos de respostas, numero do
+# capitulo, o fim do capitulo, so as impares, manual do professor, sem texto),
+# a trava do casamento medida pelo texto e os venenos dentro da prova (casar
+# pela ordem, casar com o seguinte, o fim do capitulo em qualquer lugar,
+# "Resposta pessoal" como titulo, a secao sem respostas). Sem Chrome.
+roda "livros (gabarito)"                        python biblioteca/_prova_gabaritos.py
 # A comparacao pacote a pacote (determinismo e "o que mudou de uma versao para
 # a outra") rodando contra si mesma: um veneno por tipo de diferenca que ela
 # existe para achar, mais dois controles. A comparacao de verdade precisa dos

@@ -4177,6 +4177,165 @@
     return { bytes: doc.finalizar(), total: doc.paginas.length, paginas: mapa, reduzidos: reduzidos };
   }
 
+  /* O capítulo de um livro (C15.4), e o gabarito dele (C15.5), no modelo dela.
+   *
+   * op = {
+   *   titulo, subtitulo,   o cabeçalho de seção (o capítulo; o livro)
+   *   aluno, data,         a linha do aluno, como no material da biblioteca
+   *   fonte,               o rodapé "Fonte: título, autoria, editora, ano,
+   *                        capítulo, páginas", em TODA página
+   *   partes: [{ nome: 'Capítulo' | 'Gabarito', titulo,
+   *              paginas: [{ img: {bytes, wPx, hPx}, larguraPt, alturaPt,
+   *                          textos: [{ str, x, y, tam, largura }] }]   (PDF)
+   *              blocos: [{ tipo: 'titulo' | 'texto' | 'figura', texto,
+   *                         nivel, img, larguraPt, alturaPt }] }]       (EPUB)
+   * }
+   *
+   * No PDF, cada página do livro já vem desenhada (o leitor do C14) e entra
+   * como a página de teoria do material da biblioteca: a imagem inteira, com
+   * o fio em volta e só o selo da marca no rodapé, porque a página do livro
+   * já traz a marca dela. Por cima da imagem vai o TEXTO da página, invisível
+   * (modo 3 de desenho, o das digitalizações com OCR): o PDF exportado se
+   * busca e se seleciona como o livro, e quem confere o arquivo lê o texto.
+   * No EPUB não há página: o texto e as figuras são remontados aqui, e as
+   * fórmulas podem sair diferentes do original (a tela avisa).
+   *
+   * Nenhum travessão nem meia-risca sai daqui: o texto do livro passa pela
+   * troca por hífen antes de entrar.
+   *
+   * Devolve { bytes, total, paginas: { capitulo: [i], gabarito: [i] } }, com
+   * os índices das páginas de cada parte. */
+  var RE_TRACOS_LIVRO = new RegExp('[' + String.fromCharCode(0x2013, 0x2014) + ']', 'g');
+  function textoDoLivro(t) {
+    var s = String(t == null ? '' : t).replace(RE_TRACOS_LIVRO, '-').replace(/\s+/g, ' ');
+    var saida = '';
+    for (var i = 0; i < s.length; i++) {
+      var ch = s.charAt(i);
+      if (s.codePointAt(i) > 0xFFFF) { i++; continue; }
+      if (desenhavel(ch)) saida += ch;
+    }
+    return saida;
+  }
+
+  function gerarLivroExportado(op) {
+    var doc = new Doc();
+    doc.lingua = 'pt';
+    var mapa = { capitulo: [], gabarito: [] };
+    var deImagem = [];
+    var cont = 0;
+    var fonte = textoDoLivro(op.fonte || '');
+    var primeira = true;
+
+    function anota(parte) {
+      var p = doc.paginas.length - 1;
+      if (mapa[parte].indexOf(p) < 0) mapa[parte].push(p);
+    }
+    function abrirParte(parte) {
+      if (!primeira) doc.novaPagina();
+      primeira = false;
+      // o título vai pela tubulação rica: asterisco e chave de expoente do livro não são marcação
+      var titulo = textoDoLivro(parte.titulo || op.titulo || 'Livro').replace(/[*{}^_]/g, '');
+      doc.cabecalhoDeSecao(titulo, textoDoLivro(op.subtitulo || ''));
+      if (op.aluno) {
+        doc.y -= 14;
+        doc.texto('Aluno: ' + op.aluno + (op.data ? '   ' + op.data : ''), MARG_E, doc.y, { tam: 9, cor: COR.muted });
+      }
+      doc.y -= 6;
+    }
+
+    /* O texto invisível de uma página, na posição de cada trecho, dentro da
+     * caixa da imagem. A largura de cada trecho é ajustada (Tz) à do livro,
+     * para a seleção cobrir a palavra certa. */
+    function textoInvisivel(pg, x0, y0, k) {
+      (pg.textos || []).forEach(function (t) {
+        var s = textoDoLivro(t.str).trim();
+        if (!s || !(t.tam > 0)) return;
+        var tam = t.tam * k;
+        var wa = paraWinAnsi(s);
+        var natural = medirWA(wa, tam, false);
+        var tz = t.largura > 0 && natural > 0 ? Math.max(10, Math.min(1000, t.largura * k / natural * 100)) : 100;
+        doc.op('BT 3 Tr /F1 ' + tam.toFixed(2) + ' Tf ' + tz.toFixed(1) + ' Tz ' + (x0 + t.x * k).toFixed(2) + ' ' +
+          (y0 + t.y * k).toFixed(2) + ' Td (' + escapar(wa) + ') Tj 100 Tz 0 Tr ET');
+      });
+    }
+
+    function paginaDoLivro(parte, pg, i) {
+      if (i > 0) doc.novaPagina();
+      var alto = doc.y - Y_LIMITE;
+      var k = Math.min(UTIL / pg.larguraPt, alto / pg.alturaPt);
+      var l = pg.larguraPt * k, a = pg.alturaPt * k;
+      var x = MARG_E + (UTIL - l) / 2, y = doc.y - a;
+      var ref = 'livro' + (++cont);
+      doc.registraImagem(ref, pg.img.bytes, pg.img.wPx, pg.img.hPx);
+      doc.desenhaImagem(ref, x, y, l, a);
+      textoInvisivel(pg, x, y, k);
+      // fio fino em volta: separa a página do livro da moldura dela
+      doc.op(cor3(COR.fio) + ' RG 0.50 w ' + x.toFixed(2) + ' ' + y.toFixed(2) + ' ' + l.toFixed(2) + ' ' + a.toFixed(2) + ' re S');
+      doc.y = y;
+      anota(parte);
+      deImagem.push(doc.paginas.length - 1);
+    }
+
+    function blocoDoEpub(parte, b) {
+      if (b.tipo === 'figura' && b.img && b.larguraPt > 0 && b.alturaPt > 0) {
+        var k = Math.min(1, UTIL / b.larguraPt, (Y_TOPO - Y_LIMITE - 20) / b.alturaPt);
+        var l = b.larguraPt * k, a = b.alturaPt * k;
+        doc.garanteEspaco(a + 10);
+        doc.y -= 6;
+        var ref = 'epub' + (++cont);
+        doc.registraImagem(ref, b.img.bytes, b.img.wPx, b.img.hPx);
+        doc.desenhaImagem(ref, MARG_E + (UTIL - l) / 2, doc.y - a, l, a);
+        doc.y -= a + 4;
+        anota(parte);
+        return;
+      }
+      var t = textoDoLivro(b.texto).trim();
+      if (!t) return;
+      if (b.tipo === 'titulo') {
+        doc.garanteEspaco(40);
+        doc.y -= 6;
+        doc.paragrafo(t, { tam: b.nivel <= 1 ? 13 : 11.5, bold: true, cor: COR.navy });
+        doc.y -= 2;
+      } else {
+        doc.paragrafo(t, { tam: 10.5 });
+        doc.y -= 4;
+      }
+      anota(parte);
+    }
+
+    doc.novaPagina();
+    (op.partes || []).forEach(function (parte) {
+      var nome = parte.nome === 'Gabarito' ? 'gabarito' : 'capitulo';
+      abrirParte(parte);
+      anota(nome);
+      if (parte.paginas) parte.paginas.forEach(function (pg, i) { paginaDoLivro(nome, pg, i); });
+      else (parte.blocos || []).forEach(function (b) { blocoDoEpub(nome, b); });
+    });
+
+    /* O rodapé de fonte, em toda página, na faixa entre o fim do conteúdo e o
+     * fio do rodapé; até duas linhas, encolhendo o corpo antes de cortar. */
+    var tam = 6.5, linhas = doc.quebrar(fonte, UTIL, tam, false);
+    if (linhas.length > 2) { tam = 5.6; linhas = doc.quebrar(fonte, UTIL, tam, false); }
+    if (linhas.length > 2) linhas = [linhas[0], linhas[1].replace(/.{0,3}$/, '...')];
+    var guardada = doc.pag;
+    doc.paginas.forEach(function (p, i) {
+      doc.pag = p;
+      linhas.forEach(function (l, j) {
+        doc.texto(l, MARG_E, Y_FIO_ROD + 5 + (linhas.length - 1 - j) * (tam + 1.4), { tam: tam, cor: COR.muted });
+      });
+      /* A página do livro já traz a marca e o rodapé dela: só o selo pequeno
+       * no rodapé da moldura, como na teoria do material da biblioteca. */
+      if (deImagem.indexOf(i) >= 0) {
+        p.marca = null;
+        var cx = PAGINA_L / 2, cy = PAGINA_A - 809.4 + 2.6;
+        doc.circulo(cx, cy, 8.5, COR.fio, false);
+        doc.texto('NW', cx, cy - 3, { tam: 8, bold: true, cor: COR.fio, align: 'centro' });
+      }
+    });
+    doc.pag = guardada;
+    return { bytes: doc.finalizar(), total: doc.paginas.length, paginas: mapa };
+  }
+
   /* Gera o PDF de uma folha de aula (todas as suas paginas com tracos, imagens e notas).
    * opcoes = {
    *   alunoNome: string,
@@ -4216,6 +4375,7 @@
     gerarFechamento: gerarFechamento, gerarResumoMes: gerarResumoMes,
     gerarMaterialTema: gerarMaterialTema, gerarFichaMapeamento: gerarFichaMapeamento,
     gerarMaterialBiblioteca: gerarMaterialBiblioteca,
+    gerarLivroExportado: gerarLivroExportado,
     gerarProposta: gerarProposta,
     gerarFolhaAula: gerarFolhaAula,
     NOTA_L: NOTA_L, NOTA_A: NOTA_A,

@@ -25,6 +25,15 @@
  *   --envenenado-correcao-ignorada  a correção dela não vale.
  *   --envenenado-correcao-sem-titulo  a correção vale sem conferir o título
  *                                 (a velha cai no capítulo renumerado).
+ *   --envenenado-respostas-no-capitulo  o capítulo exportado leva as páginas
+ *                                 de respostas do livro junto, mesmo sem o
+ *                                 gabarito pedido.
+ *
+ * C15.4 e C15.5 (biblioteca.js, sem tela):
+ *   5. o que vai no PDF exportado: o capítulo sem as respostas do livro, e o
+ *      gabarito DAQUELE capítulo depois, só quando pedido e localizado;
+ *      gabarito fora do livro não vale; as páginas escolhidas ("3-5, 8"); o
+ *      rodapé de fonte, sem travessão.
  *
  *   node _teste/testa_livros_regras.js [--envenenado-...]
  */
@@ -36,7 +45,7 @@ const Sintetico = require('./_pacote_sintetico.js');
 
 const RAIZ = path.join(__dirname, '..');
 const VENENOS = ['--envenenado-cortado-le-tudo', '--envenenado-teto-antigo', '--envenenado-sem-ano',
-  '--envenenado-correcao-ignorada', '--envenenado-correcao-sem-titulo'];
+  '--envenenado-correcao-ignorada', '--envenenado-correcao-sem-titulo', '--envenenado-respostas-no-capitulo'];
 const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 
 let passes = 0, falhas = 0;
@@ -70,12 +79,14 @@ const RELANCA_CORTADO = "if (e && e.cortado) throw Recusa(e.message, 'download')
 const TETO = 'var TETO_POR_LIVRO = 160 * 1024 * 1024;';
 const FILTRO_DE_ANO = 'if (!ano) return true;';
 const CORRECAO_VALE = 'var vale = !!c && c.titulo === e.titulo && Array.isArray(c.assuntos);';
+const TIRA_AS_RESPOSTAS = 'var semRespostas = todas.filter(function (u) { return respostas.indexOf(u) < 0; });';
 const TROCAS = {
   '--envenenado-cortado-le-tudo': [RELANCA_CORTADO, ''],
   '--envenenado-teto-antigo': [TETO, 'var TETO_POR_LIVRO = 40 * 1024 * 1024;'],
   '--envenenado-sem-ano': [FILTRO_DE_ANO, 'return true;'],
   '--envenenado-correcao-ignorada': [CORRECAO_VALE, 'var vale = false;'],
-  '--envenenado-correcao-sem-titulo': [CORRECAO_VALE, 'var vale = !!c && Array.isArray(c.assuntos);']
+  '--envenenado-correcao-sem-titulo': [CORRECAO_VALE, 'var vale = !!c && Array.isArray(c.assuntos);'],
+  '--envenenado-respostas-no-capitulo': [TIRA_AS_RESPOSTAS, 'var semRespostas = todas;']
 };
 const troca = TROCAS[MODO] || null;
 const Biblioteca = carregar('biblioteca.js', troca);
@@ -217,6 +228,55 @@ const Biblioteca = carregar('biblioteca.js', troca);
     conf('assunto que nenhum livro tem: lista vazia (o botão não aparece)', quem('MAT06-13', '06'), '');
     conf('a entrada leva a página do começo do capítulo', Biblioteca.livrosComAssunto(livros, correcoes, 'MAT06-05', '06')[2].entrada.pagina, 10);
   }
+
+  secao('5. Exportar o capítulo (C15.4) e o gabarito dele (C15.5)');
+  // capítulos 1 a 3 nas páginas 1-2, 3-4 e 5-6; "Respostas" 7-9 com o gabarito de cada um
+  const gab = (p) => ({ paginas: p, certeza: 'alta', como: 'fim_do_livro' });
+  const metaG = { formato: 'pdf', paginas: 9, titulo: 'Livro com gabarito', volume: 'Volume 2', autoria: 'Autora de Prova',
+    editora: 'Editora de Prova', ano: 2026, gabarito_origem: 'auto', gabarito_secoes: [[7, 9]],
+    mapa: [Object.assign(cap(1, 'Capítulo 1: Números naturais', 1, 2, []), { gabarito: gab([[7, 7]]) }),
+      Object.assign(cap(2, 'Capítulo 2: Frações', 3, 4, []), { gabarito: gab([[8, 8]]) }),
+      Object.assign(cap(3, 'Capítulo 3: Geometria plana', 5, 6, []), { gabarito: gab([[9, 9]]) }),
+      cap(4, 'Respostas', 7, 9, [])] };
+  const mG = Biblioteca.mapaDoLivro(metaG, {});
+  const partes = (n, com) => { const p = Biblioteca.partesDoCapitulo(metaG, mG[n - 1], com); return p.capitulo.join(',') + '|' + p.gabarito.join(','); };
+  conf('o capítulo 2 com o gabarito: as páginas 3 e 4, depois a 8 (a dele, e não a 7 do capítulo 1)', partes(2, true), '3,4|8');
+  conf('sem o gabarito: só as páginas do capítulo', partes(2, false), '3,4|');
+  conf('o "Respostas" do sumário, que é só respostas, vai como está', partes(4, true), '7,8,9|');
+  conf('livro com gabarito localizado', Biblioteca.livroTemGabarito(metaG), true);
+  // o último capítulo do sumário vai até o fim do livro: as respostas saem dele
+  const metaFim = Object.assign({}, metaG, { mapa: [Object.assign(cap(1, 'Capítulo 1', 1, 9, []), { gabarito: gab([[8, 9]]) })] });
+  const pFim = Biblioteca.partesDoCapitulo(metaFim, Biblioteca.mapaDoLivro(metaFim, {})[0], false);
+  if (MODO === '--envenenado-respostas-no-capitulo') {
+    secao('VENENO: as páginas de respostas ficam dentro do capítulo');
+    conf('envenenado: o capítulo sem gabarito levou as respostas junto (defeito enxergado)', pFim.capitulo.join(','), '1,2,3,4,5,6,7,8,9');
+  } else {
+    conf('capítulo que vai até o fim do livro: sem o gabarito, as respostas do livro ficam de fora', pFim.capitulo.join(','), '1,2,3,4,5,6');
+  }
+  const metaSem = Object.assign({}, metaG, { gabarito_origem: 'nenhum', gabarito_secoes: [], mapa: metaG.mapa.map(e => Object.assign({}, e, { gabarito: undefined })) });
+  conf('livro sem gabarito localizado: nenhum capítulo leva gabarito',
+    Biblioteca.livroTemGabarito(metaSem) + '|' + Biblioteca.partesDoCapitulo(metaSem, Biblioteca.mapaDoLivro(metaSem, {})[1], true).gabarito.join(','), 'false|');
+  const metaFora = Object.assign({}, metaG, { mapa: [Object.assign(cap(1, 'Capítulo 1', 1, 2, []), { gabarito: gab([[7, 99]]) })] });
+  conf('gabarito fora do livro não vale (o gabarito errado é pior que nenhum)', Biblioteca.mapaDoLivro(metaFora, {})[0].gabarito, null);
+  const epubG = { formato: 'epub', epub: { espinha: ['a', 'b', 'c', 'd'] }, gabarito_origem: 'auto', gabarito_secoes: [[4, 4]],
+    mapa: [{ n: 1, titulo: 'Parte um', capitulo: 1, capitulo_fim: 2, assuntos: [], origem: 'auto', gabarito: { partes: [[4, 4]], certeza: 'média', como: 'fim_do_livro' } }] };
+  const pE = Biblioteca.partesDoCapitulo(epubG, Biblioteca.mapaDoLivro(epubG, {})[0], true);
+  conf('no EPUB, por partes da espinha', pE.capitulo.join(',') + '|' + pE.gabarito.join(','), '1,2|4');
+
+  const esc = t => { const r = Biblioteca.paginasEscolhidas(t, 9); return r.erro ? 'erro: ' + r.erro : r.paginas.join(','); };
+  conf('páginas escolhidas: "3-5, 8"', esc('3-5, 8'), '3,4,5,8');
+  conf('"2 a 3 e 9", repetidas e fora de ordem', esc('9; 2 a 3 e 3'), '2,3,9');
+  conf('página fora do livro é recusada com a frase', esc('8-12'), 'erro: O livro vai da página 1 à 9.');
+  conf('texto que não é página é recusado', esc('três'), 'erro: Não entendi "três". Escreva as páginas assim: 3-5, 8.');
+  conf('mais páginas que o teto, recusado', Biblioteca.paginasEscolhidas('1-500', 600).erro, 'No máximo ' + Biblioteca.TETO_DE_PAGINAS_EXPORTADAS + ' páginas por PDF.');
+
+  const fonte = Biblioteca.fonteDoLivro(Object.assign({}, metaG, { titulo: 'Livro ' + String.fromCharCode(0x2013) + ' com gabarito' }),
+    'Capítulo 2: Frações', [3, 4], [8]);
+  conf('o rodapé de fonte: título, volume, autoria, editora, ano, capítulo, páginas e as do gabarito', fonte,
+    'Fonte: Livro - com gabarito, Volume 2, Autora de Prova, Editora de Prova, 2026, Capítulo 2: Frações, páginas 3 a 4; gabarito: página 8');
+  conf('e nenhum travessão nem meia-risca nele', new RegExp('[' + String.fromCharCode(0x2013, 0x2014) + ']').test(fonte), false);
+  conf('no EPUB, as partes', Biblioteca.fonteDoLivro({ formato: 'epub', titulo: 'Livro', ano: 2026 }, 'Parte dois', [2, 3, 5], null),
+    'Fonte: Livro, 2026, Parte dois, partes 2 a 3 e 5');
 
   console.log('\n' + passes + ' passaram, ' + falhas + ' falharam.');
   process.exit(falhas ? 1 : 0);
