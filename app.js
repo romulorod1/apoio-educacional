@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.40.0';
+  var VERSAO = '1.40.1';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.40.1',
+      itens: [
+        'Ao excluir um aluno, o aplicativo agora mostra exatamente tudo o que sairá junto ' +
+          '(aulas, folhas manuscritas, imagens, repetições, resumos, pagamentos e anexos) e avisa que a ação não tem Desfazer.',
+        'A exclusão e a limpeza dos arquivos acontecem numa operação única, sem deixar dados órfãos guardados no tablet nem na cópia.'
+      ]
+    },
     {
       versao: '1.40.0',
       itens: [
@@ -7147,10 +7155,10 @@
     corpo.innerHTML = '';
     corpo.appendChild(el('p', { texto: 'Ao excluir ' + alunoEmEdicao.nome + ', também sairão:' }));
     corpo.appendChild(el('ul', {}, [
-      el('li', { texto: plural(aulas.length, 'aula', 'aulas') + ' e suas folhas e imagens' }),
-      el('li', { texto: plural(series.length, 'repetição', 'repetições') }),
-      el('li', { texto: plural(resumos.length, 'resumo', 'resumos') + ' e ' + plural(pagamentos.length, 'pagamento', 'pagamentos') }),
-      el('li', { texto: plural(anexos, 'anexo', 'anexos') + ', inclusive PDF guardado no tablet' }),
+      el('li', { texto: aulas.length + ' ' + palavraPlural(aulas.length, 'aula', 'aulas') + ' e suas folhas e imagens' }),
+      el('li', { texto: series.length + ' ' + palavraPlural(series.length, 'repetição', 'repetições') }),
+      el('li', { texto: resumos.length + ' ' + palavraPlural(resumos.length, 'resumo', 'resumos') + ' e ' + pagamentos.length + ' ' + palavraPlural(pagamentos.length, 'pagamento', 'pagamentos') }),
+      el('li', { texto: anexos + ' ' + palavraPlural(anexos, 'anexo', 'anexos') + ', inclusive PDF guardado no tablet' }),
       el('li', { texto: 'uso da biblioteca e indicações "Usada com" nas listas' })
     ]));
     corpo.appendChild(el('p', { class: 'faixa-aviso', texto: 'Esta exclusão não tem Desfazer. Faça uma cópia de segurança antes, se quiser guardar esses dados.' }));
