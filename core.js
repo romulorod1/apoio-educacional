@@ -348,8 +348,7 @@
     datasDaSerieNoMes(serie, mesIso).forEach(function (iso) {
       if (apagadas.indexOf(iso) >= 0) return;
       var jaTem = (db.aulas || []).some(function (a) {
-        return (a.serieId === serie.id && a.data === iso) ||
-               (a.alunoId === serie.alunoId && a.data === iso && a.hora && a.hora === (serie.hora || ''));
+        return a.serieId === serie.id && a.data === iso;
       });
       if (jaTem) return;
       db.aulas.push({

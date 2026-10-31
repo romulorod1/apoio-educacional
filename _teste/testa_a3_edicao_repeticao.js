@@ -137,6 +137,21 @@ conf('achaAula acha aula da manhã pelo horário', !!aManha01 && aManha01.duraca
 conf('achaAula acha aula da tarde pelo horário', !!aTarde01 && aTarde01.duracaoMin === 90, true);
 conf('as duas aulas do mesmo dia têm ids diferentes', aManha01.id !== aTarde01.id, true);
 
+// Duas séries com o MESMO horário no mesmo dia (ex: 10:00)
+db = baseNova();
+const sMesma1 = Core.criarSerie(db, {
+  alunoId: 'a1', dias: [2], hora: '10:00', duracaoMin: 60,
+  inicio: '2026-09-01', fim: '2026-09-30'
+});
+const sMesma2 = Core.criarSerie(db, {
+  alunoId: 'a1', dias: [2], hora: '10:00', duracaoMin: 60,
+  inicio: '2026-09-01', fim: '2026-09-30'
+});
+const aulasMesmaHora = db.aulas.filter(a => a.alunoId === 'a1' && Core.mesDe(a.data) === '2026-09');
+conf('duas séries com mesmo horário geram 10 aulas (5 para cada serieId)', aulasMesmaHora.length, 10);
+conf('5 aulas vinculadas à primeira série', aulasMesmaHora.filter(a => a.serieId === sMesma1.id).length, 5);
+conf('5 aulas vinculadas à segunda série', aulasMesmaHora.filter(a => a.serieId === sMesma2.id).length, 5);
+
 secao('5. Preservação de notas, anexos e exceções destacadas');
 db = baseNova();
 const sExp = Core.criarSerie(db, {
