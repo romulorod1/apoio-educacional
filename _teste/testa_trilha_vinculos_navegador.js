@@ -92,6 +92,15 @@ const { conf, esperar } = H;
   conf('proposta pede guardar antes de abrir lista', await pag.$eval(
     '#modal-trilha.aberto .item-passo-trilha[data-passo="MAT07-10"]', e =>
       /Guarde a trilha para abrir esta lista/.test(e.textContent) && !e.querySelector('.abrir-lista-trilha')), true);
+  await pag.evaluate(() => { window.confirm = () => false; history.back(); });
+  await new Promise(r => setTimeout(r, 250));
+  conf('Voltar cancelado mantém proposta aberta', await pag.$eval('#modal-trilha',
+    e => e.classList.contains('aberto')), true);
+  await pag.evaluate(() => { window.confirm = () => true; history.back(); });
+  const descartou = await esperar('Voltar confirmado fecha proposta', () => pag.evaluate(() =>
+    !document.querySelector('#modal-trilha').classList.contains('aberto') &&
+    document.querySelector('#modal-aluno').classList.contains('aberto')), Boolean, 8000);
+  conf('Voltar confirmado fecha só a proposta', descartou.ok, true);
 
   const semIndice = await amb.pagina();
   await semIndice.evaluateOnNewDocument(() => {

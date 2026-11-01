@@ -1094,6 +1094,13 @@
       history.pushState({ apoioModal: topo.token }, '');
       return;
     }
+    if (topo.id === 'modal-trilha' && propostaDeTrilha) {
+      history.pushState({ apoioModal: topo.token }, '');
+      if (!confirmar('Sair sem guardar esta trilha?')) return;
+      propostaDeTrilha = null;
+      fecharModal('modal-trilha');
+      return;
+    }
     if (topo.id === 'modal-nota') {
       // A folha só pode sair depois de gravar. Se o disco falhar, o editor
       // permanece aberto e precisa conservar seu estado de Voltar.
