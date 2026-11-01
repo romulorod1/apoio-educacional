@@ -3,10 +3,21 @@ import argparse
 import hashlib
 import json
 import pathlib
+import re
 import zipfile
 
 
-def preparar(origem, destino):
+def ler_exclusoes(relatorio, pacote):
+    texto = pathlib.Path(relatorio).read_text(encoding='utf-8-sig')
+    cabecalho = '## ' + pacote + ', versão 1'
+    if cabecalho not in texto:
+        raise ValueError('Relatório do pacote não encontrado')
+    secao = texto.split(cabecalho, 1)[1].split('\n## ', 1)[0]
+    linhas = re.findall(r'^\| `([^`]+)` \| (.+?) \|\s*$', secao, re.MULTILINE)
+    return sorted(({'id': i, 'motivo': motivo} for i, motivo in linhas), key=lambda x: x['id'])
+
+
+def preparar(origem, destino, relatorio):
     with zipfile.ZipFile(origem) as antigo:
         nomes = antigo.namelist()
         if len(nomes) != len(set(nomes)) or 'kits.json' not in nomes:
@@ -24,8 +35,17 @@ def preparar(origem, destino):
         listas = json.loads(arquivos['kits.json'])
         if not isinstance(listas, list) or not listas:
             raise ValueError('Arquivo de listas vazio ou inválido')
+        excluidos = ler_exclusoes(relatorio, manifest['pacote'])
+        ids = [e['id'] for e in excluidos]
+        if len(ids) != manifest['contagens']['itens_excluidos'] or len(set(ids)) != len(ids):
+            raise ValueError('Relatório de exclusões incompleto ou com IDs repetidos')
+        itens = json.loads(arquivos['itens.json'])
+        if set(ids) & {i['id'] for i in itens}:
+            raise ValueError('Exclusão também consta nos itens')
+        arquivos['exclusoes.json'] = (json.dumps(excluidos, ensure_ascii=False, indent=1) + '\n').encode('utf-8')
         manifest['versao'] = 2
         manifest['arquivos']['kits.json'] = 'sha256:' + hashlib.sha256(arquivos['kits.json']).hexdigest()
+        manifest['arquivos']['exclusoes.json'] = 'sha256:' + hashlib.sha256(arquivos['exclusoes.json']).hexdigest()
         manifest['contagens']['kits'] = len(listas)
         manifest['gerador']['ajuste_c7'] = 'listas declaradas e versão elevada'
         texto = (json.dumps(manifest, ensure_ascii=False, indent=1) + '\n').encode('utf-8')
@@ -41,7 +61,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('origem', type=pathlib.Path)
     parser.add_argument('destino', type=pathlib.Path)
+    parser.add_argument('relatorio', type=pathlib.Path)
     args = parser.parse_args()
     if args.origem.resolve() == args.destino.resolve() or args.destino.exists():
         raise SystemExit('Escolha destino novo, diferente da origem')
-    print(json.dumps(preparar(args.origem, args.destino), ensure_ascii=False))
+    print(json.dumps(preparar(args.origem, args.destino, args.relatorio), ensure_ascii=False))
