@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.40.3';
+  var VERSAO = '1.41.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.41.0',
+      itens: [
+        'A copia de seguranca agora e gerada em arquivo .zip por partes, preservando anexos binarios sem sobrecarregar a memoria do aparelho.',
+        'A restauracao confere a integridade do arquivo antes de gravar e atualiza todos os depositos numa operacao atomica unica.',
+        'O aplicativo mantem compatibilidade total e continua aceitando copias antigas em formato .json normalmente.'
+      ]
+    },
     {
       versao: '1.40.3',
       itens: [
