@@ -4860,7 +4860,7 @@
       texto: 'Ajuda a sugerir assuntos. Você pode mudar depois; aulas antigas não são alteradas.' }));
     mostrarAnoOutro();
 
-    var cores = el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' });
+    var cores = el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' });
     var corEscolhida = novo ? CORES_ALUNO[db.alunos.length % CORES_ALUNO.length] : alunoEmEdicao.cor;
     CORES_ALUNO.forEach(function (c) {
       var b = el('button', {
