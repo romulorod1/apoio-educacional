@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.41.1';
+  var VERSAO = '1.41.2';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.41.2',
+      itens: [
+        'Botões de navegação, caixas de marcação e controles com área de toque ampliada para 44 pixels, facilitando o uso no tablet.',
+        'Pílulas da agenda com melhor espaçamento e toque mais seguro para abrir os detalhes das aulas.',
+        'Textos explicativos e de ajuda com tamanho de letra aprimorado para leitura nítida e confortável a um braço de distância.'
+      ]
+    },
     {
       versao: '1.41.1',
       itens: [

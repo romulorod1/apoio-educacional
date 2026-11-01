@@ -279,6 +279,8 @@ done
 roda "documento do ciclo"    node _teste/testa_documento_do_ciclo.js
 # B5: cabecalho em uma unica linha de 64 px e abas de toque de 44 px no tablet em pe.
 roda "cabecalho tablet (B5)"  node _teste/testa_cabecalho_tablet.js
+# B6: alvos de toque de 44 px e tipografia base
+roda "alvos de toque (B6)"    node _teste/testa_alvos_toque.js
 
 # A secao do kit de figuras (31 provas de figuras/) saiu no B14 com o material
 # autoral: o kit so servia aos temas.
@@ -668,6 +670,7 @@ roda "exclusao de aluno em cascata"                node "_teste/testa_exclusao_a
 roda "relato e Voltar"                            node "_teste/testa_relato_voltar.js"
 roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip.js"
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
+roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 # C9: o documento do ciclo na tela. A contagem do que abre sozinho (janelas,
 # aviso, faixas, dialogos) no codigo da origin/main e no de hoje, igual, com
 # controle de que o contador ve; a entrada discreta na ficha; editar, recarregar
