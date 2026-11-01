@@ -131,7 +131,7 @@ const servidor = http.createServer((req, res) => {
     await pagina.evaluate(async () => {
       const cache = await caches.open('outro-aplicativo');
       await cache.put('/outro', new Response('preservado'));
-      const antigo = await caches.open('apoio-educacional-v8999');
+      const antigo = await caches.open('apoio-educacional-v9999');
       await antigo.put('/arquivo-baixado-anterior', new Response('resgatado'));
     });
     publicada = 2;
@@ -223,7 +223,7 @@ const servidor = http.createServer((req, res) => {
       nomes: await caches.keys(),
       resgate: await (await (await caches.open('apoio-educacional-baixados')).match('/arquivo-baixado-anterior'))?.text()
     }));
-    if (antigos.nomes.includes('apoio-educacional-v8999') || antigos.resgate !== 'resgatado')
+    if (antigos.nomes.includes('apoio-educacional-v9999') || antigos.resgate !== 'resgatado')
       throw new Error('Limpeza não resgatou dados antes de apagar cache antigo');
     if (process.argv.includes('--terceira')) {
       publicada = 3;
