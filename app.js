@@ -1846,18 +1846,53 @@
    * trocar de versão nunca apaga aluno, aula, folha nem anexo. Não existe
    * desinstalar e instalar de novo. */
   var registroSW = null;
+  var versaoPendenteAtiva = null;
+
+  /* Um worker mais novo pode assumir ao fechar todas as janelas, mas ainda
+   * manter a versão anterior escolhida. A consulta é opcional para continuar
+   * funcionando com os workers antigos, que não conhecem esta mensagem. */
+  function consultarWorker(worker, tipo) {
+    if (!worker || typeof MessageChannel === 'undefined') return Promise.resolve(null);
+    return new Promise(function (resolve) {
+      var canal = new MessageChannel();
+      var terminou = false;
+      var prazo = setTimeout(function () { acabar(null); }, 1200);
+      function acabar(resposta) {
+        if (terminou) return;
+        terminou = true;
+        clearTimeout(prazo);
+        canal.port1.close();
+        resolve(resposta);
+      }
+      canal.port1.onmessage = function (e) { acabar(e.data); };
+      try { worker.postMessage({ tipo: tipo }, [canal.port2]); }
+      catch (e) { acabar(null); }
+    });
+  }
+
+  function conferirVersaoAtiva() {
+    return consultarWorker(registroSW && (registroSW.waiting || registroSW.active), 'estado-versao').then(function (estado) {
+      versaoPendenteAtiva = estado && estado.pendente ? estado : null;
+      if (versaoPendenteAtiva) mostrarAvisoDeVersao();
+      return !!versaoPendenteAtiva;
+    });
+  }
 
   function registrarServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     if (location.protocol === 'file:') return;
     navigator.serviceWorker.register('sw.js').then(function (reg) {
       registroSW = reg;
-      if (reg.waiting) mostrarAvisoDeVersao();
+      if (reg.waiting) { mostrarAvisoDeVersao(); conferirVersaoAtiva(); }
+      else conferirVersaoAtiva();
       reg.addEventListener('updatefound', function () {
         var novo = reg.installing;
         if (!novo) return;
         novo.addEventListener('statechange', function () {
-          if (novo.state === 'installed' && navigator.serviceWorker.controller) mostrarAvisoDeVersao();
+          if (novo.state === 'installed' && navigator.serviceWorker.controller) {
+            mostrarAvisoDeVersao();
+            conferirVersaoAtiva();
+          }
         });
       });
       // procura versão nova de tempos em tempos, quando houver internet
@@ -1880,7 +1915,9 @@
   }
 
   function mostrarAvisoDeVersao() {
-    avisar('Há uma versão nova do aplicativo.', 'Atualizar', aplicarAtualizacao);
+    var versao = versaoPendenteAtiva && versaoPendenteAtiva.versao;
+    avisar('Há uma versão nova do aplicativo' + (versao ? ' (' + versao + ')' : '') + '.',
+      'Atualizar agora', aplicarAtualizacao, 'Depois da aula', function () {});
     desenharAjustes();
   }
 
@@ -1908,6 +1945,11 @@
       podeRecarregar = true;
       if (registroSW && registroSW.waiting) {
         registroSW.waiting.postMessage({ tipo: 'ativar-agora' });
+      } else if (versaoPendenteAtiva && registroSW && registroSW.active) {
+        consultarWorker(registroSW.active, 'ativar-agora').then(function (resultado) {
+          if (resultado && resultado.ativada) location.reload();
+          else { podeRecarregar = false; adiarAtualizacao(); }
+        });
       } else {
         location.reload();
       }
@@ -1920,7 +1962,9 @@
     registroSW.update().then(function () {
       setTimeout(function () {
         if (registroSW.waiting) mostrarAvisoDeVersao();
-        else avisar('Você já está na versão mais recente.');
+        else conferirVersaoAtiva().then(function (pendente) {
+          if (!pendente) avisar('Você já está na versão mais recente.');
+        });
       }, 1400);
     }).catch(function () {
       avisar('Não foi possível verificar agora. Confira a internet.');
@@ -14113,7 +14157,7 @@
 
     var estado = $('#estado-versao');
     if (estado) {
-      if (registroSW && registroSW.waiting) {
+      if ((registroSW && registroSW.waiting) || versaoPendenteAtiva) {
         estado.innerHTML = '';
         estado.appendChild(el('div', { class: 'faixa-info' }, [
           el('strong', { texto: 'Há uma versão nova pronta. ' }),

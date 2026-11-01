@@ -183,6 +183,41 @@ var APOSENTADOS = ['./banco/acervo.json', './banco/acervo_indice.json',
   .map(function (u) { return new URL(u, self.location.href).href; });
 function aposentado(endereco) { return APOSENTADOS.indexOf(endereco) !== -1; }
 
+/* Seleção persistente separada do ciclo de vida do worker. Um worker em
+ * espera pode ser ativado pelo navegador quando a última janela fecha. */
+var CONTROLE = 'apoio-educacional-controle';
+function chaveControle(nome) { return new URL('./__controle_versao__/' + encodeURIComponent(nome), self.location.href).href; }
+function lerControle(nome) {
+  return caches.open(CONTROLE).then(function (c) { return c.match(chaveControle(nome)); })
+    .then(function (r) { return r ? r.json() : null; });
+}
+function gravarControle(nome, valor) {
+  return caches.open(CONTROLE).then(function (c) {
+    return c.put(chaveControle(nome), new Response(JSON.stringify(valor), { headers: { 'Content-Type': 'application/json' } }));
+  });
+}
+function cacheSelecionado() {
+  return lerControle('selecionado').then(function (selecionado) {
+    if (selecionado) return selecionado;
+    return caches.keys().then(function (nomes) {
+      var antigos = nomes.filter(function (n) { return /^apoio-educacional-v\d+$/.test(n) && n !== CACHE; })
+        .sort(function (a, b) { return Number(b.match(/\d+$/)[0]) - Number(a.match(/\d+$/)[0]); });
+      return antigos[0] || CACHE;
+    });
+  });
+}
+function versaoDoCache(nome) {
+  return caches.open(nome).then(function (c) { return c.match('./app.js'); })
+    .then(function (r) { return r ? r.text() : ''; })
+    .then(function (s) { var m = s.match(/var VERSAO = '([^']+)'/); return m ? m[1] : null; });
+}
+function redeComPrazo(pedido) {
+  var controlador = new AbortController();
+  var prazo = setTimeout(function () { controlador.abort(); }, 3000);
+  return fetch(pedido, { cache: 'no-cache', signal: controlador.signal })
+    .finally(function () { clearTimeout(prazo); });
+}
+
 /* Não assume o controle sozinho: fica esperando. Quem manda trocar de versão
  * é ela, pelo aviso que aparece no aplicativo. Assim uma atualização nunca
  * recarrega a tela no meio de uma aula.
@@ -197,16 +232,36 @@ function aposentado(endereco) { return APOSENTADOS.indexOf(endereco) !== -1; }
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) {
     return Promise.all(ARQUIVOS.map(function (u) {
-      return fetch(new Request(u, { cache: 'reload' })).then(function (r) {
+      return redeComPrazo(new Request(u, { cache: 'reload' })).then(function (r) {
         if (!r || !r.ok) throw new Error('não baixou ' + u);
         return c.put(u, r);
       });
     }));
+  }).then(function () {
+    return versaoDoCache(CACHE).then(function (versao) { return gravarControle('candidato', { cache: CACHE, versao: versao }); });
+  }).catch(function (erro) {
+    return lerControle('selecionado').then(function (selecionado) {
+      return selecionado === CACHE ? null : caches.delete(CACHE);
+    }).then(function () { throw erro; });
   }));
 });
 
 self.addEventListener('message', function (e) {
-  if (e.data && e.data.tipo === 'ativar-agora') self.skipWaiting();
+  if (!e.data) return;
+  function responder(objeto) { if (e.ports && e.ports[0]) e.ports[0].postMessage(objeto); }
+  if (e.data.tipo === 'estado-versao') {
+    e.waitUntil(Promise.all([cacheSelecionado(), lerControle('candidato')]).then(function (dados) {
+      var candidato = dados[1];
+      responder({ pendente: !!candidato && candidato.cache !== (dados[0] || CACHE),
+        versao: candidato && candidato.versao });
+    }));
+  }
+  if (e.data.tipo === 'ativar-agora') {
+    e.waitUntil(cacheSelecionado().then(function (anterior) { return gravarControle('anterior', { cache: anterior, para: CACHE }); })
+      .then(function () { return gravarControle('selecionado', CACHE); }).then(function () { return self.skipWaiting(); })
+      .then(function () { responder({ ativada: true }); })
+      .catch(function () { responder({ ativada: false }); }));
+  }
 });
 
 /* Apaga os caches das versões anteriores, e nunca o BAIXADOS. Antes de apagar
@@ -233,16 +288,46 @@ function resgatarEApagar(baixados, nome) {
   });
 }
 
+/* Só apos fixar as janelas em suas versões, limpa caches do aplicativo que
+ * nenhuma janela usa. Falhas no resgate preservam o cache antigo. */
+function limparVersoesNaoUsadas(janelas, selecionado) {
+  return Promise.all([lerControle('candidato'), caches.open(CONTROLE), caches.open(BAIXADOS), caches.keys()])
+    .then(function (dados) {
+      var candidato = dados[0], controle = dados[1], baixados = dados[2], nomes = dados[3];
+      return Promise.all(janelas.map(function (janela) { return lerControle('cliente-' + janela.id); }))
+        .then(function (fixados) {
+          var manter = [selecionado, candidato && candidato.cache].concat(fixados);
+          return Promise.all(nomes.filter(function (n) {
+            return /^apoio-educacional-v\d+$/.test(n) && manter.indexOf(n) < 0;
+          }).map(function (n) { return resgatarEApagar(baixados, n); }));
+        }).then(function () {
+          var vivos = janelas.map(function (janela) { return 'cliente-' + janela.id; });
+          return controle.keys().then(function (pedidos) {
+            return Promise.all(pedidos.map(function (pedido) {
+              var nome = decodeURIComponent(new URL(pedido.url).pathname.split('/').pop());
+              return nome.indexOf('cliente-') === 0 && vivos.indexOf(nome) < 0 ? controle.delete(pedido) : null;
+            }));
+          });
+        });
+    });
+}
+
 self.addEventListener('activate', function (e) {
-  e.waitUntil(
-    caches.open(BAIXADOS).then(function (baixados) {
-      return caches.keys().then(function (nomes) {
-        return Promise.all(nomes
-          .filter(function (n) { return n !== CACHE && n !== BAIXADOS; })
-          .map(function (n) { return resgatarEApagar(baixados, n); }));
+  e.waitUntil(cacheSelecionado().then(function (selecionado) {
+    return gravarControle('selecionado', selecionado).then(function () {
+      return lerControle('anterior').then(function (anterior) {
+        return self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (janelas) {
+          return Promise.all(janelas.map(function (janela) {
+            var chave = 'cliente-' + janela.id;
+            return lerControle(chave).then(function (fixado) {
+              return fixado ? null : gravarControle(chave,
+                anterior && anterior.para === CACHE ? anterior.cache : selecionado);
+            });
+          })).then(function () { return limparVersoesNaoUsadas(janelas, selecionado); });
+        });
       });
-    }).then(function () { return self.clients.claim(); })
-  );
+    });
+  }).then(function () { return self.clients.claim(); }));
 });
 
 /* Busca na rede primeiro para pegar atualizações, e cai no cache quando
@@ -252,6 +337,26 @@ self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
   var url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
+
+  if (doPacote(e.request.url) || e.request.mode === 'navigate') {
+    e.respondWith(lerControle('selecionado').then(function (selecionado) {
+      selecionado = selecionado || CACHE;
+      if (e.request.mode === 'navigate') {
+        var destino = e.resultingClientId || e.clientId;
+        return destino ? gravarControle('cliente-' + destino, selecionado).then(function () { return selecionado; }) : selecionado;
+      }
+      return e.clientId ? lerControle('cliente-' + e.clientId).then(function (fixado) { return fixado || selecionado; }) : selecionado;
+    }).then(function (nome) { return caches.open(nome); }).then(function (c) {
+      return c.match(e.request).then(function (r) {
+        if (r) return r;
+        if (e.request.mode === 'navigate') return c.match('./index.html');
+        return null;
+      });
+    }).then(function (r) {
+      return r || new Response('Arquivo da versão instalada indisponível.', { status: 503 });
+    }));
+    return;
+  }
 
   /* O leitor de PDF (C14) vem do cache ANTES da rede. O caminho leva a versão
    * (vendor/pdfjs-6.4.299/), então o arquivo de um caminho nunca muda, e não
@@ -277,33 +382,20 @@ self.addEventListener('fetch', function (e) {
     return;
   }
 
-  /* Pergunta ao servidor se o arquivo mudou, em vez de aceitar o que estiver
-   * guardado no cache do navegador. O GitHub Pages manda guardar por dez
-   * minutos, e sem isso uma versão nova podia demorar a chegar no tablet.
-   * A resposta continua barata: quando nada mudou o servidor devolve
-   * apenas "sem alteração".
-   *
-   * Vale para o que chega até aqui, e não é tudo: medido numa recarga da mesma
-   * aba logo depois de um deploy, nenhum dos 13 scripts e estilos do index.html
-   * passou por este handler, porque o navegador os serviu do cache dele. Quem
-   * entrega o conjunto inteiro e coerente é o botão de atualizar, que troca de
-   * service worker e recarrega. */
+  /* Arquivos baixados sob demanda continuam rede primeiro, com prazo curto.
+   * O cache da versão instalada jamais recebe uma resposta da rede. */
   e.respondWith(
-    fetch(e.request, { cache: 'no-cache' }).then(function (resposta) {
+    redeComPrazo(e.request).then(function (resposta) {
       if (resposta && resposta.status === 200 && resposta.type === 'basic') {
         var copia = resposta.clone();
-        // cada um no seu cache: o pacote no CACHE, o baixado durante o uso no BAIXADOS.
-        caches.open(doPacote(e.request.url) ? CACHE : BAIXADOS).then(function (c) {
-          c.put(e.request, copia);
-        });
+        return caches.open(BAIXADOS).then(function (c) {
+          return c.put(e.request, copia).catch(function () {});
+        }).then(function () { return resposta; });
       }
       return resposta;
     }).catch(function () {
-      // caches.match sem nome procura nos dois, então a série baixada aparece aqui.
-      return caches.match(e.request).then(function (achado) {
-        if (achado) return achado;
-        if (e.request.mode === 'navigate') return caches.match('./index.html');
-        return new Response('Sem conexão.', { status: 503, statusText: 'Sem conexão' });
+      return caches.open(BAIXADOS).then(function (c) { return c.match(e.request); }).then(function (achado) {
+        return achado || new Response('Sem conexão.', { status: 503, statusText: 'Sem conexão' });
       });
     })
   );
