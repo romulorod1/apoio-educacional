@@ -238,7 +238,7 @@ self.addEventListener('activate', function (e) {
     caches.open(BAIXADOS).then(function (baixados) {
       return caches.keys().then(function (nomes) {
         return Promise.all(nomes
-          .filter(function (n) { return n !== CACHE && n !== BAIXADOS; })
+          .filter(function (n) { return /^apoio-educacional-v\d+$/.test(n) && n !== CACHE; })
           .map(function (n) { return resgatarEApagar(baixados, n); }));
       });
     }).then(function () { return self.clients.claim(); })
@@ -252,6 +252,20 @@ self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
   var url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
+
+  /* A versão instalada é um conjunto: não misturar respostas da rede com
+   * arquivos guardados enquanto a atualização aguarda o toque dela. */
+  if (doPacote(e.request.url) || e.request.mode === 'navigate') {
+    e.respondWith(caches.open(CACHE).then(function (c) {
+      return c.match(e.request).then(function (r) {
+        if (r) return r;
+        return e.request.mode === 'navigate' ? c.match('./index.html') : null;
+      });
+    }).then(function (r) {
+      return r || new Response('Arquivo da versão instalada indisponível.', { status: 503 });
+    }));
+    return;
+  }
 
   /* O leitor de PDF (C14) vem do cache ANTES da rede. O caminho leva a versão
    * (vendor/pdfjs-6.4.299/), então o arquivo de um caminho nunca muda, e não
