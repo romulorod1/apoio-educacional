@@ -741,6 +741,7 @@ na_secao_navegador=0
 # tres niveis, um por campo, e `relaxou` conferido nos dois sentidos. A amostra
 # nao sai do gerador de proposito, senao um erro do gerador viraria o esperado.
 roda "kits e tempo (regra)"                     python biblioteca/_prova_kits.py
+roda "corrigir pacote Mirim C7"                 python biblioteca/_prova_corrigir_mirim_c7.py
 # C15.1: o tipo de fonte livros, sobre livros sinteticos (tres PDF, um EPUB e um
 # arquivo de 161 MB): o teto de 160 MB nos dois lados da fronteira (o grande
 # recusado, listado no relatorio e nunca aberto) e igual ao do aplicativo, o
