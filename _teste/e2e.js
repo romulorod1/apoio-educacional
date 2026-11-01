@@ -612,8 +612,29 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   const copia = novosArquivos.find(f => f.startsWith('Copia_Apoio_Educacional'));
   conf('a cópia foi entregue', !!copia, true);
 
-  const pacote = JSON.parse(fs.readFileSync(path.join(PASTA_DOWNLOAD, copia), 'utf8'));
-  conf('a cópia tem o formato certo', pacote.formato, 'apoio-educacional');
+  const bufferCopia = fs.readFileSync(path.join(PASTA_DOWNLOAD, copia));
+  const ehZip = bufferCopia.length >= 4 && bufferCopia[0] === 0x50 && bufferCopia[1] === 0x4b;
+
+  let pacote;
+  if (ehZip) {
+    pacote = await pag.evaluate(async (bytesBase64) => {
+      const bin = atob(bytesBase64);
+      const u8 = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      const blob = new Blob([u8]);
+      const aberto = await Zip.lerDoArquivo(blob);
+      const mapa = Object.fromEntries(aberto.entradas.map(e => [e.nome, e]));
+      const manifest = JSON.parse(new TextDecoder().decode(await Zip.extrairDoArquivo(aberto, mapa['manifest.json'])));
+      const dados = JSON.parse(new TextDecoder().decode(await Zip.extrairDoArquivo(aberto, mapa['dados.json'])));
+      const notas = JSON.parse(new TextDecoder().decode(await Zip.extrairDoArquivo(aberto, mapa['notas.json'])));
+      return { formato: manifest.formato, dados, notas };
+    }, bufferCopia.toString('base64'));
+    conf('a cópia tem o formato certo', pacote.formato, 'apoio-educacional-zip');
+  } else {
+    pacote = JSON.parse(bufferCopia.toString('utf8'));
+    conf('a cópia tem o formato certo', pacote.formato, 'apoio-educacional');
+  }
+
   conf('a cópia traz os treze alunos', pacote.dados.alunos.length, 13);
   conf('a cópia traz as folhas manuscritas', Object.keys(pacote.notas).length, 1);
   conf('a cópia traz as duas séries', pacote.dados.series.length, 2);
@@ -626,15 +647,34 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   conf('tudo foi apagado', banco.alunos.length, 0);
   conf('sem aulas', banco.aulas.length, 0);
 
-  await pag.evaluate((texto) => {
-    const entrada = document.querySelector('#arquivo-copia');
-    const arquivo = new File([texto], 'copia.json', { type: 'application/json' });
-    const dt = new DataTransfer();
-    dt.items.add(arquivo);
-    entrada.files = dt.files;
-    entrada.dispatchEvent(new Event('change', { bubbles: true }));
-  }, JSON.stringify(pacote));
+  if (ehZip) {
+    await pag.evaluate((bytesBase64) => {
+      const bin = atob(bytesBase64);
+      const u8 = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      const entrada = document.querySelector('#arquivo-copia');
+      const arquivo = new File([u8], 'copia.zip', { type: 'application/zip' });
+      const dt = new DataTransfer();
+      dt.items.add(arquivo);
+      entrada.files = dt.files;
+      entrada.dispatchEvent(new Event('change', { bubbles: true }));
+    }, bufferCopia.toString('base64'));
+  } else {
+    await pag.evaluate((texto) => {
+      const entrada = document.querySelector('#arquivo-copia');
+      const arquivo = new File([texto], 'copia.json', { type: 'application/json' });
+      const dt = new DataTransfer();
+      dt.items.add(arquivo);
+      entrada.files = dt.files;
+      entrada.dispatchEvent(new Event('change', { bubbles: true }));
+    }, JSON.stringify(pacote));
+  }
   await espera(1500);
+  for (let i = 0; i < 30; i++) {
+    banco = await bd();
+    if (banco && banco.alunos && banco.alunos.length === 13) break;
+    await espera(200);
+  }
 
   banco = await bd();
   conf('os treze alunos voltaram', banco.alunos.length, 13);
