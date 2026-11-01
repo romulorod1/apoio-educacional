@@ -14,6 +14,8 @@ const { conf, esperar } = H;
       { temaId: 'MAT07-10', titulo: 'Equações do 1º grau', serie: '07',
         modulo: '7ano:porcentagem-e-juros', duracaoMin: 60 },
       { temaId: 'MAT07-08', titulo: 'Sequências e regularidades', serie: '07',
+        modulo: '7ano:razoes-e-proporcoes', duracaoMin: 60 },
+      { temaId: 'MAT07-99', titulo: 'Assunto removido', serie: '07',
         modulo: '7ano:razoes-e-proporcoes', duracaoMin: 60 }
     ];
     const aluno = { id: 'c7_alfa', nome: 'Aluno Alfa Teste', ativo: true, precos: [] };
@@ -51,6 +53,8 @@ const { conf, esperar } = H;
     pag.$('#modal-trilha.aberto .item-passo-trilha[data-passo="MAT07-08"]'), Boolean, 8000);
   if (!reabriu.ok) throw new Error('Trilha não reabriu');
   conf('assunto sem vínculo seguro não usa módulo antigo', await pag.$eval('#modal-trilha.aberto .item-passo-trilha[data-passo="MAT07-08"]',
+    e => /sem lista pronta/.test(e.textContent) && !e.querySelector('.abrir-lista-trilha')), true);
+  conf('assunto ausente do índice não usa módulo antigo', await pag.$eval('#modal-trilha.aberto .item-passo-trilha[data-passo="MAT07-99"]',
     e => /sem lista pronta/.test(e.textContent) && !e.querySelector('.abrir-lista-trilha')), true);
   conf('equações usa vínculo atualizado e oferece lista', await pag.$eval('#modal-trilha.aberto .item-passo-trilha[data-passo="MAT07-10"]',
     e => !!e.querySelector('.abrir-lista-trilha')), true);

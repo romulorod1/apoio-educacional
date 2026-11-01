@@ -9168,14 +9168,17 @@
       if (p.temaId && !indiceTemas) return null;
       var modChave = p.modulo;
       if (p.temaId && indiceTemas) {
+        var encontrouAssunto = false;
         for (var k = 0; k < indiceTemas.length; k++) {
           if (indiceTemas[k].id === p.temaId &&
               Object.prototype.hasOwnProperty.call(indiceTemas[k], 'modulo')) {
+            encontrouAssunto = true;
             modChave = indiceTemas[k].modulo;
             if (!modChave) return null;
             break;
           }
         }
+        if (!encontrouAssunto) return null;
       }
       if (!modChave && p.titulo) {
         var achado = moduloDoAssunto({ titulo: p.titulo });
