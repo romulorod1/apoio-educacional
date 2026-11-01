@@ -709,11 +709,46 @@
   Editor.prototype.desenhar = function () {
     var ctx = this.ctx;
     var dpr = this.dpr;
+    if (!this.cacheValido) {
+      this._desenharBase(this.offscreen.getContext('2d'));
+      this.cacheValido = true;
+    }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    ctx.fillStyle = '#DDE3EA';
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.drawImage(this.offscreen, 0, 0);
 
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.save();
+    ctx.translate(this.deslocX, this.deslocY);
+    ctx.scale(this.escala, this.escala);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, FOLHA_L, FOLHA_A);
+    ctx.clip();
+    if (this.tracoAtual) this._desenharItem(ctx, this.tracoAtual);
+    /* O retângulo em andamento é apenas prévia, não faz parte do cache. */
+    if (this.tapando) {
+      var t = this.tapando;
+      ctx.strokeStyle = '#2E7D6B';
+      ctx.lineWidth = 2 / this.escala;
+      ctx.setLineDash([8 / this.escala, 5 / this.escala]);
+      ctx.strokeRect(Math.min(t.x0, t.x), Math.min(t.y0, t.y), Math.abs(t.x - t.x0), Math.abs(t.y - t.y0));
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+    if (this.selecionado) this._desenharSelecao(ctx, this.selecionado);
+    ctx.restore();
+  };
+
+  /* O fundo e os itens já concluídos só mudam em edição, zoom ou navegação.
+   * O traço em andamento fica fora desta imagem para não acumular opacidade
+   * no marca-texto nem redesenhar todos os traços a cada movimento. */
+  Editor.prototype._desenharBase = function (ctx) {
+    var dpr = this.dpr;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, this.offscreen.width, this.offscreen.height);
+    ctx.fillStyle = '#DDE3EA';
+    ctx.fillRect(0, 0, this.offscreen.width, this.offscreen.height);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.save();
     ctx.translate(this.deslocX, this.deslocY);
@@ -737,23 +772,10 @@
     var itens = this.pagina().itens;
     for (var c = 0; c < ORDEM_CAMADAS.length; c++) {
       for (var i = 0; i < itens.length; i++) {
-        if (itens[i] && itens[i].t === ORDEM_CAMADAS[c]) this._desenharItem(ctx, itens[i]);
+        if (itens[i] && itens[i] !== this.tracoAtual && itens[i].t === ORDEM_CAMADAS[c]) this._desenharItem(ctx, itens[i]);
       }
     }
-    /* O retângulo que ela está arrastando agora, ainda sem existir no vetor:
-     * mostrado com contorno e sem branco, porque enquanto arrasta o que ela
-     * precisa ver é O QUE VAI SUMIR, e não o branco por cima. */
-    if (this.tapando) {
-      var t = this.tapando;
-      ctx.strokeStyle = '#2E7D6B';
-      ctx.lineWidth = 2 / this.escala;
-      ctx.setLineDash([8 / this.escala, 5 / this.escala]);
-      ctx.strokeRect(Math.min(t.x0, t.x), Math.min(t.y0, t.y), Math.abs(t.x - t.x0), Math.abs(t.y - t.y0));
-      ctx.setLineDash([]);
-    }
     ctx.restore();
-
-    if (this.selecionado) this._desenharSelecao(ctx, this.selecionado);
     ctx.restore();
   };
 

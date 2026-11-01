@@ -350,6 +350,7 @@ for t in testa_temas testa_busca testa_mapa_e2e \
          testa_modal_aula_navegador \
          testa_folha_navegador \
          testa_folha_resiliencia_navegador \
+         testa_desenho_incremental \
          testa_documento_familia_navegador \
          testa_tabela_no_app \
          testa_ano_cadastro \
