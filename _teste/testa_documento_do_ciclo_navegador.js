@@ -398,8 +398,21 @@ async function printDe(pag, seletor, nome, folga) {
   await pag.evaluate(() => { window.__gerados = []; document.querySelector('#baixar-copia').click(); });
   await esperar('cópia pronta', () => pag.evaluate(() => document.querySelector('#aviso-texto').textContent), v => /Cópia pronta/.test(v || ''), 15000);
   await pag.evaluate(() => document.querySelector('#aviso-acao').click());
-  const copia = await esperar('a cópia entregue', () => pag.evaluate(() => (window.__gerados || []).find(x => /\.json$/.test(x.nome)) || null), v => !!v, 10000);
-  const pacote = copia.valor ? JSON.parse(Buffer.from(copia.valor.base64, 'base64').toString('utf8')) : { dados: { alunos: [] } };
+  const copia = await esperar('a cópia entregue', () => pag.evaluate(() => (window.__gerados || []).find(x => /\.(json|zip)$/.test(x.nome)) || null), v => !!v, 10000);
+  let pacote;
+  if (copia.valor && /\.zip$/.test(copia.valor.nome)) {
+    pacote = await pag.evaluate(async (b64) => {
+      const bin = atob(b64);
+      const u8 = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      const aberto = await Zip.lerDoArquivo(new Blob([u8]));
+      const mapa = Object.fromEntries(aberto.entradas.map(e => [e.nome, e]));
+      const dados = JSON.parse(new TextDecoder().decode(await Zip.extrairDoArquivo(aberto, mapa['dados.json'])));
+      return { dados };
+    }, copia.valor.base64);
+  } else {
+    pacote = copia.valor ? JSON.parse(Buffer.from(copia.valor.base64, 'base64').toString('utf8')) : { dados: { alunos: [] } };
+  }
   const naCopia = ((pacote.dados.alunos || []).find(a => a.id === ALUNO) || {}).ciclos || [];
   conf('o arquivo da cópia tem o ciclo com o texto dela e a marca', naCopia.map(c => [c.textos.significa, c.atencaoQueSai]), [[TEXTO_DELA, ['chuta']]]);
 

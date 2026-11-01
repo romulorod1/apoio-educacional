@@ -425,13 +425,27 @@ async function printDe(pag, seletor, nome, folga) {
   await pag.evaluate(() => { window.__gerados = []; document.querySelector('#baixar-copia').click(); });
   await esperar('cópia pronta', () => pag.evaluate(() => document.querySelector('#aviso-texto').textContent), v => /Cópia pronta/.test(v || ''), 15000);
   await pag.evaluate(() => document.querySelector('#aviso-acao').click());
-  const copia = await esperar('a cópia entregue', () => pag.evaluate(() => (window.__gerados || []).find(x => /\.json$/.test(x.nome)) || null), v => !!v, 10000);
+  const copia = await esperar('a cópia entregue', () => pag.evaluate(() => (window.__gerados || []).find(x => /\.(json|zip)$/.test(x.nome)) || null), v => !!v, 10000);
   conf('a cópia saiu pelo botão', !!copia.valor, true);
-  const pacote = JSON.parse(Buffer.from(copia.valor.base64, 'base64').toString('utf8'));
+  let pacote;
+  if (copia.valor && /\.zip$/.test(copia.valor.nome)) {
+    pacote = await pag.evaluate(async (b64) => {
+      const bin = atob(b64);
+      const u8 = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      const aberto = await Zip.lerDoArquivo(new Blob([u8]));
+      const mapa = Object.fromEntries(aberto.entradas.map(e => [e.nome, e]));
+      const dados = JSON.parse(new TextDecoder().decode(await Zip.extrairDoArquivo(aberto, mapa['dados.json'])));
+      return { dados };
+    }, copia.valor.base64);
+  } else {
+    pacote = JSON.parse(Buffer.from((copia.valor || {}).base64 || '', 'base64').toString('utf8'));
+  }
   const alunoNaCopia = (pacote.dados.alunos || []).find(a => a.id === ALUNO) || {};
   conf('o arquivo tem a sondagem, com as respostas', ((alunoNaCopia.sondagens || [])[0] || { itens: [] }).itens.filter(x => x.resposta).length, 11);
   conf('e a evidência no mapeamento', (((alunoNaCopia.mapeamentos || [])[0] || {}).evidencias || { lacunas: {} }).lacunas.eq2.length, 1);
-  const arquivo = path.join(os.tmpdir(), 'c5_copia_' + process.pid + '.json');
+  const ext = (copia.valor && /\.zip$/.test(copia.valor.nome)) ? '.zip' : '.json';
+  const arquivo = path.join(os.tmpdir(), 'c5_copia_' + process.pid + ext);
   fs.writeFileSync(arquivo, Buffer.from(copia.valor.base64, 'base64'));
   await pag.evaluate(async (id) => {
     const d = await Store.carregar();
