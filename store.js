@@ -811,7 +811,25 @@
     return new Blob([arr], { type: tipo || 'application/octet-stream' });
   }
 
-  function exportarTudo(db) {
+  function arredondarTracosDaCopia(nota) {
+    var copia = JSON.parse(JSON.stringify(nota));
+    (copia.paginas || []).forEach(function (p) {
+      (p.itens || []).forEach(function (it) {
+        if (it.t !== 'traco' || !Array.isArray(it.pontos)) return;
+        it.pontos.forEach(function (ponto) {
+          if (!Array.isArray(ponto)) return;
+          for (var i = 0; i < ponto.length; i++) {
+            if (typeof ponto[i] === 'number' && isFinite(ponto[i])) {
+              ponto[i] = Math.round(ponto[i] * 10) / 10;
+            }
+          }
+        });
+      });
+    });
+    return copia;
+  }
+
+  function exportarTudo(db, opcoes) {
     var pacote = { formato: 'apoio-educacional', versao: 1, quando: new Date().toISOString(), dados: db };
     var idsAulas = {}, idsAlunos = {}, anexosUsados = {}, midiasUsadas = {};
     (db.alunos || []).forEach(function (a) { idsAlunos[a.id] = true; });
@@ -824,7 +842,9 @@
       pacote.notas = {};
       Object.keys(notas).forEach(function (id) {
         if (!idsAulas[id]) return;
-        pacote.notas[id] = notas[id];
+        pacote.notas[id] = (opcoes && opcoes.arredondarTracos)
+          ? arredondarTracosDaCopia(notas[id])
+          : notas[id];
         (notas[id].paginas || []).forEach(function (p) {
           (p.itens || []).forEach(function (it) {
             if (it.t === 'imagem' && it.ref) midiasUsadas[it.ref] = true;
@@ -853,6 +873,11 @@
         if (!a.valor) return null;
         var registro = { nome: a.valor.nome, tipo: a.valor.tipo };
         if (!a.valor.blob) { pacote.anexos[a.id] = registro; return null; }
+        if (opcoes && opcoes.anexosBinarios) {
+          registro.blob = a.valor.blob;
+          pacote.anexos[a.id] = registro;
+          return null;
+        }
         return blobParaTexto(a.valor.blob).then(function (texto) {
           registro.conteudo = texto;
           pacote.anexos[a.id] = registro;
@@ -872,58 +897,140 @@
     });
   }
 
-  function importarTudo(pacote) {
-    if (!pacote || pacote.formato !== 'apoio-educacional' || !pacote.dados) {
-      /* `invalida`: recusada antes de gravar qualquer coisa, então a tela pode
-       * dizer só isso; nas outras falhas algo pode ter sido gravado pela metade. */
-      return Promise.reject(Object.assign(new Error('Arquivo de cópia inválido.'), { invalida: true }));
-    }
-    return salvar(pacote.dados).then(null, function (e) { throw nadaGravado(e); }).then(function () {
-      var passos = [];
-      Object.keys(pacote.notas || {}).forEach(function (k) { passos.push(gravar('notas', k, pacote.notas[k])); });
-      Object.keys(pacote.midias || {}).forEach(function (k) { passos.push(salvarMidia(k, pacote.midias[k])); });
-      Object.keys(pacote.anexos || {}).forEach(function (k) {
-        var reg = pacote.anexos[k];
-        // cópias antigas podiam trazer o anexo já como Blob
-        if (reg && reg.conteudo) {
-          passos.push(salvarAnexo(k, { nome: reg.nome, tipo: reg.tipo, blob: textoParaBlob(reg.conteudo, reg.tipo) }));
-        } else if (reg && reg.blob) {
-          passos.push(salvarAnexo(k, reg));
-        }
+  function exportarTudoZip(db) {
+    return exportarTudo(db, { anexosBinarios: true, arredondarTracos: true }).then(function (pacote) {
+      var meta = {}, arquivos = [
+        { nome: 'manifest.json', conteudo: JSON.stringify({
+          formato: 'apoio-educacional-zip', versao: 2, quando: pacote.quando
+        }), comprimir: true },
+        { nome: 'dados.json', conteudo: JSON.stringify(pacote.dados), comprimir: true },
+        { nome: 'notas.json', conteudo: JSON.stringify(pacote.notas), comprimir: true },
+        { nome: 'midias.json', conteudo: JSON.stringify(pacote.midias), comprimir: true },
+        { nome: 'biblioteca_uso.json', conteudo: JSON.stringify(pacote.biblioteca.uso), comprimir: true },
+        { nome: 'biblioteca_etiquetas.json', conteudo: JSON.stringify(pacote.biblioteca.etiquetas), comprimir: true },
+        { nome: 'biblioteca_listas.json', conteudo: JSON.stringify(pacote.biblioteca.listas), comprimir: true }
+      ];
+      Object.keys(pacote.anexos).forEach(function (id, i) {
+        var reg = pacote.anexos[id];
+        var caminho = 'anexos/' + i + '.bin';
+        meta[id] = { nome: reg.nome, tipo: reg.tipo, arquivo: caminho };
+        arquivos.push({ nome: caminho, conteudo: reg.blob || new Blob([]) });
       });
-      return Promise.all(passos);
-    }).then(function () {
-      /* Cópia feita antes da biblioteca não tem o campo: aí o que o tablet já
-       * tem de uso e etiquetas fica como está. */
-      if (!pacote.biblioteca) return null;
-      return restaurarBiblioteca(pacote.biblioteca);
-    }).then(function () { return completar(pacote.dados); });
+      arquivos.push({ nome: 'anexos.json', conteudo: JSON.stringify(meta), comprimir: true });
+      return root.Zip.escrever(arquivos);
+    });
   }
 
-  /* As listas dela (C2a) entram na mesma transação, para a cópia voltar
-   * inteira ou não voltar. Cópia feita antes delas não tem o campo `listas`:
-   * aí as listas que o tablet já tem ficam como estão, como o uso e as
-   * etiquetas numa cópia feita antes da biblioteca. */
-  function restaurarBiblioteca(bib) {
-    var comListas = Array.isArray(bib.listas);
+  function importarTudo(pacote) {
+    function objeto(v) { return v && typeof v === 'object' && !Array.isArray(v); }
+    function invalida() { return Object.assign(new Error('Arquivo de cópia inválido.'), { invalida: true }); }
+    if (!pacote || pacote.formato !== 'apoio-educacional' || !objeto(pacote.dados) ||
+        ['alunos', 'aulas', 'series', 'resumos', 'pagamentos'].some(function (k) {
+          return pacote.dados[k] != null && !Array.isArray(pacote.dados[k]);
+        }) ||
+        (pacote.notas != null && !objeto(pacote.notas)) ||
+        (pacote.midias != null && !objeto(pacote.midias)) ||
+        (pacote.anexos != null && !objeto(pacote.anexos))) return Promise.reject(invalida());
+    var bib = pacote.biblioteca;
+    if (bib && (!objeto(bib) || (bib.uso != null && !Array.isArray(bib.uso)) ||
+        (bib.etiquetas != null && !Array.isArray(bib.etiquetas)) ||
+        (bib.listas != null && !Array.isArray(bib.listas)))) return Promise.reject(invalida());
+
+    // Converter toda a cópia ANTES de abrir a transação. Erro de base64 ou de
+    // formato não pode deixar o banco com metade dos depósitos substituídos.
+    var anexos = {};
+    try {
+      Object.keys(pacote.anexos || {}).forEach(function (k) {
+        var reg = pacote.anexos[k];
+        if (!objeto(reg)) throw invalida();
+        if (reg.conteudo) anexos[k] = { nome: reg.nome, tipo: reg.tipo,
+          blob: textoParaBlob(reg.conteudo, reg.tipo) };
+        else if (reg.blob instanceof Blob) anexos[k] = reg;
+      });
+    } catch (e) { return Promise.reject(e && e.invalida ? e : invalida()); }
+
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var nomes = ['biblioteca_uso', 'biblioteca_etiquetas'].concat(comListas ? ['biblioteca_listas'] : []);
+        var nomes = ['dados', 'notas', 'midias', 'anexos', 'historico'];
+        if (bib) nomes.push('biblioteca_uso', 'biblioteca_etiquetas');
+        if (bib && Array.isArray(bib.listas)) nomes.push('biblioteca_listas');
         var t = b.transaction(nomes, 'readwrite');
-        var uso = t.objectStore('biblioteca_uso');
-        var etq = t.objectStore('biblioteca_etiquetas');
-        uso.clear(); etq.clear();
-        (bib.uso || []).forEach(function (r) { if (r && r.itemId) uso.put(r); });
-        (bib.etiquetas || []).forEach(function (r) { if (r && r.itemId) etq.put(r); });
-        if (comListas) {
-          var lis = t.objectStore('biblioteca_listas');
-          lis.clear();
-          bib.listas.forEach(function (r) { if (r && r.id && Array.isArray(r.itens)) lis.put(r); });
-        }
-        t.oncomplete = function () { resolve(); };
-        t.onabort = function () { reject(t.error); };
+        var erro = null;
+        try {
+          function trocar(nome, registros, chaveExterna) {
+            var s = t.objectStore(nome);
+            s.clear();
+            if (chaveExterna) Object.keys(registros || {}).forEach(function (k) { s.put(registros[k], k); });
+            else (registros || []).forEach(function (r) { s.put(r); });
+          }
+          trocar('dados', { principal: completar(pacote.dados) }, true);
+          trocar('notas', pacote.notas, true);
+          trocar('midias', pacote.midias, true);
+          trocar('anexos', anexos, true);
+          t.objectStore('historico').clear();
+          if (bib) {
+            trocar('biblioteca_uso', (bib.uso || []).filter(function (r) { return r && r.itemId; }), false);
+            trocar('biblioteca_etiquetas', (bib.etiquetas || []).filter(function (r) { return r && r.itemId; }), false);
+            if (Array.isArray(bib.listas)) trocar('biblioteca_listas', bib.listas.filter(function (r) {
+              return r && r.id && Array.isArray(r.itens);
+            }), false);
+          }
+        } catch (e) { erro = e; t.abort(); }
+        t.oncomplete = function () { resolve(completar(pacote.dados)); };
+        t.onabort = function () { reject(erro || t.error || new Error('A restauração foi interrompida.')); };
+        t.onerror = function () { /* onabort informa o motivo e resolve a promessa */ };
       });
     });
+  }
+
+  /* Lê e confere cada entrada antes de abrir a transação de restauração. O ZIP
+   * pode vir cortado ou com CRC errado; nesse caso, nada do tablet muda. */
+  async function importarZip(arquivo) {
+    var zip = await root.Zip.lerDoArquivo(arquivo);
+    var entradas = {};
+    zip.entradas.forEach(function (e) { entradas[e.nome] = e; });
+    var fixos = ['manifest.json', 'dados.json', 'notas.json', 'midias.json', 'anexos.json',
+      'biblioteca_uso.json', 'biblioteca_etiquetas.json', 'biblioteca_listas.json'];
+    var invalida = function () {
+      return Object.assign(new Error('Arquivo de cópia inválido.'), { invalida: true });
+    };
+    if (fixos.some(function (n) { return !entradas[n]; }) ||
+        Object.keys(entradas).some(function (n) {
+          return fixos.indexOf(n) < 0 && !/^anexos\/[0-9]+\.bin$/.test(n);
+        })) throw invalida();
+    async function lerJson(nome) {
+      try {
+        var bytes = await root.Zip.extrairDoArquivo(zip, entradas[nome]);
+        return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+      } catch (e) { throw invalida(); }
+    }
+    var manifest = await lerJson('manifest.json');
+    if (!manifest || manifest.formato !== 'apoio-educacional-zip' || manifest.versao !== 2) throw invalida();
+    var dados = await lerJson('dados.json');
+    var notas = await lerJson('notas.json');
+    var midias = await lerJson('midias.json');
+    var anexosMeta = await lerJson('anexos.json');
+    var uso = await lerJson('biblioteca_uso.json');
+    var etiquetas = await lerJson('biblioteca_etiquetas.json');
+    var listas = await lerJson('biblioteca_listas.json');
+    if (!anexosMeta || typeof anexosMeta !== 'object' || Array.isArray(anexosMeta)) throw invalida();
+    var anexos = {}, usados = {};
+    for (var id of Object.keys(anexosMeta)) {
+      var reg = anexosMeta[id];
+      if (!reg || typeof reg !== 'object' || typeof reg.arquivo !== 'string' ||
+          !entradas[reg.arquivo] || usados[reg.arquivo] ||
+          !/^anexos\/[0-9]+\.bin$/.test(reg.arquivo)) throw invalida();
+      usados[reg.arquivo] = true;
+      var bytes = await root.Zip.extrairDoArquivo(zip, entradas[reg.arquivo]);
+      anexos[id] = { nome: reg.nome, tipo: reg.tipo,
+        blob: new Blob([bytes], { type: reg.tipo || 'application/octet-stream' }) };
+    }
+    if (Object.keys(entradas).some(function (n) {
+      return /^anexos\/[0-9]+\.bin$/.test(n) && !usados[n];
+    })) throw invalida();
+    return importarTudo({ formato: 'apoio-educacional', dados: dados, notas: notas,
+      midias: midias, anexos: anexos,
+      biblioteca: { uso: uso, etiquetas: etiquetas, listas: listas } });
   }
 
   function apagarTudo() {
@@ -954,7 +1061,9 @@
     registrarHistorico: registrarHistorico, listarHistorico: listarHistorico,
     desfazer: desfazer, limparHistorico: limparHistorico,
     limparOrfaos: limparOrfaos, estimarEspaco: estimarEspaco, tornarPersistente: tornarPersistente,
-    exportarTudo: exportarTudo, importarTudo: importarTudo, apagarTudo: apagarTudo,
+    exportarTudo: exportarTudo, exportarTudoZip: exportarTudoZip,
+    importarTudo: importarTudo, importarZip: importarZip,
+    apagarTudo: apagarTudo,
     gravarPacoteBiblioteca: gravarPacoteBiblioteca, removerPacoteBiblioteca: removerPacoteBiblioteca,
     listarPacotesBiblioteca: listarPacotesBiblioteca,
     itensDaBiblioteca: itensDaBiblioteca, teoriaDaBiblioteca: teoriaDaBiblioteca,

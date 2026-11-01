@@ -343,7 +343,7 @@ const umSalvarDoApp = async pag => {
 async function parteQuatro(pag) {
   secao('4. Gravação que rejeita no meio: a memória volta a ser o disco');
   const antes = await nomeNoDisco(pag);
-  // a) restaurar uma cópia: os dados entram, as notas abortam
+  // a) restaurar uma cópia: restauração atômica (B2) reverte no abort e mantém o banco intacto
   const dados = await pag.evaluate(() => Store.carregar());
   dados.alunos[0].nome = 'Aluna da Cópia';
   const arq = path.join(os.tmpdir(), 'copia_prova_commit_' + process.pid + '.json');
@@ -354,17 +354,12 @@ async function parteQuatro(pag) {
   await (await pag.$('#arquivo-copia')).uploadFile(arq);
   const av1 = await H.esperar('o aviso da cópia', () => textoDoAviso(pag), v => /cópia/i.test(v || ''), 15000);
   console.log('   aviso: ' + JSON.stringify(av1.valor));
-  conf('a tela diz que a cópia não se completou', /não foi restaurada por inteiro/.test(av1.valor || ''), true);
+  conf('a tela diz que a cópia não se completou', /Não foi possível restaurar a cópia|não foi restaurada/i.test(av1.valor || ''), true);
   conf('sem mensagem técnica do navegador', /Error|abort/i.test(av1.valor || ''), false);
-  conf('o disco ficou com os dados da cópia (a parte que gravou)', await nomeNoDisco(pag), 'Aluna da Cópia');
+  conf('o disco manteve os dados anteriores (restauração atômica)', await nomeNoDisco(pag), antes);
   await umSalvarDoApp(pag);
   const depoisA = await nomeNoDisco(pag);
-  console.log('   antes: ' + antes + ' | no disco depois do próximo salvar: ' + depoisA);
-  if (VENENO_RELE && !CONTROLE) {
-    conf('VENENO ENXERGADO: o próximo salvar gravou o estado velho por cima da cópia', depoisA, antes);
-    return;
-  }
-  conf('e o próximo salvar NÃO gravou o estado velho por cima', depoisA, 'Aluna da Cópia');
+  conf('e o próximo salvar mantém os dados intactos', depoisA, antes);
 
   // b) voltar a um ponto do histórico: o estado entra, o apagar do ponto aborta
   const estado = await pag.evaluate(() => Store.carregar());
@@ -384,7 +379,13 @@ async function parteQuatro(pag) {
   console.log('   aviso: ' + JSON.stringify(av2.valor));
   conf('a tela diz que a volta não se completou', /Não consegui voltar a este ponto/.test(av2.valor || ''), true);
   await umSalvarDoApp(pag);
-  conf('e o próximo salvar NÃO gravou o estado velho por cima do ponto', await nomeNoDisco(pag), 'Aluna do Ponto');
+  const depoisB = await nomeNoDisco(pag);
+  console.log('   antes: ' + antes + ' | no disco depois do próximo salvar: ' + depoisB);
+  if (VENENO_RELE && !CONTROLE) {
+    conf('VENENO ENXERGADO: o próximo salvar gravou o estado velho por cima do ponto', depoisB, antes);
+    return;
+  }
+  conf('e o próximo salvar NÃO gravou o estado velho por cima do ponto', depoisB, 'Aluna do Ponto');
 }
 
 (async () => {

@@ -335,15 +335,28 @@ function citaPagamento(texto) {
   await pag.evaluate(() => document.querySelector('#aviso-acao').click());
   await esperar('o arquivo da cópia', () => pag.evaluate(() => window.__saidas.length), v => v >= 1, 15000);
   const copia = (await saidas())[0];
-  conf('saiu a cópia em JSON', !!copia && /\.json$/.test(copia.nome), true);
-  const pacote = JSON.parse(Buffer.from(copia.latin1, 'latin1').toString('utf8'));
+  conf('saiu a cópia no formato esperado', !!copia && /\.(json|zip)$/.test(copia.nome), true);
+  let pacote;
+  if (copia && /\.zip$/.test(copia.nome)) {
+    pacote = await pag.evaluate(async (latin1) => {
+      const u8 = new Uint8Array(latin1.length);
+      for (let i = 0; i < latin1.length; i++) u8[i] = latin1.charCodeAt(i) & 0xff;
+      const aberto = await Zip.lerDoArquivo(new Blob([u8]));
+      const mapa = Object.fromEntries(aberto.entradas.map(e => [e.nome, e]));
+      const dados = JSON.parse(new TextDecoder().decode(await Zip.extrairDoArquivo(aberto, mapa['dados.json'])));
+      return { formato: 'apoio-educacional', versao: 1, dados, notas: {}, midias: {}, anexos: {} };
+    }, copia.latin1);
+  } else {
+    pacote = JSON.parse(Buffer.from((copia || {}).latin1 || '', 'latin1').toString('utf8'));
+  }
   conf('a cópia leva db.pagamentos, com os dois registros',
     (pacote.dados.pagamentos || []).map(p => [p.alunoId, p.mes, p.pagoEm, p.valor]).sort(),
     esperado.map(p => [p.alunoId, p.mes, p.pagoEm, p.valor]).sort());
 
   const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'c4_copia_'));
-  const arqCopia = path.join(pasta, 'copia.json');
-  fs.writeFileSync(arqCopia, JSON.stringify(pacote));
+  const ext = (copia && /\.zip$/.test(copia.nome)) ? '.zip' : '.json';
+  const arqCopia = path.join(pasta, 'copia' + ext);
+  fs.writeFileSync(arqCopia, Buffer.from(copia.latin1, 'latin1'));
   // apaga os pagamentos pela tela, e restaura a cópia pelo seletor de verdade
   await irAoFechamento(pag);
   await tocarNaLinha(pag, ALFA, '.btn-desmarcar-pagamento');
