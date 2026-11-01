@@ -19,7 +19,6 @@ const path = require('path');
 
 const ARQ_CSS = path.join(__dirname, '..', 'styles.css');
 const ARQ_APP = path.join(__dirname, '..', 'app.js');
-const ARQ_SW = path.join(__dirname, '..', 'sw.js');
 
 let passes = 0;
 let falhas = 0;
@@ -97,15 +96,12 @@ console.log('=== Prova estatica do Item B6 (Alvos de toque e tipografia) ===');
 
 const cssReal = fs.readFileSync(ARQ_CSS, 'utf8');
 const appReal = fs.readFileSync(ARQ_APP, 'utf8');
-const swReal = fs.readFileSync(ARQ_SW, 'utf8');
 
 // Validacao do CSS real
 const errosReal = validarCss(cssReal);
 afirme('styles.css atende a todas as 8 regras ergonomicas de B6', errosReal.length === 0);
 
-// Versao e Cache
-afirme('app.js declara versao 1.41.2', /VERSAO\s*=\s*'1\.41\.2'/.test(appReal));
-afirme('sw.js declara cache apoio-educacional-v69', /CACHE\s*=\s*'apoio-educacional-v69'/.test(swReal));
+// A versão atual e o cache mudam em toda release; o portão já verifica ambos.
 afirme('app.js possui bloco 1.41.2 em NOVIDADES com itens acentuados',
   /versao:\s*'1\.41\.2'[\s\S]*?itens:\s*\[[\s\S]*?pixels[\s\S]*?distância/i.test(appReal));
 

@@ -5,22 +5,15 @@ Lê somente o índice de assuntos e os metadados dos zips. Não copia exercício
 """
 
 import collections
+import hashlib
 import json
 import pathlib
 import sys
-import unicodedata
 import zipfile
 
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 INDICE = RAIZ / "banco" / "topicos" / "matematica.json"
-
-
-def normalizar(texto):
-    return "".join(
-        c for c in unicodedata.normalize("NFD", texto.casefold())
-        if unicodedata.category(c) != "Mn" and c.isalnum()
-    )
 
 
 def pacotes_atuais(pasta):
@@ -36,35 +29,48 @@ def pacotes_atuais(pasta):
 
 def medir(pasta):
     assuntos = json.loads(INDICE.read_text(encoding="utf-8"))["temas"]
-    titulos = collections.defaultdict(list)
     por_modulo = collections.defaultdict(list)
     for assunto in assuntos:
-        titulos[normalizar(assunto["pt"]["titulo"])].append(assunto["id"])
         if assunto.get("modulo"):
             por_modulo[assunto["modulo"]].append(assunto["id"])
     listas = collections.defaultdict(set)
     exercicios = collections.Counter()
     sem_kit = set()
+    invalidos = []
     modulos = 0
     for caminho in pacotes_atuais(pasta):
         with zipfile.ZipFile(caminho) as z:
             manifest = json.loads(z.read("manifest.json"))
-            itens = json.loads(z.read("itens.json"))
-            kits = json.loads(z.read("kits.json")) if "kits.json" in z.namelist() else []
+            nomes = [n for n in z.namelist() if n != 'manifest.json' and not n.endswith('/')]
+            declarados = manifest['arquivos']
+            if len(nomes) != len(set(nomes)) or set(nomes) != set(declarados):
+                invalidos.append(manifest['pacote'])
+                continue
+            def ler_conferido(nome):
+                dados = z.read(nome)
+                if declarados.get(nome) != 'sha256:' + hashlib.sha256(dados).hexdigest():
+                    raise ValueError('Hash incorreto: ' + nome)
+                return json.loads(dados)
+            try:
+                itens = ler_conferido('itens.json')
+                kits = ler_conferido('kits.json') if 'kits.json' in nomes else []
+            except (ValueError, KeyError):
+                invalidos.append(manifest['pacote'])
+                continue
             por_item = {}
             for it in itens:
-                por_item[it["id"]] = it.get("tema_app")
+                por_item[it["id"]] = it
                 if it.get("tema_app"):
                     exercicios[it["tema_app"]] += 1
             for k in kits:
                 if k.get("nivel") != 1 or not k.get("degraus"):
                     continue
+                selecionados = [por_item.get(d.get('item')) for d in k['degraus']]
+                if any(not it or it['serie'] + ':' + it['modulo']['slug'] != k.get('modulo')
+                       for it in selecionados):
+                    continue
                 modulos += 1
-                vinculos = {por_item.get(d["item"]) for d in k["degraus"]}
-                vinculos.discard(None)
-                vinculos |= set(titulos[normalizar(k["titulo"])])
-                if k.get("modulo"):
-                    vinculos |= set(por_modulo.get(k["modulo"], []))
+                vinculos = por_modulo.get(k['modulo'], [])
                 for assunto_id in vinculos:
                     listas[assunto_id].add((manifest["pacote"], k["id"]))
             if not kits:
@@ -75,6 +81,7 @@ def medir(pasta):
         "assuntos_com_lista_diretamente_vinculada": len(listas),
         "modulos_com_lista_base": modulos,
         "pacotes_sem_kits": sorted(sem_kit),
+        "pacotes_invalidos": sorted(invalidos),
         "sem_lista_direta": [a["id"] for a in assuntos if a["id"] not in listas],
         "exercicios_por_assunto": dict(sorted(exercicios.items())),
     }

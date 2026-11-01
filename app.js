@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.41.2';
+  var VERSAO = '1.41.3';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -79,6 +79,13 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
+      versao: '1.41.3',
+      itens: [
+        'Na trilha, Abrir lista leva à lista ligada ao assunto e deixa a Biblioteca visível.',
+        'Quando não há uma lista adequada, a trilha avisa. Guarde uma proposta antes de abrir a lista.'
+      ]
+    },
+    {
       versao: '1.41.2',
       itens: [
         'Botões de navegação, caixas de marcação e controles com área de toque ampliada para 44 pixels, facilitando o uso no tablet.',
@@ -107,7 +114,7 @@
       itens: [
         'Passos da trilha agora contam com o botao Abrir lista para carregar diretamente a selecao de exercicios correspondente na Biblioteca.',
         'Assuntos sem lista de exercicios pronta sao claramente sinalizados na trilha com o selo sem lista pronta.',
-        'A cobertura de listas prontas foi expandida para mais de 97% dos assuntos de matematica.'
+        'A Biblioteca reúne listas de matemática que podem apoiar a preparação das aulas.'
       ]
     },
     {
@@ -1094,6 +1101,13 @@
       history.pushState({ apoioModal: topo.token }, '');
       return;
     }
+    if (topo.id === 'modal-trilha' && propostaDeTrilha) {
+      history.pushState({ apoioModal: topo.token }, '');
+      if (!confirmar('Sair sem guardar esta trilha?')) return;
+      propostaDeTrilha = null;
+      fecharModal('modal-trilha');
+      return;
+    }
     if (topo.id === 'modal-nota') {
       // A folha só pode sair depois de gravar. Se o disco falhar, o editor
       // permanece aberto e precisa conservar seu estado de Voltar.
@@ -1114,6 +1128,7 @@
     'modal-excluir-aluno': true,
     'modal-nota': true,
     'modal-proposta': true,
+    'modal-trilha': true,
     'modal-virada-anual': true
   };
 
@@ -9150,14 +9165,20 @@
 
     function listaProntaDoPasso(p) {
       if (!bib || !bib.listasPorModulo) return null;
+      if (p.temaId && !indiceTemas) return null;
       var modChave = p.modulo;
-      if (!modChave && p.temaId && indiceTemas) {
+      if (p.temaId && indiceTemas) {
+        var encontrouAssunto = false;
         for (var k = 0; k < indiceTemas.length; k++) {
-          if (indiceTemas[k].id === p.temaId) {
+          if (indiceTemas[k].id === p.temaId &&
+              Object.prototype.hasOwnProperty.call(indiceTemas[k], 'modulo')) {
+            encontrouAssunto = true;
             modChave = indiceTemas[k].modulo;
+            if (!modChave) return null;
             break;
           }
         }
+        if (!encontrouAssunto) return null;
       }
       if (!modChave && p.titulo) {
         var achado = moduloDoAssunto({ titulo: p.titulo });
@@ -9184,7 +9205,9 @@
       var botoes = [];
       var lp = p.semLista ? null : listaProntaDoPasso(p);
       var acaoLista = null;
-      if (lp) {
+      if (lp && proposta) {
+        acaoLista = el('span', { class: 'ajuda', texto: 'Guarde a trilha para abrir esta lista.' });
+      } else if (lp) {
         acaoLista = el('button', {
           type: 'button', class: 'btn pequeno abrir-lista-trilha', texto: 'Abrir lista',
           title: 'Abrir lista pronta na Biblioteca',
@@ -9197,10 +9220,16 @@
                 bibNav.serie = (bib.listaSeries || []).filter(function (s) { return mod.series[s]; })[0] || mod.serie;
               }
             }
-            usarListaPronta(lp);
-            fecharModal('modal-trilha');
-            var aba = $$('#abas .aba').filter(function (b) { return b.dataset.tela === 'biblioteca'; })[0];
-            if (aba) aba.click();
+            if (!usarListaPronta(lp)) return;
+            fecharModal('modal-trilha', function () {
+              function mostrarBiblioteca() {
+                var aba = $$('#abas .aba').filter(function (b) { return b.dataset.tela === 'biblioteca'; })[0];
+                if (aba) aba.click();
+              }
+              if ($('#modal-aluno').classList.contains('aberto')) {
+                fecharModal('modal-aluno', mostrarBiblioteca);
+              } else mostrarBiblioteca();
+            });
           }
         });
       } else {
@@ -17954,11 +17983,12 @@
   }
   function moduloDoAssuntoNoIndice(t) {
     var modChave = t.modulo;
-    if (!modChave && t.id && indiceTemas) {
+    if (t.id && indiceTemas) {
       for (var i = 0; i < indiceTemas.length; i++) {
-        if (indiceTemas[i].id === t.id) {
+        if (indiceTemas[i].id === t.id &&
+            Object.prototype.hasOwnProperty.call(indiceTemas[i], 'modulo')) {
           modChave = indiceTemas[i].modulo;
-          break;
+          return modChave && bib.modulos[modChave] ? { chave: modChave, direto: true } : false;
         }
       }
     }
