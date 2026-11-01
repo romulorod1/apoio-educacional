@@ -344,7 +344,7 @@ function citaPagamento(texto) {
       const aberto = await Zip.lerDoArquivo(new Blob([u8]));
       const mapa = Object.fromEntries(aberto.entradas.map(e => [e.nome, e]));
       const dados = JSON.parse(new TextDecoder().decode(await Zip.extrairDoArquivo(aberto, mapa['dados.json'])));
-      return { dados };
+      return { formato: 'apoio-educacional', versao: 1, dados, notas: {}, midias: {}, anexos: {} };
     }, copia.latin1);
   } else {
     pacote = JSON.parse(Buffer.from((copia || {}).latin1 || '', 'latin1').toString('utf8'));
