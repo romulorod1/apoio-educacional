@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.40.2';
+  var VERSAO = '1.40.3';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.40.3',
+      itens: [
+        'Passos da trilha agora contam com o botao Abrir lista para carregar diretamente a selecao de exercicios correspondente na Biblioteca.',
+        'Assuntos sem lista de exercicios pronta sao claramente sinalizados na trilha com o selo sem lista pronta.',
+        'A cobertura de listas prontas foi expandida para mais de 97% dos assuntos de matematica.'
+      ]
+    },
     {
       versao: '1.40.2',
       itens: [
@@ -9116,6 +9124,26 @@
     var listaPassos = el('div', { id: 'passos-trilha' });
     corpo.appendChild(listaPassos);
 
+    function listaProntaDoPasso(p) {
+      if (!bib || !bib.listasPorModulo) return null;
+      var modChave = p.modulo;
+      if (!modChave && p.temaId && indiceTemas) {
+        for (var k = 0; k < indiceTemas.length; k++) {
+          if (indiceTemas[k].id === p.temaId) {
+            modChave = indiceTemas[k].modulo;
+            break;
+          }
+        }
+      }
+      if (!modChave && p.titulo) {
+        var achado = moduloDoAssunto({ titulo: p.titulo });
+        if (achado && achado.chave) modChave = achado.chave;
+      }
+      if (!modChave) return null;
+      var listas = bib.listasPorModulo[modChave];
+      return (listas && listas.length) ? listas[0] : null;
+    }
+
     passos.forEach(function (p, i) {
       var feito = !!p.feitoEm;
       /* "1 hora" e não "60 minutos": o resumo lá em cima já fala assim, e duas
@@ -9130,6 +9158,31 @@
        * família. O que estava aqui tinha 37 px de altura. */
       var ALVO = 'min-height:44px;min-width:44px;box-sizing:border-box;';
       var botoes = [];
+      var lp = p.semLista ? null : listaProntaDoPasso(p);
+      var acaoLista = null;
+      if (lp) {
+        acaoLista = el('button', {
+          type: 'button', class: 'btn pequeno abrir-lista-trilha', texto: 'Abrir lista',
+          title: 'Abrir lista pronta na Biblioteca',
+          style: ALVO + 'padding:11px 14px;font-size:13px',
+          aoClick: function () {
+            if (lp.modulo) {
+              bibNav.modulo = lp.modulo;
+              if (bib && bib.modulos && bib.modulos[lp.modulo]) {
+                var mod = bib.modulos[lp.modulo];
+                bibNav.serie = (bib.listaSeries || []).filter(function (s) { return mod.series[s]; })[0] || mod.serie;
+              }
+            }
+            usarListaPronta(lp);
+            fecharModal('modal-trilha');
+            var aba = $$('#abas .aba').filter(function (b) { return b.dataset.tela === 'biblioteca'; })[0];
+            if (aba) aba.click();
+          }
+        });
+      } else {
+        acaoLista = el('span', { class: 'selo selo-aviso', texto: 'sem lista pronta' });
+      }
+      botoes.unshift(acaoLista);
       if (encerrada) {
         /* Nenhum botão: trilha encerrada é registro, e registro não se mexe. */
       } else if (feito) {
@@ -9435,7 +9488,11 @@
   function abrirTrilhaGuardada(aluno, trilha) {
     propostaDeTrilha = null;
     abrirModal('modal-trilha');
-    desenharTrilha(trilha, aluno, { proposta: false });
+    Promise.all([carregarIndice(), carregarBiblioteca()]).then(function () {
+      desenharTrilha(trilha, aluno, { proposta: false });
+    }).catch(function () {
+      desenharTrilha(trilha, aluno, { proposta: false });
+    });
     $('#corpo-modal-trilha').scrollTop = 0;
   }
 
@@ -17869,7 +17926,17 @@
     try { return moduloDoAssuntoNoIndice(t); } catch (e) { return false; }
   }
   function moduloDoAssuntoNoIndice(t) {
-    if (t.fonte === 'biblioteca' && t.modulo && bib.modulos[t.modulo]) return { chave: t.modulo, direto: true };
+    var modChave = t.modulo;
+    if (!modChave && t.id && indiceTemas) {
+      for (var i = 0; i < indiceTemas.length; i++) {
+        if (indiceTemas[i].id === t.id) {
+          modChave = indiceTemas[i].modulo;
+          break;
+        }
+      }
+    }
+    if (modChave && bib.modulos[modChave]) return { chave: modChave, direto: true };
+    if ((t.fonte === 'biblioteca' || t.modulo) && t.modulo && bib.modulos[t.modulo]) return { chave: t.modulo, direto: true };
     var memo = bib.assuntos = bib.assuntos || Object.create(null);
     var k = chaveDoAssunto(t.titulo || '');
     if (!k) return false;
