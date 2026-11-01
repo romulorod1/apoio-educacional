@@ -81,9 +81,9 @@
     {
       versao: '1.41.1',
       itens: [
-        'No tablet em pe, o cabecalho agora ocupa uma linha unica de 64 px sem quebra de abas.',
-        'As abas de navegacao contam com alvos de toque confortaveis de 44 px de altura.',
-        'O layout aproveita melhor a tela vertical com espaco livre para a escrita e visualizacao das aulas.'
+        'No tablet em pé, o cabeçalho agora ocupa uma linha única sem quebrar as abas de navegação.',
+        'As abas de navegação contam com área de toque mais confortável e fácil de alcançar.',
+        'Mais espaço livre na tela vertical para a escrita na folha e visualização das aulas.'
       ]
     },
     {
