@@ -107,7 +107,7 @@
       itens: [
         'Passos da trilha agora contam com o botao Abrir lista para carregar diretamente a selecao de exercicios correspondente na Biblioteca.',
         'Assuntos sem lista de exercicios pronta sao claramente sinalizados na trilha com o selo sem lista pronta.',
-        'A cobertura de listas prontas foi expandida para mais de 97% dos assuntos de matematica.'
+        'A Biblioteca reúne listas de matemática que podem apoiar a preparação das aulas.'
       ]
     },
     {
@@ -9150,11 +9150,14 @@
 
     function listaProntaDoPasso(p) {
       if (!bib || !bib.listasPorModulo) return null;
+      if (p.temaId && !indiceTemas) return null;
       var modChave = p.modulo;
-      if (!modChave && p.temaId && indiceTemas) {
+      if (p.temaId && indiceTemas) {
         for (var k = 0; k < indiceTemas.length; k++) {
-          if (indiceTemas[k].id === p.temaId) {
+          if (indiceTemas[k].id === p.temaId &&
+              Object.prototype.hasOwnProperty.call(indiceTemas[k], 'modulo')) {
             modChave = indiceTemas[k].modulo;
+            if (!modChave) return null;
             break;
           }
         }
@@ -9197,10 +9200,16 @@
                 bibNav.serie = (bib.listaSeries || []).filter(function (s) { return mod.series[s]; })[0] || mod.serie;
               }
             }
-            usarListaPronta(lp);
-            fecharModal('modal-trilha');
-            var aba = $$('#abas .aba').filter(function (b) { return b.dataset.tela === 'biblioteca'; })[0];
-            if (aba) aba.click();
+            if (!usarListaPronta(lp)) return;
+            fecharModal('modal-trilha', function () {
+              function mostrarBiblioteca() {
+                var aba = $$('#abas .aba').filter(function (b) { return b.dataset.tela === 'biblioteca'; })[0];
+                if (aba) aba.click();
+              }
+              if ($('#modal-aluno').classList.contains('aberto')) {
+                fecharModal('modal-aluno', mostrarBiblioteca);
+              } else mostrarBiblioteca();
+            });
           }
         });
       } else {
@@ -17954,11 +17963,12 @@
   }
   function moduloDoAssuntoNoIndice(t) {
     var modChave = t.modulo;
-    if (!modChave && t.id && indiceTemas) {
+    if (t.id && indiceTemas) {
       for (var i = 0; i < indiceTemas.length; i++) {
-        if (indiceTemas[i].id === t.id) {
+        if (indiceTemas[i].id === t.id &&
+            Object.prototype.hasOwnProperty.call(indiceTemas[i], 'modulo')) {
           modChave = indiceTemas[i].modulo;
-          break;
+          return modChave && bib.modulos[modChave] ? { chave: modChave, direto: true } : false;
         }
       }
     }

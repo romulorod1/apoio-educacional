@@ -326,7 +326,7 @@
     "r": "cada calcular da de o para parte quantidade reconhecer terca todo uma voltar",
     "d": "achar dividir esse exemplo igual maior meio numero partir pedaco porque pote qual quanto tres"
    },
-   "modulo": "m1:mirim-dobro-metade-e-triplo"
+   "modulo": null
   },
   {
    "id": "MAT03-07",
@@ -682,7 +682,7 @@
     "r": "algarismo arredondar comparar da de decompor do entendendo escrever ler lugar que seis seu valor",
     "d": "arredondado cada casa centena cinco classe dezena direita dois escreva esta exemplo maior mais menor milhar ordem outro porque proximo qual quanto tres unidade vale zero"
    },
-   "modulo": "m2:mirim-numeros-ate-10-000-e-valor-posicional"
+   "modulo": null
   },
   {
    "id": "MAT05-02",
@@ -832,7 +832,7 @@
     "r": "bloco cada calcular composta contorno dele distinguir em espaco figura ocupado retangulo superficie um",
     "d": "altura caixa calcule camada comprimento cubico diferente dois exemplo isso lado largura litro mais mede mesma mesmo metro quadrado qual quanto resposta retangular tres unidade vale"
    },
-   "modulo": "m2:mirim-perimetro-e-area"
+   "modulo": null
   },
   {
    "id": "MAT05-10",
@@ -1074,7 +1074,7 @@
     "r": "angulo calcular contar de diagonal elemento externo interno pelo reconhecer seu soma",
     "d": "cada como convexo decagono dividido dois duas exemplo figura grau hexagono igual isso lado liga mede menos mesmo numero quadrilatero quanto regular saem segmento sempre todo triangulo vertice vizinho"
    },
-   "modulo": "9ano:quadrilateros"
+   "modulo": null
   },
   {
    "id": "MAT06-11",
@@ -1242,7 +1242,7 @@
     "r": "a comparar descobrir divisao duas falta grandeza igual igualdade o para por quando que reconhecer sao usar valor",
     "d": "aluno cada centimetro dois entre escala esta exemplo extremo meio menina menino mesmo numa numero parte qual quantidade quanto real total turma unidade vale xicara"
    },
-   "modulo": "7ano:notacao-algebrica-e-introducao-as-equacoes"
+   "modulo": "7ano:razoes-e-proporcoes"
   },
   {
    "id": "MAT07-06",
@@ -1260,7 +1260,7 @@
     "r": "a achar certa decidir direta duas e falta grandeza inversamente montar o ou para proporcao proporcional que sao se valor",
     "d": "cada caderno combustivel constante custam distancia entao erro exemplo fazem hora inversa leva litro logo mais maquina menos mesma mesmo minuto necessario numero operario outra peca percurso pessoa produto quanto quilometro real ritmo servico tempo trabalho velocidade"
    },
-   "modulo": "7ano:equacoes-e-inequacoes-do-primeiro-grau"
+   "modulo": "7ano:razoes-e-proporcoes"
   },
   {
    "id": "MAT07-07",
@@ -1279,7 +1279,7 @@
     "r": "aplicar aumento calcular desconto do dois em nos o original para parte resultado sentido valor voltar",
     "d": "aplicado capital dele depois dividir durante erro exemplo foram fracao mais mensal mesmo montante numero periodo prazo preco produto qual quanto real rendeu taxa tempo"
    },
-   "modulo": "7ano:equacoes-e-inequacoes-do-primeiro-grau"
+   "modulo": "7ano:porcentagem-e-juros"
   },
   {
    "id": "MAT07-08",
@@ -1298,7 +1298,7 @@
     "r": "a ao da descobrir direto em escrever essa funcao gera para pedido posicao que regra saltar termo uma",
     "d": "achar anterior bloco cada degrau diferenca dois escreva esta exemplo expressao figura lado mais mesmo numa numero palito passo proximo quadrado qual quanto seguinte sempre soma tres valor"
    },
-   "modulo": "7ano:razoes-e-proporcoes"
+   "modulo": null
   },
   {
    "id": "MAT07-09",
@@ -1317,7 +1317,7 @@
     "r": "calcular com dela letra o para reduzir sem semelhante sinal situacao termo traduzir trocar valor",
     "d": "area caderno calcule custa custam diminuido dois escreva exemplo funcao lado lugar menos multiplica numero parentes perimetro quadrado quando real reduza resultado soma substituir tres"
    },
-   "modulo": "7ano:razoes-e-proporcoes"
+   "modulo": "7ano:notacao-algebrica-e-introducao-as-equacoes"
   },
   {
    "id": "MAT07-10",
@@ -1335,7 +1335,7 @@
     "r": "a conferir e equilibrio igualdade incognita isolar mantendo o para problema resposta traduzir um uma",
     "d": "cada como comum dobro dois erro exemplo idade igual lado numero outro passo ponto resolva resolver sinal solucao somando tirando valor"
    },
-   "modulo": "7ano:porcentagem-e-juros"
+   "modulo": "7ano:equacoes-e-inequacoes-do-primeiro-grau"
   },
   {
    "id": "MAT07-11",
@@ -1391,7 +1391,7 @@
     "r": "achar atencao com conhecida contorno decompor em o ou para parte percorrer somar subtrair uma",
     "d": "altura base calcular calcule caminho canto centimetro comprimento dentro diferente dois entalhe exemplo lado ladrilho maior mede meio mesmo metro necessario outro pedaco quadrado qual quanto recorte recortou retangular retangulo trapezio triangulo unidade"
    },
-   "modulo": "7ano:o-plano-cartesiano-e-sistemas-de-equacoes"
+   "modulo": null
   },
   {
    "id": "MAT07-14",
@@ -1410,7 +1410,7 @@
     "r": "a cada calcular certa chance com conjunto dado de evento medida para resumir simple situacao um",
     "d": "aluno azul bola calcule caso cinco comum dele determine dois exemplo favoravel grupo maior mais melhor nota numa numero pessoa possivel precisa qual quantidade quatro real resultado sair soma tirar todo tres turma valor"
    },
-   "modulo": "7ano:nocoes-basicas-de-estatistica"
+   "modulo": null
   },
   {
    "id": "MAT08-01",
@@ -1667,7 +1667,7 @@
     "r": "a cada calcular caso chance contando de descobrir em evento falta favoravel medir nota peso possivel que tem um valor",
     "d": "aluno azul bola caixa camisa caneta comum conta dado determine dois duas exemplo face mais mesma numa numero obteve pode preco preta qual quando quantidade real resultado retirada sempre soma total turma urna vendida vermelha"
    },
-   "modulo": "7ano:nocoes-basicas-de-estatistica"
+   "modulo": null
   },
   {
    "id": "MAT09-01",
@@ -1877,7 +1877,7 @@
     "r": "central com comprimento ele em enxergam excentrico grau inscrito medir os que relacionar",
     "d": "area cada calcule centimetro centro determine diferente dois duas entre enxerga enxergado exemplo fora interno lado mais mede medida mesmo metade numa oposto ponto quadrilatero qual quando quanto raio vale vertice volta"
    },
-   "modulo": "9ano:quadrilateros"
+   "modulo": null
   },
   {
    "id": "MAT09-12",
@@ -1915,7 +1915,7 @@
     "r": "afastam amplitude centro conjunto dado desvio do media mediana medio medir moda o os pela pelo quanto resumir se um valor",
     "d": "aluno apareceu cada calcular calcule central determine distancia dois duas exemplo isso maior mais menor mesma mesmo nota numero onde quantidade soma todo turma"
    },
-   "modulo": "7ano:nocoes-basicas-de-estatistica"
+   "modulo": null
   },
   {
    "id": "MAT09-14",
