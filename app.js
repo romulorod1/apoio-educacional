@@ -9187,7 +9187,9 @@
       var botoes = [];
       var lp = p.semLista ? null : listaProntaDoPasso(p);
       var acaoLista = null;
-      if (lp) {
+      if (lp && proposta) {
+        acaoLista = el('span', { class: 'ajuda', texto: 'Guarde a trilha para abrir esta lista.' });
+      } else if (lp) {
         acaoLista = el('button', {
           type: 'button', class: 'btn pequeno abrir-lista-trilha', texto: 'Abrir lista',
           title: 'Abrir lista pronta na Biblioteca',

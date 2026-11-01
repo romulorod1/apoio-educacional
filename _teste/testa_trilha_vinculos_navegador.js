@@ -59,4 +59,28 @@ const { conf, esperar } = H;
   conf('a ficha e a trilha não encobrem a biblioteca', await pag.evaluate(() =>
     !document.querySelector('#modal-aluno').classList.contains('aberto') &&
     !document.querySelector('#modal-trilha').classList.contains('aberto')), true);
+
+  await H.irParaAba(pag, 'alunos');
+  await pag.click('#lista-alunos .item-lista[data-aluno="c7_alfa"]');
+  await pag.evaluate(() => Array.from(document.querySelectorAll('#modal-aluno .aba-perfil'))
+    .find(b => b.textContent.trim() === 'Mapeamento').click());
+  await esperar('botão para montar trilha', () => pag.$('#nova-trilha-do-zero'), Boolean, 8000);
+  await pag.click('#nova-trilha-do-zero');
+  const seletor = await esperar('seletor de assuntos', () => pag.$('#modal-tema.aberto #lista-temas'), Boolean, 8000);
+  if (!seletor.ok) throw new Error('Seletor de assuntos não abriu');
+  await pag.$eval('#modal-tema input[placeholder="Procurar por assunto"]', e => {
+    e.value = 'Equações do 1º grau'; e.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const alvo = await esperar('assunto de equações encontrado', () => pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#modal-tema .item-tema'))
+      .some(e => e.querySelector('.nome').textContent.startsWith('Equações do 1º grau'))), Boolean, 8000);
+  if (!alvo.ok) throw new Error('Assunto de equações não encontrado');
+  await pag.evaluate(() => Array.from(document.querySelectorAll('#modal-tema .item-tema'))
+    .find(e => e.querySelector('.nome').textContent.startsWith('Equações do 1º grau')).querySelector('button').click());
+  const proposta = await esperar('proposta não salva', () =>
+    pag.$('#modal-trilha.aberto .item-passo-trilha[data-passo="MAT07-10"]'), Boolean, 8000);
+  if (!proposta.ok) throw new Error('Proposta não apareceu');
+  conf('proposta pede guardar antes de abrir lista', await pag.$eval(
+    '#modal-trilha.aberto .item-passo-trilha[data-passo="MAT07-10"]', e =>
+      /Guarde a trilha para abrir esta lista/.test(e.textContent) && !e.querySelector('.abrir-lista-trilha')), true);
 })().then(() => H.fim(amb)(), e => H.fim(amb)(e));
