@@ -11850,22 +11850,68 @@
         }));
       }
 
-      var tabela = el('table', { class: 'dados' });
+      var tabela = el('table', { class: 'dados b8-tabela' });
       var cab = el('tr');
-      ['Data', 'Dia', 'Duração', 'Situação', 'Valor'].forEach(function (t) {
+      ['Data', 'Dia', 'Duração', 'Situação', 'Valor', 'Ações'].forEach(function (t) {
         cab.appendChild(el('th', { texto: t }));
       });
       tabela.appendChild(el('thead', {}, [cab]));
       var corpo = el('tbody');
       f.linhas.forEach(function (l) {
-        corpo.appendChild(el('tr', {}, [
-          el('td', { texto: Core.ddmm(l.data) }),
+        var ocupada = false;
+        var botoes = [];
+        function alterar(mudancas, mensagem) {
+          if (ocupada) return;
+          ocupada = true;
+          botoes.forEach(function (b) { b.disabled = true; });
+          if (!Core.aplicarEdicaoAula(db, l.id, mudancas, 'esta')) {
+            desenharFechamento();
+            avisar('Não encontrei esta aula.');
+            return;
+          }
+          var trilha = revisarTrilhasDoAluno(f.aluno.id);
+          salvarEDepois(function (gravou) {
+            desenharTudo();
+            if (gravou) avisar(mensagem + textoDeTrilha(trilha));
+          });
+        }
+        function botao(classe, texto, acao) {
+          var b = el('button', { type: 'button', class: 'btn pequeno ' + classe,
+            texto: texto, 'aria-label': texto + ' em ' + Core.ddmmaaaa(l.data), aoClick: acao });
+          botoes.push(b);
+          return b;
+        }
+        var campoData = el('input', { type: 'date', 'aria-label': 'Nova data da aula de ' + Core.ddmmaaaa(l.data) });
+        campoData.value = l.data;
+        var confirmarData = botao('b8-confirmar-data', 'Mover aula', function () {
+          if (!campoData.value || !campoData.validity.valid) { avisar('Escolha uma data válida para a aula.'); return; }
+          if (campoData.value === l.data) { avisar('Escolha uma data diferente.'); return; }
+          alterar({ data: campoData.value }, 'Aula adiada.');
+        });
+        var mover = el('div', { class: 'b8-mover' }, [campoData, confirmarData]);
+        mover.hidden = true;
+        var naoCobrar = botao('b8-nao-cobrar', 'Não cobrar', function () {
+          alterar({ cobravel: false }, 'Aula marcada como não cobrada.');
+        });
+        naoCobrar.disabled = !l.cobravel;
+        var cancelar = botao('b8-cancelar', 'Cancelar aula', function () {
+          alterar({ status: 'cancelada', cobravel: false }, 'Aula cancelada sem cobrança.');
+        });
+        cancelar.disabled = l.status === 'cancelada' && !l.cobravel;
+        var adiar = botao('b8-adiar', 'Adiar', function () {
+          mover.hidden = !mover.hidden;
+          if (!mover.hidden) campoData.focus();
+        });
+        var acoes = el('td', {}, [el('div', { class: 'b8-acoes' }, [naoCobrar, cancelar, adiar]), mover]);
+        corpo.appendChild(el('tr', { 'data-aula-fechamento': l.id }, [
+          el('td', {}, [botao('b8-abrir', Core.ddmm(l.data), function () { abrirAula(l.id); })]),
           el('td', { texto: l.dia }),
           el('td', { texto: Core.fmtDuracao(l.duracaoMin) }),
           el('td', {
             texto: l.statusRotulo + (l.cobravel ? '' : ' (não cobrada)')
           }),
-          el('td', { texto: dinheiro(l.cobravel ? l.valor : 0) })
+          el('td', { texto: dinheiro(l.cobravel ? l.valor : 0) }),
+          acoes
         ]));
       });
       var linhaTotal = el('tr', { class: 'total' }, [
@@ -11873,7 +11919,8 @@
         el('td', { texto: '' }),
         el('td', { texto: f.totalHoras + ' h' }),
         el('td', { texto: '' }),
-        el('td', { texto: dinheiro(f.totalValor) })
+        el('td', { texto: dinheiro(f.totalValor) }),
+        el('td', { texto: '' })
       ]);
       corpo.appendChild(linhaTotal);
       tabela.appendChild(corpo);

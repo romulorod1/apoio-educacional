@@ -117,6 +117,13 @@ body {
 }
 .barra .cresce { flex: 1; }
 
+.b8-acoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.b8-mover { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.b8-mover[hidden] { display: none; }
+.b8-mover input { width: auto; min-width: 150px; }
+table.dados.b8-tabela th:last-child, table.dados.b8-tabela td:last-child { text-align: left; }
+table.dados.b8-tabela th:nth-child(5), table.dados.b8-tabela td:nth-child(5) { text-align: right; }
+
 h2.titulo {
   font-size: 21px;
   color: var(--navy);

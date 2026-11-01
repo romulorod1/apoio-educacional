@@ -671,6 +671,7 @@ roda "relato e Voltar"                            node "_teste/testa_relato_volt
 roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip.js"
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
+roda "ações de aula no fechamento"                node "_teste/testa_acoes_fechamento.js"
 # C9: o documento do ciclo na tela. A contagem do que abre sozinho (janelas,
 # aviso, faixas, dialogos) no codigo da origin/main e no de hoje, igual, com
 # controle de que o contador ve; a entrada discreta na ficha; editar, recarregar
