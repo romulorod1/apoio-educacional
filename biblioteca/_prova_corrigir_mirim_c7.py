@@ -39,4 +39,4 @@ with tempfile.TemporaryDirectory() as pasta:
     except ValueError:
         pass
 
-print('Pacote corrigido e recusa de hash inválido: passou')
+print('2 passaram, 0 falharam.')
