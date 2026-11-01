@@ -18,7 +18,8 @@
    "chaves": {
     "r": "algarismo dele do entender isso lugar muda o ordenar para que usar valor",
     "d": "cada casa depois dezena dois entre escreva esta fica maior mais menor ordem pela porque unidade vale voce"
-   }
+   },
+   "modulo": "m1:mirim-numeros-ate-100-ler-escrever-e-comparar"
   },
   {
    "id": "MAT02-02",
@@ -35,7 +36,8 @@
    "chaves": {
     "r": "atalho com contar de dezena e em juntando mental somar um unidade usar vez",
     "d": "calcule juntar maior mais numero quanta quanto soma"
-   }
+   },
+   "modulo": "m1:mirim-adicao-ate-100"
   },
   {
    "id": "MAT02-03",
@@ -52,7 +54,8 @@
    "chaves": {
     "r": "a cada caso certa comparar descobrir e em entender escolher estrategia falta o para que serve subtrair tirar",
     "d": "dezena faltam mais menos numero quanta quanto soma unidade"
-   }
+   },
+   "modulo": "m1:mirim-subtracao-ate-100"
   },
   {
    "id": "MAT02-04",
@@ -69,7 +72,8 @@
    "chaves": {
     "r": "a como desfaz duas em igual mesmo o outra parte perceber que reconhecer repartir somar uma vez",
     "d": "mais numero porque qual"
-   }
+   },
+   "modulo": "m1:mirim-dobro-metade-e-triplo"
   },
   {
    "id": "MAT02-05",
@@ -86,7 +90,8 @@
    "chaves": {
     "r": "a andar continuar descobrir ela faz para que regra tambem tra uma voltar",
     "d": "ante cada degrau escreva mais numero palito passo proximo qual somar tres"
-   }
+   },
+   "modulo": null
   },
   {
    "id": "MAT02-06",
@@ -101,7 +106,8 @@
    "chaves": {
     "r": "a as canto de distinguir ela lado muda nao numero o pelo perceber que virar",
     "d": "aparecem cada cima circulo contorno dois igual mesmo numa quadrado quanto quatro retangulo reto tamanho todo triangulo"
-   }
+   },
+   "modulo": "m1:mirim-figuras-planas-reconhecer-e-nomear"
   },
   {
    "id": "MAT02-07",
@@ -118,7 +124,8 @@
    "chaves": {
     "r": "aresta bloco casa cilindro cone contar cubo de e esfera face objeto pelo reconhecer vertice",
     "d": "caixa cima circulo curva embaixo forma lata plana quadrado qual quanta redonda retangular rola rolam seis superficie toda"
-   }
+   },
+   "modulo": "m1:mirim-solidos-geometricos-no-dia-a-dia"
   },
   {
    "id": "MAT02-08",
@@ -135,7 +142,8 @@
    "chaves": {
     "r": "centimetro combinada comparar de e entender medir metro o para por precisa que tamanho uma unidade usar",
     "d": "altura coisa duas mais marca mede medida meio menos mesa palmo porta quanto regua"
-   }
+   },
+   "modulo": "m1:mirim-medindo-comprimentos"
   },
   {
    "id": "MAT02-09",
@@ -152,7 +160,8 @@
    "chaves": {
     "r": "60 a calendario contar entender falta ler minuto o para quanto que relogio tem tempo usar",
     "d": "cada como esta grande hoje marca meia mesmo pequeno ponteiro semana"
-   }
+   },
+   "modulo": "m1:mirim-horas-dias-e-meses"
   },
   {
    "id": "MAT02-10",
@@ -169,7 +178,8 @@
    "chaves": {
     "r": "calcular comparar do juntar preco real reconhecer troco valor",
     "d": "centavo compra duas mais nota quanto vale valem virgula"
-   }
+   },
+   "modulo": "m1:mirim-dinheiro-moedas-e-cedulas"
   },
   {
    "id": "MAT02-11",
@@ -186,7 +196,8 @@
    "chaves": {
     "r": "a barra coletado dado de dele ler numa organizar partir pergunta pictograma responder",
     "d": "aluno aparecem cada desenho escolheram escolhida esta fruta legenda linha maca maior mais numero pesquisa preferida qual quanto representa teve total vale"
-   }
+   },
+   "modulo": "m1:mirim-tabelas-e-graficos-simples"
   },
   {
    "id": "MAT02-12",
@@ -203,7 +214,8 @@
    "chaves": {
     "r": "ate certa conferir e ele entender escolher faz ler o operacao pergunta que resposta se sentido um",
     "d": "ante bolinha cada caixa conta depois ficaram ficou figurinha ganhou havia lapis mais menos numa numero palavra passageiro quanta quanto real tinha todo"
-   }
+   },
+   "modulo": "m1:mirim-adicao-ate-100"
   },
   {
    "id": "MAT03-01",
@@ -220,7 +232,8 @@
    "chaves": {
     "r": "algarismo ao centena comparar dao dezena diferente entender escrever isso mesmo ordenar para que unidade usar",
     "d": "casa escreva esta maior mais qual tres vale zero"
-   }
+   },
+   "modulo": "m1:mirim-numeros-ate-1000-e-valor-posicional"
   },
   {
    "id": "MAT03-02",
@@ -238,7 +251,8 @@
    "chaves": {
     "r": "a algarismo casa de dois e entendendo excesso numero o para passa por que seguinte somar tres uma",
     "d": "calcular calcule dezena embaixo escreva leve mais ponto resultado soma unidade"
-   }
+   },
+   "modulo": "m1:mirim-adicao-ate-100"
   },
   {
    "id": "MAT03-03",
@@ -256,7 +270,8 @@
    "chaves": {
     "r": "algarismo aparece casa da de dois e inclusive meio no numero quando subtrair tres trocando uma unidade vizinha zero",
     "d": "calcular calcule centena conta dezena emprestimo mais menos quanto resultado"
-   }
+   },
+   "modulo": "m1:mirim-subtracao-ate-100"
   },
   {
    "id": "MAT03-04",
@@ -274,7 +289,8 @@
    "chaves": {
     "r": "como conhecido de decorar em entender fato fileira grupo igual montar para solto usar vez",
     "d": "brigadeiro cada cadeira caixa calcule mais multiplicar numero objeto pacote quanto resultado"
-   }
+   },
+   "modulo": "m1:mirim-multiplicacao-a-ideia-e-a-tabuada"
   },
   {
    "id": "MAT03-05",
@@ -291,7 +307,8 @@
    "chaves": {
     "r": "cabem descobrir e entender grupo o quantidade quanto que sobra uma",
     "d": "adesivo amigo bala cada crianca dividido dividir entre exemplo figurinha igualmente lapis mais numa outra pacote quanta recebe reparta resto sobram tamanho tire voce"
-   }
+   },
+   "modulo": "m2:mirim-as-quatro-operacoes-com-naturais"
   },
   {
    "id": "MAT03-06",
@@ -308,7 +325,8 @@
    "chaves": {
     "r": "cada calcular da de o para parte quantidade reconhecer terca todo uma voltar",
     "d": "achar dividir esse exemplo igual maior meio numero partir pedaco porque pote qual quanto tres"
-   }
+   },
+   "modulo": "m1:mirim-dobro-metade-e-triplo"
   },
   {
    "id": "MAT03-07",
@@ -325,7 +343,8 @@
    "chaves": {
     "r": "calcular contorno de las nomea numero o pelo reconhecer vertice",
     "d": "cada canto celula centimetro contar dele dois exemplo fechada igual mais mede nome numa pentagono quadrado quadrilatero quantidade quanto quatro recebe retangulo reto todo triangulo"
-   }
+   },
+   "modulo": "m1:mirim-figuras-planas-reconhecer-e-nomear"
   },
   {
    "id": "MAT03-08",
@@ -343,7 +362,8 @@
    "chaves": {
     "r": "a com comparar comprimento converter de diferente escrita forma medida medir outra para uma unidade",
     "d": "altura escreva exemplo maior mais pedaco quanto"
-   }
+   },
+   "modulo": "m1:mirim-medindo-comprimentos"
   },
   {
    "id": "MAT03-09",
@@ -361,7 +381,8 @@
    "chaves": {
     "r": "compra converter de ele entre grama litro mililitro quilograma receita resolver situacao usar",
     "d": "cada caixa copo duas exemplo garrafa meio pacote quantidade quanto unidade"
-   }
+   },
+   "modulo": "m2:mirim-unidades-de-medida-e-transformacoes"
   },
   {
    "id": "MAT03-10",
@@ -379,7 +400,8 @@
    "chaves": {
     "r": "a barata calcular com compor compra comprar de decidir forma mais moeda nota qual somar valor",
     "d": "caderno centavo conta custa custou duas exemplo preco quanto real total valem"
-   }
+   },
+   "modulo": "m1:mirim-dinheiro-moedas-e-cedulas"
   },
   {
    "id": "MAT03-11",
@@ -397,7 +419,8 @@
    "chaves": {
     "r": "calcular dia dois entre hora horario ler localizar minuto o para passou quanto semana tempo usar",
     "d": "cada comeca como completa depois dura essa exemplo mais marca ponteiro termina"
-   }
+   },
+   "modulo": "m1:mirim-horas-dias-e-meses"
   },
   {
    "id": "MAT03-12",
@@ -415,7 +438,8 @@
    "chaves": {
     "r": "a atencao comparar dado e escala exigem informacao ler num os ou pergunta que responder somar subtrair",
     "d": "altura aluno cada diferente duas escolheram exemplo feira fruta livro maca mais numa numero opcao pesquisa preferida quadradinho qual quanto recebeu time turma vale vendeu voto"
-   }
+   },
+   "modulo": "m1:mirim-tabelas-e-graficos-simples"
   },
   {
    "id": "MAT04-01",
@@ -432,7 +456,8 @@
    "chaves": {
     "r": "algarismo arredondar comparar de decide decompor dele do entendendo escrever ler lugar o quatro que",
     "d": "cada casa centena dezena diferente dois maior mais menor milhar qual quanto quem unidade vale zero"
-   }
+   },
+   "modulo": "m2:mirim-numeros-ate-10-000-e-valor-posicional"
   },
   {
    "id": "MAT04-02",
@@ -450,7 +475,8 @@
    "chaves": {
     "r": "a algarismo ante ate conferir de estimar inversa o operacao pela quatro reagrupamento resposta resultado somar subtrair",
     "d": "calcular casa centena conta dezena escreve esquerda estimativa lugar mais menos milhar quando quanto real soma unidade"
-   }
+   },
+   "modulo": "m2:mirim-adicao-e-subtracao-com-numeros-grandes"
   },
   {
    "id": "MAT04-03",
@@ -468,7 +494,8 @@
    "chaves": {
     "r": "2 anda ante calcular casa de decompondo dezena e em entender estimar fator multiplicar o parcial produto que uma unidade",
     "d": "cada calcule conta depois erro essa mais numero quanto zero"
-   }
+   },
+   "modulo": "m2:mirim-multiplicacao-por-dois-algarismos"
   },
   {
    "id": "MAT04-04",
@@ -486,7 +513,8 @@
    "chaves": {
     "r": "a conferir conforme decidir dividir do e fazer o pela pergunta principalmente problema prova que real",
     "d": "bala cabe cada caixa cheia crianca diferente dividendo dividido divisor entre exemplo mais numa onibu parte porque qual quanta quanto quociente repartir resposta sobram"
-   }
+   },
+   "modulo": "m2:mirim-divisao-com-resto"
   },
   {
    "id": "MAT04-05",
@@ -503,7 +531,8 @@
    "chaves": {
     "r": "a calcular da de denominador metade numerador o ou quantidade reconhecer referencia simplificar uma usando",
     "d": "aluno barra comeu compare comum crescente diferente dividido dois duas exemplo fatia igual maior mais menor mesma mesmo numero oculo ordem parte pelo pizza qual quando quanta quanto simple usam"
-   }
+   },
+   "modulo": "6ano:fracoes-o-primeiro-contato"
   },
   {
    "id": "MAT04-06",
@@ -522,7 +551,8 @@
    "chaves": {
     "r": "ao as centesimo comparar de decimo ler ligando somar subtrair unidade",
     "d": "cada casa centimetro como dele depois direita dois entao exemplo grama inteiro litro maior mais metro parte pedaco porque quanto quilograma real virgula zero"
-   }
+   },
+   "modulo": "m2:mirim-numeros-decimais-com-dinheiro-e-medidas"
   },
   {
    "id": "MAT04-07",
@@ -539,7 +569,8 @@
    "chaves": {
     "r": "como entendendo medir o paralela perpendicular reconhecer um",
     "d": "anti cada completa cruzam dele depois dois duas exemplo fico formam gira grau hora horario junto lado leste maior mais mede mesmo minuto norte oeste outro ponteiro ponto quando quanto raso reto segmento sentido soma tres virado voce volta"
-   }
+   },
+   "modulo": "m2:mirim-retas-angulos-e-giros"
   },
   {
    "id": "MAT04-08",
@@ -556,7 +587,8 @@
    "chaves": {
     "r": "de distinguir eixo encontrar lado nomear os pelo quadrilatero reconhecer vertice",
     "d": "angulo area cada como desenhado diagonal dois duas equilatero figura foram igual linha mais numero parte quadrado quanto quatro retangulo reto segmento todo tres triangulo"
-   }
+   },
+   "modulo": "m2:mirim-poligonos-e-simetria"
   },
   {
    "id": "MAT04-09",
@@ -575,7 +607,8 @@
    "chaves": {
     "r": "calcular composta contorno de distinguir figura igual nao perceber que retangulo significa superficie",
     "d": "cada calcule comprimento dele dois duas exemplo lado largura mais mede medida mesmo metro pergunta quadradinho quadrado qual quanto retangular seja"
-   }
+   },
+   "modulo": "m2:mirim-perimetro-e-area"
   },
   {
    "id": "MAT04-10",
@@ -593,7 +626,8 @@
    "chaves": {
     "r": "a adequada capacidade comprimento conta da errar escolher massa o sem sentido tempo transformar",
     "d": "cada comparar esta exemplo grama hora maior menor metro minuto numero quanto quilograma resposta transforme vale"
-   }
+   },
+   "modulo": "m2:mirim-unidades-de-medida-e-transformacoes"
   },
   {
    "id": "MAT04-11",
@@ -610,7 +644,8 @@
    "chaves": {
     "r": "acontecimento caso certo chance classificar comparar contando em favoravel os",
     "d": "acontece acontecer amarela azul bala bola cada caixa cara como comum coroa dado duas exemplo face igualmente lancar maior mais menos mesmo moeda morango muito nenhuma numa numero pode porque qual saco sair tirar toda verde vermelha"
-   }
+   },
+   "modulo": "m2:mirim-possivel-impossivel-e-provavel"
   },
   {
    "id": "MAT04-12",
@@ -628,7 +663,8 @@
    "chaves": {
     "r": "a barra calcular conjunto de ler linha pictograma tabela um valor",
     "d": "aluno cada calcule entre exemplo figura legenda livro maior mais mostra numa numero preferem qual quantidade quanto quatro representa soma todo tres vale vendida"
-   }
+   },
+   "modulo": "m2:mirim-graficos-e-media-simples"
   },
   {
    "id": "MAT05-01",
@@ -645,7 +681,8 @@
    "chaves": {
     "r": "algarismo arredondar comparar da de decompor do entendendo escrever ler lugar que seis seu valor",
     "d": "arredondado cada casa centena cinco classe dezena direita dois escreva esta exemplo maior mais menor milhar ordem outro porque proximo qual quanto tres unidade vale zero"
-   }
+   },
+   "modulo": "m2:mirim-numeros-ate-10-000-e-valor-posicional"
   },
   {
    "id": "MAT05-02",
@@ -663,7 +700,8 @@
    "chaves": {
     "r": "a certa conferir dividir e em escolher inversa multiplicar numero o pela problema resultado seguranca somar subtrair um",
     "d": "ante cada calcular casa conta depois dezena divisao divisor dupla exemplo grupo igual lapis mais menos multiplicacao qual quanto quociente real resposta resto sobe unidade"
-   }
+   },
+   "modulo": "m2:mirim-as-quatro-operacoes-com-naturais"
   },
   {
    "id": "MAT05-03",
@@ -680,7 +718,8 @@
    "chaves": {
     "r": "a calcular comparar de decorar e quantidade que regra sem somar subtrair tem uma",
     "d": "comeu como cortada dela dividido exemplo fatia igual inteiro mais numerador numero oitavo ordem parte pizza quando quanto resultado saco tamanho tres"
-   }
+   },
+   "modulo": "6ano:fracoes-o-primeiro-contato"
   },
   {
    "id": "MAT05-04",
@@ -698,7 +737,8 @@
    "chaves": {
     "r": "10 100 1000 as com de denominador duas entender entre escrita forma jeito numero ou outro que seguranca transitar um uma",
     "d": "casa centesimo como comparar decimo depois diga dois escreva escrever exemplo maior metro parte real virgula zero"
-   }
+   },
+   "modulo": "6ano:fracoes-o-primeiro-contato"
   },
   {
    "id": "MAT05-05",
@@ -716,7 +756,8 @@
    "chaves": {
     "r": "a cada conferir dividir e em entendendo estimativa faz multiplicar numero o por que resultado somar subtrair virgula",
     "d": "calcular calcule casa conta decimo dividido dois duas exemplo inteiro litro metro pedaco pela qual quanto quilometro real"
-   }
+   },
+   "modulo": "m2:mirim-numeros-decimais-com-dinheiro-e-medidas"
   },
   {
    "id": "MAT05-06",
@@ -733,7 +774,8 @@
    "chaves": {
     "r": "cada calcular cem cento de decorar e em entender formula parte por que sem significa total um",
     "d": "achar aluno caminho decimal desconto entao esta exemplo forma fracao igual isso mais menos metade numa oculo paga pelo porque preco qual quanto real turma usam valor"
-   }
+   },
+   "modulo": "6ano:fracao-como-porcentagem-e-como-probabilidade"
   },
   {
    "id": "MAT05-07",
@@ -750,7 +792,8 @@
    "chaves": {
     "r": "com composto comum criterio de distinguir divisibilidade os primo problema reconhecer resolver usar",
     "d": "algarismo cada depois divisao divisivel dois duas entao exemplo igual junto maior mais menor mesmo minuto numero pergunta porque qual quando quanto tambem tempo termina todo"
-   }
+   },
+   "modulo": "m2:mirim-multiplos-e-divisores"
   },
   {
    "id": "MAT05-08",
@@ -768,7 +811,8 @@
    "chaves": {
     "r": "a aresta cada contar corpo face ligar piramide prisma reconhecer redondo vertice",
     "d": "base como cone cubo dele duas exemplo hexagonal igual lado lateral mais numero plana poliedro quadrado qual quanta quanto sendo superficie triangular triangulo"
-   }
+   },
+   "modulo": "m2:mirim-solidos-e-suas-planificacoes"
   },
   {
    "id": "MAT05-09",
@@ -787,7 +831,8 @@
    "chaves": {
     "r": "bloco cada calcular composta contorno dele distinguir em espaco figura ocupado retangulo superficie um",
     "d": "altura caixa calcule camada comprimento cubico diferente dois exemplo isso lado largura litro mais mede mesma mesmo metro quadrado qual quanto resposta retangular tres unidade vale"
-   }
+   },
+   "modulo": "m2:mirim-perimetro-e-area"
   },
   {
    "id": "MAT05-10",
@@ -805,7 +850,8 @@
    "chaves": {
     "r": "capacidade comprimento dividir e em massa multiplicar outra para passar quando sabendo tempo uma",
     "d": "comparar converta entao exemplo grama hora litro maior mais metro minuto multiplique numero quanto quilograma somar vale"
-   }
+   },
+   "modulo": "m2:mirim-unidades-de-medida-e-transformacoes"
   },
   {
    "id": "MAT05-11",
@@ -822,7 +868,8 @@
    "chaves": {
     "r": "alinhado com coordenada distancia dos entre figura localizar medir ordenado par pela ponto reconhecer vertice",
     "d": "andar area como dela direita dois eixo entao esta exemplo fica horizontal igual lado mesmo numero onde ordem origem paralelo perimetro qual retangulo unidade vertical"
-   }
+   },
+   "modulo": "7ano:o-plano-cartesiano-e-sistemas-de-equacoes"
   },
   {
    "id": "MAT05-12",
@@ -840,7 +887,8 @@
    "chaves": {
     "r": "a ao calcular contrario dado descobrir em falta la organizar para que um usa valor",
     "d": "aluno coluna como escala escolheram esta exemplo frequencia igual mais moda nota numa numero pela pesquisa precisa qual quantidade quanto quatro responderam resposta soma tirou todo total tres turma"
-   }
+   },
+   "modulo": "m2:mirim-graficos-e-media-simples"
   },
   {
    "id": "MAT06-01",
@@ -857,7 +905,8 @@
    "chaves": {
     "r": "a algarismo arredondar comparar decide decompor e entender grande isso ler numero o para por posicao que seu um usar valor",
     "d": "cada centena cinco classe como dezena direita entao escreva escrever esquerda exemplo fica maior mais menor milhar natural ordem posicional proximo qual quanto seis soma tres unidade vale zero"
-   }
+   },
+   "modulo": "6ano:numeros-naturais-representacao-e-operacoes-basicas"
   },
   {
    "id": "MAT06-02",
@@ -875,7 +924,8 @@
    "chaves": {
     "r": "a as correta divisao dominar e entender expressao na numerica ordem potenciacao quatro resolver resto",
     "d": "adicao cada calcular calcule conta depois direita dividendo dividido divisor esquerda exemplo maior mais mesmo multiplicacao multiplicar numa propriedade qual quanto quociente resultado soma subtracao"
-   }
+   },
+   "modulo": "6ano:operacoes-basicas"
   },
   {
    "id": "MAT06-03",
@@ -893,7 +943,8 @@
    "chaves": {
     "r": "comum criterio de decidir divisibilidade maximo minimo o os ou pede problema quando reconhecer um usar",
     "d": "algarismo cada divisao divisivel dois duas exemplo igual junta maior menor mesmo natural numero outro pedaco porque possivel produto qual relacao soma tempo termina todo"
-   }
+   },
+   "modulo": "6ano:divisibilidade"
   },
   {
    "id": "MAT06-04",
@@ -910,7 +961,8 @@
    "chaves": {
     "r": "a calcular contar decompor divisor em fator mdc mmc natural para qualquer reconhecer usar",
     "d": "como dividido dois duas entao exatamente exemplo expoente fatore maior menor pode porque produto qual quanto todo"
-   }
+   },
+   "modulo": "6ano:divisibilidade"
   },
   {
    "id": "MAT06-05",
@@ -928,7 +980,8 @@
    "chaves": {
     "r": "a de decimal depender divisao entender parte razao sem",
     "d": "caminho compare comum crescente denominador depois diferente dividindo dois duas entre equivalente esta exemplo fica forma irredutivel maior mais menor mesmo numerador numero ordem passa perto pizza qual quando quem tres"
-   }
+   },
+   "modulo": "6ano:fracoes-o-primeiro-contato"
   },
   {
    "id": "MAT06-06",
@@ -945,7 +998,8 @@
    "chaves": {
     "r": "a cada das dividir e em multiplicar pedida problema qual quatro reconhecer seguranca somar subtrair",
     "d": "ante azul bola calcular calcule comum conta denominador dois exemplo hora inteiro mais mesmo minimo misto multiplo muro numerador numero parte tamanho"
-   }
+   },
+   "modulo": "6ano:fracoes-o-primeiro-contato"
   },
   {
    "id": "MAT06-07",
@@ -963,7 +1017,8 @@
    "chaves": {
     "r": "000 1 10 100 apena com comparar de denominador ele entendendo escrita fracao ler operar ou outra para que sao",
     "d": "cada calcule casa centesimo como decimo depois direita dividir dois exemplo forma isso maior mais menor mesmo multiplicar parte porque quanto real resultado virgula zero"
-   }
+   },
+   "modulo": "6ano:operacoes-basicas"
   },
   {
    "id": "MAT06-08",
@@ -981,7 +1036,8 @@
    "chaves": {
     "r": "acrescimo calcular cem como de descobrir desconto e fracao ler o parte partir total uma",
     "d": "aluno aumento cento depois entao exemplo loja mais mesmo metade novo numa numero preco produto qual quanto real reduzido turma valor"
-   }
+   },
+   "modulo": "6ano:fracao-como-porcentagem-e-como-probabilidade"
   },
   {
    "id": "MAT06-09",
@@ -998,7 +1054,8 @@
    "chaves": {
     "r": "aparecem as classificar complemento corta duas medir paralela quando que reconhecer relacao suplemento transversal uma usar",
     "d": "alterno bissetriz cada colateral completa correspondente cortada dele determine dois entre exemplo ficam formam grau hora igual interno lado mais mede medem medida menos mesmo oposto pelo qual quanto quatro raso suplementar vertice volta"
-   }
+   },
+   "modulo": "8ano:elementos-basicos-de-geometria-plana-parte-1"
   },
   {
    "id": "MAT06-10",
@@ -1016,7 +1073,8 @@
    "chaves": {
     "r": "angulo calcular contar de diagonal elemento externo interno pelo reconhecer seu soma",
     "d": "cada como convexo decagono dividido dois duas exemplo figura grau hexagono igual isso lado liga mede menos mesmo numero quadrilatero quanto regular saem segmento sempre todo triangulo vertice vizinho"
-   }
+   },
+   "modulo": "9ano:quadrilateros"
   },
   {
    "id": "MAT06-11",
@@ -1035,7 +1093,8 @@
    "chaves": {
     "r": "basica calcular composta contorno das distinguir resolver superficie",
     "d": "altura base calcule centimetro compra dois duas entre exemplo igual lado mede medida mesma mesmo metro pedaco quadrado qual quanto retangulo soma trapezio triangulo unidade"
-   }
+   },
+   "modulo": "6ano:unidades-de-medida-de-comprimento-e-de-areas"
   },
   {
    "id": "MAT06-12",
@@ -1053,7 +1112,8 @@
    "chaves": {
     "r": "bloco calcular centimetro cubico do entre espaco litro medir metro o ocupado por retangular solido transitar um",
     "d": "agua altura aresta base cabem caixa comporta comprimento cubinho cubo exemplo mede qual quanto tres"
-   }
+   },
+   "modulo": "6ano:unidades-de-medida-de-volume"
   },
   {
    "id": "MAT06-13",
@@ -1070,7 +1130,8 @@
    "chaves": {
     "r": "coordenada distancia e estudar figura localizar medir nomear ordenado par para ponto por um usar",
     "d": "area calcule direita dois entao entre esta exemplo ficam horizontal lado mesma mesmo numa numero ordem origem outro perimetro qual retangulo unidade vertical vertice voce"
-   }
+   },
+   "modulo": "7ano:o-plano-cartesiano-e-sistemas-de-equacoes"
   },
   {
    "id": "MAT06-14",
@@ -1088,7 +1149,8 @@
    "chaves": {
     "r": "certo com conjunto dado de em escolher frequencia mediana moda o organizar resumir um",
     "d": "absoluta aluno aparece cada calcule cinco como dessa escolheram essa exemplo mais nota numa numero qual quando quantidade quanto quatro relativa seja soma tiraram total turma valor"
-   }
+   },
+   "modulo": "7ano:nocoes-basicas-de-estatistica"
   },
   {
    "id": "MAT07-01",
@@ -1105,7 +1167,8 @@
    "chaves": {
     "r": "com comparar entender localiza los modulo na negativo oposto os para que seguranca servem usar",
     "d": "andar conta contar dele distancia dois entre esquerda esta exemplo existem grau isso lado maior mais meio menor menos mesmo ordem pode qual quanto sinal subiu temperatura todo unidade valor variacao zero"
-   }
+   },
+   "modulo": "7ano:numeros-inteiros-e-numeros-racionais"
   },
   {
    "id": "MAT07-02",
@@ -1122,7 +1185,8 @@
    "chaves": {
     "r": "da das de dividir dominio e multiplicar ordem potenciar regra sinal somar subtrair",
     "d": "andar ante cada calcular calcule caso dele depois diferente divisao dois entao erro esquerda exemplo expoente fator fica grau igual mais menos modulo multiplicacao negativo oposto ponto positivo produto resultado vale zero"
-   }
+   },
+   "modulo": "7ano:numeros-inteiros-e-numeros-racionais"
   },
   {
    "id": "MAT07-03",
@@ -1140,7 +1204,8 @@
    "chaves": {
     "r": "de decimal diferente do fracao mesmo outra para porcentagem que reconhecer roupa saber sao trocar uma",
     "d": "casa como denominador dizima dois duas entre escreva escrever exato exemplo fator inteiro irredutivel pede pelo periodica pode porque qual repetindo toda"
-   }
+   },
+   "modulo": "7ano:numeros-inteiros-e-numeros-racionais"
   },
   {
    "id": "MAT07-04",
@@ -1158,7 +1223,8 @@
    "chaves": {
     "r": "a conta curta decimal deixa dividir e escolhendo forma fracao mais multiplicar potenciar que sinal somar subtrair",
     "d": "ante cada calcular calcule comum denominador depois exemplo inverso numerador numero parte preco resultado soma tamanho tanque"
-   }
+   },
+   "modulo": "7ano:numeros-inteiros-e-numeros-racionais"
   },
   {
    "id": "MAT07-05",
@@ -1175,7 +1241,8 @@
    "chaves": {
     "r": "a comparar descobrir divisao duas falta grandeza igual igualdade o para por quando que reconhecer sao usar valor",
     "d": "aluno cada centimetro dois entre escala esta exemplo extremo meio menina menino mesmo numa numero parte qual quantidade quanto real total turma unidade vale xicara"
-   }
+   },
+   "modulo": "7ano:notacao-algebrica-e-introducao-as-equacoes"
   },
   {
    "id": "MAT07-06",
@@ -1192,7 +1259,8 @@
    "chaves": {
     "r": "a achar certa decidir direta duas e falta grandeza inversamente montar o ou para proporcao proporcional que sao se valor",
     "d": "cada caderno combustivel constante custam distancia entao erro exemplo fazem hora inversa leva litro logo mais maquina menos mesma mesmo minuto necessario numero operario outra peca percurso pessoa produto quanto quilometro real ritmo servico tempo trabalho velocidade"
-   }
+   },
+   "modulo": "7ano:equacoes-e-inequacoes-do-primeiro-grau"
   },
   {
    "id": "MAT07-07",
@@ -1210,7 +1278,8 @@
    "chaves": {
     "r": "aplicar aumento calcular desconto do dois em nos o original para parte resultado sentido valor voltar",
     "d": "aplicado capital dele depois dividir durante erro exemplo foram fracao mais mensal mesmo montante numero periodo prazo preco produto qual quanto real rendeu taxa tempo"
-   }
+   },
+   "modulo": "7ano:equacoes-e-inequacoes-do-primeiro-grau"
   },
   {
    "id": "MAT07-08",
@@ -1228,7 +1297,8 @@
    "chaves": {
     "r": "a ao da descobrir direto em escrever essa funcao gera para pedido posicao que regra saltar termo uma",
     "d": "achar anterior bloco cada degrau diferenca dois escreva esta exemplo expressao figura lado mais mesmo numa numero palito passo proximo quadrado qual quanto seguinte sempre soma tres valor"
-   }
+   },
+   "modulo": "7ano:razoes-e-proporcoes"
   },
   {
    "id": "MAT07-09",
@@ -1246,7 +1316,8 @@
    "chaves": {
     "r": "calcular com dela letra o para reduzir sem semelhante sinal situacao termo traduzir trocar valor",
     "d": "area caderno calcule custa custam diminuido dois escreva exemplo funcao lado lugar menos multiplica numero parentes perimetro quadrado quando real reduza resultado soma substituir tres"
-   }
+   },
+   "modulo": "7ano:razoes-e-proporcoes"
   },
   {
    "id": "MAT07-10",
@@ -1263,7 +1334,8 @@
    "chaves": {
     "r": "a conferir e equilibrio igualdade incognita isolar mantendo o para problema resposta traduzir um uma",
     "d": "cada como comum dobro dois erro exemplo idade igual lado numero outro passo ponto resolva resolver sinal solucao somando tirando valor"
-   }
+   },
+   "modulo": "7ano:porcentagem-e-juros"
   },
   {
    "id": "MAT07-11",
@@ -1280,7 +1352,8 @@
    "chaves": {
     "r": "a abertura as classifica dada de descobrir entre foram la medida nao para que reconhecer relacao um usar",
     "d": "bissetriz cada como complemento consecutivo dele determine divide dois duas exemplo formam grau hora lado mede medem menor mesmo minuto oposto parte pelo porque quanto quatro raso relogio reta semirreta somam suplemento todo tres vale vertice"
-   }
+   },
+   "modulo": "8ano:elementos-basicos-de-geometria-plana-parte-1"
   },
   {
    "id": "MAT07-12",
@@ -1298,7 +1371,8 @@
    "chaves": {
     "r": "a angulo classificar dos formam interno medida mesmo quando saber soma tres um usar",
     "d": "adjacente agudo base cada celula classificacao determine dois duas entre equilatero exemplo externo figura grau igual isoscele lado losango maior mais mede medem menor nome outro paralelo paralelogramo quadrado qualquer quanto quatro retangulo reto tempo todo trapezio vertice"
-   }
+   },
+   "modulo": "8ano:elementos-basicos-de-geometria-plana-parte-3"
   },
   {
    "id": "MAT07-13",
@@ -1316,7 +1390,8 @@
    "chaves": {
     "r": "achar atencao com conhecida contorno decompor em o ou para parte percorrer somar subtrair uma",
     "d": "altura base calcular calcule caminho canto centimetro comprimento dentro diferente dois entalhe exemplo lado ladrilho maior mede meio mesmo metro necessario outro pedaco quadrado qual quanto recorte recortou retangular retangulo trapezio triangulo unidade"
-   }
+   },
+   "modulo": "7ano:o-plano-cartesiano-e-sistemas-de-equacoes"
   },
   {
    "id": "MAT07-14",
@@ -1334,7 +1409,8 @@
    "chaves": {
     "r": "a cada calcular certa chance com conjunto dado de evento medida para resumir simple situacao um",
     "d": "aluno azul bola calcule caso cinco comum dele determine dois exemplo favoravel grupo maior mais melhor nota numa numero pessoa possivel precisa qual quantidade quatro real resultado sair soma tirar todo tres turma valor"
-   }
+   },
+   "modulo": "7ano:nocoes-basicas-de-estatistica"
   },
   {
    "id": "MAT08-01",
@@ -1351,7 +1427,8 @@
    "chaves": {
     "r": "as com conta curta de dominar em grande ler para potencia regra seguranca sinal transformar uma usar",
     "d": "aparece base calcular calcule como dois elevado erro escreva escrever exemplo expoente fica fracao mais mesma mesmo negativo numero parentese quando resultado valor"
-   }
+   },
+   "modulo": "8ano:potenciacao"
   },
   {
    "id": "MAT08-02",
@@ -1368,7 +1445,8 @@
    "chaves": {
     "r": "com compacta comparar de e ele escrever forma grande grandeza muito na numero operar ordem ou pequeno",
     "d": "algarismo calcule casa como escreva exemplo expoente igual maior metro quanta resultado sinal valor virgula"
-   }
+   },
+   "modulo": "8ano:potenciacao"
   },
   {
    "id": "MAT08-03",
@@ -1385,7 +1463,8 @@
    "chaves": {
     "r": "a calculadora com como desfaz ele entender operacao operar potencia que radical recorrer sem simplificar",
     "d": "calcule cubica denominador duas entre esta exemplo indice inteiro mais mesmo multiplicar numero perfeito produto quadrada quadrado qual quando radicando resultado simplifique soma vale"
-   }
+   },
+   "modulo": "8ano:potenciacao"
   },
   {
    "id": "MAT08-04",
@@ -1402,7 +1481,8 @@
    "chaves": {
     "r": "a da gerou identificar o para periodo quando que reconhecer uma vira voltar",
     "d": "algarismo ante como decimal denominador determine escreva exato exemplo existe mesmo nove numerador numero parte pelo repete resto sempre simplifica simplifique usando virgula zero"
-   }
+   },
+   "modulo": "8ano:dizimas-periodicas-e-numeros-reais"
   },
   {
    "id": "MAT08-05",
@@ -1420,7 +1500,8 @@
    "chaves": {
     "r": "calcular com confundir escrever ler letra numerico operar sem semelhante termo valor",
     "d": "calcule coeficiente determine dois entre escreva exemplo expoente lado literal multiplicar numero parte qualquer resultado sempre sinal soma substituir tres"
-   }
+   },
+   "modulo": "8ano:expressoes-algebricas-e-polinomios"
   },
   {
    "id": "MAT08-06",
@@ -1437,7 +1518,8 @@
    "chaves": {
     "r": "aparecem conta desenvolve do e encurtar errar los mais meio o os para que reconhecer sem termo tres usa",
     "d": "area cabeca calcular calcule como desenvolva diferenca dois exemplo lado quadrado resultado soma usando"
-   }
+   },
+   "modulo": "8ano:produtos-notaveis-e-fatoracao-de-expressoes-algebr"
   },
   {
    "id": "MAT08-07",
@@ -1454,7 +1536,8 @@
    "chaves": {
     "r": "aproveitar caso conta e em expressao isso para produto qual reconhecer simplificar soma transformar usar",
     "d": "agrupamento como completamente comum dois evidencia exemplo fator fatora fatorar fatore fracao mesmo numero perfeito quadrado quando resultado sempre termo trinomio valor"
-   }
+   },
+   "modulo": "8ano:produtos-notaveis-e-fatoracao-de-expressoes-algebr"
   },
   {
    "id": "MAT08-08",
@@ -1471,7 +1554,8 @@
    "chaves": {
     "r": "armadilha cair com cortar de e ela existe fatorando la na operar parcela quando reconhecer sem simplifica uma",
     "d": "ante calcule cancelar comum denominador diferenca esta exemplo fator fatorar mesmo multiplicar numerador pelo qual simplificar simplifique tanque todo valor"
-   }
+   },
+   "modulo": "8ano:fracoes-algebricas"
   },
   {
    "id": "MAT08-09",
@@ -1489,7 +1573,8 @@
    "chaves": {
     "r": "1 as do e entender escolher fazem grau infinita las lista no problema que saber sentido solucao tem uma",
     "d": "cada caderno caneta centavo custa determine entao escreva exemplo igual inteiro letra maior moeda numero quando real reta seja teste toda valor zero"
-   }
+   },
+   "modulo": "8ano:sistemas-de-equacoes-do-primeiro-grau"
   },
   {
    "id": "MAT08-10",
@@ -1506,7 +1591,8 @@
    "chaves": {
     "r": "adicao ao classificar com desconhecida duas e isso mesmo o para por problema quantidade resolver substituicao tempo usar",
     "d": "cada carro cento coeficiente determine entao exemplo formado impossivel indeterminado infinita junto letra moto numero ponto quando real resolva resposta reta roda sobra solucao"
-   }
+   },
+   "modulo": "8ano:sistemas-de-equacoes-do-primeiro-grau"
   },
   {
    "id": "MAT08-11",
@@ -1523,7 +1609,8 @@
    "chaves": {
     "r": "as calcular de duas e ele entre formado justificar medida os par para por propriedade reconhecer relacao transversal uma usar",
     "d": "adjacente alterno bissetriz cada colateral correspondente corta cortada dele determinar determine dois exemplo externo fato ficam forma igual interno lado mede medem mesma mesmo oito oposto outro pelo ponto quando quatro segmento soma somam suplementar triangulo valor vertice"
-   }
+   },
+   "modulo": "8ano:elementos-basicos-de-geometria-plana-parte-1"
   },
   {
    "id": "MAT08-12",
@@ -1541,7 +1628,8 @@
    "chaves": {
     "r": "bastam caso construcao dois e garantir identico informacao justificar os para propriedade qual que saber sao usar",
     "d": "angulo bissetriz cada centimetro comum conclua congruente corresponde correspondendo correspondente determine entre exemplo figura forma grau igual indique isoscele justifique lado mede mediana medida medindo medio mesma oposto ordem outro pelo ponto porque tres"
-   }
+   },
+   "modulo": "8ano:elementos-basicos-de-geometria-plana-parte-2"
   },
   {
    "id": "MAT08-13",
@@ -1560,7 +1648,8 @@
    "chaves": {
     "r": "calcular circunferencia coroa de do entender numero o onde para pi raio resultado setor vem voltar",
     "d": "angulo aproximado arco calcule centimetro central centro circular como contorno determine diametro duas entao entre exemplo fatia figura formula funcao grau hachurada legenda maior menor metro pede quadrado quando regiao resposta roda tres usando valor volta"
-   }
+   },
+   "modulo": "8ano:elementos-basicos-de-geometria-plana-parte-3"
   },
   {
    "id": "MAT08-14",
@@ -1577,7 +1666,8 @@
    "chaves": {
     "r": "a cada calcular caso chance contando de descobrir em evento falta favoravel medir nota peso possivel que tem um valor",
     "d": "aluno azul bola caixa camisa caneta comum conta dado determine dois duas exemplo face mais mesma numa numero obteve pode preco preta qual quando quantidade real resultado retirada sempre soma total turma urna vendida vermelha"
-   }
+   },
+   "modulo": "7ano:nocoes-basicas-de-estatistica"
   },
   {
    "id": "MAT09-01",
@@ -1595,7 +1685,8 @@
    "chaves": {
     "r": "dizima em fracao na numerica ou periodica quando racional raiz reconhecer reta situar transformar um",
     "d": "algarismo bloco como decimal dois entre escreva esta exato exemplo inteiro irredutivel justifique mais perfeito periodo quadrado qual repetindo sempre soma todo valor"
-   }
+   },
+   "modulo": "8ano:dizimas-periodicas-e-numeros-reais"
   },
   {
    "id": "MAT09-02",
@@ -1612,7 +1703,8 @@
    "chaves": {
     "r": "as cientifica das em equacao estender exponencial isso notacao para propriedade simple usar",
     "d": "base calcular calcule conta divisao escreva exemplo mesma multiplicacao raiz regra resultado seja somar zero"
-   }
+   },
+   "modulo": "8ano:potenciacao"
   },
   {
    "id": "MAT09-03",
@@ -1630,7 +1722,8 @@
    "chaves": {
     "r": "a com conjugado denominador do inclusive multiplicar raiz simplificar somar tirar",
     "d": "calcule exemplo mais mesmo numerador produto quadrado racionalizar racionalize radicando simplifique valor vira"
-   }
+   },
+   "modulo": "8ano:dizimas-periodicas-e-numeros-reais"
   },
   {
    "id": "MAT09-04",
@@ -1648,7 +1741,8 @@
    "chaves": {
     "r": "a ante calcular caminho curto de discriminante e entre escolher fatoracao forma formula geral ler mais o reconhecer resolutiva",
     "d": "coeficiente dois duas exemplo produto quadratico quando raiz real resolva soma termo valor"
-   }
+   },
+   "modulo": "9ano:equacoes-do-segundo-grau"
   },
   {
    "id": "MAT09-05",
@@ -1665,7 +1759,8 @@
    "chaves": {
     "r": "contexto das decidir e em faz no quadratica qual raiz resolver sentido situacao traduzir uma",
     "d": "altura area caminho centimetro comprimento dada determine dois duas enunciado exemplo lado lancamento largura medida metro negativa numero perimetro positivo quadrado retangulo soma toda volta"
-   }
+   },
+   "modulo": "9ano:equacoes-do-segundo-grau"
   },
   {
    "id": "MAT09-06",
@@ -1683,7 +1778,8 @@
    "chaves": {
     "r": "a altura as calcular cateto do dos e hipotenusa medida para projecao qualquer relativa usar",
     "d": "angulo cada calcule como desse dois duas exemplo igual mede medem pela produto quadrado"
-   }
+   },
+   "modulo": "9ano:teorema-de-pitagoras-e-aplicacoes"
   },
   {
    "id": "MAT09-07",
@@ -1701,7 +1797,8 @@
    "chaves": {
     "r": "calcular da distancia do e isso lado medir nao os para que relacionar retangulo tres triangulo usar",
     "d": "altura angulo area calcule cateto dela diagonal dois escada exemplo fica figura hipotenusa maior mede metro outro quadrado qual quando reto sempre terno"
-   }
+   },
+   "modulo": "9ano:teorema-de-pitagoras-e-aplicacoes"
   },
   {
    "id": "MAT09-08",
@@ -1721,7 +1818,8 @@
    "chaves": {
     "r": "achar aplicar correspondente entre feixe figura inacessivel lado medida o para paralela proporcao reconhecer semelhante usar",
     "d": "altura angulo area base calcule centimetro corta dois duas esta exemplo forma igual mede menor mesma mesmo metro numa onde original outra outro perimetro ponto poste predio projeta quadrado razao reta segmento sombra transversal triangulo vertice"
-   }
+   },
+   "modulo": "9ano:semelhanca-de-triangulos-e-teorema-de-tales"
   },
   {
    "id": "MAT09-09",
@@ -1740,7 +1838,8 @@
    "chaves": {
     "r": "achar altura as da do lado medir nao para que razao retangulo triangulo trigonometrica usar",
     "d": "adjacente agudo angulo aparecem base calcule cateto chao como depressao dois elevacao entao entre escada escolhido esse esta exemplo figura forma hipotenusa horizontal linha mede mesmo metro nivel observador olho oposto parede predio qual quando topo torre vale voce"
-   }
+   },
+   "modulo": "9ano:triangulo-retangulo-lei-dos-senos-e-cossenos-polig"
   },
   {
    "id": "MAT09-10",
@@ -1758,7 +1857,8 @@
    "chaves": {
     "r": "associa cada como entender entrada essa formula ler na no que regra saida tabela uma unica",
     "d": "afim calcule considere corta determine dois duas eixo exemplo fixo horizontal isso mais mesma minuto peca ponto preco qual quando quanto real resultado reta valor vertical voce zero"
-   }
+   },
+   "modulo": "9ano:funcoes-nocoes-basicas"
   },
   {
    "id": "MAT09-11",
@@ -1776,7 +1876,8 @@
    "chaves": {
     "r": "central com comprimento ele em enxergam excentrico grau inscrito medir os que relacionar",
     "d": "area cada calcule centimetro centro determine diferente dois duas entre enxerga enxergado exemplo fora interno lado mais mede medida mesmo metade numa oposto ponto quadrilatero qual quando quanto raio vale vertice volta"
-   }
+   },
+   "modulo": "9ano:quadrilateros"
   },
   {
    "id": "MAT09-12",
@@ -1794,7 +1895,8 @@
    "chaves": {
     "r": "calcular composto cone converter esfera litro o para piramide prisma resolver",
     "d": "agua altura area base caixa calcule centimetro cilindrico cubico cubo exemplo funcao igual lado mesma metro peca quadrada qual raio resultado semiesfera unidade"
-   }
+   },
+   "modulo": "3em:geometria-espacial-3-volumes-e-areas-de-cilindros"
   },
   {
    "id": "MAT09-13",
@@ -1812,7 +1914,8 @@
    "chaves": {
     "r": "afastam amplitude centro conjunto dado desvio do media mediana medio medir moda o os pela pelo quanto resumir se um valor",
     "d": "aluno apareceu cada calcular calcule central determine distancia dois duas exemplo isso maior mais menor mesma mesmo nota numero onde quantidade soma todo turma"
-   }
+   },
+   "modulo": "7ano:nocoes-basicas-de-estatistica"
   },
   {
    "id": "MAT09-14",
@@ -1829,7 +1932,8 @@
    "chaves": {
     "r": "a acontecimento calcular caso com distinguindo do dois em mais o ou reposicao sem sequencia",
     "d": "azul bola branca cada caminho cara carta comum dado depois duas etapa exemplo favoravel fracao honesta lancada lancado menos moeda numero pelo preta produto qual quando resultado retirada sair serem tres urna vale vermelha"
-   }
+   },
+   "modulo": "2em:introducao-a-probabilidade"
   },
   {
    "id": "MATEM1-01",
@@ -1846,7 +1950,8 @@
    "chaves": {
     "r": "como de decimal e escrever fracao inteiro intervalo irracional natural para passar racional real reconhecer",
     "d": "assim cada dentro determine diante dizima dois elemento entra escreva esta exemplo extremo fora forma igual infinita interseccao mesmo numero porque qual resultado reta sempre soma todo valor"
-   }
+   },
+   "modulo": "9ano:conjuntos"
   },
   {
    "id": "MATEM1-02",
@@ -1864,7 +1969,8 @@
    "chaves": {
     "r": "achar de distinguir entender expressao faz o que real relacao uma",
     "d": "cada calcule como conjunto dada declarado determine diferente duas elemento entrada exemplo formado maior numero pode precisa quando regra saida sobrejetora todo valor"
-   }
+   },
+   "modulo": "9ano:funcoes-nocoes-basicas"
   },
   {
    "id": "MATEM1-03",
@@ -1881,7 +1987,8 @@
    "chaves": {
     "r": "a angular coeficiente de dois e escondida lei ler linear montar num partir pelo ponto problema reconhecer reta",
     "d": "achar corta custa decrescente determine duas eixo exemplo fixo mais mesmo minuto numa onde passa plano preco quando quanto quilometro raiz real seja sempre taxa taxi vale valor variacao vertical"
-   }
+   },
+   "modulo": "9ano:funcao-afim"
   },
   {
    "id": "MATEM1-04",
@@ -1899,7 +2006,8 @@
    "chaves": {
     "r": "a achar coeficiente de e ler maximo minimo o para parabola pelo problema raiz resolver usar vertice",
     "d": "area canonica como conta corta determine dois duas eixo exemplo forma formula grafico isso lucro maior mais metro negativo numero onde ponto porque positivo produto quadrado qual real sempre sinal soma tela valor"
-   }
+   },
+   "modulo": "1em:funcao-quadratica"
   },
   {
    "id": "MATEM1-05",
@@ -1916,7 +2024,8 @@
    "chaves": {
     "r": "condicao de desigualdade existencia linear montar o perder produto quadratica quadro quociente resolver sem sinal sistema tratar",
     "d": "aceita coeficiente conjunto denominador dividir dois entao equacao exemplo fator fica fora intersecao lado linha mesmo multiplicar negativo numerador numero nunca parabola porque positivo qual quando raiz resolva resposta sentido solucao toda valor zera zero"
-   }
+   },
+   "modulo": "1em:inequacoes-produto-e-quociente-do-segundo-grau"
   },
   {
    "id": "MATEM1-06",
@@ -1933,7 +2042,8 @@
    "chaves": {
     "r": "a com como distancia e em entender equacao escrever grafico inequacao ler modulo o parte por resolver v",
     "d": "barra cada caminho caso conjunto definicao dentro dizer dois duas entao entre esta exemplo expressao faixa forma imagem intervalo lado negativo ponto quadrado quando quer resolva resposta seja sinal solucao valor zero"
-   }
+   },
+   "modulo": null
   },
   {
    "id": "MATEM1-07",
@@ -1951,7 +2061,8 @@
    "chaves": {
     "r": "a base crescimento de decaimento e em equacao expoente fixa inequacao modelo o reconhecer resolver usar variavel",
     "d": "bacteria como depois desigualdade dois eixo entre exemplo grama hora lado maior mesma negativo pela porque potencia quanto raiz resolva sentido toda vale valor zero"
-   }
+   },
+   "modulo": "1em:funcao-exponencial"
   },
   {
    "id": "MATEM1-08",
@@ -1968,7 +2079,8 @@
    "chaves": {
     "r": "as base com como condicao da de do entender existencia expoente falta mudanca o operar potencia produto que quociente respeitar",
     "d": "aproximadamente calcular calcule diferente entao equacao esta exemplo logaritmando negativo numero porque positivo quando raiz resolva resposta resultado sabendo tres vale"
-   }
+   },
+   "modulo": "1em:funcao-logaritmica"
   },
   {
    "id": "MATEM1-09",
@@ -1985,7 +2097,8 @@
    "chaves": {
     "r": "a base condicao crescimento de desfaz dominio e entender equacao esquecer existencia exponencial inequacao ler pela que resolver sem seu",
     "d": "cada como desigualdade determine duas eixo entao exemplo intensidade isso logaritmo maior mais mesma numero periodo porque positivo raiz real resolva resposta sempre sentido tempo todo unidade vale valor zero"
-   }
+   },
+   "modulo": "1em:funcao-logaritmica"
   },
   {
    "id": "MATEM1-10",
@@ -2002,7 +2115,8 @@
    "chaves": {
     "r": "a achar certa com constante e escrever formula inteira qualquer razao reconhecer sem sequencia somar termo todo uma",
     "d": "cada determine entao entre exemplo numa numero passo pertence posicao quanto seguinte sempre soma some tres ultimo vale"
-   }
+   },
+   "modulo": "1em:progressoes-aritmeticas"
   },
   {
    "id": "MATEM1-11",
@@ -2019,7 +2133,8 @@
    "chaves": {
     "r": "a achar e ela inclusive infinito multiplica qualquer quando que razao reconhecer sequencia somar tem termo",
     "d": "anterior aqui aritmetica assim cada determine diante entre exemplo mais produto qual sempre sexto soma tres vale valor"
-   }
+   },
+   "modulo": "1em:progressoes-geometricas"
   },
   {
    "id": "MATEM1-12",
@@ -2036,7 +2151,8 @@
    "chaves": {
     "r": "a conhecida de distinguir esconde forma geral lei outra para passar progressao quando reconhecer termo uma",
     "d": "achar anterior cada comeca como constante convidado decimo determine diferenca dois escreva exemplo fibonacci geometrica inicial numa numero posicao quatro razao regra seguinte soma somado somar toda triangular valor"
-   }
+   },
+   "modulo": "1em:progressoes-aritmeticas"
   },
   {
    "id": "MATEM1-13",
@@ -2053,7 +2169,8 @@
    "chaves": {
     "r": "amplitude com dado desvio e espalhamento media mediana medir moda numa o organizar padrao resumir tabela",
     "d": "aluno cada calcular calcule categoria central centro cinco conjunto dois entao erro essa exemplo frequencia grafico grupo irmao maior mais medida menor muito nota numero onde pela peso ponderada populacao quadrado qual quando quantidade quantitativa quanto quatro real responderam resultado salario soma somam todo total tres turma unidade valor variancia"
-   }
+   },
+   "modulo": "1em:estatistica-basica-i"
   },
   {
    "id": "MATEM1-14",
@@ -2070,7 +2187,8 @@
    "chaves": {
     "r": "achar altura angulo cosseno de distancia dominar e lado notavel os para problema resolver seno tangente usar",
     "d": "adjacente agudo base calcule cateto chamando chao como dois duas entre esta exemplo figura forma hipotenusa horizontal isso linha maior mede mesmo metro oposto outro parede ponto qual razao relacao reta sempre topo torre vale valor visto"
-   }
+   },
+   "modulo": "1em:leis-dos-senos-e-dos-cossenos"
   },
   {
    "id": "MATEM1-15",
@@ -2087,7 +2205,8 @@
    "chaves": {
     "r": "a achar ao aplicar composicao da de dominio e importa inversa o ordem outra para perceber que reconhecer resultado uma usar",
     "d": "ante cada calcule como dentro depois desconto determine diferente duas entra entrega exemplo expressao fora maquina mesma numero passa precisa quando real seja sejam todo vale valor"
-   }
+   },
+   "modulo": "9ano:funcoes-nocoes-basicas"
   },
   {
    "id": "MATEM2-01",
@@ -2105,7 +2224,8 @@
    "chaves": {
     "r": "a arco cosseno dele e em grau ler localizar medir no partir qualquer radiano seno tangente",
     "d": "achar angulo calcule circunferencia coordenada determinacao determine entre equacao esta exemplo existe mais menor negativo ponto positiva positivo quadrante raio seja sentido sinal todo vale valor volta"
-   }
+   },
+   "modulo": "1em:circulo-trigonometrico"
   },
   {
    "id": "MATEM2-02",
@@ -2123,7 +2243,8 @@
    "chaves": {
     "r": "cosseno das descrever deslocamento e fenomeno imagem las para periodo que reconhecer repetem se seno tangente usa",
     "d": "achar altura arco cada ciclo completa determine equacao exemplo maximo mesmo minimo muda numero onda parametro ponto positivo repete temperatura todo valor vertical volta"
-   }
+   },
+   "modulo": "2em:trigonometria-ii"
   },
   {
    "id": "MATEM2-03",
@@ -2140,7 +2261,8 @@
    "chaves": {
     "r": "a conforme dado disponivel entre escolhendo os quaisquer resolver triangulo",
     "d": "achar angulo area calcule caso dois exemplo lado mede medem oposto outro quando reto termo vertice"
-   }
+   },
+   "modulo": "1em:leis-dos-senos-e-dos-cossenos"
   },
   {
    "id": "MATEM2-04",
@@ -2157,7 +2279,8 @@
    "chaves": {
     "r": "com dado de ela em multiplicando numero operar organizar por somando tabela",
     "d": "cada coluna cuja determine duas elemento exemplo existe identidade igual indice inversa linha loja mesmo multiplicar multiplique nessa ordem pela posicao produto quadrada quando resultado soma somar tamanho todo transposta"
-   }
+   },
+   "modulo": "3em:matrizes-e-sistemas-lineares"
   },
   {
    "id": "MATEM2-05",
@@ -2174,7 +2297,8 @@
    "chaves": {
     "r": "calcular de decidir e equacao existe inversa matriz o para propriedade quadrada resolver se sua usar",
     "d": "achar calcule coluna cuja determine diagonal duas elemento exemplo linha numero pela produto quando transposta tres valor zero"
-   }
+   },
+   "modulo": "3em:matrizes-e-sistemas-lineares"
   },
   {
    "id": "MATEM2-06",
@@ -2192,7 +2316,8 @@
    "chaves": {
     "r": "1 a adicao classifica de discutir do e em equacao escalonamento funcao grau los parametro por resolver solucao substituicao um",
     "d": "cada caso coeficiente coluna cramer determinado determinante determine duas exemplo formado impossivel incognita indeterminado letra mesmo porque qual quanto quilo real resolva reta tres valor zero"
-   }
+   },
+   "modulo": "3em:sistemas-lineares-e-geometria-analitica"
   },
   {
    "id": "MATEM2-07",
@@ -2209,7 +2334,8 @@
    "chaves": {
     "r": "a as cada caso configuracao contar de e etapa existem listar multiplicando possibilidade quanta restricao sem separado tratando uma",
     "d": "algarismo calca camisa como decisao diferente distinto duas escolhido exemplo formado letra menos modo numero opcao outra placa pode podem posicao quando quanto repetir total usando"
-   }
+   },
+   "modulo": "2em:principios-basicos-de-contagem"
   },
   {
    "id": "MATEM2-08",
@@ -2226,7 +2352,8 @@
    "chaves": {
     "r": "a decidir elemento entre escolher ha importa inclusive ordem ou quando repetido restricao se",
     "d": "agrupamento algum anagrama cada caso comissao dele depois exemplo fatorial formada grupo homem lado letra modo mulher numa numero onde palavra pessoa podem podio quanta quanto total"
-   }
+   },
+   "modulo": "2em:metodos-sofisticados-de-contagem"
   },
   {
    "id": "MATEM2-09",
@@ -2244,7 +2371,8 @@
    "chaves": {
     "r": "a achar binomial coeficiente com desenvolver e escrever especifico expansao geral inteira o para potencia sem termo um usar",
     "d": "cada calcule desenvolvimento determine exemplo expoente independente isso linha negativo onde qual quando sinal soma triangulo zero"
-   }
+   },
+   "modulo": "2em:binomio-de-newton-e-o-triangulo-de-pascal"
   },
   {
    "id": "MATEM2-10",
@@ -2262,7 +2390,8 @@
    "chaves": {
     "r": "a calcular caso chance complementar condicional contagem contando de direta e evento favoravel possivel quando ruim um uniao usar",
     "d": "acaso acontece aluno amostral azul bola cara carta copa dado dois duas espaco exemplo honesto igualmente lancado maior menina menos numero onde provavel qual reposicao resultado retiram sair soma urna vale vermelha"
-   }
+   },
+   "modulo": "2em:introducao-a-probabilidade"
   },
   {
    "id": "MATEM2-11",
@@ -2280,7 +2409,8 @@
    "chaves": {
     "r": "a achar altura area aresta calcular composto de do partir resolver solido volume",
     "d": "apotema base bloco calcule centimetro cubo diagonal dimensao duas essa exemplo face figura forma lado lateral mesma paralelepipedo quadrada quando regular retangulo reto soma total tres triangular triangulo"
-   }
+   },
+   "modulo": "3em:geometria-espacial-2-volumes-e-areas-de-prismas-e"
   },
   {
    "id": "MATEM2-12",
@@ -2297,7 +2427,8 @@
    "chaves": {
     "r": "a area calcular dado de do dos formada mais medida partir peca por recuperar redondo resolver solido um volume",
     "d": "altura base calcule deixando dois duas enunciado exemplo figura funcao geratriz lateral mesma mesmo raio resposta superficie total"
-   }
+   },
+   "modulo": "3em:geometria-espacial-3-volumes-e-areas-de-cilindros"
   },
   {
    "id": "MATEM2-13",
@@ -2315,7 +2446,8 @@
    "chaves": {
     "r": "calcular capital deixam e ele em enxergar montante os para por prazo que simple taxa tra",
     "d": "achar aplicado calcule cento determine diferenca dois duas durante equivalente exemplo fator numero pelo periodo qual real rendimento vira"
-   }
+   },
+   "modulo": "1em:matematica-financeira"
   },
   {
    "id": "MATEM2-14",
@@ -2332,7 +2464,8 @@
    "chaves": {
     "r": "amplitude com conjunto dado de desvio espalham media mediana medir moda o os padrao por quanto resumir se um valor variancia",
     "d": "apareceu cada calcular calcule central determine dois entao exemplo formado frequencia isso mais medida mesma muito nota numero onde pela quadrado quantidade soma somar todo"
-   }
+   },
+   "modulo": "2em:introducao-a-inferencia-estatistica"
   },
   {
    "id": "MATEM2-15",
@@ -2349,7 +2482,8 @@
    "chaves": {
     "r": "calcular cosseno da diferenca do dois equacao essa exato formula metade obter para resolver seno soma tangente usar valor",
     "d": "calcule duas escrevendo esta exemplo fator forma frac isso mostre quadrante quando sabendo sinal zero"
-   }
+   },
+   "modulo": "2em:trigonometria-iii"
   },
   {
    "id": "MATEM3-01",
@@ -2367,7 +2501,8 @@
    "chaves": {
     "r": "achar alinhamento area baricentro calcular coordenada de desenhar medio medir nada para poligono sem testar usar",
     "d": "abscissa alinhado cada calcule determinante determine diferenca eixo entre esta estao exemplo extremo forma formula mais numero ordenada raiz resposta segmento tres triangulo vertice voce"
-   }
+   },
+   "modulo": "3em:geometria-analitica-1"
   },
   {
    "id": "MATEM3-02",
@@ -2386,7 +2521,8 @@
    "chaves": {
     "r": "angular coeficiente de distancia e equacao escrever jeito medir os paralelismo pelo perpendicularidade ponto reconhecer todo um uma",
     "d": "calcule corta determine duas eixo escreva exemplo fica forma formula geral linear mediatriz onde paralela passa perpendicular quando reduzida segmento sinal triangulo vertical zero"
-   }
+   },
+   "modulo": "3em:geometria-analitica-1"
   },
   {
    "id": "MATEM3-03",
@@ -2404,7 +2540,8 @@
    "chaves": {
     "r": "ao centro completando da de decidir distancia e em equacao geral ou para passar pela ponto posicao quadrado reduzida relacao reta um uma volta",
     "d": "caso circulo comum coordenada determine dois eixo escreva exemplo figura lado raio sinal tangente termo vale"
-   }
+   },
+   "modulo": "3em:geometria-analitica-2"
   },
   {
    "id": "MATEM3-04",
@@ -2421,7 +2558,8 @@
    "chaves": {
     "r": "a completando definicao e elipse equacao escondida escrever foco geral hiperbole identificar numa parabola pela por quadrado reconhecer reduzida sua",
     "d": "assintota centro dele denominador determine diretriz distancia dois eixo entre escreva esta excentricidade exemplo fica ficam figura fixo horizontal identifique maior mede mesma origem ponto porque quando relacao reta sinal vale vertice"
-   }
+   },
+   "modulo": "3em:conicas"
   },
   {
    "id": "MATEM3-05",
@@ -2439,7 +2577,8 @@
    "chaves": {
     "r": "a calcular com de dividir e equacao i imaginaria multiplicar na nao operar potencia que raiz real resolver somar tem unidade",
     "d": "calcule como conjugado conjunto denominador entre exemplo expoente igual modulo negativo parte pelo produto quando resto resultado seja soma termo vale"
-   }
+   },
+   "modulo": "3em:numeros-complexos-forma-algebrica"
   },
   {
    "id": "MATEM3-06",
@@ -2457,7 +2596,8 @@
    "chaves": {
     "r": "a angulo argumento de dividir e escrever formula modulo moivre multiplicar para pelo potencia raiz somando subtraindo um usar",
     "d": "algebrica calcule determine duas escreva essa esta exemplo mesmo parte quadrante resultado"
-   }
+   },
+   "modulo": "3em:numeros-complexos-forma-geometrica"
   },
   {
    "id": "MATEM3-07",
@@ -2474,7 +2614,8 @@
    "chaves": {
     "r": "a algoritmo briot chave com da de descobrir dispositivo dividir do fator fazer o operar para pelo raiz resto ruffini sem teorema usar",
     "d": "calcule coeficiente depois determine divida divisor exemplo grau maior numero potencia quando quociente soma termo usando"
-   }
+   },
+   "modulo": "3em:funcoes-polinomiais-com-coeficientes-complexos"
   },
   {
    "id": "MATEM3-08",
@@ -2492,7 +2633,8 @@
    "chaves": {
     "r": "achar as coeficiente de entre fatoracao racional relacao toda uma usando",
     "d": "determine dois duas entao exemplo forma grau isso maior multiplicidade pode polinomio produto quando real resolva resolver soma termo todo valor"
-   }
+   },
+   "modulo": "3em:equacoes-algebricas-propriedades-das-raizes"
   },
   {
    "id": "MATEM3-09",
@@ -2510,7 +2652,8 @@
    "chaves": {
     "r": "continua entender fatoracao funcao indeterminacao levantar onde para por reconhecer tende uma",
     "d": "assintota calcule denominador dois exemplo existe fator grau numerador ponto quando quanto seja vale valor zero"
-   }
+   },
+   "modulo": null
   },
   {
    "id": "MATEM3-10",
@@ -2531,7 +2674,8 @@
    "chaves": {
     "r": "a as cada certa de do em ensino escolher familia ferramenta medio pelo problema reconhecer retomar uma",
     "d": "calcule caracteristica depois determine dois eixo equacao esta exemplo inversa modulo pergunta ponto qual quando quanto raiz resolva reta valor vertice"
-   }
+   },
+   "modulo": "9ano:funcoes-nocoes-basicas"
   },
   {
    "id": "MATEM3-11",
@@ -2548,7 +2692,8 @@
    "chaves": {
     "r": "a calcular certa combinacao entre escolher multiplicativo para permutacao principio usar",
     "d": "anagrama cada carta caso comissao como comum conta contar dado depois disposicao distinto dois duas elemento exemplo grupo jogando letra lugar menos modo numero onde ordem outro palavra pelo pessoa pode possivel qual quando quanto quem reposicao resultado roda rotacao sabendo sair todo total tres"
-   }
+   },
+   "modulo": "2em:introducao-a-probabilidade"
   },
   {
    "id": "MATEM3-12",
@@ -2567,7 +2712,8 @@
    "chaves": {
     "r": "area calcular cobrado do dos las mais para plano relacao retomar solido superficie usa volume",
     "d": "altura angulo apotema aresta base calcule cateto centimetro centro cilindro circulo circunferencia comprimento cone dois esfera exemplo figura formula geratriz hachurada hipotenusa lado lateral piramide prisma qual raio razao regiao retangulo setor triangulo"
-   }
+   },
+   "modulo": "3em:geometria-espacial-2-volumes-e-areas-de-prismas-e"
   },
   {
    "id": "MATEM3-13",
@@ -2585,7 +2731,8 @@
    "chaves": {
     "r": "aumento comparar composto de desconto e fator juro pagamento para presente proposta simple usar valor",
     "d": "anual aplicado calcule capital casa custa data decimal determine duas durante exemplo hoje mais mensal montante parcela periodo preco produto qual real rende salario sofre taxa total tudo vista"
-   }
+   },
+   "modulo": "1em:matematica-financeira"
   },
   {
    "id": "MATEM3-14",
@@ -2602,7 +2749,8 @@
    "chaves": {
     "r": "adequada com conclusao conjunto julgar medida qual realmente resumir sustenta um",
     "d": "alta aluno amplitude barra cada calcule crescimento desvio diferente dois duas eixo escolheram esta exemplo fevereiro final foram grupo janeiro leram livro mais marco media mediana mensal moda mostra nota onde opcao padrao percentual peso pessoa ponto quantidade real soma todo tres usam valor venda vertical"
-   }
+   },
+   "modulo": "1em:estatistica-basica-i"
   }
  ]
 }

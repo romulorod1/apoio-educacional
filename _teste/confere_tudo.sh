@@ -231,6 +231,7 @@ roda "trilha (dados)" node _teste/testa_trilha_dados.js
 # transitividade, raizes so no 2o ano, ids e titulos congelados; com veneno.
 roda "grafo (C7)"     node _teste/testa_grafo.js
 roda "trilha (motor)" node _teste/testa_trilha.js
+roda "trilha (listas C7)" node _teste/testa_trilha_listas.js
 roda "dinheiro"      node _teste/testa_dinheiro.js
 roda "cartao do mes" node _teste/testa_cartao.js
 roda "proposta"      node _teste/testa_proposta.js
