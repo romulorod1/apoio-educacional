@@ -49,6 +49,7 @@ const { conf, esperar } = H;
   const lista = await esperar('lista correta aberta', () => pag.evaluate(() =>
     document.querySelector('#tela-biblioteca').classList.contains('ativa') &&
     document.querySelector('#bib-corpo').textContent.includes('equacoes-e-inequacoes-do-primeiro-grau')), Boolean, 8000);
+  if (process.env.C7_PRINT) await pag.screenshot({ path: process.env.C7_PRINT });
   if (!lista.ok) console.log('estado da biblioteca:', await pag.evaluate(() => ({
     ativa: document.querySelector('#tela-biblioteca').classList.contains('ativa'),
     corpo: document.querySelector('#bib-corpo').textContent.slice(0, 500),
