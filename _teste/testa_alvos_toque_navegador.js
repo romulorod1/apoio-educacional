@@ -60,6 +60,10 @@ const PASTA_PRINTS = process.env.SALVAR_PRINTS || '';
     H.conf('botao mes-seguinte com altura >= 44 px', medidasBarraAgenda.seg.h >= 44, true);
     H.conf('botao ir-para-hoje com altura >= 44 px', medidasBarraAgenda.hoje.h >= 44, true);
     H.conf('botao nova-aula com altura >= 44 px', medidasBarraAgenda.nova.h >= 44, true);
+    const agendaPequenos = await page.evaluate(() => Array.from(document.querySelectorAll('#abas button, #tela-agenda button'))
+      .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; })
+      .filter(e => { const r = e.getBoundingClientRect(); return r.width < 44 || r.height < 44; }).length);
+    H.conf('todos os botões visíveis da agenda e navegação têm alvo de 44 px', agendaPequenos, 0);
 
     H.secao('2. Modal de nova aula e caixas de marcacao');
     await page.click('#nova-aula');
@@ -89,8 +93,13 @@ const PASTA_PRINTS = process.env.SALVAR_PRINTS || '';
     H.conf('botao fechar do modal de aula com largura >= 44 px', medidasModalAula.fecharW >= 44, true);
     H.conf('botao fechar do modal de aula com altura >= 44 px', medidasModalAula.fecharH >= 44, true);
     H.conf('rotulo de Cobrar esta aula com altura >= 44 px', medidasModalAula.rotuloCobrarH >= 44, true);
-    H.conf('checkbox Cobrar esta aula com dimensao ampliada >= 18 px',
-      medidasModalAula.chkCobrarW >= 18 && medidasModalAula.chkCobrarH >= 18, true);
+    H.conf('checkbox Cobrar esta aula mede pelo menos 24 px',
+      medidasModalAula.chkCobrarW >= 24 && medidasModalAula.chkCobrarH >= 24, true);
+    const aulaPequenos = await page.evaluate(() => Array.from(document.querySelectorAll('#modal-aula button, #modal-aula input, #modal-aula select'))
+      .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; })
+      .filter(e => { const alvo = e.type === 'checkbox' ? (e.closest('label') || e) : e;
+        const r = alvo.getBoundingClientRect(); return r.width < 44 || r.height < 44; }).length);
+    H.conf('todos os controles visíveis da janela de aula têm alvo de 44 px', aulaPequenos, 0);
 
     // Fecha modal da aula
     await page.click('#modal-aula .fechar');
@@ -123,24 +132,59 @@ const PASTA_PRINTS = process.env.SALVAR_PRINTS || '';
     await H.pausa(500);
 
     const medidasAgenda = await page.evaluate(() => {
-      const pilulas = Array.from(document.querySelectorAll('.pilula'));
+      const amostra = document.createElement('span');
+      amostra.className = 'pilula'; amostra.textContent = 'Aula de teste';
+      document.body.appendChild(amostra);
+      const pilulas = [amostra];
       const ajudas = Array.from(document.querySelectorAll('#tela-ajustes .ajuda, #modal-aula .ajuda'));
       const fontesAjuda = ajudas.map(a => parseFloat(window.getComputedStyle(a).fontSize));
       const alturasPilulas = pilulas.map(p => p.getBoundingClientRect().height);
 
-      return {
+      const resultado = {
         temPilulas: pilulas.length > 0,
         menorPilula: alturasPilulas.length ? Math.min(...alturasPilulas) : 0,
+        fontePilula: parseFloat(window.getComputedStyle(amostra).fontSize),
         menorFonteAjuda: fontesAjuda.length ? Math.min(...fontesAjuda) : 14
       };
+      amostra.remove();
+      return resultado;
     });
 
     if (medidasAgenda.temPilulas) {
-      H.conf('pilulas da agenda com altura >= 24 px', medidasAgenda.menorPilula >= 24, true);
+      H.conf('pilulas da agenda com altura >= 32 px', medidasAgenda.menorPilula >= 32, true);
     } else {
       H.conf('regra css de pilula atende altura ergonomica >= 24 px', true, true);
     }
-    H.conf('textos de ajuda com piso tipografico >= 14 px', medidasAgenda.menorFonteAjuda >= 13.9, true);
+    H.conf('pílulas com letra de pelo menos 14 px', medidasAgenda.fontePilula >= 14, true);
+    H.conf('textos de ajuda com piso tipográfico >= 15 px', medidasAgenda.menorFonteAjuda >= 15, true);
+
+    H.secao('5. Alvos de cores vizinhas sem sobreposição');
+    const cores = await page.evaluate(() => {
+      const faixa = document.createElement('div');
+      faixa.style.cssText = 'position:fixed;top:80px;left:80px;display:flex;gap:8px;z-index:99999';
+      const a = document.createElement('button'), b = document.createElement('button');
+      a.className = b.className = 'cor-opcao'; faixa.append(a, b); document.body.appendChild(faixa);
+      const ra = a.getBoundingClientRect();
+      const ponto = ra.left + ra.width / 2 + 17;
+      const resultado = { largura: ra.width, altura: ra.height,
+        primeira: document.elementFromPoint(ponto, ra.top + ra.height / 2) === a };
+      faixa.remove(); return resultado;
+    });
+    H.conf('cada cor tem alvo próprio de pelo menos 44 px', cores.largura >= 44 && cores.altura >= 44, true);
+    H.conf('toque próximo da primeira cor não seleciona a segunda', cores.primeira, true);
+
+    H.secao('6. Alvos visíveis de Ajustes');
+    await page.evaluate(() => document.querySelector('#abas .aba[data-tela="ajustes"]').click());
+    const ajustes = await page.evaluate(() => {
+      const controles = Array.from(document.querySelectorAll('#tela-ajustes button, #tela-ajustes input, #tela-ajustes select'))
+        .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+      return { total: controles.length, pequenos: controles.filter(e => {
+        const alvo = e.type === 'checkbox' ? (e.closest('label') || e) : e;
+        const r = alvo.getBoundingClientRect(); return r.width < 44 || r.height < 44;
+      }).length };
+    });
+    H.conf('Ajustes tem controles para medir', ajustes.total > 0, true);
+    H.conf('controles visíveis de Ajustes têm alvo de 44 px', ajustes.pequenos, 0);
 
     // Evidencias visuais opcionais
     if (PASTA_PRINTS) {
