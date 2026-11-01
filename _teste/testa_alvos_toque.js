@@ -83,10 +83,11 @@ function validarCss(css) {
     erros.push('.pilula sem min-height de 24px ou font-size de 12px');
   }
 
-  // 8. .ajuda com piso de 14 px
-  const blocoAjuda = (css.match(/\.ajuda\s*\{([^}]+)\}/) || [])[1] || '';
-  if (!/font-size:\s*14px/i.test(blocoAjuda)) {
-    erros.push('.ajuda sem piso tipografico de 14px');
+  // 8. Piso de 14 px em Ajustes e Janela da aula
+  const temAjuda14 = /#tela-ajustes\s+\.ajuda[\s\S]*?font-size:\s*14px/i.test(css) &&
+    /#modal-aula\s+\.ajuda[\s\S]*?font-size:\s*14px/i.test(css);
+  if (!temAjuda14) {
+    erros.push('Ajustes ou modal de aula sem piso tipografico de 14px na ajuda');
   }
 
   return erros;
@@ -126,10 +127,10 @@ const v3 = cssReal.replace(/min-height:\s*24px;/g, 'min-height: 18px;');
 const e3 = validarCss(v3);
 afirme('veneno 3 (.pilula baixa) e detectado', e3.some(e => e.includes('.pilula')));
 
-// Veneno 4: .ajuda com 13 px antigo
-const v4 = cssReal.replace(/\.ajuda\s*\{\s*font-size:\s*14px;/g, '.ajuda { font-size: 13px;');
+// Veneno 4: Ajustes e modal da aula com 13 px antigo
+const v4 = cssReal.replace(/#tela-ajustes\s+\.ajuda[\s\S]*?font-size:\s*14px/i, '#tela-ajustes .ajuda { font-size: 13px;');
 const e4 = validarCss(v4);
-afirme('veneno 4 (.ajuda miuda 13px) e detectado', e4.some(e => e.includes('.ajuda')));
+afirme('veneno 4 (ajuda miuda 13px em ajustes e aula) e detectado', e4.some(e => e.includes('piso tipografico de 14px')));
 
 console.log('\n' + '='.repeat(60));
 console.log(passes + ' verificacoes passaram, ' + falhas + ' falharam.');

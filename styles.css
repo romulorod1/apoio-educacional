@@ -188,8 +188,11 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px var(--teal-claro);
 }
 .linha { display: flex; gap: 12px; flex-wrap: wrap; }
-.linha > * { flex: 1; min-width: 130px; }
-.ajuda { font-size: 14px; line-height: 1.45; color: var(--muted); margin: -4px 0 12px; }
+.ajuda { font-size: 13px; line-height: 1.45; color: var(--muted); margin: -4px 0 12px; }
+#tela-ajustes .ajuda,
+#modal-aula .ajuda {
+  font-size: 14px;
+}
 input[type="checkbox"] {
   width: 20px !important;
   height: 20px !important;
@@ -2036,7 +2039,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
   margin-bottom: 12px; padding: 10px 14px; background: var(--navy); color: var(--branco); border-radius: 10px;
   box-shadow: var(--sombra); }
 .bib-carrinho[hidden] { display: none; }
-.bib-carrinho { min-height: 56px; box-sizing: border-box; }
+.bib-carrinho { min-height: 64px; box-sizing: border-box; }
 .bib-carrinho.vazia { background: var(--soft); color: var(--navy); box-shadow: none; }
 .bib-carrinho.vazia .bib-carrinho-texto { font-weight: 600; font-size: 14px; }
 #bib-carrinho-limpar { margin-right: 18px; }

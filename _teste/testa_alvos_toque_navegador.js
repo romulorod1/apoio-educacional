@@ -124,7 +124,7 @@ const PASTA_PRINTS = process.env.SALVAR_PRINTS || '';
 
     const medidasAgenda = await page.evaluate(() => {
       const pilulas = Array.from(document.querySelectorAll('.pilula'));
-      const ajudas = Array.from(document.querySelectorAll('.ajuda'));
+      const ajudas = Array.from(document.querySelectorAll('#tela-ajustes .ajuda, #modal-aula .ajuda'));
       const fontesAjuda = ajudas.map(a => parseFloat(window.getComputedStyle(a).fontSize));
       const alturasPilulas = pilulas.map(p => p.getBoundingClientRect().height);
 
