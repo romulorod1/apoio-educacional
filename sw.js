@@ -241,6 +241,13 @@ self.addEventListener('activate', function (e) {
           .filter(function (n) { return /^apoio-educacional-v\d+$/.test(n) && n !== CACHE; })
           .map(function (n) { return resgatarEApagar(baixados, n); }));
       });
+    }).then(function () {
+      /* A próxima atualização precisa saber qual cache já estava autorizado;
+       * inferir pelo maior número poderia escolher uma instalação incompleta. */
+      return caches.open('apoio-educacional-controle').then(function (controle) {
+        var chave = new URL('./__controle_versao__/selecionado', self.location.href).href;
+        return controle.put(chave, new Response(JSON.stringify(CACHE), { headers: { 'Content-Type': 'application/json' } }));
+      });
     }).then(function () { return self.clients.claim(); })
   );
 });
