@@ -83,4 +83,30 @@ const { conf, esperar } = H;
   conf('proposta pede guardar antes de abrir lista', await pag.$eval(
     '#modal-trilha.aberto .item-passo-trilha[data-passo="MAT07-10"]', e =>
       /Guarde a trilha para abrir esta lista/.test(e.textContent) && !e.querySelector('.abrir-lista-trilha')), true);
+
+  const semIndice = await amb.pagina();
+  await semIndice.evaluateOnNewDocument(() => {
+    const original = window.fetch;
+    window.fetch = function (url) {
+      if (String(url).includes('banco/topicos/matematica.json')) return Promise.reject(new Error('índice indisponível'));
+      return original.apply(this, arguments);
+    };
+  });
+  await H.abrirApp(semIndice, amb.ORIGEM);
+  await H.irParaAba(semIndice, 'biblioteca');
+  const bib = await esperar('biblioteca disponível sem índice', () =>
+    semIndice.$eval('#bib-contagem', e => e.textContent), t => /3 exercícios/.test(t || ''), 8000);
+  if (!bib.ok) throw new Error('Biblioteca não carregou');
+  await H.irParaAba(semIndice, 'alunos');
+  await semIndice.click('#lista-alunos .item-lista[data-aluno="c7_alfa"]');
+  await semIndice.evaluate(() => Array.from(document.querySelectorAll('#modal-aluno .aba-perfil'))
+    .find(b => b.textContent.trim() === 'Mapeamento').click());
+  await esperar('trilha sem índice', () => semIndice.$('#painel-trilhas .abrir-trilha'), Boolean, 8000);
+  await semIndice.click('#painel-trilhas .abrir-trilha');
+  const passoSemIndice = await esperar('passo sem índice', () =>
+    semIndice.$('#modal-trilha.aberto .item-passo-trilha[data-passo="MAT07-10"]'), Boolean, 8000);
+  if (!passoSemIndice.ok) throw new Error('Passo não apareceu sem índice');
+  conf('sem índice não usa vínculo antigo gravado', await semIndice.$eval(
+    '#modal-trilha.aberto .item-passo-trilha[data-passo="MAT07-10"]', e =>
+      /sem lista pronta/.test(e.textContent) && !e.querySelector('.abrir-lista-trilha')), true);
 })().then(() => H.fim(amb)(), e => H.fim(amb)(e));
