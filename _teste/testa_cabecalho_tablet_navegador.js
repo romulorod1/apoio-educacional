@@ -14,7 +14,7 @@ const fs = require('fs');
 const H = require('./_bib_navegador');
 
 const PORTA = 8866;
-const PASTA_PRINTS = process.env.SALVAR_PRINTS || path.join(__dirname, 'prints');
+const PASTA_PRINTS = process.env.SALVAR_PRINTS || '';
 
 (async () => {
   const amb = H.criarAmbiente(PORTA, 'cabecalho_b5');
@@ -137,17 +137,22 @@ const PASTA_PRINTS = process.env.SALVAR_PRINTS || path.join(__dirname, 'prints')
     H.conf('[720px] subtitulo oculto no celular', cel.subtituloOculto, true);
     H.conf('[720px] layout coluna preservado no celular', cel.flexDirection, 'column');
 
-    // Captura prints de evidencia se pasta informada ou padrao
-    try {
-      if (!fs.existsSync(PASTA_PRINTS)) fs.mkdirSync(PASTA_PRINTS, { recursive: true });
-      for (const w of [721, 850, 900]) {
-        await page.setViewport({ width: w, height: 800, hasTouch: true });
-        await H.pausa(100);
-        await page.screenshot({ path: path.join(PASTA_PRINTS, `depois_b5_${w}.png`), fullPage: false });
+    // Captura prints de evidencia recortando apenas o cabecalho se pasta informada
+    if (PASTA_PRINTS) {
+      try {
+        if (!fs.existsSync(PASTA_PRINTS)) fs.mkdirSync(PASTA_PRINTS, { recursive: true });
+        for (const w of [721, 850, 900]) {
+          await page.setViewport({ width: w, height: 800, hasTouch: true });
+          await H.pausa(100);
+          const cabEl = await page.$('.cabecalho');
+          if (cabEl) {
+            await cabEl.screenshot({ path: path.join(PASTA_PRINTS, `depois_b5_${w}_cabecalho.png`) });
+          }
+        }
+        console.log('   recortes do cabecalho salvos em ' + PASTA_PRINTS);
+      } catch (e) {
+        console.log('   aviso ao salvar prints: ' + e.message);
       }
-      console.log('   prints de evidencia salvos em ' + PASTA_PRINTS);
-    } catch (e) {
-      console.log('   aviso ao salvar prints: ' + e.message);
     }
 
   } finally {
