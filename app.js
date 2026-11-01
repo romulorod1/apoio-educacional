@@ -1114,6 +1114,7 @@
     'modal-excluir-aluno': true,
     'modal-nota': true,
     'modal-proposta': true,
+    'modal-trilha': true,
     'modal-virada-anual': true
   };
 

@@ -41,6 +41,15 @@ const { conf, esperar } = H;
   const aberto = await esperar('passos da trilha', () =>
     pag.$('#modal-trilha.aberto .item-passo-trilha[data-passo="MAT07-08"]'), Boolean, 8000);
   if (!aberto.ok) throw new Error('Passos da trilha não apareceram');
+  await pag.evaluate(() => history.back());
+  const voltou = await esperar('Voltar fecha só a trilha', () => pag.evaluate(() =>
+    !document.querySelector('#modal-trilha').classList.contains('aberto') &&
+    document.querySelector('#modal-aluno').classList.contains('aberto')), Boolean, 8000);
+  conf('Voltar fecha a trilha e mantém a ficha', voltou.ok, true);
+  await pag.click('#painel-trilhas .abrir-trilha');
+  const reabriu = await esperar('trilha reaberta', () =>
+    pag.$('#modal-trilha.aberto .item-passo-trilha[data-passo="MAT07-08"]'), Boolean, 8000);
+  if (!reabriu.ok) throw new Error('Trilha não reabriu');
   conf('assunto sem vínculo seguro não usa módulo antigo', await pag.$eval('#modal-trilha.aberto .item-passo-trilha[data-passo="MAT07-08"]',
     e => /sem lista pronta/.test(e.textContent) && !e.querySelector('.abrir-lista-trilha')), true);
   conf('equações usa vínculo atualizado e oferece lista', await pag.$eval('#modal-trilha.aberto .item-passo-trilha[data-passo="MAT07-10"]',
