@@ -232,6 +232,7 @@ roda "trilha (dados)" node _teste/testa_trilha_dados.js
 roda "grafo (C7)"     node _teste/testa_grafo.js
 roda "trilha (motor)" node _teste/testa_trilha.js
 roda "trilha (listas C7)" node _teste/testa_trilha_listas.js
+roda "cobertura C7 valida pacotes" python biblioteca/_prova_cobertura_c7.py
 roda "dinheiro"      node _teste/testa_dinheiro.js
 roda "cartao do mes" node _teste/testa_cartao.js
 roda "proposta"      node _teste/testa_proposta.js
