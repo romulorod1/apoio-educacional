@@ -186,6 +186,20 @@ const PASTA_PRINTS = process.env.SALVAR_PRINTS || '';
     H.conf('Ajustes tem controles para medir', ajustes.total > 0, true);
     H.conf('controles visíveis de Ajustes têm alvo de 44 px', ajustes.pequenos, 0);
 
+    for (const tela of ['alunos', 'fechamento']) {
+      await H.irParaAba(page, tela);
+      const resultado = await page.evaluate(t => {
+        const controles = Array.from(document.querySelectorAll('#tela-' + t + ' button, #tela-' + t + ' input, #tela-' + t + ' select'))
+          .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+        return { total: controles.length, pequenos: controles.filter(e => {
+          const alvo = e.type === 'checkbox' ? (e.closest('label') || e) : e;
+          const r = alvo.getBoundingClientRect(); return r.width < 44 || r.height < 44;
+        }).length };
+      }, tela);
+      H.conf('controles visíveis de ' + tela + ' têm alvo de 44 px', resultado.pequenos, 0);
+      H.conf(tela + ' tem controles para medir', resultado.total > 0, true);
+    }
+
     // Evidencias visuais opcionais
     if (PASTA_PRINTS) {
       try {
