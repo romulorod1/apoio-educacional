@@ -709,9 +709,17 @@
   Editor.prototype.desenhar = function () {
     var ctx = this.ctx;
     var dpr = this.dpr;
+    if (this._cacheEscala !== this.escala ||
+        this._cacheDeslocX !== this.deslocX ||
+        this._cacheDeslocY !== this.deslocY) {
+      this.cacheValido = false;
+    }
     if (!this.cacheValido) {
       this._desenharBase(this.offscreen.getContext('2d'));
       this.cacheValido = true;
+      this._cacheEscala = this.escala;
+      this._cacheDeslocX = this.deslocX;
+      this._cacheDeslocY = this.deslocY;
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
