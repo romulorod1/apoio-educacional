@@ -20,7 +20,7 @@ const { conf, esperar } = H;
     db.aulas = [1, 2, 3].map(n => ({ id: 'b8-a' + n, alunoId: 'b8-alfa',
       data: mes + '-0' + n, hora: '10:00', duracaoMin: 60, status: 'realizada', cobravel: true,
       serieId: n === 3 ? 'b8-serie' : null, destacada: false, notaTexto: '', notaPrivada: '', anexos: [] }));
-    db.series = [{ id: 'b8-serie', alunoId: 'b8-alfa', dias: [], inicio: data,
+    db.series = [{ id: 'b8-serie', alunoId: 'b8-alfa', dias: [Core.diaSemana(data)], inicio: data,
       fim: null, materializadoAte: mes, exclusoes: [] }];
     db.resumos = [];
     await Store.salvar(db);
@@ -71,6 +71,14 @@ const { conf, esperar } = H;
   conf('total do mês recalculado após as três ações', estado.total, 0);
   conf('data original da repetição foi excluída', estado.exclusoes.includes(datas.data), true);
   conf('as três aulas seguem preservadas', estado.quantidade, 3);
+  const rematerializacao = await pagina.evaluate(async ({ mes, data, destino }) => {
+    const db = await Store.carregar();
+    Core.materializarSerieNoMes(db, db.series[0], mes);
+    return { antiga: db.aulas.filter(a => a.serieId === 'b8-serie' && a.data === data).length,
+      adiada: db.aulas.filter(a => a.id === 'b8-a3' && a.data === destino).length };
+  }, datas);
+  conf('rematerializar a repetição não recria a aula na data antiga', rematerializacao.antiga, 0);
+  conf('a ocorrência adiada continua única', rematerializacao.adiada, 1);
   await pagina.reload({ waitUntil: 'domcontentloaded' });
   const persistido = await pagina.evaluate(async () => (await Store.carregar()).aulas.find(a => a.id === 'b8-a3').data);
   conf('adiamento continua após recarregar', persistido, datas.destino);
