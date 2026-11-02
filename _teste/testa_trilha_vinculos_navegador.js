@@ -21,11 +21,24 @@ const { conf, esperar } = H;
     const aluno = { id: 'c7_alfa', nome: 'Aluno Alfa Teste', ativo: true, precos: [] };
     aluno.trilhas = [Core.criarTrilha({ alunoId: aluno.id, titulo: 'Trilha Teste',
       alvoId: passos[0].temaId, materia: 'matematica', passos })];
-    dados.alunos = [aluno]; dados.aulas = []; dados.series = []; dados.resumos = [];
+    dados.alunos = [aluno];
+    dados.aulas = [{ id: 'c7_aula', alunoId: aluno.id, data: Core.hojeIso(), hora: '10:00',
+      duracaoMin: 60, status: 'realizada', cobravel: true, temas: [
+        { id: 'MAT07-08', titulo: 'Sequências e regularidades', modulo: '7ano:sequencias' },
+        { id: 'MAT09-07', titulo: 'Teorema de Pitágoras' }
+      ] }];
+    dados.series = []; dados.resumos = [];
     await Store.salvar(dados);
     const mods = ['equacoes-e-inequacoes-do-primeiro-grau', 'porcentagem-e-juros', 'razoes-e-proporcoes'];
     const itens = mods.map((slug, i) => ({ id: 'c7_item_' + i, serie: '7ano',
       modulo: { slug, titulo: slug }, aula: { slug: 'aula', titulo: 'Aula Teste', n: 1 },
+      numero: 1, assets: { enunciado: 'teste.svg' } }));
+    [
+      ['7ano', 'sequencias', 'Sequências e regularidades'],
+      ['9ano', 'pitagoras-a', 'Teorema de Pitágoras'],
+      ['9ano', 'pitagoras-b', 'Teorema de Pitágoras']
+    ].forEach((m, i) => itens.push({ id: 'c7_extra_' + i, serie: m[0],
+      modulo: { slug: m[1], titulo: m[2] }, aula: { slug: 'aula', titulo: 'Aula Teste', n: 1 },
       numero: 1, assets: { enunciado: 'teste.svg' } }));
     const kits = mods.map((slug, i) => ({ id: 'c7_kit_' + i, modulo: '7ano:' + slug,
       nivel: 1, minutos: 20, regra: 'base-v1', degraus: [{ item: itens[i].id, minutos: 20, degrau: 1 }] }));
@@ -33,6 +46,21 @@ const { conf, esperar } = H;
       itens, kits, teoria: [], assets: [], busca: { temas: [] }, apelidos: {}, bytesTotais: 0 });
   });
   await H.abrirApp(pag, amb.ORIGEM);
+  const aula = await esperar('aula fictícia na agenda', () => pag.$('[data-aula-id="c7_aula"]'), Boolean, 8000);
+  if (!aula.ok) throw new Error('Aula fictícia não apareceu');
+  await pag.click('[data-aula-id="c7_aula"]');
+  const assuntos = await esperar('assuntos com índice carregado', () => pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#modal-aula .item-assunto-aula')).map(e => ({
+      nome: e.querySelector('.nome').firstChild.textContent,
+      detalhe: e.querySelector('.detalhe')?.textContent || '',
+      material: Array.from(e.querySelectorAll('button')).some(b => b.textContent.trim() === 'Material')
+    }))), a => a.length === 2 && a.every(x => x.detalhe), 8000);
+  if (!assuntos.ok) throw new Error('Assuntos não carregaram');
+  conf('vínculo nulo não encontra Material mesmo com título igual',
+    assuntos.valor.find(x => x.nome === 'Sequências e regularidades')?.material, false);
+  conf('títulos iguais em dois módulos não escolhem Material arbitrariamente',
+    assuntos.valor.find(x => x.nome === 'Teorema de Pitágoras')?.material, false);
+  await pag.click('#modal-aula [data-fechar]');
   await H.irParaAba(pag, 'alunos');
   await pag.click('#lista-alunos .item-lista[data-aluno="c7_alfa"]');
   await pag.evaluate(() => Array.from(document.querySelectorAll('#modal-aluno .aba-perfil'))
@@ -117,7 +145,7 @@ const { conf, esperar } = H;
   await H.abrirApp(semIndice, amb.ORIGEM);
   await H.irParaAba(semIndice, 'biblioteca');
   const bib = await esperar('biblioteca disponível sem índice', () =>
-    semIndice.$eval('#bib-contagem', e => e.textContent), t => /3 exercícios/.test(t || ''), 8000);
+    semIndice.$eval('#bib-contagem', e => e.textContent), t => /6 exercícios/.test(t || ''), 8000);
   if (!bib.ok) throw new Error('Biblioteca não carregou');
   await H.irParaAba(semIndice, 'alunos');
   await semIndice.click('#lista-alunos .item-lista[data-aluno="c7_alfa"]');

@@ -17988,7 +17988,18 @@
         if (indiceTemas[i].id === t.id &&
             Object.prototype.hasOwnProperty.call(indiceTemas[i], 'modulo')) {
           modChave = indiceTemas[i].modulo;
-          return modChave && bib.modulos[modChave] ? { chave: modChave, direto: true } : false;
+          if (!modChave) return false;
+          if (bib.modulos[modChave]) return { chave: modChave, direto: true };
+          /* Pacotes diferentes podem nomear o mesmo módulo com outra chave.
+           * Só aceitar título exatamente igual na mesma série e sem ambiguidade;
+           * nunca voltar ao vínculo antigo gravado no assunto. */
+          var tituloAtual = chaveDoAssunto(indiceTemas[i].pt && indiceTemas[i].pt.titulo);
+          var serieAtual = modChave.split(':')[0] + ':';
+          var equivalentes = Object.keys(bib.modulos).filter(function (chave) {
+            return tituloAtual && chave.indexOf(serieAtual) === 0 &&
+              chaveDoAssunto(bib.modulos[chave].titulo) === tituloAtual;
+          });
+          return equivalentes.length === 1 ? { chave: equivalentes[0], direto: false } : false;
         }
       }
     }
