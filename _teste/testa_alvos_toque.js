@@ -61,12 +61,12 @@ function validarCss(css) {
     erros.push('.zoom-btn-fechar sem min-height de 44px');
   }
 
-  // 5. .cor-opcao com area de toque de 44 px no ::after
-  const blocoCorOpcaoAfter = (css.match(/\.cor-opcao::after\s*\{([^}]+)\}/) || [])[1] || '';
-  const corMinW = /min-width:\s*(?:var\(--alvo[^)]*\)|44px)/i.test(blocoCorOpcaoAfter);
-  const corMinH = /min-height:\s*(?:var\(--alvo[^)]*\)|44px)/i.test(blocoCorOpcaoAfter);
+  // 5. A própria caixa tem 44 px, evitando sobreposição dos alvos.
+  const blocoCor = (css.match(/\.cor-opcao\s*\{([^}]+)\}/) || [])[1] || '';
+  const corMinW = /width:\s*44px/i.test(blocoCor);
+  const corMinH = /height:\s*44px/i.test(blocoCor);
   if (!corMinW || !corMinH) {
-    erros.push('.cor-opcao::after sem area de toque de 44x44px');
+    erros.push('.cor-opcao sem area de toque de 44x44px');
   }
 
   // 6. Caixas de marcacao com alvo de 44 px
@@ -76,17 +76,17 @@ function validarCss(css) {
     erros.push('Rotulos de checkbox sem min-height de 44px');
   }
 
-  // 7. .pilula com min-height 24 px e font-size 12 px
+  // 7. .pilula com min-height 32 px e font-size 14 px
   const blocoPilula = (css.match(/\.pilula\s*\{([^}]+)\}/) || [])[1] || '';
-  if (!/min-height:\s*24px/i.test(blocoPilula) || !/font-size:\s*12px/i.test(blocoPilula)) {
-    erros.push('.pilula sem min-height de 24px ou font-size de 12px');
+  if (!/min-height:\s*32px/i.test(blocoPilula) || !/font-size:\s*14px/i.test(blocoPilula)) {
+    erros.push('.pilula sem min-height de 32px ou font-size de 14px');
   }
 
-  // 8. Piso de 14 px em Ajustes e Janela da aula
-  const temAjuda14 = /#tela-ajustes\s+\.ajuda[\s\S]*?font-size:\s*14px/i.test(css) &&
-    /#modal-aula\s+\.ajuda[\s\S]*?font-size:\s*14px/i.test(css);
-  if (!temAjuda14) {
-    erros.push('Ajustes ou modal de aula sem piso tipografico de 14px na ajuda');
+  // 8. Piso de 15 px em Ajustes e Janela da aula
+  const temAjuda15 = /#tela-ajustes\s+\.ajuda[\s\S]*?font-size:\s*15px/i.test(css) &&
+    /#modal-aula\s+\.ajuda[\s\S]*?font-size:\s*15px/i.test(css);
+  if (!temAjuda15) {
+    erros.push('Ajustes ou modal de aula sem piso tipografico de 15px na ajuda');
   }
 
   return erros;
@@ -119,14 +119,14 @@ const e2 = validarCss(v2);
 afirme('veneno 2 (.fechar estreito) e detectado', e2.some(e => e.includes('.fechar')));
 
 // Veneno 3: .pilula miuda com 11 px
-const v3 = cssReal.replace(/min-height:\s*24px;/g, 'min-height: 18px;');
+const v3 = cssReal.replace(/min-height:\s*32px;/g, 'min-height: 18px;');
 const e3 = validarCss(v3);
 afirme('veneno 3 (.pilula baixa) e detectado', e3.some(e => e.includes('.pilula')));
 
 // Veneno 4: Ajustes e modal da aula com 13 px antigo
-const v4 = cssReal.replace(/#tela-ajustes\s+\.ajuda[\s\S]*?font-size:\s*14px/i, '#tela-ajustes .ajuda { font-size: 13px;');
+const v4 = cssReal.replace(/#tela-ajustes\s+\.ajuda[\s\S]*?font-size:\s*15px/i, '#tela-ajustes .ajuda { font-size: 13px;');
 const e4 = validarCss(v4);
-afirme('veneno 4 (ajuda miuda 13px em ajustes e aula) e detectado', e4.some(e => e.includes('piso tipografico de 14px')));
+afirme('veneno 4 (ajuda miuda 13px em ajustes e aula) e detectado', e4.some(e => e.includes('piso tipografico de 15px')));
 
 console.log('\n' + '='.repeat(60));
 console.log(passes + ' verificacoes passaram, ' + falhas + ' falharam.');

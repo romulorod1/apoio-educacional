@@ -98,6 +98,7 @@ body {
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
+  min-height: 44px;
 }
 .aba:hover { background: var(--soft); }
 .aba.ativa { background: var(--navy); color: var(--branco); }
@@ -188,16 +189,19 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px var(--teal-claro);
 }
 .linha { display: flex; gap: 12px; flex-wrap: wrap; }
+.linha > * { flex: 1; min-width: 130px; }
 .ajuda { font-size: 13px; line-height: 1.45; color: var(--muted); margin: -4px 0 12px; }
 #tela-ajustes .ajuda,
 #modal-aula .ajuda {
-  font-size: 14px;
+  font-size: 15px;
 }
+#tela-ajustes label.campo > span,
+#modal-aula label.campo > span { font-size: 15px; }
 input[type="checkbox"] {
-  width: 20px !important;
-  height: 20px !important;
-  min-width: 20px !important;
-  min-height: 20px !important;
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
   cursor: pointer;
   accent-color: var(--teal);
   flex-shrink: 0;
@@ -284,8 +288,8 @@ label.campo-checkbox {
 .marca-feriado.facultativo { color: var(--muted); font-weight: 600; }
 
 .pilula {
-  font-size: 12px;
-  min-height: 24px;
+  font-size: 14px;
+  min-height: 32px;
   padding: 3px 8px;
   border-radius: 6px;
   color: var(--branco);
@@ -821,6 +825,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   font-family: inherit;
   border-bottom: 3px solid transparent;
   margin-bottom: -1px;
+  min-height: 44px;
 }
 .aba-perfil:hover { color: var(--navy); }
 .aba-perfil.ativa { color: var(--navy); border-bottom-color: var(--teal); }
@@ -1206,8 +1211,8 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   border: 1px solid var(--fio);
   background: var(--branco);
   border-radius: 10px;
@@ -1223,22 +1228,12 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
 .ferr:disabled { opacity: .35; cursor: not-allowed; }
 
 .cor-opcao {
-  width: 30px; height: 30px;
+  width: 44px; height: 44px;
   border-radius: 50%;
   border: 2px solid var(--branco);
   box-shadow: 0 0 0 1px var(--fio);
   cursor: pointer;
   padding: 0;
-  position: relative;
-}
-.cor-opcao::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  min-width: var(--alvo, 44px);
-  min-height: var(--alvo, 44px);
 }
 .cor-opcao.ativa { box-shadow: 0 0 0 3px var(--teal); }
 

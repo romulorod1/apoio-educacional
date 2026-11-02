@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.41.3';
+  var VERSAO = '1.41.4';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,13 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.41.4',
+      itens: [
+        'As caixas de marcação e as cores ficaram maiores e mais fáceis de tocar no tablet.',
+        'As aulas na agenda e os textos de ajuda ganharam tamanho mais confortável para leitura.'
+      ]
+    },
     {
       versao: '1.41.3',
       itens: [
@@ -4875,7 +4882,7 @@
       texto: 'Ajuda a sugerir assuntos. Você pode mudar depois; aulas antigas não são alteradas.' }));
     mostrarAnoOutro();
 
-    var cores = el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' });
+    var cores = el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' });
     var corEscolhida = novo ? CORES_ALUNO[db.alunos.length % CORES_ALUNO.length] : alunoEmEdicao.cor;
     CORES_ALUNO.forEach(function (c) {
       var b = el('button', {
