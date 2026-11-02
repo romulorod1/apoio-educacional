@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.41.4';
+  var VERSAO = '1.41.5';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.41.5',
+      itens: [
+        'Na ficha do aluno, alterações nos valores só passam a valer quando você salva a ficha.'
+      ]
+    },
     {
       versao: '1.41.4',
       itens: [
@@ -4989,7 +4995,11 @@
       }));
     }
 
-    var precos = novo ? [] : (alunoEmEdicao.precos || []).slice();
+    /* A ficha é um rascunho: alterar seus campos não pode mudar o banco em
+     * memória antes de salvar, nem vazar para outra gravação ao fechar. */
+    var precos = novo ? [] : (alunoEmEdicao.precos || []).map(function (p) {
+      return Object.assign({}, p);
+    });
     var caixaPrecos = el('div', { id: 'caixa-precos' });
     painel.valores.appendChild(caixaPrecos);
 
