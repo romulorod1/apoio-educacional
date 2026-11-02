@@ -232,6 +232,7 @@ roda "trilha (dados)" node _teste/testa_trilha_dados.js
 roda "grafo (C7)"     node _teste/testa_grafo.js
 roda "trilha (motor)" node _teste/testa_trilha.js
 roda "trilha (listas C7)" node _teste/testa_trilha_listas.js
+roda "cobertura C7 valida pacotes" python biblioteca/_prova_cobertura_c7.py
 roda "dinheiro"      node _teste/testa_dinheiro.js
 roda "cartao do mes" node _teste/testa_cartao.js
 roda "proposta"      node _teste/testa_proposta.js
@@ -671,6 +672,7 @@ roda "relato e Voltar"                            node "_teste/testa_relato_volt
 roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip.js"
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
+roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"
 # C9: o documento do ciclo na tela. A contagem do que abre sozinho (janelas,
 # aviso, faixas, dialogos) no codigo da origin/main e no de hoje, igual, com
 # controle de que o contador ve; a entrada discreta na ficha; editar, recarregar
