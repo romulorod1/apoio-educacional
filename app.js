@@ -11977,8 +11977,7 @@
         el('td', { texto: '' }),
         el('td', { texto: f.totalHoras + ' h' }),
         el('td', { texto: '' }),
-        el('td', { texto: dinheiro(f.totalValor) }),
-        el('td', { texto: '' })
+        el('td', { texto: dinheiro(f.totalValor), colspan: 2 })
       ]);
       corpo.appendChild(linhaTotal);
       tabela.appendChild(corpo);
