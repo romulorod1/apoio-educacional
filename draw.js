@@ -778,9 +778,13 @@
     ctx.rect(0, 0, FOLHA_L, FOLHA_A);
     ctx.clip();
     var itens = this.pagina().itens;
+    if (this.tracoAtual) {
+      var tracoAtual = this.tracoAtual;
+      itens = itens.filter(function (it) { return it !== tracoAtual; });
+    }
     for (var c = 0; c < ORDEM_CAMADAS.length; c++) {
       for (var i = 0; i < itens.length; i++) {
-        if (itens[i] && itens[i] !== this.tracoAtual && itens[i].t === ORDEM_CAMADAS[c]) this._desenharItem(ctx, itens[i]);
+        if (itens[i] && itens[i].t === ORDEM_CAMADAS[c]) this._desenharItem(ctx, itens[i]);
       }
     }
     ctx.restore();
