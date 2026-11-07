@@ -11922,16 +11922,19 @@
           if (ocupada) return;
           ocupada = true;
           botoes.forEach(function (b) { b.disabled = true; });
-          if (!Core.aplicarEdicaoAula(db, l.id, mudancas, 'esta')) {
+          if (!db.aulas.some(function (a) { return a.id === l.id; })) {
             desenharFechamento();
             avisar('Não encontrei esta aula.');
             return;
           }
-          var trilha = revisarTrilhasDoAluno(f.aluno.id);
-          salvarEDepois(function (gravou) {
-            desenharTudo();
-            if (gravou) avisar(mensagem + textoDeTrilha(trilha));
-          });
+          /* Um toque errado em "Cancelar aula" ou "Não cobrar" muda valor e
+           * situação da aula: passa pelo comDesfazer, como as outras edições,
+           * para o aviso trazer o Desfazer com o estado de antes. */
+          var trilha = null;
+          comDesfazer(function () { return mensagem + textoDeTrilha(trilha); }, function () {
+            Core.aplicarEdicaoAula(db, l.id, mudancas, 'esta');
+            trilha = revisarTrilhasDoAluno(f.aluno.id);
+          }).then(function () { desenharTudo(); });
         }
         function botao(classe, texto, acao) {
           var b = el('button', { type: 'button', class: 'btn pequeno ' + classe,
