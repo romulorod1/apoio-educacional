@@ -90,11 +90,10 @@
  * limite, e o cartão diz em voz alta quantos assuntos ficaram de fora. Ver o
  * cortarUm() mais abaixo para a ordem exata em que as coisas são cortadas.
  *
- * As fontes da identidade (Lora e Poppins) vêm da rede. Enquanto elas não
- * estiverem no repositório e no cache do sw.js, o cartão sai na fonte do
- * sistema, e sai igual: nenhuma largura deste arquivo está escrita à mão, toda
- * medida vem do measureText na hora de desenhar. Conferido lado a lado, com a
- * Lora e sem ela, o arranjo das duas imagens é o mesmo até o pixel.
+ * O cartão usa as fontes do sistema (ver SERIF e SANS): nenhuma largura deste
+ * arquivo está escrita à mão, toda medida vem do measureText na hora de
+ * desenhar. Conferido lado a lado, com a Lora e sem ela, o arranjo das duas
+ * imagens é o mesmo até o pixel.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -143,16 +142,19 @@
     texto: '#26313F'
   };
 
-  /* As duas famílias, cada uma com o fim da fila sendo um nome genérico.
+  /* As duas famílias, só fontes do sistema, cada fila terminando num nome
+   * genérico.
    *
-   * Lora e Poppins são as fontes da identidade e é o que o protótipo aprovado
-   * usa, mas elas vêm da rede, e ela dá aula sem sinal. A pilha termina em
-   * serif e em sans-serif de propósito: sem as duas primeiras o cartão sai com
-   * a fonte do sistema e continua sendo o mesmo desenho, porque toda medida
-   * daqui é tirada do measureText no momento de desenhar e nenhuma largura
-   * está escrita à mão. */
-  var SERIF = "'Lora', Georgia, 'Times New Roman', serif";
-  var SANS = "'Poppins', 'Segoe UI', Roboto, system-ui, sans-serif";
+   * Lora e Poppins, as fontes do protótipo, nunca vieram no pacote: a pilha
+   * citava as duas, e no tablet (e nesta máquina de prova) o cartão já saía na
+   * serifa e na sem serifa do sistema. Ficou assim de propósito (B12): o app
+   * funciona sem sinal, uma fonte embarcada teria de entrar no cache do sw.js
+   * e de ser carregada antes do canvas desenhar, senão o primeiro cartão sai
+   * na fonte errada calado; e o que ela vê hoje no tablet é exatamente isto.
+   * O desenho não depende da fonte: toda medida daqui é tirada do measureText
+   * no momento de desenhar e nenhuma largura está escrita à mão. */
+  var SERIF = "Georgia, 'Times New Roman', serif";
+  var SANS = "'Segoe UI', Roboto, system-ui, sans-serif";
 
   var LADO = 1080;
   var MARG = 72;

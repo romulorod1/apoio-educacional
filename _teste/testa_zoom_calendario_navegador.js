@@ -124,7 +124,7 @@ async function rodar() {
   }
 
   const temBotaoNovaAulaNoZoom = await pag.evaluate(() => {
-    const btn = document.querySelector('#painel-zoom-dia .zoom-dia-rodape .btn.principal');
+    const btn = document.querySelector('#painel-zoom-dia .zoom-dia-rodape .zoom-nova-aula');
     return btn && btn.textContent.includes('Nova aula neste dia');
   });
   conf('acao rapida "+ Nova aula neste dia" presente no zoom', temBotaoNovaAulaNoZoom, true);
@@ -290,7 +290,7 @@ async function rodar() {
   // ================================================================
   secao('11. Acao rapida "+ Nova aula neste dia"');
 
-  await pag.click('#painel-zoom-dia .zoom-dia-rodape .btn.principal');
+  await pag.click('#painel-zoom-dia .zoom-dia-rodape .zoom-nova-aula');
   await esperar('modal de aula aberto via botao rapido', () => pag.evaluate(() => {
     const m = document.querySelector('#modal-aula');
     return m && m.classList.contains('aberto');
