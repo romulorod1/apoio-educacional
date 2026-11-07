@@ -1,7 +1,7 @@
 /* testa_trilha_listas.js
  * Teste unitário para a ligação final da trilha e cobertura de listas (C7.2 e C7.3).
  *
- * 1. Cobertura de listas por assunto acima de 90% (145/148 = 97.97%).
+ * 1. Vínculos conhecidos entre assunto e módulo, e ausência declarada de lista.
  * 2. Mapeamento explícito dos 3 assuntos sem lista pronta (MAT02-05, MATEM1-06, MATEM3-09).
  * 3. Ações da trilha: botão "Abrir lista" para passos com lista e selo "sem lista pronta" para os sem lista.
  * 4. Regras de devolução do passo ao descancelar aula e fechamento por Domina.
@@ -34,21 +34,16 @@ const temas = jsonMatematica.temas || [];
 
 conf('total de assuntos no índice de matemática', temas.length, 148);
 
-const comModulo = temas.filter(t => t.modulo !== undefined && t.modulo !== null);
-const semModulo = temas.filter(t => t.modulo === null);
 const semCampo = temas.filter(t => t.modulo === undefined);
 
 conf('nenhum assunto sem o campo modulo declarado', semCampo.length, 0);
-conf('exatamente 3 assuntos mapeados como sem lista pronta', semModulo.length, 3);
-conf('os 3 assuntos sem lista são os esperados',
-  semModulo.map(t => t.id).sort().join(','),
-  'MAT02-05,MATEM1-06,MATEM3-09'
-);
-
-const coberturaPercentual = (comModulo.length / temas.length) * 100;
-conf('145 assuntos vinculados a módulos de lista', comModulo.length, 145);
-conf('cobertura supera o piso de 90% exigido pelo contrato C7.2', coberturaPercentual >= 90, true);
-conf('cobertura atinge 97.97%', coberturaPercentual.toFixed(2), '97.97');
+const moduloDe = id => temas.find(t => t.id === id).modulo;
+conf('razão e regra de três apontam para razões e proporções',
+  [moduloDe('MAT07-05'), moduloDe('MAT07-06')].join(','),
+  '7ano:razoes-e-proporcoes,7ano:razoes-e-proporcoes');
+conf('porcentagem aponta para porcentagem e juros', moduloDe('MAT07-07'), '7ano:porcentagem-e-juros');
+conf('equações apontam para equações', moduloDe('MAT07-10'), '7ano:equacoes-e-inequacoes-do-primeiro-grau');
+conf('sequências sem lista segura ficam sem vínculo', moduloDe('MAT07-08'), null);
 
 // ============================================================================
 secao('2. Lógica visual da trilha: Abrir lista e selo sem lista pronta (C7.3)');

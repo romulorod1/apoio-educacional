@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.41.1';
+  var VERSAO = '1.41.7';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -79,6 +79,46 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
+      versao: '1.41.7',
+      itens: [
+        'No fechamento, você pode abrir, adiar, cancelar ou marcar uma aula como não cobrada sem sair da lista.'
+      ]
+    },
+    {
+      versao: '1.41.6',
+      itens: [
+        'A folha responde melhor à caneta quando já tem muitos traços.'
+      ]
+    },
+    {
+      versao: '1.41.5',
+      itens: [
+        'Na ficha do aluno, alterações nos valores só passam a valer quando você salva a ficha.'
+      ]
+    },
+    {
+      versao: '1.41.4',
+      itens: [
+        'As caixas de marcação e as cores ficaram maiores e mais fáceis de tocar no tablet.',
+        'As aulas na agenda e os textos de ajuda ganharam tamanho mais confortável para leitura.'
+      ]
+    },
+    {
+      versao: '1.41.3',
+      itens: [
+        'Na trilha, Abrir lista leva à lista ligada ao assunto e deixa a Biblioteca visível.',
+        'Quando não há uma lista adequada, a trilha avisa. Guarde uma proposta antes de abrir a lista.'
+      ]
+    },
+    {
+      versao: '1.41.2',
+      itens: [
+        'Botões de navegação, caixas de marcação e controles com área de toque ampliada para 44 pixels, facilitando o uso no tablet.',
+        'Pílulas da agenda com melhor espaçamento e toque mais seguro para abrir os detalhes das aulas.',
+        'Textos explicativos e de ajuda com tamanho de letra aprimorado para leitura nítida e confortável a um braço de distância.'
+      ]
+    },
+    {
       versao: '1.41.1',
       itens: [
         'No tablet em pé, o cabeçalho agora ocupa uma linha única sem quebrar as abas de navegação.',
@@ -99,7 +139,7 @@
       itens: [
         'Passos da trilha agora contam com o botao Abrir lista para carregar diretamente a selecao de exercicios correspondente na Biblioteca.',
         'Assuntos sem lista de exercicios pronta sao claramente sinalizados na trilha com o selo sem lista pronta.',
-        'A cobertura de listas prontas foi expandida para mais de 97% dos assuntos de matematica.'
+        'A Biblioteca reúne listas de matemática que podem apoiar a preparação das aulas.'
       ]
     },
     {
@@ -1086,6 +1126,13 @@
       history.pushState({ apoioModal: topo.token }, '');
       return;
     }
+    if (topo.id === 'modal-trilha' && propostaDeTrilha) {
+      history.pushState({ apoioModal: topo.token }, '');
+      if (!confirmar('Sair sem guardar esta trilha?')) return;
+      propostaDeTrilha = null;
+      fecharModal('modal-trilha');
+      return;
+    }
     if (topo.id === 'modal-nota') {
       // A folha só pode sair depois de gravar. Se o disco falhar, o editor
       // permanece aberto e precisa conservar seu estado de Voltar.
@@ -1106,6 +1153,7 @@
     'modal-excluir-aluno': true,
     'modal-nota': true,
     'modal-proposta': true,
+    'modal-trilha': true,
     'modal-virada-anual': true
   };
 
@@ -4896,7 +4944,7 @@
       texto: 'Ajuda a sugerir assuntos. Você pode mudar depois; aulas antigas não são alteradas.' }));
     mostrarAnoOutro();
 
-    var cores = el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' });
+    var cores = el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' });
     var corEscolhida = novo ? CORES_ALUNO[db.alunos.length % CORES_ALUNO.length] : alunoEmEdicao.cor;
     CORES_ALUNO.forEach(function (c) {
       var b = el('button', {
@@ -5003,7 +5051,11 @@
       }));
     }
 
-    var precos = novo ? [] : (alunoEmEdicao.precos || []).slice();
+    /* A ficha é um rascunho: alterar seus campos não pode mudar o banco em
+     * memória antes de salvar, nem vazar para outra gravação ao fechar. */
+    var precos = novo ? [] : (alunoEmEdicao.precos || []).map(function (p) {
+      return Object.assign({}, p);
+    });
     var caixaPrecos = el('div', { id: 'caixa-precos' });
     painel.valores.appendChild(caixaPrecos);
 
@@ -9186,14 +9238,20 @@
 
     function listaProntaDoPasso(p) {
       if (!bib || !bib.listasPorModulo) return null;
+      if (p.temaId && !indiceTemas) return null;
       var modChave = p.modulo;
-      if (!modChave && p.temaId && indiceTemas) {
+      if (p.temaId && indiceTemas) {
+        var encontrouAssunto = false;
         for (var k = 0; k < indiceTemas.length; k++) {
-          if (indiceTemas[k].id === p.temaId) {
+          if (indiceTemas[k].id === p.temaId &&
+              Object.prototype.hasOwnProperty.call(indiceTemas[k], 'modulo')) {
+            encontrouAssunto = true;
             modChave = indiceTemas[k].modulo;
+            if (!modChave) return null;
             break;
           }
         }
+        if (!encontrouAssunto) return null;
       }
       if (!modChave && p.titulo) {
         var achado = moduloDoAssunto({ titulo: p.titulo });
@@ -9220,7 +9278,9 @@
       var botoes = [];
       var lp = p.semLista ? null : listaProntaDoPasso(p);
       var acaoLista = null;
-      if (lp) {
+      if (lp && proposta) {
+        acaoLista = el('span', { class: 'ajuda', texto: 'Guarde a trilha para abrir esta lista.' });
+      } else if (lp) {
         acaoLista = el('button', {
           type: 'button', class: 'btn pequeno abrir-lista-trilha', texto: 'Abrir lista',
           title: 'Abrir lista pronta na Biblioteca',
@@ -9233,10 +9293,16 @@
                 bibNav.serie = (bib.listaSeries || []).filter(function (s) { return mod.series[s]; })[0] || mod.serie;
               }
             }
-            usarListaPronta(lp);
-            fecharModal('modal-trilha');
-            var aba = $$('#abas .aba').filter(function (b) { return b.dataset.tela === 'biblioteca'; })[0];
-            if (aba) aba.click();
+            if (!usarListaPronta(lp)) return;
+            fecharModal('modal-trilha', function () {
+              function mostrarBiblioteca() {
+                var aba = $$('#abas .aba').filter(function (b) { return b.dataset.tela === 'biblioteca'; })[0];
+                if (aba) aba.click();
+              }
+              if ($('#modal-aluno').classList.contains('aberto')) {
+                fecharModal('modal-aluno', mostrarBiblioteca);
+              } else mostrarBiblioteca();
+            });
           }
         });
       } else {
@@ -11886,22 +11952,68 @@
         }));
       }
 
-      var tabela = el('table', { class: 'dados' });
+      var tabela = el('table', { class: 'dados b8-tabela' });
       var cab = el('tr');
-      ['Data', 'Dia', 'Duração', 'Situação', 'Valor'].forEach(function (t) {
+      ['Data', 'Dia', 'Duração', 'Situação', 'Valor', 'Ações'].forEach(function (t) {
         cab.appendChild(el('th', { texto: t }));
       });
       tabela.appendChild(el('thead', {}, [cab]));
       var corpo = el('tbody');
       f.linhas.forEach(function (l) {
-        corpo.appendChild(el('tr', {}, [
-          el('td', { texto: Core.ddmm(l.data) }),
+        var ocupada = false;
+        var botoes = [];
+        function alterar(mudancas, mensagem) {
+          if (ocupada) return;
+          ocupada = true;
+          botoes.forEach(function (b) { b.disabled = true; });
+          if (!Core.aplicarEdicaoAula(db, l.id, mudancas, 'esta')) {
+            desenharFechamento();
+            avisar('Não encontrei esta aula.');
+            return;
+          }
+          var trilha = revisarTrilhasDoAluno(f.aluno.id);
+          salvarEDepois(function (gravou) {
+            desenharTudo();
+            if (gravou) avisar(mensagem + textoDeTrilha(trilha));
+          });
+        }
+        function botao(classe, texto, acao) {
+          var b = el('button', { type: 'button', class: 'btn pequeno ' + classe,
+            texto: texto, 'aria-label': texto + ' em ' + Core.ddmmaaaa(l.data), aoClick: acao });
+          botoes.push(b);
+          return b;
+        }
+        var campoData = el('input', { type: 'date', 'aria-label': 'Nova data da aula de ' + Core.ddmmaaaa(l.data) });
+        campoData.value = l.data;
+        var confirmarData = botao('b8-confirmar-data', 'Mover aula', function () {
+          if (!campoData.value || !campoData.validity.valid) { avisar('Escolha uma data válida para a aula.'); return; }
+          if (campoData.value === l.data) { avisar('Escolha uma data diferente.'); return; }
+          alterar({ data: campoData.value }, 'Aula adiada.');
+        });
+        var mover = el('div', { class: 'b8-mover' }, [campoData, confirmarData]);
+        mover.hidden = true;
+        var naoCobrar = botao('b8-nao-cobrar', 'Não cobrar', function () {
+          alterar({ cobravel: false }, 'Aula marcada como não cobrada.');
+        });
+        naoCobrar.disabled = !l.cobravel;
+        var cancelar = botao('b8-cancelar', 'Cancelar aula', function () {
+          alterar({ status: 'cancelada', cobravel: false }, 'Aula cancelada sem cobrança.');
+        });
+        cancelar.disabled = l.status === 'cancelada' && !l.cobravel;
+        var adiar = botao('b8-adiar', 'Adiar', function () {
+          mover.hidden = !mover.hidden;
+          if (!mover.hidden) campoData.focus();
+        });
+        var acoes = el('td', {}, [el('div', { class: 'b8-acoes' }, [naoCobrar, cancelar, adiar]), mover]);
+        corpo.appendChild(el('tr', { 'data-aula-fechamento': l.id }, [
+          el('td', {}, [botao('b8-abrir', Core.ddmm(l.data), function () { abrirAula(l.id); })]),
           el('td', { texto: l.dia }),
           el('td', { texto: Core.fmtDuracao(l.duracaoMin) }),
           el('td', {
             texto: l.statusRotulo + (l.cobravel ? '' : ' (não cobrada)')
           }),
-          el('td', { texto: dinheiro(l.cobravel ? l.valor : 0) })
+          el('td', { texto: dinheiro(l.cobravel ? l.valor : 0) }),
+          acoes
         ]));
       });
       var linhaTotal = el('tr', { class: 'total' }, [
@@ -11909,7 +12021,7 @@
         el('td', { texto: '' }),
         el('td', { texto: f.totalHoras + ' h' }),
         el('td', { texto: '' }),
-        el('td', { texto: dinheiro(f.totalValor) })
+        el('td', { texto: dinheiro(f.totalValor), colspan: 2 })
       ]);
       corpo.appendChild(linhaTotal);
       tabela.appendChild(corpo);
@@ -17990,11 +18102,23 @@
   }
   function moduloDoAssuntoNoIndice(t) {
     var modChave = t.modulo;
-    if (!modChave && t.id && indiceTemas) {
+    if (t.id && indiceTemas) {
       for (var i = 0; i < indiceTemas.length; i++) {
-        if (indiceTemas[i].id === t.id) {
+        if (indiceTemas[i].id === t.id &&
+            Object.prototype.hasOwnProperty.call(indiceTemas[i], 'modulo')) {
           modChave = indiceTemas[i].modulo;
-          break;
+          if (!modChave) return false;
+          if (bib.modulos[modChave]) return { chave: modChave, direto: true };
+          /* Pacotes diferentes podem nomear o mesmo módulo com outra chave.
+           * Só aceitar título exatamente igual na mesma série e sem ambiguidade;
+           * nunca voltar ao vínculo antigo gravado no assunto. */
+          var tituloAtual = chaveDoAssunto(indiceTemas[i].pt && indiceTemas[i].pt.titulo);
+          var serieAtual = modChave.split(':')[0] + ':';
+          var equivalentes = Object.keys(bib.modulos).filter(function (chave) {
+            return tituloAtual && chave.indexOf(serieAtual) === 0 &&
+              chaveDoAssunto(bib.modulos[chave].titulo) === tituloAtual;
+          });
+          return equivalentes.length === 1 ? { chave: equivalentes[0], direto: false } : false;
         }
       }
     }
