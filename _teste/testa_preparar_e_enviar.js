@@ -130,7 +130,8 @@ function arquivosNovos(pag) {
   await irAoFechamento(pag);
   const cartoes = await pag.evaluate(() => Array.from(document.querySelectorAll('#lista-fechamento .cartao')).map(c => ({
     nome: c.querySelector('h3').textContent.trim(),
-    botoes: Array.from(c.querySelectorAll('button')).map(b => b.textContent.trim()),
+    // os atalhos de cada aula (B8) moram na tabela b8-tabela; aqui contam só os botões do cartão
+    botoes: Array.from(c.querySelectorAll('button')).filter(b => !b.closest('.b8-tabela')).map(b => b.textContent.trim()),
     principal: (c.querySelector('.btn-preparar-doc') || {}).textContent || '',
     principalEhPrincipal: !!c.querySelector('.btn-preparar-doc.principal')
   })));
