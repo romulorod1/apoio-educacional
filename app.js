@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.41.8';
+  var VERSAO = '1.42.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.0',
+      itens: [
+        'O visual ficou mais uniforme: os tamanhos de letra e as cores seguem um padrão só, e cada tela tem um botão principal em destaque. Os outros viram botões de contorno.'
+      ]
+    },
     {
       versao: '1.41.8',
       itens: [
