@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.41.7';
+  var VERSAO = '1.41.8';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.41.8',
+      itens: [
+        'No Fechamento, "Cancelar aula" e "Não cobrar" agora trazem "Desfazer" no aviso: um toque errado volta a aula como estava.'
+      ]
+    },
     {
       versao: '1.41.7',
       itens: [
