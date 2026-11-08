@@ -2896,6 +2896,87 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .nuvem-leitor video { width: 100%; max-height: 260px; border-radius: 10px; background: var(--soft); }
 .nuvem-leitor[hidden] { display: none; }
 .nuvem-conta { font-size: var(--letra-2); color: var(--muted); word-break: break-all; }
+
+/* ---------- modo celular, só leitura (D6, parte 1) ----------
+   Três telas e abas embaixo, nunca a grade do mês encolhida. Com a classe no
+   body, o cabeçalho e as telas do tablet saem do ar (e com eles todo botão de
+   edição); as janelas continuam, porque o envio às famílias e a restauração
+   abrem nelas. */
+.celular { display: none; }
+body.modo-celular > .cabecalho,
+body.modo-celular > .conteudo { display: none !important; }
+body.modo-celular > .celular {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow-x: hidden;
+}
+.cel-topo {
+  background: var(--branco);
+  border-bottom: 2px solid var(--navy);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.cel-marca { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cel-marca strong { color: var(--navy); font-size: var(--letra-4); }
+.cel-origem { font-size: var(--letra-2); color: var(--muted); overflow-wrap: anywhere; }
+.cel-topo-acoes { flex-shrink: 0; }
+.cel-conteudo {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 16px;
+  -webkit-overflow-scrolling: touch;
+}
+.cel-tela { display: none; }
+.cel-tela.ativa { display: block; }
+.cel-titulo { font-size: var(--letra-6); color: var(--navy); margin: 4px 0 12px; }
+.cel-mes .cel-titulo { margin: 0; text-align: center; }
+.cel-mes .btn { min-width: var(--alvo); }
+.cel-aula-titulo { font-size: var(--letra-5); color: var(--navy); }
+.cel-lembrete { margin: 10px 0 0; }
+.cel-ultimo { margin-top: 10px; font-size: var(--letra-3); line-height: 1.5; }
+.cel-ultimo .rotulo-ultimo { font-weight: 700; color: var(--teal); }
+.cel-ver-nota { margin-top: 10px; }
+.cel-so-minha { margin-top: 8px; font-size: var(--letra-3); }
+.cel-so-minha[hidden] { display: none; }
+.cel-linhas { list-style: none; margin: 8px 0 0; padding: 0; }
+.cel-linha {
+  display: flex;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--fio-claro);
+  font-size: var(--letra-3);
+}
+.cel-abas {
+  display: flex;
+  flex-shrink: 0;
+  background: var(--branco);
+  border-top: 1px solid var(--fio);
+  padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+}
+.cel-abas[hidden] { display: none; }
+.cel-aba {
+  flex: 1;
+  min-height: 52px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--letra-4);
+  font-weight: 600;
+}
+.cel-aba.ativa { background: var(--soft); color: var(--navy); }
+body.modo-celular .celular .btn { min-height: var(--alvo); }
+body.modo-celular .celular input { min-height: var(--alvo); box-sizing: border-box; max-width: 100%; }
+body.modo-celular .celular .linha { flex-direction: column; }
 @media print {
   body.imprimindo-chave > :not(#modal-nuvem-chave) { display: none !important; }
   body.imprimindo-chave #modal-nuvem-chave { display: block; position: static; background: var(--branco); }

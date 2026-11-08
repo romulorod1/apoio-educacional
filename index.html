@@ -249,6 +249,32 @@
 
   </main>
 
+  <!-- ---------------- modo celular (D6, parte 1) ----------------
+       Abaixo de 640 px, ou no aparelho com a marca "só leitura", o cabeçalho
+       e as telas do tablet saem do ar e fica isto: Hoje, Fechamento e Enviar,
+       só leitura, com os dados da cópia do tablet na nuvem. O app.js monta as
+       telas. -->
+  <div class="celular" id="modo-celular">
+    <div class="cel-topo">
+      <div class="cel-marca">
+        <strong>Apoio Educacional</strong>
+        <span class="cel-origem" id="cel-origem" aria-live="polite"></span>
+      </div>
+      <div class="cel-topo-acoes" id="cel-topo-acoes"></div>
+    </div>
+    <div class="cel-conteudo" id="cel-conteudo">
+      <section class="cel-tela" id="cel-entrada"></section>
+      <section class="cel-tela" id="cel-hoje"></section>
+      <section class="cel-tela" id="cel-fechamento"></section>
+      <section class="cel-tela" id="cel-enviar"></section>
+    </div>
+    <nav class="cel-abas" id="cel-abas">
+      <button class="cel-aba" data-cel="hoje" type="button">Hoje</button>
+      <button class="cel-aba" data-cel="fechamento" type="button">Fechamento</button>
+      <button class="cel-aba" data-cel="enviar" type="button">Enviar</button>
+    </nav>
+  </div>
+
   <!-- ---------------- modais ---------------- -->
 
   <!-- N0: a chave da cópia na nuvem, como QR e como código, para imprimir. -->

@@ -26,6 +26,10 @@
  * A cópia automática só começa depois do primeiro envio feito por ela neste
  * aparelho (ou de uma restauração aqui): um aparelho recém-instalado, com a
  * carga inicial, não pode subir por cima da cópia do tablet dela.
+ *
+ * O celular só lê (D6, parte 1): o aparelho que trouxe a cópia pelo modo
+ * celular guarda a marca "só leitura" e nunca escreve na nuvem; o commit, que
+ * é a única porta de escrita, recusa.
  */
 (function (root) {
   'use strict';
@@ -72,6 +76,13 @@
   var geracao = 0;        // cresce a cada gravação dela; o envio compara com a do retrato
   var aparelho = null;    // rótulo curto deste aparelho, só para a lista de cópias
   var enviando = null;    // promessa do envio em curso, para não subir duas vezes
+  /* A marca "este aparelho só lê" (D6, parte 1): gravada quando ela traz a
+   * cópia pelo modo celular. Com ela, nada sobe daqui, nunca: nem ao fechar,
+   * nem uma vez por dia, nem pelo toque. Uma cópia do celular cobriria a do
+   * tablet com uma mais velha. Guarda também de que conta é a cópia, para
+   * buscar a mais nova ao abrir. { desde, uidDona } */
+  var marcaSoLeitura = null;
+  var travadoNestaAbertura = false; // a tela do celular está à vista, mesmo sem a marca
   var ouvintes = [];
   var pronto = null;
 
@@ -120,7 +131,8 @@
   function carregarEstado() {
     if (pronto) return pronto;
     pronto = Promise.all([lerEstado('sessao'), lerEstado('chave'), lerEstado('copia'),
-      lerEstado('automatica'), lerEstado('pendente'), lerEstado('aparelho')]).then(function (v) {
+      lerEstado('automatica'), lerEstado('pendente'), lerEstado('aparelho'), lerEstado('soLeitura')]).then(function (v) {
+      marcaSoLeitura = v[6] || null;
       sessao = v[0] || null;
       chaveBruta = v[1] ? new Uint8Array(v[1]) : null;
       ultimaCopia = v[2] || null;
@@ -483,7 +495,14 @@
       });
     });
   }
+  /* TODA escrita na nuvem passa pelo commit, e o aparelho que só lê não
+   * escreve: a cópia, a rotação e a lista de leitores ficam todas aqui atrás. */
+  function podeEnviar() { return !marcaSoLeitura && !travadoNestaAbertura; }
+  function recusaSoLeitura() {
+    return Object.assign(new Error('Este aparelho só lê: nada sobe daqui para a nuvem.'), { codigo: 'SO_LEITURA' });
+  }
   function commit(escritas) {
+    if (!podeEnviar()) return Promise.reject(recusaSoLeitura());
     return comToken(function (cab) {
       return pedir(urlDoc(raizDocumentos()) + ':commit', { cabecalhos: cab, corpo: { writes: escritas } });
     });
@@ -520,6 +539,7 @@
    * recém-instalado, o fechar não pode trocar a cópia boa pela vazia. Quando
    * é ela quem manda, a tela já perguntou. */
   function enviarCopia(blob, info) {
+    if (!podeEnviar()) return Promise.reject(recusaSoLeitura());
     if (enviando) return enviando;
     info = info || {};
     var conteudo = info.conteudo !== false;
@@ -664,14 +684,29 @@
     });
   }
 
-  /* Depois de restaurar aqui, este aparelho passa a ser dono da cópia. */
-  function restaurou(copia) {
+  /* Depois de restaurar aqui, este aparelho passa a ser dono da cópia. Menos
+   * o que só lê (opcoes.soLeitura, a restauração pelo modo celular): esse
+   * nunca é dono, e a automática fica desligada nele. */
+  function restaurou(copia, opcoes) {
+    var soLe = !!(opcoes && opcoes.soLeitura) || !!marcaSoLeitura;
     ultimaCopia = { id: copia.id, quando: copia.quando, bytes: copia.bytes, partes: copia.partes, aparelho: copia.aparelho };
     pendente = false;
-    automatica = true;
-    return Promise.all([gravarEstado('copia', ultimaCopia), gravarEstado('pendente', false), gravarEstado('automatica', true)])
-      .then(avisarOuvintes);
+    automatica = !soLe;
+    var gravar = [gravarEstado('copia', ultimaCopia), gravarEstado('pendente', false), gravarEstado('automatica', automatica)];
+    if (soLe && !marcaSoLeitura) gravar.push(marcarSoLeitura(copia.uid));
+    return Promise.all(gravar).then(avisarOuvintes);
   }
+
+  /* Grava a marca ANTES de os dados chegarem (quem chama faz isso antes de
+   * importar): se a página morrer no meio, o aparelho já se sabe só leitura. */
+  function marcarSoLeitura(uidDona) {
+    marcaSoLeitura = { desde: new Date().toISOString(), uidDona: String(uidDona || (sessao && sessao.uid) || '') };
+    automatica = false;
+    return Promise.all([gravarEstado('soLeitura', marcaSoLeitura), gravarEstado('automatica', false)]);
+  }
+  /* A tela do celular à vista sem a marca (aparelho que ainda não trouxe a
+   * cópia, ou o tablet numa janela estreita): nada sobe enquanto ela estiver. */
+  function travarEnvio(ligar) { travadoNestaAbertura = !!ligar; }
 
   // ---------- leitores (o aparelho observador, D7) ----------
 
@@ -732,7 +767,7 @@
   /* Ao fechar com sinal: há conta, chave, a automática já começou e houve
    * mudança desde a última cópia. */
   function copiaAutomaticaDevida() {
-    return !!(sessao && chaveBruta && automatica && pendente && online() && !enviando);
+    return !!(podeEnviar() && sessao && chaveBruta && automatica && pendente && online() && !enviando);
   }
   /* Uma vez por dia, ao abrir: o mesmo, mas só se a última cópia tem mais de
    * um dia (a de fechar pode ter falhado ontem sem ela ver). */
@@ -752,7 +787,10 @@
       automatica: automatica,
       pendente: pendente,
       enviando: !!enviando,
-      aparelho: aparelho
+      aparelho: aparelho,
+      soLeitura: !!marcaSoLeitura,
+      uidDona: marcaSoLeitura ? marcaSoLeitura.uidDona : null,
+      online: online()
     };
   }
 
@@ -783,6 +821,7 @@
     codigoValido: function (texto) { return chaveDoCodigo(texto).then(function () { return true; }); },
     formatarCodigo: formatarCodigo,
     enviarCopia: enviarCopia, listarCopias: listarCopias, baixarCopia: baixarCopia, restaurou: restaurou,
+    marcarSoLeitura: marcarSoLeitura, travarEnvio: travarEnvio, podeEnviar: podeEnviar,
     leitores: leitores, permitirLeitor: permitirLeitor, tirarLeitor: tirarLeitor,
     marcarMudanca: marcarMudanca, desligarAutomatica: desligarAutomatica,
     geracao: function () { return geracao; },

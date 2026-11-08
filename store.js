@@ -159,9 +159,25 @@
     });
   }
 
+  /* O CELULAR SÓ LÊ (D6, parte 1). Toda transação do banco nasce aqui, e uma
+   * de escrita é recusada enquanto o aparelho está só lendo. A única exceção
+   * é a restauração da cópia que vem da nuvem (importarZip com daNuvem), que
+   * é como os dados do tablet chegam ao celular. Uma trava num lugar só, e não
+   * em cada botão: se algum caminho de edição escapar da tela do celular, ele
+   * bate aqui e não grava. */
+  var soLeitura = false;
+  function somenteLeitura(ligar) { soLeitura = !!ligar; }
+  function erroSoLeitura() {
+    return Object.assign(new Error('Este aparelho só lê. Para mudar alguma coisa, use o tablet.'), { soLeitura: true });
+  }
+  function transacao(b, nomes, modo, restauracaoDaNuvem) {
+    if (modo === 'readwrite' && soLeitura && !restauracaoDaNuvem) throw erroSoLeitura();
+    return b.transaction(nomes, modo);
+  }
+
   function trans(deposito, modo) {
     return abrir().then(function (b) {
-      return b.transaction(deposito, modo).objectStore(deposito);
+      return transacao(b, deposito, modo).objectStore(deposito);
     });
   }
 
@@ -193,7 +209,7 @@
   function escrever(deposito, fazer) {
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = b.transaction(deposito, 'readwrite');
+        var t = transacao(b, deposito, 'readwrite');
         var req = fazer(t.objectStore(deposito));
         var motivo = function (padrao) {
           return t.error || (req && req.error) || new Error(padrao);
@@ -299,7 +315,7 @@
     }
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = b.transaction(['dados', 'notas', 'midias', 'anexos',
+        var t = transacao(b, ['dados', 'notas', 'midias', 'anexos',
           'biblioteca_uso', 'historico', 'livros_posicoes'], 'readwrite');
         var notas = t.objectStore('notas');
         var midiasExcluidas = {}, midiasMantidas = {};
@@ -355,7 +371,7 @@
   function todasAsNotas() {
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var s = b.transaction('notas', 'readonly').objectStore('notas');
+        var s = transacao(b, 'notas', 'readonly').objectStore('notas');
         var saida = {};
         var req = s.openCursor();
         req.onsuccess = function (e) {
@@ -415,7 +431,7 @@
     };
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = b.transaction(DEPOSITOS, 'readwrite');
+        var t = transacao(b, DEPOSITOS, 'readwrite');
         var recusa = null;
         var pacotes = t.objectStore('biblioteca_pacotes');
         var req = pacotes.get(chave);
@@ -478,7 +494,7 @@
     var DEPOSITOS = ['biblioteca_pacotes', 'biblioteca_itens', 'biblioteca_teoria', 'biblioteca_assets', 'midias'];
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = b.transaction(DEPOSITOS, 'readwrite');
+        var t = transacao(b, DEPOSITOS, 'readwrite');
         var contas = { itens: 0, teoria: 0, assets: 0, bytes: 0, achou: false };
         var pacotes = t.objectStore('biblioteca_pacotes');
         var req = pacotes.get(chave);
@@ -592,7 +608,7 @@
     var agora = new Date().toISOString();
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = b.transaction(['livros', 'livros_posicoes'], 'readwrite');
+        var t = transacao(b, ['livros', 'livros_posicoes'], 'readwrite');
         var dep = t.objectStore('livros');
         var contas = { novos: 0, atualizados: 0, iguais: 0, maisNovos: 0, removidos: 0, posicoesSoltas: 0,
           deOutroPacote: [], bytes: 0 };
@@ -660,7 +676,7 @@
   function removerLivro(id) {
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = b.transaction(['livros', 'livros_posicoes'], 'readwrite');
+        var t = transacao(b, ['livros', 'livros_posicoes'], 'readwrite');
         var contas = { achou: false, bytes: 0 };
         var req = t.objectStore('livros').get(id);
         req.onsuccess = function () {
@@ -940,7 +956,10 @@
     });
   }
 
-  function importarTudo(pacote) {
+  /* opcoes.daNuvem: a cópia veio da nuvem (Restaurar neste aparelho). É a
+   * única escrita que passa com o aparelho só lendo. */
+  function importarTudo(pacote, opcoes) {
+    var daNuvem = !!(opcoes && opcoes.daNuvem);
     function objeto(v) { return v && typeof v === 'object' && !Array.isArray(v); }
     function invalida() { return Object.assign(new Error('Arquivo de cópia inválido.'), { invalida: true }); }
     if (!pacote || pacote.formato !== 'apoio-educacional' || !objeto(pacote.dados) ||
@@ -973,7 +992,7 @@
         var nomes = ['dados', 'notas', 'midias', 'anexos', 'historico'];
         if (bib) nomes.push('biblioteca_uso', 'biblioteca_etiquetas');
         if (bib && Array.isArray(bib.listas)) nomes.push('biblioteca_listas');
-        var t = b.transaction(nomes, 'readwrite');
+        var t = transacao(b, nomes, 'readwrite', daNuvem);
         var erro = null;
         try {
           function trocar(nome, registros, chaveExterna) {
@@ -1004,7 +1023,7 @@
 
   /* Lê e confere cada entrada antes de abrir a transação de restauração. O ZIP
    * pode vir cortado ou com CRC errado; nesse caso, nada do tablet muda. */
-  async function importarZip(arquivo) {
+  async function importarZip(arquivo, opcoes) {
     var zip = await root.Zip.lerDoArquivo(arquivo);
     var entradas = {};
     zip.entradas.forEach(function (e) { entradas[e.nome] = e; });
@@ -1049,7 +1068,7 @@
     })) throw invalida();
     return importarTudo({ formato: 'apoio-educacional', dados: dados, notas: notas,
       midias: midias, anexos: anexos,
-      biblioteca: { uso: uso, etiquetas: etiquetas, listas: listas } });
+      biblioteca: { uso: uso, etiquetas: etiquetas, listas: listas } }, opcoes);
   }
 
   function apagarTudo() {
@@ -1093,7 +1112,8 @@
     listasDaBiblioteca: listasDaBiblioteca,
     gravarLivros: gravarLivros, listarLivros: listarLivros, lerLivro: lerLivro, removerLivro: removerLivro,
     lerPosicaoLivro: lerPosicaoLivro, gravarPosicaoLivro: gravarPosicaoLivro,
-    aoMudar: aoMudar,
+    aoMudar: aoMudar, somenteLeitura: somenteLeitura,
+    estaSoLendo: function () { return soLeitura; },
     SO_DESTE_TABLET: SO_DESTE_TABLET.slice()
   };
 })(typeof self !== 'undefined' ? self : this);

@@ -1472,6 +1472,14 @@
   var tempoNovaTentativa = null;
 
   function salvar() {
+    /* O celular só lê (D6): nada chega ao banco por aqui. A recusa é dita uma
+     * vez, sem a faixa de falha de gravação, que mandaria tentar de novo. */
+    if (aparelhoSoLe()) {
+      var recusa = Object.assign(new Error('Este celular só lê. Para mudar alguma coisa, use o tablet.'), { soLeitura: true });
+      if (falhasAvisadas) falhasAvisadas.add(recusa);
+      avisar(recusa.message);
+      return Promise.reject(recusa);
+    }
     var p = Store.salvar(dbParaGravar());
     p.then(gravacaoConfirmada, falhaDeGravacao);
     return p;
@@ -1938,9 +1946,15 @@
 
   function iniciar() {
     Store.tornarPersistente();
-    Store.carregar().then(function (carregado) {
+    /* O modo celular (D6) é decidido ANTES de ler o banco: o celular que
+     * ainda não trouxe a cópia do tablet não grava a carga inicial. */
+    decidirModoCelular().then(function () {
+      return Store.carregar();
+    }).then(function (carregado) {
       if (carregado && (carregado.alunos.length || carregado.aulas.length)) {
         db = carregado;
+      } else if (modoCelular) {
+        db = Store.bancoVazio(); // só na memória: os dados vêm da cópia do tablet
       } else {
         db = cargaInicial();
         mesAtual = '2026-06';
@@ -1962,8 +1976,12 @@
       // o botão Livros da aba Biblioteca nasce com a conta dos livros (C15.1)
       desenharLivrosAjustes();
       iniciarNuvem();
-      setTimeout(mostrarNovidades, 900);
-      setTimeout(verificarViradaAnualAutomatica, 1400);
+      iniciarCelular();
+      // as duas perguntam e gravam: o celular só lê, e elas ficam para o tablet
+      if (!modoCelular) {
+        setTimeout(mostrarNovidades, 900);
+        setTimeout(verificarViradaAnualAutomatica, 1400);
+      }
       registrarServiceWorker();
     }).catch(function (e) {
       /* O banco é de uma versão mais nova do aplicativo (C2a): a frase diz o
@@ -2146,6 +2164,7 @@
     desenharAlunos();
     desenharFechamento();
     desenharAjustes();
+    if (modoCelular) desenharCelular();
   }
 
   // ================= navegação =================
@@ -7756,7 +7775,10 @@
   /* N0: voltou ao aplicativo depois de um dia ou mais sem cópia: sobe agora,
    * sem esperar o próximo fechar (o de ontem pode ter falhado sem ela ver). */
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible') copiaAutomaticaParaNuvem('diaria');
+    if (document.visibilityState !== 'visible') return;
+    // o celular, ao voltar, busca a cópia mais nova; o tablet sobe a dele
+    if (aparelhoSoLe()) atualizarCelularDaNuvem();
+    else copiaAutomaticaParaNuvem('diaria');
   });
   window.addEventListener('pagehide', function () {
     if (editorAtual && editorAtual._aulaId) {
@@ -20749,7 +20771,9 @@
     Nuvem.aoMudar(desenharNuvem);
     Nuvem.pronto().then(function () {
       desenharNuvem();
-      copiaAutomaticaParaNuvem('diaria');
+      // o celular busca a cópia mais nova; quem sobe a dele é só o tablet
+      if (aparelhoSoLe()) atualizarCelularDaNuvem();
+      else copiaAutomaticaParaNuvem('diaria');
     });
   }
 
@@ -20758,6 +20782,8 @@
    * tenta de novo. */
   function copiaAutomaticaParaNuvem(motivo) {
     if (!temNuvem() || !db) return;
+    // o celular só lê (D6): a cópia dele cobriria a do tablet com uma mais velha
+    if (aparelhoSoLe()) return;
     var devida = motivo === 'diaria' ? Nuvem.copiaDiariaDevida() : Nuvem.copiaAutomaticaDevida();
     if (!devida) return;
     enviarCopiaParaNuvem(motivo);
@@ -20802,7 +20828,7 @@
   }
 
   function enviarCopiaParaNuvem(motivo) {
-    if (!temNuvem() || enviandoParaNuvem) return Promise.resolve();
+    if (!temNuvem() || enviandoParaNuvem || aparelhoSoLe()) return Promise.resolve();
     var est = Nuvem.estado();
     if (!est.entrada) return Promise.resolve();
     var semChaveAntes = !est.temChave;
@@ -20849,6 +20875,9 @@
     var caixa = $('#estado-nuvem');
     if (!caixa) return;
     caixa.innerHTML = '';
+    /* No celular, a entrada é desenhada na tela dele (D6), com os mesmos ids:
+     * o cartão de Ajustes, fora do ar, fica vazio para não haver dois. */
+    if (modoCelular) return;
     if (!temNuvem()) {
       caixa.appendChild(el('div', { class: 'faixa-aviso u-margem-baixo-0',
         texto: 'Este navegador não tem o que a cópia na nuvem precisa (a cifra e o banco local).' }));
@@ -20910,7 +20939,8 @@
     Nuvem.entrar(email, senha).then(function () {
       desenharNuvem();
       var est = Nuvem.estado();
-      if (est.temChave) avisar('Você entrou.');
+      if (modoCelular) avisar('Você entrou. Agora traga a cópia do tablet.');
+      else if (est.temChave) avisar('Você entrou.');
       else avisar('Você entrou. A chave da cópia nasce neste aparelho no primeiro envio; depois, imprima.');
     }, function (e) {
       if (botao) botao.disabled = false;
@@ -21071,21 +21101,39 @@
       mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', 'Digite o código da chave, do papel impresso, ou leia o QR.');
       return;
     }
-    if (!confirmar('Restaurar esta cópia? Os dados atuais deste aparelho serão substituídos.' + avisoDePendenciaNaConfirmacao())) return;
+    /* Pelo modo celular, o aparelho passa a só ler (D6): a marca é gravada
+     * ANTES de os dados chegarem, e daí em diante nada sobe daqui. */
+    var comoCelular = modoCelular;
+    /* O celular nunca tem mudança por guardar (ele não edita): a pergunta
+     * dele não precisa do aviso da pendência. */
+    if (comoCelular) {
+      if (!confirmar('Trazer esta cópia para este celular? Os dados atuais dele serão substituídos, e ele passa a só ler: ' +
+        'nada daqui vai para a nuvem, e os dados chegam sempre do tablet.')) return;
+    } else if (!confirmar('Restaurar esta cópia? Os dados atuais deste aparelho serão substituídos.' + avisoDePendenciaNaConfirmacao())) return;
     var botao = $('#nuvem-restaurar-confirmar');
     botao.disabled = true;
     mostrarMensagemDaNuvem(mensagem, 'faixa-info', 'Baixando e abrindo a cópia...');
     var copia = copiaEscolhida;
+    var zipBaixado = null;
     Nuvem.baixarCopia(copia.uid, copia.id, codigo).then(function (zip) {
-      return Store.importarZip(zip);
+      zipBaixado = zip;
+      return comoCelular ? Nuvem.marcarSoLeitura(copia.uid) : null;
+    }).then(function () {
+      if (comoCelular) aplicarModoCelular();
+      return Store.importarZip(zipBaixado, { daNuvem: true });
     }).then(function (dados) {
       db = dados;
       var frase = memoriaSubstituida();
       pararLeitorDeQr();
       fecharModal('modal-nuvem-restaurar');
-      return Nuvem.restaurou(copia).then(function () {
+      return Nuvem.restaurou(copia, { soLeitura: comoCelular }).then(function () {
         desenharTudo();
-        avisar('Cópia restaurada da nuvem.' + frase);
+        if (comoCelular) {
+          desenharCelular();
+          avisar('Pronto: os dados do tablet chegaram. Este celular só lê.');
+        } else {
+          avisar('Cópia restaurada da nuvem.' + frase);
+        }
       });
     }).catch(function (e) {
       botao.disabled = false;
@@ -21171,6 +21219,393 @@
     }, function (e) {
       botao.disabled = false;
       mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', e && e.message ? e.message : 'Não consegui trocar a senha.');
+    });
+  }
+
+  // ================= modo celular, só leitura (D6, parte 1) =================
+
+  /* Abaixo de 640 px de largura o aplicativo é outro: três telas (Hoje,
+   * Fechamento e Enviar) com abas embaixo, nunca a grade do mês encolhida. Os
+   * dados chegam da cópia do tablet na nuvem (N0), e o celular só lê.
+   *
+   * COMO O APARELHO SE RECONHECE COMO CELULAR: pela marca "este aparelho só
+   * lê", que o nuvem.js grava quando ela traz a cópia do tablet pelo modo
+   * celular. A largura decide só a TELA, e muda quando o celular deita: o
+   * mesmo celular deitado passa de 640 px e, pela largura, viraria tablet,
+   * gravaria no banco e subiria uma cópia velha por cima da do tablet. A
+   * marca não gira com a tela. Sem a marca, a tela estreita também só lê
+   * enquanto estiver à vista (o celular que ainda não trouxe a cópia, ou o
+   * tablet numa janela estreita); e a largura de tablet sem a marca fica
+   * exatamente como sempre foi.
+   *
+   * Só ler quer dizer três coisas, cada uma com a sua trava: nada grava no
+   * banco a não ser a cópia que vem da nuvem (Store.somenteLeitura, na porta
+   * das transações, e o salvar() daqui); nada sobe à nuvem deste aparelho,
+   * nem ao fechar, nem uma vez por dia (o commit do nuvem.js recusa, e a
+   * automática daqui nem tenta); e nenhuma das três telas tem botão de
+   * edição. */
+  var LARGURA_CELULAR = 640;
+  var modoCelular = false;
+  var telaCelular = 'hoje';
+  var mesCelular = Core.mesDe(Core.hojeIso());
+  var celularBuscando = false;
+  var celularRecado = '';     // o que a última busca disse (sem internet, sem cópia, erro)
+  var celularPedeEntrada = false; // sem a marca, com dados: ela tocou em "Trazer a cópia do tablet"
+
+  function larguraDeCelular() {
+    return (window.innerWidth || document.documentElement.clientWidth || 0) < LARGURA_CELULAR;
+  }
+  function temMarcaSoLeitura() { return temNuvem() && !!Nuvem.estado().soLeitura; }
+  function aparelhoSoLe() { return modoCelular || temMarcaSoLeitura(); }
+
+  function decidirModoCelular() {
+    var pronto = temNuvem() ? Nuvem.pronto() : Promise.resolve();
+    return pronto.then(aplicarModoCelular, aplicarModoCelular);
+  }
+
+  function aplicarModoCelular() {
+    var deve = temMarcaSoLeitura() || larguraDeCelular();
+    Store.somenteLeitura(deve);
+    if (temNuvem()) Nuvem.travarEnvio(deve);
+    if (deve === modoCelular) return;
+    modoCelular = deve;
+    document.body.classList.toggle('modo-celular', deve);
+    if (!db) return;
+    if (deve) { desenharNuvem(); desenharCelular(); }
+    else desenharTudo();
+  }
+
+  function iniciarCelular() {
+    $$('#cel-abas .cel-aba').forEach(function (b) {
+      b.addEventListener('click', function () { irParaTelaCelular(b.dataset.cel); });
+    });
+    if (temNuvem()) Nuvem.aoMudar(function () { if (modoCelular) desenharCelularDepoisDaNuvem(); });
+    var tempo = null;
+    window.addEventListener('resize', function () {
+      clearTimeout(tempo);
+      tempo = setTimeout(function () {
+        // não troca de tela com uma janela aberta: o que está nela se perderia
+        if (document.querySelector('.fundo-modal.aberto')) return;
+        aplicarModoCelular();
+      }, 250);
+    });
+    if (modoCelular) desenharCelular();
+  }
+
+  function temDadosNoCelular() { return !!(db && (db.alunos.length || db.aulas.length)); }
+
+  function irParaTelaCelular(tela) {
+    telaCelular = tela;
+    celularPedeEntrada = false;
+    desenharCelular();
+    var conteudo = $('#cel-conteudo');
+    if (conteudo) conteudo.scrollTop = 0;
+  }
+
+  /* A sessão e a chave mudam pela nuvem: a tela de entrada se refaz, as
+   * outras só mudam a linha do alto (para não perder a rolagem nem a nota
+   * aberta). */
+  function desenharCelularDepoisDaNuvem() {
+    if (!temDadosNoCelular() || celularPedeEntrada) desenharCelular();
+    else desenharTopoCelular();
+  }
+
+  function tipoDoAparelho(rotulo) {
+    return String(rotulo || '').split(' ')[0] || 'tablet';
+  }
+
+  /* "Dados de hoje, 14:02, do tablet." */
+  function fraseDaOrigemCelular() {
+    var est = temNuvem() ? Nuvem.estado() : null;
+    var u = est && est.ultimaCopia;
+    var frase;
+    if (est && est.soLeitura && u && u.quando) {
+      frase = 'Dados de ' + Nuvem.fraseDeQuando(u.quando) + ', do ' + tipoDoAparelho(u.aparelho) + '.';
+    } else if (temDadosNoCelular()) {
+      frase = 'Dados deste aparelho, que ainda não recebe a cópia do tablet.';
+    } else {
+      frase = 'Ainda sem os dados do tablet.';
+    }
+    if (celularBuscando) frase += ' Buscando a cópia mais nova...';
+    else if (celularRecado) frase += ' ' + celularRecado;
+    return frase;
+  }
+
+  function desenharTopoCelular() {
+    var origem = $('#cel-origem');
+    if (!origem) return;
+    origem.textContent = fraseDaOrigemCelular();
+    var acoes = $('#cel-topo-acoes');
+    acoes.innerHTML = '';
+    if (!temDadosNoCelular() || celularPedeEntrada) return;
+    if (temMarcaSoLeitura()) {
+      acoes.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'cel-atualizar',
+        disabled: celularBuscando, texto: 'Buscar de novo', aoClick: atualizarCelularDaNuvem }));
+    } else {
+      acoes.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'cel-trazer-copia',
+        texto: 'Trazer a cópia do tablet', aoClick: function () { celularPedeEntrada = true; desenharCelular(); } }));
+    }
+  }
+
+  function desenharCelular() {
+    if (!modoCelular || !$('#modo-celular')) return;
+    var entrada = !temDadosNoCelular() || celularPedeEntrada;
+    desenharTopoCelular();
+    $$('#modo-celular .cel-tela').forEach(function (t) { t.classList.remove('ativa'); });
+    $$('#cel-abas .cel-aba').forEach(function (b) {
+      var ativa = !entrada && b.dataset.cel === telaCelular;
+      b.classList.toggle('ativa', ativa);
+      b.setAttribute('aria-current', ativa ? 'page' : 'false');
+    });
+    $('#cel-abas').hidden = entrada;
+    if (entrada) { desenharEntradaCelular(); $('#cel-entrada').classList.add('ativa'); return; }
+    if (telaCelular === 'fechamento') desenharFechamentoCelular();
+    else if (telaCelular === 'enviar') desenharEnvioCelular();
+    else desenharHojeCelular();
+    $('#cel-' + telaCelular).classList.add('ativa');
+  }
+
+  // ---------- a entrada: conta, chave e a cópia do tablet ----------
+
+  function desenharEntradaCelular() {
+    var caixa = $('#cel-entrada');
+    caixa.innerHTML = '';
+    caixa.appendChild(el('h2', { class: 'cel-titulo', texto: 'Os dados do tablet no celular' }));
+    caixa.appendChild(el('p', { class: 'ajuda', texto: 'Entre com o e-mail e a senha da conta da cópia na nuvem. Depois, ' +
+      'leia o QR da chave na tela do tablet ou digite o código do papel. Este celular só lê: nada do que está nele vai para a nuvem.' }));
+    if (!temNuvem()) {
+      caixa.appendChild(el('div', { class: 'faixa-aviso', texto: 'Este navegador não tem o que a cópia na nuvem precisa (a cifra e o banco local).' }));
+      return;
+    }
+    var est = Nuvem.estado();
+    if (!est.entrada) {
+      var conta = el('div', { class: 'cartao', id: 'cel-conta' });
+      caixa.appendChild(conta);
+      desenharEntradaNaNuvem(conta);
+    } else {
+      caixa.appendChild(el('div', { class: 'cartao', id: 'cel-conta' }, [
+        el('p', { class: 'nuvem-conta u-margem-topo-0', texto: 'Conta: ' + est.entrada.email }),
+        el('div', { class: 'barra u-margem-baixo-0' }, [
+          el('button', { type: 'button', class: 'btn principal', id: 'cel-trazer', texto: 'Trazer a cópia do tablet',
+            aoClick: abrirRestaurarDaNuvem })
+        ])
+      ]));
+    }
+    if (temDadosNoCelular()) {
+      caixa.appendChild(el('div', { class: 'barra' }, [
+        el('button', { type: 'button', class: 'btn', id: 'cel-voltar', texto: 'Voltar',
+          aoClick: function () { irParaTelaCelular(telaCelular); } })
+      ]));
+    }
+  }
+
+  /* Ao abrir com sinal, e ao voltar ao aplicativo: a cópia mais nova da
+   * nuvem, se não for a que já está aqui. É restauração, o único caminho que
+   * grava no celular. */
+  function atualizarCelularDaNuvem() {
+    if (!temNuvem() || celularBuscando || !temMarcaSoLeitura()) return Promise.resolve();
+    var est = Nuvem.estado();
+    if (!est.entrada || !est.temChave) {
+      celularRecado = est.entrada ? '' : 'Entre na conta para receber os dados novos.';
+      desenharTopoCelular();
+      return Promise.resolve();
+    }
+    if (!est.online) {
+      celularRecado = 'Sem internet agora: são os últimos que chegaram.';
+      desenharTopoCelular();
+      return Promise.resolve();
+    }
+    celularBuscando = true;
+    celularRecado = '';
+    desenharTopoCelular();
+    return Nuvem.listarCopias(est.uidDona || null).then(function (lista) {
+      var atual = lista.filter(function (c) { return c.papel === 'atual'; })[0] || lista[0];
+      if (!atual) { celularRecado = 'Ainda não há cópia na nuvem.'; return; }
+      if (est.ultimaCopia && est.ultimaCopia.id === atual.id) return;
+      return Nuvem.baixarCopia(atual.uid, atual.id).then(function (zip) {
+        return Store.importarZip(zip, { daNuvem: true });
+      }).then(function (dados) {
+        db = dados;
+        memoriaSubstituida();
+        return Nuvem.restaurou(atual, { soLeitura: true });
+      }).then(function () {
+        celularBuscando = false;
+        desenharTudo();
+      });
+    }).catch(function (e) {
+      celularRecado = e && e.codigo === 'SEM_REDE'
+        ? 'Sem internet agora: são os últimos que chegaram.'
+        : ((e && e.message) || 'Não consegui buscar a cópia mais nova.');
+    }).then(function () {
+      celularBuscando = false;
+      desenharTopoCelular();
+    });
+  }
+
+  // ---------- Hoje ----------
+
+  function desenharHojeCelular() {
+    var caixa = $('#cel-hoje');
+    caixa.innerHTML = '';
+    var hoje = Core.hojeIso();
+    caixa.appendChild(el('h2', { class: 'cel-titulo', texto: 'Hoje, ' + Core.diaSemanaLongo(hoje) + ', ' + Core.ddmmaaaa(hoje) }));
+    var aulas = db.aulas.filter(function (a) { return a.data === hoje; }).sort(function (a, b) {
+      return String(a.hora || '').localeCompare(String(b.hora || ''));
+    });
+    if (!aulas.length) {
+      caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-sem-aula', texto: 'Nenhuma aula hoje.' }));
+      var proxima = db.aulas.filter(function (a) {
+        return a.data > hoje && a.status !== 'cancelada';
+      }).sort(function (a, b) {
+        return (a.data + (a.hora || '')).localeCompare(b.data + (b.hora || ''));
+      })[0];
+      if (proxima) {
+        var quem = alunoPorId(proxima.alunoId);
+        caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-proxima', texto: 'A próxima: ' + Core.diaSemanaLongo(proxima.data) + ', ' +
+          Core.ddmmaaaa(proxima.data) + (proxima.hora ? ', ' + proxima.hora : '') + (quem ? ', ' + quem.nome : '') + '.' }));
+      }
+      return;
+    }
+    aulas.forEach(function (a) { caixa.appendChild(cartaoDaAulaCelular(a)); });
+  }
+
+  function cartaoDaAulaCelular(a) {
+    var aluno = alunoPorId(a.alunoId);
+    var cartao = el('div', { class: 'cartao cel-aula', 'data-aula': a.id });
+    cartao.appendChild(el('div', { class: 'cel-aula-titulo' }, [
+      el('strong', { texto: (a.hora ? a.hora + ' ' : '') + (aluno ? aluno.nome : 'Aluno') })
+    ]));
+    cartao.appendChild(el('div', { class: 'ajuda u-margem-0', texto: Core.fmtDuracao(Number(a.duracaoMin) || 0) +
+      ' · ' + Core.rotuloSituacao(a.status, a.data) }));
+
+    var lembrete = aluno ? String(textoDoLembreteCompleto(aluno) || '').trim() : '';
+    if (lembrete) {
+      cartao.appendChild(el('div', { class: 'lembrete cel-lembrete' }, [
+        el('strong', { texto: 'Lembrete: ' }), document.createTextNode(lembrete)
+      ]));
+    }
+
+    var u = aluno ? Core.ultimoEncontro(db, a.alunoId, a) : null;
+    if (u) {
+      var linhas = [el('div', { class: 'rotulo-ultimo', texto: 'Na última aula, ' + Core.ddmmaaaa(u.data) })];
+      if (u.assuntos.length) linhas.push(el('div', {}, [el('strong', { texto: 'Assunto: ' }), document.createTextNode(u.assuntos.join('; '))]));
+      if (u.oQueRendeu) linhas.push(el('div', {}, [el('strong', { texto: 'Relato da aula: ' }), document.createTextNode(u.oQueRendeu)]));
+      cartao.appendChild(el('div', { class: 'cel-ultimo' }, linhas));
+    }
+
+    /* A nota só minha, a da aula de hoje e a da última, fica fechada: o
+     * celular está na mão dela na casa da família. Um toque abre. */
+    var notas = [];
+    if ((a.notaPrivada || '').trim()) notas.push(['Desta aula', a.notaPrivada.trim()]);
+    if (u && u.soMinha) notas.push(['Da última aula', u.soMinha]);
+    if (notas.length) {
+      var texto = el('div', { class: 'so-minha-anterior cel-so-minha', hidden: 'hidden' }, notas.map(function (n) {
+        return el('div', {}, [el('strong', { texto: 'Nota só minha (' + n[0].toLowerCase() + '): ' }), document.createTextNode(n[1])]);
+      }));
+      var botao = el('button', { type: 'button', class: 'btn pequeno cel-ver-nota', texto: 'Ver a sua anotação' });
+      botao.addEventListener('click', function () {
+        texto.hidden = !texto.hidden;
+        botao.textContent = texto.hidden ? 'Ver a sua anotação' : 'Esconder a sua anotação';
+      });
+      cartao.appendChild(botao);
+      cartao.appendChild(texto);
+    }
+    return cartao;
+  }
+
+  // ---------- Fechamento ----------
+
+  function barraDoMesCelular(redesenhar) {
+    return el('div', { class: 'barra cel-mes' }, [
+      el('button', { type: 'button', class: 'btn pequeno', 'aria-label': 'Mês anterior', texto: '‹',
+        aoClick: function () { mesCelular = somarMeses(mesCelular, -1); redesenhar(); } }),
+      el('h2', { class: 'cel-titulo cresce', texto: Core.mesExtenso(mesCelular) }),
+      el('button', { type: 'button', class: 'btn pequeno', 'aria-label': 'Mês seguinte', texto: '›',
+        aoClick: function () { mesCelular = somarMeses(mesCelular, 1); redesenhar(); } })
+    ]);
+  }
+  function somarMeses(mes, n) {
+    var p = mes.split('-').map(Number);
+    var d = new Date(p[0], p[1] - 1 + n, 1);
+    return d.getFullYear() + '-' + Core.pad2(d.getMonth() + 1);
+  }
+
+  function desenharFechamentoCelular() {
+    var caixa = $('#cel-fechamento');
+    caixa.innerHTML = '';
+    caixa.appendChild(barraDoMesCelular(desenharFechamentoCelular));
+    var fechs = Core.calcularMesInteiro(db, mesCelular);
+    if (!fechs.length) {
+      caixa.appendChild(el('p', { class: 'ajuda', texto: 'Não há aulas neste mês.' }));
+      return;
+    }
+    var aulas = 0, valor = 0;
+    fechs.forEach(function (f) { aulas += f.qtdEncontrosFeitos; valor += f.valorFeito; });
+    caixa.appendChild(el('div', { class: 'faixa-info', id: 'cel-total-mes', texto: aulas + ' ' + palavraPlural(aulas, 'aula dada', 'aulas dadas') +
+      ' · ' + dinheiro(Math.round(valor * 100) / 100) }));
+    fechs.forEach(function (f) {
+      var linhas = f.linhas.map(function (l) {
+        return el('li', { class: 'cel-linha' }, [
+          el('span', { class: 'cresce', texto: Core.ddmm(l.data) + (l.hora ? ' ' + l.hora : '') + ' · ' + Core.fmtDuracao(l.duracaoMin) + ' · ' + l.statusRotulo }),
+          el('span', { texto: l.cobravel ? dinheiro(l.valor) : '' })
+        ]);
+      });
+      caixa.appendChild(el('div', { class: 'cartao cel-fechamento-aluno' }, [
+        el('strong', { texto: f.alunoNome }),
+        el('div', { class: 'ajuda u-margem-0', texto: f.qtdEncontrosFeitos + ' ' + palavraPlural(f.qtdEncontrosFeitos, 'aula', 'aulas') +
+          ' · ' + f.horasFeitas + ' h · ' + dinheiro(f.valorFeito) }),
+        el('ul', { class: 'cel-linhas' }, linhas)
+      ]));
+    });
+  }
+
+  // ---------- Enviar: o PDF do fechamento pelo WhatsApp, com o Pix ----------
+
+  /* O mesmo PDF e o mesmo caminho do tablet (exportarAlunoEmPdf e o "Enviar
+   * para todas as famílias"): o compartilhar do celular abre, ela escolhe o
+   * WhatsApp e a conversa da família. A chave Pix vai dentro do PDF, como no
+   * tablet; aqui ela também pode copiar a chave para colar na conversa. */
+  function desenharEnvioCelular() {
+    var caixa = $('#cel-enviar');
+    caixa.innerHTML = '';
+    caixa.appendChild(barraDoMesCelular(desenharEnvioCelular));
+    caixa.appendChild(el('p', { class: 'ajuda', texto: 'O PDF do fechamento vai pelo compartilhar do celular: escolha o WhatsApp e a ' +
+      'conversa da família. É o mesmo PDF que sai do tablet.' }));
+    var chave = chavePix();
+    caixa.appendChild(el('div', { class: 'cartao', id: 'cel-pix' }, chave ? [
+      el('div', {}, [el('strong', { texto: 'Chave Pix (vai no PDF): ' }), document.createTextNode(chave)]),
+      el('div', { class: 'barra u-margem-baixo-0 u-margem-topo-8' }, [
+        el('button', { type: 'button', class: 'btn pequeno', id: 'cel-copiar-pix', texto: 'Copiar a chave Pix', aoClick: function () {
+          var ok = function () { avisar('Chave Pix copiada. Cole na conversa da família.'); };
+          var falhou = function () { avisar('Não consegui copiar. A chave está escrita acima.'); };
+          try { navigator.clipboard.writeText(chave).then(ok, falhou); } catch (e) { falhou(); }
+        } })
+      ])
+    ] : [el('div', { class: 'ajuda u-margem-0', texto: 'Sem chave Pix: o PDF sai sem ela. A chave se põe no tablet, em Ajustes.' })]));
+
+    var fechs = Core.calcularMesInteiro(db, mesCelular).filter(function (f) { return f.qtdEncontrosFeitos > 0; });
+    if (!fechs.length) {
+      caixa.appendChild(el('p', { class: 'ajuda', texto: 'Não há aulas dadas neste mês.' }));
+      return;
+    }
+    caixa.appendChild(el('div', { class: 'barra' }, [
+      el('button', { type: 'button', class: 'btn principal', id: 'cel-enviar-todas', texto: 'Enviar para todas as famílias',
+        aoClick: function () {
+          var antes = mesAtual;
+          mesAtual = mesCelular; // o envio lê o mês uma vez, ao abrir
+          abrirEnvioParaTodas();
+          mesAtual = antes;
+        } })
+    ]));
+    fechs.forEach(function (f) {
+      caixa.appendChild(el('div', { class: 'cartao cel-familia' }, [
+        el('strong', { texto: f.alunoNome }),
+        el('div', { class: 'ajuda u-margem-0', texto: f.qtdEncontrosFeitos + ' ' + palavraPlural(f.qtdEncontrosFeitos, 'aula', 'aulas') +
+          ' · ' + dinheiro(f.valorFeito) }),
+        el('div', { class: 'barra u-margem-baixo-0 u-margem-topo-8' }, [
+          el('button', { type: 'button', class: 'btn', texto: 'Enviar o PDF', aoClick: function () { exportarAlunoEmPdf(f, false); } })
+        ])
+      ]));
     });
   }
 
