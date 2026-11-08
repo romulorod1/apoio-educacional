@@ -46,7 +46,7 @@ const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
-const MODOS = ['--envenenado-registro-em-claro', '--envenenado-fila-fora-da-transacao'];
+const MODOS = ['--envenenado-registro-em-claro', '--envenenado-fila-fora-da-transacao', '--envenenado-culpa-na-recusa-total'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const EM_CLARO = MODO === MODOS[0];
 const FILA_FORA = MODO === MODOS[1];
@@ -94,8 +94,14 @@ conf('o bloco dos registros nas regras tem começo e fim marcados', INICIO_BLOCO
 const REGRAS_VELHAS = REGRAS.slice(0, INICIO_BLOCO) + REGRAS.slice(FIM_BLOCO);
 conf('as regras velhas não têm o caminho dos registros', REGRAS_VELHAS.indexOf(REGISTROS_NAS_REGRAS), -1);
 
+/* O critério de culpa: só quem ficou de fora enquanto outros passaram, ou erro
+ * de forma. O veneno volta a contar também quem já tinha tentativa, e aí a
+ * recusa total da nuvem leva um bom sozinho à quarentena. */
+const CULPA = "return r.enviados > 0 || (r.erro && r.erro.codigo === 'INVALID_ARGUMENT');";
+conf('o critério de culpa está num lugar só', NUVEM.split(CULPA).length, 2);
 const trocas = {};
 if (EM_CLARO) trocas['/nuvem.js'] = NUVEM.replace(CIFRA_REGISTRO, 'return Promise.resolve(new TextEncoder().encode(texto));');
+if (MODO === MODOS[2]) trocas['/nuvem.js'] = NUVEM.replace(CULPA, "return r.enviados > 0 || (r.erro && r.erro.codigo === 'INVALID_ARGUMENT') || (i.fila.tentativas || 0) > 0;");
 if (FILA_FORA) {
   trocas['/store.js'] = STORE.replace(ENFILEIRAR,
     "function enfileirar(saida, entrada) { setTimeout(function () { escrever('saida', function (s) { return s.put(entrada); }).catch(function () {}); }, 0); }");
@@ -391,21 +397,58 @@ function textoDoServidor(docs) {
   conf('e na terceira ele entra na quarentena', quarentena.resultados.map(r => r.quarentena).join(','), 'false,false,true');
   conf('o estado da nuvem conta 0 pendentes e 1 em quarentena', quarentena.estado.pendentes + '/' + quarentena.estado.quarentena, '0/1');
   conf('Ajustes diz que 1 mudança não consegue subir e as outras seguem', /1 mudança não consegue subir \(a nuvem recusa esse registro\); as outras seguem/.test(quarentena.frase), true);
-  const depoisDaQuarentena = await pagA.evaluate(async () => {
-    const d = await Store.carregar();
-    d.ajustes.chavePix = 'pix-depois';
-    await Store.salvar(d);
-    const r = await Nuvem.enviarRegistros({ versaoApp: 'prova' });
-    return { enviados: r.enviados, erro: r.erro ? r.erro.codigo : null, fila: (await Store.lerFila()).map(e => e.id + (e.quarentena ? '(q)' : '')) };
+  /* O reteste: o envio seguinte, inteiro sem recusa, solta a quarentena uma vez;
+   * o ruim volta ao lote, a nuvem o recusa de novo e ele volta para a
+   * quarentena, de onde não sai mais sozinho. */
+  const retestes = await pagA.evaluate(async () => {
+    const rodadas = [];
+    for (let k = 1; k <= 3; k++) {
+      const d = await Store.carregar();
+      d.ajustes.chavePix = 'pix-reteste-' + k;
+      await Store.salvar(d);
+      const r = await Nuvem.enviarRegistros({ versaoApp: 'prova' });
+      const fila = await Store.lerFila();
+      rodadas.push([r.enviados, r.erro ? r.erro.codigo : null, fila.map(e => e.id + (e.quarentena ? '(q)' : '') + (e.retestada ? '(r)' : '') + ':' + (e.tentativas || 0)).join(' ')]);
+    }
+    return rodadas;
   });
-  conf('com o ruim em quarentena, o próximo envio sobe o resto sem tocar nele', JSON.stringify([depoisDaQuarentena.enviados, depoisDaQuarentena.erro, depoisDaQuarentena.fila]),
-    JSON.stringify([1, null, ['aula:ruim(q)']]));
+  conf('1a: com o ruim em quarentena, o bom sobe sem tocar nele; o envio limpo solta a quarentena para o reteste',
+    JSON.stringify(retestes[0]), JSON.stringify([1, null, 'aula:ruim(r):3']));
+  conf('2a: no reteste a nuvem recusa o ruim de novo, o bom do lote sobe, e ele volta para a quarentena',
+    JSON.stringify(retestes[1]), JSON.stringify([1, null, 'aula:ruim(q)(r):4']));
+  conf('3a: já retestado, não volta mais sozinho', JSON.stringify(retestes[2]), JSON.stringify([1, null, 'aula:ruim(q)(r):4']));
   conf('o registro ruim não está no servidor', 'aula:ruim' in (await registrosNoServidor(dona.idToken, dona.localId)).docs, false);
   await pagA.evaluate(() => new Promise(res => {
     const q = indexedDB.open('apoio-educacional');
     q.onsuccess = () => { const t = q.result.transaction(['registros', 'saida'], 'readwrite'); t.objectStore('registros').delete('aula:ruim'); t.objectStore('saida').delete('aula:ruim');
       t.oncomplete = () => { q.result.close(); res(); }; };
   }));
+
+  secao('5c. Um bom sozinho na fila, com uma tentativa de uma queda parcial, não vai para a quarentena em recusas totais');
+  conf('as regras velhas voltam ao emulador (a nuvem recusa tudo)', await publicarRegras(REGRAS_VELHAS), 200);
+  const recusaTotal = await pagA.evaluate(async () => {
+    const d = await Store.carregar();
+    d.ajustes.chavePix = 'pix-sozinho';
+    await Store.salvar(d);
+    // a queda parcial de antes (um 5xx no meio do lote) deixou uma tentativa nele
+    await Store.marcarTentativa(['ajuste:chavePix']);
+    const rodadas = [];
+    for (let k = 1; k <= 2; k++) {
+      const r = await Nuvem.enviarRegistros({ versaoApp: 'prova' });
+      const e = (await Store.lerFila()).find(x => x.id === 'ajuste:chavePix');
+      rodadas.push([r.enviados, r.erro ? r.erro.codigo : null, e ? (e.tentativas || 0) : null, e ? !!e.quarentena : null]);
+    }
+    return rodadas;
+  });
+  // (sob o veneno a recusa vira culpa do registro e o erro da nuvem não aparece; a propriedade medida é a de baixo)
+  if (MODO !== MODOS[2]) conf('as duas recusas totais devolvem PERMISSION_DENIED e nada sobe', JSON.stringify(recusaTotal.map(r => [r[0], r[1]])), JSON.stringify([[0, 'PERMISSION_DENIED'], [0, 'PERMISSION_DENIED']]));
+  else conf('nada sobe nas duas recusas totais', JSON.stringify(recusaTotal.map(r => r[0])), JSON.stringify([0, 0]));
+  prop('a tentativa continua uma e o bom não entra na quarentena (recusa total nunca conta)',
+    JSON.stringify(recusaTotal.map(r => [r[2], r[3]])) === JSON.stringify([[1, false], [1, false]]), MODOS[2]);
+  if (MODO === MODOS[2]) throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
+  conf('as regras novas voltam', await publicarRegras(REGRAS), 200);
+  const sozinhoSubiu = await pagA.evaluate(async () => { const r = await Nuvem.enviarRegistros({ versaoApp: 'prova' }); return [r.enviados, r.erro || null, (await Store.lerFila()).length]; });
+  conf('e com a nuvem aceitando, o bom sobe', JSON.stringify(sozinhoSubiu), JSON.stringify([1, null, 0]));
 
   secao('6. A fila sobrevive a fechar sem sinal e sobe ao voltar');
   await pagA.setOfflineMode(true);

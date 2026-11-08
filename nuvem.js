@@ -883,7 +883,7 @@
   function enviarRegistros(info) {
     info = info || {};
     if (enviandoRegistros) return enviandoRegistros;
-    var enviados = 0, lotes = 0;
+    var enviados = 0, lotes = 0, emQuarentenaAntes = [];
     enviandoRegistros = carregarEstado().then(function () {
       if (!podeEnviar()) return { pulado: 'so leitura', enviados: 0 };
       if (!sessao) return { pulado: 'sem conta', enviados: 0 };
@@ -891,6 +891,10 @@
       if (!online()) throw semRede();
       if (!root.Store || typeof root.Store.registrosDaFila !== 'function') return { pulado: 'sem fila', enviados: 0 };
       var uid = sessao.uid;
+      // quem já estava em quarentena ANTES deste envio é quem o envio limpo solta depois (não quem entrou nele agora)
+      var quarentenaLida = typeof root.Store.lerFila === 'function'
+        ? root.Store.lerFila().then(function (l) { emQuarentenaAntes = (l || []).filter(function (e) { return e.quarentena && !e.retestada; }).map(function (e) { return e.id; }); }, function () {})
+        : Promise.resolve();
       /* Um lote inteiro, num commit; o que subiu sai da fila. */
       function subirLote(itens) {
         return Promise.all(itens.map(function (i) { return documentoDoRegistro(i.registro, info.versaoApp); })).then(function (docs) {
@@ -928,6 +932,9 @@
       }
       var jaCulpados = {}; // quem levou tentativa neste envio não volta ao lote até o próximo envio
       function proximoLote() {
+        return quarentenaLida.then(lerLote);
+      }
+      function lerLote() {
         return root.Store.registrosDaFila(REGISTROS_POR_COMMIT).then(function (itens) {
           itens = itens.filter(function (i) { return !!i.registro && !jaCulpados[i.fila.id]; });
           if (!itens.length || lotes >= 50) return { enviados: enviados };
@@ -936,10 +943,14 @@
             enviados += r.enviados;
             if (!r.indefinidos.length) return proximoLote();
             /* Culpa do registro, e não da nuvem: outros do mesmo lote passaram, ou
-             * o erro é de forma (INVALID_ARGUMENT), ou ele já tinha sido culpado
-             * antes. Senão é a nuvem recusando tudo: a fila fica e o erro sobe. */
+             * o erro é de forma (INVALID_ARGUMENT). Senão é a nuvem recusando
+             * tudo: a fila fica e o erro sobe.
+             * RECUSA TOTAL NUNCA CONTA TENTATIVA, seja o lote de 200 ou de 1: um
+             * bom que ficou sozinho (por uma queda parcial antes) e vê a nuvem
+             * recusar tudo (503, regras ainda não coladas) não pode ir para a
+             * quarentena sem culpa. */
             var culpados = r.indefinidos.filter(function (i) {
-              return r.enviados > 0 || (r.erro && r.erro.codigo === 'INVALID_ARGUMENT') || (i.fila.tentativas || 0) > 0;
+              return r.enviados > 0 || (r.erro && r.erro.codigo === 'INVALID_ARGUMENT');
             });
             if (!culpados.length) throw r.erro;
             culpados.forEach(function (i) { jaCulpados[i.fila.id] = true; });
@@ -956,6 +967,12 @@
         registros.erro = null;
         registros.ultimoEnvio = { quando: new Date().toISOString(), enviados: r.enviados };
         guardarRegistros();
+        /* Um envio inteiro sem recusa solta a quarentena UMA vez, como reteste:
+         * quem foi parar lá por uma queda da nuvem sai no próximo envio; quem
+         * a nuvem recusa de verdade volta para a quarentena e fica. */
+        if (emQuarentenaAntes.length && typeof root.Store.soltarQuarentena === 'function') {
+          return root.Store.soltarQuarentena(emQuarentenaAntes).then(function () { return r; }, function () { return r; });
+        }
       }
       return r;
     }, function (e) {

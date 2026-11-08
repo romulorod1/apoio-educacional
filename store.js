@@ -722,6 +722,32 @@
    * lotes, para não derrubar o commit dos outros para sempre. Uma edição nova
    * do mesmo item regrava a entrada (enfileirar) e a tira da quarentena. */
   var TENTATIVAS_ATE_QUARENTENA = 3;
+  /* O reteste: a quarentena volta para a fila UMA vez (a entrada fica marcada
+   * como retestada e não volta de novo sozinha; só uma edição nova a regrava).
+   * Devolve quantas voltaram. */
+  function soltarQuarentena(ids) {
+    var so = ids ? {} : null;
+    (ids || []).forEach(function (id) { so[id] = true; });
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, 'saida', 'readwrite');
+        var s = t.objectStore('saida'), soltas = 0;
+        var todos = s.getAll();
+        todos.onsuccess = function () {
+          (todos.result || []).forEach(function (e) {
+            if (!e.quarentena || e.retestada || (so && !so[e.id])) return;
+            e.quarentena = false;
+            e.retestada = true;
+            s.put(e);
+            soltas++;
+          });
+        };
+        t.oncomplete = function () { resolve(soltas); };
+        t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
   function marcarTentativa(ids) {
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
@@ -1686,7 +1712,7 @@
     AJUSTES_DO_APARELHO: AJUSTES_DO_APARELHO.slice(),
     lerRegistros: function () { return todosOsValores('registros'); },
     registrosDaFila: registrosDaFila, confirmarEnvio: confirmarEnvio, tamanhoDaFila: tamanhoDaFila,
-    estadoDaFila: estadoDaFila, marcarTentativa: marcarTentativa,
+    estadoDaFila: estadoDaFila, marcarTentativa: marcarTentativa, soltarQuarentena: soltarQuarentena,
     lerFila: function () { return todosOsValores('saida'); },
     sincronizavel: sincronizavel,
     montarRegistros: montar,
