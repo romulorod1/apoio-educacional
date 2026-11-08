@@ -538,7 +538,11 @@ function semGuardarNaMemoria(r) {
  * janela que tocou em "Atualizar agora" fica presa à versão dela até sumir, e
  * some só quando a recarga termina: limpar no activate deixava o cache velho
  * de pé até a release seguinte. A espera dá tempo de a janela velha sair da
- * lista. */
+ * lista. Corre por fora do evento, sem waitUntil: segurar a abertura por 2 s
+ * pode atrasar a ativação do worker em espera quando ela fecha o aplicativo
+ * (na prova da lista que encolhe, uma rodada achou o worker ainda em espera
+ * depois de fechar e abrir). Se o navegador parar o
+ * worker antes, a limpeza fica para a abertura seguinte. */
 function limparDepoisDaAbertura(selecionado) {
   return new Promise(function (r) { setTimeout(r, 2000); }).then(function () {
     return self.clients.matchAll({ type: 'window', includeUncontrolled: true });
@@ -576,7 +580,7 @@ self.addEventListener('fetch', function (e) {
     e.respondWith((navegacao ? escolherNaAbertura(e) : cacheSelecionado()).then(function (selecionado) {
       if (navegacao) {
         var destino = e.resultingClientId || e.clientId;
-        e.waitUntil(limparDepoisDaAbertura(selecionado));
+        limparDepoisDaAbertura(selecionado);
         return destino ? gravarControle('cliente-' + destino, selecionado).then(function () { return selecionado; }) : selecionado;
       }
       if (!e.clientId) return selecionado;
