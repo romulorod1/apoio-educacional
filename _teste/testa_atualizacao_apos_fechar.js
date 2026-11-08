@@ -44,6 +44,21 @@ const listaDoWorker = process.argv.includes('--envenenado-lista-do-worker');
  * versão; depois da recarga, todos têm de ser da versão nova, nos dois
  * caminhos: worker em espera e worker que já assumiu servindo a de antes. */
 const trocaAtomica = process.argv.includes('--troca-atomica');
+/* O worker do tablet lento: o 'ativar-agora' só começa 2,5 s depois de chegar.
+ * O processador lento da página não alcança o worker, então a demora é posta
+ * no próprio sw.js servido, por fora do código dele. Era assim que a troca
+ * misturava versões: o aplicativo desistia de esperar em 1,2 s e dizia "ficou
+ * para depois", e o worker escolhia a versão nova mesmo assim. */
+const WORKER_LENTO = `
+var __ouvir = self.addEventListener.bind(self);
+self.addEventListener = function (tipo, fn) {
+  if (tipo !== 'message') return __ouvir(tipo, fn);
+  __ouvir('message', function (e) {
+    if (!e.data || e.data.tipo !== 'ativar-agora') return fn(e);
+    e.waitUntil(new Promise(function (r) { setTimeout(r, 2500); }).then(function () { fn(e); }));
+  });
+};
+`;
 const temExtra = () => listaEncolhe && publicada === 1;
 /* --abre-no-meio-do-install (D2b): o app.js da versão 2 chega devagar, e ela
  * abre o aplicativo no meio do download. A limpeza que roda depois de cada
@@ -102,6 +117,7 @@ const servidor = http.createServer((req, res) => {
         return;
       }
       var url = new URL(e.request.url);`);
+    if (trocaAtomica) codigo = WORKER_LENTO + codigo;
     if (temExtra()) {
       if (codigo.indexOf("  './app.js',") < 0) throw new Error('não achei o app.js na lista do sw.js');
       codigo = codigo.replace("  './app.js',", "  './app.js',\n  './extra.js',");
