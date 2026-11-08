@@ -825,6 +825,14 @@ roda "celular so leitura --envenenado-janela-640"   node "_teste/testa_celular_l
 # a abertura do celular que tenta gravar a migracao do corte dos pagamentos
 # mostra "Este celular so le" sem ela ter tocado em nada
 roda "celular so leitura --envenenado-grava-abertura" node "_teste/testa_celular_leitura.js" --envenenado-grava-abertura
+# D6b: o celular da dona edita nas quatro acoes (marcar e cancelar aula, registrar
+# como foi, cadastrar aluno, pago em), que sobem pela fila de registros e chegam ao
+# tablet ao abrir; sem sinal, a fila espera e o alto diz; a copia completa nunca
+# sobe do celular; o observador de outra conta nao ve botao de edicao. Venenos: o
+# celular que envia a copia completa e o observador que edita TEM de ser vistos.
+roda "celular edita (D6b)"                          node "_teste/testa_celular_edita.js"
+roda "celular edita --envenenado-celular-envia-copia" node "_teste/testa_celular_edita.js" --envenenado-celular-envia-copia
+roda "celular edita --envenenado-observador-edita"  node "_teste/testa_celular_edita.js" --envenenado-observador-edita
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"

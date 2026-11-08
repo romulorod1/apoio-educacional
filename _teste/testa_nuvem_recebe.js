@@ -583,7 +583,7 @@ async function restaurarPelaTela(pag, botaoRestaurar, aAnterior) {
   conf('nada fundido, um conflito, e UMA entrada no histórico mesmo recebendo duas vezes', legitimas.fundidas2 + '/' + legitimas.conflitos + '/' + legitimas.conflito, '0/1/1');
   await editar(pagA, "d.aulas = d.aulas.filter(a => !/^s3@2026-07-02/.test(a.id));");
 
-  secao('8. O celular só leitura restaura e RECEBE os registros, sem nunca enviar');
+  secao('8. O celular da dona restaura e RECEBE os registros; sem editar, não envia nada');
   const contextoC = await pagA.browser().createBrowserContext();
   const pagC = await contextoC.newPage();
   await prepararPagina(pagC, true);
@@ -606,9 +606,12 @@ async function restaurarPelaTela(pag, botaoRestaurar, aAnterior) {
   conf('receber de novo no celular, em dia, não falha', rC.erro === null, true);
   conf('o celular vê "A depois" na aula de 08/06 e não vê a aula apagada', (await aula(pagC, 's1@2026-06-08')).nota + '/' + ((await aula(pagC, 'x1')) === null), 'A depois/true');
   conf('o celular tem a mesma agenda de A', await retrato(pagC), await retrato(pagA));
-  const sC = await pagC.evaluate(() => Nuvem.sincronizar({ versaoApp: 'prova' }).then(r => r.enviados.pulado || null));
-  conf('sincronizar no celular só recebe: o envio é pulado pela trava', sC, 'so leitura');
-  conf('nenhum commit saiu do celular', pagC.commits.length, 0);
+  /* Desde o D6b o celular da dona envia os registros DELE (as quatro ações,
+   * provadas no testa_celular_edita.js). Aqui ele não editou: o envio roda e
+   * não tem o que subir. */
+  const sC = await pagC.evaluate(() => Nuvem.sincronizar({ versaoApp: 'prova' }).then(r => (r.enviados.pulado || 'enviou') + '/' + (r.enviados.enviados || 0)));
+  conf('sincronizar no celular da dona recebe e envia o que é dele: sem edição, nada', sC, 'enviou/0');
+  conf('nenhum commit saiu do celular, que não editou', pagC.commits.length, 0);
   conf('a fila do celular está vazia', await pagC.evaluate(() => Store.lerFila().then(l => l.length)), 0);
   /* A fusão no celular: duas reabertas da mesma série e data chegam juntas (sem
    * a lápide de nenhuma): a de menor r vira lápide aqui, mas o celular, que

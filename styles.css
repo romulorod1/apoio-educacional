@@ -2925,7 +2925,11 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-tela.ativa { display: block; }
 .cel-titulo { font-size: var(--letra-6); color: var(--navy); margin: 4px 0 12px; }
 .cel-mes .cel-titulo { margin: 0; text-align: center; }
-.cel-mes .btn { min-width: var(--alvo); }
+.cel-mes .btn { min-width: var(--alvo-celular); }
+/* O dia de Hoje (D6b): anterior, o dia escolhido e o seguinte numa linha só. */
+.cel-dia { flex-wrap: nowrap; align-items: center; }
+.cel-dia .btn { min-width: var(--alvo-celular); flex-shrink: 0; }
+.cel-dia input[type=date] { flex: 1; min-width: 0; }
 .cel-aula-titulo { font-size: var(--letra-5); color: var(--navy); }
 .cel-lembrete { margin: 10px 0 0; }
 .cel-ultimo { margin-top: 10px; font-size: var(--letra-3); line-height: 1.5; }
@@ -2967,5 +2971,13 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 }
 .cel-aba.ativa { background: var(--soft); color: var(--navy); }
 body.modo-celular .celular .btn { min-height: var(--alvo-celular); }
-body.modo-celular .celular input { min-height: var(--alvo); box-sizing: border-box; max-width: 100%; }
+/* Campos e botões do celular com 48 px (D6b: as quatro ações escrevem aqui). */
+body.modo-celular .celular input,
+body.modo-celular .celular select { min-height: var(--alvo-celular); box-sizing: border-box; max-width: 100%; }
+body.modo-celular .celular textarea { min-height: 120px; box-sizing: border-box; width: 100%; max-width: 100%; }
+body.modo-celular .celular .campo { display: block; margin-bottom: 12px; }
+body.modo-celular .celular .campo > span { display: block; margin-bottom: 4px; }
+body.modo-celular .celular .campo input,
+body.modo-celular .celular .campo select { width: 100%; }
+body.modo-celular .celular .linha-pagamento .barra { flex-wrap: wrap; }
 body.modo-celular .celular .linha { flex-direction: column; }

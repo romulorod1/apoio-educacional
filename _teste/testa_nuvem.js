@@ -120,7 +120,7 @@ conf('o aplicativo não cria conta: nenhum signUp nem "Criar conta" no código',
 const trocas = {};
 // o observador de outra conta nunca passa a editar: a decisão está numa função só, leOutraConta
 const LE_OUTRA_CONTA = 'return !!(est && est.uidDona && est.entrada && est.uidDona !== est.entrada.uid);';
-conf('o app.js decide "lê a cópia de outra conta" num lugar só, e o usa no botão e na função', APP.split(LE_OUTRA_CONTA).length === 2 && APP.split('leOutraConta()').length === 5, true); // a função e três usos
+conf('o app.js decide "lê a cópia de outra conta" num lugar só, e o usa no botão e na função', APP.split(LE_OUTRA_CONTA).length === 2 && APP.split('leOutraConta()').length === 7, true); // a função e cinco usos (D6b: quem edita no celular)
 if (OBSERVADOR_EDITA) trocas['/app.js'] = APP.replace(LE_OUTRA_CONTA, 'return false;');
 if (SOBE_VAZIO) {
   trocas['/nuvem.js'] = NUVEM
@@ -503,7 +503,7 @@ const retrato = (pag) => pag.evaluate(async () => {
   const trouxe = await esperar('o observador restaurou', () => pagD.evaluate(async () => !document.querySelector('#modal-nuvem-restaurar.aberto') && (await Store.carregar()).alunos.some(a => a.id === 'alfa')), v => v === true, 30000);
   conf('o observador trouxe a cópia da dona, só com o login e o código da conta dela', trouxe.ok, true);
   conf('a pergunta disse que o aparelho passa a só ler', pagD.dialogos.some(d => /outra conta.*passa a só ler/.test(d)), true);
-  conf('o observador ficou só leitura, com a conta da dona na marca e a automática desligada', await pagD.evaluate(u => { const e = Nuvem.estado(); return e.soLeitura && e.uidDona === u && e.automatica === false; }, dona.localId), true);
+  conf('o observador ficou só leitura, com a conta da dona na marca e a automática desligada', await pagD.evaluate(u => { const e = Nuvem.estado(); return e.celular && e.observador && !e.celularDaDona && e.uidDona === u && e.automatica === false; }, dona.localId), true);
   conf('o observador recebe os registros da dona (só leitura na nuvem) sem erro', await pagD.evaluate(() => Nuvem.receberRegistros().then(r => r.erro ? r.erro.codigo : null)), null);
   conf('editar no observador é recusado', await pagD.evaluate(async () => { try { await Store.salvar(await Store.carregar()); return false; } catch (e) { return !!(e && e.soLeitura); } }), true);
   conf('sincronizar no observador só recebe', await pagD.evaluate(() => Nuvem.sincronizar().then(r => r.enviados.pulado || null)), 'so leitura');
@@ -513,21 +513,21 @@ const retrato = (pag) => pag.evaluate(async () => {
   conf('o aparelho do observador passou ao modo de só leitura', await pagD.evaluate(() => document.body.classList.contains('modo-celular') && Store.estaSoLendo()), true);
   await H.abrirApp(pagD, amb.ORIGEM);
   await pagD.evaluate(() => Nuvem.pronto());
-  conf('reaberto, continua só leitura, com a conta da dona na marca', await pagD.evaluate(u => { const e = Nuvem.estado(); return e.soLeitura && e.uidDona === u && document.body.classList.contains('modo-celular'); }, dona.localId), true);
+  conf('reaberto, continua só leitura, com a conta da dona na marca', await pagD.evaluate(u => { const e = Nuvem.estado(); return e.celular && e.observador && e.uidDona === u && document.body.classList.contains('modo-celular'); }, dona.localId), true);
   /* Em tela larga, o observador de OUTRA conta nunca passa a editar: o envio
    * dele iria para a conta dele com os carimbos da dona (FAILED_PRECONDITION
    * para sempre) e a cópia automática subiria os dados dela como cópia dele. */
   const botaoEditar = await esperar('o alto do celular desenhou', () => pagD.evaluate(() => !!document.querySelector('#nuvem-passa-a-editar, #nuvem-so-le-outra')), v => v === true, 10000);
   conf('(controle) o alto da tela de só leitura foi desenhado', botaoEditar.ok, true);
   if (OBSERVADOR_EDITA) {
-    conf('VENENO visto: o observador de outra conta, em tela larga, viu "Este aparelho passa a editar"', await existe(pagD, '#nuvem-passa-a-editar'), true);
+    conf('VENENO visto: o observador de outra conta, em tela larga, viu "Este aparelho passa a ser o tablet"', await existe(pagD, '#nuvem-passa-a-editar'), true);
     await clicar(pagD, '#nuvem-passa-a-editar');
-    const caiu = await esperar('a marca de só leitura caiu', () => pagD.evaluate(() => !Nuvem.estado().soLeitura), v => v === true, 10000);
+    const caiu = await esperar('a marca de celular caiu', () => pagD.evaluate(() => !Nuvem.estado().celular), v => v === true, 10000);
     conf('VENENO visto: e a marca caiu (o envio dele iria para a conta dele com os carimbos da dona)', caiu.ok, true);
   } else {
-    conf('o observador de outra conta, em tela larga, não vê "Este aparelho passa a editar"', await existe(pagD, '#nuvem-passa-a-editar'), false);
+    conf('o observador de outra conta, em tela larga, não vê "Este aparelho passa a ser o tablet"', await existe(pagD, '#nuvem-passa-a-editar'), false);
     conf('e a tela diz que ele só lê a cópia de outra conta', await texto(pagD, '#nuvem-so-le-outra'), 'Este aparelho só lê a cópia de outra conta.');
-    conf('a marca continua', await pagD.evaluate(() => Nuvem.estado().soLeitura), true);
+    conf('a marca continua', await pagD.evaluate(() => Nuvem.estado().celular), true);
   }
   conf('nenhum erro de script no observador', JSON.stringify(pagD.errosDePagina), '[]');
   await contextoD.close();

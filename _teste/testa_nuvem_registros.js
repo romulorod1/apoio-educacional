@@ -73,14 +73,15 @@ const DADOS_LEGIVEIS = 'if (!reg.apagadoEm && reg.dados !== null && reg.dados !=
 const ENFILEIRAR = 'function enfileirar(saida, entrada) { saida.put(entrada); }';
 const SAIDA_NA_TRANSACAO = "var saida = opcoes.semFila ? null : t.objectStore('saida');";
 const GATILHO = 'Nuvem.sincronizarSeDevido({ versaoApp: VERSAO });'; // desde a fatia 3: recebe e envia
-const COMMIT_TRAVADO = /function commit\(escritas\) \{\r?\n    if \(!podeEnviar\(\)\)/;
+// desde o D6b: o celular da dona passa, e só com escritas de registro
+const COMMIT_TRAVADO = /function commit\(escritas\) \{\r?\n    if \(!podeEnviarCopia\(\) && !\(celularDaDona\(\) && soRegistros\(escritas\)\)\)/;
 const REGISTROS_NAS_REGRAS = 'match /registros/{registro} {';
 conf('o conteúdo do registro vai em dados, como dado legível, num lugar só (sem cifra)', NUVEM.split(DADOS_LEGIVEIS).length === 2 && !/subtle\.|AES-GCM/.test(NUVEM), true);
 conf('o store.js enfileira num lugar só, na transação de quem chamou', STORE.split(ENFILEIRAR).length, 2);
 conf('a fila é um depósito da MESMA transação do dado', STORE.split(SAIDA_NA_TRANSACAO).length, 2);
 conf("os depósitos do documento incluem a fila", STORE.indexOf("var DEPOSITOS_DO_DOCUMENTO = ['dados', 'registros', 'controle', 'saida'];") > 0, true);
 conf('o app.js dispara o envio nos momentos da cópia, num lugar só', APP.split(GATILHO).length, 2);
-conf('o envio dos registros passa pelo commit, que recusa no aparelho que só lê', COMMIT_TRAVADO.test(NUVEM) && NUVEM.indexOf("gravacaoCarimbada(nomeDoc(uid, 'registros/' + d.id), d, ") > 0, true);
+conf('o envio dos registros passa pelo commit, que recusa no aparelho que só lê (e no celular da dona, tudo o que não for registro)', COMMIT_TRAVADO.test(NUVEM) && NUVEM.indexOf("gravacaoCarimbada(nomeDoc(uid, 'registros/' + d.id), d, ") > 0, true);
 conf('as regras têm o caminho dos registros, com a forma conferida', REGRAS.split(REGISTROS_NAS_REGRAS).length === 2 && REGRAS.indexOf('registroValido(registro)') > 0, true);
 conf('a lista de ajustes do aparelho tem versaoVista', /AJUSTES_DO_APARELHO = \[[^\]]*'versaoVista'/.test(STORE), true);
 
@@ -509,7 +510,7 @@ function textoDoServidor(docs) {
   prop('nenhuma entrada na fila para o dado que não foi gravado', atomica.fila.indexOf('aula:s1@2026-06-03') < 0, MODOS[0]);
   if (FILA_FORA) throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
 
-  secao('8. O celular só leitura restaura a cópia, não enfileira e nunca envia registro');
+  secao('8. O celular da dona restaura a cópia sem enfileirar; sem editar, não envia registro');
   const contextoC = await pagA.browser().createBrowserContext();
   const pagC = await contextoC.newPage();
   await prepararPagina(pagC, true);
@@ -528,10 +529,12 @@ function textoDoServidor(docs) {
   conf('o celular restaurou a cópia do tablet', veio.ok, true);
   const cel = await pagC.evaluate(async () => {
     const r = await Nuvem.enviarRegistros({ versaoApp: 'prova' });
-    return { fila: (await Store.lerFila()).length, pulado: r.pulado || null, soLeitura: Nuvem.estado().soLeitura, aparelho: Store.aparelho() };
+    return { fila: (await Store.lerFila()).length, pulado: r.pulado || null, enviados: r.enviados || 0, celular: Nuvem.estado().celular, dona: Nuvem.estado().celularDaDona, aparelho: Store.aparelho() };
   });
   conf('a restauração que veio da nuvem não enfileira nada', cel.fila, 0);
-  conf('o envio no celular é pulado pela trava do só leitura', cel.pulado + '/' + cel.soLeitura, 'so leitura/true');
+  /* Desde o D6b o celular da dona envia os registros das quatro ações dele
+   * (testa_celular_edita.js); sem edição, o envio não tem o que subir. */
+  conf('o celular da dona, sem edição, não envia nada: a fila está vazia', [cel.pulado, cel.enviados, cel.celular, cel.dona].join('/'), '/0/true/true');
   conf('nenhum commit saiu do celular', pagC.commits.length, 0);
   // a restauração é a única gravação do celular, e é nela que o id do aparelho nasce
   conf('o celular ganhou o id de aparelho na restauração, a única gravação dele', /^ap[0-9a-f]{12}$/.test(cel.aparelho || ''), true);

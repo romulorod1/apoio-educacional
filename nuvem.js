@@ -92,12 +92,19 @@
   var geracao = 0;        // cresce a cada gravação dela; o envio compara com a do retrato
   var aparelho = null;    // rótulo curto deste aparelho, só para a lista de cópias
   var enviando = null;    // promessa do envio em curso, para não subir duas vezes
-  /* A marca "este aparelho só lê" (D6, parte 1): gravada quando ela traz a
-   * cópia pelo modo celular. Com ela, nada sobe daqui, nunca: nem ao fechar,
-   * nem uma vez por dia, nem pelo toque. Uma cópia do celular cobriria a do
-   * tablet com uma mais velha. Guarda também de que conta é a cópia, para
-   * buscar a mais nova ao abrir. { desde, uidDona } */
-  var marcaSoLeitura = null;
+  /* A marca "este aparelho é celular" (D6): gravada quando ela traz a cópia
+   * pelo modo celular. Com ela, a CÓPIA COMPLETA nunca sobe daqui: nem ao
+   * fechar, nem uma vez por dia, nem pelo toque. Uma cópia do celular
+   * cobriria a do tablet com uma mais velha; a cópia é do tablet. Guarda
+   * também de que conta é a cópia, para buscar a mais nova ao abrir.
+   * { desde, uidDona }
+   * Na conta da DONA (D6, parte 2), o celular edita nas quatro ações e a
+   * mudança sobe pela fila de registros; na conta de outra pessoa (o
+   * observador, D7), nada sobe, nunca.
+   * No banco próprio a chave continua 'soLeitura', o nome da parte 1: a
+   * versão de antes lê essa chave, e voltar a ela (rollback) com a marca
+   * guardada noutro nome faria o celular enviar a cópia completa. */
+  var marcaCelular = null;
   var travadoNestaAbertura = false; // a tela do celular está à vista, mesmo sem a marca
   /* Os registros (N1): quantos esperam na fila, o último envio e o último erro
    * (o PERMISSION_DENIED das regras ainda não publicadas fica aqui, para
@@ -160,7 +167,7 @@
     if (pronto) return pronto;
     pronto = Promise.all([lerEstado('sessao'), lerEstado('chave'), lerEstado('copia'),
       lerEstado('automatica'), lerEstado('pendente'), lerEstado('aparelho'), lerEstado('soLeitura'), lerEstado('registros')]).then(function (v) {
-      marcaSoLeitura = v[6] || null;
+      marcaCelular = v[6] || null;
       sessao = v[0] || null;
       ultimaCopia = v[2] || null;
       automatica = !!v[3];
@@ -468,15 +475,30 @@
       });
     });
   }
-  /* TODA escrita na nuvem passa pelo commit, e o aparelho que só lê não
-   * escreve: a cópia, a rotação, a lista de leitores e os registros ficam
-   * todos aqui atrás. */
-  function podeEnviar() { return !marcaSoLeitura && !travadoNestaAbertura; }
+  /* TODA escrita na nuvem passa pelo commit. A cópia completa, a rotação e a
+   * lista de leitores sobem só do tablet (sem a marca de celular e sem a tela
+   * de celular à vista). Do celular da dona sobem os registros, e só eles: o
+   * commit confere escrita por escrita que o caminho é o de um registro. O
+   * observador de outra conta não escreve nada. */
+  function podeEnviarCopia() { return !marcaCelular && !travadoNestaAbertura; }
+  /* O celular da DONA: tem a marca e a conta dela é a conta da cópia. Sem a
+   * conta à vista (ela saiu), não há como saber: fica sem editar. */
+  function celularDaDona() {
+    return !!(marcaCelular && sessao && sessao.uid && (!marcaCelular.uidDona || marcaCelular.uidDona === sessao.uid));
+  }
+  function podeEnviarRegistros() { return podeEnviarCopia() || celularDaDona(); }
   function recusaSoLeitura() {
     return Object.assign(new Error('Este aparelho só lê: nada sobe daqui para a nuvem.'), { codigo: 'SO_LEITURA' });
   }
+  function soRegistros(escritas) {
+    var raiz = sessao ? '/usuarios/' + sessao.uid + '/registros/' : null;
+    return !!raiz && escritas.length > 0 && escritas.every(function (w) {
+      var nome = (w && w.update && w.update.name) || '';
+      return !w.delete && nome.indexOf(raiz) > 0 && nome.slice(nome.indexOf(raiz) + raiz.length).indexOf('/') < 0;
+    });
+  }
   function commit(escritas) {
-    if (!podeEnviar()) return Promise.reject(recusaSoLeitura());
+    if (!podeEnviarCopia() && !(celularDaDona() && soRegistros(escritas))) return Promise.reject(recusaSoLeitura());
     return comToken(function (cab) {
       return pedir(urlDoc(raizDocumentos()) + ':commit', { cabecalhos: cab, corpo: { writes: escritas } });
     });
@@ -527,7 +549,7 @@
    * fechar não pode trocar a cópia boa pela vazia. Quando é ela quem manda, a
    * tela já perguntou. */
   function enviarCopia(blob, info) {
-    if (!podeEnviar()) return Promise.reject(recusaSoLeitura());
+    if (!podeEnviarCopia()) return Promise.reject(recusaSoLeitura());
     if (enviando) return enviando;
     info = info || {};
     var conteudo = info.conteudo !== false;
@@ -667,30 +689,30 @@
   }
 
   /* Depois de restaurar aqui, este aparelho passa a ser dono da cópia. Menos
-   * o que só lê (opcoes.soLeitura, a restauração pelo modo celular): esse
-   * nunca é dono, e a automática fica desligada nele. */
+   * o celular (opcoes.celular, a restauração pelo modo celular): esse nunca é
+   * dono da cópia, e a automática fica desligada nele. */
   function restaurou(copia, opcoes) {
-    var soLe = !!(opcoes && opcoes.soLeitura) || !!marcaSoLeitura;
+    var ehCelular = !!(opcoes && opcoes.celular) || !!marcaCelular;
     ultimaCopia = { id: copia.id, quando: copia.quando, bytes: copia.bytes, partes: copia.partes, aparelho: copia.aparelho };
     pendente = false;
-    automatica = !soLe;
+    automatica = !ehCelular;
     var gravar = [gravarEstado('copia', ultimaCopia), gravarEstado('pendente', false), gravarEstado('automatica', automatica), religarSincronizacao()];
-    if (soLe && !marcaSoLeitura) gravar.push(marcarSoLeitura(copia.uid));
+    if (ehCelular && !marcaCelular) gravar.push(marcarCelular(copia.uid));
     return Promise.all(gravar).then(avisarOuvintes);
   }
 
   /* Grava a marca ANTES de os dados chegarem (quem chama faz isso antes de
-   * importar): se a página morrer no meio, o aparelho já se sabe só leitura. */
-  function marcarSoLeitura(uidDona) {
-    marcaSoLeitura = { desde: new Date().toISOString(), uidDona: String(uidDona || (sessao && sessao.uid) || '') };
+   * importar): se a página morrer no meio, o aparelho já se sabe celular. */
+  function marcarCelular(uidDona) {
+    marcaCelular = { desde: new Date().toISOString(), uidDona: String(uidDona || (sessao && sessao.uid) || '') };
     automatica = false;
-    return Promise.all([gravarEstado('soLeitura', marcaSoLeitura), gravarEstado('automatica', false)]);
+    return Promise.all([gravarEstado('soLeitura', marcaCelular), gravarEstado('automatica', false)]);
   }
   /* Desfazer a marca (o tablet que foi marcado por engano): daqui em diante
    * este aparelho é dono da cópia, e a automática liga. Quem chama já
    * perguntou, e só com a tela larga. */
-  function desmarcarSoLeitura() {
-    marcaSoLeitura = null;
+  function desmarcarCelular() {
+    marcaCelular = null;
     automatica = true;
     return Promise.all([gravarEstado('soLeitura', null), gravarEstado('automatica', true)]).then(avisarOuvintes);
   }
@@ -772,7 +794,7 @@
   /* Ao fechar com sinal: há conta, a automática já começou e houve mudança
    * desde a última cópia. */
   function copiaAutomaticaDevida() {
-    return !!(podeEnviar() && sessao && automatica && pendente && online() && !enviando);
+    return !!(podeEnviarCopia() && sessao && automatica && pendente && online() && !enviando);
   }
   /* Uma vez por dia, ao abrir: o mesmo, mas só se a última cópia tem mais de
    * um dia (a de fechar pode ter falhado ontem sem ela ver). */
@@ -816,7 +838,7 @@
   /* Há o que subir e tem como: conta, sinal, a sincronização ligada e o
    * aparelho pode escrever. A fila em si não entra aqui: o envio a lê. */
   function registrosDevidos() {
-    return !!(podeEnviar() && !sincronizacaoDesligada && sessao && online());
+    return !!(podeEnviarRegistros() && !sincronizacaoDesligada && sessao && online());
   }
   function agendarEnvioDeRegistros() {
     // fora da resposta da gravação dela (ver marcarMudanca): nada abre transação ali
@@ -845,7 +867,7 @@
     enviandoRegistros = carregarEstado().then(function () {
       return lerSincronizacaoDesligada();
     }).then(function () {
-      if (!podeEnviar()) return { pulado: 'so leitura', enviados: 0 };
+      if (!podeEnviarRegistros()) return { pulado: 'so leitura', enviados: 0 };
       if (!sessao) return { pulado: 'sem conta', enviados: 0 };
       if (sincronizacaoDesligada) return { pulado: 'desligada', enviados: 0 };
       if (!online()) throw semRede();
@@ -989,7 +1011,7 @@
       if (sincronizacaoDesligada) return { pulado: 'desligada', aplicados: 0 };
       if (!online()) throw semRede();
       if (!root.Store || typeof root.Store.aplicarRecebidos !== 'function') return { pulado: 'sem store', aplicados: 0 };
-      uidDona = (marcaSoLeitura && marcaSoLeitura.uidDona) || sessao.uid;
+      uidDona = (marcaCelular && marcaCelular.uidDona) || sessao.uid;
       return root.Store.lerCursor().then(function (cursor) {
         var desde = cursor && cursor.servidorEm ? { servidorEm: cursor.servidorEm, nome: cursor.nome || null } : null;
         /* A consulta: em ordem de (servidorEm, __name__), começando DEPOIS do par
@@ -1038,7 +1060,7 @@
              * registro deste aparelho (mais novo vale), tira da fila a entrada que
              * o eco já é, e avança o cursor. */
             var lote = aplicaveis.concat(ecos.map(function (r) {
-              return { id: r.id, eco: true, servidorEm: r.servidorEm, nome: r.nome, updateTime: r.updateTime,
+              return { id: r.id, tipo: r.tipo, aparelho: r.aparelho, esquema: r.esquema, eco: true, servidorEm: r.servidorEm, nome: r.nome, updateTime: r.updateTime,
                 atualizadoEm: r.atualizadoEm, apagadoEm: r.apagadoEm, dados: r.dados };
             })).concat(pulados.map(function (r) {
               // sem id: o Store só avança o cursor por cima dele
@@ -1073,10 +1095,11 @@
     return recebendo;
   }
   /* Receber e depois enviar: a ordem que faz a precondição passar na maior
-   * parte das vezes. O aparelho que só lê só recebe. */
+   * parte das vezes. O aparelho que só lê só recebe; o celular da dona envia
+   * os registros dele. */
   function sincronizar(info) {
     return receberRegistros().then(function (r) {
-      if (!podeEnviar()) return { recebidos: r, enviados: { pulado: 'so leitura', enviados: 0 } };
+      if (!podeEnviarRegistros()) return { recebidos: r, enviados: { pulado: 'so leitura', enviados: 0 } };
       return enviarRegistros(info).then(function (e) { return { recebidos: r, enviados: e }; });
     });
   }
@@ -1098,8 +1121,11 @@
       registros: { pendentes: registros.pendentes, quarentena: registros.quarentena, ultimoEnvio: registros.ultimoEnvio,
         erro: registros.erro, enviando: !!enviandoRegistros, ultimoRecebimento: registros.ultimoRecebimento || null,
         erroRecebimento: registros.erroRecebimento || null, recebendo: !!recebendo, puladosFormatoAntigo: registros.puladosFormatoAntigo || 0 },
-      soLeitura: !!marcaSoLeitura,
-      uidDona: marcaSoLeitura ? marcaSoLeitura.uidDona : null,
+      // a marca "este aparelho é celular"; quem edita nele é só a dona (celularDaDona)
+      celular: !!marcaCelular,
+      celularDaDona: celularDaDona(),
+      observador: !!(marcaCelular && marcaCelular.uidDona && sessao && sessao.uid && marcaCelular.uidDona !== sessao.uid),
+      uidDona: marcaCelular ? marcaCelular.uidDona : null,
       sincronizacaoDesligada: sincronizacaoDesligada,
       online: online()
     };
@@ -1129,7 +1155,8 @@
     disponivel: disponivel, pronto: carregarEstado, estado: estado, aoMudar: aoMudar,
     entrar: entrar, sair: sair, esqueciASenha: esqueciASenha, trocarSenha: trocarSenha,
     enviarCopia: enviarCopia, listarCopias: listarCopias, baixarCopia: baixarCopia, restaurou: restaurou,
-    marcarSoLeitura: marcarSoLeitura, desmarcarSoLeitura: desmarcarSoLeitura, travarEnvio: travarEnvio, podeEnviar: podeEnviar,
+    marcarCelular: marcarCelular, desmarcarCelular: desmarcarCelular, travarEnvio: travarEnvio,
+    podeEnviarCopia: podeEnviarCopia, podeEnviarRegistros: podeEnviarRegistros, celularDaDona: celularDaDona,
     leitores: leitores, permitirLeitor: permitirLeitor, tirarLeitor: tirarLeitor,
     marcarMudanca: marcarMudanca, desligarAutomatica: desligarAutomatica,
     geracao: function () { return geracao; },

@@ -287,14 +287,29 @@
    * é a restauração da cópia que vem da nuvem (importarZip com daNuvem), que
    * é como os dados do tablet chegam ao celular. Uma trava num lugar só, e não
    * em cada botão: se algum caminho de edição escapar da tela do celular, ele
-   * bate aqui e não grava. */
+   * bate aqui e não grava.
+   *
+   * O CELULAR DA DONA EDITA (D6, parte 2): a mesma conta do tablet, com a marca
+   * "este aparelho é celular". Ele continua sendo um aparelho que só lê para
+   * tudo o que não é dele (folhas, anexos, biblioteca, livros, importar,
+   * "Apagar tudo", a reconciliação da abertura) e ganha três portas, e só
+   * três: o documento pelo escritor de diferença (o salvar, que enfileira na
+   * mesma transação), a fila de saída (o envio tira dela o que subiu) e o
+   * histórico (o ponto do Desfazer). O que o celular edita é decidido na tela
+   * (as quatro ações); aqui fica a porta. O observador de outra conta nunca
+   * ganha as portas. */
   var soLeitura = false;
+  var celularEdita = false;
   function somenteLeitura(ligar) { soLeitura = !!ligar; }
+  function celularQueEdita(ligar) { celularEdita = !!ligar; }
+  var PORTAS_DO_CELULAR = { documento: true, fila: true, historico: true };
   function erroSoLeitura() {
     return Object.assign(new Error('Este aparelho só lê. Para mudar alguma coisa, use o tablet.'), { soLeitura: true });
   }
-  function transacao(b, nomes, modo, restauracaoDaNuvem) {
-    if (modo === 'readwrite' && soLeitura && !restauracaoDaNuvem) throw erroSoLeitura();
+  /* `porta`: true é a restauração da cópia e o recebimento (dado que vem da
+   * nuvem); 'documento', 'fila' e 'historico' são as portas do celular da dona. */
+  function transacao(b, nomes, modo, porta) {
+    if (modo === 'readwrite' && soLeitura && porta !== true && !(celularEdita && PORTAS_DO_CELULAR[porta])) throw erroSoLeitura();
     return b.transaction(nomes, modo);
   }
 
@@ -329,10 +344,10 @@
    * E A REJEIÇÃO AGORA EXISTE DE VERDADE: quem chama tem de tratar. O motivo
    * vem primeiro da TRANSAÇÃO, porque é nela que o navegador põe o útil (falta
    * de espaço é um QuotaExceededError da transação, e não do pedido). */
-  function escrever(deposito, fazer) {
+  function escrever(deposito, fazer, porta) {
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = transacao(b, deposito, 'readwrite');
+        var t = transacao(b, deposito, 'readwrite', porta);
         var req = fazer(t.objectStore(deposito));
         var motivo = function (padrao) {
           return t.error || (req && req.error) || new Error(padrao);
@@ -726,7 +741,7 @@
   function confirmarEnvio(itens) {
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = transacao(b, ['saida', 'registros'], 'readwrite');
+        var t = transacao(b, ['saida', 'registros'], 'readwrite', 'fila');
         var s = t.objectStore('saida'), registros = t.objectStore('registros'), tiradas = 0;
         (itens || []).forEach(function (item) {
           var pedido = s.get(item.id);
@@ -775,7 +790,7 @@
     (ids || []).forEach(function (id) { so[id] = true; });
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = transacao(b, 'saida', 'readwrite');
+        var t = transacao(b, 'saida', 'readwrite', 'fila');
         var s = t.objectStore('saida'), soltas = 0;
         var todos = s.getAll();
         todos.onsuccess = function () {
@@ -796,7 +811,7 @@
   function marcarTentativa(ids) {
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = transacao(b, 'saida', 'readwrite');
+        var t = transacao(b, 'saida', 'readwrite', 'fila');
         var s = t.objectStore('saida'), quarentena = 0;
         (ids || []).forEach(function (id) {
           var pedido = s.get(id);
@@ -845,6 +860,20 @@
     return !!(a && ((a.notaTexto && String(a.notaTexto).trim()) || (a.notaPrivada && String(a.notaPrivada).trim()) || a.temNota ||
       (a.anexos && a.anexos.length) || (a.temas && a.temas.length) || (a.areas && a.areas.length) || a.pago || a.pagoEm));
   }
+  /* NO CELULAR (só lê ou edita), a versão do servidor que este aparelho já
+   * conhecia volta quando o disco dele tem outra coisa no mesmo carimbo: é a
+   * restauração da cópia do tablet, mais velha que um registro já recebido ou
+   * que a edição do próprio celular já enviada, e que guardou o carimbo do
+   * registro de antes. O celular não é dono da cópia; o servidor é a versão
+   * mais nova, e a edição dele ainda na fila continua vencendo. No tablet a
+   * restauração vence (ela enfileira tudo), e isto não vale. */
+  function voltaDoServidor(local, chegou, fila) {
+    if (!soLeitura || !local || !chegou || fila[chegou.id] || !(local.nuvem && local.nuvem.servidorEm) || !chegou.servidorEm) return false;
+    if (carimboNumero(local.nuvem.servidorEm) !== carimboNumero(chegou.servidorEm)) return false;
+    return JSON.stringify(local.dados) !== JSON.stringify(chegou.apagadoEm ? null : (chegou.dados === undefined ? null : chegou.dados)) ||
+      !!local.apagadoEm !== !!chegou.apagadoEm;
+  }
+
   /* O maior par (carimbo, nome): é o cursor da próxima consulta. */
   function parMaior(a, b) {
     if (!a) return b;
@@ -918,7 +947,8 @@
              * o carimbo é anotado quando falta (a lápide do "Apagar tudo" e a
              * restauração da própria cópia o perdem, e sem ele o envio exigiria
              * que o documento não existisse, para sempre). */
-            if (chegou.eco) {
+            var volta = voltaDoServidor(local, chegou, fila);
+            if (chegou.eco && !volta) {
               /* E a resposta do commit que se perdeu (a aba fechou ou a rede caiu
                * depois de o servidor aplicar): o servidor tem a versão nova, o disco
                * tem o carimbo velho e a entrada na fila. O eco é escrita deste mesmo
@@ -938,8 +968,10 @@
               return;
             }
             if (local && local.nuvem && local.nuvem.servidorEm && chegou.servidorEm && carimboNumero(local.nuvem.servidorEm) >= carimboNumero(chegou.servidorEm)) {
-              contas.ignorados++;
-              return;
+              if (!volta) {
+                contas.ignorados++;
+                return;
+              }
             }
             var entrada = fila[chegou.id];
             /* A RESTAURAÇÃO VENCE (decisão da sessão, 08/11): restaurar uma cópia, mais
@@ -1105,10 +1137,10 @@
     });
   }
 
-  function gravarDocumento(db, opcoes) {
+  function gravarDocumento(db, opcoes, porta) {
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = transacao(b, DEPOSITOS_DO_DOCUMENTO, 'readwrite');
+        var t = transacao(b, DEPOSITOS_DO_DOCUMENTO, 'readwrite', porta);
         var contas = null;
         escreverDiferenca(t, db, opcoes, function (c) { contas = c; });
         t.oncomplete = function () { confirmarGravacao(contas); avisarMudanca('dados'); resolve(); };
@@ -1126,7 +1158,8 @@
   /* O salvar dela: o documento inteiro em `principal` e só a diferença em
    * `registros`, numa transação só, respondendo quando ela confirma (B3). */
   function salvar(db) {
-    return gravarDocumento(db);
+    // a porta do documento: no celular da dona, é por aqui (e só por aqui) que a edição dele entra
+    return gravarDocumento(db, null, 'documento');
   }
 
   /* Excluir um aluno é uma única transação: o documento, as folhas, os arquivos
@@ -1571,7 +1604,7 @@
      * pedido (a página caindo), e aí a promessa ficava pendurada para sempre. */
     return escrever('historico', function (s) {
       return s.add({ rotulo: rotulo, quando: Date.now(), estado: JSON.parse(JSON.stringify(dbAntes)) });
-    }).then(function () { return podarHistorico(); });
+    }, 'historico').then(function () { return podarHistorico(); });
   }
 
   function podarHistorico() {
@@ -1856,6 +1889,21 @@
            * tablet novo ou reinstalado é dono do que restaurou e tudo o que
            * está vivo tem de subir como registro: quem fez a cópia pode nunca
            * ter conseguido enviar (regras ainda não publicadas, por exemplo). */
+          /* O CELULAR COM MUDANÇA DELE ESPERANDO SINAL NÃO RESTAURA (D6b): a cópia
+           * trocaria o dado das entradas da fila pelo da cópia, e o envio subiria a
+           * versão do tablet como se fosse a edição do celular. A restauração fica
+           * para depois de a fila subir; o que mudou no tablet chega pelos
+           * registros de qualquer jeito. Conferido aqui dentro, na transação. */
+          if (daNuvem && soLeitura && celularEdita) {
+            var pendentesReq = t.objectStore('saida').count();
+            pendentesReq.onsuccess = function () {
+              if (!pendentesReq.result) return;
+              var n = pendentesReq.result;
+              erro = Object.assign(new Error(n === 1 ? 'Há 1 mudança deste celular esperando sinal. A cópia do tablet fica para quando ela subir.'
+                : 'Há ' + n + ' mudanças deste celular esperando sinal. A cópia do tablet fica para quando elas subirem.'), { filaPendente: n });
+              t.abort();
+            };
+          }
           escreverDiferenca(t, completar(pacote.dados), { carimbo: carimbo, semFila: daNuvem && soLeitura, restauro: daNuvem }, function (c) { contas = c; });
           trocar('notas', pacote.notas, true);
           trocar('midias', pacote.midias, true);
@@ -2065,8 +2113,9 @@
     listasDaBiblioteca: listasDaBiblioteca,
     gravarLivros: gravarLivros, listarLivros: listarLivros, lerLivro: lerLivro, removerLivro: removerLivro,
     lerPosicaoLivro: lerPosicaoLivro, gravarPosicaoLivro: gravarPosicaoLivro,
-    aoMudar: aoMudar, somenteLeitura: somenteLeitura,
+    aoMudar: aoMudar, somenteLeitura: somenteLeitura, celularQueEdita: celularQueEdita,
     estaSoLendo: function () { return soLeitura; },
+    celularEdita: function () { return soLeitura && celularEdita; },
     SO_DESTE_TABLET: SO_DESTE_TABLET.slice(),
     /* Registros (N1): o que a sincronização e as provas leem. */
     AJUSTES_DO_APARELHO: AJUSTES_DO_APARELHO.slice(),
