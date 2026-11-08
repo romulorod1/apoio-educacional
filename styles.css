@@ -3110,6 +3110,32 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-folha-cabeca { border-left: 6px solid var(--cor-aluno); padding-left: 10px; margin-bottom: 10px; }
 .cel-folha-cabeca .cel-titulo { margin: 0 0 2px; }
 .cel-folha:focus { outline: none; }
+/* Cancelar numa linha só dele, a 16 px ou mais dos outros, com a cor de perigo. */
+.cel-folha-perigo { margin: 20px 0 12px; padding-top: 12px; border-top: 1px solid var(--fio-claro); }
+body.modo-celular .celular .cel-folha .cel-folha-perigo .cel-folha-botao {
+  width: 100%; background: var(--perigo-fundo); border-color: var(--perigo-borda); color: var(--vermelho);
+}
+/* O relato da aula anterior num quadro à parte, para não parecer o desta. */
+.cel-aula-anterior {
+  background: var(--fundo-leve);
+  border: 1px solid var(--fio-claro);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.cel-salvar-com-choque { white-space: normal; }
+body.modo-celular .celular .btn.principal.cel-salvar-com-choque { background: var(--aviso-texto); border-color: var(--aviso-texto); }
+/* Hoje: a aula de agora em destaque, e as marcas "Agora" e "Próxima". */
+.cel-bloco-agora { border-color: var(--cor-aluno); box-shadow: 0 0 0 2px var(--cor-aluno); }
+.cel-bloco-marca {
+  font-size: var(--letra-1);
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--branco);
+  background: var(--navy);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+.cel-bloco-agora .cel-bloco-marca { background: var(--vermelho); }
 .cel-folha-resumo { margin-bottom: 12px; font-size: var(--letra-3); }
 .cel-folha-acoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 0 12px; }
 body.modo-celular .celular .cel-folha .cel-folha-botao { min-height: 56px; font-size: var(--letra-5); font-weight: 700; white-space: normal; }

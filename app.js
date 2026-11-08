@@ -21945,8 +21945,10 @@
     for (var i = 0; i < 7; i++) dias.push(somarDiasCelular(inicio, i));
     var botoes = dias.map(function (d) {
       var aulas = aulasDoDiaCelular(d).filter(function (a) { return a.status !== 'cancelada'; });
-      var rotulo = Core.diaSemanaLongo(d) + ', ' + Core.ddmm(d) + ': ' +
-        (aulas.length ? aulas.length + (aulas.length === 1 ? ' aula' : ' aulas') : 'sem aula');
+      /* As bolinhas dizem, a quem lê a tela, de quem é cada aula. */
+      var deQuem = aulas.map(function (a) { var al = alunoPorId(a.alunoId); return (al ? al.nome : 'aluno removido') + (a.hora ? ' às ' + a.hora : ''); });
+      var rotuloBolinhas = aulas.length ? aulas.length + (aulas.length === 1 ? ' aula: ' : ' aulas: ') + deQuem.join(', ') : 'sem aula';
+      var rotulo = Core.diaSemanaLongo(d) + ', ' + Core.ddmm(d) + ', ' + rotuloBolinhas;
       return el('button', {
         type: 'button', class: 'cel-semana-dia' + (d === dia ? ' ativo' : '') + (d === hoje ? ' hoje' : ''),
         'data-dia': d, 'aria-label': rotulo, 'aria-pressed': d === dia ? 'true' : 'false',
@@ -21954,7 +21956,7 @@
       }, [
         el('span', { class: 'cel-semana-nome', texto: Core.diaSemanaCurto(d) }),
         el('span', { class: 'cel-semana-numero', texto: String(Number(d.slice(8, 10))) }),
-        el('span', { class: 'cel-semana-bolinhas', 'aria-hidden': 'true' }, aulas.slice(0, 4).map(function (a) {
+        el('span', { class: 'cel-semana-bolinhas', role: 'img', 'aria-label': rotuloBolinhas, title: rotuloBolinhas }, aulas.slice(0, 4).map(function (a) {
           return el('span', { class: 'cel-bolinha', style: 'background:' + corDoAlunoCelular(alunoPorId(a.alunoId)) });
         }))
       ]);
@@ -21994,12 +21996,22 @@
       cursor = Math.max(cursor, fimDaAulaCelular(a));
     });
     if (fim - cursor >= 30) linhas.push({ tipo: 'livre', ini: cursor, fim: fim });
+    /* Hoje, o horário que já passou não é livre: o buraco começa na próxima
+     * meia hora depois de agora, e o que acabou antes some. */
+    if (dia === Core.hojeIso()) {
+      var dali = Math.ceil(minutosAgoraCelular() / 30) * 30;
+      linhas = linhas.filter(function (l) {
+        if (l.ini < dali) l.ini = dali;
+        return l.fim - l.ini >= 30;
+      });
+    }
     aulas.forEach(function (a) { linhas.push({ tipo: 'aula', ini: Core.minutosDaHora(a.hora), fim: fimDaAulaCelular(a), aula: a }); });
     linhas.sort(function (x, y) { return x.ini - y.ini || (x.tipo === 'livre' ? -1 : 1); });
     return linhas;
   }
 
-  function blocoDaAulaCelular(a) {
+  /* marca: 'agora' (a aula que está acontecendo) ou 'proxima' (a seguinte de hoje). */
+  function blocoDaAulaCelular(a, marca) {
     var aluno = alunoPorId(a.alunoId);
     var sit = situacaoNoCelular(a);
     var dur = Number(a.duracaoMin) || 60;
@@ -22007,15 +22019,16 @@
     var choques = a.status === 'cancelada' ? [] : choquesDaAulaCelular(a);
     var nome = aluno ? aluno.nome : 'Aluno';
     var filhos = [
+      marca ? el('span', { class: 'cel-bloco-marca', texto: marca === 'agora' ? 'Agora' : 'Próxima' }) : null,
       el('span', { class: 'cel-bloco-nome', texto: nome }),
       el('span', { class: 'cel-bloco-hora', texto: (a.hora ? a.hora + (fim !== null ? ' a ' + horaDeMinutosCelular(Math.min(fim, 24 * 60 - 1)) : '') + ' · ' : '') + Core.fmtDuracao(dur) }),
       el('span', { class: 'cel-bloco-situacao', texto: (sit.icone ? sit.icone + ' ' : '') + sit.texto })
     ];
     if (choques.length) filhos.push(el('span', { class: 'cel-bloco-choque', texto: '⚠ Mesmo horário: ' + fraseDoChoqueCelular(choques) }));
     return el('button', {
-      type: 'button', class: 'cel-bloco cel-bloco-' + sit.classe + (choques.length ? ' com-choque' : ''), 'data-aula': a.id,
+      type: 'button', class: 'cel-bloco cel-bloco-' + sit.classe + (choques.length ? ' com-choque' : '') + (marca ? ' cel-bloco-' + marca : ''), 'data-aula': a.id,
       style: '--cor-aluno:' + corDoAlunoCelular(aluno) + ';min-height:' + Math.max(ALTURA_MINIMA_BLOCO, Math.round(dur * PX_POR_MINUTO_CELULAR)) + 'px',
-      'aria-label': nome + ', ' + (a.hora || 'sem horário') + ', ' + Core.fmtDuracao(dur) + ', ' + sit.texto + (choques.length ? ', no mesmo horário de outra aula' : ''),
+      'aria-label': (marca ? (marca === 'agora' ? 'Agora: ' : 'Próxima: ') : '') + nome + ', ' + (a.hora || 'sem horário') + ', ' + Core.fmtDuracao(dur) + ', ' + sit.texto + (choques.length ? ', no mesmo horário de outra aula' : ''),
       aoClick: function () { abrirFolhaDaAulaCelular(a.id); }
     }, filhos);
   }
@@ -22052,12 +22065,20 @@
         el('span', { class: 'cel-agora-hora', texto: horaDeMinutosCelular(agora) })
       ]);
     };
+    /* Hoje, a aula que está acontecendo leva "Agora", e a seguinte, "Próxima". */
+    var marcas = {};
+    if (agora !== null) {
+      var valem = aulasDoDiaCelular(dia).filter(function (a) { return a.status !== 'cancelada' && Core.minutosDaHora(a.hora) !== null; });
+      valem.forEach(function (a) { if (Core.minutosDaHora(a.hora) <= agora && fimDaAulaCelular(a) > agora) marcas[a.id] = 'agora'; });
+      var seguinte = valem.filter(function (a) { return Core.minutosDaHora(a.hora) > agora; })[0];
+      if (seguinte) marcas[seguinte.id] = 'proxima';
+    }
     linhasDoDiaCelular(dia).forEach(function (l) {
       if (agora !== null && !linhaAgora && agora < l.ini) {
         linhaAgora = marcaDeAgora();
         caixa.appendChild(el('div', { class: 'cel-tempo-linha cel-tempo-agora-solta' }, [linhaAgora]));
       }
-      var item = el('div', { class: 'cel-tempo-item' }, [l.tipo === 'aula' ? blocoDaAulaCelular(l.aula) : buracoLivreCelular(l, dia, edita)]);
+      var item = el('div', { class: 'cel-tempo-item' }, [l.tipo === 'aula' ? blocoDaAulaCelular(l.aula, marcas[l.aula.id]) : buracoLivreCelular(l, dia, edita)]);
       var linha = el('div', { class: 'cel-tempo-linha cel-tempo-' + l.tipo }, [
         el('span', { class: 'cel-tempo-hora', texto: horaDeMinutosCelular(l.ini) }), item
       ]);
@@ -22081,6 +22102,8 @@
     if (formCelular && celularEdita()) { desenharFormularioCelular(caixa); return; }
     formCelular = null;
     var hoje = Core.hojeIso();
+    // passou a meia-noite com Hoje no dia que acabou: vai para o dia novo
+    if (hojeVistoCelular && hojeVistoCelular !== hoje && diaCelular === hojeVistoCelular) { diaCelular = hoje; diaRoladoCelular = null; }
     var dia = diaCelular || hoje;
     var edita = celularEdita();
     caixa.appendChild(faixaDaSemanaCelular(dia));
@@ -22111,6 +22134,7 @@
       ]));
     }
     if (folhaCelular) desenharFolhaCelular();
+    hojeVistoCelular = hoje; // o dia em que esta linha do tempo foi desenhada (a virada da meia-noite)
     rolarHojeCelular(dia);
   }
 
@@ -22121,25 +22145,45 @@
     if (diaRoladoCelular === dia || !$('#cel-hoje.ativa') || !$('#cel-tempo')) return;
     diaRoladoCelular = dia;
     var conteudo = $('#cel-conteudo');
-    var alvo = $('#cel-agora') || $('#cel-tempo .cel-bloco');
+    /* O alvo: a aula de agora, senão a próxima, senão a linha de agora,
+     * senão a primeira aula do dia. Ele fica logo abaixo da faixa da semana. */
+    var alvo = $('#cel-tempo .cel-bloco-agora') || $('#cel-tempo .cel-bloco-proxima') || $('#cel-agora') || $('#cel-tempo .cel-bloco');
     var faixa = $('#cel-semana');
     if (!conteudo) return;
     if (!alvo) { conteudo.scrollTop = 0; return; }
-    /* A linha de agora fica a um terço da tela, abaixo da faixa da semana: a
-     * aula que acabou de passar continua à vista acima dela. */
-    var alto = faixa ? faixa.getBoundingClientRect().height : 0;
-    var folga = alvo.id === 'cel-agora' ? Math.round((conteudo.clientHeight - alto) / 3) : 12;
-    var deslocamento = alvo.getBoundingClientRect().top - conteudo.getBoundingClientRect().top - alto - folga;
-    conteudo.scrollTop = Math.max(0, conteudo.scrollTop + deslocamento);
+    var linha = alvo.closest('.cel-tempo-linha') || alvo;
+    var baixoDaFaixa = function () { return faixa ? faixa.getBoundingClientRect().bottom : conteudo.getBoundingClientRect().top; };
+    conteudo.scrollTop = Math.max(0, conteudo.scrollTop + linha.getBoundingClientRect().top - baixoDaFaixa() - 8);
+    /* No fim do dia a rolagem para antes do alvo: a linha que ficou meio
+     * escondida sob a faixa sobe inteira à vista, em vez de aparecer cortada. */
+    var linhas = $$('#cel-tempo .cel-tempo-linha');
+    for (var i = 0; i < linhas.length; i++) {
+      var r = linhas[i].getBoundingClientRect(), limite = baixoDaFaixa();
+      if (r.bottom <= limite + 1) continue;
+      if (r.top < limite - 1) conteudo.scrollTop = Math.max(0, conteudo.scrollTop - (limite - r.top) - 8);
+      break;
+    }
   }
 
   /* A linha de agora anda sozinha: a cada minuto, com Hoje à vista e nada
-   * aberto, a linha do tempo se refaz no lugar (a rolagem fica). */
+   * aberto, a linha do tempo se refaz no lugar (a rolagem fica). Passada a
+   * meia-noite, Hoje que mostrava o dia que acabou passa para o dia novo. */
+  var hojeVistoCelular = null;
   function andarLinhaDeAgoraCelular() {
     if (!modoCelular || telaCelular !== 'hoje' || formCelular || folhaCelular || !db) return;
-    if (!$('#cel-hoje.ativa') || !$('#cel-tempo') || (diaCelular || Core.hojeIso()) !== Core.hojeIso()) return;
+    if (!$('#cel-hoje.ativa') || !$('#cel-tempo')) return;
+    var hoje = Core.hojeIso();
+    if (hojeVistoCelular && hojeVistoCelular !== hoje) {
+      var eraHoje = (diaCelular || hojeVistoCelular) === hojeVistoCelular;
+      hojeVistoCelular = hoje;
+      if (eraHoje) { diaCelular = hoje; diaRoladoCelular = null; }
+      desenharHojeCelular();
+      return;
+    }
+    hojeVistoCelular = hoje;
+    if ((diaCelular || hoje) !== hoje) return;
     var velha = $('#cel-tempo');
-    velha.parentNode.replaceChild(linhaDoTempoCelular(diaCelular || Core.hojeIso(), celularEdita()), velha);
+    velha.parentNode.replaceChild(linhaDoTempoCelular(hoje, celularEdita()), velha);
   }
 
   // ---------- a folha de baixo da aula ----------
@@ -22172,11 +22216,13 @@
       ]));
     }
     var u = aluno ? Core.ultimoEncontro(db, a.alunoId, a) : null;
+    /* O relato da aula ANTERIOR num quadro à parte, com a data no rótulo: solto
+     * logo abaixo do nome, parecia o desta aula. */
     if (u) {
-      var linhas = [el('div', { class: 'rotulo-ultimo', texto: 'Na última aula, ' + Core.ddmmaaaa(u.data) })];
+      var linhas = [el('div', { class: 'rotulo-ultimo', texto: 'Relato da aula anterior (' + Core.ddmm(u.data) + ')' })];
       if (u.assuntos.length) linhas.push(el('div', {}, [el('strong', { texto: 'Assunto: ' }), document.createTextNode(u.assuntos.join('; '))]));
-      if (u.oQueRendeu) linhas.push(el('div', {}, [el('strong', { texto: 'Relato da aula: ' }), document.createTextNode(u.oQueRendeu)]));
-      caixa.appendChild(el('div', { class: 'cel-ultimo' }, linhas));
+      linhas.push(el('div', {}, [document.createTextNode(u.oQueRendeu || 'Sem relato escrito.')]));
+      caixa.appendChild(el('div', { class: 'cel-ultimo cel-aula-anterior', id: 'cel-aula-anterior' }, linhas));
     }
     if ((a.notaTexto || '').trim()) {
       caixa.appendChild(el('div', { class: 'cel-ultimo' }, [el('strong', { texto: 'Relato desta aula: ' }), document.createTextNode(a.notaTexto.trim())]));
@@ -22228,6 +22274,20 @@
     try { folha.focus({ preventScroll: true }); } catch (e) { /* foco é conforto */ }
   }
 
+  /* Realizada, Reposição e Faltou mudam a SITUAÇÃO. Como na janela do tablet,
+   * a cobrança volta ao padrão da situação só quando a situação muda: tocar
+   * na que ela já tem não mexe em nada (a "realizada, não cobrar" do tablet
+   * continua sem cobrança). */
+  function mudarSituacaoNoCelular(a, status, mensagem) {
+    var atual = aulaPorIdCelular(a.id);
+    if (atual && (atual.status || 'realizada') === status) {
+      fecharFolhaCelular();
+      avisar('Nada mudou: a aula já está como ' + situacaoNoCelular(atual).texto.toLowerCase() + '.');
+      return;
+    }
+    mudarAulaNoCelular(a, { status: status, cobravel: (Core.STATUS[status] || Core.STATUS.realizada).cobravelPadrao }, mensagem);
+  }
+
   function desenharAcoesNaFolha(folha, a, aluno, edita) {
     folha.appendChild(resumoDaAulaNaFolha(a, aluno));
     if (edita) {
@@ -22240,23 +22300,33 @@
       };
       if (!futura) {
         acoes.push(botao('realizada', 'cel-folha-realizada', 'Realizada', function () {
-          mudarAulaNoCelular(a, { status: 'realizada', cobravel: Core.STATUS.realizada.cobravelPadrao }, 'Aula marcada como realizada.');
-        }, s === 'realizada' || s === 'reposicao'));
+          mudarSituacaoNoCelular(a, 'realizada', 'Aula marcada como realizada.');
+        }, s === 'realizada'));
+        // a reposição tem botão e nome próprios, e nunca passa por Realizada
+        if (s === 'reposicao') acoes.push(botao('reposicao', 'cel-folha-reposicao', 'Reposição', function () {
+          mudarSituacaoNoCelular(a, 'reposicao', 'Aula marcada como reposição.');
+        }, true));
         acoes.push(botao('faltou', 'cel-folha-faltou', 'Faltou', function () {
-          mudarAulaNoCelular(a, { status: 'falta', cobravel: Core.STATUS.falta.cobravelPadrao }, 'Falta registrada. Ela é cobrada, como no tablet.');
+          mudarSituacaoNoCelular(a, 'falta', 'Falta registrada. Ela é cobrada, como no tablet.');
         }, s === 'falta'));
       } else if (s === 'cancelada') {
         acoes.push(botao('reagendar', 'cel-folha-reagendar', 'Voltar a agendar', function () {
-          mudarAulaNoCelular(a, { status: 'realizada', cobravel: Core.STATUS.realizada.cobravelPadrao }, 'A aula voltou para a agenda.');
+          mudarSituacaoNoCelular(a, 'realizada', 'A aula voltou para a agenda.');
         }, false));
       }
-      acoes.push(botao('cancelar-aula', 'cel-folha-cancelar', 'Cancelar', function () { irAoPassoDaFolha('cancelar'); }, s === 'cancelada'));
       acoes.push(botao('remarcar', 'cel-folha-remarcar', 'Remarcar', function () { irAoPassoDaFolha('remarcar'); }, false));
       if (!futura) {
-        acoes.push(botaoDeAcaoCelular('registrar-como-foi', { class: 'btn cel-folha-botao cel-folha-largo', id: 'cel-folha-registrar', texto: 'Registrar como foi',
+        acoes.push(botaoDeAcaoCelular('registrar-como-foi', { class: 'btn cel-folha-botao cel-folha-largo', id: 'cel-folha-registrar', texto: 'Escrever como foi esta aula',
           aoClick: function () { fecharFolhaCelular(); abrirFormularioCelular({ tipo: 'relato', aulaId: a.id }); } }));
       }
       folha.appendChild(el('div', { class: 'cel-folha-acoes' }, acoes));
+      /* Cancelar fica numa linha só dele, longe dos outros e com a cor de
+       * perigo: um toque errado ali muda a cobrança. A pergunta "com ou sem
+       * cobrança" que vem depois é a confirmação. */
+      folha.appendChild(el('div', { class: 'cel-folha-perigo' }, [
+        botao('cancelar-aula', 'cel-folha-cancelar', s === 'cancelada' ? 'Cancelada (trocar a cobrança)' : 'Cancelar esta aula',
+          function () { irAoPassoDaFolha('cancelar'); }, false)
+      ]));
     }
     folha.appendChild(el('div', { class: 'barra u-margem-baixo-0' }, [
       el('button', { type: 'button', class: 'btn', id: 'cel-folha-fechar', texto: 'Fechar', aoClick: fecharFolhaCelular })
@@ -22307,11 +22377,35 @@
     if (atual && horas.indexOf(atual) < 0 && Core.minutosDaHora(atual) !== null) { horas.push(atual); horas.sort(); }
     return horas;
   }
-  function camposDeHorarioCelular(prefixo, inicial, ignorarId, statusDaAula, aoMudar) {
+  /* O primeiro horário livre do dia a partir de `hora` (ou o primeiro do dia,
+   * se não houver depois dela). */
+  function primeiroLivreCelular(data, hora, duracao, ignorarId) {
+    var lista = horariosLivresCelular(data, duracao, ignorarId);
+    var depois = lista.filter(function (h) { return h >= hora; });
+    return depois[0] || lista[0] || null;
+  }
+  /* Com choque, o Salvar diz o que vai acontecer, e o toque pede o sim. */
+  var SALVAR_COM_CHOQUE = 'Salvar mesmo assim (as duas aulas ficam no mesmo horário)';
+  function ajustarSalvarAoChoque(botao, textoNormal, choques) {
+    if (!botao) return;
+    botao.textContent = choques.length ? SALVAR_COM_CHOQUE : textoNormal;
+    botao.classList.toggle('cel-salvar-com-choque', !!choques.length);
+  }
+  function confirmaSalvarComChoque(choques) {
+    return !choques.length || confirmar('Já há aula neste horário: ' + fraseDoChoqueCelular(choques) +
+      '. As duas aulas vão ficar no mesmo horário. Salvar mesmo assim?');
+  }
+  /* aoMudar(valores, choques) roda a cada mudança. Com `ajustarHora`, a hora
+   * que estiver ocupada no dia escolhido (ao abrir, ou ao trocar a data) passa
+   * para o primeiro horário livre dali em diante; a escolha dela, depois,
+   * fica como ela pôs. Hora vazia (a aula sem hora) é uma opção, "sem hora". */
+  function camposDeHorarioCelular(prefixo, inicial, ignorarId, statusDaAula, aoMudar, ajustarHora) {
     var data = el('input', { type: 'text', id: prefixo + '-data', inputmode: 'numeric', autocomplete: 'off', maxlength: '10',
       placeholder: 'dd/mm/aaaa', 'aria-label': 'Data, dd/mm/aaaa', value: Core.ddmmaaaa(inicial.data) });
-    var hora = el('select', { id: prefixo + '-hora', 'aria-label': 'Hora' }, opcoesDeHoraCelular(inicial.hora).map(function (h) {
-      return el('option', { value: h, texto: h, selected: h === inicial.hora ? 'selected' : null });
+    var opcoes = opcoesDeHoraCelular(inicial.hora);
+    if (!inicial.hora) opcoes.unshift('');
+    var hora = el('select', { id: prefixo + '-hora', 'aria-label': 'Hora' }, opcoes.map(function (h) {
+      return el('option', { value: h, texto: h || 'sem hora', selected: h === inicial.hora ? 'selected' : null });
     }));
     var duracoes = DURACOES.slice();
     if (duracoes.indexOf(inicial.duracaoMin) < 0) { duracoes.push(inicial.duracaoMin); duracoes.sort(function (x, y) { return x - y; }); }
@@ -22321,25 +22415,37 @@
     var choque = el('div', { id: prefixo + '-choque', 'aria-live': 'polite' });
     var feriado = el('div', { id: prefixo + '-feriado' });
     var livres = el('div', { class: 'cel-livres', id: prefixo + '-livres' });
+    var ultimaData = null;
+    var choquesAgora = [];
     var ler = function () {
       return { data: Core.deBR(data.value), hora: hora.value, duracaoMin: parseInt(dur.value, 10) || 60 };
     };
-    var marcarHora = function (h) {
+    var porHora = function (h) {
       if (!hora.querySelector('option[value="' + h + '"]')) hora.appendChild(el('option', { value: h, texto: h }));
       hora.value = h;
-      atualizar();
+    };
+    var marcarHora = function (h) { porHora(h); atualizar(); };
+    var provisoria = function (v) {
+      return { id: ignorarId || null, data: v.data, hora: v.hora, duracaoMin: v.duracaoMin, status: statusDaAula || 'realizada' };
     };
     function atualizar() {
       var v = ler();
       choque.innerHTML = '';
       feriado.innerHTML = '';
       livres.innerHTML = '';
+      choquesAgora = [];
       if (!v.data) {
         livres.appendChild(el('p', { class: 'ajuda u-margem-0', texto: 'Escreva a data como dd/mm/aaaa para ver os horários livres.' }));
-        if (aoMudar) aoMudar(v);
+        if (aoMudar) aoMudar(v, choquesAgora);
         return;
       }
-      var choques = choquesDaAulaCelular({ id: ignorarId || null, data: v.data, hora: v.hora, duracaoMin: v.duracaoMin, status: statusDaAula || 'realizada' });
+      if (ajustarHora && v.data !== ultimaData && v.hora && choquesDaAulaCelular(provisoria(v)).length) {
+        var livre = primeiroLivreCelular(v.data, v.hora, v.duracaoMin, ignorarId);
+        if (livre) { porHora(livre); v = ler(); }
+      }
+      ultimaData = v.data;
+      var choques = choquesDaAulaCelular(provisoria(v));
+      choquesAgora = choques;
       if (choques.length) {
         choque.appendChild(el('div', { class: 'faixa-aviso cel-choque' }, [
           el('strong', { texto: 'Já há aula neste horário: ' }),
@@ -22361,7 +22467,7 @@
         return el('button', { type: 'button', class: 'cel-livre-hora' + (h === v.hora ? ' escolhida' : ''), 'data-livre': h, 'aria-pressed': h === v.hora ? 'true' : 'false',
           'aria-label': 'Escolher ' + h, texto: h, aoClick: function () { marcarHora(h); } });
       })));
-      if (aoMudar) aoMudar(v);
+      if (aoMudar) aoMudar(v, choques);
     }
     data.addEventListener('input', atualizar);
     data.addEventListener('change', atualizar);
@@ -22369,7 +22475,7 @@
     dur.addEventListener('change', atualizar);
     return {
       campos: [campoCelular('Data (dd/mm/aaaa)', data), el('div', { class: 'cel-dois-campos' }, [campoCelular('Hora', hora), campoCelular('Duração', dur)]), choque, feriado, livres],
-      ler: ler, atualizar: atualizar
+      ler: ler, atualizar: atualizar, choques: function () { return choquesAgora; }
     };
   }
 
@@ -22381,18 +22487,22 @@
     corpo.appendChild(el('p', { class: 'cel-folha-pergunta', texto: 'Remarcar a aula' }));
     var serie = Core.serieDe(db, a);
     if (serie) corpo.appendChild(el('p', { class: 'ajuda', id: 'cel-remarcar-serie', texto: 'Esta aula é de uma repetição: muda só esta. As outras continuam no dia e na hora de sempre.' }));
-    var h = camposDeHorarioCelular('cel-remarcar', { data: a.data, hora: a.hora || '15:30', duracaoMin: Number(a.duracaoMin) || 60 }, a.id, a.status);
+    var botaoSalvar = null; // não "salvar": esconderia o salvar() do app
+    var h = camposDeHorarioCelular('cel-remarcar', { data: a.data, hora: a.hora || '', duracaoMin: Number(a.duracaoMin) || 60 }, a.id, a.status,
+      function (v, choques) { ajustarSalvarAoChoque(botaoSalvar, 'Salvar a nova data', choques); }, true);
     h.campos.forEach(function (c) { corpo.appendChild(c); });
+    botaoSalvar = botaoDeAcaoCelular('remarcar', { class: 'btn principal', id: 'cel-remarcar-salvar', texto: 'Salvar a nova data', aoClick: function () {
+      var v = h.ler();
+      if (!v.data) { avisar('Escreva a data como dd/mm/aaaa, por exemplo ' + Core.ddmmaaaa(a.data) + '.'); return; }
+      var atual = aulaPorIdCelular(a.id);
+      if (atual && atual.data === v.data && (atual.hora || '') === v.hora && Number(atual.duracaoMin) === v.duracaoMin) { irAoPassoDaFolha('acoes'); return; }
+      if (!confirmaSalvarComChoque(h.choques())) return;
+      var mensagem = 'Aula remarcada para ' + quandoCurtoCelular(v.data, v.hora) + '.' + (serie ? ' As outras da repetição continuam como estavam.' : '');
+      mudarAulaNoCelular(a, { data: v.data, hora: v.hora, duracaoMin: v.duracaoMin }, mensagem, function () { diaCelular = v.data; });
+    } });
     h.atualizar();
     corpo.appendChild(el('div', { class: 'barra cel-rodape-form' }, [
-      botaoDeAcaoCelular('remarcar', { class: 'btn principal', id: 'cel-remarcar-salvar', texto: 'Salvar a nova data', aoClick: function () {
-        var v = h.ler();
-        if (!v.data) { avisar('Escreva a data como dd/mm/aaaa, por exemplo ' + Core.ddmmaaaa(a.data) + '.'); return; }
-        var atual = aulaPorIdCelular(a.id);
-        if (atual && atual.data === v.data && atual.hora === v.hora && Number(atual.duracaoMin) === v.duracaoMin) { irAoPassoDaFolha('acoes'); return; }
-        var mensagem = 'Aula remarcada para ' + quandoCurtoCelular(v.data, v.hora) + '.' + (serie ? ' As outras da repetição continuam como estavam.' : '');
-        mudarAulaNoCelular(a, { data: v.data, hora: v.hora, duracaoMin: v.duracaoMin }, mensagem, function () { diaCelular = v.data; });
-      } }),
+      botaoSalvar,
       el('button', { type: 'button', class: 'btn', id: 'cel-folha-voltar', texto: 'Voltar', aoClick: function () { irAoPassoDaFolha('acoes'); } })
     ]));
   }
@@ -22452,13 +22562,13 @@
     var selAluno = el('select', { id: 'cel-aula-aluno' }, ativos.map(function (al) { return el('option', { value: al.id, texto: al.nome }); }));
     caixa.appendChild(campoCelular('Aluno', selAluno));
     var h = camposDeHorarioCelular('cel-aula', { data: formCelular.data || diaCelular || Core.hojeIso(), hora: formCelular.hora || '15:30', duracaoMin: 60 }, null, 'realizada',
-      function (v) { titulo.textContent = 'Marcar aula às ' + v.hora; });
+      function (v, choques) { titulo.textContent = 'Marcar aula às ' + v.hora; ajustarSalvarAoChoque($('#cel-aula-salvar'), 'Salvar na agenda', choques); });
     h.campos.forEach(function (c) { caixa.appendChild(c); });
-    h.atualizar();
     caixa.appendChild(el('p', { class: 'ajuda', texto: 'Aula de repetição se marca no tablet.' }));
     caixa.appendChild(rodapeDoFormularioCelular('cel-aula-salvar', 'Salvar na agenda', function () {
       var v = h.ler();
       if (!v.data) { avisar('Escreva a data como dd/mm/aaaa, por exemplo ' + Core.ddmmaaaa(Core.hojeIso()) + '.'); return; }
+      if (!confirmaSalvarComChoque(h.choques())) return;
       var nova = novaAulaAvulsa({ alunoId: selAluno.value, data: v.data, hora: v.hora, duracaoMin: v.duracaoMin,
         status: 'realizada', cobravel: Core.STATUS.realizada.cobravelPadrao });
       comoAcaoDoCelular(function () {
@@ -22470,6 +22580,7 @@
         });
       });
     }));
+    h.atualizar(); // depois do rodapé: o Salvar já existe para dizer do choque
   }
 
   /* "Registrar como foi": a situação, o relato da aula (o mesmo campo do
