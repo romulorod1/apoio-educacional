@@ -1896,9 +1896,12 @@
   var registroSW = null;
   var versaoPendenteAtiva = null;
 
-  /* Um worker mais novo pode assumir ao fechar todas as janelas, mas ainda
-   * manter a versão anterior escolhida. A consulta é opcional para continuar
-   * funcionando com os workers antigos, que não conhecem esta mensagem. */
+  /* A versão que roda é a que ela escolheu (D2, veja o sw.js): o worker novo
+   * pode ter assumido quando ela fechou o aplicativo e continuar servindo a
+   * versão de antes, com a nova esperando o toque. Por isso a pergunta vai ao
+   * worker, e não só ao registration.waiting. A consulta tem prazo e aceita
+   * ficar sem resposta, para funcionar com os workers de antes do D2, que não
+   * conhecem a mensagem. */
   function consultarWorker(worker, tipo) {
     if (!worker || typeof MessageChannel === 'undefined') return Promise.resolve(null);
     return new Promise(function (resolve) {
@@ -1931,15 +1934,19 @@
     if (location.protocol === 'file:') return;
     navigator.serviceWorker.register('sw.js').then(function (reg) {
       registroSW = reg;
-      if (reg.waiting) { mostrarAvisoDeVersao(); conferirVersaoAtiva(); }
-      else conferirVersaoAtiva();
+      /* Um aviso só: o com o número, quando o worker responde; sem resposta e
+       * com worker em espera, o sem número. */
+      conferirVersaoAtiva().then(function (pendente) {
+        if (!pendente && reg.waiting) mostrarAvisoDeVersao();
+      });
       reg.addEventListener('updatefound', function () {
         var novo = reg.installing;
         if (!novo) return;
         novo.addEventListener('statechange', function () {
           if (novo.state === 'installed' && navigator.serviceWorker.controller) {
-            mostrarAvisoDeVersao();
-            conferirVersaoAtiva();
+            conferirVersaoAtiva().then(function (pendente) {
+              if (!pendente) mostrarAvisoDeVersao();
+            });
           }
         });
       });
@@ -1962,11 +1969,22 @@
     });
   }
 
+  /* O ÚNICO CAMINHO PARA A VERSÃO NOVA RODAR (D2). "Atualizar agora" troca na
+   * hora; "Depois da aula" deixa gravado no worker que ela entra na próxima
+   * abertura do aplicativo. Sem toque nenhum, nada muda, e o aviso volta na
+   * abertura seguinte e fica em Ajustes. */
   function mostrarAvisoDeVersao() {
     var versao = versaoPendenteAtiva && versaoPendenteAtiva.versao;
-    avisar('Há uma versão nova do aplicativo' + (versao ? ' (' + versao + ')' : '') + '.',
-      'Atualizar agora', aplicarAtualizacao, 'Depois da aula', function () {});
+    avisar('Versão nova pronta' + (versao ? ' (' + versao + ')' : ''),
+      'Atualizar agora', aplicarAtualizacao, 'Depois da aula', atualizarDepoisDaAula);
     desenharAjustes();
+  }
+
+  function atualizarDepoisDaAula() {
+    var worker = registroSW && (registroSW.waiting || registroSW.active);
+    consultarWorker(worker, 'depois-da-aula').then(function (resposta) {
+      if (resposta && resposta.adiada) avisar('A versão nova entra na próxima vez que você abrir o aplicativo.');
+    });
   }
 
   /* RECARREGAR NÃO PODE LEVAR A MUDANÇA QUE A FAIXA AINDA NÃO GUARDOU (B3).
@@ -14272,8 +14290,9 @@
       if ((registroSW && registroSW.waiting) || versaoPendenteAtiva) {
         estado.innerHTML = '';
         estado.appendChild(el('div', { class: 'faixa-info' }, [
-          el('strong', { texto: 'Há uma versão nova pronta. ' }),
-          document.createTextNode('Toque em Atualizar agora. Seus dados continuam como estão.')
+          el('strong', { texto: 'Versão nova pronta' +
+            (versaoPendenteAtiva && versaoPendenteAtiva.versao ? ' (' + versaoPendenteAtiva.versao + ')' : '') + '. ' }),
+          document.createTextNode('Ela só passa a rodar quando você tocar em Atualizar agora. Seus dados continuam como estão.')
         ]));
         estado.appendChild(el('button', {
           type: 'button', class: 'btn destaque', texto: 'Atualizar agora',

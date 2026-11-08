@@ -364,6 +364,17 @@ for t in testa_temas testa_busca testa_mapa_e2e \
   roda "$t" node "_teste/$t.js"
 done
 
+# D2: o service worker com cache primeiro. Fechar o aplicativo sem tocar no
+# aviso nao troca a versao (o navegador ativa o worker em espera sozinho, e a
+# escolha gravada segura), a instalacao que falha pela metade nao vira aviso, a
+# janela com gravacao pendente fica na versao dela, e a abertura com a rede
+# segurando 40 s nao espera a rede. O --migracao fica fora porque le a
+# origin/main do git, que o checkout raso do CI nao tem.
+roda "atualizacao apos fechar"                  node "_teste/testa_atualizacao_apos_fechar.js"
+roda "atualizacao --falha-instalacao"           node "_teste/testa_atualizacao_apos_fechar.js" --falha-instalacao
+roda "atualizacao --duas-janelas"               node "_teste/testa_atualizacao_apos_fechar.js" --duas-janelas
+roda "atualizacao --rede-lenta"                 node "_teste/testa_atualizacao_apos_fechar.js" --rede-lenta
+
 # O painel "Cada aluno, desde quando e por quanto" nasce recolhido no
 # Fechamento. Esta trava guarda quatro coisas: ele nasce fechado, o botao
 # Mostrar abre, a escolha dela fica lembrada e abrir ou fechar nao mexe na

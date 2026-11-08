@@ -368,9 +368,13 @@ async function cortarRede(pag, cortar) {
   conf('o leitor foi pedido de novo (e veio do cache)', pedidosDoLeitor.length > 0, true);
   /* O setOfflineMode da página não alcança a rede do sw.js (medido: o
    * servidor recebe os pedidos dele). Por isso o corte do lado do servidor.
-   * Controle: o resto do aplicativo, que o sw.js busca na rede primeiro,
-   * tentou o servidor cortado; o leitor, que vem do cache antes, não. */
-  conf('controle: o aplicativo tentou a rede e o servidor cortado derrubou', amb.cortados.indexOf('/app.js') >= 0, true);
+   * Controle: um baixado, que o sw.js busca na rede primeiro, tentou o
+   * servidor cortado; o leitor, que vem do cache antes, não. Até o D2 o
+   * controle era o app.js, que ia à rede primeiro; desde o D2 os ARQUIVOS vêm
+   * do cache da versão escolhida e nem tentam o servidor. */
+  await pag.evaluate(() => fetch('banco/sonda-' + Date.now() + '.json').catch(() => null));
+  conf('controle: o baixado tentou a rede e o servidor cortado derrubou', amb.cortados.some(c => c.indexOf('/banco/sonda-') === 0), true);
+  conf('e o app.js veio do cache, sem tentar a rede (D2)', amb.cortados.indexOf('/app.js') >= 0, false);
   conf('o leitor nem tentou a rede (cache primeiro)', amb.cortados.filter(c => c.indexOf('/vendor/') === 0).join(', '), '');
   conf('o leitor está no BAIXADOS, e não no pré-cache', await pag.evaluate(async () => {
     const nomes = await caches.keys();

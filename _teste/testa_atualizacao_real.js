@@ -1,8 +1,15 @@
 /* Atualização com os cabeçalhos reais do GitHub Pages (max-age=600 e ETag).
  *
- * Mede quantas aberturas o tablet precisa até receber a versão nova, nos dois
- * cenários que importam: cache do navegador recém-criado, que é o pior caso, e
- * cache já vencido, que é o caso de quem usou o aplicativo horas antes.
+ * Os cenários A e B medem a travessia de um tablet que ficou na 1.0.0, de
+ * antes do D2, até o service worker de agora: com o cache do navegador
+ * recém-criado, que é o pior caso, e já vencido, que é o caso de quem usou o
+ * aplicativo horas antes. O worker da 1.0.0 vai à rede primeiro, então nessa
+ * travessia o código novo chega sem toque; é a última vez.
+ *
+ * Daí em diante vale o D2: a versão seguinte baixa por baixo sem esperar os
+ * dez minutos do cabeçalho, NÃO roda antes do toque (nem recarregando, nem
+ * abrindo de novo), roda logo depois do toque em "Atualizar agora", e o
+ * aplicativo abre do cache sem rede.
  */
 const puppeteer = require('puppeteer-core');
 const fs = require('fs');
@@ -68,12 +75,37 @@ function reporVersaoAntiga() {
     // no runner Linux do GitHub.
     { cwd: RAIZ, shell: process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : '/bin/sh' });
 }
+/* A lista inteira do pacote, lida do próprio sw.js: com o cache primeiro, a
+ * versão nova só existe se o install baixar todos os ARQUIVOS (veja o
+ * testa_atualizacao). */
 function publicarVersaoNova() {
-  ['index.html', 'styles.css', 'core.js', 'pdf.js', 'store.js', 'draw.js', 'app.js', 'sw.js', 'manifest.webmanifest']
-    .forEach(f => fs.copyFileSync(path.join(RAIZ, f), path.join(PASTA, f)));
+  const sw = fs.readFileSync(path.join(RAIZ, 'sw.js'), 'utf8');
+  const lista = sw.slice(sw.indexOf('var ARQUIVOS = ['), sw.indexOf('];', sw.indexOf('var ARQUIVOS = [')));
+  (lista.match(/'\.\/[^']*'/g) || []).map(x => x.slice(3, -1)).filter(Boolean).concat(['sw.js']).forEach(f => {
+    fs.mkdirSync(path.dirname(path.join(PASTA, f)), { recursive: true });
+    fs.copyFileSync(path.join(RAIZ, f), path.join(PASTA, f));
+  });
 }
+/* Com foraDoAr, o servidor derruba a conexão: é o tablet sem sinal. */
+let foraDoAr = false;
+/* O aviso sobe de baixo da tela: espera ele parar dentro dela antes do toque,
+ * como o dedo espera. */
+async function tocarNoAviso(p, sel) {
+  await p.waitForFunction(s => {
+    const b = document.querySelector(s);
+    const r = b && b.getBoundingClientRect();
+    return r && r.height > 0 && r.bottom <= innerHeight;
+  }, { timeout: 10000 }, sel);
+  await espera(300);
+  await p.click(sel);
+}
+const avisoCom = (p, trecho) => p.evaluate(t => {
+  const x = document.querySelector('#aviso-texto');
+  return document.querySelector('#aviso').classList.contains('aberto') && !!x && x.textContent.includes(t);
+}, trecho).catch(() => false);
 
 const servidor = http.createServer((req, res) => {
+  if (foraDoAr) { req.socket.destroy(); return; }
   let rel = decodeURIComponent(req.url.split('?')[0]);
   if (rel === '/') rel = '/index.html';
   const arquivo = path.join(PASTA, rel);
@@ -161,14 +193,17 @@ const servidor = http.createServer((req, res) => {
   conf('sem perder nenhuma aula', await aulas(p), guardadasB);
 
   // =============================================================
-  console.log('\n=== depois de atualizada, a próxima chega na hora ===');
-  // agora ela está com o service worker novo, que sempre confere no servidor
-  await p.evaluate(() => navigator.serviceWorker.getRegistration()
-    .then(reg => { if (reg && reg.waiting) reg.waiting.postMessage({ tipo: 'ativar-agora' }); }));
-  await espera(2500);
-  await p.goto(url, { waitUntil: 'networkidle0' });
-  await espera(2000);
+  console.log('\n=== a travessia termina pelo aviso do service worker de agora ===');
+  const avisoNova = await esperaVersao(p, q => avisoCom(q, 'Versão nova pronta (' + VERSAO_NOVA + ')'), true, 30000);
+  conf('o service worker novo instalou e o aviso aparece', avisoNova, true);
+  await tocarNoAviso(p, '#aviso-acao');
+  conf('o toque deixa a versão nova no controle', await esperaVersao(p, q => q.evaluate(() =>
+    navigator.serviceWorker.getRegistration().then(r => !!r && !r.waiting && !!navigator.serviceWorker.controller))
+    .catch(() => false), true, 20000), true);
+  await espera(1500);
 
+  // =============================================================
+  console.log('\n=== a versão seguinte baixa na hora e espera o toque (D2) ===');
   // publica uma versão seguinte, sem limpar cache nenhum
   const appOriginal = fs.readFileSync(path.join(PASTA, 'app.js'), 'utf8');
   fs.writeFileSync(path.join(PASTA, 'app.js'),
@@ -176,46 +211,53 @@ const servidor = http.createServer((req, res) => {
   const swOriginal = fs.readFileSync(path.join(PASTA, 'sw.js'), 'utf8');
   fs.writeFileSync(path.join(PASTA, 'sw.js'), swOriginal.replace(CACHE_ATUAL, 'apoio-educacional-v99'));
 
-  /* QUANTAS ABERTURAS ATÉ A VERSÃO SEGUINTE CHEGAR, sem limpar cache nenhum.
+  /* QUANTAS ABERTURAS ATÉ O AVISO DA VERSÃO SEGUINTE, sem limpar cache nenhum.
    *
-   * A asserção antiga dizia que ela chegava na PRIMEIRA abertura, e isso é
-   * falso: medido, o servidor entrega 9.9.9 quando perguntado, a página é
-   * controlada pelo service worker, e mesmo assim ela executa a versão
-   * anterior, porque os scripts do index.html saem do cache HTTP do próprio
-   * navegador, que é o que o comentário do sw.js já dizia. A trava passava por
-   * sorte, quando a instalação do service worker novo ganhava a corrida do
-   * relógio fixo de 3500 ms: no HEAD limpo, quatro reprovações em seis
-   * rodadas, sempre nesta linha, sem mudança nenhuma de código. Alarme falso
-   * ensina a ignorar alarme.
+   * Antes do D2 esta trava contava aberturas até a 9.9.9 RODAR, e afirmava
+   * como desejado que ela rodava na segunda sem toque nenhum. Era o defeito
+   * FE02 da avaliação de 21/10: o aviso não segurava nada. Agora a conta é até
+   * o AVISO aparecer, e a versão de antes continua rodando em cada abertura.
    *
-   * O que o aplicativo garante de verdade, e é o que interessa para ela: a
-   * primeira abertura instala a versão nova por baixo, e a SEGUINTE já roda
-   * ela. Sem esperar os dez minutos do cabeçalho, que é o ponto do teste. Duas
-   * aberturas seguidas é o que acontece sozinho quando ela abre o aplicativo na
-   * casa de uma família e de novo na casa da seguinte.
-   *
-   * Continua sendo trava, e mais forte que a de antes: falha se passar de duas
-   * aberturas, e falha também se a versão nunca chegar. */
+   * O instalador pergunta ao servidor por ETag (cache: 'no-cache'), então o
+   * aviso chega sem esperar os dez minutos do cabeçalho. Continua sendo trava:
+   * falha se passar de duas aberturas, falha se o aviso nunca chegar, e falha
+   * se a 9.9.9 rodar antes do toque. */
   let aberturas = 0;
-  let v3 = '?';
-  while (aberturas < 3 && v3 !== '9.9.9') {
+  let avisou = false;
+  let rodouSemToque = false;
+  while (aberturas < 3 && !avisou) {
     aberturas++;
     await p.goto('about:blank'); await espera(300);
     await p.goto(url, { waitUntil: 'networkidle0' });
-    v3 = await esperaVersao(p, versao, '9.9.9', aberturas === 1 ? 4000 : 12000);
-    console.log('   abertura ' + aberturas + ': ' + v3);
+    avisou = await esperaVersao(p, q => avisoCom(q, 'Versão nova pronta (9.9.9)'), true, aberturas === 1 ? 6000 : 15000);
+    const agora = await versao(p);
+    if (agora === '9.9.9') rodouSemToque = true;
+    console.log('   abertura ' + aberturas + ': roda ' + agora + (avisou ? ', com o aviso da 9.9.9' : ''));
   }
-  conf('a versão seguinte chega sem esperar os dez minutos de cache', v3, '9.9.9');
+  conf('o aviso da versão seguinte chega sem esperar os dez minutos de cache', avisou, true);
   conf('e chega em no máximo duas aberturas', aberturas <= 2, true);
+  conf('a 9.9.9 não rodou antes do toque', rodouSemToque, false);
+  await p.goto('about:blank'); await espera(300);
+  await p.goto(url, { waitUntil: 'networkidle0' });
+  await espera(1500);
+  conf('abrir de novo sem tocar continua na versão de antes', await versao(p), VERSAO_NOVA);
+  await esperaVersao(p, q => avisoCom(q, 'Versão nova pronta (9.9.9)'), true, 15000);
+  await tocarNoAviso(p, '#aviso-acao');
+  const t3 = Date.now();
+  const v3 = await esperaVersao(p, versao, '9.9.9');
+  console.log('   depois do toque, a 9.9.9 rodou em ' + (Date.now() - t3) + ' ms');
+  conf('o toque em "Atualizar agora" leva à 9.9.9', v3, '9.9.9');
   conf('e as aulas seguem intactas', await aulas(p), guardadasB);
 
   console.log('\n=== e continua abrindo sem internet ===');
-  await p.setOfflineMode(true);
+  await espera(1500);
+  foraDoAr = true;
   await p.goto(url, { waitUntil: 'domcontentloaded' }).catch(() => { });
   await espera(2500);
   conf('abre sem rede', await p.$eval('#rotulo-mes', e => e.textContent.length > 3).catch(() => false), true);
+  conf('na versão escolhida', await versao(p), '9.9.9');
   conf('com as aulas no lugar', await aulas(p), guardadasB);
-  await p.setOfflineMode(false);
+  foraDoAr = false;
 
   await nav.close();
   servidor.close();

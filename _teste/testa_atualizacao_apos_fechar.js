@@ -98,7 +98,7 @@ const servidor = http.createServer((req, res) => {
       const resposta = await pagina.evaluate(() => fetch('./banco/serie-teste.json').then(r => r.json()));
       const tempo = Date.now() - inicio;
       if (resposta.serie !== 'teste' || tempo > 4000) throw new Error('Série não voltou ao cache no prazo: ' + tempo + ' ms');
-      console.log('1 passou, 0 falharam. Série recuperada do cache em ' + tempo + ' ms.');
+      console.log('1 de 1 verificações passaram, 0 falharam. Série recuperada do cache em ' + tempo + ' ms.');
       return;
     }
     if (ponte) {
@@ -115,7 +115,7 @@ const servidor = http.createServer((req, res) => {
           })).catch(() => null));
           throw e;
         });
-      console.log('1 passou, 0 falharam. Ponte reconhece e aplica versão pendente.');
+      console.log('1 de 1 verificações passaram, 0 falharam. Ponte reconhece e aplica versão pendente.');
       return;
     }
     if (process.argv.includes('--rede-lenta')) {
@@ -125,7 +125,7 @@ const servidor = http.createServer((req, res) => {
         pagina.goto(url, { waitUntil: 'domcontentloaded' }),
         new Promise((_, rejeitar) => setTimeout(() => rejeitar(new Error('Abertura ultrapassou 1 segundo com rede de 40 segundos')), 1000))
       ]);
-      console.log('1 passou, 0 falharam. Abertura em ' + (Date.now() - inicio) + ' ms.');
+      console.log('1 de 1 verificações passaram, 0 falharam. Abertura em ' + (Date.now() - inicio) + ' ms.');
       return;
     }
     await pagina.evaluate(async () => {
@@ -147,10 +147,26 @@ const servidor = http.createServer((req, res) => {
       await pagina.reload({ waitUntil: 'domcontentloaded' });
       const versao = await pagina.$eval('#versao-app', e => e.textContent.trim());
       if (versao !== '9.0.1') throw new Error('Instalação incompleta trocou a versão para ' + versao);
-      console.log('1 passou, 0 falharam. Instalação incompleta preservou a versão anterior.');
+      console.log('1 de 1 verificações passaram, 0 falharam. Instalação incompleta preservou a versão anterior.');
       return;
     }
     await pagina.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration()).waiting, { timeout: 30000 });
+    if (migracao && !migracaoPonte) {
+      /* A travessia da main para o D2. O worker da main vai à rede primeiro e
+       * não segura nada: uma janela nova já abriria a 9.0.2, e isso não tem
+       * conserto do lado de cá. O que o D2 garante é não deixar o tablet preso:
+       * o aplicativo da main não conhece o 'estado-versao', então, ativado o
+       * worker novo ao fechar, a escolha vai para a versão nova (regra antiga,
+       * uma última vez). Mantê-lo na versão da main o deixaria sem aviso. */
+      await pagina.close();
+      pagina = await navegador.newPage();
+      await pagina.goto(url, { waitUntil: 'domcontentloaded' });
+      await pagina.waitForFunction(() => document.querySelector('#versao-app')?.textContent.includes('9.0.2'), { timeout: 15000 });
+      const nomesMigracao = await pagina.evaluate(() => caches.keys());
+      if (!nomesMigracao.includes('apoio-educacional-controle')) throw new Error('A travessia não gravou a escolha');
+      console.log('1 de 1 verificações passaram, 0 falharam. Travessia da main sem toque não ficou presa na versão antiga.');
+      return;
+    }
     const antes = await pagina.$eval('#versao-app', e => e.textContent.trim());
     const outraJanela = await navegador.newPage();
     outraJanela.on('dialog', d => d.dismiss().catch(() => {}));
@@ -199,7 +215,7 @@ const servidor = http.createServer((req, res) => {
       }));
       if (!preservada.ficou || preservada.versao !== '9.0.1' || !preservada.codigo.includes("var VERSAO = '9.0.1'"))
         throw new Error('Janela com gravação pendente não preservou sua versão e memória');
-      console.log('1 passou, 0 falharam. A outra janela preservou dados pendentes e arquivos anteriores.');
+      console.log('1 de 1 verificações passaram, 0 falharam. A outra janela preservou dados pendentes e arquivos anteriores.');
       return;
     }
     await outraJanela.close();
