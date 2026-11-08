@@ -749,6 +749,9 @@ roda "celular so leitura --envenenado-tela"         node "_teste/testa_celular_l
 roda "celular so leitura --envenenado-limite-640"   node "_teste/testa_celular_leitura.js" --envenenado-limite-640
 # a escolha do modo celular pela janela de 640 tomaria o tablet pequeno em pe
 roda "celular so leitura --envenenado-janela-640"   node "_teste/testa_celular_leitura.js" --envenenado-janela-640
+# a abertura do celular que tenta gravar a migracao do corte dos pagamentos
+# mostra "Este celular so le" sem ela ter tocado em nada
+roda "celular so leitura --envenenado-grava-abertura" node "_teste/testa_celular_leitura.js" --envenenado-grava-abertura
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"

@@ -12308,7 +12308,8 @@
     db.ajustes = db.ajustes || {};
     if (/^\d{4}-\d{2}$/.test(String(db.ajustes.pagamentosDesde || ''))) return;
     db.ajustes.pagamentosDesde = Core.mesDe(Core.hojeIso());
-    salvar();
+    // no celular, que só lê, a memória basta para mostrar: nada de gravar ao abrir (D6)
+    if (!aparelhoSoLe()) salvar();
   }
 
   /* Os meses que o seletor do corte oferece: do mês da aula mais antiga (ou do
@@ -21453,8 +21454,16 @@
     celularRecado = '';
     desenharTopoCelular();
     return Nuvem.listarCopias(est.uidDona || null).then(function (lista) {
-      var atual = lista.filter(function (c) { return c.papel === 'atual'; })[0] || lista[0];
-      if (!atual) { celularRecado = 'Ainda não há cópia na nuvem.'; return; }
+      /* A atual é a que o ponteiro aponta (papel 'atual'), nunca a primeira
+       * da lista: sem o cabeçalho dela, a lista só traz a anterior, mais
+       * velha. Aí nada é aplicado, e fica o que o celular já tem. */
+      var atual = lista.filter(function (c) { return c.papel === 'atual'; })[0];
+      if (!atual) {
+        celularRecado = lista.length
+          ? 'A cópia mais nova da nuvem está incompleta: ficam os dados que já estão aqui.'
+          : 'Ainda não há cópia na nuvem.';
+        return;
+      }
       if (est.ultimaCopia && est.ultimaCopia.id === atual.id) return;
       return Nuvem.baixarCopia(atual.uid, atual.id).then(function (zip) {
         return Store.importarZip(zip, { daNuvem: true });

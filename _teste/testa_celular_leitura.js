@@ -37,6 +37,10 @@
  *   --envenenado-limite-640  a guarda com o limite de 640 no lado menor: o
  *                         tablet de 8 polegadas (tela 600x960) fica com a
  *                         automática bloqueada, e a prova tem de ver;
+ *   --envenenado-grava-abertura  a abertura do celular volta a tentar gravar a
+ *                         migração do corte dos pagamentos (a cópia do tablet
+ *                         sem pagamentosDesde): o aviso "Este celular só lê"
+ *                         aparece ao abrir, e a prova tem de ver;
  *   --envenenado-janela-640  a escolha do modo celular volta a ser pela
  *                         janela de 640 px: o tablet de 8 polegadas em pé vira
  *                         celular, e a prova tem de ver.
@@ -61,12 +65,13 @@ const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
-const MODO = ['--envenenado-envia', '--envenenado-edicao', '--envenenado-grava', '--envenenado-tela', '--envenenado-limite-640', '--envenenado-janela-640']
+const MODO = ['--envenenado-envia', '--envenenado-edicao', '--envenenado-grava', '--envenenado-tela', '--envenenado-limite-640', '--envenenado-janela-640', '--envenenado-grava-abertura']
   .filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const ENVIA = MODO === '--envenenado-envia';
 const TELA = MODO === '--envenenado-tela';
 const LIMITE_640 = MODO === '--envenenado-limite-640';
 const JANELA_640 = MODO === '--envenenado-janela-640';
+const GRAVA_ABERTURA = MODO === '--envenenado-grava-abertura';
 const EDICAO = MODO === '--envenenado-edicao';
 const GRAVA = MODO === '--envenenado-grava';
 
@@ -126,6 +131,11 @@ conf('a escolha do modo celular (marca ou tela do aparelho) está num lugar só'
 // a tela do aparelho fora da escolha (volta a janela) e da guarda da automática
 if (TELA) trocas['/app.js'] = APP.replace(GUARDA_TELA_RE, '\n').replace(ESCOLHA, '    var deve = temMarcaSoLeitura() || (window.innerWidth || 0) < 640;');
 if (JANELA_640) trocas['/app.js'] = APP.replace(ESCOLHA, '    var deve = temMarcaSoLeitura() || (window.innerWidth || 0) < 640;');
+/* A migração do corte dos pagamentos, que roda ao desenhar o Fechamento,
+ * volta a chamar o salvar() no celular. */
+const CORTE = '    if (!aparelhoSoLe()) salvar();';
+conf('a migração do corte dos pagamentos não grava no celular, num lugar só', APP.split(CORTE).length, 2);
+if (GRAVA_ABERTURA) trocas['/app.js'] = APP.replace(CORTE, '    salvar();');
 const LIMITE = 'var TELA_CELULAR = 500;';
 conf('o limite da tela de celular está num lugar só', APP.split(LIMITE).length, 2);
 if (LIMITE_640) trocas['/app.js'] = APP.replace(LIMITE, 'var TELA_CELULAR = 640;');
@@ -245,6 +255,20 @@ async function prepararPagina(pag, largura, altura, movel) {
       } });
     });
   }, telaPadrao);
+  /* Todo aviso flutuante que aparece, desde a abertura (também no
+   * sessionStorage, pela recarga do service worker): o celular nunca pode
+   * abrir dizendo "Este celular só lê", porque ela não tocou em nada. */
+  await pag.evaluateOnNewDocument(() => {
+    try { window.__avisos = JSON.parse(sessionStorage.getItem('__avisos') || '[]'); } catch (e) { window.__avisos = []; }
+    document.addEventListener('DOMContentLoaded', () => {
+      const alvo = document.querySelector('#aviso-texto');
+      if (!alvo) { window.__avisos.push('sem #aviso-texto: o observador não vê'); return; }
+      new MutationObserver(() => {
+        window.__avisos.push(alvo.textContent);
+        try { sessionStorage.setItem('__avisos', JSON.stringify(window.__avisos)); } catch (e) { /* fica em memória */ }
+      }).observe(alvo, { childList: true, characterData: true, subtree: true });
+    });
+  });
   /* O espião do banco, desde o primeiro instante da página: toda transação de
    * escrita no apoio-educacional fica anotada, com os depósitos. A lista vive
    * no sessionStorage da aba, e não só na memória da página: o service worker
@@ -268,6 +292,7 @@ async function prepararPagina(pag, largura, altura, movel) {
 const definirTela = (pag, t) => pag.evaluate(t => { if (t) sessionStorage.setItem('__tela', JSON.stringify(t)); else sessionStorage.removeItem('__tela'); }, t);
 const escritasNoBanco = pag => pag.evaluate(() => window.__escritas.slice());
 /* Zera a conta da aba, para medir só o que vem depois. */
+const recusasSoLeitura = pag => pag.evaluate(() => window.__avisos.filter(t => /Este celular só lê\. Para mudar/.test(t)));
 const zerarEscritas = pag => pag.evaluate(() => { window.__escritas = []; sessionStorage.removeItem('__escritas'); });
 const texto = (pag, sel) => pag.evaluate(s => { const e = document.querySelector(s); return e ? e.textContent : null; }, sel);
 const existe = (pag, sel) => pag.evaluate(s => !!document.querySelector(s), sel);
@@ -382,8 +407,17 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
   const subiu = await esperar('a cópia do tablet subiu', ponteiroAgora, v => !!v, 30000);
   conf('a cópia do tablet está na nuvem', subiu.ok, true);
   conf('o instrumento vê as escritas na nuvem (as do tablet)', pagA.escritasNaNuvem.length > 0, true);
-  const idTablet = subiu.valor;
   const chave = await pagA.evaluate(() => Nuvem.verChave());
+  /* A cópia que o celular traz é de um tablet que ainda não desenhou o
+   * Fechamento depois do C4: sem ajustes.pagamentosDesde. */
+  await pagA.evaluate(async () => {
+    const d = await Store.carregar();
+    delete d.ajustes.pagamentosDesde;
+    await Nuvem.enviarCopia(await Store.exportarTudoZip(d), { motivo: 'ela', conteudo: true });
+  });
+  const semCorte = await esperar('a cópia sem o corte subiu', ponteiroAgora, v => !!v && v !== subiu.valor, 30000);
+  conf('a cópia mais nova do tablet não tem pagamentosDesde', semCorte.ok, true);
+  const idTablet = semCorte.valor;
 
   secao('3. O celular (390 x 844) abre sem dados, entra e traz a cópia');
   const ctxB = await pagA.browser().createBrowserContext();
@@ -420,6 +454,16 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     const e = Nuvem.estado(); return e.soLeitura && e.uidDona === u && e.automatica === false;
   }, dona.localId), ENVIA ? false : true);
   conf('no alto: "Dados de hoje, HH:MM, do tablet."', /^Dados de hoje, \d\d:\d\d, do tablet\.$/.test(await texto(pagB, '#cel-origem')), true);
+  conf('o observador de avisos vê (o "Pronto" da restauração foi visto)', await pagB.evaluate(() => window.__avisos.some(t => /Pronto: os dados do tablet chegaram/.test(t))), true);
+  await pagB.evaluate(() => { document.querySelector('#cel-abas .cel-aba[data-cel="fechamento"]').click(); document.querySelector('#cel-abas .cel-aba[data-cel="hoje"]').click(); });
+  await zerarEscritas(pagB);
+  await abrir(pagB);
+  const semCorteNoDisco = await pagB.evaluate(async () => (await Store.carregar()).ajustes.pagamentosDesde === undefined);
+  prop('a cópia sem pagamentosDesde: abrir o celular não mostra "Este celular só lê" (' + (await recusasSoLeitura(pagB)).length + ' vezes)',
+    (await recusasSoLeitura(pagB)).length === 0, '--envenenado-grava-abertura');
+  if (GRAVA_ABERTURA) { await ctxB.close(); return; }
+  conf('e não gravou: o disco continua sem pagamentosDesde e nenhuma escrita no banco', semCorteNoDisco && (await escritasNoBanco(pagB)).length === 0, true);
+  await zerarEscritas(pagB);
 
   secao('4. As três telas: sem rolagem de lado, alvos de 44 px e nenhum botão de edição');
   const hojeTexto = await texto(pagB, '#cel-hoje');
@@ -472,7 +516,7 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     existe(pagB, '#modal-envio-familias.aberto #envio-enviar'), v => v === true, 5000).then(r => r.ok), true);
   await pagB.evaluate(() => document.querySelector('#envio-parar').click());
   await pagB.evaluate(() => document.querySelector('#envio-fechar').click());
-  conf('usar as três telas e enviar não gravou nada no banco', (await escritasNoBanco(pagB)).length, 1);
+  conf('usar as três telas e enviar não gravou nada no banco', (await escritasNoBanco(pagB)).length, 0);
 
   secao('5. Nenhum envio à nuvem do celular: ao fechar, ao voltar, deitado');
   const antesB = pagB.escritasNaNuvem.length;
@@ -520,6 +564,22 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     escritas = await escritasNoBanco(pagB);
     conf('a única escrita desta abertura foi a restauração da cópia nova', escritas.length === 1 && /dados/.test(escritas[0]), true);
     conf('e nenhuma escrita na nuvem do celular em toda a rodada', pagB.escritasNaNuvem.length, 0);
+
+    /* A atual sem cabeçalho: o ponteiro aponta para ela, mas a meta sumiu. A
+     * lista só traz a anterior, mais velha; o celular não aplica nada. */
+    await pagA.evaluate(async () => {
+      await Nuvem.enviarCopia(await Store.exportarTudoZip(await Store.carregar()), { motivo: 'ela', conteudo: true });
+    });
+    const quebrada = await esperar('a cópia que vai ficar sem cabeçalho subiu', ponteiroAgora, v => !!v && v !== nova.valor, 30000);
+    conf('o tablet subiu outra cópia', quebrada.ok, true);
+    conf('o cabeçalho da atual foi apagado no emulador', (await rest(docUrl(dona.localId, 'copias/' + quebrada.valor), { token: dona.idToken, metodo: 'DELETE' })).status, 200);
+    await zerarEscritas(pagB);
+    await abrir(pagB);
+    const recado = await esperar('o celular avisou da cópia incompleta', () => texto(pagB, '#cel-origem'), v => /incompleta/.test(v || ''), 20000);
+    conf('sem o cabeçalho da atual, o alto diz que ficam os dados daqui', recado.ok, true);
+    conf('e nada foi aplicado: a cópia é a mesma e nenhuma escrita no banco', (await pagB.evaluate(() => Nuvem.estado().ultimaCopia.id)) === nova.valor &&
+      (await escritasNoBanco(pagB)).length === 0, true);
+    conf('em toda a rodada do celular, nenhum "Este celular só lê"', (await recusasSoLeitura(pagB)).length, 0);
   }
 
   secao('7. O celular que restaurou pela tela do tablet antes (sem a marca) não sobe nada em pé');
