@@ -833,6 +833,7 @@ roda "celular so leitura --envenenado-grava-abertura" node "_teste/testa_celular
 roda "celular edita (D6b)"                          node "_teste/testa_celular_edita.js"
 roda "celular edita --envenenado-celular-envia-copia" node "_teste/testa_celular_edita.js" --envenenado-celular-envia-copia
 roda "celular edita --envenenado-observador-edita"  node "_teste/testa_celular_edita.js" --envenenado-observador-edita
+roda "celular edita --envenenado-corte-sobe"        node "_teste/testa_celular_edita.js" --envenenado-corte-sobe
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"

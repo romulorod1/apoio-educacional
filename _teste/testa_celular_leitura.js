@@ -352,7 +352,7 @@ async function fecharEVoltar(pag) {
  * edição. Os botões das quatro ações do celular da dona vêm marcados
  * (data-acao-celular) e contam à parte: o que não pode existir é botão de
  * edição FORA delas. O campo de escolher o dia é consulta (data-consulta). */
-const RE_EDICAO = 'registrar|editar|salvar|excluir|apagar|nova aula|novo aluno|^\\s*\\+|desmarcar|marcar|cancelar a aula|cancelar aula|cadastrar|pago|anotar|alterar|confirmar';
+const RE_EDICAO = 'registrar|corrigir|editar|salvar|excluir|apagar|nova aula|novo aluno|^\\s*\\+|desmarcar|marcar|cancelar a aula|cancelar aula|cadastrar|pago|anotar|alterar|confirmar';
 const medirTela = (pag) => pag.evaluate((reEdicao) => {
   const re = new RegExp(reEdicao, 'i');
   const visivel = e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden'; };
@@ -523,7 +523,7 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
   if (EDICAO) { await ctxB.close(); return; }
   // o instrumento vê os botões das ações: sem isto, "nenhum botão fora delas" passaria com a medida cega
   conf('(controle) as ações do celular da dona estão à vista e a medida as separa: Hoje (' + telas.hoje.dasAcoes.join(', ') + '), Fechamento (' + telas.fechamento.dasAcoes.join(', ') + ')',
-    telas.hoje.dasAcoes.indexOf('Marcar aula neste dia') >= 0 && telas.hoje.dasAcoes.indexOf('Registrar como foi') >= 0 &&
+    telas.hoje.dasAcoes.indexOf('Marcar aula neste dia') >= 0 && telas.hoje.dasAcoes.indexOf('Ver ou corrigir como foi') >= 0 &&
     telas.fechamento.dasAcoes.indexOf('Marcar como pago') >= 0, true);
   conf('todos os botões das três telas e do alto foram medidos (' + Object.keys(telas).map(t => t + ': ' + telas[t].alvos).join(', ') + ')',
     Object.keys(telas).every(t => telas[t].alvos >= 5), true);

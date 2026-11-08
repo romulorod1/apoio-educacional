@@ -46,7 +46,7 @@ const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
-const MODOS = ['--envenenado-celular-envia-copia', '--envenenado-observador-edita'];
+const MODOS = ['--envenenado-celular-envia-copia', '--envenenado-observador-edita', '--envenenado-corte-sobe'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 function prop(rotulo, ok, veneno) {
   if (MODO && MODO === veneno) return conf('VENENO visto: ' + rotulo + ', e quebrou', ok, false);
@@ -95,6 +95,10 @@ if (MODO === MODOS[1]) {
   trocas['/app.js'] = APP.replace(DONA_APP, 'return modoCelular && temNuvem() && Nuvem.celularDaDona();')
     .replace(DONA_PORTAS, 'var dona = deve && temNuvem() && Nuvem.celularDaDona();');
 }
+/* O corte dos pagamentos que o celular pôs na memória volta a subir com a ação seguinte. */
+const SEM_CORTE = 'var p = Store.salvar(semCorteDoCelular(dbParaGravar()));';
+conf('o salvar() tira o corte que o celular pôs só na memória, num lugar só', APP.split(SEM_CORTE).length, 2);
+if (MODO === MODOS[2]) { trocas['/app.js'] = APP.replace(SEM_CORTE, 'var p = Store.salvar(dbParaGravar());'); trocas['/nuvem.js'] = NUVEM + '\n'; }
 if (MODO) conf('os arquivos servidos ficaram diferentes do repositório (' + MODO + ')', trocas['/nuvem.js'] !== NUVEM && trocas['/app.js'] !== APP, true);
 
 conf('o firebase-tools está onde a prova procura (' + FIREBASE + ')', fs.existsSync(FIREBASE), true);
@@ -302,7 +306,7 @@ const filaVazia = pag => esperar('a fila do celular esvaziou', () => pag.evaluat
 
 /* O que está à vista no celular, medido: rolagem de lado, alvos de 48 px e os
  * botões de edição (os das quatro ações vêm marcados com data-acao-celular). */
-const RE_EDICAO = 'registrar|editar|salvar|excluir|apagar|nova aula|novo aluno|^\\s*\\+|desmarcar|marcar|cancelar a aula|cancelar aula|cadastrar|pago|anotar|alterar|confirmar';
+const RE_EDICAO = 'registrar|corrigir|editar|salvar|excluir|apagar|nova aula|novo aluno|^\\s*\\+|desmarcar|marcar|cancelar a aula|cancelar aula|cadastrar|pago|anotar|alterar|confirmar';
 const medirTela = (pag) => pag.evaluate((reEdicao) => {
   const re = new RegExp(reEdicao, 'i');
   const visivel = e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden'; };
@@ -329,8 +333,11 @@ const AGORA = new Date();
 const HOJE = isoDe(AGORA);
 const MES = HOJE.slice(0, 7);
 /* Um outro dia do MESMO mês (o Fechamento do tablet é o do mês corrente). */
-const OUTRO = (() => { const d = new Date(AGORA); d.setDate(d.getDate() + 1); if (isoDe(d).slice(0, 7) !== MES) d.setDate(d.getDate() - 2); return isoDe(d); })();
-const TERCEIRO = (() => { const d = new Date(AGORA); d.setDate(d.getDate() + 2); if (isoDe(d).slice(0, 7) !== MES) d.setDate(d.getDate() - 4); return isoDe(d); })();
+/* Aulas AGENDADAS (data à frente): só elas se cancelam no celular. Perto do
+ * fim do mês caem no seguinte, e a linha do Fechamento do tablet (o mês
+ * corrente) só é conferida quando a data é deste mês. */
+const OUTRO = (() => { const d = new Date(AGORA); d.setDate(d.getDate() + 1); return isoDe(d); })();
+const TERCEIRO = (() => { const d = new Date(AGORA); d.setDate(d.getDate() + 2); return isoDe(d); })();
 const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); return isoDe(d); })();
 
 (async function () {
@@ -391,8 +398,9 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
   conf('Hoje: sem rolagem de lado em ' + m.largura + ' px', m.rolaDeLado, false);
   conf('Hoje: todo alvo tem 48 px ou mais (' + m.alvos + ' alvos)', m.pequenos.join('; '), '');
   conf('Hoje: os botões de edição são todos das quatro ações (' + m.dasAcoes.join(', ') + ')', m.soltos.join(', '), '');
-  conf('Hoje: "Marcar aula neste dia", "Registrar como foi", "Cancelar aula" e "Cadastrar aluno" à vista',
-    ['Marcar aula neste dia', 'Registrar como foi', 'Cancelar aula', 'Cadastrar aluno'].every(t => m.dasAcoes.indexOf(t) >= 0), true);
+  conf('Hoje: "Marcar aula neste dia", "Ver ou corrigir como foi" e "Cadastrar aluno" à vista',
+    ['Marcar aula neste dia', 'Ver ou corrigir como foi', 'Cadastrar aluno'].every(t => m.dasAcoes.indexOf(t) >= 0), true);
+  conf('a aula de hoje, Realizada, não oferece "Cancelar aula" (só a agendada se cancela)', await existe(pagC, '.cel-aula[data-aula="aula-hoje"] .cel-cancelar'), false);
   conf('nenhum "Enviar cópia agora" no celular', await pagC.evaluate(() => { const b = document.querySelector('#nuvem-enviar'); return !!(b && b.getBoundingClientRect().height); }), false);
 
   secao('4. Marcar aula num dia escolhido');
@@ -413,9 +421,14 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
 
   secao('5. Cancelar aula, com Desfazer');
   await digitar(pagC, '#cel-dia', OUTRO);
+  conf('a aula agendada oferece "Cancelar aula", e não "Registrar como foi"', (await existe(pagC, '.cel-aula[data-aula="aula-outro"] .cel-cancelar')) &&
+    !(await existe(pagC, '.cel-aula[data-aula="aula-outro"] .cel-registrar')), true);
   await clicar(pagC, '.cel-aula[data-aula="aula-outro"] .cel-cancelar');
   conf('cancelou no celular', (await esperar('a aula ficou cancelada', () => pagC.evaluate(() => Store.carregar().then(b => b.aulas.find(a => a.id === 'aula-outro').status)), v => v === 'cancelada', 10000)).ok, true);
   conf('o aviso traz o Desfazer', await pagC.evaluate(() => { const b = document.querySelector('#aviso-acao'); return b && b.style.display !== 'none' ? b.textContent : null; }), 'Desfazer');
+  conf('o aviso fica entre o conteúdo e as abas: não cobre nenhum dos dois', await pagC.evaluate(() => {
+    const a = document.querySelector('#aviso').getBoundingClientRect(), c = document.querySelector('#cel-conteudo').getBoundingClientRect(), b = document.querySelector('#cel-abas').getBoundingClientRect();
+    return a.height > 0 && a.top >= c.bottom - 1 && a.bottom <= b.top + 1; }), true);
   await clicar(pagC, '#aviso-acao');
   conf('o Desfazer do celular volta a aula', (await esperar('a aula voltou', () => pagC.evaluate(() => Store.carregar().then(b => b.aulas.find(a => a.id === 'aula-outro').status)), v => v === 'realizada', 10000)).ok, true);
   await clicar(pagC, '.cel-aula[data-aula="aula-outro"] .cel-cancelar');
@@ -425,6 +438,7 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
   secao('6. "Registrar como foi": situação, relato e assunto dado');
   await clicar(pagC, '#cel-dia-hoje');
   await clicar(pagC, '.cel-aula[data-aula="aula-hoje"] .cel-registrar');
+  conf('abrir o formulário tira o aviso da ação anterior (o "Aula cancelada" não aparece sobre o registro)', await existe(pagC, '#aviso.aberto'), false);
   m = await medirTela(pagC);
   conf('o formulário do relato: alvos de 48 px e sem rolagem de lado', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : ''), '');
   await digitar(pagC, '#cel-relato-texto', 'Relato escrito no celular');
@@ -436,6 +450,7 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
 
   secao('7. Cadastrar aluno: o essencial');
   await clicar(pagC, '#cel-novo-aluno');
+  conf('o cadastro abre sem o aviso "Aula salva." da ação anterior', await existe(pagC, '#aviso.aberto'), false);
   conf('a tela diz que o resto fica no tablet', /se completam no tablet/.test(await texto(pagC, '#cel-aluno-resto')), true);
   m = await medirTela(pagC);
   conf('o formulário do aluno: alvos de 48 px e sem rolagem de lado', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : ''), '');
@@ -447,6 +462,7 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
   await clicar(pagC, '#cel-aluno-salvar');
   const beta = await esperar('o aluno gravou', () => pagC.evaluate(() => Store.carregar().then(b => { const a = b.alunos.find(x => x.nome === 'Aluno Beta Teste'); return a ? a.id : null; })), v => !!v, 10000);
   conf('o aluno novo está no celular', beta.ok, true);
+  conf('o aviso do cadastro diz "Aluno cadastrado."', /^Aluno cadastrado\./.test((await texto(pagC, '#aviso-texto')) || ''), true);
   const idBeta = beta.valor;
 
   secao('8. "Pago em" no Fechamento, por aluno e por mês');
@@ -455,7 +471,20 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
   m = await medirTela(pagC);
   conf('Fechamento: alvos de 48 px e sem rolagem de lado', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : ''), '');
   conf('Fechamento: os botões de edição são só os do "pago em" (' + m.dasAcoes.join(', ') + ')', m.soltos.join(', '), '');
+  if (TERCEIRO.slice(0, 7) === MES) {
+    const futuras = (await texto(pagC, '.cel-fechamento-aluno[data-aluno="alfa"] .cel-linhas-futuras')) || '';
+    conf('as aulas agendadas ficam à parte, marcadas "ainda não dada" (' + futuras + ')', /ainda não dada/.test(futuras) && !/Realizada/.test(futuras), true);
+    conf('e as dadas, na lista de cima, não levam a marca', /ainda não dada/.test((await texto(pagC, '.cel-fechamento-aluno[data-aluno="alfa"] .cel-linhas:not(.cel-linhas-futuras)')) || ''), false);
+  }
   await clicar(pagC, '.cel-fechamento-aluno[data-aluno="alfa"] .btn-marcar-pago');
+  const proposto = await pagC.evaluate(m => Store.carregar().then(d => {
+    const f = Core.calcularMesInteiro(d, m).find(x => x.aluno.id === 'alfa');
+    const campo = document.querySelector('.cel-fechamento-aluno[data-aluno="alfa"] .pagamento-valor');
+    return { campo: campo && campo.value, total: Core.fmtMoeda(f.totalValor).replace(/^R\$\s*/, ''), soma: (document.querySelector('.cel-proposto-soma') || {}).textContent || '',
+      fechar: (document.querySelector('.cel-fechamento-aluno[data-aluno="alfa"] .btn-cancelar-pagamento') || {}).textContent }; }), MES);
+  conf('o valor proposto é o do tablet, o total do mês (' + proposto.total + ')', proposto.campo, proposto.total);
+  conf('e diz o que soma: as aulas dadas e as ainda não dadas (' + proposto.soma + ')', /do mês: R\$\s?[\d.,]+ das? \d+ aulas? dadas?/.test(proposto.soma), true);
+  conf('o "Cancelar" do pago em diz "Fechar sem marcar"', proposto.fechar, 'Fechar sem marcar');
   m = await medirTela(pagC);
   conf('o "pago em" aberto: alvos de 48 px e sem rolagem de lado', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : ''), '');
   await digitar(pagC, '.cel-fechamento-aluno[data-aluno="alfa"] .pagamento-valor', '250,00');
@@ -491,8 +520,10 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
   conf('cadastrar aluno: o aluno do celular no tablet, com o essencial', noTablet.beta, 'Aluno Beta Teste | Responsável Beta Teste | Contato: telefone fictício 0000 | 120@' + HOJE);
   await H.irParaAba(pagA, 'fechamento');
   await pausa(400);
-  const linhaCancelada = await texto(pagA, 'tr[data-aula-fechamento="aula-outro"]');
-  conf('a aula cancelada no celular aparece cancelada no Fechamento do tablet (' + (linhaCancelada || 'sem linha') + ')', /Cancelada/.test(linhaCancelada || '') && /não cobrada/.test(linhaCancelada || ''), true);
+  if (OUTRO.slice(0, 7) === MES) {
+    const linhaCancelada = await texto(pagA, 'tr[data-aula-fechamento="aula-outro"]');
+    conf('a aula cancelada no celular aparece cancelada no Fechamento do tablet (' + (linhaCancelada || 'sem linha') + ')', /Cancelada/.test(linhaCancelada || '') && /não cobrada/.test(linhaCancelada || ''), true);
+  } else console.log('   (a aula de amanhã é do mês seguinte: a linha do Fechamento do tablet não é conferida hoje; o dado, sim)');
   /* O fechamento do tablet bate com o do celular: as somas do mês e a
    * situação do pagamento, calculadas pelo mesmo Core em cada aparelho. */
   const retratoFechamento = pag => pag.evaluate(mes => Store.carregar().then(d => Core.calcularMesInteiro(d, mes).map(f => {
@@ -542,6 +573,91 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
     return (p ? p.valor : 'sem pagamento') + '/' + d.aulas.find(a => a.id === 'aula-outro').status;
   }), MES);
   conf('o "pago em" e o cancelamento do celular continuam nele, por cima da cópia velha', noCel, '250/cancelada');
+
+  secao('11b. O formulário aberto não se perde quando chegam registros nem no "Buscar de novo"');
+  await clicar(pagC, '#cel-abas .cel-aba[data-cel="hoje"]');
+  await clicar(pagC, '#cel-dia-hoje');
+  await clicar(pagC, '.cel-aula[data-aula="aula-hoje"] .cel-registrar');
+  await digitar(pagC, '#cel-relato-texto', 'texto que ela digitou e não pode sumir');
+  await pagA.evaluate(async () => { const d = await Store.carregar(); d.aulas.find(a => a.id === 'aula-ontem').notaTexto = 'o tablet mexeu com o formulário aberto'; await Store.salvar(d); await Nuvem.sincronizar({ versaoApp: 'prova' }); });
+  const chegouComForm = await pagC.evaluate(() => Nuvem.receberRegistros().then(r => r.aplicados || 0));
+  await pausa(600);
+  conf('(arranjo) chegou registro do tablet com o formulário aberto', chegouComForm >= 1, true);
+  conf('o texto digitado continua no formulário depois do recebimento', await pagC.evaluate(() => (document.querySelector('#cel-relato-texto') || {}).value), 'texto que ela digitou e não pode sumir');
+  await clicar(pagC, '#cel-atualizar');
+  await esperar('o "Buscar de novo" terminou', () => pagC.evaluate(() => !Nuvem.estado().registros.recebendo && !!document.querySelector('#cel-atualizar') && !document.querySelector('#cel-atualizar').disabled), v => v === true, 20000);
+  conf('e depois do "Buscar de novo"', await pagC.evaluate(() => (document.querySelector('#cel-relato-texto') || {}).value), 'texto que ela digitou e não pode sumir');
+  await clicar(pagC, '#cel-form-voltar');
+  conf('fechando o formulário, Hoje volta e mostra o que chegou', /o tablet mexeu com o formulário aberto|10:30 Aluno Alfa Teste/.test(await texto(pagC, '#cel-hoje')), true);
+
+  secao('11c. Trinta ações com Desfazer no celular: o histórico fica em 25 e o Desfazer continua');
+  await digitar(pagC, '#cel-dia', TERCEIRO);
+  const falhasDoDesfazer = [];
+  for (let k = 0; k < 30; k++) {
+    await clicar(pagC, '.cel-aula[data-aula="' + idMarcada + '"] .cel-cancelar');
+    const c = await esperar('cancelada (' + (k + 1) + ')', () => pagC.evaluate(id => Store.carregar().then(b => b.aulas.find(a => a.id === id).status), idMarcada), v => v === 'cancelada', 10000);
+    const temDesfazer = await pagC.evaluate(() => { const b = document.querySelector('#aviso-acao'); return !!(b && b.style.display !== 'none' && document.querySelector('#aviso.aberto')); });
+    if (!c.ok || !temDesfazer) { falhasDoDesfazer.push(k + 1); break; }
+    await clicar(pagC, '#aviso-acao');
+    const v = await esperar('desfeita (' + (k + 1) + ')', () => pagC.evaluate(id => Store.carregar().then(b => b.aulas.find(a => a.id === id).status), idMarcada), v => v === 'realizada', 10000);
+    if (!v.ok) { falhasDoDesfazer.push(k + 1); break; }
+  }
+  conf('as 30 ações tiveram o Desfazer, e o Desfazer voltou a aula (falhou em: ' + (falhasDoDesfazer.join(', ') || 'nenhuma') + ')', falhasDoDesfazer.length, 0);
+  conf('o histórico do celular ficou em 25 pontos', await pagC.evaluate(() => Store.listarHistorico().then(l => l.length)), 25);
+  await filaVazia(pagC);
+
+  secao('11d. A cópia sem o corte dos pagamentos: nenhuma ação do celular sobe ajuste:pagamentosDesde');
+  /* O banco do celular perde o corte (a cópia de um tablet que nunca desenhou
+   * o Fechamento): o Fechamento do celular o põe na memória, e a ação seguinte
+   * não pode levá-lo para a fila. */
+  await pagC.evaluate(() => new Promise((res, rej) => {
+    const q = indexedDB.open('apoio-educacional');
+    q.onsuccess = () => {
+      const t = q.result.transaction(['registros', 'dados'], 'readwrite');
+      t.objectStore('registros').delete('ajuste:pagamentosDesde');
+      const p = t.objectStore('dados').get('principal');
+      p.onsuccess = () => { const d = p.result; delete d.ajustes.pagamentosDesde; t.objectStore('dados').put(d, 'principal'); };
+      t.oncomplete = () => { q.result.close(); res(); };
+      t.onerror = () => rej(t.error);
+    };
+  }));
+  await abrirCelular(pagC);
+  conf('(arranjo) o celular abriu sem o corte no banco', await pagC.evaluate(() => Store.carregar().then(d => d.ajustes.pagamentosDesde === undefined)), true);
+  const antesDoCorte = (await escritasLidas(pagC)).length;
+  await clicar(pagC, '#cel-abas .cel-aba[data-cel="fechamento"]');
+  await pausa(300);
+  await clicar(pagC, '#cel-abas .cel-aba[data-cel="hoje"]');
+  await digitar(pagC, '#cel-dia', TERCEIRO);
+  await clicar(pagC, '.cel-aula[data-aula="' + idMarcada + '"] .cel-cancelar');
+  await esperar('a ação depois do Fechamento gravou', () => pagC.evaluate(id => Store.carregar().then(b => b.aulas.find(a => a.id === id).status), idMarcada), v => v === 'cancelada', 10000);
+  await sincronizar(pagC);
+  await filaVazia(pagC);
+  const depoisDoCorte = (await escritasLidas(pagC)).slice(antesDoCorte);
+  conf('(controle) a ação subiu: ' + depoisDoCorte.map(n => n.replace(/^.*\/registros\//, '')).join(', '), depoisDoCorte.some(n => /registros\/aula:/.test(n)), true);
+  prop('nenhum ajuste:pagamentosDesde subiu do celular', depoisDoCorte.filter(n => /ajuste:pagamentosDesde/.test(n)).length === 0, MODOS[2]);
+  if (MODO === MODOS[2]) fimDoVeneno();
+  conf('e o banco do celular continua sem o corte', await pagC.evaluate(() => Store.lerRegistros().then(l => !l.some(r => r.id === 'ajuste:pagamentosDesde'))), true);
+
+  secao('11e. A quarentena não segura a cópia do tablet: a restauração a substitui');
+  await pagC.evaluate(() => new Promise((res, rej) => {
+    const q = indexedDB.open('apoio-educacional');
+    q.onsuccess = () => {
+      const t = q.result.transaction('saida', 'readwrite');
+      t.objectStore('saida').put({ id: 'aula:aula-ontem', tipo: 'aula', atualizadoEm: new Date().toISOString(), apagadoEm: null, tentativas: 3, quarentena: true, retestada: true });
+      t.oncomplete = () => { q.result.close(); res(); };
+      t.onerror = () => rej(t.error);
+    };
+  }));
+  await pagC.evaluate(() => Nuvem.contarFila());
+  const fraseQ = await esperar('o alto diz da quarentena', () => texto(pagC, '#cel-origem'), v => /1 mudança não consegue subir; a restauração vai substituir\./.test(v || ''), 10000);
+  conf('o alto diz "1 mudança não consegue subir; a restauração vai substituir." e não que espera sinal (' + fraseQ.valor + ')', fraseQ.ok && !/esperando/.test(fraseQ.valor), true);
+  await pagA.evaluate(async () => { await Nuvem.enviarCopia(await Store.exportarTudoZip(await Store.carregar()), { motivo: 'ela', conteudo: true }); });
+  const pont = await rest(docUrl(dona.localId, 'estado/copia'), { token: dona.idToken });
+  const copiaNova = pont.json && pont.json.fields ? pont.json.fields.atual.stringValue : null;
+  await clicar(pagC, '#cel-atualizar');
+  const trouxe = await esperar('o celular trouxe a cópia nova', () => pagC.evaluate(() => Nuvem.estado().ultimaCopia && Nuvem.estado().ultimaCopia.id), v => v === copiaNova, 30000);
+  conf('com só a quarentena na fila, o celular trouxe a cópia nova do tablet', trouxe.ok, true);
+  conf('e a quarentena saiu da fila', JSON.stringify(await fila(pagC)), '[]');
 
   secao('12. A cópia completa nunca sobe do celular');
   await pagC.evaluate(() => Nuvem.marcarMudanca());

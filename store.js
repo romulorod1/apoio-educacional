@@ -381,8 +381,8 @@
   function gravar(deposito, chave, valor) {
     return escrever(deposito, function (s) { return s.put(valor, chave); });
   }
-  function apagar(deposito, chave) {
-    return escrever(deposito, function (s) { return s.delete(chave); });
+  function apagar(deposito, chave, porta) {
+    return escrever(deposito, function (s) { return s.delete(chave); }, porta);
   }
   function esvaziar(deposito) {
     return escrever(deposito, function (s) { return s.clear(); });
@@ -1611,7 +1611,8 @@
     return todasAsChaves('historico').then(function (chaves) {
       if (chaves.length <= MAX_HISTORICO) return;
       var excedente = chaves.slice(0, chaves.length - MAX_HISTORICO);
-      return Promise.all(excedente.map(function (k) { return apagar('historico', k); }));
+      // pela mesma porta do registrar: no celular da dona, a poda é parte do Desfazer
+      return Promise.all(excedente.map(function (k) { return apagar('historico', k, 'historico'); }));
     });
   }
 
@@ -1895,10 +1896,16 @@
            * para depois de a fila subir; o que mudou no tablet chega pelos
            * registros de qualquer jeito. Conferido aqui dentro, na transação. */
           if (daNuvem && soLeitura && celularEdita) {
-            var pendentesReq = t.objectStore('saida').count();
+            var pendentesReq = t.objectStore('saida').getAll();
             pendentesReq.onsuccess = function () {
-              if (!pendentesReq.result) return;
-              var n = pendentesReq.result;
+              /* A QUARENTENA NÃO SEGURA (a nuvem recusa esse registro, e ele não
+               * sobe com sinal nenhum): a restauração a substitui, e a entrada sai
+               * da fila aqui, na mesma transação. Só a mudança que espera sinal
+               * segura a cópia. */
+              var lista = pendentesReq.result || [];
+              lista.forEach(function (e) { if (e.quarentena) t.objectStore('saida').delete(e.id); });
+              var n = lista.filter(function (e) { return !e.quarentena; }).length;
+              if (!n) return;
               erro = Object.assign(new Error(n === 1 ? 'Há 1 mudança deste celular esperando sinal. A cópia do tablet fica para quando ela subir.'
                 : 'Há ' + n + ' mudanças deste celular esperando sinal. A cópia do tablet fica para quando elas subirem.'), { filaPendente: n });
               t.abort();

@@ -1510,7 +1510,7 @@
       avisar(recusa.message);
       return Promise.reject(recusa);
     }
-    var p = Store.salvar(dbParaGravar());
+    var p = Store.salvar(semCorteDoCelular(dbParaGravar()));
     p.then(gravacaoConfirmada, falhaDeGravacao);
     return p;
   }
@@ -12262,6 +12262,14 @@
     return caixa;
   }
 
+  /* "R$ 450,00 do mês: R$ 250,00 das 2 aulas dadas e R$ 200,00 das 2 ainda não dadas." */
+  function fraseDaSomaDoMes(f) {
+    var dadas = f.qtdEncontrosFeitos || 0, previstas = f.qtdEncontrosPrevistos || 0;
+    var frase = dinheiro(f.totalValor || 0) + ' do mês: ' + dinheiro(f.valorFeito || 0) + ' ' + palavraPlural(dadas, 'da ' + dadas + ' aula dada', 'das ' + dadas + ' aulas dadas');
+    if (previstas) frase += ' e ' + dinheiro(f.valorPrevisto || 0) + ' ' + palavraPlural(previstas, 'da ' + previstas + ' ainda não dada', 'das ' + previstas + ' ainda não dadas');
+    return frase + '.';
+  }
+
   // "1.250,00": o número como ela escreve, sem o R$, para o campo de digitar
   function valorNoCampo(v) { return Core.fmtMoeda(v).replace(/^R\$\s*/, ''); }
 
@@ -12305,7 +12313,7 @@
         el('label', { class: 'campo u-margem-0' }, [el('span', { texto: 'Pago em' }), campoData]),
         el('button', { type: 'button', class: 'btn principal btn-confirmar-pagamento', texto: 'Confirmar', aoClick: gravarPagamento }),
         el('button', {
-          type: 'button', class: 'btn btn-cancelar-pagamento', texto: 'Cancelar',
+          type: 'button', class: 'btn btn-cancelar-pagamento', texto: modoCelular ? 'Fechar sem marcar' : 'Cancelar',
           aoClick: function () { desenharLinhaDePagamento(caixa, f, false); }
         })
       ]));
@@ -12316,6 +12324,10 @@
             : 'O valor proposto é o total do mês, como no documento da família.') +
           ' Troque se a família pagou outro valor.'
       }));
+      /* No celular (D6b), o que o total soma, pelos números do próprio
+       * fechamento: as aulas dadas e as ainda não dadas. A regra do proposto é
+       * a do tablet; aqui só a conta à vista. */
+      if (modoCelular) caixa.appendChild(el('div', { class: 'ajuda cel-proposto-soma', texto: fraseDaSomaDoMes(f) }));
       return;
     }
 
@@ -12372,8 +12384,23 @@
     db.ajustes = db.ajustes || {};
     if (/^\d{4}-\d{2}$/.test(String(db.ajustes.pagamentosDesde || ''))) return;
     db.ajustes.pagamentosDesde = Core.mesDe(Core.hojeIso());
-    // no celular, que só lê, a memória basta para mostrar: nada de gravar ao abrir (D6)
+    // no celular, a memória basta para mostrar: nada de gravar ao abrir (D6), e a ação dele também não leva o corte (D6b)
     if (!aparelhoSoLe()) salvar();
+    else corteSoNaMemoria = db.ajustes.pagamentosDesde;
+  }
+  /* O CORTE QUE O CELULAR PÔS SÓ NA MEMÓRIA (D6b) nunca entra na fila: a ação
+   * seguinte dele gravaria o documento inteiro e subiria um
+   * `ajuste:pagamentosDesde` que é do tablet. Vale enquanto a memória for a
+   * que o celular montou; a memória que vem do disco (recebimento,
+   * restauração) zera a marca, e o corte que chegar do tablet sobe e desce
+   * como sempre. */
+  var corteSoNaMemoria = null;
+  function semCorteDoCelular(gravando) {
+    if (!corteSoNaMemoria || !aparelhoSoLe() || !gravando || !gravando.ajustes ||
+        gravando.ajustes.pagamentosDesde !== corteSoNaMemoria) return gravando;
+    var copia = Object.assign({}, gravando, { ajustes: Object.assign({}, gravando.ajustes) });
+    delete copia.ajustes.pagamentosDesde;
+    return copia;
   }
 
   /* Os meses que o seletor do corte oferece: do mês da aula mais antiga (ou do
@@ -20838,6 +20865,7 @@
     Store.carregar().then(function (lido) {
       if (!lido) return;
       db = lido;
+      corteSoNaMemoria = null;
       valoresOcultos = !!(db.ajustes && db.ajustes.valoresOcultos);
       desenharTudo();
       if (modoCelular) desenharCelularDepoisDaNuvem();
@@ -21250,6 +21278,7 @@
       return Store.importarZip(zipBaixado, { daNuvem: true });
     }).then(function (dados) {
       db = dados;
+      corteSoNaMemoria = null;
       var frase = memoriaSubstituida();
       fecharModal('modal-nuvem-restaurar');
       return Nuvem.restaurou(copia, { celular: ficaCelular }).then(function () {
@@ -21413,6 +21442,13 @@
     if (deve === modoCelular) return;
     modoCelular = deve;
     document.body.classList.toggle('modo-celular', deve);
+    /* O aviso, no celular, ocupa o seu lugar entre o conteúdo e as abas: não
+     * cobre o formulário nem a barra de baixo. No tablet volta a flutuar. */
+    var aviso = $('#aviso'), abas = $('#cel-abas');
+    if (aviso && abas) {
+      if (deve) abas.parentNode.insertBefore(aviso, abas);
+      else document.body.appendChild(aviso);
+    }
     if (!db) return;
     if (deve) { desenharNuvem(); desenharCelular(); }
     else desenharTudo();
@@ -21456,6 +21492,7 @@
     telaCelular = tela;
     celularPedeEntrada = false;
     formCelular = null;
+    esconderAviso(); // o aviso de uma ação não segue para outra tela
     desenharCelular();
     var conteudo = $('#cel-conteudo');
     if (conteudo) conteudo.scrollTop = 0;
@@ -21476,13 +21513,21 @@
   /* "N mudanças esperando sinal": a edição do celular que ainda não subiu. */
   function fraseDaFilaDoCelular(est) {
     var r = (est && est.registros) || {};
-    var n = (r.pendentes || 0) + (r.quarentena || 0);
-    if (!n || !celularEdita()) return '';
-    var quantas = n === 1 ? '1 mudança' : n + ' mudanças';
-    if (!est.online || (r.erro && r.erro.codigo === 'SEM_REDE')) return quantas + ' esperando sinal.';
-    if (r.enviando) return 'Subindo ' + quantas + '...';
-    if (r.erro) return quantas + ' guardadas aqui; vou tentar de novo.';
-    return quantas + ' a subir.';
+    if (!celularEdita()) return '';
+    var n = r.pendentes || 0, q = r.quarentena || 0;
+    var frase = '';
+    if (n) {
+      var quantas = n === 1 ? '1 mudança' : n + ' mudanças';
+      if (!est.online || (r.erro && r.erro.codigo === 'SEM_REDE')) frase = quantas + ' esperando sinal.';
+      else if (r.enviando) frase = 'Subindo ' + quantas + '...';
+      else if (r.erro) frase = quantas + ' guardadas aqui; vou tentar de novo.';
+      else frase = quantas + ' esperando para ir ao tablet.';
+    }
+    /* A quarentena (a nuvem recusa o registro, três vezes) não espera sinal e
+     * não segura a cópia do tablet: a restauração a substitui. */
+    if (q) frase += (frase ? ' ' : '') + (q === 1 ? '1 mudança não consegue subir; a restauração vai substituir.'
+      : q + ' mudanças não conseguem subir; a restauração vai substituí-las.');
+    return frase;
   }
 
   /* "Dados de hoje, 14:02, do tablet." */
@@ -21543,8 +21588,18 @@
     }
   }
 
+  /* Um formulário aberto (as ações de Hoje, ou o "pago em" sendo
+   * preenchido no Fechamento) não se redesenha do zero quando chegam
+   * registros ou a cópia: o que ela digitou se perderia. Só o alto muda; a
+   * tela se refaz quando ela fecha o formulário. */
+  function formularioAbertoNoCelular() {
+    if (telaCelular === 'hoje') return !!(formCelular && $('#cel-hoje [data-form-celular]'));
+    if (telaCelular === 'fechamento') return !!$('#cel-fechamento .pagamento-valor');
+    return false;
+  }
   function desenharCelular() {
     if (!modoCelular || !$('#modo-celular')) return;
+    if (!celularPedeEntrada && temDadosNoCelular() && celularEdita() && formularioAbertoNoCelular()) { desenharTopoCelular(); return; }
     var entrada = !temDadosNoCelular() || celularPedeEntrada;
     // a ação aberta só vale no celular que edita (ela pode ter saído da conta no meio)
     if (formCelular && !celularEdita()) formCelular = null;
@@ -21623,7 +21678,7 @@
       ? Nuvem.sincronizar({ versaoApp: VERSAO }).then(function () { return Store.estadoDaFila(); })
       : Promise.resolve({ pendentes: 0, quarentena: 0 });
     return antes.then(function (fila) {
-      if (fila && (fila.pendentes || fila.quarentena)) return null; // a cópia espera; o alto diz quantas mudanças
+      if (fila && fila.pendentes) return null; // a cópia espera; o alto diz quantas mudanças (a quarentena não segura)
       return Nuvem.listarCopias(est.uidDona || null);
     }).then(function (lista) {
       if (!lista) return;
@@ -21642,6 +21697,7 @@
         return Store.importarZip(zip, { daNuvem: true });
       }).then(function (dados) {
         db = dados;
+        corteSoNaMemoria = null;
         memoriaSubstituida();
         return Nuvem.restaurou(atual, { celular: true });
       }).then(function () {
@@ -21714,7 +21770,7 @@
     if (edita) {
       caixa.appendChild(el('div', { class: 'barra' }, [
         botaoDeAcaoCelular('marcar-aula', { class: 'btn principal', id: 'cel-marcar-aula', texto: 'Marcar aula neste dia',
-          aoClick: function () { formCelular = { tipo: 'aula' }; desenharHojeCelular(); } })
+          aoClick: function () { abrirFormularioCelular({ tipo: 'aula' }); } })
       ]));
     }
     var aulas = db.aulas.filter(function (a) { return a.data === dia; }).sort(function (a, b) {
@@ -21737,7 +21793,7 @@
     if (edita) {
       caixa.appendChild(el('div', { class: 'barra u-margem-topo-12' }, [
         botaoDeAcaoCelular('cadastrar-aluno', { class: 'btn', id: 'cel-novo-aluno', texto: 'Cadastrar aluno',
-          aoClick: function () { formCelular = { tipo: 'aluno' }; desenharHojeCelular(); } })
+          aoClick: function () { abrirFormularioCelular({ tipo: 'aluno' }); } })
       ]));
     }
   }
@@ -21783,14 +21839,18 @@
       cartao.appendChild(botao);
       cartao.appendChild(texto);
     }
+    /* A aula AGENDADA (data à frente, não cancelada) se cancela; a de hoje ou
+     * de antes, dada ou cancelada, só se vê e se corrige: cancelar uma aula
+     * que aparece como Realizada mudaria a cobrança sem ela saber se a aula
+     * foi dada. */
     if (edita && aluno) {
-      var acoes = [botaoDeAcaoCelular('registrar-como-foi', { class: 'btn pequeno cel-registrar', texto: 'Registrar como foi',
-        aoClick: function () { formCelular = { tipo: 'relato', aulaId: a.id }; desenharHojeCelular(); } })];
-      if (a.status !== 'cancelada') {
-        acoes.push(botaoDeAcaoCelular('cancelar-aula', { class: 'btn pequeno cel-cancelar', texto: 'Cancelar aula',
-          aoClick: function () { cancelarAulaNoCelular(a); } }));
-      }
-      cartao.appendChild(el('div', { class: 'barra u-margem-baixo-0 u-margem-topo-8' }, acoes));
+      var agendada = a.data > Core.hojeIso() && a.status !== 'cancelada';
+      var acao = agendada
+        ? botaoDeAcaoCelular('cancelar-aula', { class: 'btn pequeno cel-cancelar', texto: 'Cancelar aula',
+          aoClick: function () { cancelarAulaNoCelular(a); } })
+        : botaoDeAcaoCelular('registrar-como-foi', { class: 'btn pequeno cel-registrar', texto: 'Ver ou corrigir como foi',
+          aoClick: function () { abrirFormularioCelular({ tipo: 'relato', aulaId: a.id }); } });
+      cartao.appendChild(el('div', { class: 'barra u-margem-baixo-0 u-margem-topo-8' }, [acao]));
     }
     return cartao;
   }
@@ -21815,20 +21875,28 @@
       botaoDeAcaoCelular(formCelular.tipo === 'aula' ? 'marcar-aula' : formCelular.tipo === 'aluno' ? 'cadastrar-aluno' : 'registrar-como-foi',
         { class: 'btn principal', id: idSalvar, texto: textoSalvar, aoClick: aoSalvar }),
       el('button', { type: 'button', class: 'btn', id: 'cel-form-voltar', texto: 'Voltar',
-        aoClick: function () { formCelular = null; desenharHojeCelular(); } })
+        aoClick: function () { esconderAviso(); formCelular = null; desenharHojeCelular(); } })
     ]);
   }
   function fecharFormularioCelular() {
+    esconderAviso();
     formCelular = null;
     desenharCelular();
     var conteudo = $('#cel-conteudo');
     if (conteudo) conteudo.scrollTop = 0;
   }
 
+  function abrirFormularioCelular(form) {
+    esconderAviso(); // o aviso da ação anterior não fica em cima do formulário
+    formCelular = form;
+    desenharHojeCelular();
+  }
   function desenharFormularioCelular(caixa) {
-    if (formCelular.tipo === 'aula') desenharMarcarAulaCelular(caixa);
-    else if (formCelular.tipo === 'aluno') desenharNovoAlunoCelular(caixa);
-    else desenharRelatoCelular(caixa);
+    var corpo = el('div', { 'data-form-celular': formCelular.tipo + ':' + (formCelular.aulaId || '') });
+    caixa.appendChild(corpo);
+    if (formCelular.tipo === 'aula') desenharMarcarAulaCelular(corpo);
+    else if (formCelular.tipo === 'aluno') desenharNovoAlunoCelular(corpo);
+    else desenharRelatoCelular(corpo);
   }
 
   /* Marcar aula: a aula avulsa do tablet (novaAulaAvulsa), com os padrões da
@@ -21898,10 +21966,13 @@
       if (situacao.value !== (aula.status || 'realizada')) mudancas.cobravel = (Core.STATUS[situacao.value] || Core.STATUS.realizada).cobravelPadrao;
       var novoAssunto = assunto.value.trim();
       var repetido = false;
+      // a memória pode ter sido trocada por um recebimento com o formulário aberto: vale a aula de agora
+      var atual = db.aulas.filter(function (x) { return x.id === aula.id; })[0];
+      if (!atual) { avisar('Esta aula não existe mais neste aparelho.'); fecharFormularioCelular(); return; }
       comoAcaoDoCelular(function () {
-        Core.aplicarEdicaoAula(db, aula.id, mudancas, 'esta');
-        if (novoAssunto) repetido = !incluirAssuntoNaAula(aula, { titulo: novoAssunto, fonte: 'livre' });
-        var mexeu = revisarTrilhasDoAluno(aula.alunoId);
+        Core.aplicarEdicaoAula(db, atual.id, mudancas, 'esta');
+        if (novoAssunto) repetido = !incluirAssuntoNaAula(atual, { titulo: novoAssunto, fonte: 'livre' });
+        var mexeu = revisarTrilhasDoAluno(atual.alunoId);
         return salvarEDepois(function (gravou) {
           fecharFormularioCelular();
           if (gravou) avisar('Aula salva.' + (repetido ? ' O assunto já estava registrado nesta aula.' : '') + textoDeTrilha(mexeu));
@@ -21980,18 +22051,26 @@
     caixa.appendChild(el('div', { class: 'faixa-info', id: 'cel-total-mes', texto: aulas + ' ' + palavraPlural(aulas, 'aula dada', 'aulas dadas') +
       ' · ' + dinheiro(Math.round(valor * 100) / 100) }));
     fechs.forEach(function (f) {
-      var linhas = f.linhas.map(function (l) {
-        return el('li', { class: 'cel-linha' }, [
-          el('span', { class: 'cresce', texto: Core.ddmm(l.data) + (l.hora ? ' ' + l.hora : '') + ' · ' + Core.fmtDuracao(l.duracaoMin) + ' · ' + l.statusRotulo }),
+      /* As aulas ainda AGENDADAS (data à frente) ficam à parte, marcadas "ainda
+       * não dada": misturadas às dadas, o total pareceria o do que já aconteceu. */
+      var linha = function (l) {
+        return el('li', { class: 'cel-linha' + (l.futura ? ' cel-linha-futura' : '') }, [
+          el('span', { class: 'cresce', texto: Core.ddmm(l.data) + (l.hora ? ' ' + l.hora : '') + ' · ' + Core.fmtDuracao(l.duracaoMin) + ' · ' + l.statusRotulo +
+            (l.futura && l.status !== 'cancelada' ? ' · ainda não dada' : '') }),
           el('span', { class: 'cel-valor', texto: l.cobravel ? dinheiro(l.valor) : '' })
         ]);
-      });
+      };
+      var dadas = f.linhas.filter(function (l) { return !l.futura; }), aindaNao = f.linhas.filter(function (l) { return l.futura; });
       var filhos = [
         el('strong', { texto: f.alunoNome }),
-        el('div', { class: 'ajuda u-margem-0', texto: f.qtdEncontrosFeitos + ' ' + palavraPlural(f.qtdEncontrosFeitos, 'aula', 'aulas') +
+        el('div', { class: 'ajuda u-margem-0', texto: f.qtdEncontrosFeitos + ' ' + palavraPlural(f.qtdEncontrosFeitos, 'aula dada', 'aulas dadas') +
           ' · ' + f.horasFeitas + ' h · ' + dinheiro(f.valorFeito) }),
-        el('ul', { class: 'cel-linhas' }, linhas)
+        el('ul', { class: 'cel-linhas' }, dadas.map(linha))
       ];
+      if (aindaNao.length) {
+        filhos.push(el('div', { class: 'cel-subtitulo', texto: 'Ainda não dadas neste mês' }));
+        filhos.push(el('ul', { class: 'cel-linhas cel-linhas-futuras' }, aindaNao.map(linha)));
+      }
       /* "Pago em", por aluno e por mês: a mesma linha do Fechamento do tablet
        * (Core.marcarPagamento e o Desmarcar), no pé do cartão. */
       if (edita) {

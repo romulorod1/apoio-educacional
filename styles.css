@@ -2980,4 +2980,13 @@ body.modo-celular .celular .campo > span { display: block; margin-bottom: 4px; }
 body.modo-celular .celular .campo input,
 body.modo-celular .celular .campo select { width: 100%; }
 body.modo-celular .celular .linha-pagamento .barra { flex-wrap: wrap; }
+/* As aulas ainda agendadas, à parte no Fechamento do celular (D6b). */
+.cel-subtitulo { margin-top: 10px; font-size: var(--letra-2); font-weight: 700; color: var(--novidades-subtitulo); }
+.cel-linha-futura { color: var(--novidades-subtitulo); }
+/* O aviso no celular ocupa o seu lugar entre o conteúdo e as abas (o app.js
+   o põe ali): nunca cobre o formulário nem a barra de baixo. */
+body.modo-celular .celular > .aviso { position: static; transform: none; transition: none; display: none; max-width: none;
+  margin: 0; border-radius: 0; box-shadow: none; padding: 8px 16px; flex-shrink: 0; pointer-events: auto; }
+body.modo-celular .celular > .aviso.aberto { display: flex; }
+body.modo-celular .celular > .aviso button { min-height: var(--alvo-celular); min-width: var(--alvo-celular); }
 body.modo-celular .celular .linha { flex-direction: column; }
