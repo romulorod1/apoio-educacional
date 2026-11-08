@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.4';
+  var VERSAO = '1.42.5';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,13 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.5',
+      itens: [
+        'No celular, o aplicativo abre só para consulta, com três abas embaixo: Hoje (as aulas do dia, o lembrete e a sua nota), Fechamento (o mês de cada aluno) e Enviar (o PDF do mês para as famílias).',
+        'Para o celular receber os dados, entre na conta e restaure a cópia da nuvem com a chave. Ele nunca envia cópia: tudo o que muda continua sendo feito no tablet.'
+      ]
+    },
     {
       versao: '1.42.4',
       itens: [
