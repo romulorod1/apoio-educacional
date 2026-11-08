@@ -386,7 +386,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   // "+ Nova aula neste dia" do painel.
   await pag.evaluate(() => document.querySelector('[data-dia="2026-11-20"]').click());
   await espera(300);
-  await clicar('#painel-zoom-dia .zoom-dia-rodape .btn.principal');
+  await clicar('#painel-zoom-dia .zoom-dia-rodape .zoom-nova-aula');
   await espera(400);
   const avisoFer = await $texto('#aviso-feriado');
   conf('o modal avisa do feriado', avisoFer.includes('Feriado: Consciência Negra'), true);

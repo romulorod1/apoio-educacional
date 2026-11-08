@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.41.8';
+  var VERSAO = '1.42.0';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.0',
+      itens: [
+        'O visual ficou mais uniforme: os tamanhos de letra e as cores seguem um padrão só, e cada tela tem um botão principal em destaque. Os outros viram botões de contorno.'
+      ]
+    },
     {
       versao: '1.41.8',
       itens: [
@@ -1046,13 +1052,12 @@
     var corpo = $('#corpo-modal-novidades');
     corpo.innerHTML = '';
     corpo.appendChild(el('p', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'Você está agora na versão ' + VERSAO + '. Nada do que você já tinha foi alterado.'
+      class: 'ajuda u-margem-topo-0', texto: 'Você está agora na versão ' + VERSAO + '. Nada do que você já tinha foi alterado.'
     }));
     novas.forEach(function (n) {
       var caixa = el('div', { class: 'cartao compacto' });
       caixa.appendChild(el('div', {
-        class: 'tag serie', texto: 'versão ' + n.versao, style: 'margin-bottom:8px'
+        class: 'tag serie u-margem-baixo-8', texto: 'versão ' + n.versao
       }));
       var ul = el('ul', { class: 'lista-novidades' });
       n.itens.forEach(function (t) { ul.appendChild(el('li', { texto: t })); });
@@ -1703,8 +1708,7 @@
   function abrirCompartilhar(arquivos, titulo) {
     var corpo = $('#corpo-modal-bib-compartilhar');
     corpo.innerHTML = '';
-    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0',
-      texto: 'O material saiu em dois arquivos. Mande a lista ao aluno e guarde o gabarito para você.' }));
+    corpo.appendChild(el('p', { class: 'ajuda u-margem-topo-0', texto: 'O material saiu em dois arquivos. Mande a lista ao aluno e guarde o gabarito para você.' }));
     /* Sem compartilhamento no aparelho, o botão diz o que faz: baixa. */
     var podeCompartilhar = false;
     try {
@@ -2218,7 +2222,7 @@
     (rodapes || []).forEach(function (t) {
       if (!t) return;
       filhos.push(el('div', {
-        style: 'font-size:12px;color:var(--muted);margin-top:3px;line-height:1.35',
+        class: 'u-letra-2 u-cor-muted u-margem-topo-3 u-entrelinha-135',
         texto: t
       }));
     });
@@ -2362,7 +2366,7 @@
     var rodape = el('div', { class: 'zoom-dia-rodape' }, [
       el('button', {
         type: 'button',
-        class: 'btn principal',
+        class: 'btn zoom-nova-aula',
         texto: '+ Nova aula neste dia',
         aoClick: function () {
           abrirAula(null, dia);
@@ -2443,8 +2447,7 @@
           : 'Sua última cópia de segurança tem ' + dias + ' dias. ' }),
         document.createTextNode('Tudo fica só neste tablet. Salve uma cópia e guarde no Drive. '),
         el('button', {
-          type: 'button', class: 'btn pequeno', style: 'margin-left:8px',
-          texto: 'Salvar cópia agora',
+          type: 'button', class: 'btn pequeno u-margem-esq-8', texto: 'Salvar cópia agora',
           aoClick: function () { baixarCopia(); }
         })
       ]));
@@ -2681,7 +2684,7 @@
     var stAtual = aulaEmEdicao ? (Core.STATUS[aulaEmEdicao.status] || Core.STATUS.realizada) : Core.STATUS.realizada;
     var cobravelVal = aulaEmEdicao && typeof aulaEmEdicao.cobravel === 'boolean'
       ? aulaEmEdicao.cobravel : stAtual.cobravelPadrao;
-    var chkCobrar = el('input', { type: 'checkbox', id: 'campo-cobrar', style: 'width:auto;min-height:auto' });
+    var chkCobrar = el('input', { type: 'checkbox', id: 'campo-cobrar', class: 'caixa-de-marcar' });
     chkCobrar.checked = cobravelVal;
 
     selStatus.addEventListener('change', function () {
@@ -2765,7 +2768,7 @@
       var blocoQuandoNovo = el('div', { id: 'bloco-quando' });
       corpo.appendChild(blocoQuandoNovo);
 
-      blocoQuandoNovo.appendChild(el('div', { class: 'faixa-info', style: 'margin-bottom:12px' }, [
+      blocoQuandoNovo.appendChild(el('div', { class: 'faixa-info u-margem-baixo-12' }, [
         el('strong', { texto: 'Agendamento: ' }),
         document.createTextNode('defina o aluno, a data e o horário da aula.')
       ]));
@@ -2782,25 +2785,25 @@
         el('label', { class: 'campo' }, [el('span', { texto: 'Situação' }), selStatus])
       ]));
 
-      blocoQuandoNovo.appendChild(el('label', { class: 'campo', style: 'display:flex;align-items:center;gap:10px' }, [
-        chkCobrar, el('span', { texto: 'Cobrar esta aula', style: 'margin:0' })
+      blocoQuandoNovo.appendChild(el('label', { class: 'campo u-mostra-flex u-alinha-centro u-vao-10' }, [
+        chkCobrar, el('span', { texto: 'Cobrar esta aula', class: 'u-margem-0' })
       ]));
 
       blocoQuandoNovo.appendChild(avisoFeriado);
       blocoQuandoNovo.appendChild(avisoChoque);
       blocoQuandoNovo.appendChild(previsao);
 
-      var chkRepetir = el('input', { type: 'checkbox', id: 'campo-repetir', style: 'width:auto;min-height:auto' });
-      corpo.appendChild(el('label', { class: 'campo', style: 'display:flex;align-items:center;gap:10px;margin-top:6px' }, [
-        chkRepetir, el('span', { texto: 'Repetir toda semana', style: 'margin:0' })
+      var chkRepetir = el('input', { type: 'checkbox', id: 'campo-repetir', class: 'caixa-de-marcar' });
+      corpo.appendChild(el('label', { class: 'campo u-mostra-flex u-alinha-centro u-vao-10 u-margem-topo-6' }, [
+        chkRepetir, el('span', { texto: 'Repetir toda semana', class: 'u-margem-0' })
       ]));
 
       var caixaRep = el('div', { id: 'caixa-repeticao', style: 'display:none' });
-      var linhaDias = el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px' });
+      var linhaDias = el('div', { class: 'u-mostra-flex u-vao-6 u-flex-quebra-sim u-margem-baixo-12' });
       Core.DIAS_CURTO.forEach(function (nome, indice) {
         var b = el('button', {
-          type: 'button', class: 'btn pequeno', 'data-dia-semana': String(indice),
-          texto: nome, style: 'min-width:52px'
+          type: 'button', class: 'btn pequeno u-larg-min-52', 'data-dia-semana': String(indice),
+          texto: nome
         });
         b.addEventListener('click', function () {
           var ativo = b.classList.toggle('principal');
@@ -2809,7 +2812,7 @@
         linhaDias.appendChild(b);
       });
       caixaRep.appendChild(el('div', { class: 'campo' }, [
-        el('span', { texto: 'Em quais dias da semana', style: 'display:block;font-size:13px;font-weight:700;color:#1F3A5F;margin-bottom:5px' }),
+        el('span', { texto: 'Em quais dias da semana', class: 'rotulo-de-campo' }),
         linhaDias
       ]));
       var atePadrao = Core.mesAdjacente(Core.mesDe(dataVal), 6) + '-28';
@@ -2867,10 +2870,10 @@
     grupoPreparar.appendChild(el('div', { id: 'cartao-trilha' }));
 
     if (serie) {
-      grupoPreparar.appendChild(el('div', { class: 'faixa-info', style: 'margin-bottom:10px' }, [
+      grupoPreparar.appendChild(el('div', { class: 'faixa-info u-margem-baixo-10' }, [
         el('strong', { texto: 'Aula que se repete. ' }),
         document.createTextNode(Core.descreveSerie(serie)),
-        aulaEmEdicao.destacada ? el('div', { style: 'margin-top:6px' }, [
+        aulaEmEdicao.destacada ? el('div', { class: 'u-margem-topo-6' }, [
           el('span', { class: 'tag excecao', texto: 'alterada só neste dia' })
         ]) : null
       ]));
@@ -2891,7 +2894,7 @@
 
     desenharAssuntos(grupoPreparar, aulaEmEdicao, alunoDaAula);
 
-    var linhaFolha = el('div', { id: 'linha-folha', class: 'barra', style: 'margin-bottom:6px' });
+    var linhaFolha = el('div', { id: 'linha-folha', class: 'barra u-margem-baixo-6' });
     linhaFolha.appendChild(el('button', {
       type: 'button', class: 'btn destaque',
       texto: aulaEmEdicao.temNota ? 'Abrir folha de aula' : 'Escrever à mão na folha',
@@ -2938,23 +2941,23 @@
 
     var eFutura = aulaEmEdicao.data > Core.hojeIso();
     if (eFutura) {
-      grupoRegistro.appendChild(el('div', { class: 'faixa-info', style: 'margin-bottom:12px' }, [
+      grupoRegistro.appendChild(el('div', { class: 'faixa-info u-margem-baixo-12' }, [
         el('strong', { texto: 'Aula futura: ' }),
         document.createTextNode('preencha esta seção depois que a aula acontecer.')
       ]));
     } else if (!aulaEmEdicao.notaTexto && (!aulaEmEdicao.areas || !aulaEmEdicao.areas.length)) {
       if (aulaEmEdicao.status === 'cancelada') {
-        grupoRegistro.appendChild(el('div', { class: 'faixa-info', style: 'margin-bottom:12px' }, [
+        grupoRegistro.appendChild(el('div', { class: 'faixa-info u-margem-baixo-12' }, [
           el('strong', { texto: 'Aula cancelada: ' }),
           document.createTextNode('esta aula foi marcada como cancelada.')
         ]));
       } else if (aulaEmEdicao.status === 'falta') {
-        grupoRegistro.appendChild(el('div', { class: 'faixa-aviso', style: 'margin-bottom:12px' }, [
+        grupoRegistro.appendChild(el('div', { class: 'faixa-aviso u-margem-baixo-12' }, [
           el('strong', { texto: 'Falta sem aviso: ' }),
           document.createTextNode('esta aula foi marcada como falta.')
         ]));
       } else {
-        grupoRegistro.appendChild(el('div', { class: 'faixa-aviso', style: 'margin-bottom:12px' }, [
+        grupoRegistro.appendChild(el('div', { class: 'faixa-aviso u-margem-baixo-12' }, [
           el('strong', { texto: 'Aula realizada: ' }),
           document.createTextNode('confirme a situação e registre o relato da aula.')
         ]));
@@ -2966,8 +2969,8 @@
       el('label', { class: 'campo' }, [el('span', { texto: 'Situação da aula' }), selStatus])
     ]));
 
-    grupoRegistro.appendChild(el('label', { class: 'campo', style: 'display:flex;align-items:center;gap:10px;margin-bottom:6px' }, [
-      chkCobrar, el('span', { texto: 'Cobrar esta aula', style: 'margin:0' })
+    grupoRegistro.appendChild(el('label', { class: 'campo u-mostra-flex u-alinha-centro u-vao-10 u-margem-baixo-6' }, [
+      chkCobrar, el('span', { texto: 'Cobrar esta aula', class: 'u-margem-0' })
     ]));
 
     grupoRegistro.appendChild(previsao);
@@ -2977,20 +2980,19 @@
       placeholder: 'O que foi trabalhado nesta aula. Este texto entra no fechamento quando você pedir.'
     });
     areaNota.value = aulaEmEdicao.notaTexto || '';
-    grupoRegistro.appendChild(el('label', { class: 'campo', style: 'margin-top:10px' }, [
+    grupoRegistro.appendChild(el('label', { class: 'campo u-margem-topo-10' }, [
       el('div', { class: 'campo-titulo-com-destino' }, [
-        el('span', { texto: 'Relato da aula', style: 'font-weight:700' }),
+        el('span', { texto: 'Relato da aula', class: 'u-peso-negrito' }),
         el('span', { class: 'destino-publico', texto: 'Vai para o fechamento / família' })
       ]),
       areaNota
     ]));
     grupoRegistro.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:-6px;margin-bottom:10px',
-      texto: 'Este é o relato pedagógico que pode sair no arquivo e resumo enviados à família.'
+      class: 'ajuda u-margem-topo-menos6 u-margem-baixo-10', texto: 'Este é o relato pedagógico que pode sair no arquivo e resumo enviados à família.'
     }));
 
     var areaPrivada = el('textarea', {
-      id: 'campo-nota-privada', style: 'min-height:64px',
+      id: 'campo-nota-privada', class: 'u-alt-min-64',
       placeholder: 'Anotações particulares, impressões ou pontos de atenção para você. Fica só aqui.'
     });
     areaPrivada.value = aulaEmEdicao.notaPrivada || '';
@@ -3010,14 +3012,13 @@
     });
     grupoRegistro.appendChild(el('label', { class: 'campo' }, [
       el('div', { class: 'campo-titulo-com-destino' }, [
-        el('span', { texto: 'Nota só minha', style: 'font-weight:700' }),
+        el('span', { texto: 'Nota só minha', class: 'u-peso-negrito' }),
         el('span', { class: 'destino-privado', texto: 'Só você vê' })
       ]),
       areaPrivada
     ]));
     grupoRegistro.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:-6px;margin-bottom:12px',
-      texto: 'Fica salva somente neste tablet. Não entra no fechamento nem vai para a família. ' +
+      class: 'ajuda u-margem-topo-menos6 u-margem-baixo-12', texto: 'Fica salva somente neste tablet. Não entra no fechamento nem vai para a família. ' +
         'Aparece para você no alto da próxima aula deste aluno.'
     }));
     if (rascunho) grupoRegistro.appendChild(el('div', {
@@ -3049,7 +3050,7 @@
     grupoArquivos.appendChild(listaAnexos);
     desenharAnexos(listaAnexos, aulaEmEdicao);
 
-    grupoArquivos.appendChild(el('div', { class: 'ajuda', style: 'margin-top:8px' }, [
+    grupoArquivos.appendChild(el('div', { class: 'ajuda u-margem-topo-8' }, [
       el('strong', { texto: 'Arquivos salvos neste tablet: ' }),
       document.createTextNode('PDFs gerados e fotos anexadas ficam guardados nesta aula. ' +
         'Para trazer do Samsung Notes, exporte como PDF lá e anexe na folha acima.')
@@ -3057,7 +3058,7 @@
 
     var podeDiv = Core.podeDividir(aulaEmEdicao);
     var acoesAvancadas = el('div', { class: 'bloco-acoes-avancadas' }, [
-      el('div', { class: 'barra', style: 'margin:0 0 6px' }, [
+      el('div', { class: 'barra u-margem-0-0-6' }, [
         el('button', {
           type: 'button', class: 'btn pequeno',
           texto: 'Repetir para trás',
@@ -3069,7 +3070,7 @@
           aoClick: function () { dividirAulaEmDuas(aulaEmEdicao.id); }
         }) : null
       ].filter(Boolean)),
-      el('div', { class: 'ajuda', style: 'margin:0' }, [
+      el('div', { class: 'ajuda u-margem-0' }, [
         el('strong', { texto: 'Ações da agenda: ' }),
         document.createTextNode('Repetir para trás cria as datas anteriores caso as aulas já acontecessem antes do cadastro.')
       ])
@@ -3100,24 +3101,22 @@
   var blocoDominioAtivo = null;
 
   function desenharDominio(corpo, aula, eFutura) {
-    var bloco = el('div', { id: 'bloco-dominio', style: 'margin:12px 0 4px' });
+    var bloco = el('div', { id: 'bloco-dominio', class: 'u-margem-12-0-4' });
     corpo.appendChild(bloco);
 
     function desenhar() {
       bloco.innerHTML = '';
       var temas = Core.temasDaAula(aula);
       bloco.appendChild(el('div', { class: 'campo-titulo-com-destino' }, [
-        el('span', { texto: 'Domínio por assunto', style: 'font-weight:700' }),
+        el('span', { texto: 'Domínio por assunto', class: 'u-peso-negrito' }),
         el('span', { class: 'destino-privado', texto: 'Só você vê' })
       ]));
       if (!temas.length) {
-        bloco.appendChild(el('div', { class: 'ajuda', style: 'margin-top:2px',
-          texto: 'Registre o assunto da aula, acima, para marcar como o aluno está nele.' }));
+        bloco.appendChild(el('div', { class: 'ajuda u-margem-topo-2', texto: 'Registre o assunto da aula, acima, para marcar como o aluno está nele.' }));
         return;
       }
       if (eFutura) {
-        bloco.appendChild(el('div', { class: 'ajuda', style: 'margin-top:2px',
-          texto: 'Marque depois que a aula acontecer.' }));
+        bloco.appendChild(el('div', { class: 'ajuda u-margem-topo-2', texto: 'Marque depois que a aula acontecer.' }));
         return;
       }
       temas.forEach(function (t) {
@@ -3133,15 +3132,12 @@
           });
           botoes.appendChild(b);
         });
-        bloco.appendChild(el('div', { class: 'item-dominio', 'data-chave': Core.chaveDoDominio(t),
-          style: 'margin:8px 0 10px' }, [
-          el('div', { class: 'nome', style: 'font-size:14px;font-weight:600;color:#1F3A5F;margin-bottom:6px',
-            texto: t.titulo || t.id }),
+        bloco.appendChild(el('div', { class: 'item-dominio u-margem-8-0-10', 'data-chave': Core.chaveDoDominio(t) }, [
+          el('div', { class: 'nome u-letra-3 u-peso-seminegrito u-cor-navy u-margem-baixo-6', texto: t.titulo || t.id }),
           botoes
         ]));
       });
-      bloco.appendChild(el('div', { class: 'ajuda', style: 'margin-top:-2px',
-        texto: 'Opcional. Toque de novo no marcado para desmarcar. Domina fecha o passo da trilha ' +
+      bloco.appendChild(el('div', { class: 'ajuda u-margem-topo-menos2', texto: 'Opcional. Toque de novo no marcado para desmarcar. Domina fecha o passo da trilha ' +
           'daquele assunto. Não vai para a família.' }));
     }
 
@@ -3226,10 +3222,10 @@
       botao.textContent = aberto ? 'Mostrar' : 'Esconder';
     });
 
-    corpo.appendChild(el('div', { class: 'barra', style: 'margin:10px 0 4px' }, [
+    corpo.appendChild(el('div', { class: 'barra u-margem-10-0-4' }, [
       el('span', {
         texto: 'Habilidades e hábitos trabalhados',
-        style: 'font-size:13px;font-weight:700;color:#1F3A5F'
+        class: 'u-letra-2 u-peso-negrito u-cor-navy'
       }),
       contador,
       el('span', { class: 'cresce' }),
@@ -3248,7 +3244,7 @@
       caixa.appendChild(el('div', { class: 'bloco-exercicios', texto: grupo.grupo }));
       var grade = el('div', { class: 'grade-areas' });
       grupo.itens.forEach(function (item) {
-        var chk = el('input', { type: 'checkbox', style: 'width:auto;min-height:auto' });
+        var chk = el('input', { type: 'checkbox', class: 'caixa-de-marcar' });
         chk.checked = aula.areas.indexOf(item.id) >= 0;
         chk.addEventListener('change', function () {
           if (this.checked) {
@@ -3284,7 +3280,7 @@
   var blocoAssuntoAtivo = null;
 
   function desenharAssuntos(corpo, aula, aluno) {
-    var bloco = el('div', { id: 'bloco-assunto', style: 'margin-bottom:14px' });
+    var bloco = el('div', { id: 'bloco-assunto', class: 'u-margem-baixo-14' });
     corpo.appendChild(bloco);
 
     function desenhar() {
@@ -3314,11 +3310,10 @@
        * caminho de um toque some no meio. Sem trilha, ele continua sendo o
        * botão principal do bloco, como sempre foi. */
       var quantos = Core.temasDaAula(aula).length;
-      bloco.appendChild(el('div', { class: 'barra', style: 'margin:0' }, [
+      bloco.appendChild(el('div', { class: 'barra u-margem-0' }, [
         el('button', {
           type: 'button', id: 'escolher-assunto',
-          class: quantos ? 'btn pequeno' : (passoAOferecer ? 'btn' : 'btn destaque'),
-          style: quantos ? '' : 'flex:1',
+          class: quantos ? 'btn pequeno' : (passoAOferecer ? 'btn u-flex-1' : 'btn destaque u-flex-1'),
           texto: quantos ? 'Mais um assunto' : (passoAOferecer
             ? 'Escolher outro assunto' : 'Escolher o assunto da aula'),
           aoClick: function () { abrirAssunto(aula.id); }
@@ -3329,8 +3324,7 @@
          * material para oferecer: a biblioteca, quando há pacote importado.
          * Sem ela o assunto vale sozinho, e é só isso que a linha diz. */
         bloco.appendChild(el('div', {
-          class: 'ajuda', style: 'margin-top:4px',
-          texto: 'O assunto entra no fechamento do mês.' +
+          class: 'ajuda u-margem-topo-4', texto: 'O assunto entra no fechamento do mês.' +
             (temPacoteBiblioteca ? ' O material da biblioteca sai daqui mesmo.' : '')
         }));
       }
@@ -3385,29 +3379,26 @@
     var contaAgora = st === 'realizada' || st === 'reposicao';
 
     var dentro = [
-      el('div', { class: 'barra', style: 'margin:0 0 6px' }, [
+      el('div', { class: 'barra u-margem-0-0-6' }, [
         el('span', {
-          class: 'cresce', style: 'font-size:13px;color:#1F5A4C',
-          texto: 'Trilha até ' + trilha.titulo + ' · passo ' + numero + ' de ' + total
+          class: 'cresce u-letra-2 u-cor-info-texto', texto: 'Trilha até ' + trilha.titulo + ' · passo ' + numero + ' de ' + total
         })
       ])
     ];
 
     if (jaNaAula) {
       dentro.push(el('div', {
-        style: 'font-size:14px;font-weight:700;color:#1F3A5F',
+        class: 'u-letra-3 u-peso-negrito u-cor-navy',
         texto: 'Próximo passo já registrado nesta aula: ' + passo.titulo
       }));
       /* Registrado não é fechado (C1): o passo só fecha com "Domina". Sem esta
        * linha ela veria o passo registrado e a trilha parada, sem saber por quê. */
       dentro.push(el('div', {
-        class: 'ajuda', id: 'passo-fecha-com-dominio', style: 'margin:6px 0 0',
-        texto: 'O passo fecha quando você marcar Domina neste assunto, em Registrar como foi.'
+        class: 'ajuda u-margem-6-0-0', id: 'passo-fecha-com-dominio', texto: 'O passo fecha quando você marcar Domina neste assunto, em Registrar como foi.'
       }));
     } else {
       dentro.push(el('button', {
-        type: 'button', class: 'btn destaque', id: 'usar-proximo-passo',
-        style: 'width:100%;text-align:left;padding:14px 16px;font-size:15px;white-space:normal',
+        type: 'button', class: 'btn destaque u-larg-100p u-texto-esquerda u-recuo-14-16 u-letra-4 u-espacos-normal', id: 'usar-proximo-passo',
         texto: 'Próximo passo: ' + passo.titulo,
         aoClick: function () {
           registrarAssunto(aula, {
@@ -3417,8 +3408,7 @@
         }
       }));
       dentro.push(el('div', {
-        class: 'ajuda', style: 'margin:6px 0 0',
-        texto: contaAgora
+        class: 'ajuda u-margem-6-0-0', texto: contaAgora
           ? 'Um toque registra o assunto da aula. O passo fecha quando você marcar Domina nele, ' +
             'em Registrar como foi, com a data desta aula.'
           : 'Um toque registra o assunto. O passo só fecha em aula realizada ou reposição, e ' +
@@ -3431,8 +3421,7 @@
      * qual é a outra basta, e é o que cabe aqui sem virar uma segunda tela. */
     if (outras.length) {
       dentro.push(el('div', {
-        class: 'ajuda', id: 'outras-trilhas-ativas', style: 'margin:6px 0 0',
-        texto: outras.length === 1
+        class: 'ajuda u-margem-6-0-0', id: 'outras-trilhas-ativas', texto: outras.length === 1
           ? 'Este aluno tem outra trilha em andamento, até ' + outras[0].titulo +
             '. Para dar um passo dela, escolha o assunto por baixo; a ficha do aluno mostra as duas.'
           : 'Este aluno tem outras ' + outras.length + ' trilhas em andamento (até ' +
@@ -3613,7 +3602,7 @@
           el('div', { class: 'nome' }, [
             document.createTextNode(t.titulo || t.id),
             comMaterial
-              ? el('span', { class: 'tag', texto: 'com material pronto', style: 'margin-left:8px' })
+              ? el('span', { class: 'tag u-margem-esq-8', texto: 'com material pronto' })
               : null
           ].filter(Boolean)),
           detalhe ? el('div', { class: 'detalhe', texto: detalhe }) : null
@@ -3651,16 +3640,14 @@
           }
         }) : null,
         nosLivros.length ? el('button', {
-          type: 'button', class: 'btn pequeno', texto: 'Abrir no livro', 'data-abrir-no-livro': t.id,
-          style: podeMaterial ? 'margin-left:8px' : '',
+          type: 'button', class: 'btn pequeno' + (podeMaterial ? ' u-margem-esq-8' : ''), texto: 'Abrir no livro', 'data-abrir-no-livro': t.id,
           aoClick: function () { abrirLivrosDoAssunto(t, nosLivros); }
         }) : null,
         /* A folga sai dos 12 px da linha para 32: Tirar apaga, Material não, e
          * os dois ficavam a um dedo de distância um do outro numa tela que ela
          * usa em pé, na casa da família, muitas vezes com o aluno do lado. */
         el('button', {
-          type: 'button', class: 'btn pequeno perigo', texto: 'Tirar',
-          style: 'margin-left:20px',
+          type: 'button', class: 'btn pequeno perigo u-margem-esq-20', texto: 'Tirar',
           aoClick: function () {
             /* Tirar um assunto que tem PDF leva o arquivo junto, e arquivo
              * apagado não volta: aí ela é perguntada antes. Sem PDF não há o
@@ -3767,7 +3754,7 @@
           if (r && r.blob) return;
           falta.hidden = false;
           falta.innerHTML = '';
-          falta.appendChild(el('p', { class: 'ajuda', style: 'margin:4px 0', texto: 'O arquivo não está neste tablet (o PDF de livro não vai na cópia de segurança).' }));
+          falta.appendChild(el('p', { class: 'ajuda u-margem-4-0', texto: 'O arquivo não está neste tablet (o PDF de livro não vai na cópia de segurança).' }));
           falta.appendChild(el('button', { type: 'button', class: 'btn pequeno principal', 'data-gerar-de-novo': an.id, texto: 'Gerar de novo',
             aoClick: function () { gerarDeNovoOExportado(an, aula, function () { desenharAnexos(caixa, aula); }); } }));
         }, function () { /* sem leitura, a linha fica como está */ });
@@ -4302,18 +4289,17 @@
     var corpo = $('#corpo-modal-retroativo');
     corpo.innerHTML = '';
     corpo.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'Partindo da aula de ' + Core.ddmmaaaa(aula.data) + ', às ' + (aula.hora || 'sem horário') +
+      class: 'ajuda u-margem-topo-0', texto: 'Partindo da aula de ' + Core.ddmmaaaa(aula.data) + ', às ' + (aula.hora || 'sem horário') +
         ', de ' + Core.fmtDuracao(aula.duracaoMin) + ', para ' + (aluno ? aluno.nome : '') + '.'
     }));
 
     var escolhidos = serie ? serie.dias.slice() : [Core.diaSemana(aula.data)];
-    var linhaDias = el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px' });
+    var linhaDias = el('div', { class: 'u-mostra-flex u-vao-6 u-flex-quebra-sim u-margem-baixo-12' });
     Core.DIAS_CURTO.forEach(function (nome, indice) {
       var marcado = escolhidos.indexOf(indice) >= 0;
       var b = el('button', {
-        type: 'button', class: 'btn pequeno' + (marcado ? ' principal' : ''),
-        texto: nome, style: 'min-width:52px'
+        type: 'button', class: ('btn pequeno' + (marcado ? ' principal' : '')) + ' u-larg-min-52',
+        texto: nome
       });
       b.dataset.dia = String(indice);
       b.dataset.marcado = marcado ? '1' : '';
@@ -4325,7 +4311,7 @@
       linhaDias.appendChild(b);
     });
     corpo.appendChild(el('div', { class: 'campo' }, [
-      el('span', { texto: 'Em quais dias da semana', style: 'display:block;font-size:13px;font-weight:700;color:#1F3A5F;margin-bottom:5px' }),
+      el('span', { texto: 'Em quais dias da semana', class: 'rotulo-de-campo' }),
       linhaDias
     ]));
 
@@ -4464,19 +4450,18 @@
     corpo.innerHTML = '';
 
     corpo.appendChild(el('p', {
-      class: 'ajuda', style: 'margin-top:0;margin-bottom:14px',
-      texto: 'Confira a série proposta para cada aluno no ano letivo de ' + ano +
+      class: 'ajuda u-margem-topo-0 u-margem-baixo-14', texto: 'Confira a série proposta para cada aluno no ano letivo de ' + ano +
         '. Você pode alterar a série no seletor ou marcar "Encerrar ciclo" caso o aluno tenha concluído ou não vá mais continuar.'
     }));
 
-    var rolagem = el('div', { class: 'rolagem', style: 'margin-bottom:12px' });
+    var rolagem = el('div', { class: 'rolagem u-margem-baixo-12' });
     var tabela = el('table', { class: 'dados tabela-virada' });
     var thead = el('thead', {}, [
       el('tr', {}, [
         el('th', { texto: 'Aluno' }),
         el('th', { texto: 'Série anterior' }),
         el('th', { texto: 'Nova série (' + ano + ')' }),
-        el('th', { texto: 'Fim do ciclo', style: 'text-align:center' })
+        el('th', { texto: 'Fim do ciclo', class: 'u-texto-centro' })
       ])
     ]);
     tabela.appendChild(thead);
@@ -4532,7 +4517,7 @@
       tdNova.appendChild(sel);
       tdNova.appendChild(inpOutro);
 
-      var tdEncerrar = el('td', { style: 'text-align:center' });
+      var tdEncerrar = el('td', { class: 'u-texto-centro' });
       var check = el('input', {
         type: 'checkbox',
         class: 'check-encerrar-ciclo',
@@ -4572,9 +4557,9 @@
     corpo.appendChild(rolagem);
 
     var avisoEncerrados = el('div', {
-      class: 'faixa-aviso',
+      class: 'faixa-aviso u-margem-topo-10',
       id: 'aviso-virada-encerrados',
-      style: 'display:none;margin-top:10px',
+      style: 'display:none',
       texto: 'Atenção: alunos com ciclo encerrado não terão novas aulas geradas e as aulas futuras a partir de 01/01/' +
         ano + ' serão canceladas. As aulas passadas e fechamentos anteriores continuam 100% preservados.'
     });
@@ -4761,7 +4746,7 @@
         el('div', { class: 'cresce' }, [
           el('div', { class: 'nome' }, [
             document.createTextNode(a.nome),
-            (!Core.precoVigente(a, Core.hojeIso())) ? el('span', { class: 'tag excecao', texto: 'falta o valor', style: 'margin-left:8px' }) : null
+            (!Core.precoVigente(a, Core.hojeIso())) ? el('span', { class: 'tag excecao u-margem-esq-8', texto: 'falta o valor' }) : null
           ]),
           el('div', {
             class: 'detalhe',
@@ -4902,11 +4887,10 @@
       el('span', { texto: 'Ano escolar atual' }), selecaoAno
     ]));
     painel.dados.appendChild(caixaAnoOutro);
-    painel.dados.appendChild(el('p', { class: 'ajuda', style: 'margin-top:-4px',
-      texto: 'Ajuda a sugerir assuntos. Você pode mudar depois; aulas antigas não são alteradas.' }));
+    painel.dados.appendChild(el('p', { class: 'ajuda u-margem-topo-menos4', texto: 'Ajuda a sugerir assuntos. Você pode mudar depois; aulas antigas não são alteradas.' }));
     mostrarAnoOutro();
 
-    var cores = el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' });
+    var cores = el('div', { class: 'u-mostra-flex u-vao-6 u-flex-quebra-sim' });
     var corEscolhida = novo ? CORES_ALUNO[db.alunos.length % CORES_ALUNO.length] : alunoEmEdicao.cor;
     CORES_ALUNO.forEach(function (c) {
       var b = el('button', {
@@ -4921,7 +4905,7 @@
       cores.appendChild(b);
     });
     painel.dados.appendChild(el('div', { class: 'campo' }, [
-      el('span', { texto: 'Cor na agenda', style: 'display:block;font-size:13px;font-weight:700;color:#1F3A5F;margin-bottom:5px' }),
+      el('span', { texto: 'Cor na agenda', class: 'rotulo-de-campo' }),
       cores
     ]));
 
@@ -4929,7 +4913,7 @@
       el('span', { texto: 'Observações gerais' }),
       (function () {
         var t = el('textarea', {
-          id: 'campo-obs', style: 'min-height:64px',
+          id: 'campo-obs', class: 'u-alt-min-64',
           placeholder: 'Combinados, horários, contato, o que for prático de lembrar.'
         });
         t.value = novo ? '' : (alunoEmEdicao.obs || '');
@@ -4941,7 +4925,7 @@
       el('span', { texto: 'Nota só minha' }),
       (function () {
         var t = el('textarea', {
-          id: 'campo-obs-pedagogicas', style: 'min-height:88px',
+          id: 'campo-obs-pedagogicas', class: 'u-alt-min-88',
           placeholder: 'Como este aluno aprende melhor, onde costuma travar, o que já deu certo.'
         });
         t.value = novo ? '' : (alunoEmEdicao.obsPedagogicas || '');
@@ -4961,11 +4945,10 @@
 
       painel.dados.appendChild(el('h3', { class: 'subtitulo', texto: 'Primeira aula' }));
       painel.dados.appendChild(el('label', {
-        style: 'display:flex;align-items:center;gap:9px;cursor:pointer;margin-bottom:6px'
+        class: 'u-mostra-flex u-alinha-centro u-vao-9 u-cursor-mao u-margem-baixo-6'
       }, [marcarEncontro, el('span', { texto: 'Agendar aula de mapeamento' })]));
       painel.dados.appendChild(el('div', {
-        class: 'ajuda', style: 'margin-top:0',
-        texto: 'Uma primeira aula de sondagem, para entender de onde o aluno parte antes de ' +
+        class: 'ajuda u-margem-topo-0', texto: 'Uma primeira aula de sondagem, para entender de onde o aluno parte antes de ' +
           'montar o plano. Abre com roteiro e com a ficha de mapeamento para preencher na hora. ' +
           'Conta como aula normal no fechamento.'
       }));
@@ -5001,8 +4984,7 @@
     // ---------------- aba: valores ----------------
 
     painel.valores.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:4px',
-      texto: 'Cada valor vale de uma data até outra. Ao reajustar, encerre o valor antigo e crie o ' +
+      class: 'ajuda u-margem-topo-4', texto: 'Cada valor vale de uma data até outra. Ao reajustar, encerre o valor antigo e crie o ' +
         'novo. O fechamento usa o valor vigente na data de cada aula.'
     }));
 
@@ -5027,21 +5009,21 @@
         .forEach(function (pr) {
           caixaPrecos.appendChild(el('div', { class: 'cartao compacto' }, [
             el('div', { class: 'linha' }, [
-              el('label', { class: 'campo', style: 'margin-bottom:6px' }, [
+              el('label', { class: 'campo u-margem-baixo-6' }, [
                 el('span', { texto: 'R$ por hora' }),
                 el('input', {
                   type: 'number', step: '0.01', min: '0', value: String(pr.valorHora),
                   aoInput: function () { pr.valorHora = parseFloat(this.value) || 0; }
                 })
               ]),
-              el('label', { class: 'campo', style: 'margin-bottom:6px' }, [
+              el('label', { class: 'campo u-margem-baixo-6' }, [
                 el('span', { texto: 'A partir de' }),
                 el('input', {
                   type: 'date', value: pr.inicio || '',
                   aoInput: function () { pr.inicio = this.value; }
                 })
               ]),
-              el('label', { class: 'campo', style: 'margin-bottom:6px' }, [
+              el('label', { class: 'campo u-margem-baixo-6' }, [
                 el('span', { texto: 'Até (vazio: sem fim)' }),
                 el('input', {
                   type: 'date', value: pr.fim || '',
@@ -5163,7 +5145,7 @@
             'abrir uma aula dele.'
         }),
         el('button', {
-          type: 'button', class: 'btn principal', id: 'mapear-aluno',
+          type: 'button', class: 'btn', id: 'mapear-aluno',
           texto: 'Mapear ' + aluno.nome,
           aoClick: function () {
             fecharModal('modal-aluno');
@@ -5178,12 +5160,11 @@
     }
 
     var lista = Core.mapeamentosDe(aluno);
-    caixa.appendChild(el('div', { class: 'barra', style: 'margin:6px 0 10px' }, [
+    caixa.appendChild(el('div', { class: 'barra u-margem-6-0-10' }, [
       el('span', {
-        class: 'cresce',
+        class: 'cresce u-letra-3',
         texto: 'Mapeado em ' + Core.ddmmaaaa(m.data) +
-          (lista.length > 1 ? ', com ' + (lista.length - 1) + ' revisão anterior' : ''),
-        style: 'font-size:14px'
+          (lista.length > 1 ? ', com ' + (lista.length - 1) + ' revisão anterior' : '')
       }),
       el('button', {
         type: 'button', class: 'btn pequeno', id: 'editar-mapeamento', texto: 'Abrir',
@@ -5209,7 +5190,7 @@
     }
     if (m.motivo) contexto.push(m.motivo);
     if (contexto.length) {
-      caixa.appendChild(el('div', { class: 'ajuda', style: 'margin-top:0', texto: contexto.join(' · ') }));
+      caixa.appendChild(el('div', { class: 'ajuda u-margem-topo-0', texto: contexto.join(' · ') }));
     }
 
     /* Para onde ele está indo, com o prazo em semanas quando há data de prova. */
@@ -5237,7 +5218,7 @@
       caixa.appendChild(el('div', { class: 'bloco-exercicios', texto: titulo }));
       var grade = el('div', { class: 'grade-areas' });
       rotulos.forEach(function (r) {
-        grade.appendChild(el('div', { class: 'item-area', style: 'cursor:default' },
+        grade.appendChild(el('div', { class: 'item-area u-cursor-default' },
           [el('span', { texto: r })]));
       });
       caixa.appendChild(grade);
@@ -5256,7 +5237,7 @@
           class: 'bloco-exercicios', texto: nomeMateria + ': o que o colégio cobra no bimestre'
         }));
         caixa.appendChild(el('div', {
-          style: 'font-size:14px;line-height:1.55;white-space:pre-wrap', texto: cobranca
+          class: 'texto-do-relato', texto: cobranca
         }));
       }
     });
@@ -5271,10 +5252,10 @@
       var texto = (m[par[0]] || '').trim();
       if (!texto) return;
       caixa.appendChild(el('h3', { class: 'subtitulo', texto: par[1] }));
-      caixa.appendChild(el('div', { style: 'font-size:14px;line-height:1.55;white-space:pre-wrap', texto: texto }));
+      caixa.appendChild(el('div', { class: 'texto-do-relato', texto: texto }));
     });
 
-    caixa.appendChild(el('div', { class: 'barra', style: 'margin-top:14px' }, [
+    caixa.appendChild(el('div', { class: 'barra u-margem-topo-14' }, [
       el('button', {
         type: 'button', class: 'btn', id: 'pdf-mapeamento', texto: 'Gerar ficha em PDF',
         aoClick: function () { gerarFichaDeMapeamento(aluno, m); }
@@ -5802,7 +5783,7 @@
           el('div', { texto: 'A proposta de ' + nome + ' já saiu. Se a família fechar, ' +
             nome + ' entra na lista de alunos com esta proposta guardada na ficha, ' +
             'e o valor combinado vem junto.' }),
-          el('div', { class: 'barra', style: 'margin:10px 0 0' }, [
+          el('div', { class: 'barra u-margem-10-0-0' }, [
             el('button', {
               type: 'button', class: 'btn principal', 'data-acao': 'cadastrar-do-rascunho',
               texto: 'Cadastrar ' + nome.split(' ')[0],
@@ -5897,7 +5878,7 @@
       }
 
       if (propostaTemAlgoEscrito(p)) {
-        topo.appendChild(el('div', { class: 'barra', style: 'margin:0 0 12px' }, [
+        topo.appendChild(el('div', { class: 'barra u-margem-0-0-12' }, [
           el('span', { class: 'cresce' }),
           el('button', {
             type: 'button', class: 'btn', 'data-acao': 'comecar-outra', texto: 'Começar outra',
@@ -5958,10 +5939,9 @@
 
     if (ultima) {
       var mesma = trabalho.id === ultima.id;
-      caixa.appendChild(el('div', { class: 'barra', style: 'margin:6px 0 10px' }, [
+      caixa.appendChild(el('div', { class: 'barra u-margem-6-0-10' }, [
         el('span', {
-          class: 'cresce', style: 'font-size:14px',
-          texto: 'Última proposta em ' + Core.ddmmaaaa(ultima.data) +
+          class: 'cresce u-letra-3', texto: 'Última proposta em ' + Core.ddmmaaaa(ultima.data) +
             (salvas.length > 1 ? ', com ' + (salvas.length - 1) + ' anterior' +
               (salvas.length > 2 ? 'es' : '') : '')
         }),
@@ -5996,7 +5976,7 @@
               '. Enquanto esse valor não estiver na ficha, o fechamento do mês continua ' +
               'cobrando o valor antigo.'
           }),
-          el('div', { class: 'barra', style: 'margin:10px 0 0' }, [
+          el('div', { class: 'barra u-margem-10-0-0' }, [
             el('button', {
               type: 'button', class: 'btn principal', 'data-acao': 'criar-vigencia',
               texto: 'Criar o valor na ficha',
@@ -6020,7 +6000,7 @@
     gerarDaAbaProposta = function () {
       gerarPropostaEmPdf(ctx, function () { desenharAbaProposta(caixa, aluno, null); });
     };
-    caixa.appendChild(el('div', { class: 'barra', style: 'margin-top:14px' }, [
+    caixa.appendChild(el('div', { class: 'barra u-margem-topo-14' }, [
       el('button', {
         type: 'button', class: 'btn', 'data-acao': 'gerar-proposta',
         texto: 'Gerar proposta em PDF',
@@ -6094,7 +6074,7 @@
       return el('div', { class: 'campo' }, [
         el('span', {
           texto: rotulo,
-          style: 'display:block;font-size:13px;font-weight:700;color:#1F3A5F;margin-bottom:5px'
+          class: 'rotulo-de-campo'
         }),
         conteudo
       ]);
@@ -6146,7 +6126,7 @@
     function gradeDeMarcar(itens, marcados, teto, aoMudar) {
       var g = el('div', { class: 'grade-areas' });
       itens.forEach(function (item) {
-        var chk = el('input', { type: 'checkbox', style: 'width:auto;min-height:auto' });
+        var chk = el('input', { type: 'checkbox', class: 'caixa-de-marcar' });
         chk.checked = marcados.indexOf(item.id) >= 0;
         chk.addEventListener('change', function () {
           var i = marcados.indexOf(item.id);
@@ -6203,10 +6183,9 @@
         }
       });
       return el('div', {}, [
-        el('div', { class: 'barra', style: 'margin:12px 0 0' }, [el('span', { class: 'cresce' }), b]),
+        el('div', { class: 'barra u-margem-12-0-0' }, [el('span', { class: 'cresce' }), b]),
         el('div', {
-          class: 'ajuda', style: 'margin-top:6px',
-          texto: 'O que você escreve aqui vale só para esta família. Este botão é o único ' +
+          class: 'ajuda u-margem-topo-6', texto: 'O que você escreve aqui vale só para esta família. Este botão é o único ' +
             'caminho para virar o texto de todas.'
         })
       ]);
@@ -6236,8 +6215,7 @@
         function (v) { p.responsavel = v; }, 'responsavel'))
     ]));
     b1.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'Estes dois são obrigatórios. A proposta é escrita sobre o aluno e endereçada a quem decide.'
+      class: 'ajuda u-margem-topo-0', texto: 'Estes dois são obrigatórios. A proposta é escrita sobre o aluno e endereçada a quem decide.'
     }));
 
     var campoAnoLivre = el('input', {
@@ -6284,8 +6262,7 @@
       campo('Válida até', entradaData(p.validaAte, function (v) { p.validaAte = v; }, 'valida-ate'))
     ]));
     b1.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'Proposta sem prazo fica em aberto, e em janeiro a família decide sobre o que leu em setembro.'
+      class: 'ajuda u-margem-topo-0', texto: 'Proposta sem prazo fica em aberto, e em janeiro a família decide sobre o que leu em setembro.'
     }));
 
     // ---- bloco 2: ponto de partida
@@ -6325,15 +6302,13 @@
 
       caixaListas.appendChild(el('h3', { class: 'subtitulo', texto: 'Pontos fortes' }));
       caixaListas.appendChild(el('div', {
-        class: 'ajuda', style: 'margin-top:0',
-        texto: 'É por aqui que a folha abre. Sem nenhum ponto forte marcado, a lista de atenção não é impressa.'
+        class: 'ajuda u-margem-topo-0', texto: 'É por aqui que a folha abre. Sem nenhum ponto forte marcado, a lista de atenção não é impressa.'
       }));
       caixaListas.appendChild(gradeDeMarcar(fortes, p.fortes, 0, null));
 
       caixaListas.appendChild(el('h3', { class: 'subtitulo', texto: 'Pontos de atenção' }));
       caixaListas.appendChild(el('div', {
-        class: 'ajuda', style: 'margin-top:0',
-        texto: 'Nascem desmarcados de propósito, mesmo quando estão no mapeamento. ' +
+        class: 'ajuda u-margem-topo-0', texto: 'Nascem desmarcados de propósito, mesmo quando estão no mapeamento. ' +
           'Marque só o que você diria na frente da família, e no máximo seis: ' +
           'seis é conversa, dezenove é laudo.'
       }));
@@ -6373,8 +6348,7 @@
 
     b2.appendChild(el('h3', { class: 'subtitulo', texto: 'Matérias' }));
     b2.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'Marque também as disciplinas que você vai acompanhar além da primeira. ' +
+      class: 'ajuda u-margem-topo-0', texto: 'Marque também as disciplinas que você vai acompanhar além da primeira. ' +
         'A primeira da lista é a que manda nas marcações abaixo.'
     }));
     /* Sem 'Método de estudo': é disciplina do catálogo de tópicos, não matéria
@@ -6443,7 +6417,7 @@
       el('span', { texto: 'O que você quer dizer para eles' }),
       (function () {
         var t = el('textarea', {
-          'data-campo': 'texto', style: 'min-height:92px',
+          'data-campo': 'texto', class: 'u-alt-min-92',
           placeholder: 'Duas a quatro linhas, com as suas palavras. É o que a família mais lê.'
         });
         t.value = p.texto || '';
@@ -6463,8 +6437,7 @@
       return { texto: contar(n, 'área', 'áreas') + ' em ' + contar(grupos, 'frente', 'frentes') };
     });
     b3.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'Já vem marcado o que sai dos pontos de atenção do mapeamento. Confira e mude.'
+      class: 'ajuda u-margem-topo-0', texto: 'Já vem marcado o que sai dos pontos de atenção do mapeamento. Confira e mude.'
     }));
     /* A proposta declara as matérias (p.materias), então a grade só oferece as
      * áreas que existem nelas; o que já estiver marcado continua na grade. */
@@ -6514,21 +6487,21 @@
     function desenharCombinados() {
       caixaCombinados.innerHTML = '';
       (p.combinados.itens || []).forEach(function (item) {
-        var chk = el('input', { type: 'checkbox', style: 'width:auto;min-height:auto' });
+        var chk = el('input', { type: 'checkbox', class: 'caixa-de-marcar' });
         chk.checked = item.ligado !== false;
         chk.addEventListener('change', function () {
           item.ligado = this.checked;
           atualizarResumos();
         });
         var cartao = el('div', { class: 'cartao compacto item-combinado', 'data-item': item.id }, [
-          el('label', { class: 'item-area', style: 'border:none;background:none;padding:0 0 8px' }, [
+          el('label', { class: 'item-area u-borda-nenhum u-fundo-nenhum u-recuo-0-0-8' }, [
             chk, el('span', { class: 'cresce', texto: 'Entra na proposta' })
           ]),
           campo('Título', entradaTexto(item.rotulo, '', function (v) { item.rotulo = v; })),
           el('label', { class: 'campo' }, [
             el('span', { texto: 'Texto' }),
             (function () {
-              var t = el('textarea', { style: 'min-height:78px' });
+              var t = el('textarea', { class: 'u-alt-min-78' });
               t.value = item.texto || '';
               t.addEventListener('input', function () { item.texto = this.value; });
               return t;
@@ -6555,8 +6528,7 @@
       };
     });
     b5.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'Tudo aqui é editável, e é para ser: cada palavra tem que ser uma que você diria. ' +
+      class: 'ajuda u-margem-topo-0', texto: 'Tudo aqui é editável, e é para ser: cada palavra tem que ser uma que você diria. ' +
         'Desmarque o que não quiser mandar.'
     }));
     b5.appendChild(faixaFolgas);
@@ -6566,7 +6538,7 @@
       campo('Folgas por semestre', entradaNumero(p.combinados.folgas,
         function (v) { p.combinados.folgas = v; }, '1', 'folgas'))
     ]));
-    b5.appendChild(el('div', { class: 'barra', style: 'margin:0 0 12px' }, [
+    b5.appendChild(el('div', { class: 'barra u-margem-0-0-12' }, [
       el('button', {
         type: 'button', class: 'btn', 'data-acao': 'reescrever-combinados',
         texto: 'Reescrever os textos com estes números',
@@ -6582,8 +6554,7 @@
       })
     ]));
     b5.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'Mudar os números acima não reescreve o que já está escrito: o seu texto vence. ' +
+      class: 'ajuda u-margem-topo-0', texto: 'Mudar os números acima não reescreve o que já está escrito: o seu texto vence. ' +
         'O botão existe para quando você quiser o contrário.'
     }));
     b5.appendChild(caixaCombinados);
@@ -6760,8 +6731,7 @@
 
     // modo hora-aula
     caixaHora.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'Na folha sai uma linha só: quanto custa a hora, quanto sai o encontro, ' +
+      class: 'ajuda u-margem-topo-0', texto: 'Na folha sai uma linha só: quanto custa a hora, quanto sai o encontro, ' +
         'e que a cobrança é mensal, pelas aulas que aconteceram.'
     }));
     faixaValorPadrao.style.display = temValorDela ? 'none' : '';
@@ -6771,8 +6741,7 @@
      * hora-aula e voltar para os planos, e um número parado ali seria a âncora
      * de um preço que não é mais o dela. */
     var botaoAncora = el('button', {
-      type: 'button', class: 'btn', 'data-acao': 'usar-ancora', style: 'width:100%',
-      aoClick: function () {
+      type: 'button', class: 'btn u-larg-100p', 'data-acao': 'usar-ancora', aoClick: function () {
         p.cobranca.ancora = Core.ancoraSugerida(p.cobranca.valorHora);
         var alvo = caixaPlanos.querySelector('[data-campo="ancora"]');
         if (alvo) alvo.value = String(p.cobranca.ancora);
@@ -6796,8 +6765,7 @@
       grupo('Sugestão', botaoAncora)
     ]));
     caixaPlanos.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'A âncora tem que ser um preço que você cobraria de verdade de quem vem sem compromisso. ' +
+      class: 'ajuda u-margem-topo-0', texto: 'A âncora tem que ser um preço que você cobraria de verdade de quem vem sem compromisso. ' +
         'Se não for, a família descobre na primeira conversa com a vizinha e a folha inteira perde valor. ' +
         'A sugestão é o seu valor de hoje mais 15 por cento, o que faz o mensal cair no que você já cobra. ' +
         'Ela não entra na conta dos planos: os três descem do seu preço de hoje.'
@@ -6818,7 +6786,7 @@
      * dissesse R$ 100,00 enquanto o campo já diz 130 seria a mesma mentira
      * noutro lugar. */
     var rotuloDescontos = el('span', {
-      style: 'display:block;font-size:13px;font-weight:700;color:#1F3A5F;margin-bottom:5px',
+      class: 'rotulo-de-campo',
       'data-rotulo': 'base-desconto'
     });
     function escreverBaseDosDescontos() {
@@ -6856,22 +6824,21 @@
       return { texto: n + ' de ' + (p.vantagens || []).length + ' itens na folha' };
     });
     b7.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'As duas primeiras você já faz e quase ninguém faz. Hoje isso é invisível ' +
+      class: 'ajuda u-margem-topo-0', texto: 'As duas primeiras você já faz e quase ninguém faz. Hoje isso é invisível ' +
         'exatamente na hora em que a família está decidindo o preço.'
     }));
     (p.vantagens || []).forEach(function (item) {
-      var chk = el('input', { type: 'checkbox', style: 'width:auto;min-height:auto' });
+      var chk = el('input', { type: 'checkbox', class: 'caixa-de-marcar' });
       chk.checked = item.ligado !== false;
       chk.addEventListener('change', function () { item.ligado = this.checked; atualizarResumos(); });
       b7.appendChild(el('div', { class: 'cartao compacto', 'data-item': item.id }, [
-        el('label', { class: 'item-area', style: 'border:none;background:none;padding:0 0 8px' }, [
+        el('label', { class: 'item-area u-borda-nenhum u-fundo-nenhum u-recuo-0-0-8' }, [
           chk, el('span', { class: 'cresce', texto: 'Entra na proposta' })
         ]),
         el('label', { class: 'campo' }, [
           el('span', { texto: 'Texto' }),
           (function () {
-            var t = el('textarea', { style: 'min-height:70px' });
+            var t = el('textarea', { class: 'u-alt-min-70' });
             t.value = item.texto || '';
             t.addEventListener('input', function () { item.texto = this.value; });
             return t;
@@ -7212,14 +7179,14 @@
     });
 
     var desde = aluno.desde || (aulas.length ? aulas[aulas.length - 1].data : null);
-    var resumo = el('div', { class: 'numeros', style: 'margin-bottom:12px' });
+    var resumo = el('div', { class: 'numeros u-margem-baixo-12' });
     [['Aulas', String(cobradas)],
     ['Horas somadas', Core.fmtHoras(minutos) + ' h'],
     ['Aluno desde', desde ? Core.ddmmaaaa(desde) : 'sem data'],
     ['Aulas marcadas', String(futurasAtivas.length)]].forEach(function (par) {
       resumo.appendChild(el('div', { class: 'numero' }, [
         el('div', { class: 'rotulo', texto: par[0] }),
-        el('div', { class: 'valor', style: 'font-size:19px', texto: par[1] })
+        el('div', { class: 'valor u-letra-6', texto: par[1] })
       ]));
     });
     caixa.appendChild(resumo);
@@ -7227,7 +7194,7 @@
     /* A entrada do documento do ciclo (C9): um botão comum, sem cor, sem
      * selo e sem contagem de dias. "Não force o uso, deixe que ela explore":
      * nada no aplicativo lembra, avisa ou abre este documento sozinho. */
-    caixa.appendChild(el('div', { class: 'barra', style: 'margin:-4px 0 12px' }, [
+    caixa.appendChild(el('div', { class: 'barra u-margem-menos4-0-12' }, [
       el('button', {
         type: 'button', class: 'btn pequeno', id: 'abrir-documento-ciclo', texto: 'Documento do ciclo',
         aoClick: function () { abrirDocumentoDoCiclo(aluno.id); }
@@ -7258,8 +7225,7 @@
       linhasDeAula(listaAulas, passadas.slice(0, mostrando));
       if (passadas.length > mostrando) {
         maisBotao.appendChild(el('button', {
-          type: 'button', class: 'btn', style: 'width:100%',
-          texto: 'Ver mais (faltam ' + (passadas.length - mostrando) + ')',
+          type: 'button', class: 'btn u-larg-100p', texto: 'Ver mais (faltam ' + (passadas.length - mostrando) + ')',
           aoClick: function () { mostrando += 12; redesenhar(); }
         }));
       }
@@ -7278,9 +7244,9 @@
   function desenharQuadroDeDominio(caixa, aluno) {
     var linhas = Core.dominioPorAssunto(db, aluno.id);
     if (!linhas.length) return;
-    var quadro = el('div', { id: 'quadro-dominio', style: 'margin-bottom:12px' });
+    var quadro = el('div', { id: 'quadro-dominio', class: 'u-margem-baixo-12' });
     quadro.appendChild(el('div', { class: 'campo-titulo-com-destino' }, [
-      el('h3', { class: 'subtitulo', texto: 'Domínio por assunto', style: 'margin:0' }),
+      el('h3', { class: 'subtitulo u-margem-0', texto: 'Domínio por assunto' }),
       el('span', { class: 'destino-privado', texto: 'Só você vê' })
     ]));
     var COR = { nao: '#8A6D2F', andamento: '#1F3A5F', domina: '#1F5A4C' };
@@ -7322,9 +7288,9 @@
         el('div', { class: 'cresce' }, [
           el('div', { class: 'nome' }, [
             document.createTextNode(Core.ddmmaaaa(a.data)),
-            a.temNota ? el('span', { class: 'tag serie', texto: 'folha', style: 'margin-left:8px' }) : null,
+            a.temNota ? el('span', { class: 'tag serie u-margem-esq-8', texto: 'folha' }) : null,
             (a.anexos && a.anexos.length)
-              ? el('span', { class: 'tag', texto: 'anexo', style: 'margin-left:6px' }) : null
+              ? el('span', { class: 'tag u-margem-esq-6', texto: 'anexo' }) : null
           ]),
           el('div', { class: 'detalhe', texto: detalhes.join(' · ') }),
           anotacao ? el('div', { class: 'anotacao-historico', texto: anotacao }) : null
@@ -7897,7 +7863,7 @@
     var rodape = $('#rodape-nota');
     rodape.innerHTML = '';
 
-    var selFundo = el('select', { style: 'max-width:150px;min-height:38px' });
+    var selFundo = el('select', { class: 'u-larg-max-150 u-alt-min-38' });
     [['branco', 'Sem pauta'], ['pautado', 'Pautado'], ['pontilhado', 'Pontilhado']].forEach(function (f) {
       var o = el('option', { value: f[0], texto: f[1] });
       if (editorAtual.pagina().fundo === f[0]) o.selected = true;
@@ -8147,13 +8113,12 @@
 
     if (opcoes.aulaId) {
       corpo.appendChild(el('div', {
-        class: 'ajuda', style: 'margin-top:0',
-        texto: 'Este mapeamento fica ligado à aula de hoje.'
+        class: 'ajuda u-margem-topo-0', texto: 'Este mapeamento fica ligado à aula de hoje.'
       }));
     }
 
     // ---- contexto ----
-    corpo.appendChild(el('h3', { class: 'subtitulo', style: 'margin-top:6px', texto: 'Contexto' }));
+    corpo.appendChild(el('h3', { class: 'subtitulo u-margem-topo-6', texto: 'Contexto' }));
 
     var campos = {};
     function campoTexto(chave, rotulo, dica, largo) {
@@ -8219,7 +8184,7 @@
       el('span', { texto: 'Expectativa da família' }),
       (function () {
         var t = el('textarea', {
-          style: 'min-height:56px',
+          class: 'u-alt-min-56',
           placeholder: 'O que eles esperam ver mudar, e em quanto tempo.'
         });
         t.value = trabalho.expectativa || '';
@@ -8248,7 +8213,7 @@
     function grade(itens, marcados, aoMudar) {
       var g = el('div', { class: 'grade-areas' });
       itens.forEach(function (item) {
-        var chk = el('input', { type: 'checkbox', style: 'width:auto;min-height:auto' });
+        var chk = el('input', { type: 'checkbox', class: 'caixa-de-marcar' });
         chk.checked = marcados.indexOf(item.id) >= 0;
         chk.addEventListener('change', function () { aoMudar(item, this.checked); });
         /* A lacuna marcada pela sondagem (C5) traz a evidência escrita logo
@@ -8294,13 +8259,13 @@
         caixa.style.display = aberto ? 'none' : '';
         botao.textContent = aberto ? 'Mostrar' : 'Esconder';
       });
-      destino.appendChild(el('div', { class: 'barra', style: 'margin:16px 0 2px' }, [
-        el('h3', { class: 'subtitulo', style: 'margin:0;border:none', texto: titulo }),
+      destino.appendChild(el('div', { class: 'barra u-margem-16-0-2' }, [
+        el('h3', { class: 'subtitulo u-margem-0 u-borda-nenhum', texto: titulo }),
         contador,
         el('span', { class: 'cresce' }),
         botao
       ]));
-      destino.appendChild(el('div', { class: 'ajuda', style: 'margin-top:0', texto: ajuda }));
+      destino.appendChild(el('div', { class: 'ajuda u-margem-topo-0', texto: ajuda }));
       return atualizar;
     }
 
@@ -8361,22 +8326,21 @@
        * não existe; em matemática soma-se às lacunas, porque a lista do colégio
        * é útil de qualquer jeito. */
       var cob = el('textarea', {
-        id: 'mapa-cobranca', style: 'min-height:72px',
+        id: 'mapa-cobranca', class: 'u-alt-min-72',
         placeholder: 'Os assuntos que o colégio vai cobrar neste bimestre nesta matéria.'
       });
       cob.value = Core.cobrancaDaMateria(trabalho, mat.id);
       cob.addEventListener('input', function () {
         Core.definirCobranca(trabalho, mat.id, this.value);
       });
-      caixaMateria.appendChild(el('label', { class: 'campo', style: 'margin-top:14px' }, [
+      caixaMateria.appendChild(el('label', { class: 'campo u-margem-topo-14' }, [
         el('span', { texto: 'O que o colégio vai cobrar no bimestre' }), cob
       ]));
     }
 
     corpo.appendChild(el('h3', { class: 'subtitulo', texto: 'A matéria' }));
     corpo.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'Esta parte se repete por matéria que você dá para este aluno. ' +
+      class: 'ajuda u-margem-topo-0', texto: 'Esta parte se repete por matéria que você dá para este aluno. ' +
         'Trocar a matéria aqui em cima troca só o que está abaixo.'
     }));
     var selMateria = el('select', { id: 'mapa-materia' });
@@ -8404,10 +8368,9 @@
     corpo.appendChild(caixaMateria);
     desenharMateria();
 
-    corpo.appendChild(el('h3', { class: 'subtitulo', style: 'margin-top:22px', texto: 'O aluno' }));
+    corpo.appendChild(el('h3', { class: 'subtitulo u-margem-topo-22', texto: 'O aluno' }));
     corpo.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'Isto vale em qualquer matéria e fica respondido uma vez só. ' +
+      class: 'ajuda u-margem-topo-0', texto: 'Isto vale em qualquer matéria e fica respondido uma vez só. ' +
         'Não é preciso repetir quando você abrir outra matéria.'
     }));
 
@@ -8491,8 +8454,7 @@
     }
 
     rodape.appendChild(el('span', {
-      class: 'esquerda ajuda', style: 'margin:0;align-self:center',
-      texto: 'Mapeamento de ' + Core.ddmmaaaa(trabalho.data)
+      class: 'esquerda ajuda u-margem-0 u-alinha-se-centro', texto: 'Mapeamento de ' + Core.ddmmaaaa(trabalho.data)
     }));
     rodape.appendChild(el('button', {
       type: 'button', class: 'btn', texto: 'Cancelar',
@@ -8579,8 +8541,7 @@
     corpo.appendChild(caixaLivre);
     mostrarLivre();
     corpo.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'Com a data preenchida, a janela de cada aula deste aluno passa a dizer ' +
+      class: 'ajuda u-margem-topo-0', texto: 'Com a data preenchida, a janela de cada aula deste aluno passa a dizer ' +
         'quantas semanas faltam.'
     }));
   }
@@ -8605,7 +8566,7 @@
 
     function desenhar() {
       bloco.innerHTML = '';
-      bloco.appendChild(el('div', { class: 'barra', style: 'margin-bottom:6px' }, [
+      bloco.appendChild(el('div', { class: 'barra u-margem-baixo-6' }, [
         el('span', { class: 'rotulo-resumo-etapas', texto: 'Em que etapa ele está' }),
         el('span', { class: 'cresce' }),
         el('button', {
@@ -8636,12 +8597,11 @@
 
     function desenhar() {
       bloco.innerHTML = '';
-      bloco.appendChild(el('div', { class: 'barra', style: 'margin-bottom:4px' }, [
-        el('h3', { class: 'subtitulo', style: 'margin:0;border:none', texto: 'Em que etapa ele está' })
+      bloco.appendChild(el('div', { class: 'barra u-margem-baixo-4' }, [
+        el('h3', { class: 'subtitulo u-margem-0 u-borda-nenhum', texto: 'Em que etapa ele está' })
       ]));
       bloco.appendChild(el('div', {
-        class: 'ajuda', style: 'margin-top:0',
-        texto: 'Fica parado aqui mostrando o ponto. Toque em Mudou de etapa só quando ' +
+        class: 'ajuda u-margem-topo-0', texto: 'Fica parado aqui mostrando o ponto. Toque em Mudou de etapa só quando ' +
           'perceber que ele andou, o que costuma levar semanas ou meses.'
       }));
 
@@ -8721,14 +8681,14 @@
 
     if (Core.rotuloNivel(m.nivel)) {
       corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Onde estava' }));
-      corpo.appendChild(el('div', { style: 'font-size:14px', texto: Core.rotuloNivel(m.nivel) }));
+      corpo.appendChild(el('div', { class: 'u-letra-3', texto: Core.rotuloNivel(m.nivel) }));
     }
 
     function bloco(titulo, rotulos) {
       if (!rotulos.length) return;
       corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: titulo }));
       corpo.appendChild(el('div', {
-        style: 'font-size:14px;line-height:1.55', texto: rotulos.join(', ') + '.'
+        class: 'u-letra-3 u-entrelinha-155', texto: rotulos.join(', ') + '.'
       }));
     }
     Core.materiasDoMapeamento(m).forEach(function (materiaId) {
@@ -8744,7 +8704,7 @@
           class: 'bloco-exercicios', texto: nomeMateria + ': o que o colégio cobrava no bimestre'
         }));
         corpo.appendChild(el('div', {
-          style: 'font-size:14px;line-height:1.55;white-space:pre-wrap', texto: cobranca
+          class: 'texto-do-relato', texto: cobranca
         }));
       }
     });
@@ -8760,7 +8720,7 @@
       if (!texto) return;
       corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: par[1] }));
       corpo.appendChild(el('div', {
-        style: 'font-size:14px;line-height:1.55;white-space:pre-wrap', texto: texto
+        class: 'texto-do-relato', texto: texto
       }));
     });
 
@@ -8903,7 +8863,7 @@
     corpo.innerHTML = '';
     rodape.innerHTML = '';
     corpo.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0', texto: 'Abrindo o banco de temas...'
+      class: 'ajuda u-margem-topo-0', texto: 'Abrindo o banco de temas...'
     }));
     abrirModal('modal-trilha');
 
@@ -8960,7 +8920,7 @@
 
     var ano = Core.anoEscolarDe(aluno);
     corpo.appendChild(el('div', { class: 'bloco-exercicios', id: 'trilha-onde-chegar', texto: 'Onde ele precisa chegar' }));
-    corpo.appendChild(el('div', { class: 'ajuda', style: 'margin-top:0' }, [
+    corpo.appendChild(el('div', { class: 'ajuda u-margem-topo-0' }, [
       document.createTextNode(ano
         ? 'Toque no assunto que fecha a lacuna. A sugestão é o mais alto que não passa do ' +
           nomeDoAno(ano) + ', que é o ano de ' + aluno.nome + '. '
@@ -8972,21 +8932,19 @@
     r.candidatos.slice(0, 5).forEach(function (c) {
       var ehSugerido = c.id === r.sugerido;
       var linha = el('div', {
-        class: 'item-lista clicavel item-alvo-trilha', 'data-alvo': c.id,
-        style: ehSugerido ? 'border-color:#2E8B76;border-width:2px' : ''
+        class: 'item-lista clicavel item-alvo-trilha' + (ehSugerido ? ' alvo-sugerido' : ''), 'data-alvo': c.id
       }, [
         el('div', { class: 'cresce' }, [
           el('div', { class: 'nome' }, [
             document.createTextNode(c.titulo),
             ehSugerido
-              ? el('span', { class: 'tag cheia', texto: 'sugerido', style: 'margin-left:8px' })
+              ? el('span', { class: 'tag cheia u-margem-esq-8', texto: 'sugerido' })
               : null
           ].filter(Boolean)),
           el('div', { class: 'detalhe', texto: rotuloDisciplina(materiaDoTemaId(c.id)) + ', ' + nomeDoAno(c.serie) })
         ]),
         el('button', {
-          type: 'button', class: 'btn pequeno principal', texto: 'Montar',
-          style: 'min-height:44px;box-sizing:border-box;padding:11px 18px;font-size:14px'
+          type: 'button', class: 'btn pequeno principal u-alt-min-44 u-medida-borda u-recuo-11-18 u-letra-3', texto: 'Montar'
         })
       ]);
       /* O clique do botão sobe até aqui: a linha inteira é o alvo de toque, e
@@ -9004,8 +8962,7 @@
     }));
 
     rodape.appendChild(el('button', {
-      type: 'button', class: 'btn', texto: 'Cancelar', style: 'min-height:44px',
-      aoClick: function () { fecharModal('modal-trilha'); }
+      type: 'button', class: 'btn u-alt-min-44', texto: 'Cancelar', aoClick: function () { fecharModal('modal-trilha'); }
     }));
     corpo.scrollTop = 0;
   }
@@ -9121,7 +9078,7 @@
     /* Guardar a trilha não guarda o mapeamento, e a tela diz isso antes: sem
      * esta linha ela fecharia a trilha achando que já tinha confirmado tudo. */
     if (mapeamentoEmEdicao && aluno && mapeamentoEmEdicao.alunoId === aluno.id) {
-      corpo.appendChild(el('div', { class: 'ajuda', id: 'trilha-mapeamento-aberto', style: 'margin-top:0' }, [
+      corpo.appendChild(el('div', { class: 'ajuda u-margem-topo-0', id: 'trilha-mapeamento-aberto' }, [
         el('strong', { texto: 'O mapeamento continua aberto atrás desta janela. ' }),
         document.createTextNode('O que você marcar lá só é gravado por "Salvar mapeamento": ' +
           'guardar a trilha aqui não salva o mapeamento junto.')
@@ -9132,8 +9089,7 @@
      * embaixo faria a mesma frase aparecer duas vezes na mesma tela. */
     if (!proposta && !encerrada) {
       corpo.appendChild(el('div', {
-        class: 'ajuda', style: 'margin-top:0',
-        texto: 'Criada em ' + Core.ddmmaaaa(trilha.criadaEm)
+        class: 'ajuda u-margem-topo-0', texto: 'Criada em ' + Core.ddmmaaaa(trilha.criadaEm)
       }));
     }
 
@@ -9155,10 +9111,9 @@
         document.createTextNode('Se ele não tiver base nem para isso, puxe mais de trás: ' +
           'ainda há ' + cortados.length + (cortados.length === 1
             ? ' assunto anterior guardado.' : ' assuntos anteriores guardados.')),
-        el('div', { class: 'barra', style: 'margin:8px 0 0' }, [
+        el('div', { class: 'barra u-margem-8-0-0' }, [
           el('button', {
-            type: 'button', class: 'btn', id: 'puxar-mais-de-tras', texto: 'Puxar mais de trás',
-            style: 'min-height:44px;padding:11px 16px',
+            type: 'button', class: 'btn u-alt-min-44 u-recuo-11-16', id: 'puxar-mais-de-tras', texto: 'Puxar mais de trás',
             aoClick: function () {
               mudar(function () {
                 var novo = propostaDeTrilha.cortados.pop();
@@ -9178,8 +9133,7 @@
      * tema declara no banco. A tela nunca dizia isso, e sem saber de onde vem a
      * ordem ela não tinha como decidir quando mudá-la. */
     corpo.appendChild(el('div', {
-      class: 'ajuda', id: 'trilha-de-onde-vem-a-ordem', style: 'margin-top:0',
-      texto: encerrada
+      class: 'ajuda u-margem-topo-0', id: 'trilha-de-onde-vem-a-ordem', texto: encerrada
         ? 'A ordem veio dos pré-requisitos do banco: cada assunto entrou depois daquele que ele exige.'
         : 'A ordem vem dos pré-requisitos do banco: cada assunto vem depois daquele que ele exige. ' +
           'Se para este aluno fizer mais sentido de outro jeito, use as setas.'
@@ -9234,9 +9188,9 @@
         detalhe = comoOPassoFechou(p) + Core.ddmm(p.feitoEm) + ' · ' + detalhe;
       }
 
-      /* Alvo de toque de 44 px, que é o que a mão dela pede em pé, na casa da
-       * família. O que estava aqui tinha 37 px de altura. */
-      var ALVO = 'min-height:44px;min-width:44px;box-sizing:border-box;';
+      /* Alvo de toque de 44 px (u-alt-min-44 e u-larg-min-44), que é o que a
+       * mão dela pede em pé, na casa da família. O que estava aqui tinha 37 px
+       * de altura. */
       var botoes = [];
       var lp = p.semLista ? null : listaProntaDoPasso(p);
       var acaoLista = null;
@@ -9244,9 +9198,8 @@
         acaoLista = el('span', { class: 'ajuda', texto: 'Guarde a trilha para abrir esta lista.' });
       } else if (lp) {
         acaoLista = el('button', {
-          type: 'button', class: 'btn pequeno abrir-lista-trilha', texto: 'Abrir lista',
+          type: 'button', class: 'btn pequeno abrir-lista-trilha u-alt-min-44 u-larg-min-44 u-medida-borda u-recuo-11-14 u-letra-2', texto: 'Abrir lista',
           title: 'Abrir lista pronta na Biblioteca',
-          style: ALVO + 'padding:11px 14px;font-size:13px',
           aoClick: function () {
             if (lp.modulo) {
               bibNav.modulo = lp.modulo;
@@ -9275,9 +9228,8 @@
         /* Nenhum botão: trilha encerrada é registro, e registro não se mexe. */
       } else if (feito) {
         botoes.push(el('button', {
-          type: 'button', class: 'btn pequeno trazer-passo', texto: 'Trazer de volta',
+          type: 'button', class: 'btn pequeno trazer-passo u-alt-min-44 u-larg-min-44 u-medida-borda u-recuo-11-14 u-letra-2', texto: 'Trazer de volta',
           title: 'Volta a contar como passo a dar',
-          style: ALVO + 'padding:11px 14px;font-size:13px',
           aoClick: function () {
             var marca = { feitoEm: p.feitoEm, aulaId: p.aulaId, jaEra: p.jaEra, porDominio: p.porDominio };
             mudarComDesfazer('Passo de volta na fila.', function () {
@@ -9288,8 +9240,7 @@
       } else {
         if (!proposta) {
           botoes.push(el('button', {
-            type: 'button', class: 'btn pequeno marcar-passo', texto: 'Já dei este',
-            style: ALVO + 'padding:11px 14px;font-size:13px',
+            type: 'button', class: 'btn pequeno marcar-passo u-alt-min-44 u-larg-min-44 u-medida-borda u-recuo-11-14 u-letra-2', texto: 'Já dei este',
             aoClick: function () {
               mudar(function () { remarcarPasso(p, null); }, 'Passo marcado.');
             }
@@ -9302,18 +9253,18 @@
          * seta desce o passo que ela queria subir, e ela só descobre relendo a
          * lista. Agora há 16 px entre uma e outra. */
         botoes.push(el('button', {
-          type: 'button', class: 'btn pequeno subir-passo', texto: '↑', title: 'Subir este passo',
-          style: ALVO + 'padding:11px 15px;font-size:16px;margin-right:16px' +
-            (i === 0 ? ';visibility:hidden' : ''),
+          type: 'button', texto: '↑', title: 'Subir este passo',
+          class: 'btn pequeno subir-passo u-alt-min-44 u-larg-min-44 u-medida-borda u-recuo-11-15 u-letra-5 u-margem-dir-16' +
+            (i === 0 ? ' u-invisivel' : ''),
           aoClick: function () {
             if (i === 0) return;
             mudar(function () { Core.moverPasso(trilha, i, i - 1); });
           }
         }));
         botoes.push(el('button', {
-          type: 'button', class: 'btn pequeno descer-passo', texto: '↓', title: 'Descer este passo',
-          style: ALVO + 'padding:11px 15px;font-size:16px' +
-            (i === passos.length - 1 ? ';visibility:hidden' : ''),
+          type: 'button', texto: '↓', title: 'Descer este passo',
+          class: 'btn pequeno descer-passo u-alt-min-44 u-larg-min-44 u-medida-borda u-recuo-11-15 u-letra-5' +
+            (i === passos.length - 1 ? ' u-invisivel' : ''),
           aoClick: function () {
             if (i === passos.length - 1) return;
             mudar(function () { Core.moverPasso(trilha, i, i + 1); });
@@ -9322,10 +9273,9 @@
       }
       if (!encerrada) {
         botoes.push(el('button', {
-          type: 'button', class: 'btn pequeno perigo tirar-passo', texto: 'Tirar',
+          type: 'button', class: 'btn pequeno perigo tirar-passo u-alt-min-44 u-larg-min-44 u-medida-borda u-margem-esq-28 u-recuo-11-14 u-letra-2', texto: 'Tirar',
           /* A folga existe pelo mesmo motivo da lista de assuntos: Tirar apaga,
            * e ficava a 21 px da seta de descer numa tela usada em pé. */
-          style: ALVO + 'margin-left:28px;padding:11px 14px;font-size:13px',
           aoClick: function () {
             var guardado = p, posicao = i;
             mudarComDesfazer('Passo tirado da trilha.', function () {
@@ -9338,19 +9288,18 @@
       }
 
       listaPassos.appendChild(el('div', {
-        class: 'passo-roteiro item-passo-trilha', 'data-passo': p.temaId,
-        style: 'display:flex;align-items:center;gap:10px;flex-wrap:wrap' +
-          (feito ? ';opacity:.65' : '')
+        class: 'passo-roteiro item-passo-trilha u-mostra-flex u-alinha-centro u-vao-10 u-flex-quebra-sim' +
+          (feito ? ' u-esmaecido' : ''),
+        'data-passo': p.temaId
       }, [
-        el('div', { class: 'cresce', style: 'flex:1;min-width:200px' }, [
+        el('div', { class: 'cresce u-flex-1 u-larg-min-200' }, [
           el('div', {
-            class: 'nome',
-            style: feito ? 'text-decoration:line-through' : '',
+            class: feito ? 'nome u-riscado' : 'nome',
             texto: (i + 1) + '. ' + p.titulo
           }),
           el('div', { class: 'detalhe', texto: detalhe })
         ]),
-        el('div', { style: 'display:flex;align-items:center;gap:6px;flex-wrap:wrap' }, botoes)
+        el('div', { class: 'u-mostra-flex u-alinha-centro u-vao-6 u-flex-quebra-sim' }, botoes)
       ]));
     });
 
@@ -9358,8 +9307,7 @@
     var barraDoFim = [];
     if (!encerrada) {
       barraDoFim.push(el('button', {
-        type: 'button', class: 'btn', id: 'acrescentar-passo', texto: '+ Acrescentar passo',
-        style: 'min-height:44px;padding:11px 16px',
+        type: 'button', class: 'btn u-alt-min-44 u-recuo-11-16', id: 'acrescentar-passo', texto: '+ Acrescentar passo',
         aoClick: function () {
           escolherTemaDeMatematica(aluno, 'Acrescentar passo à trilha', function (t) {
             var jaTem = passos.filter(function (x) { return x.temaId === t.id; }).length;
@@ -9379,7 +9327,7 @@
     /* Barra vazia não nasce: numa trilha encerrada não sobra botão nenhum
      * aqui, e uma faixa vazia deixaria um vão na tela. */
     if (barraDoFim.length) {
-      corpo.appendChild(el('div', { class: 'barra', style: 'margin:12px 0 4px' }, barraDoFim));
+      corpo.appendChild(el('div', { class: 'barra u-margem-12-0-4' }, barraDoFim));
     }
     var ajudaDoFim = encerrada
       ? ''
@@ -9389,14 +9337,12 @@
     // ---- rodapé ----
     if (proposta) {
       rodape.appendChild(el('button', {
-        type: 'button', class: 'btn', texto: 'Cancelar',
-        style: 'min-height:44px',
+        type: 'button', class: 'btn u-alt-min-44', texto: 'Cancelar',
         aoClick: function () { propostaDeTrilha = null; fecharModal('modal-trilha'); }
       }));
       rodape.appendChild(el('button', {
-        type: 'button', class: 'btn principal', id: 'guardar-trilha',
+        type: 'button', class: 'btn principal u-alt-min-44', id: 'guardar-trilha',
         texto: passos.length === 1 ? 'Guardar assim mesmo' : 'Guardar trilha',
-        style: 'min-height:44px',
         aoClick: function (ev) {
           /* Trava do segundo toque, aqui e dentro do guardarProposta: no tablet
            * o toque duplica com facilidade, e dois toques empurravam a MESMA
@@ -9408,8 +9354,7 @@
     } else {
       if (!encerrada) {
         rodape.appendChild(el('button', {
-          type: 'button', class: 'btn esquerda', id: 'encerrar-trilha', texto: 'Encerrar trilha',
-          style: 'min-height:44px',
+          type: 'button', class: 'btn esquerda u-alt-min-44', id: 'encerrar-trilha', texto: 'Encerrar trilha',
           aoClick: function () {
             abrirEncerramento(trilha, aluno, function () {
               desenharTrilha(trilha, aluno, opcoes);
@@ -9418,8 +9363,7 @@
         }));
       }
       rodape.appendChild(el('button', {
-        type: 'button', class: 'btn principal', id: 'fechar-trilha', texto: 'Fechar',
-        style: 'min-height:44px',
+        type: 'button', class: 'btn principal u-alt-min-44', id: 'fechar-trilha', texto: 'Fechar',
         aoClick: function () { fecharModal('modal-trilha'); }
       }));
     }
@@ -9493,20 +9437,18 @@
     ]));
 
     var campo = el('textarea', {
-      id: 'motivo-encerramento', style: 'min-height:72px',
+      id: 'motivo-encerramento', class: 'u-alt-min-72',
       placeholder: 'Ele destravou, mudou a prioridade, a família pediu outra coisa...'
     });
     corpo.appendChild(el('label', { class: 'campo' }, [
       el('span', { texto: 'Por que está encerrando (opcional)' }), campo
     ]));
     corpo.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'Pode deixar em branco. O motivo aparece junto da trilha encerrada na ficha do aluno.'
+      class: 'ajuda u-margem-topo-0', texto: 'Pode deixar em branco. O motivo aparece junto da trilha encerrada na ficha do aluno.'
     }));
 
     rodape.appendChild(el('button', {
-      type: 'button', class: 'btn', id: 'cancelar-encerramento', texto: '‹ Voltar',
-      style: 'min-height:44px',
+      type: 'button', class: 'btn u-alt-min-44', id: 'cancelar-encerramento', texto: '‹ Voltar',
       aoClick: function () {
         if (voltar) voltar(); else fecharModal('modal-trilha');
       }
@@ -9515,9 +9457,8 @@
       /* Sem a classe perigo junto da principal: as duas mandam na cor e a
        * segunda vence, deixando texto vermelho sobre fundo azul-escuro. E
        * encerrar não apaga nada mesmo, então vermelho contaria outra história. */
-      type: 'button', class: 'btn principal', id: 'confirmar-encerramento',
-      texto: 'Encerrar trilha', style: 'min-height:44px',
-      aoClick: function (ev) {
+      type: 'button', class: 'btn principal u-alt-min-44', id: 'confirmar-encerramento',
+      texto: 'Encerrar trilha', aoClick: function (ev) {
         if (ev && ev.currentTarget) ev.currentTarget.disabled = true;
         var motivo = String(campo.value || '').trim();
         /* Encerrar é destrutivo do ponto de vista dela: some da lista das
@@ -9548,7 +9489,7 @@
     corpo.innerHTML = '';
     rodape.innerHTML = '';
     corpo.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0', texto: 'Carregando os temas...'
+      class: 'ajuda u-margem-topo-0', texto: 'Carregando os temas...'
     }));
     abrirModal('modal-tema');
     carregarIndice().then(function (temas) {
@@ -9603,8 +9544,7 @@
     if (itens.length) {
       corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Lacunas marcadas no mapeamento' }));
       corpo.appendChild(el('div', {
-        class: 'ajuda', style: 'margin-top:0',
-        texto: 'Toque na lacuna que você quer fechar. Na tela seguinte você confirma onde ele ' +
+        class: 'ajuda u-margem-topo-0', texto: 'Toque na lacuna que você quer fechar. Na tela seguinte você confirma onde ele ' +
           'precisa chegar, e só depois a trilha é montada.'
       }));
       itens.forEach(function (item) {
@@ -9615,8 +9555,7 @@
             el('div', { class: 'nome', texto: item.rotulo })
           ]),
           el('button', {
-            type: 'button', class: 'btn pequeno principal', texto: 'Montar',
-            style: 'min-height:44px;box-sizing:border-box;padding:11px 18px;font-size:14px'
+            type: 'button', class: 'btn pequeno principal u-alt-min-44 u-medida-borda u-recuo-11-18 u-letra-3', texto: 'Montar'
           })
         ]);
         linha.addEventListener('click', function () { abrirTrilhaDaLacuna(aluno, item); });
@@ -9633,17 +9572,15 @@
       ]));
     }
 
-    corpo.appendChild(el('div', { class: 'barra', style: 'margin-top:12px' }, [
+    corpo.appendChild(el('div', { class: 'barra u-margem-topo-12' }, [
       el('button', {
-        type: 'button', class: 'btn', id: 'trilha-do-zero-na-escolha', texto: 'Trilha do zero',
-        style: 'min-height:44px;padding:11px 16px',
+        type: 'button', class: 'btn u-alt-min-44 u-recuo-11-16', id: 'trilha-do-zero-na-escolha', texto: 'Trilha do zero',
         aoClick: function () { novaTrilhaDoZero(aluno); }
       })
     ]));
 
     rodape.appendChild(el('button', {
-      type: 'button', class: 'btn principal', texto: 'Fechar', style: 'min-height:44px',
-      aoClick: function () { fecharModal('modal-trilha'); }
+      type: 'button', class: 'btn principal u-alt-min-44', texto: 'Fechar', aoClick: function () { fecharModal('modal-trilha'); }
     }));
     abrirModal('modal-trilha');
     corpo.scrollTop = 0;
@@ -9684,29 +9621,25 @@
 
       painel.appendChild(el('h3', { class: 'subtitulo', texto: 'Trilhas' }));
       painel.appendChild(el('div', {
-        class: 'ajuda', style: 'margin-top:0',
-        texto: 'A trilha é a sequência de assuntos que precisa vir antes daquele em que ele ' +
+        class: 'ajuda u-margem-topo-0', texto: 'A trilha é a sequência de assuntos que precisa vir antes daquele em que ele ' +
           'travou, na ordem. Ela anda sozinha: quando você marca Domina no assunto da aula, em ' +
           'Registrar como foi, o passo daquele assunto fecha com a data da aula.'
       }));
 
-      painel.appendChild(el('div', { class: 'barra', style: 'margin:10px 0' }, [
+      painel.appendChild(el('div', { class: 'barra u-margem-10-0' }, [
         el('button', {
-          type: 'button', class: 'btn principal', id: 'montar-trilha',
-          texto: 'Montar trilha', style: 'flex:1;min-height:44px;padding:12px 16px',
-          aoClick: function () { abrirEscolhaDaLacuna(aluno); }
+          type: 'button', class: 'btn u-flex-1 u-alt-min-44 u-recuo-12-16', id: 'montar-trilha',
+          texto: 'Montar trilha', aoClick: function () { abrirEscolhaDaLacuna(aluno); }
         }),
         el('button', {
-          type: 'button', class: 'btn', id: 'nova-trilha-do-zero', texto: 'Trilha do zero',
-          style: 'min-height:44px;padding:12px 16px',
+          type: 'button', class: 'btn u-alt-min-44 u-recuo-12-16', id: 'nova-trilha-do-zero', texto: 'Trilha do zero',
           aoClick: function () { novaTrilhaDoZero(aluno); }
         })
       ]));
 
       if (!todas.length) {
         painel.appendChild(el('div', {
-          class: 'ajuda', style: 'margin-top:0',
-          texto: 'Nenhuma trilha ainda. Montar trilha parte das lacunas marcadas no ' +
+          class: 'ajuda u-margem-topo-0', texto: 'Nenhuma trilha ainda. Montar trilha parte das lacunas marcadas no ' +
             'mapeamento; Trilha do zero parte de um assunto escolhido por você.'
         }));
         return;
@@ -9717,8 +9650,7 @@
       if (encerradas.length) {
         painel.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Trilhas encerradas' }));
         painel.appendChild(el('div', {
-          class: 'ajuda', style: 'margin-top:0',
-          texto: 'Trilha encerrada não some: é a prova do trabalho, e é o que uma conversa com ' +
+          class: 'ajuda u-margem-topo-0', texto: 'Trilha encerrada não some: é a prova do trabalho, e é o que uma conversa com ' +
             'a família vai querer ver.'
         }));
         encerradas.forEach(function (trilha) {
@@ -9733,10 +9665,7 @@
               })
             ]),
             el('button', {
-              type: 'button', class: 'btn pequeno abrir-trilha', texto: 'Abrir',
-              style: 'min-height:44px;min-width:44px;box-sizing:border-box;padding:11px 16px;font-size:13px',
-              /* Sem fechar a ficha: ver a trilha e voltar tem que custar um
-               * toque, como já custa em Montar trilha, que empilha. */
+              type: 'button', class: 'btn pequeno abrir-trilha u-alt-min-44 u-larg-min-44 u-medida-borda u-recuo-11-16 u-letra-2', texto: 'Abrir',
               aoClick: function () { abrirTrilhaGuardada(aluno, trilha); }
             })
           ]));
@@ -9758,27 +9687,21 @@
    * marcar, que passou de 13 para 44 px. */
   function cartaoDeTrilha(trilha, aluno, redesenhar) {
     var caixa = el('div', {
-      class: 'cartao item-trilha-ativa', 'data-trilha': trilha.id,
-      style: 'margin-bottom:12px'
+      class: 'cartao item-trilha-ativa u-margem-baixo-12', 'data-trilha': trilha.id
     });
-    var ALVO = 'min-height:44px;min-width:44px;box-sizing:border-box;';
 
-    caixa.appendChild(el('div', { class: 'barra', style: 'margin-bottom:6px;gap:10px' }, [
+    caixa.appendChild(el('div', { class: 'barra u-margem-baixo-6 u-vao-10' }, [
       el('div', { class: 'cresce' }, [
-        el('div', { class: 'nome', style: 'font-weight:700;color:#1F3A5F', texto: trilha.titulo }),
-        el('div', { class: 'detalhe', style: 'font-size:13px', texto: resumoDaTrilha(trilha, aluno) })
+        el('div', { class: 'nome u-peso-negrito u-cor-navy', texto: trilha.titulo }),
+        el('div', { class: 'detalhe u-letra-2', texto: resumoDaTrilha(trilha, aluno) })
       ]),
       el('button', {
-        type: 'button', class: 'btn pequeno abrir-trilha', texto: 'Abrir',
-        style: ALVO + 'padding:11px 16px;font-size:13px',
-        /* Abrir empilha em cima da ficha, do mesmo jeito que Montar trilha:
-         * fechar a ficha aqui fazia o caminho de volta custar seis toques. */
+        type: 'button', class: 'btn pequeno abrir-trilha u-alt-min-44 u-larg-min-44 u-medida-borda u-recuo-11-16 u-letra-2', texto: 'Abrir',
         aoClick: function () { abrirTrilhaGuardada(aluno, trilha); }
       }),
       el('button', {
-        type: 'button', class: 'btn pequeno encerrar-trilha', texto: 'Encerrar',
+        type: 'button', class: 'btn pequeno encerrar-trilha u-alt-min-44 u-larg-min-44 u-medida-borda u-margem-esq-22 u-recuo-11-16 u-letra-2', texto: 'Encerrar',
         /* Encerrar ficava a 10 px de Abrir, e uma some da lista e a outra não. */
-        style: ALVO + 'margin-left:22px;padding:11px 16px;font-size:13px',
         aoClick: function () { encerrarPeloPainel(trilha, aluno, redesenhar); }
       })
     ]));
@@ -9790,8 +9713,7 @@
        * invisível maior do que o desenho, que é o tipo de alvo que ela erra
        * justamente por não ver onde acaba. */
       var chk = el('input', {
-        type: 'checkbox', class: 'marca-passo',
-        style: 'width:44px;height:44px;min-height:44px;flex:none;margin:0;cursor:pointer'
+        type: 'checkbox', class: 'marca-passo u-larg-44 u-alt-44 u-alt-min-44 u-flex-nenhum u-margem-0 u-cursor-mao'
       });
       chk.checked = feito;
       chk.addEventListener('change', function () {
@@ -9829,16 +9751,16 @@
        * a caixa, e era a linha inteira que virava alvo. A caixa ganhou 10 px de
        * folga em volta para chegar aos 44, sem crescer o desenho. */
       caixa.appendChild(el('div', {
-        class: 'item-area passo-da-trilha', 'data-passo': p.temaId,
-        style: 'margin-bottom:5px;cursor:default;padding:4px 10px' + (feito ? ';opacity:.65' : '')
+        class: 'item-area passo-da-trilha u-margem-baixo-5 u-cursor-default u-recuo-4-10' + (feito ? ' u-esmaecido' : ''),
+        'data-passo': p.temaId
       }, [
         chk,
         el('span', { class: 'cresce' }, [
           el('span', {
-            style: feito ? 'text-decoration:line-through' : '',
+            class: feito ? 'u-riscado' : '',
             texto: (i + 1) + '. ' + p.titulo
           }),
-          quando ? el('span', { class: 'detalhe', style: 'display:block;font-size:12px', texto: quando }) : null
+          quando ? el('span', { class: 'detalhe u-mostra-bloco u-letra-2', texto: quando }) : null
         ].filter(Boolean))
       ]));
     });
@@ -9893,8 +9815,7 @@
     if (u.temFolha) sinais.push('folha escrita');
     if (u.qtdAnexos) sinais.push(u.qtdAnexos === 1 ? '1 anexo' : u.qtdAnexos + ' anexos');
     if (sinais.length) {
-      linhas.push(el('div', { class: 'linha-ultimo ajuda', style: 'margin:2px 0 0',
-        texto: 'Essa aula tem ' + sinais.join(' e ') + '.' }));
+      linhas.push(el('div', { class: 'linha-ultimo ajuda u-margem-2-0-0', texto: 'Essa aula tem ' + sinais.join(' e ') + '.' }));
     }
 
     /* A anotação particular do encontro anterior sai por último e fechada.
@@ -9927,12 +9848,12 @@
           caixa.scrollTop = caixa.scrollHeight;
         }
       });
-      linhas.push(el('div', { style: 'margin-top:6px' }, [botao]));
+      linhas.push(el('div', { class: 'u-margem-topo-6' }, [botao]));
       linhas.push(texto);
     }
 
     corpo.appendChild(el('div', { class: 'ultimo-encontro', id: 'ultimo-encontro' }, [
-      el('div', { class: 'barra', style: 'margin-bottom:6px' }, [
+      el('div', { class: 'barra u-margem-baixo-6' }, [
         el('span', {
           class: 'rotulo-ultimo',
           texto: 'Na última aula, ' + Core.ddmmaaaa(u.data) + ', ' + u.diaSemana
@@ -10082,14 +10003,14 @@
         texto += (texto ? '. ' : '') + 'Prova em ' + Core.ddmmaaaa(prazo.data) +
           ', ' + prazo.texto;
       }
-      conteudo.push(el('div', { id: 'objetivo-da-aula', style: 'margin-bottom:5px' }, [
+      conteudo.push(el('div', { id: 'objetivo-da-aula', class: 'u-margem-baixo-5' }, [
         el('strong', { texto: 'Objetivo: ' }),
         document.createTextNode(texto + '.')
       ]));
     }
 
     if (l.prioridades) {
-      conteudo.push(el('div', { style: 'margin-bottom:5px' }, [
+      conteudo.push(el('div', { class: 'u-margem-baixo-5' }, [
         el('strong', { texto: 'Prioridades: ' }),
         document.createTextNode(l.prioridades.replace(/\s*\n\s*/g, '; '))
       ]));
@@ -10097,7 +10018,7 @@
     function linha(rotulo, itens, total) {
       if (!itens.length) return;
       var extra = total > itens.length ? ' e mais ' + (total - itens.length) : '';
-      conteudo.push(el('div', { style: 'margin-bottom:4px' }, [
+      conteudo.push(el('div', { class: 'u-margem-baixo-4' }, [
         el('strong', { texto: rotulo + ': ' }),
         document.createTextNode(itens.join(', ') + extra + '.')
       ]));
@@ -10107,10 +10028,10 @@
     linha('Costuma funcionar', l.aprende, l.aprende.length);
 
     var caixa = el('div', { class: 'lembrete', id: 'lembrete-mapeamento' }, [
-      el('div', { class: 'barra', style: 'margin-bottom:6px' }, [
+      el('div', { class: 'barra u-margem-baixo-6' }, [
         el('span', {
           texto: 'Do mapeamento de ' + Core.ddmmaaaa(l.data),
-          style: 'font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#2E7D6B'
+          class: 'u-letra-2 u-peso-negrito u-espaco-letras-05em u-caixa-maiusculas u-cor-teal'
         }),
         el('span', { class: 'cresce' }),
         el('button', {
@@ -10122,8 +10043,7 @@
 
     if (aula) {
       caixa.appendChild(el('button', {
-        type: 'button', class: 'btn pequeno', id: 'usar-lembrete',
-        style: 'margin-top:8px',
+        type: 'button', class: 'btn pequeno u-margem-topo-8', id: 'usar-lembrete',
         texto: 'Copiar para a anotação',
         aoClick: function () {
           var area = $('#campo-nota-texto');
@@ -10147,7 +10067,7 @@
     ]));
 
     var jaTem = Core.mapeado(aluno);
-    corpo.appendChild(el('div', { class: 'barra', style: 'margin-bottom:6px' }, [
+    corpo.appendChild(el('div', { class: 'barra u-margem-baixo-6' }, [
       el('button', {
         type: 'button', class: 'btn destaque', id: 'abrir-mapeamento',
         texto: jaTem ? 'Abrir o mapeamento' : 'Preencher o mapeamento',
@@ -10252,8 +10172,8 @@
   function desenharBlocoDaSondagem(corpo, aluno, aula) {
     var ano = Core.anoEscolarDe(aluno);
     var feita = sondagemDaAula(aluno, aula.id);
-    var bloco = el('div', { id: 'bloco-sondagem', class: 'lembrete', style: 'margin:10px 0' });
-    bloco.appendChild(el('div', { class: 'nome', style: 'font-weight:700', texto: 'Sondagem escrita' }));
+    var bloco = el('div', { id: 'bloco-sondagem', class: 'lembrete u-margem-10-0' });
+    bloco.appendChild(el('div', { class: 'nome u-peso-negrito', texto: 'Sondagem escrita' }));
     if (feita) {
       var lacunas = [];
       feita.itens.forEach(function (x) { if (lacunas.indexOf(x.lacuna) < 0) lacunas.push(x.lacuna); });
@@ -10265,7 +10185,7 @@
         texto: 'Sondagem do ' + nomeDoAnoDaSondagem(feita.anoEscolar) + ': ' +
           contagemDaSondagem(feita.itens.length, 'exercício', 'exercícios') + ' de ' +
           contagemDaSondagem(lacunas.length, 'lacuna', 'lacunas') + '; ' + estado + '.' }));
-      bloco.appendChild(el('div', { class: 'barra', style: 'margin-top:8px' }, [
+      bloco.appendChild(el('div', { class: 'barra u-margem-topo-8' }, [
         el('button', { type: 'button', class: 'btn pequeno', id: 'abrir-sondagem', texto: 'Abrir a sondagem',
           aoClick: function () { abrirSondagem(aluno.id, aula.id); } }),
         el('button', { type: 'button', class: 'btn pequeno destaque', id: 'corrigir-sondagem', texto: 'Corrigir',
@@ -10275,7 +10195,7 @@
       bloco.appendChild(el('div', { class: 'detalhe', id: 'sondagem-pronta',
         texto: 'Pronta para o ' + nomeDoAnoDaSondagem(ano) + ': dois exercícios por lacuna provável do ano, ' +
           origemDaSondagem(ano) + '. Você tira, troca e põe antes de usar.' }));
-      bloco.appendChild(el('div', { class: 'barra', style: 'margin-top:8px' }, [
+      bloco.appendChild(el('div', { class: 'barra u-margem-topo-8' }, [
         el('button', { type: 'button', class: 'btn pequeno destaque', id: 'montar-sondagem',
           texto: 'Montar a sondagem do ' + nomeDoAnoDaSondagem(ano),
           aoClick: function () { abrirSondagem(aluno.id, aula.id); } })
@@ -10308,7 +10228,7 @@
   /* O enunciado do exercício, do próprio tablet, em miniatura: tirar e trocar
    * sem ver o exercício seria escolher pelo nome da lista. */
   function miniaturaDoExercicio(it) {
-    var img = el('img', { class: 'miniatura-sondagem', alt: 'Enunciado', style: 'display:block;max-width:100%;max-height:150px;margin:4px 0;background:#fff' });
+    var img = el('img', { class: 'miniatura-sondagem u-mostra-bloco u-larg-max-100p u-alt-max-150 u-margem-4-0 u-fundo-fff', alt: 'Enunciado' });
     if (it && it.assets && it.assets.enunciado) {
       Store.lerAssetBiblioteca(it.pacote, it.assets.enunciado).then(function (b) {
         if (!b) return;
@@ -10396,7 +10316,7 @@
     var rolagem = corpo.scrollTop;
     corpo.innerHTML = '';
     rodape.innerHTML = '';
-    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', id: 'sondagem-explica',
+    corpo.appendChild(el('p', { class: 'ajuda u-margem-topo-0', id: 'sondagem-explica',
       texto: 'Sondagem do ' + nomeDoAnoDaSondagem(s.ano) + ': dois exercícios por lacuna provável do ano, ' +
         origemDaSondagem(s.ano) + '. Tire, troque ou ponha exercício antes de gerar a folha. ' +
         'Não é prova: é para ver onde a base falha.' }));
@@ -10408,10 +10328,10 @@
           : 'Nenhum pacote da biblioteca está no tablet. Importe os pacotes da OBMEP em Ajustes, na Biblioteca.' }));
     }
     s.blocos.forEach(function (b, bi) {
-      var caixa = el('div', { class: 'bloco-sondagem', 'data-lacuna': b.lacuna, style: 'margin:14px 0' });
+      var caixa = el('div', { class: 'bloco-sondagem u-margem-14-0', 'data-lacuna': b.lacuna });
       var proximo = proximoDaLacuna(b);
       caixa.appendChild(el('div', { class: 'barra' }, [
-        el('h3', { class: 'subtitulo', style: 'margin:0;border:none', texto: b.rotulo }),
+        el('h3', { class: 'subtitulo u-margem-0 u-borda-nenhum', texto: b.rotulo }),
         el('span', { class: 'tag' + (b.itens.length ? ' cheia' : ''), texto: contagemDaSondagem(b.itens.length, 'exercício', 'exercícios') }),
         el('span', { class: 'cresce' }),
         el('button', { type: 'button', class: 'btn pequeno por-sondagem', texto: 'Pôr mais um', disabled: proximo ? null : 'disabled',
@@ -10470,7 +10390,7 @@
     if (outras.length) {
       var sel = el('select', { id: 'sondagem-outra-lacuna' });
       outras.forEach(function (i) { sel.appendChild(el('option', { value: i.id, texto: i.rotulo })); });
-      corpo.appendChild(el('div', { class: 'campo', style: 'margin-top:18px' }, [
+      corpo.appendChild(el('div', { class: 'campo u-margem-topo-18' }, [
         el('span', { texto: 'Pôr outra lacuna' }),
         el('div', { class: 'barra' }, [sel, el('button', { type: 'button', class: 'btn pequeno', id: 'sondagem-por-lacuna', texto: 'Pôr',
           aoClick: function () {
@@ -10487,8 +10407,7 @@
     var total = itensDaSondagemAberta().length;
     var aluno = alunoPorId(s.alunoId);
     var feita = aluno ? sondagemDaAula(aluno, s.aulaId) : null;
-    rodape.appendChild(el('span', { class: 'esquerda ajuda', id: 'sondagem-total', style: 'margin:0;align-self:center',
-      texto: contagemDaSondagem(total, 'exercício', 'exercícios') + ' na sondagem' }));
+    rodape.appendChild(el('span', { class: 'esquerda ajuda u-margem-0 u-alinha-se-centro', id: 'sondagem-total', texto: contagemDaSondagem(total, 'exercício', 'exercícios') + ' na sondagem' }));
     rodape.appendChild(el('button', { type: 'button', class: 'btn', texto: 'Cancelar',
       aoClick: function () { fecharModal('modal-sondagem'); } }));
     if (feita) {
@@ -10562,8 +10481,7 @@
     var rolagem = corpo.scrollTop;
     corpo.innerHTML = '';
     rodape.innerHTML = '';
-    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0',
-      texto: 'Para cada exercício, marque como saiu. A lacuna só vai para o mapeamento quando nenhum exercício dela ' +
+    corpo.appendChild(el('p', { class: 'ajuda u-margem-topo-0', texto: 'Para cada exercício, marque como saiu. A lacuna só vai para o mapeamento quando nenhum exercício dela ' +
         'saiu certo, e nada é gravado antes de você confirmar.' }));
     var lacunaAntes = null;
     feita.itens.forEach(function (x, k) {
@@ -10592,8 +10510,7 @@
       ]));
     });
     var feitos = c.respostas.filter(Boolean).length;
-    rodape.appendChild(el('span', { class: 'esquerda ajuda', id: 'sondagem-corrigidos', style: 'margin:0;align-self:center',
-      texto: feitos + ' de ' + feita.itens.length + ' corrigidos' }));
+    rodape.appendChild(el('span', { class: 'esquerda ajuda u-margem-0 u-alinha-se-centro', id: 'sondagem-corrigidos', texto: feitos + ' de ' + feita.itens.length + ' corrigidos' }));
     rodape.appendChild(el('button', { type: 'button', class: 'btn', texto: 'Cancelar',
       aoClick: function () { fecharModal('modal-sondagem'); } }));
     rodape.appendChild(el('button', { type: 'button', class: 'btn principal', id: 'sondagem-ver-resultado',
@@ -10624,7 +10541,7 @@
     var m = Core.mapeamentoAtual(aluno);
     var marcadas = m ? Core.marcadosDaMateria(m, Core.MATERIA_PADRAO).lacunas : [];
     var res = Core.lacunasDaCorrecao(tmp);
-    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', texto: m
+    corpo.appendChild(el('p', { class: 'ajuda u-margem-topo-0', texto: m
       ? 'Isto vai para o mapeamento de ' + Core.ddmmaaaa(m.data) + '. O que você já marcou lá continua como está.'
       : 'Ainda não há mapeamento: um novo nasce com estas lacunas, ligado a esta aula.' }));
     var lista = el('div', { id: 'sondagem-confirmacao' });
@@ -11065,7 +10982,7 @@
     corpo.innerHTML = '';
     rodape.innerHTML = '';
     corpo.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0', texto: 'Carregando os assuntos...'
+      class: 'ajuda u-margem-topo-0', texto: 'Carregando os assuntos...'
     }));
     abrirModal('modal-tema');
 
@@ -11260,7 +11177,7 @@
     var campoBusca = el('input', {
       type: 'text', id: 'busca-assunto',
       placeholder: 'Procurar assunto em qualquer matéria',
-      style: 'flex:1;min-width:160px'
+      class: 'u-flex-1 u-larg-min-160'
     });
     campoBusca.addEventListener('input', function () {
       busca = this.value;
@@ -11314,9 +11231,9 @@
     }
 
     function voltarPara(rotulo, titulo, aoTocar) {
-      return el('div', { class: 'barra', style: 'margin-bottom:8px' }, [
+      return el('div', { class: 'barra u-margem-baixo-8' }, [
         el('button', { type: 'button', class: 'btn pequeno', texto: '‹ Voltar', aoClick: aoTocar }),
-        el('h3', { class: 'titulo', style: 'font-size:17px', texto: titulo })
+        el('h3', { class: 'titulo u-letra-5', texto: titulo })
       ]);
     }
 
@@ -11348,7 +11265,7 @@
       lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Escrever o assunto' }));
       var campoOutro = el('input', {
         type: 'text', id: 'assunto-outro', maxlength: '70',
-        placeholder: 'Com as suas palavras', style: 'flex:1;min-width:160px'
+        placeholder: 'Com as suas palavras', class: 'u-flex-1 u-larg-min-160'
       });
       campoOutro.value = textoLivre;
       var usar = el('button', {
@@ -11362,7 +11279,7 @@
       campoOutro.addEventListener('keydown', function (ev) {
         if (ev.key === 'Enter') { ev.preventDefault(); usar.click(); }
       });
-      lista.appendChild(el('div', { class: 'barra', style: 'margin-bottom:12px' }, [campoOutro, usar]));
+      lista.appendChild(el('div', { class: 'barra u-margem-baixo-12' }, [campoOutro, usar]));
 
       function criarLinhaSugestao(s) {
         return linhaComDisponibilidade(s.item.titulo, s.detalhe, s.item, function () {
@@ -11411,8 +11328,7 @@
           : (Core.ANOS_ESCOLARES[anoInfo.ano] || 'Fora da escola');
         lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Matemática (' + rotuloEtapa + ')' }));
         lista.appendChild(el('div', {
-          class: 'ajuda', style: 'margin:-4px 0 8px',
-          texto: 'Este aluno está cadastrado como ' + rotuloEtapa + '. Você pode escrever o assunto acima, pesquisar por qualquer matéria ou abrir o catálogo completo de Matemática por ano.'
+          class: 'ajuda u-margem-menos4-0-8', texto: 'Este aluno está cadastrado como ' + rotuloEtapa + '. Você pode escrever o assunto acima, pesquisar por qualquer matéria ou abrir o catálogo completo de Matemática por ano.'
         }));
         lista.appendChild(linha(
           'Abrir o catálogo de Matemática por ano (' + (indiceTemas ? indiceTemas.length + ' assuntos' : 'grade completa') + ')',
@@ -11428,8 +11344,7 @@
           texto: 'Sugestões de Matemática (' + rotuloAno + ' · ano não cadastrado)'
         }));
         lista.appendChild(el('div', {
-          class: 'ajuda', style: 'margin:-4px 0 8px',
-          texto: 'O ano escolar não está informado na ficha deste aluno. Você pode escolher qualquer assunto abaixo, navegar por outros anos ou buscar livremente.'
+          class: 'ajuda u-margem-menos4-0-8', texto: 'O ano escolar não está informado na ficha deste aluno. Você pode escolher qualquer assunto abaixo, navegar por outros anos ou buscar livremente.'
         }));
         var temasDoAno = sugestoesDoAnoDeMatematica(aula, aluno, anoFallback, chavesRecentes);
         if (temasDoAno.length) {
@@ -11576,7 +11491,7 @@
       if (!achados.length) return;
 
       if (exatos) {
-        lista.appendChild(el('div', { class: 'ajuda', style: 'margin-top:0' }, [
+        lista.appendChild(el('div', { class: 'ajuda u-margem-topo-0' }, [
           document.createTextNode(achados.length +
             (achados.length === 1 ? ' assunto encontrado' : ' assuntos encontrados') +
             (achados.length > LIMITE ? ', mostrando os ' + LIMITE + ' primeiros.' : '.'))
@@ -11630,7 +11545,7 @@
     rodape.innerHTML = '';
 
     if (opcoes.voltar) {
-      corpo.appendChild(el('div', { class: 'barra', style: 'margin-bottom:8px' }, [
+      corpo.appendChild(el('div', { class: 'barra u-margem-baixo-8' }, [
         el('button', {
           type: 'button', class: 'btn pequeno',
           texto: opcoes.rotuloVoltar || '‹ Voltar', aoClick: opcoes.voltar
@@ -11641,7 +11556,7 @@
     var serieAtual = anoEscolarDe(aluno) || ultimoAnoEscolar || '06';
     var busca = buscaInicial || '';
 
-    var selSerie = el('select', { style: 'max-width:150px' });
+    var selSerie = el('select', { class: 'u-larg-max-150' });
     SERIES_NOMES.forEach(function (par) {
       var o = el('option', { value: par[0], texto: par[1] });
       if (par[0] === serieAtual) o.selected = true;
@@ -11649,7 +11564,7 @@
     });
 
     var campoBusca = el('input', {
-      type: 'text', placeholder: 'Procurar por assunto', style: 'flex:1;min-width:160px'
+      type: 'text', placeholder: 'Procurar por assunto', class: 'u-flex-1 u-larg-min-160'
     });
     campoBusca.value = busca;
 
@@ -11733,7 +11648,7 @@
         var extra = '';
         if (achado.corrigida) extra = ' Corrigi o que parecia erro de digitação.';
         else if (achado.completa === false) extra = ' Não achei tudo o que você escreveu, então mostro o mais próximo.';
-        lista.appendChild(el('div', { class: 'ajuda', style: 'margin-top:0' }, [
+        lista.appendChild(el('div', { class: 'ajuda u-margem-topo-0' }, [
           document.createTextNode(recado),
           extra ? el('strong', { texto: extra }) : null
         ].filter(Boolean)));
@@ -11749,11 +11664,11 @@
           el('div', { class: 'cresce' }, [
             el('div', { class: 'nome' }, [
               document.createTextNode(t.pt.titulo),
-              el('span', { class: 'tag', texto: rotuloUnidade(t), style: 'margin-left:8px' }),
+              el('span', { class: 'tag u-margem-esq-8', texto: rotuloUnidade(t) }),
               termo && t.serie !== serieAtual
-                ? el('span', { class: 'tag serie', texto: nomeDoAno(t.serie), style: 'margin-left:6px' })
+                ? el('span', { class: 'tag serie u-margem-esq-6', texto: nomeDoAno(t.serie) })
                 : null,
-              rotulo ? el('span', { class: 'tag', texto: rotulo, style: 'margin-left:6px' }) : null
+              rotulo ? el('span', { class: 'tag u-margem-esq-6', texto: rotulo }) : null
             ].filter(Boolean)),
             /* O resumo de uma linha saiu com o material autoral (B14): o
              * índice de assuntos guarda título, ano, unidade, duração e
@@ -11871,17 +11786,14 @@
     fechs.forEach(function (f) {
       var cartao = el('div', { class: 'cartao' });
 
-      cartao.appendChild(el('div', { class: 'barra', style: 'margin-bottom:10px' }, [
-        el('h3', { class: 'titulo', style: 'font-size:18px', texto: f.alunoNome }),
+      cartao.appendChild(el('div', { class: 'barra u-margem-baixo-10' }, [
+        el('h3', { class: 'titulo u-letra-6', texto: f.alunoNome }),
         el('span', { class: 'cresce' }),
-        el('strong', { style: 'color:#1F3A5F;font-size:18px', texto: dinheiro(f.valorFeito) })
+        el('strong', { class: 'u-cor-navy u-letra-6', texto: dinheiro(f.valorFeito) })
       ]));
 
       cartao.appendChild(el('div', {
-        class: 'ajuda', style: 'margin-top:0',
-        /* Num mês já vencido nada está à frente, e a frase fica igual à de
-         * sempre. O "até aqui" só aparece quando existe algo depois de hoje. */
-        texto: f.qtdEncontrosFeitos + ' aula' + (f.qtdEncontrosFeitos === 1 ? '' : 's') +
+        class: 'ajuda u-margem-topo-0', texto: f.qtdEncontrosFeitos + ' aula' + (f.qtdEncontrosFeitos === 1 ? '' : 's') +
           (f.qtdEncontrosPrevistos ? ' até aqui' : '') +
           ' · ' + f.horasFeitas + ' h cobradas' +
           (f.qtdEncontrosPrevistos
@@ -11896,8 +11808,7 @@
        * aviso e sem sugestão, só o número, e só na tela dela. */
       if (f.minutosDadosSemCobrar || f.minutosDesmarcados) {
         cartao.appendChild(el('div', {
-          class: 'ajuda', style: 'margin-top:-6px',
-          texto: [
+          class: 'ajuda u-margem-topo-menos6', texto: [
             f.minutosDadosSemCobrar
               ? 'Dadas sem cobrar: ' + Core.fmtHoras(f.minutosDadosSemCobrar) + ' h' : '',
             f.minutosDesmarcados
@@ -12009,8 +11920,7 @@
           textoAjuda += partes[0] + ', ' + partes[1] + ' e ' + partes[2] + '.';
         }
         cartao.appendChild(el('div', {
-          class: 'ajuda', style: 'margin-top:6px',
-          texto: textoAjuda
+          class: 'ajuda u-margem-topo-6', texto: textoAjuda
         }));
       }
 
@@ -12019,7 +11929,7 @@
       /* A caixa fica ACIMA dos botões de exportar, e não dentro da fileira: ela
        * muda o que vai sair, então precisa ser lida antes de tocar em PDF. */
       var chkListas = el('input', {
-        type: 'checkbox', style: 'width:auto;min-height:auto'
+        type: 'checkbox', class: 'caixa-de-marcar'
       });
       chkListas.checked = exibirTemasEAreas();
       chkListas.addEventListener('change', function () {
@@ -12028,16 +11938,15 @@
         salvarEDepois(function (gravou) { desenharFechamento(); });
       });
       cartao.appendChild(el('label', {
-        class: 'campo', style: 'display:flex;align-items:center;gap:10px;margin:12px 0 0'
+        class: 'campo u-mostra-flex u-alinha-centro u-vao-10 u-margem-12-0-0'
       }, [
         chkListas,
         el('span', {
-          texto: 'Exibir os temas e as habilidades e hábitos no documento', style: 'margin:0'
+          texto: 'Exibir os temas e as habilidades e hábitos no documento', class: 'u-margem-0'
         })
       ]));
       cartao.appendChild(el('div', {
-        class: 'ajuda', style: 'margin:2px 0 0',
-        texto: exibirTemasEAreas()
+        class: 'ajuda u-margem-2-0-0', texto: exibirTemasEAreas()
           ? 'A família vai ver a lista de assuntos e a de habilidades e hábitos, com as datas de cada um.'
           : 'Por enquanto o documento leva a tabela de aulas, o total e o seu feedback. '
             + 'Marque quando quiser que a lista de assuntos e a de habilidades e hábitos entrem também.'
@@ -12047,14 +11956,13 @@
        * janela, em "Mais formatos", e o cartão fica com uma decisão só. */
       cartao.appendChild(el('div', { class: 'acoes-doc-familia' }, [
         el('button', {
-          type: 'button', class: 'btn principal destaque btn-preparar-doc',
-          style: 'font-weight:700;padding:10px 16px',
+          type: 'button', class: 'btn principal destaque btn-preparar-doc u-peso-negrito u-recuo-10-16',
           texto: 'Preparar e enviar',
           aoClick: function () { abrirDocumentoFamilia(f.aluno.id, mesAtual); }
         })
       ]));
 
-      cartao.appendChild(el('div', { class: 'barra', style: 'margin:8px 0 0' }, [
+      cartao.appendChild(el('div', { class: 'barra u-margem-8-0-0' }, [
         el('button', {
           type: 'button', class: 'btn' + (temResumo ? '' : ' destaque'),
           texto: temResumo ? 'Editar o feedback' : 'Escrever o feedback',
@@ -12064,8 +11972,7 @@
 
       if (!temResumo) {
         cartao.appendChild(el('div', {
-          class: 'ajuda', style: 'margin:8px 0 0',
-          texto: 'O feedback ainda não foi escrito. Ele entra no PDF logo abaixo da tabela; ' +
+          class: 'ajuda u-margem-8-0-0', texto: 'O feedback ainda não foi escrito. Ele entra no PDF logo abaixo da tabela; ' +
             'em branco, o PDF sai sem ele.'
         }));
       }
@@ -12090,8 +11997,7 @@
    * até ali, e redesenhar tudo jogaria a rolagem de volta para o topo. */
   function linhaDePagamento(f) {
     var caixa = el('div', {
-      class: 'linha-pagamento', 'data-aluno': f.aluno.id,
-      style: 'margin-top:12px;padding-top:10px;border-top:1px solid var(--fio)'
+      class: 'linha-pagamento u-margem-topo-12 u-recuo-topo-10 u-borda-topo-1-solid-varfio', 'data-aluno': f.aluno.id
     });
     desenharLinhaDePagamento(caixa, f, false);
     return caixa;
@@ -12117,11 +12023,11 @@
       var proposto = reg ? reg.valor : (f.totalValor || 0);
       var comMarcadas = (f.linhas || []).some(function (l) { return l.futura && l.status !== 'cancelada'; });
       var campoValor = el('input', {
-        type: 'text', inputmode: 'decimal', autocomplete: 'off', class: 'pagamento-valor',
-        value: proposto > 0 ? valorNoCampo(proposto) : '', style: 'max-width:150px'
+        type: 'text', inputmode: 'decimal', autocomplete: 'off', class: 'pagamento-valor u-larg-max-150',
+        value: proposto > 0 ? valorNoCampo(proposto) : ''
       });
       var campoData = el('input', {
-        type: 'date', class: 'pagamento-data', value: reg ? reg.pagoEm : Core.hojeIso(), style: 'max-width:180px'
+        type: 'date', class: 'pagamento-data u-larg-max-180', value: reg ? reg.pagoEm : Core.hojeIso()
       });
       var gravarPagamento = function () {
         var valor = Core.lerReais(campoValor.value);
@@ -12135,9 +12041,9 @@
         desenharLinhaDePagamento(caixa, f, false);
         desenharPendentesDePagamento();
       };
-      caixa.appendChild(el('div', { class: 'barra', style: 'gap:10px;align-items:flex-end;flex-wrap:wrap;margin:0' }, [
-        el('label', { class: 'campo', style: 'margin:0' }, [el('span', { texto: 'Valor pago (R$)' }), campoValor]),
-        el('label', { class: 'campo', style: 'margin:0' }, [el('span', { texto: 'Pago em' }), campoData]),
+      caixa.appendChild(el('div', { class: 'barra u-vao-10 u-alinha-fim u-flex-quebra-sim u-margem-0' }, [
+        el('label', { class: 'campo u-margem-0' }, [el('span', { texto: 'Valor pago (R$)' }), campoValor]),
+        el('label', { class: 'campo u-margem-0' }, [el('span', { texto: 'Pago em' }), campoData]),
         el('button', { type: 'button', class: 'btn principal btn-confirmar-pagamento', texto: 'Confirmar', aoClick: gravarPagamento }),
         el('button', {
           type: 'button', class: 'btn btn-cancelar-pagamento', texto: 'Cancelar',
@@ -12145,8 +12051,7 @@
         })
       ]));
       caixa.appendChild(el('div', {
-        class: 'ajuda ajuda-proposto', style: 'margin:6px 0 0',
-        texto: (reg ? 'O campo traz o valor que você marcou.'
+        class: 'ajuda ajuda-proposto u-margem-6-0-0', texto: (reg ? 'O campo traz o valor que você marcou.'
           : comMarcadas
             ? 'O valor proposto é o total do mês, já contando as datas ainda marcadas, como no documento da família.'
             : 'O valor proposto é o total do mês, como no documento da família.') +
@@ -12160,7 +12065,7 @@
       /* Pago a menos fica dito, com a diferença: esconder a diferença porque
        * existe uma marca de pagamento seria a lista dizer que está tudo certo. */
       if (s.falta > 0) {
-        filhos.push(el('span', { class: 'pagamento-falta', style: 'color:var(--vermelho)', texto: 'faltam ' + dinheiro(s.falta) }));
+        filhos.push(el('span', { class: 'pagamento-falta u-cor-vermelho', texto: 'faltam ' + dinheiro(s.falta) }));
       }
       filhos.push(el('span', { class: 'cresce' }));
       filhos.push(el('button', {
@@ -12177,11 +12082,11 @@
           desenharPendentesDePagamento();
         }
       }));
-      caixa.appendChild(el('div', { class: 'barra', style: 'gap:10px;margin:0;flex-wrap:wrap' }, filhos));
+      caixa.appendChild(el('div', { class: 'barra u-vao-10 u-margem-0 u-flex-quebra-sim' }, filhos));
       return;
     }
 
-    caixa.appendChild(el('div', { class: 'barra', style: 'margin:0' }, [
+    caixa.appendChild(el('div', { class: 'barra u-margem-0' }, [
       el('button', {
         type: 'button', class: 'btn btn-marcar-pago', texto: 'Marcar como pago',
         aoClick: function () { desenharLinhaDePagamento(caixa, f, true); }
@@ -12226,7 +12131,7 @@
 
   function linhaDoCorte(escolhendo) {
     var corte = Core.corteDosPagamentos(db);
-    var caixa = el('div', { class: 'barra linha-corte-pagamentos', style: 'gap:10px;margin:0 0 6px;flex-wrap:wrap' });
+    var caixa = el('div', { class: 'barra linha-corte-pagamentos u-vao-10 u-margem-0-0-6 u-flex-quebra-sim' });
     if (!escolhendo) {
       caixa.appendChild(el('span', { class: 'texto-corte', texto: 'Controlando a partir de ' + Core.mesExtenso(corte) }));
       caixa.appendChild(el('button', {
@@ -12235,7 +12140,7 @@
       }));
       return caixa;
     }
-    var sel = el('select', { id: 'corte-pagamentos', style: 'max-width:210px' });
+    var sel = el('select', { id: 'corte-pagamentos', class: 'u-larg-max-210' });
     mesesDoCorte(corte).forEach(function (m) {
       var o = el('option', { value: m, texto: Core.mesExtenso(m) });
       if (m === corte) o.selected = true;
@@ -12267,20 +12172,18 @@
     var corpo = el('div', { class: 'cartao', id: 'lista-pendentes', style: pendentesAbertos ? '' : 'display:none' });
     corpo.appendChild(linhaDoCorte(false));
     corpo.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'Só para você. Nada daqui entra no documento que a família recebe. ' +
+      class: 'ajuda u-margem-topo-0', texto: 'Só para você. Nada daqui entra no documento que a família recebe. ' +
         'Conta só mês que já terminou, e quem pagou a menos aparece com a diferença.'
     }));
     if (!lista.length) {
-      corpo.appendChild(el('div', { class: 'ajuda', id: 'pendentes-vazio', style: 'margin:8px 0 0', texto: 'Nada pendente.' }));
+      corpo.appendChild(el('div', { class: 'ajuda u-margem-8-0-0', id: 'pendentes-vazio', texto: 'Nada pendente.' }));
     }
     var mesDaVez = null;
     lista.forEach(function (p) {
       if (p.mes !== mesDaVez) {
         mesDaVez = p.mes;
         corpo.appendChild(el('div', {
-          class: 'pendentes-mes', style: 'margin:12px 0 6px;font-weight:700;color:var(--navy)',
-          texto: p.mesExtenso
+          class: 'pendentes-mes u-margem-12-0-6 u-peso-negrito u-cor-navy', texto: p.mesExtenso
         }));
       }
       var detalhe = p.aMenos
@@ -12312,12 +12215,10 @@
     });
 
     caixa.appendChild(el('div', {
-      class: 'barra',
-      style: 'margin:4px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--fio)'
+      class: 'barra u-margem-4-0-10 u-recuo-baixo-6 u-borda-baixo-1-solid-varfio'
     }, [
       el('h3', {
-        class: 'subtitulo', style: 'margin:0;padding-bottom:0;border-bottom:none',
-        texto: 'Pagamentos pendentes'
+        class: 'subtitulo u-margem-0 u-recuo-baixo-0 u-borda-baixo-nenhum', texto: 'Pagamentos pendentes'
       }),
       el('span', {
         class: 'tag cheia', id: 'resumo-pendentes',
@@ -12349,16 +12250,13 @@
     caixa.innerHTML = '';
     if (!t.minutosDadosSemCobrar && !t.minutosDesmarcados) return;
     caixa.appendChild(el('div', {
-      class: 'ajuda', style: 'margin:-8px 0 4px',
-      texto: 'Horas dadas sem cobrar no mês: ' + Core.fmtHoras(t.minutosDadosSemCobrar) + ' h'
+      class: 'ajuda u-margem-menos8-0-4', texto: 'Horas dadas sem cobrar no mês: ' + Core.fmtHoras(t.minutosDadosSemCobrar) + ' h'
     }));
     caixa.appendChild(el('div', {
-      class: 'ajuda', style: 'margin:0 0 4px',
-      texto: 'Horas reservadas e desmarcadas: ' + Core.fmtHoras(t.minutosDesmarcados) + ' h'
+      class: 'ajuda u-margem-0-0-4', texto: 'Horas reservadas e desmarcadas: ' + Core.fmtHoras(t.minutosDesmarcados) + ' h'
     }));
     caixa.appendChild(el('div', {
-      class: 'ajuda', style: 'margin:0 0 14px;font-size:12px',
-      texto: 'Só para você. Não entra no documento que a família recebe.'
+      class: 'ajuda u-margem-0-0-14 u-letra-2', texto: 'Só para você. Não entra no documento que a família recebe.'
     }));
   }
 
@@ -12397,11 +12295,11 @@
     }
 
     var caixa = el('div', { class: 'item-lista', style: 'display:block' });
-    caixa.appendChild(el('div', { class: 'barra', style: 'margin-bottom:2px' }, [
+    caixa.appendChild(el('div', { class: 'barra u-margem-baixo-2' }, [
       el('div', { class: 'nome', texto: l.nome }),
       el('span', { class: 'cresce' }),
       el('strong', {
-        style: 'color:#1F3A5F',
+        class: 'u-cor-navy',
         texto: l.valorHora === null ? 'sem valor por hora' : dinheiro(l.valorHora) + ' por hora'
       })
     ]));
@@ -12410,18 +12308,16 @@
     }
     if (!l.sugestao) {
       caixa.appendChild(el('div', {
-        class: 'detalhe', style: 'margin-top:4px',
-        texto: 'Sem valor por hora cadastrado, então não há o que sugerir.'
+        class: 'detalhe u-margem-topo-4', texto: 'Sem valor por hora cadastrado, então não há o que sugerir.'
       }));
       return caixa;
     }
     caixa.appendChild(el('div', {
-      class: 'detalhe', style: 'margin-top:6px;color:#1F3A5F',
-      texto: 'Sugestão: ' + dinheiro(l.sugestao.valorNovo) + ' por hora, ' +
+      class: 'detalhe u-margem-topo-6 u-cor-navy', texto: 'Sugestão: ' + dinheiro(l.sugestao.valorNovo) + ' por hora, ' +
         Core.pctBR(l.sugestao.percentual) + ' a mais' +
         (l.sugestao.noAno > 0 ? '. No ano, ' + dinheiro(l.sugestao.noAno) + ' a mais' : '') + '.'
     }));
-    caixa.appendChild(el('div', { class: 'detalhe', style: 'margin-top:2px', texto: l.sugestao.motivo }));
+    caixa.appendChild(el('div', { class: 'detalhe u-margem-topo-2', texto: l.sugestao.motivo }));
     return caixa;
   }
 
@@ -12474,8 +12370,7 @@
 
     var cartao = el('div', { class: 'cartao', style: aberto ? '' : 'display:none' });
     cartao.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'Só para você. Nada daqui entra no documento que a família recebe. ' +
+      class: 'ajuda u-margem-topo-0', texto: 'Só para você. Nada daqui entra no documento que a família recebe. ' +
         textoDaIdadeDoIndice(pan.indices) +
         (pan.margem > 0 ? ' A sugestão já soma os ' + Core.pctBR(pan.margem) +
           ' acima que você escolheu em Ajustes.' : '')
@@ -12513,12 +12408,10 @@
      * cima passam para a barra inteira, senão a linha do título terminaria
      * antes da tag e do botão. */
     caixa.appendChild(el('div', {
-      class: 'barra',
-      style: 'margin:22px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--fio)'
+      class: 'barra u-margem-22-0-10 u-recuo-baixo-6 u-borda-baixo-1-solid-varfio'
     }, [
       el('h3', {
-        class: 'subtitulo', style: 'margin:0;padding-bottom:0;border-bottom:none',
-        texto: 'Cada aluno, desde quando e por quanto'
+        class: 'subtitulo u-margem-0 u-recuo-baixo-0 u-borda-baixo-nenhum', texto: 'Cada aluno, desde quando e por quanto'
       }),
       el('span', {
         class: 'tag cheia',
@@ -12579,21 +12472,20 @@
     var painelConfig = el('div', { class: 'painel-doc-config' });
 
     // 1. Edição de feedback
-    painelConfig.appendChild(el('div', { class: 'campo', style: 'margin:0' }, [
+    painelConfig.appendChild(el('div', { class: 'campo u-margem-0' }, [
       el('label', {
         for: 'doc-feedback-texto',
         texto: 'Feedback do mês para a família',
-        style: 'font-weight:700;color:var(--navy);margin-bottom:4px;display:block'
+        class: 'u-peso-negrito u-cor-navy u-margem-baixo-4 u-mostra-bloco'
       }),
       el('div', {
-        class: 'ajuda', style: 'margin:0 0 6px',
-        texto: 'O que você quer contar sobre o rendimento e a evolução do aluno.'
+        class: 'ajuda u-margem-0-0-6', texto: 'O que você quer contar sobre o rendimento e a evolução do aluno.'
       })
     ]));
 
     var areaFeedback = el('textarea', {
       id: 'doc-feedback-texto',
-      style: 'min-height:120px;resize:vertical',
+      class: 'u-alt-min-120 u-redimensiona-vertical',
       placeholder: 'Como foi o mês, conquistas pedagógicas, pontos de atenção e próximos passos...'
     });
     areaFeedback.value = estado.feedbackTexto;
@@ -12622,12 +12514,12 @@
 
     // 2. Opções de conteúdo
     painelConfig.appendChild(el('div', {
-      style: 'font-size:12px;font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:0.05em;margin-top:6px'
+      class: 'rotulo-de-secao'
     }, [document.createTextNode('Opções de conteúdo')]));
 
     // Checkbox temas e áreas
     var chkTemas = el('input', {
-      type: 'checkbox', id: 'doc-chk-temas', style: 'width:auto;min-height:auto'
+      type: 'checkbox', id: 'doc-chk-temas', class: 'caixa-de-marcar'
     });
     chkTemas.checked = estado.exibirTemas;
     chkTemas.addEventListener('change', function () {
@@ -12639,18 +12531,18 @@
     });
 
     painelConfig.appendChild(el('label', {
-      class: 'campo', style: 'display:flex;align-items:flex-start;gap:8px;margin:0;cursor:pointer'
+      class: 'campo linha-de-marcar'
     }, [
       chkTemas,
-      el('span', { style: 'font-size:13px;line-height:1.3' }, [
+      el('span', { class: 'u-letra-2 u-entrelinha-13' }, [
         el('strong', { texto: 'Exibir temas, habilidades e hábitos' }),
-        el('span', { class: 'ajuda', style: 'display:block;margin:2px 0 0', texto: 'Inclui os assuntos, as habilidades e os hábitos vistos no mês (escopo global).' })
+        el('span', { class: 'ajuda u-mostra-bloco u-margem-2-0-0', texto: 'Inclui os assuntos, as habilidades e os hábitos vistos no mês (escopo global).' })
       ])
     ]));
 
     // Checkbox notas públicas
     var chkNotas = el('input', {
-      type: 'checkbox', id: 'doc-chk-notas', style: 'width:auto;min-height:auto'
+      type: 'checkbox', id: 'doc-chk-notas', class: 'caixa-de-marcar'
     });
     chkNotas.checked = estado.incluirNotas;
     chkNotas.addEventListener('change', function () {
@@ -12659,18 +12551,18 @@
     });
 
     painelConfig.appendChild(el('label', {
-      class: 'campo', style: 'display:flex;align-items:flex-start;gap:8px;margin:0;cursor:pointer'
+      class: 'campo linha-de-marcar'
     }, [
       chkNotas,
-      el('span', { style: 'font-size:13px;line-height:1.3' }, [
+      el('span', { class: 'u-letra-2 u-entrelinha-13' }, [
         el('strong', { texto: 'Incluir o relato de cada aula' }),
-        el('span', { class: 'ajuda', style: 'display:block;margin:2px 0 0', texto: 'Mostra o relato de cada aula. A nota só minha nunca entra.' })
+        el('span', { class: 'ajuda u-mostra-bloco u-margem-2-0-0', texto: 'Mostra o relato de cada aula. A nota só minha nunca entra.' })
       ])
     ]));
 
     // Checkbox horas sem cobrar
     var chkNaoCobradas = el('input', {
-      type: 'checkbox', id: 'doc-chk-nao-cobradas', style: 'width:auto;min-height:auto'
+      type: 'checkbox', id: 'doc-chk-nao-cobradas', class: 'caixa-de-marcar'
     });
     chkNaoCobradas.checked = estado.mostrarNaoCobradas;
     chkNaoCobradas.addEventListener('change', function () {
@@ -12682,12 +12574,12 @@
     });
 
     painelConfig.appendChild(el('label', {
-      class: 'campo', style: 'display:flex;align-items:flex-start;gap:8px;margin:0;cursor:pointer'
+      class: 'campo linha-de-marcar'
     }, [
       chkNaoCobradas,
-      el('span', { style: 'font-size:13px;line-height:1.3' }, [
+      el('span', { class: 'u-letra-2 u-entrelinha-13' }, [
         el('strong', { texto: 'Mostrar horas dadas sem cobrar' }),
-        el('span', { class: 'ajuda', style: 'display:block;margin:2px 0 0', texto: 'Apresenta a gentileza de horas concedidas sem cobrança no resumo.' })
+        el('span', { class: 'ajuda u-mostra-bloco u-margem-2-0-0', texto: 'Apresenta a gentileza de horas concedidas sem cobrança no resumo.' })
       ])
     ]));
 
@@ -12697,8 +12589,7 @@
     var titulosAbertos = el('details', { id: 'doc-titulos', class: 'doc-titulos' });
     titulosAbertos.appendChild(el('summary', { texto: 'Títulos do documento' }));
     titulosAbertos.appendChild(el('div', {
-      class: 'ajuda', style: 'margin:4px 0 8px',
-      texto: 'Mude o nome de cada parte do documento. Vale para todos os alunos e os próximos meses. Deixe em branco para voltar ao de sempre.'
+      class: 'ajuda u-margem-4-0-8', texto: 'Mude o nome de cada parte do documento. Vale para todos os alunos e os próximos meses. Deixe em branco para voltar ao de sempre.'
     }));
     var ROTULOS_DOS_TITULOS = {
       documento: 'Título do documento', datas: 'Tabela das aulas', marcadas: 'Aulas ainda marcadas',
@@ -12719,7 +12610,7 @@
         salvar();
         desenharPrevia();
       });
-      titulosAbertos.appendChild(el('label', { class: 'campo', style: 'margin:0 0 6px' }, [
+      titulosAbertos.appendChild(el('label', { class: 'campo u-margem-0-0-6' }, [
         el('span', { texto: ROTULOS_DOS_TITULOS[k] }), campo
       ]));
     });
@@ -12727,7 +12618,7 @@
 
     // 3. Garantia de Privacidade
     painelConfig.appendChild(el('div', { class: 'faixa-privacidade-garantida' }, [
-      el('span', { style: 'font-size:16px;line-height:1' }, [document.createTextNode('🔒')]),
+      el('span', { class: 'u-letra-5 u-entrelinha-1' }, [document.createTextNode('🔒')]),
       el('div', {}, [
         el('strong', { texto: 'Garantia de privacidade: ' }),
         el('span', { texto: 'A nota só minha nunca é exportada em PDF, texto, cartão ou documento da família.' })
@@ -12739,10 +12630,10 @@
      * fechamento fica só no rodapé, que é a ação principal desta janela. */
     painelConfig.appendChild(el('div', {
       id: 'doc-mais-formatos-titulo',
-      style: 'font-size:12px;font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:0.05em;margin-top:6px'
+      class: 'rotulo-de-secao'
     }, [document.createTextNode('Mais formatos')]));
 
-    var barraOutras = el('div', { id: 'doc-mais-formatos', style: 'display:flex;flex-wrap:wrap;gap:8px' }, [
+    var barraOutras = el('div', { id: 'doc-mais-formatos', class: 'u-mostra-flex u-flex-quebra-sim u-vao-8' }, [
       el('button', {
         type: 'button', class: 'btn',
         texto: 'O mês numa tela',
@@ -12809,8 +12700,7 @@
     ]);
     painelConfig.appendChild(barraOutras);
     painelConfig.appendChild(el('div', {
-      class: 'ajuda', id: 'ajuda-doc-familia-folhas', style: 'margin:0',
-      texto: 'O PDF com as folhas anexa ao final os desenhos manuscritos do mês, não exibidos nesta prévia. ' +
+      class: 'ajuda u-margem-0', id: 'ajuda-doc-familia-folhas', texto: 'O PDF com as folhas anexa ao final os desenhos manuscritos do mês, não exibidos nesta prévia. ' +
         'O PDF do fechamento, o que a família recebe, fica no botão principal aqui embaixo.'
     }));
 
@@ -12926,7 +12816,7 @@
               document.createTextNode(Core.fmtHoras(estado.f.minutosDadosSemCobrar) + ' h')
             ])
           : null,
-        el('div', { style: 'font-size:14px;margin-top:4px' }, [
+        el('div', { class: 'u-letra-3 u-margem-topo-4' }, [
           el('strong', { texto: temFuturas ? 'Total destas datas' + ate + ': ' : 'Total a cobrar: ' }),
           document.createTextNode(dinheiro(valorACobrar))
         ])
@@ -13009,7 +12899,7 @@
       // Pix
       var chave = chavePix();
       if (chave) {
-        papelPrevia.appendChild(el('div', { class: 'ajuda', style: 'margin:8px 0;font-size:12px' }, [
+        papelPrevia.appendChild(el('div', { class: 'ajuda u-margem-8-0 u-letra-2' }, [
           el('strong', { texto: 'Chave Pix para pagamento: ' }),
           document.createTextNode(chave)
         ]));
@@ -13019,7 +12909,7 @@
       var temasNoTexto = (temFuturas ? estado.f.temasFeitos : estado.f.temasDoMes) || estado.f.temasDoMes || [];
       if (estado.exibirTemas && temasNoTexto.length) {
         papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: TP.temas }));
-        var ulTemas = el('ul', { style: 'margin:4px 0 12px 20px;padding:0;font-size:12px' });
+        var ulTemas = el('ul', { class: 'u-margem-4-0-12-20 u-recuo-0 u-letra-2' });
         temasNoTexto.forEach(function (t) {
           ulTemas.appendChild(el('li', {
             texto: t.titulo + ' (' + t.datas.map(Core.ddmm).join(', ') + ')'
@@ -13032,7 +12922,7 @@
       var areasNoTexto = (temFuturas ? estado.f.areasFeitas : estado.f.areasDoMes) || estado.f.areasDoMes || [];
       if (estado.exibirTemas && areasNoTexto.length) {
         papelPrevia.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: TP.areas }));
-        var ulAreas = el('ul', { style: 'margin:4px 0 12px 20px;padding:0;font-size:12px' });
+        var ulAreas = el('ul', { class: 'u-margem-4-0-12-20 u-recuo-0 u-letra-2' });
         areasNoTexto.forEach(function (a) {
           ulAreas.appendChild(el('li', {
             texto: a.rotulo + (a.vezes > 1 ? ' (' + a.vezes + ' aulas)' : '')
@@ -13075,19 +12965,17 @@
     var corpo = $('#corpo-modal-resumo');
     corpo.innerHTML = '';
     corpo.appendChild(el('div', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'Este texto vai para o fechamento que a família recebe. Escreva como você já escreve.'
+      class: 'ajuda u-margem-topo-0', texto: 'Este texto vai para o fechamento que a família recebe. Escreva como você já escreve.'
     }));
     var area = el('textarea', {
-      id: 'campo-resumo', style: 'min-height:280px',
+      id: 'campo-resumo', class: 'u-alt-min-280',
       placeholder: 'Como foi o mês, o que evoluiu, o que merece atenção e o que vem a seguir.'
     });
     area.value = registro ? registro.texto : '';
     corpo._roteiro = null;
     if (roteiroLigado()) {
       corpo.appendChild(el('div', {
-        class: 'ajuda', style: 'margin:0 0 6px',
-        texto: 'Roteiro: responda o que quiser e toque em "Montar o texto". As perguntas também podem ser reescritas.'
+        class: 'ajuda u-margem-0-0-6', texto: 'Roteiro: responda o que quiser e toque em "Montar o texto". As perguntas também podem ser reescritas.'
       }));
       corpo._roteiro = blocoDoRoteiro(area);
       corpo.appendChild(corpo._roteiro);
@@ -13196,29 +13084,25 @@
     corpo.appendChild(el('div', { class: 'previa-presa' }, [
       tela,
       el('div', {
-        class: 'ajuda', style: 'margin:8px 0 0;text-align:center',
-        texto: 'É exatamente esta imagem que a família recebe.'
+        class: 'ajuda u-margem-8-0-0 u-texto-centro', texto: 'É exatamente esta imagem que a família recebe.'
       })
     ]));
 
     if (frases.length) {
       corpo.appendChild(el('div', {
-        class: 'ajuda', style: 'margin:14px 0 8px',
-        texto: 'A frase sai do feedback que você já escreveu. Toque numa e ela vai para o cartão.'
+        class: 'ajuda u-margem-14-0-8', texto: 'A frase sai do feedback que você já escreveu. Toque numa e ela vai para o cartão.'
       }));
       frases.forEach(function (fr) { corpo.appendChild(opcao(fr, fr)); });
       corpo.appendChild(opcao('Sem frase nenhuma', '', ' sem-frase'));
     } else {
       corpo.appendChild(el('div', {
-        class: 'ajuda', style: 'margin:14px 0 8px',
-        texto: 'O feedback deste mês ainda não foi escrito, então o cartão sai sem frase. ' +
+        class: 'ajuda u-margem-14-0-8', texto: 'O feedback deste mês ainda não foi escrito, então o cartão sai sem frase. ' +
           'Escreva o feedback e volte aqui para escolher uma.'
       }));
     }
 
     corpo.appendChild(el('div', {
-      class: 'ajuda', style: 'margin:10px 0 0',
-      texto: 'O cartão não leva valor nenhum. A conta continua no PDF do fechamento, ' +
+      class: 'ajuda u-margem-10-0-0', texto: 'O cartão não leva valor nenhum. A conta continua no PDF do fechamento, ' +
         'e a lista completa de assuntos também.'
     }));
 
@@ -13447,8 +13331,7 @@
 
     if (!modoFamilia && (f.minutosDadosSemCobrar || f.minutosDesmarcados)) {
       corpo.appendChild(el('div', {
-        class: 'ajuda', style: 'margin-top:-6px',
-        texto: [
+        class: 'ajuda u-margem-topo-menos6', texto: [
           f.minutosDadosSemCobrar
             ? 'Dadas sem cobrar: ' + Core.fmtHoras(f.minutosDadosSemCobrar) + ' h' : '',
           f.minutosDesmarcados
@@ -13479,10 +13362,9 @@
       // no modo família, o título é o dela (C11); na tela dela, o de sempre
       corpo.appendChild(el('h3', { class: 'subtitulo', texto: modoFamilia ? titulosDoDocumento().feedback : 'Feedback do mês' }));
       corpo.appendChild(texto
-        ? el('div', { class: 'texto-rendeu', style: 'margin-top:0', texto: texto })
+        ? el('div', { class: 'texto-rendeu u-margem-topo-0', texto: texto })
         : el('div', {
-          class: 'ajuda', style: 'margin-top:0',
-          texto: 'Ainda não escrito. É esta tela que serve para escrever, sem abrir aula por aula.'
+          class: 'ajuda u-margem-topo-0', texto: 'Ainda não escrito. É esta tela que serve para escrever, sem abrir aula por aula.'
         }));
     }
 
@@ -13666,7 +13548,7 @@
         cicloEmEdicao = { alunoId: e.alunoId, ciclo: achado, guardado: true };
         desenharDocumentoDoCiclo();
       });
-      painel.appendChild(el('div', { class: 'campo', style: 'margin:0' }, [
+      painel.appendChild(el('div', { class: 'campo u-margem-0' }, [
         el('label', { for: 'ciclo-escolha', texto: 'Ciclo' }),
         el('div', { class: 'barra' }, [
           escolha,
@@ -13709,15 +13591,14 @@
     campoInicio.addEventListener('change', trocarPeriodo);
     campoFim.addEventListener('change', trocarPeriodo);
     painel.appendChild(el('div', { class: 'linha' }, [
-      el('label', { class: 'campo', style: 'margin:0' }, [el('span', { texto: 'De' }), campoInicio]),
-      el('label', { class: 'campo', style: 'margin:0' }, [el('span', { texto: 'Até' }), campoFim])
+      el('label', { class: 'campo u-margem-0' }, [el('span', { texto: 'De' }), campoInicio]),
+      el('label', { class: 'campo u-margem-0' }, [el('span', { texto: 'Até' }), campoFim])
     ]));
 
     // as quatro seções, cada uma com o texto dela
     Core.SECOES_DO_CICLO.forEach(function (s) {
       var area = el('textarea', {
-        id: 'ciclo-texto-' + s.chave, class: 'ciclo-texto', 'data-secao': s.chave,
-        style: 'min-height:110px;resize:vertical',
+        id: 'ciclo-texto-' + s.chave, class: 'ciclo-texto u-alt-min-110 u-redimensiona-vertical', 'data-secao': s.chave,
         placeholder: 'Escreva aqui. Seção em branco não sai no documento.'
       });
       area.value = ciclo.textos[s.chave] || '';
@@ -13755,13 +13636,13 @@
           });
         }
       });
-      var bloco = el('div', { class: 'campo secao-ciclo', 'data-secao': s.chave, style: 'margin:0' }, [
+      var bloco = el('div', { class: 'campo secao-ciclo u-margem-0', 'data-secao': s.chave }, [
         el('div', { class: 'campo-titulo-com-destino' }, [
-          el('label', { for: 'ciclo-texto-' + s.chave, texto: s.titulo, style: 'font-weight:700;color:var(--navy)' }),
+          el('label', { for: 'ciclo-texto-' + s.chave, texto: s.titulo, class: 'u-peso-negrito u-cor-navy' }),
           el('span', { class: 'destino-publico', texto: 'Vai para a família' })
         ]),
         area,
-        el('div', { class: 'barra', style: 'margin-top:4px' }, [refazer])
+        el('div', { class: 'barra u-margem-topo-4' }, [refazer])
       ]);
       if (s.chave === 'atencao') desenharPontosDoCiclo(bloco, aluno, e, desenharPrevia);
       painel.appendChild(bloco);
@@ -13796,10 +13677,10 @@
       doc.secoes.forEach(function (sec) {
         papel.appendChild(el('div', { class: 'previa-doc-secao-titulo', texto: sec.titulo }));
         sec.texto.split(/\n{2,}/).forEach(function (par) {
-          if (par.trim()) papel.appendChild(el('p', { style: 'margin:0 0 8px;white-space:pre-wrap;font-size:13px', texto: par }));
+          if (par.trim()) papel.appendChild(el('p', { class: 'u-margem-0-0-8 u-espacos-preservado u-letra-2', texto: par }));
         });
         if (sec.itens.length) {
-          papel.appendChild(el('ul', { style: 'margin:0 0 8px 18px;padding:0;font-size:13px' },
+          papel.appendChild(el('ul', { class: 'u-margem-0-0-8-18 u-recuo-0 u-letra-2' },
             sec.itens.map(function (i) { return el('li', { texto: i }); })));
         }
       });
@@ -13851,16 +13732,15 @@
     var ciclo = e.ciclo;
     var pontos = Core.pontosDeAtencaoDoCiclo(aluno);
     if (!pontos.length) return;
-    var caixa = el('div', { id: 'ciclo-pontos', style: 'margin-top:8px' }, [
+    var caixa = el('div', { id: 'ciclo-pontos', class: 'u-margem-topo-8' }, [
       el('div', { class: 'campo-titulo-com-destino' }, [
-        el('span', { texto: 'Pontos de atenção do mapeamento', style: 'font-size:13px;font-weight:700' }),
+        el('span', { texto: 'Pontos de atenção do mapeamento', class: 'u-letra-2 u-peso-negrito' }),
         el('span', { class: 'destino-privado', texto: 'Só sai o que você marcar' })
       ]),
-      el('div', { class: 'ajuda', id: 'ciclo-pontos-ajuda', style: 'margin:2px 0 4px',
-        texto: 'Cada ponto marcado sai em lista, logo abaixo do texto de "O que ainda pede atenção".' })
+      el('div', { class: 'ajuda u-margem-2-0-4', id: 'ciclo-pontos-ajuda', texto: 'Cada ponto marcado sai em lista, logo abaixo do texto de "O que ainda pede atenção".' })
     ]);
     pontos.forEach(function (p) {
-      var chk = el('input', { type: 'checkbox', class: 'ciclo-ponto', 'data-ponto': p.id, style: 'width:auto;min-height:auto' });
+      var chk = el('input', { type: 'checkbox', class: 'ciclo-ponto caixa-de-marcar', 'data-ponto': p.id });
       chk.checked = ciclo.atencaoQueSai.indexOf(p.id) >= 0;
       chk.addEventListener('change', function () {
         var l = ciclo.atencaoQueSai.filter(function (x) { return x !== p.id; });
@@ -13870,7 +13750,7 @@
         desenharPrevia();
       });
       caixa.appendChild(el('label', {
-        class: 'campo', style: 'display:flex;align-items:center;gap:8px;margin:4px 0 0;cursor:pointer;font-size:13px'
+        class: 'campo u-mostra-flex u-alinha-centro u-vao-8 u-margem-4-0-0 u-cursor-mao u-letra-2'
       }, [chk, el('span', { texto: p.rotulo })]));
     });
     bloco.appendChild(caixa);
@@ -14034,15 +13914,14 @@
       $('#titulo-modal-envio-familias').textContent = 'Envio do mês';
       var faltaram = total - e.enviadas - e.puladas;
       corpo.appendChild(el('div', { id: 'envio-resumo' }, [
-        el('p', { id: 'envio-enviadas', style: 'margin:0 0 4px;font-weight:700', texto: 'Enviadas: ' + e.enviadas }),
-        el('p', { id: 'envio-puladas', style: 'margin:0 0 4px;font-weight:700', texto: 'Puladas: ' + e.puladas }),
+        el('p', { id: 'envio-enviadas', class: 'u-margem-0-0-4 u-peso-negrito', texto: 'Enviadas: ' + e.enviadas }),
+        el('p', { id: 'envio-puladas', class: 'u-margem-0-0-4 u-peso-negrito', texto: 'Puladas: ' + e.puladas }),
         faltaram > 0
-          ? el('p', { id: 'envio-faltaram', style: 'margin:0 0 4px', texto: 'Ficaram para depois: ' + faltaram })
+          ? el('p', { id: 'envio-faltaram', class: 'u-margem-0-0-4', texto: 'Ficaram para depois: ' + faltaram })
           : null
       ].filter(Boolean)));
       corpo.appendChild(el('div', {
-        class: 'ajuda', style: 'margin:8px 0 0',
-        texto: 'Enviada quer dizer que o PDF foi para o compartilhar do tablet. ' +
+        class: 'ajuda u-margem-8-0-0', texto: 'Enviada quer dizer que o PDF foi para o compartilhar do tablet. ' +
           'O aplicativo não marca nada como enviado: confira na conversa de cada família.'
       }));
       rodape.appendChild(el('span', { class: 'cresce' }));
@@ -14058,13 +13937,12 @@
     var nome = f ? f.alunoNome : e.nomes[e.i];
     $('#titulo-modal-envio-familias').textContent = 'Enviar para todas as famílias';
     corpo.appendChild(el('h4', {
-      id: 'envio-etapa', style: 'margin:0 0 6px;font-size:18px;color:var(--navy)',
+      id: 'envio-etapa', class: 'u-margem-0-0-6 u-letra-6 u-cor-navy',
       texto: 'Família ' + (e.i + 1) + ' de ' + total + ': ' + nome
     }));
     if (f) {
       corpo.appendChild(el('div', {
-        class: 'ajuda', style: 'margin:0 0 6px',
-        texto: f.qtdEncontrosFeitos + ' ' + palavraPlural(f.qtdEncontrosFeitos, 'aula', 'aulas') +
+        class: 'ajuda u-margem-0-0-6', texto: f.qtdEncontrosFeitos + ' ' + palavraPlural(f.qtdEncontrosFeitos, 'aula', 'aulas') +
           ' · ' + dinheiro(f.valorFeito) + ' · ' + f.mesExtenso
       }));
       if (!(f.resumoTexto || '').trim()) {
@@ -14074,8 +13952,7 @@
       }
     }
     corpo.appendChild(el('div', {
-      class: 'ajuda', style: 'margin:8px 0 0',
-      texto: 'Toque em Enviar o PDF e escolha a conversa da família. Depois o aplicativo passa para a próxima.'
+      class: 'ajuda u-margem-8-0-0', texto: 'Toque em Enviar o PDF e escolha a conversa da família. Depois o aplicativo passa para a próxima.'
     }));
 
     rodape.appendChild(el('button', {
@@ -14201,13 +14078,11 @@
       caixaBuscas.innerHTML = '';
       if (!vazias.length) {
         caixaBuscas.appendChild(el('div', {
-          class: 'ajuda', style: 'margin-top:0',
-          texto: 'Nenhuma busca sem resultado registrada ainda.'
+          class: 'ajuda u-margem-topo-0', texto: 'Nenhuma busca sem resultado registrada ainda.'
         }));
       } else {
         caixaBuscas.appendChild(el('div', {
-          class: 'ajuda', style: 'margin-top:0',
-          texto: 'O que você procurou e não encontrou. Fica só neste tablet. ' +
+          class: 'ajuda u-margem-topo-0', texto: 'O que você procurou e não encontrou. Fica só neste tablet. ' +
             'Serve para a gente descobrir que assunto falta no banco.'
         }));
         vazias.slice(0, 12).forEach(function (b) {
@@ -14362,7 +14237,7 @@
     caixa.appendChild(el('h3', { class: 'subtitulo', texto: 'O documento da família' }));
     var cartao = el('div', { class: 'cartao' });
 
-    var chk = el('input', { type: 'checkbox', style: 'width:auto;min-height:auto' });
+    var chk = el('input', { type: 'checkbox', class: 'caixa-de-marcar' });
     chk.checked = mostrarNaoCobradas();
     chk.addEventListener('change', function () {
       db.ajustes = db.ajustes || {};
@@ -14370,17 +14245,16 @@
       salvarEDepois(function (gravou) { desenharAjustesDoFechamento(); });
     });
     cartao.appendChild(el('label', {
-      class: 'campo', style: 'display:flex;align-items:center;gap:10px;margin:0'
+      class: 'campo u-mostra-flex u-alinha-centro u-vao-10 u-margem-0'
     }, [
       chk,
       el('span', {
-        texto: 'Mostrar as horas que você deu e não cobrou', style: 'margin:0'
+        texto: 'Mostrar as horas que você deu e não cobrou', class: 'u-margem-0'
       })
     ]));
 
     cartao.appendChild(el('p', {
-      class: 'ajuda', style: 'margin:8px 0 0',
-      texto: mostrarNaoCobradas()
+      class: 'ajuda u-margem-8-0-0', texto: mostrarNaoCobradas()
         ? 'O fechamento leva uma linha com o total de horas que você deu sem cobrar no mês. '
           + 'Ela dá valor ao que você fez de graça, e é isso que costuma passar despercebido. '
           + 'Se achar que soa como cobrança, desmarque: a conta continua na sua tela.'
@@ -14415,13 +14289,12 @@
      * caixinha de cima debaixo do dedo, se ela saísse do campo tocando nela. */
     campoPix.addEventListener('change', guardarPix);
     campoPix.addEventListener('blur', guardarPix);
-    cartaoPix.appendChild(el('label', { class: 'campo', style: 'margin:0' }, [
+    cartaoPix.appendChild(el('label', { class: 'campo u-margem-0' }, [
       el('span', { texto: 'Chave Pix para pagamento' }),
       campoPix
     ]));
     cartaoPix.appendChild(el('p', {
-      class: 'ajuda', style: 'margin:8px 0 0',
-      texto: 'A chave sai no fechamento que a família recebe, no texto e no PDF, logo abaixo do '
+      class: 'ajuda u-margem-8-0-0', texto: 'A chave sai no fechamento que a família recebe, no texto e no PDF, logo abaixo do '
         + 'total. Com o campo vazio, o fechamento continua como sempre foi.'
     }));
     caixa.appendChild(cartaoPix);
@@ -14429,7 +14302,7 @@
     /* O roteiro de três perguntas do feedback (C11): desligado por padrão, e
      * a chave mora aqui para a janela do Feedback continuar a de sempre. */
     var cartaoRoteiro = el('div', { class: 'cartao' });
-    var chkRoteiro = el('input', { type: 'checkbox', id: 'chk-roteiro-feedback', style: 'width:auto;min-height:auto' });
+    var chkRoteiro = el('input', { type: 'checkbox', id: 'chk-roteiro-feedback', class: 'caixa-de-marcar' });
     chkRoteiro.checked = roteiroLigado();
     chkRoteiro.addEventListener('change', function () {
       db.ajustes = db.ajustes || {};
@@ -14437,11 +14310,10 @@
       salvarEDepois(function (gravou) { desenharAjustesDoFechamento(); });
     });
     cartaoRoteiro.appendChild(el('label', {
-      class: 'campo', style: 'display:flex;align-items:center;gap:10px;margin:0'
-    }, [chkRoteiro, el('span', { texto: 'Usar roteiro de perguntas no feedback', style: 'margin:0' })]));
+      class: 'campo u-mostra-flex u-alinha-centro u-vao-10 u-margem-0'
+    }, [chkRoteiro, el('span', { texto: 'Usar roteiro de perguntas no feedback', class: 'u-margem-0' })]));
     cartaoRoteiro.appendChild(el('p', {
-      class: 'ajuda', style: 'margin:8px 0 0',
-      texto: roteiroLigado()
+      class: 'ajuda u-margem-8-0-0', texto: roteiroLigado()
         ? 'A janela do Feedback mostra três perguntas para responder. O texto sai montado das respostas e você '
           + 'continua podendo mudar tudo. As perguntas também são suas: dá para reescrever cada uma lá mesmo.'
         : 'Com a caixa desmarcada, o Feedback é o campo único de sempre.'
@@ -14467,8 +14339,7 @@
       var campoP = el('input', { type: 'text', class: 'roteiro-pergunta', id: 'roteiro-pergunta-' + i, maxlength: '200', autocomplete: 'off',
         placeholder: Core.PERGUNTAS_DO_ROTEIRO[i], 'aria-label': 'Pergunta ' + (i + 1) });
       campoP.value = p;
-      var campoR = el('textarea', { class: 'roteiro-resposta', id: 'roteiro-resposta-' + i, style: 'min-height:64px',
-        'aria-label': 'Resposta ' + (i + 1) });
+      var campoR = el('textarea', { class: 'roteiro-resposta u-alt-min-64', id: 'roteiro-resposta-' + i, 'aria-label': 'Resposta ' + (i + 1) });
       camposP.push(campoP);
       camposR.push(campoR);
       bloco.appendChild(campoP);
@@ -14539,8 +14410,7 @@
     var cartao = el('div', { class: 'cartao' });
 
     cartao.appendChild(el('p', {
-      class: 'ajuda', style: 'margin-top:0',
-      texto: 'A sugestão que aparece no fechamento usa dois números do IBGE: quanto as escolas ' +
+      class: 'ajuda u-margem-topo-0', texto: 'A sugestão que aparece no fechamento usa dois números do IBGE: quanto as escolas ' +
         'subiram em doze meses e a inflação geral no mesmo período. Os dois vêm do mesmo lugar e ' +
         'se atualizam juntos, sozinhos, sempre que o tablet estiver com internet.'
     }));
@@ -14586,12 +14456,11 @@
     ]));
 
     cartao.appendChild(el('p', {
-      class: 'ajuda', style: 'margin:16px 0 8px',
-      texto: 'Quanto você quer subir acima da inflação. Entra na sugestão, somado à alta das escolas.'
+      class: 'ajuda u-margem-16-0-8', texto: 'Quanto você quer subir acima da inflação. Entra na sugestão, somado à alta das escolas.'
     }));
 
     var mostra = el('strong', {
-      style: 'font-size:20px;min-width:78px;text-align:center;color:#1F3A5F',
+      class: 'u-letra-6 u-larg-min-78 u-texto-centro u-cor-navy',
       texto: Core.pctBR(margem)
     });
     var mudar = function (passo) {
@@ -14605,14 +14474,14 @@
         desenharFechamento();
       });
     };
-    cartao.appendChild(el('div', { class: 'barra', style: 'margin-bottom:0' }, [
+    cartao.appendChild(el('div', { class: 'barra u-margem-baixo-0' }, [
       el('button', {
-        type: 'button', class: 'btn', style: 'min-width:64px', texto: '-1%',
+        type: 'button', class: 'btn u-larg-min-64', texto: '-1%',
         'aria-label': 'Diminuir um ponto', aoClick: function () { mudar(-1); }
       }),
       mostra,
       el('button', {
-        type: 'button', class: 'btn', style: 'min-width:64px', texto: '+1%',
+        type: 'button', class: 'btn u-larg-min-64', texto: '+1%',
         'aria-label': 'Aumentar um ponto', aoClick: function () { mudar(1); }
       })
     ]));
@@ -14642,7 +14511,7 @@
     aviso.appendChild(el('strong', { texto: copiaPronta.baixada
       ? 'O arquivo foi baixado. Confirme depois de guardá-lo. '
       : 'Cópia montada. Toque em Enviar para guardar em local seguro. ' }));
-    aviso.appendChild(el('div', { class: 'barra', style: 'margin-top:8px' }, [
+    aviso.appendChild(el('div', { class: 'barra u-margem-topo-8' }, [
       el('button', {
         type: 'button', class: 'btn principal pequeno',
         texto: copiaPronta.baixada ? 'Já guardei o arquivo' : 'Enviar',
@@ -14798,10 +14667,10 @@
     if (!caixa) return;
     caixa.innerHTML = '';
     if (!linhas || !linhas.length) return;
-    caixa.appendChild(el('div', { class: classe, style: 'margin-bottom:10px' }, linhas.map(function (l, i) {
+    caixa.appendChild(el('div', { class: (classe) + ' u-margem-baixo-10' }, linhas.map(function (l, i) {
       // linha de detalhe técnico: pequena, para quem for investigar
-      if (l && l.detalhe) return el('div', { style: 'font-size:12px;opacity:.75;margin-top:4px', texto: l.detalhe });
-      return el('div', { style: i ? '' : 'font-weight:600' }, [l]);
+      if (l && l.detalhe) return el('div', { class: 'u-letra-2 u-opacidade-75 u-margem-topo-4', texto: l.detalhe });
+      return el('div', { class: i ? '' : 'u-peso-seminegrito' }, [l]);
     })));
   }
 
@@ -14963,11 +14832,11 @@
         // a data do tablet, e não a de Greenwich: à noite o dia UTC já virou
         var quando = d && !isNaN(d) ? Core.ddmmaaaa(d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) +
           '-' + ('0' + d.getDate()).slice(-2)) : '';
-        caixa.appendChild(el('div', { class: 'cartao compacto', style: 'margin-bottom:10px' }, [
-          el('div', { style: 'font-weight:600', texto: linhas[0] }),
-          el('div', { class: 'ajuda', style: 'margin:4px 0 0', texto: linhas.slice(1).join('. ') +
+        caixa.appendChild(el('div', { class: 'cartao compacto u-margem-baixo-10' }, [
+          el('div', { class: 'u-peso-seminegrito', texto: linhas[0] }),
+          el('div', { class: 'ajuda u-margem-4-0-0', texto: linhas.slice(1).join('. ') +
             (quando ? '. Importado em ' + quando + '.' : '.') }),
-          el('div', { class: 'barra', style: 'margin:8px 0 0' }, [
+          el('div', { class: 'barra u-margem-8-0-0' }, [
             el('button', {
               type: 'button', class: 'btn pequeno perigo', 'data-remover-pacote': p.pacote,
               texto: 'Remover', aoClick: function () { removerPacote(p, linhas[0]); }
@@ -15138,16 +15007,15 @@
           ]),
           el('button', { type: 'button', class: 'btn pequeno', 'data-abrir-livro': l.id, texto: 'Abrir',
             aoClick: function () { abrirLivro(l.id); } }),
-          el('button', { type: 'button', class: 'btn pequeno perigo', 'data-remover-livro': l.id, texto: 'Remover',
-            style: 'margin-left:8px', aoClick: function () { removerLivroDoTablet(l); } })
+          el('button', { type: 'button', class: 'btn pequeno perigo u-margem-esq-8', 'data-remover-livro': l.id, texto: 'Remover',
+            aoClick: function () { removerLivroDoTablet(l); } })
         ]);
       });
-      caixa.appendChild(el('div', { class: 'cartao compacto', id: 'cartao-livros', style: 'margin-bottom:10px' }, [
-        el('div', { style: 'font-weight:600', texto: 'Livros neste tablet' }),
+      caixa.appendChild(el('div', { class: 'cartao compacto u-margem-baixo-10', id: 'cartao-livros' }, [
+        el('div', { class: 'u-peso-seminegrito', texto: 'Livros neste tablet' }),
         el('div', { class: 'livros-total', id: 'livros-total', 'data-bytes': String(total),
           texto: lista.length + (lista.length === 1 ? ' livro, ' : ' livros, ') + Biblioteca.mb(total) + ' no total' }),
-        el('div', { class: 'ajuda', style: 'margin:0 0 6px',
-          texto: 'Os livros ficam só neste tablet: a cópia de segurança não os leva. Para usar num tablet novo, ' +
+        el('div', { class: 'ajuda u-margem-0-0-6', texto: 'Os livros ficam só neste tablet: a cópia de segurança não os leva. Para usar num tablet novo, ' +
             'importe o pacote de livros de novo do Drive.' })
       ].concat(linhas)));
     }).catch(function () { quantosLivros = 0; livrosDoTablet = []; atualizarBotaoLivros(); if (caixa) caixa.innerHTML = ''; });
@@ -15177,8 +15045,7 @@
     if (!b) {
       var guia = $('#btn-guia-listas');
       if (!guia) return;
-      b = el('button', { type: 'button', class: 'btn pequeno', id: 'btn-livros', style: 'margin-right:8px',
-        aoClick: abrirEstanteDeLivros });
+      b = el('button', { type: 'button', class: 'btn pequeno u-margem-dir-8', id: 'btn-livros', aoClick: abrirEstanteDeLivros });
       guia.parentNode.insertBefore(b, guia);
     }
     b.textContent = 'Livros (' + quantosLivros + ')';
@@ -15333,8 +15200,7 @@
     };
     var lista = el('div', { class: 'cobre-escolha', role: 'list' });
     if (!opcoes.length) {
-      lista.appendChild(el('p', { class: 'ajuda', style: 'margin:8px 12px',
-        texto: 'A matéria deste livro não tem assuntos no índice; dá para marcar só que o capítulo não cobre nenhum.' }));
+      lista.appendChild(el('p', { class: 'ajuda u-margem-8-12', texto: 'A matéria deste livro não tem assuntos no índice; dá para marcar só que o capítulo não cobre nenhum.' }));
     }
     /* O assunto de agora vem marcado (o visto, negrito e fundo), para ela ver
      * de relance qual está antes de trocar; "Nenhum" é o atual quando o
@@ -15799,7 +15665,7 @@
     corpo.innerHTML = '';
     rodape.innerHTML = '';
     corpo.dataset.livro = origem.reg.id;
-    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', id: 'livro-exportar-livro', texto: tituloDoLivro(meta) }));
+    corpo.appendChild(el('p', { class: 'ajuda u-margem-topo-0', id: 'livro-exportar-livro', texto: tituloDoLivro(meta) }));
 
     // o que exportar: o capítulo à vista, ou (no PDF) as páginas que ela escrever
     var radioCap = el('input', { type: 'radio', name: 'livro-exportar-o-que', id: 'livro-exportar-capitulo', value: 'capitulo' });
@@ -16497,13 +16363,13 @@
          * mesmo controle: não há uma segunda gravação de pacotes. */
         corpo.innerHTML = '';
         corpo.appendChild(el('div', { class: 'vazio', id: 'biblioteca-sem-pacotes' }, [
-          el('p', { style: 'font-size:18px;font-weight:600;color:var(--navy);margin:0 0 8px',
+          el('p', { class: 'u-letra-6 u-peso-seminegrito u-cor-navy u-margem-0-0-8',
             texto: 'Nenhum pacote de materiais importado' }),
-          el('p', { style: 'margin:0', texto: 'Importe um pacote para consultar listas, exercícios e teoria neste tablet.' }),
-          el('p', { class: 'ajuda', style: 'margin:10px 0 0', id: 'biblioteca-onde-importar',
+          el('p', { class: 'u-margem-0', texto: 'Importe um pacote para consultar listas, exercícios e teoria neste tablet.' }),
+          el('p', { class: 'ajuda u-margem-10-0-0', id: 'biblioteca-onde-importar',
             texto: 'Folhas e arquivos próprios das aulas continuam disponíveis nas respectivas aulas.' }),
-          el('button', { type: 'button', class: 'btn principal', id: 'biblioteca-importar-pacote',
-            texto: 'Importar material', style: 'margin-top:12px', aoClick: function () {
+          el('button', { type: 'button', class: 'btn principal u-margem-topo-12', id: 'biblioteca-importar-pacote',
+            texto: 'Importar material', aoClick: function () {
               var ajustes = $('#abas .aba[data-tela="ajustes"]');
               if (ajustes) ajustes.click();
               var importar = $('#importar-biblioteca');
@@ -17370,9 +17236,8 @@
     var t = listasParaMostrar();
     if (!t.dela.length && !t.doAplicativo.length) {
       corpo.appendChild(el('div', { class: 'vazio', id: 'bib-minhas-vazio' }, [
-        el('p', { style: 'margin:0', texto: 'Você ainda não guardou nenhuma lista.' }),
-        el('p', { class: 'ajuda', style: 'margin:8px 0 0',
-          texto: 'Marque os exercícios, toque em Gerar material e, no fim da janela, em "Salvar esta seleção como lista".' })
+        el('p', { class: 'u-margem-0', texto: 'Você ainda não guardou nenhuma lista.' }),
+        el('p', { class: 'ajuda u-margem-8-0-0', texto: 'Marque os exercícios, toque em Gerar material e, no fim da janela, em "Salvar esta seleção como lista".' })
       ]));
       return;
     }
@@ -17382,7 +17247,7 @@
     }
     if (t.doAplicativo.length) {
       corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Guardadas pelo aplicativo' }));
-      corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', id: 'bib-minhas-automaticas-ajuda',
+      corpo.appendChild(el('p', { class: 'ajuda u-margem-topo-0', id: 'bib-minhas-automaticas-ajuda',
         texto: 'Quando o material é trocado, o que estava marcado fica guardado aqui (as três últimas). ' +
           'Dê um nome para guardar de vez.' }));
       t.doAplicativo.forEach(function (l) { corpo.appendChild(cartaoDeMinhaLista(l)); });
@@ -17547,7 +17412,7 @@
           desenharCorpoBiblioteca();
         } }));
     }
-    corpo.appendChild(el('div', { class: 'barra', style: 'margin-top:16px' }, [
+    corpo.appendChild(el('div', { class: 'barra u-margem-topo-16' }, [
       el('span', { class: 'cresce' }),
       el('button', { type: 'button', class: 'btn', id: 'bib-minha-cancelar', texto: 'Cancelar',
         aoClick: function () { minhaEmEdicao = null; irNaBiblioteca({ minhas: {} }); } }),
@@ -18912,7 +18777,7 @@
      * não há), e a ordem diz de onde veio: da lista, ou da mão dela. */
     var lpDoMaterial = lpEmEdicao() ? listaProntaPorId(lpEmEdicao()) : null;
     var daListaPronta = !!(lpDoMaterial && mesmaSelecao(bibCarrinho, lpDoMaterial));
-    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', id: 'bib-gerar-resumo',
+    corpo.appendChild(el('p', { class: 'ajuda u-margem-topo-0', id: 'bib-gerar-resumo',
       texto: [itens.length ? plural(itens.length, 'exercício', 'exercícios') : '',
         paginas.length ? plural(paginas.length, 'página de teoria', 'páginas de teoria') : ''].filter(Boolean).join(' e ') +
         (daListaPronta ? ', na ordem da lista.' : ', na ordem em que você marcou.') }));
@@ -19993,13 +19858,12 @@
       marcada ? el('span', { class: 'bib-selo-marcado', id: 'bib-selo-marcado', texto: 'Marcado' }) : null
     ]));
     if (peca.item && peca.item.origem_citada) {
-      corpo.appendChild(el('div', { class: 'bib-origem', style: 'text-align:center', texto: peca.item.origem_citada }));
+      corpo.appendChild(el('div', { class: 'bib-origem u-texto-centro', texto: peca.item.origem_citada }));
     }
     // sem solução e com a letra do gabarito (ENEM): o "Ver resposta" mostra a letra
     var resposta = bibVendo.tipo === 'exercicio' ? respostaSemSolucao(peca.item) : null;
     if (resposta && bibVendo.solucao) {
-      corpo.appendChild(el('div', { id: 'bib-resposta', class: 'bib-resposta',
-        style: 'text-align:center;font-size:18px;font-weight:700;color:var(--navy);margin-top:10px',
+      corpo.appendChild(el('div', { id: 'bib-resposta', class: 'bib-resposta u-texto-centro u-letra-6 u-peso-negrito u-cor-navy u-margem-topo-10',
         texto: 'Resposta: ' + resposta }));
     }
     var vez = ++bibVezDoVisor;
@@ -20088,7 +19952,7 @@
   function mostrarAulasParaFolha(alvo) {
     var corpo = $('#corpo-modal-bib-folha');
     corpo.innerHTML = '';
-    corpo.appendChild(el('p', { class: 'ajuda', style: 'margin-top:0', texto: alvo.titulo }));
+    corpo.appendChild(el('p', { class: 'ajuda u-margem-topo-0', texto: alvo.titulo }));
     var hoje = Core.hojeIso();
     var aulas = db.aulas.filter(function (a) { return alunoPorId(a.alunoId); });
     var doDia = aulas.filter(function (a) { return a.data === hoje; })
@@ -20104,7 +19968,7 @@
     corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Aulas de hoje' }));
     if (doDia.length) doDia.forEach(function (a) { corpo.appendChild(linhaAula(a)); });
     else corpo.appendChild(el('p', { class: 'ajuda', texto: 'Nenhuma aula marcada para hoje.' }));
-    corpo.appendChild(el('div', { class: 'barra', style: 'margin:6px 0 4px' }, [
+    corpo.appendChild(el('div', { class: 'barra u-margem-6-0-4' }, [
       el('button', { type: 'button', class: 'btn', id: 'bib-nova-aula', texto: 'Nova aula hoje', aoClick: function () {
         if (!db.alunos.length) { avisar('Cadastre um aluno antes de marcar a primeira aula.'); return; }
         fecharModal('modal-bib-folha');

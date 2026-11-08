@@ -94,7 +94,16 @@ function validarCss(css) {
 
 console.log('=== Prova estatica do Item B6 (Alvos de toque e tipografia) ===');
 
-const cssReal = fs.readFileSync(ARQ_CSS, 'utf8');
+// Desde o B12 todo font-size usa a escala do :root (--letra-1 a --letra-6).
+// As regras acima leem px; aqui cada var(--letra-N) vira o px que ela vale,
+// lido do proprio :root, para a prova medir o tamanho e nao o nome.
+function resolverLetras(css) {
+  const raiz = (css.match(/:root\s*\{([\s\S]*?)\}/) || [])[1] || '';
+  const valor = {};
+  raiz.replace(/(--letra-\d+)\s*:\s*([^;]+);/g, (_, n, v) => { valor[n] = v.trim(); });
+  return css.replace(/var\((--letra-\d+)\)/g, (tudo, n) => valor[n] || tudo);
+}
+const cssReal = resolverLetras(fs.readFileSync(ARQ_CSS, 'utf8'));
 const appReal = fs.readFileSync(ARQ_APP, 'utf8');
 
 // Validacao do CSS real
