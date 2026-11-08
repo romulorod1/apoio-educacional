@@ -34,8 +34,8 @@
  * VÊ o veneno):
  *   --envenenado-envia    as travas de envio tiradas (nuvem.js e app.js) e a
  *                         restauração pelo celular ligando a automática;
- *   --envenenado-edicao   um botão "Registrar como foi" no cartão da aula de
- *                         Hoje;
+ *   --envenenado-edicao   um botão "Registrar como foi" solto na linha do tempo
+ *                         de Hoje (D6c);
  *   --envenenado-grava    a trava do banco tirada e o celular gravando a carga
  *                         inicial ao abrir;
  *   --envenenado-tela     a tela do aparelho tirada da escolha (volta a
@@ -113,7 +113,7 @@ const ENVIO_DELA = 'if (!temNuvem() || enviandoParaNuvem || aparelhoSoLe()) retu
 /* D6b: o fechar do celular da dona sobe só os registros e sai; o veneno de
  * envio tira também esta saída, senão a cópia nem seria tentada. */
 const FECHAR_CELULAR = 'if (celularEdita()) { Nuvem.enviarRegistrosSeDevido({ versaoApp: VERSAO }); return; }';
-const CARTAO = "    cartao.appendChild(el('div', { class: 'ajuda u-margem-0', texto: Core.fmtDuracao(Number(a.duracaoMin) || 0) +";
+const CARTAO = '    caixa.appendChild(linhaDoTempoCelular(dia, edita));';
 const TRAVA_BANCO = "if (modo === 'readwrite' && soLeitura && porta !== true && !(celularEdita && PORTAS_DO_CELULAR[porta])) throw erroSoLeitura();";
 const SALVAR_GUARDA = '    if (aparelhoSoLe() && !(gravacaoDoCelular > 0 && celularEdita())) {';
 const SEM_CARGA = '} else if (modoCelular) {';
@@ -125,7 +125,7 @@ conf('a automática do app.js recusa em tela de celular, num lugar só', (APP.ma
 conf('o envio do app.js recusa no aparelho que só lê, num lugar só', APP.split(ENVIO_DELA).length, 2);
 conf('o fechar do celular da dona sobe só os registros e sai, num lugar só', APP.split(FECHAR_CELULAR).length, 2);
 conf('a restauração pelo celular deixa a automática desligada num lugar só', NUVEM.split(AUTO_RESTAURA).length, 2);
-conf('o cartão da aula de Hoje existe para o veneno de edição', APP.split(CARTAO).length, 2);
+conf('a linha do tempo de Hoje (D6c) existe para o veneno de edição, num lugar só', APP.split(CARTAO).length, 2);
 conf('a trava do banco está num lugar só', STORE.split(TRAVA_BANCO).length, 2);
 /* Toda transação do banco passa pela trava: b.transaction só aparece dentro dela. */
 conf('o store.js só abre transação pela trava (um b.transaction, o de dentro dela)',
@@ -162,7 +162,7 @@ const LIMITE = 'var TELA_CELULAR = 500;';
 conf('o limite da tela de celular está num lugar só', APP.split(LIMITE).length, 2);
 if (LIMITE_640) trocas['/app.js'] = APP.replace(LIMITE, 'var TELA_CELULAR = 640;');
 if (EDICAO) {
-  trocas['/app.js'] = APP.replace(CARTAO, "    cartao.appendChild(el('button', { type: 'button', class: 'btn pequeno', texto: 'Registrar como foi' }));\n" + CARTAO);
+  trocas['/app.js'] = APP.replace(CARTAO, "    caixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', texto: 'Registrar como foi' }));\n" + CARTAO);
 }
 if (GRAVA) {
   trocas['/store.js'] = STORE.replace(TRAVA_BANCO, '');
@@ -485,10 +485,12 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     const e = Nuvem.estado(); return e.celular && e.celularDaDona && !e.observador && e.uidDona === u && e.automatica === false;
   }, dona.localId), ENVIA ? false : true);
   conf('no alto: "Dados de hoje, HH:MM, do tablet."', /^Dados de hoje, \d\d:\d\d, do tablet\.$/.test(await texto(pagB, '#cel-origem')), true);
-  conf('no alto, antes, o que este celular edita (e que o resto é do tablet)', await texto(pagB, '#cel-regra'),
-    'Aqui: marcar e cancelar aula, registrar como foi, aluno novo e pago. O resto, no tablet.');
+  /* D6c: o alto da dona é enxuto, sem o texto de sistema (o que ela pode
+   * fazer está nos botões), com o ícone da nuvem ao lado do estado curto. */
+  conf('no alto da dona, nenhum texto de sistema, e o ícone da nuvem ao lado do estado', await pagB.evaluate(() =>
+    document.querySelector('#cel-regra').hidden && !document.querySelector('#cel-regra').textContent && !!document.querySelector('#cel-estado-icone, #cel-nuvem')), true);
   conf('o texto secundário do celular usa o cinza escuro da escala (#4B5563, mais de 7:1), e não o --muted', await pagB.evaluate(() =>
-    [getComputedStyle(document.querySelector('#cel-hoje .ajuda')).color, getComputedStyle(document.querySelector('#cel-origem')).color].join(' ')),
+    [getComputedStyle(document.querySelector('#cel-hoje .cel-semana-dia:not(.ativo) .cel-semana-nome')).color, getComputedStyle(document.querySelector('#cel-origem')).color].join(' ')),
     'rgb(75, 85, 99) rgb(75, 85, 99)');
   conf('o observador de avisos vê (o "Pronto" da restauração foi visto)', await pagB.evaluate(() => window.__avisos.some(t => /Pronto: os dados do tablet chegaram/.test(t))), true);
   await pagB.evaluate(() => { document.querySelector('#cel-abas .cel-aba[data-cel="fechamento"]').click(); document.querySelector('#cel-abas .cel-aba[data-cel="hoje"]').click(); });
@@ -506,13 +508,21 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
 
   secao('4. As três telas: sem rolagem de lado, alvos de 48 px e nenhum botão de edição fora das quatro ações');
   const hojeTexto = await texto(pagB, '#cel-hoje');
-  conf('Hoje: a aula do dia, com o horário', /10:30 Aluno Alfa Teste/.test(hojeTexto), true);
-  conf('Hoje: o lembrete do mapeamento', /Lembrete: Prioridades: Frações antes da prova/.test(hojeTexto), true);
-  conf('Hoje: a última aula e o relato', /Na última aula/.test(hojeTexto) && /Rendeu bem em frações/.test(hojeTexto), true);
-  conf('Hoje: a nota só minha nasce fechada', await pagB.evaluate(() => document.querySelector('.cel-so-minha').hidden), true);
-  await clicar(pagB, '.cel-ver-nota');
-  conf('Hoje: um toque abre a nota só minha', await pagB.evaluate(() =>
-    !document.querySelector('.cel-so-minha').hidden && /Mãe pediu para falar da prova/.test(document.querySelector('.cel-so-minha').textContent)), true);
+  conf('Hoje: a aula do dia, na linha do tempo, com o horário à esquerda', await pagB.evaluate(() => { const b = document.querySelector('#cel-tempo .cel-bloco[data-aula="aula-hoje"]');
+    return !!b && /Aluno Alfa Teste/.test(b.textContent) && b.closest('.cel-tempo-linha').querySelector('.cel-tempo-hora').textContent === '10:30'; }), true);
+  /* D6c: o bloco não repete o relato da última aula; o lembrete, a última aula
+   * e a nota só minha ficam na folha que o toque no bloco abre. */
+  conf('Hoje: o bloco não repete o relato da última aula', /Na última aula|Rendeu bem em frações/.test(hojeTexto), false);
+  await clicar(pagB, '#cel-tempo .cel-bloco[data-aula="aula-hoje"]');
+  const folhaTexto = (await texto(pagB, '#cel-folha')) || '';
+  conf('a folha da aula: o lembrete do mapeamento', /Lembrete: Prioridades: Frações antes da prova/.test(folhaTexto), true);
+  conf('a folha da aula: o relato da aula anterior, num quadro rotulado com a data', /^Relato da aula anterior \(\d\d\/\d\d\)/.test((await texto(pagB, '#cel-aula-anterior')) || '') &&
+    /Rendeu bem em frações/.test(folhaTexto), true);
+  conf('a folha da aula: a nota só minha nasce fechada', await pagB.evaluate(() => document.querySelector('#cel-folha .cel-so-minha').hidden), true);
+  await clicar(pagB, '#cel-folha .cel-ver-nota');
+  conf('a folha da aula: um toque abre a nota só minha', await pagB.evaluate(() =>
+    !document.querySelector('#cel-folha .cel-so-minha').hidden && /Mãe pediu para falar da prova/.test(document.querySelector('#cel-folha .cel-so-minha').textContent)), true);
+  await clicar(pagB, '#cel-folha-fechar');
   const telas = { hoje: null, fechamento: null, enviar: null };
   for (const t of Object.keys(telas)) {
     await clicar(pagB, '#cel-abas .cel-aba[data-cel="' + t + '"]');
@@ -532,7 +542,7 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
   if (EDICAO) { await ctxB.close(); return; }
   // o instrumento vê os botões das ações: sem isto, "nenhum botão fora delas" passaria com a medida cega
   conf('(controle) as ações do celular da dona estão à vista e a medida as separa: Hoje (' + telas.hoje.dasAcoes.join(', ') + '), Fechamento (' + telas.fechamento.dasAcoes.join(', ') + ')',
-    telas.hoje.dasAcoes.indexOf('Marcar aula neste dia') >= 0 && telas.hoje.dasAcoes.indexOf('Ver ou corrigir como foi') >= 0 &&
+    telas.hoje.dasAcoes.indexOf('+') >= 0 && telas.hoje.dasAcoes.indexOf('Cadastrar aluno') >= 0 &&
     telas.fechamento.dasAcoes.indexOf('Marcar como pago') >= 0, true);
   conf('todos os botões das três telas e do alto foram medidos (' + Object.keys(telas).map(t => t + ': ' + telas[t].alvos).join(', ') + ')',
     Object.keys(telas).every(t => telas[t].alvos >= 5), true);

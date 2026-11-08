@@ -2926,11 +2926,247 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-titulo { font-size: var(--letra-6); color: var(--navy); margin: 4px 0 12px; }
 .cel-mes .cel-titulo { margin: 0; text-align: center; }
 .cel-mes .btn { min-width: var(--alvo-celular); }
-/* O dia de Hoje (D6b): anterior, o dia escolhido e o seguinte numa linha só. */
-.cel-dia { flex-wrap: nowrap; align-items: center; }
-.cel-dia .btn { min-width: var(--alvo-celular); flex-shrink: 0; }
-.cel-dia input[type=date] { flex: 1; min-width: 0; }
-.cel-aula-titulo { font-size: var(--letra-5); color: var(--navy); }
+/* ---------- Hoje como linha do tempo (D6c) ----------
+   No alto, o dia uma vez só e a faixa da semana, presos ao rolar. Embaixo, a
+   hora à esquerda e cada aula num bloco com a altura pela duração e a cor do
+   aluno (a mesma do tablet, que chega por --cor-aluno, no próprio bloco). */
+.cel-semana {
+  position: sticky;
+  top: -12px; /* o recuo do conteúdo: presa rente ao alto da tela */
+  z-index: 3;
+  background: var(--ivory);
+  margin: -12px -16px 8px;
+  padding: 8px 16px 6px;
+  border-bottom: 1px solid var(--fio-claro);
+}
+.cel-semana-topo { flex-wrap: nowrap; align-items: center; margin-bottom: 4px; }
+.cel-semana-topo .btn { min-width: var(--alvo-celular); flex-shrink: 0; }
+.cel-semana-topo .cel-titulo { margin: 0; text-align: center; font-size: var(--letra-5); }
+.cel-semana-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.cel-semana-dia {
+  min-height: 56px;
+  min-width: 0; /* em 390 px cada dia tem 49; num celular de 360, encolhe sem rolar de lado */
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  padding: 2px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.cel-semana-nome { font-size: var(--letra-1); color: var(--novidades-subtitulo); }
+.cel-semana-numero { font-size: var(--letra-4); font-weight: 700; }
+.cel-semana-dia.hoje .cel-semana-numero { color: var(--teal); }
+.cel-semana-dia.ativo { background: var(--navy); border-color: var(--navy); }
+.cel-semana-dia.ativo .cel-semana-nome,
+.cel-semana-dia.ativo .cel-semana-numero { color: var(--branco); }
+.cel-semana-bolinhas { display: flex; gap: 2px; min-height: 7px; }
+.cel-bolinha { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 0 1px var(--branco); }
+
+.cel-tempo { margin-top: 4px; }
+.cel-tempo-linha { position: relative; display: flex; gap: 8px; margin-bottom: 6px; }
+.cel-tempo-hora {
+  flex: 0 0 44px;
+  font-size: var(--letra-2);
+  font-weight: 700;
+  color: var(--novidades-subtitulo);
+  padding-top: 6px;
+  text-align: right;
+}
+.cel-tempo-item { flex: 1; min-width: 0; display: flex; }
+.cel-tempo-agora-solta { min-height: 12px; }
+.cel-bloco {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  font: inherit;
+  color: var(--texto);
+  border: 1px solid var(--fio-claro);
+  border-left: 6px solid var(--cor-aluno);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--cor-aluno) 14%, var(--branco));
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.cel-bloco-nome { font-size: var(--letra-5); font-weight: 700; color: var(--navy); overflow-wrap: anywhere; }
+.cel-bloco-hora { font-size: var(--letra-2); color: var(--novidades-subtitulo); }
+.cel-bloco-situacao { font-size: var(--letra-2); font-weight: 700; color: var(--novidades-subtitulo); }
+.cel-bloco-realizada .cel-bloco-situacao { color: var(--teal); }
+.cel-bloco-reposicao { border-right: 4px solid var(--novidades-selo-borda); }
+.cel-bloco-reposicao .cel-bloco-situacao { color: var(--novidades-tag-ouro-texto); }
+.cel-bloco-falta .cel-bloco-situacao { color: var(--vermelho); }
+.cel-bloco-cancelada { opacity: .6; background: var(--fundo-leve); }
+.cel-bloco-cancelada .cel-bloco-nome,
+.cel-bloco-cancelada .cel-bloco-hora { text-decoration: line-through; }
+.cel-bloco-choque { font-size: var(--letra-2); font-weight: 700; color: var(--aviso-texto); }
+.cel-bloco.com-choque { border-color: var(--etapas-borda); }
+
+/* O buraco do dia, escrito, e as horas em que se pode marcar nele. */
+.cel-livre {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  border: 1px dashed var(--fio);
+  border-radius: 10px;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+.cel-livre-texto { font-size: var(--letra-3); color: var(--novidades-subtitulo); }
+.cel-livre-horas { display: flex; flex-wrap: wrap; gap: 6px; }
+.cel-livre-hora {
+  min-height: var(--alvo-celular);
+  min-width: 64px;
+  border: 1px solid var(--fio);
+  border-radius: 10px;
+  background: var(--branco);
+  color: var(--navy);
+  font: inherit;
+  font-size: var(--letra-4);
+  font-weight: 700;
+}
+.cel-livre-hora.escolhida { background: var(--navy); border-color: var(--navy); color: var(--branco); }
+
+/* A linha de agora: um fio vermelho atravessando a aula ou o buraco. */
+.cel-agora {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 0;
+  border-top: 2px solid var(--vermelho);
+  z-index: 2;
+  pointer-events: none;
+}
+.cel-tempo-agora-solta .cel-agora { top: 6px; }
+.cel-agora-hora {
+  position: absolute;
+  left: 0;
+  top: -9px;
+  background: var(--vermelho);
+  color: var(--branco);
+  font-size: var(--letra-1);
+  font-weight: 700;
+  border-radius: 6px;
+  padding: 1px 4px;
+}
+
+/* "Marcar aula neste dia" é um "+" flutuante no canto de baixo. */
+/* o espaço no fim de Hoje para o "+" não cobrir o último botão */
+.cel-fab-lugar {
+  position: sticky;
+  margin-top: 72px;
+  bottom: 0;
+  height: 0;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+  z-index: 4;
+}
+.cel-fab {
+  pointer-events: auto;
+  width: 56px;
+  height: 56px;
+  margin-top: -64px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--navy);
+  color: var(--branco);
+  font: inherit;
+  font-size: var(--letra-6);
+  font-weight: 700;
+  box-shadow: var(--sombra-forte);
+}
+
+/* A folha de baixo da aula: botões grandes, sobre um véu. */
+.cel-folha-fundo {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--veu-janela);
+  display: flex;
+  align-items: flex-end;
+}
+.cel-folha {
+  width: 100%;
+  max-height: 88%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  background: var(--branco);
+  border-radius: 16px 16px 0 0;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  box-shadow: var(--sombra-forte);
+}
+.cel-folha-cabeca { border-left: 6px solid var(--cor-aluno); padding-left: 10px; margin-bottom: 10px; }
+.cel-folha-cabeca .cel-titulo { margin: 0 0 2px; }
+.cel-folha:focus { outline: none; }
+/* Cancelar numa linha só dele, a 16 px ou mais dos outros, com a cor de perigo. */
+.cel-folha-perigo { margin: 20px 0 12px; padding-top: 12px; border-top: 1px solid var(--fio-claro); }
+body.modo-celular .celular .cel-folha .cel-folha-perigo .cel-folha-botao {
+  width: 100%; background: var(--perigo-fundo); border-color: var(--perigo-borda); color: var(--vermelho);
+}
+/* O relato da aula anterior num quadro à parte, para não parecer o desta. */
+.cel-aula-anterior {
+  background: var(--fundo-leve);
+  border: 1px solid var(--fio-claro);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.cel-salvar-com-choque { white-space: normal; }
+body.modo-celular .celular .btn.principal.cel-salvar-com-choque { background: var(--aviso-texto); border-color: var(--aviso-texto); }
+/* Hoje: a aula de agora em destaque, e as marcas "Agora" e "Próxima". */
+.cel-bloco-agora { border-color: var(--cor-aluno); box-shadow: 0 0 0 2px var(--cor-aluno); }
+.cel-bloco-marca {
+  font-size: var(--letra-1);
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--branco);
+  background: var(--navy);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+.cel-bloco-agora .cel-bloco-marca { background: var(--vermelho); }
+.cel-folha-resumo { margin-bottom: 12px; font-size: var(--letra-3); }
+.cel-folha-acoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 0 12px; }
+body.modo-celular .celular .cel-folha .cel-folha-botao { min-height: 56px; font-size: var(--letra-5); font-weight: 700; white-space: normal; }
+.cel-folha-botao.atual { border-color: var(--teal); color: var(--teal); }
+.cel-folha-largo { grid-column: 1 / -1; }
+.cel-folha-pergunta { font-size: var(--letra-5); font-weight: 700; color: var(--navy); margin: 4px 0 8px; }
+.cel-dois-campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.cel-livres { margin: 4px 0 12px; display: flex; flex-direction: column; gap: 6px; }
+.cel-choque { margin-bottom: 8px; }
+
+/* O rodapé do formulário fica preso embaixo: com o teclado aberto, Salvar e
+   Voltar continuam à vista. */
+.cel-rodape-form {
+  position: sticky;
+  bottom: -12px; /* o recuo do conteúdo: preso rente ao pé da tela */
+  z-index: 3;
+  background: var(--ivory);
+  margin: 8px -16px -12px;
+  padding: 8px 16px 12px;
+  border-top: 1px solid var(--fio-claro);
+}
+.cel-folha .cel-rodape-form { background: var(--branco); bottom: calc(-16px - env(safe-area-inset-bottom, 0px)); margin: 8px -16px -16px; padding: 8px 16px 16px; }
+
+/* O alto enxuto: o ícone da nuvem com o estado curto. */
+.cel-estado { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cel-nuvem { flex-shrink: 0; color: var(--novidades-subtitulo); }
+.cel-nuvem[data-tom="em-dia"] { color: var(--teal); }
+.cel-nuvem[data-tom="esperando"] { color: var(--aviso-texto); }
+.cel-nuvem[data-tom="problema"] { color: var(--vermelho); }
+.cel-regra[hidden] { display: none; }
+body.modo-celular .celular .cel-icone { min-width: var(--alvo-celular); padding: 0; font-size: var(--letra-6); }
 .cel-lembrete { margin: 10px 0 0; }
 .cel-ultimo { margin-top: 10px; font-size: var(--letra-3); line-height: 1.5; }
 .cel-ultimo .rotulo-ultimo { font-weight: 700; color: var(--teal); }
