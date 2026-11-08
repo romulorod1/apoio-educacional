@@ -51,6 +51,23 @@ const { conf, esperar } = H;
   }), Boolean, 5000);
   if (!cancelou.ok) throw new Error('Cancelamento não foi gravado');
   await totalEsperado('100,00');
+  // B8b: o toque errado tem Desfazer, e situação, cobrança e total voltam
+  const desfez = await esperar('Desfazer no aviso', () => pagina.evaluate(() => {
+    const b = Array.from(document.querySelectorAll('#aviso button')).find(x => x.textContent.trim() === 'Desfazer');
+    if (!b) return false; b.click(); return true;
+  }), Boolean, 5000);
+  conf('o aviso do Cancelar aula traz o Desfazer', desfez.ok, true);
+  const voltou = await esperar('segunda aula de volta', () => pagina.evaluate(async () => {
+    const a = (await Store.carregar()).aulas.find(x => x.id === 'b8-a2'); return a.status === 'realizada' && a.cobravel === true;
+  }), Boolean, 5000);
+  conf('desfeito, a aula volta a realizada e cobrada', voltou.ok, true);
+  await totalEsperado('200,00');
+  await esperar('ações de volta', () => pagina.$(linha('b8-a2') + ' .b8-cancelar'), Boolean, 5000);
+  await pagina.click(linha('b8-a2') + ' .b8-cancelar');
+  const recancelou = await esperar('segunda aula cancelada de novo', () => pagina.evaluate(async () =>
+    (await Store.carregar()).aulas.find(x => x.id === 'b8-a2').status === 'cancelada'), Boolean, 5000);
+  if (!recancelou.ok) throw new Error('Cancelamento de novo não foi gravado');
+  await totalEsperado('100,00');
   await pagina.click(linha('b8-a3') + ' .b8-adiar');
   await pagina.$eval(linha('b8-a3') + ' input[type=date]', e => { e.value = ''; });
   await pagina.click(linha('b8-a3') + ' .b8-confirmar-data');
