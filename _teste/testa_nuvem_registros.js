@@ -11,10 +11,11 @@
  *      guardadas;
  *   2. com as regras novas publicadas (trocadas no emulador em pleno voo), a
  *      mesma fila sobe: um documento por registro em usuarios/{uid}/registros,
- *      metadados em claro (id, tipo, atualizadoEm, aparelho, esquema, app) e o
- *      conteúdo só como bytes cifrados; o nome fictício da aluna não aparece
- *      em lugar nenhum do servidor; ajuste do aparelho (versaoVista) nunca
- *      entra na fila; lápide sobe sem conteúdo; a cópia completa continua
+ *      metadados (id, tipo, atualizadoEm, aparelho, esquema, app) e o conteúdo
+ *      em `dados`, como dado legível do Firestore (decisão do dono de
+ *      08/11/2026: sem cifra; quem protege são o login e as regras, e um
+ *      estranho não lê nem escreve registro); ajuste do aparelho (versaoVista)
+ *      nunca entra na fila; lápide sobe sem conteúdo; a cópia completa continua
  *      subindo com as regras novas e leva o mesmo id de aparelho dos registros
  *      (o do Store);
  *   3. a fila sobrevive a fechar sem sinal (a página fica sem rede, grava,
@@ -27,9 +28,6 @@
  *
  * Venenos, que TÊM de reprovar a propriedade (a rodada passa quando a prova VÊ
  * o veneno):
- *   --envenenado-registro-em-claro       o nuvem.js servido sobe o conteúdo
- *                                        do registro sem cifrar: o nome
- *                                        fictício aparece no servidor;
  *   --envenenado-fila-fora-da-transacao  o store.js servido grava a entrada da
  *                                        fila numa transação à parte: o dado
  *                                        abortado deixa entrada na fila.
@@ -46,10 +44,9 @@ const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
-const MODOS = ['--envenenado-registro-em-claro', '--envenenado-fila-fora-da-transacao', '--envenenado-culpa-na-recusa-total'];
+const MODOS = ['--envenenado-fila-fora-da-transacao', '--envenenado-culpa-na-recusa-total'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
-const EM_CLARO = MODO === MODOS[0];
-const FILA_FORA = MODO === MODOS[1];
+const FILA_FORA = MODO === MODOS[0];
 function prop(rotulo, ok, veneno) {
   if (MODO && MODO === veneno) return conf('VENENO visto: ' + rotulo + ', e quebrou', ok, false);
   return conf(rotulo, ok, true);
@@ -63,6 +60,7 @@ const FIREBASE = process.env.FIREBASE_TOOLS ||
   'C:/Users/romul/ferramentas/firebase-tools/node_modules/firebase-tools/lib/bin/firebase.js';
 const JAVA_HOME = process.env.JAVA_HOME || '';
 const DONA = { email: 'dona@exemplo.test', senha: 'senha-da-dona-1' };
+const ESTRANHO = { email: 'estranho@exemplo.test', senha: 'senha-do-estranho-1' };
 
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const NUVEM = fs.readFileSync(path.join(H.RAIZ, 'nuvem.js'), 'utf8');
@@ -71,13 +69,13 @@ const REGRAS = fs.readFileSync(path.join(H.RAIZ, 'firestore.rules'), 'utf8');
 
 /* ---------- âncoras ---------- */
 secao('0. As âncoras, o veneno e o ambiente');
-const CIFRA_REGISTRO = "return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv, additionalData: new TextEncoder().encode(ROTULO_REGISTRO) }, k, new TextEncoder().encode(texto));";
+const DADOS_LEGIVEIS = 'if (!reg.apagadoEm && reg.dados !== null && reg.dados !== undefined) campo.dados = reg.dados;';
 const ENFILEIRAR = 'function enfileirar(saida, entrada) { saida.put(entrada); }';
 const SAIDA_NA_TRANSACAO = "var saida = opcoes.semFila ? null : t.objectStore('saida');";
 const GATILHO = 'Nuvem.sincronizarSeDevido({ versaoApp: VERSAO });'; // desde a fatia 3: recebe e envia
 const COMMIT_TRAVADO = /function commit\(escritas\) \{\r?\n    if \(!podeEnviar\(\)\)/;
 const REGISTROS_NAS_REGRAS = 'match /registros/{registro} {';
-conf('o nuvem.js cifra o registro num lugar só', NUVEM.split(CIFRA_REGISTRO).length, 2);
+conf('o conteúdo do registro vai em dados, como dado legível, num lugar só (sem cifra)', NUVEM.split(DADOS_LEGIVEIS).length === 2 && !/subtle\.|AES-GCM/.test(NUVEM), true);
 conf('o store.js enfileira num lugar só, na transação de quem chamou', STORE.split(ENFILEIRAR).length, 2);
 conf('a fila é um depósito da MESMA transação do dado', STORE.split(SAIDA_NA_TRANSACAO).length, 2);
 conf("os depósitos do documento incluem a fila", STORE.indexOf("var DEPOSITOS_DO_DOCUMENTO = ['dados', 'registros', 'controle', 'saida'];") > 0, true);
@@ -100,8 +98,7 @@ conf('as regras velhas não têm o caminho dos registros', REGRAS_VELHAS.indexOf
 const CULPA = "return r.enviados > 0 || (r.erro && r.erro.codigo === 'INVALID_ARGUMENT');";
 conf('o critério de culpa está num lugar só', NUVEM.split(CULPA).length, 2);
 const trocas = {};
-if (EM_CLARO) trocas['/nuvem.js'] = NUVEM.replace(CIFRA_REGISTRO, 'return Promise.resolve(new TextEncoder().encode(texto));');
-if (MODO === MODOS[2]) trocas['/nuvem.js'] = NUVEM.replace(CULPA, "return r.enviados > 0 || (r.erro && r.erro.codigo === 'INVALID_ARGUMENT') || (i.fila.tentativas || 0) > 0;");
+if (MODO === MODOS[1]) trocas['/nuvem.js'] = NUVEM.replace(CULPA, "return r.enviados > 0 || (r.erro && r.erro.codigo === 'INVALID_ARGUMENT') || (i.fila.tentativas || 0) > 0;");
 if (FILA_FORA) {
   trocas['/store.js'] = STORE.replace(ENFILEIRAR,
     "function enfileirar(saida, entrada) { setTimeout(function () { escrever('saida', function (s) { return s.put(entrada); }).catch(function () {}); }, 0); }");
@@ -262,6 +259,8 @@ function textoDoServidor(docs) {
   secao('1. O emulador sobe com as regras VELHAS (sem o caminho dos registros) e a conta existe');
   await subirEmulador(REGRAS_VELHAS);
   const dona = (await criarUsuario(DONA)).json;
+  const estranho = (await criarUsuario(ESTRANHO)).json;
+  conf('a conta do estranho existe no emulador', !!(estranho && estranho.localId), true);
   conf('a conta da dona existe no emulador', !!(dona && dona.localId), true);
 
   secao('2. O tablet entra, grava dados fictícios e a fila nasce na mesma gravação');
@@ -291,9 +290,8 @@ function textoDoServidor(docs) {
   await H.abrirApp(pagA, amb.ORIGEM);
   conf('o tablet entrou com e-mail e senha pela tela', await entrarPelaTela(pagA, DONA.email, DONA.senha), true);
   await clicar(pagA, '#nuvem-enviar');
-  const copiaSubiu = await esperar('a cópia completa subiu (a chave nasceu)', () => texto(pagA, '#nuvem-ultima'), v => /^Última cópia na nuvem: hoje/.test(v || ''), 30000);
+  const copiaSubiu = await esperar('a cópia completa subiu', () => texto(pagA, '#nuvem-ultima'), v => /^Última cópia na nuvem: hoje/.test(v || ''), 30000);
   conf('a cópia completa sobe com as regras velhas (fase 0 intacta)', copiaSubiu.ok, true);
-  const chaveA = await pagA.evaluate(() => Nuvem.verChave());
   const filaAntes = await fila(pagA);
 
   secao('3. A nuvem recusa os registros: nada trava, a fila fica e Ajustes diz');
@@ -308,7 +306,7 @@ function textoDoServidor(docs) {
   conf('o servidor não tem registro nenhum (a leitura também é recusada)', (await registrosNoServidor(dona.idToken, dona.localId)).status, 403);
   conf('o aplicativo segue vivo: nenhum erro de página', pagA.errosDePagina.join(' | '), '');
 
-  secao('4. As regras novas publicadas: a mesma fila sobe, cifrada e com os metadados em claro');
+  secao('4. As regras novas publicadas: a mesma fila sobe, com os metadados e o conteúdo legível');
   conf('as regras novas foram publicadas no emulador em pleno voo', await publicarRegras(REGRAS), 200);
   const envio = await enviar(pagA);
   conf('o envio sobe tudo o que estava na fila', envio.enviados, filaAntes.length);
@@ -320,21 +318,25 @@ function textoDoServidor(docs) {
   const ids = Object.keys(noServidor.docs).sort();
   conf('há um documento por entrada da fila, pelo id do registro', JSON.stringify(ids), JSON.stringify(filaAntes));
   const aulaDoc = noServidor.docs['aula:s1@2026-06-03'];
-  conf('o documento da aula tem só os metadados esperados mais iv e dados',
-    aulaDoc && Object.keys(aulaDoc).sort().join(','), 'aparelho,app,atualizadoEm,dados,esquema,id,iv,servidorEm,tipo');
+  conf('o documento da aula tem só os metadados esperados mais dados (sem iv)',
+    aulaDoc && Object.keys(aulaDoc).sort().join(','), 'aparelho,app,atualizadoEm,dados,esquema,id,servidorEm,tipo');
   conf('servidorEm é a hora do servidor (timestamp), posta pelo commit', aulaDoc && 'timestampValue' in aulaDoc.servidorEm, true);
   conf('os metadados em claro: id, tipo, atualizadoEm ISO, aparelho do Store, esquema 1, app',
     aulaDoc && aulaDoc.id.stringValue === 'aula:s1@2026-06-03' && aulaDoc.tipo.stringValue === 'aula' && !isNaN(new Date(aulaDoc.atualizadoEm.stringValue).getTime()) &&
       aulaDoc.aparelho.stringValue === gravou.aparelho && aulaDoc.esquema.integerValue === '1' && aulaDoc.app.stringValue === 'prova', true);
-  conf('o conteúdo vai como bytes, com iv de 12 bytes', aulaDoc && 'bytesValue' in aulaDoc.dados && Buffer.from(aulaDoc.iv.bytesValue, 'base64').length === 12, true);
+  conf('o conteúdo vai em dados como mapa do Firestore, legível: a nota da aula está lá, como texto',
+    aulaDoc && aulaDoc.dados.mapValue && aulaDoc.dados.mapValue.fields.notaTexto.stringValue, 'nota da ' + NOME_FICTICIO);
+  conf('os tipos do mapa: inteiro, booleano, texto e lista vazia', aulaDoc && aulaDoc.dados.mapValue.fields.duracaoMin.integerValue === '60' &&
+    aulaDoc.dados.mapValue.fields.cobravel.booleanValue === true && aulaDoc.dados.mapValue.fields.data.stringValue === '2026-06-03' &&
+    'arrayValue' in aulaDoc.dados.mapValue.fields.anexos, true);
   const tudo = textoDoServidor(noServidor.docs);
-  prop('o nome fictício da aluna não aparece em nenhum documento nem nos bytes', tudo.indexOf(NOME_FICTICIO) < 0 && tudo.indexOf('Alfa') < 0, MODOS[0]);
-  prop('nem o texto da nota nem a chave Pix', tudo.indexOf('nota da') < 0 && tudo.indexOf('pix-de-teste') < 0, MODOS[0]);
-  if (!EM_CLARO) {
-    const tamanhoJson = Buffer.byteLength(JSON.stringify({ id: 's1@2026-06-03', alunoId: 'alfa', serieId: 's1', destacada: false, data: '2026-06-03', hora: '10:00',
-      duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: 'nota da ' + NOME_FICTICIO, anexos: [] }));
-    conf('o cifrado tem o tamanho do JSON mais a etiqueta de 16 bytes do GCM', Buffer.from(aulaDoc.dados.bytesValue, 'base64').length, tamanhoJson + 16);
-  }
+  conf('o nome fictício da aluna está no registro do aluno (dado legível, protegido pelas regras)', tudo.indexOf(NOME_FICTICIO) >= 0, true);
+  conf('o estranho não lê os registros dela (a regra nega a lista)', (await registrosNoServidor(estranho.idToken, dona.localId)).status, 403);
+  conf('o estranho não lê um registro dela pelo nome', (await lerDoc(estranho.idToken, dona.localId, 'registros/aula:s1@2026-06-03')).status, 403);
+  conf('o estranho não escreve por cima de um registro dela', (await rest(docUrl(dona.localId, 'registros/aula:s1@2026-06-03'), { token: estranho.idToken, metodo: 'PATCH',
+    corpo: { fields: { id: { stringValue: 'aula:s1@2026-06-03' }, tipo: { stringValue: 'aula' }, atualizadoEm: { stringValue: '2026-11-08T00:00:00.000Z' },
+      aparelho: { stringValue: 'ap000000000000' }, esquema: { integerValue: '1' } } } })).status, 403);
+  conf('sem login ninguém lê registro', (await lerDoc(null, dona.localId, 'registros/aula:s1@2026-06-03')).status, 403);
   const ponteiro = (await lerDoc(dona.idToken, dona.localId, 'estado/copia')).json;
   const metaCopia = (await lerDoc(dona.idToken, dona.localId, 'copias/' + ponteiro.fields.atual.stringValue)).json;
   conf('a cópia completa leva o mesmo id de aparelho dos registros (o do Store), ao lado do rótulo',
@@ -355,9 +357,9 @@ function textoDoServidor(docs) {
   conf('os dois subiram e a fila esvaziou', edicao.enviados + '/' + edicao.filaDepois + '/' + (edicao.erro === null), '2/0/true');
   const depois = await registrosNoServidor(dona.idToken, dona.localId);
   const lapide = depois.docs['aula:s1@2026-06-08'];
-  conf('a lápide no servidor tem apagadoEm e não tem conteúdo', lapide && 'apagadoEm' in lapide && !('dados' in lapide) && !('iv' in lapide), true);
+  conf('a lápide no servidor tem apagadoEm e não tem conteúdo', lapide && 'apagadoEm' in lapide && !('dados' in lapide), true);
   conf('o ajuste do aparelho não está no servidor', 'ajuste:versaoVista' in depois.docs, false);
-  conf('o ajuste dela foi atualizado (bytes diferentes dos de antes)', depois.docs['ajuste:chavePix'].dados.bytesValue !== noServidor.docs['ajuste:chavePix'].dados.bytesValue, true);
+  conf('o ajuste dela foi atualizado no servidor (pix-novo)', JSON.stringify(depois.docs['ajuste:chavePix'].dados), JSON.stringify({ stringValue: 'pix-novo' }));
 
   secao('5b. Um registro que a nuvem recusa sozinho não derruba a fila: tentativas, quarentena e a frase');
   const quarentena = await pagA.evaluate(async () => {
@@ -442,11 +444,11 @@ function textoDoServidor(docs) {
     return rodadas;
   });
   // (sob o veneno a recusa vira culpa do registro e o erro da nuvem não aparece; a propriedade medida é a de baixo)
-  if (MODO !== MODOS[2]) conf('as duas recusas totais devolvem PERMISSION_DENIED e nada sobe', JSON.stringify(recusaTotal.map(r => [r[0], r[1]])), JSON.stringify([[0, 'PERMISSION_DENIED'], [0, 'PERMISSION_DENIED']]));
+  if (MODO !== MODOS[1]) conf('as duas recusas totais devolvem PERMISSION_DENIED e nada sobe', JSON.stringify(recusaTotal.map(r => [r[0], r[1]])), JSON.stringify([[0, 'PERMISSION_DENIED'], [0, 'PERMISSION_DENIED']]));
   else conf('nada sobe nas duas recusas totais', JSON.stringify(recusaTotal.map(r => r[0])), JSON.stringify([0, 0]));
   prop('a tentativa continua uma e o bom não entra na quarentena (recusa total nunca conta)',
-    JSON.stringify(recusaTotal.map(r => [r[2], r[3]])) === JSON.stringify([[1, false], [1, false]]), MODOS[2]);
-  if (MODO === MODOS[2]) throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
+    JSON.stringify(recusaTotal.map(r => [r[2], r[3]])) === JSON.stringify([[1, false], [1, false]]), MODOS[1]);
+  if (MODO === MODOS[1]) throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
   conf('as regras novas voltam', await publicarRegras(REGRAS), 200);
   const sozinhoSubiu = await pagA.evaluate(async () => { const r = await Nuvem.enviarRegistros({ versaoApp: 'prova' }); return [r.enviados, r.erro || null, (await Store.lerFila()).length]; });
   conf('e com a nuvem aceitando, o bom sobe', JSON.stringify(sozinhoSubiu), JSON.stringify([1, null, 0]));
@@ -481,8 +483,8 @@ function textoDoServidor(docs) {
   const subiuAoVoltar = await esperar('a fila subiu ao voltar', () => fila(pagA), v => Array.isArray(v) && v.length === 0, 20000);
   conf('a fila subiu ao voltar, pelo gatilho de sempre', subiuAoVoltar.ok, true);
   const aoVoltar = await registrosNoServidor(dona.idToken, dona.localId);
-  conf('o registro editado sem sinal está no servidor com bytes novos',
-    aoVoltar.docs['aula:s1@2026-06-01'].dados.bytesValue !== noServidor.docs['aula:s1@2026-06-01'].dados.bytesValue, true);
+  conf('o registro editado sem sinal está no servidor com o conteúdo novo (dados mudou)',
+    JSON.stringify(aoVoltar.docs['aula:s1@2026-06-01'].dados) !== JSON.stringify(noServidor.docs['aula:s1@2026-06-01'].dados), true);
 
   secao('7. A gravação e a entrada na fila são atômicas');
   const atomica = await pagA.evaluate(async () => {
@@ -504,7 +506,7 @@ function textoDoServidor(docs) {
   });
   conf('a gravação abortada rejeita', atomica.rejeitou, true);
   conf('e o registro ficou como estava', atomica.registroIntacto, true);
-  prop('nenhuma entrada na fila para o dado que não foi gravado', atomica.fila.indexOf('aula:s1@2026-06-03') < 0, MODOS[1]);
+  prop('nenhuma entrada na fila para o dado que não foi gravado', atomica.fila.indexOf('aula:s1@2026-06-03') < 0, MODOS[0]);
   if (FILA_FORA) throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
 
   secao('8. O celular só leitura restaura a cópia, não enfileira e nunca envia registro');
@@ -520,7 +522,6 @@ function textoDoServidor(docs) {
   conf('o celular entrou', (await esperar('o botão de trazer a cópia', () => existe(pagC, '#cel-trazer'), v => v === true, 15000)).ok, true);
   await clicar(pagC, '#cel-trazer');
   await esperar('a janela lista a cópia', () => pagC.evaluate(() => document.querySelectorAll('#modal-nuvem-restaurar.aberto #nuvem-copias input[type=radio]').length), v => v >= 1, 15000);
-  await digitar(pagC, '#nuvem-codigo-digitado', chaveA.formatado);
   await clicar(pagC, '#nuvem-restaurar-confirmar');
   const veio = await esperar('a cópia chegou ao celular', () => pagC.evaluate(async () => !document.querySelector('#modal-nuvem-restaurar.aberto') &&
     (await Store.carregar()).alunos.some(a => a.id === 'alfa')), v => v === true, 30000);

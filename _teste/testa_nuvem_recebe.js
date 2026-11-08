@@ -31,6 +31,17 @@
  *                                apagada em B continua viva em A;
  *   --envenenado-velho-por-cima  a comparação pelo carimbo do servidor sai: o
  *                                registro mais velho é aplicado por cima.
+ *   (revisão do PR 118, 08/11)
+ *   --envenenado-fila-sobrevive-ao-apagar  o "Apagar tudo" não zera a fila: a
+ *                                edição presa sobe como lápide ao religar;
+ *   --envenenado-aplica-desligado  o aplicar não confere a marca da
+ *                                sincronização desligada dentro da transação;
+ *   --envenenado-celular-enfileira-fusao  o celular enfileira a lápide da
+ *                                fusão, que nunca sairia da fila;
+ *   --envenenado-restauro-sem-iguais  a restauração não enfileira o que é
+ *                                igual à cópia, e esse registro perde;
+ *   --envenenado-confirma-sem-apagado  a confirmação do envio vai sem
+ *                                apagadoEm e nuvem.apagado fica sempre false.
  *
  * Portas: 8821 (app), 8823 (auth), 8824 (firestore), 8825 (hub), 8826 (log),
  * 8827 (websocket). Precisa do firebase-tools e de um JDK 21 em JAVA_HOME.
@@ -44,7 +55,8 @@ const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
 const MODOS = ['--envenenado-ignora-lapide', '--envenenado-velho-por-cima', '--envenenado-pagina-so-carimbo', '--envenenado-sem-already-exists', '--envenenado-fusao-pelo-prefixo',
-  '--envenenado-eco-so-sem-carimbo'];
+  '--envenenado-eco-so-sem-carimbo', '--envenenado-fila-sobrevive-ao-apagar', '--envenenado-aplica-desligado', '--envenenado-celular-enfileira-fusao',
+  '--envenenado-restauro-sem-iguais', '--envenenado-confirma-sem-apagado'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 function prop(rotulo, ok, veneno) {
   if (MODO && MODO === veneno) return conf('VENENO visto: ' + rotulo + ', e quebrou', ok, false);
@@ -105,6 +117,26 @@ if (MODO === MODOS[2]) trocas['/nuvem.js'] = NUVEM.replace(PAGINA, "if (c && c.s
 if (MODO === MODOS[3]) trocas['/nuvem.js'] = NUVEM.replace(JA_EXISTE, "if (statusNuvem === 'FAILED_PRECONDITION') e.codigo = 'FAILED_PRECONDITION';");
 if (MODO === MODOS[5]) trocas['/store.js'] = STORE.replace(ECO, 'if (local && !(local.nuvem && local.nuvem.servidorEm)) {');
 if (MODO === MODOS[4]) trocas['/store.js'] = STORE.replace("if (!p || !p.r || !r.dados) return; var chave = r.dados.serieId + '@' + r.dados.data;", "if (!p || !r.dados) return; var chave = p.serieId + '@' + p.data;");
+/* A revisão do PR 118 (08/11): o "Apagar tudo" zera a fila e a marca da
+ * sincronização desligada é conferida dentro da transação de aplicar; o
+ * celular não enfileira a lápide da fusão; a restauração enfileira também o
+ * que é igual à cópia; a confirmação do envio leva apagadoEm. */
+const FILA_ZERA = "t.objectStore('saida').clear();";
+const APLICA_DESLIGADO = "if (desligada) { contas.pulado = 'desligada'; return; }";
+const FUSAO_SO_LEITURA = "if (!soLeitura) enfileirar(saida, { id: lapide.id, tipo: lapide.tipo, atualizadoEm: agora, apagadoEm: agora });";
+const RESTAURO_IGUAL = "if (restauro && saida && sincronizavel(chave, item.tipo)) {";
+const CONFIRMA_APAGADO = "apagadoEm: i.registro.apagadoEm || null,";
+conf('o "Apagar tudo" zera a fila na mesma transação, num lugar só', STORE.split(FILA_ZERA).length, 2);
+conf('o "Apagar tudo" grava a marca da sincronização desligada na mesma transação', STORE.indexOf("t.objectStore('controle').put({ desligada: true, desde: agora }, 'sincronizacao');") > 0, true);
+conf('o aplicar confere a marca dentro da transação, num lugar só', STORE.split(APLICA_DESLIGADO).length, 2);
+conf('a lápide da fusão só entra na fila fora do aparelho que só lê, num lugar só', STORE.split(FUSAO_SO_LEITURA).length, 2);
+conf('a restauração enfileira também o item igual à cópia, num lugar só', STORE.split(RESTAURO_IGUAL).length, 2);
+conf('a confirmação do envio leva apagadoEm, num lugar só', NUVEM.split(CONFIRMA_APAGADO).length, 2);
+if (MODO === MODOS[6]) trocas['/store.js'] = STORE.replace(FILA_ZERA, '');
+if (MODO === MODOS[7]) trocas['/store.js'] = STORE.replace(APLICA_DESLIGADO, '');
+if (MODO === MODOS[8]) trocas['/store.js'] = STORE.replace(FUSAO_SO_LEITURA, FUSAO_SO_LEITURA.replace('if (!soLeitura) ', ''));
+if (MODO === MODOS[9]) trocas['/store.js'] = STORE.replace(RESTAURO_IGUAL, 'if (false) {');
+if (MODO === MODOS[10]) trocas['/nuvem.js'] = NUVEM.replace(CONFIRMA_APAGADO, '');
 if (MODO) conf('o arquivo servido ficou diferente do repositório (' + MODO + ')', (trocas['/store.js'] || STORE) !== STORE || (trocas['/nuvem.js'] || NUVEM) !== NUVEM, true);
 
 conf('o firebase-tools está onde a prova procura (' + FIREBASE + ')', fs.existsSync(FIREBASE), true);
@@ -239,12 +271,11 @@ const retrato = pag => pag.evaluate(async () => {
 });
 const aula = (pag, id) => pag.evaluate(async i => { const d = await Store.carregar(); const a = d.aulas.find(x => x.id === i); return a ? { hora: a.hora, status: a.status, nota: a.notaTexto || '' } : null; }, id);
 const historico = pag => pag.evaluate(() => Store.listarHistorico().then(l => l.filter(h => /outro aparelho/.test(h.rotulo)).map(h => ({ rotulo: h.rotulo, notas: h.estado.aulas.map(a => a.notaTexto || '') }))));
-async function restaurarPelaTela(pag, chaveFormatada, botaoRestaurar, aAnterior) {
+async function restaurarPelaTela(pag, botaoRestaurar, aAnterior) {
   await clicar(pag, botaoRestaurar);
   await esperar('a janela lista a cópia', () => pag.evaluate(() => document.querySelectorAll('#modal-nuvem-restaurar.aberto #nuvem-copias input[type=radio]').length), v => v >= (aAnterior ? 2 : 1), 15000);
   // a cópia anterior (a com conteúdo), quando a atual é a vazia que o próprio aparelho acabou de mandar
   if (aAnterior) await pag.evaluate(() => { const r = document.querySelectorAll('#modal-nuvem-restaurar.aberto #nuvem-copias input[type=radio]'); r[r.length - 1].click(); });
-  await digitar(pag, '#nuvem-codigo-digitado', chaveFormatada);
   await clicar(pag, '#nuvem-restaurar-confirmar');
   return (await esperar('a cópia chegou', () => pag.evaluate(async () => !document.querySelector('#modal-nuvem-restaurar.aberto') &&
     (await Store.carregar()).alunos.some(a => a.id === 'alfa')), v => v === true, 30000)).ok;
@@ -273,8 +304,7 @@ async function restaurarPelaTela(pag, chaveFormatada, botaoRestaurar, aAnterior)
   await H.abrirApp(pagA, amb.ORIGEM);
   conf('A entrou', await entrarPelaTela(pagA, DONA.email, DONA.senha), true);
   await clicar(pagA, '#nuvem-enviar');
-  conf('a cópia de A subiu (a chave nasceu)', (await esperar('a cópia subiu', () => texto(pagA, '#nuvem-ultima'), v => /^Última cópia na nuvem: hoje/.test(v || ''), 30000)).ok, true);
-  const chaveA = await pagA.evaluate(() => Nuvem.verChave());
+  conf('a cópia de A subiu', (await esperar('a cópia subiu', () => texto(pagA, '#nuvem-ultima'), v => /^Última cópia na nuvem: hoje/.test(v || ''), 30000)).ok, true);
   const sA1 = await sincronizar(pagA);
   conf('A sincronizou: nada a receber, tudo enviado', sA1.recebidos === 0 && sA1.enviados > 0 && sA1.erroE === null, true);
   /* A edita DEPOIS da cópia e sobe o registro: a cópia que B vai restaurar é mais
@@ -287,7 +317,7 @@ async function restaurarPelaTela(pag, chaveFormatada, botaoRestaurar, aAnterior)
   await prepararPagina(pagB, false);
   await H.abrirApp(pagB, amb.ORIGEM);
   conf('B entrou', await entrarPelaTela(pagB, DONA.email, DONA.senha), true);
-  conf('B restaurou a cópia de A pelo código (tela larga: dono)', await restaurarPelaTela(pagB, chaveA.formatado, '#nuvem-restaurar'), true);
+  conf('B restaurou a cópia de A só com o login (tela larga: dono)', await restaurarPelaTela(pagB, '#nuvem-restaurar'), true);
   const filaB = await pagB.evaluate(() => Store.lerFila().then(l => l.length));
   conf('B, dono, enfileirou o que restaurou', filaB > 0, true);
   const filaRestauro = await pagB.evaluate(() => Store.lerFila().then(l => l.some(e => e.id === 'aula:s1@2026-06-08' && e.restauro === true)));
@@ -384,6 +414,12 @@ async function restaurarPelaTela(pag, chaveFormatada, botaoRestaurar, aAnterior)
   secao('3. A aula apagada em B não volta por A');
   await editar(pagB, "d.aulas = d.aulas.filter(a => a.id !== 'x1');");
   await sincronizar(pagB);
+  /* A confirmação do envio leva apagadoEm: a lápide que subiu fica marcada em
+   * nuvem.apagado, e a restauração não a reenfileira à toa. (O eco deste envio
+   * ainda não chegou a B: o sincronizar recebe antes de enviar.) */
+  const lapideX1EmB = await pagB.evaluate(() => Store.lerRegistros().then(l => { const r = l.find(x => x.id === 'aula:x1'); return r ? { lapide: !!r.apagadoEm, apagado: r.nuvem ? r.nuvem.apagado : null } : null; }));
+  prop('em B, a lápide enviada ficou com nuvem.apagado = true logo na confirmação do envio', !!(lapideX1EmB && lapideX1EmB.lapide && lapideX1EmB.apagado === true), MODOS[10]);
+  if (MODO === MODOS[10]) throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
   const sA4 = await sincronizar(pagA);
   prop('a lápide chegou a A e a aula avulsa sumiu de A', (await aula(pagA, 'x1')) === null && sA4.recebidos >= 1, MODOS[0]);
   await editar(pagA, "d.ajustes.chavePix = 'pix-mudou';");
@@ -535,7 +571,7 @@ async function restaurarPelaTela(pag, chaveFormatada, botaoRestaurar, aAnterior)
   await digitar(pagC, '#cel-conta #nuvem-senha', DONA.senha);
   await clicar(pagC, '#cel-conta #nuvem-entrar');
   await esperar('o botão de trazer a cópia', () => existe(pagC, '#cel-trazer'), v => v === true, 15000);
-  conf('o celular restaurou a cópia (a de A, antiga)', await restaurarPelaTela(pagC, chaveA.formatado, '#cel-trazer'), true);
+  conf('o celular restaurou a cópia (a de A, antiga), só com o login', await restaurarPelaTela(pagC, '#cel-trazer'), true);
   /* A ordem no celular é restaurar e DEPOIS receber, em série, e a restauração
    * zera o cursor: o recebimento recomeça do zero e as edições que a cópia não
    * tinha chegam por cima dela. Aqui a prova espera o receber que a tela do
@@ -552,6 +588,23 @@ async function restaurarPelaTela(pag, chaveFormatada, botaoRestaurar, aAnterior)
   conf('sincronizar no celular só recebe: o envio é pulado pela trava', sC, 'so leitura');
   conf('nenhum commit saiu do celular', pagC.commits.length, 0);
   conf('a fila do celular está vazia', await pagC.evaluate(() => Store.lerFila().then(l => l.length)), 0);
+  /* A fusão no celular: duas reabertas da mesma série e data chegam juntas (sem
+   * a lápide de nenhuma): a de menor r vira lápide aqui, mas o celular, que
+   * nunca envia, NÃO a enfileira; uma entrada eterna na fila faria "a edição
+   * local pendente vence" ignorar para sempre as versões novas dessa aula. */
+  const fusaoCel = await pagC.evaluate(async () => {
+    const base = { alunoId: 'alfa', serieId: 's1', destacada: false, data: '2026-06-24', hora: '10:00', duracaoMin: 60, status: 'prevista', cobravel: true, notaTexto: '', anexos: [] };
+    const c = await Store.lerCursor();
+    const item = (id, min) => ({ id: 'aula:' + id, tipo: 'aula', atualizadoEm: '2026-06-20T10:0' + min + ':00.000Z', apagadoEm: null, aparelho: 'ap000000000000', esquema: 1,
+      servidorEm: c.servidorEm, nome: c.nome, updateTime: c.servidorEm, dados: Object.assign({ id }, base) });
+    const contas = await Store.aplicarRecebidos([item('s1@2026-06-24+r1', 0), item('s1@2026-06-24+r2', 1)]);
+    const regs = await Store.lerRegistros();
+    const r1 = regs.find(r => r.id === 'aula:s1@2026-06-24+r1'), r2 = regs.find(r => r.id === 'aula:s1@2026-06-24+r2');
+    return { fundidas: contas.fundidas || 0, r1Lapide: !!(r1 && r1.apagadoEm), r2Viva: !!(r2 && !r2.apagadoEm), fila: (await Store.lerFila()).map(e => e.id) };
+  });
+  conf('(controle) a fusão rodou no celular: a r1 virou lápide e a r2 ficou viva', fusaoCel.fundidas === 1 && fusaoCel.r1Lapide && fusaoCel.r2Viva, true);
+  prop('o celular não enfileira a lápide da fusão (ele nunca envia; a entrada travaria as versões novas dessa aula)', fusaoCel.fila.length === 0, MODOS[8]);
+  if (MODO === MODOS[8]) throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
 
   secao('9. O cursor é guardado: receber de novo não aplica nada');
   const rA = await pagA.evaluate(() => Nuvem.receberRegistros().then(r => r.aplicados));
@@ -559,10 +612,32 @@ async function restaurarPelaTela(pag, chaveFormatada, botaoRestaurar, aAnterior)
   conf('o cursor de A está gravado, com o par carimbo e nome', await pagA.evaluate(() => Store.lerCursor().then(c => !!(c && c.servidorEm && c.nome))), true);
 
   secao('9b. "Apagar tudo" desliga a sincronização; restaurar a própria cópia religa, e três sincronizações zeram a fila sem erro');
+  /* Uma edição presa na fila ANTES do "Apagar tudo" (sem sinal, ela não subiu):
+   * depois dele a entrada apontaria para uma lápide, e religar a sincronização
+   * mandaria a lápide ao outro aparelho. A fila tem de zerar com o apagar. */
+  await pagB.evaluate(() => { Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false }); });
+  await editar(pagB, "d.aulas.find(a => a.id === 'x2').notaTexto = 'edição presa na fila antes do Apagar tudo';");
+  conf('(arranjo) B sem sinal tem a edição de x2 presa na fila', await pagB.evaluate(() => Store.lerFila().then(l => l.some(e => e.id === 'aula:x2'))), true);
+  const x2EmAAntes = await aula(pagA, 'x2');
+  conf('(arranjo) x2 está viva em A', !!x2EmAAntes, true);
   await H.irParaAba(pagB, 'ajustes');
   await clicar(pagB, '#apagar-tudo');
   const apagou = await esperar('B apagou tudo', () => pagB.evaluate(async () => { const d = await Store.carregar(); return d ? d.alunos.filter(a => !a.daCargaInicial).length : -1; }), v => v === 0, 15000);
   conf('B apagou tudo (fica só a carga inicial ou nada)', apagou.ok, true);
+  await pagB.evaluate(() => { delete navigator.onLine; });
+  const filaDepoisDoApagar = await pagB.evaluate(() => Store.lerFila().then(l => l.map(e => e.id)));
+  prop('"Apagar tudo" zerou a fila deste aparelho (a edição presa não vai subir como lápide)', filaDepoisDoApagar.length === 0, MODOS[6]);
+  if (filaDepoisDoApagar.length) console.log('   fila depois do apagar: ' + JSON.stringify(filaDepoisDoApagar));
+  /* O recebimento que estava em curso quando ela apagou tudo: o que chega
+   * depois não entra. A marca é conferida dentro da própria transação. */
+  const aplicouDesligado = await pagB.evaluate(async () => {
+    const contas = await Store.aplicarRecebidos([{ id: 'aula:solta', tipo: 'aula', atualizadoEm: '2026-11-08T00:00:00.000Z', apagadoEm: null, aparelho: 'ap000000000000', esquema: 1,
+      servidorEm: '2026-11-08T00:00:00.000000Z', nome: 'x', updateTime: '2026-11-08T00:00:00.000000Z',
+      dados: { id: 'solta', alunoId: 'alfa', serieId: null, data: '2026-11-08', hora: '09:00', duracaoMin: 60, status: 'prevista', cobravel: true, notaTexto: '', anexos: [] } }]);
+    return { pulado: contas.pulado || null, entrou: (await Store.lerRegistros()).some(r => r.id === 'aula:solta' && !r.apagadoEm) };
+  });
+  prop('com a sincronização desligada, o aplicar não entra (conferido na transação): nada de aula solta num banco vazio', aplicouDesligado.pulado === 'desligada' && !aplicouDesligado.entrou, MODOS[7]);
+  if (MODO === MODOS[7]) throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
   const desligada = await pagB.evaluate(() => Nuvem.sincronizar({ versaoApp: 'prova' }).then(r => ({ recebe: r.recebidos.pulado || null, envia: r.enviados.pulado || null, estado: Nuvem.estado().sincronizacaoDesligada })));
   conf('depois do "Apagar tudo", receber e enviar ficam desligados', JSON.stringify(desligada), JSON.stringify({ recebe: 'desligada', envia: 'desligada', estado: true }));
   const fraseDesligada = await pagB.evaluate(() => Nuvem.contarFila().then(() => (document.querySelector('#nuvem-registros') || {}).textContent || ''));
@@ -576,9 +651,13 @@ async function restaurarPelaTela(pag, chaveFormatada, botaoRestaurar, aAnterior)
   await clicar(pagB, '#nuvem-enviar');
   const religouPeloEnvio = await esperar('o envio dela religou a sincronização', () => pagB.evaluate(() => !Nuvem.estado().sincronizacaoDesligada && !Nuvem.estado().enviando), v => v === true, 30000);
   conf('"Enviar cópia agora" religa a sincronização (o que está no aparelho passa a valer)', religouPeloEnvio.ok, true);
+  await sincronizar(pagB);
+  await sincronizar(pagA);
+  prop('depois de religar, nada da fila velha subiu: x2 continua viva em A, como estava', JSON.stringify(await aula(pagA, 'x2')) === JSON.stringify(x2EmAAntes), MODOS[6]);
+  if (MODO === MODOS[6]) throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
   conf('a frase da sincronização desligada saiu', /desligada desde o "Apagar tudo"/.test(await pagB.evaluate(() => Nuvem.contarFila().then(() => (document.querySelector('#nuvem-registros') || {}).textContent || ''))), false);
   const hBAntesDoRestauro = (await pagB.evaluate(() => Store.listarHistorico().then(l => l.length)));
-  conf('B restaurou a cópia com conteúdo (a anterior: a atual é a vazia que ele acabou de mandar), pelo código', await restaurarPelaTela(pagB, chaveA.formatado, '#nuvem-restaurar', true), true);
+  conf('B restaurou a cópia com conteúdo (a anterior: a atual é a vazia que ele acabou de mandar), só com o login', await restaurarPelaTela(pagB, '#nuvem-restaurar', true), true);
   const hBRestauro = await pagB.evaluate(() => Store.listarHistorico().then(l => l.map(h => h.rotulo)));
   conf('a restauração guardou o estado anterior no histórico (e só ele, depois da limpeza)', JSON.stringify(hBRestauro), JSON.stringify(['Antes de restaurar a cópia']));
   void hBAntesDoRestauro;
@@ -598,6 +677,50 @@ async function restaurarPelaTela(pag, chaveFormatada, botaoRestaurar, aAnterior)
   conf('e a tela ficou sem erro', /Todas as mudanças já subiram/.test(religada.frase), true);
   await sincronizar(pagA);
   conf('A e B iguais depois do apagar tudo e da restauração', await retrato(pagA), await retrato(pagB));
+
+  secao('9c. A restauração vence também no que é igual à cópia: o registro restaurado sobe e cobre a edição posterior do outro');
+  /* A sobe a cópia agora; B edita x2 e sobe; A, sem ter recebido, restaura a
+   * cópia que acabou de mandar. x2 é IGUAL à cópia em A: mesmo assim entra na
+   * fila da restauração, e é o que vale no servidor e em B. Sem isso, a
+   * restauração perderia nesse registro para a edição posterior de B. */
+  const copiaAtual = async () => { const p = (await lerDoc(dona.idToken, dona.localId, 'estado/copia')).json; return p && p.fields ? p.fields.atual.stringValue : null; };
+  await H.irParaAba(pagA, 'ajustes');
+  const copiaAntes9c = await copiaAtual();
+  await clicar(pagA, '#nuvem-enviar');
+  conf('A subiu a cópia de agora', (await esperar('a cópia de A subiu', copiaAtual, v => !!v && v !== copiaAntes9c, 30000)).ok, true);
+  await esperar('A sem envio em curso', () => pagA.evaluate(() => !Nuvem.estado().enviando), v => v === true, 15000);
+  const x2DaCopia = await aula(pagA, 'x2');
+  await editar(pagB, "d.aulas.find(a => a.id === 'x2').notaTexto = 'B editou depois da cópia de A';");
+  const sB9c = await sincronizar(pagB);
+  conf('B subiu a edição posterior à cópia', sB9c.enviados >= 1 && sB9c.erroE === null, true);
+  // A fica sem sinal durante a restauração: a fila é lida antes de qualquer envio automático
+  await pagA.evaluate(() => { Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false }); });
+  await clicar(pagA, '#nuvem-restaurar');
+  await esperar('a janela de A lista as cópias', () => pagA.evaluate(() => document.querySelectorAll('#modal-nuvem-restaurar.aberto #nuvem-copias input[type=radio]').length), v => v >= 1, 15000);
+  await clicar(pagA, '#nuvem-restaurar-confirmar');
+  // a restauração limpa o histórico e guarda só o estado anterior
+  conf('A restaurou a própria cópia (o estado anterior foi ao histórico)', (await esperar('a restauração de A terminou', () => pagA.evaluate(() =>
+    !document.querySelector('#modal-nuvem-restaurar.aberto') && Store.listarHistorico().then(l => l.map(h => h.rotulo).join('|'))), v => v === 'Antes de restaurar a cópia', 30000)).ok, true);
+  const filaA9c = await pagA.evaluate(() => Store.lerFila().then(l => l.filter(e => e.id === 'aula:x2').map(e => !!e.restauro)));
+  prop('x2, igual à cópia, entrou na fila da restauração', JSON.stringify(filaA9c) === '[true]', MODOS[9]);
+  await pagA.evaluate(() => { delete navigator.onLine; });
+  const rodadas9c = [];
+  for (let k = 0; k < 3; k++) rodadas9c.push(await sincronizar(pagA));
+  /* O documento que A reenvia pela restauração leva o id de A como aparelho,
+   * mesmo que a versão local tenha vindo de B (na 9b): com o id de B, B o
+   * tomaria por eco e nunca o aplicaria. */
+  const x2NoServidor9c = ((await lerDoc(dona.idToken, dona.localId, 'registros/aula:x2')).json || { fields: {} }).fields;
+  if (MODO !== MODOS[9]) conf('o documento reenviado por A leva o aparelho de A (quem envia), e não o autor local da versão',
+    x2NoServidor9c.aparelho && x2NoServidor9c.aparelho.stringValue, await pagA.evaluate(() => Store.aparelho()));
+  rodadas9c.push(await sincronizar(pagB));
+  console.log('   9c: ' + JSON.stringify(rodadas9c) + ' | x2 em A: ' + JSON.stringify(await pagA.evaluate(() => Store.lerRegistros().then(l => { const r = l.find(x => x.id === 'aula:x2'); return r && [r.atualizadoEm, r.nuvem]; }))) +
+    ' | x2 no servidor: ' + JSON.stringify((((await lerDoc(dona.idToken, dona.localId, 'registros/aula:x2')).json || { fields: {} }).fields.atualizadoEm || {}).stringValue) +
+    ' | fila de A: ' + JSON.stringify(await pagA.evaluate(() => Store.lerFila().then(l => l.map(e => e.id)))) + ' | erro de envio em A: ' + JSON.stringify(await pagA.evaluate(() => Nuvem.estado().registros.erro)));
+  prop('a restauração venceu: x2 em B voltou ao que a cópia tinha', JSON.stringify(await aula(pagB, 'x2')) === JSON.stringify(x2DaCopia), MODOS[9]);
+  if (MODO === MODOS[9]) throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
+  conf('e em A x2 é o da cópia', JSON.stringify(await aula(pagA, 'x2')), JSON.stringify(x2DaCopia));
+  conf('a edição de B que perdeu está no histórico de B, recuperável', (await historico(pagB)).some(h => h.notas.indexOf('B editou depois da cópia de A') >= 0), true);
+  conf('A e B iguais depois da restauração que venceu', await retrato(pagA), await retrato(pagB));
 
   secao('10. Mil registros em cinco commits: a paginação não perde nenhum');
   const mil = await pagA.evaluate(async () => {

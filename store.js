@@ -588,7 +588,17 @@
         var texto = JSON.stringify(item.dados);
         if (texto === undefined) return;
         var antes = porId[chave], ordem = ordens[i];
-        if (antes && !antes.apagadoEm && antes.ordem === ordem && JSON.stringify(antes.dados) === texto) { contas.iguais++; return; }
+        if (antes && !antes.apagadoEm && antes.ordem === ordem && JSON.stringify(antes.dados) === texto) {
+          contas.iguais++;
+          /* Na RESTAURAÇÃO o item igual à cópia também entra na fila: a restauração
+           * vence em todos os registros, e um registro que este aparelho não
+           * subisse perderia para a edição posterior do outro. */
+          if (restauro && saida && sincronizavel(chave, item.tipo)) {
+            enfileirar(saida, { id: chave, tipo: item.tipo, atualizadoEm: antes.atualizadoEm, apagadoEm: null, restauro: true });
+            contas.enfileirados++;
+          }
+          return;
+        }
         // `nuvem` (o carimbo do servidor que este aparelho conhece, fatia 3) fica com o registro
         gravarRegistro({ id: chave, tipo: item.tipo, atualizadoEm: agora, apagadoEm: null, aparelho: aparelho,
           esquema: ESQUEMA_REGISTRO, ordem: ordem, dados: item.dados, nuvem: antes && antes.nuvem ? antes.nuvem : null });
@@ -646,10 +656,17 @@
     var controle = t.objectStore('controle');
     var registros = t.objectStore('registros');
     var saida = opcoes.semFila ? null : t.objectStore('saida');
+    /* Com a sincronização DESLIGADA (o "Apagar tudo"), nada do que nasce
+     * aqui entra na fila: o banco vazio que ela refaz não pode subir por
+     * registro quando religar. A restauração é a exceção (ela religa). */
+    var pedidoMarca = controle.get('sincronizacao');
+    var desligada = false;
+    pedidoMarca.onsuccess = function () { desligada = !!(pedidoMarca.result && pedidoMarca.result.desligada); };
     var pedidoAparelho = controle.get('aparelho');
     pedidoAparelho.onsuccess = function () {
       var ap = pedidoAparelho.result;
       if (!ap) { ap = novoIdAparelho(); controle.put(ap, 'aparelho'); }
+      if (desligada && !opcoes.restauro) saida = null;
       var todos = registros.getAll();
       todos.onsuccess = function () {
         var contas;
@@ -870,11 +887,19 @@
         var conflitosReq = t.objectStore('controle').get('conflitos');
         var conflitosJaRegistrados = {};
         conflitosReq.onsuccess = function () { conflitosJaRegistrados = conflitosReq.result || {}; };
+        /* A sincronização desligada pelo "Apagar tudo" é conferida AQUI, dentro
+         * da transação: um recebimento que estava em curso quando ela apagou
+         * tudo não pode aplicar nada depois (aula solta, sem aluno, num banco
+         * vazio). */
+        var desligadaReq = t.objectStore('controle').get('sincronizacao');
+        var desligada = false;
+        desligadaReq.onsuccess = function () { desligada = !!(desligadaReq.result && desligadaReq.result.desligada); };
         var todosReq = registros.getAll();
         var fila = {}, existentes = [], cursorAntes = null;
         filaReq.onsuccess = function () { (filaReq.result || []).forEach(function (e) { fila[e.id] = e; }); };
         cursorReq.onsuccess = function () { cursorAntes = cursorReq.result || null; };
         todosReq.onsuccess = function () {
+          if (desligada) { contas.pulado = 'desligada'; return; }
           existentes = todosReq.result || [];
           var porId = {};
           existentes.forEach(function (r) { porId[r.id] = r; });
@@ -982,7 +1007,10 @@
                 esquema: g.reg.esquema || ESQUEMA_REGISTRO, ordem: g.reg.ordem, dados: null, nuvem: g.reg.nuvem || null };
               registros.put(lapide);
               porId[g.reg.id] = lapide;
-              enfileirar(saida, { id: lapide.id, tipo: lapide.tipo, atualizadoEm: agora, apagadoEm: agora });
+              /* No aparelho que só lê a lápide da fusão não entra na fila: ele
+               * nunca envia, a entrada nunca sairia, e "a edição local pendente
+               * vence" ignoraria para sempre as versões novas dessa aula. */
+              if (!soLeitura) enfileirar(saida, { id: lapide.id, tipo: lapide.tipo, atualizadoEm: agora, apagadoEm: agora });
               contas.fundidas++;
               contas.mudou = true;
             });
@@ -1929,6 +1957,15 @@
              * qualquer restauração seguinte. Levar o "Apagar tudo" à nuvem é a
              * fatia 4, com regra própria. */
           });
+          /* A FILA ZERA: nada do que esperava para subir (uma edição feita sem
+           * rede antes do "Apagar tudo", a fila semeada na subida da versão e
+           * segurada por um 403) pode subir depois dele: a entrada apontaria
+           * para o que agora é lápide, e a lápide iria ao outro aparelho. E a
+           * sincronização deste aparelho, envio e recebimento, fica desligada
+           * aqui, na mesma transação, até ela restaurar ou enviar uma cópia; o
+           * recebimento em curso lê esta marca dentro da transação de aplicar. */
+          t.objectStore('saida').clear();
+          t.objectStore('controle').put({ desligada: true, desde: agora }, 'sincronizacao');
           t.objectStore('dados').delete('principal');
           t.objectStore('controle').delete('retrato');
         };
@@ -1937,6 +1974,18 @@
         t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
       });
     });
+  }
+
+  /* A marca da sincronização desligada (o "Apagar tudo"), em `controle`. O
+   * nuvem.js a lê e a espelha; quem a desfaz é a restauração ou o envio dela. */
+  function sincronizacaoDesligada() {
+    return ler('controle', 'sincronizacao').then(function (m) { return !!(m && m.desligada); });
+  }
+  function desligarSincronizacao() {
+    return gravar('controle', 'sincronizacao', { desligada: true, desde: new Date().toISOString() });
+  }
+  function religarSincronizacao() {
+    return apagar('controle', 'sincronizacao');
   }
 
   function apagarTudo() {
@@ -1990,6 +2039,7 @@
     estadoDaFila: estadoDaFila, marcarTentativa: marcarTentativa, soltarQuarentena: soltarQuarentena,
     aplicarRecebidos: aplicarRecebidos, lerCursor: lerCursor, aoReceber: aoReceber, partesDoIdDeAula: partesDoIdDeAula,
     carimboNumero: carimboNumero,
+    sincronizacaoDesligada: sincronizacaoDesligada, desligarSincronizacao: desligarSincronizacao, religarSincronizacao: religarSincronizacao,
     lerFila: function () { return todosOsValores('saida'); },
     sincronizavel: sincronizavel,
     montarRegistros: montar,

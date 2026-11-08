@@ -141,7 +141,6 @@ var ARQUIVOS = [
   './cartao.js',
   /* A cópia na nuvem (N0): o motor e o gerador do QR da chave. Fora da lista,
    * o app.js novo abriria Ajustes sem o Nuvem depois de uma atualização. */
-  './vendor/qrcode-generator-1.4.4/qrcode.js',
   './nuvem.js',
   './app.js',
   './manifest.webmanifest',

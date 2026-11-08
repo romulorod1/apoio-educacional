@@ -1,38 +1,40 @@
 /* nuvem.js
- * Fase 0 da nuvem (N0): a cópia completa deste aparelho, cifrada AQUI, numa
- * conta do Firebase que é só dela.
+ * A nuvem (fases 0 e 1): a cópia completa deste aparelho e os registros, um a
+ * um, numa conta do Firebase que é só dela.
  *
- * O que sobe é o mesmo .zip da cópia de segurança (store.js, exportarTudoZip:
- * sem livros e sem pacotes), trancado com AES-GCM de 256 bits pela WebCrypto.
- * A chave nasce neste aparelho, fica no IndexedDB (num banco à parte, para
- * nunca entrar na cópia) e aparece para ela como QR e como código de
- * recuperação, para imprimir. A chave NUNCA vai para o servidor: o Firestore
- * guarda bytes que não abre, mais o tamanho, a hora e o nome do aparelho.
+ * O que protege os dados é o login (e-mail e senha no Firebase Auth), a senha
+ * e as regras do Firestore (firestore.rules): só a conta dela escreve no
+ * caminho dela, o aparelho observador só lê, e qualquer outra conta é negada.
+ * DECISÃO DO DONO (08/11/2026): a cifra no aparelho saiu. Não há chave, QR nem
+ * código de recuperação; "Restaurar neste aparelho" e o pareamento do
+ * observador dependem só do login. Um aparelho que ainda tenha uma chave
+ * antiga guardada a ignora e apaga.
  *
- * Fala com o Firebase pela API REST (login por e-mail e senha no Identity
- * Toolkit, documentos no Firestore), sem o SDK: a fase 0 só sobe e baixa uma
- * cópia, e o SDK inteiro pesa mais que o aplicativo. A configuração web do
- * projeto não é segredo (ela vai em todo site que usa Firebase): quem protege
- * os dados são as regras do Firestore (firestore.rules, na raiz) e a cifra.
+ * O que sobe na fase 0 é o mesmo .zip da cópia de segurança (store.js,
+ * exportarTudoZip: sem livros e sem pacotes), em partes de bytes. Fala com o
+ * Firebase pela API REST (login por e-mail e senha no Identity Toolkit,
+ * documentos no Firestore), sem o SDK. A configuração web do projeto não é
+ * segredo (ela vai em todo site que usa Firebase).
  *
  * Caminho na nuvem, tudo embaixo de usuarios/{uid}:
  *   estado/copia             { atual, anterior, quando }  qual cópia vale
- *   copias/{id}              { iv, bytes, partes, quando, aparelho, versao }
- *   copias/{id}/partes/{n}   { dados: bytes cifrados }   até 768 KiB cada
+ *   copias/{id}              { bytes, partes, quando, aparelho, aparelhoId, versao }
+ *   copias/{id}/partes/{n}   { dados: bytes }   até 768 KiB cada
  *   config/leitores          { uids: [...] }   quem mais pode LER (D7)
  *   registros/{id}           { id, tipo, atualizadoEm, apagadoEm, aparelho,
- *                              esquema, app, iv, dados }  (N1, fatia 2)
+ *                              esquema, app, dados, servidorEm }  (N1)
  * A cópia nova sobe inteira com um id novo e só então o ponteiro muda; a de
  * antes vira "anterior" e a mais velha sai. Quem baixa nunca vê metade.
  *
  * Os REGISTROS (fase 1 da nuvem) sobem um a um, da fila `saida` do store.js,
- * que entra na mesma transação de cada gravação dela: os metadados em claro
- * (id, tipo, carimbos, aparelho, esquema) e o conteúdo cifrado com a mesma
- * chave da cópia, rótulo próprio. Uma entrada sai da fila só depois de o
+ * que entra na mesma transação de cada gravação dela: os metadados (id, tipo,
+ * carimbos, aparelho, esquema) e o conteúdo em `dados`, como dado legível do
+ * Firestore. O servidor carimba `servidorEm` com a hora dele; é esse carimbo
+ * que ordena o recebimento (fatia 3). Uma entrada sai da fila só depois de o
  * commit responder, e só se ainda for a que subiu. Com a nuvem recusando (as
  * regras ainda não publicadas, por exemplo), a fila fica guardada e a tela
  * diz isso; nada trava. O id de aparelho dos registros é o do Store, e a
- * cópia completa passa a levar o mesmo id (aparelhoId) ao lado do rótulo.
+ * cópia completa leva o mesmo id (aparelhoId) ao lado do rótulo.
  *
  * A cópia automática só começa depois do primeiro envio feito por ela neste
  * aparelho (ou de uma restauração aqui): um aparelho recém-instalado, com a
@@ -40,7 +42,11 @@
  *
  * O celular só lê (D6, parte 1): o aparelho que trouxe a cópia pelo modo
  * celular guarda a marca "só leitura" e nunca escreve na nuvem; o commit, que
- * é a única porta de escrita, recusa.
+ * é a única porta de escrita, recusa. Ele recebe registros (fatia 3).
+ *
+ * "Apagar tudo" desliga a sincronização deste aparelho (envio e recebimento)
+ * até ela restaurar ou enviar uma cópia; a marca mora no Store (controle), e
+ * o recebimento a confere dentro da própria transação de aplicar.
  */
 (function (root) {
   'use strict';
@@ -67,23 +73,19 @@
   }
 
   /* Um documento do Firestore cabe 1 MiB com tudo (nome, campos, codificação).
-   * 768 KiB de bytes cifrados por parte deixa folga. Um commit aceita 10 MiB;
-   * oito partes (6 MiB de bytes, 8 MiB em base64) ficam abaixo disso. */
+   * 768 KiB de bytes por parte deixa folga. Um commit aceita 10 MiB; oito
+   * partes (6 MiB de bytes, 8 MiB em base64) ficam abaixo disso. */
   var TETO_PARTE = 768 * 1024;
   var PARTES_POR_PEDIDO = 8;
-  var ROTULO_CIFRA = 'apoio-educacional-copia:1';
-  var ROTULO_REGISTRO = 'apoio-educacional-registro:1';
   var REGISTROS_POR_COMMIT = 200;   // o commit aceita 500 escritas; 200 deixa folga de tamanho
   var ATRASO_ENVIO_REGISTROS = 2500; // depois de uma gravação dela, espera as vizinhas antes de subir
   var NOME_BANCO = 'apoio-nuvem';
   var UM_DIA = 24 * 60 * 60 * 1000;
-  var CODIGO_TAMANHO = 56; // 52 letras da chave (256 bits) + 4 de conferência
-  var ALFABETO = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'; // sem I, L, O e U: não se confundem com 1 e 0
+  var ALFABETO = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'; // só para o rótulo do aparelho ("tablet 7K")
 
   // ---------- estado em memória, espelho do banco próprio ----------
 
   var sessao = null;      // { email, uid, idToken, refreshToken, expiraEm }
-  var chaveBruta = null;  // Uint8Array(32)
   var ultimaCopia = null; // { id, quando, bytes, partes, aparelho }
   var automatica = false; // ligada depois do primeiro envio manual ou restauração aqui
   var pendente = false;   // houve gravação local desde a última cópia
@@ -97,16 +99,17 @@
    * buscar a mais nova ao abrir. { desde, uidDona } */
   var marcaSoLeitura = null;
   var travadoNestaAbertura = false; // a tela do celular está à vista, mesmo sem a marca
-  /* Os registros (N1, fatia 2): quantos esperam na fila, o último envio e o
-   * último erro (o PERMISSION_DENIED das regras ainda não publicadas fica
-   * aqui, para Ajustes dizer). Espelhado no banco próprio, chave 'registros'. */
+  /* Os registros (N1): quantos esperam na fila, o último envio e o último erro
+   * (o PERMISSION_DENIED das regras ainda não publicadas fica aqui, para
+   * Ajustes dizer). Espelhado no banco próprio, chave 'registros'. */
   var registros = { pendentes: 0, quarentena: 0, ultimoEnvio: null, erro: null };
   var enviandoRegistros = null;  // promessa do envio em curso
   var envioAgendado = null;      // o setTimeout do envio depois de uma gravação
   /* "Apagar tudo" DESLIGA A SINCRONIZAÇÃO deste aparelho, o envio e o
-   * recebimento, até ela entrar e restaurar de novo (ou mandar a cópia ela
-   * mesma), como a fase 0 já desliga a cópia automática: num banco vazio nunca
-   * chegam aulas soltas, sem aluno. Espelhado no banco próprio. */
+   * recebimento, até ela restaurar ou mandar a cópia ela mesma, como a fase 0
+   * já desliga a cópia automática: num banco vazio nunca chegam aulas soltas,
+   * sem aluno. A marca mora no Store (controle), que a confere dentro da
+   * transação de aplicar; aqui fica o espelho para as decisões rápidas. */
   var sincronizacaoDesligada = false;
   var ouvintes = [];
   var pronto = null;
@@ -156,29 +159,35 @@
   function carregarEstado() {
     if (pronto) return pronto;
     pronto = Promise.all([lerEstado('sessao'), lerEstado('chave'), lerEstado('copia'),
-      lerEstado('automatica'), lerEstado('pendente'), lerEstado('aparelho'), lerEstado('soLeitura'), lerEstado('registros'),
-      lerEstado('sincronizacaoDesligada')]).then(function (v) {
-      sincronizacaoDesligada = !!v[8];
+      lerEstado('automatica'), lerEstado('pendente'), lerEstado('aparelho'), lerEstado('soLeitura'), lerEstado('registros')]).then(function (v) {
       marcaSoLeitura = v[6] || null;
       sessao = v[0] || null;
-      chaveBruta = v[1] ? new Uint8Array(v[1]) : null;
       ultimaCopia = v[2] || null;
       automatica = !!v[3];
       pendente = !!v[4];
       aparelho = v[5] || null;
       if (v[7]) registros = { pendentes: 0, quarentena: 0, ultimoEnvio: v[7].ultimoEnvio || null, erro: v[7].erro || null };
-      // a fila é do Store; a contagem é lida dele, nunca guardada aqui
+      var pendencias = [];
+      // a chave antiga (fase 0 com cifra, decisão do dono de 08/11): ignorada e apagada
+      if (v[1]) pendencias.push(gravarEstado('chave', null).catch(function () { /* fica, ignorada */ }));
+      // a fila é do Store; a contagem e a marca da sincronização são lidas dele, nunca guardadas aqui
       contarFila();
+      pendencias.push(lerSincronizacaoDesligada());
       if (!aparelho) {
         aparelho = rotuloDoAparelho();
-        return gravarEstado('aparelho', aparelho);
+        pendencias.push(gravarEstado('aparelho', aparelho));
       }
+      return Promise.all(pendencias);
     }).catch(function () { /* sem IndexedDB: a nuvem fica indisponível e a tela diz */ });
     return pronto;
   }
+  function lerSincronizacaoDesligada() {
+    if (!root.Store || typeof root.Store.sincronizacaoDesligada !== 'function') return Promise.resolve(false);
+    return root.Store.sincronizacaoDesligada().then(function (d) { sincronizacaoDesligada = !!d; return !!d; }, function () { return sincronizacaoDesligada; });
+  }
   /* O id deste aparelho é o do Store (nasce na primeira gravação dela): é o
-   * que vai em cada registro e, desde a fatia 2, também no cabeçalho da cópia
-   * completa. O `aparelho` daqui é só o rótulo que ela lê ("tablet 7K"). */
+   * que vai em cada registro e também no cabeçalho da cópia completa. O
+   * `aparelho` daqui é só o rótulo que ela lê ("tablet 7K"). */
   function idDoAparelho() {
     return (root.Store && typeof root.Store.aparelho === 'function' && root.Store.aparelho()) || '';
   }
@@ -200,7 +209,7 @@
 
   function disponivel() {
     return typeof indexedDB !== 'undefined' && typeof crypto !== 'undefined' &&
-      !!crypto.subtle && typeof fetch === 'function' && typeof TextEncoder !== 'undefined';
+      typeof fetch === 'function' && typeof TextEncoder !== 'undefined';
   }
 
   // ---------- pedidos HTTP ----------
@@ -361,130 +370,7 @@
     }).then(function (s) { return s.idToken; });
   }
 
-  // ---------- a chave: bytes, código de recuperação e QR ----------
-
-  function paraBase32(bytes) {
-    var saida = '', bits = 0, valor = 0;
-    for (var i = 0; i < bytes.length; i++) {
-      valor = (valor << 8) | bytes[i];
-      bits += 8;
-      while (bits >= 5) {
-        saida += ALFABETO[(valor >>> (bits - 5)) & 31];
-        bits -= 5;
-      }
-    }
-    if (bits > 0) saida += ALFABETO[(valor << (5 - bits)) & 31];
-    return saida;
-  }
-  function deBase32(texto) {
-    var bytes = [], bits = 0, valor = 0;
-    for (var i = 0; i < texto.length; i++) {
-      var n = ALFABETO.indexOf(texto[i]);
-      if (n < 0) return null;
-      valor = (valor << 5) | n;
-      bits += 5;
-      if (bits >= 8) {
-        bytes.push((valor >>> (bits - 8)) & 255);
-        bits -= 8;
-      }
-    }
-    return new Uint8Array(bytes);
-  }
-  function digesto(bytes) {
-    return crypto.subtle.digest('SHA-256', bytes).then(function (d) { return new Uint8Array(d); });
-  }
-  /* Tira espaços e traços, põe em maiúsculas e aceita as confusões comuns de
-   * leitura (O por 0, I e L por 1, U por V). */
-  function normalizarCodigo(texto) {
-    return String(texto || '').toUpperCase().replace(/[^0-9A-Z]/g, '')
-      .replace(/O/g, '0').replace(/[IL]/g, '1').replace(/U/g, 'V');
-  }
-  function formatarCodigo(codigo) {
-    return (codigo.match(/.{1,4}/g) || []).join(' ');
-  }
-  /* 32 bytes viram 52 letras; a conferência são 20 bits do SHA-256 da chave,
-   * em 4 letras. Um erro de digitação é pego antes de tentar decifrar. */
-  function codigoDaChave(bytes) {
-    return digesto(bytes).then(function (d) {
-      return paraBase32(bytes).slice(0, 52) + paraBase32(d.subarray(0, 3)).slice(0, 4);
-    });
-  }
-  function chaveDoCodigo(texto) {
-    var codigo = normalizarCodigo(texto);
-    var invalida = function (frase) { return Object.assign(new Error(frase), { invalida: true }); };
-    if (codigo.length !== CODIGO_TAMANHO) {
-      return Promise.reject(invalida('O código tem ' + CODIGO_TAMANHO + ' letras e números; este tem ' + codigo.length + '.'));
-    }
-    var bytes = deBase32(codigo.slice(0, 52) + '000');
-    if (!bytes || bytes.length < 32) return Promise.reject(invalida('O código não é de uma chave.'));
-    bytes = bytes.subarray(0, 32);
-    return codigoDaChave(bytes).then(function (esperado) {
-      if (esperado !== codigo) throw invalida('O código tem alguma letra trocada. Confira com o papel ou leia o QR.');
-      return bytes;
-    });
-  }
-  function gerarChave() {
-    var bytes = new Uint8Array(32);
-    crypto.getRandomValues(bytes);
-    return bytes;
-  }
-  function garantirChave() {
-    return carregarEstado().then(function () {
-      if (chaveBruta) return chaveBruta;
-      chaveBruta = gerarChave();
-      return gravarEstado('chave', chaveBruta).then(function () { avisarOuvintes(); return chaveBruta; });
-    });
-  }
-  function temChave() { return !!chaveBruta; }
-  /* O QR leva também o uid da dona, para o aparelho que lê saber de que conta
-   * baixar (o observador do D7 entra com outra conta). */
-  function verChave() {
-    return garantirChave().then(codigoDaChave).then(function (codigo) {
-      return { codigo: codigo, formatado: formatarCodigo(codigo),
-        qr: 'APOIO1:' + ((sessao && sessao.uid) || '') + ':' + codigo };
-    });
-  }
-  /* O uid do Firebase é só letras, números, traço e sublinhado; outra coisa
-   * no lugar dele (barra, interrogação) viraria pedaço de caminho ou de
-   * consulta, e o QR é recusado. */
-  function lerQr(texto) {
-    var m = /^APOIO1:([A-Za-z0-9_-]{0,128}):([0-9A-Za-z]+)$/.exec(String(texto || '').trim());
-    if (!m) return null;
-    return { uid: m[1], codigo: m[2].toUpperCase() };
-  }
-  function importarChave(texto) {
-    var lido = lerQr(texto);
-    return chaveDoCodigo(lido ? lido.codigo : texto).then(function (bytes) {
-      chaveBruta = bytes;
-      return gravarEstado('chave', chaveBruta);
-    }).then(function () { avisarOuvintes(); return true; });
-  }
-
-  // ---------- cifra ----------
-
-  function chaveCripto(bytes, usos) {
-    return crypto.subtle.importKey('raw', bytes, { name: 'AES-GCM' }, false, usos);
-  }
-  function cifrar(bytes) {
-    var iv = new Uint8Array(12);
-    crypto.getRandomValues(iv);
-    return chaveCripto(chaveBruta, ['encrypt']).then(function (k) {
-      return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv, additionalData: new TextEncoder().encode(ROTULO_CIFRA) }, k, bytes);
-    }).then(function (saida) { return { iv: iv, dados: new Uint8Array(saida) }; });
-  }
-  /* O GCM não separa chave errada de parte adulterada: a frase depende de
-   * quem mandou a chave. Com código digitado, o provável é o código; com a
-   * chave do aparelho, a cópia está danificada ou é de outra chave. */
-  function decifrar(iv, dados, bytesDaChave) {
-    return chaveCripto(bytesDaChave || chaveBruta, ['decrypt']).then(function (k) {
-      return crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv, additionalData: new TextEncoder().encode(ROTULO_CIFRA) }, k, dados);
-    }).then(function (saida) { return new Uint8Array(saida); }, function () {
-      throw Object.assign(new Error(bytesDaChave
-        ? 'A chave não abre esta cópia. Confira o código ou leia o QR de novo.'
-        : 'Esta cópia está danificada ou foi feita com outra chave, não a deste aparelho. Se tiver o papel dela, digite o código.'),
-      { chaveErrada: true });
-    });
-  }
+  // ---------- bytes ----------
 
   function paraBase64(bytes) {
     var s = '';
@@ -508,32 +394,65 @@
   function nomeDoc(uid, relativo) { return raizDocumentos() + '/usuarios/' + uid + '/' + relativo; }
   function urlDoc(nome) { return PONTAS.firestore + '/' + nome; }
 
-  /* Só os tipos que a fase 0 usa. */
+  /* Um valor do aplicativo vira um Value do Firestore, e volta. O conteúdo do
+   * registro (`dados`) é dado legível: objeto vira mapValue, lista vira
+   * arrayValue, número inteiro vira integerValue, os outros, doubleValue. O
+   * Firestore não aceita lista dentro de lista: essa, rara, vira um mapa com a
+   * lista em JSON (`__json`), que a volta desfaz. */
+  function valorFirestore(v) {
+    if (v === null || v === undefined) return { nullValue: null };
+    if (v instanceof Uint8Array) return { bytesValue: paraBase64(v) };
+    if (typeof v === 'boolean') return { booleanValue: v };
+    if (typeof v === 'number') {
+      if (!isFinite(v)) return { nullValue: null };
+      return Number.isInteger(v) && Math.abs(v) < 9007199254740991 ? { integerValue: String(v) } : { doubleValue: v };
+    }
+    if (typeof v === 'string') return { stringValue: v };
+    if (Array.isArray(v)) {
+      if (v.some(function (x) { return Array.isArray(x); })) return { mapValue: { fields: { __json: { stringValue: JSON.stringify(v) } } } };
+      return { arrayValue: { values: v.map(valorFirestore) } };
+    }
+    if (typeof v === 'object') {
+      var fields = {};
+      Object.keys(v).forEach(function (k) { if (v[k] !== undefined) fields[k] = valorFirestore(v[k]); });
+      return { mapValue: { fields: fields } };
+    }
+    return { stringValue: String(v) };
+  }
+  function valorDoFirestore(v) {
+    if (!v || typeof v !== 'object') return null;
+    if ('nullValue' in v) return null;
+    if ('bytesValue' in v) return deBase64(v.bytesValue);
+    if ('integerValue' in v) return Number(v.integerValue);
+    if ('doubleValue' in v) return Number(v.doubleValue);
+    if ('booleanValue' in v) return !!v.booleanValue;
+    if ('stringValue' in v) return v.stringValue;
+    if ('timestampValue' in v) return v.timestampValue;
+    if ('arrayValue' in v) return ((v.arrayValue && v.arrayValue.values) || []).map(valorDoFirestore);
+    if ('mapValue' in v) {
+      var fields = (v.mapValue && v.mapValue.fields) || {};
+      if (Object.keys(fields).length === 1 && fields.__json && 'stringValue' in fields.__json) {
+        try { return JSON.parse(fields.__json.stringValue); } catch (e) { return null; }
+      }
+      var saida = {};
+      Object.keys(fields).forEach(function (k) { saida[k] = valorDoFirestore(fields[k]); });
+      return saida;
+    }
+    return null;
+  }
+  /* Os campos de um documento: null e undefined ficam de fora. */
   function campos(obj) {
     var saida = {};
     Object.keys(obj).forEach(function (k) {
       var v = obj[k];
       if (v === null || v === undefined) return;
-      if (v instanceof Uint8Array) saida[k] = { bytesValue: paraBase64(v) };
-      else if (typeof v === 'number') saida[k] = { integerValue: String(Math.round(v)) };
-      else if (typeof v === 'boolean') saida[k] = { booleanValue: v };
-      else if (Array.isArray(v)) saida[k] = { arrayValue: { values: v.map(function (x) { return { stringValue: String(x) }; }) } };
-      else saida[k] = { stringValue: String(v) };
+      saida[k] = valorFirestore(v);
     });
     return saida;
   }
   function valores(fields) {
     var saida = {};
-    Object.keys(fields || {}).forEach(function (k) {
-      var v = fields[k];
-      if ('bytesValue' in v) saida[k] = deBase64(v.bytesValue);
-      else if ('integerValue' in v) saida[k] = Number(v.integerValue);
-      else if ('booleanValue' in v) saida[k] = !!v.booleanValue;
-      else if ('arrayValue' in v) saida[k] = ((v.arrayValue && v.arrayValue.values) || []).map(function (x) { return x.stringValue; });
-      else if ('stringValue' in v) saida[k] = v.stringValue;
-      else if ('timestampValue' in v) saida[k] = v.timestampValue; // servidorEm (fatia 3)
-      else saida[k] = null;
-    });
+    Object.keys(fields || {}).forEach(function (k) { saida[k] = valorDoFirestore(fields[k]); });
     return saida;
   }
 
@@ -550,7 +469,8 @@
     });
   }
   /* TODA escrita na nuvem passa pelo commit, e o aparelho que só lê não
-   * escreve: a cópia, a rotação e a lista de leitores ficam todas aqui atrás. */
+   * escreve: a cópia, a rotação, a lista de leitores e os registros ficam
+   * todos aqui atrás. */
   function podeEnviar() { return !marcaSoLeitura && !travadoNestaAbertura; }
   function recusaSoLeitura() {
     return Object.assign(new Error('Este aparelho só lê: nada sobe daqui para a nuvem.'), { codigo: 'SO_LEITURA' });
@@ -566,7 +486,8 @@
    * hora DELE (é o carimbo que ordena o recebimento), e a precondição
    * `currentDocument.updateTime` recusa a escrita se outro aparelho ou outra
    * aba gravou depois do que este aparelho viu por último; sem carimbo
-   * conhecido, sem precondição (o primeiro envio do registro). */
+   * conhecido, sem precondição (o primeiro envio do registro), salvo a
+   * entrada de restauração, que exige que o documento não exista. */
   function gravacaoCarimbada(nome, obj, precondicao) {
     var w = { update: { name: nome, fields: campos(obj) },
       updateTransforms: [{ fieldPath: 'servidorEm', setToServerValue: 'REQUEST_TIME' }] };
@@ -579,9 +500,10 @@
   // ---------- a cópia: subir ----------
 
   function idNovo() {
-    var r = new Uint8Array(4);
+    var r = new Uint8Array(4), s = '';
     crypto.getRandomValues(r);
-    return 'c' + Date.now().toString(36) + paraBase32(r).slice(0, 6).toLowerCase();
+    for (var i = 0; i < r.length; i++) s += (r[i] < 16 ? '0' : '') + r[i].toString(16);
+    return 'c' + Date.now().toString(36) + s;
   }
 
   /* As duas cópias apontadas e o cabeçalho de cada uma. Cabeçalho antigo sem o
@@ -601,9 +523,9 @@
    * info.conteudo: false quando o banco está vazio ou é só a carga inicial.
    *
    * A AUTOMÁTICA NUNCA SOBE UM BANCO SEM CONTEÚDO POR CIMA DE UMA CÓPIA COM
-   * CONTEÚDO, e nunca cria chave: depois de um "Apagar tudo", ou num aparelho
-   * recém-instalado, o fechar não pode trocar a cópia boa pela vazia. Quando
-   * é ela quem manda, a tela já perguntou. */
+   * CONTEÚDO: depois de um "Apagar tudo", ou num aparelho recém-instalado, o
+   * fechar não pode trocar a cópia boa pela vazia. Quando é ela quem manda, a
+   * tela já perguntou. */
   function enviarCopia(blob, info) {
     if (!podeEnviar()) return Promise.reject(recusaSoLeitura());
     if (enviando) return enviando;
@@ -617,27 +539,24 @@
     var geracaoDoRetrato = typeof info.geracao === 'number' ? info.geracao : geracao;
     enviando = carregarEstado().then(function () {
       if (!sessao) throw erro('TOKEN_EXPIRED');
-      if (automatica_ && !chaveBruta) throw Object.assign(new Error('A cópia automática não cria chave.'), { semChave: true });
       return copiasApontadas(sessao.uid);
     }).then(function (lista) {
       apontadas = lista;
       if (automatica_ && !conteudo && apontadas.some(function (c) { return c.conteudo; })) {
         return null; // fica a cópia com conteúdo; nada sobe
       }
-      return garantirChave().then(function () { return blob.arrayBuffer(); }).then(function (buf) {
-        return cifrar(new Uint8Array(buf));
-      });
-    }).then(function (cifrado) {
-      if (!cifrado) return { pulada: true };
+      return blob.arrayBuffer().then(function (buf) { return new Uint8Array(buf); });
+    }).then(function (bytes) {
+      if (!bytes) return { pulada: true };
       var uid = sessao.uid;
       var id = idNovo();
       var partes = [];
-      for (var i = 0; i < cifrado.dados.length; i += TETO_PARTE) {
-        partes.push(cifrado.dados.subarray(i, Math.min(i + TETO_PARTE, cifrado.dados.length)));
+      for (var i = 0; i < bytes.length; i += TETO_PARTE) {
+        partes.push(bytes.subarray(i, Math.min(i + TETO_PARTE, bytes.length)));
       }
       if (!partes.length) partes.push(new Uint8Array(0));
       var quando = new Date().toISOString();
-      var meta = { formato: 'apoio-educacional-copia', versao: 1, iv: cifrado.iv, bytes: cifrado.dados.length,
+      var meta = { formato: 'apoio-educacional-copia', versao: 2, bytes: bytes.length,
         partes: partes.length, quando: quando, aparelho: aparelho || 'aparelho', aparelhoId: idDoAparelho(),
         motivo: info.motivo || 'ela', app: info.versaoApp || '', conteudo: conteudo };
       var fila = Promise.resolve();
@@ -710,7 +629,7 @@
           return lerDoc(nomeDoc(uid, 'copias/' + id)).then(function (meta) {
             if (!meta) return null;
             return { id: id, uid: uid, quando: meta.quando, bytes: meta.bytes, partes: meta.partes,
-              aparelho: meta.aparelho, conteudo: meta.conteudo !== false,
+              aparelho: meta.aparelho, conteudo: meta.conteudo !== false, versao: meta.versao,
               papel: id === ponteiro.atual ? 'atual' : 'anterior' };
           });
         }));
@@ -718,24 +637,19 @@
     });
   }
 
-  /* Devolve o .zip decifrado, como Blob. Com `codigo`, decifra com a chave
-   * desse código e, abrindo, guarda essa chave aqui (é a restauração num
-   * aparelho novo). */
-  function baixarCopia(uidDona, id, codigo) {
-    var uid, meta, bytesDaChave = null;
+  /* Devolve o .zip da cópia, como Blob. Só o login é preciso: as regras do
+   * Firestore decidem quem lê. Uma cópia do formato antigo, cifrada (versão 1
+   * do cabeçalho), não abre mais: nunca houve uma na conta dela. */
+  function baixarCopia(uidDona, id) {
+    var uid, meta;
     return carregarEstado().then(function () {
       if (!sessao) throw erro('TOKEN_EXPIRED');
       uid = uidDona || sessao.uid;
-      if (codigo) {
-        var lido = lerQr(codigo);
-        return chaveDoCodigo(lido ? lido.codigo : codigo).then(function (b) { bytesDaChave = b; });
-      }
-      if (!chaveBruta) throw Object.assign(new Error('Sem a chave da cópia não dá para abrir. Leia o QR ou digite o código.'), { semChave: true });
-    }).then(function () {
       return lerDoc(nomeDoc(uid, 'copias/' + id));
     }).then(function (m) {
       meta = m;
       if (!meta || meta.formato !== 'apoio-educacional-copia') throw erro('NOT_FOUND');
+      if (meta.iv) throw Object.assign(new Error('Esta cópia é de uma versão antiga do aplicativo e não abre mais. Envie uma cópia nova do tablet.'), { formatoAntigo: true });
       var pedidos = [];
       for (var n = 0; n < Number(meta.partes); n++) pedidos.push(lerDoc(nomeDoc(uid, 'copias/' + id + '/partes/' + n)));
       return Promise.all(pedidos);
@@ -745,10 +659,7 @@
       if (total !== Number(meta.bytes)) throw new Error('A cópia na nuvem está incompleta. Tente de novo mais tarde.');
       var juntos = new Uint8Array(total), pos = 0;
       partes.forEach(function (p) { juntos.set(p.dados, pos); pos += p.dados.length; });
-      return decifrar(meta.iv, juntos, bytesDaChave);
-    }).then(function (claro) {
-      var depois = bytesDaChave ? gravarEstado('chave', bytesDaChave).then(function () { chaveBruta = bytesDaChave; }) : Promise.resolve();
-      return depois.then(function () { return new Blob([claro], { type: 'application/zip' }); });
+      return new Blob([juntos], { type: 'application/zip' });
     });
   }
 
@@ -812,16 +723,20 @@
   // ---------- cópia automática ----------
 
   /* "Apagar tudo" desliga a automática neste aparelho: o banco vazio nunca
-   * sobe sozinho; ela religa no próximo envio dela ou numa restauração. */
+   * sobe sozinho; ela religa no próximo envio dela ou numa restauração. A
+   * sincronização (envio e recebimento) o Store já desligou na transação do
+   * próprio "Apagar tudo"; aqui só o espelho. */
   function desligarAutomatica() {
     automatica = false;
     sincronizacaoDesligada = true;
-    return Promise.all([gravarEstado('automatica', false), gravarEstado('sincronizacaoDesligada', true)]).then(avisarOuvintes, avisarOuvintes);
+    var marca = root.Store && typeof root.Store.desligarSincronizacao === 'function' ? root.Store.desligarSincronizacao().catch(function () {}) : Promise.resolve();
+    return Promise.all([gravarEstado('automatica', false), marca]).then(avisarOuvintes, avisarOuvintes);
   }
   function religarSincronizacao() {
-    if (!sincronizacaoDesligada) return Promise.resolve();
     sincronizacaoDesligada = false;
-    return gravarEstado('sincronizacaoDesligada', false).catch(function () { /* fica em memória */ });
+    if (!root.Store || typeof root.Store.religarSincronizacao !== 'function') return Promise.resolve();
+    // sempre no Store, mesmo com a memória já ligada: a marca de lá é a que vale
+    return root.Store.religarSincronizacao().catch(function () { /* fica em memória */ });
   }
   /* O aviso chega de dentro do oncomplete da gravação dela (store.js). A
    * memória muda na hora; a gravação do sinal no banco próprio fica para o
@@ -848,10 +763,10 @@
   function online() {
     return !(typeof navigator !== 'undefined' && navigator.onLine === false);
   }
-  /* Ao fechar com sinal: há conta, chave, a automática já começou e houve
-   * mudança desde a última cópia. */
+  /* Ao fechar com sinal: há conta, a automática já começou e houve mudança
+   * desde a última cópia. */
   function copiaAutomaticaDevida() {
-    return !!(podeEnviar() && sessao && chaveBruta && automatica && pendente && online() && !enviando);
+    return !!(podeEnviar() && sessao && automatica && pendente && online() && !enviando);
   }
   /* Uma vez por dia, ao abrir: o mesmo, mas só se a última cópia tem mais de
    * um dia (a de fechar pode ter falhado ontem sem ela ver). */
@@ -864,25 +779,17 @@
 
   // ---------- os registros, um a um (N1, fatia 2) ----------
 
-  function cifrarRegistro(texto) {
-    var iv = new Uint8Array(12);
-    crypto.getRandomValues(iv);
-    return chaveCripto(chaveBruta, ['encrypt']).then(function (k) {
-      return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv, additionalData: new TextEncoder().encode(ROTULO_REGISTRO) }, k, new TextEncoder().encode(texto));
-    }).then(function (saida) { return { iv: iv, dados: new Uint8Array(saida) }; });
-  }
-
-  /* O documento de um registro: os metadados em claro e o conteúdo cifrado.
-   * Lápide não leva conteúdo. */
+  /* O documento de um registro: os metadados e o conteúdo, como dado legível
+   * do Firestore. Lápide não leva conteúdo. O `aparelho` do documento é quem o
+   * ENVIA, não quem escreveu a versão localmente: é por ele que o recebimento
+   * reconhece o eco, e este aparelho pode reafirmar, pela restauração, uma
+   * versão que tinha recebido do outro (se fosse com o id do outro, o outro a
+   * tomaria por eco e nunca a aplicaria). */
   function documentoDoRegistro(reg, versaoApp) {
     var campo = { id: reg.id, tipo: reg.tipo, atualizadoEm: reg.atualizadoEm, apagadoEm: reg.apagadoEm || null,
-      aparelho: reg.aparelho || idDoAparelho() || 'aparelho', esquema: reg.esquema || 1, app: versaoApp || '' };
-    if (reg.apagadoEm || reg.dados === null || reg.dados === undefined) return Promise.resolve(campo);
-    return cifrarRegistro(JSON.stringify(reg.dados)).then(function (c) {
-      campo.iv = c.iv;
-      campo.dados = c.dados;
-      return campo;
-    });
+      aparelho: idDoAparelho() || reg.aparelho || 'aparelho', esquema: reg.esquema || 1, app: versaoApp || '' };
+    if (!reg.apagadoEm && reg.dados !== null && reg.dados !== undefined) campo.dados = reg.dados;
+    return campo;
   }
 
   function contarFila() {
@@ -900,10 +807,10 @@
     return gravarEstado('registros', { ultimoEnvio: registros.ultimoEnvio, erro: registros.erro })
       .catch(function () { /* fica em memória */ });
   }
-  /* Há o que subir e tem como: conta, chave, sinal e o aparelho pode escrever.
-   * A fila em si não entra aqui: o envio a lê. */
+  /* Há o que subir e tem como: conta, sinal, a sincronização ligada e o
+   * aparelho pode escrever. A fila em si não entra aqui: o envio a lê. */
   function registrosDevidos() {
-    return !!(podeEnviar() && !sincronizacaoDesligada && sessao && chaveBruta && online());
+    return !!(podeEnviar() && !sincronizacaoDesligada && sessao && online());
   }
   function agendarEnvioDeRegistros() {
     // fora da resposta da gravação dela (ver marcarMudanca): nada abre transação ali
@@ -930,9 +837,10 @@
     if (enviandoRegistros) return enviandoRegistros;
     var enviados = 0, lotes = 0, emQuarentenaAntes = [];
     enviandoRegistros = carregarEstado().then(function () {
+      return lerSincronizacaoDesligada();
+    }).then(function () {
       if (!podeEnviar()) return { pulado: 'so leitura', enviados: 0 };
       if (!sessao) return { pulado: 'sem conta', enviados: 0 };
-      if (!chaveBruta) return { pulado: 'sem chave', enviados: 0 };
       if (sincronizacaoDesligada) return { pulado: 'desligada', enviados: 0 };
       if (!online()) throw semRede();
       if (!root.Store || typeof root.Store.registrosDaFila !== 'function') return { pulado: 'sem fila', enviados: 0 };
@@ -943,22 +851,21 @@
         : Promise.resolve();
       /* Um lote inteiro, num commit; o que subiu sai da fila. */
       function subirLote(itens) {
-        return Promise.all(itens.map(function (i) { return documentoDoRegistro(i.registro, info.versaoApp); })).then(function (docs) {
-          return commit(docs.map(function (d, k) {
-            var conhecido = itens[k].registro.nuvem && itens[k].registro.nuvem.updateTime;
-            /* A entrada de RESTAURAÇÃO sem carimbo conhecido exige que o documento
-             * não exista: se existir, a nuvem tem algo que este aparelho não viu,
-             * a precondição falha, o recebimento decide (o mais novo que a cópia
-             * vence) e só então se tenta de novo. */
-            var precondicao = conhecido ? { updateTime: conhecido } : (itens[k].fila.restauro ? { exists: false } : null);
-            return gravacaoCarimbada(nomeDoc(uid, 'registros/' + d.id), d, precondicao);
-          }));
-        }).then(function (resposta) {
+        var docs = itens.map(function (i) { return documentoDoRegistro(i.registro, info.versaoApp); });
+        return commit(docs.map(function (d, k) {
+          var conhecido = itens[k].registro.nuvem && itens[k].registro.nuvem.updateTime;
+          /* A entrada de RESTAURAÇÃO sem carimbo conhecido exige que o documento
+           * não exista: se existir, a nuvem tem algo que este aparelho não viu,
+           * a precondição falha, o recebimento decide e só então se tenta de
+           * novo. */
+          var precondicao = conhecido ? { updateTime: conhecido } : (itens[k].fila.restauro ? { exists: false } : null);
+          return gravacaoCarimbada(nomeDoc(uid, 'registros/' + d.id), d, precondicao);
+        })).then(function (resposta) {
           var resultados = (resposta && resposta.writeResults) || [];
           return root.Store.confirmarEnvio(itens.map(function (i, k) {
             var w = resultados[k] || {};
             var transformado = w.transformResults && w.transformResults[0] && w.transformResults[0].timestampValue;
-            return { id: i.fila.id, atualizadoEm: i.fila.atualizadoEm,
+            return { id: i.fila.id, atualizadoEm: i.fila.atualizadoEm, apagadoEm: i.registro.apagadoEm || null,
               nuvem: { updateTime: w.updateTime || null, servidorEm: transformado || w.updateTime || null } };
           }));
         });
@@ -1059,23 +966,20 @@
 
   // ---------- o recebimento (N1, fatia 3) ----------
 
-  function decifrarRegistro(iv, dados) {
-    return chaveCripto(chaveBruta, ['decrypt']).then(function (k) {
-      return crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv, additionalData: new TextEncoder().encode(ROTULO_REGISTRO) }, k, dados);
-    }).then(function (saida) { return JSON.parse(new TextDecoder().decode(new Uint8Array(saida))); });
-  }
   var recebendo = null;
   /* Busca no servidor os registros com `servidorEm` depois do cursor deste
-   * aparelho, em ordem, decifra e aplica (Store.aplicarRecebidos decide por
-   * registro). O celular só leitura também recebe: é leitura na nuvem e a
-   * escrita local passa pela trava como a restauração. Nunca rejeita por
-   * recusa da nuvem: o erro fica em registros.erroRecebimento. */
+   * aparelho, em ordem, e aplica (Store.aplicarRecebidos decide por registro
+   * e confere a sincronização desligada dentro da própria transação). O
+   * celular só leitura também recebe: é leitura na nuvem e a escrita local
+   * passa pela trava como a restauração. Nunca rejeita por recusa da nuvem: o
+   * erro fica em registros.erroRecebimento. */
   function receberRegistros() {
     if (recebendo) return recebendo;
     var aplicados = 0, lidos = 0, paginas = 0, uidDona;
     recebendo = carregarEstado().then(function () {
+      return lerSincronizacaoDesligada();
+    }).then(function () {
       if (!sessao) return { pulado: 'sem conta', aplicados: 0 };
-      if (!chaveBruta) return { pulado: 'sem chave', aplicados: 0 };
       if (sincronizacaoDesligada) return { pulado: 'desligada', aplicados: 0 };
       if (!online()) throw semRede();
       if (!root.Store || typeof root.Store.aplicarRecebidos !== 'function') return { pulado: 'sem store', aplicados: 0 };
@@ -1107,39 +1011,30 @@
             var docs = (resposta || []).filter(function (x) { return x && x.document; }).map(function (x) { return x.document; });
             lidos += docs.length;
             var meuId = idDoAparelho();
-            return Promise.all(docs.map(function (d) {
+            var regs = docs.map(function (d) {
               var v = valores(d.fields);
-              var reg = { id: v.id, tipo: v.tipo, atualizadoEm: v.atualizadoEm, apagadoEm: v.apagadoEm || null, aparelho: v.aparelho || '',
-                esquema: v.esquema || 1, servidorEm: v.servidorEm || null, updateTime: d.updateTime || null, nome: d.name, dados: null, eco: false };
-              if (meuId && reg.aparelho === meuId) reg.eco = true;
-              if (reg.apagadoEm || !v.dados || !v.iv) return reg;
-              return decifrarRegistro(v.iv, v.dados).then(function (dados) { reg.dados = dados; return reg; }, function () {
-                reg.indecifravel = true; return reg;
-              });
-            })).then(function (regs) {
-              /* O eco do que este aparelho mesmo subiu só avança o cursor: o
-               * registro já está aqui, com o carimbo anotado no envio. O que não
-               * decifra (outra chave) não é aplicado, e não some calado: conta. */
-              var aplicaveis = regs.filter(function (r) { return !r.eco && !r.indecifravel; });
-              var ecos = regs.filter(function (r) { return r.eco; });
-              var indecifraveis = regs.filter(function (r) { return r.indecifravel; }).length;
-              var ultimo = regs.length ? { servidorEm: regs[regs.length - 1].servidorEm, nome: regs[regs.length - 1].nome } : null;
-              /* O eco vai com o id e o carimbo, marcado: o Store só anota o carimbo
-               * no registro que ainda não o tem (a lápide do "Apagar tudo" e a
-               * restauração da própria cópia o perdem), e avança o cursor. */
-              var lote = aplicaveis.concat(ecos.map(function (r) {
-                return { id: r.id, eco: true, servidorEm: r.servidorEm, nome: r.nome, updateTime: r.updateTime,
-                  atualizadoEm: r.atualizadoEm, apagadoEm: r.apagadoEm, dados: r.dados };
-              }));
-              // nada a aplicar: nenhuma transação de escrita (o celular em dia não grava nada)
-              var aplicar = lote.length ? root.Store.aplicarRecebidos(lote) : Promise.resolve({ aplicados: 0 });
-              return aplicar.then(function (contas) {
-                aplicados += contas.aplicados;
-                registros.indecifraveis = (registros.indecifraveis || 0) + indecifraveis;
-                if (docs.length < 300 || !ultimo || !ultimo.servidorEm) return { aplicados: aplicados, lidos: lidos };
-                desde = ultimo;
-                return pagina();
-              });
+              return { id: v.id, tipo: v.tipo, atualizadoEm: v.atualizadoEm, apagadoEm: v.apagadoEm || null, aparelho: v.aparelho || '',
+                esquema: v.esquema || 1, servidorEm: v.servidorEm || null, updateTime: d.updateTime || null, nome: d.name,
+                dados: v.apagadoEm ? null : (v.dados === undefined ? null : v.dados), eco: !!(meuId && v.aparelho === meuId) };
+            });
+            var aplicaveis = regs.filter(function (r) { return !r.eco; });
+            var ecos = regs.filter(function (r) { return r.eco; });
+            var ultimo = regs.length ? { servidorEm: regs[regs.length - 1].servidorEm, nome: regs[regs.length - 1].nome } : null;
+            /* O eco vai com o id e o carimbo, marcado: o Store anota o carimbo no
+             * registro deste aparelho (mais novo vale), tira da fila a entrada que
+             * o eco já é, e avança o cursor. */
+            var lote = aplicaveis.concat(ecos.map(function (r) {
+              return { id: r.id, eco: true, servidorEm: r.servidorEm, nome: r.nome, updateTime: r.updateTime,
+                atualizadoEm: r.atualizadoEm, apagadoEm: r.apagadoEm, dados: r.dados };
+            }));
+            // nada a aplicar: nenhuma transação de escrita (o celular em dia não grava nada)
+            var aplicar = lote.length ? root.Store.aplicarRecebidos(lote) : Promise.resolve({ aplicados: 0 });
+            return aplicar.then(function (contas) {
+              if (contas.pulado === 'desligada') { sincronizacaoDesligada = true; return { pulado: 'desligada', aplicados: aplicados, lidos: lidos }; }
+              aplicados += contas.aplicados;
+              if (docs.length < 300 || !ultimo || !ultimo.servidorEm) return { aplicados: aplicados, lidos: lidos };
+              desde = ultimo;
+              return pagina();
             });
           });
         }
@@ -1165,7 +1060,7 @@
     });
   }
   function sincronizarSeDevido(info) {
-    if (!(sessao && chaveBruta && online()) || sincronizacaoDesligada) return Promise.resolve({ pulado: sincronizacaoDesligada ? 'desligada' : 'indevido' });
+    if (!(sessao && online()) || sincronizacaoDesligada) return Promise.resolve({ pulado: sincronizacaoDesligada ? 'desligada' : 'indevido' });
     return sincronizar(info);
   }
 
@@ -1173,7 +1068,6 @@
     return {
       disponivel: disponivel(),
       entrada: sessao ? { email: sessao.email, uid: sessao.uid } : null,
-      temChave: !!chaveBruta,
       ultimaCopia: ultimaCopia,
       automatica: automatica,
       pendente: pendente,
@@ -1182,7 +1076,7 @@
       aparelhoId: idDoAparelho(),
       registros: { pendentes: registros.pendentes, quarentena: registros.quarentena, ultimoEnvio: registros.ultimoEnvio,
         erro: registros.erro, enviando: !!enviandoRegistros, ultimoRecebimento: registros.ultimoRecebimento || null,
-        erroRecebimento: registros.erroRecebimento || null, recebendo: !!recebendo, indecifraveis: registros.indecifraveis || 0 },
+        erroRecebimento: registros.erroRecebimento || null, recebendo: !!recebendo },
       soLeitura: !!marcaSoLeitura,
       uidDona: marcaSoLeitura ? marcaSoLeitura.uidDona : null,
       sincronizacaoDesligada: sincronizacaoDesligada,
@@ -1213,9 +1107,6 @@
   root.Nuvem = {
     disponivel: disponivel, pronto: carregarEstado, estado: estado, aoMudar: aoMudar,
     entrar: entrar, sair: sair, esqueciASenha: esqueciASenha, trocarSenha: trocarSenha,
-    verChave: verChave, temChave: temChave, importarChave: importarChave, lerQr: lerQr,
-    codigoValido: function (texto) { return chaveDoCodigo(texto).then(function () { return true; }); },
-    formatarCodigo: formatarCodigo,
     enviarCopia: enviarCopia, listarCopias: listarCopias, baixarCopia: baixarCopia, restaurou: restaurou,
     marcarSoLeitura: marcarSoLeitura, desmarcarSoLeitura: desmarcarSoLeitura, travarEnvio: travarEnvio, podeEnviar: podeEnviar,
     leitores: leitores, permitirLeitor: permitirLeitor, tirarLeitor: tirarLeitor,

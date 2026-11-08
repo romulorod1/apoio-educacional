@@ -4,9 +4,9 @@ Aplicativo de agenda, folha de aula e fechamento mensal para uma professora part
 1.28.
 
 Funciona como aplicativo instalado no tablet: abre em tela cheia, tem ícone próprio e funciona sem
-internet. Os dados ficam guardados no próprio aparelho, no navegador. O que sai do aparelho é uma
-coisa só, e cifrada: a cópia na nuvem, que sobe trancada com uma chave que só existe no aparelho
-dela (veja *Cópia na nuvem*, abaixo). Quem guarda a cópia não consegue abri-la.
+internet. Os dados ficam guardados no próprio aparelho, no navegador. O que sai do aparelho vai para
+uma conta na nuvem que é só dela: a cópia completa e, mudança a mudança, os registros (veja *Cópia
+na nuvem*, abaixo). Só quem entra com a senha dela abre o que está lá.
 
 ---
 
@@ -126,13 +126,11 @@ tablet quebrar ou for trocado, é essa cópia que devolve tudo. Ela leva junto a
 mão, as imagens coladas e os arquivos anexados.
 
 **Cópia na nuvem.** Em *Ajustes*, entre com o e-mail e a senha da sua conta (a mesma no tablet e no
-celular; nunca a conta do Google). No primeiro **Enviar cópia agora** nasce, no aparelho, a chave que
-tranca a cópia; toque em **Ver a chave da cópia** e imprima o papel com o QR e o código. Daí em
-diante a mesma cópia de segurança (sem os livros e sem os pacotes) sobe sozinha, cifrada, quando você
-fecha o aplicativo com internet, e uma vez por dia; *Ajustes* mostra "Última cópia na nuvem: hoje,
-14:02". Sem a chave, a cópia não abre: nem para quem a guarda, nem para nós. Perder o papel perde só
-a cópia da nuvem, nunca o que está no tablet nem a cópia em arquivo. Num aparelho novo, entre na
-conta, toque em **Restaurar neste aparelho**, leia o QR com a câmera ou digite o código, e tudo volta.
+celular; nunca a conta do Google). Depois do primeiro **Enviar cópia agora**, a mesma cópia de
+segurança (sem os livros e sem os pacotes) sobe sozinha quando você fecha o aplicativo com internet,
+e uma vez por dia; *Ajustes* mostra "Última cópia na nuvem: hoje, 14:02". Cada mudança gravada sobe
+também, logo depois, e chega ao outro aparelho quando ele abre com sinal. Num aparelho novo, entre na
+conta, toque em **Restaurar neste aparelho**, e tudo volta.
 Também em *Ajustes*: **Trocar senha**, **Esqueci a senha** (chega um e-mail do Firebase com o link)
 e **Quem mais pode ler esta cópia**, para o celular de confiança ler sem mexer.
 
@@ -171,9 +169,8 @@ alunos fica em zero e um aviso aparece na tela de alunos.
 | `cartao.js` | Cartão do mês |
 | `biblioteca.js`, `zip.js` | Abertura e conferência dos pacotes da biblioteca |
 | `busca.js` | Busca de assunto, sem acento e sem caixa |
-| `nuvem.js` | Cópia na nuvem (fase 0): entrada por e-mail e senha, chave e cifra no aparelho, documentos no Firestore pela API REST |
+| `nuvem.js` | A nuvem (fases 0 e 1): entrada por e-mail e senha, a cópia completa e os registros no Firestore pela API REST |
 | `firestore.rules` | As regras do Firestore: só a dona lê e escreve o caminho dela; o leitor permitido só lê; mais ninguém nada |
-| `vendor/qrcode-generator-1.4.4/` | O gerador do QR da chave (MIT, Kazuhiko Arase) |
 | `app.js` | Interface e ligação entre as partes |
 | `sw.js` | Modo offline |
 | `banco/topicos/` | Índice de assuntos: um arquivo por matéria, e o `matematica.json` com os 148 assuntos de matemática (o LEIA-ME da pasta explica os dois formatos) |
@@ -198,21 +195,22 @@ isso vira caminho vetorial, então a letra sai nítida em qualquer tamanho e o a
 acentuação do português. As larguras da Helvetica estão embutidas em `pdf.js` porque o tablet não
 tem essa fonte instalada e a quebra de linha precisa ser exata mesmo assim.
 
-**O servidor é cego.** São dados de crianças, então a única coisa que sai do aparelho é a cópia na
-nuvem, e ela sai cifrada (AES-GCM de 256 bits pela WebCrypto) com uma chave que nasce no aparelho e
-nunca é enviada; o Firestore guarda bytes que não abre, mais o tamanho, a hora e o nome do aparelho.
-Fala-se com o Firebase pela API REST, sem o SDK, porque a fase 0 só sobe e baixa uma cópia. A
-configuração web do projeto fica no código porque não é segredo; quem protege são as regras
-(`firestore.rules`, só a conta dela lê e escreve o caminho dela) e a chave. A cópia automática só
+**O que protege a nuvem é a conta.** São dados de crianças, e o que sai do aparelho vai para a conta
+dela no Firebase: a cópia completa (o .zip em partes de bytes) e os registros, um documento por
+aluno, aula ou pagamento, como dado legível do Firestore. Quem protege são o login, a senha e as
+regras (`firestore.rules`): só a conta dela escreve no caminho dela, e as regras conferem a forma do
+que entra; o leitor que ela permitiu só lê; qualquer outra conta é negada em tudo. Não há cifra no
+aparelho, nem chave, nem código para guardar (decisão do dono, 08/11/2026). Fala-se com o Firebase
+pela API REST, sem o SDK. A configuração web do projeto fica no código porque não é segredo. A cópia automática só
 começa depois do primeiro envio feito por ela em cada aparelho, para um aparelho recém-instalado não
 subir a carga inicial por cima da cópia do tablet; "Apagar todos os dados" desliga a automática, a
 automática nunca sobe banco vazio ou carga inicial por cima de uma cópia com conteúdo, e a nuvem nunca
 apaga a última cópia com conteúdo só pela contagem (guarda a atual e a anterior; a rotação pula a
-vazia). No primeiro envio de um aparelho sem chave, se a nuvem já tem cópia, o aplicativo pergunta e
-manda restaurar primeiro; e a janela de restaurar sempre aceita digitar outro código, mesmo com chave
-no aparelho. Não existe "Criar conta": as contas nascem no console do Firebase, pela mão do dono, e o
-aplicativo só entra. A chave mora num banco do IndexedDB à parte (`apoio-nuvem`), fora da cópia e
-fora do "Apagar todos os dados". Material que identifique um aluno
+vazia). No primeiro envio de um aparelho que ainda não enviou nem restaurou, se a nuvem já tem
+cópia, o aplicativo pergunta e manda restaurar primeiro. Não existe "Criar conta": as contas nascem
+no console do Firebase, pela mão do dono, e o aplicativo só entra. O estado da nuvem (a sessão, a
+última cópia, a marca de só leitura) mora num banco do IndexedDB à parte (`apoio-nuvem`), fora da
+cópia e fora do "Apagar todos os dados". Material que identifique um aluno
 nunca entra neste repositório, que é público; conteúdo de terceiros (OBMEP, livros) também não: fica
 em pacote no Drive, importado pelo aplicativo.
 

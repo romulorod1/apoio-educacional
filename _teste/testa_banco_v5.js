@@ -367,7 +367,8 @@ const ITENS_DO_DOCUMENTO = 3 + 2 + 40 + 2 + 2 + 5 + 1; // alunos, séries, aulas
   conf('a cópia sem pagamentos lê com a lista vazia', outros.restaurar.pagamentosVazio, true);
   conf('apagar tudo: carregar() volta null', outros.apagarTudo.carregar, null);
   conf('nenhum registro vivo, e os de antes viraram lápide', outros.apagarTudo.vivos + '/' + (outros.apagarTudo.lapides > 0), '0/true');
-  conf('o principal saiu e o aparelho ficou', (outros.apagarTudo.principal === null) + '/' + outros.apagarTudo.controle + '/' + outros.apagarTudo.aparelhoIgual, 'true/1/true');
+  // em controle ficam o aparelho e a marca da sincronização desligada (fatia 3)
+  conf('o principal saiu; ficaram o aparelho e a marca da sincronização desligada', (outros.apagarTudo.principal === null) + '/' + outros.apagarTudo.controle + '/' + outros.apagarTudo.aparelhoIgual, 'true/2/true');
   conf('o salvar seguinte grava os itens novos (aluna e versao)', outros.recomeco.puts.join(','), 'aluno:c1,raiz:versao');
   conf('e fica consistente', outros.recomeco.iguais, true);
 
@@ -395,7 +396,7 @@ const ITENS_DO_DOCUMENTO = 3 + 2 + 40 + 2 + 2 + 5 + 1; // alunos, séries, aulas
   // (a fila leva também a lápide do que a restauração tirou, aluno:c1: a nuvem precisa saber que saiu)
   prop('no aparelho que escreve, a restauração enfileira todo registro vivo sincronizável (' + restauroDaNuvem.vivos.length + ')',
     restauroDaNuvem.vivos.every(id => restauroDaNuvem.filaDono.indexOf(id) >= 0) && restauroDaNuvem.vivos.length === 3, '--envenenado-restauro-sem-fila');
-  conf('e a lápide do que a restauração tirou', restauroDaNuvem.filaDono.indexOf('aluno:c1') >= 0, true);
+  prop('e a lápide do que a restauração tirou', restauroDaNuvem.filaDono.indexOf('aluno:c1') >= 0, '--envenenado-restauro-sem-fila');
   conf('a trava do só leitura recusa a edição comum (controle)', restauroDaNuvem.recusouEdicao, true);
   conf('no aparelho que só lê, a mesma restauração não enfileira nada', restauroDaNuvem.filaCelular, 0);
   if (MODO === '--envenenado-restauro-sem-fila') throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });

@@ -743,20 +743,18 @@ roda "relato e Voltar"                            node "_teste/testa_relato_volt
 roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip.js"
 # N0: a copia na nuvem contra o Firebase Emulator Suite: as regras nos tres
 # casos (dona, observador, estranho), a ida e volta entre dois aparelhos pela
-# chave digitada, a copia automatica ao fechar e o servidor cego. Precisa do
-# firebase-tools FORA do repositorio (FIREBASE_TOOLS ou o caminho padrao da
-# prova) e de um JDK 21 em JAVA_HOME; sem eles, a prova diz onde procurou e
-# REPROVA, nunca passa calada. Os venenos: o zip subindo sem cifra tem de ser
-# visto pela parte do servidor cego; a regra que deixa qualquer conta ler tem
-# de ser vista pela parte das regras.
+# restauracao so com o login (sem cifra, sem chave: decisao do dono de 08/11), a
+# copia automatica ao fechar e as regras por caminho. Precisa do firebase-tools
+# FORA do repositorio (FIREBASE_TOOLS ou o caminho padrao da prova) e de um JDK
+# 21 em JAVA_HOME; sem eles, a prova diz onde procurou e REPROVA, nunca passa
+# calada. Os venenos: a regra que deixa qualquer conta ler tem de ser vista pela
+# parte das regras; a que deixa quem le escrever registro, idem.
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
-roda "nuvem fase 0 --envenenado-sem-cifra"          node "_teste/testa_nuvem.js" --envenenado-sem-cifra
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
-# os dois medios da revisao adversarial (07/11): o banco vazio que subiria por
-# cima da copia boa depois do "Apagar tudo", e o campo do codigo que sumia
-# quando o aparelho ja tinha chave (sem saida para restaurar a copia de outra)
+roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve
+# o medio da revisao adversarial (07/11): o banco vazio que subiria por cima da
+# copia boa depois do "Apagar tudo"
 roda "nuvem fase 0 --envenenado-sobe-vazio"         node "_teste/testa_nuvem.js" --envenenado-sobe-vazio
-roda "nuvem fase 0 --envenenado-esconde-codigo"     node "_teste/testa_nuvem.js" --envenenado-esconde-codigo
 # segunda rodada: a rotacao que so olhava o conteudo quando a nova era vazia
 # apagava a boa quando a atual era vazia e a anterior boa
 roda "nuvem fase 0 --envenenado-anterior-cega"      node "_teste/testa_nuvem.js" --envenenado-anterior-cega
@@ -770,12 +768,11 @@ roda "nuvem fase 0 --envenenado-pendente-zerado"    node "_teste/testa_nuvem.js"
 # venenos: o celular que envia, o que mostra botao de edicao e o que grava a
 # carga inicial ao abrir TEM de ser vistos.
 # N1 fatia 2: os registros sobem um a um, da fila `saida` gravada na mesma
-# transacao do dado, cifrados e com os metadados em claro; a nuvem recusando
-# (regras velhas) guarda a fila e Ajustes diz; a fila sobrevive a fechar sem
-# sinal e sobe ao voltar; o celular so leitura nunca envia. Venenos: registro em
-# claro e fila fora da transacao TEM de ser vistos.
+# transacao do dado, com os metadados e o conteudo legivel (sem cifra; o
+# estranho nao le nem escreve); a nuvem recusando (regras velhas) guarda a fila
+# e Ajustes diz; a fila sobrevive a fechar sem sinal e sobe ao voltar; o celular
+# so leitura nunca envia. Veneno: fila fora da transacao TEM de ser visto.
 roda "nuvem registros (N1 fatia 2)"                 node "_teste/testa_nuvem_registros.js"
-roda "nuvem registros --envenenado-registro-em-claro" node "_teste/testa_nuvem_registros.js" --envenenado-registro-em-claro
 roda "nuvem registros --envenenado-fila-fora-da-transacao" node "_teste/testa_nuvem_registros.js" --envenenado-fila-fora-da-transacao
 # (revisao) recusa total da nuvem nunca conta tentativa: o veneno que culpa quem ja
 # tinha tentativa leva um bom sozinho a quarentena, e TEM de ser visto.
@@ -799,6 +796,15 @@ roda "nuvem recebe --envenenado-fusao-pelo-prefixo" node "_teste/testa_nuvem_rec
 # atualiza o carimbo e tira a entrada da fila; o veneno que so anota quando falta TEM
 # de ser visto.
 roda "nuvem recebe --envenenado-eco-so-sem-carimbo" node "_teste/testa_nuvem_recebe.js" --envenenado-eco-so-sem-carimbo
+# (revisao do PR 118) o "Apagar tudo" zera a fila deste aparelho e o recebimento
+# em curso confere a marca dentro da transacao; o celular nao enfileira a lapide
+# da fusao; a restauracao enfileira tambem o que e igual a copia; a confirmacao
+# do envio leva apagadoEm. Os cinco venenos TEM de ser vistos.
+roda "nuvem recebe --envenenado-fila-sobrevive-ao-apagar" node "_teste/testa_nuvem_recebe.js" --envenenado-fila-sobrevive-ao-apagar
+roda "nuvem recebe --envenenado-aplica-desligado"   node "_teste/testa_nuvem_recebe.js" --envenenado-aplica-desligado
+roda "nuvem recebe --envenenado-celular-enfileira-fusao" node "_teste/testa_nuvem_recebe.js" --envenenado-celular-enfileira-fusao
+roda "nuvem recebe --envenenado-restauro-sem-iguais" node "_teste/testa_nuvem_recebe.js" --envenenado-restauro-sem-iguais
+roda "nuvem recebe --envenenado-confirma-sem-apagado" node "_teste/testa_nuvem_recebe.js" --envenenado-confirma-sem-apagado
 roda "celular so leitura"                           node "_teste/testa_celular_leitura.js"
 roda "celular so leitura --envenenado-envia"        node "_teste/testa_celular_leitura.js" --envenenado-envia
 roda "celular so leitura --envenenado-edicao"       node "_teste/testa_celular_leitura.js" --envenenado-edicao
