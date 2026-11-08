@@ -777,6 +777,9 @@ roda "nuvem fase 0 --envenenado-pendente-zerado"    node "_teste/testa_nuvem.js"
 roda "nuvem registros (N1 fatia 2)"                 node "_teste/testa_nuvem_registros.js"
 roda "nuvem registros --envenenado-registro-em-claro" node "_teste/testa_nuvem_registros.js" --envenenado-registro-em-claro
 roda "nuvem registros --envenenado-fila-fora-da-transacao" node "_teste/testa_nuvem_registros.js" --envenenado-fila-fora-da-transacao
+# (revisao) recusa total da nuvem nunca conta tentativa: o veneno que culpa quem ja
+# tinha tentativa leva um bom sozinho a quarentena, e TEM de ser visto.
+roda "nuvem registros --envenenado-culpa-na-recusa-total" node "_teste/testa_nuvem_registros.js" --envenenado-culpa-na-recusa-total
 roda "celular so leitura"                           node "_teste/testa_celular_leitura.js"
 roda "celular so leitura --envenenado-envia"        node "_teste/testa_celular_leitura.js" --envenenado-envia
 roda "celular so leitura --envenenado-edicao"       node "_teste/testa_celular_leitura.js" --envenenado-edicao
