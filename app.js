@@ -7774,6 +7774,81 @@
     atualizarStatusGravacaoFolha('salvo');
   }
 
+  /* A FOLHA SÓ PARA LER (N2): no celular da dona e no observador, a folha que
+   * o tablet escreveu abre na mesma janela, sem barra de ferramentas, sem
+   * "Salvo" e sem botão de salvar; o rodapé só passa de página e ajusta à
+   * tela. O editor nasce com `soLeitura`: todo ponteiro arrasta, nenhum
+   * escreve, e nada daqui grava (o fechar não passa pelo gravarNota). */
+  var leitorDeFolha = null;
+  function abrirFolhaParaLer(aulaId) {
+    var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
+    if (!aula) return Promise.resolve(false);
+    var aluno = alunoPorId(aula.alunoId);
+    return Store.lerNota(aulaId).then(function (nota) {
+      if (!nota || !nota.paginas || !nota.paginas.length) {
+        avisar(aula.temNota ? 'A folha ainda não chegou da nuvem. Com sinal, ela chega sozinha.' : 'Esta aula não tem folha.');
+        return false;
+      }
+      var refs = [];
+      nota.paginas.forEach(function (p) {
+        (p.itens || []).forEach(function (it) { if (it.t === 'imagem' && it.ref) refs.push(it.ref); });
+      });
+      return Promise.all(refs.map(function (r) {
+        return Store.lerMidia(r).then(function (m) { return { ref: r, midia: m }; }, function () { return { ref: r, midia: null }; });
+      })).then(function (lista) {
+        var midias = {};
+        lista.forEach(function (x) {
+          if (!x.midia) return;
+          var img = new Image();
+          img.src = x.midia.dataUrl;
+          midias[x.ref] = { dataUrl: x.midia.dataUrl, w: x.midia.w, h: x.midia.h, img: img };
+        });
+        $('#titulo-modal-nota').textContent = 'Folha de aula, ' + (aluno ? aluno.nome : '') + ', ' + Core.ddmmaaaa(aula.data) + ' (só para ler)';
+        abrirModal('modal-nota');
+        if (leitorDeFolha) { leitorDeFolha.destruir(); leitorDeFolha = null; }
+        if (editorAtual) { editorAtual.destruir(); editorAtual = null; }
+        document.body.classList.add('folha-so-leitura');
+        $('#ferramentas-nota').innerHTML = '';
+        $('#ferramentas-nota').hidden = true;
+        $('#status-gravacao-folha').hidden = true;
+        $('#ajuda-folha-painel').style.display = 'none';
+        leitorDeFolha = new Draw.Editor($('#tela-desenho'), { nota: nota, midias: midias, soLeitura: true });
+        leitorDeFolha._aulaId = aulaId;
+        setTimeout(function () { if (leitorDeFolha) { leitorDeFolha.ajustarTamanho(); leitorDeFolha.ajustarNaTela(); } }, 30);
+        desenharRodapeLeitura();
+        return true;
+      });
+    });
+  }
+  function desenharRodapeLeitura() {
+    var rodape = $('#rodape-nota');
+    rodape.innerHTML = '';
+    if (!leitorDeFolha) return;
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn pequeno', texto: '‹', 'aria-label': 'Página anterior',
+      aoClick: function () { leitorDeFolha.irParaPagina(leitorDeFolha.indicePagina - 1); desenharRodapeLeitura(); }
+    }));
+    rodape.appendChild(el('span', { class: 'contador-pagina', id: 'folha-leitura-pagina',
+      texto: 'Página ' + (leitorDeFolha.indicePagina + 1) + ' de ' + leitorDeFolha.nota.paginas.length }));
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn pequeno', texto: '›', 'aria-label': 'Próxima página',
+      aoClick: function () { leitorDeFolha.irParaPagina(leitorDeFolha.indicePagina + 1); desenharRodapeLeitura(); }
+    }));
+    rodape.appendChild(el('span', { class: 'cresce' }));
+    rodape.appendChild(el('span', { class: 'ajuda u-margem-0', id: 'folha-leitura-aviso', texto: 'Só para ler. A folha se escreve no tablet.' }));
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn pequeno', texto: 'Ajustar à tela',
+      aoClick: function () { leitorDeFolha.ajustarNaTela(); }
+    }));
+  }
+  function fecharLeitorDeFolha() {
+    if (leitorDeFolha) { leitorDeFolha.destruir(); leitorDeFolha = null; }
+    document.body.classList.remove('folha-so-leitura');
+    $('#ferramentas-nota').hidden = false;
+    $('#status-gravacao-folha').hidden = false;
+    fecharModal('modal-nota');
+  }
+
   var painelAjudaFolhaAberto = false;
 
   function atualizarStatusGravacaoFolha(estado, msg) {
@@ -7903,6 +7978,8 @@
 
   var fechandoEditorNota = false;
   function fecharEditorNota() {
+    // a folha aberta só para ler (N2) fecha sem gravar nada
+    if (leitorDeFolha) { fecharLeitorDeFolha(); return; }
     if (fechandoEditorNota) return;
     fechandoEditorNota = true;
     var aulaId = editorAtual && editorAtual._aulaId;
@@ -7921,6 +7998,8 @@
       if (editorAtual) { editorAtual.destruir(); editorAtual = null; }
       fecharModal('modal-nota');
       desenharAgenda();
+      // N2: a folha fechada sobe agora, sem esperar os 30 segundos da página recém-gravada
+      if (temNuvem()) Nuvem.enviarRegistrosSeDevido({ versaoApp: VERSAO, tudo: true });
     }).catch(function () {
       /* A folha fica ABERTA: fechar agora jogaria fora o que ela escreveu, que
        * ainda está só na tela. */
@@ -20892,6 +20971,20 @@
    * uma frase diz quantas mudanças chegaram. */
   function registrosChegaram(contas) {
     if (!contas || !contas.mudou) return;
+    /* Páginas de folha (N2): o documento dela não mudou; a folha aberta para
+     * ler, se for de uma aula que chegou, recarrega; a tela do celular
+     * redesenha (o "Ver a folha" segue o temNota, que vem pelo registro). */
+    if (contas.folhas) {
+      if (leitorDeFolha && leitorDeFolha._aulaId && (contas.aulas || []).indexOf(leitorDeFolha._aulaId) >= 0) {
+        var aulaAberta = leitorDeFolha._aulaId;
+        fecharLeitorDeFolha();
+        abrirFolhaParaLer(aulaAberta);
+      }
+      if (modoCelular) desenharCelular();
+      var np = contas.aplicados;
+      avisar(np === 1 ? 'Chegou 1 página de folha do tablet.' : 'Chegaram ' + np + ' páginas de folha do tablet.');
+      return;
+    }
     Store.carregar().then(function (lido) {
       if (!lido) return;
       db = lido;
@@ -20934,7 +21027,8 @@
     /* N1 (fatia 2): os registros que esperam na fila sobem nos mesmos momentos
      * da cópia (fechar, abrir, voltar), pelas mesmas guardas acima. A recusa da
      * nuvem fica guardada em Nuvem.estado().registros.erro e a fila fica. */
-    Nuvem.sincronizarSeDevido({ versaoApp: VERSAO });
+    // `tudo` (N2): ao fechar, abrir e voltar, as páginas de folha recém-gravadas sobem sem esperar
+    Nuvem.sincronizarSeDevido({ versaoApp: VERSAO, tudo: true });
     var devida = motivo === 'diaria' ? Nuvem.copiaDiariaDevida() : Nuvem.copiaAutomaticaDevida();
     if (!devida) return;
     enviarCopiaParaNuvem(motivo);
@@ -22298,6 +22392,15 @@
 
   function desenharAcoesNaFolha(folha, a, aluno, edita) {
     folha.appendChild(resumoDaAulaNaFolha(a, aluno));
+    /* A FOLHA ESCRITA À MÃO (N2): a que o tablet escreveu abre daqui só para
+     * ler, para a dona e para o observador. É leitura, não ação de edição:
+     * nada grava, e por isso não passa por botaoDeAcaoCelular. */
+    if (a.temNota) {
+      folha.appendChild(el('div', { class: 'barra u-margem-baixo-0' }, [
+        el('button', { type: 'button', class: 'btn cel-folha-botao cel-folha-largo cel-ver-folha', id: 'cel-folha-ver-folha', 'data-ver-folha': a.id, texto: 'Ver a folha escrita à mão',
+          aoClick: function () { abrirFolhaParaLer(a.id); } })
+      ]));
+    }
     if (edita) {
       var futura = a.data > Core.hojeIso();
       var s = a.status || 'realizada';

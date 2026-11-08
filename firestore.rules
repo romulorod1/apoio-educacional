@@ -55,6 +55,28 @@ service cloud.firestore {
         && (!('dados' in d) || !(d.dados is bytes))
         && (!('servidorEm' in d) || d.servidorEm is timestamp);
     }
+    // uma página de folha (N2): id igual ao nome do documento, hash do texto
+    // canônico obrigatório na página viva (16 a 64), bytes comprimidos de até
+    // 900 KiB na página viva (a lápide vai sem bytes), metadados com nomes e
+    // tamanhos fechados; servidorEm é a hora do servidor, posta pelo commit
+    function folhaValida(id) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['id', 'aulaId', 'n', 'hash', 'bytes', 'tamanho', 'algoritmo', 'atualizadoEm', 'apagadoEm', 'aparelho', 'esquema', 'app', 'servidorEm'])
+        && d.id == id && d.id.size() <= 200
+        && d.aulaId is string && d.aulaId.size() <= 120
+        && d.n is int && d.n >= 0 && d.n < 1000
+        && d.atualizadoEm is string && d.atualizadoEm.size() <= 40
+        && d.aparelho is string && d.aparelho.size() <= 64
+        && d.esquema is int
+        && (!('app' in d) || (d.app is string && d.app.size() <= 32))
+        && (!('apagadoEm' in d) || (d.apagadoEm is string && d.apagadoEm.size() <= 40))
+        && (!('hash' in d) || (d.hash is string && d.hash.size() >= 16 && d.hash.size() <= 64))
+        && (!('bytes' in d) || (d.bytes is bytes && d.bytes.size() <= 900 * 1024))
+        && (!('tamanho' in d) || d.tamanho is int)
+        && (!('algoritmo' in d) || (d.algoritmo is string && d.algoritmo.size() <= 16))
+        && (('apagadoEm' in d) || ('hash' in d && 'bytes' in d))
+        && (!('servidorEm' in d) || d.servidorEm is timestamp);
+    }
     // o cabeçalho da cópia completa e as partes dela, em bytes: só os campos
     // que o aplicativo escreve, cada um com o tipo esperado quando presente
     function copiaValida() {
@@ -140,6 +162,13 @@ service cloud.firestore {
         allow delete: if dona(uid);
       }
       // fim registros (N1)
+      // as páginas de folha (N2): só a dona escreve, com a forma conferida;
+      // quem lê a cópia lê as folhas
+      match /folhas/{folha} {
+        allow read: if podeLer(uid);
+        allow create, update: if dona(uid) && folhaValida(folha);
+        allow delete: if dona(uid);
+      }
       // o diagnóstico por aparelho (D7): a dona escreve só o do próprio
       // aparelho (o id do documento), e quem lê a cópia lê os resumos
       match /diagnostico/{aparelho} {

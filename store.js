@@ -713,15 +713,43 @@
   /* As entradas da fila com os registros delas, até `limite`, para o envio.
    * Uma transação só de leitura sobre os dois depósitos: o registro lido é o
    * que a fila aponta, no instante da leitura. */
-  function registrosDaFila(limite) {
+  function registrosDaFila(limite, opcoes) {
+    opcoes = opcoes || {};
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = transacao(b, ['saida', 'registros'], 'readonly');
+        var t = transacao(b, ['saida', 'registros', 'notas', 'controle'], 'readonly');
         var saida = [];
+        saida.adiadas = 0;
         var fila = t.objectStore('saida').getAll();
         fila.onsuccess = function () {
+          var agora = Date.now();
           // a quarentena fica de fora: o resto da fila não espera por ela
-          (fila.result || []).filter(function (e) { return !e.quarentena; }).slice(0, limite || 200).forEach(function (entrada) {
+          (fila.result || []).filter(function (e) {
+            if (e.quarentena) return false;
+            /* A página de folha recém-gravada espera (ESPERA_FOLHA) por mais traços,
+             * salvo quando quem chama quer tudo (fechar, abrir, voltar). */
+            if (e.tipo === 'folha' && !opcoes.tudo && !e.apagadoEm && agora - new Date(e.atualizadoEm).getTime() < ESPERA_FOLHA) { saida.adiadas++; return false; }
+            return true;
+          }).slice(0, limite || 200).forEach(function (entrada) {
+            if (entrada.tipo === 'folha') {
+              var p = partesDoIdDaPagina(entrada.id);
+              if (!p) { saida.push({ fila: entrada, registro: null }); return; }
+              var nota = null, estado = null;
+              t.objectStore('notas').get(p.aulaId).onsuccess = function (e) { nota = e.target.result || null; };
+              var estadoReq = t.objectStore('controle').get(PREFIXO_FOLHA + p.aulaId);
+              estadoReq.onsuccess = function () {
+                estado = estadoReq.result || null;
+                var pag = nota && nota.paginas ? nota.paginas[p.n] : null;
+                var ePag = estado && estado.paginas ? estado.paginas[p.n] : null;
+                /* Entrada viva sem página no disco é incoerência (não deveria
+                 * acontecer): vira lápide, para a fila não prender nela. */
+                var apagadoEm = entrada.apagadoEm || (!pag ? entrada.atualizadoEm : null);
+                saida.push({ fila: entrada, registro: { id: entrada.id, tipo: 'folha', aulaId: p.aulaId, n: p.n,
+                  atualizadoEm: entrada.atualizadoEm, apagadoEm: apagadoEm, pagina: apagadoEm ? null : pag,
+                  hash: ePag ? ePag.hash : null, nuvem: ePag ? ePag.nuvem : null, aparelho: aparelhoId } });
+              };
+              return;
+            }
             var pedido = t.objectStore('registros').get(entrada.id);
             pedido.onsuccess = function () {
               if (pedido.result) saida.push({ fila: entrada, registro: pedido.result });
@@ -741,14 +769,24 @@
   function confirmarEnvio(itens) {
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = transacao(b, ['saida', 'registros'], 'readwrite', 'fila');
+        var t = transacao(b, ['saida', 'registros', 'controle'], 'readwrite', 'fila');
         var s = t.objectStore('saida'), registros = t.objectStore('registros'), tiradas = 0;
+        /* As páginas de folha (N2), AGRUPADAS POR AULA: o estado da folha é um
+         * documento só em `controle`, e dois get/put do mesmo estado na mesma
+         * transação perderiam a página do primeiro (o segundo get lê antes do
+         * primeiro put). Um get e um put por aula, com todas as páginas. */
+        var folhasPorAula = {};
         (itens || []).forEach(function (item) {
           var pedido = s.get(item.id);
           pedido.onsuccess = function () {
             var atual = pedido.result;
             if (atual && atual.atualizadoEm === item.atualizadoEm) { s.delete(item.id); tiradas++; }
           };
+          var pag = item.tipo === 'folha' ? partesDoIdDaPagina(item.id) : null;
+          if (pag && item.nuvem) {
+            (folhasPorAula[pag.aulaId] = folhasPorAula[pag.aulaId] || []).push({ n: pag.n, item: item });
+            return;
+          }
           /* O carimbo do servidor que o commit devolveu fica no registro: é a
            * precondição do próximo envio e o desempate do recebimento (fatia 3). */
           if (item.nuvem) {
@@ -760,6 +798,21 @@
               registros.put(reg.result);
             };
           }
+        });
+        Object.keys(folhasPorAula).forEach(function (aulaId) {
+          var controle = t.objectStore('controle');
+          var estadoReq = controle.get(PREFIXO_FOLHA + aulaId);
+          estadoReq.onsuccess = function () {
+            var estado = estadoReq.result || { paginas: [] };
+            folhasPorAula[aulaId].forEach(function (f) {
+              var item = f.item;
+              var p = estado.paginas[f.n] || { hash: null, atualizadoEm: item.atualizadoEm, apagadoEm: item.apagadoEm || null, nuvem: null };
+              p.nuvem = { updateTime: item.nuvem.updateTime || null, servidorEm: item.nuvem.servidorEm || null, apagado: !!item.apagadoEm };
+              if (item.hash && !p.hash) p.hash = item.hash;
+              estado.paginas[f.n] = p;
+            });
+            controle.put(estado, PREFIXO_FOLHA + aulaId);
+          };
         });
         t.oncomplete = function () { resolve(tiradas); };
         t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
@@ -1225,6 +1278,12 @@
             uso.continue();
           };
           t.objectStore('historico').clear();
+          /* As páginas das folhas das aulas excluídas viram lápide e entram na
+           * fila (N2), na mesma transação, salvo com a sincronização desligada. */
+          var marcaReq = t.objectStore('controle').get('sincronizacao');
+          marcaReq.onsuccess = function () {
+            lapidarFolhas(t, Object.keys(aulasExcluidas), new Date().toISOString(), !(marcaReq.result && marcaReq.result.desligada));
+          };
           escreverDiferenca(t, novo, null, function (c) { contas = c; });
         };
         t.oncomplete = function () { confirmarGravacao(contas); avisarMudanca('dados'); resolve(novo); };
@@ -1233,16 +1292,361 @@
     });
   }
 
-  // ---------- notas manuscritas ----------
+  // ---------- notas manuscritas (e a folha por página na nuvem, N2 fatia 1) ----------
+
+  /* A FOLHA SOBE POR PÁGINA (N2). O depósito `notas` continua guardando a
+   * folha inteira por aula, como o editor a lê e grava. O que a nuvem vê é
+   * cada página, arredondada (os pontos dos traços a 0,1, a mesma regra da
+   * cópia de segurança), em JSON canônico, com o SHA-256 desse texto como
+   * hash, comprimida pelo nuvem.js. O estado de sincronização mora em
+   * `controle`, chave 'folha:<aulaId>', um item por página:
+   *   { hash, atualizadoEm, apagadoEm, nuvem: { updateTime, servidorEm, apagado } }
+   * O salvar compara o hash de cada página com o do estado: só a página que
+   * mudou entra na fila `saida` (id 'folha:<aulaId>:<n>', tipo 'folha'), na
+   * MESMA transação da gravação; a página que sumiu vira lápide; a igual não
+   * é tocada nem enfileirada. Nada disto entra em `registros` (o escritor de
+   * diferença lapidaria o que não está no documento), e o banco não sobe de
+   * versão. O tablet é o dono da folha: no celular e no observador a trava
+   * recusa a gravação, e o que chega da nuvem entra pela porta da nuvem. */
+  var PREFIXO_FOLHA = 'folha:';
+  var PREFIXO_FOLHA_ANTERIOR = 'folha-anterior:';
+  /* Entrada de folha espera 30 segundos sem traço novo antes de subir (ao
+   * fechar a folha ou o aplicativo sobe na hora): uma aula escrita a mão não
+   * vira centenas de escritas na nuvem. */
+  var ESPERA_FOLHA = 30 * 1000;
+
+  function arredondarPagina(pagina) {
+    var p = JSON.parse(JSON.stringify(pagina));
+    (p.itens || []).forEach(function (it) {
+      if (it.t !== 'traco' || !Array.isArray(it.pontos)) return;
+      it.pontos.forEach(function (ponto) {
+        if (!Array.isArray(ponto)) return;
+        for (var i = 0; i < ponto.length; i++) {
+          if (typeof ponto[i] === 'number' && isFinite(ponto[i])) ponto[i] = Math.round(ponto[i] * 10) / 10;
+        }
+      });
+    });
+    return p;
+  }
+  /* O texto que sobe e que é hasheado: a página arredondada, em JSON. Quem
+   * recebe guarda o que leu desse texto, e stringify devolve o mesmo texto. */
+  function paginaCanonica(pagina) { return JSON.stringify(arredondarPagina(pagina)); }
+  /* SHA-256 em hexadecimal, de um texto ou de bytes. Sem WebCrypto (não
+   * acontece no tablet nem no iPhone), um FNV-1a duplo serve de hash. */
+  function sha256Hex(entrada) {
+    var bytes = typeof entrada === 'string' ? new TextEncoder().encode(entrada) : entrada;
+    if (typeof crypto !== 'undefined' && crypto.subtle && crypto.subtle.digest) {
+      return crypto.subtle.digest('SHA-256', bytes).then(function (buf) {
+        var v = new Uint8Array(buf), s = '';
+        for (var i = 0; i < v.length; i++) s += (v[i] < 16 ? '0' : '') + v[i].toString(16);
+        return s;
+      });
+    }
+    var texto = typeof entrada === 'string' ? entrada : String.fromCharCode.apply(null, bytes);
+    var a = hashTexto(texto).toString(16), b = hashTexto(texto + '\u0001').toString(16);
+    return Promise.resolve(('00000000' + a).slice(-8) + ('00000000' + b).slice(-8));
+  }
+  function hashPagina(pagina) { return sha256Hex(paginaCanonica(pagina)); }
+  function idDaPagina(aulaId, n) { return PREFIXO_FOLHA + aulaId + ':' + n; }
+  function partesDoIdDaPagina(id) {
+    var s = String(id || '');
+    if (s.indexOf(PREFIXO_FOLHA) !== 0) return null;
+    var corte = s.lastIndexOf(':');
+    if (corte <= PREFIXO_FOLHA.length) return null;
+    var n = Number(s.slice(corte + 1));
+    if (!Number.isInteger(n) || n < 0) return null;
+    return { aulaId: s.slice(PREFIXO_FOLHA.length, corte), n: n };
+  }
+
+  /* Compara os hashes de agora com o estado e grava, dentro da transação de
+   * quem chamou: o estado novo em `controle` e as entradas na fila `saida`
+   * (null quando a sincronização está desligada ou o aparelho não enfileira).
+   * `opcoes.restauro` enfileira também a página igual (a restauração vence).
+   * Devolve as contas. */
+  function sincronizarPaginas(controle, saida, aulaId, estado, hashes, agora, opcoes) {
+    opcoes = opcoes || {};
+    var antes = (estado && Array.isArray(estado.paginas)) ? estado.paginas : [];
+    var depois = [], contas = { mudadas: 0, lapides: 0, iguais: 0, enfileiradas: 0 };
+    function enfileirarPagina(n, atualizadoEm, apagadoEm) {
+      if (!saida) return;
+      var entrada = { id: idDaPagina(aulaId, n), tipo: 'folha', atualizadoEm: atualizadoEm, apagadoEm: apagadoEm || null };
+      if (opcoes.restauro) entrada.restauro = true;
+      enfileirar(saida, entrada);
+      contas.enfileiradas++;
+    }
+    hashes.forEach(function (hash, n) {
+      var p = antes[n];
+      if (p && !p.apagadoEm && p.hash && p.hash === hash) {
+        contas.iguais++;
+        depois.push(p);
+        if (opcoes.restauro) enfileirarPagina(n, p.atualizadoEm, null);
+        return;
+      }
+      depois.push({ hash: hash, atualizadoEm: agora, apagadoEm: null, nuvem: p && p.nuvem ? p.nuvem : null });
+      contas.mudadas++;
+      enfileirarPagina(n, agora, null);
+    });
+    for (var n = hashes.length; n < antes.length; n++) {
+      var p = antes[n];
+      if (!p) continue;
+      if (p.apagadoEm) {
+        depois.push(p);
+        // a lápide que o servidor ainda não tem como lápide volta à fila na restauração
+        if (opcoes.restauro && !(p.nuvem && p.nuvem.apagado)) enfileirarPagina(n, p.atualizadoEm, p.apagadoEm);
+        continue;
+      }
+      depois.push({ hash: p.hash || null, atualizadoEm: agora, apagadoEm: agora, nuvem: p.nuvem || null });
+      contas.lapides++;
+      enfileirarPagina(n, agora, agora);
+    }
+    controle.put({ paginas: depois }, PREFIXO_FOLHA + aulaId);
+    return contas;
+  }
 
   function lerNota(aulaId) {
     return ler('notas', aulaId).then(function (n) { return n || null; });
   }
+  /* A folha inteira em `notas`, o estado por página em `controle` e as
+   * entradas na fila, numa transação só, que responde no oncomplete (B3). Os
+   * hashes são calculados ANTES da transação (o WebCrypto é assíncrono e a
+   * transação não espera). Nota vazia apaga a folha e lapida as páginas. */
   function salvarNota(aulaId, nota) {
-    if (!nota || !nota.paginas || !nota.paginas.length) return apagar('notas', aulaId);
-    return gravar('notas', aulaId, nota);
+    var vazia = !nota || !nota.paginas || !nota.paginas.length;
+    var paginas = vazia ? [] : nota.paginas;
+    return Promise.all(paginas.map(hashPagina)).then(function (hashes) {
+      return abrir().then(function (b) {
+        return new Promise(function (resolve, reject) {
+          var t = transacao(b, ['notas', 'controle', 'saida'], 'readwrite');
+          var agora = new Date().toISOString();
+          var controle = t.objectStore('controle');
+          var desligada = false, contas = null;
+          var marcaReq = controle.get('sincronizacao');
+          marcaReq.onsuccess = function () { desligada = !!(marcaReq.result && marcaReq.result.desligada); };
+          var estadoReq = controle.get(PREFIXO_FOLHA + aulaId);
+          estadoReq.onsuccess = function () {
+            try {
+              contas = sincronizarPaginas(controle, desligada ? null : t.objectStore('saida'), aulaId, estadoReq.result, hashes, agora);
+              if (vazia) t.objectStore('notas').delete(aulaId);
+              else t.objectStore('notas').put(nota, aulaId);
+            } catch (e) {
+              if (!e || (e.name !== 'TransactionInactiveError' && e.name !== 'InvalidStateError')) throw e;
+            }
+          };
+          t.oncomplete = function () { ultimaGravacaoDeFolha = contas; avisarMudanca('notas'); resolve(); };
+          t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+          t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+        });
+      });
+    });
   }
-  function apagarNota(aulaId) { return apagar('notas', aulaId); }
+  var ultimaGravacaoDeFolha = null;
+  function apagarNota(aulaId) { return salvarNota(aulaId, null); }
+  function estadoDaFolha(aulaId) {
+    return ler('controle', PREFIXO_FOLHA + aulaId).then(function (e) { return e || null; });
+  }
+  function lerCursorFolhas() {
+    return ler('controle', 'cursorFolhas').then(function (c) { return c || null; });
+  }
+  /* Todas as chaves de `controle` com um prefixo, dentro da transação `t`;
+   * `cada(chave, valor)` para cada uma, `depois()` no fim. */
+  function varrerControle(t, prefixo, cada, depois) {
+    var req = t.objectStore('controle').openCursor(IDBKeyRange.bound(prefixo, prefixo + '￿'));
+    req.onsuccess = function (e) {
+      var c = e.target.result;
+      if (!c) { if (depois) depois(); return; }
+      cada(c.key, c.value, c);
+      c.continue();
+    };
+  }
+  /* Apaga o estado das folhas (e as versões anteriores e o cursor) dentro da
+   * transação `t`: a restauração e o "Apagar tudo" refazem do zero. */
+  function limparEstadoDasFolhas(t) {
+    varrerControle(t, PREFIXO_FOLHA, function (chave, valor, cursor) { cursor.delete(); });
+    varrerControle(t, PREFIXO_FOLHA_ANTERIOR, function (chave, valor, cursor) { cursor.delete(); });
+    t.objectStore('controle').delete('cursorFolhas');
+  }
+  /* Enfileira, dentro de `t`, toda página das notas dadas (sem hash: o envio o
+   * calcula e a confirmação o guarda). A restauração no aparelho que escreve. */
+  function enfileirarNotas(t, notas, carimbo, restauro) {
+    var controle = t.objectStore('controle'), saida = t.objectStore('saida');
+    Object.keys(notas || {}).forEach(function (aulaId) {
+      var paginas = (notas[aulaId] && notas[aulaId].paginas) || [];
+      if (!paginas.length) return;
+      var estado = [];
+      paginas.forEach(function (p, n) {
+        estado.push({ hash: null, atualizadoEm: carimbo, apagadoEm: null, nuvem: null });
+        var entrada = { id: idDaPagina(aulaId, n), tipo: 'folha', atualizadoEm: carimbo, apagadoEm: null };
+        if (restauro) entrada.restauro = true;
+        enfileirar(saida, entrada);
+      });
+      controle.put({ paginas: estado }, PREFIXO_FOLHA + aulaId);
+    });
+  }
+  /* Lapida, dentro de `t`, as páginas das aulas dadas (a exclusão em cascata). */
+  function lapidarFolhas(t, aulaIds, agora, enfileira) {
+    var controle = t.objectStore('controle'), saida = enfileira ? t.objectStore('saida') : null;
+    aulaIds.forEach(function (aulaId) {
+      var req = controle.get(PREFIXO_FOLHA + aulaId);
+      req.onsuccess = function () {
+        if (!req.result) return;
+        sincronizarPaginas(controle, saida, aulaId, req.result, [], agora);
+      };
+    });
+  }
+
+  /* APLICA AS PÁGINAS QUE CHEGARAM DA NUVEM, numa transação só, pela porta da
+   * nuvem (o celular e o observador também recebem). A regra é a dos
+   * registros: eco anota o carimbo e tira da fila a entrada que já subiu; o
+   * que chega com carimbo do servidor igual ou mais velho que o conhecido não
+   * entra; a edição local ainda não enviada vence (só o carimbo é anotado, e a
+   * página que chegou fica guardada como versão anterior); senão a página
+   * entra, e a versão local que perde, no aparelho que escreve, fica guardada
+   * em 'folha-anterior:<id>:<servidorEm>' por 30 dias. A lápide tira a página;
+   * a folha sem página viva sai de `notas`. Item sem id só avança o cursor. */
+  function aplicarFolhasRecebidas(lista) {
+    var agora = new Date().toISOString();
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, ['notas', 'controle', 'saida'], 'readwrite', true);
+        var controle = t.objectStore('controle'), notas = t.objectStore('notas'), saida = t.objectStore('saida');
+        var contas = { aplicados: 0, ignorados: 0, perdedoresLocais: 0, mudou: false, aulas: [] };
+        var fila = {}, cursorAntes = null, desligada = false;
+        saida.getAll().onsuccess = function (e) { (e.target.result || []).forEach(function (f) { fila[f.id] = f; }); };
+        controle.get('cursorFolhas').onsuccess = function (e) { cursorAntes = e.target.result || null; };
+        var marcaReq = controle.get('sincronizacao');
+        marcaReq.onsuccess = function () { desligada = !!(marcaReq.result && marcaReq.result.desligada); };
+        var porAula = {}, ordemAulas = [];
+        (lista || []).forEach(function (c) {
+          if (!c || !c.id) return;
+          var p = partesDoIdDaPagina(c.id);
+          if (!p) return;
+          if (!porAula[p.aulaId]) { porAula[p.aulaId] = []; ordemAulas.push(p.aulaId); }
+          porAula[p.aulaId].push(Object.assign({ n: p.n }, c));
+        });
+        var cursorMaior = cursorAntes;
+        var pendentesDeLeitura = ordemAulas.length;
+        var lidos = {};
+        function terminar() {
+          // a marca do "Apagar tudo", lida dentro da transação, como nos registros
+          if (desligada) { contas.pulado = 'desligada'; return undefined; }
+          cursorMaior = cursorAntes && cursorAntes.servidorEm ? { servidorEm: cursorAntes.servidorEm, nome: cursorAntes.nome || '' } : null;
+          (lista || []).forEach(function (c) {
+            if (c && c.servidorEm) cursorMaior = parMaior(cursorMaior, { servidorEm: c.servidorEm, nome: c.nome || '' });
+          });
+          ordemAulas.forEach(function (aulaId) {
+            var nota = lidos[aulaId].nota || null;
+            var estado = lidos[aulaId].estado || { paginas: [] };
+            var paginas = nota && Array.isArray(nota.paginas) ? nota.paginas.slice() : [];
+            var estados = Array.isArray(estado.paginas) ? estado.paginas.slice() : [];
+            var mudouAula = false;
+            porAula[aulaId].sort(function (a, b) { return a.n - b.n; }).forEach(function (chegou) {
+              var n = chegou.n, local = estados[n] || null;
+              var carimbo = { updateTime: chegou.updateTime || null, servidorEm: chegou.servidorEm || null };
+              var pendente = fila[chegou.id];
+              /* O documento INVÁLIDO (hash que não bate): o conteúdo não entra; só o
+               * carimbo é anotado, se mais novo, para a próxima escrita deste
+               * aparelho passar na precondição e cobrir o documento ruim. */
+              if (chegou.invalido) {
+                contas.invalidos = (contas.invalidos || 0) + 1;
+                if (local && (!(local.nuvem && local.nuvem.servidorEm) || carimboNumero(local.nuvem.servidorEm) < carimboNumero(chegou.servidorEm))) {
+                  local.nuvem = Object.assign({}, local.nuvem || {}, carimbo);
+                  estados[n] = local;
+                }
+                return;
+              }
+              if (chegou.eco) {
+                if (local && (!(local.nuvem && local.nuvem.servidorEm) || carimboNumero(local.nuvem.servidorEm) < carimboNumero(chegou.servidorEm))) {
+                  local.nuvem = Object.assign({}, carimbo, { apagado: !!chegou.apagadoEm });
+                  if (chegou.hash && !local.hash) local.hash = chegou.hash;
+                  estados[n] = local;
+                  if (pendente && !pendente.quarentena && pendente.atualizadoEm === chegou.atualizadoEm) { saida.delete(chegou.id); delete fila[chegou.id]; }
+                }
+                return;
+              }
+              if (local && local.nuvem && local.nuvem.servidorEm && chegou.servidorEm && carimboNumero(chegou.servidorEm) <= carimboNumero(local.nuvem.servidorEm)) {
+                contas.ignorados++;
+                return;
+              }
+              if (local && pendente && !pendente.quarentena && !soLeitura) {
+                // a edição local ainda não enviada vence: só o carimbo é anotado, e o que chegou fica guardado
+                local.nuvem = Object.assign({}, carimbo, { apagado: !!chegou.apagadoEm });
+                estados[n] = local;
+                if (chegou.hash && chegou.hash !== local.hash) {
+                  controle.put({ id: chegou.id, pagina: chegou.apagadoEm ? null : chegou.pagina, hash: chegou.hash, quando: agora, de: chegou.aparelho || '', motivo: 'perdeu para a edição daqui' },
+                    PREFIXO_FOLHA_ANTERIOR + chegou.id + ':' + (chegou.servidorEm || agora));
+                }
+                contas.ignorados++;
+                return;
+              }
+              // a versão local que perde (viva, diferente, num aparelho que escreve) fica guardada
+              if (!soLeitura && local && !local.apagadoEm && paginas[n] && local.hash !== chegou.hash) {
+                controle.put({ id: chegou.id, pagina: paginas[n], hash: local.hash || null, quando: agora, de: aparelhoId || '', motivo: 'perdeu para o outro aparelho' },
+                  PREFIXO_FOLHA_ANTERIOR + chegou.id + ':' + (local.nuvem && local.nuvem.servidorEm ? local.nuvem.servidorEm : agora));
+                contas.perdedoresLocais++;
+              }
+              if (chegou.apagadoEm) {
+                if (n < paginas.length) paginas[n] = null;
+                estados[n] = { hash: local && local.hash || chegou.hash || null, atualizadoEm: chegou.atualizadoEm || agora, apagadoEm: chegou.apagadoEm, nuvem: Object.assign({}, carimbo, { apagado: true }) };
+              } else {
+                while (paginas.length < n) paginas.push({ fundo: 'pautado', itens: [] });
+                paginas[n] = chegou.pagina;
+                estados[n] = { hash: chegou.hash, atualizadoEm: chegou.atualizadoEm || agora, apagadoEm: null, nuvem: Object.assign({}, carimbo, { apagado: false }) };
+              }
+              for (var k = estados.length; k < n; k++) if (!estados[k]) estados[k] = { hash: null, atualizadoEm: agora, apagadoEm: null, nuvem: null };
+              mudouAula = true;
+              contas.aplicados++;
+            });
+            if (!mudouAula) { controle.put({ paginas: estados }, PREFIXO_FOLHA + aulaId); return; }
+            // páginas apagadas no fim saem; uma no meio vira página em branco até a dela chegar
+            while (paginas.length && paginas[paginas.length - 1] === null) paginas.pop();
+            paginas = paginas.map(function (p) { return p === null ? { fundo: 'pautado', itens: [] } : p; });
+            if (paginas.length) notas.put(Object.assign({}, nota || {}, { paginas: paginas }), aulaId);
+            else notas.delete(aulaId);
+            controle.put({ paginas: estados }, PREFIXO_FOLHA + aulaId);
+            contas.mudou = true;
+            contas.aulas.push(aulaId);
+          });
+          if (cursorMaior && (!cursorAntes || cursorMaior.servidorEm !== cursorAntes.servidorEm || cursorMaior.nome !== (cursorAntes.nome || ''))) {
+            controle.put({ servidorEm: cursorMaior.servidorEm, nome: cursorMaior.nome, quando: agora }, 'cursorFolhas');
+          }
+          contas.cursor = cursorMaior ? cursorMaior.servidorEm : null;
+        }
+        if (!pendentesDeLeitura) {
+          // só o cursor a avançar: os pedidos respondem na ordem, este vem depois da marca e do cursor
+          controle.get('cursorFolhas').onsuccess = function () { terminar(); };
+        }
+        ordemAulas.forEach(function (aulaId) {
+          lidos[aulaId] = {};
+          notas.get(aulaId).onsuccess = function (e) { lidos[aulaId].nota = e.target.result || null; };
+          var estadoReq = controle.get(PREFIXO_FOLHA + aulaId);
+          estadoReq.onsuccess = function () {
+            lidos[aulaId].estado = estadoReq.result || null;
+            if (--pendentesDeLeitura === 0) terminar();
+          };
+        });
+        t.oncomplete = function () {
+          if (contas.mudou) avisarMudanca('notas');
+          ouvintesDeRecebimento.forEach(function (fn) { try { fn(Object.assign({ folhas: true }, contas)); } catch (e) { /* o ouvinte se vira */ } });
+          resolve(contas);
+        };
+        t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
+  /* As versões anteriores de página guardadas neste aparelho, mais novas que
+   * 30 dias (as velhas saem aqui mesmo, na leitura). */
+  function versoesAnterioresDeFolha() {
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, 'controle', 'readonly');
+        var saida = [];
+        varrerControle(t, PREFIXO_FOLHA_ANTERIOR, function (chave, valor) { saida.push(Object.assign({ chave: chave }, valor)); });
+        t.oncomplete = function () { resolve(saida); };
+        t.onerror = function () { reject(t.error); };
+      });
+    });
+  }
 
   function todasAsNotas() {
     return abrir().then(function (b) {
@@ -1725,19 +2129,7 @@
 
   function arredondarTracosDaCopia(nota) {
     var copia = JSON.parse(JSON.stringify(nota));
-    (copia.paginas || []).forEach(function (p) {
-      (p.itens || []).forEach(function (it) {
-        if (it.t !== 'traco' || !Array.isArray(it.pontos)) return;
-        it.pontos.forEach(function (ponto) {
-          if (!Array.isArray(ponto)) return;
-          for (var i = 0; i < ponto.length; i++) {
-            if (typeof ponto[i] === 'number' && isFinite(ponto[i])) {
-              ponto[i] = Math.round(ponto[i] * 10) / 10;
-            }
-          }
-        });
-      });
-    });
+    copia.paginas = (copia.paginas || []).map(arredondarPagina);
     return copia;
   }
 
@@ -1913,6 +2305,12 @@
           }
           escreverDiferenca(t, completar(pacote.dados), { carimbo: carimbo, semFila: daNuvem && soLeitura, restauro: daNuvem }, function (c) { contas = c; });
           trocar('notas', pacote.notas, true);
+          /* As folhas (N2): o estado por página é refeito do zero e, no aparelho
+           * que escreve, toda página da cópia entra na fila (com `restauro` quando
+           * a cópia veio da nuvem: a restauração vence). O celular só leitura não
+           * enfileira. O cursor das folhas zera com o dos registros. */
+          limparEstadoDasFolhas(t);
+          if (!(daNuvem && soLeitura)) enfileirarNotas(t, pacote.notas, carimbo || new Date().toISOString(), daNuvem);
           trocar('midias', pacote.midias, true);
           trocar('anexos', anexos, true);
           t.objectStore('historico').clear();
@@ -2071,6 +2469,15 @@
                 else saida.put({ id: r.id, tipo: r.tipo, atualizadoEm: r.atualizadoEm, apagadoEm: null, restauro: true });
               });
             };
+            // e as páginas das folhas deste aparelho (N2): as vivas com restauro, as lápides como lápide
+            varrerControle(t, PREFIXO_FOLHA, function (chave, estado) {
+              var aulaId = String(chave).slice(PREFIXO_FOLHA.length);
+              (estado && estado.paginas || []).forEach(function (p, n) {
+                if (!p) return;
+                if (p.apagadoEm) { if (!(p.nuvem && p.nuvem.apagado)) saida.put({ id: idDaPagina(aulaId, n), tipo: 'folha', atualizadoEm: p.atualizadoEm, apagadoEm: p.apagadoEm }); }
+                else saida.put({ id: idDaPagina(aulaId, n), tipo: 'folha', atualizadoEm: p.atualizadoEm, apagadoEm: null, restauro: true });
+              });
+            });
           }
         };
         t.oncomplete = function () { resolve(); };
@@ -2079,10 +2486,24 @@
     });
   }
 
+  /* O estado das folhas (N2) sai junto com as notas no "Apagar tudo": a fila
+   * já zerou e a sincronização já desligou na transação do documento. */
+  function apagarEstadoDasFolhas() {
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, 'controle', 'readwrite');
+        limparEstadoDasFolhas(t);
+        t.oncomplete = function () { resolve(); };
+        t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
   function apagarTudo() {
     return Promise.all([
       apagarDocumento(),
       esvaziar('notas'),
+      apagarEstadoDasFolhas(),
       esvaziar('midias'),
       esvaziar('anexos'),
       esvaziar('historico'),
@@ -2134,6 +2555,12 @@
     sincronizacaoDesligada: sincronizacaoDesligada, desligarSincronizacao: desligarSincronizacao, religarSincronizacao: religarSincronizacao,
     lerFila: function () { return todosOsValores('saida'); },
     sincronizavel: sincronizavel,
+    /* Folhas por página (N2): o que o nuvem.js e as provas leem. */
+    paginaCanonica: paginaCanonica, arredondarPagina: arredondarPagina, hashPagina: hashPagina, sha256Hex: sha256Hex,
+    partesDoIdDaPagina: partesDoIdDaPagina, estadoDaFolha: estadoDaFolha, lerCursorFolhas: lerCursorFolhas,
+    aplicarFolhasRecebidas: aplicarFolhasRecebidas, versoesAnterioresDeFolha: versoesAnterioresDeFolha,
+    ultimaGravacaoDeFolha: function () { return ultimaGravacaoDeFolha; },
+    ESPERA_FOLHA: ESPERA_FOLHA,
     montarRegistros: montar,
     aparelho: function () { return aparelhoId; },
     ultimaGravacao: function () { return ultimaGravacao; }
