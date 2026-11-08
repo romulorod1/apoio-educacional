@@ -20805,8 +20805,11 @@
     var pergunta = motivo === 'ela' ? confirmarEnvioDela(est) : Promise.resolve(true);
     return pergunta.then(function (segue) {
       if (!segue) { enviandoParaNuvem = false; desenharNuvem(); return null; }
+      // a geração lida ANTES de montar o zip: o que ela gravar daqui em diante
+      // não está no retrato e continua pendente depois do envio
+      var geracaoDoRetrato = Nuvem.geracao();
       return Store.exportarTudoZip(db).then(function (zip) {
-        return Nuvem.enviarCopia(zip, { motivo: motivo, versaoApp: VERSAO, conteudo: copiaTemConteudo() });
+        return Nuvem.enviarCopia(zip, { motivo: motivo, versaoApp: VERSAO, conteudo: copiaTemConteudo(), geracao: geracaoDoRetrato });
       });
     }).then(function (copia) {
       enviandoParaNuvem = false;

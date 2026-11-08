@@ -69,6 +69,7 @@
   var ultimaCopia = null; // { id, quando, bytes, partes, aparelho }
   var automatica = false; // ligada depois do primeiro envio manual ou restauração aqui
   var pendente = false;   // houve gravação local desde a última cópia
+  var geracao = 0;        // cresce a cada gravação dela; o envio compara com a do retrato
   var aparelho = null;    // rótulo curto deste aparelho, só para a lista de cópias
   var enviando = null;    // promessa do envio em curso, para não subir duas vezes
   var ouvintes = [];
@@ -524,6 +525,10 @@
     var conteudo = info.conteudo !== false;
     var automatica_ = info.motivo && info.motivo !== 'ela';
     var apontadas = [];
+    /* A geração do RETRATO que sobe (a tela lê antes de montar o zip e passa
+     * em info.geracao); sem ela, a de agora. Uma gravação durante o envio
+     * muda a geração, e aí a cópia que subiu já não é a do aparelho. */
+    var geracaoDoRetrato = typeof info.geracao === 'number' ? info.geracao : geracao;
     enviando = carregarEstado().then(function () {
       if (!sessao) throw erro('TOKEN_EXPIRED');
       if (automatica_ && !chaveBruta) throw Object.assign(new Error('A cópia automática não cria chave.'), { semChave: true });
@@ -583,9 +588,10 @@
         });
       }).then(function () {
         ultimaCopia = { id: id, quando: quando, bytes: meta.bytes, partes: meta.partes, aparelho: meta.aparelho };
-        pendente = false;
+        // o que ela gravou DURANTE o envio não está nesta cópia: continua pendente
+        pendente = geracao !== geracaoDoRetrato;
         automatica = true;
-        return Promise.all([gravarEstado('copia', ultimaCopia), gravarEstado('pendente', false), gravarEstado('automatica', true)]);
+        return Promise.all([gravarEstado('copia', ultimaCopia), gravarEstado('pendente', pendente), gravarEstado('automatica', true)]);
       }).then(function () { return ultimaCopia; });
     });
     var limpar = function () { enviando = null; avisarOuvintes(); };
@@ -707,6 +713,9 @@
    * aqui, mesmo noutro banco, quebraria a medida. */
   var gravarPendenteAgendado = false;
   function marcarMudanca() {
+    /* A geração cresce SEMPRE, mesmo com pendente já ligado: é ela que diz ao
+     * envio em curso que houve gravação depois do retrato que está subindo. */
+    geracao++;
     if (pendente) return;
     pendente = true;
     if (gravarPendenteAgendado) return;
@@ -776,6 +785,7 @@
     enviarCopia: enviarCopia, listarCopias: listarCopias, baixarCopia: baixarCopia, restaurou: restaurou,
     leitores: leitores, permitirLeitor: permitirLeitor, tirarLeitor: tirarLeitor,
     marcarMudanca: marcarMudanca, desligarAutomatica: desligarAutomatica,
+    geracao: function () { return geracao; },
     copiaAutomaticaDevida: copiaAutomaticaDevida, copiaDiariaDevida: copiaDiariaDevida,
     fraseDeQuando: fraseDeQuando,
     TETO_PARTE: TETO_PARTE

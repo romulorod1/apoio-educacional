@@ -47,7 +47,12 @@ const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
 const MODO = ['--envenenado-sem-cifra', '--envenenado-regra-aberta', '--envenenado-sobe-vazio', '--envenenado-esconde-codigo',
-  '--envenenado-anterior-cega'].filter(m => process.argv.indexOf(m) !== -1)[0] || '';
+  '--envenenado-anterior-cega', '--envenenado-pendente-zerado'].filter(m => process.argv.indexOf(m) !== -1)[0] || '';
+/* N0b (08/11): --envenenado-pendente-zerado volta a regra que zerava `pendente`
+ * no fim do envio sem olhar se houve gravação DURANTE o envio; a edição feita
+ * enquanto a cópia sobe ficava fora da nuvem até a próxima edição. A prova da
+ * gravação no meio do envio tem de acusar. */
+const PENDENTE_ZERADO = MODO === '--envenenado-pendente-zerado';
 /* Segunda rodada da revisão (07/11): --envenenado-anterior-cega volta a regra
  * de ed7415e, em que a rotação só olhava o conteúdo quando a NOVA era vazia;
  * com atual vazia e anterior boa, a próxima cópia com conteúdo apagava a boa.
@@ -123,6 +128,10 @@ if (ANTERIOR_CEGA) {
   trocas['/nuvem.js'] = NUVEM.replace(ANTERIOR,
     'var anterior = apontadas[0] || null;\n        if (!conteudo) anterior = apontadas.filter(function (c) { return c.conteudo; })[0] || anterior;');
 }
+const PENDENTE_POR_GERACAO = 'pendente = geracao !== geracaoDoRetrato;';
+conf('o fim do envio decide o pendente pela geração num lugar só', NUVEM.split(PENDENTE_POR_GERACAO).length, 2);
+conf('a geração cresce em toda gravação, antes de olhar o pendente', /geracao\+\+;\r?\n\s*if \(pendente\) return;/.test(NUVEM), true);
+if (PENDENTE_ZERADO) trocas['/nuvem.js'] = NUVEM.replace(PENDENTE_POR_GERACAO, 'pendente = false;');
 const regrasServidas = REGRA_ABERTA ? REGRAS.replace(LEITURA, 'allow read: if entrou();') : REGRAS;
 
 conf('o firebase-tools está onde a prova procura (' + FIREBASE + ')', fs.existsSync(FIREBASE), true);
@@ -632,6 +641,72 @@ const retrato = (pag) => pag.evaluate(async () => {
   }
   conf('lerQr recusa uid com barra ou interrogação e aceita o formato do Firebase',
     await pagC.evaluate(() => Nuvem.lerQr('APOIO1:ab/c?d:ABCD') === null && Nuvem.lerQr('APOIO1:x_Y-9:ABCD').uid === 'x_Y-9'), true);
+
+  secao('11. Gravação no meio do envio continua pendente e sobe no envio seguinte');
+  /* O commit das partes no Firestore é segurado 1,5 s pela própria página, para
+   * caber uma gravação dela no meio do envio. */
+  await pagA.evaluate(() => {
+    const original = window.fetch;
+    window.__segurarCommit = 1500;
+    window.fetch = function (url) {
+      const args = arguments;
+      if (String(url).indexOf(':commit') >= 0 && window.__segurarCommit) {
+        return new Promise(r => setTimeout(r, window.__segurarCommit)).then(() => original.apply(this, args));
+      }
+      return original.apply(this, args);
+    };
+  });
+  const geracaoAntes = await pagA.evaluate(() => Nuvem.geracao());
+  const antesDoLento = await ponteiroAgora();
+  await clicar(pagA, '#nuvem-enviar');
+  const comecou = await esperar('o envio lento começou', () => pagA.evaluate(() => Nuvem.estado().enviando), v => v === true, 10000);
+  conf('o envio de A está em curso', comecou.ok, true);
+  await pagA.evaluate(async () => {
+    const d = await Store.carregar();
+    d.alunos.push({ id: 'epsilon', nome: 'Aluna Epsilon Teste' });
+    await Store.salvar(d);
+  });
+  conf('a gravação no meio do envio subiu a geração', await pagA.evaluate(() => Nuvem.geracao()) > geracaoAntes, true);
+  const lentoSubiu = await esperar('o envio lento terminou', ponteiroAgora, v => !!v && v[0] !== antesDoLento[0], 40000);
+  conf('o envio lento terminou com uma cópia nova', lentoSubiu.ok, true);
+  await esperar('o motor fechou o envio', () => pagA.evaluate(() => Nuvem.estado().enviando), v => v === false, 10000);
+  const pendenteDepois = await pagA.evaluate(() => Nuvem.estado().pendente);
+  if (PENDENTE_ZERADO) conf('VENENO visto: o fim do envio zerou o pendente apesar da gravação no meio', pendenteDepois, false);
+  else conf('depois do envio, a gravação feita no meio continua pendente', pendenteDepois, true);
+  conf('o sinal gravado no apoio-nuvem acompanha a memória', await pagA.evaluate(() => new Promise(r => {
+    const q = indexedDB.open('apoio-nuvem');
+    q.onsuccess = () => { const g = q.result.transaction('estado').objectStore('estado').get('pendente'); g.onsuccess = () => { q.result.close(); r(!!g.result); }; g.onerror = () => r('erro'); };
+    q.onerror = () => r('erro');
+  })), pendenteDepois);
+  const comEpsilon = async (id) => {
+    const zipB = await pagA.evaluate(async (id) => {
+      const blob = await Nuvem.baixarCopia(null, id);
+      const aberto = await Zip.lerDoArquivo(blob);
+      const e = aberto.entradas.find(x => x.nome === 'dados.json');
+      const dados = JSON.parse(new TextDecoder().decode(await Zip.extrairDoArquivo(aberto, e)));
+      return dados.alunos.some(a => a.id === 'epsilon');
+    }, id);
+    return zipB;
+  };
+  conf('a cópia que acabou de subir NÃO tem a aluna gravada no meio (é o retrato de antes)', await comEpsilon(lentoSubiu.valor[0]), false);
+  await pagA.evaluate(() => { window.__segurarCommit = 0; });
+  conf('com a gravação pendente, o fechar é devido', await pagA.evaluate(() => Nuvem.copiaAutomaticaDevida()), !PENDENTE_ZERADO);
+  if (!PENDENTE_ZERADO) {
+    /* A gravação de cima foi direto no Store, por fora da tela; o aplicativo
+     * reaberto lê o banco com ela, como quando ela fecha e abre de novo. O
+     * pendente e a conta sobrevivem à reabertura, gravados no apoio-nuvem. */
+    await H.abrirApp(pagA, amb.ORIGEM);
+    await esperar('a nuvem recarregou o estado', () => pagA.evaluate(() => Nuvem.pronto().then(() => Nuvem.estado().entrada && Nuvem.estado().pendente)), v => !!v, 10000);
+    conf('reaberto, o aplicativo continua entrado e com a gravação pendente', await pagA.evaluate(() => !!Nuvem.estado().entrada && Nuvem.estado().pendente), true);
+    await pagA.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    const seguinte = await esperar('o envio seguinte subiu', ponteiroAgora, v => !!v && v[0] !== lentoSubiu.valor[0], 30000);
+    await pagA.evaluate(() => { delete document.visibilityState; });
+    conf('o envio seguinte leva a edição feita no meio do anterior', seguinte.ok && await comEpsilon(seguinte.valor[0]), true);
+    conf('e aí nada mais está pendente', await esperar('pendente limpou', () => pagA.evaluate(() => Nuvem.estado().pendente), v => v === false, 10000).then(r => r.ok), true);
+  }
 
   secao('8. Sem erro de página e nenhum pedido ao signUp');
   conf('nenhum erro de script em A', JSON.stringify(pagA.errosDePagina), '[]');
