@@ -20698,8 +20698,11 @@
       // apagou tudo: o diário das guardadas pelo aplicativo também sai (C2a)
       gravarSelecoesAnteriores([]);
       memoriaSubstituida(); // apagou tudo: da pendência não há o que dizer além disso
+      /* N0: o banco vazio nunca pode subir sozinho por cima da cópia boa na
+       * nuvem. A automática desliga aqui e religa no próximo envio dela. */
+      if (temNuvem()) Nuvem.desligarAutomatica();
       desenharTudo();
-      avisar('Todos os dados foram apagados.');
+      avisar('Todos os dados foram apagados.' + (temNuvem() && Nuvem.estado().entrada ? ' A cópia automática na nuvem ficou desligada até o seu próximo envio.' : ''));
     }).catch(function (e) {
       releDoDisco(e, 'Não consegui apagar tudo.');
     });
@@ -20746,6 +20749,44 @@
     enviarCopiaParaNuvem(motivo);
   }
 
+  /* Cópia com conteúdo: algum aluno que não veio da carga inicial, ou mais
+   * aulas, séries ou resumos do que a carga inicial traz. Banco vazio e carga
+   * inicial intocada não contam: são o que um aparelho novo tem antes de
+   * restaurar, e nunca podem cobrir a cópia boa na nuvem. */
+  function copiaTemConteudo() {
+    if (!db || (!db.alunos.length && !db.aulas.length)) return false;
+    if (db.alunos.some(function (a) { return !a.daCargaInicial; })) return true;
+    var padrao = cargaInicial();
+    return db.aulas.length !== padrao.aulas.length || (db.series || []).length !== padrao.series.length ||
+      (db.resumos || []).length !== padrao.resumos.length;
+  }
+
+  /* Antes do envio dela, duas perguntas que evitam perder a cópia boa: num
+   * aparelho ainda sem chave, se a nuvem já tem cópia, o caminho certo é
+   * restaurar primeiro (enviar criaria uma chave nova aqui e poria a cópia
+   * deste aparelho como a mais recente); e um banco sem conteúdo por cima de
+   * uma cópia com conteúdo só sobe se ela confirmar. */
+  function confirmarEnvioDela(est) {
+    var conteudo = copiaTemConteudo();
+    if (est.temChave && conteudo) return Promise.resolve(true);
+    return Nuvem.listarCopias().then(function (lista) {
+      if (!lista.length) return true;
+      var quando = Nuvem.fraseDeQuando(lista[0].quando);
+      if (!est.temChave) {
+        return confirmar('Já existe uma cópia na nuvem desta conta, de ' + quando + '. Se este aparelho é novo, ' +
+          'toque em "Restaurar neste aparelho" primeiro. Enviar agora cria uma chave nova neste aparelho e põe a ' +
+          'cópia dele como a mais recente. Enviar mesmo assim?');
+      }
+      if (!lista.some(function (c) { return c.conteudo; })) return true;
+      return confirmar('A cópia deste aparelho está vazia, ou só com a carga inicial, e a nuvem tem uma cópia com ' +
+        'conteúdo, de ' + quando + '. Enviar mesmo assim? A cópia com conteúdo fica guardada como anterior.');
+    }, function () {
+      // sem conseguir consultar a nuvem, não se arrisca a cópia boa
+      avisar('Não consegui consultar a nuvem antes de enviar. Tente de novo em um minuto.');
+      return false;
+    });
+  }
+
   function enviarCopiaParaNuvem(motivo) {
     if (!temNuvem() || enviandoParaNuvem) return Promise.resolve();
     var est = Nuvem.estado();
@@ -20753,12 +20794,16 @@
     var semChaveAntes = !est.temChave;
     enviandoParaNuvem = true;
     desenharNuvem();
-    return Store.exportarTudoZip(db).then(function (zip) {
-      return Nuvem.enviarCopia(zip, { motivo: motivo, versaoApp: VERSAO });
+    var pergunta = motivo === 'ela' ? confirmarEnvioDela(est) : Promise.resolve(true);
+    return pergunta.then(function (segue) {
+      if (!segue) { enviandoParaNuvem = false; desenharNuvem(); return null; }
+      return Store.exportarTudoZip(db).then(function (zip) {
+        return Nuvem.enviarCopia(zip, { motivo: motivo, versaoApp: VERSAO, conteudo: copiaTemConteudo() });
+      });
     }).then(function (copia) {
       enviandoParaNuvem = false;
       desenharNuvem();
-      if (motivo !== 'ela') return;
+      if (!copia || copia.pulada || motivo !== 'ela') return;
       if (semChaveAntes) {
         avisar('Cópia enviada, ' + Math.round(copia.bytes / 1024) + ' KB. Agora imprima a chave da cópia.',
           'Ver a chave', abrirChaveDaNuvem);
@@ -20960,7 +21005,11 @@
     copiasDaNuvem = [];
     copiaEscolhida = null;
     donaDaCopiaLida = null;
-    $('#nuvem-chave-entrada').hidden = est.temChave;
+    /* O campo do código fica SEMPRE à vista, mesmo com chave neste aparelho:
+     * a cópia pode ser de outra chave (um envio feito antes de restaurar), e
+     * sem o campo não haveria saída. Em branco, vale a chave do aparelho. */
+    $('#nuvem-chave-entrada').hidden = false;
+    $('#nuvem-codigo-digitado').placeholder = est.temChave ? 'Em branco: a chave deste aparelho' : 'XXXX XXXX XXXX ...';
     $('#nuvem-codigo-digitado').value = '';
     mostrarMensagemDaNuvem($('#nuvem-restaurar-mensagem'), '', '');
     $('#nuvem-restaurar-confirmar').disabled = false;
@@ -21000,8 +21049,8 @@
     var mensagem = $('#nuvem-restaurar-mensagem');
     if (!copiaEscolhida) { mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', 'Não há cópia escolhida.'); return; }
     var est = Nuvem.estado();
-    var codigo = est.temChave ? null : $('#nuvem-codigo-digitado').value;
-    if (!est.temChave && !String(codigo || '').trim()) {
+    var codigo = String($('#nuvem-codigo-digitado').value || '').trim() || null;
+    if (!est.temChave && !codigo) {
       mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', 'Digite o código da chave, do papel impresso, ou leia o QR.');
       return;
     }

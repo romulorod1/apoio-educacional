@@ -46,10 +46,21 @@ const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
-const MODO = ['--envenenado-sem-cifra', '--envenenado-regra-aberta']
+const MODO = ['--envenenado-sem-cifra', '--envenenado-regra-aberta', '--envenenado-sobe-vazio', '--envenenado-esconde-codigo']
   .filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const SEM_CIFRA = MODO === '--envenenado-sem-cifra';
 const REGRA_ABERTA = MODO === '--envenenado-regra-aberta';
+/* Os dois médios da revisão adversarial (07/11):
+ *   --envenenado-sobe-vazio      o nuvem.js servido deixa a automática subir
+ *                                o banco vazio por cima da cópia boa e o
+ *                                "Apagar tudo" não desliga a automática; a
+ *                                prova do apagar tudo tem de acusar.
+ *   --envenenado-esconde-codigo  o app.js servido esconde o campo do código
+ *                                quando o aparelho já tem chave; a prova do
+ *                                aparelho que enviou antes de restaurar tem
+ *                                de acusar. */
+const SOBE_VAZIO = MODO === '--envenenado-sobe-vazio';
+const ESCONDE_CODIGO = MODO === '--envenenado-esconde-codigo';
 
 const PORTA_APP = 8871, PORTA_AUTH = 8873, PORTA_FS = 8874, PORTA_HUB = 8875, PORTA_LOG = 8876, PORTA_WS = 8877;
 const PROJETO = 'demo-nath-n0';
@@ -79,12 +90,28 @@ conf('as regras dão leitura à dona e ao leitor num lugar só', REGRAS.split(LE
 conf('as regras não têm uid fixo', /uid\s*==\s*['"]/.test(REGRAS), false);
 conf('as regras só deixam a dona escrever', REGRAS.indexOf('allow write: if dona(uid);') > 0, true);
 
+const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
+const GUARDA_VAZIO = 'if (automatica_ && !conteudo && apontadas.some(function (c) { return c.conteudo; })) {';
+const DESLIGA = /automatica = false;\r?\n    return gravarEstado\('automatica', false\)/;
+const CAMPO_CODIGO = "$('#nuvem-chave-entrada').hidden = false;";
+conf('a automática recusa banco vazio por cima de cópia com conteúdo num lugar só', NUVEM.split(GUARDA_VAZIO).length, 2);
+conf('o "Apagar tudo" tem o que desligar (desligarAutomatica grava false)', DESLIGA.test(NUVEM), true);
+conf('o campo do código fica sempre à vista num lugar só', APP.split(CAMPO_CODIGO).length, 2);
+conf('o aplicativo não cria conta: nenhum signUp nem "Criar conta" no código',
+  /signUp|Criar conta/i.test(NUVEM + APP + fs.readFileSync(path.join(H.RAIZ, 'index.html'), 'utf8')), false);
+
 const trocas = {};
 if (SEM_CIFRA) {
   trocas['/nuvem.js'] = NUVEM
     .replace(CIFRA, 'return Promise.resolve(bytes);')
     .replace(DECIFRA, 'return Promise.resolve(dados);');
 }
+if (SOBE_VAZIO) {
+  trocas['/nuvem.js'] = NUVEM
+    .replace(GUARDA_VAZIO, 'if (false) {')
+    .replace(DESLIGA, "return gravarEstado('automatica', automatica)");
+}
+if (ESCONDE_CODIGO) trocas['/app.js'] = APP.replace(CAMPO_CODIGO, "$('#nuvem-chave-entrada').hidden = est.temChave;");
 const regrasServidas = REGRA_ABERTA ? REGRAS.replace(LEITURA, 'allow read: if entrou();') : REGRAS;
 
 conf('o firebase-tools está onde a prova procura (' + FIREBASE + ')', fs.existsSync(FIREBASE), true);
@@ -201,7 +228,16 @@ async function prepararPagina(pag) {
   pag.setDefaultTimeout(60000);
   pag.errosDePagina = [];
   pag.on('pageerror', e => pag.errosDePagina.push(e.message));
-  pag.on('dialog', async d => { try { await d.accept(); } catch (e) { /* ok */ } });
+  // as perguntas (confirm) ficam registradas; proximoDialogo = false responde "não"
+  pag.dialogos = [];
+  pag.proximoDialogo = true;
+  pag.on('dialog', async d => {
+    pag.dialogos.push(d.message());
+    try { if (pag.proximoDialogo === false) await d.dismiss(); else await d.accept(); } catch (e) { /* ok */ }
+  });
+  // todo pedido que sai da página, para provar que nenhum vai ao signUp
+  pag.pedidos = [];
+  pag.on('request', r => pag.pedidos.push(r.url()));
   await pag.evaluateOnNewDocument(cfg => { window.NUVEM_EMULADOR = cfg; }, CFG);
   await pag.evaluateOnNewDocument(() => {
     const original = window.fetch;
@@ -396,9 +432,8 @@ const retrato = (pag) => pag.evaluate(async () => {
   conf('B guardou a chave e a automática ligou depois de restaurar',
     await pagB.evaluate(() => Nuvem.estado().temChave) && /Sobe sozinha/.test(await texto(pagB, '#nuvem-automatica')), true);
   conf('em B, "Última cópia na nuvem" passa a ser a restaurada', /^Última cópia na nuvem: hoje, \d\d:\d\d\.$/.test(await texto(pagB, '#nuvem-ultima')), true);
-  const codigoB = (await pagB.evaluate(() => Nuvem.verChave())).codigo;
-  if (SEM_CIFRA) conf('VENENO visto: sem cifra, a chave errada "abriu" a cópia e ficou em B', codigoB !== chaveA.codigo, true);
-  else conf('a chave de B é a mesma de A', codigoB, chaveA.codigo);
+  // (sem cifra, a chave errada "abriu" antes, acusado acima; o código certo depois a substitui)
+  conf('a chave de B é a mesma de A', (await pagB.evaluate(() => Nuvem.verChave())).codigo, chaveA.codigo);
 
   secao('6. (b) A cópia automática ao fechar, a anterior e a que sai');
   await pagB.evaluate(async () => {
@@ -426,6 +461,7 @@ const retrato = (pag) => pag.evaluate(async () => {
     return p && p.fields ? [p.fields.atual.stringValue, p.fields.anterior.stringValue] : null;
   }, v => !!v && v[0] !== idSegunda && v[1] === idSegunda, 30000);
   conf('a terceira cópia vira atual e a segunda, anterior', terceira.ok, true);
+  const idTerceira = terceira.valor ? terceira.valor[0] : null;
   const sumiu = await esperar('a primeira cópia saiu da nuvem', () => lerDoc(dona.idToken, dona.localId, 'copias/' + idAtual).then(r => r.status), v => v === 404, 15000);
   conf('a mais velha (a primeira) saiu, com as partes', sumiu.ok &&
     (await lerDoc(dona.idToken, dona.localId, 'copias/' + idAtual + '/partes/0')).status === 404, true);
@@ -458,8 +494,117 @@ const retrato = (pag) => pag.evaluate(async () => {
   conf('o Firebase registrou o pedido de redefinição para o e-mail dela',
     !!(oob && (oob.oobCodes || []).some(c => c.email === DONA.email && c.requestType === 'PASSWORD_RESET')), true);
 
-  secao('8. Sem erro de página');
+  const ponteiroAgora = async () => {
+    const p = (await lerDoc(dona.idToken, dona.localId, 'estado/copia')).json;
+    return p && p.fields ? [p.fields.atual.stringValue, p.fields.anterior.stringValue] : null;
+  };
+  /* O banco vazio que sobe por cima da boa: no modo sobe-vazio a prova tem de
+   * ver o ponteiro mudar. */
+  function confVazioNaoSubiu(rotulo, mudou) {
+    if (SOBE_VAZIO) conf('VENENO visto: ' + rotulo + ', e o vazio subiu por cima da boa', mudou, true);
+    else conf(rotulo, mudou, false);
+  }
+
+  secao('9. "Apagar tudo" não manda o banco vazio por cima da cópia boa');
+  conf('B entrou de novo, com a senha nova', await entrarPelaTela(pagB, DONA.email, SENHA_NOVA), true);
+  conf('B está com a automática ligada antes de apagar', await pagB.evaluate(() => Nuvem.estado().automatica), true);
+  await clicar(pagB, '#apagar-tudo');
+  const apagou = await esperar('B apagou tudo', () => pagB.evaluate(async () => { const d = await Store.carregar(); return d ? d.alunos.length : -1; }), v => v === 0, 15000);
+  conf('"Apagar todos os dados" esvaziou B', apagou.ok, true);
+  if (!SOBE_VAZIO) conf('"Apagar tudo" desligou a cópia automática em B', await esperar('automática desligada', () => pagB.evaluate(() => Nuvem.estado().automatica), v => v === false, 5000).then(r => r.ok), true);
+  conf('a tela de B diz que a automática espera o próximo envio dela', /começa depois do primeiro envio/.test(await texto(pagB, '#nuvem-automatica')), !SOBE_VAZIO);
+  await pagB.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  const vazioAoFechar = await esperar('o fechar de B depois do apagar tudo', ponteiroAgora, v => !!v && v[0] !== idTerceira, 8000);
+  confVazioNaoSubiu('o fechar depois do "Apagar tudo" não troca a cópia boa', vazioAoFechar.ok);
+  await pagB.evaluate(() => { delete document.visibilityState; });
+  const pulada = await pagB.evaluate(async () => {
+    const zip = await Store.exportarTudoZip(await Store.carregar());
+    const r = await Nuvem.enviarCopia(zip, { motivo: 'fechar', conteudo: false });
+    return !!(r && r.pulada);
+  });
+  const depoisDoMotor = await ponteiroAgora();
+  confVazioNaoSubiu('nem chamado direto o motor sobe banco vazio automático por cima da boa', !pulada || (depoisDoMotor && depoisDoMotor[0] !== (vazioAoFechar.valor ? vazioAoFechar.valor[0] : idTerceira)));
+  conf('o motor devolve "pulada" em vez de fingir que subiu', pulada, !SOBE_VAZIO);
+  const antesDoEnvioVazio = await ponteiroAgora();
+  await clicar(pagB, '#nuvem-enviar');
+  const perguntouVazio = await esperar('a pergunta do banco vazio', () => pagB.dialogos.slice(-1)[0], v => /está vazia, ou só com a carga inicial/.test(v || ''), 15000);
+  conf('o envio DELA de um banco vazio pergunta antes, citando a cópia com conteúdo', perguntouVazio.ok, true);
+  const envioVazio = await esperar('o envio vazio dela subiu', ponteiroAgora, v => !!v && v[0] !== antesDoEnvioVazio[0], 30000);
+  conf('aceito, o vazio vira atual e a ANTERIOR é a cópia com conteúdo, não a vazia de antes',
+    envioVazio.ok && envioVazio.valor[1] === idTerceira, true);
+  conf('a cópia com conteúdo continua na nuvem', (await lerDoc(dona.idToken, dona.localId, 'copias/' + idTerceira)).status, 200);
+  const idVazia1 = envioVazio.valor ? envioVazio.valor[0] : null;
+  await clicar(pagB, '#nuvem-enviar');
+  const envioVazio2 = await esperar('o segundo envio vazio dela subiu', ponteiroAgora, v => !!v && v[0] !== idVazia1, 30000);
+  conf('o segundo vazio vira atual, a com conteúdo segue como anterior e a vazia de antes sai',
+    envioVazio2.ok && envioVazio2.valor[1] === idTerceira &&
+    (await lerDoc(dona.idToken, dona.localId, 'copias/' + idVazia1)).status === 404, true);
+  conf('a nuvem nunca apaga a última cópia com conteúdo só pela contagem', (await lerDoc(dona.idToken, dona.localId, 'copias/' + idTerceira)).status, 200);
+
+  secao('10. Aparelho novo que envia antes de restaurar não fica sem saída');
+  const contextoC = await pagA.browser().createBrowserContext();
+  const pagC = await contextoC.newPage();
+  await prepararPagina(pagC);
+  await H.abrirApp(pagC, amb.ORIGEM);
+  await H.irParaAba(pagC, 'ajustes');
+  await digitar(pagC, '#nuvem-email', 'ninguem@exemplo.test');
+  await digitar(pagC, '#nuvem-senha', 'tanto-faz-123');
+  await clicar(pagC, '#nuvem-entrar');
+  const inexistente = await esperar('conta inexistente recusada', () => texto(pagC, '#nuvem-mensagem'), v => /Esta conta não existe; peça ao Rômulo para criá-la/.test(v || ''), 10000);
+  conf('conta que não existe: "Esta conta não existe; peça ao Rômulo para criá-la"', inexistente.ok, true);
+  conf('C entrou com a conta criada no console (pela tela)', await entrarPelaTela(pagC, DONA.email, SENHA_NOVA), true);
+  const antesDeC = await ponteiroAgora();
+  pagC.proximoDialogo = false;
+  await clicar(pagC, '#nuvem-enviar');
+  const avisouC = await esperar('C foi avisado de que já há cópia', () => pagC.dialogos.slice(-1)[0], v => /Já existe uma cópia na nuvem desta conta/.test(v || ''), 15000);
+  conf('primeiro envio de um aparelho sem chave, com cópia na nuvem: pergunta e manda restaurar primeiro', avisouC.ok, true);
+  conf('a pergunta cita "Restaurar neste aparelho"', /Restaurar neste aparelho/.test(pagC.dialogos.slice(-1)[0] || ''), true);
+  await pausa(1500);
+  conf('com o "não", nada subiu e C continua sem chave',
+    JSON.stringify(await ponteiroAgora()) === JSON.stringify(antesDeC) && !(await pagC.evaluate(() => Nuvem.estado().temChave)), true);
+  pagC.proximoDialogo = true;
+  await clicar(pagC, '#nuvem-enviar');
+  const subiuC = await esperar('com o "sim", C subiu com chave nova', ponteiroAgora, v => !!v && v[0] !== antesDeC[0], 30000);
+  conf('aceito, a cópia de C (carga inicial, chave nova) vira atual e a com conteúdo fica como anterior',
+    subiuC.ok && subiuC.valor[1] === idTerceira, true);
+  conf('C tem agora uma chave diferente da de A', (await pagC.evaluate(() => Nuvem.verChave())).codigo !== chaveA.codigo, true);
+  await clicar(pagC, '#nuvem-restaurar');
+  await esperar('a janela de C lista as duas cópias', () => pagC.evaluate(() => document.querySelectorAll('#modal-nuvem-restaurar.aberto #nuvem-copias input[type=radio]').length), v => v === 2, 15000);
+  const campoVisivel = await pagC.evaluate(() => !document.querySelector('#nuvem-chave-entrada').hidden);
+  if (ESCONDE_CODIGO) conf('VENENO visto: com chave no aparelho, o campo do código sumiu', campoVisivel, false);
+  else conf('com chave no aparelho, o campo do código continua à vista', campoVisivel, true);
+  await pagC.evaluate(id => { document.querySelector('#nuvem-copias input[value="' + id + '"]').click(); }, idTerceira);
+  await clicar(pagC, '#nuvem-restaurar-confirmar');
+  if (SEM_CIFRA) {
+    const abriuSemChave = await esperar('sem cifra, a chave de C "abre" a cópia de A', () => pagC.evaluate(async () =>
+      !document.querySelector('#modal-nuvem-restaurar.aberto') && (await Store.carregar()).alunos.some(a => a.id === 'alfa')), v => v === true, 30000);
+    conf('VENENO visto: sem cifra, a cópia de A abriu com a chave de C', abriuSemChave.ok, true);
+  } else {
+    const danificada = await esperar('a chave de C não abre a cópia de A', () => texto(pagC, '#nuvem-restaurar-mensagem'), v => /danificada ou foi feita com outra chave/.test(v || ''), 20000);
+    conf('sem código digitado, a frase é de cópia danificada ou de outra chave, e manda digitar o código', danificada.ok, true);
+  }
+  if (!ESCONDE_CODIGO && !SEM_CIFRA) {
+    await digitar(pagC, '#nuvem-codigo-digitado', chaveA.formatado);
+    await clicar(pagC, '#nuvem-restaurar-confirmar');
+    const saiu = await esperar('C restaurou a anterior com o código de A', () => pagC.evaluate(async () =>
+      !document.querySelector('#modal-nuvem-restaurar.aberto') && (await Store.carregar()).alunos.some(a => a.id === 'alfa')), v => v === true, 30000);
+    conf('digitando o código de A, C restaura a cópia com conteúdo', saiu.ok, true);
+    conf('os dados de C batem com os de A', await retrato(pagC), retratoA);
+    conf('C passou a usar a chave de A', (await pagC.evaluate(() => Nuvem.verChave())).codigo, chaveA.codigo);
+  }
+  conf('lerQr recusa uid com barra ou interrogação e aceita o formato do Firebase',
+    await pagC.evaluate(() => Nuvem.lerQr('APOIO1:ab/c?d:ABCD') === null && Nuvem.lerQr('APOIO1:x_Y-9:ABCD').uid === 'x_Y-9'), true);
+
+  secao('8. Sem erro de página e nenhum pedido ao signUp');
   conf('nenhum erro de script em A', JSON.stringify(pagA.errosDePagina), '[]');
   conf('nenhum erro de script em B', JSON.stringify(pagB.errosDePagina), '[]');
+  conf('nenhum erro de script em C', JSON.stringify(pagC.errosDePagina), '[]');
+  const pedidos = pagA.pedidos.concat(pagB.pedidos, pagC.pedidos);
+  conf('as páginas falaram com o Firebase (o instrumento vê os pedidos)', pedidos.some(u => u.indexOf('signInWithPassword') >= 0), true);
+  conf('nenhum pedido ao accounts:signUp saiu do aplicativo', pedidos.some(u => /signUp/i.test(u)), false);
+  await contextoC.close();
   await contextoB.close();
 })().then(() => derrubarEmulador().then(H.fim(amb)), e => derrubarEmulador().then(() => H.fim(amb)(e)));

@@ -205,8 +205,14 @@ Fala-se com o Firebase pela API REST, sem o SDK, porque a fase 0 só sobe e baix
 configuração web do projeto fica no código porque não é segredo; quem protege são as regras
 (`firestore.rules`, só a conta dela lê e escreve o caminho dela) e a chave. A cópia automática só
 começa depois do primeiro envio feito por ela em cada aparelho, para um aparelho recém-instalado não
-subir a carga inicial por cima da cópia do tablet. A chave mora num banco do IndexedDB à parte
-(`apoio-nuvem`), fora da cópia e fora do "Apagar todos os dados". Material que identifique um aluno
+subir a carga inicial por cima da cópia do tablet; "Apagar todos os dados" desliga a automática, a
+automática nunca sobe banco vazio ou carga inicial por cima de uma cópia com conteúdo, e a nuvem nunca
+apaga a última cópia com conteúdo só pela contagem (guarda a atual e a anterior; a rotação pula a
+vazia). No primeiro envio de um aparelho sem chave, se a nuvem já tem cópia, o aplicativo pergunta e
+manda restaurar primeiro; e a janela de restaurar sempre aceita digitar outro código, mesmo com chave
+no aparelho. Não existe "Criar conta": as contas nascem no console do Firebase, pela mão do dono, e o
+aplicativo só entra. A chave mora num banco do IndexedDB à parte (`apoio-nuvem`), fora da cópia e
+fora do "Apagar todos os dados". Material que identifique um aluno
 nunca entra neste repositório, que é público; conteúdo de terceiros (OBMEP, livros) também não: fica
 em pacote no Drive, importado pelo aplicativo.
 

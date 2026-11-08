@@ -721,6 +721,11 @@ roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-sem-cifra"          node "_teste/testa_nuvem.js" --envenenado-sem-cifra
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
+# os dois medios da revisao adversarial (07/11): o banco vazio que subiria por
+# cima da copia boa depois do "Apagar tudo", e o campo do codigo que sumia
+# quando o aparelho ja tinha chave (sem saida para restaurar a copia de outra)
+roda "nuvem fase 0 --envenenado-sobe-vazio"         node "_teste/testa_nuvem.js" --envenenado-sobe-vazio
+roda "nuvem fase 0 --envenenado-esconde-codigo"     node "_teste/testa_nuvem.js" --envenenado-esconde-codigo
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"

@@ -158,9 +158,13 @@
 
   /* As mensagens do Firebase são códigos em inglês; aqui viram frase dela. */
   var FRASES = {
-    INVALID_LOGIN_CREDENTIALS: 'E-mail ou senha não conferem.',
+    /* O aplicativo só ENTRA: as contas nascem no console do Firebase, pela
+     * mão do dono, e aqui não há caminho que crie conta. Em produção o
+     * Firebase costuma responder INVALID_LOGIN_CREDENTIALS sem dizer se o
+     * e-mail existe. */
+    INVALID_LOGIN_CREDENTIALS: 'E-mail ou senha não conferem. Se a conta ainda não existe, peça ao Rômulo para criá-la.',
     INVALID_PASSWORD: 'E-mail ou senha não conferem.',
-    EMAIL_NOT_FOUND: 'E-mail ou senha não conferem.',
+    EMAIL_NOT_FOUND: 'Esta conta não existe; peça ao Rômulo para criá-la.',
     INVALID_EMAIL: 'Este e-mail não está escrito certo.',
     MISSING_PASSWORD: 'Falta a senha.',
     MISSING_EMAIL: 'Falta o e-mail.',
@@ -374,10 +378,13 @@
         qr: 'APOIO1:' + ((sessao && sessao.uid) || '') + ':' + codigo };
     });
   }
+  /* O uid do Firebase é só letras, números, traço e sublinhado; outra coisa
+   * no lugar dele (barra, interrogação) viraria pedaço de caminho ou de
+   * consulta, e o QR é recusado. */
   function lerQr(texto) {
-    var m = /^APOIO1:([^:]*):([0-9A-Z]+)$/.exec(String(texto || '').trim());
+    var m = /^APOIO1:([A-Za-z0-9_-]{0,128}):([0-9A-Za-z]+)$/.exec(String(texto || '').trim());
     if (!m) return null;
-    return { uid: m[1], codigo: m[2] };
+    return { uid: m[1], codigo: m[2].toUpperCase() };
   }
   function importarChave(texto) {
     var lido = lerQr(texto);
@@ -399,11 +406,17 @@
       return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv, additionalData: new TextEncoder().encode(ROTULO_CIFRA) }, k, bytes);
     }).then(function (saida) { return { iv: iv, dados: new Uint8Array(saida) }; });
   }
+  /* O GCM não separa chave errada de parte adulterada: a frase depende de
+   * quem mandou a chave. Com código digitado, o provável é o código; com a
+   * chave do aparelho, a cópia está danificada ou é de outra chave. */
   function decifrar(iv, dados, bytesDaChave) {
     return chaveCripto(bytesDaChave || chaveBruta, ['decrypt']).then(function (k) {
       return crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv, additionalData: new TextEncoder().encode(ROTULO_CIFRA) }, k, dados);
     }).then(function (saida) { return new Uint8Array(saida); }, function () {
-      throw Object.assign(new Error('A chave não abre esta cópia. Confira o código ou leia o QR de novo.'), { chaveErrada: true });
+      throw Object.assign(new Error(bytesDaChave
+        ? 'A chave não abre esta cópia. Confira o código ou leia o QR de novo.'
+        : 'Esta cópia está danificada ou foi feita com outra chave, não a deste aparelho. Se tiver o papel dela, digite o código.'),
+      { chaveErrada: true });
     });
   }
 
@@ -485,18 +498,46 @@
     return 'c' + Date.now().toString(36) + paraBase32(r).slice(0, 6).toLowerCase();
   }
 
-  /* blob: o .zip da cópia. info.motivo: 'ela', 'fechar' ou 'diaria'. */
+  /* As duas cópias apontadas e o cabeçalho de cada uma. Cabeçalho antigo sem o
+   * campo `conteudo` conta como cópia com conteúdo: o lado seguro. */
+  function copiasApontadas(uid) {
+    return lerDoc(nomeDoc(uid, 'estado/copia')).then(function (ponteiro) {
+      var ids = ponteiro ? [ponteiro.atual, ponteiro.anterior].filter(Boolean) : [];
+      return Promise.all(ids.map(function (id) {
+        return lerDoc(nomeDoc(uid, 'copias/' + id)).then(function (meta) {
+          return meta ? { id: id, meta: meta, conteudo: meta.conteudo !== false } : null;
+        });
+      })).then(function (lista) { return lista.filter(Boolean); });
+    });
+  }
+
+  /* blob: o .zip da cópia. info.motivo: 'ela', 'fechar' ou 'diaria'.
+   * info.conteudo: false quando o banco está vazio ou é só a carga inicial.
+   *
+   * A AUTOMÁTICA NUNCA SOBE UM BANCO SEM CONTEÚDO POR CIMA DE UMA CÓPIA COM
+   * CONTEÚDO, e nunca cria chave: depois de um "Apagar tudo", ou num aparelho
+   * recém-instalado, o fechar não pode trocar a cópia boa pela vazia. Quando
+   * é ela quem manda, a tela já perguntou. */
   function enviarCopia(blob, info) {
     if (enviando) return enviando;
     info = info || {};
+    var conteudo = info.conteudo !== false;
+    var automatica_ = info.motivo && info.motivo !== 'ela';
+    var apontadas = [];
     enviando = carregarEstado().then(function () {
       if (!sessao) throw erro('TOKEN_EXPIRED');
-      return garantirChave();
-    }).then(function () {
-      return blob.arrayBuffer();
-    }).then(function (buf) {
-      return cifrar(new Uint8Array(buf));
+      if (automatica_ && !chaveBruta) throw Object.assign(new Error('A cópia automática não cria chave.'), { semChave: true });
+      return copiasApontadas(sessao.uid);
+    }).then(function (lista) {
+      apontadas = lista;
+      if (automatica_ && !conteudo && apontadas.some(function (c) { return c.conteudo; })) {
+        return null; // fica a cópia com conteúdo; nada sobe
+      }
+      return garantirChave().then(function () { return blob.arrayBuffer(); }).then(function (buf) {
+        return cifrar(new Uint8Array(buf));
+      });
     }).then(function (cifrado) {
+      if (!cifrado) return { pulada: true };
       var uid = sessao.uid;
       var id = idNovo();
       var partes = [];
@@ -507,7 +548,7 @@
       var quando = new Date().toISOString();
       var meta = { formato: 'apoio-educacional-copia', versao: 1, iv: cifrado.iv, bytes: cifrado.dados.length,
         partes: partes.length, quando: quando, aparelho: aparelho || 'aparelho', motivo: info.motivo || 'ela',
-        app: info.versaoApp || '' };
+        app: info.versaoApp || '', conteudo: conteudo };
       var fila = Promise.resolve();
       for (var p = 0; p < partes.length; p += PARTES_POR_PEDIDO) {
         (function (inicio) {
@@ -521,18 +562,23 @@
         })(p);
       }
       return fila.then(function () {
-        return lerDoc(nomeDoc(uid, 'estado/copia'));
-      }).then(function (ponteiro) {
-        var anterior = ponteiro && ponteiro.atual ? ponteiro.atual : null;
-        var saindo = ponteiro && ponteiro.anterior ? ponteiro.anterior : null;
+        /* A rotação: a nova vira atual; a anterior é a que estava como atual,
+         * SALVO quando a nova não tem conteúdo: aí a anterior é a mais nova
+         * com conteúdo, e a vazia é que sai. A nuvem nunca apaga a última
+         * cópia com conteúdo só pela contagem. */
+        var anterior = apontadas[0] || null;
+        if (!conteudo) anterior = apontadas.filter(function (c) { return c.conteudo; })[0] || anterior;
+        var saindo = apontadas.filter(function (c) { return !anterior || c.id !== anterior.id; });
         var escritas = [
           gravacao(nomeDoc(uid, 'copias/' + id), meta),
-          gravacao(nomeDoc(uid, 'estado/copia'), { atual: id, anterior: anterior || '', quando: quando })
+          gravacao(nomeDoc(uid, 'estado/copia'), { atual: id, anterior: anterior ? anterior.id : '', quando: quando })
         ];
         return commit(escritas).then(function () {
-          /* A mais velha sai depois, e sem derrubar o envio se falhar: na
+          /* A que sai, sai depois, e sem derrubar o envio se falhar: na
            * próxima subida ela sai de novo, pelo mesmo caminho. */
-          if (saindo && saindo !== anterior) return apagarCopia(uid, saindo).catch(function () { /* fica para a próxima */ });
+          return saindo.reduce(function (p, c) {
+            return p.then(function () { return apagarCopia(uid, c.id).catch(function () { /* fica para a próxima */ }); });
+          }, Promise.resolve());
         });
       }).then(function () {
         ultimaCopia = { id: id, quando: quando, bytes: meta.bytes, partes: meta.partes, aparelho: meta.aparelho };
@@ -569,7 +615,8 @@
           return lerDoc(nomeDoc(uid, 'copias/' + id)).then(function (meta) {
             if (!meta) return null;
             return { id: id, uid: uid, quando: meta.quando, bytes: meta.bytes, partes: meta.partes,
-              aparelho: meta.aparelho, papel: id === ponteiro.atual ? 'atual' : 'anterior' };
+              aparelho: meta.aparelho, conteudo: meta.conteudo !== false,
+              papel: id === ponteiro.atual ? 'atual' : 'anterior' };
           });
         }));
       }).then(function (lista) { return lista.filter(Boolean); });
@@ -646,6 +693,12 @@
 
   // ---------- cópia automática ----------
 
+  /* "Apagar tudo" desliga a automática neste aparelho: o banco vazio nunca
+   * sobe sozinho; ela religa no próximo envio dela ou numa restauração. */
+  function desligarAutomatica() {
+    automatica = false;
+    return gravarEstado('automatica', false).then(avisarOuvintes, avisarOuvintes);
+  }
   function marcarMudanca() {
     if (pendente) return;
     pendente = true;
@@ -709,7 +762,8 @@
     formatarCodigo: formatarCodigo,
     enviarCopia: enviarCopia, listarCopias: listarCopias, baixarCopia: baixarCopia, restaurou: restaurou,
     leitores: leitores, permitirLeitor: permitirLeitor, tirarLeitor: tirarLeitor,
-    marcarMudanca: marcarMudanca, copiaAutomaticaDevida: copiaAutomaticaDevida, copiaDiariaDevida: copiaDiariaDevida,
+    marcarMudanca: marcarMudanca, desligarAutomatica: desligarAutomatica,
+    copiaAutomaticaDevida: copiaAutomaticaDevida, copiaDiariaDevida: copiaDiariaDevida,
     fraseDeQuando: fraseDeQuando,
     TETO_PARTE: TETO_PARTE
   };
