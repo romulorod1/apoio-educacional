@@ -1622,14 +1622,14 @@
         el('p', { texto: 'O endereço novo é apoio-educacional.pages.dev. Este aqui continua funcionando, ' +
           'com tudo o que você já guardou, até você passar para o novo.' }),
         el('ol', {}, [
-          el('li', { texto: 'Aqui, em Ajustes, no cartão "Cópia na nuvem", entre com o seu e-mail e toque em "Enviar cópia agora". Tenha à mão a chave impressa (o QR ou o código).' }),
+          el('li', { texto: 'Aqui, em Ajustes, no cartão "Cópia na nuvem", entre com o seu e-mail e toque em "Enviar cópia agora". Se for a primeira vez, o aplicativo mostra a sua chave (um QR e um código): imprima ou anote antes de seguir, porque sem ela a cópia não abre no novo.' }),
           el('li', { texto: 'Abra o endereço novo e instale: no menu do Chrome, "Instalar aplicativo".' }),
           el('li', { texto: 'No aplicativo novo, em Ajustes, entre com o mesmo e-mail e toque em "Restaurar neste aparelho", com a chave.' })
         ]),
+        el('p', { id: 'faixa-endereco-nao-apague', texto: 'Não apague este aplicativo nem os arquivos dos livros até conferir, no novo, que estão lá os seus alunos, aulas e pagamentos.' }),
         el('p', { id: 'faixa-endereco-livros', texto: 'Atenção: os livros, os pacotes de materiais e os PDFs não vão na cópia. ' +
           'No aplicativo novo, importe de novo em Ajustes os livros e os materiais ("Importar material"), e baixe ou gere de novo os PDFs que for usar.' }),
-        el('p', { texto: 'Por garantia, salve também a cópia em arquivo ("Salvar a cópia agora"). Se a nuvem falhar, no aplicativo novo use "Restaurar de uma cópia" com esse arquivo. ' +
-          'Este endereço continua funcionando até você se acostumar com o novo.' })
+        el('p', { texto: 'Por garantia, salve também a cópia em arquivo ("Salvar a cópia agora"). Se a nuvem falhar, no aplicativo novo use "Restaurar de uma cópia" com esse arquivo.' })
       ]),
       el('div', { class: 'faixa-endereco-botoes' }, [
         el('a', { class: 'btn principal pequeno', id: 'faixa-endereco-abrir', href: ENDERECO_NOVO,
