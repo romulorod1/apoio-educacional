@@ -27,6 +27,22 @@ git ls-files -z | tr '\0' '\n' | while IFS= read -r f; do
   mkdir -p "$destino/$(dirname "$f")"
   cp "$f" "$destino/$f"
 done
+# O icone do endereco NOVO e outro (pedido do dono, 08/11): NW navy sobre
+# dourado, com um livro aberto, para ela distinguir os dois apps na tela
+# inicial enquanto o antigo (GitHub Pages) continua no ar com o NW navy de
+# sempre. Os arquivos novos moram em icons/pages-dev/ e, so no site do
+# Cloudflare, vao por cima dos de icons/ com os MESMOS nomes: o index.html, o
+# manifest e o ARQUIVOS do sw.js ficam iguais nos dois enderecos (a
+# conferencia-no-ar compara o index.html com o commit). O apple-touch-icon do
+# index.html aponta para icons/icon-192.png, que aqui ja e o novo. A pasta
+# icons/pages-dev/ nao sobe.
+if [ -d "$destino/icons/pages-dev" ]; then
+  for f in icon-192.png icon-512.png icon-maskable-512.png favicon.png; do
+    cp "$destino/icons/pages-dev/$f" "$destino/icons/$f"
+  done
+  cp "$destino/icons/pages-dev/apple-touch-icon.png" "$destino/icons/apple-touch-icon.png"
+  rm -rf "$destino/icons/pages-dev"
+fi
 # Sem um 404.html na raiz, o Cloudflare Pages trata o site como aplicacao de
 # pagina unica e responde 200 com o index.html para QUALQUER caminho que nao
 # existe (medido no preview do B4: _teste/confere_tudo.sh voltava 200). Ai um

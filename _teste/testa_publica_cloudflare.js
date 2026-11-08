@@ -172,6 +172,24 @@ try {
     !!pasta && tem(pasta + 'pdf.min.mjs') && tem(pasta + 'pdf.worker.min.mjs') && tem(pasta + 'wasm/jbig2.wasm'));
   conf('o site tem 404.html (sem ele o Cloudflare responde 200 com o index para caminho que nao existe)',
     tem('404.html') && /não encontrado/.test(fs.readFileSync(path.join(destino, '404.html'), 'utf8')));
+  // O icone do endereco novo (pedido do dono, 08/11): no site do Cloudflare os
+  // arquivos de icons/ sao os de icons/pages-dev/; no repositorio (o que o
+  // GitHub Pages publica) continuam os de sempre; a pasta pages-dev nao sobe.
+  const crypto = require('crypto');
+  const hashDe = p => crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+  ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'favicon.png'].forEach(f => {
+    const novo = hashDe(path.join(RAIZ, 'icons', 'pages-dev', f));
+    const velho = hashDe(path.join(RAIZ, 'icons', f));
+    conf('icone ' + f + ': o site do Cloudflare tem o NOVO', hashDe(path.join(destino, 'icons', f)) === novo);
+    conf('icone ' + f + ': o repositorio (GitHub Pages) continua com o de sempre, diferente do novo', velho !== novo);
+  });
+  conf('o site do Cloudflare tem o apple-touch-icon novo (180 px)',
+    tem('icons/apple-touch-icon.png') && hashDe(path.join(destino, 'icons', 'apple-touch-icon.png')) === hashDe(path.join(RAIZ, 'icons', 'pages-dev', 'apple-touch-icon.png')));
+  conf('a pasta icons/pages-dev nao sobe para o site', !tem('icons/pages-dev/icon-192.png'));
+  conf('o index.html do site e o do commit, igual (a conferencia-no-ar compara)',
+    fs.readFileSync(path.join(destino, 'index.html'), 'utf8').replace(/\r\n/g, '\n') === ler('index.html'));
+  conf('o apple-touch-icon do index.html aponta para icons/icon-192.png, que no Cloudflare e o novo',
+    /<link rel="apple-touch-icon" href="icons\/icon-192\.png">/.test(ler('index.html')));
   const todos = [];
   (function anda(d, rel) {
     fs.readdirSync(d, { withFileTypes: true }).forEach(e => {
