@@ -2,13 +2,13 @@
  *
  * Tres provas, no Chrome, com perfil novo:
  *
- * 0. DESLIGADA (o app.js como esta, MUDOU_DE_ENDERECO_NO_AR = false): a faixa
- *    nao aparece em lugar nenhum, nem no endereco antigo, nem no novo, nem no
- *    local. A faixa liga junto com a fase 0 da nuvem.
+ * 0. DESLIGADA (o app.js servido com a constante em false, pela troca do
+ *    arquivo servido): a faixa nao aparece em lugar nenhum, nem no endereco
+ *    antigo, nem no novo, nem no local. Prova que a constante e quem decide.
  *
- * 1. LIGADA (o app.js servido com a constante em true, pela troca do arquivo
- *    servido, como os venenos dos outros testes): a FAIXA "O aplicativo mudou
- *    de endereço" aparece no endereço antigo e nunca no novo. O mesmo código,
+ * 1. LIGADA (o app.js como esta no disco, MUDOU_DE_ENDERECO_NO_AR = true, desde
+ *    08/11, com a fase 0 no ar): a FAIXA "O aplicativo mudou de endereço"
+ *    aparece no endereço antigo e nunca no novo. O mesmo código,
  *    servido em tres origens:
  *      https://romulorod1.github.io/apoio-educacional/   tem a faixa
  *      https://apoio-educacional.pages.dev/              nao tem
@@ -56,16 +56,20 @@ const TIPOS = {
   '.wasm': 'application/wasm'
 };
 
-/* A faixa ligada: o app.js servido com a constante em true. O disco nunca
- * muda; so o que o servidor e a interceptacao entregam. */
+/* A faixa desligada: o app.js servido com a constante em false. O disco nunca
+ * muda; so o que o servidor e a interceptacao entregam. O veneno
+ * --envenenado-desligada serve a constante em false TAMBEM na prova da faixa
+ * ligada, e ela TEM de reprovar. */
+const LIGADA = 'var MUDOU_DE_ENDERECO_NO_AR = true;';
 const DESLIGADA = 'var MUDOU_DE_ENDERECO_NO_AR = false;';
 const APP_DISCO = fs.readFileSync(path.join(RAIZ, 'app.js'), 'utf8');
+const VENENO_DESLIGADA = process.argv.indexOf('--envenenado-desligada') >= 0;
 let faixaLigada = false;
 function doDisco(rel) {
   if (rel === '' || rel === '/') rel = 'index.html';
   rel = rel.replace(/^\/+/, '');
-  if (rel === 'app.js' && faixaLigada) {
-    return { tipo: TIPOS['.js'], corpo: Buffer.from(APP_DISCO.replace(DESLIGADA, 'var MUDOU_DE_ENDERECO_NO_AR = true;')) };
+  if (rel === 'app.js' && (!faixaLigada || VENENO_DESLIGADA)) {
+    return { tipo: TIPOS['.js'], corpo: Buffer.from(APP_DISCO.replace(LIGADA, DESLIGADA)) };
   }
   if (rel === 'vazio.html') return { tipo: TIPOS['.html'], corpo: Buffer.from('<!doctype html><title>vazio</title>') };
   const arq = path.join(RAIZ, rel);
@@ -158,7 +162,8 @@ const estadoFaixa = pag => pag.evaluate(() => {
 
 async function provaDesligada() {
   secao('desligada: a faixa não aparece em lugar nenhum');
-  conf('o app.js do disco tem a constante desligada, uma vez', APP_DISCO.split(DESLIGADA).length - 1, 1);
+  conf('o app.js do disco tem a constante LIGADA, uma vez', APP_DISCO.split(LIGADA).length - 1, 1);
+  conf('o app.js do disco não tem a constante desligada', APP_DISCO.split(DESLIGADA).length - 1, 0);
   for (const base of [ANTIGO, NOVO, OUTRA]) {
     const pag = await novaPagina();
     await abrir(pag, base);
@@ -181,8 +186,13 @@ async function provaDaFaixa() {
   conf('o link leva ao endereço novo', f.link, NOVO);
   conf('o link abre fora do aplicativo instalado', f.alvo, '_blank');
   conf('a faixa fica logo abaixo do cabeçalho, no fluxo', f.depoisDoCabecalho, true);
-  conf('a faixa guia: cópia, instalar, restaurar',
-    /Salvar a cópia agora/.test(f.texto) && /Instalar aplicativo/.test(f.texto) && /Restaurar de uma cópia/.test(f.texto), true);
+  conf('a faixa guia pela nuvem: enviar, instalar, entrar e restaurar neste aparelho',
+    /Enviar cópia agora/.test(f.texto) && /Instalar aplicativo/.test(f.texto) && /Restaurar neste aparelho/.test(f.texto), true);
+  conf('a faixa guarda a saída de reserva: a cópia em arquivo',
+    /Salvar a cópia agora/.test(f.texto) && /Restaurar de uma cópia/.test(f.texto), true);
+  conf('a faixa avisa que livros, materiais e PDFs não vão na cópia e precisam ser importados de novo',
+    /livros/.test(f.texto) && /PDFs/.test(f.texto) && /não vão na cópia/.test(f.texto) && /Importar material/.test(f.texto), true);
+  conf('a faixa diz que o endereço antigo continua funcionando', /continua funcionando/.test(f.texto), true);
   conf('sem travessão no texto da faixa', /[\u2013\u2014]/.test(f.texto || ''), false);
 
   // um aluno novo, gravado pelo Store do próprio aplicativo

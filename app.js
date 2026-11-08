@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.6';
+  var VERSAO = '1.42.7';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.7',
+      itens: [
+        'O aplicativo ganhou um endereço novo, só dele: apoio-educacional.pages.dev. No endereço antigo aparece uma faixa com o passo a passo para passar para o novo, pela cópia na nuvem. O antigo continua funcionando até você se acostumar.'
+      ]
+    },
     {
       versao: '1.42.6',
       itens: [
@@ -1596,12 +1602,13 @@
    * ONDE aparece é decidido pela origem: o mesmo código vai para os dois
    * endereços, e a faixa só pode aparecer no antigo.
    *
-   * QUANDO aparece é esta constante. Ela entra DESLIGADA: o endereço novo já é
-   * publicado a cada merge, mas ninguém é mandado para lá antes de a fase 0
-   * da nuvem existir. Liga junto com a fase 0, para a migração dela ser um
-   * toque (instalar o novo e entrar), como pedem as instruções. A prova
-   * testa_mudou_de_endereco_navegador cobre os dois estados. */
-  var MUDOU_DE_ENDERECO_NO_AR = false;
+   * QUANDO aparece é esta constante. Ela entrou DESLIGADA no B4 e foi LIGADA
+   * em 08/11, depois de o dono publicar as regras do Firestore e de a cópia na
+   * nuvem (fase 0) funcionar no ar: a migração dela é enviar a cópia aqui,
+   * instalar o novo, entrar e "Restaurar neste aparelho". A cópia em arquivo
+   * continua como saída de reserva. A prova testa_mudou_de_endereco_navegador
+   * cobre os dois estados. */
+  var MUDOU_DE_ENDERECO_NO_AR = true;
   var ENDERECO_NOVO = 'https://apoio-educacional.pages.dev/';
   function noEnderecoAntigo(nome) {
     return /(^|\.)github\.io$/i.test(String(nome || ''));
@@ -1615,10 +1622,14 @@
         el('p', { texto: 'O endereço novo é apoio-educacional.pages.dev. Este aqui continua funcionando, ' +
           'com tudo o que você já guardou, até você passar para o novo.' }),
         el('ol', {}, [
-          el('li', { texto: 'Aqui, toque em "Salvar a cópia agora" e guarde o arquivo.' }),
+          el('li', { texto: 'Aqui, em Ajustes, no cartão "Cópia na nuvem", entre com o seu e-mail e toque em "Enviar cópia agora". Tenha à mão a chave impressa (o QR ou o código).' }),
           el('li', { texto: 'Abra o endereço novo e instale: no menu do Chrome, "Instalar aplicativo".' }),
-          el('li', { texto: 'No aplicativo novo, em Ajustes, toque em "Restaurar de uma cópia" e escolha o arquivo.' })
-        ])
+          el('li', { texto: 'No aplicativo novo, em Ajustes, entre com o mesmo e-mail e toque em "Restaurar neste aparelho", com a chave.' })
+        ]),
+        el('p', { id: 'faixa-endereco-livros', texto: 'Atenção: os livros, os pacotes de materiais e os PDFs não vão na cópia. ' +
+          'No aplicativo novo, importe de novo em Ajustes os livros e os materiais ("Importar material"), e baixe ou gere de novo os PDFs que for usar.' }),
+        el('p', { texto: 'Por garantia, salve também a cópia em arquivo ("Salvar a cópia agora"). Se a nuvem falhar, no aplicativo novo use "Restaurar de uma cópia" com esse arquivo. ' +
+          'Este endereço continua funcionando até você se acostumar com o novo.' })
       ]),
       el('div', { class: 'faixa-endereco-botoes' }, [
         el('a', { class: 'btn principal pequeno', id: 'faixa-endereco-abrir', href: ENDERECO_NOVO,
