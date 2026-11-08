@@ -519,6 +519,10 @@ roda "salvar --envenenado-escreve-no-pedido"    node "_teste/testa_store_grava_n
 # registros) e veneno proprio: --envenenado-salvar-no-pedido faz o salvar responder
 # com a transacao aberta e tem de acusar exatamente o salvar.
 roda "salvar --envenenado-salvar-no-pedido"     node "_teste/testa_store_grava_no_commit.js" --envenenado-salvar-no-pedido
+# N2 (folha por pagina): o salvarNota tem transacao propria (notas, controle e
+# saida); --envenenado-nota-no-pedido o faz responder com ela aberta e tem de
+# acusar EXATAMENTE o salvarNota
+roda "salvar --envenenado-nota-no-pedido"       node "_teste/testa_store_grava_no_commit.js" --envenenado-nota-no-pedido
 # E o outro lado, que o conserto criou: a escrita que falha passa a REJEITAR.
 # --envenenado-nao-rejeita tira o onabort do escrever, e a transacao abortada
 # depois do sucesso do pedido tem de deixar a promessa pendurada a vista;
@@ -809,6 +813,18 @@ roda "nuvem recebe --envenenado-eco-so-sem-carimbo" node "_teste/testa_nuvem_rec
 roda "nuvem diagnostico (D7)"                       node "_teste/testa_nuvem_diagnostico.js"
 roda "nuvem diagnostico --envenenado-diagnostico-aberto" node "_teste/testa_nuvem_diagnostico.js" --envenenado-diagnostico-aberto
 roda "nuvem diagnostico --envenenado-observador-grava" node "_teste/testa_nuvem_diagnostico.js" --envenenado-observador-grava
+# N2 (fase 2 da nuvem, fatia 1): a folha sobe POR PAGINA (hash SHA-256 do texto
+# canonico, pontos a 0,1, gzip pelo CompressionStream) em usuarios/{uid}/folhas,
+# so do tablet; o celular da dona e o observador recebem e abrem so para ler;
+# a pagina igual nao sobe de novo; a lapide apaga a pagina no outro; quem recebe
+# confere o hash. Venenos: a pagina sem hash TEM de ser recusada pelas regras; a
+# regravacao da pagina igual TEM de ser vista; a folha editada no celular TEM de
+# ser vista; o documento adulterado aplicado sem conferir o hash TEM de ser visto.
+roda "nuvem folhas (N2 fatia 1)"                    node "_teste/testa_nuvem_folhas.js"
+roda "nuvem folhas --envenenado-sem-hash"           node "_teste/testa_nuvem_folhas.js" --envenenado-sem-hash
+roda "nuvem folhas --envenenado-regrava-igual"      node "_teste/testa_nuvem_folhas.js" --envenenado-regrava-igual
+roda "nuvem folhas --envenenado-celular-edita-folha" node "_teste/testa_nuvem_folhas.js" --envenenado-celular-edita-folha
+roda "nuvem folhas --envenenado-aplica-sem-conferir-hash" node "_teste/testa_nuvem_folhas.js" --envenenado-aplica-sem-conferir-hash
 # (revisao do PR 118) o "Apagar tudo" zera a fila deste aparelho e o recebimento
 # em curso confere a marca dentro da transacao; o celular nao enfileira a lapide
 # da fusao; a restauracao enfileira tambem o que e igual a copia; a confirmacao
