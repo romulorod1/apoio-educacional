@@ -21204,6 +21204,11 @@
         } else {
           avisar('Cópia restaurada da nuvem.' + frase);
         }
+      }).then(function () {
+        /* N1 (fatia 3): logo DEPOIS da cópia, em série, chegam os registros mais
+         * novos que ela (a restauração zerou o cursor). Só recebe: o envio do que
+         * a restauração enfileirou fica para os gatilhos de sempre. */
+        return Nuvem.receberRegistros();
       });
     }).catch(function (e) {
       botao.disabled = false;
@@ -21530,10 +21535,6 @@
     celularBuscando = true;
     celularRecado = '';
     desenharTopoCelular();
-    /* N1 (fatia 3): o celular recebe os registros do tablet (registro a
-     * registro, pela exceção da trava), além da cópia completa abaixo. Nunca
-     * envia: o sincronizar no aparelho que só lê só recebe. */
-    Nuvem.receberRegistros();
     return Nuvem.listarCopias(est.uidDona || null).then(function (lista) {
       /* A atual é a que o ponteiro aponta (papel 'atual'), nunca a primeira
        * da lista: sem o cabeçalho dela, a lista só traz a anterior, mais
@@ -21560,6 +21561,13 @@
       celularRecado = e && e.codigo === 'SEM_REDE'
         ? 'Sem internet agora: são os últimos que chegaram.'
         : ((e && e.message) || 'Não consegui buscar a cópia mais nova.');
+    }).then(function () {
+      /* N1 (fatia 3): DEPOIS da cópia, em série, o celular recebe os registros do
+       * tablet (registro a registro, pela exceção da trava). A restauração zera
+       * o cursor, então o recebimento recomeça do zero e as edições do dia que a
+       * cópia não tinha chegam por cima dela. Nunca envia: o sincronizar no
+       * aparelho que só lê só recebe. */
+      return Nuvem.receberRegistros();
     }).then(function () {
       celularBuscando = false;
       desenharTopoCelular();

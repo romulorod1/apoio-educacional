@@ -566,7 +566,7 @@
    *   - item igual: não é tocado.
    * A comparação é pelo texto JSON de cada item e pela `ordem` (ordensDoGrupo):
    * um item igual, na mesma posição relativa, não é tocado. Devolve as contas. */
-  function aplicarDiferenca(deposito, saida, existentes, db, agora, aparelho) {
+  function aplicarDiferenca(deposito, saida, existentes, db, agora, aparelho, restauro) {
     var porId = {};
     existentes.forEach(function (r) { porId[r.id] = r; });
     var novo = desmontar(db);
@@ -574,7 +574,10 @@
     function gravarRegistro(reg) {
       deposito.put(reg);
       if (saida && sincronizavel(reg.id, reg.tipo)) {
-        enfileirar(saida, { id: reg.id, tipo: reg.tipo, atualizadoEm: reg.atualizadoEm, apagadoEm: reg.apagadoEm });
+        var entrada = { id: reg.id, tipo: reg.tipo, atualizadoEm: reg.atualizadoEm, apagadoEm: reg.apagadoEm };
+        // a entrada da restauração só vence na nuvem o que for mais velho que a cópia (fatia 3)
+        if (restauro) entrada.restauro = true;
+        enfileirar(saida, entrada);
         contas.enfileirados++;
       }
     }
@@ -645,7 +648,9 @@
          * transação encerrada, a transação já abortou e o `onabort` de quem
          * chamou responde: nada a fazer aqui, e nada a espalhar como erro. */
         try {
-          contas = aplicarDiferenca(registros, saida, todos.result || [], db, agora, ap);
+          contas = aplicarDiferenca(registros, saida, todos.result || [], db, agora, ap, !!opcoes.restauro);
+          // a restauração que vem da nuvem recomeça o recebimento do zero: o cursor sai
+          if (opcoes.restauro) controle.delete('cursor');
           controle.put({ quando: agora, esquema: VERSAO_BANCO, assinatura: assinatura(db) }, 'retrato');
           if (!opcoes.semPrincipal) t.objectStore('dados').put(db, 'principal');
         } catch (e) {
@@ -795,6 +800,30 @@
     var m = ID_DE_REPETICAO.exec(String(id || ''));
     return m ? { serieId: m[1], data: m[2], r: m[3] ? Number(m[3]) : 0 } : null;
   }
+  /* Carimbo do servidor como número (microssegundos): o texto ISO vem ora com
+   * 3, ora com 6 dígitos de fração, e comparar como texto erra entre eles. */
+  function carimboNumero(iso) {
+    if (!iso) return 0;
+    var ms = Date.parse(iso);
+    if (isNaN(ms)) return 0;
+    var m = /\.(\d+)Z?$/.exec(String(iso));
+    var fracao = m ? (m[1] + '000000').slice(0, 6) : '000000';
+    return Math.floor(ms / 1000) * 1000000 + Number(fracao);
+  }
+  /* A aula que carrega trabalho dela: relato, nota só minha, folha, anexo,
+   * assunto, pagamento marcado. A fusão das reaberturas nunca apaga uma destas. */
+  function aulaComConteudo(a) {
+    return !!(a && ((a.notaTexto && String(a.notaTexto).trim()) || (a.notaPrivada && String(a.notaPrivada).trim()) || a.temNota ||
+      (a.anexos && a.anexos.length) || (a.temas && a.temas.length) || (a.areas && a.areas.length) || a.pago || a.pagoEm));
+  }
+  /* O maior par (carimbo, nome): é o cursor da próxima consulta. */
+  function parMaior(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    var ca = carimboNumero(a.servidorEm), cb = carimboNumero(b.servidorEm);
+    if (ca !== cb) return ca > cb ? a : b;
+    return String(a.nome || '') >= String(b.nome || '') ? a : b;
+  }
 
   /* APLICA O QUE CHEGOU DA NUVEM, numa transação só (passa pela trava como a
    * restauração: é dado que vem da nuvem, e o celular só leitura também
@@ -837,19 +866,30 @@
           var dbAntes = montar(existentes);
           var maiorOrdem = -1;
           existentes.forEach(function (r) { if (typeof r.ordem === 'number' && r.ordem > maiorOrdem) maiorOrdem = r.ordem; });
-          var maiorServidorEm = cursorAntes && cursorAntes.servidorEm ? cursorAntes.servidorEm : '';
+          var cursorMaior = cursorAntes && cursorAntes.servidorEm ? { servidorEm: cursorAntes.servidorEm, nome: cursorAntes.nome || '' } : null;
           var houvePerdedor = false, chegadosQuePerderam = [];
           (lista || []).forEach(function (chegou) {
-            // o eco do próprio aparelho vem sem id: só avança o cursor
-            if (chegou && chegou.servidorEm && chegou.servidorEm > maiorServidorEm) maiorServidorEm = chegou.servidorEm;
+            // o eco do próprio aparelho vem sem id: só avança o cursor (o par carimbo e nome)
+            if (chegou && chegou.servidorEm) cursorMaior = parMaior(cursorMaior, { servidorEm: chegou.servidorEm, nome: chegou.nome || '' });
             if (!chegou || !chegou.id) return;
             var local = porId[chegou.id];
             var carimbo = { updateTime: chegou.updateTime || null, servidorEm: chegou.servidorEm || null };
-            if (local && local.nuvem && local.nuvem.servidorEm && chegou.servidorEm && local.nuvem.servidorEm >= chegou.servidorEm) {
+            if (local && local.nuvem && local.nuvem.servidorEm && chegou.servidorEm && carimboNumero(local.nuvem.servidorEm) >= carimboNumero(chegou.servidorEm)) {
               contas.ignorados++;
               return;
             }
-            if (local && fila[chegou.id] && !fila[chegou.id].quarentena) {
+            var entrada = fila[chegou.id];
+            /* A entrada de RESTAURAÇÃO (a cópia completa restaurada num aparelho que
+             * escreve) só vence o que é mais velho que a cópia: se o servidor tem
+             * uma edição mais nova que o `quando` da cópia, o servidor vence e a
+             * entrada sai da fila; a cópia velha não reescreve a nuvem. */
+            if (local && entrada && !entrada.quarentena && entrada.restauro && chegou.atualizadoEm && entrada.atualizadoEm &&
+                chegou.atualizadoEm > entrada.atualizadoEm) {
+              saida.delete(chegou.id);
+              delete fila[chegou.id];
+              entrada = null;
+            }
+            if (local && entrada && !entrada.quarentena) {
               // a edição local ainda não enviada vence: só o carimbo é anotado
               local.nuvem = carimbo;
               registros.put(local);
@@ -867,7 +907,11 @@
               aparelho: chegou.aparelho || '', esquema: chegou.esquema || ESQUEMA_REGISTRO,
               ordem: local && typeof local.ordem === 'number' ? local.ordem : ++maiorOrdem,
               dados: chegou.apagadoEm ? null : (chegou.dados === undefined ? null : chegou.dados), nuvem: carimbo };
-            if (local && !local.apagadoEm && (JSON.stringify(local.dados) !== JSON.stringify(novo.dados) || !!novo.apagadoEm)) {
+            /* Perde a versão local quando: estava viva e muda ou vira lápide; ou era
+             * uma lápide daqui e o outro aparelho a ressuscitou (o apagamento
+             * daqui perdeu, e vai para o histórico também). */
+            if (local && ((!local.apagadoEm && (JSON.stringify(local.dados) !== JSON.stringify(novo.dados) || !!novo.apagadoEm)) ||
+                (local.apagadoEm && !novo.apagadoEm))) {
               houvePerdedor = true;
               contas.perdedoresLocais++;
             }
@@ -876,20 +920,27 @@
             contas.aplicados++;
             contas.mudou = true;
           });
-          // a fusão das reaberturas: numa mesma série e data, só a aula de maior r fica viva
-          var porSerieData = {};
+          /* A fusão das reaberturas: numa mesma SÉRIE E DATA (pelos dados da aula,
+           * não pelo prefixo do id: o "seguintes" move a aula para a série filha
+           * mantendo o id da mãe), e só entre aulas REABERTAS (id com +r), fica
+           * viva a de maior r. Nunca apaga aula com conteúdo: nesse caso as duas
+           * ficam e o conflito vai para o histórico. */
+          var porSerieData = {}, conflitos = [];
           Object.keys(porId).forEach(function (id) {
             var r = porId[id];
             if (r.tipo !== 'aula' || r.apagadoEm) return;
             var p = partesDoIdDeAula(id.slice('aula:'.length));
-            if (!p) return;
-            var chave = p.serieId + '@' + p.data;
+            if (!p || !p.r || !r.dados) return; var chave = r.dados.serieId + '@' + r.dados.data;
             (porSerieData[chave] = porSerieData[chave] || []).push({ reg: r, r: p.r });
           });
           Object.keys(porSerieData).forEach(function (chave) {
             var grupo = porSerieData[chave];
             if (grupo.length < 2) return;
             grupo.sort(function (a, b) { return b.r - a.r; });
+            if (grupo.slice(1).some(function (g) { return aulaComConteudo(g.reg.dados); })) {
+              conflitos.push(chave);
+              return;
+            }
             grupo.slice(1).forEach(function (g) {
               var lapide = { id: g.reg.id, tipo: g.reg.tipo, atualizadoEm: agora, apagadoEm: agora, aparelho: aparelhoId || g.reg.aparelho,
                 esquema: g.reg.esquema || ESQUEMA_REGISTRO, ordem: g.reg.ordem, dados: null, nuvem: g.reg.nuvem || null };
@@ -903,6 +954,11 @@
           if (houvePerdedor) {
             t.objectStore('historico').add({ rotulo: 'Antes de receber do outro aparelho', quando: Date.now(),
               estado: JSON.parse(JSON.stringify(completar(dbAntes))) });
+          }
+          if (conflitos.length) {
+            contas.conflitos = conflitos.length;
+            t.objectStore('historico').add({ rotulo: 'Duas aulas na mesma data da mesma série, reabertas em aparelhos diferentes, as duas com conteúdo',
+              quando: Date.now(), estado: JSON.parse(JSON.stringify(completar(montar(Object.keys(porId).map(function (id) { return porId[id]; }))))) });
           }
           if (chegadosQuePerderam.length) {
             // o documento como ficaria com a versão do outro aparelho: "Voltar a este ponto" a traz de volta
@@ -918,12 +974,10 @@
             t.objectStore('dados').put(dbDepois, 'principal');
             t.objectStore('controle').put({ quando: agora, esquema: VERSAO_BANCO, assinatura: assinatura(dbDepois) }, 'retrato');
           }
-          if (maiorServidorEm && (!cursorAntes || !cursorAntes.servidorEm || maiorServidorEm > cursorAntes.servidorEm)) {
-            t.objectStore('controle').put({ servidorEm: maiorServidorEm, quando: agora }, 'cursor');
-            contas.cursor = maiorServidorEm;
-          } else if (cursorAntes) {
-            contas.cursor = cursorAntes.servidorEm || null;
+          if (cursorMaior && (!cursorAntes || cursorMaior.servidorEm !== cursorAntes.servidorEm || cursorMaior.nome !== (cursorAntes.nome || ''))) {
+            t.objectStore('controle').put({ servidorEm: cursorMaior.servidorEm, nome: cursorMaior.nome, quando: agora }, 'cursor');
           }
+          contas.cursor = cursorMaior ? cursorMaior.servidorEm : null;
         };
         t.oncomplete = function () {
           if (contas.mudou) avisarMudanca('dados');
@@ -1732,7 +1786,7 @@
            * tablet novo ou reinstalado é dono do que restaurou e tudo o que
            * está vivo tem de subir como registro: quem fez a cópia pode nunca
            * ter conseguido enviar (regras ainda não publicadas, por exemplo). */
-          escreverDiferenca(t, completar(pacote.dados), { carimbo: carimbo, semFila: daNuvem && soLeitura }, function (c) { contas = c; });
+          escreverDiferenca(t, completar(pacote.dados), { carimbo: carimbo, semFila: daNuvem && soLeitura, restauro: daNuvem }, function (c) { contas = c; });
           trocar('notas', pacote.notas, true);
           trocar('midias', pacote.midias, true);
           trocar('anexos', anexos, true);
@@ -1810,7 +1864,7 @@
       return new Promise(function (resolve, reject) {
         var t = transacao(b, DEPOSITOS_DO_DOCUMENTO, 'readwrite');
         var agora = new Date().toISOString();
-        var registros = t.objectStore('registros'), saida = t.objectStore('saida');
+        var registros = t.objectStore('registros');
         var todos = registros.getAll();
         todos.onsuccess = function () {
           (todos.result || []).forEach(function (r) {
@@ -1818,7 +1872,11 @@
             var lapide = { id: r.id, tipo: r.tipo, atualizadoEm: agora, apagadoEm: agora, aparelho: aparelhoId || r.aparelho,
               esquema: r.esquema || ESQUEMA_REGISTRO, ordem: r.ordem, dados: null };
             registros.put(lapide);
-            if (sincronizavel(r.id, r.tipo)) enfileirar(saida, { id: r.id, tipo: r.tipo, atualizadoEm: agora, apagadoEm: agora });
+            /* As lápides do "Apagar tudo" ficam SÓ AQUI, fora da fila: a decisão da
+             * fase 0 é que o banco vazio nunca cobre a cópia boa na nuvem, e
+             * mandar as lápides apagaria, pelos registros, o outro aparelho e
+             * qualquer restauração seguinte. Levar o "Apagar tudo" à nuvem é a
+             * fatia 4, com regra própria. */
           });
           t.objectStore('dados').delete('principal');
           t.objectStore('controle').delete('retrato');
@@ -1880,6 +1938,7 @@
     registrosDaFila: registrosDaFila, confirmarEnvio: confirmarEnvio, tamanhoDaFila: tamanhoDaFila,
     estadoDaFila: estadoDaFila, marcarTentativa: marcarTentativa, soltarQuarentena: soltarQuarentena,
     aplicarRecebidos: aplicarRecebidos, lerCursor: lerCursor, aoReceber: aoReceber, partesDoIdDeAula: partesDoIdDeAula,
+    carimboNumero: carimboNumero,
     lerFila: function () { return todosOsValores('saida'); },
     sincronizavel: sincronizavel,
     montarRegistros: montar,

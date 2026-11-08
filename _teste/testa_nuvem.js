@@ -621,7 +621,13 @@ const retrato = (pag) => pag.evaluate(async () => {
     const saiu = await esperar('C restaurou a anterior com o código de A', () => pagC.evaluate(async () =>
       !document.querySelector('#modal-nuvem-restaurar.aberto') && (await Store.carregar()).alunos.some(a => a.id === 'alfa')), v => v === true, 30000);
     conf('digitando o código de A, C restaura a cópia com conteúdo', saiu.ok, true);
-    conf('os dados de C batem com os de A', await retrato(pagC), retratoA);
+    /* Desde a N1 (fatia 3), logo depois da cópia chegam os registros mais novos
+     * que ela: a cópia "anterior" não tinha a aluna gama, que B gravou depois e
+     * subiu como registro; C fica com a cópia MAIS a gama, que é o que B tem. */
+    const retratoC = await retrato(pagC);
+    const retratoB2 = (() => { const r = JSON.parse(retratoA); r.alunos.push(['gama', 'Aluna Gama Teste']); return JSON.stringify(r); })();
+    const esperadoC = await esperar('os registros mais novos que a cópia chegaram a C', () => retrato(pagC), v => v === retratoB2, 20000);
+    conf('os dados de C são os da cópia de A mais o que chegou por registro depois dela (a gama de B)', esperadoC.ok || retratoC === retratoB2, true);
     conf('C passou a usar a chave de A', (await pagC.evaluate(() => Nuvem.verChave())).codigo, chaveA.codigo);
   }
   if (!ESCONDE_CODIGO) {

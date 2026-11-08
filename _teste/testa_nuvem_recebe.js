@@ -43,7 +43,7 @@ const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
-const MODOS = ['--envenenado-ignora-lapide', '--envenenado-velho-por-cima'];
+const MODOS = ['--envenenado-ignora-lapide', '--envenenado-velho-por-cima', '--envenenado-pagina-so-carimbo', '--envenenado-restauro-vence', '--envenenado-fusao-pelo-prefixo'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 function prop(rotulo, ok, veneno) {
   if (MODO && MODO === veneno) return conf('VENENO visto: ' + rotulo + ', e quebrou', ok, false);
@@ -66,8 +66,16 @@ const REGRAS = fs.readFileSync(path.join(H.RAIZ, 'firestore.rules'), 'utf8');
 
 secao('0. As âncoras, o veneno e o ambiente');
 const RECEBE_CADA = 'if (!chegou || !chegou.id) return;';
-const COMPARA = 'if (local && local.nuvem && local.nuvem.servidorEm && chegou.servidorEm && local.nuvem.servidorEm >= chegou.servidorEm) {';
-const PRECONDICAO = 'if (updateTime) w.currentDocument = { updateTime: updateTime };';
+const COMPARA = 'if (local && local.nuvem && local.nuvem.servidorEm && chegou.servidorEm && carimboNumero(local.nuvem.servidorEm) >= carimboNumero(chegou.servidorEm)) {';
+/* A paginação pelo par (carimbo, nome): o veneno volta a pedir só "maior que o
+ * carimbo", e perde o resto de um commit cortado no fim da página. */
+const PAGINA = 'if (c && c.servidorEm) q.startAt = { values: valoresDoCursor(c), before: !c.nome };';
+/* A restauração só vence o que é mais velho que a cópia: o veneno a faz vencer sempre. */
+const RESTAURO = 'if (local && entrada && !entrada.quarentena && entrada.restauro && chegou.atualizadoEm && entrada.atualizadoEm &&';
+conf('a paginação começa depois do par do cursor, num lugar só', NUVEM.split(PAGINA).length, 2);
+conf('a regra da restauração está num lugar só', STORE.split(RESTAURO).length, 2);
+conf('a fusão agrupa pela série e data DOS DADOS e só entre reabertas', STORE.indexOf("if (!p || !p.r || !r.dados) return; var chave = r.dados.serieId + '@' + r.dados.data;") > 0, true);
+const PRECONDICAO = 'if (precondicao && precondicao.updateTime) w.currentDocument = { updateTime: precondicao.updateTime };';
 const TRAVA_PASSA = "var t = transacao(b, nomes, 'readwrite', true);";
 conf('o recebimento olha cada registro num lugar só', STORE.split(RECEBE_CADA).length, 2);
 conf('a comparação pelo carimbo do servidor está num lugar só', STORE.split(COMPARA).length, 2);
@@ -80,7 +88,10 @@ conf('as regras aceitam servidorEm como timestamp', REGRAS.indexOf("(!('servidor
 const trocas = {};
 if (MODO === MODOS[0]) trocas['/store.js'] = STORE.replace(RECEBE_CADA, 'if (!chegou || !chegou.id || chegou.apagadoEm) return;');
 if (MODO === MODOS[1]) trocas['/store.js'] = STORE.replace(COMPARA, 'if (false) {');
-if (MODO) conf('o store.js servido ficou diferente do repositório (' + MODO + ')', trocas['/store.js'] !== STORE, true);
+if (MODO === MODOS[2]) trocas['/nuvem.js'] = NUVEM.replace(PAGINA, "if (c && c.servidorEm) q.where = { fieldFilter: { field: { fieldPath: 'servidorEm' }, op: 'GREATER_THAN', value: { timestampValue: c.servidorEm } } };");
+if (MODO === MODOS[3]) trocas['/store.js'] = STORE.replace(RESTAURO, 'if (false &&');
+if (MODO === MODOS[4]) trocas['/store.js'] = STORE.replace("if (!p || !p.r || !r.dados) return; var chave = r.dados.serieId + '@' + r.dados.data;", "if (!p || !r.dados) return; var chave = p.serieId + '@' + p.data;");
+if (MODO) conf('o arquivo servido ficou diferente do repositório (' + MODO + ')', (trocas['/store.js'] || STORE) !== STORE || (trocas['/nuvem.js'] || NUVEM) !== NUVEM, true);
 
 conf('o firebase-tools está onde a prova procura (' + FIREBASE + ')', fs.existsSync(FIREBASE), true);
 const javaExe = JAVA_HOME ? path.join(JAVA_HOME, 'bin', process.platform === 'win32' ? 'java.exe' : 'java') : 'java';
@@ -239,6 +250,7 @@ async function restaurarPelaTela(pag, chaveFormatada, botaoRestaurar) {
     d.aulas = ['2026-06-01', '2026-06-03', '2026-06-08', '2026-06-10'].map(data => ({ id: 's1@' + data, alunoId: 'alfa', serieId: 's1', destacada: false, data, hora: '10:00',
       duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', anexos: [] }));
     d.aulas.push({ id: 'x1', alunoId: 'alfa', serieId: null, data: '2026-06-05', hora: '15:00', duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: 'avulsa', anexos: [] });
+    d.aulas.push({ id: 'x2', alunoId: 'alfa', serieId: null, data: '2026-06-12', hora: '15:00', duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: 'avulsa dois', anexos: [] });
     d.ajustes = { chavePix: 'pix-de-teste' };
     await Store.salvar(d);
   });
@@ -249,6 +261,11 @@ async function restaurarPelaTela(pag, chaveFormatada, botaoRestaurar) {
   const chaveA = await pagA.evaluate(() => Nuvem.verChave());
   const sA1 = await sincronizar(pagA);
   conf('A sincronizou: nada a receber, tudo enviado', sA1.recebidos === 0 && sA1.enviados > 0 && sA1.erroE === null, true);
+  /* A edita DEPOIS da cópia e sobe o registro: a cópia que B vai restaurar é mais
+   * velha que esta edição, e a restauração num dono não pode reescrevê-la. */
+  await editar(pagA, "d.aulas.find(a => a.id === 's1@2026-06-10').notaTexto = 'A editou antes de B restaurar';");
+  const sA1b = await sincronizar(pagA);
+  conf('A subiu a edição posterior à cópia', sA1b.enviados >= 1 && sA1b.erroE === null, true);
   const contextoB = await pagA.browser().createBrowserContext();
   const pagB = await contextoB.newPage();
   await prepararPagina(pagB, false);
@@ -257,8 +274,15 @@ async function restaurarPelaTela(pag, chaveFormatada, botaoRestaurar) {
   conf('B restaurou a cópia de A pelo código (tela larga: dono)', await restaurarPelaTela(pagB, chaveA.formatado, '#nuvem-restaurar'), true);
   const filaB = await pagB.evaluate(() => Store.lerFila().then(l => l.length));
   conf('B, dono, enfileirou o que restaurou', filaB > 0, true);
+  const filaRestauro = await pagB.evaluate(() => Store.lerFila().then(l => l.some(e => e.id === 'aula:s1@2026-06-08' && e.restauro === true)));
+  conf('as entradas da restauração estão marcadas como tal', filaRestauro, true);
   const sB1 = await sincronizar(pagB);
-  conf('B sincronizou: recebeu os de A (anotou o carimbo) e subiu os seus sem erro', sB1.erroR === null && sB1.erroE === null && sB1.enviados === filaB, true);
+  conf('B sincronizou: recebeu os de A (anotou o carimbo) e subiu os seus sem erro', sB1.erroR === null && sB1.erroE === null && sB1.enviados >= 1, true);
+  const restauroNaoVenceu = (await aula(pagB, 's1@2026-06-10')).nota === 'A editou antes de B restaurar' &&
+    (((await lerDoc(dona.idToken, dona.localId, 'registros/aula:s1@2026-06-10')).json || { fields: {} }).fields.atualizadoEm || {}).stringValue ===
+    (await pagA.evaluate(() => Store.lerRegistros().then(l => l.find(r => r.id === 'aula:s1@2026-06-10').atualizadoEm)));
+  prop('a restauração não reescreveu a edição mais nova de A: B ficou com ela e o servidor também', restauroNaoVenceu, MODOS[3]);
+  if (MODO === MODOS[3]) throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
   const sA2 = await sincronizar(pagA);
   conf('A recebeu as versões de B (iguais em conteúdo) sem erro', sA2.erroR === null, true);
   conf('A e B têm a mesma agenda', await retrato(pagA), await retrato(pagB));
@@ -293,6 +317,18 @@ async function restaurarPelaTela(pag, chaveFormatada, botaoRestaurar) {
   conf('depois de A gravar e subir outra coisa, a aula não voltou em B', (await aula(pagB, 'x1')) === null, true);
   if (MODO === MODOS[0]) throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
   conf('A e B iguais, sem a aula', await retrato(pagA), await retrato(pagB));
+
+  secao('3b. B apaga, A edita a mesma aula sem ter recebido: a edição ressuscita a aula, e o apagamento de B vai ao histórico de B');
+  const hBAntes = (await historico(pagB)).length;
+  await editar(pagB, "d.aulas = d.aulas.filter(a => a.id !== 'x2');");
+  await sincronizar(pagB);
+  await editar(pagA, "d.aulas.find(a => a.id === 'x2').notaTexto = 'A mexeu na que B apagou';");
+  const sA4b = await sincronizar(pagA);
+  conf('A recebeu a lápide de B, a edição pendente venceu e subiu', sA4b.erroR === null && sA4b.enviados >= 1, true);
+  const sB4b = await sincronizar(pagB);
+  conf('B recebeu a aula de volta', sB4b.recebidos >= 1 && (await aula(pagB, 'x2')) !== null, true);
+  conf('o apagamento de B que perdeu foi para o histórico de B', (await historico(pagB)).length, hBAntes + 1);
+  conf('A e B iguais, com a aula de volta', await retrato(pagA), await retrato(pagB));
 
   secao('4. Edição concorrente do mesmo registro: a última a chegar ao servidor vence, a outra vai ao histórico nos dois');
   await editar(pagB, "d.aulas.find(a => a.id === 's1@2026-06-08').notaTexto = 'B primeiro';");
@@ -376,6 +412,43 @@ async function restaurarPelaTela(pag, chaveFormatada, botaoRestaurar) {
   const lapideR1 = await pagB.evaluate(() => Store.lerRegistros().then(l => { const r = l.find(x => x.id === 'aula:s1@2026-06-01+r1'); return r ? !!r.apagadoEm : null; }));
   conf('a r1 em B virou lápide', lapideR1, true);
 
+  secao('7b. A fusão não mata aula legítima: a aula da série filha com o id da mãe (seguintes) e a mãe reaberta com +2; e nunca apaga aula com conteúdo');
+  const legitimas = await pagA.evaluate(async () => {
+    const d = await Store.carregar();
+    d.series.push({ id: 's3', alunoId: 'alfa', dias: [2, 4], hora: '09:00', duracaoMin: 60, inicio: '2026-07-01', fim: '2026-07-31', exclusoes: [], materializadoAte: null });
+    Core.garantirSeriesAte(d, '2026-07');
+    const corte = d.aulas.find(a => a.serieId === 's3' && a.data === '2026-07-14');
+    // "desta em diante" com hora nova: a série filha nasce e as aulas de 14/07 em diante passam para ela, com o id que têm
+    Core.aplicarEdicaoAula(d, corte.id, { hora: '16:00' }, 'seguintes');
+    const daFilha = d.aulas.find(a => a.id === 's3@2026-07-14');
+    daFilha.notaTexto = 'relato na aula da filha';
+    // a mãe reaberta sobre 14/07: o id s3@2026-07-14 já existe, a nova ganha +2
+    Core.editarSerie(d, 's3', { fim: '2026-07-31' }, '2026-07-14');
+    await Store.salvar(d);
+    const porId = l => l.filter(a => a.data === '2026-07-14').map(a => a.id + ' (' + a.serieId + ')').sort();
+    const antes = porId(d.aulas);
+    const contas = await Store.aplicarRecebidos([]);
+    const depois = porId((await Store.carregar()).aulas);
+    // duas reabertas (+r) na mesma série e data, a de menor r com relato: as duas ficam e o conflito vai ao histórico
+    const d2 = await Store.carregar();
+    d2.aulas.push({ id: 's3@2026-07-02+r1', alunoId: 'alfa', serieId: 's3', data: '2026-07-02', hora: '09:00', duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: 'relato da r1', anexos: [] });
+    d2.aulas.push({ id: 's3@2026-07-02+r2', alunoId: 'alfa', serieId: 's3', data: '2026-07-02', hora: '09:00', duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', anexos: [] });
+    await Store.salvar(d2);
+    const contas2 = await Store.aplicarRecebidos([]);
+    const vivas0702 = (await Store.carregar()).aulas.filter(a => a.data === '2026-07-02' && a.serieId === 's3').map(a => a.id).sort();
+    const conflito = (await Store.listarHistorico()).some(h => /as duas com conteúdo/.test(h.rotulo));
+    return { antes, depois, fundidas: contas.fundidas, vivas0702, conflitos: contas2.conflitos || 0, fundidas2: contas2.fundidas, conflito };
+  });
+  conf('o Core produziu as duas aulas legítimas de 14/07: a da filha com o id da mãe e a da mãe com +2',
+    JSON.stringify(legitimas.antes.map(a => a.split(' ')[0])), JSON.stringify(['s3@2026-07-14', 's3@2026-07-14+2']));
+  conf('e em séries diferentes', legitimas.antes.map(a => a.split(' ')[1]).join(',') !== '(s3),(s3)', true);
+  prop('a fusão não tocou nelas (séries diferentes, e sem +r)', legitimas.fundidas === 0 && JSON.stringify(legitimas.depois) === JSON.stringify(legitimas.antes), MODOS[4]);
+  if (MODO === MODOS[4]) throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
+  // (a aula original de 02/07, sem +r, fica fora da fusão e continua viva também)
+  conf('duas reabertas na mesma série e data, a de menor r com relato: as duas ficam', JSON.stringify(legitimas.vivas0702), JSON.stringify(['s3@2026-07-02', 's3@2026-07-02+r1', 's3@2026-07-02+r2']));
+  conf('nada fundido, um conflito registrado no histórico', legitimas.fundidas2 + '/' + legitimas.conflitos + '/' + legitimas.conflito, '0/1/true');
+  await editar(pagA, "d.aulas = d.aulas.filter(a => !/^s3@2026-07-02/.test(a.id));");
+
   secao('8. O celular só leitura restaura e RECEBE os registros, sem nunca enviar');
   const contextoC = await pagA.browser().createBrowserContext();
   const pagC = await contextoC.newPage();
@@ -387,8 +460,16 @@ async function restaurarPelaTela(pag, chaveFormatada, botaoRestaurar) {
   await clicar(pagC, '#cel-conta #nuvem-entrar');
   await esperar('o botão de trazer a cópia', () => existe(pagC, '#cel-trazer'), v => v === true, 15000);
   conf('o celular restaurou a cópia (a de A, antiga)', await restaurarPelaTela(pagC, chaveA.formatado, '#cel-trazer'), true);
+  /* A ordem no celular é restaurar e DEPOIS receber, em série, e a restauração
+   * zera o cursor: o recebimento recomeça do zero e as edições que a cópia não
+   * tinha chegam por cima dela. Aqui a prova espera o receber que a tela do
+   * celular dispara depois da restauração, e confere o cursor dos dois lados. */
+  const cursorDepois = await esperar('o recebimento que segue a restauração', () => pagC.evaluate(() => Store.lerCursor().then(c => c && c.servidorEm ? c.servidorEm : null)), v => !!v, 20000);
+  conf('depois da restauração veio um recebimento, em série, e o cursor foi gravado de novo', cursorDepois.ok, true);
   const rC = await pagC.evaluate(() => Nuvem.receberRegistros().then(r => ({ aplicados: r.aplicados, erro: r.erro ? r.erro.codigo : null })));
-  conf('o celular recebeu registros (as edições de A e B por cima da cópia antiga)', rC.aplicados > 0 && rC.erro === null, true);
+  conf('a cópia é mais velha que as edições: foi o recebimento que trouxe "A depois" (a restauração zerou o cursor e recomeçou)',
+    (await aula(pagC, 's1@2026-06-08')).nota, 'A depois');
+  conf('receber de novo no celular, em dia, não falha', rC.erro === null, true);
   conf('o celular vê "A depois" na aula de 08/06 e não vê a aula apagada', (await aula(pagC, 's1@2026-06-08')).nota + '/' + ((await aula(pagC, 'x1')) === null), 'A depois/true');
   conf('o celular tem a mesma agenda de A', await retrato(pagC), await retrato(pagA));
   const sC = await pagC.evaluate(() => Nuvem.sincronizar({ versaoApp: 'prova' }).then(r => r.enviados.pulado || null));
@@ -399,7 +480,22 @@ async function restaurarPelaTela(pag, chaveFormatada, botaoRestaurar) {
   secao('9. O cursor é guardado: receber de novo não aplica nada');
   const rA = await pagA.evaluate(() => Nuvem.receberRegistros().then(r => r.aplicados));
   conf('A, em dia, recebe zero', rA, 0);
-  conf('o cursor de A está gravado', await pagA.evaluate(() => Store.lerCursor().then(c => !!(c && c.servidorEm))), true);
+  conf('o cursor de A está gravado, com o par carimbo e nome', await pagA.evaluate(() => Store.lerCursor().then(c => !!(c && c.servidorEm && c.nome))), true);
+
+  secao('10. Mil registros em cinco commits: a paginação não perde nenhum');
+  const mil = await pagA.evaluate(async () => {
+    const d = await Store.carregar();
+    for (let k = 0; k < 1000; k++) d.aulas.push({ id: 'm' + k, alunoId: 'alfa', serieId: null, data: '2027-0' + (1 + (k % 9)) + '-' + String(1 + (k % 28)).padStart(2, '0'), hora: '08:00',
+      duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', anexos: [] });
+    await Store.salvar(d);
+    const r = await Nuvem.sincronizar({ versaoApp: 'prova' });
+    return { enviados: r.enviados.enviados, erro: r.enviados.erro ? r.enviados.erro.codigo : null, fila: await Store.tamanhoDaFila() };
+  });
+  conf('A subiu os mil (em lotes de 200) sem erro e a fila esvaziou', JSON.stringify(mil), JSON.stringify({ enviados: 1000, erro: null, fila: 0 }));
+  const milEmB = await pagB.evaluate(() => Nuvem.sincronizar({ versaoApp: 'prova' }).then(async r => ({ recebidos: r.recebidos.aplicados, erro: r.recebidos.erro ? r.recebidos.erro.codigo : null,
+    aulasM: (await Store.carregar()).aulas.filter(a => /^m\d+$/.test(a.id)).length })));
+  prop('B recebeu os mil registros, nenhum perdido entre as páginas', milEmB.aulasM === 1000 && milEmB.erro === null, MODOS[2]);
+  if (MODO === MODOS[2]) throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
   conf('nenhum erro de página em A, B e C', [pagA, pagB, pagC].map(p => p.errosDePagina.join(' | ')).filter(Boolean).join(' || '), '');
   await pagC.close(); await contextoC.close();
   await pagB.close(); await contextoB.close();

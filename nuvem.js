@@ -545,10 +545,11 @@
    * `currentDocument.updateTime` recusa a escrita se outro aparelho ou outra
    * aba gravou depois do que este aparelho viu por último; sem carimbo
    * conhecido, sem precondição (o primeiro envio do registro). */
-  function gravacaoCarimbada(nome, obj, updateTime) {
+  function gravacaoCarimbada(nome, obj, precondicao) {
     var w = { update: { name: nome, fields: campos(obj) },
       updateTransforms: [{ fieldPath: 'servidorEm', setToServerValue: 'REQUEST_TIME' }] };
-    if (updateTime) w.currentDocument = { updateTime: updateTime };
+    if (precondicao && precondicao.updateTime) w.currentDocument = { updateTime: precondicao.updateTime };
+    else if (precondicao && precondicao.exists === false) w.currentDocument = { exists: false };
     return w;
   }
   function remocao(nome) { return { delete: nome }; }
@@ -914,7 +915,12 @@
         return Promise.all(itens.map(function (i) { return documentoDoRegistro(i.registro, info.versaoApp); })).then(function (docs) {
           return commit(docs.map(function (d, k) {
             var conhecido = itens[k].registro.nuvem && itens[k].registro.nuvem.updateTime;
-            return gravacaoCarimbada(nomeDoc(uid, 'registros/' + d.id), d, conhecido || null);
+            /* A entrada de RESTAURAÇÃO sem carimbo conhecido exige que o documento
+             * não exista: se existir, a nuvem tem algo que este aparelho não viu,
+             * a precondição falha, o recebimento decide (o mais novo que a cópia
+             * vence) e só então se tenta de novo. */
+            var precondicao = conhecido ? { updateTime: conhecido } : (itens[k].fila.restauro ? { exists: false } : null);
+            return gravacaoCarimbada(nomeDoc(uid, 'registros/' + d.id), d, precondicao);
           }));
         }).then(function (resposta) {
           var resultados = (resposta && resposta.writeResults) || [];
@@ -1043,18 +1049,28 @@
       if (!root.Store || typeof root.Store.aplicarRecebidos !== 'function') return { pulado: 'sem store', aplicados: 0 };
       uidDona = (marcaSoLeitura && marcaSoLeitura.uidDona) || sessao.uid;
       return root.Store.lerCursor().then(function (cursor) {
-        var desde = (cursor && cursor.servidorEm) || '1970-01-01T00:00:00Z';
+        var desde = cursor && cursor.servidorEm ? { servidorEm: cursor.servidorEm, nome: cursor.nome || null } : null;
+        /* A consulta: em ordem de (servidorEm, __name__), começando DEPOIS do par
+         * do cursor. Só pelo carimbo não dá: os 200 registros de um commit têm o
+         * MESMO servidorEm, e uma página que acabasse no meio deles perderia o
+         * resto ao pedir "maior que o carimbo". Cursor antigo sem nome (não
+         * existe em produção) recomeça no próprio carimbo, inclusivo. */
+        function montarConsulta(c) {
+          var q = { from: [{ collectionId: 'registros' }],
+            orderBy: [{ field: { fieldPath: 'servidorEm' }, direction: 'ASCENDING' }, { field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
+            limit: 300 };
+          if (c && c.servidorEm) q.startAt = { values: valoresDoCursor(c), before: !c.nome };
+          return q;
+        }
+        function valoresDoCursor(c) {
+          var v = [{ timestampValue: c.servidorEm }];
+          if (c.nome) v.push({ referenceValue: c.nome });
+          return v;
+        }
         function pagina() {
           if (paginas++ >= 50) return { aplicados: aplicados, lidos: lidos };
           return comToken(function (cab) {
-            return pedir(urlDoc(raizDocumentos() + '/usuarios/' + uidDona) + ':runQuery', { cabecalhos: cab, corpo: {
-              structuredQuery: {
-                from: [{ collectionId: 'registros' }],
-                where: { fieldFilter: { field: { fieldPath: 'servidorEm' }, op: 'GREATER_THAN', value: { timestampValue: desde } } },
-                orderBy: [{ field: { fieldPath: 'servidorEm' }, direction: 'ASCENDING' }],
-                limit: 300
-              }
-            } });
+            return pedir(urlDoc(raizDocumentos() + '/usuarios/' + uidDona) + ':runQuery', { cabecalhos: cab, corpo: { structuredQuery: montarConsulta(desde) } });
           }).then(function (resposta) {
             var docs = (resposta || []).filter(function (x) { return x && x.document; }).map(function (x) { return x.document; });
             lidos += docs.length;
@@ -1062,7 +1078,7 @@
             return Promise.all(docs.map(function (d) {
               var v = valores(d.fields);
               var reg = { id: v.id, tipo: v.tipo, atualizadoEm: v.atualizadoEm, apagadoEm: v.apagadoEm || null, aparelho: v.aparelho || '',
-                esquema: v.esquema || 1, servidorEm: v.servidorEm || null, updateTime: d.updateTime || null, dados: null, eco: false };
+                esquema: v.esquema || 1, servidorEm: v.servidorEm || null, updateTime: d.updateTime || null, nome: d.name, dados: null, eco: false };
               if (meuId && reg.aparelho === meuId) reg.eco = true;
               if (reg.apagadoEm || !v.dados || !v.iv) return reg;
               return decifrarRegistro(v.iv, v.dados).then(function (dados) { reg.dados = dados; return reg; }, function () {
@@ -1075,14 +1091,14 @@
               var aplicaveis = regs.filter(function (r) { return !r.eco && !r.indecifravel; });
               var ecos = regs.filter(function (r) { return r.eco; });
               var indecifraveis = regs.filter(function (r) { return r.indecifravel; }).length;
-              var ultimo = regs.length ? regs[regs.length - 1].servidorEm : null;
-              var lote = aplicaveis.concat(ecos.map(function (r) { return { id: null, servidorEm: r.servidorEm }; }));
+              var ultimo = regs.length ? { servidorEm: regs[regs.length - 1].servidorEm, nome: regs[regs.length - 1].nome } : null;
+              var lote = aplicaveis.concat(ecos.map(function (r) { return { id: null, servidorEm: r.servidorEm, nome: r.nome }; }));
               // nada a aplicar: nenhuma transação de escrita (o celular em dia não grava nada)
               var aplicar = lote.length ? root.Store.aplicarRecebidos(lote) : Promise.resolve({ aplicados: 0 });
               return aplicar.then(function (contas) {
                 aplicados += contas.aplicados;
                 registros.indecifraveis = (registros.indecifraveis || 0) + indecifraveis;
-                if (docs.length < 300 || !ultimo) return { aplicados: aplicados, lidos: lidos };
+                if (docs.length < 300 || !ultimo || !ultimo.servidorEm) return { aplicados: aplicados, lidos: lidos };
                 desde = ultimo;
                 return pagina();
               });
