@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.6';
+  var VERSAO = '1.42.8';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.8',
+      itens: [
+        'O tablet e o celular passam a ficar iguais sozinhos: cada mudança sobe para a nuvem logo depois de gravada, cifrada, e chega ao outro aparelho quando ele abre com sinal.',
+        'Se os dois aparelhos mudarem a mesma coisa, vale a mudança mais nova, e a outra fica guardada no histórico, sem sumir.',
+        'Em Ajustes, o cartão da nuvem diz quantas mudanças ainda esperam para subir e quando chegaram as do outro aparelho.'
+      ]
+    },
     {
       versao: '1.42.6',
       itens: [
