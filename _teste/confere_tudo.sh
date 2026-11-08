@@ -732,6 +732,16 @@ roda "nuvem fase 0 --envenenado-anterior-cega"      node "_teste/testa_nuvem.js"
 # N0b: a gravacao feita DURANTE o envio continua pendente e sobe no envio
 # seguinte; o veneno zera o pendente no fim do envio, como antes
 roda "nuvem fase 0 --envenenado-pendente-zerado"    node "_teste/testa_nuvem.js" --envenenado-pendente-zerado
+# D6, parte 1: o modo celular so leitura, em 390x844 e contra o mesmo
+# emulador: as tres telas sem rolagem de lado e com alvos de 44 px, a copia
+# restaurada em Hoje, nenhuma gravacao no banco alem da restauracao, nenhum
+# envio a nuvem do celular (nem ao fechar, nem a diaria, nem deitado). Os
+# venenos: o celular que envia, o que mostra botao de edicao e o que grava a
+# carga inicial ao abrir TEM de ser vistos.
+roda "celular so leitura"                           node "_teste/testa_celular_leitura.js"
+roda "celular so leitura --envenenado-envia"        node "_teste/testa_celular_leitura.js" --envenenado-envia
+roda "celular so leitura --envenenado-edicao"       node "_teste/testa_celular_leitura.js" --envenenado-edicao
+roda "celular so leitura --envenenado-grava"        node "_teste/testa_celular_leitura.js" --envenenado-grava
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"
