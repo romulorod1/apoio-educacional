@@ -710,6 +710,25 @@ roda "copia confirmada"                           node "_teste/testa_copia_confi
 roda "exclusao de aluno em cascata"                node "_teste/testa_exclusao_aluno_cascata.js"
 roda "relato e Voltar"                            node "_teste/testa_relato_voltar.js"
 roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip.js"
+# N0: a copia na nuvem contra o Firebase Emulator Suite: as regras nos tres
+# casos (dona, observador, estranho), a ida e volta entre dois aparelhos pela
+# chave digitada, a copia automatica ao fechar e o servidor cego. Precisa do
+# firebase-tools FORA do repositorio (FIREBASE_TOOLS ou o caminho padrao da
+# prova) e de um JDK 21 em JAVA_HOME; sem eles, a prova diz onde procurou e
+# REPROVA, nunca passa calada. Os venenos: o zip subindo sem cifra tem de ser
+# visto pela parte do servidor cego; a regra que deixa qualquer conta ler tem
+# de ser vista pela parte das regras.
+roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
+roda "nuvem fase 0 --envenenado-sem-cifra"          node "_teste/testa_nuvem.js" --envenenado-sem-cifra
+roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
+# os dois medios da revisao adversarial (07/11): o banco vazio que subiria por
+# cima da copia boa depois do "Apagar tudo", e o campo do codigo que sumia
+# quando o aparelho ja tinha chave (sem saida para restaurar a copia de outra)
+roda "nuvem fase 0 --envenenado-sobe-vazio"         node "_teste/testa_nuvem.js" --envenenado-sobe-vazio
+roda "nuvem fase 0 --envenenado-esconde-codigo"     node "_teste/testa_nuvem.js" --envenenado-esconde-codigo
+# segunda rodada: a rotacao que so olhava o conteudo quando a nova era vazia
+# apagava a boa quando a atual era vazia e a anterior boa
+roda "nuvem fase 0 --envenenado-anterior-cega"      node "_teste/testa_nuvem.js" --envenenado-anterior-cega
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"

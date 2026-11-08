@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.2';
+  var VERSAO = '1.42.3';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.3',
+      itens: [
+        'Cópia na nuvem, em Ajustes: entre com o seu e-mail e senha e o aplicativo guarda uma cópia de tudo, trancada com uma chave que só existe neste tablet. Ninguém mais consegue ler: nem o Google, nem o Rômulo sem a sua permissão.',
+        'A cópia sobe sozinha ao fechar o aplicativo com sinal e uma vez por dia. Em Ajustes aparece quando foi a última.',
+        'Imprima a chave (o QR e o código) e guarde num lugar seguro: sem ela, a cópia não abre. Com ela, num tablet novo, é só entrar e tocar em "Restaurar neste aparelho".'
+      ]
+    },
     {
       versao: '1.42.2',
       itens: [
@@ -1179,7 +1187,10 @@
     'modal-nota': true,
     'modal-proposta': true,
     'modal-trilha': true,
-    'modal-virada-anual': true
+    'modal-virada-anual': true,
+    'modal-nuvem-chave': true,
+    'modal-nuvem-restaurar': true,
+    'modal-nuvem-senha': true
   };
 
   function abrirModal(id) {
@@ -1944,6 +1955,7 @@
       atualizarTemBiblioteca();
       // o botão Livros da aba Biblioteca nasce com a conta dos livros (C15.1)
       desenharLivrosAjustes();
+      iniciarNuvem();
       setTimeout(mostrarNovidades, 900);
       setTimeout(verificarViradaAnualAutomatica, 1400);
       registrarServiceWorker();
@@ -2281,6 +2293,15 @@
     $('#baixar-copia').addEventListener('click', baixarCopia);
     $('#restaurar-copia').addEventListener('click', function () { $('#arquivo-copia').click(); });
     $('#arquivo-copia').addEventListener('change', restaurarCopia);
+    /* N0: os botões fixos das janelas da nuvem; os do cartão em Ajustes nascem
+     * com o cartão (desenharNuvem). */
+    $('#nuvem-imprimir').addEventListener('click', imprimirChaveDaNuvem);
+    $('#nuvem-ler-qr').addEventListener('click', lerQrDaChave);
+    $('#nuvem-restaurar-confirmar').addEventListener('click', restaurarDaNuvem);
+    $('#nuvem-senha-confirmar').addEventListener('click', trocarSenhaDaNuvem);
+    $('#modal-nuvem-restaurar').addEventListener('click', function (ev) {
+      if (ev.target && ev.target.hasAttribute && ev.target.hasAttribute('data-fechar')) pararLeitorDeQr();
+    });
     $('#importar-biblioteca').addEventListener('click', function () { $('#arquivo-biblioteca').click(); });
     $('#exportar-etiquetas').addEventListener('click', exportarEtiquetas);
     $('#arquivo-biblioteca').addEventListener('change', importarBiblioteca);
@@ -7723,6 +7744,13 @@
      * exatamente aqui que a proposta que ela acabou de escrever precisa estar
      * no disco. */
     gravarRascunhoAgora();
+    // N0: fechou o aplicativo com sinal e houve mudança desde a última cópia
+    copiaAutomaticaParaNuvem('fechar');
+  });
+  /* N0: voltou ao aplicativo depois de um dia ou mais sem cópia: sobe agora,
+   * sem esperar o próximo fechar (o de ontem pode ter falhado sem ela ver). */
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') copiaAutomaticaParaNuvem('diaria');
   });
   window.addEventListener('pagehide', function () {
     if (editorAtual && editorAtual._aulaId) {
@@ -7731,6 +7759,7 @@
       gravarNota(editorAtual._aulaId).catch(function () { /* indicador registra o erro */ });
     }
     gravarRascunhoAgora();
+    copiaAutomaticaParaNuvem('fechar');
   });
 
   function gravarNota(aulaId) {
@@ -14206,6 +14235,7 @@
       }
       if (copiaPronta) desenharCopiaPronta(estadoCopia);
     }
+    desenharNuvem();
 
     /* O que ela procurou e não achou. Fica em Ajustes porque é conversa nossa,
      * não recurso dela: serve para decidir que assunto falta no banco e que
@@ -20676,10 +20706,462 @@
       // apagou tudo: o diário das guardadas pelo aplicativo também sai (C2a)
       gravarSelecoesAnteriores([]);
       memoriaSubstituida(); // apagou tudo: da pendência não há o que dizer além disso
+      /* N0: o banco vazio nunca pode subir sozinho por cima da cópia boa na
+       * nuvem. A automática desliga aqui e religa no próximo envio dela. */
+      if (temNuvem()) Nuvem.desligarAutomatica();
       desenharTudo();
-      avisar('Todos os dados foram apagados.');
+      avisar('Todos os dados foram apagados.' + (temNuvem() && Nuvem.estado().entrada ? ' A cópia automática na nuvem ficou desligada até o seu próximo envio.' : ''));
     }).catch(function (e) {
       releDoDisco(e, 'Não consegui apagar tudo.');
+    });
+  }
+
+  // ================= cópia na nuvem (N0) =================
+
+  /* O cartão "Cópia na nuvem" em Ajustes e as três janelas dele. O motor é o
+   * nuvem.js: entrada por e-mail e senha, a chave que nasce aqui e nunca sai,
+   * a cifra e os documentos no Firestore. Aqui fica só a tela e a ligação com
+   * o banco: o .zip que sobe é o da cópia de segurança (Store.exportarTudoZip)
+   * e o que volta passa pelo mesmo caminho da restauração (Store.importarZip),
+   * então a cópia na nuvem e a cópia em arquivo são a mesma coisa, com e sem
+   * cifra.
+   *
+   * A cópia automática (ao fechar com sinal, e uma vez por dia) só começa
+   * depois do primeiro envio feito por ela neste aparelho, ou de uma
+   * restauração aqui: um aparelho recém-instalado, ainda com a carga inicial,
+   * não pode subir por cima da cópia do tablet. */
+  var enviandoParaNuvem = false;
+  var copiasDaNuvem = [];
+  var copiaEscolhida = null;
+  var donaDaCopiaLida = null; // o uid que veio no QR, quando é de outra conta (D7)
+  var leitorDeQr = null;      // a câmera aberta para ler o QR da chave
+
+  function temNuvem() { return typeof Nuvem !== 'undefined' && Nuvem.disponivel(); }
+
+  function iniciarNuvem() {
+    if (!temNuvem()) { desenharNuvem(); return; }
+    Nuvem.aoMudar(desenharNuvem);
+    Nuvem.pronto().then(function () {
+      desenharNuvem();
+      copiaAutomaticaParaNuvem('diaria');
+    });
+  }
+
+  /* 'fechar' sobe se há mudança; 'diaria' só se a última cópia tem mais de um
+   * dia. Falha de automática fica quieta: a pendência continua e a próxima
+   * tenta de novo. */
+  function copiaAutomaticaParaNuvem(motivo) {
+    if (!temNuvem() || !db) return;
+    var devida = motivo === 'diaria' ? Nuvem.copiaDiariaDevida() : Nuvem.copiaAutomaticaDevida();
+    if (!devida) return;
+    enviarCopiaParaNuvem(motivo);
+  }
+
+  /* Cópia com conteúdo: algum aluno que não veio da carga inicial, ou mais
+   * aulas, séries ou resumos do que a carga inicial traz. Banco vazio e carga
+   * inicial intocada não contam: são o que um aparelho novo tem antes de
+   * restaurar, e nunca podem cobrir a cópia boa na nuvem. */
+  function copiaTemConteudo() {
+    if (!db || (!db.alunos.length && !db.aulas.length)) return false;
+    if (db.alunos.some(function (a) { return !a.daCargaInicial; })) return true;
+    var padrao = cargaInicial();
+    return db.aulas.length !== padrao.aulas.length || (db.series || []).length !== padrao.series.length ||
+      (db.resumos || []).length !== padrao.resumos.length;
+  }
+
+  /* Antes do envio dela, duas perguntas que evitam perder a cópia boa: num
+   * aparelho ainda sem chave, se a nuvem já tem cópia, o caminho certo é
+   * restaurar primeiro (enviar criaria uma chave nova aqui e poria a cópia
+   * deste aparelho como a mais recente); e um banco sem conteúdo por cima de
+   * uma cópia com conteúdo só sobe se ela confirmar. */
+  function confirmarEnvioDela(est) {
+    var conteudo = copiaTemConteudo();
+    if (est.temChave && conteudo) return Promise.resolve(true);
+    return Nuvem.listarCopias().then(function (lista) {
+      if (!lista.length) return true;
+      var quando = Nuvem.fraseDeQuando(lista[0].quando);
+      if (!est.temChave) {
+        return confirmar('Já existe uma cópia na nuvem desta conta, de ' + quando + '. Se este aparelho é novo, ' +
+          'toque em "Restaurar neste aparelho" primeiro. Enviar agora cria uma chave nova neste aparelho e põe a ' +
+          'cópia dele como a mais recente. Enviar mesmo assim?');
+      }
+      if (!lista.some(function (c) { return c.conteudo; })) return true;
+      return confirmar('A cópia deste aparelho está vazia, ou só com a carga inicial, e a nuvem tem uma cópia com ' +
+        'conteúdo, de ' + quando + '. Enviar mesmo assim? A cópia com conteúdo fica guardada como anterior.');
+    }, function () {
+      // sem conseguir consultar a nuvem, não se arrisca a cópia boa
+      avisar('Não consegui consultar a nuvem antes de enviar. Tente de novo em um minuto.');
+      return false;
+    });
+  }
+
+  function enviarCopiaParaNuvem(motivo) {
+    if (!temNuvem() || enviandoParaNuvem) return Promise.resolve();
+    var est = Nuvem.estado();
+    if (!est.entrada) return Promise.resolve();
+    var semChaveAntes = !est.temChave;
+    enviandoParaNuvem = true;
+    desenharNuvem();
+    var pergunta = motivo === 'ela' ? confirmarEnvioDela(est) : Promise.resolve(true);
+    return pergunta.then(function (segue) {
+      if (!segue) { enviandoParaNuvem = false; desenharNuvem(); return null; }
+      return Store.exportarTudoZip(db).then(function (zip) {
+        return Nuvem.enviarCopia(zip, { motivo: motivo, versaoApp: VERSAO, conteudo: copiaTemConteudo() });
+      });
+    }).then(function (copia) {
+      enviandoParaNuvem = false;
+      desenharNuvem();
+      if (!copia || copia.pulada || motivo !== 'ela') return;
+      if (semChaveAntes) {
+        avisar('Cópia enviada, ' + Math.round(copia.bytes / 1024) + ' KB. Agora imprima a chave da cópia.',
+          'Ver a chave', abrirChaveDaNuvem);
+      } else {
+        avisar('Cópia na nuvem enviada, ' + Math.round(copia.bytes / 1024) + ' KB.');
+      }
+    }, function (e) {
+      enviandoParaNuvem = false;
+      desenharNuvem();
+      if (motivo === 'ela') avisar(e && e.message ? e.message : 'Não consegui enviar a cópia. Tente de novo.');
+    });
+  }
+
+  function fraseDaUltimaCopiaNaNuvem(est) {
+    if (!est.ultimaCopia || !est.ultimaCopia.quando) return 'Nenhuma cópia subiu ainda deste aparelho.';
+    return 'Última cópia na nuvem: ' + Nuvem.fraseDeQuando(est.ultimaCopia.quando) + '.';
+  }
+
+  function mostrarMensagemDaNuvem(caixa, classe, texto) {
+    if (!caixa) return;
+    caixa.innerHTML = '';
+    if (texto) caixa.appendChild(el('div', { class: classe, texto: texto }));
+  }
+
+  function desenharNuvem() {
+    var caixa = $('#estado-nuvem');
+    if (!caixa) return;
+    caixa.innerHTML = '';
+    if (!temNuvem()) {
+      caixa.appendChild(el('div', { class: 'faixa-aviso u-margem-baixo-0',
+        texto: 'Este navegador não tem o que a cópia na nuvem precisa (a cifra e o banco local).' }));
+      return;
+    }
+    var est = Nuvem.estado();
+    if (!est.entrada) { desenharEntradaNaNuvem(caixa); return; }
+    var ocupado = est.enviando || enviandoParaNuvem;
+    caixa.appendChild(el('div', { class: est.ultimaCopia ? 'faixa-info' : 'faixa-aviso', id: 'nuvem-ultima',
+      texto: fraseDaUltimaCopiaNaNuvem(est) }));
+    caixa.appendChild(el('div', { class: 'ajuda', id: 'nuvem-automatica', texto: est.automatica
+      ? 'Sobe sozinha quando você fecha o aplicativo com internet, e uma vez por dia.' +
+        (est.pendente ? ' Há mudanças que ainda não subiram.' : '')
+      : 'A cópia automática começa depois do primeiro envio feito por você neste aparelho.' }));
+    caixa.appendChild(el('div', { class: 'barra' }, [
+      el('button', { type: 'button', class: 'btn principal', id: 'nuvem-enviar', disabled: ocupado,
+        texto: ocupado ? 'Enviando...' : 'Enviar cópia agora',
+        aoClick: function () { enviarCopiaParaNuvem('ela'); } }),
+      el('button', { type: 'button', class: 'btn', id: 'nuvem-restaurar', texto: 'Restaurar neste aparelho',
+        aoClick: abrirRestaurarDaNuvem }),
+      el('button', { type: 'button', class: 'btn', id: 'nuvem-ver-chave', texto: 'Ver a chave da cópia',
+        aoClick: abrirChaveDaNuvem })
+    ]));
+    caixa.appendChild(el('div', { class: 'barra u-margem-topo-8' }, [
+      el('span', { class: 'nuvem-conta cresce', id: 'nuvem-conta', texto: 'Conta: ' + est.entrada.email }),
+      el('button', { type: 'button', class: 'btn pequeno', id: 'nuvem-trocar-senha', texto: 'Trocar senha',
+        aoClick: abrirTrocarSenha }),
+      el('button', { type: 'button', class: 'btn pequeno', id: 'nuvem-sair', texto: 'Sair', aoClick: sairDaNuvem })
+    ]));
+    caixa.appendChild(desenharLeitoresDaNuvem(est));
+  }
+
+  function desenharEntradaNaNuvem(caixa) {
+    var email = el('input', { type: 'email', id: 'nuvem-email', autocomplete: 'username', inputmode: 'email',
+      autocapitalize: 'off', spellcheck: 'false' });
+    var senha = el('input', { type: 'password', id: 'nuvem-senha', autocomplete: 'current-password' });
+    var mensagem = el('div', { id: 'nuvem-mensagem' });
+    caixa.appendChild(el('p', { class: 'ajuda', texto: 'Entre com o e-mail e a senha da sua conta. É a mesma conta no tablet e no celular; nunca a conta do Google.' }));
+    caixa.appendChild(el('div', { class: 'linha' }, [
+      el('label', { class: 'campo' }, [el('span', { texto: 'E-mail' }), email]),
+      el('label', { class: 'campo' }, [el('span', { texto: 'Senha' }), senha])
+    ]));
+    caixa.appendChild(mensagem);
+    caixa.appendChild(el('div', { class: 'barra u-margem-baixo-0' }, [
+      el('button', { type: 'button', class: 'btn principal', id: 'nuvem-entrar', texto: 'Entrar',
+        aoClick: function () { entrarNaNuvem(email.value, senha.value, mensagem); } }),
+      el('button', { type: 'button', class: 'btn', id: 'nuvem-esqueci', texto: 'Esqueci a senha',
+        aoClick: function () { esqueciASenhaDaNuvem(email.value, mensagem); } })
+    ]));
+    senha.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') entrarNaNuvem(email.value, senha.value, mensagem);
+    });
+  }
+
+  function entrarNaNuvem(email, senha, mensagem) {
+    var botao = $('#nuvem-entrar');
+    if (botao) botao.disabled = true;
+    mostrarMensagemDaNuvem(mensagem, 'faixa-info', 'Entrando...');
+    Nuvem.entrar(email, senha).then(function () {
+      desenharNuvem();
+      var est = Nuvem.estado();
+      if (est.temChave) avisar('Você entrou.');
+      else avisar('Você entrou. A chave da cópia nasce neste aparelho no primeiro envio; depois, imprima.');
+    }, function (e) {
+      if (botao) botao.disabled = false;
+      mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', e && e.message ? e.message : 'Não consegui entrar.');
+    });
+  }
+
+  function esqueciASenhaDaNuvem(email, mensagem) {
+    mostrarMensagemDaNuvem(mensagem, 'faixa-info', 'Pedindo o e-mail...');
+    Nuvem.esqueciASenha(email).then(function () {
+      mostrarMensagemDaNuvem(mensagem, 'faixa-info',
+        'Se este e-mail tiver conta, chega uma mensagem com o link para criar uma senha nova. Olhe também o spam.');
+    }, function (e) {
+      mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', e && e.message ? e.message : 'Não consegui pedir o e-mail.');
+    });
+  }
+
+  function sairDaNuvem() {
+    if (!confirmar('Sair da conta neste aparelho? A chave da cópia continua guardada aqui, e a cópia automática para até você entrar de novo.')) return;
+    Nuvem.sair().then(desenharNuvem);
+  }
+
+  /* Quem mais pode ler (D7, o aparelho observador): a lista de códigos de
+   * conta que só leem a cópia. Fica dobrada e só consulta a nuvem ao abrir. */
+  function desenharLeitoresDaNuvem(est) {
+    var lista = el('div', { id: 'nuvem-leitores' });
+    var campo = el('input', { type: 'text', id: 'nuvem-leitor-novo', autocomplete: 'off', spellcheck: 'false' });
+    var mensagem = el('div', { id: 'nuvem-leitores-mensagem' });
+    function recarregar() {
+      lista.innerHTML = '';
+      lista.appendChild(el('div', { class: 'ajuda', texto: 'Consultando...' }));
+      Nuvem.leitores().then(function (uids) {
+        lista.innerHTML = '';
+        if (!uids.length) {
+          lista.appendChild(el('div', { class: 'ajuda', texto: 'Ninguém além de você lê esta cópia.' }));
+          return;
+        }
+        uids.forEach(function (uid) {
+          lista.appendChild(el('div', { class: 'item-lista' }, [
+            el('div', { class: 'cresce nuvem-conta', texto: uid }),
+            el('button', { type: 'button', class: 'btn pequeno', texto: 'Tirar', aoClick: function () {
+              Nuvem.tirarLeitor(uid).then(recarregar, function (e) { mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', e.message); });
+            } })
+          ]));
+        });
+      }, function (e) {
+        lista.innerHTML = '';
+        lista.appendChild(el('div', { class: 'faixa-aviso', texto: e && e.message ? e.message : 'Não consegui consultar agora.' }));
+      });
+    }
+    var det = el('details', { class: 'u-margem-topo-8', id: 'nuvem-detalhes', aoToggle: function () {
+      if (det.open) recarregar();
+    } }, [
+      el('summary', { texto: 'Quem mais pode ler esta cópia' }),
+      el('p', { class: 'ajuda u-margem-topo-8', texto: 'Outra conta (o celular de confiança) pode ler a cópia sem mexer nela. ' +
+        'Para isso, a pessoa entra na conta dela em Ajustes, copia o código da conta que aparece aqui embaixo e você o permite.' }),
+      el('p', { class: 'nuvem-conta', id: 'nuvem-meu-codigo', texto: 'Código desta conta: ' + est.entrada.uid }),
+      lista,
+      el('label', { class: 'campo u-margem-topo-8' }, [el('span', { texto: 'Permitir que esta conta leia (código da conta)' }), campo]),
+      mensagem,
+      el('div', { class: 'barra u-margem-baixo-0' }, [
+        el('button', { type: 'button', class: 'btn pequeno', id: 'nuvem-permitir', texto: 'Permitir só leitura', aoClick: function () {
+          Nuvem.permitirLeitor(campo.value).then(function () {
+            campo.value = '';
+            mostrarMensagemDaNuvem(mensagem, '', '');
+            recarregar();
+          }, function (e) { mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', e.message); });
+        } })
+      ])
+    ]);
+    return det;
+  }
+
+  // ---------- a chave ----------
+
+  function abrirChaveDaNuvem() {
+    Nuvem.verChave().then(function (chave) {
+      var qr = $('#nuvem-qr');
+      qr.innerHTML = '';
+      if (typeof qrcode === 'function') {
+        var q = qrcode(0, 'M');
+        q.addData(chave.qr);
+        q.make();
+        qr.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+      }
+      $('#nuvem-codigo').textContent = chave.formatado;
+      $('#nuvem-chave-conta').textContent = 'Conta: ' + Nuvem.estado().entrada.email;
+      abrirModal('modal-nuvem-chave');
+    }).catch(function (e) {
+      avisar(e && e.message ? e.message : 'Não consegui mostrar a chave.');
+    });
+  }
+
+  function imprimirChaveDaNuvem() {
+    document.body.classList.add('imprimindo-chave');
+    var tirar = function () {
+      document.body.classList.remove('imprimindo-chave');
+      window.removeEventListener('afterprint', tirar);
+    };
+    window.addEventListener('afterprint', tirar);
+    try { window.print(); } catch (e) { tirar(); return; }
+    setTimeout(tirar, 60000); // navegador que não dispara afterprint
+  }
+
+  // ---------- restaurar neste aparelho ----------
+
+  function abrirRestaurarDaNuvem() {
+    var est = Nuvem.estado();
+    copiasDaNuvem = [];
+    copiaEscolhida = null;
+    donaDaCopiaLida = null;
+    /* O campo do código fica SEMPRE à vista, mesmo com chave neste aparelho:
+     * a cópia pode ser de outra chave (um envio feito antes de restaurar), e
+     * sem o campo não haveria saída. Em branco, vale a chave do aparelho. */
+    $('#nuvem-chave-entrada').hidden = false;
+    $('#nuvem-codigo-digitado').placeholder = est.temChave ? 'Em branco: a chave deste aparelho' : 'XXXX XXXX XXXX ...';
+    $('#nuvem-codigo-digitado').value = '';
+    mostrarMensagemDaNuvem($('#nuvem-restaurar-mensagem'), '', '');
+    $('#nuvem-restaurar-confirmar').disabled = false;
+    pararLeitorDeQr();
+    abrirModal('modal-nuvem-restaurar');
+    listarCopiasDaNuvem(null);
+  }
+
+  function listarCopiasDaNuvem(uidDona) {
+    var caixa = $('#nuvem-copias');
+    caixa.innerHTML = '';
+    caixa.appendChild(el('div', { class: 'ajuda u-margem-topo-0', texto: 'Procurando as cópias na nuvem...' }));
+    Nuvem.listarCopias(uidDona).then(function (lista) {
+      copiasDaNuvem = lista;
+      copiaEscolhida = lista[0] || null;
+      caixa.innerHTML = '';
+      if (!lista.length) {
+        caixa.appendChild(el('div', { class: 'faixa-aviso', texto: 'Não há cópia na nuvem nesta conta ainda.' }));
+        return;
+      }
+      caixa.appendChild(el('p', { class: 'ajuda u-margem-topo-0', texto: 'Qual cópia trazer para este aparelho?' }));
+      lista.forEach(function (c, i) {
+        var marcador = el('input', { type: 'radio', name: 'nuvem-copia', value: c.id, checked: i === 0 ? 'checked' : null });
+        marcador.addEventListener('change', function () { copiaEscolhida = c; });
+        caixa.appendChild(el('label', { class: 'campo-checkbox' }, [marcador, el('span', {
+          texto: (c.papel === 'atual' ? 'Mais recente, de ' : 'Anterior, de ') + Nuvem.fraseDeQuando(c.quando) +
+            ' (' + Math.max(1, Math.round(c.bytes / 1024)) + ' KB, ' + c.aparelho + ')'
+        })]));
+      });
+    }).catch(function (e) {
+      caixa.innerHTML = '';
+      caixa.appendChild(el('div', { class: 'faixa-aviso', texto: e && e.message ? e.message : 'Não consegui consultar a nuvem.' }));
+    });
+  }
+
+  function restaurarDaNuvem() {
+    var mensagem = $('#nuvem-restaurar-mensagem');
+    if (!copiaEscolhida) { mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', 'Não há cópia escolhida.'); return; }
+    var est = Nuvem.estado();
+    var codigo = String($('#nuvem-codigo-digitado').value || '').trim() || null;
+    if (!est.temChave && !codigo) {
+      mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', 'Digite o código da chave, do papel impresso, ou leia o QR.');
+      return;
+    }
+    if (!confirmar('Restaurar esta cópia? Os dados atuais deste aparelho serão substituídos.' + avisoDePendenciaNaConfirmacao())) return;
+    var botao = $('#nuvem-restaurar-confirmar');
+    botao.disabled = true;
+    mostrarMensagemDaNuvem(mensagem, 'faixa-info', 'Baixando e abrindo a cópia...');
+    var copia = copiaEscolhida;
+    Nuvem.baixarCopia(copia.uid, copia.id, codigo).then(function (zip) {
+      return Store.importarZip(zip);
+    }).then(function (dados) {
+      db = dados;
+      var frase = memoriaSubstituida();
+      pararLeitorDeQr();
+      fecharModal('modal-nuvem-restaurar');
+      return Nuvem.restaurou(copia).then(function () {
+        desenharTudo();
+        avisar('Cópia restaurada da nuvem.' + frase);
+      });
+    }).catch(function (e) {
+      botao.disabled = false;
+      var frase = (e && (e.chaveErrada || e.invalida || e.semChave || e.codigo)) && e.message
+        ? e.message
+        : 'Não foi possível restaurar a cópia. Os dados atuais foram mantidos.';
+      mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', frase);
+    });
+  }
+
+  /* A câmera lê o QR do papel ou da tela do outro aparelho (BarcodeDetector,
+   * que o Chrome do Android tem). Sem ele, fica o código digitado. */
+  function lerQrDaChave() {
+    var caixa = $('#nuvem-leitor'), video = $('#nuvem-video'), mensagem = $('#nuvem-restaurar-mensagem');
+    if (leitorDeQr) { pararLeitorDeQr(); return; }
+    if (typeof BarcodeDetector === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', 'Este aparelho não lê QR pela câmera aqui dentro. Digite o código do papel.');
+      return;
+    }
+    var detector;
+    try { detector = new BarcodeDetector({ formats: ['qr_code'] }); }
+    catch (e) {
+      mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', 'Este aparelho não lê QR pela câmera aqui dentro. Digite o código do papel.');
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function (stream) {
+      caixa.hidden = false;
+      video.srcObject = stream;
+      var vivo = true;
+      leitorDeQr = { parar: function () {
+        vivo = false;
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        video.srcObject = null;
+        caixa.hidden = true;
+      } };
+      var olhar = function () {
+        if (!vivo) return;
+        detector.detect(video).then(function (codigos) {
+          var lido = codigos && codigos[0] && Nuvem.lerQr(codigos[0].rawValue);
+          if (!lido) { setTimeout(olhar, 300); return; }
+          $('#nuvem-codigo-digitado').value = Nuvem.formatarCodigo(lido.codigo);
+          pararLeitorDeQr();
+          mostrarMensagemDaNuvem(mensagem, 'faixa-info', 'QR lido. Toque em "Restaurar neste aparelho".');
+          var est = Nuvem.estado();
+          if (lido.uid && est.entrada && lido.uid !== est.entrada.uid) {
+            donaDaCopiaLida = lido.uid;
+            listarCopiasDaNuvem(lido.uid);
+          }
+        }, function () { setTimeout(olhar, 500); });
+      };
+      video.play().then(function () { setTimeout(olhar, 300); }, function () { setTimeout(olhar, 800); });
+    }).catch(function () {
+      mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', 'Não consegui abrir a câmera. Digite o código do papel.');
+    });
+  }
+  function pararLeitorDeQr() {
+    if (!leitorDeQr) return;
+    leitorDeQr.parar();
+    leitorDeQr = null;
+  }
+
+  // ---------- trocar senha ----------
+
+  function abrirTrocarSenha() {
+    $('#nuvem-senha-atual').value = '';
+    $('#nuvem-senha-nova').value = '';
+    $('#nuvem-senha-repetida').value = '';
+    $('#nuvem-senha-confirmar').disabled = false;
+    mostrarMensagemDaNuvem($('#nuvem-senha-mensagem'), '', '');
+    abrirModal('modal-nuvem-senha');
+  }
+
+  function trocarSenhaDaNuvem() {
+    var mensagem = $('#nuvem-senha-mensagem');
+    var atual = $('#nuvem-senha-atual').value, nova = $('#nuvem-senha-nova').value, repetida = $('#nuvem-senha-repetida').value;
+    if (nova !== repetida) { mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', 'As duas senhas novas não são iguais.'); return; }
+    var botao = $('#nuvem-senha-confirmar');
+    botao.disabled = true;
+    mostrarMensagemDaNuvem(mensagem, 'faixa-info', 'Trocando...');
+    Nuvem.trocarSenha(atual, nova).then(function () {
+      fecharModal('modal-nuvem-senha');
+      avisar('Senha trocada.');
+    }, function (e) {
+      botao.disabled = false;
+      mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', e && e.message ? e.message : 'Não consegui trocar a senha.');
     });
   }
 

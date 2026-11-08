@@ -109,8 +109,10 @@
  * tablet na main instalaria a D2 dentro do cache de onde está abrindo. O v78
  * (D2b com B4) serve da versão da janela tudo o que está no cache dela, troca
  * só com o cache novo completo, e traz o deploy no Cloudflare com a faixa de
- * endereço desligada (sw.js, app.js, styles.css e index.html). */
-var CACHE = 'apoio-educacional-v78';
+ * endereço desligada (sw.js, app.js, styles.css e index.html). O v79 (N0)
+ * traz a cópia na nuvem cifrada no aparelho: nuvem.js e o gerador de QR entram
+ * na lista; app.js, store.js, index.html e styles.css mudam. */
+var CACHE = 'apoio-educacional-v79';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -130,6 +132,10 @@ var ARQUIVOS = [
    * WhatsApp. Se ficasse de fora da lista, o app.js novo rodaria contra o
    * cartao.js velho servido do cache de sobra, depois de uma atualizacao. */
   './cartao.js',
+  /* A cópia na nuvem (N0): o motor e o gerador do QR da chave. Fora da lista,
+   * o app.js novo abriria Ajustes sem o Nuvem depois de uma atualização. */
+  './vendor/qrcode-generator-1.4.4/qrcode.js',
+  './nuvem.js',
   './app.js',
   './manifest.webmanifest',
   './icons/icon-192.png',

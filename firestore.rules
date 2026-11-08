@@ -1,0 +1,36 @@
+rules_version = '2';
+
+// Regras do Firestore do Apoio Educacional (fase 0 da nuvem, projeto
+// nw-apoio-educacional).
+//
+// Tudo mora em usuarios/{uid}/... e o uid é o da conta que entrou no app:
+//   - a dona do caminho (a professora) lê e escreve o caminho dela;
+//   - quem estiver no documento usuarios/{uid}/config/leitores, no campo
+//     uids, lê o caminho dela e não escreve nada (o aparelho observador);
+//   - qualquer outra conta, com ou sem login, não lê nem escreve nada.
+// Nenhum uid fica fixo aqui: o documento de leitores é escrito só pela dona,
+// pelo próprio aplicativo. O conteúdo da cópia chega cifrado no aparelho
+// (AES-GCM), então estas regras protegem quem pode baixar a cópia, e a chave,
+// que nunca sai do aparelho, protege o que está dentro dela.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function entrou() {
+      return request.auth != null && request.auth.uid != null;
+    }
+    function dona(uid) {
+      return entrou() && request.auth.uid == uid;
+    }
+    function leitor(uid) {
+      return entrou()
+        && exists(/databases/$(database)/documents/usuarios/$(uid)/config/leitores)
+        && request.auth.uid in get(/databases/$(database)/documents/usuarios/$(uid)/config/leitores).data.uids;
+    }
+    match /usuarios/{uid}/{resto=**} {
+      allow read: if dona(uid) || leitor(uid);
+      allow write: if dona(uid);
+    }
+    match /{outro=**} {
+      allow read, write: if false;
+    }
+  }
+}

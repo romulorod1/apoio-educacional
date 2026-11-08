@@ -145,9 +145,24 @@ conf('controle: a busca de nomes repetidos enxerga um var a mais',
 const corpoRele = (APP.split(RELE_ASSINATURA)[1] || '').split(/\r?\n  \}\r?\n/)[0];
 conf('o corpo do releDoDisco foi achado', corpoRele.length > 50, true);
 conf('o releDoDisco não grava a memória', /salvar\(/.test(corpoRele), false);
-// as três substituições inteiras e o Atualizar perguntam já dizendo o que a pendência perde
-conf('as quatro perguntas (três substituições e o Atualizar) levam o aviso da pendência',
-  (APP.match(/avisoDePendenciaNaConfirmacao\(\)\)/g) || []).length, 4);
+// as substituições inteiras (voltar a um ponto, restaurar cópia em arquivo, restaurar da
+// nuvem (N0) e apagar tudo) e o Atualizar perguntam já dizendo o que a pendência perde.
+// O critério é por pergunta, e não só pela contagem: toda confirmar() que troca ou
+// apaga o banco inteiro tem de levar o aviso, e nenhuma outra pergunta o leva.
+const PERGUNTAS_QUE_SUBSTITUEM = [
+  /confirmar\('Atualizar o aplicativo agora\?'[^\n]*/,
+  /confirmar\('Voltar ao estado anterior a "[^\n]*/,
+  /confirmar\('Restaurar esta cópia\? Os dados atuais deste tablet serão substituídos\.'[^\n]*/,
+  /confirmar\('Restaurar esta cópia\? Os dados atuais deste aparelho serão substituídos\.'[^\n]*/,
+  /confirmar\('Apagar TODOS os dados deste tablet\?[\s\S]*?avisoDePendenciaNaConfirmacao\(\)\)\)/
+];
+const perguntasAchadas = PERGUNTAS_QUE_SUBSTITUEM.map(re => (APP.match(re) || [''])[0]);
+conf('as cinco perguntas que substituem o banco (quatro substituições e o Atualizar) existem no app.js',
+  perguntasAchadas.filter(Boolean).length, PERGUNTAS_QUE_SUBSTITUEM.length);
+conf('cada uma delas leva o aviso da pendência',
+  perguntasAchadas.filter(p => /avisoDePendenciaNaConfirmacao\(\)/.test(p)).length, PERGUNTAS_QUE_SUBSTITUEM.length);
+conf('nenhuma outra pergunta leva o aviso (toda ocorrência é de uma das cinco)',
+  (APP.match(/avisoDePendenciaNaConfirmacao\(\)\)/g) || []).length, PERGUNTAS_QUE_SUBSTITUEM.length);
 [['ligação do tratamento', APP, LIGACAO], ['olho na hora', APP, OLHO_NA_HORA], ['início do releDoDisco', APP, RELE_INICIO],
   ['frase da pendência que saiu', APP, FRASE_SAIU], ['comDesfazer cumpre na falha', APP, DESFAZER_CUMPRE],
   ['ponto de retorno não segura', APP, PONTO_NAO_SEGURA], ['aviso na confirmação', APP, AVISO_NA_CONFIRMACAO],
