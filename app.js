@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.12';
+  var VERSAO = '1.42.13';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.13',
+      itens: [
+        'No celular, o Hoje virou uma agenda do dia: cada aula na cor do aluno, os horários livres à vista e a faixa da semana no alto para trocar de dia.',
+        'Tocando numa aula do celular: Realizada, Faltou, Cancelar (com ou sem cobrança, também a de hoje), Remarcar (com os horários livres e aviso se houver outra aula no mesmo horário) e Escrever como foi.',
+        'Tocando num horário livre, o celular já abre "Marcar aula" naquela hora.'
+      ]
+    },
     {
       versao: '1.42.11',
       itens: [
