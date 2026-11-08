@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.10';
+  var VERSAO = '1.42.11';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,13 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.11',
+      itens: [
+        'Em Ajustes, no cartão da nuvem, "Aparelhos na nuvem" mostra os aparelhos que usam a sua conta, com a versão e se está tudo enviado. Um aparelho antigo pode ser esquecido ali.',
+        'Se você der ao Rômulo o código da conta, o celular dele só lê a sua agenda e o fechamento, e mostra se os seus aparelhos estão em dia. Ele nunca muda nada.'
+      ]
+    },
     {
       versao: '1.42.10',
       itens: [
