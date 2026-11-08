@@ -21,6 +21,7 @@
   --sombra-forte: 0 12px 40px rgba(20, 40, 70, .22);
   --raio: 12px;
   --alvo: 44px;
+  --alvo-celular: 48px; /* no celular (D6), folga acima dos 44 */
 
   /* Seis tamanhos de letra (B12). Todo font-size da folha sai daqui; um
      tamanho novo entra na escala, nunca solto numa regra. */
@@ -2923,9 +2924,13 @@ body.modo-celular > .celular {
   flex-shrink: 0;
 }
 .cel-marca { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.cel-marca strong { color: var(--navy); font-size: var(--letra-4); }
-.cel-origem { font-size: var(--letra-2); color: var(--muted); overflow-wrap: anywhere; }
-.cel-topo-acoes { flex-shrink: 0; }
+.cel-marca strong { color: var(--navy); font-size: var(--letra-3); line-height: 1.35; }
+/* O texto secundário do celular usa o cinza escuro da escala (mais de 7:1
+   sobre o branco e o marfim), e não o --muted, que fica perto de 4,5:1. */
+.cel-origem { font-size: var(--letra-2); color: var(--novidades-subtitulo); overflow-wrap: anywhere; }
+body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
+.cel-topo-acoes { flex-shrink: 0; max-width: 45%; }
+.cel-topo-acoes .btn { white-space: normal; text-align: center; line-height: 1.25; }
 .cel-conteudo {
   flex: 1;
   min-height: 0;
@@ -2953,7 +2958,12 @@ body.modo-celular > .celular {
   padding: 6px 0;
   border-top: 1px solid var(--fio-claro);
   font-size: var(--letra-3);
+  color: var(--texto);
 }
+.cel-linha .cresce { flex: 1; min-width: 0; }
+/* O valor de cada aula, alinhado à direita e na cor do texto: a cor aqui não
+   quer dizer nada (pago ou não é do tablet, na lista de pendências). */
+.cel-valor { white-space: nowrap; color: var(--texto); }
 .cel-abas {
   display: flex;
   flex-shrink: 0;
@@ -2968,13 +2978,13 @@ body.modo-celular > .celular {
   border: 0;
   border-radius: 10px;
   background: transparent;
-  color: var(--muted);
+  color: var(--novidades-subtitulo);
   font: inherit;
   font-size: var(--letra-4);
   font-weight: 600;
 }
 .cel-aba.ativa { background: var(--soft); color: var(--navy); }
-body.modo-celular .celular .btn { min-height: var(--alvo); }
+body.modo-celular .celular .btn { min-height: var(--alvo-celular); }
 body.modo-celular .celular input { min-height: var(--alvo); box-sizing: border-box; max-width: 100%; }
 body.modo-celular .celular .linha { flex-direction: column; }
 @media print {

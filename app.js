@@ -20943,7 +20943,13 @@
     Nuvem.entrar(email, senha).then(function () {
       desenharNuvem();
       var est = Nuvem.estado();
-      if (modoCelular) avisar('Você entrou. Agora traga a cópia do tablet.');
+      if (modoCelular && temMarcaSoLeitura()) {
+        // o celular que já tem a cópia: volta às telas e busca a mais nova
+        celularPedeEntrada = false;
+        desenharCelular();
+        atualizarCelularDaNuvem();
+        avisar('Você entrou. Os dados novos do tablet chegam sozinhos ao abrir.');
+      } else if (modoCelular) avisar('Você entrou. Agora traga a cópia do tablet.');
       else if (est.temChave) avisar('Você entrou.');
       else avisar('Você entrou. A chave da cópia nasce neste aparelho no primeiro envio; depois, imprima.');
     }, function (e) {
@@ -21360,16 +21366,28 @@
     return frase;
   }
 
+  /* O alto diz em duas linhas o que o celular é e de quando são os dados:
+   * "Este celular só consulta. Para mudar algo, use o tablet." e, embaixo,
+   * "Dados de hoje, 14:02, do tablet." */
+  var REGRA_CELULAR = 'Este celular só consulta. Para mudar algo, use o tablet.';
   function desenharTopoCelular() {
     var origem = $('#cel-origem');
     if (!origem) return;
+    $('#cel-regra').textContent = REGRA_CELULAR;
     origem.textContent = fraseDaOrigemCelular();
-    var acoes = $('#cel-topo-acoes');
+    var acoes = $('#cel-acoes');
     acoes.innerHTML = '';
     if (!temDadosNoCelular() || celularPedeEntrada) return;
     if (temMarcaSoLeitura()) {
-      acoes.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'cel-atualizar',
-        disabled: celularBuscando, texto: 'Buscar de novo', aoClick: atualizarCelularDaNuvem }));
+      var semConta = temNuvem() && !Nuvem.estado().entrada;
+      if (semConta) {
+        // sem a conta, o que ela precisa fazer, num botão que leva direto à entrada
+        acoes.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'cel-entrar',
+          texto: 'Entrar para receber os dados novos', aoClick: function () { celularPedeEntrada = true; desenharCelular(); } }));
+      } else {
+        acoes.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'cel-atualizar',
+          disabled: celularBuscando, texto: 'Buscar de novo', aoClick: atualizarCelularDaNuvem }));
+      }
       /* A saída da marca, só com a tela larga (a janela E o aparelho): num
        * celular, em pé ou deitado, ela não aparece. */
       if (telaLarga()) {
@@ -21441,7 +21459,7 @@
     if (!temNuvem() || celularBuscando || !temMarcaSoLeitura()) return Promise.resolve();
     var est = Nuvem.estado();
     if (!est.entrada || !est.temChave) {
-      celularRecado = est.entrada ? '' : 'Entre na conta para receber os dados novos.';
+      celularRecado = ''; // sem a conta, o alto mostra o botão de entrar
       desenharTopoCelular();
       return Promise.resolve();
     }
@@ -21590,7 +21608,7 @@
       var linhas = f.linhas.map(function (l) {
         return el('li', { class: 'cel-linha' }, [
           el('span', { class: 'cresce', texto: Core.ddmm(l.data) + (l.hora ? ' ' + l.hora : '') + ' · ' + Core.fmtDuracao(l.duracaoMin) + ' · ' + l.statusRotulo }),
-          el('span', { texto: l.cobravel ? dinheiro(l.valor) : '' })
+          el('span', { class: 'cel-valor', texto: l.cobravel ? dinheiro(l.valor) : '' })
         ]);
       });
       caixa.appendChild(el('div', { class: 'cartao cel-fechamento-aluno' }, [

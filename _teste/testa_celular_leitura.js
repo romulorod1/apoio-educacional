@@ -454,6 +454,11 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     const e = Nuvem.estado(); return e.soLeitura && e.uidDona === u && e.automatica === false;
   }, dona.localId), ENVIA ? false : true);
   conf('no alto: "Dados de hoje, HH:MM, do tablet."', /^Dados de hoje, \d\d:\d\d, do tablet\.$/.test(await texto(pagB, '#cel-origem')), true);
+  conf('no alto, antes: "Este celular só consulta. Para mudar algo, use o tablet."', await texto(pagB, '#cel-regra'),
+    'Este celular só consulta. Para mudar algo, use o tablet.');
+  conf('o texto secundário do celular usa o cinza escuro da escala (#4B5563, mais de 7:1), e não o --muted', await pagB.evaluate(() =>
+    [getComputedStyle(document.querySelector('#cel-hoje .ajuda')).color, getComputedStyle(document.querySelector('#cel-origem')).color].join(' ')),
+    'rgb(75, 85, 99) rgb(75, 85, 99)');
   conf('o observador de avisos vê (o "Pronto" da restauração foi visto)', await pagB.evaluate(() => window.__avisos.some(t => /Pronto: os dados do tablet chegaram/.test(t))), true);
   await pagB.evaluate(() => { document.querySelector('#cel-abas .cel-aba[data-cel="fechamento"]').click(); document.querySelector('#cel-abas .cel-aba[data-cel="hoje"]').click(); });
   await zerarEscritas(pagB);
@@ -490,6 +495,8 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     conf('"' + t + '": em pé, "Este aparelho passa a editar" não aparece', await existe(pagB, '#nuvem-passa-a-editar'), false);
   }
   if (EDICAO) { await ctxB.close(); return; }
+  conf('todos os botões das três telas e do alto foram medidos (' + Object.keys(telas).map(t => t + ': ' + telas[t].alvos).join(', ') + ')',
+    Object.keys(telas).every(t => telas[t].alvos >= 5), true);
   conf('as abas de baixo têm alvo de 44 px ou mais', await pagB.evaluate(() =>
     Array.from(document.querySelectorAll('#cel-abas .cel-aba')).every(b => b.getBoundingClientRect().height >= 44)), true);
   conf('Fechamento: o aluno, as aulas e o valor do mês', await pagB.evaluate(() => {
@@ -511,10 +518,18 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
   conf('Enviar: cada família tem "Enviar o PDF"', baixados, true);
   const pdf = await esperar('o PDF do fechamento saiu pelo caminho do tablet', () => pagB.evaluate(() => window.__baixou.slice()), v => v && v.length > 0, 10000);
   conf('o PDF do fechamento foi para o compartilhar do celular (o mesmo exportarAlunoEmPdf)', pdf.ok && /^Fechamento.*\.pdf application\/pdf$/.test(pdf.valor[0]), true);
+  const enviadosAntes = (await pagB.evaluate(() => window.__baixou.length));
   await clicar(pagB, '#cel-enviar-todas');
   conf('"Enviar para todas as famílias" abre a janela de sempre', await esperar('a janela do envio abriu', () =>
     existe(pagB, '#modal-envio-familias.aberto #envio-enviar'), v => v === true, 5000).then(r => r.ok), true);
-  await pagB.evaluate(() => document.querySelector('#envio-parar').click());
+  conf('a sequência do tablet mostra a quem vai antes de enviar ("Família 1 de 1: Aluno Alfa Teste")',
+    await texto(pagB, '#envio-etapa'), 'Família 1 de 1: Aluno Alfa Teste');
+  conf('e o toque não dispara nada: nenhum PDF foi ao compartilhar antes de "Enviar o PDF"',
+    await pagB.evaluate(() => window.__baixou.length), enviadosAntes);
+  await clicar(pagB, '#envio-enviar');
+  conf('o "Enviar o PDF" da sequência manda um PDF, o da família mostrada',
+    (await esperar('o PDF da sequência saiu', () => pagB.evaluate(() => window.__baixou.length), v => v === enviadosAntes + 1, 10000)).ok, true);
+  await esperar('o fim da sequência', () => existe(pagB, '#envio-fechar'), v => v === true, 5000);
   await pagB.evaluate(() => document.querySelector('#envio-fechar').click());
   conf('usar as três telas e enviar não gravou nada no banco', (await escritasNoBanco(pagB)).length, 0);
 
@@ -580,6 +595,21 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     conf('e nada foi aplicado: a cópia é a mesma e nenhuma escrita no banco', (await pagB.evaluate(() => Nuvem.estado().ultimaCopia.id)) === nova.valor &&
       (await escritasNoBanco(pagB)).length === 0, true);
     conf('em toda a rodada do celular, nenhum "Este celular só lê"', (await recusasSoLeitura(pagB)).length, 0);
+
+    /* Sem a conta: o alto mostra o botão de entrar, que leva direto à entrada;
+     * entrando, o celular volta às telas. */
+    await pagB.evaluate(() => Nuvem.sair());
+    await abrir(pagB);
+    conf('sem a conta, o alto oferece "Entrar para receber os dados novos"', await texto(pagB, '#cel-entrar'), 'Entrar para receber os dados novos');
+    conf('e a linha dos dados não manda ninguém "entrar na conta" em texto solto', /Entre na conta/.test(await texto(pagB, '#cel-origem')), false);
+    await clicar(pagB, '#cel-entrar');
+    conf('o botão leva direto à entrada (e-mail e senha)', await pagB.evaluate(() =>
+      document.querySelector('#cel-entrada').classList.contains('ativa') && !!document.querySelector('#cel-conta #nuvem-email')), true);
+    await digitar(pagB, '#cel-conta #nuvem-email', DONA.email);
+    await digitar(pagB, '#cel-conta #nuvem-senha', DONA.senha);
+    await clicar(pagB, '#cel-conta #nuvem-entrar');
+    conf('entrando, o celular volta às telas com os dados', (await esperar('voltou a Hoje', () => pagB.evaluate(() =>
+      document.querySelector('#cel-hoje.ativa') !== null && !!document.querySelector('#cel-atualizar')), v => v === true, 15000)).ok, true);
   }
 
   secao('7. O celular que restaurou pela tela do tablet antes (sem a marca) não sobe nada em pé');
