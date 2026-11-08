@@ -114,8 +114,9 @@
  * na lista; app.js, store.js, index.html e styles.css mudam. O v80 (N0b) conta
  * a geração das mudanças no envio da nuvem (nuvem.js e app.js). O v81 (D6a)
  * traz o modo celular só leitura (app.js, store.js, nuvem.js, index.html e
- * styles.css), com a lista igual. */
-var CACHE = 'apoio-educacional-v81';
+ * styles.css), com a lista igual. O v82 (N1, fatia 1) traz o banco por registro
+ * (IndexedDB 5; store.js e core.js), com a lista igual. */
+var CACHE = 'apoio-educacional-v82';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
