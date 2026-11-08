@@ -596,10 +596,13 @@
         // o que ela gravou DURANTE o envio não está nesta cópia: continua pendente
         pendente = geracao !== geracaoDoRetrato;
         automatica = true;
-        // o envio feito por ela religa a sincronização que o "Apagar tudo" desligou
-        var religar = info.motivo === 'ela' ? religarSincronizacao() : Promise.resolve();
+        // o envio feito por ela religa a sincronização que o "Apagar tudo" desligou, e o que está aqui passa a valer
+        var religar = info.motivo === 'ela' ? religarSincronizacao({ tudoDesteAparelho: true }) : Promise.resolve();
         return Promise.all([gravarEstado('copia', ultimaCopia), gravarEstado('pendente', pendente), gravarEstado('automatica', true), religar]);
-      }).then(function () { return ultimaCopia; });
+      }).then(function () {
+        if (info.motivo === 'ela') agendarEnvioDeRegistros(); // o que o religar enfileirou sobe daqui a pouco
+        return ultimaCopia;
+      });
     });
     var limpar = function () { enviando = null; avisarOuvintes(); };
     enviando.then(limpar, limpar);
@@ -732,11 +735,14 @@
     var marca = root.Store && typeof root.Store.desligarSincronizacao === 'function' ? root.Store.desligarSincronizacao().catch(function () {}) : Promise.resolve();
     return Promise.all([gravarEstado('automatica', false), marca]).then(avisarOuvintes, avisarOuvintes);
   }
-  function religarSincronizacao() {
+  /* opcoes.tudoDesteAparelho: o religar pelo "Enviar cópia agora", em que o
+   * Store enfileira todo registro vivo e as lápides (o que está neste aparelho
+   * passa a valer); a restauração religa sem isso, porque já enfileirou. */
+  function religarSincronizacao(opcoes) {
     sincronizacaoDesligada = false;
     if (!root.Store || typeof root.Store.religarSincronizacao !== 'function') return Promise.resolve();
     // sempre no Store, mesmo com a memória já ligada: a marca de lá é a que vale
-    return root.Store.religarSincronizacao().catch(function () { /* fica em memória */ });
+    return root.Store.religarSincronizacao(opcoes || {}).catch(function () { /* fica em memória */ });
   }
   /* O aviso chega de dentro do oncomplete da gravação dela (store.js). A
    * memória muda na hora; a gravação do sinal no banco próprio fica para o

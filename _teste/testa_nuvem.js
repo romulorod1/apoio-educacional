@@ -452,6 +452,52 @@ const retrato = (pag) => pag.evaluate(async () => {
   conf('a automática ligou em B depois de restaurar', /Sobe sozinha/.test(await texto(pagB, '#nuvem-automatica')), true);
   conf('em B, "Última cópia na nuvem" passa a ser a restaurada', /^Última cópia na nuvem: hoje, \d\d:\d\d\.$/.test(await texto(pagB, '#nuvem-ultima')), true);
 
+  secao('5b. O observador, com OUTRA conta, traz a cópia da dona só para ler (D7)');
+  /* O uid da dona vinha no QR, que saiu: agora ela o copia do cartão da nuvem
+   * ("Código da conta para o observador") e o observador o digita em
+   * "Restaurar neste aparelho". As regras decidem: o observador permitido lê a
+   * cópia dela; o aparelho dele passa a só ler e não escreve nada na nuvem. */
+  const contextoD = await pagA.browser().createBrowserContext();
+  const pagD = await contextoD.newPage();
+  await prepararPagina(pagD);
+  await H.abrirApp(pagD, amb.ORIGEM);
+  conf('o observador entrou com a conta dele', await entrarPelaTela(pagD, OBS.email, OBS.senha), true);
+  conf('o cartão mostra o código da conta para o observador (o uid)', await texto(pagD, '#nuvem-meu-codigo'), 'Código da conta para o observador: ' + obs.localId);
+  conf('com o botão Copiar ao lado', await existe(pagD, '#nuvem-copiar-codigo'), true);
+  conf('no aparelho da dona o código é o dela', await texto(pagA, '#nuvem-meu-codigo'), 'Código da conta para o observador: ' + dona.localId);
+  await clicar(pagD, '#nuvem-restaurar');
+  const semCopia = await esperar('a janela diz que a conta do observador não tem cópia', () => texto(pagD, '#nuvem-copias'), v => /Não há cópia na nuvem nesta conta/.test(v || ''), 15000);
+  conf('sem código da dona, a lista é a da própria conta (vazia)', semCopia.ok, true);
+  await digitar(pagD, '#nuvem-conta-dona', 'ab/c?d');
+  await clicar(pagD, '#nuvem-conta-dona-buscar');
+  conf('código de conta mal formado é recusado antes de consultar', /não parece certo/.test(await texto(pagD, '#nuvem-restaurar-mensagem')), true);
+  await digitar(pagD, '#nuvem-conta-dona', estranho.localId);
+  await clicar(pagD, '#nuvem-conta-dona-buscar');
+  const estranhoNao = await esperar('a conta que não permitiu o observador não lista cópia', () => texto(pagD, '#nuvem-copias'), v => /Não há cópia|recusou/.test(v || ''), 15000);
+  conf('o código de uma conta que não o permitiu não lista cópia (a regra nega)', estranhoNao.ok && /recusou/.test(await texto(pagD, '#nuvem-copias')), !REGRA_ABERTA);
+  await digitar(pagD, '#nuvem-conta-dona', dona.localId);
+  await clicar(pagD, '#nuvem-conta-dona-buscar');
+  const listaDona = await esperar('a janela lista as cópias da dona', () => pagD.evaluate(() => document.querySelectorAll('#modal-nuvem-restaurar.aberto #nuvem-copias input[type=radio]').length), v => v >= 1, 15000);
+  conf('com o código da dona, as cópias dela aparecem', listaDona.ok, true);
+  const pedidosAntesD = pagD.pedidos.length;
+  await clicar(pagD, '#nuvem-restaurar-confirmar');
+  const trouxe = await esperar('o observador restaurou', () => pagD.evaluate(async () => !document.querySelector('#modal-nuvem-restaurar.aberto') && (await Store.carregar()).alunos.some(a => a.id === 'alfa')), v => v === true, 30000);
+  conf('o observador trouxe a cópia da dona, só com o login e o código da conta dela', trouxe.ok, true);
+  conf('a pergunta disse que o aparelho passa a só ler', pagD.dialogos.some(d => /outra conta.*passa a só ler/.test(d)), true);
+  conf('o observador ficou só leitura, com a conta da dona na marca e a automática desligada', await pagD.evaluate(u => { const e = Nuvem.estado(); return e.soLeitura && e.uidDona === u && e.automatica === false; }, dona.localId), true);
+  conf('o observador recebe os registros da dona (só leitura na nuvem) sem erro', await pagD.evaluate(() => Nuvem.receberRegistros().then(r => r.erro ? r.erro.codigo : null)), null);
+  conf('editar no observador é recusado', await pagD.evaluate(async () => { try { await Store.salvar(await Store.carregar()); return false; } catch (e) { return !!(e && e.soLeitura); } }), true);
+  conf('sincronizar no observador só recebe', await pagD.evaluate(() => Nuvem.sincronizar().then(r => r.enviados.pulado || null)), 'so leitura');
+  await pausa(3000);
+  conf('nenhuma escrita saiu do observador (nenhum commit)', pagD.pedidos.slice(pedidosAntesD).filter(u => /:commit\b/.test(u)).length, 0);
+  // com a marca, o aparelho do observador fica no modo de só leitura (as telas do celular), e assim reabre
+  conf('o aparelho do observador passou ao modo de só leitura', await pagD.evaluate(() => document.body.classList.contains('modo-celular') && Store.estaSoLendo()), true);
+  await H.abrirApp(pagD, amb.ORIGEM);
+  await pagD.evaluate(() => Nuvem.pronto());
+  conf('reaberto, continua só leitura, com a conta da dona na marca', await pagD.evaluate(u => { const e = Nuvem.estado(); return e.soLeitura && e.uidDona === u && document.body.classList.contains('modo-celular'); }, dona.localId), true);
+  conf('nenhum erro de script no observador', JSON.stringify(pagD.errosDePagina), '[]');
+  await contextoD.close();
+
   secao('6. (b) A cópia automática ao fechar, a anterior e a que sai');
   await pagB.evaluate(async () => {
     const d = await Store.carregar();
@@ -595,12 +641,14 @@ const retrato = (pag) => pag.evaluate(async () => {
     !document.querySelector('#modal-nuvem-restaurar.aberto') && (await Store.carregar()).alunos.some(a => a.id === 'alfa')), v => v === true, 30000);
   conf('mesmo tendo enviado antes, C restaura a cópia com conteúdo sem chave nem código', saiuC.ok, true);
   /* Desde a N1 (fatia 3), logo depois da cópia chegam os registros mais novos
-   * que ela: a cópia "anterior" não tinha a aluna gama, que B gravou depois e
-   * subiu como registro; C fica com a cópia MAIS a gama, que é o que B tem. */
-  const retratoC = await retrato(pagC);
-  const retratoB2 = (() => { const r = JSON.parse(retratoA); r.alunos.push(['gama', 'Aluna Gama Teste']); return JSON.stringify(r); })();
-  const esperadoC = await esperar('os registros mais novos que a cópia chegaram a C', () => retrato(pagC), v => v === retratoB2, 20000);
-  conf('os dados de C são os da cópia de A mais o que chegou por registro depois dela (a gama de B)', esperadoC.ok || retratoC === retratoB2, true);
+   * que ela. A gama, que B gravou depois da cópia, NÃO volta: B apagou tudo e
+   * mandou a cópia dele valer ("Enviar cópia agora" religa e o que está no
+   * aparelho passa a valer), e a gama virou lápide no servidor. A restauração
+   * de C vence nas lápides do que a cópia tem. */
+  await pagC.evaluate(() => Nuvem.receberRegistros());
+  conf('os dados de C são os da cópia de A (a gama de B, apagada no "Apagar tudo" que passou a valer, não volta)', await retrato(pagC), retratoA);
+  const gamaNoServidor = ((await lerDoc(dona.idToken, dona.localId, 'registros/aluno:gama')).json || { fields: {} }).fields;
+  conf('no servidor a gama é lápide (apagada por B)', !!(gamaNoServidor && gamaNoServidor.apagadoEm), true);
   {
     /* Vazia atual (a de C), boa anterior (a terceira): C cria um aluno e fecha.
      * A automática sobe com conteúdo, e a boa tem de ficar como anterior; a

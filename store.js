@@ -1984,8 +1984,44 @@
   function desligarSincronizacao() {
     return gravar('controle', 'sincronizacao', { desligada: true, desde: new Date().toISOString() });
   }
-  function religarSincronizacao() {
-    return apagar('controle', 'sincronizacao');
+  /* Religar pelo "Enviar cópia agora" (opcoes.tudoDesteAparelho): "o que está
+   * neste aparelho passa a valer", como na restauração. Todo registro vivo
+   * sincronizável entra na fila (com `restauro`, para o servidor ser recebido
+   * antes quando o carimbo não é conhecido) e a lápide do que não está vivo
+   * também: o cadastro feito depois do "Apagar tudo" sobe, e o que ela apagou
+   * sai do outro aparelho. Só quando a marca estava lá; a restauração já
+   * enfileirou o dela e religa sem isto. Passa pela trava como a restauração. */
+  function religarSincronizacao(opcoes) {
+    opcoes = opcoes || {};
+    return sincronizacaoDesligada().then(function (estava) {
+      if (!estava) return; // nada a religar: nenhuma transação de escrita (o celular que só lê não grava à toa)
+      return abrir().then(function (b) { return religarNoBanco(b, opcoes); });
+    });
+  }
+  function religarNoBanco(b, opcoes) {
+    return new Promise(function (resolve, reject) {
+        var t = transacao(b, ['controle', 'registros', 'saida'], 'readwrite', true);
+        var controle = t.objectStore('controle');
+        var marcaReq = controle.get('sincronizacao');
+        marcaReq.onsuccess = function () {
+          var marca = marcaReq.result;
+          controle.delete('sincronizacao');
+          if (opcoes.tudoDesteAparelho && marca && marca.desligada) {
+            var saida = t.objectStore('saida');
+            var todos = t.objectStore('registros').getAll();
+            todos.onsuccess = function () {
+              (todos.result || []).forEach(function (r) {
+                if (!sincronizavel(r.id, r.tipo)) return;
+                if (r.apagadoEm) saida.put({ id: r.id, tipo: r.tipo, atualizadoEm: r.atualizadoEm, apagadoEm: r.apagadoEm });
+                else saida.put({ id: r.id, tipo: r.tipo, atualizadoEm: r.atualizadoEm, apagadoEm: null, restauro: true });
+              });
+            };
+          }
+        };
+        t.oncomplete = function () { resolve(); };
+        t.onerror = function () { reject(t.error); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+    });
   }
 
   function apagarTudo() {

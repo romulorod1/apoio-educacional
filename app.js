@@ -2342,6 +2342,7 @@
     /* N0: os botões fixos das janelas da nuvem; os do cartão em Ajustes nascem
      * com o cartão (desenharNuvem). */
     $('#nuvem-restaurar-confirmar').addEventListener('click', restaurarDaNuvem);
+    $('#nuvem-conta-dona-buscar').addEventListener('click', buscarCopiasDaContaDigitada);
     $('#nuvem-senha-confirmar').addEventListener('click', trocarSenhaDaNuvem);
     $('#importar-biblioteca').addEventListener('click', function () { $('#arquivo-biblioteca').click(); });
     $('#exportar-etiquetas').addEventListener('click', exportarEtiquetas);
@@ -20764,9 +20765,9 @@
 
   // ================= cópia na nuvem (N0) =================
 
-  /* O cartão "Cópia na nuvem" em Ajustes e as três janelas dele. O motor é o
-   * nuvem.js: entrada por e-mail e senha, a chave que nasce aqui e nunca sai,
-   * a cifra e os documentos no Firestore. Aqui fica só a tela e a ligação com
+  /* O cartão "Cópia na nuvem" em Ajustes e as duas janelas dele. O motor é o
+   * nuvem.js: entrada por e-mail e senha e os documentos no Firestore (sem
+   * cifra: o que protege é a conta e as regras). Aqui fica só a tela e a ligação com
    * o banco: o .zip que sobe é o da cópia de segurança (Store.exportarTudoZip)
    * e o que volta passa pelo mesmo caminho da restauração (Store.importarZip),
    * então a cópia na nuvem e a cópia em arquivo são a mesma coisa, com e sem
@@ -20954,6 +20955,16 @@
       : 'A cópia automática começa depois do primeiro envio feito por você neste aparelho.' }));
     caixa.appendChild(el('div', { class: (est.registros && est.registros.erro) || est.sincronizacaoDesligada ? 'faixa-aviso u-margem-baixo-0' : 'ajuda',
       id: 'nuvem-registros', texto: fraseDosRegistrosNaNuvem(est) }));
+    /* O código desta conta (D7): o observador digita este código no "Restaurar
+     * neste aparelho" dele para achar a cópia dela; ela o copia daqui. */
+    caixa.appendChild(el('div', { class: 'item-lista' }, [
+      el('span', { class: 'cresce nuvem-conta', id: 'nuvem-meu-codigo', texto: 'Código da conta para o observador: ' + est.entrada.uid }),
+      el('button', { type: 'button', class: 'btn pequeno', id: 'nuvem-copiar-codigo', texto: 'Copiar', aoClick: function () {
+        var ok = function () { avisar('Código da conta copiado.'); };
+        var falhou = function () { avisar('Não consegui copiar. O código está escrito ao lado do botão.'); };
+        try { navigator.clipboard.writeText(est.entrada.uid).then(ok, falhou); } catch (e) { falhou(); }
+      } })
+    ]));
     caixa.appendChild(el('div', { class: 'barra' }, [
       el('button', { type: 'button', class: 'btn principal', id: 'nuvem-enviar', disabled: ocupado,
         texto: ocupado ? 'Enviando...' : 'Enviar cópia agora',
@@ -21061,8 +21072,8 @@
     } }, [
       el('summary', { texto: 'Quem mais pode ler esta cópia' }),
       el('p', { class: 'ajuda u-margem-topo-8', texto: 'Outra conta (o celular de confiança) pode ler a cópia sem mexer nela. ' +
-        'Para isso, a pessoa entra na conta dela em Ajustes, copia o código da conta que aparece aqui embaixo e você o permite.' }),
-      el('p', { class: 'nuvem-conta', id: 'nuvem-meu-codigo', texto: 'Código desta conta: ' + est.entrada.uid }),
+        'Para isso, a pessoa entra na conta dela em Ajustes, copia o código da conta que aparece no cartão da nuvem dela e você o permite aqui. ' +
+        'No aparelho dela, em "Restaurar neste aparelho", ela digita o código da SUA conta (o de cima, com o botão Copiar).' }),
       lista,
       el('label', { class: 'campo u-margem-topo-8' }, [el('span', { texto: 'Permitir que esta conta leia (código da conta)' }), campo]),
       mensagem,
@@ -21090,9 +21101,26 @@
     copiaEscolhida = null;
     mostrarMensagemDaNuvem($('#nuvem-restaurar-mensagem'), '', '');
     $('#nuvem-restaurar-confirmar').disabled = false;
-    abrirModal('modal-nuvem-restaurar');
     var est = Nuvem.estado();
-    listarCopiasDaNuvem(est.soLeitura && est.uidDona ? est.uidDona : null);
+    /* O observador (D7) digita o código da conta da dona; em branco, a cópia é
+     * da própria conta. Quem já é observador vê o código guardado na marca. */
+    var deOutra = est.soLeitura && est.uidDona && est.entrada && est.uidDona !== est.entrada.uid;
+    $('#nuvem-conta-dona').value = deOutra ? est.uidDona : '';
+    abrirModal('modal-nuvem-restaurar');
+    listarCopiasDaNuvem(deOutra ? est.uidDona : null);
+  }
+  /* "Buscar as cópias desta conta": o código digitado, validado, lista as
+   * cópias da dona; as regras do Firestore decidem se este aparelho pode ler. */
+  function buscarCopiasDaContaDigitada() {
+    var mensagem = $('#nuvem-restaurar-mensagem');
+    var codigo = String($('#nuvem-conta-dona').value || '').trim();
+    var est = Nuvem.estado();
+    if (codigo && !/^[A-Za-z0-9_-]{6,128}$/.test(codigo)) {
+      mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', 'Este código de conta não parece certo. Peça à dona para copiá-lo em Ajustes, no cartão da nuvem.');
+      return;
+    }
+    mostrarMensagemDaNuvem(mensagem, '', '');
+    listarCopiasDaNuvem(codigo && est.entrada && codigo !== est.entrada.uid ? codigo : null);
   }
 
   function listarCopiasDaNuvem(uidDona) {
@@ -21129,9 +21157,17 @@
      * ANTES de os dados chegarem, e daí em diante nada sobe daqui. */
     // por qualquer caminho, num aparelho com tela de celular a restauração grava a marca
     var comoCelular = modoCelular || telaDeCelular();
+    /* A cópia de OUTRA conta (o observador, D7) só pode ser lida: este aparelho
+     * passa a só ler, seja qual for a tela, e nunca escreve na nuvem dela. */
+    var est = Nuvem.estado();
+    var deOutraConta = !!(est.entrada && copiaEscolhida.uid && copiaEscolhida.uid !== est.entrada.uid);
+    var soLeitura = comoCelular || deOutraConta;
     /* O celular nunca tem mudança por guardar (ele não edita): a pergunta
      * dele não precisa do aviso da pendência. */
-    if (comoCelular) {
+    if (deOutraConta && !comoCelular) {
+      if (!confirmar('Trazer a cópia de outra conta para este aparelho? Os dados atuais dele serão substituídos, e ele passa a só ler: ' +
+        'nada daqui vai para a nuvem, e os dados chegam sempre do aparelho da dona.')) return;
+    } else if (comoCelular) {
       if (!confirmar('Trazer esta cópia para este celular? Os dados atuais dele serão substituídos, e ele passa a só ler: ' +
         'nada daqui vai para a nuvem, e os dados chegam sempre do tablet.')) return;
     } else if (!confirmar('Restaurar esta cópia? Os dados atuais deste aparelho serão substituídos.' + avisoDePendenciaNaConfirmacao())) return;
@@ -21142,19 +21178,20 @@
     var zipBaixado = null;
     Nuvem.baixarCopia(copia.uid, copia.id).then(function (zip) {
       zipBaixado = zip;
-      return comoCelular ? Nuvem.marcarSoLeitura(copia.uid) : null;
+      return soLeitura ? Nuvem.marcarSoLeitura(copia.uid) : null;
     }).then(function () {
-      if (comoCelular) aplicarModoCelular();
+      // com a marca gravada, o aparelho passa ao modo de só leitura (o mesmo que ele terá ao reabrir)
+      if (soLeitura) aplicarModoCelular();
       return Store.importarZip(zipBaixado, { daNuvem: true });
     }).then(function (dados) {
       db = dados;
       var frase = memoriaSubstituida();
       fecharModal('modal-nuvem-restaurar');
-      return Nuvem.restaurou(copia, { soLeitura: comoCelular }).then(function () {
+      return Nuvem.restaurou(copia, { soLeitura: soLeitura }).then(function () {
         desenharTudo();
-        if (comoCelular) {
+        if (soLeitura) {
           desenharCelular();
-          avisar('Pronto: os dados do tablet chegaram. Este celular só lê.');
+          avisar(comoCelular ? 'Pronto: os dados do tablet chegaram. Este celular só lê.' : 'Pronto: a cópia da outra conta chegou. Este aparelho só lê.');
         } else {
           avisar('Cópia restaurada da nuvem.' + frase);
         }

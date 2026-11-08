@@ -60,7 +60,11 @@ service cloud.firestore {
         && (!('partes' in d) || d.partes is int)
         && (!('quando' in d) || (d.quando is string && d.quando.size() <= 40))
         && (!('aparelho' in d) || (d.aparelho is string && d.aparelho.size() <= 64))
-        && (!('aparelhoId' in d) || (d.aparelhoId is string && d.aparelhoId.size() <= 64));
+        && (!('aparelhoId' in d) || (d.aparelhoId is string && d.aparelhoId.size() <= 64))
+        && (!('versao' in d) || d.versao is int)
+        && (!('motivo' in d) || (d.motivo is string && d.motivo.size() <= 16))
+        && (!('app' in d) || (d.app is string && d.app.size() <= 32))
+        && (!('conteudo' in d) || d.conteudo is bool);
     }
     function parteValida() {
       let d = request.resource.data;
