@@ -3219,6 +3219,33 @@ body.modo-celular .celular .linha-pagamento .barra { flex-wrap: wrap; }
 /* As aulas ainda agendadas, à parte no Fechamento do celular (D6b). */
 .cel-subtitulo { margin-top: 10px; font-size: var(--letra-2); font-weight: 700; color: var(--novidades-subtitulo); }
 .cel-linha-futura { color: var(--novidades-subtitulo); }
+/* A ficha mínima do aluno e a aba Alunos (D6c, lote 2). Ligar, WhatsApp, as
+   mensagens prontas, o mapa e o link são links com cara de botão: abrem fora
+   do aplicativo e não gravam nada. */
+.cel-folha-nome {
+  display: inline-flex; align-items: center; gap: 6px; min-height: var(--alvo-celular); max-width: 100%;
+  padding: 0; border: 0; background: transparent; color: var(--navy);
+  font: inherit; font-weight: 700; text-align: left; cursor: pointer;
+}
+.cel-folha-nome-seta { color: var(--novidades-subtitulo); }
+.cel-ficha { font-size: var(--letra-3); }
+.cel-ficha-linha { margin: 8px 0 4px; font-size: var(--letra-4); color: var(--texto); }
+.cel-ficha-botoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 0; }
+.cel-ficha-mensagens { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; }
+body.modo-celular .celular a.cel-link-botao { min-height: var(--alvo-celular); text-decoration: none; text-align: center; white-space: normal; }
+.cel-ficha-lugar { margin-top: 8px; }
+.cel-alunos-lista { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.cel-aluno-item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  width: 100%; min-height: 56px; padding: 8px 12px;
+  border: 1px solid var(--fio-claro); border-left: 6px solid var(--cor-aluno); border-radius: 10px;
+  background: var(--branco); color: var(--texto); font: inherit; text-align: left; cursor: pointer;
+}
+.cel-aluno-nome { font-size: var(--letra-5); font-weight: 700; color: var(--navy); }
+.cel-aluno-detalhe { font-size: var(--letra-2); color: var(--novidades-subtitulo); }
+body.modo-celular .celular .campo[hidden] { display: none; }
+/* Com cinco abas (o observador), a letra desce um degrau para caber em 390 px. */
+.cel-abas.muitas .cel-aba { min-width: 0; padding: 0 2px; font-size: var(--letra-2); }
 /* O aviso no celular ocupa o seu lugar entre o conteúdo e as abas (o app.js
    o põe ali): nunca cobre o formulário nem a barra de baixo. */
 body.modo-celular .celular > .aviso { position: static; transform: none; transition: none; display: none; max-width: none;

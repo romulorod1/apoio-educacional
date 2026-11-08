@@ -5110,6 +5110,45 @@
       ])
     ]));
 
+    /* (D6c, lote 2) Telefone do responsável e casa ou online, todos
+     * opcionais: é o que a ficha mínima do celular usa para ligar, abrir o
+     * WhatsApp, o mapa e o link da aula. */
+    var localDaFicha = novo ? '' : (alunoEmEdicao.local || '');
+    painel.dados.appendChild(el('div', { class: 'linha' }, [
+      el('label', { class: 'campo' }, [
+        el('span', { texto: 'Telefone do responsável' }),
+        el('input', {
+          type: 'tel', id: 'campo-telefone', autocomplete: 'off',
+          value: novo ? '' : (alunoEmEdicao.telefone || ''),
+          placeholder: 'Opcional. Com DDD, para ligar e o WhatsApp no celular.'
+        })
+      ]),
+      el('label', { class: 'campo' }, [
+        el('span', { texto: 'Onde é a aula' }),
+        el('select', { id: 'campo-local' }, [['', 'Não informado'], ['casa', ONDE_E_A_AULA.casa], ['online', ONDE_E_A_AULA.online]].map(function (o) {
+          return el('option', { value: o[0], texto: o[1], selected: o[0] === localDaFicha ? 'selected' : null });
+        }))
+      ])
+    ]));
+    painel.dados.appendChild(el('div', { class: 'linha' }, [
+      el('label', { class: 'campo' }, [
+        el('span', { texto: 'Endereço' }),
+        el('input', {
+          type: 'text', id: 'campo-endereco', autocomplete: 'off',
+          value: novo ? '' : (alunoEmEdicao.endereco || ''),
+          placeholder: 'Opcional. Abre no mapa pelo celular.'
+        })
+      ]),
+      el('label', { class: 'campo' }, [
+        el('span', { texto: 'Link da aula online' }),
+        el('input', {
+          type: 'url', id: 'campo-link-online', autocomplete: 'off',
+          value: novo ? '' : (alunoEmEdicao.linkOnline || ''),
+          placeholder: 'Opcional. https://...'
+        })
+      ])
+    ]));
+
     var anoDaFicha = novo ? { ano: '', outro: '' } : anoEscolarCadastrado(alunoEmEdicao);
     var selecaoAno = el('select', { id: 'campo-ano-escolar' });
     selecaoAno.appendChild(el('option', { value: '', texto: 'Não informado' }));
@@ -7556,7 +7595,8 @@
   /* O aluno novo: o da ficha do tablet (salvarAluno) e o do celular (D6b),
    * que preenche só o essencial. */
   function alunoNovo(c) {
-    return {
+    // o telefone, casa ou online, o endereço e o link (D6c, lote 2) só entram quando preenchidos
+    return gravarLugarEContato({
       id: Core.uid(), nome: c.nome,
       anoEscolar: c.anoEscolar || '', anoEscolarOutro: c.anoEscolarOutro || '',
       responsavel: c.responsavel || '',
@@ -7565,7 +7605,13 @@
       obsPedagogicas: c.obsPedagogicas || '',
       desde: c.desde || null,
       mapeamentos: []
-    };
+    }, c);
+  }
+
+  /* Os campos opcionais do lote 2 do D6c, como a ficha do tablet os tem. */
+  function lugarEContatoDaFicha() {
+    var ler = function (s) { var e = $(s); return e ? e.value : ''; };
+    return { telefone: ler('#campo-telefone'), local: ler('#campo-local'), endereco: ler('#campo-endereco'), linkOnline: ler('#campo-link-online') };
   }
 
   function salvarAluno() {
@@ -7599,8 +7645,9 @@
       alunoEmEdicao.obs = $('#campo-obs').value.trim();
       alunoEmEdicao.obsPedagogicas = $('#campo-obs-pedagogicas').value.trim();
       alunoEmEdicao.desde = $('#campo-desde').value || null;
+      gravarLugarEContato(alunoEmEdicao, lugarEContatoDaFicha());
     } else {
-      var criado = alunoNovo({
+      var criado = alunoNovo(Object.assign({
         nome: nome,
         anoEscolar: anoNovo, anoEscolarOutro: Core.anoEscolarLivre(anoNovo) ? anoOutroNovo : '',
         responsavel: $('#campo-responsavel').value.trim(),
@@ -7608,7 +7655,7 @@
         obs: $('#campo-obs').value.trim(),
         obsPedagogicas: $('#campo-obs-pedagogicas').value.trim(),
         desde: $('#campo-desde').value || null
-      });
+      }, lugarEContatoDaFicha()));
       db.alunos.push(criado);
 
       var marcar = $('#campo-agendar-mapeamento');
@@ -21582,6 +21629,7 @@
     celularPedeEntrada = false;
     formCelular = null;
     folhaCelular = null;
+    alunoCelular = null; // a aba Alunos volta à lista
     diaRoladoCelular = null; // voltando a Hoje, a linha do tempo rola até agora
     esconderAviso(); // o aviso de uma ação não segue para outra tela
     var conteudo = $('#cel-conteudo');
@@ -21712,7 +21760,7 @@
     var entrada = !temDadosNoCelular() || celularPedeEntrada;
     // a ação aberta só vale no celular que edita (ela pode ter saído da conta no meio)
     if (formCelular && !celularEdita()) formCelular = null;
-    if (folhaCelular && !celularEdita()) folhaCelular.passo = 'acoes';
+    if (folhaCelular && !celularEdita() && folhaCelular.passo !== 'ficha') folhaCelular.passo = 'acoes';
     desenharTopoCelular();
     ajustarAbasDoCelular(); // as telas do observador (D7) só com ele
     $$('#modo-celular .cel-tela').forEach(function (t) { t.classList.remove('ativa'); });
@@ -21727,6 +21775,7 @@
     else if (telaCelular === 'enviar') desenharEnvioCelular();
     else if (telaCelular === 'diagnostico') desenharDiagnosticoCelular();
     else if (telaCelular === 'ajustes') desenharAjustesObservador();
+    else if (telaCelular === 'alunos') desenharAlunosCelular();
     else desenharHojeCelular();
     $('#cel-' + telaCelular).classList.add('ativa');
     if (telaCelular === 'hoje') rolarHojeCelular(diaCelular || Core.hojeIso());
@@ -22268,20 +22317,30 @@
     if (!a) { folhaCelular = null; return; }
     var aluno = alunoPorId(a.alunoId);
     var edita = celularEdita() && !!aluno;
-    if (!edita) folhaCelular.passo = 'acoes'; // quem só lê vê a aula, e só
+    // quem só lê vê a aula e a ficha mínima, e só
+    if (!edita && !(folhaCelular.passo === 'ficha' && aluno)) folhaCelular.passo = 'acoes';
     var folha = el('div', { class: 'cel-folha', id: 'cel-folha', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'cel-folha-titulo', 'data-aula': a.id });
     var fundo = el('div', { class: 'cel-folha-fundo', id: 'cel-folha-fundo' }, [folha]);
     fundo.addEventListener('click', function (e) {
       // fora da folha fecha; no meio de um formulário, só pelo Voltar (o que ela digitou não se perde)
-      if (e.target === fundo && folhaCelular && folhaCelular.passo === 'acoes') fecharFolhaCelular();
+      if (e.target === fundo && folhaCelular && (folhaCelular.passo === 'acoes' || folhaCelular.passo === 'ficha')) fecharFolhaCelular();
     });
     var sit = situacaoNoCelular(a);
+    /* (D6c, lote 2) Um toque no nome abre a ficha mínima do aluno: ligar, o
+     * WhatsApp, as mensagens prontas, o valor por hora e o último relato. */
+    var titulo = aluno && folhaCelular.passo === 'acoes'
+      ? el('h2', { class: 'cel-titulo', id: 'cel-folha-titulo' }, [
+        el('button', { type: 'button', class: 'cel-folha-nome', id: 'cel-folha-ficha', 'aria-label': 'Ver a ficha de ' + aluno.nome + ': telefone, WhatsApp e endereço',
+          aoClick: function () { irAoPassoDaFolha('ficha'); } }, [el('span', { texto: aluno.nome }), el('span', { class: 'cel-folha-nome-seta', 'aria-hidden': 'true', texto: '›' })])
+      ])
+      : el('h2', { class: 'cel-titulo', id: 'cel-folha-titulo', texto: aluno ? aluno.nome : 'Aluno' });
     folha.appendChild(el('div', { class: 'cel-folha-cabeca', style: '--cor-aluno:' + corDoAlunoCelular(aluno) }, [
-      el('h2', { class: 'cel-titulo', id: 'cel-folha-titulo', texto: aluno ? aluno.nome : 'Aluno' }),
+      titulo,
       el('div', { class: 'ajuda u-margem-0', texto: quandoCurtoCelular(a.data, a.hora) + ' · ' + Core.fmtDuracao(Number(a.duracaoMin) || 60) + ' · ' + sit.texto })
     ]));
     if (folhaCelular.passo === 'cancelar') desenharCancelarNaFolha(folha, a);
     else if (folhaCelular.passo === 'remarcar') desenharRemarcarNaFolha(folha, a);
+    else if (folhaCelular.passo === 'ficha') desenharFichaNaFolha(folha, a, aluno);
     else desenharAcoesNaFolha(folha, a, aluno, edita);
     $('#cel-hoje').appendChild(fundo);
     // o foco vai para a folha (quem lê a tela ouve o nome do aluno), sem destacar um botão como se fosse o escolhido
@@ -22362,6 +22421,15 @@
       botaoDeAcaoCelular('cancelar-aula', { class: 'btn cel-folha-botao cel-folha-largo', id: 'cel-cancelar-com', texto: 'Cancelar com cobrança',
         aoClick: function () { mudarAulaNoCelular(a, { status: 'cancelada', cobravel: true }, 'Aula cancelada com cobrança.'); } })
     ]));
+    folha.appendChild(el('div', { class: 'barra u-margem-baixo-0' }, [
+      el('button', { type: 'button', class: 'btn', id: 'cel-folha-voltar', texto: 'Voltar', aoClick: function () { irAoPassoDaFolha('acoes'); } })
+    ]));
+  }
+
+  /* A ficha mínima dentro da folha da aula: o "Podemos remarcar?" leva o dia
+   * e a hora DESTA aula. Voltar leva às ações (ou, para quem só lê, à aula). */
+  function desenharFichaNaFolha(folha, a, aluno) {
+    folha.appendChild(fichaMinimaCelular(aluno, a));
     folha.appendChild(el('div', { class: 'barra u-margem-baixo-0' }, [
       el('button', { type: 'button', class: 'btn', id: 'cel-folha-voltar', texto: 'Voltar', aoClick: function () { irAoPassoDaFolha('acoes'); } })
     ]));
@@ -22622,14 +22690,17 @@
     caixa.appendChild(campoCelular(temas.length ? 'Mais um assunto dado' : 'Assunto dado nesta aula', assunto));
     caixa.appendChild(el('p', { class: 'ajuda', texto: 'Vale só para esta aula. Assunto do catálogo, domínio, nota só minha e folha, no tablet.' }));
     caixa.appendChild(rodapeDoFormularioCelular('cel-relato-salvar', 'Salvar', function () {
-      var mudancas = { status: situacao.value, notaTexto: relato.value };
-      // trocar a situação traz a cobrança padrão dela, como a janela do tablet
-      if (situacao.value !== (aula.status || 'realizada')) mudancas.cobravel = (Core.STATUS[situacao.value] || Core.STATUS.realizada).cobravelPadrao;
-      var novoAssunto = assunto.value.trim();
-      var repetido = false;
       // a memória pode ter sido trocada por um recebimento com o formulário aberto: vale a aula de agora
       var atual = db.aulas.filter(function (x) { return x.id === aula.id; })[0];
       if (!atual) { avisar('Esta aula não existe mais neste aparelho.'); fecharFormularioCelular(); return; }
+      var mudancas = { status: situacao.value, notaTexto: relato.value };
+      /* Trocar a situação traz a cobrança padrão dela, como a janela do tablet.
+       * A troca se mede contra a aula de AGORA, e não contra o retrato de
+       * quando o formulário abriu: um recebimento no meio pode ter mudado a
+       * situação, e a cobrança segue o estado atual (nota da segunda mão). */
+      if (situacao.value !== (atual.status || 'realizada')) mudancas.cobravel = (Core.STATUS[situacao.value] || Core.STATUS.realizada).cobravelPadrao;
+      var novoAssunto = assunto.value.trim();
+      var repetido = false;
       comoAcaoDoCelular(function () {
         Core.aplicarEdicaoAula(db, atual.id, mudancas, 'esta');
         if (novoAssunto) repetido = !incluirAssuntoNaAula(atual, { titulo: novoAssunto, fonte: 'livre' });
@@ -22656,6 +22727,23 @@
     caixa.appendChild(campoCelular('Responsável', resp));
     caixa.appendChild(campoCelular('Contato', contato));
     caixa.appendChild(campoCelular('Valor por hora (R$), a partir de hoje', preco));
+    /* (D6c, lote 2) Casa ou online, opcional: o endereço abre o mapa, e o
+     * link, a aula online. "Ainda não sei" não grava nada. */
+    var local = el('select', { id: 'cel-aluno-local' }, [['', 'Ainda não sei'], ['casa', ONDE_E_A_AULA.casa], ['online', ONDE_E_A_AULA.online]].map(function (o) {
+      return el('option', { value: o[0], texto: o[1] });
+    }));
+    var endereco = el('input', { type: 'text', id: 'cel-aluno-endereco', autocomplete: 'off', placeholder: 'Rua, número, bairro' });
+    var link = el('input', { type: 'url', id: 'cel-aluno-link', autocomplete: 'off', inputmode: 'url', placeholder: 'https://meet.google.com/...' });
+    var campoEndereco = campoCelular('Endereço (abre no mapa)', endereco), campoLink = campoCelular('Link da aula online', link);
+    var mostrarLugar = function () {
+      campoEndereco.hidden = local.value !== 'casa';
+      campoLink.hidden = local.value !== 'online';
+    };
+    local.addEventListener('change', mostrarLugar);
+    caixa.appendChild(campoCelular('Onde é a aula (opcional)', local));
+    caixa.appendChild(campoEndereco);
+    caixa.appendChild(campoLink);
+    mostrarLugar();
     caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-aluno-resto', texto: 'Aqui fica só o essencial. Ano escolar, cor, valores com outra data, ' +
       'observações e mapeamento se completam no tablet, na ficha do aluno.' }));
     caixa.appendChild(rodapeDoFormularioCelular('cel-aluno-salvar', 'Cadastrar', function () {
@@ -22669,7 +22757,8 @@
       }
       var erros = Core.validarPrecos({ precos: precos });
       if (erros.length) { avisar(erros[0]); return; }
-      var novo = alunoNovo({ nome: n, responsavel: resp.value.trim(), obs: contato.value.trim() ? 'Contato: ' + contato.value.trim() : '', precos: precos });
+      var novo = alunoNovo({ nome: n, responsavel: resp.value.trim(), obs: contato.value.trim() ? 'Contato: ' + contato.value.trim() : '', precos: precos,
+        local: local.value, endereco: local.value === 'casa' ? endereco.value : '', linkOnline: local.value === 'online' ? link.value : '' });
       comoAcaoDoCelular(function () {
         db.alunos.push(novo);
         return salvarEDepois(function (gravou) {
@@ -22678,6 +22767,195 @@
         });
       });
     }));
+  }
+
+  // ---------- Alunos: a ficha mínima e as mensagens prontas (D6c, lote 2) ----------
+
+  /* Os campos que o lote 2 criou no aluno, todos OPCIONAIS e sem migração:
+   *   telefone    o do responsável, para ligar e para o WhatsApp;
+   *   local       'casa' ou 'online' (sem ele, "não informado");
+   *   endereco    o da casa, que abre no mapa;
+   *   linkOnline  o da aula online.
+   * O aluno sem nenhum deles funciona como antes: a ficha só não mostra o
+   * botão que dependeria do campo. Campo vazio não fica gravado (sai do
+   * registro), para o aluno que nunca os usou continuar igual. */
+  var ONDE_E_A_AULA = { casa: 'Na casa do aluno', online: 'Online' };
+  function gravarLugarEContato(aluno, c) {
+    var valores = {
+      telefone: String(c.telefone || '').trim(),
+      local: ONDE_E_A_AULA[c.local] ? c.local : '',
+      endereco: String(c.endereco || '').trim(),
+      linkOnline: String(c.linkOnline || '').trim()
+    };
+    Object.keys(valores).forEach(function (k) {
+      if (valores[k]) aluno[k] = valores[k];
+      else delete aluno[k];
+    });
+    return aluno;
+  }
+
+  /* O telefone do responsável: o campo da ficha; sem ele, o que vem depois de
+   * "Contato:" nas observações, onde o cadastro do celular (D6b) o põe. */
+  function telefoneDoAluno(aluno) {
+    if (!aluno) return '';
+    var daFicha = String(aluno.telefone || '').trim();
+    if (daFicha) return daFicha;
+    var m = /(?:^|\n)\s*contato\s*:\s*([^\n]+)/i.exec(String(aluno.obs || ''));
+    return m && m[1].replace(/\D/g, '').length >= 8 ? m[1].trim() : '';
+  }
+  /* O número para o WhatsApp (wa.me): só dígitos, com o 55 do Brasil. O
+   * número com DDD (10 ou 11 dígitos) ganha o 55; sem DDD, não há como
+   * saber a cidade, e o WhatsApp fica de fora (o ligar continua). */
+  function numeroDoWhatsapp(telefone) {
+    var d = String(telefone || '').replace(/\D/g, '').replace(/^0+/, '');
+    if (d.length === 10 || d.length === 11) d = '55' + d;
+    return /^55\d{10,11}$/.test(d) ? d : '';
+  }
+  function linkDeLigar(telefone) {
+    var wa = numeroDoWhatsapp(telefone);
+    if (wa) return 'tel:+' + wa;
+    var d = String(telefone || '').replace(/\D/g, '');
+    return d.length >= 8 ? 'tel:' + d : '';
+  }
+  /* O link abre a conversa com o texto ESCRITO, e quem toca em enviar é ela:
+   * o aplicativo nunca envia nada sozinho. */
+  function linkDoWhatsapp(telefone, mensagem) {
+    var wa = numeroDoWhatsapp(telefone);
+    if (!wa) return '';
+    return 'https://wa.me/' + wa + (mensagem ? '?text=' + encodeURIComponent(mensagem) : '');
+  }
+  function linkDoMapa(endereco) {
+    var e = String(endereco || '').trim();
+    return e ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(e) : '';
+  }
+  /* Só http e https: o link escrito sem o começo (meet.google.com/abc) ganha
+   * o https://; qualquer outro esquema não vira botão. */
+  function linkDaAulaOnline(texto) {
+    var t = String(texto || '').trim();
+    if (!t || /\s/.test(t)) return '';
+    if (/^https?:\/\//i.test(t)) return t;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(t)) return '';
+    return /^[^/]+\.[a-z]{2,}(\/|$)/i.test(t) ? 'https://' + t : '';
+  }
+
+  /* As mensagens prontas para a família. O nome é o primeiro do aluno; o
+   * "Podemos remarcar?" aberto da folha de uma aula diz o dia e a hora dela. */
+  var MENSAGENS_PRONTAS = [
+    { id: 'atrasada', rotulo: 'Estou 10 minutos atrasada', texto: function (nome) { return 'Olá! Estou 10 minutos atrasada para a aula de ' + nome + '.'; } },
+    { id: 'remarcar', rotulo: 'Podemos remarcar?', texto: function (nome, quando) { return 'Olá! Podemos remarcar a aula de ' + nome + (quando ? ' (' + quando + ')' : '') + '?'; } },
+    { id: 'chegando', rotulo: 'Chegando', texto: function (nome) { return 'Olá! Estou chegando para a aula de ' + nome + '.'; } }
+  ];
+  function textoDaMensagemPronta(id, aluno, aula) {
+    var m = MENSAGENS_PRONTAS.filter(function (x) { return x.id === id; })[0];
+    if (!m || !aluno) return '';
+    var primeiro = String(aluno.nome || '').trim().split(/\s+/)[0] || 'aluno';
+    return m.texto(primeiro, aula ? quandoCurtoCelular(aula.data, aula.hora) : '');
+  }
+
+  /* Um link com cara de botão: ligar, WhatsApp, mapa e link da aula abrem
+   * fora do aplicativo e não gravam nada, e por isso o observador também
+   * os tem (o telefone que abre é o dele). */
+  function botaoDeLinkCelular(id, texto, href, extra) {
+    var atributos = { class: 'btn cel-link-botao', id: id, href: href, texto: texto };
+    if (!/^tel:/.test(href)) { atributos.target = '_blank'; atributos.rel = 'noopener'; }
+    Object.keys(extra || {}).forEach(function (k) { atributos[k] = extra[k]; });
+    return el('a', atributos);
+  }
+
+  /* A ficha mínima: o que ela precisa na rua. A ficha completa fica no tablet. */
+  function fichaMinimaCelular(aluno, aula) {
+    var caixa = el('div', { class: 'cel-ficha', id: 'cel-ficha', 'data-aluno': aluno.id });
+    var resp = String(aluno.responsavel || '').trim();
+    caixa.appendChild(el('div', { class: 'cel-ficha-linha', id: 'cel-ficha-responsavel', texto: resp ? 'Responsável: ' + resp : 'Responsável não informado.' }));
+    var tel = telefoneDoAluno(aluno);
+    var ligar = linkDeLigar(tel), whats = linkDoWhatsapp(tel, '');
+    if (ligar || whats) {
+      caixa.appendChild(el('div', { class: 'cel-ficha-botoes' }, [
+        ligar ? botaoDeLinkCelular('cel-ficha-ligar', 'Ligar', ligar, { 'aria-label': 'Ligar para ' + (resp || 'o responsável') + ', ' + tel }) : null,
+        whats ? botaoDeLinkCelular('cel-ficha-whatsapp', 'WhatsApp', whats, { 'aria-label': 'Abrir o WhatsApp de ' + (resp || 'o responsável') }) : null
+      ]));
+      caixa.appendChild(el('div', { class: 'ajuda u-margem-0', id: 'cel-ficha-telefone', texto: 'Telefone: ' + tel }));
+    } else {
+      caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-ficha-sem-telefone', texto: 'Sem telefone do responsável. Ele se põe no tablet, na ficha do aluno.' }));
+    }
+    if (whats) {
+      caixa.appendChild(el('div', { class: 'cel-subtitulo', texto: 'Mensagem pronta no WhatsApp' }));
+      caixa.appendChild(el('p', { class: 'ajuda u-margem-0', texto: 'Abre a conversa com o texto escrito. Quem envia é você.' }));
+      caixa.appendChild(el('div', { class: 'cel-ficha-mensagens', id: 'cel-ficha-mensagens' }, MENSAGENS_PRONTAS.map(function (m) {
+        var texto = textoDaMensagemPronta(m.id, aluno, aula);
+        return botaoDeLinkCelular('cel-msg-' + m.id, m.rotulo, linkDoWhatsapp(tel, texto), { 'data-mensagem': m.id, 'aria-label': m.rotulo + ': abre o WhatsApp com a mensagem escrita' });
+      })));
+    }
+    var preco = Core.precoVigente(aluno, Core.hojeIso());
+    caixa.appendChild(el('div', { class: 'cel-ficha-linha', id: 'cel-ficha-valor', texto: preco ? 'Valor por hora: ' + dinheiro(preco.valorHora) : 'Sem valor por hora para hoje.' }));
+    /* Casa ou online, se o cadastro disser. Sem os campos, nada aparece. */
+    var endereco = String(aluno.endereco || '').trim(), link = linkDaAulaOnline(aluno.linkOnline);
+    var onde = ONDE_E_A_AULA[aluno.local] || '';
+    if (onde || endereco || link) {
+      var lugar = el('div', { class: 'cel-ficha-lugar', id: 'cel-ficha-lugar' });
+      if (onde) lugar.appendChild(el('div', { class: 'cel-ficha-linha', id: 'cel-ficha-onde', texto: onde }));
+      var mostraCasa = endereco && aluno.local !== 'online', mostraLink = link && aluno.local !== 'casa';
+      if (mostraCasa) {
+        lugar.appendChild(el('div', { class: 'ajuda u-margem-0', id: 'cel-ficha-endereco', texto: endereco }));
+        lugar.appendChild(el('div', { class: 'cel-ficha-botoes' }, [botaoDeLinkCelular('cel-ficha-mapa', 'Abrir no mapa', linkDoMapa(endereco))]));
+      }
+      if (mostraLink) lugar.appendChild(el('div', { class: 'cel-ficha-botoes' }, [botaoDeLinkCelular('cel-ficha-link', 'Abrir o link da aula', link)]));
+      caixa.appendChild(lugar);
+    }
+    var u = Core.ultimoEncontro(db, aluno.id, null);
+    var relato = el('div', { class: 'cel-ultimo cel-aula-anterior', id: 'cel-ficha-relato' });
+    if (u) {
+      relato.appendChild(el('div', { class: 'rotulo-ultimo', texto: 'Último relato (' + Core.ddmm(u.data) + ')' }));
+      if (u.assuntos.length) relato.appendChild(el('div', {}, [el('strong', { texto: 'Assunto: ' }), document.createTextNode(u.assuntos.join('; '))]));
+      relato.appendChild(el('div', { texto: u.oQueRendeu || 'Sem relato escrito.' }));
+    } else {
+      relato.appendChild(el('div', { texto: 'Ainda sem relato de aula.' }));
+    }
+    caixa.appendChild(relato);
+    caixa.appendChild(el('p', { class: 'ajuda', texto: 'A ficha completa fica no tablet.' }));
+    return caixa;
+  }
+
+  /* A aba Alunos: a lista dos ativos e, com um toque no nome, a ficha mínima. */
+  var alunoCelular = null; // o aluno da ficha aberta na aba Alunos
+  function desenharAlunosCelular() {
+    var caixa = $('#cel-alunos');
+    caixa.innerHTML = '';
+    var aberto = alunoCelular ? alunoPorId(alunoCelular) : null;
+    if (aberto) {
+      caixa.appendChild(el('div', { class: 'cel-folha-cabeca', style: '--cor-aluno:' + corDoAlunoCelular(aberto) }, [
+        el('h2', { class: 'cel-titulo', id: 'cel-ficha-nome', texto: aberto.nome })
+      ]));
+      caixa.appendChild(fichaMinimaCelular(aberto, null));
+      caixa.appendChild(el('div', { class: 'barra' }, [
+        el('button', { type: 'button', class: 'btn', id: 'cel-alunos-voltar', texto: 'Voltar à lista',
+          aoClick: function () { alunoCelular = null; desenharAlunosCelular(); var c = $('#cel-conteudo'); if (c) c.scrollTop = 0; } })
+      ]));
+      return;
+    }
+    alunoCelular = null;
+    caixa.appendChild(el('h2', { class: 'cel-titulo', texto: 'Alunos' }));
+    var ativos = db.alunos.filter(function (al) { return al.ativo !== false; })
+      .sort(function (x, y) { return String(x.nome).localeCompare(String(y.nome)); });
+    if (!ativos.length) caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-alunos-vazio', texto: 'Nenhum aluno ativo.' }));
+    caixa.appendChild(el('div', { class: 'cel-alunos-lista', id: 'cel-alunos-lista' }, ativos.map(function (al) {
+      var detalhe = [String(al.responsavel || '').trim(), ONDE_E_A_AULA[al.local] || ''].filter(Boolean).join(' · ');
+      return el('button', { type: 'button', class: 'cel-aluno-item', 'data-aluno': al.id, style: '--cor-aluno:' + corDoAlunoCelular(al),
+        'aria-label': 'Ver a ficha de ' + al.nome + (detalhe ? ', ' + detalhe : ''),
+        aoClick: function () { alunoCelular = al.id; desenharAlunosCelular(); var c = $('#cel-conteudo'); if (c) c.scrollTop = 0; } }, [
+        el('span', { class: 'cel-aluno-nome', texto: al.nome }),
+        detalhe ? el('span', { class: 'cel-aluno-detalhe', texto: detalhe }) : null
+      ]);
+    })));
+    var inativos = db.alunos.length - ativos.length;
+    if (inativos) caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-alunos-inativos', texto: (inativos === 1 ? '1 aluno inativo fica' : inativos + ' alunos inativos ficam') + ' só no tablet.' }));
+    var podeCadastrar = celularEdita(); // o observador só lê: sem o botão
+    if (podeCadastrar) {
+      caixa.appendChild(el('div', { class: 'barra u-margem-topo-12' }, [
+        botaoDeAcaoCelular('cadastrar-aluno', { class: 'btn', id: 'cel-alunos-cadastrar', texto: 'Cadastrar aluno',
+          aoClick: function () { irParaTelaCelular('hoje'); abrirFormularioCelular({ tipo: 'aluno' }); } })
+      ]));
+    }
   }
 
   // ---------- Fechamento ----------
@@ -22849,6 +23127,8 @@
       if (telaDoObservador(b.dataset.cel)) b.hidden = !observador;
       else if (b.dataset.cel === 'enviar') b.hidden = observador;
     });
+    var abas = $('#cel-abas');
+    if (abas) abas.classList.toggle('muitas', $$('#cel-abas .cel-aba').filter(function (b) { return !b.hidden; }).length > 4);
     if (telaDoObservador(telaCelular) && !observador) telaCelular = 'hoje';
     if (telaCelular === 'enviar' && observador) telaCelular = 'hoje';
   }

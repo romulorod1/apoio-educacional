@@ -632,8 +632,8 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
     const c = document.querySelector('#cel-folha-cancelar').getBoundingClientRect();
     return Array.from(document.querySelectorAll('#cel-folha .cel-folha-botao')).filter(b => b.id !== 'cel-folha-cancelar').every(b => {
       const o = b.getBoundingClientRect(); return Math.max(c.top - o.bottom, o.top - c.bottom, c.left - o.right, o.left - c.right) >= 16; }); }), true);
-  conf('a aula de HOJE oferece Realizada, Faltou, Cancelar, Remarcar e Registrar como foi', (await botoesDaFolha(pagC)).join(','),
-    'cel-folha-realizada,cel-folha-faltou,cel-folha-remarcar,cel-folha-registrar,cel-folha-cancelar,cel-folha-fechar');
+  conf('a aula de HOJE oferece o nome (a ficha, D6c lote 2), Realizada, Faltou, Cancelar, Remarcar e Registrar como foi', (await botoesDaFolha(pagC)).join(','),
+    'cel-folha-ficha,cel-folha-realizada,cel-folha-faltou,cel-folha-remarcar,cel-folha-registrar,cel-folha-cancelar,cel-folha-fechar');
   m = await medirTela(pagC);
   conf('a folha: alvos de 48 px e sem rolagem de lado', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : ''), '');
   conf('a folha: os botões de edição são todos das ações do celular', m.soltos.join(', '), '');
@@ -644,7 +644,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('"Fechar" tira a folha', await existe(pagC, '#cel-folha'), false);
   await irParaDia(pagC, OUTRO);
   await abrirFolha(pagC, 'aula-outro');
-  conf('a aula de amanhã oferece Cancelar e Remarcar, e não Realizada nem Faltou', (await botoesDaFolha(pagC)).join(','), 'cel-folha-remarcar,cel-folha-cancelar,cel-folha-fechar');
+  conf('a aula de amanhã oferece Cancelar e Remarcar, e não Realizada nem Faltou', (await botoesDaFolha(pagC)).join(','), 'cel-folha-ficha,cel-folha-remarcar,cel-folha-cancelar,cel-folha-fechar');
   await clicar(pagC, '#cel-folha-fechar');
 
   secao('3c. Faltou e Realizada, pela folha');
@@ -858,7 +858,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('a tela diz que o resto fica no tablet', /se completam no tablet/.test(await texto(pagC, '#cel-aluno-resto')), true);
   m = await medirTela(pagC);
   conf('o formulário do aluno: alvos de 48 px e sem rolagem de lado', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : ''), '');
-  conf('o formulário tem só nome, responsável, contato e preço', m.campos.join(','), 'cel-aluno-nome,cel-aluno-responsavel,cel-aluno-contato,cel-aluno-preco');
+  conf('o formulário tem só nome, responsável, contato, preço e (D6c lote 2) onde é a aula', m.campos.join(','), 'cel-aluno-nome,cel-aluno-responsavel,cel-aluno-contato,cel-aluno-preco,cel-aluno-local');
   await digitar(pagC, '#cel-aluno-nome', 'Aluno Beta Teste');
   await digitar(pagC, '#cel-aluno-responsavel', 'Responsável Beta Teste');
   await digitar(pagC, '#cel-aluno-contato', 'telefone fictício 0000');
@@ -1167,8 +1167,8 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
     mais: !!document.querySelector('#cel-marcar-aula'), horas: document.querySelectorAll('.cel-livre-hora').length
   }));
   conf('(controle) o observador vê a linha do tempo e a folha abre com a aula', livresD >= 0 && !!(await existe(pagD, '#cel-tempo')) && abriuD && /Aluno Alfa Teste/.test((await texto(pagD, '#cel-folha')) || ''), true);
-  prop('(D6c) na linha do tempo e na folha do observador, nenhuma ação: sem "+", sem horas para marcar, só "Fechar" (' + JSON.stringify(folhaD) + ')',
-    folhaD.acoes === 0 && !folhaD.mais && folhaD.horas === 0 && /^(Ver a sua anotação,)?cel-folha-fechar$/.test(folhaD.botoes), MODOS[1]);
+  prop('(D6c) na linha do tempo e na folha do observador, nenhuma ação: sem "+", sem horas para marcar, só o nome (a ficha mínima) e "Fechar" (' + JSON.stringify(folhaD) + ')',
+    folhaD.acoes === 0 && !folhaD.mais && folhaD.horas === 0 && /^cel-folha-ficha,(Ver a sua anotação,)?cel-folha-fechar$/.test(folhaD.botoes), MODOS[1]);
   await clicar(pagD, '#cel-folha-fechar');
   prop('o observador não vê nenhum botão de edição nem campo de escrever (' + telasD.join(' | ') + ')', telasD.every(t => /: $/.test(t)), MODOS[1]);
   prop('o alto do observador diz que só consulta', (await texto(pagD, '#cel-regra')) === 'Este celular só consulta. Para mudar algo, use o tablet.', MODOS[1]);

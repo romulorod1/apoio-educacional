@@ -861,6 +861,20 @@ roda "celular edita --envenenado-cobranca-volta"    node "_teste/testa_celular_e
 # (portao de 09/11) a rolagem inicial com o relogio fixo em varias horas: a folga antiga deixa
 # a linha de agora cortada sob a faixa dos dias as 00:30 e as 06:00
 roda "celular edita --envenenado-rolagem-antiga"   node "_teste/testa_celular_edita.js" --envenenado-rolagem-antiga
+# D6c (lote 2): a aba Alunos e a ficha minima (ligar, WhatsApp, valor por hora,
+# ultimo relato, casa ou online), as mensagens prontas em wa.me, os campos
+# opcionais que sobem pela fila e chegam ao tablet, e a cobranca do "Escrever
+# como foi" pelo estado atual da aula. Venenos: o numero sem 55, o texto
+# errado, a ficha que abre o WhatsApp sozinha, o campo lido sem conferir, os
+# campos que nao sobem, a cobranca pelo retrato e o observador que cadastra.
+roda "celular ficha (D6c lote 2)"                   node "_teste/testa_celular_ficha.js"
+roda "celular ficha --envenenado-sem-55"            node "_teste/testa_celular_ficha.js" --envenenado-sem-55
+roda "celular ficha --envenenado-texto-errado"      node "_teste/testa_celular_ficha.js" --envenenado-texto-errado
+roda "celular ficha --envenenado-abre-sozinho"      node "_teste/testa_celular_ficha.js" --envenenado-abre-sozinho
+roda "celular ficha --envenenado-campo-obrigatorio" node "_teste/testa_celular_ficha.js" --envenenado-campo-obrigatorio
+roda "celular ficha --envenenado-campos-nao-sobem"  node "_teste/testa_celular_ficha.js" --envenenado-campos-nao-sobem
+roda "celular ficha --envenenado-cobranca-retrato"  node "_teste/testa_celular_ficha.js" --envenenado-cobranca-retrato
+roda "celular ficha --envenenado-observador-cadastra" node "_teste/testa_celular_ficha.js" --envenenado-observador-cadastra
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"

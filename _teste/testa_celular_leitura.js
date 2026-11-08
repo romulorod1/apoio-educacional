@@ -523,7 +523,7 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
   conf('a folha da aula: um toque abre a nota só minha', await pagB.evaluate(() =>
     !document.querySelector('#cel-folha .cel-so-minha').hidden && /Mãe pediu para falar da prova/.test(document.querySelector('#cel-folha .cel-so-minha').textContent)), true);
   await clicar(pagB, '#cel-folha-fechar');
-  const telas = { hoje: null, fechamento: null, enviar: null };
+  const telas = { hoje: null, alunos: null, fechamento: null, enviar: null }; // (D6c, lote 2) a aba Alunos
   for (const t of Object.keys(telas)) {
     await clicar(pagB, '#cel-abas .cel-aba[data-cel="' + t + '"]');
     await pausa(200);
@@ -546,10 +546,10 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     telas.fechamento.dasAcoes.indexOf('Marcar como pago') >= 0, true);
   conf('todos os botões das três telas e do alto foram medidos (' + Object.keys(telas).map(t => t + ': ' + telas[t].alvos).join(', ') + ')',
     Object.keys(telas).every(t => telas[t].alvos >= 5), true);
-  // (D7) as abas só do observador ficam escondidas (hidden) no celular da dona: não são alvo; as três à vista é que se medem
-  conf('as abas de baixo à vista (três) têm alvo de 48 px ou mais', await pagB.evaluate(() => {
+  // (D7) as abas só do observador ficam escondidas (hidden) no celular da dona: não são alvo; as quatro à vista (com Alunos, D6c lote 2) é que se medem
+  conf('as abas de baixo à vista (quatro) têm alvo de 48 px ou mais', await pagB.evaluate(() => {
     const vistas = Array.from(document.querySelectorAll('#cel-abas .cel-aba')).filter(b => !b.hidden);
-    return vistas.length === 3 && vistas.every(b => b.getBoundingClientRect().height >= 48);
+    return vistas.length === 4 && vistas.every(b => b.getBoundingClientRect().height >= 48);
   }), true);
   conf('Fechamento: o aluno, as aulas e o valor do mês', await pagB.evaluate(() => {
     document.querySelector('#cel-abas .cel-aba[data-cel="fechamento"]').click();
