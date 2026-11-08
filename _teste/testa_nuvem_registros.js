@@ -352,6 +352,61 @@ function textoDoServidor(docs) {
   conf('o ajuste do aparelho não está no servidor', 'ajuste:versaoVista' in depois.docs, false);
   conf('o ajuste dela foi atualizado (bytes diferentes dos de antes)', depois.docs['ajuste:chavePix'].dados.bytesValue !== noServidor.docs['ajuste:chavePix'].dados.bytesValue, true);
 
+  secao('5b. Um registro que a nuvem recusa sozinho não derruba a fila: tentativas, quarentena e a frase');
+  const quarentena = await pagA.evaluate(async () => {
+    const P = {};
+    // um registro que a regra recusa (tipo com mais de 32 letras), posto por fora, com a entrada dele na fila
+    const agora = new Date().toISOString();
+    await new Promise((res, rej) => {
+      const q = indexedDB.open('apoio-educacional');
+      q.onsuccess = () => {
+        const t = q.result.transaction(['registros', 'saida'], 'readwrite');
+        t.objectStore('registros').put({ id: 'aula:ruim', tipo: 'x'.repeat(40), atualizadoEm: agora, apagadoEm: null, aparelho: Store.aparelho(), esquema: 1, ordem: 9999, dados: { id: 'ruim' } });
+        t.objectStore('saida').put({ id: 'aula:ruim', tipo: 'x'.repeat(40), atualizadoEm: agora, apagadoEm: null });
+        t.oncomplete = () => { q.result.close(); res(); };
+        t.onerror = () => rej(t.error);
+      };
+    });
+    const resultados = [];
+    for (let rodada = 1; rodada <= 3; rodada++) {
+      const d = await Store.carregar();
+      d.ajustes.chavePix = 'pix-rodada-' + rodada;   // um bom no mesmo lote
+      await Store.salvar(d);
+      const r = await Nuvem.enviarRegistros({ versaoApp: 'prova' });
+      const fila = await Store.lerFila();
+      const ruim = fila.find(e => e.id === 'aula:ruim');
+      resultados.push({ enviados: r.enviados, erro: r.erro ? r.erro.codigo : null, bonsNaFila: fila.filter(e => e.id !== 'aula:ruim').length,
+        tentativas: ruim ? ruim.tentativas || 0 : null, quarentena: ruim ? !!ruim.quarentena : null });
+    }
+    await Nuvem.contarFila();
+    P.resultados = resultados;
+    P.estado = Nuvem.estado().registros;
+    P.frase = (document.querySelector('#nuvem-registros') || {}).textContent || '';
+    // uma edição do mesmo item tira da quarentena (a entrada é regravada)
+    return P;
+  });
+  conf('em cada rodada o bom subiu e o ruim ficou, sem erro de nuvem', JSON.stringify(quarentena.resultados.map(r => [r.enviados, r.erro, r.bonsNaFila])),
+    JSON.stringify([[1, null, 0], [1, null, 0], [1, null, 0]]));
+  conf('as tentativas do ruim contam 1, 2, 3', quarentena.resultados.map(r => r.tentativas).join(','), '1,2,3');
+  conf('e na terceira ele entra na quarentena', quarentena.resultados.map(r => r.quarentena).join(','), 'false,false,true');
+  conf('o estado da nuvem conta 0 pendentes e 1 em quarentena', quarentena.estado.pendentes + '/' + quarentena.estado.quarentena, '0/1');
+  conf('Ajustes diz que 1 mudança não consegue subir e as outras seguem', /1 mudança não consegue subir \(a nuvem recusa esse registro\); as outras seguem/.test(quarentena.frase), true);
+  const depoisDaQuarentena = await pagA.evaluate(async () => {
+    const d = await Store.carregar();
+    d.ajustes.chavePix = 'pix-depois';
+    await Store.salvar(d);
+    const r = await Nuvem.enviarRegistros({ versaoApp: 'prova' });
+    return { enviados: r.enviados, erro: r.erro ? r.erro.codigo : null, fila: (await Store.lerFila()).map(e => e.id + (e.quarentena ? '(q)' : '')) };
+  });
+  conf('com o ruim em quarentena, o próximo envio sobe o resto sem tocar nele', JSON.stringify([depoisDaQuarentena.enviados, depoisDaQuarentena.erro, depoisDaQuarentena.fila]),
+    JSON.stringify([1, null, ['aula:ruim(q)']]));
+  conf('o registro ruim não está no servidor', 'aula:ruim' in (await registrosNoServidor(dona.idToken, dona.localId)).docs, false);
+  await pagA.evaluate(() => new Promise(res => {
+    const q = indexedDB.open('apoio-educacional');
+    q.onsuccess = () => { const t = q.result.transaction(['registros', 'saida'], 'readwrite'); t.objectStore('registros').delete('aula:ruim'); t.objectStore('saida').delete('aula:ruim');
+      t.oncomplete = () => { q.result.close(); res(); }; };
+  }));
+
   secao('6. A fila sobrevive a fechar sem sinal e sobe ao voltar');
   await pagA.setOfflineMode(true);
   const semSinal = await pagA.evaluate(async () => {

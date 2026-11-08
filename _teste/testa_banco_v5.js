@@ -372,6 +372,35 @@ const ITENS_DO_DOCUMENTO = 3 + 2 + 40 + 2 + 2 + 5 + 1; // alunos, séries, aulas
   conf('e fica consistente', outros.recomeco.iguais, true);
 
   // ================================================================
+  secao('5b. A restauração vinda da nuvem: no aparelho que escreve enfileira tudo o que está vivo; no que só lê, nada');
+  const restauroDaNuvem = await pag.evaluate(async () => {
+    const pacote = () => ({ formato: 'apoio-educacional', versao: 1, quando: '2026-06-02T12:00:00.000Z',
+      dados: { versao: 1, alunos: [{ id: 'd1', nome: 'Aluna Da Nuvem Teste', ativo: true, precos: [] }], series: [],
+        aulas: [{ id: 's7@2026-06-02', alunoId: 'd1', serieId: 's7', data: '2026-06-02', hora: '09:00', duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', anexos: [] }],
+        resumos: [], ajustes: { chavePix: 'pix-da-nuvem', versaoVista: '7.7.7' } }, notas: {}, midias: {}, anexos: {} });
+    // o tablet novo, em tela larga: dono do que restaurou
+    await Store.importarTudo(pacote(), { daNuvem: true });
+    const filaDono = (await Store.lerFila()).map(e => e.id).sort();
+    const vivos = (await Store.lerRegistros()).filter(r => !r.apagadoEm && Store.sincronizavel(r.id, r.tipo)).map(r => r.id).sort();
+    // o celular só leitura: a mesma restauração, nada entra na fila
+    await Store.confirmarEnvio((await Store.lerFila()).map(e => ({ id: e.id, atualizadoEm: e.atualizadoEm })));
+    Store.somenteLeitura(true);
+    let recusouEdicao = false;
+    try { await Store.salvar(await Store.carregar()); } catch (e) { recusouEdicao = !!(e && e.soLeitura); }
+    await Store.importarTudo(pacote(), { daNuvem: true });
+    const filaCelular = (await Store.lerFila()).length;
+    Store.somenteLeitura(false);
+    return { filaDono, vivos, filaCelular, recusouEdicao };
+  });
+  // (a fila leva também a lápide do que a restauração tirou, aluno:c1: a nuvem precisa saber que saiu)
+  prop('no aparelho que escreve, a restauração enfileira todo registro vivo sincronizável (' + restauroDaNuvem.vivos.length + ')',
+    restauroDaNuvem.vivos.every(id => restauroDaNuvem.filaDono.indexOf(id) >= 0) && restauroDaNuvem.vivos.length === 3, '--envenenado-restauro-sem-fila');
+  conf('e a lápide do que a restauração tirou', restauroDaNuvem.filaDono.indexOf('aluno:c1') >= 0, true);
+  conf('a trava do só leitura recusa a edição comum (controle)', restauroDaNuvem.recusouEdicao, true);
+  conf('no aparelho que só lê, a mesma restauração não enfileira nada', restauroDaNuvem.filaCelular, 0);
+  if (MODO === '--envenenado-restauro-sem-fila') throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
+
+  // ================================================================
   secao('6. A lista dos ajustes do aparelho');
   const lista = await pag.evaluate(() => Store.AJUSTES_DO_APARELHO.slice().sort().join(','));
   conf('são cinco, explícitos', lista, 'ibge,painelValoresAberto,ultimaCopia,valoresOcultos,versaoVista');

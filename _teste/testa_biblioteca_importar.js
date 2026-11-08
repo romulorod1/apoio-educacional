@@ -145,13 +145,18 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
         aulas: d.result && d.result.aulas.length, nota: !!n.result, midia: !!m.result }); };
     };
   }));
-  /* Desde o C15.1 o código atual sobe direto para a versão 4: os seis
-   * depósitos da biblioteca (versão 2), o das Minhas listas (versão 3) e os
-   * dois dos livros (versão 4) nascem juntos, e nada da versão 1 se perde,
-   * como antes. */
-  conf('o banco agora está na versão 4', depois.v, 4);
-  conf('com os catorze depósitos', depois.nomes.join(','),
-    'anexos,biblioteca_assets,biblioteca_etiquetas,biblioteca_itens,biblioteca_listas,biblioteca_pacotes,biblioteca_teoria,biblioteca_uso,dados,historico,livros,livros_posicoes,midias,notas');
+  /* O código atual sobe direto para a versão de hoje: os seis depósitos da
+   * biblioteca (versão 2), o das Minhas listas (versão 3), os dois dos livros
+   * (versão 4), os registros e o controle (versão 5, N1) e a fila de saída
+   * (versão 6, N1 fatia 2) nascem juntos, e nada da versão 1 se perde, como
+   * antes. A versão e a lista vêm do próprio store.js, para esta prova não
+   * ter de ser reescrita a cada subida; o que ela prova é a migração. */
+  const storeJs = fs.readFileSync(path.join(H.RAIZ, 'store.js'), 'utf8');
+  const VERSAO_DO_STORE = Number((/var VERSAO_BANCO = (\d+);/.exec(storeJs) || [])[1]);
+  const DEPOSITOS_DO_STORE = Array.from(storeJs.matchAll(/createObjectStore\('([a-z_]+)'/g)).map(m => m[1]).sort();
+  conf('o store.js declara a versão e dezessete depósitos', VERSAO_DO_STORE >= 6 && DEPOSITOS_DO_STORE.length === 17, true);
+  conf('o banco agora está na versão do store.js (' + VERSAO_DO_STORE + ')', depois.v, VERSAO_DO_STORE);
+  conf('com todos os depósitos que o store.js cria', depois.nomes.join(','), DEPOSITOS_DO_STORE.join(','));
   conf('a aluna continua lá', depois.aluno, 'Aluna da Migração');
   conf('a aula continua lá', depois.aulas, 1);
   conf('a folha continua lá', depois.nota, true);

@@ -669,9 +669,10 @@
       return new Promise(function (resolve, reject) {
         var t = transacao(b, ['saida', 'registros'], 'readonly');
         var saida = [];
-        var fila = t.objectStore('saida').getAll(undefined, limite || 200);
+        var fila = t.objectStore('saida').getAll();
         fila.onsuccess = function () {
-          (fila.result || []).forEach(function (entrada) {
+          // a quarentena fica de fora: o resto da fila não espera por ela
+          (fila.result || []).filter(function (e) { return !e.quarentena; }).slice(0, limite || 200).forEach(function (entrada) {
             var pedido = t.objectStore('registros').get(entrada.id);
             pedido.onsuccess = function () {
               if (pedido.result) saida.push({ fila: entrada, registro: pedido.result });
@@ -706,8 +707,41 @@
       });
     });
   }
+  /* Quantas esperam para subir e quantas estão em quarentena. */
+  function estadoDaFila() {
+    return todosOsValores('saida').then(function (lista) {
+      var q = (lista || []).filter(function (e) { return !!e.quarentena; }).length;
+      return { pendentes: (lista || []).length - q, quarentena: q };
+    });
+  }
   function tamanhoDaFila() {
-    return trans('saida', 'readonly').then(function (s) { return comoPromessa(s.count()); });
+    return estadoDaFila().then(function (e) { return e.pendentes; });
+  }
+  /* A entrada que a nuvem recusou sozinha (a regra ou o teto de 1 MiB) ganha
+   * uma tentativa; na terceira vai para a quarentena, e deixa de entrar nos
+   * lotes, para não derrubar o commit dos outros para sempre. Uma edição nova
+   * do mesmo item regrava a entrada (enfileirar) e a tira da quarentena. */
+  var TENTATIVAS_ATE_QUARENTENA = 3;
+  function marcarTentativa(ids) {
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, 'saida', 'readwrite');
+        var s = t.objectStore('saida'), quarentena = 0;
+        (ids || []).forEach(function (id) {
+          var pedido = s.get(id);
+          pedido.onsuccess = function () {
+            var e = pedido.result;
+            if (!e) return;
+            e.tentativas = (e.tentativas || 0) + 1;
+            if (e.tentativas >= TENTATIVAS_ATE_QUARENTENA) { e.quarentena = true; quarentena++; }
+            s.put(e);
+          };
+        });
+        t.oncomplete = function () { resolve(quarentena); };
+        t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
   }
 
   /* Lê os três de uma vez, numa transação só de leitura. */
@@ -1501,7 +1535,12 @@
             if (chaveExterna) Object.keys(registros || {}).forEach(function (k) { s.put(registros[k], k); });
             else (registros || []).forEach(function (r) { s.put(r); });
           }
-          escreverDiferenca(t, completar(pacote.dados), { carimbo: carimbo, semFila: daNuvem }, function (c) { contas = c; });
+          /* A fila: a restauração só NÃO enfileira no aparelho que só lê (o
+           * celular do D6a, que nunca envia). Num aparelho que escreve, o
+           * tablet novo ou reinstalado é dono do que restaurou e tudo o que
+           * está vivo tem de subir como registro: quem fez a cópia pode nunca
+           * ter conseguido enviar (regras ainda não publicadas, por exemplo). */
+          escreverDiferenca(t, completar(pacote.dados), { carimbo: carimbo, semFila: daNuvem && soLeitura }, function (c) { contas = c; });
           trocar('notas', pacote.notas, true);
           trocar('midias', pacote.midias, true);
           trocar('anexos', anexos, true);
@@ -1647,6 +1686,7 @@
     AJUSTES_DO_APARELHO: AJUSTES_DO_APARELHO.slice(),
     lerRegistros: function () { return todosOsValores('registros'); },
     registrosDaFila: registrosDaFila, confirmarEnvio: confirmarEnvio, tamanhoDaFila: tamanhoDaFila,
+    estadoDaFila: estadoDaFila, marcarTentativa: marcarTentativa,
     lerFila: function () { return todosOsValores('saida'); },
     sincronizavel: sincronizavel,
     montarRegistros: montar,

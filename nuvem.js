@@ -100,7 +100,7 @@
   /* Os registros (N1, fatia 2): quantos esperam na fila, o último envio e o
    * último erro (o PERMISSION_DENIED das regras ainda não publicadas fica
    * aqui, para Ajustes dizer). Espelhado no banco próprio, chave 'registros'. */
-  var registros = { pendentes: 0, ultimoEnvio: null, erro: null };
+  var registros = { pendentes: 0, quarentena: 0, ultimoEnvio: null, erro: null };
   var enviandoRegistros = null;  // promessa do envio em curso
   var envioAgendado = null;      // o setTimeout do envio depois de uma gravação
   var ouvintes = [];
@@ -159,7 +159,7 @@
       automatica = !!v[3];
       pendente = !!v[4];
       aparelho = v[5] || null;
-      if (v[7]) registros = { pendentes: 0, ultimoEnvio: v[7].ultimoEnvio || null, erro: v[7].erro || null };
+      if (v[7]) registros = { pendentes: 0, quarentena: 0, ultimoEnvio: v[7].ultimoEnvio || null, erro: v[7].erro || null };
       // a fila é do Store; a contagem é lida dele, nunca guardada aqui
       contarFila();
       if (!aparelho) {
@@ -841,10 +841,14 @@
   }
 
   function contarFila() {
-    if (!root.Store || typeof root.Store.tamanhoDaFila !== 'function') return Promise.resolve(0);
-    return root.Store.tamanhoDaFila().then(function (n) {
-      if (n !== registros.pendentes) { registros.pendentes = n; avisarOuvintes(); }
-      return n;
+    if (!root.Store || typeof root.Store.estadoDaFila !== 'function') return Promise.resolve(0);
+    return root.Store.estadoDaFila().then(function (e) {
+      if (e.pendentes !== registros.pendentes || e.quarentena !== registros.quarentena) {
+        registros.pendentes = e.pendentes;
+        registros.quarentena = e.quarentena;
+        avisarOuvintes();
+      }
+      return e.pendentes;
     }, function () { return registros.pendentes; });
   }
   function guardarRegistros() {
@@ -887,19 +891,62 @@
       if (!online()) throw semRede();
       if (!root.Store || typeof root.Store.registrosDaFila !== 'function') return { pulado: 'sem fila', enviados: 0 };
       var uid = sessao.uid;
+      /* Um lote inteiro, num commit; o que subiu sai da fila. */
+      function subirLote(itens) {
+        return Promise.all(itens.map(function (i) { return documentoDoRegistro(i.registro, info.versaoApp); })).then(function (docs) {
+          return commit(docs.map(function (d) { return gravacao(nomeDoc(uid, 'registros/' + d.id), d); }));
+        }).then(function () {
+          return root.Store.confirmarEnvio(itens.map(function (i) { return { id: i.fila.id, atualizadoEm: i.fila.atualizadoEm }; }));
+        });
+      }
+      /* O COMMIT É ATÔMICO: um registro que a regra ou o teto de 1 MiB recuse
+       * derrubaria o lote inteiro, para sempre. Quando um lote falha, ele é
+       * dividido ao meio até isolar o culpado; o que não é culpa de registro
+       * (sem rede, sessão vencida) sobe na hora. Devolve o que subiu e os que
+       * ficaram sozinhos sem passar (indefinidos), com o erro. Se a metade de
+       * cima falhou inteira, a de baixo é tentada inteira uma vez: as duas
+       * falhando inteiras é a nuvem recusando tudo, e não se desce mais. */
+      function subir(itens) {
+        return subirLote(itens).then(function (n) { return { enviados: n, indefinidos: [], erro: null }; }, function (e) {
+          if (!e || e.codigo === 'SEM_REDE' || e.codigo === 'TOKEN_EXPIRED') throw e;
+          if (itens.length === 1) return { enviados: 0, indefinidos: itens, erro: e };
+          var meio = Math.ceil(itens.length / 2), a = itens.slice(0, meio), b = itens.slice(meio);
+          return subir(a).then(function (r1) {
+            if (r1.enviados === 0 && r1.indefinidos.length === a.length && a.length > 1) {
+              return subirLote(b).then(function (n) {
+                return { enviados: n, indefinidos: r1.indefinidos, erro: r1.erro };
+              }, function (e2) {
+                if (!e2 || e2.codigo === 'SEM_REDE' || e2.codigo === 'TOKEN_EXPIRED') throw e2;
+                throw r1.erro || e2;
+              });
+            }
+            return subir(b).then(function (r2) {
+              return { enviados: r1.enviados + r2.enviados, indefinidos: r1.indefinidos.concat(r2.indefinidos), erro: r1.erro || r2.erro };
+            });
+          });
+        });
+      }
+      var jaCulpados = {}; // quem levou tentativa neste envio não volta ao lote até o próximo envio
       function proximoLote() {
         return root.Store.registrosDaFila(REGISTROS_POR_COMMIT).then(function (itens) {
-          itens = itens.filter(function (i) { return !!i.registro; });
+          itens = itens.filter(function (i) { return !!i.registro && !jaCulpados[i.fila.id]; });
           if (!itens.length || lotes >= 50) return { enviados: enviados };
           lotes++;
-          return Promise.all(itens.map(function (i) { return documentoDoRegistro(i.registro, info.versaoApp); })).then(function (docs) {
-            return commit(docs.map(function (d) { return gravacao(nomeDoc(uid, 'registros/' + d.id), d); }));
-          }).then(function () {
-            return root.Store.confirmarEnvio(itens.map(function (i) { return { id: i.fila.id, atualizadoEm: i.fila.atualizadoEm }; }));
-          }).then(function (tiradas) {
-            enviados += tiradas;
-            // nada saiu da fila: tudo foi editado durante o lote; o próximo leva a versão nova
-            return proximoLote();
+          return subir(itens).then(function (r) {
+            enviados += r.enviados;
+            if (!r.indefinidos.length) return proximoLote();
+            /* Culpa do registro, e não da nuvem: outros do mesmo lote passaram, ou
+             * o erro é de forma (INVALID_ARGUMENT), ou ele já tinha sido culpado
+             * antes. Senão é a nuvem recusando tudo: a fila fica e o erro sobe. */
+            var culpados = r.indefinidos.filter(function (i) {
+              return r.enviados > 0 || (r.erro && r.erro.codigo === 'INVALID_ARGUMENT') || (i.fila.tentativas || 0) > 0;
+            });
+            if (!culpados.length) throw r.erro;
+            culpados.forEach(function (i) { jaCulpados[i.fila.id] = true; });
+            return root.Store.marcarTentativa(culpados.map(function (i) { return i.fila.id; })).then(function () {
+              // o lote seguinte lê a fila de novo, sem os culpados deste envio: uma tentativa por envio
+              return proximoLote();
+            });
           });
         });
       }
@@ -932,7 +979,8 @@
       enviando: !!enviando,
       aparelho: aparelho,
       aparelhoId: idDoAparelho(),
-      registros: { pendentes: registros.pendentes, ultimoEnvio: registros.ultimoEnvio, erro: registros.erro, enviando: !!enviandoRegistros },
+      registros: { pendentes: registros.pendentes, quarentena: registros.quarentena, ultimoEnvio: registros.ultimoEnvio,
+        erro: registros.erro, enviando: !!enviandoRegistros },
       soLeitura: !!marcaSoLeitura,
       uidDona: marcaSoLeitura ? marcaSoLeitura.uidDona : null,
       online: online()

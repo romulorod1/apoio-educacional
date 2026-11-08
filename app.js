@@ -20890,17 +20890,21 @@
    * regras ainda não publicadas), a fila fica guardada e a frase diz isso. */
   function fraseDosRegistrosNaNuvem(est) {
     var r = est.registros || { pendentes: 0 };
-    var n = r.pendentes || 0;
+    var n = r.pendentes || 0, q = r.quarentena || 0;
     var guardadas = n === 1 ? '1 mudança guardada aqui' : n + ' mudanças guardadas aqui';
+    /* A quarentena: o registro que a nuvem recusa sozinho, três vezes, sai dos
+     * lotes para não segurar os outros, e a frase diz. */
+    var presas = q ? ' ' + (q === 1 ? '1 mudança não consegue subir' : q + ' mudanças não conseguem subir') +
+      ' (a nuvem recusa esse registro); as outras seguem.' : '';
     if (r.erro && r.erro.codigo === 'PERMISSION_DENIED') {
       return 'A nuvem ainda não aceita as mudanças uma a uma (as regras novas não foram publicadas). ' +
-        guardadas + ', para subir quando aceitar.';
+        guardadas + ', para subir quando aceitar.' + presas;
     }
-    if (r.erro && r.erro.codigo === 'SEM_REDE') return 'Sem internet agora. ' + guardadas + ', para subir quando houver sinal.';
-    if (r.erro) return 'A nuvem recusou as mudanças uma a uma (' + r.erro.codigo + '). ' + guardadas + '; vou tentar de novo.';
-    if (r.enviando) return 'Subindo as mudanças...';
-    if (n > 0) return (n === 1 ? '1 mudança' : n + ' mudanças') + ' a subir para a nuvem.';
-    return 'Todas as mudanças já subiram para a nuvem, uma a uma.';
+    if (r.erro && r.erro.codigo === 'SEM_REDE') return 'Sem internet agora. ' + guardadas + ', para subir quando houver sinal.' + presas;
+    if (r.erro) return 'A nuvem recusou as mudanças uma a uma (' + r.erro.codigo + '). ' + guardadas + '; vou tentar de novo.' + presas;
+    if (r.enviando) return 'Subindo as mudanças...' + presas;
+    if (n > 0) return (n === 1 ? '1 mudança' : n + ' mudanças') + ' a subir para a nuvem.' + presas;
+    return (q ? 'Todas as outras mudanças já subiram para a nuvem, uma a uma.' : 'Todas as mudanças já subiram para a nuvem, uma a uma.') + presas;
   }
 
   function mostrarMensagemDaNuvem(caixa, classe, texto) {
