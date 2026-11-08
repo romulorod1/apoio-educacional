@@ -400,8 +400,18 @@ const retrato = (pag) => pag.evaluate(async () => {
   }), true);
   conf('nenhuma chave guardada no apoio-nuvem', await lerEstadoDaNuvem(pagA, 'chave'), null);
   conf('o cartão não tem mais "Ver a chave da cópia"', await existe(pagA, '#nuvem-ver-chave'), false);
-  // "código da conta" (o uid do observador, D7) fica; o que saiu é a chave, o QR e o código do papel
-  conf('o cartão da nuvem não fala em chave, QR, código do papel nem imprimir', /chave|QR|código d[ao] (papel|cópia|chave)|imprim|cifra/i.test(await texto(pagA, '#cartao-nuvem')), false);
+  /* "código da conta" (o uid, D7) fica; o que saiu é a chave, o QR e o código
+   * do papel. O uid é aleatório e às vezes contém "qr": ele sai do texto antes
+   * da busca (era a falha intermitente desta verificação). */
+  const VOCAB_CHAVE = /chave|QR|código d[ao] (papel|cópia|chave)|imprim|cifra/i;
+  const semCodigoDaConta = (t, uid) => String(t || '').split(uid).join('');
+  const textoCartao = await texto(pagA, '#cartao-nuvem');
+  conf('o cartão mostra o código da conta', textoCartao.indexOf(dona.localId) >= 0, true);
+  conf('o cartão da nuvem não fala em chave, QR, código do papel nem imprimir', VOCAB_CHAVE.test(semCodigoDaConta(textoCartao, dona.localId)), false);
+  const uidPlantado = 'AbQrcdqrXYZ0123456789abc';
+  const cartaoPlantado = textoCartao.split(dona.localId).join(uidPlantado);
+  conf('(controle) sem tirar o código da conta, um uid com "qr" acusaria: a causa da falha intermitente', VOCAB_CHAVE.test(cartaoPlantado), true);
+  conf('(controle) com o código fora do texto, a verificação passa mesmo com "qr" no uid', VOCAB_CHAVE.test(semCodigoDaConta(cartaoPlantado, uidPlantado)), false);
   const retratoA = await retrato(pagA);
 
   secao('4. (c) A cópia na nuvem é o zip em partes, e só quem as regras deixam a lê');
@@ -671,8 +681,10 @@ const retrato = (pag) => pag.evaluate(async () => {
    * de C vence nas lápides do que a cópia tem. */
   await pagC.evaluate(() => Nuvem.receberRegistros());
   conf('os dados de C são os da cópia de A (a gama de B, apagada no "Apagar tudo" que passou a valer, não volta)', await retrato(pagC), retratoA);
-  const gamaNoServidor = ((await lerDoc(dona.idToken, dona.localId, 'registros/aluno:gama')).json || { fields: {} }).fields;
-  conf('no servidor a gama é lápide (apagada por B)', !!(gamaNoServidor && gamaNoServidor.apagadoEm), true);
+  // as lápides do religar de B sobem pelo envio agendado; B sincroniza para não depender do relógio
+  await pagB.evaluate(() => Nuvem.sincronizar({ versaoApp: 'prova' }));
+  const gamaLapide = await esperar('a gama virou lápide no servidor', () => lerDoc(dona.idToken, dona.localId, 'registros/aluno:gama').then(r => !!(r.json && r.json.fields && r.json.fields.apagadoEm)), v => v === true, 20000);
+  conf('no servidor a gama é lápide (apagada por B)', gamaLapide.ok, true);
   {
     /* Vazia atual (a de C), boa anterior (a terceira): C cria um aluno e fecha.
      * A automática sobe com conteúdo, e a boa tem de ficar como anterior; a
