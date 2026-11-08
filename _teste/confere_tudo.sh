@@ -752,6 +752,8 @@ roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve
+# (D7) o observador de outra conta, em tela larga, nunca "passa a editar"
+roda "nuvem fase 0 --envenenado-observador-edita"   node "_teste/testa_nuvem.js" --envenenado-observador-edita
 # o medio da revisao adversarial (07/11): o banco vazio que subiria por cima da
 # copia boa depois do "Apagar tudo"
 roda "nuvem fase 0 --envenenado-sobe-vazio"         node "_teste/testa_nuvem.js" --envenenado-sobe-vazio

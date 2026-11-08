@@ -28,6 +28,10 @@
  *   --envenenado-leitor-escreve  as regras deixam quem lê escrever os
  *                              registros; a parte (a) tem de acusar no
  *                              observador permitido.
+ *   --envenenado-observador-edita  o app.js servido deixa o observador de
+ *                              outra conta, em tela larga, "passar a editar";
+ *                              a seção 5b tem de acusar (o botão aparece e a
+ *                              marca cai).
  *
  * O que a prova precisa na máquina, e diz onde procurou quando falta:
  *   - firebase-tools instalado FORA do repositório (npm, em
@@ -48,7 +52,7 @@ const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
-const MODO = ['--envenenado-leitor-escreve', '--envenenado-regra-aberta', '--envenenado-sobe-vazio',
+const MODO = ['--envenenado-leitor-escreve', '--envenenado-regra-aberta', '--envenenado-sobe-vazio', '--envenenado-observador-edita',
   '--envenenado-anterior-cega', '--envenenado-pendente-zerado'].filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 /* N0b (08/11): --envenenado-pendente-zerado volta a regra que zerava `pendente`
  * no fim do envio sem olhar se houve gravação DURANTE o envio; a edição feita
@@ -61,6 +65,7 @@ const PENDENTE_ZERADO = MODO === '--envenenado-pendente-zerado';
  * A prova "a boa fica, a vazia sai" tem de acusar. */
 const ANTERIOR_CEGA = MODO === '--envenenado-anterior-cega';
 const LEITOR_ESCREVE = MODO === '--envenenado-leitor-escreve';
+const OBSERVADOR_EDITA = MODO === '--envenenado-observador-edita';
 const REGRA_ABERTA = MODO === '--envenenado-regra-aberta';
 /* O médio da revisão adversarial (07/11):
  *   --envenenado-sobe-vazio      o nuvem.js servido deixa a automática subir
@@ -113,6 +118,10 @@ conf('o aplicativo não cria conta: nenhum signUp nem "Criar conta" no código',
   /signUp|Criar conta/i.test(NUVEM + APP + INDEX), false);
 
 const trocas = {};
+// o observador de outra conta nunca passa a editar: a decisão está numa função só, leOutraConta
+const LE_OUTRA_CONTA = 'return !!(est && est.uidDona && est.entrada && est.uidDona !== est.entrada.uid);';
+conf('o app.js decide "lê a cópia de outra conta" num lugar só, e o usa no botão e na função', APP.split(LE_OUTRA_CONTA).length === 2 && APP.split('leOutraConta()').length === 5, true); // a função e três usos
+if (OBSERVADOR_EDITA) trocas['/app.js'] = APP.replace(LE_OUTRA_CONTA, 'return false;');
 if (SOBE_VAZIO) {
   trocas['/nuvem.js'] = NUVEM
     .replace(GUARDA_VAZIO, 'if (false) {')
@@ -130,7 +139,7 @@ conf('a geração cresce em toda gravação, antes de olhar o pendente', /geraca
 if (PENDENTE_ZERADO) trocas['/nuvem.js'] = NUVEM.replace(PENDENTE_POR_GERACAO, 'pendente = false;');
 const regrasServidas = REGRA_ABERTA ? REGRAS.replace(LEITURA, 'return entrou();')
   : LEITOR_ESCREVE ? REGRAS.replace(ESCRITA_REGISTRO, 'allow create, update: if podeLer(uid) && registroValido(registro);') : REGRAS;
-if (MODO) conf('o arquivo servido ficou diferente do repositório (' + MODO + ')', (trocas['/nuvem.js'] || NUVEM) !== NUVEM || regrasServidas !== REGRAS, true);
+if (MODO) conf('o arquivo servido ficou diferente do repositório (' + MODO + ')', (trocas['/nuvem.js'] || NUVEM) !== NUVEM || (trocas['/app.js'] || APP) !== APP || regrasServidas !== REGRAS, true);
 
 conf('o firebase-tools está onde a prova procura (' + FIREBASE + ')', fs.existsSync(FIREBASE), true);
 const javaExe = JAVA_HOME ? path.join(JAVA_HOME, 'bin', process.platform === 'win32' ? 'java.exe' : 'java') : 'java';
@@ -495,6 +504,21 @@ const retrato = (pag) => pag.evaluate(async () => {
   await H.abrirApp(pagD, amb.ORIGEM);
   await pagD.evaluate(() => Nuvem.pronto());
   conf('reaberto, continua só leitura, com a conta da dona na marca', await pagD.evaluate(u => { const e = Nuvem.estado(); return e.soLeitura && e.uidDona === u && document.body.classList.contains('modo-celular'); }, dona.localId), true);
+  /* Em tela larga, o observador de OUTRA conta nunca passa a editar: o envio
+   * dele iria para a conta dele com os carimbos da dona (FAILED_PRECONDITION
+   * para sempre) e a cópia automática subiria os dados dela como cópia dele. */
+  const botaoEditar = await esperar('o alto do celular desenhou', () => pagD.evaluate(() => !!document.querySelector('#nuvem-passa-a-editar, #nuvem-so-le-outra')), v => v === true, 10000);
+  conf('(controle) o alto da tela de só leitura foi desenhado', botaoEditar.ok, true);
+  if (OBSERVADOR_EDITA) {
+    conf('VENENO visto: o observador de outra conta, em tela larga, viu "Este aparelho passa a editar"', await existe(pagD, '#nuvem-passa-a-editar'), true);
+    await clicar(pagD, '#nuvem-passa-a-editar');
+    const caiu = await esperar('a marca de só leitura caiu', () => pagD.evaluate(() => !Nuvem.estado().soLeitura), v => v === true, 10000);
+    conf('VENENO visto: e a marca caiu (o envio dele iria para a conta dele com os carimbos da dona)', caiu.ok, true);
+  } else {
+    conf('o observador de outra conta, em tela larga, não vê "Este aparelho passa a editar"', await existe(pagD, '#nuvem-passa-a-editar'), false);
+    conf('e a tela diz que ele só lê a cópia de outra conta', await texto(pagD, '#nuvem-so-le-outra'), 'Este aparelho só lê a cópia de outra conta.');
+    conf('a marca continua', await pagD.evaluate(() => Nuvem.estado().soLeitura), true);
+  }
   conf('nenhum erro de script no observador', JSON.stringify(pagD.errosDePagina), '[]');
   await contextoD.close();
 

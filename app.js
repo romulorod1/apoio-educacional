@@ -20848,9 +20848,16 @@
    * caminho certo é restaurar primeiro (enviar poria a cópia deste aparelho
    * como a mais recente); e um banco sem conteúdo por cima de uma cópia com
    * conteúdo só sobe se ela confirmar. */
+  /* Com a sincronização desligada pelo "Apagar tudo", o envio dela religa e o
+   * que está aqui passa a valer também no outro aparelho: ela confirma. */
+  function avisoDeReligar(est) {
+    if (!est.sincronizacaoDesligada) return true;
+    return confirmar('Enviar a cópia religa a sincronização: o que está aqui passa a valer também no outro aparelho; ' +
+      'o que está lá vai para o histórico dele. Enviar?');
+  }
   function confirmarEnvioDela(est) {
     var conteudo = copiaTemConteudo();
-    if (est.ultimaCopia && conteudo) return Promise.resolve(true);
+    if (est.ultimaCopia && conteudo) return Promise.resolve(avisoDeReligar(est));
     return Nuvem.listarCopias().then(function (lista) {
       if (!lista.length) return true;
       var quando = Nuvem.fraseDeQuando(lista[0].quando);
@@ -20859,9 +20866,13 @@
           'toque em "Restaurar neste aparelho" primeiro. Enviar agora põe a cópia deste aparelho como a mais ' +
           'recente. Enviar mesmo assim?');
       }
-      if (!lista.some(function (c) { return c.conteudo; })) return true;
+      if (!lista.some(function (c) { return c.conteudo; })) return avisoDeReligar(est);
+      /* Depois do "Apagar tudo", o envio dela também religa a sincronização: o
+       * banco vazio apaga, por registro, a agenda do outro tablet (recuperável
+       * no histórico dele). A pergunta diz isso. */
       return confirmar('A cópia deste aparelho está vazia, ou só com a carga inicial, e a nuvem tem uma cópia com ' +
-        'conteúdo, de ' + quando + '. Enviar mesmo assim? A cópia com conteúdo fica guardada como anterior.');
+        'conteúdo, de ' + quando + '. Enviar mesmo assim? A cópia com conteúdo fica guardada como anterior' +
+        (est.sincronizacaoDesligada ? ', e o que está aqui passa a valer também no outro aparelho; o que está lá vai para o histórico dele.' : '.'));
     }, function () {
       // sem conseguir consultar a nuvem, não se arrisca a cópia boa
       avisar('Não consegui consultar a nuvem antes de enviar. Tente de novo em um minuto.');
@@ -21280,9 +21291,18 @@
   }
   function telaLarga() { return !telaDeCelular(); }
 
-  /* Desfazer a marca: só depois do sim, e só com a tela larga. */
+  /* O observador de OUTRA conta (D7) nunca passa a editar: o envio dele iria
+   * para a conta dele com os carimbos da dona (FAILED_PRECONDITION para
+   * sempre) e a cópia automática subiria os dados dela como cópia dele. */
+  function leOutraConta() {
+    var est = temNuvem() ? Nuvem.estado() : null;
+    return !!(est && est.uidDona && est.entrada && est.uidDona !== est.entrada.uid);
+  }
+  /* Desfazer a marca: só depois do sim, só com a tela larga, e nunca para a
+   * cópia de outra conta. */
   function passarAEditar() {
     if (!telaLarga() || !temMarcaSoLeitura()) return;
+    if (leOutraConta()) { avisar('Este aparelho só lê a cópia de outra conta.'); return; }
     if (!confirmar('Use só no tablet onde você dá aula. A partir daqui, este aparelho envia a cópia para a nuvem, ' +
       'por cima da que está lá.')) return;
     Nuvem.desmarcarSoLeitura().then(function () {
@@ -21394,9 +21414,11 @@
       }
       /* A saída da marca, só com a tela larga (a janela E o aparelho): num
        * celular, em pé ou deitado, ela não aparece. */
-      if (telaLarga()) {
+      if (telaLarga() && !leOutraConta()) {
         acoes.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'nuvem-passa-a-editar',
           texto: 'Este aparelho passa a editar', aoClick: passarAEditar }));
+      } else if (leOutraConta()) {
+        acoes.appendChild(el('span', { class: 'ajuda', id: 'nuvem-so-le-outra', texto: 'Este aparelho só lê a cópia de outra conta.' }));
       }
     } else {
       acoes.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'cel-trazer-copia',
