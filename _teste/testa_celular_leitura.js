@@ -30,13 +30,16 @@
  *                         Hoje;
  *   --envenenado-grava    a trava do banco tirada e o celular gravando a carga
  *                         inicial ao abrir;
- *   --envenenado-tela     só a guarda da tela de celular tirada (o lado menor
- *                         da tela abaixo de 640 px): o celular que restaurou
- *                         pelo cartão de Ajustes, deitado em 844x390 e sem a
+ *   --envenenado-tela     a tela do aparelho tirada da escolha (volta a
+ *                         janela de 640) e da guarda da automática: o celular que
+ *                         restaurou como tablet, deitado em 844x390 e sem a
  *                         marca, sobe a cópia ao fechar;
  *   --envenenado-limite-640  a guarda com o limite de 640 no lado menor: o
  *                         tablet de 8 polegadas (tela 600x960) fica com a
- *                         automática bloqueada, e a prova tem de ver.
+ *                         automática bloqueada, e a prova tem de ver;
+ *   --envenenado-janela-640  a escolha do modo celular volta a ser pela
+ *                         janela de 640 px: o tablet de 8 polegadas em pé vira
+ *                         celular, e a prova tem de ver.
  *
  * E a saída da marca: com a marca e a tela larga (janela e aparelho), aparece
  * "Este aparelho passa a editar"; depois do sim, o aparelho envia. Com a tela
@@ -58,11 +61,12 @@ const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
-const MODO = ['--envenenado-envia', '--envenenado-edicao', '--envenenado-grava', '--envenenado-tela', '--envenenado-limite-640']
+const MODO = ['--envenenado-envia', '--envenenado-edicao', '--envenenado-grava', '--envenenado-tela', '--envenenado-limite-640', '--envenenado-janela-640']
   .filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const ENVIA = MODO === '--envenenado-envia';
 const TELA = MODO === '--envenenado-tela';
 const LIMITE_640 = MODO === '--envenenado-limite-640';
+const JANELA_640 = MODO === '--envenenado-janela-640';
 const EDICAO = MODO === '--envenenado-edicao';
 const GRAVA = MODO === '--envenenado-grava';
 
@@ -82,7 +86,7 @@ const REGRAS = fs.readFileSync(path.join(H.RAIZ, 'firestore.rules'), 'utf8');
 
 /* A propriedade de cada veneno: no modo dele, a prova tem de vê-la quebrada. */
 function prop(rotulo, ok, veneno) {
-  if (MODO && MODO === veneno) return conf('VENENO visto: ' + rotulo + ', e quebrou', ok, false);
+  if (MODO && [].concat(veneno).indexOf(MODO) >= 0) return conf('VENENO visto: ' + rotulo + ', e quebrou', ok, false);
   return conf(rotulo, ok, true);
 }
 
@@ -117,7 +121,11 @@ if (ENVIA) {
   trocas['/nuvem.js'] = NUVEM.replace(PODE_ENVIAR, 'function podeEnviar() { return true; }').replace(AUTO_RESTAURA, 'automatica = true;');
   trocas['/app.js'] = APP.replace(GUARDA_AUTO_RE, '\n').replace(GUARDA_TELA_RE, '\n').replace(ENVIO_DELA, 'if (!temNuvem() || enviandoParaNuvem) return Promise.resolve();');
 }
-if (TELA) trocas['/app.js'] = APP.replace(GUARDA_TELA_RE, '\n');
+const ESCOLHA = '    var deve = temMarcaSoLeitura() || telaDeCelular();';
+conf('a escolha do modo celular (marca ou tela do aparelho) está num lugar só', APP.split(ESCOLHA).length, 2);
+// a tela do aparelho fora da escolha (volta a janela) e da guarda da automática
+if (TELA) trocas['/app.js'] = APP.replace(GUARDA_TELA_RE, '\n').replace(ESCOLHA, '    var deve = temMarcaSoLeitura() || (window.innerWidth || 0) < 640;');
+if (JANELA_640) trocas['/app.js'] = APP.replace(ESCOLHA, '    var deve = temMarcaSoLeitura() || (window.innerWidth || 0) < 640;');
 const LIMITE = 'var TELA_CELULAR = 500;';
 conf('o limite da tela de celular está num lugar só', APP.split(LIMITE).length, 2);
 if (LIMITE_640) trocas['/app.js'] = APP.replace(LIMITE, 'var TELA_CELULAR = 640;');
@@ -219,15 +227,24 @@ async function prepararPagina(pag, largura, altura, movel) {
     if (/:commit\b/.test(u) || r.method() === 'PATCH' || r.method() === 'DELETE') pag.escritasNaNuvem.push(r.method() + ' ' + u);
   });
   await pag.evaluateOnNewDocument(cfg => { window.NUVEM_EMULADOR = cfg; }, CFG);
-  /* A tela do aparelho: sem __tela, a do Chrome (no modo móvel, a do
-   * viewport); com __tela, a que a prova pôs. */
-  await pag.evaluateOnNewDocument(() => {
+  /* A tela do aparelho. A página aberta fora do modo móvel é um tablet, de
+   * tela 1280x800 (a do Chrome sem cabeça seria 800x600); a do modo móvel é
+   * a do viewport, que o Chrome emula. Com __tela no sessionStorage, vale o
+   * que a prova pôs ('nativa' devolve a do Chrome: o aparelho que passa de
+   * tablet para celular no meio da prova). */
+  const telaPadrao = (movel === undefined ? largura < 640 : movel) ? null : { width: 1280, height: 800 };
+  await pag.evaluateOnNewDocument(padrao => {
     const ler = () => { try { return JSON.parse(sessionStorage.getItem('__tela') || 'null'); } catch (e) { return null; } };
     ['width', 'height'].forEach(k => {
       const d = Object.getOwnPropertyDescriptor(Screen.prototype, k);
-      Object.defineProperty(Screen.prototype, k, { configurable: true, get() { const t = ler(); return t ? t[k] : d.get.call(this); } });
+      Object.defineProperty(Screen.prototype, k, { configurable: true, get() {
+        const t = ler();
+        if (t === 'nativa') return d.get.call(this);
+        if (t) return t[k];
+        return padrao ? padrao[k] : d.get.call(this);
+      } });
     });
-  });
+  }, telaPadrao);
   /* O espião do banco, desde o primeiro instante da página: toda transação de
    * escrita no apoio-educacional fica anotada, com os depósitos. A lista vive
    * no sessionStorage da aba, e não só na memória da página: o service worker
@@ -374,7 +391,7 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
   await prepararPagina(pagB, 390, 844);
   await abrir(pagB);
   let m = await medirTela(pagB);
-  conf('abaixo de 640 px o aplicativo entra no modo celular', m.celular, true);
+  conf('com tela de celular (390 x 844) o aplicativo entra no modo celular', m.celular, true);
   prop('ao abrir sem dados, o celular não grava nada no banco (nem a carga inicial)', (await escritasNoBanco(pagB)).length === 0, '--envenenado-grava');
   if (GRAVA) { await ctxB.close(); return; }
   conf('sem dados, aparece a entrada (conta e chave) e não as abas', await pagB.evaluate(() =>
@@ -531,6 +548,7 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     await Store.salvar(d);
   });
   conf('e com mudança pendente', await pagC.evaluate(() => Nuvem.estado().pendente), true);
+  await definirTela(pagC, 'nativa');
   await pagC.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true });
   const antesC = pagC.escritasNaNuvem.length;
   await zerarEscritas(pagC);
@@ -544,14 +562,18 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
   prop('e nenhuma escrita no banco nessa abertura', (await escritasNoBanco(pagC)).length === 0, 'nenhum');
   await ctxC.close();
 
-  /* Um aparelho sem a marca, deitado (janela de tablet), que restaurou pelo
-   * cartão de Ajustes, com a automática ligada e uma mudança pendente. */
-  async function peloCartao(rotulo, largura, altura, idAluno) {
+  /* Um aparelho sem a marca que restaurou pelo cartão de Ajustes, com a
+   * automática ligada e uma mudança pendente. Devolve null quando ele nem
+   * abre no modo de sempre (só nos venenos que trocam a escolha da tela). */
+  async function peloCartao(rotulo, largura, altura, movel, idAluno, venenos) {
     const ctx = await pagA.browser().createBrowserContext();
     const pag = await ctx.newPage();
-    await prepararPagina(pag, largura, altura, true);
+    await prepararPagina(pag, largura, altura, movel);
     await abrir(pag);
-    conf(rotulo + ': com ' + largura + ' px de janela, abre como tablet (sem a marca, a janela decide a tela)', (await medirTela(pag)).celular, false);
+    const tela = await pag.evaluate(() => screen.width + 'x' + screen.height);
+    const normal = !(await medirTela(pag)).celular;
+    prop(rotulo + ': janela de ' + largura + 'x' + altura + ', tela ' + tela + ', sem a marca: abre no modo de sempre', normal, venenos);
+    if (!normal) { await ctx.close(); return null; }
     await pag.evaluate(() => document.querySelector('#abas .aba[data-tela="ajustes"]').click());
     await pausa(200);
     await digitar(pag, '#nuvem-email', DONA.email);
@@ -567,36 +589,53 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
       Nuvem.estado().automatica && !document.querySelector('#modal-nuvem-restaurar.aberto')), v => v === true, 30000);
     conf(rotulo + ': restaurou pelo cartão, sem a marca, com a automática ligada', r.ok &&
       !(await pag.evaluate(() => Nuvem.estado().soLeitura)), true);
+    await mudarAlgo(pag, idAluno);
+    return { ctx, pag };
+  }
+  async function mudarAlgo(pag, id) {
     await pag.evaluate(async id => {
       const d = await Store.carregar();
       d.alunos.push({ id, nome: 'Aluno ' + id + ' Teste', ativo: true, precos: [] });
       await Store.salvar(d);
-    }, idAluno);
-    conf(rotulo + ': e com mudança pendente', await pag.evaluate(() => Nuvem.estado().pendente), true);
-    return { ctx, pag };
+    }, id);
+    conf('e com mudança pendente (' + id + ')', await pag.evaluate(() => Nuvem.estado().pendente), true);
   }
   const FRASE_TELA = 'Neste aparelho a cópia não sobe sozinha (tela de celular).';
-  const fraseDaTela = pag => pag.evaluate(() => { const e = document.querySelector('#nuvem-tela-celular'); return e ? e.textContent : null; });
 
-  secao('7b. O celular deitado (844 x 390) que restaurou pelo cartão de Ajustes, sem a marca, não sobe nada e diz por quê');
-  const D = await peloCartao('o celular deitado', 844, 390, 'delta');
+  secao('7b. O celular que restaurou como tablet na versão de antes, agora deitado (tela 844 x 390): modo celular, nada sobe, e diz por quê');
+  const D = await peloCartao('o celular de antes', 1280, 800, false, 'delta', 'nenhum');
+  await definirTela(D.pag, 'nativa'); // o mesmo aparelho, agora com a tela de celular
+  await D.pag.setViewport({ width: 844, height: 390, hasTouch: true, isMobile: true });
+  await abrir(D.pag);
   conf('a tela do celular tem lado menor 390', await D.pag.evaluate(() => Math.min(screen.width, screen.height)), 390);
-  conf('o cartão de Ajustes diz: "' + FRASE_TELA + '"', await fraseDaTela(D.pag), FRASE_TELA);
+  prop('deitado, com janela de 844 px, o celular abre no modo celular (pela tela do aparelho, sem a marca)',
+    (await medirTela(D.pag)).celular, ['--envenenado-tela', '--envenenado-janela-640']);
+  prop('o alto do modo celular diz: "' + FRASE_TELA + '"', ((await texto(D.pag, '#cel-origem')) || '').indexOf(FRASE_TELA) >= 0, ['--envenenado-tela', '--envenenado-janela-640']);
   const antesD = D.pag.escritasNaNuvem.length;
   await fecharEVoltar(D.pag);
   prop('celular deitado, sem a marca e com a automática ligada: nenhuma escrita na nuvem ao fechar nem ao voltar (' +
-    D.pag.escritasNaNuvem.slice(antesD).join(' ') + ')', D.pag.escritasNaNuvem.length === antesD, TELA ? '--envenenado-tela' : '--envenenado-envia');
+    D.pag.escritasNaNuvem.slice(antesD).join(' ') + ')', D.pag.escritasNaNuvem.length === antesD, ['--envenenado-tela', '--envenenado-envia']);
   await D.ctx.close();
 
-  secao('7c. O tablet de 8 polegadas (tela 600 x 960), deitado e sem a marca, sobe a cópia');
-  const E = await peloCartao('o tablet pequeno', 960, 600, 'epsilon');
-  conf('a tela do tablet pequeno tem lado menor 600', await E.pag.evaluate(() => Math.min(screen.width, screen.height)), 600);
-  prop('o tablet pequeno não mostra a frase da tela de celular', (await fraseDaTela(E.pag)) === null, '--envenenado-limite-640');
-  const antesE = E.pag.escritasNaNuvem.length;
-  await fecharEVoltar(E.pag);
-  const subiuE = await esperar('a automática do tablet pequeno subiu', () => E.pag.escritasNaNuvem.length > antesE, v => v === true, 20000);
-  prop('o tablet pequeno, ao fechar, sobe a cópia (a guarda é lado menor < 500, não < 640)', subiuE.ok, '--envenenado-limite-640');
-  await E.ctx.close();
+  secao('7c. O tablet de 8 polegadas (tela 600 x 960), em pé e deitado, sem a marca: modo de sempre, e sobe a cópia');
+  const E = await peloCartao('o tablet pequeno em pé', 600, 960, true, 'epsilon', ['--envenenado-janela-640', '--envenenado-limite-640', '--envenenado-tela']);
+  if (E) {
+    conf('a tela do tablet pequeno tem lado menor 600', await E.pag.evaluate(() => Math.min(screen.width, screen.height)), 600);
+    let antesE = E.pag.escritasNaNuvem.length;
+    await fecharEVoltar(E.pag);
+    conf('em pé, ao fechar, o tablet pequeno sobe a cópia', (await esperar('a automática do tablet em pé subiu',
+      () => E.pag.escritasNaNuvem.length > antesE, v => v === true, 20000)).ok, true);
+    await E.pag.setViewport({ width: 960, height: 600, hasTouch: true, isMobile: true });
+    await abrir(E.pag);
+    conf('deitado, o tablet pequeno continua no modo de sempre', (await medirTela(E.pag)).celular, false);
+    await mudarAlgo(E.pag, 'zeta');
+    antesE = E.pag.escritasNaNuvem.length;
+    await fecharEVoltar(E.pag);
+    conf('deitado, ao fechar, o tablet pequeno sobe a cópia', (await esperar('a automática do tablet deitado subiu',
+      () => E.pag.escritasNaNuvem.length > antesE, v => v === true, 20000)).ok, true);
+    conf('o tablet pequeno não tem a marca', await E.pag.evaluate(() => Nuvem.estado().soLeitura), false);
+    await E.ctx.close();
+  }
 
   if (!MODO) {
     secao('7d. A saída da marca: só com a tela larga, e depois do sim o aparelho envia');

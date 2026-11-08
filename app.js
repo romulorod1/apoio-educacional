@@ -20895,11 +20895,6 @@
       ? 'Sobe sozinha quando você fecha o aplicativo com internet, e uma vez por dia.' +
         (est.pendente ? ' Há mudanças que ainda não subiram.' : '')
       : 'A cópia automática começa depois do primeiro envio feito por você neste aparelho.' }));
-    // a guarda da tela de celular (D6) nunca bloqueia calada
-    if (telaDeCelular()) {
-      caixa.appendChild(el('div', { class: 'faixa-aviso', id: 'nuvem-tela-celular',
-        texto: 'Neste aparelho a cópia não sobe sozinha (tela de celular).' }));
-    }
     caixa.appendChild(el('div', { class: 'barra' }, [
       el('button', { type: 'button', class: 'btn principal', id: 'nuvem-enviar', disabled: ocupado,
         texto: ocupado ? 'Enviando...' : 'Enviar cópia agora',
@@ -21111,8 +21106,8 @@
     }
     /* Pelo modo celular, o aparelho passa a só ler (D6): a marca é gravada
      * ANTES de os dados chegarem, e daí em diante nada sobe daqui. */
-    // por qualquer caminho, com a janela abaixo de 640 px a restauração grava a marca
-    var comoCelular = modoCelular || larguraDeCelular();
+    // por qualquer caminho, num aparelho com tela de celular a restauração grava a marca
+    var comoCelular = modoCelular || telaDeCelular();
     /* O celular nunca tem mudança por guardar (ele não edita): a pergunta
      * dele não precisa do aviso da pendência. */
     if (comoCelular) {
@@ -21233,19 +21228,19 @@
 
   // ================= modo celular, só leitura (D6, parte 1) =================
 
-  /* Abaixo de 640 px de largura o aplicativo é outro: três telas (Hoje,
-   * Fechamento e Enviar) com abas embaixo, nunca a grade do mês encolhida. Os
-   * dados chegam da cópia do tablet na nuvem (N0), e o celular só lê.
+  /* No celular o aplicativo é outro: três telas (Hoje, Fechamento e Enviar)
+   * com abas embaixo, nunca a grade do mês encolhida. Os dados chegam da
+   * cópia do tablet na nuvem (N0), e o celular só lê.
    *
-   * COMO O APARELHO SE RECONHECE COMO CELULAR: pela marca "este aparelho só
-   * lê", que o nuvem.js grava quando ela traz a cópia do tablet pelo modo
-   * celular. A largura decide só a TELA, e muda quando o celular deita: o
-   * mesmo celular deitado passa de 640 px e, pela largura, viraria tablet,
-   * gravaria no banco e subiria uma cópia velha por cima da do tablet. A
-   * marca não gira com a tela. Sem a marca, a tela estreita também só lê
-   * enquanto estiver à vista (o celular que ainda não trouxe a cópia, ou o
-   * tablet numa janela estreita); e a largura de tablet sem a marca fica
-   * exatamente como sempre foi.
+   * COMO O APARELHO SE RECONHECE COMO CELULAR: pelo APARELHO, e não pela
+   * janela. O modo celular liga com a marca "este aparelho só lê" (gravada
+   * pelo nuvem.js em toda restauração feita num aparelho assim), ou quando o
+   * lado menor da TELA tem menos de 500 px, em pé ou deitado. A janela muda
+   * quando o celular deita (passa de 640 px) e quando um tablet de 8
+   * polegadas fica em pé (cerca de 600 px): pela janela, o celular deitado
+   * viraria tablet e subiria uma cópia velha, e o tablet pequeno em pé
+   * deixaria de editar. A tela do aparelho e a marca não giram. Fora disso,
+   * o aplicativo fica exatamente como sempre foi.
    *
    * Só ler quer dizer três coisas, cada uma com a sua trava: nada grava no
    * banco a não ser a cópia que vem da nuvem (Store.somenteLeitura, na porta
@@ -21253,7 +21248,6 @@
    * nem ao fechar, nem uma vez por dia (o commit do nuvem.js recusa, e a
    * automática daqui nem tenta); e nenhuma das três telas tem botão de
    * edição. */
-  var LARGURA_CELULAR = 640;
   var modoCelular = false;
   var telaCelular = 'hoje';
   var mesCelular = Core.mesDe(Core.hojeIso());
@@ -21261,22 +21255,19 @@
   var celularRecado = '';     // o que a última busca disse (sem internet, sem cópia, erro)
   var celularPedeEntrada = false; // sem a marca, com dados: ela tocou em "Trazer a cópia do tablet"
 
-  function larguraDeCelular() {
-    return (window.innerWidth || document.documentElement.clientWidth || 0) < LARGURA_CELULAR;
-  }
   function temMarcaSoLeitura() { return temNuvem() && !!Nuvem.estado().soLeitura; }
   function aparelhoSoLe() { return modoCelular || temMarcaSoLeitura(); }
   /* O lado MENOR da tela do aparelho, e não da janela: não muda quando o
    * celular deita. Celular fica entre 360 e 430 px; um tablet de 8
-   * polegadas tem cerca de 600. O limite é 500, e não os 640 da janela, para
-   * não bloquear a automática de um tablet pequeno. */
+   * polegadas tem cerca de 600. O limite é 500 para o tablet pequeno nunca
+   * ser tomado por celular. */
   var TELA_CELULAR = 500;
   function telaDeCelular() {
     var s = window.screen || {};
     var menor = Math.min(Number(s.width) || 0, Number(s.height) || 0);
     return menor > 0 && menor < TELA_CELULAR;
   }
-  function telaLarga() { return !larguraDeCelular() && !telaDeCelular(); }
+  function telaLarga() { return !telaDeCelular(); }
 
   /* Desfazer a marca: só depois do sim, e só com a tela larga. */
   function passarAEditar() {
@@ -21298,7 +21289,7 @@
   }
 
   function aplicarModoCelular() {
-    var deve = temMarcaSoLeitura() || larguraDeCelular();
+    var deve = temMarcaSoLeitura() || telaDeCelular();
     Store.somenteLeitura(deve);
     if (temNuvem()) Nuvem.travarEnvio(deve);
     if (deve === modoCelular) return;
@@ -21321,7 +21312,7 @@
         // não troca de tela com uma janela aberta: o que está nela se perderia
         if (document.querySelector('.fundo-modal.aberto')) return;
         aplicarModoCelular();
-        if (modoCelular) desenharTopoCelular(); // a saída da marca depende da largura
+        if (modoCelular) desenharTopoCelular();
       }, 250);
     });
     if (modoCelular) desenharCelular();
@@ -21358,6 +21349,8 @@
       frase = 'Dados de ' + Nuvem.fraseDeQuando(u.quando) + ', do ' + tipoDoAparelho(u.aparelho) + '.';
     } else if (temDadosNoCelular()) {
       frase = 'Dados deste aparelho, que ainda não recebe a cópia do tablet.';
+      // a guarda da tela de celular nunca bloqueia calada
+      if (telaDeCelular()) frase += ' Neste aparelho a cópia não sobe sozinha (tela de celular).';
     } else {
       frase = 'Ainda sem os dados do tablet.';
     }
