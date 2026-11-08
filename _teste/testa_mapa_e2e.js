@@ -253,7 +253,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   });
   await espera(300);
   await pag.evaluate(() => {
-    document.querySelector('#painel-zoom-dia .zoom-dia-rodape .btn.principal').click();
+    document.querySelector('#painel-zoom-dia .zoom-dia-rodape .zoom-nova-aula').click();
   });
   await espera(600);
   await pag.evaluate((id) => {

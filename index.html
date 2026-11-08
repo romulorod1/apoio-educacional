@@ -15,120 +15,6 @@
   <link rel="icon" href="icons/favicon.png" type="image/png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
-  <style>
-    /* O último encontro, no alto da janela da aula.
-       Bloco de leitura, sem nada para tocar além do botão Abrir: por isso o
-       fundo é claro e o traço lateral é discreto, para não competir com o
-       cartão da trilha, que fica logo abaixo e é onde ela age. */
-    .ultimo-encontro {
-      border: 1px solid #D9E2EC;
-      border-left: 4px solid #1F3A5F;
-      background: #F7F9FC;
-      border-radius: 10px;
-      padding: 10px 12px;
-      margin-bottom: 12px;
-      /* Teto de altura, porque o bloco cresce com o que ela escreveu na aula
-         passada. Deitado, num corpo de 600 pixels, ele já tomou 374 e empurrou
-         o campo de escrever para fora da tela. Passando disso, ele rola por
-         dentro e o resto da janela fica onde está. */
-      max-height: 32vh;
-      overflow-y: auto;
-    }
-
-    /* A anotação particular do encontro anterior nasce fechada e sai por
-       último: o tablet fica na mesa durante a aula e a mãe passa ao lado. */
-    .ultimo-encontro .btn.mostrar-so-minha {
-      min-height: 44px;
-      min-width: 44px;
-    }
-
-    .ultimo-encontro .so-minha-anterior {
-      margin-top: 6px;
-      border-left: 3px solid #829AB1;
-      background: #EEF2F7;
-      border-radius: 0 8px 8px 0;
-      padding: 7px 10px;
-    }
-
-    .ultimo-encontro .rotulo-ultimo {
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: .05em;
-      text-transform: uppercase;
-      color: #1F3A5F;
-    }
-
-    .ultimo-encontro .linha-ultimo {
-      font-size: 14px;
-      line-height: 1.5;
-      margin-bottom: 4px;
-      white-space: pre-wrap;
-    }
-
-    /* As três frentes da etapa, na ficha do aluno. Os quatro botões de escolha
-       ficam em grade de dois por dois, com alvo de toque folgado: é um toque por
-       mês, no máximo, e ela está com a criança do lado.
-
-       Em linha com quebra, os quatro caíam em três mais um, e o quarto ficava a
-       12 pixels do título da frente seguinte: um toque de dedo ali marcava a
-       etapa na frente errada, e essa é uma marca que fica com data. Dois por
-       dois cabe deitado e em pé, nunca sobra um botão solto embaixo, e o espaço
-       até a linha de baixo passou a ser folgado. */
-    .quadro-etapas { margin-bottom: 14px; }
-
-    .quadro-etapas .linha-etapa { align-items: center; }
-
-    .quadro-etapas .escolha-etapa {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-      margin: 8px 0 20px;
-    }
-
-    .quadro-etapas .escolha-etapa .btn {
-      width: 100%;
-      min-height: 46px;
-    }
-
-    /* As mesmas três linhas, só para ler, no alto da aba Dados. A etapa mora na
-       aba Mapeamento e a ficha abre na aba Dados: ficava atrás de um toque que
-       ninguém dá sem já saber o que vai achar. */
-    .resumo-etapas {
-      border: 1px solid #D9E2EC;
-      border-left: 4px solid #C99A2E;
-      background: #FDFBF5;
-      border-radius: 10px;
-      padding: 10px 12px;
-      margin-bottom: 16px;
-    }
-
-    .resumo-etapas .rotulo-resumo-etapas {
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: .05em;
-      text-transform: uppercase;
-      color: #1F3A5F;
-    }
-
-    .resumo-etapas .btn.pequeno { min-height: 44px; min-width: 44px; }
-
-    .resumo-etapas .linha-resumo-etapa {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px 10px;
-      font-size: 14px;
-      line-height: 1.5;
-      padding: 3px 0;
-    }
-
-    .resumo-etapas .frente-etapa {
-      font-weight: 700;
-      color: #1F3A5F;
-      min-width: 132px;
-    }
-
-    .resumo-etapas .valor-etapa.vazia { color: #627D98; font-style: italic; }
-  </style>
 </head>
 
 <body>
@@ -187,7 +73,7 @@
       <div class="barra">
         <h2 class="titulo">Fechamento do mês</h2>
         <span class="cresce"></span>
-        <select id="mes-fechamento" style="max-width:210px"></select>
+        <select class="u-larg-max-210" id="mes-fechamento"></select>
       </div>
 
       <div class="numeros" id="numeros-fechamento"></div>
@@ -199,7 +85,7 @@
 
       <div class="barra">
         <!-- C10b: percorre os alunos do mês, uma família por toque. -->
-        <button class="btn principal" id="enviar-todas-familias" type="button">Enviar para todas as famílias</button>
+        <button class="btn" id="enviar-todas-familias" type="button">Enviar para todas as famílias</button>
         <button class="btn" id="exportar-md-mes" type="button">Exportar o mês em texto</button>
         <button class="btn" id="exportar-pdf-mes" type="button">PDF do resumo do mês</button>
       </div>
@@ -224,15 +110,15 @@
     <!-- ---------------- biblioteca ----------------
          Sem pacote importado, oferece a importação pelo controle de Ajustes. -->
     <section class="tela" id="tela-biblioteca">
-      <div class="barra" style="margin-bottom:12px">
+      <div class="barra u-margem-baixo-12">
         <h2 class="titulo">Biblioteca</h2>
         <span class="cresce"></span>
-        <button class="btn pequeno" id="btn-guia-listas" type="button" style="margin-right:8px">Como usar as listas</button>
-        <div id="bib-contagem" class="ajuda" style="margin:0;font-weight:600"></div>
+        <button class="btn pequeno u-margem-dir-8" id="btn-guia-listas" type="button">Como usar as listas</button>
+        <div id="bib-contagem" class="ajuda u-margem-0 u-peso-seminegrito"></div>
       </div>
-      <div class="cartao" id="bib-busca-cartao" style="margin-bottom:14px;padding:12px 14px;display:none">
-        <div class="barra" style="margin-bottom:0;gap:8px">
-          <input type="text" id="busca-biblioteca" placeholder="Buscar na biblioteca: assunto, fórmula ou nome (bhaskara, pitágoras...)" style="flex:1;min-width:200px" autocomplete="off">
+      <div class="cartao u-margem-baixo-14 u-recuo-12-14" id="bib-busca-cartao" style="display:none">
+        <div class="barra u-margem-baixo-0 u-vao-8">
+          <input class="u-flex-1 u-larg-min-200" type="text" id="busca-biblioteca" placeholder="Buscar na biblioteca: assunto, fórmula ou nome (bhaskara, pitágoras...)" autocomplete="off">
           <button class="btn pequeno" id="limpar-busca-biblioteca" type="button" style="display:none">Limpar</button>
         </div>
       </div>
@@ -247,12 +133,12 @@
 
       <h3 class="subtitulo">Cópia de segurança</h3>
       <div class="cartao">
-        <p class="ajuda" style="margin-top:0">
+        <p class="ajuda u-margem-topo-0">
           Tudo fica guardado apenas neste tablet. Nada é enviado para a internet.
           Faça uma cópia de vez em quando e guarde no Google Drive.
         </p>
         <div id="estado-copia"></div>
-        <div class="barra" style="margin-bottom:0">
+        <div class="barra u-margem-baixo-0">
           <button class="btn principal" id="baixar-copia" type="button">Salvar cópia de segurança</button>
           <button class="btn" id="restaurar-copia" type="button">Restaurar de uma cópia</button>
           <input type="file" id="arquivo-copia" accept="application/zip,.zip,application/json,.json" hidden>
@@ -261,19 +147,19 @@
 
       <h3 class="subtitulo">Ano letivo e progressão escolar</h3>
       <div class="cartao">
-        <p class="ajuda" style="margin-top:0">
+        <p class="ajuda u-margem-topo-0">
           Atualize as séries dos alunos para o novo ano letivo ou encerre ciclos pedagógicos.
           O histórico dos anos anteriores e relatórios passados permanecem 100% preservados.
         </p>
-        <div id="info-ano-letivo" class="ajuda" style="margin-bottom:8px"></div>
-        <div class="barra" style="margin-bottom:0">
+        <div id="info-ano-letivo" class="ajuda u-margem-baixo-8"></div>
+        <div class="barra u-margem-baixo-0">
           <button class="btn" id="btn-revisar-virada-anual" type="button">Novo ano letivo</button>
         </div>
       </div>
 
       <h3 class="subtitulo">Desfazer</h3>
       <div class="cartao">
-        <p class="ajuda" style="margin-top:0">
+        <p class="ajuda u-margem-topo-0">
           Toda alteração que atinge mais de uma aula fica registrada aqui.
           Dá para voltar ao estado anterior mesmo depois de fechar o aplicativo.
         </p>
@@ -282,7 +168,7 @@
 
       <h3 class="subtitulo" id="titulo-cartao-biblioteca" hidden>Biblioteca</h3>
       <div class="cartao" id="cartao-biblioteca" hidden>
-        <p class="ajuda" style="margin-top:0">
+        <p class="ajuda u-margem-topo-0">
           A biblioteca chega em pacotes (um arquivo .zip por série), guardados no Google Drive.
           Importado uma vez, o pacote fica neste tablet e abre sem internet, na aba Biblioteca.
           A cópia de segurança não leva os pacotes: num tablet novo, importe de novo do Drive.
@@ -293,7 +179,7 @@
              Biblioteca, que é de leitura: remover é decisão de espaço. -->
         <div id="lista-livros-biblioteca"></div>
         <div id="estado-importacao-biblioteca"></div>
-        <div class="barra" style="margin-bottom:0">
+        <div class="barra u-margem-baixo-0">
           <button class="btn" id="importar-biblioteca" type="button">Importar biblioteca</button>
           <button class="btn" id="exportar-etiquetas" type="button" hidden>Exportar minhas etiquetas de dificuldade</button>
           <input type="file" id="arquivo-biblioteca" accept=".zip,application/zip,application/x-zip-compressed" hidden>
@@ -302,20 +188,20 @@
 
       <h3 class="subtitulo">Espaço e manutenção</h3>
       <div class="cartao">
-        <div id="info-espaco" class="ajuda" style="margin-top:0"></div>
-        <div class="barra" style="margin-bottom:0">
+        <div id="info-espaco" class="ajuda u-margem-topo-0"></div>
+        <div class="barra u-margem-baixo-0">
           <button class="btn" id="limpar-orfaos" type="button">Liberar espaço de folhas descartadas</button>
         </div>
       </div>
 
       <h3 class="subtitulo">Recomeçar</h3>
       <div class="cartao">
-        <p class="ajuda" style="margin-top:0">
+        <p class="ajuda u-margem-topo-0">
           O aplicativo já vem com os doze alunos de julho de 2026 cadastrados, e com
           o mês de junho do Marcelo preenchido. Falta informar o valor da hora-aula
           de cada um, porque esse dado não estava registrado em lugar nenhum.
         </p>
-        <div class="barra" style="margin-bottom:0">
+        <div class="barra u-margem-baixo-0">
           <button class="btn perigo" id="apagar-exemplo" type="button">Apagar a carga inicial</button>
           <button class="btn perigo" id="apagar-tudo" type="button">Apagar todos os dados</button>
         </div>
@@ -328,7 +214,7 @@
 
       <h3 class="subtitulo">Versão do aplicativo</h3>
       <div class="cartao">
-        <p class="ajuda" style="margin-top:0">
+        <p class="ajuda u-margem-topo-0">
           Você está na versão <strong><span id="versao-app">.</span></strong>.
           O aplicativo abre do que está guardado no tablet, sem esperar a internet.
           Quando sai uma versão nova, ela é baixada por baixo enquanto você usa, e aparece o
@@ -339,7 +225,7 @@
           no lugar. Nunca é preciso desinstalar e instalar de novo.
         </p>
         <div id="estado-versao"></div>
-        <div class="barra" style="margin-bottom:0;gap:8px">
+        <div class="barra u-margem-baixo-0 u-vao-8">
           <button class="btn" id="procurar-atualizacao" type="button">Procurar atualização</button>
           <button class="btn" id="ver-novidades-ajustes" type="button">Novidades e guia das listas</button>
         </div>
@@ -426,7 +312,7 @@
     <!-- Alta como as janelas largas, para a rolagem nao pular de tamanho a cada
          bloco que abre, e estreita o bastante para a linha de texto continuar
          legivel: e um documento sendo escrito, e nao uma tabela. -->
-    <div class="modal largo" style="max-width:820px">
+    <div class="modal largo u-larg-max-820">
       <div class="modal-cabecalho">
         <h3 id="titulo-modal-proposta">Proposta de acompanhamento</h3>
         <button class="fechar" data-fechar type="button" aria-label="Fechar">&times;</button>
@@ -440,7 +326,7 @@
   </div>
 
   <div class="fundo-modal" id="modal-escopo">
-    <div class="modal" style="max-width:460px">
+    <div class="modal u-larg-max-460">
       <div class="modal-cabecalho">
         <h3 id="titulo-modal-escopo">Esta aula se repete</h3>
         <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
@@ -665,13 +551,13 @@
   </div>
 
   <div class="fundo-modal" id="modal-novidades">
-    <div class="modal modal-novidades-carrossel" style="max-width:520px">
+    <div class="modal modal-novidades-carrossel u-larg-max-520">
       <div class="modal-cabecalho">
         <h3 id="titulo-modal-novidades">Novidades</h3>
         <button class="fechar" data-fechar type="button" aria-label="Fechar">&times;</button>
       </div>
       <div class="modal-corpo" id="corpo-modal-novidades"></div>
-      <div class="modal-rodape" id="rodape-modal-novidades" style="display:flex;align-items:center;gap:10px">
+      <div class="modal-rodape u-mostra-flex u-alinha-centro u-vao-10" id="rodape-modal-novidades">
         <button class="btn" id="btn-carrossel-voltar" type="button" style="display:none">Voltar</button>
         <div class="carrossel-indicadores" id="carrossel-indicadores"></div>
         <span class="cresce"></span>
@@ -681,7 +567,7 @@
   </div>
 
   <div class="fundo-modal" id="modal-retroativo">
-    <div class="modal" style="max-width:500px">
+    <div class="modal u-larg-max-500">
       <div class="modal-cabecalho">
         <h3>Repetir para trás</h3>
         <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
@@ -695,7 +581,7 @@
   </div>
 
   <div class="fundo-modal" id="modal-texto">
-    <div class="modal" style="max-width:460px">
+    <div class="modal u-larg-max-460">
       <div class="modal-cabecalho">
         <h3>Texto na folha</h3>
         <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
@@ -703,7 +589,7 @@
       <div class="modal-corpo">
         <label class="campo">
           <span>O que escrever</span>
-          <textarea id="campo-texto-folha" style="min-height:110px"
+          <textarea class="u-alt-min-110" id="campo-texto-folha"
             placeholder="Pode usar mais de uma linha."></textarea>
         </label>
         <label class="campo">
@@ -758,11 +644,11 @@
 
   <!-- Modal Preparar documento para a família (T10) -->
   <div class="fundo-modal" id="modal-documento-familia">
-    <div class="modal largo" style="max-width:960px">
+    <div class="modal largo u-larg-max-960">
       <div class="modal-cabecalho">
         <div>
           <h3 id="titulo-modal-doc-familia">Preparar e enviar</h3>
-          <div class="ajuda" id="subtitulo-modal-doc-familia" style="margin-top:2px"></div>
+          <div class="ajuda u-margem-topo-2" id="subtitulo-modal-doc-familia"></div>
         </div>
         <button class="fechar" data-fechar type="button" aria-label="Fechar">&times;</button>
       </div>
@@ -774,11 +660,11 @@
   <!-- O documento do ciclo (C9). Só abre pelo botão da ficha do aluno; o
        corpo e o rodapé são montados no app.js. -->
   <div class="fundo-modal" id="modal-documento-ciclo">
-    <div class="modal largo" style="max-width:960px">
+    <div class="modal largo u-larg-max-960">
       <div class="modal-cabecalho">
         <div>
           <h3 id="titulo-modal-doc-ciclo">Documento do ciclo</h3>
-          <div class="ajuda" id="subtitulo-modal-doc-ciclo" style="margin-top:2px"></div>
+          <div class="ajuda u-margem-topo-2" id="subtitulo-modal-doc-ciclo"></div>
         </div>
         <button class="fechar" data-fechar type="button" aria-label="Fechar">&times;</button>
       </div>
@@ -817,12 +703,12 @@
   </div>
 
   <div class="fundo-modal" id="modal-virada-anual">
-    <div class="modal" style="max-width:760px;width:95vw;max-height:92vh;display:flex;flex-direction:column">
+    <div class="modal u-larg-max-760 u-larg-95vw u-alt-max-92vh u-mostra-flex u-direcao-coluna">
       <div class="modal-cabecalho">
         <h3 id="titulo-modal-virada-anual">Novo ano letivo <span id="virada-ano-letivo"></span></h3>
         <button class="fechar" id="fechar-modal-virada-anual" data-fechar type="button" aria-label="Fechar">&times;</button>
       </div>
-      <div class="modal-corpo" id="corpo-modal-virada-anual" style="padding:16px;overflow-y:auto"></div>
+      <div class="modal-corpo u-recuo-16 u-rolagem-y-auto" id="corpo-modal-virada-anual"></div>
       <div class="modal-rodape">
         <button class="btn" id="virada-lembrar-depois" type="button">Lembrar mais tarde</button>
         <button class="btn principal" id="virada-confirmar-series" type="button">Confirmar atualização de séries</button>

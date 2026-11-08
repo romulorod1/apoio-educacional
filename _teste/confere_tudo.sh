@@ -282,6 +282,10 @@ roda "documento do ciclo"    node _teste/testa_documento_do_ciclo.js
 roda "cabecalho tablet (B5)"  node _teste/testa_cabecalho_tablet.js
 # B6: alvos de toque de 44 px e tipografia base
 roda "alvos de toque (B6)"    node _teste/testa_alvos_toque.js
+# B12: nenhuma cor literal fora do :root no styles.css e no maximo 6 tamanhos de
+# letra; os venenos (cor solta, setimo tamanho) TEM de reprovar, e regra que usa
+# variavel nao pode ser acusada.
+roda "sistema visual (B12)"   node _teste/testa_sistema_visual.js
 
 # A secao do kit de figuras (31 provas de figuras/) saiu no B14 com o material
 # autoral: o kit so servia aos temas.
