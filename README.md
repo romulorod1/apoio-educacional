@@ -124,8 +124,12 @@ passarem catorze dias sem cópia, aparece um aviso na Agenda com um botão para 
 tablet quebrar ou for trocado, é essa cópia que devolve tudo. Ela leva junto as folhas escritas à
 mão, as imagens coladas e os arquivos anexados.
 
-**Atualização e novidades.** Quando sai uma versão nova, ela chega pela internet e aparece um aviso
-perguntando se quer atualizar. **Atualizar não apaga nada**: alunos, aulas, folhas e anexos
+**Atualização e novidades.** O aplicativo abre do que está guardado no tablet, sem esperar a
+internet, então abre rápido mesmo com sinal fraco. Quando sai uma versão nova, ela é baixada por
+baixo enquanto você usa, e aparece o aviso *Versão nova pronta*, com *Atualizar agora* e *Depois da
+aula*. A versão nova só passa a rodar depois do seu toque: em *Atualizar agora*, na hora; em *Depois
+da aula*, na próxima vez que você abrir o aplicativo. Sem toque, nada muda no meio da aula, e o
+aviso volta na abertura seguinte. **Atualizar não apaga nada**: alunos, aulas, folhas e anexos
 continuam no lugar. Depois de atualizar, uma janela conta o que chegou de novo. Em *Ajustes* há o
 botão *Procurar atualização*, para verificar na hora.
 
@@ -225,7 +229,18 @@ Ao mudar qualquer arquivo do aplicativo, suba o nome do cache em `sw.js` (o port
 muda arquivo do pacote sem subir o cache) e, numa release, a `VERSAO` em `app.js` com uma entrada nova
 em `NOVIDADES`.
 
+O service worker serve os arquivos do pacote (`ARQUIVOS` em `sw.js`) do cache da versão que ela
+escolheu, sem esperar a rede. A versão nova baixa em segundo plano para um cache novo, com prazo de
+3 s para o servidor responder, e só roda depois do toque no aviso; a escolha fica gravada no cache
+`apoio-educacional-controle`, porque o navegador ativa o worker em espera sozinho quando a última
+janela fecha. Os arquivos baixados durante o uso continuam rede primeiro, com o mesmo prazo, e caem no
+cache `apoio-educacional-baixados` sem sinal; o leitor de PDF vem desse cache antes da rede. Por isso
+um merge na `main` não chega mais à Nathália sem o toque dela.
+
 O GitHub Pages manda guardar os arquivos por dez minutos (`Cache-Control: max-age=600`). Por isso o
-service worker busca com `cache: no-cache`: ele pergunta ao servidor se o arquivo mudou em vez de
-aceitar o que está guardado. `testa_atualizacao_real.js` cobre esse caminho, com os mesmos cabeçalhos
-do servidor de verdade.
+instalador busca com `cache: no-cache` (pergunta ao servidor se o arquivo mudou) e as respostas do
+cache vão para a página com `no-cache` (sem isso a recarga depois do toque reaproveitava o script da
+versão de antes, guardado na memória da aba). `testa_atualizacao_real.js` cobre esse caminho, com os
+mesmos cabeçalhos do servidor de verdade; `testa_atualizacao.js` e `testa_atualizacao_apos_fechar.js`
+cobrem a versão que não entra sem toque, o "Depois da aula", a instalação que falha pela metade e a
+abertura sem rede.

@@ -102,8 +102,12 @@
  * Nota só minha, Habilidades e hábitos, Novo ano letivo e aula (app.js,
  * core.js, pdf.js e index.html), com a lista igual. O v55 (C10b) deixa um
  * botão por aluno no Fechamento, os outros formatos dentro da janela e o envio
- * às famílias em sequência (app.js e index.html), com a lista igual. */
-var CACHE = 'apoio-educacional-v76';
+ * às famílias em sequência (app.js e index.html), com a lista igual. O v77 (D2)
+ * traz o cache primeiro e a versão que só roda depois do toque (sw.js, app.js e
+ * index.html), com a lista igual; pula o v76, que é o nome do B12 no PR dele.
+ * Aqui o nome novo é obrigatório pelo motivo original: com o v75 repetido, o
+ * tablet na main instalaria a D2 dentro do cache de onde está abrindo. */
+var CACHE = 'apoio-educacional-v77';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -183,9 +187,100 @@ var APOSENTADOS = ['./banco/acervo.json', './banco/acervo_indice.json',
   .map(function (u) { return new URL(u, self.location.href).href; });
 function aposentado(endereco) { return APOSENTADOS.indexOf(endereco) !== -1; }
 
+/* CACHE PRIMEIRO, E A VERSÃO QUE RODA É A QUE ELA ESCOLHEU (D2).
+ *
+ * Até a 1.41 o fetch ia à rede primeiro, sem prazo, inclusive para abrir o
+ * aplicativo. Medido na avaliação de 21/10: sem sinal abria em 75 ms, mas com a
+ * rede demorando 40 s para responder a agenda só aparecia aos 40 s. Na casa da
+ * família o sinal de uma barrinha é pior que sinal nenhum. E o aviso de versão
+ * não segurava nada: o código novo rodava na abertura seguinte, sem toque, e o
+ * cache da versão ATIVA recebia o app.js novo da rede.
+ *
+ * Agora os ARQUIVOS saem do cache da versão escolhida, sem perguntar à rede.
+ * Quem escolhe é ela, no aviso "Versão nova pronta": a escolha fica gravada no
+ * cache CONTROLE, separada do ciclo de vida do service worker, porque o
+ * navegador ativa o worker em espera sozinho quando a última janela fecha.
+ * Sem essa separação, fechar o aplicativo depois da aula já seria atualizar.
+ *
+ * As chaves do CONTROLE: 'selecionado' (o cache que abre o aplicativo),
+ * 'candidato' (o último cache instalado por inteiro, com a versão dele),
+ * 'na-proxima' (o "Depois da aula": entra na próxima abertura), 'anterior' (de
+ * onde a troca saiu, para as outras janelas abertas ficarem onde estavam) e
+ * 'cliente-<id>' (a versão em que cada janela aberta nasceu). O CONTROLE não
+ * casa com o padrão das versões, então o activate nunca o apaga. */
+var CONTROLE = 'apoio-educacional-controle';
+var VERSAO_DO_APP = /^apoio-educacional-v\d+$/;
+function chaveControle(nome) { return new URL('./__controle_versao__/' + encodeURIComponent(nome), self.location.href).href; }
+function lerControle(nome) {
+  return caches.open(CONTROLE).then(function (c) { return c.match(chaveControle(nome)); })
+    .then(function (r) { return r ? r.json() : null; });
+}
+function gravarControle(nome, valor) {
+  return caches.open(CONTROLE).then(function (c) {
+    return c.put(chaveControle(nome), new Response(JSON.stringify(valor), { headers: { 'Content-Type': 'application/json' } }));
+  });
+}
+function apagarControle(nome) {
+  return caches.open(CONTROLE).then(function (c) { return c.delete(chaveControle(nome)); });
+}
+
+/* O cache que está abrindo o aplicativo agora. Sem escolha gravada, é o worker
+ * de antes do D2 que está servindo, e ele serve o cache de versão mais nova
+ * que não é o desta: é de lá que sai o "anterior" de uma troca. */
+function cacheEmUso() {
+  return lerControle('selecionado').then(function (selecionado) {
+    if (selecionado) return selecionado;
+    return caches.keys().then(function (nomes) {
+      var antigos = nomes.filter(function (n) { return VERSAO_DO_APP.test(n) && n !== CACHE; })
+        .sort(function (a, b) { return Number(b.match(/\d+$/)[0]) - Number(a.match(/\d+$/)[0]); });
+      return antigos[0] || CACHE;
+    });
+  });
+}
+
+/* A escolha que abre o aplicativo, conferida: se o cache escolhido não existe
+ * mais (o navegador pode apagar armazenamento), abre com o desta versão, que
+ * está inteiro, em vez de deixar a tela branca. Um aplicativo preso numa
+ * versão que sumiu não teria como mostrar o aviso que o tira de lá. */
+function cacheSelecionado() {
+  return lerControle('selecionado').then(function (selecionado) {
+    if (!selecionado || selecionado === CACHE) return CACHE;
+    return caches.has(selecionado).then(function (existe) {
+      if (existe) return selecionado;
+      return gravarControle('selecionado', CACHE).then(function () { return CACHE; });
+    });
+  });
+}
+
+function versaoDoCache(nome) {
+  return caches.open(nome).then(function (c) { return c.match('./app.js'); })
+    .then(function (r) { return r ? r.text() : ''; })
+    .then(function (s) { var m = s.match(/var VERSAO = '([^']+)'/); return m ? m[1] : null; });
+}
+
+/* Rede com prazo de 3 s até a resposta começar. O prazo vale para o servidor
+ * responder, e não para o corpo inteiro chegar: um app.js grande numa conexão
+ * lenta ainda baixa, e o tablet que só tem sinal fraco não fica preso para
+ * sempre na versão antiga por nunca caber em 3 s. Se a conexão cair no meio do
+ * corpo, o c.put do install falha e a instalação falha inteira (veja abaixo).
+ *
+ * Pergunta ao servidor se o arquivo mudou (cache: 'no-cache'), em vez de
+ * aceitar o que estiver no cache do navegador: o GitHub Pages manda guardar por
+ * dez minutos, e a resposta continua barata quando nada mudou. */
+function redeComPrazo(pedido) {
+  var controlador = new AbortController();
+  var prazo = setTimeout(function () { controlador.abort(); }, 3000);
+  return fetch(pedido, { cache: 'no-cache', signal: controlador.signal })
+    .finally(function () { clearTimeout(prazo); });
+}
+
 /* Não assume o controle sozinho: fica esperando. Quem manda trocar de versão
  * é ela, pelo aviso que aparece no aplicativo. Assim uma atualização nunca
  * recarrega a tela no meio de uma aula.
+ *
+ * O download é em segundo plano e vai para um cache NOVO (o nome sobe a cada
+ * release, veja o topo): o cache de onde a versão ativa está servindo nunca
+ * recebe um arquivo da versão nova.
  *
  * Faltando um arquivo, a instalação inteira falha, de propósito. Antes a falha
  * de cada arquivo era engolida: com a conexão caindo no meio, uma instalação
@@ -193,20 +288,72 @@ function aposentado(endereco) { return APOSENTADOS.indexOf(endereco) !== -1; }
  * dela promovia o cache incompleto por cima do completo (medido: FigSolidos
  * indefinido sem sinal, e a figura do sólido saindo muda na folha). Falhando
  * aqui ela continua com a versão anterior inteira, e o navegador tenta de novo
- * na abertura seguinte. */
+ * na abertura seguinte. O 'candidato' só é gravado com tudo baixado: é ele que
+ * faz o aviso aparecer.
+ *
+ * O cache pela metade é apagado SÓ se nasceu nesta instalação. Um cache que já
+ * existia antes dela é o de onde uma versão está abrindo: o nome repetido faz o
+ * install escrever dentro dele (veja o topo), e o worker de antes do D2 não
+ * grava escolha nenhuma. Apagar pela escolha gravada deixava o tablet na main,
+ * com o corte no meio do download, sem cache nenhum para abrir sem rede (achado
+ * da revisão do D2, provado com veneno no testa_atualizacao_apos_fechar). */
 self.addEventListener('install', function (e) {
-  e.waitUntil(caches.open(CACHE).then(function (c) {
+  var jaExistia = false;
+  e.waitUntil(caches.has(CACHE).then(function (existe) {
+    jaExistia = existe;
+    return caches.open(CACHE);
+  }).then(function (c) {
     return Promise.all(ARQUIVOS.map(function (u) {
-      return fetch(new Request(u, { cache: 'reload' })).then(function (r) {
+      return redeComPrazo(new Request(u, { cache: 'reload' })).then(function (r) {
         if (!r || !r.ok) throw new Error('não baixou ' + u);
         return c.put(u, r);
       });
     }));
+  }).then(function () {
+    return versaoDoCache(CACHE).then(function (versao) { return gravarControle('candidato', { cache: CACHE, versao: versao }); });
+  }).catch(function (erro) {
+    return (jaExistia ? Promise.resolve() : caches.delete(CACHE)).then(function () { throw erro; });
   }));
 });
 
+/* As três conversas com o aplicativo. A resposta vai pela porta do
+ * MessageChannel quando há uma; o aplicativo de antes do D2 manda o
+ * 'ativar-agora' sem porta, e ele funciona do mesmo jeito: é por ali que o
+ * tablet que ficou numa versão antiga sai dela.
+ *
+ * 'estado-versao': há versão nova pronta, e qual é.
+ * 'ativar-agora': o "Atualizar agora". Grava a escolha antes de pedir o
+ *   skipWaiting, para a ordem nunca deixar o worker novo servindo a versão de
+ *   antes, nem o contrário.
+ * 'depois-da-aula': grava que a versão nova entra na próxima abertura. */
 self.addEventListener('message', function (e) {
-  if (e.data && e.data.tipo === 'ativar-agora') self.skipWaiting();
+  if (!e.data) return;
+  function responder(objeto) { if (e.ports && e.ports[0]) e.ports[0].postMessage(objeto); }
+  if (e.data.tipo === 'estado-versao') {
+    e.waitUntil(Promise.all([cacheEmUso(), lerControle('candidato')]).then(function (dados) {
+      var candidato = dados[1];
+      responder({ pendente: !!candidato && candidato.cache !== dados[0],
+        versao: candidato && candidato.versao });
+    }, function () { responder(null); }));
+  }
+  if (e.data.tipo === 'ativar-agora') {
+    /* A janela que tocou vai recarregar na versão nova, então ela não fica
+     * presa à de antes: sem isso o cache velho seguia no tablet até a release
+     * seguinte, porque a janela ainda existia na hora da limpeza. */
+    var quem = e.source && e.source.id;
+    e.waitUntil(cacheEmUso().then(function (anterior) { return gravarControle('anterior', { cache: anterior, para: CACHE, quem: quem || null }); })
+      .then(function () { return quem ? apagarControle('cliente-' + quem) : null; })
+      .then(function () { return gravarControle('selecionado', CACHE); })
+      .then(function () { return apagarControle('na-proxima'); })
+      .then(function () { return self.skipWaiting(); })
+      .then(function () { responder({ ativada: true }); })
+      .catch(function () { responder({ ativada: false }); }));
+  }
+  if (e.data.tipo === 'depois-da-aula') {
+    e.waitUntil(lerControle('candidato').then(function (candidato) {
+      return candidato ? gravarControle('na-proxima', candidato.cache) : null;
+    }).then(function () { responder({ adiada: true }); }, function () { responder({ adiada: false }); }));
+  }
 });
 
 /* Apaga os caches das versões anteriores, e nunca o BAIXADOS. Antes de apagar
@@ -233,25 +380,159 @@ function resgatarEApagar(baixados, nome) {
   });
 }
 
+/* Só os caches DESTE aplicativo, pelo padrão apoio-educacional-v<número>, e
+ * nunca o BAIXADOS nem o CONTROLE. Antes o activate apagava todo cache que não
+ * fosse o novo, e no GitHub Pages a origem é a mesma para todos os
+ * repositórios do usuário: o cache de outro aplicativo ia junto. Fica de pé o
+ * escolhido, o candidato e o de cada janela aberta, que pode estar no meio de
+ * uma aula na versão de antes. As chaves de janela que já fecharam saem. */
+function limparVersoesNaoUsadas(janelas, selecionado) {
+  return Promise.all([lerControle('candidato'), caches.open(CONTROLE), caches.open(BAIXADOS), caches.keys()])
+    .then(function (dados) {
+      var candidato = dados[0], controle = dados[1], baixados = dados[2], nomes = dados[3];
+      return Promise.all(janelas.map(function (janela) { return lerControle('cliente-' + janela.id); }))
+        .then(function (fixados) {
+          var manter = [selecionado, CACHE, candidato && candidato.cache].concat(fixados);
+          return Promise.all(nomes.filter(function (n) {
+            return VERSAO_DO_APP.test(n) && manter.indexOf(n) < 0;
+          }).map(function (n) { return resgatarEApagar(baixados, n); }));
+        }).then(function () {
+          var vivos = janelas.map(function (janela) { return 'cliente-' + janela.id; });
+          return controle.keys().then(function (pedidos) {
+            return Promise.all(pedidos.map(function (pedido) {
+              var nome = decodeURIComponent(new URL(pedido.url).pathname.split('/').pop());
+              return nome.indexOf('cliente-') === 0 && vivos.indexOf(nome) < 0 ? controle.delete(pedido) : null;
+            }));
+          });
+        });
+    });
+}
+
+/* Quando a escolha muda sem toque nesta ativação.
+ *
+ * Sem escolha gravada, quem estava servindo era o worker de antes do D2. O
+ * aplicativo daquela época não conhece o 'estado-versao': com o worker novo
+ * ativo ele não vê worker em espera, e nunca mostraria o aviso. Mantê-lo na
+ * versão dele seria deixar o tablet preso. Essa travessia segue a regra
+ * antiga uma última vez: ativou porque ela fechou o aplicativo, a versão nova
+ * abre na próxima abertura.
+ *
+ * Com 'na-proxima' igual a esta versão, ela já tocou "Depois da aula": é a
+ * próxima abertura, e a versão entra. Nos dois casos, as janelas que ainda
+ * estiverem abertas ficam onde estavam (veja o fetch). */
+function escolherNaAtivacao() {
+  return Promise.all([lerControle('selecionado'), lerControle('na-proxima')]).then(function (dados) {
+    if (!dados[0] || dados[1] === CACHE) {
+      return gravarControle('selecionado', CACHE).then(function () { return apagarControle('na-proxima'); })
+        .then(function () { return CACHE; });
+    }
+    return cacheSelecionado();
+  });
+}
+
+/* Em que versão ficam as janelas abertas na hora da ativação. Com toque, as
+ * outras janelas ficam na de antes ('anterior'). Sem toque e com escolha
+ * gravada, na que estava em uso. Sem toque e sem escolha gravada não havia
+ * worker do D2 antes: ou é a primeira instalação, e a janela aberta veio da
+ * rede, sem worker, ou é a travessia ao fechar, sem janela nenhuma. Prender
+ * essa janela ao cache velho mais novo seria errado e o deixaria de pé
+ * (medido no testa_limpeza_acervo: o v37 sobrava sem o resgate). */
 self.addEventListener('activate', function (e) {
-  e.waitUntil(
-    caches.open(BAIXADOS).then(function (baixados) {
-      return caches.keys().then(function (nomes) {
-        return Promise.all(nomes
-          .filter(function (n) { return n !== CACHE && n !== BAIXADOS; })
-          .map(function (n) { return resgatarEApagar(baixados, n); }));
+  e.waitUntil(Promise.all([cacheEmUso(), lerControle('selecionado')]).then(function (dados) {
+    var emUso = dados[0], haviaEscolha = !!dados[1];
+    return escolherNaAtivacao().then(function (selecionado) {
+      return lerControle('anterior').then(function (anterior) {
+        var tocou = anterior && anterior.para === CACHE;
+        var deOnde = tocou ? anterior.cache : (haviaEscolha ? emUso : selecionado);
+        return self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (janelas) {
+          janelas = janelas.filter(function (janela) { return !(tocou && janela.id === anterior.quem); });
+          return Promise.all(janelas.map(function (janela) {
+            var chave = 'cliente-' + janela.id;
+            return lerControle(chave).then(function (fixado) {
+              return fixado ? null : gravarControle(chave, deOnde);
+            });
+          })).then(function () { return limparVersoesNaoUsadas(janelas, selecionado); });
+        });
       });
-    }).then(function () { return self.clients.claim(); })
-  );
+    });
+  }).then(function () { return self.clients.claim(); }));
 });
 
-/* Busca na rede primeiro para pegar atualizações, e cai no cache quando
- * não há sinal. É o comportamento certo para quem dá aula na casa das famílias.
- * A exceção é o leitor de PDF, que tem o caminho versionado: cache primeiro. */
+/* A abertura do aplicativo. É aqui que o "Depois da aula" vira versão nova:
+ * abertura de verdade é a navegação sem outra janela do aplicativo aberta.
+ * Com outra aberta, a escolha espera, para as duas não rodarem versões
+ * diferentes contra o mesmo banco. */
+function escolherNaAbertura(e) {
+  return lerControle('na-proxima').then(function (naProxima) {
+    if (naProxima !== CACHE) return cacheSelecionado();
+    return self.clients.matchAll({ type: 'window' }).then(function (janelas) {
+      var outras = janelas.filter(function (j) { return j.id !== e.resultingClientId && j.id !== e.clientId; });
+      if (outras.length) return cacheSelecionado();
+      return gravarControle('selecionado', CACHE).then(function () { return apagarControle('na-proxima'); })
+        .then(function () { return CACHE; });
+    });
+  });
+}
+
+/* De onde vem cada pedido:
+ *
+ * os ARQUIVOS e a abertura, do cache da versão escolhida, sem esperar a rede.
+ * Cada janela fica na versão em que nasceu ('cliente-<id>'): a troca feita
+ * noutra janela não troca os arquivos desta no meio da aula. Faltando o
+ * arquivo no cache (não devia), vai à rede com prazo e, sem ela, ao cache
+ * desta versão, que está inteiro, em vez de responder erro;
+ *
+ * o leitor de PDF, do BAIXADOS antes da rede (o caminho leva a versão);
+ *
+ * o resto (os baixados durante o uso, como banco/serie-*.json), da rede
+ * primeiro, com o prazo de 3 s, e do BAIXADOS sem ela. É o que muda no
+ * servidor sem release, e o prazo curto impede a tela de esperar 40 s. */
+/* A resposta do cache vai para a página com Cache-Control: no-cache. O
+ * arquivo guardado leva o max-age=600 do GitHub Pages, e com ele o navegador
+ * guarda o script na memória da aba e o reaproveita ao recarregar, sem passar
+ * por aqui. Medido no D2: depois do "Atualizar agora" com o worker novo já
+ * ativo (ela tinha fechado o aplicativo sem tocar), a recarga rodou o app.js
+ * da versão de antes, servido da memória, enquanto este handler já entregava o
+ * novo. Com no-cache o navegador pergunta de novo, e quem responde é a escolha
+ * gravada. Custa uma cópia de cabeçalhos por arquivo. */
+function semGuardarNaMemoria(r) {
+  var cabecalhos = new Headers(r.headers);
+  cabecalhos.set('Cache-Control', 'no-cache');
+  return new Response(r.body, { status: r.status, statusText: r.statusText, headers: cabecalhos });
+}
+
 self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
   var url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
+
+  if (doPacote(e.request.url) || e.request.mode === 'navigate') {
+    var navegacao = e.request.mode === 'navigate';
+    e.respondWith((navegacao ? escolherNaAbertura(e) : cacheSelecionado()).then(function (selecionado) {
+      if (navegacao) {
+        var destino = e.resultingClientId || e.clientId;
+        return destino ? gravarControle('cliente-' + destino, selecionado).then(function () { return selecionado; }) : selecionado;
+      }
+      if (!e.clientId) return selecionado;
+      return lerControle('cliente-' + e.clientId).then(function (fixado) { return fixado || selecionado; });
+    }).then(function (nome) { return caches.open(nome); }).then(function (c) {
+      return c.match(e.request).then(function (r) {
+        if (r) return r;
+        if (navegacao) return c.match('./index.html');
+        return null;
+      });
+    }).then(function (r) {
+      if (r) return semGuardarNaMemoria(r);
+      return redeComPrazo(e.request).catch(function () {
+        return caches.open(CACHE).then(function (c) {
+          return c.match(navegacao ? './index.html' : e.request);
+        }).then(function (achado) {
+          return achado || new Response('Sem conexão.', { status: 503, statusText: 'Sem conexão' });
+        });
+      });
+    }));
+    return;
+  }
 
   /* O leitor de PDF (C14) vem do cache ANTES da rede. O caminho leva a versão
    * (vendor/pdfjs-6.4.299/), então o arquivo de um caminho nunca muda, e não
@@ -277,33 +558,20 @@ self.addEventListener('fetch', function (e) {
     return;
   }
 
-  /* Pergunta ao servidor se o arquivo mudou, em vez de aceitar o que estiver
-   * guardado no cache do navegador. O GitHub Pages manda guardar por dez
-   * minutos, e sem isso uma versão nova podia demorar a chegar no tablet.
-   * A resposta continua barata: quando nada mudou o servidor devolve
-   * apenas "sem alteração".
-   *
-   * Vale para o que chega até aqui, e não é tudo: medido numa recarga da mesma
-   * aba logo depois de um deploy, nenhum dos 13 scripts e estilos do index.html
-   * passou por este handler, porque o navegador os serviu do cache dele. Quem
-   * entrega o conjunto inteiro e coerente é o botão de atualizar, que troca de
-   * service worker e recarrega. */
+  /* O baixado durante o uso vai para o BAIXADOS, nunca para o cache de uma
+   * versão: o cache da versão escolhida só recebe o que o install baixou. */
   e.respondWith(
-    fetch(e.request, { cache: 'no-cache' }).then(function (resposta) {
+    redeComPrazo(e.request).then(function (resposta) {
       if (resposta && resposta.status === 200 && resposta.type === 'basic') {
         var copia = resposta.clone();
-        // cada um no seu cache: o pacote no CACHE, o baixado durante o uso no BAIXADOS.
-        caches.open(doPacote(e.request.url) ? CACHE : BAIXADOS).then(function (c) {
-          c.put(e.request, copia);
-        });
+        return caches.open(BAIXADOS).then(function (c) {
+          return c.put(e.request, copia).catch(function () {});
+        }).then(function () { return resposta; });
       }
       return resposta;
     }).catch(function () {
-      // caches.match sem nome procura nos dois, então a série baixada aparece aqui.
-      return caches.match(e.request).then(function (achado) {
-        if (achado) return achado;
-        if (e.request.mode === 'navigate') return caches.match('./index.html');
-        return new Response('Sem conexão.', { status: 503, statusText: 'Sem conexão' });
+      return caches.open(BAIXADOS).then(function (c) { return c.match(e.request); }).then(function (achado) {
+        return achado || new Response('Sem conexão.', { status: 503, statusText: 'Sem conexão' });
       });
     })
   );

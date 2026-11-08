@@ -494,7 +494,7 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   /* O "Procurar atualização" mostra o aviso da versão nova 1,4 s depois de
    * achar; espera esse aviso chegar, senão ele cobre o aviso que se confere
    * abaixo. Se a espera for curta, o erro é uma falha falsa, nunca um passe. */
-  await esperar('o aviso da versão nova', () => aviso(pag), a => /versão nova/.test(a.texto), 5000);
+  await esperar('o aviso da versão nova', () => aviso(pag), a => /versão nova/i.test(a.texto), 5000);
   await pausa(1800);
   const temBotao = () => pag.evaluate(() =>
     Array.from(document.querySelectorAll('#estado-versao button')).some(x => /Atualizar agora/.test(x.textContent)));
