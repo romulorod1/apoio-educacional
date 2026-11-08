@@ -313,6 +313,10 @@ const servidor = http.createServer((req, res) => {
         redeLenta = true;
         const t0 = Date.now();
         await pagina.click('#aviso-acao');
+        // o worker lento leva 2,5 s: nesse meio tempo o aviso diz que está andando
+        const andando = await pagina.waitForFunction(() => (document.querySelector('#aviso-texto')?.textContent || '') === 'Atualizando...' &&
+          document.querySelector('#aviso').classList.contains('aberto'), { timeout: 2000 }).then(() => true, () => false);
+        if (!andando) throw new Error('Depois do toque, o aviso não disse Atualizando...');
         await pagina.waitForFunction(v => document.querySelector('#versao-app')?.textContent === v, { timeout: 30000 }, alvo);
         await new Promise(resolve => setTimeout(resolve, 1500));
         redeLenta = false;

@@ -268,12 +268,13 @@ function versaoDoCache(nome) {
  * aceitar o que estiver no cache do navegador: o GitHub Pages manda guardar por
  * dez minutos, e a resposta continua barata quando nada mudou.
  *
- * O install pede 'reload': baixa inteiro, sem tocar no cache do navegador.
- * Com 'no-cache', o corte no meio do download deixava no cache do navegador o
- * app.js pela metade, e a tentativa seguinte pedia só a faixa que faltava
- * (Range e If-Range, visto no servidor de prova do D2b): o arquivo do
- * pré-cache sairia de um remendo de dois downloads. O pré-cache é a versão que
- * ela vai rodar sem sinal; ele vem de um download só. */
+ * O install também usa 'no-cache'. Depois de um corte no meio do corpo, a
+ * tentativa seguinte retoma de onde parou (Range com If-Range pela ETag, que
+ * garante que é o mesmo arquivo), e num sinal que cai sempre no meio a versão
+ * nova chega mais cedo do que baixando tudo de novo a cada vez. O 'reload' que
+ * esteve aqui no D2b não consertava nada: a versão nova sem app.js que parecia
+ * vir da retomada era a limpeza apagando o cache em obra (veja a marca
+ * 'instalando' no install). */
 function redeComPrazo(pedido, modo) {
   var controlador = new AbortController();
   var prazo = setTimeout(function () { controlador.abort(); }, 3000);
@@ -318,7 +319,7 @@ self.addEventListener('install', function (e) {
     return caches.open(CACHE);
   }).then(function (c) {
     return Promise.all(ARQUIVOS.map(function (u) {
-      return redeComPrazo(new Request(u), 'reload').then(function (r) {
+      return redeComPrazo(new Request(u)).then(function (r) {
         if (!r || !r.ok) throw new Error('não baixou ' + u);
         return c.put(u, r);
       });

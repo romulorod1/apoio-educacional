@@ -2029,6 +2029,11 @@
     prontoParaRecarregar().then(function (ok) {
       if (!ok) { adiarAtualizacao(); return; }
       podeRecarregar = true;
+      /* O worker confere o cache novo antes de trocar, e num tablet lento isso
+       * leva segundos: o aviso diz que está andando, em vez da tela parada. Fica
+       * aberto até a recarga, ou até o "ficou para depois" tomar o lugar. */
+      avisar('Atualizando...');
+      clearTimeout(tempoAviso);
       if (registroSW && registroSW.waiting) {
         registroSW.waiting.postMessage({ tipo: 'ativar-agora' });
       } else if (versaoPendenteAtiva && registroSW && registroSW.active) {
