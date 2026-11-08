@@ -91,7 +91,8 @@ const REGRAS = fs.readFileSync(path.join(H.RAIZ, 'firestore.rules'), 'utf8');
 /* ---------- âncoras dos venenos ---------- */
 const CIFRA = "return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv, additionalData: new TextEncoder().encode(ROTULO_CIFRA) }, k, bytes);";
 const DECIFRA = "return crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv, additionalData: new TextEncoder().encode(ROTULO_CIFRA) }, k, dados);";
-const LEITURA = 'allow read: if dona(uid) || leitor(uid);';
+// desde a N1 a leitura e decidida numa funcao so, podeLer, usada em cada caminho
+const LEITURA = 'return dona(uid) || leitor(uid);';
 
 secao('0. As âncoras e o ambiente');
 conf('o nuvem.js cifra num lugar só', NUVEM.split(CIFRA).length, 2);
@@ -132,7 +133,7 @@ const PENDENTE_POR_GERACAO = 'pendente = geracao !== geracaoDoRetrato;';
 conf('o fim do envio decide o pendente pela geração num lugar só', NUVEM.split(PENDENTE_POR_GERACAO).length, 2);
 conf('a geração cresce em toda gravação, antes de olhar o pendente', /geracao\+\+;\r?\n\s*if \(pendente\) return;/.test(NUVEM), true);
 if (PENDENTE_ZERADO) trocas['/nuvem.js'] = NUVEM.replace(PENDENTE_POR_GERACAO, 'pendente = false;');
-const regrasServidas = REGRA_ABERTA ? REGRAS.replace(LEITURA, 'allow read: if entrou();') : REGRAS;
+const regrasServidas = REGRA_ABERTA ? REGRAS.replace(LEITURA, 'return entrou();') : REGRAS;
 
 conf('o firebase-tools está onde a prova procura (' + FIREBASE + ')', fs.existsSync(FIREBASE), true);
 const javaExe = JAVA_HOME ? path.join(JAVA_HOME, 'bin', process.platform === 'win32' ? 'java.exe' : 'java') : 'java';

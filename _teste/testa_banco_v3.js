@@ -53,11 +53,11 @@ const AVISA_TROCA = "if (typeof root.aoBancoTrocado === 'function') root.aoBanco
  * store.js de agora sem os dois depósitos dos livros e com o número 3. A
  * subida de 3 para 4 é do _teste/testa_livros.js, no mesmo modelo. */
 const V4 = 'var VERSAO_BANCO = 4;';
-const V5 = 'var VERSAO_BANCO = 5;';
+const V6 = 'var VERSAO_BANCO = 6;';
 const CRIA_LIVROS = /    if \(!b\.objectStoreNames\.contains\('livros'\)\) \{\r?\n      s = b\.createObjectStore\('livros', \{ keyPath: 'id' \}\);\r?\n      s\.createIndex\('pacote', 'pacote'\);\r?\n    \}\r?\n    if \(!b\.objectStoreNames\.contains\('livros_posicoes'\)\) \{\r?\n      b\.createObjectStore\('livros_posicoes', \{ keyPath: 'id' \}\);\r?\n    \}\r?\n/;
 
 secao('0. As âncoras');
-conf('o store.js está na versão 5', STORE.split(V5).length, 2);
+conf('o store.js está na versão 6', STORE.split(V6).length, 2);
 conf('o código histórico da versão 4 está na versão 4', HIST.split(V4).length, 2);
 conf('o store.js cria os depósitos dos livros uma vez', (STORE.match(new RegExp(CRIA_LIVROS.source, 'g')) || []).length, 1);
 conf('o store.js cria o depósito das listas uma vez', (STORE.match(new RegExp(CRIA_LISTAS.source, 'g')) || []).length, 1);
@@ -68,7 +68,7 @@ const STORE_V3 = HIST.replace(V4, V3).replace(CRIA_LIVROS, '');
 conf('o código da versão 3 ficou sem os livros e com o número 3',
   STORE_V3.indexOf("createObjectStore('livros'") < 0 && STORE_V3.split(V3).length === 2, true);
 const STORE_V2 = STORE_V3.replace(V3, 'var VERSAO_BANCO = 2;').replace(CRIA_LISTAS, '');
-const STORE_V6 = STORE.replace(V5, 'var VERSAO_BANCO = 6;');
+const STORE_V7 = STORE.replace(V6, 'var VERSAO_BANCO = 7;');
 const trocas = {};
 const APP_SERVIDO = MODO === '--envenenado-versao-tecnica' ? APP.split(RAMO_VERSAO).join('if (false) {') : APP;
 const STORE_SERVIDO = MODO === '--envenenado-troca-calada' ? STORE.split(AVISA_TROCA).join('') : STORE;
@@ -139,7 +139,7 @@ const contagens = pag => pag.evaluate(() => new Promise(r => {
   await H.abrirApp(pag2, amb.ORIGEM);
   await pausa(1000);
   const v3 = await versaoEDepositos(pag2);
-  conf('o código novo subiu o banco para a versão 5', v3 && v3.versao, 5);
+  conf('o código novo subiu o banco para a versão 6', v3 && v3.versao, 6);
   conf('com o depósito das listas', v3 && v3.depositos.indexOf('biblioteca_listas') >= 0, true);
   const depois = await contagens(pag2);
   const chaves = Object.keys(antes).sort();
@@ -168,7 +168,7 @@ const contagens = pag => pag.evaluate(() => new Promise(r => {
   conf('e diz que esta janela é de uma versão anterior', /versão anterior do aplicativo/.test(texto3), true);
   conf('e o que fazer', /Feche o aplicativo e abra de novo/.test(texto3), true);
   conf('sem a mensagem técnica do navegador', /VersionError|version|versão solicitada/i.test(texto3.replace(/versão anterior|versão mais nova/g, '')), false);
-  conf('e o banco continua na versão 5', (await versaoEDepositos(pag3)).versao, 5);
+  conf('e o banco continua na versão 6', (await versaoEDepositos(pag3)).versao, 6);
   await pag3.close();
 
   // ================================================================
@@ -179,11 +179,11 @@ const contagens = pag => pag.evaluate(() => new Promise(r => {
   await H.abrirApp(pagA, amb.ORIGEM);
   await pausa(800);
   // uma janela com uma versão mais nova do banco abre agora
-  trocas['/store.js'] = STORE_V6;
+  trocas['/store.js'] = STORE_V7;
   const pagB = await amb.pagina();
   await pagB.setBypassServiceWorker(true);
   await H.abrirApp(pagB, amb.ORIGEM);
-  const subiu = await esperar('o banco na versão 6', () => versaoEDepositos(pagB), v => !!v && v.versao === 6, 10000);
+  const subiu = await esperar('o banco na versão 7', () => versaoEDepositos(pagB), v => !!v && v.versao === 7, 10000);
   conf('a janela nova subiu o banco, sem ficar bloqueada', subiu.ok, true);
   conf('e não mostra o aviso de bloqueio', await pagB.evaluate(() => !!document.querySelector('#aviso-banco-bloqueado')), false);
   await pagA.bringToFront();

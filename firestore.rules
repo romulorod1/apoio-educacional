@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// Regras do Firestore do Apoio Educacional (fase 0 da nuvem, projeto
+// Regras do Firestore do Apoio Educacional (fases 0 e 1 da nuvem, projeto
 // nw-apoio-educacional).
 //
 // Tudo mora em usuarios/{uid}/... e o uid é o da conta que entrou no app:
@@ -9,9 +9,14 @@ rules_version = '2';
 //     uids, lê o caminho dela e não escreve nada (o aparelho observador);
 //   - qualquer outra conta, com ou sem login, não lê nem escreve nada.
 // Nenhum uid fica fixo aqui: o documento de leitores é escrito só pela dona,
-// pelo próprio aplicativo. O conteúdo da cópia chega cifrado no aparelho
-// (AES-GCM), então estas regras protegem quem pode baixar a cópia, e a chave,
-// que nunca sai do aparelho, protege o que está dentro dela.
+// pelo próprio aplicativo. O conteúdo da cópia e de cada registro chega
+// cifrado no aparelho (AES-GCM), então estas regras protegem quem pode baixar,
+// e a chave, que nunca sai do aparelho, protege o que está dentro.
+//
+// Desde a fase 1 (N1) só os caminhos que o aplicativo usa existem aqui, um a
+// um: a cópia completa (estado/copia, copias/{id} e as partes), os leitores e
+// os registros (registros/{id}), cujo documento tem a forma conferida: os
+// metadados em claro com os nomes esperados e o conteúdo só como bytes.
 service cloud.firestore {
   match /databases/{database}/documents {
     function entrou() {
@@ -25,9 +30,50 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/usuarios/$(uid)/config/leitores)
         && request.auth.uid in get(/databases/$(database)/documents/usuarios/$(uid)/config/leitores).data.uids;
     }
-    match /usuarios/{uid}/{resto=**} {
-      allow read: if dona(uid) || leitor(uid);
-      allow write: if dona(uid);
+    function podeLer(uid) {
+      return dona(uid) || leitor(uid);
+    }
+    // um registro: id igual ao do documento, metadados em claro, conteúdo em bytes
+    function registroValido(id) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['id', 'tipo', 'atualizadoEm', 'apagadoEm', 'aparelho', 'esquema', 'app', 'iv', 'dados'])
+        && d.id == id
+        && d.tipo is string && d.tipo.size() <= 32
+        && d.atualizadoEm is string && d.atualizadoEm.size() <= 40
+        && d.aparelho is string && d.aparelho.size() <= 64
+        && d.esquema is int
+        && (!('app' in d) || d.app is string)
+        && (!('apagadoEm' in d) || d.apagadoEm is string)
+        && (!('iv' in d) || d.iv is bytes)
+        && (!('dados' in d) || d.dados is bytes);
+    }
+
+    match /usuarios/{uid} {
+      // a cópia completa (fase 0)
+      match /estado/{doc} {
+        allow read: if podeLer(uid);
+        allow write: if dona(uid);
+      }
+      match /copias/{copia} {
+        allow read: if podeLer(uid);
+        allow write: if dona(uid);
+        match /partes/{parte} {
+          allow read: if podeLer(uid);
+          allow write: if dona(uid);
+        }
+      }
+      // quem mais pode ler (D7): só a dona escreve
+      match /config/leitores {
+        allow read: if podeLer(uid);
+        allow write: if dona(uid);
+      }
+      // registros (N1): um documento por registro, com a forma conferida
+      match /registros/{registro} {
+        allow read: if podeLer(uid);
+        allow create, update: if dona(uid) && registroValido(registro);
+        allow delete: if dona(uid);
+      }
+      // fim registros (N1)
     }
     match /{outro=**} {
       allow read, write: if false;

@@ -20,8 +20,19 @@
  *   copias/{id}              { iv, bytes, partes, quando, aparelho, versao }
  *   copias/{id}/partes/{n}   { dados: bytes cifrados }   até 768 KiB cada
  *   config/leitores          { uids: [...] }   quem mais pode LER (D7)
+ *   registros/{id}           { id, tipo, atualizadoEm, apagadoEm, aparelho,
+ *                              esquema, app, iv, dados }  (N1, fatia 2)
  * A cópia nova sobe inteira com um id novo e só então o ponteiro muda; a de
  * antes vira "anterior" e a mais velha sai. Quem baixa nunca vê metade.
+ *
+ * Os REGISTROS (fase 1 da nuvem) sobem um a um, da fila `saida` do store.js,
+ * que entra na mesma transação de cada gravação dela: os metadados em claro
+ * (id, tipo, carimbos, aparelho, esquema) e o conteúdo cifrado com a mesma
+ * chave da cópia, rótulo próprio. Uma entrada sai da fila só depois de o
+ * commit responder, e só se ainda for a que subiu. Com a nuvem recusando (as
+ * regras ainda não publicadas, por exemplo), a fila fica guardada e a tela
+ * diz isso; nada trava. O id de aparelho dos registros é o do Store, e a
+ * cópia completa passa a levar o mesmo id (aparelhoId) ao lado do rótulo.
  *
  * A cópia automática só começa depois do primeiro envio feito por ela neste
  * aparelho (ou de uma restauração aqui): um aparelho recém-instalado, com a
@@ -61,6 +72,9 @@
   var TETO_PARTE = 768 * 1024;
   var PARTES_POR_PEDIDO = 8;
   var ROTULO_CIFRA = 'apoio-educacional-copia:1';
+  var ROTULO_REGISTRO = 'apoio-educacional-registro:1';
+  var REGISTROS_POR_COMMIT = 200;   // o commit aceita 500 escritas; 200 deixa folga de tamanho
+  var ATRASO_ENVIO_REGISTROS = 2500; // depois de uma gravação dela, espera as vizinhas antes de subir
   var NOME_BANCO = 'apoio-nuvem';
   var UM_DIA = 24 * 60 * 60 * 1000;
   var CODIGO_TAMANHO = 56; // 52 letras da chave (256 bits) + 4 de conferência
@@ -83,6 +97,12 @@
    * buscar a mais nova ao abrir. { desde, uidDona } */
   var marcaSoLeitura = null;
   var travadoNestaAbertura = false; // a tela do celular está à vista, mesmo sem a marca
+  /* Os registros (N1, fatia 2): quantos esperam na fila, o último envio e o
+   * último erro (o PERMISSION_DENIED das regras ainda não publicadas fica
+   * aqui, para Ajustes dizer). Espelhado no banco próprio, chave 'registros'. */
+  var registros = { pendentes: 0, ultimoEnvio: null, erro: null };
+  var enviandoRegistros = null;  // promessa do envio em curso
+  var envioAgendado = null;      // o setTimeout do envio depois de uma gravação
   var ouvintes = [];
   var pronto = null;
 
@@ -131,7 +151,7 @@
   function carregarEstado() {
     if (pronto) return pronto;
     pronto = Promise.all([lerEstado('sessao'), lerEstado('chave'), lerEstado('copia'),
-      lerEstado('automatica'), lerEstado('pendente'), lerEstado('aparelho'), lerEstado('soLeitura')]).then(function (v) {
+      lerEstado('automatica'), lerEstado('pendente'), lerEstado('aparelho'), lerEstado('soLeitura'), lerEstado('registros')]).then(function (v) {
       marcaSoLeitura = v[6] || null;
       sessao = v[0] || null;
       chaveBruta = v[1] ? new Uint8Array(v[1]) : null;
@@ -139,12 +159,21 @@
       automatica = !!v[3];
       pendente = !!v[4];
       aparelho = v[5] || null;
+      if (v[7]) registros = { pendentes: 0, ultimoEnvio: v[7].ultimoEnvio || null, erro: v[7].erro || null };
+      // a fila é do Store; a contagem é lida dele, nunca guardada aqui
+      contarFila();
       if (!aparelho) {
         aparelho = rotuloDoAparelho();
         return gravarEstado('aparelho', aparelho);
       }
     }).catch(function () { /* sem IndexedDB: a nuvem fica indisponível e a tela diz */ });
     return pronto;
+  }
+  /* O id deste aparelho é o do Store (nasce na primeira gravação dela): é o
+   * que vai em cada registro e, desde a fatia 2, também no cabeçalho da cópia
+   * completa. O `aparelho` daqui é só o rótulo que ela lê ("tablet 7K"). */
+  function idDoAparelho() {
+    return (root.Store && typeof root.Store.aparelho === 'function' && root.Store.aparelho()) || '';
   }
 
   function rotuloDoAparelho() {
@@ -572,8 +601,8 @@
       if (!partes.length) partes.push(new Uint8Array(0));
       var quando = new Date().toISOString();
       var meta = { formato: 'apoio-educacional-copia', versao: 1, iv: cifrado.iv, bytes: cifrado.dados.length,
-        partes: partes.length, quando: quando, aparelho: aparelho || 'aparelho', motivo: info.motivo || 'ela',
-        app: info.versaoApp || '', conteudo: conteudo };
+        partes: partes.length, quando: quando, aparelho: aparelho || 'aparelho', aparelhoId: idDoAparelho(),
+        motivo: info.motivo || 'ela', app: info.versaoApp || '', conteudo: conteudo };
       var fila = Promise.resolve();
       for (var p = 0; p < partes.length; p += PARTES_POR_PEDIDO) {
         (function (inicio) {
@@ -758,6 +787,8 @@
   function marcarMudanca() {
     /* A geração cresce SEMPRE, mesmo com pendente já ligado: é ela que diz ao
      * envio em curso que houve gravação depois do retrato que está subindo. */
+    // os registros da gravação já estão na fila: sobem daqui a pouco, com sinal
+    agendarEnvioDeRegistros();
     geracao++;
     if (pendente) return;
     pendente = true;
@@ -786,6 +817,110 @@
     return !(ha >= 0 && ha < UM_DIA);
   }
 
+  // ---------- os registros, um a um (N1, fatia 2) ----------
+
+  function cifrarRegistro(texto) {
+    var iv = new Uint8Array(12);
+    crypto.getRandomValues(iv);
+    return chaveCripto(chaveBruta, ['encrypt']).then(function (k) {
+      return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv, additionalData: new TextEncoder().encode(ROTULO_REGISTRO) }, k, new TextEncoder().encode(texto));
+    }).then(function (saida) { return { iv: iv, dados: new Uint8Array(saida) }; });
+  }
+
+  /* O documento de um registro: os metadados em claro e o conteúdo cifrado.
+   * Lápide não leva conteúdo. */
+  function documentoDoRegistro(reg, versaoApp) {
+    var campo = { id: reg.id, tipo: reg.tipo, atualizadoEm: reg.atualizadoEm, apagadoEm: reg.apagadoEm || null,
+      aparelho: reg.aparelho || idDoAparelho() || 'aparelho', esquema: reg.esquema || 1, app: versaoApp || '' };
+    if (reg.apagadoEm || reg.dados === null || reg.dados === undefined) return Promise.resolve(campo);
+    return cifrarRegistro(JSON.stringify(reg.dados)).then(function (c) {
+      campo.iv = c.iv;
+      campo.dados = c.dados;
+      return campo;
+    });
+  }
+
+  function contarFila() {
+    if (!root.Store || typeof root.Store.tamanhoDaFila !== 'function') return Promise.resolve(0);
+    return root.Store.tamanhoDaFila().then(function (n) {
+      if (n !== registros.pendentes) { registros.pendentes = n; avisarOuvintes(); }
+      return n;
+    }, function () { return registros.pendentes; });
+  }
+  function guardarRegistros() {
+    return gravarEstado('registros', { ultimoEnvio: registros.ultimoEnvio, erro: registros.erro })
+      .catch(function () { /* fica em memória */ });
+  }
+  /* Há o que subir e tem como: conta, chave, sinal e o aparelho pode escrever.
+   * A fila em si não entra aqui: o envio a lê. */
+  function registrosDevidos() {
+    return !!(podeEnviar() && sessao && chaveBruta && online());
+  }
+  function agendarEnvioDeRegistros() {
+    // fora da resposta da gravação dela (ver marcarMudanca): nada abre transação ali
+    setTimeout(contarFila, 0);
+    if (!registrosDevidos()) return;
+    if (envioAgendado) clearTimeout(envioAgendado);
+    envioAgendado = setTimeout(function () {
+      envioAgendado = null;
+      enviarRegistros().catch(function () { /* o erro ficou em registros.erro */ });
+    }, ATRASO_ENVIO_REGISTROS);
+  }
+  /* Ao fechar, ao abrir e ao voltar: sobe o que houver, sem esperar. */
+  function enviarRegistrosSeDevido(info) {
+    if (!registrosDevidos()) return Promise.resolve({ pulado: 'indevido' });
+    return enviarRegistros(info);
+  }
+
+  /* Sobe a fila em lotes, pelo commit (que recusa no aparelho que só lê).
+   * Nunca rejeita: devolve { enviados, erro }, e o erro fica em
+   * registros.erro para a tela. Uma entrada sai da fila só depois de o lote
+   * dela responder, e só se ainda for a que subiu. */
+  function enviarRegistros(info) {
+    info = info || {};
+    if (enviandoRegistros) return enviandoRegistros;
+    var enviados = 0, lotes = 0;
+    enviandoRegistros = carregarEstado().then(function () {
+      if (!podeEnviar()) return { pulado: 'so leitura', enviados: 0 };
+      if (!sessao) return { pulado: 'sem conta', enviados: 0 };
+      if (!chaveBruta) return { pulado: 'sem chave', enviados: 0 };
+      if (!online()) throw semRede();
+      if (!root.Store || typeof root.Store.registrosDaFila !== 'function') return { pulado: 'sem fila', enviados: 0 };
+      var uid = sessao.uid;
+      function proximoLote() {
+        return root.Store.registrosDaFila(REGISTROS_POR_COMMIT).then(function (itens) {
+          itens = itens.filter(function (i) { return !!i.registro; });
+          if (!itens.length || lotes >= 50) return { enviados: enviados };
+          lotes++;
+          return Promise.all(itens.map(function (i) { return documentoDoRegistro(i.registro, info.versaoApp); })).then(function (docs) {
+            return commit(docs.map(function (d) { return gravacao(nomeDoc(uid, 'registros/' + d.id), d); }));
+          }).then(function () {
+            return root.Store.confirmarEnvio(itens.map(function (i) { return { id: i.fila.id, atualizadoEm: i.fila.atualizadoEm }; }));
+          }).then(function (tiradas) {
+            enviados += tiradas;
+            // nada saiu da fila: tudo foi editado durante o lote; o próximo leva a versão nova
+            return proximoLote();
+          });
+        });
+      }
+      return proximoLote();
+    }).then(function (r) {
+      if (!r.pulado) {
+        registros.erro = null;
+        registros.ultimoEnvio = { quando: new Date().toISOString(), enviados: r.enviados };
+        guardarRegistros();
+      }
+      return r;
+    }, function (e) {
+      registros.erro = { codigo: (e && e.codigo) || 'ERRO', quando: new Date().toISOString(), mensagem: (e && e.message) || '' };
+      guardarRegistros();
+      return { enviados: enviados, erro: registros.erro };
+    });
+    var limpar = function () { enviandoRegistros = null; contarFila().then(avisarOuvintes, avisarOuvintes); };
+    enviandoRegistros.then(limpar, limpar);
+    return enviandoRegistros;
+  }
+
   function estado() {
     return {
       disponivel: disponivel(),
@@ -796,6 +931,8 @@
       pendente: pendente,
       enviando: !!enviando,
       aparelho: aparelho,
+      aparelhoId: idDoAparelho(),
+      registros: { pendentes: registros.pendentes, ultimoEnvio: registros.ultimoEnvio, erro: registros.erro, enviando: !!enviandoRegistros },
       soLeitura: !!marcaSoLeitura,
       uidDona: marcaSoLeitura ? marcaSoLeitura.uidDona : null,
       online: online()
@@ -833,6 +970,7 @@
     leitores: leitores, permitirLeitor: permitirLeitor, tirarLeitor: tirarLeitor,
     marcarMudanca: marcarMudanca, desligarAutomatica: desligarAutomatica,
     geracao: function () { return geracao; },
+    enviarRegistros: enviarRegistros, enviarRegistrosSeDevido: enviarRegistrosSeDevido, contarFila: contarFila,
     copiaAutomaticaDevida: copiaAutomaticaDevida, copiaDiariaDevida: copiaDiariaDevida,
     fraseDeQuando: fraseDeQuando,
     TETO_PARTE: TETO_PARTE

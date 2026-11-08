@@ -27,10 +27,10 @@ const PAGINA_NUA = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8
 
 /* Âncoras do store.js novo. Cada uma tem de aparecer UMA vez. */
 const ANCORAS = {
-  versao5: 'var VERSAO_BANCO = 5;',
+  versao6: 'var VERSAO_BANCO = 6;',
   criaRegistros: "s = b.createObjectStore('registros', { keyPath: 'id' });",
   criaControle: "if (!b.objectStoreNames.contains('controle')) b.createObjectStore('controle');",
-  migracao: 'migrarParaRegistros(e.target.transaction, e.oldVersion);',
+  migracao: 'migrarParaRegistros(e.target.transaction, ',
   lacoDoVetor: '(Array.isArray(db[vetor]) ? db[vetor] : []).forEach(function (item) {',
   igual: 'if (antes && !antes.apagadoEm && antes.ordem === ordem && JSON.stringify(antes.dados) === texto) { contas.iguais++; return; }',
   apagadoPorFora: 'return apagarDocumento().then(function () { return null; });',

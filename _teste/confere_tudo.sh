@@ -760,6 +760,14 @@ roda "nuvem fase 0 --envenenado-pendente-zerado"    node "_teste/testa_nuvem.js"
 # envio a nuvem do celular (nem ao fechar, nem a diaria, nem deitado). Os
 # venenos: o celular que envia, o que mostra botao de edicao e o que grava a
 # carga inicial ao abrir TEM de ser vistos.
+# N1 fatia 2: os registros sobem um a um, da fila `saida` gravada na mesma
+# transacao do dado, cifrados e com os metadados em claro; a nuvem recusando
+# (regras velhas) guarda a fila e Ajustes diz; a fila sobrevive a fechar sem
+# sinal e sobe ao voltar; o celular so leitura nunca envia. Venenos: registro em
+# claro e fila fora da transacao TEM de ser vistos.
+roda "nuvem registros (N1 fatia 2)"                 node "_teste/testa_nuvem_registros.js"
+roda "nuvem registros --envenenado-registro-em-claro" node "_teste/testa_nuvem_registros.js" --envenenado-registro-em-claro
+roda "nuvem registros --envenenado-fila-fora-da-transacao" node "_teste/testa_nuvem_registros.js" --envenenado-fila-fora-da-transacao
 roda "celular so leitura"                           node "_teste/testa_celular_leitura.js"
 roda "celular so leitura --envenenado-envia"        node "_teste/testa_celular_leitura.js" --envenenado-envia
 roda "celular so leitura --envenenado-edicao"       node "_teste/testa_celular_leitura.js" --envenenado-edicao

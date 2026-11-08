@@ -42,8 +42,8 @@ secao('0. As âncoras e o veneno');
 R.conferirAncoras(conf);
 const STORE_SERVIDO = R.storeEnvenenado(MODO);
 if (MODO) conf('o store.js servido ficou diferente do repositório (' + MODO + ')', STORE_SERVIDO !== R.STORE, true);
-const V4_EM_5 = R.STORE_V4.replace('var VERSAO_BANCO = 4;', 'var VERSAO_BANCO = 5;');
-conf('o código da versão 4 foi republicado com VERSAO_BANCO = 5 (o rollback do plano)', V4_EM_5 !== R.STORE_V4, true);
+const V4_EM_6 = R.STORE_V4.replace('var VERSAO_BANCO = 4;', 'var VERSAO_BANCO = 6;');
+conf('o código da versão 4 foi republicado com VERSAO_BANCO = 6 (o rollback do plano)', V4_EM_6 !== R.STORE_V4, true);
 
 const trocas = {};
 const amb = H.criarAmbiente(PORTA, 'perfil_rollback_v4', trocas);
@@ -70,11 +70,11 @@ const DOC = function () {
     const c = await Store.carregar();
     return { canon: P.canon(c), ordem: P.ordem(c), versao: (await P.versaoEDepositos()).versao, regs: P.resumoDosRegistros(await P.registrosPorFora()) };
   }, DOC.toString());
-  conf('banco na 5 com um registro vivo por item', a.versao + '/' + a.regs.vivos, '5/11');
+  conf('banco na 6 com um registro vivo por item', a.versao + '/' + a.regs.vivos, '6/11');
   await pag.close();
 
-  secao('2. Rollback: o código da 4 (com VERSAO_BANCO = 5) lê, edita e grava o principal');
-  pag = await R.abrirPaginaNua(amb, trocas, V4_EM_5);
+  secao('2. Rollback: o código da 4 (com VERSAO_BANCO = 6) lê, edita e grava o principal');
+  pag = await R.abrirPaginaNua(amb, trocas, V4_EM_6);
   const b = await pag.evaluate(async () => {
     const P = window.__prova;
     const d = await Store.carregar();
@@ -85,7 +85,7 @@ const DOC = function () {
     await Store.salvar(d);
     return { lido, ordemLida, gravado: P.canon(d), ordemGravada: P.ordem(d), versao: (await P.versaoEDepositos()).versao };
   });
-  conf('a 4 abre o banco da 5 sem subir versão', b.versao, 5);
+  conf('a 4 abre o banco da 6 sem subir versão', b.versao, 6);
   conf('a 4 lê o que a 5 gravou, na mesma ordem', b.lido === a.canon && b.ordemLida === a.ordem, true);
   conf('nenhum erro de página na 4', pag.errosDePagina.join(' | '), '');
   await pag.close();
@@ -104,7 +104,7 @@ const DOC = function () {
   await pag.close();
 
   secao('4. Rollback de novo: a 4 faz "Apagar tudo" e a 5 volta');
-  pag = await R.abrirPaginaNua(amb, trocas, V4_EM_5);
+  pag = await R.abrirPaginaNua(amb, trocas, V4_EM_6);
   const d4 = await pag.evaluate(async () => {
     const P = window.__prova;
     await Store.apagarTudo();
