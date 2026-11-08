@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.9';
+  var VERSAO = '1.42.10';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,13 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.10',
+      itens: [
+        'No celular, agora dá para mudar algumas coisas: marcar e cancelar aula, "Registrar como foi", cadastrar aluno (só o essencial) e marcar "pago em" no Fechamento. Tudo chega ao tablet quando ele abre com sinal.',
+        'O resto continua no tablet: repetição semanal, assuntos do catálogo, folhas e a ficha completa do aluno. O celular avisa quando algo é só no tablet.'
+      ]
+    },
     {
       versao: '1.42.9',
       itens: [
