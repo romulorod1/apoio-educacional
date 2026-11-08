@@ -704,6 +704,14 @@
     automatica = false;
     return Promise.all([gravarEstado('soLeitura', marcaSoLeitura), gravarEstado('automatica', false)]);
   }
+  /* Desfazer a marca (o tablet que foi marcado por engano): daqui em diante
+   * este aparelho é dono da cópia, e a automática liga. Quem chama já
+   * perguntou, e só com a tela larga. */
+  function desmarcarSoLeitura() {
+    marcaSoLeitura = null;
+    automatica = true;
+    return Promise.all([gravarEstado('soLeitura', null), gravarEstado('automatica', true)]).then(avisarOuvintes);
+  }
   /* A tela do celular à vista sem a marca (aparelho que ainda não trouxe a
    * cópia, ou o tablet numa janela estreita): nada sobe enquanto ela estiver. */
   function travarEnvio(ligar) { travadoNestaAbertura = !!ligar; }
@@ -821,7 +829,7 @@
     codigoValido: function (texto) { return chaveDoCodigo(texto).then(function () { return true; }); },
     formatarCodigo: formatarCodigo,
     enviarCopia: enviarCopia, listarCopias: listarCopias, baixarCopia: baixarCopia, restaurou: restaurou,
-    marcarSoLeitura: marcarSoLeitura, travarEnvio: travarEnvio, podeEnviar: podeEnviar,
+    marcarSoLeitura: marcarSoLeitura, desmarcarSoLeitura: desmarcarSoLeitura, travarEnvio: travarEnvio, podeEnviar: podeEnviar,
     leitores: leitores, permitirLeitor: permitirLeitor, tirarLeitor: tirarLeitor,
     marcarMudanca: marcarMudanca, desligarAutomatica: desligarAutomatica,
     geracao: function () { return geracao; },

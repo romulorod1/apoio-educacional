@@ -29,7 +29,18 @@
  *   --envenenado-edicao   um botão "Registrar como foi" no cartão da aula de
  *                         Hoje;
  *   --envenenado-grava    a trava do banco tirada e o celular gravando a carga
- *                         inicial ao abrir.
+ *                         inicial ao abrir;
+ *   --envenenado-tela     só a guarda da tela de celular tirada (o lado menor
+ *                         da tela abaixo de 640 px): o celular que restaurou
+ *                         pelo cartão de Ajustes, deitado em 844x390 e sem a
+ *                         marca, sobe a cópia ao fechar.
+ *
+ * E a saída da marca: com a marca e a tela larga (janela e aparelho), aparece
+ * "Este aparelho passa a editar"; depois do sim, o aparelho envia. Com a tela
+ * estreita, em pé ou deitado, o botão não aparece.
+ *
+ * A tela do aparelho (screen) no Chrome sem cabeça é 800x600 fora do modo
+ * móvel: a prova põe a tela de tablet (1280x800) por cima, quando precisa.
  *
  * Precisa do firebase-tools fora do repositório e de um JDK 21 em JAVA_HOME,
  * como o testa_nuvem.js; sem eles, reprova dizendo onde procurou.
@@ -44,9 +55,10 @@ const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
-const MODO = ['--envenenado-envia', '--envenenado-edicao', '--envenenado-grava']
+const MODO = ['--envenenado-envia', '--envenenado-edicao', '--envenenado-grava', '--envenenado-tela']
   .filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const ENVIA = MODO === '--envenenado-envia';
+const TELA = MODO === '--envenenado-tela';
 const EDICAO = MODO === '--envenenado-edicao';
 const GRAVA = MODO === '--envenenado-grava';
 
@@ -75,6 +87,7 @@ secao('0. As âncoras e o ambiente');
 const PODE_ENVIAR = 'function podeEnviar() { return !marcaSoLeitura && !travadoNestaAbertura; }';
 const GUARDA_AUTO_RE = /    if \(aparelhoSoLe\(\)\) return;\r?\n/;
 const AUTO_RESTAURA = 'automatica = !soLe;';
+const GUARDA_TELA_RE = /    if \(telaDeCelular\(\)\) return;\r?\n/;
 const ENVIO_DELA = 'if (!temNuvem() || enviandoParaNuvem || aparelhoSoLe()) return Promise.resolve();';
 const CARTAO = "    cartao.appendChild(el('div', { class: 'ajuda u-margem-0', texto: Core.fmtDuracao(Number(a.duracaoMin) || 0) +";
 const TRAVA_BANCO = "if (modo === 'readwrite' && soLeitura && !restauracaoDaNuvem) throw erroSoLeitura();";
@@ -84,6 +97,7 @@ conf('a trava de envio do nuvem.js está num lugar só', NUVEM.split(PODE_ENVIAR
 conf('o commit e a automática do nuvem.js passam pela trava', /function commit\(escritas\) \{\r?\n    if \(!podeEnviar\(\)\)/.test(NUVEM) &&
   NUVEM.indexOf('return !!(podeEnviar() && sessao') > 0, true);
 conf('a automática do app.js recusa no aparelho que só lê, num lugar só', (APP.match(new RegExp(GUARDA_AUTO_RE.source, 'g')) || []).length, 1);
+conf('a automática do app.js recusa em tela de celular, num lugar só', (APP.match(new RegExp(GUARDA_TELA_RE.source, 'g')) || []).length, 1);
 conf('o envio do app.js recusa no aparelho que só lê, num lugar só', APP.split(ENVIO_DELA).length, 2);
 conf('a restauração pelo celular deixa a automática desligada num lugar só', NUVEM.split(AUTO_RESTAURA).length, 2);
 conf('o cartão da aula de Hoje existe para o veneno de edição', APP.split(CARTAO).length, 2);
@@ -97,8 +111,9 @@ conf('o celular sem dados não grava a carga inicial (âncora)', APP.split(SEM_C
 const trocas = {};
 if (ENVIA) {
   trocas['/nuvem.js'] = NUVEM.replace(PODE_ENVIAR, 'function podeEnviar() { return true; }').replace(AUTO_RESTAURA, 'automatica = true;');
-  trocas['/app.js'] = APP.replace(GUARDA_AUTO_RE, '\n').replace(ENVIO_DELA, 'if (!temNuvem() || enviandoParaNuvem) return Promise.resolve();');
+  trocas['/app.js'] = APP.replace(GUARDA_AUTO_RE, '\n').replace(GUARDA_TELA_RE, '\n').replace(ENVIO_DELA, 'if (!temNuvem() || enviandoParaNuvem) return Promise.resolve();');
 }
+if (TELA) trocas['/app.js'] = APP.replace(GUARDA_TELA_RE, '\n');
 if (EDICAO) {
   trocas['/app.js'] = APP.replace(CARTAO, "    cartao.appendChild(el('button', { type: 'button', class: 'btn pequeno', texto: 'Registrar como foi' }));\n" + CARTAO);
 }
@@ -181,9 +196,9 @@ const docUrl = (uid, rel) => FS + '/v1/projects/' + PROJETO + '/databases/(defau
 const CFG = { auth: AUTH, firestore: FS, projectId: PROJETO };
 const amb = H.criarAmbiente(PORTA_APP, 'nath_d6a_celular', trocas);
 
-async function prepararPagina(pag, largura, altura) {
+async function prepararPagina(pag, largura, altura, movel) {
   pag.setDefaultTimeout(60000);
-  await pag.setViewport({ width: largura, height: altura, hasTouch: true, isMobile: largura < 640 });
+  await pag.setViewport({ width: largura, height: altura, hasTouch: true, isMobile: movel === undefined ? largura < 640 : movel });
   pag.errosDePagina = [];
   pag.on('pageerror', e => pag.errosDePagina.push(e.message));
   pag.dialogos = [];
@@ -197,6 +212,15 @@ async function prepararPagina(pag, largura, altura) {
     if (/:commit\b/.test(u) || r.method() === 'PATCH' || r.method() === 'DELETE') pag.escritasNaNuvem.push(r.method() + ' ' + u);
   });
   await pag.evaluateOnNewDocument(cfg => { window.NUVEM_EMULADOR = cfg; }, CFG);
+  /* A tela do aparelho: sem __tela, a do Chrome (no modo móvel, a do
+   * viewport); com __tela, a que a prova pôs. */
+  await pag.evaluateOnNewDocument(() => {
+    const ler = () => { try { return JSON.parse(sessionStorage.getItem('__tela') || 'null'); } catch (e) { return null; } };
+    ['width', 'height'].forEach(k => {
+      const d = Object.getOwnPropertyDescriptor(Screen.prototype, k);
+      Object.defineProperty(Screen.prototype, k, { configurable: true, get() { const t = ler(); return t ? t[k] : d.get.call(this); } });
+    });
+  });
   /* O espião do banco, desde o primeiro instante da página: toda transação de
    * escrita no apoio-educacional fica anotada, com os depósitos. A lista vive
    * no sessionStorage da aba, e não só na memória da página: o service worker
@@ -217,6 +241,7 @@ async function prepararPagina(pag, largura, altura) {
     };
   });
 }
+const definirTela = (pag, t) => pag.evaluate(t => { if (t) sessionStorage.setItem('__tela', JSON.stringify(t)); else sessionStorage.removeItem('__tela'); }, t);
 const escritasNoBanco = pag => pag.evaluate(() => window.__escritas.slice());
 /* Zera a conta da aba, para medir só o que vem depois. */
 const zerarEscritas = pag => pag.evaluate(() => { window.__escritas = []; sessionStorage.removeItem('__escritas'); });
@@ -394,6 +419,7 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     prop('"' + t + '": nenhum botão de edição nem campo de escrever (' + (telas[t].botoesEdicao.concat(telas[t].campos).join(', ') || 'nenhum') + ')',
       telas[t].botoesEdicao.length === 0 && telas[t].campos.length === 0, t === 'hoje' ? '--envenenado-edicao' : 'nenhum');
     conf('"' + t + '": nada do tablet à vista', telas[t].doTablet.join(','), '');
+    conf('"' + t + '": em pé, "Este aparelho passa a editar" não aparece', await existe(pagB, '#nuvem-passa-a-editar'), false);
   }
   if (EDICAO) { await ctxB.close(); return; }
   conf('as abas de baixo têm alvo de 44 px ou mais', await pagB.evaluate(() =>
@@ -440,6 +466,7 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     const deitado = await medirTela(pagB);
     conf('reaberto deitado, continua no modo celular', deitado.celular, true);
     conf('deitado: nada do tablet à vista e nenhum botão de edição', deitado.doTablet.concat(deitado.botoesEdicao).join(','), '');
+    conf('deitado (janela de 900 px, tela de celular): "Este aparelho passa a editar" não aparece', await existe(pagB, '#nuvem-passa-a-editar'), false);
     await pagB.evaluate(() => Nuvem.marcarMudanca());
     await fecharEVoltar(pagB);
     conf('deitado, fechar e voltar: nenhuma escrita na nuvem do celular', pagB.escritasNaNuvem.length, antesB);
@@ -509,6 +536,64 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     pagC.escritasNaNuvem.slice(antesC).join(' ') + ')', pagC.escritasNaNuvem.length === antesC, '--envenenado-envia');
   prop('e nenhuma escrita no banco nessa abertura', (await escritasNoBanco(pagC)).length === 0, 'nenhum');
   await ctxC.close();
+
+  secao('7b. O celular deitado (844 x 390) que restaurou pelo cartão de Ajustes, sem a marca, não sobe nada');
+  const ctxD = await pagA.browser().createBrowserContext();
+  const pagD = await ctxD.newPage();
+  await prepararPagina(pagD, 844, 390, true);
+  await abrir(pagD);
+  conf('deitado, com 844 px, abre como tablet (sem a marca, a janela decide a tela)', (await medirTela(pagD)).celular, false);
+  conf('a tela do aparelho é de celular (lado menor 390)', await pagD.evaluate(() => Math.min(screen.width, screen.height)), 390);
+  await pagD.evaluate(() => document.querySelector('#abas .aba[data-tela="ajustes"]').click());
+  await pausa(200);
+  await digitar(pagD, '#nuvem-email', DONA.email);
+  await digitar(pagD, '#nuvem-senha', DONA.senha);
+  await clicar(pagD, '#nuvem-entrar');
+  await esperar('D entrou', () => existe(pagD, '#nuvem-restaurar'), v => v === true, 15000);
+  await clicar(pagD, '#nuvem-restaurar');
+  await esperar('D lista as cópias', () => pagD.evaluate(() =>
+    document.querySelectorAll('#modal-nuvem-restaurar.aberto #nuvem-copias input[type=radio]').length), v => v >= 1, 15000);
+  await digitar(pagD, '#nuvem-codigo-digitado', chave.formatado);
+  await clicar(pagD, '#nuvem-restaurar-confirmar');
+  const dRest = await esperar('D restaurou pelo cartão de Ajustes', () => pagD.evaluate(() =>
+    Nuvem.estado().automatica && !document.querySelector('#modal-nuvem-restaurar.aberto')), v => v === true, 30000);
+  conf('ponto de partida: restaurou pelo cartão, sem a marca, com a automática ligada', dRest.ok &&
+    !(await pagD.evaluate(() => Nuvem.estado().soLeitura)), true);
+  await pagD.evaluate(async () => {
+    const d = await Store.carregar();
+    d.alunos.push({ id: 'delta', nome: 'Aluno Delta Teste', ativo: true, precos: [] });
+    await Store.salvar(d);
+  });
+  conf('e com mudança pendente', await pagD.evaluate(() => Nuvem.estado().pendente), true);
+  const antesD = pagD.escritasNaNuvem.length;
+  await fecharEVoltar(pagD);
+  prop('deitado, sem a marca e com a automática ligada: nenhuma escrita na nuvem ao fechar nem ao voltar (' +
+    pagD.escritasNaNuvem.slice(antesD).join(' ') + ')', pagD.escritasNaNuvem.length === antesD, TELA ? '--envenenado-tela' : '--envenenado-envia');
+  await ctxD.close();
+
+  if (!MODO) {
+    secao('7c. A saída da marca: só com a tela larga, e depois do sim o aparelho envia');
+    await pagB.setViewport({ width: 1280, height: 800, hasTouch: true, isMobile: false });
+    await definirTela(pagB, { width: 1280, height: 800 });
+    await abrir(pagB);
+    conf('com a marca e a tela larga, continua só leitura (modo celular)', (await medirTela(pagB)).celular, true);
+    conf('com a marca e a tela larga, "Este aparelho passa a editar" aparece', await existe(pagB, '#nuvem-passa-a-editar'), true);
+    const antesSim = pagB.escritasNaNuvem.length;
+    await pagB.evaluate(() => Nuvem.marcarMudanca());
+    await fecharEVoltar(pagB);
+    conf('antes do sim, nada sobe', pagB.escritasNaNuvem.length, antesSim);
+    const dialogosAntes = pagB.dialogos.length;
+    await clicar(pagB, '#nuvem-passa-a-editar');
+    const saiu = await esperar('a marca saiu', () => pagB.evaluate(() => !Nuvem.estado().soLeitura &&
+      !document.body.classList.contains('modo-celular')), v => v === true, 10000);
+    conf('a confirmação diz para usar só no tablet e que a cópia vai por cima',
+      pagB.dialogos.slice(dialogosAntes).some(d => /^Use só no tablet onde você dá aula\. A partir daqui, este aparelho envia a cópia para a nuvem, por cima da que está lá\.$/.test(d)), true);
+    conf('depois do sim, a marca saiu e o aparelho voltou à tela do tablet', saiu.ok, true);
+    await pagB.evaluate(() => Nuvem.marcarMudanca());
+    await fecharEVoltar(pagB);
+    const enviou = await esperar('a cópia deste aparelho subiu', () => pagB.escritasNaNuvem.length > antesSim, v => v === true, 20000);
+    conf('depois do sim, ao fechar, o aparelho envia a cópia', enviou.ok, true);
+  }
 
   secao('8. Sem erro de página');
   conf('nenhum erro de script no tablet', JSON.stringify(pagA.errosDePagina), '[]');

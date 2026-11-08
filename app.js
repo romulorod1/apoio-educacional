@@ -20784,6 +20784,9 @@
     if (!temNuvem() || !db) return;
     // o celular só lê (D6): a cópia dele cobriria a do tablet com uma mais velha
     if (aparelhoSoLe()) return;
+    /* E nunca de um aparelho com tela de celular, mesmo sem a marca e deitado
+     * (o celular que restaurou pelo cartão de Ajustes, na versão de antes). */
+    if (telaDeCelular()) return;
     var devida = motivo === 'diaria' ? Nuvem.copiaDiariaDevida() : Nuvem.copiaAutomaticaDevida();
     if (!devida) return;
     enviarCopiaParaNuvem(motivo);
@@ -21103,7 +21106,8 @@
     }
     /* Pelo modo celular, o aparelho passa a só ler (D6): a marca é gravada
      * ANTES de os dados chegarem, e daí em diante nada sobe daqui. */
-    var comoCelular = modoCelular;
+    // por qualquer caminho, com a janela abaixo de 640 px a restauração grava a marca
+    var comoCelular = modoCelular || larguraDeCelular();
     /* O celular nunca tem mudança por guardar (ele não edita): a pergunta
      * dele não precisa do aviso da pendência. */
     if (comoCelular) {
@@ -21257,6 +21261,28 @@
   }
   function temMarcaSoLeitura() { return temNuvem() && !!Nuvem.estado().soLeitura; }
   function aparelhoSoLe() { return modoCelular || temMarcaSoLeitura(); }
+  /* O lado MENOR da tela do aparelho, e não da janela: não muda quando o
+   * celular deita. Abaixo de 640 px é celular; um tablet passa disso. */
+  function telaDeCelular() {
+    var s = window.screen || {};
+    var menor = Math.min(Number(s.width) || 0, Number(s.height) || 0);
+    return menor > 0 && menor < LARGURA_CELULAR;
+  }
+  function telaLarga() { return !larguraDeCelular() && !telaDeCelular(); }
+
+  /* Desfazer a marca: só depois do sim, e só com a tela larga. */
+  function passarAEditar() {
+    if (!telaLarga() || !temMarcaSoLeitura()) return;
+    if (!confirmar('Use só no tablet onde você dá aula. A partir daqui, este aparelho envia a cópia para a nuvem, ' +
+      'por cima da que está lá.')) return;
+    Nuvem.desmarcarSoLeitura().then(function () {
+      aplicarModoCelular();
+      desenharTudo();
+      avisar('Este aparelho passou a editar. A cópia dele sobe para a nuvem.');
+    }, function () {
+      avisar('Não consegui tirar a marca de só leitura. Tente de novo.');
+    });
+  }
 
   function decidirModoCelular() {
     var pronto = temNuvem() ? Nuvem.pronto() : Promise.resolve();
@@ -21287,6 +21313,7 @@
         // não troca de tela com uma janela aberta: o que está nela se perderia
         if (document.querySelector('.fundo-modal.aberto')) return;
         aplicarModoCelular();
+        if (modoCelular) desenharTopoCelular(); // a saída da marca depende da largura
       }, 250);
     });
     if (modoCelular) desenharCelular();
@@ -21341,6 +21368,12 @@
     if (temMarcaSoLeitura()) {
       acoes.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'cel-atualizar',
         disabled: celularBuscando, texto: 'Buscar de novo', aoClick: atualizarCelularDaNuvem }));
+      /* A saída da marca, só com a tela larga (a janela E o aparelho): num
+       * celular, em pé ou deitado, ela não aparece. */
+      if (telaLarga()) {
+        acoes.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'nuvem-passa-a-editar',
+          texto: 'Este aparelho passa a editar', aoClick: passarAEditar }));
+      }
     } else {
       acoes.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'cel-trazer-copia',
         texto: 'Trazer a cópia do tablet', aoClick: function () { celularPedeEntrada = true; desenharCelular(); } }));

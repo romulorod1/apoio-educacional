@@ -742,6 +742,9 @@ roda "celular so leitura"                           node "_teste/testa_celular_l
 roda "celular so leitura --envenenado-envia"        node "_teste/testa_celular_leitura.js" --envenenado-envia
 roda "celular so leitura --envenenado-edicao"       node "_teste/testa_celular_leitura.js" --envenenado-edicao
 roda "celular so leitura --envenenado-grava"        node "_teste/testa_celular_leitura.js" --envenenado-grava
+# a guarda da tela de celular (lado menor abaixo de 640): o celular deitado,
+# sem a marca, que restaurou pelo cartao de Ajustes, TEM de ser visto subindo
+roda "celular so leitura --envenenado-tela"         node "_teste/testa_celular_leitura.js" --envenenado-tela
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"
