@@ -67,6 +67,8 @@ const UA_IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleW
 const ESCRITA_DIAG = 'allow create, update: if dona(uid) && diagnosticoValido(aparelho);';
 const GUARDA_DIAG = "if (!sessao || !podeEnviarRegistros() || !online()) return Promise.resolve({ pulado: 'indevido' });";
 const PORTAO = 'if (!podeEnviarCopia() && !(celularDaDona() && (soRegistros(escritas) || soDiagnosticoProprio(escritas)))) return Promise.reject(recusaSoLeitura());';
+// a terceira guarda: o celular que nada escreveu (fila 0, quarentena 0, nada enviado) não sobe nem o resumo; o veneno a derruba também
+const GUARDA_SEM_ESCRITA = 'if (!podeEnviarCopia() && !(registros.pendentes || registros.quarentena || (registros.ultimoEnvio && registros.ultimoEnvio.enviados > 0))) {';
 
 secao('0. As âncoras e o ambiente');
 conf('a versão do aplicativo foi lida do app.js', /^\d+\.\d+\.\d+$/.test(VERSAO), true);
@@ -74,6 +76,7 @@ conf('as regras têm o caminho do diagnóstico, escrito só pela dona e com a fo
 conf('as regras fecham os nomes dos campos do diagnóstico (hasOnly) e limitam a frase do erro a 200', /diagnosticoValido[\s\S]*hasOnly\(\['aparelhoId'[\s\S]*erroFrase\.size\(\) <= 200/.test(REGRAS), true);
 conf('o nuvem.js só sobe o diagnóstico de quem escreve na nuvem, num lugar só', NUVEM.split(GUARDA_DIAG).length, 2);
 conf('o commit só deixa o celular da dona subir registro ou o diagnóstico do próprio aparelho, num lugar só', NUVEM.split(PORTAO).length, 2);
+conf('o celular que nada escreveu não sobe nem o resumo, numa guarda só', NUVEM.split(GUARDA_SEM_ESCRITA).length, 2);
 const montar = NUVEM.slice(NUVEM.indexOf('function montarDiagnostico'), NUVEM.indexOf('function assinaturaDoDiagnostico'));
 conf('o resumo que sobe não toca em aluno, aula, nome, nota, valor nem mensagem de erro', montar.length > 200 && !/alunos|aulas|nome|nota|valor|mensagem|\.message/.test(montar), true);
 conf('o erro de script entra só pelo nome e pelo lugar, nunca pela mensagem', /anotarErroScript\(ev && ev\.error && ev\.error\.name, ev && ev\.filename, ev && ev\.lineno\)/.test(NUVEM) && !/erroScript[^\n]*\.message/.test(NUVEM), true);
@@ -86,6 +89,7 @@ const regrasServidas = DIAG_ABERTO ? REGRAS.replace(ESCRITA_DIAG, 'allow create,
 if (OBS_GRAVA) {
   trocas['/nuvem.js'] = NUVEM
     .replace(GUARDA_DIAG, "if (!sessao || !online()) return Promise.resolve({ pulado: 'indevido' });")
+    .replace(GUARDA_SEM_ESCRITA, 'if (false) {')
     .replace(PORTAO, 'if (!podeEnviarCopia() && !soDiagnosticoProprio(escritas) && !(celularDaDona() && soRegistros(escritas))) return Promise.reject(recusaSoLeitura());');
 }
 if (MODO) conf('o arquivo servido ficou diferente do repositório (' + MODO + ')', (trocas['/nuvem.js'] || NUVEM) !== NUVEM || regrasServidas !== REGRAS, true);
@@ -366,6 +370,30 @@ const commitsDe = (pag, desde) => pag.pedidos.slice(desde).filter(u => /:commit\
   const campos2 = diag2.ok ? diag2.valor.json.fields : {};
   conf('o resumo novo não traz mais o erro de script (era da abertura anterior) e diz a última sincronização', campos2.erroCodigo === undefined && /^\d{4}-/.test(valor(campos2.ultimoEnvio) || valor(campos2.ultimoRecebimento) || ''), true);
   conf('com a fila já subida, o resumo da reabertura diz 0 a subir', valor(campos2.pendentes), 0);
+
+  secao('3b. "Aparelhos na nuvem" no tablet: a lista e o "Esquecer este aparelho"');
+  await H.irParaAba(pagA, 'ajustes');
+  const abrirAparelhos = async () => {
+    await pagA.evaluate(() => { const d = document.querySelector('#nuvem-aparelhos-detalhes'); d.open = false; d.open = true; });
+    return esperar('a lista de aparelhos consultou', () => pagA.evaluate(() => Array.from(document.querySelectorAll('#nuvem-aparelhos .item-lista')).map(e => e.dataset.aparelho)), v => Array.isArray(v) && v.length > 0, 10000);
+  };
+  const lista1 = await abrirAparelhos();
+  conf('dobrada no cartão da nuvem, a lista mostra este tablet, e só ele', JSON.stringify(lista1.valor), JSON.stringify([idTablet]));
+  conf('o aparelho atual é marcado e não tem "Esquecer"', /\(este aparelho\)$/.test(await texto(pagA, '#nuvem-aparelhos .item-lista .cresce')) && !(await existe(pagA, '#nuvem-aparelhos [data-esquecer]')), true);
+  // um aparelho antigo da dona (plantado por REST, como um tablet de antes)
+  conf('(arranjo) um resumo de um tablet antigo foi plantado na conta dela', (await gravarDoc(dona.idToken, dona.localId, 'diagnostico/apVelho00000001', diagnosticoDeProva('apVelho00000001', { aparelho: s('tablet ZZ'), app: s('1.40.0') }))).status, 200);
+  const lista2 = await abrirAparelhos();
+  conf('reaberta, a lista tem os dois aparelhos', (lista2.valor || []).slice().sort().join(','), [idTablet, 'apVelho00000001'].sort().join(','));
+  conf('o antigo aparece em frase simples, com o último erro dele', /^Tablet ZZ: versão 1\.40\.0, tudo enviado, último erro .*: Sem internet\.$/.test(await texto(pagA, '#nuvem-aparelhos [data-aparelho="apVelho00000001"] .cresce')), true);
+  conf('só o antigo tem "Esquecer este aparelho"', await pagA.evaluate(() => Array.from(document.querySelectorAll('#nuvem-aparelhos [data-esquecer]')).map(b => b.dataset.esquecer).join(',')), 'apVelho00000001');
+  await clicar(pagA, '#nuvem-aparelhos [data-esquecer="apVelho00000001"]');
+  conf('a pergunta diz que só o resumo sai e que os dados não mudam', /Esquecer o tablet zz na lista de aparelhos\? Só o resumo de diagnóstico dele sai da nuvem; os dados não mudam\./.test(pagA.dialogos.slice(-1)[0] || ''), true);
+  const esquecido = await esperar('o resumo do antigo saiu da nuvem', () => lerDoc(dona.idToken, dona.localId, 'diagnostico/apVelho00000001').then(r => r.status), v => v === 404, 10000);
+  conf('aceito, o resumo do antigo é apagado na nuvem (as regras deixam a dona apagar)', esquecido.ok, true);
+  const lista3 = await esperar('a lista voltou a um aparelho', () => pagA.evaluate(() => Array.from(document.querySelectorAll('#nuvem-aparelhos .item-lista')).map(e => e.dataset.aparelho)), v => Array.isArray(v) && v.length === 1, 10000);
+  conf('a lista redesenhada mostra só este tablet', JSON.stringify(lista3.valor), JSON.stringify([idTablet]));
+  conf('o tablet recusa esquecer a si mesmo (o atual refaz o resumo sozinho)', await pagA.evaluate(() => Nuvem.esquecerDiagnostico(Store.aparelho()).then(() => 'apagou', e => e.message)), 'Este é o aparelho atual; ele refaz o resumo sozinho.');
+  conf('o diagnóstico deste tablet continua na nuvem', (await lerDoc(dona.idToken, dona.localId, 'diagnostico/' + idTablet)).status, 200);
 
   secao('4. (c) O observador, num Safari de iPhone simulado, lê tudo e não escreve nada');
   const contextoD = await pagA.browser().createBrowserContext();

@@ -21079,6 +21079,51 @@
       el('button', { type: 'button', class: 'btn pequeno', id: 'nuvem-sair', texto: 'Sair', aoClick: sairDaNuvem })
     ]));
     caixa.appendChild(desenharLeitoresDaNuvem(est));
+    caixa.appendChild(desenharAparelhosNaNuvem(est));
+  }
+
+  /* Aparelhos na nuvem (D7): os resumos de diagnóstico desta conta, um por
+   * aparelho, dobrados; um aparelho antigo sai da lista por "Esquecer este
+   * aparelho" (o atual refaz o resumo sozinho, e não tem o botão). */
+  function desenharAparelhosNaNuvem(est) {
+    var lista = el('div', { id: 'nuvem-aparelhos' });
+    var mensagem = el('div', { id: 'nuvem-aparelhos-mensagem' });
+    function recarregar() {
+      lista.innerHTML = '';
+      lista.appendChild(el('div', { class: 'ajuda', texto: 'Consultando...' }));
+      Nuvem.listarDiagnosticos().then(function (resumos) {
+        lista.innerHTML = '';
+        if (!resumos.length) {
+          lista.appendChild(el('div', { class: 'ajuda', texto: 'Nenhum aparelho enviou resumo ainda; este envia na próxima sincronização.' }));
+          return;
+        }
+        var atual = est.aparelhoId || '';
+        resumos.forEach(function (d) {
+          var filhos = [el('div', { class: 'cresce', texto: fraseDoDiagnostico(d) + (d.aparelhoId === atual ? ' (este aparelho)' : '') })];
+          if (d.aparelhoId !== atual) {
+            filhos.push(el('button', { type: 'button', class: 'btn pequeno', 'data-esquecer': d.aparelhoId, texto: 'Esquecer este aparelho', aoClick: function () {
+              if (!confirmar('Esquecer o ' + tituloDoAparelho(d.aparelho).toLowerCase() + ' na lista de aparelhos? Só o resumo de diagnóstico dele sai da nuvem; ' +
+                'os dados não mudam. Se ele voltar a sincronizar, reaparece.')) return;
+              Nuvem.esquecerDiagnostico(d.aparelhoId).then(recarregar, function (e) { mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', e && e.message ? e.message : 'Não consegui esquecer agora.'); });
+            } }));
+          }
+          lista.appendChild(el('div', { class: 'item-lista', 'data-aparelho': d.aparelhoId || '' }, filhos));
+        });
+      }, function (e) {
+        lista.innerHTML = '';
+        lista.appendChild(el('div', { class: 'faixa-aviso', texto: e && e.message ? e.message : 'Não consegui consultar agora.' }));
+      });
+    }
+    var det = el('details', { class: 'u-margem-topo-8', id: 'nuvem-aparelhos-detalhes', aoToggle: function () {
+      if (det.open) recarregar();
+    } }, [
+      el('summary', { texto: 'Aparelhos na nuvem' }),
+      el('p', { class: 'ajuda u-margem-topo-8', texto: 'O resumo de diagnóstico que cada aparelho desta conta enviou (versão, mudanças a subir, último erro). ' +
+        'Um aparelho que você não usa mais pode ser esquecido; só o resumo dele sai.' }),
+      lista,
+      mensagem
+    ]);
+    return det;
   }
 
   function desenharEntradaNaNuvem(caixa) {

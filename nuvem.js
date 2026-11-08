@@ -1292,6 +1292,16 @@
       }).sort(function (a, b) { return String(b.quando || '').localeCompare(String(a.quando || '')); });
     });
   }
+  /* "Esquecer este aparelho": a dona, no tablet, apaga o resumo de um aparelho
+   * antigo da lista. Passa pelo commit: só o tablet (podeEnviarCopia) chega
+   * aqui; o celular e o observador são recusados. */
+  function esquecerDiagnostico(aparelhoId) {
+    aparelhoId = String(aparelhoId || '').trim();
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(aparelhoId)) return Promise.reject(new Error('Este aparelho não foi encontrado.'));
+    if (!sessao) return Promise.reject(erro('TOKEN_EXPIRED'));
+    if (aparelhoId === idDoAparelho()) return Promise.reject(new Error('Este é o aparelho atual; ele refaz o resumo sozinho.'));
+    return commit([remocao(nomeDoc(sessao.uid, 'diagnostico/' + aparelhoId))]).then(function () { return true; });
+  }
   /* O que este aparelho diria de si, sem subir nada: o painel do observador
    * mostra o próprio aparelho por aqui, e nada disso é gravado nele. */
   function diagnosticoLocal() {
@@ -1361,6 +1371,7 @@
     receberRegistros: receberRegistros, sincronizar: sincronizar, sincronizarSeDevido: sincronizarSeDevido,
     copiaAutomaticaDevida: copiaAutomaticaDevida, copiaDiariaDevida: copiaDiariaDevida,
     informar: informar, gravarDiagnostico: gravarDiagnostico, listarDiagnosticos: listarDiagnosticos, diagnosticoLocal: diagnosticoLocal,
+    esquecerDiagnostico: esquecerDiagnostico,
     fraseDoCodigo: fraseDoCodigo, rotuloDoNavegador: rotuloDoNavegador, instaladoNaTela: instaladoNaTela,
     fraseDeQuando: fraseDeQuando,
     TETO_PARTE: TETO_PARTE
