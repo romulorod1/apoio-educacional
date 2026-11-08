@@ -1331,22 +1331,29 @@
   /* O texto que sobe e que é hasheado: a página arredondada, em JSON. Quem
    * recebe guarda o que leu desse texto, e stringify devolve o mesmo texto. */
   function paginaCanonica(pagina) { return JSON.stringify(arredondarPagina(pagina)); }
-  /* SHA-256 em hexadecimal, de um texto ou de bytes. Sem WebCrypto (não
-   * acontece no tablet nem no iPhone), um FNV-1a duplo serve de hash. */
-  function sha256Hex(entrada) {
-    var bytes = typeof entrada === 'string' ? new TextEncoder().encode(entrada) : entrada;
-    if (typeof crypto !== 'undefined' && crypto.subtle && crypto.subtle.digest) {
-      return crypto.subtle.digest('SHA-256', bytes).then(function (buf) {
-        var v = new Uint8Array(buf), s = '';
-        for (var i = 0; i < v.length; i++) s += (v[i] < 16 ? '0' : '') + v[i].toString(16);
-        return s;
-      });
-    }
-    var texto = typeof entrada === 'string' ? entrada : String.fromCharCode.apply(null, bytes);
-    var a = hashTexto(texto).toString(16), b = hashTexto(texto + '\u0001').toString(16);
-    return Promise.resolve(('00000000' + a).slice(-8) + ('00000000' + b).slice(-8));
+  /* SHA-256 em hexadecimal (64 caracteres), de um texto ou de bytes, pelo
+   * WebCrypto. SEM WebCrypto NÃO HÁ HASH: quem recebe sempre recalcula o
+   * SHA-256, e um hash de outro algoritmo ficaria "inválido" para sempre em
+   * todo receptor (revisão da fatia 1). A folha continua gravada no aparelho;
+   * só não sobe, e o nuvem.js diz isso numa frase. */
+  function temWebCrypto() {
+    return typeof crypto !== 'undefined' && !!(crypto.subtle && crypto.subtle.digest) && typeof TextEncoder !== 'undefined';
   }
-  function hashPagina(pagina) { return sha256Hex(paginaCanonica(pagina)); }
+  function sha256Hex(entrada) {
+    if (!temWebCrypto()) return Promise.reject(Object.assign(new Error('Este navegador não tem o WebCrypto que a folha na nuvem precisa.'), { codigo: 'SEM_WEBCRYPTO' }));
+    var bytes = typeof entrada === 'string' ? new TextEncoder().encode(entrada) : entrada;
+    return crypto.subtle.digest('SHA-256', bytes).then(function (buf) {
+      var v = new Uint8Array(buf), s = '';
+      for (var i = 0; i < v.length; i++) s += (v[i] < 16 ? '0' : '') + v[i].toString(16);
+      return s;
+    });
+  }
+  /* O hash da página para o estado local: null sem WebCrypto (a página conta
+   * como mudada a cada gravação e fica na fila, sem subir). */
+  function hashPagina(pagina) {
+    if (!temWebCrypto()) return Promise.resolve(null);
+    return sha256Hex(paginaCanonica(pagina));
+  }
   function idDaPagina(aulaId, n) { return PREFIXO_FOLHA + aulaId + ':' + n; }
   function partesDoIdDaPagina(id) {
     var s = String(id || '');
@@ -1634,8 +1641,37 @@
       });
     });
   }
-  /* As versões anteriores de página guardadas neste aparelho, mais novas que
-   * 30 dias (as velhas saem aqui mesmo, na leitura). */
+  /* A FOLHA QUE CHEGOU COM O EDITOR ABERTO nela (dois tablets, revisão da
+   * fatia 1): a gravação seguinte do editor cobriria a página recebida sem
+   * aviso. Antes disso, a versão recebida (a que está no disco agora) fica
+   * guardada em 'folha-anterior:', página por página, como no outro caminho. */
+  function guardarVersaoRecebida(aulaId) {
+    var agora = new Date().toISOString();
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, ['notas', 'controle'], 'readwrite', true);
+        var controle = t.objectStore('controle'), guardadas = 0;
+        t.objectStore('notas').get(aulaId).onsuccess = function (e) {
+          var nota = e.target.result;
+          var estadoReq = controle.get(PREFIXO_FOLHA + aulaId);
+          estadoReq.onsuccess = function () {
+            var estados = (estadoReq.result && estadoReq.result.paginas) || [];
+            ((nota && nota.paginas) || []).forEach(function (p, n) {
+              var e_ = estados[n] || {};
+              controle.put({ id: idDaPagina(aulaId, n), pagina: p, hash: e_.hash || null, quando: agora, de: 'outro tablet',
+                motivo: 'chegou do outro tablet com a folha aberta aqui' }, PREFIXO_FOLHA_ANTERIOR + idDaPagina(aulaId, n) + ':' + agora);
+              guardadas++;
+            });
+          };
+        };
+        t.oncomplete = function () { resolve(guardadas); };
+        t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
+  /* As versões anteriores de página guardadas neste aparelho. A purga das
+   * que passarem de 30 dias é da fatia 4; aqui só a leitura. */
   function versoesAnterioresDeFolha() {
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
@@ -2559,6 +2595,7 @@
     paginaCanonica: paginaCanonica, arredondarPagina: arredondarPagina, hashPagina: hashPagina, sha256Hex: sha256Hex,
     partesDoIdDaPagina: partesDoIdDaPagina, estadoDaFolha: estadoDaFolha, lerCursorFolhas: lerCursorFolhas,
     aplicarFolhasRecebidas: aplicarFolhasRecebidas, versoesAnterioresDeFolha: versoesAnterioresDeFolha,
+    guardarVersaoRecebida: guardarVersaoRecebida, temWebCrypto: temWebCrypto,
     ultimaGravacaoDeFolha: function () { return ultimaGravacaoDeFolha; },
     ESPERA_FOLHA: ESPERA_FOLHA,
     montarRegistros: montar,

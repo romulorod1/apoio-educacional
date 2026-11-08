@@ -55,8 +55,8 @@ service cloud.firestore {
         && (!('dados' in d) || !(d.dados is bytes))
         && (!('servidorEm' in d) || d.servidorEm is timestamp);
     }
-    // uma página de folha (N2): id igual ao nome do documento, hash do texto
-    // canônico obrigatório na página viva (16 a 64), bytes comprimidos de até
+    // uma página de folha (N2): id igual ao nome do documento, hash SHA-256 do
+    // texto canônico (64 hexadecimais) obrigatório na página viva, bytes comprimidos de até
     // 900 KiB na página viva (a lápide vai sem bytes), metadados com nomes e
     // tamanhos fechados; servidorEm é a hora do servidor, posta pelo commit
     function folhaValida(id) {
@@ -70,7 +70,7 @@ service cloud.firestore {
         && d.esquema is int
         && (!('app' in d) || (d.app is string && d.app.size() <= 32))
         && (!('apagadoEm' in d) || (d.apagadoEm is string && d.apagadoEm.size() <= 40))
-        && (!('hash' in d) || (d.hash is string && d.hash.size() >= 16 && d.hash.size() <= 64))
+        && (!('hash' in d) || (d.hash is string && d.hash.size() == 64))
         && (!('bytes' in d) || (d.bytes is bytes && d.bytes.size() <= 900 * 1024))
         && (!('tamanho' in d) || d.tamanho is int)
         && (!('algoritmo' in d) || (d.algoritmo is string && d.algoritmo.size() <= 16))

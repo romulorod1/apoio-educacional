@@ -20980,6 +20980,18 @@
         fecharLeitorDeFolha();
         abrirFolhaParaLer(aulaAberta);
       }
+      /* DOIS TABLETS com o EDITOR ABERTO na aula que chegou: a gravação seguinte
+       * deste editor cobriria a página recebida. Antes dela, a versão recebida
+       * fica guardada (folha-anterior) e ela é avisada. A guarda entra na fila
+       * das gravações da folha, para a próxima gravação esperar por ela. */
+      if (editorAtual && editorAtual._aulaId && (contas.aulas || []).indexOf(editorAtual._aulaId) >= 0) {
+        var aulaNoEditor = editorAtual._aulaId;
+        filaGravacaoNota = filaGravacaoNota.then(function () {
+          return Store.guardarVersaoRecebida(aulaNoEditor);
+        }).then(function () {
+          avisar('Esta folha mudou no outro tablet; a versão de lá ficou guardada.');
+        }, function () { /* sem guarda, a frase não é dita */ });
+      }
       if (modoCelular) desenharCelular();
       var np = contas.aplicados;
       avisar(np === 1 ? 'Chegou 1 página de folha do tablet.' : 'Chegaram ' + np + ' páginas de folha do tablet.');
@@ -21027,8 +21039,9 @@
     /* N1 (fatia 2): os registros que esperam na fila sobem nos mesmos momentos
      * da cópia (fechar, abrir, voltar), pelas mesmas guardas acima. A recusa da
      * nuvem fica guardada em Nuvem.estado().registros.erro e a fila fica. */
-    // `tudo` (N2): ao fechar, abrir e voltar, as páginas de folha recém-gravadas sobem sem esperar
-    Nuvem.sincronizarSeDevido({ versaoApp: VERSAO, tudo: true });
+    // `tudo` (N2): ao fechar, abrir e voltar, as páginas de folha recém-gravadas sobem sem esperar;
+    // `fechando`: o pedido vai com keepalive quando couber, para sobreviver à página fechando
+    Nuvem.sincronizarSeDevido({ versaoApp: VERSAO, tudo: true, fechando: motivo === 'fechar' });
     var devida = motivo === 'diaria' ? Nuvem.copiaDiariaDevida() : Nuvem.copiaAutomaticaDevida();
     if (!devida) return;
     enviarCopiaParaNuvem(motivo);

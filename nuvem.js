@@ -103,6 +103,7 @@
    * cortado pelos bytes também: 5 MiB em base64 deixa folga para os campos. */
   var TETO_COMMIT_BYTES = 5 * 1024 * 1024;
   var TETO_PAGINA_BYTES = 900 * 1024;   // uma página comprimida acima disto não cabe num documento (as regras também recusam)
+  var TETO_KEEPALIVE = 60 * 1024;       // o corpo que ainda cabe num fetch com keepalive (o navegador limita a 64 KiB)
   var ATRASO_ENVIO_REGISTROS = 2500; // depois de uma gravação dela, espera as vizinhas antes de subir
   var NOME_BANCO = 'apoio-nuvem';
   var UM_DIA = 24 * 60 * 60 * 1000;
@@ -292,7 +293,8 @@
     INVALID_ARGUMENT: 'A nuvem recusou a forma de um registro.',
     PAGINA_GRANDE: 'Uma página da folha ficou grande demais para subir inteira.',
     LOTE_GRANDE: 'O lote passou do tamanho e vai dividido.',
-    SEM_COMPRESSAO: 'Este navegador não comprime a folha para a nuvem.',
+    SEM_COMPRESSAO: 'Este navegador não comprime a folha para a nuvem: as folhas ficam só neste aparelho.',
+    SEM_WEBCRYPTO: 'Este navegador não calcula o hash da folha para a nuvem: as folhas ficam só neste aparelho.',
     RESOURCE_EXHAUSTED: 'A cota da nuvem acabou por hoje; tento de novo mais tarde.',
     UNAVAILABLE: 'A nuvem está indisponível agora; tento de novo mais tarde.',
     DEADLINE_EXCEEDED: 'A nuvem demorou demais; tento de novo mais tarde.',
@@ -322,9 +324,15 @@
       corpo = JSON.stringify(corpo);
       cabecalhos['Content-Type'] = 'application/json';
     }
+    /* `keepalive` (ao fechar o aplicativo, N2): o pedido sobrevive à página
+     * fechando. O navegador limita o corpo em voo com keepalive a 64 KiB; um
+     * lote com uma página densa (67 KB em gzip, mais em base64) não cabe, e
+     * vai sem keepalive: se a página morrer antes, a fila guarda a entrada e
+     * ela sobe na próxima abertura. */
+    var keepalive = !!opcoes.keepalive && (corpo === undefined || corpo.length <= TETO_KEEPALIVE);
     var p;
     try {
-      p = fetch(url, { method: opcoes.metodo || (corpo !== undefined ? 'POST' : 'GET'), headers: cabecalhos, body: corpo });
+      p = fetch(url, { method: opcoes.metodo || (corpo !== undefined ? 'POST' : 'GET'), headers: cabecalhos, body: corpo, keepalive: keepalive });
     } catch (e) { return Promise.reject(semRede()); }
     return p.then(function (r) {
       return r.text().then(function (texto) {
@@ -560,11 +568,11 @@
       return nome.indexOf('/folhas/') > 0;
     });
   }
-  function commit(escritas) {
+  function commit(escritas, opcoes) {
     if (!podeEnviarCopia() && temFolhas(escritas)) return Promise.reject(recusaSoLeitura());
     if (!podeEnviarCopia() && !(celularDaDona() && (soRegistros(escritas) || soDiagnosticoProprio(escritas)))) return Promise.reject(recusaSoLeitura());
     return comToken(function (cab) {
-      return pedir(urlDoc(raizDocumentos()) + ':commit', { cabecalhos: cab, corpo: { writes: escritas } });
+      return pedir(urlDoc(raizDocumentos()) + ':commit', { cabecalhos: cab, corpo: { writes: escritas }, keepalive: !!(opcoes && opcoes.keepalive) });
     });
   }
   function gravacao(nome, obj) { return { update: { name: nome, fields: campos(obj) } }; }
@@ -893,6 +901,12 @@
 
   // ---------- bytes comprimidos (as páginas da folha, N2) ----------
 
+  /* A folha só sobe (e só se confere) com WebCrypto e CompressionStream; sem
+   * um deles a página fica na fila e a frase vai para Ajustes e o diagnóstico. */
+  function suportaFolhas() {
+    return typeof CompressionStream === 'function' && typeof DecompressionStream === 'function' &&
+      !!(root.Store && typeof root.Store.temWebCrypto === 'function' && root.Store.temWebCrypto());
+  }
   function juntarFluxo(fluxo) {
     return new Response(fluxo).arrayBuffer().then(function (buf) { return new Uint8Array(buf); });
   }
@@ -980,10 +994,15 @@
    * Nunca rejeita: devolve { enviados, erro }, e o erro fica em
    * registros.erro para a tela. Uma entrada sai da fila só depois de o lote
    * dela responder, e só se ainda for a que subiu. */
+  var tudoPendente = false;      // um "sobe tudo agora" chegou com um envio em voo: roda de novo quando ele acabar
+  var ultimaInfoDeEnvio = {};
   function enviarRegistros(info) {
     info = info || {};
-    if (enviandoRegistros) return enviandoRegistros;
-    var enviados = 0, lotes = 0, emQuarentenaAntes = [], adiadas = 0;
+    ultimaInfoDeEnvio = info;
+    /* O "sobe ao fechar" não se perde com um envio em curso (revisão da fatia
+     * 1): fica marcado e o envio roda de novo, com `tudo`, assim que este acabar. */
+    if (enviandoRegistros) { if (info.tudo) tudoPendente = true; return enviandoRegistros; }
+    var enviados = 0, lotes = 0, emQuarentenaAntes = [], adiadas = 0, folhasSemSuporte = 0;
     enviandoRegistros = carregarEstado().then(function () {
       return lerSincronizacaoDesligada();
     }).then(function () {
@@ -1012,7 +1031,7 @@
              * novo. */
             var precondicao = conhecido ? { updateTime: conhecido } : (itens[k].fila.restauro ? { exists: false } : null);
             return gravacaoCarimbada(nomeDoc(uid, p.colecao + p.doc.id), p.doc, precondicao);
-          })).then(function (resposta) {
+          }), { keepalive: !!info.fechando }).then(function (resposta) {
             var resultados = (resposta && resposta.writeResults) || [];
             return root.Store.confirmarEnvio(itens.map(function (i, k) {
               var w = resultados[k] || {};
@@ -1059,6 +1078,13 @@
         return root.Store.registrosDaFila(REGISTROS_POR_COMMIT, { tudo: !!info.tudo }).then(function (itens) {
           // páginas de folha recém-gravadas que esperam mais traços (N2): o envio volta daqui a pouco
           if (itens.adiadas) adiadas = itens.adiadas;
+          /* Sem WebCrypto ou sem CompressionStream a folha NÃO SOBE: as páginas
+           * ficam na fila e a frase vai para Ajustes e para o diagnóstico. */
+          if (!suportaFolhas()) {
+            var comFolhas = itens.length;
+            itens = itens.filter(function (i) { return !(i.registro && i.registro.tipo === 'folha'); });
+            folhasSemSuporte += comFolhas - itens.length;
+          }
           itens = itens.filter(function (i) { return !!i.registro && !jaCulpados[i.fila.id]; });
           if (!itens.length || lotes >= 50) return { enviados: enviados };
           lotes++;
@@ -1099,6 +1125,13 @@
     }).then(function (r) {
       if (!r.pulado) {
         registros.erro = null;
+        /* As páginas que este navegador não consegue subir (sem WebCrypto ou
+         * sem CompressionStream) ficam na fila, e a frase fica aqui: Ajustes e o
+         * diagnóstico (D7) a mostram. */
+        if (folhasSemSuporte) {
+          var codigoSuporte = root.Store && typeof root.Store.temWebCrypto === 'function' && !root.Store.temWebCrypto() ? 'SEM_WEBCRYPTO' : 'SEM_COMPRESSAO';
+          registros.erro = { codigo: codigoSuporte, quando: new Date().toISOString(), mensagem: FRASES[codigoSuporte] };
+        }
         registros.ultimoEnvio = { quando: new Date().toISOString(), enviados: r.enviados };
         guardarRegistros();
         /* Um envio inteiro sem recusa solta a quarentena UMA vez, como reteste:
@@ -1117,6 +1150,11 @@
     var limpar = function () {
       enviandoRegistros = null;
       registros.folhasAdiadas = adiadas;
+      // o "sobe tudo agora" que chegou durante este envio roda agora
+      if (tudoPendente) {
+        tudoPendente = false;
+        setTimeout(function () { enviarRegistros(Object.assign({}, ultimaInfoDeEnvio, { tudo: true })).catch(function () { /* o erro ficou em registros.erro */ }); }, 0);
+      }
       /* Páginas de folha que esperavam mais traços (N2): o envio volta quando a
        * espera acabar, sem depender de outra gravação dela. */
       if (adiadas && registrosDevidos()) {

@@ -87,6 +87,15 @@ conf('o celular abre a folha só para ler pelo cartão da aula', APP.indexOf("'d
 conf('o fechar da folha só leitura não passa pelo gravarNota', APP.indexOf('if (leitorDeFolha) { fecharLeitorDeFolha(); return; }') > 0, true);
 conf('as regras têm o caminho das folhas com hash obrigatório na página viva', /match \/folhas\/\{folha\}/.test(REGRAS) && REGRAS.indexOf("(('apagadoEm' in d) || ('hash' in d && 'bytes' in d))") > 0, true);
 conf('a página canônica arredonda a 0,1, a regra da cópia', STORE.indexOf('ponto[i] = Math.round(ponto[i] * 10) / 10;') > 0 && STORE.indexOf('copia.paginas = (copia.paginas || []).map(arredondarPagina);') > 0, true);
+/* Revisão da fatia 1: sem WebCrypto não há hash de outro algoritmo (a página
+ * ficaria inválida para sempre em todo receptor): o sha256Hex rejeita, o
+ * envio pula as páginas e diz a frase, e as regras só aceitam 64 hexadecimais. */
+conf('sem WebCrypto o sha256Hex rejeita, e não há hash de outro algoritmo', STORE.indexOf("if (!temWebCrypto()) return Promise.reject(") > 0 && STORE.indexOf("hashTexto(texto + '\\u0001')") < 0, true);
+conf('sem suporte, o envio pula as páginas de folha e guarda a frase em registros.erro', NUVEM.indexOf('if (!suportaFolhas()) {') > 0 && NUVEM.indexOf("registros.erro = { codigo: codigoSuporte, quando: new Date().toISOString(), mensagem: FRASES[codigoSuporte] };") > 0, true);
+conf('as regras só aceitam hash de 64 caracteres', REGRAS.indexOf('d.hash is string && d.hash.size() == 64') > 0, true);
+conf('o "sobe tudo agora" que chega com um envio em voo roda de novo ao fim dele', NUVEM.indexOf('if (enviandoRegistros) { if (info.tudo) tudoPendente = true; return enviandoRegistros; }') > 0 && NUVEM.indexOf('if (tudoPendente) {') > 0, true);
+conf('ao fechar, o commit vai com keepalive quando o corpo cabe', NUVEM.indexOf('keepalive: !!(opcoes && opcoes.keepalive)') > 0 && NUVEM.indexOf('corpo.length <= TETO_KEEPALIVE') > 0 && APP.indexOf("fechando: motivo === 'fechar'") > 0, true);
+conf('a folha que chega com o editor aberto nela é guardada antes da próxima gravação, com aviso', APP.indexOf('return Store.guardarVersaoRecebida(aulaNoEditor);') > 0 && APP.indexOf("'Esta folha mudou no outro tablet; a versão de lá ficou guardada.'") > 0 && STORE.indexOf('function guardarVersaoRecebida(aulaId)') > 0, true);
 const trocas = {};
 if (MODO === MODOS[0]) trocas['/nuvem.js'] = NUVEM.replace(HASH_NO_DOC, '');
 if (MODO === MODOS[1]) trocas['/store.js'] = STORE.replace(COMPARA_HASH, 'if (false) {');
