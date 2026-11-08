@@ -236,7 +236,8 @@ secao('5. Base antiga, sem o campo');
       const fonte = fs.readFileSync(path.join(__dirname, '..', 'store.js'), 'utf8');
       return [
         /if \(!Array\.isArray\(d\.pagamentos\)\) d\.pagamentos = \[\];/.test(fonte),
-        /return completar\(d\);/.test(fonte),
+        // desde a N1 o carregar monta o documento dos registros, e completa o que montou
+        /return completar\(montar\(lido\.registros\)\);/.test(fonte),
         /return completar\(registro\.estado\);/.test(fonte)
       ];
     })(), [true, true, true]);

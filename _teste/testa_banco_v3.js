@@ -39,6 +39,10 @@ const MODO = ['--envenenado-versao-tecnica', '--envenenado-troca-calada']
   .filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const STORE = fs.readFileSync(path.join(H.RAIZ, 'store.js'), 'utf8');
+/* O código de ANTES é o real: o store.js da versão 4 (016eef5), congelado em
+ * _store_v4_historico.js. As versões 2 e 3 derivam dele, tirando os depósitos
+ * que cada uma ainda não tinha. O código novo é o deste commit (versão 5, N1). */
+const HIST = fs.readFileSync(path.join(__dirname, '_store_v4_historico.js'), 'utf8');
 
 const V3 = 'var VERSAO_BANCO = 3;';
 const CRIA_LISTAS = /    if \(!b\.objectStoreNames\.contains\('biblioteca_listas'\)\) \{\r?\n      b\.createObjectStore\('biblioteca_listas', \{ keyPath: 'id' \}\);\r?\n    \}\r?\n/;
@@ -49,26 +53,28 @@ const AVISA_TROCA = "if (typeof root.aoBancoTrocado === 'function') root.aoBanco
  * store.js de agora sem os dois depósitos dos livros e com o número 3. A
  * subida de 3 para 4 é do _teste/testa_livros.js, no mesmo modelo. */
 const V4 = 'var VERSAO_BANCO = 4;';
+const V5 = 'var VERSAO_BANCO = 5;';
 const CRIA_LIVROS = /    if \(!b\.objectStoreNames\.contains\('livros'\)\) \{\r?\n      s = b\.createObjectStore\('livros', \{ keyPath: 'id' \}\);\r?\n      s\.createIndex\('pacote', 'pacote'\);\r?\n    \}\r?\n    if \(!b\.objectStoreNames\.contains\('livros_posicoes'\)\) \{\r?\n      b\.createObjectStore\('livros_posicoes', \{ keyPath: 'id' \}\);\r?\n    \}\r?\n/;
 
 secao('0. As âncoras');
-conf('o store.js está na versão 4', STORE.split(V4).length, 2);
+conf('o store.js está na versão 5', STORE.split(V5).length, 2);
+conf('o código histórico da versão 4 está na versão 4', HIST.split(V4).length, 2);
 conf('o store.js cria os depósitos dos livros uma vez', (STORE.match(new RegExp(CRIA_LIVROS.source, 'g')) || []).length, 1);
 conf('o store.js cria o depósito das listas uma vez', (STORE.match(new RegExp(CRIA_LISTAS.source, 'g')) || []).length, 1);
 conf('o app.js tem o ramo da versão mais nova uma vez', APP.split(RAMO_VERSAO).length, 2);
 conf('o store.js avisa a troca uma vez', STORE.split(AVISA_TROCA).length, 2);
 
-const STORE_V3 = STORE.replace(V4, V3).replace(CRIA_LIVROS, '');
+const STORE_V3 = HIST.replace(V4, V3).replace(CRIA_LIVROS, '');
 conf('o código da versão 3 ficou sem os livros e com o número 3',
   STORE_V3.indexOf("createObjectStore('livros'") < 0 && STORE_V3.split(V3).length === 2, true);
 const STORE_V2 = STORE_V3.replace(V3, 'var VERSAO_BANCO = 2;').replace(CRIA_LISTAS, '');
-const STORE_V4 = STORE_V3.replace(V3, V4);
+const STORE_V6 = STORE.replace(V5, 'var VERSAO_BANCO = 6;');
 const trocas = {};
 const APP_SERVIDO = MODO === '--envenenado-versao-tecnica' ? APP.split(RAMO_VERSAO).join('if (false) {') : APP;
-const STORE_SERVIDO = MODO === '--envenenado-troca-calada' ? STORE_V3.split(AVISA_TROCA).join('') : STORE_V3;
+const STORE_SERVIDO = MODO === '--envenenado-troca-calada' ? STORE.split(AVISA_TROCA).join('') : STORE;
 if (APP_SERVIDO !== APP) trocas['/app.js'] = APP_SERVIDO;
 trocas['/store.js'] = STORE_SERVIDO;
-const envenenados = (APP_SERVIDO !== APP ? 1 : 0) + (STORE_SERVIDO !== STORE_V3 ? 1 : 0);
+const envenenados = (APP_SERVIDO !== APP ? 1 : 0) + (STORE_SERVIDO !== STORE ? 1 : 0);
 const amb = H.criarAmbiente(PORTA, 'perfil_banco_v3', trocas);
 
 const versaoEDepositos = pag => pag.evaluate(() => new Promise(r => {
@@ -95,7 +101,7 @@ const contagens = pag => pag.evaluate(() => new Promise(r => {
 (async () => {
   if (MODO) {
     secao('O veneno é de verdade');
-    conf('um arquivo servido ficou diferente do código da versão 3 (' + MODO + ')', envenenados, 1);
+    conf('um arquivo servido ficou diferente do repositório (' + MODO + ')', envenenados, 1);
   }
   await amb.subir();
 
@@ -126,14 +132,14 @@ const contagens = pag => pag.evaluate(() => new Promise(r => {
   });
   const antes = await contagens(pag);
   await pag.close();
-  // o código deste commit, na versão 3 (sem os livros do C15.1)
+  // o código deste commit, na versão 5 (N1): sobe de 2 para 5 de uma vez, migrando para registros
   trocas['/store.js'] = STORE_SERVIDO;
   const pag2 = await amb.pagina();
   await pag2.setBypassServiceWorker(true);
   await H.abrirApp(pag2, amb.ORIGEM);
   await pausa(1000);
   const v3 = await versaoEDepositos(pag2);
-  conf('o código novo subiu o banco para a versão 3', v3 && v3.versao, 3);
+  conf('o código novo subiu o banco para a versão 5', v3 && v3.versao, 5);
   conf('com o depósito das listas', v3 && v3.depositos.indexOf('biblioteca_listas') >= 0, true);
   const depois = await contagens(pag2);
   const chaves = Object.keys(antes).sort();
@@ -162,7 +168,7 @@ const contagens = pag => pag.evaluate(() => new Promise(r => {
   conf('e diz que esta janela é de uma versão anterior', /versão anterior do aplicativo/.test(texto3), true);
   conf('e o que fazer', /Feche o aplicativo e abra de novo/.test(texto3), true);
   conf('sem a mensagem técnica do navegador', /VersionError|version|versão solicitada/i.test(texto3.replace(/versão anterior|versão mais nova/g, '')), false);
-  conf('e o banco continua na versão 3', (await versaoEDepositos(pag3)).versao, 3);
+  conf('e o banco continua na versão 5', (await versaoEDepositos(pag3)).versao, 5);
   await pag3.close();
 
   // ================================================================
@@ -173,11 +179,11 @@ const contagens = pag => pag.evaluate(() => new Promise(r => {
   await H.abrirApp(pagA, amb.ORIGEM);
   await pausa(800);
   // uma janela com uma versão mais nova do banco abre agora
-  trocas['/store.js'] = STORE_V4;
+  trocas['/store.js'] = STORE_V6;
   const pagB = await amb.pagina();
   await pagB.setBypassServiceWorker(true);
   await H.abrirApp(pagB, amb.ORIGEM);
-  const subiu = await esperar('o banco na versão 4', () => versaoEDepositos(pagB), v => !!v && v.versao === 4, 10000);
+  const subiu = await esperar('o banco na versão 6', () => versaoEDepositos(pagB), v => !!v && v.versao === 6, 10000);
   conf('a janela nova subiu o banco, sem ficar bloqueada', subiu.ok, true);
   conf('e não mostra o aviso de bloqueio', await pagB.evaluate(() => !!document.querySelector('#aviso-banco-bloqueado')), false);
   await pagA.bringToFront();
