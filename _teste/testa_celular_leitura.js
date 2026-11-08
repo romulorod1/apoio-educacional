@@ -536,8 +536,11 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     telas.fechamento.dasAcoes.indexOf('Marcar como pago') >= 0, true);
   conf('todos os botões das três telas e do alto foram medidos (' + Object.keys(telas).map(t => t + ': ' + telas[t].alvos).join(', ') + ')',
     Object.keys(telas).every(t => telas[t].alvos >= 5), true);
-  conf('as abas de baixo têm alvo de 48 px ou mais', await pagB.evaluate(() =>
-    Array.from(document.querySelectorAll('#cel-abas .cel-aba')).every(b => b.getBoundingClientRect().height >= 48)), true);
+  // (D7) as abas só do observador ficam escondidas (hidden) no celular da dona: não são alvo; as três à vista é que se medem
+  conf('as abas de baixo à vista (três) têm alvo de 48 px ou mais', await pagB.evaluate(() => {
+    const vistas = Array.from(document.querySelectorAll('#cel-abas .cel-aba')).filter(b => !b.hidden);
+    return vistas.length === 3 && vistas.every(b => b.getBoundingClientRect().height >= 48);
+  }), true);
   conf('Fechamento: o aluno, as aulas e o valor do mês', await pagB.evaluate(() => {
     document.querySelector('#cel-abas .cel-aba[data-cel="fechamento"]').click();
     const t = document.querySelector('#cel-fechamento').textContent;

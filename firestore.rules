@@ -14,10 +14,15 @@ rules_version = '2';
 // elas são por caminho e conferem a forma do que entra.
 //
 // Só os caminhos que o aplicativo usa existem aqui, um a um: a cópia completa
-// (estado/copia, copias/{id} e as partes, em bytes), os leitores e os
+// (estado/copia, copias/{id} e as partes, em bytes), os leitores, os
 // registros (registros/{id}), cujo documento tem a forma conferida: os
 // metadados com os nomes esperados e tamanho limitado, e o conteúdo em
-// `dados`, como dado legível do Firestore.
+// `dados`, como dado legível do Firestore; e o diagnóstico por aparelho
+// (diagnostico/{aparelhoId}, D7): um resumo só de metadados (versão, último
+// erro pelo código e pela frase fixa, última sincronização, fila), que só a
+// dona escreve, só para o próprio aparelho, e que o observador lê. Nenhum
+// campo de dado de criança cabe nele: os nomes dos campos são fechados
+// (hasOnly) e cada um tem tipo e tamanho máximo.
 service cloud.firestore {
   match /databases/{database}/documents {
     function entrou() {
@@ -79,6 +84,32 @@ service cloud.firestore {
         && (!('anterior' in d) || (d.anterior is string && d.anterior.size() <= 64))
         && (!('quando' in d) || (d.quando is string && d.quando.size() <= 40));
     }
+    // o diagnóstico de um aparelho (D7): só metadados, com os nomes fechados
+    // e o tamanho limitado; o id do documento é o do aparelho
+    function diagnosticoValido(aparelhoId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['aparelhoId', 'aparelho', 'papel', 'app', 'quando', 'pendentes', 'quarentena',
+          'ultimoEnvio', 'ultimoRecebimento', 'ultimaCopia', 'sincronizacao', 'navegador', 'instalado', 'persistente',
+          'erroCodigo', 'erroFrase', 'erroQuando', 'erroOrigem'])
+        && d.aparelhoId == aparelhoId && d.aparelhoId.size() <= 64
+        && d.quando is string && d.quando.size() <= 40
+        && (!('aparelho' in d) || (d.aparelho is string && d.aparelho.size() <= 64))
+        && (!('papel' in d) || (d.papel is string && d.papel.size() <= 16))
+        && (!('app' in d) || (d.app is string && d.app.size() <= 32))
+        && (!('pendentes' in d) || d.pendentes is int)
+        && (!('quarentena' in d) || d.quarentena is int)
+        && (!('ultimoEnvio' in d) || (d.ultimoEnvio is string && d.ultimoEnvio.size() <= 40))
+        && (!('ultimoRecebimento' in d) || (d.ultimoRecebimento is string && d.ultimoRecebimento.size() <= 40))
+        && (!('ultimaCopia' in d) || (d.ultimaCopia is string && d.ultimaCopia.size() <= 40))
+        && (!('sincronizacao' in d) || (d.sincronizacao is string && d.sincronizacao.size() <= 16))
+        && (!('navegador' in d) || (d.navegador is string && d.navegador.size() <= 64))
+        && (!('instalado' in d) || d.instalado is bool)
+        && (!('persistente' in d) || d.persistente is bool)
+        && (!('erroCodigo' in d) || (d.erroCodigo is string && d.erroCodigo.size() <= 40))
+        && (!('erroFrase' in d) || (d.erroFrase is string && d.erroFrase.size() <= 200))
+        && (!('erroQuando' in d) || (d.erroQuando is string && d.erroQuando.size() <= 40))
+        && (!('erroOrigem' in d) || (d.erroOrigem is string && d.erroOrigem.size() <= 16));
+    }
 
     match /usuarios/{uid} {
       // a cópia completa (fase 0)
@@ -109,6 +140,13 @@ service cloud.firestore {
         allow delete: if dona(uid);
       }
       // fim registros (N1)
+      // o diagnóstico por aparelho (D7): a dona escreve só o do próprio
+      // aparelho (o id do documento), e quem lê a cópia lê os resumos
+      match /diagnostico/{aparelho} {
+        allow read: if podeLer(uid);
+        allow create, update: if dona(uid) && diagnosticoValido(aparelho);
+        allow delete: if dona(uid);
+      }
     }
     match /{outro=**} {
       allow read, write: if false;
