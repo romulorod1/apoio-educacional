@@ -37,7 +37,10 @@ while :; do
   rodada=$((rodada + 1))
   diferentes=""
   for f in $arquivos; do
-    if curl -fsS -m 30 -H 'Cache-Control: no-cache' \
+    # -L: o Cloudflare Pages responde 308 para /index.html, mandando para /
+    # (B4, medido no preview). Sem seguir, o corpo lido era o do 308 e o
+    # index.html nunca batia; o GitHub Pages responde 200 direto.
+    if curl -fsSL -m 30 -H 'Cache-Control: no-cache' \
          -o "$tmp/$f" "$site/$f?conferencia=$(date +%s)$rodada" 2>"$tmp/erro"; then
       [ "$(hash_de "$tmp/$f")" = "$(hash_de "$f")" ] || diferentes="$diferentes $f"
     else

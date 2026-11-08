@@ -170,6 +170,8 @@ try {
   const pasta = (ler('app.js').match(/var PDFJS_PASTA = '([^']+)'/) || [])[1];
   conf('o leitor de PDF (' + pasta + ') esta no site',
     !!pasta && tem(pasta + 'pdf.min.mjs') && tem(pasta + 'pdf.worker.min.mjs') && tem(pasta + 'wasm/jbig2.wasm'));
+  conf('o site tem 404.html (sem ele o Cloudflare responde 200 com o index para caminho que nao existe)',
+    tem('404.html') && /não encontrado/.test(fs.readFileSync(path.join(destino, '404.html'), 'utf8')));
   const todos = [];
   (function anda(d, rel) {
     fs.readdirSync(d, { withFileTypes: true }).forEach(e => {

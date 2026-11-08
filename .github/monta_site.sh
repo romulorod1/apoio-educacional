@@ -27,4 +27,10 @@ git ls-files -z | tr '\0' '\n' | while IFS= read -r f; do
   mkdir -p "$destino/$(dirname "$f")"
   cp "$f" "$destino/$f"
 done
+# Sem um 404.html na raiz, o Cloudflare Pages trata o site como aplicacao de
+# pagina unica e responde 200 com o index.html para QUALQUER caminho que nao
+# existe (medido no preview do B4: _teste/confere_tudo.sh voltava 200). Ai um
+# arquivo esquecido no ARQUIVOS entraria no cache do worker como index.html,
+# calado, e a conferencia-no-ar leria 200. Com ele, caminho que nao existe e 404.
+printf '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Apoio Educacional</title><p>Endereço não encontrado. <a href="./">Abrir o aplicativo</a></p></html>\n' > "$destino/404.html"
 printf 'site montado em %s: %s arquivos\n' "$destino" "$(find "$destino" -type f | wc -l | tr -d ' ')"
