@@ -368,9 +368,15 @@ done
 # aviso nao troca a versao (o navegador ativa o worker em espera sozinho, e a
 # escolha gravada segura), a instalacao que falha pela metade nao vira aviso, a
 # janela com gravacao pendente fica na versao dela, e a abertura com a rede
-# segurando 40 s nao espera a rede. O --migracao fica fora porque le a
-# origin/main do git, que o checkout raso do CI nao tem.
+# segurando 40 s nao espera a rede. O --migracao e o --corte-sobre-a-main partem
+# de um commit fixo de antes do D2 (a main com o B8b), lido do git: o CI tem o
+# historico inteiro (fetch-depth 0). O corte cai no meio do install com o mesmo
+# nome de cache da main, e o app tem de abrir sem rede; o veneno devolve a guarda
+# antiga, que apagava o cache ativo, e a trava tem de ve-lo.
 roda "atualizacao apos fechar"                  node "_teste/testa_atualizacao_apos_fechar.js"
+roda "atualizacao --migracao"                   node "_teste/testa_atualizacao_apos_fechar.js" --migracao
+roda "atualizacao --corte-sobre-a-main"         node "_teste/testa_atualizacao_apos_fechar.js" --corte-sobre-a-main
+roda "atualizacao corte --envenenado-apaga-ativo" node "_teste/testa_atualizacao_apos_fechar.js" --corte-sobre-a-main --envenenado-apaga-ativo
 roda "atualizacao --falha-instalacao"           node "_teste/testa_atualizacao_apos_fechar.js" --falha-instalacao
 roda "atualizacao --duas-janelas"               node "_teste/testa_atualizacao_apos_fechar.js" --duas-janelas
 roda "atualizacao --rede-lenta"                 node "_teste/testa_atualizacao_apos_fechar.js" --rede-lenta

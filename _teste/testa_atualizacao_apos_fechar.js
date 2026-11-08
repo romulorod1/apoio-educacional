@@ -13,11 +13,28 @@ let redeLenta = false;
 const ponte = process.argv.includes('--ponte');
 const falhaInstalacao = process.argv.includes('--falha-instalacao');
 const migracaoPonte = process.argv.includes('--migracao-ponte');
-const migracao = process.argv.includes('--migracao') || migracaoPonte;
+/* --corte-sobre-a-main: o tablet está na main de antes do D2 e a instalação
+ * do D2 cai no meio do app.js, com o MESMO nome de cache do worker antigo (o
+ * pior caso: o install escreve dentro do cache de onde ela abre). O app tem de
+ * continuar abrindo sem rede. Com --envenenado-apaga-ativo o install volta à
+ * guarda antiga, que só poupava o cache "escolhido" e apagava o ativo da main:
+ * aí esta prova TEM de reprovar. */
+const corteSobreMain = process.argv.includes('--corte-sobre-a-main');
+const apagaAtivo = process.argv.includes('--envenenado-apaga-ativo');
+const migracao = process.argv.includes('--migracao') || migracaoPonte || corteSobreMain;
 const ponteDir = migracaoPonte && process.env.D2_PONTE_DIR;
-const swAnterior = migracao ? execFileSync('git', ['show', 'origin/main:sw.js'], { cwd: raiz, encoding: 'utf8' }) : null;
+/* A versão de antes do D2 sai de um commit FIXO, e não da origin/main: depois
+ * do merge a main já é o D2, e a prova passaria a migrar do D2 para o D2 sem
+ * avisar ninguém. É a main com o B8b (1.41.8, v75), a última antes do D2. */
+const ANTES_DO_D2 = '29839c6deab5e6d8af34380ba9a8243bc31ca5f4';
+const daAntiga = arq => execFileSync('git', ['show', ANTES_DO_D2 + ':' + arq], { cwd: raiz, encoding: 'utf8' });
+const swAnterior = migracao ? daAntiga('sw.js') : null;
+const appAnterior = migracao ? daAntiga('app.js') : null;
+const CACHE_DA_MAIN = swAnterior ? swAnterior.match(/var CACHE = '([^']+)'/)[1] : null;
+let semRede = false;
 const tipos = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
 const servidor = http.createServer((req, res) => {
+  if (semRede) { req.socket.destroy(); return; }
   const nome = decodeURIComponent(new URL(req.url, 'http://localhost').pathname).replace(/^\/+/, '') || 'index.html';
   if (nome === 'banco/serie-teste.json') {
     const responder = () => { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end('{"serie":"teste"}'); };
@@ -47,6 +64,7 @@ const servidor = http.createServer((req, res) => {
   }
   let corpo = ponteDir && publicada === 1 && (nome === 'app.js' || nome === 'sw.js')
     ? fs.readFileSync(path.join(ponteDir, nome)) : fs.readFileSync(arquivo);
+  if (migracao && !ponteDir && publicada === 1 && nome === 'app.js') corpo = Buffer.from(appAnterior);
   if (nome === 'sw.js') {
     let codigo = migracao && publicada === 1 && !ponteDir ? swAnterior : corpo.toString();
     if (migracaoPonte && publicada === 1 && !ponteDir) codigo = codigo.replace('  var url = new URL(e.request.url);', `
@@ -57,13 +75,28 @@ const servidor = http.createServer((req, res) => {
         return;
       }
       var url = new URL(e.request.url);`);
-    corpo = Buffer.from(codigo.replace(/var CACHE = '[^']+'/,
-      "var CACHE = '" + (migracao ? 'apoio-educacional-v900' : 'apoio-educacional-d2-prova-') + publicada + "'"));
+    if (corteSobreMain && apagaAtivo && publicada === 2) {
+      const guardaNova = '(jaExistia ? Promise.resolve() : caches.delete(CACHE))';
+      if (codigo.indexOf(guardaNova) < 0) throw new Error('veneno não achou a guarda do install');
+      codigo = codigo.split(guardaNova).join(
+        "lerControle('selecionado').then(function (selecionado) { return selecionado === CACHE ? null : caches.delete(CACHE); })");
+    }
+    corpo = Buffer.from(corteSobreMain
+      ? codigo.replace(/var CACHE = '[^']+'/, "var CACHE = '" + CACHE_DA_MAIN + "'")
+      : codigo.replace(/var CACHE = '[^']+'/,
+        "var CACHE = '" + (migracao ? 'apoio-educacional-v900' : 'apoio-educacional-d2-prova-') + publicada + "'"));
   }
   if (nome === 'app.js') corpo = Buffer.from(corpo.toString().replace(/var VERSAO = '[^']+'/,
     "var VERSAO = '9.0." + publicada + "'"));
   function responder() {
-    res.writeHead(200, { 'Content-Type': tipos[path.extname(arquivo)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
+    res.writeHead(200, { 'Content-Type': tipos[path.extname(arquivo)] || 'application/octet-stream', 'Cache-Control': 'no-store',
+      'Content-Length': corpo.length });
+    if (corteSobreMain && publicada === 2 && nome === 'app.js') {
+      // metade do corpo e a conexão cai: a rede some no meio do download
+      res.write(corpo.subarray(0, Math.floor(corpo.length / 2)));
+      setTimeout(() => req.socket.destroy(), 150);
+      return;
+    }
     res.end(corpo);
   }
   if (!redeLenta || nome === 'sw.js') responder();
@@ -136,6 +169,35 @@ const servidor = http.createServer((req, res) => {
     });
     publicada = 2;
     await pagina.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
+    if (corteSobreMain) {
+      await pagina.waitForFunction(async () => !(await navigator.serviceWorker.getRegistration()).installing, { timeout: 30000 });
+      const depoisDoCorte = await pagina.evaluate(async nome => ({
+        esperando: !!(await navigator.serviceWorker.getRegistration()).waiting,
+        ativo: await caches.has(nome),
+        app: !!(await (await caches.open(nome)).match('./app.js'))
+      }), CACHE_DA_MAIN);
+      console.log('   depois do corte: ' + JSON.stringify(depoisDoCorte));
+      if (depoisDoCorte.esperando) throw new Error('Instalação cortada ficou esperando');
+      const apagou = !depoisDoCorte.ativo || !depoisDoCorte.app;
+      /* No portão, o veneno passa quando a trava o vê: a cópia que apaga o
+       * cache ativo reprova a conferência abaixo, e esse é o resultado certo. */
+      if (apagaAtivo) {
+        if (!apagou) throw new Error('O veneno não foi visto: a guarda antiga deixou o cache ativo de pé');
+        console.log('   a conferência reprovou a cópia envenenada: o corte apagou o cache ativo da main (' + CACHE_DA_MAIN + ')');
+        console.log('1 de 1 verificações passaram, 0 falharam. Veneno visto.');
+        return;
+      }
+      if (apagou) throw new Error('O corte apagou o cache ativo da main (' + CACHE_DA_MAIN + ')');
+      semRede = true;
+      await pagina.close();
+      pagina = await navegador.newPage();
+      await pagina.goto(url, { waitUntil: 'domcontentloaded' }).catch(() => {});
+      const aberta = await pagina.waitForFunction(() => document.querySelector('#versao-app')?.textContent.includes('9.0.1'),
+        { timeout: 10000 }).then(() => true, () => false);
+      if (!aberta) throw new Error('Sem rede, o aplicativo não abriu depois do corte');
+      console.log('1 de 1 verificações passaram, 0 falharam. Corte no meio do install sobre a main: abre sem rede na versão de antes.');
+      return;
+    }
     if (falhaInstalacao) {
       await pagina.waitForFunction(async () => !(await navigator.serviceWorker.getRegistration()).installing, { timeout: 30000 });
       const estado = await pagina.evaluate(async () => ({

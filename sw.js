@@ -102,8 +102,12 @@
  * Nota só minha, Habilidades e hábitos, Novo ano letivo e aula (app.js,
  * core.js, pdf.js e index.html), com a lista igual. O v55 (C10b) deixa um
  * botão por aluno no Fechamento, os outros formatos dentro da janela e o envio
- * às famílias em sequência (app.js e index.html), com a lista igual. */
-var CACHE = 'apoio-educacional-v75';
+ * às famílias em sequência (app.js e index.html), com a lista igual. O v77 (D2)
+ * traz o cache primeiro e a versão que só roda depois do toque (sw.js, app.js e
+ * index.html), com a lista igual; pula o v76, que é o nome do B12 no PR dele.
+ * Aqui o nome novo é obrigatório pelo motivo original: com o v75 repetido, o
+ * tablet na main instalaria a D2 dentro do cache de onde está abrindo. */
+var CACHE = 'apoio-educacional-v77';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -284,11 +288,21 @@ function redeComPrazo(pedido) {
  * dela promovia o cache incompleto por cima do completo (medido: FigSolidos
  * indefinido sem sinal, e a figura do sólido saindo muda na folha). Falhando
  * aqui ela continua com a versão anterior inteira, e o navegador tenta de novo
- * na abertura seguinte. O cache pela metade é apagado, a não ser que seja o
- * escolhido (só acontece se alguém reinstalar a mesma versão). O 'candidato' só
- * é gravado com tudo baixado: é ele que faz o aviso aparecer. */
+ * na abertura seguinte. O 'candidato' só é gravado com tudo baixado: é ele que
+ * faz o aviso aparecer.
+ *
+ * O cache pela metade é apagado SÓ se nasceu nesta instalação. Um cache que já
+ * existia antes dela é o de onde uma versão está abrindo: o nome repetido faz o
+ * install escrever dentro dele (veja o topo), e o worker de antes do D2 não
+ * grava escolha nenhuma. Apagar pela escolha gravada deixava o tablet na main,
+ * com o corte no meio do download, sem cache nenhum para abrir sem rede (achado
+ * da revisão do D2, provado com veneno no testa_atualizacao_apos_fechar). */
 self.addEventListener('install', function (e) {
-  e.waitUntil(caches.open(CACHE).then(function (c) {
+  var jaExistia = false;
+  e.waitUntil(caches.has(CACHE).then(function (existe) {
+    jaExistia = existe;
+    return caches.open(CACHE);
+  }).then(function (c) {
     return Promise.all(ARQUIVOS.map(function (u) {
       return redeComPrazo(new Request(u, { cache: 'reload' })).then(function (r) {
         if (!r || !r.ok) throw new Error('não baixou ' + u);
@@ -298,9 +312,7 @@ self.addEventListener('install', function (e) {
   }).then(function () {
     return versaoDoCache(CACHE).then(function (versao) { return gravarControle('candidato', { cache: CACHE, versao: versao }); });
   }).catch(function (erro) {
-    return lerControle('selecionado').then(function (selecionado) {
-      return selecionado === CACHE ? null : caches.delete(CACHE);
-    }).then(function () { throw erro; });
+    return (jaExistia ? Promise.resolve() : caches.delete(CACHE)).then(function () { throw erro; });
   }));
 });
 
