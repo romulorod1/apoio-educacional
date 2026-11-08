@@ -1,7 +1,15 @@
 /* testa_celular_leitura.js
  *
- * D6, parte 1: o modo celular só leitura, no navegador e contra o Firebase
- * Emulator Suite (Auth e Firestore), do mesmo jeito que o testa_nuvem.js.
+ * D6, parte 1: o modo celular, no navegador e contra o Firebase Emulator
+ * Suite (Auth e Firestore), do mesmo jeito que o testa_nuvem.js.
+ *
+ * Desde a parte 2 (D6b), o celular DA DONA edita em quatro ações (marcar e
+ * cancelar aula, "Registrar como foi", cadastrar aluno e o "pago em"), que
+ * sobem pela fila de registros; essas ações e a chegada delas ao tablet são
+ * provadas no testa_celular_edita.js. Aqui o celular não toca em nenhuma
+ * delas, e a prova afirma que ele não grava nada FORA delas: nenhuma
+ * gravação sua ao abrir, ao navegar, ao enviar o PDF, ao fechar e ao voltar,
+ * e nenhum botão de edição que não seja de uma das quatro.
  *
  * O tablet (1280 px) cria dados fictícios e sobe a cópia. O celular (390 por
  * 844) abre, entra com e-mail e senha e traz a cópia (só o login, sem código)
@@ -97,21 +105,25 @@ function prop(rotulo, ok, veneno) {
 
 /* ---------- âncoras ---------- */
 secao('0. As âncoras e o ambiente');
-const PODE_ENVIAR = 'function podeEnviar() { return !marcaSoLeitura && !travadoNestaAbertura; }';
+const PODE_ENVIAR = 'function podeEnviarCopia() { return !marcaCelular && !travadoNestaAbertura; }';
 const GUARDA_AUTO_RE = /    if \(aparelhoSoLe\(\)\) return;\r?\n/;
-const AUTO_RESTAURA = 'automatica = !soLe;';
+const AUTO_RESTAURA = 'automatica = !ehCelular;';
 const GUARDA_TELA_RE = /    if \(telaDeCelular\(\)\) return;\r?\n/;
 const ENVIO_DELA = 'if (!temNuvem() || enviandoParaNuvem || aparelhoSoLe()) return Promise.resolve();';
+/* D6b: o fechar do celular da dona sobe só os registros e sai; o veneno de
+ * envio tira também esta saída, senão a cópia nem seria tentada. */
+const FECHAR_CELULAR = 'if (celularEdita()) { Nuvem.enviarRegistrosSeDevido({ versaoApp: VERSAO }); return; }';
 const CARTAO = "    cartao.appendChild(el('div', { class: 'ajuda u-margem-0', texto: Core.fmtDuracao(Number(a.duracaoMin) || 0) +";
-const TRAVA_BANCO = "if (modo === 'readwrite' && soLeitura && !restauracaoDaNuvem) throw erroSoLeitura();";
-const SALVAR_GUARDA = '    if (aparelhoSoLe()) {';
+const TRAVA_BANCO = "if (modo === 'readwrite' && soLeitura && porta !== true && !(celularEdita && PORTAS_DO_CELULAR[porta])) throw erroSoLeitura();";
+const SALVAR_GUARDA = '    if (aparelhoSoLe() && !(gravacaoDoCelular > 0 && celularEdita())) {';
 const SEM_CARGA = '} else if (modoCelular) {';
 conf('a trava de envio do nuvem.js está num lugar só', NUVEM.split(PODE_ENVIAR).length, 2);
-conf('o commit e a automática do nuvem.js passam pela trava', /function commit\(escritas\) \{\r?\n    if \(!podeEnviar\(\)\)/.test(NUVEM) &&
-  NUVEM.indexOf('return !!(podeEnviar() && sessao') > 0, true);
+conf('o commit e a automática do nuvem.js passam pela trava da cópia', /function commit\(escritas\) \{\r?\n    if \(!podeEnviarCopia\(\) && /.test(NUVEM) &&
+  NUVEM.indexOf('return !!(podeEnviarCopia() && sessao') > 0, true);
 conf('a automática do app.js recusa no aparelho que só lê, num lugar só', (APP.match(new RegExp(GUARDA_AUTO_RE.source, 'g')) || []).length, 1);
 conf('a automática do app.js recusa em tela de celular, num lugar só', (APP.match(new RegExp(GUARDA_TELA_RE.source, 'g')) || []).length, 1);
 conf('o envio do app.js recusa no aparelho que só lê, num lugar só', APP.split(ENVIO_DELA).length, 2);
+conf('o fechar do celular da dona sobe só os registros e sai, num lugar só', APP.split(FECHAR_CELULAR).length, 2);
 conf('a restauração pelo celular deixa a automática desligada num lugar só', NUVEM.split(AUTO_RESTAURA).length, 2);
 conf('o cartão da aula de Hoje existe para o veneno de edição', APP.split(CARTAO).length, 2);
 conf('a trava do banco está num lugar só', STORE.split(TRAVA_BANCO).length, 2);
@@ -123,19 +135,29 @@ conf('o celular sem dados não grava a carga inicial (âncora)', APP.split(SEM_C
 
 const trocas = {};
 if (ENVIA) {
-  trocas['/nuvem.js'] = NUVEM.replace(PODE_ENVIAR, 'function podeEnviar() { return true; }').replace(AUTO_RESTAURA, 'automatica = true;');
-  trocas['/app.js'] = APP.replace(GUARDA_AUTO_RE, '\n').replace(GUARDA_TELA_RE, '\n').replace(ENVIO_DELA, 'if (!temNuvem() || enviandoParaNuvem) return Promise.resolve();');
+  trocas['/nuvem.js'] = NUVEM.replace(PODE_ENVIAR, 'function podeEnviarCopia() { return true; }').replace(AUTO_RESTAURA, 'automatica = true;');
+  trocas['/app.js'] = APP.replace(GUARDA_AUTO_RE, '\n').replace(GUARDA_TELA_RE, '\n').replace(ENVIO_DELA, 'if (!temNuvem() || enviandoParaNuvem) return Promise.resolve();')
+    .replace(FECHAR_CELULAR, 'if (celularEdita()) { Nuvem.enviarRegistrosSeDevido({ versaoApp: VERSAO }); }');
 }
-const ESCOLHA = '    var deve = temMarcaSoLeitura() || telaDeCelular();';
+const ESCOLHA = '    var deve = temMarcaCelular() || telaDeCelular();';
 conf('a escolha do modo celular (marca ou tela do aparelho) está num lugar só', APP.split(ESCOLHA).length, 2);
 // a tela do aparelho fora da escolha (volta a janela) e da guarda da automática
-if (TELA) trocas['/app.js'] = APP.replace(GUARDA_TELA_RE, '\n').replace(ESCOLHA, '    var deve = temMarcaSoLeitura() || (window.innerWidth || 0) < 640;');
-if (JANELA_640) trocas['/app.js'] = APP.replace(ESCOLHA, '    var deve = temMarcaSoLeitura() || (window.innerWidth || 0) < 640;');
+if (TELA) trocas['/app.js'] = APP.replace(GUARDA_TELA_RE, '\n').replace(ESCOLHA, '    var deve = temMarcaCelular() || (window.innerWidth || 0) < 640;');
+if (JANELA_640) trocas['/app.js'] = APP.replace(ESCOLHA, '    var deve = temMarcaCelular() || (window.innerWidth || 0) < 640;');
 /* A migração do corte dos pagamentos, que roda ao desenhar o Fechamento,
  * volta a chamar o salvar() no celular. */
-const CORTE = '    if (!aparelhoSoLe()) salvar();';
-conf('a migração do corte dos pagamentos não grava no celular, num lugar só', APP.split(CORTE).length, 2);
-if (GRAVA_ABERTURA) trocas['/app.js'] = APP.replace(CORTE, '    salvar();');
+/* Desde o D6b a guarda tem duas linhas: o "else" guarda o corte que o celular
+ * pôs só na memória. O veneno troca as DUAS por um salvar() solto; trocar só a
+ * primeira deixava um "else" órfão, o app.js não abria e o veneno reprovava
+ * pelo motivo errado (sem chegar a mostrar a gravação ao abrir). */
+const CORTE_RE = /    if \(!aparelhoSoLe\(\)\) salvar\(\);\r?\n    else corteSoNaMemoria = db\.ajustes\.pagamentosDesde;/;
+conf('a migração do corte dos pagamentos não grava no celular, num lugar só', (APP.match(new RegExp(CORTE_RE.source, 'g')) || []).length, 1);
+if (GRAVA_ABERTURA) {
+  trocas['/app.js'] = APP.replace(CORTE_RE, '    salvar();');
+  let sintaxe = 'ok';
+  try { new Function(trocas['/app.js']); } catch (e) { sintaxe = e.message; }
+  conf('o app.js envenenado continua sendo JavaScript válido (o veneno quebra a regra, não o arquivo)', sintaxe, 'ok');
+}
 const LIMITE = 'var TELA_CELULAR = 500;';
 conf('o limite da tela de celular está num lugar só', APP.split(LIMITE).length, 2);
 if (LIMITE_640) trocas['/app.js'] = APP.replace(LIMITE, 'var TELA_CELULAR = 640;');
@@ -335,23 +357,28 @@ async function fecharEVoltar(pag) {
   await pausa(2500);
 }
 
-/* O que está à vista na página, medido: rolagem de lado, alvos e edição. */
-const RE_EDICAO = 'registrar|editar|salvar|excluir|apagar|nova aula|novo aluno|^\\s*\\+|desmarcar|marcar|cancelar a aula|pago em|anotar';
+/* O que está à vista na página, medido: rolagem de lado, alvos de 48 px e
+ * edição. Os botões das quatro ações do celular da dona vêm marcados
+ * (data-acao-celular) e contam à parte: o que não pode existir é botão de
+ * edição FORA delas. O campo de escolher o dia é consulta (data-consulta). */
+const RE_EDICAO = 'registrar|corrigir|editar|salvar|excluir|apagar|nova aula|novo aluno|^\\s*\\+|desmarcar|marcar|cancelar a aula|cancelar aula|cadastrar|pago|anotar|alterar|confirmar';
 const medirTela = (pag) => pag.evaluate((reEdicao) => {
   const re = new RegExp(reEdicao, 'i');
   const visivel = e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden'; };
   const abertas = Array.from(document.querySelectorAll('.fundo-modal.aberto'));
   const raiz = document.querySelector('#modo-celular');
   const alvos = Array.from(raiz.querySelectorAll('button, a[href], input, select, textarea, [role=button], summary')).filter(visivel);
-  const pequenos = alvos.filter(e => { const r = e.getBoundingClientRect(); return r.height < 44 || r.width < 44; })
+  const pequenos = alvos.filter(e => { const r = e.getBoundingClientRect(); return r.height < 48 || r.width < 48; })
     .map(e => (e.id || e.textContent.trim().slice(0, 30)) + ' ' + Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height));
   /* Edição: no celular, campo de escrever (fora da entrada da conta) ou botão
    * com verbo de edição; no documento inteiro, os botões de edição do tablet
    * à vista. */
   const campos = Array.from(raiz.querySelectorAll('input, select, textarea, [contenteditable=true]')).filter(visivel)
-    .filter(e => !e.closest('#cel-entrada')).map(e => e.id || e.tagName);
-  const botoesEdicao = Array.from(document.querySelectorAll('button')).filter(visivel)
-    .filter(b => !b.closest('.fundo-modal')).filter(b => re.test(b.textContent)).map(b => b.textContent.trim());
+    .filter(e => !e.closest('#cel-entrada') && !e.hasAttribute('data-consulta')).map(e => e.id || e.tagName);
+  const deEdicao = Array.from(document.querySelectorAll('button')).filter(visivel)
+    .filter(b => !b.closest('.fundo-modal')).filter(b => re.test(b.textContent));
+  const botoesEdicao = deEdicao.filter(b => !b.closest('[data-acao-celular]')).map(b => b.textContent.trim());
+  const dasAcoes = deEdicao.filter(b => b.closest('[data-acao-celular]')).map(b => b.textContent.trim());
   const doTablet = ['#nova-aula', '#novo-aluno', '#proposta-nova', '#grade-mes', '#abas', '#nuvem-enviar']
     .filter(s => { const e = document.querySelector(s); return e && visivel(e); });
   const conteudo = document.querySelector('#cel-conteudo');
@@ -359,7 +386,7 @@ const medirTela = (pag) => pag.evaluate((reEdicao) => {
     largura: window.innerWidth,
     rolaDeLado: document.documentElement.scrollWidth > window.innerWidth || document.body.scrollWidth > window.innerWidth ||
       (conteudo && conteudo.scrollWidth > conteudo.clientWidth),
-    alvos: alvos.length, pequenos, campos, botoesEdicao, doTablet, abertas: abertas.map(m => m.id),
+    alvos: alvos.length, pequenos, campos, botoesEdicao, dasAcoes, doTablet, abertas: abertas.map(m => m.id),
     celular: document.body.classList.contains('modo-celular')
   };
 }, RE_EDICAO);
@@ -451,15 +478,15 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     !document.querySelector('#modal-nuvem-restaurar.aberto') && document.querySelector('#cel-hoje.ativa') &&
     /Aluno Alfa Teste/.test(document.querySelector('#cel-hoje').textContent)), v => v === true, 30000);
   conf('a cópia restaurada aparece em Hoje', veio.ok, true);
-  conf('a pergunta de restaurar diz que o celular passa a só ler', pagB.dialogos.some(d => /passa a só ler/.test(d)), true);
+  conf('a pergunta de restaurar diz que a cópia completa continua saindo só do tablet', pagB.dialogos.some(d => /A cópia completa continua saindo só do tablet/.test(d)), true);
   let escritas = await escritasNoBanco(pagB);
   conf('a única escrita no banco foi a restauração (uma transação, com os dados)', escritas.length === 1 && /dados/.test(escritas[0]), true);
-  conf('a marca "só leitura" foi gravada, de que conta, e a automática ficou desligada', await pagB.evaluate(u => {
-    const e = Nuvem.estado(); return e.soLeitura && e.uidDona === u && e.automatica === false;
+  conf('a marca "este aparelho é celular" foi gravada, de que conta (a da dona: ele edita pelos registros), e a automática ficou desligada', await pagB.evaluate(u => {
+    const e = Nuvem.estado(); return e.celular && e.celularDaDona && !e.observador && e.uidDona === u && e.automatica === false;
   }, dona.localId), ENVIA ? false : true);
   conf('no alto: "Dados de hoje, HH:MM, do tablet."', /^Dados de hoje, \d\d:\d\d, do tablet\.$/.test(await texto(pagB, '#cel-origem')), true);
-  conf('no alto, antes: "Este celular só consulta. Para mudar algo, use o tablet."', await texto(pagB, '#cel-regra'),
-    'Este celular só consulta. Para mudar algo, use o tablet.');
+  conf('no alto, antes, o que este celular edita (e que o resto é do tablet)', await texto(pagB, '#cel-regra'),
+    'Aqui: marcar e cancelar aula, registrar como foi, aluno novo e pago. O resto, no tablet.');
   conf('o texto secundário do celular usa o cinza escuro da escala (#4B5563, mais de 7:1), e não o --muted', await pagB.evaluate(() =>
     [getComputedStyle(document.querySelector('#cel-hoje .ajuda')).color, getComputedStyle(document.querySelector('#cel-origem')).color].join(' ')),
     'rgb(75, 85, 99) rgb(75, 85, 99)');
@@ -477,7 +504,7 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     (semCorteNoDisco ? 'não veio' : 'veio, em ' + (await recebimentosNoBanco(pagB)) + ' recebimento(s)') + ')', (await escritasNoBanco(pagB)).length, 0);
   await zerarEscritas(pagB);
 
-  secao('4. As três telas: sem rolagem de lado, alvos de 44 px e nenhum botão de edição');
+  secao('4. As três telas: sem rolagem de lado, alvos de 48 px e nenhum botão de edição fora das quatro ações');
   const hojeTexto = await texto(pagB, '#cel-hoje');
   conf('Hoje: a aula do dia, com o horário', /10:30 Aluno Alfa Teste/.test(hojeTexto), true);
   conf('Hoje: o lembrete do mapeamento', /Lembrete: Prioridades: Frações antes da prova/.test(hojeTexto), true);
@@ -495,17 +522,22 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
       document.querySelector('#cel-' + t).textContent.trim().length > 0, t);
     conf('a tela "' + t + '" existe e abre pela aba de baixo', ativa, true);
     conf('"' + t + '": sem rolagem de lado em ' + telas[t].largura + ' px', telas[t].rolaDeLado, false);
-    conf('"' + t + '": todo alvo de toque tem 44 px ou mais (' + telas[t].alvos + ' alvos)', telas[t].pequenos.join('; '), '');
-    prop('"' + t + '": nenhum botão de edição nem campo de escrever (' + (telas[t].botoesEdicao.concat(telas[t].campos).join(', ') || 'nenhum') + ')',
+    conf('"' + t + '": todo alvo de toque tem 48 px ou mais (' + telas[t].alvos + ' alvos)', telas[t].pequenos.join('; '), '');
+    prop('"' + t + '": nenhum botão de edição nem campo de escrever fora das quatro ações (' + (telas[t].botoesEdicao.concat(telas[t].campos).join(', ') || 'nenhum') +
+      '; das ações: ' + (telas[t].dasAcoes.join(', ') || 'nenhum') + ')',
       telas[t].botoesEdicao.length === 0 && telas[t].campos.length === 0, t === 'hoje' ? '--envenenado-edicao' : 'nenhum');
     conf('"' + t + '": nada do tablet à vista', telas[t].doTablet.join(','), '');
     conf('"' + t + '": em pé, "Este aparelho passa a editar" não aparece', await existe(pagB, '#nuvem-passa-a-editar'), false);
   }
   if (EDICAO) { await ctxB.close(); return; }
+  // o instrumento vê os botões das ações: sem isto, "nenhum botão fora delas" passaria com a medida cega
+  conf('(controle) as ações do celular da dona estão à vista e a medida as separa: Hoje (' + telas.hoje.dasAcoes.join(', ') + '), Fechamento (' + telas.fechamento.dasAcoes.join(', ') + ')',
+    telas.hoje.dasAcoes.indexOf('Marcar aula neste dia') >= 0 && telas.hoje.dasAcoes.indexOf('Ver ou corrigir como foi') >= 0 &&
+    telas.fechamento.dasAcoes.indexOf('Marcar como pago') >= 0, true);
   conf('todos os botões das três telas e do alto foram medidos (' + Object.keys(telas).map(t => t + ': ' + telas[t].alvos).join(', ') + ')',
     Object.keys(telas).every(t => telas[t].alvos >= 5), true);
-  conf('as abas de baixo têm alvo de 44 px ou mais', await pagB.evaluate(() =>
-    Array.from(document.querySelectorAll('#cel-abas .cel-aba')).every(b => b.getBoundingClientRect().height >= 44)), true);
+  conf('as abas de baixo têm alvo de 48 px ou mais', await pagB.evaluate(() =>
+    Array.from(document.querySelectorAll('#cel-abas .cel-aba')).every(b => b.getBoundingClientRect().height >= 48)), true);
   conf('Fechamento: o aluno, as aulas e o valor do mês', await pagB.evaluate(() => {
     document.querySelector('#cel-abas .cel-aba[data-cel="fechamento"]').click();
     const t = document.querySelector('#cel-fechamento').textContent;
@@ -538,7 +570,7 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     (await esperar('o PDF da sequência saiu', () => pagB.evaluate(() => window.__baixou.length), v => v === enviadosAntes + 1, 10000)).ok, true);
   await esperar('o fim da sequência', () => existe(pagB, '#envio-fechar'), v => v === true, 5000);
   await pagB.evaluate(() => document.querySelector('#envio-fechar').click());
-  conf('usar as três telas e enviar não gravou nada no banco', (await escritasNoBanco(pagB)).length, 0);
+  conf('usar as três telas e enviar (fora das quatro ações) não gravou nada no banco', (await escritasNoBanco(pagB)).length, 0);
 
   secao('5. Nenhum envio à nuvem do celular: ao fechar, ao voltar, deitado');
   const antesB = pagB.escritasNaNuvem.length;
@@ -555,7 +587,7 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     await abrir(pagB);
     const deitado = await medirTela(pagB);
     conf('reaberto deitado, continua no modo celular', deitado.celular, true);
-    conf('deitado: nada do tablet à vista e nenhum botão de edição', deitado.doTablet.concat(deitado.botoesEdicao).join(','), '');
+    conf('deitado: nada do tablet à vista e nenhum botão de edição fora das quatro ações', deitado.doTablet.concat(deitado.botoesEdicao).join(','), '');
     conf('deitado (janela de 900 px, tela de celular): "Este aparelho passa a editar" não aparece', await existe(pagB, '#nuvem-passa-a-editar'), false);
     await pagB.evaluate(() => Nuvem.marcarMudanca());
     await fecharEVoltar(pagB);
@@ -637,7 +669,7 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
   const cRest = await esperar('C restaurou pela tela do tablet', () => pagC.evaluate(() =>
     Nuvem.estado().automatica && !document.querySelector('#modal-nuvem-restaurar.aberto')), v => v === true, 30000);
   conf('ponto de partida: restaurou como tablet, sem a marca, com a automática ligada', cRest.ok &&
-    !(await pagC.evaluate(() => Nuvem.estado().soLeitura)), true);
+    !(await pagC.evaluate(() => Nuvem.estado().celular)), true);
   await pagC.evaluate(async () => {
     const d = await Store.carregar();
     d.alunos.push({ id: 'gama', nome: 'Aluno Gama Teste', ativo: true, precos: [] });
@@ -683,7 +715,7 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     const r = await esperar(rotulo + ' restaurou pelo cartão de Ajustes', () => pag.evaluate(() =>
       Nuvem.estado().automatica && !document.querySelector('#modal-nuvem-restaurar.aberto')), v => v === true, 30000);
     conf(rotulo + ': restaurou pelo cartão, sem a marca, com a automática ligada', r.ok &&
-      !(await pag.evaluate(() => Nuvem.estado().soLeitura)), true);
+      !(await pag.evaluate(() => Nuvem.estado().celular)), true);
     await mudarAlgo(pag, idAluno);
     return { ctx, pag };
   }
@@ -728,7 +760,7 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     await fecharEVoltar(E.pag);
     conf('deitado, ao fechar, o tablet pequeno sobe a cópia', (await esperar('a automática do tablet deitado subiu',
       () => E.pag.escritasNaNuvem.length > antesE, v => v === true, 20000)).ok, true);
-    conf('o tablet pequeno não tem a marca', await E.pag.evaluate(() => Nuvem.estado().soLeitura), false);
+    conf('o tablet pequeno não tem a marca', await E.pag.evaluate(() => Nuvem.estado().celular), false);
     await E.ctx.close();
   }
 
@@ -737,15 +769,15 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     await pagB.setViewport({ width: 1280, height: 800, hasTouch: true, isMobile: false });
     await definirTela(pagB, { width: 1280, height: 800 });
     await abrir(pagB);
-    conf('com a marca e a tela larga, continua só leitura (modo celular)', (await medirTela(pagB)).celular, true);
-    conf('com a marca e a tela larga, "Este aparelho passa a editar" aparece', await existe(pagB, '#nuvem-passa-a-editar'), true);
+    conf('com a marca e a tela larga, continua no modo celular', (await medirTela(pagB)).celular, true);
+    conf('com a marca e a tela larga, "Este aparelho passa a ser o tablet" aparece', await texto(pagB, '#nuvem-passa-a-editar'), 'Este aparelho passa a ser o tablet');
     const antesSim = pagB.escritasNaNuvem.length;
     await pagB.evaluate(() => Nuvem.marcarMudanca());
     await fecharEVoltar(pagB);
     conf('antes do sim, nada sobe', pagB.escritasNaNuvem.length, antesSim);
     const dialogosAntes = pagB.dialogos.length;
     await clicar(pagB, '#nuvem-passa-a-editar');
-    const saiu = await esperar('a marca saiu', () => pagB.evaluate(() => !Nuvem.estado().soLeitura &&
+    const saiu = await esperar('a marca saiu', () => pagB.evaluate(() => !Nuvem.estado().celular &&
       !document.body.classList.contains('modo-celular')), v => v === true, 10000);
     conf('a confirmação diz para usar só no tablet e que a cópia vai por cima',
       pagB.dialogos.slice(dialogosAntes).some(d => /^Use só no tablet onde você dá aula\. A partir daqui, este aparelho envia a cópia para a nuvem, por cima da que está lá\.$/.test(d)), true);

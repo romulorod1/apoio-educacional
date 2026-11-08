@@ -119,8 +119,10 @@
  * (faixa de endereço) no PR dele. O v84 (N1, fatias 2 e 3) traz a fila de saída,
  * o envio e o recebimento por registro (IndexedDB 6; store.js, nuvem.js e
  * app.js), com a lista igual. O v85 (N1d) pula, no recebimento, documento do formato
- * antigo (com iv ou dados em bytes): nuvem.js e app.js, com a lista igual. */
-var CACHE = 'apoio-educacional-v85';
+ * antigo (com iv ou dados em bytes): nuvem.js e app.js, com a lista igual. O v86 (D6b) deixa o celular da dona editar em quatro
+ * ações, pela fila de registros (app.js, store.js, nuvem.js e styles.css), com a
+ * lista igual. */
+var CACHE = 'apoio-educacional-v86';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
