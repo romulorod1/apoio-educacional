@@ -32,6 +32,27 @@ const swAnterior = migracao ? daAntiga('sw.js') : null;
 const appAnterior = migracao ? daAntiga('app.js') : null;
 const CACHE_DA_MAIN = swAnterior ? swAnterior.match(/var CACHE = '([^']+)'/)[1] : null;
 let semRede = false;
+/* --lista-encolhe (D2b): a versão 2 tira o extra.js do pré-cache e o
+ * index.html dela deixa de carregá-lo. Ela fecha sem tocar no aviso, o worker
+ * 2 ativa servindo a versão 1, e a rede some: o extra.js tem de vir do cache da
+ * versão 1. Com --envenenado-lista-do-worker o worker 2 volta à regra antiga
+ * (só serve do cache o que está na lista DELE), e a prova TEM de reprovar. */
+const listaEncolhe = process.argv.includes('--lista-encolhe');
+const listaDoWorker = process.argv.includes('--envenenado-lista-do-worker');
+/* --troca-atomica (D2b): com a rede segurando 40 s e o processador lento, o
+ * "Atualizar agora" troca tudo de uma vez. Cada script servido se marca com a
+ * versão; depois da recarga, todos têm de ser da versão nova, nos dois
+ * caminhos: worker em espera e worker que já assumiu servindo a de antes. */
+const trocaAtomica = process.argv.includes('--troca-atomica');
+const temExtra = () => listaEncolhe && publicada === 1;
+/* --abre-no-meio-do-install (D2b): o app.js da versão 2 chega devagar, e ela
+ * abre o aplicativo no meio do download. A limpeza que roda depois de cada
+ * abertura não pode apagar o cache que o install está enchendo. Medido antes
+ * da marca 'instalando': a 9.0.2 ficava esperando com o cache sem o app.js, e
+ * o aviso saía sem número. */
+const abreNoMeio = process.argv.includes('--abre-no-meio-do-install');
+// veneno: a limpeza esquece o cache em obra, e a prova TEM de reprovar
+const semMarca = process.argv.includes('--envenenado-sem-marca');
 const tipos = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
 const servidor = http.createServer((req, res) => {
   if (semRede) { req.socket.destroy(); return; }
@@ -43,6 +64,12 @@ const servidor = http.createServer((req, res) => {
     return;
   }
   if (falhaInstalacao && publicada === 2 && nome === 'styles.css') { res.writeHead(503); res.end(); return; }
+  if (listaEncolhe && nome === 'extra.js') {
+    if (!temExtra()) { res.writeHead(404); res.end(); return; }
+    res.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-store' });
+    res.end('window.__EXTRA = 1;');
+    return;
+  }
   if (ponte && nome === '__ativar') { publicada = 2; res.writeHead(200); res.end('ok'); return; }
   if (ponte && nome === 'sw.js') {
     res.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-store' });
@@ -75,6 +102,20 @@ const servidor = http.createServer((req, res) => {
         return;
       }
       var url = new URL(e.request.url);`);
+    if (temExtra()) {
+      if (codigo.indexOf("  './app.js',") < 0) throw new Error('não achei o app.js na lista do sw.js');
+      codigo = codigo.replace("  './app.js',", "  './app.js',\n  './extra.js',");
+    }
+    if (abreNoMeio && semMarca) {
+      const marca = 'candidato && candidato.cache, emObra]';
+      if (codigo.indexOf(marca) < 0) throw new Error('veneno não achou a marca do cache em obra');
+      codigo = codigo.split(marca).join('candidato && candidato.cache]');
+    }
+    if (listaEncolhe && listaDoWorker && publicada === 2) {
+      const regraNova = 'var daVersao = navegacao || !baixadoDuranteOUso(url.pathname);';
+      if (codigo.indexOf(regraNova) < 0) throw new Error('veneno não achou a regra do fetch');
+      codigo = codigo.split(regraNova).join('var daVersao = navegacao || doPacote(e.request.url);');
+    }
     if (corteSobreMain && apagaAtivo && publicada === 2) {
       const guardaNova = '(jaExistia ? Promise.resolve() : caches.delete(CACHE))';
       if (codigo.indexOf(guardaNova) < 0) throw new Error('veneno não achou a guarda do install');
@@ -84,13 +125,25 @@ const servidor = http.createServer((req, res) => {
     corpo = Buffer.from(corteSobreMain
       ? codigo.replace(/var CACHE = '[^']+'/, "var CACHE = '" + CACHE_DA_MAIN + "'")
       : codigo.replace(/var CACHE = '[^']+'/,
-        "var CACHE = '" + (migracao ? 'apoio-educacional-v900' : 'apoio-educacional-d2-prova-') + publicada + "'"));
+        "var CACHE = '" + (migracao || abreNoMeio ? 'apoio-educacional-v900' : 'apoio-educacional-d2-prova-') + publicada + "'"));
   }
   if (nome === 'app.js') corpo = Buffer.from(corpo.toString().replace(/var VERSAO = '[^']+'/,
     "var VERSAO = '9.0." + publicada + "'"));
+  if (temExtra() && nome === 'index.html') {
+    const html = corpo.toString();
+    if (html.indexOf('<script src="app.js"') < 0) throw new Error('index.html sem o script do app.js');
+    corpo = Buffer.from(html.replace('<script src="app.js"', '<script src="extra.js"></script><script src="app.js"'));
+  }
+  if (trocaAtomica && /\.js$/.test(nome) && nome !== 'sw.js')
+    corpo = Buffer.concat([corpo, Buffer.from('\n;(window.__marcas = window.__marcas || []).push(' + JSON.stringify(nome + '@' + publicada) + ');\n')]);
   function responder() {
     res.writeHead(200, { 'Content-Type': tipos[path.extname(arquivo)] || 'application/octet-stream', 'Cache-Control': 'no-store',
       'Content-Length': corpo.length });
+    if (abreNoMeio && publicada === 2 && nome === 'app.js') {
+      res.write(corpo.subarray(0, Math.floor(corpo.length / 2)));
+      setTimeout(() => res.end(corpo.subarray(Math.floor(corpo.length / 2))), 6000);
+      return;
+    }
     if (corteSobreMain && publicada === 2 && nome === 'app.js') {
       // metade do corpo e a conexão cai: a rede some no meio do download
       res.write(corpo.subarray(0, Math.floor(corpo.length / 2)));
@@ -99,7 +152,7 @@ const servidor = http.createServer((req, res) => {
     }
     res.end(corpo);
   }
-  if (!redeLenta || nome === 'sw.js') responder();
+  if (!redeLenta || (nome === 'sw.js' && !trocaAtomica)) responder();
   else {
     const atraso = setTimeout(responder, 40000);
     req.on('close', () => clearTimeout(atraso));
@@ -169,6 +222,106 @@ const servidor = http.createServer((req, res) => {
     });
     publicada = 2;
     await pagina.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
+    if (listaEncolhe) {
+      await pagina.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration()).waiting, { timeout: 30000 });
+      if (!(await pagina.evaluate(() => window.__EXTRA === 1))) throw new Error('A versão 1 não carregou o extra.js');
+      await pagina.close();
+      semRede = true;
+      pagina = await navegador.newPage();
+      await pagina.goto(url, { waitUntil: 'load' }).catch(() => {});
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      await pagina.reload({ waitUntil: 'load' }).catch(() => {});
+      await new Promise(resolve => setTimeout(resolve, 2500));
+      const estado = await pagina.evaluate(async () => ({
+        extra: window.__EXTRA === 1,
+        versao: document.querySelector('#versao-app')?.textContent,
+        ativo: (await navigator.serviceWorker.getRegistration()).active.scriptURL,
+        esperando: !!(await navigator.serviceWorker.getRegistration()).waiting
+      }));
+      console.log('   sem rede, depois de fechar sem tocar: ' + JSON.stringify(estado));
+      if (estado.esperando || estado.versao !== '9.0.1') throw new Error('O worker 2 não assumiu servindo a 9.0.1: ' + JSON.stringify(estado));
+      if (listaDoWorker) {
+        if (estado.extra) throw new Error('O veneno não foi visto: a regra antiga achou o extra.js');
+        console.log('   a conferência reprovou a cópia envenenada: a versão aberta perdeu o extra.js sem rede');
+        console.log('1 de 1 verificações passaram, 0 falharam. Veneno visto.');
+        return;
+      }
+      if (!estado.extra) throw new Error('Sem rede, a versão aberta perdeu o extra.js que saiu da lista nova');
+      console.log('1 de 1 verificações passaram, 0 falharam. A versão aberta achou no cache dela o arquivo que saiu da lista nova.');
+      return;
+    }
+    if (abreNoMeio) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (!(await pagina.evaluate(async () => !!(await navigator.serviceWorker.getRegistration()).installing)))
+        throw new Error('O install da 9.0.2 não estava em andamento na hora da abertura');
+      await pagina.close();
+      pagina = await navegador.newPage();
+      await pagina.goto(url, { waitUntil: 'domcontentloaded' });
+      await pagina.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration()).waiting, { timeout: 30000 });
+      await new Promise(resolve => setTimeout(resolve, 2500));
+      const obra = await pagina.evaluate(async () => {
+        const nomes = await caches.keys();
+        const nome = nomes.find(n => /v9002$/.test(n));
+        const app = nome && await (await caches.open(nome)).match('./app.js');
+        return { nomes, app: app ? ((await app.text()).match(/var VERSAO = '([^']+)'/) || [])[1] : null };
+      });
+      console.log('   depois de abrir no meio do install: ' + JSON.stringify(obra));
+      if (semMarca) {
+        if (obra.app === '9.0.2') throw new Error('O veneno não foi visto: sem a marca, o cache em obra sobreviveu');
+        console.log('   a conferência reprovou a cópia envenenada: o cache em obra foi apagado no meio do install');
+        console.log('1 de 1 verificações passaram, 0 falharam. Veneno visto.');
+        return;
+      }
+      if (obra.app !== '9.0.2') throw new Error('A abertura no meio do install estragou o cache da versão nova');
+      const aviso = await pagina.waitForFunction(() => (document.querySelector('#aviso-texto')?.textContent || '').includes('Versão nova pronta (9.0.2)'),
+        { timeout: 15000 }).then(() => true, () => false);
+      if (!aviso) throw new Error('O aviso da 9.0.2 não apareceu com o número');
+      console.log('1 de 1 verificações passaram, 0 falharam. Abrir no meio do install não apaga o cache em obra.');
+      return;
+    }
+    if (trocaAtomica) {
+      const ESPERADOS = (fs.readFileSync(path.join(raiz, 'index.html'), 'utf8').match(/<script src="[^"]+\.js"/g) || []).length;
+      const conferir = async (versao, rotulo) => {
+        const marcas = await pagina.evaluate(() => window.__marcas || []);
+        const fora = marcas.filter(m => !m.endsWith('@' + versao));
+        console.log('   ' + rotulo + ': ' + marcas.length + ' scripts, fora da versão ' + versao + ': ' + (fora.join(', ') || 'nenhum'));
+        if (marcas.length !== ESPERADOS || fora.length) throw new Error(rotulo + ': troca misturou versões ou faltou script');
+      };
+      const tocarAtualizar = async alvo => {
+        await pagina.waitForFunction(t => document.querySelector('#aviso')?.classList.contains('aberto') &&
+          (document.querySelector('#aviso-texto')?.textContent || '').includes(t) &&
+          document.querySelector('#aviso-acao').getBoundingClientRect().bottom <= innerHeight, { timeout: 30000 }, 'Versão nova pronta (' + alvo + ')');
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const cdp = await pagina.target().createCDPSession();
+        await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+        redeLenta = true;
+        const t0 = Date.now();
+        await pagina.click('#aviso-acao');
+        await pagina.waitForFunction(v => document.querySelector('#versao-app')?.textContent === v, { timeout: 30000 }, alvo);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        redeLenta = false;
+        return Date.now() - t0;
+      };
+      await pagina.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration()).waiting, { timeout: 30000 });
+      const ms1 = await tocarAtualizar('9.0.2');
+      console.log('   worker em espera: troca em ' + ms1 + ' ms com a rede segurando 40 s');
+      await conferir(2, 'worker em espera');
+      publicada = 3;
+      await pagina.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
+      await pagina.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration()).waiting, { timeout: 30000 });
+      await pagina.close();
+      pagina = await navegador.newPage();
+      pagina.on('dialog', d => d.dismiss().catch(() => {}));
+      await pagina.goto(url, { waitUntil: 'domcontentloaded' });
+      await pagina.waitForFunction(() => document.querySelector('#versao-app')?.textContent === '9.0.2', { timeout: 15000 });
+      if (await pagina.evaluate(async () => !!(await navigator.serviceWorker.getRegistration()).waiting))
+        throw new Error('O worker 3 não assumiu ao fechar');
+      const ms2 = await tocarAtualizar('9.0.3');
+      console.log('   worker que já assumiu: troca em ' + ms2 + ' ms com a rede segurando 40 s');
+      await conferir(3, 'worker que já assumiu');
+      console.log('2 de 2 verificações passaram, 0 falharam. A troca foi inteira nos dois caminhos, sem esperar a rede.');
+      return;
+    }
     if (corteSobreMain) {
       await pagina.waitForFunction(async () => !(await navigator.serviceWorker.getRegistration()).installing, { timeout: 30000 });
       const depoisDoCorte = await pagina.evaluate(async nome => ({

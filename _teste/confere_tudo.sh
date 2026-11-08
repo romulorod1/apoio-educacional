@@ -381,6 +381,17 @@ roda "atualizacao apos fechar"                  node "_teste/testa_atualizacao_a
 roda "atualizacao --migracao"                   node "_teste/testa_atualizacao_apos_fechar.js" --migracao
 roda "atualizacao --corte-sobre-a-main"         node "_teste/testa_atualizacao_apos_fechar.js" --corte-sobre-a-main
 roda "atualizacao corte --envenenado-apaga-ativo" node "_teste/testa_atualizacao_apos_fechar.js" --corte-sobre-a-main --envenenado-apaga-ativo
+# D2b: a versao aberta acha no cache dela o arquivo que saiu da lista nova, sem
+# rede; o veneno volta a regra de servir do cache so o que esta na lista do
+# worker novo, e a trava tem de ve-lo. E a troca do "Atualizar agora" e inteira
+# com a rede segurando 40 s e o processador lento, nos dois caminhos.
+roda "atualizacao --lista-encolhe"              node "_teste/testa_atualizacao_apos_fechar.js" --lista-encolhe
+roda "atualizacao lista --envenenado-lista-do-worker" node "_teste/testa_atualizacao_apos_fechar.js" --lista-encolhe --envenenado-lista-do-worker
+roda "atualizacao --troca-atomica"              node "_teste/testa_atualizacao_apos_fechar.js" --troca-atomica
+# D2b: abrir o aplicativo no meio do download da versao nova nao apaga o cache
+# em obra; o veneno tira a marca 'instalando' da limpeza.
+roda "atualizacao --abre-no-meio-do-install"    node "_teste/testa_atualizacao_apos_fechar.js" --abre-no-meio-do-install
+roda "atualizacao meio --envenenado-sem-marca"  node "_teste/testa_atualizacao_apos_fechar.js" --abre-no-meio-do-install --envenenado-sem-marca
 roda "atualizacao --falha-instalacao"           node "_teste/testa_atualizacao_apos_fechar.js" --falha-instalacao
 roda "atualizacao --duas-janelas"               node "_teste/testa_atualizacao_apos_fechar.js" --duas-janelas
 roda "atualizacao --rede-lenta"                 node "_teste/testa_atualizacao_apos_fechar.js" --rede-lenta

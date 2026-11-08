@@ -1919,12 +1919,12 @@
    * worker, e não só ao registration.waiting. A consulta tem prazo e aceita
    * ficar sem resposta, para funcionar com os workers de antes do D2, que não
    * conhecem a mensagem. */
-  function consultarWorker(worker, tipo) {
+  function consultarWorker(worker, tipo, prazoMs) {
     if (!worker || typeof MessageChannel === 'undefined') return Promise.resolve(null);
     return new Promise(function (resolve) {
       var canal = new MessageChannel();
       var terminou = false;
-      var prazo = setTimeout(function () { acabar(null); }, 1200);
+      var prazo = setTimeout(function () { acabar(null); }, prazoMs || 1200);
       function acabar(resposta) {
         if (terminou) return;
         terminou = true;
@@ -1938,8 +1938,11 @@
     });
   }
 
+  /* Prazo de 5 s: o worker em espera pode estar parado e precisa subir antes de
+   * responder. Com 1,2 s, um worker que demora a subir (tablet lento, máquina
+   * ocupada) fazia o aviso sair sem o número da versão. */
   function conferirVersaoAtiva() {
-    return consultarWorker(registroSW && (registroSW.waiting || registroSW.active), 'estado-versao').then(function (estado) {
+    return consultarWorker(registroSW && (registroSW.waiting || registroSW.active), 'estado-versao', 5000).then(function (estado) {
       versaoPendenteAtiva = estado && estado.pendente ? estado : null;
       if (versaoPendenteAtiva) mostrarAvisoDeVersao();
       return !!versaoPendenteAtiva;
@@ -2029,7 +2032,11 @@
       if (registroSW && registroSW.waiting) {
         registroSW.waiting.postMessage({ tipo: 'ativar-agora' });
       } else if (versaoPendenteAtiva && registroSW && registroSW.active) {
-        consultarWorker(registroSW.active, 'ativar-agora').then(function (resultado) {
+        /* Prazo longo: o worker confere o cache novo inteiro antes de
+         * escolher, e num tablet lento isso passa de 1,2 s. Desistir antes
+         * deixava a escolha feita no worker e a tela dizendo "ficou para
+         * depois". */
+        consultarWorker(registroSW.active, 'ativar-agora', 15000).then(function (resultado) {
           if (resultado && resultado.ativada) location.reload();
           else { podeRecarregar = false; adiarAtualizacao(); }
         });
