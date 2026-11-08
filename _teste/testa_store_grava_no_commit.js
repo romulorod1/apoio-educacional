@@ -106,9 +106,11 @@ const GRAVAR_ANTIGO =
   "    return trans(deposito, 'readwrite').then(function (s) { return comoPromessa(s.put(valor, chave)); });\n" +
   "  }";
 /* O segundo veneno: o `escrever` responde no pedido e não na transação. */
-const ESCREVER_CONSERTADO = /t\.oncomplete = function \(\) \{ resolve\(req \? req\.result : undefined\); \};/;
+/* Desde a N0 o oncomplete também avisa a mudança (avisarMudanca, para a cópia
+ * na nuvem); o veneno mantém o aviso e só devolve a resposta ao pedido. */
+const ESCREVER_CONSERTADO = /t\.oncomplete = function \(\) \{ avisarMudanca\(deposito\); resolve\(req \? req\.result : undefined\); \};/;
 const ESCREVER_ANTIGO = 'if (req) req.onsuccess = function () { resolve(req.result); }; ' +
-  't.oncomplete = function () { resolve(req ? req.result : undefined); };';
+  't.oncomplete = function () { avisarMudanca(deposito); resolve(req ? req.result : undefined); };';
 const ANCORA = VENENO_ESCREVER ? ESCREVER_CONSERTADO : GRAVAR_CONSERTADO;
 const trocas = {};
 let trocaFeita = false;

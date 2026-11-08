@@ -185,8 +185,10 @@ async function cortarRede(pag, cortar) {
   const sw = fs.readFileSync(path.join(raiz, 'sw.js'), 'utf8');
   const lista = (sw.match(/var ARQUIVOS = \[([\s\S]*?)\n\];/) || ['', ''])[1];
   conf('achei a lista ARQUIVOS do sw.js', lista.indexOf("'./app.js'") >= 0, true);
-  conf('o leitor não está no pré-cache', /vendor/.test(lista.replace(/\/\*[\s\S]*?\*\//g, '')), false);
-  conf('nem num <script> do index.html', /<script[^>]+vendor/.test(fs.readFileSync(path.join(raiz, 'index.html'), 'utf8')), false);
+  // o que fica de fora é o LEITOR (vendor/pdfjs-*); o gerador do QR da chave da
+  // nuvem (vendor/qrcode-generator-*, N0) é pequeno e vem com o aplicativo
+  conf('o leitor não está no pré-cache', /vendor\/pdfjs/.test(lista.replace(/\/\*[\s\S]*?\*\//g, '')), false);
+  conf('nem num <script> do index.html', /<script[^>]+vendor\/pdfjs/.test(fs.readFileSync(path.join(raiz, 'index.html'), 'utf8')), false);
   conf('os arquivos do leitor existem', ['pdf.min.mjs', 'pdf.worker.min.mjs', 'LICENSE']
     .every(f => fs.existsSync(path.join(raiz, 'vendor', 'pdfjs-6.4.299', f))), true);
   conf('nenhum pedido do leitor ao abrir o aplicativo', pedidosDoLeitor.length, 0);

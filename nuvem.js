@@ -700,10 +700,22 @@
     automatica = false;
     return gravarEstado('automatica', false).then(avisarOuvintes, avisarOuvintes);
   }
+  /* O aviso chega de dentro do oncomplete da gravação dela (store.js). A
+   * memória muda na hora; a gravação do sinal no banco próprio fica para o
+   * próximo giro, fora da resposta da gravação dela: a promessa do B3 é que
+   * a resposta chega sem nenhuma transação de escrita aberta, e abrir uma
+   * aqui, mesmo noutro banco, quebraria a medida. */
+  var gravarPendenteAgendado = false;
   function marcarMudanca() {
     if (pendente) return;
     pendente = true;
-    gravarEstado('pendente', true).catch(function () { /* fica só em memória; a próxima gravação tenta de novo */ });
+    if (gravarPendenteAgendado) return;
+    gravarPendenteAgendado = true;
+    setTimeout(function () {
+      gravarPendenteAgendado = false;
+      if (!pendente) return;
+      gravarEstado('pendente', true).catch(function () { /* fica só em memória; a próxima gravação tenta de novo */ });
+    }, 0);
   }
   function online() {
     return !(typeof navigator !== 'undefined' && navigator.onLine === false);
