@@ -20801,6 +20801,10 @@
     /* E nunca de um aparelho com tela de celular, mesmo sem a marca e deitado
      * (o celular que restaurou pelo cartão de Ajustes, na versão de antes). */
     if (telaDeCelular()) return;
+    /* N1 (fatia 2): os registros que esperam na fila sobem nos mesmos momentos
+     * da cópia (fechar, abrir, voltar), pelas mesmas guardas acima. A recusa da
+     * nuvem fica guardada em Nuvem.estado().registros.erro e a fila fica. */
+    Nuvem.enviarRegistrosSeDevido({ versaoApp: VERSAO });
     var devida = motivo === 'diaria' ? Nuvem.copiaDiariaDevida() : Nuvem.copiaAutomaticaDevida();
     if (!devida) return;
     enviarCopiaParaNuvem(motivo);
@@ -20882,6 +20886,23 @@
     return 'Última cópia na nuvem: ' + Nuvem.fraseDeQuando(est.ultimaCopia.quando) + '.';
   }
 
+  /* N1 (fatia 2): as mudanças registro a registro. Com a nuvem recusando (as
+   * regras ainda não publicadas), a fila fica guardada e a frase diz isso. */
+  function fraseDosRegistrosNaNuvem(est) {
+    var r = est.registros || { pendentes: 0 };
+    var n = r.pendentes || 0;
+    var guardadas = n === 1 ? '1 mudança guardada aqui' : n + ' mudanças guardadas aqui';
+    if (r.erro && r.erro.codigo === 'PERMISSION_DENIED') {
+      return 'A nuvem ainda não aceita as mudanças uma a uma (as regras novas não foram publicadas). ' +
+        guardadas + ', para subir quando aceitar.';
+    }
+    if (r.erro && r.erro.codigo === 'SEM_REDE') return 'Sem internet agora. ' + guardadas + ', para subir quando houver sinal.';
+    if (r.erro) return 'A nuvem recusou as mudanças uma a uma (' + r.erro.codigo + '). ' + guardadas + '; vou tentar de novo.';
+    if (r.enviando) return 'Subindo as mudanças...';
+    if (n > 0) return (n === 1 ? '1 mudança' : n + ' mudanças') + ' a subir para a nuvem.';
+    return 'Todas as mudanças já subiram para a nuvem, uma a uma.';
+  }
+
   function mostrarMensagemDaNuvem(caixa, classe, texto) {
     if (!caixa) return;
     caixa.innerHTML = '';
@@ -20909,6 +20930,10 @@
       ? 'Sobe sozinha quando você fecha o aplicativo com internet, e uma vez por dia.' +
         (est.pendente ? ' Há mudanças que ainda não subiram.' : '')
       : 'A cópia automática começa depois do primeiro envio feito por você neste aparelho.' }));
+    if (est.temChave) {
+      caixa.appendChild(el('div', { class: est.registros && est.registros.erro ? 'faixa-aviso u-margem-baixo-0' : 'ajuda',
+        id: 'nuvem-registros', texto: fraseDosRegistrosNaNuvem(est) }));
+    }
     caixa.appendChild(el('div', { class: 'barra' }, [
       el('button', { type: 'button', class: 'btn principal', id: 'nuvem-enviar', disabled: ocupado,
         texto: ocupado ? 'Enviando...' : 'Enviar cópia agora',

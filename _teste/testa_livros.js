@@ -80,7 +80,7 @@ const STORE = fs.readFileSync(path.join(H.RAIZ, 'store.js'), 'utf8');
 const HIST = fs.readFileSync(path.join(__dirname, '_store_v4_historico.js'), 'utf8');
 const V3 = 'var VERSAO_BANCO = 3;';
 const V4 = 'var VERSAO_BANCO = 4;';
-const V5 = 'var VERSAO_BANCO = 5;';
+const V6 = 'var VERSAO_BANCO = 6;';
 const CRIA_LIVROS = /    if \(!b\.objectStoreNames\.contains\('livros'\)\) \{\r?\n      s = b\.createObjectStore\('livros', \{ keyPath: 'id' \}\);\r?\n      s\.createIndex\('pacote', 'pacote'\);\r?\n    \}\r?\n    if \(!b\.objectStoreNames\.contains\('livros_posicoes'\)\) \{\r?\n      b\.createObjectStore\('livros_posicoes', \{ keyPath: 'id' \}\);\r?\n    \}\r?\n/;
 // os pontos que os venenos trocam, cada um tem de existir exatamente uma vez
 const COPIA_FECHA = /pacote\.biblioteca = \{ uso: \(bib\[0\] \|\| \[\]\)\.filter\(function \(r\) \{\r?\n        return idsAlunos\[r\.alunoId\] && idsAulas\[r\.aulaId\];\r?\n      \}\), etiquetas: bib\[1\] \|\| \[\], listas: bib\[2\] \|\| \[\] \};\r?\n      return pacote;/;
@@ -228,7 +228,7 @@ async function printar(pag, nome) {
 
 (async () => {
   secao('0. As âncoras e o veneno');
-  conf('o store.js está na versão 5', STORE.split(V5).length, 2);
+  conf('o store.js está na versão 6', STORE.split(V6).length, 2);
   conf('o código histórico da versão 4 está na versão 4', HIST.split(V4).length, 2);
   conf('o store.js cria os depósitos dos livros uma vez', (STORE.match(new RegExp(CRIA_LIVROS.source, 'g')) || []).length, 1);
   conf('o código da versão 3 ficou sem os livros', STORE_V3.indexOf("createObjectStore('livros'") < 0 && STORE_V3.split(V3).length === 2, true);
@@ -293,7 +293,7 @@ async function printar(pag, nome) {
   await H.abrirApp(p, amb.ORIGEM);
   await pausa(800);
   const v4 = await versaoEDepositos(p);
-  conf('o código novo subiu o banco para a versão 5 (N1)', v4 && v4.versao, 5);
+  conf('o código novo subiu o banco para a versão 6 (N1)', v4 && v4.versao, 6);
   conf('com os dois depósitos dos livros', v4 && v4.depositos.filter(d => /^livros/.test(d)).join(','), 'livros,livros_posicoes');
   const depois = await contagens(p);
   const chaves = Object.keys(antes).sort();

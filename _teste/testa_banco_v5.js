@@ -115,7 +115,7 @@ const ITENS_DO_DOCUMENTO = 3 + 2 + 40 + 2 + 2 + 5 + 1; // alunos, séries, aulas
 
   pag = await R.abrirPaginaNua(amb, trocas, STORE_SERVIDO);
   const v5 = await pag.evaluate(() => window.__prova.versaoEDepositos());
-  conf('o código novo subiu o banco para a versão 5', v5 && v5.versao, 5);
+  conf('o código novo subiu o banco para a versão 6 (registros, controle e a fila da fatia 2)', v5 && v5.versao, 6);
   conf('com os depósitos registros e controle', v5 && v5.depositos.filter(d => d === 'registros' || d === 'controle').join(','), 'controle,registros');
   const depois = await pag.evaluate(async () => {
     const P = window.__prova;
