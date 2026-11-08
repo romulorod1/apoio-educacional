@@ -122,8 +122,10 @@
  * antigo (com iv ou dados em bytes): nuvem.js e app.js, com a lista igual. O v86 (D6b) deixa o celular da dona editar em quatro
  * ações, pela fila de registros (app.js, store.js, nuvem.js e styles.css), com a
  * lista igual. O v87 (D7) traz o observador: diagnóstico por aparelho,
- * painel no iPhone e as frases do Safari (app.js e nuvem.js), com a lista igual. */
-var CACHE = 'apoio-educacional-v87';
+ * painel no iPhone e as frases do Safari (app.js e nuvem.js), com a lista igual. O v88 troca os ícones só no site do Cloudflare (o
+ * monta_site.sh põe icons/pages-dev/ por cima de icons/): sem o nome novo, o
+ * worker do endereço novo seguiria servindo os ícones velhos do cache. */
+var CACHE = 'apoio-educacional-v88';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
