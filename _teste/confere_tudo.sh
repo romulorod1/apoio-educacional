@@ -658,6 +658,9 @@ roda "banco v3 --envenenado-troca-calada"         node "_teste/testa_banco_v3.js
 roda "banco v5 (N1)"                              node "_teste/testa_banco_v5.js"
 roda "banco v5 --envenenado-perde-registro"       node "_teste/testa_banco_v5.js" --envenenado-perde-registro
 roda "banco v5 --envenenado-regrava-tudo"         node "_teste/testa_banco_v5.js" --envenenado-regrava-tudo
+# fatia 2 (revisao): a restauracao vinda da nuvem enfileira tudo no aparelho que
+# escreve, e nada no que so le; o veneno sem fila para todos TEM de ser visto.
+roda "banco v5 --envenenado-restauro-sem-fila"    node "_teste/testa_banco_v5.js" --envenenado-restauro-sem-fila
 # N1: o rollback de verdade. O codigo REAL da versao 4, republicado com
 # VERSAO_BANCO = 5, le, edita e apaga o principal; a 5 volta e ve o que a 4 fez,
 # inclusive o "Apagar tudo" (o apagamento de fora vence: tudo vira lapide e

@@ -34,6 +34,7 @@ const ANCORAS = {
   lacoDoVetor: '(Array.isArray(db[vetor]) ? db[vetor] : []).forEach(function (item) {',
   igual: 'if (antes && !antes.apagadoEm && antes.ordem === ordem && JSON.stringify(antes.dados) === texto) { contas.iguais++; return; }',
   apagadoPorFora: 'return apagarDocumento().then(function () { return null; });',
+  restauroSemFila: 'semFila: daNuvem && soLeitura }',
   principalFica: "if (!opcoes.semPrincipal) t.objectStore('dados').put(db, 'principal');",
   respondeNoCommit: "t.oncomplete = function () { confirmarGravacao(contas); avisarMudanca('dados'); resolve(); };"
 };
@@ -45,7 +46,10 @@ const VENENOS = {
   '--envenenado-regrava-tudo': ['igual', 'if (false) { contas.iguais++; return; }'],
   /* a regra antiga do carregar: sem principal, os registros vivos montam o
    * documento de volta (o "Apagar tudo" do código da versão 4 é desfeito) */
-  '--envenenado-registros-ressuscitam': ['apagadoPorFora', 'return completar(montar(lido.registros));']
+  '--envenenado-registros-ressuscitam': ['apagadoPorFora', 'return completar(montar(lido.registros));'],
+  /* a restauração vinda da nuvem não enfileira em aparelho nenhum (nem no
+   * tablet dono, que então nunca subiria o que restaurou) */
+  '--envenenado-restauro-sem-fila': ['restauroSemFila', 'semFila: daNuvem }']
 };
 
 function conferirAncoras(conf) {
