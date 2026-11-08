@@ -4,8 +4,9 @@ Aplicativo de agenda, folha de aula e fechamento mensal para uma professora part
 1.28.
 
 Funciona como aplicativo instalado no tablet: abre em tela cheia, tem ícone próprio e funciona sem
-internet. Os dados ficam guardados no próprio aparelho, no navegador. Nada é enviado para servidor
-nenhum.
+internet. Os dados ficam guardados no próprio aparelho, no navegador. O que sai do aparelho é uma
+coisa só, e cifrada: a cópia na nuvem, que sobe trancada com uma chave que só existe no aparelho
+dela (veja *Cópia na nuvem*, abaixo). Quem guarda a cópia não consegue abri-la.
 
 ---
 
@@ -33,8 +34,8 @@ e anexo) e *Proposta* (a proposta de acompanhamento em PDF para a família).
 
 **Biblioteca.** As listas de exercícios dos pacotes importados, por série, módulo e assunto.
 
-**Ajustes.** Cópia de segurança, importar biblioteca, chave Pix, histórico do que foi desfeito e a
-busca por atualização.
+**Ajustes.** Cópia de segurança, cópia na nuvem, importar biblioteca, chave Pix, histórico do que
+foi desfeito e a busca por atualização.
 
 ### O que dá para fazer
 
@@ -124,6 +125,17 @@ passarem catorze dias sem cópia, aparece um aviso na Agenda com um botão para 
 tablet quebrar ou for trocado, é essa cópia que devolve tudo. Ela leva junto as folhas escritas à
 mão, as imagens coladas e os arquivos anexados.
 
+**Cópia na nuvem.** Em *Ajustes*, entre com o e-mail e a senha da sua conta (a mesma no tablet e no
+celular; nunca a conta do Google). No primeiro **Enviar cópia agora** nasce, no aparelho, a chave que
+tranca a cópia; toque em **Ver a chave da cópia** e imprima o papel com o QR e o código. Daí em
+diante a mesma cópia de segurança (sem os livros e sem os pacotes) sobe sozinha, cifrada, quando você
+fecha o aplicativo com internet, e uma vez por dia; *Ajustes* mostra "Última cópia na nuvem: hoje,
+14:02". Sem a chave, a cópia não abre: nem para quem a guarda, nem para nós. Perder o papel perde só
+a cópia da nuvem, nunca o que está no tablet nem a cópia em arquivo. Num aparelho novo, entre na
+conta, toque em **Restaurar neste aparelho**, leia o QR com a câmera ou digite o código, e tudo volta.
+Também em *Ajustes*: **Trocar senha**, **Esqueci a senha** (chega um e-mail do Firebase com o link)
+e **Quem mais pode ler esta cópia**, para o celular de confiança ler sem mexer.
+
 **Atualização e novidades.** O aplicativo abre do que está guardado no tablet, sem esperar a
 internet, então abre rápido mesmo com sinal fraco. Quando sai uma versão nova, ela é baixada por
 baixo enquanto você usa, e aparece o aviso *Versão nova pronta*, com *Atualizar agora* e *Depois da
@@ -159,6 +171,9 @@ alunos fica em zero e um aviso aparece na tela de alunos.
 | `cartao.js` | Cartão do mês |
 | `biblioteca.js`, `zip.js` | Abertura e conferência dos pacotes da biblioteca |
 | `busca.js` | Busca de assunto, sem acento e sem caixa |
+| `nuvem.js` | Cópia na nuvem (fase 0): entrada por e-mail e senha, chave e cifra no aparelho, documentos no Firestore pela API REST |
+| `firestore.rules` | As regras do Firestore: só a dona lê e escreve o caminho dela; o leitor permitido só lê; mais ninguém nada |
+| `vendor/qrcode-generator-1.4.4/` | O gerador do QR da chave (MIT, Kazuhiko Arase) |
 | `app.js` | Interface e ligação entre as partes |
 | `sw.js` | Modo offline |
 | `banco/topicos/` | Índice de assuntos: um arquivo por matéria, e o `matematica.json` com os 148 assuntos de matemática (o LEIA-ME da pasta explica os dois formatos) |
@@ -183,10 +198,17 @@ isso vira caminho vetorial, então a letra sai nítida em qualquer tamanho e o a
 acentuação do português. As larguras da Helvetica estão embutidas em `pdf.js` porque o tablet não
 tem essa fonte instalada e a quebra de linha precisa ser exata mesmo assim.
 
-**Nada sai do aparelho.** Não há servidor, conta ou sincronização. A cópia de segurança é manual, de
-propósito: são dados de crianças. Material que identifique um aluno nunca entra neste repositório,
-que é público; conteúdo de terceiros (OBMEP, livros) também não: fica em pacote no Drive, importado
-pelo aplicativo.
+**O servidor é cego.** São dados de crianças, então a única coisa que sai do aparelho é a cópia na
+nuvem, e ela sai cifrada (AES-GCM de 256 bits pela WebCrypto) com uma chave que nasce no aparelho e
+nunca é enviada; o Firestore guarda bytes que não abre, mais o tamanho, a hora e o nome do aparelho.
+Fala-se com o Firebase pela API REST, sem o SDK, porque a fase 0 só sobe e baixa uma cópia. A
+configuração web do projeto fica no código porque não é segredo; quem protege são as regras
+(`firestore.rules`, só a conta dela lê e escreve o caminho dela) e a chave. A cópia automática só
+começa depois do primeiro envio feito por ela em cada aparelho, para um aparelho recém-instalado não
+subir a carga inicial por cima da cópia do tablet. A chave mora num banco do IndexedDB à parte
+(`apoio-nuvem`), fora da cópia e fora do "Apagar todos os dados". Material que identifique um aluno
+nunca entra neste repositório, que é público; conteúdo de terceiros (OBMEP, livros) também não: fica
+em pacote no Drive, importado pelo aplicativo.
 
 **Anexo vira texto na cópia.** Blob não sobrevive a `JSON.stringify`: viraria um objeto vazio e o
 arquivo se perderia calado. Por isso o anexo é convertido para texto na exportação e reconstruído na
@@ -207,6 +229,13 @@ sh _teste/confere_tudo.sh --rapido   # tudo que não abre navegador (cerca de 2 
 O portão sobe o próprio servidor em `127.0.0.1:8777`, roda todas as provas do repositório e confere
 que nenhuma ficou de fora (a lista do que fica fora, com motivo, está nele). O caminho do Chrome vem
 da variável `CHROME`, com o do Windows de reserva.
+
+A prova da cópia na nuvem (`_teste/testa_nuvem.js`) sobe o Firebase Emulator Suite (Auth e
+Firestore) nas portas 8871 a 8877. Ela precisa do `firebase-tools` instalado com npm **fora do
+repositório** (o caminho do `firebase.js` em `FIREBASE_TOOLS`; na máquina do Rômulo,
+`C:\Users\romul\ferramentas\firebase-tools`) e de um JDK 21 ou mais novo em `JAVA_HOME` (o Java 8 do
+sistema não serve; um JDK portátil, só descompactado, basta). Sem um dos dois, a prova diz onde
+procurou e reprova. No GitHub, o `portao.yml` instala os dois antes das fatias.
 
 No GitHub, `.github/workflows/portao.yml` roda o `--rapido` em todo PR e o portão inteiro no push na
 `main` e no PR com o rótulo `navegador`. Depois de cada push na `main`,

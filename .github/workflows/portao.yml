@@ -117,6 +117,17 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Chrome do runner
         run: $CHROME --version
+      # N0: a prova da nuvem (testa_nuvem.js) sobe o Firebase Emulator Suite.
+      # O firebase-tools fica fora do repositorio, numa pasta temporaria do
+      # runner, e o emulador exige Java 21 (o runner ja o tem em JAVA_HOME_21_X64).
+      - name: firebase-tools e Java 21 para a prova da nuvem
+        run: |
+          mkdir -p "$RUNNER_TEMP/firebase-tools"
+          cd "$RUNNER_TEMP/firebase-tools"
+          npm init -y > /dev/null
+          npm install firebase-tools@15 --no-audit --no-fund
+          echo "FIREBASE_TOOLS=$RUNNER_TEMP/firebase-tools/node_modules/firebase-tools/lib/bin/firebase.js" >> "$GITHUB_ENV"
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
       - name: Fatia do portao inteiro
         run: sh _teste/confere_tudo.sh --pedaco ${{ matrix.fatia }}/4
       - name: Saida de quem reprovou
