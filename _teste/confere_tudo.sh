@@ -265,6 +265,9 @@ roda "merge seguro"          node _teste/testa_merge_seguro.js
 # As fatias do portao inteiro no CI: toda prova de navegador em exatamente uma
 # fatia, para qualquer numero de fatias, com controle que reprova.
 roda "fatias do portao"      node _teste/testa_pedacos_do_portao.js
+# B4: o deploy no Cloudflare Pages so depois do portao inteiro verde na main,
+# com venenos, e o site montado com tudo o que o aplicativo pede.
+roda "publica cloudflare (B4)" node _teste/testa_publica_cloudflare.js
 # Oito que moravam no laco "com navegador" sem abrir navegador nenhum (nem
 # puppeteer, nem a porta 8777). La, o --rapido os pulava; aqui o GitHub os roda
 # em todo PR.
@@ -457,6 +460,10 @@ roda "biblioteca dificuldade --envenenado-etiqueta" node "_teste/testa_bibliotec
 # que nao existe a lista do sw.js, e o service worker nao pode instalar.
 roda "limpeza do acervo"                        node "_teste/testa_limpeza_acervo.js"
 roda "limpeza do acervo --envenenado-lista"     node "_teste/testa_limpeza_acervo.js" --envenenado-lista
+# B4: a faixa "O aplicativo mudou de endereço" so na origem github.io (nunca no
+# pages.dev nem no local), o app seguindo com os dados, e o activate do sw.js
+# sem tocar cache de outra origem. Servidor proprio na 8881, sem internet.
+roda "mudou de endereco (B4)"                   node "_teste/testa_mudou_de_endereco_navegador.js"
 # B14: o material autoral saiu do repositorio. Sem navegador, a chave fora do
 # app.js, o material fora do repositorio e do pacote do service worker, o indice
 # de assuntos com os 148 ids, e a TRILHA ANTES E DEPOIS da migracao (os 148

@@ -1541,6 +1541,47 @@
     if (faixa) faixa.hidden = true;
   }
 
+  /* O APLICATIVO MUDOU DE ENDEREÇO (B4). O endereço novo é uma origem só
+   * dele, no Cloudflare Pages; o antigo, no GitHub Pages, divide a origem
+   * romulorod1.github.io com todo projeto da conta. Os dados moram no
+   * IndexedDB da origem e não atravessam sozinhos: a passagem é salvar a cópia
+   * aqui e restaurar no novo (ou entrar, quando a nuvem existir). Até ela
+   * passar, este endereço continua funcionando igual, só com a faixa.
+   *
+   * Decidido pela origem, e nunca por uma marca no código: o mesmo código vai
+   * para os dois endereços, e a faixa só pode aparecer no antigo. */
+  var ENDERECO_NOVO = 'https://apoio-educacional.pages.dev/';
+  function noEnderecoAntigo(nome) {
+    return /(^|\.)github\.io$/i.test(String(nome || ''));
+  }
+
+  function mostrarFaixaEndereco() {
+    if (!noEnderecoAntigo(location.hostname) || $('#faixa-endereco')) return;
+    var faixa = el('div', { id: 'faixa-endereco', class: 'faixa-endereco', role: 'status' }, [
+      el('div', { class: 'cresce' }, [
+        el('strong', { texto: 'O aplicativo mudou de endereço' }),
+        el('p', { texto: 'O endereço novo é apoio-educacional.pages.dev. Este aqui continua funcionando, ' +
+          'com tudo o que você já guardou, até você passar para o novo.' }),
+        el('ol', {}, [
+          el('li', { texto: 'Aqui, toque em "Salvar a cópia agora" e guarde o arquivo.' }),
+          el('li', { texto: 'Abra o endereço novo e instale: no menu do Chrome, "Instalar aplicativo".' }),
+          el('li', { texto: 'No aplicativo novo, em Ajustes, toque em "Restaurar de uma cópia" e escolha o arquivo.' })
+        ])
+      ]),
+      el('div', { class: 'faixa-endereco-botoes' }, [
+        el('a', { class: 'btn principal pequeno', id: 'faixa-endereco-abrir', href: ENDERECO_NOVO,
+          target: '_blank', rel: 'noopener', texto: 'Abrir o endereço novo' }),
+        el('button', { type: 'button', class: 'btn pequeno', id: 'faixa-endereco-copia', texto: 'Salvar a cópia agora',
+          aoClick: function () { var b = $('#baixar-copia'); if (b) b.click(); } }),
+        el('button', { type: 'button', class: 'btn pequeno', id: 'faixa-endereco-fechar', texto: 'Agora não',
+          aoClick: function () { faixa.hidden = true; } })
+      ])
+    ]);
+    var cabecalho = $('.cabecalho');
+    if (cabecalho) cabecalho.insertAdjacentElement('afterend', faixa);
+    else document.body.insertBefore(faixa, document.body.firstChild);
+  }
+
   /* O OUVINTE GLOBAL. A rejeição que o salvar() já avisou passa calada aqui
    * (preventDefault), porque a faixa já está na tela. Qualquer outra promessa
    * rejeitada sem tratamento vira uma frase para ela e uma linha no console, e
@@ -1884,6 +1925,8 @@
       ligarEventos();
       atualizarBotaoOlho();
       desenharTudo();
+      // só no endereço antigo, pela origem (B4)
+      mostrarFaixaEndereco();
       atualizarTemBiblioteca();
       // o botão Livros da aba Biblioteca nasce com a conta dos livros (C15.1)
       desenharLivrosAjustes();
