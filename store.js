@@ -85,7 +85,14 @@
    * Versão 6 (N1, fatia 2): só CRIA o depósito `saida`, a fila do que ainda
    * não subiu para a nuvem registro a registro, e a semeia com todo registro
    * vivo sincronizável (o primeiro envio leva o banco inteiro). Desfazer este
-   * release é republicar o código antigo COM VERSAO_BANCO = 6. */
+   * release é republicar o código antigo COM VERSAO_BANCO = 6.
+   *
+   * E A VOLTA DEPOIS DO ROLLBACK: o código antigo republicado com o número
+   * novo abre, num aparelho que nunca passou por aqui, um banco nessa versão
+   * SEM os depósitos novos. Quando este código volta, o onupgradeneeded não
+   * roda (a versão já é a dele). Por isso o abrir sonda o banco sem versão,
+   * vê que falta depósito e reabre com a versão mais um, criando o que falta e
+   * migrando a partir do `principal` (ver abrir). */
   var VERSAO_BANCO = 6;
   /* Depósitos que nunca saem do tablet: nem na cópia de segurança nem na
    * nuvem. Quem for copiar ou sincronizar depósitos lê esta lista. */
@@ -99,7 +106,19 @@
 
   var bancoAberto = null;
 
+  /* Os depósitos que este código precisa encontrar abertos. Quem faltar é
+   * criado na transação de versão (criarDepositos) ou, se o banco já está na
+   * versão deste código sem eles, pela cura do abrir (ver lá). */
+  var DEPOSITOS = ['dados', 'notas', 'midias', 'anexos', 'historico', 'biblioteca_pacotes', 'biblioteca_itens',
+    'biblioteca_teoria', 'biblioteca_assets', 'biblioteca_uso', 'biblioteca_etiquetas', 'biblioteca_listas',
+    'livros', 'livros_posicoes', 'registros', 'controle', 'saida'];
+  function depositosQueFaltam(b) {
+    return DEPOSITOS.filter(function (n) { return !b.objectStoreNames.contains(n); });
+  }
+  /* Cria o que falta e devolve os nomes criados, para a migração saber o que
+   * acabou de nascer. */
   function criarDepositos(b) {
+    var criados = depositosQueFaltam(b);
     if (!b.objectStoreNames.contains('dados')) b.createObjectStore('dados');
     if (!b.objectStoreNames.contains('notas')) b.createObjectStore('notas');
     if (!b.objectStoreNames.contains('midias')) b.createObjectStore('midias');
@@ -151,23 +170,32 @@
     }
     if (!b.objectStoreNames.contains('controle')) b.createObjectStore('controle');
     if (!b.objectStoreNames.contains('saida')) b.createObjectStore('saida', { keyPath: 'id' });
+    return criados;
   }
 
-  /* A migração 4 para 5, dentro da transação de versão `t`: o documento
-   * inteiro vira um registro por item, todos com atualizadoEm igual ao
-   * instante da migração e `ordem` igual à posição no vetor. O `principal`
-   * fica como está (ele mesmo é o retrato). Banco novo (de 0) não tem o que
-   * migrar; banco já na 5 não passa por aqui. */
-  function migrarParaRegistros(t, de) {
-    if (!de || de >= 6) return;
-    if (de >= 5) { semearFila(t); return; }
-    var agora = new Date().toISOString();
-    var pedido = t.objectStore('dados').get('principal');
-    pedido.onsuccess = function () {
-      if (!pedido.result) return;
-      // a diferença contra um depósito vazio: cada item entra em registros E na fila
-      escreverDiferenca(t, pedido.result, { carimbo: agora, semPrincipal: true });
-    };
+  /* A migração para os registros, dentro da transação de versão `t`, guiada
+   * pelo que ACABOU DE SER CRIADO (e não pelo número da versão, porque a cura
+   * do abrir também passa por aqui):
+   *   - nasceu `registros`: o documento inteiro vira um registro por item,
+   *     todos com atualizadoEm igual ao instante da migração e `ordem` igual à
+   *     posição no vetor, e cada um entra na fila; o `principal` fica como
+   *     está (ele mesmo é o retrato);
+   *   - nasceu só `saida` (a subida 5 para 6): a fila é semeada com todo
+   *     registro vivo sincronizável, para o primeiro envio por registro levar
+   *     o que já estava no aparelho.
+   * Banco novo (de 0) não tem `principal`, e nada é migrado. */
+  function migrarParaRegistros(t, criados) {
+    if (criados.indexOf('registros') >= 0) {
+      var agora = new Date().toISOString();
+      var pedido = t.objectStore('dados').get('principal');
+      pedido.onsuccess = function () {
+        if (!pedido.result) return;
+        // a diferença contra um depósito vazio: cada item entra em registros E na fila
+        escreverDiferenca(t, pedido.result, { carimbo: agora, semPrincipal: true });
+      };
+      return;
+    }
+    if (criados.indexOf('saida') >= 0) semearFila(t);
   }
   /* A subida 5 para 6: a fila nasce com todo registro vivo sincronizável, para
    * o primeiro envio por registro levar o que já estava no aparelho. */
@@ -182,20 +210,62 @@
     };
   }
 
+  /* ABRIR, EM DOIS TEMPOS. Primeiro uma sonda SEM versão, que abre o banco como
+   * ele está (um banco que não existe nasce vazio, na versão 1) e diz a versão
+   * e os depósitos. Se a versão é a deste código ou maior E todo depósito que
+   * este código precisa está lá, essa conexão serve. Senão ela fecha e a
+   * abertura de verdade pede a versão deste código ou, quando o banco já está
+   * nela (ou acima) e mesmo assim falta depósito, a versão dele mais um: a
+   * transação de versão cria o que falta e migra a partir do `principal`.
+   *
+   * É A CURA DO ROLLBACK (segunda mão do #116): o código da versão 4
+   * republicado com VERSAO_BANCO = 5 ou 6 abre um banco novo nessa versão sem
+   * `registros`, `controle` nem `saida`; quando este código volta, o
+   * onupgradeneeded não roda (a versão já é a dele) e, sem a cura, toda
+   * leitura cairia em NotFoundError para sempre. Depois da cura o banco pode
+   * ficar numa versão acima de VERSAO_BANCO; a sonda sem versão não se importa.
+   * Só o código antigo, que pede a versão dele, veria VersionError num segundo
+   * rollback: nesse caso é republicar o antigo com o número que a tela disser. */
   function abrir() {
     if (bancoAberto) return Promise.resolve(bancoAberto);
     return new Promise(function (resolve, reject) {
-      var req = indexedDB.open(NOME_BANCO, VERSAO_BANCO);
-      req.onupgradeneeded = function (e) {
-        criarDepositos(e.target.result);
-        migrarParaRegistros(e.target.transaction, e.oldVersion);
+      var sonda = indexedDB.open(NOME_BANCO);
+      sonda.onblocked = function () { if (typeof root.aoBancoBloqueado === 'function') root.aoBancoBloqueado(); };
+      sonda.onerror = function () { reject(sonda.error); };
+      sonda.onsuccess = function () {
+        var b = sonda.result;
+        var faltam = depositosQueFaltam(b);
+        if (b.version >= VERSAO_BANCO && !faltam.length) { adotar(b); return; }
+        var alvo = b.version >= VERSAO_BANCO ? b.version + 1 : VERSAO_BANCO;
+        b.close();
+        abrirNaVersao(alvo);
       };
-      /* Outra janela do aplicativo, ainda na versão antiga, segura o banco na
-       * versão 1: a subida espera ela fechar. Sem aviso, a tela ficaria em
-       * branco sem motivo aparente; quem mostra o aviso é o app.js. */
-      req.onblocked = function () { if (typeof root.aoBancoBloqueado === 'function') root.aoBancoBloqueado(); };
-      req.onsuccess = function () {
-        var conexao = req.result;
+      function abrirNaVersao(alvo) {
+        var req = indexedDB.open(NOME_BANCO, alvo);
+        req.onupgradeneeded = function (e) {
+          var criados = criarDepositos(e.target.result);
+          migrarParaRegistros(e.target.transaction, criados);
+        };
+        /* Outra janela do aplicativo, ainda na versão antiga, segura o banco na
+         * versão 1: a subida espera ela fechar. Sem aviso, a tela ficaria em
+         * branco sem motivo aparente; quem mostra o aviso é o app.js. */
+        req.onblocked = function () { if (typeof root.aoBancoBloqueado === 'function') root.aoBancoBloqueado(); };
+        req.onsuccess = function () { adotar(req.result); };
+        /* CÓDIGO MAIS VELHO QUE O BANCO (C2a): o banco já está numa versão maior
+         * que a deste código (outra janela subiu no meio). O navegador recusa com
+         * VersionError, e a tela tem de dizer o que fazer, e não mostrar a
+         * mensagem técnica. */
+        req.onerror = function () {
+          var e = req.error;
+          if (e && e.name === 'VersionError') {
+            reject(Object.assign(new Error('O banco do aparelho é de uma versão mais nova do aplicativo.'),
+              { versaoNova: true, causa: e }));
+            return;
+          }
+          reject(e);
+        };
+      }
+      function adotar(conexao) {
         bancoAberto = conexao;
         /* Uma aba com a versão nova do aplicativo pede para subir o banco:
          * esta conexão sai do caminho em vez de travar a outra. */
@@ -208,20 +278,7 @@
         };
         if (typeof root.aoBancoLiberado === 'function') root.aoBancoLiberado();
         resolve(conexao);
-      };
-      /* CÓDIGO MAIS VELHO QUE O BANCO (C2a): o banco já está numa versão maior
-       * que a deste código (outra janela, ou um aparelho que voltou a uma
-       * versão anterior pelo cache). O navegador recusa com VersionError, e a
-       * tela tem de dizer o que fazer, e não mostrar a mensagem técnica. */
-      req.onerror = function () {
-        var e = req.error;
-        if (e && e.name === 'VersionError') {
-          reject(Object.assign(new Error('O banco do aparelho é de uma versão mais nova do aplicativo.'),
-            { versaoNova: true, causa: e }));
-          return;
-        }
-        reject(e);
-      };
+      }
     });
   }
 
