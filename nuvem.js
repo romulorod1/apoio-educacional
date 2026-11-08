@@ -981,7 +981,7 @@
    * erro fica em registros.erroRecebimento. */
   function receberRegistros() {
     if (recebendo) return recebendo;
-    var aplicados = 0, lidos = 0, paginas = 0, uidDona;
+    var aplicados = 0, lidos = 0, paginas = 0, puladosAqui = 0, uidDona;
     recebendo = carregarEstado().then(function () {
       return lerSincronizacaoDesligada();
     }).then(function () {
@@ -1017,14 +1017,22 @@
             var docs = (resposta || []).filter(function (x) { return x && x.document; }).map(function (x) { return x.document; });
             lidos += docs.length;
             var meuId = idDoAparelho();
+            /* Um documento do FORMATO ANTIGO (cifrado: com `iv`, ou com `dados` em
+             * bytes; o formato de agora leva mapa, lista ou escalar, o ajuste é um
+             * escalar) é PULADO: não aplica e não é eco, mas o cursor passa por
+             * cima dele, senão seria lido para sempre. Nunca houve um na conta
+             * dela; a contagem fica no estado, sem erro na tela. */
+            var formatoAntigo = function (v) { return v.iv !== undefined || v.dados instanceof Uint8Array; };
             var regs = docs.map(function (d) {
               var v = valores(d.fields);
               return { id: v.id, tipo: v.tipo, atualizadoEm: v.atualizadoEm, apagadoEm: v.apagadoEm || null, aparelho: v.aparelho || '',
                 esquema: v.esquema || 1, servidorEm: v.servidorEm || null, updateTime: d.updateTime || null, nome: d.name,
-                dados: v.apagadoEm ? null : (v.dados === undefined ? null : v.dados), eco: !!(meuId && v.aparelho === meuId) };
+                dados: v.apagadoEm ? null : (v.dados === undefined ? null : v.dados), eco: !!(meuId && v.aparelho === meuId), antigo: formatoAntigo(v) };
             });
-            var aplicaveis = regs.filter(function (r) { return !r.eco; });
-            var ecos = regs.filter(function (r) { return r.eco; });
+            var pulados = regs.filter(function (r) { return r.antigo; });
+            puladosAqui += pulados.length;
+            var aplicaveis = regs.filter(function (r) { return !r.antigo && !r.eco; });
+            var ecos = regs.filter(function (r) { return !r.antigo && r.eco; });
             var ultimo = regs.length ? { servidorEm: regs[regs.length - 1].servidorEm, nome: regs[regs.length - 1].nome } : null;
             /* O eco vai com o id e o carimbo, marcado: o Store anota o carimbo no
              * registro deste aparelho (mais novo vale), tira da fila a entrada que
@@ -1032,6 +1040,9 @@
             var lote = aplicaveis.concat(ecos.map(function (r) {
               return { id: r.id, eco: true, servidorEm: r.servidorEm, nome: r.nome, updateTime: r.updateTime,
                 atualizadoEm: r.atualizadoEm, apagadoEm: r.apagadoEm, dados: r.dados };
+            })).concat(pulados.map(function (r) {
+              // sem id: o Store só avança o cursor por cima dele
+              return { servidorEm: r.servidorEm, nome: r.nome };
             }));
             // nada a aplicar: nenhuma transação de escrita (o celular em dia não grava nada)
             var aplicar = lote.length ? root.Store.aplicarRecebidos(lote) : Promise.resolve({ aplicados: 0 });
@@ -1047,7 +1058,11 @@
         return pagina();
       });
     }).then(function (r) {
-      if (!r.pulado) { registros.erroRecebimento = null; registros.ultimoRecebimento = { quando: new Date().toISOString(), aplicados: r.aplicados, lidos: r.lidos }; }
+      if (!r.pulado) {
+        registros.erroRecebimento = null;
+        registros.puladosFormatoAntigo = (registros.puladosFormatoAntigo || 0) + puladosAqui;
+        registros.ultimoRecebimento = { quando: new Date().toISOString(), aplicados: r.aplicados, lidos: r.lidos, puladosFormatoAntigo: puladosAqui };
+      }
       return r;
     }, function (e) {
       registros.erroRecebimento = { codigo: (e && e.codigo) || 'ERRO', quando: new Date().toISOString(), mensagem: (e && e.message) || '' };
@@ -1082,7 +1097,7 @@
       aparelhoId: idDoAparelho(),
       registros: { pendentes: registros.pendentes, quarentena: registros.quarentena, ultimoEnvio: registros.ultimoEnvio,
         erro: registros.erro, enviando: !!enviandoRegistros, ultimoRecebimento: registros.ultimoRecebimento || null,
-        erroRecebimento: registros.erroRecebimento || null, recebendo: !!recebendo },
+        erroRecebimento: registros.erroRecebimento || null, recebendo: !!recebendo, puladosFormatoAntigo: registros.puladosFormatoAntigo || 0 },
       soLeitura: !!marcaSoLeitura,
       uidDona: marcaSoLeitura ? marcaSoLeitura.uidDona : null,
       sincronizacaoDesligada: sincronizacaoDesligada,

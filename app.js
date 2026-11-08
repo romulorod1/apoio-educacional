@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.8';
+  var VERSAO = '1.42.9';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.9',
+      itens: [
+        'Por dentro: a sincronização entre os aparelhos ignora, com segurança, qualquer registro de um formato antigo que tenha ficado na nuvem. Para você, nada muda.'
+      ]
+    },
     {
       versao: '1.42.8',
       itens: [
