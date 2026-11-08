@@ -146,9 +146,18 @@ if (TELA) trocas['/app.js'] = APP.replace(GUARDA_TELA_RE, '\n').replace(ESCOLHA,
 if (JANELA_640) trocas['/app.js'] = APP.replace(ESCOLHA, '    var deve = temMarcaCelular() || (window.innerWidth || 0) < 640;');
 /* A migração do corte dos pagamentos, que roda ao desenhar o Fechamento,
  * volta a chamar o salvar() no celular. */
-const CORTE = '    if (!aparelhoSoLe()) salvar();';
-conf('a migração do corte dos pagamentos não grava no celular, num lugar só', APP.split(CORTE).length, 2);
-if (GRAVA_ABERTURA) trocas['/app.js'] = APP.replace(CORTE, '    salvar();');
+/* Desde o D6b a guarda tem duas linhas: o "else" guarda o corte que o celular
+ * pôs só na memória. O veneno troca as DUAS por um salvar() solto; trocar só a
+ * primeira deixava um "else" órfão, o app.js não abria e o veneno reprovava
+ * pelo motivo errado (sem chegar a mostrar a gravação ao abrir). */
+const CORTE_RE = /    if \(!aparelhoSoLe\(\)\) salvar\(\);\r?\n    else corteSoNaMemoria = db\.ajustes\.pagamentosDesde;/;
+conf('a migração do corte dos pagamentos não grava no celular, num lugar só', (APP.match(new RegExp(CORTE_RE.source, 'g')) || []).length, 1);
+if (GRAVA_ABERTURA) {
+  trocas['/app.js'] = APP.replace(CORTE_RE, '    salvar();');
+  let sintaxe = 'ok';
+  try { new Function(trocas['/app.js']); } catch (e) { sintaxe = e.message; }
+  conf('o app.js envenenado continua sendo JavaScript válido (o veneno quebra a regra, não o arquivo)', sintaxe, 'ok');
+}
 const LIMITE = 'var TELA_CELULAR = 500;';
 conf('o limite da tela de celular está num lugar só', APP.split(LIMITE).length, 2);
 if (LIMITE_640) trocas['/app.js'] = APP.replace(LIMITE, 'var TELA_CELULAR = 640;');
