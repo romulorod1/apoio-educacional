@@ -111,8 +111,9 @@
  * só com o cache novo completo, e traz o deploy no Cloudflare com a faixa de
  * endereço desligada (sw.js, app.js, styles.css e index.html). O v79 (N0)
  * traz a cópia na nuvem cifrada no aparelho: nuvem.js e o gerador de QR entram
- * na lista; app.js, store.js, index.html e styles.css mudam. */
-var CACHE = 'apoio-educacional-v79';
+ * na lista; app.js, store.js, index.html e styles.css mudam. O v80 (N0b) conta
+ * a geração das mudanças no envio da nuvem (nuvem.js e app.js). */
+var CACHE = 'apoio-educacional-v80';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

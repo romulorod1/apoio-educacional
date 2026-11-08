@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.3';
+  var VERSAO = '1.42.4';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.4',
+      itens: [
+        'Cópia na nuvem: uma mudança feita enquanto a cópia sobe não se perde mais; ela vai na próxima.'
+      ]
+    },
     {
       versao: '1.42.3',
       itens: [
@@ -20805,8 +20811,11 @@
     var pergunta = motivo === 'ela' ? confirmarEnvioDela(est) : Promise.resolve(true);
     return pergunta.then(function (segue) {
       if (!segue) { enviandoParaNuvem = false; desenharNuvem(); return null; }
+      // a geração lida ANTES de montar o zip: o que ela gravar daqui em diante
+      // não está no retrato e continua pendente depois do envio
+      var geracaoDoRetrato = Nuvem.geracao();
       return Store.exportarTudoZip(db).then(function (zip) {
-        return Nuvem.enviarCopia(zip, { motivo: motivo, versaoApp: VERSAO, conteudo: copiaTemConteudo() });
+        return Nuvem.enviarCopia(zip, { motivo: motivo, versaoApp: VERSAO, conteudo: copiaTemConteudo(), geracao: geracaoDoRetrato });
       });
     }).then(function (copia) {
       enviandoParaNuvem = false;
