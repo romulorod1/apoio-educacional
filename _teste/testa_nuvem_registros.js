@@ -74,7 +74,7 @@ secao('0. As âncoras, o veneno e o ambiente');
 const CIFRA_REGISTRO = "return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv, additionalData: new TextEncoder().encode(ROTULO_REGISTRO) }, k, new TextEncoder().encode(texto));";
 const ENFILEIRAR = 'function enfileirar(saida, entrada) { saida.put(entrada); }';
 const SAIDA_NA_TRANSACAO = "var saida = opcoes.semFila ? null : t.objectStore('saida');";
-const GATILHO = 'Nuvem.enviarRegistrosSeDevido({ versaoApp: VERSAO });';
+const GATILHO = 'Nuvem.sincronizarSeDevido({ versaoApp: VERSAO });'; // desde a fatia 3: recebe e envia
 const COMMIT_TRAVADO = /function commit\(escritas\) \{\r?\n    if \(!podeEnviar\(\)\)/;
 const REGISTROS_NAS_REGRAS = 'match /registros/{registro} {';
 conf('o nuvem.js cifra o registro num lugar só', NUVEM.split(CIFRA_REGISTRO).length, 2);
@@ -82,7 +82,7 @@ conf('o store.js enfileira num lugar só, na transação de quem chamou', STORE.
 conf('a fila é um depósito da MESMA transação do dado', STORE.split(SAIDA_NA_TRANSACAO).length, 2);
 conf("os depósitos do documento incluem a fila", STORE.indexOf("var DEPOSITOS_DO_DOCUMENTO = ['dados', 'registros', 'controle', 'saida'];") > 0, true);
 conf('o app.js dispara o envio nos momentos da cópia, num lugar só', APP.split(GATILHO).length, 2);
-conf('o envio dos registros passa pelo commit, que recusa no aparelho que só lê', COMMIT_TRAVADO.test(NUVEM) && NUVEM.indexOf("gravacao(nomeDoc(uid, 'registros/' + d.id), d)") > 0, true);
+conf('o envio dos registros passa pelo commit, que recusa no aparelho que só lê', COMMIT_TRAVADO.test(NUVEM) && NUVEM.indexOf("gravacaoCarimbada(nomeDoc(uid, 'registros/' + d.id), d, ") > 0, true);
 conf('as regras têm o caminho dos registros, com a forma conferida', REGRAS.split(REGISTROS_NAS_REGRAS).length === 2 && REGRAS.indexOf('registroValido(registro)') > 0, true);
 conf('a lista de ajustes do aparelho tem versaoVista', /AJUSTES_DO_APARELHO = \[[^\]]*'versaoVista'/.test(STORE), true);
 
@@ -321,7 +321,8 @@ function textoDoServidor(docs) {
   conf('há um documento por entrada da fila, pelo id do registro', JSON.stringify(ids), JSON.stringify(filaAntes));
   const aulaDoc = noServidor.docs['aula:s1@2026-06-03'];
   conf('o documento da aula tem só os metadados esperados mais iv e dados',
-    aulaDoc && Object.keys(aulaDoc).sort().join(','), 'aparelho,app,atualizadoEm,dados,esquema,id,iv,tipo');
+    aulaDoc && Object.keys(aulaDoc).sort().join(','), 'aparelho,app,atualizadoEm,dados,esquema,id,iv,servidorEm,tipo');
+  conf('servidorEm é a hora do servidor (timestamp), posta pelo commit', aulaDoc && 'timestampValue' in aulaDoc.servidorEm, true);
   conf('os metadados em claro: id, tipo, atualizadoEm ISO, aparelho do Store, esquema 1, app',
     aulaDoc && aulaDoc.id.stringValue === 'aula:s1@2026-06-03' && aulaDoc.tipo.stringValue === 'aula' && !isNaN(new Date(aulaDoc.atualizadoEm.stringValue).getTime()) &&
       aulaDoc.aparelho.stringValue === gravou.aparelho && aulaDoc.esquema.integerValue === '1' && aulaDoc.app.stringValue === 'prova', true);

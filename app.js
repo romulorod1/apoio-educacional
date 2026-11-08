@@ -20780,9 +20780,26 @@
 
   function temNuvem() { return typeof Nuvem !== 'undefined' && Nuvem.disponivel(); }
 
+  /* N1 (fatia 3): chegaram registros do outro aparelho e o Store já os aplicou
+   * e refez o documento. A memória passa a ser o disco e a tela redesenha;
+   * uma frase diz quantas mudanças chegaram. */
+  function registrosChegaram(contas) {
+    if (!contas || !contas.mudou) return;
+    Store.carregar().then(function (lido) {
+      if (!lido) return;
+      db = lido;
+      valoresOcultos = !!(db.ajustes && db.ajustes.valoresOcultos);
+      desenharTudo();
+      if (modoCelular) desenharCelularDepoisDaNuvem();
+      var n = contas.aplicados;
+      avisar(n === 1 ? 'Chegou 1 mudança do outro aparelho.' : 'Chegaram ' + n + ' mudanças do outro aparelho.');
+    }, function () { /* a próxima abertura lê o disco */ });
+  }
+
   function iniciarNuvem() {
     if (!temNuvem()) { desenharNuvem(); return; }
     Nuvem.aoMudar(desenharNuvem);
+    Store.aoReceber(registrosChegaram);
     Nuvem.pronto().then(function () {
       desenharNuvem();
       // o celular busca a cópia mais nova; quem sobe a dele é só o tablet
@@ -20804,7 +20821,7 @@
     /* N1 (fatia 2): os registros que esperam na fila sobem nos mesmos momentos
      * da cópia (fechar, abrir, voltar), pelas mesmas guardas acima. A recusa da
      * nuvem fica guardada em Nuvem.estado().registros.erro e a fila fica. */
-    Nuvem.enviarRegistrosSeDevido({ versaoApp: VERSAO });
+    Nuvem.sincronizarSeDevido({ versaoApp: VERSAO });
     var devida = motivo === 'diaria' ? Nuvem.copiaDiariaDevida() : Nuvem.copiaAutomaticaDevida();
     if (!devida) return;
     enviarCopiaParaNuvem(motivo);
@@ -21513,6 +21530,10 @@
     celularBuscando = true;
     celularRecado = '';
     desenharTopoCelular();
+    /* N1 (fatia 3): o celular recebe os registros do tablet (registro a
+     * registro, pela exceção da trava), além da cópia completa abaixo. Nunca
+     * envia: o sincronizar no aparelho que só lê só recebe. */
+    Nuvem.receberRegistros();
     return Nuvem.listarCopias(est.uidDona || null).then(function (lista) {
       /* A atual é a que o ponteiro aponta (papel 'atual'), nunca a primeira
        * da lista: sem o cabeçalho dela, a lista só traz a anterior, mais

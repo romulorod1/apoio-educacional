@@ -586,15 +586,16 @@
         if (texto === undefined) return;
         var antes = porId[chave], ordem = ordens[i];
         if (antes && !antes.apagadoEm && antes.ordem === ordem && JSON.stringify(antes.dados) === texto) { contas.iguais++; return; }
+        // `nuvem` (o carimbo do servidor que este aparelho conhece, fatia 3) fica com o registro
         gravarRegistro({ id: chave, tipo: item.tipo, atualizadoEm: agora, apagadoEm: null, aparelho: aparelho,
-          esquema: ESQUEMA_REGISTRO, ordem: ordem, dados: item.dados });
+          esquema: ESQUEMA_REGISTRO, ordem: ordem, dados: item.dados, nuvem: antes && antes.nuvem ? antes.nuvem : null });
         contas.gravados++;
       });
     });
     existentes.forEach(function (r) {
       if (r.apagadoEm || novo.itens[r.id]) return;
       gravarRegistro({ id: r.id, tipo: r.tipo, atualizadoEm: agora, apagadoEm: agora, aparelho: aparelho,
-        esquema: r.esquema || ESQUEMA_REGISTRO, ordem: r.ordem, dados: null });
+        esquema: r.esquema || ESQUEMA_REGISTRO, ordem: r.ordem, dados: null, nuvem: r.nuvem || null });
       contas.lapides++;
     });
     return contas;
@@ -692,14 +693,24 @@
   function confirmarEnvio(itens) {
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = transacao(b, 'saida', 'readwrite');
-        var s = t.objectStore('saida'), tiradas = 0;
+        var t = transacao(b, ['saida', 'registros'], 'readwrite');
+        var s = t.objectStore('saida'), registros = t.objectStore('registros'), tiradas = 0;
         (itens || []).forEach(function (item) {
           var pedido = s.get(item.id);
           pedido.onsuccess = function () {
             var atual = pedido.result;
             if (atual && atual.atualizadoEm === item.atualizadoEm) { s.delete(item.id); tiradas++; }
           };
+          /* O carimbo do servidor que o commit devolveu fica no registro: é a
+           * precondição do próximo envio e o desempate do recebimento (fatia 3). */
+          if (item.nuvem) {
+            var reg = registros.get(item.id);
+            reg.onsuccess = function () {
+              if (!reg.result) return;
+              reg.result.nuvem = { updateTime: item.nuvem.updateTime || null, servidorEm: item.nuvem.servidorEm || null };
+              registros.put(reg.result);
+            };
+          }
         });
         t.oncomplete = function () { resolve(tiradas); };
         t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
@@ -764,6 +775,161 @@
           };
         });
         t.oncomplete = function () { resolve(quarentena); };
+        t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
+
+  // ---------- o recebimento (N1, fatia 3) ----------
+
+  /* Quem quiser saber que chegaram registros do outro aparelho. */
+  var ouvintesDeRecebimento = [];
+  function aoReceber(fn) { ouvintesDeRecebimento.push(fn); }
+  function lerCursor() {
+    return ler('controle', 'cursor').then(function (c) { return c || null; });
+  }
+  /* O id da aula de repetição leva a conta de reaberturas: `serieId@data+rN`. */
+  var ID_DE_REPETICAO = /^([^@]+)@(\d{4}-\d{2}-\d{2})(?:\+r(\d+))?(?:\+\d+)?$/;
+  function partesDoIdDeAula(id) {
+    var m = ID_DE_REPETICAO.exec(String(id || ''));
+    return m ? { serieId: m[1], data: m[2], r: m[3] ? Number(m[3]) : 0 } : null;
+  }
+
+  /* APLICA O QUE CHEGOU DA NUVEM, numa transação só (passa pela trava como a
+   * restauração: é dado que vem da nuvem, e o celular só leitura também
+   * recebe). A regra, por registro, pelo carimbo do servidor:
+   *   - registro que não existe aqui: entra (vivo ou lápide);
+   *   - registro que este aparelho conhece com carimbo do servidor igual ou
+   *     mais novo (`nuvem.servidorEm`): o que chegou é velho ou é o eco do que
+   *     este aparelho mesmo subiu, e não é aplicado;
+   *   - registro com edição LOCAL ainda não enviada (está na fila): a edição
+   *     local é a escrita mais nova, vai subir e vencer; o que chegou fica no
+   *     histórico e só o carimbo do servidor é anotado, para o envio passar;
+   *   - senão o que chegou vence; a versão local que perde vai para o
+   *     histórico ("Antes de receber do outro aparelho"), nunca some calada.
+   * Lápide que chega apaga aqui. Depois, a fusão das reaberturas: numa mesma
+   * série e data, fica viva só a aula de maior r (as outras viram lápide e
+   * entram na fila, para os outros aparelhos saberem). Por fim o `principal`
+   * é refeito dos registros, o retrato e o cursor gravados. */
+  function aplicarRecebidos(lista, opcoes) {
+    opcoes = opcoes || {};
+    var agora = new Date().toISOString();
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var nomes = DEPOSITOS_DO_DOCUMENTO.concat(['historico']);
+        var t = transacao(b, nomes, 'readwrite', true);
+        var registros = t.objectStore('registros'), saida = t.objectStore('saida');
+        var contas = { aplicados: 0, ignorados: 0, perdedoresLocais: 0, fundidas: 0, cursor: null, mudou: false };
+        /* A fila e o cursor são pedidos ANTES dos registros: os pedidos de uma
+         * transação respondem na ordem, e o processamento acontece na resposta
+         * do último. */
+        var filaReq = saida.getAll();
+        var cursorReq = t.objectStore('controle').get('cursor');
+        var todosReq = registros.getAll();
+        var fila = {}, existentes = [], cursorAntes = null;
+        filaReq.onsuccess = function () { (filaReq.result || []).forEach(function (e) { fila[e.id] = e; }); };
+        cursorReq.onsuccess = function () { cursorAntes = cursorReq.result || null; };
+        todosReq.onsuccess = function () {
+          existentes = todosReq.result || [];
+          var porId = {};
+          existentes.forEach(function (r) { porId[r.id] = r; });
+          var dbAntes = montar(existentes);
+          var maiorOrdem = -1;
+          existentes.forEach(function (r) { if (typeof r.ordem === 'number' && r.ordem > maiorOrdem) maiorOrdem = r.ordem; });
+          var maiorServidorEm = cursorAntes && cursorAntes.servidorEm ? cursorAntes.servidorEm : '';
+          var houvePerdedor = false, chegadosQuePerderam = [];
+          (lista || []).forEach(function (chegou) {
+            // o eco do próprio aparelho vem sem id: só avança o cursor
+            if (chegou && chegou.servidorEm && chegou.servidorEm > maiorServidorEm) maiorServidorEm = chegou.servidorEm;
+            if (!chegou || !chegou.id) return;
+            var local = porId[chegou.id];
+            var carimbo = { updateTime: chegou.updateTime || null, servidorEm: chegou.servidorEm || null };
+            if (local && local.nuvem && local.nuvem.servidorEm && chegou.servidorEm && local.nuvem.servidorEm >= chegou.servidorEm) {
+              contas.ignorados++;
+              return;
+            }
+            if (local && fila[chegou.id] && !fila[chegou.id].quarentena) {
+              // a edição local ainda não enviada vence: só o carimbo é anotado
+              local.nuvem = carimbo;
+              registros.put(local);
+              porId[chegou.id] = local;
+              if (JSON.stringify(local.dados) !== JSON.stringify(chegou.dados || null) || !!local.apagadoEm !== !!chegou.apagadoEm) {
+                // a versão do outro aparelho que não entrou aqui vai para o histórico, não some
+                chegadosQuePerderam.push({ id: chegou.id, tipo: chegou.tipo, atualizadoEm: chegou.atualizadoEm || agora, apagadoEm: chegou.apagadoEm || null,
+                  aparelho: chegou.aparelho || '', esquema: chegou.esquema || ESQUEMA_REGISTRO, ordem: local.ordem,
+                  dados: chegou.apagadoEm ? null : (chegou.dados === undefined ? null : chegou.dados) });
+              }
+              contas.ignorados++;
+              return;
+            }
+            var novo = { id: chegou.id, tipo: chegou.tipo, atualizadoEm: chegou.atualizadoEm || agora, apagadoEm: chegou.apagadoEm || null,
+              aparelho: chegou.aparelho || '', esquema: chegou.esquema || ESQUEMA_REGISTRO,
+              ordem: local && typeof local.ordem === 'number' ? local.ordem : ++maiorOrdem,
+              dados: chegou.apagadoEm ? null : (chegou.dados === undefined ? null : chegou.dados), nuvem: carimbo };
+            if (local && !local.apagadoEm && (JSON.stringify(local.dados) !== JSON.stringify(novo.dados) || !!novo.apagadoEm)) {
+              houvePerdedor = true;
+              contas.perdedoresLocais++;
+            }
+            registros.put(novo);
+            porId[chegou.id] = novo;
+            contas.aplicados++;
+            contas.mudou = true;
+          });
+          // a fusão das reaberturas: numa mesma série e data, só a aula de maior r fica viva
+          var porSerieData = {};
+          Object.keys(porId).forEach(function (id) {
+            var r = porId[id];
+            if (r.tipo !== 'aula' || r.apagadoEm) return;
+            var p = partesDoIdDeAula(id.slice('aula:'.length));
+            if (!p) return;
+            var chave = p.serieId + '@' + p.data;
+            (porSerieData[chave] = porSerieData[chave] || []).push({ reg: r, r: p.r });
+          });
+          Object.keys(porSerieData).forEach(function (chave) {
+            var grupo = porSerieData[chave];
+            if (grupo.length < 2) return;
+            grupo.sort(function (a, b) { return b.r - a.r; });
+            grupo.slice(1).forEach(function (g) {
+              var lapide = { id: g.reg.id, tipo: g.reg.tipo, atualizadoEm: agora, apagadoEm: agora, aparelho: aparelhoId || g.reg.aparelho,
+                esquema: g.reg.esquema || ESQUEMA_REGISTRO, ordem: g.reg.ordem, dados: null, nuvem: g.reg.nuvem || null };
+              registros.put(lapide);
+              porId[g.reg.id] = lapide;
+              enfileirar(saida, { id: lapide.id, tipo: lapide.tipo, atualizadoEm: agora, apagadoEm: agora });
+              contas.fundidas++;
+              contas.mudou = true;
+            });
+          });
+          if (houvePerdedor) {
+            t.objectStore('historico').add({ rotulo: 'Antes de receber do outro aparelho', quando: Date.now(),
+              estado: JSON.parse(JSON.stringify(completar(dbAntes))) });
+          }
+          if (chegadosQuePerderam.length) {
+            // o documento como ficaria com a versão do outro aparelho: "Voltar a este ponto" a traz de volta
+            var comOOutro = {};
+            existentes.forEach(function (r) { comOOutro[r.id] = r; });
+            chegadosQuePerderam.forEach(function (r) { comOOutro[r.id] = r; });
+            t.objectStore('historico').add({ rotulo: 'Do outro aparelho, que perdeu para a edição daqui', quando: Date.now(),
+              estado: JSON.parse(JSON.stringify(completar(montar(Object.keys(comOOutro).map(function (id) { return comOOutro[id]; }))))) });
+            contas.chegadosQuePerderam = chegadosQuePerderam.length;
+          }
+          if (contas.mudou) {
+            var dbDepois = completar(montar(Object.keys(porId).map(function (id) { return porId[id]; })));
+            t.objectStore('dados').put(dbDepois, 'principal');
+            t.objectStore('controle').put({ quando: agora, esquema: VERSAO_BANCO, assinatura: assinatura(dbDepois) }, 'retrato');
+          }
+          if (maiorServidorEm && (!cursorAntes || !cursorAntes.servidorEm || maiorServidorEm > cursorAntes.servidorEm)) {
+            t.objectStore('controle').put({ servidorEm: maiorServidorEm, quando: agora }, 'cursor');
+            contas.cursor = maiorServidorEm;
+          } else if (cursorAntes) {
+            contas.cursor = cursorAntes.servidorEm || null;
+          }
+        };
+        t.oncomplete = function () {
+          if (contas.mudou) avisarMudanca('dados');
+          ouvintesDeRecebimento.forEach(function (fn) { try { fn(contas); } catch (e) { /* o ouvinte se vira */ } });
+          resolve(contas);
+        };
         t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
         t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
       });
@@ -1713,6 +1879,7 @@
     lerRegistros: function () { return todosOsValores('registros'); },
     registrosDaFila: registrosDaFila, confirmarEnvio: confirmarEnvio, tamanhoDaFila: tamanhoDaFila,
     estadoDaFila: estadoDaFila, marcarTentativa: marcarTentativa, soltarQuarentena: soltarQuarentena,
+    aplicarRecebidos: aplicarRecebidos, lerCursor: lerCursor, aoReceber: aoReceber, partesDoIdDeAula: partesDoIdDeAula,
     lerFila: function () { return todosOsValores('saida'); },
     sincronizavel: sincronizavel,
     montarRegistros: montar,

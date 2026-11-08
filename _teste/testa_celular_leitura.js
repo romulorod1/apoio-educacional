@@ -290,7 +290,13 @@ async function prepararPagina(pag, largura, altura, movel) {
   });
 }
 const definirTela = (pag, t) => pag.evaluate(t => { if (t) sessionStorage.setItem('__tela', JSON.stringify(t)); else sessionStorage.removeItem('__tela'); }, t);
-const escritasNoBanco = pag => pag.evaluate(() => window.__escritas.slice());
+/* Desde a N1 fatia 3 o celular RECEBE registros do tablet: é a segunda escrita
+ * permitida (passa pela trava como a restauração), com os depósitos do
+ * documento e o histórico, e sem as folhas. Ela fica fora da conta: o que
+ * esta prova mede é que o celular não grava NADA SEU. */
+const RECEBIMENTO = 'dados,registros,controle,saida,historico';
+const escritasNoBanco = pag => pag.evaluate(r => window.__escritas.filter(e => e !== r), RECEBIMENTO);
+const recebimentosNoBanco = pag => pag.evaluate(r => window.__escritas.filter(e => e === r).length, RECEBIMENTO);
 /* Zera a conta da aba, para medir só o que vem depois. */
 const recusasSoLeitura = pag => pag.evaluate(() => window.__avisos.filter(t => /Este celular só lê\. Para mudar/.test(t)));
 const zerarEscritas = pag => pag.evaluate(() => { window.__escritas = []; sessionStorage.removeItem('__escritas'); });
@@ -467,7 +473,10 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
   prop('a cópia sem pagamentosDesde: abrir o celular não mostra "Este celular só lê" (' + (await recusasSoLeitura(pagB)).length + ' vezes)',
     (await recusasSoLeitura(pagB)).length === 0, '--envenenado-grava-abertura');
   if (GRAVA_ABERTURA) { await ctxB.close(); return; }
-  conf('e não gravou: o disco continua sem pagamentosDesde e nenhuma escrita no banco', semCorteNoDisco && (await escritasNoBanco(pagB)).length === 0, true);
+  /* O corte dos pagamentos pode chegar pelos registros do tablet (fatia 3): o
+   * que não pode é o celular gravar a migração ele mesmo. */
+  conf('e não gravou: nenhuma escrita sua no banco (o corte só pode ter vindo do tablet, pelos registros: ' +
+    (semCorteNoDisco ? 'não veio' : 'veio, em ' + (await recebimentosNoBanco(pagB)) + ' recebimento(s)') + ')', (await escritasNoBanco(pagB)).length, 0);
   await zerarEscritas(pagB);
 
   secao('4. As três telas: sem rolagem de lado, alvos de 44 px e nenhum botão de edição');

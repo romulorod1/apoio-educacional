@@ -255,6 +255,8 @@
         e.status = r.status;
         if (r.status === 404) e.codigo = 'NOT_FOUND';
         if (r.status === 403) e.codigo = 'PERMISSION_DENIED';
+        // a precondição do commit (fatia 3): outro aparelho ou outra aba escreveu antes
+        if (json && json.error && json.error.status === 'FAILED_PRECONDITION') e.codigo = 'FAILED_PRECONDITION';
         throw e;
       });
     }, function () { throw semRede(); });
@@ -507,6 +509,7 @@
       else if ('booleanValue' in v) saida[k] = !!v.booleanValue;
       else if ('arrayValue' in v) saida[k] = ((v.arrayValue && v.arrayValue.values) || []).map(function (x) { return x.stringValue; });
       else if ('stringValue' in v) saida[k] = v.stringValue;
+      else if ('timestampValue' in v) saida[k] = v.timestampValue; // servidorEm (fatia 3)
       else saida[k] = null;
     });
     return saida;
@@ -537,6 +540,17 @@
     });
   }
   function gravacao(nome, obj) { return { update: { name: nome, fields: campos(obj) } }; }
+  /* A escrita de um registro (fatia 3): o servidor carimba `servidorEm` com a
+   * hora DELE (é o carimbo que ordena o recebimento), e a precondição
+   * `currentDocument.updateTime` recusa a escrita se outro aparelho ou outra
+   * aba gravou depois do que este aparelho viu por último; sem carimbo
+   * conhecido, sem precondição (o primeiro envio do registro). */
+  function gravacaoCarimbada(nome, obj, updateTime) {
+    var w = { update: { name: nome, fields: campos(obj) },
+      updateTransforms: [{ fieldPath: 'servidorEm', setToServerValue: 'REQUEST_TIME' }] };
+    if (updateTime) w.currentDocument = { updateTime: updateTime };
+    return w;
+  }
   function remocao(nome) { return { delete: nome }; }
 
   // ---------- a cópia: subir ----------
@@ -898,9 +912,18 @@
       /* Um lote inteiro, num commit; o que subiu sai da fila. */
       function subirLote(itens) {
         return Promise.all(itens.map(function (i) { return documentoDoRegistro(i.registro, info.versaoApp); })).then(function (docs) {
-          return commit(docs.map(function (d) { return gravacao(nomeDoc(uid, 'registros/' + d.id), d); }));
-        }).then(function () {
-          return root.Store.confirmarEnvio(itens.map(function (i) { return { id: i.fila.id, atualizadoEm: i.fila.atualizadoEm }; }));
+          return commit(docs.map(function (d, k) {
+            var conhecido = itens[k].registro.nuvem && itens[k].registro.nuvem.updateTime;
+            return gravacaoCarimbada(nomeDoc(uid, 'registros/' + d.id), d, conhecido || null);
+          }));
+        }).then(function (resposta) {
+          var resultados = (resposta && resposta.writeResults) || [];
+          return root.Store.confirmarEnvio(itens.map(function (i, k) {
+            var w = resultados[k] || {};
+            var transformado = w.transformResults && w.transformResults[0] && w.transformResults[0].timestampValue;
+            return { id: i.fila.id, atualizadoEm: i.fila.atualizadoEm,
+              nuvem: { updateTime: w.updateTime || null, servidorEm: transformado || w.updateTime || null } };
+          }));
         });
       }
       /* O COMMIT É ATÔMICO: um registro que a regra ou o teto de 1 MiB recuse
@@ -912,7 +935,7 @@
        * falhando inteiras é a nuvem recusando tudo, e não se desce mais. */
       function subir(itens) {
         return subirLote(itens).then(function (n) { return { enviados: n, indefinidos: [], erro: null }; }, function (e) {
-          if (!e || e.codigo === 'SEM_REDE' || e.codigo === 'TOKEN_EXPIRED') throw e;
+          if (!e || e.codigo === 'SEM_REDE' || e.codigo === 'TOKEN_EXPIRED' || e.codigo === 'FAILED_PRECONDITION') throw e;
           if (itens.length === 1) return { enviados: 0, indefinidos: itens, erro: e };
           var meio = Math.ceil(itens.length / 2), a = itens.slice(0, meio), b = itens.slice(meio);
           return subir(a).then(function (r1) {
@@ -931,6 +954,7 @@
         });
       }
       var jaCulpados = {}; // quem levou tentativa neste envio não volta ao lote até o próximo envio
+      var recebimentos = 0; // quantas vezes a precondição mandou receber antes de insistir
       function proximoLote() {
         return quarentenaLida.then(lerLote);
       }
@@ -939,7 +963,18 @@
           itens = itens.filter(function (i) { return !!i.registro && !jaCulpados[i.fila.id]; });
           if (!itens.length || lotes >= 50) return { enviados: enviados };
           lotes++;
-          return subir(itens).then(function (r) {
+          return subir(itens).then(null, function (e) {
+            /* A PRECONDIÇÃO FALHOU: outro aparelho (ou outra aba) gravou algum
+             * destes registros depois do que este aparelho viu. Recebe primeiro
+             * (a regra do recebimento decide, e anota o carimbo novo), e tenta de
+             * novo; na terceira vez a fila fica para o próximo envio. */
+            if (e && e.codigo === 'FAILED_PRECONDITION' && recebimentos < 2) {
+              recebimentos++;
+              return receberRegistros().then(function () { return { enviados: 0, indefinidos: [], erro: null, repetir: true }; });
+            }
+            throw e;
+          }).then(function (r) {
+            if (r.repetir) return lerLote();
             enviados += r.enviados;
             if (!r.indefinidos.length) return proximoLote();
             /* Culpa do registro, e não da nuvem: outros do mesmo lote passaram, ou
@@ -985,6 +1020,101 @@
     return enviandoRegistros;
   }
 
+  // ---------- o recebimento (N1, fatia 3) ----------
+
+  function decifrarRegistro(iv, dados) {
+    return chaveCripto(chaveBruta, ['decrypt']).then(function (k) {
+      return crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv, additionalData: new TextEncoder().encode(ROTULO_REGISTRO) }, k, dados);
+    }).then(function (saida) { return JSON.parse(new TextDecoder().decode(new Uint8Array(saida))); });
+  }
+  var recebendo = null;
+  /* Busca no servidor os registros com `servidorEm` depois do cursor deste
+   * aparelho, em ordem, decifra e aplica (Store.aplicarRecebidos decide por
+   * registro). O celular só leitura também recebe: é leitura na nuvem e a
+   * escrita local passa pela trava como a restauração. Nunca rejeita por
+   * recusa da nuvem: o erro fica em registros.erroRecebimento. */
+  function receberRegistros() {
+    if (recebendo) return recebendo;
+    var aplicados = 0, lidos = 0, paginas = 0, uidDona;
+    recebendo = carregarEstado().then(function () {
+      if (!sessao) return { pulado: 'sem conta', aplicados: 0 };
+      if (!chaveBruta) return { pulado: 'sem chave', aplicados: 0 };
+      if (!online()) throw semRede();
+      if (!root.Store || typeof root.Store.aplicarRecebidos !== 'function') return { pulado: 'sem store', aplicados: 0 };
+      uidDona = (marcaSoLeitura && marcaSoLeitura.uidDona) || sessao.uid;
+      return root.Store.lerCursor().then(function (cursor) {
+        var desde = (cursor && cursor.servidorEm) || '1970-01-01T00:00:00Z';
+        function pagina() {
+          if (paginas++ >= 50) return { aplicados: aplicados, lidos: lidos };
+          return comToken(function (cab) {
+            return pedir(urlDoc(raizDocumentos() + '/usuarios/' + uidDona) + ':runQuery', { cabecalhos: cab, corpo: {
+              structuredQuery: {
+                from: [{ collectionId: 'registros' }],
+                where: { fieldFilter: { field: { fieldPath: 'servidorEm' }, op: 'GREATER_THAN', value: { timestampValue: desde } } },
+                orderBy: [{ field: { fieldPath: 'servidorEm' }, direction: 'ASCENDING' }],
+                limit: 300
+              }
+            } });
+          }).then(function (resposta) {
+            var docs = (resposta || []).filter(function (x) { return x && x.document; }).map(function (x) { return x.document; });
+            lidos += docs.length;
+            var meuId = idDoAparelho();
+            return Promise.all(docs.map(function (d) {
+              var v = valores(d.fields);
+              var reg = { id: v.id, tipo: v.tipo, atualizadoEm: v.atualizadoEm, apagadoEm: v.apagadoEm || null, aparelho: v.aparelho || '',
+                esquema: v.esquema || 1, servidorEm: v.servidorEm || null, updateTime: d.updateTime || null, dados: null, eco: false };
+              if (meuId && reg.aparelho === meuId) reg.eco = true;
+              if (reg.apagadoEm || !v.dados || !v.iv) return reg;
+              return decifrarRegistro(v.iv, v.dados).then(function (dados) { reg.dados = dados; return reg; }, function () {
+                reg.indecifravel = true; return reg;
+              });
+            })).then(function (regs) {
+              /* O eco do que este aparelho mesmo subiu só avança o cursor: o
+               * registro já está aqui, com o carimbo anotado no envio. O que não
+               * decifra (outra chave) não é aplicado, e não some calado: conta. */
+              var aplicaveis = regs.filter(function (r) { return !r.eco && !r.indecifravel; });
+              var ecos = regs.filter(function (r) { return r.eco; });
+              var indecifraveis = regs.filter(function (r) { return r.indecifravel; }).length;
+              var ultimo = regs.length ? regs[regs.length - 1].servidorEm : null;
+              var lote = aplicaveis.concat(ecos.map(function (r) { return { id: null, servidorEm: r.servidorEm }; }));
+              // nada a aplicar: nenhuma transação de escrita (o celular em dia não grava nada)
+              var aplicar = lote.length ? root.Store.aplicarRecebidos(lote) : Promise.resolve({ aplicados: 0 });
+              return aplicar.then(function (contas) {
+                aplicados += contas.aplicados;
+                registros.indecifraveis = (registros.indecifraveis || 0) + indecifraveis;
+                if (docs.length < 300 || !ultimo) return { aplicados: aplicados, lidos: lidos };
+                desde = ultimo;
+                return pagina();
+              });
+            });
+          });
+        }
+        return pagina();
+      });
+    }).then(function (r) {
+      if (!r.pulado) { registros.erroRecebimento = null; registros.ultimoRecebimento = { quando: new Date().toISOString(), aplicados: r.aplicados, lidos: r.lidos }; }
+      return r;
+    }, function (e) {
+      registros.erroRecebimento = { codigo: (e && e.codigo) || 'ERRO', quando: new Date().toISOString(), mensagem: (e && e.message) || '' };
+      return { aplicados: aplicados, erro: registros.erroRecebimento };
+    });
+    var limpar = function () { recebendo = null; avisarOuvintes(); };
+    recebendo.then(limpar, limpar);
+    return recebendo;
+  }
+  /* Receber e depois enviar: a ordem que faz a precondição passar na maior
+   * parte das vezes. O aparelho que só lê só recebe. */
+  function sincronizar(info) {
+    return receberRegistros().then(function (r) {
+      if (!podeEnviar()) return { recebidos: r, enviados: { pulado: 'so leitura', enviados: 0 } };
+      return enviarRegistros(info).then(function (e) { return { recebidos: r, enviados: e }; });
+    });
+  }
+  function sincronizarSeDevido(info) {
+    if (!(sessao && chaveBruta && online())) return Promise.resolve({ pulado: 'indevido' });
+    return sincronizar(info);
+  }
+
   function estado() {
     return {
       disponivel: disponivel(),
@@ -997,7 +1127,8 @@
       aparelho: aparelho,
       aparelhoId: idDoAparelho(),
       registros: { pendentes: registros.pendentes, quarentena: registros.quarentena, ultimoEnvio: registros.ultimoEnvio,
-        erro: registros.erro, enviando: !!enviandoRegistros },
+        erro: registros.erro, enviando: !!enviandoRegistros, ultimoRecebimento: registros.ultimoRecebimento || null,
+        erroRecebimento: registros.erroRecebimento || null, recebendo: !!recebendo, indecifraveis: registros.indecifraveis || 0 },
       soLeitura: !!marcaSoLeitura,
       uidDona: marcaSoLeitura ? marcaSoLeitura.uidDona : null,
       online: online()
@@ -1036,6 +1167,7 @@
     marcarMudanca: marcarMudanca, desligarAutomatica: desligarAutomatica,
     geracao: function () { return geracao; },
     enviarRegistros: enviarRegistros, enviarRegistrosSeDevido: enviarRegistrosSeDevido, contarFila: contarFila,
+    receberRegistros: receberRegistros, sincronizar: sincronizar, sincronizarSeDevido: sincronizarSeDevido,
     copiaAutomaticaDevida: copiaAutomaticaDevida, copiaDiariaDevida: copiaDiariaDevida,
     fraseDeQuando: fraseDeQuando,
     TETO_PARTE: TETO_PARTE

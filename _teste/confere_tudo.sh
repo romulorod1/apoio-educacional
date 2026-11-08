@@ -780,6 +780,15 @@ roda "nuvem registros --envenenado-fila-fora-da-transacao" node "_teste/testa_nu
 # (revisao) recusa total da nuvem nunca conta tentativa: o veneno que culpa quem ja
 # tinha tentativa leva um bom sozinho a quarentena, e TEM de ser visto.
 roda "nuvem registros --envenenado-culpa-na-recusa-total" node "_teste/testa_nuvem_registros.js" --envenenado-culpa-na-recusa-total
+# N1 fatia 3: o recebimento. Dois tablets e um celular contra o emulador: cursor por
+# servidorEm, ultima escrita vence por registro pelo carimbo do servidor, a versao
+# que perde vai ao historico, lapide de um nao volta pelo outro, duas abas em ordem
+# cruzada (precondicao updateTime), r1 e r2 na mesma data (fica a de maior r), o
+# celular recebe e nunca envia. Venenos: ignorar a lapide e aplicar o mais velho
+# por cima TEM de ser vistos.
+roda "nuvem recebe (N1 fatia 3)"                    node "_teste/testa_nuvem_recebe.js"
+roda "nuvem recebe --envenenado-ignora-lapide"      node "_teste/testa_nuvem_recebe.js" --envenenado-ignora-lapide
+roda "nuvem recebe --envenenado-velho-por-cima"     node "_teste/testa_nuvem_recebe.js" --envenenado-velho-por-cima
 roda "celular so leitura"                           node "_teste/testa_celular_leitura.js"
 roda "celular so leitura --envenenado-envia"        node "_teste/testa_celular_leitura.js" --envenenado-envia
 roda "celular so leitura --envenenado-edicao"       node "_teste/testa_celular_leitura.js" --envenenado-edicao
