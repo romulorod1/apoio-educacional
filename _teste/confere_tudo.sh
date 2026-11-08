@@ -665,6 +665,12 @@ roda "banco v5 --envenenado-regrava-tudo"         node "_teste/testa_banco_v5.js
 # registros, e TEM de ser visto.
 roda "rollback v4 (N1)"                           node "_teste/testa_rollback_v4.js"
 roda "rollback v4 --envenenado-registros-ressuscitam" node "_teste/testa_rollback_v4.js" --envenenado-registros-ressuscitam
+# N1: a volta depois do rollback. O codigo da 4 republicado com o numero novo abre
+# um banco nesse numero sem os depositos novos; o codigo novo, voltando, sonda o
+# banco, cria o que falta na versao mais um e migra. O veneno sem a deteccao TEM
+# de cair em NotFoundError.
+roda "banco cura (N1)"                            node "_teste/testa_banco_cura.js"
+roda "banco cura --envenenado-sem-cura"           node "_teste/testa_banco_cura.js" --envenenado-sem-cura
 # C15.1: o banco sobe de 3 para 4 sem perder nada; o pacote de livros sintetico
 # importa por Ajustes; a copia de seguranca nao cresce com 1,2 MB de livro no
 # tablet; o PDF abre pelo sumario no capitulo 2 e reabre onde parou; o EPUB abre
