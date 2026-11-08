@@ -1480,6 +1480,30 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   box-shadow: var(--sombra-forte);
 }
 .faixa-gravacao[hidden] { display: none; }
+/* B4: só no endereço antigo. No mesmo lugar da faixa de gravação, no fluxo,
+ * para não cobrir as abas; o aplicativo continua inteiro por baixo. */
+.faixa-endereco {
+  flex-shrink: 0;
+  margin: 8px 12px 0;
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: var(--soft);
+  border: 1px solid var(--fio);
+  border-left: 4px solid var(--navy);
+  color: var(--texto);
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-size: 15px;
+}
+.faixa-endereco strong { color: var(--navy); font-size: 16px; }
+.faixa-endereco p { margin: 4px 0; }
+.faixa-endereco ol { margin: 4px 0 0; padding-left: 20px; }
+.faixa-endereco-botoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.faixa-endereco-botoes .btn { min-height: var(--alvo); }
+.faixa-endereco-botoes a.btn { display: inline-flex; align-items: center; text-decoration: none; }
+.faixa-endereco[hidden] { display: none; }
 .faixa-info {
   background: var(--teal-claro);
   border: 1px solid var(--info-borda);
@@ -1702,6 +1726,7 @@ body.modo-familia > .cabecalho,
 body.modo-familia > .conteudo,
 body.modo-familia > .aviso,
 body.modo-familia > .faixa-gravacao,
+body.modo-familia > .faixa-endereco,
 body.modo-familia > .fundo-modal:not(#modal-mes) { display: none !important; }
 
 body.modo-familia #modal-mes { padding: 0; background: var(--ivory); }

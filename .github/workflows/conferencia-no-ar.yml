@@ -12,21 +12,48 @@
 # novo, e comparar o site com um commit que ja foi ultrapassado reprovaria
 # sem defeito nenhum.
 #
-# SITE muda no B4 (origem propria no Cloudflare Pages); e a unica linha a
-# trocar aqui.
+# DOIS ENDERECOS DESDE O B4, enquanto o antigo existir:
+#   antigo  https://romulorod1.github.io/apoio-educacional, o GitHub Pages, que
+#           publica sozinho a cada push na main; conferido no push, como sempre.
+#   novo    https://apoio-educacional.pages.dev, o Cloudflare Pages, que so
+#           recebe o commit depois do portao inteiro verde; conferido quando o
+#           publica-cloudflare.yml termina de enviar (ele chama este arquivo
+#           com workflow_call, dizendo o site e o commit). No push o novo ainda
+#           nao tem o commit, e conferir ali reprovaria sem defeito.
+# Na mao (workflow_dispatch), escolhe-se qual dos dois.
+#
+# Quando o GitHub Pages for desligado (virada do B4), sai o push e a linha
+# SITE_ANTIGO; o resto fica.
 name: conferencia-no-ar
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      site:
+        description: Endereco a conferir
+        type: choice
+        default: https://apoio-educacional.pages.dev
+        options:
+          - https://apoio-educacional.pages.dev
+          - https://romulorod1.github.io/apoio-educacional
+  workflow_call:
+    inputs:
+      site:
+        type: string
+        required: true
+      ref:
+        type: string
+        required: true
 
+# Um grupo por endereco: a conferencia do novo nao cancela a do antigo.
 concurrency:
-  group: conferencia-no-ar
+  group: conferencia-no-ar-${{ inputs.site || 'antigo' }}
   cancel-in-progress: true
 
 env:
-  SITE: https://romulorod1.github.io/apoio-educacional
+  SITE_ANTIGO: https://romulorod1.github.io/apoio-educacional
 
 jobs:
   no-ar:
@@ -34,5 +61,12 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - name: O site publicado bate com o commit
-        run: sh _teste/confere_no_ar.sh "$SITE" 900
+        env:
+          SITE_PEDIDO: ${{ inputs.site }}
+        run: |
+          SITE="${SITE_PEDIDO:-$SITE_ANTIGO}"
+          echo "conferindo $SITE"
+          sh _teste/confere_no_ar.sh "$SITE" 900

@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.1';
+  var VERSAO = '1.42.2';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,13 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.2',
+      itens: [
+        'Ao tocar em "Atualizar agora", o aviso mostra "Atualizando..." e a troca só acontece com a versão nova inteira baixada: nada fica pela metade, nem num tablet lento.',
+        'A versão aberta continua funcionando sem internet mesmo quando a versão nova tem menos arquivos.'
+      ]
+    },
     {
       versao: '1.42.1',
       itens: [
@@ -1541,6 +1548,54 @@
     if (faixa) faixa.hidden = true;
   }
 
+  /* O APLICATIVO MUDOU DE ENDEREÇO (B4). O endereço novo é uma origem só
+   * dele, no Cloudflare Pages; o antigo, no GitHub Pages, divide a origem
+   * romulorod1.github.io com todo projeto da conta. Os dados moram no
+   * IndexedDB da origem e não atravessam sozinhos: a passagem é salvar a cópia
+   * aqui e restaurar no novo (ou entrar, quando a nuvem existir). Até ela
+   * passar, este endereço continua funcionando igual, só com a faixa.
+   *
+   * ONDE aparece é decidido pela origem: o mesmo código vai para os dois
+   * endereços, e a faixa só pode aparecer no antigo.
+   *
+   * QUANDO aparece é esta constante. Ela entra DESLIGADA: o endereço novo já é
+   * publicado a cada merge, mas ninguém é mandado para lá antes de a fase 0
+   * da nuvem existir. Liga junto com a fase 0, para a migração dela ser um
+   * toque (instalar o novo e entrar), como pedem as instruções. A prova
+   * testa_mudou_de_endereco_navegador cobre os dois estados. */
+  var MUDOU_DE_ENDERECO_NO_AR = false;
+  var ENDERECO_NOVO = 'https://apoio-educacional.pages.dev/';
+  function noEnderecoAntigo(nome) {
+    return /(^|\.)github\.io$/i.test(String(nome || ''));
+  }
+
+  function mostrarFaixaEndereco() {
+    if (!MUDOU_DE_ENDERECO_NO_AR || !noEnderecoAntigo(location.hostname) || $('#faixa-endereco')) return;
+    var faixa = el('div', { id: 'faixa-endereco', class: 'faixa-endereco', role: 'status' }, [
+      el('div', { class: 'cresce' }, [
+        el('strong', { texto: 'O aplicativo mudou de endereço' }),
+        el('p', { texto: 'O endereço novo é apoio-educacional.pages.dev. Este aqui continua funcionando, ' +
+          'com tudo o que você já guardou, até você passar para o novo.' }),
+        el('ol', {}, [
+          el('li', { texto: 'Aqui, toque em "Salvar a cópia agora" e guarde o arquivo.' }),
+          el('li', { texto: 'Abra o endereço novo e instale: no menu do Chrome, "Instalar aplicativo".' }),
+          el('li', { texto: 'No aplicativo novo, em Ajustes, toque em "Restaurar de uma cópia" e escolha o arquivo.' })
+        ])
+      ]),
+      el('div', { class: 'faixa-endereco-botoes' }, [
+        el('a', { class: 'btn principal pequeno', id: 'faixa-endereco-abrir', href: ENDERECO_NOVO,
+          target: '_blank', rel: 'noopener', texto: 'Abrir o endereço novo' }),
+        el('button', { type: 'button', class: 'btn pequeno', id: 'faixa-endereco-copia', texto: 'Salvar a cópia agora',
+          aoClick: function () { var b = $('#baixar-copia'); if (b) b.click(); } }),
+        el('button', { type: 'button', class: 'btn pequeno', id: 'faixa-endereco-fechar', texto: 'Agora não',
+          aoClick: function () { faixa.hidden = true; } })
+      ])
+    ]);
+    var cabecalho = $('.cabecalho');
+    if (cabecalho) cabecalho.insertAdjacentElement('afterend', faixa);
+    else document.body.insertBefore(faixa, document.body.firstChild);
+  }
+
   /* O OUVINTE GLOBAL. A rejeição que o salvar() já avisou passa calada aqui
    * (preventDefault), porque a faixa já está na tela. Qualquer outra promessa
    * rejeitada sem tratamento vira uma frase para ela e uma linha no console, e
@@ -1884,6 +1939,8 @@
       ligarEventos();
       atualizarBotaoOlho();
       desenharTudo();
+      // só no endereço antigo, pela origem (B4)
+      mostrarFaixaEndereco();
       atualizarTemBiblioteca();
       // o botão Livros da aba Biblioteca nasce com a conta dos livros (C15.1)
       desenharLivrosAjustes();
@@ -1919,12 +1976,12 @@
    * worker, e não só ao registration.waiting. A consulta tem prazo e aceita
    * ficar sem resposta, para funcionar com os workers de antes do D2, que não
    * conhecem a mensagem. */
-  function consultarWorker(worker, tipo) {
+  function consultarWorker(worker, tipo, prazoMs) {
     if (!worker || typeof MessageChannel === 'undefined') return Promise.resolve(null);
     return new Promise(function (resolve) {
       var canal = new MessageChannel();
       var terminou = false;
-      var prazo = setTimeout(function () { acabar(null); }, 1200);
+      var prazo = setTimeout(function () { acabar(null); }, prazoMs || 1200);
       function acabar(resposta) {
         if (terminou) return;
         terminou = true;
@@ -1938,8 +1995,11 @@
     });
   }
 
+  /* Prazo de 5 s: o worker em espera pode estar parado e precisa subir antes de
+   * responder. Com 1,2 s, um worker que demora a subir (tablet lento, máquina
+   * ocupada) fazia o aviso sair sem o número da versão. */
   function conferirVersaoAtiva() {
-    return consultarWorker(registroSW && (registroSW.waiting || registroSW.active), 'estado-versao').then(function (estado) {
+    return consultarWorker(registroSW && (registroSW.waiting || registroSW.active), 'estado-versao', 5000).then(function (estado) {
       versaoPendenteAtiva = estado && estado.pendente ? estado : null;
       if (versaoPendenteAtiva) mostrarAvisoDeVersao();
       return !!versaoPendenteAtiva;
@@ -2026,10 +2086,19 @@
     prontoParaRecarregar().then(function (ok) {
       if (!ok) { adiarAtualizacao(); return; }
       podeRecarregar = true;
+      /* O worker confere o cache novo antes de trocar, e num tablet lento isso
+       * leva segundos: o aviso diz que está andando, em vez da tela parada. Fica
+       * aberto até a recarga, ou até o "ficou para depois" tomar o lugar. */
+      avisar('Atualizando...');
+      clearTimeout(tempoAviso);
       if (registroSW && registroSW.waiting) {
         registroSW.waiting.postMessage({ tipo: 'ativar-agora' });
       } else if (versaoPendenteAtiva && registroSW && registroSW.active) {
-        consultarWorker(registroSW.active, 'ativar-agora').then(function (resultado) {
+        /* Prazo longo: o worker confere o cache novo inteiro antes de
+         * escolher, e num tablet lento isso passa de 1,2 s. Desistir antes
+         * deixava a escolha feita no worker e a tela dizendo "ficou para
+         * depois". */
+        consultarWorker(registroSW.active, 'ativar-agora', 15000).then(function (resultado) {
           if (resultado && resultado.ativada) location.reload();
           else { podeRecarregar = false; adiarAtualizacao(); }
         });

@@ -1,0 +1,100 @@
+# Publica o aplicativo no endereco proprio, https://apoio-educacional.pages.dev (B4).
+#
+# SO DEPOIS DO PORTAO INTEIRO VERDE NA MAIN. Este workflow nao tem push nem
+# pull_request: ele acorda quando o workflow "portao" termina (workflow_run) e
+# so publica se aquela rodada foi
+#   - de um push (nunca de PR: o PR roda o portao sobre o commit de merge, que
+#     nao e o que esta na main),
+#   - na main, do proprio repositorio (nunca de fork),
+#   - com conclusao success, que no push na main quer dizer portao-rapido,
+#     as quatro fatias do navegador e o portao-navegador verdes (no push nenhum
+#     job do portao e pulado; veja o portao.yml).
+# Portao vermelho, cancelado ou pulado: este job nem comeca.
+#
+# E SO SE AQUELE COMMIT AINDA E A PONTA DA MAIN. Dois pushes seguidos: o portao
+# do segundo cancela o do primeiro (concurrency do portao), mas se o primeiro
+# terminar depois do segundo, publicar o primeiro levaria o site para tras. O
+# passo "ponta" compara o commit do portao com a main de agora e, se ela ja
+# andou, nao publica: quem publica e o portao do commit mais novo.
+#
+# Publicacao por envio direto (wrangler pages deploy), com o token e o id da
+# conta nos secrets do repositorio. A integracao Git da Cloudflare com o GitHub
+# nao e usada: assim quem decide o que sobe e o portao, e nao a Cloudflare.
+# Sobe a pasta montada pelo .github/monta_site.sh, sem _teste/ nem os
+# geradores da biblioteca.
+#
+# Depois de publicar, a conferencia-no-ar confere o endereco novo contra o
+# mesmo commit, como ja conferia o GitHub Pages.
+name: publica-cloudflare
+
+on:
+  workflow_run:
+    workflows: [portao]
+    types: [completed]
+    branches: [main]
+
+# Uma publicacao por vez, sem cancelar a que esta no meio: cancelar um envio
+# pela metade pode deixar o Pages sem a versao nova e sem dizer por que.
+concurrency:
+  group: publica-cloudflare
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publica:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      publicou: ${{ steps.envio.outputs.publicou }}
+    env:
+      COMMIT: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - name: O commit do portao ainda e a ponta da main
+        id: ponta
+        run: |
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          ponta=$(git rev-parse origin/main)
+          echo "portao verde em $COMMIT; ponta da main: $ponta"
+          if [ "$ponta" = "$COMMIT" ]; then
+            echo "publicar=sim" >> "$GITHUB_OUTPUT"
+          else
+            echo "a main ja andou: quem publica e o portao do commit mais novo"
+            echo "publicar=nao" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.ponta.outputs.publicar == 'sim'
+        with:
+          node-version: '24.14.1'
+      - name: Monta o site
+        if: steps.ponta.outputs.publicar == 'sim'
+        run: sh .github/monta_site.sh _site
+      - name: Envia ao Cloudflare Pages (producao, ramo main)
+        id: envio
+        if: steps.ponta.outputs.publicar == 'sim'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4.151.3 pages deploy _site \
+            --project-name apoio-educacional --branch main \
+            --commit-hash "$COMMIT" --commit-message "portao verde em $COMMIT" --commit-dirty=true
+          echo "publicou=sim" >> "$GITHUB_OUTPUT"
+
+  conferencia:
+    needs: publica
+    if: needs.publica.outputs.publicou == 'sim'
+    uses: ./.github/workflows/conferencia-no-ar.yml
+    with:
+      site: https://apoio-educacional.pages.dev
+      ref: ${{ github.event.workflow_run.head_sha }}

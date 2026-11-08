@@ -265,6 +265,9 @@ roda "merge seguro"          node _teste/testa_merge_seguro.js
 # As fatias do portao inteiro no CI: toda prova de navegador em exatamente uma
 # fatia, para qualquer numero de fatias, com controle que reprova.
 roda "fatias do portao"      node _teste/testa_pedacos_do_portao.js
+# B4: o deploy no Cloudflare Pages so depois do portao inteiro verde na main,
+# com venenos, e o site montado com tudo o que o aplicativo pede.
+roda "publica cloudflare (B4)" node _teste/testa_publica_cloudflare.js
 # Oito que moravam no laco "com navegador" sem abrir navegador nenhum (nem
 # puppeteer, nem a porta 8777). La, o --rapido os pulava; aqui o GitHub os roda
 # em todo PR.
@@ -381,6 +384,17 @@ roda "atualizacao apos fechar"                  node "_teste/testa_atualizacao_a
 roda "atualizacao --migracao"                   node "_teste/testa_atualizacao_apos_fechar.js" --migracao
 roda "atualizacao --corte-sobre-a-main"         node "_teste/testa_atualizacao_apos_fechar.js" --corte-sobre-a-main
 roda "atualizacao corte --envenenado-apaga-ativo" node "_teste/testa_atualizacao_apos_fechar.js" --corte-sobre-a-main --envenenado-apaga-ativo
+# D2b: a versao aberta acha no cache dela o arquivo que saiu da lista nova, sem
+# rede; o veneno volta a regra de servir do cache so o que esta na lista do
+# worker novo, e a trava tem de ve-lo. E a troca do "Atualizar agora" e inteira
+# com a rede segurando 40 s e o processador lento, nos dois caminhos.
+roda "atualizacao --lista-encolhe"              node "_teste/testa_atualizacao_apos_fechar.js" --lista-encolhe
+roda "atualizacao lista --envenenado-lista-do-worker" node "_teste/testa_atualizacao_apos_fechar.js" --lista-encolhe --envenenado-lista-do-worker
+roda "atualizacao --troca-atomica"              node "_teste/testa_atualizacao_apos_fechar.js" --troca-atomica
+# D2b: abrir o aplicativo no meio do download da versao nova nao apaga o cache
+# em obra; o veneno tira a marca 'instalando' da limpeza.
+roda "atualizacao --abre-no-meio-do-install"    node "_teste/testa_atualizacao_apos_fechar.js" --abre-no-meio-do-install
+roda "atualizacao meio --envenenado-sem-marca"  node "_teste/testa_atualizacao_apos_fechar.js" --abre-no-meio-do-install --envenenado-sem-marca
 roda "atualizacao --falha-instalacao"           node "_teste/testa_atualizacao_apos_fechar.js" --falha-instalacao
 roda "atualizacao --duas-janelas"               node "_teste/testa_atualizacao_apos_fechar.js" --duas-janelas
 roda "atualizacao --rede-lenta"                 node "_teste/testa_atualizacao_apos_fechar.js" --rede-lenta
@@ -446,6 +460,10 @@ roda "biblioteca dificuldade --envenenado-etiqueta" node "_teste/testa_bibliotec
 # que nao existe a lista do sw.js, e o service worker nao pode instalar.
 roda "limpeza do acervo"                        node "_teste/testa_limpeza_acervo.js"
 roda "limpeza do acervo --envenenado-lista"     node "_teste/testa_limpeza_acervo.js" --envenenado-lista
+# B4: a faixa "O aplicativo mudou de endereço" so na origem github.io (nunca no
+# pages.dev nem no local), o app seguindo com os dados, e o activate do sw.js
+# sem tocar cache de outra origem. Servidor proprio na 8881, sem internet.
+roda "mudou de endereco (B4)"                   node "_teste/testa_mudou_de_endereco_navegador.js"
 # B14: o material autoral saiu do repositorio. Sem navegador, a chave fora do
 # app.js, o material fora do repositorio e do pacote do service worker, o indice
 # de assuntos com os 148 ids, e a TRILHA ANTES E DEPOIS da migracao (os 148
