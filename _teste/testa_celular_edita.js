@@ -27,8 +27,28 @@
  *   9. o observador de outra conta não vê nenhum botão de edição e não
  *      grava nada.
  *
+ * D6c (lote 1), Hoje como linha do tempo, na mesma rodada:
+ *  10. a faixa da semana, a linha do tempo com a cor do aluno, os horários
+ *      livres escritos e a linha de agora; o "+" flutuante e o toque num
+ *      horário livre ("Marcar aula às 14:00"); o alto enxuto (sem o texto de
+ *      sistema da dona); data dd/mm/aaaa e hora em 24 h em todos os
+ *      formulários, e Salvar à vista com o teclado aberto;
+ *  11. a folha de baixo da aula: Realizada, Faltou, Cancelar (com e sem
+ *      cobrança, valendo para a aula de HOJE, batendo com o fechamento),
+ *      Remarcar (só esta ocorrência de uma repetição, com o vínculo mantido,
+ *      os horários livres e o aviso de choque) e Registrar como foi;
+ *  12. o fechamento de referência de junho continua 10 encontros, 10:30 e
+ *      R$ 1.050,00 depois de remarcar a aula de 1h30 dele, no celular e no
+ *      tablet; o observador vê a linha do tempo, sem botão nem folha de edição.
+ *
  * Venenos, que TÊM de reprovar a propriedade (a rodada passa quando a prova
  * VÊ o veneno):
+ *   --envenenado-remarca-todas   remarcar muda a hora de toda a repetição;
+ *   --envenenado-remarca-solta   remarcar apaga a ocorrência e cria uma avulsa
+ *                         (perde o vínculo com a série);
+ *   --envenenado-sem-choque      a conta de choque do celular não vê nada;
+ *   --envenenado-duracao-padrao  remarcar não traz a duração da aula (vem 1 h);
+ *   --envenenado-cancela-sempre-sem  "Cancelar com cobrança" grava sem cobrança;
  *   --envenenado-celular-envia-copia  a trava da cópia confunde o celular da
  *                         dona com o tablet (nuvem.js) e o fechar do celular
  *                         monta e manda a cópia (app.js);
@@ -46,7 +66,11 @@ const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
-const MODOS = ['--envenenado-celular-envia-copia', '--envenenado-observador-edita', '--envenenado-corte-sobe'];
+const MODOS = ['--envenenado-celular-envia-copia', '--envenenado-observador-edita', '--envenenado-corte-sobe',
+  '--envenenado-remarca-todas', '--envenenado-remarca-solta', '--envenenado-sem-choque', '--envenenado-duracao-padrao', '--envenenado-cancela-sempre-sem'];
+const V_TODAS = MODOS[3], V_SOLTA = MODOS[4], V_CHOQUE = MODOS[5], V_DURACAO = MODOS[6], V_CANCELA = MODOS[7];
+/* --prints <pasta>: tira os quatro prints do D6c em 390 x 844 (dados fictícios). */
+const PRINTS = (() => { const i = process.argv.indexOf('--prints'); return i >= 0 ? process.argv[i + 1] : ''; })();
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 function prop(rotulo, ok, veneno) {
   if (MODO && MODO === veneno) return conf('VENENO visto: ' + rotulo + ', e quebrou', ok, false);
@@ -100,6 +124,24 @@ if (MODO === MODOS[1]) {
 const SEM_CORTE = 'var p = Store.salvar(semCorteDoCelular(dbParaGravar()));';
 conf('o salvar() tira o corte que o celular pôs só na memória, num lugar só', APP.split(SEM_CORTE).length, 2);
 if (MODO === MODOS[2]) { trocas['/app.js'] = APP.replace(SEM_CORTE, 'var p = Store.salvar(dbParaGravar());'); trocas['/nuvem.js'] = NUVEM + '\n'; }
+/* D6c: as âncoras dos venenos da agenda, cada uma num lugar só. */
+const REMARCA = 'mudarAulaNoCelular(a, { data: v.data, hora: v.hora, duracaoMin: v.duracaoMin }, mensagem, function () { diaCelular = v.data; });';
+const CHOQUE = '    return Core.conflitosDe(db, provisoria);';
+const DURACAO = 'duracaoMin: Number(a.duracaoMin) || 60 }, a.id, a.status);';
+const CANCELA_COM = "{ status: 'cancelada', cobravel: true }, 'Aula cancelada com cobrança.'";
+conf('(D6c) remarcar, o choque, a duração do remarcar e o cancelar com cobrança estão cada um num lugar só',
+  [REMARCA, CHOQUE, DURACAO, CANCELA_COM].map(a => APP.split(a).length).join(','), '2,2,2,2');
+conf('(D6c) remarcar e cancelar usam o núcleo do tablet (alterarAulaComDesfazer, que é Core.aplicarEdicaoAula só nesta aula)',
+  /function mudarAulaNoCelular[\s\S]{0,400}alterarAulaComDesfazer\(atual\.id, atual\.alunoId, mudancas, mensagem\)/.test(APP) &&
+  /function alterarAulaComDesfazer[\s\S]{0,300}Core\.aplicarEdicaoAula\(db, aulaId, mudancas, 'esta'\)/.test(APP), true);
+const comNuvemIgual = app => { trocas['/app.js'] = app; trocas['/nuvem.js'] = NUVEM + '\n'; };
+if (MODO === V_TODAS) comNuvemIgual(APP.replace(REMARCA, "comoAcaoDoCelular(function () { fecharFolhaCelular(); Core.aplicarEdicaoAula(db, a.id, { hora: v.hora, duracaoMin: v.duracaoMin }, 'todas'); " +
+  "Core.aplicarEdicaoAula(db, a.id, { data: v.data }, 'esta'); return salvar(); }).then(function () { diaCelular = v.data; desenharCelular(); });"));
+if (MODO === V_SOLTA) comNuvemIgual(APP.replace(REMARCA, 'comoAcaoDoCelular(function () { fecharFolhaCelular(); var n = novaAulaAvulsa({ alunoId: a.alunoId, data: v.data, hora: v.hora, ' +
+  "duracaoMin: v.duracaoMin, status: a.status, cobravel: a.cobravel }); Core.excluirAulas(db, a.id, 'esta'); db.aulas.push(n); return salvar(); }).then(function () { diaCelular = v.data; desenharCelular(); });"));
+if (MODO === V_CHOQUE) comNuvemIgual(APP.replace(CHOQUE, '    return [];'));
+if (MODO === V_DURACAO) comNuvemIgual(APP.replace(DURACAO, 'duracaoMin: 60 }, a.id, a.status);'));
+if (MODO === V_CANCELA) comNuvemIgual(APP.replace(CANCELA_COM, "{ status: 'cancelada', cobravel: false }, 'Aula cancelada com cobrança.'"));
 if (MODO) conf('os arquivos servidos ficaram diferentes do repositório (' + MODO + ')', trocas['/nuvem.js'] !== NUVEM && trocas['/app.js'] !== APP, true);
 
 conf('o firebase-tools está onde a prova procura (' + FIREBASE + ')', fs.existsSync(FIREBASE), true);
@@ -305,6 +347,46 @@ async function tabletAbreERecebe(pag, rotulo, condicao, arg) {
 const fila = pag => pag.evaluate(() => Store.lerFila().then(l => l.map(e => e.id)));
 const filaVazia = pag => esperar('a fila do celular esvaziou', () => pag.evaluate(() => Store.lerFila().then(l => l.length)), v => v === 0, 20000);
 
+/* (D6c) A agenda pela tela: a faixa da semana troca de semana pelas setas até
+ * o dia aparecer, e um toque nele; o toque no bloco abre a folha da aula. */
+async function irParaDia(pag, iso) {
+  for (let i = 0; i < 80; i++) {
+    const onde = await pag.evaluate(d => {
+      if (document.querySelector('.cel-semana-dia[data-dia="' + d + '"]')) return 'achou';
+      const primeiro = document.querySelector('.cel-semana-dia');
+      if (!primeiro) return 'sem faixa';
+      return primeiro.dataset.dia > d ? 'antes' : 'depois';
+    }, iso);
+    if (onde === 'achou') { await clicar(pag, '.cel-semana-dia[data-dia="' + iso + '"]'); await pausa(60); return true; }
+    if (onde === 'sem faixa') return false;
+    await clicar(pag, onde === 'antes' ? '#cel-semana-anterior' : '#cel-semana-seguinte');
+  }
+  return false;
+}
+async function abrirFolha(pag, aulaId) {
+  if (!(await clicar(pag, '.cel-bloco[data-aula="' + aulaId + '"]'))) return false;
+  return existe(pag, '#cel-folha[data-aula="' + aulaId + '"]');
+}
+async function cancelarPelaFolha(pag, aulaId, comCobranca) {
+  if (!(await abrirFolha(pag, aulaId))) return false;
+  await clicar(pag, '#cel-folha-cancelar');
+  return clicar(pag, comCobranca ? '#cel-cancelar-com' : '#cel-cancelar-sem');
+}
+const botoesDaFolha = pag => pag.evaluate(() => Array.from(document.querySelectorAll('#cel-folha button')).map(b => b.id).filter(Boolean));
+const ddmmaaaa = iso => iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4);
+async function tirarPrint(pag, nome) {
+  if (!PRINTS) return;
+  fs.mkdirSync(PRINTS, { recursive: true });
+  await pausa(250);
+  await pag.screenshot({ path: path.join(PRINTS, nome) });
+  console.log('   print: ' + path.join(PRINTS, nome));
+}
+/* O fechamento de um aluno num mês, pelo mesmo Core em cada aparelho. */
+const fechamentoDe = (pag, alunoId, mes) => pag.evaluate((id, m) => Store.carregar().then(d => {
+  const f = Core.calcularMesInteiro(d, m).find(x => x.aluno.id === id);
+  return f ? { linhas: f.linhas.length, horas: Core.fmtHoras(f.totalMin), total: Core.fmtMoeda(f.totalValor), feito: Core.fmtMoeda(f.valorFeito) } : null;
+}), alunoId, mes);
+
 /* O que está à vista no celular, medido: rolagem de lado, alvos de 48 px e os
  * botões de edição (os das quatro ações vêm marcados com data-acao-celular). */
 const RE_EDICAO = 'registrar|corrigir|editar|salvar|excluir|apagar|nova aula|novo aluno|^\\s*\\+|desmarcar|marcar|cancelar a aula|cancelar aula|cadastrar|pago|anotar|alterar|confirmar';
@@ -321,7 +403,10 @@ const medirTela = (pag) => pag.evaluate((reEdicao) => {
   const campos = Array.from(raiz.querySelectorAll('input, select, textarea')).filter(visivel)
     .filter(e => !e.closest('#cel-entrada') && !e.hasAttribute('data-consulta')).map(e => e.id || e.tagName);
   const conteudo = document.querySelector('#cel-conteudo');
+  // (D6c) os seletores do navegador seguem a língua do aparelho (2:00 PM, 11/10): nenhum à vista no celular
+  const nativos = Array.from(raiz.querySelectorAll('input[type=date], input[type=time], input[type=datetime-local]')).filter(visivel).map(e => e.id || e.className);
   return {
+    nativos,
     largura: window.innerWidth,
     rolaDeLado: document.documentElement.scrollWidth > window.innerWidth || document.body.scrollWidth > window.innerWidth ||
       (conteudo && conteudo.scrollWidth > conteudo.clientWidth),
@@ -340,6 +425,16 @@ const MES = HOJE.slice(0, 7);
 const OUTRO = (() => { const d = new Date(AGORA); d.setDate(d.getDate() + 1); return isoDe(d); })();
 const TERCEIRO = (() => { const d = new Date(AGORA); d.setDate(d.getDate() + 2); return isoDe(d); })();
 const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); return isoDe(d); })();
+/* (D6c) A repetição semanal do aluno Gama: quatro aulas, de TERCEIRO em
+ * diante, às 16:00; a primeira se remarca para QUARTO, às 17:00. */
+const QUARTO = (() => { const d = new Date(AGORA); d.setDate(d.getDate() + 3); return isoDe(d); })();
+const FIM_GAMA = (() => { const d = new Date(AGORA); d.setDate(d.getDate() + 2 + 21); return isoDe(d); })();
+/* O fechamento de referência de junho (o do Marcelo, conferido à mão): 10
+ * encontros, 10:30 e R$ 1.050,00, com um aluno fictício. A aula de 1h30 (10/06)
+ * se remarca no celular para 12/06. */
+const JUNHO = [['2026-06-01', 60], ['2026-06-05', 60], ['2026-06-08', 60], ['2026-06-10', 90], ['2026-06-15', 60],
+  ['2026-06-17', 60], ['2026-06-19', 60], ['2026-06-22', 60], ['2026-06-24', 60], ['2026-06-26', 60]];
+const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
 
 (async function () {
   secao('1. O tablet da dona cria a agenda fictícia, sobe a cópia e os registros, e permite o observador');
@@ -351,7 +446,7 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
   const pagA = await amb.pagina();
   await prepararPagina(pagA, false);
   await H.abrirApp(pagA, amb.ORIGEM);
-  await pagA.evaluate(async (hoje, outro, terceiro, ontem) => {
+  await pagA.evaluate(async (hoje, outro, terceiro, ontem, junho, fimGama) => {
     const d = Store.bancoVazio();
     d.alunos = [{ id: 'alfa', nome: 'Aluno Alfa Teste', ativo: true, cor: '#1F3A5F', responsavel: 'Responsável Alfa Teste',
       precos: [{ id: 'p1', inicio: '2026-01-01', fim: null, valorHora: 100 }], mapeamentos: [] }];
@@ -362,8 +457,25 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
       { id: 'aula-terceiro', alunoId: 'alfa', serieId: null, data: terceiro, hora: '11:00', duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', anexos: [] }
     ];
     d.ajustes = { chavePix: 'pix-de-teste' };
+    // (D6c) a repetição do Gama, uma reposição hoje e o aluno do fechamento de referência de junho
+    d.alunos.push({ id: 'gama', nome: 'Aluno Gama Teste', ativo: true, cor: '#C9A961', responsavel: 'Responsável Gama Teste',
+      precos: [{ id: 'pg', inicio: '2026-01-01', fim: null, valorHora: 80 }], mapeamentos: [] });
+    d.alunos.push({ id: 'ref', nome: 'Aluno Referência Teste', ativo: true, cor: '#2E7D6B', responsavel: '',
+      precos: [{ id: 'pr1', inicio: '2025-01-01', fim: '2026-05-31', valorHora: 100 }, { id: 'pr2', inicio: '2026-06-01', fim: null, valorHora: 100 }], mapeamentos: [] });
+    d.aulas.push({ id: 'aula-hoje-gama', alunoId: 'gama', serieId: null, data: hoje, hora: '14:00', duracaoMin: 60, status: 'reposicao', cobravel: true, notaTexto: '', anexos: [] });
+    junho.forEach(([data, dur], i) => d.aulas.push({ id: 'ref-' + data, alunoId: 'ref', serieId: null, data, hora: '15:30', duracaoMin: dur, status: 'realizada', cobravel: true, notaTexto: '', anexos: [] }));
+    Core.criarSerie(d, { alunoId: 'gama', dias: [Core.diaSemana(terceiro)], hora: '16:00', duracaoMin: 60, inicio: terceiro, fim: fimGama });
     await Store.salvar(d);
-  }, HOJE, OUTRO, TERCEIRO, ONTEM);
+  }, HOJE, OUTRO, TERCEIRO, ONTEM, JUNHO, FIM_GAMA);
+  const serieGama = await pagA.evaluate(() => Store.carregar().then(d => {
+    const s = d.series.find(x => x.alunoId === 'gama');
+    return { id: s.id, aulas: d.aulas.filter(a => a.serieId === s.id).map(a => a.id + ' ' + a.data + ' ' + a.hora).sort() };
+  }));
+  conf('(arranjo) a repetição do Gama tem quatro aulas às 16:00, a primeira em ' + TERCEIRO, serieGama.aulas.length === 4 &&
+    serieGama.aulas.every(t => / 16:00$/.test(t)) && serieGama.aulas.some(t => t.indexOf(' ' + TERCEIRO + ' ') > 0), true);
+  const idGama1 = serieGama.aulas.map(t => t.split(' ')).find(p => p[1] === TERCEIRO)[0];
+  conf('(arranjo) o fechamento de referência de junho no tablet: 10 encontros, 10:30, R$ 1.050,00',
+    JSON.stringify(await fechamentoDe(pagA, 'ref', '2026-06')), JSON.stringify(Object.assign({}, REF_JUNHO, { feito: 'R$ 1.050,00' })));
   await H.abrirApp(pagA, amb.ORIGEM);
   conf('o tablet entrou', await entrarPelaTela(pagA, DONA.email, DONA.senha), true);
   await clicar(pagA, '#nuvem-enviar');
@@ -390,41 +502,126 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
     const q = indexedDB.open('apoio-nuvem');
     q.onsuccess = () => { const g = q.result.transaction('estado', 'readonly').objectStore('estado').get('soLeitura'); g.onsuccess = () => { q.result.close(); r(!!(g.result && g.result.uidDona)); }; };
   })), true);
-  conf('o alto diz o que este celular edita', await texto(pagC, '#cel-regra'), 'Aqui: marcar e cancelar aula, registrar como foi, aluno novo e pago. O resto, no tablet.');
+  conf('(D6c) o alto da dona é enxuto: sem texto de sistema, com o ícone da nuvem e o estado curto ("' + (await texto(pagC, '#cel-origem')) + '")',
+    await pagC.evaluate(() => document.querySelector('#cel-regra').hidden && !document.querySelector('#cel-regra').textContent &&
+      !!document.querySelector('#cel-nuvem') && document.querySelector('#cel-nuvem').getAttribute('data-tom') === 'em-dia'), true);
+  conf('(D6c) o "o resto, no tablet" não aparece mais no celular', /o resto, no tablet/i.test(await pagC.evaluate(() => document.querySelector('#modo-celular').textContent)), false);
+  conf('(D6c) com o teclado, a página do celular encolhe até ele (interactive-widget), e a do tablet não',
+    (await pagC.evaluate(() => document.querySelector('meta[name=viewport]').content)).indexOf('interactive-widget=resizes-content') >= 0 &&
+    (await pagA.evaluate(() => document.querySelector('meta[name=viewport]').content)).indexOf('interactive-widget') < 0, true);
   conf('a restauração no celular não enfileirou nada', (await fila(pagC)).length, 0);
   const idCelular = await pagC.evaluate(() => Store.aparelho());
+  const reais = t => Number(String(t).replace(/[^\d,]/g, '').replace(',', '.'));
 
-  secao('3. Hoje em 390 x 844: as ações à vista, alvos de 48 px, sem rolagem de lado');
+  secao('3. Hoje como linha do tempo em 390 x 844: a semana, as aulas na cor do aluno, os horários livres e a linha de agora');
   let m = await medirTela(pagC);
   conf('Hoje: sem rolagem de lado em ' + m.largura + ' px', m.rolaDeLado, false);
   conf('Hoje: todo alvo tem 48 px ou mais (' + m.alvos + ' alvos)', m.pequenos.join('; '), '');
-  conf('Hoje: os botões de edição são todos das quatro ações (' + m.dasAcoes.join(', ') + ')', m.soltos.join(', '), '');
-  conf('Hoje: "Marcar aula neste dia", "Ver ou corrigir como foi" e "Cadastrar aluno" à vista',
-    ['Marcar aula neste dia', 'Ver ou corrigir como foi', 'Cadastrar aluno'].every(t => m.dasAcoes.indexOf(t) >= 0), true);
-  conf('a aula de hoje, Realizada, não oferece "Cancelar aula" (só a agendada se cancela)', await existe(pagC, '.cel-aula[data-aula="aula-hoje"] .cel-cancelar'), false);
+  conf('Hoje: os botões de edição são todos das ações do celular (' + m.dasAcoes.join(', ') + ')', m.soltos.join(', '), '');
+  conf('Hoje: o "+" flutuante, os horários livres e "Cadastrar aluno" à vista',
+    m.dasAcoes.indexOf('+') >= 0 && m.dasAcoes.indexOf('Cadastrar aluno') >= 0 &&
+    await pagC.evaluate(() => !!document.querySelector('.cel-livre-hora[data-acao-celular="marcar-aula"][data-livre="12:00"]')), true);
+  conf('o "+" diz o que faz a quem lê a tela', await pagC.evaluate(() => document.querySelector('#cel-marcar-aula').getAttribute('aria-label')), 'Marcar aula neste dia');
+  const semana = await pagC.evaluate(hoje => {
+    const dias = Array.from(document.querySelectorAll('#cel-semana .cel-semana-dia'));
+    const deHoje = document.querySelector('.cel-semana-dia[data-dia="' + hoje + '"]');
+    return { dias: dias.length, ativo: !!(deHoje && deHoje.classList.contains('ativo')),
+      bolinhas: deHoje ? Array.from(deHoje.querySelectorAll('.cel-bolinha')).map(b => getComputedStyle(b).backgroundColor) : [],
+      titulo: document.querySelector('#cel-dia-titulo').textContent, tudo: document.querySelector('#cel-hoje').textContent };
+  }, HOJE);
+  const ddmmHoje = HOJE.slice(8, 10) + '/' + HOJE.slice(5, 7);
+  conf('a faixa da semana tem 7 dias, com hoje escolhido', semana.dias === 7 && semana.ativo, true);
+  conf('hoje tem uma bolinha por aula, na cor do aluno (' + semana.bolinhas.join(' ') + ')', semana.bolinhas.join(' '), 'rgb(31, 58, 95) rgb(201, 169, 97)');
+  conf('a data aparece uma vez só, no título ("' + semana.titulo + '")', new RegExp('^Hoje, \\S+, ' + ddmmHoje + '$').test(semana.titulo) &&
+    semana.tudo.split(ddmmHoje).length === 2, true);
+  const bloco = await pagC.evaluate(() => {
+    const b = document.querySelector('.cel-bloco[data-aula="aula-hoje"]'), g = document.querySelector('.cel-bloco[data-aula="aula-hoje-gama"]');
+    return { borda: getComputedStyle(b).borderLeftColor, altura: Math.round(b.getBoundingClientRect().height), altura60: Math.round(g.getBoundingClientRect().height),
+      texto: b.textContent, reposicao: g.classList.contains('cel-bloco-reposicao') && /Reposição/.test(g.textContent),
+      horaAEsquerda: b.getBoundingClientRect().left > b.closest('.cel-tempo-linha').querySelector('.cel-tempo-hora').getBoundingClientRect().right,
+      horaDoBloco: b.closest('.cel-tempo-linha').querySelector('.cel-tempo-hora').textContent };
+  });
+  conf('o bloco tem a cor do aluno, a mesma do tablet (' + bloco.borda + ')', bloco.borda, 'rgb(31, 58, 95)');
+  conf('a hora fica à esquerda do bloco (' + bloco.horaDoBloco + ')', bloco.horaAEsquerda && bloco.horaDoBloco === '10:30', true);
+  conf('a altura vai pela duração: a aula de 1h30 (' + bloco.altura + ' px) é maior que a de 1h (' + bloco.altura60 + ' px)', bloco.altura > bloco.altura60 && bloco.altura >= 100, true);
+  conf('a reposição se vê pela cor e pelo nome', bloco.reposicao, true);
+  conf('o bloco não repete o relato da última aula (ele fica na folha)', /Na última aula|Rendeu bem/.test(bloco.texto), false);
+  const livres = await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-tempo .cel-livre-texto')).map(e => e.textContent));
+  conf('os horários livres aparecem escritos (' + livres.join('; ') + ')', livres.join('; '), 'Livre 07:00 a 10:30; Livre 12:00 a 14:00; Livre 15:00 a 21:00');
+  conf('a linha de agora está na linha do tempo de hoje', await existe(pagC, '#cel-tempo #cel-agora'), true);
   conf('nenhum "Enviar cópia agora" no celular', await pagC.evaluate(() => { const b = document.querySelector('#nuvem-enviar'); return !!(b && b.getBoundingClientRect().height); }), false);
+  await tirarPrint(pagC, '1_hoje_linha_do_tempo.png');
 
-  secao('4. Marcar aula num dia escolhido');
-  await digitar(pagC, '#cel-dia', TERCEIRO);
-  conf('o dia escolhido aparece em Hoje', /11:00 Aluno Alfa Teste/.test(await texto(pagC, '#cel-hoje')), true);
-  await clicar(pagC, '#cel-marcar-aula');
+  secao('3b. O toque no bloco abre a folha de baixo, com botões grandes');
+  conf('o toque no bloco de hoje abre a folha da aula', await abrirFolha(pagC, 'aula-hoje'), true);
+  const naFolha = await texto(pagC, '#cel-folha');
+  conf('a folha traz a última aula e o relato dela', /Na última aula/.test(naFolha) && /Rendeu bem/.test(naFolha), true);
+  conf('a aula de HOJE oferece Realizada, Faltou, Cancelar, Remarcar e Registrar como foi', (await botoesDaFolha(pagC)).join(','),
+    'cel-folha-realizada,cel-folha-faltou,cel-folha-cancelar,cel-folha-remarcar,cel-folha-registrar,cel-folha-fechar');
   m = await medirTela(pagC);
-  conf('o formulário de marcar: alvos de 48 px e sem rolagem de lado', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : ''), '');
-  conf('o formulário traz o dia escolhido', await pagC.evaluate(() => document.querySelector('#cel-aula-data').value), TERCEIRO);
-  await digitar(pagC, '#cel-aula-hora', '14:00');
+  conf('a folha: alvos de 48 px e sem rolagem de lado', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : ''), '');
+  conf('a folha: os botões de edição são todos das ações do celular', m.soltos.join(', '), '');
+  conf('a folha: os botões das ações são grandes (56 px)', await pagC.evaluate(() =>
+    Array.from(document.querySelectorAll('#cel-folha .cel-folha-botao')).every(b => b.getBoundingClientRect().height >= 56)), true);
+  await tirarPrint(pagC, '2_folha_da_aula.png');
+  await clicar(pagC, '#cel-folha-fechar');
+  conf('"Fechar" tira a folha', await existe(pagC, '#cel-folha'), false);
+  await irParaDia(pagC, OUTRO);
+  await abrirFolha(pagC, 'aula-outro');
+  conf('a aula de amanhã oferece Cancelar e Remarcar, e não Realizada nem Faltou', (await botoesDaFolha(pagC)).join(','), 'cel-folha-cancelar,cel-folha-remarcar,cel-folha-fechar');
+  await clicar(pagC, '#cel-folha-fechar');
+
+  secao('3c. Faltou e Realizada, pela folha');
+  await irParaDia(pagC, ONTEM);
+  await abrirFolha(pagC, 'aula-ontem');
+  await clicar(pagC, '#cel-folha-faltou');
+  const situacao = id => pagC.evaluate(i => Store.carregar().then(b => { const a = b.aulas.find(x => x.id === i); return a.status + '/' + a.cobravel; }), id);
+  conf('Faltou: a aula de ontem fica "falta", cobrada como a falta sem aviso do tablet', (await esperar('faltou gravou', () => situacao('aula-ontem'), v => v === 'falta/true', 10000)).ok, true);
+  conf('o bloco diz "Faltou"', /✕ Faltou/.test((await texto(pagC, '.cel-bloco[data-aula="aula-ontem"]')) || ''), true);
+  await abrirFolha(pagC, 'aula-ontem');
+  await clicar(pagC, '#cel-folha-realizada');
+  conf('Realizada: a aula volta a "realizada", cobrada', (await esperar('realizada gravou', () => situacao('aula-ontem'), v => v === 'realizada/true', 10000)).ok, true);
+  conf('o bloco diz "✓ Realizada"', /✓ Realizada/.test((await texto(pagC, '.cel-bloco[data-aula="aula-ontem"]')) || ''), true);
+
+  secao('4. Marcar aula num horário livre ("Marcar aula às 14:00") e pelo "+"');
+  conf('a faixa da semana leva ao dia escolhido', await irParaDia(pagC, TERCEIRO), true);
+  conf('o dia escolhido aparece em Hoje, com a aula das 11:00', /Aluno Alfa Teste/.test((await texto(pagC, '.cel-bloco[data-aula="aula-terceiro"]')) || ''), true);
+  await clicar(pagC, '#cel-marcar-aula');
+  const peloMais = await pagC.evaluate(() => document.querySelector('#cel-aula-titulo').textContent + ' | ' + document.querySelector('#cel-aula-data').value);
+  conf('o "+" abre "Marcar aula" no dia à vista, às 15:30 (o padrão do tablet)', peloMais, 'Marcar aula às 15:30 | ' + ddmmaaaa(TERCEIRO));
+  await clicar(pagC, '#cel-form-voltar');
+  conf('o horário livre das 12:00 às 16:00 oferece 14:00', await existe(pagC, '.cel-livre[data-livre-de="12:00"] .cel-livre-hora[data-livre="14:00"]'), true);
+  await clicar(pagC, '.cel-livre-hora[data-livre="14:00"]');
+  const form = await pagC.evaluate(() => ({ titulo: document.querySelector('#cel-aula-titulo').textContent, data: document.querySelector('#cel-aula-data').value,
+    hora: document.querySelector('#cel-aula-hora').value,
+    horas24: Array.from(document.querySelectorAll('#cel-aula-hora option')).every(o => /^([01]\d|2[0-3]):[0-5]\d$/.test(o.textContent)) }));
+  conf('o toque no horário livre abre "Marcar aula às 14:00", com a data e a hora preenchidas', form.titulo + ' | ' + form.data + ' | ' + form.hora,
+    'Marcar aula às 14:00 | ' + ddmmaaaa(TERCEIRO) + ' | 14:00');
+  conf('a hora vem numa lista de 24 h, e a data em dd/mm/aaaa', form.horas24 && /^\d\d\/\d\d\/\d{4}$/.test(form.data), true);
+  m = await medirTela(pagC);
+  conf('o formulário de marcar: alvos de 48 px, sem rolagem de lado e sem o seletor do navegador', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : '') + m.nativos.join(','), '');
+  await tirarPrint(pagC, '4_marcar_aula_as_14.png');
+  /* O teclado aberto: com o interactive-widget, a página encolhe até ele; a
+   * janela de 460 px é a tela que sobra acima do teclado. */
+  await pagC.setViewport({ width: 390, height: 460, hasTouch: true, isMobile: true });
+  await pagC.evaluate(() => document.querySelector('#cel-aula-data').focus());
+  await pausa(400);
+  conf('com o teclado aberto (sobram 460 px), "Salvar na agenda" e "Voltar" continuam à vista, sem rolar', await pagC.evaluate(() => ['#cel-aula-salvar', '#cel-form-voltar'].every(s => {
+    const r = document.querySelector(s).getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight && r.height >= 48; })), true);
+  await pagC.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true });
+  await pausa(400);
   await clicar(pagC, '#cel-aula-salvar');
   const marcada = await esperar('a aula marcada gravou', () => pagC.evaluate(d => Store.carregar().then(b => {
-    const a = b.aulas.find(x => x.data === d && x.hora === '14:00'); return a ? a.id : null; }), TERCEIRO), v => !!v, 10000);
+    const a = b.aulas.find(x => x.data === d && x.hora === '14:00' && x.alunoId === 'alfa'); return a ? a.id : null; }), TERCEIRO), v => !!v, 10000);
   conf('a aula nova está no banco do celular', marcada.ok, true);
   const idMarcada = marcada.valor;
   conf('e a entrada dela entrou na fila na mesma gravação', (await fila(pagC)).indexOf('aula:' + idMarcada) >= 0, true);
-  conf('Hoje voltou ao dia da aula, com ela', /14:00 Aluno Alfa Teste/.test(await texto(pagC, '#cel-hoje')), true);
+  conf('Hoje voltou ao dia da aula, com ela às 14:00', await pagC.evaluate(id => { const b = document.querySelector('.cel-bloco[data-aula="' + id + '"]');
+    return !!b && b.closest('.cel-tempo-linha').querySelector('.cel-tempo-hora').textContent === '14:00'; }, idMarcada), true);
 
-  secao('5. Cancelar aula, com Desfazer');
-  await digitar(pagC, '#cel-dia', OUTRO);
-  conf('a aula agendada oferece "Cancelar aula", e não "Registrar como foi"', (await existe(pagC, '.cel-aula[data-aula="aula-outro"] .cel-cancelar')) &&
-    !(await existe(pagC, '.cel-aula[data-aula="aula-outro"] .cel-registrar')), true);
-  await clicar(pagC, '.cel-aula[data-aula="aula-outro"] .cel-cancelar');
+  secao('5. Cancelar aula pela folha, com Desfazer');
+  await irParaDia(pagC, OUTRO);
+  await cancelarPelaFolha(pagC, 'aula-outro', false);
   conf('cancelou no celular', (await esperar('a aula ficou cancelada', () => pagC.evaluate(() => Store.carregar().then(b => b.aulas.find(a => a.id === 'aula-outro').status)), v => v === 'cancelada', 10000)).ok, true);
   conf('o aviso traz o Desfazer', await pagC.evaluate(() => { const b = document.querySelector('#aviso-acao'); return b && b.style.display !== 'none' ? b.textContent : null; }), 'Desfazer');
   conf('o aviso fica entre o conteúdo e as abas: não cobre nenhum dos dois', await pagC.evaluate(() => {
@@ -432,13 +629,37 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
     return a.height > 0 && a.top >= c.bottom - 1 && a.bottom <= b.top + 1; }), true);
   await clicar(pagC, '#aviso-acao');
   conf('o Desfazer do celular volta a aula', (await esperar('a aula voltou', () => pagC.evaluate(() => Store.carregar().then(b => b.aulas.find(a => a.id === 'aula-outro').status)), v => v === 'realizada', 10000)).ok, true);
-  await clicar(pagC, '.cel-aula[data-aula="aula-outro"] .cel-cancelar');
-  const cancelada = await esperar('cancelada de novo', () => pagC.evaluate(() => Store.carregar().then(b => { const a = b.aulas.find(x => x.id === 'aula-outro'); return a.status + '/' + a.cobravel; })), v => v === 'cancelada/false', 10000);
+  await cancelarPelaFolha(pagC, 'aula-outro', false);
+  const cancelada = await esperar('cancelada de novo', () => situacao('aula-outro'), v => v === 'cancelada/false', 10000);
   conf('cancelada de novo, sem cobrança (o mesmo "Cancelar aula" do Fechamento do tablet)', cancelada.ok, true);
+  conf('a aula cancelada fica esmaecida e riscada, e o bloco diz sem cobrança', await pagC.evaluate(() => {
+    const b = document.querySelector('.cel-bloco[data-aula="aula-outro"]');
+    return Number(getComputedStyle(b).opacity) < 1 && /line-through/.test(getComputedStyle(b.querySelector('.cel-bloco-nome')).textDecorationLine) && /Cancelada, sem cobrança/.test(b.textContent); }), true);
+
+  secao('5b. Cancelar a aula de HOJE, sem e com cobrança: bate com o fechamento');
+  await irParaDia(pagC, HOJE);
+  const antesF = await fechamentoDe(pagC, 'alfa', MES);
+  await cancelarPelaFolha(pagC, 'aula-hoje', false);
+  await esperar('hoje cancelada sem cobrança', () => situacao('aula-hoje'), v => v === 'cancelada/false', 10000);
+  const semF = await fechamentoDe(pagC, 'alfa', MES);
+  conf('a aula de HOJE se cancela sem cobrança, e o dado do mês cai R$ 150,00 (1h30 a R$ 100,00): ' + antesF.feito + ' para ' + semF.feito,
+    (await situacao('aula-hoje')) === 'cancelada/false' && Math.round((reais(antesF.feito) - reais(semF.feito)) * 100) === 15000, true);
+  await cancelarPelaFolha(pagC, 'aula-hoje', true);
+  await esperar('hoje cancelada com cobrança', () => situacao('aula-hoje'), v => /^cancelada\//.test(v) && v !== 'cancelada/false', 10000);
+  const comF = await fechamentoDe(pagC, 'alfa', MES);
+  prop('cancelada COM cobrança, a aula continua cancelada e o mês volta ao de antes (' + comF.feito + ', antes ' + antesF.feito + ')',
+    (await situacao('aula-hoje')) === 'cancelada/true' && comF.feito === antesF.feito, V_CANCELA);
+  if (MODO === V_CANCELA) fimDoVeneno();
+  conf('o bloco diz "Cancelada, com cobrança"', /Cancelada, com cobrança/.test((await texto(pagC, '.cel-bloco[data-aula="aula-hoje"]')) || ''), true);
+  await clicar(pagC, '#cel-abas .cel-aba[data-cel="fechamento"]');
+  await pausa(200);
+  conf('o Fechamento do celular mostra o mesmo valor feito (' + comF.feito + ')', ((await texto(pagC, '.cel-fechamento-aluno[data-aluno="alfa"]')) || '').indexOf(comF.feito) >= 0, true);
+  await clicar(pagC, '#cel-abas .cel-aba[data-cel="hoje"]');
 
   secao('6. "Registrar como foi": situação, relato e assunto dado');
-  await clicar(pagC, '#cel-dia-hoje');
-  await clicar(pagC, '.cel-aula[data-aula="aula-hoje"] .cel-registrar');
+  await irParaDia(pagC, HOJE);
+  await abrirFolha(pagC, 'aula-hoje');
+  await clicar(pagC, '#cel-folha-registrar');
   conf('abrir o formulário tira o aviso da ação anterior (o "Aula cancelada" não aparece sobre o registro)', await existe(pagC, '#aviso.aberto'), false);
   m = await medirTela(pagC);
   conf('o formulário do relato: alvos de 48 px e sem rolagem de lado', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : ''), '');
@@ -448,6 +669,82 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
   const relato = await esperar('o relato gravou', () => pagC.evaluate(() => Store.carregar().then(b => {
     const a = b.aulas.find(x => x.id === 'aula-hoje'); return a.notaTexto + '/' + (a.temas || []).map(t => t.titulo).join(','); })), v => v === 'Relato escrito no celular/Frações equivalentes', 10000);
   conf('o relato e o assunto estão na aula do celular', relato.ok, true);
+  conf('e a situação escolhida antes (cancelada com cobrança) ficou', await situacao('aula-hoje'), 'cancelada/true');
+
+  secao('6b. Remarcar: data, hora e duração preenchidas, os horários livres do dia e o aviso de choque');
+  await irParaDia(pagC, TERCEIRO);
+  await abrirFolha(pagC, 'aula-terceiro');
+  await clicar(pagC, '#cel-folha-remarcar');
+  const pre = await pagC.evaluate(() => ['#cel-remarcar-data', '#cel-remarcar-hora', '#cel-remarcar-duracao'].map(s => document.querySelector(s).value).join(' | '));
+  conf('Remarcar vem com a data, a hora e a duração da aula', pre, ddmmaaaa(TERCEIRO) + ' | 11:00 | 60');
+  await digitar(pagC, '#cel-remarcar-hora', '16:00');
+  const choque = (await texto(pagC, '#cel-remarcar-choque')) || '';
+  prop('o choque de horário avisa: às 16:00 já há a aula do Gama ("' + choque + '")', /Já há aula neste horário: Aluno Gama Teste às 16:00/.test(choque), V_CHOQUE);
+  const livresR = await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-remarcar-livres .cel-livre-hora')).map(b => b.dataset.livre));
+  prop('os horários livres do dia não oferecem 14:00 nem 16:00 (ocupados) e oferecem 13:00, 15:00 e 17:00 (' + livresR.join(' ') + ')',
+    ['14:00', '14:30', '16:00', '16:30'].every(h => livresR.indexOf(h) < 0) && ['13:00', '15:00', '17:00'].every(h => livresR.indexOf(h) >= 0), V_CHOQUE);
+  if (MODO === V_CHOQUE) fimDoVeneno();
+  m = await medirTela(pagC);
+  conf('o Remarcar: alvos de 48 px, sem rolagem de lado e sem o seletor do navegador', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : '') + m.nativos.join(','), '');
+  await tirarPrint(pagC, '3_remarcar_livres_e_choque.png');
+  await clicar(pagC, '#cel-remarcar-livres .cel-livre-hora[data-livre="15:00"]');
+  conf('o toque num horário livre põe a hora e tira o aviso de choque', await pagC.evaluate(() =>
+    document.querySelector('#cel-remarcar-hora').value + '|' + document.querySelector('#cel-remarcar-choque').textContent), '15:00|');
+  /* O formulário aberto não se perde quando chegam registros do tablet. */
+  await digitar(pagC, '#cel-remarcar-data', '01/02/2027');
+  await pagC.evaluate(() => Nuvem.receberRegistros());
+  await pausa(300);
+  conf('a data digitada no Remarcar continua depois de um recebimento', await pagC.evaluate(() => (document.querySelector('#cel-remarcar-data') || {}).value), '01/02/2027');
+  await clicar(pagC, '#cel-folha-voltar');
+  await clicar(pagC, '#cel-folha-fechar');
+  conf('"Voltar" não grava nada: a aula continua às 11:00 do mesmo dia', await pagC.evaluate(() => Store.carregar().then(b => {
+    const a = b.aulas.find(x => x.id === 'aula-terceiro'); return a.data + ' ' + a.hora; })), TERCEIRO + ' 11:00');
+
+  secao('6c. Remarcar UMA aula da repetição: só esta muda, e o vínculo com a série fica');
+  await abrirFolha(pagC, idGama1);
+  await clicar(pagC, '#cel-folha-remarcar');
+  conf('o Remarcar diz que, numa repetição, muda só esta', /muda só esta/.test((await texto(pagC, '#cel-remarcar-serie')) || ''), true);
+  await digitar(pagC, '#cel-remarcar-data', ddmmaaaa(QUARTO));
+  await digitar(pagC, '#cel-remarcar-hora', '17:00');
+  await clicar(pagC, '#cel-remarcar-salvar');
+  await esperar('a remarcação gravou', () => pagC.evaluate(q => Store.carregar().then(b => b.aulas.some(a => a.alunoId === 'gama' && a.data === q && a.hora === '17:00')), QUARTO), v => v === true, 10000);
+  const retratoGama = pag => pag.evaluate((sid, q) => Store.carregar().then(b => {
+    const s = (b.series || []).find(x => x.id === sid);
+    const movida = b.aulas.find(a => a.alunoId === 'gama' && a.data === q);
+    const outras = b.aulas.filter(a => a.serieId === sid && a !== movida);
+    return { movida: movida ? [movida.serieId === sid, !!movida.destacada, movida.hora, movida.duracaoMin].join(' ') : 'nenhuma',
+      outras: outras.map(a => a.data + ' ' + a.hora + ' ' + a.duracaoMin + (a.destacada ? ' destacada' : '')).sort().join('; '),
+      serie: s ? s.hora + ' ' + (s.exclusoes || []).join(',') : 'sem série', gama: b.aulas.filter(a => a.alunoId === 'gama' && a.serieId).length };
+  }), serieGama.id, QUARTO);
+  const outrasAntes = serieGama.aulas.map(t => t.split(' ')).filter(p => p[1] !== TERCEIRO).map(p => p[1] + ' 16:00 60').sort().join('; ');
+  const rg = await retratoGama(pagC);
+  console.log('   no celular: ' + JSON.stringify(rg));
+  prop('a aula remarcada continua na série (destacada, às 17:00, 1h) e a data de onde saiu fica como exclusão da série',
+    rg.movida === 'true true 17:00 60' && rg.serie.split(' ')[1] === TERCEIRO, V_SOLTA);
+  prop('as outras três aulas da repetição não mudaram, nem a hora da série (' + rg.outras + ')', rg.outras === outrasAntes && rg.serie.split(' ')[0] === '16:00', V_TODAS);
+  if (MODO === V_SOLTA || MODO === V_TODAS) fimDoVeneno();
+  conf('Hoje foi ao dia novo da aula, às 17:00', (await texto(pagC, '#cel-dia-titulo')).indexOf(QUARTO.slice(8, 10) + '/' + QUARTO.slice(5, 7)) >= 0 &&
+    !!(await existe(pagC, '.cel-bloco[data-aula="' + idGama1 + '"]')), true);
+
+  secao('6d. O fechamento de referência de junho continua igual depois de remarcar a aula de 1h30 dele');
+  conf('a faixa da semana chega a 10/06/2026', await irParaDia(pagC, '2026-06-10'), true);
+  await abrirFolha(pagC, 'ref-2026-06-10');
+  await clicar(pagC, '#cel-folha-remarcar');
+  conf('o Remarcar da aula de junho traz a duração dela, 1h30', await pagC.evaluate(() => document.querySelector('#cel-remarcar-duracao').value), MODO === V_DURACAO ? '60' : '90');
+  await digitar(pagC, '#cel-remarcar-data', '12/06/2026');
+  await clicar(pagC, '#cel-remarcar-salvar');
+  await esperar('a aula de junho foi para 12/06', () => pagC.evaluate(() => Store.carregar().then(b => b.aulas.find(a => a.id === 'ref-2026-06-10').data)), v => v === '2026-06-12', 10000);
+  const junhoC = await fechamentoDe(pagC, 'ref', '2026-06');
+  prop('junho no celular: 10 encontros, 10:30, R$ 1.050,00 (' + JSON.stringify(junhoC) + ')',
+    junhoC.linhas === REF_JUNHO.linhas && junhoC.horas === REF_JUNHO.horas && junhoC.total === REF_JUNHO.total, V_DURACAO);
+  if (MODO === V_DURACAO) fimDoVeneno();
+  await clicar(pagC, '#cel-abas .cel-aba[data-cel="fechamento"]');
+  for (let i = 0; i < 24 && ((await texto(pagC, '#cel-fechamento .cel-mes .cel-titulo')) || '') !== 'Junho de 2026'; i++) await clicar(pagC, '#cel-fechamento .cel-mes button[aria-label="Mês anterior"]');
+  conf('e o Fechamento do celular, em junho, diz 10 aulas dadas, 10:30 h e R$ 1.050,00',
+    /10 aulas dadas · 10:30 h · R\$\s?1\.050,00/.test((await texto(pagC, '.cel-fechamento-aluno[data-aluno="ref"]')) || ''), true);
+  for (let i = 0; i < 24 && ((await texto(pagC, '#cel-fechamento .cel-mes .cel-titulo')) || '') !== (await pagC.evaluate(m => Core.mesExtenso(m), MES)); i++) await clicar(pagC, '#cel-fechamento .cel-mes button[aria-label="Mês seguinte"]');
+  await clicar(pagC, '#cel-abas .cel-aba[data-cel="hoje"]');
+  await irParaDia(pagC, HOJE);
 
   secao('7. Cadastrar aluno: o essencial');
   await clicar(pagC, '#cel-novo-aluno');
@@ -489,7 +786,8 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
   m = await medirTela(pagC);
   conf('o "pago em" aberto: alvos de 48 px e sem rolagem de lado', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : ''), '');
   await digitar(pagC, '.cel-fechamento-aluno[data-aluno="alfa"] .pagamento-valor', '250,00');
-  await digitar(pagC, '.cel-fechamento-aluno[data-aluno="alfa"] .pagamento-data', HOJE);
+  conf('(D6c) o "pago em" do celular pede a data como dd/mm/aaaa, sem o seletor do navegador', await pagC.evaluate(() => { const c = document.querySelector('.cel-fechamento-aluno[data-aluno="alfa"] .pagamento-data'); return c.type + ' ' + c.value; }), 'text ' + ddmmaaaa(HOJE));
+  await digitar(pagC, '.cel-fechamento-aluno[data-aluno="alfa"] .pagamento-data', ddmmaaaa(HOJE));
   await clicar(pagC, '.cel-fechamento-aluno[data-aluno="alfa"] .btn-confirmar-pagamento');
   const pago = await esperar('o pagamento gravou', () => pagC.evaluate(m => Store.carregar().then(b => {
     const p = (b.pagamentos || []).find(x => x.alunoId === 'alfa' && x.mes === m); return p ? p.pagoEm + '/' + p.valor : null; }), MES), v => v === HOJE + '/250', 10000);
@@ -519,6 +817,20 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
   conf('marcar aula: a aula do celular no tablet, com data, hora, duração e aluno', noTablet.nova, TERCEIRO + ' 14:00 60 alfa');
   conf('"Registrar como foi": o assunto dado chegou ao tablet', noTablet.temas, 'Frações equivalentes');
   conf('cadastrar aluno: o aluno do celular no tablet, com o essencial', noTablet.beta, 'Aluno Beta Teste | Responsável Beta Teste | Contato: telefone fictício 0000 | 120@' + HOJE);
+  /* (D6c) O que a folha fez chega ao tablet igual: a remarcação de uma aula
+   * da repetição (o tablet, ao abrir, materializa a série e não recria a
+   * aula na data de onde ela saiu), o cancelar de hoje com cobrança, o faltou
+   * e realizada, e junho. */
+  const rgA = await retratoGama(pagA);
+  console.log('   no tablet: ' + JSON.stringify(rgA));
+  conf('(D6c) remarcar chegou ao tablet: a aula na série, destacada, às 17:00, e as outras três como estavam', JSON.stringify(rgA), JSON.stringify(rg));
+  conf('(D6c) e o tablet, ao abrir, não recriou a aula na data de onde ela saiu (a repetição continua com quatro)', rgA.gama, 4);
+  conf('(D6c) cancelar hoje com cobrança chegou ao tablet', await pagA.evaluate(() => Store.carregar().then(b => { const a = b.aulas.find(x => x.id === 'aula-hoje'); return a.status + '/' + a.cobravel; })), 'cancelada/true');
+  conf('(D6c) faltou e realizada: a aula de ontem chegou ao tablet como realizada', await pagA.evaluate(() => Store.carregar().then(b => b.aulas.find(x => x.id === 'aula-ontem').status)), 'realizada');
+  const junhoA = await fechamentoDe(pagA, 'ref', '2026-06');
+  conf('(D6c) junho no tablet depois da remarcação do celular: 10 encontros, 10:30, R$ 1.050,00 (' + JSON.stringify(junhoA) + ')',
+    junhoA.linhas + ' ' + junhoA.horas + ' ' + junhoA.total, REF_JUNHO.linhas + ' ' + REF_JUNHO.horas + ' ' + REF_JUNHO.total);
+  conf('(D6c) e a aula de 1h30 está em 12/06 no tablet', await pagA.evaluate(() => Store.carregar().then(b => { const a = b.aulas.find(x => x.id === 'ref-2026-06-10'); return a.data + ' ' + a.duracaoMin; })), '2026-06-12 90');
   await H.irParaAba(pagA, 'fechamento');
   await pausa(400);
   if (OUTRO.slice(0, 7) === MES) {
@@ -540,8 +852,8 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
   await clicar(pagC, '#cel-abas .cel-aba[data-cel="hoje"]');
   await pagC.setOfflineMode(true);
   await pagC.evaluate(() => window.dispatchEvent(new Event('offline')));
-  await digitar(pagC, '#cel-dia', TERCEIRO);
-  await clicar(pagC, '.cel-aula[data-aula="aula-terceiro"] .cel-cancelar');
+  await irParaDia(pagC, TERCEIRO);
+  await cancelarPelaFolha(pagC, 'aula-terceiro', false);
   await esperar('cancelada sem sinal', () => pagC.evaluate(() => Store.carregar().then(b => b.aulas.find(a => a.id === 'aula-terceiro').status)), v => v === 'cancelada', 10000);
   await pausa(3500); // o envio agendado tenta e não sai
   conf('a edição sem sinal ficou na fila', JSON.stringify(await fila(pagC)), JSON.stringify(['aula:aula-terceiro']));
@@ -577,8 +889,9 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
 
   secao('11b. O formulário aberto não se perde quando chegam registros nem no "Buscar de novo"');
   await clicar(pagC, '#cel-abas .cel-aba[data-cel="hoje"]');
-  await clicar(pagC, '#cel-dia-hoje');
-  await clicar(pagC, '.cel-aula[data-aula="aula-hoje"] .cel-registrar');
+  await irParaDia(pagC, HOJE);
+  await abrirFolha(pagC, 'aula-hoje');
+  await clicar(pagC, '#cel-folha-registrar');
   await digitar(pagC, '#cel-relato-texto', 'texto que ela digitou e não pode sumir');
   await pagA.evaluate(async () => { const d = await Store.carregar(); d.aulas.find(a => a.id === 'aula-ontem').notaTexto = 'o tablet mexeu com o formulário aberto'; await Store.salvar(d); await Nuvem.sincronizar({ versaoApp: 'prova' }); });
   const chegouComForm = await pagC.evaluate(() => Nuvem.receberRegistros().then(r => r.aplicados || 0));
@@ -589,13 +902,13 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
   await esperar('o "Buscar de novo" terminou', () => pagC.evaluate(() => !Nuvem.estado().registros.recebendo && !!document.querySelector('#cel-atualizar') && !document.querySelector('#cel-atualizar').disabled), v => v === true, 20000);
   conf('e depois do "Buscar de novo"', await pagC.evaluate(() => (document.querySelector('#cel-relato-texto') || {}).value), 'texto que ela digitou e não pode sumir');
   await clicar(pagC, '#cel-form-voltar');
-  conf('fechando o formulário, Hoje volta e mostra o que chegou', /o tablet mexeu com o formulário aberto|10:30 Aluno Alfa Teste/.test(await texto(pagC, '#cel-hoje')), true);
+  conf('fechando o formulário, Hoje volta à linha do tempo, com a aula', await existe(pagC, '#cel-tempo .cel-bloco[data-aula="aula-hoje"]'), true);
 
   secao('11c. Trinta ações com Desfazer no celular: o histórico fica em 25 e o Desfazer continua');
-  await digitar(pagC, '#cel-dia', TERCEIRO);
+  await irParaDia(pagC, TERCEIRO);
   const falhasDoDesfazer = [];
   for (let k = 0; k < 30; k++) {
-    await clicar(pagC, '.cel-aula[data-aula="' + idMarcada + '"] .cel-cancelar');
+    await cancelarPelaFolha(pagC, idMarcada, false);
     const c = await esperar('cancelada (' + (k + 1) + ')', () => pagC.evaluate(id => Store.carregar().then(b => b.aulas.find(a => a.id === id).status), idMarcada), v => v === 'cancelada', 10000);
     const temDesfazer = await pagC.evaluate(() => { const b = document.querySelector('#aviso-acao'); return !!(b && b.style.display !== 'none' && document.querySelector('#aviso.aberto')); });
     if (!c.ok || !temDesfazer) { falhasDoDesfazer.push(k + 1); break; }
@@ -628,8 +941,8 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
   await clicar(pagC, '#cel-abas .cel-aba[data-cel="fechamento"]');
   await pausa(300);
   await clicar(pagC, '#cel-abas .cel-aba[data-cel="hoje"]');
-  await digitar(pagC, '#cel-dia', TERCEIRO);
-  await clicar(pagC, '.cel-aula[data-aula="' + idMarcada + '"] .cel-cancelar');
+  await irParaDia(pagC, TERCEIRO);
+  await cancelarPelaFolha(pagC, idMarcada, false);
   await esperar('a ação depois do Fechamento gravou', () => pagC.evaluate(id => Store.carregar().then(b => b.aulas.find(a => a.id === id).status), idMarcada), v => v === 'cancelada', 10000);
   await sincronizar(pagC);
   await filaVazia(pagC);
@@ -693,14 +1006,16 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
   if (MODO === MODOS[0]) fimDoVeneno();
 
   secao('13. O celular não grava fora das quatro ações');
-  const tudoDoCelular = Array.from(new Set((await escritasLidas(pagC)).map(n => n.replace(/^.*\/documents\/usuarios\/[^/]+\//, ''))));
+  const tudoDoCelular = Array.from(new Set((await escritasLidas(pagC)).map(n => decodeURIComponent(n.replace(/^.*\/documents\/usuarios\/[^/]+\//, '')))));
   console.log('   o que subiu do celular: ' + tudoDoCelular.join(', '));
   /* (D7) o diagnóstico do celular, só o do PRÓPRIO aparelho, é a outra coisa
    * que sobe dele; fica fora da conta dos registros, abaixo. */
   const diagnosticosDoCelular = tudoDoCelular.filter(n => /^diagnostico\//.test(n));
   conf('(D7) o celular que editou sobe o diagnóstico dele, e só o do próprio aparelho', diagnosticosDoCelular.join(','), 'diagnostico/' + idCelular);
   const enviadosDoCelular = tudoDoCelular.filter(n => !/^diagnostico\//.test(n));
-  const esperados = ['registros/aula:' + idMarcada, 'registros/aula:aula-outro', 'registros/aula:aula-hoje', 'registros/aluno:' + idBeta, 'registros/aula:aula-terceiro'];
+  // (D6c) e os da folha: faltou e realizada (ontem), a remarcação da repetição (a aula e a série) e a de junho
+  const esperados = ['registros/aula:' + idMarcada, 'registros/aula:aula-outro', 'registros/aula:aula-hoje', 'registros/aluno:' + idBeta, 'registros/aula:aula-terceiro',
+    'registros/aula:aula-ontem', 'registros/aula:' + idGama1, 'registros/serie:' + serieGama.id, 'registros/aula:ref-2026-06-10'];
   const pagamento = enviadosDoCelular.filter(n => /^registros\/pagamento:/.test(n));
   conf('tudo o que subiu do celular é um registro das quatro ações: as aulas, o aluno novo e o pagamento, e nada mais',
     enviadosDoCelular.filter(n => esperados.indexOf(n) < 0 && pagamento.indexOf(n) < 0).join(', ') + '|' + esperados.filter(n => enviadosDoCelular.indexOf(n) < 0).join(', ') + '|' + pagamento.length, '||1');
@@ -732,8 +1047,23 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
     await pausa(200);
     const md = await medirTela(pagD);
     telasD.push(t + ': ' + md.dasAcoes.concat(md.soltos).concat(md.campos).join(' + '));
-    if (t === 'hoje') conf('(controle) o observador vê a aula de hoje', /10:30 Aluno Alfa Teste/.test(await texto(pagD, '#cel-hoje')), true);
+    if (t === 'hoje') conf('(controle) o observador vê a linha do tempo, com a aula de hoje', /Aluno Alfa Teste/.test((await texto(pagD, '#cel-tempo .cel-bloco[data-aula="aula-hoje"]')) || ''), true);
   }
+  /* (D6c) a linha do tempo do observador: o toque no bloco mostra a aula, sem
+   * nenhuma ação; nem o "+", nem as horas dos horários livres. */
+  await clicar(pagD, '#cel-abas .cel-aba[data-cel="hoje"]');
+  await pausa(200);
+  const livresD = await pagD.evaluate(() => document.querySelectorAll('#cel-tempo .cel-livre').length);
+  const abriuD = await abrirFolha(pagD, 'aula-hoje');
+  const folhaD = await pagD.evaluate(() => ({
+    acoes: document.querySelectorAll('#modo-celular [data-acao-celular]').length,
+    botoes: Array.from(document.querySelectorAll('#cel-folha button')).map(b => b.id || b.textContent.trim()).join(','),
+    mais: !!document.querySelector('#cel-marcar-aula'), horas: document.querySelectorAll('.cel-livre-hora').length
+  }));
+  conf('(controle) o observador vê os horários livres escritos e a folha abre com a aula', livresD > 0 && abriuD && /Aluno Alfa Teste/.test((await texto(pagD, '#cel-folha')) || ''), true);
+  prop('(D6c) na linha do tempo e na folha do observador, nenhuma ação: sem "+", sem horas para marcar, só "Fechar" (' + JSON.stringify(folhaD) + ')',
+    folhaD.acoes === 0 && !folhaD.mais && folhaD.horas === 0 && /^(Ver a sua anotação,)?cel-folha-fechar$/.test(folhaD.botoes), MODOS[1]);
+  await clicar(pagD, '#cel-folha-fechar');
   prop('o observador não vê nenhum botão de edição nem campo de escrever (' + telasD.join(' | ') + ')', telasD.every(t => /: $/.test(t)), MODOS[1]);
   prop('o alto do observador diz que só consulta', (await texto(pagD, '#cel-regra')) === 'Este celular só consulta. Para mudar algo, use o tablet.', MODOS[1]);
   if (MODO === MODOS[1]) fimDoVeneno();

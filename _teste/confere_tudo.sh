@@ -845,6 +845,17 @@ roda "celular edita (D6b)"                          node "_teste/testa_celular_e
 roda "celular edita --envenenado-celular-envia-copia" node "_teste/testa_celular_edita.js" --envenenado-celular-envia-copia
 roda "celular edita --envenenado-observador-edita"  node "_teste/testa_celular_edita.js" --envenenado-observador-edita
 roda "celular edita --envenenado-corte-sobe"        node "_teste/testa_celular_edita.js" --envenenado-corte-sobe
+# D6c (lote 1): Hoje como linha do tempo, a folha da aula (realizada, faltou,
+# cancelar com e sem cobranca, remarcar, registrar como foi) e o "Marcar aula as
+# HH:MM" do horario livre, na mesma rodada do D6b. Venenos: remarcar que muda a
+# repeticao inteira, remarcar que solta a aula da serie, o choque que nao ve,
+# a duracao que nao vem preenchida (junho deixa de dar 10:30 e R$ 1.050,00) e o
+# cancelar com cobranca que grava sem cobranca TEM de ser vistos.
+roda "celular edita --envenenado-remarca-todas"     node "_teste/testa_celular_edita.js" --envenenado-remarca-todas
+roda "celular edita --envenenado-remarca-solta"     node "_teste/testa_celular_edita.js" --envenenado-remarca-solta
+roda "celular edita --envenenado-sem-choque"        node "_teste/testa_celular_edita.js" --envenenado-sem-choque
+roda "celular edita --envenenado-duracao-padrao"    node "_teste/testa_celular_edita.js" --envenenado-duracao-padrao
+roda "celular edita --envenenado-cancela-sempre-sem" node "_teste/testa_celular_edita.js" --envenenado-cancela-sempre-sem
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"
