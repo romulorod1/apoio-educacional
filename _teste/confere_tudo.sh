@@ -726,6 +726,9 @@ roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js"
 # quando o aparelho ja tinha chave (sem saida para restaurar a copia de outra)
 roda "nuvem fase 0 --envenenado-sobe-vazio"         node "_teste/testa_nuvem.js" --envenenado-sobe-vazio
 roda "nuvem fase 0 --envenenado-esconde-codigo"     node "_teste/testa_nuvem.js" --envenenado-esconde-codigo
+# segunda rodada: a rotacao que so olhava o conteudo quando a nova era vazia
+# apagava a boa quando a atual era vazia e a anterior boa
+roda "nuvem fase 0 --envenenado-anterior-cega"      node "_teste/testa_nuvem.js" --envenenado-anterior-cega
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"

@@ -562,12 +562,13 @@
         })(p);
       }
       return fila.then(function () {
-        /* A rotação: a nova vira atual; a anterior é a que estava como atual,
-         * SALVO quando a nova não tem conteúdo: aí a anterior é a mais nova
-         * com conteúdo, e a vazia é que sai. A nuvem nunca apaga a última
+        /* A rotação: a nova vira atual; a anterior é SEMPRE a mais nova das
+         * apontadas que tem conteúdo (só sem nenhuma com conteúdo é a que
+         * estava como atual), e o resto sai. Vale em todo envio, tenha a nova
+         * conteúdo ou não: com atual vazia e anterior boa, a próxima com
+         * conteúdo mantém a boa e tira a vazia. A nuvem nunca apaga a última
          * cópia com conteúdo só pela contagem. */
-        var anterior = apontadas[0] || null;
-        if (!conteudo) anterior = apontadas.filter(function (c) { return c.conteudo; })[0] || anterior;
+        var anterior = apontadas.filter(function (c) { return c.conteudo; })[0] || apontadas[0] || null;
         var saindo = apontadas.filter(function (c) { return !anterior || c.id !== anterior.id; });
         var escritas = [
           gravacao(nomeDoc(uid, 'copias/' + id), meta),

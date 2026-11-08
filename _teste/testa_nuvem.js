@@ -46,8 +46,13 @@ const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
-const MODO = ['--envenenado-sem-cifra', '--envenenado-regra-aberta', '--envenenado-sobe-vazio', '--envenenado-esconde-codigo']
-  .filter(m => process.argv.indexOf(m) !== -1)[0] || '';
+const MODO = ['--envenenado-sem-cifra', '--envenenado-regra-aberta', '--envenenado-sobe-vazio', '--envenenado-esconde-codigo',
+  '--envenenado-anterior-cega'].filter(m => process.argv.indexOf(m) !== -1)[0] || '';
+/* Segunda rodada da revisão (07/11): --envenenado-anterior-cega volta a regra
+ * de ed7415e, em que a rotação só olhava o conteúdo quando a NOVA era vazia;
+ * com atual vazia e anterior boa, a próxima cópia com conteúdo apagava a boa.
+ * A prova "a boa fica, a vazia sai" tem de acusar. */
+const ANTERIOR_CEGA = MODO === '--envenenado-anterior-cega';
 const SEM_CIFRA = MODO === '--envenenado-sem-cifra';
 const REGRA_ABERTA = MODO === '--envenenado-regra-aberta';
 /* Os dois médios da revisão adversarial (07/11):
@@ -112,6 +117,12 @@ if (SOBE_VAZIO) {
     .replace(DESLIGA, "return gravarEstado('automatica', automatica)");
 }
 if (ESCONDE_CODIGO) trocas['/app.js'] = APP.replace(CAMPO_CODIGO, "$('#nuvem-chave-entrada').hidden = est.temChave;");
+const ANTERIOR = 'var anterior = apontadas.filter(function (c) { return c.conteudo; })[0] || apontadas[0] || null;';
+conf('a rotação escolhe a anterior pelo conteúdo num lugar só', NUVEM.split(ANTERIOR).length, 2);
+if (ANTERIOR_CEGA) {
+  trocas['/nuvem.js'] = NUVEM.replace(ANTERIOR,
+    'var anterior = apontadas[0] || null;\n        if (!conteudo) anterior = apontadas.filter(function (c) { return c.conteudo; })[0] || anterior;');
+}
 const regrasServidas = REGRA_ABERTA ? REGRAS.replace(LEITURA, 'allow read: if entrou();') : REGRAS;
 
 conf('o firebase-tools está onde a prova procura (' + FIREBASE + ')', fs.existsSync(FIREBASE), true);
@@ -594,6 +605,30 @@ const retrato = (pag) => pag.evaluate(async () => {
     conf('digitando o código de A, C restaura a cópia com conteúdo', saiu.ok, true);
     conf('os dados de C batem com os de A', await retrato(pagC), retratoA);
     conf('C passou a usar a chave de A', (await pagC.evaluate(() => Nuvem.verChave())).codigo, chaveA.codigo);
+  }
+  if (!ESCONDE_CODIGO) {
+    /* Vazia atual (a de C), boa anterior (a terceira): C cria um aluno e fecha.
+     * A automática sobe com conteúdo, e a boa tem de ficar como anterior; a
+     * vazia é que sai. Com a regra de ed7415e, a boa era apagada aqui. */
+    const idVaziaC = subiuC.valor ? subiuC.valor[0] : null;
+    conf('ponto de partida: atual vazia (de C) e anterior com conteúdo', JSON.stringify(await ponteiroAgora()), JSON.stringify([idVaziaC, idTerceira]));
+    await pagC.evaluate(async () => {
+      const d = await Store.carregar();
+      d.alunos.push({ id: 'delta', nome: 'Aluno Delta Teste' });
+      await Store.salvar(d);
+    });
+    await pagC.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    const comConteudo = await esperar('a automática de C subiu com conteúdo', ponteiroAgora, v => !!v && v[0] !== idVaziaC, 30000);
+    await pagC.evaluate(() => { delete document.visibilityState; });
+    conf('a cópia com conteúdo de C virou atual', comConteudo.ok, true);
+    const boaFicou = comConteudo.ok && comConteudo.valor[1] === idTerceira &&
+      (await lerDoc(dona.idToken, dona.localId, 'copias/' + idTerceira)).status === 200;
+    const vaziaSaiu = (await esperar('a vazia de C saiu', () => lerDoc(dona.idToken, dona.localId, 'copias/' + idVaziaC).then(r => r.status), v => v === 404, 15000)).ok;
+    if (ANTERIOR_CEGA) conf('VENENO visto: com a rotação cega, a boa foi apagada e a vazia ficou', !boaFicou, true);
+    else conf('vazia atual, boa anterior, sobe uma com conteúdo: a boa fica como anterior e a vazia sai', boaFicou && vaziaSaiu, true);
   }
   conf('lerQr recusa uid com barra ou interrogação e aceita o formato do Firebase',
     await pagC.evaluate(() => Nuvem.lerQr('APOIO1:ab/c?d:ABCD') === null && Nuvem.lerQr('APOIO1:x_Y-9:ABCD').uid === 'x_Y-9'), true);
