@@ -74,14 +74,15 @@ const ENFILEIRAR = 'function enfileirar(saida, entrada) { saida.put(entrada); }'
 const SAIDA_NA_TRANSACAO = "var saida = opcoes.semFila ? null : t.objectStore('saida');";
 const GATILHO = 'Nuvem.sincronizarSeDevido({ versaoApp: VERSAO });'; // desde a fatia 3: recebe e envia
 // desde o D6b: o celular da dona passa, e só com escritas de registro
-const COMMIT_TRAVADO = /function commit\(escritas\) \{\r?\n    if \(!podeEnviarCopia\(\) && !\(celularDaDona\(\) && soRegistros\(escritas\)\)\)/;
+// (D7) no celular da dona, além do registro, só passa o diagnóstico do PRÓPRIO aparelho (soDiagnosticoProprio)
+const COMMIT_TRAVADO = /function commit\(escritas\) \{\r?\n    if \(!podeEnviarCopia\(\) && !\(celularDaDona\(\) && \(soRegistros\(escritas\) \|\| soDiagnosticoProprio\(escritas\)\)\)\)/;
 const REGISTROS_NAS_REGRAS = 'match /registros/{registro} {';
 conf('o conteúdo do registro vai em dados, como dado legível, num lugar só (sem cifra)', NUVEM.split(DADOS_LEGIVEIS).length === 2 && !/subtle\.|AES-GCM/.test(NUVEM), true);
 conf('o store.js enfileira num lugar só, na transação de quem chamou', STORE.split(ENFILEIRAR).length, 2);
 conf('a fila é um depósito da MESMA transação do dado', STORE.split(SAIDA_NA_TRANSACAO).length, 2);
 conf("os depósitos do documento incluem a fila", STORE.indexOf("var DEPOSITOS_DO_DOCUMENTO = ['dados', 'registros', 'controle', 'saida'];") > 0, true);
 conf('o app.js dispara o envio nos momentos da cópia, num lugar só', APP.split(GATILHO).length, 2);
-conf('o envio dos registros passa pelo commit, que recusa no aparelho que só lê (e no celular da dona, tudo o que não for registro)', COMMIT_TRAVADO.test(NUVEM) && NUVEM.indexOf("gravacaoCarimbada(nomeDoc(uid, 'registros/' + d.id), d, ") > 0, true);
+conf('o envio dos registros passa pelo commit, que recusa no aparelho que só lê (e no celular da dona, tudo o que não for registro ou o diagnóstico do próprio aparelho)', COMMIT_TRAVADO.test(NUVEM) && NUVEM.indexOf("gravacaoCarimbada(nomeDoc(uid, 'registros/' + d.id), d, ") > 0, true);
 conf('as regras têm o caminho dos registros, com a forma conferida', REGRAS.split(REGISTROS_NAS_REGRAS).length === 2 && REGRAS.indexOf('registroValido(registro)') > 0, true);
 conf('a lista de ajustes do aparelho tem versaoVista', /AJUSTES_DO_APARELHO = \[[^\]]*'versaoVista'/.test(STORE), true);
 

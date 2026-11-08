@@ -23,6 +23,16 @@
  *   config/leitores          { uids: [...] }   quem mais pode LER (D7)
  *   registros/{id}           { id, tipo, atualizadoEm, apagadoEm, aparelho,
  *                              esquema, app, dados, servidorEm }  (N1)
+ *   diagnostico/{aparelhoId} { aparelhoId, aparelho, papel, app, quando,
+ *                              pendentes, quarentena, ultimoEnvio,
+ *                              ultimoRecebimento, ultimaCopia, sincronizacao,
+ *                              navegador, instalado, persistente, erroCodigo,
+ *                              erroFrase, erroQuando, erroOrigem }  (D7)
+ * O DIAGNÓSTICO é um resumo pequeno de cada aparelho que escreve (o tablet e
+ * o celular da dona), só metadados e nunca dado de criança: a versão, o
+ * último erro (o código e a frase fixa dele, nunca o conteúdo), a última
+ * sincronização, a fila e a quarentena. Sobe quando muda, no máximo uma vez
+ * por hora, só do próprio aparelho; o observador (D7) o lê no painel dele.
  * A cópia nova sobe inteira com um id novo e só então o ponteiro muda; a de
  * antes vira "anterior" e a mais velha sai. Quem baixa nunca vê metade.
  *
@@ -118,6 +128,20 @@
    * sem aluno. A marca mora no Store (controle), que a confere dentro da
    * transação de aplicar; aqui fica o espelho para as decisões rápidas. */
   var sincronizacaoDesligada = false;
+  /* O diagnóstico deste aparelho (D7): o que a tela informa (a versão do
+   * aplicativo e o resultado do pedido de armazenamento persistente), o
+   * último erro da cópia completa e o último erro de script (só o nome e o
+   * lugar, nunca a mensagem), e o último resumo que subiu, com a assinatura
+   * (para subir só quando muda) e a hora (no máximo um por hora). Espelhado
+   * no banco próprio, chave 'diagnostico'. */
+  var versaoApp = '';
+  var persistente = null;         // true, false, ou null enquanto o navegador não respondeu
+  var erroCopia = null;           // { codigo, quando }
+  var erroScript = null;          // { codigo, frase, quando }
+  var ultimoDiagnostico = null;   // { quando, assinatura }
+  var gravandoDiagnostico = null;
+  var problemaBanco = null;       // o nome do erro quando o banco próprio não abre (navegação privada do Safari)
+  var UMA_HORA = 60 * 60 * 1000;
   var ouvintes = [];
   var pronto = null;
 
@@ -166,7 +190,8 @@
   function carregarEstado() {
     if (pronto) return pronto;
     pronto = Promise.all([lerEstado('sessao'), lerEstado('chave'), lerEstado('copia'),
-      lerEstado('automatica'), lerEstado('pendente'), lerEstado('aparelho'), lerEstado('soLeitura'), lerEstado('registros')]).then(function (v) {
+      lerEstado('automatica'), lerEstado('pendente'), lerEstado('aparelho'), lerEstado('soLeitura'), lerEstado('registros'),
+      lerEstado('diagnostico')]).then(function (v) {
       marcaCelular = v[6] || null;
       sessao = v[0] || null;
       ultimaCopia = v[2] || null;
@@ -174,6 +199,7 @@
       pendente = !!v[4];
       aparelho = v[5] || null;
       if (v[7]) registros = { pendentes: 0, quarentena: 0, ultimoEnvio: v[7].ultimoEnvio || null, erro: v[7].erro || null };
+      ultimoDiagnostico = v[8] || null;
       var pendencias = [];
       // a chave antiga (fase 0 com cifra, decisão do dono de 08/11): ignorada e apagada
       if (v[1]) pendencias.push(gravarEstado('chave', null).catch(function () { /* fica, ignorada */ }));
@@ -185,7 +211,11 @@
         pendencias.push(gravarEstado('aparelho', aparelho));
       }
       return Promise.all(pendencias);
-    }).catch(function () { /* sem IndexedDB: a nuvem fica indisponível e a tela diz */ });
+    }).catch(function (e) {
+      /* Sem IndexedDB (a navegação privada do Safari recusa o banco): a nuvem
+       * fica indisponível e a tela diz o motivo, pelo estado. */
+      problemaBanco = (e && (e.name || e.message)) ? String(e.name || e.message).slice(0, 80) : 'erro';
+    });
     return pronto;
   }
   function lerSincronizacaoDesligada() {
@@ -497,8 +527,15 @@
       return !w.delete && nome.indexOf(raiz) > 0 && nome.slice(nome.indexOf(raiz) + raiz.length).indexOf('/') < 0;
     });
   }
+  /* O diagnóstico (D7) do PRÓPRIO aparelho, numa escrita só, no caminho da
+   * conta que entrou: é a outra coisa que o celular da dona pode subir. */
+  function soDiagnosticoProprio(escritas) {
+    var id = idDoAparelho();
+    var nome = escritas.length === 1 && escritas[0] && escritas[0].update && escritas[0].update.name;
+    return !!(sessao && id && nome && nome === nomeDoc(sessao.uid, 'diagnostico/' + id));
+  }
   function commit(escritas) {
-    if (!podeEnviarCopia() && !(celularDaDona() && soRegistros(escritas))) return Promise.reject(recusaSoLeitura());
+    if (!podeEnviarCopia() && !(celularDaDona() && (soRegistros(escritas) || soDiagnosticoProprio(escritas)))) return Promise.reject(recusaSoLeitura());
     return comToken(function (cab) {
       return pedir(urlDoc(raizDocumentos()) + ':commit', { cabecalhos: cab, corpo: { writes: escritas } });
     });
@@ -626,8 +663,15 @@
         return ultimaCopia;
       });
     });
-    var limpar = function () { enviando = null; avisarOuvintes(); };
-    enviando.then(limpar, limpar);
+    /* O resultado entra no diagnóstico deste aparelho (D7): um erro da cópia
+     * fica anotado pelo código, e o envio que deu certo o apaga. */
+    var limpar = function (e) {
+      enviando = null;
+      erroCopia = e && e.codigo ? { codigo: e.codigo, quando: new Date().toISOString() } : null;
+      avisarOuvintes();
+      gravarDiagnostico();
+    };
+    enviando.then(function () { limpar(null); }, limpar);
     return enviando;
   }
 
@@ -987,7 +1031,11 @@
       guardarRegistros();
       return { enviados: enviados, erro: registros.erro };
     });
-    var limpar = function () { enviandoRegistros = null; contarFila().then(avisarOuvintes, avisarOuvintes); };
+    var limpar = function () {
+      enviandoRegistros = null;
+      // a fila contada antes do diagnóstico: o resumo leva o tamanho de agora
+      contarFila().then(avisarOuvintes, avisarOuvintes).then(gravarDiagnostico);
+    };
     enviandoRegistros.then(limpar, limpar);
     return enviandoRegistros;
   }
@@ -1090,7 +1138,7 @@
       registros.erroRecebimento = { codigo: (e && e.codigo) || 'ERRO', quando: new Date().toISOString(), mensagem: (e && e.message) || '' };
       return { aplicados: aplicados, erro: registros.erroRecebimento };
     });
-    var limpar = function () { recebendo = null; avisarOuvintes(); };
+    var limpar = function () { recebendo = null; avisarOuvintes(); gravarDiagnostico(); };
     recebendo.then(limpar, limpar);
     return recebendo;
   }
@@ -1108,9 +1156,162 @@
     return sincronizar(info);
   }
 
+  // ---------- o diagnóstico por aparelho (D7) ----------
+
+  /* A tela informa o que só ela sabe: a versão do aplicativo e o resultado do
+   * navigator.storage.persist() desta abertura. */
+  function informar(info) {
+    info = info || {};
+    if (info.versaoApp !== undefined) versaoApp = String(info.versaoApp || '');
+    if (info.persistente !== undefined) persistente = info.persistente === null ? null : !!info.persistente;
+  }
+  /* Um erro de script anotado SEM a mensagem: só o nome do erro e o lugar
+   * (arquivo e linha). A mensagem poderia carregar um pedaço de dado. */
+  function anotarErroScript(nome, arquivo, linha) {
+    var lugar = String(arquivo || '').split(/[\\/]/).pop().split('?')[0];
+    erroScript = { codigo: 'SCRIPT', quando: new Date().toISOString(),
+      frase: 'Erro no aplicativo (' + (String(nome || 'Erro').slice(0, 40)) + (lugar ? ' em ' + lugar.slice(0, 40) + (linha ? ':' + linha : '') : '') + ').' };
+  }
+  /* A frase de um código, sempre a fixa daqui: nunca a mensagem de um erro. */
+  function fraseDoCodigo(codigo) {
+    if (codigo === 'SEM_REDE') return 'Sem internet.';
+    if (codigo === 'SO_LEITURA') return recusaSoLeitura().message;
+    return FRASES[codigo] || 'A nuvem não respondeu como esperado.';
+  }
+  /* Um rótulo curto do navegador, só para o painel: "Safari iOS", "Chrome
+   * Android", "Chrome", "Samsung Internet"... */
+  function rotuloDoNavegador() {
+    var ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+    if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1)) {
+      return /CriOS/.test(ua) ? 'Chrome iOS' : /FxiOS/.test(ua) ? 'Firefox iOS' : 'Safari iOS';
+    }
+    if (/Android/.test(ua)) return /SamsungBrowser/.test(ua) ? 'Samsung Internet' : /Chrome/.test(ua) ? 'Chrome Android' : 'Android';
+    if (/Edg\//.test(ua)) return 'Edge';
+    if (/Firefox/.test(ua)) return 'Firefox';
+    if (/Chrome/.test(ua)) return 'Chrome';
+    if (/Safari/.test(ua)) return 'Safari';
+    return 'navegador';
+  }
+  function instaladoNaTela() {
+    if (typeof navigator !== 'undefined' && navigator.standalone === true) return true;
+    try { return !!(root.matchMedia && root.matchMedia('(display-mode: standalone)').matches); } catch (e) { return false; }
+  }
+  /* O último erro conhecido deste aparelho, entre os quatro lugares. */
+  function ultimoErro() {
+    var candidatos = [
+      registros.erro && { codigo: registros.erro.codigo, quando: registros.erro.quando, origem: 'envio' },
+      registros.erroRecebimento && { codigo: registros.erroRecebimento.codigo, quando: registros.erroRecebimento.quando, origem: 'recebimento' },
+      erroCopia && { codigo: erroCopia.codigo, quando: erroCopia.quando, origem: 'copia' },
+      erroScript && { codigo: erroScript.codigo, quando: erroScript.quando, origem: 'script', frase: erroScript.frase }
+    ].filter(Boolean);
+    candidatos.sort(function (a, b) { return String(b.quando).localeCompare(String(a.quando)); });
+    return candidatos[0] || null;
+  }
+  /* O resumo que sobe: só metadados. Nenhum campo leva nome, aula, nota,
+   * valor ou mensagem livre; as regras do Firestore conferem os nomes dos
+   * campos (hasOnly) e o tamanho de cada um. */
+  function montarDiagnostico(id) {
+    var d = { aparelhoId: id, aparelho: aparelho || 'aparelho', papel: marcaCelular ? 'celular' : 'tablet',
+      app: String(versaoApp || '').slice(0, 32), quando: new Date().toISOString(),
+      pendentes: Number(registros.pendentes) || 0, quarentena: Number(registros.quarentena) || 0,
+      ultimoEnvio: (registros.ultimoEnvio && registros.ultimoEnvio.quando) || null,
+      ultimoRecebimento: (registros.ultimoRecebimento && registros.ultimoRecebimento.quando) || null,
+      ultimaCopia: (ultimaCopia && ultimaCopia.quando) || null,
+      sincronizacao: sincronizacaoDesligada ? 'desligada' : 'ligada',
+      navegador: rotuloDoNavegador(), instalado: instaladoNaTela(),
+      persistente: persistente === null ? null : !!persistente };
+    var e = ultimoErro();
+    if (e) {
+      d.erroCodigo = String(e.codigo || 'ERRO').slice(0, 40);
+      d.erroFrase = String(e.frase || fraseDoCodigo(e.codigo)).slice(0, 200);
+      d.erroQuando = String(e.quando || '').slice(0, 40);
+      d.erroOrigem = e.origem;
+    }
+    return d;
+  }
+  function assinaturaDoDiagnostico(d) {
+    var copia = {};
+    Object.keys(d).forEach(function (k) { if (k !== 'quando') copia[k] = d[k]; });
+    return JSON.stringify(copia);
+  }
+  /* Sobe o resumo deste aparelho, se mudou e se a última subida tem mais de
+   * uma hora. Só de quem escreve na nuvem (o tablet e o celular da dona): o
+   * observador de outra conta não passa pelo commit, e nada dele sobe. Nunca
+   * rejeita e nunca mexe em registros.erro: uma recusa daqui (as regras
+   * ainda sem o diagnóstico) fica quieta e a próxima sincronização tenta. */
+  function gravarDiagnostico() {
+    if (!sessao || !podeEnviarRegistros() || !online()) return Promise.resolve({ pulado: 'indevido' });
+    /* O celular da dona é "aparelho que escreve" só depois de escrever: um
+     * celular que só consulta não sobe nem o resumo (nenhum commit sai dele,
+     * como antes do D6b). Com uma mudança dele na fila, na quarentena ou
+     * acabada de subir, o resumo passa a subir, porque é aí que o erro dele
+     * importa. (Um envio de fila vazia e o "sem internet" de um celular que
+     * nada tinha a subir não contam.) */
+    if (!podeEnviarCopia() && !(registros.pendentes || registros.quarentena || (registros.ultimoEnvio && registros.ultimoEnvio.enviados > 0))) {
+      return Promise.resolve({ pulado: 'celular sem escrita' });
+    }
+    var id = idDoAparelho();
+    if (!id) return Promise.resolve({ pulado: 'sem aparelho' });
+    if (gravandoDiagnostico) return gravandoDiagnostico;
+    /* A anotação da última subida é lida do banco próprio a cada vez: duas
+     * abas do mesmo tablet dividem a mesma, e não sobem duas vezes. */
+    gravandoDiagnostico = lerEstado('diagnostico').then(function (anotado) { return anotado || ultimoDiagnostico; }, function () { return ultimoDiagnostico; }).then(function (anotado) {
+      var resumo = montarDiagnostico(id);
+      var assinatura = assinaturaDoDiagnostico(resumo);
+      if (anotado && anotado.assinatura === assinatura) return { pulado: 'igual' };
+      if (anotado && anotado.quando) {
+        var ha = Date.now() - new Date(anotado.quando).getTime();
+        if (ha >= 0 && ha < UMA_HORA) return { pulado: 'hora' };
+      }
+      return commit([gravacao(nomeDoc(sessao.uid, 'diagnostico/' + id), resumo)]).then(function () {
+        ultimoDiagnostico = { quando: resumo.quando, assinatura: assinatura };
+        return gravarEstado('diagnostico', ultimoDiagnostico).catch(function () { /* fica em memória */ }).then(function () { return { gravado: true }; });
+      }, function (e) {
+        return { erro: (e && e.codigo) || 'ERRO' };
+      });
+    });
+    var limpar = function () { gravandoDiagnostico = null; };
+    gravandoDiagnostico.then(limpar, limpar);
+    return gravandoDiagnostico;
+  }
+  /* O observador (D7) lê os resumos de todos os aparelhos da dona. uidDona:
+   * a conta da cópia; sem ele, a própria. As regras decidem quem lê. */
+  function listarDiagnosticos(uidDona) {
+    return carregarEstado().then(function () {
+      if (!sessao) throw erro('TOKEN_EXPIRED');
+      var uid = uidDona || (marcaCelular && marcaCelular.uidDona) || sessao.uid;
+      return comToken(function (cab) {
+        return pedir(urlDoc(nomeDoc(uid, 'diagnostico')) + '?pageSize=50', { cabecalhos: cab });
+      });
+    }).then(function (resposta) {
+      var docs = (resposta && resposta.documents) || [];
+      return docs.map(function (d) {
+        var v = valores(d.fields);
+        v.aparelhoId = v.aparelhoId || String(d.name || '').split('/').pop();
+        return v;
+      }).sort(function (a, b) { return String(b.quando || '').localeCompare(String(a.quando || '')); });
+    });
+  }
+  /* "Esquecer este aparelho": a dona, no tablet, apaga o resumo de um aparelho
+   * antigo da lista. Passa pelo commit: só o tablet (podeEnviarCopia) chega
+   * aqui; o celular e o observador são recusados. */
+  function esquecerDiagnostico(aparelhoId) {
+    aparelhoId = String(aparelhoId || '').trim();
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(aparelhoId)) return Promise.reject(new Error('Este aparelho não foi encontrado.'));
+    if (!sessao) return Promise.reject(erro('TOKEN_EXPIRED'));
+    if (aparelhoId === idDoAparelho()) return Promise.reject(new Error('Este é o aparelho atual; ele refaz o resumo sozinho.'));
+    return commit([remocao(nomeDoc(sessao.uid, 'diagnostico/' + aparelhoId))]).then(function () { return true; });
+  }
+  /* O que este aparelho diria de si, sem subir nada: o painel do observador
+   * mostra o próprio aparelho por aqui, e nada disso é gravado nele. */
+  function diagnosticoLocal() {
+    return montarDiagnostico(idDoAparelho() || 'este-aparelho');
+  }
+
   function estado() {
     return {
       disponivel: disponivel(),
+      bancoIndisponivel: problemaBanco,
       entrada: sessao ? { email: sessao.email, uid: sessao.uid } : null,
       ultimaCopia: ultimaCopia,
       automatica: automatica,
@@ -1149,6 +1350,12 @@
 
   // Toda gravação dela no banco principal marca que há cópia a subir.
   if (root.Store && typeof root.Store.aoMudar === 'function') root.Store.aoMudar(marcarMudanca);
+  // o último erro de script entra no diagnóstico (D7), só o nome e o lugar
+  if (typeof root.addEventListener === 'function') {
+    root.addEventListener('error', function (ev) {
+      anotarErroScript(ev && ev.error && ev.error.name, ev && ev.filename, ev && ev.lineno);
+    });
+  }
   if (disponivel()) carregarEstado();
 
   root.Nuvem = {
@@ -1163,6 +1370,9 @@
     enviarRegistros: enviarRegistros, enviarRegistrosSeDevido: enviarRegistrosSeDevido, contarFila: contarFila,
     receberRegistros: receberRegistros, sincronizar: sincronizar, sincronizarSeDevido: sincronizarSeDevido,
     copiaAutomaticaDevida: copiaAutomaticaDevida, copiaDiariaDevida: copiaDiariaDevida,
+    informar: informar, gravarDiagnostico: gravarDiagnostico, listarDiagnosticos: listarDiagnosticos, diagnosticoLocal: diagnosticoLocal,
+    esquecerDiagnostico: esquecerDiagnostico,
+    fraseDoCodigo: fraseDoCodigo, rotuloDoNavegador: rotuloDoNavegador, instaladoNaTela: instaladoNaTela,
     fraseDeQuando: fraseDeQuando,
     TETO_PARTE: TETO_PARTE
   };

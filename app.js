@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.10';
+  var VERSAO = '1.42.11';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,13 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.11',
+      itens: [
+        'Em Ajustes, no cartão da nuvem, "Aparelhos na nuvem" mostra os aparelhos que usam a sua conta, com a versão e se está tudo enviado. Um aparelho antigo pode ser esquecido ali.',
+        'Se você der ao Rômulo o código da conta, o celular dele só lê a sua agenda e o fechamento, e mostra se os seus aparelhos estão em dia. Ele nunca muda nada.'
+      ]
+    },
     {
       versao: '1.42.10',
       itens: [
@@ -1988,7 +1995,10 @@
   // ================= início =================
 
   function iniciar() {
-    Store.tornarPersistente();
+    /* navigator.storage.persist() a cada abertura; o resultado vai ao
+     * diagnóstico (D7): no Safari do iPhone ele costuma ser recusado, e o
+     * painel diz isso em vez de falhar calado. */
+    pedirPersistencia();
     /* O modo celular (D6) é decidido ANTES de ler o banco: o celular que
      * ainda não trouxe a cópia do tablet não grava a carga inicial. */
     decidirModoCelular().then(function () {
@@ -20883,6 +20893,7 @@
 
   function iniciarNuvem() {
     if (!temNuvem()) { desenharNuvem(); return; }
+    Nuvem.informar({ versaoApp: VERSAO, persistente: persistenciaConcedida });
     Nuvem.aoMudar(desenharNuvem);
     // (guardado: o código de antes da fatia 3, servido pelas provas de subida de banco, não tem aoReceber)
     if (typeof Store.aoReceber === 'function') Store.aoReceber(registrosChegaram);
@@ -21075,6 +21086,51 @@
       el('button', { type: 'button', class: 'btn pequeno', id: 'nuvem-sair', texto: 'Sair', aoClick: sairDaNuvem })
     ]));
     caixa.appendChild(desenharLeitoresDaNuvem(est));
+    caixa.appendChild(desenharAparelhosNaNuvem(est));
+  }
+
+  /* Aparelhos na nuvem (D7): os resumos de diagnóstico desta conta, um por
+   * aparelho, dobrados; um aparelho antigo sai da lista por "Esquecer este
+   * aparelho" (o atual refaz o resumo sozinho, e não tem o botão). */
+  function desenharAparelhosNaNuvem(est) {
+    var lista = el('div', { id: 'nuvem-aparelhos' });
+    var mensagem = el('div', { id: 'nuvem-aparelhos-mensagem' });
+    function recarregar() {
+      lista.innerHTML = '';
+      lista.appendChild(el('div', { class: 'ajuda', texto: 'Consultando...' }));
+      Nuvem.listarDiagnosticos().then(function (resumos) {
+        lista.innerHTML = '';
+        if (!resumos.length) {
+          lista.appendChild(el('div', { class: 'ajuda', texto: 'Nenhum aparelho enviou resumo ainda; este envia na próxima sincronização.' }));
+          return;
+        }
+        var atual = est.aparelhoId || '';
+        resumos.forEach(function (d) {
+          var filhos = [el('div', { class: 'cresce', texto: fraseDoDiagnostico(d) + (d.aparelhoId === atual ? ' (este aparelho)' : '') })];
+          if (d.aparelhoId !== atual) {
+            filhos.push(el('button', { type: 'button', class: 'btn pequeno', 'data-esquecer': d.aparelhoId, texto: 'Esquecer este aparelho', aoClick: function () {
+              if (!confirmar('Esquecer o ' + tituloDoAparelho(d.aparelho).toLowerCase() + ' na lista de aparelhos? Só o resumo de diagnóstico dele sai da nuvem; ' +
+                'os dados não mudam. Se ele voltar a sincronizar, reaparece.')) return;
+              Nuvem.esquecerDiagnostico(d.aparelhoId).then(recarregar, function (e) { mostrarMensagemDaNuvem(mensagem, 'faixa-aviso', e && e.message ? e.message : 'Não consegui esquecer agora.'); });
+            } }));
+          }
+          lista.appendChild(el('div', { class: 'item-lista', 'data-aparelho': d.aparelhoId || '' }, filhos));
+        });
+      }, function (e) {
+        lista.innerHTML = '';
+        lista.appendChild(el('div', { class: 'faixa-aviso', texto: e && e.message ? e.message : 'Não consegui consultar agora.' }));
+      });
+    }
+    var det = el('details', { class: 'u-margem-topo-8', id: 'nuvem-aparelhos-detalhes', aoToggle: function () {
+      if (det.open) recarregar();
+    } }, [
+      el('summary', { texto: 'Aparelhos na nuvem' }),
+      el('p', { class: 'ajuda u-margem-topo-8', texto: 'O resumo de diagnóstico que cada aparelho desta conta enviou (versão, mudanças a subir, último erro). ' +
+        'Um aparelho que você não usa mais pode ser esquecido; só o resumo dele sai.' }),
+      lista,
+      mensagem
+    ]);
+    return det;
   }
 
   function desenharEntradaNaNuvem(caixa) {
@@ -21611,6 +21667,7 @@
     // a ação aberta só vale no celular que edita (ela pode ter saído da conta no meio)
     if (formCelular && !celularEdita()) formCelular = null;
     desenharTopoCelular();
+    ajustarAbasDoCelular(); // as telas do observador (D7) só com ele
     $$('#modo-celular .cel-tela').forEach(function (t) { t.classList.remove('ativa'); });
     $$('#cel-abas .cel-aba').forEach(function (b) {
       var ativa = !entrada && b.dataset.cel === telaCelular;
@@ -21621,6 +21678,8 @@
     if (entrada) { desenharEntradaCelular(); $('#cel-entrada').classList.add('ativa'); return; }
     if (telaCelular === 'fechamento') desenharFechamentoCelular();
     else if (telaCelular === 'enviar') desenharEnvioCelular();
+    else if (telaCelular === 'diagnostico') desenharDiagnosticoCelular();
+    else if (telaCelular === 'ajustes') desenharAjustesObservador();
     else desenharHojeCelular();
     $('#cel-' + telaCelular).classList.add('ativa');
   }
@@ -22137,6 +22196,176 @@
         ])
       ]));
     });
+  }
+
+  // ---------- o aparelho observador (D7): diagnóstico e ajustes ----------
+
+  /* O iPhone do Rômulo lê a cópia de outra conta (leOutraConta) e só lê. Duas
+   * telas são dele: "Diagnóstico", para onde chegam os resumos dos aparelhos
+   * da dona (versão, último erro, última sincronização, fila), e "Ajustes",
+   * com a conta, a instalação pelo Safari e o que o navegador não garante.
+   * Nada do observador é gravado além da marca e da sessão: o que ele mostra
+   * de si é recalculado a cada abertura, e os dados chegam da nuvem. */
+  var persistenciaConcedida = null; // o resultado do navigator.storage.persist() desta abertura
+  function pedirPersistencia() {
+    var p;
+    try { p = Promise.resolve(Store.tornarPersistente()); } catch (e) { p = Promise.resolve(false); }
+    return p.then(function (r) { return !!r; }, function () { return false; }).then(function (r) {
+      persistenciaConcedida = r;
+      if (temNuvem()) Nuvem.informar({ persistente: r });
+      if (modoCelular && (telaCelular === 'diagnostico' || telaCelular === 'ajustes')) desenharCelular();
+    });
+  }
+  /* Onde o Safari (ou outro navegador) não coopera, o motivo em uma frase,
+   * em vez de falhar calado: armazenamento recusado, banco local que não
+   * abre (navegação privada), sem sincronização em segundo plano, aberto
+   * fora da Tela de Início. */
+  function sondarNavegador() {
+    var ua = navigator.userAgent || '';
+    var iOS = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    var rotulo = temNuvem() ? Nuvem.rotuloDoNavegador() : (iOS ? 'Safari iOS' : 'navegador');
+    var safariIOS = rotulo === 'Safari iOS';
+    var instalado = temNuvem() ? Nuvem.instaladoNaTela() : (navigator.standalone === true);
+    var est = temNuvem() ? Nuvem.estado() : null;
+    var quem = safariIOS ? 'O Safari' : 'O navegador';
+    var motivos = [];
+    if (!temNuvem()) motivos.push('Este navegador não tem o que a nuvem precisa (o banco local).');
+    else if (est.bancoIndisponivel) {
+      motivos.push('O banco local não abre neste navegador (' + est.bancoIndisponivel + '). No Safari isso acontece na navegação privada: saia dela e abra de novo.');
+    }
+    if (!(navigator.storage && navigator.storage.persist)) motivos.push('Este navegador não tem o pedido de armazenamento persistente.');
+    else if (persistenciaConcedida === false) {
+      motivos.push(quem + ' não garantiu o armazenamento: se o aparelho ficar sem espaço, ele pode apagar os dados locais. Nada se perde: ao abrir, tudo volta da nuvem.');
+    }
+    if (!('SyncManager' in window)) motivos.push('Sem sincronização em segundo plano ' + (safariIOS ? 'no Safari' : 'neste navegador') + ': os dados chegam quando o aplicativo abre, não antes.');
+    if (iOS && !instalado) motivos.push('Aberto no Safari, e não pela Tela de Início: toque em Compartilhar e em "Adicionar à Tela de Início" para instalar.');
+    return { iOS: iOS, safariIOS: safariIOS, rotulo: rotulo, instalado: instalado, persistente: persistenciaConcedida, motivos: motivos };
+  }
+  var TEXTO_INSTALAR_SAFARI = 'Para instalar no iPhone: abra este endereço no Safari, toque em Compartilhar (o quadrado com a seta para cima) e ' +
+    'depois em "Adicionar à Tela de Início". Abra o aplicativo sempre pelo ícone da Tela de Início: é assim que ele guarda a conta e os dados entre uma abertura e outra.';
+
+  /* As telas só do observador valem só enquanto ele é observador (com a
+   * conta à vista); fora disso a tela volta para Hoje. */
+  function telaDoObservador(tela) { return tela === 'diagnostico' || tela === 'ajustes'; }
+  function ajustarAbasDoCelular() {
+    var observador = leOutraConta();
+    $$('#cel-abas .cel-aba').forEach(function (b) {
+      // o observador não envia PDF às famílias: a aba Enviar dá lugar às dele
+      if (telaDoObservador(b.dataset.cel)) b.hidden = !observador;
+      else if (b.dataset.cel === 'enviar') b.hidden = observador;
+    });
+    if (telaDoObservador(telaCelular) && !observador) telaCelular = 'hoje';
+    if (telaCelular === 'enviar' && observador) telaCelular = 'hoje';
+  }
+
+  function tituloDoAparelho(rotulo) {
+    var r = String(rotulo || 'aparelho');
+    return r.charAt(0).toUpperCase() + r.slice(1);
+  }
+  /* "Tablet 7K: versão 1.42.10, tudo enviado, último erro ontem, 18:40: Sem
+   * internet." A frase em linguagem simples, a partir do resumo da nuvem. */
+  function fraseDoDiagnostico(d) {
+    var partes = [];
+    partes.push(d.app ? 'versão ' + d.app : 'versão desconhecida');
+    var n = Number(d.pendentes) || 0, q = Number(d.quarentena) || 0;
+    if (d.sincronizacao === 'desligada') partes.push('sincronização desligada');
+    else if (!n && !q) partes.push('tudo enviado');
+    else {
+      if (n) partes.push(n === 1 ? '1 mudança a subir' : n + ' mudanças a subir');
+      if (q) partes.push(q === 1 ? '1 mudança não consegue subir' : q + ' mudanças não conseguem subir');
+    }
+    if (d.erroQuando) partes.push('último erro ' + Nuvem.fraseDeQuando(d.erroQuando) + ': ' + (d.erroFrase || d.erroCodigo || 'erro'));
+    else partes.push('sem erro registrado');
+    return tituloDoAparelho(d.aparelho) + ': ' + partes.join(', ') + (/[.!?]$/.test(partes[partes.length - 1]) ? '' : '.');
+  }
+  function detalhesDoDiagnostico(d) {
+    var linhas = [];
+    var sinc = d.ultimoEnvio || d.ultimoRecebimento;
+    if (d.ultimoEnvio && d.ultimoRecebimento) sinc = d.ultimoEnvio > d.ultimoRecebimento ? d.ultimoEnvio : d.ultimoRecebimento;
+    linhas.push(sinc ? 'Última sincronização: ' + Nuvem.fraseDeQuando(sinc) + '.' : 'Ainda não sincronizou registros.');
+    if (d.papel !== 'celular') linhas.push(d.ultimaCopia ? 'Cópia completa: ' + Nuvem.fraseDeQuando(d.ultimaCopia) + '.' : 'Nenhuma cópia completa anotada.');
+    var nav = d.navegador ? d.navegador + (d.instalado ? ', instalado na tela inicial' : '') : '';
+    if (nav) linhas.push('Navegador: ' + nav + '.');
+    if (d.persistente === false) linhas.push('O navegador não garantiu o armazenamento desse aparelho.');
+    linhas.push('Resumo enviado ' + (d.quando ? Nuvem.fraseDeQuando(d.quando) : 'em hora desconhecida') + '.');
+    return linhas;
+  }
+  function cartaoDoDiagnostico(d) {
+    return el('div', { class: 'cartao cel-diag-aparelho', 'data-aparelho': d.aparelhoId || '' }, [
+      el('strong', { class: 'cel-diag-frase', texto: fraseDoDiagnostico(d) })
+    ].concat(detalhesDoDiagnostico(d).map(function (l) { return el('div', { class: 'ajuda u-margem-0', texto: l }); })));
+  }
+
+  /* O que este aparelho (o observador) diria de si, sem gravar nada. */
+  function cartaoDesteAparelho(sonda) {
+    var est = Nuvem.estado();
+    var r = est.registros || {};
+    var linhas = [];
+    linhas.push('Versão ' + VERSAO + ', ' + sonda.rotulo + (sonda.instalado ? ', instalado na Tela de Início.' : ', aberto no navegador.'));
+    linhas.push(sonda.persistente === null ? 'Armazenamento persistente: ainda sem resposta do navegador.'
+      : sonda.persistente ? 'Armazenamento persistente: garantido.' : 'Armazenamento persistente: recusado pelo navegador.');
+    if (r.ultimoRecebimento && r.ultimoRecebimento.quando) linhas.push('Última leitura da nuvem: ' + Nuvem.fraseDeQuando(r.ultimoRecebimento.quando) + '.');
+    else linhas.push('Ainda não leu registros da nuvem nesta abertura.');
+    if (r.erroRecebimento) linhas.push('Último erro ao ler: ' + Nuvem.fraseDoCodigo(r.erroRecebimento.codigo) + ' (' + Nuvem.fraseDeQuando(r.erroRecebimento.quando) + ').');
+    linhas.push('Nada deste aparelho sobe para a nuvem; o que está aqui volta da nuvem ao abrir.');
+    var filhos = [el('strong', { texto: 'Este aparelho (observador)' })]
+      .concat(linhas.map(function (l) { return el('div', { class: 'ajuda u-margem-0', texto: l }); }));
+    sonda.motivos.forEach(function (m) { filhos.push(el('div', { class: 'faixa-aviso u-margem-topo-8 cel-motivo-navegador', texto: m })); });
+    return el('div', { class: 'cartao', id: 'cel-diag-este' }, filhos);
+  }
+
+  function desenharDiagnosticoCelular() {
+    var caixa = $('#cel-diagnostico');
+    caixa.innerHTML = '';
+    caixa.appendChild(el('h2', { class: 'cel-titulo', texto: 'Diagnóstico' }));
+    if (!temNuvem()) {
+      caixa.appendChild(el('div', { class: 'faixa-aviso', texto: 'Este navegador não tem o que a nuvem precisa (o banco local).' }));
+      return;
+    }
+    caixa.appendChild(cartaoDesteAparelho(sondarNavegador()));
+    var est = Nuvem.estado();
+    var lista = el('div', { id: 'cel-diag-lista' });
+    lista.appendChild(el('div', { class: 'ajuda', texto: 'Consultando os aparelhos da dona...' }));
+    caixa.appendChild(el('h2', { class: 'cel-titulo u-margem-topo-8', texto: 'Aparelhos da dona' }));
+    caixa.appendChild(lista);
+    caixa.appendChild(el('div', { class: 'barra' }, [
+      el('button', { type: 'button', class: 'btn', id: 'cel-diag-buscar', texto: 'Buscar de novo', aoClick: desenharDiagnosticoCelular })
+    ]));
+    Nuvem.listarDiagnosticos(est.uidDona || null).then(function (resumos) {
+      lista.innerHTML = '';
+      if (!resumos.length) {
+        lista.appendChild(el('div', { class: 'ajuda', texto: 'Nenhum aparelho da dona enviou resumo ainda. Cada um envia na primeira sincronização com esta versão.' }));
+        return;
+      }
+      resumos.forEach(function (d) { lista.appendChild(cartaoDoDiagnostico(d)); });
+    }, function (e) {
+      lista.innerHTML = '';
+      lista.appendChild(el('div', { class: 'faixa-aviso', id: 'cel-diag-erro', texto: 'Não consegui ler os resumos: ' + (e && e.message ? e.message : 'a nuvem não respondeu.') }));
+    });
+  }
+
+  function desenharAjustesObservador() {
+    var caixa = $('#cel-ajustes');
+    caixa.innerHTML = '';
+    caixa.appendChild(el('h2', { class: 'cel-titulo', texto: 'Ajustes do observador' }));
+    var est = temNuvem() ? Nuvem.estado() : null;
+    if (est && est.entrada) {
+      caixa.appendChild(el('div', { class: 'cartao', id: 'cel-obs-conta' }, [
+        el('p', { class: 'nuvem-conta u-margem-topo-0', texto: 'Conta: ' + est.entrada.email }),
+        el('p', { class: 'ajuda', id: 'cel-obs-regra', texto: 'Este aparelho só lê a cópia de outra conta (código da dona: ' + est.uidDona + '). ' +
+          'Nada daqui vai para a nuvem, e ao abrir ele relê tudo da nuvem.' }),
+        el('div', { class: 'barra u-margem-baixo-0' }, [
+          el('button', { type: 'button', class: 'btn', id: 'cel-obs-atualizar', disabled: celularBuscando, texto: 'Buscar de novo', aoClick: atualizarCelularDaNuvem }),
+          el('button', { type: 'button', class: 'btn pequeno', id: 'cel-obs-sair', texto: 'Sair', aoClick: sairDaNuvem })
+        ])
+      ]));
+    }
+    var sonda = sondarNavegador();
+    var instalar = [el('strong', { texto: sonda.instalado ? 'Instalado na Tela de Início.' : 'Instalar no iPhone' }),
+      el('p', { class: 'ajuda u-margem-baixo-0', id: 'cel-obs-instalar-texto', texto: TEXTO_INSTALAR_SAFARI })];
+    sonda.motivos.forEach(function (m) { instalar.push(el('div', { class: 'faixa-aviso u-margem-topo-8 cel-motivo-navegador', texto: m })); });
+    caixa.appendChild(el('div', { class: 'cartao', id: 'cel-obs-instalar' }, instalar));
+    caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-obs-versao', texto: 'Versão ' + VERSAO + ', ' + sonda.rotulo + '.' }));
   }
 
   // ================= partida =================

@@ -798,6 +798,17 @@ roda "nuvem recebe --envenenado-fusao-pelo-prefixo" node "_teste/testa_nuvem_rec
 # atualiza o carimbo e tira a entrada da fila; o veneno que so anota quando falta TEM
 # de ser visto.
 roda "nuvem recebe --envenenado-eco-so-sem-carimbo" node "_teste/testa_nuvem_recebe.js" --envenenado-eco-so-sem-carimbo
+# D7: o aparelho observador (o iPhone). O diagnostico por aparelho em
+# usuarios/{uid}/diagnostico/{aparelhoId} (so metadados, forma fechada pelas
+# regras, so a dona escreve, o leitor le; sobe quando muda, no maximo um por
+# hora); o painel "Diagnostico" do observador; o Safari de iPhone simulado
+# (persist recusado, sem Background Sync, fora da Tela de Inicio) com o motivo
+# em uma frase; zero commits do observador; reaberto, rele da nuvem. Venenos: o
+# diagnostico com campo de dado de crianca aceito e o observador que grava TEM
+# de ser vistos.
+roda "nuvem diagnostico (D7)"                       node "_teste/testa_nuvem_diagnostico.js"
+roda "nuvem diagnostico --envenenado-diagnostico-aberto" node "_teste/testa_nuvem_diagnostico.js" --envenenado-diagnostico-aberto
+roda "nuvem diagnostico --envenenado-observador-grava" node "_teste/testa_nuvem_diagnostico.js" --envenenado-observador-grava
 # (revisao do PR 118) o "Apagar tudo" zera a fila deste aparelho e o recebimento
 # em curso confere a marca dentro da transacao; o celular nao enfileira a lapide
 # da fusao; a restauracao enfileira tambem o que e igual a copia; a confirmacao

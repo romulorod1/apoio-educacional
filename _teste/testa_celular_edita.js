@@ -71,14 +71,15 @@ const REGRAS = fs.readFileSync(path.join(H.RAIZ, 'firestore.rules'), 'utf8');
 
 secao('0. As âncoras, os venenos e o ambiente');
 const TRAVA_COPIA = 'function podeEnviarCopia() { return !marcaCelular && !travadoNestaAbertura; }';
-const COMMIT = 'if (!podeEnviarCopia() && !(celularDaDona() && soRegistros(escritas))) return Promise.reject(recusaSoLeitura());';
+// (D7) o celular da dona sobe também o diagnóstico do PRÓPRIO aparelho (só metadados), e nada mais
+const COMMIT = 'if (!podeEnviarCopia() && !(celularDaDona() && (soRegistros(escritas) || soDiagnosticoProprio(escritas)))) return Promise.reject(recusaSoLeitura());';
 const FECHAR_CELULAR = 'if (celularEdita()) { Nuvem.enviarRegistrosSeDevido({ versaoApp: VERSAO }); return; }';
 const DONA_NUVEM = 'return !!(marcaCelular && sessao && sessao.uid && (!marcaCelular.uidDona || marcaCelular.uidDona === sessao.uid));';
 const DONA_APP = 'return modoCelular && temNuvem() && Nuvem.celularDaDona() && !leOutraConta();';
 const DONA_PORTAS = 'var dona = deve && temNuvem() && Nuvem.celularDaDona() && !leOutraConta();';
 const PORTA_STORE = "if (modo === 'readwrite' && soLeitura && porta !== true && !(celularEdita && PORTAS_DO_CELULAR[porta])) throw erroSoLeitura();";
 conf('a trava da cópia completa está num lugar só', NUVEM.split(TRAVA_COPIA).length, 2);
-conf('o commit recusa no celular tudo o que não for registro, num lugar só', NUVEM.split(COMMIT).length, 2);
+conf('o commit recusa no celular tudo o que não for registro ou o diagnóstico do próprio aparelho, num lugar só', NUVEM.split(COMMIT).length, 2);
 conf('o fechar do celular da dona sobe só os registros, num lugar só', APP.split(FECHAR_CELULAR).length, 2);
 conf('o celular da dona confere a conta no nuvem.js e no app.js, cada um num lugar só',
   NUVEM.split(DONA_NUVEM).length === 2 && APP.split(DONA_APP).length === 2 && APP.split(DONA_PORTAS).length === 2, true);
@@ -692,8 +693,13 @@ const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); re
   if (MODO === MODOS[0]) fimDoVeneno();
 
   secao('13. O celular não grava fora das quatro ações');
-  const enviadosDoCelular = Array.from(new Set((await escritasLidas(pagC)).map(n => n.replace(/^.*\/documents\/usuarios\/[^/]+\//, ''))));
-  console.log('   o que subiu do celular: ' + enviadosDoCelular.join(', '));
+  const tudoDoCelular = Array.from(new Set((await escritasLidas(pagC)).map(n => n.replace(/^.*\/documents\/usuarios\/[^/]+\//, ''))));
+  console.log('   o que subiu do celular: ' + tudoDoCelular.join(', '));
+  /* (D7) o diagnóstico do celular, só o do PRÓPRIO aparelho, é a outra coisa
+   * que sobe dele; fica fora da conta dos registros, abaixo. */
+  const diagnosticosDoCelular = tudoDoCelular.filter(n => /^diagnostico\//.test(n));
+  conf('(D7) o celular que editou sobe o diagnóstico dele, e só o do próprio aparelho', diagnosticosDoCelular.join(','), 'diagnostico/' + idCelular);
+  const enviadosDoCelular = tudoDoCelular.filter(n => !/^diagnostico\//.test(n));
   const esperados = ['registros/aula:' + idMarcada, 'registros/aula:aula-outro', 'registros/aula:aula-hoje', 'registros/aluno:' + idBeta, 'registros/aula:aula-terceiro'];
   const pagamento = enviadosDoCelular.filter(n => /^registros\/pagamento:/.test(n));
   conf('tudo o que subiu do celular é um registro das quatro ações: as aulas, o aluno novo e o pagamento, e nada mais',
