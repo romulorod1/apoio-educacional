@@ -246,6 +246,14 @@ const amb = H.criarAmbiente(PORTA_APP, 'nath_n0_nuvem', trocas);
 
 async function prepararPagina(pag) {
   pag.setDefaultTimeout(60000);
+  /* Os três aparelhos desta prova são tablets: a tela (screen) do Chrome sem
+   * cabeça fora do modo móvel é 800x600, de lado menor abaixo de 640, e a
+   * automática nunca sobe de tela de celular (D6). A prova põe a tela de um
+   * tablet, 1280x800. */
+  await pag.evaluateOnNewDocument(() => {
+    Object.defineProperty(Screen.prototype, 'width', { configurable: true, get: () => 1280 });
+    Object.defineProperty(Screen.prototype, 'height', { configurable: true, get: () => 800 });
+  });
   pag.errosDePagina = [];
   pag.on('pageerror', e => pag.errosDePagina.push(e.message));
   // as perguntas (confirm) ficam registradas; proximoDialogo = false responde "não"

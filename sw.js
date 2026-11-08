@@ -112,8 +112,10 @@
  * endereço desligada (sw.js, app.js, styles.css e index.html). O v79 (N0)
  * traz a cópia na nuvem cifrada no aparelho: nuvem.js e o gerador de QR entram
  * na lista; app.js, store.js, index.html e styles.css mudam. O v80 (N0b) conta
- * a geração das mudanças no envio da nuvem (nuvem.js e app.js). */
-var CACHE = 'apoio-educacional-v80';
+ * a geração das mudanças no envio da nuvem (nuvem.js e app.js). O v81 (D6a)
+ * traz o modo celular só leitura (app.js, store.js, nuvem.js, index.html e
+ * styles.css), com a lista igual. */
+var CACHE = 'apoio-educacional-v81';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
