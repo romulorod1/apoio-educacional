@@ -20895,6 +20895,11 @@
       ? 'Sobe sozinha quando você fecha o aplicativo com internet, e uma vez por dia.' +
         (est.pendente ? ' Há mudanças que ainda não subiram.' : '')
       : 'A cópia automática começa depois do primeiro envio feito por você neste aparelho.' }));
+    // a guarda da tela de celular (D6) nunca bloqueia calada
+    if (telaDeCelular()) {
+      caixa.appendChild(el('div', { class: 'faixa-aviso', id: 'nuvem-tela-celular',
+        texto: 'Neste aparelho a cópia não sobe sozinha (tela de celular).' }));
+    }
     caixa.appendChild(el('div', { class: 'barra' }, [
       el('button', { type: 'button', class: 'btn principal', id: 'nuvem-enviar', disabled: ocupado,
         texto: ocupado ? 'Enviando...' : 'Enviar cópia agora',
@@ -21262,11 +21267,14 @@
   function temMarcaSoLeitura() { return temNuvem() && !!Nuvem.estado().soLeitura; }
   function aparelhoSoLe() { return modoCelular || temMarcaSoLeitura(); }
   /* O lado MENOR da tela do aparelho, e não da janela: não muda quando o
-   * celular deita. Abaixo de 640 px é celular; um tablet passa disso. */
+   * celular deita. Celular fica entre 360 e 430 px; um tablet de 8
+   * polegadas tem cerca de 600. O limite é 500, e não os 640 da janela, para
+   * não bloquear a automática de um tablet pequeno. */
+  var TELA_CELULAR = 500;
   function telaDeCelular() {
     var s = window.screen || {};
     var menor = Math.min(Number(s.width) || 0, Number(s.height) || 0);
-    return menor > 0 && menor < LARGURA_CELULAR;
+    return menor > 0 && menor < TELA_CELULAR;
   }
   function telaLarga() { return !larguraDeCelular() && !telaDeCelular(); }
 

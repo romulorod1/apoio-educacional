@@ -33,7 +33,10 @@
  *   --envenenado-tela     só a guarda da tela de celular tirada (o lado menor
  *                         da tela abaixo de 640 px): o celular que restaurou
  *                         pelo cartão de Ajustes, deitado em 844x390 e sem a
- *                         marca, sobe a cópia ao fechar.
+ *                         marca, sobe a cópia ao fechar;
+ *   --envenenado-limite-640  a guarda com o limite de 640 no lado menor: o
+ *                         tablet de 8 polegadas (tela 600x960) fica com a
+ *                         automática bloqueada, e a prova tem de ver.
  *
  * E a saída da marca: com a marca e a tela larga (janela e aparelho), aparece
  * "Este aparelho passa a editar"; depois do sim, o aparelho envia. Com a tela
@@ -55,10 +58,11 @@ const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
-const MODO = ['--envenenado-envia', '--envenenado-edicao', '--envenenado-grava', '--envenenado-tela']
+const MODO = ['--envenenado-envia', '--envenenado-edicao', '--envenenado-grava', '--envenenado-tela', '--envenenado-limite-640']
   .filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const ENVIA = MODO === '--envenenado-envia';
 const TELA = MODO === '--envenenado-tela';
+const LIMITE_640 = MODO === '--envenenado-limite-640';
 const EDICAO = MODO === '--envenenado-edicao';
 const GRAVA = MODO === '--envenenado-grava';
 
@@ -114,6 +118,9 @@ if (ENVIA) {
   trocas['/app.js'] = APP.replace(GUARDA_AUTO_RE, '\n').replace(GUARDA_TELA_RE, '\n').replace(ENVIO_DELA, 'if (!temNuvem() || enviandoParaNuvem) return Promise.resolve();');
 }
 if (TELA) trocas['/app.js'] = APP.replace(GUARDA_TELA_RE, '\n');
+const LIMITE = 'var TELA_CELULAR = 500;';
+conf('o limite da tela de celular está num lugar só', APP.split(LIMITE).length, 2);
+if (LIMITE_640) trocas['/app.js'] = APP.replace(LIMITE, 'var TELA_CELULAR = 640;');
 if (EDICAO) {
   trocas['/app.js'] = APP.replace(CARTAO, "    cartao.appendChild(el('button', { type: 'button', class: 'btn pequeno', texto: 'Registrar como foi' }));\n" + CARTAO);
 }
@@ -537,42 +544,62 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
   prop('e nenhuma escrita no banco nessa abertura', (await escritasNoBanco(pagC)).length === 0, 'nenhum');
   await ctxC.close();
 
-  secao('7b. O celular deitado (844 x 390) que restaurou pelo cartão de Ajustes, sem a marca, não sobe nada');
-  const ctxD = await pagA.browser().createBrowserContext();
-  const pagD = await ctxD.newPage();
-  await prepararPagina(pagD, 844, 390, true);
-  await abrir(pagD);
-  conf('deitado, com 844 px, abre como tablet (sem a marca, a janela decide a tela)', (await medirTela(pagD)).celular, false);
-  conf('a tela do aparelho é de celular (lado menor 390)', await pagD.evaluate(() => Math.min(screen.width, screen.height)), 390);
-  await pagD.evaluate(() => document.querySelector('#abas .aba[data-tela="ajustes"]').click());
-  await pausa(200);
-  await digitar(pagD, '#nuvem-email', DONA.email);
-  await digitar(pagD, '#nuvem-senha', DONA.senha);
-  await clicar(pagD, '#nuvem-entrar');
-  await esperar('D entrou', () => existe(pagD, '#nuvem-restaurar'), v => v === true, 15000);
-  await clicar(pagD, '#nuvem-restaurar');
-  await esperar('D lista as cópias', () => pagD.evaluate(() =>
-    document.querySelectorAll('#modal-nuvem-restaurar.aberto #nuvem-copias input[type=radio]').length), v => v >= 1, 15000);
-  await digitar(pagD, '#nuvem-codigo-digitado', chave.formatado);
-  await clicar(pagD, '#nuvem-restaurar-confirmar');
-  const dRest = await esperar('D restaurou pelo cartão de Ajustes', () => pagD.evaluate(() =>
-    Nuvem.estado().automatica && !document.querySelector('#modal-nuvem-restaurar.aberto')), v => v === true, 30000);
-  conf('ponto de partida: restaurou pelo cartão, sem a marca, com a automática ligada', dRest.ok &&
-    !(await pagD.evaluate(() => Nuvem.estado().soLeitura)), true);
-  await pagD.evaluate(async () => {
-    const d = await Store.carregar();
-    d.alunos.push({ id: 'delta', nome: 'Aluno Delta Teste', ativo: true, precos: [] });
-    await Store.salvar(d);
-  });
-  conf('e com mudança pendente', await pagD.evaluate(() => Nuvem.estado().pendente), true);
-  const antesD = pagD.escritasNaNuvem.length;
-  await fecharEVoltar(pagD);
-  prop('deitado, sem a marca e com a automática ligada: nenhuma escrita na nuvem ao fechar nem ao voltar (' +
-    pagD.escritasNaNuvem.slice(antesD).join(' ') + ')', pagD.escritasNaNuvem.length === antesD, TELA ? '--envenenado-tela' : '--envenenado-envia');
-  await ctxD.close();
+  /* Um aparelho sem a marca, deitado (janela de tablet), que restaurou pelo
+   * cartão de Ajustes, com a automática ligada e uma mudança pendente. */
+  async function peloCartao(rotulo, largura, altura, idAluno) {
+    const ctx = await pagA.browser().createBrowserContext();
+    const pag = await ctx.newPage();
+    await prepararPagina(pag, largura, altura, true);
+    await abrir(pag);
+    conf(rotulo + ': com ' + largura + ' px de janela, abre como tablet (sem a marca, a janela decide a tela)', (await medirTela(pag)).celular, false);
+    await pag.evaluate(() => document.querySelector('#abas .aba[data-tela="ajustes"]').click());
+    await pausa(200);
+    await digitar(pag, '#nuvem-email', DONA.email);
+    await digitar(pag, '#nuvem-senha', DONA.senha);
+    await clicar(pag, '#nuvem-entrar');
+    await esperar(rotulo + ' entrou', () => existe(pag, '#nuvem-restaurar'), v => v === true, 15000);
+    await clicar(pag, '#nuvem-restaurar');
+    await esperar(rotulo + ' lista as cópias', () => pag.evaluate(() =>
+      document.querySelectorAll('#modal-nuvem-restaurar.aberto #nuvem-copias input[type=radio]').length), v => v >= 1, 15000);
+    await digitar(pag, '#nuvem-codigo-digitado', chave.formatado);
+    await clicar(pag, '#nuvem-restaurar-confirmar');
+    const r = await esperar(rotulo + ' restaurou pelo cartão de Ajustes', () => pag.evaluate(() =>
+      Nuvem.estado().automatica && !document.querySelector('#modal-nuvem-restaurar.aberto')), v => v === true, 30000);
+    conf(rotulo + ': restaurou pelo cartão, sem a marca, com a automática ligada', r.ok &&
+      !(await pag.evaluate(() => Nuvem.estado().soLeitura)), true);
+    await pag.evaluate(async id => {
+      const d = await Store.carregar();
+      d.alunos.push({ id, nome: 'Aluno ' + id + ' Teste', ativo: true, precos: [] });
+      await Store.salvar(d);
+    }, idAluno);
+    conf(rotulo + ': e com mudança pendente', await pag.evaluate(() => Nuvem.estado().pendente), true);
+    return { ctx, pag };
+  }
+  const FRASE_TELA = 'Neste aparelho a cópia não sobe sozinha (tela de celular).';
+  const fraseDaTela = pag => pag.evaluate(() => { const e = document.querySelector('#nuvem-tela-celular'); return e ? e.textContent : null; });
+
+  secao('7b. O celular deitado (844 x 390) que restaurou pelo cartão de Ajustes, sem a marca, não sobe nada e diz por quê');
+  const D = await peloCartao('o celular deitado', 844, 390, 'delta');
+  conf('a tela do celular tem lado menor 390', await D.pag.evaluate(() => Math.min(screen.width, screen.height)), 390);
+  conf('o cartão de Ajustes diz: "' + FRASE_TELA + '"', await fraseDaTela(D.pag), FRASE_TELA);
+  const antesD = D.pag.escritasNaNuvem.length;
+  await fecharEVoltar(D.pag);
+  prop('celular deitado, sem a marca e com a automática ligada: nenhuma escrita na nuvem ao fechar nem ao voltar (' +
+    D.pag.escritasNaNuvem.slice(antesD).join(' ') + ')', D.pag.escritasNaNuvem.length === antesD, TELA ? '--envenenado-tela' : '--envenenado-envia');
+  await D.ctx.close();
+
+  secao('7c. O tablet de 8 polegadas (tela 600 x 960), deitado e sem a marca, sobe a cópia');
+  const E = await peloCartao('o tablet pequeno', 960, 600, 'epsilon');
+  conf('a tela do tablet pequeno tem lado menor 600', await E.pag.evaluate(() => Math.min(screen.width, screen.height)), 600);
+  prop('o tablet pequeno não mostra a frase da tela de celular', (await fraseDaTela(E.pag)) === null, '--envenenado-limite-640');
+  const antesE = E.pag.escritasNaNuvem.length;
+  await fecharEVoltar(E.pag);
+  const subiuE = await esperar('a automática do tablet pequeno subiu', () => E.pag.escritasNaNuvem.length > antesE, v => v === true, 20000);
+  prop('o tablet pequeno, ao fechar, sobe a cópia (a guarda é lado menor < 500, não < 640)', subiuE.ok, '--envenenado-limite-640');
+  await E.ctx.close();
 
   if (!MODO) {
-    secao('7c. A saída da marca: só com a tela larga, e depois do sim o aparelho envia');
+    secao('7d. A saída da marca: só com a tela larga, e depois do sim o aparelho envia');
     await pagB.setViewport({ width: 1280, height: 800, hasTouch: true, isMobile: false });
     await definirTela(pagB, { width: 1280, height: 800 });
     await abrir(pagB);
