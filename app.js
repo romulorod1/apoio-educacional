@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.2';
+  var VERSAO = '1.42.3';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.3',
+      itens: [
+        'Cópia na nuvem, em Ajustes: entre com o seu e-mail e senha e o aplicativo guarda uma cópia de tudo, trancada com uma chave que só existe neste tablet. Ninguém mais consegue ler: nem o Google, nem o Rômulo sem a sua permissão.',
+        'A cópia sobe sozinha ao fechar o aplicativo com sinal e uma vez por dia. Em Ajustes aparece quando foi a última.',
+        'Imprima a chave (o QR e o código) e guarde num lugar seguro: sem ela, a cópia não abre. Com ela, num tablet novo, é só entrar e tocar em "Restaurar neste aparelho".'
+      ]
+    },
     {
       versao: '1.42.2',
       itens: [
