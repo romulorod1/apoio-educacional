@@ -76,8 +76,11 @@ const PYTHON = process.env.PYTHON || 'python';
 
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const STORE = fs.readFileSync(path.join(H.RAIZ, 'store.js'), 'utf8');
+// o código de ANTES é o real: o store.js da versão 4 (016eef5), congelado; a versão 3 deriva dele
+const HIST = fs.readFileSync(path.join(__dirname, '_store_v4_historico.js'), 'utf8');
 const V3 = 'var VERSAO_BANCO = 3;';
 const V4 = 'var VERSAO_BANCO = 4;';
+const V5 = 'var VERSAO_BANCO = 5;';
 const CRIA_LIVROS = /    if \(!b\.objectStoreNames\.contains\('livros'\)\) \{\r?\n      s = b\.createObjectStore\('livros', \{ keyPath: 'id' \}\);\r?\n      s\.createIndex\('pacote', 'pacote'\);\r?\n    \}\r?\n    if \(!b\.objectStoreNames\.contains\('livros_posicoes'\)\) \{\r?\n      b\.createObjectStore\('livros_posicoes', \{ keyPath: 'id' \}\);\r?\n    \}\r?\n/;
 // os pontos que os venenos trocam, cada um tem de existir exatamente uma vez
 const COPIA_FECHA = /pacote\.biblioteca = \{ uso: \(bib\[0\] \|\| \[\]\)\.filter\(function \(r\) \{\r?\n        return idsAlunos\[r\.alunoId\] && idsAulas\[r\.aulaId\];\r?\n      \}\), etiquetas: bib\[1\] \|\| \[\], listas: bib\[2\] \|\| \[\] \};\r?\n      return pacote;/;
@@ -90,7 +93,7 @@ const GUARDA_PAGINA = "Store.gravarPosicaoLivro({ id: id, pagina: n })";
 // a revisão do C15.1: o mesmo livro é o mesmo id E o mesmo hash; o veneno volta à conta só pelo id e pela versão
 const MESMO_ARQUIVO = 'var mesmoArquivo = !!atual && !!atual.meta && atual.meta.hash === l.meta.hash;';
 
-const STORE_V3 = STORE.replace(V4, V3).replace(CRIA_LIVROS, '');
+const STORE_V3 = HIST.replace(V4, V3).replace(CRIA_LIVROS, '');
 const trocas = {};
 let APP_SERVIDO = APP, STORE_SERVIDO = STORE;
 if (MODO === '--envenenado-copia-com-livros') STORE_SERVIDO = STORE.replace(COPIA_FECHA, COPIA_COM_LIVROS);
@@ -225,7 +228,8 @@ async function printar(pag, nome) {
 
 (async () => {
   secao('0. As âncoras e o veneno');
-  conf('o store.js está na versão 4', STORE.split(V4).length, 2);
+  conf('o store.js está na versão 5', STORE.split(V5).length, 2);
+  conf('o código histórico da versão 4 está na versão 4', HIST.split(V4).length, 2);
   conf('o store.js cria os depósitos dos livros uma vez', (STORE.match(new RegExp(CRIA_LIVROS.source, 'g')) || []).length, 1);
   conf('o código da versão 3 ficou sem os livros', STORE_V3.indexOf("createObjectStore('livros'") < 0 && STORE_V3.split(V3).length === 2, true);
   conf('a cópia fecha num lugar só', (STORE.match(new RegExp(COPIA_FECHA.source, 'g')) || []).length, 1);
@@ -289,7 +293,7 @@ async function printar(pag, nome) {
   await H.abrirApp(p, amb.ORIGEM);
   await pausa(800);
   const v4 = await versaoEDepositos(p);
-  conf('o código novo subiu o banco para a versão 4', v4 && v4.versao, 4);
+  conf('o código novo subiu o banco para a versão 5 (N1)', v4 && v4.versao, 5);
   conf('com os dois depósitos dos livros', v4 && v4.depositos.filter(d => /^livros/.test(d)).join(','), 'livros,livros_posicoes');
   const depois = await contagens(p);
   const chaves = Object.keys(antes).sort();

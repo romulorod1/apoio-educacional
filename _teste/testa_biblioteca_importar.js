@@ -145,13 +145,13 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
         aulas: d.result && d.result.aulas.length, nota: !!n.result, midia: !!m.result }); };
     };
   }));
-  /* Desde o C15.1 o código atual sobe direto para a versão 4: os seis
-   * depósitos da biblioteca (versão 2), o das Minhas listas (versão 3) e os
-   * dois dos livros (versão 4) nascem juntos, e nada da versão 1 se perde,
-   * como antes. */
-  conf('o banco agora está na versão 4', depois.v, 4);
-  conf('com os catorze depósitos', depois.nomes.join(','),
-    'anexos,biblioteca_assets,biblioteca_etiquetas,biblioteca_itens,biblioteca_listas,biblioteca_pacotes,biblioteca_teoria,biblioteca_uso,dados,historico,livros,livros_posicoes,midias,notas');
+  /* Desde o C15.1 o código atual sobe direto para a versão de hoje: os seis
+   * depósitos da biblioteca (versão 2), o das Minhas listas (versão 3), os
+   * dois dos livros (versão 4) e os dois do banco por registro (versão 5, N1)
+   * nascem juntos, e nada da versão 1 se perde, como antes. */
+  conf('o banco agora está na versão 5', depois.v, 5);
+  conf('com os dezesseis depósitos', depois.nomes.join(','),
+    'anexos,biblioteca_assets,biblioteca_etiquetas,biblioteca_itens,biblioteca_listas,biblioteca_pacotes,biblioteca_teoria,biblioteca_uso,controle,dados,historico,livros,livros_posicoes,midias,notas,registros');
   conf('a aluna continua lá', depois.aluno, 'Aluna da Migração');
   conf('a aula continua lá', depois.aulas, 1);
   conf('a folha continua lá', depois.nota, true);
