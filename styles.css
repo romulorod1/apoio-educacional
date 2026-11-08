@@ -3233,6 +3233,12 @@ body.modo-celular .celular .linha-pagamento .barra { flex-wrap: wrap; }
 .cel-ficha-botoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 0; }
 .cel-ficha-mensagens { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; }
 body.modo-celular .celular a.cel-link-botao { min-height: var(--alvo-celular); text-decoration: none; text-align: center; white-space: normal; }
+/* No toque, o :hover gruda: o link não pode ficar cinza, com cara de "já enviado". */
+body.modo-celular .celular a.cel-link-botao:hover,
+body.modo-celular .celular a.cel-link-botao:focus { background: var(--branco); }
+.cel-ficha-telefone { margin: 8px 0 4px; font-size: var(--letra-5); font-weight: 700; color: var(--texto); }
+/* O alto, quando o celular pode estar atrás do tablet. */
+.cel-origem.cel-desatualizado { color: var(--vermelho); font-weight: 700; }
 .cel-ficha-lugar { margin-top: 8px; }
 .cel-alunos-lista { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
 .cel-aluno-item {

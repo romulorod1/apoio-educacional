@@ -815,10 +815,10 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('a tela diz que o resto fica no tablet', /se completam no tablet/.test(await texto(pagC, '#cel-aluno-resto')), true);
   m = await medirTela(pagC);
   conf('o formulário do aluno: alvos de 48 px e sem rolagem de lado', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : ''), '');
-  conf('o formulário tem só nome, responsável, contato, preço e (D6c lote 2) onde é a aula', m.campos.join(','), 'cel-aluno-nome,cel-aluno-responsavel,cel-aluno-contato,cel-aluno-preco,cel-aluno-local');
+  conf('o formulário tem só nome, responsável, telefone, preço e (D6c lote 2) onde é a aula', m.campos.join(','), 'cel-aluno-nome,cel-aluno-responsavel,cel-aluno-telefone,cel-aluno-preco,cel-aluno-local');
   await digitar(pagC, '#cel-aluno-nome', 'Aluno Beta Teste');
   await digitar(pagC, '#cel-aluno-responsavel', 'Responsável Beta Teste');
-  await digitar(pagC, '#cel-aluno-contato', 'telefone fictício 0000');
+  await digitar(pagC, '#cel-aluno-telefone', '(11) 90000-0010');
   await digitar(pagC, '#cel-aluno-preco', '120,00');
   await clicar(pagC, '#cel-aluno-salvar');
   const beta = await esperar('o aluno gravou', () => pagC.evaluate(() => Store.carregar().then(b => { const a = b.alunos.find(x => x.nome === 'Aluno Beta Teste'); return a ? a.id : null; })), v => !!v, 10000);
@@ -875,11 +875,11 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   const noTablet = await pagA.evaluate((a) => Store.carregar().then(d => {
     const nova = d.aulas.find(x => x.id === a.idMarcada), hoje = d.aulas.find(x => x.id === 'aula-hoje'), beta = d.alunos.find(x => x.id === a.idBeta);
     return { nova: nova && [nova.data, nova.hora, nova.duracaoMin, nova.alunoId].join(' '), temas: (hoje.temas || []).map(t => t.titulo).join(','),
-      beta: beta && [beta.nome, beta.responsavel, beta.obs, beta.precos.map(p => p.valorHora + '@' + p.inicio).join(',')].join(' | ') };
+      beta: beta && [beta.nome, beta.responsavel, 'obs=' + beta.obs + ' telefone=' + beta.telefone, beta.precos.map(p => p.valorHora + '@' + p.inicio).join(',')].join(' | ') };
   }), { idMarcada, idBeta });
   conf('marcar aula: a aula do celular no tablet, com data, hora, duração e aluno', noTablet.nova, TERCEIRO + ' 14:00 60 alfa');
   conf('"Registrar como foi": o assunto dado chegou ao tablet', noTablet.temas, 'Frações equivalentes');
-  conf('cadastrar aluno: o aluno do celular no tablet, com o essencial', noTablet.beta, 'Aluno Beta Teste | Responsável Beta Teste | Contato: telefone fictício 0000 | 120@' + HOJE);
+  conf('cadastrar aluno: o aluno do celular no tablet, com o essencial', noTablet.beta, 'Aluno Beta Teste | Responsável Beta Teste | obs= telefone=(11) 90000-0010 | 120@' + HOJE);
   /* (D6c) O que a folha fez chega ao tablet igual: a remarcação de uma aula
    * da repetição (o tablet, ao abrir, materializa a série e não recria a
    * aula na data de onde ela saiu), o cancelar de hoje com cobrança, o faltou
