@@ -49,6 +49,8 @@
  *   --envenenado-sem-choque      a conta de choque do celular não vê nada;
  *   --envenenado-duracao-padrao  remarcar não traz a duração da aula (vem 1 h);
  *   --envenenado-cancela-sempre-sem  "Cancelar com cobrança" grava sem cobrança;
+ *   --envenenado-cobranca-volta  tocar na situação que a aula já tem volta a
+ *                         cobrança ao padrão (a regra de antes da revisão);
  *   --envenenado-celular-envia-copia  a trava da cópia confunde o celular da
  *                         dona com o tablet (nuvem.js) e o fechar do celular
  *                         monta e manda a cópia (app.js);
@@ -67,8 +69,9 @@ const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
 const MODOS = ['--envenenado-celular-envia-copia', '--envenenado-observador-edita', '--envenenado-corte-sobe',
-  '--envenenado-remarca-todas', '--envenenado-remarca-solta', '--envenenado-sem-choque', '--envenenado-duracao-padrao', '--envenenado-cancela-sempre-sem'];
-const V_TODAS = MODOS[3], V_SOLTA = MODOS[4], V_CHOQUE = MODOS[5], V_DURACAO = MODOS[6], V_CANCELA = MODOS[7];
+  '--envenenado-remarca-todas', '--envenenado-remarca-solta', '--envenenado-sem-choque', '--envenenado-duracao-padrao', '--envenenado-cancela-sempre-sem',
+  '--envenenado-cobranca-volta'];
+const V_TODAS = MODOS[3], V_SOLTA = MODOS[4], V_CHOQUE = MODOS[5], V_DURACAO = MODOS[6], V_CANCELA = MODOS[7], V_COBRANCA = MODOS[8];
 /* --prints <pasta>: tira os quatro prints do D6c em 390 x 844 (dados fictícios). */
 const PRINTS = (() => { const i = process.argv.indexOf('--prints'); return i >= 0 ? process.argv[i + 1] : ''; })();
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
@@ -127,10 +130,11 @@ if (MODO === MODOS[2]) { trocas['/app.js'] = APP.replace(SEM_CORTE, 'var p = Sto
 /* D6c: as âncoras dos venenos da agenda, cada uma num lugar só. */
 const REMARCA = 'mudarAulaNoCelular(a, { data: v.data, hora: v.hora, duracaoMin: v.duracaoMin }, mensagem, function () { diaCelular = v.data; });';
 const CHOQUE = '    return Core.conflitosDe(db, provisoria);';
-const DURACAO = 'duracaoMin: Number(a.duracaoMin) || 60 }, a.id, a.status);';
+const DURACAO = 'duracaoMin: Number(a.duracaoMin) || 60 }, a.id, a.status,';
+const MESMA_SITUACAO = "    if (atual && (atual.status || 'realizada') === status) {";
 const CANCELA_COM = "{ status: 'cancelada', cobravel: true }, 'Aula cancelada com cobrança.'";
 conf('(D6c) remarcar, o choque, a duração do remarcar e o cancelar com cobrança estão cada um num lugar só',
-  [REMARCA, CHOQUE, DURACAO, CANCELA_COM].map(a => APP.split(a).length).join(','), '2,2,2,2');
+  [REMARCA, CHOQUE, DURACAO, CANCELA_COM, MESMA_SITUACAO].map(a => APP.split(a).length).join(','), '2,2,2,2,2');
 conf('(D6c) remarcar e cancelar usam o núcleo do tablet (alterarAulaComDesfazer, que é Core.aplicarEdicaoAula só nesta aula)',
   /function mudarAulaNoCelular[\s\S]{0,400}alterarAulaComDesfazer\(atual\.id, atual\.alunoId, mudancas, mensagem\)/.test(APP) &&
   /function alterarAulaComDesfazer[\s\S]{0,300}Core\.aplicarEdicaoAula\(db, aulaId, mudancas, 'esta'\)/.test(APP), true);
@@ -140,7 +144,8 @@ if (MODO === V_TODAS) comNuvemIgual(APP.replace(REMARCA, "comoAcaoDoCelular(func
 if (MODO === V_SOLTA) comNuvemIgual(APP.replace(REMARCA, 'comoAcaoDoCelular(function () { fecharFolhaCelular(); var n = novaAulaAvulsa({ alunoId: a.alunoId, data: v.data, hora: v.hora, ' +
   "duracaoMin: v.duracaoMin, status: a.status, cobravel: a.cobravel }); Core.excluirAulas(db, a.id, 'esta'); db.aulas.push(n); return salvar(); }).then(function () { diaCelular = v.data; desenharCelular(); });"));
 if (MODO === V_CHOQUE) comNuvemIgual(APP.replace(CHOQUE, '    return [];'));
-if (MODO === V_DURACAO) comNuvemIgual(APP.replace(DURACAO, 'duracaoMin: 60 }, a.id, a.status);'));
+if (MODO === V_DURACAO) comNuvemIgual(APP.replace(DURACAO, 'duracaoMin: 60 }, a.id, a.status,'));
+if (MODO === V_COBRANCA) comNuvemIgual(APP.replace(MESMA_SITUACAO, '    if (false) {'));
 if (MODO === V_CANCELA) comNuvemIgual(APP.replace(CANCELA_COM, "{ status: 'cancelada', cobravel: false }, 'Aula cancelada com cobrança.'"));
 if (MODO) conf('os arquivos servidos ficaram diferentes do repositório (' + MODO + ')', trocas['/nuvem.js'] !== NUVEM && trocas['/app.js'] !== APP, true);
 
@@ -228,7 +233,11 @@ async function prepararPagina(pag, movel) {
   pag.errosDePagina = [];
   pag.on('pageerror', e => pag.errosDePagina.push(e.message));
   pag.dialogos = [];
-  pag.on('dialog', async d => { pag.dialogos.push(d.message()); try { await d.accept(); } catch (e) { /* ok */ } });
+  pag.on('dialog', async d => {
+    pag.dialogos.push(d.message());
+    const recusa = pag.recusarProximo; pag.recusarProximo = false;
+    try { if (recusa) await d.dismiss(); else await d.accept(); } catch (e) { /* ok */ }
+  });
   /* Os commits que saem, contados por fora (o pedido na rede) e lidos por
    * dentro (o corpo, no fetch da página, guardado no sessionStorage da aba
    * para sobreviver às recargas): o corpo grande da cópia não vem inteiro
@@ -463,6 +472,8 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
     d.alunos.push({ id: 'ref', nome: 'Aluno Referência Teste', ativo: true, cor: '#2E7D6B', responsavel: '',
       precos: [{ id: 'pr1', inicio: '2025-01-01', fim: '2026-05-31', valorHora: 100 }, { id: 'pr2', inicio: '2026-06-01', fim: null, valorHora: 100 }], mapeamentos: [] });
     d.aulas.push({ id: 'aula-hoje-gama', alunoId: 'gama', serieId: null, data: hoje, hora: '14:00', duracaoMin: 60, status: 'reposicao', cobravel: true, notaTexto: '', anexos: [] });
+    // marcada no tablet como realizada, mas sem cobrança
+    d.aulas.push({ id: 'aula-gratis', alunoId: 'gama', serieId: null, data: ontem, hora: '16:00', duracaoMin: 60, status: 'realizada', cobravel: false, notaTexto: '', anexos: [] });
     junho.forEach(([data, dur], i) => d.aulas.push({ id: 'ref-' + data, alunoId: 'ref', serieId: null, data, hora: '15:30', duracaoMin: dur, status: 'realizada', cobravel: true, notaTexto: '', anexos: [] }));
     Core.criarSerie(d, { alunoId: 'gama', dias: [Core.diaSemana(terceiro)], hora: '16:00', duracaoMin: 60, inicio: terceiro, fim: fimGama });
     await Store.salvar(d);
@@ -518,9 +529,13 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('Hoje: sem rolagem de lado em ' + m.largura + ' px', m.rolaDeLado, false);
   conf('Hoje: todo alvo tem 48 px ou mais (' + m.alvos + ' alvos)', m.pequenos.join('; '), '');
   conf('Hoje: os botões de edição são todos das ações do celular (' + m.dasAcoes.join(', ') + ')', m.soltos.join(', '), '');
-  conf('Hoje: o "+" flutuante, os horários livres e "Cadastrar aluno" à vista',
-    m.dasAcoes.indexOf('+') >= 0 && m.dasAcoes.indexOf('Cadastrar aluno') >= 0 &&
-    await pagC.evaluate(() => !!document.querySelector('.cel-livre-hora[data-acao-celular="marcar-aula"][data-livre="12:00"]')), true);
+  conf('Hoje: o "+" flutuante e "Cadastrar aluno" à vista', m.dasAcoes.indexOf('+') >= 0 && m.dasAcoes.indexOf('Cadastrar aluno') >= 0, true);
+  conf('(revisão) a rolagem inicial não deixa nenhuma linha cortada sob a faixa dos dias', await pagC.evaluate(() => {
+    const baixo = document.querySelector('#cel-semana').getBoundingClientRect().bottom;
+    const l = Array.from(document.querySelectorAll('#cel-tempo .cel-tempo-linha')).find(x => x.getBoundingClientRect().bottom > baixo + 1);
+    return !l || l.getBoundingClientRect().top >= baixo - 1; }), true);
+  conf('(revisão) as bolinhas de hoje dizem de quem é cada aula a quem lê a tela', await pagC.evaluate(h =>
+    document.querySelector('.cel-semana-dia[data-dia="' + h + '"] .cel-semana-bolinhas').getAttribute('aria-label'), HOJE), '2 aulas: Aluno Alfa Teste às 10:30, Aluno Gama Teste às 14:00');
   conf('o "+" diz o que faz a quem lê a tela', await pagC.evaluate(() => document.querySelector('#cel-marcar-aula').getAttribute('aria-label')), 'Marcar aula neste dia');
   const semana = await pagC.evaluate(hoje => {
     const dias = Array.from(document.querySelectorAll('#cel-semana .cel-semana-dia'));
@@ -546,8 +561,20 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('a altura vai pela duração: a aula de 1h30 (' + bloco.altura + ' px) é maior que a de 1h (' + bloco.altura60 + ' px)', bloco.altura > bloco.altura60 && bloco.altura >= 100, true);
   conf('a reposição se vê pela cor e pelo nome', bloco.reposicao, true);
   conf('o bloco não repete o relato da última aula (ele fica na folha)', /Na última aula|Rendeu bem/.test(bloco.texto), false);
-  const livres = await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-tempo .cel-livre-texto')).map(e => e.textContent));
-  conf('os horários livres aparecem escritos (' + livres.join('; ') + ')', livres.join('; '), 'Livre 07:00 a 10:30; Livre 12:00 a 14:00; Livre 15:00 a 21:00');
+  /* (revisão) hoje, o que já passou não é livre; e a aula de agora e a próxima levam o nome. */
+  const hojeLivre = await pagC.evaluate(() => {
+    const d = new Date(), agora = d.getHours() * 60 + d.getMinutes();
+    const min = t => { const p = t.split(':'); return +p[0] * 60 + +p[1]; };
+    const textos = Array.from(document.querySelectorAll('#cel-tempo .cel-livre-texto')).map(e => e.textContent);
+    const marcas = Array.from(document.querySelectorAll('#cel-tempo .cel-bloco')).map(b => b.dataset.aula + '=' + ((b.querySelector('.cel-bloco-marca') || {}).textContent || '')).join(' ');
+    const aulas = [['aula-hoje', 630, 720], ['aula-hoje-gama', 840, 900]];
+    const esperado = aulas.map(a => a[0] + '=' + (a[1] <= agora && agora < a[2] ? 'Agora' : '')).map((t, i, l) => t);
+    const prox = aulas.find(a => a[1] > agora);
+    const esperadas = aulas.map(a => a[0] + '=' + (a[1] <= agora && agora < a[2] ? 'Agora' : (prox && prox[0] === a[0] ? 'Próxima' : ''))).join(' ');
+    return { textos, passado: textos.filter(t => min(t.match(/Livre (\d\d:\d\d)/)[1]) < agora).length, marcas, esperadas };
+  });
+  conf('hoje, nenhum horário que já passou aparece como livre (' + hojeLivre.textos.join('; ') + ')', hojeLivre.passado, 0);
+  conf('a aula de agora leva "Agora" e a seguinte "Próxima" (' + hojeLivre.marcas + ')', hojeLivre.marcas, hojeLivre.esperadas);
   conf('a linha de agora está na linha do tempo de hoje', await existe(pagC, '#cel-tempo #cel-agora'), true);
   conf('nenhum "Enviar cópia agora" no celular', await pagC.evaluate(() => { const b = document.querySelector('#nuvem-enviar'); return !!(b && b.getBoundingClientRect().height); }), false);
   await tirarPrint(pagC, '1_hoje_linha_do_tempo.png');
@@ -555,9 +582,15 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   secao('3b. O toque no bloco abre a folha de baixo, com botões grandes');
   conf('o toque no bloco de hoje abre a folha da aula', await abrirFolha(pagC, 'aula-hoje'), true);
   const naFolha = await texto(pagC, '#cel-folha');
-  conf('a folha traz a última aula e o relato dela', /Na última aula/.test(naFolha) && /Rendeu bem/.test(naFolha), true);
+  conf('a folha traz o relato da aula ANTERIOR num quadro à parte, com a data no rótulo', /^Relato da aula anterior \(\d\d\/\d\d\)/.test((await texto(pagC, '#cel-folha #cel-aula-anterior')) || '') &&
+    /Rendeu bem/.test((await texto(pagC, '#cel-aula-anterior')) || ''), true);
+  conf('o botão do relato diz que é desta aula', await texto(pagC, '#cel-folha-registrar'), 'Escrever como foi esta aula');
+  conf('(revisão) Cancelar fica numa linha só dele, a 16 px ou mais de qualquer outro botão de ação', await pagC.evaluate(() => {
+    const c = document.querySelector('#cel-folha-cancelar').getBoundingClientRect();
+    return Array.from(document.querySelectorAll('#cel-folha .cel-folha-botao')).filter(b => b.id !== 'cel-folha-cancelar').every(b => {
+      const o = b.getBoundingClientRect(); return Math.max(c.top - o.bottom, o.top - c.bottom, c.left - o.right, o.left - c.right) >= 16; }); }), true);
   conf('a aula de HOJE oferece Realizada, Faltou, Cancelar, Remarcar e Registrar como foi', (await botoesDaFolha(pagC)).join(','),
-    'cel-folha-realizada,cel-folha-faltou,cel-folha-cancelar,cel-folha-remarcar,cel-folha-registrar,cel-folha-fechar');
+    'cel-folha-realizada,cel-folha-faltou,cel-folha-remarcar,cel-folha-registrar,cel-folha-cancelar,cel-folha-fechar');
   m = await medirTela(pagC);
   conf('a folha: alvos de 48 px e sem rolagem de lado', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : ''), '');
   conf('a folha: os botões de edição são todos das ações do celular', m.soltos.join(', '), '');
@@ -568,7 +601,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('"Fechar" tira a folha', await existe(pagC, '#cel-folha'), false);
   await irParaDia(pagC, OUTRO);
   await abrirFolha(pagC, 'aula-outro');
-  conf('a aula de amanhã oferece Cancelar e Remarcar, e não Realizada nem Faltou', (await botoesDaFolha(pagC)).join(','), 'cel-folha-cancelar,cel-folha-remarcar,cel-folha-fechar');
+  conf('a aula de amanhã oferece Cancelar e Remarcar, e não Realizada nem Faltou', (await botoesDaFolha(pagC)).join(','), 'cel-folha-remarcar,cel-folha-cancelar,cel-folha-fechar');
   await clicar(pagC, '#cel-folha-fechar');
 
   secao('3c. Faltou e Realizada, pela folha');
@@ -582,6 +615,23 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   await clicar(pagC, '#cel-folha-realizada');
   conf('Realizada: a aula volta a "realizada", cobrada', (await esperar('realizada gravou', () => situacao('aula-ontem'), v => v === 'realizada/true', 10000)).ok, true);
   conf('o bloco diz "✓ Realizada"', /✓ Realizada/.test((await texto(pagC, '.cel-bloco[data-aula="aula-ontem"]')) || ''), true);
+
+  secao('3d. (revisão) Tocar na situação que a aula já tem não mexe na cobrança, e a reposição tem botão próprio');
+  await abrirFolha(pagC, 'aula-gratis');
+  conf('(arranjo) a aula de ontem marcada no tablet como realizada sem cobrança mostra "✓ Realizada" na folha',
+    (await texto(pagC, '#cel-folha-realizada')) === '✓ Realizada' && (await situacao('aula-gratis')) === 'realizada/false', true);
+  await clicar(pagC, '#cel-folha-realizada');
+  await pausa(600);
+  prop('tocar em Realizada para confirmar deixa a aula sem cobrança (' + (await situacao('aula-gratis')) + ')', (await situacao('aula-gratis')) === 'realizada/false', V_COBRANCA);
+  if (MODO === V_COBRANCA) fimDoVeneno();
+  conf('e o aviso diz que nada mudou', /^Nada mudou: a aula já está como realizada, sem cobrança\./.test((await texto(pagC, '#aviso-texto')) || ''), true);
+  await irParaDia(pagC, HOJE);
+  await abrirFolha(pagC, 'aula-hoje-gama');
+  conf('a reposição tem o botão "✓ Reposição", e Realizada não aparece marcada', (await texto(pagC, '#cel-folha-reposicao')) === '✓ Reposição' &&
+    (await texto(pagC, '#cel-folha-realizada')) === 'Realizada', true);
+  await clicar(pagC, '#cel-folha-reposicao');
+  await pausa(400);
+  conf('tocar em Reposição não a transforma em realizada', await situacao('aula-hoje-gama'), 'reposicao/true');
 
   secao('4. Marcar aula num horário livre ("Marcar aula às 14:00") e pelo "+"');
   conf('a faixa da semana leva ao dia escolhido', await irParaDia(pagC, TERCEIRO), true);
@@ -683,12 +733,25 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   const livresR = await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-remarcar-livres .cel-livre-hora')).map(b => b.dataset.livre));
   prop('os horários livres do dia não oferecem 14:00 nem 16:00 (ocupados) e oferecem 13:00, 15:00 e 17:00 (' + livresR.join(' ') + ')',
     ['14:00', '14:30', '16:00', '16:30'].every(h => livresR.indexOf(h) < 0) && ['13:00', '15:00', '17:00'].every(h => livresR.indexOf(h) >= 0), V_CHOQUE);
+  conf('com choque, o Salvar diz "Salvar mesmo assim (as duas aulas ficam no mesmo horário)"', await texto(pagC, '#cel-remarcar-salvar'),
+    MODO === V_CHOQUE ? 'Salvar a nova data' : 'Salvar mesmo assim (as duas aulas ficam no mesmo horário)');
   if (MODO === V_CHOQUE) fimDoVeneno();
+  pagC.recusarProximo = true;
+  const dialogosAntes = pagC.dialogos.length;
+  await clicar(pagC, '#cel-remarcar-salvar');
+  await pausa(300);
+  conf('salvar com choque pede o sim, e o "não" não grava (a aula continua às 11:00)', /As duas aulas vão ficar no mesmo horário/.test(pagC.dialogos.slice(dialogosAntes).join(' ')) &&
+    (await pagC.evaluate(() => Store.carregar().then(b => b.aulas.find(x => x.id === 'aula-terceiro').hora))) === '11:00' && !!(await existe(pagC, '#cel-remarcar-salvar')), true);
   m = await medirTela(pagC);
   conf('o Remarcar: alvos de 48 px, sem rolagem de lado e sem o seletor do navegador', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : '') + m.nativos.join(','), '');
   await tirarPrint(pagC, '3_remarcar_livres_e_choque.png');
   await clicar(pagC, '#cel-remarcar-livres .cel-livre-hora[data-livre="15:00"]');
   conf('o toque num horário livre põe a hora e tira o aviso de choque', await pagC.evaluate(() =>
+    document.querySelector('#cel-remarcar-hora').value + '|' + document.querySelector('#cel-remarcar-choque').textContent + '|' + document.querySelector('#cel-remarcar-salvar').textContent), '15:00||Salvar a nova data');
+  /* A hora ocupada no dia novo vem trocada pelo primeiro horário livre dali em diante. */
+  await digitar(pagC, '#cel-remarcar-hora', '14:00');
+  await digitar(pagC, '#cel-remarcar-data', ddmmaaaa(HOJE));
+  conf('trocando a data para hoje, as 14:00 (ocupadas pela reposição do Gama) viram 15:00, o primeiro livre', await pagC.evaluate(() =>
     document.querySelector('#cel-remarcar-hora').value + '|' + document.querySelector('#cel-remarcar-choque').textContent), '15:00|');
   /* O formulário aberto não se perde quando chegam registros do tablet. */
   await digitar(pagC, '#cel-remarcar-data', '01/02/2027');
@@ -707,7 +770,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   await digitar(pagC, '#cel-remarcar-data', ddmmaaaa(QUARTO));
   await digitar(pagC, '#cel-remarcar-hora', '17:00');
   await clicar(pagC, '#cel-remarcar-salvar');
-  await esperar('a remarcação gravou', () => pagC.evaluate(q => Store.carregar().then(b => b.aulas.some(a => a.alunoId === 'gama' && a.data === q && a.hora === '17:00')), QUARTO), v => v === true, 10000);
+  conf('(arranjo) a remarcação gravou: há aula do Gama em ' + QUARTO + ' às 17:00 (também nos venenos, senão eles nada provam)', (await esperar('a remarcação gravou', () => pagC.evaluate(q => Store.carregar().then(b => b.aulas.some(a => a.alunoId === 'gama' && a.data === q && a.hora === '17:00')), QUARTO), v => v === true, 10000)).ok, true);
   const retratoGama = pag => pag.evaluate((sid, q) => Store.carregar().then(b => {
     const s = (b.series || []).find(x => x.id === sid);
     const movida = b.aulas.find(a => a.alunoId === 'gama' && a.data === q);
@@ -1060,7 +1123,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
     botoes: Array.from(document.querySelectorAll('#cel-folha button')).map(b => b.id || b.textContent.trim()).join(','),
     mais: !!document.querySelector('#cel-marcar-aula'), horas: document.querySelectorAll('.cel-livre-hora').length
   }));
-  conf('(controle) o observador vê os horários livres escritos e a folha abre com a aula', livresD > 0 && abriuD && /Aluno Alfa Teste/.test((await texto(pagD, '#cel-folha')) || ''), true);
+  conf('(controle) o observador vê a linha do tempo e a folha abre com a aula', livresD >= 0 && !!(await existe(pagD, '#cel-tempo')) && abriuD && /Aluno Alfa Teste/.test((await texto(pagD, '#cel-folha')) || ''), true);
   prop('(D6c) na linha do tempo e na folha do observador, nenhuma ação: sem "+", sem horas para marcar, só "Fechar" (' + JSON.stringify(folhaD) + ')',
     folhaD.acoes === 0 && !folhaD.mais && folhaD.horas === 0 && /^(Ver a sua anotação,)?cel-folha-fechar$/.test(folhaD.botoes), MODOS[1]);
   await clicar(pagD, '#cel-folha-fechar');

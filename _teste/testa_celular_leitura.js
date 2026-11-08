@@ -490,7 +490,7 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
   conf('no alto da dona, nenhum texto de sistema, e o ícone da nuvem ao lado do estado', await pagB.evaluate(() =>
     document.querySelector('#cel-regra').hidden && !document.querySelector('#cel-regra').textContent && !!document.querySelector('#cel-estado-icone, #cel-nuvem')), true);
   conf('o texto secundário do celular usa o cinza escuro da escala (#4B5563, mais de 7:1), e não o --muted', await pagB.evaluate(() =>
-    [getComputedStyle(document.querySelector('#cel-hoje .cel-livre-texto')).color, getComputedStyle(document.querySelector('#cel-origem')).color].join(' ')),
+    [getComputedStyle(document.querySelector('#cel-hoje .cel-semana-dia:not(.ativo) .cel-semana-nome')).color, getComputedStyle(document.querySelector('#cel-origem')).color].join(' ')),
     'rgb(75, 85, 99) rgb(75, 85, 99)');
   conf('o observador de avisos vê (o "Pronto" da restauração foi visto)', await pagB.evaluate(() => window.__avisos.some(t => /Pronto: os dados do tablet chegaram/.test(t))), true);
   await pagB.evaluate(() => { document.querySelector('#cel-abas .cel-aba[data-cel="fechamento"]').click(); document.querySelector('#cel-abas .cel-aba[data-cel="hoje"]').click(); });
@@ -516,7 +516,8 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
   await clicar(pagB, '#cel-tempo .cel-bloco[data-aula="aula-hoje"]');
   const folhaTexto = (await texto(pagB, '#cel-folha')) || '';
   conf('a folha da aula: o lembrete do mapeamento', /Lembrete: Prioridades: Frações antes da prova/.test(folhaTexto), true);
-  conf('a folha da aula: a última aula e o relato', /Na última aula/.test(folhaTexto) && /Rendeu bem em frações/.test(folhaTexto), true);
+  conf('a folha da aula: o relato da aula anterior, num quadro rotulado com a data', /^Relato da aula anterior \(\d\d\/\d\d\)/.test((await texto(pagB, '#cel-aula-anterior')) || '') &&
+    /Rendeu bem em frações/.test(folhaTexto), true);
   conf('a folha da aula: a nota só minha nasce fechada', await pagB.evaluate(() => document.querySelector('#cel-folha .cel-so-minha').hidden), true);
   await clicar(pagB, '#cel-folha .cel-ver-nota');
   conf('a folha da aula: um toque abre a nota só minha', await pagB.evaluate(() =>
