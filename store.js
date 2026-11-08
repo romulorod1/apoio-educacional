@@ -35,7 +35,10 @@
  * para o Drive continua do tamanho de antes. A fase 1 da nuvem (N1, agora
  * versão 5 do banco) tem de respeitar a lista SO_DESTE_TABLET, lá embaixo.
  *
- * Nada sai daqui sem a Nathália mandar. Não há servidor nem envio automático.
+ * Daqui nada sai sozinho. A cópia na nuvem (nuvem.js, fase 0) sobe o mesmo
+ * .zip da cópia de segurança, cifrado no aparelho, e só depois de ela entrar
+ * na conta e mandar a primeira vez; este arquivo só a avisa de que algo dela
+ * mudou (aoMudar).
  */
 (function (root) {
   'use strict';
@@ -195,11 +198,27 @@
         var motivo = function (padrao) {
           return t.error || (req && req.error) || new Error(padrao);
         };
-        t.oncomplete = function () { resolve(req ? req.result : undefined); };
+        t.oncomplete = function () { avisarMudanca(deposito); resolve(req ? req.result : undefined); };
         t.onerror = function () { reject(motivo('A gravação falhou.')); };
         t.onabort = function () { reject(motivo('A gravação foi interrompida.')); };
       });
     });
+  }
+
+  /* Quem quiser saber que algo DELA mudou no aparelho (a cópia na nuvem, N0)
+   * se inscreve aqui. Avisa depois de a transação confirmar, e só para o que
+   * vai na cópia: o histórico de desfazer e o que é só deste tablet ficam de
+   * fora, senão abrir um livro faria a cópia subir de novo. */
+  var ouvintesDeMudanca = [];
+  var FORA_DA_COPIA = ['historico', 'biblioteca_pacotes', 'biblioteca_itens', 'biblioteca_teoria', 'biblioteca_assets'];
+  function aoMudar(fn) { ouvintesDeMudanca.push(fn); }
+  function avisarMudanca(deposito) {
+    var nomes = Array.isArray(deposito) ? deposito : [deposito];
+    var conta = nomes.some(function (n) {
+      return FORA_DA_COPIA.indexOf(n) < 0 && SO_DESTE_TABLET.indexOf(n) < 0;
+    });
+    if (!conta) return;
+    ouvintesDeMudanca.forEach(function (fn) { try { fn(nomes); } catch (e) { /* o ouvinte se vira */ } });
   }
 
   function ler(deposito, chave) {
@@ -316,7 +335,7 @@
           t.objectStore('historico').clear();
           t.objectStore('dados').put(novo, 'principal');
         };
-        t.oncomplete = function () { resolve(novo); };
+        t.oncomplete = function () { avisarMudanca('dados'); resolve(novo); };
         t.onabort = function () { reject(t.error || new Error('Exclusão interrompida.')); };
       });
     });
@@ -976,7 +995,7 @@
             }), false);
           }
         } catch (e) { erro = e; t.abort(); }
-        t.oncomplete = function () { resolve(completar(pacote.dados)); };
+        t.oncomplete = function () { avisarMudanca('dados'); resolve(completar(pacote.dados)); };
         t.onabort = function () { reject(erro || t.error || new Error('A restauração foi interrompida.')); };
         t.onerror = function () { /* onabort informa o motivo e resolve a promessa */ };
       });
@@ -1074,6 +1093,7 @@
     listasDaBiblioteca: listasDaBiblioteca,
     gravarLivros: gravarLivros, listarLivros: listarLivros, lerLivro: lerLivro, removerLivro: removerLivro,
     lerPosicaoLivro: lerPosicaoLivro, gravarPosicaoLivro: gravarPosicaoLivro,
+    aoMudar: aoMudar,
     SO_DESTE_TABLET: SO_DESTE_TABLET.slice()
   };
 })(typeof self !== 'undefined' ? self : this);

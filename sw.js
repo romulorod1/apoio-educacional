@@ -130,6 +130,10 @@ var ARQUIVOS = [
    * WhatsApp. Se ficasse de fora da lista, o app.js novo rodaria contra o
    * cartao.js velho servido do cache de sobra, depois de uma atualizacao. */
   './cartao.js',
+  /* A cópia na nuvem (N0): o motor e o gerador do QR da chave. Fora da lista,
+   * o app.js novo abriria Ajustes sem o Nuvem depois de uma atualização. */
+  './vendor/qrcode-generator-1.4.4/qrcode.js',
+  './nuvem.js',
   './app.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
