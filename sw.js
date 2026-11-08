@@ -118,8 +118,9 @@
  * (IndexedDB 5; store.js e core.js), com a lista igual. O v83 é o nome do B4b
  * (faixa de endereço) no PR dele. O v84 (N1, fatias 2 e 3) traz a fila de saída,
  * o envio e o recebimento por registro (IndexedDB 6; store.js, nuvem.js e
- * app.js), com a lista igual. */
-var CACHE = 'apoio-educacional-v84';
+ * app.js), com a lista igual. O v85 (N1d) pula, no recebimento, documento do formato
+ * antigo (com iv ou dados em bytes): nuvem.js e app.js, com a lista igual. */
+var CACHE = 'apoio-educacional-v85';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
