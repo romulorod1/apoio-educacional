@@ -4,7 +4,7 @@
  * Emulator Suite (Auth e Firestore), do mesmo jeito que o testa_nuvem.js.
  *
  * O tablet (1280 px) cria dados fictícios e sobe a cópia. O celular (390 por
- * 844) abre, entra com e-mail e senha, digita o código da chave e traz a cópia
+ * 844) abre, entra com e-mail e senha e traz a cópia (só o login, sem código)
  * pelo caminho que já existe ("Restaurar neste aparelho"). Daí em diante:
  *   - as três telas (Hoje, Fechamento, Enviar) existem, sem rolagem de lado,
  *     com todo alvo de toque de pelo menos 44 px, e a grade do mês não aparece;
@@ -290,7 +290,13 @@ async function prepararPagina(pag, largura, altura, movel) {
   });
 }
 const definirTela = (pag, t) => pag.evaluate(t => { if (t) sessionStorage.setItem('__tela', JSON.stringify(t)); else sessionStorage.removeItem('__tela'); }, t);
-const escritasNoBanco = pag => pag.evaluate(() => window.__escritas.slice());
+/* Desde a N1 fatia 3 o celular RECEBE registros do tablet: é a segunda escrita
+ * permitida (passa pela trava como a restauração), com os depósitos do
+ * documento e o histórico, e sem as folhas. Ela fica fora da conta: o que
+ * esta prova mede é que o celular não grava NADA SEU. */
+const RECEBIMENTO = 'dados,registros,controle,saida,historico';
+const escritasNoBanco = pag => pag.evaluate(r => window.__escritas.filter(e => e !== r), RECEBIMENTO);
+const recebimentosNoBanco = pag => pag.evaluate(r => window.__escritas.filter(e => e === r).length, RECEBIMENTO);
 /* Zera a conta da aba, para medir só o que vem depois. */
 const recusasSoLeitura = pag => pag.evaluate(() => window.__avisos.filter(t => /Este celular só lê\. Para mudar/.test(t)));
 const zerarEscritas = pag => pag.evaluate(() => { window.__escritas = []; sessionStorage.removeItem('__escritas'); });
@@ -407,7 +413,6 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
   const subiu = await esperar('a cópia do tablet subiu', ponteiroAgora, v => !!v, 30000);
   conf('a cópia do tablet está na nuvem', subiu.ok, true);
   conf('o instrumento vê as escritas na nuvem (as do tablet)', pagA.escritasNaNuvem.length > 0, true);
-  const chave = await pagA.evaluate(() => Nuvem.verChave());
   /* A cópia que o celular traz é de um tablet que ainda não desenhou o
    * Fechamento depois do C4: sem ajustes.pagamentosDesde. */
   await pagA.evaluate(async () => {
@@ -428,7 +433,7 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
   conf('com tela de celular (390 x 844) o aplicativo entra no modo celular', m.celular, true);
   prop('ao abrir sem dados, o celular não grava nada no banco (nem a carga inicial)', (await escritasNoBanco(pagB)).length === 0, '--envenenado-grava');
   if (GRAVA) { await ctxB.close(); return; }
-  conf('sem dados, aparece a entrada (conta e chave) e não as abas', await pagB.evaluate(() =>
+  conf('sem dados, aparece a entrada (a conta) e não as abas', await pagB.evaluate(() =>
     document.querySelector('#cel-entrada').classList.contains('ativa') && document.querySelector('#cel-abas').hidden), true);
   conf('a grade do mês e as abas do tablet não aparecem', m.doTablet.join(','), '');
   conf('só um formulário de entrada na página (o de Ajustes fica vazio no celular)',
@@ -441,7 +446,6 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
   const lista = await esperar('a janela lista a cópia do tablet', () => pagB.evaluate(() =>
     document.querySelectorAll('#modal-nuvem-restaurar.aberto #nuvem-copias input[type=radio]').length), v => v >= 1, 15000);
   conf('"Trazer a cópia do tablet" abre a restauração de sempre, com a cópia', lista.ok, true);
-  await digitar(pagB, '#nuvem-codigo-digitado', chave.formatado);
   await clicar(pagB, '#nuvem-restaurar-confirmar');
   const veio = await esperar('a cópia chegou e Hoje mostra a aula', () => pagB.evaluate(() =>
     !document.querySelector('#modal-nuvem-restaurar.aberto') && document.querySelector('#cel-hoje.ativa') &&
@@ -467,7 +471,10 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
   prop('a cópia sem pagamentosDesde: abrir o celular não mostra "Este celular só lê" (' + (await recusasSoLeitura(pagB)).length + ' vezes)',
     (await recusasSoLeitura(pagB)).length === 0, '--envenenado-grava-abertura');
   if (GRAVA_ABERTURA) { await ctxB.close(); return; }
-  conf('e não gravou: o disco continua sem pagamentosDesde e nenhuma escrita no banco', semCorteNoDisco && (await escritasNoBanco(pagB)).length === 0, true);
+  /* O corte dos pagamentos pode chegar pelos registros do tablet (fatia 3): o
+   * que não pode é o celular gravar a migração ele mesmo. */
+  conf('e não gravou: nenhuma escrita sua no banco (o corte só pode ter vindo do tablet, pelos registros: ' +
+    (semCorteNoDisco ? 'não veio' : 'veio, em ' + (await recebimentosNoBanco(pagB)) + ' recebimento(s)') + ')', (await escritasNoBanco(pagB)).length, 0);
   await zerarEscritas(pagB);
 
   secao('4. As três telas: sem rolagem de lado, alvos de 44 px e nenhum botão de edição');
@@ -626,7 +633,6 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
   await clicar(pagC, '#nuvem-restaurar');
   await esperar('C lista as cópias', () => pagC.evaluate(() =>
     document.querySelectorAll('#modal-nuvem-restaurar.aberto #nuvem-copias input[type=radio]').length), v => v >= 1, 15000);
-  await digitar(pagC, '#nuvem-codigo-digitado', chave.formatado);
   await clicar(pagC, '#nuvem-restaurar-confirmar');
   const cRest = await esperar('C restaurou pela tela do tablet', () => pagC.evaluate(() =>
     Nuvem.estado().automatica && !document.querySelector('#modal-nuvem-restaurar.aberto')), v => v === true, 30000);
@@ -673,7 +679,6 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
     await clicar(pag, '#nuvem-restaurar');
     await esperar(rotulo + ' lista as cópias', () => pag.evaluate(() =>
       document.querySelectorAll('#modal-nuvem-restaurar.aberto #nuvem-copias input[type=radio]').length), v => v >= 1, 15000);
-    await digitar(pag, '#nuvem-codigo-digitado', chave.formatado);
     await clicar(pag, '#nuvem-restaurar-confirmar');
     const r = await esperar(rotulo + ' restaurou pelo cartão de Ajustes', () => pag.evaluate(() =>
       Nuvem.estado().automatica && !document.querySelector('#modal-nuvem-restaurar.aberto')), v => v === true, 30000);

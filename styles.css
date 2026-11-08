@@ -2877,25 +2877,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .u-vao-8 { gap: 8px !important; }
 .u-vao-9 { gap: 9px !important; }
 
-/* A cópia na nuvem (N0). O QR e o código de recuperação da chave: o código em
- * letra de máquina, em grupos de quatro, grande o bastante para copiar de um
- * papel; na impressão, só a janela da chave sai, para o papel ter o QR, o
- * código e a frase, e nada da agenda. */
-.nuvem-qr { display: flex; justify-content: center; margin: 8px 0 14px; }
-.nuvem-qr svg { width: 220px; height: 220px; }
-.nuvem-codigo {
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: var(--letra-6);
-  letter-spacing: 1px;
-  line-height: 1.6;
-  text-align: center;
-  word-break: break-word;
-  color: var(--navy);
-  margin: 0 0 12px;
-}
-.nuvem-codigo-entrada { font-family: ui-monospace, Consolas, monospace; text-transform: uppercase; }
-.nuvem-leitor video { width: 100%; max-height: 260px; border-radius: 10px; background: var(--soft); }
-.nuvem-leitor[hidden] { display: none; }
+/* A cópia na nuvem (N0). */
 .nuvem-conta { font-size: var(--letra-2); color: var(--muted); word-break: break-all; }
 
 /* ---------- modo celular, só leitura (D6, parte 1) ----------
@@ -2987,10 +2969,3 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 body.modo-celular .celular .btn { min-height: var(--alvo-celular); }
 body.modo-celular .celular input { min-height: var(--alvo); box-sizing: border-box; max-width: 100%; }
 body.modo-celular .celular .linha { flex-direction: column; }
-@media print {
-  body.imprimindo-chave > :not(#modal-nuvem-chave) { display: none !important; }
-  body.imprimindo-chave #modal-nuvem-chave { display: block; position: static; background: var(--branco); }
-  body.imprimindo-chave #modal-nuvem-chave .modal { box-shadow: none; max-height: none; }
-  body.imprimindo-chave #modal-nuvem-chave .modal-rodape,
-  body.imprimindo-chave #modal-nuvem-chave .fechar { display: none; }
-}

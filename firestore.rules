@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// Regras do Firestore do Apoio Educacional (fase 0 da nuvem, projeto
+// Regras do Firestore do Apoio Educacional (fases 0 e 1 da nuvem, projeto
 // nw-apoio-educacional).
 //
 // Tudo mora em usuarios/{uid}/... e o uid é o da conta que entrou no app:
@@ -9,9 +9,15 @@ rules_version = '2';
 //     uids, lê o caminho dela e não escreve nada (o aparelho observador);
 //   - qualquer outra conta, com ou sem login, não lê nem escreve nada.
 // Nenhum uid fica fixo aqui: o documento de leitores é escrito só pela dona,
-// pelo próprio aplicativo. O conteúdo da cópia chega cifrado no aparelho
-// (AES-GCM), então estas regras protegem quem pode baixar a cópia, e a chave,
-// que nunca sai do aparelho, protege o que está dentro dela.
+// pelo próprio aplicativo. DECISÃO DO DONO (08/11/2026): a cifra no aparelho
+// saiu; o que protege os dados é o login, a senha e estas regras. Por isso
+// elas são por caminho e conferem a forma do que entra.
+//
+// Só os caminhos que o aplicativo usa existem aqui, um a um: a cópia completa
+// (estado/copia, copias/{id} e as partes, em bytes), os leitores e os
+// registros (registros/{id}), cujo documento tem a forma conferida: os
+// metadados com os nomes esperados e tamanho limitado, e o conteúdo em
+// `dados`, como dado legível do Firestore.
 service cloud.firestore {
   match /databases/{database}/documents {
     function entrou() {
@@ -25,9 +31,84 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/usuarios/$(uid)/config/leitores)
         && request.auth.uid in get(/databases/$(database)/documents/usuarios/$(uid)/config/leitores).data.uids;
     }
-    match /usuarios/{uid}/{resto=**} {
-      allow read: if dona(uid) || leitor(uid);
-      allow write: if dona(uid);
+    function podeLer(uid) {
+      return dona(uid) || leitor(uid);
+    }
+    // um registro: id igual ao do documento, metadados com os nomes e tamanhos
+    // esperados, conteúdo em `dados` (qualquer forma legível, só sem bytes);
+    // servidorEm é a hora do servidor, posta pelo próprio commit
+    function registroValido(id) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['id', 'tipo', 'atualizadoEm', 'apagadoEm', 'aparelho', 'esquema', 'app', 'dados', 'servidorEm'])
+        && d.id == id && d.id.size() <= 200
+        && d.tipo is string && d.tipo.size() <= 32
+        && d.atualizadoEm is string && d.atualizadoEm.size() <= 40
+        && d.aparelho is string && d.aparelho.size() <= 64
+        && d.esquema is int
+        && (!('app' in d) || (d.app is string && d.app.size() <= 32))
+        && (!('apagadoEm' in d) || (d.apagadoEm is string && d.apagadoEm.size() <= 40))
+        && (!('dados' in d) || !(d.dados is bytes))
+        && (!('servidorEm' in d) || d.servidorEm is timestamp);
+    }
+    // o cabeçalho da cópia completa e as partes dela, em bytes: só os campos
+    // que o aplicativo escreve, cada um com o tipo esperado quando presente
+    function copiaValida() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['formato', 'versao', 'bytes', 'partes', 'quando', 'aparelho', 'aparelhoId', 'motivo', 'app', 'conteudo'])
+        && (!('formato' in d) || (d.formato is string && d.formato.size() <= 40))
+        && (!('bytes' in d) || d.bytes is int)
+        && (!('partes' in d) || d.partes is int)
+        && (!('quando' in d) || (d.quando is string && d.quando.size() <= 40))
+        && (!('aparelho' in d) || (d.aparelho is string && d.aparelho.size() <= 64))
+        && (!('aparelhoId' in d) || (d.aparelhoId is string && d.aparelhoId.size() <= 64))
+        && (!('versao' in d) || d.versao is int)
+        && (!('motivo' in d) || (d.motivo is string && d.motivo.size() <= 16))
+        && (!('app' in d) || (d.app is string && d.app.size() <= 32))
+        && (!('conteudo' in d) || d.conteudo is bool);
+    }
+    function parteValida() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['dados', 'n'])
+        && (!('dados' in d) || d.dados is bytes)
+        && (!('n' in d) || d.n is int);
+    }
+    function ponteiroValido() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['atual', 'anterior', 'quando'])
+        && (!('atual' in d) || (d.atual is string && d.atual.size() <= 64))
+        && (!('anterior' in d) || (d.anterior is string && d.anterior.size() <= 64))
+        && (!('quando' in d) || (d.quando is string && d.quando.size() <= 40));
+    }
+
+    match /usuarios/{uid} {
+      // a cópia completa (fase 0)
+      match /estado/copia {
+        allow read: if podeLer(uid);
+        allow create, update: if dona(uid) && ponteiroValido();
+        allow delete: if dona(uid);
+      }
+      match /copias/{copia} {
+        allow read: if podeLer(uid);
+        allow create, update: if dona(uid) && copiaValida();
+        allow delete: if dona(uid);
+        match /partes/{parte} {
+          allow read: if podeLer(uid);
+          allow create, update: if dona(uid) && parteValida();
+          allow delete: if dona(uid);
+        }
+      }
+      // quem mais pode ler (D7): só a dona escreve
+      match /config/leitores {
+        allow read: if podeLer(uid);
+        allow write: if dona(uid);
+      }
+      // registros (N1): um documento por registro, com a forma conferida
+      match /registros/{registro} {
+        allow read: if podeLer(uid);
+        allow create, update: if dona(uid) && registroValido(registro);
+        allow delete: if dona(uid);
+      }
+      // fim registros (N1)
     }
     match /{outro=**} {
       allow read, write: if false;

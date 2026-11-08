@@ -60,10 +60,13 @@ const { conf, secao, esperar } = H;
   conf('dados e depósitos anteriores permanecem', JSON.stringify(resultado.depoisFalha),
     JSON.stringify({ aluno: 'alfa', nota: true, midia: true, anexo: true,
       listas: ['lista-alfa'], historico: 1 }));
-  conf('restauração válida substitui todos os depósitos e limpa histórico',
+  /* Desde a N1 (fatia 3) a restauração limpa o histórico e guarda nele UMA entrada,
+   * "Antes de restaurar a cópia", com o estado anterior: cada versão que a
+   * restauração troca ou apaga continua recuperável. */
+  conf('restauração válida substitui todos os depósitos e deixa no histórico só o ponto de antes dela',
     JSON.stringify(resultado.depoisSucesso),
     JSON.stringify({ aluno: 'beta', notaAntiga: false, notaNova: true,
-      anexoAntigo: false, anexoNovo: 'beta', listas: 0, historico: 0,
+      anexoAntigo: false, anexoNovo: 'beta', listas: 0, historico: 1,
       pagamentos: true }));
 
   secao('ZIP é conferido antes de substituir os dados');

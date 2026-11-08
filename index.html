@@ -135,7 +135,7 @@
       <div class="cartao">
         <p class="ajuda u-margem-topo-0">
           Tudo fica guardado neste tablet. Para a internet só vai a cópia na nuvem, logo abaixo,
-          cifrada e só se você entrar na conta. Faça também uma cópia em arquivo de vez em quando e
+          e só se você entrar na conta. Faça também uma cópia em arquivo de vez em quando e
           guarde no Google Drive.
         </p>
         <div id="estado-copia"></div>
@@ -149,13 +149,13 @@
       <!-- N0: a cópia na nuvem. Discreta: um cartão em Ajustes, com a entrada
            por e-mail e senha e, depois, o estado da última cópia e os botões.
            O conteúdo é desenhado pelo app.js (desenharNuvem), porque muda com
-           a entrada, a chave e a cópia. -->
+           a entrada e a cópia. -->
       <h3 class="subtitulo">Cópia na nuvem</h3>
       <div class="cartao" id="cartao-nuvem">
         <p class="ajuda u-margem-topo-0">
-          Uma cópia completa deste aparelho, trancada com uma chave que só existe aqui, sobe para a
-          nuvem quando você fecha o aplicativo com internet, e uma vez por dia. Sem a chave, a cópia
-          não abre: nem para quem a guarda, nem para nós. Guarde o papel com a chave.
+          Uma cópia completa deste aparelho sobe para a nuvem quando você fecha o aplicativo com
+          internet, e uma vez por dia, e cada mudança sobe logo depois de gravada. Só a sua conta
+          abre o que está lá: guarde bem a senha.
         </p>
         <div id="estado-nuvem"></div>
       </div>
@@ -277,30 +277,8 @@
 
   <!-- ---------------- modais ---------------- -->
 
-  <!-- N0: a chave da cópia na nuvem, como QR e como código, para imprimir. -->
-  <div class="fundo-modal" id="modal-nuvem-chave">
-    <div class="modal u-larg-max-460">
-      <div class="modal-cabecalho">
-        <h3>Chave da cópia na nuvem</h3>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
-      </div>
-      <div class="modal-corpo">
-        <p class="ajuda u-margem-topo-0">
-          Sem esta chave, a cópia na nuvem não abre. Imprima este papel e guarde em lugar seguro.
-          Num aparelho novo, leia o QR com a câmera ou digite o código.
-        </p>
-        <div class="nuvem-qr" id="nuvem-qr"></div>
-        <p class="nuvem-codigo" id="nuvem-codigo"></p>
-        <p class="nuvem-conta" id="nuvem-chave-conta"></p>
-      </div>
-      <div class="modal-rodape">
-        <button class="btn" data-fechar type="button">Fechar</button>
-        <button class="btn principal" id="nuvem-imprimir" type="button">Imprimir</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- N0: restaurar neste aparelho a partir da cópia na nuvem. -->
+  <!-- N0: restaurar neste aparelho a partir da cópia na nuvem. Só o login:
+       as regras do Firestore decidem quem lê a cópia. -->
   <div class="fundo-modal" id="modal-nuvem-restaurar">
     <div class="modal u-larg-max-460">
       <div class="modal-cabecalho">
@@ -308,18 +286,14 @@
         <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
       </div>
       <div class="modal-corpo">
-        <div id="nuvem-copias"></div>
-        <div id="nuvem-chave-entrada">
-          <label class="campo">
-            <span>Chave da cópia (o código do papel; em branco, vale a chave deste aparelho)</span>
-            <input type="text" class="nuvem-codigo-entrada" id="nuvem-codigo-digitado" autocomplete="off"
-              autocapitalize="characters" spellcheck="false" placeholder="XXXX XXXX XXXX ...">
-          </label>
-          <div class="barra">
-            <button class="btn pequeno" id="nuvem-ler-qr" type="button">Ler o QR com a câmera</button>
-          </div>
-          <div class="nuvem-leitor" id="nuvem-leitor" hidden><video id="nuvem-video" playsinline muted></video></div>
+        <label class="campo" id="nuvem-conta-dona-campo">
+          <span>Código da conta da dona (só para o observador; em branco, a sua própria conta)</span>
+          <input type="text" id="nuvem-conta-dona" autocomplete="off" spellcheck="false">
+        </label>
+        <div class="barra">
+          <button class="btn pequeno" id="nuvem-conta-dona-buscar" type="button">Buscar as cópias desta conta</button>
         </div>
+        <div id="nuvem-copias"></div>
         <div id="nuvem-restaurar-mensagem"></div>
       </div>
       <div class="modal-rodape">
@@ -863,9 +837,7 @@
   <script src="store.js"></script>
   <script src="zip.js"></script>
   <script src="biblioteca.js"></script>
-  <!-- N0: o gerador do QR da chave (MIT, Kazuhiko Arase) e o motor da cópia na
-       nuvem, depois do store.js, de quem ele ouve as mudanças. -->
-  <script src="vendor/qrcode-generator-1.4.4/qrcode.js"></script>
+  <!-- N0: o motor da nuvem, depois do store.js, de quem ele ouve as mudanças. -->
   <script src="nuvem.js"></script>
   <script src="draw.js"></script>
   <!-- O cartão do mês, desenhado em canvas. Entra ANTES do app.js, que procura

@@ -115,8 +115,11 @@
  * a geração das mudanças no envio da nuvem (nuvem.js e app.js). O v81 (D6a)
  * traz o modo celular só leitura (app.js, store.js, nuvem.js, index.html e
  * styles.css), com a lista igual. O v82 (N1, fatia 1) traz o banco por registro
- * (IndexedDB 5; store.js e core.js), com a lista igual. */
-var CACHE = 'apoio-educacional-v82';
+ * (IndexedDB 5; store.js e core.js), com a lista igual. O v83 é o nome do B4b
+ * (faixa de endereço) no PR dele. O v84 (N1, fatias 2 e 3) traz a fila de saída,
+ * o envio e o recebimento por registro (IndexedDB 6; store.js, nuvem.js e
+ * app.js), com a lista igual. */
+var CACHE = 'apoio-educacional-v84';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -138,7 +141,6 @@ var ARQUIVOS = [
   './cartao.js',
   /* A cópia na nuvem (N0): o motor e o gerador do QR da chave. Fora da lista,
    * o app.js novo abriria Ajustes sem o Nuvem depois de uma atualização. */
-  './vendor/qrcode-generator-1.4.4/qrcode.js',
   './nuvem.js',
   './app.js',
   './manifest.webmanifest',

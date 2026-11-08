@@ -80,8 +80,20 @@
    * item (migrarParaRegistros). Se qualquer passo falhar, a transação de
    * versão aborta inteira e o banco fica na 4, intacto. O `principal` não é
    * apagado nem deixa de ser gravado: desfazer este release é republicar o
-   * código antigo COM VERSAO_BANCO = 5, e ele lê o `principal` atual. */
-  var VERSAO_BANCO = 5;
+   * código antigo COM VERSAO_BANCO = 5, e ele lê o `principal` atual.
+   *
+   * Versão 6 (N1, fatia 2): só CRIA o depósito `saida`, a fila do que ainda
+   * não subiu para a nuvem registro a registro, e a semeia com todo registro
+   * vivo sincronizável (o primeiro envio leva o banco inteiro). Desfazer este
+   * release é republicar o código antigo COM VERSAO_BANCO = 6.
+   *
+   * E A VOLTA DEPOIS DO ROLLBACK: o código antigo republicado com o número
+   * novo abre, num aparelho que nunca passou por aqui, um banco nessa versão
+   * SEM os depósitos novos. Quando este código volta, o onupgradeneeded não
+   * roda (a versão já é a dele). Por isso o abrir sonda o banco sem versão,
+   * vê que falta depósito e reabre com a versão mais um, criando o que falta e
+   * migrando a partir do `principal` (ver abrir). */
+  var VERSAO_BANCO = 6;
   /* Depósitos que nunca saem do tablet: nem na cópia de segurança nem na
    * nuvem. Quem for copiar ou sincronizar depósitos lê esta lista. */
   var SO_DESTE_TABLET = ['livros', 'livros_posicoes'];
@@ -94,7 +106,19 @@
 
   var bancoAberto = null;
 
+  /* Os depósitos que este código precisa encontrar abertos. Quem faltar é
+   * criado na transação de versão (criarDepositos) ou, se o banco já está na
+   * versão deste código sem eles, pela cura do abrir (ver lá). */
+  var DEPOSITOS = ['dados', 'notas', 'midias', 'anexos', 'historico', 'biblioteca_pacotes', 'biblioteca_itens',
+    'biblioteca_teoria', 'biblioteca_assets', 'biblioteca_uso', 'biblioteca_etiquetas', 'biblioteca_listas',
+    'livros', 'livros_posicoes', 'registros', 'controle', 'saida'];
+  function depositosQueFaltam(b) {
+    return DEPOSITOS.filter(function (n) { return !b.objectStoreNames.contains(n); });
+  }
+  /* Cria o que falta e devolve os nomes criados, para a migração saber o que
+   * acabou de nascer. */
   function criarDepositos(b) {
+    var criados = depositosQueFaltam(b);
     if (!b.objectStoreNames.contains('dados')) b.createObjectStore('dados');
     if (!b.objectStoreNames.contains('notas')) b.createObjectStore('notas');
     if (!b.objectStoreNames.contains('midias')) b.createObjectStore('midias');
@@ -145,37 +169,103 @@
       s.createIndex('atualizadoEm', 'atualizadoEm');
     }
     if (!b.objectStoreNames.contains('controle')) b.createObjectStore('controle');
+    if (!b.objectStoreNames.contains('saida')) b.createObjectStore('saida', { keyPath: 'id' });
+    return criados;
   }
 
-  /* A migração 4 para 5, dentro da transação de versão `t`: o documento
-   * inteiro vira um registro por item, todos com atualizadoEm igual ao
-   * instante da migração e `ordem` igual à posição no vetor. O `principal`
-   * fica como está (ele mesmo é o retrato). Banco novo (de 0) não tem o que
-   * migrar; banco já na 5 não passa por aqui. */
-  function migrarParaRegistros(t, de) {
-    if (!de || de >= 5) return;
-    var agora = new Date().toISOString();
-    var pedido = t.objectStore('dados').get('principal');
-    pedido.onsuccess = function () {
-      if (!pedido.result) return;
-      escreverDiferenca(t, pedido.result, { carimbo: agora, semPrincipal: true });
+  /* A migração para os registros, dentro da transação de versão `t`, guiada
+   * pelo que ACABOU DE SER CRIADO (e não pelo número da versão, porque a cura
+   * do abrir também passa por aqui):
+   *   - nasceu `registros`: o documento inteiro vira um registro por item,
+   *     todos com atualizadoEm igual ao instante da migração e `ordem` igual à
+   *     posição no vetor, e cada um entra na fila; o `principal` fica como
+   *     está (ele mesmo é o retrato);
+   *   - nasceu só `saida` (a subida 5 para 6): a fila é semeada com todo
+   *     registro vivo sincronizável, para o primeiro envio por registro levar
+   *     o que já estava no aparelho.
+   * Banco novo (de 0) não tem `principal`, e nada é migrado. */
+  function migrarParaRegistros(t, criados) {
+    if (criados.indexOf('registros') >= 0) {
+      var agora = new Date().toISOString();
+      var pedido = t.objectStore('dados').get('principal');
+      pedido.onsuccess = function () {
+        if (!pedido.result) return;
+        // a diferença contra um depósito vazio: cada item entra em registros E na fila
+        escreverDiferenca(t, pedido.result, { carimbo: agora, semPrincipal: true });
+      };
+      return;
+    }
+    if (criados.indexOf('saida') >= 0) semearFila(t);
+  }
+  /* A subida 5 para 6: a fila nasce com todo registro vivo sincronizável, para
+   * o primeiro envio por registro levar o que já estava no aparelho. */
+  function semearFila(t) {
+    var saida = t.objectStore('saida');
+    var todos = t.objectStore('registros').getAll();
+    todos.onsuccess = function () {
+      (todos.result || []).forEach(function (r) {
+        if (r.apagadoEm || !sincronizavel(r.id, r.tipo)) return;
+        enfileirar(saida, { id: r.id, tipo: r.tipo, atualizadoEm: r.atualizadoEm, apagadoEm: null });
+      });
     };
   }
 
+  /* ABRIR, EM DOIS TEMPOS. Primeiro uma sonda SEM versão, que abre o banco como
+   * ele está (um banco que não existe nasce vazio, na versão 1) e diz a versão
+   * e os depósitos. Se a versão é a deste código ou maior E todo depósito que
+   * este código precisa está lá, essa conexão serve. Senão ela fecha e a
+   * abertura de verdade pede a versão deste código ou, quando o banco já está
+   * nela (ou acima) e mesmo assim falta depósito, a versão dele mais um: a
+   * transação de versão cria o que falta e migra a partir do `principal`.
+   *
+   * É A CURA DO ROLLBACK (segunda mão do #116): o código da versão 4
+   * republicado com VERSAO_BANCO = 5 ou 6 abre um banco novo nessa versão sem
+   * `registros`, `controle` nem `saida`; quando este código volta, o
+   * onupgradeneeded não roda (a versão já é a dele) e, sem a cura, toda
+   * leitura cairia em NotFoundError para sempre. Depois da cura o banco pode
+   * ficar numa versão acima de VERSAO_BANCO; a sonda sem versão não se importa.
+   * Só o código antigo, que pede a versão dele, veria VersionError num segundo
+   * rollback: nesse caso é republicar o antigo com o número que a tela disser. */
   function abrir() {
     if (bancoAberto) return Promise.resolve(bancoAberto);
     return new Promise(function (resolve, reject) {
-      var req = indexedDB.open(NOME_BANCO, VERSAO_BANCO);
-      req.onupgradeneeded = function (e) {
-        criarDepositos(e.target.result);
-        migrarParaRegistros(e.target.transaction, e.oldVersion);
+      var sonda = indexedDB.open(NOME_BANCO);
+      sonda.onblocked = function () { if (typeof root.aoBancoBloqueado === 'function') root.aoBancoBloqueado(); };
+      sonda.onerror = function () { reject(sonda.error); };
+      sonda.onsuccess = function () {
+        var b = sonda.result;
+        var faltam = depositosQueFaltam(b);
+        if (b.version >= VERSAO_BANCO && !faltam.length) { adotar(b); return; }
+        var alvo = b.version >= VERSAO_BANCO ? b.version + 1 : VERSAO_BANCO;
+        b.close();
+        abrirNaVersao(alvo);
       };
-      /* Outra janela do aplicativo, ainda na versão antiga, segura o banco na
-       * versão 1: a subida espera ela fechar. Sem aviso, a tela ficaria em
-       * branco sem motivo aparente; quem mostra o aviso é o app.js. */
-      req.onblocked = function () { if (typeof root.aoBancoBloqueado === 'function') root.aoBancoBloqueado(); };
-      req.onsuccess = function () {
-        var conexao = req.result;
+      function abrirNaVersao(alvo) {
+        var req = indexedDB.open(NOME_BANCO, alvo);
+        req.onupgradeneeded = function (e) {
+          var criados = criarDepositos(e.target.result);
+          migrarParaRegistros(e.target.transaction, criados);
+        };
+        /* Outra janela do aplicativo, ainda na versão antiga, segura o banco na
+         * versão 1: a subida espera ela fechar. Sem aviso, a tela ficaria em
+         * branco sem motivo aparente; quem mostra o aviso é o app.js. */
+        req.onblocked = function () { if (typeof root.aoBancoBloqueado === 'function') root.aoBancoBloqueado(); };
+        req.onsuccess = function () { adotar(req.result); };
+        /* CÓDIGO MAIS VELHO QUE O BANCO (C2a): o banco já está numa versão maior
+         * que a deste código (outra janela subiu no meio). O navegador recusa com
+         * VersionError, e a tela tem de dizer o que fazer, e não mostrar a
+         * mensagem técnica. */
+        req.onerror = function () {
+          var e = req.error;
+          if (e && e.name === 'VersionError') {
+            reject(Object.assign(new Error('O banco do aparelho é de uma versão mais nova do aplicativo.'),
+              { versaoNova: true, causa: e }));
+            return;
+          }
+          reject(e);
+        };
+      }
+      function adotar(conexao) {
         bancoAberto = conexao;
         /* Uma aba com a versão nova do aplicativo pede para subir o banco:
          * esta conexão sai do caminho em vez de travar a outra. */
@@ -188,20 +278,7 @@
         };
         if (typeof root.aoBancoLiberado === 'function') root.aoBancoLiberado();
         resolve(conexao);
-      };
-      /* CÓDIGO MAIS VELHO QUE O BANCO (C2a): o banco já está numa versão maior
-       * que a deste código (outra janela, ou um aparelho que voltou a uma
-       * versão anterior pelo cache). O navegador recusa com VersionError, e a
-       * tela tem de dizer o que fazer, e não mostrar a mensagem técnica. */
-      req.onerror = function () {
-        var e = req.error;
-        if (e && e.name === 'VersionError') {
-          reject(Object.assign(new Error('O banco do aparelho é de uma versão mais nova do aplicativo.'),
-            { versaoNova: true, causa: e }));
-          return;
-        }
-        reject(e);
-      };
+      }
     });
   }
 
@@ -489,11 +566,21 @@
    *   - item igual: não é tocado.
    * A comparação é pelo texto JSON de cada item e pela `ordem` (ordensDoGrupo):
    * um item igual, na mesma posição relativa, não é tocado. Devolve as contas. */
-  function aplicarDiferenca(deposito, existentes, db, agora, aparelho) {
+  function aplicarDiferenca(deposito, saida, existentes, db, agora, aparelho, restauro) {
     var porId = {};
     existentes.forEach(function (r) { porId[r.id] = r; });
     var novo = desmontar(db);
-    var contas = { gravados: 0, lapides: 0, iguais: 0 };
+    var contas = { gravados: 0, lapides: 0, iguais: 0, enfileirados: 0 };
+    function gravarRegistro(reg) {
+      deposito.put(reg);
+      if (saida && sincronizavel(reg.id, reg.tipo)) {
+        var entrada = { id: reg.id, tipo: reg.tipo, atualizadoEm: reg.atualizadoEm, apagadoEm: reg.apagadoEm };
+        // a entrada da restauração só vence na nuvem o que for mais velho que a cópia (fatia 3)
+        if (restauro) entrada.restauro = true;
+        enfileirar(saida, entrada);
+        contas.enfileirados++;
+      }
+    }
     novo.grupos.forEach(function (chaves) {
       var ordens = ordensDoGrupo(chaves, porId);
       chaves.forEach(function (chave, i) {
@@ -501,20 +588,57 @@
         var texto = JSON.stringify(item.dados);
         if (texto === undefined) return;
         var antes = porId[chave], ordem = ordens[i];
-        if (antes && !antes.apagadoEm && antes.ordem === ordem && JSON.stringify(antes.dados) === texto) { contas.iguais++; return; }
-        deposito.put({ id: chave, tipo: item.tipo, atualizadoEm: agora, apagadoEm: null, aparelho: aparelho,
-          esquema: ESQUEMA_REGISTRO, ordem: ordem, dados: item.dados });
+        if (antes && !antes.apagadoEm && antes.ordem === ordem && JSON.stringify(antes.dados) === texto) {
+          contas.iguais++;
+          /* Na RESTAURAÇÃO o item igual à cópia também entra na fila: a restauração
+           * vence em todos os registros, e um registro que este aparelho não
+           * subisse perderia para a edição posterior do outro. */
+          if (restauro && saida && sincronizavel(chave, item.tipo)) {
+            enfileirar(saida, { id: chave, tipo: item.tipo, atualizadoEm: antes.atualizadoEm, apagadoEm: null, restauro: true });
+            contas.enfileirados++;
+          }
+          return;
+        }
+        // `nuvem` (o carimbo do servidor que este aparelho conhece, fatia 3) fica com o registro
+        gravarRegistro({ id: chave, tipo: item.tipo, atualizadoEm: agora, apagadoEm: null, aparelho: aparelho,
+          esquema: ESQUEMA_REGISTRO, ordem: ordem, dados: item.dados, nuvem: antes && antes.nuvem ? antes.nuvem : null });
         contas.gravados++;
       });
     });
     existentes.forEach(function (r) {
+      /* Na RESTAURAÇÃO, a lápide que já existia e não está na cópia também entra
+       * na fila: a restauração vence em todos os registros, inclusive os que o
+       * "Apagar tudo" já tinha apagado aqui sem avisar a nuvem. */
+      if (restauro && r.apagadoEm && !novo.itens[r.id] && saida && sincronizavel(r.id, r.tipo)) {
+        // só a lápide que o servidor ainda não tem como lápide: a já enviada não volta à fila
+        if (!(r.nuvem && r.nuvem.apagado)) {
+          enfileirar(saida, { id: r.id, tipo: r.tipo, atualizadoEm: r.atualizadoEm, apagadoEm: r.apagadoEm, restauro: true });
+          contas.enfileirados++;
+        }
+        return;
+      }
       if (r.apagadoEm || novo.itens[r.id]) return;
-      deposito.put({ id: r.id, tipo: r.tipo, atualizadoEm: agora, apagadoEm: agora, aparelho: aparelho,
-        esquema: r.esquema || ESQUEMA_REGISTRO, ordem: r.ordem, dados: null });
+      gravarRegistro({ id: r.id, tipo: r.tipo, atualizadoEm: agora, apagadoEm: agora, aparelho: aparelho,
+        esquema: r.esquema || ESQUEMA_REGISTRO, ordem: r.ordem, dados: null, nuvem: r.nuvem || null });
       contas.lapides++;
     });
     return contas;
   }
+
+  /* O que sobe para a nuvem registro a registro (N1, fatia 2): alunos, séries,
+   * aulas, resumos, pagamentos e os ajustes que são dela. Os ajustes do
+   * aparelho ficam, e a raiz do documento (`versao`) é estrutura, não dado. */
+  function sincronizavel(id, tipo) {
+    if (tipo === 'raiz') return false;
+    if (tipo === 'ajuste') return AJUSTES_DO_APARELHO.indexOf(id.slice('ajuste:'.length)) < 0;
+    return true;
+  }
+  /* A FILA ENTRA NA MESMA TRANSAÇÃO DO DADO: a entrada é um pedido na
+   * transação `saida` de quem chamou, nunca uma transação à parte. Abortou o
+   * dado, não há fila; confirmou o dado, a fila está lá. Uma entrada por id (a
+   * segunda edição do mesmo item substitui a primeira, e o envio leva o
+   * registro como estiver). */
+  function enfileirar(saida, entrada) { saida.put(entrada); }
 
   /* TODA gravação do documento passa por aqui, dentro da transação `t` (que
    * tem 'dados', 'registros' e 'controle'): grava o `principal` inteiro (o
@@ -523,16 +647,26 @@
    * Encadeado por eventos, sem Promise no meio: um await soltaria a
    * transação. `opcoes.carimbo` é o atualizadoEm a usar (a restauração de uma
    * cópia usa o `quando` dela); `opcoes.semPrincipal` é da migração, em que o
-   * `principal` já está no disco. `depois` recebe as contas. */
+   * `principal` já está no disco; `opcoes.semFila` é da restauração da cópia
+   * que veio da nuvem (o aparelho que a fez já tinha enviado os registros).
+   * `depois` recebe as contas. */
   function escreverDiferenca(t, db, opcoes, depois) {
     opcoes = opcoes || {};
     var agora = opcoes.carimbo || new Date().toISOString();
     var controle = t.objectStore('controle');
     var registros = t.objectStore('registros');
+    var saida = opcoes.semFila ? null : t.objectStore('saida');
+    /* Com a sincronização DESLIGADA (o "Apagar tudo"), nada do que nasce
+     * aqui entra na fila: o banco vazio que ela refaz não pode subir por
+     * registro quando religar. A restauração é a exceção (ela religa). */
+    var pedidoMarca = controle.get('sincronizacao');
+    var desligada = false;
+    pedidoMarca.onsuccess = function () { desligada = !!(pedidoMarca.result && pedidoMarca.result.desligada); };
     var pedidoAparelho = controle.get('aparelho');
     pedidoAparelho.onsuccess = function () {
       var ap = pedidoAparelho.result;
       if (!ap) { ap = novoIdAparelho(); controle.put(ap, 'aparelho'); }
+      if (desligada && !opcoes.restauro) saida = null;
       var todos = registros.getAll();
       todos.onsuccess = function () {
         var contas;
@@ -542,7 +676,9 @@
          * transação encerrada, a transação já abortou e o `onabort` de quem
          * chamou responde: nada a fazer aqui, e nada a espalhar como erro. */
         try {
-          contas = aplicarDiferenca(registros, todos.result || [], db, agora, ap);
+          contas = aplicarDiferenca(registros, saida, todos.result || [], db, agora, ap, !!opcoes.restauro);
+          // a restauração que vem da nuvem recomeça o recebimento do zero: o cursor sai
+          if (opcoes.restauro) controle.delete('cursor');
           controle.put({ quando: agora, esquema: VERSAO_BANCO, assinatura: assinatura(db) }, 'retrato');
           if (!opcoes.semPrincipal) t.objectStore('dados').put(db, 'principal');
         } catch (e) {
@@ -555,7 +691,374 @@
     };
   }
 
-  var DEPOSITOS_DO_DOCUMENTO = ['dados', 'registros', 'controle'];
+  var DEPOSITOS_DO_DOCUMENTO = ['dados', 'registros', 'controle', 'saida'];
+
+  // ---------- a fila de saída (N1, fatia 2) ----------
+
+  /* As entradas da fila com os registros delas, até `limite`, para o envio.
+   * Uma transação só de leitura sobre os dois depósitos: o registro lido é o
+   * que a fila aponta, no instante da leitura. */
+  function registrosDaFila(limite) {
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, ['saida', 'registros'], 'readonly');
+        var saida = [];
+        var fila = t.objectStore('saida').getAll();
+        fila.onsuccess = function () {
+          // a quarentena fica de fora: o resto da fila não espera por ela
+          (fila.result || []).filter(function (e) { return !e.quarentena; }).slice(0, limite || 200).forEach(function (entrada) {
+            var pedido = t.objectStore('registros').get(entrada.id);
+            pedido.onsuccess = function () {
+              if (pedido.result) saida.push({ fila: entrada, registro: pedido.result });
+              else saida.push({ fila: entrada, registro: null });
+            };
+          });
+        };
+        t.oncomplete = function () { resolve(saida); };
+        t.onerror = function () { reject(t.error || new Error('A leitura falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A leitura foi interrompida.')); };
+      });
+    });
+  }
+  /* Tira da fila o que subiu, e SÓ se a entrada ainda for a mesma que subiu
+   * (mesmo atualizadoEm): uma edição feita durante o envio deixa uma entrada
+   * mais nova, que fica para o próximo. Devolve quantas saíram. */
+  function confirmarEnvio(itens) {
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, ['saida', 'registros'], 'readwrite');
+        var s = t.objectStore('saida'), registros = t.objectStore('registros'), tiradas = 0;
+        (itens || []).forEach(function (item) {
+          var pedido = s.get(item.id);
+          pedido.onsuccess = function () {
+            var atual = pedido.result;
+            if (atual && atual.atualizadoEm === item.atualizadoEm) { s.delete(item.id); tiradas++; }
+          };
+          /* O carimbo do servidor que o commit devolveu fica no registro: é a
+           * precondição do próximo envio e o desempate do recebimento (fatia 3). */
+          if (item.nuvem) {
+            var reg = registros.get(item.id);
+            reg.onsuccess = function () {
+              if (!reg.result) return;
+              // `apagado`: o servidor ficou com uma lápide (a restauração não a reenfileira à toa)
+              reg.result.nuvem = { updateTime: item.nuvem.updateTime || null, servidorEm: item.nuvem.servidorEm || null, apagado: !!item.apagadoEm };
+              registros.put(reg.result);
+            };
+          }
+        });
+        t.oncomplete = function () { resolve(tiradas); };
+        t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
+  /* Quantas esperam para subir e quantas estão em quarentena. */
+  function estadoDaFila() {
+    return todosOsValores('saida').then(function (lista) {
+      var q = (lista || []).filter(function (e) { return !!e.quarentena; }).length;
+      return { pendentes: (lista || []).length - q, quarentena: q };
+    });
+  }
+  function tamanhoDaFila() {
+    return estadoDaFila().then(function (e) { return e.pendentes; });
+  }
+  /* A entrada que a nuvem recusou sozinha (a regra ou o teto de 1 MiB) ganha
+   * uma tentativa; na terceira vai para a quarentena, e deixa de entrar nos
+   * lotes, para não derrubar o commit dos outros para sempre. Uma edição nova
+   * do mesmo item regrava a entrada (enfileirar) e a tira da quarentena. */
+  var TENTATIVAS_ATE_QUARENTENA = 3;
+  /* O reteste: a quarentena volta para a fila UMA vez (a entrada fica marcada
+   * como retestada e não volta de novo sozinha; só uma edição nova a regrava).
+   * Devolve quantas voltaram. */
+  function soltarQuarentena(ids) {
+    var so = ids ? {} : null;
+    (ids || []).forEach(function (id) { so[id] = true; });
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, 'saida', 'readwrite');
+        var s = t.objectStore('saida'), soltas = 0;
+        var todos = s.getAll();
+        todos.onsuccess = function () {
+          (todos.result || []).forEach(function (e) {
+            if (!e.quarentena || e.retestada || (so && !so[e.id])) return;
+            e.quarentena = false;
+            e.retestada = true;
+            s.put(e);
+            soltas++;
+          });
+        };
+        t.oncomplete = function () { resolve(soltas); };
+        t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
+  function marcarTentativa(ids) {
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, 'saida', 'readwrite');
+        var s = t.objectStore('saida'), quarentena = 0;
+        (ids || []).forEach(function (id) {
+          var pedido = s.get(id);
+          pedido.onsuccess = function () {
+            var e = pedido.result;
+            if (!e) return;
+            e.tentativas = (e.tentativas || 0) + 1;
+            if (e.tentativas >= TENTATIVAS_ATE_QUARENTENA) { e.quarentena = true; quarentena++; }
+            s.put(e);
+          };
+        });
+        t.oncomplete = function () { resolve(quarentena); };
+        t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
+
+  // ---------- o recebimento (N1, fatia 3) ----------
+
+  /* Quem quiser saber que chegaram registros do outro aparelho. */
+  var ouvintesDeRecebimento = [];
+  function aoReceber(fn) { ouvintesDeRecebimento.push(fn); }
+  function lerCursor() {
+    return ler('controle', 'cursor').then(function (c) { return c || null; });
+  }
+  /* O id da aula de repetição leva a conta de reaberturas: `serieId@data+rN`. */
+  var ID_DE_REPETICAO = /^([^@]+)@(\d{4}-\d{2}-\d{2})(?:\+r(\d+))?(?:\+\d+)?$/;
+  function partesDoIdDeAula(id) {
+    var m = ID_DE_REPETICAO.exec(String(id || ''));
+    return m ? { serieId: m[1], data: m[2], r: m[3] ? Number(m[3]) : 0 } : null;
+  }
+  /* Carimbo do servidor como número (microssegundos): o texto ISO vem ora com
+   * 3, ora com 6 dígitos de fração, e comparar como texto erra entre eles. */
+  function carimboNumero(iso) {
+    if (!iso) return 0;
+    var ms = Date.parse(iso);
+    if (isNaN(ms)) return 0;
+    var m = /\.(\d+)Z?$/.exec(String(iso));
+    var fracao = m ? (m[1] + '000000').slice(0, 6) : '000000';
+    return Math.floor(ms / 1000) * 1000000 + Number(fracao);
+  }
+  /* A aula que carrega trabalho dela: relato, nota só minha, folha, anexo,
+   * assunto, pagamento marcado. A fusão das reaberturas nunca apaga uma destas. */
+  function aulaComConteudo(a) {
+    return !!(a && ((a.notaTexto && String(a.notaTexto).trim()) || (a.notaPrivada && String(a.notaPrivada).trim()) || a.temNota ||
+      (a.anexos && a.anexos.length) || (a.temas && a.temas.length) || (a.areas && a.areas.length) || a.pago || a.pagoEm));
+  }
+  /* O maior par (carimbo, nome): é o cursor da próxima consulta. */
+  function parMaior(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    var ca = carimboNumero(a.servidorEm), cb = carimboNumero(b.servidorEm);
+    if (ca !== cb) return ca > cb ? a : b;
+    return String(a.nome || '') >= String(b.nome || '') ? a : b;
+  }
+
+  /* APLICA O QUE CHEGOU DA NUVEM, numa transação só (passa pela trava como a
+   * restauração: é dado que vem da nuvem, e o celular só leitura também
+   * recebe). A regra, por registro, pelo carimbo do servidor:
+   *   - registro que não existe aqui: entra (vivo ou lápide);
+   *   - registro que este aparelho conhece com carimbo do servidor igual ou
+   *     mais novo (`nuvem.servidorEm`): o que chegou é velho ou é o eco do que
+   *     este aparelho mesmo subiu, e não é aplicado;
+   *   - registro com edição LOCAL ainda não enviada (está na fila): a edição
+   *     local é a escrita mais nova, vai subir e vencer; o que chegou fica no
+   *     histórico e só o carimbo do servidor é anotado, para o envio passar;
+   *   - senão o que chegou vence; a versão local que perde vai para o
+   *     histórico ("Antes de receber do outro aparelho"), nunca some calada.
+   * Lápide que chega apaga aqui. Depois, a fusão das reaberturas: numa mesma
+   * série e data, fica viva só a aula de maior r (as outras viram lápide e
+   * entram na fila, para os outros aparelhos saberem). Por fim o `principal`
+   * é refeito dos registros, o retrato e o cursor gravados. */
+  function aplicarRecebidos(lista, opcoes) {
+    opcoes = opcoes || {};
+    var agora = new Date().toISOString();
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var nomes = DEPOSITOS_DO_DOCUMENTO.concat(['historico']);
+        var t = transacao(b, nomes, 'readwrite', true);
+        var registros = t.objectStore('registros'), saida = t.objectStore('saida');
+        var contas = { aplicados: 0, ignorados: 0, perdedoresLocais: 0, fundidas: 0, cursor: null, mudou: false };
+        /* A fila e o cursor são pedidos ANTES dos registros: os pedidos de uma
+         * transação respondem na ordem, e o processamento acontece na resposta
+         * do último. */
+        var filaReq = saida.getAll();
+        var cursorReq = t.objectStore('controle').get('cursor');
+        var conflitosReq = t.objectStore('controle').get('conflitos');
+        var conflitosJaRegistrados = {};
+        conflitosReq.onsuccess = function () { conflitosJaRegistrados = conflitosReq.result || {}; };
+        /* A sincronização desligada pelo "Apagar tudo" é conferida AQUI, dentro
+         * da transação: um recebimento que estava em curso quando ela apagou
+         * tudo não pode aplicar nada depois (aula solta, sem aluno, num banco
+         * vazio). */
+        var desligadaReq = t.objectStore('controle').get('sincronizacao');
+        var desligada = false;
+        desligadaReq.onsuccess = function () { desligada = !!(desligadaReq.result && desligadaReq.result.desligada); };
+        var todosReq = registros.getAll();
+        var fila = {}, existentes = [], cursorAntes = null;
+        filaReq.onsuccess = function () { (filaReq.result || []).forEach(function (e) { fila[e.id] = e; }); };
+        cursorReq.onsuccess = function () { cursorAntes = cursorReq.result || null; };
+        todosReq.onsuccess = function () {
+          if (desligada) { contas.pulado = 'desligada'; return; }
+          existentes = todosReq.result || [];
+          var porId = {};
+          existentes.forEach(function (r) { porId[r.id] = r; });
+          var dbAntes = montar(existentes);
+          var maiorOrdem = -1;
+          existentes.forEach(function (r) { if (typeof r.ordem === 'number' && r.ordem > maiorOrdem) maiorOrdem = r.ordem; });
+          var cursorMaior = cursorAntes && cursorAntes.servidorEm ? { servidorEm: cursorAntes.servidorEm, nome: cursorAntes.nome || '' } : null;
+          var houvePerdedor = false, chegadosQuePerderam = [];
+          (lista || []).forEach(function (chegou) {
+            // o eco do próprio aparelho vem sem id: só avança o cursor (o par carimbo e nome)
+            if (chegou && chegou.servidorEm) cursorMaior = parMaior(cursorMaior, { servidorEm: chegou.servidorEm, nome: chegou.nome || '' });
+            if (!chegou || !chegou.id) return;
+            var local = porId[chegou.id];
+            var carimbo = { updateTime: chegou.updateTime || null, servidorEm: chegou.servidorEm || null };
+            /* O ECO do que este aparelho mesmo subiu: o registro já está aqui; só
+             * o carimbo é anotado quando falta (a lápide do "Apagar tudo" e a
+             * restauração da própria cópia o perdem, e sem ele o envio exigiria
+             * que o documento não existisse, para sempre). */
+            if (chegou.eco) {
+              /* E a resposta do commit que se perdeu (a aba fechou ou a rede caiu
+               * depois de o servidor aplicar): o servidor tem a versão nova, o disco
+               * tem o carimbo velho e a entrada na fila. O eco é escrita deste mesmo
+               * aparelho: o carimbo mais novo vale sempre, e se o eco é a própria
+               * versão que a fila guarda, a entrada sai, porque já subiu. */
+              if (local && (!(local.nuvem && local.nuvem.servidorEm) || carimboNumero(chegou.servidorEm) > carimboNumero(local.nuvem.servidorEm))) {
+                local.nuvem = Object.assign({}, carimbo, { apagado: !!chegou.apagadoEm });
+                registros.put(local);
+                var pendente = fila[chegou.id];
+                if (pendente && !pendente.quarentena && (pendente.atualizadoEm === chegou.atualizadoEm ||
+                    (!!pendente.apagadoEm === !!chegou.apagadoEm && JSON.stringify(local.dados) === JSON.stringify(chegou.dados || null)))) {
+                  saida.delete(chegou.id);
+                  delete fila[chegou.id];
+                  contas.confirmadosPeloEco = (contas.confirmadosPeloEco || 0) + 1;
+                }
+              }
+              return;
+            }
+            if (local && local.nuvem && local.nuvem.servidorEm && chegou.servidorEm && carimboNumero(local.nuvem.servidorEm) >= carimboNumero(chegou.servidorEm)) {
+              contas.ignorados++;
+              return;
+            }
+            var entrada = fila[chegou.id];
+            /* A RESTAURAÇÃO VENCE (decisão da sessão, 08/11): restaurar uma cópia, mais
+             * velha ou não, é a vontade dela de voltar àquele ponto, no mesmo
+             * tablet ou num novo. A entrada da restauração é uma edição local
+             * pendente como qualquer outra: vence o que chega, e cada versão do
+             * servidor que perde vai para o histórico, recuperável. A marca
+             * `restauro` só muda o envio (exige que o documento não exista quando
+             * o carimbo não é conhecido, para o servidor ser recebido antes). */
+            if (local && entrada && !entrada.quarentena) {
+              // a edição local ainda não enviada vence: só o carimbo é anotado
+              local.nuvem = carimbo;
+              registros.put(local);
+              porId[chegou.id] = local;
+              if (JSON.stringify(local.dados) !== JSON.stringify(chegou.dados || null) || !!local.apagadoEm !== !!chegou.apagadoEm) {
+                // a versão do outro aparelho que não entrou aqui vai para o histórico, não some
+                chegadosQuePerderam.push({ id: chegou.id, tipo: chegou.tipo, atualizadoEm: chegou.atualizadoEm || agora, apagadoEm: chegou.apagadoEm || null,
+                  aparelho: chegou.aparelho || '', esquema: chegou.esquema || ESQUEMA_REGISTRO, ordem: local.ordem,
+                  dados: chegou.apagadoEm ? null : (chegou.dados === undefined ? null : chegou.dados) });
+              }
+              contas.ignorados++;
+              return;
+            }
+            var novo = { id: chegou.id, tipo: chegou.tipo, atualizadoEm: chegou.atualizadoEm || agora, apagadoEm: chegou.apagadoEm || null,
+              aparelho: chegou.aparelho || '', esquema: chegou.esquema || ESQUEMA_REGISTRO,
+              ordem: local && typeof local.ordem === 'number' ? local.ordem : ++maiorOrdem,
+              dados: chegou.apagadoEm ? null : (chegou.dados === undefined ? null : chegou.dados),
+              nuvem: Object.assign({}, carimbo, { apagado: !!chegou.apagadoEm }) };
+            /* Perde a versão local quando: estava viva e muda ou vira lápide; ou era
+             * uma lápide daqui e o outro aparelho a ressuscitou (o apagamento
+             * daqui perdeu, e vai para o histórico também). */
+            if (local && ((!local.apagadoEm && (JSON.stringify(local.dados) !== JSON.stringify(novo.dados) || !!novo.apagadoEm)) ||
+                (local.apagadoEm && !novo.apagadoEm))) {
+              houvePerdedor = true;
+              contas.perdedoresLocais++;
+            }
+            registros.put(novo);
+            porId[chegou.id] = novo;
+            contas.aplicados++;
+            contas.mudou = true;
+          });
+          /* A fusão das reaberturas: numa mesma SÉRIE E DATA (pelos dados da aula,
+           * não pelo prefixo do id: o "seguintes" move a aula para a série filha
+           * mantendo o id da mãe), e só entre aulas REABERTAS (id com +r), fica
+           * viva a de maior r. Nunca apaga aula com conteúdo: nesse caso as duas
+           * ficam e o conflito vai para o histórico. */
+          var porSerieData = {}, conflitos = [];
+          Object.keys(porId).forEach(function (id) {
+            var r = porId[id];
+            if (r.tipo !== 'aula' || r.apagadoEm) return;
+            var p = partesDoIdDeAula(id.slice('aula:'.length));
+            if (!p || !p.r || !r.dados) return; var chave = r.dados.serieId + '@' + r.dados.data;
+            (porSerieData[chave] = porSerieData[chave] || []).push({ reg: r, r: p.r });
+          });
+          Object.keys(porSerieData).forEach(function (chave) {
+            var grupo = porSerieData[chave];
+            if (grupo.length < 2) return;
+            grupo.sort(function (a, b) { return b.r - a.r; });
+            if (grupo.slice(1).some(function (g) { return aulaComConteudo(g.reg.dados); })) {
+              conflitos.push(chave);
+              return;
+            }
+            grupo.slice(1).forEach(function (g) {
+              var lapide = { id: g.reg.id, tipo: g.reg.tipo, atualizadoEm: agora, apagadoEm: agora, aparelho: aparelhoId || g.reg.aparelho,
+                esquema: g.reg.esquema || ESQUEMA_REGISTRO, ordem: g.reg.ordem, dados: null, nuvem: g.reg.nuvem || null };
+              registros.put(lapide);
+              porId[g.reg.id] = lapide;
+              /* No aparelho que só lê a lápide da fusão não entra na fila: ele
+               * nunca envia, a entrada nunca sairia, e "a edição local pendente
+               * vence" ignoraria para sempre as versões novas dessa aula. */
+              if (!soLeitura) enfileirar(saida, { id: lapide.id, tipo: lapide.tipo, atualizadoEm: agora, apagadoEm: agora });
+              contas.fundidas++;
+              contas.mudou = true;
+            });
+          });
+          if (houvePerdedor) {
+            t.objectStore('historico').add({ rotulo: 'Antes de receber do outro aparelho', quando: Date.now(),
+              estado: JSON.parse(JSON.stringify(completar(dbAntes))) });
+          }
+          if (conflitos.length) {
+            contas.conflitos = conflitos.length;
+            // uma entrada no histórico por conflito, e não a cada recebimento enquanto ele durar
+            var novosConflitos = conflitos.filter(function (c) { return !conflitosJaRegistrados[c]; });
+            if (novosConflitos.length) {
+              t.objectStore('historico').add({ rotulo: 'Duas aulas na mesma data da mesma série, reabertas em aparelhos diferentes, as duas com conteúdo',
+                quando: Date.now(), estado: JSON.parse(JSON.stringify(completar(montar(Object.keys(porId).map(function (id) { return porId[id]; }))))) });
+              novosConflitos.forEach(function (c) { conflitosJaRegistrados[c] = agora; });
+              t.objectStore('controle').put(conflitosJaRegistrados, 'conflitos');
+            }
+          }
+          if (chegadosQuePerderam.length) {
+            // o documento como ficaria com a versão do outro aparelho: "Voltar a este ponto" a traz de volta
+            var comOOutro = {};
+            existentes.forEach(function (r) { comOOutro[r.id] = r; });
+            chegadosQuePerderam.forEach(function (r) { comOOutro[r.id] = r; });
+            t.objectStore('historico').add({ rotulo: 'Do outro aparelho, que perdeu para a edição daqui', quando: Date.now(),
+              estado: JSON.parse(JSON.stringify(completar(montar(Object.keys(comOOutro).map(function (id) { return comOOutro[id]; }))))) });
+            contas.chegadosQuePerderam = chegadosQuePerderam.length;
+          }
+          if (contas.mudou) {
+            var dbDepois = completar(montar(Object.keys(porId).map(function (id) { return porId[id]; })));
+            t.objectStore('dados').put(dbDepois, 'principal');
+            t.objectStore('controle').put({ quando: agora, esquema: VERSAO_BANCO, assinatura: assinatura(dbDepois) }, 'retrato');
+          }
+          if (cursorMaior && (!cursorAntes || cursorMaior.servidorEm !== cursorAntes.servidorEm || cursorMaior.nome !== (cursorAntes.nome || ''))) {
+            t.objectStore('controle').put({ servidorEm: cursorMaior.servidorEm, nome: cursorMaior.nome, quando: agora }, 'cursor');
+          }
+          contas.cursor = cursorMaior ? cursorMaior.servidorEm : null;
+        };
+        t.oncomplete = function () {
+          if (contas.mudou) avisarMudanca('dados');
+          ouvintesDeRecebimento.forEach(function (fn) { try { fn(contas); } catch (e) { /* o ouvinte se vira */ } });
+          resolve(contas);
+        };
+        t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
 
   /* Lê os três de uma vez, numa transação só de leitura. */
   function lerDocumento() {
@@ -1348,11 +1851,25 @@
             if (chaveExterna) Object.keys(registros || {}).forEach(function (k) { s.put(registros[k], k); });
             else (registros || []).forEach(function (r) { s.put(r); });
           }
-          escreverDiferenca(t, completar(pacote.dados), { carimbo: carimbo }, function (c) { contas = c; });
+          /* A fila: a restauração só NÃO enfileira no aparelho que só lê (o
+           * celular do D6a, que nunca envia). Num aparelho que escreve, o
+           * tablet novo ou reinstalado é dono do que restaurou e tudo o que
+           * está vivo tem de subir como registro: quem fez a cópia pode nunca
+           * ter conseguido enviar (regras ainda não publicadas, por exemplo). */
+          escreverDiferenca(t, completar(pacote.dados), { carimbo: carimbo, semFila: daNuvem && soLeitura, restauro: daNuvem }, function (c) { contas = c; });
           trocar('notas', pacote.notas, true);
           trocar('midias', pacote.midias, true);
           trocar('anexos', anexos, true);
           t.objectStore('historico').clear();
+          /* O estado anterior fica no histórico, depois da limpeza (os pedidos
+           * respondem na ordem): cada versão que a restauração troca ou apaga
+           * continua recuperável por "Voltar a este ponto" (decisão da sessão). */
+          var anteriorReq = t.objectStore('dados').get('principal');
+          anteriorReq.onsuccess = function () {
+            if (!anteriorReq.result) return;
+            t.objectStore('historico').add({ rotulo: 'Antes de restaurar a cópia', quando: Date.now(),
+              estado: JSON.parse(JSON.stringify(completar(anteriorReq.result))) });
+          };
           if (bib) {
             trocar('biblioteca_uso', (bib.uso || []).filter(function (r) { return r && r.itemId; }), false);
             trocar('biblioteca_etiquetas', (bib.etiquetas || []).filter(function (r) { return r && r.itemId; }), false);
@@ -1431,9 +1948,24 @@
         todos.onsuccess = function () {
           (todos.result || []).forEach(function (r) {
             if (r.apagadoEm) return;
-            registros.put({ id: r.id, tipo: r.tipo, atualizadoEm: agora, apagadoEm: agora, aparelho: aparelhoId || r.aparelho,
-              esquema: r.esquema || ESQUEMA_REGISTRO, ordem: r.ordem, dados: null });
+            var lapide = { id: r.id, tipo: r.tipo, atualizadoEm: agora, apagadoEm: agora, aparelho: aparelhoId || r.aparelho,
+              esquema: r.esquema || ESQUEMA_REGISTRO, ordem: r.ordem, dados: null, nuvem: r.nuvem || null };
+            registros.put(lapide);
+            /* As lápides do "Apagar tudo" ficam SÓ AQUI, fora da fila: a decisão da
+             * fase 0 é que o banco vazio nunca cobre a cópia boa na nuvem, e
+             * mandar as lápides apagaria, pelos registros, o outro aparelho e
+             * qualquer restauração seguinte. Levar o "Apagar tudo" à nuvem é a
+             * fatia 4, com regra própria. */
           });
+          /* A FILA ZERA: nada do que esperava para subir (uma edição feita sem
+           * rede antes do "Apagar tudo", a fila semeada na subida da versão e
+           * segurada por um 403) pode subir depois dele: a entrada apontaria
+           * para o que agora é lápide, e a lápide iria ao outro aparelho. E a
+           * sincronização deste aparelho, envio e recebimento, fica desligada
+           * aqui, na mesma transação, até ela restaurar ou enviar uma cópia; o
+           * recebimento em curso lê esta marca dentro da transação de aplicar. */
+          t.objectStore('saida').clear();
+          t.objectStore('controle').put({ desligada: true, desde: agora }, 'sincronizacao');
           t.objectStore('dados').delete('principal');
           t.objectStore('controle').delete('retrato');
         };
@@ -1441,6 +1973,54 @@
         t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
         t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
       });
+    });
+  }
+
+  /* A marca da sincronização desligada (o "Apagar tudo"), em `controle`. O
+   * nuvem.js a lê e a espelha; quem a desfaz é a restauração ou o envio dela. */
+  function sincronizacaoDesligada() {
+    return ler('controle', 'sincronizacao').then(function (m) { return !!(m && m.desligada); });
+  }
+  function desligarSincronizacao() {
+    return gravar('controle', 'sincronizacao', { desligada: true, desde: new Date().toISOString() });
+  }
+  /* Religar pelo "Enviar cópia agora" (opcoes.tudoDesteAparelho): "o que está
+   * neste aparelho passa a valer", como na restauração. Todo registro vivo
+   * sincronizável entra na fila (com `restauro`, para o servidor ser recebido
+   * antes quando o carimbo não é conhecido) e a lápide do que não está vivo
+   * também: o cadastro feito depois do "Apagar tudo" sobe, e o que ela apagou
+   * sai do outro aparelho. Só quando a marca estava lá; a restauração já
+   * enfileirou o dela e religa sem isto. Passa pela trava como a restauração. */
+  function religarSincronizacao(opcoes) {
+    opcoes = opcoes || {};
+    return sincronizacaoDesligada().then(function (estava) {
+      if (!estava) return; // nada a religar: nenhuma transação de escrita (o celular que só lê não grava à toa)
+      return abrir().then(function (b) { return religarNoBanco(b, opcoes); });
+    });
+  }
+  function religarNoBanco(b, opcoes) {
+    return new Promise(function (resolve, reject) {
+        var t = transacao(b, ['controle', 'registros', 'saida'], 'readwrite', true);
+        var controle = t.objectStore('controle');
+        var marcaReq = controle.get('sincronizacao');
+        marcaReq.onsuccess = function () {
+          var marca = marcaReq.result;
+          controle.delete('sincronizacao');
+          if (opcoes.tudoDesteAparelho && marca && marca.desligada) {
+            var saida = t.objectStore('saida');
+            var todos = t.objectStore('registros').getAll();
+            todos.onsuccess = function () {
+              (todos.result || []).forEach(function (r) {
+                if (!sincronizavel(r.id, r.tipo)) return;
+                if (r.apagadoEm) saida.put({ id: r.id, tipo: r.tipo, atualizadoEm: r.atualizadoEm, apagadoEm: r.apagadoEm });
+                else saida.put({ id: r.id, tipo: r.tipo, atualizadoEm: r.atualizadoEm, apagadoEm: null, restauro: true });
+              });
+            };
+          }
+        };
+        t.oncomplete = function () { resolve(); };
+        t.onerror = function () { reject(t.error); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
     });
   }
 
@@ -1491,6 +2071,13 @@
     /* Registros (N1): o que a sincronização e as provas leem. */
     AJUSTES_DO_APARELHO: AJUSTES_DO_APARELHO.slice(),
     lerRegistros: function () { return todosOsValores('registros'); },
+    registrosDaFila: registrosDaFila, confirmarEnvio: confirmarEnvio, tamanhoDaFila: tamanhoDaFila,
+    estadoDaFila: estadoDaFila, marcarTentativa: marcarTentativa, soltarQuarentena: soltarQuarentena,
+    aplicarRecebidos: aplicarRecebidos, lerCursor: lerCursor, aoReceber: aoReceber, partesDoIdDeAula: partesDoIdDeAula,
+    carimboNumero: carimboNumero,
+    sincronizacaoDesligada: sincronizacaoDesligada, desligarSincronizacao: desligarSincronizacao, religarSincronizacao: religarSincronizacao,
+    lerFila: function () { return todosOsValores('saida'); },
+    sincronizavel: sincronizavel,
     montarRegistros: montar,
     aparelho: function () { return aparelhoId; },
     ultimaGravacao: function () { return ultimaGravacao; }

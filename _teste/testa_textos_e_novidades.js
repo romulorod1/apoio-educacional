@@ -178,8 +178,9 @@ conf('ALUNOS_INICIAIS continua presente', appJs.includes('var ALUNOS_INICIAIS = 
 conf('flag cargaInicial é atribuída no arranque de novo banco', appJs.includes('novo.ajustes.cargaInicial = true;'), true);
 const storeJs = fs.readFileSync(path.join(__dirname, '..', 'store.js'), 'utf8');
 // subiu para 3 no C2a (depósito biblioteca_listas), para 4 no C15.1 (os
-// livros) e para 5 na N1 (o banco por registro); o número nunca desce
-conf('VERSAO_BANCO é 5 em store.js', (storeJs.match(/VERSAO_BANCO\s*=\s*5;/) || []).length > 0, true);
+// livros), para 5 na N1 (o banco por registro) e para 6 na fatia 2 dela (a
+// fila de saida); o número nunca desce
+conf('VERSAO_BANCO é 6 em store.js', (storeJs.match(/VERSAO_BANCO\s*=\s*6;/) || []).length > 0, true);
 
 // ============================================================================
 console.log('\n============================================================');

@@ -27,13 +27,14 @@ const PAGINA_NUA = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8
 
 /* Âncoras do store.js novo. Cada uma tem de aparecer UMA vez. */
 const ANCORAS = {
-  versao5: 'var VERSAO_BANCO = 5;',
+  versao6: 'var VERSAO_BANCO = 6;',
   criaRegistros: "s = b.createObjectStore('registros', { keyPath: 'id' });",
   criaControle: "if (!b.objectStoreNames.contains('controle')) b.createObjectStore('controle');",
-  migracao: 'migrarParaRegistros(e.target.transaction, e.oldVersion);',
+  migracao: 'migrarParaRegistros(e.target.transaction, ',
   lacoDoVetor: '(Array.isArray(db[vetor]) ? db[vetor] : []).forEach(function (item) {',
-  igual: 'if (antes && !antes.apagadoEm && antes.ordem === ordem && JSON.stringify(antes.dados) === texto) { contas.iguais++; return; }',
+  igual: 'if (antes && !antes.apagadoEm && antes.ordem === ordem && JSON.stringify(antes.dados) === texto) {',
   apagadoPorFora: 'return apagarDocumento().then(function () { return null; });',
+  restauroSemFila: 'semFila: daNuvem && soLeitura, restauro: daNuvem }',
   principalFica: "if (!opcoes.semPrincipal) t.objectStore('dados').put(db, 'principal');",
   respondeNoCommit: "t.oncomplete = function () { confirmarGravacao(contas); avisarMudanca('dados'); resolve(); };"
 };
@@ -42,10 +43,13 @@ const VENENOS = {
   /* a migração (e toda gravação) deixa o último item de cada vetor de fora */
   '--envenenado-perde-registro': ['lacoDoVetor', '(Array.isArray(db[vetor]) ? db[vetor] : []).slice(0, -1).forEach(function (item) {'],
   /* a comparação diz sempre "mudou": tudo é regravado a cada salvar */
-  '--envenenado-regrava-tudo': ['igual', 'if (false) { contas.iguais++; return; }'],
+  '--envenenado-regrava-tudo': ['igual', 'if (false) {'],
   /* a regra antiga do carregar: sem principal, os registros vivos montam o
    * documento de volta (o "Apagar tudo" do código da versão 4 é desfeito) */
-  '--envenenado-registros-ressuscitam': ['apagadoPorFora', 'return completar(montar(lido.registros));']
+  '--envenenado-registros-ressuscitam': ['apagadoPorFora', 'return completar(montar(lido.registros));'],
+  /* a restauração vinda da nuvem não enfileira em aparelho nenhum (nem no
+   * tablet dono, que então nunca subiria o que restaurou) */
+  '--envenenado-restauro-sem-fila': ['restauroSemFila', 'semFila: daNuvem, restauro: daNuvem }']
 };
 
 function conferirAncoras(conf) {
