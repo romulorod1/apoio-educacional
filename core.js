@@ -345,14 +345,25 @@
   function materializarSerieNoMes(db, serie, mesIso) {
     var criadas = 0;
     var apagadas = serie.exclusoes || [];
+    /* O id da aula de repetição é DETERMINÍSTICO, `serieId@data` (N1): dois
+     * aparelhos que materializam o mesmo mês da mesma série criam o mesmo
+     * id, e a sincronização funde em vez de duplicar. Aula que já existe fica
+     * com o id que tem. Se o id já estiver em uso (uma série reaberta sobre
+     * datas que uma série filha tomou, no "desta em diante"), entra um
+     * sufixo, também determinístico, para nunca haver dois ids iguais. */
+    var ids = {};
+    (db.aulas || []).forEach(function (a) { ids[a.id] = true; });
     datasDaSerieNoMes(serie, mesIso).forEach(function (iso) {
       if (apagadas.indexOf(iso) >= 0) return;
       var jaTem = (db.aulas || []).some(function (a) {
         return a.serieId === serie.id && a.data === iso;
       });
       if (jaTem) return;
+      var id = serie.id + '@' + iso, n = 2;
+      while (ids[id]) id = serie.id + '@' + iso + '+' + (n++);
+      ids[id] = true;
       db.aulas.push({
-        id: uid(),
+        id: id,
         alunoId: serie.alunoId,
         serieId: serie.id,
         destacada: false,

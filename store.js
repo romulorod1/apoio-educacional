@@ -32,8 +32,24 @@
  * OS DOIS SÃO SÓ DESTE TABLET: ficam FORA da cópia de segurança (o
  * exportarTudo não os lê) e FORA da nuvem. Livro é material de terceiro, pesa
  * dezenas de MB, e volta importando o pacote do Drive; a cópia que ela manda
- * para o Drive continua do tamanho de antes. A fase 1 da nuvem (N1, agora
- * versão 5 do banco) tem de respeitar a lista SO_DESTE_TABLET, lá embaixo.
+ * para o Drive continua do tamanho de antes. A fase 1 da nuvem (N1, versão 5
+ * do banco) respeita a lista SO_DESTE_TABLET, lá embaixo.
+ *
+ * E os da fase 1 da nuvem (versão 5 do banco, N1 fatia 1):
+ *   registros : UM REGISTRO POR ITEM do documento principal (aluno, série,
+ *               aula, resumo, pagamento, chave de ajuste), com atualizadoEm,
+ *               apagadoEm (lápide), aparelho, esquema e ordem. É o formato
+ *               que sincroniza: a fatia 2 põe na fila o que mudou, a fatia 3
+ *               aplica o que chega, registro a registro.
+ *   controle  : o id deste aparelho e o `retrato` (quando e a assinatura do
+ *               `principal` que os registros espelham).
+ * O documento `dados/principal` CONTINUA sendo gravado inteiro, na mesma
+ * transação, em toda gravação: é o retrato de segurança que o código da
+ * versão anterior lê, e é o que faz o rollback (republicar o código antigo
+ * com VERSAO_BANCO = 5) não perder nada. O salvar grava nele e grava em
+ * `registros` só a diferença; o carregar monta o db dos registros, e se o
+ * `principal` tiver sido gravado por fora (código antigo, prova que semeia o
+ * banco), ele vence e os registros são refeitos a partir dele.
  *
  * Daqui nada sai sozinho. A cópia na nuvem (nuvem.js, fase 0) sobe o mesmo
  * .zip da cópia de segurança, cifrado no aparelho, e só depois de ela entrar
@@ -56,10 +72,16 @@
    * VERSAO_BANCO = 3.
    *
    * Versão 4 (C15.1, livros): de novo só CRIA o que falta, os depósitos livros
-   * e livros_posicoes. A fase 1 da nuvem (N1), que estava marcada para a
-   * versão 4, passa a ser a 5. Desfazer este release é republicar o código
-   * antigo COM VERSAO_BANCO = 4. */
-  var VERSAO_BANCO = 4;
+   * e livros_posicoes. Desfazer este release é republicar o código antigo COM
+   * VERSAO_BANCO = 4.
+   *
+   * Versão 5 (N1, fase 1 da nuvem, fatia 1): cria `registros` e `controle` e,
+   * NA MESMA transação de versão, lê `dados/principal` e grava um registro por
+   * item (migrarParaRegistros). Se qualquer passo falhar, a transação de
+   * versão aborta inteira e o banco fica na 4, intacto. O `principal` não é
+   * apagado nem deixa de ser gravado: desfazer este release é republicar o
+   * código antigo COM VERSAO_BANCO = 5, e ele lê o `principal` atual. */
+  var VERSAO_BANCO = 5;
   /* Depósitos que nunca saem do tablet: nem na cópia de segurança nem na
    * nuvem. Quem for copiar ou sincronizar depósitos lê esta lista. */
   var SO_DESTE_TABLET = ['livros', 'livros_posicoes'];
@@ -117,13 +139,37 @@
     if (!b.objectStoreNames.contains('livros_posicoes')) {
       b.createObjectStore('livros_posicoes', { keyPath: 'id' });
     }
+    if (!b.objectStoreNames.contains('registros')) {
+      s = b.createObjectStore('registros', { keyPath: 'id' });
+      s.createIndex('tipo', 'tipo');
+      s.createIndex('atualizadoEm', 'atualizadoEm');
+    }
+    if (!b.objectStoreNames.contains('controle')) b.createObjectStore('controle');
+  }
+
+  /* A migração 4 para 5, dentro da transação de versão `t`: o documento
+   * inteiro vira um registro por item, todos com atualizadoEm igual ao
+   * instante da migração e `ordem` igual à posição no vetor. O `principal`
+   * fica como está (ele mesmo é o retrato). Banco novo (de 0) não tem o que
+   * migrar; banco já na 5 não passa por aqui. */
+  function migrarParaRegistros(t, de) {
+    if (!de || de >= 5) return;
+    var agora = new Date().toISOString();
+    var pedido = t.objectStore('dados').get('principal');
+    pedido.onsuccess = function () {
+      if (!pedido.result) return;
+      escreverDiferenca(t, pedido.result, { carimbo: agora, semPrincipal: true });
+    };
   }
 
   function abrir() {
     if (bancoAberto) return Promise.resolve(bancoAberto);
     return new Promise(function (resolve, reject) {
       var req = indexedDB.open(NOME_BANCO, VERSAO_BANCO);
-      req.onupgradeneeded = function (e) { criarDepositos(e.target.result); };
+      req.onupgradeneeded = function (e) {
+        criarDepositos(e.target.result);
+        migrarParaRegistros(e.target.transaction, e.oldVersion);
+      };
       /* Outra janela do aplicativo, ainda na versão antiga, segura o banco na
        * versão 1: a subida espera ela fechar. Sem aviso, a tela ficaria em
        * branco sem motivo aparente; quem mostra o aviso é o app.js. */
@@ -276,15 +322,242 @@
     return d;
   }
 
-  function carregar() {
-    return ler('dados', 'principal').then(function (d) {
-      if (!d) return null;
-      return completar(d);
+  // ---------- registros: um por item (versão 5, N1 fatia 1) ----------
+
+  var ESQUEMA_REGISTRO = 1;
+  /* Chaves de `ajustes` que são DESTE APARELHO, e não dela: ficam no banco e
+   * na cópia como sempre, mas a sincronização (fatia 2) não as põe na fila.
+   * Lista explícita, por decisão (sincronizacao.md, 5.4): o que está fora
+   * dela sincroniza. */
+  var AJUSTES_DO_APARELHO = ['versaoVista', 'painelValoresAberto', 'valoresOcultos', 'ultimaCopia', 'ibge'];
+  /* vetor do documento -> tipo do registro, e a volta */
+  var VETORES = { alunos: 'aluno', series: 'serie', aulas: 'aula', resumos: 'resumo', pagamentos: 'pagamento' };
+  var VETOR_DO_TIPO = {};
+  Object.keys(VETORES).forEach(function (v) { VETOR_DO_TIPO[VETORES[v]] = v; });
+
+  var aparelhoId = null;      // o id deste aparelho, lido ou criado na primeira gravação
+  var ultimaGravacao = null;  // { gravados, lapides, iguais } da última escrita de diferença
+
+  function novoIdAparelho() {
+    var r = new Uint8Array(6), s = '';
+    (typeof crypto !== 'undefined' && crypto.getRandomValues) ? crypto.getRandomValues(r)
+      : r.forEach(function (_, i) { r[i] = Math.floor(Math.random() * 256); });
+    for (var i = 0; i < r.length; i++) s += (r[i] < 16 ? '0' : '') + r[i].toString(16);
+    return 'ap' + s;
+  }
+
+  /* A chave do registro leva o tipo na frente, para tipos nunca colidirem e
+   * para já servir de nome de documento na nuvem. Resumo não tem id: a chave
+   * é aluno e mês. Uma chave que se repetir dentro do mesmo documento (dois
+   * itens sem id, dois resumos do mesmo mês) ganha um sufixo, determinístico
+   * pela ordem do vetor: nenhum item é perdido por colisão. */
+  function chaveDoItem(tipo, item, usadas) {
+    var base = tipo === 'resumo'
+      ? 'resumo:' + (item && item.alunoId != null ? item.alunoId : '') + ':' + (item && item.mes != null ? item.mes : '')
+      : tipo + ':' + (item && item.id != null ? item.id : '');
+    var chave = base, n = 2;
+    while (usadas[chave]) chave = base + '#' + (n++);
+    usadas[chave] = true;
+    return chave;
+  }
+
+  /* O documento inteiro desmontado: { itens: { chave: { tipo, dados } }, ordem: [chave...] }.
+   * Vetores conhecidos, depois cada chave de `ajustes`, depois o que sobrar
+   * na raiz (`versao`), para nenhum campo do documento ficar de fora. */
+  function desmontar(db) {
+    var itens = {}, ordem = [], usadas = {};
+    Object.keys(VETORES).forEach(function (vetor) {
+      var tipo = VETORES[vetor];
+      (Array.isArray(db[vetor]) ? db[vetor] : []).forEach(function (item) {
+        var chave = chaveDoItem(tipo, item, usadas);
+        itens[chave] = { tipo: tipo, dados: item };
+        ordem.push(chave);
+      });
+    });
+    Object.keys(db.ajustes || {}).forEach(function (k) {
+      if (db.ajustes[k] === undefined) return;
+      itens['ajuste:' + k] = { tipo: 'ajuste', dados: db.ajustes[k] };
+      ordem.push('ajuste:' + k);
+    });
+    Object.keys(db).forEach(function (k) {
+      if (VETORES[k] || k === 'ajustes' || db[k] === undefined) return;
+      itens['raiz:' + k] = { tipo: 'raiz', dados: db[k] };
+      ordem.push('raiz:' + k);
+    });
+    return { itens: itens, ordem: ordem };
+  }
+
+  /* A volta: os registros vivos, na ordem gravada, montam o documento no
+   * formato de sempre. Lápide fica de fora. */
+  function montar(registros) {
+    var db = { alunos: [], series: [], aulas: [], resumos: [], ajustes: {}, pagamentos: [] };
+    var vivos = (registros || []).filter(function (r) { return r && !r.apagadoEm; });
+    vivos.sort(function (a, b) {
+      return ((a.ordem || 0) - (b.ordem || 0)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    });
+    vivos.forEach(function (r) {
+      var vetor = VETOR_DO_TIPO[r.tipo];
+      if (vetor) db[vetor].push(r.dados);
+      else if (r.tipo === 'ajuste') db.ajustes[r.id.slice('ajuste:'.length)] = r.dados;
+      else if (r.tipo === 'raiz') db[r.id.slice('raiz:'.length)] = r.dados;
+    });
+    return db;
+  }
+
+  /* A assinatura do `principal`: tamanho e FNV-1a do JSON. Serve para saber,
+   * na abertura, se os registros espelham o `principal` que está no disco ou
+   * se alguém (o código antigo, uma prova) gravou o `principal` por fora. */
+  function hashTexto(s) {
+    var h = 0x811c9dc5;
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return h >>> 0;
+  }
+  function assinatura(db) {
+    var s = JSON.stringify(db);
+    return { tamanho: s.length, hash: hashTexto(s) };
+  }
+  function mesmaAssinatura(a, b) {
+    return !!a && !!b && a.tamanho === b.tamanho && a.hash === b.hash;
+  }
+
+  /* Compara o documento com os registros que estão no disco e grava SÓ A
+   * DIFERENÇA no depósito `deposito`:
+   *   - item que mudou ou nasceu: registro vivo com atualizadoEm = agora;
+   *   - item que sumiu: lápide (apagadoEm = agora, dados null);
+   *   - item igual: não é tocado.
+   * A comparação é pelo texto JSON de cada item. `ordem` nasce na primeira
+   * gravação do item (depois do maior que existe) e nunca muda: apagar um
+   * item não regrava os outros. Devolve as contas. */
+  function aplicarDiferenca(deposito, existentes, db, agora, aparelho) {
+    var porId = {}, maiorOrdem = -1;
+    existentes.forEach(function (r) {
+      porId[r.id] = r;
+      if (typeof r.ordem === 'number' && r.ordem > maiorOrdem) maiorOrdem = r.ordem;
+    });
+    var novo = desmontar(db);
+    var contas = { gravados: 0, lapides: 0, iguais: 0 };
+    novo.ordem.forEach(function (chave) {
+      var item = novo.itens[chave];
+      var texto = JSON.stringify(item.dados);
+      if (texto === undefined) return;
+      var antes = porId[chave];
+      if (antes && !antes.apagadoEm && JSON.stringify(antes.dados) === texto) { contas.iguais++; return; }
+      var ordem = antes && typeof antes.ordem === 'number' ? antes.ordem : ++maiorOrdem;
+      deposito.put({ id: chave, tipo: item.tipo, atualizadoEm: agora, apagadoEm: null, aparelho: aparelho,
+        esquema: ESQUEMA_REGISTRO, ordem: ordem, dados: item.dados });
+      contas.gravados++;
+    });
+    existentes.forEach(function (r) {
+      if (r.apagadoEm || novo.itens[r.id]) return;
+      deposito.put({ id: r.id, tipo: r.tipo, atualizadoEm: agora, apagadoEm: agora, aparelho: aparelho,
+        esquema: r.esquema || ESQUEMA_REGISTRO, ordem: r.ordem, dados: null });
+      contas.lapides++;
+    });
+    return contas;
+  }
+
+  /* TODA gravação do documento passa por aqui, dentro da transação `t` (que
+   * tem 'dados', 'registros' e 'controle'): grava o `principal` inteiro (o
+   * retrato de segurança), a diferença em `registros` e o `retrato` em
+   * `controle`, tudo na mesma transação, que confirma ou aborta inteira.
+   * Encadeado por eventos, sem Promise no meio: um await soltaria a
+   * transação. `opcoes.carimbo` é o atualizadoEm a usar (a restauração de uma
+   * cópia usa o `quando` dela); `opcoes.semPrincipal` é da migração, em que o
+   * `principal` já está no disco. `depois` recebe as contas. */
+  function escreverDiferenca(t, db, opcoes, depois) {
+    opcoes = opcoes || {};
+    var agora = opcoes.carimbo || new Date().toISOString();
+    var controle = t.objectStore('controle');
+    var registros = t.objectStore('registros');
+    var pedidoAparelho = controle.get('aparelho');
+    pedidoAparelho.onsuccess = function () {
+      var ap = pedidoAparelho.result;
+      if (!ap) { ap = novoIdAparelho(); controle.put(ap, 'aparelho'); }
+      var todos = registros.getAll();
+      todos.onsuccess = function () {
+        var contas;
+        /* O `principal` é o ÚLTIMO pedido: o tablet sem espaço (e a prova que
+         * o simula abortando a transação nesse put) não deixa pedido nenhum
+         * para fazer numa transação já morta. Se mesmo assim um pedido cair em
+         * transação encerrada, a transação já abortou e o `onabort` de quem
+         * chamou responde: nada a fazer aqui, e nada a espalhar como erro. */
+        try {
+          contas = aplicarDiferenca(registros, todos.result || [], db, agora, ap);
+          controle.put({ quando: agora, esquema: VERSAO_BANCO, assinatura: assinatura(db) }, 'retrato');
+          if (!opcoes.semPrincipal) t.objectStore('dados').put(db, 'principal');
+        } catch (e) {
+          if (!e || (e.name !== 'TransactionInactiveError' && e.name !== 'InvalidStateError')) throw e;
+          return;
+        }
+        contas.aparelho = ap;
+        if (depois) depois(contas);
+      };
+    };
+  }
+
+  var DEPOSITOS_DO_DOCUMENTO = ['dados', 'registros', 'controle'];
+
+  /* Lê os três de uma vez, numa transação só de leitura. */
+  function lerDocumento() {
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, DEPOSITOS_DO_DOCUMENTO, 'readonly');
+        var lido = { principal: undefined, retrato: undefined, registros: [], aparelho: null };
+        t.objectStore('dados').get('principal').onsuccess = function (e) { lido.principal = e.target.result; };
+        t.objectStore('controle').get('retrato').onsuccess = function (e) { lido.retrato = e.target.result; };
+        t.objectStore('controle').get('aparelho').onsuccess = function (e) { lido.aparelho = e.target.result || null; };
+        t.objectStore('registros').getAll().onsuccess = function (e) { lido.registros = e.target.result || []; };
+        t.oncomplete = function () { resolve(lido); };
+        t.onerror = function () { reject(t.error || new Error('A leitura falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A leitura foi interrompida.')); };
+      });
     });
   }
 
+  /* O documento, montado dos registros. Quando o `principal` do disco não é o
+   * que os registros espelham (gravado por fora: código da versão anterior
+   * depois de um rollback, ou uma prova que semeia o banco), o `principal`
+   * vence: os registros são refeitos a partir dele, e ele é devolvido. No
+   * aparelho que só lê, essa reconciliação não grava nada. */
+  function carregar() {
+    return lerDocumento().then(function (lido) {
+      if (lido.aparelho) aparelhoId = lido.aparelho;
+      if (!lido.principal) {
+        var vivos = lido.registros.filter(function (r) { return !r.apagadoEm; });
+        return vivos.length ? completar(montar(lido.registros)) : null;
+      }
+      if (lido.retrato && mesmaAssinatura(lido.retrato.assinatura, assinatura(lido.principal))) {
+        return completar(montar(lido.registros));
+      }
+      if (soLeitura) return completar(lido.principal);
+      return gravarDocumento(lido.principal, { semPrincipal: true }).then(function () {
+        return completar(lido.principal);
+      });
+    });
+  }
+
+  function gravarDocumento(db, opcoes) {
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, DEPOSITOS_DO_DOCUMENTO, 'readwrite');
+        var contas = null;
+        escreverDiferenca(t, db, opcoes, function (c) { contas = c; });
+        t.oncomplete = function () { confirmarGravacao(contas); avisarMudanca('dados'); resolve(); };
+        t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
+  function confirmarGravacao(contas) {
+    if (!contas) return;
+    ultimaGravacao = contas;
+    if (contas.aparelho) aparelhoId = contas.aparelho;
+  }
+
+  /* O salvar dela: o documento inteiro em `principal` e só a diferença em
+   * `registros`, numa transação só, respondendo quando ela confirma (B3). */
   function salvar(db) {
-    return gravar('dados', 'principal', db);
+    return gravarDocumento(db);
   }
 
   /* Excluir um aluno é uma única transação: o documento, as folhas, os arquivos
@@ -315,8 +588,9 @@
     }
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = transacao(b, ['dados', 'notas', 'midias', 'anexos',
-          'biblioteca_uso', 'historico', 'livros_posicoes'], 'readwrite');
+        var t = transacao(b, DEPOSITOS_DO_DOCUMENTO.concat(['notas', 'midias', 'anexos',
+          'biblioteca_uso', 'historico', 'livros_posicoes']), 'readwrite');
+        var contas = null;
         var notas = t.objectStore('notas');
         var midiasExcluidas = {}, midiasMantidas = {};
         var cursorNotas = notas.openCursor();
@@ -349,9 +623,9 @@
             uso.continue();
           };
           t.objectStore('historico').clear();
-          t.objectStore('dados').put(novo, 'principal');
+          escreverDiferenca(t, novo, null, function (c) { contas = c; });
         };
-        t.oncomplete = function () { avisarMudanca('dados'); resolve(novo); };
+        t.oncomplete = function () { confirmarGravacao(contas); avisarMudanca('dados'); resolve(novo); };
         t.onabort = function () { reject(t.error || new Error('Exclusão interrompida.')); };
       });
     });
@@ -987,13 +1261,20 @@
       });
     } catch (e) { return Promise.reject(e && e.invalida ? e : invalida()); }
 
+    /* Os registros da restauração levam o `quando` da cópia, e não o de agora:
+     * restaurar é voltar a um retrato, não editar tudo (a fatia 3 da nuvem,
+     * que aplica "última escrita vence", não pode ver uma restauração como a
+     * edição mais nova de cada item). Sem `quando` válido, vale agora. */
+    var carimbo = (opcoes && opcoes.carimbo) || pacote.quando;
+    if (typeof carimbo !== 'string' || isNaN(new Date(carimbo).getTime())) carimbo = null;
+
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var nomes = ['dados', 'notas', 'midias', 'anexos', 'historico'];
+        var nomes = DEPOSITOS_DO_DOCUMENTO.concat(['notas', 'midias', 'anexos', 'historico']);
         if (bib) nomes.push('biblioteca_uso', 'biblioteca_etiquetas');
         if (bib && Array.isArray(bib.listas)) nomes.push('biblioteca_listas');
         var t = transacao(b, nomes, 'readwrite', daNuvem);
-        var erro = null;
+        var erro = null, contas = null;
         try {
           function trocar(nome, registros, chaveExterna) {
             var s = t.objectStore(nome);
@@ -1001,7 +1282,7 @@
             if (chaveExterna) Object.keys(registros || {}).forEach(function (k) { s.put(registros[k], k); });
             else (registros || []).forEach(function (r) { s.put(r); });
           }
-          trocar('dados', { principal: completar(pacote.dados) }, true);
+          escreverDiferenca(t, completar(pacote.dados), { carimbo: carimbo }, function (c) { contas = c; });
           trocar('notas', pacote.notas, true);
           trocar('midias', pacote.midias, true);
           trocar('anexos', anexos, true);
@@ -1014,7 +1295,7 @@
             }), false);
           }
         } catch (e) { erro = e; t.abort(); }
-        t.oncomplete = function () { avisarMudanca('dados'); resolve(completar(pacote.dados)); };
+        t.oncomplete = function () { confirmarGravacao(contas); avisarMudanca('dados'); resolve(completar(pacote.dados)); };
         t.onabort = function () { reject(erro || t.error || new Error('A restauração foi interrompida.')); };
         t.onerror = function () { /* onabort informa o motivo e resolve a promessa */ };
       });
@@ -1066,14 +1347,40 @@
     if (Object.keys(entradas).some(function (n) {
       return /^anexos\/[0-9]+\.bin$/.test(n) && !usados[n];
     })) throw invalida();
-    return importarTudo({ formato: 'apoio-educacional', dados: dados, notas: notas,
+    return importarTudo({ formato: 'apoio-educacional', quando: manifest.quando, dados: dados, notas: notas,
       midias: midias, anexos: anexos,
       biblioteca: { uso: uso, etiquetas: etiquetas, listas: listas } }, opcoes);
   }
 
+  /* O documento sai: `principal` e `retrato` apagados, e cada registro vivo
+   * vira lápide (não é esvaziado: a lápide é o que, na fatia 3, diz ao outro
+   * aparelho que o item saiu). O id do aparelho fica. */
+  function apagarDocumento() {
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, DEPOSITOS_DO_DOCUMENTO, 'readwrite');
+        var agora = new Date().toISOString();
+        var registros = t.objectStore('registros');
+        var todos = registros.getAll();
+        todos.onsuccess = function () {
+          (todos.result || []).forEach(function (r) {
+            if (r.apagadoEm) return;
+            registros.put({ id: r.id, tipo: r.tipo, atualizadoEm: agora, apagadoEm: agora, aparelho: aparelhoId || r.aparelho,
+              esquema: r.esquema || ESQUEMA_REGISTRO, ordem: r.ordem, dados: null });
+          });
+          t.objectStore('dados').delete('principal');
+          t.objectStore('controle').delete('retrato');
+        };
+        t.oncomplete = function () { avisarMudanca('dados'); resolve(); };
+        t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
+
   function apagarTudo() {
     return Promise.all([
-      esvaziar('dados'),
+      apagarDocumento(),
       esvaziar('notas'),
       esvaziar('midias'),
       esvaziar('anexos'),
@@ -1114,6 +1421,12 @@
     lerPosicaoLivro: lerPosicaoLivro, gravarPosicaoLivro: gravarPosicaoLivro,
     aoMudar: aoMudar, somenteLeitura: somenteLeitura,
     estaSoLendo: function () { return soLeitura; },
-    SO_DESTE_TABLET: SO_DESTE_TABLET.slice()
+    SO_DESTE_TABLET: SO_DESTE_TABLET.slice(),
+    /* Registros (N1): o que a sincronização e as provas leem. */
+    AJUSTES_DO_APARELHO: AJUSTES_DO_APARELHO.slice(),
+    lerRegistros: function () { return todosOsValores('registros'); },
+    montarRegistros: montar,
+    aparelho: function () { return aparelhoId; },
+    ultimaGravacao: function () { return ultimaGravacao; }
   };
 })(typeof self !== 'undefined' ? self : this);
