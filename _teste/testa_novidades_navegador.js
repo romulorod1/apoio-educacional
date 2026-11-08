@@ -23,6 +23,7 @@ const ENTRADA = (() => {
   return i < 0 ? '' : APP_TEXTO.slice(i, APP_TEXTO.indexOf('\n    }', i));
 })();
 const ENTRADA_TEM_SLIDES = /slides:\s*\[/.test(ENTRADA);
+const SILENCIOSA = !ENTRADA;
 /* Um pedaço do primeiro item, para conferir que a janela mostra a entrada
  * da versão atual: as primeiras palavras do primeiro texto entre aspas. */
 const TRECHO_DA_ENTRADA = ((ENTRADA.match(/'([^'\n]{20,})'/) || [])[1] || '').slice(0, 30);
@@ -92,7 +93,12 @@ async function conteudoModal(pag) {
 
     const bancoNovo = await obterBanco(pag);
     conf('perfil novo gravou versaoVista no banco', !!(bancoNovo && bancoNovo.ajustes && bancoNovo.ajustes.versaoVista), true);
-    conf('li a versão e a entrada dela no app.js', !!VERSAO && !!ENTRADA && TRECHO_DA_ENTRADA.length >= 20, true);
+    /* Lançamento silencioso: a versão pode não ter entrada em NOVIDADES (a
+     * 1.42.12 só troca o ícone do endereço novo, e o item falaria do endereço
+     * novo no tablet dela pelo antigo, o que o dono vetou). Aí a prova confere o
+     * contrário: a janela NÃO abre e a versão vista anda sozinha. */
+    if (SILENCIOSA) conf('li a versão no app.js; ela não tem entrada em NOVIDADES (lançamento silencioso)', !!VERSAO && !ENTRADA, true);
+    else conf('li a versão e a entrada dela no app.js', !!VERSAO && !!ENTRADA && TRECHO_DA_ENTRADA.length >= 20, true);
     conf('versaoVista do perfil novo é a versão atual', bancoNovo.ajustes.versaoVista, VERSAO);
 
     secao('2. Perfil atualizando de versão anterior (versaoVista = 1.27.0)');
@@ -110,6 +116,11 @@ async function conteudoModal(pag) {
     await pausa(1500);
 
     const abertoAtualizacao = await modalAberto(pag);
+    if (SILENCIOSA) {
+      conf('perfil atualizando para ' + VERSAO + ' (silenciosa) NÃO abre a janela de novidades', abertoAtualizacao, false);
+      const bancoSil = await obterBanco(pag);
+      conf('na silenciosa, a versaoVista anda sozinha para ' + VERSAO, bancoSil.ajustes.versaoVista, VERSAO);
+    } else {
     conf('perfil atualizando para ' + VERSAO + ' abre a janela de novidades', abertoAtualizacao, true);
 
     const textoModal = await conteudoModal(pag);
@@ -136,6 +147,7 @@ async function conteudoModal(pag) {
 
     const bancoDepois = await obterBanco(pag);
     conf('versaoVista foi atualizada para ' + VERSAO + ' no banco', bancoDepois.ajustes.versaoVista, VERSAO);
+    }
 
     secao('3. Perfil já na versão atual (versaoVista = ' + VERSAO + ')');
     await pag.reload({ waitUntil: 'networkidle0' });

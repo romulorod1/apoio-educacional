@@ -79,12 +79,6 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.12',
-      itens: [
-        'O aplicativo do endereço novo ganhou um ícone próprio, dourado com o NW e um livro aberto, para não confundir com o antigo na tela inicial.'
-      ]
-    },
-    {
       versao: '1.42.11',
       itens: [
         'Em Ajustes, no cartão da nuvem, "Aparelhos na nuvem" mostra os aparelhos que usam a sua conta, com a versão e se está tudo enviado. Um aparelho antigo pode ser esquecido ali.',
