@@ -106,8 +106,11 @@
  * traz o cache primeiro e a versão que só roda depois do toque (sw.js, app.js e
  * index.html), com a lista igual; pula o v76, que é o nome do B12 no PR dele.
  * Aqui o nome novo é obrigatório pelo motivo original: com o v75 repetido, o
- * tablet na main instalaria a D2 dentro do cache de onde está abrindo. */
-var CACHE = 'apoio-educacional-v77';
+ * tablet na main instalaria a D2 dentro do cache de onde está abrindo. O v78
+ * (D2b com B4) serve da versão da janela tudo o que está no cache dela, troca
+ * só com o cache novo completo, e traz o deploy no Cloudflare com a faixa de
+ * endereço desligada (sw.js, app.js, styles.css e index.html). */
+var CACHE = 'apoio-educacional-v78';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
