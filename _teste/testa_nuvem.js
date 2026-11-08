@@ -103,7 +103,8 @@ conf('as regras só deixam a dona escrever', REGRAS.indexOf('allow write: if don
 
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const GUARDA_VAZIO = 'if (automatica_ && !conteudo && apontadas.some(function (c) { return c.conteudo; })) {';
-const DESLIGA = /automatica = false;\r?\n    return gravarEstado\('automatica', false\)/;
+// desde a N1 fatia 3 o "Apagar tudo" desliga também a sincronização, na mesma função
+const DESLIGA = /automatica = false;\r?\n    sincronizacaoDesligada = true;\r?\n    return Promise\.all\(\[gravarEstado\('automatica', false\)/;
 const CAMPO_CODIGO = "$('#nuvem-chave-entrada').hidden = false;";
 conf('a automática recusa banco vazio por cima de cópia com conteúdo num lugar só', NUVEM.split(GUARDA_VAZIO).length, 2);
 conf('o "Apagar tudo" tem o que desligar (desligarAutomatica grava false)', DESLIGA.test(NUVEM), true);
@@ -120,7 +121,7 @@ if (SEM_CIFRA) {
 if (SOBE_VAZIO) {
   trocas['/nuvem.js'] = NUVEM
     .replace(GUARDA_VAZIO, 'if (false) {')
-    .replace(DESLIGA, "return gravarEstado('automatica', automatica)");
+    .replace(DESLIGA, "sincronizacaoDesligada = true;\n    return Promise.all([gravarEstado('automatica', automatica)");
 }
 if (ESCONDE_CODIGO) trocas['/app.js'] = APP.replace(CAMPO_CODIGO, "$('#nuvem-chave-entrada').hidden = est.temChave;");
 const ANTERIOR = 'var anterior = apontadas.filter(function (c) { return c.conteudo; })[0] || apontadas[0] || null;';

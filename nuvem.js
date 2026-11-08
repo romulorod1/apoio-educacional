@@ -103,6 +103,11 @@
   var registros = { pendentes: 0, quarentena: 0, ultimoEnvio: null, erro: null };
   var enviandoRegistros = null;  // promessa do envio em curso
   var envioAgendado = null;      // o setTimeout do envio depois de uma gravação
+  /* "Apagar tudo" DESLIGA A SINCRONIZAÇÃO deste aparelho, o envio e o
+   * recebimento, até ela entrar e restaurar de novo (ou mandar a cópia ela
+   * mesma), como a fase 0 já desliga a cópia automática: num banco vazio nunca
+   * chegam aulas soltas, sem aluno. Espelhado no banco próprio. */
+  var sincronizacaoDesligada = false;
   var ouvintes = [];
   var pronto = null;
 
@@ -151,7 +156,9 @@
   function carregarEstado() {
     if (pronto) return pronto;
     pronto = Promise.all([lerEstado('sessao'), lerEstado('chave'), lerEstado('copia'),
-      lerEstado('automatica'), lerEstado('pendente'), lerEstado('aparelho'), lerEstado('soLeitura'), lerEstado('registros')]).then(function (v) {
+      lerEstado('automatica'), lerEstado('pendente'), lerEstado('aparelho'), lerEstado('soLeitura'), lerEstado('registros'),
+      lerEstado('sincronizacaoDesligada')]).then(function (v) {
+      sincronizacaoDesligada = !!v[8];
       marcaSoLeitura = v[6] || null;
       sessao = v[0] || null;
       chaveBruta = v[1] ? new Uint8Array(v[1]) : null;
@@ -218,11 +225,21 @@
     INVALID_REFRESH_TOKEN: 'A entrada venceu. Entre de novo.',
     USER_NOT_FOUND: 'A entrada venceu. Entre de novo.',
     PERMISSION_DENIED: 'A nuvem recusou: esta conta não pode mexer neste lugar.',
-    NOT_FOUND: 'Não há cópia na nuvem para esta conta.'
+    NOT_FOUND: 'Não há cópia na nuvem para esta conta.',
+    FAILED_PRECONDITION: 'Outro aparelho gravou antes; vou receber e tentar de novo.',
+    ALREADY_EXISTS: 'Outro aparelho gravou antes; vou receber e tentar de novo.',
+    INVALID_ARGUMENT: 'A nuvem recusou a forma de um registro.',
+    RESOURCE_EXHAUSTED: 'A cota da nuvem acabou por hoje; tento de novo mais tarde.',
+    UNAVAILABLE: 'A nuvem está indisponível agora; tento de novo mais tarde.',
+    DEADLINE_EXCEEDED: 'A nuvem demorou demais; tento de novo mais tarde.',
+    INTERNAL: 'A nuvem falhou por dentro; tento de novo mais tarde.',
+    UNAUTHENTICATED: 'A entrada venceu. Entre de novo.'
   };
+  /* Nenhum erro cru chega à tela: o código fica em e.codigo, para o
+   * diagnóstico, e a frase é sempre dela. */
   function erro(codigo, detalhe) {
     var chave = String(codigo || '').split(/[\s:]/)[0];
-    var e = new Error(FRASES[chave] || ('A nuvem não respondeu como esperado (' + (codigo || 'sem código') + ').'));
+    var e = new Error(FRASES[chave] || 'A nuvem não respondeu como esperado. Tento de novo daqui a pouco.');
     e.codigo = chave;
     e.detalhe = detalhe || null;
     return e;
@@ -255,8 +272,13 @@
         e.status = r.status;
         if (r.status === 404) e.codigo = 'NOT_FOUND';
         if (r.status === 403) e.codigo = 'PERMISSION_DENIED';
-        // a precondição do commit (fatia 3): outro aparelho ou outra aba escreveu antes
-        if (json && json.error && json.error.status === 'FAILED_PRECONDITION') e.codigo = 'FAILED_PRECONDITION';
+        /* A precondição do commit (fatia 3): outro aparelho ou outra aba escreveu
+         * antes (FAILED_PRECONDITION), ou o documento já existe quando a escrita
+         * exigia que não (ALREADY_EXISTS, 409 em produção). Os dois têm a mesma
+         * saída: receber e decidir. */
+        var statusNuvem = json && json.error && json.error.status;
+        if (statusNuvem === 'FAILED_PRECONDITION' || statusNuvem === 'ALREADY_EXISTS' || r.status === 409) e.codigo = 'FAILED_PRECONDITION';
+        else if (statusNuvem && FRASES[statusNuvem]) { e.codigo = statusNuvem; e.message = FRASES[statusNuvem]; }
         throw e;
       });
     }, function () { throw semRede(); });
@@ -655,7 +677,9 @@
         // o que ela gravou DURANTE o envio não está nesta cópia: continua pendente
         pendente = geracao !== geracaoDoRetrato;
         automatica = true;
-        return Promise.all([gravarEstado('copia', ultimaCopia), gravarEstado('pendente', pendente), gravarEstado('automatica', true)]);
+        // o envio feito por ela religa a sincronização que o "Apagar tudo" desligou
+        var religar = info.motivo === 'ela' ? religarSincronizacao() : Promise.resolve();
+        return Promise.all([gravarEstado('copia', ultimaCopia), gravarEstado('pendente', pendente), gravarEstado('automatica', true), religar]);
       }).then(function () { return ultimaCopia; });
     });
     var limpar = function () { enviando = null; avisarOuvintes(); };
@@ -736,7 +760,7 @@
     ultimaCopia = { id: copia.id, quando: copia.quando, bytes: copia.bytes, partes: copia.partes, aparelho: copia.aparelho };
     pendente = false;
     automatica = !soLe;
-    var gravar = [gravarEstado('copia', ultimaCopia), gravarEstado('pendente', false), gravarEstado('automatica', automatica)];
+    var gravar = [gravarEstado('copia', ultimaCopia), gravarEstado('pendente', false), gravarEstado('automatica', automatica), religarSincronizacao()];
     if (soLe && !marcaSoLeitura) gravar.push(marcarSoLeitura(copia.uid));
     return Promise.all(gravar).then(avisarOuvintes);
   }
@@ -791,7 +815,13 @@
    * sobe sozinho; ela religa no próximo envio dela ou numa restauração. */
   function desligarAutomatica() {
     automatica = false;
-    return gravarEstado('automatica', false).then(avisarOuvintes, avisarOuvintes);
+    sincronizacaoDesligada = true;
+    return Promise.all([gravarEstado('automatica', false), gravarEstado('sincronizacaoDesligada', true)]).then(avisarOuvintes, avisarOuvintes);
+  }
+  function religarSincronizacao() {
+    if (!sincronizacaoDesligada) return Promise.resolve();
+    sincronizacaoDesligada = false;
+    return gravarEstado('sincronizacaoDesligada', false).catch(function () { /* fica em memória */ });
   }
   /* O aviso chega de dentro do oncomplete da gravação dela (store.js). A
    * memória muda na hora; a gravação do sinal no banco próprio fica para o
@@ -873,7 +903,7 @@
   /* Há o que subir e tem como: conta, chave, sinal e o aparelho pode escrever.
    * A fila em si não entra aqui: o envio a lê. */
   function registrosDevidos() {
-    return !!(podeEnviar() && sessao && chaveBruta && online());
+    return !!(podeEnviar() && !sincronizacaoDesligada && sessao && chaveBruta && online());
   }
   function agendarEnvioDeRegistros() {
     // fora da resposta da gravação dela (ver marcarMudanca): nada abre transação ali
@@ -903,6 +933,7 @@
       if (!podeEnviar()) return { pulado: 'so leitura', enviados: 0 };
       if (!sessao) return { pulado: 'sem conta', enviados: 0 };
       if (!chaveBruta) return { pulado: 'sem chave', enviados: 0 };
+      if (sincronizacaoDesligada) return { pulado: 'desligada', enviados: 0 };
       if (!online()) throw semRede();
       if (!root.Store || typeof root.Store.registrosDaFila !== 'function') return { pulado: 'sem fila', enviados: 0 };
       var uid = sessao.uid;
@@ -1045,6 +1076,7 @@
     recebendo = carregarEstado().then(function () {
       if (!sessao) return { pulado: 'sem conta', aplicados: 0 };
       if (!chaveBruta) return { pulado: 'sem chave', aplicados: 0 };
+      if (sincronizacaoDesligada) return { pulado: 'desligada', aplicados: 0 };
       if (!online()) throw semRede();
       if (!root.Store || typeof root.Store.aplicarRecebidos !== 'function') return { pulado: 'sem store', aplicados: 0 };
       uidDona = (marcaSoLeitura && marcaSoLeitura.uidDona) || sessao.uid;
@@ -1092,7 +1124,10 @@
               var ecos = regs.filter(function (r) { return r.eco; });
               var indecifraveis = regs.filter(function (r) { return r.indecifravel; }).length;
               var ultimo = regs.length ? { servidorEm: regs[regs.length - 1].servidorEm, nome: regs[regs.length - 1].nome } : null;
-              var lote = aplicaveis.concat(ecos.map(function (r) { return { id: null, servidorEm: r.servidorEm, nome: r.nome }; }));
+              /* O eco vai com o id e o carimbo, marcado: o Store só anota o carimbo
+               * no registro que ainda não o tem (a lápide do "Apagar tudo" e a
+               * restauração da própria cópia o perdem), e avança o cursor. */
+              var lote = aplicaveis.concat(ecos.map(function (r) { return { id: r.id, eco: true, servidorEm: r.servidorEm, nome: r.nome, updateTime: r.updateTime }; }));
               // nada a aplicar: nenhuma transação de escrita (o celular em dia não grava nada)
               var aplicar = lote.length ? root.Store.aplicarRecebidos(lote) : Promise.resolve({ aplicados: 0 });
               return aplicar.then(function (contas) {
@@ -1127,7 +1162,7 @@
     });
   }
   function sincronizarSeDevido(info) {
-    if (!(sessao && chaveBruta && online())) return Promise.resolve({ pulado: 'indevido' });
+    if (!(sessao && chaveBruta && online()) || sincronizacaoDesligada) return Promise.resolve({ pulado: sincronizacaoDesligada ? 'desligada' : 'indevido' });
     return sincronizar(info);
   }
 
@@ -1147,6 +1182,7 @@
         erroRecebimento: registros.erroRecebimento || null, recebendo: !!recebendo, indecifraveis: registros.indecifraveis || 0 },
       soLeitura: !!marcaSoLeitura,
       uidDona: marcaSoLeitura ? marcaSoLeitura.uidDona : null,
+      sincronizacaoDesligada: sincronizacaoDesligada,
       online: online()
     };
   }

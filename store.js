@@ -596,6 +596,14 @@
       });
     });
     existentes.forEach(function (r) {
+      /* Na RESTAURAÇÃO, a lápide que já existia e não está na cópia também entra
+       * na fila: a restauração vence em todos os registros, inclusive os que o
+       * "Apagar tudo" já tinha apagado aqui sem avisar a nuvem. */
+      if (restauro && r.apagadoEm && !novo.itens[r.id] && saida && sincronizavel(r.id, r.tipo)) {
+        enfileirar(saida, { id: r.id, tipo: r.tipo, atualizadoEm: r.atualizadoEm, apagadoEm: r.apagadoEm, restauro: true });
+        contas.enfileirados++;
+        return;
+      }
       if (r.apagadoEm || novo.itens[r.id]) return;
       gravarRegistro({ id: r.id, tipo: r.tipo, atualizadoEm: agora, apagadoEm: agora, aparelho: aparelho,
         esquema: r.esquema || ESQUEMA_REGISTRO, ordem: r.ordem, dados: null, nuvem: r.nuvem || null });
@@ -855,6 +863,9 @@
          * do último. */
         var filaReq = saida.getAll();
         var cursorReq = t.objectStore('controle').get('cursor');
+        var conflitosReq = t.objectStore('controle').get('conflitos');
+        var conflitosJaRegistrados = {};
+        conflitosReq.onsuccess = function () { conflitosJaRegistrados = conflitosReq.result || {}; };
         var todosReq = registros.getAll();
         var fila = {}, existentes = [], cursorAntes = null;
         filaReq.onsuccess = function () { (filaReq.result || []).forEach(function (e) { fila[e.id] = e; }); };
@@ -874,21 +885,26 @@
             if (!chegou || !chegou.id) return;
             var local = porId[chegou.id];
             var carimbo = { updateTime: chegou.updateTime || null, servidorEm: chegou.servidorEm || null };
+            /* O ECO do que este aparelho mesmo subiu: o registro já está aqui; só
+             * o carimbo é anotado quando falta (a lápide do "Apagar tudo" e a
+             * restauração da própria cópia o perdem, e sem ele o envio exigiria
+             * que o documento não existisse, para sempre). */
+            if (chegou.eco) {
+              if (local && !(local.nuvem && local.nuvem.servidorEm)) { local.nuvem = carimbo; registros.put(local); }
+              return;
+            }
             if (local && local.nuvem && local.nuvem.servidorEm && chegou.servidorEm && carimboNumero(local.nuvem.servidorEm) >= carimboNumero(chegou.servidorEm)) {
               contas.ignorados++;
               return;
             }
             var entrada = fila[chegou.id];
-            /* A entrada de RESTAURAÇÃO (a cópia completa restaurada num aparelho que
-             * escreve) só vence o que é mais velho que a cópia: se o servidor tem
-             * uma edição mais nova que o `quando` da cópia, o servidor vence e a
-             * entrada sai da fila; a cópia velha não reescreve a nuvem. */
-            if (local && entrada && !entrada.quarentena && entrada.restauro && chegou.atualizadoEm && entrada.atualizadoEm &&
-                chegou.atualizadoEm > entrada.atualizadoEm) {
-              saida.delete(chegou.id);
-              delete fila[chegou.id];
-              entrada = null;
-            }
+            /* A RESTAURAÇÃO VENCE (decisão da sessão, 08/11): restaurar uma cópia, mais
+             * velha ou não, é a vontade dela de voltar àquele ponto, no mesmo
+             * tablet ou num novo. A entrada da restauração é uma edição local
+             * pendente como qualquer outra: vence o que chega, e cada versão do
+             * servidor que perde vai para o histórico, recuperável. A marca
+             * `restauro` só muda o envio (exige que o documento não exista quando
+             * o carimbo não é conhecido, para o servidor ser recebido antes). */
             if (local && entrada && !entrada.quarentena) {
               // a edição local ainda não enviada vence: só o carimbo é anotado
               local.nuvem = carimbo;
@@ -957,8 +973,14 @@
           }
           if (conflitos.length) {
             contas.conflitos = conflitos.length;
-            t.objectStore('historico').add({ rotulo: 'Duas aulas na mesma data da mesma série, reabertas em aparelhos diferentes, as duas com conteúdo',
-              quando: Date.now(), estado: JSON.parse(JSON.stringify(completar(montar(Object.keys(porId).map(function (id) { return porId[id]; }))))) });
+            // uma entrada no histórico por conflito, e não a cada recebimento enquanto ele durar
+            var novosConflitos = conflitos.filter(function (c) { return !conflitosJaRegistrados[c]; });
+            if (novosConflitos.length) {
+              t.objectStore('historico').add({ rotulo: 'Duas aulas na mesma data da mesma série, reabertas em aparelhos diferentes, as duas com conteúdo',
+                quando: Date.now(), estado: JSON.parse(JSON.stringify(completar(montar(Object.keys(porId).map(function (id) { return porId[id]; }))))) });
+              novosConflitos.forEach(function (c) { conflitosJaRegistrados[c] = agora; });
+              t.objectStore('controle').put(conflitosJaRegistrados, 'conflitos');
+            }
           }
           if (chegadosQuePerderam.length) {
             // o documento como ficaria com a versão do outro aparelho: "Voltar a este ponto" a traz de volta
@@ -1870,7 +1892,7 @@
           (todos.result || []).forEach(function (r) {
             if (r.apagadoEm) return;
             var lapide = { id: r.id, tipo: r.tipo, atualizadoEm: agora, apagadoEm: agora, aparelho: aparelhoId || r.aparelho,
-              esquema: r.esquema || ESQUEMA_REGISTRO, ordem: r.ordem, dados: null };
+              esquema: r.esquema || ESQUEMA_REGISTRO, ordem: r.ordem, dados: null, nuvem: r.nuvem || null };
             registros.put(lapide);
             /* As lápides do "Apagar tudo" ficam SÓ AQUI, fora da fila: a decisão da
              * fase 0 é que o banco vazio nunca cobre a cópia boa na nuvem, e

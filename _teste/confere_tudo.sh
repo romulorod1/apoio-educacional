@@ -790,10 +790,10 @@ roda "nuvem recebe (N1 fatia 3)"                    node "_teste/testa_nuvem_rec
 roda "nuvem recebe --envenenado-ignora-lapide"      node "_teste/testa_nuvem_recebe.js" --envenenado-ignora-lapide
 roda "nuvem recebe --envenenado-velho-por-cima"     node "_teste/testa_nuvem_recebe.js" --envenenado-velho-por-cima
 # (revisao da fatia 3) a paginacao pelo par carimbo e nome (mil registros em cinco
-# commits), a restauracao que nao vence a edicao mais nova, e a fusao que nao mata
+# commits), o ALREADY_EXISTS tratado como a precondicao, e a fusao que nao mata
 # aula legitima: os tres venenos TEM de ser vistos.
 roda "nuvem recebe --envenenado-pagina-so-carimbo"  node "_teste/testa_nuvem_recebe.js" --envenenado-pagina-so-carimbo
-roda "nuvem recebe --envenenado-restauro-vence"     node "_teste/testa_nuvem_recebe.js" --envenenado-restauro-vence
+roda "nuvem recebe --envenenado-sem-already-exists" node "_teste/testa_nuvem_recebe.js" --envenenado-sem-already-exists
 roda "nuvem recebe --envenenado-fusao-pelo-prefixo" node "_teste/testa_nuvem_recebe.js" --envenenado-fusao-pelo-prefixo
 roda "celular so leitura"                           node "_teste/testa_celular_leitura.js"
 roda "celular so leitura --envenenado-envia"        node "_teste/testa_celular_leitura.js" --envenenado-envia

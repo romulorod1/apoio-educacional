@@ -20752,7 +20752,8 @@
        * nuvem. A automática desliga aqui e religa no próximo envio dela. */
       if (temNuvem()) Nuvem.desligarAutomatica();
       desenharTudo();
-      avisar('Todos os dados foram apagados.' + (temNuvem() && Nuvem.estado().entrada ? ' A cópia automática na nuvem ficou desligada até o seu próximo envio.' : ''));
+      avisar('Todos os dados foram apagados.' + (temNuvem() && Nuvem.estado().entrada
+        ? ' A cópia automática e a sincronização entre aparelhos ficaram desligadas até você restaurar a cópia ou enviar uma.' : ''));
     }).catch(function (e) {
       releDoDisco(e, 'Não consegui apagar tudo.');
     });
@@ -20913,12 +20914,16 @@
      * lotes para não segurar os outros, e a frase diz. */
     var presas = q ? ' ' + (q === 1 ? '1 mudança não consegue subir' : q + ' mudanças não conseguem subir') +
       ' (a nuvem recusa esse registro); as outras seguem.' : '';
+    if (est.sincronizacaoDesligada) {
+      return 'A sincronização entre aparelhos está desligada desde o "Apagar tudo": entre e restaure a cópia para religar.' +
+        (n ? ' ' + guardadas + '.' : '');
+    }
     if (r.erro && r.erro.codigo === 'PERMISSION_DENIED') {
       return 'A nuvem ainda não aceita as mudanças uma a uma (as regras novas não foram publicadas). ' +
         guardadas + ', para subir quando aceitar.' + presas;
     }
     if (r.erro && r.erro.codigo === 'SEM_REDE') return 'Sem internet agora. ' + guardadas + ', para subir quando houver sinal.' + presas;
-    if (r.erro) return 'A nuvem recusou as mudanças uma a uma (' + r.erro.codigo + '). ' + guardadas + '; vou tentar de novo.' + presas;
+    if (r.erro) return (r.erro.mensagem || 'A nuvem recusou as mudanças uma a uma.') + ' ' + guardadas + '; vou tentar de novo.' + presas;
     if (r.enviando) return 'Subindo as mudanças...' + presas;
     if (n > 0) return (n === 1 ? '1 mudança' : n + ' mudanças') + ' a subir para a nuvem.' + presas;
     return (q ? 'Todas as outras mudanças já subiram para a nuvem, uma a uma.' : 'Todas as mudanças já subiram para a nuvem, uma a uma.') + presas;
