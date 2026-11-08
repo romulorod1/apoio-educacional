@@ -1,12 +1,18 @@
 /* testa_mudou_de_endereco_navegador.js (B4)
  *
- * Duas provas, no Chrome, com perfil novo:
+ * Tres provas, no Chrome, com perfil novo:
  *
- * 1. A FAIXA "O aplicativo mudou de endereço" aparece no endereço antigo e
- *    nunca no novo. O mesmo código, servido em tres origens:
+ * 0. DESLIGADA (o app.js como esta, MUDOU_DE_ENDERECO_NO_AR = false): a faixa
+ *    nao aparece em lugar nenhum, nem no endereco antigo, nem no novo, nem no
+ *    local. A faixa liga junto com a fase 0 da nuvem.
+ *
+ * 1. LIGADA (o app.js servido com a constante em true, pela troca do arquivo
+ *    servido, como os venenos dos outros testes): a FAIXA "O aplicativo mudou
+ *    de endereço" aparece no endereço antigo e nunca no novo. O mesmo código,
+ *    servido em tres origens:
  *      https://romulorod1.github.io/apoio-educacional/   tem a faixa
  *      https://apoio-educacional.pages.dev/              nao tem
- *      http://localhost:<porta>/                         nao tem
+ *      http://127.0.0.1:<porta>/                         nao tem
  *    As duas primeiras sao entregues pela interceptacao do puppeteer, a partir
  *    do disco: a pagina roda com a origem de verdade (location.hostname e o
  *    nome real), sem nenhum pedido sair para a internet (o resolvedor do
@@ -50,9 +56,17 @@ const TIPOS = {
   '.wasm': 'application/wasm'
 };
 
+/* A faixa ligada: o app.js servido com a constante em true. O disco nunca
+ * muda; so o que o servidor e a interceptacao entregam. */
+const DESLIGADA = 'var MUDOU_DE_ENDERECO_NO_AR = false;';
+const APP_DISCO = fs.readFileSync(path.join(RAIZ, 'app.js'), 'utf8');
+let faixaLigada = false;
 function doDisco(rel) {
   if (rel === '' || rel === '/') rel = 'index.html';
   rel = rel.replace(/^\/+/, '');
+  if (rel === 'app.js' && faixaLigada) {
+    return { tipo: TIPOS['.js'], corpo: Buffer.from(APP_DISCO.replace(DESLIGADA, 'var MUDOU_DE_ENDERECO_NO_AR = true;')) };
+  }
   if (rel === 'vazio.html') return { tipo: TIPOS['.html'], corpo: Buffer.from('<!doctype html><title>vazio</title>') };
   const arq = path.join(RAIZ, rel);
   if (!arq.startsWith(RAIZ) || !fs.existsSync(arq) || fs.statSync(arq).isDirectory()) return null;
@@ -69,8 +83,12 @@ function caminhoInterceptado(url) {
   return null;
 }
 
+/* Quem recebeu do servidor o app.js LIGADO, pelo Host do pedido. */
+const ligadoServidoA = [];
 const servidor = http.createServer((req, res) => {
-  const a = doDisco(decodeURIComponent(req.url.split('?')[0]));
+  const rel0 = decodeURIComponent(req.url.split('?')[0]);
+  if (faixaLigada && rel0.replace(/^\/+/, '') === 'app.js') ligadoServidoA.push(req.headers.host);
+  const a = doDisco(rel0);
   if (!a) { res.writeHead(404); res.end('nao encontrado'); return; }
   res.writeHead(200, { 'Content-Type': a.tipo, 'Cache-Control': 'no-store' });
   res.end(a.corpo);
@@ -138,8 +156,21 @@ const estadoFaixa = pag => pag.evaluate(() => {
   };
 });
 
+async function provaDesligada() {
+  secao('desligada: a faixa não aparece em lugar nenhum');
+  conf('o app.js do disco tem a constante desligada, uma vez', APP_DISCO.split(DESLIGADA).length - 1, 1);
+  for (const base of [ANTIGO, NOVO, OUTRA]) {
+    const pag = await novaPagina();
+    await abrir(pag, base);
+    await pausa(800);
+    conf('desligada: a faixa NÃO existe em ' + base, (await estadoFaixa(pag)).existe, false);
+    conf('desligada: sem erro de página em ' + base, pag.errosDePagina.join(' | '), '');
+    await pag.close();
+  }
+}
+
 async function provaDaFaixa() {
-  secao('endereço antigo: a faixa aparece e o aplicativo segue com os dados');
+  secao('ligada, endereço antigo: a faixa aparece e o aplicativo segue com os dados');
   const pag = await novaPagina();
   await abrir(pag, ANTIGO);
   conf('a página roda com a origem do endereço antigo', await pag.evaluate(() => location.origin), 'https://romulorod1.github.io');
@@ -191,7 +222,7 @@ async function provaDaFaixa() {
   conf('sem erro de página no endereço antigo', pag.errosDePagina.join(' | '), '');
   await pag.close();
 
-  secao('endereço novo: nunca a faixa');
+  secao('ligada, endereço novo: nunca a faixa');
   const novo = await novaPagina();
   await abrir(novo, NOVO);
   conf('a página roda com a origem do endereço novo', await novo.evaluate(() => location.origin), 'https://apoio-educacional.pages.dev');
@@ -203,11 +234,17 @@ async function provaDaFaixa() {
   conf('sem erro de página no endereço novo', novo.errosDePagina.join(' | '), '');
   await novo.close();
 
-  secao('endereço local de teste (localhost): nunca a faixa');
+  /* 127.0.0.1, e nao localhost: em localhost o worker da prova do activate
+   * ja guardou o app.js desligado e o serviria do cache, e a prova ficaria
+   * cega. Em 127.0.0.1 nenhum worker foi registrado ate aqui, entao a
+   * primeira abertura busca o app.js no servidor, e o servidor conta. */
+  secao('ligada, endereço local de teste (127.0.0.1): nunca a faixa');
   const local = await novaPagina();
-  await abrir(local, OUTRA);
+  await abrir(local, LOCAL);
   await pausa(800);
-  conf('a faixa NÃO existe em localhost', (await estadoFaixa(local)).existe, false);
+  conf('ligada: 127.0.0.1 recebeu do servidor o app.js ligado',
+    ligadoServidoA.indexOf('127.0.0.1:' + PORTA) >= 0, true);
+  conf('a faixa NÃO existe em 127.0.0.1', (await estadoFaixa(local)).existe, false);
   await local.close();
 }
 
@@ -261,6 +298,8 @@ async function provaDoActivate() {
     const cdp = await nav.target().createCDPSession();
     await cdp.send('Browser.setDownloadBehavior', { behavior: 'deny' });
     await provaDoActivate();
+    await provaDesligada();
+    faixaLigada = true;
     await provaDaFaixa();
     const reais = fora.filter(u => !/ibge/.test(u));
     conf('nenhum pedido tentou sair para a internet (fora o IBGE, recusado)', reais.slice(0, 3).join(' '), '');

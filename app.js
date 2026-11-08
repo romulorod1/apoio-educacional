@@ -1548,15 +1548,22 @@
    * aqui e restaurar no novo (ou entrar, quando a nuvem existir). Até ela
    * passar, este endereço continua funcionando igual, só com a faixa.
    *
-   * Decidido pela origem, e nunca por uma marca no código: o mesmo código vai
-   * para os dois endereços, e a faixa só pode aparecer no antigo. */
+   * ONDE aparece é decidido pela origem: o mesmo código vai para os dois
+   * endereços, e a faixa só pode aparecer no antigo.
+   *
+   * QUANDO aparece é esta constante. Ela entra DESLIGADA: o endereço novo já é
+   * publicado a cada merge, mas ninguém é mandado para lá antes de a fase 0
+   * da nuvem existir. Liga junto com a fase 0, para a migração dela ser um
+   * toque (instalar o novo e entrar), como pedem as instruções. A prova
+   * testa_mudou_de_endereco_navegador cobre os dois estados. */
+  var MUDOU_DE_ENDERECO_NO_AR = false;
   var ENDERECO_NOVO = 'https://apoio-educacional.pages.dev/';
   function noEnderecoAntigo(nome) {
     return /(^|\.)github\.io$/i.test(String(nome || ''));
   }
 
   function mostrarFaixaEndereco() {
-    if (!noEnderecoAntigo(location.hostname) || $('#faixa-endereco')) return;
+    if (!MUDOU_DE_ENDERECO_NO_AR || !noEnderecoAntigo(location.hostname) || $('#faixa-endereco')) return;
     var faixa = el('div', { id: 'faixa-endereco', class: 'faixa-endereco', role: 'status' }, [
       el('div', { class: 'cresce' }, [
         el('strong', { texto: 'O aplicativo mudou de endereço' }),
