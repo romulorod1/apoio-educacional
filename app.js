@@ -5118,7 +5118,7 @@
       el('label', { class: 'campo' }, [
         el('span', { texto: 'Telefone do responsável' }),
         el('input', {
-          type: 'tel', id: 'campo-telefone', autocomplete: 'off',
+          type: 'text', inputmode: 'tel', id: 'campo-telefone', autocomplete: 'off',
           value: novo ? '' : (alunoEmEdicao.telefone || ''),
           placeholder: 'Opcional. Com DDD, para ligar e o WhatsApp no celular.'
         })
@@ -21698,7 +21698,31 @@
     if (celularBuscando) return { frase: 'Buscando a cópia mais nova...', tom: 'esperando' };
     if (celularRecado) return { frase: celularRecado, tom: 'problema' };
     var u = est && est.ultimaCopia;
+    var atualizado = atualizacaoDoCelular(est);
+    if (atualizado) return atualizado;
     return { frase: fraseDaOrigemCelular(), tom: est && est.celular && u && u.quando ? 'em-dia' : 'esperando' };
+  }
+
+  /* (D6c, lote 2) "Atualizado às 14:02": a hora do último recebimento de
+   * registros que deu certo (antes do primeiro, a da cópia trazida), e não a
+   * hora da cópia: é ela que diz se o celular está em dia com o tablet. Com
+   * mais de 2 horas sem receber, ou com o último recebimento em erro, o aviso
+   * vem em destaque. Só no aparelho com a marca de celular. */
+  var HORAS_SEM_RECEBER = 2;
+  function atualizacaoDoCelular(est) {
+    if (!est || !est.celular) return null;
+    var r = est.registros || {};
+    var u = est.ultimaCopia;
+    var quando = (r.ultimoRecebimento && r.ultimoRecebimento.quando) || (u && u.quando) || null;
+    if (!quando) return null;
+    var d = new Date(quando);
+    if (isNaN(d.getTime())) return null;
+    var agora = new Date();
+    var hora = Core.pad2(d.getHours()) + ':' + Core.pad2(d.getMinutes());
+    var frase = d.toDateString() === agora.toDateString() ? 'Atualizado às ' + hora + '.' : 'Atualizado ' + Nuvem.fraseDeQuando(quando) + '.';
+    var desatualizado = !!r.erroRecebimento || agora.getTime() - d.getTime() > HORAS_SEM_RECEBER * 3600 * 1000;
+    if (desatualizado) return { frase: 'Pode estar desatualizado: toque em ↻. ' + frase, tom: 'problema', destaque: true };
+    return { frase: frase, tom: 'em-dia' };
   }
 
   /* O alto, enxuto: o ícone da nuvem com o estado curto. No celular que só
@@ -21714,6 +21738,7 @@
     regra.hidden = edita;
     var estado = estadoCurtoDaNuvemCelular();
     origem.textContent = estado.frase;
+    origem.classList.toggle('cel-desatualizado', !!estado.destaque);
     var nuvem = $('#cel-nuvem');
     if (nuvem) nuvem.setAttribute('data-tom', estado.tom);
     var acoes = $('#cel-acoes');
@@ -22713,19 +22738,20 @@
     }));
   }
 
-  /* Cadastrar aluno: só o essencial (nome, responsável, contato, preço por
+  /* Cadastrar aluno: só o essencial (nome, responsável, telefone, preço por
    * hora), pelo mesmo aluno novo do tablet (alunoNovo) e a mesma conferência
-   * dos valores (Core.validarPrecos). O contato vai nas observações, onde a
-   * ficha do tablet o pede. */
+   * dos valores (Core.validarPrecos). O telefone do responsável vai no campo
+   * `telefone` (D6c, lote 2), o que liga e abre o WhatsApp; as observações
+   * ficam para o texto livre, no tablet. */
   function desenharNovoAlunoCelular(caixa) {
     caixa.appendChild(el('h2', { class: 'cel-titulo', texto: 'Cadastrar aluno' }));
     var nome = el('input', { type: 'text', id: 'cel-aluno-nome', autocomplete: 'off', placeholder: 'Nome da criança' });
     var resp = el('input', { type: 'text', id: 'cel-aluno-responsavel', autocomplete: 'off' });
-    var contato = el('input', { type: 'text', id: 'cel-aluno-contato', autocomplete: 'off', inputmode: 'tel' });
+    var telefone = el('input', { type: 'text', id: 'cel-aluno-telefone', autocomplete: 'off', inputmode: 'tel', placeholder: 'Com DDD, por exemplo (11) 98765-4321' });
     var preco = el('input', { type: 'text', id: 'cel-aluno-preco', inputmode: 'decimal', autocomplete: 'off', placeholder: 'por exemplo 100,00' });
     caixa.appendChild(campoCelular('Nome do aluno', nome));
     caixa.appendChild(campoCelular('Responsável', resp));
-    caixa.appendChild(campoCelular('Contato', contato));
+    caixa.appendChild(campoCelular('Telefone do responsável (para ligar e WhatsApp)', telefone));
     caixa.appendChild(campoCelular('Valor por hora (R$), a partir de hoje', preco));
     /* (D6c, lote 2) Casa ou online, opcional: o endereço abre o mapa, e o
      * link, a aula online. "Ainda não sei" não grava nada. */
@@ -22757,7 +22783,9 @@
       }
       var erros = Core.validarPrecos({ precos: precos });
       if (erros.length) { avisar(erros[0]); return; }
-      var novo = alunoNovo({ nome: n, responsavel: resp.value.trim(), obs: contato.value.trim() ? 'Contato: ' + contato.value.trim() : '', precos: precos,
+      // um telefone só, com DDD: é ele que liga e abre o WhatsApp da família
+      if (telefone.value.trim() && !numeroDoWhatsapp(telefone.value)) { avisar('Escreva um telefone só, com DDD, por exemplo (11) 98765-4321.'); return; }
+      var novo = alunoNovo({ nome: n, responsavel: resp.value.trim(), telefone: telefone.value, precos: precos,
         local: local.value, endereco: local.value === 'casa' ? endereco.value : '', linkOnline: local.value === 'online' ? link.value : '' });
       comoAcaoDoCelular(function () {
         db.alunos.push(novo);
@@ -22801,21 +22829,38 @@
     var daFicha = String(aluno.telefone || '').trim();
     if (daFicha) return daFicha;
     var m = /(?:^|\n)\s*contato\s*:\s*([^\n]+)/i.exec(String(aluno.obs || ''));
-    return m && m[1].replace(/\D/g, '').length >= 8 ? m[1].trim() : '';
+    return m ? m[1].trim() : '';
   }
-  /* O número para o WhatsApp (wa.me): só dígitos, com o 55 do Brasil. O
-   * número com DDD (10 ou 11 dígitos) ganha o 55; sem DDD, não há como
-   * saber a cidade, e o WhatsApp fica de fora (o ligar continua). */
+  /* UM telefone com cara de telefone, tirado do texto por token: com ou sem
+   * o 55, com ou sem o DDD (entre parênteses ou não), com hífen, ponto ou
+   * espaço. Dígitos soltos ao lado ("casa 2", "prédio 12", "ramal 2") não
+   * entram no número. Nenhum ou dois números: não há telefone certo, e o
+   * aplicativo não monta link (ligar para um estranho, ou mandar a ele o
+   * nome da criança, é pior do que não ter o botão). Devolve só os dígitos,
+   * sem o 55. */
+  var RE_TELEFONE = /(?:^|[^\d])((?:\+?55[\s.-]?)?(?:\(?\d{2}\)?[\s.-]?)?9?\d{4}[\s.-]?\d{4})(?!\d)/g;
+  function telefoneUnico(texto) {
+    var achados = [], m;
+    RE_TELEFONE.lastIndex = 0;
+    while ((m = RE_TELEFONE.exec(String(texto || ''))) !== null) achados.push(m[1]);
+    if (achados.length !== 1) return '';
+    var d = achados[0].replace(/\D/g, '');
+    if (d.length >= 12 && /^55/.test(d)) d = d.slice(2);
+    return d.length >= 8 && d.length <= 11 ? d : '';
+  }
+  /* O número para o WhatsApp (wa.me): o telefone com DDD (10 ou 11 dígitos)
+   * e o 55 do Brasil; sem DDD não há como saber a cidade, e o WhatsApp fica
+   * de fora (o ligar continua). */
   function numeroDoWhatsapp(telefone) {
-    var d = String(telefone || '').replace(/\D/g, '').replace(/^0+/, '');
+    var d = telefoneUnico(telefone);
     if (d.length === 10 || d.length === 11) d = '55' + d;
     return /^55\d{10,11}$/.test(d) ? d : '';
   }
   function linkDeLigar(telefone) {
     var wa = numeroDoWhatsapp(telefone);
     if (wa) return 'tel:+' + wa;
-    var d = String(telefone || '').replace(/\D/g, '');
-    return d.length >= 8 ? 'tel:' + d : '';
+    var d = telefoneUnico(telefone);
+    return d ? 'tel:' + d : '';
   }
   /* O link abre a conversa com o texto ESCRITO, e quem toca em enviar é ela:
    * o aplicativo nunca envia nada sozinho. */
@@ -22828,12 +22873,12 @@
     var e = String(endereco || '').trim();
     return e ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(e) : '';
   }
-  /* Só http e https: o link escrito sem o começo (meet.google.com/abc) ganha
-   * o https://; qualquer outro esquema não vira botão. */
+  /* Só https: o link escrito sem o começo (meet.google.com/abc) ganha o
+   * https://; http e qualquer outro esquema não viram botão. */
   function linkDaAulaOnline(texto) {
     var t = String(texto || '').trim();
     if (!t || /\s/.test(t)) return '';
-    if (/^https?:\/\//i.test(t)) return t;
+    if (/^https:\/\//i.test(t)) return t;
     if (/^[a-z][a-z0-9+.-]*:/i.test(t)) return '';
     return /^[^/]+\.[a-z]{2,}(\/|$)/i.test(t) ? 'https://' + t : '';
   }
@@ -22845,6 +22890,19 @@
     { id: 'remarcar', rotulo: 'Podemos remarcar?', texto: function (nome, quando) { return 'Olá! Podemos remarcar a aula de ' + nome + (quando ? ' (' + quando + ')' : '') + '?'; } },
     { id: 'chegando', rotulo: 'Chegando', texto: function (nome) { return 'Olá! Estou chegando para a aula de ' + nome + '.'; } }
   ];
+  function aulaDeHojeAindaNaoDada(a) {
+    if (!a || a.data !== Core.hojeIso() || a.status === 'cancelada') return false;
+    var fim = fimDaAulaCelular(a);
+    return fim === null || fim > minutosAgoraCelular();
+  }
+  /* Na aba Alunos, a aula de que a mensagem fala: a de hoje que ainda não
+   * acabou; sem ela, a próxima marcada. */
+  function aulaDeContextoDoAluno(alunoId) {
+    var hoje = Core.hojeIso();
+    var dele = db.aulas.filter(function (a) { return a.alunoId === alunoId && a.status !== 'cancelada' && a.data >= hoje; })
+      .sort(function (a, b) { return (a.data + (a.hora || '')).localeCompare(b.data + (b.hora || '')); });
+    return dele.filter(aulaDeHojeAindaNaoDada)[0] || dele.filter(function (a) { return a.data > hoje; })[0] || null;
+  }
   function textoDaMensagemPronta(id, aluno, aula) {
     var m = MENSAGENS_PRONTAS.filter(function (x) { return x.id === id; })[0];
     if (!m || !aluno) return '';
@@ -22869,19 +22927,29 @@
     caixa.appendChild(el('div', { class: 'cel-ficha-linha', id: 'cel-ficha-responsavel', texto: resp ? 'Responsável: ' + resp : 'Responsável não informado.' }));
     var tel = telefoneDoAluno(aluno);
     var ligar = linkDeLigar(tel), whats = linkDoWhatsapp(tel, '');
-    if (ligar || whats) {
-      caixa.appendChild(el('div', { class: 'cel-ficha-botoes' }, [
-        ligar ? botaoDeLinkCelular('cel-ficha-ligar', 'Ligar', ligar, { 'aria-label': 'Ligar para ' + (resp || 'o responsável') + ', ' + tel }) : null,
-        whats ? botaoDeLinkCelular('cel-ficha-whatsapp', 'WhatsApp', whats, { 'aria-label': 'Abrir o WhatsApp de ' + (resp || 'o responsável') }) : null
-      ]));
-      caixa.appendChild(el('div', { class: 'ajuda u-margem-0', id: 'cel-ficha-telefone', texto: 'Telefone: ' + tel }));
+    if (tel) {
+      caixa.appendChild(el('div', { class: 'cel-ficha-telefone', id: 'cel-ficha-telefone', texto: (ligar ? 'Telefone: ' : 'Contato: ') + tel }));
+      if (ligar || whats) {
+        caixa.appendChild(el('div', { class: 'cel-ficha-botoes' }, [
+          ligar ? botaoDeLinkCelular('cel-ficha-ligar', 'Ligar', ligar, { 'aria-label': 'Ligar para ' + (resp || 'o responsável') + ', ' + tel }) : null,
+          whats ? botaoDeLinkCelular('cel-ficha-whatsapp', 'WhatsApp', whats, { 'aria-label': 'Abrir o WhatsApp de ' + (resp || 'o responsável') }) : null
+        ]));
+      }
+      /* Sem um telefone só, com DDD, nenhum link para o WhatsApp: ela confere no tablet. */
+      if (!whats) caixa.appendChild(el('p', { class: 'faixa-aviso', id: 'cel-ficha-confira', texto: 'Confira o telefone no tablet' +
+        (ligar ? ': para o WhatsApp, ele precisa do DDD.' : ': não achei um telefone só, com DDD, neste contato.') }));
     } else {
       caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-ficha-sem-telefone', texto: 'Sem telefone do responsável. Ele se põe no tablet, na ficha do aluno.' }));
     }
     if (whats) {
+      /* "Estou 10 minutos atrasada" e "Chegando" só valem para a aula de HOJE
+       * que ainda não acabou; "Podemos remarcar?" vale sempre. */
+      var deHoje = aula && aulaDeHojeAindaNaoDada(aula) ? aula : null;
       caixa.appendChild(el('div', { class: 'cel-subtitulo', texto: 'Mensagem pronta no WhatsApp' }));
       caixa.appendChild(el('p', { class: 'ajuda u-margem-0', texto: 'Abre a conversa com o texto escrito. Quem envia é você.' }));
-      caixa.appendChild(el('div', { class: 'cel-ficha-mensagens', id: 'cel-ficha-mensagens' }, MENSAGENS_PRONTAS.map(function (m) {
+      caixa.appendChild(el('div', { class: 'cel-ficha-mensagens', id: 'cel-ficha-mensagens' }, MENSAGENS_PRONTAS.filter(function (m) {
+        return m.id === 'remarcar' || deHoje;
+      }).map(function (m) {
         var texto = textoDaMensagemPronta(m.id, aluno, aula);
         return botaoDeLinkCelular('cel-msg-' + m.id, m.rotulo, linkDoWhatsapp(tel, texto), { 'data-mensagem': m.id, 'aria-label': m.rotulo + ': abre o WhatsApp com a mensagem escrita' });
       })));
@@ -22926,7 +22994,7 @@
       caixa.appendChild(el('div', { class: 'cel-folha-cabeca', style: '--cor-aluno:' + corDoAlunoCelular(aberto) }, [
         el('h2', { class: 'cel-titulo', id: 'cel-ficha-nome', texto: aberto.nome })
       ]));
-      caixa.appendChild(fichaMinimaCelular(aberto, null));
+      caixa.appendChild(fichaMinimaCelular(aberto, aulaDeContextoDoAluno(aberto.id)));
       caixa.appendChild(el('div', { class: 'barra' }, [
         el('button', { type: 'button', class: 'btn', id: 'cel-alunos-voltar', texto: 'Voltar à lista',
           aoClick: function () { alunoCelular = null; desenharAlunosCelular(); var c = $('#cel-conteudo'); if (c) c.scrollTop = 0; } })
@@ -22939,7 +23007,7 @@
       .sort(function (x, y) { return String(x.nome).localeCompare(String(y.nome)); });
     if (!ativos.length) caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-alunos-vazio', texto: 'Nenhum aluno ativo.' }));
     caixa.appendChild(el('div', { class: 'cel-alunos-lista', id: 'cel-alunos-lista' }, ativos.map(function (al) {
-      var detalhe = [String(al.responsavel || '').trim(), ONDE_E_A_AULA[al.local] || ''].filter(Boolean).join(' · ');
+      var detalhe = [String(al.responsavel || '').trim(), ONDE_E_A_AULA[al.local] || '', telefoneDoAluno(al) ? '' : 'sem telefone cadastrado'].filter(Boolean).join(' · ');
       return el('button', { type: 'button', class: 'cel-aluno-item', 'data-aluno': al.id, style: '--cor-aluno:' + corDoAlunoCelular(al),
         'aria-label': 'Ver a ficha de ' + al.nome + (detalhe ? ', ' + detalhe : ''),
         aoClick: function () { alunoCelular = al.id; desenharAlunosCelular(); var c = $('#cel-conteudo'); if (c) c.scrollTop = 0; } }, [

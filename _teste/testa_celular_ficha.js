@@ -46,8 +46,9 @@ const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
 const MODOS = ['--envenenado-sem-55', '--envenenado-texto-errado', '--envenenado-abre-sozinho', '--envenenado-campo-obrigatorio',
-  '--envenenado-campos-nao-sobem', '--envenenado-cobranca-retrato', '--envenenado-observador-cadastra'];
-const [V_55, V_TEXTO, V_SOZINHO, V_OBRIGATORIO, V_NAO_SOBE, V_RETRATO, V_OBS] = MODOS;
+  '--envenenado-campos-nao-sobem', '--envenenado-cobranca-retrato', '--envenenado-observador-cadastra',
+  '--envenenado-todos-os-digitos', '--envenenado-aceita-http', '--envenenado-nunca-desatualizado'];
+const [V_55, V_TEXTO, V_SOZINHO, V_OBRIGATORIO, V_NAO_SOBE, V_RETRATO, V_OBS, V_DIGITOS, V_HTTP, V_HORA] = MODOS;
 const PRINTS = (() => { const i = process.argv.indexOf('--prints'); return i >= 0 ? process.argv[i + 1] : ''; })();
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 function prop(rotulo, ok, veneno) {
@@ -77,7 +78,11 @@ const ANCORAS = {
   [V_OBRIGATORIO]: ["var endereco = String(aluno.endereco || '').trim(), link", 'var endereco = aluno.endereco.trim(), link'],
   [V_NAO_SOBE]: ['    return gravarLugarEContato({', '    return (function (x) { return x; })({'],
   [V_RETRATO]: ["if (situacao.value !== (atual.status || 'realizada'))", "if (situacao.value !== (aula.status || 'realizada'))"],
-  [V_OBS]: ['var podeCadastrar = celularEdita();', 'var podeCadastrar = true;']
+  [V_OBS]: ['var podeCadastrar = celularEdita();', 'var podeCadastrar = true;'],
+  // (revisão) a regra de antes: todos os dígitos do contato viram um número só
+  [V_DIGITOS]: ["    if (achados.length !== 1) return '';", '    achados = [String(texto || \'\')];'],
+  [V_HTTP]: ['if (/^https:\\/\\//i.test(t)) return t;', 'if (/^https?:\\/\\//i.test(t)) return t;'],
+  [V_HORA]: ['var desatualizado = !!r.erroRecebimento || agora.getTime() - d.getTime() > HORAS_SEM_RECEBER * 3600 * 1000;', 'var desatualizado = false;']
 };
 conf('cada âncora de veneno está no app.js uma vez só', MODOS.map(m => APP.split(ANCORAS[m][0]).length - 1).join(','), MODOS.map(() => 1).join(','));
 conf('o app.js não tem travessão', new RegExp('[' + String.fromCharCode(0x2013, 0x2014) + ']').test(APP), false);
@@ -324,6 +329,11 @@ const telaBoa = m => m.pequenos.join('; ') + (m.rolaDeLado ? ' ROLA DE LADO' : '
 function isoDe(d) { const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
 const AGORA = new Date();
 const HOJE = isoDe(AGORA);
+/* A aula de hoje de Alfa ainda não acabou quando a prova roda (a próxima
+ * hora cheia de 15 em 15 minutos, no máximo 23:00): é a que leva o "Estou 10
+ * minutos atrasada" e o "Chegando". */
+const HORA_HOJE = (() => { const m = Math.min(Math.ceil((AGORA.getHours() * 60 + AGORA.getMinutes() + 1) / 15) * 15, 23 * 60);
+  return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); })();
 const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); return isoDe(d); })();
 /* Telefones fictícios (DDD 11 e 21, prefixo 9 0000). */
 const TEL_ALFA = '(11) 90000-0001', WA_ALFA = '5511900000001';
@@ -354,18 +364,26 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
       { id: 'nada', nome: 'Aluno Sem Contato Teste', ativo: true, cor: '#2E7D6B', responsavel: '', precos: [], mapeamentos: [] },
       { id: 'online', nome: 'Aluno Online Teste', ativo: true, cor: '#B4453C', responsavel: 'Responsável Online Teste', precos: preco(90), mapeamentos: [],
         telefone: c.telOnline, local: 'online', linkOnline: 'meet.google.com/abc-defg-hij' },
-      { id: 'inativo', nome: 'Aluno Inativo Teste', ativo: false, cor: '#9AA3AF', responsavel: '', precos: [], mapeamentos: [] }
+      { id: 'inativo', nome: 'Aluno Inativo Teste', ativo: false, cor: '#9AA3AF', responsavel: '', precos: [], mapeamentos: [] },
+      // (revisão) os contatos dela que não são UM telefone com DDD, e o campo próprio que vence o "Contato:"
+      { id: 'c1', nome: 'Contato Caso 1 Teste', ativo: true, cor: '#1F3A5F', responsavel: 'R1', precos: [], mapeamentos: [], obs: 'Contato: 98765-4321 (casa 2)' },
+      { id: 'c2', nome: 'Contato Caso 2 Teste', ativo: true, cor: '#1F3A5F', responsavel: 'R2', precos: [], mapeamentos: [], obs: 'Contato: mãe, prédio 12' },
+      { id: 'c3', nome: 'Contato Caso 3 Teste', ativo: true, cor: '#1F3A5F', responsavel: 'R3', precos: [], mapeamentos: [], obs: 'Contato: mãe 11 98765-4321, pai 11 91234-5678' },
+      { id: 'c4', nome: 'Contato Caso 4 Teste', ativo: true, cor: '#1F3A5F', responsavel: 'R4', precos: [], mapeamentos: [], obs: 'Contato: ramal 2',
+        local: 'online', linkOnline: 'http://inseguro.example.test/sala' },
+      { id: 'c5', nome: 'Contato Caso 5 Teste', ativo: true, cor: '#1F3A5F', responsavel: 'R5', precos: [], mapeamentos: [], obs: 'Contato: (11) 90000-0009',
+        telefone: '(31) 90000-0005' }
     ];
     d.aulas = [
       { id: 'aula-ontem', alunoId: 'alfa', serieId: null, data: c.ontem, hora: '09:00', duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: 'Rendeu bem em frações', anexos: [] },
-      { id: 'aula-hoje', alunoId: 'alfa', serieId: null, data: c.hoje, hora: '15:00', duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', anexos: [] },
+      { id: 'aula-hoje', alunoId: 'alfa', serieId: null, data: c.hoje, hora: c.horaHoje, duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', anexos: [] },
       { id: 'aula-velho', alunoId: 'velho', serieId: null, data: c.hoje, hora: '10:00', duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', anexos: [] },
       // as da nota da segunda mão: o tablet muda a situação com o formulário aberto no celular
       { id: 'aula-cobra', alunoId: 'velho', serieId: null, data: c.ontem, hora: '16:00', duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', anexos: [] },
       { id: 'aula-cobra2', alunoId: 'velho', serieId: null, data: c.ontem, hora: '17:30', duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', anexos: [] }
     ];
     await Store.salvar(d);
-  }, { hoje: HOJE, ontem: ONTEM, telAlfa: TEL_ALFA, telVelho: TEL_VELHO, telOnline: TEL_ONLINE, endereco: ENDERECO_ALFA });
+  }, { hoje: HOJE, ontem: ONTEM, horaHoje: HORA_HOJE, telAlfa: TEL_ALFA, telVelho: TEL_VELHO, telOnline: TEL_ONLINE, endereco: ENDERECO_ALFA });
   await H.abrirApp(pagA, amb.ORIGEM);
   conf('o tablet entrou', await entrarPelaTela(pagA, DONA.email, DONA.senha), true);
   await clicar(pagA, '#nuvem-enviar');
@@ -388,13 +406,45 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   conf('trouxe a cópia do tablet', await trazerCopiaNoCelular(pagC), true);
   conf('(arranjo) é o celular da dona, que edita', await pagC.evaluate(() => Nuvem.estado().celularDaDona), true);
 
+  secao('2b. (painel) O alto diz "Atualizado às HH:MM" pelo último recebimento, e avisa quando pode estar desatualizado');
+  await pagC.evaluate(() => Nuvem.receberRegistros());
+  const horaReceb = await pagC.evaluate(() => { const q = new Date(Nuvem.estado().registros.ultimoRecebimento.quando); return Core.pad2(q.getHours()) + ':' + Core.pad2(q.getMinutes()); });
+  const alto = () => pagC.evaluate(() => { const o = document.querySelector('#cel-origem'); return o.textContent + (o.classList.contains('cel-desatualizado') ? ' [destaque]' : ''); });
+  conf('depois de receber, o alto diz a hora do recebimento, sem destaque', (await esperar('o alto diz a hora', alto, v => /^Atualizado às/.test(v || ''), 10000)).valor, 'Atualizado às ' + horaReceb + '.');
+  conf('e a nuvem do alto fica em dia', await pagC.evaluate(() => document.querySelector('#cel-nuvem').getAttribute('data-tom')), 'em-dia');
+  /* O recebimento que falha (sem sinal): o aviso em destaque. */
+  await pagC.setOfflineMode(true);
+  await pagC.evaluate(() => window.dispatchEvent(new Event('offline')));
+  await pagC.evaluate(() => Nuvem.receberRegistros());
+  const falhou = await esperar('o alto avisa depois da falha', alto, v => /\[destaque\]$/.test(v || ''), 10000);
+  prop('o recebimento falhou: "Pode estar desatualizado: toque em ↻." em destaque (' + falhou.valor + ')',
+    falhou.valor === 'Pode estar desatualizado: toque em ↻. Atualizado às ' + horaReceb + '. [destaque]', V_HORA);
+  await pagC.setOfflineMode(false);
+  await pagC.evaluate(() => window.dispatchEvent(new Event('online')));
+  await pagC.evaluate(() => Nuvem.receberRegistros());
+  conf('com o sinal de volta e o recebimento certo, o destaque sai', !/destaque/.test((await esperar('o alto voltou', alto, v => !/destaque/.test(v || ''), 15000)).valor || ''), true);
+  /* Mais de 2 horas sem receber: o relógio da página anda 3 horas. */
+  await pagC.evaluate(() => {
+    const Real = Date, desvio = 3 * 3600 * 1000;
+    class Adiantado extends Real { constructor(...a) { if (a.length) super(...a); else super(Real.now() + desvio); } static now() { return Real.now() + desvio; } }
+    window.__DataReal = Real; window.Date = Adiantado;
+    window.dispatchEvent(new Event('offline'));
+  });
+  const velhoAlto = await alto();
+  await pagC.evaluate(() => { window.Date = window.__DataReal; window.dispatchEvent(new Event('offline')); });
+  prop('três horas sem receber: o aviso em destaque (' + velhoAlto + ')', /^Pode estar desatualizado: toque em ↻\. Atualizado .* \[destaque\]$/.test(velhoAlto), V_HORA);
+  if (MODO === V_HORA) fimDoVeneno();
+
   secao('3. A aba Alunos: a lista dos ativos');
   conf('a aba Alunos está nas abas de baixo, depois de Hoje', await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-abas .cel-aba')).filter(b => !b.hidden).map(b => b.textContent).join(',')),
     'Hoje,Alunos,Fechamento,Enviar');
   await aba(pagC, 'alunos');
   const lista = await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-alunos-lista .cel-aluno-item')).map(b => b.dataset.aluno + '=' + b.querySelector('.cel-aluno-nome').textContent));
-  conf('a lista traz os quatro ativos em ordem de nome, sem o inativo', lista.join(', '),
-    'alfa=Aluno Alfa Teste, online=Aluno Online Teste, nada=Aluno Sem Contato Teste, velho=Aluno Velho Teste');
+  conf('a lista traz os ativos em ordem de nome, sem o inativo', lista.join(', '),
+    'alfa=Aluno Alfa Teste, online=Aluno Online Teste, nada=Aluno Sem Contato Teste, velho=Aluno Velho Teste, ' +
+    [1, 2, 3, 4, 5].map(i => 'c' + i + '=Contato Caso ' + i + ' Teste').join(', '));
+  conf('(painel) o aluno sem contato diz na lista "sem telefone cadastrado"', await texto(pagC, '.cel-aluno-item[data-aluno="nada"] .cel-aluno-detalhe'), 'sem telefone cadastrado');
+  conf('e o que tem telefone não diz', await texto(pagC, '.cel-aluno-item[data-aluno="alfa"] .cel-aluno-detalhe'), 'Responsável Alfa Teste · Na casa do aluno');
   conf('e diz que o inativo fica no tablet', await texto(pagC, '#cel-alunos-inativos'), '1 aluno inativo fica só no tablet.');
   conf('cada aluno da lista leva a cor dele', await pagC.evaluate(() => getComputedStyle(document.querySelector('.cel-aluno-item[data-aluno="alfa"]')).borderLeftColor), 'rgb(31, 58, 95)');
   let m = await medirTela(pagC);
@@ -424,17 +474,19 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   if (MODO === V_55) fimDoVeneno();
   m = await medirTela(pagC);
   conf('a ficha: alvos de 48 px (os links também) e sem rolagem de lado', telaBoa(m), '');
+  conf('(painel) o telefone na ficha em letra maior (16 px, negrito)', await pagC.evaluate(() => { const c = getComputedStyle(document.querySelector('#cel-ficha-telefone')); return c.fontSize + ' ' + c.fontWeight + ' ' + document.querySelector('#cel-ficha-telefone').textContent; }), '16px 700 Telefone: ' + TEL_ALFA);
   conf('a ficha: nenhum botão nem campo de edição', m.soltos.join(', ') + '|' + m.campos.join(','), '|');
   await tirarPrint(pagC, '2_ficha_minima.png');
 
   secao('5. As mensagens prontas: wa.me com o telefone do responsável e o texto certo, e nada sai sozinho');
+  const quando = await pagC.evaluate((h, hora) => Core.diaSemanaCurto(h) + ' ' + Core.ddmm(h) + ', ' + hora, HOJE, HORA_HOJE);
   const esperadas = {
     atrasada: 'Olá! Estou 10 minutos atrasada para a aula de Aluno.',
-    remarcar: 'Olá! Podemos remarcar a aula de Aluno?',
+    remarcar: 'Olá! Podemos remarcar a aula de Aluno (' + quando + ')?',
     chegando: 'Olá! Estou chegando para a aula de Aluno.'
   };
   const msgs = await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-ficha-mensagens a')).map(a => ({ id: a.dataset.mensagem, rotulo: a.textContent, href: a.getAttribute('href') })));
-  conf('as três mensagens prontas, com os rótulos do pedido', msgs.map(x => x.rotulo).join(' / '), 'Estou 10 minutos atrasada / Podemos remarcar? / Chegando');
+  conf('a aula de hoje de Alfa (' + HORA_HOJE + ') ainda não foi dada: as três mensagens prontas, com os rótulos do pedido', msgs.map(x => x.rotulo).join(' / '), 'Estou 10 minutos atrasada / Podemos remarcar? / Chegando');
   prop('cada uma abre wa.me/' + WA_ALFA + ' com o texto certo (' + msgs.map(x => x.href).join(' ; ') + ')',
     msgs.length === 3 && msgs.every(x => x.href === 'https://wa.me/' + WA_ALFA + '?text=' + encodeURIComponent(esperadas[x.id])), V_TEXTO);
   if (MODO === V_TEXTO) fimDoVeneno();
@@ -452,6 +504,8 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   conf('(controle) o instrumento vê o toque: um, no "Chegando", com o link dele', depoisDoToque.join(' ; '), 'toque ' + msgs.find(x => x.id === 'chegando').href);
   conf('o link do WhatsApp abre numa aba nova, sem levar o aplicativo junto', await pagC.evaluate(() => { const a = document.querySelector('#cel-msg-chegando'); return a.target + ' ' + a.rel; }), '_blank noopener');
   conf('tocar no link não gravou nada (a fila continua vazia) nem foi a wa.me pela rede do aplicativo', (await fila(pagC)).length + '/' + pagC.paraFora.length, '0/0');
+  await pagC.hover('#cel-msg-atrasada');
+  conf('(painel) o "Estou 10 minutos atrasada" sob o dedo não fica cinza, com cara de já enviado', await pagC.evaluate(() => getComputedStyle(document.querySelector('#cel-msg-atrasada')).backgroundColor), 'rgb(255, 255, 255)');
 
   secao('5b. Na folha da aula: o toque no nome abre a mesma ficha, e o "Podemos remarcar?" diz qual aula');
   await aba(pagC, 'hoje');
@@ -461,7 +515,6 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
     'Ver a ficha de Aluno Alfa Teste: telefone, WhatsApp e endereço');
   await clicar(pagC, '#cel-folha-ficha');
   conf('o toque no nome abre a ficha mínima dentro da folha', await existe(pagC, '#cel-folha #cel-ficha[data-aluno="alfa"]'), true);
-  const quando = await pagC.evaluate(h => Core.diaSemanaCurto(h) + ' ' + Core.ddmm(h) + ', 15:00', HOJE);
   conf('o "Podemos remarcar?" da folha diz o dia e a hora da aula (' + quando + ')',
     decodeURIComponent(((await href(pagC, '#cel-folha #cel-msg-remarcar')) || '').split('?text=')[1] || ''), 'Olá! Podemos remarcar a aula de Aluno (' + quando + ')?');
   m = await medirTela(pagC);
@@ -470,6 +523,13 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   await tirarPrint(pagC, '3_mensagens_prontas.png');
   await clicar(pagC, '#cel-folha-voltar');
   conf('"Voltar" leva às ações da aula', await existe(pagC, '#cel-folha-realizada'), true);
+  await clicar(pagC, '#cel-folha-fechar');
+  /* A aula de ontem já foi dada: só o "Podemos remarcar?". */
+  await irParaDia(pagC, ONTEM);
+  await clicar(pagC, '.cel-bloco[data-aula="aula-ontem"]');
+  await clicar(pagC, '#cel-folha-ficha');
+  conf('(painel) na aula que já foi dada, atrasada e chegando não aparecem; o remarcar, sim', await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-folha #cel-ficha-mensagens a')).map(a => a.dataset.mensagem).join(',')), 'remarcar');
+  await clicar(pagC, '#cel-folha-voltar');
   await clicar(pagC, '#cel-folha-fechar');
 
   secao('6. O aluno SEM os campos novos funciona como hoje');
@@ -497,23 +557,51 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
     'cel-folha-ficha,cel-folha-realizada,cel-folha-faltou,cel-folha-remarcar,cel-folha-registrar,cel-folha-cancelar,cel-folha-fechar');
   await clicar(pagC, '#cel-folha-fechar');
 
+  secao('6b. (revisão) Um telefone só, com cara de telefone: os contatos dela que não são, não viram link');
+  const doCaso = async id => { await abrirFichaPelaLista(pagC, id); const r = await pagC.evaluate(() => ({
+    ligar: (document.querySelector('#cel-ficha-ligar') || { getAttribute: () => '' }).getAttribute('href'),
+    whats: (document.querySelector('#cel-ficha-whatsapp') || { getAttribute: () => '' }).getAttribute('href'),
+    msgs: document.querySelectorAll('#cel-ficha-mensagens a').length,
+    confira: !!document.querySelector('#cel-ficha-confira'), texto: (document.querySelector('#cel-ficha-telefone') || {}).textContent || '',
+    link: !!document.querySelector('#cel-ficha-link') })); await clicar(pagC, '#cel-alunos-voltar'); return r; };
+  const c1 = await doCaso('c1'), c2 = await doCaso('c2'), c3 = await doCaso('c3'), c4 = await doCaso('c4'), c5 = await doCaso('c5');
+  console.log('   casos: ' + JSON.stringify({ c1, c2, c3, c4, c5 }));
+  prop('"98765-4321 (casa 2)": liga para 98765-4321, sem WhatsApp nem mensagem (falta o DDD), e pede para conferir (' + c1.ligar + ' ' + c1.whats + ')',
+    c1.ligar === 'tel:987654321' && !c1.whats && c1.msgs === 0 && c1.confira, V_DIGITOS);
+  if (MODO === V_DIGITOS) fimDoVeneno();
+  conf('"mãe, prédio 12": nenhum link, o texto à vista e "Confira o telefone no tablet"', [c2.ligar, c2.whats, c2.msgs, c2.confira, c2.texto].join('|'), '||0|true|Contato: mãe, prédio 12');
+  conf('dois números ("mãe 11 98765-4321, pai 11 91234-5678"): nenhum link, e pede para conferir', [c3.ligar, c3.whats, c3.msgs, c3.confira].join('|'), '||0|true');
+  conf('"ramal 2": nenhum link, e pede para conferir', [c4.ligar, c4.whats, c4.msgs, c4.confira].join('|'), '||0|true');
+  conf('o campo telefone próprio vence o "Contato:" das observações', c5.ligar + ' ' + c5.whats, 'tel:+5531900000005 https://wa.me/5531900000005');
+  prop('(revisão) o link online com http: não vira botão, só https', c4.link === false, V_HTTP);
+  if (MODO === V_HTTP) fimDoVeneno();
+
   secao('7. O cadastro do celular com os campos opcionais, e eles chegam ao tablet pela fila');
   await aba(pagC, 'alunos');
   await clicar(pagC, '#cel-alunos-cadastrar');
   conf('"Cadastrar aluno" da aba Alunos abre o cadastro', await existe(pagC, '#cel-aluno-nome'), true);
   m = await medirTela(pagC);
-  conf('sem "onde é a aula", o endereço e o link ficam escondidos', m.campos.join(','), 'cel-aluno-nome,cel-aluno-responsavel,cel-aluno-contato,cel-aluno-preco,cel-aluno-local');
+  conf('sem "onde é a aula", o endereço e o link ficam escondidos', m.campos.join(','), 'cel-aluno-nome,cel-aluno-responsavel,cel-aluno-telefone,cel-aluno-preco,cel-aluno-local');
+  conf('(painel) o campo diz que é o telefone do responsável, para ligar e o WhatsApp, com o formato', await pagC.evaluate(() => document.querySelector('#cel-aluno-telefone').closest('label').querySelector('span').textContent + ' | ' + document.querySelector('#cel-aluno-telefone').placeholder),
+    'Telefone do responsável (para ligar e WhatsApp) | Com DDD, por exemplo (11) 98765-4321');
   await digitar(pagC, '#cel-aluno-nome', 'Aluno Novo Casa Teste');
   await digitar(pagC, '#cel-aluno-responsavel', 'Responsável Novo Teste');
-  await digitar(pagC, '#cel-aluno-contato', '(11) 90000-0004');
+  await digitar(pagC, '#cel-aluno-telefone', '(11) 90000-0004');
   await digitar(pagC, '#cel-aluno-preco', '110,00');
   await pagC.select('#cel-aluno-local', 'casa');
   await digitar(pagC, '#cel-aluno-endereco', 'Avenida Fictícia, 200, Centro Teste');
   m = await medirTela(pagC);
-  conf('na casa do aluno: aparece o endereço, e o link não', m.campos.join(','), 'cel-aluno-nome,cel-aluno-responsavel,cel-aluno-contato,cel-aluno-preco,cel-aluno-local,cel-aluno-endereco');
+  conf('na casa do aluno: aparece o endereço, e o link não', m.campos.join(','), 'cel-aluno-nome,cel-aluno-responsavel,cel-aluno-telefone,cel-aluno-preco,cel-aluno-local,cel-aluno-endereco');
   conf('o cadastro: alvos de 48 px e sem rolagem de lado', telaBoa(m), '');
   await pagC.evaluate(() => document.querySelector('#cel-aluno-endereco').scrollIntoView({ block: 'center' }));
   await tirarPrint(pagC, '4_cadastro_com_campos_novos.png');
+  /* Dois números no telefone: o cadastro não grava e diz como escrever. */
+  await digitar(pagC, '#cel-aluno-telefone', 'mãe 11 98765-4321, pai 11 91234-5678');
+  await clicar(pagC, '#cel-aluno-salvar');
+  await pausa(300);
+  conf('telefone com dois números: o cadastro avisa e não grava', (await texto(pagC, '#aviso-texto')) + ' | ' + (await pagC.evaluate(() => Store.carregar().then(b => b.alunos.some(x => x.nome === 'Aluno Novo Casa Teste')))),
+    'Escreva um telefone só, com DDD, por exemplo (11) 98765-4321. | false');
+  await digitar(pagC, '#cel-aluno-telefone', '(11) 90000-0004');
   await clicar(pagC, '#cel-aluno-salvar');
   const novo = await esperar('o aluno gravou', () => pagC.evaluate(() => Store.carregar().then(b => { const a = b.alunos.find(x => x.nome === 'Aluno Novo Casa Teste'); return a ? a.id : null; })), v => !!v, 10000);
   conf('o aluno novo está no celular', novo.ok, true);
@@ -546,18 +634,20 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   conf('(arranjo) os três alunos do celular chegaram ao tablet', chegou.ok, true);
   const noTablet = await pagA.evaluate((a) => Store.carregar().then(d => {
     const r = id => { const x = d.alunos.find(y => y.id === id); return x ? ['telefone', 'local', 'endereco', 'linkOnline'].map(k => k in x ? k + '=' + x[k] : '').filter(Boolean).join(' ; ') : 'não chegou'; };
-    return [r(a.n1), r(a.n2), r(a.n3)];
+    const ob = id => (d.alunos.find(y => y.id === id) || {}).obs;
+    return [r(a.n1), r(a.n2), r(a.n3), ob(a.n1)];
   }), { n1: idNovo, n2: idNovo2, n3: idNovo3 });
   console.log('   no tablet: ' + JSON.stringify(noTablet));
-  prop('o aluno da casa chegou ao tablet com casa e o endereço (' + noTablet[0] + ')', noTablet[0] === 'local=casa ; endereco=Avenida Fictícia, 200, Centro Teste', V_NAO_SOBE);
+  prop('o aluno da casa chegou ao tablet com casa e o endereço (' + noTablet[0] + ')', noTablet[0] === 'telefone=(11) 90000-0004 ; local=casa ; endereco=Avenida Fictícia, 200, Centro Teste', V_NAO_SOBE);
   prop('o online chegou com o link e sem o endereço digitado antes (' + noTablet[1] + ')', noTablet[1] === 'local=online ; linkOnline=https://meet.example.test/sala-nova', V_NAO_SOBE);
   if (MODO === V_NAO_SOBE) fimDoVeneno();
   conf('o sem nada chegou sem nenhum dos campos novos (sem chave vazia)', noTablet[2], '');
+  conf('(painel) as observações ficam só para o texto livre: o telefone não vai para elas', noTablet[3], '');
   await H.irParaAba(pagA, 'alunos');
   await pagA.evaluate(() => { const l = [...document.querySelectorAll('#lista-alunos .item-lista')].find(e => e.textContent.includes('Aluno Novo Casa Teste')); if (l) l.click(); });
   const fichaTablet = await esperar('a ficha completa do tablet abriu', () => pagA.evaluate(() => document.querySelector('#modal-aluno.aberto #campo-endereco') ?
     ['#campo-local', '#campo-endereco', '#campo-link-online', '#campo-telefone'].map(s => document.querySelector(s).value).join(' | ') : null), v => !!v, 8000);
-  conf('a ficha completa do tablet mostra os campos que vieram do celular', fichaTablet.valor, 'casa | Avenida Fictícia, 200, Centro Teste |  | ');
+  conf('a ficha completa do tablet mostra os campos que vieram do celular', fichaTablet.valor, 'casa | Avenida Fictícia, 200, Centro Teste |  | (11) 90000-0004');
   await pagA.evaluate(() => { const b = document.querySelector('#modal-aluno.aberto .fechar, #modal-aluno.aberto [data-fechar]'); if (b) b.click(); });
 
   secao('7b. O tablet grava os campos opcionais na ficha completa, e eles chegam ao celular');

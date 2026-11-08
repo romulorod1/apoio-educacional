@@ -18,7 +18,7 @@
  *     com todo alvo de toque de pelo menos 44 px, e a grade do mês não aparece;
  *   - Hoje mostra a cópia restaurada: a aula do dia, o lembrete e a nota só
  *     minha (fechada, abre com um toque);
- *   - no alto, "Dados de hoje, HH:MM, do tablet.";
+ *   - no alto, "Atualizado às HH:MM." (D6c lote 2: a hora do último recebimento);
  *   - NENHUMA gravação no banco apoio-educacional além das restaurações: um
  *     espião em IDBDatabase.prototype.transaction (como o testa_store_grava_
  *     no_commit do B3) conta toda transação de escrita, do primeiro instante
@@ -484,7 +484,7 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
   conf('a marca "este aparelho é celular" foi gravada, de que conta (a da dona: ele edita pelos registros), e a automática ficou desligada', await pagB.evaluate(u => {
     const e = Nuvem.estado(); return e.celular && e.celularDaDona && !e.observador && e.uidDona === u && e.automatica === false;
   }, dona.localId), ENVIA ? false : true);
-  conf('no alto: "Dados de hoje, HH:MM, do tablet."', /^Dados de hoje, \d\d:\d\d, do tablet\.$/.test(await texto(pagB, '#cel-origem')), true);
+  conf('no alto: "Atualizado às HH:MM."', /^Atualizado às \d\d:\d\d\.$/.test(await texto(pagB, '#cel-origem')), true);
   /* D6c: o alto da dona é enxuto, sem o texto de sistema (o que ela pode
    * fazer está nos botões), com o ícone da nuvem ao lado do estado curto. */
   conf('no alto da dona, nenhum texto de sistema, e o ícone da nuvem ao lado do estado', await pagB.evaluate(() =>
@@ -627,7 +627,7 @@ const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p
       /Aluno Beta Teste/.test(document.querySelector('#cel-hoje').textContent)), v => v === true, 30000);
     conf('ao abrir, Hoje já mostra a aula da cópia nova', aplicou.ok, true);
     conf('a cópia aplicada é a mais nova', await pagB.evaluate(() => Nuvem.estado().ultimaCopia.id), nova.valor);
-    conf('no alto, de novo: "Dados de hoje, HH:MM, do tablet."', /^Dados de hoje, \d\d:\d\d, do tablet\.$/.test(await texto(pagB, '#cel-origem')), true);
+    conf('no alto, de novo: "Atualizado às HH:MM."', /^Atualizado às \d\d:\d\d\.$/.test(await texto(pagB, '#cel-origem')), true);
     escritas = await escritasNoBanco(pagB);
     conf('a única escrita desta abertura foi a restauração da cópia nova', escritas.length === 1 && /dados/.test(escritas[0]), true);
     conf('e nenhuma escrita na nuvem do celular em toda a rodada', pagB.escritasNaNuvem.length, 0);
