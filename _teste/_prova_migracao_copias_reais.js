@@ -82,7 +82,7 @@ async function apagarBanco(pag) {
       const principal = await P.principalPorFora();
       const carregado = await Store.carregar();
       return { versao: v.versao, depositos: await P.contagensDosDepositos(), canon: P.canon(principal), canonCarregado: P.canon(carregado),
-        idsAulas: principal.aulas.map(a => a.id).join(','), contagens: P.contagens(carregado), regua: P.regua(carregado),
+        ordem: P.ordem(principal), contagens: P.contagens(carregado), regua: P.regua(carregado),
         notas: Object.keys(p.notas || {}).length, anexos: Object.keys(p.anexos || {}).length };
     });
     conf('o código de antes deixou o banco na versão 4', antes.versao, 4);
@@ -114,8 +114,8 @@ async function apagarBanco(pag) {
       const deNovo = await Store.carregar();
       const montado = Store.montarRegistros(await Store.lerRegistros());
       return { versao: v.versao, depositos: await P.contagensDosDepositos(), canonPrincipal: P.canon(principal), canonCarregado: P.canon(carregado),
-        idsAulas: carregado.aulas.map(a => a.id).join(','), contagens: P.contagens(carregado), regua: P.regua(carregado), registros: resumo,
-        putsNoSalvar, canonDeNovo: P.canon(deNovo), canonMontado: P.canon(montado) };
+        ordem: P.ordem(carregado), contagens: P.contagens(carregado), regua: P.regua(carregado), registros: resumo,
+        putsNoSalvar, canonDeNovo: P.canon(deNovo), ordemDeNovo: P.ordem(deNovo), canonMontado: P.canon(montado), ordemMontado: P.ordem(montado) };
     });
     conf('o código novo subiu o banco para a versão 5', depois.versao, 5);
     const chaves = Object.keys(antes.depositos).sort();
@@ -123,7 +123,7 @@ async function apagarBanco(pag) {
       chaves.map(k => k + '=' + antes.depositos[k]).join(' '), chaves.map(k => k + '=' + depois.depositos[k]).join(' '));
     conf('o principal não foi tocado', depois.canonPrincipal === antes.canon, true);
     conf('carregar() depois da migração é a cópia, campo a campo', depois.canonCarregado === antes.canonCarregado, true);
-    conf('as aulas vêm na mesma ordem', depois.idsAulas === antes.idsAulas, true);
+    conf('todo vetor e as chaves de ajustes vêm na mesma ordem', depois.ordem === antes.ordem, true);
     const itens = antes.contagens.alunos + antes.contagens.series + antes.contagens.aulas + antes.contagens.resumos +
       antes.contagens.pagamentos + antes.contagens.ajustes + 1;
     conf('um registro vivo por item (' + itens + ')', depois.registros.vivos, itens);
@@ -135,8 +135,8 @@ async function apagarBanco(pag) {
     conf('e o caso com R$ 1.050,00 continua onde estava', depois.regua.com1050, antes.regua.com1050);
     // 5. ida e volta
     conf('salvar(carregar()) não grava registro nenhum', depois.putsNoSalvar, 0);
-    conf('e carregar() continua igual', depois.canonDeNovo === antes.canonCarregado, true);
-    conf('o documento montado dos registros é o carregar()', depois.canonMontado === depois.canonCarregado, true);
+    conf('e carregar() continua igual, na mesma ordem', depois.canonDeNovo === antes.canonCarregado && depois.ordemDeNovo === antes.ordem, true);
+    conf('o documento montado dos registros é o carregar(), na mesma ordem', depois.canonMontado === depois.canonCarregado && depois.ordemMontado === depois.ordem, true);
     conf('nenhum erro de página', pag.errosDePagina.join(' | '), '');
     await apagarBanco(pag);
     await pag.close();

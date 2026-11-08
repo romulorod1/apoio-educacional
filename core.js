@@ -353,14 +353,16 @@
      * sufixo, também determinístico, para nunca haver dois ids iguais. */
     var ids = {};
     (db.aulas || []).forEach(function (a) { ids[a.id] = true; });
+    var reaberturas = serie.reaberturas || {};
     datasDaSerieNoMes(serie, mesIso).forEach(function (iso) {
       if (apagadas.indexOf(iso) >= 0) return;
       var jaTem = (db.aulas || []).some(function (a) {
         return a.serieId === serie.id && a.data === iso;
       });
       if (jaTem) return;
-      var id = serie.id + '@' + iso, n = 2;
-      while (ids[id]) id = serie.id + '@' + iso + '+' + (n++);
+      var base = serie.id + '@' + iso + (reaberturas[iso] ? '+r' + reaberturas[iso] : '');
+      var id = base, n = 2;
+      while (ids[id]) id = base + '+' + (n++);
       ids[id] = true;
       db.aulas.push({
         id: id,
@@ -400,6 +402,22 @@
       if (!s.materializadoAte || s.materializadoAte < limite) s.materializadoAte = limite;
     });
     return criadas;
+  }
+
+  /* Uma data que SAI de `exclusoes` volta a ser materializada. A aula nova não
+   * pode herdar a folha nem o uso da biblioteca da aula apagada naquela data,
+   * que ficam ligados ao id da aula (e o id é determinístico desde a N1): por
+   * isso a série conta as reaberturas por data e o id leva a conta
+   * (`serieId@data+r1`). A folha antiga não é apagada aqui: o Desfazer volta a
+   * aula antiga com o id antigo, e a folha dela continua lá. */
+  function reabrirDatas(serie, ficam) {
+    var antes = serie.exclusoes || [];
+    serie.exclusoes = antes.filter(ficam);
+    antes.forEach(function (d) {
+      if (serie.exclusoes.indexOf(d) >= 0) return;
+      serie.reaberturas = serie.reaberturas || {};
+      serie.reaberturas[d] = (serie.reaberturas[d] || 0) + 1;
+    });
   }
 
   function criarSerie(db, dados) {
@@ -680,7 +698,7 @@
     });
     db._preservadasNaEdicao = preservadas;
 
-    s.exclusoes = (s.exclusoes || []).filter(function (d) { return d < corte; });
+    reabrirDatas(s, function (d) { return d < corte; });
 
     // Antecipar o início faz a recorrência passar a valer para trás, criando
     // as datas que ainda não existiam naquele intervalo.
@@ -696,7 +714,7 @@
     var serieCorte = {
       id: s.id, alunoId: s.alunoId, dias: s.dias, hora: s.hora,
       duracaoMin: s.duracaoMin, inicio: corte > s.inicio ? corte : s.inicio, fim: s.fim,
-      exclusoes: s.exclusoes
+      exclusoes: s.exclusoes, reaberturas: s.reaberturas
     };
     // As aulas que sobreviveram ao corte passam a seguir o horário e a duração
     // novos, sem trocar de registro: assim a folha de aula continua com a aula.
@@ -764,7 +782,7 @@
     if (serie) {
       // a recorrência passa a valer desde a data mais antiga recuperada
       if (datas.length && datas[0] < serie.inicio) serie.inicio = datas[0];
-      serie.exclusoes = (serie.exclusoes || []).filter(function (d) { return datas.indexOf(d) < 0; });
+      reabrirDatas(serie, function (d) { return datas.indexOf(d) < 0; });
       listaDias.forEach(function (d) { if (serie.dias.indexOf(d) < 0) serie.dias.push(d); });
       serie.dias.sort();
     }

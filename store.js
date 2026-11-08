@@ -365,26 +365,88 @@
    * Vetores conhecidos, depois cada chave de `ajustes`, depois o que sobrar
    * na raiz (`versao`), para nenhum campo do documento ficar de fora. */
   function desmontar(db) {
-    var itens = {}, ordem = [], usadas = {};
+    var itens = {}, grupos = [], usadas = {};
     Object.keys(VETORES).forEach(function (vetor) {
-      var tipo = VETORES[vetor];
+      var tipo = VETORES[vetor], chaves = [];
       (Array.isArray(db[vetor]) ? db[vetor] : []).forEach(function (item) {
         var chave = chaveDoItem(tipo, item, usadas);
         itens[chave] = { tipo: tipo, dados: item };
-        ordem.push(chave);
+        chaves.push(chave);
       });
+      grupos.push(chaves);
     });
+    var ajustes = [];
     Object.keys(db.ajustes || {}).forEach(function (k) {
       if (db.ajustes[k] === undefined) return;
       itens['ajuste:' + k] = { tipo: 'ajuste', dados: db.ajustes[k] };
-      ordem.push('ajuste:' + k);
+      ajustes.push('ajuste:' + k);
     });
+    grupos.push(ajustes);
+    var raiz = [];
     Object.keys(db).forEach(function (k) {
       if (VETORES[k] || k === 'ajustes' || db[k] === undefined) return;
       itens['raiz:' + k] = { tipo: 'raiz', dados: db[k] };
-      ordem.push('raiz:' + k);
+      raiz.push('raiz:' + k);
     });
-    return { itens: itens, ordem: ordem };
+    grupos.push(raiz);
+    return { itens: itens, grupos: grupos };
+  }
+
+  /* A `ordem` de cada chave de um grupo (um vetor, as chaves de ajustes, a
+   * raiz), na ordem em que o documento foi salvo. Quem já tem ordem, e ela
+   * cresce em relação à do item anterior, fica com a sua e não é regravado
+   * por isso: apagar um item não toca os vizinhos. Quem nasce, revive ou está
+   * fora de ordem recebe um número entre a ordem anterior e a próxima que
+   * ainda vale (um item encaixado no meio custa um registro). Assim o montar
+   * devolve cada vetor exatamente na ordem do documento salvo. Se a precisão
+   * do meio se esgotar, segue com inteiros e os seguintes se ajustam. */
+  function ordensDoGrupo(chaves, porId) {
+    var atuais = chaves.map(function (c) {
+      var r = porId[c];
+      return r && typeof r.ordem === 'number' && isFinite(r.ordem) ? r.ordem : null;
+    });
+    /* Quem fica com a ordem que tem: a maior sequência crescente das ordens
+     * existentes (um item movido para a frente regrava só ele, e não todos os
+     * que ficaram atrás). */
+    var mantidos = maiorSequenciaCrescente(atuais);
+    var proximaMantida = new Array(chaves.length), prox = null;
+    for (var k = chaves.length - 1; k >= 0; k--) {
+      proximaMantida[k] = prox;
+      if (mantidos[k]) prox = atuais[k];
+    }
+    var saida = [], ultima = -Infinity;
+    for (var i = 0; i < chaves.length; i++) {
+      var o;
+      if (mantidos[i] && atuais[i] > ultima) o = atuais[i];
+      else {
+        var proxima = proximaMantida[i];
+        if (proxima !== null && proxima <= ultima) proxima = null;
+        if (proxima === null) o = ultima === -Infinity ? 0 : Math.floor(ultima) + 1;
+        else if (ultima === -Infinity) o = proxima - 1;
+        else o = (ultima + proxima) / 2;
+        if (!(o > ultima && (proxima === null || o < proxima))) o = ultima + 1;
+      }
+      saida.push(o);
+      ultima = o;
+    }
+    return saida;
+  }
+  /* Índices da maior subsequência estritamente crescente dos valores (null não
+   * conta). Pilhas de paciência com antecessor: O(n log n). */
+  function maiorSequenciaCrescente(valores) {
+    var topos = [], indices = [], anterior = {};
+    for (var i = 0; i < valores.length; i++) {
+      var v = valores[i];
+      if (v === null) continue;
+      var lo = 0, hi = topos.length;
+      while (lo < hi) { var m = (lo + hi) >> 1; if (topos[m] < v) lo = m + 1; else hi = m; }
+      topos[lo] = v; indices[lo] = i;
+      anterior[i] = lo > 0 ? indices[lo - 1] : -1;
+    }
+    var mantidos = {};
+    var k = topos.length ? indices[topos.length - 1] : -1;
+    while (k >= 0) { mantidos[k] = true; k = anterior[k]; }
+    return mantidos;
   }
 
   /* A volta: os registros vivos, na ordem gravada, montam o documento no
@@ -425,27 +487,25 @@
    *   - item que mudou ou nasceu: registro vivo com atualizadoEm = agora;
    *   - item que sumiu: lápide (apagadoEm = agora, dados null);
    *   - item igual: não é tocado.
-   * A comparação é pelo texto JSON de cada item. `ordem` nasce na primeira
-   * gravação do item (depois do maior que existe) e nunca muda: apagar um
-   * item não regrava os outros. Devolve as contas. */
+   * A comparação é pelo texto JSON de cada item e pela `ordem` (ordensDoGrupo):
+   * um item igual, na mesma posição relativa, não é tocado. Devolve as contas. */
   function aplicarDiferenca(deposito, existentes, db, agora, aparelho) {
-    var porId = {}, maiorOrdem = -1;
-    existentes.forEach(function (r) {
-      porId[r.id] = r;
-      if (typeof r.ordem === 'number' && r.ordem > maiorOrdem) maiorOrdem = r.ordem;
-    });
+    var porId = {};
+    existentes.forEach(function (r) { porId[r.id] = r; });
     var novo = desmontar(db);
     var contas = { gravados: 0, lapides: 0, iguais: 0 };
-    novo.ordem.forEach(function (chave) {
-      var item = novo.itens[chave];
-      var texto = JSON.stringify(item.dados);
-      if (texto === undefined) return;
-      var antes = porId[chave];
-      if (antes && !antes.apagadoEm && JSON.stringify(antes.dados) === texto) { contas.iguais++; return; }
-      var ordem = antes && typeof antes.ordem === 'number' ? antes.ordem : ++maiorOrdem;
-      deposito.put({ id: chave, tipo: item.tipo, atualizadoEm: agora, apagadoEm: null, aparelho: aparelho,
-        esquema: ESQUEMA_REGISTRO, ordem: ordem, dados: item.dados });
-      contas.gravados++;
+    novo.grupos.forEach(function (chaves) {
+      var ordens = ordensDoGrupo(chaves, porId);
+      chaves.forEach(function (chave, i) {
+        var item = novo.itens[chave];
+        var texto = JSON.stringify(item.dados);
+        if (texto === undefined) return;
+        var antes = porId[chave], ordem = ordens[i];
+        if (antes && !antes.apagadoEm && antes.ordem === ordem && JSON.stringify(antes.dados) === texto) { contas.iguais++; return; }
+        deposito.put({ id: chave, tipo: item.tipo, atualizadoEm: agora, apagadoEm: null, aparelho: aparelho,
+          esquema: ESQUEMA_REGISTRO, ordem: ordem, dados: item.dados });
+        contas.gravados++;
+      });
     });
     existentes.forEach(function (r) {
       if (r.apagadoEm || novo.itens[r.id]) return;
@@ -523,8 +583,14 @@
     return lerDocumento().then(function (lido) {
       if (lido.aparelho) aparelhoId = lido.aparelho;
       if (!lido.principal) {
+        /* Sem documento. Se ainda há registro vivo, o `principal` foi apagado
+         * POR FORA (o código da versão 4, no rollback, "Apagar tudo" esvazia
+         * 'dados' e não conhece os registros): o apagamento vence, como
+         * qualquer escrita de fora. Tudo vira lápide, e o documento é null.
+         * No aparelho que só lê, null sem gravar. */
         var vivos = lido.registros.filter(function (r) { return !r.apagadoEm; });
-        return vivos.length ? completar(montar(lido.registros)) : null;
+        if (!vivos.length || soLeitura) return null;
+        return apagarDocumento().then(function () { return null; });
       }
       if (lido.retrato && mesmaAssinatura(lido.retrato.assinatura, assinatura(lido.principal))) {
         return completar(montar(lido.registros));

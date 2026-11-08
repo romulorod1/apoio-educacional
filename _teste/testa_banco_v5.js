@@ -106,7 +106,7 @@ const ITENS_DO_DOCUMENTO = 3 + 2 + 40 + 2 + 2 + 5 + 1; // alunos, séries, aulas
     await Store.registrarHistorico('ponto de prova', d);
     const P = window.__prova;
     const principal = await P.principalPorFora();
-    return { depositos: await P.contagensDosDepositos(), canon: P.canon(principal), idsAulas: principal.aulas.map(a => a.id).join(','),
+    return { depositos: await P.contagensDosDepositos(), canon: P.canon(principal), ordem: P.ordem(principal),
       contagens: P.contagens(principal) };
   }, DOCUMENTO.toString());
   console.log('   contagens de antes: ' + JSON.stringify(antes.contagens));
@@ -123,8 +123,7 @@ const ITENS_DO_DOCUMENTO = 3 + 2 + 40 + 2 + 2 + 5 + 1; // alunos, séries, aulas
     const registros = await P.registrosPorFora();
     const carregado = await Store.carregar();
     return { depositos: await P.contagensDosDepositos(), canonPrincipal: P.canon(principal), canonCarregado: P.canon(carregado),
-      idsAulas: carregado.aulas.map(a => a.id).join(','), registros: P.resumoDosRegistros(registros),
-      ordemDasChavesDeAjustes: Object.keys(carregado.ajustes).join(','), aparelho: Store.aparelho() };
+      ordem: P.ordem(carregado), registros: P.resumoDosRegistros(registros), aparelho: Store.aparelho() };
   });
   const chavesDeAntes = Object.keys(antes.depositos).sort();
   conf('as contagens dos depósitos de antes, um a um, são as de depois',
@@ -138,7 +137,7 @@ const ITENS_DO_DOCUMENTO = 3 + 2 + 40 + 2 + 2 + 5 + 1; // alunos, séries, aulas
   conf('o controle tem o aparelho e o retrato', depois.depositos.controle, 2);
   conf('o Store sabe o id deste aparelho depois de carregar', /^ap[0-9a-f]{12}$/.test(depois.aparelho || ''), true);
   prop('carregar() depois da migração é o documento de antes, campo a campo', depois.canonCarregado === antes.canon, PERDE);
-  prop('e as aulas vêm na mesma ordem', depois.idsAulas === antes.idsAulas, PERDE);
+  prop('e todo vetor e as chaves de ajustes vêm na mesma ordem', depois.ordem === antes.ordem, PERDE);
   console.log('   registros: ' + JSON.stringify(depois.registros));
   if (MODO === PERDE) throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
 
@@ -172,14 +171,26 @@ const ITENS_DO_DOCUMENTO = 3 + 2 + 40 + 2 + 2 + 5 + 1; // alunos, séries, aulas
     db.aulas.push(removida);
     P.zerarPuts();
     await Store.salvar(db);
-    const regs2 = await Store.lerRegistros();
-    const revivida = regs2.find(r => r.id === 'aula:aula20');
+    const revivida = (await Store.lerRegistros()).find(r => r.id === 'aula:aula20');
     saida.revivida = { registros: P.puts.registros.slice(), viva: !!revivida && !revivida.apagadoEm && !!revivida.dados,
-      ordemIgual: !!revivida && !!lapide && revivida.ordem === lapide.ordem };
+      ordem: P.ordem(await Store.carregar()) === P.ordem(db) };
+    // encaixada no MEIO do vetor: só ela é gravada, e o carregar devolve a ordem do documento
+    db.aulas.splice(5, 0, { id: 'aulaMeio', alunoId: 'a1', serieId: null, data: '2026-06-15', hora: '08:00', duracaoMin: 60,
+      status: 'realizada', cobravel: true, notaTexto: '', anexos: [] });
+    P.zerarPuts();
+    await Store.salvar(db);
+    saida.noMeio = { registros: P.puts.registros.slice(), ordem: P.ordem(await Store.carregar()) === P.ordem(db) };
+    // a última aula vai para a frente: um registro, e a ordem continua a do documento
+    db.aulas.unshift(db.aulas.pop());
+    P.zerarPuts();
+    await Store.salvar(db);
+    saida.movida = { registros: P.puts.registros.slice(), ordem: P.ordem(await Store.carregar()) === P.ordem(db) };
+    const regs2 = await Store.lerRegistros();
     const carregado = await Store.carregar();
     const montado = Store.montarRegistros(regs2);
     saida.idaEVolta = P.canon(carregado) === P.canon(db);
-    saida.montadoIgual = P.canon(montado) === P.canon(carregado);
+    saida.ordemFinal = P.ordem(carregado) === P.ordem(db);
+    saida.montadoIgual = P.canon(montado) === P.canon(carregado) && P.ordem(montado) === P.ordem(carregado);
     saida.atualizadoEmIso = regs2.every(r => !isNaN(new Date(r.atualizadoEm).getTime()));
     return saida;
   });
@@ -192,13 +203,53 @@ const ITENS_DO_DOCUMENTO = 3 + 2 + 40 + 2 + 2 + 5 + 1; // alunos, séries, aulas
   conf('a lápide tem apagadoEm e dados null', JSON.stringify(dif.apagada.lapide), JSON.stringify({ apagadoEm: 'string', dados: null }));
   conf('e carregar() não a devolve', dif.apagada.aulasCarregadas, 39);
   prop('criar uma aluna e um ajuste grava exatamente dois', dif.novos.join(',') === 'ajuste:esconderNaoCobradas,aluno:a4', REGRAVA);
-  prop('a aula que volta revive o registro (um put, vivo, com a mesma ordem)',
-    dif.revivida.registros.join(',') === 'aula:aula20' && dif.revivida.viva && dif.revivida.ordemIgual, REGRAVA);
+  prop('a aula que volta revive o registro (um put, vivo, no fim do vetor como no documento)',
+    dif.revivida.registros.join(',') === 'aula:aula20' && dif.revivida.viva && dif.revivida.ordem, REGRAVA);
+  prop('uma aula encaixada no meio do vetor grava só ela, e a ordem devolvida é a do documento',
+    dif.noMeio.registros.join(',') === 'aula:aulaMeio' && dif.noMeio.ordem, REGRAVA);
+  prop('a última aula movida para a frente grava só ela, e a ordem devolvida é a do documento',
+    dif.movida.registros.join(',') === 'aula:aula20' && dif.movida.ordem, REGRAVA);
   if (MODO === REGRAVA) throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
+
+  // ================================================================
+  secao('2b. Aula de série excluída e reaberta na mesma data nasce limpa; o Desfazer traz a antiga de volta');
+  const reaberta = await pag.evaluate(async () => {
+    const P = window.__prova;
+    const db = await Store.carregar();
+    const ANTIGA = 's1@2026-06-03';
+    await Store.salvarNota(ANTIGA, { paginas: [{ itens: [{ t: 'texto', texto: 'folha da aula antiga' }] }] });
+    await Store.registrarUsoBiblioteca({ itemId: 'x:9', alunoId: 'a1', aulaId: ANTIGA, data: '2026-06-03' });
+    await Store.registrarHistorico('antes de excluir', db);
+    const excluidas = Core.excluirAulas(db, ANTIGA, 'esta');
+    await Store.salvar(db);
+    const serie = db.series.find(s => s.id === 's1');
+    const excluida = (serie.exclusoes || []).indexOf('2026-06-03') >= 0 && !db.aulas.some(a => a.id === ANTIGA);
+    // reabrir: mudar o padrão desta em diante solta as exclusões a partir do corte, e a data volta a ser materializada
+    Core.editarSerie(db, 's1', { hora: '11:00' }, '2026-06-01');
+    await Store.salvar(db);
+    const nova = db.aulas.find(a => a.serieId === 's1' && a.data === '2026-06-03');
+    const notaDaNova = nova ? await Store.lerNota(nova.id) : 'sem aula';
+    const usoDaNova = nova ? (await Store.usoDaBiblioteca()).filter(u => u.aulaId === nova.id).length : -1;
+    const ponto = (await Store.listarHistorico()).find(h => h.rotulo === 'antes de excluir');
+    const voltou = await Store.desfazer(ponto.id);
+    const notaDaAntiga = await Store.lerNota(ANTIGA);
+    return { excluidas, excluida, novaId: nova ? nova.id : null, notaDaNova, usoDaNova, reaberturas: JSON.stringify(serie.reaberturas || null),
+      antigaVoltou: voltou.aulas.some(a => a.id === ANTIGA), notaDaAntiga: notaDaAntiga ? notaDaAntiga.paginas[0].itens[0].texto : null,
+      ordemDepoisDoDesfazer: P.ordem(await Store.carregar()) === P.ordem(voltou) };
+  });
+  conf('a aula foi excluída e a data ficou nas exclusões da série', reaberta.excluidas + '/' + reaberta.excluida, '1/true');
+  conf('reaberta na mesma data, a aula nasce com outro id, determinístico', reaberta.novaId, 's1@2026-06-03+r1');
+  conf('e a série guarda a reabertura', reaberta.reaberturas, '{"2026-06-03":1}');
+  conf('a aula nova não herda a folha da antiga', reaberta.notaDaNova, null);
+  conf('nem o uso da biblioteca', reaberta.usoDaNova, 0);
+  conf('o Desfazer traz a aula antiga de volta, com o id antigo', reaberta.antigaVoltou, true);
+  conf('e a folha dela continua lá', reaberta.notaDaAntiga, 'folha da aula antiga');
+  conf('o carregar depois do Desfazer devolve a ordem do ponto', reaberta.ordemDepoisDoDesfazer, true);
 
   secao('3. Ida e volta');
   conf('carregar() é o documento em memória, campo a campo', dif.idaEVolta, true);
-  conf('o documento montado dos registros é o carregar()', dif.montadoIgual, true);
+  conf('e na mesma ordem', dif.ordemFinal, true);
+  conf('o documento montado dos registros é o carregar(), na mesma ordem', dif.montadoIgual, true);
   conf('todo atualizadoEm é uma data ISO', dif.atualizadoEmIso, true);
 
   // ================================================================
@@ -209,7 +260,7 @@ const ITENS_DO_DOCUMENTO = 3 + 2 + 40 + 2 + 2 + 5 + 1; // alunos, séries, aulas
     principal.aulas.find(a => a.id === 'aula21').notaTexto = 'semeada por fora';
     principal.alunos.push({ id: 'a5', nome: 'Aluna Semeada Teste', ativo: true, precos: [] });
     await P.semearPrincipal(principal);
-    return P.canon(principal);
+    return { canon: P.canon(principal), ordem: P.ordem(principal) };
   });
   await pag.close();
   pag = await R.abrirPaginaNua(amb, trocas, STORE_SERVIDO);
@@ -222,14 +273,15 @@ const ITENS_DO_DOCUMENTO = 3 + 2 + 40 + 2 + 2 + 5 + 1; // alunos, séries, aulas
     const montado = Store.montarRegistros(regs);
     P.zerarPuts();
     const deNovo = await Store.carregar();
-    return { canon: P.canon(carregado), puts, montadoIgual: P.canon(montado) === P.canon(carregado), putsNaSegunda: P.puts.registros.length,
-      canonDeNovo: P.canon(deNovo) };
+    return { canon: P.canon(carregado), ordem: P.ordem(carregado), puts, montadoIgual: P.canon(montado) === P.canon(carregado),
+      putsNaSegunda: P.puts.registros.length, canonDeNovo: P.canon(deNovo) };
   });
-  conf('carregar() devolve o que foi semeado', reconciliado.canon === semeado, true);
+  conf('carregar() devolve o que foi semeado', reconciliado.canon === semeado.canon, true);
+  conf('na ordem do principal semeado', reconciliado.ordem === semeado.ordem, true);
   conf('e refez só os registros que mudaram', reconciliado.puts.join(','), 'aluno:a5,aula:aula21');
   conf('os registros montados são o carregar()', reconciliado.montadoIgual, true);
   conf('a abertura seguinte não grava nada', reconciliado.putsNaSegunda, 0);
-  conf('e devolve o mesmo', reconciliado.canonDeNovo === semeado, true);
+  conf('e devolve o mesmo', reconciliado.canonDeNovo === semeado.canon, true);
 
   // ================================================================
   secao('5. Os outros caminhos que gravam o documento');
@@ -240,7 +292,8 @@ const ITENS_DO_DOCUMENTO = 3 + 2 + 40 + 2 + 2 + 5 + 1; // alunos, séries, aulas
       const carregado = await Store.carregar();
       const regs = await Store.lerRegistros();
       const principal = await P.principalPorFora();
-      return P.canon(carregado) === P.canon(db) && P.canon(Store.montarRegistros(regs)) === P.canon(db) && P.canon(principal) === P.canon(db);
+      return P.canon(carregado) === P.canon(db) && P.ordem(carregado) === P.ordem(db) &&
+        P.canon(Store.montarRegistros(regs)) === P.canon(db) && P.canon(principal) === P.canon(db);
     };
     // desfazer
     let db = await Store.carregar();
@@ -255,11 +308,14 @@ const ITENS_DO_DOCUMENTO = 3 + 2 + 40 + 2 + 2 + 5 + 1; // alunos, séries, aulas
     saida.desfazer = { iguais: await iguais(antesDoPonto), devolveu: P.canon(voltou) === P.canon(antesDoPonto), puts: P.puts.registros.slice().sort() };
     // excluir aluna em cascata
     db = await Store.carregar();
-    const aulasDaA3 = db.aulas.filter(a => a.alunoId === 'a3').length;
+    const idsDaA3 = { 'aluno:a3': true };
+    db.aulas.filter(a => a.alunoId === 'a3').forEach(a => { idsDaA3['aula:' + a.id] = true; });
+    const aulasDaA3 = Object.keys(idsDaA3).length - 1;
     P.zerarPuts();
     const novo = await Store.excluirAlunoEmCascata(db, 'a3');
     const regs = await Store.lerRegistros();
-    saida.cascata = { iguais: await iguais(novo), aulasDaA3, lapides: regs.filter(r => r.apagadoEm && (r.id === 'aluno:a3' || r.tipo === 'aula')).length,
+    // só os registros dela: as lápides da seção 2b (aulas que o Desfazer tirou de volta) não contam aqui
+    saida.cascata = { iguais: await iguais(novo), aulasDaA3, lapides: regs.filter(r => r.apagadoEm && idsDaA3[r.id]).length,
       puts: P.puts.registros.length, alunaFora: !novo.alunos.some(a => a.id === 'a3') };
     // importarTudo com o carimbo da cópia
     const pacote = { formato: 'apoio-educacional', versao: 1, quando: '2026-06-01T12:00:00.000Z',

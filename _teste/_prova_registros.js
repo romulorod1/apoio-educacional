@@ -32,7 +32,8 @@ const ANCORAS = {
   criaControle: "if (!b.objectStoreNames.contains('controle')) b.createObjectStore('controle');",
   migracao: 'migrarParaRegistros(e.target.transaction, e.oldVersion);',
   lacoDoVetor: '(Array.isArray(db[vetor]) ? db[vetor] : []).forEach(function (item) {',
-  igual: 'if (antes && !antes.apagadoEm && JSON.stringify(antes.dados) === texto) { contas.iguais++; return; }',
+  igual: 'if (antes && !antes.apagadoEm && antes.ordem === ordem && JSON.stringify(antes.dados) === texto) { contas.iguais++; return; }',
+  apagadoPorFora: 'return apagarDocumento().then(function () { return null; });',
   principalFica: "if (!opcoes.semPrincipal) t.objectStore('dados').put(db, 'principal');",
   respondeNoCommit: "t.oncomplete = function () { confirmarGravacao(contas); avisarMudanca('dados'); resolve(); };"
 };
@@ -41,7 +42,10 @@ const VENENOS = {
   /* a migração (e toda gravação) deixa o último item de cada vetor de fora */
   '--envenenado-perde-registro': ['lacoDoVetor', '(Array.isArray(db[vetor]) ? db[vetor] : []).slice(0, -1).forEach(function (item) {'],
   /* a comparação diz sempre "mudou": tudo é regravado a cada salvar */
-  '--envenenado-regrava-tudo': ['igual', 'if (false) { contas.iguais++; return; }']
+  '--envenenado-regrava-tudo': ['igual', 'if (false) { contas.iguais++; return; }'],
+  /* a regra antiga do carregar: sem principal, os registros vivos montam o
+   * documento de volta (o "Apagar tudo" do código da versão 4 é desfeito) */
+  '--envenenado-registros-ressuscitam': ['apagadoPorFora', 'return completar(montar(lido.registros));']
 };
 
 function conferirAncoras(conf) {
@@ -96,6 +100,17 @@ const AJUDANTES = function () {
     saida.ajustes = db.ajustes || {};
     Object.keys(db).forEach(k => { if (!vetores[k] && k !== 'ajustes') saida['raiz:' + k] = db[k]; });
     return JSON.stringify(P.ordenaChaves(saida));
+  };
+  /* A ORDEM dos vetores e das chaves, como texto: a prova compara isto além
+   * da forma canônica, porque o montar tem de devolver o documento na ordem
+   * em que foi salvo. */
+  P.ordem = function (db) {
+    if (!db) return 'null';
+    return JSON.stringify({
+      alunos: (db.alunos || []).map(a => a.id), series: (db.series || []).map(s => s.id), aulas: (db.aulas || []).map(a => a.id),
+      resumos: (db.resumos || []).map(r => r.alunoId + ':' + r.mes), pagamentos: (db.pagamentos || []).map(p => p.id),
+      ajustes: Object.keys(db.ajustes || {})
+    });
   };
   P.contagens = function (db) {
     return {

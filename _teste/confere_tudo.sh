@@ -658,6 +658,13 @@ roda "banco v3 --envenenado-troca-calada"         node "_teste/testa_banco_v3.js
 roda "banco v5 (N1)"                              node "_teste/testa_banco_v5.js"
 roda "banco v5 --envenenado-perde-registro"       node "_teste/testa_banco_v5.js" --envenenado-perde-registro
 roda "banco v5 --envenenado-regrava-tudo"         node "_teste/testa_banco_v5.js" --envenenado-regrava-tudo
+# N1: o rollback de verdade. O codigo REAL da versao 4, republicado com
+# VERSAO_BANCO = 5, le, edita e apaga o principal; a 5 volta e ve o que a 4 fez,
+# inclusive o "Apagar tudo" (o apagamento de fora vence: tudo vira lapide e
+# carregar() e null). O veneno volta a regra antiga, que ressuscitava os
+# registros, e TEM de ser visto.
+roda "rollback v4 (N1)"                           node "_teste/testa_rollback_v4.js"
+roda "rollback v4 --envenenado-registros-ressuscitam" node "_teste/testa_rollback_v4.js" --envenenado-registros-ressuscitam
 # C15.1: o banco sobe de 3 para 4 sem perder nada; o pacote de livros sintetico
 # importa por Ajustes; a copia de seguranca nao cresce com 1,2 MB de livro no
 # tablet; o PDF abre pelo sumario no capitulo 2 e reabre onde parou; o EPUB abre
