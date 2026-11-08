@@ -46,6 +46,9 @@
  *                                não enfileira o que está no aparelho: o
  *                                cadastro feito depois do "Apagar tudo" nunca
  *                                sobe e o outro aparelho diverge calado.
+ *   --envenenado-sem-pulo        o recebimento não pula o documento do formato
+ *                                antigo (cifrado): ele entra como registro
+ *                                com lixo nos dados.
  *
  * Portas: 8821 (app), 8823 (auth), 8824 (firestore), 8825 (hub), 8826 (log),
  * 8827 (websocket). Precisa do firebase-tools e de um JDK 21 em JAVA_HOME.
@@ -60,7 +63,7 @@ const { conf, secao, pausa, esperar } = H;
 
 const MODOS = ['--envenenado-ignora-lapide', '--envenenado-velho-por-cima', '--envenenado-pagina-so-carimbo', '--envenenado-sem-already-exists', '--envenenado-fusao-pelo-prefixo',
   '--envenenado-eco-so-sem-carimbo', '--envenenado-fila-sobrevive-ao-apagar', '--envenenado-aplica-desligado', '--envenenado-celular-enfileira-fusao',
-  '--envenenado-restauro-sem-iguais', '--envenenado-confirma-sem-apagado', '--envenenado-religar-sem-enfileirar'];
+  '--envenenado-restauro-sem-iguais', '--envenenado-confirma-sem-apagado', '--envenenado-religar-sem-enfileirar', '--envenenado-sem-pulo'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 function prop(rotulo, ok, veneno) {
   if (MODO && MODO === veneno) return conf('VENENO visto: ' + rotulo + ', e quebrou', ok, false);
@@ -146,6 +149,10 @@ if (MODO === MODOS[10]) trocas['/nuvem.js'] = NUVEM.replace(CONFIRMA_APAGADO, ''
 const RELIGAR_TUDO = 'if (opcoes.tudoDesteAparelho && marca && marca.desligada) {';
 conf('o religar pelo envio dela enfileira o que está no aparelho, num lugar só', STORE.split(RELIGAR_TUDO).length === 2 && NUVEM.indexOf('religarSincronizacao({ tudoDesteAparelho: true })') > 0, true);
 if (MODO === MODOS[11]) trocas['/store.js'] = STORE.replace(RELIGAR_TUDO, 'if (false) {');
+/* O documento do formato antigo (cifrado) é pulado no recebimento, numa função só. */
+const FORMATO_ANTIGO = 'var formatoAntigo = function (v) { return v.iv !== undefined || v.dados instanceof Uint8Array; };';
+conf('o recebimento decide o formato antigo num lugar só, e o pulado só avança o cursor', NUVEM.split(FORMATO_ANTIGO).length === 2 && NUVEM.indexOf('return { servidorEm: r.servidorEm, nome: r.nome };') > 0, true);
+if (MODO === MODOS[12]) trocas['/nuvem.js'] = NUVEM.replace(FORMATO_ANTIGO, 'var formatoAntigo = function (v) { return false; };');
 if (MODO) conf('o arquivo servido ficou diferente do repositório (' + MODO + ')', (trocas['/store.js'] || STORE) !== STORE || (trocas['/nuvem.js'] || NUVEM) !== NUVEM, true);
 
 conf('o firebase-tools está onde a prova procura (' + FIREBASE + ')', fs.existsSync(FIREBASE), true);
@@ -280,6 +287,12 @@ const retrato = pag => pag.evaluate(async () => {
 });
 const aula = (pag, id) => pag.evaluate(async i => { const d = await Store.carregar(); const a = d.aulas.find(x => x.id === i); return a ? { hora: a.hora, status: a.status, nota: a.notaTexto || '' } : null; }, id);
 const historico = pag => pag.evaluate(() => Store.listarHistorico().then(l => l.filter(h => /outro aparelho/.test(h.rotulo)).map(h => ({ rotulo: h.rotulo, notas: h.estado.aulas.map(a => a.notaTexto || '') }))));
+/* Troca as regras do emulador em pleno voo (a API própria dele). */
+async function publicarRegras(regras) {
+  const r = await rest(FS + '/emulator/v1/projects/' + PROJETO + ':securityRules', { metodo: 'PUT',
+    corpo: { rules: { files: [{ name: 'firestore.rules', content: regras }] } } });
+  return r.status;
+}
 async function restaurarPelaTela(pag, botaoRestaurar, aAnterior) {
   await clicar(pag, botaoRestaurar);
   await esperar('a janela lista a cópia', () => pag.evaluate(() => document.querySelectorAll('#modal-nuvem-restaurar.aberto #nuvem-copias input[type=radio]').length), v => v >= (aAnterior ? 2 : 1), 15000);
@@ -619,6 +632,44 @@ async function restaurarPelaTela(pag, botaoRestaurar, aAnterior) {
   const rA = await pagA.evaluate(() => Nuvem.receberRegistros().then(r => r.aplicados));
   conf('A, em dia, recebe zero', rA, 0);
   conf('o cursor de A está gravado, com o par carimbo e nome', await pagA.evaluate(() => Store.lerCursor().then(c => !!(c && c.servidorEm && c.nome))), true);
+
+  secao('9a. Um documento do formato antigo (cifrado) entre dois novos é pulado, e o cursor passa por cima dele');
+  /* Escrito direto no emulador, com as regras abertas só neste passo (as de
+   * verdade recusam iv e dados em bytes), com o carimbo do servidor, como um
+   * aplicativo antigo o teria gravado. */
+  await editar(pagA, "d.aulas.find(a => a.id === 's1@2026-06-03').notaTexto = 'antes do antigo';");
+  await sincronizar(pagA);
+  const ABERTAS = REGRAS.replace('allow create, update: if dona(uid) && registroValido(registro);', 'allow create, update: if dona(uid);');
+  conf('(arranjo) regras abertas publicadas no emulador só para este passo', ABERTAS !== REGRAS && (await publicarRegras(ABERTAS)) === 200, true);
+  const nomeAntigo = 'projects/' + PROJETO + '/databases/(default)/documents/usuarios/' + dona.localId + '/registros/aula:antiga';
+  const antigo = await rest(FS + '/v1/projects/' + PROJETO + '/databases/(default)/documents:commit', { token: dona.idToken, corpo: { writes: [{
+    update: { name: nomeAntigo, fields: { id: { stringValue: 'aula:antiga' }, tipo: { stringValue: 'aula' }, atualizadoEm: { stringValue: '2026-11-01T10:00:00.000Z' },
+      aparelho: { stringValue: 'ap000000000000' }, esquema: { integerValue: '1' }, app: { stringValue: '1.42.7' },
+      iv: { bytesValue: Buffer.alloc(12, 7).toString('base64') }, dados: { bytesValue: Buffer.from('lixo cifrado de prova').toString('base64') } } },
+    updateTransforms: [{ fieldPath: 'servidorEm', setToServerValue: 'REQUEST_TIME' }] }] } });
+  conf('(arranjo) o documento do formato antigo, com iv e dados em bytes, está no servidor com o carimbo', antigo.status, 200);
+  conf('(arranjo) as regras de verdade voltaram', await publicarRegras(REGRAS), 200);
+  await editar(pagA, "d.aulas.find(a => a.id === 's1@2026-06-10').notaTexto = 'depois do antigo';");
+  await sincronizar(pagA);
+  const sB9a = await sincronizar(pagB);
+  const emB9a = await pagB.evaluate(async () => {
+    const regs = await Store.lerRegistros();
+    const e = Nuvem.estado().registros;
+    return { antiga: regs.some(r => r.id === 'aula:antiga'), pulados: e.puladosFormatoAntigo, erro: e.erroRecebimento ? e.erroRecebimento.codigo : null,
+      notas: [(await Store.carregar()).aulas.find(a => a.id === 's1@2026-06-03').notaTexto, (await Store.carregar()).aulas.find(a => a.id === 's1@2026-06-10').notaTexto] };
+  });
+  console.log('   9a: ' + JSON.stringify({ sB9a, emB9a }));
+  // B também recebe o que A escreveu desde a última vez que sincronizou (seções 7 a 9): por isso 'pelo menos' os dois novos
+  prop('B recebeu os dois novos (e o que faltava de A), pulou o antigo (sem registro com lixo, sem erro) e contou um pulado',
+    sB9a.recebidos >= 2 && sB9a.erroR === null && !emB9a.antiga && emB9a.pulados === 1 && emB9a.erro === null &&
+    JSON.stringify(emB9a.notas) === JSON.stringify(['antes do antigo', 'depois do antigo']), MODOS[12]);
+  const sB9a2 = await sincronizar(pagB);
+  const lidos9a2 = await pagB.evaluate(() => Nuvem.estado().registros.ultimoRecebimento.lidos);
+  conf('a segunda sincronização lê zero: o cursor passou por cima do antigo', sB9a2.recebidos === 0 && lidos9a2 === 0, true);
+  conf('a tela de B não mostra erro', /Todas as mudanças já subiram/.test(await pagB.evaluate(() => Nuvem.contarFila().then(() => (document.querySelector('#nuvem-registros') || {}).textContent || ''))), true);
+  if (MODO === MODOS[12]) throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
+  // o antigo sai do servidor: o resto da prova segue como antes
+  conf('(arranjo) o documento antigo saiu do servidor', (await rest(FS + '/v1/' + nomeAntigo, { token: dona.idToken, metodo: 'DELETE' })).status, 200);
 
   secao('9b. "Apagar tudo" desliga a sincronização; restaurar a própria cópia religa, e três sincronizações zeram a fila sem erro');
   /* Uma edição presa na fila ANTES do "Apagar tudo" (sem sinal, ela não subiu):

@@ -807,6 +807,10 @@ roda "nuvem recebe --envenenado-aplica-desligado"   node "_teste/testa_nuvem_rec
 roda "nuvem recebe --envenenado-celular-enfileira-fusao" node "_teste/testa_nuvem_recebe.js" --envenenado-celular-enfileira-fusao
 roda "nuvem recebe --envenenado-restauro-sem-iguais" node "_teste/testa_nuvem_recebe.js" --envenenado-restauro-sem-iguais
 roda "nuvem recebe --envenenado-confirma-sem-apagado" node "_teste/testa_nuvem_recebe.js" --envenenado-confirma-sem-apagado
+# (segunda rodada) o religar pelo "Enviar copia agora" enfileira o que esta no aparelho
+roda "nuvem recebe --envenenado-religar-sem-enfileirar" node "_teste/testa_nuvem_recebe.js" --envenenado-religar-sem-enfileirar
+# o documento do formato antigo (cifrado) e pulado no recebimento, e o cursor passa por cima
+roda "nuvem recebe --envenenado-sem-pulo"           node "_teste/testa_nuvem_recebe.js" --envenenado-sem-pulo
 roda "celular so leitura"                           node "_teste/testa_celular_leitura.js"
 roda "celular so leitura --envenenado-envia"        node "_teste/testa_celular_leitura.js" --envenenado-envia
 roda "celular so leitura --envenenado-edicao"       node "_teste/testa_celular_leitura.js" --envenenado-edicao
