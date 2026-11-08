@@ -1127,7 +1127,10 @@
               /* O eco vai com o id e o carimbo, marcado: o Store só anota o carimbo
                * no registro que ainda não o tem (a lápide do "Apagar tudo" e a
                * restauração da própria cópia o perdem), e avança o cursor. */
-              var lote = aplicaveis.concat(ecos.map(function (r) { return { id: r.id, eco: true, servidorEm: r.servidorEm, nome: r.nome, updateTime: r.updateTime }; }));
+              var lote = aplicaveis.concat(ecos.map(function (r) {
+                return { id: r.id, eco: true, servidorEm: r.servidorEm, nome: r.nome, updateTime: r.updateTime,
+                  atualizadoEm: r.atualizadoEm, apagadoEm: r.apagadoEm, dados: r.dados };
+              }));
               // nada a aplicar: nenhuma transação de escrita (o celular em dia não grava nada)
               var aplicar = lote.length ? root.Store.aplicarRecebidos(lote) : Promise.resolve({ aplicados: 0 });
               return aplicar.then(function (contas) {

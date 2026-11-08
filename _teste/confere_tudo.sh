@@ -795,6 +795,10 @@ roda "nuvem recebe --envenenado-velho-por-cima"     node "_teste/testa_nuvem_rec
 roda "nuvem recebe --envenenado-pagina-so-carimbo"  node "_teste/testa_nuvem_recebe.js" --envenenado-pagina-so-carimbo
 roda "nuvem recebe --envenenado-sem-already-exists" node "_teste/testa_nuvem_recebe.js" --envenenado-sem-already-exists
 roda "nuvem recebe --envenenado-fusao-pelo-prefixo" node "_teste/testa_nuvem_recebe.js" --envenenado-fusao-pelo-prefixo
+# (terceira rodada) a resposta do commit perdida depois de o servidor aplicar: o eco
+# atualiza o carimbo e tira a entrada da fila; o veneno que so anota quando falta TEM
+# de ser visto.
+roda "nuvem recebe --envenenado-eco-so-sem-carimbo" node "_teste/testa_nuvem_recebe.js" --envenenado-eco-so-sem-carimbo
 roda "celular so leitura"                           node "_teste/testa_celular_leitura.js"
 roda "celular so leitura --envenenado-envia"        node "_teste/testa_celular_leitura.js" --envenenado-envia
 roda "celular so leitura --envenenado-edicao"       node "_teste/testa_celular_leitura.js" --envenenado-edicao

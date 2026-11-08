@@ -20915,8 +20915,8 @@
     var presas = q ? ' ' + (q === 1 ? '1 mudança não consegue subir' : q + ' mudanças não conseguem subir') +
       ' (a nuvem recusa esse registro); as outras seguem.' : '';
     if (est.sincronizacaoDesligada) {
-      return 'A sincronização entre aparelhos está desligada desde o "Apagar tudo": entre e restaure a cópia para religar.' +
-        (n ? ' ' + guardadas + '.' : '');
+      return 'A sincronização entre aparelhos está desligada desde o "Apagar tudo". Para voltar a sincronizar, restaure a cópia da nuvem ' +
+        'ou toque em Enviar cópia agora (o que está neste aparelho passa a valer).' + (n ? ' ' + guardadas + '.' : '');
     }
     if (r.erro && r.erro.codigo === 'PERMISSION_DENIED') {
       return 'A nuvem ainda não aceita as mudanças uma a uma (as regras novas não foram publicadas). ' +

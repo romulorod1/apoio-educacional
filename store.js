@@ -600,8 +600,11 @@
        * na fila: a restauração vence em todos os registros, inclusive os que o
        * "Apagar tudo" já tinha apagado aqui sem avisar a nuvem. */
       if (restauro && r.apagadoEm && !novo.itens[r.id] && saida && sincronizavel(r.id, r.tipo)) {
-        enfileirar(saida, { id: r.id, tipo: r.tipo, atualizadoEm: r.atualizadoEm, apagadoEm: r.apagadoEm, restauro: true });
-        contas.enfileirados++;
+        // só a lápide que o servidor ainda não tem como lápide: a já enviada não volta à fila
+        if (!(r.nuvem && r.nuvem.apagado)) {
+          enfileirar(saida, { id: r.id, tipo: r.tipo, atualizadoEm: r.atualizadoEm, apagadoEm: r.apagadoEm, restauro: true });
+          contas.enfileirados++;
+        }
         return;
       }
       if (r.apagadoEm || novo.itens[r.id]) return;
@@ -720,7 +723,8 @@
             var reg = registros.get(item.id);
             reg.onsuccess = function () {
               if (!reg.result) return;
-              reg.result.nuvem = { updateTime: item.nuvem.updateTime || null, servidorEm: item.nuvem.servidorEm || null };
+              // `apagado`: o servidor ficou com uma lápide (a restauração não a reenfileira à toa)
+              reg.result.nuvem = { updateTime: item.nuvem.updateTime || null, servidorEm: item.nuvem.servidorEm || null, apagado: !!item.apagadoEm };
               registros.put(reg.result);
             };
           }
@@ -890,7 +894,22 @@
              * restauração da própria cópia o perdem, e sem ele o envio exigiria
              * que o documento não existisse, para sempre). */
             if (chegou.eco) {
-              if (local && !(local.nuvem && local.nuvem.servidorEm)) { local.nuvem = carimbo; registros.put(local); }
+              /* E a resposta do commit que se perdeu (a aba fechou ou a rede caiu
+               * depois de o servidor aplicar): o servidor tem a versão nova, o disco
+               * tem o carimbo velho e a entrada na fila. O eco é escrita deste mesmo
+               * aparelho: o carimbo mais novo vale sempre, e se o eco é a própria
+               * versão que a fila guarda, a entrada sai, porque já subiu. */
+              if (local && (!(local.nuvem && local.nuvem.servidorEm) || carimboNumero(chegou.servidorEm) > carimboNumero(local.nuvem.servidorEm))) {
+                local.nuvem = Object.assign({}, carimbo, { apagado: !!chegou.apagadoEm });
+                registros.put(local);
+                var pendente = fila[chegou.id];
+                if (pendente && !pendente.quarentena && (pendente.atualizadoEm === chegou.atualizadoEm ||
+                    (!!pendente.apagadoEm === !!chegou.apagadoEm && JSON.stringify(local.dados) === JSON.stringify(chegou.dados || null)))) {
+                  saida.delete(chegou.id);
+                  delete fila[chegou.id];
+                  contas.confirmadosPeloEco = (contas.confirmadosPeloEco || 0) + 1;
+                }
+              }
               return;
             }
             if (local && local.nuvem && local.nuvem.servidorEm && chegou.servidorEm && carimboNumero(local.nuvem.servidorEm) >= carimboNumero(chegou.servidorEm)) {
@@ -922,7 +941,8 @@
             var novo = { id: chegou.id, tipo: chegou.tipo, atualizadoEm: chegou.atualizadoEm || agora, apagadoEm: chegou.apagadoEm || null,
               aparelho: chegou.aparelho || '', esquema: chegou.esquema || ESQUEMA_REGISTRO,
               ordem: local && typeof local.ordem === 'number' ? local.ordem : ++maiorOrdem,
-              dados: chegou.apagadoEm ? null : (chegou.dados === undefined ? null : chegou.dados), nuvem: carimbo };
+              dados: chegou.apagadoEm ? null : (chegou.dados === undefined ? null : chegou.dados),
+              nuvem: Object.assign({}, carimbo, { apagado: !!chegou.apagadoEm }) };
             /* Perde a versão local quando: estava viva e muda ou vira lápide; ou era
              * uma lápide daqui e o outro aparelho a ressuscitou (o apagamento
              * daqui perdeu, e vai para o histórico também). */
@@ -1813,6 +1833,15 @@
           trocar('midias', pacote.midias, true);
           trocar('anexos', anexos, true);
           t.objectStore('historico').clear();
+          /* O estado anterior fica no histórico, depois da limpeza (os pedidos
+           * respondem na ordem): cada versão que a restauração troca ou apaga
+           * continua recuperável por "Voltar a este ponto" (decisão da sessão). */
+          var anteriorReq = t.objectStore('dados').get('principal');
+          anteriorReq.onsuccess = function () {
+            if (!anteriorReq.result) return;
+            t.objectStore('historico').add({ rotulo: 'Antes de restaurar a cópia', quando: Date.now(),
+              estado: JSON.parse(JSON.stringify(completar(anteriorReq.result))) });
+          };
           if (bib) {
             trocar('biblioteca_uso', (bib.uso || []).filter(function (r) { return r && r.itemId; }), false);
             trocar('biblioteca_etiquetas', (bib.etiquetas || []).filter(function (r) { return r && r.itemId; }), false);
