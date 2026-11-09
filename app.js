@@ -2094,6 +2094,8 @@
    * desinstalar e instalar de novo. */
   var registroSW = null;
   var versaoPendenteAtiva = null;
+  // a versão do último "Versão nova pronta" (ou 'nova', quando o worker não disse o número): vira aviso do painel do celular
+  var versaoProntaParaOPainel = null;
 
   /* A versão que roda é a que ela escolheu (D2, veja o sw.js): o worker novo
    * pode ter assumido quando ela fechou o aplicativo e continuar servindo a
@@ -2177,6 +2179,7 @@
    * abertura seguinte e fica em Ajustes. */
   function mostrarAvisoDeVersao() {
     var versao = versaoPendenteAtiva && versaoPendenteAtiva.versao;
+    versaoProntaParaOPainel = versao || 'nova';
     avisar('Versão nova pronta' + (versao ? ' (' + versao + ')' : ''),
       'Atualizar agora', aplicarAtualizacao, 'Depois da aula', atualizarDepoisDaAula);
     desenharAjustes();
@@ -21727,6 +21730,7 @@
     folhaCelular = null;
     alunoCelular = null; // a aba Alunos volta à lista
     diaRoladoCelular = null; // voltando a Hoje, a linha do tempo rola até agora
+    painelDosAvisosAberto = PAINEL_ABERTO_AO_CHEGAR; // e os avisos chegam recolhidos
     esconderAviso(); // o aviso de uma ação não segue para outra tela
     var conteudo = $('#cel-conteudo');
     if (conteudo) conteudo.scrollTop = 0;
@@ -22308,14 +22312,19 @@
    * texto escrito, e o recolhido e os dispensados são do APARELHO
    * (localStorage), nunca da fila de registros nem da nuvem. */
 
-  /* O estado do aparelho: { recolhida, dispensados: { 'AAAA-MM-DD': [chaves] } }.
+  /* O estado do aparelho: { dispensados: { 'AAAA-MM-DD': [chaves] } }. O
+   * painel aberto NÃO se grava (revisão da F4): recolhido é o padrão a cada
+   * chegada ao Hoje e a cada abertura do aplicativo; aberto só vive em
+   * memória, até ela sair de Hoje.
    * A chave de um aviso é o tipo e o id dele, nunca o texto:
    * 'registrar:<aula>', 'cobrar:<aluno>:<meses>' e 'fechar:<mês>'. Sem
    * armazenamento (o navegador recusa, ou lança erro), vale a cópia em
    * memória: abre recolhido, sem dispensados, e o que ela dispensar vale
    * até fechar o aplicativo. */
   var CHAVE_AVISOS_CELULAR = 'apoio-educacional:celular-avisos';
-  var avisosCelularEmMemoria = { recolhida: true, dispensados: {} };
+  var avisosCelularEmMemoria = { dispensados: {} };
+  var PAINEL_ABERTO_AO_CHEGAR = false;
+  var painelDosAvisosAberto = PAINEL_ABERTO_AO_CHEGAR;
   function lerEstadoDosAvisosCelular() {
     var e = null;
     try { e = JSON.parse(localStorage.getItem(CHAVE_AVISOS_CELULAR) || 'null'); } catch (x) { e = null; }
@@ -22326,14 +22335,14 @@
         if (/^\d{4}-\d{2}-\d{2}$/.test(d) && Array.isArray(e.dispensados[d])) dispensados[d] = e.dispensados[d].filter(function (c) { return typeof c === 'string'; });
       });
     }
-    return { recolhida: e.recolhida !== false, dispensados: dispensados };
+    return { dispensados: dispensados };
   }
   /* Gravar limpa os dias que já passaram: só o de hoje (e algum à frente,
    * se o relógio voltou) fica. */
   function gravarEstadoDosAvisosCelular(e) {
     var hoje = Core.hojeIso(), limpo = {};
     Object.keys(e.dispensados).forEach(function (d) { if (d >= hoje && e.dispensados[d].length) limpo[d] = e.dispensados[d]; });
-    avisosCelularEmMemoria = { recolhida: e.recolhida !== false, dispensados: limpo };
+    avisosCelularEmMemoria = { dispensados: limpo };
     try { localStorage.setItem(CHAVE_AVISOS_CELULAR, JSON.stringify(avisosCelularEmMemoria)); } catch (x) { /* sem armazenamento: fica a memória */ }
   }
   /* Os dispensados valem só no dia em que foram dispensados: no dia seguinte,
@@ -22459,13 +22468,14 @@
     Object.keys(l.dados || {}).forEach(function (k) { atributos['data-' + k] = l.dados[k]; });
     var corpo = el('div', { class: 'cel-aviso-corpo' }, [
       el('div', { class: 'cel-aviso-titulo', texto: l.titulo }),
-      l.detalhe ? el('div', { class: 'cel-aviso-detalhe', texto: l.detalhe }) : null,
+      l.linhas ? el('ul', { class: 'cel-aviso-detalhe cel-aviso-aulas' }, l.linhas.map(function (t) { return el('li', { texto: t }); }))
+        : l.detalhe ? el('div', { class: 'cel-aviso-detalhe', texto: l.detalhe }) : null,
       l.acoes.length ? el('div', { class: 'cel-aviso-acoes' }, l.acoes) : null
     ]);
-    var x = el('button', { type: 'button', class: 'cel-aviso-dispensar', 'aria-label': 'Dispensar até amanhã: ' + l.titulo,
-      aoClick: function () { dispensarAvisoCelular(l.chaves); } }, [iconeDoAvisoCelular('fechar_x', 'cel-aviso-x')]);
+    var x = el('button', { type: 'button', class: 'cel-aviso-dispensar', 'aria-label': 'Dispensar até amanhã', title: 'Dispensar até amanhã',
+      aoClick: function () { dispensarAvisoCelular(l.chaves, l.nome); } }, [iconeDoAvisoCelular('fechar_x', 'cel-aviso-x')]);
     var linha = el('div', atributos, [iconeDoAvisoCelular(l.icone), corpo, x]);
-    deslizarParaDispensarCelular(linha, l.chaves);
+    deslizarParaDispensarCelular(linha, l.chaves, l.nome);
     return el('div', { class: 'cel-aviso-trilho' }, [linha]);
   }
   /* O nome curto do aluno para o botão de cobrar: as primeiras palavras do
@@ -22481,10 +22491,10 @@
     }
     return partes.join(' ');
   }
-  /* "Aluno Alfa Teste hoje, 10:00" ou "Aluno Alfa Teste seg 05/10, 10:00". */
+  /* "Aluno Alfa Teste, hoje, 10:00" ou "Aluno Alfa Teste, seg 05/10, 10:00". */
   function aulaNoAvisoCelular(a, hoje) {
     var al = alunoPorId(a.alunoId);
-    return (al ? al.nome : 'aluno removido') + ' ' + (a.data === hoje ? 'hoje' + (a.hora ? ', ' + a.hora : '') : quandoCurtoCelular(a.data, a.hora));
+    return (al ? al.nome : 'aluno removido') + ', ' + (a.data === hoje ? 'hoje' + (a.hora ? ', ' + a.hora : '') : quandoCurtoCelular(a.data, a.hora));
   }
   /* Os avisos de hoje, uma linha por tipo, na ordem de urgência, sem os
    * dispensados: { linhas, conta, resumo }. A conta do selinho é o número de
@@ -22509,7 +22519,7 @@
       linhas.push({ tipo: 'registrar', icone: 'registrar', chaves: semRegistro.map(function (a) { return 'registrar:' + a.id; }),
         dados: { aula: primeira.id, aulas: semRegistro.map(function (a) { return a.id; }).join(' ') },
         titulo: semRegistro.length + ' ' + palavraPlural(semRegistro.length, 'aula sem registro', 'aulas sem registro'),
-        detalhe: semRegistro.map(function (a) { return aulaNoAvisoCelular(a, hoje) + '.'; }).join(' '),
+        nome: 'das aulas sem registro', linhas: semRegistro.map(function (a) { return aulaNoAvisoCelular(a, hoje); }),
         /* Quem edita abre o "Registrar como foi" da mais recente; quem só lê,
          * a folha dela, sem botão de mudar. */
         acoes: [edita
@@ -22526,7 +22536,7 @@
         var outras = familias.slice(1);
         var curto = nomeCurtoCelular(fam.aluno);
         var acoes = [];
-        if (link) acoes.push(botaoDeLinkCelular('cel-aviso-cobrar', 'Cobrar ' + curto, link, { class: 'btn cel-link-botao cel-aviso-acao principal',
+        if (link) acoes.push(botaoDeLinkCelular('cel-aviso-cobrar', 'Cobrar ' + curto, link, { class: 'btn cel-link-botao cel-aviso-acao',
           'aria-label': 'Cobrar a família de ' + fam.aluno.nome + ' pelo WhatsApp: abre a conversa com a mensagem escrita' }));
         /* As outras famílias não entram no botão de cobrar: um toque à parte
          * leva ao Fechamento do mês mais antigo delas, onde cada uma tem o
@@ -22534,7 +22544,7 @@
         acoes.push(acaoDoAvisoCelular('cel-aviso-cobranca', 'Ver o mês', function () { fecharAvisosCelular(); mesCelular = fam.meses[0].mes; irParaTelaCelular('fechamento'); }));
         if (outras.length) acoes.push(acaoDoAvisoCelular('cel-aviso-mais-familias', 'E mais ' + outras.length + ' ' + palavraPlural(outras.length, 'família', 'famílias'),
           function () { fecharAvisosCelular(); mesCelular = outras[0].meses[0].mes; irParaTelaCelular('fechamento'); }));
-        linhas.push({ tipo: 'cobrar', icone: 'cobrar', chaves: [chaveDaCobrancaCelular(fam)], dados: { aluno: fam.aluno.id },
+        linhas.push({ tipo: 'cobrar', icone: 'cobrar', chaves: [chaveDaCobrancaCelular(fam)], dados: { aluno: fam.aluno.id }, nome: 'da cobrança de ' + curto,
           titulo: 'Em aberto: ' + fam.aluno.nome,
           detalhe: fam.meses.map(function (x) { return mesMinusculoCelular(x.mes); }).join(' e ') + ', ' + dinheiro(faltaDaFamiliaCelular(fam)) +
             (link ? '' : '. Sem celular na ficha para o WhatsApp'),
@@ -22545,7 +22555,7 @@
     if (daDona) {
       var fechar = mesAFecharCelular(hoje, agora);
       if (fechar && fora.indexOf('fechar:' + fechar.mes) < 0) {
-        linhas.push({ tipo: 'fechar', icone: 'fechar', chaves: ['fechar:' + fechar.mes], dados: { mes: fechar.mes },
+        linhas.push({ tipo: 'fechar', icone: 'fechar', chaves: ['fechar:' + fechar.mes], dados: { mes: fechar.mes }, nome: 'de fechar ' + mesMinusculoCelular(fechar.mes),
           titulo: 'Fechar ' + mesMinusculoCelular(fechar.mes),
           detalhe: [
             fechar.semRegistro ? fechar.semRegistro + ' ' + palavraPlural(fechar.semRegistro, 'aula sem registro', 'aulas sem registro') : '',
@@ -22555,9 +22565,9 @@
         resumo.push('fechar ' + mesMinusculoCelular(fechar.mes));
       }
     }
-    var versao = versaoPendenteAtiva ? (versaoPendenteAtiva.versao || 'nova') : null;
+    var versao = versaoPendenteAtiva ? (versaoPendenteAtiva.versao || 'nova') : versaoProntaParaOPainel;
     if (versao && !folhaCelular && !formCelular && fora.indexOf('versao:' + versao) < 0) {
-      linhas.push({ tipo: 'versao', icone: 'versao', chaves: ['versao:' + versao], titulo: 'Versão nova pronta.', detalhe: '',
+      linhas.push({ tipo: 'versao', icone: 'versao', chaves: ['versao:' + versao], nome: 'da versão nova', titulo: 'Versão nova pronta.', detalhe: '',
         acoes: [acaoDoAvisoCelular('cel-aviso-versao', 'Atualizar', function () { fecharAvisosCelular(); aplicarAtualizacao(); }, true)] });
       resumo.push('versão nova pronta');
     }
@@ -22567,7 +22577,7 @@
   /* Dispensar: as chaves entram nos dispensados de hoje, os avisos e a
    * agenda (a marca de sem registro) se refazem no lugar, e a barra escura
    * oferece o Desfazer por 12 s. A rolagem da agenda não muda. */
-  function dispensarAvisoCelular(chaves) {
+  function dispensarAvisoCelular(chaves, nome) {
     var hoje = Core.hojeIso();
     var estado = lerEstadoDosAvisosCelular();
     var lista = estado.dispensados[hoje] || [];
@@ -22575,7 +22585,7 @@
     estado.dispensados[hoje] = lista;
     gravarEstadoDosAvisosCelular(estado);
     refazerAvisosEAgendaCelular();
-    avisar(chaves.length > 1 && !/^registrar:/.test(chaves[0]) ? 'Avisos dispensados até amanhã.' : 'Aviso dispensado até amanhã.', 'Desfazer', function () {
+    avisar(nome ? 'Aviso ' + nome + ' dispensado até amanhã.' : 'Avisos dispensados até amanhã.', 'Desfazer', function () {
       var e = lerEstadoDosAvisosCelular();
       e.dispensados[hoje] = (e.dispensados[hoje] || []).filter(function (c) { return chaves.indexOf(c) < 0; });
       gravarEstadoDosAvisosCelular(e);
@@ -22585,6 +22595,11 @@
      * para quem desliza com a outra mão ocupada; auditoria de UX de 09/11),
      * em dourado sobre o marinho, como no desenho final. */
     $('#aviso').classList.add('aviso-dourado');
+    /* A barra escura fica acima das abas de baixo, nunca por trás delas. */
+    var abas = $('#cel-abas');
+    if (abas && abas.getBoundingClientRect().height) {
+      $('#aviso').style.setProperty('--sobe', Math.max(0, Math.round(window.innerHeight - abas.getBoundingClientRect().top - 24 + 8)) + 'px');
+    }
     clearTimeout(tempoAviso);
     tempoAviso = setTimeout(esconderAviso, TEMPO_DO_DESFAZER_DISPENSAR);
   }
@@ -22604,7 +22619,7 @@
    * pé; antes disso o aviso volta ao lugar. O evento não sobe: a faixa da
    * semana não vê o arrasto. */
   var LIMIAR_DE_DISPENSAR = 72;
-  function deslizarParaDispensarCelular(elemento, chaves) {
+  function deslizarParaDispensarCelular(elemento, chaves, nome) {
     var x0 = 0, y0 = 0, id = null, arrastando = false, engoleClique = false;
     function voltar() { elemento.style.transform = ''; elemento.classList.remove('arrastando'); }
     elemento.addEventListener('pointerdown', function (e) {
@@ -22631,7 +22646,7 @@
       e.stopPropagation();
       engoleClique = true;
       var dx = e.clientX - x0, dy = e.clientY - y0;
-      if (!cancelou && Math.abs(dx) >= LIMIAR_DE_DISPENSAR && Math.abs(dx) > Math.abs(dy) * 1.5) dispensarAvisoCelular(chaves);
+      if (!cancelou && Math.abs(dx) >= LIMIAR_DE_DISPENSAR && Math.abs(dx) > Math.abs(dy) * 1.5) dispensarAvisoCelular(chaves, nome);
       else voltar();
       setTimeout(function () { engoleClique = false; }, 400);
     }
@@ -22651,7 +22666,7 @@
   function porAvisosNaFaixaCelular(faixa) {
     var av = avisosDoHojeCelular();
     if (!av.conta) return;
-    var aberto = !lerEstadoDosAvisosCelular().recolhida, classeDoPainel = 'cel-avisos cel-avisos-sobre';
+    var aberto = painelDosAvisosAberto, classeDoPainel = 'cel-avisos cel-avisos-sobre';
     var rotulo = av.conta + ' ' + palavraPlural(av.conta, 'aviso', 'avisos') + ' de hoje: ' + av.resumo.join(', ');
     var selo = el('button', { type: 'button', class: 'cel-avisos-selo', id: 'cel-avisos-selo', 'aria-controls': 'cel-avisos',
       'aria-expanded': aberto ? 'true' : 'false', 'aria-label': rotulo + '. ' + (aberto ? 'Toque para recolher' : 'Toque para ver'),
@@ -22697,20 +22712,19 @@
     painel.style.maxHeight = Math.max(160, Math.floor(baixo - topo - 12)) + 'px';
   }
   function alternarAvisosCelular() {
-    var estado = lerEstadoDosAvisosCelular();
-    estado.recolhida = !estado.recolhida;
-    gravarEstadoDosAvisosCelular(estado);
+    painelDosAvisosAberto = !painelDosAvisosAberto;
+    var recolhida = !painelDosAvisosAberto;
     var painel = $('#cel-avisos'), selo = $('#cel-avisos-selo'), fundo = $('#cel-avisos-fundo');
     if (!painel || !selo) return;
-    painel.hidden = estado.recolhida;
-    if (fundo) fundo.hidden = estado.recolhida || !painel.classList.contains('cel-avisos-sobre');
-    selo.setAttribute('aria-expanded', estado.recolhida ? 'false' : 'true');
-    selo.setAttribute('aria-label', selo.getAttribute('aria-label').replace(/Toque para (ver|recolher)$/, estado.recolhida ? 'Toque para ver' : 'Toque para recolher'));
+    painel.hidden = recolhida;
+    if (fundo) fundo.hidden = recolhida || !painel.classList.contains('cel-avisos-sobre');
+    selo.setAttribute('aria-expanded', recolhida ? 'false' : 'true');
+    selo.setAttribute('aria-label', selo.getAttribute('aria-label').replace(/Toque para (ver|recolher)$/, recolhida ? 'Toque para ver' : 'Toque para recolher'));
     ajustarPainelDosAvisosCelular();
   }
   /* A ação de um aviso leva a outra tela ou à folha: o painel recolhe antes. */
   function fecharAvisosCelular() {
-    if (!lerEstadoDosAvisosCelular().recolhida) alternarAvisosCelular();
+    if (painelDosAvisosAberto) alternarAvisosCelular();
   }
   /* A cada minuto, com a linha de agora, os avisos se refazem. */
   function renovarAvisosCelular() {

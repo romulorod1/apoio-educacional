@@ -126,7 +126,7 @@ const ANCORAS = {
   [V_VALOR]: ['app.js', 'porAluno[p.alunoId].meses.push({ mes: p.mes, falta: s.falta, selo: s.selo });', 'porAluno[p.alunoId].meses.push({ mes: p.mes, falta: s.devido, selo: s.selo });'],
   [V_REGISTRADA]: ['app.js', '    return !Core.aulaTemRegistro(a);', '    return true;'],
   // (compactos) o painel aberto sem toque
-  [V_ABERTA]: ['app.js', 'var avisosCelularEmMemoria = { recolhida: true, dispensados: {} };', 'var avisosCelularEmMemoria = { recolhida: false, dispensados: {} };'],
+  [V_ABERTA]: ['app.js', 'var PAINEL_ABERTO_AO_CHEGAR = false;', 'var PAINEL_ABERTO_AO_CHEGAR = true;'],
   // o ponto também na aula registrada
   [V_MARCA_REG]: ['app.js', 'blocoDaAulaCelular(l.aula, marcas[l.aula.id], !!semRegistro[l.aula.id])',
     'blocoDaAulaCelular(l.aula, marcas[l.aula.id], !!semRegistro[l.aula.id] || Core.aulaTemRegistro(l.aula))'],
@@ -134,7 +134,7 @@ const ANCORAS = {
   [V_DISCORDA]: ['app.js', 'aulasDoAvisoSemRegistroCelular(hoje, minutosAgoraCelular()).forEach(function (a) { semRegistro[a.id] = true; });',
     'aulasDoDiaCelular(dia).filter(function (a) { return !Core.aulaTemRegistro(a); }).forEach(function (a) { semRegistro[a.id] = true; });'],
   // os avisos de antes: todos à vista, empilhados, sem o corte na metade da tela
-  [V_EMPILHADOS]: ['app.js', "var aberto = !lerEstadoDosAvisosCelular().recolhida, classeDoPainel = 'cel-avisos cel-avisos-sobre';",
+  [V_EMPILHADOS]: ['app.js', "var aberto = painelDosAvisosAberto, classeDoPainel = 'cel-avisos cel-avisos-sobre';",
     "var aberto = true, classeDoPainel = 'cel-avisos';"],
   // o selinho numa linha só dele, entre a data e os dias
   [V_EMPURRA]: ['app.js', "topo.insertBefore(selo, topo.querySelector('#cel-semana-seguinte'));",
@@ -380,7 +380,7 @@ async function momento(pag, iso, hhmm) {
  * linha em ordem e as chaves do dispensar. */
 const avisos = pag => pag.evaluate(() => Array.from(document.querySelectorAll('#cel-semana #cel-avisos .cel-aviso')).map(a => {
   const l = a.querySelector('a[href]'), ac = a.querySelector('[data-acao-celular]'), mais = a.querySelector('#cel-aviso-mais-familias');
-  const t = s => { const e = a.querySelector(s); return e ? e.textContent : ''; };
+  const t = s => { const e = a.querySelector(s); return !e ? '' : e.querySelector('li') ? Array.from(e.querySelectorAll('li')).map(li => li.textContent).join(' ; ') : e.textContent; };
   const primeira = a.querySelector('.cel-aviso-acao');
   return { tipo: a.dataset.aviso, texto: [t('.cel-aviso-titulo'), t('.cel-aviso-detalhe')].filter(Boolean).join(' | ').replace(/\u00a0/g, ' '),
     seta: primeira ? primeira.textContent : '',
@@ -440,6 +440,23 @@ const mensagemDoLink = href => { const i = String(href || '').indexOf('?text=');
 const fmt = s => String(s || '').replace(/\u00a0/g, ' ');
 const WA_ALFA = '5511987654321';
 const REG = '#cel-avisos .cel-aviso-registrar';
+/* O painel aberto: os alvos (altura e largura), o texto que transborda, e,
+ * rolando a lista até o fim, se o último aviso aparece inteiro. */
+const medePainel = pag => pag.evaluate(() => {
+  const p = document.querySelector('#cel-avisos'), lista = p.querySelector('.cel-avisos-lista');
+  const alvos = Array.from(p.querySelectorAll('button, a[href]')).filter(e => e.getBoundingClientRect().height > 0);
+  const pequenos = alvos.filter(e => { const r = e.getBoundingClientRect(); return r.height < 47.5 || r.width < 47.5; })
+    .map(e => (e.id || e.className) + ' ' + Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height));
+  const transborda = alvos.filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.id || e.textContent.trim());
+  lista.scrollTop = lista.scrollHeight;
+  const trilhos = lista.querySelectorAll('.cel-aviso-trilho');
+  const ultima = trilhos[trilhos.length - 1].getBoundingClientRect(), rl = lista.getBoundingClientRect(), rp = p.getBoundingClientRect();
+  const abas = document.querySelector('#cel-abas').getBoundingClientRect();
+  const r = { alvos: alvos.length, avisos: trilhos.length, pequenos, transborda, ultimaInteira: ultima.bottom <= rl.bottom + 1 && ultima.top >= rl.top - 1,
+    painelAcimaDasAbas: rp.bottom <= abas.top + 1 };
+  lista.scrollTop = 0;
+  return r;
+});
 
 (async function () {
   secao('1. O tablet cria os alunos fictícios, as aulas e os pagamentos e sobe a cópia');
@@ -553,7 +570,7 @@ const REG = '#cel-avisos .cel-aviso-registrar';
   conf('é a aula seguinte de hoje, a das 15:30 do Alfa', await pagC.evaluate(() => (document.querySelector('#cel-tempo .cel-bloco-proxima') || { dataset: {} }).dataset.aula), 'alfa-1006');
   const reg = av.find(a => a.tipo === 'registrar') || {};
   prop('sem registro: a aula do Alfa de ontem; a do Gama de hoje (com relato), a de ontem (com nota só minha), a falta e a cancelada ficam fora (' + reg.texto + ' ; ' + reg.aula + ')',
-    reg.texto === '1 aula sem registro | Aluno Alfa Teste seg 05/10, 10:00.' && reg.aula === 'alfa-1005', V_REGISTRADA);
+    reg.texto === '1 aula sem registro | Aluno Alfa Teste, seg 05/10, 10:00' && reg.aula === 'alfa-1005', V_REGISTRADA);
   seVeneno(V_REGISTRADA);
   conf('o aviso de registrar é uma ação do celular da dona', reg.acao, 'registrar-como-foi');
   const cob = av.find(a => a.tipo === 'cobrar') || {};
@@ -605,7 +622,7 @@ const REG = '#cel-avisos .cel-aviso-registrar';
   seVeneno(V_DIA5);
   conf('dia 5: a aula do Alfa das 10:00 (a Próxima, Gama às 16:00, é o selo do bloco)', textos(av) + ' | ' +
     (await pagC.evaluate(() => (document.querySelector('#cel-tempo .cel-bloco-proxima') || { dataset: {} }).dataset.aula)),
-    '1 aula sem registro | Aluno Alfa Teste hoje, 10:00. | gama-1005');
+    '1 aula sem registro | Aluno Alfa Teste, hoje, 10:00 | gama-1005');
   await tirarPrint(pagC, '3_dia_5_sem_cobrar.png');
 
   secao('6. Dia 3, 20:00: nenhum aviso');
@@ -634,9 +651,9 @@ const REG = '#cel-avisos .cel-aviso-registrar';
   conf('05/11: o mesmo outubro, com as 4 aulas sem registro', fechar('2026-11-05').texto, 'Fechar outubro de 2026 | 4 aulas sem registro e 3 famílias em aberto');
   /* (compactos) Sem o corte em 3: recolhidos, os quatro cabem no selinho. */
   conf('29/10 ao meio-dia: os três avisos, na ordem de urgência (' + tipos(janela['2026-10-29']) + ')', tipos(janela['2026-10-29']), 'registrar,cobrar,fechar');
-  conf('29/10: a aula do Gama de terça', textos(janela['2026-10-29'].slice(0, 1)), '1 aula sem registro | Aluno Gama Teste ter 27/10, 10:00.');
+  conf('29/10: a aula do Gama de terça', textos(janela['2026-10-29'].slice(0, 1)), '1 aula sem registro | Aluno Gama Teste, ter 27/10, 10:00');
   conf('31/10: as duas sem registro, da mais recente para a mais antiga', (janela['2026-10-31'].find(a => a.tipo === 'registrar') || {}).texto,
-    '2 aulas sem registro | Aluno Alfa Teste qui 29/10, 16:00. Aluno Gama Teste ter 27/10, 10:00.');
+    '2 aulas sem registro | Aluno Alfa Teste, qui 29/10, 16:00 ; Aluno Gama Teste, ter 27/10, 10:00');
   conf('01/11 a 05/11: sem cobrança (antes do dia 6), e em 06/11 ela volta', ['2026-11-01', '2026-11-05', '2026-11-06'].map(d => janela[d].some(a => a.tipo === 'cobrar')).join(','), 'false,false,true');
   const cob6 = janela['2026-11-06'].find(a => a.tipo === 'cobrar') || {};
   const selos6 = await pagC.evaluate(() => Store.carregar().then(d => ['2026-07', '2026-10'].map(mes => Core.seloDoPagamento(d, Core.calcularFechamento(d, 'alfa', mes, '2026-11-06')).falta)));
@@ -664,7 +681,7 @@ const REG = '#cel-avisos .cel-aviso-registrar';
   seVeneno(V_OBS);
   await momento(pagD, '2026-10-06', '14:50');
   conf('o observador lê a aula sem registro, com "Ver a aula" e sem ação que grava', textos(avD) + ' | ' + avD.map(a => a.seta + '/' + a.acao).join(''),
-    '1 aula sem registro | Aluno Alfa Teste seg 05/10, 10:00. | Ver a aula/');
+    '1 aula sem registro | Aluno Alfa Teste, seg 05/10, 10:00 | Ver a aula/');
   await abrirPainel(pagD);
   m = await medirTela(pagD);
   conf('o observador, Hoje com avisos: alvos de 48 px, sem rolagem de lado, nenhum botão de edição nem ação (' + m.soltos.join(', ') + ' ; ' + m.acoes + ')',
@@ -833,6 +850,20 @@ const REG = '#cel-avisos .cel-aviso-registrar';
     tetos.every(t => t.pct <= 20), V_TOPO);
   seVeneno(V_TOPO);
   conf('nas seis, nada rola de lado', tetos.filter(t => t.rolaDeLado).map(t => t.tela + '/' + t.letra).join(','), '');
+  /* Com a letra a 130% num celular de 360 x 780: o painel aberto, o terceiro
+   * aviso inteiro ao rolar o painel, e nenhum botão cortado ou pequeno. */
+  await pagC.setViewport({ width: 360, height: 780, hasTouch: true, isMobile: true });
+  await pagC.evaluate((css) => { const s = document.createElement('style'); s.id = 'prova-letra'; s.textContent = css; document.head.appendChild(s); }, LETRA_130);
+  await momento(pagC, ...CENA);
+  await abrirPainel(pagC);
+  const painel130 = await medePainel(pagC);
+  console.log('   painel em 360 x 780, letra 130%: ' + JSON.stringify(painel130));
+  conf('a 130% em 360 x 780: o terceiro aviso aparece inteiro rolando o painel, o painel para acima das abas, e todo botão tem 48 px e não transborda (' +
+    painel130.pequenos.join(', ') + ' ; ' + painel130.transborda.join(', ') + ')',
+    painel130.ultimaInteira && painel130.painelAcimaDasAbas && painel130.avisos === 3 && !painel130.pequenos.length && !painel130.transborda.length, true);
+  await fecharPainel(pagC);
+  await pagC.evaluate(() => { const v = document.querySelector('#prova-letra'); if (v) v.remove(); });
+  await pagC.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true });
   avC = await momento(pagC, ...CENA);
   const lay13 = await leiaute(pagC);
   conf('a linha de agora (12:00) continua à vista', lay13.agoraAVista && lay13.agora === '12:00', true);
@@ -890,9 +921,9 @@ const REG = '#cel-avisos .cel-aviso-registrar';
   conf('o toque no selinho abre o painel', (await tocar(pagC, cdp, '#cel-avisos-selo')) + ' ' + (await selinho(pagC)).painelVisivel, 'true true');
   avC = await avisos(pagC);
   const reg13 = avC.find(a => a.tipo === 'registrar') || { aulas: [] };
-  prop('o painel junta as 4 aulas sem registro numa linha, da mais recente para a mais antiga, com aluno, dia e hora (' + reg13.texto + ')',
+  prop('o painel junta as 4 aulas sem registro num aviso, uma por linha, da mais recente para a mais antiga, com aluno, dia e hora (' + reg13.texto + ')',
     reg13.aulas.join(',') === SEM_REGISTRO.join(',') &&
-    reg13.texto === '4 aulas sem registro | Aluno Alfa Teste hoje, 10:00. Aluno Gama Teste hoje, 09:00. Aluno Beta Teste hoje, 08:00. Aluno Alfa Teste hoje, 07:00.' &&
+    reg13.texto === '4 aulas sem registro | Aluno Alfa Teste, hoje, 10:00 ; Aluno Gama Teste, hoje, 09:00 ; Aluno Beta Teste, hoje, 08:00 ; Aluno Alfa Teste, hoje, 07:00' &&
     reg13.chaves === SEM_REGISTRO.map(id => 'registrar:' + id).join(' '),
     V_REGISTRADA);
   seVeneno(V_REGISTRADA);
@@ -903,6 +934,13 @@ const REG = '#cel-avisos .cel-aviso-registrar';
   conf('aberto, o painel para antes da metade: o topo da agenda a no máximo 422 px (' + topoAberto + ' px)', topoAberto <= 422, true);
   m = await medirTela(pagC);
   conf('painel aberto: alvos de 48 px, sem rolagem de lado e nenhum botão de edição solto', telaBoa(m) + '|' + m.soltos.join(', '), '|');
+  const painel390 = await medePainel(pagC);
+  console.log('   painel em 390 x 844: ' + JSON.stringify(painel390));
+  conf('painel aberto em 390 x 844: todo botão e link do painel com 48 px ou mais de altura e de largura, e nenhum texto transbordando (' + painel390.alvos + ' alvos; ' + painel390.pequenos.join(', ') + ')',
+    painel390.alvos >= 8 && !painel390.pequenos.length && !painel390.transborda.length, true);
+  conf('o ✕ diz "Dispensar até amanhã" (rótulo e title), e o "Cobrar" tem o mesmo peso dos outros botões', await pagC.evaluate(() =>
+    Array.from(document.querySelectorAll('#cel-avisos .cel-aviso-dispensar')).every(x => x.getAttribute('aria-label') === 'Dispensar até amanhã' && x.title === 'Dispensar até amanhã') + ' ' +
+    (getComputedStyle(document.querySelector('#cel-aviso-cobrar')).backgroundColor === getComputedStyle(document.querySelector('#cel-aviso-cobranca')).backgroundColor)), 'true true');
   await tirarPrint(pagC, '6_compacto_painel_aberto.png');
   conf('o toque fecha o painel, e a agenda volta ao lugar: a mesma rolagem e o bloco da Próxima na mesma altura (' + JSON.stringify(antesDeAbrir) + ')',
     (await tocar(pagC, cdp, '#cel-avisos-selo')) + ' ' + (await selinho(pagC)).painelVisivel + ' ' + JSON.stringify(await posicao()), 'true false ' + JSON.stringify(antesDeAbrir));
@@ -933,14 +971,20 @@ const REG = '#cel-avisos .cel-aviso-registrar';
   await deslizar(pagC, cdp, REG, 160, 6);
   const inicioDoDesfazer = Date.now();
   const depois = { selo: (await selinho(pagC)).numero, item: await existe(pagC, REG), marcas: await marcadas(),
-    desfazer: await pagC.evaluate(() => !!document.querySelector('#aviso.aberto.aviso-dourado') && (document.querySelector('#aviso-acao') || {}).textContent) };
+    desfazer: await pagC.evaluate(() => !!document.querySelector('#aviso.aberto.aviso-dourado') && (document.querySelector('#aviso-acao') || {}).textContent),
+    frase: await texto(pagC, '#aviso-texto') };
+  await pausa(400);
+  const barra = await pagC.evaluate(() => ({ baixo: Math.round(document.querySelector('#aviso').getBoundingClientRect().bottom), abas: Math.round(document.querySelector('#cel-abas').getBoundingClientRect().top) }));
+  conf('a barra do Desfazer diz qual aviso saiu e fica acima das abas (' + depois.frase + ' ; ' + JSON.stringify(barra) + ')',
+    depois.frase === 'Aviso das aulas sem registro dispensado até amanhã.' && barra.baixo <= barra.abas, true);
   console.log('   depois de dispensar: ' + JSON.stringify(depois));
   prop('arrastar a linha para o lado dispensa: as 4 aulas saem do painel e do ponto na agenda, o selinho conta 2, e o "Desfazer" aparece na barra escura, em dourado',
     !depois.item && depois.selo === '2' && depois.marcas === '' && depois.desfazer === 'Desfazer', V_NAO_SOME);
   seVeneno(V_NAO_SOME);
   await tirarPrint(pagC, '7_compacto_dispensado_desfazer.png');
   conf('a chave guardada no aparelho é o tipo e o id da aula, no dia de hoje', await pagC.evaluate(() => localStorage.getItem('apoio-educacional:celular-avisos')),
-    JSON.stringify({ recolhida: false, dispensados: { '2026-10-29': SEM_REGISTRO.map(id => 'registrar:' + id) } }));
+    JSON.stringify({ dispensados: { '2026-10-29': SEM_REGISTRO.map(id => 'registrar:' + id) } }));
+  conf('o painel aberto não se grava: no aparelho só os dispensados', await pagC.evaluate(() => /recolhida|aberto/.test(localStorage.getItem('apoio-educacional:celular-avisos'))), false);
   conf('dispensar não muda a semana: o mesmo dia no título', await tituloDaSemana(), titulo0);
   await pausa(2500);
   const fila1 = await pagC.evaluate(() => Store.estadoDaFila().then(e => e.pendentes));
@@ -992,9 +1036,23 @@ const REG = '#cel-avisos .cel-aviso-registrar';
   prop('no dia seguinte, a aula ainda sem registro e a família ainda em aberto voltam (' + reg30.aulas.join(',') + ' ; ' + cob30.aluno + ')',
     reg30.aulas.join(',') === ['alfa-1029'].concat(SEM_REGISTRO).join(',') && cob30.aluno === 'alfa', V_SEMPRE);
   seVeneno(V_SEMPRE);
-  await fecharPainel(pagC);
+  await abrirPainel(pagC);
+  await clicar(pagC, '.cel-aviso-fechar .cel-aviso-dispensar');
   conf('e a primeira gravação do dia novo limpa os dispensados de ontem', await pagC.evaluate(() => localStorage.getItem('apoio-educacional:celular-avisos')),
-    JSON.stringify({ recolhida: true, dispensados: {} }));
+    JSON.stringify({ dispensados: { '2026-10-30': ['fechar:2026-10'] } }));
+  await clicar(pagC, '#aviso-acao');
+  /* O aberto não volta sozinho: outra abertura do aplicativo, no mesmo
+   * aparelho e com o painel aberto aqui, chega recolhida. */
+  conf('(arranjo) o painel está aberto neste aparelho', (await selinho(pagC)).expandido, 'true');
+  const pagR = await ctxC.newPage();
+  await prepararPagina(pagR, true);
+  await pagR.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true });
+  await abrirCelular(pagR);
+  await momento(pagR, '2026-10-30', '12:00');
+  const selR = await selinho(pagR);
+  prop('a próxima abertura do aplicativo chega recolhida, mesmo com o painel aberto quando ela saiu (' + JSON.stringify(selR) + ')', selR.existe && selR.expandido === 'false' && !selR.painelVisivel, V_ABERTA);
+  await pagR.close();
+  await fecharPainel(pagC);
 
   /* O armazenamento que lança erro: o app abre, recolhido, e dispensar vale
    * em memória. */

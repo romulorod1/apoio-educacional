@@ -3070,6 +3070,9 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-aviso-corpo { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .cel-aviso-titulo { font-size: var(--letra-4); font-weight: 600; color: var(--texto); line-height: 1.3; }
 .cel-aviso-detalhe { font-size: var(--letra-3); color: var(--novidades-subtitulo); line-height: 1.35; margin-top: 2px; }
+/* As aulas sem registro, uma por linha (aluno, dia e hora). */
+.cel-aviso-aulas { list-style: none; margin: 2px 0 0; padding: 0; }
+.cel-aviso-aulas li + li { margin-top: 2px; }
 .cel-aviso-acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 body.modo-celular .celular .cel-aviso .cel-aviso-acao {
   min-height: var(--alvo-celular);
