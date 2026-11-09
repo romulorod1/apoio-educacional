@@ -32,7 +32,7 @@
  * Veneno: --envenenado-sem-padrao serve o helper com RELOGIO_PADRAO_LIGADO
  * desligado (em memória, sem cópia em disco), roda o cenário do padrão e
  * confirma "VENENO visto": a virada abre onde o padrão deveria impedir.
- * Porta 8898. Sem emulador.
+ * Porta 8899. Sem emulador.
  */
 'use strict';
 const fs = require('fs');
@@ -40,7 +40,7 @@ const path = require('path');
 const Module = require('module');
 const { spawnSync } = require('child_process');
 
-const PORTA = 8898;
+const PORTA = 8899;
 const ANCORA_VENENO = 'const RELOGIO_PADRAO_LIGADO = true;';
 const CAMINHO_HELPER = path.join(__dirname, '_bib_navegador.js');
 const filho = (process.argv.find(a => a.indexOf('--filho=') === 0) || '').slice(8);
