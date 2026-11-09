@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.18';
+  var VERSAO = '1.42.19';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -81,6 +81,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.19',
+      itens: [
+        'A folha escrita à mão de cada aula agora vai para a nuvem junto com o resto, página por página, e só sobe o que mudou.',
+        'No celular, o registro da aula tem "Ver a folha escrita à mão": a folha aparece do jeito que você escreveu no tablet, só para ler.',
+        'Uma página apagada no tablet sai também da nuvem.'
+      ]
+    },
     {
       versao: '1.42.18',
       itens: [
