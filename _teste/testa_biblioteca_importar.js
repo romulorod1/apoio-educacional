@@ -166,7 +166,13 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
 
   // ================================================================
   secao('1b. Outra janela na versão antiga segura o banco: aviso, e depois abre');
-  {
+  /* Duas vezes. Na segunda, o app.js chega 1,5 s depois dos outros scripts:
+   * o nuvem.js já pede ao Store o banco antes de o app.js rodar, e o bloqueio
+   * cai quando ainda não há quem mostre o aviso. O navegador só avisa o
+   * bloqueio uma vez; sem o store.js guardar que bloqueou, a tela ficava em
+   * branco para sempre (medido: 1 em 20 rodadas, no tempo natural). */
+  for (const atrasarApp of [false, true]) {
+    const nome = atrasarApp ? ' (app.js atrasado)' : '';
     const ctx = await pag.browser().createBrowserContext();
     const velhaJanela = await ctx.newPage();
     await velhaJanela.goto(amb.ORIGEM + '/vazio.html', { waitUntil: 'load' });
@@ -178,18 +184,46 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
     }));
     const nova = await ctx.newPage();
     nova.on('dialog', async d => { try { await d.accept(); } catch (e) { /* ok */ } });
+    /* Cada documento anota se já nasceu sob o service worker. O contexto é
+     * novo, sem worker: o app só registra o sw.js depois que o banco abre, o
+     * primeiro clients.claim() dispara controllerchange e o app recarrega
+     * sozinho (app.js, registrarServiceWorker). É do app, e é o de sempre na
+     * primeira visita; a prova só não pode medir em cima da página que está
+     * para sumir (o "Execution context was destroyed" da fatia 2). */
+    await nova.evaluateOnNewDocument(() => {
+      window.__nasceuControlada = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+    });
+    let segurando = atrasarApp, appSegurado = false;
+    if (atrasarApp) {
+      await nova.setRequestInterception(true);
+      nova.on('request', q => {
+        if (!segurando) { q.continue().catch(() => { /* interceptação já desligada */ }); return; }
+        if (/\/app\.js(\?|$)/.test(q.url())) { appSegurado = true; setTimeout(() => q.continue().catch(() => {}), 1500); return; }
+        q.continue().catch(() => {});
+      });
+    }
     await nova.goto(amb.ORIGEM + '/index.html', { waitUntil: 'domcontentloaded' });
-    const aviso = await esperar('aviso de banco bloqueado', () => nova.evaluate(() => {
+    if (atrasarApp) {
+      conf('o app.js foi mesmo segurado' + nome, appSegurado, true);
+      segurando = false;
+      await nova.setRequestInterception(false);
+    }
+    const aviso = await esperar('aviso de banco bloqueado' + nome, () => nova.evaluate(() => {
       const f = document.querySelector('#aviso-banco-bloqueado');
       return f ? f.textContent : null;
     }), v => !!v, 15000);
-    conf('a janela nova avisa que outra janela antiga está aberta', aviso.valor,
+    conf('a janela nova avisa que outra janela antiga está aberta' + nome, aviso.valor,
       'O aplicativo está aberto em outra janela com a versão anterior. Feche as outras janelas do aplicativo; esta abre sozinha em seguida. Nada foi perdido.');
     await velhaJanela.evaluate(() => window.__con.close());
-    const abriu = await esperar('o aplicativo abre depois que a antiga larga o banco', () => nova.evaluate(() =>
+    const abriu = await esperar('o aplicativo abre depois que a antiga larga o banco' + nome, () => nova.evaluate(() =>
       !!document.querySelector('#abas .aba') && document.querySelector('#versao-app').textContent.length > 1), v => v === true, 20000);
-    conf('e o aplicativo abre sozinho quando a janela antiga fecha', abriu.ok, true);
-    conf('e o aviso some quando o banco é liberado', await nova.evaluate(() => !!document.querySelector('#aviso-banco-bloqueado')), false);
+    conf('e o aplicativo abre sozinho quando a janela antiga fecha' + nome, abriu.ok, true);
+    // a recarga do primeiro controle passou: o documento de agora nasceu controlado e o app abriu nele
+    const assentou = await esperar('a recarga do primeiro controle do service worker terminou' + nome, () => nova.evaluate(() =>
+      window.__nasceuControlada === true && !!document.querySelector('#abas .aba') &&
+      document.querySelector('#versao-app').textContent.length > 1), v => v === true, 30000);
+    conf('e o aplicativo abre de novo depois da recarga do primeiro controle' + nome, assentou.ok, true);
+    conf('e o aviso some quando o banco é liberado' + nome, await nova.evaluate(() => !!document.querySelector('#aviso-banco-bloqueado')), false);
     await ctx.close();
   }
 

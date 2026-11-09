@@ -60,6 +60,8 @@
       'Feche as outras janelas do aplicativo; esta abre sozinha em seguida. Nada foi perdido.';
     (document.body || document.documentElement).appendChild(faixa);
   };
+  // o bloqueio pode ter chegado antes deste arquivo rodar, e o navegador não repete
+  if (self.Store && typeof Store.bancoBloqueado === 'function' && Store.bancoBloqueado()) self.aoBancoBloqueado();
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
